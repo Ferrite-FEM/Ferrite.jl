@@ -101,7 +101,7 @@ end
     o = Ferrite.OctantBWG(0,(0,0,0))
     @test Ferrite.descendants(o,2) == (Ferrite.OctantBWG(2,(0,0,0)), Ferrite.OctantBWG(2,(3,3,3)))
     @test Ferrite.descendants(o,3) == (Ferrite.OctantBWG(3,(0,0,0)), Ferrite.OctantBWG(3,(7,7,7)))
-    
+
     @test Ferrite.edge_neighbor(Ferrite.OctantBWG(2,(2,0,0)),1,3) == Ferrite.OctantBWG(2,(2,-2,-2))
     @test Ferrite.edge_neighbor(Ferrite.OctantBWG(2,(2,0,0)),4,3) == Ferrite.OctantBWG(2,(2,2,2))
     @test Ferrite.edge_neighbor(Ferrite.OctantBWG(2,(2,0,0)),6,3) == Ferrite.OctantBWG(2,(4,0,-2))
@@ -132,11 +132,38 @@ end
     # Octant level 3 size == 2^3/2 = 1
     # test translation constructor
     grid = generate_grid(Quadrilateral,(2,2))
+    grid.cells[2] = Quadrilateral((grid.cells[2].nodes[2], grid.cells[2].nodes[3], grid.cells[2].nodes[4], grid.cells[2].nodes[1]))
+    # x-----------x-----------x
+    # |4    4    3|4    4    3|
+    # |           |           |
+    # |     ^     |     ^     |
+    # |1    |    2|1    |    2|
+    # |     +-->  |     +-->  |
+    # |           |           |
+    # |1    3    2|1    3    2|
+    # x-----------x-----------|
+    # |4    4    3|3    2    2|
+    # |           |           |
+    # |     ^     |     ^     |
+    # |1    |    2|4    |    3|
+    # |     +-->  |  <--+     |
+    # |           |           |
+    # |1    3    2|4    1    1|
+    # x-----------x-----------x
     adaptive_grid = ForestBWG(grid,3)
     for cell in adaptive_grid.cells
         @test cell isa OctreeBWG
         @test cell.leaves[1] == OctantBWG(2,0,1,cell.b)
     end
+    # Looks like some sign error sneaked in :)
+    @test Ferrite.transform_face(adaptive_grid, FaceIndex(2,4), adaptive_grid.cells[1].leaves[1]) == OctantBWG(0,(-8,0))
+    @test Ferrite.transform_face(adaptive_grid, FaceIndex(1,2), adaptive_grid.cells[2].leaves[1]) == OctantBWG(0,(0,-8))
+    @test Ferrite.transform_face(adaptive_grid, FaceIndex(4,1), adaptive_grid.cells[3].leaves[1]) == OctantBWG(0,(-8,0))
+    @test Ferrite.transform_face(adaptive_grid, FaceIndex(3,2), adaptive_grid.cells[4].leaves[1]) == OctantBWG(0,(8,0))
+    @test Ferrite.transform_face(adaptive_grid, FaceIndex(3,3), adaptive_grid.cells[1].leaves[1]) == OctantBWG(0,(0,-8))
+    @test Ferrite.transform_face(adaptive_grid, FaceIndex(1,4), adaptive_grid.cells[3].leaves[1]) == OctantBWG(0,(0,8))
+    @test Ferrite.transform_face(adaptive_grid, FaceIndex(4,3), adaptive_grid.cells[2].leaves[1]) == OctantBWG(0,(-8,0))
+    @test Ferrite.transform_face(adaptive_grid, FaceIndex(2,2), adaptive_grid.cells[4].leaves[1]) == OctantBWG(0,(0,8))
     #simple first and second level refinement
     # first case
     # x-----------x-----------x

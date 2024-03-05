@@ -1,3 +1,8 @@
+# TODO we should remove the mixture of indices. Maybe with these:
+# - struct FaceIndexBWG ... end
+# - struct QuadrilateralBWG ... end
+# - struct HexahedronBWG ... end
+
 abstract type AbstractAdaptiveGrid{dim} <: AbstractGrid{dim} end
 abstract type AbstractAdaptiveCell{refshape <: AbstractRefShape} <: AbstractCell{refshape} end
 
@@ -1103,6 +1108,29 @@ end
 face_neighbor(o::OctantBWG{dim,N,M,T1}, f::T2, b::T3) where {dim,N,M,T1<:Integer,T2<:Integer,T3<:Integer} = face_neighbor(o,T1(f),T1(b))
 
 """
+    compute_face_orientation(forest::ForestBWG, k::Integer, f::Integer)
+Slow implementation for the determination of the face orientation of face `f` from octree `k` following definition 2.1 from the BWG p4est paper.
+
+TODO use table 3 for more vroom
+"""
+function compute_face_orientation(forest::ForestBWG{<:Any,<:OctreeBWG{dim,<:Any,<:Any,T2}}, k::T1, f::T1) where {dim,T1,T2}
+    perm = (dim == 2 ? 𝒱₂_perm : 𝒱₃_perm)
+    _perminv = (dim == 2 ? 𝒱₂_perm_inv : 𝒱₃_perm_inv)
+
+    f_ferrite = perm[f]
+    kprime, fprime_ferrite = getneighborhood(forest,FaceIndex(k,f_ferrite))[1]
+    fprime = _perminv[fprime_ferrite]
+    reffacenodes = Ferrite.reference_faces(RefHypercube{dim})
+    nodes_f = [forest.cells[k].nodes[ni] for ni in reffacenodes[f_ferrite]]
+    nodes_fprime = [forest.cells[kprime].nodes[ni] for ni in reffacenodes[fprime_ferrite]]
+    if f > fprime
+        return T2(findfirst(isequal(nodes_fprime[1]), nodes_f)-1)
+    else
+        return T2(findfirst(isequal(nodes_f[1]), nodes_fprime)-1)
+    end
+end
+
+"""
     transform_face(forest::ForestBWG, k::T1, f::T1, o::OctantBWG{dim,N,M,T2}) -> OctantBWG{dim,N,M,T1,T2}
     transform_face(forest::ForestBWG, f::FaceIndex, o::OctantBWG{dim,N,M,T2}) -> OctantBWG{dim,N,M,T2}
 Interoctree coordinate transformation of an given octant `o` to the octree `k` coordinate system by virtually pushing `o`s coordinate system through `k`'s face `f`.
@@ -1126,7 +1154,6 @@ TODO: this is working for 2D except rotation, 3D I don't know
 function transform_face(forest::ForestBWG, k::T1, f::T1, o::OctantBWG{dim,N,M,T2}) where {dim,N,M,T1<:Integer,T2<:Integer}
     _one = one(T2)
     _two = T2(2)
-    #currently rotation not encoded
     perm = (dim == 2 ? 𝒱₂_perm : 𝒱₃_perm)
     _perminv = (dim == 2 ? 𝒱₂_perm_inv : 𝒱₃_perm_inv)
     kprime, fprime = getneighborhood(forest,FaceIndex(k,perm[f]))[1]
@@ -1135,10 +1162,10 @@ function transform_face(forest::ForestBWG, k::T1, f::T1, o::OctantBWG{dim,N,M,T2
     s = zeros(T2,3)
     b = zeros(T2,3)
     a = zeros(T2,3)
-    r = zero(T2)  #no rotation information in face_neighbor currently
+    r = compute_face_orientation(forest,k,f)
     a[3] = (f-_one) ÷ 2; b[3] = (fprime-_one) ÷ 2
     if dim == 2
-        a[1] = 1 - a[3]; b[1] = 1 - b[3]; s[1] = r #no rotation as of now
+        a[1] = 1 - a[3]; b[1] = 1 - b[3]; s[1] = r
     else
         a[1] = (f < 3) ? 1 : 0; a[2] = (f < 5) ? 2 : 1
         #u = ℛ[1,f] ⊻ ℛ[1,fprime] ⊻ T2((r == 1) | (r == 3))
