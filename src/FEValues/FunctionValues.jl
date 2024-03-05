@@ -23,11 +23,17 @@ typeof_d2Ndξ2(::Type{T}, ::VectorInterpolation{dim}, ::VectorizedInterpolation{
 typeof_N(   ::Type{T}, ::ScalarInterpolation, ::VectorizedInterpolation{sdim, <: AbstractRefShape{rdim}}) where {T, sdim, rdim} = T
 typeof_dNdx(::Type{T}, ::ScalarInterpolation, ::VectorizedInterpolation{sdim, <: AbstractRefShape{rdim}}) where {T, sdim, rdim} = SVector{sdim, T}
 typeof_dNdξ(::Type{T}, ::ScalarInterpolation, ::VectorizedInterpolation{sdim, <: AbstractRefShape{rdim}}) where {T, sdim, rdim} = SVector{rdim, T}
+typeof_d2Ndx2(::Type{T}, ::ScalarInterpolation, ::VectorizedInterpolation{sdim, <: AbstractRefShape{rdim}}) where {T, sdim, rdim} = SMatrix{sdim, sdim, T}
+typeof_d2Ndξ2(::Type{T}, ::ScalarInterpolation, ::VectorizedInterpolation{sdim, <: AbstractRefShape{rdim}}) where {T, sdim, rdim} = SMatrix{rdim, rdim, T}
+
 
 # Vector, vdim != sdim != rdim (TODO: Use Vec/Tensor if (s|r)dim <= 3?)
 typeof_N(   ::Type{T}, ::VectorInterpolation{vdim}, ::VectorizedInterpolation{sdim, <: AbstractRefShape{rdim}}) where {T, vdim, sdim, rdim} = SVector{vdim, T}
 typeof_dNdx(::Type{T}, ::VectorInterpolation{vdim}, ::VectorizedInterpolation{sdim, <: AbstractRefShape{rdim}}) where {T, vdim, sdim, rdim} = SMatrix{vdim, sdim, T}
 typeof_dNdξ(::Type{T}, ::VectorInterpolation{vdim}, ::VectorizedInterpolation{sdim, <: AbstractRefShape{rdim}}) where {T, vdim, sdim, rdim} = SMatrix{vdim, rdim, T}
+typeof_d2Ndx2(::Type{T}, ::VectorInterpolation{vdim}, ::VectorizedInterpolation{sdim, <: AbstractRefShape{rdim}}) where {T, vdim, sdim, rdim} = SArray{Tuple{vdim, sdim, sdim}, T}
+typeof_d2Ndξ2(::Type{T}, ::VectorInterpolation{vdim}, ::VectorizedInterpolation{sdim, <: AbstractRefShape{rdim}}) where {T, vdim, sdim, rdim} = SArray{Tuple{vdim, rdim, rdim}, T}
+
 
 """
     FunctionValues{DiffOrder}(::Type{T}, ip_fun, qr::QuadratureRule, ip_geo::VectorizedInterpolation)
@@ -77,7 +83,7 @@ function FunctionValues{DiffOrder}(::Type{T}, ip::Interpolation, qr::QuadratureR
         throw(ArgumentError("Currently only values and gradients can be updated in FunctionValues"))
     end
 
-    fv = FunctionValues(ip, Nx, Nξ, dNdx, dNdξ, d2Ndξ2, d2Ndx2)
+    fv = FunctionValues(ip, Nx, Nξ, dNdx, dNdξ, d2Ndx2, d2Ndξ2)
     precompute_values!(fv, getpoints(qr)) # Separate function for qr point update in PointValues
     return fv
 end
