@@ -1107,6 +1107,10 @@ function face_neighbor(octant::OctantBWG{2,N,M,T}, f::T, b::T=_maxlevel[1]) wher
 end
 face_neighbor(o::OctantBWG{dim,N,M,T1}, f::T2, b::T3) where {dim,N,M,T1<:Integer,T2<:Integer,T3<:Integer} = face_neighbor(o,T1(f),T1(b))
 
+reference_faces_bwg(::Type{RefHypercube{2}}) = ((1,3) , (2,4), (1,2), (3,4))
+reference_faces_bwg(::Type{RefHypercube{3}}) = ((1,3,5,7) , (2,4,6,8), (1,2,5,6), (3,4,7,8), (1,2,3,4), (5,6,7,8)) # p4est consistent ordering
+# reference_faces_bwg(::Type{RefHypercube{3}}) = ((1,3,7,5) , (2,4,8,6), (1,2,6,5), (3,4,8,7), (1,2,4,4), (5,6,8,7)) # Note that this does NOT follow P4est order!
+
 """
     compute_face_orientation(forest::ForestBWG, k::Integer, f::Integer)
 Slow implementation for the determination of the face orientation of face `f` from octree `k` following definition 2.1 from the BWG p4est paper.
@@ -1114,15 +1118,18 @@ Slow implementation for the determination of the face orientation of face `f` fr
 TODO use table 3 for more vroom
 """
 function compute_face_orientation(forest::ForestBWG{<:Any,<:OctreeBWG{dim,<:Any,<:Any,T2}}, k::T1, f::T1) where {dim,T1,T2}
-    perm = (dim == 2 ? 𝒱₂_perm : 𝒱₃_perm)
-    _perminv = (dim == 2 ? 𝒱₂_perm_inv : 𝒱₃_perm_inv)
+    f_perm = (dim == 2 ? 𝒱₂_perm : 𝒱₃_perm)
+    f_perminv = (dim == 2 ? 𝒱₂_perm_inv : 𝒱₃_perm_inv)
+    n_perm = (dim == 2 ? node_map₂ : node_map₃)
+    n_perminv = (dim == 2 ? node_map₂_inv : node_map₃_inv)
 
-    f_ferrite = perm[f]
+    f_ferrite = f_perm[f]
     kprime, fprime_ferrite = getneighborhood(forest,FaceIndex(k,f_ferrite))[1]
-    fprime = _perminv[fprime_ferrite]
-    reffacenodes = Ferrite.reference_faces(RefHypercube{dim})
-    nodes_f = [forest.cells[k].nodes[ni] for ni in reffacenodes[f_ferrite]]
-    nodes_fprime = [forest.cells[kprime].nodes[ni] for ni in reffacenodes[fprime_ferrite]]
+    fprime = f_perminv[fprime_ferrite]
+    reffacenodes = reference_faces_bwg(RefHypercube{dim})
+    nodes_f = [forest.cells[k].nodes[n_perm[ni]] for ni in reffacenodes[f]]
+    nodes_fprime = [forest.cells[kprime].nodes[n_perm[ni]] for ni in reffacenodes[fprime]]
+    @show nodes_f, nodes_fprime
     if f > fprime
         return T2(findfirst(isequal(nodes_fprime[1]), nodes_f)-1)
     else
@@ -1159,29 +1166,37 @@ function transform_face(forest::ForestBWG, k::T1, f::T1, o::OctantBWG{dim,N,M,T2
     kprime, fprime = getneighborhood(forest,FaceIndex(k,perm[f]))[1]
     fprime = _perminv[fprime]
     sprime = _one - (((f - _one) & _one) ⊻ ((fprime - _one) & _one))
+    @show f,fprime,sprime
     s = zeros(T2,3)
-    b = zeros(T2,3)
-    a = zeros(T2,3)
+    a = zeros(T2,3) # Coordinate axes of f
+    b = zeros(T2,3) # Coordinate axes of f'
     r = compute_face_orientation(forest,k,f)
-    a[3] = (f-_one) ÷ 2; b[3] = (fprime-_one) ÷ 2
+    a[3] = (f-_one) ÷ 2; b[3] = (fprime - _one) ÷ 2 # origin and target normal axis
+    @show a, b, r
     if dim == 2
         a[1] = 1 - a[3]; b[1] = 1 - b[3]; s[1] = r
     else
         a[1] = (f < 3) ? 1 : 0; a[2] = (f < 5) ? 2 : 1
-        #u = ℛ[1,f] ⊻ ℛ[1,fprime] ⊻ T2((r == 1) | (r == 3))
-        b[1] = (fprime < 3) ? 1 : 0; b[2] = (fprime < 5) ? 2 : 1 # r = 0 -> index 1
-        #v = T2(ℛ[f,fprime] == 1)
-        s[1] = r & 1; s[2] = r & 2
+        u = (ℛ[1,f] - _one) ⊻ (ℛ[1,fprime] - _one) ⊻ (((r == 0) | (r == 3)))
+        @show u
+        b[u+1] = (fprime < 3) ? 1 : 0; b[1-u+1] = (fprime < 5) ? 2 : 1 # r = 0 -> index 1
+        if ℛ[f,fprime] == 1+1 # R is one-based
+            s[2] = r & 1; s[1] = r & 2
+        else
+            s[1] = r & 1; s[2] = r & 2
+        end
     end
+    @show a, b, s
     maxlevel = forest.cells[1].b
     l = o.l; g = 2^maxlevel - 2^(maxlevel-l)
     xyz = zeros(T2,dim)
-    xyz[b[1] + 1] = T2((s[1] == 0) ? o.xyz[a[1] + 1] : g - o.xyz[a[1] + 1])
-    xyz[b[3] + 1] = T2((_two*(fprime & 1) - 1)*2^maxlevel + sprime*g + (1-2*sprime)*o.xyz[a[3] + 1])
+    xyz[b[1] + _one] = T2((s[1] == 0) ? o.xyz[a[1] + _one] : g - o.xyz[a[1] + _one])
+    xyz[b[3] + _one] = T2((_two*((fprime - _one) & 1) - _one)*2^maxlevel + sprime*g + (1-2*sprime)*o.xyz[a[3] + _one])
+    @show xyz
     if dim == 2
         return OctantBWG(l,(xyz[1],xyz[2]))
     else
-        xyz[b[2] + 1] = T2((s[2] == 0) ? o.xyz[a[1] + 1] : g - o.xyz[a[2] + 1])
+        xyz[b[2] + _one] = T2((s[2] == 0) ? o.xyz[a[2] + _one] : g - o.xyz[a[2] + _one])
         return OctantBWG(l,(xyz[1],xyz[2],xyz[3]))
     end
 end
@@ -1394,18 +1409,18 @@ const 𝒱₂_perm_inv = [3
                      4
                      1]
 
-const 𝒱₃_perm = [2
-                 4
+const 𝒱₃_perm = [5
                  3
-                 5
+                 2
+                 4
                  1
                  6]
 
 const 𝒱₃_perm_inv = [5
-                     1
                      3
                      2
                      4
+                     1
                      6]
 
 const ℛ = [1  2  2  1  1  2
@@ -1454,11 +1469,13 @@ const opposite_face_3 = [2,
                          6,
                          5]
 
+# Node indices permutation from p4est idx to Ferrite idx
 const node_map₂ = [1,
                    2,
                    4,
                    3]
 
+# Node indices permutation from Ferrite idx to p4est idx
 const node_map₂_inv = [1,
                        2,
                        4,
