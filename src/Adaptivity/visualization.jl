@@ -22,7 +22,7 @@ function visualize_grid(forest::ForestBWG{dim}) where dim
                     y = octant_physical_coordinates[faceids,2] + (octant_physical_coordinates[faceids,2] .- center[2])*0.02
                     GLMakie.lines!(ax,x,y,color=:black)
                 else
-                    faceids = [faceids[1], faceids[2], faceids[4], faceids[3]]
+                    faceids = [faceids[1], faceids[2], faceids[4], faceids[3], faceids[1]]
                     x = octant_physical_coordinates[faceids,1] + (octant_physical_coordinates[faceids,1] .- center[1])*0.02
                     y = octant_physical_coordinates[faceids,2] + (octant_physical_coordinates[faceids,2] .- center[2])*0.02
                     z = octant_physical_coordinates[faceids,3] + (octant_physical_coordinates[faceids,3] .- center[3])*0.02
