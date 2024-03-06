@@ -182,7 +182,7 @@ function run_assemble()
     ip = Lagrange{RefHexahedron,1}()^3
     dh = create_dofhandler(grid, ip);
 
-    K = create_sparsity_pattern(dh);
+    K = create_matrix(dh);
     C = create_stiffness(Val{3}());
     ## compilation
     doassemble(K, colors, grid, dh, C, ip);

@@ -343,9 +343,9 @@ end
         C, g = Ferrite.create_constraint_matrix(ch)
 
         # Assemble
-        K = create_sparsity_pattern(dh, ch)
+        K = create_matrix(dh, ch)
         f = zeros(ndofs(dh)); f[end] = 1.0
-        Kl = create_sparsity_pattern(dh, ch)
+        Kl = create_matrix(dh, ch)
         fl = copy(f)
         assembler = start_assemble(Kl, fl)
         for cell in CellIterator(dh)
@@ -410,7 +410,7 @@ end
         add!(ch, AffineConstraint(1, [3=>params.a], params.b))
         close!(ch)
 
-        K = create_sparsity_pattern(dh, ch)
+        K = create_matrix(dh, ch)
         r = zeros(ndofs(dh))
         a = zeros(ndofs(dh))
 
@@ -1293,10 +1293,10 @@ end # testset
     close!(ch2)
     update!(ch2, 0)
 
-    K1 = create_sparsity_pattern(dh, ch1)
+    K1 = create_matrix(dh, ch1)
     f1 = zeros(ndofs(dh))
     a1 = start_assemble(K1, f1)
-    K2 = create_sparsity_pattern(dh, ch2)
+    K2 = create_matrix(dh, ch2)
     f2 = zeros(ndofs(dh))
     a2 = start_assemble(K2, f2)
 
@@ -1333,9 +1333,9 @@ end # subtestset
     add!(ch2, Dirichlet(:u, getfaceset(grid, "right"), (x, t) -> 2.0t))
     close!(ch2)
 
-    K1 = create_sparsity_pattern(dh, ch1)
+    K1 = create_matrix(dh, ch1)
     f1 = zeros(ndofs(dh))
-    K2 = create_sparsity_pattern(dh, ch2)
+    K2 = create_matrix(dh, ch2)
     f2 = zeros(ndofs(dh))
 
     for t in (1.0, 2.0)
@@ -1415,7 +1415,7 @@ end # testset
 
     for azero in (nothing, false, true)
 
-        S = create_sparsity_pattern(dh)
+        S = create_matrix(dh)
         f = zeros(ndofs(dh))
 
         K_dbc_standard = copy(S)
@@ -1428,7 +1428,7 @@ end # testset
         f_dbc_local = copy(f)
         assembler_dbc_local = start_assemble(K_dbc_local, f_dbc_local)
 
-        S = create_sparsity_pattern(dh, ch_ac)
+        S = create_matrix(dh, ch_ac)
 
         K_ac_standard = copy(S)
         f_ac_standard = copy(f)
@@ -1440,7 +1440,7 @@ end # testset
         f_ac_local = copy(f)
         assembler_ac_local = start_assemble(K_ac_local, f_ac_local)
 
-        S = create_sparsity_pattern(dh, ch_p)
+        S = create_matrix(dh, ch_p)
 
         K_p_standard = copy(S)
         f_p_standard = copy(f)
@@ -1573,8 +1573,8 @@ end # testset
     ch = ConstraintHandler(dh)
     add!(ch, Dirichlet(:u, getfaceset(grid, "left"), (x, t) -> 0))
     close!(ch)
-    Kfull = create_sparsity_pattern(dh, ch)
-    K = create_sparsity_pattern(dh, ch; keep_constrained=false)
+    Kfull = create_matrix(dh, ch)
+    K = create_matrix(dh, ch; keep_constrained=false)
     # Pattern tests
     nonzero_edges = Set(
         (i, j) for d in 1:getncells(grid)

@@ -39,7 +39,7 @@ Affine constraints will affect the sparsity pattern of the stiffness matrix, and
 the `ConstraintHandler` as an argument when creating the sparsity pattern:
 
 ```julia
-K = create_sparsity_pattern(dh, ch)
+K = create_matrix(dh, ch)
 ```
 
 ### Solving linear problems

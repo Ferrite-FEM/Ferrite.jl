@@ -282,7 +282,7 @@ function solve()
     u  = zeros(n_dofs)  # solution vector
     Δu = zeros(n_dofs)  # displacement correction
     r = zeros(n_dofs)   # residual
-    K = create_sparsity_pattern(dh); # tangent stiffness matrix
+    K = create_matrix(dh); # tangent stiffness matrix
 
     ## Create material states. One array for each cell, where each element is an array of material-
     ## states - one for each integration point

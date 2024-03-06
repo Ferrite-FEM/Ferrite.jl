@@ -190,6 +190,22 @@ more discussion).
   + add!(dh, :u, Lagrange{RefTriangle, 1}())
   ```
 
+- **Sparsity pattern and global matrix construction**: since there is now explicit support
+  for working with the sparsity pattern before instantiating a matrix the function
+  `create_sparsity_pattern` have been repurposed. To simply recover the old functionaly that
+  returns a sparse matrix from the DofHandler directly use `create_matrix` instead.
+
+  Examples:
+  ```diff
+  # Create sparse matrix from DofHandler
+  - K = create_sparsity_pattern(dh)
+  + K = create_matrix(dh)
+
+  # Create condensed sparse matrix from DofHandler
+  - K = create_sparsity_pattern(dh, ch)
+  + K = create_matrix(dh, ch)
+  ```
+
 ### Added
 
 - `InterfaceValues` for computing jumps and averages over interfaces. ([#743][github-743])
@@ -265,6 +281,17 @@ more discussion).
 - The function `bounding_box(::AbstractGrid)` has been added. It computes the bounding box for 
   a given grid (based on its node coordinates), and returns the minimum and maximum vertices 
   of the bounding box. ([#880][github-880])
+
+- Support for working with sparsity patterns have been added. This means that Ferrite
+  exposes the intermediate "state" between the DofHandler and the instantiated matrix as the
+  new struct `SparsityPattern`. This make it possible to insert custom equations or
+  couplings in the pattern before instantiating the matrix. The function
+  `create_sparsity_pattern` have been repurposed to return a `SparsityPattern` instead of a
+  `SparseMatrixCSC`. The new function `create_matrix` is used to instantiate the matrix
+  instead. ([#888][github-888])
+
+  **To upgrade** replace any usage of `create_sparsity_pattern` with `create_matrix` if you
+  simply want to recover the old functionality and don't need to work with the pattern.
 
 ### Changed
 
@@ -896,4 +923,4 @@ poking into Ferrite internals:
 [github-835]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/835
 [github-855]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/855
 [github-880]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/880
-
+[github-888]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/888

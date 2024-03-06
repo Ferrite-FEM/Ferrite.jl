@@ -84,7 +84,7 @@ data = (thickness = 1.0, C = C); #Named tuple
 nnodes = getnbasefunctions(ip)
 ndofs_shell = ndofs_per_cell(dh)
 
-K = create_sparsity_pattern(dh)
+K = create_matrix(dh)
 f = zeros(Float64, ndofs(dh))
 
 ke = zeros(ndofs_shell, ndofs_shell)

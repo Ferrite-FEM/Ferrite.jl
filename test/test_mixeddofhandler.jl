@@ -335,7 +335,7 @@ function test_2_element_heat_eq()
         end
     end
 
-    K = create_sparsity_pattern(dh)
+    K = create_matrix(dh)
     f = zeros(ndofs(dh));
     assembler = start_assemble(K, f);
     # Use the same assemble function since it is the same weak form for both cell-types
