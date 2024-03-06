@@ -545,6 +545,8 @@ function creategrid(forest::ForestBWG{dim,C,T}) where {dim,C,T}
     nodeids = Dict{Tuple{Int,NTuple{dim,Int32}},Int}()
     nodeowners = Dict{Tuple{Int,NTuple{dim,Int32}},Tuple{Int,NTuple{dim,Int32}}}()
     pivot_nodeid = 1
+
+    # Phase 1: Assign node owners intra-octree
     for (k,tree) in enumerate(forest.cells)
         for leaf in tree.leaves
             _vertices = vertices(leaf,tree.b)
@@ -556,72 +558,122 @@ function creategrid(forest::ForestBWG{dim,C,T}) where {dim,C,T}
             end
         end
     end
+
+    # Phase 2: Assign node owners inter-octree
     for (k,tree) in enumerate(forest.cells)
         _vertices = vertices(root(dim),tree.b)
+        # Vertex neighbors
+        println("  Setting vertex neighbors for $k")
         for (vi,v) in enumerate(_vertices)
             vertex_neighbor =  forest.topology.vertex_vertex_neighbor[k,node_map[vi]]
-            if length(vertex_neighbor) == 0
-                continue
-            end
-            if k < vertex_neighbor[1][1]
-                #delete!(nodes,(k,v))
-                new_v = vertex(root(dim),node_map[vertex_neighbor[1][2]],tree.b)
-                new_k = vertex_neighbor[1][1]
-                nodeids[(k,v)] = nodeids[(new_k,new_v)]
-                nodeowners[(k,v)] = (new_k,new_v)
+            for (k′, v′) in vertex_neighbor
+                if k < k′
+                    #delete!(nodes,(k,v))
+                    new_v = vertex(root(dim),node_map[v′],tree.b)
+                    nodeids[(k,v)] = nodeids[(k′,new_v)]
+                    nodeowners[(k,v)] = (k′,new_v)
+                end
             end
         end
-        _faces = faces(root(dim),tree.b)
-        for (fi,f) in enumerate(_faces) # fi in p4est notation
-            face_neighbor =  forest.topology.face_face_neighbor[k,_perm[fi]]
-            if length(face_neighbor) == 0
-                continue
-            end
-            k′ = face_neighbor[1][1]
-            neighbor_vertices = vertices.(forest.cells[k′].leaves,forest.cells[k′].b)
-            if k < k′
-                if fi < 3
-                    parallel_axis = 1
-                elseif 3 ≤ fi < 5
-                    parallel_axis = 2
-                elseif 5 ≤ fi < 7
-                    parallel_axis = 3
+        if dim > 1
+            _faces = faces(root(dim),tree.b)
+            # Face neighbors
+            println("  Updating face neighbors for $k")
+            for (f,fc) in enumerate(_faces) # f in p4est notation
+                f_axis_index, f_axis_sign = divrem(f-1,2)
+                face_neighbor = forest.topology.face_face_neighbor[k,_perm[f]]
+                if length(face_neighbor) == 0
+                    continue
                 end
-                for leaf in tree.leaves
-                    for v in vertices(leaf,tree.b)
-                        if v[parallel_axis] == f[1][parallel_axis] == f[2][parallel_axis]
-                            cache_octant = OctantBWG(leaf.l,v)
-                            cache_octant = transform_face(forest,k′,_perminv[face_neighbor[1][2]],cache_octant) # after transform
-                            #TODO check if its worth to change this comparison from ∈ nodes to ∈ all nodes of k'
-                            #if (k′,cache_octant.xyz) ∈ nodes
-                            if any((cache_octant.xyz,) .∈ neighbor_vertices)
-                                #delete!(nodes,(k,v))
-                                nodeids[(k,v)] = nodeids[(k′,cache_octant.xyz)]
-                                nodeowners[(k,v)] = (k′,cache_octant.xyz)
+                @debug @assert length(face_neighbor) == 1
+                k′, f′_ferrite = face_neighbor[1]
+                f′ = _perminv[f′_ferrite]
+                if k < k′ # Owner
+                    tree′ = forest.cells[k′]
+                    for leaf in tree.leaves
+                        if f_axis_sign == 1 # positive face
+                            if leaf.xyz[f_axis_index + 1] < 2^tree.b-2^(tree.b-leaf.l)
+                                println("    Rejecting $leaf")
+                                continue
                             end
+                        else # negative face
+                            if leaf.xyz[f_axis_index + 1] > 0
+                                println("    Rejecting $leaf")
+                                continue
+                            end
+                        end
+                        neighbor_candidate = transform_face(forest,k′,f′,leaf)
+                        # Candidate must be the face opposite to f'
+                        f′candidate = ((f′ - 1) ⊻ 1) + 1
+                        fnodes = face(leaf, f , tree.b)
+                        fnodes_neighbor = face(neighbor_candidate, f′candidate, tree′.b)
+                        r = compute_face_orientation(forest,k,f)
+                        println("    Matching $fnodes (local) to $fnodes_neighbor (neighbor)")
+                        if dim == 2
+                            if r == 0 # same orientation
+                                for i ∈ 1:2
+                                    if haskey(nodeids, (k′,fnodes_neighbor[i]))
+                                        nodeids[(k,fnodes[i])] = nodeids[(k′,fnodes_neighbor[i])]
+                                        nodeowners[(k,fnodes[i])] = (k′,fnodes_neighbor[i])
+                                    end
+                                end
+                            else
+                                for i ∈ 1:2
+                                    if haskey(nodeids, (k′,fnodes_neighbor[3-i]))
+                                        nodeids[(k,fnodes[i])] = nodeids[(k′,fnodes_neighbor[3-i])]
+                                        nodeowners[(k,fnodes[i])] = (k′,fnodes_neighbor[3-i])
+                                    end
+                                end
+                            end
+                        else
+                            @error "Not implemented for $dim dimensions."
                         end
                     end
                 end
             end
         end
         if dim > 2
-            #TODO add egede dupplication check
+            #TODO add egde duplication check
         end
     end
+    @show values(nodeids)
+    # Phase 3: Compute unique physical nodes
+    nodeids_dedup = Dict{Int,Int}()
+    next_nodeid = 1
+    for (kv,nodeid) in nodeids
+        if !haskey(nodeids_dedup, nodeid)
+            nodeids_dedup[nodeid] = next_nodeid
+            next_nodeid += 1
+        end
+    end
+    @show values(nodeids_dedup)
+    nodes_physical_all = transform_pointBWG(forest,nodes)
+    nodes_physical = zeros(eltype(nodes_physical_all), next_nodeid-1)
+    for (ni, (kv,nodeid)) in enumerate(nodeids)
+        nodes_physical[nodeids_dedup[nodeid]] = nodes_physical_all[nodeid]
+    end
+
+    # Phase 4: Generate cells
     celltype = dim < 3 ? Quadrilateral : Hexahedron
     cells = celltype[]
     cellnodes = zeros(Int,2^dim)
     for (k,tree) in enumerate(forest.cells)
         for leaf in tree.leaves
             _vertices = vertices(leaf,tree.b)
-            cellnodes = ntuple(i-> nodeids[nodeowners[(k,_vertices[i])]],length(_vertices))
+            cellnodes = ntuple(i-> nodeids_dedup[nodeids[nodeowners[(k,_vertices[i])]]],length(_vertices))
             push!(cells,celltype(ntuple(i->cellnodes[node_map[i]],length(cellnodes))))
         end
     end
+
+    # Phase 5: Generate grid and haning nodes
     facesets = reconstruct_facesets(forest) #TODO edge, node and cellsets
-    grid = Grid(cells,transform_pointBWG(forest,nodes) .|> Node, facesets=facesets)
+    grid = Grid(cells,nodes_physical .|> Node, facesets=facesets)
     hnodes = hangingnodes(forest, nodeids, nodeowners)
-    return grid, hnodes
+    hnodes_dedup = Dict{Int64, Vector{Int64}}()
+    for (constrained,constainers) in hnodes
+        hnodes_dedup[nodeids_dedup[constrained]] = [nodeids_dedup[constainer] for constainer in constainers]
+    end
+    return grid, hnodes_dedup
 end
 
 function reconstruct_facesets(forest::ForestBWG{dim}) where dim
@@ -726,6 +778,7 @@ function balanceforest!(forest::ForestBWG{dim}) where dim
                     if s_i <= 4 #corner neighbor, only true for 2D see possibleneighbors
                         cc = forest.topology.vertex_vertex_neighbor[k,perm_corner[s_i]]
                         isempty(cc) && continue
+                        @assert length(cc) == 1 # FIXME there can be more than 1 vertex neighbor
                         cc = cc[1]
                         k′, c′ = cc[1], perm_corner_inv[cc[2]]
                         o′ = transform_corner(forest,k′,c′,o)
@@ -742,6 +795,7 @@ function balanceforest!(forest::ForestBWG{dim}) where dim
                         s_i -= 4
                         fc = forest.topology.face_face_neighbor[k,perm_face[s_i]]
                         isempty(fc) && continue
+                        @debug @assert length(fc) == 1
                         fc = fc[1]
                         k′, f′ = fc[1], perm_face_inv[fc[2]]
                         o′ = transform_face(forest,k′,f′,o)
@@ -1124,15 +1178,15 @@ function compute_face_orientation(forest::ForestBWG{<:Any,<:OctreeBWG{dim,<:Any,
     n_perminv = (dim == 2 ? node_map₂_inv : node_map₃_inv)
 
     f_ferrite = f_perm[f]
-    kprime, fprime_ferrite = getneighborhood(forest,FaceIndex(k,f_ferrite))[1]
-    fprime = f_perminv[fprime_ferrite]
+    k′, f′_ferrite = getneighborhood(forest,FaceIndex(k,f_ferrite))[1]
+    f′ = f_perminv[f′_ferrite]
     reffacenodes = reference_faces_bwg(RefHypercube{dim})
     nodes_f = [forest.cells[k].nodes[n_perm[ni]] for ni in reffacenodes[f]]
-    nodes_fprime = [forest.cells[kprime].nodes[n_perm[ni]] for ni in reffacenodes[fprime]]
-    if f > fprime
-        return T2(findfirst(isequal(nodes_fprime[1]), nodes_f)-1)
+    nodes_f′ = [forest.cells[k′].nodes[n_perm[ni]] for ni in reffacenodes[f′]]
+    if f > f′
+        return T2(findfirst(isequal(nodes_f′[1]), nodes_f)-1)
     else
-        return T2(findfirst(isequal(nodes_f[1]), nodes_fprime)-1)
+        return T2(findfirst(isequal(nodes_f[1]), nodes_f′)-1)
     end
 end
 
@@ -1161,21 +1215,21 @@ function transform_face_remote(forest::ForestBWG, k::T1, f::T1, o::OctantBWG{dim
     _two = T2(2)
     _perm = (dim == 2 ? 𝒱₂_perm : 𝒱₃_perm)
     _perminv = (dim == 2 ? 𝒱₂_perm_inv : 𝒱₃_perm_inv)
-    kprime, fprime = getneighborhood(forest,FaceIndex(k,_perm[f]))[1]
-    fprime = _perminv[fprime]
-    sprime = _one - (((f - _one) & _one) ⊻ ((fprime - _one) & _one))
+    k′, f′ = getneighborhood(forest,FaceIndex(k,_perm[f]))[1]
+    f′ = _perminv[f′]
+    s′ = _one - (((f - _one) & _one) ⊻ ((f′ - _one) & _one))
     s = zeros(T2,dim-1)
     a = zeros(T2,3) # Coordinate axes of f
     b = zeros(T2,3) # Coordinate axes of f'
     r = compute_face_orientation(forest,k,f)
-    a[3] = (f - _one) ÷ 2; b[3] = (fprime - _one) ÷ 2 # origin and target normal axis
+    a[3] = (f - _one) ÷ 2; b[3] = (f′ - _one) ÷ 2 # origin and target normal axis
     if dim == 2
         a[1] = 1 - a[3]; b[1] = 1 - b[3]; s[1] = r
     else
         a[1] = (f < 3) ? 1 : 0; a[2] = (f < 5) ? 2 : 1
-        u = (ℛ[1,f] - _one) ⊻ (ℛ[1,fprime] - _one) ⊻ (((r == 0) | (r == 3)))
-        b[u+1] = (fprime < 3) ? 1 : 0; b[1-u+1] = (fprime < 5) ? 2 : 1 # r = 0 -> index 1
-        if ℛ[f,fprime] == 1+1 # R is one-based
+        u = (ℛ[1,f] - _one) ⊻ (ℛ[1,f′] - _one) ⊻ (((r == 0) | (r == 3)))
+        b[u+1] = (f′ < 3) ? 1 : 0; b[1-u+1] = (f′ < 5) ? 2 : 1 # r = 0 -> index 1
+        if ℛ[f,f′] == 1+1 # R is one-based
             s[2] = r & 1; s[1] = r & 2
         else
             s[1] = r & 1; s[2] = r & 2
@@ -1185,7 +1239,7 @@ function transform_face_remote(forest::ForestBWG, k::T1, f::T1, o::OctantBWG{dim
     l = o.l; g = 2^maxlevel - 2^(maxlevel-l)
     xyz = zeros(T2,dim)
     xyz[b[1] + _one] = T2((s[1] == 0) ? o.xyz[a[1] + _one] : g - o.xyz[a[1] + _one])
-    xyz[b[3] + _one] = T2(((_two*((fprime - _one) & 1)) - _one)*2^maxlevel + sprime*g + (1-2*sprime)*o.xyz[a[3] + _one])
+    xyz[b[3] + _one] = T2(((_two*((f′ - _one) & 1)) - _one)*2^maxlevel + s′*g + (1-2*s′)*o.xyz[a[3] + _one])
     if dim == 2
         return OctantBWG(l,(xyz[1],xyz[2]))
     else
@@ -1201,8 +1255,8 @@ function transform_face(forest::ForestBWG, k::T1, f::T1, o::OctantBWG{2,<:Any,<:
     _two = T2(2)
     _perm = 𝒱₂_perm
     _perminv = 𝒱₂_perm_inv
-    kprime, fprime = getneighborhood(forest,FaceIndex(k,_perm[f]))[1]
-    fprime = _perminv[fprime]
+    k′, f′ = getneighborhood(forest,FaceIndex(k,_perm[f]))[1]
+    f′ = _perminv[f′]
 
     r = compute_face_orientation(forest,k,f)
     # Coordinate axes of f
@@ -1213,25 +1267,25 @@ function transform_face(forest::ForestBWG, k::T1, f::T1, o::OctantBWG{2,<:Any,<:
     a_sign = _two*((f - _one) & 1) - _one
     # Coordinate axes of f'
     b = (
-        fprime ≤ 2, # tangent
-        fprime > 2  # normal 
+        f′ ≤ 2, # tangent
+        f′ > 2  # normal 
     )
-    # b_sign = _two*(fprime & 1) - _one
+    # b_sign = _two*(f′ & 1) - _one
 
     maxlevel = forest.cells[1].b
     depth_offset = 2^maxlevel - 2^(maxlevel-o.l)
 
-    sprime = _one - (((f - _one) & _one) ⊻ ((fprime - _one) & _one)) # arithmetic switch: TODO understand this.
+    s′ = _one - (((f - _one) & _one) ⊻ ((f′ - _one) & _one)) # arithmetic switch: TODO understand this.
 
     # xyz = zeros(T2, 2)
     # xyz[a[1] + _one] = T2((r == 0) ? o.xyz[b[1] + _one] : depth_offset - o.xyz[b[1] + _one])
-    # xyz[a[2] + _one] = T2(a_sign*2^maxlevel + sprime*depth_offset + (1-2*sprime)*o.xyz[b[2] + _one])
+    # xyz[a[2] + _one] = T2(a_sign*2^maxlevel + s′*depth_offset + (1-2*s′)*o.xyz[b[2] + _one])
     # return OctantBWG(o.l,(xyz[1],xyz[2]))
 
     # We can do this because the permutation and inverse permutation are the same
     xyz = (
         T2((r == 0) ? o.xyz[b[1] + _one] : depth_offset - o.xyz[b[1] + _one]),
-        T2(a_sign*2^maxlevel + sprime*depth_offset + (1-2*sprime)*o.xyz[b[2] + _one])
+        T2(a_sign*2^maxlevel + s′*depth_offset + (1-2*s′)*o.xyz[b[2] + _one])
     )
     return OctantBWG(o.l,(xyz[a[1] + _one],xyz[a[2] + _one]))
 end
@@ -1241,9 +1295,9 @@ function transform_face(forest::ForestBWG, k::T1, f::T1, o::OctantBWG{3,<:Any,<:
     _two = T2(2)
     _perm = 𝒱₃_perm
     _perminv = 𝒱₃_perm_inv
-    kprime, fprime = getneighborhood(forest,FaceIndex(k,_perm[f]))[1]
-    fprime = _perminv[fprime]
-    sprime = _one - (((f - _one) & _one) ⊻ ((fprime - _one) & _one))
+    k′, f′ = getneighborhood(forest,FaceIndex(k,_perm[f]))[1]
+    f′ = _perminv[f′]
+    s′ = _one - (((f - _one) & _one) ⊻ ((f′ - _one) & _one))
     r = compute_face_orientation(forest,k,f)
 
     # Coordinate axes of f
@@ -1255,22 +1309,22 @@ function transform_face(forest::ForestBWG, k::T1, f::T1, o::OctantBWG{3,<:Any,<:
     a_sign = _two*((f - _one) & 1) - _one
 
     # Coordinate axes of f'
-    b = if Bool(ℛ[1,f] - _one) ⊻ Bool(ℛ[1,fprime] - _one) ⊻ (((r == 0) || (r == 3))) # What is this condition exactly?
+    b = if Bool(ℛ[1,f] - _one) ⊻ Bool(ℛ[1,f′] - _one) ⊻ (((r == 0) || (r == 3))) # What is this condition exactly?
         (
-            (fprime < 5) ? 2 : 1,
-            (fprime < 3) ? 1 : 0,
-            (fprime - _one) ÷ 2
+            (f′ < 5) ? 2 : 1,
+            (f′ < 3) ? 1 : 0,
+            (f′ - _one) ÷ 2
         )
     else
         (
-            (fprime < 3) ? 1 : 0,
-            (fprime < 5) ? 2 : 1,
-            (fprime - _one) ÷ 2
+            (f′ < 3) ? 1 : 0,
+            (f′ < 5) ? 2 : 1,
+            (f′ - _one) ÷ 2
         )
     end
-    # b_sign = _two*(fprime & 1) - _one
+    # b_sign = _two*(f′ & 1) - _one
 
-    s = if ℛ[f,fprime] == 1+1 # R is one-based
+    s = if ℛ[f,f′] == 1+1 # R is one-based
         (r & 2, r & 1)
     else
         (r & 1, r & 2)
@@ -1280,13 +1334,13 @@ function transform_face(forest::ForestBWG, k::T1, f::T1, o::OctantBWG{3,<:Any,<:
     xyz = zeros(T2,3)
     xyz[a[1] + _one] = T2((s[1] == 0) ? o.xyz[b[1] + _one] : depth_offset - o.xyz[b[1] + _one])
     xyz[a[2] + _one] = T2((s[2] == 0) ? o.xyz[b[2] + _one] : depth_offset - o.xyz[b[2] + _one])
-    xyz[a[3] + _one] = T2(a_sign*2^maxlevel + sprime*depth_offset + (1-2*sprime)*o.xyz[b[3] + _one])
+    xyz[a[3] + _one] = T2(a_sign*2^maxlevel + s′*depth_offset + (1-2*s′)*o.xyz[b[3] + _one])
     return OctantBWG(o.l,(xyz[1],xyz[2],xyz[3]))
 
     # xyz = (
     #     T2((s[1] == 0) ? o.xyz[b[1] + _one] : depth_offset - o.xyz[b[1] + _one]),
     #     T2((s[2] == 0) ? o.xyz[b[2] + _one] : depth_offset - o.xyz[b[2] + _one]),
-    #     T2(a_sign*2^maxlevel + sprime*depth_offset + (1-2*sprime)*o.xyz[b[3] + _one])
+    #     T2(a_sign*2^maxlevel + s′*depth_offset + (1-2*s′)*o.xyz[b[3] + _one])
     # )
     # return OctantBWG(o.l,(xyz[a[1] + _one],xyz[a[2] + _one],xyz[a[3] + _one]))
 end

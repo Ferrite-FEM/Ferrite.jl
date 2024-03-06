@@ -174,7 +174,10 @@ end
     @test Ferrite.transform_face(adaptive_grid, FaceIndex(3,3), o) == OctantBWG(0,(0,-8))
     @test Ferrite.transform_face(adaptive_grid, FaceIndex(4,1), o) == OctantBWG(0,(-8,0))
     @test Ferrite.transform_face(adaptive_grid, FaceIndex(4,3), o) == OctantBWG(0,(0,-8))
-    @test length(unique([ni for cell in Ferrite.creategrid(adaptive_grid)[1].cells for ni in cell.nodes])) == 9
+
+    (grid_new, hnodes) = Ferrite.creategrid(adaptive_grid)
+    @test length(unique([ni for cell in grid_new.cells for ni in cell.nodes])) == 9
+    @test length(hnodes) == 0
 
 
     #simple first and second level refinement
