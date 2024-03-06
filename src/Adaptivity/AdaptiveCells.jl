@@ -544,9 +544,9 @@ function creategrid(forest::ForestBWG{dim,C,T}) where {dim,C,T}
     node_map_inv = dim < 3 ? node_map₂_inv : node_map₃_inv
     nodeids = Dict{Tuple{Int,NTuple{dim,Int32}},Int}()
     nodeowners = Dict{Tuple{Int,NTuple{dim,Int32}},Tuple{Int,NTuple{dim,Int32}}}()
-    pivot_nodeid = 1
 
     # Phase 1: Assign node owners intra-octree
+    pivot_nodeid = 1
     for (k,tree) in enumerate(forest.cells)
         for leaf in tree.leaves
             _vertices = vertices(leaf,tree.b)
@@ -563,22 +563,24 @@ function creategrid(forest::ForestBWG{dim,C,T}) where {dim,C,T}
     for (k,tree) in enumerate(forest.cells)
         _vertices = vertices(root(dim),tree.b)
         # Vertex neighbors
-        println("  Setting vertex neighbors for $k")
-        for (vi,v) in enumerate(_vertices)
-            vertex_neighbor =  forest.topology.vertex_vertex_neighbor[k,node_map[vi]]
+        @debug println("Setting vertex neighbors for octree $k")
+        for (v,vc) in enumerate(_vertices)
+            vertex_neighbor = forest.topology.vertex_vertex_neighbor[k,node_map[v]]
             for (k′, v′) in vertex_neighbor
-                if k < k′
+                @debug println("  pair $v $v′")
+                if k > k′
                     #delete!(nodes,(k,v))
                     new_v = vertex(root(dim),node_map[v′],tree.b)
-                    nodeids[(k,v)] = nodeids[(k′,new_v)]
-                    nodeowners[(k,v)] = (k′,new_v)
+                    nodeids[(k,vc)] = nodeids[(k′,new_v)]
+                    nodeowners[(k,vc)] = (k′,new_v)
+                    @debug println("    Matching $vc (local) to $new_v (neighbor)")
                 end
             end
         end
         if dim > 1
             _faces = faces(root(dim),tree.b)
             # Face neighbors
-            println("  Updating face neighbors for $k")
+            @debug println("Updating face neighbors for octree $k")
             for (f,fc) in enumerate(_faces) # f in p4est notation
                 f_axis_index, f_axis_sign = divrem(f-1,2)
                 face_neighbor = forest.topology.face_face_neighbor[k,_perm[f]]
@@ -588,17 +590,17 @@ function creategrid(forest::ForestBWG{dim,C,T}) where {dim,C,T}
                 @debug @assert length(face_neighbor) == 1
                 k′, f′_ferrite = face_neighbor[1]
                 f′ = _perminv[f′_ferrite]
-                if k < k′ # Owner
+                if k > k′ # Owner
                     tree′ = forest.cells[k′]
                     for leaf in tree.leaves
                         if f_axis_sign == 1 # positive face
                             if leaf.xyz[f_axis_index + 1] < 2^tree.b-2^(tree.b-leaf.l)
-                                println("    Rejecting $leaf")
+                                @debug println("    Rejecting $leaf")
                                 continue
                             end
                         else # negative face
                             if leaf.xyz[f_axis_index + 1] > 0
-                                println("    Rejecting $leaf")
+                                @debug println("    Rejecting $leaf")
                                 continue
                             end
                         end
@@ -608,7 +610,7 @@ function creategrid(forest::ForestBWG{dim,C,T}) where {dim,C,T}
                         fnodes = face(leaf, f , tree.b)
                         fnodes_neighbor = face(neighbor_candidate, f′candidate, tree′.b)
                         r = compute_face_orientation(forest,k,f)
-                        println("    Matching $fnodes (local) to $fnodes_neighbor (neighbor)")
+                        @debug println("    Matching $fnodes (local) to $fnodes_neighbor (neighbor)")
                         if dim == 2
                             if r == 0 # same orientation
                                 for i ∈ 1:2
@@ -636,7 +638,7 @@ function creategrid(forest::ForestBWG{dim,C,T}) where {dim,C,T}
             #TODO add egde duplication check
         end
     end
-    @show values(nodeids)
+
     # Phase 3: Compute unique physical nodes
     nodeids_dedup = Dict{Int,Int}()
     next_nodeid = 1
@@ -646,7 +648,6 @@ function creategrid(forest::ForestBWG{dim,C,T}) where {dim,C,T}
             next_nodeid += 1
         end
     end
-    @show values(nodeids_dedup)
     nodes_physical_all = transform_pointBWG(forest,nodes)
     nodes_physical = zeros(eltype(nodes_physical_all), next_nodeid-1)
     for (ni, (kv,nodeid)) in enumerate(nodeids)

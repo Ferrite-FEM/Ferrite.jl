@@ -176,7 +176,7 @@ end
     @test Ferrite.transform_face(adaptive_grid, FaceIndex(4,3), o) == OctantBWG(0,(0,-8))
 
     (grid_new, hnodes) = Ferrite.creategrid(adaptive_grid)
-    @test length(unique([ni for cell in grid_new.cells for ni in cell.nodes])) == 9
+    @test length(grid_new.nodes) == 9
     @test length(hnodes) == 0
 
 
@@ -212,7 +212,7 @@ end
     @test Ferrite.transform_face(adaptive_grid, FaceIndex(3,3), adaptive_grid.cells[1].leaves[7]) == OctantBWG(1,(4,-4))
 
     (grid_new, hnodes) = Ferrite.creategrid(adaptive_grid)
-    @test length(unique([ni for cell in grid_new.cells for ni in cell.nodes])) == 19
+    @test length(grid_new.nodes) == 19
     @test length(hnodes) == 4
 
     # octree holds now 3 first level and 4 second level
@@ -251,7 +251,7 @@ end
     @test Ferrite.transform_face(adaptive_grid, FaceIndex(3,3), adaptive_grid.cells[1].leaves[7]) == OctantBWG(2,(6,-2))
 
     (grid_new, hnodes) = Ferrite.creategrid(adaptive_grid)
-    @test length(unique([ni for cell in grid_new.cells for ni in cell.nodes])) == 19
+    @test length(grid_new.nodes) == 19
     @test length(hnodes) == 4
 
     ##################################################################
