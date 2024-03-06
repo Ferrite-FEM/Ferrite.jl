@@ -1137,8 +1137,8 @@ function compute_face_orientation(forest::ForestBWG{<:Any,<:OctreeBWG{dim,<:Any,
 end
 
 """
-    transform_face(forest::ForestBWG, k::T1, f::T1, o::OctantBWG{dim,N,M,T2}) -> OctantBWG{dim,N,M,T1,T2}
-    transform_face(forest::ForestBWG, f::FaceIndex, o::OctantBWG{dim,N,M,T2}) -> OctantBWG{dim,N,M,T2}
+    transform_face_remote(forest::ForestBWG, k::T1, f::T1, o::OctantBWG{dim,N,M,T2}) -> OctantBWG{dim,N,M,T1,T2}
+    transform_face_remote(forest::ForestBWG, f::FaceIndex, o::OctantBWG{dim,N,M,T2}) -> OctantBWG{dim,N,M,T2}
 Interoctree coordinate transformation of an given octant `o` to the face-neighboring of octree `k` by virtually pushing `o`s coordinate system through `k`s face `f`.
 Implements Algorithm 8 of BWG p4est paper.
 
@@ -1156,7 +1156,7 @@ Consider 4 octrees with a single leaf each and a maximum refinement level of 1
 This function transforms octant 1 into the coordinate system of octant 2 by specifying `k=2` and `f=1`.
 While in the own octree coordinate system octant 1 is at `xyz=(0,0)`, the returned and transformed octant is located at `xyz=(-2,0)`
 """
-function transform_face(forest::ForestBWG, k::T1, f::T1, o::OctantBWG{dim,N,M,T2}) where {dim,N,M,T1<:Integer,T2<:Integer}
+function transform_face_remote(forest::ForestBWG, k::T1, f::T1, o::OctantBWG{dim,N,M,T2}) where {dim,N,M,T1<:Integer,T2<:Integer}
     _one = one(T2)
     _two = T2(2)
     _perm = (dim == 2 ? 𝒱₂_perm : 𝒱₃_perm)
@@ -1192,6 +1192,94 @@ function transform_face(forest::ForestBWG, k::T1, f::T1, o::OctantBWG{dim,N,M,T2
         xyz[b[2] + _one] = T2((s[2] == 0) ? o.xyz[a[2] + _one] : g - o.xyz[a[2] + _one])
         return OctantBWG(l,(xyz[1],xyz[2],xyz[3]))
     end
+end
+
+function transform_face(forest::ForestBWG, k::T1, f::T1, o::OctantBWG{2,<:Any,<:Any,T2}) where {T1<:Integer,T2<:Integer}
+    _one = one(T2)
+    _two = T2(2)
+    _perm = 𝒱₂_perm
+    _perminv = 𝒱₂_perm_inv
+    kprime, fprime = getneighborhood(forest,FaceIndex(k,_perm[f]))[1]
+    fprime = _perminv[fprime]
+
+    r = compute_face_orientation(forest,k,f)
+    # Coordinate axes of f
+    a = (
+        f ≤ 2, # tangent
+        f > 2  # normal 
+    )
+    a_sign = _two*((f - _one) & 1) - _one
+    # Coordinate axes of f'
+    b = (
+        fprime ≤ 2, # tangent
+        fprime > 2  # normal 
+    )
+    # b_sign = _two*(fprime & 1) - _one
+
+    maxlevel = forest.cells[1].b
+    depth_offset = 2^maxlevel - 2^(maxlevel-o.l)
+
+    sprime = _one - (((f - _one) & _one) ⊻ ((fprime - _one) & _one)) # arithmetic switch: TODO understand this.
+    xyz = (
+        T2((r == 0) ? o.xyz[b[1] + _one] : depth_offset - o.xyz[b[1] + _one]),
+        T2(a_sign*2^maxlevel + sprime*depth_offset + (1-2*sprime)*o.xyz[b[2] + _one])
+    )
+    return OctantBWG(o.l,(xyz[a[1] + _one],xyz[a[2] + _one]))
+end
+
+function transform_face(forest::ForestBWG, k::T1, f::T1, o::OctantBWG{3,<:Any,<:Any,T2}) where {T1<:Integer,T2<:Integer}
+    _one = one(T2)
+    _two = T2(2)
+    _perm = 𝒱₃_perm
+    _perminv = 𝒱₃_perm_inv
+    kprime, fprime = getneighborhood(forest,FaceIndex(k,_perm[f]))[1]
+    fprime = _perminv[fprime]
+    sprime = _one - (((f - _one) & _one) ⊻ ((fprime - _one) & _one))
+    r = compute_face_orientation(forest,k,f)
+
+    # Coordinate axes of f
+    a = (
+        (f ≤ 2) ? 1 : 0,
+        (f ≤ 4) ? 2 : 1,
+        (f - _one) ÷ 2
+    )
+    a_sign = _two*((f - _one) & 1) - _one
+
+    # Coordinate axes of f'
+    b = if Bool(ℛ[1,f] - _one) ⊻ Bool(ℛ[1,fprime] - _one) ⊻ (((r == 0) || (r == 3))) # What is this condition exactly?
+        (
+            (fprime < 3) ? 1 : 0,
+            (fprime < 5) ? 2 : 1,
+            (fprime - _one) ÷ 2
+        )
+    else
+        (
+            (fprime < 5) ? 2 : 1,
+            (fprime < 3) ? 1 : 0,
+            (fprime - _one) ÷ 2
+        )
+    end
+    # b_sign = _two*(fprime & 1) - _one
+
+    s = if ℛ[f,fprime] == 1+1 # R is one-based
+        (r & 2, r & 1)
+    else
+        (r & 1, r & 2)
+    end
+    maxlevel = forest.cells[1].b
+    depth_offset = 2^maxlevel - 2^(maxlevel-o.l)
+    # xyz = zeros(T2,3)
+    # xyz[a[1] + _one] = T2((s[1] == 0) ? o.xyz[b[1] + _one] : depth_offset - o.xyz[b[1] + _one])
+    # xyz[a[2] + _one] = T2((s[2] == 0) ? o.xyz[b[2] + _one] : depth_offset - o.xyz[b[2] + _one])
+    # xyz[a[3] + _one] = T2(a_sign*2^maxlevel + sprime*depth_offset + (1-2*sprime)*o.xyz[b[3] + _one])
+    # return OctantBWG(o.l,(xyz[1],xyz[2],xyz[3]))
+
+    xyz = (
+        T2((s[1] == 0) ? o.xyz[b[1] + _one] : depth_offset - o.xyz[b[1] + _one]),
+        T2((s[2] == 0) ? o.xyz[b[2] + _one] : depth_offset - o.xyz[b[2] + _one]),
+        T2(a_sign*2^maxlevel + sprime*depth_offset + (1-2*sprime)*o.xyz[b[3] + _one])
+    )
+    return OctantBWG(o.l,(xyz[a[1] + _one],xyz[a[2] + _one],xyz[a[3] + _one]))
 end
 
 transform_face(forest::ForestBWG,f::FaceIndex,oct::OctantBWG) = transform_face(forest,f[1],f[2],oct)
