@@ -1129,7 +1129,6 @@ function compute_face_orientation(forest::ForestBWG{<:Any,<:OctreeBWG{dim,<:Any,
     reffacenodes = reference_faces_bwg(RefHypercube{dim})
     nodes_f = [forest.cells[k].nodes[n_perm[ni]] for ni in reffacenodes[f]]
     nodes_fprime = [forest.cells[kprime].nodes[n_perm[ni]] for ni in reffacenodes[fprime]]
-    @show nodes_f, nodes_fprime
     if f > fprime
         return T2(findfirst(isequal(nodes_fprime[1]), nodes_f)-1)
     else
@@ -1140,7 +1139,7 @@ end
 """
     transform_face(forest::ForestBWG, k::T1, f::T1, o::OctantBWG{dim,N,M,T2}) -> OctantBWG{dim,N,M,T1,T2}
     transform_face(forest::ForestBWG, f::FaceIndex, o::OctantBWG{dim,N,M,T2}) -> OctantBWG{dim,N,M,T2}
-Interoctree coordinate transformation of an given octant `o` to the octree `k` coordinate system by virtually pushing `o`s coordinate system through `k`'s face `f`.
+Interoctree coordinate transformation of an given octant `o` to the face-neighboring of octree `k` by virtually pushing `o`s coordinate system through `k`s face `f`.
 Implements Algorithm 8 of BWG p4est paper.
 
     x-------x-------x
@@ -1156,29 +1155,25 @@ Implements Algorithm 8 of BWG p4est paper.
 Consider 4 octrees with a single leaf each and a maximum refinement level of 1
 This function transforms octant 1 into the coordinate system of octant 2 by specifying `k=2` and `f=1`.
 While in the own octree coordinate system octant 1 is at `xyz=(0,0)`, the returned and transformed octant is located at `xyz=(-2,0)`
-TODO: this is working for 2D except rotation, 3D I don't know
 """
 function transform_face(forest::ForestBWG, k::T1, f::T1, o::OctantBWG{dim,N,M,T2}) where {dim,N,M,T1<:Integer,T2<:Integer}
     _one = one(T2)
     _two = T2(2)
-    perm = (dim == 2 ? 𝒱₂_perm : 𝒱₃_perm)
+    _perm = (dim == 2 ? 𝒱₂_perm : 𝒱₃_perm)
     _perminv = (dim == 2 ? 𝒱₂_perm_inv : 𝒱₃_perm_inv)
-    kprime, fprime = getneighborhood(forest,FaceIndex(k,perm[f]))[1]
+    kprime, fprime = getneighborhood(forest,FaceIndex(k,_perm[f]))[1]
     fprime = _perminv[fprime]
     sprime = _one - (((f - _one) & _one) ⊻ ((fprime - _one) & _one))
-    @show f,fprime,sprime
-    s = zeros(T2,3)
+    s = zeros(T2,dim-1)
     a = zeros(T2,3) # Coordinate axes of f
     b = zeros(T2,3) # Coordinate axes of f'
     r = compute_face_orientation(forest,k,f)
-    a[3] = (f-_one) ÷ 2; b[3] = (fprime - _one) ÷ 2 # origin and target normal axis
-    @show a, b, r
+    a[3] = (f - _one) ÷ 2; b[3] = (fprime - _one) ÷ 2 # origin and target normal axis
     if dim == 2
         a[1] = 1 - a[3]; b[1] = 1 - b[3]; s[1] = r
     else
         a[1] = (f < 3) ? 1 : 0; a[2] = (f < 5) ? 2 : 1
         u = (ℛ[1,f] - _one) ⊻ (ℛ[1,fprime] - _one) ⊻ (((r == 0) | (r == 3)))
-        @show u
         b[u+1] = (fprime < 3) ? 1 : 0; b[1-u+1] = (fprime < 5) ? 2 : 1 # r = 0 -> index 1
         if ℛ[f,fprime] == 1+1 # R is one-based
             s[2] = r & 1; s[1] = r & 2
@@ -1186,13 +1181,11 @@ function transform_face(forest::ForestBWG, k::T1, f::T1, o::OctantBWG{dim,N,M,T2
             s[1] = r & 1; s[2] = r & 2
         end
     end
-    @show a, b, s
     maxlevel = forest.cells[1].b
     l = o.l; g = 2^maxlevel - 2^(maxlevel-l)
     xyz = zeros(T2,dim)
     xyz[b[1] + _one] = T2((s[1] == 0) ? o.xyz[a[1] + _one] : g - o.xyz[a[1] + _one])
-    xyz[b[3] + _one] = T2((_two*((fprime - _one) & 1) - _one)*2^maxlevel + sprime*g + (1-2*sprime)*o.xyz[a[3] + _one])
-    @show xyz
+    xyz[b[3] + _one] = T2(((_two*((fprime - _one) & 1)) - _one)*2^maxlevel + sprime*g + (1-2*sprime)*o.xyz[a[3] + _one])
     if dim == 2
         return OctantBWG(l,(xyz[1],xyz[2]))
     else
