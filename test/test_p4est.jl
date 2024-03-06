@@ -254,6 +254,17 @@ end
     @test length(grid_new.nodes) == 19
     @test length(hnodes) == 4
 
+    # more complex neighborhoods
+    grid = Ferrite.generate_simple_disc_grid(Quadrilateral, 6)
+    grid.cells[2] = Quadrilateral((grid.cells[2].nodes[2], grid.cells[2].nodes[3], grid.cells[2].nodes[4], grid.cells[2].nodes[1]))
+    adaptive_grid = ForestBWG(grid,3)
+    Ferrite.refine!(adaptive_grid.cells[3],adaptive_grid.cells[3].leaves[1])
+    Ferrite.refine!(adaptive_grid.cells[5],adaptive_grid.cells[5].leaves[1])
+
+    (grid_new, hnodes) = Ferrite.creategrid(adaptive_grid)
+    @test length(grid_new.nodes) == 23
+    @test length(hnodes) == 4
+
     ##################################################################
     ####uniform refinement and coarsening for all cells and levels####
     ##################################################################

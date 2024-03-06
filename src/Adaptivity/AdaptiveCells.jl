@@ -576,6 +576,7 @@ function creategrid(forest::ForestBWG{dim,C,T}) where {dim,C,T}
                     @debug println("    Matching $vc (local) to $new_v (neighbor)")
                 end
             end
+            # TODO check if we need to also update the face neighbors
         end
         if dim > 1
             _faces = faces(root(dim),tree.b)
