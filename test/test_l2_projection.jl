@@ -4,6 +4,7 @@
 function test_projection(order, refshape)
     element = refshape == RefQuadrilateral ? Quadrilateral : Triangle
     grid = generate_grid(element, (1, 1), Vec((0.,0.)), Vec((1.,1.)))
+    Ferrite.transform_coordinates!(grid, x->x+rand(Vec{2,Float64})*0.01)
 
     ip = Lagrange{refshape, order}()
     ip_geom = Lagrange{refshape, 1}()

@@ -206,18 +206,21 @@ function function_gradient_init(cv::AbstractValues, ::AbstractVector{T}) where {
 end
 
 """
-    function_hessian(fe_v::AbstractValues{dim}, q_point::Int, u::AbstractVector, [dof_range])
+    function_hessian(fe_v::AbstractValues{dim}, q_point::Int, u::AbstractVector{<:AbstractFloat}, [dof_range])
+
+    Compute the hessian of the function in a quadrature point. `u` is a vector with values
+    for the degrees of freedom. 
 """
 function function_hessian(fe_v::AbstractValues, q_point::Int, u::AbstractVector, dof_range = eachindex(u))
     n_base_funcs = getnbasefunctions(fe_v)
     length(dof_range) == n_base_funcs || throw_incompatible_dof_length(length(dof_range), n_base_funcs)
     @boundscheck checkbounds(u, dof_range)
     @boundscheck checkquadpoint(fe_v, q_point)
-    grad = function_hessian_init(fe_v, u)
+    hess = function_hessian_init(fe_v, u)
     @inbounds for (i, j) in pairs(dof_range)
-        grad += shape_hessian(fe_v, q_point, i) * u[j]
+        hess += shape_hessian(fe_v, q_point, i) * u[j]
     end
-    return grad
+    return hess
 end
 
 """

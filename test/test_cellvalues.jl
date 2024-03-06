@@ -1,4 +1,43 @@
+
+#Inverse parametric mapping ξ = ϕ(x)
+function MAPPING(interpolation, cell_coordinates, global_coordinate::Vec{dim}) where dim
+    ξ = zero(global_coordinate)
+    n_basefuncs = getnbasefunctions(interpolation)
+    max_iters = 10
+    tol_norm = 1e-16
+    for _ in 1:max_iters
+        global_guess = zero(global_coordinate)
+        J = zero(Tensor{2, dim, T})
+        # TODO batched eval after 764 is merged.
+        for j in 1:n_basefuncs
+            dNdξ, N = Ferrite.shape_gradient_and_value(interpolation, ξ, j)
+            global_guess += N * cell_coordinates[j]
+            J += cell_coordinates[j] ⊗ dNdξ
+        end
+        residual = global_guess - global_coordinate
+        if norm(residual) <= tol_norm
+            break
+        end
+        ξ -= inv(J) ⋅ residual
+    end
+    return ξ
+end
+
+function function_value_from_physical_coord(interpolation::Interpolation, cell_coordinates, X::Vec{dim,T}, ue) where {dim,T}
+    n_basefuncs = getnbasefunctions(interpolation)
+    scalar_ip = interpolation isa Ferrite.ScalarInterpolation ? interpolation : interpolation.ip
+    @assert length(ue) == n_basefuncs
+    ξ = MAPPING(scalar_ip, cell_coordinates, X)
+    u = zero(typeof(shape_value(interpolation, ξ, 1))) #Is there a utility function for this init?
+    for j in 1:n_basefuncs
+        N = shape_value(interpolation, ξ, j)
+        u += N * ue[j]
+    end
+    return u
+end
+
 @testset "CellValues" begin
+    scalar_interpol, quad_rule =  (Lagrange{RefQuadrilateral, 2}(), QuadratureRule{RefQuadrilateral}(2))
 @testset "ip=$scalar_interpol quad_rule=$(typeof(quad_rule))" for (scalar_interpol, quad_rule) in  (
                                     (Lagrange{RefLine, 1}(), QuadratureRule{RefLine}(2)),
                                     (Lagrange{RefLine, 2}(), QuadratureRule{RefLine}(2)),
@@ -16,56 +55,104 @@
                                     (Lagrange{RefPrism, 2}(), QuadratureRule{RefPrism}(2)),
                                     (Lagrange{RefPyramid, 2}(), QuadratureRule{RefPyramid}(2)),
                                    )
-
-    for func_interpol in (scalar_interpol, VectorizedInterpolation(scalar_interpol))
+    DiffOrder=2
+    func_interpol = VectorizedInterpolation(scalar_interpol)
+    for DiffOrder in 1:2, func_interpol in (scalar_interpol, VectorizedInterpolation(scalar_interpol))
+        T = eltype(quad_rule.weights)
         geom_interpol = scalar_interpol # Tests below assume this
         n_basefunc_base = getnbasefunctions(scalar_interpol)
-        cv = CellValues(quad_rule, func_interpol, geom_interpol)
+        update_gradients = true
+        update_hessians = (DiffOrder==2 && Ferrite.getorder(func_interpol) > 1)
+        cv = CellValues(quad_rule, func_interpol, geom_interpol; update_gradients, update_hessians)
         ndim = Ferrite.getdim(func_interpol)
         n_basefuncs = getnbasefunctions(func_interpol)
 
         @test getnbasefunctions(cv) == n_basefuncs
 
-        x, n = valid_coordinates_and_normals(func_interpol)
-        reinit!(cv, x)
-        @test_call reinit!(cv, x)
+        coords, n = valid_coordinates_and_normals(func_interpol)
+        reinit!(cv, coords)
+        @test_call reinit!(cv, coords)
 
         # We test this by applying a given deformation gradient on all the nodes.
         # Since this is a linear deformation we should get back the exact values
         # from the interpolation.
-        u = Vec{ndim, Float64}[zero(Tensor{1,ndim}) for i in 1:n_basefunc_base]
-        u_scal = zeros(n_basefunc_base)
-        H = rand(Tensor{2, ndim})
-        V = rand(Tensor{1, ndim})
-        for i in 1:n_basefunc_base
-            u[i] = H ⋅ x[i]
-            u_scal[i] = V ⋅ x[i]
+        V, G, H = if func_interpol isa Ferrite.ScalarInterpolation
+            (rand(T), rand(Tensor{1, ndim}), Tensor{2, ndim}((i,j)-> i==j ? rand(T) : 0.0))
+        else
+            (rand(Tensor{1, ndim}), rand(Tensor{2, ndim}), Tensor{3, ndim}((i,j,k)-> i==j==k ? rand(T) : 0.0))
         end
-        u_vector = reinterpret(Float64, u)
+
+        u_funk(x,V,G,H) = begin 
+            if update_hessians
+                0.5*x⋅H⋅x + G⋅x + V
+            else
+                G⋅x + V
+            end
+        end
+
+        _ue = [u_funk(coords[i],V,G,H) for i in 1:n_basefunc_base]
+        ue = reinterpret(Float64, _ue)
+
+        for i in 1:getnquadpoints(cv)
+            xqp = spatial_coordinate(cv, i, coords)
+            Hqp, Gqp, Vqp = Tensors.hessian(x -> u_funk(x,V,G,H), xqp, :all)
+
+            @test function_value(cv, i, ue) ≈ Vqp
+            @test function_gradient(cv, i, ue) ≈ Gqp
+            if update_hessians
+                #Note, the jacobian of the element is constant, which makes the hessian (of the mapping) 
+                #zero. So this is not the optimal test
+                @test Ferrite.function_hessian(cv, i, ue) ≈ Hqp
+            end
+            if func_interpol isa Ferrite.VectorInterpolation
+                @test function_symmetric_gradient(cv, i, ue) ≈ 0.5(Gqp + Gqp')
+                @test function_divergence(cv, i, ue) ≈ tr(Gqp)
+                ndim == 3 && @test function_curl(cv, i, ue) ≈ Ferrite.curl_from_gradient(Gqp)
+            else
+                @test function_divergence(cv, i, ue) ≈ sum(Gqp)
+            end
+        end
+
+        #Test CellValues when input is a ::Vector{<:Vec} (most of which is deprecated)
+        ue_vec = [zero(Vec{ndim,Float64}) for i in 1:n_basefunc_base]
+        G_vector = rand(Tensor{2, ndim})
+        for i in 1:n_basefunc_base
+            ue_vec[i] = G_vector ⋅ coords[i]
+        end
 
         for i in 1:getnquadpoints(cv)
             if func_interpol isa Ferrite.ScalarInterpolation
-                @test function_gradient(cv, i, u) ≈ H
-                @test function_symmetric_gradient(cv, i, u) ≈ 0.5(H + H')
-                @test function_divergence(cv, i, u_scal) ≈ sum(V)
-                @test function_divergence(cv, i, u) ≈ tr(H)
-                @test function_gradient(cv, i, u_scal) ≈ V
-                ndim == 3 && @test function_curl(cv, i, u) ≈ Ferrite.curl_from_gradient(H)
-                function_value(cv, i, u)
-                function_value(cv, i, u_scal)
+                @test function_gradient(cv, i, ue_vec) ≈ G_vector
             else# func_interpol isa Ferrite.VectorInterpolation
-                @test function_gradient(cv, i, u_vector)  ≈ H
-                @test (@test_deprecated function_gradient(cv, i, u)) ≈ H
-                @test function_symmetric_gradient(cv, i, u_vector) ≈ 0.5(H + H')
-                @test (@test_deprecated function_symmetric_gradient(cv, i, u)) ≈ 0.5(H + H')
-                @test function_divergence(cv, i, u_vector) ≈ tr(H)
-                @test (@test_deprecated function_divergence(cv, i, u)) ≈ tr(H)
+                @test (@test_deprecated function_gradient(cv, i, ue_vec)) ≈ G_vector
+                @test (@test_deprecated function_symmetric_gradient(cv, i, ue_vec)) ≈ 0.5(G_vector + G_vector')
+                @test (@test_deprecated function_divergence(cv, i, ue_vec)) ≈ tr(G_vector)
                 if ndim == 3
-                    @test function_curl(cv, i, u_vector) ≈ Ferrite.curl_from_gradient(H)
-                    @test (@test_deprecated function_curl(cv, i, u)) ≈ Ferrite.curl_from_gradient(H)
+                    @test (@test_deprecated function_curl(cv, i, ue_vec)) ≈ Ferrite.curl_from_gradient(G_vector)
                 end
-                @test function_value(cv, i, u_vector) ≈ (@test_deprecated function_value(cv, i, u))
+                function_value(cv, i, ue_vec)
             end
+        end
+
+        #Check if the non-linear mapping is correct
+        #Only do this for one interpolation becuase it relise on AD on "iterative function"
+        if scalar_interpol === Lagrange{RefQuadrilateral, 1}()
+            coords_nl = [x+rand(x)*0.01 for x in coords] #add some displacement to nodes
+            reinit!(cv, coords_nl)
+
+            _ue_nl = [u_funk(coords[i],V,G,H) for i in 1:n_basefunc_base]
+            ue_nl = reinterpret(Float64, _ue_nl)
+            
+            for i in 1:getnquadpoints(cv)
+                xqp = spatial_coordinate(cv, i, coords_nl)
+                Hqp, Gqp, Vqp = Tensors.hessian(x -> function_value_from_physical_coord(func_interpol, coords_nl, x, ue_nl), xqp, :all)
+                @test function_value(cv, i, ue_nl) ≈ Vqp
+                @test function_gradient(cv, i, ue_nl) ≈ Gqp
+                if update_hessians
+                    @test Ferrite.function_hessian(cv, i, ue_nl) ≈ Hqp
+                end
+            end
+            reinit!(cv, coords) # reinit back to old coords
         end
 
         # Test of volume
@@ -73,11 +160,11 @@
         for i in 1:getnquadpoints(cv)
             vol += getdetJdV(cv,i)
         end
-        @test vol ≈ calculate_volume(func_interpol, x)
+        @test vol ≈ calculate_volume(func_interpol, coords)
 
         # Test quadrature rule after reinit! with ref. coords
-        x = Ferrite.reference_coordinates(func_interpol)
-        reinit!(cv, x)
+        coords = Ferrite.reference_coordinates(func_interpol)
+        reinit!(cv, coords)
         vol = 0.0
         for i in 1:getnquadpoints(cv)
             vol += getdetJdV(cv,i)
@@ -86,7 +173,7 @@
 
         # Test spatial coordinate (after reinit with ref.coords we should get back the quad_points)
         for (i, qp_x) in pairs(Ferrite.getpoints(quad_rule))
-            @test spatial_coordinate(cv, i, x) ≈ qp_x
+            @test spatial_coordinate(cv, i, coords) ≈ qp_x
         end
 
         @testset "copy(::CellValues)" begin

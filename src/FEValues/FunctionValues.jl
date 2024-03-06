@@ -62,6 +62,10 @@ struct FunctionValues{DiffOrder, IP, N_t, dNdx_t, dNdξ_t, d2Ndx2_t, d2Ndξ2_t}
     end
 end
 function FunctionValues{DiffOrder}(::Type{T}, ip::Interpolation, qr::QuadratureRule, ip_geo::VectorizedInterpolation) where {DiffOrder, T}
+    sdim = n_components(ip_geo)
+    rdim = getdim(ip_geo)
+    (DiffOrder > 1 && (rdim != sdim)) && error("Higher order gradient for embedded elements not implemented")
+
     n_shape = getnbasefunctions(ip)
     n_qpoints = getnquadpoints(qr)
     
@@ -202,7 +206,13 @@ end
     H    = gethessian(mapping_values)
     @inbounds for j in 1:getnbasefunctions(funvals)
         dNdx = dothelper(funvals.dNdξ[j, q_point], Jinv)
-        d2Ndx2 = Jinv'⋅funvals.d2Ndξ2[j, q_point]⋅Jinv - Jinv'⋅(dNdx⋅H)⋅Jinv
+        
+        is_vector_valued = first(funvals.Nx) isa Vec
+        if is_vector_valued #TODO - combine with helper function ? 
+            d2Ndx2 = (funvals.d2Ndξ2[j, q_point] - dNdx⋅H) ⊡ otimesu(Jinv,Jinv)
+        else
+            d2Ndx2 = Jinv'⋅(funvals.d2Ndξ2[j, q_point] - dNdx⋅H)⋅Jinv
+        end
 
         funvals.dNdx[j, q_point]   = dNdx
         funvals.d2Ndx2[j, q_point] = d2Ndx2
