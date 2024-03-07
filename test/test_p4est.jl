@@ -326,7 +326,7 @@ end
         end
     end
 
-    # Reproducer test for Fig.3 
+    # Reproducer test for Fig.3 BWG 11
     grid = generate_grid(Hexahedron,(2,1,1))
     # (a)
     adaptive_grid = ForestBWG(grid,3)
