@@ -42,6 +42,14 @@ For scalar fields, we always use scalar base functions. For tensorial fields (no
 \end{align*}
 ```
 
+Second order gradients of the shape functions are computed as
+
+```math
+\begin{align*} 
+    \mathrm{grad}(\mathrm{grad}(N(\boldsymbol{x}))) = \frac{\mathrm{d}^2 N}{\mathrm{d}\boldsymbol{x}^2} = \boldsymbol{J}^{-T} \cdot \frac{\mathrm{d}^2\hat{N}}{\mathrm{d}\boldsymbol{\xi}^2} \cdot \boldsymbol{J}^{-1} -  \boldsymbol{J}^{-T} \cdot\mathrm{grad}(N) \cdot \boldsymbol{\mathcal{H}}  \cdot \boldsymbol{J}^{-1}
+\end{align*}
+```
+
 ### Covariant Piola mapping, H(curl)
 `Ferrite.CovariantPiolaMapping`
 
