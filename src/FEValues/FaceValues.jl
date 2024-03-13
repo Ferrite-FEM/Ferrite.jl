@@ -42,10 +42,10 @@ end
 
 function FaceValues(::Type{T}, fqr::FaceQuadratureRule, ip_fun::Interpolation, ip_geo::VectorizedInterpolation{sdim} = default_geometric_interpolation(ip_fun); 
     update_gradients::Union{Bool,Nothing} = nothing, 
-    update_hessians::Union{Bool,Nothing} = nothing) where T 
+    update_hessians::Union{Bool,Nothing} = nothing) where {T,sdim}
 
     _update_gradients = update_gradients === nothing ? true : update_gradients
-    _update_hessians  = update_hessians  === nothing ? true : update_hessians
+    _update_hessians  = update_hessians  === nothing ? false : update_hessians
     _update_hessians && @assert _update_gradients
 
     FunDiffOrder  = convert(Int, _update_gradients) 

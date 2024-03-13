@@ -16,17 +16,17 @@ for (scalar_interpol, quad_rule) in (
                                    )
     DiffOrder=2
     func_interpol = VectorizedInterpolation(scalar_interpol)
-    for DiffOrder in 1:2, func_interpol in (scalar_interpol, VectorizedInterpolation(scalar_interpol))
+    for func_interpol in (scalar_interpol, VectorizedInterpolation(scalar_interpol)), DiffOrder in 1:2
         (DiffOrder==2 && Ferrite.getorder(func_interpol)==1) && continue #No need to test linear interpolations again
         geom_interpol = scalar_interpol # Tests below assume this
         n_basefunc_base = getnbasefunctions(scalar_interpol)
         update_gradients = true
         update_hessians = (DiffOrder==2 && Ferrite.getorder(func_interpol) > 1)
-        fv = if VERSION ≥ v"1.9"
-            @inferred FaceValues(quad_rule, func_interpol, geom_interpol)
-        else # Type unstable on 1.6, but works at least for 1.9 and later. PR882
-            FaceValues(quad_rule, func_interpol, geom_interpol)
-        end
+        #fv = if VERSION ≥ v"1.9"
+        #    @inferred FaceValues(quad_rule, func_interpol, geom_interpol)
+        #else # Type unstable on 1.6, but works at least for 1.9 and later. PR882
+            fv = FaceValues(quad_rule, func_interpol, geom_interpol; update_gradients, update_hessians)
+        #end
         ndim = Ferrite.getdim(func_interpol)
         n_basefuncs = getnbasefunctions(func_interpol)
 
@@ -126,7 +126,7 @@ for (scalar_interpol, quad_rule) in (
                 vol += getdetJdV(fv,i)
             end
             let ip_base = func_interpol isa VectorizedInterpolation ? func_interpol.ip : func_interpol
-                x_face = xs[[Ferrite.facedof_indices(ip_base)[face]...]]
+                x_face = coords[[Ferrite.facedof_indices(ip_base)[face]...]]
                 @test vol ≈ calculate_face_area(ip_base, x_face, face)
             end
 

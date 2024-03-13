@@ -235,7 +235,7 @@ end
         H, G, V = Ferrite.shape_hessian_gradient_and_value(ip, ξ, I)
 
         @test V ≈ V_sa
-        @stes G ≈ G_sa
+        @test G ≈ G_sa
         @test H ≈ H_sa
     end
 end

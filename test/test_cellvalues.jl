@@ -1,6 +1,6 @@
 @testset "CellValues" begin
     scalar_interpol, quad_rule =  (Lagrange{RefQuadrilateral, 2}(), QuadratureRule{RefQuadrilateral}(2))
-@testset "ip=$scalar_interpol quad_rule=$(typeof(quad_rule))" for (scalar_interpol, quad_rule) in  (
+@testset "ip=$scalar_interpol" for (scalar_interpol, quad_rule) in  (
                                     (Lagrange{RefLine, 1}(), QuadratureRule{RefLine}(2)),
                                     (Lagrange{RefLine, 2}(), QuadratureRule{RefLine}(2)),
                                     (Lagrange{RefQuadrilateral, 1}(), QuadratureRule{RefQuadrilateral}(2)),
@@ -19,13 +19,13 @@
                                    )
     DiffOrder=2
     func_interpol = VectorizedInterpolation(scalar_interpol)
-    for DiffOrder in 1:2, func_interpol in (scalar_interpol, VectorizedInterpolation(scalar_interpol))
+    for func_interpol in (scalar_interpol, VectorizedInterpolation(scalar_interpol)), DiffOrder in 1:2
         (DiffOrder==2 && Ferrite.getorder(func_interpol)==1) && continue #No need to test linear interpolations again
         geom_interpol = scalar_interpol # Tests below assume this
         n_basefunc_base = getnbasefunctions(scalar_interpol)
         update_gradients = true
         update_hessians = (DiffOrder==2 && Ferrite.getorder(func_interpol) > 1)
-        cv = @inferred CellValues(quad_rule, func_interpol, geom_interpol; update_gradients, update_hessians)
+        cv = CellValues(quad_rule, func_interpol, geom_interpol; update_gradients, update_hessians)
         ndim = Ferrite.getdim(func_interpol)
         n_basefuncs = getnbasefunctions(func_interpol)
 
@@ -92,7 +92,7 @@
                 if ndim == 3
                     @test (@test_deprecated function_curl(cv, i, ue_vec)) ≈ Ferrite.curl_from_gradient(G_vector)
                 end
-                function_value(cv, i, ue_vec)
+                @test_deprecated function_value(cv, i, ue_vec)
             end
         end
 

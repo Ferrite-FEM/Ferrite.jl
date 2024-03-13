@@ -47,7 +47,7 @@ function CellValues(::Type{T}, qr::QuadratureRule, ip_fun::Interpolation, ip_geo
         update_detJdV::Union{Bool,Nothing} = nothing) where T 
     
     _update_gradients = update_gradients === nothing ? true : update_gradients
-    _update_hessians  = update_hessians  === nothing ? true : update_hessians
+    _update_hessians  = update_hessians  === nothing ? false : update_hessians
     _update_detJdV    = update_detJdV    === nothing ? true : update_detJdV
     _update_hessians && @assert _update_gradients
 
