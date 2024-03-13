@@ -50,21 +50,40 @@ Second order gradients of the shape functions are computed as
 \end{align*}
 ```
 !!! details "Derivation"
-    $$
-    \frac{\mathrm{d}^2 N}{\mathrm{d}x_i \mathrm{d}x_j} = \frac{\mathrm{d}}{\mathrm{d}x_j}(\frac{\mathrm{d} \hat N}{\mathrm{d} \xi_r}) J^{-1}_{ri} + \frac{\mathrm{d} \hat N}{\mathrm{d} \xi_r} \frac{\mathrm{d}}{\mathrm{d}x_j}(J^{-1}_{ri})
-    $$
+    The gradient of the shape functions is obtained using the chain rule:
 
-    First term:
+    \begin{align*} 
+        \frac{\mathrm{d} N}{\mathrm{d}x_i} = \frac{\mathrm{d} \hat N}{\mathrm{d} \xi_r}\frac{\mathrm{d} \xi_r}{\mathrm{d} x_i} = \frac{\mathrm{d} \hat N}{\mathrm{d} \xi_r} J^{-1}_{ri}
+    \end{align*}
 
-    Second term:
+    For the second order gradients, we first use the product rule on the equation above:
 
+    \begin{align*} 
+        \frac{\mathrm{d}^2 N}{\mathrm{d}x_i \mathrm{d}x_j} = \frac{\mathrm{d}}{\mathrm{d}x_j}(\frac{\mathrm{d} \hat N}{\mathrm{d}   \xi_r}) J^{-1}_{ri} + \frac{\mathrm{d} \hat N}{\mathrm{d} \xi_r} \frac{\mathrm{d}}{\mathrm{d}x_j}(J^{-1}_{ri}) 
+    \end{align*}
 
+    The first term can be computed as:
 
-```math
-\begin{align*} 
-    \mathrm{grad}(\mathrm{grad}(N(\boldsymbol{x}))) = \frac{\mathrm{d}^2 N}{\mathrm{d}\boldsymbol{x}^2} = \boldsymbol{J}^{-T} \cdot \frac{\mathrm{d}^2\hat{N}}{\mathrm{d}\boldsymbol{\xi}^2} \cdot \boldsymbol{J}^{-1} -  \boldsymbol{J}^{-T} \cdot\mathrm{grad}(N) \cdot \boldsymbol{\mathcal{H}}  \cdot \boldsymbol{J}^{-1}
-\end{align*}
-```
+    \begin{align*} 
+        \frac{\mathrm{d}}{\mathrm{d}x_j}(\frac{\mathrm{d} \hat N}{\mathrm{d} \xi_r}) J^{-1}_{ri} = J^{-1}_{si}\frac{\mathrm{d}}{\mathrm{d}\xi_s}(\frac{\mathrm{d} \hat N}{\mathrm{d} \xi_r}) J^{-1}_{ri} = J^{-1}_{si}\frac{\mathrm{d}^2 \hat N}{\mathrm{d} \xi_s\mathrm{d} \xi_r} J^{-1}_{ri}
+    \end{align*}
+
+    The second term can be written as:
+
+    \begin{align*} 
+        \frac{\mathrm{d} \hat N}{\mathrm{d} \xi_r}\frac{\mathrm{d}}{\mathrm{d}x_j}(J^{-1}_{ri}) = \frac{\mathrm{d} \hat N}{\mathrm{d} \xi_r}[\frac{\mathrm{d}J^{-1}_{ri}}{\mathrm{d}\xi_s}]\frac{\mathrm{d} \xi_s}{\mathrm{d}x_j} = \frac{\mathrm{d} \hat N}{\mathrm{d} \xi_r}[ - J^{-1}_{ri}\mathcal{H}_{ris} J^{-1}_{li}]J^{-1}_{sj} = - \frac{\mathrm{d} \hat N}{\mathrm{d} x_i}\mathcal{H}_{ris} J^{-1}_{li}J^{-1}_{sj} 
+    \end{align*}
+
+    where we have used that the inverse of the jacobian can be computed as:
+    
+    \begin{align*} 
+    0 = \frac{\mathrm{d}}{\mathrm{d}\xi_s} (J_{rl} J^{-1}_{li} ) = \frac{\mathrm{d}J_{rl}}{\mathrm{d}\xi_s} J^{-1}_{li}  + J_{ri} \frac{\mathrm{d}J^{-1}_{li}}{\mathrm{d}\xi_s} = 0 \quad \Rightarrow \\
+    \end{align*}
+
+    \begin{align*} 
+    \frac{\mathrm{d}J^{-1}_{li}}{\mathrm{d}\xi_s} = - J^{-1}_{ri}\frac{\mathrm{d}J_{rl}}{\mathrm{d}\xi_s} J^{-1}_{li} = - J^{-1}_{ri}\mathcal{H}_{ris} J^{-1}_{li}\\
+    \end{align*}
+
 
 ### Covariant Piola mapping, H(curl)
 `Ferrite.CovariantPiolaMapping`
