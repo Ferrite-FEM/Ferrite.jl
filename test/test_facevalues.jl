@@ -22,7 +22,11 @@ for (scalar_interpol, quad_rule) in (
         n_basefunc_base = getnbasefunctions(scalar_interpol)
         update_gradients = true
         update_hessians = (DiffOrder==2 && Ferrite.getorder(func_interpol) > 1)
-        fv = FaceValues(quad_rule, func_interpol, geom_interpol; update_gradients, update_hessians)
+        fv = if VERSION ≥ v"1.9"
+            @inferred FaceValues(quad_rule, func_interpol, geom_interpol)
+        else # Type unstable on 1.6, but works at least for 1.9 and later. PR882
+            FaceValues(quad_rule, func_interpol, geom_interpol)
+        end
         ndim = Ferrite.getdim(func_interpol)
         n_basefuncs = getnbasefunctions(func_interpol)
 

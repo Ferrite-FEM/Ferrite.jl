@@ -41,13 +41,20 @@ struct FaceValues{FV, GM, FQR, detT, nT, V_FV<:AbstractVector{FV}, V_GM<:Abstrac
 end
 
 function FaceValues(::Type{T}, fqr::FaceQuadratureRule, ip_fun::Interpolation, ip_geo::VectorizedInterpolation{sdim} = default_geometric_interpolation(ip_fun); 
-        update_gradients::Bool = true, update_hessians::Bool = false) where {T,sdim} 
-    
-    FunDiffOrder = convert(Int, update_gradients) # Logic must change when supporting update_hessian kwargs
-    FunDiffOrder += convert(Int, update_hessians) # Logic must change when supporting update_hessian kwargs
+    update_gradients::Union{Bool,Nothing} = nothing, 
+    update_hessians::Union{Bool,Nothing} = nothing) where T 
+
+    _update_gradients = update_gradients === nothing ? true : update_gradients
+    _update_hessians  = update_hessians  === nothing ? true : update_hessians
+    _update_hessians && @assert _update_gradients
+
+    FunDiffOrder  = convert(Int, _update_gradients) 
+    FunDiffOrder += convert(Int, _update_hessians) 
     GeoDiffOrder = max(required_geo_diff_order(mapping_type(ip_fun), FunDiffOrder), 1)
-    geo_mapping = [GeometryMapping{GeoDiffOrder}(T, ip_geo.ip, qr) for qr in fqr.face_rules]
-    fun_values = [FunctionValues{FunDiffOrder}(T, ip_fun, qr, ip_geo) for qr in fqr.face_rules]
+    # Not sure why the type-asserts are required here but not for CellValues, 
+    # but they solve the type-instability for FaceValues
+    geo_mapping = [GeometryMapping{GeoDiffOrder}(T, ip_geo.ip, qr) for qr in fqr.face_rules]::Vector{<:GeometryMapping{GeoDiffOrder}}
+    fun_values = [FunctionValues{FunDiffOrder}(T, ip_fun, qr, ip_geo) for qr in fqr.face_rules]::Vector{<:FunctionValues{FunDiffOrder}}
     max_nquadpoints = maximum(qr->length(getweights(qr)), fqr.face_rules)
     detJdV  = fill(T(NaN), max_nquadpoints)
     normals = fill(zero(Vec{sdim, T}) * T(NaN), max_nquadpoints)

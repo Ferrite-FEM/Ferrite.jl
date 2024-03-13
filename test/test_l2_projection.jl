@@ -146,6 +146,13 @@ function test_projection_mixedgrid()
     proj = L2Projector(ip, mesh; geom_ip=ip_geom, set=quadset)
     point_vars = project(proj, qp_values, qr)
     point_vars_2 = project(proj, qp_values_matrix, qr)
+    projection_at_nodes = evaluate_at_grid_nodes(proj, point_vars)
+    for cellid in quadset
+        for nodeid in mesh.cells[cellid].nodes
+            x = mesh.nodes[nodeid].x
+            @test projection_at_nodes[nodeid] ≈ f(x)
+        end
+    end
 
     ae = zeros(3, length(point_vars))
     for i in 1:3
@@ -155,7 +162,6 @@ function test_projection_mixedgrid()
     @test point_vars ≈ point_vars_2 ≈ ae
 
     # Do the same thing but for the triangle set
-    order = 2
     ip = Lagrange{RefTriangle, order}()
     ip_geom = Lagrange{RefTriangle, 1}()
     qr = QuadratureRule{RefTriangle}(4)
@@ -176,6 +182,14 @@ function test_projection_mixedgrid()
     proj = L2Projector(ip, mesh; geom_ip=ip_geom, set=triaset)
     point_vars = project(proj, qp_values_tria, qr)
     point_vars_2 = project(proj, qp_values_matrix_tria, qr)
+    projection_at_nodes = evaluate_at_grid_nodes(proj, point_vars)
+    for cellid in triaset
+        for nodeid in mesh.cells[cellid].nodes
+            x = mesh.nodes[nodeid].x
+            @test projection_at_nodes[nodeid] ≈ f(x)
+        end
+    end
+
     ae = zeros(3, length(point_vars))
     for i in 1:3
         apply_analytical!(@view(ae[i, :]), proj.dh, :_, x -> f(x).data[i], triaset)
