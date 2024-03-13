@@ -49,6 +49,22 @@ Second order gradients of the shape functions are computed as
     \mathrm{grad}(\mathrm{grad}(N(\boldsymbol{x}))) = \frac{\mathrm{d}^2 N}{\mathrm{d}\boldsymbol{x}^2} = \boldsymbol{J}^{-T} \cdot \frac{\mathrm{d}^2\hat{N}}{\mathrm{d}\boldsymbol{\xi}^2} \cdot \boldsymbol{J}^{-1} -  \boldsymbol{J}^{-T} \cdot\mathrm{grad}(N) \cdot \boldsymbol{\mathcal{H}}  \cdot \boldsymbol{J}^{-1}
 \end{align*}
 ```
+!!! details "Derivation"
+    $$
+    \frac{\mathrm{d}^2 N}{\mathrm{d}x_i \mathrm{d}x_j} = \frac{\mathrm{d}}{\mathrm{d}x_j}(\frac{\mathrm{d} \hat N}{\mathrm{d} \xi_r}) J^{-1}_{ri} + \frac{\mathrm{d} \hat N}{\mathrm{d} \xi_r} \frac{\mathrm{d}}{\mathrm{d}x_j}(J^{-1}_{ri})
+    $$
+
+    First term:
+
+    Second term:
+
+
+
+```math
+\begin{align*} 
+    \mathrm{grad}(\mathrm{grad}(N(\boldsymbol{x}))) = \frac{\mathrm{d}^2 N}{\mathrm{d}\boldsymbol{x}^2} = \boldsymbol{J}^{-T} \cdot \frac{\mathrm{d}^2\hat{N}}{\mathrm{d}\boldsymbol{\xi}^2} \cdot \boldsymbol{J}^{-1} -  \boldsymbol{J}^{-T} \cdot\mathrm{grad}(N) \cdot \boldsymbol{\mathcal{H}}  \cdot \boldsymbol{J}^{-1}
+\end{align*}
+```
 
 ### Covariant Piola mapping, H(curl)
 `Ferrite.CovariantPiolaMapping`

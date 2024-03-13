@@ -1,41 +1,3 @@
-
-#Inverse parametric mapping ξ = ϕ(x)
-function MAPPING(interpolation, cell_coordinates, global_coordinate::Vec{dim}) where dim
-    ξ = zero(global_coordinate)
-    n_basefuncs = getnbasefunctions(interpolation)
-    max_iters = 10
-    tol_norm = 1e-16
-    for _ in 1:max_iters
-        global_guess = zero(global_coordinate)
-        J = zero(Tensor{2, dim, T})
-        # TODO batched eval after 764 is merged.
-        for j in 1:n_basefuncs
-            dNdξ, N = Ferrite.shape_gradient_and_value(interpolation, ξ, j)
-            global_guess += N * cell_coordinates[j]
-            J += cell_coordinates[j] ⊗ dNdξ
-        end
-        residual = global_guess - global_coordinate
-        if norm(residual) <= tol_norm
-            break
-        end
-        ξ -= inv(J) ⋅ residual
-    end
-    return ξ
-end
-
-function function_value_from_physical_coord(interpolation::Interpolation, cell_coordinates, X::Vec{dim,T}, ue) where {dim,T}
-    n_basefuncs = getnbasefunctions(interpolation)
-    scalar_ip = interpolation isa Ferrite.ScalarInterpolation ? interpolation : interpolation.ip
-    @assert length(ue) == n_basefuncs
-    ξ = MAPPING(scalar_ip, cell_coordinates, X)
-    u = zero(typeof(shape_value(interpolation, ξ, 1))) #Is there a utility function for this init?
-    for j in 1:n_basefuncs
-        N = shape_value(interpolation, ξ, j)
-        u += N * ue[j]
-    end
-    return u
-end
-
 @testset "CellValues" begin
     scalar_interpol, quad_rule =  (Lagrange{RefQuadrilateral, 2}(), QuadratureRule{RefQuadrilateral}(2))
 @testset "ip=$scalar_interpol quad_rule=$(typeof(quad_rule))" for (scalar_interpol, quad_rule) in  (
@@ -58,7 +20,7 @@ end
     DiffOrder=2
     func_interpol = VectorizedInterpolation(scalar_interpol)
     for DiffOrder in 1:2, func_interpol in (scalar_interpol, VectorizedInterpolation(scalar_interpol))
-        T = eltype(quad_rule.weights)
+        (DiffOrder==2 && Ferrite.getorder(func_interpol)==1) && continue #No need to test linear interpolations again
         geom_interpol = scalar_interpol # Tests below assume this
         n_basefunc_base = getnbasefunctions(scalar_interpol)
         update_gradients = true
@@ -77,9 +39,9 @@ end
         # Since this is a linear deformation we should get back the exact values
         # from the interpolation.
         V, G, H = if func_interpol isa Ferrite.ScalarInterpolation
-            (rand(T), rand(Tensor{1, ndim}), Tensor{2, ndim}((i,j)-> i==j ? rand(T) : 0.0))
+            (rand(), rand(Tensor{1, ndim}), Tensor{2, ndim}((i,j)-> i==j ? rand() : 0.0))
         else
-            (rand(Tensor{1, ndim}), rand(Tensor{2, ndim}), Tensor{3, ndim}((i,j,k)-> i==j==k ? rand(T) : 0.0))
+            (rand(Tensor{1, ndim}), rand(Tensor{2, ndim}), Tensor{3, ndim}((i,j,k)-> i==j==k ? rand() : 0.0))
         end
 
         u_funk(x,V,G,H) = begin 
@@ -136,11 +98,11 @@ end
 
         #Check if the non-linear mapping is correct
         #Only do this for one interpolation becuase it relise on AD on "iterative function"
-        if scalar_interpol === Lagrange{RefQuadrilateral, 1}()
+        if scalar_interpol === Lagrange{RefQuadrilateral, 2}()
             coords_nl = [x+rand(x)*0.01 for x in coords] #add some displacement to nodes
             reinit!(cv, coords_nl)
 
-            _ue_nl = [u_funk(coords[i],V,G,H) for i in 1:n_basefunc_base]
+            _ue_nl = [u_funk(coords_nl[i],V,G,H) for i in 1:n_basefunc_base]
             ue_nl = reinterpret(Float64, _ue_nl)
             
             for i in 1:getnquadpoints(cv)

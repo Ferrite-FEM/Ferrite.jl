@@ -1564,6 +1564,9 @@ function shape_hessian_gradient_and_value(ipv::VectorizedInterpolation{dim, shap
 end
 # vdim != refdim
 function shape_hessian_gradient_and_value(ipv::VectorizedInterpolation{vdim, shape}, ξ::V, I::Int) where {vdim, refdim, shape <: AbstractRefShape{refdim}, T, V <: Vec{refdim, T}}
+    _shape_hessian_gradient_and_value_static_array(ipv, ξ, I)
+end
+function _shape_hessian_gradient_and_value_static_array(ipv::VectorizedInterpolation{vdim, shape}, ξ::V, I::Int) where {vdim, refdim, shape <: AbstractRefShape{refdim}, T, V <: Vec{refdim, T}}
     # Load with dual numbers and compute the value
     f = x -> shape_value(ipv, x, I)
     ξd =  Tensors._load(Tensors._load(ξ, Tensors.Tag(f, V)), Tensors.Tag(f, V))

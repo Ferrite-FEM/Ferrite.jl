@@ -294,3 +294,42 @@ module DummyRefShapes
         )
     end
 end
+
+############################################################
+# Inverse parametric mapping ξ = ϕ(x) for testing hessians #             
+############################################################
+function function_value_from_physical_coord(interpolation::Interpolation, cell_coordinates, X::Vec{dim,T}, ue::Vector{T2}) where {dim,T,T2}
+    n_basefuncs = getnbasefunctions(interpolation)
+    scalar_ip = interpolation isa Ferrite.ScalarInterpolation ? interpolation : interpolation.ip
+    @assert length(ue) == n_basefuncs
+    ξ = MAPPING(scalar_ip, cell_coordinates, X)
+    u = zero(typeof(shape_value(interpolation, ξ, 1))) #Is there a utility function for this init?
+    for j in 1:n_basefuncs
+        N = shape_value(interpolation, ξ, j)
+        u += N * ue[j]
+    end
+    return u
+end
+
+function MAPPING(interpolation, cell_coordinates, global_coordinate::Vec{dim}) where dim
+    ξ = zero(global_coordinate)
+    n_basefuncs = getnbasefunctions(interpolation)
+    max_iters = 10
+    tol_norm = 1e-16
+    for _ in 1:max_iters
+        global_guess = zero(global_coordinate)
+        J = zero(Tensor{2, dim, T})
+        # TODO batched eval after 764 is merged.
+        for j in 1:n_basefuncs
+            dNdξ, N = Ferrite.shape_gradient_and_value(interpolation, ξ, j)
+            global_guess += N * cell_coordinates[j]
+            J += cell_coordinates[j] ⊗ dNdξ
+        end
+        residual = global_guess - global_coordinate
+        if norm(residual) <= tol_norm
+            break
+        end
+        ξ -= inv(J) ⋅ residual
+    end
+    return ξ
+end
