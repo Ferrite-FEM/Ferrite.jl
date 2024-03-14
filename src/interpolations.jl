@@ -84,6 +84,7 @@ struct InterpolationInfo
     nedgedofs::Vector{Int}
     nfacedofs::Vector{Int}
     ncelldofs::Int
+    nglobaldofs::Int
     reference_dim::Int
     adjust_during_distribution::Bool
     n_copies::Int
@@ -95,6 +96,7 @@ function InterpolationInfo(interpolation::InterpolationByDim{3}, n_copies)
         [length(i) for i ∈ edgedof_interior_indices(interpolation)],
         [length(i) for i ∈ facedof_interior_indices(interpolation)],
         length(celldof_interior_indices(interpolation)),
+        0,
         3,
         adjust_dofs_during_distribution(interpolation),
         n_copies,
@@ -107,6 +109,7 @@ function InterpolationInfo(interpolation::InterpolationByDim{2}, n_copies)
         Int[],
         [length(i) for i ∈ facedof_interior_indices(interpolation)],
         length(celldof_interior_indices(interpolation)),
+        0, 
         2,
         adjust_dofs_during_distribution(interpolation),
         n_copies,
@@ -119,6 +122,7 @@ function InterpolationInfo(interpolation::InterpolationByDim{1}, n_copies)
         Int[],
         Int[],
         length(celldof_interior_indices(interpolation)),
+        0,
         1,
         adjust_dofs_during_distribution(interpolation),
         n_copies,
@@ -126,6 +130,19 @@ function InterpolationInfo(interpolation::InterpolationByDim{1}, n_copies)
     )
 end
 InterpolationInfo(interpolation::Interpolation) = InterpolationInfo(interpolation, 1)
+
+
+struct GlobalDofInterpolation{N} <: Interpolation{:global, Nothing, Nothing} end
+getdim(::GlobalDofInterpolation) = 0
+getnbasefunctions(::GlobalDofInterpolation{N}) where N = N # Required to make dof_range work. 
+getorder(::GlobalDofInterpolation{N}) where N = N          # Used for checks when adding in multiple SubDofHandlers
+n_components(::GlobalDofInterpolation{N}) where N = N      # Used for checks when adding in multiple SubDofHandlers
+
+
+function InterpolationInfo(::GlobalDofInterpolation{N}) where N
+    InterpolationInfo(Int[], Int[], Int[],    0,      N,     0,  false,    1,  false)
+                    #  vert,  edge,  face, cell, global,  rdim, adjust, ncpy, discont
+end
 
 # Some redundant information about the geometry of the reference cells.
 nfaces(::Interpolation{RefHypercube{dim}}) where {dim} = 2*dim

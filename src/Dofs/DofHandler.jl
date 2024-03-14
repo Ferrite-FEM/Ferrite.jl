@@ -56,15 +56,17 @@ close!(dh) # Finalize by closing the parent
 function SubDofHandler(dh::DH, cellset) where {DH <: AbstractDofHandler}
     # TODO: Should be an inner constructor.
     isclosed(dh) && error("DofHandler already closed")
-    # Compute the celltype and make sure all elements have the same one
-    CT = getcelltype(dh.grid, first(cellset))
-    if any(x -> getcelltype(dh.grid, x) !== CT, cellset)
-        error("all cells in a SubDofHandler must be of the same type")
-    end
-    # Make sure this set is disjoint with all other existing
-    for sdh in dh.subdofhandlers
-        if !isdisjoint(cellset, sdh.cellset)
-            error("cellset not disjoint with sets in existing SubDofHandlers")
+    if !isempty(cellset) # Allow empty cellset
+        # Compute the celltype and make sure all elements have the same one
+        CT = getcelltype(dh.grid, first(cellset))
+        if any(x -> getcelltype(dh.grid, x) !== CT, cellset)
+            error("all cells in a SubDofHandler must be of the same type")
+        end
+        # Make sure this set is disjoint with all other existing
+        for sdh in dh.subdofhandlers
+            if !isdisjoint(cellset, sdh.cellset)
+                error("cellset not disjoint with sets in existing SubDofHandlers")
+            end
         end
     end
     # Construct and insert into the parent dh
@@ -272,9 +274,11 @@ function add!(sdh::SubDofHandler, name::Symbol, ip::Interpolation)
     end
     
     # Check that interpolation is compatible with cells it it added to
-    refshape_sdh = getrefshape(getcells(sdh.dh.grid, first(sdh.cellset)))
-    if refshape_sdh !== getrefshape(ip)
-        error("The refshape of the interpolation $(getrefshape(ip)) is incompatible with the refshape $refshape_sdh of the cells.")
+    if !isa(ip, GlobalDofInterpolation)
+        refshape_sdh = getrefshape(getcells(sdh.dh.grid, first(sdh.cellset)))
+        if refshape_sdh !== getrefshape(ip)
+            error("The refshape of the interpolation $(getrefshape(ip)) is incompatible with the refshape $refshape_sdh of the cells.")
+        end
     end
 
     # Store in the SubDofHandler, it is collected to the parent DofHandler in close!.
@@ -365,6 +369,9 @@ function __close!(dh::DofHandler{dim}) where {dim}
     # surface) is uniquely determined by 3 vertices.
     facedicts = [Dict{NTuple{dim,Int}, Int}() for _ in 1:numfields]
 
+    # Set to first global dof in ip when distributed. Actually a Vector, but following naming convention for vertices as well...
+    globaldicts = [ScalarWrapper(0) for _ in 1:numfields] 
+
     # Set initial values
     nextdof = 1  # next free dof to distribute
 
@@ -378,6 +385,7 @@ function __close!(dh::DofHandler{dim}) where {dim}
             vertexdicts,
             edgedicts,
             facedicts,
+            globaldicts,
         )
     end
     dh.ndofs[] = maximum(dh.cell_dofs; init=0)
@@ -392,16 +400,18 @@ end
 
 Main entry point to distribute dofs for a single [`SubDofHandler`](@ref) on its subdomain.
 """
-function _close_subdofhandler!(dh::DofHandler{sdim}, sdh::SubDofHandler, sdh_index::Int, nextdof::Int, vertexdicts, edgedicts, facedicts) where {sdim}
+function _close_subdofhandler!(dh::DofHandler{sdim}, sdh::SubDofHandler, sdh_index::Int, nextdof::Int, vertexdicts, edgedicts, facedicts, globaldicts) where {sdim}
     ip_infos = InterpolationInfo[]
     for interpolation in sdh.field_interpolations
         ip_info = InterpolationInfo(interpolation)
         begin
             next_dof_index = 1
-            for vdofs ∈ vertexdof_indices(interpolation)
-                for dof_index ∈ vdofs
-                    @assert dof_index == next_dof_index "Vertex dof ordering not supported. Please consult the dev docs."
-                    next_dof_index += 1
+            if getdim(interpolation) > 0
+                for vdofs ∈ vertexdof_indices(interpolation)
+                    for dof_index ∈ vdofs
+                        @assert dof_index == next_dof_index "Vertex dof ordering not supported. Please consult the dev docs."
+                        next_dof_index += 1
+                    end
                 end
             end
             if getdim(interpolation) > 2
@@ -441,7 +451,23 @@ function _close_subdofhandler!(dh::DofHandler{sdim}, sdh::SubDofHandler, sdh_ind
     # Mapping between the local field index and the global field index
     global_fidxs = Int[findfirst(gname -> gname === lname, dh.field_names) for lname in sdh.field_names]
 
-    # loop over all the cells, and distribute dofs for all the fields
+    # First distribute any global dofs
+    for (lidx, gidx) in pairs(global_fidxs)
+        if ip_infos[lidx].nglobaldofs != 0      # field has global dofs
+            if globaldicts[gidx][] == 0         # the global dofs haven't been distributed earlier
+                globaldicts[gidx][] = nextdof   
+                nextdof += ip_infos[lidx].nglobaldofs
+                # Set ndofs_per_cell in case there are no cells in SubDofHandler
+                if sdh.ndofs_per_cell[] == -1
+                    sdh.ndofs_per_cell[] = ip_infos[lidx].nglobaldofs
+                else
+                    sdh.ndofs_per_cell[] += ip_infos[lidx].nglobaldofs
+                end
+            end
+        end
+    end
+
+    # then loop over all the cells, and distribute dofs for all the fields
     # TODO: Remove BitSet construction when SubDofHandler ensures sorted collections
     for ci in BitSet(sdh.cellset)
         @debug println("Creating dofs for cell #$ci")
@@ -464,7 +490,8 @@ function _close_subdofhandler!(dh::DofHandler{sdim}, sdh::SubDofHandler, sdh_ind
                 nextdof,
                 vertexdicts[gidx],
                 edgedicts[gidx],
-                facedicts[gidx]
+                facedicts[gidx],
+                globaldicts[gidx],
             )
         end
 
@@ -485,13 +512,15 @@ end
 
 Main entry point to distribute dofs for a single cell.
 """
-function _distribute_dofs_for_cell!(dh::DofHandler{sdim}, cell::AbstractCell, ip_info::InterpolationInfo, nextdof::Int, vertexdict, edgedict, facedict) where {sdim}
+function _distribute_dofs_for_cell!(dh::DofHandler{sdim}, cell::AbstractCell, ip_info::InterpolationInfo, nextdof::Int, vertexdict, edgedict, facedict, globaldict) where {sdim}
 
     # Distribute dofs for vertices
-    nextdof = add_vertex_dofs(
-        dh.cell_dofs, cell, vertexdict,
-        ip_info.nvertexdofs, nextdof, ip_info.n_copies,
-    )
+    if ip_info.reference_dim > 0
+        nextdof = add_vertex_dofs(
+            dh.cell_dofs, cell, vertexdict,
+            ip_info.nvertexdofs, nextdof, ip_info.n_copies,
+        )
+    end
 
     # Distribute dofs for edges (only applicable when dim is 3)
     if sdim == 3 && (ip_info.reference_dim == 3 || ip_info.reference_dim == 2)
@@ -518,6 +547,9 @@ function _distribute_dofs_for_cell!(dh::DofHandler{sdim}, cell::AbstractCell, ip
     nextdof = add_cell_dofs(
         dh.cell_dofs, ip_info.ncelldofs, nextdof, ip_info.n_copies,
     )
+
+    # Distribute global dofs for cells
+    nextdof = add_global_dofs(dh.cell_dofs, globaldict, ip_info.nglobaldofs, nextdof)
 
     return nextdof
 end
@@ -598,6 +630,14 @@ function add_cell_dofs(cell_dofs::CD, ncelldofs::Int, nextdof::Int, n_copies::In
     for _ in 1:ncelldofs, _ in 1:n_copies
         push!(cell_dofs, nextdof)
         nextdof += 1
+    end
+    return nextdof
+end
+
+function add_global_dofs(cell_dofs, globaldict, nglobaldofs, nextdof)
+    if nglobaldofs != 0
+        @assert globaldict[] != 0
+        append!(cell_dofs, globaldict[] .+ (0:(nglobaldofs - 1)))
     end
     return nextdof
 end
