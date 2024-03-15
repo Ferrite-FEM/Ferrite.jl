@@ -1,5 +1,4 @@
 @testset "FaceValues" begin
-    scalar_interpol, quad_rule =  (Lagrange{RefQuadrilateral, 2}(), FaceQuadratureRule{RefQuadrilateral}(2))
 for (scalar_interpol, quad_rule) in (
                                     (Lagrange{RefLine, 1}(), FaceQuadratureRule{RefLine}(2)),
                                     (Lagrange{RefLine, 2}(), FaceQuadratureRule{RefLine}(2)),
@@ -14,8 +13,6 @@ for (scalar_interpol, quad_rule) in (
                                     (Lagrange{RefPyramid, 2}(), FaceQuadratureRule{RefPyramid}(2)),
                                     (Lagrange{RefPrism, 2}(), FaceQuadratureRule{RefPrism}(2)),
                                    )
-    DiffOrder=2
-    func_interpol = VectorizedInterpolation(scalar_interpol)
     for func_interpol in (scalar_interpol, VectorizedInterpolation(scalar_interpol)), DiffOrder in 1:2
         (DiffOrder==2 && Ferrite.getorder(func_interpol)==1) && continue #No need to test linear interpolations again
         geom_interpol = scalar_interpol # Tests below assume this

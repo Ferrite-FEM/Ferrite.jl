@@ -62,6 +62,10 @@ struct FunctionValues{DiffOrder, IP, N_t, dNdx_t, dNdξ_t, d2Ndx2_t, d2Ndξ2_t}
     end
 end
 function FunctionValues{DiffOrder}(::Type{T}, ip::Interpolation, qr::QuadratureRule, ip_geo::VectorizedInterpolation) where {DiffOrder, T}
+    sdim = n_components(ip_geo)
+    rdim = getdim(ip)
+    ((rdim != sdim) && DiffOrder>1) && error("CellValues/FunctionValues for embedded elements and higher order gradient not implemented")
+
     n_shape = getnbasefunctions(ip)
     n_qpoints = getnquadpoints(qr)
     
@@ -198,10 +202,6 @@ end
 end
 
 @inline function apply_mapping!(funvals::FunctionValues{2}, ::IdentityMapping, q_point::Int, mapping_values, args...)
-    sdim = sdim_from_gradtype(eltype(funvals.dNdx))
-    rdim = getdim(funvals.ip)
-    (rdim != sdim) && error("Mapping for embedded elements and higher order gradient not implemented")
-
     Jinv = calculate_Jinv(getjacobian(mapping_values))
     H    = gethessian(mapping_values)
     is_vector_valued = first(funvals.Nx) isa Vec

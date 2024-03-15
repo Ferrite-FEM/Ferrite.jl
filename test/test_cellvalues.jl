@@ -1,5 +1,4 @@
 @testset "CellValues" begin
-    scalar_interpol, quad_rule =  (Lagrange{RefQuadrilateral, 2}(), QuadratureRule{RefQuadrilateral}(2))
 @testset "ip=$scalar_interpol" for (scalar_interpol, quad_rule) in  (
                                     (Lagrange{RefLine, 1}(), QuadratureRule{RefLine}(2)),
                                     (Lagrange{RefLine, 2}(), QuadratureRule{RefLine}(2)),
@@ -17,8 +16,6 @@
                                     (Lagrange{RefPrism, 2}(), QuadratureRule{RefPrism}(2)),
                                     (Lagrange{RefPyramid, 2}(), QuadratureRule{RefPyramid}(2)),
                                    )
-    DiffOrder=2
-    func_interpol = VectorizedInterpolation(scalar_interpol)
     for func_interpol in (scalar_interpol, VectorizedInterpolation(scalar_interpol)), DiffOrder in 1:2
         (DiffOrder==2 && Ferrite.getorder(func_interpol)==1) && continue #No need to test linear interpolations again
         geom_interpol = scalar_interpol # Tests below assume this
