@@ -41,9 +41,15 @@ struct FaceValues{FV, GM, FQR, detT, nT, V_FV<:AbstractVector{FV}, V_GM<:Abstrac
 end
 
 function FaceValues(::Type{T}, fqr::FaceQuadratureRule, ip_fun::Interpolation, ip_geo::VectorizedInterpolation{sdim} = default_geometric_interpolation(ip_fun); 
-        update_gradients::Union{Bool,Nothing} = nothing) where {T,sdim} 
-    
-    FunDiffOrder = update_gradients === nothing ? 1 : convert(Int, update_gradients) # Logic must change when supporting update_hessian kwargs
+    update_gradients::Union{Bool,Nothing} = nothing, 
+    update_hessians::Union{Bool,Nothing} = nothing) where {T,sdim}
+
+    _update_gradients = update_gradients === nothing ? true : update_gradients
+    _update_hessians  = update_hessians  === nothing ? false : update_hessians
+    _update_hessians && @assert _update_gradients
+
+    FunDiffOrder  = convert(Int, _update_gradients) 
+    FunDiffOrder += convert(Int, _update_hessians) 
     GeoDiffOrder = max(required_geo_diff_order(mapping_type(ip_fun), FunDiffOrder), 1)
     # Not sure why the type-asserts are required here but not for CellValues, 
     # but they solve the type-instability for FaceValues
@@ -84,6 +90,7 @@ get_fun_values(fv::FaceValues) = @inbounds fv.fun_values[getcurrentface(fv)]
 
 @propagate_inbounds shape_value(fv::FaceValues, q_point::Int, i::Int) = shape_value(get_fun_values(fv), q_point, i)
 @propagate_inbounds shape_gradient(fv::FaceValues, q_point::Int, i::Int) = shape_gradient(get_fun_values(fv), q_point, i)
+@propagate_inbounds shape_hessian(fv::FaceValues, q_point::Int, i::Int) = shape_hessian(get_fun_values(fv), q_point, i)
 @propagate_inbounds shape_symmetric_gradient(fv::FaceValues, q_point::Int, i::Int) = shape_symmetric_gradient(get_fun_values(fv), q_point, i)
 
 """

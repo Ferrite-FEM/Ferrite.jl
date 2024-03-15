@@ -33,6 +33,7 @@ export
     reinit!,
     shape_value,
     shape_gradient,
+    shape_hessian,
     shape_symmetric_gradient,
     shape_divergence,
     shape_curl,
