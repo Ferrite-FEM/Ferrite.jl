@@ -1751,7 +1751,6 @@ function get_direction(::Nedelec{2,RefTriangle,2}, j, cell)
     return face_vertices[2] > face_vertices[1] ? 1 : -1
 end
 
-# RefTetrahedron, 1st order Lagrange - 𝐍𝐎𝐓 𝐓𝐄𝐒𝐓𝐄𝐃  
 # https://defelement.com/elements/examples/tetrahedron-nedelec1-lagrange-1.html
 function shape_value(ip::Nedelec{3,RefTetrahedron,1}, ξ::Vec{3,T}, i::Int) where T
     x, y, z = ξ
@@ -1789,3 +1788,43 @@ It might be that this works automatically, following `adjust_dofs_during_distrib
 but test cases need to be developed first to make sure. 
 No point in implementing guesses that cannot be verified...
 =#
+
+# https://defelement.com/elements/examples/hexahedron-nedelec1-lagrange-1.html
+function shape_value(ip::Nedelec{3,RefHexahedron,1}, ξ::Vec{3,T}, i::Int) where T
+    x, y, z = 2ξ - ones(ξ)
+    # Edge 1 (defelement 0, positive)
+    i ==  1 && return Vec(- y*z - y - z + 1, zero(T), zero(T))
+    # Edge 2 (defelement 3, positive)
+    i ==  2 && return Vec(zero(T), x * (1 - z), zero(T))
+    # Edge 3 (defelement 5, negative)
+    i ==  3 && return Vec(-y*(1-z), zero(T), zero(T))
+    # Edge 4 (defelement 1, negative)
+    i ==  4 && return Vec(zero(T), - x*z + x + z - 1, zero(T))
+    # Edge 5 (defelement 8, positive)
+    i ==  5 && return Vec(z*(1-y), zero(T), zero(T))
+    # Edge 6 (defelement 10, positive)
+    i ==  6 && return Vec(zero(T), z * z, zero(T))
+    # Edge 7 (defelement 11, negative)
+    i ==  7 && return Vec(- y*z, zero(T), zero(T))
+    # Edge 8 (defelement 9, negative)
+    i ==  8 && return Vec(zero(T), - z * (1 - x), zero(T))
+    # Edge 9 (defelement 2, positive)
+    i ==  9 && return Vec(zero(T), zero(T), x*y - x - y + 1)
+    # Edge 10 (defelement 4, positive)
+    i == 10 && return Vec(zero(T), zero(T), x * (1 - y))
+    # Edge 11 (defelement 7, positive)
+    i == 11 && return Vec(zero(T), zero(T), x * y)
+    # Edge 12 (defelement 6, positive)
+    i == 12 && return Vec(zero(T), zero(T), y * (1 - x))
+
+    throw(ArgumentError("no shape function $i for interpolation $ip"))
+end
+
+getnbasefunctions(::Nedelec{3,RefHexahedron,1}) = 12
+edgedof_interior_indices(::Nedelec{3,RefHexahedron,1}) = ntuple(i->(i,), 12)
+adjust_dofs_during_distribution(::Nedelec{3,RefHexahedron,1}) = false
+
+function get_direction(::Nedelec{3,RefHexahedron,1}, j, cell)
+    edge_vertices = edges(cell)[j]
+    return edge_vertices[2] > edge_vertices[1] ? 1 : -1
+end
