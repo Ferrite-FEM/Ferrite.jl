@@ -233,7 +233,7 @@ end
     transformation_functions = Dict(
         Nedelec=>(v,n)-> v - n*(v⋅n),   # Hcurl (tangent continuity)
         RaviartThomas=>(v,n) -> v ⋅ n)  # Hdiv (normal continuity)
-    for CT in (Triangle, QuadraticTriangle, Tetrahedron)
+    for CT in (Triangle, QuadraticTriangle, Tetrahedron, Hexahedron)
         dim = Ferrite.getdim(CT)
         p1, p2 = (rand(Vec{dim}), ones(Vec{dim})+rand(Vec{dim}))
         grid = generate_grid(CT, ntuple(_->nel, dim), p1, p2)
@@ -247,13 +247,14 @@ end
             for IPT in (Nedelec, RaviartThomas)
                 dim == 3 && order > 1 && continue
                 IPT == RaviartThomas && (dim == 3 || order > 1) && continue
+                IPT == RaviartThomas && (CT == Hexahedron) && continue
                 transformation_function=transformation_functions[IPT]
                 ip = IPT{dim,RefShape,order}()
                 @testset "$CT, $ip" begin
                     dh = DofHandler(grid)
                     add!(dh, :u, ip)
                     close!(dh)
-                    cellnr = getncells(grid)÷2 # Should be a cell in the center
+                    cellnr = getncells(grid)÷2 + 1 # Should be a cell in the center
                     for facenr in 1:nfaces(RefShape)
                         fi = FaceIndex(cellnr, facenr)
                         # Check continuity of tangential function value

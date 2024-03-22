@@ -1790,10 +1790,14 @@ No point in implementing guesses that cannot be verified...
 =#
 
 # https://defelement.com/elements/examples/hexahedron-nedelec1-lagrange-1.html
+# TODO: Need to "map" from defelement [0,1] refcell to Ferrite [-1,1], which 
+# for Nedelec should be scaling with J^-T where J=2I, i.e. divide by 2
+# For RT elements with Hdiv, this should instead be J/det(J) => 2/2^dim, 
+# i.e. also divide by 2 in 3d, no scaling in 2d, and multiply by 2 in 1d. 
 function shape_value(ip::Nedelec{3,RefHexahedron,1}, ξ::Vec{3,T}, i::Int) where T
-    x, y, z = 2ξ - ones(ξ)
+    x, y, z = (ξ + ones(ξ))/2
     # Edge 1 (defelement 0, positive)
-    i ==  1 && return Vec(- y*z - y - z + 1, zero(T), zero(T))
+    i ==  1 && return Vec(y*z - y - z + 1, zero(T), zero(T))
     # Edge 2 (defelement 3, positive)
     i ==  2 && return Vec(zero(T), x * (1 - z), zero(T))
     # Edge 3 (defelement 5, negative)
@@ -1803,7 +1807,7 @@ function shape_value(ip::Nedelec{3,RefHexahedron,1}, ξ::Vec{3,T}, i::Int) where
     # Edge 5 (defelement 8, positive)
     i ==  5 && return Vec(z*(1-y), zero(T), zero(T))
     # Edge 6 (defelement 10, positive)
-    i ==  6 && return Vec(zero(T), z * z, zero(T))
+    i ==  6 && return Vec(zero(T), x * z, zero(T))
     # Edge 7 (defelement 11, negative)
     i ==  7 && return Vec(- y*z, zero(T), zero(T))
     # Edge 8 (defelement 9, negative)
