@@ -17,7 +17,7 @@ if HAS_EXTENSIONS && MODULE_CAN_BE_TYPE_PARAMETER
     import Metis
 end
 
-const RUN_JET_TESTS = VERSION >= v"1.9"
+const RUN_JET_TESTS = (VERSION >= v"1.9" && isempty(VERSION.prerelease)) # Temporarily disable on nightly since JET fails
 
 if RUN_JET_TESTS
     using JET: @test_call
