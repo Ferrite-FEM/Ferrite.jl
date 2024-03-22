@@ -226,6 +226,56 @@
     @test Ferrite.is_discontinuous(d_ip_t) == true
 end
 
+reference_cell(::Type{RefTriangle}) = Triangle((1,2,3))
+reference_cell(::Type{RefQuadrilateral}) = Quadrilateral((1,2,3,4))
+reference_cell(::Type{RefTetrahedron}) = Tetrahedron((1,2,3,4))
+reference_cell(::Type{RefHexahedron}) = Hexahedron((ntuple(identity, 8)))
+
+function line_integral(qr::QuadratureRule{RefLine, T}, ip, shape_nr, x0, Δx, L, v, f) where T
+    s = zero(T)
+    for (ξ1d, w) in zip(Ferrite.getpoints(qr), Ferrite.getweights(qr))
+        ξ = x0 + (ξ1d[1]/2) * Δx
+        s += (shape_value(ip, ξ, shape_nr) ⋅ v) * (w*L/2) * f((ξ1d[1]+1)/2)
+    end
+    return s
+end
+
+# Required properties of shape value Nⱼ of an edge-elements (Hcurl) on an edge with direction v, length L, and dofs ∈ 𝔇 
+# 1) Unit property: ∑_{j∈𝔇} ∫(Nⱼ ⋅ v f(s) dS) = 1 
+#    Where f(s) = 1 for linear interpolation and f(s)=1-s and f(s)=s for 2nd order interpolation (first and second shape function)
+#    And s is the path parameter ∈[0,1] along the positive direction of the path. 
+# 2) Zero along other edges: Nⱼ ⋅ v = 0 if j∉𝔇
+@testset "Nedelec" begin
+    lineqr = QuadratureRule{RefLine}(20)
+    for ip in (Nedelec{2,RefTriangle,1}(), Nedelec{2,RefTriangle,2}(), Nedelec{3,RefTetrahedron,1}(), Nedelec{3,RefHexahedron,1}())
+        cell = reference_cell(getrefshape(ip))
+        edges = Ferrite.getdim(ip) == 2 ? Ferrite.faces(cell) : Ferrite.edges(cell)
+        dofs = Ferrite.getdim(ip) == 2 ? Ferrite.facedof_interior_indices(ip) : Ferrite.edgedof_interior_indices(ip)
+        x = Ferrite.reference_coordinates(Ferrite.default_interpolation(typeof(cell)))
+        @testset "$(getrefshape(ip)), order=$(Ferrite.getorder(ip))" begin
+            for (edge_nr, (i1, i2)) in enumerate(edges)
+                Δx = x[i2]-x[i1]
+                x0 = (x[i1]+x[i2])/2
+                L = norm(Δx)
+                v = Δx/L
+                for (idof, shape_nr) in enumerate(dofs[edge_nr])
+                    nedgedofs = length(dofs[edge_nr])
+                    f(x) = nedgedofs == 1 ? 1.0 : (idof == 1 ? 1-x : x)
+                    s = line_integral(lineqr, ip, shape_nr, x0, Δx, L, v, f)
+                    @test s ≈ one(s)
+                end
+                for (j_edge, shape_nrs) in enumerate(dofs)
+                    j_edge == edge_nr && continue
+                    for shape_nr in shape_nrs
+                        for ξ in (x[i1] + r*Δx for r in [0.0, rand(3)..., 1.0])
+                            @test abs(shape_value(ip, ξ, shape_nr) ⋅ v) < eps()*100
+                        end
+                    end
+                end
+            end
+        end
+    end
+end
 
 tupleshift(t::NTuple{N}, shift::Int) where N = ntuple(i -> t[mod(i - 1 - shift, N) + 1], N)
 #tupleshift(t::NTuple, shift::Int) = tuple(circshift(SVector(t), shift)...)

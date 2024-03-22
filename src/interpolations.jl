@@ -1789,37 +1789,34 @@ but test cases need to be developed first to make sure.
 No point in implementing guesses that cannot be verified...
 =#
 
-# https://defelement.com/elements/examples/hexahedron-nedelec1-lagrange-1.html
-# TODO: Need to "map" from defelement [0,1] refcell to Ferrite [-1,1], which 
-# for Nedelec should be scaling with J^-T where J=2I, i.e. divide by 2
-# For RT elements with Hdiv, this should instead be J/det(J) => 2/2^dim, 
-# i.e. also divide by 2 in 3d, no scaling in 2d, and multiply by 2 in 1d. 
+# https://defelement.com/elements/examples/hexahedron-nedelec1-lagrange-1.html 
+# Note: Divide by 2 since J=2I compared to DefElement's reference shape, and mapping is N ⋅ J^-T
 function shape_value(ip::Nedelec{3,RefHexahedron,1}, ξ::Vec{3,T}, i::Int) where T
     x, y, z = (ξ + ones(ξ))/2
     # Edge 1 (defelement 0, positive)
-    i ==  1 && return Vec(y*z - y - z + 1, zero(T), zero(T))
+    i ==  1 && return Vec(y*z - y - z + 1, zero(T), zero(T))/2
     # Edge 2 (defelement 3, positive)
-    i ==  2 && return Vec(zero(T), x * (1 - z), zero(T))
+    i ==  2 && return Vec(zero(T), x * (1 - z), zero(T))/2
     # Edge 3 (defelement 5, negative)
-    i ==  3 && return Vec(-y*(1-z), zero(T), zero(T))
+    i ==  3 && return Vec(-y*(1-z), zero(T), zero(T))/2
     # Edge 4 (defelement 1, negative)
-    i ==  4 && return Vec(zero(T), - x*z + x + z - 1, zero(T))
+    i ==  4 && return Vec(zero(T), - x*z + x + z - 1, zero(T))/2
     # Edge 5 (defelement 8, positive)
-    i ==  5 && return Vec(z*(1-y), zero(T), zero(T))
+    i ==  5 && return Vec(z*(1-y), zero(T), zero(T))/2
     # Edge 6 (defelement 10, positive)
-    i ==  6 && return Vec(zero(T), x * z, zero(T))
+    i ==  6 && return Vec(zero(T), x * z, zero(T))/2
     # Edge 7 (defelement 11, negative)
-    i ==  7 && return Vec(- y*z, zero(T), zero(T))
+    i ==  7 && return Vec(- y*z, zero(T), zero(T))/2
     # Edge 8 (defelement 9, negative)
-    i ==  8 && return Vec(zero(T), - z * (1 - x), zero(T))
+    i ==  8 && return Vec(zero(T), - z * (1 - x), zero(T))/2
     # Edge 9 (defelement 2, positive)
-    i ==  9 && return Vec(zero(T), zero(T), x*y - x - y + 1)
+    i ==  9 && return Vec(zero(T), zero(T), x*y - x - y + 1)/2
     # Edge 10 (defelement 4, positive)
-    i == 10 && return Vec(zero(T), zero(T), x * (1 - y))
+    i == 10 && return Vec(zero(T), zero(T), x * (1 - y))/2
     # Edge 11 (defelement 7, positive)
-    i == 11 && return Vec(zero(T), zero(T), x * y)
+    i == 11 && return Vec(zero(T), zero(T), x * y)/2
     # Edge 12 (defelement 6, positive)
-    i == 12 && return Vec(zero(T), zero(T), y * (1 - x))
+    i == 12 && return Vec(zero(T), zero(T), y * (1 - x))/2
 
     throw(ArgumentError("no shape function $i for interpolation $ip"))
 end
