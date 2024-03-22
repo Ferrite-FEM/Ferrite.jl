@@ -1,0 +1,4 @@
+[deps]
+Ferrite = "c061ca5d-56c9-439f-9c0e-210fe06d3992"
+FerriteViz = "59d0093e-b1f1-4fb7-ac85-ab57e45f39d9"
+GLMakie = "e9467ef8-e4e7-5192-8a1a-b1aee30e663a"
