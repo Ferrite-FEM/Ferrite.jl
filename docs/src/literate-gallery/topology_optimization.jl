@@ -287,7 +287,7 @@ function update_density(dh, states, mp, ρ, topology, Δh)
     
         Δχ = pΨ/p_Ω + mp.β*∇²χ 
 
-        χn1 = compute_χn1(χn, Δχ, ρ, mp.η, mp.χ_min) 
+        χn1 = compute_χn1(χn, Δχ, ρ, mp.η*n_j, mp.χ_min) 
 
         if(j<n_j)
             χn[:] = χn1[:]
