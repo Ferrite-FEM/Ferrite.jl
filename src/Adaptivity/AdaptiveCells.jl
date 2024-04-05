@@ -54,18 +54,21 @@ end
 #OctantBWG(level::Int32,coords::NTuple) = OctantBWG(level,Int32.(coords))
 #OctantBWG(level::Int32, coords::NTuple{dim,Int32}) where dim = OctantBWG{dim,2^dim,2*dim,Int32}(level,coords)
 
-# From BWG 2011
-# > The octant coordinates are stored as integers of a fixed number b of bits,
-# > where the highest (leftmost) bit represents the first vertical level of the
-# > octree (counting the root as level zero), the second highest bit the second level of the octree, and so on.
-# Morton Index can thus be constructed by interleaving the integer bits:
-# m(Oct) := (y_b,x_b,y_b-1,x_b-1,...y0,x0)_2
-# further we assume the following
-# > Due to the two-complement representation of integers in practically all current hardware,
-# > where the highest digit denotes the negated appropriate power of two, bitwise operations as used,
-# > for example, in Algorithm 1 yield the correct result even for negative coordinates.
-# also from BWG 2011
-# TODO: use LUT method from https://www.forceflow.be/2013/10/07/morton-encodingdecoding-through-bit-interleaving-implementations/
+"""
+From [BWG2011](@citet);
+> The octant coordinates are stored as integers of a fixed number b of bits,
+> where the highest (leftmost) bit represents the first vertical level of the
+> octree (counting the root as level zero), the second highest bit the second level of the octree, and so on.
+A morton index can thus be constructed by interleaving the integer bits:
+m(Oct) := (y_b,x_b,y_b-1,x_b-1,...y0,x0)_2
+further we assume the following
+> Due to the two-complement representation of integers in practically all current hardware,
+> where the highest digit denotes the negated appropriate power of two, bitwise operations as used,
+> for example, in Algorithm 1 yield the correct result even for negative coordinates.
+also from [BWG2011](@citet)
+
+TODO: use LUT method from https://www.forceflow.be/2013/10/07/morton-encodingdecoding-through-bit-interleaving-implementations/
+"""
 function morton(octant::OctantBWG{dim,N,T},l::T,b::T) where {dim,N,T<:Integer}
     o = one(T)
     z = zero(T)
@@ -97,7 +100,7 @@ nchilds(o::OctantBWG) = nchilds(typeof(o))# Follow z order, x before y before z 
 Base.isequal(o1::OctantBWG, o2::OctantBWG) = (o1.l == o2.l) && (o1.xyz == o2.xyz)
 """
     o1::OctantBWG < o2::OctantBWG
-Implements Algorithm 2.1 of IBWG 2015.
+Implements Algorithm 2.1 of [IBWG2015](@citet).
 Checks first if mortonid is smaller and later if level is smaller.
 Thus, ancestors precede descendants (preordering).
 """
@@ -178,7 +181,7 @@ end
 
 """
     boundaryset(o::OctantBWG{2}, i::Integer, b::Integer
-implements two dimensional boundaryset table from Fig.4.1 IBWG 2015
+implements two dimensional boundaryset table from Fig.4.1 [IBWG2015](@citet)
 TODO: could be done little bit less ugly
 """
 function boundaryset(o::OctantBWG{2,N,T}, i::Integer, b::Integer) where {N,T}
@@ -197,7 +200,7 @@ end
 
 """
     boundaryset(o::OctantBWG{3}, i::Integer, b::Integer
-implements three dimensional boundaryset table from Fig.4.1 IBWG 2015
+implements three dimensional boundaryset table from Fig.4.1 [IBWG2015](@citet)
 TODO: could be done little bit less ugly
 """
 function boundaryset(o::OctantBWG{3,N,T}, i::Integer, b::Integer) where {N,T}
@@ -225,7 +228,7 @@ end
 """
     find_range_boundaries(f::OctantBWG{dim,N,T}, l::OctantBWG{dim,N,T}, s::OctantBWG{dim,N,T}, idxset, b)
     find_range_boundaries(s::OctantBWG{dim,N,T}, idxset, b)
-Algorithm 4.2 of IBWG 2015
+Algorithm 4.2 of [IBWG2015](@citet)
 TODO: write tests
 """
 function find_range_boundaries(f::OctantBWG{dim,N,T1}, l::OctantBWG{dim,N,T1}, s::OctantBWG{dim,N,T1}, idxset::Set{OctantIndex{T2}}, b) where {dim,N,T1,T2}
@@ -331,7 +334,7 @@ inside(tree::OctreeBWG{dim},oct::OctantBWG{dim}) where dim = inside(oct,tree.b)
 """
     split_array(octree::OctreeBWG, a::OctantBWG)
     split_array(octantarray, a::OctantBWG, b::Integer)
-Algorithm 3.3 of IBWG2015. Efficient binary search
+Algorithm 3.3 of [IBWG2015](@citet). Efficient binary search.
 """
 function split_array(octantarray, a::OctantBWG{dim,N,T}, b::Integer) where {dim,N,T}
     o = one(T)
@@ -379,7 +382,7 @@ search(tree::OctreeBWG, a::OctantBWG, idxset, Match=match) = search(tree.leaves,
 
 """
     match(o::OctantBWG, isleaf::Bool, q)
-from IBWG2015
+from [IBWG2015](@citet)
 > match returns true if there is a leaf r ∈ 𝒪 that is a descendant of o
 > such that match_q(r) = true, and is allowed to return a false positive
 > (i.e., true even if match_q(r) = false for all descendants leaves of o)
@@ -395,8 +398,8 @@ end
 
 """
     ForestBWG{dim, C<:AbstractAdaptiveCell, T<:Real} <: AbstractAdaptiveGrid{dim}
-`p4est` adaptive grid implementation based on Burstedde, Wilcox, Ghattas [2011]
-and Isaac, Burstedde, Wilcox, Ghattas [2015]
+`p4est` adaptive grid implementation based on [BWG2011](@citet)
+and [IBWG2015](@citet).
 
 ## Constructor
     ForestBWG(grid::AbstractGrid{dim}, b=_maxlevel[dim-1]) where dim
@@ -505,7 +508,7 @@ function getcells(forest::ForestBWG{dim}, cellid::Int)  where dim
     @warn "Slow dispatch, consider to call `getcells(forest)` once instead" maxlog=1 #TODO doc page for performance
     #TODO should nleaves be saved by forest?
     nleaves = length.(forest.cells) # cells=trees
-    #TODO remove that later by for loop or IBWG 2015 iterator approach
+    #TODO remove that later by for loop or [IBWG2015](@citet) iterator approach
     nleaves_cumsum = cumsum(nleaves)
     k = findfirst(x->cellid<=x,nleaves_cumsum)
     #TODO is this actually correct?
@@ -532,7 +535,7 @@ end
 
 transform_pointBWG(forest, vertices) = transform_pointBWG.((forest,), first.(vertices), last.(vertices))
 
-#TODO: this function should wrap the LNodes Iterator of IBWG2015
+#TODO: this function should wrap the LNodes Iterator of [IBWG2015](@citet)
 function creategrid(forest::ForestBWG{dim,C,T}) where {dim,C,T}
     nodes = Vector{Tuple{Int,NTuple{dim,Int32}}}()
     sizehint!(nodes,getncells(forest)*2^dim)
@@ -757,8 +760,10 @@ function hangingnodes(forest::ForestBWG{dim}, nodeids, nodeowners) where dim
     return hnodes
 end
 
-# Algorithm 17 of BWG Paper
-# TODO need further work for dimension agnostic case
+"""
+Algorithm 17 of [BWG2011](@citet)
+TODO need further work for dimension agnostic case
+"""
 function balanceforest!(forest::ForestBWG{dim}) where dim
     perm_face = dim == 2 ? 𝒱₂_perm : 𝒱₃_perm
     perm_face_inv = dim == 2 ? 𝒱₂_perm_inv : 𝒱₃_perm_inv
@@ -821,9 +826,11 @@ function balanceforest!(forest::ForestBWG{dim}) where dim
     #end
 end
 
-# Algorithm 7 of preprint Sundar, Sampath, Biros
-# https://padas.oden.utexas.edu/static/papers/OctreeBalance21.pdf
-# TODO optimise the unnecessary allocations
+"""
+Algorithm 7 of [SSB2008](@citet)
+
+TODO optimise the unnecessary allocations
+"""
 function balancetree(tree::OctreeBWG)
     if length(tree.leaves) == 1
         return tree
@@ -859,8 +866,11 @@ function balancetree(tree::OctreeBWG)
     return OctreeBWG(R,tree.b,tree.nodes)
 end
 
-# Algorithm 8 of preprint Sundar, Sampath, Biros
-# inverted the algorithm to delete! instead of add incrementally to a new array
+"""
+Algorithm 8 of [SSB2008](@citet)
+
+Inverted the algorithm to delete! instead of add incrementally to a new array
+"""
 function linearise!(leaves::Vector{T},b) where T<:OctantBWG
     inds = [i for i in 1:length(leaves)-1 if isancestor(leaves[i],leaves[i+1],b)]
     deleteat!(leaves,inds)
@@ -1086,7 +1096,7 @@ end
 
 """
     ancestor_id(octant::OctantBWG, l::Integer, b::Integer)
-Algorithm 3.2 of IBWG 2015 that generalizes `child_id` for different queried levels.
+Algorithm 3.2 of [IBWG2015](@citet) that generalizes `child_id` for different queried levels.
 Applied to a single octree, i.e. the array of leaves, yields a monotonic sequence
 """
 function ancestor_id(octant::OctantBWG{dim,N,T}, l::Integer, b::Integer=_maxlevel[dim-1]) where {dim,N,T<:Integer}
@@ -1126,7 +1136,7 @@ end
 """
     face_neighbor(octant::OctantBWG{dim,N,T}, f::T, b::T=_maxlevel[2]) -> OctantBWG{3,N,T}
 Intraoctree face neighbor for a given faceindex `f` (in p4est, i.e. z order convention) and specified maximum refinement level `b`.
-Implements Algorithm 5 of BWG p4est paper.
+Implements Algorithm 5 of [BWG2011](@citet).
 
     x-------x-------x
     |       |       |
@@ -1168,7 +1178,7 @@ reference_faces_bwg(::Type{RefHypercube{3}}) = ((1,3,5,7) , (2,4,6,8), (1,2,5,6)
 
 """
     compute_face_orientation(forest::ForestBWG, k::Integer, f::Integer)
-Slow implementation for the determination of the face orientation of face `f` from octree `k` following definition 2.1 from the BWG p4est paper.
+Slow implementation for the determination of the face orientation of face `f` from octree `k` following definition 2.1 from [BWG2011](@citet).
 
 TODO use table 3 for more vroom
 """
@@ -1195,7 +1205,7 @@ end
     transform_face_remote(forest::ForestBWG, k::T1, f::T1, o::OctantBWG{dim,N,T2}) -> OctantBWG{dim,N,T1,T2}
     transform_face_remote(forest::ForestBWG, f::FaceIndex, o::OctantBWG{dim,N,T2}) -> OctantBWG{dim,N,T2}
 Interoctree coordinate transformation of an given octant `o` to the face-neighboring of octree `k` by virtually pushing `o`s coordinate system through `k`s face `f`.
-Implements Algorithm 8 of BWG p4est paper.
+Implements Algorithm 8 of [BWG2011](@citet).
 
     x-------x-------x
     |       |       |
@@ -1352,7 +1362,7 @@ transform_face(forest::ForestBWG,f::FaceIndex,oct::OctantBWG) = transform_face(f
     transform_corner(forest,k,c',oct)
     transform_corner(forest,v::VertexIndex,oct)
 
-Algorithm 12 in p4est paper to transform corner into different octree coordinate system
+Algorithm 12 in [BWG2011](@citet) to transform corner into different octree coordinate system
 Note: in Algorithm 12 is c as a argument, but it's never used, therefore I removed it
 """
 function transform_corner(forest::ForestBWG,k::T1,c′::T1,oct::OctantBWG{dim,N,T2}) where {dim,N,T1<:Integer,T2<:Integer}
