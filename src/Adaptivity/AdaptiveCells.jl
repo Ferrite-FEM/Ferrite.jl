@@ -6,7 +6,7 @@
 abstract type AbstractAdaptiveGrid{dim} <: AbstractGrid{dim} end
 abstract type AbstractAdaptiveCell{refshape <: AbstractRefShape} <: AbstractCell{refshape} end
 
-_maxlevel = [30,19]
+const _maxlevel = [30,19]
 
 function set_maxlevel(dim::Integer,maxlevel::Integer)
     _maxlevel[dim-1] = maxlevel
@@ -635,6 +635,7 @@ function creategrid(forest::ForestBWG{dim,C,T}) where {dim,C,T}
         end
         if dim > 2
             #TODO add egde duplication check
+            @error "Edge deduplication not implemented yet."
         end
     end
 
