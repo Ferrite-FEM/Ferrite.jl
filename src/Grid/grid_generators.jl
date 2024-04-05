@@ -102,13 +102,12 @@ function _generate_2d_nodes!(nodes, nx, ny, LL, LR, UR, UL)
     end
 end
 
-
-function generate_grid(C::Type{Cell{2,M,N}}, nel::NTuple{2,Int}, X::Vector{Vec{2,T}}) where {M,N,T}
+function generate_grid(C::Type{<:AbstractCell{<:AbstractRefShape{2}}}, nel::NTuple{2,Int}, X::Vector{Vec{2,T}}) where {T}
     @assert length(X) == 4
     generate_grid(C, nel, X[1], X[2], X[3], X[4])
 end
 
-function generate_grid(C::Type{Cell{2,M,N}}, nel::NTuple{2,Int}, left::Vec{2,T}=Vec{2}((-1.0,-1.0)), right::Vec{2,T}=Vec{2}((1.0,1.0))) where {M,N,T}
+function generate_grid(C::Type{<:AbstractCell{<:AbstractRefShape{2}}}, nel::NTuple{2,Int}, left::Vec{2,T}=Vec{2}((-1.0,-1.0)), right::Vec{2,T}=Vec{2}((1.0,1.0))) where {T}
     LL = left
     UR = right
     LR = Vec{2}((UR[1], LL[2]))
@@ -237,6 +236,176 @@ function generate_grid(::Type{Hexahedron}, nel::NTuple{3,Int}, left::Vec{3,T}=Ve
     facesets["top"]    = Set{FaceIndex}(boundary[(1:length(cell_array[:,:,end][:])) .+ offset]); offset += length(cell_array[:,:,end][:])
 
     return Grid(cells, nodes, facesets=facesets, boundary_matrix=boundary_matrix)
+end 
+
+# Wedge
+function generate_grid(::Type{Wedge}, nel::NTuple{3,Int}, left::Vec{3,T}=Vec{3}((-1.0,-1.0,-1.0)), right::Vec{3,T}=Vec{3}((1.0,1.0,1.0))) where {T}
+    nel_x = nel[1]; nel_y = nel[2]; nel_z = nel[3]; nel_tot = nel_x*nel_y*nel_z
+    n_nodes_x = nel_x + 1; n_nodes_y = nel_y + 1; n_nodes_z = nel_z + 1
+    n_nodes = n_nodes_x * n_nodes_y * n_nodes_z
+
+    # Generate nodes
+    coords_x = range(left[1], stop=right[1], length=n_nodes_x)
+    coords_y = range(left[2], stop=right[2], length=n_nodes_y)
+    coords_z = range(left[3], stop=right[3], length=n_nodes_z)
+    nodes = Node{3,T}[]
+    for k in 1:n_nodes_z, j in 1:n_nodes_y, i in 1:n_nodes_x
+        push!(nodes, Node((coords_x[i], coords_y[j], coords_z[k])))
+    end
+
+    # Generate cells
+    node_array = reshape(collect(1:n_nodes), (n_nodes_x, n_nodes_y, n_nodes_z))
+    cells = Wedge[]
+    for k in 1:nel_z, j in 1:nel_y, i in 1:nel_x
+        push!(cells, Wedge((node_array[i,j,k], node_array[i+1,j,k], node_array[i,j+1,k], 
+                            node_array[i,j,k+1], node_array[i+1,j,k+1], node_array[i,j+1,k+1]))) # ◺
+        push!(cells, Wedge((node_array[i+1,j,k], node_array[i+1,j+1,k], node_array[i,j+1,k], 
+                            node_array[i+1,j,k+1], node_array[i+1,j+1,k+1], node_array[i,j+1,k+1]))) # ◹
+    end
+
+    # Order the cells as c_nxyz[2, x, y, z] such that we can look up boundary cells
+    c_nxyz = reshape(1:length(cells), (2, nel...))
+
+    @views le = map(x -> FaceIndex(x,3), c_nxyz[1,   1, :, :][:])
+    @views ri = map(x -> FaceIndex(x,2), c_nxyz[2, end, :, :][:])
+    @views fr = map(x -> FaceIndex(x,2), c_nxyz[1, :, 1, :][:])  
+    @views ba = map(x -> FaceIndex(x,4), c_nxyz[2, :, end, :][:])
+    @views bo = [map(x -> FaceIndex(x,1), c_nxyz[1, :, :, 1][:])   ; map(x -> FaceIndex(x,1), c_nxyz[2, :, :, 1][:])]
+    @views to = [map(x -> FaceIndex(x,5), c_nxyz[1, :, :, end][:]) ; map(x -> FaceIndex(x,5), c_nxyz[2, :, :, end][:])]
+
+    boundary_matrix = boundaries_to_sparse([le; ri; bo; to; fr; ba])
+
+    facesets = Dict(
+        "left" => Set(le),
+        "right" => Set(ri),
+        "front" => Set(fr),
+        "back" => Set(ba),
+        "bottom" => Set(bo),
+        "top" => Set(to),
+    )
+
+    return Grid(cells, nodes, facesets=facesets, boundary_matrix=boundary_matrix)
+end 
+
+#Pyramid
+function generate_grid(::Type{Pyramid}, nel::NTuple{3,Int}, left::Vec{3,T}=Vec{3}((-1.0,-1.0,-1.0)), right::Vec{3,T}=Vec{3}((1.0,1.0,1.0))) where {T}
+    nel_x = nel[1]; nel_y = nel[2]; nel_z = nel[3]; nel_tot = nel_x*nel_y*nel_z
+    n_nodes_x = nel_x + 1; n_nodes_y = nel_y + 1; n_nodes_z = nel_z + 1
+    n_nodes = n_nodes_x * n_nodes_y * n_nodes_z
+
+    # Generate nodes
+    coords_x = range(left[1], stop=right[1], length=n_nodes_x)
+    coords_y = range(left[2], stop=right[2], length=n_nodes_y)
+    coords_z = range(left[3], stop=right[3], length=n_nodes_z)
+    nodes = Node{3,T}[]
+    for k in 1:n_nodes_z, j in 1:n_nodes_y, i in 1:n_nodes_x
+        push!(nodes, Node((coords_x[i], coords_y[j], coords_z[k])))
+    end
+
+    #Center node in each "voxel"
+    for k in 1:nel_z, j in 1:nel_y, i in 1:nel_x
+        midx = 0.5(coords_x[i+1] + coords_x[i])
+        midy = 0.5(coords_y[j+1] + coords_y[j])
+        midz = 0.5(coords_z[k+1] + coords_z[k])
+        push!(nodes, Node((midx, midy, midz)))
+    end 
+
+    # Generate cells
+    node_array = reshape(collect(1:n_nodes), (n_nodes_x, n_nodes_y, n_nodes_z))
+    cells = Pyramid[]
+    midnodecounter = n_nodes_x*n_nodes_y*n_nodes_z 
+    for k in 1:nel_z, j in 1:nel_y, i in 1:nel_x
+        midnodecounter += 1
+        pyramid1 = Pyramid((node_array[i,j,k], node_array[i+1,j,k], node_array[i,j+1,k], node_array[i+1,j+1,k], midnodecounter )) # bottom
+        pyramid2 = Pyramid((node_array[i,j,k], node_array[i,j,k+1], node_array[i+1,j,k], node_array[i+1,j,k+1], midnodecounter )) # front 
+        pyramid3 = Pyramid((node_array[i+1,j,k], node_array[i+1,j,k+1], node_array[i+1,j+1,k], node_array[i+1,j+1,k+1], midnodecounter )) # right
+        pyramid4 = Pyramid((node_array[i,j+1,k], node_array[i+1,j+1,k], node_array[i,j+1,k+1], node_array[i+1,j+1,k+1], midnodecounter )) # back
+        pyramid5 = Pyramid((node_array[i,j,k], node_array[i,j+1,k], node_array[i,j,k+1], node_array[i,j+1,k+1], midnodecounter )) # left 
+        pyramid6 = Pyramid((node_array[i,j,k+1], node_array[i,j+1,k+1], node_array[i+1,j,k+1], node_array[i+1,j+1,k+1], midnodecounter )) # top 
+        push!(cells, pyramid1, pyramid2, pyramid3, pyramid4, pyramid5, pyramid6)
+    end
+
+    # Order the cells as c_nxyz[2, x, y, z] such that we can look up boundary cells
+    ncells_per_voxel = 6
+    c_nxyz = reshape(1:(prod(nel)*ncells_per_voxel), (ncells_per_voxel, nel...))
+
+    @views le = map(x -> FaceIndex(x,1), c_nxyz[5,   1, :, :][:])
+    @views ri = map(x -> FaceIndex(x,1), c_nxyz[3, end, :, :][:])
+    @views fr = map(x -> FaceIndex(x,1), c_nxyz[2, :, 1, :][:])  
+    @views ba = map(x -> FaceIndex(x,1), c_nxyz[4, :, end, :][:])
+    @views bo = map(x -> FaceIndex(x,1), c_nxyz[1, :, :, 1][:]) 
+    @views to = map(x -> FaceIndex(x,1), c_nxyz[6, :, :, end][:])
+
+    boundary_matrix = boundaries_to_sparse([le; ri; bo; to; fr; ba])
+
+    facesets = Dict(
+        "left" => Set(le),
+        "right" => Set(ri),
+        "front" => Set(fr),
+        "back" => Set(ba),
+        "bottom" => Set(bo),
+        "top" => Set(to),
+    )
+
+    return Grid(cells, nodes, facesets=facesets, boundary_matrix=boundary_matrix)
+end 
+
+function Ferrite.generate_grid(::Type{SerendipityQuadraticHexahedron}, nel::NTuple{3,Int}, left::Vec{3,T}=Vec{3}((-1.0,-1.0,-1.0)), right::Vec{3,T}=Vec{3}((1.0,1.0,1.0))) where {T}
+    nel_x = nel[1]; nel_y = nel[2]; nel_z = nel[3]; nel_tot = nel_x*nel_y*nel_z
+    nnode_x = 2nel_x + 1; nnode_y = 2nel_y + 1; nnode_z = 2nel_z + 1 #Note: not the actually number of nodes in x/y/z, just a temporary variables
+
+    # Generate nodes
+    coords_x = range(left[1], stop=right[1], length=nnode_x)
+    coords_y = range(left[2], stop=right[2], length=nnode_y)
+    coords_z = range(left[3], stop=right[3], length=nnode_z)
+    nodes = Node{3,T}[]
+
+    node_array = fill(0, (nnode_x,nnode_y,nnode_z))
+    nodeid = 0
+    for k in 1:nnode_z, j in 1:nnode_y, i in 1:nnode_x
+        (iseven(i) && iseven(j)) && continue
+        (iseven(i) && iseven(k)) && continue
+        (iseven(k) && iseven(j)) && continue
+        push!(nodes, Node((coords_x[i], coords_y[j], coords_z[k])))
+        nodeid += 1
+        node_array[i,j,k] = nodeid
+    end
+
+
+    # Generate cells
+    cells = SerendipityQuadraticHexahedron[]
+    for k in 1:2:2nel_z, j in 1:2:2nel_y, i in 1:2:2nel_x     
+        push!(cells, SerendipityQuadraticHexahedron((
+                node_array[i,j,k], node_array[i+2,j,k], node_array[i+2,j+2,k], node_array[i,j+2,k], # vertices bot 
+                node_array[i,j,k+2], node_array[i+2,j,k+2], node_array[i+2,j+2,k+2], node_array[i,j+2,k+2], # vertices top
+                node_array[i+1,j,k], node_array[i+2,j+1,k], node_array[i+1,j+2,k], node_array[i,j+1,k], # edges horizontal bottom
+                node_array[i+1,j,k+2], node_array[i+2,j+1,k+2], node_array[i+1,j+2,k+2], node_array[i,j+1,k+2], # edges horizontal top
+                node_array[i,j,k+1], node_array[i+2,j,k+1], node_array[i+2,j+2,k+1], node_array[i,j+2,k+1] ))  # edges vertical
+            )
+    end
+
+    # Cell faces
+    cell_array = reshape(collect(1:nel_tot),(nel_x, nel_y, nel_z))
+    boundary = FaceIndex[[FaceIndex(cl, 1) for cl in cell_array[:,:,1][:]];
+                              [FaceIndex(cl, 2) for cl in cell_array[:,1,:][:]];
+                              [FaceIndex(cl, 3) for cl in cell_array[end,:,:][:]];
+                              [FaceIndex(cl, 4) for cl in cell_array[:,end,:][:]];
+                              [FaceIndex(cl, 5) for cl in cell_array[1,:,:][:]];
+                              [FaceIndex(cl, 6) for cl in cell_array[:,:,end][:]]]
+
+    boundary_matrix = Ferrite.boundaries_to_sparse(boundary)
+
+    # Cell face sets
+    offset = 0
+    facesets = Dict{String,Set{FaceIndex}}()
+    facesets["bottom"] = Set{FaceIndex}(boundary[(1:length(cell_array[:,:,1][:]))   .+ offset]); offset += length(cell_array[:,:,1][:])
+    facesets["front"]  = Set{FaceIndex}(boundary[(1:length(cell_array[:,1,:][:]))   .+ offset]); offset += length(cell_array[:,1,:][:])
+    facesets["right"]  = Set{FaceIndex}(boundary[(1:length(cell_array[end,:,:][:])) .+ offset]); offset += length(cell_array[end,:,:][:])
+    facesets["back"]   = Set{FaceIndex}(boundary[(1:length(cell_array[:,end,:][:])) .+ offset]); offset += length(cell_array[:,end,:][:])
+    facesets["left"]   = Set{FaceIndex}(boundary[(1:length(cell_array[1,:,:][:]))   .+ offset]); offset += length(cell_array[1,:,:][:])
+    facesets["top"]    = Set{FaceIndex}(boundary[(1:length(cell_array[:,:,end][:])) .+ offset]); offset += length(cell_array[:,:,end][:])
+
+    return Grid(cells, nodes, facesets=facesets, boundary_matrix=boundary_matrix)   
 end
 
 # Triangle

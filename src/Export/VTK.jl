@@ -1,68 +1,116 @@
 cell_to_vtkcell(::Type{Line}) = VTKCellTypes.VTK_LINE
-cell_to_vtkcell(::Type{Line2D}) = VTKCellTypes.VTK_LINE
-cell_to_vtkcell(::Type{Line3D}) = VTKCellTypes.VTK_LINE
 cell_to_vtkcell(::Type{QuadraticLine}) = VTKCellTypes.VTK_QUADRATIC_EDGE
 
 cell_to_vtkcell(::Type{Quadrilateral}) = VTKCellTypes.VTK_QUAD
-cell_to_vtkcell(::Type{Quadrilateral3D}) = VTKCellTypes.VTK_QUAD
 cell_to_vtkcell(::Type{QuadraticQuadrilateral}) = VTKCellTypes.VTK_BIQUADRATIC_QUAD
 cell_to_vtkcell(::Type{Triangle}) = VTKCellTypes.VTK_TRIANGLE
 cell_to_vtkcell(::Type{QuadraticTriangle}) = VTKCellTypes.VTK_QUADRATIC_TRIANGLE
-cell_to_vtkcell(::Type{Cell{2,8,4}}) = VTKCellTypes.VTK_QUADRATIC_QUAD
+cell_to_vtkcell(::Type{SerendipityQuadraticQuadrilateral}) = VTKCellTypes.VTK_QUADRATIC_QUAD
 
 cell_to_vtkcell(::Type{Hexahedron}) = VTKCellTypes.VTK_HEXAHEDRON
+cell_to_vtkcell(::Type{SerendipityQuadraticHexahedron}) = VTKCellTypes.VTK_QUADRATIC_HEXAHEDRON
+cell_to_vtkcell(::Type{QuadraticHexahedron}) = VTKCellTypes.VTK_TRIQUADRATIC_HEXAHEDRON
 cell_to_vtkcell(::Type{Tetrahedron}) = VTKCellTypes.VTK_TETRA
 cell_to_vtkcell(::Type{QuadraticTetrahedron}) = VTKCellTypes.VTK_QUADRATIC_TETRA
+cell_to_vtkcell(::Type{Wedge}) = VTKCellTypes.VTK_WEDGE
+cell_to_vtkcell(::Type{Pyramid}) = VTKCellTypes.VTK_PYRAMID
+
+nodes_to_vtkorder(cell::AbstractCell) = collect(cell.nodes)
+nodes_to_vtkorder(cell::Pyramid) = cell.nodes[[1,2,4,3,5]]
+nodes_to_vtkorder(cell::QuadraticHexahedron) = [
+    cell.nodes[1], # faces
+    cell.nodes[2],
+    cell.nodes[3],
+    cell.nodes[4],
+    cell.nodes[5],
+    cell.nodes[6],
+    cell.nodes[7],
+    cell.nodes[8],
+    cell.nodes[9], # edges
+    cell.nodes[10],
+    cell.nodes[11],
+    cell.nodes[12],
+    cell.nodes[13],
+    cell.nodes[14],
+    cell.nodes[15],
+    cell.nodes[16],
+    cell.nodes[17],
+    cell.nodes[18],
+    cell.nodes[19],
+    cell.nodes[20],
+    cell.nodes[25], # faces
+    cell.nodes[23],
+    cell.nodes[22],
+    cell.nodes[24],
+    cell.nodes[21],
+    cell.nodes[26],
+    cell.nodes[27], # interior
+]
 
 """
-    vtk_grid(filename::AbstractString, grid::Grid)
+    vtk_grid(filename::AbstractString, grid::Grid; kwargs...)
+    vtk_grid(filename::AbstractString, dh::DofHandler; kwargs...)
 
-Create a unstructured VTK grid from a `Grid`. Return a `DatasetFile`
-which data can be appended to, see `vtk_point_data` and `vtk_cell_data`.
+Create a unstructured VTK grid from `grid` (alternatively from the `grid` stored in `dh`). 
+Return a `DatasetFile` that data can be appended to, see 
+[`vtk_point_data`](@ref) and [`vtk_cell_data`](@ref).
+The keyword arguments are forwarded to `WriteVTK.vtk_grid`, see 
+[Data Formatting Options](https://juliavtk.github.io/WriteVTK.jl/stable/grids/syntax/#Data-formatting-options)
 """
-function WriteVTK.vtk_grid(filename::AbstractString, grid::Grid{dim,C,T}; compress::Bool=true) where {dim,C,T}
+function WriteVTK.vtk_grid(filename::AbstractString, grid::Grid{dim,C,T}; kwargs...) where {dim,C,T}
     cls = MeshCell[]
-    for cell in grid.cells
+    for cell in getcells(grid)
         celltype = Ferrite.cell_to_vtkcell(typeof(cell))
-        push!(cls, MeshCell(celltype, collect(cell.nodes)))
+        push!(cls, MeshCell(celltype, nodes_to_vtkorder(cell)))
     end
     coords = reshape(reinterpret(T, getnodes(grid)), (dim, getnnodes(grid)))
-    return vtk_grid(filename, coords, cls; compress=compress)
+    return vtk_grid(filename, coords, cls; kwargs...)
+end
+function WriteVTK.vtk_grid(filename::AbstractString, dh::AbstractDofHandler; kwargs...)
+    vtk_grid(filename, get_grid(dh); kwargs...)
+end
+
+function toparaview!(v, x::Vec{D}) where D
+    v[1:D] .= x
+end
+function toparaview!(v, x::SecondOrderTensor{D}) where D
+    tovoigt!(v, x)
 end
 
 """
-    vtk_point_data(vtk, data::Vector{<:Tensor}, name)
+    vtk_point_data(vtk, data::Vector{<:AbstractTensor}, name)
 
-Write the tensor field data to the vtk file. Only writes the tensor values available in `data`.
-In the vtu-file, ordering of the tensor components is coulumn-wise (just like Julia).
-[1 2
- 3 4] => 1, 3, 2, 4
+Write the tensor field `data` to the vtk file. Two-dimensional tensors are padded with zeros.
+
+For second order tensors the following indexing ordering is used:
+`[11, 22, 33, 23, 13, 12, 32, 31, 21]`. This is the default Voigt order in Tensors.jl.
 """
 function WriteVTK.vtk_point_data(
     vtk::WriteVTK.DatasetFile,
-    data::Union{
-        Vector{Tensor{order,dim,T,M}},
-        Vector{SymmetricTensor{order,dim,T,M}}
-        },
+    data::Vector{S},
     name::AbstractString
-    ) where {order,dim,T,M}
-
+    ) where {O, D, T, M, S <: Union{Tensor{O, D, T, M}, SymmetricTensor{O, D, T, M}}}
+    noutputs = S <: Vec{2} ? 3 : M # Pad 2D Vec to 3D
     npoints = length(data)
-    out = zeros(T, M, npoints)
-    out[1:M, :] .= reshape(reinterpret(T, data), (M, npoints))
-    return vtk_point_data(vtk, out, name)
+    out = zeros(T, noutputs, npoints)
+    for i in 1:npoints
+        toparaview!(@view(out[:, i]), data[i])
+    end
+    return vtk_point_data(vtk, out, name; component_names=component_names(S))
 end
 
-"""
-    vtk_point_data(vtk, data::Vector{<:Vec}, name)
-
-Write the vector field data to the vtk file.
-"""
-function WriteVTK.vtk_point_data(vtk::WriteVTK.DatasetFile, data::Vector{Vec{dim,T}}, name::AbstractString) where {dim,T}
-    npoints = length(data)
-    out = zeros(T, (dim == 2 ? 3 : dim), npoints)
-    out[1:dim, :] .= reshape(reinterpret(T, data), (dim, npoints))
-    return vtk_point_data(vtk, out, name)
+function component_names(::Type{S}) where S
+    names =
+        S <:             Vec{1}   ? ["x"] :
+        S <:             Vec      ? ["x", "y", "z"] : # Pad 2D Vec to 3D
+        S <:          Tensor{2,1} ? ["xx"] :
+        S <: SymmetricTensor{2,1} ? ["xx"] :
+        S <:          Tensor{2,2} ? ["xx", "yy", "xy", "yx"] :
+        S <: SymmetricTensor{2,2} ? ["xx", "yy", "xy"] :
+        S <:          Tensor{2,3} ? ["xx", "yy", "zz", "yz", "xz", "xy", "zy", "zx", "yx"] :
+        S <: SymmetricTensor{2,3} ? ["xx", "yy", "zz", "yz", "xz", "xy"] :
+                                    nothing
+    return names
 end
 
 function vtk_nodeset(vtk::WriteVTK.DatasetFile, grid::Grid{dim}, nodeset::String) where {dim}
@@ -70,9 +118,6 @@ function vtk_nodeset(vtk::WriteVTK.DatasetFile, grid::Grid{dim}, nodeset::String
     z[collect(getnodeset(grid, nodeset))] .= 1.0
     vtk_point_data(vtk, z, nodeset)
 end
-
-
-
 
 """
     vtk_cellset(vtk, grid::Grid)
@@ -99,45 +144,13 @@ the cell is in the set and 0 otherwise.
 vtk_cellset(vtk::WriteVTK.DatasetFile, grid::AbstractGrid, cellset::String) =
     vtk_cellset(vtk, grid, [cellset])
 
-import Ferrite.field_offset
-function WriteVTK.vtk_point_data(vtkfile, dh::MixedDofHandler, u::Vector, suffix="")
+
+function WriteVTK.vtk_point_data(vtkfile, dh::AbstractDofHandler, u::Vector, suffix="")
 
     fieldnames = Ferrite.getfieldnames(dh)  # all primary fields
 
     for name in fieldnames
-        @debug println("exporting field $(name)")
-        field_dim = getfielddim(dh, name)
-        space_dim = field_dim == 2 ? 3 : field_dim
-        data = fill(NaN, space_dim, getnnodes(dh.grid))  # set default value
-
-        for fh in dh.fieldhandlers
-            # check if this fh contains this field, otherwise continue to the next
-            field_pos = findfirst(i->i == name, getfieldnames(fh))
-            field_pos === nothing && continue
-
-            cellnumbers = sort(collect(fh.cellset))  # TODO necessary to have them ordered?
-            offset = field_offset(fh, name)
-
-            for cellnum in cellnumbers
-                cell = dh.grid.cells[cellnum]
-                n = ndofs_per_cell(dh, cellnum)
-                eldofs = zeros(Int, n)
-                _celldofs = celldofs!(eldofs, dh, cellnum)
-                counter = 1
-
-                for node in cell.nodes
-                    for d in 1:field_dim
-                        data[d, node] = u[_celldofs[counter + offset]]
-                        @debug println("  exporting $(u[_celldofs[counter + offset]]) for dof#$(_celldofs[counter + offset])")
-                        counter += 1
-                    end
-                    if field_dim == 2
-                        # paraview requires 3D-data so pad with zero
-                        data[3, node] = 0
-                    end
-                end
-            end
-        end
+        data = _evaluate_at_grid_nodes(dh, u, name, #=vtk=# Val(true))
         vtk_point_data(vtkfile, data, string(name, suffix))
     end
 
