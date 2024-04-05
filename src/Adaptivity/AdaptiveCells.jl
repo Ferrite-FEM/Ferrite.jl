@@ -6,7 +6,7 @@
 abstract type AbstractAdaptiveGrid{dim} <: AbstractGrid{dim} end
 abstract type AbstractAdaptiveCell{refshape <: AbstractRefShape} <: AbstractCell{refshape} end
 
-const _maxlevel = [30,19]
+_maxlevel = [30,19]
 
 function set_maxlevel(dim::Integer,maxlevel::Integer)
     _maxlevel[dim-1] = maxlevel
