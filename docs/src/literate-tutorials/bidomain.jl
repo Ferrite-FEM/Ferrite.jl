@@ -251,12 +251,9 @@ end;
 # `ch::ConstraintHandler`, stiffness matrix `K` and constant material parameters `FHNParameters()`
 function apply_nonlinear!(du, u, p, t)
     dh = p[2]
-    ch = p[3]
     params = p[4]
-    ip = p[5]
-    qr = p[6]
     cellvalues = p[7]
-    n_basefuncs = getnquadpoints(cellvalues)
+    n_basefuncs = getnbasefunctions(cellvalues)
 
     for cell in CellIterator(dh)
         Ferrite.reinit!(cellvalues, cell)
@@ -279,7 +276,6 @@ function apply_nonlinear!(du, u, p, t)
             end
         end
     end
-    apply_zero!(du, ch)
 end;
 #
 # We assemble the linear parts into `K` and `M`, respectively.
@@ -294,6 +290,9 @@ apply!(M, ch);
 function bidomain!(du,u,p,t)
     du .= K * u
     apply_nonlinear!(du, u, p, t)
+
+    ch = p[3]
+    apply_zero!(du, ch)
 end;
 # In the following code block we define the initial condition of the problem. We first
 # initialize a zero vector of length `ndofs(dh)` and fill it afterwards in a for loop over all cells.
