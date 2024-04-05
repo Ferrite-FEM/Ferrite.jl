@@ -33,7 +33,7 @@
 #
 # with parameters and initial conditions as stated in: Alfonso Bueno-Orovio, David Kay, and Kevin Burrage. "Fourier spectral methods for fractional-in-space reaction-diffusion equations." BIT Numerical mathematics 54.4 (2014): 937-954.
 #
-# To utilize [DifferentialEquations.jl](https://github.com/SciML/DifferentialEquations.jl) we first have to discretize the system with JuAFEM into a system of ordinary differential equations (ODEs) in mass matrix form. Therefore we have first to transform it into a weak form
+# To utilize [DifferentialEquations.jl](https://github.com/SciML/DifferentialEquations.jl) we first have to discretize the system with Ferrite into a system of ordinary differential equations (ODEs) in mass matrix form. Therefore we have first to transform it into a weak form
 #
 # ```math
 # \begin{aligned}
@@ -72,7 +72,7 @@
 #
 # ## Commented Program
 #
-using JuAFEM, SparseArrays, BlockArrays
+using Ferrite, SparseArrays, BlockArrays
 # Instead of using a self written time integrator,
 # we will use in this example a time integrator of [DifferentialEquations.jl](https://github.com/SciML/DifferentialEquations.jl)
 # [DifferentialEquations.jl](https://github.com/SciML/DifferentialEquations.jl) is a powerful package, from which we will use
@@ -81,15 +81,15 @@ using JuAFEM, SparseArrays, BlockArrays
 import DifferentialEquations
 #
 # Now, we define the computational domain and cellvalues. We exploit the fact that all fields of
-# the Bidomain model are approximated with the same Ansatz. Hence, we use one CellScalarValues struct for all three fields.
+# the Bidomain model are approximated with the same Ansatz. Hence, we use one CellValues struct for all three fields.
 grid = generate_grid(Quadrilateral, (60, 60), Vec{2}((0.0,0.0)), Vec{2}((2.5,2.5)))
 addnodeset!(grid, "ground", x-> x[2] == -0 && x[1] == -0)
 dim = 2
 Δt = 0.1
 T = 1000
-ip = Lagrange{dim, RefCube, 1}()
-qr = QuadratureRule{dim, RefCube}(2)
-cellvalues = CellScalarValues(qr, ip);
+ip = Lagrange{RefQuadrilateral, 1}()
+qr = QuadratureRule{RefQuadrilateral}(2)
+cellvalues = CellValues(qr, ip);
 #
 # We need to intialize a DofHandler. The DofHandler needs to be aware of three different fields
 # which are all first order approximations. After pushing all fields into the DofHandler, we `close`
@@ -165,7 +165,7 @@ update!(ch, 0.0);
 #
 # In the following function, `doassemble_linear!`, we assemble all linear parts of the system that stay same over all time steps.
 # This follows from the used Method of Lines, where we first discretize in space and afterwards in time.
-function doassemble_linear!(cellvalues::CellScalarValues{dim}, K::SparseMatrixCSC, M::SparseMatrixCSC, dh::DofHandler; params::FHNParameters = FHNParameters()) where {dim}
+function doassemble_linear!(cellvalues::CellValues{dim}, K::SparseMatrixCSC, M::SparseMatrixCSC, dh::DofHandler; params::FHNParameters = FHNParameters()) where {dim}
     n_ϕₘ = getnbasefunctions(cellvalues)
     n_ϕₑ = getnbasefunctions(cellvalues)
     n_s = getnbasefunctions(cellvalues)
@@ -188,7 +188,7 @@ function doassemble_linear!(cellvalues::CellScalarValues{dim}, K::SparseMatrixCS
         #get the coordinates of the current cell
         coords = getcoordinates(cell)
 
-        JuAFEM.reinit!(cellvalues, cell)
+        Ferrite.reinit!(cellvalues, cell)
         #loop over all Gauss points
         for q_point in 1:getnquadpoints(cellvalues)
             #get the spatial coordinates of the current gauss point
@@ -259,7 +259,7 @@ function apply_nonlinear!(du, u, p, t)
     n_basefuncs = getnquadpoints(cellvalues)
 
     for cell in CellIterator(dh)
-        JuAFEM.reinit!(cellvalues, cell)
+        Ferrite.reinit!(cellvalues, cell)
         _celldofs = celldofs(cell)
         ϕₘ_celldofs = _celldofs[dof_range(dh, :ϕₘ)]
         s_celldofs = _celldofs[dof_range(dh, :s)]
@@ -316,7 +316,7 @@ end
 jac_sparsity = sparse(K)
 
 f = DifferentialEquations.ODEFunction(bidomain!,mass_matrix=M;jac_prototype=jac_sparsity)
-p = [K, dh, ch, FHNParameters(), ip, qr, cellvalues]
+p = (K, dh, ch, FHNParameters(), ip, qr, cellvalues)
 prob_mm = DifferentialEquations.ODEProblem(f,u₀,(0.0,T),p)
 
 sol = DifferentialEquations.solve(prob_mm,DifferentialEquations.QNDF(),reltol=1e-3,abstol=1e-4, progress=true, progress_steps = 1, adaptive=true, dt=Δt);
