@@ -1,9 +1,13 @@
 # This file contains utiltiies for working with (sparse) matrices and vectors.
 # These methods can be overloaded by other array types.
 
-struct SparsityError end
-function Base.showerror(io::IO, ::SparsityError)
-    print(io, "SparsityError: writing to an index outside the sparsity pattern is not allowed")
+struct SparsityError{IDX<:Tuple}
+    indices::IDX
+end
+SparsityError(args::Int...) = SparsityError(args)
+
+function Base.showerror(io::IO, se::SparsityError)
+    print(io, "SparsityError: writing to index ", se.indices, ", which is outside the sparsity pattern, is not allowed")
     return
 end
 
@@ -73,7 +77,7 @@ function addindex!(A::SparseMatrixCSC{Tv}, v::Tv, i::Int, j::Int) where Tv
         return A
     else
         # (i, j) not stored. Throw.
-        throw(SparsityError())
+        throw(SparsityError(i, j))
     end
 end
 
