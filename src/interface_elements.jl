@@ -499,6 +499,19 @@ function function_gradient_average(cv::InterfaceCellValues, qp::Int, u::Abstract
 end
 
 """
+    getdetJdV_average(cv::InterfaceCellValues, qp::Int)
+
+Return the average of the product between the determinant of the Jacobian on each side of the
+interface and the quadrature point weight for the given quadrature point: ``\\det(J(\\mathbf{x})) w_q``.
+
+This value is typically used when one integrating a function on the mid-plane of an interface
+element.
+"""
+function getdetJdV_average(cv::InterfaceCellValues, qp::Int)
+    return (getdetJdV(cv.here, qp) + getdetJdV(cv.there, qp)) / 2
+end
+
+"""
     function_value_jump(cv::InterfaceCellValues, qp::Int, u::AbstractVector)
 
 Compute the jump of the function value in a quadrature point.
