@@ -13,7 +13,7 @@ project
 # Postprocessing
 ```@docs
 PointEvalHandler
-get_point_values
+evaluate_at_points
 Ferrite.PointValues
 PointIterator
 PointLocation

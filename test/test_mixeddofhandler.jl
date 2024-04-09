@@ -133,6 +133,8 @@ function test_2d_mixed_2_el()
     @test ndofs_per_cell(dh.subdofhandlers[1]) == 12
     @test ndofs_per_cell(dh, 2) == 9
     @test ndofs_per_cell(dh.subdofhandlers[2]) == 9
+    @test_throws ErrorException ndofs_per_cell(dh)
+    @test_throws ErrorException Ferrite.nnodes_per_cell(grid)
     @test celldofs(dh, 1) == [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
     @test celldofs(dh, 2) == [5, 6, 3, 4, 13, 14, 11, 10, 15]
 end
@@ -311,7 +313,7 @@ function test_2_element_heat_eq()
 
         for cellnum in cellset
             celldofs!(eldofs, dh, cellnum)
-            xe = get_cell_coordinates(dh.grid, cellnum)
+            xe = getcoordinates(dh.grid, cellnum)
             reinit!(cellvalues, xe)
             fill!(Ke, 0)
             fill!(fe, 0)
@@ -517,6 +519,22 @@ function test_subparametric_triangle()
     @test celldofs(dh, 1) == [i for i in 1:12]
 end
 
+function test_celliterator_subdomain()
+    for celltype in (Line, Quadrilateral, Hexahedron)
+        ip = Ferrite.default_interpolation(celltype)
+        dim = Ferrite.getdim(ip)
+        grid = generate_grid(celltype, ntuple(i->i==1 ? 2 : 1, dim)) # 2 cells
+        dh = DofHandler(grid)
+        sdh = SubDofHandler(dh, Set(2)) # only cell 2, cell 1 is not part of dh
+        add!(sdh, :u, ip)
+        close!(dh)
+
+        ci = CellIterator(sdh)
+        reinit!(ci.cc, 2)
+        @test celldofs(ci.cc) == collect(1:length(ci.cc.dofs))
+    end
+end
+
 function test_separate_fields_on_separate_domains()
     # 5_______6
     # |\      | 
@@ -578,8 +596,8 @@ function test_show()
     add!(dh, :u, Lagrange{RefTriangle, 1}()^2)
     close!(dh)
     @test repr("text/plain", dh) == string(
-        repr(typeof(dh)), "\n  Fields:\n    :u, ",
-        repr(dh.subdofhandlers[1].field_interpolations[1]), "\n  Dofs per cell: 6\n  Total dofs: 8")
+        repr("text/plain", typeof(dh)), "\n  Fields:\n    :u, ",
+        repr("text/plain", dh.subdofhandlers[1].field_interpolations[1]), "\n  Dofs per cell: 6\n  Total dofs: 8")
 
     # multiple SubDofHandlers
     grid = get_2d_grid()
@@ -591,8 +609,38 @@ function test_show()
     close!(dh)
     @test repr("text/plain", dh) == repr(typeof(dh)) * "\n  Fields:\n    :u, dim: 2\n  Total dofs: 10"
     @test repr("text/plain", dh.subdofhandlers[1]) == string(
-        repr(typeof(dh.subdofhandlers[1])), "\n  Cell type: Quadrilateral\n  Fields:\n    :u, ",
-            repr(dh.subdofhandlers[1].field_interpolations[1]), "\n  Dofs per cell: 8\n")
+        repr("text/plain", typeof(dh.subdofhandlers[1])), "\n  Cell type: Quadrilateral\n  Fields:\n    :u, ",
+            repr("text/plain", dh.subdofhandlers[1].field_interpolations[1]), "\n  Dofs per cell: 8\n")
+end
+
+function test_vtk_export()
+    nodes = Node.([Vec(0.0, 0.0),
+                   Vec(1.0, 0.0),
+                   Vec(1.0, 1.0),
+                   Vec(0.0, 1.0),
+                   Vec(2.0, 0.0),
+            ])
+    cells = [
+        Quadrilateral((1, 2, 3, 4)),
+        Triangle((3, 2, 5))
+        ]
+    grid = Grid(cells, nodes)
+    ip_tri = Lagrange{RefTriangle, 1}()
+    ip_quad = Lagrange{RefQuadrilateral, 1}()
+    dh = DofHandler(grid)
+    sdh_quad = SubDofHandler(dh, Set(1))
+    add!(sdh_quad, :u, ip_quad)
+    sdh_tri = SubDofHandler(dh, Set(2))
+    add!(sdh_tri, :u, ip_tri)
+    close!(dh)
+    u = collect(1:ndofs(dh))
+    filename = "mixed_2d_grid"
+    vtk_grid(filename, dh) do vtk
+        vtk_point_data(vtk, dh, u)
+    end
+    sha = bytes2hex(open(SHA.sha1, filename*".vtu"))
+    @test sha == "339ab8a8a613c2f38af684cccd695ae816671607"
+    rm(filename*".vtu") # clean up 
 end
 
 @testset "DofHandler" begin
@@ -619,5 +667,7 @@ end
     test_mixed_grid_show()
     test_separate_fields_on_separate_domains();
     test_unique_cellsets()
+    test_celliterator_subdomain()
     test_show()
+    test_vtk_export()
 end

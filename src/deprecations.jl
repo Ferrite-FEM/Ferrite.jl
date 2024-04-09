@@ -11,9 +11,7 @@ import Base: push!
 # @deprecate add!(ch::ConstraintHandler, fh::FieldHandler, dbc::Dirichlet) add!(ch, dbc)
 
 @deprecate getcoordinates(node::Node) get_node_coordinate(node) true
-@deprecate getcoordinates(args...) get_cell_coordinates(args...) true
-@deprecate getcoordinates!(args...) get_cell_coordinates!(args...) true
-@deprecate cellcoords!(x::Vector, dh::DofHandler, args...) get_cell_coordinates!(x, dh.grid, args...) false
+@deprecate cellcoords!(x::Vector, dh::DofHandler, args...) getcoordinates!(x, dh.grid, args...) false
 
 struct Cell{refdim, nnodes, nfaces}
     function Cell{refdim, nnodes, nfaces}(nodes) where {refdim, nnodes, nfaces}
@@ -156,8 +154,9 @@ for VT in (
     end
 end
 
+# TODO: Are these needed to be deprecated - harder? with the new parameterization
 # (Cell|Face)Values with vector dofs
-const _VectorValues = Union{CellValues{<:VectorInterpolation}, FaceValues{<:VectorInterpolation}}
+const _VectorValues = Union{CellValues{<:FV}, FaceValues{<:FV}} where {FV <: FunctionValues{<:Any,<:VectorInterpolation}}
 @deprecate      function_value(fe_v::_VectorValues, q_point::Int, u::AbstractVector{Vec{dim,T}}) where {dim,T}      function_value(fe_v, q_point, reinterpret(T, u))
 @deprecate   function_gradient(fe_v::_VectorValues, q_point::Int, u::AbstractVector{Vec{dim,T}}) where {dim,T}   function_gradient(fe_v, q_point, reinterpret(T, u))
 @deprecate function_divergence(fe_v::_VectorValues, q_point::Int, u::AbstractVector{Vec{dim,T}}) where {dim,T} function_divergence(fe_v, q_point, reinterpret(T, u))
@@ -338,3 +337,7 @@ function MixedDofHandler(::AbstractGrid)
     error("MixedDofHandler is the standard DofHandler in Ferrite now and has been renamed to DofHandler.
 Use DofHandler even for mixed grids and fields on subdomains.")
 end
+
+@deprecate end_assemble finish_assemble
+@deprecate get_point_values evaluate_at_points
+@deprecate transform! transform_coordinates!

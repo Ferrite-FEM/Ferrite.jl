@@ -22,7 +22,7 @@ function test_projection(order, refshape)
         qp_values = []
         for cell in CellIterator(grid)
             reinit!(cv, cell)
-            r = [f(spatial_coordinate(cv, qp, get_cell_coordinates(cell))) for qp in 1:getnquadpoints(cv)]
+            r = [f(spatial_coordinate(cv, qp, getcoordinates(cell))) for qp in 1:getnquadpoints(cv)]
             push!(qp_values, r)
         end
         return identity.(qp_values) # Tighten the type
@@ -132,7 +132,7 @@ function test_projection_mixedgrid()
     # Create node values for the 1st cell
     # use a SymmetricTensor here for testing the symmetric version of project
     f(x) = SymmetricTensor{2,2,Float64}((1 + x[1]^2, 2x[2]^2, x[1]*x[2]))
-    xe = get_cell_coordinates(mesh, 1)
+    xe = getcoordinates(mesh, 1)
     
     # analytical values
     qp_values = [[f(spatial_coordinate(cv, qp, xe)) for qp in 1:getnquadpoints(cv)]]
@@ -145,6 +145,13 @@ function test_projection_mixedgrid()
     proj = L2Projector(ip, mesh; geom_ip=ip_geom, set=quadset)
     point_vars = project(proj, qp_values, qr)
     point_vars_2 = project(proj, qp_values_matrix, qr)
+    projection_at_nodes = evaluate_at_grid_nodes(proj, point_vars)
+    for cellid in quadset
+        for nodeid in mesh.cells[cellid].nodes
+            x = mesh.nodes[nodeid].x
+            @test projection_at_nodes[nodeid] ≈ f(x)
+        end
+    end
 
     ae = zeros(3, length(point_vars))
     for i in 1:3
@@ -154,7 +161,6 @@ function test_projection_mixedgrid()
     @test point_vars ≈ point_vars_2 ≈ ae
 
     # Do the same thing but for the triangle set
-    order = 2
     ip = Lagrange{RefTriangle, order}()
     ip_geom = Lagrange{RefTriangle, 1}()
     qr = QuadratureRule{RefTriangle}(4)
@@ -164,7 +170,7 @@ function test_projection_mixedgrid()
     qp_values_tria = [zeros(SymmetricTensor{2,2}, nqp) for _ in triaset]
     qp_values_matrix_tria = [zero(SymmetricTensor{2,2}) for _ in 1:nqp, _ in triaset]
     for (ic, cellid) in enumerate(triaset)
-        xe = get_cell_coordinates(mesh, cellid)
+        xe = getcoordinates(mesh, cellid)
         # analytical values
         qp_values = [f(spatial_coordinate(cv, qp, xe)) for qp in 1:getnquadpoints(cv)]
         qp_values_tria[ic] = qp_values
@@ -175,6 +181,14 @@ function test_projection_mixedgrid()
     proj = L2Projector(ip, mesh; geom_ip=ip_geom, set=triaset)
     point_vars = project(proj, qp_values_tria, qr)
     point_vars_2 = project(proj, qp_values_matrix_tria, qr)
+    projection_at_nodes = evaluate_at_grid_nodes(proj, point_vars)
+    for cellid in triaset
+        for nodeid in mesh.cells[cellid].nodes
+            x = mesh.nodes[nodeid].x
+            @test projection_at_nodes[nodeid] ≈ f(x)
+        end
+    end
+
     ae = zeros(3, length(point_vars))
     for i in 1:3
         apply_analytical!(@view(ae[i, :]), proj.dh, :_, x -> f(x).data[i], triaset)
@@ -202,7 +216,7 @@ function test_export(;subset::Bool)
     end
     for cell in CellIterator(grid)
         reinit!(cv, cell)
-        xh = get_cell_coordinates(cell)
+        xh = getcoordinates(cell)
         for qp in 1:getnquadpoints(cv)
             x = spatial_coordinate(cv, qp, xh)
             qpdata_scalar[cellid(cell)][qp] = f(x)
