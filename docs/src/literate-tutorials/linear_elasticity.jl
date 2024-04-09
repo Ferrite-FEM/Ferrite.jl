@@ -55,13 +55,15 @@
 # $\mathbb{T}$ are suitable trial and test function sets, respectively. The boundary traction
 # is denoted $\boldsymbol{t}^\ast$ and body forces are denoted $\boldsymbol{b}$.
 #
-# However, for this example we will neglect all external loads and thus the weak form reads:
+# However, for this example we will neglect body foces and thus the weak form reads:
 # ```math
 # \int_\Omega 
 #   \boldsymbol{\sigma} : \left(\delta \boldsymbol{u} \otimes \boldsymbol{\nabla} \right)
 # \, \mathrm{d}V
 # =
-# 0 \,.
+# \int_{\partial\Omega}
+#   \boldsymbol{t}^\ast \cdot \delta \boldsymbol{u}
+# \, \mathrm{d}A \,.
 # ```
 #
 # Finally, we choose to operate on a 2-dimensional problem under plain strain conditions.
@@ -124,22 +126,26 @@ add!(ch, Dirichlet(:u, getfaceset(grid, "left"), (x, t) -> 0.0, 1))
 close!(ch);
 
 # ### Material behavior
-# Next, we need to define the material behavior. Since we use linear elasticity here,
-# we have a linear problem and only need to assemble the stiffness matrix, but not the 
-# residual vector. Consequently we only need the tangent of the stress $\boldsymbol{\sigma}$
-# with respect to the small strain tensor $\boldsymbol{\varepsilon}$ for our element routine.
+# Next, we need to define the material behavior. In this example, we use linear elasticity,
+# such that
+# ```math
+# \boldsymbol{\sigma} = \boldsymbol{\mathrm{E}} : \boldsymbol \varepsilon
+# ```
+# where $\boldsymbol{\mathrm{E}}$ is the elastic stiffness tensor and
+# $\boldsymbol{\varepsilon}$ is the small strain tensor.
+# Consequently, we need to set up the elastic stiffness tensor $\boldsymbol{\mathrm{E}}$.
 #
-# We also operate on a 2-dimensional problem under plain strain conditions here, keep in
-# mind that the plane stress stiffness tensor is defined differently.
-E = 200e3 # Young's modulus [MPa]
+# Here, we operate in plane strain conditions, keep in mind that the plane stress stiffness 
+# tensor is defined differently.
+Emod = 200e3 # Young's modulus [MPa]
 ν = 0.3 # Poisson's ratio [-]
 #md nothing # hide
 
-λ = E*ν / ((1 + ν) * (1 - 2ν)) # 1st Lamé parameter
-μ = E / (2(1 + ν)) # 2nd Lamé parameter
+λ = Emod*ν / ((1 + ν) * (1 - 2ν)) # 1st Lamé parameter
+μ = Emod / (2(1 + ν)) # 2nd Lamé parameter
 I = one(SymmetricTensor{2, dim}) # 2nd order unit tensor
 II = one(SymmetricTensor{4, dim}) # 4th order symmetric unit tensor
-∂σ∂ε = 2μ * II + λ * (I ⊗ I); # elastic stiffness tensor
+𝐄 = 2μ * II + λ * (I ⊗ I); # elastic stiffness tensor
 
 # ### Element routine
 # The stiffness matrix follows from the weak form such that
@@ -159,8 +165,8 @@ II = one(SymmetricTensor{4, dim}) # 4th order symmetric unit tensor
 # The element routine computes the local  stiffness matrix `ke`
 # for a single element. `ke` is pre-allocated and reused for all elements.
 #
-# Note that the elastic stiffness tensor is constant. Thus is needs to be computed and once
-# and can then be used for all integration points.
+# Note that the elastic stiffness tensor $\boldsymbol{\mathrm{E}}$ is constant.
+# Thus is needs to be computed and once and can then be used for all integration points.
 function assemble_cell!(ke, cellvalues, ∂σ∂ε)
     fill!(ke, 0.0)
     n_basefuncs = getnbasefunctions(cellvalues)
@@ -178,7 +184,7 @@ function assemble_cell!(ke, cellvalues, ∂σ∂ε)
 end
 #md nothing # hide
 
-# #### Global assembly
+# ### Global assembly
 # We define the function `assemble_global` to loop over the elements and do the global
 # assembly. The function takes the preallocated sparse matrix `K`, our DofHandler `dh`, our
 # `cellvalues` and the elastic stiffness tensor `∂σ∂ε` as input arguments and computes the
