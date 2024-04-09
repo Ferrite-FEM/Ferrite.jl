@@ -553,4 +553,3 @@ Compute the jump of the function gradient in a quadrature point.
 function function_gradient_jump(cv::InterfaceCellValues, qp::Int, u::AbstractVector)
     return function_gradient(cv, qp, u, false) - function_gradient(cv, qp, u, true)
 end
-
