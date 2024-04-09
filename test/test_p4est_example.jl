@@ -105,7 +105,7 @@ function check_and_compute_convergence(dh, u, cellvalues, testatol, forest)
         end
     end
     Ferrite.refine!(forest,marked_cells)
-    #Ferrite.balanceforest!(forest)
+    Ferrite.balanceforest!(forest)
     L2norm, L∞norm
 end
 
@@ -186,14 +186,14 @@ end
             grid_transfered, hnodes = Ferrite.creategrid(adaptive_grid)
             dh, ch, cellvalues = ConvergenceTestHelper.setup_poisson_problem(grid_transfered, interpolation, interpolation_geo, qr, N, hnodes)
             u = ConvergenceTestHelper.solve(dh, ch, cellvalues)
-            q_gp = compute_fluxes(cellvalues, dh, u);
-            projector = L2Projector(interpolation, grid_transfered);
-            q_projected = project(projector, q_gp, qr);
+            # q_gp = compute_fluxes(cellvalues, dh, u);
+            # projector = L2Projector(interpolation, grid_transfered);
+            # q_projected = project(projector, q_gp, qr);
             L2norm, _ = ConvergenceTestHelper.check_and_compute_convergence(dh, u, cellvalues, 1e-2, adaptive_grid)
-            vtk_grid("p4est_test$(i).vtu",dh) do vtk
-                vtk_point_data(vtk,dh,u)
-                vtk_point_data(vtk, projector, q_projected, "q")
-            end
+            # vtk_grid("p4est_test$(i).vtu",dh) do vtk
+            #     vtk_point_data(vtk,dh,u)
+            #     vtk_point_data(vtk, projector, q_projected, "q")
+            # end
             i += 1
         end
     end

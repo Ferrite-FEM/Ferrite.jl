@@ -1,3 +1,8 @@
+# TODO we should remove the mixture of indices. Maybe with these:
+# - struct FaceIndexBWG ... end
+# - struct QuadrilateralBWG ... end
+# - struct HexahedronBWG ... end
+
 abstract type AbstractAdaptiveGrid{dim} <: AbstractGrid{dim} end
 abstract type AbstractAdaptiveCell{refshape <: AbstractRefShape} <: AbstractCell{refshape} end
 
@@ -7,7 +12,7 @@ function set_maxlevel(dim::Integer,maxlevel::Integer)
     _maxlevel[dim-1] = maxlevel
 end
 
-struct OctantBWG{dim, N, M, T} <: AbstractCell{RefHypercube{dim}}
+struct OctantBWG{dim, N, T} <: AbstractCell{RefHypercube{dim}}
     #Refinement level
     l::T
     #x,y,z \in {0,...,2^b} where (0 ≤ l ≤ b)}
@@ -32,9 +37,9 @@ function OctantBWG(dim::Integer, l::T1, m::T2, b::T1=_maxlevel[dim-1]) where {T1
         z = z | (h*((m-_one) & _two^(dim*i+_two))÷_two^((dim-_one)*i+_two))
     end
     if dim < 3
-        OctantBWG{2,4,4,T1}(l,(x,y))
+        OctantBWG{2,4,T1}(l,(x,y))
     else
-        OctantBWG{3,8,6,T1}(l,(x,y,z))
+        OctantBWG{3,8,T1}(l,(x,y,z))
     end
 end
 
@@ -44,25 +49,27 @@ end
 function OctantBWG(level::Int,coords::NTuple)
     dim = length(coords)
     nnodes = 2^dim
-    nfaces = 2*dim
-    OctantBWG{dim,nnodes,nfaces,eltype(coords)}(level,coords)
+    OctantBWG{dim,nnodes,eltype(coords)}(level,coords)
 end
 #OctantBWG(level::Int32,coords::NTuple) = OctantBWG(level,Int32.(coords))
 #OctantBWG(level::Int32, coords::NTuple{dim,Int32}) where dim = OctantBWG{dim,2^dim,2*dim,Int32}(level,coords)
 
-# From BWG 2011
-# > The octant coordinates are stored as integers of a fixed number b of bits,
-# > where the highest (leftmost) bit represents the first vertical level of the
-# > octree (counting the root as level zero), the second highest bit the second level of the octree, and so on.
-# Morton Index can thus be constructed by interleaving the integer bits:
-# m(Oct) := (y_b,x_b,y_b-1,x_b-1,...y0,x0)_2
-# further we assume the following
-# > Due to the two-complement representation of integers in practically all current hardware,
-# > where the highest digit denotes the negated appropriate power of two, bitwise operations as used,
-# > for example, in Algorithm 1 yield the correct result even for negative coordinates.
-# also from BWG 2011
-# TODO: use LUT method from https://www.forceflow.be/2013/10/07/morton-encodingdecoding-through-bit-interleaving-implementations/
-function morton(octant::OctantBWG{dim,N,M,T},l::T,b::T) where {dim,N,M,T<:Integer}
+"""
+From [BWG2011](@citet);
+> The octant coordinates are stored as integers of a fixed number b of bits,
+> where the highest (leftmost) bit represents the first vertical level of the
+> octree (counting the root as level zero), the second highest bit the second level of the octree, and so on.
+A morton index can thus be constructed by interleaving the integer bits:
+m(Oct) := (y_b,x_b,y_b-1,x_b-1,...y0,x0)_2
+further we assume the following
+> Due to the two-complement representation of integers in practically all current hardware,
+> where the highest digit denotes the negated appropriate power of two, bitwise operations as used,
+> for example, in Algorithm 1 yield the correct result even for negative coordinates.
+also from [BWG2011](@citet)
+
+TODO: use LUT method from https://www.forceflow.be/2013/10/07/morton-encodingdecoding-through-bit-interleaving-implementations/
+"""
+function morton(octant::OctantBWG{dim,N,T},l::T,b::T) where {dim,N,T<:Integer}
     o = one(T)
     z = zero(T)
     id = zero(widen(eltype(octant.xyz)))
@@ -76,24 +83,24 @@ function morton(octant::OctantBWG{dim,N,M,T},l::T,b::T) where {dim,N,M,T<:Intege
     # discard the bit information about deeper levels
     return (id >> ((b-l)*dim))+o
 end
-morton(octant::OctantBWG{dim,N,M,T1},l::T2,b::T3) where {dim,N,M,T1<:Integer,T2<:Integer,T3<:Integer} = morton(octant,T1(l),T1(b))
+morton(octant::OctantBWG{dim,N,T1},l::T2,b::T3) where {dim,N,T1<:Integer,T2<:Integer,T3<:Integer} = morton(octant,T1(l),T1(b))
 
-Base.zero(::Type{OctantBWG{3, 8, 6}}) = OctantBWG(3, 0, 1)
-Base.zero(::Type{OctantBWG{2, 4, 4}}) = OctantBWG(2, 0, 1)
-root(dim::T) where T<:Integer = zero(OctantBWG{dim,2^dim,2*dim})
-Base.eltype(::Type{OctantBWG{dim,N,M,T}}) where {dim,N,M,T} = T
+Base.zero(::Type{OctantBWG{3, 8}}) = OctantBWG(3, 0, 1)
+Base.zero(::Type{OctantBWG{2, 4}}) = OctantBWG(2, 0, 1)
+root(dim::T) where T<:Integer = zero(OctantBWG{dim,2^dim})
+Base.eltype(::Type{OctantBWG{dim,N,T}}) where {dim,N,T} = T
 
-ncorners(::Type{OctantBWG{dim,N,M,T}}) where {dim,N,M,T} = N # TODO change to how many corners
+ncorners(::Type{OctantBWG{dim,N,T}}) where {dim,N,T} = N # TODO change to how many corners
 ncorners(o::OctantBWG) = ncorners(typeof(o))
-nnodes(::Type{OctantBWG{dim,N,M,T}}) where {dim,N,M,T} = N
+nnodes(::Type{OctantBWG{dim,N,T}}) where {dim,N,T} = N
 nnodes(o::OctantBWG) = ncorners(typeof(o))
-nchilds(::Type{OctantBWG{dim,N,M,T}}) where {dim,N,M,T} = N
+nchilds(::Type{OctantBWG{dim,N,T}}) where {dim,N,T} = N
 nchilds(o::OctantBWG) = nchilds(typeof(o))# Follow z order, x before y before z for faces, edges and corners
 
 Base.isequal(o1::OctantBWG, o2::OctantBWG) = (o1.l == o2.l) && (o1.xyz == o2.xyz)
 """
     o1::OctantBWG < o2::OctantBWG
-Implements Algorithm 2.1 of IBWG 2015.
+Implements Algorithm 2.1 of [IBWG2015](@citet).
 Checks first if mortonid is smaller and later if level is smaller.
 Thus, ancestors precede descendants (preordering).
 """
@@ -106,7 +113,7 @@ function Base.isless(o1::OctantBWG, o2::OctantBWG)
     end
 end
 
-function children(octant::OctantBWG{dim,N,M,T}, b::Integer) where {dim,N,M,T}
+function children(octant::OctantBWG{dim,N,T}, b::Integer) where {dim,N,T}
     o = one(T)
     _nchilds = nchilds(octant)
     startid = morton(octant,octant.l+o,b)
@@ -140,7 +147,7 @@ Base.show(io::IO, ::MIME"text/plain", f::OctantFaceIndex) = print(io, "O-Face $(
 Base.show(io::IO, f::OctantFaceIndex) = print(io, "O-Face $(f.idx)")
 
 vertex(octant::OctantBWG, c::OctantCornerIndex, b::Integer) = vertex(octant,c.idx,b)
-function vertex(octant::OctantBWG{dim,N,M,T}, c::Integer, b::Integer) where {dim,N,M,T}
+function vertex(octant::OctantBWG{dim,N,T}, c::Integer, b::Integer) where {dim,N,T}
     h = T(_compute_size(b,octant.l))
     return ntuple(d->((c-1) & (2^(d-1))) == 0 ? octant.xyz[d] : octant.xyz[d] + h ,dim)
 end
@@ -174,10 +181,10 @@ end
 
 """
     boundaryset(o::OctantBWG{2}, i::Integer, b::Integer
-implements two dimensional boundaryset table from Fig.4.1 IBWG 2015
+implements two dimensional boundaryset table from Fig.4.1 [IBWG2015](@citet)
 TODO: could be done little bit less ugly
 """
-function boundaryset(o::OctantBWG{2,N,M,T}, i::Integer, b::Integer) where {N,M,T}
+function boundaryset(o::OctantBWG{2,N,T}, i::Integer, b::Integer) where {N,T}
     if i==1
         return Set((OctantCornerIndex(1),OctantFaceIndex(1),OctantFaceIndex(3)))
     elseif i==2
@@ -193,10 +200,10 @@ end
 
 """
     boundaryset(o::OctantBWG{3}, i::Integer, b::Integer
-implements three dimensional boundaryset table from Fig.4.1 IBWG 2015
+implements three dimensional boundaryset table from Fig.4.1 [IBWG2015](@citet)
 TODO: could be done little bit less ugly
 """
-function boundaryset(o::OctantBWG{3,N,M,T}, i::Integer, b::Integer) where {N,M,T}
+function boundaryset(o::OctantBWG{3,N,T}, i::Integer, b::Integer) where {N,T}
     if i==1
         return Set((OctantCornerIndex(1),OctantEdgeIndex(1),OctantEdgeIndex(5),OctantEdgeIndex(9), OctantFaceIndex(1),OctantFaceIndex(3),OctantFaceIndex(5)))
     elseif i==2
@@ -219,12 +226,12 @@ function boundaryset(o::OctantBWG{3,N,M,T}, i::Integer, b::Integer) where {N,M,T
 end
 
 """
-    find_range_boundaries(f::OctantBWG{dim,N,M,T}, l::OctantBWG{dim,N,M,T}, s::OctantBWG{dim,N,M,T}, idxset, b)
-    find_range_boundaries(s::OctantBWG{dim,N,M,T}, idxset, b)
-Algorithm 4.2 of IBWG 2015
+    find_range_boundaries(f::OctantBWG{dim,N,T}, l::OctantBWG{dim,N,T}, s::OctantBWG{dim,N,T}, idxset, b)
+    find_range_boundaries(s::OctantBWG{dim,N,T}, idxset, b)
+Algorithm 4.2 of [IBWG2015](@citet)
 TODO: write tests
 """
-function find_range_boundaries(f::OctantBWG{dim,N,M,T1}, l::OctantBWG{dim,N,M,T1}, s::OctantBWG{dim,N,M,T1}, idxset::Set{OctantIndex{T2}}, b) where {dim,N,M,T1,T2}
+function find_range_boundaries(f::OctantBWG{dim,N,T1}, l::OctantBWG{dim,N,T1}, s::OctantBWG{dim,N,T1}, idxset::Set{OctantIndex{T2}}, b) where {dim,N,T1,T2}
     o = one(T1)
     if isempty(idxset) || s.l == b
         return idxset
@@ -271,14 +278,14 @@ function isrelevant(xyz::NTuple{dim,T},leafsuppₚ::Set{<:OctantBWG}) where {dim
     return true
 end
 
-struct OctreeBWG{dim,N,M,T} <: AbstractAdaptiveCell{RefHypercube{dim}}
-    leaves::Vector{OctantBWG{dim,N,M,T}}
+struct OctreeBWG{dim,N,T} <: AbstractAdaptiveCell{RefHypercube{dim}}
+    leaves::Vector{OctantBWG{dim,N,T}}
     #maximum refinement level
     b::T
     nodes::NTuple{N,Int}
 end
 
-function refine!(octree::OctreeBWG{dim,N,M,T}, pivot_octant::OctantBWG{dim,N,M,T}) where {dim,N,M,T<:Integer}
+function refine!(octree::OctreeBWG{dim,N,T}, pivot_octant::OctantBWG{dim,N,T}) where {dim,N,T<:Integer}
     if !(pivot_octant.l + 1 <= octree.b)
         return
     end
@@ -293,7 +300,7 @@ function refine!(octree::OctreeBWG{dim,N,M,T}, pivot_octant::OctantBWG{dim,N,M,T
     end
 end
 
-function coarsen!(octree::OctreeBWG{dim,N,M,T}, o::OctantBWG{dim,N,M,T}) where {dim,N,M,T<:Integer}
+function coarsen!(octree::OctreeBWG{dim,N,T}, o::OctantBWG{dim,N,T}) where {dim,N,T<:Integer}
     _two = T(2)
     leave_idx = findfirst(x->x==o,octree.leaves)
     shift = child_id(o,octree.b) - one(T)
@@ -308,13 +315,13 @@ function coarsen!(octree::OctreeBWG{dim,N,M,T}, o::OctantBWG{dim,N,M,T}) where {
     deleteat!(octree.leaves,leave_idx-shift+one(T):leave_idx-shift+window_length)
 end
 
-OctreeBWG{3,8,6}(nodes::NTuple,b=_maxlevel[2]) = OctreeBWG{3,8,6,Int64}([zero(OctantBWG{3,8,6})],Int64(b),nodes)
-OctreeBWG{2,4,4}(nodes::NTuple,b=_maxlevel[1]) = OctreeBWG{2,4,4,Int64}([zero(OctantBWG{2,4,4})],Int64(b),nodes)
-OctreeBWG(cell::Quadrilateral,b=_maxlevel[2]) = OctreeBWG{2,4,4}(cell.nodes,b)
-OctreeBWG(cell::Hexahedron,b=_maxlevel[1]) = OctreeBWG{3,8,6}(cell.nodes,b)
+OctreeBWG{3,8}(nodes::NTuple,b=_maxlevel[2]) = OctreeBWG{3,8,Int64}([zero(OctantBWG{3,8})],Int64(b),nodes)
+OctreeBWG{2,4}(nodes::NTuple,b=_maxlevel[1]) = OctreeBWG{2,4,Int64}([zero(OctantBWG{2,4})],Int64(b),nodes)
+OctreeBWG(cell::Quadrilateral,b=_maxlevel[2]) = OctreeBWG{2,4}(cell.nodes,b)
+OctreeBWG(cell::Hexahedron,b=_maxlevel[1]) = OctreeBWG{3,8}(cell.nodes,b)
 
 Base.length(tree::OctreeBWG) = length(tree.leaves)
-Base.eltype(::Type{OctreeBWG{dim,N,M,T}}) where {dim,N,M,T} = T
+Base.eltype(::Type{OctreeBWG{dim,N,T}}) where {dim,N,T} = T
 
 function inside(oct::OctantBWG{dim},b) where dim
     maxsize = _maximum_size(b)
@@ -327,9 +334,9 @@ inside(tree::OctreeBWG{dim},oct::OctantBWG{dim}) where dim = inside(oct,tree.b)
 """
     split_array(octree::OctreeBWG, a::OctantBWG)
     split_array(octantarray, a::OctantBWG, b::Integer)
-Algorithm 3.3 of IBWG2015. Efficient binary search
+Algorithm 3.3 of [IBWG2015](@citet). Efficient binary search.
 """
-function split_array(octantarray, a::OctantBWG{dim,N,M,T}, b::Integer) where {dim,N,M,T}
+function split_array(octantarray, a::OctantBWG{dim,N,T}, b::Integer) where {dim,N,T}
     o = one(T)
     𝐤 = T[i==1 ? 1 : length(octantarray)+1 for i in 1:2^dim+1]
     for i in 2:2^dim
@@ -352,7 +359,7 @@ end
 
 split_array(tree::OctreeBWG, a::OctantBWG) = split_array(tree.leaves, a, tree.b)
 
-function search(octantarray, a::OctantBWG{dim,N,M,T1}, idxset::Vector{T2}, b::Integer, Match=match) where {dim,N,M,T1<:Integer,T2}
+function search(octantarray, a::OctantBWG{dim,N,T1}, idxset::Vector{T2}, b::Integer, Match=match) where {dim,N,T1<:Integer,T2}
     isempty(octantarray) && return
     isleaf = (length(octantarray) == 1 && a ∈ octantarray) ? true : false
     idxset_match = eltype(idxset)[]
@@ -375,7 +382,7 @@ search(tree::OctreeBWG, a::OctantBWG, idxset, Match=match) = search(tree.leaves,
 
 """
     match(o::OctantBWG, isleaf::Bool, q)
-from IBWG2015
+from [IBWG2015](@citet)
 > match returns true if there is a leaf r ∈ 𝒪 that is a descendant of o
 > such that match_q(r) = true, and is allowed to return a false positive
 > (i.e., true even if match_q(r) = false for all descendants leaves of o)
@@ -391,8 +398,8 @@ end
 
 """
     ForestBWG{dim, C<:AbstractAdaptiveCell, T<:Real} <: AbstractAdaptiveGrid{dim}
-`p4est` adaptive grid implementation based on Burstedde, Wilcox, Ghattas [2011]
-and Isaac, Burstedde, Wilcox, Ghattas [2015]
+`p4est` adaptive grid implementation based on [BWG2011](@citet)
+and [IBWG2015](@citet).
 
 ## Constructor
     ForestBWG(grid::AbstractGrid{dim}, b=_maxlevel[dim-1]) where dim
@@ -485,8 +492,7 @@ function getcells(forest::ForestBWG{dim,C}) where {dim,C}
     treetype = C
     ncells = getncells(forest)
     nnodes = 2^dim
-    nfaces = 2*dim
-    cellvector = Vector{OctantBWG{dim,nnodes,nfaces,eltype(C)}}(undef,ncells)
+    cellvector = Vector{OctantBWG{dim,nnodes,eltype(C)}}(undef,ncells)
     o = one(eltype(C))
     cellid = o
     for tree in forest.cells
@@ -502,7 +508,7 @@ function getcells(forest::ForestBWG{dim}, cellid::Int)  where dim
     @warn "Slow dispatch, consider to call `getcells(forest)` once instead" maxlog=1 #TODO doc page for performance
     #TODO should nleaves be saved by forest?
     nleaves = length.(forest.cells) # cells=trees
-    #TODO remove that later by for loop or IBWG 2015 iterator approach
+    #TODO remove that later by for loop or [IBWG2015](@citet) iterator approach
     nleaves_cumsum = cumsum(nleaves)
     k = findfirst(x->cellid<=x,nleaves_cumsum)
     #TODO is this actually correct?
@@ -529,7 +535,7 @@ end
 
 transform_pointBWG(forest, vertices) = transform_pointBWG.((forest,), first.(vertices), last.(vertices))
 
-#TODO: this function should wrap the LNodes Iterator of IBWG2015
+#TODO: this function should wrap the LNodes Iterator of [IBWG2015](@citet)
 function creategrid(forest::ForestBWG{dim,C,T}) where {dim,C,T}
     nodes = Vector{Tuple{Int,NTuple{dim,Int32}}}()
     sizehint!(nodes,getncells(forest)*2^dim)
@@ -539,6 +545,8 @@ function creategrid(forest::ForestBWG{dim,C,T}) where {dim,C,T}
     node_map_inv = dim < 3 ? node_map₂_inv : node_map₃_inv
     nodeids = Dict{Tuple{Int,NTuple{dim,Int32}},Int}()
     nodeowners = Dict{Tuple{Int,NTuple{dim,Int32}},Tuple{Int,NTuple{dim,Int32}}}()
+
+    # Phase 1: Assign node owners intra-octree
     pivot_nodeid = 1
     for (k,tree) in enumerate(forest.cells)
         for leaf in tree.leaves
@@ -551,72 +559,125 @@ function creategrid(forest::ForestBWG{dim,C,T}) where {dim,C,T}
             end
         end
     end
+
+    # Phase 2: Assign node owners inter-octree
     for (k,tree) in enumerate(forest.cells)
         _vertices = vertices(root(dim),tree.b)
-        for (vi,v) in enumerate(_vertices)
-            vertex_neighbor =  forest.topology.vertex_vertex_neighbor[k,node_map[vi]]
-            if length(vertex_neighbor) == 0
-                continue
-            end
-            if k < vertex_neighbor[1][1]
-                #delete!(nodes,(k,v))
-                new_v = vertex(root(dim),node_map[vertex_neighbor[1][2]],tree.b)
-                new_k = vertex_neighbor[1][1]
-                nodeids[(k,v)] = nodeids[(new_k,new_v)]
-                nodeowners[(k,v)] = (new_k,new_v)
-            end
-        end
-        _faces = faces(root(dim),tree.b)
-        for (fi,f) in enumerate(_faces) # fi in p4est notation
-            face_neighbor =  forest.topology.face_face_neighbor[k,_perm[fi]]
-            if length(face_neighbor) == 0
-                continue
-            end
-            k′ = face_neighbor[1][1]
-            neighbor_vertices = vertices.(forest.cells[k′].leaves,forest.cells[k′].b)
-            if k < k′
-                if fi < 3
-                    parallel_axis = 1
-                elseif 3 ≤ fi < 5
-                    parallel_axis = 2
-                elseif 5 ≤ fi < 7
-                    parallel_axis = 3
+        # Vertex neighbors
+        @debug println("Setting vertex neighbors for octree $k")
+        for (v,vc) in enumerate(_vertices)
+            vertex_neighbor = forest.topology.vertex_vertex_neighbor[k,node_map[v]]
+            for (k′, v′) in vertex_neighbor
+                @debug println("  pair $v $v′")
+                if k > k′
+                    #delete!(nodes,(k,v))
+                    new_v = vertex(root(dim),node_map[v′],tree.b)
+                    nodeids[(k,vc)] = nodeids[(k′,new_v)]
+                    nodeowners[(k,vc)] = (k′,new_v)
+                    @debug println("    Matching $vc (local) to $new_v (neighbor)")
                 end
-                for leaf in tree.leaves
-                    for v in vertices(leaf,tree.b)
-                        if v[parallel_axis] == f[1][parallel_axis] == f[2][parallel_axis]
-                            cache_octant = OctantBWG(leaf.l,v)
-                            cache_octant = transform_face(forest,k′,_perminv[face_neighbor[1][2]],cache_octant) # after transform
-                            #TODO check if its worth to change this comparison from ∈ nodes to ∈ all nodes of k'
-                            #if (k′,cache_octant.xyz) ∈ nodes
-                            if any((cache_octant.xyz,) .∈ neighbor_vertices)
-                                #delete!(nodes,(k,v))
-                                nodeids[(k,v)] = nodeids[(k′,cache_octant.xyz)]
-                                nodeowners[(k,v)] = (k′,cache_octant.xyz)
+            end
+            # TODO check if we need to also update the face neighbors
+        end
+        if dim > 1
+            _faces = faces(root(dim),tree.b)
+            # Face neighbors
+            @debug println("Updating face neighbors for octree $k")
+            for (f,fc) in enumerate(_faces) # f in p4est notation
+                f_axis_index, f_axis_sign = divrem(f-1,2)
+                face_neighbor = forest.topology.face_face_neighbor[k,_perm[f]]
+                if length(face_neighbor) == 0
+                    continue
+                end
+                @debug @assert length(face_neighbor) == 1
+                k′, f′_ferrite = face_neighbor[1]
+                f′ = _perminv[f′_ferrite]
+                if k > k′ # Owner
+                    tree′ = forest.cells[k′]
+                    for leaf in tree.leaves
+                        if f_axis_sign == 1 # positive face
+                            if leaf.xyz[f_axis_index + 1] < 2^tree.b-2^(tree.b-leaf.l)
+                                @debug println("    Rejecting $leaf")
+                                continue
                             end
+                        else # negative face
+                            if leaf.xyz[f_axis_index + 1] > 0
+                                @debug println("    Rejecting $leaf")
+                                continue
+                            end
+                        end
+                        neighbor_candidate = transform_face(forest,k′,f′,leaf)
+                        # Candidate must be the face opposite to f'
+                        f′candidate = ((f′ - 1) ⊻ 1) + 1
+                        fnodes = face(leaf, f , tree.b)
+                        fnodes_neighbor = face(neighbor_candidate, f′candidate, tree′.b)
+                        r = compute_face_orientation(forest,k,f)
+                        @debug println("    Matching $fnodes (local) to $fnodes_neighbor (neighbor)")
+                        if dim == 2
+                            if r == 0 # same orientation
+                                for i ∈ 1:2
+                                    if haskey(nodeids, (k′,fnodes_neighbor[i]))
+                                        nodeids[(k,fnodes[i])] = nodeids[(k′,fnodes_neighbor[i])]
+                                        nodeowners[(k,fnodes[i])] = (k′,fnodes_neighbor[i])
+                                    end
+                                end
+                            else
+                                for i ∈ 1:2
+                                    if haskey(nodeids, (k′,fnodes_neighbor[3-i]))
+                                        nodeids[(k,fnodes[i])] = nodeids[(k′,fnodes_neighbor[3-i])]
+                                        nodeowners[(k,fnodes[i])] = (k′,fnodes_neighbor[3-i])
+                                    end
+                                end
+                            end
+                        else
+                            @error "Not implemented for $dim dimensions."
                         end
                     end
                 end
             end
         end
         if dim > 2
-            #TODO add egede dupplication check
+            #TODO add egde duplication check
+            @error "Edge deduplication not implemented yet."
         end
     end
+
+    # Phase 3: Compute unique physical nodes
+    nodeids_dedup = Dict{Int,Int}()
+    next_nodeid = 1
+    for (kv,nodeid) in nodeids
+        if !haskey(nodeids_dedup, nodeid)
+            nodeids_dedup[nodeid] = next_nodeid
+            next_nodeid += 1
+        end
+    end
+    nodes_physical_all = transform_pointBWG(forest,nodes)
+    nodes_physical = zeros(eltype(nodes_physical_all), next_nodeid-1)
+    for (ni, (kv,nodeid)) in enumerate(nodeids)
+        nodes_physical[nodeids_dedup[nodeid]] = nodes_physical_all[nodeid]
+    end
+
+    # Phase 4: Generate cells
     celltype = dim < 3 ? Quadrilateral : Hexahedron
     cells = celltype[]
     cellnodes = zeros(Int,2^dim)
     for (k,tree) in enumerate(forest.cells)
         for leaf in tree.leaves
             _vertices = vertices(leaf,tree.b)
-            cellnodes = ntuple(i-> nodeids[nodeowners[(k,_vertices[i])]],length(_vertices))
+            cellnodes = ntuple(i-> nodeids_dedup[nodeids[nodeowners[(k,_vertices[i])]]],length(_vertices))
             push!(cells,celltype(ntuple(i->cellnodes[node_map[i]],length(cellnodes))))
         end
     end
+
+    # Phase 5: Generate grid and haning nodes
     facesets = reconstruct_facesets(forest) #TODO edge, node and cellsets
-    grid = Grid(cells,transform_pointBWG(forest,nodes) .|> Node, facesets=facesets)
+    grid = Grid(cells,nodes_physical .|> Node, facesets=facesets)
     hnodes = hangingnodes(forest, nodeids, nodeowners)
-    return grid, hnodes
+    hnodes_dedup = Dict{Int64, Vector{Int64}}()
+    for (constrained,constainers) in hnodes
+        hnodes_dedup[nodeids_dedup[constrained]] = [nodeids_dedup[constainer] for constainer in constainers]
+    end
+    return grid, hnodes_dedup
 end
 
 function reconstruct_facesets(forest::ForestBWG{dim}) where dim
@@ -699,8 +760,10 @@ function hangingnodes(forest::ForestBWG{dim}, nodeids, nodeowners) where dim
     return hnodes
 end
 
-# Algorithm 17 of BWG Paper
-# TODO need further work for dimension agnostic case
+"""
+Algorithm 17 of [BWG2011](@citet)
+TODO need further work for dimension agnostic case
+"""
 function balanceforest!(forest::ForestBWG{dim}) where dim
     perm_face = dim == 2 ? 𝒱₂_perm : 𝒱₃_perm
     perm_face_inv = dim == 2 ? 𝒱₂_perm_inv : 𝒱₃_perm_inv
@@ -721,6 +784,7 @@ function balanceforest!(forest::ForestBWG{dim}) where dim
                     if s_i <= 4 #corner neighbor, only true for 2D see possibleneighbors
                         cc = forest.topology.vertex_vertex_neighbor[k,perm_corner[s_i]]
                         isempty(cc) && continue
+                        @assert length(cc) == 1 # FIXME there can be more than 1 vertex neighbor
                         cc = cc[1]
                         k′, c′ = cc[1], perm_corner_inv[cc[2]]
                         o′ = transform_corner(forest,k′,c′,o)
@@ -737,6 +801,7 @@ function balanceforest!(forest::ForestBWG{dim}) where dim
                         s_i -= 4
                         fc = forest.topology.face_face_neighbor[k,perm_face[s_i]]
                         isempty(fc) && continue
+                        @debug @assert length(fc) == 1
                         fc = fc[1]
                         k′, f′ = fc[1], perm_face_inv[fc[2]]
                         o′ = transform_face(forest,k′,f′,o)
@@ -761,9 +826,11 @@ function balanceforest!(forest::ForestBWG{dim}) where dim
     #end
 end
 
-# Algorithm 7 of preprint Sundar, Sampath, Biros
-# https://padas.oden.utexas.edu/static/papers/OctreeBalance21.pdf
-# TODO optimise the unnecessary allocations
+"""
+Algorithm 7 of [SSB2008](@citet)
+
+TODO optimise the unnecessary allocations
+"""
 function balancetree(tree::OctreeBWG)
     if length(tree.leaves) == 1
         return tree
@@ -799,8 +866,11 @@ function balancetree(tree::OctreeBWG)
     return OctreeBWG(R,tree.b,tree.nodes)
 end
 
-# Algorithm 8 of preprint Sundar, Sampath, Biros
-# inverted the algorithm to delete! instead of add incrementally to a new array
+"""
+Algorithm 8 of [SSB2008](@citet)
+
+Inverted the algorithm to delete! instead of add incrementally to a new array
+"""
 function linearise!(leaves::Vector{T},b) where T<:OctantBWG
     inds = [i for i in 1:length(leaves)-1 if isancestor(leaves[i],leaves[i+1],b)]
     deleteat!(leaves,inds)
@@ -1012,7 +1082,7 @@ note the following quote from Bursedde et al:
   4, . . . , 7 being the four children on top of the children 0, . . . , 3.
 shifted by 1 due to julia 1 based indexing
 """
-function child_id(octant::OctantBWG{dim,N,M,T},b::Integer=_maxlevel[2]) where {dim,N,M,T<:Integer}
+function child_id(octant::OctantBWG{dim,N,T},b::Integer=_maxlevel[2]) where {dim,N,T<:Integer}
     i = 0x00
     t = T(2)
     z = zero(T)
@@ -1026,10 +1096,10 @@ end
 
 """
     ancestor_id(octant::OctantBWG, l::Integer, b::Integer)
-Algorithm 3.2 of IBWG 2015 that generalizes `child_id` for different queried levels.
+Algorithm 3.2 of [IBWG2015](@citet) that generalizes `child_id` for different queried levels.
 Applied to a single octree, i.e. the array of leaves, yields a monotonic sequence
 """
-function ancestor_id(octant::OctantBWG{dim,N,M,T}, l::Integer, b::Integer=_maxlevel[dim-1]) where {dim,N,M,T<:Integer}
+function ancestor_id(octant::OctantBWG{dim,N,T}, l::Integer, b::Integer=_maxlevel[dim-1]) where {dim,N,T<:Integer}
     @assert 0 < l ≤ octant.l
     i = 0x00
     t = T(2)
@@ -1041,7 +1111,7 @@ function ancestor_id(octant::OctantBWG{dim,N,M,T}, l::Integer, b::Integer=_maxle
     return i+0x01
 end
 
-function parent(octant::OctantBWG{dim,N,M,T}, b::Integer=_maxlevel[dim-1]) where {dim,N,M,T}
+function parent(octant::OctantBWG{dim,N,T}, b::Integer=_maxlevel[dim-1]) where {dim,N,T}
     if octant.l > zero(T)
         h = T(_compute_size(b,octant.l))
         l = octant.l - one(T)
@@ -1057,16 +1127,16 @@ Given an `octant`, computes the two smallest possible octants that fit into the 
 of `octant`, respectively. These computed octants are called first and last descendants of `octant`
 since they are connected to `octant` by a path down the octree to the maximum level  `b`
 """
-function descendants(octant::OctantBWG{dim,N,M,T}, b::Integer=_maxlevel[dim-1]) where {dim,N,M,T}
+function descendants(octant::OctantBWG{dim,N,T}, b::Integer=_maxlevel[dim-1]) where {dim,N,T}
     l1 = b; l2 = b
     h = T(_compute_size(b,octant.l))
     return OctantBWG(l1,octant.xyz), OctantBWG(l2,octant.xyz .+ (h-one(T)))
 end
 
 """
-    face_neighbor(octant::OctantBWG{dim,N,M,T}, f::T, b::T=_maxlevel[2]) -> OctantBWG{3,N,M,T}
+    face_neighbor(octant::OctantBWG{dim,N,T}, f::T, b::T=_maxlevel[2]) -> OctantBWG{3,N,T}
 Intraoctree face neighbor for a given faceindex `f` (in p4est, i.e. z order convention) and specified maximum refinement level `b`.
-Implements Algorithm 5 of BWG p4est paper.
+Implements Algorithm 5 of [BWG2011](@citet).
 
     x-------x-------x
     |       |       |
@@ -1083,7 +1153,7 @@ Then, the computed face neighbor will be octant 2 with `xyz=(1,0)`.
 Note that the function is not sensitive in terms of leaving the octree boundaries.
 For the above example, a query for face index 1 (marked as `o`) will return an octant outside of the octree with `xyz=(-1,0)`.
 """
-function face_neighbor(octant::OctantBWG{3,N,M,T}, f::T, b::T=_maxlevel[2]) where {N,M,T<:Integer}
+function face_neighbor(octant::OctantBWG{3,N,T}, f::T, b::T=_maxlevel[2]) where {N,T<:Integer}
     l = octant.l
     h = T(_compute_size(b,octant.l))
     x,y,z = octant.xyz
@@ -1092,7 +1162,7 @@ function face_neighbor(octant::OctantBWG{3,N,M,T}, f::T, b::T=_maxlevel[2]) wher
     z += ((f == T(5)) ? -h : ((f == T(6)) ? h : zero(T)))
     return OctantBWG(l,(x,y,z))
 end
-function face_neighbor(octant::OctantBWG{2,N,M,T}, f::T, b::T=_maxlevel[1]) where {N,M,T<:Integer}
+function face_neighbor(octant::OctantBWG{2,N,T}, f::T, b::T=_maxlevel[1]) where {N,T<:Integer}
     l = octant.l
     h = T(_compute_size(b,octant.l))
     x,y = octant.xyz
@@ -1100,13 +1170,42 @@ function face_neighbor(octant::OctantBWG{2,N,M,T}, f::T, b::T=_maxlevel[1]) wher
     y += ((f == T(3)) ? -h : ((f == T(4)) ? h : zero(T)))
     return OctantBWG(l,(x,y))
 end
-face_neighbor(o::OctantBWG{dim,N,M,T1}, f::T2, b::T3) where {dim,N,M,T1<:Integer,T2<:Integer,T3<:Integer} = face_neighbor(o,T1(f),T1(b))
+face_neighbor(o::OctantBWG{dim,N,T1}, f::T2, b::T3) where {dim,N,T1<:Integer,T2<:Integer,T3<:Integer} = face_neighbor(o,T1(f),T1(b))
+
+reference_faces_bwg(::Type{RefHypercube{2}}) = ((1,3) , (2,4), (1,2), (3,4))
+reference_faces_bwg(::Type{RefHypercube{3}}) = ((1,3,5,7) , (2,4,6,8), (1,2,5,6), (3,4,7,8), (1,2,3,4), (5,6,7,8)) # p4est consistent ordering
+# reference_faces_bwg(::Type{RefHypercube{3}}) = ((1,3,7,5) , (2,4,8,6), (1,2,6,5), (3,4,8,7), (1,2,4,4), (5,6,8,7)) # Note that this does NOT follow P4est order!
 
 """
-    transform_face(forest::ForestBWG, k::T1, f::T1, o::OctantBWG{dim,N,M,T2}) -> OctantBWG{dim,N,M,T1,T2}
-    transform_face(forest::ForestBWG, f::FaceIndex, o::OctantBWG{dim,N,M,T2}) -> OctantBWG{dim,N,M,T2}
-Interoctree coordinate transformation of an given octant `o` to the octree `k` coordinate system by virtually pushing `o`s coordinate system through `k`'s face `f`.
-Implements Algorithm 8 of BWG p4est paper.
+    compute_face_orientation(forest::ForestBWG, k::Integer, f::Integer)
+Slow implementation for the determination of the face orientation of face `f` from octree `k` following definition 2.1 from [BWG2011](@citet).
+
+TODO use table 3 for more vroom
+"""
+function compute_face_orientation(forest::ForestBWG{<:Any,<:OctreeBWG{dim,<:Any,T2}}, k::T1, f::T1) where {dim,T1,T2}
+    f_perm = (dim == 2 ? 𝒱₂_perm : 𝒱₃_perm)
+    f_perminv = (dim == 2 ? 𝒱₂_perm_inv : 𝒱₃_perm_inv)
+    n_perm = (dim == 2 ? node_map₂ : node_map₃)
+    n_perminv = (dim == 2 ? node_map₂_inv : node_map₃_inv)
+
+    f_ferrite = f_perm[f]
+    k′, f′_ferrite = getneighborhood(forest,FaceIndex(k,f_ferrite))[1]
+    f′ = f_perminv[f′_ferrite]
+    reffacenodes = reference_faces_bwg(RefHypercube{dim})
+    nodes_f = [forest.cells[k].nodes[n_perm[ni]] for ni in reffacenodes[f]]
+    nodes_f′ = [forest.cells[k′].nodes[n_perm[ni]] for ni in reffacenodes[f′]]
+    if f > f′
+        return T2(findfirst(isequal(nodes_f′[1]), nodes_f)-1)
+    else
+        return T2(findfirst(isequal(nodes_f[1]), nodes_f′)-1)
+    end
+end
+
+"""
+    transform_face_remote(forest::ForestBWG, k::T1, f::T1, o::OctantBWG{dim,N,T2}) -> OctantBWG{dim,N,T1,T2}
+    transform_face_remote(forest::ForestBWG, f::FaceIndex, o::OctantBWG{dim,N,T2}) -> OctantBWG{dim,N,T2}
+Interoctree coordinate transformation of an given octant `o` to the face-neighboring of octree `k` by virtually pushing `o`s coordinate system through `k`s face `f`.
+Implements Algorithm 8 of [BWG2011](@citet).
 
     x-------x-------x
     |       |       |
@@ -1121,42 +1220,140 @@ Implements Algorithm 8 of BWG p4est paper.
 Consider 4 octrees with a single leaf each and a maximum refinement level of 1
 This function transforms octant 1 into the coordinate system of octant 2 by specifying `k=2` and `f=1`.
 While in the own octree coordinate system octant 1 is at `xyz=(0,0)`, the returned and transformed octant is located at `xyz=(-2,0)`
-TODO: this is working for 2D except rotation, 3D I don't know
 """
-function transform_face(forest::ForestBWG, k::T1, f::T1, o::OctantBWG{dim,N,M,T2}) where {dim,N,M,T1<:Integer,T2<:Integer}
+function transform_face_remote(forest::ForestBWG, k::T1, f::T1, o::OctantBWG{dim,N,T2}) where {dim,N,T1<:Integer,T2<:Integer}
     _one = one(T2)
     _two = T2(2)
-    #currently rotation not encoded
-    perm = (dim == 2 ? 𝒱₂_perm : 𝒱₃_perm)
+    _perm = (dim == 2 ? 𝒱₂_perm : 𝒱₃_perm)
     _perminv = (dim == 2 ? 𝒱₂_perm_inv : 𝒱₃_perm_inv)
-    kprime, fprime = getneighborhood(forest,FaceIndex(k,perm[f]))[1]
-    fprime = _perminv[fprime]
-    sprime = _one - (((f - _one) & _one) ⊻ ((fprime - _one) & _one))
-    s = zeros(T2,3)
-    b = zeros(T2,3)
-    a = zeros(T2,3)
-    r = zero(T2)  #no rotation information in face_neighbor currently
-    a[3] = (f-_one) ÷ 2; b[3] = (fprime-_one) ÷ 2
+    k′, f′ = getneighborhood(forest,FaceIndex(k,_perm[f]))[1]
+    f′ = _perminv[f′]
+    s′ = _one - (((f - _one) & _one) ⊻ ((f′ - _one) & _one))
+    s = zeros(T2,dim-1)
+    a = zeros(T2,3) # Coordinate axes of f
+    b = zeros(T2,3) # Coordinate axes of f'
+    r = compute_face_orientation(forest,k,f)
+    a[3] = (f - _one) ÷ 2; b[3] = (f′ - _one) ÷ 2 # origin and target normal axis
     if dim == 2
-        a[1] = 1 - a[3]; b[1] = 1 - b[3]; s[1] = r #no rotation as of now
+        a[1] = 1 - a[3]; b[1] = 1 - b[3]; s[1] = r
     else
         a[1] = (f < 3) ? 1 : 0; a[2] = (f < 5) ? 2 : 1
-        #u = ℛ[1,f] ⊻ ℛ[1,fprime] ⊻ T2((r == 1) | (r == 3))
-        b[1] = (fprime < 3) ? 1 : 0; b[2] = (fprime < 5) ? 2 : 1 # r = 0 -> index 1
-        #v = T2(ℛ[f,fprime] == 1)
-        s[1] = r & 1; s[2] = r & 2
+        u = (ℛ[1,f] - _one) ⊻ (ℛ[1,f′] - _one) ⊻ (((r == 0) | (r == 3)))
+        b[u+1] = (f′ < 3) ? 1 : 0; b[1-u+1] = (f′ < 5) ? 2 : 1 # r = 0 -> index 1
+        if ℛ[f,f′] == 1+1 # R is one-based
+            s[2] = r & 1; s[1] = r & 2
+        else
+            s[1] = r & 1; s[2] = r & 2
+        end
     end
     maxlevel = forest.cells[1].b
     l = o.l; g = 2^maxlevel - 2^(maxlevel-l)
     xyz = zeros(T2,dim)
-    xyz[b[1] + 1] = T2((s[1] == 0) ? o.xyz[a[1] + 1] : g - o.xyz[a[1] + 1])
-    xyz[b[3] + 1] = T2((_two*(fprime & 1) - 1)*2^maxlevel + sprime*g + (1-2*sprime)*o.xyz[a[3] + 1])
+    xyz[b[1] + _one] = T2((s[1] == 0) ? o.xyz[a[1] + _one] : g - o.xyz[a[1] + _one])
+    xyz[b[3] + _one] = T2(((_two*((f′ - _one) & 1)) - _one)*2^maxlevel + s′*g + (1-2*s′)*o.xyz[a[3] + _one])
     if dim == 2
         return OctantBWG(l,(xyz[1],xyz[2]))
     else
-        xyz[b[2] + 1] = T2((s[2] == 0) ? o.xyz[a[1] + 1] : g - o.xyz[a[2] + 1])
+        xyz[b[2] + _one] = T2((s[2] == 0) ? o.xyz[a[2] + _one] : g - o.xyz[a[2] + _one])
         return OctantBWG(l,(xyz[1],xyz[2],xyz[3]))
     end
+end
+
+transform_face_remote(forest::ForestBWG,f::FaceIndex,oct::OctantBWG) = transform_face_remote(forest,f[1],f[2],oct)
+
+function transform_face(forest::ForestBWG, k::T1, f::T1, o::OctantBWG{2,<:Any,T2}) where {T1<:Integer,T2<:Integer}
+    _one = one(T2)
+    _two = T2(2)
+    _perm = 𝒱₂_perm
+    _perminv = 𝒱₂_perm_inv
+    k′, f′ = getneighborhood(forest,FaceIndex(k,_perm[f]))[1]
+    f′ = _perminv[f′]
+
+    r = compute_face_orientation(forest,k,f)
+    # Coordinate axes of f
+    a = (
+        f ≤ 2, # tangent
+        f > 2  # normal 
+    )
+    a_sign = _two*((f - _one) & 1) - _one
+    # Coordinate axes of f'
+    b = (
+        f′ ≤ 2, # tangent
+        f′ > 2  # normal 
+    )
+    # b_sign = _two*(f′ & 1) - _one
+
+    maxlevel = forest.cells[1].b
+    depth_offset = 2^maxlevel - 2^(maxlevel-o.l)
+
+    s′ = _one - (((f - _one) & _one) ⊻ ((f′ - _one) & _one)) # arithmetic switch: TODO understand this.
+
+    # xyz = zeros(T2, 2)
+    # xyz[a[1] + _one] = T2((r == 0) ? o.xyz[b[1] + _one] : depth_offset - o.xyz[b[1] + _one])
+    # xyz[a[2] + _one] = T2(a_sign*2^maxlevel + s′*depth_offset + (1-2*s′)*o.xyz[b[2] + _one])
+    # return OctantBWG(o.l,(xyz[1],xyz[2]))
+
+    # We can do this because the permutation and inverse permutation are the same
+    xyz = (
+        T2((r == 0) ? o.xyz[b[1] + _one] : depth_offset - o.xyz[b[1] + _one]),
+        T2(a_sign*2^maxlevel + s′*depth_offset + (1-2*s′)*o.xyz[b[2] + _one])
+    )
+    return OctantBWG(o.l,(xyz[a[1] + _one],xyz[a[2] + _one]))
+end
+
+function transform_face(forest::ForestBWG, k::T1, f::T1, o::OctantBWG{3,<:Any,T2}) where {T1<:Integer,T2<:Integer}
+    _one = one(T2)
+    _two = T2(2)
+    _perm = 𝒱₃_perm
+    _perminv = 𝒱₃_perm_inv
+    k′, f′ = getneighborhood(forest,FaceIndex(k,_perm[f]))[1]
+    f′ = _perminv[f′]
+    s′ = _one - (((f - _one) & _one) ⊻ ((f′ - _one) & _one))
+    r = compute_face_orientation(forest,k,f)
+
+    # Coordinate axes of f
+    a = (
+        (f ≤ 2) ? 1 : 0,
+        (f ≤ 4) ? 2 : 1,
+        (f - _one) ÷ 2
+    )
+    a_sign = _two*((f - _one) & 1) - _one
+
+    # Coordinate axes of f'
+    b = if Bool(ℛ[1,f] - _one) ⊻ Bool(ℛ[1,f′] - _one) ⊻ (((r == 0) || (r == 3))) # What is this condition exactly?
+        (
+            (f′ < 5) ? 2 : 1,
+            (f′ < 3) ? 1 : 0,
+            (f′ - _one) ÷ 2
+        )
+    else
+        (
+            (f′ < 3) ? 1 : 0,
+            (f′ < 5) ? 2 : 1,
+            (f′ - _one) ÷ 2
+        )
+    end
+    # b_sign = _two*(f′ & 1) - _one
+
+    s = if ℛ[f,f′] == 1+1 # R is one-based
+        (r & 2, r & 1)
+    else
+        (r & 1, r & 2)
+    end
+    maxlevel = forest.cells[1].b
+    depth_offset = 2^maxlevel - 2^(maxlevel-o.l)
+    xyz = zeros(T2,3)
+    xyz[a[1] + _one] = T2((s[1] == 0) ? o.xyz[b[1] + _one] : depth_offset - o.xyz[b[1] + _one])
+    xyz[a[2] + _one] = T2((s[2] == 0) ? o.xyz[b[2] + _one] : depth_offset - o.xyz[b[2] + _one])
+    xyz[a[3] + _one] = T2(a_sign*2^maxlevel + s′*depth_offset + (1-2*s′)*o.xyz[b[3] + _one])
+    return OctantBWG(o.l,(xyz[1],xyz[2],xyz[3]))
+
+    # xyz = (
+    #     T2((s[1] == 0) ? o.xyz[b[1] + _one] : depth_offset - o.xyz[b[1] + _one]),
+    #     T2((s[2] == 0) ? o.xyz[b[2] + _one] : depth_offset - o.xyz[b[2] + _one]),
+    #     T2(a_sign*2^maxlevel + s′*depth_offset + (1-2*s′)*o.xyz[b[3] + _one])
+    # )
+    # return OctantBWG(o.l,(xyz[a[1] + _one],xyz[a[2] + _one],xyz[a[3] + _one]))
 end
 
 transform_face(forest::ForestBWG,f::FaceIndex,oct::OctantBWG) = transform_face(forest,f[1],f[2],oct)
@@ -1165,10 +1362,10 @@ transform_face(forest::ForestBWG,f::FaceIndex,oct::OctantBWG) = transform_face(f
     transform_corner(forest,k,c',oct)
     transform_corner(forest,v::VertexIndex,oct)
 
-Algorithm 12 in p4est paper to transform corner into different octree coordinate system
+Algorithm 12 in [BWG2011](@citet) to transform corner into different octree coordinate system
 Note: in Algorithm 12 is c as a argument, but it's never used, therefore I removed it
 """
-function transform_corner(forest::ForestBWG,k::T1,c′::T1,oct::OctantBWG{dim,N,M,T2}) where {dim,N,M,T1<:Integer,T2<:Integer}
+function transform_corner(forest::ForestBWG,k::T1,c′::T1,oct::OctantBWG{dim,N,T2}) where {dim,N,T1<:Integer,T2<:Integer}
     # make a dispatch that returns only the coordinates?
     b = forest.cells[k].b
     l = oct.l; g = 2^b - 2^(b-l)
@@ -1184,7 +1381,7 @@ transform_corner(forest::ForestBWG,v::VertexIndex,oct::OctantBWG) = transform_co
     edge_neighbor(octant::OctantBWG, e::Integer, b::Integer)
 Computes the edge neighbor octant which is only connected by the edge `e` to `octant`
 """
-function edge_neighbor(octant::OctantBWG{3,N,M,T}, e::T, b::T=_maxlevel[2]) where {N,M,T<:Integer}
+function edge_neighbor(octant::OctantBWG{3,N,T}, e::T, b::T=_maxlevel[2]) where {N,T<:Integer}
     @assert 1 ≤ e ≤ 12
     e -= one(T)
     l = octant.l
@@ -1212,13 +1409,13 @@ function edge_neighbor(octant::OctantBWG{3,N,M,T}, e::T, b::T=_maxlevel[2]) wher
         error("edge case not found")
     end
 end
-edge_neighbor(o::OctantBWG{3,N,M,T1}, e::T2, b::T3) where {N,M,T1<:Integer,T2<:Integer,T3<:Integer} = edge_neighbor(o,T1(e),T1(b))
+edge_neighbor(o::OctantBWG{3,N,T1}, e::T2, b::T3) where {N,T1<:Integer,T2<:Integer,T3<:Integer} = edge_neighbor(o,T1(e),T1(b))
 
 """
     corner_neighbor(octant::OctantBWG, c::Integer, b::Integer)
 Computes the corner neighbor octant which is only connected by the corner `c` to `octant`
 """
-function corner_neighbor(octant::OctantBWG{3,N,M,T}, c::T, b::T=_maxlevel[2]) where {N,M,T<:Integer}
+function corner_neighbor(octant::OctantBWG{3,N,T}, c::T, b::T=_maxlevel[2]) where {N,T<:Integer}
     c -= one(T)
     l = octant.l
     h = T(_compute_size(b,octant.l))
@@ -1231,7 +1428,7 @@ function corner_neighbor(octant::OctantBWG{3,N,M,T}, c::T, b::T=_maxlevel[2]) wh
     return OctantBWG(l,(x,y,z))
 end
 
-function corner_neighbor(octant::OctantBWG{2,N,M,T}, c::T, b::T=_maxlevel[1]) where {N,M,T<:Integer}
+function corner_neighbor(octant::OctantBWG{2,N,T}, c::T, b::T=_maxlevel[1]) where {N,T<:Integer}
     c -= one(T)
     l = octant.l
     h = _compute_size(b,octant.l)
@@ -1242,7 +1439,7 @@ function corner_neighbor(octant::OctantBWG{2,N,M,T}, c::T, b::T=_maxlevel[1]) wh
     y = oy + ((c & _two) - _one)*h
     return OctantBWG(l,(x,y))
 end
-corner_neighbor(o::OctantBWG{dim,N,M,T1}, c::T2, b::T3) where {dim,N,M,T1<:Integer,T2<:Integer,T3<:Integer} = corner_neighbor(o,T1(c),T1(b))
+corner_neighbor(o::OctantBWG{dim,N,T1}, c::T2, b::T3) where {dim,N,T1<:Integer,T2<:Integer,T3<:Integer} = corner_neighbor(o,T1(c),T1(b))
 
 function corner_face_participation(dim::T,c::T) where T<:Integer
     if dim == 2
@@ -1367,18 +1564,18 @@ const 𝒱₂_perm_inv = [3
                      4
                      1]
 
-const 𝒱₃_perm = [2
-                 4
+const 𝒱₃_perm = [5
                  3
-                 5
+                 2
+                 4
                  1
                  6]
 
 const 𝒱₃_perm_inv = [5
-                     1
                      3
                      2
                      4
+                     1
                      6]
 
 const ℛ = [1  2  2  1  1  2
@@ -1427,11 +1624,13 @@ const opposite_face_3 = [2,
                          6,
                          5]
 
+# Node indices permutation from p4est idx to Ferrite idx
 const node_map₂ = [1,
                    2,
                    4,
                    3]
 
+# Node indices permutation from Ferrite idx to p4est idx
 const node_map₂_inv = [1,
                        2,
                        4,

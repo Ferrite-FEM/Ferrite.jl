@@ -17,7 +17,7 @@
     @test Ferrite._face_edge_corners(9,1) == (1,3)
     @test Ferrite._face_edge_corners(10,2) == (1,3)
     @test Ferrite._face_edge_corners(12,2) == (2,4)
-   
+
     @test Ferrite.𝒱₃[1,:] == Ferrite.𝒰[1:4,1] == Ferrite._face_corners(3,1)
     @test Ferrite.𝒱₃[2,:] == Ferrite.𝒰[1:4,2] == Ferrite._face_corners(3,2)
     @test Ferrite.𝒱₃[3,:] == Ferrite.𝒰[5:8,1] == Ferrite._face_corners(3,3)
@@ -28,7 +28,7 @@
     @test Ferrite._edge_corners(1) == [1,2]
     @test Ferrite._edge_corners(4) == [7,8]
     @test Ferrite._edge_corners(12,2) == 8
-   
+
     #Test Figure 3a) of Burstedde, Wilcox, Ghattas [2011]
     test_ξs = (1,2,3,4)
     @test Ferrite._neighbor_corner.((1,),(2,),(1,),test_ξs) == test_ξs
@@ -101,7 +101,7 @@ end
     o = Ferrite.OctantBWG(0,(0,0,0))
     @test Ferrite.descendants(o,2) == (Ferrite.OctantBWG(2,(0,0,0)), Ferrite.OctantBWG(2,(3,3,3)))
     @test Ferrite.descendants(o,3) == (Ferrite.OctantBWG(3,(0,0,0)), Ferrite.OctantBWG(3,(7,7,7)))
-    
+
     @test Ferrite.edge_neighbor(Ferrite.OctantBWG(2,(2,0,0)),1,3) == Ferrite.OctantBWG(2,(2,-2,-2))
     @test Ferrite.edge_neighbor(Ferrite.OctantBWG(2,(2,0,0)),4,3) == Ferrite.OctantBWG(2,(2,2,2))
     @test Ferrite.edge_neighbor(Ferrite.OctantBWG(2,(2,0,0)),6,3) == Ferrite.OctantBWG(2,(4,0,-2))
@@ -132,11 +132,97 @@ end
     # Octant level 3 size == 2^3/2 = 1
     # test translation constructor
     grid = generate_grid(Quadrilateral,(2,2))
+    # Rotate face topologically
+    grid.cells[2] = Quadrilateral((grid.cells[2].nodes[2], grid.cells[2].nodes[3], grid.cells[2].nodes[4], grid.cells[2].nodes[1]))
+    # This is our root mesh
+    # x-----------x-----------x
+    # |4    4    3|4    4    3|
+    # |           |           |
+    # |     ^     |     ^     |
+    # |1    |    2|1    |    2|
+    # |     +-->  |     +-->  |
+    # |           |           |
+    # |1    3    2|1    3    2|
+    # x-----------x-----------x
+    # |4    4    3|3    2    2|
+    # |           |           |
+    # |     ^     |     ^     |
+    # |1    |    2|4    |    3|
+    # |     +-->  |  <--+     |
+    # |           |           |
+    # |1    3    2|4    1    1|
+    # x-----------x-----------x
     adaptive_grid = ForestBWG(grid,3)
     for cell in adaptive_grid.cells
         @test cell isa OctreeBWG
         @test cell.leaves[1] == OctantBWG(2,0,1,cell.b)
     end
+    @test Ferrite.transform_face_remote(adaptive_grid, FaceIndex(2,4), adaptive_grid.cells[1].leaves[1]) == OctantBWG(0,(8,0))
+    @test Ferrite.transform_face_remote(adaptive_grid, FaceIndex(1,2), adaptive_grid.cells[1].leaves[1]) == OctantBWG(0,(0,8))
+    @test Ferrite.transform_face_remote(adaptive_grid, FaceIndex(4,1), adaptive_grid.cells[3].leaves[1]) == OctantBWG(0,(8,0))
+    @test Ferrite.transform_face_remote(adaptive_grid, FaceIndex(3,2), adaptive_grid.cells[4].leaves[1]) == OctantBWG(0,(-8,0))
+    @test Ferrite.transform_face_remote(adaptive_grid, FaceIndex(3,3), adaptive_grid.cells[1].leaves[1]) == OctantBWG(0,(0,8))
+    @test Ferrite.transform_face_remote(adaptive_grid, FaceIndex(1,4), adaptive_grid.cells[3].leaves[1]) == OctantBWG(0,(0,-8))
+    @test Ferrite.transform_face_remote(adaptive_grid, FaceIndex(4,3), adaptive_grid.cells[2].leaves[1]) == OctantBWG(0,(8,0))
+    @test Ferrite.transform_face_remote(adaptive_grid, FaceIndex(2,2), adaptive_grid.cells[4].leaves[1]) == OctantBWG(0,(0,-8))
+    o = adaptive_grid.cells[1].leaves[1]
+    @test Ferrite.transform_face(adaptive_grid, FaceIndex(1,2), o) == OctantBWG(0,(8,0))
+    @test Ferrite.transform_face(adaptive_grid, FaceIndex(1,4), o) == OctantBWG(0,(0,8))
+    @test Ferrite.transform_face(adaptive_grid, FaceIndex(2,4), o) == OctantBWG(0,(0,8))
+    @test Ferrite.transform_face(adaptive_grid, FaceIndex(2,2), o) == OctantBWG(0,(8,0))
+    @test Ferrite.transform_face(adaptive_grid, FaceIndex(3,2), o) == OctantBWG(0,(8,0))
+    @test Ferrite.transform_face(adaptive_grid, FaceIndex(3,3), o) == OctantBWG(0,(0,-8))
+    @test Ferrite.transform_face(adaptive_grid, FaceIndex(4,1), o) == OctantBWG(0,(-8,0))
+    @test Ferrite.transform_face(adaptive_grid, FaceIndex(4,3), o) == OctantBWG(0,(0,-8))
+
+    (grid_new, hnodes) = Ferrite.creategrid(adaptive_grid)
+    @test length(grid_new.nodes) == 9
+    @test length(hnodes) == 0
+
+    grid.cells[4] = Quadrilateral((grid.cells[4].nodes[2], grid.cells[4].nodes[3], grid.cells[4].nodes[4], grid.cells[4].nodes[1]))
+    grid.cells[4] = Quadrilateral((grid.cells[4].nodes[2], grid.cells[4].nodes[3], grid.cells[4].nodes[4], grid.cells[4].nodes[1]))
+    # Now this is our root mesh
+    # x-----------x-----------x
+    # |4    4    3|4    3    3|
+    # |           |           |
+    # |     ^     |  <--+     |
+    # |1    |    2|2    |    1|
+    # |     +-->  |     v     |
+    # |           |           |
+    # |1    3    2|1    4    2|
+    # x-----------x-----------x
+    # |4    4    3|3    2    2|
+    # |           |           |
+    # |     ^     |     ^     |
+    # |1    |    2|4    |    3|
+    # |     +-->  |  <--+     |
+    # |           |           |
+    # |1    3    2|4    1    1|
+    # x-----------x-----------x
+    adaptive_grid = ForestBWG(grid,3)
+    for cell in adaptive_grid.cells
+        @test cell isa OctreeBWG
+        @test cell.leaves[1] == OctantBWG(2,0,1,cell.b)
+    end
+    @test Ferrite.transform_face_remote(adaptive_grid, FaceIndex(2,4), adaptive_grid.cells[1].leaves[1]) == OctantBWG(0,(8,0))
+    @test Ferrite.transform_face_remote(adaptive_grid, FaceIndex(1,2), adaptive_grid.cells[1].leaves[1]) == OctantBWG(0,(0,8))
+    @test Ferrite.transform_face_remote(adaptive_grid, FaceIndex(4,2), adaptive_grid.cells[3].leaves[1]) == OctantBWG(0,(8,0))
+    @test Ferrite.transform_face_remote(adaptive_grid, FaceIndex(3,2), adaptive_grid.cells[4].leaves[1]) == OctantBWG(0,(8,0))
+    @test Ferrite.transform_face_remote(adaptive_grid, FaceIndex(3,3), adaptive_grid.cells[1].leaves[1]) == OctantBWG(0,(0,8))
+    @test Ferrite.transform_face_remote(adaptive_grid, FaceIndex(1,4), adaptive_grid.cells[3].leaves[1]) == OctantBWG(0,(0,-8))
+    @test Ferrite.transform_face_remote(adaptive_grid, FaceIndex(4,4), adaptive_grid.cells[2].leaves[1]) == OctantBWG(0,(8,0))
+    @test Ferrite.transform_face_remote(adaptive_grid, FaceIndex(2,2), adaptive_grid.cells[4].leaves[1]) == OctantBWG(0,(0,8))
+    o = adaptive_grid.cells[1].leaves[1]
+    @test Ferrite.transform_face(adaptive_grid, FaceIndex(1,2), o) == OctantBWG(0,(8,0))
+    @test Ferrite.transform_face(adaptive_grid, FaceIndex(1,4), o) == OctantBWG(0,(0,8))
+    @test Ferrite.transform_face(adaptive_grid, FaceIndex(2,4), o) == OctantBWG(0,(0,8))
+    @test Ferrite.transform_face(adaptive_grid, FaceIndex(2,2), o) == OctantBWG(0,(8,0))
+    @test Ferrite.transform_face(adaptive_grid, FaceIndex(3,2), o) == OctantBWG(0,(8,0))
+    @test Ferrite.transform_face(adaptive_grid, FaceIndex(3,3), o) == OctantBWG(0,(0,-8))
+    @test Ferrite.transform_face(adaptive_grid, FaceIndex(4,2), o) == OctantBWG(0,(8,0))
+    @test Ferrite.transform_face(adaptive_grid, FaceIndex(4,4), o) == OctantBWG(0,(0,8))
+
+
     #simple first and second level refinement
     # first case
     # x-----------x-----------x
@@ -147,7 +233,7 @@ end
     # |           |           |
     # |           |           |
     # |           |           |
-    # x-----x-----x-----------|
+    # x-----x-----x-----------x
     # |     |     |           |
     # |     |     |           |
     # |     |     |           |
@@ -162,11 +248,23 @@ end
         @test octant == OctantBWG(2,1,m,adaptive_grid.cells[1].b)
     end
     Ferrite.refine!(adaptive_grid.cells[1],adaptive_grid.cells[1].leaves[1])
+
+    @test Ferrite.transform_face(adaptive_grid, FaceIndex(2,4), adaptive_grid.cells[1].leaves[5]) == OctantBWG(1,(0,8))
+    @test Ferrite.transform_face(adaptive_grid, FaceIndex(2,4), adaptive_grid.cells[1].leaves[7]) == OctantBWG(1,(4,8))
+    @test Ferrite.transform_face(adaptive_grid, FaceIndex(3,3), adaptive_grid.cells[1].leaves[6]) == OctantBWG(1,(0,-4))
+    @test Ferrite.transform_face(adaptive_grid, FaceIndex(3,3), adaptive_grid.cells[1].leaves[7]) == OctantBWG(1,(4,-4))
+
+    (grid_new, hnodes) = Ferrite.creategrid(adaptive_grid)
+    @test length(grid_new.nodes) == 19
+    @test length(hnodes) == 4
+
     # octree holds now 3 first level and 4 second level
     @test length(adaptive_grid.cells[1].leaves) == 7
     for (m,octant) in zip(1:4,adaptive_grid.cells[1].leaves)
         @test octant == OctantBWG(2,2,m,adaptive_grid.cells[1].b)
     end
+
+
     # second case
     # x-----------x-----------x
     # |           |           |
@@ -187,6 +285,29 @@ end
     Ferrite.refine!(adaptive_grid.cells[1],adaptive_grid.cells[1].leaves[4])
     @test length(adaptive_grid.cells[1].leaves) == 7
     @test all(getproperty.(adaptive_grid.cells[1].leaves[1:3],:l) .== 1)
+
+    @test Ferrite.transform_face(adaptive_grid, FaceIndex(2,4), adaptive_grid.cells[1].leaves[2]) == OctantBWG(1,(0,8))
+    @test Ferrite.transform_face(adaptive_grid, FaceIndex(2,4), adaptive_grid.cells[1].leaves[5]) == OctantBWG(2,(4,8))
+    @test Ferrite.transform_face(adaptive_grid, FaceIndex(2,4), adaptive_grid.cells[1].leaves[7]) == OctantBWG(2,(6,8))
+    @test Ferrite.transform_face(adaptive_grid, FaceIndex(3,3), adaptive_grid.cells[1].leaves[3]) == OctantBWG(1,(0,-4))
+    @test Ferrite.transform_face(adaptive_grid, FaceIndex(3,3), adaptive_grid.cells[1].leaves[6]) == OctantBWG(2,(4,-2))
+    @test Ferrite.transform_face(adaptive_grid, FaceIndex(3,3), adaptive_grid.cells[1].leaves[7]) == OctantBWG(2,(6,-2))
+
+    (grid_new, hnodes) = Ferrite.creategrid(adaptive_grid)
+    @test length(grid_new.nodes) == 19
+    @test length(hnodes) == 4
+
+    # more complex neighborhoods
+    grid = Ferrite.generate_simple_disc_grid(Quadrilateral, 6)
+    grid.cells[2] = Quadrilateral((grid.cells[2].nodes[2], grid.cells[2].nodes[3], grid.cells[2].nodes[4], grid.cells[2].nodes[1]))
+    adaptive_grid = ForestBWG(grid,3)
+    Ferrite.refine!(adaptive_grid.cells[3],adaptive_grid.cells[3].leaves[1])
+    Ferrite.refine!(adaptive_grid.cells[5],adaptive_grid.cells[5].leaves[1])
+
+    (grid_new, hnodes) = Ferrite.creategrid(adaptive_grid)
+    @test length(grid_new.nodes) == 23
+    @test length(hnodes) == 4
+
     ##################################################################
     ####uniform refinement and coarsening for all cells and levels####
     ##################################################################
@@ -247,6 +368,24 @@ end
             @test all(Ferrite.morton.(tree.leaves,l,5) == collect(1:2^(3*l)))
         end
     end
+
+    # Reproducer test for Fig.3 BWG 11
+    grid = generate_grid(Hexahedron,(2,1,1))
+    # (a)
+    adaptive_grid = ForestBWG(grid,3)
+    Ferrite.refine!(adaptive_grid.cells[2],adaptive_grid.cells[2].leaves[1])
+    Ferrite.refine!(adaptive_grid.cells[2],adaptive_grid.cells[2].leaves[3])
+    @test adaptive_grid.cells[2].leaves[3+4] == OctantBWG(2,(0,4,2))
+    @test Ferrite.transform_face(adaptive_grid, FaceIndex(1,2), adaptive_grid.cells[2].leaves[3+4]) == OctantBWG(2,(8,4,2))
+    # (b) Rotate elements topologically
+    grid.cells[1] = Hexahedron((grid.cells[1].nodes[2], grid.cells[1].nodes[3], grid.cells[1].nodes[4], grid.cells[1].nodes[1], grid.cells[1].nodes[6], grid.cells[1].nodes[7], grid.cells[1].nodes[8], grid.cells[1].nodes[5]))
+    grid.cells[2] = Hexahedron((grid.cells[2].nodes[4], grid.cells[2].nodes[1], grid.cells[2].nodes[2], grid.cells[2].nodes[3], grid.cells[2].nodes[8], grid.cells[2].nodes[5], grid.cells[2].nodes[6], grid.cells[2].nodes[7]))
+    # grid.cells[2] = Hexahedron((grid.cells[2].nodes[1], grid.cells[2].nodes[3], grid.cells[2].nodes[4], grid.cells[2].nodes[8], grid.cells[2].nodes[6], grid.cells[2].nodes[2], grid.cells[2].nodes[7], grid.cells[2].nodes[5])) How to rotate along diagonal? :)
+    adaptive_grid = ForestBWG(grid,3)
+    Ferrite.refine!(adaptive_grid.cells[2],adaptive_grid.cells[2].leaves[1])
+    Ferrite.refine!(adaptive_grid.cells[2],adaptive_grid.cells[2].leaves[1])
+    @test adaptive_grid.cells[2].leaves[6] == OctantBWG(2,(2,0,2))
+    @test Ferrite.transform_face(adaptive_grid, FaceIndex(1,3), adaptive_grid.cells[2].leaves[6]) == OctantBWG(2,(4,-2,2))
 end
 
 @testset "ForestBWG AbstractGrid Interfacing" begin
