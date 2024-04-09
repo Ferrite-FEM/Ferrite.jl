@@ -1,34 +1,6 @@
 ####################################################################################
-# Helper functions
-####################################################################################
-
-
-"""
-    get_interface_cell_sdim(::Type{<:AbstractRefShape})
-
-Return the spatial dimension of an interface given a base reference shape.
-E.g. given `RefTriangle`, 3 is returned, because a triangle forms an interface in 3D.
-"""
-get_interface_cell_sdim(::Type{RefLine}) = 2
-get_interface_cell_sdim(::Type{RefTriangle}) = 3
-get_interface_cell_sdim(::Type{RefQuadrilateral}) = 3
-
-
-"""
-    get_interface_cell_shape(::Type{<:AbstractRefShape})
-
-Return the shape of an interface given a base reference shape.
-E.g. given `RefTriangle`, `RefPrism` is returned, because two triangles form an interface based on a prism.
-"""
-get_interface_cell_shape(::Type{RefLine}) = RefQuadrilateral
-get_interface_cell_shape(::Type{RefTriangle}) = RefPrism
-get_interface_cell_shape(::Type{RefQuadrilateral}) = RefHexahedron
-
-
-####################################################################################
 # Cells
 ####################################################################################
-
 
 """
     InterfaceCell(here::AbstractCell, there::AbstractCell) <: AbstractCell
@@ -39,16 +11,36 @@ The two base cells need to use the same reference shape.
 # Fields
 - `here::AbstractCell`: cell representing the face "here"
 - `there::AbstractCell`: cell representing the face "there"
+- `nodes`::NTuple: tuple with all node indices in appropriate order: vertex nodes "here", vertex nodes "there", face nodes "here", ...
 """
-struct InterfaceCell{sdim, rdim, shape<:AbstractRefShape{sdim}, rshape<:AbstractRefShape{rdim}, Chere<:AbstractCell{rshape}, Cthere<:AbstractCell{rshape}} <: AbstractCell{shape}
+struct InterfaceCell{shape, Chere, Cthere, N} <: AbstractCell{shape}
     here::Chere
     there::Cthere
+    nodes::NTuple{N,Int}
+
+    function InterfaceCell{shape, Chere, Cthere}(here::Chere, there::Cthere) where {shape<:AbstractRefShape, Chere<:AbstractCell, Cthere<:AbstractCell}
+        sni = get_sides_and_base_indices(Chere, Cthere)
+        nodes = ntuple( i -> sni[i][1] == :here ? here.nodes[sni[i][2]] : there.nodes[sni[i][2]], length(sni))
+        new{shape, Chere, Cthere, length(nodes)}(here, there, nodes)
+    end
 end
 
-function InterfaceCell(here::Chere, there::Cthere) where {rdim, rshape<:AbstractRefShape{rdim}, Chere<:AbstractCell{rshape}, Cthere<:AbstractCell{rshape}}
-    sdim, shape = get_interface_cell_sdim(rshape), get_interface_cell_shape(rshape)
-    return InterfaceCell{sdim, rdim, shape, rshape, Chere, Cthere}(here, there)
+function InterfaceCell(here::Chere, there::Cthere) where {Chere<:AbstractCell, Cthere<:AbstractCell}
+    @assert getrefshape(here) == getrefshape(there) "For an `InterfaceCell` the underlying cells need to be based on the same shape."
+    shape = get_interface_cell_shape(getrefshape(here))
+    return InterfaceCell{shape, Chere, Cthere}(here, there)
 end
+
+"""
+    get_interface_cell_shape(::Type{<:AbstractRefShape})
+
+Return the shape of an interface given a base reference shape.
+E.g. given `RefTriangle`, `RefPrism` is returned, meaning two triangles form an interface based on a prism.
+"""
+get_interface_cell_shape(::Type{RefLine}) = RefQuadrilateral
+get_interface_cell_shape(::Type{RefTriangle}) = RefPrism
+get_interface_cell_shape(::Type{RefQuadrilateral}) = RefHexahedron
+
 
 vertices(c::InterfaceCell) = (vertices(c.here)..., vertices(c.there)...)
 faces(c::InterfaceCell) = (vertices(c.here), vertices(c.there))
@@ -82,24 +74,9 @@ get_sides_and_base_indices(::Type{QuadraticQuadrilateral}, ::Type{Quadrilateral}
 get_sides_and_base_indices(::Type{Quadrilateral}, ::Type{QuadraticQuadrilateral}) = ((:here,1), (:here,2), (:here,3), (:here,4), (:there,1), (:there,2), (:there,3), (:there,4), (:there,5), (:there,6), (:there,7), (:there,8), (:there,9))
 get_sides_and_base_indices(::Type{QuadraticQuadrilateral}, ::Type{QuadraticQuadrilateral}) = ((:here,1), (:here,2), (:here,3), (:here,4), (:there,1), (:there,2), (:there,3), (:there,4), (:here,5), (:here,6), (:here,7), (:here,8), (:there,5), (:there,6), (:there,7), (:there,8), (:here,9), (:there,9))
 
-function get_node_ids(c::InterfaceCell)
-    sni = get_sides_and_base_indices(c)
-    return ntuple( i -> getproperty(c, sni[i][1]).nodes[sni[i][2]], length(sni))
-end
-
-function Base.getproperty(c::InterfaceCell, s::Symbol)
-    if s == :nodes
-        return get_node_ids(c)
-    else
-        return getfield(c,s)
-    end
-end
-
-
 ####################################################################################
 # Interpolation
 ####################################################################################
-
 
 # The constructors of `InterpolationInfo` require a `VectorizedInterpolation{InterfaceCellInterpolation}`
 # and not an `InterfaceCellInterpolation{VectorizedInterpolation,VectorizedInterpolation}`.
@@ -115,16 +92,15 @@ If only one interpolation is given, it will be used for both faces.
 - `here::ScalarInterpolation`: interpolation on the face "here"
 - `there::ScalarInterpolation`: interpolation on the face "there"
 """
-struct InterfaceCellInterpolation{sdim, rdim, shape<:AbstractRefShape{sdim}, rshape<:AbstractRefShape{rdim},
-        IPhere<:ScalarInterpolation{rshape}, IPthere<:ScalarInterpolation{rshape}} <: ScalarInterpolation{shape, Nothing}
+struct InterfaceCellInterpolation{shape, IPhere, IPthere} <: ScalarInterpolation{shape, Nothing}
     here::IPhere
     there::IPthere
-end
 
-function InterfaceCellInterpolation(here::IPhere, there::IPthere) where {
-        rdim, rshape<:AbstractRefShape{rdim}, IPhere<:ScalarInterpolation{rshape}, IPthere<:ScalarInterpolation{rshape}}
-    sdim, shape = get_interface_cell_sdim(rshape), get_interface_cell_shape(rshape)
-    return InterfaceCellInterpolation{sdim, rdim, shape, rshape, IPhere, IPthere}(here, there)
+    function InterfaceCellInterpolation(here::IPhere, there::IPthere) where {IPhere<:ScalarInterpolation, IPthere<:ScalarInterpolation}
+        @assert getrefshape(here) == getrefshape(there) "For an `InterfaceCellInterpolation` the underlying interpolations need to be based on the same shape."
+        shape = get_interface_cell_shape(getrefshape(here))
+        return new{shape, IPhere, IPthere}(here, there)
+    end
 end
 
 function InterfaceCellInterpolation(ip::ScalarInterpolation)
@@ -224,17 +200,15 @@ end
 
 n_components(ip::InterfaceCellInterpolation) = n_components(ip.here)
 
-function default_interpolation(::Type{InterfaceCell{sdim, rdim, shape, rshape, Chere, Cthere}}
-    ) where {sdim, rdim, shape<:AbstractRefShape{sdim}, rshape<:AbstractRefShape{rdim},
-             Chere<:AbstractCell{rshape}, Cthere<:AbstractCell{rshape}} 
+function default_interpolation(::Type{InterfaceCell{shape, Chere, Cthere}}) where {shape<:AbstractRefShape, Chere<:AbstractCell, Cthere<:AbstractCell} 
     return InterfaceCellInterpolation(default_interpolation(Chere), default_interpolation(Cthere))
 end
 
-function default_geometric_interpolation(ip::InterfaceCellInterpolation{sdim, <:Any, <:Any, <:Any, IPhere, IPthere}
+function default_geometric_interpolation(ip::InterfaceCellInterpolation{<:AbstractRefShape{sdim}, IPhere, IPthere}
     ) where {sdim, IPhere<:ScalarInterpolation, IPthere<:ScalarInterpolation}
     return InterfaceCellInterpolation(ip.here, ip.there)^sdim
 end
-function default_geometric_interpolation(ip::InterfaceCellInterpolation{sdim, <:Any, <:Any, <:Any, IPhere, IPthere}
+function default_geometric_interpolation(ip::InterfaceCellInterpolation{<:AbstractRefShape{sdim}, IPhere, IPthere}
     ) where {sdim, IPhere<:VectorizedInterpolation, IPthere<:VectorizedInterpolation}
     return InterfaceCellInterpolation(ip.here.ip, ip.there.ip)^sdim
 end
@@ -242,14 +216,14 @@ function default_geometric_interpolation(ip::VectorizedInterpolation{<:Any, <:An
     return ip
 end
 
+#Base.:(^)(ip::InterfaceCellInterpolation, vdim::Int) = VectorizedInterpolation{vdim}(ip)
+
 getorder(ip::InterfaceCellInterpolation) = getorder(ip.here) == getorder(ip.there) ? getorder(ip.here) : (getorder(ip.here), getorder(ip.there))
 getorder(ip::VectorizedInterpolation{<:Any,<:Any,<:Any,<:InterfaceCellInterpolation}) = getorder(ip.ip)
-
 
 ####################################################################################
 # Cell values
 ####################################################################################
-
 
 """
     InterfaceCellValues([::Type{T},] qr::QuadratureRule, func_ip::InterfaceCellInterpolation, [geom_ip::InterfaceCellInterpolation])
@@ -263,14 +237,16 @@ An `InterfaceCellValues` wraps two `CellValues`, one for each face of an `Interf
 - `basefunctionshere::Vector{Int}`: base function indices on face "here"
 - `basefunctionsthere::Vector{Int}`: base function indices on face "there"
 """
-struct InterfaceCellValues{IP, CVhere<:CellValues, CVthere<:CellValues} <: AbstractCellValues
+struct InterfaceCellValues{IP, CVhere, CVthere} <: AbstractCellValues
     ip::IP
     here::CVhere
     there::CVthere
     basefunctionshere::Vector{Int}
     basefunctionsthere::Vector{Int}
 
-    function InterfaceCellValues(ip::IP, here::CVhere, there::CVthere) where {IP<:Interpolation, CVhere, CVthere}
+    function InterfaceCellValues(ip::IP, here::CVhere, there::CVthere) where {IP<:Interpolation, CVhere<:CellValues, CVthere<:CellValues}
+        # CHeck QR
+        
         sip = ip isa VectorizedInterpolation ? ip.ip : ip
         basefunctionshere = collect( get_interface_index(sip, :here, i) for i in 1:getnbasefunctions(sip.here))
         basefunctionsthere = collect( get_interface_index(sip, :there, i) for i in 1:getnbasefunctions(sip.there))
@@ -293,7 +269,7 @@ end
 
 function InterfaceCellValues(::Type{T}, qr::QuadratureRule, 
                              ip::Union{InterfaceCellInterpolation, VectorizedInterpolation{<:Any,<:Any,<:Any,<:InterfaceCellInterpolation}}, 
-                             sgip::InterfaceCellInterpolation{sdim}) where {T, sdim}
+                             sgip::InterfaceCellInterpolation{shape}) where {T, sdim, shape <: AbstractRefShape{sdim}}
     return InterfaceCellValues(T, qr, ip, sgip^sdim)
 end
 
@@ -302,10 +278,10 @@ function InterfaceCellValues(::Type{T}, qr::QR, ip::IP, gip::VGIP) where {
     QR  <: QuadratureRule{rshape},
     IPhere  <: ScalarInterpolation{rshape},
     IPthere  <: ScalarInterpolation{rshape},
-    IP <: InterfaceCellInterpolation{sdim, rdim, shape, rshape, IPhere, IPthere},
-    GIPhere <:ScalarInterpolation{rshape},
-    GIPthere <:ScalarInterpolation{rshape},
-    GIP <: InterfaceCellInterpolation{sdim, rdim, shape, rshape, GIPhere, GIPthere},
+    IP <: InterfaceCellInterpolation{shape, IPhere, IPthere},
+    GIPhere <: ScalarInterpolation{rshape},
+    GIPthere <: ScalarInterpolation{rshape},
+    GIP <: InterfaceCellInterpolation{shape, GIPhere, GIPthere},
     VGIP <: VectorizedInterpolation{sdim, shape, <:Any, GIP}
 }
     here = CellValues(T, qr, ip.here, gip.ip.here^sdim)
@@ -318,11 +294,11 @@ function InterfaceCellValues(::Type{T}, qr::QR, ip::VIP, gip::VGIP) where {
     QR  <: QuadratureRule{rshape},
     IPhere  <: ScalarInterpolation{rshape},
     IPthere  <: ScalarInterpolation{rshape},
-    IP <: InterfaceCellInterpolation{sdim, rdim, shape, rshape, IPhere, IPthere},
+    IP <: InterfaceCellInterpolation{shape, IPhere, IPthere},
     VIP <: VectorizedInterpolation{vdim, shape, <:Any, IP},
-    GIPhere <:ScalarInterpolation{rshape},
-    GIPthere <:ScalarInterpolation{rshape},
-    GIP <: InterfaceCellInterpolation{sdim, rdim, shape, rshape, GIPhere, GIPthere},
+    GIPhere <: ScalarInterpolation{rshape},
+    GIPthere <: ScalarInterpolation{rshape},
+    GIP <: InterfaceCellInterpolation{shape, GIPhere, GIPthere},
     VGIP <: VectorizedInterpolation{sdim, shape, <:Any, GIP}
 }
     here = CellValues(T, qr, ip.ip.here^vdim, gip.ip.here^sdim)
@@ -333,7 +309,6 @@ end
 reinit!(cv::InterfaceCellValues, cc::CellCache) = reinit!(cv, cc.coords)
 
 function reinit!(cv::InterfaceCellValues, x::AbstractVector{Vec{sdim,T}}) where {sdim, T}
-    #nsplit = getngeobasefunctions(cv.here)
     reinit!(cv.here, @view x[cv.basefunctionshere])
     reinit!(cv.there, @view x[cv.basefunctionsthere])
     return nothing

@@ -1,25 +1,25 @@
 @testset "Interface elements" begin
 
 @testset "InterfaceCell" begin
-    for (here, there, sdim, rdim, shape, rshape) in (
-            (         Line((1,2)),            Line((3,4)),   2, 1, RefQuadrilateral, RefLine), 
-            (QuadraticLine((1,2,5)),          Line((3,4)),   2, 1, RefQuadrilateral, RefLine), 
-            (         Line((1,2)),   QuadraticLine((3,4,5)), 2, 1, RefQuadrilateral, RefLine), 
-            (QuadraticLine((1,2,5)), QuadraticLine((3,4,6)), 2, 1, RefQuadrilateral, RefLine),
-            (         Triangle((1,2,3)),                Triangle((4,5,6)),          3, 2, RefPrism, RefTriangle), 
-            (QuadraticTriangle((1,2,3,7,8,9)),          Triangle((4,5,6)),          3, 2, RefPrism, RefTriangle), 
-            (         Triangle((1,2,3)),       QuadraticTriangle((4,5,6,7,8,9)),    3, 2, RefPrism, RefTriangle), 
-            (QuadraticTriangle((1,2,3,7,8,9)), QuadraticTriangle((4,5,6,10,11,12)), 3, 2, RefPrism, RefTriangle),
-            (         Quadrilateral((1,2,3,4)),                        Quadrilateral((5,6,7,8)),                3, 2, RefHexahedron, RefQuadrilateral), 
-            (QuadraticQuadrilateral((1,2,3,4,9,10,11,12,13)),          Quadrilateral((5,6,7,8)),                3, 2, RefHexahedron, RefQuadrilateral), 
-            (         Quadrilateral((1,2,3,4)),               QuadraticQuadrilateral((5,6,7,8,9,10,11,12,13)),  3, 2, RefHexahedron, RefQuadrilateral), 
-            (QuadraticQuadrilateral((1,2,3,4,9,10,11,12,17)), QuadraticQuadrilateral((5,6,7,8,13,14,15,16,18)), 3, 2, RefHexahedron, RefQuadrilateral)
+    for (here, there, shape) in (
+            (         Line((1,2)),            Line((3,4)),   RefQuadrilateral), 
+            (QuadraticLine((1,2,5)),          Line((3,4)),   RefQuadrilateral), 
+            (         Line((1,2)),   QuadraticLine((3,4,5)), RefQuadrilateral), 
+            (QuadraticLine((1,2,5)), QuadraticLine((3,4,6)), RefQuadrilateral),
+            (         Triangle((1,2,3)),                Triangle((4,5,6)),          RefPrism), 
+            (QuadraticTriangle((1,2,3,7,8,9)),          Triangle((4,5,6)),          RefPrism), 
+            (         Triangle((1,2,3)),       QuadraticTriangle((4,5,6,7,8,9)),    RefPrism), 
+            (QuadraticTriangle((1,2,3,7,8,9)), QuadraticTriangle((4,5,6,10,11,12)), RefPrism),
+            (         Quadrilateral((1,2,3,4)),                        Quadrilateral((5,6,7,8)),                RefHexahedron), 
+            (QuadraticQuadrilateral((1,2,3,4,9,10,11,12,13)),          Quadrilateral((5,6,7,8)),                RefHexahedron), 
+            (         Quadrilateral((1,2,3,4)),               QuadraticQuadrilateral((5,6,7,8,9,10,11,12,13)),  RefHexahedron), 
+            (QuadraticQuadrilateral((1,2,3,4,9,10,11,12,17)), QuadraticQuadrilateral((5,6,7,8,13,14,15,16,18)), RefHexahedron)
             ) # The nodes have been chosen as the numbers representing their expected ordering
-        Chere = typeof(here)
+        Chere  = typeof(here)
         Cthere = typeof(there)
 
-        @test InterfaceCell{sdim, rdim, shape, rshape, Chere, Cthere}(here, there) isa InterfaceCell{sdim, rdim, shape, rshape, Chere, Cthere}
-        @test InterfaceCell(here, there) isa InterfaceCell{sdim, rdim, shape, rshape, Chere, Cthere}
+        @test InterfaceCell{shape, Chere, Cthere}(here, there) isa InterfaceCell{shape, Chere, Cthere}
+        @test InterfaceCell(here, there) isa InterfaceCell{shape, Chere, Cthere}
         cell = InterfaceCell(here, there)
 
         @test Ferrite.nvertices(cell) == Ferrite.nvertices(here) + Ferrite.nvertices(there)
@@ -33,17 +33,16 @@
 end
 
 @testset "InterfaceCellInterpolation" begin
-    for (iphere, ipthere, sdim, rdim, shape, rshape) in (
-            (Lagrange{RefTriangle, 1}(), Lagrange{RefTriangle, 1}(), 3, 2, RefPrism, RefTriangle), 
-            (Lagrange{RefTriangle, 2}(), Lagrange{RefTriangle, 2}(), 3, 2, RefPrism, RefTriangle),
-            (Lagrange{RefTriangle, 1}(), Lagrange{RefTriangle, 2}(), 3, 2, RefPrism, RefTriangle),
-            (Lagrange{RefQuadrilateral, 1}(), Lagrange{RefQuadrilateral, 1}(), 3, 2, RefHexahedron, RefQuadrilateral), )
-        IPhere = typeof(iphere)
+    for (iphere, ipthere, shape) in (
+            (Lagrange{RefTriangle, 1}(), Lagrange{RefTriangle, 1}(), RefPrism), 
+            (Lagrange{RefTriangle, 2}(), Lagrange{RefTriangle, 2}(), RefPrism),
+            (Lagrange{RefTriangle, 1}(), Lagrange{RefTriangle, 2}(), RefPrism),
+            (Lagrange{RefQuadrilateral, 1}(), Lagrange{RefQuadrilateral, 1}(), RefHexahedron), )
+        IPhere  = typeof(iphere)
         IPthere = typeof(ipthere)
 
-        @test InterfaceCellInterpolation{sdim, rdim, shape, rshape, IPhere, IPthere}(iphere, ipthere) isa InterfaceCellInterpolation{sdim, rdim, shape, rshape, IPhere, IPthere}
-        @test InterfaceCellInterpolation(iphere, ipthere) isa InterfaceCellInterpolation{sdim, rdim, shape, rshape, IPhere, IPthere}
-        @test InterfaceCellInterpolation(iphere) isa InterfaceCellInterpolation{sdim, rdim, shape, rshape, IPhere, IPhere}
+        @test InterfaceCellInterpolation(iphere, ipthere) isa InterfaceCellInterpolation{shape, IPhere, IPthere}
+        @test InterfaceCellInterpolation(iphere) isa InterfaceCellInterpolation{shape, IPhere, IPhere}
         ip = InterfaceCellInterpolation(iphere, ipthere)
         @test Ferrite.nvertices(ip) == Ferrite.nvertices(iphere) + Ferrite.nvertices(ipthere)
         @test all(Ferrite.vertexdof_indices(ip) .== collect( (v,) for v in 1:Ferrite.nvertices(ip) ))
