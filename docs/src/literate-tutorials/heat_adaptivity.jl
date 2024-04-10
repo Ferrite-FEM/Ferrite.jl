@@ -1,5 +1,13 @@
 using Ferrite, FerriteGmsh, SparseArrays
-grid = generate_grid(Quadrilateral, (1,1));
+grid = generate_grid(Quadrilateral, (8,8));
+function random_deformation_field(x)
+    if any(x .≈ -1.0) || any(x .≈ 1.0)
+        return x
+    else
+        Vec{2}(x .+ (rand(2).-0.5)*0.15)
+    end
+end
+transform_coordinates!(grid, random_deformation_field)
 grid  = ForestBWG(grid,10)
 
 analytical_solution(x) = atan(2*(norm(x)-0.5)/0.02)
@@ -123,36 +131,35 @@ function solve_adaptive(initial_grid)
         vtk_grid("heat_amr-grid_$i", transfered_grid) do vtk
         end
         u,dh,ch,cv = solve(transfered_grid)
-        # σ_gp, σ_gp_sc = compute_fluxes(u,dh)
-        # projector = L2Projector(Lagrange{RefQuadrilateral, 1}(), transfered_grid)
-        # σ_dof = project(projector, σ_gp, QuadratureRule{RefQuadrilateral}(2))
-        # cells_to_refine = Int[]
-        # error_arr = Float64[]
-        # for (cellid,cell) in enumerate(CellIterator(projector.dh))
-        #     reinit!(cellvalues_flux, cell)
-        #     @views σe = σ_dof[celldofs(cell)]
-        #     error = 0.0
-        #     for q_point in 1:getnquadpoints(cellvalues_flux)
-        #         σ_dof_at_sc = function_value(cellvalues_flux, q_point, σe)
-        #         error += norm((σ_gp_sc[cellid][q_point] - σ_dof_at_sc ))
-        #         error *= getdetJdV(cellvalues_flux,q_point)
-        #     end
-        #     if error > 0.001
-        #         push!(cells_to_refine,cellid)
-        #     end
-        #     push!(error_arr,error)
-        # end
+        σ_gp, σ_gp_sc = compute_fluxes(u,dh)
+        projector = L2Projector(Lagrange{RefQuadrilateral, 1}(), transfered_grid)
+        σ_dof = project(projector, σ_gp, QuadratureRule{RefQuadrilateral}(2))
+        cells_to_refine = Int[]
+        error_arr = Float64[]
+        for (cellid,cell) in enumerate(CellIterator(projector.dh))
+            reinit!(cellvalues_flux, cell)
+            @views σe = σ_dof[celldofs(cell)]
+            error = 0.0
+            for q_point in 1:getnquadpoints(cellvalues_flux)
+                σ_dof_at_sc = function_value(cellvalues_flux, q_point, σe)
+                error += norm((σ_gp_sc[cellid][q_point] - σ_dof_at_sc ))
+                error *= getdetJdV(cellvalues_flux,q_point)
+            end
+            if error > 0.001
+                push!(cells_to_refine,cellid)
+            end
+            push!(error_arr,error)
+        end
 
         vtk_grid("heat_amr-iteration_$i", dh) do vtk
             vtk_point_data(vtk, dh, u)
-            # vtk_point_data(vtk, projector, σ_dof, "flux")
-            # vtk_cell_data(vtk, getindex.(collect(Iterators.flatten(σ_gp_sc)),1), "flux sc x")
-            # vtk_cell_data(vtk, getindex.(collect(Iterators.flatten(σ_gp_sc)),2), "flux sc y")
-            # vtk_cell_data(vtk, error_arr, "error")
+            vtk_point_data(vtk, projector, σ_dof, "flux")
+            vtk_cell_data(vtk, getindex.(collect(Iterators.flatten(σ_gp_sc)),1), "flux sc x")
+            vtk_cell_data(vtk, getindex.(collect(Iterators.flatten(σ_gp_sc)),2), "flux sc y")
+            vtk_cell_data(vtk, error_arr, "error")
             pvd[i] = vtk
         end
 
-        cells_to_refine = [1]
         Ferrite.refine!(grid,cells_to_refine)
         transfered_grid = Ferrite.creategrid(grid)
         Ferrite.balanceforest!(grid)

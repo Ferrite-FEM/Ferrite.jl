@@ -117,26 +117,23 @@ function solve(dh, ch, cellvalues)
     apply!(u,ch)
 end
 
-function setup_poisson_problem(grid, interpolation, interpolation_geo, qr, N, hnodes)
+function setup_poisson_problem(grid, interpolation, interpolation_geo, qr, N)
     # Construct Ferrite stuff
     dh = DofHandler(grid)
     add!(dh, :u, interpolation)
-    dh, vdict, edict, fdict = Ferrite.__close!(dh);
-    
+    close!(dh);
+
     ch = ConstraintHandler(dh);
     ∂Ω = union(
         values(Ferrite.getfacesets(grid))...
     );
     dbc = Dirichlet(:u, ∂Ω, (x, t) -> analytical_solution(x))
     add!(ch, dbc);
-    for (hdof,mdof) in hnodes
-        lc = AffineConstraint(vdict[1][hdof],[vdict[1][m] => 0.5 for m in mdof],0.0)
-        add!(ch,lc)
-    end
+    add!(ch, ConformityConstraint(:u))
     close!(ch);
 
     cellvalues = CellValues(qr, interpolation, interpolation_geo);
-    
+
     return dh, ch, cellvalues
 end
 
@@ -183,8 +180,8 @@ end
         # ... and then pray to the gods of convergence.
         i = 0
         while L2norm > 1e-3 && i < 8
-            grid_transfered, hnodes = Ferrite.creategrid(adaptive_grid)
-            dh, ch, cellvalues = ConvergenceTestHelper.setup_poisson_problem(grid_transfered, interpolation, interpolation_geo, qr, N, hnodes)
+            grid_transfered = Ferrite.creategrid(adaptive_grid)
+            dh, ch, cellvalues = ConvergenceTestHelper.setup_poisson_problem(grid_transfered, interpolation, interpolation_geo, qr, N)
             u = ConvergenceTestHelper.solve(dh, ch, cellvalues)
             # q_gp = compute_fluxes(cellvalues, dh, u);
             # projector = L2Projector(interpolation, grid_transfered);

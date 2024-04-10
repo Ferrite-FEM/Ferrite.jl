@@ -643,19 +643,19 @@ function creategrid(forest::ForestBWG{dim,C,T}) where {dim,C,T}
     end
 
     # Phase 3: Compute unique physical nodes
-    # nodeids_dedup = Dict{Int,Int}()
-    # next_nodeid = 1
-    # for (kv,nodeid) in nodeids
-    #     if !haskey(nodeids_dedup, nodeid)
-    #         nodeids_dedup[nodeid] = next_nodeid
-    #         next_nodeid += 1
-    #     end
-    # end
+    nodeids_dedup = Dict{Int,Int}()
+    next_nodeid = 1
+    for (kv,nodeid) in nodeids
+        if !haskey(nodeids_dedup, nodeid)
+            nodeids_dedup[nodeid] = next_nodeid
+            next_nodeid += 1
+        end
+    end
     nodes_physical_all = transform_pointBWG(forest,nodes)
-    # nodes_physical = zeros(eltype(nodes_physical_all), next_nodeid-1)
-    # for (ni, (kv,nodeid)) in enumerate(nodeids)
-    #     nodes_physical[nodeids_dedup[nodeid]] = nodes_physical_all[nodeid]
-    # end
+    nodes_physical = zeros(eltype(nodes_physical_all), next_nodeid-1)
+    for (ni, (kv,nodeid)) in enumerate(nodeids)
+        nodes_physical[nodeids_dedup[nodeid]] = nodes_physical_all[nodeid]
+    end
 
     # Phase 4: Generate cells
     celltype = dim < 3 ? Quadrilateral : Hexahedron
@@ -664,8 +664,8 @@ function creategrid(forest::ForestBWG{dim,C,T}) where {dim,C,T}
     for (k,tree) in enumerate(forest.cells)
         for leaf in tree.leaves
             _vertices = vertices(leaf,tree.b)
-            # cellnodes = ntuple(i-> nodeids_dedup[nodeids[nodeowners[(k,_vertices[i])]]],length(_vertices))
-            cellnodes = ntuple(i-> nodeids[nodeowners[(k,_vertices[i])]],length(_vertices))
+            cellnodes = ntuple(i-> nodeids_dedup[nodeids[nodeowners[(k,_vertices[i])]]],length(_vertices))
+            # cellnodes = ntuple(i-> nodeids[nodeowners[(k,_vertices[i])]],length(_vertices))
             push!(cells,celltype(ntuple(i->cellnodes[node_map[i]],length(cellnodes))))
         end
     end
@@ -673,11 +673,11 @@ function creategrid(forest::ForestBWG{dim,C,T}) where {dim,C,T}
     # Phase 5: Generate grid and haning nodes
     facesets = reconstruct_facesets(forest) #TODO edge, node and cellsets
     hnodes = hangingnodes(forest, nodeids, nodeowners)
-    # hnodes_dedup = Dict{Int64, Vector{Int64}}()
-    # for (constrained,constainers) in hnodes
-    #     hnodes_dedup[nodeids_dedup[constrained]] = [nodeids_dedup[constainer] for constainer in constainers]
-    # end
-    return NonConformingGrid(cells, nodes_physical_all .|> Node, facesets=facesets, conformity_info=hnodes)
+    hnodes_dedup = Dict{Int64, Vector{Int64}}()
+    for (constrained,constainers) in hnodes
+        hnodes_dedup[nodeids_dedup[constrained]] = [nodeids_dedup[constainer] for constainer in constainers]
+    end
+    return NonConformingGrid(cells, nodes_physical .|> Node, facesets=facesets, conformity_info=hnodes_dedup)
 end
 
 function reconstruct_facesets(forest::ForestBWG{dim}) where dim
