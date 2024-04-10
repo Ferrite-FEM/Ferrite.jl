@@ -158,7 +158,7 @@ function get_interface_index(ip::InterfaceCellInterpolation, side::Symbol, i::In
         end
         throw(ArgumentError("No interface index for base index $(i) on side $(side) for interpolation $(ip)."))
     end
-    throw(ArgumentError("Interface side must be defined by `:here` oder `there`."))
+    throw(ArgumentError("Interface side must be defined by `:here` or `:there`."))
 end
 
 """
@@ -220,8 +220,6 @@ end
 function default_geometric_interpolation(ip::VectorizedInterpolation{<:Any, <:Any, <:Any, <:InterfaceCellInterpolation})
     return ip
 end
-
-#Base.:(^)(ip::InterfaceCellInterpolation, vdim::Int) = VectorizedInterpolation{vdim}(ip)
 
 getorder(ip::InterfaceCellInterpolation) = getorder(ip.here) == getorder(ip.there) ? getorder(ip.here) : (getorder(ip.here), getorder(ip.there))
 getorder(ip::VectorizedInterpolation{<:Any,<:Any,<:Any,<:InterfaceCellInterpolation}) = getorder(ip.ip)
@@ -355,7 +353,7 @@ end
     get_base_value(get_value::Function, cv::InterfaceCellValues, qp::Int, i::Int, here::Bool)
 
 Return a value from an `::InterfaceCellValues` by specifing:
-- `get_value`: function specifing which kind of value, e.g. by passing `shape_value`
+- `get_value`: function specifing which kind of value, e.g. `shape_value`
 - `qp`: index of the quadrature point
 - `i`: index of the base function
 - `here`: side of the interface, where `true` means "here" and `false` means "there".
@@ -508,8 +506,7 @@ end
 Return the average of the product between the determinant of the Jacobian on each side of the
 interface and the quadrature point weight for the given quadrature point: ``\\det(J(\\mathbf{x})) w_q``.
 
-This value is typically used when one integrating a function on the mid-plane of an interface
-element.
+This value is typically used when integrating a function on the mid-plane of an interface element.
 """
 function getdetJdV_average(cv::InterfaceCellValues, qp::Int)
     return (getdetJdV(cv.here, qp) + getdetJdV(cv.there, qp)) / 2

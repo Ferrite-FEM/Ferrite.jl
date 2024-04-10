@@ -30,6 +30,10 @@
         @test Ferrite.vertices(cell) == (Ferrite.vertices(here)..., Ferrite.vertices(there)...)
         @test Ferrite.faces(cell) == (Ferrite.vertices(here), Ferrite.vertices(there))
     end
+    here, there = Line((1,2)), QuadraticLine((3,4,5))
+    interface = InterfaceCell(here, there)
+    @test Ferrite.get_sides_and_base_indices(interface)   == ((:here,1), (:here,2), (:there,1), (:there,2), (:there,3))
+    @test Ferrite.get_sides_and_base_indices(here, there) == ((:here,1), (:here,2), (:there,1), (:there,2), (:there,3))
 end
 
 @testset "InterfaceCellInterpolation" begin
@@ -47,6 +51,23 @@ end
         @test Ferrite.nvertices(ip) == Ferrite.nvertices(iphere) + Ferrite.nvertices(ipthere)
         @test all(Ferrite.vertexdof_indices(ip) .== collect( (v,) for v in 1:Ferrite.nvertices(ip) ))
     end
+    here, there = Lagrange{RefTriangle, 1}(), Lagrange{RefTriangle, 2}()
+    interface = InterfaceCellInterpolation(here, there)
+
+    @test getnbasefunctions(interface) == 9
+
+    @test_throws ArgumentError Ferrite.get_interface_index(interface, :here, 10)
+    @test_throws ArgumentError Ferrite.get_interface_index(interface, :there, 10)
+    @test_throws ArgumentError Ferrite.get_interface_index(interface, :nowhere, 10)
+
+    @test Ferrite.facedof_indices(interface) == ((1,2,3), (4,5,6,7,8,9))
+
+    @test Ferrite.edgedof_indices(interface) == ((1,2),(2,3),(3,1),(4,5,7),(5,6,8),(6,4,9))
+
+    testcelltype = InterfaceCell{RefQuadrilateral, Line, QuadraticLine}
+    expectedtype = InterfaceCellInterpolation{RefQuadrilateral, Lagrange{RefLine,1,Nothing}, Lagrange{RefLine,2,Nothing}}
+    @test Ferrite.default_interpolation(testcelltype) isa expectedtype
+    @test Ferrite.default_geometric_interpolation(Ferrite.default_interpolation(testcelltype)) isa VectorizedInterpolation{2, RefQuadrilateral, <:Any, expectedtype}
 end
 
 @testset "InterfaceCellValues" begin
@@ -58,6 +79,7 @@ end
                          InterfaceCellInterpolation(Lagrange{RefTriangle, 2}(), Lagrange{RefTriangle, 1}())) )
         @test InterfaceCellValues(qr, fip) isa InterfaceCellValues
         @test InterfaceCellValues(Float32, qr, fip) isa InterfaceCellValues
+        @test InterfaceCellValues(Float32, qr, fip^3) isa InterfaceCellValues
         @test InterfaceCellValues(qr, fip, gip) isa InterfaceCellValues
         @test InterfaceCellValues(Float32, qr, fip, gip) isa InterfaceCellValues
         @test InterfaceCellValues(qr, fip, gip^3) isa InterfaceCellValues
@@ -67,6 +89,12 @@ end
 
     ip = InterfaceCellInterpolation(Lagrange{RefTriangle, 1}())
     cv = InterfaceCellValues(qr, ip)
+
+    @test getnbasefunctions(cv) == 6
+    @test Ferrite.getngeobasefunctions(cv) == 6
+    @test get_side_and_baseindex(cv, 4) == (:there, 1)
+    @test_throws ArgumentError get_side_and_baseindex(cv, 7)
+
     x = repeat([rand(Vec{3}), rand(Vec{3}), rand(Vec{3})], 2)
     reinit!(cv, x)
     nbf = getnbasefunctions(cv)
@@ -77,10 +105,11 @@ end
         @test function_value(cv, qp, u, false) ≈ there
         @test all(abs.(function_gradient(cv, qp, u, true)) .≤ 1e-14)
         @test all(abs.(function_gradient(cv, qp, u, false)) .≤ 1e-14)
-        @test function_value_average(cv, qp, u) ≈ (here+there)/2
-        @test function_value_jump(cv, qp, u) ≈ there-here
+        @test function_value_average(cv, qp, u) ≈ (here + there)/2
+        @test function_value_jump(cv, qp, u) ≈ there - here
         @test all(abs.(function_gradient_average(cv, qp, u)) .≤ 1e-14)
         @test all(abs.(function_gradient_jump(cv, qp, u)) .≤ 1e-14)
+        @test getdetJdV_average(cv, qp) == (getdetJdV(cv.here, qp) + getdetJdV(cv.there, qp)) / 2
     end
 end
 
