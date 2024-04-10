@@ -6,7 +6,12 @@
     InterfaceCell(here::AbstractCell, there::AbstractCell) <: AbstractCell
 
 An `InterfaceCell` is a cell based on two cells of lower dimension representing the two faces.
-The two base cells need to use the same reference shape.
+The two base cells need to use the same reference shape and the order of nodes needs to match, e.g.:
+```
+1---2 "here"
+4---3 "there"
+InterfaceCell(Line((1,2)), Line((4,3)))
+```
 
 # Fields
 - `here::AbstractCell`: cell representing the face "here"
@@ -48,7 +53,7 @@ edges(c::InterfaceCell) = (faces(c.here)..., faces(c.there)...)
 
 """
     get_sides_and_base_indices(c::InterfaceCell)
-    get_sides_and_base_indices(chere::AbstractCell, cthere::AbstractCell)
+    get_sides_and_base_indices(::AbstractCell, ::AbstractCell)
     get_sides_and_base_indices(::Type{<:AbstractRefShape}, ::Type{<:AbstractRefShape})
 
 Return a tuple containing tuples of a symbol (:here or :there) and an integer.
@@ -57,7 +62,7 @@ In the inner tuple, the symbol represents the side the node is on
 and the integer represents the nodes index in the base cell.
 """
 get_sides_and_base_indices(c::InterfaceCell) = get_sides_and_base_indices(c.here, c.there)
-get_sides_and_base_indices(chere::AbstractCell, cthere::AbstractCell) = get_sides_and_base_indices(typeof(chere), typeof(cthere))
+get_sides_and_base_indices(::Chere, ::Cthere) where {Chere <: AbstractCell, Cthere <: AbstractCell} = get_sides_and_base_indices(Chere, Cthere)
 
 get_sides_and_base_indices(::Type{Line}, ::Type{Line}) = ((:here,1), (:here,2), (:there,1), (:there,2))
 get_sides_and_base_indices(::Type{QuadraticLine}, ::Type{Line}) = ((:here,1), (:here,2), (:there,1), (:there,2), (:here,3))
@@ -245,8 +250,7 @@ struct InterfaceCellValues{IP, CVhere, CVthere} <: AbstractCellValues
     basefunctionsthere::Vector{Int}
 
     function InterfaceCellValues(ip::IP, here::CVhere, there::CVthere) where {IP<:Interpolation, CVhere<:CellValues, CVthere<:CellValues}
-        # CHeck QR
-        
+        @assert here.qr === there.qr "For `InterfaceCellValues` the underlying `CellValues` need to use the same `QuadratureRule`."
         sip = ip isa VectorizedInterpolation ? ip.ip : ip
         basefunctionshere = collect( get_interface_index(sip, :here, i) for i in 1:getnbasefunctions(sip.here))
         basefunctionsthere = collect( get_interface_index(sip, :there, i) for i in 1:getnbasefunctions(sip.there))
@@ -495,7 +499,7 @@ end
 Compute the average gradient of the function in a quadrature point.
 """
 function function_gradient_average(cv::InterfaceCellValues, qp::Int, u::AbstractVector)
-    return (function_gradient(cv, qp, u, true) + function_gradient(cv, qp, u, false))/2
+    return (function_gradient(cv, qp, u, true) + function_gradient(cv, qp, u, false)) / 2
 end
 
 """
