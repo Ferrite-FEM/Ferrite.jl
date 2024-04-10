@@ -665,7 +665,6 @@ function creategrid(forest::ForestBWG{dim,C,T}) where {dim,C,T}
         for leaf in tree.leaves
             _vertices = vertices(leaf,tree.b)
             cellnodes = ntuple(i-> nodeids_dedup[nodeids[nodeowners[(k,_vertices[i])]]],length(_vertices))
-            # cellnodes = ntuple(i-> nodeids[nodeowners[(k,_vertices[i])]],length(_vertices))
             push!(cells,celltype(ntuple(i->cellnodes[node_map[i]],length(cellnodes))))
         end
     end

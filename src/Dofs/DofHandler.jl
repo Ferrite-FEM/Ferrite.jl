@@ -88,7 +88,6 @@ struct DofHandler{dim,G<:AbstractGrid{dim}} <: AbstractDofHandler
     # Maps from entity to dofs
     # `vertexdict` keeps track of the visited vertices. The first dof added to vertex v is
     # stored in vertexdict[v].
-    # TODO: No need to allocate this vector for fields that don't have vertex dofs
     vertexdicts::Vector{Vector{Int}}
     # `edgedict` keeps track of the visited edges, this will only be used for a 3D problem.
     # An edge is uniquely determined by two global vertices, with global direction going

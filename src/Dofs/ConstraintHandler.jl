@@ -98,6 +98,12 @@ function ConstraintHandler(dh::AbstractDofHandler)
     )
 end
 
+"""
+    This constraint can be passed to the constraint handler when working with non-conforming meshes to
+    add the affine constraints required to make the associated interpolation conforming.
+
+    For a full example visit the AMR tutorial.
+"""
 struct ConformityConstraint
     field_name::Symbol
 end
