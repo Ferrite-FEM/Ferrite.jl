@@ -1,5 +1,5 @@
 using Ferrite, FerriteGmsh, SparseArrays
-grid = generate_grid(Quadrilateral, (4,4));
+grid = generate_grid(Quadrilateral, (1,1));
 grid  = ForestBWG(grid,10)
 
 analytical_solution(x) = atan(2*(norm(x)-0.5)/0.02)
@@ -45,7 +45,7 @@ function assemble_global!(K, f, a, dh, cellvalues)
     return K, f
 end
 
-function solve(grid, hnodes)
+function solve(grid)
     dim = 2
     order = 1 # linear interpolation
     ip = Lagrange{RefQuadrilateral, order}() # vector valued interpolation
@@ -54,17 +54,14 @@ function solve(grid, hnodes)
 
     dh = DofHandler(grid)
     add!(dh, :u, ip)
-    dh, vdict, edict, fdict = Ferrite.__close!(dh);
+    close!(dh);
 
     ch = ConstraintHandler(dh)
+    add!(ch, ConformityConstraint(:u))
     add!(ch, Dirichlet(:u, getfaceset(grid, "top"), (x, t) -> 0.0))
     add!(ch, Dirichlet(:u, getfaceset(grid, "right"), (x, t) -> 0.0))
     add!(ch, Dirichlet(:u, getfaceset(grid, "left"), (x, t) -> 0.0))
     add!(ch, Dirichlet(:u, getfaceset(grid, "bottom"), (x, t) -> 0.0))
-    for (hdof,mdof) in hnodes
-        lc = AffineConstraint(vdict[1][hdof],[vdict[1][m] => 0.5 for m in mdof],0.0)
-        add!(ch,lc)
-    end
     close!(ch);
 
     K = create_sparsity_pattern(dh,ch)
@@ -74,7 +71,7 @@ function solve(grid, hnodes)
     apply!(K, f, ch)
     u = K \ f;
     apply!(u,ch)
-    return u,dh,ch,cellvalues,vdict
+    return u,dh,ch,cellvalues
 end
 
 function compute_fluxes(u,dh)
@@ -122,40 +119,44 @@ function solve_adaptive(initial_grid)
     pvd = paraview_collection("heat_amr.pvd");
     while !finished && i<=10
         @show i
-        transfered_grid, hnodes = Ferrite.creategrid(grid)
-        u,dh,ch,cv,vdict = solve(transfered_grid,hnodes)
-        σ_gp, σ_gp_sc = compute_fluxes(u,dh)
-        projector = L2Projector(Lagrange{RefQuadrilateral, 1}(), transfered_grid; hnodes=hnodes)
-        σ_dof = project(projector, σ_gp, QuadratureRule{RefQuadrilateral}(2))
-        cells_to_refine = Int[]
-        error_arr = Float64[]
-        for (cellid,cell) in enumerate(CellIterator(projector.dh))
-            reinit!(cellvalues_flux, cell)
-            @views σe = σ_dof[celldofs(cell)]
-            error = 0.0
-            for q_point in 1:getnquadpoints(cellvalues_flux)
-                σ_dof_at_sc = function_value(cellvalues_flux, q_point, σe)
-                error += norm((σ_gp_sc[cellid][q_point] - σ_dof_at_sc ))
-                error *= getdetJdV(cellvalues_flux,q_point)
-            end
-            if error > 0.001
-                push!(cells_to_refine,cellid)
-            end
-            push!(error_arr,error)
+        transfered_grid = Ferrite.creategrid(grid)
+        vtk_grid("heat_amr-grid_$i", transfered_grid) do vtk
         end
+        u,dh,ch,cv = solve(transfered_grid)
+        # σ_gp, σ_gp_sc = compute_fluxes(u,dh)
+        # projector = L2Projector(Lagrange{RefQuadrilateral, 1}(), transfered_grid)
+        # σ_dof = project(projector, σ_gp, QuadratureRule{RefQuadrilateral}(2))
+        # cells_to_refine = Int[]
+        # error_arr = Float64[]
+        # for (cellid,cell) in enumerate(CellIterator(projector.dh))
+        #     reinit!(cellvalues_flux, cell)
+        #     @views σe = σ_dof[celldofs(cell)]
+        #     error = 0.0
+        #     for q_point in 1:getnquadpoints(cellvalues_flux)
+        #         σ_dof_at_sc = function_value(cellvalues_flux, q_point, σe)
+        #         error += norm((σ_gp_sc[cellid][q_point] - σ_dof_at_sc ))
+        #         error *= getdetJdV(cellvalues_flux,q_point)
+        #     end
+        #     if error > 0.001
+        #         push!(cells_to_refine,cellid)
+        #     end
+        #     push!(error_arr,error)
+        # end
 
         vtk_grid("heat_amr-iteration_$i", dh) do vtk
             vtk_point_data(vtk, dh, u)
-            vtk_point_data(vtk, projector, σ_dof, "flux")
-            vtk_cell_data(vtk, getindex.(collect(Iterators.flatten(σ_gp_sc)),1), "flux sc x")
-            vtk_cell_data(vtk, getindex.(collect(Iterators.flatten(σ_gp_sc)),2), "flux sc y")
-            vtk_cell_data(vtk, error_arr, "error")
+            # vtk_point_data(vtk, projector, σ_dof, "flux")
+            # vtk_cell_data(vtk, getindex.(collect(Iterators.flatten(σ_gp_sc)),1), "flux sc x")
+            # vtk_cell_data(vtk, getindex.(collect(Iterators.flatten(σ_gp_sc)),2), "flux sc y")
+            # vtk_cell_data(vtk, error_arr, "error")
             pvd[i] = vtk
         end
+
+        cells_to_refine = [1]
         Ferrite.refine!(grid,cells_to_refine)
-        transfered_grid, hnodes = Ferrite.creategrid(grid)
+        transfered_grid = Ferrite.creategrid(grid)
         Ferrite.balanceforest!(grid)
-        transfered_grid, hnodes = Ferrite.creategrid(grid)
+        transfered_grid = Ferrite.creategrid(grid)
         i += 1
         if isempty(cells_to_refine)
             finished = true

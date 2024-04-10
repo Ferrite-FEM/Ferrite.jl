@@ -98,6 +98,27 @@ function ConstraintHandler(dh::AbstractDofHandler)
     )
 end
 
+struct ConformityConstraint
+    field_name::Symbol
+end
+
+function add!(ch::ConstraintHandler{<:DofHandler{<:Any,<:Grid}}, cc::ConformityConstraint)
+    @warn "Trying to add conformity constraint to $(cc.field_name) on a conforming grid. Skipping."
+end
+
+function add!(ch::ConstraintHandler{<:DofHandler{dim,<:NonConformingGrid}}, cc::ConformityConstraint) where dim
+    @assert length(ch.dh.field_names) == 1 "Multiple fields not supported yet."
+    @assert cc.field_name ∈ ch.dh.field_names "Field $(cc.field_name) not found in provided dof handler. Available fields are $(ch.dh.field_names)."
+    # One set of linear contraints per hanging node
+    for (hdof,mdof) in ch.dh.grid.conformity_info
+        # One constraint per component
+        for d in 1:dim
+            lc = AffineConstraint(ch.dh.vertexdicts[1][hdof]+d-1,[ch.dh.vertexdicts[1][m]+d-1 => 0.5 for m in mdof],0.0)
+            add!(ch,lc)
+        end
+    end
+end
+
 """
     RHSData
 
@@ -218,6 +239,7 @@ function close!(ch::ConstraintHandler)
             i == 0 && continue
             icoeffs = ch.dofcoefficients[i]
             if !(icoeffs === nothing || isempty(icoeffs))
+                @debug @info "Nested affine constraint detected for $coeffs and $i"
                 error("nested affine constraints currently not supported")
             end
         end
