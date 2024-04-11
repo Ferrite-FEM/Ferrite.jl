@@ -46,7 +46,7 @@ end
 #OctantBWG(dim::Int,l::Int,m::Int,b::Int=_maxlevel[dim-1]) = OctantBWG(dim,l,m,b)
 #OctantBWG(dim::Int,l::Int,m::Int,b::Int32) = OctantBWG(dim,l,m,b)
 #OctantBWG(dim::Int,l::Int32,m::Int,b::Int32) = OctantBWG(dim,l,Int32(m),b)
-function OctantBWG(level::Int,coords::NTuple)
+function OctantBWG(level::T,coords::NTuple) where T <: Integer
     dim = length(coords)
     nnodes = 2^dim
     OctantBWG{dim,nnodes,eltype(coords)}(level,coords)
@@ -1214,13 +1214,13 @@ TODO use some table?
 function compute_edge_orientation(forest::ForestBWG{<:Any,<:OctreeBWG{3,<:Any,T2}}, k::T1, e::T1) where {T1,T2}
     n_perm = node_map₃
     n_perminv = node_map₃_inv
-    e_perm =
-    e_perminv = 
+    e_perm = edge_perm
+    e_perminv = edge_perm_inv
 
     e_ferrite = e_perm[e]
-    k′, e′_ferrite = getneighborhood(forest,EdgeIndex(k,e_ferrite))[1]
+    k′, e′_ferrite = forest.topology.edge_edge_neighbor[k,e_ferrite][1]
     e′ = e_perminv[e′_ferrite]
-    refedgenodes = reference_edges_bwg(RefHypercube{dim})
+    refedgenodes = reference_edges_bwg(RefHypercube{3})
     nodes_e = ntuple(i->forest.cells[k].nodes[n_perm[refedgenodes[e][i]]],length(refedgenodes[e]))
     nodes_e′ = ntuple(i->forest.cells[k′].nodes[n_perm[refedgenodes[e′][i]]],length(refedgenodes[e′]))
     if nodes_e == nodes_e′
@@ -1395,12 +1395,11 @@ transform_face(forest::ForestBWG,f::FaceIndex,oct::OctantBWG) = transform_face(f
 Algorithm 12 in [BWG2011](@citet) to transform corner into different octree coordinate system
 Note: in Algorithm 12 is c as a argument, but it's never used, therefore I removed it
 """
-function transform_corner(forest::ForestBWG,k::T1,c::T1,oct::OctantBWG{dim,N,T2}) where {dim,N,T1<:Integer,T2<:Integer}
+function transform_corner(forest::ForestBWG,k::T1,c::T1,oct::OctantBWG{dim,N,T2},inside::Bool) where {dim,N,T1<:Integer,T2<:Integer}
     # make a dispatch that returns only the coordinates?
     b = forest.cells[k].b
     l = oct.l; g = 2^b - 2^(b-l)
-    _inside = inside(forest.cells[k],oct)
-    h⁻ = _inside ? 0 : -2^(b-l); h⁺ = _inside ? g : 2^b
+    h⁻ = inside ? 0 : -2^(b-l); h⁺ = inside ? g : 2^b
     xyz = ntuple(i->((c-1) & 2^(i-1) == 0) ? h⁻ : h⁺,dim)
     return OctantBWG(l,xyz)
 end
@@ -1414,22 +1413,31 @@ transform_corner(forest::ForestBWG,v::VertexIndex,oct::OctantBWG) = transform_co
 
 Algorithm 10 in [BWG2011](@citet) to transform cedge into different octree coordinate system.
 """
-function transform_edge(forest::ForestBWG,k::T1,e::T1,oct::OctantBWG{3,N,T2}) where {N,T1<:Integer,T2<:Integer}     
+function transform_edge(forest::ForestBWG,k::T1,e::T1,oct::OctantBWG{3,N,T2},inside::Bool) where {N,T1<:Integer,T2<:Integer}     
     _four = T2(4)
     _one = T2(1)
     _two = T2(2)
     z = zero(T2)
+    e_perm = edge_perm
+    e_perminv = edge_perm_inv
+
+    e_ferrite = e_perm[e]
+    k′, e′_ferrite = forest.topology.edge_edge_neighbor[k,e_ferrite][1]
+    e′ = e_perminv[e′_ferrite]
+    #see Algorithm 9, line 18
+    𝐛 = (((e′-_one) ÷ _four),
+           e′-_one < 4 ? 1 : 0,
+           e′-_one < 8 ? 2 : 1)
     a₀ = ((e-_one) ÷ _four) #subtract 1 based index
     a₀ += _one #add it again
     b = forest.cells[k].b
     l = oct.l; g = _two^b - _two^(b-l)
-    _inside = inside(forest.cells[k],oct)    
-    h⁻ = _inside ? z : -_two^(b-l); h⁺ = _inside ? g : _two^b
-    s = compute_face_orientation(forest,k,e)
-    xyz = (s*g+(_one-_two*s)*oct.xyz[a₀],
-           ((e-_one) & 1) == 0 ? h⁻ : h⁺,
-           ((e-_one) & 2) == 0 ? h⁻ : h⁺)
-    OctantBWG(l,xyz)
+    h⁻ = inside ? z : -_two^(b-l); h⁺ = inside ? g : _two^b    
+    s = compute_edge_orientation(forest,k,e)
+    xyz = (s*g+(_one-(_two*s))*oct.xyz[a₀],
+           ((e′-_one) & 1) == 0 ? h⁻ : h⁺,
+           ((e′-_one) & 2) == 0 ? h⁻ : h⁺)
+    return OctantBWG(l,(xyz[𝐛[1]+_one],xyz[𝐛[2]+_one],xyz[𝐛[3]+_one]))
 end
 
 transform_corner(forest::ForestBWG,e::EdgeIndex,oct::OctantBWG) = transform_corner(forest,e[1],e[2],oct)
