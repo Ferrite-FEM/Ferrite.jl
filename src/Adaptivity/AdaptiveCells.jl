@@ -788,7 +788,7 @@ function balanceforest!(forest::ForestBWG{dim}) where dim
                         cc = cc[1]
                         k′, c′ = cc[1], perm_corner_inv[cc[2]]
                         o′ = transform_corner(forest,k′,c′,o,false)
-                        s′ = transform_corner(forest,k′,c′,s,false)
+                        s′ = transform_corner(forest,k′,c′,s,true)
                         neighbor_tree = forest.cells[cc[1]]
                         if s′ ∉ neighbor_tree.leaves && parent(s′, neighbor_tree.b) ∉ neighbor_tree.leaves
                             if parent(parent(s′,neighbor_tree.b),neighbor_tree.b) ∈ neighbor_tree.leaves
