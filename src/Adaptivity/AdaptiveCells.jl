@@ -1389,8 +1389,8 @@ end
 transform_face(forest::ForestBWG,f::FaceIndex,oct::OctantBWG) = transform_face(forest,f[1],f[2],oct)
 
 """
-    transform_corner(forest,k,c',oct)
-    transform_corner(forest,v::VertexIndex,oct)
+    transform_corner(forest,k,c',oct,inside::Bool)
+    transform_corner(forest,v::VertexIndex,oct,inside::Bool)
 
 Algorithm 12 but with flipped logic in [BWG2011](@citet) to transform corner into different octree coordinate system
 Implements flipped logic in the sense of pushing the Octant `oct` through vertex v and stays within octree coordinate system `k`.
@@ -1404,11 +1404,11 @@ function transform_corner(forest::ForestBWG,k::T1,c::T1,oct::OctantBWG{dim,N,T2}
     return OctantBWG(l,xyz)
 end
 
-transform_corner(forest::ForestBWG,v::VertexIndex,oct::OctantBWG) = transform_corner(forest,v[1],v[2],oct)
+transform_corner(forest::ForestBWG,v::VertexIndex,oct::OctantBWG,inside) = transform_corner(forest,v[1],v[2],oct,inside)
 
 """
-    transform_corner_remote(forest,k,c',oct)
-    transform_corner_remote(forest,v::VertexIndex,oct)
+    transform_corner_remote(forest,k,c',oct,inside::Bool)
+    transform_corner_remote(forest,v::VertexIndex,oct,inside::Bool)
 
 Algorithm 12 in [BWG2011](@citet) to transform corner into different octree coordinate system.
 Follows exactly the version of the paper by taking `oct` and looking from the neighbor octree coordinate system (neighboring to `k`,`v`) at `oct`.
@@ -1426,12 +1426,12 @@ function transform_corner_remote(forest::ForestBWG,k::T1,c::T1,oct::OctantBWG{di
     return OctantBWG(l,xyz)
 end
 
-transform_corner_remote(forest::ForestBWG,v::VertexIndex,oct::OctantBWG) = transform_corner_remote(forest,v[1],v[2],oct)
+transform_corner_remote(forest::ForestBWG,v::VertexIndex,oct::OctantBWG,inside) = transform_corner_remote(forest,v[1],v[2],oct,inside)
 
 
 """
-    transform_edge_remote(forest,k,e,oct)
-    transform_edge_remote(forest,e::Edgeindex,oct)
+    transform_edge_remote(forest,k,e,oct,inside::Bool)
+    transform_edge_remote(forest,e::Edgeindex,oct,inside::Bool)
 
 Algorithm 10 in [BWG2011](@citet) to transform edge into different octree coordinate system.
 This function looks at the octant from the octree coordinate system of the neighbor that can be found at (k,e)
@@ -1466,11 +1466,11 @@ function transform_edge_remote(forest::ForestBWG,k::T1,e::T1,oct::OctantBWG{3,N,
     return OctantBWG(l,(xyz[1],xyz[2],xyz[3]))
 end
 
-transform_edge_remote(forest::ForestBWG,e::EdgeIndex,oct::OctantBWG) = transform_edge_remote(forest,e[1],e[2],oct)
+transform_edge_remote(forest::ForestBWG,e::EdgeIndex,oct::OctantBWG,inside) = transform_edge_remote(forest,e[1],e[2],oct,inside)
 
 """
-    transform_edge(forest,k,e,oct)
-    transform_edge(forest,e::Edgeindex,oct)
+    transform_edge(forest,k,e,oct,inside::Bool)
+    transform_edge(forest,e::Edgeindex,oct,inside::Bool)
 
 Algorithm 10 in [BWG2011](@citet) to transform cedge into different octree coordinate system but reversed logic.
 See `transform_edge_remote` with logic from paper.
@@ -1499,7 +1499,7 @@ function transform_edge(forest::ForestBWG,k::T1,e::T1,oct::OctantBWG{3,N,T2},ins
     return OctantBWG(l,(xyz[1],xyz[2],xyz[3]))
 end
 
-transform_edge(forest::ForestBWG,e::EdgeIndex,oct::OctantBWG) = transform_edge(forest,e[1],e[2],oct)
+transform_edge(forest::ForestBWG,e::EdgeIndex,oct::OctantBWG,inside) = transform_edge(forest,e[1],e[2],oct,inside)
 
 """
     edge_neighbor(octant::OctantBWG, e::Integer, b::Integer)
