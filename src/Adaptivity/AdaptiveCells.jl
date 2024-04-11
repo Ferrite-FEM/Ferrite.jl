@@ -1408,12 +1408,13 @@ transform_corner(forest::ForestBWG,v::VertexIndex,oct::OctantBWG) = transform_co
 
 
 """
-    transform_edge(forest,k,e′,oct)
-    transform_edge(forest,e::Edgeindex,oct)
+    transform_edge_remote(forest,k,e,oct)
+    transform_edge_remote(forest,e::Edgeindex,oct)
 
-Algorithm 10 in [BWG2011](@citet) to transform cedge into different octree coordinate system.
+Algorithm 10 in [BWG2011](@citet) to transform edge into different octree coordinate system.
+This function looks at the octant from the octree coordinate system of the neighbor that can be found at (k,e)
 """
-function transform_edge(forest::ForestBWG,k::T1,e::T1,oct::OctantBWG{3,N,T2},inside::Bool) where {N,T1<:Integer,T2<:Integer}     
+function transform_edge_remote(forest::ForestBWG,k::T1,e::T1,oct::OctantBWG{3,N,T2},inside::Bool) where {N,T1<:Integer,T2<:Integer}     
     _four = T2(4)
     _one = T2(1)
     _two = T2(2)
@@ -1437,15 +1438,50 @@ function transform_edge(forest::ForestBWG,k::T1,e::T1,oct::OctantBWG{3,N,T2},ins
     xyz = zeros(T2,3)
     xyz[𝐛[1]+_one] = s*g+(_one-(_two*s))*oct.xyz[a₀]
     xyz[𝐛[2]+_one] = ((e′-_one) & 1) == 0 ? h⁻ : h⁺
+    #xyz[𝐛[2]+_one] = ((e-_one) & 1) == 0 ? h⁻ : h⁺
     xyz[𝐛[3]+_one] = ((e′-_one) & 2) == 0 ? h⁻ : h⁺
+    #xyz[𝐛[3]+_one] = ((e-_one) & 2) == 0 ? h⁻ : h⁺
     return OctantBWG(l,(xyz[1],xyz[2],xyz[3]))
 end
 
-transform_corner(forest::ForestBWG,e::EdgeIndex,oct::OctantBWG) = transform_corner(forest,e[1],e[2],oct)
+transform_edge_remote(forest::ForestBWG,e::EdgeIndex,oct::OctantBWG) = transform_edge_remote(forest,e[1],e[2],oct)
+
+"""
+    transform_edge(forest,k,e,oct)
+    transform_edge(forest,e::Edgeindex,oct)
+
+Algorithm 10 in [BWG2011](@citet) to transform cedge into different octree coordinate system but reversed logic.
+See `transform_edge_remote` with logic from paper.
+In this function we stick to the coordinate system of the pivot tree k and transform an octant through edge e into this k-th octree coordinate system.
+"""
+function transform_edge(forest::ForestBWG,k::T1,e::T1,oct::OctantBWG{3,N,T2},inside::Bool) where {N,T1<:Integer,T2<:Integer}     
+    _four = T2(4)
+    _one = T2(1)
+    _two = T2(2)
+    z = zero(T2)
+
+    #see Algorithm 9, line 18
+    𝐛 = (((e-_one) ÷ _four),
+           e-_one < 4 ? 1 : 0,
+           e-_one < 8 ? 2 : 1)
+    a₀ = ((e-_one) ÷ _four) #subtract 1 based index
+    a₀ += _one #add it again
+    b = forest.cells[k].b
+    l = oct.l; g = _two^b - _two^(b-l)
+    h⁻ = inside ? z : -_two^(b-l); h⁺ = inside ? g : _two^b    
+    s = compute_edge_orientation(forest,k,e)
+    xyz = zeros(T2,3)
+    xyz[𝐛[1]+_one] = s*g+(_one-(_two*s))*oct.xyz[a₀]
+    xyz[𝐛[2]+_one] = ((e-_one) & 1) == 0 ? h⁻ : h⁺
+    xyz[𝐛[3]+_one] = ((e-_one) & 2) == 0 ? h⁻ : h⁺
+    return OctantBWG(l,(xyz[1],xyz[2],xyz[3]))
+end
+
+transform_edge(forest::ForestBWG,e::EdgeIndex,oct::OctantBWG) = transform_edge(forest,e[1],e[2],oct)
 
 """
     edge_neighbor(octant::OctantBWG, e::Integer, b::Integer)
-Computes the edge neighbor octant which is only connected by the edge `e` to `octant`
+Computes the edge neighbor octant which is only connected by the edge `e` to `octant`.
 """
 function edge_neighbor(octant::OctantBWG{3,N,T}, e::T, b::T=_maxlevel[2]) where {N,T<:Integer}
     @assert 1 ≤ e ≤ 12
