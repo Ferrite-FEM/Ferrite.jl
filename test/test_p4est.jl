@@ -124,6 +124,24 @@ end
     @test Ferrite.corner_neighbor(Ferrite.OctantBWG(2,(2,0)),4,3) == Ferrite.OctantBWG(2,(4,2))
 end
 
+@testset "Index Permutation" begin
+    for i in 1:length(Ferrite.edge_perm)
+        @test i == Ferrite.edge_perm_inv[Ferrite.edge_perm[i]]
+    end
+    for i in 1:length(Ferrite.𝒱₂_perm)
+        @test i == Ferrite.𝒱₂_perm_inv[Ferrite.𝒱₂_perm[i]]
+    end
+    for i in 1:length(Ferrite.𝒱₃_perm)
+        @test i == Ferrite.𝒱₃_perm_inv[Ferrite.𝒱₃_perm[i]]
+    end
+    for i in 1:length(Ferrite.node_map₂)
+        @test i == Ferrite.node_map₂_inv[Ferrite.node_map₂[i]]
+    end
+    for i in 1:length(Ferrite.node_map₃)
+        @test i == Ferrite.node_map₃_inv[Ferrite.node_map₃[i]]
+    end
+end
+
 @testset "OctreeBWG Operations" begin
     # maximum level == 3
     # Octant level 0 size == 2^3=8

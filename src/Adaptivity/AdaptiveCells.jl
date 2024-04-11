@@ -1174,6 +1174,10 @@ face_neighbor(o::OctantBWG{dim,N,T1}, f::T2, b::T3) where {dim,N,T1<:Integer,T2<
 
 reference_faces_bwg(::Type{RefHypercube{2}}) = ((1,3) , (2,4), (1,2), (3,4))
 reference_faces_bwg(::Type{RefHypercube{3}}) = ((1,3,5,7) , (2,4,6,8), (1,2,5,6), (3,4,7,8), (1,2,3,4), (5,6,7,8)) # p4est consistent ordering
+reference_edges_bwg(::Type{RefHypercube{3}}) = ((𝒰[1,1],𝒰[1,2]), (𝒰[2,1],𝒰[2,2]), (𝒰[3,1],𝒰[3,2]),
+                                                (𝒰[4,1],𝒰[4,2]), (𝒰[5,1],𝒰[5,2]), (𝒰[6,1],𝒰[6,2]),
+                                                (𝒰[7,1],𝒰[7,2]), (𝒰[8,1],𝒰[8,2]), (𝒰[9,1],𝒰[9,2]),
+                                                (𝒰[10,1],𝒰[10,2]), (𝒰[11,1],𝒰[11,2]), (𝒰[12,1],𝒰[12,2])) # TODO maybe remove, unnecessary, can directly use the table
 # reference_faces_bwg(::Type{RefHypercube{3}}) = ((1,3,7,5) , (2,4,8,6), (1,2,6,5), (3,4,8,7), (1,2,4,4), (5,6,8,7)) # Note that this does NOT follow P4est order!
 
 """
@@ -1199,6 +1203,32 @@ function compute_face_orientation(forest::ForestBWG{<:Any,<:OctreeBWG{dim,<:Any,
     else
         return T2(findfirst(isequal(nodes_f[1]), nodes_f′)-1)
     end
+end
+
+"""
+    compute_edge_orientation(forest::ForestBWG, k::Integer, e::Integer)
+Slow implementation for the determination of the edge orientation of edge `e` from octree `k` following definition below Table 3 [BWG2011](@citet).
+
+TODO use some table?
+"""
+function compute_edge_orientation(forest::ForestBWG{<:Any,<:OctreeBWG{3,<:Any,T2}}, k::T1, e::T1) where {T1,T2}
+    n_perm = node_map₃
+    n_perminv = node_map₃_inv
+    e_perm =
+    e_perminv = 
+
+    e_ferrite = e_perm[e]
+    k′, e′_ferrite = getneighborhood(forest,EdgeIndex(k,e_ferrite))[1]
+    e′ = e_perminv[e′_ferrite]
+    refedgenodes = reference_edges_bwg(RefHypercube{dim})
+    nodes_e = ntuple(i->forest.cells[k].nodes[n_perm[refedgenodes[e][i]]],length(refedgenodes[e]))
+    nodes_e′ = ntuple(i->forest.cells[k′].nodes[n_perm[refedgenodes[e′][i]]],length(refedgenodes[e′]))
+    if nodes_e == nodes_e′
+        s = T2(0)
+    else
+        s = T2(1)
+    end
+    return s
 end
 
 """
@@ -1365,17 +1395,44 @@ transform_face(forest::ForestBWG,f::FaceIndex,oct::OctantBWG) = transform_face(f
 Algorithm 12 in [BWG2011](@citet) to transform corner into different octree coordinate system
 Note: in Algorithm 12 is c as a argument, but it's never used, therefore I removed it
 """
-function transform_corner(forest::ForestBWG,k::T1,c′::T1,oct::OctantBWG{dim,N,T2}) where {dim,N,T1<:Integer,T2<:Integer}
+function transform_corner(forest::ForestBWG,k::T1,c::T1,oct::OctantBWG{dim,N,T2}) where {dim,N,T1<:Integer,T2<:Integer}
     # make a dispatch that returns only the coordinates?
     b = forest.cells[k].b
     l = oct.l; g = 2^b - 2^(b-l)
     _inside = inside(forest.cells[k],oct)
     h⁻ = _inside ? 0 : -2^(b-l); h⁺ = _inside ? g : 2^b
-    xyz = ntuple(i->((c′-1) & 2^(i-1) == 0) ? h⁻ : h⁺,dim)
+    xyz = ntuple(i->((c-1) & 2^(i-1) == 0) ? h⁻ : h⁺,dim)
     return OctantBWG(l,xyz)
 end
 
 transform_corner(forest::ForestBWG,v::VertexIndex,oct::OctantBWG) = transform_corner(forest,v[1],v[2],oct)
+
+
+"""
+    transform_edge(forest,k,e′,oct)
+    transform_edge(forest,e::Edgeindex,oct)
+
+Algorithm 10 in [BWG2011](@citet) to transform cedge into different octree coordinate system.
+"""
+function transform_edge(forest::ForestBWG,k::T1,e::T1,oct::OctantBWG{3,N,T2}) where {N,T1<:Integer,T2<:Integer}     
+    _four = T2(4)
+    _one = T2(1)
+    _two = T2(2)
+    z = zero(T2)
+    a₀ = ((e-_one) ÷ _four) #subtract 1 based index
+    a₀ += _one #add it again
+    b = forest.cells[k].b
+    l = oct.l; g = _two^b - _two^(b-l)
+    _inside = inside(forest.cells[k],oct)    
+    h⁻ = _inside ? z : -_two^(b-l); h⁺ = _inside ? g : _two^b
+    s = compute_face_orientation(forest,k,e)
+    xyz = (s*g+(_one-_two*s)*oct.xyz[a₀],
+           ((e-_one) & 1) == 0 ? h⁻ : h⁺,
+           ((e-_one) & 2) == 0 ? h⁻ : h⁺)
+    OctantBWG(l,xyz)
+end
+
+transform_corner(forest::ForestBWG,e::EdgeIndex,oct::OctantBWG) = transform_corner(forest,e[1],e[2],oct)
 
 """
     edge_neighbor(octant::OctantBWG, e::Integer, b::Integer)
@@ -1577,6 +1634,34 @@ const 𝒱₃_perm_inv = [5
                      4
                      1
                      6]
+
+# edge indices permutation from p4est idx to Ferrite idx
+const edge_perm = [1
+                   3
+                   5
+                   7
+                   4
+                   2
+                   8
+                   6
+                   9
+                   10
+                   12
+                   11]
+
+# edge indices permutation from Ferrite idx to p4est idx
+const edge_perm_inv = [1
+                       6
+                       2
+                       5
+                       3
+                       8
+                       4
+                       7
+                       9
+                       10
+                       12
+                       11]
 
 const ℛ = [1  2  2  1  1  2
            3  1  1  2  2  1
