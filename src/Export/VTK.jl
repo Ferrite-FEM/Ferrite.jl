@@ -57,7 +57,7 @@ Return a `DatasetFile` that data can be appended to, see
 The keyword arguments are forwarded to `WriteVTK.vtk_grid`, see 
 [Data Formatting Options](https://juliavtk.github.io/WriteVTK.jl/stable/grids/syntax/#Data-formatting-options)
 """
-function WriteVTK.vtk_grid(filename::AbstractString, grid::Grid{dim,C,T}; kwargs...) where {dim,C,T}
+function WriteVTK.vtk_grid(filename::AbstractString, grid::Union{Grid{dim,<:Any,T}, NonConformingGrid{dim,<:Any,T}}; kwargs...) where {dim,T}
     cls = MeshCell[]
     for cell in getcells(grid)
         celltype = Ferrite.cell_to_vtkcell(typeof(cell))
@@ -113,7 +113,7 @@ function component_names(::Type{S}) where S
     return names
 end
 
-function vtk_nodeset(vtk::WriteVTK.DatasetFile, grid::Grid{dim}, nodeset::String) where {dim}
+function vtk_nodeset(vtk::WriteVTK.DatasetFile, grid::AbstractGrid, nodeset::String) where {dim}
     z = zeros(getnnodes(grid))
     z[collect(getnodeset(grid, nodeset))] .= 1.0
     vtk_point_data(vtk, z, nodeset)

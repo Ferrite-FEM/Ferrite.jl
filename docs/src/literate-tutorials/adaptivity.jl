@@ -61,7 +61,7 @@ function assemble_global!(K, f, a, dh, cellvalues, material)
     return K, f
 end
 
-function solve(grid,hnodes)
+function solve(grid)
     dim = 2
     order = 1 # linear interpolation
     ip = Lagrange{RefQuadrilateral, order}()^dim # vector valued interpolation
@@ -70,19 +70,12 @@ function solve(grid,hnodes)
 
     dh = DofHandler(grid)
     add!(dh, :u, ip)
-    dh, vdict, edict, fdict = Ferrite.__close!(dh);
+    close!(dh);
 
     ch = ConstraintHandler(dh)
+    add!(ch, Ferrite.ConformityConstraint(:u))
     add!(ch, Dirichlet(:u, getfaceset(grid, "top"), (x, t) -> Vec{2}((0.0,0.0)), [1,2]))
     add!(ch, Dirichlet(:u, getfaceset(grid, "right"), (x, t) -> 0.01, 2))
-    # One set of linear contraints per hanging node
-    for (hdof,mdof) in hnodes
-        # One constraint per component
-        for d in 1:dim
-            lc = AffineConstraint(vdict[1][hdof]+d-1,[vdict[1][m]+d-1 => 0.5 for m in mdof],0.0)
-            add!(ch,lc)
-        end
-    end
     close!(ch);
 
     K = create_sparsity_pattern(dh,ch)
@@ -92,7 +85,7 @@ function solve(grid,hnodes)
     apply!(K, f, ch)
     u = K \ f;
     apply!(u,ch)
-    return u,dh,ch,cellvalues,vdict
+    return u,dh,ch,cellvalues
 end
 
 function compute_fluxes(u,dh)
@@ -139,10 +132,10 @@ function solve_adaptive(initial_grid)
     i = 1
     grid = initial_grid
     while !finished
-        transfered_grid, hnodes = Ferrite.creategrid(grid)
-        u,dh,ch,cv,vdict = solve(transfered_grid,hnodes)
+        transfered_grid = Ferrite.creategrid(grid)
+        u,dh,ch,cv = solve(transfered_grid)
         σ_gp, σ_gp_sc = compute_fluxes(u,dh)
-        projector = L2Projector(Lagrange{RefQuadrilateral, 1}()^2, transfered_grid; hnodes=hnodes)
+        projector = L2Projector(Lagrange{RefQuadrilateral, 1}()^2, transfered_grid)
         σ_dof = project(projector, σ_gp, QuadratureRule{RefQuadrilateral}(2))
         cells_to_refine = Int[]
         error_arr = Float64[]
@@ -166,14 +159,15 @@ function solve_adaptive(initial_grid)
             vtk_cell_data(vtk, getindex.(collect(Iterators.flatten(σ_gp_sc)),1), "stress sc")
             vtk_cell_data(vtk, error_arr, "error")
         end
+
         Ferrite.refine!(grid,cells_to_refine)
-        transfered_grid, hnodes = Ferrite.creategrid(grid)
         vtk_grid("unbalanced.vtu", dh) do vtk
         end
+
         Ferrite.balanceforest!(grid)
-        transfered_grid, hnodes = Ferrite.creategrid(grid)
         vtk_grid("balanced.vtu", dh) do vtk
         end
+
         i += 1
         if isempty(cells_to_refine)
             finished = true
