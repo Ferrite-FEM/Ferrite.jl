@@ -1434,13 +1434,11 @@ function transform_edge(forest::ForestBWG,k::T1,e::T1,oct::OctantBWG{3,N,T2},ins
     l = oct.l; g = _two^b - _two^(b-l)
     h⁻ = inside ? z : -_two^(b-l); h⁺ = inside ? g : _two^b    
     s = compute_edge_orientation(forest,k,e)
-    xyz = (s*g+(_one-(_two*s))*oct.xyz[a₀],
-           ((e′-_one) & 1) == 0 ? h⁻ : h⁺,
-           ((e′-_one) & 2) == 0 ? h⁻ : h⁺)
-    @show s
-    @show xyz
-    @show 𝐛 .+ 1
-    return OctantBWG(l,(xyz[𝐛[1]+_one],xyz[𝐛[2]+_one],xyz[𝐛[3]+_one]))
+    xyz = zeros(T2,3)
+    xyz[𝐛[1]+_one] = s*g+(_one-(_two*s))*oct.xyz[a₀]
+    xyz[𝐛[2]+_one] = ((e′-_one) & 1) == 0 ? h⁻ : h⁺
+    xyz[𝐛[3]+_one] = ((e′-_one) & 2) == 0 ? h⁻ : h⁺
+    return OctantBWG(l,(xyz[1],xyz[2],xyz[3]))
 end
 
 transform_corner(forest::ForestBWG,e::EdgeIndex,oct::OctantBWG) = transform_corner(forest,e[1],e[2],oct)
