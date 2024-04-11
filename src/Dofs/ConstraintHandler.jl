@@ -135,7 +135,7 @@ function _add_conformity_constraint(ch::ConstraintHandler, field_index::Int, int
         @debug @assert length(mdof) == 2
         # One constraint per component
         for vd in 1:vdim
-            lc = AffineConstraint(ch.dh.vertexdicts[field_index][hdof]+vd-1,[ch.dh.vertexdicts[field_index][m]+vd-1 => 0.5 for m in mdof], 0.0)
+            lc = AffineConstraint(ch.dh.vertexdicts[field_index][hdof]+vd-1,[ch.dh.vertexdicts[field_index][m]+vd-1 => 0.5 for m in mdof], 0.0) # TODO change for other interpolation types than linear
             add!(ch,lc)
         end
     end
