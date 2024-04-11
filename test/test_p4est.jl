@@ -110,8 +110,20 @@ end
 
     @test Ferrite.edge_neighbor(Ferrite.OctantBWG(3,(0,0,0)),1,4)  == Ferrite.OctantBWG(3,(0,-2,-2))
     @test Ferrite.edge_neighbor(Ferrite.OctantBWG(3,(0,0,0)),12,4) == Ferrite.OctantBWG(3,(2,2,0))
+
     @test Ferrite.edge_neighbor(Ferrite.OctantBWG(2,(0,0,0)),1,4)  == Ferrite.OctantBWG(2,(0,-4,-4))
+    @test Ferrite.edge_neighbor(Ferrite.OctantBWG(2,(0,0,0)),2,4)  == Ferrite.OctantBWG(2,(0,4,-4))
+    @test Ferrite.edge_neighbor(Ferrite.OctantBWG(2,(0,0,0)),3,4)  == Ferrite.OctantBWG(2,(0,-4,4))
+    @test Ferrite.edge_neighbor(Ferrite.OctantBWG(2,(0,0,0)),4,4)  == Ferrite.OctantBWG(2,(0,4,4))
+    @test Ferrite.edge_neighbor(Ferrite.OctantBWG(2,(0,0,0)),5,4)  == Ferrite.OctantBWG(2,(-4,0,-4))
+    @test Ferrite.edge_neighbor(Ferrite.OctantBWG(2,(0,0,0)),6,4)  == Ferrite.OctantBWG(2,(4,0,-4))
+    @test Ferrite.edge_neighbor(Ferrite.OctantBWG(2,(0,0,0)),7,4)  == Ferrite.OctantBWG(2,(-4,0,4))
+    @test Ferrite.edge_neighbor(Ferrite.OctantBWG(2,(0,0,0)),8,4)  == Ferrite.OctantBWG(2,(4,0,4))
+    @test Ferrite.edge_neighbor(Ferrite.OctantBWG(2,(0,0,0)),9,4)  == Ferrite.OctantBWG(2,(-4,-4,0))
+    @test Ferrite.edge_neighbor(Ferrite.OctantBWG(2,(0,0,0)),10,4)  == Ferrite.OctantBWG(2,(4,-4,0))
+    @test Ferrite.edge_neighbor(Ferrite.OctantBWG(2,(0,0,0)),11,4)  == Ferrite.OctantBWG(2,(-4,4,0))
     @test Ferrite.edge_neighbor(Ferrite.OctantBWG(2,(0,0,0)),12,4) == Ferrite.OctantBWG(2,(4,4,0))
+
     @test Ferrite.edge_neighbor(Ferrite.OctantBWG(1,(0,0,0)),1,4)  == Ferrite.OctantBWG(1,(0,-8,-8))
     @test Ferrite.edge_neighbor(Ferrite.OctantBWG(1,(0,0,0)),12,4) == Ferrite.OctantBWG(1,(8,8,0))
 

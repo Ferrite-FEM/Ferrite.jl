@@ -787,8 +787,8 @@ function balanceforest!(forest::ForestBWG{dim}) where dim
                         @assert length(cc) == 1 # FIXME there can be more than 1 vertex neighbor
                         cc = cc[1]
                         k′, c′ = cc[1], perm_corner_inv[cc[2]]
-                        o′ = transform_corner(forest,k′,c′,o)
-                        s′ = transform_corner(forest,k′,c′,s)
+                        o′ = transform_corner(forest,k′,c′,o,false)
+                        s′ = transform_corner(forest,k′,c′,s,false)
                         neighbor_tree = forest.cells[cc[1]]
                         if s′ ∉ neighbor_tree.leaves && parent(s′, neighbor_tree.b) ∉ neighbor_tree.leaves
                             if parent(parent(s′,neighbor_tree.b),neighbor_tree.b) ∈ neighbor_tree.leaves
@@ -1437,6 +1437,9 @@ function transform_edge(forest::ForestBWG,k::T1,e::T1,oct::OctantBWG{3,N,T2},ins
     xyz = (s*g+(_one-(_two*s))*oct.xyz[a₀],
            ((e′-_one) & 1) == 0 ? h⁻ : h⁺,
            ((e′-_one) & 2) == 0 ? h⁻ : h⁺)
+    @show s
+    @show xyz
+    @show 𝐛 .+ 1
     return OctantBWG(l,(xyz[𝐛[1]+_one],xyz[𝐛[2]+_one],xyz[𝐛[3]+_one]))
 end
 
@@ -1448,31 +1451,20 @@ Computes the edge neighbor octant which is only connected by the edge `e` to `oc
 """
 function edge_neighbor(octant::OctantBWG{3,N,T}, e::T, b::T=_maxlevel[2]) where {N,T<:Integer}
     @assert 1 ≤ e ≤ 12
-    e -= one(T)
-    l = octant.l
     _one = one(T)
     _two = T(2)
+    e -= _one
+    l = octant.l
     h = T(_compute_size(b,octant.l))
     ox,oy,oz = octant.xyz
-    case = e ÷ T(4)
-    if case == zero(T)
-        x = ox
-        y = oy + (_two*(e & _one) - one(T))*h
-        z = oz + ((e & _two) - _one)*h
-        return OctantBWG(l,(x,y,z))
-    elseif case == one(T)
-        x = ox  + (_two*(e & _one) - _one)*h
-        y = oy
-        z = oz + ((e & _two) - _one)*h
-        return OctantBWG(l,(x,y,z))
-    elseif case == _two
-        x = ox + (_two*(e & _one) - _one)*h
-        y = oy + ((e & _two) - _one)*h
-        z = oz
-        return OctantBWG(l,(x,y,z))
-    else
-        error("edge case not found")
-    end
+    𝐚 = (e ÷ 4,
+         e < 4 ? 1 : 0,
+         e < 8 ? 2 : 1) 
+    xyz = zeros(T,3)
+    xyz[𝐚[1]+_one] = octant.xyz[𝐚[1]+_one]
+    xyz[𝐚[2]+_one] = octant.xyz[𝐚[2]+_one] + (_two*(e&_one)-_one)*h
+    xyz[𝐚[3]+_one] = octant.xyz[𝐚[3]+_one] + ((e & _two)-_one)*h
+    return  OctantBWG(l,(xyz[1],xyz[2],xyz[3]))
 end
 edge_neighbor(o::OctantBWG{3,N,T1}, e::T2, b::T3) where {N,T1<:Integer,T2<:Integer,T3<:Integer} = edge_neighbor(o,T1(e),T1(b))
 
