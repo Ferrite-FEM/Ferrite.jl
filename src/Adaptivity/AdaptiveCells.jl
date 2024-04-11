@@ -1392,8 +1392,8 @@ transform_face(forest::ForestBWG,f::FaceIndex,oct::OctantBWG) = transform_face(f
     transform_corner(forest,k,c',oct)
     transform_corner(forest,v::VertexIndex,oct)
 
-Algorithm 12 in [BWG2011](@citet) to transform corner into different octree coordinate system
-Note: in Algorithm 12 is c as a argument, but it's never used, therefore I removed it
+Algorithm 12 but with flipped logic in [BWG2011](@citet) to transform corner into different octree coordinate system
+Implements flipped logic in the sense of pushing the Octant `oct` through vertex v and stays within octree coordinate system `k`.
 """
 function transform_corner(forest::ForestBWG,k::T1,c::T1,oct::OctantBWG{dim,N,T2},inside::Bool) where {dim,N,T1<:Integer,T2<:Integer}
     # make a dispatch that returns only the coordinates?
@@ -1405,6 +1405,28 @@ function transform_corner(forest::ForestBWG,k::T1,c::T1,oct::OctantBWG{dim,N,T2}
 end
 
 transform_corner(forest::ForestBWG,v::VertexIndex,oct::OctantBWG) = transform_corner(forest,v[1],v[2],oct)
+
+"""
+    transform_corner_remote(forest,k,c',oct)
+    transform_corner_remote(forest,v::VertexIndex,oct)
+
+Algorithm 12 in [BWG2011](@citet) to transform corner into different octree coordinate system.
+Follows exactly the version of the paper by taking `oct` and looking from the neighbor octree coordinate system (neighboring to `k`,`v`) at `oct`.
+"""
+function transform_corner_remote(forest::ForestBWG,k::T1,c::T1,oct::OctantBWG{dim,N,T2},inside::Bool) where {dim,N,T1<:Integer,T2<:Integer}
+    _perm = dim == 2 ? node_map₂ : node_map₃
+    _perminv = dim == 2 ? node_map₂_inv : node_map₃_inv
+    k′, c′ = forest.topology.vertex_vertex_neighbor[k,_perm[c]][1]
+    c′ = _perminv[c′]
+    # make a dispatch that returns only the coordinates?
+    b = forest.cells[k].b
+    l = oct.l; g = 2^b - 2^(b-l)
+    h⁻ = inside ? 0 : -2^(b-l); h⁺ = inside ? g : 2^b
+    xyz = ntuple(i->((c′-1) & 2^(i-1) == 0) ? h⁻ : h⁺,dim)
+    return OctantBWG(l,xyz)
+end
+
+transform_corner_remote(forest::ForestBWG,v::VertexIndex,oct::OctantBWG) = transform_corner_remote(forest,v[1],v[2],oct)
 
 
 """
