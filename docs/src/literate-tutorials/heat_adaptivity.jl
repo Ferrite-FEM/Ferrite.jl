@@ -160,10 +160,9 @@ function solve_adaptive(initial_grid)
             pvd[i] = vtk
         end
 
-        Ferrite.refine!(grid,cells_to_refine)
-        transfered_grid = Ferrite.creategrid(grid)
+        Ferrite.refine!(grid, cells_to_refine)
         Ferrite.balanceforest!(grid)
-        transfered_grid = Ferrite.creategrid(grid)
+
         i += 1
         if isempty(cells_to_refine)
             finished = true

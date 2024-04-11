@@ -159,14 +159,15 @@ function solve_adaptive(initial_grid)
             vtk_cell_data(vtk, getindex.(collect(Iterators.flatten(σ_gp_sc)),1), "stress sc")
             vtk_cell_data(vtk, error_arr, "error")
         end
+
         Ferrite.refine!(grid,cells_to_refine)
-        transfered_grid = Ferrite.creategrid(grid)
         vtk_grid("unbalanced.vtu", dh) do vtk
         end
+
         Ferrite.balanceforest!(grid)
-        transfered_grid = Ferrite.creategrid(grid)
         vtk_grid("balanced.vtu", dh) do vtk
         end
+
         i += 1
         if isempty(cells_to_refine)
             finished = true
