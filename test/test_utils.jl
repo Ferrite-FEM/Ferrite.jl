@@ -205,7 +205,7 @@ end
 function calculate_facet_area(ip::Union{Lagrange{RefLine}, DiscontinuousLagrange{RefLine}}, x::Vector{<:Vec}, faceindex::Int)
     return one(eltype(eltype(x)))
 end
-function calculate_facte_area(ip::Union{Lagrange{RefQuadrilateral, order}, DiscontinuousLagrange{RefQuadrilateral, order}}, x::Vector{<:Vec}, faceindex::Int) where order
+function calculate_facet_area(ip::Union{Lagrange{RefQuadrilateral, order}, DiscontinuousLagrange{RefQuadrilateral, order}}, x::Vector{<:Vec}, faceindex::Int) where order
     return calculate_volume(Lagrange{RefLine, order}(), x)
 end
 function calculate_facet_area(ip::Union{Lagrange{RefTriangle, order}, DiscontinuousLagrange{RefTriangle, order}}, x::Vector{<:Vec}, faceindex::Int) where order
@@ -217,14 +217,14 @@ end
 function calculate_facet_area(ip::Serendipity{RefQuadrilateral, order}, x::Vector{<:Vec}, faceindex::Int) where order
     return calculate_volume(Lagrange{RefLine, order}(), x)
 end
-function calculate_face_area(p::Union{Lagrange{RefTetrahedron, order}, DiscontinuousLagrange{RefTetrahedron, order}}, x::Vector{<:Vec}, faceindex::Int) where order
+function calculate_facet_area(p::Union{Lagrange{RefTetrahedron, order}, DiscontinuousLagrange{RefTetrahedron, order}}, x::Vector{<:Vec}, faceindex::Int) where order
     return calculate_volume(Lagrange{RefTriangle, order}(), x)
 end
 function calculate_facet_area(p::Union{Lagrange{RefPrism, order}, DiscontinuousLagrange{RefPrism, order}}, x::Vector{<:Vec}, faceindex::Int) where order
     faceindex ∈ [1,5] && return calculate_volume(Lagrange{RefTriangle, order}(), x)
     return calculate_volume(Lagrange{RefQuadrilateral, order}(), x)
 end
-function calculate_face_area(p::Union{Lagrange{RefPyramid, order}, DiscontinuousLagrange{RefPyramid, order}}, x::Vector{<:Vec}, faceindex::Int) where order
+function calculate_facet_area(p::Union{Lagrange{RefPyramid, order}, DiscontinuousLagrange{RefPyramid, order}}, x::Vector{<:Vec}, faceindex::Int) where order
     faceindex != 1 && return calculate_volume(Lagrange{RefTriangle, order}(), x)
     return calculate_volume(Lagrange{RefQuadrilateral, order}(), x)
 end

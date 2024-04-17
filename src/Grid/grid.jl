@@ -47,7 +47,10 @@ getrefshape(::AbstractCell{refshape}) where refshape = refshape
 nvertices(c::AbstractCell) = length(vertices(c))
 nedges(   c::AbstractCell) = length(edges(c))
 nfaces(   c::AbstractCell) = length(faces(c))
+nvertices(   ::Type{T}) where {T <: AbstractRefShape} = length(reference_vertices(T))
+nedges(   ::Type{T}) where {T <: AbstractRefShape} = length(reference_edges(T))
 nfaces(   ::Type{T}) where {T <: AbstractRefShape} = length(reference_faces(T))
+nfacets(   ::Type{T}) where {T <: AbstractRefShape} = length(reference_facets(T))
 nnodes(   c::AbstractCell) = length(get_node_ids(c))
 
 """
@@ -97,24 +100,6 @@ Note that the vertices are sufficient to define a face uniquely.
 """
 faces(::AbstractCell)
 
-function faces(c::AbstractCell{refshape}) where refshape
-    ns = get_node_ids(c)
-    rfs = reference_faces(refshape)
-    return ntuple(i -> getindex.(Ref(ns), rfs[i]), nfaces(refshape))::typeof(rfs)
-end
-
-function edges(c::AbstractCell{refshape}) where refshape
-    ns = get_node_ids(c)
-    rfs = reference_edges(refshape)
-    return ntuple(i -> getindex.(Ref(ns), rfs[i]), nedges(refshape))::typeof(rfs)
-end
-
-function vertices(c::AbstractCell{refshape}) where refshape
-    ns = get_node_ids(c)
-    rfs = reference_vertices(refshape)
-    return ntuple(i -> getindex.(Ref(ns), rfs[i]), nvertices(refshape))::typeof(rfs)
-end
-
 """
     Ferrite.default_interpolation(::AbstractCell)::Interpolation
 
@@ -131,61 +116,89 @@ Default implementation: `c.nodes`.
 """
 get_node_ids(c::AbstractCell) = c.nodes
 
-refernce_facets(c::AbstractCell{<:AbstractRefShape{1}}) = reference_vertices(c)
-refernce_facets(c::AbstractCell{<:AbstractRefShape{2}}) = reference_edges(c)
-refernce_facets(c::AbstractCell{<:AbstractRefShape{3}}) = reference_faces(c)
-
 # Default implementations of vertices/edges/faces that work as long as get_node_ids is
 # correctly implemented for the cell.
 
 # RefLine (refdim = 1): vertices for vertexdofs, faces for BC
-function reference_vertices(c::AbstractCell{RefLine})
-    return (1, 2) # v1, v2
+function vertices(c::AbstractCell{RefLine})
+    ns = get_node_ids(c)
+    return (ns[1], ns[2]) # v1, v2
 end
-function reference_edges(::Type{RefLine})
-    return ((1, 2),)
+function edges(c::AbstractCell{RefLine})
+    ns = get_node_ids(c)
+    return ((ns[1],ns[2]),) # f1, f2
 end
-function reference_faces(c::AbstractCell{RefLine})
-    return () 
+function faces(c::AbstractCell{RefLine})
+    #ns = get_node_ids(c)
+    return () # f1, f2
+end
+function reference_vertices(::Type{RefLine})
+    return ((1,), (2,)) # f1, f2
 end
 
 # RefTriangle (refdim = 2): vertices for vertexdofs, faces for facedofs (edgedofs) and BC
-function reference_vertices(c::AbstractCell{RefTriangle})
-    return (1,2,3) # v1, v2, v3
+function vertices(c::AbstractCell{RefTriangle})
+    ns = get_node_ids(c)
+    return (ns[1], ns[2], ns[3]) # v1, v2, v3
+end
+function edges(c::AbstractCell{RefTriangle})
+    ns = get_node_ids(c)
+    return (
+        (ns[1], ns[2]), (ns[2], ns[3]), (ns[3], ns[1]), # f1, f2, f3
+    )
+end
+function faces(c::AbstractCell{RefTriangle})
+    ns = get_node_ids(c)
+    return (
+        (ns[1], ns[2], ns[3]), # f1
+    )
 end
 function reference_edges(::Type{RefTriangle})
     return (
         (1, 2), (2, 3), (3, 1), # f1, f2, f3
     )
 end
-function reference_faces(c::AbstractCell{RefTriangle})
-    return ((1, 2, 3),) 
-end
 
 # RefQuadrilateral (refdim = 2): vertices for vertexdofs, faces for facedofs (edgedofs) and BC
-function reference_vertices(c::AbstractCell{RefQuadrilateral})
-    return (1, 2, 3, 4) # v1, v2, v3, v4
+function vertices(c::AbstractCell{RefQuadrilateral})
+    ns = get_node_ids(c)
+    return (ns[1], ns[2], ns[3], ns[4]) # v1, v2, v3, v4
+end
+function edges(c::AbstractCell{RefQuadrilateral})
+    ns = get_node_ids(c)
+    return (
+        (ns[1], ns[2]), (ns[2], ns[3]), (ns[3], ns[4]), (ns[4], ns[1]), # f1, f2, f3, f4
+    )
+end
+function faces(c::AbstractCell{RefQuadrilateral})
+    ns = get_node_ids(c)
+    return (
+        (ns[1], ns[2], ns[3], ns[4]), # f1
+    )
 end
 function reference_edges(::Type{RefQuadrilateral})
     return (
         (1, 2), (2, 3), (3, 4), (4, 1), # f1, f2, f3, f4
     )
 end
-function references_faces(c::AbstractCell{RefQuadrilateral})
-    return (
-        (1, 2, 3, 4), 
-    )
-end
 
 # RefTetrahedron (refdim = 3): vertices for vertexdofs, edges for edgedofs, faces for facedofs and BC
-function references_vertices(c::AbstractCell{RefTetrahedron})
+function vertices(c::AbstractCell{RefTetrahedron})
     ns = get_node_ids(c)
-    return (1,2,3,4)# v1, v2, v3, v4
+    return (ns[1], ns[2], ns[3], ns[4]) # v1, v2, v3, v4
 end
-function reference_edges(c::AbstractCell{RefTetrahedron})
+function edges(c::AbstractCell{RefTetrahedron})
+    ns = get_node_ids(c)
     return (
-        (1, 2), (2, 3), (3, 1), # e1, e2, e3
-        (1, 4), (2, 4), (3, 4), # e4, e5, e6
+        (ns[1], ns[2]), (ns[2], ns[3]), (ns[3], ns[1]), # e1, e2, e3
+        (ns[1], ns[4]), (ns[2], ns[4]), (ns[3], ns[4]), # e4, e5, e6
+    )
+end
+function faces(c::AbstractCell{RefTetrahedron})
+    ns = get_node_ids(c)
+    return (
+        (ns[1], ns[3], ns[2]), (ns[1], ns[2], ns[4]), # f1, f2
+        (ns[2], ns[3], ns[4]), (ns[1], ns[4], ns[3]), # f3, f4
     )
 end
 function reference_faces(::Type{RefTetrahedron})
@@ -196,10 +209,10 @@ function reference_faces(::Type{RefTetrahedron})
 end
 
 # RefHexahedron (refdim = 3): vertices for vertexdofs, edges for edgedofs, faces for facedofs and BC
-function references_vertices(c::AbstractCell{RefHexahedron})
+function vertices(c::AbstractCell{RefHexahedron})
     ns = get_node_ids(c)
     return (
-       1, 2, 3, 4, 5, 6, 7, 8, # v1, ..., v8
+        ns[1], ns[2], ns[3], ns[4], ns[5], ns[6], ns[7], ns[8], # v1, ..., v8
     )
 end
 function edges(c::AbstractCell{RefHexahedron})
@@ -208,6 +221,14 @@ function edges(c::AbstractCell{RefHexahedron})
         (ns[1], ns[2]), (ns[2], ns[3]), (ns[3], ns[4]), (ns[4], ns[1]), # e1, e2, e3, e4
         (ns[5], ns[6]), (ns[6], ns[7]), (ns[7], ns[8]), (ns[8], ns[5]), # e5, e6, e7, e8
         (ns[1], ns[5]), (ns[2], ns[6]), (ns[3], ns[7]), (ns[4], ns[8]), # e9, e10, e11, e12
+    )
+end
+function faces(c::AbstractCell{RefHexahedron})
+    ns = get_node_ids(c)
+    return (
+        (ns[1], ns[4], ns[3], ns[2]), (ns[1], ns[2], ns[6], ns[5]), # f1, f2
+        (ns[2], ns[3], ns[7], ns[6]), (ns[3], ns[4], ns[8], ns[7]), # f3, f4
+        (ns[1], ns[5], ns[8], ns[4]), (ns[5], ns[6], ns[7], ns[8]), # f5, f6
     )
 end
 function reference_faces(::Type{RefHexahedron})
@@ -231,6 +252,14 @@ function edges(c::AbstractCell{RefPrism})
         (ns[6], ns[5]),                                                 # e9
     )
 end
+function faces(c::AbstractCell{RefPrism})
+    ns = get_node_ids(c)
+    return (
+        (ns[1], ns[3], ns[2]),        (ns[1], ns[2], ns[5], ns[4]), # f1, f2
+        (ns[3], ns[1], ns[4], ns[6]), (ns[2], ns[3], ns[6], ns[5]), # f3, f4
+        (ns[4], ns[5], ns[6]),                                      # f5
+    )
+end
 function reference_faces(::Type{RefPrism})
     return (
         (1, 3, 2),    (1, 2, 5, 4), # f1, f2
@@ -249,6 +278,14 @@ function edges(c::AbstractCell{RefPyramid})
     return (
         (ns[1], ns[2]), (ns[1], ns[3]), (ns[1], ns[5]), (ns[2], ns[4]), 
         (ns[2], ns[5]), (ns[4], ns[3]), (ns[3], ns[5]), (ns[4], ns[5]), 
+    )
+end
+function faces(c::AbstractCell{RefPyramid})
+    ns = get_node_ids(c)
+    return (
+        (ns[1], ns[3], ns[4], ns[2]), (ns[1], ns[2], ns[5]), 
+        (ns[1], ns[5], ns[3]), (ns[2], ns[4], ns[5]), 
+        (ns[3], ns[5], ns[4]),                                      
     )
 end
 function reference_faces(::Type{RefPyramid})
@@ -504,19 +541,40 @@ getfacetsets(grid::AbstractGrid{2}) = grid.edgesets
 getfacetsets(grid::AbstractGrid{3}) = grid.facesets
 
 #Backwards compat
-@inline getfacesets(grid::AbstractGrid{2}) = grid.edgesets
-@inline getfaceset(grid::AbstractGrid{2}, setname::String) = grid.edgesets[setname]
-@inline addfaceset!(grid::AbstractGrid{2}, name::String, f::Function; all::Bool=true) = addedgeset!(grid, name, f; all)
-@inline addfaceset!(grid::AbstractGrid{2}, name::String, set::Union{Set{EdgeIndex},Vector{EdgeIndex}}) = addedgeset!(grid, name, set)
+@inline getfacesets(grid::AbstractGrid{2}) = grid.egdeset
+function getfaceset(grid::AbstractGrid{2}, setname::String) 
+    @warn("getfaceset for 2d-problems have been deprecated. Use getfacetset instead")
+    grid.edgesets[setname]
+end
+function addfaceset!(grid::AbstractGrid{2}, name::String, f::Function; all::Bool=true) 
+    @warn("addfaceset! for 2d-problems have been deprecated. Use getfacetset instead")
+    addedgeset!(grid, name, f; all)
+end
+function addfaceset!(grid::AbstractGrid{2}, name::String, set::Union{Set{EdgeIndex},Vector{EdgeIndex}}) 
+    @warn("addfaceset! for 2d-problems have been deprecated. Use getfacetset instead")
+    addedgeset!(grid, name, set)
+end
 
 @inline getfacesets(grid::AbstractGrid{1}) = grid.vertexsets
-@inline getfaceset(grid::AbstractGrid{1}, setname::String) = grid.vertexsets[setname]
-@inline addfaceset!(grid::AbstractGrid{1}, name::String, f::Function; all::Bool=true) = addvertexset!(grid, name, f; all)
-@inline addfaceset!(grid::AbstractGrid{1}, name::String, set::Union{Set{VertexIndex},Vector{VertexIndex}}) = addvertexset!(grid, name, set)
+function getfaceset(grid::AbstractGrid{1}, setname::String) 
+    @warn("getfaceset for 1d-problems have been deprecated. Use getfacetset instead")
+    grid.vertexsets[setname]
+end
+function addfaceset!(grid::AbstractGrid{1}, name::String, f::Function; all::Bool=true) 
+    @warn("addfaceset! for 1d-problems have been deprecated. Use getfacetset instead")
+     addvertexset!(grid, name, f; all)
+end
+function addfaceset!(grid::AbstractGrid{1}, name::String, set::Union{Set{VertexIndex},Vector{VertexIndex}}) 
+    addvertexset!(grid, name, set)
+end
 
 @inline facets(c::AbstractCell{<:AbstractRefShape{1}}) = vertices(c)
 @inline facets(c::AbstractCell{<:AbstractRefShape{2}}) = edges(c)
 @inline facets(c::AbstractCell{<:AbstractRefShape{3}}) = faces(c)
+
+@inline reference_facets(c::Type{<:AbstractRefShape{1}}) = reference_vertices(c)
+@inline reference_facets(c::Type{<:AbstractRefShape{2}}) = reference_edges(c)
+@inline reference_facets(c::Type{<:AbstractRefShape{3}}) = reference_faces(c)
 
 # Transformations
 """

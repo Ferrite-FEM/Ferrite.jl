@@ -83,13 +83,13 @@ struct InterpolationInfo
     n_copies::Int
     is_discontinuous::Bool
 end
-function InterpolationInfo(interpolation::Interpolation, n_copies)
+function InterpolationInfo(interpolation::Interpolation{shape}, n_copies) where {rdim, shape<:AbstractRefShape{rdim}}
     InterpolationInfo(
         [length(i) for i ∈ vertexdof_indices(interpolation)],
         [length(i) for i ∈ edgedof_interior_indices(interpolation)],
         [length(i) for i ∈ facedof_interior_indices(interpolation)],
         length(celldof_interior_indices(interpolation)),
-        3,
+        rdim,
         adjust_dofs_during_distribution(interpolation),
         n_copies,
         is_discontinuous(interpolation)

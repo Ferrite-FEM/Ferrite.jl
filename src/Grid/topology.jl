@@ -328,12 +328,12 @@ end
 Creates an iterateable face skeleton. The skeleton consists of `FaceIndex` that can be used to `reinit`
 `FaceValues`.
 """
-function _faceskeleton(top::ExclusiveTopology, grid::Grid{3})
+function _faceskeleton(top::ExclusiveTopology, grid::Grid)
     cells = getcells(grid)
     cell_dim = getdim(first(cells))
     @assert all(cell -> getdim(cell) == cell_dim, cells) "Face skeleton construction requires all the elements to be of the same dimensionality"
     i = 1
-    neighborhood = cell_dim == 1 ? top.vertex_vertex_neighbor : top.face_face_neighbor
+    neighborhood = top.face_face_neighbor
     face_skeleton_local = Array{FaceIndex}(undef, length(neighborhood) - count(neighbors -> !isempty(neighbors) , neighborhood) ÷ 2)
     for (idx, face) in pairs(neighborhood)
         isempty(face.neighbor_info) || face.neighbor_info[][1] > idx[1] || continue
@@ -343,7 +343,10 @@ function _faceskeleton(top::ExclusiveTopology, grid::Grid{3})
     return face_skeleton_local
 end
 
-function _edgeskeleton(top::ExclusiveTopology, grid::Grid{2})
+function _edgeskeleton(top::ExclusiveTopology, grid::Grid)
+    cells = getcells(grid)
+    cell_dim = getdim(first(cells))
+    @assert all(cell -> getdim(cell) == cell_dim, cells) "Edge skeleton construction requires all the elements to be of the same dimensionality"
     face_skeleton_global = Set{NTuple}()
     face_skeleton_local = Vector{EdgeIndex}()
     fs_length = length(face_skeleton_global)
@@ -366,6 +369,15 @@ end
 Creates an iterateable face skeleton. The skeleton consists of `FaceIndex` that can be used to `reinit`
 `FaceValues`.
 """
+function faceskeleton(top::ExclusiveTopology, grid::Grid)
+    if top.face_skeleton === nothing
+        top.face_skeleton = _faceskeleton(top, grid)
+    end
+    return top.face_skeleton
+end
+
+facetskeleton(top::ExclusiveTopology, grid::Grid{3}) = faceskeleton(top, grid)
+
 function facetskeleton(top::ExclusiveTopology, grid::Grid{2})
     if top.edge_skeleton === nothing
         top.edge_skeleton = _edgeskeleton(top, grid)

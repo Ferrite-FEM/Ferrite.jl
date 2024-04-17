@@ -38,7 +38,7 @@ faces indices, weights and points are passed separately.
 """
 function create_face_quad_rule(::Type{RefShape}, w::Vector{T}, p::Vector{Vec{N, T}}) where {N, T, RefShape <: AbstractRefShape}
     face_quad_rule = QuadratureRule{RefShape, T, getdim(AbstractCell{RefShape})}[]
-    for face in 1:nfaces(RefShape)
+    for face in 1:nfacets(RefShape)
         new_points = [face_to_element_transformation(p[i], RefShape, face) for i in 1:length(w)]
         push!(face_quad_rule, QuadratureRule{RefShape, T}(w, new_points))
     end

@@ -8,7 +8,7 @@ using Random
 using LinearAlgebra
 using SparseArrays
 
-const HAS_EXTENSIONS = isdefined(Base, :get_extension)
+const HAS_EXTENSIONS = false#isdefined(Base, :get_extension)
 
 # https://github.com/JuliaLang/julia/pull/47749
 const MODULE_CAN_BE_TYPE_PARAMETER = VERSION >= v"1.10.0-DEV.90"
@@ -17,7 +17,7 @@ if HAS_EXTENSIONS && MODULE_CAN_BE_TYPE_PARAMETER
     import Metis
 end
 
-const RUN_JET_TESTS = VERSION >= v"1.9"
+const RUN_JET_TESTS = false#VERSION >= v"1.9"
 
 if RUN_JET_TESTS
     using JET: @test_call

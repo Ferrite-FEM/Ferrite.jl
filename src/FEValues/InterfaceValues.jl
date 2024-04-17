@@ -425,8 +425,8 @@ Return the relative orientation info for face B with regards to face A.
 Relative orientation is computed using a [`OrientationInfo`](@ref) for each side of the interface.
 """
 function InterfaceOrientationInfo(cell_a::AbstractCell{RefShapeA}, cell_b::AbstractCell{RefShapeB}, face_a::Int, face_b::Int) where {RefShapeA <: AbstractRefShape, RefShapeB <: AbstractRefShape}
-    OI_a = OrientationInfo(faces(cell_a)[face_a])
-    OI_b = OrientationInfo(faces(cell_b)[face_b])
+    OI_a = OrientationInfo(facets(cell_a)[face_a])
+    OI_b = OrientationInfo(facets(cell_b)[face_b])
     flipped = OI_a.flipped != OI_b.flipped
     shift_index = OI_b.shift_index - OI_a.shift_index
     return InterfaceOrientationInfo{RefShapeA, RefShapeB}(flipped, shift_index, OI_b.shift_index, face_a, face_b)
@@ -448,7 +448,7 @@ get_transformation_matrix
 
 function get_transformation_matrix(interface_transformation::InterfaceOrientationInfo{RefShapeA}) where RefShapeA <: AbstractRefShape{3}
     face_a = interface_transformation.face_a
-    facenodes = reference_faces(RefShapeA)[face_a]
+    facenodes = reference_facets(RefShapeA)[face_a]
     _get_transformation_matrix(facenodes, interface_transformation)
 end
 

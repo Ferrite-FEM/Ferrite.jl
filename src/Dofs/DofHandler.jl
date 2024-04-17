@@ -707,9 +707,6 @@ For more details we refer to [1] as we follow the methodology described therein.
     !!!TODO Investigate if we can somehow pass the interpolation into this function in a typestable way.
 """
 @inline function permute_and_push!(cell_dofs::Vector{Int}, dofs::StepRange{Int,Int}, orientation::SurfaceOrientationInfo, adjust_during_distribution::Bool)
-    if adjust_during_distribution && length(dofs) > 1
-        error("Dof distribution for interpolations with multiple dofs per face not implemented yet.")
-    end
     n_copies = step(dofs)
     @assert n_copies > 0
     for dof in dofs

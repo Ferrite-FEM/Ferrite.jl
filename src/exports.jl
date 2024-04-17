@@ -77,6 +77,7 @@ export
     ExclusiveTopology,
     getneighborhood,
     faceskeleton,
+    facetskeleton,
     vertex_star_stencils,
     getstencil,
     getcells,
@@ -89,6 +90,7 @@ export
     getfaceset,
     getedgeset,
     getvertexset,
+    getfacetset,
     get_node_coordinate,
     getcoordinates,
     getcoordinates!,
@@ -102,6 +104,7 @@ export
     addvertexset!,
     addboundaryvertexset!,
     addcellset!,
+    addfacetset!,
     transform_coordinates!,
     generate_grid,
 

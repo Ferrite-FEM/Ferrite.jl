@@ -72,8 +72,8 @@
                 ccoords = getcoordinates(grid, cellid)
                 Vec_t = Vec{dim,Float64}
                 Vec_face_t = Vec{dim-1,Float64}
-                for lfaceid in nfaces(refshape)
-                    facenodes = Ferrite.faces(cell)[lfaceid]
+                for lfaceid in Ferrite.nfacets(refshape)
+                    facenodes = Ferrite.facets(cell)[lfaceid]
                     fcoords = zeros(Vec_t, length(facenodes))
                     for (i,nodeid) in enumerate(facenodes)
                         x = grid.nodes[nodeid].x
