@@ -68,7 +68,7 @@ function _print_field_information(io::IO, sdh::SubDofHandler)
 end
 
 """
-    DofHandler(grid::Grid)
+    DofHandler(grid::AbstractGrid)
 
 Construct a `DofHandler` based on `grid`. Supports:
 - `Grid`s with or without concrete element type (E.g. "mixed" grids with several different element types.)
@@ -85,12 +85,25 @@ struct DofHandler{dim,G<:AbstractGrid{dim}} <: AbstractDofHandler
     closed::ScalarWrapper{Bool}
     grid::G
     ndofs::ScalarWrapper{Int}
+    # Maps from entity to dofs
+    # `vertexdict` keeps track of the visited vertices. The first dof added to vertex v is
+    # stored in vertexdict[v].
+    vertexdicts::Vector{Vector{Int}}
+    # `edgedict` keeps track of the visited edges, this will only be used for a 3D problem.
+    # An edge is uniquely determined by two global vertices, with global direction going
+    # from low to high vertex number.
+    edgedicts::Vector{Dict{Tuple{Int,Int}, Int}}
+    # `facedict` keeps track of the visited faces. We only need to store the first dof we
+    # add to the face since currently more dofs per face isn't supported. In
+    # 2D a face (i.e. a line) is uniquely determined by 2 vertices, and in 3D a face (i.e. a
+    # surface) is uniquely determined by 3 vertices.
+    facedicts::Vector{Dict{NTuple{dim,Int}, Int}}
 end
 
 function DofHandler(grid::G) where {dim, G <: AbstractGrid{dim}}
     ncells = getncells(grid)
     sdhs = SubDofHandler{DofHandler{dim, G}}[]
-    DofHandler{dim, G}(sdhs, Symbol[], Int[], zeros(Int, ncells), zeros(Int, ncells), ScalarWrapper(false), grid, ScalarWrapper(-1))
+    DofHandler{dim, G}(sdhs, Symbol[], Int[], zeros(Int, ncells), zeros(Int, ncells), ScalarWrapper(false), grid, ScalarWrapper(-1), [Int[]], Dict{Tuple{Int,Int}}[], Dict{NTuple{dim,Int}}[])
 end
 
 function Base.show(io::IO, ::MIME"text/plain", dh::DofHandler)
@@ -300,23 +313,16 @@ function __close!(dh::DofHandler{dim}) where {dim}
     end
     numfields = length(dh.field_names)
 
-    # NOTE: Maybe it makes sense to store *Index in the dicts instead.
+    resize!(dh.vertexdicts, numfields)
+    resize!(dh.edgedicts, numfields)
+    resize!(dh.facedicts, numfields)
 
-    # `vertexdict` keeps track of the visited vertices. The first dof added to vertex v is
-    # stored in vertexdict[v].
-    # TODO: No need to allocate this vector for fields that don't have vertex dofs
-    vertexdicts = [zeros(Int, getnnodes(get_grid(dh))) for _ in 1:numfields]
-
-    # `edgedict` keeps track of the visited edges, this will only be used for a 3D problem.
-    # An edge is uniquely determined by two global vertices, with global direction going
-    # from low to high vertex number.
-    edgedicts = [Dict{Tuple{Int,Int}, Int}() for _ in 1:numfields]
-
-    # `facedict` keeps track of the visited faces. We only need to store the first dof we
-    # add to the face since currently more dofs per face isn't supported. In
-    # 2D a face (i.e. a line) is uniquely determined by 2 vertices, and in 3D a face (i.e. a
-    # surface) is uniquely determined by 3 vertices.
-    facedicts = [Dict{NTuple{dim,Int}, Int}() for _ in 1:numfields]
+    nnodes = getnnodes(get_grid(dh))
+    for fi in 1:numfields
+        dh.vertexdicts[fi] = zeros(Int, nnodes)
+        dh.edgedicts[fi] = Dict{Tuple{Int,Int}, Int}()
+        dh.facedicts[fi] = Dict{NTuple{dim,Int}, Int}()
+    end
 
     # Set initial values
     nextdof = 1  # next free dof to distribute
@@ -328,15 +334,15 @@ function __close!(dh::DofHandler{dim}) where {dim}
             sdh,
             sdhi, # TODO: Store in the SubDofHandler?
             nextdof,
-            vertexdicts,
-            edgedicts,
-            facedicts,
+            dh.vertexdicts,
+            dh.edgedicts,
+            dh.facedicts,
         )
     end
     dh.ndofs[] = maximum(dh.cell_dofs; init=0)
     dh.closed[] = true
 
-    return dh, vertexdicts, edgedicts, facedicts
+    return dh, dh.vertexdicts, dh.edgedicts, dh.facedicts
 
 end
 

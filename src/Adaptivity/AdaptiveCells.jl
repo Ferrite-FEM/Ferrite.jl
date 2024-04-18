@@ -671,13 +671,12 @@ function creategrid(forest::ForestBWG{dim,C,T}) where {dim,C,T}
 
     # Phase 5: Generate grid and haning nodes
     facesets = reconstruct_facesets(forest) #TODO edge, node and cellsets
-    grid = Grid(cells,nodes_physical .|> Node, facesets=facesets)
     hnodes = hangingnodes(forest, nodeids, nodeowners)
     hnodes_dedup = Dict{Int64, Vector{Int64}}()
     for (constrained,constainers) in hnodes
         hnodes_dedup[nodeids_dedup[constrained]] = [nodeids_dedup[constainer] for constainer in constainers]
     end
-    return grid, hnodes_dedup
+    return NonConformingGrid(cells, nodes_physical .|> Node, facesets=facesets, conformity_info=hnodes_dedup)
 end
 
 function reconstruct_facesets(forest::ForestBWG{dim}) where dim

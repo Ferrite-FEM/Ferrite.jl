@@ -38,8 +38,7 @@ function L2Projector(
         grid::AbstractGrid;
         qr_lhs::QuadratureRule = _mass_qr(func_ip),
         set = 1:getncells(grid),
-        geom_ip::Interpolation = default_interpolation(getcelltype(grid, first(set))),
-        hnodes=nothing,
+        geom_ip::Interpolation = default_interpolation(getcelltype(grid, first(set)))
     )
 
     # TODO: Maybe this should not be allowed? We always assume to project scalar entries.
@@ -55,14 +54,11 @@ function L2Projector(
     dh = DofHandler(grid)
     sdh = SubDofHandler(dh, Set(set))
     add!(sdh, :_, func_ip) # we need to create the field, but the interpolation is not used here
-    dh, vdict, _ = __close!(dh)
+    close!(dh)
 
     ch_hanging = ConstraintHandler(dh)
-    if hnodes !== nothing
-        for (hdof,mdof) in hnodes
-            lc = AffineConstraint(vdict[1][hdof],[vdict[1][m] => 0.5 for m in mdof],0.0)
-            add!(ch_hanging,lc)
-        end
+    if grid isa NonConformingGrid
+        add!(ch_hanging, ConformityConstraint(:_))
     end
     close!(ch_hanging);
     M = _assemble_L2_matrix(fe_values_mass, set, dh, ch_hanging)  # the "mass" matrix

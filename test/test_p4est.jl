@@ -205,9 +205,9 @@ end
     @test Ferrite.transform_face(adaptive_grid, FaceIndex(4,1), o) == OctantBWG(0,(-8,0))
     @test Ferrite.transform_face(adaptive_grid, FaceIndex(4,3), o) == OctantBWG(0,(0,-8))
 
-    (grid_new, hnodes) = Ferrite.creategrid(adaptive_grid)
+    grid_new = Ferrite.creategrid(adaptive_grid)
     @test length(grid_new.nodes) == 9
-    @test length(hnodes) == 0
+    @test length(grid_new.conformity_info) == 0
 
     grid.cells[4] = Quadrilateral((grid.cells[4].nodes[2], grid.cells[4].nodes[3], grid.cells[4].nodes[4], grid.cells[4].nodes[1]))
     grid.cells[4] = Quadrilateral((grid.cells[4].nodes[2], grid.cells[4].nodes[3], grid.cells[4].nodes[4], grid.cells[4].nodes[1]))
@@ -290,9 +290,9 @@ end
     @test Ferrite.transform_face(adaptive_grid, FaceIndex(3,3), adaptive_grid.cells[1].leaves[6]) == OctantBWG(1,(0,-4))
     @test Ferrite.transform_face(adaptive_grid, FaceIndex(3,3), adaptive_grid.cells[1].leaves[7]) == OctantBWG(1,(4,-4))
 
-    (grid_new, hnodes) = Ferrite.creategrid(adaptive_grid)
+    grid_new = Ferrite.creategrid(adaptive_grid)
     @test length(grid_new.nodes) == 19
-    @test length(hnodes) == 4
+    @test length(grid_new.conformity_info) == 4
 
     # octree holds now 3 first level and 4 second level
     @test length(adaptive_grid.cells[1].leaves) == 7
@@ -329,9 +329,9 @@ end
     @test Ferrite.transform_face(adaptive_grid, FaceIndex(3,3), adaptive_grid.cells[1].leaves[6]) == OctantBWG(2,(4,-2))
     @test Ferrite.transform_face(adaptive_grid, FaceIndex(3,3), adaptive_grid.cells[1].leaves[7]) == OctantBWG(2,(6,-2))
 
-    (grid_new, hnodes) = Ferrite.creategrid(adaptive_grid)
+    grid_new = Ferrite.creategrid(adaptive_grid)
     @test length(grid_new.nodes) == 19
-    @test length(hnodes) == 4
+    @test length(grid_new.conformity_info) == 4
 
     # more complex neighborhoods
     grid = Ferrite.generate_simple_disc_grid(Quadrilateral, 6)
@@ -340,9 +340,9 @@ end
     Ferrite.refine!(adaptive_grid.cells[3],adaptive_grid.cells[3].leaves[1])
     Ferrite.refine!(adaptive_grid.cells[5],adaptive_grid.cells[5].leaves[1])
 
-    (grid_new, hnodes) = Ferrite.creategrid(adaptive_grid)
+    grid_new = Ferrite.creategrid(adaptive_grid)
     @test length(grid_new.nodes) == 23
-    @test length(hnodes) == 4
+    @test length(grid_new.conformity_info) == 4
 
     ##################################################################
     ####uniform refinement and coarsening for all cells and levels####

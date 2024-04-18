@@ -128,6 +128,7 @@ export
     collect_periodic_faces!,
     PeriodicFacePair,
     AffineConstraint,
+    ConformityConstraint,
     update!,
     apply!,
     apply_rhs!,
