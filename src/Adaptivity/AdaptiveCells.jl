@@ -638,7 +638,7 @@ function creategrid(forest::ForestBWG{dim,C,T}) where {dim,C,T}
         end
         if dim > 2
             #TODO add egde duplication check
-            @error "Edge deduplication not implemented yet."
+            #@error "Edge deduplication not implemented yet."
         end
     end
 
@@ -680,6 +680,8 @@ function creategrid(forest::ForestBWG{dim,C,T}) where {dim,C,T}
 end
 
 function reconstruct_facesets(forest::ForestBWG{dim}) where dim
+    _perm = dim == 2 ? 𝒱₂_perm : 𝒱₃_perm
+    _perm_inv = dim == 2 ? 𝒱₂_perm_inv : 𝒱₃_perm_inv
     new_facesets = typeof(forest.facesets)()
     for (facesetname, faceset) in forest.facesets
         new_faceset = typeof(faceset)()
@@ -687,11 +689,11 @@ function reconstruct_facesets(forest::ForestBWG{dim}) where dim
             pivot_tree = forest.cells[faceidx[1]]
             last_cellid = faceidx[1] != 1 ? sum(length,@view(forest.cells[1:(faceidx[1]-1)])) : 0
             pivot_faceid = faceidx[2]
-            pivot_face = faces(root(dim),pivot_tree.b)[𝒱₂_perm_inv[pivot_faceid]]
+            pivot_face = faces(root(dim),pivot_tree.b)[_perm_inv[pivot_faceid]]
             for (leaf_idx,leaf) in enumerate(pivot_tree.leaves)
                 for (leaf_face_idx,leaf_face) in enumerate(faces(leaf,pivot_tree.b))
                     if contains_face(pivot_face,leaf_face)
-                        ferrite_leaf_face_idx = 𝒱₂_perm[leaf_face_idx]
+                        ferrite_leaf_face_idx = _perm[leaf_face_idx]
                         push!(new_faceset,FaceIndex(last_cellid+leaf_idx,ferrite_leaf_face_idx))
                     end
                 end

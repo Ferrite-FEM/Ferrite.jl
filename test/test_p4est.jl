@@ -548,3 +548,66 @@ end
     Ferrite.balanceforest!(adaptive_grid)
     @test Ferrite.getncells(adaptive_grid) == 19
 end
+
+@testset "Materializing Grid" begin
+    #################################################
+    ############ structured 2D examples #############
+    #################################################
+    
+    # 2D case with a single tree
+    grid = generate_grid(Quadrilateral,(1,1))
+    adaptive_grid = ForestBWG(grid,3)
+    Ferrite.refine_all!(adaptive_grid,1)
+    Ferrite.refine!(adaptive_grid.cells[1],adaptive_grid.cells[1].leaves[1])
+    Ferrite.refine!(adaptive_grid.cells[1],adaptive_grid.cells[1].leaves[1])
+    transfered_grid = Ferrite.creategrid(adaptive_grid)
+    @test length(transfered_grid.cells) == 10
+    @test length(transfered_grid.nodes) == 19
+    @test unique(transfered_grid.nodes) == transfered_grid.nodes
+
+    #2D case with four trees and somewhat refinement pattern
+    grid = generate_grid(Quadrilateral,(2,2))
+    adaptive_grid = ForestBWG(grid,3)
+    Ferrite.refine_all!(adaptive_grid,1)
+    Ferrite.refine!(adaptive_grid.cells[1],adaptive_grid.cells[1].leaves[1])
+    Ferrite.refine!(adaptive_grid.cells[1],adaptive_grid.cells[1].leaves[1])
+    transfered_grid = Ferrite.creategrid(adaptive_grid)
+    @test length(transfered_grid.cells) == 22
+    @test length(transfered_grid.nodes) == 35
+    @test unique(transfered_grid.nodes) == transfered_grid.nodes
+
+    #more random refinement
+    grid = generate_grid(Quadrilateral,(3,3))
+    adaptive_grid = ForestBWG(grid,3)
+    Ferrite.refine!(adaptive_grid.cells[1],adaptive_grid.cells[1].leaves[1])
+    Ferrite.refine!(adaptive_grid.cells[1],adaptive_grid.cells[1].leaves[1])
+    Ferrite.refine!(adaptive_grid.cells[1],adaptive_grid.cells[1].leaves[1])
+    Ferrite.refine!(adaptive_grid.cells[3],adaptive_grid.cells[3].leaves[1])
+    Ferrite.refine!(adaptive_grid.cells[3],adaptive_grid.cells[3].leaves[2])
+    Ferrite.refine!(adaptive_grid.cells[3],adaptive_grid.cells[3].leaves[3])
+    Ferrite.refine!(adaptive_grid.cells[7],adaptive_grid.cells[7].leaves[1])
+    Ferrite.refine!(adaptive_grid.cells[7],adaptive_grid.cells[7].leaves[3])
+    Ferrite.refine!(adaptive_grid.cells[7],adaptive_grid.cells[7].leaves[5])
+    Ferrite.refine!(adaptive_grid.cells[9],adaptive_grid.cells[9].leaves[end])
+    Ferrite.refine!(adaptive_grid.cells[9],adaptive_grid.cells[9].leaves[end])
+    Ferrite.refine!(adaptive_grid.cells[9],adaptive_grid.cells[9].leaves[end]) 
+    transfered_grid = Ferrite.creategrid(adaptive_grid)
+    @test length(transfered_grid.cells) == 45
+    @test length(transfered_grid.nodes) == 76
+    @test unique(transfered_grid.nodes) == transfered_grid.nodes
+
+    #################################################
+    ############ structured 3D examples #############
+    #################################################
+
+    # 3D case with a single tree
+    grid = generate_grid(Hexahedron,(1,1,1))
+    adaptive_grid = ForestBWG(grid,3)
+    Ferrite.refine_all!(adaptive_grid,1)
+    Ferrite.refine!(adaptive_grid.cells[1],adaptive_grid.cells[1].leaves[1])
+    Ferrite.refine!(adaptive_grid.cells[1],adaptive_grid.cells[1].leaves[1])
+    #transfered_grid = Ferrite.creategrid(adaptive_grid)
+    #@test length(transfered_grid.cells) == 8+7+7
+    #@test length(transfered_grid.nodes) == 65
+    #@test unique(transfered_grid.nodes) == transfered_grid.nodes
+end
