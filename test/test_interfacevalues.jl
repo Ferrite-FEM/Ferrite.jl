@@ -106,13 +106,15 @@
                 face = here ? Ferrite.getcurrentface(iv.here) : Ferrite.getcurrentface(iv.there)
                 func_interpol = here ? ip_here : ip_there
                 let ip_base = func_interpol isa VectorizedInterpolation ? func_interpol.ip : func_interpol
-                    x_face = xs[[Ferrite.dirichlet_facedof_indices(ip_base)[face]...]]
-                    @test vol ≈ calculate_face_area(ip_base, x_face, face)
+                    x_face = xs[[Ferrite.dirichlet_facetdof_indices(ip_base)[face]...]]
+                    @test vol ≈ calculate_facet_area(ip_base, x_face, face)
                 end
             end
         end
     end
     getcelltypedim(::Type{<:Ferrite.AbstractCell{shape}}) where {dim, shape <: Ferrite.AbstractRefShape{dim}} = dim
+    cell_shape, scalar_interpol, quad_rule = (Quadrilateral, DiscontinuousLagrange{RefQuadrilateral, 1}(), FaceQuadratureRule{RefQuadrilateral}(2))
+    cell_shape, scalar_interpol, quad_rule = (Hexahedron, DiscontinuousLagrange{RefHexahedron, 1}(), FaceQuadratureRule{RefHexahedron}(2))
     for (cell_shape, scalar_interpol, quad_rule) in (
                                         #TODO: update interfaces for lines
                                         #(Line, DiscontinuousLagrange{RefLine, 1}(), FaceQuadratureRule{RefLine}(2)),
@@ -134,10 +136,10 @@
         @testset "faces nodes indices" begin
             cell = getcells(grid, 1)
             geom_ip_faces_indices = Ferrite.facetdof_indices(ip)
-            Ferrite.getdim(ip) > 1 && (geom_ip_faces_indices = Tuple([face[collect(face .∉ Ref(interior))] for (face, interior) in [(geom_ip_faces_indices[i], Ferrite.facedof_interior_indices(ip)[i]) for i in 1:nfaces(ip)]]))
+            Ferrite.getdim(ip) > 1 && (geom_ip_faces_indices = Tuple([face[collect(face .∉ Ref(interior))] for (face, interior) in [(geom_ip_faces_indices[i], Ferrite.facetdof_interior_indices(ip)[i]) for i in 1:Ferrite.nfacets(ip)]]))
             faces_indices = Ferrite.reference_facets(Ferrite.getrefshape(Ferrite.default_interpolation(typeof(cell))))
             node_ids = Ferrite.get_node_ids(cell)
-            @test getindex.(Ref(node_ids), collect.(faces_indices)) == Ferrite.faces(cell) == getindex.(Ref(node_ids), collect.(geom_ip_faces_indices))
+            @test getindex.(Ref(node_ids), collect.(faces_indices)) == Ferrite.facets(cell) == getindex.(Ref(node_ids), collect.(geom_ip_faces_indices))
         end
         @testset "error paths" begin
             cell = getcells(grid, 1)

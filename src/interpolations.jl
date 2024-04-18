@@ -406,7 +406,12 @@ boundarydof_indices(::Type{VertexIndex}) = Ferrite.vertexdof_indices
 facetdof_indices(ip::InterpolationByDim{3}) = Ferrite.facedof_indices(ip)
 facetdof_indices(ip::InterpolationByDim{2}) = Ferrite.edgedof_indices(ip)
 facetdof_indices(ip::InterpolationByDim{1}) = Ferrite.vertexdof_indices(ip)
-dirichlet_facetdof_indices(ip::Interpolation) = facetdof_indices(ip)
+facetdof_interior_indices(ip::InterpolationByDim{3}) = Ferrite.facedof_interior_indices(ip)
+facetdof_interior_indices(ip::InterpolationByDim{2}) = Ferrite.edgedof_interior_indices(ip)
+facetdof_interior_indices(ip::InterpolationByDim{1}) = ntuple(_ -> (), nvertices(ip)) 
+dirichlet_facetdof_indices(ip::InterpolationByDim{3}) = dirichlet_facedof_indices(ip)
+dirichlet_facetdof_indices(ip::InterpolationByDim{2}) = dirichlet_edgedof_indices(ip)
+dirichlet_facetdof_indices(ip::InterpolationByDim{1}) = dirichlet_vertexdof_indices(ip)
 
 nfacets(ip::InterpolationByDim{3}) = nfaces(ip)
 nfacets(ip::InterpolationByDim{2}) = nedges(ip)
