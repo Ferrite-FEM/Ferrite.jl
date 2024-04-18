@@ -173,14 +173,14 @@ K = create_sparsity_pattern(dh, topology = topology, cross_coupling = trues(1,1)
 # The Dirichlet boundary conditions are treated 
 # as usual by a `ConstraintHandler`.
 ch = ConstraintHandler(dh)
-add!(ch, Dirichlet(:u, getfaceset(grid, "right"), (x, t) -> 1.0))
-add!(ch, Dirichlet(:u, getfaceset(grid, "left"), (x, t) -> -1.0))
+add!(ch, Dirichlet(:u, getfacetset(grid, "right"), (x, t) -> 1.0))
+add!(ch, Dirichlet(:u, getfacetset(grid, "left"), (x, t) -> -1.0))
 close!(ch);
 
 # Furthermore, we define $\partial \Omega_N$ as the `union` of the face sets with Neumann boundary conditions for later use
 ∂Ωₙ = union(
-    getfaceset(grid, "top"),
-    getfaceset(grid, "bottom"),
+    getfacetset(grid, "top"),
+    getfacetset(grid, "bottom"),
 );
 
 

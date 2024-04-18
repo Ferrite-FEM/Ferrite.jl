@@ -80,7 +80,7 @@ end;
 
 dbcs = ConstraintHandler(dh)
 # The (strong) Dirichlet boundary condition can be handled automatically by the Ferrite library.
-dbc = Dirichlet(:u, union(getfaceset(grid, "top"), getfaceset(grid, "right")), (x,t) -> u_ana(x))
+dbc = Dirichlet(:u, union(getfacetset(grid, "top"), getfacetset(grid, "right")), (x,t) -> u_ana(x))
 add!(dbcs, dbc)
 close!(dbcs)
 update!(dbcs, 0.0)
@@ -136,8 +136,8 @@ function doassemble(cellvalues::CellValues, facevalues::FaceValues,
         #+
         for face in 1:nfaces(cell)
             if onboundary(cell, face) && 
-                   ((cellcount, face) ∈ getfaceset(grid, "left") || 
-                    (cellcount, face) ∈ getfaceset(grid, "bottom"))
+                   ((cellcount, face) ∈ getfacetset(grid, "left") || 
+                    (cellcount, face) ∈ getfacetset(grid, "bottom"))
                 reinit!(facevalues, cell, face)
                 for q_point in 1:getnquadpoints(facevalues)
                     coords_qp = spatial_coordinate(facevalues, q_point, coords)

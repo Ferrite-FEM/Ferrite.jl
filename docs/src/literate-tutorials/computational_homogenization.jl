@@ -251,7 +251,7 @@ close!(dh);
 ch_dirichlet = ConstraintHandler(dh)
 dirichlet = Dirichlet(
     :u,
-    union(getfaceset.(Ref(grid), ["left", "right", "top", "bottom"])...),
+    union(getfacetset.(Ref(grid), ["left", "right", "top", "bottom"])...),
     (x, t) ->  [0, 0],
     [1, 2]
 )

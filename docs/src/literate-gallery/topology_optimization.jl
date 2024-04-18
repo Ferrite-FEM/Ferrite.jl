@@ -79,7 +79,7 @@ function create_grid(n)
     
     ## node-/facesets for boundary conditions
     addnodeset!(grid, "clamped", x -> x[1] ≈ 0.0)
-    addfaceset!(grid, "traction", x -> x[1] ≈ 2.0 && norm(x[2]-0.5) <= 0.05); 
+    addfacetset!(grid, "traction", x -> x[1] ≈ 2.0 && norm(x[2]-0.5) <= 0.05); 
     return grid
 end
 #md nothing # hide
@@ -351,7 +351,7 @@ function elmt!(Ke, re, element, cellvalues, facevalues, grid, mp, ue, state)
     symmetrize_lower!(Ke)
 
     @inbounds for face in 1:nfaces(element) 
-        if onboundary(element, face) && (cellid(element), face) ∈ getfaceset(grid, "traction")
+        if onboundary(element, face) && (cellid(element), face) ∈ getfacetset(grid, "traction")
             reinit!(facevalues, element, face)
             t = Vec((0.0, -1.0)) # force pointing downwards
             for q_point in 1:getnquadpoints(facevalues)
