@@ -113,12 +113,10 @@
         end
     end
     getcelltypedim(::Type{<:Ferrite.AbstractCell{shape}}) where {dim, shape <: Ferrite.AbstractRefShape{dim}} = dim
-    cell_shape, scalar_interpol, quad_rule = (Quadrilateral, DiscontinuousLagrange{RefQuadrilateral, 1}(), FaceQuadratureRule{RefQuadrilateral}(2))
-    cell_shape, scalar_interpol, quad_rule = (Hexahedron, DiscontinuousLagrange{RefHexahedron, 1}(), FaceQuadratureRule{RefHexahedron}(2))
     for (cell_shape, scalar_interpol, quad_rule) in (
                                         #TODO: update interfaces for lines
-                                        #(Line, DiscontinuousLagrange{RefLine, 1}(), FaceQuadratureRule{RefLine}(2)),
-                                        #(QuadraticLine, DiscontinuousLagrange{RefLine, 2}(), FaceQuadratureRule{RefLine}(2)), 
+                                        (Line, DiscontinuousLagrange{RefLine, 1}(), FaceQuadratureRule{RefLine}(2)),
+                                        (QuadraticLine, DiscontinuousLagrange{RefLine, 2}(), FaceQuadratureRule{RefLine}(2)), 
                                         (Quadrilateral, DiscontinuousLagrange{RefQuadrilateral, 1}(), FaceQuadratureRule{RefQuadrilateral}(2)),
                                         (QuadraticQuadrilateral, DiscontinuousLagrange{RefQuadrilateral, 2}(), FaceQuadratureRule{RefQuadrilateral}(2)),
                                         (Triangle, DiscontinuousLagrange{RefTriangle, 1}(), FaceQuadratureRule{RefTriangle}(2)),
@@ -139,7 +137,11 @@
             Ferrite.getdim(ip) > 1 && (geom_ip_faces_indices = Tuple([face[collect(face .∉ Ref(interior))] for (face, interior) in [(geom_ip_faces_indices[i], Ferrite.facetdof_interior_indices(ip)[i]) for i in 1:Ferrite.nfacets(ip)]]))
             faces_indices = Ferrite.reference_facets(Ferrite.getrefshape(Ferrite.default_interpolation(typeof(cell))))
             node_ids = Ferrite.get_node_ids(cell)
-            @test getindex.(Ref(node_ids), collect.(faces_indices)) == Ferrite.facets(cell) == getindex.(Ref(node_ids), collect.(geom_ip_faces_indices))
+            cellfacets = Ferrite.facets(cell)
+            if dim == 1 # change vertices from (1, 2) to ((1,),(2,))
+                cellfacets = ntuple(i->(cellfacets[i],), length(cellfacets))
+            end
+            @test getindex.(Ref(node_ids), collect.(faces_indices)) == cellfacets == getindex.(Ref(node_ids), collect.(geom_ip_faces_indices))
         end
         @testset "error paths" begin
             cell = getcells(grid, 1)
@@ -147,6 +149,7 @@
             @test_throws ArgumentError("unknown face number") Ferrite.element_to_face_transformation(Vec{dim,Float64}(ntuple(_->0.0, dim)), Ferrite.getrefshape(cell), 100)
             @test_throws ArgumentError("unknown face number") Ferrite.face_to_element_transformation(Vec{dim-1,Float64}(ntuple(_->0.0, dim-1)), Ferrite.getrefshape(cell), 100)
         end
+        func_interpol = scalar_interpol
         for func_interpol in (scalar_interpol, VectorizedInterpolation(scalar_interpol))
             iv = cell_shape ∈ (QuadraticLine, QuadraticQuadrilateral, QuadraticTriangle, QuadraticTetrahedron) ? 
                 InterfaceValues(quad_rule, func_interpol, ip) : InterfaceValues(quad_rule, func_interpol)

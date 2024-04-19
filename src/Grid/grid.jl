@@ -540,28 +540,32 @@ getfacetsets(grid::AbstractGrid{1}) = grid.vertexsets
 getfacetsets(grid::AbstractGrid{2}) = grid.edgesets
 getfacetsets(grid::AbstractGrid{3}) = grid.facesets
 
+addfacetset!(grid::AbstractGrid{1}, args...; kwargs...) = addvertexset!(grid, args...; kwargs...)
+addfacetset!(grid::AbstractGrid{2}, args...; kwargs...) = addedgeset!(grid, args...; kwargs...)
+addfacetset!(grid::AbstractGrid{3}, args...; kwargs...) = addfaceset!(grid, args...; kwargs...)
+
 #Backwards compat
 @inline getfacesets(grid::AbstractGrid{2}) = grid.egdeset
 function getfaceset(grid::AbstractGrid{2}, setname::String) 
-    @warn("getfaceset for 2d-problems have been deprecated. Use getfacetset instead")
+    @warn("getfaceset for 2d-problems have been deprecated. Use addfacetset! instead")
     grid.edgesets[setname]
 end
 function addfaceset!(grid::AbstractGrid{2}, name::String, f::Function; all::Bool=true) 
-    @warn("addfaceset! for 2d-problems have been deprecated. Use getfacetset instead")
+    @warn("addfaceset! for 2d-problems have been deprecated. Use addfacetset! instead")
     addedgeset!(grid, name, f; all)
 end
 function addfaceset!(grid::AbstractGrid{2}, name::String, set::Union{Set{EdgeIndex},Vector{EdgeIndex}}) 
-    @warn("addfaceset! for 2d-problems have been deprecated. Use getfacetset instead")
+    @warn("addfaceset! for 2d-problems have been deprecated. Use addfacetset! instead")
     addedgeset!(grid, name, set)
 end
 
 @inline getfacesets(grid::AbstractGrid{1}) = grid.vertexsets
 function getfaceset(grid::AbstractGrid{1}, setname::String) 
-    @warn("getfaceset for 1d-problems have been deprecated. Use getfacetset instead")
+    @warn("getfaceset for 1d-problems have been deprecated. Use addfacetset! instead")
     grid.vertexsets[setname]
 end
 function addfaceset!(grid::AbstractGrid{1}, name::String, f::Function; all::Bool=true) 
-    @warn("addfaceset! for 1d-problems have been deprecated. Use getfacetset instead")
+    @warn("addfaceset! for 1d-problems have been deprecated. Use addfacetset! instead")
      addvertexset!(grid, name, f; all)
 end
 function addfaceset!(grid::AbstractGrid{1}, name::String, set::Union{Set{VertexIndex},Vector{VertexIndex}}) 

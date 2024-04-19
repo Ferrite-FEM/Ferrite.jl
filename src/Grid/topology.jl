@@ -71,6 +71,7 @@ mutable struct ExclusiveTopology <: AbstractTopology
     # lazy constructed face topology
     face_skeleton::Union{Vector{FaceIndex}, Nothing}
     edge_skeleton::Union{Vector{EdgeIndex}, Nothing}
+    vertex_skeleton::Union{Vector{VertexIndex}, Nothing}
     # TODO reintroduce the codimensional connectivity, e.g. 3D edge to 2D face
 end
 
@@ -201,7 +202,7 @@ function ExclusiveTopology(cells::Vector{C}) where C <: AbstractCell
 
     _exclusive_topology_ctor(cells, vertex_cell_table, vertex_table, face_table, edge_table, cell_neighbor_table)
 
-    return ExclusiveTopology(vertex_cell_table,cell_neighbor_table,face_table,vertex_table,edge_table,nothing,nothing)
+    return ExclusiveTopology(vertex_cell_table,cell_neighbor_table,face_table,vertex_table,edge_table,nothing,nothing,nothing)
 end
 
 function _add_single_face_neighbor!(face_table, cell::C1, cell_id, cell_neighbor::C2, cell_neighbor_id) where {C1, C2}
@@ -364,6 +365,27 @@ function _edgeskeleton(top::ExclusiveTopology, grid::Grid)
     return face_skeleton_local
 end
 
+function _vertexskeleton(top::ExclusiveTopology, grid::Grid)
+    cells = getcells(grid)
+    cell_dim = getdim(first(cells))
+    @assert all(cell -> getdim(cell) == cell_dim, cells) "Vertex skeleton construction requires all the elements to be of the same dimensionality"
+    vertex_skeleton_global = Set{Int}()
+    vertex_skeleton_local = Vector{VertexIndex}()
+    fs_length = length(vertex_skeleton_global)
+    # TODO use topology to speed up :)
+    for (cellid,cell) ∈ enumerate(grid.cells)
+        for (local_vertex_id,vertex) ∈ enumerate(vertices(cell))
+            push!(vertex_skeleton_global, vertex)
+            fs_length_new = length(vertex_skeleton_global)
+            if fs_length != fs_length_new
+                push!(vertex_skeleton_local, VertexIndex(cellid,local_vertex_id))
+                fs_length = fs_length_new
+            end
+        end
+    end
+    return vertex_skeleton_local
+end
+
 """
     face_skeleton(top::ExclusiveTopology, grid::Grid) -> Vector{FaceIndex}
 Creates an iterateable face skeleton. The skeleton consists of `FaceIndex` that can be used to `reinit`
@@ -383,4 +405,11 @@ function facetskeleton(top::ExclusiveTopology, grid::Grid{2})
         top.edge_skeleton = _edgeskeleton(top, grid)
     end
     return top.edge_skeleton
+end
+
+function facetskeleton(top::ExclusiveTopology, grid::Grid{1})
+    if top.vertex_skeleton === nothing
+        top.vertex_skeleton = _vertexskeleton(top, grid)
+    end
+    return top.vertex_skeleton
 end
