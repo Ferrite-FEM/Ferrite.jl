@@ -931,6 +931,17 @@ function contains_face(mface::Tuple{Tuple{T1,T1},Tuple{T1,T1}},sface::Tuple{Tupl
     end
 end
 
+# currently checking if sface centroid lies in mface
+# TODO should be checked if applicaple in general, I guess yes
+function contains_face(mface::NTuple{4,Tuple{T1,T1,T1}}, sface::NTuple{4,Tuple{T2,T2,T2}}) where {T1<:Integer,T2<:Integer}
+    sface_center = center(sface)
+    if mface[1][1] ≤ sface_center[1] ≤ mface[2][1] && mface[1][2] ≤ sface_center[2] ≤ mface[2][2] && mface[1][3] ≤ sface_center[3] ≤ mface[2][3]
+        return true
+    else
+        return false
+    end
+end
+
 function center(pivot_face)
     centerpoint = ntuple(i->0,length(pivot_face[1]))
     for c in pivot_face

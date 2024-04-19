@@ -36,6 +36,24 @@
     @test Ferrite._neighbor_corner.((3,),(5,),(3,),test_ξs) == (Ferrite.𝒫[5,:]...,)
 end
 
+@testset "Index Permutation" begin
+    for i in 1:length(Ferrite.edge_perm)
+        @test i == Ferrite.edge_perm_inv[Ferrite.edge_perm[i]]
+    end
+    for i in 1:length(Ferrite.𝒱₂_perm)
+        @test i == Ferrite.𝒱₂_perm_inv[Ferrite.𝒱₂_perm[i]]
+    end
+    for i in 1:length(Ferrite.𝒱₃_perm)
+        @test i == Ferrite.𝒱₃_perm_inv[Ferrite.𝒱₃_perm[i]]
+    end
+    for i in 1:length(Ferrite.node_map₂)
+        @test i == Ferrite.node_map₂_inv[Ferrite.node_map₂[i]]
+    end
+    for i in 1:length(Ferrite.node_map₃)
+        @test i == Ferrite.node_map₃_inv[Ferrite.node_map₃[i]]
+    end
+end
+
 @testset "OctantBWG Encoding" begin
 #    # Tests from Figure 3a) and 3b) of Burstedde et al
     o = Ferrite.OctantBWG(3,2,21,3)
@@ -134,24 +152,6 @@ end
     @test Ferrite.corner_neighbor(Ferrite.OctantBWG(2,(2,0)),1,3) == Ferrite.OctantBWG(2,(0,-2))
     @test Ferrite.corner_neighbor(Ferrite.OctantBWG(2,(2,0)),2,3) == Ferrite.OctantBWG(2,(4,-2))
     @test Ferrite.corner_neighbor(Ferrite.OctantBWG(2,(2,0)),4,3) == Ferrite.OctantBWG(2,(4,2))
-end
-
-@testset "Index Permutation" begin
-    for i in 1:length(Ferrite.edge_perm)
-        @test i == Ferrite.edge_perm_inv[Ferrite.edge_perm[i]]
-    end
-    for i in 1:length(Ferrite.𝒱₂_perm)
-        @test i == Ferrite.𝒱₂_perm_inv[Ferrite.𝒱₂_perm[i]]
-    end
-    for i in 1:length(Ferrite.𝒱₃_perm)
-        @test i == Ferrite.𝒱₃_perm_inv[Ferrite.𝒱₃_perm[i]]
-    end
-    for i in 1:length(Ferrite.node_map₂)
-        @test i == Ferrite.node_map₂_inv[Ferrite.node_map₂[i]]
-    end
-    for i in 1:length(Ferrite.node_map₃)
-        @test i == Ferrite.node_map₃_inv[Ferrite.node_map₃[i]]
-    end
 end
 
 @testset "OctreeBWG Operations" begin
@@ -606,8 +606,8 @@ end
     Ferrite.refine_all!(adaptive_grid,1)
     Ferrite.refine!(adaptive_grid.cells[1],adaptive_grid.cells[1].leaves[1])
     Ferrite.refine!(adaptive_grid.cells[1],adaptive_grid.cells[1].leaves[1])
-    #transfered_grid = Ferrite.creategrid(adaptive_grid)
-    #@test length(transfered_grid.cells) == 8+7+7
-    #@test length(transfered_grid.nodes) == 65
-    #@test unique(transfered_grid.nodes) == transfered_grid.nodes
+    transfered_grid = Ferrite.creategrid(adaptive_grid)
+    @test length(transfered_grid.cells) == 8+7+7
+    @test length(transfered_grid.nodes) == 65
+    @test unique(transfered_grid.nodes) == transfered_grid.nodes
 end
