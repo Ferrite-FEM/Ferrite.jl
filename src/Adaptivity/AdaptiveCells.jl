@@ -179,6 +179,8 @@ function edge(octant::OctantBWG{3}, e::Integer, b::Integer)
     return ntuple(i->vertex(octant,cornerid[i], b),2)
 end
 
+edges(octant::OctantBWG{3}, b::Integer) = ntuple(i->edge(octant,i,b),12)
+
 """
     boundaryset(o::OctantBWG{2}, i::Integer, b::Integer
 implements two dimensional boundaryset table from Fig.4.1 [IBWG2015](@citet)
@@ -612,6 +614,7 @@ function creategrid(forest::ForestBWG{dim,C,T}) where {dim,C,T}
                         fnodes = face(leaf, f , tree.b)
                         fnodes_neighbor = face(neighbor_candidate, f′candidate, tree′.b)
                         r = compute_face_orientation(forest,k,f)
+                        @show r
                         @debug println("    Matching $fnodes (local) to $fnodes_neighbor (neighbor)")
                         if dim == 2
                             if r == 0 # same orientation
@@ -630,19 +633,26 @@ function creategrid(forest::ForestBWG{dim,C,T}) where {dim,C,T}
                                 end
                             end
                         else
-                            if r == 0 # same orientation
-                                for i ∈ 1:4
-                                    if haskey(nodeids, (k′,fnodes_neighbor[i]))
-                                        nodeids[(k,fnodes[i])] = nodeids[(k′,fnodes_neighbor[i])]
-                                        nodeowners[(k,fnodes[i])] = (k′,fnodes_neighbor[i])
-                                    end
-                                end
-                            else
-                                for i ∈ 1:4
-                                    if haskey(nodeids, (k′,fnodes_neighbor[5-i]))
-                                        nodeids[(k,fnodes[i])] = nodeids[(k′,fnodes_neighbor[5-i])]
-                                        nodeowners[(k,fnodes[i])] = (k′,fnodes_neighbor[5-i])
-                                    end
+                            #if r == 0 # same orientation
+                            #    for i ∈ 1:4
+                            #        if haskey(nodeids, (k′,fnodes_neighbor[i]))
+                            #            nodeids[(k,fnodes[i])] = nodeids[(k′,fnodes_neighbor[i])]
+                            #            nodeowners[(k,fnodes[i])] = (k′,fnodes_neighbor[i])
+                            #        end
+                            #    end
+                            #else
+                            #    for i ∈ 1:4
+                            #        if haskey(nodeids, (k′,fnodes_neighbor[5-i]))
+                            #            nodeids[(k,fnodes[i])] = nodeids[(k′,fnodes_neighbor[5-i])]
+                            #            nodeowners[(k,fnodes[i])] = (k′,fnodes_neighbor[5-i])
+                            #        end
+                            #    end
+                            #end
+                            for i ∈ 1:4
+                                rotated_ξ = 𝒫[𝒬[ℛ[f′,f],r+1],i]
+                                if haskey(nodeids, (k′,fnodes_neighbor[i]))
+                                    nodeids[(k,fnodes[rotated_ξ])] = nodeids[(k′,fnodes_neighbor[i])]
+                                    nodeowners[(k,fnodes[rotated_ξ])] = (k′,fnodes_neighbor[i])
                                 end
                             end
                         end
@@ -651,8 +661,58 @@ function creategrid(forest::ForestBWG{dim,C,T}) where {dim,C,T}
             end
         end
         if dim > 2
-            #TODO add egde duplication check
-            #@error "Edge deduplication not implemented yet."
+            _edges = edges(root(dim),tree.b)
+            # Face neighbors
+            @debug println("Updating edge neighbors for octree $k")
+            for (e,ec) in enumerate(_edges) # f in p4est notation
+                e_axis_index, e_axis_sign = divrem(e-1,4) #first axis 0 (x), 1 (y), 2(z), second positive or negative direction
+                edge_neighbor = forest.topology.edge_edge_neighbor[k,edge_perm[e]]
+                if length(edge_neighbor) == 0
+                    continue
+                end
+                @debug @assert length(edge_neighbor) == 1
+                k′, e′_ferrite = edge_neighbor[1]
+                e′ = edge_perm_inv[e′_ferrite]
+                if k > k′ # Owner
+                    tree′ = forest.cells[k′]
+                    for leaf in tree.leaves
+                        #debugging checks; should be inbounds anyway due to iteration
+                        if e_axis_sign == 1 # positive edge
+                            if leaf.xyz[e_axis_index + 1] < 2^tree.b-2^(tree.b-leaf.l)
+                                @debug println("    Rejecting $leaf")
+                                continue
+                            end
+                        else # negative face
+                            if leaf.xyz[e_axis_index + 1] > 0
+                                @debug println("    Rejecting $leaf")
+                                continue
+                            end
+                        end
+                        neighbor_candidate = transform_edge(forest,k′,e′,leaf, false)
+                        # Candidate must be the face opposite to f'
+                        e′candidate = ((e′ - 1) ⊻ 1) + 1
+                        enodes = edge(leaf, e , tree.b)
+                        enodes_neighbor = edge(neighbor_candidate, e′candidate, tree′.b)
+                        r = compute_edge_orientation(forest,k,e)
+                        @debug println("    Matching $enodes (local) to $enodes_neighbor (neighbor)")
+                        if r == 0 # same orientation
+                            for i ∈ 1:2
+                                if haskey(nodeids, (k′,enodes_neighbor[i]))
+                                    nodeids[(k,enodes[i])] = nodeids[(k′,enodes_neighbor[i])]
+                                    nodeowners[(k,enodes[i])] = (k′,enodes_neighbor[i])
+                                end
+                            end
+                        else
+                            for i ∈ 1:2
+                                if haskey(nodeids, (k′,enodes_neighbor[3-i]))
+                                    nodeids[(k,enodes[i])] = nodeids[(k′,enodes_neighbor[3-i])]
+                                    nodeowners[(k,enodes[i])] = (k′,enodes_neighbor[3-i])
+                                end
+                            end
+                        end
+                    end
+                end
+            end
         end
     end
 

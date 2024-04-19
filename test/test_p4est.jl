@@ -619,4 +619,57 @@ end
     @test length(transfered_grid.cells) == 16
     @test length(transfered_grid.nodes) == 45
     @test unique(transfered_grid.nodes) == transfered_grid.nodes
+    #rotate the case around 
+    grid = generate_grid(Hexahedron,(1,2,1))
+    adaptive_grid = ForestBWG(grid,3)
+    Ferrite.refine_all!(adaptive_grid,1)
+    transfered_grid = Ferrite.creategrid(adaptive_grid)
+    @test length(transfered_grid.cells) == 16
+    @test length(transfered_grid.nodes) == 45
+    @test unique(transfered_grid.nodes) == transfered_grid.nodes
+    grid = generate_grid(Hexahedron,(1,1,2))
+    adaptive_grid = ForestBWG(grid,3)
+    Ferrite.refine_all!(adaptive_grid,1)
+    transfered_grid = Ferrite.creategrid(adaptive_grid)
+    @test length(transfered_grid.cells) == 16
+    @test length(transfered_grid.nodes) == 45
+    @test unique(transfered_grid.nodes) == transfered_grid.nodes
+
+    grid = generate_grid(Hexahedron,(2,2,2))
+    adaptive_grid = ForestBWG(grid,3)
+    Ferrite.refine_all!(adaptive_grid,1)
+    transfered_grid = Ferrite.creategrid(adaptive_grid)
+    @test length(transfered_grid.cells) == 8^2
+    @test length(transfered_grid.nodes) == 125 # 5 per edge
+    @test unique(transfered_grid.nodes) == transfered_grid.nodes
+
+    # Rotate three dimensional case 
+    grid = generate_grid(Hexahedron,(2,2,2))
+    # Rotate face topologically
+    grid.cells[2] = Hexahedron((grid.cells[2].nodes[2], grid.cells[2].nodes[3], grid.cells[2].nodes[4], grid.cells[2].nodes[1], grid.cells[2].nodes[4+2], grid.cells[2].nodes[4+3], grid.cells[2].nodes[4+4], grid.cells[2].nodes[4+1]))
+    grid.cells[2] = Hexahedron((grid.cells[2].nodes[2], grid.cells[2].nodes[3], grid.cells[2].nodes[4], grid.cells[2].nodes[1], grid.cells[2].nodes[4+2], grid.cells[2].nodes[4+3], grid.cells[2].nodes[4+4], grid.cells[2].nodes[4+1]))
+    # This is our root mesh bottom view
+    # x-----------x-----------x
+    # |4    4    3|4    4    3|
+    # |           |           |
+    # |     ^     |     ^     |
+    # |1    |    2|1    |    2|
+    # |     +-->  |     +-->  |
+    # |           |           |
+    # |1    3    2|1    3    2|
+    # x-----------x-----------x
+    # |4    4    3|3    2    2|
+    # |           |           |
+    # |     ^     |     ^     |
+    # |1    |    2|4    |    3|
+    # |     +-->  |  <--+     |
+    # |           |           |
+    # |1    3    2|4    1    1|
+    # x-----------x-----------x
+    adaptive_grid = ForestBWG(grid,3)
+    Ferrite.refine_all!(adaptive_grid,1)
+    transfered_grid = Ferrite.creategrid(adaptive_grid)
+    @test length(transfered_grid.cells) == 8^2
+    @test length(transfered_grid.nodes) == 125 # 5 per edge
+    @test unique(transfered_grid.nodes) == transfered_grid.nodes
 end
