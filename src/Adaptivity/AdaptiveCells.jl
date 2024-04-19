@@ -614,42 +614,18 @@ function creategrid(forest::ForestBWG{dim,C,T}) where {dim,C,T}
                         fnodes = face(leaf, f , tree.b)
                         fnodes_neighbor = face(neighbor_candidate, f′candidate, tree′.b)
                         r = compute_face_orientation(forest,k,f)
-                        @show r
                         @debug println("    Matching $fnodes (local) to $fnodes_neighbor (neighbor)")
                         if dim == 2
-                            if r == 0 # same orientation
-                                for i ∈ 1:2
-                                    if haskey(nodeids, (k′,fnodes_neighbor[i]))
-                                        nodeids[(k,fnodes[i])] = nodeids[(k′,fnodes_neighbor[i])]
-                                        nodeowners[(k,fnodes[i])] = (k′,fnodes_neighbor[i])
-                                    end
-                                end
-                            else
-                                for i ∈ 1:2
-                                    if haskey(nodeids, (k′,fnodes_neighbor[3-i]))
-                                        nodeids[(k,fnodes[i])] = nodeids[(k′,fnodes_neighbor[3-i])]
-                                        nodeowners[(k,fnodes[i])] = (k′,fnodes_neighbor[3-i])
-                                    end
+                            for i ∈ 1:2
+                                i′ = r == 0 ? i : 3-i
+                                if haskey(nodeids, (k′,fnodes_neighbor[i′]))
+                                    nodeids[(k,fnodes[i])] = nodeids[(k′,fnodes_neighbor[i′])]
+                                    nodeowners[(k,fnodes[i])] = (k′,fnodes_neighbor[i′])
                                 end
                             end
                         else
-                            #if r == 0 # same orientation
-                            #    for i ∈ 1:4
-                            #        if haskey(nodeids, (k′,fnodes_neighbor[i]))
-                            #            nodeids[(k,fnodes[i])] = nodeids[(k′,fnodes_neighbor[i])]
-                            #            nodeowners[(k,fnodes[i])] = (k′,fnodes_neighbor[i])
-                            #        end
-                            #    end
-                            #else
-                            #    for i ∈ 1:4
-                            #        if haskey(nodeids, (k′,fnodes_neighbor[5-i]))
-                            #            nodeids[(k,fnodes[i])] = nodeids[(k′,fnodes_neighbor[5-i])]
-                            #            nodeowners[(k,fnodes[i])] = (k′,fnodes_neighbor[5-i])
-                            #        end
-                            #    end
-                            #end
                             for i ∈ 1:4
-                                rotated_ξ = 𝒫[𝒬[ℛ[f′,f],r+1],i]
+                                rotated_ξ = 𝒫[𝒬[ℛ[f′,f],r+1],i] # see Table 3 and Theorem 2.2 [BWG2011]
                                 if haskey(nodeids, (k′,fnodes_neighbor[i]))
                                     nodeids[(k,fnodes[rotated_ξ])] = nodeids[(k′,fnodes_neighbor[i])]
                                     nodeowners[(k,fnodes[rotated_ξ])] = (k′,fnodes_neighbor[i])
@@ -695,19 +671,11 @@ function creategrid(forest::ForestBWG{dim,C,T}) where {dim,C,T}
                         enodes_neighbor = edge(neighbor_candidate, e′candidate, tree′.b)
                         r = compute_edge_orientation(forest,k,e)
                         @debug println("    Matching $enodes (local) to $enodes_neighbor (neighbor)")
-                        if r == 0 # same orientation
-                            for i ∈ 1:2
-                                if haskey(nodeids, (k′,enodes_neighbor[i]))
-                                    nodeids[(k,enodes[i])] = nodeids[(k′,enodes_neighbor[i])]
-                                    nodeowners[(k,enodes[i])] = (k′,enodes_neighbor[i])
-                                end
-                            end
-                        else
-                            for i ∈ 1:2
-                                if haskey(nodeids, (k′,enodes_neighbor[3-i]))
-                                    nodeids[(k,enodes[i])] = nodeids[(k′,enodes_neighbor[3-i])]
-                                    nodeowners[(k,enodes[i])] = (k′,enodes_neighbor[3-i])
-                                end
+                        for i ∈ 1:2
+                            i′ = r == 0 ? i : 3-i
+                            if haskey(nodeids, (k′,enodes_neighbor[i′]))
+                                nodeids[(k,enodes[i])] = nodeids[(k′,enodes_neighbor[i′])]
+                                nodeowners[(k,enodes[i])] = (k′,enodes_neighbor[i′])
                             end
                         end
                     end

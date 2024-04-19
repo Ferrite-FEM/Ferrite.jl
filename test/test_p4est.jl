@@ -672,4 +672,5 @@ end
     @test length(transfered_grid.cells) == 8^2
     @test length(transfered_grid.nodes) == 125 # 5 per edge
     @test unique(transfered_grid.nodes) == transfered_grid.nodes
+    #TODO iterate over all rotated versions and check if det J > 0
 end
