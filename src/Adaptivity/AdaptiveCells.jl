@@ -630,7 +630,21 @@ function creategrid(forest::ForestBWG{dim,C,T}) where {dim,C,T}
                                 end
                             end
                         else
-                            @error "Not implemented for $dim dimensions."
+                            if r == 0 # same orientation
+                                for i ∈ 1:4
+                                    if haskey(nodeids, (k′,fnodes_neighbor[i]))
+                                        nodeids[(k,fnodes[i])] = nodeids[(k′,fnodes_neighbor[i])]
+                                        nodeowners[(k,fnodes[i])] = (k′,fnodes_neighbor[i])
+                                    end
+                                end
+                            else
+                                for i ∈ 1:4
+                                    if haskey(nodeids, (k′,fnodes_neighbor[5-i]))
+                                        nodeids[(k,fnodes[i])] = nodeids[(k′,fnodes_neighbor[5-i])]
+                                        nodeowners[(k,fnodes[i])] = (k′,fnodes_neighbor[5-i])
+                                    end
+                                end
+                            end
                         end
                     end
                 end

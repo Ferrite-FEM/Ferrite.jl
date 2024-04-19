@@ -610,4 +610,13 @@ end
     @test length(transfered_grid.cells) == 8+7+7
     @test length(transfered_grid.nodes) == 65
     @test unique(transfered_grid.nodes) == transfered_grid.nodes
+
+    # Test only Interoctree by face connection
+    grid = generate_grid(Hexahedron,(2,1,1))
+    adaptive_grid = ForestBWG(grid,3)
+    Ferrite.refine_all!(adaptive_grid,1)
+    transfered_grid = Ferrite.creategrid(adaptive_grid)
+    @test length(transfered_grid.cells) == 16
+    @test length(transfered_grid.nodes) == 45
+    @test unique(transfered_grid.nodes) == transfered_grid.nodes
 end
