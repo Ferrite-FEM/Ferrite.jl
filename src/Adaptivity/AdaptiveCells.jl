@@ -824,38 +824,92 @@ function balanceforest!(forest::ForestBWG{dim}) where dim
             if !isempty(notinsideidx)
                 for s_i in notinsideidx
                     s = ss[s_i]
-                    if s_i <= 4 #corner neighbor, only true for 2D see possibleneighbors
-                        cc = forest.topology.vertex_vertex_neighbor[k,perm_corner[s_i]]
-                        isempty(cc) && continue
-                        @assert length(cc) == 1 # FIXME there can be more than 1 vertex neighbor
-                        cc = cc[1]
-                        k′, c′ = cc[1], perm_corner_inv[cc[2]]
-                        o′ = transform_corner(forest,k′,c′,o,false)
-                        s′ = transform_corner(forest,k′,c′,s,true)
-                        neighbor_tree = forest.cells[cc[1]]
-                        if s′ ∉ neighbor_tree.leaves && parent(s′, neighbor_tree.b) ∉ neighbor_tree.leaves
-                            if parent(parent(s′,neighbor_tree.b),neighbor_tree.b) ∈ neighbor_tree.leaves
-                                refine!(neighbor_tree,parent(parent(s′,neighbor_tree.b),neighbor_tree.b))
-                            #else
-                            #    refine!(tree,o)
+                    if dim == 2 # need more clever s_i encoding
+                        if s_i <= 4 #corner neighbor, only true for 2D see possibleneighbors
+                            cc = forest.topology.vertex_vertex_neighbor[k,perm_corner[s_i]]
+                            isempty(cc) && continue
+                            @assert length(cc) == 1 # FIXME there can be more than 1 vertex neighbor
+                            cc = cc[1]
+                            k′, c′ = cc[1], perm_corner_inv[cc[2]]
+                            o′ = transform_corner(forest,k′,c′,o,false)
+                            s′ = transform_corner(forest,k′,c′,s,true)
+                            neighbor_tree = forest.cells[cc[1]]
+                            if s′ ∉ neighbor_tree.leaves && parent(s′, neighbor_tree.b) ∉ neighbor_tree.leaves
+                                if parent(parent(s′,neighbor_tree.b),neighbor_tree.b) ∈ neighbor_tree.leaves
+                                    refine!(neighbor_tree,parent(parent(s′,neighbor_tree.b),neighbor_tree.b))
+                                #else
+                                #    refine!(tree,o)
+                                end
+                            end
+                        else # face neighbor, only true for 2D
+                            s_i -= 4
+                            fc = forest.topology.face_face_neighbor[k,perm_face[s_i]]
+                            isempty(fc) && continue
+                            @debug @assert length(fc) == 1
+                            fc = fc[1]
+                            k′, f′ = fc[1], perm_face_inv[fc[2]]
+                            o′ = transform_face(forest,k′,f′,o)
+                            s′ = transform_face(forest,k′,f′,s)
+                            neighbor_tree = forest.cells[fc[1]]
+                            if s′ ∉ neighbor_tree.leaves && parent(s′, neighbor_tree.b) ∉ neighbor_tree.leaves
+                                if parent(parent(s′,neighbor_tree.b),neighbor_tree.b) ∈ neighbor_tree.leaves
+                                    refine!(neighbor_tree,parent(parent(s′,neighbor_tree.b),neighbor_tree.b))
+                                #else
+                                #    refine!(tree,o)
+                                end
                             end
                         end
-                    else # face neighbor, only true for 2D
-                        s_i -= 4
-                        fc = forest.topology.face_face_neighbor[k,perm_face[s_i]]
-                        isempty(fc) && continue
-                        @debug @assert length(fc) == 1
-                        fc = fc[1]
-                        k′, f′ = fc[1], perm_face_inv[fc[2]]
-                        o′ = transform_face(forest,k′,f′,o)
-                        s′ = transform_face(forest,k′,f′,s)
-                        neighbor_tree = forest.cells[fc[1]]
-                        if s′ ∉ neighbor_tree.leaves && parent(s′, neighbor_tree.b) ∉ neighbor_tree.leaves
-                            if parent(parent(s′,neighbor_tree.b),neighbor_tree.b) ∈ neighbor_tree.leaves
-                                refine!(neighbor_tree,parent(parent(s′,neighbor_tree.b),neighbor_tree.b))
-                            #else
-                            #    refine!(tree,o)
+                    else #TODO collapse this 3D branch with more clever s_i encoding into the 2D branch
+                        if s_i <= 8 #corner neighbor, only true for 2D see possibleneighbors
+                            cc = forest.topology.vertex_vertex_neighbor[k,perm_corner[s_i]]
+                            isempty(cc) && continue
+                            @assert length(cc) == 1 # FIXME there can be more than 1 vertex neighbor
+                            cc = cc[1]
+                            k′, c′ = cc[1], perm_corner_inv[cc[2]]
+                            o′ = transform_corner(forest,k′,c′,o,false)
+                            s′ = transform_corner(forest,k′,c′,s,true)
+                            neighbor_tree = forest.cells[cc[1]]
+                            if s′ ∉ neighbor_tree.leaves && parent(s′, neighbor_tree.b) ∉ neighbor_tree.leaves
+                                if parent(parent(s′,neighbor_tree.b),neighbor_tree.b) ∈ neighbor_tree.leaves
+                                    refine!(neighbor_tree,parent(parent(s′,neighbor_tree.b),neighbor_tree.b))
+                                #else
+                                #    refine!(tree,o)
+                                end
                             end
+                        elseif 8 < s_i <= 14
+                            s_i -= 8
+                            fc = forest.topology.face_face_neighbor[k,perm_face[s_i]]
+                            isempty(fc) && continue
+                            @debug @assert length(fc) == 1
+                            fc = fc[1]
+                            k′, f′ = fc[1], perm_face_inv[fc[2]]
+                            o′ = transform_face(forest,k′,f′,o)
+                            s′ = transform_face(forest,k′,f′,s)
+                            neighbor_tree = forest.cells[fc[1]]
+                            if s′ ∉ neighbor_tree.leaves && parent(s′, neighbor_tree.b) ∉ neighbor_tree.leaves
+                                if parent(parent(s′,neighbor_tree.b),neighbor_tree.b) ∈ neighbor_tree.leaves
+                                    refine!(neighbor_tree,parent(parent(s′,neighbor_tree.b),neighbor_tree.b))
+                                #else
+                                #    refine!(tree,o)
+                                end
+                            end
+                        else
+                            s_i -= 14
+                            ec = forest.topology.edge_edge[k,edge_perm[s_i]]
+                            isempty(ec) && continue
+                            @debug @assert length(ec) == 1
+                            ec = ec[1]
+                            k′, e′ = ec[1], edge_perm_inv[ec[2]]
+                            o′ = transform_face(forest,k′,f′,o,false)
+                            s′ = transform_face(forest,k′,f′,s,true)
+                            neighbor_tree = forest.cells[ec[1]]
+                            if s′ ∉ neighbor_tree.leaves && parent(s′, neighbor_tree.b) ∉ neighbor_tree.leaves
+                                if parent(parent(s′,neighbor_tree.b),neighbor_tree.b) ∈ neighbor_tree.leaves
+                                    refine!(neighbor_tree,parent(parent(s′,neighbor_tree.b),neighbor_tree.b))
+                                #else
+                                #    refine!(tree,o)
+                                end
+                            end 
                         end
                     end
                 end

@@ -512,6 +512,8 @@ end
 end
 
 @testset "Balancing" begin
+    #2D cases
+    #simple one quad with one additional non-allowed non-conformity level
     grid = generate_grid(Quadrilateral,(1,1))
     adaptive_grid = ForestBWG(grid,3)
     Ferrite.refine_all!(adaptive_grid,1)
@@ -521,6 +523,7 @@ end
     balanced = Ferrite.balancetree(adaptive_grid.cells[1])
     @test length(balanced.leaves) == 16
 
+    #more complex non-conformity level 3 and 4 that needs to be balanced
     adaptive_grid = ForestBWG(grid,5)
     Ferrite.refine_all!(adaptive_grid,1)
     Ferrite.refine!(adaptive_grid.cells[1],adaptive_grid.cells[1].leaves[2])
@@ -532,7 +535,6 @@ end
     Ferrite.refine!(adaptive_grid.cells[1],adaptive_grid.cells[1].leaves[16])
     balanced = Ferrite.balancetree(adaptive_grid.cells[1])
     @test length(balanced.leaves) == 64
-
 
     grid = generate_grid(Quadrilateral,(2,1))
     adaptive_grid = ForestBWG(grid,2)
@@ -547,6 +549,30 @@ end
     Ferrite.refine!(adaptive_grid.cells[1],adaptive_grid.cells[1].leaves[4])
     Ferrite.balanceforest!(adaptive_grid)
     @test Ferrite.getncells(adaptive_grid) == 19
+
+    # 3D case intra treee simple test, non conformity level 2
+    grid = generate_grid(Hexahedron,(1,1,1))
+    adaptive_grid = ForestBWG(grid,3)
+    Ferrite.refine_all!(adaptive_grid,1)
+    Ferrite.refine!(adaptive_grid.cells[1],adaptive_grid.cells[1].leaves[2])
+    Ferrite.refine!(adaptive_grid.cells[1],adaptive_grid.cells[1].leaves[6])
+    Ferrite.refine!(adaptive_grid.cells[1],adaptive_grid.cells[1].leaves[6])
+    balanced = Ferrite.balancetree(adaptive_grid.cells[1])
+    @test length(balanced.leaves) == 43
+
+    #3D case intra tree non conformity level 3 at two different places
+    adaptive_grid = ForestBWG(grid,4)
+    Ferrite.refine_all!(adaptive_grid,1)
+    Ferrite.refine!(adaptive_grid.cells[1],adaptive_grid.cells[1].leaves[2])
+    Ferrite.refine!(adaptive_grid.cells[1],adaptive_grid.cells[1].leaves[4])
+    Ferrite.refine!(adaptive_grid.cells[1],adaptive_grid.cells[1].leaves[7])
+    Ferrite.refine!(adaptive_grid.cells[1],adaptive_grid.cells[1].leaves[12])
+    Ferrite.refine!(adaptive_grid.cells[1],adaptive_grid.cells[1].leaves[28])
+    Ferrite.refine!(adaptive_grid.cells[1],adaptive_grid.cells[1].leaves[29])
+    Ferrite.refine!(adaptive_grid.cells[1],adaptive_grid.cells[1].leaves[37])
+    Ferrite.refine!(adaptive_grid.cells[1],adaptive_grid.cells[1].leaves[39])
+    balanced = Ferrite.balancetree(adaptive_grid.cells[1])
+    @test length(balanced.leaves) == 127
 end
 
 @testset "Materializing Grid" begin
