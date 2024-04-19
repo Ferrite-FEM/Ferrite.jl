@@ -573,6 +573,19 @@ end
     Ferrite.refine!(adaptive_grid.cells[1],adaptive_grid.cells[1].leaves[39])
     balanced = Ferrite.balancetree(adaptive_grid.cells[1])
     @test length(balanced.leaves) == 127
+
+    #3D case intra tree non conformity level 3 at two different places
+    grid = generate_grid(Hexahedron,(2,2,2))
+    adaptive_grid = ForestBWG(grid,4)
+    Ferrite.refine!(adaptive_grid.cells[1],adaptive_grid.cells[1].leaves[1])
+    Ferrite.refine!(adaptive_grid.cells[1],adaptive_grid.cells[1].leaves[2])
+    Ferrite.refine!(adaptive_grid.cells[1],adaptive_grid.cells[1].leaves[4])
+    #Ferrite.refine!(adaptive_grid.cells[1],adaptive_grid.cells[1].leaves[7])
+    Ferrite.refine!(adaptive_grid.cells[7],adaptive_grid.cells[7].leaves[1])
+    Ferrite.refine!(adaptive_grid.cells[7],adaptive_grid.cells[7].leaves[1])
+    Ferrite.refine!(adaptive_grid.cells[7],adaptive_grid.cells[7].leaves[1])
+    #Ferrite.refine!(adaptive_grid.cells[7],adaptive_grid.cells[7].leaves[1])
+    Ferrite.balanceforest!(adaptive_grid)
 end
 
 @testset "Materializing Grid" begin

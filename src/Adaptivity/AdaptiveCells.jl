@@ -895,13 +895,13 @@ function balanceforest!(forest::ForestBWG{dim}) where dim
                             end
                         else
                             s_i -= 14
-                            ec = forest.topology.edge_edge[k,edge_perm[s_i]]
+                            ec = forest.topology.edge_edge_neighbor[k,edge_perm[s_i]]
                             isempty(ec) && continue
                             @debug @assert length(ec) == 1
                             ec = ec[1]
                             k′, e′ = ec[1], edge_perm_inv[ec[2]]
-                            o′ = transform_face(forest,k′,f′,o,false)
-                            s′ = transform_face(forest,k′,f′,s,true)
+                            o′ = transform_edge(forest,k′,e′,o,false)
+                            s′ = transform_edge(forest,k′,e′,s,true)
                             neighbor_tree = forest.cells[ec[1]]
                             if s′ ∉ neighbor_tree.leaves && parent(s′, neighbor_tree.b) ∉ neighbor_tree.leaves
                                 if parent(parent(s′,neighbor_tree.b),neighbor_tree.b) ∈ neighbor_tree.leaves
