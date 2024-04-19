@@ -943,6 +943,24 @@ function possibleneighbors(o::OctantBWG{2},l,b;insidetree=true)
     return neighbors
 end
 
+function possibleneighbors(o::OctantBWG{3},l,b;insidetree=true)
+    neighbors = ntuple(26) do i
+        if 8 < i ≤ 14
+            j = i - 8
+            face_neighbor(o,j,b)
+        elseif 14 < i ≤ 26
+            j = i - 14
+            edge_neighbor(o,j,b)
+        else
+            corner_neighbor(o,i,b)
+        end
+    end
+    if insidetree
+        neighbors = filter(x->inside(x,b),neighbors)
+    end
+    return neighbors
+end
+
 """
     isancestor(o1,o2,b) -> Bool
 Is o2 an ancestor of o1
