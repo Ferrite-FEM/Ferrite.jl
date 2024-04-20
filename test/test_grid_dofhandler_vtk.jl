@@ -282,7 +282,7 @@ end
 
 end
 
-#=@testset "Grid topology" begin
+@testset "Grid topology" begin
 #
 #      (1) (2) (3) (4)
 #       +---+---+---+
@@ -298,7 +298,6 @@ end
     @test linetopo.vertex_vertex_neighbor[3,1] == Ferrite.EntityNeighborhood(VertexIndex(2,2))
     @test getneighborhood(linetopo, linegrid, VertexIndex(3,1)) == [VertexIndex(2,2)]
 
-    #= TODO: fix
     linefaceskeleton = Ferrite.facetskeleton(linetopo, linegrid)
     quadlinegrid = generate_grid(QuadraticLine,(3,))
     quadlinetopo = ExclusiveTopology(quadlinegrid)
@@ -306,7 +305,7 @@ end
     # Test faceskeleton
     @test Set(linefaceskeleton) == Set(quadlinefaceskeleton) == Set([
         VertexIndex(1,1), VertexIndex(1,2), VertexIndex(2,2),VertexIndex(3,2), 
-    ])=#
+    ])
 
 #                           (11)
 #                   (10)+-----+-----+(12)
@@ -520,15 +519,15 @@ end
     @test Set(Ferrite.toglobal(quadgrid, Ferrite.getstencil(stars, quadgrid, VertexIndex(2,1)))) == Set([2,1,6,3])
     @test Set(Ferrite.toglobal(quadgrid, Ferrite.getstencil(stars, quadgrid, VertexIndex(5,4)))) == Set([10,6,9,11,14])
 
-    #=face_skeleton = Ferrite.faceskeleton(topology, quadgrid)
-    @test Set(face_skeleton) == Set([FaceIndex(1,1),FaceIndex(1,2),FaceIndex(1,3),FaceIndex(1,4),
-                                          FaceIndex(2,1),FaceIndex(2,2),FaceIndex(2,3),
-                                          FaceIndex(3,1),FaceIndex(3,2),FaceIndex(3,3),
-                                          FaceIndex(4,2),FaceIndex(4,3),FaceIndex(4,4),
-                                          FaceIndex(5,2),FaceIndex(5,3),FaceIndex(6,2),FaceIndex(6,3),
-                                          FaceIndex(7,2),FaceIndex(7,3),FaceIndex(7,4),
-                                          FaceIndex(8,2),FaceIndex(8,3),FaceIndex(9,2),FaceIndex(9,3)])
-    @test length(face_skeleton) == 4*3 + 3*4=#
+    face_skeleton = Ferrite.facetskeleton(topology, quadgrid)
+    @test Set(face_skeleton) == Set([EdgeIndex(1,1),EdgeIndex(1,2),EdgeIndex(1,3),EdgeIndex(1,4),
+        EdgeIndex(2,1),EdgeIndex(2,2),EdgeIndex(2,3),
+        EdgeIndex(3,1),EdgeIndex(3,2),EdgeIndex(3,3),
+        EdgeIndex(4,2),EdgeIndex(4,3),EdgeIndex(4,4),
+        EdgeIndex(5,2),EdgeIndex(5,3),EdgeIndex(6,2),EdgeIndex(6,3),
+        EdgeIndex(7,2),EdgeIndex(7,3),EdgeIndex(7,4),
+        EdgeIndex(8,2),EdgeIndex(8,3),EdgeIndex(9,2),EdgeIndex(9,3)])
+    @test length(face_skeleton) == 4*3 + 3*4
 
     quadratic_quadgrid = generate_grid(QuadraticQuadrilateral,(3,3))
     quadgrid_topology = ExclusiveTopology(quadratic_quadgrid)
@@ -574,7 +573,7 @@ end
     end
     @test isapprox(jump_abs, 2/3*2*4,atol=1e-6) # 2*4*0.66666, jump is always 2, 4 sides, length =0.66
     @test isapprox(jump_int, 0.0, atol=1e-6)
-end=#
+end
 
 @testset "grid coloring" begin
     function test_coloring(grid, cellset=1:getncells(grid))

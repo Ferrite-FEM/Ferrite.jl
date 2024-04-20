@@ -47,10 +47,9 @@ getrefshape(::AbstractCell{refshape}) where refshape = refshape
 nvertices(c::AbstractCell) = length(vertices(c))
 nedges(   c::AbstractCell) = length(edges(c))
 nfaces(   c::AbstractCell) = length(faces(c))
-nvertices(   ::Type{T}) where {T <: AbstractRefShape} = length(reference_vertices(T))
+nvertices(::Type{T}) where {T <: AbstractRefShape} = length(reference_vertices(T))
 nedges(   ::Type{T}) where {T <: AbstractRefShape} = length(reference_edges(T))
 nfaces(   ::Type{T}) where {T <: AbstractRefShape} = length(reference_faces(T))
-nfacets(   ::Type{T}) where {T <: AbstractRefShape} = length(reference_facets(T))
 nnodes(   c::AbstractCell) = length(get_node_ids(c))
 
 """
@@ -126,14 +125,13 @@ function vertices(c::AbstractCell{RefLine})
 end
 function edges(c::AbstractCell{RefLine})
     ns = get_node_ids(c)
-    return ((ns[1],ns[2]),) # f1, f2
+    return ((ns[1],ns[2]),) # e1
 end
 function faces(c::AbstractCell{RefLine})
-    #ns = get_node_ids(c)
-    return () # f1, f2
+    return ()
 end
 function reference_vertices(::Type{RefLine})
-    return ((1,), (2,)) # f1, f2
+    return (1, 2) 
 end
 
 # RefTriangle (refdim = 2): vertices for vertexdofs, faces for facedofs (edgedofs) and BC
@@ -144,7 +142,7 @@ end
 function edges(c::AbstractCell{RefTriangle})
     ns = get_node_ids(c)
     return (
-        (ns[1], ns[2]), (ns[2], ns[3]), (ns[3], ns[1]), # f1, f2, f3
+        (ns[1], ns[2]), (ns[2], ns[3]), (ns[3], ns[1]), # e1, e2, e3
     )
 end
 function faces(c::AbstractCell{RefTriangle})
@@ -155,7 +153,7 @@ function faces(c::AbstractCell{RefTriangle})
 end
 function reference_edges(::Type{RefTriangle})
     return (
-        (1, 2), (2, 3), (3, 1), # f1, f2, f3
+        (1, 2), (2, 3), (3, 1), # e1, e2, e3
     )
 end
 
@@ -167,7 +165,7 @@ end
 function edges(c::AbstractCell{RefQuadrilateral})
     ns = get_node_ids(c)
     return (
-        (ns[1], ns[2]), (ns[2], ns[3]), (ns[3], ns[4]), (ns[4], ns[1]), # f1, f2, f3, f4
+        (ns[1], ns[2]), (ns[2], ns[3]), (ns[3], ns[4]), (ns[4], ns[1]), # e1, e2, e3, e4
     )
 end
 function faces(c::AbstractCell{RefQuadrilateral})
@@ -178,7 +176,7 @@ function faces(c::AbstractCell{RefQuadrilateral})
 end
 function reference_edges(::Type{RefQuadrilateral})
     return (
-        (1, 2), (2, 3), (3, 4), (4, 1), # f1, f2, f3, f4
+        (1, 2), (2, 3), (3, 4), (4, 1), # e1, e2, e3, e4
     )
 end
 
@@ -522,63 +520,6 @@ Returns all vertex sets of the grid.
 @inline getvertexsets(grid::AbstractGrid) = grid.vertexsets
 
 n_faces_per_cell(grid::Grid) = nfaces(getcelltype(grid))
-
-
-"""
-    getfacetset(grid::AbstractGrid, setname::String)
-
-Returns all facets in a `Set` of a given `setname`. 
-"""
-getfacetset(grid::AbstractGrid{sdim}, setname::String) where sdim = getfacetsets(grid)[setname]
-
-"""
-    getfacetsets(grid::AbstractGrid)
-
-Returns all facet sets of the grid.
-"""
-getfacetsets(grid::AbstractGrid{1}) = grid.vertexsets
-getfacetsets(grid::AbstractGrid{2}) = grid.edgesets
-getfacetsets(grid::AbstractGrid{3}) = grid.facesets
-
-addfacetset!(grid::AbstractGrid{1}, args...; kwargs...) = addvertexset!(grid, args...; kwargs...)
-addfacetset!(grid::AbstractGrid{2}, args...; kwargs...) = addedgeset!(grid, args...; kwargs...)
-addfacetset!(grid::AbstractGrid{3}, args...; kwargs...) = addfaceset!(grid, args...; kwargs...)
-
-#Backwards compat
-@inline getfacesets(grid::AbstractGrid{2}) = grid.egdeset
-function getfaceset(grid::AbstractGrid{2}, setname::String) 
-    @warn("getfaceset for 2d-problems have been deprecated. Use addfacetset! instead")
-    grid.edgesets[setname]
-end
-function addfaceset!(grid::AbstractGrid{2}, name::String, f::Function; all::Bool=true) 
-    @warn("addfaceset! for 2d-problems have been deprecated. Use addfacetset! instead")
-    addedgeset!(grid, name, f; all)
-end
-function addfaceset!(grid::AbstractGrid{2}, name::String, set::Union{Set{EdgeIndex},Vector{EdgeIndex}}) 
-    @warn("addfaceset! for 2d-problems have been deprecated. Use addfacetset! instead")
-    addedgeset!(grid, name, set)
-end
-
-@inline getfacesets(grid::AbstractGrid{1}) = grid.vertexsets
-function getfaceset(grid::AbstractGrid{1}, setname::String) 
-    @warn("getfaceset for 1d-problems have been deprecated. Use addfacetset! instead")
-    grid.vertexsets[setname]
-end
-function addfaceset!(grid::AbstractGrid{1}, name::String, f::Function; all::Bool=true) 
-    @warn("addfaceset! for 1d-problems have been deprecated. Use addfacetset! instead")
-     addvertexset!(grid, name, f; all)
-end
-function addfaceset!(grid::AbstractGrid{1}, name::String, set::Union{Set{VertexIndex},Vector{VertexIndex}}) 
-    addvertexset!(grid, name, set)
-end
-
-@inline facets(c::AbstractCell{<:AbstractRefShape{1}}) = vertices(c)
-@inline facets(c::AbstractCell{<:AbstractRefShape{2}}) = edges(c)
-@inline facets(c::AbstractCell{<:AbstractRefShape{3}}) = faces(c)
-
-@inline reference_facets(c::Type{<:AbstractRefShape{1}}) = reference_vertices(c)
-@inline reference_facets(c::Type{<:AbstractRefShape{2}}) = reference_edges(c)
-@inline reference_facets(c::Type{<:AbstractRefShape{3}}) = reference_faces(c)
 
 # Transformations
 """
@@ -1011,4 +952,49 @@ function OrientationInfo(surface::NTuple{N, Int}) where N
         flipped = surface[min_idx + 1] < surface[min_idx - 1]
     end
     return OrientationInfo(flipped, shift_index)
+end
+
+# Dispatches for facets and boundary
+
+"""
+    getfacetset(grid::AbstractGrid, setname::String)
+
+Returns all facets in a `Set` of a given `setname`. 
+"""
+getfacetset(grid::AbstractGrid{1}, setname::String) = grid.vertexsets[setname]
+getfacetset(grid::AbstractGrid{2}, setname::String) = grid.edgesets[setname]
+getfacetset(grid::AbstractGrid{3}, setname::String) = grid.facesets[setname]
+
+"""
+    getfacetsets(grid::AbstractGrid)
+
+Returns all facet sets of the grid.
+"""
+getfacetsets(grid::AbstractGrid{1}) = grid.vertexsets
+getfacetsets(grid::AbstractGrid{2}) = grid.edgesets
+getfacetsets(grid::AbstractGrid{3}) = grid.facesets
+
+addfacetset!(grid::AbstractGrid{1}, args...; kwargs...) = addvertexset!(grid, args...; kwargs...)
+addfacetset!(grid::AbstractGrid{2}, args...; kwargs...) = addedgeset!(grid, args...; kwargs...)
+addfacetset!(grid::AbstractGrid{3}, args...; kwargs...) = addfaceset!(grid, args...; kwargs...)
+
+@inline facets(c::AbstractCell{<:AbstractRefShape{1}}) = vertices(c)
+@inline facets(c::AbstractCell{<:AbstractRefShape{2}}) = edges(c)
+@inline facets(c::AbstractCell{<:AbstractRefShape{3}}) = faces(c)
+nfacets(::Type{T}) where {T <: AbstractRefShape} = length(reference_facets(T))
+
+@inline reference_facets(c::Type{<:AbstractRefShape{1}}) = reference_vertices(c)
+@inline reference_facets(c::Type{<:AbstractRefShape{2}}) = reference_edges(c)
+@inline reference_facets(c::Type{<:AbstractRefShape{3}}) = reference_faces(c)
+
+#Backward compat
+function getfaceset(grid::Union{AbstractGrid{1},AbstractGrid{2}}, args...; kwargs...)
+    sdim = getdim(grid)
+    @warn("getfaceset for $sdim-problems have been deprecated. Use addfacetset! instead")
+    getfacetset(grid, args...; kwargs...)
+end
+function addfaceset!(grid::Union{AbstractGrid{1},AbstractGrid{2}}, args...; kwargs...) 
+    sdim = getdim(grid)
+    @warn("addfaceset! for $sdim-problems have been deprecated. Use addfacetset! instead")
+    addvertexset!(grid, args...; kwargs...)
 end

@@ -397,19 +397,19 @@ function faceskeleton(top::ExclusiveTopology, grid::Grid)
     end
     return top.face_skeleton
 end
-
-facetskeleton(top::ExclusiveTopology, grid::Grid{3}) = faceskeleton(top, grid)
-
-function facetskeleton(top::ExclusiveTopology, grid::Grid{2})
+function edgeskeleton(top::ExclusiveTopology, grid::Grid)
     if top.edge_skeleton === nothing
         top.edge_skeleton = _edgeskeleton(top, grid)
     end
     return top.edge_skeleton
 end
-
-function facetskeleton(top::ExclusiveTopology, grid::Grid{1})
+function vertexskeleton(top::ExclusiveTopology, grid::Grid)
     if top.vertex_skeleton === nothing
         top.vertex_skeleton = _vertexskeleton(top, grid)
     end
     return top.vertex_skeleton
 end
+
+facetskeleton(top::ExclusiveTopology, grid::Grid{3}) = faceskeleton(top, grid)
+facetskeleton(top::ExclusiveTopology, grid::Grid{2}) = edgeskeleton(top, grid)
+facetskeleton(top::ExclusiveTopology, grid::Grid{1}) = vertexskeleton(top, grid)
