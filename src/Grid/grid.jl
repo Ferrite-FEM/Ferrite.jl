@@ -957,44 +957,58 @@ end
 # Dispatches for facets and boundary
 
 """
-    getfacetset(grid::AbstractGrid, setname::String)
+    getboundaryset(grid::AbstractGrid, setname::String)
 
-Returns all facets in a `Set` of a given `setname`. 
+Returns the a boundary set of a given `setname`. 
+The boundary set is a defined as ::Set{FaceIndex} in 3d-problems, ::Set{EdgeIndex} in 2d-problems, and ::Set{VertexIndex} in 1d-problems, 
 """
-getfacetset(grid::AbstractGrid{1}, setname::String) = grid.vertexsets[setname]
-getfacetset(grid::AbstractGrid{2}, setname::String) = grid.edgesets[setname]
-getfacetset(grid::AbstractGrid{3}, setname::String) = grid.facesets[setname]
+getboundaryset(grid::AbstractGrid{1}, setname::String) = grid.vertexsets[setname]
+getboundaryset(grid::AbstractGrid{2}, setname::String) = grid.edgesets[setname]
+getboundaryset(grid::AbstractGrid{3}, setname::String) = grid.facesets[setname]
+
 
 """
-    getfacetsets(grid::AbstractGrid)
+    addboundaryset!(grid::AbstractGrid, name::String, faceid::Union{Set{<:BoundaryIndex},Vector{<:BoundaryIndex}})
+    addboundaryset!(grid::AbstractGrid, name::String, f::Function; all::Bool=true) 
 
-Returns all facet sets of the grid.
+Adds a boundary set to the grid with key `name`.
+The boundary set is a defined as ::Set{FaceIndex} in 3d-problems, ::Set{EdgeIndex} in 2d-problems, and ::Set{VertexIndex} in 1d-problems, 
+
+A boundary set maps a `String` key to a `Set` of tuples corresponding to `(global_cell_id, local_id)`.
+Boundary sets are used to initialize `Dirichlet` structs, that are needed to specify the boundary for the `ConstraintHandler`.
+`all=true` implies that `f(x)` must return `true` for all nodal coordinates `x` on the boundary if the boundary
+should be added to the set, otherwise it suffices that `f(x)` returns `true` for one node. 
 """
-getfacetsets(grid::AbstractGrid{1}) = grid.vertexsets
-getfacetsets(grid::AbstractGrid{2}) = grid.edgesets
-getfacetsets(grid::AbstractGrid{3}) = grid.facesets
+addboundaryset!(grid::AbstractGrid{1}, args...; kwargs...) = addvertexset!(grid, args...; kwargs...)
+addboundaryset!(grid::AbstractGrid{2}, args...; kwargs...) = addedgeset!(grid, args...; kwargs...)
+addboundaryset!(grid::AbstractGrid{3}, args...; kwargs...) = addfaceset!(grid, args...; kwargs...)
 
-addfacetset!(grid::AbstractGrid{1}, args...; kwargs...) = addvertexset!(grid, args...; kwargs...)
-addfacetset!(grid::AbstractGrid{2}, args...; kwargs...) = addedgeset!(grid, args...; kwargs...)
-addfacetset!(grid::AbstractGrid{3}, args...; kwargs...) = addfaceset!(grid, args...; kwargs...)
+"""
+    getboundarysets(grid::AbstractGrid)
+
+Returns the boundary sets of the grid.
+"""
+getboundarysets(grid::AbstractGrid{1}) = grid.vertexsets
+getboundarysets(grid::AbstractGrid{2}) = grid.edgesets
+getboundarysets(grid::AbstractGrid{3}) = grid.facesets
 
 @inline facets(c::AbstractCell{<:AbstractRefShape{1}}) = vertices(c)
 @inline facets(c::AbstractCell{<:AbstractRefShape{2}}) = edges(c)
 @inline facets(c::AbstractCell{<:AbstractRefShape{3}}) = faces(c)
-nfacets(::Type{T}) where {T <: AbstractRefShape} = length(reference_facets(T))
 
 @inline reference_facets(c::Type{<:AbstractRefShape{1}}) = reference_vertices(c)
 @inline reference_facets(c::Type{<:AbstractRefShape{2}}) = reference_edges(c)
 @inline reference_facets(c::Type{<:AbstractRefShape{3}}) = reference_faces(c)
+nfacets(::Type{T}) where {T <: AbstractRefShape} = length(reference_facets(T))
 
 #Backward compat
 function getfaceset(grid::Union{AbstractGrid{1},AbstractGrid{2}}, args...; kwargs...)
     sdim = getdim(grid)
-    @warn("getfaceset for $sdim-problems have been deprecated. Use addfacetset! instead")
-    getfacetset(grid, args...; kwargs...)
+    @warn("getfaceset for $sdim-problems have been deprecated. Use getboundaryset instead")
+    getboundaryset(grid, args...; kwargs...)
 end
 function addfaceset!(grid::Union{AbstractGrid{1},AbstractGrid{2}}, args...; kwargs...) 
     sdim = getdim(grid)
-    @warn("addfaceset! for $sdim-problems have been deprecated. Use addfacetset! instead")
-    addvertexset!(grid, args...; kwargs...)
+    @warn("addfaceset! for $sdim-problems have been deprecated. Use addboundaryset! instead")
+    addboundaryset!(grid, args...; kwargs...)
 end

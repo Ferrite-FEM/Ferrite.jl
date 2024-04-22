@@ -161,7 +161,7 @@ function create_bc(dh, grid)
     dbcs = ConstraintHandler(dh)
     ## Clamped on the left side
     dofs = [1, 2, 3]
-    dbc = Dirichlet(:u, getfacetset(grid, "left"), (x,t) -> [0.0, 0.0, 0.0], dofs)
+    dbc = Dirichlet(:u, getboundaryset(grid, "left"), (x,t) -> [0.0, 0.0, 0.0], dofs)
     add!(dbcs, dbc)
     close!(dbcs)
     return dbcs
@@ -311,7 +311,7 @@ function solve()
             ## Tangent and residual contribution from the cells (volume integral)
             doassemble!(K, r, cellvalues, dh, material, u, states, states_old);
             ## Residual contribution from the Neumann boundary (surface integral)
-            doassemble_neumann!(r, dh, getfacetset(grid, "right"), facevalues, traction)
+            doassemble_neumann!(r, dh, getboundaryset(grid, "right"), facevalues, traction)
             norm_r = norm(r[Ferrite.free_dofs(dbcs)])
 
             print("Iteration: $newton_itr \tresidual: $(@sprintf("%.8f", norm_r))\n")

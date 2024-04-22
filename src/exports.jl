@@ -90,7 +90,7 @@ export
     getfaceset,
     getedgeset,
     getvertexset,
-    getfacetset,
+    getboundaryset,
     get_node_coordinate,
     getcoordinates,
     getcoordinates!,
@@ -104,7 +104,7 @@ export
     addvertexset!,
     addboundaryvertexset!,
     addcellset!,
-    addfacetset!,
+    addboundaryset!,
     transform_coordinates!,
     generate_grid,
 

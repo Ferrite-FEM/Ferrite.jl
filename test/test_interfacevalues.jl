@@ -140,6 +140,7 @@
             cellfacets = Ferrite.facets(cell)
             if dim == 1 # change vertices from (1, 2) to ((1,),(2,))
                 cellfacets = ntuple(i->(cellfacets[i],), length(cellfacets))
+                faces_indices = ntuple(i->(faces_indices[i],), length(faces_indices))
             end
             @test getindex.(Ref(node_ids), collect.(faces_indices)) == cellfacets == getindex.(Ref(node_ids), collect.(geom_ip_faces_indices))
         end

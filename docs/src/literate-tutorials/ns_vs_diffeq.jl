@@ -179,7 +179,7 @@ ch = ConstraintHandler(dh);
 nosplip_face_names = ["top", "bottom", "hole"];
 # No hole for the test present                                          #src
 nosplip_face_names = ["top", "bottom"]                                  #hide
-∂Ω_noslip = union(getfacetset.((grid, ), nosplip_face_names)...);
+∂Ω_noslip = union(getboundaryset.((grid, ), nosplip_face_names)...);
 noslip_bc = Dirichlet(:v, ∂Ω_noslip, (x, t) -> [0,0], [1,2])
 add!(ch, noslip_bc);
 
@@ -188,7 +188,7 @@ add!(ch, noslip_bc);
 # is already enough to obtain some simple vortex streets. By increasing the
 # velocity further we can obtain stronger vortices - which may need additional
 # refinement of the grid.
-∂Ω_inflow = getfacetset(grid, "left");
+∂Ω_inflow = getboundaryset(grid, "left");
 
 vᵢₙ(t) = clamp(t, 0.0, 1.0)*1.0 #inflow velocity
 vᵢₙ(t) = clamp(t, 0.0, 1.0)*0.3 #hide
@@ -200,7 +200,7 @@ add!(ch, inflow_bc);
 # cylinder when the weak form has been derived by setting the boundary integral
 # to zero. It is also called the do-nothing condition. Other outflow conditions
 # are also possible.
-∂Ω_free = getfacetset(grid, "right");
+∂Ω_free = getboundaryset(grid, "right");
 
 close!(ch)
 update!(ch, 0.0);

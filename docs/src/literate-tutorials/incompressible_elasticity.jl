@@ -33,8 +33,8 @@ function create_cook_grid(nx, ny)
                Vec{2}(( 0.0, 44.0))]
     grid = generate_grid(Triangle, (nx, ny), corners)
     ## facesets for boundary conditions
-    addfacetset!(grid, "clamped", x -> norm(x[1]) ≈ 0.0)
-    addfacetset!(grid, "traction", x -> norm(x[1]) ≈ 48.0)
+    addboundaryset!(grid, "clamped", x -> norm(x[1]) ≈ 0.0)
+    addboundaryset!(grid, "traction", x -> norm(x[1]) ≈ 48.0)
     return grid
 end;
 
@@ -69,7 +69,7 @@ end;
 # We specify a homogeneous Dirichlet bc on the displacement field, `:u`.
 function create_bc(dh)
     dbc = ConstraintHandler(dh)
-    add!(dbc, Dirichlet(:u, getfacetset(dh.grid, "clamped"), x -> zero(x), [1, 2]))
+    add!(dbc, Dirichlet(:u, getboundaryset(dh.grid, "clamped"), x -> zero(x), [1, 2]))
     close!(dbc)
     return dbc
 end;
@@ -158,7 +158,7 @@ function assemble_up!(Ke, fe, cell, cellvalues_u, cellvalues_p, facevalues_u, gr
     ## We loop over all the faces in the cell, then check if the face
     ## is in our `"traction"` faceset.
     for face in 1:nfaces(cell)
-        if onboundary(cell, face) && (cellid(cell), face) ∈ getfacetset(grid, "traction")
+        if onboundary(cell, face) && (cellid(cell), face) ∈ getboundaryset(grid, "traction")
             reinit!(facevalues_u, cell, face)
             for q_point in 1:getnquadpoints(facevalues_u)
                 dΓ = getdetJdV(facevalues_u, q_point)
