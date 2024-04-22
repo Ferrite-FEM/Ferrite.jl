@@ -714,10 +714,12 @@ function creategrid(forest::ForestBWG{dim,C,T}) where {dim,C,T}
     # Phase 5: Generate grid and haning nodes
     facesets = reconstruct_facesets(forest) #TODO edge, node and cellsets
     hnodes = hangingnodes(forest, nodeids, nodeowners)
+    @show hnodes
     hnodes_dedup = Dict{Int64, Vector{Int64}}()
     for (constrained,constainers) in hnodes
         hnodes_dedup[nodeids_dedup[constrained]] = [nodeids_dedup[constainer] for constainer in constainers]
     end
+    @show hnodes_dedup
     return NonConformingGrid(cells, nodes_physical .|> Node, facesets=facesets, conformity_info=hnodes_dedup)
 end
 
@@ -749,12 +751,14 @@ end
 function hangingnodes(forest::ForestBWG{dim}, nodeids, nodeowners) where dim
     _perm = dim == 2 ? 𝒱₂_perm : 𝒱₃_perm
     _perminv = dim == 2 ? 𝒱₂_perm_inv : 𝒱₃_perm_inv
+    facetable = dim == 2 ? 𝒱₂ : 𝒱₃
     opposite_face = dim == 2 ? opposite_face_2 : opposite_face_3
     #hnodes = Dict{Tuple{Int,NTuple{dim,Int32}},Vector{Tuple{Int,NTuple{dim,Int32}}}}()
     hnodes = Dict{Int,Vector{Int}}()
     for (k,tree) in enumerate(forest.cells)
         rootfaces = faces(root(dim),tree.b)
         for (l,leaf) in enumerate(tree.leaves)
+            c̃ = child_id(leaf,tree.b)
             if leaf == root(dim)
                 continue
             end
@@ -771,6 +775,20 @@ function hangingnodes(forest::ForestBWG{dim}, nodeids, nodeowners) where dim
                                 nf = findfirst(x->x==pface,neighbor_candidate_faces)
                                 #hnodes[(k,c)] = [(k,nc) for nc in neighbor_candidate_faces[nf]]
                                 hnodes[nodeids[nodeowners[(k,c)]]] = [nodeids[nodeowners[(k,nc)]] for nc in neighbor_candidate_faces[nf]]
+                                #if dim > 2
+                                #    vs = vertices(leaf,tree.b)
+                                #    for ξ ∈ 1:4
+                                #        c′ = facetable[pface_i, ξ]
+                                #        if !haskey(hnodes,nodeids[nodeowners[(k,c)]])
+                                #            neighbor_candidate_edges = edges(neighbor_candidate,tree.b)
+                                #            ne = findfirst(x->iscenter(vs[c′],x),neighbor_candidate_edges)
+                                #            #hnodes[(k,c)] = [(k,nc) for nc in neighbor_candidate_faces[nf]]
+                                #            if ne !== nothing
+                                #                hnodes[nodeids[nodeowners[(k,c)]]] = [nodeids[nodeowners[(k,ne)]] for ne in neighbor_candidate_edges[ne]]
+                                #            end
+                                #        end
+                                #    end
+                                #end
                                 break
                             end
                         else #interoctree branch

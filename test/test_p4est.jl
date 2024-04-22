@@ -775,3 +775,28 @@ end
     @test unique(transfered_grid.nodes) == transfered_grid.nodes
     #TODO iterate over all rotated versions and check if det J > 0
 end
+
+@testset "hanging nodes" begin
+    grid = generate_grid(Hexahedron,(1,1,1))
+    adaptive_grid = ForestBWG(grid,3)
+    Ferrite.refine_all!(adaptive_grid,1)
+    Ferrite.refine!(adaptive_grid.cells[1],adaptive_grid.cells[1].leaves[1])
+    # x-----------x-----------x
+    # |           |           |
+    # |           |           |
+    # |           |           |
+    # |           |           |
+    # |           |           |
+    # |           |           |
+    # |           |           |
+    # x-----x-----x-----------x
+    # |     |     |           |
+    # |     |     |           |
+    # |     |     |           |
+    # x-----x-----x           |
+    # |     |     |           |
+    # |     |     |           |
+    # |     |     |           |
+    # x-----x-----x-----------x
+    transfered_grid = Ferrite.creategrid(adaptive_grid)
+end
