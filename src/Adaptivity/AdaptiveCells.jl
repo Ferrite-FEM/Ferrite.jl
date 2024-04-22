@@ -832,7 +832,7 @@ function balanceforest!(forest::ForestBWG{dim}) where dim
                             cc = cc[1]
                             k′, c′ = cc[1], perm_corner_inv[cc[2]]
                             o′ = transform_corner(forest,k′,c′,o,false)
-                            s′ = transform_corner(forest,k′,c′,s,true)
+                            s′ = transform_corner(forest,k′,c′,s,false) #TODO verify the bool here; I think it's correct
                             neighbor_tree = forest.cells[cc[1]]
                             if s′ ∉ neighbor_tree.leaves && parent(s′, neighbor_tree.b) ∉ neighbor_tree.leaves
                                 if parent(parent(s′,neighbor_tree.b),neighbor_tree.b) ∈ neighbor_tree.leaves
@@ -867,7 +867,7 @@ function balanceforest!(forest::ForestBWG{dim}) where dim
                             cc = cc[1]
                             k′, c′ = cc[1], perm_corner_inv[cc[2]]
                             o′ = transform_corner(forest,k′,c′,o,false)
-                            s′ = transform_corner(forest,k′,c′,s,true)
+                            s′ = transform_corner(forest,k′,c′,s,false)
                             neighbor_tree = forest.cells[cc[1]]
                             if s′ ∉ neighbor_tree.leaves && parent(s′, neighbor_tree.b) ∉ neighbor_tree.leaves
                                 if parent(parent(s′,neighbor_tree.b),neighbor_tree.b) ∈ neighbor_tree.leaves
@@ -901,7 +901,7 @@ function balanceforest!(forest::ForestBWG{dim}) where dim
                             ec = ec[1]
                             k′, e′ = ec[1], edge_perm_inv[ec[2]]
                             o′ = transform_edge(forest,k′,e′,o,false)
-                            s′ = transform_edge(forest,k′,e′,s,true)
+                            s′ = transform_edge(forest,k′,e′,s,false)
                             neighbor_tree = forest.cells[ec[1]]
                             if s′ ∉ neighbor_tree.leaves && parent(s′, neighbor_tree.b) ∉ neighbor_tree.leaves
                                 if parent(parent(s′,neighbor_tree.b),neighbor_tree.b) ∈ neighbor_tree.leaves
@@ -1522,11 +1522,16 @@ Algorithm 12 but with flipped logic in [BWG2011](@citet) to transform corner int
 Implements flipped logic in the sense of pushing the Octant `oct` through vertex v and stays within octree coordinate system `k`.
 """
 function transform_corner(forest::ForestBWG,k::T1,c::T1,oct::OctantBWG{dim,N,T2},inside::Bool) where {dim,N,T1<:Integer,T2<:Integer}
+    _perm = dim == 2 ? node_map₂ : node_map₃
+    _perminv = dim == 2 ? node_map₂_inv : node_map₃_inv
+    k′, c′ = forest.topology.vertex_vertex_neighbor[k,_perm[c]][1]
+    k′, c′ = forest.topology.vertex_vertex_neighbor[k′,c′][1] #get the corner connection of neighbor to pivot oct
+    c′ = _perminv[c′]
     # make a dispatch that returns only the coordinates?
     b = forest.cells[k].b
     l = oct.l; g = 2^b - 2^(b-l)
     h⁻ = inside ? 0 : -2^(b-l); h⁺ = inside ? g : 2^b
-    xyz = ntuple(i->((c-1) & 2^(i-1) == 0) ? h⁻ : h⁺,dim)
+    xyz = ntuple(i->((c′-1) & 2^(i-1) == 0) ? h⁻ : h⁺,dim)
     return OctantBWG(l,xyz)
 end
 
@@ -1602,16 +1607,22 @@ Algorithm 10 in [BWG2011](@citet) to transform cedge into different octree coord
 See `transform_edge_remote` with logic from paper.
 In this function we stick to the coordinate system of the pivot tree k and transform an octant through edge e into this k-th octree coordinate system.
 """
-function transform_edge(forest::ForestBWG,k::T1,e::T1,oct::OctantBWG{3,N,T2},inside::Bool) where {N,T1<:Integer,T2<:Integer}     
+function transform_edge(forest::ForestBWG,k::T1,e::T1,oct::OctantBWG{3,N,T2},inside::Bool) where {N,T1<:Integer,T2<:Integer}
     _four = T2(4)
     _one = T2(1)
     _two = T2(2)
     z = zero(T2)
+    e_perm = edge_perm
+    e_perminv = edge_perm_inv
 
+    e_ferrite = e_perm[e]
+    k′, e′_ferrite = forest.topology.edge_edge_neighbor[k,e_ferrite][1]
+    k′, e′_ferrite = forest.topology.edge_edge_neighbor[k′,e′_ferrite][1] #get pivot connection from neighbor perspective
+    e′ = e_perminv[e′_ferrite]
     #see Algorithm 9, line 18
-    𝐛 = (((e-_one) ÷ _four),
-           e-_one < 4 ? 1 : 0,
-           e-_one < 8 ? 2 : 1)
+    𝐛 = (((e′-_one) ÷ _four),
+           e′-_one < 4 ? 1 : 0,
+           e′-_one < 8 ? 2 : 1)
     a₀ = ((e-_one) ÷ _four) #subtract 1 based index
     a₀ += _one #add it again
     b = forest.cells[k].b
@@ -1620,8 +1631,10 @@ function transform_edge(forest::ForestBWG,k::T1,e::T1,oct::OctantBWG{3,N,T2},ins
     s = compute_edge_orientation(forest,k,e)
     xyz = zeros(T2,3)
     xyz[𝐛[1]+_one] = s*g+(_one-(_two*s))*oct.xyz[a₀]
-    xyz[𝐛[2]+_one] = ((e-_one) & 1) == 0 ? h⁻ : h⁺
-    xyz[𝐛[3]+_one] = ((e-_one) & 2) == 0 ? h⁻ : h⁺
+    xyz[𝐛[2]+_one] = ((e′-_one) & 1) == 0 ? h⁻ : h⁺
+    #xyz[𝐛[2]+_one] = ((e-_one) & 1) == 0 ? h⁻ : h⁺
+    xyz[𝐛[3]+_one] = ((e′-_one) & 2) == 0 ? h⁻ : h⁺
+    #xyz[𝐛[3]+_one] = ((e-_one) & 2) == 0 ? h⁻ : h⁺
     return OctantBWG(l,(xyz[1],xyz[2],xyz[3]))
 end
 

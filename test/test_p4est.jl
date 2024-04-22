@@ -404,13 +404,13 @@ end
     @test_throws BoundsError Ferrite.transform_face_remote(adaptive_grid, FaceIndex(8,6), o)
 
     #corners
-    @test Ferrite.transform_corner(adaptive_grid, VertexIndex(1,1), o, false) == OctantBWG(0,(-8,-8,-8))
-    @test Ferrite.transform_corner(adaptive_grid, VertexIndex(1,2), o, false) == OctantBWG(0,(8,-8,-8))
-    @test Ferrite.transform_corner(adaptive_grid, VertexIndex(1,3), o, false) == OctantBWG(0,(-8,8,-8))
-    @test Ferrite.transform_corner(adaptive_grid, VertexIndex(1,4), o, false) == OctantBWG(0,(8,8,-8))
-    @test Ferrite.transform_corner(adaptive_grid, VertexIndex(1,5), o, false) == OctantBWG(0,(-8,-8,8))
-    @test Ferrite.transform_corner(adaptive_grid, VertexIndex(1,6), o, false) == OctantBWG(0,(8,-8,8))
-    @test Ferrite.transform_corner(adaptive_grid, VertexIndex(1,7), o, false) == OctantBWG(0,(-8,8,8))
+    @test_throws BoundsError Ferrite.transform_corner(adaptive_grid, VertexIndex(1,1), o, false) == OctantBWG(0,(-8,-8,-8))
+    @test_throws BoundsError Ferrite.transform_corner(adaptive_grid, VertexIndex(1,2), o, false) == OctantBWG(0,(8,-8,-8))
+    @test_throws BoundsError Ferrite.transform_corner(adaptive_grid, VertexIndex(1,3), o, false) == OctantBWG(0,(-8,8,-8))
+    @test_throws BoundsError Ferrite.transform_corner(adaptive_grid, VertexIndex(1,4), o, false) == OctantBWG(0,(8,8,-8))
+    @test_throws BoundsError Ferrite.transform_corner(adaptive_grid, VertexIndex(1,5), o, false) == OctantBWG(0,(-8,-8,8))
+    @test_throws BoundsError Ferrite.transform_corner(adaptive_grid, VertexIndex(1,6), o, false) == OctantBWG(0,(8,-8,8))
+    @test_throws BoundsError Ferrite.transform_corner(adaptive_grid, VertexIndex(1,7), o, false) == OctantBWG(0,(-8,8,8))
     @test Ferrite.transform_corner(adaptive_grid, VertexIndex(1,8), o, false) == OctantBWG(0,(8,8,8))
     @test_throws BoundsError Ferrite.transform_corner_remote(adaptive_grid, VertexIndex(1,1), o, false)
     @test_throws BoundsError Ferrite.transform_corner_remote(adaptive_grid, VertexIndex(1,2), o, false)
@@ -447,6 +447,31 @@ end
     @test Ferrite.transform_edge(adaptive_grid, EdgeIndex(1,12), o, false) == OctantBWG(0,(8,8,0))
     @test Ferrite.transform_edge_remote(adaptive_grid, EdgeIndex(1,12), o, false) == OctantBWG(0,(-8,-8,0))
 
+    # Rotate three dimensional case 
+    grid = generate_grid(Hexahedron,(2,2,2))
+    # This is our root mesh top view
+    # x-----------x-----------x
+    # |6    3    5|8    4    7|
+    # |           |           |
+    # |     ^     |     ^     |
+    # |2    |    1|1    |    2|
+    # |  <--+     |     +-->  |
+    # |           |           |
+    # |7    4    8|5    3    6|
+    # x-----------x-----------x
+    # |8    4    7|8    4    7|
+    # |           |           |
+    # |     ^     |     ^     |
+    # |1    |    2|1    |    2|
+    # |     +-->  |     +-->  |
+    # |           |           |
+    # |5    3    6|5    3    6|
+    # x-----------x-----------x
+    # Rotate face topologically
+    grid.cells[7] = Hexahedron((grid.cells[7].nodes[2], grid.cells[7].nodes[3], grid.cells[7].nodes[4], grid.cells[7].nodes[1], grid.cells[7].nodes[4+2], grid.cells[7].nodes[4+3], grid.cells[7].nodes[4+4], grid.cells[7].nodes[4+1]))
+    grid.cells[7] = Hexahedron((grid.cells[7].nodes[2], grid.cells[7].nodes[3], grid.cells[7].nodes[4], grid.cells[7].nodes[1], grid.cells[7].nodes[4+2], grid.cells[7].nodes[4+3], grid.cells[7].nodes[4+4], grid.cells[7].nodes[4+1]))
+    adaptive_grid = ForestBWG(grid,3)
+    @test Ferrite.transform_corner(adaptive_grid,7,3,OctantBWG(0,(0,0,0)),false) == OctantBWG(0,(-8,8,-8))
 
     #refinement
     Ferrite.refine!(adaptive_grid.cells[1],adaptive_grid.cells[1].leaves[1])
@@ -574,7 +599,7 @@ end
     balanced = Ferrite.balancetree(adaptive_grid.cells[1])
     @test length(balanced.leaves) == 127
 
-    #3D case intra tree non conformity level 3 at two different places
+    #3D case inter tree non conformity level 3 at two different places
     grid = generate_grid(Hexahedron,(2,2,2))
     adaptive_grid = ForestBWG(grid,4)
     Ferrite.refine!(adaptive_grid.cells[1],adaptive_grid.cells[1].leaves[1])
@@ -586,6 +611,43 @@ end
     Ferrite.refine!(adaptive_grid.cells[7],adaptive_grid.cells[7].leaves[1])
     #Ferrite.refine!(adaptive_grid.cells[7],adaptive_grid.cells[7].leaves[1])
     Ferrite.balanceforest!(adaptive_grid)
+    transfered_grid_ref = Ferrite.creategrid(adaptive_grid)
+
+    # Rotate three dimensional case 
+    grid = generate_grid(Hexahedron,(2,2,2))
+    # This is our root mesh top view
+    # x-----------x-----------x
+    # |7    2    6|8    4    7|
+    # |           |           |
+    # |     ^     |     ^     |
+    # |4    |    3|1    |    2|
+    # |  <--+     |     +-->  |
+    # |           |           |
+    # |8    1    5|5    3    6|
+    # x-----------x-----------x
+    # |8    4    7|8    4    7|
+    # |           |           |
+    # |     ^     |     ^     |
+    # |1    |    2|1    |    2|
+    # |     +-->  |     +-->  |
+    # |           |           |
+    # |5    3    6|5    3    6|
+    # x-----------x-----------x
+    # Rotate face topologically
+    grid.cells[7] = Hexahedron((grid.cells[7].nodes[2], grid.cells[7].nodes[3], grid.cells[7].nodes[4], grid.cells[7].nodes[1], grid.cells[7].nodes[4+2], grid.cells[7].nodes[4+3], grid.cells[7].nodes[4+4], grid.cells[7].nodes[4+1]))
+    grid.cells[7] = Hexahedron((grid.cells[7].nodes[2], grid.cells[7].nodes[3], grid.cells[7].nodes[4], grid.cells[7].nodes[1], grid.cells[7].nodes[4+2], grid.cells[7].nodes[4+3], grid.cells[7].nodes[4+4], grid.cells[7].nodes[4+1]))
+    adaptive_grid = ForestBWG(grid,3)
+    Ferrite.refine!(adaptive_grid.cells[1],adaptive_grid.cells[1].leaves[1])
+    Ferrite.refine!(adaptive_grid.cells[1],adaptive_grid.cells[1].leaves[2])
+    Ferrite.refine!(adaptive_grid.cells[1],adaptive_grid.cells[1].leaves[4])
+    #Ferrite.refine!(adaptive_grid.cells[1],adaptive_grid.cells[1].leaves[7])
+    Ferrite.refine!(adaptive_grid.cells[7],adaptive_grid.cells[7].leaves[1])
+    Ferrite.refine!(adaptive_grid.cells[7],adaptive_grid.cells[7].leaves[1])
+    Ferrite.refine!(adaptive_grid.cells[7],adaptive_grid.cells[7].leaves[1])
+    #Ferrite.refine!(adaptive_grid.cells[7],adaptive_grid.cells[7].leaves[1])
+    Ferrite.balanceforest!(adaptive_grid)
+    transfered_grid = Ferrite.creategrid(adaptive_grid)
+    @test length(transfered_grid.cells) == length(transfered_grid_ref.cells)
 end
 
 @testset "Materializing Grid" begin
