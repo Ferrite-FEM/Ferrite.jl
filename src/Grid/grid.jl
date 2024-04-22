@@ -1002,13 +1002,27 @@ getboundarysets(grid::AbstractGrid{3}) = grid.facesets
 nfacets(::Type{T}) where {T <: AbstractRefShape} = length(reference_facets(T))
 
 #Backward compat
-function getfaceset(grid::Union{AbstractGrid{1},AbstractGrid{2}}, args...; kwargs...)
-    sdim = getdim(grid)
-    @warn("getfaceset for $sdim-problems have been deprecated. Use getboundaryset instead")
-    getboundaryset(grid, args...; kwargs...)
+function getfaceset(grid::AbstractGrid{1}, name::String)
+    @warn("getfaceset for 1d-problems have been deprecated. Use getboundaryset instead")
+    getboundaryset(grid, name)
 end
-function addfaceset!(grid::Union{AbstractGrid{1},AbstractGrid{2}}, args...; kwargs...) 
-    sdim = getdim(grid)
-    @warn("addfaceset! for $sdim-problems have been deprecated. Use addboundaryset! instead")
-    addboundaryset!(grid, args...; kwargs...)
+function getfaceset(grid::AbstractGrid{2}, name::String)
+    @warn("getfaceset for 2d-problems have been deprecated. Use getboundaryset instead")
+    getboundaryset(grid, name)
+end
+function addfaceset!(grid::AbstractGrid{1}, name::String, f::Function; all::Bool=true)
+    @warn("addfaceset! for 1d-problems have been deprecated. Use addboundaryset! instead")
+    addboundaryset!(grid, name, f; all)
+end
+function addfaceset!(grid::AbstractGrid{2}, name::String, f::Function; all::Bool=true)
+    @warn("addfaceset! for 2d-problems have been deprecated. Use addboundaryset! instead")
+    addboundaryset!(grid, name, f; all)
+end
+function addfaceset!(grid::AbstractGrid{1}, name::String, set)
+    @warn("addfaceset! for 1d-problems have been deprecated. Use addboundaryset! instead")
+    addboundaryset!(grid, name, set)
+end
+function addfaceset!(grid::AbstractGrid{2}, name::String, set)
+    @warn("addfaceset! for 2d-problems have been deprecated. Use addboundaryset! instead")
+    addboundaryset!(grid, name, set)
 end
