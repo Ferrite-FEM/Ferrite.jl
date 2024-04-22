@@ -138,6 +138,11 @@ getnbasefunctions(::GlobalDofInterpolation{N}) where N = N # Required to make do
 getorder(::GlobalDofInterpolation{N}) where N = N          # Used for checks when adding in multiple SubDofHandlers
 n_components(::GlobalDofInterpolation{N}) where N = N      # Used for checks when adding in multiple SubDofHandlers
 
+function isglobalfield(dh #=DofHandler=#, fieldname::Symbol)
+    field_idx = find_field(dh, fieldname)
+    ip = getfieldinterpolation(dh, field_idx)
+    return isa(ip, GlobalDofInterpolation)
+end
 
 function InterpolationInfo(::GlobalDofInterpolation{N}) where N
     InterpolationInfo(Int[], Int[], Int[],    0,      N,     0,  false,    1,  false)
