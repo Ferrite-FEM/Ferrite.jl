@@ -775,7 +775,7 @@ function hangingnodes(forest::ForestBWG{dim}, nodeids, nodeowners) where dim
                                 hnodes[nodeids[nodeowners[(k,c)]]] = [nodeids[nodeowners[(k,nc)]] for nc in neighbor_candidate_faces[nf]]
                                 if dim > 2
                                     vs = vertices(leaf,tree.b)
-                                    for ξ ∈ 1:4 #TODO add rotation table here
+                                    for ξ ∈ 1:4 
                                         c′ = facetable[pface_i, ξ]
                                         if c′ ∉ (c̃,c)
                                             neighbor_candidate_edges = edges(neighbor_candidate,tree.b)
@@ -801,6 +801,7 @@ function hangingnodes(forest::ForestBWG{dim}, nodeids, nodeowners) where dim
                                     interoctree_neighbor = transform_face(forest, k′, ri′, neighbor_candidate)
                                     interoctree_neighbor_candidate_idx = findfirst(x->x==interoctree_neighbor,forest.cells[k′].leaves)
                                     if interoctree_neighbor_candidate_idx !== nothing
+                                        r = compute_face_orientation(forest,k,pface_i)
                                         neighbor_candidate_faces = faces(neighbor_candidate,forest.cells[k′].b)
                                         transformed_neighbor_faces = faces(interoctree_neighbor,forest.cells[k′].b)
                                         nf = findfirst(x->x==pface,neighbor_candidate_faces) # todo needs rotation stuff I think
@@ -808,8 +809,9 @@ function hangingnodes(forest::ForestBWG{dim}, nodeids, nodeowners) where dim
                                         hnodes[nodeids[nodeowners[(k,c)]]] = [nodeids[nodeowners[(k′,nc)]] for nc in transformed_neighbor_faces[nf]]
                                         if dim > 2
                                             vs = vertices(leaf,tree.b)
-                                            for ξ ∈ 1:4 #TODO add rotation table here
-                                                c′ = facetable[pface_i, ξ]
+                                            for ξ ∈ 1:4 
+                                                rotated_ξ = 𝒫[𝒬[ℛ[pface_i,nf],r+1],ξ] # see Table 3 and Theorem 2.2 [BWG2011]
+                                                c′ = facetable[pface_i, rotated_ξ]
                                                 if c′ ∉ (c̃,c)
                                                     neighbor_candidate_edges = edges(interoctree_neighbor,tree.b)
                                                     ne = findfirst(x->iscenter(vs[c′],x),neighbor_candidate_edges)

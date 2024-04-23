@@ -825,4 +825,14 @@ end
     # x-----x-----x-----------x
     transfered_grid = Ferrite.creategrid(adaptive_grid)
     @test length(transfered_grid.conformity_info) == 12
+
+    #rotate the case from above in the first cell around
+    grid = generate_grid(Hexahedron,(2,2,2))
+    # Rotate face topologically
+    grid.cells[1] = Hexahedron((grid.cells[1].nodes[2], grid.cells[1].nodes[3], grid.cells[1].nodes[4], grid.cells[1].nodes[1], grid.cells[1].nodes[4+2], grid.cells[1].nodes[4+3], grid.cells[1].nodes[4+4], grid.cells[1].nodes[4+1]))
+    grid.cells[1] = Hexahedron((grid.cells[1].nodes[2], grid.cells[1].nodes[3], grid.cells[1].nodes[4], grid.cells[1].nodes[1], grid.cells[1].nodes[4+2], grid.cells[1].nodes[4+3], grid.cells[1].nodes[4+4], grid.cells[1].nodes[4+1]))
+    adaptive_grid = ForestBWG(grid,3)
+    Ferrite.refine!(adaptive_grid.cells[1],adaptive_grid.cells[1].leaves[1])
+    transfered_grid = Ferrite.creategrid(adaptive_grid)
+    @test length(transfered_grid.conformity_info) == 12
 end
