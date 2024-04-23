@@ -537,7 +537,29 @@ end
 
 transform_pointBWG(forest, vertices) = transform_pointBWG.((forest,), first.(vertices), last.(vertices))
 
+"""
+    rotation_permutation(::Val{2},r,i) -> i′
+computes based on the rotation indicator `r` ∈ {0,1} and a given corner index `i` ∈ {1,2} the permuted corner index `i′`
+"""
+function rotation_permutation(r,i)
+     i′ = r == 0 ? i : 3-i
+    return i′
+end
+
+"""
+    rotation_permutation(f,f′,r,i) -> i′
+computes based on the rotation indicator `r` ∈ {0,...,3} and a given corner index `i` ∈ {1,...,4} the permuted corner index `i′`
+See Table 3 and Theorem 2.2 [BWG2011](@citet).
+"""
+function rotation_permutation(f,f′,r,i)
+    return 𝒫[𝒬[ℛ[f,f′],r+1],i] 
+end
+
 #TODO: this function should wrap the LNodes Iterator of [IBWG2015](@citet)
+"""
+    creategrid(forest::ForestBWG) -> NonConformingGrid
+Materializes a p4est forest into a NonConformingGrid that can be used as usual to solve a finite element problem.
+"""
 function creategrid(forest::ForestBWG{dim,C,T}) where {dim,C,T}
     nodes = Vector{Tuple{Int,NTuple{dim,Int32}}}()
     sizehint!(nodes,getncells(forest)*2^dim)
@@ -617,7 +639,7 @@ function creategrid(forest::ForestBWG{dim,C,T}) where {dim,C,T}
                         @debug println("    Matching $fnodes (local) to $fnodes_neighbor (neighbor)")
                         if dim == 2
                             for i ∈ 1:2
-                                i′ = r == 0 ? i : 3-i
+                                i′ = rotation_permutation(r,i)
                                 if haskey(nodeids, (k′,fnodes_neighbor[i′]))
                                     nodeids[(k,fnodes[i])] = nodeids[(k′,fnodes_neighbor[i′])]
                                     nodeowners[(k,fnodes[i])] = (k′,fnodes_neighbor[i′])
@@ -625,7 +647,7 @@ function creategrid(forest::ForestBWG{dim,C,T}) where {dim,C,T}
                             end
                         else
                             for i ∈ 1:4
-                                rotated_ξ = 𝒫[𝒬[ℛ[f′,f],r+1],i] # see Table 3 and Theorem 2.2 [BWG2011]
+                                rotated_ξ = rotation_permutation(f′,f,r,i) 
                                 if haskey(nodeids, (k′,fnodes_neighbor[i]))
                                     nodeids[(k,fnodes[rotated_ξ])] = nodeids[(k′,fnodes_neighbor[i])]
                                     nodeowners[(k,fnodes[rotated_ξ])] = (k′,fnodes_neighbor[i])
@@ -672,7 +694,7 @@ function creategrid(forest::ForestBWG{dim,C,T}) where {dim,C,T}
                         r = compute_edge_orientation(forest,k,e)
                         @debug println("    Matching $enodes (local) to $enodes_neighbor (neighbor)")
                         for i ∈ 1:2
-                            i′ = r == 0 ? i : 3-i
+                            i′ = rotation_permutation(r,i)
                             if haskey(nodeids, (k′,enodes_neighbor[i′]))
                                 nodeids[(k,enodes[i])] = nodeids[(k′,enodes_neighbor[i′])]
                                 nodeowners[(k,enodes[i])] = (k′,enodes_neighbor[i′])
@@ -751,7 +773,6 @@ function hangingnodes(forest::ForestBWG{dim}, nodeids, nodeowners) where dim
     _perminv = dim == 2 ? 𝒱₂_perm_inv : 𝒱₃_perm_inv
     facetable = dim == 2 ? 𝒱₂ : 𝒱₃
     opposite_face = dim == 2 ? opposite_face_2 : opposite_face_3
-    #hnodes = Dict{Tuple{Int,NTuple{dim,Int32}},Vector{Tuple{Int,NTuple{dim,Int32}}}}()
     hnodes = Dict{Int,Vector{Int}}()
     for (k,tree) in enumerate(forest.cells)
         rootfaces = faces(root(dim),tree.b)
@@ -771,7 +792,6 @@ function hangingnodes(forest::ForestBWG{dim}, nodeids, nodeowners) where dim
                             if neighbor_candidate_idx !== nothing
                                 neighbor_candidate_faces = faces(neighbor_candidate,tree.b)
                                 nf = findfirst(x->x==pface,neighbor_candidate_faces)
-                                #hnodes[(k,c)] = [(k,nc) for nc in neighbor_candidate_faces[nf]]
                                 hnodes[nodeids[nodeowners[(k,c)]]] = [nodeids[nodeowners[(k,nc)]] for nc in neighbor_candidate_faces[nf]]
                                 if dim > 2
                                     vs = vertices(leaf,tree.b)
@@ -780,7 +800,6 @@ function hangingnodes(forest::ForestBWG{dim}, nodeids, nodeowners) where dim
                                         if c′ ∉ (c̃,c)
                                             neighbor_candidate_edges = edges(neighbor_candidate,tree.b)
                                             ne = findfirst(x->iscenter(vs[c′],x),neighbor_candidate_edges)
-                                            #hnodes[(k,c)] = [(k,nc) for nc in neighbor_candidate_faces[nf]]
                                             if ne !== nothing
                                                 hnodes[nodeids[nodeowners[(k,vs[c′])]]] = [nodeids[nodeowners[(k,ne)]] for ne in neighbor_candidate_edges[ne]]
                                             end
@@ -808,9 +827,9 @@ function hangingnodes(forest::ForestBWG{dim}, nodeids, nodeowners) where dim
                                         fnodes = transformed_neighbor_faces[ri′]
                                         vs = vertices(leaf,tree.b)
                                         if dim > 2
-                                            rotated_ξ = [𝒫[𝒬[ℛ[ri′,ri],r+1],i] for i in 1:4]# see Table 3 and Theorem 2.2 [BWG2011]
+                                            rotated_ξ = ntuple(i->rotation_permutation(ri′,ri,r,i),4)
                                         else
-                                            rotated_ξ = [r == 0 ? i : 3-i for i in 1:2]
+                                            rotated_ξ = ntuple(i->rotation_permutation(r,i),2)
                                         end
                                         hnodes[nodeids[nodeowners[(k,c)]]] = [nodeids[nodeowners[(k′,fnodes[ξ])]] for ξ in rotated_ξ]
 
@@ -820,7 +839,6 @@ function hangingnodes(forest::ForestBWG{dim}, nodeids, nodeowners) where dim
                                                 if c′ ∉ (c̃,c)
                                                     neighbor_candidate_edges = edges(interoctree_neighbor,tree.b)
                                                     ne = findfirst(x->iscenter(vs[c′],x),neighbor_candidate_edges)
-                                                    #hnodes[(k,c)] = [(k,nc) for nc in neighbor_candidate_faces[nf]]
                                                     if ne !== nothing
                                                         hnodes[nodeids[nodeowners[(k,vs[c′])]]] = [nodeids[nodeowners[(k,ne)]] for ne in neighbor_candidate_edges[ne]]
                                                     end
@@ -965,7 +983,7 @@ function balanceforest!(forest::ForestBWG{dim}) where dim
                             ec = ec[1]
                             k′, e′ = ec[1], edge_perm_inv[ec[2]]
                             o′ = transform_edge(forest,k′,e′,o,false)
-                            s′ = transform_edge(forest,k′,e′,s,false)
+                            s′ = transform_edge(forest,k′,e′,s,true)
                             neighbor_tree = forest.cells[ec[1]]
                             if s′ ∉ neighbor_tree.leaves && parent(s′, neighbor_tree.b) ∉ neighbor_tree.leaves
                                 if parent(parent(s′,neighbor_tree.b),neighbor_tree.b) ∈ neighbor_tree.leaves

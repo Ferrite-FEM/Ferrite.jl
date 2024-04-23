@@ -648,6 +648,7 @@ end
     Ferrite.balanceforest!(adaptive_grid)
     transfered_grid = Ferrite.creategrid(adaptive_grid)
     @test length(transfered_grid.cells) == length(transfered_grid_ref.cells)
+    @test length(transfered_grid.cells) == 148
 end
 
 @testset "Materializing Grid" begin
