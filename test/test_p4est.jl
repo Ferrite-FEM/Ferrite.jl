@@ -777,6 +777,7 @@ end
 end
 
 @testset "hanging nodes" begin
+    #Easy Intraoctree
     grid = generate_grid(Hexahedron,(1,1,1))
     adaptive_grid = ForestBWG(grid,3)
     Ferrite.refine_all!(adaptive_grid,1)
@@ -799,4 +800,29 @@ end
     # |     |     |           |
     # x-----x-----x-----------x
     transfered_grid = Ferrite.creategrid(adaptive_grid)
+    @test length(transfered_grid.conformity_info) == 12
+    
+    # Easy Interoctree
+    grid = generate_grid(Hexahedron,(2,2,2))
+    adaptive_grid = ForestBWG(grid,3)
+    Ferrite.refine!(adaptive_grid.cells[1],adaptive_grid.cells[1].leaves[1])
+    # x-----------x-----------x
+    # |           |           |
+    # |           |           |
+    # |           |           |
+    # |           |           |
+    # |           |           |
+    # |           |           |
+    # |           |           |
+    # x-----x-----x-----------x
+    # |     |     |           |
+    # |     |     |           |
+    # |     |     |           |
+    # x-----x-----x           |
+    # |     |     |           |
+    # |     |     |           |
+    # |     |     |           |
+    # x-----x-----x-----------x
+    transfered_grid = Ferrite.creategrid(adaptive_grid)
+    @test length(transfered_grid.conformity_info) == 12
 end

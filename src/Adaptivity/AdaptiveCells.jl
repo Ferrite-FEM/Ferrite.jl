@@ -714,12 +714,10 @@ function creategrid(forest::ForestBWG{dim,C,T}) where {dim,C,T}
     # Phase 5: Generate grid and haning nodes
     facesets = reconstruct_facesets(forest) #TODO edge, node and cellsets
     hnodes = hangingnodes(forest, nodeids, nodeowners)
-    @show hnodes
     hnodes_dedup = Dict{Int64, Vector{Int64}}()
     for (constrained,constainers) in hnodes
         hnodes_dedup[nodeids_dedup[constrained]] = [nodeids_dedup[constainer] for constainer in constainers]
     end
-    @show hnodes_dedup
     return NonConformingGrid(cells, nodes_physical .|> Node, facesets=facesets, conformity_info=hnodes_dedup)
 end
 
@@ -775,20 +773,20 @@ function hangingnodes(forest::ForestBWG{dim}, nodeids, nodeowners) where dim
                                 nf = findfirst(x->x==pface,neighbor_candidate_faces)
                                 #hnodes[(k,c)] = [(k,nc) for nc in neighbor_candidate_faces[nf]]
                                 hnodes[nodeids[nodeowners[(k,c)]]] = [nodeids[nodeowners[(k,nc)]] for nc in neighbor_candidate_faces[nf]]
-                                #if dim > 2
-                                #    vs = vertices(leaf,tree.b)
-                                #    for ξ ∈ 1:4
-                                #        c′ = facetable[pface_i, ξ]
-                                #        if !haskey(hnodes,nodeids[nodeowners[(k,c)]])
-                                #            neighbor_candidate_edges = edges(neighbor_candidate,tree.b)
-                                #            ne = findfirst(x->iscenter(vs[c′],x),neighbor_candidate_edges)
-                                #            #hnodes[(k,c)] = [(k,nc) for nc in neighbor_candidate_faces[nf]]
-                                #            if ne !== nothing
-                                #                hnodes[nodeids[nodeowners[(k,c)]]] = [nodeids[nodeowners[(k,ne)]] for ne in neighbor_candidate_edges[ne]]
-                                #            end
-                                #        end
-                                #    end
-                                #end
+                                if dim > 2
+                                    vs = vertices(leaf,tree.b)
+                                    for ξ ∈ 1:4 #TODO add rotation table here
+                                        c′ = facetable[pface_i, ξ]
+                                        if c′ ∉ (c̃,c)
+                                            neighbor_candidate_edges = edges(neighbor_candidate,tree.b)
+                                            ne = findfirst(x->iscenter(vs[c′],x),neighbor_candidate_edges)
+                                            #hnodes[(k,c)] = [(k,nc) for nc in neighbor_candidate_faces[nf]]
+                                            if ne !== nothing
+                                                hnodes[nodeids[nodeowners[(k,vs[c′])]]] = [nodeids[nodeowners[(k,ne)]] for ne in neighbor_candidate_edges[ne]]
+                                            end
+                                        end
+                                    end
+                                end
                                 break
                             end
                         else #interoctree branch
@@ -805,9 +803,50 @@ function hangingnodes(forest::ForestBWG{dim}, nodeids, nodeowners) where dim
                                     if interoctree_neighbor_candidate_idx !== nothing
                                         neighbor_candidate_faces = faces(neighbor_candidate,forest.cells[k′].b)
                                         transformed_neighbor_faces = faces(interoctree_neighbor,forest.cells[k′].b)
-                                        nf = findfirst(x->x==pface,neighbor_candidate_faces)
+                                        nf = findfirst(x->x==pface,neighbor_candidate_faces) # todo needs rotation stuff I think
                                         #hnodes[(k,c)] = [(k′,nc) for nc in transformed_neighbor_faces[nf]]
                                         hnodes[nodeids[nodeowners[(k,c)]]] = [nodeids[nodeowners[(k′,nc)]] for nc in transformed_neighbor_faces[nf]]
+                                        if dim > 2
+                                            vs = vertices(leaf,tree.b)
+                                            for ξ ∈ 1:4 #TODO add rotation table here
+                                                c′ = facetable[pface_i, ξ]
+                                                if c′ ∉ (c̃,c)
+                                                    neighbor_candidate_edges = edges(interoctree_neighbor,tree.b)
+                                                    ne = findfirst(x->iscenter(vs[c′],x),neighbor_candidate_edges)
+                                                    #hnodes[(k,c)] = [(k,nc) for nc in neighbor_candidate_faces[nf]]
+                                                    if ne !== nothing
+                                                        hnodes[nodeids[nodeowners[(k,vs[c′])]]] = [nodeids[nodeowners[(k,ne)]] for ne in neighbor_candidate_edges[ne]]
+                                                    end
+                                                end
+                                            end
+                                        end
+                                        break
+                                    end
+                                end
+                            end
+                        end
+                    end
+                end
+                if dim > 2
+                    parentedges = edges(parent_,tree.b)
+                    for (pedge_i, pedge) in enumerate(parentedges)
+                        if iscenter(c,pedge) #hanging node candidate
+                            neighbor_candidate = edge_neighbor(parent_, pedge_i, tree.b)
+                            for (ri,re) in enumerate(edges(root(dim),tree.b))
+                                edge_neighbor =  forest.topology.edge_edge_neighbor[k,edge_perm[ri]]
+                                if length(edge_neighbor) == 0
+                                    continue
+                                end
+                                if contains_edge(re, pedge)
+                                    k′ = edge_neighbor[1][1]
+                                    ri′ = edge_perm_inv[edge_neighbor[1][2]]
+                                    interoctree_neighbor = transform_edge(forest, k′, ri′, neighbor_candidate, true)
+                                    interoctree_neighbor_candidate_idx = findfirst(x->x==interoctree_neighbor,forest.cells[k′].leaves)
+                                    if interoctree_neighbor_candidate_idx !== nothing
+                                        neighbor_candidate_edges = edges(neighbor_candidate,forest.cells[k′].b)
+                                        transformed_neighbor_edges = edges(interoctree_neighbor,forest.cells[k′].b)
+                                        ne = findfirst(x->x==pedge,neighbor_candidate_edges) #TODO needs rotation stuff I think
+                                        hnodes[nodeids[nodeowners[(k,c)]]] = [nodeids[nodeowners[(k′,nc)]] for nc in transformed_neighbor_edges[ne]]
                                         break
                                     end
                                 end
@@ -1067,8 +1106,22 @@ end
 # TODO should be checked if applicaple in general, I guess yes
 function contains_face(mface::NTuple{4,Tuple{T1,T1,T1}}, sface::NTuple{4,Tuple{T2,T2,T2}}) where {T1<:Integer,T2<:Integer}
     sface_center = center(sface)
-    if mface[1][1] ≤ sface_center[1] ≤ mface[2][1] && mface[1][2] ≤ sface_center[2] ≤ mface[2][2] && mface[1][3] ≤ sface_center[3] ≤ mface[2][3]
+    lower_left = ntuple(i->minimum(getindex.(mface,i)),3)
+    top_right = ntuple(i->maximum(getindex.(mface,i)),3)
+    if (lower_left[1] ≤ sface_center[1] ≤ top_right[1]) && (lower_left[2] ≤ sface_center[2] ≤ top_right[2]) && (lower_left[3] ≤ sface_center[3] ≤ top_right[3])
         return true
+    else
+        return false
+    end
+end
+
+function contains_edge(medge::Tuple{Tuple{T1,T1,T1},Tuple{T1,T1,T1}},sedge::Tuple{Tuple{T2,T2,T2},Tuple{T2,T2,T2}}) where {T1<:Integer,T2<:Integer}
+    if (medge[1][1] == sedge[1][1] && medge[2][1] == sedge[2][1]) && (medge[1][2] == sedge[1][2] && medge[2][2] == sedge[2][2]) # x1 & x2 aligned
+        return medge[1][3] ≤ sedge[1][3] ≤ sedge[2][3] ≤ medge[2][3]
+    elseif (medge[1][1] == sedge[1][1] && medge[2][1] == sedge[2][1]) && (medge[1][3] == sedge[1][3] && medge[2][3] == sedge[2][3])# x1 & x3 aligned
+        return medge[1][2] ≤ sedge[1][2] ≤ sedge[2][2] ≤ medge[2][2]
+    elseif (medge[1][2] == sedge[1][2] && medge[2][2] == sedge[2][2]) && (medge[1][3] == sedge[1][3] && medge[2][3] == sedge[2][3])# x2 & x3 aligned
+        return medge[1][1] ≤ sedge[1][1] ≤ sedge[2][1] ≤ medge[2][1]
     else
         return false
     end
