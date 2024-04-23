@@ -659,10 +659,9 @@ function creategrid(forest::ForestBWG{dim,C,T}) where {dim,C,T}
             end
         end
         if dim > 2
-            _edges = edges(root(dim),tree.b)
-            # Face neighbors
+            # edge neighbors
             @debug println("Updating edge neighbors for octree $k")
-            for (e,ec) in enumerate(_edges) # f in p4est notation
+            for (e,ec) in enumerate(edges(root(dim),tree.b)) # e in p4est notation
                 e_axis_index, e_axis_sign = divrem(e-1,4) #first axis 0 (x), 1 (y), 2(z), second positive or negative direction
                 edge_neighbor = forest.topology.edge_edge_neighbor[k,edge_perm[e]]
                 if length(edge_neighbor) == 0
@@ -680,14 +679,14 @@ function creategrid(forest::ForestBWG{dim,C,T}) where {dim,C,T}
                                 @debug println("    Rejecting $leaf")
                                 continue
                             end
-                        else # negative face
+                        else # negative edge
                             if leaf.xyz[e_axis_index + 1] > 0
                                 @debug println("    Rejecting $leaf")
                                 continue
                             end
                         end
                         neighbor_candidate = transform_edge(forest,k′,e′,leaf, false)
-                        # Candidate must be the face opposite to f'
+                        # Candidate must be the edge opposite to e'
                         e′candidate = ((e′ - 1) ⊻ 1) + 1
                         enodes = edge(leaf, e , tree.b)
                         enodes_neighbor = edge(neighbor_candidate, e′candidate, tree′.b)
@@ -768,6 +767,10 @@ function reconstruct_facesets(forest::ForestBWG{dim}) where dim
     return new_facesets
 end
 
+"""
+    hangingnodes(forest,nodeids,nodeowners)
+Constructs a map from constrained nodeids to the ones that constraint
+"""
 function hangingnodes(forest::ForestBWG{dim}, nodeids, nodeowners) where dim
     _perm = dim == 2 ? 𝒱₂_perm : 𝒱₃_perm
     _perminv = dim == 2 ? 𝒱₂_perm_inv : 𝒱₃_perm_inv
@@ -886,8 +889,8 @@ function hangingnodes(forest::ForestBWG{dim}, nodeids, nodeowners) where dim
 end
 
 """
+    balanceforest!(forest)
 Algorithm 17 of [BWG2011](@citet)
-TODO need further work for dimension agnostic case
 """
 function balanceforest!(forest::ForestBWG{dim}) where dim
     perm_face = dim == 2 ? 𝒱₂_perm : 𝒱₃_perm
@@ -904,6 +907,8 @@ function balanceforest!(forest::ForestBWG{dim}) where dim
             isinside = inside.(ss,(tree.b,))
             notinsideidx = findall(.! isinside)
             if !isempty(notinsideidx)
+                # s_i encodes the type of neighborhood, since it is the index of possibleneighbors
+                # see the docs of this function
                 for s_i in notinsideidx
                     s = ss[s_i]
                     if dim == 2 # need more clever s_i encoding
@@ -936,8 +941,6 @@ function balanceforest!(forest::ForestBWG{dim}) where dim
                             if s′ ∉ neighbor_tree.leaves && parent(s′, neighbor_tree.b) ∉ neighbor_tree.leaves
                                 if parent(parent(s′,neighbor_tree.b),neighbor_tree.b) ∈ neighbor_tree.leaves
                                     refine!(neighbor_tree,parent(parent(s′,neighbor_tree.b),neighbor_tree.b))
-                                #else
-                                #    refine!(tree,o)
                                 end
                             end
                         end
@@ -954,8 +957,6 @@ function balanceforest!(forest::ForestBWG{dim}) where dim
                             if s′ ∉ neighbor_tree.leaves && parent(s′, neighbor_tree.b) ∉ neighbor_tree.leaves
                                 if parent(parent(s′,neighbor_tree.b),neighbor_tree.b) ∈ neighbor_tree.leaves
                                     refine!(neighbor_tree,parent(parent(s′,neighbor_tree.b),neighbor_tree.b))
-                                #else
-                                #    refine!(tree,o)
                                 end
                             end
                         elseif 8 < s_i <= 14
@@ -971,8 +972,6 @@ function balanceforest!(forest::ForestBWG{dim}) where dim
                             if s′ ∉ neighbor_tree.leaves && parent(s′, neighbor_tree.b) ∉ neighbor_tree.leaves
                                 if parent(parent(s′,neighbor_tree.b),neighbor_tree.b) ∈ neighbor_tree.leaves
                                     refine!(neighbor_tree,parent(parent(s′,neighbor_tree.b),neighbor_tree.b))
-                                #else
-                                #    refine!(tree,o)
                                 end
                             end
                         else
@@ -988,8 +987,6 @@ function balanceforest!(forest::ForestBWG{dim}) where dim
                             if s′ ∉ neighbor_tree.leaves && parent(s′, neighbor_tree.b) ∉ neighbor_tree.leaves
                                 if parent(parent(s′,neighbor_tree.b),neighbor_tree.b) ∈ neighbor_tree.leaves
                                     refine!(neighbor_tree,parent(parent(s′,neighbor_tree.b),neighbor_tree.b))
-                                #else
-                                #    refine!(tree,o)
                                 end
                             end 
                         end
@@ -1063,7 +1060,11 @@ function siblings(o::OctantBWG,b;include_self=false)
     return siblings
 end
 
-# TODO make dimension agnostic
+"""
+    possibleneighbors(o::OctantBWG{2},l,b;insidetree=true)
+Returns a list of possible neighbors, where the first four are corner neighbors that are exclusively connected via a corner.
+The other four possible neighbors are face neighbors.
+"""
 function possibleneighbors(o::OctantBWG{2},l,b;insidetree=true)
     neighbors = ntuple(8) do i
         if i > 4
@@ -1079,6 +1080,11 @@ function possibleneighbors(o::OctantBWG{2},l,b;insidetree=true)
     return neighbors
 end
 
+"""
+    possibleneighbors(o::OctantBWG{3},l,b;insidetree=true)
+Returns a list of possible neighbors, where the first eight are corner neighbors that are exclusively connected via a corner.
+After the first eight corner neighbors, the 6 possible face neighbors follow and after them, the edge neighbors.
+"""
 function possibleneighbors(o::OctantBWG{3},l,b;insidetree=true)
     neighbors = ntuple(26) do i
         if 8 < i ≤ 14
@@ -1116,7 +1122,6 @@ function isancestor(o1,o2,b)
     return ancestor
 end
 
-# TODO verify and generalize
 function contains_face(mface::Tuple{Tuple{T1,T1},Tuple{T1,T1}},sface::Tuple{Tuple{T2,T2},Tuple{T2,T2}}) where {T1<:Integer,T2<:Integer}
     if mface[1][1] == sface[1][1] && mface[2][1] == sface[2][1] # vertical
         return mface[1][2] ≤ sface[1][2] ≤ sface[2][2] ≤ mface[2][2]
@@ -1687,9 +1692,7 @@ function transform_edge_remote(forest::ForestBWG,k::T1,e::T1,oct::OctantBWG{3,N,
     xyz = zeros(T2,3)
     xyz[𝐛[1]+_one] = s*g+(_one-(_two*s))*oct.xyz[a₀]
     xyz[𝐛[2]+_one] = ((e′-_one) & 1) == 0 ? h⁻ : h⁺
-    #xyz[𝐛[2]+_one] = ((e-_one) & 1) == 0 ? h⁻ : h⁺
     xyz[𝐛[3]+_one] = ((e′-_one) & 2) == 0 ? h⁻ : h⁺
-    #xyz[𝐛[3]+_one] = ((e-_one) & 2) == 0 ? h⁻ : h⁺
     return OctantBWG(l,(xyz[1],xyz[2],xyz[3]))
 end
 
@@ -1728,9 +1731,7 @@ function transform_edge(forest::ForestBWG,k::T1,e::T1,oct::OctantBWG{3,N,T2},ins
     xyz = zeros(T2,3)
     xyz[𝐛[1]+_one] = s*g+(_one-(_two*s))*oct.xyz[a₀]
     xyz[𝐛[2]+_one] = ((e′-_one) & 1) == 0 ? h⁻ : h⁺
-    #xyz[𝐛[2]+_one] = ((e-_one) & 1) == 0 ? h⁻ : h⁺
     xyz[𝐛[3]+_one] = ((e′-_one) & 2) == 0 ? h⁻ : h⁺
-    #xyz[𝐛[3]+_one] = ((e-_one) & 2) == 0 ? h⁻ : h⁺
     return OctantBWG(l,(xyz[1],xyz[2],xyz[3]))
 end
 
