@@ -833,6 +833,34 @@ end
     grid.cells[1] = Hexahedron((grid.cells[1].nodes[2], grid.cells[1].nodes[3], grid.cells[1].nodes[4], grid.cells[1].nodes[1], grid.cells[1].nodes[4+2], grid.cells[1].nodes[4+3], grid.cells[1].nodes[4+4], grid.cells[1].nodes[4+1]))
     adaptive_grid = ForestBWG(grid,3)
     Ferrite.refine!(adaptive_grid.cells[1],adaptive_grid.cells[1].leaves[1])
-    transfered_grid = Ferrite.creategrid(adaptive_grid)
-    @test length(transfered_grid.conformity_info) == 12
+    transfered_grid_rotated = Ferrite.creategrid(adaptive_grid)
+    @test length(transfered_grid_rotated.conformity_info) == 12
+
+    #2D rotated case
+    grid = generate_grid(Quadrilateral,(2,2))
+    # Rotate face topologically
+    grid.cells[2] = Quadrilateral((grid.cells[2].nodes[2], grid.cells[2].nodes[3], grid.cells[2].nodes[4], grid.cells[2].nodes[1]))
+    # This is our root mesh
+    # x-----------x-----------x
+    # |4    4    3|4    4    3|
+    # |           |           |
+    # |     ^     |     ^     |
+    # |1    |    2|1    |    2|
+    # |     +-->  |     +-->  |
+    # |           |           |
+    # |1    3    2|1    3    2|
+    # x-----------x-----------x
+    # |4    4    3|3    2    2|
+    # |           |           |
+    # |     ^     |     ^     |
+    # |1    |    2|4    |    3|
+    # |     +-->  |  <--+     |
+    # |           |           |
+    # |1    3    2|4    1    1|
+    # x-----------x-----------x
+    adaptive_grid = ForestBWG(grid,3)
+    Ferrite.refine!(adaptive_grid.cells[2],adaptive_grid.cells[2].leaves[1])
+    transfered_grid_rotated = Ferrite.creategrid(adaptive_grid)
+    @test transfered_grid_rotated.conformity_info[11] == [1,7]
+    @test transfered_grid_rotated.conformity_info[10] == [3,7]
 end
