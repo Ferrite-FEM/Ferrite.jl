@@ -613,12 +613,12 @@ function creategrid(forest::ForestBWG{dim,C,T}) where {dim,C,T}
             @debug println("Updating face neighbors for octree $k")
             for (f,fc) in enumerate(_faces) # f in p4est notation
                 f_axis_index, f_axis_sign = divrem(f-1,2)
-                face_neighbor = forest.topology.face_face_neighbor[k,_perm[f]]
-                if length(face_neighbor) == 0
+                face_neighbor_ = forest.topology.face_face_neighbor[k,_perm[f]]
+                if length(face_neighbor_) == 0
                     continue
                 end
-                @debug @assert length(face_neighbor) == 1
-                k′, f′_ferrite = face_neighbor[1]
+                @debug @assert length(face_neighbor_) == 1
+                k′, f′_ferrite = face_neighbor_[1]
                 f′ = _perminv[f′_ferrite]
                 if k > k′ # Owner
                     tree′ = forest.cells[k′]
@@ -667,12 +667,12 @@ function creategrid(forest::ForestBWG{dim,C,T}) where {dim,C,T}
             @debug println("Updating edge neighbors for octree $k")
             for (e,ec) in enumerate(edges(root(dim),tree.b)) # e in p4est notation
                 e_axis_index, e_axis_sign = divrem(e-1,4) #first axis 0 (x), 1 (y), 2(z), second positive or negative direction
-                edge_neighbor = forest.topology.edge_edge_neighbor[k,edge_perm[e]]
-                if length(edge_neighbor) == 0
+                edge_neighbor_ = forest.topology.edge_edge_neighbor[k,edge_perm[e]]
+                if length(edge_neighbor_) == 0
                     continue
                 end
-                @debug @assert length(edge_neighbor) == 1
-                k′, e′_ferrite = edge_neighbor[1]
+                @debug @assert length(edge_neighbor_) == 1
+                k′, e′_ferrite = edge_neighbor_[1]
                 e′ = edge_perm_inv[e′_ferrite]
                 if k > k′ # Owner
                     tree′ = forest.cells[k′]
@@ -817,13 +817,13 @@ function hangingnodes(forest::ForestBWG{dim}, nodeids, nodeowners) where dim
                             end
                         else #interoctree branch
                             for (ri,rf) in enumerate(rootfaces)
-                                face_neighbor =  forest.topology.face_face_neighbor[k,_perm[ri]]
-                                if length(face_neighbor) == 0
+                                face_neighbor_ =  forest.topology.face_face_neighbor[k,_perm[ri]]
+                                if length(face_neighbor_) == 0
                                     continue
                                 end
                                 if contains_face(rf, pface)
-                                    k′ = face_neighbor[1][1]
-                                    ri′ = _perminv[face_neighbor[1][2]]
+                                    k′ = face_neighbor_[1][1]
+                                    ri′ = _perminv[face_neighbor_[1][2]]
                                     interoctree_neighbor = transform_face(forest, k′, ri′, neighbor_candidate)
                                     interoctree_neighbor_candidate_idx = findfirst(x->x==interoctree_neighbor,forest.cells[k′].leaves)
                                     if interoctree_neighbor_candidate_idx !== nothing
@@ -865,20 +865,24 @@ function hangingnodes(forest::ForestBWG{dim}, nodeids, nodeowners) where dim
                         if iscenter(c,pedge) #hanging node candidate
                             neighbor_candidate = edge_neighbor(parent_, pedge_i, tree.b)
                             for (ri,re) in enumerate(edges(root(dim),tree.b))
-                                edge_neighbor =  forest.topology.edge_edge_neighbor[k,edge_perm[ri]]
-                                if length(edge_neighbor) == 0
+                                edge_neighbor_ =  forest.topology.edge_edge_neighbor[k,edge_perm[ri]]
+                                if length(edge_neighbor_) == 0
                                     continue
                                 end
                                 if contains_edge(re, pedge)
-                                    k′ = edge_neighbor[1][1]
-                                    ri′ = edge_perm_inv[edge_neighbor[1][2]]
+                                    k′ = edge_neighbor_[1][1]
+                                    ri′ = edge_perm_inv[edge_neighbor_[1][2]]
                                     interoctree_neighbor = transform_edge(forest, k′, ri′, neighbor_candidate, true)
                                     interoctree_neighbor_candidate_idx = findfirst(x->x==interoctree_neighbor,forest.cells[k′].leaves)
                                     if interoctree_neighbor_candidate_idx !== nothing
                                         neighbor_candidate_edges = edges(neighbor_candidate,forest.cells[k′].b)
                                         transformed_neighbor_edges = edges(interoctree_neighbor,forest.cells[k′].b)
                                         ne = findfirst(x->iscenter(c,x),neighbor_candidate_edges)
-                                        hnodes[nodeids[nodeowners[(k,c)]]] = [nodeids[nodeowners[(k′,nc)]] for nc in transformed_neighbor_edges[ne]]
+                                        if ne !== nothing
+                                            hnodes[nodeids[nodeowners[(k,c)]]] = [nodeids[nodeowners[(k′,nc)]] for nc in transformed_neighbor_edges[ne]]
+                                        else
+                                            @error "things are messed up for hanging edge constraint interoctree at octree $k edge $(_perm[ri])"
+                                        end
                                         break
                                     end
                                 end

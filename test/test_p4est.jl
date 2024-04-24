@@ -835,6 +835,18 @@ end
     adaptive_grid = ForestBWG(grid,3)
     Ferrite.refine!(adaptive_grid.cells[1],adaptive_grid.cells[1].leaves[1])
     transfered_grid_rotated = Ferrite.creategrid(adaptive_grid)
+    @test transfered_grid_rotated.conformity_info[5] == [28,25]
+    @test transfered_grid_rotated.conformity_info[20] == [10,15]
+    @test transfered_grid_rotated.conformity_info[30] == [15,18]
+    @test transfered_grid_rotated.conformity_info[1] == [2,18]
+    @test transfered_grid_rotated.conformity_info[19] == [16,28]
+    @test transfered_grid_rotated.conformity_info[22] == [10,15,2,18]
+    @test transfered_grid_rotated.conformity_info[41] == [10,16,2,28]
+    @test transfered_grid_rotated.conformity_info[43] == [18,25]
+    @test transfered_grid_rotated.conformity_info[11] == [10,2]
+    @test transfered_grid_rotated.conformity_info[36] == [2,28]
+    @test transfered_grid_rotated.conformity_info[40] == [10,16]
+    @test transfered_grid_rotated.conformity_info[38] == [2,18,28,25]
     @test length(transfered_grid_rotated.conformity_info) == 12
 
     #2D rotated case
