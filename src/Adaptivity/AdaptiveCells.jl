@@ -877,7 +877,7 @@ function hangingnodes(forest::ForestBWG{dim}, nodeids, nodeowners) where dim
                                     if interoctree_neighbor_candidate_idx !== nothing
                                         neighbor_candidate_edges = edges(neighbor_candidate,forest.cells[k′].b)
                                         transformed_neighbor_edges = edges(interoctree_neighbor,forest.cells[k′].b)
-                                        ne = findfirst(x->x==pedge,neighbor_candidate_edges) #TODO needs rotation stuff I think
+                                        ne = findfirst(x->iscenter(c,x),neighbor_candidate_edges)
                                         hnodes[nodeids[nodeowners[(k,c)]]] = [nodeids[nodeowners[(k′,nc)]] for nc in transformed_neighbor_edges[ne]]
                                         break
                                     end
