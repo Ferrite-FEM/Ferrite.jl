@@ -6,6 +6,10 @@
 abstract type AbstractAdaptiveGrid{dim} <: AbstractGrid{dim} end
 abstract type AbstractAdaptiveCell{refshape <: AbstractRefShape} <: AbstractCell{refshape} end
 
+const ncorners_face3D = 4
+const ncorners_face2D = 2
+const ncorners_edge = ncorners_face2D
+
 _maxlevel = [30,19]
 
 function set_maxlevel(dim::Integer,maxlevel::Integer)
@@ -638,7 +642,7 @@ function creategrid(forest::ForestBWG{dim,C,T}) where {dim,C,T}
                         r = compute_face_orientation(forest,k,f)
                         @debug println("    Matching $fnodes (local) to $fnodes_neighbor (neighbor)")
                         if dim == 2
-                            for i ∈ 1:2
+                            for i ∈ 1:ncorners_face2D
                                 i′ = rotation_permutation(r,i)
                                 if haskey(nodeids, (k′,fnodes_neighbor[i′]))
                                     nodeids[(k,fnodes[i])] = nodeids[(k′,fnodes_neighbor[i′])]
@@ -646,7 +650,7 @@ function creategrid(forest::ForestBWG{dim,C,T}) where {dim,C,T}
                                 end
                             end
                         else
-                            for i ∈ 1:4
+                            for i ∈ 1:ncorners_face3D
                                 rotated_ξ = rotation_permutation(f′,f,r,i) 
                                 if haskey(nodeids, (k′,fnodes_neighbor[i]))
                                     nodeids[(k,fnodes[rotated_ξ])] = nodeids[(k′,fnodes_neighbor[i])]
@@ -692,7 +696,7 @@ function creategrid(forest::ForestBWG{dim,C,T}) where {dim,C,T}
                         enodes_neighbor = edge(neighbor_candidate, e′candidate, tree′.b)
                         r = compute_edge_orientation(forest,k,e)
                         @debug println("    Matching $enodes (local) to $enodes_neighbor (neighbor)")
-                        for i ∈ 1:2
+                        for i ∈ 1:ncorners_edge
                             i′ = rotation_permutation(r,i)
                             if haskey(nodeids, (k′,enodes_neighbor[i′]))
                                 nodeids[(k,enodes[i])] = nodeids[(k′,enodes_neighbor[i′])]
@@ -798,7 +802,7 @@ function hangingnodes(forest::ForestBWG{dim}, nodeids, nodeowners) where dim
                                 hnodes[nodeids[nodeowners[(k,c)]]] = [nodeids[nodeowners[(k,nc)]] for nc in neighbor_candidate_faces[nf]]
                                 if dim > 2
                                     vs = vertices(leaf,tree.b)
-                                    for ξ ∈ 1:4 
+                                    for ξ ∈ 1:ncorners_face3D
                                         c′ = facetable[pface_i, ξ]
                                         if c′ ∉ (c̃,c)
                                             neighbor_candidate_edges = edges(neighbor_candidate,tree.b)
@@ -830,9 +834,9 @@ function hangingnodes(forest::ForestBWG{dim}, nodeids, nodeowners) where dim
                                         fnodes = transformed_neighbor_faces[ri′]
                                         vs = vertices(leaf,tree.b)
                                         if dim > 2
-                                            rotated_ξ = ntuple(i->rotation_permutation(ri′,ri,r,i),4)
+                                            rotated_ξ = ntuple(i->rotation_permutation(ri′,ri,r,i),ncorners_face3D)
                                         else
-                                            rotated_ξ = ntuple(i->rotation_permutation(r,i),2)
+                                            rotated_ξ = ntuple(i->rotation_permutation(r,i),ncorners_face2D)
                                         end
                                         hnodes[nodeids[nodeowners[(k,c)]]] = [nodeids[nodeowners[(k′,fnodes[ξ])]] for ξ in rotated_ξ]
 
