@@ -4,7 +4,7 @@ include("gaussquad_prism_table.jl")
 include("gaussquad_pyramid_table.jl")
 include("generate_quadrature.jl")
 
-import Base.Cartesian: @nloops, @nref, @ntuple, @nexprs
+using Base.Cartesian: @nloops, @ntuple, @nexprs
 
 ##################
 # QuadratureRule #
