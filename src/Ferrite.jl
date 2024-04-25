@@ -8,7 +8,7 @@ using Base:
     @propagate_inbounds
 using EnumX:
     EnumX, @enumx
-using LinearAlgebra
+using LinearAlgebra:
     LinearAlgebra, Symmetric, Transpose, cholesky, det, issymmetric, norm,
     pinv, tr
 using NearestNeighbors:
