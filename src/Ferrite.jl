@@ -1,14 +1,27 @@
 module Ferrite
-using Reexport
+
+using Reexport: @reexport
 @reexport using Tensors
 @reexport using WriteVTK
 
-using LinearAlgebra
-using SparseArrays
-using StaticArrays
-using Base: @propagate_inbounds
-using NearestNeighbors
-using EnumX
+using Base:
+    @propagate_inbounds
+using EnumX:
+    EnumX, @enumx
+using LinearAlgebra:
+    LinearAlgebra, Symmetric, Transpose, cholesky, det, issymmetric, norm,
+    pinv, tr
+using NearestNeighbors:
+    NearestNeighbors, KDTree, knn
+using SparseArrays:
+    SparseArrays, SparseMatrixCSC, nonzeros, nzrange, rowvals, sparse, spzeros
+using StaticArrays:
+    StaticArrays, MMatrix, SMatrix, SVector
+using Tensors:
+    Tensors, AbstractTensor, SecondOrderTensor, SymmetricTensor, Tensor, Vec, gradient,
+    rotation_tensor, symmetric, tovoigt!
+using WriteVTK:
+    WriteVTK, MeshCell, VTKCellTypes, vtk_cell_data, vtk_grid, vtk_point_data, vtk_save
 
 include("exports.jl")
 
