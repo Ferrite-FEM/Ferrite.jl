@@ -16,11 +16,12 @@ using SparseArrays:
     SparseArrays, SparseMatrixCSC, nonzeros, nzrange, rowvals, sparse, spzeros
 using StaticArrays:
     StaticArrays, MMatrix, SMatrix, SVector
+using WriteVTK:
+    WriteVTK, VTKCellTypes
 using Tensors:
     Tensors, AbstractTensor, SecondOrderTensor, SymmetricTensor, Tensor, Vec, gradient,
     rotation_tensor, symmetric, tovoigt!
 
-import WriteVTK
 
 include("exports.jl")
 
