@@ -13,6 +13,8 @@ using LinearAlgebra:
     pinv, tr
 using NearestNeighbors:
     NearestNeighbors, KDTree, knn
+using Preferences:
+    Preferences
 using SparseArrays:
     SparseArrays, SparseMatrixCSC, nonzeros, nzrange, rowvals, sparse, spzeros
 using StaticArrays:
