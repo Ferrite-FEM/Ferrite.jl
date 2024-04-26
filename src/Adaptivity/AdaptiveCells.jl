@@ -896,6 +896,38 @@ function hangingnodes(forest::ForestBWG{dim}, nodeids, nodeowners) where dim
     return hnodes
 end
 
+function balance_corner(forest,k′,c′,o,s)
+    o′ = transform_corner(forest,k′,c′,o,false)
+    s′ = transform_corner(forest,k′,c′,s,false) #TODO verify the bool here; I think it's correct
+    neighbor_tree = forest.cells[k′]
+    if s′ ∉ neighbor_tree.leaves && parent(s′, neighbor_tree.b) ∉ neighbor_tree.leaves
+        if parent(parent(s′,neighbor_tree.b),neighbor_tree.b) ∈ neighbor_tree.leaves
+            refine!(neighbor_tree,parent(parent(s′,neighbor_tree.b),neighbor_tree.b))
+        end
+    end
+end
+
+function balance_face(forest,k′,f′,o,s)
+    o′ = transform_face(forest,k′,f′,o)
+    s′ = transform_face(forest,k′,f′,s)
+    neighbor_tree = forest.cells[k′]
+    if s′ ∉ neighbor_tree.leaves && parent(s′, neighbor_tree.b) ∉ neighbor_tree.leaves
+        if parent(parent(s′,neighbor_tree.b),neighbor_tree.b) ∈ neighbor_tree.leaves
+            refine!(neighbor_tree,parent(parent(s′,neighbor_tree.b),neighbor_tree.b))
+        end
+    end
+end
+
+function balance_edge(forest,k′,e′,o,s)
+    o′ = transform_edge(forest,k′,e′,o,false)
+    s′ = transform_edge(forest,k′,e′,s,true)
+    neighbor_tree = forest.cells[k′]
+    if s′ ∉ neighbor_tree.leaves && parent(s′, neighbor_tree.b) ∉ neighbor_tree.leaves
+        if parent(parent(s′,neighbor_tree.b),neighbor_tree.b) ∈ neighbor_tree.leaves
+            refine!(neighbor_tree,parent(parent(s′,neighbor_tree.b),neighbor_tree.b))
+        end
+    end
+end
 """
     balanceforest!(forest)
 Algorithm 17 of [BWG2011](@citet)
@@ -923,34 +955,18 @@ function balanceforest!(forest::ForestBWG{dim}) where dim
                         if s_i <= 4 #corner neighbor, only true for 2D see possibleneighbors
                             cc = forest.topology.vertex_vertex_neighbor[k,perm_corner[s_i]]
                             isempty(cc) && continue
-                            @assert length(cc) == 1 # FIXME there can be more than 1 vertex neighbor
+                            @assert length(cc) == 1
                             cc = cc[1]
                             k′, c′ = cc[1], perm_corner_inv[cc[2]]
-                            o′ = transform_corner(forest,k′,c′,o,false)
-                            s′ = transform_corner(forest,k′,c′,s,false) #TODO verify the bool here; I think it's correct
-                            neighbor_tree = forest.cells[cc[1]]
-                            if s′ ∉ neighbor_tree.leaves && parent(s′, neighbor_tree.b) ∉ neighbor_tree.leaves
-                                if parent(parent(s′,neighbor_tree.b),neighbor_tree.b) ∈ neighbor_tree.leaves
-                                    refine!(neighbor_tree,parent(parent(s′,neighbor_tree.b),neighbor_tree.b))
-                                #else
-                                #    refine!(tree,o)
-                                end
-                            end
+                            balance_corner(forest,k′,c′,o,s)
                         else # face neighbor, only true for 2D
                             s_i -= 4
                             fc = forest.topology.face_face_neighbor[k,perm_face[s_i]]
                             isempty(fc) && continue
-                            @debug @assert length(fc) == 1
+                            @assert length(fc) == 1
                             fc = fc[1]
                             k′, f′ = fc[1], perm_face_inv[fc[2]]
-                            o′ = transform_face(forest,k′,f′,o)
-                            s′ = transform_face(forest,k′,f′,s)
-                            neighbor_tree = forest.cells[fc[1]]
-                            if s′ ∉ neighbor_tree.leaves && parent(s′, neighbor_tree.b) ∉ neighbor_tree.leaves
-                                if parent(parent(s′,neighbor_tree.b),neighbor_tree.b) ∈ neighbor_tree.leaves
-                                    refine!(neighbor_tree,parent(parent(s′,neighbor_tree.b),neighbor_tree.b))
-                                end
-                            end
+                            balance_face(forest,k′,f′,o,s)
                         end
                     else #TODO collapse this 3D branch with more clever s_i encoding into the 2D branch
                         if s_i <= 8 #corner neighbor, only true for 2D see possibleneighbors
@@ -959,44 +975,23 @@ function balanceforest!(forest::ForestBWG{dim}) where dim
                             @assert length(cc) == 1 # FIXME there can be more than 1 vertex neighbor
                             cc = cc[1]
                             k′, c′ = cc[1], perm_corner_inv[cc[2]]
-                            o′ = transform_corner(forest,k′,c′,o,false)
-                            s′ = transform_corner(forest,k′,c′,s,false)
-                            neighbor_tree = forest.cells[cc[1]]
-                            if s′ ∉ neighbor_tree.leaves && parent(s′, neighbor_tree.b) ∉ neighbor_tree.leaves
-                                if parent(parent(s′,neighbor_tree.b),neighbor_tree.b) ∈ neighbor_tree.leaves
-                                    refine!(neighbor_tree,parent(parent(s′,neighbor_tree.b),neighbor_tree.b))
-                                end
-                            end
+                            balance_corner(forest,k′,c′,o,s)
                         elseif 8 < s_i <= 14
                             s_i -= 8
                             fc = forest.topology.face_face_neighbor[k,perm_face[s_i]]
                             isempty(fc) && continue
-                            @debug @assert length(fc) == 1
+                            @assert length(fc) == 1
                             fc = fc[1]
                             k′, f′ = fc[1], perm_face_inv[fc[2]]
-                            o′ = transform_face(forest,k′,f′,o)
-                            s′ = transform_face(forest,k′,f′,s)
-                            neighbor_tree = forest.cells[fc[1]]
-                            if s′ ∉ neighbor_tree.leaves && parent(s′, neighbor_tree.b) ∉ neighbor_tree.leaves
-                                if parent(parent(s′,neighbor_tree.b),neighbor_tree.b) ∈ neighbor_tree.leaves
-                                    refine!(neighbor_tree,parent(parent(s′,neighbor_tree.b),neighbor_tree.b))
-                                end
-                            end
+                            balance_face(forest,k′,f′,o,s)
                         else
                             s_i -= 14
                             ec = forest.topology.edge_edge_neighbor[k,edge_perm[s_i]]
                             isempty(ec) && continue
-                            @debug @assert length(ec) == 1
+                            @assert length(ec) == 1
                             ec = ec[1]
                             k′, e′ = ec[1], edge_perm_inv[ec[2]]
-                            o′ = transform_edge(forest,k′,e′,o,false)
-                            s′ = transform_edge(forest,k′,e′,s,true)
-                            neighbor_tree = forest.cells[ec[1]]
-                            if s′ ∉ neighbor_tree.leaves && parent(s′, neighbor_tree.b) ∉ neighbor_tree.leaves
-                                if parent(parent(s′,neighbor_tree.b),neighbor_tree.b) ∈ neighbor_tree.leaves
-                                    refine!(neighbor_tree,parent(parent(s′,neighbor_tree.b),neighbor_tree.b))
-                                end
-                            end 
+                            balance_edge(forest,k′,e′,o,s)
                         end
                     end
                 end
