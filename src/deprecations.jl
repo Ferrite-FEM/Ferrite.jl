@@ -1,7 +1,7 @@
 Base.@deprecate_binding DirichletBoundaryConditions ConstraintHandler
 Base.@deprecate_binding DirichletBoundaryCondition Dirichlet
 
-@deprecate Base.push!(dh::AbstractDofHandler, args...) add!(dh, args...)
+@deprecate Base.push!(dh::AbstractDofHandler, args...) add!(dh, args...) false
 
 @deprecate vertices(ip::Interpolation) vertexdof_indices(ip) false
 @deprecate faces(ip::Interpolation) facedof_indices(ip) false
