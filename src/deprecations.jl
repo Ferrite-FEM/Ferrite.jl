@@ -59,7 +59,7 @@ Base.@deprecate_binding Line3D Line
 Base.@deprecate_binding Quadrilateral3D Quadrilateral
 export Line2D, Line3D, Quadrilateral3D
 
-import WriteVTK: vtk_grid 
+using WriteVTK: vtk_grid 
 export vtk_grid # To give better error
 
 function WriteVTK.vtk_grid(::String, ::Union{AbstractGrid,AbstractDofHandler}; kwargs...)
