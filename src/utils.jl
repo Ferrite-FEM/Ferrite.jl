@@ -1,5 +1,3 @@
-import Preferences
-
 const DEBUG = Preferences.@load_preference("use_debug", false)
 
 """
