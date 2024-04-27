@@ -954,11 +954,30 @@ function balanceforest!(forest::ForestBWG{dim}) where dim
                     if dim == 2 # need more clever s_i encoding
                         if s_i <= 4 #corner neighbor, only true for 2D see possibleneighbors
                             cc = forest.topology.vertex_vertex_neighbor[k,perm_corner[s_i]]
-                            isempty(cc) && continue
-                            @assert length(cc) == 1
-                            cc = cc[1]
-                            k′, c′ = cc[1], perm_corner_inv[cc[2]]
-                            balance_corner(forest,k′,c′,o,s)
+                            participating_faces_idx = findall(x->any(x .== s_i),eachrow(𝒱₂)) #TODO! optimize by using inverted table
+                            pivot_faces = faces(o,tree.b)
+                            if isempty(cc)
+                                # the branch below checks if we are in a newly introduced topologic tree connection
+                                # by checking if the corner neighbor is only accesible by transforming through a face
+                                # TODO: enable a bool that either activates or deactivates the balancing over a corner
+                                for face_idx in participating_faces_idx
+                                    contained = contains_face(faces(root_,tree.b)[face_idx],pivot_faces[face_idx])
+                                    if contained
+                                        fc = forest.topology.face_face_neighbor[k,perm_face[face_idx]]
+                                        isempty(fc) && continue
+                                        @assert length(fc) == 1
+                                        fc = fc[1]
+                                        k′, f′ = fc[1], perm_face_inv[fc[2]]
+                                        balance_face(forest,k′,f′,o,s)
+                                    end
+                                end
+                                continue
+                            else
+                                @assert length(cc) == 1
+                                cc = cc[1]
+                                k′, c′ = cc[1], perm_corner_inv[cc[2]]
+                                balance_corner(forest,k′,c′,o,s)
+                            end
                         else # face neighbor, only true for 2D
                             s_i -= 4
                             fc = forest.topology.face_face_neighbor[k,perm_face[s_i]]
