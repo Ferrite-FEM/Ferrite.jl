@@ -991,6 +991,7 @@ function balanceforest!(forest::ForestBWG{dim}) where dim
                         end
                     else #TODO collapse this 3D branch with more clever s_i encoding into the 2D branch
                         if s_i <= 8 #corner neighbor, only true for 2D see possibleneighbors
+                            #TODO a check of new introduced corner neighbors aka corner balancing, see 2D branch
                             cc = forest.topology.vertex_vertex_neighbor[k,perm_corner[s_i]]
                             isempty(cc) && continue
                             @assert length(cc) == 1 # FIXME there can be more than 1 vertex neighbor
