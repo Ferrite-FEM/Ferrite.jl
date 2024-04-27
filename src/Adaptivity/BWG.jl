@@ -937,11 +937,12 @@ function balanceforest!(forest::ForestBWG{dim}) where dim
     perm_face_inv = dim == 2 ? 𝒱₂_perm_inv : 𝒱₃_perm_inv
     perm_corner = dim == 2 ? node_map₂ : node_map₃
     perm_corner_inv = dim == 2 ? node_map₂_inv : node_map₃_inv
+    root_ = root(dim)
     for k in 1:length(forest.cells)
         tree = forest.cells[k]
+        rootfaces = faces(root_,tree.b)
         balanced = balancetree(tree)
         forest.cells[k] = balanced
-        root_ = root(dim)
         for (o_i, o) in enumerate(forest.cells[k].leaves)
             ss = possibleneighbors(o,o.l,tree.b,;insidetree=false)
             isinside = inside.(ss,(tree.b,))
@@ -962,7 +963,7 @@ function balanceforest!(forest::ForestBWG{dim}) where dim
                                 # TODO: enable a bool that either activates or deactivates the balancing over a corner
                                 for face_idx in participating_faces_idx
                                     face_idx = face_idx[1]
-                                    contained = contains_face(faces(root_,tree.b)[face_idx],pivot_faces[face_idx])
+                                    contained = contains_face(rootfaces[face_idx],pivot_faces[face_idx])
                                     if contained
                                         fc = forest.topology.face_face_neighbor[k,perm_face[face_idx]]
                                         isempty(fc) && continue
@@ -1007,7 +1008,19 @@ function balanceforest!(forest::ForestBWG{dim}) where dim
                         else
                             s_i -= 14
                             ec = forest.topology.edge_edge_neighbor[k,edge_perm[s_i]]
-                            isempty(ec) && continue
+                            pivot_edge = edge(o,s_i,tree.b)
+                            if isempty(ec)
+                                contained_face = findall(x->face_contains_edge(x,pivot_edge),rootfaces)
+                                for face_idx in contained_face
+                                    fc = forest.topology.face_face_neighbor[k,perm_face[face_idx]]
+                                    isempty(fc) && continue
+                                    @assert length(fc) == 1
+                                    fc = fc[1]
+                                    k′, f′ = fc[1], perm_face_inv[fc[2]]
+                                    balance_face(forest,k′,f′,o,s)
+                                end
+                                continue
+                            end
                             @assert length(ec) == 1
                             ec = ec[1]
                             k′, e′ = ec[1], edge_perm_inv[ec[2]]
@@ -1162,6 +1175,17 @@ function contains_face(mface::NTuple{4,Tuple{T1,T1,T1}}, sface::NTuple{4,Tuple{T
     lower_left = ntuple(i->minimum(getindex.(mface,i)),3)
     top_right = ntuple(i->maximum(getindex.(mface,i)),3)
     if (lower_left[1] ≤ sface_center[1] ≤ top_right[1]) && (lower_left[2] ≤ sface_center[2] ≤ top_right[2]) && (lower_left[3] ≤ sface_center[3] ≤ top_right[3])
+        return true
+    else
+        return false
+    end
+end
+
+function face_contains_edge(f::NTuple{4,Tuple{T1,T1,T1}},e::Tuple{Tuple{T2,T2,T2},Tuple{T2,T2,T2}}) where {T1<:Integer,T2<:Integer}
+    edge_center = center(e)
+    lower_left = ntuple(i->minimum(getindex.(f,i)),3)
+    top_right = ntuple(i->maximum(getindex.(f,i)),3) 
+    if (lower_left[1] ≤ edge_center[1] ≤ top_right[1]) && (lower_left[2] ≤ edge_center[2] ≤ top_right[2]) && (lower_left[3] ≤ edge_center[3] ≤ top_right[3])
         return true
     else
         return false

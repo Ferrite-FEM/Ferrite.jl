@@ -668,6 +668,17 @@ end
     transfered_grid = Ferrite.creategrid(adaptive_grid)
     @test length(transfered_grid.cells) == length(transfered_grid_ref.cells)
     @test length(transfered_grid.cells) == 148
+    
+    # edge balancing for new introduced connection that is not within topology table
+    grid = generate_grid(Hexahedron, (2,1,1));
+    adaptive_grid  = ForestBWG(grid,3)
+    Ferrite.refine!(adaptive_grid, [1,2])
+    Ferrite.balanceforest!(adaptive_grid)
+    Ferrite.refine!(adaptive_grid, [4])
+    Ferrite.balanceforest!(adaptive_grid)
+    Ferrite.refine!(adaptive_grid, [5])
+    Ferrite.balanceforest!(adaptive_grid)
+    @test Ferrite.getncells(adaptive_grid) == 51
 end
 
 @testset "Materializing Grid" begin
