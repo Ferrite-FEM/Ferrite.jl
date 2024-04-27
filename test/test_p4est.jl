@@ -575,6 +575,15 @@ end
     Ferrite.balanceforest!(adaptive_grid)
     @test Ferrite.getncells(adaptive_grid) == 19
 
+    # 2D example with balancing over a corner connection that is not within the topology tables
+    grid = generate_grid(Quadrilateral,(2,1))
+    adaptive_grid = ForestBWG(grid,3)
+    Ferrite.refine!(adaptive_grid.cells[1],adaptive_grid.cells[1].leaves[1])
+    Ferrite.refine!(adaptive_grid.cells[1],adaptive_grid.cells[1].leaves[2])
+    Ferrite.refine!(adaptive_grid.cells[1],adaptive_grid.cells[1].leaves[5])
+    Ferrite.balanceforest!(adaptive_grid)
+    @test Ferrite.getncells(adaptive_grid) == 23
+
     # 3D case intra treee simple test, non conformity level 2
     grid = generate_grid(Hexahedron,(1,1,1))
     adaptive_grid = ForestBWG(grid,3)
