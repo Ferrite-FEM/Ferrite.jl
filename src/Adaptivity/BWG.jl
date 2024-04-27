@@ -954,13 +954,14 @@ function balanceforest!(forest::ForestBWG{dim}) where dim
                     if dim == 2 # need more clever s_i encoding
                         if s_i <= 4 #corner neighbor, only true for 2D see possibleneighbors
                             cc = forest.topology.vertex_vertex_neighbor[k,perm_corner[s_i]]
-                            participating_faces_idx = findall(x->any(x .== s_i),eachrow(𝒱₂)) #TODO! optimize by using inverted table
+                            participating_faces_idx = findall(x->any(x .== s_i),𝒱₂) #TODO! optimize by using inverted table
                             pivot_faces = faces(o,tree.b)
                             if isempty(cc)
                                 # the branch below checks if we are in a newly introduced topologic tree connection
                                 # by checking if the corner neighbor is only accesible by transforming through a face
                                 # TODO: enable a bool that either activates or deactivates the balancing over a corner
                                 for face_idx in participating_faces_idx
+                                    face_idx = face_idx[1]
                                     contained = contains_face(faces(root_,tree.b)[face_idx],pivot_faces[face_idx])
                                     if contained
                                         fc = forest.topology.face_face_neighbor[k,perm_face[face_idx]]
