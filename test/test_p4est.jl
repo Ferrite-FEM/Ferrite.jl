@@ -627,7 +627,6 @@ end
     #Ferrite.refine!(adaptive_grid.cells[1],adaptive_grid.cells[1].leaves[7])
     Ferrite.refine!(adaptive_grid.cells[7],adaptive_grid.cells[7].leaves[1])
     Ferrite.refine!(adaptive_grid.cells[7],adaptive_grid.cells[7].leaves[1])
-    Ferrite.refine!(adaptive_grid.cells[7],adaptive_grid.cells[7].leaves[1])
     #Ferrite.refine!(adaptive_grid.cells[7],adaptive_grid.cells[7].leaves[1])
     Ferrite.balanceforest!(adaptive_grid)
     transfered_grid_ref = Ferrite.creategrid(adaptive_grid)
@@ -662,12 +661,10 @@ end
     #Ferrite.refine!(adaptive_grid.cells[1],adaptive_grid.cells[1].leaves[7])
     Ferrite.refine!(adaptive_grid.cells[7],adaptive_grid.cells[7].leaves[1])
     Ferrite.refine!(adaptive_grid.cells[7],adaptive_grid.cells[7].leaves[1])
-    Ferrite.refine!(adaptive_grid.cells[7],adaptive_grid.cells[7].leaves[1])
-    #Ferrite.refine!(adaptive_grid.cells[7],adaptive_grid.cells[7].leaves[1])
     Ferrite.balanceforest!(adaptive_grid)
     transfered_grid = Ferrite.creategrid(adaptive_grid)
     @test length(transfered_grid.cells) == length(transfered_grid_ref.cells)
-    @test length(transfered_grid.cells) == 148
+    @test length(transfered_grid.cells) == 92
     
     # edge balancing for new introduced connection that is not within topology table
     grid = generate_grid(Hexahedron, (2,1,1));
@@ -679,6 +676,67 @@ end
     Ferrite.refine!(adaptive_grid, [5])
     Ferrite.balanceforest!(adaptive_grid)
     @test Ferrite.getncells(adaptive_grid) == 51
+
+    #another edge balancing case
+    grid = generate_grid(Hexahedron,(2,2,2))
+    adaptive_grid = ForestBWG(grid,3)
+    Ferrite.refine!(adaptive_grid,1)
+    Ferrite.balanceforest!(adaptive_grid)
+    Ferrite.refine!(adaptive_grid,[2,4,6,8])
+    Ferrite.balanceforest!(adaptive_grid)
+    Ferrite.refine!(adaptive_grid,34)
+    Ferrite.balanceforest!(adaptive_grid)
+    @test Ferrite.getncells(adaptive_grid) == 134
+
+    #yet another edge balancing case
+    grid = generate_grid(Hexahedron,(2,2,2))
+    adaptive_grid = ForestBWG(grid,3)
+    Ferrite.refine!(adaptive_grid,1)
+    Ferrite.balanceforest!(adaptive_grid)
+    Ferrite.refine!(adaptive_grid,[2,4,6,8])
+    Ferrite.balanceforest!(adaptive_grid)
+    Ferrite.refine!(adaptive_grid,30)
+    Ferrite.balanceforest!(adaptive_grid)
+    @test Ferrite.getncells(adaptive_grid) == 120
+
+    grid = generate_grid(Hexahedron,(2,2,2))
+    adaptive_grid = ForestBWG(grid,3)
+    Ferrite.refine!(adaptive_grid.cells[4],adaptive_grid.cells[4].leaves[1])
+    Ferrite.balanceforest!(adaptive_grid)
+    @test Ferrite.getncells(adaptive_grid) == 15
+
+    #yet another edge balancing case
+    grid = generate_grid(Hexahedron,(2,2,2))
+    adaptive_grid = ForestBWG(grid,3)
+    Ferrite.refine!(adaptive_grid.cells[4],adaptive_grid.cells[4].leaves[1])
+    Ferrite.balanceforest!(adaptive_grid)
+    Ferrite.refine!(adaptive_grid.cells[4],adaptive_grid.cells[4].leaves[1])
+    Ferrite.balanceforest!(adaptive_grid)
+    @test Ferrite.getncells(adaptive_grid) == 43
+
+    #yet another edge balancing case
+    grid = generate_grid(Hexahedron,(2,2,2))
+    adaptive_grid = ForestBWG(grid,3)
+    Ferrite.refine!(adaptive_grid.cells[4],adaptive_grid.cells[4].leaves[1])
+    Ferrite.balanceforest!(adaptive_grid)
+    Ferrite.refine!(adaptive_grid.cells[4],adaptive_grid.cells[4].leaves[1])
+    Ferrite.balanceforest!(adaptive_grid)
+    Ferrite.refine!(adaptive_grid.cells[3],adaptive_grid.cells[3].leaves[2])
+    Ferrite.refine!(adaptive_grid.cells[4],adaptive_grid.cells[4].leaves[10])
+    Ferrite.refine!(adaptive_grid.cells[4],adaptive_grid.cells[4].leaves[3])
+    Ferrite.balanceforest!(adaptive_grid)
+    @test Ferrite.getncells(adaptive_grid) == 71
+
+    #yet another edge balancing case
+    grid = generate_grid(Hexahedron,(2,2,2))
+    adaptive_grid = ForestBWG(grid,3)
+    Ferrite.refine!(adaptive_grid.cells[4],adaptive_grid.cells[4].leaves[1])
+    Ferrite.balanceforest!(adaptive_grid)
+    Ferrite.refine!(adaptive_grid.cells[4],adaptive_grid.cells[4].leaves[1])
+    Ferrite.balanceforest!(adaptive_grid)
+    Ferrite.refine!(adaptive_grid.cells[4],adaptive_grid.cells[4].leaves[7])
+    Ferrite.balanceforest!(adaptive_grid)
+    @test Ferrite.getncells(adaptive_grid) == 120
 end
 
 @testset "Materializing Grid" begin
