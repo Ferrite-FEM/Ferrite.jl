@@ -97,7 +97,7 @@ include("Grid/grid_generators.jl")
 include("Grid/coloring.jl")
 
 # Adaptiviy
-include(joinpath("Adaptivity", "AdaptiveCells.jl"))
+include("Adaptivity/BWG.jl")
 
 # Dofs
 include("Dofs/DofHandler.jl")

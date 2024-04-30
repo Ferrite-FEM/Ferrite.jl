@@ -113,7 +113,7 @@ function component_names(::Type{S}) where S
     return names
 end
 
-function vtk_nodeset(vtk::WriteVTK.DatasetFile, grid::AbstractGrid, nodeset::String) where {dim}
+function vtk_nodeset(vtk::WriteVTK.DatasetFile, grid::AbstractGrid, nodeset::String)
     z = zeros(getnnodes(grid))
     z[collect(getnodeset(grid, nodeset))] .= 1.0
     vtk_point_data(vtk, z, nodeset)

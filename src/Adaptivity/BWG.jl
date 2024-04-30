@@ -6,6 +6,10 @@
 abstract type AbstractAdaptiveGrid{dim} <: AbstractGrid{dim} end
 abstract type AbstractAdaptiveCell{refshape <: AbstractRefShape} <: AbstractCell{refshape} end
 
+const ncorners_face3D = 4
+const ncorners_face2D = 2
+const ncorners_edge = ncorners_face2D
+
 _maxlevel = [30,19]
 
 function set_maxlevel(dim::Integer,maxlevel::Integer)
@@ -46,7 +50,7 @@ end
 #OctantBWG(dim::Int,l::Int,m::Int,b::Int=_maxlevel[dim-1]) = OctantBWG(dim,l,m,b)
 #OctantBWG(dim::Int,l::Int,m::Int,b::Int32) = OctantBWG(dim,l,m,b)
 #OctantBWG(dim::Int,l::Int32,m::Int,b::Int32) = OctantBWG(dim,l,Int32(m),b)
-function OctantBWG(level::Int,coords::NTuple)
+function OctantBWG(level::T,coords::NTuple) where T <: Integer
     dim = length(coords)
     nnodes = 2^dim
     OctantBWG{dim,nnodes,eltype(coords)}(level,coords)
@@ -178,6 +182,8 @@ function edge(octant::OctantBWG{3}, e::Integer, b::Integer)
     cornerid = view(𝒰,e,:)
     return ntuple(i->vertex(octant,cornerid[i], b),2)
 end
+
+edges(octant::OctantBWG{3}, b::Integer) = ntuple(i->edge(octant,i,b),12)
 
 """
     boundaryset(o::OctantBWG{2}, i::Integer, b::Integer
@@ -459,6 +465,7 @@ function refine!(forest::ForestBWG, cellid::Integer)
 end
 
 function refine!(forest::ForestBWG, cellids::Vector{<:Integer})
+    sort!(cellids)
     ncells = getncells(forest)
     shift = 0
     for cellid in cellids
@@ -535,7 +542,29 @@ end
 
 transform_pointBWG(forest, vertices) = transform_pointBWG.((forest,), first.(vertices), last.(vertices))
 
+"""
+    rotation_permutation(::Val{2},r,i) -> i′
+computes based on the rotation indicator `r` ∈ {0,1} and a given corner index `i` ∈ {1,2} the permuted corner index `i′`
+"""
+function rotation_permutation(r,i)
+     i′ = r == 0 ? i : 3-i
+    return i′
+end
+
+"""
+    rotation_permutation(f,f′,r,i) -> i′
+computes based on the rotation indicator `r` ∈ {0,...,3} and a given corner index `i` ∈ {1,...,4} the permuted corner index `i′`
+See Table 3 and Theorem 2.2 [BWG2011](@citet).
+"""
+function rotation_permutation(f,f′,r,i)
+    return 𝒫[𝒬[ℛ[f,f′],r+1],i] 
+end
+
 #TODO: this function should wrap the LNodes Iterator of [IBWG2015](@citet)
+"""
+    creategrid(forest::ForestBWG) -> NonConformingGrid
+Materializes a p4est forest into a NonConformingGrid that can be used as usual to solve a finite element problem.
+"""
 function creategrid(forest::ForestBWG{dim,C,T}) where {dim,C,T}
     nodes = Vector{Tuple{Int,NTuple{dim,Int32}}}()
     sizehint!(nodes,getncells(forest)*2^dim)
@@ -585,12 +614,12 @@ function creategrid(forest::ForestBWG{dim,C,T}) where {dim,C,T}
             @debug println("Updating face neighbors for octree $k")
             for (f,fc) in enumerate(_faces) # f in p4est notation
                 f_axis_index, f_axis_sign = divrem(f-1,2)
-                face_neighbor = forest.topology.face_face_neighbor[k,_perm[f]]
-                if length(face_neighbor) == 0
+                face_neighbor_ = forest.topology.face_face_neighbor[k,_perm[f]]
+                if length(face_neighbor_) == 0
                     continue
                 end
-                @debug @assert length(face_neighbor) == 1
-                k′, f′_ferrite = face_neighbor[1]
+                @debug @assert length(face_neighbor_) == 1
+                k′, f′_ferrite = face_neighbor_[1]
                 f′ = _perminv[f′_ferrite]
                 if k > k′ # Owner
                     tree′ = forest.cells[k′]
@@ -614,31 +643,70 @@ function creategrid(forest::ForestBWG{dim,C,T}) where {dim,C,T}
                         r = compute_face_orientation(forest,k,f)
                         @debug println("    Matching $fnodes (local) to $fnodes_neighbor (neighbor)")
                         if dim == 2
-                            if r == 0 # same orientation
-                                for i ∈ 1:2
-                                    if haskey(nodeids, (k′,fnodes_neighbor[i]))
-                                        nodeids[(k,fnodes[i])] = nodeids[(k′,fnodes_neighbor[i])]
-                                        nodeowners[(k,fnodes[i])] = (k′,fnodes_neighbor[i])
-                                    end
-                                end
-                            else
-                                for i ∈ 1:2
-                                    if haskey(nodeids, (k′,fnodes_neighbor[3-i]))
-                                        nodeids[(k,fnodes[i])] = nodeids[(k′,fnodes_neighbor[3-i])]
-                                        nodeowners[(k,fnodes[i])] = (k′,fnodes_neighbor[3-i])
-                                    end
+                            for i ∈ 1:ncorners_face2D
+                                i′ = rotation_permutation(r,i)
+                                if haskey(nodeids, (k′,fnodes_neighbor[i′]))
+                                    nodeids[(k,fnodes[i])] = nodeids[(k′,fnodes_neighbor[i′])]
+                                    nodeowners[(k,fnodes[i])] = (k′,fnodes_neighbor[i′])
                                 end
                             end
                         else
-                            @error "Not implemented for $dim dimensions."
+                            for i ∈ 1:ncorners_face3D
+                                rotated_ξ = rotation_permutation(f′,f,r,i) 
+                                if haskey(nodeids, (k′,fnodes_neighbor[i]))
+                                    nodeids[(k,fnodes[rotated_ξ])] = nodeids[(k′,fnodes_neighbor[i])]
+                                    nodeowners[(k,fnodes[rotated_ξ])] = (k′,fnodes_neighbor[i])
+                                end
+                            end
                         end
                     end
                 end
             end
         end
         if dim > 2
-            #TODO add egde duplication check
-            @error "Edge deduplication not implemented yet."
+            # edge neighbors
+            @debug println("Updating edge neighbors for octree $k")
+            for (e,ec) in enumerate(edges(root(dim),tree.b)) # e in p4est notation
+                e_axis_index, e_axis_sign = divrem(e-1,4) #first axis 0 (x), 1 (y), 2(z), second positive or negative direction
+                edge_neighbor_ = forest.topology.edge_edge_neighbor[k,edge_perm[e]]
+                if length(edge_neighbor_) == 0
+                    continue
+                end
+                @debug @assert length(edge_neighbor_) == 1
+                k′, e′_ferrite = edge_neighbor_[1]
+                e′ = edge_perm_inv[e′_ferrite]
+                if k > k′ # Owner
+                    tree′ = forest.cells[k′]
+                    for leaf in tree.leaves
+                        #debugging checks; should be inbounds anyway due to iteration
+                        if e_axis_sign == 1 # positive edge
+                            if leaf.xyz[e_axis_index + 1] < 2^tree.b-2^(tree.b-leaf.l)
+                                @debug println("    Rejecting $leaf")
+                                continue
+                            end
+                        else # negative edge
+                            if leaf.xyz[e_axis_index + 1] > 0
+                                @debug println("    Rejecting $leaf")
+                                continue
+                            end
+                        end
+                        neighbor_candidate = transform_edge(forest,k′,e′,leaf, false)
+                        # Candidate must be the edge opposite to e'
+                        e′candidate = ((e′ - 1) ⊻ 1) + 1
+                        enodes = edge(leaf, e , tree.b)
+                        enodes_neighbor = edge(neighbor_candidate, e′candidate, tree′.b)
+                        r = compute_edge_orientation(forest,k,e)
+                        @debug println("    Matching $enodes (local) to $enodes_neighbor (neighbor)")
+                        for i ∈ 1:ncorners_edge
+                            i′ = rotation_permutation(r,i)
+                            if haskey(nodeids, (k′,enodes_neighbor[i′]))
+                                nodeids[(k,enodes[i])] = nodeids[(k′,enodes_neighbor[i′])]
+                                nodeowners[(k,enodes[i])] = (k′,enodes_neighbor[i′])
+                            end
+                        end
+                    end
+                end
+            end
         end
     end
 
@@ -680,6 +748,8 @@ function creategrid(forest::ForestBWG{dim,C,T}) where {dim,C,T}
 end
 
 function reconstruct_facesets(forest::ForestBWG{dim}) where dim
+    _perm = dim == 2 ? 𝒱₂_perm : 𝒱₃_perm
+    _perm_inv = dim == 2 ? 𝒱₂_perm_inv : 𝒱₃_perm_inv
     new_facesets = typeof(forest.facesets)()
     for (facesetname, faceset) in forest.facesets
         new_faceset = typeof(faceset)()
@@ -687,11 +757,11 @@ function reconstruct_facesets(forest::ForestBWG{dim}) where dim
             pivot_tree = forest.cells[faceidx[1]]
             last_cellid = faceidx[1] != 1 ? sum(length,@view(forest.cells[1:(faceidx[1]-1)])) : 0
             pivot_faceid = faceidx[2]
-            pivot_face = faces(root(dim),pivot_tree.b)[𝒱₂_perm_inv[pivot_faceid]]
+            pivot_face = faces(root(dim),pivot_tree.b)[_perm_inv[pivot_faceid]]
             for (leaf_idx,leaf) in enumerate(pivot_tree.leaves)
                 for (leaf_face_idx,leaf_face) in enumerate(faces(leaf,pivot_tree.b))
                     if contains_face(pivot_face,leaf_face)
-                        ferrite_leaf_face_idx = 𝒱₂_perm[leaf_face_idx]
+                        ferrite_leaf_face_idx = _perm[leaf_face_idx]
                         push!(new_faceset,FaceIndex(last_cellid+leaf_idx,ferrite_leaf_face_idx))
                     end
                 end
@@ -702,15 +772,20 @@ function reconstruct_facesets(forest::ForestBWG{dim}) where dim
     return new_facesets
 end
 
+"""
+    hangingnodes(forest,nodeids,nodeowners)
+Constructs a map from constrained nodeids to the ones that constraint
+"""
 function hangingnodes(forest::ForestBWG{dim}, nodeids, nodeowners) where dim
     _perm = dim == 2 ? 𝒱₂_perm : 𝒱₃_perm
     _perminv = dim == 2 ? 𝒱₂_perm_inv : 𝒱₃_perm_inv
+    facetable = dim == 2 ? 𝒱₂ : 𝒱₃
     opposite_face = dim == 2 ? opposite_face_2 : opposite_face_3
-    #hnodes = Dict{Tuple{Int,NTuple{dim,Int32}},Vector{Tuple{Int,NTuple{dim,Int32}}}}()
     hnodes = Dict{Int,Vector{Int}}()
     for (k,tree) in enumerate(forest.cells)
         rootfaces = faces(root(dim),tree.b)
         for (l,leaf) in enumerate(tree.leaves)
+            c̃ = child_id(leaf,tree.b)
             if leaf == root(dim)
                 continue
             end
@@ -725,27 +800,90 @@ function hangingnodes(forest::ForestBWG{dim}, nodeids, nodeowners) where dim
                             if neighbor_candidate_idx !== nothing
                                 neighbor_candidate_faces = faces(neighbor_candidate,tree.b)
                                 nf = findfirst(x->x==pface,neighbor_candidate_faces)
-                                #hnodes[(k,c)] = [(k,nc) for nc in neighbor_candidate_faces[nf]]
                                 hnodes[nodeids[nodeowners[(k,c)]]] = [nodeids[nodeowners[(k,nc)]] for nc in neighbor_candidate_faces[nf]]
+                                if dim > 2
+                                    vs = vertices(leaf,tree.b)
+                                    for ξ ∈ 1:ncorners_face3D
+                                        c′ = facetable[pface_i, ξ]
+                                        if c′ ∉ (c̃,c)
+                                            neighbor_candidate_edges = edges(neighbor_candidate,tree.b)
+                                            ne = findfirst(x->iscenter(vs[c′],x),neighbor_candidate_edges)
+                                            if ne !== nothing
+                                                hnodes[nodeids[nodeowners[(k,vs[c′])]]] = [nodeids[nodeowners[(k,ne)]] for ne in neighbor_candidate_edges[ne]]
+                                            end
+                                        end
+                                    end
+                                end
                                 break
                             end
                         else #interoctree branch
                             for (ri,rf) in enumerate(rootfaces)
-                                face_neighbor =  forest.topology.face_face_neighbor[k,_perm[ri]]
-                                if length(face_neighbor) == 0
+                                face_neighbor_ =  forest.topology.face_face_neighbor[k,_perm[ri]]
+                                if length(face_neighbor_) == 0
                                     continue
                                 end
                                 if contains_face(rf, pface)
-                                    k′ = face_neighbor[1][1]
-                                    ri′ = _perminv[face_neighbor[1][2]]
+                                    k′ = face_neighbor_[1][1]
+                                    ri′ = _perminv[face_neighbor_[1][2]]
                                     interoctree_neighbor = transform_face(forest, k′, ri′, neighbor_candidate)
                                     interoctree_neighbor_candidate_idx = findfirst(x->x==interoctree_neighbor,forest.cells[k′].leaves)
                                     if interoctree_neighbor_candidate_idx !== nothing
+                                        r = compute_face_orientation(forest,k,pface_i)
                                         neighbor_candidate_faces = faces(neighbor_candidate,forest.cells[k′].b)
                                         transformed_neighbor_faces = faces(interoctree_neighbor,forest.cells[k′].b)
-                                        nf = findfirst(x->x==pface,neighbor_candidate_faces)
-                                        #hnodes[(k,c)] = [(k′,nc) for nc in transformed_neighbor_faces[nf]]
-                                        hnodes[nodeids[nodeowners[(k,c)]]] = [nodeids[nodeowners[(k′,nc)]] for nc in transformed_neighbor_faces[nf]]
+
+                                        fnodes = transformed_neighbor_faces[ri′]
+                                        vs = vertices(leaf,tree.b)
+                                        if dim > 2
+                                            rotated_ξ = ntuple(i->rotation_permutation(ri′,ri,r,i),ncorners_face3D)
+                                        else
+                                            rotated_ξ = ntuple(i->rotation_permutation(r,i),ncorners_face2D)
+                                        end
+                                        hnodes[nodeids[nodeowners[(k,c)]]] = [nodeids[nodeowners[(k′,fnodes[ξ])]] for ξ in rotated_ξ]
+
+                                        if dim > 2
+                                            for ξ in rotated_ξ
+                                                c′ = facetable[pface_i, ξ]
+                                                if c′ ∉ (c̃,c)
+                                                    neighbor_candidate_edges = edges(interoctree_neighbor,tree.b)
+                                                    ne = findfirst(x->iscenter(vs[c′],x),neighbor_candidate_edges)
+                                                    if ne !== nothing
+                                                        hnodes[nodeids[nodeowners[(k,vs[c′])]]] = [nodeids[nodeowners[(k,ne)]] for ne in neighbor_candidate_edges[ne]]
+                                                    end
+                                                end
+                                            end
+                                        end
+                                        break
+                                    end
+                                end
+                            end
+                        end
+                    end
+                end
+                if dim > 2
+                    parentedges = edges(parent_,tree.b)
+                    for (pedge_i, pedge) in enumerate(parentedges)
+                        if iscenter(c,pedge) #hanging node candidate
+                            neighbor_candidate = edge_neighbor(parent_, pedge_i, tree.b)
+                            for (ri,re) in enumerate(edges(root(dim),tree.b))
+                                edge_neighbor_ =  forest.topology.edge_edge_neighbor[k,edge_perm[ri]]
+                                if length(edge_neighbor_) == 0
+                                    continue
+                                end
+                                if contains_edge(re, pedge)
+                                    k′ = edge_neighbor_[1][1]
+                                    ri′ = edge_perm_inv[edge_neighbor_[1][2]]
+                                    interoctree_neighbor = transform_edge(forest, k′, ri′, neighbor_candidate, true)
+                                    interoctree_neighbor_candidate_idx = findfirst(x->x==interoctree_neighbor,forest.cells[k′].leaves)
+                                    if interoctree_neighbor_candidate_idx !== nothing
+                                        neighbor_candidate_edges = edges(neighbor_candidate,forest.cells[k′].b)
+                                        transformed_neighbor_edges = edges(interoctree_neighbor,forest.cells[k′].b)
+                                        ne = findfirst(x->iscenter(c,x),neighbor_candidate_edges)
+                                        if ne !== nothing
+                                            hnodes[nodeids[nodeowners[(k,c)]]] = [nodeids[nodeowners[(k′,nc)]] for nc in transformed_neighbor_edges[ne]]
+                                        else
+                                            @error "things are messed up for hanging edge constraint interoctree at octree $k edge $(_perm[ri])"
+                                        end
                                         break
                                     end
                                 end
@@ -759,58 +897,148 @@ function hangingnodes(forest::ForestBWG{dim}, nodeids, nodeowners) where dim
     return hnodes
 end
 
+function balance_corner(forest,k′,c′,o,s)
+    o.l == 1 && return # no balancing needed for pivot octant level == 1
+    o′ = transform_corner(forest,k′,c′,o,false)
+    s′ = transform_corner(forest,k′,c′,s,true) #TODO verify the bool here; I think it's correct
+    neighbor_tree = forest.cells[k′]
+    if s′ ∉ neighbor_tree.leaves && parent(s′, neighbor_tree.b) ∉ neighbor_tree.leaves
+        if parent(parent(s′,neighbor_tree.b),neighbor_tree.b) ∈ neighbor_tree.leaves
+            refine!(neighbor_tree,parent(parent(s′,neighbor_tree.b),neighbor_tree.b))
+        end
+    end
+end
+
+function balance_face(forest,k′,f′,o,s)
+    o.l == 1 && return # no balancing needed for pivot octant level == 1
+    o′ = transform_face(forest,k′,f′,o)
+    s′ = transform_face(forest,k′,f′,s)
+    neighbor_tree = forest.cells[k′]
+    if s′ ∉ neighbor_tree.leaves && parent(s′, neighbor_tree.b) ∉ neighbor_tree.leaves
+        if parent(parent(s′,neighbor_tree.b),neighbor_tree.b) ∈ neighbor_tree.leaves
+            refine!(neighbor_tree,parent(parent(s′,neighbor_tree.b),neighbor_tree.b))
+        end
+    end
+end
+
+function balance_edge(forest,k′,e′,o,s)
+    o.l == 1 && return # no balancing needed for pivot octant level == 1
+    o′ = transform_edge(forest,k′,e′,o,false)
+    s′ = transform_edge(forest,k′,e′,s,true)
+    neighbor_tree = forest.cells[k′]
+    if s′ ∉ neighbor_tree.leaves && parent(s′, neighbor_tree.b) ∉ neighbor_tree.leaves
+        if parent(parent(s′,neighbor_tree.b),neighbor_tree.b) ∈ neighbor_tree.leaves
+            refine!(neighbor_tree,parent(parent(s′,neighbor_tree.b),neighbor_tree.b))
+        end
+    end
+end
 """
+    balanceforest!(forest)
 Algorithm 17 of [BWG2011](@citet)
-TODO need further work for dimension agnostic case
 """
 function balanceforest!(forest::ForestBWG{dim}) where dim
     perm_face = dim == 2 ? 𝒱₂_perm : 𝒱₃_perm
     perm_face_inv = dim == 2 ? 𝒱₂_perm_inv : 𝒱₃_perm_inv
     perm_corner = dim == 2 ? node_map₂ : node_map₃
     perm_corner_inv = dim == 2 ? node_map₂_inv : node_map₃_inv
-    for k in 1:length(forest.cells)
-        tree = forest.cells[k]
-        balanced = balancetree(tree)
-        forest.cells[k] = balanced
-        root_ = root(dim)
-        for (o_i, o) in enumerate(forest.cells[k].leaves)
-            ss = possibleneighbors(o,o.l,tree.b,;insidetree=false)
-            isinside = inside.(ss,(tree.b,))
-            notinsideidx = findall(.! isinside)
-            if !isempty(notinsideidx)
-                for s_i in notinsideidx
-                    s = ss[s_i]
-                    if s_i <= 4 #corner neighbor, only true for 2D see possibleneighbors
-                        cc = forest.topology.vertex_vertex_neighbor[k,perm_corner[s_i]]
-                        isempty(cc) && continue
-                        @assert length(cc) == 1 # FIXME there can be more than 1 vertex neighbor
-                        cc = cc[1]
-                        k′, c′ = cc[1], perm_corner_inv[cc[2]]
-                        o′ = transform_corner(forest,k′,c′,o)
-                        s′ = transform_corner(forest,k′,c′,s)
-                        neighbor_tree = forest.cells[cc[1]]
-                        if s′ ∉ neighbor_tree.leaves && parent(s′, neighbor_tree.b) ∉ neighbor_tree.leaves
-                            if parent(parent(s′,neighbor_tree.b),neighbor_tree.b) ∈ neighbor_tree.leaves
-                                refine!(neighbor_tree,parent(parent(s′,neighbor_tree.b),neighbor_tree.b))
-                            #else
-                            #    refine!(tree,o)
+    root_ = root(dim)
+    nrefcells = 0
+    while nrefcells - getncells(forest) != 0
+        for k in 1:length(forest.cells)
+            tree = forest.cells[k]
+            rootfaces = faces(root_,tree.b)
+            rootedges = dim == 3 ? edges(root_,tree.b) : nothing #TODO change
+            rootvertices = vertices(root_,tree.b)
+            balanced = balancetree(tree)
+            forest.cells[k] = balanced
+            nrefcells = getncells(forest)
+            for (o_i, o) in enumerate(forest.cells[k].leaves)
+                ss = possibleneighbors(o,o.l,tree.b,;insidetree=false)
+                isinside = inside.(ss,(tree.b,))
+                notinsideidx = findall(.! isinside)
+                if !isempty(notinsideidx)
+                    # s_i encodes the type of neighborhood, since it is the index of possibleneighbors
+                    # see the docs of this function
+                    for s_i in notinsideidx
+                        s = ss[s_i]
+                        if dim == 2 # need more clever s_i encoding
+                            if s_i <= 4 #corner neighbor, only true for 2D see possibleneighbors
+                                cc = forest.topology.vertex_vertex_neighbor[k,perm_corner[s_i]]
+                                participating_faces_idx = findall(x->any(x .== s_i),𝒱₂) #TODO! optimize by using inverted table
+                                pivot_faces = faces(o,tree.b)
+                                if isempty(cc)
+                                    # the branch below checks if we are in a newly introduced topologic tree connection
+                                    # by checking if the corner neighbor is only accesible by transforming through a face
+                                    # TODO: enable a bool that either activates or deactivates the balancing over a corner
+                                    for face_idx in participating_faces_idx
+                                        face_idx = face_idx[1]
+                                        contained = contains_face(rootfaces[face_idx],pivot_faces[face_idx])
+                                        if contained
+                                            fc = forest.topology.face_face_neighbor[k,perm_face[face_idx]]
+                                            isempty(fc) && continue
+                                            @assert length(fc) == 1
+                                            fc = fc[1]
+                                            k′, f′ = fc[1], perm_face_inv[fc[2]]
+                                            balance_face(forest,k′,f′,o,s)
+                                        end
+                                    end
+                                    continue
+                                else
+                                    @assert length(cc) == 1
+                                    !(vertex(o,s_i,tree.b) == rootvertices[s_i]) && continue
+                                    cc = cc[1]
+                                    k′, c′ = cc[1], perm_corner_inv[cc[2]]
+                                    balance_corner(forest,k′,c′,o,s)
+                                end
+                            else # face neighbor, only true for 2D
+                                s_i -= 4
+                                fc = forest.topology.face_face_neighbor[k,perm_face[s_i]]
+                                isempty(fc) && continue
+                                @assert length(fc) == 1
+                                fc = fc[1]
+                                k′, f′ = fc[1], perm_face_inv[fc[2]]
+                                balance_face(forest,k′,f′,o,s)
                             end
-                        end
-                    else # face neighbor, only true for 2D
-                        s_i -= 4
-                        fc = forest.topology.face_face_neighbor[k,perm_face[s_i]]
-                        isempty(fc) && continue
-                        @debug @assert length(fc) == 1
-                        fc = fc[1]
-                        k′, f′ = fc[1], perm_face_inv[fc[2]]
-                        o′ = transform_face(forest,k′,f′,o)
-                        s′ = transform_face(forest,k′,f′,s)
-                        neighbor_tree = forest.cells[fc[1]]
-                        if s′ ∉ neighbor_tree.leaves && parent(s′, neighbor_tree.b) ∉ neighbor_tree.leaves
-                            if parent(parent(s′,neighbor_tree.b),neighbor_tree.b) ∈ neighbor_tree.leaves
-                                refine!(neighbor_tree,parent(parent(s′,neighbor_tree.b),neighbor_tree.b))
-                            #else
-                            #    refine!(tree,o)
+                        else #TODO collapse this 3D branch with more clever s_i encoding into the 2D branch
+                            if s_i <= 8 #corner neighbor, only true for 2D see possibleneighbors
+                                #TODO a check of new introduced corner neighbors aka corner balancing, see 2D branch
+                                cc = forest.topology.vertex_vertex_neighbor[k,perm_corner[s_i]]
+                                isempty(cc) && continue
+                                @assert length(cc) == 1 # FIXME there can be more than 1 vertex neighbor
+                                !(vertex(o,s_i,tree.b) == rootvertices[s_i]) && continue
+                                cc = cc[1]
+                                k′, c′ = cc[1], perm_corner_inv[cc[2]]
+                                balance_corner(forest,k′,c′,o,s)
+                            elseif 8 < s_i <= 14
+                                s_i -= 8
+                                fc = forest.topology.face_face_neighbor[k,perm_face[s_i]]
+                                isempty(fc) && continue
+                                @assert length(fc) == 1
+                                fc = fc[1]
+                                k′, f′ = fc[1], perm_face_inv[fc[2]]
+                                balance_face(forest,k′,f′,o,s)
+                            else
+                                s_i -= 14
+                                ec = forest.topology.edge_edge_neighbor[k,edge_perm[s_i]]
+                                pivot_edge = edge(o,s_i,tree.b)
+                                contained_face = findall(x->face_contains_edge(x,pivot_edge),rootfaces)
+                                if !isempty(contained_face) && !contains_edge(rootedges[s_i],pivot_edge) #check if pivot edge in interior of rootface and not octree edge
+                                    for face_idx in contained_face
+                                        fc = forest.topology.face_face_neighbor[k,perm_face[face_idx]]
+                                        isempty(fc) && continue
+                                        @assert length(fc) == 1
+                                        fc = fc[1]
+                                        k′, f′ = fc[1], perm_face_inv[fc[2]]
+                                        balance_face(forest,k′,f′,o,s)
+                                    end
+                                    continue
+                                end
+                                isempty(ec) && continue
+                                @assert length(ec) == 1
+                                !contains_edge(rootedges[s_i],pivot_edge) && continue
+                                ec = ec[1]
+                                k′, e′ = ec[1], edge_perm_inv[ec[2]]
+                                balance_edge(forest,k′,e′,o,s)
                             end
                         end
                     end
@@ -818,11 +1046,6 @@ function balanceforest!(forest::ForestBWG{dim}) where dim
             end
         end
     end
-    #for k in 1:length(forest.cells)
-    #    tree = forest.cells[k]
-    #    balanced = balancetree(tree)
-    #    forest.cells[k] = balanced
-    #end
 end
 
 """
@@ -883,12 +1106,39 @@ function siblings(o::OctantBWG,b;include_self=false)
     return siblings
 end
 
-# TODO make dimension agnostic
+"""
+    possibleneighbors(o::OctantBWG{2},l,b;insidetree=true)
+Returns a list of possible neighbors, where the first four are corner neighbors that are exclusively connected via a corner.
+The other four possible neighbors are face neighbors.
+"""
 function possibleneighbors(o::OctantBWG{2},l,b;insidetree=true)
     neighbors = ntuple(8) do i
         if i > 4
             j = i - 4
             face_neighbor(o,j,b)
+        else
+            corner_neighbor(o,i,b)
+        end
+    end
+    if insidetree
+        neighbors = filter(x->inside(x,b),neighbors)
+    end
+    return neighbors
+end
+
+"""
+    possibleneighbors(o::OctantBWG{3},l,b;insidetree=true)
+Returns a list of possible neighbors, where the first eight are corner neighbors that are exclusively connected via a corner.
+After the first eight corner neighbors, the 6 possible face neighbors follow and after them, the edge neighbors.
+"""
+function possibleneighbors(o::OctantBWG{3},l,b;insidetree=true)
+    neighbors = ntuple(26) do i
+        if 8 < i ≤ 14
+            j = i - 8
+            face_neighbor(o,j,b)
+        elseif 14 < i ≤ 26
+            j = i - 14
+            edge_neighbor(o,j,b)
         else
             corner_neighbor(o,i,b)
         end
@@ -918,12 +1168,47 @@ function isancestor(o1,o2,b)
     return ancestor
 end
 
-# TODO verify and generalize
 function contains_face(mface::Tuple{Tuple{T1,T1},Tuple{T1,T1}},sface::Tuple{Tuple{T2,T2},Tuple{T2,T2}}) where {T1<:Integer,T2<:Integer}
     if mface[1][1] == sface[1][1] && mface[2][1] == sface[2][1] # vertical
         return mface[1][2] ≤ sface[1][2] ≤ sface[2][2] ≤ mface[2][2]
     elseif mface[1][2] == sface[1][2] && mface[2][2] == sface[2][2] # horizontal
         return mface[1][1] ≤ sface[1][1] ≤ sface[2][1] ≤ mface[2][1]
+    else
+        return false
+    end
+end
+
+# currently checking if sface centroid lies in mface
+# TODO should be checked if applicaple in general, I guess yes
+function contains_face(mface::NTuple{4,Tuple{T1,T1,T1}}, sface::NTuple{4,Tuple{T2,T2,T2}}) where {T1<:Integer,T2<:Integer}
+    sface_center = center(sface)
+    lower_left = ntuple(i->minimum(getindex.(mface,i)),3)
+    top_right = ntuple(i->maximum(getindex.(mface,i)),3)
+    if (lower_left[1] ≤ sface_center[1] ≤ top_right[1]) && (lower_left[2] ≤ sface_center[2] ≤ top_right[2]) && (lower_left[3] ≤ sface_center[3] ≤ top_right[3])
+        return true
+    else
+        return false
+    end
+end
+
+function face_contains_edge(f::NTuple{4,Tuple{T1,T1,T1}},e::Tuple{Tuple{T2,T2,T2},Tuple{T2,T2,T2}}) where {T1<:Integer,T2<:Integer}
+    edge_center = center(e)
+    lower_left = ntuple(i->minimum(getindex.(f,i)),3)
+    top_right = ntuple(i->maximum(getindex.(f,i)),3) 
+    if (lower_left[1] ≤ edge_center[1] ≤ top_right[1]) && (lower_left[2] ≤ edge_center[2] ≤ top_right[2]) && (lower_left[3] ≤ edge_center[3] ≤ top_right[3])
+        return true
+    else
+        return false
+    end
+end
+
+function contains_edge(medge::Tuple{Tuple{T1,T1,T1},Tuple{T1,T1,T1}},sedge::Tuple{Tuple{T2,T2,T2},Tuple{T2,T2,T2}}) where {T1<:Integer,T2<:Integer}
+    if (medge[1][1] == sedge[1][1] && medge[2][1] == sedge[2][1]) && (medge[1][2] == sedge[1][2] && medge[2][2] == sedge[2][2]) # x1 & x2 aligned
+        return medge[1][3] ≤ sedge[1][3] ≤ sedge[2][3] ≤ medge[2][3]
+    elseif (medge[1][1] == sedge[1][1] && medge[2][1] == sedge[2][1]) && (medge[1][3] == sedge[1][3] && medge[2][3] == sedge[2][3])# x1 & x3 aligned
+        return medge[1][2] ≤ sedge[1][2] ≤ sedge[2][2] ≤ medge[2][2]
+    elseif (medge[1][2] == sedge[1][2] && medge[2][2] == sedge[2][2]) && (medge[1][3] == sedge[1][3] && medge[2][3] == sedge[2][3])# x2 & x3 aligned
+        return medge[1][1] ≤ sedge[1][1] ≤ sedge[2][1] ≤ medge[2][1]
     else
         return false
     end
@@ -938,133 +1223,6 @@ function center(pivot_face)
 end
 
 iscenter(c,f) = c == center(f)
-
-#TODO unfinished, isreplaced logic fails
-function creategridFB23(forest::ForestBWG{dim}) where dim
-    celltype = dim < 3 ? Quadrilateral : Hexahedron
-    opposite_corner = dim < 3 ? opposite_corner_2 : opposite_corner_3
-    opposite_face = dim < 3 ? opposite_face_2 : opposite_face_3
-    leaves = [Dict{Tuple{Int,Int},celltype}() for i in 1:length(forest.cells)]
-    isreplaced = zeros(Bool,getncells(forest)*nnodes(forest.cells[1]))
-    pivot_nodeid = 1
-    for (k,tree) in enumerate(forest.cells)
-        for leaf in tree.leaves
-            mortonid = morton(leaf,tree.b,tree.b)
-            _nnodes = nnodes(leaf)
-            leaves[k][(leaf.l,mortonid)] = celltype(ntuple(i->pivot_nodeid+i-1,_nnodes))
-            pivot_nodeid += _nnodes
-        end
-    end
-    for (k,tree) in enumerate(forest.cells)
-        for leaf in tree.leaves
-            leaf_mortonid = morton(leaf,tree.b,tree.b)
-            leaf_vertices = vertices(leaf,tree.b)
-            leaf_faces = faces(leaf,tree.b)
-            leaf_nodes = leaves[k][(leaf.l,leaf_mortonid)].nodes
-            for local_nodeid in 1:nnodes(leaf)
-                node_neighbor = corner_neighbor(leaf, local_nodeid, tree.b)
-                if !inside(tree,node_neighbor)
-                    #TODO interoctree :)
-                    continue
-                end
-                if node_neighbor.l == tree.b
-                    candidates = (parent(node_neighbor,tree.b), node_neighbor)
-                elseif node_neighbor.l == 0
-                    continue
-                else
-                    candidates = (parent(node_neighbor,tree.b), node_neighbor, children(node_neighbor,tree.b)[opposite_corner[local_nodeid]])
-                end
-                for candidate in candidates
-                    candidate_mortonid = morton(candidate,tree.b,tree.b)
-                    owner = leaf_mortonid < candidate_mortonid
-                    if !owner
-                        continue
-                    end
-                    if haskey(leaves[k],(candidate.l,candidate_mortonid))
-                        v = vertex(candidate, opposite_corner[local_nodeid], tree.b)
-                        if v == leaf_vertices[local_nodeid]
-                            candidate_nodes = leaves[k][(candidate.l,candidate_mortonid)].nodes
-                            isreplaced[candidate_nodes[opposite_corner[local_nodeid]]] = true
-                            altered_nodetuple = replace(candidate_nodes,candidate_nodes[opposite_corner[local_nodeid]] => leaf_nodes[local_nodeid])
-                            leaves[k][(candidate.l,candidate_mortonid)] = celltype(altered_nodetuple)
-                        end
-                    end
-                end
-            end
-            for local_faceid in 1:2*dim #true for all hypercubes
-                _face_neighbor = face_neighbor(leaf, local_faceid, tree.b)
-                if !inside(tree, _face_neighbor)
-                    #TODO interoctree :)
-                    continue
-                end
-                if _face_neighbor.l == tree.b
-                    candidates = (parent(_face_neighbor,tree.b), _face_neighbor)
-                elseif _face_neighbor.l == 0
-                    continue
-                else
-                    kidz = children(_face_neighbor,tree.b)
-                    if local_faceid < 3
-                        small_c1 = kidz[opposite_face[local_faceid]]
-                        small_c2 = OctantBWG(dim,small_c1.l,morton(small_c1,small_c1.l,tree.b)+2,tree.b)
-                    else #TODO add 3D case
-                        small_c1 = kidz[opposite_face[local_faceid]]
-                        small_c2 = OctantBWG(dim,small_c1.l,morton(small_c1,small_c1.l,tree.b)+1,tree.b)
-                    end
-                    if _face_neighbor.l - 1 != 0
-                        candidates = (parent(_face_neighbor,tree.b), _face_neighbor, small_c1, small_c2)
-                    else
-                        candidates = (_face_neighbor, small_c1, small_c2)
-                    end
-                end
-                for candidate in candidates
-                    candidate_mortonid = morton(candidate,tree.b,tree.b)
-                    owner = leaf_mortonid < candidate_mortonid
-                    if !owner
-                        continue
-                    end
-                    if haskey(leaves[k],(candidate.l,candidate_mortonid))
-                        neighbor_face = face(candidate, opposite_face[local_faceid], tree.b)
-                        pivot_face = leaf_faces[local_faceid]
-                        contributing_nodes = @view 𝒱₂[local_faceid,:]
-                        contributing_nodes_opposite = @view 𝒱₂[opposite_face[local_faceid],:]
-                        if neighbor_face[1] == pivot_face[1] && neighbor_face[2] == pivot_face[2]
-                            candidate_nodes = leaves[k][(candidate.l,candidate_mortonid)].nodes
-                            altered_nodetuple = candidate_nodes
-                            if candidate_nodes[contributing_nodes_opposite[1]] != leaf_nodes[contributing_nodes[1]]
-                                #isreplaced[candidate_nodes[contributing_nodes_opposite[1]]] = true
-                                altered_nodetuple = replace(altered_nodetuple,candidate_nodes[contributing_nodes_opposite[1]] => leaf_nodes[contributing_nodes[1]])
-                            end
-                            if candidate_nodes[contributing_nodes_opposite[2]] != leaf_nodes[contributing_nodes[2]]
-                                #isreplaced[candidate_nodes[contributing_nodes_opposite[2]]] = true
-                                altered_nodetuple = replace(altered_nodetuple,candidate_nodes[contributing_nodes_opposite[2]] => leaf_nodes[contributing_nodes[2]])
-                            end
-                            leaves[k][(candidate.l,candidate_mortonid)] = celltype(altered_nodetuple)
-                        end
-                    end
-                end
-            end
-        end
-    end
-    shift = zeros(Int,length(isreplaced))
-    for (id,r) in enumerate(isreplaced)
-        if id == 1
-            continue
-        end
-        if r
-            shift[id] = shift[id-1] + 1
-        else
-            shift[id] = shift[id-1]
-        end
-    end
-    for k in 1:length(leaves)
-        for ((l,m),cell) in leaves[k]
-            old_nodes = cell.nodes
-            new_nodes = ntuple(n->old_nodes[n]-shift[old_nodes[n]],length(old_nodes))
-            leaves[k][(l,m)] = celltype(new_nodes)
-        end
-    end
-    return leaves
-end
 
 function Base.show(io::IO, ::MIME"text/plain", agrid::ForestBWG)
     println(io, "ForestBWG with ")
@@ -1173,6 +1331,10 @@ face_neighbor(o::OctantBWG{dim,N,T1}, f::T2, b::T3) where {dim,N,T1<:Integer,T2<
 
 reference_faces_bwg(::Type{RefHypercube{2}}) = ((1,3) , (2,4), (1,2), (3,4))
 reference_faces_bwg(::Type{RefHypercube{3}}) = ((1,3,5,7) , (2,4,6,8), (1,2,5,6), (3,4,7,8), (1,2,3,4), (5,6,7,8)) # p4est consistent ordering
+reference_edges_bwg(::Type{RefHypercube{3}}) = ((𝒰[1,1],𝒰[1,2]), (𝒰[2,1],𝒰[2,2]), (𝒰[3,1],𝒰[3,2]),
+                                                (𝒰[4,1],𝒰[4,2]), (𝒰[5,1],𝒰[5,2]), (𝒰[6,1],𝒰[6,2]),
+                                                (𝒰[7,1],𝒰[7,2]), (𝒰[8,1],𝒰[8,2]), (𝒰[9,1],𝒰[9,2]),
+                                                (𝒰[10,1],𝒰[10,2]), (𝒰[11,1],𝒰[11,2]), (𝒰[12,1],𝒰[12,2])) # TODO maybe remove, unnecessary, can directly use the table
 # reference_faces_bwg(::Type{RefHypercube{3}}) = ((1,3,7,5) , (2,4,8,6), (1,2,6,5), (3,4,8,7), (1,2,4,4), (5,6,8,7)) # Note that this does NOT follow P4est order!
 
 """
@@ -1198,6 +1360,32 @@ function compute_face_orientation(forest::ForestBWG{<:Any,<:OctreeBWG{dim,<:Any,
     else
         return T2(findfirst(isequal(nodes_f[1]), nodes_f′)-1)
     end
+end
+
+"""
+    compute_edge_orientation(forest::ForestBWG, k::Integer, e::Integer)
+Slow implementation for the determination of the edge orientation of edge `e` from octree `k` following definition below Table 3 [BWG2011](@citet).
+
+TODO use some table?
+"""
+function compute_edge_orientation(forest::ForestBWG{<:Any,<:OctreeBWG{3,<:Any,T2}}, k::T1, e::T1) where {T1,T2}
+    n_perm = node_map₃
+    n_perminv = node_map₃_inv
+    e_perm = edge_perm
+    e_perminv = edge_perm_inv
+
+    e_ferrite = e_perm[e]
+    k′, e′_ferrite = forest.topology.edge_edge_neighbor[k,e_ferrite][1]
+    e′ = e_perminv[e′_ferrite]
+    refedgenodes = reference_edges_bwg(RefHypercube{3})
+    nodes_e = ntuple(i->forest.cells[k].nodes[n_perm[refedgenodes[e][i]]],length(refedgenodes[e]))
+    nodes_e′ = ntuple(i->forest.cells[k′].nodes[n_perm[refedgenodes[e′][i]]],length(refedgenodes[e′]))
+    if nodes_e == nodes_e′
+        s = T2(0)
+    else
+        s = T2(1)
+    end
+    return s
 end
 
 """
@@ -1358,55 +1546,147 @@ end
 transform_face(forest::ForestBWG,f::FaceIndex,oct::OctantBWG) = transform_face(forest,f[1],f[2],oct)
 
 """
-    transform_corner(forest,k,c',oct)
-    transform_corner(forest,v::VertexIndex,oct)
+    transform_corner(forest,k,c',oct,inside::Bool)
+    transform_corner(forest,v::VertexIndex,oct,inside::Bool)
 
-Algorithm 12 in [BWG2011](@citet) to transform corner into different octree coordinate system
-Note: in Algorithm 12 is c as a argument, but it's never used, therefore I removed it
+Algorithm 12 but with flipped logic in [BWG2011](@citet) to transform corner into different octree coordinate system
+Implements flipped logic in the sense of pushing the Octant `oct` through vertex v and stays within octree coordinate system `k`.
 """
-function transform_corner(forest::ForestBWG,k::T1,c′::T1,oct::OctantBWG{dim,N,T2}) where {dim,N,T1<:Integer,T2<:Integer}
+function transform_corner(forest::ForestBWG,k::T1,c::T1,oct::OctantBWG{dim,N,T2},inside::Bool) where {dim,N,T1<:Integer,T2<:Integer}
+    _perm = dim == 2 ? node_map₂ : node_map₃
+    _perminv = dim == 2 ? node_map₂_inv : node_map₃_inv
+    k′, c′ = forest.topology.vertex_vertex_neighbor[k,_perm[c]][1]
+    k′, c′ = forest.topology.vertex_vertex_neighbor[k′,c′][1] #get the corner connection of neighbor to pivot oct
+    c′ = _perminv[c′]
     # make a dispatch that returns only the coordinates?
     b = forest.cells[k].b
     l = oct.l; g = 2^b - 2^(b-l)
-    _inside = inside(forest.cells[k],oct)
-    h⁻ = _inside ? 0 : -2^(b-l); h⁺ = _inside ? g : 2^b
+    h⁻ = inside ? 0 : -2^(b-l); h⁺ = inside ? g : 2^b
     xyz = ntuple(i->((c′-1) & 2^(i-1) == 0) ? h⁻ : h⁺,dim)
     return OctantBWG(l,xyz)
 end
 
-transform_corner(forest::ForestBWG,v::VertexIndex,oct::OctantBWG) = transform_corner(forest,v[1],v[2],oct)
+transform_corner(forest::ForestBWG,v::VertexIndex,oct::OctantBWG,inside) = transform_corner(forest,v[1],v[2],oct,inside)
+
+"""
+    transform_corner_remote(forest,k,c',oct,inside::Bool)
+    transform_corner_remote(forest,v::VertexIndex,oct,inside::Bool)
+
+Algorithm 12 in [BWG2011](@citet) to transform corner into different octree coordinate system.
+Follows exactly the version of the paper by taking `oct` and looking from the neighbor octree coordinate system (neighboring to `k`,`v`) at `oct`.
+"""
+function transform_corner_remote(forest::ForestBWG,k::T1,c::T1,oct::OctantBWG{dim,N,T2},inside::Bool) where {dim,N,T1<:Integer,T2<:Integer}
+    _perm = dim == 2 ? node_map₂ : node_map₃
+    _perminv = dim == 2 ? node_map₂_inv : node_map₃_inv
+    k′, c′ = forest.topology.vertex_vertex_neighbor[k,_perm[c]][1]
+    c′ = _perminv[c′]
+    # make a dispatch that returns only the coordinates?
+    b = forest.cells[k].b
+    l = oct.l; g = 2^b - 2^(b-l)
+    h⁻ = inside ? 0 : -2^(b-l); h⁺ = inside ? g : 2^b
+    xyz = ntuple(i->((c′-1) & 2^(i-1) == 0) ? h⁻ : h⁺,dim)
+    return OctantBWG(l,xyz)
+end
+
+transform_corner_remote(forest::ForestBWG,v::VertexIndex,oct::OctantBWG,inside) = transform_corner_remote(forest,v[1],v[2],oct,inside)
+
+
+"""
+    transform_edge_remote(forest,k,e,oct,inside::Bool)
+    transform_edge_remote(forest,e::Edgeindex,oct,inside::Bool)
+
+Algorithm 10 in [BWG2011](@citet) to transform edge into different octree coordinate system.
+This function looks at the octant from the octree coordinate system of the neighbor that can be found at (k,e)
+"""
+function transform_edge_remote(forest::ForestBWG,k::T1,e::T1,oct::OctantBWG{3,N,T2},inside::Bool) where {N,T1<:Integer,T2<:Integer}     
+    _four = T2(4)
+    _one = T2(1)
+    _two = T2(2)
+    z = zero(T2)
+    e_perm = edge_perm
+    e_perminv = edge_perm_inv
+
+    e_ferrite = e_perm[e]
+    k′, e′_ferrite = forest.topology.edge_edge_neighbor[k,e_ferrite][1]
+    e′ = e_perminv[e′_ferrite]
+    #see Algorithm 9, line 18
+    𝐛 = (((e′-_one) ÷ _four),
+           e′-_one < 4 ? 1 : 0,
+           e′-_one < 8 ? 2 : 1)
+    a₀ = ((e-_one) ÷ _four) #subtract 1 based index
+    a₀ += _one #add it again
+    b = forest.cells[k].b
+    l = oct.l; g = _two^b - _two^(b-l)
+    h⁻ = inside ? z : -_two^(b-l); h⁺ = inside ? g : _two^b    
+    s = compute_edge_orientation(forest,k,e)
+    xyz = zeros(T2,3)
+    xyz[𝐛[1]+_one] = s*g+(_one-(_two*s))*oct.xyz[a₀]
+    xyz[𝐛[2]+_one] = ((e′-_one) & 1) == 0 ? h⁻ : h⁺
+    xyz[𝐛[3]+_one] = ((e′-_one) & 2) == 0 ? h⁻ : h⁺
+    return OctantBWG(l,(xyz[1],xyz[2],xyz[3]))
+end
+
+transform_edge_remote(forest::ForestBWG,e::EdgeIndex,oct::OctantBWG,inside) = transform_edge_remote(forest,e[1],e[2],oct,inside)
+
+"""
+    transform_edge(forest,k,e,oct,inside::Bool)
+    transform_edge(forest,e::Edgeindex,oct,inside::Bool)
+
+Algorithm 10 in [BWG2011](@citet) to transform cedge into different octree coordinate system but reversed logic.
+See `transform_edge_remote` with logic from paper.
+In this function we stick to the coordinate system of the pivot tree k and transform an octant through edge e into this k-th octree coordinate system.
+"""
+function transform_edge(forest::ForestBWG,k::T1,e::T1,oct::OctantBWG{3,N,T2},inside::Bool) where {N,T1<:Integer,T2<:Integer}
+    _four = T2(4)
+    _one = T2(1)
+    _two = T2(2)
+    z = zero(T2)
+    e_perm = edge_perm
+    e_perminv = edge_perm_inv
+
+    e_ferrite = e_perm[e]
+    k′, e′_ferrite = forest.topology.edge_edge_neighbor[k,e_ferrite][1]
+    k′, e′_ferrite = forest.topology.edge_edge_neighbor[k′,e′_ferrite][1] #get pivot connection from neighbor perspective
+    e′ = e_perminv[e′_ferrite]
+    #see Algorithm 9, line 18
+    𝐛 = (((e′-_one) ÷ _four),
+           e′-_one < 4 ? 1 : 0,
+           e′-_one < 8 ? 2 : 1)
+    a₀ = ((e-_one) ÷ _four) #subtract 1 based index
+    a₀ += _one #add it again
+    b = forest.cells[k].b
+    l = oct.l; g = _two^b - _two^(b-l)
+    h⁻ = inside ? z : -_two^(b-l); h⁺ = inside ? g : _two^b    
+    s = compute_edge_orientation(forest,k′,e′)
+    xyz = zeros(T2,3)
+    xyz[𝐛[1]+_one] = s*g+(_one-(_two*s))*oct.xyz[a₀]
+    xyz[𝐛[2]+_one] = ((e′-_one) & 1) == 0 ? h⁻ : h⁺
+    xyz[𝐛[3]+_one] = ((e′-_one) & 2) == 0 ? h⁻ : h⁺
+    return OctantBWG(l,(xyz[1],xyz[2],xyz[3]))
+end
+
+transform_edge(forest::ForestBWG,e::EdgeIndex,oct::OctantBWG,inside) = transform_edge(forest,e[1],e[2],oct,inside)
 
 """
     edge_neighbor(octant::OctantBWG, e::Integer, b::Integer)
-Computes the edge neighbor octant which is only connected by the edge `e` to `octant`
+Computes the edge neighbor octant which is only connected by the edge `e` to `octant`.
 """
 function edge_neighbor(octant::OctantBWG{3,N,T}, e::T, b::T=_maxlevel[2]) where {N,T<:Integer}
     @assert 1 ≤ e ≤ 12
-    e -= one(T)
-    l = octant.l
     _one = one(T)
     _two = T(2)
+    e -= _one
+    l = octant.l
     h = T(_compute_size(b,octant.l))
     ox,oy,oz = octant.xyz
-    case = e ÷ T(4)
-    if case == zero(T)
-        x = ox
-        y = oy + (_two*(e & _one) - one(T))*h
-        z = oz + ((e & _two) - _one)*h
-        return OctantBWG(l,(x,y,z))
-    elseif case == one(T)
-        x = ox  + (_two*(e & _one) - _one)*h
-        y = oy
-        z = oz + ((e & _two) - _one)*h
-        return OctantBWG(l,(x,y,z))
-    elseif case == _two
-        x = ox + (_two*(e & _one) - _one)*h
-        y = oy + ((e & _two) - _one)*h
-        z = oz
-        return OctantBWG(l,(x,y,z))
-    else
-        error("edge case not found")
-    end
+    𝐚 = (e ÷ 4,
+         e < 4 ? 1 : 0,
+         e < 8 ? 2 : 1) 
+    xyz = zeros(T,3)
+    xyz[𝐚[1]+_one] = octant.xyz[𝐚[1]+_one]
+    xyz[𝐚[2]+_one] = octant.xyz[𝐚[2]+_one] + (_two*(e&_one)-_one)*h
+    xyz[𝐚[3]+_one] = octant.xyz[𝐚[3]+_one] + ((e & _two)-_one)*h
+    return  OctantBWG(l,(xyz[1],xyz[2],xyz[3]))
 end
 edge_neighbor(o::OctantBWG{3,N,T1}, e::T2, b::T3) where {N,T1<:Integer,T2<:Integer,T3<:Integer} = edge_neighbor(o,T1(e),T1(b))
 
@@ -1576,6 +1856,34 @@ const 𝒱₃_perm_inv = [5
                      4
                      1
                      6]
+
+# edge indices permutation from p4est idx to Ferrite idx
+const edge_perm = [1
+                   3
+                   5
+                   7
+                   4
+                   2
+                   8
+                   6
+                   9
+                   10
+                   12
+                   11]
+
+# edge indices permutation from Ferrite idx to p4est idx
+const edge_perm_inv = [1
+                       6
+                       2
+                       5
+                       3
+                       8
+                       4
+                       7
+                       9
+                       10
+                       12
+                       11]
 
 const ℛ = [1  2  2  1  1  2
            3  1  1  2  2  1
