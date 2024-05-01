@@ -273,7 +273,7 @@ end
 #md nothing # hide
 
 # Finally, we put everything together to update the density. The loop ensures the stability of the 
-# updated solution.
+# updated solution, see [JanHacJun2019regularizedthermotopopt](@cite) equation (42) for reference.
 
 function update_density(dh, states, mp, ρ, topology, Δh)
     n_j = Int(ceil(6*mp.β/(mp.η*Δh^2))) # iterations needed for stability
@@ -287,7 +287,7 @@ function update_density(dh, states, mp, ρ, topology, Δh)
     
         Δχ = pΨ/p_Ω + mp.β*∇²χ 
 
-        χn1 = compute_χn1(χn, Δχ, ρ, mp.η, mp.χ_min) 
+        χn1 = compute_χn1(χn, Δχ, ρ, mp.η*n_j, mp.χ_min) 
 
         if(j<n_j)
             χn[:] = χn1[:]
