@@ -984,11 +984,11 @@ function balanceforest!(forest::ForestBWG{dim}) where dim
                                     end
                                     continue
                                 else
-                                    @assert length(cc) == 1
-                                    !(vertex(o,s_i,tree.b) == rootvertices[s_i]) && continue
-                                    cc = cc[1]
-                                    k′, c′ = cc[1], perm_corner_inv[cc[2]]
-                                    balance_corner(forest,k′,c′,o,s)
+                                    for corner_connection in cc
+                                        !(vertex(o,s_i,tree.b) == rootvertices[s_i]) && continue
+                                        k′, c′ = corner_connection[1], perm_corner_inv[corner_connection[2]]
+                                        balance_corner(forest,k′,c′,o,s)
+                                    end
                                 end
                             else # face neighbor, only true for 2D
                                 s_i -= 4
@@ -1004,11 +1004,11 @@ function balanceforest!(forest::ForestBWG{dim}) where dim
                                 #TODO a check of new introduced corner neighbors aka corner balancing, see 2D branch
                                 cc = forest.topology.vertex_vertex_neighbor[k,perm_corner[s_i]]
                                 isempty(cc) && continue
-                                @assert length(cc) == 1 # FIXME there can be more than 1 vertex neighbor
-                                !(vertex(o,s_i,tree.b) == rootvertices[s_i]) && continue
-                                cc = cc[1]
-                                k′, c′ = cc[1], perm_corner_inv[cc[2]]
-                                balance_corner(forest,k′,c′,o,s)
+                                for corner_connection in cc
+                                    !(vertex(o,s_i,tree.b) == rootvertices[s_i]) && continue
+                                    k′, c′ = corner_connection[1], perm_corner_inv[corner_connection[2]]
+                                    balance_corner(forest,k′,c′,o,s)
+                                end
                             elseif 8 < s_i <= 14
                                 s_i -= 8
                                 fc = forest.topology.face_face_neighbor[k,perm_face[s_i]]
