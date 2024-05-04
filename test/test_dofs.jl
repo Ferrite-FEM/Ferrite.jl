@@ -437,6 +437,27 @@ end
         @test is_stored(K, i, j)
     end
 
+    # Full coupling (default) with reduced precision
+    K = create_sparsity_pattern(dh; matrix_type=SparseMatrixCSC{Float32})
+    @test eltype(K) == Float32
+    for j in 1:ndofs(dh), i in 1:ndofs(dh)
+        @test is_stored(K, i, j)
+    end
+
+    # Full coupling (default) with reduced precision
+    K = create_sparsity_pattern(dh; matrix_type=SparseMatrixCSC{Float32})
+    @test eltype(K) == Float32
+    for j in 1:ndofs(dh), i in 1:ndofs(dh)
+        @test is_stored(K, i, j)
+    end
+
+    # Complex operator
+    K = create_sparsity_pattern(dh; matrix_type=SparseMatrixCSC{ComplexF64})
+    @test eltype(K) == Float32
+    for j in 1:ndofs(dh), i in 1:ndofs(dh)
+        @test is_stored(K, i, j)
+    end
+
     # Field coupling
     coupling = [
     #   u    p
