@@ -113,10 +113,12 @@ ip = Lagrange{RefQuadrilateral, 1}()
 qr = QuadratureRule{RefQuadrilateral}(2)
 
 dh = DofHandler(grid)
+
 add!(dh, :u, ip)
 close!(dh);
 
 cellvalues = CellValues(qr, ip);
+
 static_cellvalues = Ferrite.StaticCellValues(cellvalues)
 
 stdassy(buffer, cv, dh) = assemble_global!(buffer, cv, dh; qp_iter=Val(false), reinit=Val(false))
@@ -124,15 +126,18 @@ qp_outside(buffer, cv, dh) = assemble_global!(buffer, cv, dh; qp_iter=Val(true),
 qp_inside(buffer, cv, dh) = assemble_global!(buffer, cv, dh; qp_iter=Val(true), reinit=Val(false))
 
 Kstd, fstd = stdassy(create_buffers(cellvalues, dh), cellvalues, dh);
+using LinearAlgebra
+norm(Kstd)
 K_qp_o, f_qp_o = qp_outside(create_buffers(cellvalues, dh), cellvalues, dh);
+norm(K_qp_o)
 K_qp_i, f_qp_i = qp_inside(create_buffers(cellvalues, dh), cellvalues, dh);
-
+norm(K_qp_i)
 cvs_o = Ferrite.StaticCellValues(cellvalues, Val(true)) # Save cell_coords in cvs_o
 Ks_o, fs_o = qp_outside(create_buffers(cvs_o, dh), cvs_o, dh);
-
+norm(Ks_o)
 cvs_i = Ferrite.StaticCellValues(cellvalues, Val(false)) # Don't save cell_coords in cvs_o
 Ks_i, fs_i = qp_inside(create_buffers(cvs_i, dh), cvs_i, dh);
-
+norm(Ks_i)
 using Test
 @testset "check outputs" begin
     for (k, K, f) in (("qpo", K_qp_o, f_qp_o), ("qpi", K_qp_i, f_qp_i), ("so", Ks_o, fs_o), ("si", Ks_i, fs_i))
