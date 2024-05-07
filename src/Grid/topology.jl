@@ -43,7 +43,7 @@ abstract type AbstractTopology end
     ExclusiveTopology(grid::Grid)
 
 `ExclusiveTopology` saves topological (connectivity/neighborhood) data of the grid. The constructor works with an `AbstractCell`
-vector for all cells that dispatch `vertices`, `faces` and in 3D `edges`.
+vector for all cells that dispatch `vertices`, `edges`, and `faces`.
 The struct saves the highest dimensional neighborhood, i.e. if something is connected by a face and an
  edge only the face neighborhood is saved. The lower dimensional neighborhood is recomputed, if needed.
 
@@ -75,9 +75,9 @@ mutable struct ExclusiveTopology <: AbstractTopology
     # TODO reintroduce the codimensional connectivity, e.g. 3D edge to 2D face
 end
 
-get_facet_facet_neighbor(t::ExclusiveTopology, dim::Val{3}) = t.face_face_neighbor
-get_facet_facet_neighbor(t::ExclusiveTopology, dim::Val{2}) = t.edge_edge_neighbor
-get_facet_facet_neighbor(t::ExclusiveTopology, dim::Val{1}) = t.vertex_vertex_neighbor
+get_sdim_minus_one_neighbor(t::ExclusiveTopology, #=dim=#::Val{3}) = t.face_face_neighbor
+get_sdim_minus_one_neighbor(t::ExclusiveTopology, #=dim=#::Val{2}) = t.edge_edge_neighbor
+get_sdim_minus_one_neighbor(t::ExclusiveTopology, #=dim=#::Val{1}) = t.vertex_vertex_neighbor
 
 function Base.show(io::IO, ::MIME"text/plain", topology::ExclusiveTopology)
     println(io, "ExclusiveTopology\n")
@@ -327,7 +327,7 @@ end
 """
     _faceskeleton(topology::ExclusiveTopology, grid::Grid) -> Iterable{FaceIndex}
 Creates an iterateable face skeleton. The skeleton consists of `FaceIndex` that can be used to `reinit`
-`FaceValues`.
+`FacetValues`.
 """
 function _faceskeleton(top::ExclusiveTopology, grid::Grid)
     cells = getcells(grid)
@@ -389,7 +389,7 @@ end
 """
     face_skeleton(top::ExclusiveTopology, grid::Grid) -> Vector{FaceIndex}
 Creates an iterateable face skeleton. The skeleton consists of `FaceIndex` that can be used to `reinit`
-`FaceValues`.
+`FacetValues`.
 """
 function faceskeleton(top::ExclusiveTopology, grid::Grid)
     if top.face_skeleton === nothing
@@ -409,7 +409,3 @@ function vertexskeleton(top::ExclusiveTopology, grid::Grid)
     end
     return top.vertex_skeleton
 end
-
-facetskeleton(top::ExclusiveTopology, grid::Grid{3}) = faceskeleton(top, grid)
-facetskeleton(top::ExclusiveTopology, grid::Grid{2}) = edgeskeleton(top, grid)
-facetskeleton(top::ExclusiveTopology, grid::Grid{1}) = vertexskeleton(top, grid)

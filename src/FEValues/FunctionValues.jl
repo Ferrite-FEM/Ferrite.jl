@@ -100,7 +100,7 @@ sdim_from_gradtype(::Type{<:SVector{sdim}}) where sdim = sdim
 sdim_from_gradtype(::Type{<:SMatrix{<:Any,sdim}}) where sdim = sdim
 
 # For performance, these must be fully inferable for the compiler.
-# args: valname (:CellValues or :FaceValues), shape_gradient_type, eltype(x)
+# args: valname (:CellValues or :FacetValues), shape_gradient_type, eltype(x)
 function check_reinit_sdim_consistency(valname, gradtype::Type, ::Type{<:Vec{sdim}}) where {sdim}
     check_reinit_sdim_consistency(valname, Val(sdim_from_gradtype(gradtype)), Val(sdim))
 end

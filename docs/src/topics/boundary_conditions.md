@@ -104,7 +104,7 @@ For a scalar field, this can be done as
 ```julia
 grid = generate_grid(Quadrilateral, (3,3))
 dh = DofHandler(grid); push!(dh, :u, 1); close!(dh)
-fv = FaceValues(QuadratureRule{RefQuadrilateral}(2), Lagrange{RefQuadrilateral, 1}())
+fv = FacetValues(QuadratureRule{RefQuadrilateral}(2), Lagrange{RefQuadrilateral, 1}())
 f = zeros(ndofs(dh))
 fe = zeros(ndofs_per_cell(dh))
 qn = 1.0    # Normal flux
@@ -139,11 +139,11 @@ to evaluate the boundary integral:
 ```julia
 for face in 1:nfaces(cell)
     if (cellid(cell), face) ∈ getfaceset(grid, "Neumann Boundary")
-        reinit!(facevalues, cell, face)
-        for q_point in 1:getnquadpoints(facevalues)
-            dΓ = getdetJdV(facevalues, q_point)
-            for i in 1:getnbasefunctions(facevalues)
-                δu = shape_value(facevalues, q_point, i)
+        reinit!(FacetValues, cell, face)
+        for q_point in 1:getnquadpoints(FacetValues)
+            dΓ = getdetJdV(FacetValues, q_point)
+            for i in 1:getnbasefunctions(FacetValues)
+                δu = shape_value(FacetValues, q_point, i)
                 fe[i] += δu * qn * dΓ
             end
         end
@@ -154,8 +154,8 @@ end
 We start by looping over all the faces of the cell, next we check if this particular face is
 located on our faceset of interest called `"Neumann Boundary"`. If we have determined
 that the current face is indeed on the boundary and in our faceset, then we
-reinitialize `facevalues` for this face, using [`reinit!`](@ref). When `reinit!`ing
-`facevalues` we also need to give the face number in addition to the cell.
+reinitialize `FacetValues` for this face, using [`reinit!`](@ref). When `reinit!`ing
+`FacetValues` we also need to give the face number in addition to the cell.
 Next we simply loop over the quadrature points of the face, and then loop over
 all the test functions and assemble the contribution to the force vector.
 

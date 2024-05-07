@@ -167,7 +167,7 @@ type [`AbstractRefShape`](@ref)). `order` is the order of the quadrature rule.
 `quad_rule_type` is an optional argument determining the type of quadrature rule, currently
 the `:legendre` and `:lobatto` rules are implemented.
 
-`FaceQuadratureRule` is used as one of the components to create [`FaceValues`](@ref).
+`FaceQuadratureRule` is used as one of the components to create [`FacetValues`](@ref).
 """
 struct FaceQuadratureRule{shape, T, dim}
     face_rules::Vector{QuadratureRule{shape, T, dim}}

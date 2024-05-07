@@ -57,7 +57,7 @@ ip = Lagrange{RefQuadrilateral, 1}()
 qr = QuadratureRule{RefQuadrilateral}(2)
 qr_face = FaceQuadratureRule{RefQuadrilateral}(2)
 cellvalues = CellValues(qr, ip);
-facevalues = FaceValues(qr_face, ip);
+FacetValues = FacetValues(qr_face, ip);
 
 dh = DofHandler(grid)
 add!(dh, :u, ip)
@@ -87,7 +87,7 @@ update!(dbcs, 0.0)
 
 K = create_sparsity_pattern(dh);
 
-function doassemble(cellvalues::CellValues, facevalues::FaceValues,
+function doassemble(cellvalues::CellValues, FacetValues::FacetValues,
                          K::SparseMatrixCSC, dh::DofHandler)
     b = 1.0
     f = zeros(ndofs(dh))
@@ -138,14 +138,14 @@ function doassemble(cellvalues::CellValues, facevalues::FaceValues,
             if onboundary(cell, face) && 
                    ((cellcount, face) ∈ getboundaryset(grid, "left") || 
                     (cellcount, face) ∈ getboundaryset(grid, "bottom"))
-                reinit!(facevalues, cell, face)
-                for q_point in 1:getnquadpoints(facevalues)
-                    coords_qp = spatial_coordinate(facevalues, q_point, coords)
-                    n = getnormal(facevalues, q_point)
+                reinit!(FacetValues, cell, face)
+                for q_point in 1:getnquadpoints(FacetValues)
+                    coords_qp = spatial_coordinate(FacetValues, q_point, coords)
+                    n = getnormal(FacetValues, q_point)
                     g_2 = gradient(u_ana, coords_qp) ⋅ n
-                    dΓ = getdetJdV(facevalues, q_point)
+                    dΓ = getdetJdV(FacetValues, q_point)
                     for i in 1:n_basefuncs
-                        δu = shape_value(facevalues, q_point, i)
+                        δu = shape_value(FacetValues, q_point, i)
                         fe[i] += (δu * g_2) * dΓ
                     end
                 end
@@ -158,7 +158,7 @@ function doassemble(cellvalues::CellValues, facevalues::FaceValues,
     return K, f
 end;
 
-K, f = doassemble(cellvalues, facevalues, K, dh);
+K, f = doassemble(cellvalues, FacetValues, K, dh);
 apply!(K, f, dbcs)
 u = Symmetric(K) \ f;
 

@@ -91,12 +91,12 @@ function create_values()
     qr      = QuadratureRule{RefQuadrilateral}(2)
     face_qr = FaceQuadratureRule{RefQuadrilateral}(2)
 
-    ## cell and facevalues for u
+    ## cell and FacetValues for u
     ip = Lagrange{RefQuadrilateral,1}()^2
     cellvalues = CellValues(qr, ip)
-    facevalues = FaceValues(face_qr, ip)
+    FacetValues = FacetValues(face_qr, ip)
     
-    return cellvalues, facevalues
+    return cellvalues, FacetValues
 end
 
 function create_dofhandler(grid)
@@ -300,7 +300,7 @@ end
     
 # Now, we move on to the Finite Element part of the program. We use the following function to assemble our linear system.
 
-function doassemble!(cellvalues::CellValues, facevalues::FaceValues, K::SparseMatrixCSC, grid::Grid, dh::DofHandler, mp::MaterialParameters, u, states)
+function doassemble!(cellvalues::CellValues, FacetValues::FacetValues, K::SparseMatrixCSC, grid::Grid, dh::DofHandler, mp::MaterialParameters, u, states)
     r = zeros(ndofs(dh))
     assembler = start_assemble(K, r)
     nu = getnbasefunctions(cellvalues)
@@ -315,7 +315,7 @@ function doassemble!(cellvalues::CellValues, facevalues::FaceValues, K::SparseMa
         eldofs = celldofs(element)
         ue = u[eldofs]
         
-        elmt!(Ke, re, element, cellvalues, facevalues, grid, mp, ue, state)
+        elmt!(Ke, re, element, cellvalues, FacetValues, grid, mp, ue, state)
         assemble!(assembler, celldofs(element), re, Ke)
     end
 
@@ -327,7 +327,7 @@ end
 # elastomechanic problem, for topology optimization we additionally use our material state to receive the density value of
 # the element and to store the strain at each quadrature point.
 
-function elmt!(Ke, re, element, cellvalues, facevalues, grid, mp, ue, state)
+function elmt!(Ke, re, element, cellvalues, FacetValues, grid, mp, ue, state)
     n_basefuncs = getnbasefunctions(cellvalues)
     reinit!(cellvalues, element)    
     χ = state.χ    
@@ -352,12 +352,12 @@ function elmt!(Ke, re, element, cellvalues, facevalues, grid, mp, ue, state)
 
     @inbounds for face in 1:nfaces(element) 
         if onboundary(element, face) && (cellid(element), face) ∈ getboundaryset(grid, "traction")
-            reinit!(facevalues, element, face)
+            reinit!(FacetValues, element, face)
             t = Vec((0.0, -1.0)) # force pointing downwards
-            for q_point in 1:getnquadpoints(facevalues)
-                dΓ = getdetJdV(facevalues, q_point)
+            for q_point in 1:getnquadpoints(FacetValues)
+                dΓ = getdetJdV(FacetValues, q_point)
                 for i in 1:n_basefuncs
-                    δu = shape_value(facevalues, q_point, i)
+                    δu = shape_value(FacetValues, q_point, i)
                     re[i] += (δu ⋅ t) * dΓ
                 end
             end
@@ -401,7 +401,7 @@ function topopt(ra,ρ,n,filename; output=:false)
     dbc = create_bc(dh)
     
     ## cellvalues
-    cellvalues, facevalues = create_values()
+    cellvalues, FacetValues = create_values()
     
     ## Pre-allocate solution vectors, etc.
     n_dofs = ndofs(dh) # total number of dofs
@@ -445,7 +445,7 @@ function topopt(ra,ρ,n,filename; output=:false)
         
             ## current guess
             u .= un .+ Δu
-            K, r = doassemble!(cellvalues, facevalues, K, grid, dh, mp, u, states);
+            K, r = doassemble!(cellvalues, FacetValues, K, grid, dh, mp, u, states);
             norm_r = norm(r[Ferrite.free_dofs(dbc)]) 
 
             if (norm_r) < NEWTON_TOL

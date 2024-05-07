@@ -15,7 +15,7 @@ This is the inverse of `face_to_element_transformation`.
 element_to_face_transformation
 
 """
-    weighted_normal(J::AbstractTensor, fv::FaceValues, face::Int)
+    weighted_normal(J::AbstractTensor, fv::FacetValues, face::Int)
     weighted_normal(J::AbstractTensor, ::Type{<:AbstractRefShape}, face::Int)
 
 Compute the vector normal to the face weighted by the area ratio between the face and the

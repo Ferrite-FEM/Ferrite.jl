@@ -253,7 +253,7 @@ function setup_fevalues(ipu, ipp, ipg)
     cvu = CellValues(qr, ipu, ipg)
     cvp = CellValues(qr, ipp, ipg)
     qr_face = FaceQuadratureRule{RefTriangle}(2)
-    fvp = FaceValues(qr_face, ipp, ipg)
+    fvp = FacetValues(qr_face, ipp, ipg)
     return cvu, cvp, fvp
 end
 #md nothing #hide

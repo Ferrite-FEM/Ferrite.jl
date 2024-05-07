@@ -6,18 +6,18 @@ DocTestSetup = :(using Ferrite)
 # FEValues
 
 ## Main types
-[`CellValues`](@ref) and [`FaceValues`](@ref) are the most common 
+[`CellValues`](@ref) and [`FacetValues`](@ref) are the most common 
 subtypes of `Ferrite.AbstractValues`. For more details about how 
 these work, please see the related [topic guide](@ref fevalues_topicguide).
 
 ```@docs
 CellValues
-FaceValues
+FacetValues
 ```
 
 ## Applicable functions
 The following functions are applicable to both `CellValues`
-and `FaceValues`.
+and `FacetValues`.
 
 ```@docs
 reinit!
@@ -39,20 +39,20 @@ function_curl
 spatial_coordinate
 ```
 
-In addition, there are some methods that are unique for `FaceValues`.
+In addition, there are some methods that are unique for `FacetValues`.
 
 ```@docs
 Ferrite.getcurrentface
 getnormal
 ```
 
-## [InterfaceValues](@id reference-interfacevalues)
+## [InterFacetValues](@id reference-interFacetValues)
 
-All of the methods for [`FaceValues`](@ref) apply for `InterfaceValues` as well.
-In addition, there are some methods that are unique for `InterfaceValues`:
+All of the methods for [`FacetValues`](@ref) apply for `InterFacetValues` as well.
+In addition, there are some methods that are unique for `InterFacetValues`:
 
 ```@docs
-InterfaceValues
+InterFacetValues
 shape_value_average
 shape_value_jump
 shape_gradient_average

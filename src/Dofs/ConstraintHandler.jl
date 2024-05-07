@@ -465,7 +465,7 @@ end
 
 # for nodes
 function _update!(inhomogeneities::Vector{T}, f::Function, ::Set{Int}, field::Symbol, nodeidxs::Vector{Int}, globaldofs::Vector{Int},
-                  components::Vector{Int}, dh::AbstractDofHandler, facevalues::BCValues,
+                  components::Vector{Int}, dh::AbstractDofHandler, FacetValues::BCValues,
                   dofmapping::Dict{Int,Int}, dofcoefficients::Vector{Union{Nothing,DofCoefficients{T}}}, time::Real) where T
     counter = 1
     for nodenumber in nodeidxs
@@ -1491,7 +1491,7 @@ function __check_periodic_faces(grid::Grid, fi::BIndex, fj::BIndex, known_order:
     cij, fij = fj
     nodes_j = facets(grid.cells[cij])[fij]
 
-    # 1. Check that normals are opposite TODO: Should use FaceValues here
+    # 1. Check that normals are opposite TODO: Should use FacetValues here
     ni = __outward_normal(grid, nodes_i)
     nj = __outward_normal(grid, nodes_j)
     if norm(ni + nj) >= tol
@@ -1567,7 +1567,7 @@ function __check_periodic_faces_f(grid::Grid, fi::BIndex, fj::BIndex, xmi, xmj, 
     cij, fij = fj
     nodes_j = facets(grid.cells[cij])[fij]
 
-    # 1. Check if normals are aligned or opposite TODO: Should use FaceValues here
+    # 1. Check if normals are aligned or opposite TODO: Should use FacetValues here
     ni = __outward_normal(grid, nodes_i)
     nj = __outward_normal(grid, nodes_j, transformation)
     if norm(ni + nj) < tol

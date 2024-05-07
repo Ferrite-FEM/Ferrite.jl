@@ -38,20 +38,20 @@ function create_cook_grid(nx, ny)
     return grid
 end;
 
-# Next we define a function to set up our cell- and facevalues.
+# Next we define a function to set up our cell- and FacetValues.
 function create_values(interpolation_u, interpolation_p)
     ## quadrature rules
     qr      = QuadratureRule{RefTriangle}(3)
     face_qr = FaceQuadratureRule{RefTriangle}(3)
 
-    ## cell and facevalues for u
+    ## cell and FacetValues for u
     cellvalues_u = CellValues(qr, interpolation_u)
-    facevalues_u = FaceValues(face_qr, interpolation_u)
+    FacetValues_u = FacetValues(face_qr, interpolation_u)
 
     ## cellvalues for p
     cellvalues_p = CellValues(qr, interpolation_p)
 
-    return cellvalues_u, cellvalues_p, facevalues_u
+    return cellvalues_u, cellvalues_p, FacetValues_u
 end;
 
 
@@ -87,7 +87,7 @@ end
 function doassemble(
     cellvalues_u::CellValues,
     cellvalues_p::CellValues,
-    facevalues_u::FaceValues,
+    FacetValues_u::FacetValues,
     K::SparseMatrixCSC, grid::Grid, dh::DofHandler, mp::LinearElasticity
 )
     f = zeros(ndofs(dh))
@@ -106,7 +106,7 @@ function doassemble(
     for cell in CellIterator(dh)
         fill!(ke, 0)
         fill!(fe, 0)
-        assemble_up!(ke, fe, cell, cellvalues_u, cellvalues_p, facevalues_u, grid, mp, ɛdev, t)
+        assemble_up!(ke, fe, cell, cellvalues_u, cellvalues_p, FacetValues_u, grid, mp, ɛdev, t)
         assemble!(assembler, celldofs(cell), fe, ke)
     end
 
@@ -116,7 +116,7 @@ end;
 # The element routine integrates the local stiffness and force vector for all elements.
 # Since the problem results in a symmetric matrix we choose to only assemble the lower part,
 # and then symmetrize it after the loop over the quadrature points.
-function assemble_up!(Ke, fe, cell, cellvalues_u, cellvalues_p, facevalues_u, grid, mp, ɛdev, t)
+function assemble_up!(Ke, fe, cell, cellvalues_u, cellvalues_p, FacetValues_u, grid, mp, ɛdev, t)
 
     n_basefuncs_u = getnbasefunctions(cellvalues_u)
     n_basefuncs_p = getnbasefunctions(cellvalues_p)
@@ -154,16 +154,16 @@ function assemble_up!(Ke, fe, cell, cellvalues_u, cellvalues_p, facevalues_u, gr
 
     symmetrize_lower!(Ke)
 
-    ## We integrate the Neumann boundary using the facevalues.
+    ## We integrate the Neumann boundary using the FacetValues.
     ## We loop over all the faces in the cell, then check if the face
     ## is in our `"traction"` faceset.
     for face in 1:nfaces(cell)
         if onboundary(cell, face) && (cellid(cell), face) ∈ getboundaryset(grid, "traction")
-            reinit!(facevalues_u, cell, face)
-            for q_point in 1:getnquadpoints(facevalues_u)
-                dΓ = getdetJdV(facevalues_u, q_point)
+            reinit!(FacetValues_u, cell, face)
+            for q_point in 1:getnquadpoints(FacetValues_u)
+                dΓ = getdetJdV(FacetValues_u, q_point)
                 for i in 1:n_basefuncs_u
-                    δu = shape_value(facevalues_u, q_point, i)
+                    δu = shape_value(FacetValues_u, q_point, i)
                     fe[i] += (δu ⋅ t) * dΓ
                 end
             end
@@ -255,11 +255,11 @@ function solve(ν, interpolation_u, interpolation_p)
     dbc = create_bc(dh)
 
     ## CellValues
-    cellvalues_u, cellvalues_p, facevalues_u = create_values(interpolation_u, interpolation_p)
+    cellvalues_u, cellvalues_p, FacetValues_u = create_values(interpolation_u, interpolation_p)
 
     ## Assembly and solve
     K = create_sparsity_pattern(dh)
-    K, f = doassemble(cellvalues_u, cellvalues_p, facevalues_u, K, grid, dh, mp)
+    K, f = doassemble(cellvalues_u, cellvalues_p, FacetValues_u, K, grid, dh, mp)
     apply!(K, f, dbc)
     u = K \ f
 

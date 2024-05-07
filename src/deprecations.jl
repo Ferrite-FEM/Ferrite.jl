@@ -156,7 +156,7 @@ end
 
 # TODO: Are these needed to be deprecated - harder? with the new parameterization
 # (Cell|Face)Values with vector dofs
-const _VectorValues = Union{CellValues{<:FV}, FaceValues{<:FV}} where {FV <: FunctionValues{<:Any,<:VectorInterpolation}}
+const _VectorValues = Union{CellValues{<:FV}, FacetValues{<:FV}} where {FV <: FunctionValues{<:Any,<:VectorInterpolation}}
 @deprecate      function_value(fe_v::_VectorValues, q_point::Int, u::AbstractVector{Vec{dim,T}}) where {dim,T}      function_value(fe_v, q_point, reinterpret(T, u))
 @deprecate   function_gradient(fe_v::_VectorValues, q_point::Int, u::AbstractVector{Vec{dim,T}}) where {dim,T}   function_gradient(fe_v, q_point, reinterpret(T, u))
 @deprecate function_divergence(fe_v::_VectorValues, q_point::Int, u::AbstractVector{Vec{dim,T}}) where {dim,T} function_divergence(fe_v, q_point, reinterpret(T, u))
@@ -284,34 +284,34 @@ function CellValues(
     Base.depwarn("The input quadrature rule have the wrong reference shape, likely this comes from a constructor like `QuadratureRule{2, RefTetrahedron}(...)` which have been deprecated in favor of `QuadratureRule{RefTriangle}(...)`.", :CellValues)
     CellValues(T, qr′, ip, gip)
 end
-function FaceValues(qr::QuadratureRule, ip::Interpolation,
+function FacetValues(qr::QuadratureRule, ip::Interpolation,
                     gip::Interpolation = default_geometric_interpolation(ip))
-    return FaceValues(Float64, qr, ip, gip)
+    return FacetValues(Float64, qr, ip, gip)
 end
-function FaceValues(
+function FacetValues(
     ::Type{T}, qr::QuadratureRule{RefLine, TQ}, ip::Interpolation{RefQuadrilateral},
     gip::Interpolation{RefQuadrilateral} = default_geometric_interpolation(ip),
 ) where {T, TQ}
-    Base.depwarn("The input quadrature rule have the wrong reference shape, likely this comes from a constructor like `QuadratureRule{1, RefCube}(...)` which have been deprecated in favor of `FaceQuadratureRule{RefQuadrilateral}(...)`.", :FaceValues)
+    Base.depwarn("The input quadrature rule have the wrong reference shape, likely this comes from a constructor like `QuadratureRule{1, RefCube}(...)` which have been deprecated in favor of `FaceQuadratureRule{RefQuadrilateral}(...)`.", :FacetValues)
     qr′ = create_face_quad_rule(RefQuadrilateral, qr.weights, qr.points)
-    FaceValues(T, qr′, ip, gip)
+    FacetValues(T, qr′, ip, gip)
 end
-function FaceValues(
+function FacetValues(
     ::Type{T}, qr::QuadratureRule{RefQuadrilateral, TQ}, ip::Interpolation{RefHexahedron},
     gip::Interpolation{RefHexahedron} = default_geometric_interpolation(ip),
 ) where {T, TQ}
-    Base.depwarn("The input quadrature rule have the wrong reference shape, likely this comes from a constructor like `QuadratureRule{2, RefCube}(...)` which have been deprecated in favor of `FaceQuadratureRule{RefHexahedron}(...)`.", :FaceValues)
+    Base.depwarn("The input quadrature rule have the wrong reference shape, likely this comes from a constructor like `QuadratureRule{2, RefCube}(...)` which have been deprecated in favor of `FaceQuadratureRule{RefHexahedron}(...)`.", :FacetValues)
     qr′ = create_face_quad_rule(RefHexahedron, qr.weights, qr.points)
-    FaceValues(T, qr′, ip, gip)
+    FacetValues(T, qr′, ip, gip)
 end
-function FaceValues(
+function FacetValues(
     ::Type{T}, qr::QuadratureRule{RefTriangle, TQ}, ip::Interpolation{RefTetrahedron},
     gip::Interpolation{RefTetrahedron} = default_geometric_interpolation(ip),
 ) where {T, TQ}
 @info "fdjsfdsf"
-    Base.depwarn("The input quadrature rule have the wrong reference shape, likely this comes from a constructor like `QuadratureRule{2, RefTetrahedron}(...)` which have been deprecated in favor of `FaceQuadratureRule{RefTetrahedron}(...)`.", :FaceValues)
+    Base.depwarn("The input quadrature rule have the wrong reference shape, likely this comes from a constructor like `QuadratureRule{2, RefTetrahedron}(...)` which have been deprecated in favor of `FaceQuadratureRule{RefTetrahedron}(...)`.", :FacetValues)
     qr′ = create_face_quad_rule(RefTetrahedron, qr.weights, qr.points)
-    FaceValues(T, qr′, ip, gip)
+    FacetValues(T, qr′, ip, gip)
 end
 
 # Hide the last unused type param...

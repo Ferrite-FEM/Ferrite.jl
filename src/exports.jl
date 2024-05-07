@@ -26,10 +26,10 @@ export
 
 # FEValues
     AbstractCellValues,
-    AbstractFaceValues,
+    AbstractFacetValues,
     CellValues,
-    FaceValues,
-    InterfaceValues,
+    FacetValues,
+    InterFacetValues,
     reinit!,
     shape_value,
     shape_gradient,
@@ -77,7 +77,6 @@ export
     ExclusiveTopology,
     getneighborhood,
     faceskeleton,
-    facetskeleton,
     vertex_star_stencils,
     getstencil,
     getcells,

@@ -100,14 +100,14 @@ function create_values(interpolation_u, interpolation_p)
     qr      = QuadratureRule{RefTetrahedron}(4)
     face_qr = FaceQuadratureRule{RefTetrahedron}(4)
 
-    ## cell and facevalues for u
+    ## cell and FacetValues for u
     cellvalues_u = CellValues(qr, interpolation_u)
-    facevalues_u = FaceValues(face_qr, interpolation_u)
+    FacetValues_u = FacetValues(face_qr, interpolation_u)
 
     ## cellvalues for p
     cellvalues_p = CellValues(qr, interpolation_p)
 
-    return cellvalues_u, cellvalues_p, facevalues_u
+    return cellvalues_u, cellvalues_p, FacetValues_u
 end;
 
 # We now create the function for Ψ*
@@ -284,7 +284,7 @@ function solve(interpolation_u, interpolation_p)
 
     ## Create the DofHandler and CellValues
     dh = create_dofhandler(grid, interpolation_u, interpolation_p)
-    cellvalues_u, cellvalues_p, facevalues_u = create_values(interpolation_u, interpolation_p)
+    cellvalues_u, cellvalues_p, FacetValues_u = create_values(interpolation_u, interpolation_p)
 
     ## Create the DirichletBCs
     dbc = create_bc(dh)

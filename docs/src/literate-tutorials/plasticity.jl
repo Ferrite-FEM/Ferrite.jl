@@ -141,11 +141,11 @@ function create_values(interpolation)
     qr      = QuadratureRule{RefTetrahedron}(2)
     face_qr = FaceQuadratureRule{RefTetrahedron}(3)
 
-    ## cell and facevalues for u
+    ## cell and FacetValues for u
     cellvalues_u = CellValues(qr, interpolation)
-    facevalues_u = FaceValues(face_qr, interpolation)
+    FacetValues_u = FacetValues(face_qr, interpolation)
 
-    return cellvalues_u, facevalues_u
+    return cellvalues_u, FacetValues_u
 end;
 
 # ### Add degrees of freedom
@@ -229,17 +229,17 @@ function symmetrize_lower!(K)
     end
 end;
 
-function doassemble_neumann!(r, dh, faceset, facevalues, t)
-    n_basefuncs = getnbasefunctions(facevalues)
+function doassemble_neumann!(r, dh, faceset, FacetValues, t)
+    n_basefuncs = getnbasefunctions(FacetValues)
     re = zeros(n_basefuncs)                      # element residual vector
     for fc in FaceIterator(dh, faceset)
         ## Add traction as a negative contribution to the element residual `re`:
-        reinit!(facevalues, fc)
+        reinit!(FacetValues, fc)
         fill!(re, 0)
-        for q_point in 1:getnquadpoints(facevalues)
-            dΓ = getdetJdV(facevalues, q_point)
+        for q_point in 1:getnquadpoints(FacetValues)
+            dΓ = getdetJdV(FacetValues, q_point)
             for i in 1:n_basefuncs
-                δu = shape_value(facevalues, q_point, i)
+                δu = shape_value(FacetValues, q_point, i)
                 re[i] -= (δu ⋅ t) * dΓ
             end
         end
@@ -275,7 +275,7 @@ function solve()
     dh = create_dofhandler(grid, interpolation) # JuaFEM helper function
     dbcs = create_bc(dh, grid) # create Dirichlet boundary-conditions
 
-    cellvalues, facevalues = create_values(interpolation)
+    cellvalues, FacetValues = create_values(interpolation)
 
     ## Pre-allocate solution vectors, etc.
     n_dofs = ndofs(dh)  # total number of dofs
@@ -311,7 +311,7 @@ function solve()
             ## Tangent and residual contribution from the cells (volume integral)
             doassemble!(K, r, cellvalues, dh, material, u, states, states_old);
             ## Residual contribution from the Neumann boundary (surface integral)
-            doassemble_neumann!(r, dh, getboundaryset(grid, "right"), facevalues, traction)
+            doassemble_neumann!(r, dh, getboundaryset(grid, "right"), FacetValues, traction)
             norm_r = norm(r[Ferrite.free_dofs(dbcs)])
 
             print("Iteration: $newton_itr \tresidual: $(@sprintf("%.8f", norm_r))\n")

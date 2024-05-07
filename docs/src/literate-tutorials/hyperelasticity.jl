@@ -330,7 +330,7 @@ function solve()
     qr = QuadratureRule{RefTetrahedron}(1)
     qr_face = FaceQuadratureRule{RefTetrahedron}(1)
     cv = CellValues(qr, ip)
-    fv = FaceValues(qr_face, ip)
+    fv = FacetValues(qr_face, ip)
 
     ## DofHandler
     dh = DofHandler(grid)
