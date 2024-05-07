@@ -3,7 +3,7 @@ using Ferrite, Test
 @testset "Deprecations" begin
 
 @testset "Deprecation of auto-vectorized methods" begin
-    # Deprecation of auto-selecing the interpolation
+    # Deprecation of auto-selecting the interpolation
     grid = generate_grid(Quadrilateral, (1, 1))
     dh = DofHandler(grid)
     @test_deprecated r"interpolation explicitly, and vectorize it" add!(dh, :u, 2)

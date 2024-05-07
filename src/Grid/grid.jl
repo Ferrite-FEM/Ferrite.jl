@@ -39,7 +39,8 @@ get_coordinate_eltype(::Node{dim,T}) where {dim,T} = T
 # AbstractCell interface #
 ##########################
 
-abstract type AbstractCell{refshape <: AbstractRefShape} end
+# Defined in src/Ferrite.jl
+# abstract type AbstractCell{refshape <: AbstractRefShape} end
 
 getrefshape(::AbstractCell{refshape}) where refshape = refshape
 
@@ -387,7 +388,13 @@ to a Node.
 "Returns the number of nodes in the grid."
 @inline getnnodes(grid::AbstractGrid) = length(grid.nodes)
 "Returns the number of nodes of the `i`-th cell."
-@inline nnodes_per_cell(grid::AbstractGrid, i::Int=1) = nnodes(grid.cells[i])
+function nnodes_per_cell(grid::AbstractGrid) 
+    if !isconcretetype(getcelltype(grid))
+        error("There are different celltypes in the `grid`. Use `nnodes_per_cell(grid, cellid::Int)` instead")
+    end
+    return nnodes(first(grid.cells))
+end
+@inline nnodes_per_cell(grid::AbstractGrid, i::Int) = nnodes(grid.cells[i])
 
 "Return the number type of the nodal coordinates."
 @inline get_coordinate_eltype(grid::AbstractGrid) = get_coordinate_eltype(first(getnodes(grid)))
@@ -765,8 +772,11 @@ for INDEX in (:VertexIndex, :EdgeIndex, :FaceIndex)
         #To be able to do a,b = faceidx
         Base.iterate(I::($INDEX), state::Int=1) = (state==3) ?  nothing : (I[state], state+1)
 
-        #For (cellid, faceidx) in faceset
-        Base.in(v::Tuple{Int, Int}, s::Set{$INDEX}) = in($INDEX(v), s)
+        # Necessary to check if, e.g. `(cellid, faceidx) in faceset`
+        Base.isequal(x::$INDEX, y::$INDEX) = x.idx == y.idx
+        Base.isequal(x::Tuple{Int, Int}, y::$INDEX) = x[1] == y.idx[1] && x[2] == y.idx[2]
+        Base.isequal(y::$INDEX, x::Tuple{Int, Int}) = x[1] == y.idx[1] && x[2] == y.idx[2]
+        Base.hash(x::$INDEX, h::UInt) = hash(x.idx, h)
     end
 end
 
@@ -822,4 +832,69 @@ the shift index.
 struct SurfaceOrientationInfo
     #flipped::Bool
     #shift_index::Int
+end
+
+
+@doc raw"""
+    InterfaceOrientationInfo
+
+Orientation information for 1D and 2D entities.
+The orientation is defined by the indices of the grid nodes
+associated to the vertices. To give an example, the oriented path
+```
+1 ---> 2
+```
+is called *regular*, indicated by `flipped=false`, while the oriented path
+```
+2 ---> 1
+```
+is called *inverted*, indicated by `flipped=true`.
+
+2D entities can be flipped (i.e. the defining vertex order is reverse to the 
+spanning vertex order) and the vertices can be rotated against each other.
+
+The reference entity is a one with it's first node is the lowest index vertex
+and its vertices span counter-clock-wise.
+Take for example the faces
+```
+1           2
+| \         | \
+|  \        |  \
+| A \       | B \
+|    \      |    \
+2-----3     3-----1
+```
+which are rotated against each other by 240° after tranfroming to an
+equilateral triangle (shift index is 2). Or the faces
+```
+3           2
+| \         | \
+|  \        |  \
+| A \       | B \
+|    \      |    \
+2-----1     3-----1
+```
+which are flipped against each other.
+"""
+struct OrientationInfo
+    flipped::Bool
+    shift_index::Int
+end
+
+function OrientationInfo(path::NTuple{2, Int})
+    flipped = first(path) < last(path)
+    return OrientationInfo(flipped, 0)
+end
+
+function OrientationInfo(surface::NTuple{N, Int}) where N
+    min_idx = argmin(surface)
+    shift_index = min_idx - 1
+    if min_idx == 1
+        flipped = surface[2] < surface[end]
+    elseif min_idx == length(surface)
+        flipped = surface[1] < surface[end-1]
+    else
+        flipped = surface[min_idx + 1] < surface[min_idx - 1]
+    end
+    return OrientationInfo(flipped, shift_index)
 end

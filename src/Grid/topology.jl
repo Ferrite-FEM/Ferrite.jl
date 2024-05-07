@@ -260,17 +260,15 @@ function getneighborhood(top::ExclusiveTopology, grid::AbstractGrid, vertexidx::
     cellid, local_vertexid = vertexidx[1], vertexidx[2]
     cell_vertices = vertices(getcells(grid,cellid))
     global_vertexid = cell_vertices[local_vertexid]
-    if include_self
-        vertex_to_cell = top.vertex_to_cell[global_vertexid]
-        self_reference_local = Vector{VertexIndex}(undef,length(vertex_to_cell))
-        for (i,cellid) in enumerate(vertex_to_cell)
-            local_vertex = VertexIndex(cellid,findfirst(x->x==global_vertexid,vertices(getcells(grid,cellid)))::Int)
-            self_reference_local[i] = local_vertex
-        end
-        return [top.vertex_vertex_neighbor[global_vertexid].neighbor_info; self_reference_local]
-    else
-        return top.vertex_vertex_neighbor[global_vertexid].neighbor_info
+    vertex_to_cell = top.vertex_to_cell[global_vertexid]
+    self_reference_local = Vector{VertexIndex}()
+    sizehint!(self_reference_local, length(vertex_to_cell))
+    for (i,cellid) in enumerate(vertex_to_cell)
+        local_vertex = VertexIndex(cellid,findfirst(x->x==global_vertexid,vertices(getcells(grid,cellid)))::Int)
+        !include_self && local_vertex == vertexidx && continue
+        push!(self_reference_local, local_vertex)
     end
+    return self_reference_local
 end
 
 function getneighborhood(top::ExclusiveTopology, grid::AbstractGrid{3}, edgeidx::EdgeIndex, include_self=false)
@@ -332,19 +330,16 @@ Creates an iterateable face skeleton. The skeleton consists of `FaceIndex` that 
 `FaceValues`.
 """
 function _faceskeleton(top::ExclusiveTopology, grid::Grid)
-    face_skeleton_global = Set{NTuple}()
-    face_skeleton_local = Vector{FaceIndex}()
-    fs_length = length(face_skeleton_global)
-    # TODO use topology to speed up :)
-    for (cellid,cell) ∈ enumerate(grid.cells)
-        for (local_face_id,face) ∈ enumerate(faces(cell))
-            push!(face_skeleton_global, sortface_fast(face))
-            fs_length_new = length(face_skeleton_global)
-            if fs_length != fs_length_new
-                push!(face_skeleton_local, FaceIndex(cellid,local_face_id))
-                fs_length = fs_length_new
-            end
-        end
+    cells = getcells(grid)
+    cell_dim = getdim(first(cells))
+    @assert all(cell -> getdim(cell) == cell_dim, cells) "Face skeleton construction requires all the elements to be of the same dimensionality"
+    i = 1
+    neighborhood = cell_dim == 1 ? top.vertex_vertex_neighbor : top.face_face_neighbor
+    face_skeleton_local = Array{FaceIndex}(undef, length(neighborhood) - count(neighbors -> !isempty(neighbors) , neighborhood) ÷ 2)
+    for (idx, face) in pairs(neighborhood)
+        isempty(face.neighbor_info) || face.neighbor_info[][1] > idx[1] || continue
+        face_skeleton_local[i] = FaceIndex(idx[1], idx[2])
+        i += 1
     end
     return face_skeleton_local
 end

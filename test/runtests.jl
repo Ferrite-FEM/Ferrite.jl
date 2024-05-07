@@ -17,10 +17,24 @@ if HAS_EXTENSIONS && MODULE_CAN_BE_TYPE_PARAMETER
     import Metis
 end
 
+const RUN_JET_TESTS = VERSION >= v"1.9"
+
+if RUN_JET_TESTS
+    using JET: @test_call
+else
+    # Just eat the macro on incompatible versions
+    macro test_call(args...)
+        nothing
+    end
+end
+
 #include("test_utils.jl")
+#
+## Unit tests
 #include("test_interpolations.jl")
 #include("test_cellvalues.jl")
 #include("test_facevalues.jl")
+#include("test_interfacevalues.jl")
 #include("test_quadrules.jl")
 #include("test_assemble.jl")
 #include("test_dofs.jl")
@@ -37,6 +51,10 @@ end
 #include("test_deprecations.jl")
 #HAS_EXTENSIONS && include("blockarrays.jl")
 #include("test_examples.jl")
+#@test all(x -> isdefined(Ferrite, x), names(Ferrite))  # Test that all exported symbols are defined
+#
+## Integration tests
+#include("integration/test_simple_scalar_convergence.jl")
+
 include("test_p4est.jl")
 include("test_p4est_example.jl")
-@test all(x -> isdefined(Ferrite, x), names(Ferrite))  # Test that all exported symbols are defined

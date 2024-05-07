@@ -41,6 +41,13 @@ If you encounter what you think is a bug please report it, see
 Please keep in mind that we are part of the Julia community and adhere to the
 [Julia Community Standards][standards].
 
+## Related packages
+The following registered packages are part of the `Ferrite.jl` ecosystem in addition to Ferrite itself:
+* [Tensors.jl][Tensors]: Used throughout Ferrite for efficient tensor manipulation.
+* [FerriteViz.jl][FerriteViz]: [Makie.jl][Makie]-based visualization of Ferrite data.
+* [FerriteGmsh.jl][FerriteGmsh]: Create, interact with, and import [Gmsh][Gmsh] meshes into Ferrite.
+* [FerriteMeshParser.jl][FerriteMeshParser]: Parse the mesh from Abaqus input files into a Ferrite mesh.
+
 
 [docs-stable-img]: https://img.shields.io/badge/docs-latest%20release-blue
 [docs-stable-url]: http://ferrite-fem.github.io/Ferrite.jl/
@@ -49,3 +56,10 @@ Please keep in mind that we are part of the Julia community and adhere to the
 [julia-slack]: https://julialang.org/slack/
 [julia-zulip]: https://julialang.zulipchat.com/
 [gh-discussion]: https://github.com/Ferrite-FEM/Ferrite.jl/discussions/new
+
+[Tensors]: https://github.com/Ferrite-FEM/Tensors.jl
+[FerriteViz]: https://github.com/Ferrite-FEM/FerriteViz.jl
+[FerriteGmsh]: https://github.com/Ferrite-FEM/FerriteGmsh.jl
+[FerriteMeshParser]: https://github.com/Ferrite-FEM/FerriteMeshParser.jl
+[Makie]: https://docs.makie.org/stable/
+[Gmsh]: https://gmsh.info/

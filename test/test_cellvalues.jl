@@ -1,5 +1,5 @@
 @testset "CellValues" begin
-for (scalar_interpol, quad_rule) in  (
+@testset "ip=$scalar_interpol quad_rule=$(typeof(quad_rule))" for (scalar_interpol, quad_rule) in  (
                                     (Lagrange{RefLine, 1}(), QuadratureRule{RefLine}(2)),
                                     (Lagrange{RefLine, 2}(), QuadratureRule{RefLine}(2)),
                                     (Lagrange{RefQuadrilateral, 1}(), QuadratureRule{RefQuadrilateral}(2)),
@@ -20,7 +20,7 @@ for (scalar_interpol, quad_rule) in  (
     for func_interpol in (scalar_interpol, VectorizedInterpolation(scalar_interpol))
         geom_interpol = scalar_interpol # Tests below assume this
         n_basefunc_base = getnbasefunctions(scalar_interpol)
-        cv = CellValues(quad_rule, func_interpol, geom_interpol)
+        cv = @inferred CellValues(quad_rule, func_interpol, geom_interpol)
         ndim = Ferrite.getdim(func_interpol)
         n_basefuncs = getnbasefunctions(func_interpol)
 
@@ -28,6 +28,7 @@ for (scalar_interpol, quad_rule) in  (
 
         x, n = valid_coordinates_and_normals(func_interpol)
         reinit!(cv, x)
+        @test_call reinit!(cv, x)
 
         # We test this by applying a given deformation gradient on all the nodes.
         # Since this is a linear deformation we should get back the exact values
@@ -88,16 +89,29 @@ for (scalar_interpol, quad_rule) in  (
             @test spatial_coordinate(cv, i, x) ≈ qp_x
         end
 
-        # test copy
-        cvc = copy(cv)
-        @test typeof(cv) == typeof(cvc)
-        for fname in fieldnames(typeof(cv))
-            v = getfield(cv, fname)
-            vc = getfield(cvc, fname)
-            if hasmethod(pointer, Tuple{typeof(v)})
-                @test pointer(getfield(cv, fname)) != pointer(getfield(cvc, fname))
+        @testset "copy(::CellValues)" begin
+            cvc = copy(cv)
+            @test typeof(cv) == typeof(cvc)
+
+            # Test that all mutable types in FunctionValues and GeometryMapping have been copied
+            for key in (:fun_values, :geo_mapping)
+                val = getfield(cv, key)
+                valc = getfield(cvc, key)
+                for fname in fieldnames(typeof(val))
+                    v = getfield(val, fname)
+                    vc = getfield(valc, fname)
+                    isbits(v) || @test v !== vc
+                    @test v == vc
+                end
             end
-            @test v == vc
+            # Test that qr and detJdV is copied as expected. 
+            # Note that qr remain aliased, as defined by `copy(qr)=qr`, see quadrature.jl.
+            for fname in (:qr, :detJdV)
+                v = getfield(cv, fname)
+                vc = getfield(cvc, fname)
+                fname === :qr || @test v !== vc
+                @test v == vc
+            end
         end
     end
 end
@@ -129,14 +143,17 @@ end
     qr_f = FaceQuadratureRule{RefTriangle}(1)
     csv = CellValues(qr, ip)
     cvv = CellValues(qr, VectorizedInterpolation(ip))
+    csv_embedded = CellValues(qr, ip, ip^3)
     fsv = FaceValues(qr_f, ip)
     fvv = FaceValues(qr_f, VectorizedInterpolation(ip))
+    fsv_embedded = FaceValues(qr_f, ip, ip^3)
+    
     x, n = valid_coordinates_and_normals(ip)
     reinit!(csv, x)
     reinit!(cvv, x)
     reinit!(fsv, x, 1)
     reinit!(fvv, x, 1)
-
+    
     # Wrong number of coordinates
     xx = [x; x]
     @test_throws ArgumentError reinit!(csv, xx)
@@ -148,6 +165,10 @@ end
     @test_throws ArgumentError spatial_coordinate(cvv, qp, xx)
     @test_throws ArgumentError spatial_coordinate(fsv, qp, xx)
     @test_throws ArgumentError spatial_coordinate(fvv, qp, xx)
+
+    # Wrong dimension of coordinates 
+    @test_throws ArgumentError reinit!(csv_embedded, x)
+    @test_throws ArgumentError reinit!(fsv_embedded, x, 1)
 
     # Wrong number of (local) dofs
     # Scalar values, scalar dofs
@@ -179,6 +200,7 @@ end
         ## sdim = 2, Consistency with 1D
         csv2 = CellValues(qr, ip, ip_base^2)
         reinit!(csv2, [Vec((0.0, 0.0)), Vec((1.0, 0.0))])
+        @test_call skip=true reinit!(csv2, [Vec((0.0, 0.0)), Vec((1.0, 0.0))]) # External error in pinv
         # Test spatial interpolation
         @test spatial_coordinate(csv2, 1, [Vec((0.0, 0.0)), Vec((1.0, 0.0))]) == Vec{2}((0.5, 0.0))
         # Test volume
@@ -199,6 +221,7 @@ end
         ## sdim = 3, Consistency with 1D
         csv3 = CellValues(qr, ip, ip_base^3)
         reinit!(csv3, [Vec((0.0, 0.0, 0.0)), Vec((1.0, 0.0, 0.0))])
+        @test_call skip=true reinit!(csv3, [Vec((0.0, 0.0, 0.0)), Vec((1.0, 0.0, 0.0))]) # External error in pinv
         # Test spatial interpolation
         @test spatial_coordinate(csv3, 1, [Vec((0.0, 0.0, 0.0)), Vec((1.0, 0.0, 0.0))]) == Vec{3}((0.5, 0.0, 0.0))
         # Test volume
@@ -261,7 +284,9 @@ end
         csv2 = CellValues(qr, ip)
         csv3 = CellValues(qr, ip, ip_base^3)
         reinit!(csv2, [Vec((-1.0,-1.0)), Vec((1.0,-1.0)), Vec((1.0,1.0)), Vec((-1.0,1.0))])
+        @test_call skip=true reinit!(csv2, [Vec((-1.0,-1.0)), Vec((1.0,-1.0)), Vec((1.0,1.0)), Vec((-1.0,1.0))]) # External error in pinv
         reinit!(csv3, [Vec((-1.0,-1.0,0.0)), Vec((1.0,-1.0,0.0)), Vec((1.0,1.0,0.0)), Vec((-1.0,1.0,0.0))])
+        @test_call skip=true reinit!(csv3, [Vec((-1.0,-1.0,0.0)), Vec((1.0,-1.0,0.0)), Vec((1.0,1.0,0.0)), Vec((-1.0,1.0,0.0))]) # External error in pinv
         # Test spatial interpolation
         @test spatial_coordinate(csv2, 1, [Vec((-1.0,-1.0)), Vec((1.0,-1.0)), Vec((1.0,1.0)), Vec((-1.0,1.0))]) == Vec{2}((0.0, 0.0))
         @test spatial_coordinate(csv3, 1, [Vec((-1.0,-1.0,0.0)), Vec((1.0,-1.0,0.0)), Vec((1.0,1.0,0.0)), Vec((-1.0,1.0,0.0))]) == Vec{3}((0.0, 0.0, 0.0))
@@ -281,6 +306,7 @@ end
 
 @testset "CellValues constructor entry points" begin
     qr = QuadratureRule{RefTriangle}(1)
+    
     for fun_ip in (Lagrange{RefTriangle, 1}(), Lagrange{RefTriangle, 2}()^2)
         value_type(T) = fun_ip isa ScalarInterpolation ? T : Vec{2, T}
         grad_type(T) = fun_ip isa ScalarInterpolation ? Vec{2, T} : Tensor{2, 2, T, 4}
@@ -288,34 +314,80 @@ end
         cv = CellValues(qr, fun_ip)
         @test Ferrite.shape_value_type(cv) == value_type(Float64)
         @test Ferrite.shape_gradient_type(cv) == grad_type(Float64)
-        @test cv.gip == Lagrange{RefTriangle, 1}()
+        @test Ferrite.geometric_interpolation(cv) == Lagrange{RefTriangle, 1}()
         # Numeric type + quadrature + scalar function
         cv = CellValues(Float32, qr, fun_ip)
         @test Ferrite.shape_value_type(cv) == value_type(Float32)
         @test Ferrite.shape_gradient_type(cv) == grad_type(Float32)
-        @test cv.gip == Lagrange{RefTriangle, 1}()
+        @test Ferrite.geometric_interpolation(cv) == Lagrange{RefTriangle, 1}()
         for geo_ip in (Lagrange{RefTriangle, 2}(), Lagrange{RefTriangle, 2}()^2)
             scalar_ip(ip) = ip isa VectorizedInterpolation ? ip.ip : ip
             # Quadrature + scalar function + geo
             cv = CellValues(qr, fun_ip, geo_ip)
             @test Ferrite.shape_value_type(cv) == value_type(Float64)
             @test Ferrite.shape_gradient_type(cv) == grad_type(Float64)
-            @test cv.gip == scalar_ip(geo_ip)
+            @test Ferrite.geometric_interpolation(cv) == scalar_ip(geo_ip)
             # Numeric type + quadrature + scalar function + scalar geo
             cv = CellValues(Float32, qr, fun_ip, geo_ip)
             @test Ferrite.shape_value_type(cv) == value_type(Float32)
             @test Ferrite.shape_gradient_type(cv) == grad_type(Float32)
-            @test cv.gip == scalar_ip(geo_ip)
+            @test Ferrite.geometric_interpolation(cv) == scalar_ip(geo_ip)
         end
+        x = Ferrite.reference_coordinates(fun_ip)
+        @test_call reinit!(cv, x)
     end
 end
 
 @testset "show" begin
-    # Just smoke test
     cv_quad = CellValues(QuadratureRule{RefQuadrilateral}(2), Lagrange{RefQuadrilateral,2}()^2)
+    showstring = sprint(show, MIME"text/plain"(), cv_quad)
+    @test startswith(showstring, "CellValues(vdim=2, rdim=2, and sdim=2): 4 quadrature points")
+    @test contains(showstring, "Function interpolation: Lagrange{RefQuadrilateral, 2}()^2")
+
     cv_wedge = CellValues(QuadratureRule{RefPrism}(2), Lagrange{RefPrism,2}())
-    show(stdout, MIME"text/plain"(), cv_quad)
-    show(stdout, MIME"text/plain"(), cv_wedge)
+    showstring = sprint(show, MIME"text/plain"(), cv_wedge)
+    @test startswith(showstring, "CellValues(scalar, rdim=3, and sdim=3): 5 quadrature points")
+    @test contains(showstring, "Function interpolation: Lagrange{RefPrism, 2}()")
+
+    pv = PointValues(cv_wedge)
+    pv_showstring = sprint(show, MIME"text/plain"(), pv)
+    @test startswith(pv_showstring, "PointValues containing")
+    @test contains(pv_showstring, "Function interpolation: Lagrange{RefPrism, 2}()")
+end
+
+@testset "CustomCellValues" begin
+    
+    @testset "SimpleCellValues" begin
+        include(joinpath(@__DIR__, "../docs/src/topics/SimpleCellValues_literate.jl"))
+    end
+    
+    @testset "TestCustomCellValues" begin
+    
+        struct TestCustomCellValues{CV<:CellValues} <: Ferrite.AbstractValues
+            cv::CV
+        end
+        # Check that the list in devdocs/FEValues.md is true
+        # If changes are made that makes the following tests fails,
+        # the devdocs should be updated accordingly.
+        for op = (:shape_value, :shape_gradient, :getnquadpoints, :getnbasefunctions, :geometric_value, :getngeobasefunctions)
+            @eval Ferrite.$op(cv::TestCustomCellValues, args...; kwargs...) = Ferrite.$op(cv.cv, args...; kwargs...)
+        end
+        ip = Lagrange{RefQuadrilateral,1}()^2
+        qr = QuadratureRule{RefQuadrilateral}(2)
+        cv = CellValues(qr, ip)
+        grid = generate_grid(Quadrilateral, (1,1))
+        x = getcoordinates(grid, 1)
+        cell = getcells(grid, 1)
+        reinit!(cv, cell, x)
+        ae = rand(getnbasefunctions(cv))
+        q_point = rand(1:getnquadpoints(cv))
+        cv_custom = TestCustomCellValues(cv)
+        for fun in (function_value, function_gradient, 
+                        function_divergence, function_symmetric_gradient, function_curl)
+            @test fun(cv_custom, q_point, ae) == fun(cv, q_point, ae)
+        end
+        @test spatial_coordinate(cv_custom, q_point, x) == spatial_coordinate(cv, q_point, x)
+    end
 end
 
 end # of testset

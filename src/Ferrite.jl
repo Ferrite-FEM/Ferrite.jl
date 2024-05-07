@@ -1,14 +1,27 @@
 module Ferrite
-using Reexport
+
+using Reexport: @reexport
 @reexport using Tensors
 @reexport using WriteVTK
 
-using LinearAlgebra
-using SparseArrays
-using StaticArrays
-using Base: @propagate_inbounds
-using NearestNeighbors
-using EnumX
+using Base:
+    @propagate_inbounds
+using EnumX:
+    EnumX, @enumx
+using LinearAlgebra:
+    LinearAlgebra, Symmetric, Transpose, cholesky, det, issymmetric, norm,
+    pinv, tr
+using NearestNeighbors:
+    NearestNeighbors, KDTree, knn
+using SparseArrays:
+    SparseArrays, SparseMatrixCSC, nonzeros, nzrange, rowvals, sparse, spzeros
+using StaticArrays:
+    StaticArrays, MMatrix, SMatrix, SVector
+using Tensors:
+    Tensors, AbstractTensor, SecondOrderTensor, SymmetricTensor, Tensor, Vec, gradient,
+    rotation_tensor, symmetric, tovoigt!
+using WriteVTK:
+    WriteVTK, MeshCell, VTKCellTypes, vtk_cell_data, vtk_grid, vtk_point_data, vtk_save
 
 include("exports.jl")
 
@@ -32,6 +45,8 @@ const RefTriangle      = RefSimplex{2}
 const RefTetrahedron   = RefSimplex{3}
 struct RefPrism         <: AbstractRefShape{3} end
 struct RefPyramid       <: AbstractRefShape{3} end
+
+abstract type AbstractCell{refshape <: AbstractRefShape} end
 
 abstract type AbstractValues end
 abstract type AbstractCellValues <: AbstractValues end
@@ -82,9 +97,12 @@ include("interpolations.jl")
 include("Quadrature/quadrature.jl")
 
 # FEValues
-include("FEValues/cell_values.jl")
-include("FEValues/face_values.jl")
-include("PointEval/point_values.jl")
+include("FEValues/GeometryMapping.jl")
+include("FEValues/FunctionValues.jl")
+include("FEValues/CellValues.jl")
+include("FEValues/FaceValues.jl")
+include("FEValues/InterfaceValues.jl")
+include("FEValues/PointValues.jl")
 include("FEValues/common_values.jl")
 include("FEValues/face_integrals.jl")
 
@@ -118,7 +136,7 @@ include("L2_projection.jl")
 include("Export/VTK.jl")
 
 # Point Evaluation
-include("PointEval/PointEvalHandler.jl")
+include("PointEvalHandler.jl")
 
 # Other
 include("deprecations.jl")

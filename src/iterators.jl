@@ -51,24 +51,24 @@ struct CellCache{X,G<:AbstractGrid,DH<:Union{AbstractDofHandler,Nothing}}
 end
 
 function CellCache(grid::Grid{dim,C,T}, flags::UpdateFlags=UpdateFlags()) where {dim,C,T}
-    N = nnodes_per_cell(grid)
+    N = nnodes_per_cell(grid, 1) # nodes and coords will be resized in `reinit!`
     nodes = zeros(Int, N)
     coords = zeros(Vec{dim,T}, N)
     return CellCache(flags, grid, ScalarWrapper(-1), nodes, coords, nothing, Int[])
 end
 
 function CellCache(dh::DofHandler{dim}, flags::UpdateFlags=UpdateFlags()) where {dim}
-    N = nnodes_per_cell(get_grid(dh))
+    n = ndofs_per_cell(dh.subdofhandlers[1]) # dofs and coords will be resized in `reinit!`
+    N = nnodes_per_cell(get_grid(dh), 1)
     nodes = zeros(Int, N)
     coords = zeros(Vec{dim, get_coordinate_eltype(get_grid(dh))}, N)
-    n = ndofs_per_cell(dh)
     celldofs = zeros(Int, n)
     return CellCache(flags, get_grid(dh), ScalarWrapper(-1), nodes, coords, dh, celldofs)
 end
 
 function CellCache(sdh::SubDofHandler, flags::UpdateFlags=UpdateFlags())
-    dim = getdim(sdh.dh.grid)
-    CellCache(flags, sdh.dh.grid, ScalarWrapper(-1), Int[], Vec{dim,Float64}[], sdh, Int[])
+    Tv = get_coordinate_type(sdh.dh.grid)
+    CellCache(flags, sdh.dh.grid, ScalarWrapper(-1), Int[], Tv[], sdh, Int[])
 end
 
 function reinit!(cc::CellCache, i::Int)
@@ -91,9 +91,6 @@ end
 # reinit! FEValues with CellCache
 reinit!(cv::CellValues, cc::CellCache) = reinit!(cv, cc.coords)
 reinit!(fv::FaceValues, cc::CellCache, f::Int) = reinit!(fv, cc.coords, f) # TODO: Deprecate?
-# TODOL enable this after InterfaceValues are merges
-# reinit!(iv::InterfaceValues, ic::InterfaceCache) = reinit!(iv, FaceIndex(cellid(ic.face_a), ic.face_a.current_faceid[]), getcoordinates(ic.face_a),
-#     FaceIndex(cellid(ic.face_b), ic.face_b.current_faceid[]), getcoordinates(ic.face_b), ic.face_a.cc.grid)
 
 # Accessor functions (TODO: Deprecate? We are so inconsistent with `getxx` vs `xx`...)
 getnodes(cc::CellCache) = cc.nodes
@@ -208,7 +205,20 @@ function reinit!(cache::InterfaceCache, face_a::FaceIndex, face_b::FaceIndex)
     return cache
 end
 
+function reinit!(iv::InterfaceValues, ic::InterfaceCache)
+    return reinit!(iv,
+        getcells(ic.a.cc.grid, cellid(ic.a)),
+        getcoordinates(ic.a),
+        ic.a.current_faceid[],
+        getcells(ic.b.cc.grid, cellid(ic.b)),
+        getcoordinates(ic.b),
+        ic.b.current_faceid[],
+   )
+end
+
 interfacedofs(ic::InterfaceCache) = ic.dofs
+dof_range(ic::InterfaceCache, field::Symbol) = (dof_range(ic.a.cc.dh, field), dof_range(ic.b.cc.dh, field) .+ length(celldofs(ic.a)))
+getcoordinates(ic::InterfaceCache) = (getcoordinates(ic.a), getcoordinates(ic.b))
 
 ####################
 ## Grid iterators ##

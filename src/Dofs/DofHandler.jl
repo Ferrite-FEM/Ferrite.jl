@@ -12,7 +12,6 @@ Access some grid representation for the dof handler.
 """
 get_grid(dh::AbstractDofHandler)
 
-
 struct SubDofHandler{DH} <: AbstractDofHandler
     # From constructor
     dh::DH
@@ -26,8 +25,36 @@ struct SubDofHandler{DH} <: AbstractDofHandler
     # const dof_ranges::Vector{UnitRange{Int}} # TODO: Why not?
 end
 
-# TODO: Should be an inner constructor.
+"""
+    SubDofHandler(dh::AbstractDofHandler, cellset::Set{Int})
+
+Create an `sdh::SubDofHandler` from the parent `dh`, pertaining to the 
+cells in `cellset`. This allows you to add fields to parts of the domain, or using 
+different interpolations or cell types (e.g. `Triangles` and `Quadrilaterals`). All 
+fields and cell types must be the same in one `SubDofHandler`.
+
+After construction any number of discrete fields can be added to the SubDofHandler using
+[`add!`](@ref). Construction is finalized by calling [`close!`](@ref) on the parent `dh`.
+
+# Examples
+We assume we have a `grid` containing "Triangle" and "Quadrilateral" cells, 
+including the cellsets "triangles" and "quadilaterals" for to these cells. 
+```julia
+dh = DofHandler(grid)
+
+sdh_tri = SubDofHandler(dh, getcellset(grid, "triangles"))
+ip_tri = Lagrange{RefTriangle, 2}()^2 # vector interpolation for a field u
+add!(sdh_tri, :u, ip_tri)
+
+sdh_quad = SubDofHandler(dh, getcellset(grid, "quadilaterals"))
+ip_quad = Lagrange{RefQuadrilateral, 2}()^2 # vector interpolation for a field u
+add!(sdh_quad, :u, ip_quad)
+
+close!(dh) # Finalize by closing the parent 
+```
+"""
 function SubDofHandler(dh::DH, cellset) where {DH <: AbstractDofHandler}
+    # TODO: Should be an inner constructor.
     isclosed(dh) && error("DofHandler already closed")
     # Compute the celltype and make sure all elements have the same one
     CT = getcelltype(dh.grid, first(cellset))
@@ -46,19 +73,18 @@ function SubDofHandler(dh::DH, cellset) where {DH <: AbstractDofHandler}
     return sdh
 end
 
-# Shortcut
-@inline getcelltype(grid::AbstractGrid, sdh::SubDofHandler) = getcelltype(grid, first(sdh.cellset))
+@inline getcelltype(sdh::SubDofHandler) = getcelltype(get_grid(sdh.dh), first(sdh.cellset))
 
-function Base.show(io::IO, ::MIME"text/plain", sdh::SubDofHandler)
+function Base.show(io::IO, mime::MIME"text/plain", sdh::SubDofHandler)
     println(io, typeof(sdh))
-    println(io, "  Cell type: ", getcelltype(sdh.dh.grid, first(sdh.cellset)))
-    _print_field_information(io, sdh)
+    println(io, "  Cell type: ", getcelltype(sdh))
+    _print_field_information(io, mime, sdh)
 end
 
-function _print_field_information(io::IO, sdh::SubDofHandler)
+function _print_field_information(io::IO, mime::MIME"text/plain", sdh::SubDofHandler)
     println(io, "  Fields:")
     for (i, fieldname) in pairs(sdh.field_names)
-        println(io, "    ", repr(fieldname), ", ", sdh.field_interpolations[i])
+        println(io, "    ", repr(mime, fieldname), ", ", repr(mime, sdh.field_interpolations[i]))
     end
     if !isclosed(sdh.dh)
         print(io, "  Not closed!")
@@ -67,13 +93,6 @@ function _print_field_information(io::IO, sdh::SubDofHandler)
     end
 end
 
-"""
-    DofHandler(grid::AbstractGrid)
-
-Construct a `DofHandler` based on `grid`. Supports:
-- `Grid`s with or without concrete element type (E.g. "mixed" grids with several different element types.)
-- One or several fields, which can live on the whole domain or on subsets of the `Grid`.
-"""
 struct DofHandler{dim,G<:AbstractGrid{dim}} <: AbstractDofHandler
     subdofhandlers::Vector{SubDofHandler{DofHandler{dim, G}}}
     field_names::Vector{Symbol}
@@ -100,16 +119,38 @@ struct DofHandler{dim,G<:AbstractGrid{dim}} <: AbstractDofHandler
     facedicts::Vector{Dict{NTuple{dim,Int}, Int}}
 end
 
+"""
+    DofHandler(grid::Grid)
+
+Construct a `DofHandler` based on the grid `grid`.
+
+After construction any number of discrete fields can be added to the DofHandler using
+[`add!`](@ref). Construction is finalized by calling [`close!`](@ref).
+
+By default fields are added to all elements of the grid. Refer to [`SubDofHandler`](@ref)
+for restricting fields to subdomains of the grid.
+
+# Examples
+
+```julia
+dh = DofHandler(grid)
+ip_u = Lagrange{RefTriangle, 2}()^2 # vector interpolation for a field u
+ip_p = Lagrange{RefTriangle, 1}()   # scalar interpolation for a field p
+add!(dh, :u, ip_u)
+add!(dh, :p, ip_p)
+close!(dh)
+```
+"""
 function DofHandler(grid::G) where {dim, G <: AbstractGrid{dim}}
     ncells = getncells(grid)
     sdhs = SubDofHandler{DofHandler{dim, G}}[]
     DofHandler{dim, G}(sdhs, Symbol[], Int[], zeros(Int, ncells), zeros(Int, ncells), ScalarWrapper(false), grid, ScalarWrapper(-1), [Int[]], Dict{Tuple{Int,Int}}[], Dict{NTuple{dim,Int}}[])
 end
 
-function Base.show(io::IO, ::MIME"text/plain", dh::DofHandler)
+function Base.show(io::IO, mime::MIME"text/plain", dh::DofHandler)
     println(io, typeof(dh))
     if length(dh.subdofhandlers) == 1
-        _print_field_information(io, dh.subdofhandlers[1])
+        _print_field_information(io, mime, dh.subdofhandlers[1])
     else
         println(io, "  Fields:")
         for fieldname in getfieldnames(dh)
@@ -140,9 +181,15 @@ Return the number of degrees of freedom for the cell with index `cell`.
 
 See also [`ndofs`](@ref).
 """
-function ndofs_per_cell(dh::DofHandler, cell::Int=1)
-    @boundscheck 1 <= cell <= getncells(get_grid(dh))
-    return @inbounds ndofs_per_cell(dh.subdofhandlers[dh.cell_to_subdofhandler[cell]])
+function ndofs_per_cell(dh::DofHandler)
+    if length(dh.subdofhandlers) > 1
+        error("There are more than one subdofhandler. Use `ndofs_per_cell(dh, cellid::Int)` instead.")
+    end
+    @assert length(dh.subdofhandlers) != 0
+    return @inbounds ndofs_per_cell(dh.subdofhandlers[1])
+end
+function ndofs_per_cell(dh::DofHandler, cell::Int)
+    return ndofs_per_cell(dh.subdofhandlers[dh.cell_to_subdofhandler[cell]])
 end
 ndofs_per_cell(sdh::SubDofHandler) = sdh.ndofs_per_cell[]
 ndofs_per_cell(sdh::SubDofHandler, ::Int) = sdh.ndofs_per_cell[] # for compatibility with DofHandler
@@ -586,7 +633,7 @@ For most scalar-valued interpolations we can simply compensate for this by rever
 numbering on all edges that do not match the global edge direction, i.e. for the edge on
 element B in the example.
 
-In addition, we also have to preverse the ordering at each dof location.
+In addition, we also have to preserve the ordering at each dof location.
 
 For more details we refer to Scroggs et al. [Scroggs2022](@cite) as we follow the methodology
 described therein.
@@ -743,7 +790,7 @@ Return the index of the field with name `field_name` in a `DofHandler`. The inde
 field was found and the 2nd entry is the index of the field within the `SubDofHandler`.
 
 !!! note
-    Always finds the 1st occurence of a field within `DofHandler`.
+    Always finds the 1st occurrence of a field within `DofHandler`.
 
 See also: [`find_field(sdh::SubDofHandler, field_name::Symbol)`](@ref),
 [`_find_field(sdh::SubDofHandler, field_name::Symbol)`](@ref).
@@ -808,7 +855,7 @@ index, where `field_idx` represents the index of a field within a `SubDofHandler
     The `dof_range` of a field can vary between different `SubDofHandler`s. Therefore, it is
     advised to use the `field_idxs` or refer to a given `SubDofHandler` directly in case
     several `SubDofHandler`s exist. Using the `field_name` will always refer to the first
-    occurence of `field` within the `DofHandler`.
+    occurrence of `field` within the `DofHandler`.
 
 Example:
 ```jldoctest
@@ -868,7 +915,7 @@ getfieldinterpolation(sdh::SubDofHandler, field_name::Symbol) = getfieldinterpol
 Evaluate the approximated solution for field `fieldname` at the node
 coordinates of the grid given the Dof handler `dh` and the solution vector `u`.
 
-Return a vector of length `getnnodes(grid)` where entry `i` contains the evalutation of the
+Return a vector of length `getnnodes(grid)` where entry `i` contains the evaluation of the
 approximation in the coordinate of node `i`. If the field does not live on parts of the
 grid, the corresponding values for those nodes will be returned as `NaN`s.
 """
@@ -890,7 +937,7 @@ function _evaluate_at_grid_nodes(dh::DofHandler, u::Vector{T}, fieldname::Symbol
         vtk_dim = n_c == 2 ? 3 : n_c # VTK wants vectors padded to 3D
         data = fill(NaN * zero(T), vtk_dim, getnnodes(get_grid(dh)))
     else
-        # Just evalutation at grid nodes
+        # Just evaluation at grid nodes
         data = fill(NaN * zero(RT), getnnodes(get_grid(dh)))
     end
     # Loop over the subdofhandlers
@@ -899,11 +946,11 @@ function _evaluate_at_grid_nodes(dh::DofHandler, u::Vector{T}, fieldname::Symbol
         field_idx = _find_field(sdh, fieldname)
         field_idx === nothing && continue
         # Set up CellValues with the local node coords as quadrature points
-        CT = getcelltype(get_grid(dh), first(sdh.cellset))
+        CT = getcelltype(sdh)
+        ip = getfieldinterpolation(sdh, field_idx)
         ip_geo = default_interpolation(CT)
         local_node_coords = reference_coordinates(ip_geo)
         qr = QuadratureRule{getrefshape(ip)}(zeros(length(local_node_coords)), local_node_coords)
-        ip = getfieldinterpolation(sdh, field_idx)
         if ip isa VectorizedInterpolation
             # TODO: Remove this hack when embedding works...
             cv = CellValues(qr, ip.ip, ip_geo)
@@ -922,7 +969,7 @@ function _evaluate_at_grid_nodes!(data::Union{Vector,Matrix}, sdh::SubDofHandler
         u::Vector{T}, cv::CellValues, drange::UnitRange, ::Type{RT}) where {T, RT}
     ue = zeros(T, length(drange))
     # TODO: Remove this hack when embedding works...
-    if RT <: Vec && cv isa CellValues{<:ScalarInterpolation}
+    if RT <: Vec && function_interpolation(cv) isa ScalarInterpolation
         uer = reinterpret(RT, ue)
     else
         uer = ue

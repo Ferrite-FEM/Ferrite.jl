@@ -5,5 +5,5 @@ developing the library.
 
 ```@contents
 Depth = 1
-Pages = ["reference_cells.md", "interpolations.md", "elements.md", "dofhandler.md", "performance.md"]
+Pages = ["reference_cells.md", "interpolations.md", "elements.md", "FEValues.md", "dofhandler.md", "performance.md"]
 ```
