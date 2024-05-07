@@ -42,14 +42,14 @@ function generate_grid(::Type{Line}, nel::NTuple{1,Int}, left::Vec{1,T}=Vec{1}((
 
 
     # Cell faces
-    boundary = [VertexIndex(1, 1), VertexIndex(nel_x, 2)]
+    boundary = [FacetIndex(1, 1), FacetIndex(nel_x, 2)]
 
     boundary_matrix = boundaries_to_sparse(boundary)
 
-    # Cell face sets
-    vertexsets = Dict("left"  => Set{VertexIndex}([boundary[1]]),
-                      "right" => Set{VertexIndex}([boundary[2]]))
-    return Grid(cells, nodes, vertexsets=vertexsets, boundary_matrix=boundary_matrix)
+    # Cell facet sets
+    facetsets = Dict("left"  => Set{FacetIndex}([boundary[1]]),
+                      "right" => Set{FacetIndex}([boundary[2]]))
+    return Grid(cells, nodes; facetsets, boundary_matrix)
 end
 
 # QuadraticLine
@@ -71,14 +71,14 @@ function generate_grid(::Type{QuadraticLine}, nel::NTuple{1,Int}, left::Vec{1,T}
     end
 
     # Cell faces
-    boundary = [VertexIndex(1, 1), VertexIndex(nel_x, 2)]
+    boundary = [FacetIndex(1, 1), FacetIndex(nel_x, 2)]
 
     boundary_matrix = boundaries_to_sparse(boundary)
 
-    # Cell face sets
-    vertexsets = Dict("left"  => Set{VertexIndex}([boundary[1]]),
-                      "right" => Set{VertexIndex}([boundary[2]]))
-    return Grid(cells, nodes, vertexsets=vertexsets, boundary_matrix=boundary_matrix)
+    # Cell facet sets
+    facetsets = Dict("left"  => Set{FacetIndex}([boundary[1]]),
+                      "right" => Set{FacetIndex}([boundary[2]]))
+    return Grid(cells, nodes; facetsets, boundary_matrix)
 end
 
 function _generate_2d_nodes!(nodes, nx, ny, LL, LR, UR, UL)

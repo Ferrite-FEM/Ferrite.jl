@@ -85,6 +85,13 @@ struct VertexIndex <: BoundaryIndex
     idx::Tuple{Int,Int} # cell and side
 end
 
+"""
+A `FacetIndex` wraps an (Int, Int) and defines a local facet by pointing to a (cell, facet).
+"""
+struct FacetIndex <: BoundaryIndex
+    idx::Tuple{Int,Int} # cell and side
+end
+
 include("utils.jl")
 
 # Matrix/Vector utilities

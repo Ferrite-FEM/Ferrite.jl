@@ -72,6 +72,10 @@ Note that the vertices are sufficient to define an edge uniquely.
 """
 edges(::AbstractCell)
 
+#TODO: Add docs for reference_vertices and reference_edges
+# Or remove, doesn't seemed used at all. 
+# Alternatively, make separate file for the reference shapes. 
+# Cells should rather use info from reference shape than other way around...
 """
     reference_faces(::AbstractRefShape)
 
@@ -363,8 +367,7 @@ There are multiple helper structures to apply boundary conditions or define subd
 - `nodes::Vector{Node{dim,T}}`: stores the `dim` dimensional nodes of the grid
 - `cellsets::Dict{String,Set{Int}}`: maps a `String` key to a `Set` of cell ids
 - `nodesets::Dict{String,Set{Int}}`: maps a `String` key to a `Set` of global node ids
-- `facesets::Dict{String,Set{FaceIndex}}`: maps a `String` to a `Set` of `Set{FaceIndex} (global_cell_id, local_face_id)`
-- `edgesets::Dict{String,Set{EdgeIndex}}`: maps a `String` to a `Set` of `Set{EdgeIndex} (global_cell_id, local_edge_id`
+- `facetsets::Dict{String,Set{FacetIndex}}`: maps a `String` to a `Set` of `Set{FacetIndex} (global_cell_id, local_facet_id)`
 - `vertexsets::Dict{String,Set{VertexIndex}}`: maps a `String` key to a `Set` of local vertex ids
 - `boundary_matrix::SparseMatrixCSC{Bool,Int}`: optional, only needed by `onboundary` to check if a cell is on the boundary, see, e.g. Helmholtz example
 """
@@ -374,22 +377,20 @@ mutable struct Grid{dim,C<:AbstractCell,T<:Real} <: AbstractGrid{dim}
     # Sets
     cellsets::Dict{String,Set{Int}}
     nodesets::Dict{String,Set{Int}}
-    facesets::Dict{String,Set{FaceIndex}}
-    edgesets::Dict{String,Set{EdgeIndex}}
+    facetsets::Dict{String,Set{FacetIndex}}
     vertexsets::Dict{String,Set{VertexIndex}}
     # Boundary matrix (faces per cell × cell)
-    boundary_matrix::SparseMatrixCSC{Bool,Int}
+    boundary_matrix::SparseMatrixCSC{Bool,Int} # TODO: Deprecate!
 end
 
 function Grid(cells::Vector{C},
               nodes::Vector{Node{dim,T}};
               cellsets::Dict{String,Set{Int}}=Dict{String,Set{Int}}(),
               nodesets::Dict{String,Set{Int}}=Dict{String,Set{Int}}(),
-              facesets::Dict{String,Set{FaceIndex}}=Dict{String,Set{FaceIndex}}(),
-              edgesets::Dict{String,Set{EdgeIndex}}=Dict{String,Set{EdgeIndex}}(),
+              facetsets::Dict{String,Set{FacetIndex}}=Dict{String,Set{FacetIndex}}(),
               vertexsets::Dict{String,Set{VertexIndex}}=Dict{String,Set{VertexIndex}}(),
               boundary_matrix::SparseMatrixCSC{Bool,Int}=spzeros(Bool, 0, 0)) where {dim,C,T}
-    return Grid(cells, nodes, cellsets, nodesets, facesets, edgesets, vertexsets, boundary_matrix)
+    return Grid(cells, nodes, cellsets, nodesets, facetsets, vertexsets, boundary_matrix)
 end
 
 ##########################
@@ -481,33 +482,21 @@ Returns all nodesets of the `grid`.
 @inline getnodesets(grid::AbstractGrid) = grid.nodesets
 
 """
-    getfaceset(grid::AbstractGrid, setname::String)
+    getfacetset(grid::AbstractGrid, setname::String)
 
-Returns all faces as `FaceIndex` in a `Set` of a given `setname`.
+Returns all facets as `FacetIndex` in a `Set` of a given `setname`.
 """
-@inline getfaceset(grid::AbstractGrid, setname::String) = grid.facesets[setname]
+@inline getfacetset(grid::AbstractGrid, setname::String) = grid.facetsets[setname]
 """
-    getfacesets(grid::AbstractGrid)
+    getfacetsets(grid::AbstractGrid)
 
-Returns all facesets of the `grid`.
+Returns all facet sets of the `grid`.
 """
-@inline getfacesets(grid::AbstractGrid) = grid.facesets
+@inline getfacetsets(grid::AbstractGrid) = grid.facesets
 
-"""
-    getedgeset(grid::AbstractGrid, setname::String)
-
-Returns all edges as `EdgeIndex` in a `Set` of a given `setname`.
-"""
-@inline getedgeset(grid::AbstractGrid, setname::String) = grid.edgesets[setname]
-"""
-    getedgesets(grid::AbstractGrid)
-
-Returns all edge sets of the grid.
-"""
-@inline getedgesets(grid::AbstractGrid) = grid.edgesets
 
 """
-    getedgeset(grid::AbstractGrid, setname::String)
+    getvertexset(grid::AbstractGrid, setname::String)
 
 Returns all vertices as `VertexIndex` in a `Set` of a given `setname`.
 """
@@ -592,10 +581,8 @@ addfaceset!(grid, "right", Set(((2,2),(4,2))) #see grid manual example for refer
 addfaceset!(grid, "clamped", x -> norm(x[1]) ≈ 0.0) #see incompressible elasticity example for reference
 ```
 """
-addfaceset!(grid::AbstractGrid, name::String, set::Union{Set{FaceIndex},Vector{FaceIndex}}) = 
-    _addset!(grid, name, set, grid.facesets)
-addedgeset!(grid::AbstractGrid, name::String, set::Union{Set{EdgeIndex},Vector{EdgeIndex}}) = 
-    _addset!(grid, name, set, grid.edgesets)
+addfacetset!(grid::AbstractGrid, name::String, set::Union{Set{FacetIndex},Vector{FacetIndex}}) = 
+    _addset!(grid, name, set, grid.facetsets)
 addvertexset!(grid::AbstractGrid, name::String, set::Union{Set{VertexIndex},Vector{VertexIndex}}) = 
     _addset!(grid, name, set, grid.vertexsets)
 function _addset!(grid::AbstractGrid, name::String, _set, dict::Dict)
@@ -606,12 +593,10 @@ function _addset!(grid::AbstractGrid, name::String, _set, dict::Dict)
     grid
 end
 
-addfaceset!(grid::AbstractGrid, name::String, f::Function; all::Bool=true) = 
-    _addset!(grid, name, f, Ferrite.faces, grid.facesets, FaceIndex; all=all)
-addedgeset!(grid::AbstractGrid, name::String, f::Function; all::Bool=true) = 
-    _addset!(grid, name, f, Ferrite.edges, grid.edgesets, EdgeIndex; all=all)
+addfacetset!(grid::AbstractGrid, name::String, f::Function; all::Bool=true) = 
+    _addset!(grid, name, f, facets, grid.facesets, FacetIndex; all=all)
 addvertexset!(grid::AbstractGrid, name::String, f::Function; all::Bool=true) = 
-    _addset!(grid, name, f, Ferrite.vertices, grid.vertexsets, VertexIndex; all=all)
+    _addset!(grid, name, f, vertices, grid.vertexsets, VertexIndex; all=all)
 function _addset!(grid::AbstractGrid, name::String, f::Function, _ftype::Function, dict::Dict, _indextype::Type; all::Bool=true)
     _check_setname(dict, name)
     _set = Set{_indextype}()
@@ -813,11 +798,12 @@ Helper function to dispatch on the correct entity from a given boundary index.
 """
 boundaryfunction(::Type{<:BoundaryIndex})
 
-boundaryfunction(::Type{FaceIndex}) = Ferrite.faces
-boundaryfunction(::Type{EdgeIndex}) = Ferrite.edges
-boundaryfunction(::Type{VertexIndex}) = Ferrite.vertices
+boundaryfunction(::Type{FaceIndex}) = faces
+boundaryfunction(::Type{EdgeIndex}) = edges
+boundaryfunction(::Type{VertexIndex}) = vertices
+boundaryfunction(::Type{FacetIndex}) = facets
 
-for INDEX in (:VertexIndex, :EdgeIndex, :FaceIndex)
+for INDEX in (:VertexIndex, :EdgeIndex, :FaceIndex, :FacetIndex)
     @eval begin  
         #Constructor
         ($INDEX)(a::Int, b::Int) = ($INDEX)((a,b))
@@ -954,75 +940,19 @@ function OrientationInfo(surface::NTuple{N, Int}) where N
     return OrientationInfo(flipped, shift_index)
 end
 
-# Dispatches for facets and boundary
-
-"""
-    getboundaryset(grid::AbstractGrid, setname::String)
-
-Returns the a boundary set of a given `setname`. 
-The boundary set is a defined as ::Set{FaceIndex} in 3d-problems, ::Set{EdgeIndex} in 2d-problems, and ::Set{VertexIndex} in 1d-problems, 
-"""
-getboundaryset(grid::AbstractGrid{1}, setname::String) = grid.vertexsets[setname]
-getboundaryset(grid::AbstractGrid{2}, setname::String) = grid.edgesets[setname]
-getboundaryset(grid::AbstractGrid{3}, setname::String) = grid.facesets[setname]
-
-
-"""
-    addboundaryset!(grid::AbstractGrid, name::String, faceid::Union{Set{<:BoundaryIndex},Vector{<:BoundaryIndex}})
-    addboundaryset!(grid::AbstractGrid, name::String, f::Function; all::Bool=true) 
-
-Adds a boundary set to the grid with key `name`.
-The boundary set is a defined as ::Set{FaceIndex} in 3d-problems, ::Set{EdgeIndex} in 2d-problems, and ::Set{VertexIndex} in 1d-problems, 
-
-A boundary set maps a `String` key to a `Set` of tuples corresponding to `(global_cell_id, local_id)`.
-Boundary sets are used to initialize `Dirichlet` structs, that are needed to specify the boundary for the `ConstraintHandler`.
-`all=true` implies that `f(x)` must return `true` for all nodal coordinates `x` on the boundary if the boundary
-should be added to the set, otherwise it suffices that `f(x)` returns `true` for one node. 
-"""
-addboundaryset!(grid::AbstractGrid{1}, args...; kwargs...) = addvertexset!(grid, args...; kwargs...)
-addboundaryset!(grid::AbstractGrid{2}, args...; kwargs...) = addedgeset!(grid, args...; kwargs...)
-addboundaryset!(grid::AbstractGrid{3}, args...; kwargs...) = addfaceset!(grid, args...; kwargs...)
-
-"""
-    getboundarysets(grid::AbstractGrid)
-
-Returns the boundary sets of the grid.
-"""
-getboundarysets(grid::AbstractGrid{1}) = grid.vertexsets
-getboundarysets(grid::AbstractGrid{2}) = grid.edgesets
-getboundarysets(grid::AbstractGrid{3}) = grid.facesets
+# Dispatches for facets
 
 @inline facets(c::AbstractCell{<:AbstractRefShape{1}}) = vertices(c)
 @inline facets(c::AbstractCell{<:AbstractRefShape{2}}) = edges(c)
 @inline facets(c::AbstractCell{<:AbstractRefShape{3}}) = faces(c)
 
-@inline reference_facets(c::Type{<:AbstractRefShape{1}}) = reference_vertices(c)
-@inline reference_facets(c::Type{<:AbstractRefShape{2}}) = reference_edges(c)
-@inline reference_facets(c::Type{<:AbstractRefShape{3}}) = reference_faces(c)
+@inline reference_facets(refshape::Type{<:AbstractRefShape{1}}) = reference_vertices(refshape)
+@inline reference_facets(refshape::Type{<:AbstractRefShape{2}}) = reference_edges(refshape)
+@inline reference_facets(refshape::Type{<:AbstractRefShape{3}}) = reference_faces(refshape)
 nfacets(::Type{T}) where {T <: AbstractRefShape} = length(reference_facets(T))
 
-#Backward compat
-function getfaceset(grid::AbstractGrid{1}, name::String)
-    @warn("getfaceset for 1d-problems have been deprecated. Use getboundaryset instead")
-    getboundaryset(grid, name)
-end
-function getfaceset(grid::AbstractGrid{2}, name::String)
-    @warn("getfaceset for 2d-problems have been deprecated. Use getboundaryset instead")
-    getboundaryset(grid, name)
-end
-function addfaceset!(grid::AbstractGrid{1}, name::String, f::Function; all::Bool=true)
-    @warn("addfaceset! for 1d-problems have been deprecated. Use addboundaryset! instead")
-    addboundaryset!(grid, name, f; all)
-end
-function addfaceset!(grid::AbstractGrid{2}, name::String, f::Function; all::Bool=true)
-    @warn("addfaceset! for 2d-problems have been deprecated. Use addboundaryset! instead")
-    addboundaryset!(grid, name, f; all)
-end
-function addfaceset!(grid::AbstractGrid{1}, name::String, set)
-    @warn("addfaceset! for 1d-problems have been deprecated. Use addboundaryset! instead")
-    addboundaryset!(grid, name, set)
-end
-function addfaceset!(grid::AbstractGrid{2}, name::String, set)
-    @warn("addfaceset! for 2d-problems have been deprecated. Use addboundaryset! instead")
-    addboundaryset!(grid, name, set)
+# Deprecation (TODO: Move to deprecated.jl)
+function getfaceset(grid::AbstractGrid, name::String)
+    @warn("getfaceset is deprecated, use getfacetset instead") maxlog=1
+    getfacetset(grid, name)
 end
