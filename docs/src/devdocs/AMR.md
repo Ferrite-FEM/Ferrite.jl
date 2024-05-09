@@ -165,6 +165,10 @@ OctantBWG{2,4,4}
 
 ### Intraoctree operation
 
+Intraoctree operation stay within one octree and compute octants that are attached in some way to a pivot octant `o`.
+These operations are useful to collect unique entities within a single octree or to compute possible neighbors of `o`.
+[BWG2011](@citet) Algorithm 5, 6, and 7 describe the following intraoctree operations:
+
 ```@docs
 Ferrite.corner_neighbor
 Ferrite.edge_neighbor
@@ -173,8 +177,23 @@ Ferrite.face_neighbor
 
 ### Interoctree operation
 
+Interoctree operation are in contrast to intraoctree operation by computing octant transformations across different octrees.
+Thereby, one needs to account for topological connections between the octrees as well as possible rotations of the octrees.
+[BWG2011](@citet) Algorithm 8, 10, and 12 explain the algorithms that are implemented in the following functions:
+
 ```@docs
 Ferrite.transform_corner
 Ferrite.transform_edge
 Ferrite.transform_face
 ```
+
+Note that we flipped the input and to expected output logic a bit to the proposed algorithms of the paper.
+However, the original proposed versions are implemented as well in:
+
+```@docs
+Ferrite.transform_corner_remote
+Ferrite.transform_edge_remote
+Ferrite.transform_face_remote
+```
+
+despite being never used in the code base so far.
