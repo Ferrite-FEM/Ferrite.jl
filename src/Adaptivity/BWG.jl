@@ -63,8 +63,8 @@ From [BWG2011](@citet);
 > The octant coordinates are stored as integers of a fixed number b of bits,
 > where the highest (leftmost) bit represents the first vertical level of the
 > octree (counting the root as level zero), the second highest bit the second level of the octree, and so on.
-A morton index can thus be constructed by interleaving the integer bits:
-m(Oct) := (y_b,x_b,y_b-1,x_b-1,...y0,x0)_2
+A morton index can thus be constructed by interleaving the integer bits (2D):
+\$m(\\text{Oct}) := (y_b,x_b,y_{b-1},x_{b-1},...y_0,x_0)_2\$
 further we assume the following
 > Due to the two-complement representation of integers in practically all current hardware,
 > where the highest digit denotes the negated appropriate power of two, bitwise operations as used,
@@ -117,6 +117,10 @@ function Base.isless(o1::OctantBWG, o2::OctantBWG)
     end
 end
 
+"""
+    children(octant::OctantBWG{dim,N,T}, b::Integer) -> NTuple{M,OctantBWG}
+Computes all childern of `octant`
+"""
 function children(octant::OctantBWG{dim,N,T}, b::Integer) where {dim,N,T}
     o = one(T)
     _nchilds = nchilds(octant)
@@ -156,6 +160,11 @@ function vertex(octant::OctantBWG{dim,N,T}, c::Integer, b::Integer) where {dim,N
     return ntuple(d->((c-1) & (2^(d-1))) == 0 ? octant.xyz[d] : octant.xyz[d] + h ,dim)
 end
 
+"""
+    vertices(octant::OctantBWG{dim}, b::Integer)
+
+Computes all vertices of a given `octant`. Each vertex is encoded within the octree coordinates i.e. by integers.
+"""
 function vertices(octant::OctantBWG{dim},b::Integer) where {dim}
     _nvertices = 2^dim
     return ntuple(i->vertex(octant,i,b),_nvertices)
@@ -172,6 +181,12 @@ function face(octant::OctantBWG{3}, f::Integer, b::Integer)
     return ntuple(i->vertex(octant, cornerid[i], b),4)
 end
 
+"""
+    faces(octant::OctantBWG{dim}, b::Integer)
+
+Computes all faces of a given `octant`. Each face is encoded within the octree coordinates i.e. by integers.
+Further, each face consists of either two two-dimensional integer coordinates or four three-dimensional integer coordinates.
+"""
 function faces(octant::OctantBWG{dim}, b::Integer) where dim
     _nfaces = 2*dim
     return ntuple(i->face(octant,i,b),_nfaces)
@@ -183,6 +198,12 @@ function edge(octant::OctantBWG{3}, e::Integer, b::Integer)
     return ntuple(i->vertex(octant,cornerid[i], b),2)
 end
 
+"""
+    edges(octant::OctantBWG{dim}, b::Integer)
+
+Computes all edges of a given `octant`. Each edge is encoded within the octree coordinates i.e. by integers.
+Further, each edge consists of two three-dimensional integer coordinates.
+"""
 edges(octant::OctantBWG{3}, b::Integer) = ntuple(i->edge(octant,i,b),12)
 
 """

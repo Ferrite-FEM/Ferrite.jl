@@ -163,6 +163,20 @@ OctantBWG{2,4,4}
    xy = 4,0
 ```
 
+### Octant operation
+
+There are multiple useful functions to compute information about an octant e.g. parent, childs, etc.
+
+```@docs
+Ferrite.isancestor
+Ferrite.morton
+Ferrite.children
+Ferrite.vertices(octant::OctantBWG, b::Integer)
+Ferrite.edges(octant::OctantBWG{3}, b::Integer)
+Ferrite.faces(octant::OctantBWG, b::Integer)
+Ferrite.transform_pointBWG
+```
+
 ### Intraoctree operation
 
 Intraoctree operation stay within one octree and compute octants that are attached in some way to a pivot octant `o`.
@@ -173,6 +187,7 @@ These operations are useful to collect unique entities within a single octree or
 Ferrite.corner_neighbor
 Ferrite.edge_neighbor
 Ferrite.face_neighbor
+Ferrite.possibleneighbors
 ```
 
 ### Interoctree operation
