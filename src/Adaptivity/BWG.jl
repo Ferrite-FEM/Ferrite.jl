@@ -1448,6 +1448,29 @@ end
 
 transform_face_remote(forest::ForestBWG,f::FaceIndex,oct::OctantBWG) = transform_face_remote(forest,f[1],f[2],oct)
 
+"""
+    transform_face(forest::ForestBWG, k', f', o::OctantBWG) -> OctantBWG
+    transform_face(forest::ForestBWG, f'::FaceIndex, o::OctantBWG) -> OctantBWG
+Interoctree coordinate transformation of an given octant `o` that lies outside of the pivot octree `k`, namely in neighbor octree `k'`.
+However, the coordinate of `o` is given in octree coordinates of `k`.
+Thus, this algorithm implements the transformation of the octree coordinates of `o` into the octree coordinates of `k'`.
+Useful in order to check whether or not a possible neighbor exists in a neighboring octree.
+Implements Algorithm 8 of [BWG2011](@citet).
+
+    x-------x-------x
+    |       |       |
+    |   3   |   4   |
+    |       |       |
+    x-------x-------x
+    |       |       |
+    |   1   *   2   |
+    |       |       |
+    x-------x-------x
+
+Consider 4 octrees with a single leaf each and a maximum refinement level of 1
+This function transforms octant 1 into the coordinate system of octant 2 by specifying `k=1` and `f=2`.
+While from the perspective of octree coordinates `k=2` octant 1 is at `xyz=(-2,0)`, the returned and transformed octant is located at `xyz=(0,0)`
+"""
 function transform_face(forest::ForestBWG, k::T1, f::T1, o::OctantBWG{2,<:Any,T2}) where {T1<:Integer,T2<:Integer}
     _one = one(T2)
     _two = T2(2)
