@@ -131,10 +131,10 @@ function _exclusive_topology_ctor(cells::Vector{C}, vertex_cell_table::Array{Set
                         end
                     end
                 end
-            # Shared path
+            # Shared edge
             elseif num_shared_vertices == 2
                 _add_single_edge_neighbor!(edge_table, cell, cell_id, cell_neighbor, cell_neighbor_id)
-            # Shared surface
+            # Shared face
             elseif num_shared_vertices >= 3
                 _add_single_face_neighbor!(face_table, cell, cell_id, cell_neighbor, cell_neighbor_id)
             else
@@ -344,47 +344,18 @@ function _faceskeleton(top::ExclusiveTopology, grid::Grid)
     return face_skeleton_local
 end
 
-function _edgeskeleton(top::ExclusiveTopology, grid::Grid)
-    cells = getcells(grid)
-    cell_dim = getdim(first(cells))
-    @assert all(cell -> getdim(cell) == cell_dim, cells) "Edge skeleton construction requires all the elements to be of the same dimensionality"
-    face_skeleton_global = Set{NTuple}()
-    face_skeleton_local = Vector{EdgeIndex}()
-    fs_length = length(face_skeleton_global)
-    # TODO use topology to speed up :)
-    for (cellid,cell) ∈ enumerate(grid.cells)
-        for (local_face_id,face) ∈ enumerate(edges(cell))
-            push!(face_skeleton_global, sortedge_fast(face))
-            fs_length_new = length(face_skeleton_global)
-            if fs_length != fs_length_new
-                push!(face_skeleton_local, EdgeIndex(cellid,local_face_id))
-                fs_length = fs_length_new
-            end
-        end
-    end
-    return face_skeleton_local
+function facetskeleton(top::ExclusiveTopology, grid::Grid)
+    rdim = getdim(getcells(grid, 1))
+    return _facetskeleton(top, grid, Val(rdim))
 end
 
-function _vertexskeleton(top::ExclusiveTopology, grid::Grid)
-    cells = getcells(grid)
-    cell_dim = getdim(first(cells))
-    @assert all(cell -> getdim(cell) == cell_dim, cells) "Vertex skeleton construction requires all the elements to be of the same dimensionality"
-    vertex_skeleton_global = Set{Int}()
-    vertex_skeleton_local = Vector{VertexIndex}()
-    fs_length = length(vertex_skeleton_global)
-    # TODO use topology to speed up :)
-    for (cellid,cell) ∈ enumerate(grid.cells)
-        for (local_vertex_id,vertex) ∈ enumerate(vertices(cell))
-            push!(vertex_skeleton_global, vertex)
-            fs_length_new = length(vertex_skeleton_global)
-            if fs_length != fs_length_new
-                push!(vertex_skeleton_local, VertexIndex(cellid,local_vertex_id))
-                fs_length = fs_length_new
-            end
-        end
+function _facetskeleton(top::ExclusiveTopology, grid::Grid, #=rdim=#::Val{1})
+    if top.vertex_skeleton === nothing
+        top.vertex_skeleton = _facetskeleton(top)
     end
-    return vertex_skeleton_local
+    return top.vertex_skeleton
 end
+
 
 """
     face_skeleton(top::ExclusiveTopology, grid::Grid) -> Vector{FaceIndex}

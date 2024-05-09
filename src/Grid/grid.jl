@@ -953,6 +953,6 @@ nfacets(::Type{T}) where {T <: AbstractRefShape} = length(reference_facets(T))
 
 # Deprecation (TODO: Move to deprecated.jl)
 function getfaceset(grid::AbstractGrid, name::String)
-    @warn("getfaceset is deprecated, use getfacetset instead") maxlog=1
+    @warn "getfaceset is deprecated, use getfacetset instead" maxlog=1
     getfacetset(grid, name)
 end
