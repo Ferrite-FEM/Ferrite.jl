@@ -1543,7 +1543,7 @@ function __check_periodic_faces(grid::Grid, fi::BIndex, fj::BIndex, known_order:
     end
 
     # Rotation is only relevant for 3D
-    if getdim(grid) == 3
+    if getsdim(grid) == 3
         node_rot = mod(node_rot, length(nodes_i))
     else
         node_rot = 0
@@ -1598,7 +1598,7 @@ function __check_periodic_faces_f(grid::Grid, fi::BIndex, fj::BIndex, xmi, xmj, 
     found || return nothing
 
     # 3. Rotation is only relevant for 3D.
-    if getdim(grid) == 3
+    if getsdim(grid) == 3
         node_rot = mod(node_rot, length(nodes_i))
     else
         node_rot = 0
