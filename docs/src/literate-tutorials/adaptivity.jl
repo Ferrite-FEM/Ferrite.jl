@@ -1,5 +1,6 @@
 using Ferrite, FerriteGmsh, SparseArrays
-grid = togrid("l.msh");
+#grid = togrid("l.msh");
+grid = generate_grid(Quadrilateral,(2,2))
 grid  = ForestBWG(grid,25)
 Ferrite.refine_all!(grid,1)
 Ferrite.refine_all!(grid,2)
