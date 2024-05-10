@@ -168,13 +168,13 @@ OctantBWG{2,4,4}
 There are multiple useful functions to compute information about an octant e.g. parent, childs, etc.
 
 ```@docs
-Ferrite.isancestor
-Ferrite.morton
-Ferrite.children
-Ferrite.vertices(octant::OctantBWG, b::Integer)
-Ferrite.edges(octant::OctantBWG{3}, b::Integer)
-Ferrite.faces(octant::OctantBWG, b::Integer)
-Ferrite.transform_pointBWG
+Ferrite.AMR.isancestor
+Ferrite.AMR.morton
+Ferrite.AMR.children
+Ferrite.AMR.vertices
+Ferrite.AMR.edges
+Ferrite.AMR.faces
+Ferrite.AMR.transform_pointBWG
 ```
 
 ### Intraoctree operation
@@ -184,10 +184,10 @@ These operations are useful to collect unique entities within a single octree or
 [BWG2011](@citet) Algorithm 5, 6, and 7 describe the following intraoctree operations:
 
 ```@docs
-Ferrite.corner_neighbor
-Ferrite.edge_neighbor
-Ferrite.face_neighbor
-Ferrite.possibleneighbors
+Ferrite.AMR.corner_neighbor
+Ferrite.AMR.edge_neighbor
+Ferrite.AMR.face_neighbor
+Ferrite.AMR.possibleneighbors
 ```
 
 ### Interoctree operation
@@ -197,18 +197,18 @@ Thereby, one needs to account for topological connections between the octrees as
 [BWG2011](@citet) Algorithm 8, 10, and 12 explain the algorithms that are implemented in the following functions:
 
 ```@docs
-Ferrite.transform_corner
-Ferrite.transform_edge
-Ferrite.transform_face
+Ferrite.AMR.transform_corner
+Ferrite.AMR.transform_edge
+Ferrite.AMR.transform_face
 ```
 
 Note that we flipped the input and to expected output logic a bit to the proposed algorithms of the paper.
 However, the original proposed versions are implemented as well in:
 
 ```@docs
-Ferrite.transform_corner_remote
-Ferrite.transform_edge_remote
-Ferrite.transform_face_remote
+Ferrite.AMR.transform_corner_remote
+Ferrite.AMR.transform_edge_remote
+Ferrite.AMR.transform_face_remote
 ```
 
 despite being never used in the code base so far.
