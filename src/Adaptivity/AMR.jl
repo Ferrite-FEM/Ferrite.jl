@@ -9,6 +9,7 @@ include("constraints.jl")
 
 export ForestBWG, 
        refine!,
+       refine_all!,
        coarsen!,
        balanceforest!,
        creategrid,
