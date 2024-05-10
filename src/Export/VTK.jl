@@ -63,7 +63,7 @@ function WriteVTK.vtk_grid(filename::AbstractString, grid::AbstractGrid{dim}; kw
         celltype = Ferrite.cell_to_vtkcell(typeof(cell))
         push!(cls, MeshCell(celltype, nodes_to_vtkorder(cell)))
     end
-    coords = reshape(reinterpret(eltype(getnodes(grid,1).x), getnodes(grid)), (dim, getnnodes(grid)))
+    coords = reshape(reinterpret(get_coordinate_eltype(grid), getnodes(grid)), (dim, getnnodes(grid)))
     return vtk_grid(filename, coords, cls; kwargs...)
 end
 function WriteVTK.vtk_grid(filename::AbstractString, dh::AbstractDofHandler; kwargs...)
