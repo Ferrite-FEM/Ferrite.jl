@@ -3,8 +3,8 @@
 # - struct QuadrilateralBWG ... end
 # - struct HexahedronBWG ... end
 
-abstract type AbstractAdaptiveGrid{dim} <: AbstractGrid{dim} end
-abstract type AbstractAdaptiveCell{refshape <: AbstractRefShape} <: AbstractCell{refshape} end
+abstract type AbstractAdaptiveGrid{dim} <: Ferrite.AbstractGrid{dim} end
+abstract type AbstractAdaptiveCell{refshape <: Ferrite.AbstractRefShape} <: Ferrite.AbstractCell{refshape} end
 
 const ncorners_face3D = 4
 const ncorners_face2D = 2
@@ -16,7 +16,7 @@ function set_maxlevel(dim::Integer,maxlevel::Integer)
     _maxlevel[dim-1] = maxlevel
 end
 
-struct OctantBWG{dim, N, T} <: AbstractCell{RefHypercube{dim}}
+struct OctantBWG{dim, N, T} <: Ferrite.AbstractCell{Ferrite.RefHypercube{dim}}
     #Refinement level
     l::T
     #x,y,z \in {0,...,2^b} where (0 ≤ l ≤ b)}
@@ -305,7 +305,7 @@ function isrelevant(xyz::NTuple{dim,T},leafsuppₚ::Set{<:OctantBWG}) where {dim
     return true
 end
 
-struct OctreeBWG{dim,N,T} <: AbstractAdaptiveCell{RefHypercube{dim}}
+struct OctreeBWG{dim,N,T} <: AbstractAdaptiveCell{Ferrite.RefHypercube{dim}}
     leaves::Vector{OctantBWG{dim,N,T}}
     #maximum refinement level
     b::T
@@ -438,26 +438,26 @@ struct ForestBWG{dim, C<:OctreeBWG, T<:Real} <: AbstractAdaptiveGrid{dim}
     # Sets
     cellsets::Dict{String,Set{Int}}
     nodesets::Dict{String,Set{Int}}
-    facesets::Dict{String,Set{FaceIndex}}
-    edgesets::Dict{String,Set{EdgeIndex}}
-    vertexsets::Dict{String,Set{VertexIndex}}
+    facesets::Dict{String,Set{Ferrite.FaceIndex}}
+    edgesets::Dict{String,Set{Ferrite.EdgeIndex}}
+    vertexsets::Dict{String,Set{Ferrite.VertexIndex}}
     #Topology
     topology::ExclusiveTopology
 end
 
-function ForestBWG(grid::AbstractGrid{dim},b=_maxlevel[dim-1]) where dim
+function ForestBWG(grid::Ferrite.AbstractGrid{dim},b=_maxlevel[dim-1]) where dim
     cells = getcells(grid)
     C = eltype(cells)
     @assert isconcretetype(C)
     @assert (C == Quadrilateral && dim == 2) || (C == Hexahedron && dim == 3)
     topology = ExclusiveTopology(cells)
     cells = OctreeBWG.(grid.cells,b)
-    nodes = getnodes(grid)
-    cellsets = getcellsets(grid)
-    nodesets = getnodesets(grid)
-    facesets = getfacesets(grid)
-    edgesets = getedgesets(grid)
-    vertexsets = getvertexsets(grid)
+    nodes =      getnodes(grid)
+    cellsets =   Ferrite.getcellsets(grid)
+    nodesets =   Ferrite.getnodesets(grid)
+    facesets =   Ferrite.getfacesets(grid)
+    edgesets =   Ferrite.getedgesets(grid)
+    vertexsets = Ferrite.getvertexsets(grid)
     return ForestBWG(cells,nodes,cellsets,nodesets,facesets,edgesets,vertexsets,topology)
 end
 
@@ -506,9 +506,9 @@ function coarsen_all!(forest::ForestBWG)
     end
 end
 
-getneighborhood(forest::ForestBWG,idx) = getneighborhood(forest.topology,forest,idx)
+Ferrite.getneighborhood(forest::ForestBWG,idx) = getneighborhood(forest.topology,forest,idx)
 
-function getncells(grid::ForestBWG)
+function Ferrite.getncells(grid::ForestBWG)
     numcells = 0
     for tree in grid.cells
         numcells += length(tree)
@@ -516,7 +516,7 @@ function getncells(grid::ForestBWG)
     return numcells
 end
 
-function getcells(forest::ForestBWG{dim,C}) where {dim,C}
+function Ferrite.getcells(forest::ForestBWG{dim,C}) where {dim,C}
     treetype = C
     ncells = getncells(forest)
     nnodes = 2^dim
@@ -532,7 +532,7 @@ function getcells(forest::ForestBWG{dim,C}) where {dim,C}
     return cellvector
 end
 
-function getcells(forest::ForestBWG{dim}, cellid::Int)  where dim
+function Ferrite.getcells(forest::ForestBWG{dim}, cellid::Int)  where dim
     @warn "Slow dispatch, consider to call `getcells(forest)` once instead" maxlog=1 #TODO doc page for performance
     #TODO should nleaves be saved by forest?
     nleaves = length.(forest.cells) # cells=trees
@@ -544,8 +544,8 @@ function getcells(forest::ForestBWG{dim}, cellid::Int)  where dim
     return forest.cells[k].leaves[leafid]
 end
 
-getcelltype(grid::ForestBWG) = eltype(grid.cells)
-getcelltype(grid::ForestBWG, i::Int) = eltype(grid.cells) # assume for now same cell type TODO
+Ferrite.getcelltype(grid::ForestBWG) = eltype(grid.cells)
+Ferrite.getcelltype(grid::ForestBWG, i::Int) = eltype(grid.cells) # assume for now same cell type TODO
 
 """
     transform_pointBWG(forest, vertices) -> Vector{Vec{dim}}
@@ -1350,9 +1350,9 @@ function face_neighbor(octant::OctantBWG{2,N,T}, f::T, b::T=_maxlevel[1]) where 
 end
 face_neighbor(o::OctantBWG{dim,N,T1}, f::T2, b::T3) where {dim,N,T1<:Integer,T2<:Integer,T3<:Integer} = face_neighbor(o,T1(f),T1(b))
 
-reference_faces_bwg(::Type{RefHypercube{2}}) = ((1,3) , (2,4), (1,2), (3,4))
-reference_faces_bwg(::Type{RefHypercube{3}}) = ((1,3,5,7) , (2,4,6,8), (1,2,5,6), (3,4,7,8), (1,2,3,4), (5,6,7,8)) # p4est consistent ordering
-reference_edges_bwg(::Type{RefHypercube{3}}) = ((𝒰[1,1],𝒰[1,2]), (𝒰[2,1],𝒰[2,2]), (𝒰[3,1],𝒰[3,2]),
+reference_faces_bwg(::Type{Ferrite.RefHypercube{2}}) = ((1,3) , (2,4), (1,2), (3,4))
+reference_faces_bwg(::Type{Ferrite.RefHypercube{3}}) = ((1,3,5,7) , (2,4,6,8), (1,2,5,6), (3,4,7,8), (1,2,3,4), (5,6,7,8)) # p4est consistent ordering
+reference_edges_bwg(::Type{Ferrite.RefHypercube{3}}) = ((𝒰[1,1],𝒰[1,2]), (𝒰[2,1],𝒰[2,2]), (𝒰[3,1],𝒰[3,2]),
                                                 (𝒰[4,1],𝒰[4,2]), (𝒰[5,1],𝒰[5,2]), (𝒰[6,1],𝒰[6,2]),
                                                 (𝒰[7,1],𝒰[7,2]), (𝒰[8,1],𝒰[8,2]), (𝒰[9,1],𝒰[9,2]),
                                                 (𝒰[10,1],𝒰[10,2]), (𝒰[11,1],𝒰[11,2]), (𝒰[12,1],𝒰[12,2])) # TODO maybe remove, unnecessary, can directly use the table
@@ -1371,9 +1371,9 @@ function compute_face_orientation(forest::ForestBWG{<:Any,<:OctreeBWG{dim,<:Any,
     n_perminv = (dim == 2 ? node_map₂_inv : node_map₃_inv)
 
     f_ferrite = f_perm[f]
-    k′, f′_ferrite = getneighborhood(forest,FaceIndex(k,f_ferrite))[1]
+    k′, f′_ferrite = getneighborhood(forest,Ferrite.FaceIndex(k,f_ferrite))[1]
     f′ = f_perminv[f′_ferrite]
-    reffacenodes = reference_faces_bwg(RefHypercube{dim})
+    reffacenodes = reference_faces_bwg(Ferrite.RefHypercube{dim})
     nodes_f = [forest.cells[k].nodes[n_perm[ni]] for ni in reffacenodes[f]]
     nodes_f′ = [forest.cells[k′].nodes[n_perm[ni]] for ni in reffacenodes[f′]]
     if f > f′
@@ -1398,7 +1398,7 @@ function compute_edge_orientation(forest::ForestBWG{<:Any,<:OctreeBWG{3,<:Any,T2
     e_ferrite = e_perm[e]
     k′, e′_ferrite = forest.topology.edge_edge_neighbor[k,e_ferrite][1]
     e′ = e_perminv[e′_ferrite]
-    refedgenodes = reference_edges_bwg(RefHypercube{3})
+    refedgenodes = reference_edges_bwg(Ferrite.RefHypercube{3})
     nodes_e = ntuple(i->forest.cells[k].nodes[n_perm[refedgenodes[e][i]]],length(refedgenodes[e]))
     nodes_e′ = ntuple(i->forest.cells[k′].nodes[n_perm[refedgenodes[e′][i]]],length(refedgenodes[e′]))
     if nodes_e == nodes_e′

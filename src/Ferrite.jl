@@ -108,14 +108,10 @@ include("FEValues/face_integrals.jl")
 
 # Grid
 include("Grid/grid.jl")
-include("Grid/ncgrid.jl")
 include("Grid/topology.jl")
 include("Grid/utils.jl")
 include("Grid/grid_generators.jl")
 include("Grid/coloring.jl")
-
-# Adaptiviy
-include("Adaptivity/BWG.jl")
 
 # Dofs
 include("Dofs/DofHandler.jl")
@@ -141,5 +137,9 @@ include("PointEvalHandler.jl")
 # Other
 include("deprecations.jl")
 include("docs.jl")
+
+# Adaptiviy
+include("Adaptivity/AMR.jl")
+using .AMR
 
 end # module

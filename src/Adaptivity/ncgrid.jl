@@ -19,15 +19,15 @@ This grid serves as an entry point for non-intrusive adaptive grid libraries.
 - `conformity_info::CIT`: a container for conformity information
 - `boundary_matrix::SparseMatrixCSC{Bool,Int}`: optional, only needed by `onboundary` to check if a cell is on the boundary, see, e.g. Helmholtz example
 """
-mutable struct NonConformingGrid{dim,C<:AbstractCell,T<:Real,CIT} <: AbstractGrid{dim}
+mutable struct NonConformingGrid{dim,C<:Ferrite.AbstractCell,T<:Real,CIT} <: Ferrite.AbstractGrid{dim}
     cells::Vector{C}
     nodes::Vector{Node{dim,T}}
     # Sets
     cellsets::Dict{String,Set{Int}}
     nodesets::Dict{String,Set{Int}}
-    facesets::Dict{String,Set{FaceIndex}}
-    edgesets::Dict{String,Set{EdgeIndex}}
-    vertexsets::Dict{String,Set{VertexIndex}}
+    facesets::Dict{String,Set{Ferrite.FaceIndex}}
+    edgesets::Dict{String,Set{Ferrite.EdgeIndex}}
+    vertexsets::Dict{String,Set{Ferrite.VertexIndex}}
     conformity_info::CIT # TODO refine
     # Boundary matrix (faces per cell × cell)
     boundary_matrix::SparseMatrixCSC{Bool,Int}
@@ -38,9 +38,9 @@ function NonConformingGrid(
     nodes::Vector{Node{dim,T}};
     cellsets::Dict{String,Set{Int}}=Dict{String,Set{Int}}(),
     nodesets::Dict{String,Set{Int}}=Dict{String,Set{Int}}(),
-    facesets::Dict{String,Set{FaceIndex}}=Dict{String,Set{FaceIndex}}(),
-    edgesets::Dict{String,Set{EdgeIndex}}=Dict{String,Set{EdgeIndex}}(),
-    vertexsets::Dict{String,Set{VertexIndex}}=Dict{String,Set{VertexIndex}}(),
+    facesets::Dict{String,Set{Ferrite.FaceIndex}}=Dict{String,Set{Ferrite.FaceIndex}}(),
+    edgesets::Dict{String,Set{Ferrite.EdgeIndex}}=Dict{String,Set{Ferrite.EdgeIndex}}(),
+    vertexsets::Dict{String,Set{Ferrite.VertexIndex}}=Dict{String,Set{Ferrite.VertexIndex}}(),
     conformity_info,
     boundary_matrix::SparseMatrixCSC{Bool,Int}=spzeros(Bool, 0, 0)
     ) where {dim,C,T}
