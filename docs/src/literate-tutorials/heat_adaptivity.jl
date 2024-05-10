@@ -23,8 +23,8 @@ function assemble_cell!(ke, fe, cellvalues, ue, coords)
         dΩ = getdetJdV(cellvalues, q_point)
         for i in 1:n_basefuncs
             Nᵢ = shape_value(cellvalues, q_point, i)
-            ∇Nᵢ = shape_gradient(cellvalues, q_point, i)# shape_symmetric_gradient(cellvalues, q_point, i)
-            fe[i] += analytical_rhs(x) * Nᵢ * dΩ # add internal force to residual
+            ∇Nᵢ = shape_gradient(cellvalues, q_point, i)
+            fe[i] += analytical_rhs(x) * Nᵢ * dΩ 
             for j in 1:n_basefuncs
                 ∇Nⱼ = shape_gradient(cellvalues, q_point, j)
                 ke[i, j] += ∇Nⱼ ⋅ ∇Nᵢ * dΩ
@@ -42,7 +42,7 @@ function assemble_global!(K, f, a, dh, cellvalues)
     assembler = start_assemble(K, f)
     ## Loop over all cells
     for cell in CellIterator(dh)
-        reinit!(cellvalues, cell) # update spatial derivatives based on element coordinates
+        reinit!(cellvalues, cell) 
         @views ue = a[celldofs(cell)]
         ## Compute element contribution
         coords = getcoordinates(cell)
@@ -55,9 +55,9 @@ end
 
 function solve(grid)
     dim = 2
-    order = 1 # linear interpolation
-    ip = Lagrange{RefQuadrilateral, order}() # vector valued interpolation
-    qr = QuadratureRule{RefQuadrilateral}(2) # 1 quadrature point
+    order = 1 
+    ip = Lagrange{RefQuadrilateral, order}()
+    qr = QuadratureRule{RefQuadrilateral}(2)
     cellvalues = CellValues(qr, ip);
 
     dh = DofHandler(grid)
@@ -84,13 +84,13 @@ end
 
 function compute_fluxes(u,dh)
     ip = Lagrange{RefQuadrilateral, 1}()
-    # Normal quadrature points
+    ## Normal quadrature points
     qr = QuadratureRule{RefQuadrilateral}(2)
     cellvalues = CellValues(qr, ip);
-    # Superconvergent point
+    ## Superconvergent point
     qr_sc = QuadratureRule{RefQuadrilateral}(1)
     cellvalues_sc = CellValues(qr_sc, ip);
-    #Buffers
+    ## Buffers
     σ_gp = Vector{Vector{Vec{2,Float64}}}()
     σ_gp_loc = Vector{Vec{2,Float64}}()
     σ_gp_sc = Vector{Vector{Vec{2,Float64}}}()

@@ -33,8 +33,8 @@ function assemble_cell!(ke, fe, cellvalues, material, ue)
 
         dΩ = getdetJdV(cellvalues, q_point)
         for i in 1:n_basefuncs
-            ∇Nᵢ = shape_gradient(cellvalues, q_point, i)# shape_symmetric_gradient(cellvalues, q_point, i)
-            fe[i] += σ ⊡ ∇Nᵢ * dΩ # add internal force to residual
+            ∇Nᵢ = shape_gradient(cellvalues, q_point, i)
+            fe[i] += σ ⊡ ∇Nᵢ * dΩ
             for j in 1:n_basefuncs
                 ∇ˢʸᵐNⱼ = shape_symmetric_gradient(cellvalues, q_point, j)
                 ke[i, j] += (∂σ∂ε ⊡ ∇ˢʸᵐNⱼ) ⊡ ∇Nᵢ * dΩ
@@ -52,7 +52,7 @@ function assemble_global!(K, f, a, dh, cellvalues, material)
     assembler = start_assemble(K, f)
     ## Loop over all cells
     for cell in CellIterator(dh)
-        reinit!(cellvalues, cell) # update spatial derivatives based on element coordinates
+        reinit!(cellvalues, cell)
         @views ue = a[celldofs(cell)]
         ## Compute element contribution
         assemble_cell!(ke, fe, cellvalues, material, ue)
@@ -64,9 +64,9 @@ end
 
 function solve(grid)
     dim = 2
-    order = 1 # linear interpolation
-    ip = Lagrange{RefQuadrilateral, order}()^dim # vector valued interpolation
-    qr = QuadratureRule{RefQuadrilateral}(2) # 1 quadrature point
+    order = 1 
+    ip = Lagrange{RefQuadrilateral, order}()^dim 
+    qr = QuadratureRule{RefQuadrilateral}(2) 
     cellvalues = CellValues(qr, ip);
 
     dh = DofHandler(grid)
@@ -91,19 +91,19 @@ end
 
 function compute_fluxes(u,dh)
     ip = Lagrange{RefQuadrilateral, 1}()^2
-    # Superconvergent points
+    ## Superconvergent points
     qr = QuadratureRule{RefQuadrilateral}(1)
     cellvalues_sc = CellValues(qr, ip);
-    # "Normal" quadrature points for the fluxes
+    ## "Normal" quadrature points for the fluxes
     qr = QuadratureRule{RefQuadrilateral}(2)
     cellvalues = CellValues(qr, ip);
-    # Buffers
+    ## Buffers
     σ_gp_sc = Vector{Vector{SymmetricTensor{2,2,Float64,3}}}()
     σ_gp_sc_loc = Vector{SymmetricTensor{2,2,Float64,3}}()
     σ_gp = Vector{Vector{SymmetricTensor{2,2,Float64,3}}}()
     σ_gp_loc = Vector{SymmetricTensor{2,2,Float64,3}}()
     for (cellid,cell) in enumerate(CellIterator(dh))
-        reinit!(cellvalues, cell) # update spatial derivatives based on element coordinates
+        reinit!(cellvalues, cell)
         reinit!(cellvalues_sc, cell)
         @views ue = u[celldofs(cell)]
         for q_point in 1:getnquadpoints(cellvalues)
@@ -118,7 +118,7 @@ function compute_fluxes(u,dh)
         end
         push!(σ_gp,copy(σ_gp_loc))
         push!(σ_gp_sc,copy(σ_gp_sc_loc))
-        # Reset buffer for local points
+        ## Reset buffer for local points
         empty!(σ_gp_loc)
         empty!(σ_gp_sc_loc)
     end
@@ -146,7 +146,6 @@ function solve_adaptive(initial_grid)
             error = 0.0
             for q_point in 1:getnquadpoints(cellvalues_tensorial)
                 σ_dof_at_sc = function_value(cellvalues_tensorial, q_point, σe)
-                #error += norm((σ_dof_at_sc - σ_gp_sc[cellid][1])/σ_gp_sc[cellid][1])
                 error += norm((σ_gp_sc[cellid][1] - σ_dof_at_sc )) * getdetJdV(cellvalues_tensorial,q_point)
             end
             if error > 0.01
