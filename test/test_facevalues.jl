@@ -1,4 +1,4 @@
-@testset "FaceValues" begin
+@testset "FacetValues" begin
 for (scalar_interpol, quad_rule) in (
                                     (Lagrange{RefLine, 1}(), FaceQuadratureRule{RefLine}(2)),
                                     (Lagrange{RefLine, 2}(), FaceQuadratureRule{RefLine}(2)),
@@ -18,9 +18,9 @@ for (scalar_interpol, quad_rule) in (
         geom_interpol = scalar_interpol # Tests below assume this
         n_basefunc_base = getnbasefunctions(scalar_interpol)
         fv = if VERSION ≥ v"1.9"
-            @inferred FaceValues(quad_rule, func_interpol, geom_interpol)
+            @inferred FacetValues(quad_rule, func_interpol, geom_interpol)
         else # Type unstable on 1.6, but works at least for 1.9 and later. PR882
-            FaceValues(quad_rule, func_interpol, geom_interpol)
+            FacetValues(quad_rule, func_interpol, geom_interpol)
         end
         ndim = Ferrite.getdim(func_interpol)
         n_basefuncs = getnbasefunctions(func_interpol)
@@ -90,14 +90,14 @@ for (scalar_interpol, quad_rule) in (
             @test vol ≈ reference_face_area(func_interpol, face)
 
             # Test spatial coordinate (after reinit with ref.coords we should get back the quad_points)
-            # TODO: Renable somehow after quad rule is no longer stored in FaceValues
+            # TODO: Renable somehow after quad rule is no longer stored in FacetValues
             #for (i, qp_x) in enumerate(getpoints(quad_rule))
             #    @test spatial_coordinate(fv, i, x) ≈ qp_x
             #end
 
         end
 
-        @testset "copy(::FaceValues)" begin
+        @testset "copy(::FacetValues)" begin
             fvc = copy(fv)
             @test typeof(fv) == typeof(fvc)
 
@@ -133,15 +133,15 @@ end
 
 @testset "show" begin
     # Just smoke test to make sure show doesn't error. 
-    fv = FaceValues(FaceQuadratureRule{RefQuadrilateral}(2), Lagrange{RefQuadrilateral,2}())
+    fv = FacetValues(FaceQuadratureRule{RefQuadrilateral}(2), Lagrange{RefQuadrilateral,2}())
     showstring = sprint(show, MIME"text/plain"(), fv)
-    @test startswith(showstring, "FaceValues(scalar, rdim=2, sdim=2): 2 quadrature points per face")
+    @test startswith(showstring, "FacetValues(scalar, rdim=2, sdim=2): 2 quadrature points per face")
     @test contains(showstring, "Function interpolation: Lagrange{RefQuadrilateral, 2}()")
     @test contains(showstring, "Geometric interpolation: Lagrange{RefQuadrilateral, 1}()^2")
     fv.fqr.face_rules[1] = deepcopy(fv.fqr.face_rules[1])
     push!(Ferrite.getweights(fv.fqr.face_rules[1]), 1)
     showstring = sprint(show, MIME"text/plain"(), fv)
-    @test startswith(showstring, "FaceValues(scalar, rdim=2, sdim=2): (3, 2, 2, 2) quadrature points on each face")
+    @test startswith(showstring, "FacetValues(scalar, rdim=2, sdim=2): (3, 2, 2, 2) quadrature points on each face")
 end
 
 end # of testset

@@ -79,7 +79,7 @@ function create_grid(n)
     
     ## node-/facesets for boundary conditions
     addnodeset!(grid, "clamped", x -> x[1] ≈ 0.0)
-    addboundaryset!(grid, "traction", x -> x[1] ≈ 2.0 && norm(x[2]-0.5) <= 0.05); 
+    addfacetset!(grid, "traction", x -> x[1] ≈ 2.0 && norm(x[2]-0.5) <= 0.05); 
     return grid
 end
 #md nothing # hide
@@ -91,10 +91,10 @@ function create_values()
     qr      = QuadratureRule{RefQuadrilateral}(2)
     face_qr = FaceQuadratureRule{RefQuadrilateral}(2)
 
-    ## cell and FacetValues for u
+    ## cell and facetvalues for u
     ip = Lagrange{RefQuadrilateral,1}()^2
     cellvalues = CellValues(qr, ip)
-    FacetValues = FacetValues(face_qr, ip)
+    facetvalues = FacetValues(face_qr, ip)
     
     return cellvalues, FacetValues
 end
@@ -300,7 +300,7 @@ end
     
 # Now, we move on to the Finite Element part of the program. We use the following function to assemble our linear system.
 
-function doassemble!(cellvalues::CellValues, FacetValues::FacetValues, K::SparseMatrixCSC, grid::Grid, dh::DofHandler, mp::MaterialParameters, u, states)
+function doassemble!(cellvalues::CellValues, facetvaluesFacetValues, K::SparseMatrixCSC, grid::Grid, dh::DofHandler, mp::MaterialParameters, u, states)
     r = zeros(ndofs(dh))
     assembler = start_assemble(K, r)
     nu = getnbasefunctions(cellvalues)
@@ -351,13 +351,13 @@ function elmt!(Ke, re, element, cellvalues, FacetValues, grid, mp, ue, state)
     symmetrize_lower!(Ke)
 
     @inbounds for face in 1:nfaces(element) 
-        if onboundary(element, face) && (cellid(element), face) ∈ getboundaryset(grid, "traction")
-            reinit!(FacetValues, element, face)
+        if onboundary(element, face) && (cellid(element), face) ∈ getfacetset(grid, "traction")
+            reinit!(facetvalues, element, face)
             t = Vec((0.0, -1.0)) # force pointing downwards
-            for q_point in 1:getnquadpoints(FacetValues)
-                dΓ = getdetJdV(FacetValues, q_point)
+            for q_point in 1:getnquadpoints(facetvalues)
+                dΓ = getdetJdV(facetvalues, q_point)
                 for i in 1:n_basefuncs
-                    δu = shape_value(FacetValues, q_point, i)
+                    δu = shape_value(facetvalues, q_point, i)
                     re[i] += (δu ⋅ t) * dΓ
                 end
             end
@@ -401,7 +401,7 @@ function topopt(ra,ρ,n,filename; output=:false)
     dbc = create_bc(dh)
     
     ## cellvalues
-    cellvalues, FacetValues = create_values()
+    cellvalues, facetvalues = create_values()
     
     ## Pre-allocate solution vectors, etc.
     n_dofs = ndofs(dh) # total number of dofs

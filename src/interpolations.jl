@@ -402,6 +402,7 @@ boundarydof_indices(::Type{<:BoundaryIndex})
 boundarydof_indices(::Type{FaceIndex}) = Ferrite.facedof_indices
 boundarydof_indices(::Type{EdgeIndex}) = Ferrite.edgedof_indices
 boundarydof_indices(::Type{VertexIndex}) = Ferrite.vertexdof_indices
+boundarydof_indices(::Type{FacetIndex}) = facetdof_indices
 
 facetdof_indices(ip::InterpolationByDim{3}) = Ferrite.facedof_indices(ip)
 facetdof_indices(ip::InterpolationByDim{2}) = Ferrite.edgedof_indices(ip)
@@ -438,6 +439,7 @@ dirichlet_boundarydof_indices(::Type{<:BoundaryIndex})
 dirichlet_boundarydof_indices(::Type{FaceIndex}) = Ferrite.dirichlet_facedof_indices
 dirichlet_boundarydof_indices(::Type{EdgeIndex}) = Ferrite.dirichlet_edgedof_indices
 dirichlet_boundarydof_indices(::Type{VertexIndex}) = Ferrite.dirichlet_vertexdof_indices
+dirichlet_boundarydof_indices(::Type{FacetIndex}) = dirichlet_facetdof_indices
 
 #########################
 # DiscontinuousLagrange #

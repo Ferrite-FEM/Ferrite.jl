@@ -25,9 +25,9 @@ for computing the prescribed value. Example:
 
 ```julia
 dbc1 = Dirichlet(
-    :u,                       # Name of the field
-    getfaceset(grid, "left"), # Part of the boundary
-    x -> 1.0,                 # Function mapping coordinate to a prescribed value
+    :u,                        # Name of the field
+    getfacetset(grid, "left"), # Part of the boundary
+    x -> 1.0,                  # Function mapping coordinate to a prescribed value
 )
 ```
 
@@ -40,9 +40,9 @@ function computing the prescribed value should be of the form `f(x)` or `f(x, t)
     To apply a constraint on multiple face sets in the grid you can use `union` to join
     them, for example
     ```julia
-    left_right = union(getfaceset(grid, "left"), getfaceset(grid, "right"))
+    left_right = union(getfacetset(grid, "left"), getfacetset(grid, "right"))
     ```
-    creates a new face set containing all faces in the `"left"` and "`right`" face sets,
+    creates a new facetset containing all facets in the `"left"` and "`right`" facetsets,
     which can be passed to the `Dirichlet` constructor.
 
 By default the constraint is added to all components of the given field. To add the
@@ -52,10 +52,10 @@ vector field `:u`:
 
 ```julia
 dbc2 = Dirichlet(
-    :u,                       # Name of the field
-    getfaceset(grid, "left"), # Part of the boundary
-    x -> [0.0, 0.0],          # Function mapping coordinate to prescribed values
-    [1, 3],                   # Components
+    :u,                        # Name of the field
+    getfacetset(grid, "left"), # Part of the boundary
+    x -> [0.0, 0.0],           # Function mapping coordinate to prescribed values
+    [1, 3],                    # Components
 )
 ```
 
@@ -96,9 +96,9 @@ For complete examples that use Neumann boundary conditions, please see
 - [von-Mises-plasticity](@ref tutorial-plasticity)
 - [Hyperelasticity](@ref tutorial-hyperelasticity)
 
-### Using the `FaceIterator`
+### Using the `FacetIterator`
 A Neumann boundary contribution can be added by iterating over
-the relevant `faceset::Set{FaceIndex}` by using the [`FaceIterator`](@ref)
+the relevant `faceset::Set{FaceIndex}` by using the [`FacetIterator`](@ref)
 For a scalar field, this can be done as
 
 ```julia
@@ -108,7 +108,7 @@ fv = FacetValues(QuadratureRule{RefQuadrilateral}(2), Lagrange{RefQuadrilateral,
 f = zeros(ndofs(dh))
 fe = zeros(ndofs_per_cell(dh))
 qn = 1.0    # Normal flux
-for fc in FaceIterator(dh, getfaceset(grid, "right"))
+for fc in FacetIterator(dh, getfacetset(grid, "right"))
     reinit!(fv, fc)
     fill!(fe, 0)
     for q_point in 1:getnquadpoints(fv)
@@ -137,13 +137,13 @@ Alternatively, the following code snippet can be included in the element routine
 to evaluate the boundary integral:
 
 ```julia
-for face in 1:nfaces(cell)
-    if (cellid(cell), face) ∈ getfaceset(grid, "Neumann Boundary")
-        reinit!(FacetValues, cell, face)
-        for q_point in 1:getnquadpoints(FacetValues)
-            dΓ = getdetJdV(FacetValues, q_point)
-            for i in 1:getnbasefunctions(FacetValues)
-                δu = shape_value(FacetValues, q_point, i)
+for facet in 1:nfacets(cell)
+    if (cellid(cell), facet) ∈ getfacetset(grid, "Neumann Boundary")
+        reinit!(facetvalues, cell, facet)
+        for q_point in 1:getnquadpoints(facetvalues)
+            dΓ = getdetJdV(facetvalues, q_point)
+            for i in 1:getnbasefunctions(facetvalues)
+                δu = shape_value(facetvalues, q_point, i)
                 fe[i] += δu * qn * dΓ
             end
         end

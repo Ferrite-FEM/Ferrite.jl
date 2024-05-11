@@ -32,7 +32,7 @@
     dhs = [DofHandler(grid) for grid in (subtype_grid, reference_grid)]
     u1 = Vector{Float64}(undef, 9)
     u2 = Vector{Float64}(undef, 9)
-    ∂Ω = union(getfaceset.((reference_grid, ), ["left", "right", "top", "bottom"])...)
+    ∂Ω = union(getfacetset.((reference_grid, ), ["left", "right", "top", "bottom"])...)
     dbc = Dirichlet(:u, ∂Ω, (x, t) -> 0)
 
     function doassemble!(cellvalues::CellValues, K::SparseMatrixCSC, dh::DofHandler)

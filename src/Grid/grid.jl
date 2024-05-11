@@ -103,6 +103,12 @@ Note that the vertices are sufficient to define a face uniquely.
 """
 faces(::AbstractCell)
 
+boundary_node_function(::Type{VertexIndex}) = vertices 
+boundary_node_function(::Type{EdgeIndex}) = edges 
+boundary_node_function(::Type{FaceIndex}) = faces 
+boundary_node_function(::Type{FacetIndex}) = facets 
+
+
 """
     Ferrite.default_interpolation(::AbstractCell)::Interpolation
 
@@ -388,8 +394,19 @@ function Grid(cells::Vector{C},
               cellsets::Dict{String,Set{Int}}=Dict{String,Set{Int}}(),
               nodesets::Dict{String,Set{Int}}=Dict{String,Set{Int}}(),
               facetsets::Dict{String,Set{FacetIndex}}=Dict{String,Set{FacetIndex}}(),
+              facesets = nothing,
               vertexsets::Dict{String,Set{VertexIndex}}=Dict{String,Set{VertexIndex}}(),
               boundary_matrix::SparseMatrixCSC{Bool,Int}=spzeros(Bool, 0, 0)) where {dim,C,T}
+    if facesets !== nothing 
+        if isempty(facetsets)
+            @warn "facesets in Grid is deprecated, use facetsets instead" maxlog=1
+            for (key, set) in facesets
+                facetsets[key] = Set(FacetIndex(cellnr, facenr) for (cellnr, facenr) in set)
+            end
+        else
+            error("facesets are deprecated, use only facetsets")
+        end
+    end
     return Grid(cells, nodes, cellsets, nodesets, facetsets, vertexsets, boundary_matrix)
 end
 
@@ -422,7 +439,7 @@ If all cells have the same reference dimension, `rdim::Int` is returned.
 Otherwise, the `Symbol` `:mixed` is returned indicating a mixed-rdimensionality grid.
 """
 get_reference_dimensionality(g::AbstractGrid) = _get_reference_dimensionality(getcells(g))
-_get_reference_dimensionality(::AbstractVector{C}) where C <: AbstractCell{<:AbstractRefShape{rdim}} where rdim = (rdim,) # Fast path for single rdim inferable from eltype 
+_get_reference_dimensionality(::AbstractVector{C}) where C <: AbstractCell{<:AbstractRefShape{rdim}} where rdim = rdim # Fast path for single rdim inferable from eltype 
 function _get_reference_dimensionality(cells::AbstractVector{<:AbstractCell})
     # Could make fast-path for eltype being union of cells with different rdims, but @KristofferC recommends against that,
     # https://discourse.julialang.org/t/iterating-through-types-of-a-union-in-a-type-stable-manner/58285/3
@@ -590,18 +607,18 @@ function addcellset!(grid::AbstractGrid, name::String, f::Function; all::Bool=tr
 end
 
 """
-    addfaceset!(grid::AbstractGrid, name::String, faceid::Union{Set{FaceIndex},Vector{FaceIndex}})
-    addfaceset!(grid::AbstractGrid, name::String, f::Function; all::Bool=true) 
+    addfacetset!(grid::AbstractGrid, name::String, faceid::Union{Set{FaceIndex},Vector{FaceIndex}})
+    addfacetset!(grid::AbstractGrid, name::String, f::Function; all::Bool=true) 
 
-Adds a faceset to the grid with key `name`.
-A faceset maps a `String` key to a `Set` of tuples corresponding to `(global_cell_id, local_face_id)`.
-Facesets are used to initialize `Dirichlet` structs, that are needed to specify the boundary for the `ConstraintHandler`.
-`all=true` implies that `f(x)` must return `true` for all nodal coordinates `x` on the face if the face
+Adds a facetset to the grid with key `name`.
+A facetset maps a `String` key to a `Set` of tuples corresponding to `(global_cell_id, local_facet_id)`.
+Facetsets are used to initialize `Dirichlet` structs, that are needed to specify the boundary for the `ConstraintHandler`.
+`all=true` implies that `f(x)` must return `true` for all nodal coordinates `x` on the facet if the facet
 should be added to the set, otherwise it suffices that `f(x)` returns `true` for one node. 
 
 ```julia
-addfaceset!(grid, "right", Set(((2,2),(4,2))) #see grid manual example for reference
-addfaceset!(grid, "clamped", x -> norm(x[1]) ≈ 0.0) #see incompressible elasticity example for reference
+addfacetset!(grid, "right", Set(((2,2),(4,2))) #see grid manual example for reference
+addfacetset!(grid, "clamped", x -> norm(x[1]) ≈ 0.0) #see incompressible elasticity example for reference
 ```
 """
 addfacetset!(grid::AbstractGrid, name::String, set::Union{Set{FacetIndex},Vector{FacetIndex}}) = 
@@ -617,26 +634,37 @@ function _addset!(grid::AbstractGrid, name::String, _set, dict::Dict)
 end
 
 addfacetset!(grid::AbstractGrid, name::String, f::Function; all::Bool=true) = 
-    _addset!(grid, name, f, facets, grid.facesets, FacetIndex; all=all)
+    _addset!(grid, name, f, grid.facetsets; all=all)
 addvertexset!(grid::AbstractGrid, name::String, f::Function; all::Bool=true) = 
-    _addset!(grid, name, f, vertices, grid.vertexsets, VertexIndex; all=all)
-function _addset!(grid::AbstractGrid, name::String, f::Function, _ftype::Function, dict::Dict, _indextype::Type; all::Bool=true)
+    _addset!(grid, name, f, grid.vertexsets; all=all)
+function _addset!(grid::AbstractGrid, name::String, f::Function, dict::Dict{String, Set{BI}}; all::Bool=true) where {BI <: BoundaryIndex}
     _check_setname(dict, name)
-    _set = Set{_indextype}()
-    for (cell_idx, cell) in enumerate(getcells(grid))
-        for (face_idx, face) in enumerate(_ftype(cell))
-            pass = all
-            for node_idx in face
-                v = f(grid.nodes[node_idx].x)
-                all ? (!v && (pass = false; break)) : (v && (pass = true; break))
-            end
-            pass && push!(_set, _indextype(cell_idx, face_idx))
-        end
-    end
-    _warn_emptyset(_set, name)
-    dict[name] = _set
+    set = _create_set(f, grid, BI; all)
+    _warn_emptyset(set, name)
+    dict[name] = set
     grid
 end
+
+function _create_set(f::Function, grid::AbstractGrid, ::Type{BI}; all=true) where {BI <: BoundaryIndex}
+    set = Set{BI}()
+    for (cell_idx, cell) in enumerate(getcells(grid))
+        for (entity_idx, entity) in enumerate(boundary_node_function(BI)(cell))
+            pass = all
+            for node_idx in entity
+                v = f(get_node_coordinate(grid, node_idx))
+                all ? (!v && (pass = false; break)) : (v && (pass = true; break))
+            end
+            pass && push!(set, BI(cell_idx, entity_idx))
+        end
+    end
+    return set
+end
+
+# Following julia style-guide, should be (f, grid; kwargs...), but doesn't match add<X>set!() already defined...
+create_vertexset(grid::AbstractGrid, f::Function; kwargs...) = _create_set(f, grid, VertexIndex; kwargs...)
+create_edgeset(  grid::AbstractGrid, f::Function; kwargs...) = _create_set(f, grid, EdgeIndex;   kwargs...)
+create_faceset(  grid::AbstractGrid, f::Function; kwargs...) = _create_set(f, grid, FaceIndex;   kwargs...)
+create_facetset( grid::AbstractGrid, f::Function; kwargs...) = _create_set(f, grid, FacetIndex;  kwargs...)
 
 
 """
@@ -965,11 +993,11 @@ end
 
 # Dispatches for facets
 
-@inline facets(c::AbstractCell{<:AbstractRefShape{1}}) = vertices(c)
+@inline facets(c::AbstractCell{<:AbstractRefShape{1}}) = map(i -> (i,), vertices(c)) # facet always tuple of tuple
 @inline facets(c::AbstractCell{<:AbstractRefShape{2}}) = edges(c)
 @inline facets(c::AbstractCell{<:AbstractRefShape{3}}) = faces(c)
 
-@inline reference_facets(refshape::Type{<:AbstractRefShape{1}}) = reference_vertices(refshape)
+@inline reference_facets(refshape::Type{<:AbstractRefShape{1}}) = map(i -> (i,), reference_vertices(refshape)) 
 @inline reference_facets(refshape::Type{<:AbstractRefShape{2}}) = reference_edges(refshape)
 @inline reference_facets(refshape::Type{<:AbstractRefShape{3}}) = reference_faces(refshape)
 nfacets(::Type{T}) where {T <: AbstractRefShape} = length(reference_facets(T))

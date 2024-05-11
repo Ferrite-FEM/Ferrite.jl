@@ -144,9 +144,9 @@ end
     csv = CellValues(qr, ip)
     cvv = CellValues(qr, VectorizedInterpolation(ip))
     csv_embedded = CellValues(qr, ip, ip^3)
-    fsv = FaceValues(qr_f, ip)
-    fvv = FaceValues(qr_f, VectorizedInterpolation(ip))
-    fsv_embedded = FaceValues(qr_f, ip, ip^3)
+    fsv = FacetValues(qr_f, ip)
+    fvv = FacetValues(qr_f, VectorizedInterpolation(ip))
+    fsv_embedded = FacetValues(qr_f, ip, ip^3)
     
     x, n = valid_coordinates_and_normals(ip)
     reinit!(csv, x)

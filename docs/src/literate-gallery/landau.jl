@@ -98,8 +98,8 @@ function LandauModel(α, G, gridsize, left::Vec{DIM, T}, right::Vec{DIM, T}, elp
     startingconditions!(dofvector, dofhandler)
     boundaryconds = ConstraintHandler(dofhandler)
     #boundary conditions can be added but aren't necessary for optimization
-    #add!(boundaryconds, Dirichlet(:P, getboundaryset(grid, "left"), (x, t) -> [0.0,0.0,0.53], [1,2,3]))
-    #add!(boundaryconds, Dirichlet(:P, getboundaryset(grid, "right"), (x, t) -> [0.0,0.0,-0.53], [1,2,3]))
+    #add!(boundaryconds, Dirichlet(:P, getfacetset(grid, "left"), (x, t) -> [0.0,0.0,0.53], [1,2,3]))
+    #add!(boundaryconds, Dirichlet(:P, getfacetset(grid, "right"), (x, t) -> [0.0,0.0,-0.53], [1,2,3]))
     close!(boundaryconds)
     update!(boundaryconds, 0.0)
 

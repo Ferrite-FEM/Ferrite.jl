@@ -77,7 +77,7 @@ struct ScratchValues{T, CV <: CellValues, FV <: FacetValues, TT <: AbstractTenso
     Ke::Matrix{T}
     fe::Vector{T}
     cellvalues::CV
-    FacetValues::FV
+    facetvaluesFV
     global_dofs::Vector{Int}
     ɛ::Vector{TT}
     coordinates::Vector{Vec{dim, T}}
@@ -91,7 +91,7 @@ function create_values(interpolation_space::Interpolation{refshape}, qr_order::I
     quadrature_rule = QuadratureRule{refshape}(qr_order)
     face_quadrature_rule = FaceQuadratureRule{refshape}(qr_order)
     cellvalues = [CellValues(quadrature_rule, interpolation_space) for i in 1:Threads.nthreads()];
-    FacetValues = [FacetValues(face_quadrature_rule, interpolation_space) for i in 1:Threads.nthreads()];
+    facetvalues = [FacetValues(face_quadrature_rule, interpolation_space) for i in 1:Threads.nthreads()];
     return cellvalues, FacetValues
 end;
 
@@ -99,7 +99,7 @@ end;
 function create_scratchvalues(K, f, dh::DofHandler{dim}, ip) where {dim}
     nthreads = Threads.nthreads()
     assemblers = [start_assemble(K, f) for i in 1:nthreads]
-    cellvalues, FacetValues = create_values(ip, 2)
+    cellvalues, facetvalues = create_values(ip, 2)
 
     n_basefuncs = getnbasefunctions(cellvalues[1])
     global_dofs = [zeros(Int, ndofs_per_cell(dh)) for i in 1:nthreads]

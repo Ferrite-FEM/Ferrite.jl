@@ -86,10 +86,10 @@ end
 # to later assign Dirichlet boundary conditions
 function importTestGrid()
     grid = generate_grid(Tetrahedron, (5, 5, 5), zero(Vec{3}), ones(Vec{3}));
-    addboundaryset!(grid, "myBottom", x -> norm(x[2]) ≈ 0.0);
-    addboundaryset!(grid, "myBack", x -> norm(x[3]) ≈ 0.0);
-    addboundaryset!(grid, "myRight", x -> norm(x[1]) ≈ 1.0);
-    addboundaryset!(grid, "myLeft", x -> norm(x[1]) ≈ 0.0);
+    addfacetset!(grid, "myBottom", x -> norm(x[2]) ≈ 0.0);
+    addfacetset!(grid, "myBack", x -> norm(x[3]) ≈ 0.0);
+    addfacetset!(grid, "myRight", x -> norm(x[1]) ≈ 1.0);
+    addfacetset!(grid, "myLeft", x -> norm(x[1]) ≈ 0.0);
     return grid
 end;
 
@@ -100,7 +100,7 @@ function create_values(interpolation_u, interpolation_p)
     qr      = QuadratureRule{RefTetrahedron}(4)
     face_qr = FaceQuadratureRule{RefTetrahedron}(4)
 
-    ## cell and FacetValues for u
+    ## cell and facetvalues for u
     cellvalues_u = CellValues(qr, interpolation_u)
     FacetValues_u = FacetValues(face_qr, interpolation_u)
 
@@ -145,10 +145,10 @@ end;
 # of the loading.
 function create_bc(dh)
     dbc = ConstraintHandler(dh)
-    add!(dbc, Dirichlet(:u, getboundaryset(dh.grid, "myLeft"), (x,t) -> zero(Vec{1}), [1]))
-    add!(dbc, Dirichlet(:u, getboundaryset(dh.grid, "myBottom"), (x,t) -> zero(Vec{1}), [2]))
-    add!(dbc, Dirichlet(:u, getboundaryset(dh.grid, "myBack"), (x,t) -> zero(Vec{1}), [3]))
-    add!(dbc, Dirichlet(:u, getboundaryset(dh.grid, "myRight"), (x,t) -> t*ones(Vec{1}), [1]))
+    add!(dbc, Dirichlet(:u, getfacetset(dh.grid, "myLeft"), (x,t) -> zero(Vec{1}), [1]))
+    add!(dbc, Dirichlet(:u, getfacetset(dh.grid, "myBottom"), (x,t) -> zero(Vec{1}), [2]))
+    add!(dbc, Dirichlet(:u, getfacetset(dh.grid, "myBack"), (x,t) -> zero(Vec{1}), [3]))
+    add!(dbc, Dirichlet(:u, getfacetset(dh.grid, "myRight"), (x,t) -> t*ones(Vec{1}), [1]))
     close!(dbc)
     Ferrite.update!(dbc, 0.0)
     return dbc

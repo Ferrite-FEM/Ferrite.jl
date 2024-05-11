@@ -215,8 +215,8 @@ end
         add!(dh, :s, Lagrange{RefQuadrilateral,1}())
         close!(dh)
         ch = ConstraintHandler(dh)
-        add!(ch, Dirichlet(:v, getfaceset(grid, "left"), (x, t) -> 0, [2]))
-        add!(ch, Dirichlet(:s, getfaceset(grid, "left"), (x, t) -> 0))
+        add!(ch, Dirichlet(:v, getfacetset(grid, "left"), (x, t) -> 0, [2]))
+        add!(ch, Dirichlet(:s, getfacetset(grid, "left"), (x, t) -> 0))
         add!(ch, AffineConstraint(13, [15 => 0.5, 16 => 0.5], 0.0))
         close!(ch)
         return dh, ch
@@ -305,8 +305,8 @@ end
         add!(sdh2, :v, ip^2)
         close!(dh)
         ch = ConstraintHandler(dh)
-        add!(ch, Dirichlet(:v, getfaceset(grid, "left"), (x, t) -> 0, [2]))
-        add!(ch, Dirichlet(:s, getfaceset(grid, "left"), (x, t) -> 0))
+        add!(ch, Dirichlet(:v, getfacetset(grid, "left"), (x, t) -> 0, [2]))
+        add!(ch, Dirichlet(:s, getfacetset(grid, "left"), (x, t) -> 0))
         add!(ch, AffineConstraint(13, [15 => 0.5, 16 => 0.5], 0.0))
         close!(ch)
         return dh, ch

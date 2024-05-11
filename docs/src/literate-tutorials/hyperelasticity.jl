@@ -349,9 +349,9 @@ function solve()
 
     dbcs = ConstraintHandler(dh)
     ## Add a homogeneous boundary condition on the "clamped" edge
-    dbc = Dirichlet(:u, getboundaryset(grid, "right"), (x,t) -> [0.0, 0.0, 0.0], [1, 2, 3])
+    dbc = Dirichlet(:u, getfacetset(grid, "right"), (x,t) -> [0.0, 0.0, 0.0], [1, 2, 3])
     add!(dbcs, dbc)
-    dbc = Dirichlet(:u, getboundaryset(grid, "left"), (x,t) -> rotation(x, t), [1, 2, 3])
+    dbc = Dirichlet(:u, getfacetset(grid, "left"), (x,t) -> rotation(x, t), [1, 2, 3])
     add!(dbcs, dbc)
     close!(dbcs)
     t = 0.5
@@ -359,10 +359,10 @@ function solve()
 
     ## Neumann part of the boundary
     ΓN = union(
-        getboundaryset(grid, "top"),
-        getboundaryset(grid, "bottom"),
-        getboundaryset(grid, "front"),
-        getboundaryset(grid, "back"),
+        getfacetset(grid, "top"),
+        getfacetset(grid, "bottom"),
+        getfacetset(grid, "front"),
+        getfacetset(grid, "back"),
     )
 
     ## Pre-allocation of vectors for the solution and Newton increments

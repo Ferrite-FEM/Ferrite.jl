@@ -161,7 +161,7 @@ function create_bc(dh, grid)
     dbcs = ConstraintHandler(dh)
     ## Clamped on the left side
     dofs = [1, 2, 3]
-    dbc = Dirichlet(:u, getboundaryset(grid, "left"), (x,t) -> [0.0, 0.0, 0.0], dofs)
+    dbc = Dirichlet(:u, getfacetset(grid, "left"), (x,t) -> [0.0, 0.0, 0.0], dofs)
     add!(dbcs, dbc)
     close!(dbcs)
     return dbcs
@@ -230,16 +230,16 @@ function symmetrize_lower!(K)
 end;
 
 function doassemble_neumann!(r, dh, faceset, FacetValues, t)
-    n_basefuncs = getnbasefunctions(FacetValues)
+    n_basefuncs = getnbasefunctions(facetvalues)
     re = zeros(n_basefuncs)                      # element residual vector
-    for fc in FaceIterator(dh, faceset)
+    for fc in FacetIterator(dh, faceset)
         ## Add traction as a negative contribution to the element residual `re`:
-        reinit!(FacetValues, fc)
+        reinit!(facetvalues, fc)
         fill!(re, 0)
-        for q_point in 1:getnquadpoints(FacetValues)
-            dΓ = getdetJdV(FacetValues, q_point)
+        for q_point in 1:getnquadpoints(facetvalues)
+            dΓ = getdetJdV(facetvalues, q_point)
             for i in 1:n_basefuncs
-                δu = shape_value(FacetValues, q_point, i)
+                δu = shape_value(facetvalues, q_point, i)
                 re[i] -= (δu ⋅ t) * dΓ
             end
         end
@@ -275,7 +275,7 @@ function solve()
     dh = create_dofhandler(grid, interpolation) # JuaFEM helper function
     dbcs = create_bc(dh, grid) # create Dirichlet boundary-conditions
 
-    cellvalues, FacetValues = create_values(interpolation)
+    cellvalues, facetvalues = create_values(interpolation)
 
     ## Pre-allocate solution vectors, etc.
     n_dofs = ndofs(dh)  # total number of dofs
@@ -311,7 +311,7 @@ function solve()
             ## Tangent and residual contribution from the cells (volume integral)
             doassemble!(K, r, cellvalues, dh, material, u, states, states_old);
             ## Residual contribution from the Neumann boundary (surface integral)
-            doassemble_neumann!(r, dh, getboundaryset(grid, "right"), FacetValues, traction)
+            doassemble_neumann!(r, dh, getfacetset(grid, "right"), FacetValues, traction)
             norm_r = norm(r[Ferrite.free_dofs(dbcs)])
 
             print("Iteration: $newton_itr \tresidual: $(@sprintf("%.8f", norm_r))\n")

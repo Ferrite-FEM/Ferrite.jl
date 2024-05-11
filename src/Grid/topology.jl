@@ -75,9 +75,16 @@ mutable struct ExclusiveTopology <: AbstractTopology
     # TODO reintroduce the codimensional connectivity, e.g. 3D edge to 2D face
 end
 
-get_sdim_minus_one_neighbor(t::ExclusiveTopology, #=dim=#::Val{3}) = t.face_face_neighbor
-get_sdim_minus_one_neighbor(t::ExclusiveTopology, #=dim=#::Val{2}) = t.edge_edge_neighbor
-get_sdim_minus_one_neighbor(t::ExclusiveTopology, #=dim=#::Val{1}) = t.vertex_vertex_neighbor
+function get_facet_facet_neighborhood(t::ExclusiveTopology, g::AbstractGrid)
+    return _get_facet_facet_neighborhood(t, Val(get_reference_dimensionality(g)))
+end
+_get_facet_facet_neighborhood(t::ExclusiveTopology, #=rdim=#::Val{1}) = t.vertex_vertex_neighbor
+_get_facet_facet_neighborhood(t::ExclusiveTopology, #=rdim=#::Val{2}) = t.edge_edge_neighbor
+_get_facet_facet_neighborhood(t::ExclusiveTopology, #=rdim=#::Val{3}) = t.face_face_neighbor
+function _get_facet_facet_neighborhood(t::ExclusiveTopology, #=rdim=#::Val{:mixed})
+    throw(ArgumentError("get_facet_facet_neightborhood is only supported for grids containing cells with the same reference dimension.
+    Access the `vertex_vertex_neighbor`, `edge_edge_neighbor`, or `face_face_neighbor` fields explicitly instead."))
+end
 
 function Base.show(io::IO, ::MIME"text/plain", topology::ExclusiveTopology)
     println(io, "ExclusiveTopology\n")
@@ -345,38 +352,39 @@ function _create_skeleton(neighborhood::Matrix{EntityNeighborhood{BI}}) where BI
 end
 _create_skeleton(::Nothing) = nothing
 
+#TODO: For the specific entities the grid input is unused
 """
-    vertexskeleton(top::ExclusiveTopology) -> Vector{VertexIndex}
+    vertexskeleton(top::ExclusiveTopology, ::AbstractGrid) -> Vector{VertexIndex}
 
 Materializes the skeleton from the `neighborhood` information by returning a `Vector{VertexIndex}` 
 describing the unique vertices in the grid. (One unique vertex may have multiple `VertexIndex`, but only 
 one is included in the returned `Vector`) 
 """
-function vertexskeleton(top::ExclusiveTopology)
+function vertexskeleton(top::ExclusiveTopology, ::Union{AbstractGrid,Nothing}=nothing)
     top.vertex_skeleton = _create_skeleton(top.vertex_vertex_neighbor)
     return top.vertex_skeleton
 end
 
 """
-    edgeskeleton(top::ExclusiveTopology) -> Vector{EdgeIndex}
+    edgeskeleton(top::ExclusiveTopology, ::AbstractGrid) -> Vector{EdgeIndex}
 
 Materializes the skeleton from the `neighborhood` information by returning a `Vector{EdgeIndex}` 
 describing the unique edge in the grid. (One unique edge may have multiple `EdgeIndex`, but only 
 one is included in the returned `Vector`) 
 """
-function edgeskeleton(top::ExclusiveTopology)
+function edgeskeleton(top::ExclusiveTopology, ::Union{AbstractGrid,Nothing}=nothing)
     top.edge_skeleton = _create_skeleton(top.edge_edge_neighbor)
     return top.edge_skeleton
 end
 
 """
-    faceskeleton(top::ExclusiveTopology) -> Vector{FaceIndex}
+    faceskeleton(top::ExclusiveTopology, ::AbstractGrid) -> Vector{FaceIndex}
 
 Materializes the skeleton from the `neighborhood` information by returning a `Vector{FaceIndex}` 
 describing the unique faces in the grid. (One unique face may have multiple `FaceIndex`, but only 
 one is included in the returned `Vector`) 
 """
-function faceskeleton(top::ExclusiveTopology)
+function faceskeleton(top::ExclusiveTopology, ::Union{AbstractGrid,Nothing}=nothing)
     top.face_skeleton = _create_skeleton(top.face_face_neighbor)
     return top.face_skeleton
 end

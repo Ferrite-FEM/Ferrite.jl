@@ -33,8 +33,8 @@ end
         radius = 2*1.5
         addcellset!(grid, "cell-1", [1,])
         addcellset!(grid, "middle-cells", x -> norm(x) < radius)
-        addfaceset!(grid, "middle-faceset", x -> norm(x) < radius)
-        addfaceset!(grid, "right-faceset", getfaceset(grid, "right"))
+        addfacetset!(grid, "middle-facetset", x -> norm(x) < radius)
+        addfacetset!(grid, "right-facetset", getfacetset(grid, "right"))
         addnodeset!(grid, "middle-nodes", x -> norm(x) < radius)
 
         gridfilename = "grid-$(repr(celltype))"
@@ -61,12 +61,12 @@ end
         add!(dofhandler, :displacement, ip^dim)
         close!(dofhandler)
         ch = ConstraintHandler(dofhandler)
-        dbc = Dirichlet(:temperature, getfaceset(grid, "right-faceset"), (x,t)->1)
+        dbc = Dirichlet(:temperature, getfacetset(grid, "right-facetset"), (x,t)->1)
         add!(ch, dbc)
-        dbc = Dirichlet(:temperature, getfaceset(grid, "left"), (x,t)->4)
+        dbc = Dirichlet(:temperature, getfacetset(grid, "left"), (x,t)->4)
         add!(ch, dbc)
         for d in 1:dim
-            dbc = Dirichlet(:displacement, union(getfaceset(grid, "left")), (x,t) -> d, d)
+            dbc = Dirichlet(:displacement, union(getfacetset(grid, "left")), (x,t) -> d, d)
             add!(ch, dbc)
         end
         close!(ch)
@@ -185,10 +185,10 @@ end
     end
     @test n == div(getncells(grid)*(getncells(grid) + 1), 2)
 
-    # FaceCache
+    # FacetCache
     grid = generate_grid(Triangle, (3,3))
-    fc = FaceCache(grid)
-    faceindex = first(getfaceset(grid, "left"))
+    fc = FacetCache(grid)
+    faceindex = first(getfacetset(grid, "left"))
     cell_id, face_id = faceindex
     reinit!(fc, faceindex)
     # @test Ferrite.faceindex(fc) == faceindex
@@ -198,18 +198,18 @@ end
     @test getcoordinates(fc) == getcoordinates(grid, cell_id)
     @test length(celldofs(fc)) == 0 # Empty because no DofHandler given
 
-    # FaceIterator, also tests `reinit!(fv::FaceValues, fc::FaceCache)`
+    # FacetIterator, also tests `reinit!(fv::FacetValues, fc::FacetCache)`
     for (dim, celltype) in ((1, Line), (2, Quadrilateral), (3, Hexahedron))
         grid = generate_grid(celltype, ntuple(_ -> 3, dim))
         ip = Lagrange{Ferrite.RefHypercube{dim}, 1}()^dim
         fqr = FaceQuadratureRule{Ferrite.RefHypercube{dim}}(2)
-        fv = FaceValues(fqr, ip)
+        fv = FacetValues(fqr, ip)
         dh = DofHandler(grid); add!(dh, :u, ip); close!(dh)
-        faceset = getfaceset(grid, "right")
+        faceset = getfacetset(grid, "right")
         for dh_or_grid in (grid, dh)
-            @test first(FaceIterator(dh_or_grid, faceset)) isa FaceCache
+            @test first(FacetIterator(dh_or_grid, faceset)) isa FacetCache
             area = 0.0
-            for face in FaceIterator(dh_or_grid, faceset)
+            for face in FacetIterator(dh_or_grid, faceset)
                 reinit!(fv, face)
                 for q_point in 1:getnquadpoints(fv)
                     area += getdetJdV(fv, q_point)
@@ -266,18 +266,17 @@ end
     #Test manual add
     addcellset!(grid, "cell_set", [1]);
     addnodeset!(grid, "node_set", [1])
-    addfaceset!(grid, "face_set", [FaceIndex(1,1)])
-    addedgeset!(grid, "edge_set", [EdgeIndex(1,1)])
+    addfacetset!(grid, "face_set", [FacetIndex(1,1)])
     addvertexset!(grid, "vert_set", [VertexIndex(1,1)])
 
     #Test function add
-    addfaceset!(grid, "left_face", (x)-> x[1] ≈ 0.0)
-    addedgeset!(grid, "left_lower_edge", (x)-> x[1] ≈ 0.0 && x[3] ≈ 0.0)
+    addfacetset!(grid, "left_face", (x)-> x[1] ≈ 0.0)
+    left_lower_edge = Ferrite.create_edgeset(grid, (x)-> x[1] ≈ 0.0 && x[3] ≈ 0.0)
     addvertexset!(grid, "left_corner", (x)-> x[1] ≈ 0.0 && x[2] ≈ 0.0 && x[3] ≈ 0.0)
 
     @test 1 in Ferrite.getnodeset(grid, "node_set")
-    @test FaceIndex(1,5) in getfaceset(grid, "left_face")
-    @test EdgeIndex(1,4) in getedgeset(grid, "left_lower_edge")
+    @test FacetIndex(1,5) in getfacetset(grid, "left_face")
+    @test EdgeIndex(1,4) in left_lower_edge
     @test VertexIndex(1,1) in getvertexset(grid, "left_corner")
 
 end
@@ -467,7 +466,7 @@ end
     grid = Grid(cells, nodes)
     topology = ExclusiveTopology(grid)
 
-    @test_throws AssertionError("Face skeleton construction requires all the elements to be of the same dimensionality") Ferrite.faceskeleton(topology, grid)
+    @test_throws ArgumentError Ferrite.facetskeleton(topology, grid)
     # @test topology.face_face_neighbor[3,4] == Ferrite.EntityNeighborhood(EdgeIndex(1,2))
     # @test topology.edge_edge_neighbor[1,2] == Ferrite.EntityNeighborhood(FaceIndex(3,4))
     # # regression that it doesn't error for boundary faces, see https://github.com/Ferrite-FEM/Ferrite.jl/issues/518
@@ -485,7 +484,7 @@ end
     nodes = [Node(coord) for coord in zeros(Vec{2,Float64}, 18)]
     grid = Grid(cells, nodes)
     topology = ExclusiveTopology(grid)
-    @test_throws AssertionError("Edge skeleton construction requires all the elements to be of the same dimensionality") Ferrite.facetskeleton(topology, grid)
+    @test_throws ArgumentError Ferrite.facetskeleton(topology, grid)
 
 #
 #                   +-----+-----+-----+

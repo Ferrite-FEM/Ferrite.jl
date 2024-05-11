@@ -16,7 +16,7 @@ Dirichlet condition for the `:u` field, on the faceset called
 *Examples*
 ```jldoctest
 # Obtain the faceset from the grid
-∂Ω = getfaceset(grid, "boundary-1")
+∂Ω = getfacetset(grid, "boundary-1")
 
 # Prescribe scalar field :s on ∂Ω to sin(t)
 dbc = Dirichlet(:s, ∂Ω, (x, t) -> sin(t))
@@ -33,7 +33,7 @@ which applies the condition via [`apply!`](@ref) and/or [`apply_zero!`](@ref).
 """
 struct Dirichlet # <: Constraint
     f::Function # f(x) or f(x,t) -> value(s)
-    faces::Union{Set{Int},Set{FaceIndex},Set{EdgeIndex},Set{VertexIndex}}
+    faces::Union{Set{Int},Set{FaceIndex},Set{EdgeIndex},Set{VertexIndex},Set{FacetIndex}}
     field_name::Symbol
     components::Vector{Int} # components of the field
     local_face_dofs::Vector{Int}
@@ -465,7 +465,7 @@ end
 
 # for nodes
 function _update!(inhomogeneities::Vector{T}, f::Function, ::Set{Int}, field::Symbol, nodeidxs::Vector{Int}, globaldofs::Vector{Int},
-                  components::Vector{Int}, dh::AbstractDofHandler, FacetValues::BCValues,
+                  components::Vector{Int}, dh::AbstractDofHandler, facetvaluesBCValues,
                   dofmapping::Dict{Int,Int}, dofcoefficients::Vector{Union{Nothing,DofCoefficients{T}}}, time::Real) where T
     counter = 1
     for nodenumber in nodeidxs
@@ -1333,8 +1333,8 @@ end
 Same as [`collect_periodic_faces`](@ref) but adds all matches to the existing `face_map`.
 """
 function collect_periodic_faces!(face_map::Vector{PeriodicFacePair}, grid::Grid, mset::Union{Set{<:BoundaryIndex},String}, iset::Union{Set{<:BoundaryIndex},String}, transform::Union{Function,Nothing}=nothing; tol::Float64=1e-12)
-    mset = __to_faceset(grid, mset)
-    iset = __to_faceset(grid, iset)
+    mset = __to_facetset(grid, mset)
+    iset = __to_facetset(grid, iset)
     if transform === nothing
         # This method is destructive, hence the copy
         __collect_periodic_faces_bruteforce!(face_map, grid, copy(mset), copy(iset), #=known_order=#true, tol)
@@ -1346,15 +1346,15 @@ function collect_periodic_faces!(face_map::Vector{PeriodicFacePair}, grid::Grid,
 end
 
 function collect_periodic_faces!(face_map::Vector{PeriodicFacePair}, grid::Grid, faceset::Union{Set{<:BoundaryIndex},String,Nothing}; tol::Float64=1e-12)
-    faceset = faceset === nothing ? __collect_boundary_faces(grid) : copy(__to_faceset(grid, faceset))
+    faceset = faceset === nothing ? __collect_boundary_faces(grid) : copy(__to_facetset(grid, faceset))
     if mod(length(faceset), 2) != 0
         error("uneven number of faces")
     end
     return __collect_periodic_faces_bruteforce!(face_map, grid, faceset, faceset, #=known_order=#false, tol)
 end
 
-__to_faceset(_, set::Set{<:BoundaryIndex}) = set
-__to_faceset(grid, set::String) = getfaceset(grid, set)
+__to_facetset(_, set::Set{<:BoundaryIndex}) = set
+__to_facetset(grid, set::String) = getfacetset(grid, set)
 function __collect_boundary_faces(grid::Grid{dim}) where dim
     BIndex = (dim==1 ? VertexIndex : (dim==2 ? EdgeIndex : FaceIndex)) #TODO
     candidates = Dict{Tuple, BIndex}()

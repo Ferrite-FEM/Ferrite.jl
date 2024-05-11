@@ -309,10 +309,10 @@ function setup_mean_constraint(dh, fvp)
     assembler = start_assemble()
     ## All external boundaries
     set = union(
-        getboundaryset(dh.grid, "Γ1"),
-        getboundaryset(dh.grid, "Γ2"),
-        getboundaryset(dh.grid, "Γ3"),
-        getboundaryset(dh.grid, "Γ4"),
+        getfacetset(dh.grid, "Γ1"),
+        getfacetset(dh.grid, "Γ2"),
+        getfacetset(dh.grid, "Γ3"),
+        getfacetset(dh.grid, "Γ4"),
     )
     ## Allocate buffers
     range_p = dof_range(dh, :p)
@@ -379,7 +379,7 @@ function setup_constraints(dh, fvp)
     periodic = PeriodicDirichlet(:u, periodic_faces, R, [1, 2])
     add!(ch, periodic)
     ## Dirichlet BC
-    Γ24 = union(getboundaryset(dh.grid, "Γ2"), getboundaryset(dh.grid, "Γ4"))
+    Γ24 = union(getfacetset(dh.grid, "Γ2"), getfacetset(dh.grid, "Γ4"))
     dbc = Dirichlet(:u, Γ24, (x, t) -> [0, 0], [1, 2])
     add!(ch, dbc)
     ## Compute mean value constraint and add it
@@ -460,8 +460,8 @@ end
 function check_mean_constraint(dh, fvp, u)                                  #src
     ## All external boundaries                                              #src
     set = union(                                                            #src
-        getboundaryset(dh.grid, "Γ1"), getboundaryset(dh.grid, "Γ2"),               #src
-        getboundaryset(dh.grid, "Γ3"), getboundaryset(dh.grid, "Γ4"),               #src
+        getfacetset(dh.grid, "Γ1"), getfacetset(dh.grid, "Γ2"),               #src
+        getfacetset(dh.grid, "Γ3"), getfacetset(dh.grid, "Γ4"),               #src
     )                                                                       #src
     range_p = dof_range(dh, :p)                                             #src
     cc = CellCache(dh)                                                      #src

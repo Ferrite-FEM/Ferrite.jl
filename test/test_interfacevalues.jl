@@ -138,10 +138,6 @@
             faces_indices = Ferrite.reference_facets(Ferrite.getrefshape(Ferrite.default_interpolation(typeof(cell))))
             node_ids = Ferrite.get_node_ids(cell)
             cellfacets = Ferrite.facets(cell)
-            if dim == 1 # change vertices from (1, 2) to ((1,),(2,))
-                cellfacets = ntuple(i->(cellfacets[i],), length(cellfacets))
-                faces_indices = ntuple(i->(faces_indices[i],), length(faces_indices))
-            end
             @test getindex.(Ref(node_ids), collect.(faces_indices)) == cellfacets == getindex.(Ref(node_ids), collect.(geom_ip_faces_indices))
         end
         @testset "error paths" begin
@@ -187,7 +183,7 @@
             test_interfacevalues(grid, iv; tol = 5*eps(Float64))
         end
     end
-    # @testset "Mixed elements 2D grids" begin # TODO: this shouldn't work because it should change the FaceValues object
+    # @testset "Mixed elements 2D grids" begin # TODO: this shouldn't work because it should change the FacetValues object
     #     dim = 2
     #     nodes = [Node((-1.0, 0.0)), Node((0.0, 0.0)), Node((1.0, 0.0)), Node((-1.0, 1.0)), Node((0.0, 1.0))]
     #     cells = [
@@ -243,7 +239,7 @@
         if hasmethod(pointer, Tuple{typeof(v)})
             @test pointer(v) != pointer(vc)
         end
-        v isa FaceValues && continue
+        v isa FacetValues && continue
         for fname in fieldnames(typeof(vc))
             v2 = getfield(v, fname)
             v2 isa Ferrite.ScalarWrapper && continue

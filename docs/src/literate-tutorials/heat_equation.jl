@@ -84,10 +84,10 @@ ch = ConstraintHandler(dh);
 # homogeneous Dirichlet boundary conditions on the whole boundary, i.e.
 # the `union` of all the face sets on the boundary.
 ∂Ω = union(
-    getboundaryset(grid, "left"),
-    getboundaryset(grid, "right"),
-    getboundaryset(grid, "top"),
-    getboundaryset(grid, "bottom"),
+    getfacetset(grid, "left"),
+    getfacetset(grid, "right"),
+    getfacetset(grid, "top"),
+    getfacetset(grid, "bottom"),
 );
 
 # Now we are set up to define our constraint. We specify which field

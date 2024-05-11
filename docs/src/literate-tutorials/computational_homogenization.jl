@@ -210,23 +210,18 @@ grid = togrid("periodic-rve.msh") #src
 
 # Temp fix for FerriteGmsh
 function FerriteGmsh.tofacesets(boundarydict::Dict{String,Vector}, elements::Vector{<:Ferrite.AbstractCell})
-    faces = Ferrite.facets.(elements)
-    facesets = Dict{String,Set{FaceIndex}}()
-    for (boundaryname, boundaryfaces) in boundarydict
-        facesettuple = Set{FaceIndex}()
-        for boundaryface in boundaryfaces
-            FerriteGmsh._add_to_facesettuple!(facesettuple, boundaryface, faces)
+    facets = Ferrite.facets.(elements)
+    facetsets = Dict{String,Set{FacetIndex}}()
+    for (boundaryname, boundaryfacets) in boundarydict
+        facetsettuple = Set{FaceIndex}()
+        for boundaryfacet in boundaryfacets
+            FerriteGmsh._add_to_facesettuple!(facetsettuple, boundaryfacet, facets)
         end
-        facesets[boundaryname] = facesettuple
+        facesets[boundaryname] = facetsettuple
     end
-    return facesets
+    return facetsets
 end
-for setname in ["left", "right", "top", "bottom"]
-    faceset = grid.facesets[setname]
-    edgeset = Set([EdgeIndex(f[1], f[2]) for f in faceset])
-    grid.edgesets[setname] = edgeset
-    delete!(grid.facesets, setname)
-end
+
 
 # Next we construct the interpolation and quadrature rule, and combining them into
 # cellvalues as usual:
@@ -251,7 +246,7 @@ close!(dh);
 ch_dirichlet = ConstraintHandler(dh)
 dirichlet = Dirichlet(
     :u,
-    union(getboundaryset.(Ref(grid), ["left", "right", "top", "bottom"])...),
+    union(getfacetset.(Ref(grid), ["left", "right", "top", "bottom"])...),
     (x, t) ->  [0, 0],
     [1, 2]
 )

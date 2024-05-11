@@ -1,25 +1,25 @@
-# Defines InterFacetValues and common methods
+# Defines InterfaceValues and common methods
 """
-    InterFacetValues
+    InterfaceValues
 
-An `InterFacetValues` object facilitates the process of evaluating values, averages, jumps
+An `InterfaceValues` object facilitates the process of evaluating values, averages, jumps
 and gradients of shape functions and function on the interfaces between elements.
 
 The first element of the interface is denoted "here" and the second element "there".
 
 **Constructors**
-* `InterFacetValues(qr::FaceQuadratureRule, ip::Interpolation)`: same quadrature rule and
+* `InterfaceValues(qr::FaceQuadratureRule, ip::Interpolation)`: same quadrature rule and
   interpolation on both sides, default linear Lagrange geometric interpolation.
-* `InterFacetValues(qr::FaceQuadratureRule, ip::Interpolation, ip_geo::Interpolation)`: same
+* `InterfaceValues(qr::FaceQuadratureRule, ip::Interpolation, ip_geo::Interpolation)`: same
   as above but with given geometric interpolation.
-* `InterFacetValues(qr_here::FaceQuadratureRule, ip_here::Interpolation, qr_there::FaceQuadratureRule, ip_there::Interpolation)`:
+* `InterfaceValues(qr_here::FaceQuadratureRule, ip_here::Interpolation, qr_there::FaceQuadratureRule, ip_there::Interpolation)`:
   different quadrature rule and interpolation on the two sides, default linear Lagrange
   geometric interpolation.
-* `InterFacetValues(qr_here::FaceQuadratureRule, ip_here::Interpolation, ip_geo_here::Interpolation, qr_there::FaceQuadratureRule, ip_there::Interpolation, ip_geo_there::Interpolation)`:
+* `InterfaceValues(qr_here::FaceQuadratureRule, ip_here::Interpolation, ip_geo_here::Interpolation, qr_there::FaceQuadratureRule, ip_there::Interpolation, ip_geo_there::Interpolation)`:
   same as above but with given geometric interpolation.
-* `InterFacetValues(fv::FacetValues)`: quadrature rule and interpolations from face values
+* `InterfaceValues(fv::FacetValues)`: quadrature rule and interpolations from face values
   (same on both sides).
-* `InterFacetValues(fv_here::FacetValues, fv_there::FacetValues)`: quadrature rule and
+* `InterfaceValues(fv_here::FacetValues, fv_there::FacetValues)`: quadrature rule and
   interpolations from the face values.
 
 **Associated methods:**
@@ -45,80 +45,80 @@ The first element of the interface is denoted "here" and the second element "the
 * [`function_curl`](@ref)
 * [`spatial_coordinate`](@ref)
 """
-InterFacetValues
+InterfaceValues
 
-struct InterFacetValues{FVA <: FacetValues, FVB <: FacetValues} <: AbstractValues
+struct InterfaceValues{FVA <: FacetValues, FVB <: FacetValues} <: AbstractValues
     here::FVA
     there::FVB
-    function InterFacetValues{FVA, FVB}(here::FVA, there::FVB) where {FVA, FVB}
+    function InterfaceValues{FVA, FVB}(here::FVA, there::FVB) where {FVA, FVB}
         # TODO: check that fields don't alias
         return new{FVA, FVB}(here, there)
     end
 end
 
-function InterFacetValues(
+function InterfaceValues(
         qr_here::FaceQuadratureRule, ip_here::Interpolation, ipg_here::Interpolation,
         qr_there::FaceQuadratureRule, ip_there::Interpolation, ipg_there::Interpolation
         )
     # FacetValues constructor enforces that refshape matches for all arguments
     here = FacetValues(qr_here, ip_here, ipg_here)
     there = FacetValues(qr_there, ip_there, ipg_there)
-    return InterFacetValues{typeof(here), typeof(there)}(here, there)
+    return InterfaceValues{typeof(here), typeof(there)}(here, there)
 end
 
 # Same on both sides, default geometric mapping
-InterFacetValues(qr_here::FaceQuadratureRule, ip_here::Interpolation) =
-    InterFacetValues(qr_here, ip_here, deepcopy(qr_here), ip_here)
+InterfaceValues(qr_here::FaceQuadratureRule, ip_here::Interpolation) =
+    InterfaceValues(qr_here, ip_here, deepcopy(qr_here), ip_here)
 # Same on both sides, given geometric mapping
-InterFacetValues(qr_here::FaceQuadratureRule, ip_here::Interpolation, ipg_here::Interpolation) =
-    InterFacetValues(qr_here, ip_here, ipg_here, deepcopy(qr_here), ip_here, ipg_here)
+InterfaceValues(qr_here::FaceQuadratureRule, ip_here::Interpolation, ipg_here::Interpolation) =
+    InterfaceValues(qr_here, ip_here, ipg_here, deepcopy(qr_here), ip_here, ipg_here)
 # Different on both sides, default geometric mapping
-function InterFacetValues(
+function InterfaceValues(
         qr_here::FaceQuadratureRule, ip_here::Interpolation,
         qr_there::FaceQuadratureRule, ip_there::Interpolation,
     )
-    return InterFacetValues(
+    return InterfaceValues(
         qr_here, ip_here, default_geometric_interpolation(ip_here),
         qr_there, ip_there, default_geometric_interpolation(ip_there),
     )
 end
 # From FaceValue(s)
-InterFacetValues(FacetValues_here::FVA, FacetValues_there::FVB = deepcopy(FacetValues_here)) where {FVA <: FacetValues, FVB <: FacetValues} =
-    InterFacetValues{FVA,FVB}(FacetValues_here, FacetValues_there)
+InterfaceValues(FacetValues_here::FVA, FacetValues_there::FVB = deepcopy(FacetValues_here)) where {FVA <: FacetValues, FVB <: FacetValues} =
+    InterfaceValues{FVA,FVB}(FacetValues_here, FacetValues_there)
 
-function Base.copy(iv::InterFacetValues)
-    return InterFacetValues(copy(iv.here), copy(iv.there))
+function Base.copy(iv::InterfaceValues)
+    return InterfaceValues(copy(iv.here), copy(iv.there))
 end
 
-function getnbasefunctions(iv::InterFacetValues)
+function getnbasefunctions(iv::InterfaceValues)
     return getnbasefunctions(iv.here) + getnbasefunctions(iv.there)
 end
 
 """
-    getnquadpoints(iv::InterFacetValues)
+    getnquadpoints(iv::InterfaceValues)
 
 Return the number of quadrature points on the interface for the current (most recently
 [`reinit!`](@ref)ed) interface.
 """
-getnquadpoints(iv::InterFacetValues) = getnquadpoints(iv.here)
+getnquadpoints(iv::InterfaceValues) = getnquadpoints(iv.here)
 
-@propagate_inbounds function getdetJdV(iv::InterFacetValues, q_point::Int)
+@propagate_inbounds function getdetJdV(iv::InterfaceValues, q_point::Int)
     return getdetJdV(iv.here, q_point)
 end
 
 """
     reinit!(
-        iv::InterFacetValues,
+        iv::InterfaceValues,
         cell_here::AbstractCell, coords_here::AbstractVector{Vec{dim, T}}, face_here::Int,
         cell_there::AbstractCell, coords_there::AbstractVector{Vec{dim, T}}, face_there::Int
     )
 
-Update the [`InterFacetValues`](@ref) for the interface between `cell_here` (with cell
+Update the [`InterfaceValues`](@ref) for the interface between `cell_here` (with cell
 coordinates `coords_here`) and `cell_there` (with cell coordinates `coords_there`).
 `face_here` and `face_there` are the (local) face numbers for the respective cell.
 """
 function reinit!(
-        iv::InterFacetValues,
+        iv::InterfaceValues,
         cell_here::AbstractCell, coords_here::AbstractVector{Vec{dim, T}}, face_here::Int,
         cell_there::AbstractCell, coords_there::AbstractVector{Vec{dim, T}}, face_there::Int
     ) where {dim, T}
@@ -145,20 +145,20 @@ function reinit!(
 end
 
 """
-    getnormal(iv::InterFacetValues, qp::Int; here::Bool=true)
+    getnormal(iv::InterfaceValues, qp::Int; here::Bool=true)
 
 Return the normal vector in the quadrature point `qp` on the interface. If `here = true`
 (default) the outward normal to the "here" element is returned, otherwise the outward normal
 to the "there" element.
 """
-function getnormal(iv::InterFacetValues, qp::Int; here::Bool=true)
+function getnormal(iv::InterfaceValues, qp::Int; here::Bool=true)
     # TODO: Remove the `here` kwarg and let user use `- getnormal(iv, qp)` instead?
     return getnormal(here ? iv.here : iv.there, qp)
 end
 
 """
-    function_value(iv::InterFacetValues, q_point::Int, u; here::Bool)
-    function_value(iv::InterFacetValues, q_point::Int, u, dof_range_here, dof_range_there; here::Bool)
+    function_value(iv::InterfaceValues, q_point::Int, u; here::Bool)
+    function_value(iv::InterfaceValues, q_point::Int, u, dof_range_here, dof_range_there; here::Bool)
 
 Compute the value of the function in quadrature point `q_point` on the "here" (`here=true`)
 or "there" (`here=false`) side of the interface. `u_here` and `u_there` are the values of
@@ -176,12 +176,12 @@ where ``u_i`` are the value of ``u`` in the nodes. For a vector valued function 
 ``\\mathbf{u}(\\mathbf{x}) = \\sum\\limits_{i = 1}^n N_i (\\mathbf{x}) \\mathbf{u}_i`` where ``\\mathbf{u}_i`` are the
 nodal values of ``\\mathbf{u}``.
 """
-function_value(::InterFacetValues, ::Int, args...; kwargs...)
+function_value(::InterfaceValues, ::Int, args...; kwargs...)
 
 
 """
-    function_gradient(iv::InterFacetValues, q_point::Int, u; here::Bool)
-    function_gradient(iv::InterFacetValues, q_point::Int, u, dof_range_here, dof_range_there; here::Bool)
+    function_gradient(iv::InterfaceValues, q_point::Int, u; here::Bool)
+    function_gradient(iv::InterfaceValues, q_point::Int, u, dof_range_here, dof_range_there; here::Bool)
 
 Compute the gradient of the function in a quadrature point. `u` is a vector of scalar values for the degrees of freedom.
 This function can be used with a single `u` vector containing the dofs of both elements of the interface or
@@ -198,10 +198,10 @@ For a vector valued function with use of `ScalarValues` the gradient is computed
 ``\\mathbf{\\nabla} \\mathbf{u}(\\mathbf{x}) = \\sum\\limits_{i = 1}^n \\mathbf{u}_i \\otimes \\mathbf{\\nabla} N_i (\\mathbf{x})``
 where ``\\mathbf{u}_i`` are the nodal values of ``\\mathbf{u}``.
 """
-function_gradient(::InterFacetValues, ::Int, args...; kwargs...)
+function_gradient(::InterfaceValues, ::Int, args...; kwargs...)
 
 """
-    shape_value_average(iv::InterFacetValues, qp::Int, i::Int)
+    shape_value_average(iv::InterfaceValues, qp::Int, i::Int)
 
 Compute the average of the value of shape function `i` at quadrature point `qp` across the
 interface.
@@ -209,20 +209,20 @@ interface.
 function shape_value_average end
 
 """
-    shape_value_jump(iv::InterFacetValues, qp::Int, i::Int)
+    shape_value_jump(iv::InterfaceValues, qp::Int, i::Int)
 
 Compute the jump of the value of shape function `i` at quadrature point `qp` across the
 interface.
 
 This function uses the definition ``\\llbracket \\vec{v} \\rrbracket=\\vec{v}^\\text{here} -\\vec{v}^\\text{there}``. to obtain the form
 ``\\llbracket \\vec{v} \\rrbracket=\\vec{v}^\\text{there} ⋅ \\vec{n}^\\text{there} + \\vec{v}^\\text{here} ⋅ \\vec{n}^\\text{here}``
-multiply by the outward facing normal to the first element's side of the interface (which is the default normal for [`getnormal`](@ref) with [`InterFacetValues`](@ref)).
+multiply by the outward facing normal to the first element's side of the interface (which is the default normal for [`getnormal`](@ref) with [`InterfaceValues`](@ref)).
 
 """
 function shape_value_jump end
 
 """
-    shape_gradient_average(iv::InterFacetValues, qp::Int, i::Int)
+    shape_gradient_average(iv::InterfaceValues, qp::Int, i::Int)
 
 Compute the average of the gradient of shape function `i` at quadrature point `qp` across
 the interface.
@@ -230,14 +230,14 @@ the interface.
 function shape_gradient_average end
 
 """
-    shape_gradient_jump(iv::InterFacetValues, qp::Int, i::Int)
+    shape_gradient_jump(iv::InterfaceValues, qp::Int, i::Int)
 
 Compute the jump of the gradient of shape function `i` at quadrature point `qp` across the
 interface.
 
 This function uses the definition ``\\llbracket \\vec{v} \\rrbracket=\\vec{v}^\\text{here} -\\vec{v}^\\text{there}``. to obtain the form
 ``\\llbracket \\vec{v} \\rrbracket=\\vec{v}^\\text{there} ⋅ \\vec{n}^\\text{there} + \\vec{v}^\\text{here} ⋅ \\vec{n}^\\text{here}``
-multiply by the outward facing normal to the first element's side of the interface (which is the default normal for [`getnormal`](@ref) with [`InterFacetValues`](@ref)).
+multiply by the outward facing normal to the first element's side of the interface (which is the default normal for [`getnormal`](@ref) with [`InterfaceValues`](@ref)).
 """
 function shape_gradient_jump end
 
@@ -246,7 +246,7 @@ for (func,                      f_,              f_type) in (
     (:shape_gradient,           :shape_gradient, :shape_gradient_type),
 )
     @eval begin
-        function $(func)(iv::InterFacetValues, qp::Int, i::Int; here::Bool)
+        function $(func)(iv::InterfaceValues, qp::Int, i::Int; here::Bool)
             nbf = getnbasefunctions(iv)
             nbf_a = getnbasefunctions(iv.here)
             if i <= nbf_a
@@ -272,7 +272,7 @@ for (func,                      f_,               is_avg) in (
     (:shape_gradient_jump,      :shape_gradient,  false),
 )
     @eval begin
-        function $(func)(iv::InterFacetValues, qp::Int, i::Int)
+        function $(func)(iv::InterfaceValues, qp::Int, i::Int)
             f_here = $(f_)(iv, qp, i; here = true)
             f_there = $(f_)(iv, qp, i; here = false)
             return $(is_avg ? :((f_here + f_there) / 2) : :(f_here - f_there))
@@ -281,42 +281,42 @@ for (func,                      f_,               is_avg) in (
 end
 
 """
-    function_value_average(iv::InterFacetValues, q_point::Int, u)
-    function_value_average(iv::InterFacetValues, q_point::Int, u, dof_range_here, dof_range_there)
+    function_value_average(iv::InterfaceValues, q_point::Int, u)
+    function_value_average(iv::InterfaceValues, q_point::Int, u, dof_range_here, dof_range_there)
 
 Compute the average of the function value at the quadrature point on the interface.
 """
 function function_value_average end
 
 """
-    function_value_jump(iv::InterFacetValues, q_point::Int, u)
-    function_value_jump(iv::InterFacetValues, q_point::Int, u, dof_range_here, dof_range_there)
+    function_value_jump(iv::InterfaceValues, q_point::Int, u)
+    function_value_jump(iv::InterfaceValues, q_point::Int, u, dof_range_here, dof_range_there)
 
 Compute the jump of the function value at the quadrature point over the interface.
 
 This function uses the definition ``\\llbracket \\vec{v} \\rrbracket=\\vec{v}^\\text{here} -\\vec{v}^\\text{there}``. to obtain the form
 ``\\llbracket \\vec{v} \\rrbracket=\\vec{v}^\\text{there} ⋅ \\vec{n}^\\text{there} + \\vec{v}^\\text{here} ⋅ \\vec{n}^\\text{here}``
-multiply by the outward facing normal to the first element's side of the interface (which is the default normal for [`getnormal`](@ref) with [`InterFacetValues`](@ref)).
+multiply by the outward facing normal to the first element's side of the interface (which is the default normal for [`getnormal`](@ref) with [`InterfaceValues`](@ref)).
 """
 function function_value_jump end
 
 """
-    function_gradient_average(iv::InterFacetValues, q_point::Int, u)
-    function_gradient_average(iv::InterFacetValues, q_point::Int, u, dof_range_here, dof_range_there)
+    function_gradient_average(iv::InterfaceValues, q_point::Int, u)
+    function_gradient_average(iv::InterfaceValues, q_point::Int, u, dof_range_here, dof_range_there)
 
 Compute the average of the function gradient at the quadrature point on the interface.
 """
 function function_gradient_average end
 
 """
-    function_gradient_jump(iv::InterFacetValues, q_point::Int, u)
-    function_gradient_jump(iv::InterFacetValues, q_point::Int, u, dof_range_here, dof_range_there)
+    function_gradient_jump(iv::InterfaceValues, q_point::Int, u)
+    function_gradient_jump(iv::InterfaceValues, q_point::Int, u, dof_range_here, dof_range_there)
 
 Compute the jump of the function gradient at the quadrature point over the interface.
 
 This function uses the definition ``\\llbracket \\vec{v} \\rrbracket=\\vec{v}^\\text{here} -\\vec{v}^\\text{there}``. to obtain the form
 ``\\llbracket \\vec{v} \\rrbracket=\\vec{v}^\\text{there} ⋅ \\vec{n}^\\text{there} + \\vec{v}^\\text{here} ⋅ \\vec{n}^\\text{here}``
-multiply by the outward facing normal to the first element's side of the interface (which is the default normal for [`getnormal`](@ref) with [`InterFacetValues`](@ref)).
+multiply by the outward facing normal to the first element's side of the interface (which is the default normal for [`getnormal`](@ref) with [`InterfaceValues`](@ref)).
 """
 function function_gradient_jump end
 
@@ -326,7 +326,7 @@ for (func,                          ) in (
 )
     @eval begin
         function $(func)(
-                iv::InterFacetValues, q_point::Int, u::AbstractVector;
+                iv::InterfaceValues, q_point::Int, u::AbstractVector;
                 here::Bool
             )
             @boundscheck checkbounds(u, 1:getnbasefunctions(iv))
@@ -339,7 +339,7 @@ for (func,                          ) in (
             end
         end
         function $(func)(
-                iv::InterFacetValues, q_point::Int,
+                iv::InterfaceValues, q_point::Int,
                 u::AbstractVector,
                 dof_range_here::AbstractUnitRange{Int}, dof_range_there::AbstractUnitRange{Int};
                 here::Bool
@@ -362,7 +362,7 @@ for (func,                          f_,                     is_avg) in (
     (:function_gradient_jump,       :function_gradient,     false),
 )
     @eval begin
-        function $(func)(iv::InterFacetValues, qp::Int, u::AbstractVector)
+        function $(func)(iv::InterfaceValues, qp::Int, u::AbstractVector)
             @boundscheck checkbounds(u, getnbasefunctions(iv))
             dof_range_here = 1:getnbasefunctions(iv.here)
             dof_range_there = (1:getnbasefunctions(iv.there)) .+ getnbasefunctions(iv.here)
@@ -371,7 +371,7 @@ for (func,                          f_,                     is_avg) in (
             return $(is_avg ? :((f_here + f_there) / 2) : :(f_here - f_there))
         end
         function $(func)(
-                iv::InterFacetValues, qp::Int,
+                iv::InterfaceValues, qp::Int,
                 u::AbstractVector,
                 dof_range_here::AbstractUnitRange{Int}, dof_range_there::AbstractUnitRange{Int},
             )
@@ -383,7 +383,7 @@ for (func,                          f_,                     is_avg) in (
 end
 
 function spatial_coordinate(
-        iv::InterFacetValues, q_point::Int,
+        iv::InterfaceValues, q_point::Int,
         x_here::AbstractVector{<:Vec}, x_there::AbstractVector{<:Vec}; here::Bool,
     )
     if here
@@ -578,8 +578,8 @@ function transform_interface_points!(dst::Vector{Vec{2, Float64}}, points::Vecto
     return nothing
 end
 
-function Base.show(io::IO, m::MIME"text/plain", iv::InterFacetValues)
-    println(io, "InterFacetValues with")
+function Base.show(io::IO, m::MIME"text/plain", iv::InterfaceValues)
+    println(io, "InterfaceValues with")
     print(io, "{Here} ")
     show(io,m,iv.here)
     println(io)

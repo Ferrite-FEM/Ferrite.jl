@@ -46,13 +46,13 @@ Ferrite.getcurrentface
 getnormal
 ```
 
-## [InterFacetValues](@id reference-interFacetValues)
+## [InterfaceValues](@id reference-interfacevalues)
 
-All of the methods for [`FacetValues`](@ref) apply for `InterFacetValues` as well.
-In addition, there are some methods that are unique for `InterFacetValues`:
+All of the methods for [`FacetValues`](@ref) apply for `InterfaceValues` as well.
+In addition, there are some methods that are unique for `InterfaceValues`:
 
 ```@docs
-InterFacetValues
+InterfaceValues
 shape_value_average
 shape_value_jump
 shape_gradient_average

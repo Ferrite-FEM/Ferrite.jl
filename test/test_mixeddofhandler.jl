@@ -295,8 +295,8 @@ function test_2_element_heat_eq()
 
     # Create two Dirichlet boundary conditions - one for each field.
     ch = ConstraintHandler(dh);
-    ∂Ω1 = getfaceset(grid, "left")
-    ∂Ω2 = getfaceset(grid, "right")
+    ∂Ω1 = getfacetset(grid, "left")
+    ∂Ω2 = getfacetset(grid, "right")
     dbc1 = Dirichlet(:u, ∂Ω1, (x, t) -> 0)
     dbc2 = Dirichlet(:u, ∂Ω2, (x, t) -> 0)
     add!(ch, dbc1);
@@ -492,7 +492,7 @@ function test_subparametric_quad()
     close!(dh)
     
     ch = ConstraintHandler(dh)
-    dbc1 = Dirichlet(:u, getfaceset(grid, "left"), (x, t) -> 0.0, 2)
+    dbc1 = Dirichlet(:u, getfacetset(grid, "left"), (x, t) -> 0.0, 2)
     add!(ch, dbc1)
     close!(ch)
     update!(ch, 1.0)
@@ -511,7 +511,7 @@ function test_subparametric_triangle()
     close!(dh)
     
     ch = ConstraintHandler(dh)
-    dbc1 = Dirichlet(:u, getfaceset(grid, "left"), (x, t) -> 0.0, 2)
+    dbc1 = Dirichlet(:u, getfacetset(grid, "left"), (x, t) -> 0.0, 2)
     add!(ch, dbc1)
     close!(ch)
     update!(ch, 1.0)

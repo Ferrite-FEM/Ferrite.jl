@@ -205,7 +205,7 @@ function reinit!(cache::InterfaceCache, face_a::BoundaryIndex, face_b::BoundaryI
     return cache
 end
 
-function reinit!(iv::InterFacetValues, ic::InterfaceCache)
+function reinit!(iv::InterfaceValues, ic::InterfaceCache)
     return reinit!(iv,
         getcells(ic.a.cc.grid, cellid(ic.a)),
         getcoordinates(ic.a),
@@ -369,9 +369,9 @@ end
 
 # Iterator interface
 function Base.iterate(ii::InterfaceIterator{<:Any, <:Grid{sdim}}, state...) where sdim
-    neighborhood = get_sdim_minus_one_neighbor(ii.topology, Val(sdim))
+    neighborhood = get_facet_facet_neighborhood(ii.topology, ii.grid) # TODO: This could be moved to InterfaceIterator constructor
     while true
-        it = iterate(sdim_minus_one_skeleton(ii.topology, ii.grid), state...)
+        it = iterate(facetskeleton(ii.topology, ii.grid), state...)   # TODO: facetskeleton could be saved in InterfaceIterator constructor. 
         it === nothing && return nothing
         face_a, state = it
         if isempty(neighborhood[face_a[1], face_a[2]])

@@ -38,23 +38,23 @@ add!(dh, :u, ip^3)
 add!(dh, :θ, ip^2)
 close!(dh)
 
-# In order to apply our boundary conditions, we first need to create some edge- and vertex-sets. This 
-# is done with `addedgeset!` and `addvertexset!` (similar to `addfaceset!`)
+# In order to apply our boundary conditions, we first need to create some facet- and vertex-sets. This 
+# is done with `addfacetset!` and `addvertexset!` 
 #+
-addedgeset!(grid, "left",  (x) -> x[1] ≈ 0.0)
-addedgeset!(grid, "right", (x) -> x[1] ≈ size[1])
+addfacetset!(grid, "left",  (x) -> x[1] ≈ 0.0)
+addfacetset!(grid, "right", (x) -> x[1] ≈ size[1])
 addvertexset!(grid, "corner", (x) -> x[1] ≈ 0.0 && x[2] ≈ 0.0 && x[3] ≈ 0.0)
 
 # Here we define the boundary conditions. On the left edge, we lock the displacements in the x- and z- directions, and all the rotations.
 #+
 ch = ConstraintHandler(dh)
-add!(ch,  Dirichlet(:u, getedgeset(grid, "left"), (x, t) -> (0.0, 0.0), [1,3])  )
-add!(ch,  Dirichlet(:θ, getedgeset(grid, "left"), (x, t) -> (0.0, 0.0), [1,2])  )
+add!(ch,  Dirichlet(:u, getfacetset(grid, "left"), (x, t) -> (0.0, 0.0), [1,3])  )
+add!(ch,  Dirichlet(:θ, getfacetset(grid, "left"), (x, t) -> (0.0, 0.0), [1,2])  )
 
 # On the right edge, we also lock the displacements in the x- and z- directions, but apply a precribed rotation.
 #+
-add!(ch,  Dirichlet(:u, getedgeset(grid, "right"), (x, t) -> (0.0, 0.0), [1,3])  )
-add!(ch,  Dirichlet(:θ, getedgeset(grid, "right"), (x, t) -> (0.0, pi/10), [1,2])  )
+add!(ch,  Dirichlet(:u, getfacetset(grid, "right"), (x, t) -> (0.0, 0.0), [1,3])  )
+add!(ch,  Dirichlet(:θ, getfacetset(grid, "right"), (x, t) -> (0.0, pi/10), [1,2])  )
 
 # In order to not get rigid body motion, we lock the y-displacement in one of the corners.
 #+
