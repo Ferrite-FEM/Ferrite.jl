@@ -77,7 +77,7 @@ struct ScratchValues{T, CV <: CellValues, FV <: FacetValues, TT <: AbstractTenso
     Ke::Matrix{T}
     fe::Vector{T}
     cellvalues::CV
-    facetvaluesFV
+    facetvalues::FV
     global_dofs::Vector{Int}
     ɛ::Vector{TT}
     coordinates::Vector{Vec{dim, T}}
@@ -92,7 +92,7 @@ function create_values(interpolation_space::Interpolation{refshape}, qr_order::I
     face_quadrature_rule = FaceQuadratureRule{refshape}(qr_order)
     cellvalues = [CellValues(quadrature_rule, interpolation_space) for i in 1:Threads.nthreads()];
     facetvalues = [FacetValues(face_quadrature_rule, interpolation_space) for i in 1:Threads.nthreads()];
-    return cellvalues, FacetValues
+    return cellvalues, facetvalues
 end;
 
 # Create a `ScratchValues` for each thread with the thread local data
@@ -111,7 +111,7 @@ function create_scratchvalues(K, f, dh::DofHandler{dim}, ip) where {dim}
 
     coordinates = [[zero(Vec{dim}) for i in 1:length(dh.grid.cells[1].nodes)] for i in 1:nthreads]
 
-    return [ScratchValues(Kes[i], fes[i], cellvalues[i], FacetValues[i], global_dofs[i],
+    return [ScratchValues(Kes[i], fes[i], cellvalues[i], facetvalues[i], global_dofs[i],
                          ɛs[i], coordinates[i], assemblers[i]) for i in 1:nthreads]
 end;
 
@@ -140,8 +140,8 @@ function assemble_cell!(scratch::ScratchValues, cell::Int, K::SparseMatrixCSC,
                         grid::Grid, dh::DofHandler, C::SymmetricTensor{4, dim}, b::Vec{dim}) where {dim}
 
     ## Unpack our stuff from the scratch
-    Ke, fe, cellvalues, FacetValues, global_dofs, ɛ, coordinates, assembler =
-         scratch.Ke, scratch.fe, scratch.cellvalues, scratch.FacetValues,
+    Ke, fe, cellvalues, facetvalues, global_dofs, ɛ, coordinates, assembler =
+         scratch.Ke, scratch.fe, scratch.cellvalues, scratch.facetvalues,
          scratch.global_dofs, scratch.ɛ, scratch.coordinates, scratch.assembler
 
     fill!(Ke, 0)

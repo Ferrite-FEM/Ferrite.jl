@@ -141,11 +141,11 @@ function create_values(interpolation)
     qr      = QuadratureRule{RefTetrahedron}(2)
     face_qr = FaceQuadratureRule{RefTetrahedron}(3)
 
-    ## cell and FacetValues for u
+    ## Cell and FacetValues for u
     cellvalues_u = CellValues(qr, interpolation)
-    FacetValues_u = FacetValues(face_qr, interpolation)
+    facetvalues_u = FacetValues(face_qr, interpolation)
 
-    return cellvalues_u, FacetValues_u
+    return cellvalues_u, facetvalues_u
 end;
 
 # ### Add degrees of freedom
@@ -229,7 +229,7 @@ function symmetrize_lower!(K)
     end
 end;
 
-function doassemble_neumann!(r, dh, faceset, FacetValues, t)
+function doassemble_neumann!(r, dh, faceset, facetvalues, t)
     n_basefuncs = getnbasefunctions(facetvalues)
     re = zeros(n_basefuncs)                      # element residual vector
     for fc in FacetIterator(dh, faceset)
@@ -311,7 +311,7 @@ function solve()
             ## Tangent and residual contribution from the cells (volume integral)
             doassemble!(K, r, cellvalues, dh, material, u, states, states_old);
             ## Residual contribution from the Neumann boundary (surface integral)
-            doassemble_neumann!(r, dh, getfacetset(grid, "right"), FacetValues, traction)
+            doassemble_neumann!(r, dh, getfacetset(grid, "right"), facetvalues, traction)
             norm_r = norm(r[Ferrite.free_dofs(dbcs)])
 
             print("Iteration: $newton_itr \tresidual: $(@sprintf("%.8f", norm_r))\n")

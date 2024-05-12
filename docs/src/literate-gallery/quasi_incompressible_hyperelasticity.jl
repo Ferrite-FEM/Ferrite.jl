@@ -102,12 +102,12 @@ function create_values(interpolation_u, interpolation_p)
 
     ## cell and facetvalues for u
     cellvalues_u = CellValues(qr, interpolation_u)
-    FacetValues_u = FacetValues(face_qr, interpolation_u)
+    facetvalues_u = FacetValues(face_qr, interpolation_u)
 
     ## cellvalues for p
     cellvalues_p = CellValues(qr, interpolation_p)
 
-    return cellvalues_u, cellvalues_p, FacetValues_u
+    return cellvalues_u, cellvalues_p, facetvalues_u
 end;
 
 # We now create the function for Ψ*
@@ -284,7 +284,7 @@ function solve(interpolation_u, interpolation_p)
 
     ## Create the DofHandler and CellValues
     dh = create_dofhandler(grid, interpolation_u, interpolation_p)
-    cellvalues_u, cellvalues_p, FacetValues_u = create_values(interpolation_u, interpolation_p)
+    cellvalues_u, cellvalues_p, facetvalues_u = create_values(interpolation_u, interpolation_p)
 
     ## Create the DirichletBCs
     dbc = create_bc(dh)

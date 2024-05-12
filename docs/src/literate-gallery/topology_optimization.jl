@@ -96,7 +96,7 @@ function create_values()
     cellvalues = CellValues(qr, ip)
     facetvalues = FacetValues(face_qr, ip)
     
-    return cellvalues, FacetValues
+    return cellvalues, facetvalues
 end
 
 function create_dofhandler(grid)
@@ -300,7 +300,7 @@ end
     
 # Now, we move on to the Finite Element part of the program. We use the following function to assemble our linear system.
 
-function doassemble!(cellvalues::CellValues, facetvaluesFacetValues, K::SparseMatrixCSC, grid::Grid, dh::DofHandler, mp::MaterialParameters, u, states)
+function doassemble!(cellvalues::CellValues, facetvalues::FacetValues, K::SparseMatrixCSC, grid::Grid, dh::DofHandler, mp::MaterialParameters, u, states)
     r = zeros(ndofs(dh))
     assembler = start_assemble(K, r)
     nu = getnbasefunctions(cellvalues)
@@ -315,7 +315,7 @@ function doassemble!(cellvalues::CellValues, facetvaluesFacetValues, K::SparseMa
         eldofs = celldofs(element)
         ue = u[eldofs]
         
-        elmt!(Ke, re, element, cellvalues, FacetValues, grid, mp, ue, state)
+        elmt!(Ke, re, element, cellvalues, facetvalues, grid, mp, ue, state)
         assemble!(assembler, celldofs(element), re, Ke)
     end
 
@@ -327,7 +327,7 @@ end
 # elastomechanic problem, for topology optimization we additionally use our material state to receive the density value of
 # the element and to store the strain at each quadrature point.
 
-function elmt!(Ke, re, element, cellvalues, FacetValues, grid, mp, ue, state)
+function elmt!(Ke, re, element, cellvalues, facetvalues, grid, mp, ue, state)
     n_basefuncs = getnbasefunctions(cellvalues)
     reinit!(cellvalues, element)    
     χ = state.χ    
@@ -445,7 +445,7 @@ function topopt(ra,ρ,n,filename; output=:false)
         
             ## current guess
             u .= un .+ Δu
-            K, r = doassemble!(cellvalues, FacetValues, K, grid, dh, mp, u, states);
+            K, r = doassemble!(cellvalues, facetvalues, K, grid, dh, mp, u, states);
             norm_r = norm(r[Ferrite.free_dofs(dbc)]) 
 
             if (norm_r) < NEWTON_TOL

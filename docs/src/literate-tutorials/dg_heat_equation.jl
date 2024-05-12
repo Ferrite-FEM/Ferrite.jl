@@ -280,7 +280,7 @@ end
 # We define the function `assemble_global` to loop over all elements and internal faces
 # (interfaces), as well as the external faces involved in Neumann boundary conditions.
 
-function assemble_global(cellvalues::CellValues, facetvaluesFacetValues, interfacevalues::InterfaceValues, K::SparseMatrixCSC, dh::DofHandler, order::Int, dim::Int)
+function assemble_global(cellvalues::CellValues, facetvalues::FacetValues, interfacevalues::InterfaceValues, K::SparseMatrixCSC, dh::DofHandler, order::Int, dim::Int)
     ## Allocate the element stiffness matrix and element force vector
     n_basefuncs = getnbasefunctions(cellvalues)
     Ke = zeros(n_basefuncs, n_basefuncs)
@@ -318,13 +318,13 @@ function assemble_global(cellvalues::CellValues, facetvaluesFacetValues, interfa
         ## Reinitialize face_values_a for this boundary face
         reinit!(facetvalues, fc)
         ## Compute boundary face surface integrals contribution
-        assemble_boundary!(fe, FacetValues)
+        assemble_boundary!(fe, facetvalues)
         ## Assemble fe into f
         assemble!(f, celldofs(fc), fe)
     end
     return K, f
 end
-K, f = assemble_global(cellvalues, FacetValues, interfacevalues, K, dh, order, dim);
+K, f = assemble_global(cellvalues, facetvalues, interfacevalues, K, dh, order, dim);
 #md nothing # hide
 
 # ### Solution of the system

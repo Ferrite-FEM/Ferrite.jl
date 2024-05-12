@@ -158,7 +158,7 @@ function doassemble(cellvalues::CellValues, facetvaluesFacetValues,
     return K, f
 end;
 
-K, f = doassemble(cellvalues, FacetValues, K, dh);
+K, f = doassemble(cellvalues, facetvalues, K, dh);
 apply!(K, f, dbcs)
 u = Symmetric(K) \ f;
 

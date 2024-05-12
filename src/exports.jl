@@ -96,7 +96,7 @@ export
     nfaces,
     addnodeset!,
     addfacetset!,
-    addboundaryfaceset!,
+    addboundaryfacetset!,
     addvertexset!,
     addboundaryvertexset!,
     addcellset!,

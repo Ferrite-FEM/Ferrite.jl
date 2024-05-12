@@ -52,14 +52,11 @@ include("test_deprecations.jl")
 HAS_EXTENSIONS && include("blockarrays.jl")
 include("test_examples.jl")
 
-#=all_defined = =# @test all(x -> isdefined(Ferrite, x), names(Ferrite))  # Test that all exported symbols are defined
-#=
-if !all_defined
-    for name in names(Ferrite)
-        isdefined(Ferrite, name) || @warn "$name is not defined"
-    end
-    @test false 
-end
+@test all(x -> isdefined(Ferrite, x), names(Ferrite))  # Test that all exported symbols are defined
+#= See which is not defined if fails 
+for name in names(Ferrite)
+    isdefined(Ferrite, name) || @warn "Ferrite.$name is not defined but $name is exported"
+end 
 =#
 
 # Integration tests
