@@ -627,6 +627,17 @@ function _addset!(grid::AbstractGrid, name::String, _set, dict::Dict)
     grid
 end
 
+function addfaceset!(grid::AbstractGrid, name, set::Union{Set{FaceIndex}, Vector{FacetIndex}})
+    @warn "addfaceset! is deprecated, use addfacetset! instead. Interpreting FaceIndex as FacetIndex"
+    new_set = Set(FacetIndex(idx[1], idx[2]) for idx in set)
+    addfacetset!(grid, name, new_set)
+end
+
+function addfaceset!(grid, name, f::Function; kwargs...)
+    @warn "addfaceset! is deprecated, using addfacetset! instead"
+    return addfacetset!(grid, name, f; kwargs...)
+end
+
 addfacetset!(grid::AbstractGrid, name::String, f::Function; all::Bool=true) = 
     _addset!(grid, name, create_facetset(grid, f; all=all), grid.facetsets)
 addvertexset!(grid::AbstractGrid, name::String, f::Function; all::Bool=true) = 
@@ -1053,7 +1064,7 @@ end
 @inline reference_facets(refshape::Type{<:AbstractRefShape{2}}) = reference_edges(refshape)
 @inline reference_facets(refshape::Type{<:AbstractRefShape{3}}) = reference_faces(refshape)
 nfacets(::Type{T}) where {T <: AbstractRefShape} = length(reference_facets(T))
-
+nfacets(c::AbstractCell) = length(facets(c))
 # Deprecation (TODO: Move to deprecated.jl)
 function getfaceset(grid::AbstractGrid, name::String)
     @warn "getfaceset is deprecated, use getfacetset instead" maxlog=1

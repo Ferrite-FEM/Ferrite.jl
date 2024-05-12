@@ -278,14 +278,14 @@ function getneighborhood(top::ExclusiveTopology, grid::AbstractGrid, vertexidx::
     return self_reference_local
 end
 
-function getneighborhood(top::ExclusiveTopology, grid::AbstractGrid{3}, edgeidx::EdgeIndex, include_self=false)
+function getneighborhood(top::ExclusiveTopology, grid::AbstractGrid, edgeidx::EdgeIndex, include_self=false)
     cellid, local_edgeidx = edgeidx[1], edgeidx[2]
     cell_edges = edges(getcells(grid,cellid))
     nonlocal_edgeid = cell_edges[local_edgeidx]
     cell_neighbors = getneighborhood(top,grid,CellIndex(cellid))
     self_reference_local = EdgeIndex[]
     for cellid in cell_neighbors
-        local_neighbor_edgeid = findfirst(x->issubset(x,nonlocal_edgeid),edges(getcells(grid,cellid)))::Int
+        local_neighbor_edgeid = findfirst(x->issubset(x,nonlocal_edgeid),edges(getcells(grid,cellid)))
         local_neighbor_edgeid === nothing && continue
         local_edge = EdgeIndex(cellid,local_neighbor_edgeid)
         push!(self_reference_local, local_edge)
@@ -295,6 +295,18 @@ function getneighborhood(top::ExclusiveTopology, grid::AbstractGrid{3}, edgeidx:
     else
         return unique([top.edge_edge_neighbor[cellid, local_edgeidx].neighbor_info; self_reference_local])
     end
+end
+
+function getneighborhood(top::ExclusiveTopology, grid::AbstractGrid, facetindex::FacetIndex, include_self=false)
+    rdim = get_reference_dimensionality(grid)
+    return _getneighborhood(Val(rdim), top, grid, facetindex, include_self)
+end
+_getneighborhood(::Val{1}, top, grid, facetindex::FacetIndex, include_self) = getneighborhood(top, grid, VertexIndex(facetindex...), include_self)
+_getneighborhood(::Val{2}, top, grid, facetindex::FacetIndex, include_self) = getneighborhood(top, grid, EdgeIndex(facetindex...), include_self)
+_getneighborhood(::Val{3}, top, grid, facetindex::FacetIndex, include_self) = getneighborhood(top, grid, FaceIndex(facetindex...), include_self)
+function _getneighborhood(::Val{:mixed}, args...)
+    throw(ArgumentError("getneighborhood with FacetIndex is is only supported for grids containing cells with a common reference dimension.
+    For mixed-dimensionality grid, use `VertexIndex`, `EdgeIndex`, and `FaceIndex` explicitly"))
 end
 
 """

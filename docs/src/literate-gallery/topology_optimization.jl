@@ -193,18 +193,18 @@ end
 
 function approximate_laplacian(dh, topology, χn, Δh)
     ∇²χ = zeros(getncells(dh.grid))
-    _nfaces = nfaces(dh.grid.cells[1])
+    _nfacets = nfacets(dh.grid.cells[1])
     opp = Dict(1=>3, 2=>4, 3=>1, 4=>2)
-    nbg = zeros(Int,_nfaces)
+    nbg = zeros(Int,_nfacets)
     
     for element in CellIterator(dh)
         i = cellid(element)
-        for j in 1:_nfaces
-            nbg_cellid = getcells(getneighborhood(topology, dh.grid, FaceIndex(i,j)))
+        for j in 1:_nfacets
+            nbg_cellid = getcells(getneighborhood(topology, dh.grid, FacetIndex(i,j)))
             if(!isempty(nbg_cellid))
                 nbg[j] = first(nbg_cellid) # assuming only one face neighbor per cell
             else # boundary face
-                nbg[j] = first(getcells(getneighborhood(topology, dh.grid, FaceIndex(i,opp[j]))))
+                nbg[j] = first(getcells(getneighborhood(topology, dh.grid, FacetIndex(i,opp[j]))))
             end
         end
         
@@ -350,9 +350,9 @@ function elmt!(Ke, re, element, cellvalues, facetvalues, grid, mp, ue, state)
 
     symmetrize_lower!(Ke)
 
-    @inbounds for face in 1:nfaces(element) 
-        if onboundary(element, face) && (cellid(element), face) ∈ getfacetset(grid, "traction")
-            reinit!(facetvalues, element, face)
+    @inbounds for facet in 1:nfacets(getcells(grid, cellid(element))) 
+        if onboundary(element, facet) && (cellid(element), facet) ∈ getfacetset(grid, "traction")
+            reinit!(facetvalues, element, facet)
             t = Vec((0.0, -1.0)) # force pointing downwards
             for q_point in 1:getnquadpoints(facetvalues)
                 dΓ = getdetJdV(facetvalues, q_point)
