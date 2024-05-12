@@ -103,12 +103,6 @@ Note that the vertices are sufficient to define a face uniquely.
 """
 faces(::AbstractCell)
 
-boundary_node_function(::Type{VertexIndex}) = vertices 
-boundary_node_function(::Type{EdgeIndex}) = edges 
-boundary_node_function(::Type{FaceIndex}) = faces 
-boundary_node_function(::Type{FacetIndex}) = facets 
-
-
 """
     Ferrite.default_interpolation(::AbstractCell)::Interpolation
 
@@ -532,7 +526,7 @@ Returns all facets as `FacetIndex` in a `Set` of a given `setname`.
 
 Returns all facet sets of the `grid`.
 """
-@inline getfacetsets(grid::AbstractGrid) = grid.facesets
+@inline getfacetsets(grid::AbstractGrid) = grid.facetsets
 
 
 """
@@ -634,21 +628,14 @@ function _addset!(grid::AbstractGrid, name::String, _set, dict::Dict)
 end
 
 addfacetset!(grid::AbstractGrid, name::String, f::Function; all::Bool=true) = 
-    _addset!(grid, name, f, grid.facetsets; all=all)
+    _addset!(grid, name, create_facetset(grid, f; all=all), grid.facetsets)
 addvertexset!(grid::AbstractGrid, name::String, f::Function; all::Bool=true) = 
-    _addset!(grid, name, f, grid.vertexsets; all=all)
-function _addset!(grid::AbstractGrid, name::String, f::Function, dict::Dict{String, Set{BI}}; all::Bool=true) where {BI <: BoundaryIndex}
-    _check_setname(dict, name)
-    set = _create_set(f, grid, BI; all)
-    _warn_emptyset(set, name)
-    dict[name] = set
-    grid
-end
+    _addset!(grid, name, create_vertexset(grid, f; all=all), grid.vertexsets)
 
 function _create_set(f::Function, grid::AbstractGrid, ::Type{BI}; all=true) where {BI <: BoundaryIndex}
     set = Set{BI}()
     for (cell_idx, cell) in enumerate(getcells(grid))
-        for (entity_idx, entity) in enumerate(boundary_node_function(BI)(cell))
+        for (entity_idx, entity) in enumerate(boundaryfunction(BI)(cell))
             pass = all
             for node_idx in entity
                 v = f(get_node_coordinate(grid, node_idx))
@@ -660,11 +647,74 @@ function _create_set(f::Function, grid::AbstractGrid, ::Type{BI}; all=true) wher
     return set
 end
 
+function push_entity_instances!(set::Set{BI}, grid::AbstractGrid, top, entity::BI) where {BI <: BoundaryIndex}
+    push!(set, entity) # Add the given entity
+    cell = getcells(grid, entity[1])
+    verts = boundaryfunction(BI)(cell)[entity[2]]
+    for cell_idx in top.vertex_to_cell[verts[1]]# Since all vertices should be shared, the first one can be used here
+        cell_entities = boundaryfunction(BI)(getcells(grid, cell_idx))
+        for (entity_idx, cell_entity) in pairs(cell_entities)
+            if all(x -> x in verts, cell_entity)
+                push!(set, BI(cell_idx, entity_idx))
+            end
+        end
+    end
+    return set
+end
+
+function _create_boundaryset(f::Function, grid::AbstractGrid, top #=::ExclusiveTopology=#, ::Type{BI}; all = true) where {BI <: BoundaryIndex}
+    # Function barrier
+    function _makeset(ff_nh)
+        set = Set{BI}()
+        for (ff_nh_idx, neighborhood) in pairs(ff_nh)
+            # ff_nh_idx::CartesianIndex into Matrix{<:EntityNeighborhood}
+            isempty(neighborhood) || continue # Skip any facets with neighbors (not on boundary)
+            cell_idx  = ff_nh_idx[1]
+            facet_nr = ff_nh_idx[2]
+            cell = getcells(grid, cell_idx)
+            facet_nodes = facets(cell)[facet_nr]
+            #println(FacetIndex(cell_idx, facet_nr), ", ", facet_nodes)
+            for (subentity_idx, subentity_nodes) in pairs(boundaryfunction(BI)(cell))
+                if Base.all(n -> n in facet_nodes, subentity_nodes)
+                    #check_fun = all ? Base.all : any
+                    #pass = check_fun(node_idx -> f(get_node_coordinate(grid, node_idx)), subentity_nodes)
+                    pass = all
+                    for node_idx in subentity_nodes
+                        v = f(get_node_coordinate(grid, node_idx))
+                        all ? (!v && (pass = false; break)) : (v && (pass = true; break))
+                    end
+                    if pass 
+                        index = BI(cell_idx, subentity_idx)
+                        push_entity_instances!(set, grid, top, index)
+                    end
+                end
+            end
+        end
+        return set
+    end
+    return _makeset(get_facet_facet_neighborhood(top, grid))
+end
+
 # Following julia style-guide, should be (f, grid; kwargs...), but doesn't match add<X>set!() already defined...
 create_vertexset(grid::AbstractGrid, f::Function; kwargs...) = _create_set(f, grid, VertexIndex; kwargs...)
 create_edgeset(  grid::AbstractGrid, f::Function; kwargs...) = _create_set(f, grid, EdgeIndex;   kwargs...)
 create_faceset(  grid::AbstractGrid, f::Function; kwargs...) = _create_set(f, grid, FaceIndex;   kwargs...)
 create_facetset( grid::AbstractGrid, f::Function; kwargs...) = _create_set(f, grid, FacetIndex;  kwargs...)
+
+create_boundaryvertexset(grid::AbstractGrid, top, f::Function; kwargs...) = _create_boundaryset(f, grid, top, VertexIndex; kwargs...)
+create_boundaryedgeset(  grid::AbstractGrid, top, f::Function; kwargs...) = _create_boundaryset(f, grid, top, EdgeIndex; kwargs...)
+create_boundaryfaceset(  grid::AbstractGrid, top, f::Function; kwargs...) = _create_boundaryset(f, grid, top, FaceIndex; kwargs...)
+create_boundaryfacetset( grid::AbstractGrid, top, f::Function; kwargs...) = _create_boundaryset(f, grid, top, FacetIndex; kwargs...)
+
+function addboundaryvertexset!(grid::AbstractGrid, top, name::String, f::Function; kwargs...)
+    set = create_boundaryvertexset(grid, top, f; kwargs...)
+    return _addset!(grid, name, set, grid.vertexsets)
+end
+
+function addboundaryfacetset!(grid::AbstractGrid, top, name::String, f::Function; kwargs...)
+    set = create_boundaryfacetset(grid, top, f; kwargs...)
+    return _addset!(grid, name, set, grid.facetsets)
+end
 
 
 """
@@ -752,6 +802,8 @@ for (func,             entity_f, subentity_f, entity_t,   subentity_t) in (
         end
     end
 end
+
+
 
 """
     addnodeset!(grid::AbstractGrid, name::String, nodeid::Union{Vector{Int},Set{Int}})

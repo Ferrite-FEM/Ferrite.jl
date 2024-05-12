@@ -1,3 +1,4 @@
+#=
 """
 getfaceinstances(grid::AbstractGrid, topology::ExclusiveTopology, face::FaceIndex)
 
@@ -340,8 +341,7 @@ for (func,                   entity_f,            entity_t,     filter_f,       
     end
 end
 end
-
-
+=#
 
 """
     bounding_box(grid::AbstractGrid)

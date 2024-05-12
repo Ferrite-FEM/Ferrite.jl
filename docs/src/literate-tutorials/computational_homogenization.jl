@@ -206,22 +206,21 @@ using FerriteGmsh
 #md     togrid("periodic-rve-coarse.msh") #hide
 #md end                                               #hide
 
-grid = togrid("periodic-rve.msh") #src
-
 # Temp fix for FerriteGmsh
 function FerriteGmsh.tofacesets(boundarydict::Dict{String,Vector}, elements::Vector{<:Ferrite.AbstractCell})
-    facets = Ferrite.facets.(elements)
-    facetsets = Dict{String,Set{FacetIndex}}()
-    for (boundaryname, boundaryfacets) in boundarydict
-        facetsettuple = Set{FaceIndex}()
-        for boundaryfacet in boundaryfacets
-            FerriteGmsh._add_to_facesettuple!(facetsettuple, boundaryfacet, facets)
+    faces = Ferrite.facets.(elements)
+    facesets = Dict{String,Set{FaceIndex}}()
+    for (boundaryname, boundaryfaces) in boundarydict
+        facesettuple = Set{FaceIndex}()
+        for boundaryface in boundaryfaces
+            FerriteGmsh._add_to_facesettuple!(facesettuple, boundaryface, faces)
         end
-        facesets[boundaryname] = facetsettuple
+        facesets[boundaryname] = facesettuple
     end
-    return facetsets
+    return facesets
 end
 
+grid = togrid("periodic-rve.msh") #src
 
 # Next we construct the interpolation and quadrature rule, and combining them into
 # cellvalues as usual:
