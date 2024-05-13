@@ -79,7 +79,7 @@ This means, that the octants are now of size $2^{3-1}=4$.
 Construct all level 1 octants based on mortonid:
 ```julia
 # note the arguments are dim,level,mortonid,maximumlevel
-julia> dim = 2; level = 1; maximumlevel=3
+julia> dim = 2; level = 1; maximumlevel = 3
 julia> oct = Ferrite.AMR.OctantBWG(dim, level, 1, maximumlevel)
 OctantBWG{2,4,4}
    l = 1
