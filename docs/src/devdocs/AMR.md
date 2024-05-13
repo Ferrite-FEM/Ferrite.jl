@@ -1,8 +1,8 @@
-# AMR
+# Adaptive Mesh Refinement (AMR)
 
 ## P4est
 
-All of it is based on these papers:
+Ferrite's P4est implementation is based on these papers:
 
 - [BWG2011](@citet)
 - [IBWG2015](@citet)
@@ -13,7 +13,7 @@ Look into the issues of Ferrite.jl and search for the AMR tag.
 
 ### Important Concepts
 
-One of the most important concepts, where everything is based on, are space filling curves (SFC).
+One of the most important concepts, which everything is based on, are space filling curves (SFC).
 In particular, [Z-order (also named Morton order, Morton space-filling curves)](https://en.wikipedia.org/wiki/Z-order_curve) are used in p4est.
 The basic idea is that each Octant (in 3D) or quadrant (in 2D) can be encoded by 2 quantities
 
@@ -77,7 +77,8 @@ julia> Ferrite._compute_size(3,1)
 Construct all level 1 octants based on mortonid:
 ```julia
 # note the arguments are dim,level,mortonid,maximumlevel
-julia> oct = OctantBWG(2,1,1,3)
+julia> dim = 2; level = 1; maximumlevel=3
+julia> oct = OctantBWG(dim, level, 1, maximumlevel)
 OctantBWG{2,4,4}
    l = 1
    xy = 0,0
