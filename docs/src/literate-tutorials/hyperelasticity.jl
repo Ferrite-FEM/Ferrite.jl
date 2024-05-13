@@ -305,12 +305,9 @@ function assemble_global!(K, g, dh, cv, fv, mp, u, ΓN)
     end
 end;
 
-# Finally, we define a main function which sets up everything and then performs Newton
-# iterations until convergence.
 
-function solve()
-    reset_timer!()
-
+# Creating the grid, boundary conditions, and meshes.
+function create_grid()
     ## Generate a grid
     N = 10
     L = 1.0
@@ -346,7 +343,6 @@ function solve()
             L/2 - z + (y-L/2)*sin(θ) + (z-L/2)*cos(θ)
         ))
     end
-
     dbcs = ConstraintHandler(dh)
     ## Add a homogeneous boundary condition on the "clamped" edge
     dbc = Dirichlet(:u, getfaceset(grid, "right"), (x,t) -> [0.0, 0.0, 0.0], [1, 2, 3])
@@ -364,14 +360,16 @@ function solve()
         getfaceset(grid, "front"),
         getfaceset(grid, "back"),
     )
+    return dh, cv, fv, mp, ΓN, dbcs
+end
 
+# Finally, we define a main function which performs Newton iterations until convergence.
+function manual_solve()
+    dh, cv, fv, mp, ΓN, dbcs = create_grid()
     ## Pre-allocation of vectors for the solution and Newton increments
     _ndofs = ndofs(dh)
-    un = zeros(_ndofs) # previous solution vector
     u  = zeros(_ndofs)
     Δu = zeros(_ndofs)
-    ΔΔu = zeros(_ndofs)
-    apply!(un, dbcs)
 
     ## Create sparse matrix and residual vector
     K = create_sparsity_pattern(dh)
@@ -384,8 +382,7 @@ function solve()
     prog = ProgressMeter.ProgressThresh(NEWTON_TOL, "Solving:")
 
     while true; newton_itr += 1
-        ## Construct the current guess
-        u .= un .+ Δu
+        apply!(u, dbcs)
         ## Compute residual and tangent for current guess
         assemble_global!(K, g, dh, cv, fv, mp, u, ΓN)
         ## Apply boundary conditions
@@ -400,11 +397,10 @@ function solve()
         end
 
         ## Compute increment using conjugate gradients
-        @timeit "linear solve" IterativeSolvers.cg!(ΔΔu, K, g; maxiter=1000)
-
-        apply_zero!(ΔΔu, dbcs)
-        Δu .-= ΔΔu
+        @timeit "linear solve" IterativeSolvers.cg!(Δu, K, g; maxiter=1000)
+        u .-= Δu
     end
+
 
     ## Save the solution
     @timeit "export" begin
@@ -417,14 +413,53 @@ function solve()
     return u
 end
 
+# Alternatively, it is possible to solve the same system with NonlinearSolve by defining a few wrappers:
+# Note that as written, this is missing some of the optimizations that you would want for a real deployment.
+function nonlinearsolve_solve()
+    dh, cv, fv, mp, ΓN, dbcs = create_grid()
+
+    ## Create sparse matrix and residual vector
+    K = create_sparsity_pattern(dh)
+    g = zeros(ndofs(dh))
+
+    function nl_assemble(g, u, p)
+        (;K, dh, cv, fv, mp, ΓN, dbcs) = p
+        apply!(u, dbcs)
+        assemble_global!(K, g, dh, cv, fv, mp, u, ΓN)
+        apply_zero!(K, g, dbcs)
+        g
+    end
+    function nl_assemble_jac(K, u, p)
+        (;g, dh, cv, fv, mp, ΓN, dbcs) = p
+        apply!(u, dbcs)
+        assemble_global!(K, g, dh, cv, fv, mp, u, ΓN)
+        apply_zero!(K, g, dbcs)
+        K
+    end
+
+    nlf = NonlinearFunction(nl_assemble, jac=nl_assemble_jac, jac_prototype=K)
+    p = (;K, g, dh, cv, fv, mp, ΓN, dbcs)
+    nlp = NonlinearProblem(nlf, u, p)
+    u = solve(nlp, NewtonRaphson(), abstol=1e-8, maxiter=30).u
+
+    ## Save the solution
+    @timeit "export" begin
+        vtk_grid("hyperelasticity", dh) do vtkfile
+            vtk_point_data(vtkfile, dh, u)
+        end
+    end
+
+    print_timer(title = "Analysis with $(getncells(grid)) elements", linechars = :ascii)
+    return u
+end
 
 # Run the simulation
-
-u = solve();
+u = manual_solve();
 
 ## test the result                #src
 using Test                        #src
 @test norm(u) ≈ 4.761404305083876 #src
+@test u ≈ nonlinearsolve_solve()  #src
 
 #md # ## Plain program
 #md #
