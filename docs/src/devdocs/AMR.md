@@ -73,12 +73,9 @@ The size of octants at a specific level can be computed by a simple operation
 julia> Ferrite.AMR._compute_size(#=b=#3,#=l=#0)
 8
 ```
+This computation is based on the relation $\text{size}=2^{b-l}$.
 Now, to fully understand the octree coordinate system we go a level down, i.e. we cut the space in $x$ and $y$ in half.
-This means, that the octants are now of size 4.
-```julia
-julia> Ferrite.AMR._compute_size(3,1)
-4
-```
+This means, that the octants are now of size $2^{3-1}=4$.
 Construct all level 1 octants based on mortonid:
 ```julia
 # note the arguments are dim,level,mortonid,maximumlevel
@@ -149,7 +146,7 @@ Let's try to construct the lower right based on the morton index on level 1
 
 ```julia
 julia> o = Ferrite.OctantBWG(2,1,8,3)
-ERROR: AssertionError: m ≤ (one(T) + one(T)) ^ (dim * l)
+ERROR: AssertionError: m ≤ (one(T) + one(T)) ^ (dim * l) # 8 > 4
 Stacktrace:
  [1] OctantBWG(dim::Int64, l::Int32, m::Int32, b::Int32)
    @ Ferrite ~/repos/Ferrite.jl/src/Adaptivity/AdaptiveCells.jl:23
