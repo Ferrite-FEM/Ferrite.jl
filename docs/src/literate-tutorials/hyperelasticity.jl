@@ -368,8 +368,11 @@ function manual_solve()
     dh, cv, fv, mp, ΓN, dbcs = create_grid()
     ## Pre-allocation of vectors for the solution and Newton increments
     _ndofs = ndofs(dh)
+    un = zeros(_ndofs) # previous solution vector
     u  = zeros(_ndofs)
     Δu = zeros(_ndofs)
+    ΔΔu = zeros(_ndofs)
+    apply!(un, dbcs)
 
     ## Create sparse matrix and residual vector
     K = create_sparsity_pattern(dh)
@@ -379,10 +382,12 @@ function manual_solve()
     newton_itr = -1
     NEWTON_TOL = 1e-8
     NEWTON_MAXITER = 30
+
     prog = ProgressMeter.ProgressThresh(NEWTON_TOL, "Solving:")
 
     while true; newton_itr += 1
-        apply!(u, dbcs)
+        ## Construct the current guess
+        u .= un .+ Δu
         ## Compute residual and tangent for current guess
         assemble_global!(K, g, dh, cv, fv, mp, u, ΓN)
         ## Apply boundary conditions
@@ -397,8 +402,10 @@ function manual_solve()
         end
 
         ## Compute increment using conjugate gradients
-        @timeit "linear solve" IterativeSolvers.cg!(Δu, K, g; maxiter=1000)
-        u .-= Δu
+        @timeit "linear solve" IterativeSolvers.cg!(ΔΔu, K, g; maxiter=1000)
+
+        apply_zero!(ΔΔu, dbcs)
+        Δu .-= ΔΔu
     end
 
 
