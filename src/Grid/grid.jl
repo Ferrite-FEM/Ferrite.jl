@@ -601,31 +601,44 @@ function addcellset!(grid::AbstractGrid, name::String, f::Function; all::Bool=tr
 end
 
 """
-    addfacetset!(grid::AbstractGrid, name::String, faceid::Union{Set{FaceIndex},Vector{FaceIndex}})
+    addfacetset!(grid::AbstractGrid, name::String, faceid::Union{Set{FacetIndex},Vector{FacetIndex}})
     addfacetset!(grid::AbstractGrid, name::String, f::Function; all::Bool=true) 
 
 Adds a facetset to the grid with key `name`.
 A facetset maps a `String` key to a `Set` of tuples corresponding to `(global_cell_id, local_facet_id)`.
-Facetsets are used to initialize `Dirichlet` structs, that are needed to specify the boundary for the `ConstraintHandler`.
+Facetsets can be used to initialize `Dirichlet` boundary conditions for the `ConstraintHandler`.
 `all=true` implies that `f(x)` must return `true` for all nodal coordinates `x` on the facet if the facet
 should be added to the set, otherwise it suffices that `f(x)` returns `true` for one node. 
 
 ```julia
-addfacetset!(grid, "right", Set(((2,2),(4,2))) #see grid manual example for reference
+addfacetset!(grid, "right", Set((FacetIndex(2,2), FacetIndex(4,2)))) #see grid manual example for reference
 addfacetset!(grid, "clamped", x -> norm(x[1]) ≈ 0.0) #see incompressible elasticity example for reference
 ```
 """
 addfacetset!(grid::AbstractGrid, name::String, set::Union{Set{FacetIndex},Vector{FacetIndex}}) = 
     _addset!(grid, name, set, grid.facetsets)
+
+addfacetset!(grid::AbstractGrid, name::String, f::Function; all::Bool=true) = 
+    _addset!(grid, name, create_facetset(grid, f; all=all), grid.facetsets)
+
+"""
+    addvertexset!(grid::AbstractGrid, name::String, faceid::Union{Set{FaceIndex},Vector{FaceIndex}})
+    addvertexset!(grid::AbstractGrid, name::String, f::Function) 
+
+Adds a vertexset to the grid with key `name`.
+A vertexset maps a `String` key to a `Set` of tuples corresponding to `(global_cell_id, local_vertex_id)`.
+Vertexsets can be used to initialize `Dirichlet` boundary conditions for the `ConstraintHandler`.
+
+```julia
+addvertexset!(grid, "right", Set((VertexIndex(2,2), VertexIndex(4,2))))
+addvertexset!(grid, "clamped", x -> norm(x[1]) ≈ 0.0)
+```
+"""
 addvertexset!(grid::AbstractGrid, name::String, set::Union{Set{VertexIndex},Vector{VertexIndex}}) = 
     _addset!(grid, name, set, grid.vertexsets)
-function _addset!(grid::AbstractGrid, name::String, _set, dict::Dict)
-    _check_setname(dict, name)
-    set = Set(_set)
-    _warn_emptyset(set, name)
-    dict[name] = set
-    grid
-end
+
+addvertexset!(grid::AbstractGrid, name::String, f::Function) = 
+    _addset!(grid, name, create_vertexset(grid, f; all=true), grid.vertexsets)
 
 function addfaceset!(grid::AbstractGrid, name, set::Union{Set{FaceIndex}, Vector{FacetIndex}})
     @warn "addfaceset! is deprecated, use addfacetset! instead. Interpreting FaceIndex as FacetIndex"
@@ -638,10 +651,13 @@ function addfaceset!(grid, name, f::Function; kwargs...)
     return addfacetset!(grid, name, f; kwargs...)
 end
 
-addfacetset!(grid::AbstractGrid, name::String, f::Function; all::Bool=true) = 
-    _addset!(grid, name, create_facetset(grid, f; all=all), grid.facetsets)
-addvertexset!(grid::AbstractGrid, name::String, f::Function; all::Bool=true) = 
-    _addset!(grid, name, create_vertexset(grid, f; all=all), grid.vertexsets)
+function _addset!(grid::AbstractGrid, name::String, _set, dict::Dict)
+    _check_setname(dict, name)
+    set = Set(_set)
+    _warn_emptyset(set, name)
+    dict[name] = set
+    grid
+end
 
 function _create_set(f::Function, grid::AbstractGrid, ::Type{BI}; all=true) where {BI <: BoundaryIndex}
     set = Set{BI}()
@@ -717,11 +733,31 @@ create_boundaryedgeset(  grid::AbstractGrid, top, f::Function; kwargs...) = _cre
 create_boundaryfaceset(  grid::AbstractGrid, top, f::Function; kwargs...) = _create_boundaryset(f, grid, top, FaceIndex; kwargs...)
 create_boundaryfacetset( grid::AbstractGrid, top, f::Function; kwargs...) = _create_boundaryset(f, grid, top, FacetIndex; kwargs...)
 
+
+"""
+addboundaryvertexset!(grid::AbstractGrid, topology::ExclusiveTopology, name::String, f::Function; all::Bool=true)
+
+Adds a boundary vertexset to the grid with key `name`.
+A vertexset maps a `String` key to a `Set` of tuples corresponding to `(global_cell_id,
+local_vertex_id)`. `all=true` implies that `f(x)` must return `true` for all nodal
+coordinates `x` on the face if the face should be added to the set, otherwise it suffices
+that `f(x)` returns `true` for one node.
+"""
 function addboundaryvertexset!(grid::AbstractGrid, top, name::String, f::Function; kwargs...)
     set = create_boundaryvertexset(grid, top, f; kwargs...)
     return _addset!(grid, name, set, grid.vertexsets)
 end
 
+"""
+addboundaryfacetset!(grid::AbstractGrid, topology::ExclusiveTopology, name::String, f::Function; all::Bool=true)
+
+Adds a boundary facetset to the grid with key `name`.
+A facetset maps a `String` key to a `Set` of tuples corresponding to `(global_cell_id,
+local_facet_id)`. Facetsets are used to initialize `Dirichlet` structs, that are needed to
+specify the boundary for the `ConstraintHandler`. `all=true` implies that `f(x)` must return
+`true` for all nodal coordinates `x` on the facet if the facet should be added to the set,
+otherwise it suffices that `f(x)` returns `true` for one node.
+"""
 function addboundaryfacetset!(grid::AbstractGrid, top, name::String, f::Function; kwargs...)
     set = create_boundaryfacetset(grid, top, f; kwargs...)
     return _addset!(grid, name, set, grid.facetsets)

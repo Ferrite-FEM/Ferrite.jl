@@ -193,6 +193,7 @@ using Test #src
 # the [`FerriteGmsh`](https://github.com/Ferrite-FEM/FerriteGmsh.jl) package:
 
 using FerriteGmsh
+
 #src notebook: use coarse mesh to decrease build time
 #src   script: use the fine mesh
 #src markdown: use the coarse mesh to decrease build time, but make it look like the fine
@@ -205,20 +206,6 @@ using FerriteGmsh
 #md grid = redirect_stdout(devnull) do                #hide
 #md     togrid("periodic-rve-coarse.msh") #hide
 #md end                                               #hide
-
-# Temp fix for FerriteGmsh
-function FerriteGmsh.tofacesets(boundarydict::Dict{String,Vector}, elements::Vector{<:Ferrite.AbstractCell})
-    faces = Ferrite.facets.(elements)
-    facesets = Dict{String,Set{FaceIndex}}()
-    for (boundaryname, boundaryfaces) in boundarydict
-        facesettuple = Set{FaceIndex}()
-        for boundaryface in boundaryfaces
-            FerriteGmsh._add_to_facesettuple!(facesettuple, boundaryface, faces)
-        end
-        facesets[boundaryname] = facesettuple
-    end
-    return facesets
-end
 
 grid = togrid("periodic-rve.msh") #src
 

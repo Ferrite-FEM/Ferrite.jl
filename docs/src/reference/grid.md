@@ -49,8 +49,8 @@ Ferrite.getstencil
 ```@docs
 addcellset!
 addfacetset!
-addboundaryfaceset!
-addboundaryedgeset!
+addboundaryfacetset!
+addvertexset!
 addboundaryvertexset!
 addnodeset!
 ```

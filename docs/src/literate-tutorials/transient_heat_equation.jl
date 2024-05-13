@@ -95,12 +95,12 @@ t_rise = 100
 ch = ConstraintHandler(dh);
 
 # Here, we define the boundary condition related to $\partial \Omega_1$.
-∂Ω₁ = union(getboundaryset.((grid,), ["left", "right"])...)
+∂Ω₁ = union(getfacetset.((grid,), ["left", "right"])...)
 dbc = Dirichlet(:u, ∂Ω₁, (x, t) -> 0)
 add!(ch, dbc);
 # While the next code block corresponds to the linearly increasing temperature description on $\partial \Omega_2$
 # until `t=t_rise`, and then keep constant
-∂Ω₂ = union(getboundaryset.((grid,), ["top", "bottom"])...)
+∂Ω₂ = union(getfacetset.((grid,), ["top", "bottom"])...)
 dbc = Dirichlet(:u, ∂Ω₂, (x, t) -> max_temp * clamp(t / t_rise, 0, 1))
 add!(ch, dbc)
 close!(ch)
