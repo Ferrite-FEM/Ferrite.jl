@@ -34,6 +34,11 @@ struct OctantBWG{dim, N, T} <: AbstractCell{RefHypercube{dim}}
 end
 ```
 whenever coordinates are considered we follow the z order logic, meaning x before y before z.
+Note that the acronym BWG stands for the initials of the surname of the authors of the p4est paper.
+The coordinates of an octant are described in the *octree coordinate system* which goes from $[0,2^b]^{dim}$.
+The parameter $b$ describes the maximum level of refinement and is set a priori.
+Another important aspect of the octree coordinate system is, that it is a discrete integer coordinate system.
+The size of an octant at the lowest possible level `b` is always 1, sometimes these octants are called atoms.
 
 The octree is implemented as:
 ```julia
@@ -48,7 +53,6 @@ end
 So, only the leaves of the tree are stored and not any intermediate refinement level.
 The field `b` is the maximum refinement level and is crucial. This parameter determines the size of the octree coordinate system.
 The octree coordinate system is the coordinate system in which the coordinates `xyz` of any `octant::OctantBWG` are described.
-This coordinate system goes from [0,2^b]^{dim}. The size of an octant is always 1 at the lowest possible level `b`.
 
 ### Examples
 
@@ -58,42 +62,43 @@ So, our root is on level 0 of size 8 and has the lower left coordinates `(0,0)`
 ```julia
 # different constructors available, first one OctantBWG(dim,level,mortonid,maximumlevel)
 # other possibility by giving directly level and a tuple of coordinates OctantBWG(level,(x,y))
-julia> oct = OctantBWG(2,0,1,3)
+julia> dim = 2; level = 0; maximumlevel=3
+julia> oct = OctantBWG(dim,level,1,maximumlevel)
 OctantBWG{2,4,4}
    l = 0
    xy = 0,0
 ```
 The size of octants at a specific level can be computed by a simple operation
 ```julia
-julia> Ferrite._compute_size(3,0)
+julia> Ferrite.AMR._compute_size(#=b=#3,#=l=#0)
 8
 ```
 Now, to fully understand the octree coordinate system we go a level down, i.e. we cut the space in $x$ and $y$ in half.
 This means, that the octants are now of size 4.
 ```julia
-julia> Ferrite._compute_size(3,1)
+julia> Ferrite.AMR._compute_size(3,1)
 4
 ```
 Construct all level 1 octants based on mortonid:
 ```julia
 # note the arguments are dim,level,mortonid,maximumlevel
 julia> dim = 2; level = 1; maximumlevel=3
-julia> oct = OctantBWG(dim, level, 1, maximumlevel)
+julia> oct = Ferrite.AMR.OctantBWG(dim, level, 1, maximumlevel)
 OctantBWG{2,4,4}
    l = 1
    xy = 0,0
 
-julia> o = OctantBWG(2,1,2,3)
+julia> oct = Ferrite.AMR.OctantBWG(dim, level, 2, maximumlevel)
 OctantBWG{2,4,4}
    l = 1
    xy = 4,0
 
-julia> o = OctantBWG(2,1,3,3)
+julia> oct = Ferrite.AMR.OctantBWG(dim, level, 3, maximumlevel)
 OctantBWG{2,4,4}
    l = 1
    xy = 0,4
 
-julia> o = OctantBWG(2,1,4,3)
+julia> oct = Ferrite.AMR.OctantBWG(dim, level, 4, maximumlevel)
 OctantBWG{2,4,4}
    l = 1
    xy = 4,4
@@ -143,7 +148,7 @@ What we see above is just the `leafindex`, i.e. the index where you find this le
 Let's try to construct the lower right based on the morton index on level 1
 
 ```julia
-julia> o = OctantBWG(2,1,8,3)
+julia> o = Ferrite.OctantBWG(2,1,8,3)
 ERROR: AssertionError: m ≤ (one(T) + one(T)) ^ (dim * l)
 Stacktrace:
  [1] OctantBWG(dim::Int64, l::Int32, m::Int32, b::Int32)
@@ -158,7 +163,7 @@ The assertion expresses that it is not possible to construct a morton index 8 oc
 The morton index of the lower right cell is 2 on level 1.
 
 ```julia
-julia> o = OctantBWG(2,1,2,3)
+julia> o = Ferrite.AMR.OctantBWG(2,1,2,3)
 OctantBWG{2,4,4}
    l = 1
    xy = 4,0
