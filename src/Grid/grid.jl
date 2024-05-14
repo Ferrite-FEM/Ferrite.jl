@@ -640,7 +640,7 @@ addvertexset!(grid::AbstractGrid, name::String, set::Union{Set{VertexIndex},Vect
 addvertexset!(grid::AbstractGrid, name::String, f::Function) = 
     _addset!(grid, name, create_vertexset(grid, f; all=true), grid.vertexsets)
 
-function addfaceset!(grid::AbstractGrid, name, set::Union{Set{FaceIndex}, Vector{FacetIndex}})
+function addfaceset!(grid::AbstractGrid, name, set::Union{Set{FaceIndex}, Vector{FaceIndex}})
     @warn "addfaceset! is deprecated, use addfacetset! instead. Interpreting FaceIndex as FacetIndex"
     new_set = Set(FacetIndex(idx[1], idx[2]) for idx in set)
     addfacetset!(grid, name, new_set)

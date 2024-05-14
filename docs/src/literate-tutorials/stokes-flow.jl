@@ -146,6 +146,20 @@
 using Ferrite, FerriteGmsh, Gmsh, Tensors, LinearAlgebra, SparseArrays
 using Test #src
 
+# Overload for specific elements in this tutorial.
+function FerriteGmsh.tofacesets(boundarydict::Dict{String,Vector}, elements::Vector{Triangle})
+    faces = Ferrite.facets.(elements)
+    facesets = Dict{String,Set{FaceIndex}}()
+    for (boundaryname, boundaryfaces) in boundarydict
+        facesettuple = Set{FaceIndex}()
+        for boundaryface in boundaryfaces
+            FerriteGmsh._add_to_facesettuple!(facesettuple, boundaryface, faces)
+        end
+        facesets[boundaryname] = facesettuple
+    end
+    return facesets
+end
+
 # ### Geometry and mesh generation with `Gmsh.jl`
 #
 # In the `setup_grid` function below we use the
@@ -447,8 +461,8 @@ end
 function check_mean_constraint(dh, fvp, u)                                  #src
     ## All external boundaries                                              #src
     set = union(                                                            #src
-        getfacetset(dh.grid, "Γ1"), getfacetset(dh.grid, "Γ2"),               #src
-        getfacetset(dh.grid, "Γ3"), getfacetset(dh.grid, "Γ4"),               #src
+        getfacetset(dh.grid, "Γ1"), getfacetset(dh.grid, "Γ2"),             #src
+        getfacetset(dh.grid, "Γ3"), getfacetset(dh.grid, "Γ4"),             #src
     )                                                                       #src
     range_p = dof_range(dh, :p)                                             #src
     cc = CellCache(dh)                                                      #src
