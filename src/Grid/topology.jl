@@ -373,7 +373,9 @@ describing the unique vertices in the grid. (One unique vertex may have multiple
 one is included in the returned `Vector`) 
 """
 function vertexskeleton(top::ExclusiveTopology, ::Union{AbstractGrid,Nothing}=nothing)
-    top.vertex_skeleton = _create_skeleton(top.vertex_vertex_neighbor)
+    if top.vertex_skeleton === nothing
+        top.vertex_skeleton = _create_skeleton(top.vertex_vertex_neighbor)
+    end
     return top.vertex_skeleton
 end
 
@@ -385,7 +387,9 @@ describing the unique edge in the grid. (One unique edge may have multiple `Edge
 one is included in the returned `Vector`) 
 """
 function edgeskeleton(top::ExclusiveTopology, ::Union{AbstractGrid,Nothing}=nothing)
-    top.edge_skeleton = _create_skeleton(top.edge_edge_neighbor)
+    if top.edge_skeleton === nothing
+        top.edge_skeleton = _create_skeleton(top.edge_edge_neighbor)
+    end
     return top.edge_skeleton
 end
 
@@ -397,7 +401,9 @@ describing the unique faces in the grid. (One unique face may have multiple `Fac
 one is included in the returned `Vector`) 
 """
 function faceskeleton(top::ExclusiveTopology, ::Union{AbstractGrid,Nothing}=nothing)
-    top.face_skeleton = _create_skeleton(top.face_face_neighbor)
+    if top.face_skeleton === nothing
+        top.face_skeleton = _create_skeleton(top.face_face_neighbor)
+    end
     return top.face_skeleton
 end
 

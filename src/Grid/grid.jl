@@ -763,7 +763,7 @@ function addboundaryfacetset!(grid::AbstractGrid, top, name::String, f::Function
     return _addset!(grid, name, set, grid.facetsets)
 end
 
-
+#=
 """
     getfaceedges(grid::AbstractGrid, face::FaceIndex)
     getfaceedges(cell::AbstractCell, face::FaceIndex)
@@ -849,7 +849,7 @@ for (func,             entity_f, subentity_f, entity_t,   subentity_t) in (
         end
     end
 end
-
+=#
 
 
 """

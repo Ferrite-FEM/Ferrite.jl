@@ -369,9 +369,9 @@ end
 
 # Iterator interface
 function Base.iterate(ii::InterfaceIterator{<:Any, <:Grid{sdim}}, state...) where sdim
-    neighborhood = get_facet_facet_neighborhood(ii.topology, ii.grid) # TODO: This could be moved to InterfaceIterator constructor
+    neighborhood = get_facet_facet_neighborhood(ii.topology, ii.grid) # TODO: This could be moved to InterfaceIterator constructor (potentially type-instable for non-union or mixed grids)
     while true
-        it = iterate(facetskeleton(ii.topology, ii.grid), state...)   # TODO: facetskeleton could be saved in InterfaceIterator constructor. 
+        it = iterate(facetskeleton(ii.topology, ii.grid), state...)
         it === nothing && return nothing
         face_a, state = it
         if isempty(neighborhood[face_a[1], face_a[2]])
