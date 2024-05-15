@@ -204,13 +204,13 @@ end
 # QuadratureRule{1, RefCube}(...) -> QuadratureRule{RefLine}(...)
 # QuadratureRule{2, RefCube}(...) -> QuadratureRule{RefQuadrilateral}(...)
 # QuadratureRule{3, RefCube}(...) -> QuadratureRule{RefHexahedron}(...)
-# QuadratureRule{1, RefCube}(...) -> FaceQuadratureRule{RefQuadrilateral}(...)
-# QuadratureRule{2, RefCube}(...) -> FaceQuadratureRule{RefHexahedron}(...)
+# QuadratureRule{1, RefCube}(...) -> FacetQuadratureRule{RefQuadrilateral}(...)
+# QuadratureRule{2, RefCube}(...) -> FacetQuadratureRule{RefHexahedron}(...)
 function QuadratureRule{D, RefCube}(order::Int) where D
     shapes = (RefLine, RefQuadrilateral, RefHexahedron)
     msg = "`QuadratureRule{$D, RefCube}(order::Int)` is deprecated, use `QuadratureRule{$(shapes[D])}(order)` instead"
     if D == 1 || D == 2
-        msg *= " (or `FaceQuadratureRule{$(shapes[D+1])}(order)` if this is a face quadrature rule)"
+        msg *= " (or `FacetQuadratureRule{$(shapes[D+1])}(order)` if this is a face quadrature rule)"
     end
     msg *= "."
     Base.depwarn(msg, :QuadratureRule)
@@ -220,7 +220,7 @@ function QuadratureRule{D, RefCube}(quad_type::Symbol, order::Int) where D
     shapes = (RefLine, RefQuadrilateral, RefHexahedron)
     msg = "`QuadratureRule{$D, RefCube}(quad_type::Symbol, order::Int)` is deprecated, use `QuadratureRule{$(shapes[D])}(quad_type, order)` instead"
     if D == 1 || D == 2
-        msg *= " (or `FaceQuadratureRule{$(shapes[D+1])}(quad_type, order)` if this is a face quadrature rule)"
+        msg *= " (or `FacetQuadratureRule{$(shapes[D+1])}(quad_type, order)` if this is a face quadrature rule)"
     end
     msg *= "."
     Base.depwarn(msg, :QuadratureRule)
@@ -229,12 +229,12 @@ end
 
 # QuadratureRule{2, RefTetrahedron}(...) -> QuadratureRule{RefTriangle}(...)
 # QuadratureRule{3, RefTetrahedron}(...) -> QuadratureRule{RefTetrahedron}(...)
-# QuadratureRule{2, RefTetrahedron}(...) -> FaceQuadratureRule{RefTetrahedron}(...)
+# QuadratureRule{2, RefTetrahedron}(...) -> FacetQuadratureRule{RefTetrahedron}(...)
 function QuadratureRule{D, RefTetrahedron}(order::Int) where D
     shapes = (nothing, RefTriangle, RefTetrahedron)
     msg = "`QuadratureRule{$D, RefTetrahedron}(order::Int)` is deprecated, use `QuadratureRule{$(shapes[D])}(order)` instead"
     if D == 2
-        msg *= " (or `FaceQuadratureRule{RefTetrahedron)}(order)` if this is a face quadrature rule)"
+        msg *= " (or `FacetQuadratureRule{RefTetrahedron)}(order)` if this is a face quadrature rule)"
     end
     msg *= "."
     Base.depwarn(msg, :QuadratureRule)
@@ -244,35 +244,35 @@ function QuadratureRule{D, RefTetrahedron}(quad_type::Symbol, order::Int) where 
     shapes = (nothing, RefTriangle, RefTetrahedron)
     msg = "`QuadratureRule{$D, RefTetrahedron}(quad_type::Symbol, order::Int)` is deprecated, use `QuadratureRule{$(shapes[D])}(quad_type, order)` instead"
     if D == 2
-        msg *= " (or `FaceQuadratureRule{RefTetrahedron)}(order)` if this is a face quadrature rule)"
+        msg *= " (or `FacetQuadratureRule{RefTetrahedron)}(order)` if this is a face quadrature rule)"
     end
     msg *= "."
     Base.depwarn(msg, :QuadratureRule)
     return QuadratureRule{shapes[D]}(quad_type, order)
 end
 
-# QuadratureRule{0, RefCube}(...) -> FaceQuadratureRule{RefLine}
+# QuadratureRule{0, RefCube}(...) -> FacetQuadratureRule{RefLine}
 function QuadratureRule{0, RefCube}(order::Int)
-    msg = "`QuadratureRule{0, RefCube}(order::Int)` is deprecated, use `FaceQuadratureRule{RefLine}(order)` instead."
+    msg = "`QuadratureRule{0, RefCube}(order::Int)` is deprecated, use `FacetQuadratureRule{RefLine}(order)` instead."
     Base.depwarn(msg, :QuadratureRule)
-    return FaceQuadratureRule{RefLine}(order)
+    return FacetQuadratureRule{RefLine}(order)
 end
 function QuadratureRule{0, RefCube}(quad_type::Symbol, order::Int)
-    msg = "`QuadratureRule{0, RefCube}(quad_type::Symbol, order::Int)` is deprecated, use `FaceQuadratureRule{RefLine}(quad_type, order)` instead."
+    msg = "`QuadratureRule{0, RefCube}(quad_type::Symbol, order::Int)` is deprecated, use `FacetQuadratureRule{RefLine}(quad_type, order)` instead."
     Base.depwarn(msg, :QuadratureRule)
-    return FaceQuadratureRule{RefLine}(quad_type, order)
+    return FacetQuadratureRule{RefLine}(quad_type, order)
 end
 
-# QuadratureRule{1, RefTetrahedron}(...) -> FaceQuadratureRule{RefTriangle}
+# QuadratureRule{1, RefTetrahedron}(...) -> FacetQuadratureRule{RefTriangle}
 function QuadratureRule{1, RefTetrahedron}(order::Int)
-    msg = "`QuadratureRule{1, RefTetrahedron}(order::Int)` is deprecated, use `FaceQuadratureRule{RefTriangle}(order)` instead."
+    msg = "`QuadratureRule{1, RefTetrahedron}(order::Int)` is deprecated, use `FacetQuadratureRule{RefTriangle}(order)` instead."
     Base.depwarn(msg, :QuadratureRule)
-    return FaceQuadratureRule{RefTriangle}(order)
+    return FacetQuadratureRule{RefTriangle}(order)
 end
 function QuadratureRule{1, RefTetrahedron}(quad_type::Symbol, order::Int)
-    msg = "`QuadratureRule{1, RefTetrahedron}(quad_type::Symbol, order::Int)` is deprecated, use `FaceQuadratureRule{RefTriangle}(quad_type, order)` instead."
+    msg = "`QuadratureRule{1, RefTetrahedron}(quad_type::Symbol, order::Int)` is deprecated, use `FacetQuadratureRule{RefTriangle}(quad_type, order)` instead."
     Base.depwarn(msg, :QuadratureRule)
-    return FaceQuadratureRule{RefTriangle}(quad_type, order)
+    return FacetQuadratureRule{RefTriangle}(quad_type, order)
 end
 
 # Catch remaining cases in (Cell|Face)Value constructors
@@ -292,16 +292,16 @@ function FacetValues(
     ::Type{T}, qr::QuadratureRule{RefLine, TQ}, ip::Interpolation{RefQuadrilateral},
     gip::Interpolation{RefQuadrilateral} = default_geometric_interpolation(ip),
 ) where {T, TQ}
-    Base.depwarn("The input quadrature rule have the wrong reference shape, likely this comes from a constructor like `QuadratureRule{1, RefCube}(...)` which have been deprecated in favor of `FaceQuadratureRule{RefQuadrilateral}(...)`.", :FacetValues)
-    qr′ = create_face_quad_rule(RefQuadrilateral, qr.weights, qr.points)
+    Base.depwarn("The input quadrature rule have the wrong reference shape, likely this comes from a constructor like `QuadratureRule{1, RefCube}(...)` which have been deprecated in favor of `FacetQuadratureRule{RefQuadrilateral}(...)`.", :FacetValues)
+    qr′ = create_facet_quad_rule(RefQuadrilateral, qr.weights, qr.points)
     FacetValues(T, qr′, ip, gip)
 end
 function FacetValues(
     ::Type{T}, qr::QuadratureRule{RefQuadrilateral, TQ}, ip::Interpolation{RefHexahedron},
     gip::Interpolation{RefHexahedron} = default_geometric_interpolation(ip),
 ) where {T, TQ}
-    Base.depwarn("The input quadrature rule have the wrong reference shape, likely this comes from a constructor like `QuadratureRule{2, RefCube}(...)` which have been deprecated in favor of `FaceQuadratureRule{RefHexahedron}(...)`.", :FacetValues)
-    qr′ = create_face_quad_rule(RefHexahedron, qr.weights, qr.points)
+    Base.depwarn("The input quadrature rule have the wrong reference shape, likely this comes from a constructor like `QuadratureRule{2, RefCube}(...)` which have been deprecated in favor of `FacetQuadratureRule{RefHexahedron}(...)`.", :FacetValues)
+    qr′ = create_facet_quad_rule(RefHexahedron, qr.weights, qr.points)
     FacetValues(T, qr′, ip, gip)
 end
 function FacetValues(
@@ -309,8 +309,8 @@ function FacetValues(
     gip::Interpolation{RefTetrahedron} = default_geometric_interpolation(ip),
 ) where {T, TQ}
 @info "fdjsfdsf"
-    Base.depwarn("The input quadrature rule have the wrong reference shape, likely this comes from a constructor like `QuadratureRule{2, RefTetrahedron}(...)` which have been deprecated in favor of `FaceQuadratureRule{RefTetrahedron}(...)`.", :FacetValues)
-    qr′ = create_face_quad_rule(RefTetrahedron, qr.weights, qr.points)
+    Base.depwarn("The input quadrature rule have the wrong reference shape, likely this comes from a constructor like `QuadratureRule{2, RefTetrahedron}(...)` which have been deprecated in favor of `FacetQuadratureRule{RefTetrahedron}(...)`.", :FacetValues)
+    qr′ = create_facet_quad_rule(RefTetrahedron, qr.weights, qr.points)
     FacetValues(T, qr′, ip, gip)
 end
 

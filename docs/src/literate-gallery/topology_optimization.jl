@@ -89,12 +89,12 @@ end
 function create_values()
     ## quadrature rules
     qr      = QuadratureRule{RefQuadrilateral}(2)
-    face_qr = FaceQuadratureRule{RefQuadrilateral}(2)
+    facet_qr = FacetQuadratureRule{RefQuadrilateral}(2)
 
     ## cell and facetvalues for u
     ip = Lagrange{RefQuadrilateral,1}()^2
     cellvalues = CellValues(qr, ip)
-    facetvalues = FacetValues(face_qr, ip)
+    facetvalues = FacetValues(facet_qr, ip)
     
     return cellvalues, facetvalues
 end

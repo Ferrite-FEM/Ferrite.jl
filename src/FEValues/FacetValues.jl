@@ -1,13 +1,13 @@
 """
-    FacetValues([::Type{T}], quad_rule::FaceQuadratureRule, func_interpol::Interpolation, [geom_interpol::Interpolation])
+    FacetValues([::Type{T}], quad_rule::FacetQuadratureRule, func_interpol::Interpolation, [geom_interpol::Interpolation])
 
 A `FacetValues` object facilitates the process of evaluating values of shape functions, gradients of shape functions,
-values of nodal functions, gradients and divergences of nodal functions etc. on the faces of finite elements.
+values of nodal functions, gradients and divergences of nodal functions etc. on the facets of finite elements.
 
 **Arguments:**
 
 * `T`: an optional argument (default to `Float64`) to determine the type the internal data is stored as.
-* `quad_rule`: an instance of a [`FaceQuadratureRule`](@ref)
+* `quad_rule`: an instance of a [`FacetQuadratureRule`](@ref)
 * `func_interpol`: an instance of an [`Interpolation`](@ref) used to interpolate the approximated function
 * `geom_interpol`: an optional instance of an [`Interpolation`](@ref) which is used to interpolate the geometry.
   By default linear Lagrange interpolation is used.
@@ -34,13 +34,13 @@ FacetValues
 struct FacetValues{FV, GM, FQR, detT, nT, V_FV<:AbstractVector{FV}, V_GM<:AbstractVector{GM}} <: AbstractFacetValues
     fun_values::V_FV  # AbstractVector{FunctionValues}
     geo_mapping::V_GM # AbstractVector{GeometryMapping}
-    fqr::FQR          # FaceQuadratureRule
+    fqr::FQR          # FacetQuadratureRule
     detJdV::detT      # AbstractVector{<:Number}
     normals::nT       # AbstractVector{<:Vec}
     current_face::ScalarWrapper{Int}
 end
 
-function FacetValues(::Type{T}, fqr::FaceQuadratureRule, ip_fun::Interpolation, ip_geo::VectorizedInterpolation{sdim} = default_geometric_interpolation(ip_fun); 
+function FacetValues(::Type{T}, fqr::FacetQuadratureRule, ip_fun::Interpolation, ip_geo::VectorizedInterpolation{sdim} = default_geometric_interpolation(ip_fun); 
         update_gradients::Union{Bool,Nothing} = nothing) where {T,sdim} 
     
     FunDiffOrder = update_gradients === nothing ? 1 : convert(Int, update_gradients) # Logic must change when supporting update_hessian kwargs
@@ -55,8 +55,8 @@ function FacetValues(::Type{T}, fqr::FaceQuadratureRule, ip_fun::Interpolation, 
     return FacetValues(fun_values, geo_mapping, fqr, detJdV, normals, ScalarWrapper(1))
 end
 
-FacetValues(qr::FaceQuadratureRule, ip::Interpolation, args...; kwargs...) = FacetValues(Float64, qr, ip, args...; kwargs...)
-function FacetValues(::Type{T}, qr::FaceQuadratureRule, ip::Interpolation, ip_geo::ScalarInterpolation; kwargs...) where T
+FacetValues(qr::FacetQuadratureRule, ip::Interpolation, args...; kwargs...) = FacetValues(Float64, qr, ip, args...; kwargs...)
+function FacetValues(::Type{T}, qr::FacetQuadratureRule, ip::Interpolation, ip_geo::ScalarInterpolation; kwargs...) where T
     return FacetValues(T, qr, ip, VectorizedInterpolation(ip_geo); kwargs...)
 end
 

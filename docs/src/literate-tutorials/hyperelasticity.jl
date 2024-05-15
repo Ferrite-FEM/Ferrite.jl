@@ -328,9 +328,9 @@ function solve()
     ## Finite element base
     ip = Lagrange{RefTetrahedron, 1}()^3
     qr = QuadratureRule{RefTetrahedron}(1)
-    qr_face = FaceQuadratureRule{RefTetrahedron}(1)
+    qr_facet = FacetQuadratureRule{RefTetrahedron}(1)
     cv = CellValues(qr, ip)
-    fv = FacetValues(qr_face, ip)
+    fv = FacetValues(qr_facet, ip)
 
     ## DofHandler
     dh = DofHandler(grid)

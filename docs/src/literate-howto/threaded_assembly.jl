@@ -89,7 +89,7 @@ end;
 function create_values(interpolation_space::Interpolation{refshape}, qr_order::Int) where {dim, refshape<:Ferrite.AbstractRefShape{dim}}
     ## Interpolations and values
     quadrature_rule = QuadratureRule{refshape}(qr_order)
-    face_quadrature_rule = FaceQuadratureRule{refshape}(qr_order)
+    facet_quadrature_rule = FacetQuadratureRule{refshape}(qr_order)
     cellvalues = [CellValues(quadrature_rule, interpolation_space) for i in 1:Threads.nthreads()];
     facetvalues = [FacetValues(face_quadrature_rule, interpolation_space) for i in 1:Threads.nthreads()];
     return cellvalues, facetvalues

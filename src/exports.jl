@@ -21,7 +21,7 @@ export
 
 # Quadrature
     QuadratureRule,
-    FaceQuadratureRule,
+    FacetQuadratureRule,
     getnquadpoints,
 
 # FEValues

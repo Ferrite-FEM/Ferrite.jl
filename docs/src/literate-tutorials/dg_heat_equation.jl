@@ -148,11 +148,11 @@ topology = ExclusiveTopology(grid);
 order = 1;
 ip = DiscontinuousLagrange{RefQuadrilateral, order}();
 qr = QuadratureRule{RefQuadrilateral}(2);
-# For `FacetValues` and `InterfaceValues` we use `FaceQuadratureRule`
-face_qr = FaceQuadratureRule{RefQuadrilateral}(2);
+# For `FacetValues` and `InterfaceValues` we use `FacetQuadratureRule`
+facet_qr = FacetQuadratureRule{RefQuadrilateral}(2);
 cellvalues = CellValues(qr, ip);
-facetvalues = FacetValues(face_qr, ip);
-interfacevalues = InterfaceValues(face_qr, ip);
+facetvalues = FacetValues(facet_qr, ip);
+interfacevalues = InterfaceValues(facet_qr, ip);
 # ### Penalty term parameters
 # We define functions to calculate the diameter of a set of points, used to calculate the characteristic size $h_e$ in the assembly routine.
 getdistance(p1::Vec{N, T},p2::Vec{N, T}) where {N, T} = norm(p1-p2);

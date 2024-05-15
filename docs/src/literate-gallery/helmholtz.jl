@@ -55,9 +55,9 @@ grid = generate_grid(Quadrilateral, (150, 150))
 
 ip = Lagrange{RefQuadrilateral, 1}()
 qr = QuadratureRule{RefQuadrilateral}(2)
-qr_face = FaceQuadratureRule{RefQuadrilateral}(2)
+qr_facet = FacetQuadratureRule{RefQuadrilateral}(2)
 cellvalues = CellValues(qr, ip);
-facetvalues = FacetValues(qr_face, ip);
+facetvalues = FacetValues(qr_facet, ip);
 
 dh = DofHandler(grid)
 add!(dh, :u, ip)

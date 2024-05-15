@@ -139,11 +139,11 @@ end
 function create_values(interpolation)
     ## setup quadrature rules
     qr      = QuadratureRule{RefTetrahedron}(2)
-    face_qr = FaceQuadratureRule{RefTetrahedron}(3)
+    facet_qr = FacetQuadratureRule{RefTetrahedron}(3)
 
     ## Cell and FacetValues for u
     cellvalues_u = CellValues(qr, interpolation)
-    facetvalues_u = FacetValues(face_qr, interpolation)
+    facetvalues_u = FacetValues(facet_qr, interpolation)
 
     return cellvalues_u, facetvalues_u
 end;

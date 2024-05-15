@@ -8,14 +8,14 @@ and gradients of shape functions and function on the interfaces between elements
 The first element of the interface is denoted "here" and the second element "there".
 
 **Constructors**
-* `InterfaceValues(qr::FaceQuadratureRule, ip::Interpolation)`: same quadrature rule and
+* `InterfaceValues(qr::FacetQuadratureRule, ip::Interpolation)`: same quadrature rule and
   interpolation on both sides, default linear Lagrange geometric interpolation.
-* `InterfaceValues(qr::FaceQuadratureRule, ip::Interpolation, ip_geo::Interpolation)`: same
+* `InterfaceValues(qr::FacetQuadratureRule, ip::Interpolation, ip_geo::Interpolation)`: same
   as above but with given geometric interpolation.
-* `InterfaceValues(qr_here::FaceQuadratureRule, ip_here::Interpolation, qr_there::FaceQuadratureRule, ip_there::Interpolation)`:
+* `InterfaceValues(qr_here::FacetQuadratureRule, ip_here::Interpolation, qr_there::FacetQuadratureRule, ip_there::Interpolation)`:
   different quadrature rule and interpolation on the two sides, default linear Lagrange
   geometric interpolation.
-* `InterfaceValues(qr_here::FaceQuadratureRule, ip_here::Interpolation, ip_geo_here::Interpolation, qr_there::FaceQuadratureRule, ip_there::Interpolation, ip_geo_there::Interpolation)`:
+* `InterfaceValues(qr_here::FacetQuadratureRule, ip_here::Interpolation, ip_geo_here::Interpolation, qr_there::FacetQuadratureRule, ip_there::Interpolation, ip_geo_there::Interpolation)`:
   same as above but with given geometric interpolation.
 * `InterfaceValues(fv::FacetValues)`: quadrature rule and interpolations from face values
   (same on both sides).
@@ -57,8 +57,8 @@ struct InterfaceValues{FVA <: FacetValues, FVB <: FacetValues} <: AbstractValues
 end
 
 function InterfaceValues(
-        qr_here::FaceQuadratureRule, ip_here::Interpolation, ipg_here::Interpolation,
-        qr_there::FaceQuadratureRule, ip_there::Interpolation, ipg_there::Interpolation
+        qr_here::FacetQuadratureRule, ip_here::Interpolation, ipg_here::Interpolation,
+        qr_there::FacetQuadratureRule, ip_there::Interpolation, ipg_there::Interpolation
         )
     # FacetValues constructor enforces that refshape matches for all arguments
     here = FacetValues(qr_here, ip_here, ipg_here)
@@ -67,15 +67,15 @@ function InterfaceValues(
 end
 
 # Same on both sides, default geometric mapping
-InterfaceValues(qr_here::FaceQuadratureRule, ip_here::Interpolation) =
+InterfaceValues(qr_here::FacetQuadratureRule, ip_here::Interpolation) =
     InterfaceValues(qr_here, ip_here, deepcopy(qr_here), ip_here)
 # Same on both sides, given geometric mapping
-InterfaceValues(qr_here::FaceQuadratureRule, ip_here::Interpolation, ipg_here::Interpolation) =
+InterfaceValues(qr_here::FacetQuadratureRule, ip_here::Interpolation, ipg_here::Interpolation) =
     InterfaceValues(qr_here, ip_here, ipg_here, deepcopy(qr_here), ip_here, ipg_here)
 # Different on both sides, default geometric mapping
 function InterfaceValues(
-        qr_here::FaceQuadratureRule, ip_here::Interpolation,
-        qr_there::FaceQuadratureRule, ip_there::Interpolation,
+        qr_here::FacetQuadratureRule, ip_here::Interpolation,
+        qr_there::FacetQuadratureRule, ip_there::Interpolation,
     )
     return InterfaceValues(
         qr_here, ip_here, default_geometric_interpolation(ip_here),

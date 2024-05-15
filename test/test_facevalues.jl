@@ -1,17 +1,17 @@
 @testset "FacetValues" begin
 for (scalar_interpol, quad_rule) in (
-                                    (Lagrange{RefLine, 1}(), FaceQuadratureRule{RefLine}(2)),
-                                    (Lagrange{RefLine, 2}(), FaceQuadratureRule{RefLine}(2)),
-                                    (Lagrange{RefQuadrilateral, 1}(), FaceQuadratureRule{RefQuadrilateral}(2)),
-                                    (Lagrange{RefQuadrilateral, 2}(), FaceQuadratureRule{RefQuadrilateral}(2)),
-                                    (Lagrange{RefTriangle, 1}(), FaceQuadratureRule{RefTriangle}(2)),
-                                    (Lagrange{RefTriangle, 2}(), FaceQuadratureRule{RefTriangle}(2)),
-                                    (Lagrange{RefHexahedron, 1}(), FaceQuadratureRule{RefHexahedron}(2)),
-                                    (Serendipity{RefQuadrilateral, 2}(), FaceQuadratureRule{RefQuadrilateral}(2)),
-                                    (Lagrange{RefTetrahedron, 1}(), FaceQuadratureRule{RefTetrahedron}(2)),
-                                    (Lagrange{RefTetrahedron, 2}(), FaceQuadratureRule{RefTetrahedron}(2)),
-                                    (Lagrange{RefPyramid, 2}(), FaceQuadratureRule{RefPyramid}(2)),
-                                    (Lagrange{RefPrism, 2}(), FaceQuadratureRule{RefPrism}(2)),
+                                    (Lagrange{RefLine, 1}(), FacetQuadratureRule{RefLine}(2)),
+                                    (Lagrange{RefLine, 2}(), FacetQuadratureRule{RefLine}(2)),
+                                    (Lagrange{RefQuadrilateral, 1}(), FacetQuadratureRule{RefQuadrilateral}(2)),
+                                    (Lagrange{RefQuadrilateral, 2}(), FacetQuadratureRule{RefQuadrilateral}(2)),
+                                    (Lagrange{RefTriangle, 1}(), FacetQuadratureRule{RefTriangle}(2)),
+                                    (Lagrange{RefTriangle, 2}(), FacetQuadratureRule{RefTriangle}(2)),
+                                    (Lagrange{RefHexahedron, 1}(), FacetQuadratureRule{RefHexahedron}(2)),
+                                    (Serendipity{RefQuadrilateral, 2}(), FacetQuadratureRule{RefQuadrilateral}(2)),
+                                    (Lagrange{RefTetrahedron, 1}(), FacetQuadratureRule{RefTetrahedron}(2)),
+                                    (Lagrange{RefTetrahedron, 2}(), FacetQuadratureRule{RefTetrahedron}(2)),
+                                    (Lagrange{RefPyramid, 2}(), FacetQuadratureRule{RefPyramid}(2)),
+                                    (Lagrange{RefPrism, 2}(), FacetQuadratureRule{RefPrism}(2)),
                                    )
 
     for func_interpol in (scalar_interpol, VectorizedInterpolation(scalar_interpol))
@@ -133,7 +133,7 @@ end
 
 @testset "show" begin
     # Just smoke test to make sure show doesn't error. 
-    fv = FacetValues(FaceQuadratureRule{RefQuadrilateral}(2), Lagrange{RefQuadrilateral,2}())
+    fv = FacetValues(FacetQuadratureRule{RefQuadrilateral}(2), Lagrange{RefQuadrilateral,2}())
     showstring = sprint(show, MIME"text/plain"(), fv)
     @test startswith(showstring, "FacetValues(scalar, rdim=2, sdim=2): 2 quadrature points per face")
     @test contains(showstring, "Function interpolation: Lagrange{RefQuadrilateral, 2}()")

@@ -42,11 +42,11 @@ end;
 function create_values(interpolation_u, interpolation_p)
     ## quadrature rules
     qr      = QuadratureRule{RefTriangle}(3)
-    face_qr = FaceQuadratureRule{RefTriangle}(3)
+    facet_qr = FacetQuadratureRule{RefTriangle}(3)
 
     ## cell and FacetValues for u
     cellvalues_u = CellValues(qr, interpolation_u)
-    facetvalues_u = FacetValues(face_qr, interpolation_u)
+    facetvalues_u = FacetValues(facet_qr, interpolation_u)
 
     ## cellvalues for p
     cellvalues_p = CellValues(qr, interpolation_p)

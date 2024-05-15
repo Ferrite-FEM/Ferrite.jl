@@ -140,7 +140,7 @@ end
     qp = 1
     ip = Lagrange{RefTriangle,1}()
     qr = QuadratureRule{RefTriangle}(1)
-    qr_f = FaceQuadratureRule{RefTriangle}(1)
+    qr_f = FacetQuadratureRule{RefTriangle}(1)
     csv = CellValues(qr, ip)
     cvv = CellValues(qr, VectorizedInterpolation(ip))
     csv_embedded = CellValues(qr, ip, ip^3)

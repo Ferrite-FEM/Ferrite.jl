@@ -202,7 +202,7 @@ end
     for (dim, celltype) in ((1, Line), (2, Quadrilateral), (3, Hexahedron))
         grid = generate_grid(celltype, ntuple(_ -> 3, dim))
         ip = Lagrange{Ferrite.RefHypercube{dim}, 1}()^dim
-        fqr = FaceQuadratureRule{Ferrite.RefHypercube{dim}}(2)
+        fqr = FacetQuadratureRule{Ferrite.RefHypercube{dim}}(2)
         fv = FacetValues(fqr, ip)
         dh = DofHandler(grid); add!(dh, :u, ip); close!(dh)
         faceset = getfacetset(grid, "right")
@@ -549,8 +549,8 @@ end
 #                   +-----+-----+-----+
 # test application: integrate jump across element boundary 5
     ip = DiscontinuousLagrange{RefQuadrilateral, 1}()^2
-    qr_face = FaceQuadratureRule{RefQuadrilateral}(2)
-    iv = InterfaceValues(qr_face, ip)
+    qr_facet = FacetQuadratureRule{RefQuadrilateral}(2)
+    iv = InterfaceValues(qr_facet, ip)
     dh = DofHandler(quadgrid)
     add!(dh, :u, ip)
     close!(dh)

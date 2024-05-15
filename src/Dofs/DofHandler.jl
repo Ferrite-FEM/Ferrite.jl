@@ -354,16 +354,15 @@ function __close!(dh::DofHandler{dim}) where {dim}
     # TODO: No need to allocate this vector for fields that don't have vertex dofs
     vertexdicts = [zeros(Int, getnnodes(get_grid(dh))) for _ in 1:numfields]
 
-    # `edgedict` keeps track of the visited edges, this will only be used for a 3D problem.
+    # `edgedict` keeps track of the visited edges.
     # An edge is uniquely determined by two global vertices, with global direction going
-    # from low to high vertex number.
-    edgedicts = [Dict{Tuple{Int,Int}, Int}() for _ in 1:numfields]
+    # from low to high vertex node number, see sortedge
+    edgedicts = [Dict{NTuple{2, Int}, Int}() for _ in 1:numfields]
 
     # `facedict` keeps track of the visited faces. We only need to store the first dof we
-    # add to the face since currently more dofs per face isn't supported. In
-    # 2D a face (i.e. a line) is uniquely determined by 2 vertices, and in 3D a face (i.e. a
-    # surface) is uniquely determined by 3 vertices.
-    facedicts = [Dict{Tuple{Int,Int,Int}, Int}() for _ in 1:numfields]
+    # add to the face since currently more dofs per face isn't supported. 
+    # A face is uniquely determined by 3 vertex nodes, see sortface
+    facedicts = [Dict{NTuple{3, Int}, Int}() for _ in 1:numfields]
 
     # Set initial values
     nextdof = 1  # next free dof to distribute

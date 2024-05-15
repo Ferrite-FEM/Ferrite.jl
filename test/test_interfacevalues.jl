@@ -52,7 +52,7 @@
             @test_throws ErrorException("Invalid base function $(n_basefuncs + 1). Interface has only $(n_basefuncs) base functions") shape_value_jump(iv, 1, n_basefuncs + 1)
             @test_throws ErrorException("Invalid base function $(n_basefuncs + 1). Interface has only $(n_basefuncs) base functions") shape_gradient_average(iv, 1, n_basefuncs + 1)
 
-            # Test function* copied from facevalues tests
+            # Test function* copied from facetvalues tests
             nbf_a = Ferrite.getngeobasefunctions(iv.here)
             nbf_b = Ferrite.getngeobasefunctions(iv.there)
             for here in (true, false)
@@ -115,18 +115,18 @@
     getcelltypedim(::Type{<:Ferrite.AbstractCell{shape}}) where {dim, shape <: Ferrite.AbstractRefShape{dim}} = dim
     for (cell_shape, scalar_interpol, quad_rule) in (
                                         #TODO: update interfaces for lines
-                                        (Line, DiscontinuousLagrange{RefLine, 1}(), FaceQuadratureRule{RefLine}(2)),
-                                        (QuadraticLine, DiscontinuousLagrange{RefLine, 2}(), FaceQuadratureRule{RefLine}(2)), 
-                                        (Quadrilateral, DiscontinuousLagrange{RefQuadrilateral, 1}(), FaceQuadratureRule{RefQuadrilateral}(2)),
-                                        (QuadraticQuadrilateral, DiscontinuousLagrange{RefQuadrilateral, 2}(), FaceQuadratureRule{RefQuadrilateral}(2)),
-                                        (Triangle, DiscontinuousLagrange{RefTriangle, 1}(), FaceQuadratureRule{RefTriangle}(2)),
-                                        (QuadraticTriangle, DiscontinuousLagrange{RefTriangle, 2}(), FaceQuadratureRule{RefTriangle}(2)),
-                                        (Hexahedron, DiscontinuousLagrange{RefHexahedron, 1}(), FaceQuadratureRule{RefHexahedron}(2)),
-                                        # (QuadraticQuadrilateral, Serendipity{RefQuadrilateral, 2}(), FaceQuadratureRule{RefQuadrilateral}(2)),
-                                        (Tetrahedron, DiscontinuousLagrange{RefTetrahedron, 1}(), FaceQuadratureRule{RefTetrahedron}(2)),
-                                        # (QuadraticTetrahedron, Lagrange{RefTetrahedron, 2}(), FaceQuadratureRule{RefTetrahedron}(2)),
-                                        (Wedge, DiscontinuousLagrange{RefPrism, 1}(), FaceQuadratureRule{RefPrism}(2)),
-                                        (Pyramid, DiscontinuousLagrange{RefPyramid, 1}(), FaceQuadratureRule{RefPyramid}(2)),
+                                        (Line, DiscontinuousLagrange{RefLine, 1}(), FacetQuadratureRule{RefLine}(2)),
+                                        (QuadraticLine, DiscontinuousLagrange{RefLine, 2}(), FacetQuadratureRule{RefLine}(2)), 
+                                        (Quadrilateral, DiscontinuousLagrange{RefQuadrilateral, 1}(), FacetQuadratureRule{RefQuadrilateral}(2)),
+                                        (QuadraticQuadrilateral, DiscontinuousLagrange{RefQuadrilateral, 2}(), FacetQuadratureRule{RefQuadrilateral}(2)),
+                                        (Triangle, DiscontinuousLagrange{RefTriangle, 1}(), FacetQuadratureRule{RefTriangle}(2)),
+                                        (QuadraticTriangle, DiscontinuousLagrange{RefTriangle, 2}(), FacetQuadratureRule{RefTriangle}(2)),
+                                        (Hexahedron, DiscontinuousLagrange{RefHexahedron, 1}(), FacetQuadratureRule{RefHexahedron}(2)),
+                                        # (QuadraticQuadrilateral, Serendipity{RefQuadrilateral, 2}(), FacetQuadratureRule{RefQuadrilateral}(2)),
+                                        (Tetrahedron, DiscontinuousLagrange{RefTetrahedron, 1}(), FacetQuadratureRule{RefTetrahedron}(2)),
+                                        # (QuadraticTetrahedron, Lagrange{RefTetrahedron, 2}(), FacetQuadratureRule{RefTetrahedron}(2)),
+                                        (Wedge, DiscontinuousLagrange{RefPrism, 1}(), FacetQuadratureRule{RefPrism}(2)),
+                                        (Pyramid, DiscontinuousLagrange{RefPyramid, 1}(), FacetQuadratureRule{RefPyramid}(2)),
                                        )
         dim = getcelltypedim(cell_shape)
         grid = generate_grid(cell_shape, ntuple(i -> 2, dim))
@@ -161,7 +161,7 @@
         points = Vec{2, Float64}.([[0.0, 0.844948974278318], [0.205051025721682, 0.694948974278318], [0.487979589711327, 0.487979589711327], [0.0, 0.355051025721682], [0.29202041028867254, 0.29202041028867254], [0.694948974278318, 0.205051025721682], [0.0, 0.0], [0.355051025721682, 0.0], [0.844948974278318, 0.0]])
         # Weights resulted in 4 times the volume [-1, 1] -> so /4 to get [0, 1]
         weights = [0.096614387479324, 0.308641975308642, 0.087870061825481, 0.187336229804627, 0.677562036939952, 0.308641975308642, 0.049382716049383, 0.187336229804627, 0.096614387479324] / 4
-        quad_rule = Ferrite.create_face_quad_rule(RefTetrahedron, weights, points)
+        quad_rule = Ferrite.create_facet_quad_rule(RefTetrahedron, weights, points)
         dim = getcelltypedim(cell_shape)
         grid = generate_grid(cell_shape, ntuple(i -> 2, dim))
         @testset "faces nodes indices" begin
@@ -194,8 +194,8 @@
     #     grid = Grid(cells, nodes)
     #     topology = ExclusiveTopology(grid)
     #     test_interfacevalues(grid,
-    #     DiscontinuousLagrange{RefQuadrilateral, 1}(), FaceQuadratureRule{RefQuadrilateral}(2),
-    #     DiscontinuousLagrange{RefTriangle, 1}(), FaceQuadratureRule{RefTriangle}(2))
+    #     DiscontinuousLagrange{RefQuadrilateral, 1}(), FacetQuadratureRule{RefQuadrilateral}(2),
+    #     DiscontinuousLagrange{RefTriangle, 1}(), FacetQuadratureRule{RefTriangle}(2))
     # end
     @testset "Unordered nodes 3D" begin
         dim = 2
@@ -211,14 +211,14 @@
 
         grid = Grid(cells, nodes)
         test_interfacevalues(grid,
-            InterfaceValues(FaceQuadratureRule{RefHexahedron}(2), DiscontinuousLagrange{RefHexahedron, 1}()))
+            InterfaceValues(FacetQuadratureRule{RefHexahedron}(2), DiscontinuousLagrange{RefHexahedron, 1}()))
     end
     @testset "Interface dof_range" begin
         grid = generate_grid(Quadrilateral,(3,3))
         ip_u = DiscontinuousLagrange{RefQuadrilateral, 1}()^2
         ip_p = DiscontinuousLagrange{RefQuadrilateral, 1}()
-        qr_face = FaceQuadratureRule{RefQuadrilateral}(2)
-        iv = InterfaceValues(qr_face, ip_p)
+        qr_facet = FacetQuadratureRule{RefQuadrilateral}(2)
+        iv = InterfaceValues(qr_facet, ip_p)
         @test iv == InterfaceValues(iv.here, iv.there)
         dh = DofHandler(grid)
         add!(dh, :u, ip_u)
@@ -229,7 +229,7 @@
         @test dof_range(ic, :p) == (9:12, 25:28)
     end
     # Test copy
-    iv = InterfaceValues(FaceQuadratureRule{RefQuadrilateral}(2), DiscontinuousLagrange{RefQuadrilateral, 1}())
+    iv = InterfaceValues(FacetQuadratureRule{RefQuadrilateral}(2), DiscontinuousLagrange{RefQuadrilateral, 1}())
     ivc = copy(iv)
     @test typeof(iv) == typeof(ivc)
     for fname in fieldnames(typeof(iv))
@@ -255,7 +255,7 @@
         @test_throws ArgumentError("transformation is not implemented") Ferrite.get_transformation_matrix(it)
     end
     @testset "show" begin
-        iv = InterfaceValues(FaceQuadratureRule{RefQuadrilateral}(2), Lagrange{RefQuadrilateral,2}())
+        iv = InterfaceValues(FacetQuadratureRule{RefQuadrilateral}(2), Lagrange{RefQuadrilateral,2}())
         showstring = sprint(show, MIME"text/plain"(), iv)
         @test contains(showstring, "InterfaceValues with")
     end
