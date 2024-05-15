@@ -964,4 +964,14 @@ end
     transfered_grid_rotated = Ferrite.AMR.creategrid(adaptive_grid)
     @test transfered_grid_rotated.conformity_info[11] == [1,7]
     @test transfered_grid_rotated.conformity_info[10] == [3,7]
+
+    # multiple corner connections in 2D by disc discretization
+    grid = Ferrite.generate_simple_disc_grid(Quadrilateral,10)
+    adaptive_grid = ForestBWG(grid,3)
+    @test getncells(adaptive_grid) == 10
+    Ferrite.refine!(adaptive_grid.cells[1],adaptive_grid.cells[1].leaves[1])
+    Ferrite.refine!(adaptive_grid.cells[1],adaptive_grid.cells[1].leaves[3])
+    @test getncells(adaptive_grid) == 16
+    Ferrite.balanceforest!(adaptive_grid)
+    @test getncells(adaptive_grid) == 9*4 + 3 + 4
 end
