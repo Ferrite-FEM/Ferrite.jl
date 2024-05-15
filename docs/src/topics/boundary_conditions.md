@@ -205,7 +205,7 @@ simply a translation (e.g. sides of a cube) this matrix will be the identity mat
 In `Ferrite` this type of periodic Dirichlet boundary conditions can be added to the
 `ConstraintHandler` by constructing an instance of [`PeriodicDirichlet`](@ref). This is
 usually done it two steps. First we compute the mapping between mirror and image faces using
-[`collect_periodic_faces`](@ref). Here we specify the mirror set and image sets (the sets
+[`collect_periodic_facets`](@ref). Here we specify the mirror set and image sets (the sets
 are usually known or can be constructed easily ) and the mapping ``\varphi``. Second we
 construct the constraint using the `PeriodicDirichlet` constructor. Here we specify which
 components of the function that should be constrained, and the rotation matrix
@@ -223,7 +223,7 @@ ch = ConstraintHandler(dofhandler)
 
 # Compute the face mapping
 φ(x) = x - Vec{2}((1.0, 0.0))
-face_mapping = collect_periodic_faces(grid, "left", "right", φ)
+face_mapping = collect_periodic_facets(grid, "left", "right", φ)
 
 # Construct the periodic constraint for field :u
 pdbc = PeriodicDirichlet(:u, face_mapping, [1, 2])

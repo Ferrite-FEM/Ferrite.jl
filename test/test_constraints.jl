@@ -3,7 +3,7 @@
 @testset "constructors and error checking" begin
     grid = generate_grid(Triangle, (2, 2))
     Γ = getfacetset(grid, "left")
-    face_map = collect_periodic_faces(grid, "left", "right")
+    face_map = collect_periodic_facets(grid, "left", "right")
     dh = DofHandler(grid)
     add!(dh, :s, Lagrange{RefTriangle,1}())
     add!(dh, :v, Lagrange{RefTriangle,1}()^2)
@@ -451,10 +451,10 @@ function rotpio2(v, dir=3)
     return typeof(v)(i -> rv[i])
 end
 
-@testset "periodic bc: collect_periodic_faces" begin
+@testset "periodic bc: collect_periodic_facets" begin
     # 1D (TODO: Broken)
     # grid = generate_grid(Line, (2,))
-    # face_map = collect_periodic_faces(grid)
+    # face_map = collect_periodic_facets(grid)
 
 
     # 2D quad grid
@@ -471,18 +471,18 @@ end
     #       1       1
     for grid  in (generate_grid(Quadrilateral, (2, 2)), generate_grid(QuadraticQuadrilateral, (2, 2)))
         correct_map = [
-            PeriodicFacePair(FaceIndex(1, 1), FaceIndex(3, 3), 0x00, true),
-            PeriodicFacePair(FaceIndex(2, 1), FaceIndex(4, 3), 0x00, true),
-            PeriodicFacePair(FaceIndex(1, 4), FaceIndex(2, 2), 0x00, true),
-            PeriodicFacePair(FaceIndex(3, 4), FaceIndex(4, 2), 0x00, true),
+            PeriodicFacetPair(FacetIndex(1, 1), FacetIndex(3, 3), 0x00, true),
+            PeriodicFacetPair(FacetIndex(2, 1), FacetIndex(4, 3), 0x00, true),
+            PeriodicFacetPair(FacetIndex(1, 4), FacetIndex(2, 2), 0x00, true),
+            PeriodicFacetPair(FacetIndex(3, 4), FacetIndex(4, 2), 0x00, true),
         ]
 
         # Brute force path with no boundary info
-        face_map = collect_periodic_faces(grid)
+        face_map = collect_periodic_facets(grid)
         @test issetequal(face_map, correct_map)
 
         # Brute force path with boundary info
-        face_map = collect_periodic_faces(grid,
+        face_map = collect_periodic_facets(grid,
             union(
                 getfacetset(grid, "left"),
                 getfacetset(grid, "bottom"),
@@ -495,7 +495,7 @@ end
         @test issetequal(face_map, correct_map)
 
         # Brute force, keeping the mirror/image ordering
-        face_map = collect_periodic_faces(grid,
+        face_map = collect_periodic_facets(grid,
             union(
                 getfacetset(grid, "right"),
                 getfacetset(grid, "top"),
@@ -505,28 +505,28 @@ end
                 getfacetset(grid, "bottom"),
             )
         )
-        @test issetequal(face_map, map(x -> PeriodicFacePair(x.image, x.mirror, x.rotation, x.mirrored), correct_map))
+        @test issetequal(face_map, map(x -> PeriodicFacetPair(x.image, x.mirror, x.rotation, x.mirrored), correct_map))
 
         # Known pairs with transformation
-        face_map = collect_periodic_faces(grid, "left", "right", x -> x - Vec{2}((2.0, 0.0)))
-        collect_periodic_faces!(face_map, grid, "bottom", "top", x -> x - Vec{2}((0.0, 2.0)))
+        face_map = collect_periodic_facets(grid, "left", "right", x -> x - Vec{2}((2.0, 0.0)))
+        collect_periodic_facets!(face_map, grid, "bottom", "top", x -> x - Vec{2}((0.0, 2.0)))
         @test issetequal(face_map, correct_map)
 
         # More advanced transformation by rotation
-        face_map = collect_periodic_faces(grid, "left", "bottom", rotpio2)
-        collect_periodic_faces!(face_map, grid, "right", "top", rotpio2)
+        face_map = collect_periodic_facets(grid, "left", "bottom", rotpio2)
+        collect_periodic_facets!(face_map, grid, "right", "top", rotpio2)
         @test issetequal(face_map, [
-            PeriodicFacePair(FaceIndex(3, 4), FaceIndex(1, 1), 0x00, false),
-            PeriodicFacePair(FaceIndex(1, 4), FaceIndex(2, 1), 0x00, false),
-            PeriodicFacePair(FaceIndex(2, 2), FaceIndex(4, 3), 0x00, false),
-            PeriodicFacePair(FaceIndex(4, 2), FaceIndex(3, 3), 0x00, false),
+            PeriodicFacetPair(FacetIndex(3, 4), FacetIndex(1, 1), 0x00, false),
+            PeriodicFacetPair(FacetIndex(1, 4), FacetIndex(2, 1), 0x00, false),
+            PeriodicFacetPair(FacetIndex(2, 2), FacetIndex(4, 3), 0x00, false),
+            PeriodicFacetPair(FacetIndex(4, 2), FacetIndex(3, 3), 0x00, false),
         ])
 
         # Rotate and translate
-        face_map = collect_periodic_faces(grid, "bottom", "left", x -> rotpio2(x) - Vec{2}((0.0, 2.0)))
+        face_map = collect_periodic_facets(grid, "bottom", "left", x -> rotpio2(x) - Vec{2}((0.0, 2.0)))
         @test issetequal(face_map, [
-            PeriodicFacePair(FaceIndex(1, 1), FaceIndex(1, 4), 0x00, true),
-            PeriodicFacePair(FaceIndex(2, 1), FaceIndex(3, 4), 0x00, true),
+            PeriodicFacetPair(FacetIndex(1, 1), FacetIndex(1, 4), 0x00, true),
+            PeriodicFacetPair(FacetIndex(2, 1), FacetIndex(3, 4), 0x00, true),
         ])
     end
 
@@ -548,18 +548,18 @@ end
     for grid in (generate_grid(Triangle, (2, 2)), generate_grid(QuadraticTriangle, (2, 2)))
 
         correct_map = [
-            PeriodicFacePair(FaceIndex(1, 1), FaceIndex(6, 2), 0x00, true),
-            PeriodicFacePair(FaceIndex(3, 1), FaceIndex(8, 2), 0x00, true),
-            PeriodicFacePair(FaceIndex(1, 3), FaceIndex(4, 1), 0x00, true),
-            PeriodicFacePair(FaceIndex(5, 3), FaceIndex(8, 1), 0x00, true),
+            PeriodicFacetPair(FacetIndex(1, 1), FacetIndex(6, 2), 0x00, true),
+            PeriodicFacetPair(FacetIndex(3, 1), FacetIndex(8, 2), 0x00, true),
+            PeriodicFacetPair(FacetIndex(1, 3), FacetIndex(4, 1), 0x00, true),
+            PeriodicFacetPair(FacetIndex(5, 3), FacetIndex(8, 1), 0x00, true),
         ]
 
         # Brute force path with no boundary info
-        face_map = collect_periodic_faces(grid)
+        face_map = collect_periodic_facets(grid)
         @test issetequal(face_map, correct_map)
 
         # Brute force path with boundary info
-        face_map = collect_periodic_faces(grid,
+        face_map = collect_periodic_facets(grid,
             union(
                 getfacetset(grid, "left"),
                 getfacetset(grid, "bottom"),
@@ -572,7 +572,7 @@ end
         @test issetequal(face_map, correct_map)
 
         # Brute force, keeping the mirror/image ordering
-        face_map = collect_periodic_faces(grid,
+        face_map = collect_periodic_facets(grid,
             union(
                 getfacetset(grid, "right"),
                 getfacetset(grid, "top"),
@@ -582,28 +582,28 @@ end
                 getfacetset(grid, "bottom"),
             )
         )
-        @test issetequal(face_map, map(x -> PeriodicFacePair(x.image, x.mirror, x.rotation, x.mirrored), correct_map))
+        @test issetequal(face_map, map(x -> PeriodicFacetPair(x.image, x.mirror, x.rotation, x.mirrored), correct_map))
 
         # Known pairs with transformation
-        face_map = collect_periodic_faces(grid, "left", "right", x -> x - Vec{2}((2.0, 0.0)))
-        collect_periodic_faces!(face_map, grid, "bottom", "top", x -> x - Vec{2}((0.0, 2.0)))
+        face_map = collect_periodic_facets(grid, "left", "right", x -> x - Vec{2}((2.0, 0.0)))
+        collect_periodic_facets!(face_map, grid, "bottom", "top", x -> x - Vec{2}((0.0, 2.0)))
         @test issetequal(face_map, correct_map)
 
         # More advanced transformation by rotation
-        face_map = collect_periodic_faces(grid, "left", "bottom", rotpio2)
-        collect_periodic_faces!(face_map, grid, "right", "top", rotpio2)
+        face_map = collect_periodic_facets(grid, "left", "bottom", rotpio2)
+        collect_periodic_facets!(face_map, grid, "right", "top", rotpio2)
         @test issetequal(face_map, [
-            PeriodicFacePair(FaceIndex(5, 3), FaceIndex(1, 1), 0x00, false),
-            PeriodicFacePair(FaceIndex(1, 3), FaceIndex(3, 1), 0x00, false),
-            PeriodicFacePair(FaceIndex(4, 1), FaceIndex(8, 2), 0x00, false),
-            PeriodicFacePair(FaceIndex(8, 1), FaceIndex(6, 2), 0x00, false),
+            PeriodicFacetPair(FacetIndex(5, 3), FacetIndex(1, 1), 0x00, false),
+            PeriodicFacetPair(FacetIndex(1, 3), FacetIndex(3, 1), 0x00, false),
+            PeriodicFacetPair(FacetIndex(4, 1), FacetIndex(8, 2), 0x00, false),
+            PeriodicFacetPair(FacetIndex(8, 1), FacetIndex(6, 2), 0x00, false),
         ])
 
         # Rotate and translate
-        face_map = collect_periodic_faces(grid, "bottom", "left", x -> rotpio2(x) - Vec{2}((0.0, 2.0)))
+        face_map = collect_periodic_facets(grid, "bottom", "left", x -> rotpio2(x) - Vec{2}((0.0, 2.0)))
         @test issetequal(face_map, [
-            PeriodicFacePair(FaceIndex(1, 1), FaceIndex(1, 3), 0x00, true),
-            PeriodicFacePair(FaceIndex(3, 1), FaceIndex(5, 3), 0x00, true),
+            PeriodicFacetPair(FacetIndex(1, 1), FacetIndex(1, 3), 0x00, true),
+            PeriodicFacetPair(FacetIndex(3, 1), FacetIndex(5, 3), 0x00, true),
         ])
     end
 
@@ -611,120 +611,120 @@ end
 
     # 3D hex grids
     grid = generate_grid(Hexahedron, (1, 1, 1))
-    face_map = collect_periodic_faces(grid)
+    face_map = collect_periodic_facets(grid)
     @test issetequal(face_map, [
-        PeriodicFacePair(FaceIndex(1, 1), FaceIndex(1, 6), 0x00, true),
-        PeriodicFacePair(FaceIndex(1, 2), FaceIndex(1, 4), 0x03, true),
-        PeriodicFacePair(FaceIndex(1, 5), FaceIndex(1, 3), 0x00, true),
+        PeriodicFacetPair(FacetIndex(1, 1), FacetIndex(1, 6), 0x00, true),
+        PeriodicFacetPair(FacetIndex(1, 2), FacetIndex(1, 4), 0x03, true),
+        PeriodicFacetPair(FacetIndex(1, 5), FacetIndex(1, 3), 0x00, true),
     ])
 
     grid = generate_grid(Hexahedron, (2, 2, 2))
-    face_map = collect_periodic_faces(grid, "left", "right", x -> x - Vec{3}((2.0, 0.0, 0.0)))
-    collect_periodic_faces!(face_map, grid, "bottom", "top")
-    collect_periodic_faces!(face_map, grid, "front", "back")
+    face_map = collect_periodic_facets(grid, "left", "right", x -> x - Vec{3}((2.0, 0.0, 0.0)))
+    collect_periodic_facets!(face_map, grid, "bottom", "top")
+    collect_periodic_facets!(face_map, grid, "front", "back")
     @test issetequal(face_map, [
-        PeriodicFacePair(FaceIndex(1, 5), FaceIndex(2, 3), 0x00, true),
-        PeriodicFacePair(FaceIndex(3, 5), FaceIndex(4, 3), 0x00, true),
-        PeriodicFacePair(FaceIndex(5, 5), FaceIndex(6, 3), 0x00, true),
-        PeriodicFacePair(FaceIndex(7, 5), FaceIndex(8, 3), 0x00, true),
-        PeriodicFacePair(FaceIndex(1, 1), FaceIndex(5, 6), 0x00, true),
-        PeriodicFacePair(FaceIndex(2, 1), FaceIndex(6, 6), 0x00, true),
-        PeriodicFacePair(FaceIndex(3, 1), FaceIndex(7, 6), 0x00, true),
-        PeriodicFacePair(FaceIndex(4, 1), FaceIndex(8, 6), 0x00, true),
-        PeriodicFacePair(FaceIndex(1, 2), FaceIndex(3, 4), 0x03, true),
-        PeriodicFacePair(FaceIndex(2, 2), FaceIndex(4, 4), 0x03, true),
-        PeriodicFacePair(FaceIndex(5, 2), FaceIndex(7, 4), 0x03, true),
-        PeriodicFacePair(FaceIndex(6, 2), FaceIndex(8, 4), 0x03, true),
+        PeriodicFacetPair(FacetIndex(1, 5), FacetIndex(2, 3), 0x00, true),
+        PeriodicFacetPair(FacetIndex(3, 5), FacetIndex(4, 3), 0x00, true),
+        PeriodicFacetPair(FacetIndex(5, 5), FacetIndex(6, 3), 0x00, true),
+        PeriodicFacetPair(FacetIndex(7, 5), FacetIndex(8, 3), 0x00, true),
+        PeriodicFacetPair(FacetIndex(1, 1), FacetIndex(5, 6), 0x00, true),
+        PeriodicFacetPair(FacetIndex(2, 1), FacetIndex(6, 6), 0x00, true),
+        PeriodicFacetPair(FacetIndex(3, 1), FacetIndex(7, 6), 0x00, true),
+        PeriodicFacetPair(FacetIndex(4, 1), FacetIndex(8, 6), 0x00, true),
+        PeriodicFacetPair(FacetIndex(1, 2), FacetIndex(3, 4), 0x03, true),
+        PeriodicFacetPair(FacetIndex(2, 2), FacetIndex(4, 4), 0x03, true),
+        PeriodicFacetPair(FacetIndex(5, 2), FacetIndex(7, 4), 0x03, true),
+        PeriodicFacetPair(FacetIndex(6, 2), FacetIndex(8, 4), 0x03, true),
     ])
 
     # Rotation
     grid = generate_grid(Hexahedron, (2, 2, 2))
-    face_map = collect_periodic_faces(grid, "left", "front", rotpio2)
+    face_map = collect_periodic_facets(grid, "left", "front", rotpio2)
     @test issetequal(face_map, [
-        PeriodicFacePair(FaceIndex(1, 5), FaceIndex(2, 2), 0x03, false),
-        PeriodicFacePair(FaceIndex(3, 5), FaceIndex(1, 2), 0x03, false),
-        PeriodicFacePair(FaceIndex(5, 5), FaceIndex(6, 2), 0x03, false),
-        PeriodicFacePair(FaceIndex(7, 5), FaceIndex(5, 2), 0x03, false),
+        PeriodicFacetPair(FacetIndex(1, 5), FacetIndex(2, 2), 0x03, false),
+        PeriodicFacetPair(FacetIndex(3, 5), FacetIndex(1, 2), 0x03, false),
+        PeriodicFacetPair(FacetIndex(5, 5), FacetIndex(6, 2), 0x03, false),
+        PeriodicFacetPair(FacetIndex(7, 5), FacetIndex(5, 2), 0x03, false),
     ])
 
     # Rotation and translation
     grid = generate_grid(Hexahedron, (2, 2, 2))
-    face_map = collect_periodic_faces(grid, "front", "left", x -> rotpio2(x) - Vec{3}((0.0, 2.0, 0.0)))
+    face_map = collect_periodic_facets(grid, "front", "left", x -> rotpio2(x) - Vec{3}((0.0, 2.0, 0.0)))
     @test issetequal(face_map, [
-        PeriodicFacePair(FaceIndex(1, 2), FaceIndex(1, 5), 0x00, true),
-        PeriodicFacePair(FaceIndex(2, 2), FaceIndex(3, 5), 0x00, true),
-        PeriodicFacePair(FaceIndex(5, 2), FaceIndex(5, 5), 0x00, true),
-        PeriodicFacePair(FaceIndex(6, 2), FaceIndex(7, 5), 0x00, true),
+        PeriodicFacetPair(FacetIndex(1, 2), FacetIndex(1, 5), 0x00, true),
+        PeriodicFacetPair(FacetIndex(2, 2), FacetIndex(3, 5), 0x00, true),
+        PeriodicFacetPair(FacetIndex(5, 2), FacetIndex(5, 5), 0x00, true),
+        PeriodicFacetPair(FacetIndex(6, 2), FacetIndex(7, 5), 0x00, true),
     ])
 
     # Test with keyword tol
     grid = generate_grid(Hexahedron, (2, 2, 2))
-    face_map     = collect_periodic_faces(grid, "bottom", "top")
-    face_map_TOL = collect_periodic_faces(grid, "bottom", "top"; tol=1e-10)
+    face_map     = collect_periodic_facets(grid, "bottom", "top")
+    face_map_TOL = collect_periodic_facets(grid, "bottom", "top"; tol=1e-10)
     @test face_map == face_map_TOL
-    collect_periodic_faces!(face_map, grid, "right", "left")
-    collect_periodic_faces!(face_map_TOL, grid, "right", "left"; tol=1e-10)
+    collect_periodic_facets!(face_map, grid, "right", "left")
+    collect_periodic_facets!(face_map_TOL, grid, "right", "left"; tol=1e-10)
     @test face_map == face_map_TOL
 
     ####################################################################
 
     # 3D tetra grid
     grid = generate_grid(Tetrahedron, (1, 1, 1))
-    face_map = collect_periodic_faces(grid)
+    face_map = collect_periodic_facets(grid)
     @test issetequal(face_map, [
-        PeriodicFacePair(FaceIndex(1, 4), FaceIndex(4, 1), 0x00, true)
-        PeriodicFacePair(FaceIndex(2, 2), FaceIndex(6, 1), 0x00, true)
-        PeriodicFacePair(FaceIndex(2, 1), FaceIndex(3, 3), 0x02, true)
-        PeriodicFacePair(FaceIndex(5, 1), FaceIndex(4, 3), 0x02, true)
-        PeriodicFacePair(FaceIndex(1, 1), FaceIndex(5, 3), 0x00, true)
-        PeriodicFacePair(FaceIndex(3, 1), FaceIndex(6, 3), 0x00, true)
+        PeriodicFacetPair(FacetIndex(1, 4), FacetIndex(4, 1), 0x00, true)
+        PeriodicFacetPair(FacetIndex(2, 2), FacetIndex(6, 1), 0x00, true)
+        PeriodicFacetPair(FacetIndex(2, 1), FacetIndex(3, 3), 0x02, true)
+        PeriodicFacetPair(FacetIndex(5, 1), FacetIndex(4, 3), 0x02, true)
+        PeriodicFacetPair(FacetIndex(1, 1), FacetIndex(5, 3), 0x00, true)
+        PeriodicFacetPair(FacetIndex(3, 1), FacetIndex(6, 3), 0x00, true)
     ])
 
     grid = generate_grid(Tetrahedron, (2, 2, 2))
-    face_map = collect_periodic_faces(grid, "left", "right", x -> x - Vec{3}((2.0, 0.0, 0.0)))
-    collect_periodic_faces!(face_map, grid, "bottom", "top")
-    collect_periodic_faces!(face_map, grid, "front", "back")
+    face_map = collect_periodic_facets(grid, "left", "right", x -> x - Vec{3}((2.0, 0.0, 0.0)))
+    collect_periodic_facets!(face_map, grid, "bottom", "top")
+    collect_periodic_facets!(face_map, grid, "front", "back")
     @test issetequal(face_map, [
-        PeriodicFacePair(FaceIndex(1, 4), FaceIndex(10, 1), 0x00, true)
-        PeriodicFacePair(FaceIndex(2, 2), FaceIndex(12, 1), 0x00, true)
-        PeriodicFacePair(FaceIndex(13, 4), FaceIndex(22, 1), 0x00, true)
-        PeriodicFacePair(FaceIndex(14, 2), FaceIndex(24, 1), 0x00, true)
-        PeriodicFacePair(FaceIndex(25, 4), FaceIndex(34, 1), 0x00, true)
-        PeriodicFacePair(FaceIndex(26, 2), FaceIndex(36, 1), 0x00, true)
-        PeriodicFacePair(FaceIndex(37, 4), FaceIndex(46, 1), 0x00, true)
-        PeriodicFacePair(FaceIndex(38, 2), FaceIndex(48, 1), 0x00, true)
-        PeriodicFacePair(FaceIndex(2, 1), FaceIndex(15, 3), 0x02, true)
-        PeriodicFacePair(FaceIndex(5, 1), FaceIndex(16, 3), 0x02, true)
-        PeriodicFacePair(FaceIndex(8, 1), FaceIndex(21, 3), 0x02, true)
-        PeriodicFacePair(FaceIndex(11, 1), FaceIndex(22, 3), 0x02, true)
-        PeriodicFacePair(FaceIndex(26, 1), FaceIndex(39, 3), 0x02, true)
-        PeriodicFacePair(FaceIndex(29, 1), FaceIndex(40, 3), 0x02, true)
-        PeriodicFacePair(FaceIndex(32, 1), FaceIndex(45, 3), 0x02, true)
-        PeriodicFacePair(FaceIndex(35, 1), FaceIndex(46, 3), 0x02, true)
-        PeriodicFacePair(FaceIndex(1, 1), FaceIndex(29, 3), 0x00, true)
-        PeriodicFacePair(FaceIndex(3, 1), FaceIndex(30, 3), 0x00, true)
-        PeriodicFacePair(FaceIndex(7, 1), FaceIndex(35, 3), 0x00, true)
-        PeriodicFacePair(FaceIndex(9, 1), FaceIndex(36, 3), 0x00, true)
-        PeriodicFacePair(FaceIndex(13, 1), FaceIndex(41, 3), 0x00, true)
-        PeriodicFacePair(FaceIndex(15, 1), FaceIndex(42, 3), 0x00, true)
-        PeriodicFacePair(FaceIndex(19, 1), FaceIndex(47, 3), 0x00, true)
-        PeriodicFacePair(FaceIndex(21, 1), FaceIndex(48, 3), 0x00, true)
+        PeriodicFacetPair(FacetIndex(1, 4), FacetIndex(10, 1), 0x00, true)
+        PeriodicFacetPair(FacetIndex(2, 2), FacetIndex(12, 1), 0x00, true)
+        PeriodicFacetPair(FacetIndex(13, 4), FacetIndex(22, 1), 0x00, true)
+        PeriodicFacetPair(FacetIndex(14, 2), FacetIndex(24, 1), 0x00, true)
+        PeriodicFacetPair(FacetIndex(25, 4), FacetIndex(34, 1), 0x00, true)
+        PeriodicFacetPair(FacetIndex(26, 2), FacetIndex(36, 1), 0x00, true)
+        PeriodicFacetPair(FacetIndex(37, 4), FacetIndex(46, 1), 0x00, true)
+        PeriodicFacetPair(FacetIndex(38, 2), FacetIndex(48, 1), 0x00, true)
+        PeriodicFacetPair(FacetIndex(2, 1), FacetIndex(15, 3), 0x02, true)
+        PeriodicFacetPair(FacetIndex(5, 1), FacetIndex(16, 3), 0x02, true)
+        PeriodicFacetPair(FacetIndex(8, 1), FacetIndex(21, 3), 0x02, true)
+        PeriodicFacetPair(FacetIndex(11, 1), FacetIndex(22, 3), 0x02, true)
+        PeriodicFacetPair(FacetIndex(26, 1), FacetIndex(39, 3), 0x02, true)
+        PeriodicFacetPair(FacetIndex(29, 1), FacetIndex(40, 3), 0x02, true)
+        PeriodicFacetPair(FacetIndex(32, 1), FacetIndex(45, 3), 0x02, true)
+        PeriodicFacetPair(FacetIndex(35, 1), FacetIndex(46, 3), 0x02, true)
+        PeriodicFacetPair(FacetIndex(1, 1), FacetIndex(29, 3), 0x00, true)
+        PeriodicFacetPair(FacetIndex(3, 1), FacetIndex(30, 3), 0x00, true)
+        PeriodicFacetPair(FacetIndex(7, 1), FacetIndex(35, 3), 0x00, true)
+        PeriodicFacetPair(FacetIndex(9, 1), FacetIndex(36, 3), 0x00, true)
+        PeriodicFacetPair(FacetIndex(13, 1), FacetIndex(41, 3), 0x00, true)
+        PeriodicFacetPair(FacetIndex(15, 1), FacetIndex(42, 3), 0x00, true)
+        PeriodicFacetPair(FacetIndex(19, 1), FacetIndex(47, 3), 0x00, true)
+        PeriodicFacetPair(FacetIndex(21, 1), FacetIndex(48, 3), 0x00, true)
     ])
 
     # Rotation
     grid = generate_grid(Tetrahedron, (1, 1, 1))
-    face_map = collect_periodic_faces(grid, "left", "front", rotpio2)
+    face_map = collect_periodic_facets(grid, "left", "front", rotpio2)
     @test issetequal(face_map, [
-        PeriodicFacePair(FaceIndex(1, 4), FaceIndex(2, 1), 0x02, false)
-        PeriodicFacePair(FaceIndex(2, 2), FaceIndex(5, 1), 0x00, false)
+        PeriodicFacetPair(FacetIndex(1, 4), FacetIndex(2, 1), 0x02, false)
+        PeriodicFacetPair(FacetIndex(2, 2), FacetIndex(5, 1), 0x00, false)
     ])
 
     # Rotation and translation
     grid = generate_grid(Tetrahedron, (1, 1, 1))
-    face_map = collect_periodic_faces(grid, "front", "left", x -> rotpio2(rotate(x, Vec{3}((1., 0., 0.)), 3pi/2)) - Vec{3}((0.0, 2.0, 0.0)))
+    face_map = collect_periodic_facets(grid, "front", "left", x -> rotpio2(rotate(x, Vec{3}((1., 0., 0.)), 3pi/2)) - Vec{3}((0.0, 2.0, 0.0)))
     @test issetequal(face_map, [
-        PeriodicFacePair(FaceIndex(2, 1), FaceIndex(1, 4), 0x01, true)
-        PeriodicFacePair(FaceIndex(5, 1), FaceIndex(2, 2), 0x01, true)
+        PeriodicFacetPair(FacetIndex(2, 1), FacetIndex(1, 4), 0x01, true)
+        PeriodicFacetPair(FacetIndex(5, 1), FacetIndex(2, 2), 0x01, true)
     ])
 end # testset
 
@@ -780,8 +780,8 @@ end # testset
     add!(dh, :s, Lagrange{RefQuadrilateral,1}())
     close!(dh)
     ch = ConstraintHandler(dh)
-    face_map = collect_periodic_faces(grid, "left", "right")
-    collect_periodic_faces!(face_map, grid, "bottom", "top")
+    face_map = collect_periodic_facets(grid, "left", "right")
+    collect_periodic_facets!(face_map, grid, "bottom", "top")
     pbc = PeriodicDirichlet(:s, face_map)
     add!(ch, pbc)
     @test get_dof_map(ch) == Dict{Int,Int}(
@@ -794,7 +794,7 @@ end # testset
 
     # Rotation
     ch = ConstraintHandler(dh)
-    face_map = collect_periodic_faces(grid, "left", "bottom", rotpio2)
+    face_map = collect_periodic_facets(grid, "left", "bottom", rotpio2)
     pbc = PeriodicDirichlet(:s, face_map)
     add!(ch, pbc)
     @test get_dof_map(ch) == Dict{Int,Int}(
@@ -805,7 +805,7 @@ end # testset
 
     # Rotation and translation
     ch = ConstraintHandler(dh)
-    face_map = collect_periodic_faces(grid, "bottom", "left", x -> rotpio2(x) - Vec{2}((0.0, 2.0)))
+    face_map = collect_periodic_facets(grid, "bottom", "left", x -> rotpio2(x) - Vec{2}((0.0, 2.0)))
     pbc = PeriodicDirichlet(:s, face_map)
     add!(ch, pbc)
     @test get_dof_map(ch) == Dict{Int,Int}(
@@ -819,8 +819,8 @@ end # testset
     add!(dh, :v, Lagrange{RefQuadrilateral,1}()^2)
     close!(dh)
     ch = ConstraintHandler(dh)
-    face_map = collect_periodic_faces(grid, "left", "right")
-    collect_periodic_faces!(face_map, grid, "bottom", "top")
+    face_map = collect_periodic_facets(grid, "left", "right")
+    collect_periodic_facets!(face_map, grid, "bottom", "top")
     pbc = PeriodicDirichlet(:v, face_map, [1, 2])
     add!(ch, pbc)
     @test get_dof_map(ch) == Dict{Int,Int}(
@@ -843,7 +843,7 @@ end # testset
     )
 
     # Rotation without dof rotation
-    face_map = collect_periodic_faces(grid, "left", "bottom", rotpio2)
+    face_map = collect_periodic_facets(grid, "left", "bottom", rotpio2)
     ch = ConstraintHandler(dh)
     pbc = PeriodicDirichlet(:v, face_map, [1, 2])
     add!(ch, pbc)
@@ -857,7 +857,7 @@ end # testset
     )
 
     # Rotation with dof rotation
-    face_map = collect_periodic_faces(grid, "left", "bottom", rotpio2)
+    face_map = collect_periodic_facets(grid, "left", "bottom", rotpio2)
     ch = ConstraintHandler(dh)
     pbc = PeriodicDirichlet(:v, face_map, rotation_tensor(-π/2), [1, 2])
     add!(ch, pbc)
@@ -878,7 +878,7 @@ end # testset
     end
 
     # Rotation and translation
-    face_map = collect_periodic_faces(grid, "bottom", "left", x -> rotpio2(x) - Vec{2}((0.0, 2.0)))
+    face_map = collect_periodic_facets(grid, "bottom", "left", x -> rotpio2(x) - Vec{2}((0.0, 2.0)))
     ch = ConstraintHandler(dh)
     pbc = PeriodicDirichlet(:v, face_map, [1, 2])
     add!(ch, pbc)
@@ -905,8 +905,8 @@ end # testset
     add!(dh, :s, Lagrange{RefQuadrilateral,2}())
     close!(dh)
     ch = ConstraintHandler(dh)
-    face_map = collect_periodic_faces(grid, "left", "right")
-    collect_periodic_faces!(face_map, grid, "bottom", "top")
+    face_map = collect_periodic_facets(grid, "left", "right")
+    collect_periodic_facets!(face_map, grid, "bottom", "top")
     pbc = PeriodicDirichlet(:s, face_map)
     add!(ch, pbc)
     @test get_dof_map(ch) == Dict{Int,Int}(
@@ -923,7 +923,7 @@ end # testset
 
     # Rotation
     ch = ConstraintHandler(dh)
-    face_map = collect_periodic_faces(grid, "left", "bottom", rotpio2)
+    face_map = collect_periodic_facets(grid, "left", "bottom", rotpio2)
     pbc = PeriodicDirichlet(:s, face_map)
     add!(ch, pbc)
     @test get_dof_map(ch) == Dict{Int,Int}(
@@ -936,7 +936,7 @@ end # testset
 
     # Rotation and translation
     ch = ConstraintHandler(dh)
-    face_map = collect_periodic_faces(grid, "bottom", "left", x -> rotpio2(x) - Vec{2}((0.0, 2.0)))
+    face_map = collect_periodic_facets(grid, "bottom", "left", x -> rotpio2(x) - Vec{2}((0.0, 2.0)))
     pbc = PeriodicDirichlet(:s, face_map)
     add!(ch, pbc)
     @test get_dof_map(ch) == Dict{Int,Int}(
@@ -965,7 +965,7 @@ end # testset
     add!(dh, :v, Lagrange{RefQuadrilateral,2}()^2)
     close!(dh)
     ch = ConstraintHandler(dh)
-    face_map = collect_periodic_faces(grid, "left", "bottom", rotpio2)
+    face_map = collect_periodic_facets(grid, "left", "bottom", rotpio2)
     pbc = PeriodicDirichlet(:v, face_map, rotation_tensor(-π/2), [1, 2])
     add!(ch, pbc)
     close!(ch)
@@ -991,7 +991,7 @@ end # testset
 
     # 3D hex scalar/vector
     grid = generate_grid(Hexahedron, (1, 1, 1))
-    face_map = collect_periodic_faces(grid)
+    face_map = collect_periodic_facets(grid)
     dh = DofHandler(grid)
     add!(dh, :s, Lagrange{RefHexahedron,1}())
     add!(dh, :v, Lagrange{RefHexahedron,1}()^2)
@@ -1019,7 +1019,7 @@ end # testset
 
     # Rotation
     ch = ConstraintHandler(dh)
-    face_map = collect_periodic_faces(grid, "left", "front", rotpio2)
+    face_map = collect_periodic_facets(grid, "left", "front", rotpio2)
     pbc = PeriodicDirichlet(:s, face_map)
     add!(ch, pbc)
     @test get_dof_map(ch) == Dict{Int,Int}(
@@ -1030,7 +1030,7 @@ end # testset
     )
 
     ch = ConstraintHandler(dh)
-    face_map = collect_periodic_faces(grid, "front", "left", x -> rotpio2(x) - Vec{3}((0.0, 2.0, 0.0)))
+    face_map = collect_periodic_facets(grid, "front", "left", x -> rotpio2(x) - Vec{3}((0.0, 2.0, 0.0)))
     pbc = PeriodicDirichlet(:s, face_map)
     add!(ch, pbc)
     @test get_dof_map(ch) == Dict{Int,Int}(
@@ -1049,21 +1049,21 @@ end # testset
 
     compare_by_dbc(
         dh,
-        PeriodicDirichlet(:s, collect_periodic_faces(grid, "left", "right")),
+        PeriodicDirichlet(:s, collect_periodic_facets(grid, "left", "right")),
         Dirichlet(:s, getfacetset(grid, "left"), (x, t) -> 0.),
         Dirichlet(:s, getfacetset(grid, "right"), (x, t) -> 0.),
     )
 
     compare_by_dbc(
         dh,
-        PeriodicDirichlet(:v, collect_periodic_faces(grid, "left", "right"), [1, 2]),
+        PeriodicDirichlet(:v, collect_periodic_facets(grid, "left", "right"), [1, 2]),
         Dirichlet(:v, getfacetset(grid, "left"), (x, t) -> [0., 0.], [1, 2]),
         Dirichlet(:v, getfacetset(grid, "right"), (x, t) -> [0., 0.], [1, 2]),
     )
 
     compare_by_dbc(
         dh,
-        PeriodicDirichlet(:v, collect_periodic_faces(grid, "left", "right"), [2]),
+        PeriodicDirichlet(:v, collect_periodic_facets(grid, "left", "right"), [2]),
         Dirichlet(:v, getfacetset(grid, "left"), (x, t) -> 0., [2]),
         Dirichlet(:v, getfacetset(grid, "right"), (x, t) -> 0., [2]),
     )
@@ -1073,7 +1073,7 @@ end # testset
     dh = DofHandler(grid)
     add!(dh, :s, Lagrange{RefTetrahedron,1}())
     close!(dh)
-    face_map = collect_periodic_faces(grid)
+    face_map = collect_periodic_facets(grid)
     ch = ConstraintHandler(dh)
     pbc = PeriodicDirichlet(:s, face_map)
     add!(ch, pbc)
@@ -1087,7 +1087,7 @@ end # testset
     dh = DofHandler(grid)
     add!(dh, :v, Lagrange{RefTetrahedron,1}()^2)
     close!(dh)
-    face_map = collect_periodic_faces(grid, "left", "right")
+    face_map = collect_periodic_facets(grid, "left", "right")
     ch = ConstraintHandler(dh)
     pbc = PeriodicDirichlet(:v, face_map, [1, 2])
     add!(ch, pbc)
@@ -1109,7 +1109,7 @@ end # testset
     add!(dh, :v, Lagrange{RefHexahedron,1}()^3)
     close!(dh)
     rot = rotation_tensor(Vec{3}((0., 1., 0.)), π/2)
-    face_map = collect_periodic_faces(grid, "left", "bottom", x -> rot ⋅ x)
+    face_map = collect_periodic_facets(grid, "left", "bottom", x -> rot ⋅ x)
     ch = ConstraintHandler(dh)
     pbc = PeriodicDirichlet(:v, face_map, rot, [1, 2, 3])
     add!(ch, pbc)
@@ -1155,38 +1155,38 @@ end # testset
         # Scalar
         compare_by_dbc(
             dh,
-            PeriodicDirichlet(:s, collect_periodic_faces(grid, "left", "right")),
+            PeriodicDirichlet(:s, collect_periodic_facets(grid, "left", "right")),
             Dirichlet(:s, getfacetset(grid, "left"), (x,t) -> 0),
             Dirichlet(:s, getfacetset(grid, "right"), (x,t) -> 0),
         )
         compare_by_dbc(
             dh,
-            PeriodicDirichlet(:s, collect_periodic_faces(grid, "right", "left")),
+            PeriodicDirichlet(:s, collect_periodic_facets(grid, "right", "left")),
             Dirichlet(:s, getfacetset(grid, "right"), (x,t) -> 0),
             Dirichlet(:s, getfacetset(grid, "left"), (x,t) -> 0),
         )
         compare_by_dbc(
             dh,
-            PeriodicDirichlet(:s, collect_periodic_faces(grid, "bottom", "top")),
+            PeriodicDirichlet(:s, collect_periodic_facets(grid, "bottom", "top")),
             Dirichlet(:s, getfacetset(grid, "bottom"), (x,t) -> 0),
             Dirichlet(:s, getfacetset(grid, "top"), (x,t) -> 0),
         )
         compare_by_dbc(
             dh,
-            PeriodicDirichlet(:s, collect_periodic_faces(grid, "top", "bottom")),
+            PeriodicDirichlet(:s, collect_periodic_facets(grid, "top", "bottom")),
             Dirichlet(:s, getfacetset(grid, "top"), (x,t) -> 0),
             Dirichlet(:s, getfacetset(grid, "bottom"), (x,t) -> 0),
         )
         if D == 3
             compare_by_dbc(
                 dh,
-                PeriodicDirichlet(:s, collect_periodic_faces(grid, "front", "back")),
+                PeriodicDirichlet(:s, collect_periodic_facets(grid, "front", "back")),
                 Dirichlet(:s, getfacetset(grid, "front"), (x,t) -> 0),
                 Dirichlet(:s, getfacetset(grid, "back"), (x,t) -> 0),
             )
             compare_by_dbc(
                 dh,
-                PeriodicDirichlet(:s, collect_periodic_faces(grid, "back", "front")),
+                PeriodicDirichlet(:s, collect_periodic_facets(grid, "back", "front")),
                 Dirichlet(:s, getfacetset(grid, "back"), (x,t) -> 0),
                 Dirichlet(:s, getfacetset(grid, "front"), (x,t) -> 0),
             )
@@ -1195,38 +1195,38 @@ end # testset
         # Vector
         compare_by_dbc(
             dh,
-            PeriodicDirichlet(:v, collect_periodic_faces(grid, "left", "right"), collect(1:D)),
+            PeriodicDirichlet(:v, collect_periodic_facets(grid, "left", "right"), collect(1:D)),
             Dirichlet(:v, getfacetset(grid, "left"), (x,t) -> fill(0., D), collect(1:D)),
             Dirichlet(:v, getfacetset(grid, "right"), (x,t) -> fill(0., D), collect(1:D)),
         )
         compare_by_dbc(
             dh,
-            PeriodicDirichlet(:v, collect_periodic_faces(grid, "right", "left"), [D-1]),
+            PeriodicDirichlet(:v, collect_periodic_facets(grid, "right", "left"), [D-1]),
             Dirichlet(:v, getfacetset(grid, "right"), (x,t) -> 0, [D-1]),
             Dirichlet(:v, getfacetset(grid, "left"), (x,t) -> 0, [D-1]),
         )
         compare_by_dbc(
             dh,
-            PeriodicDirichlet(:v, collect_periodic_faces(grid, "bottom", "top"), [1, 2]),
+            PeriodicDirichlet(:v, collect_periodic_facets(grid, "bottom", "top"), [1, 2]),
             Dirichlet(:v, getfacetset(grid, "bottom"), (x,t) -> [0., 0.], [1, 2]),
             Dirichlet(:v, getfacetset(grid, "top"), (x,t) -> [0., 0.], [1, 2]),
         )
         compare_by_dbc(
             dh,
-            PeriodicDirichlet(:v, collect_periodic_faces(grid, "top", "bottom"), [D]),
+            PeriodicDirichlet(:v, collect_periodic_facets(grid, "top", "bottom"), [D]),
             Dirichlet(:v, getfacetset(grid, "top"), (x,t) -> 0, [D]),
             Dirichlet(:v, getfacetset(grid, "bottom"), (x,t) -> 0, [D]),
         )
         if D == 3
             compare_by_dbc(
                 dh,
-                PeriodicDirichlet(:v, collect_periodic_faces(grid, "front", "back"), 1:D),
+                PeriodicDirichlet(:v, collect_periodic_facets(grid, "front", "back"), 1:D),
                 Dirichlet(:v, getfacetset(grid, "front"), (x,t) -> fill(0., D), 1:D),
                 Dirichlet(:v, getfacetset(grid, "back"), (x,t) -> fill(0., D), 1:D),
             )
             compare_by_dbc(
                 dh,
-                PeriodicDirichlet(:v, collect_periodic_faces(grid, "back", "front"), D),
+                PeriodicDirichlet(:v, collect_periodic_facets(grid, "back", "front"), D),
                 Dirichlet(:v, getfacetset(grid, "back"), (x,t) -> 0, D),
                 Dirichlet(:v, getfacetset(grid, "front"), (x,t) -> 0, D),
             )
@@ -1270,7 +1270,7 @@ end # testset
     ch1 = ConstraintHandler(dh)
     add!(ch1, Dirichlet(:u, getfacetset(grid, "left"), (x, t) -> 0))
     add!(ch1, Dirichlet(:u, getfacetset(grid, "right"), (x, t) -> 1))
-    add!(ch1, PeriodicDirichlet(:u, collect_periodic_faces(grid, "bottom", "top")))
+    add!(ch1, PeriodicDirichlet(:u, collect_periodic_facets(grid, "bottom", "top")))
     close!(ch1)
     update!(ch1, 0)
 
@@ -1287,7 +1287,7 @@ end # testset
     ##  u8 = 0
     ##  u9 = 1
     ch2 = ConstraintHandler(dh)
-    add!(ch2, PeriodicDirichlet(:u, collect_periodic_faces(grid, "bottom", "top")))
+    add!(ch2, PeriodicDirichlet(:u, collect_periodic_facets(grid, "bottom", "top")))
     add!(ch2, Dirichlet(:u, getfacetset(grid, "left"), (x, t) -> 0))
     add!(ch2, Dirichlet(:u, getfacetset(grid, "right"), (x, t) -> 1))
     close!(ch2)
@@ -1389,7 +1389,7 @@ end # testset
     # Periodic constraints (non-local couplings) #
     ch_p = ConstraintHandler(dh)
     # TODO: Order matters, but probably shouldn't, see Ferrite-FEM/Ferrite.jl#530
-    face_map = collect_periodic_faces(grid, getfacetset(grid, "bottom"), getfacetset(grid, "top"))
+    face_map = collect_periodic_facets(grid, getfacetset(grid, "bottom"), getfacetset(grid, "top"))
     add!(ch_p, PeriodicDirichlet(:u, face_map))
     add!(ch_p, Dirichlet(:u, getfacetset(grid, "left"), (x, t) -> 0))
     add!(ch_p, Dirichlet(:u, getfacetset(grid, "right"), (x, t) -> 1))

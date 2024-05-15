@@ -147,7 +147,7 @@ end
         ch = ConstraintHandler(dh)
         add!(ch, Dirichlet(:u, getfacetset(grid, "left"), (x, t) -> 0))
         add!(ch, Dirichlet(:u, getfacetset(grid, "right"), (x, t) -> 2))
-        face_map = collect_periodic_faces(grid, "bottom", "top")
+        face_map = collect_periodic_facets(grid, "bottom", "top")
         add!(ch, PeriodicDirichlet(:u, face_map))
         close!(ch)
         update!(ch, 0)
