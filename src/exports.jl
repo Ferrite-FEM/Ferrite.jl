@@ -103,7 +103,6 @@ export
     addcellset!,
     transform_coordinates!,
     generate_grid,
-    addfaceset!, # deprecated
 
 # Grid coloring
     create_coloring,

@@ -341,3 +341,15 @@ end
 @deprecate end_assemble finish_assemble
 @deprecate get_point_values evaluate_at_points
 @deprecate transform! transform_coordinates!
+
+export addfaceset! # deprecated, export for backwards compatibility.
+# Use warn to show for standard users.  
+function addfaceset!(grid::AbstractGrid, name, set::Union{Set{FaceIndex}, Vector{FaceIndex}})
+    @warn "addfaceset! is deprecated, use addfacetset! instead. Interpreting FaceIndex as FacetIndex"
+    new_set = Set(FacetIndex(idx[1], idx[2]) for idx in set)
+    addfacetset!(grid, name, new_set)
+end
+function addfaceset!(grid, name, f::Function; kwargs...)
+    @warn "addfaceset! is deprecated, using addfacetset! instead"
+    return addfacetset!(grid, name, f; kwargs...)
+end
