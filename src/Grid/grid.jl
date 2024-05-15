@@ -72,10 +72,6 @@ Note that the vertices are sufficient to define an edge uniquely.
 """
 edges(::AbstractCell)
 
-#TODO: Add docs for reference_vertices and reference_edges
-# Or remove, doesn't seemed used at all. 
-# Alternatively, make separate file for the reference shapes. 
-# Cells should rather use info from reference shape than other way around...
 """
     reference_faces(::AbstractRefShape)
 
@@ -576,28 +572,11 @@ addcellset!(grid, "right", x -> norm(x[1]) < 2.0 ) #add cell to cellset right, i
 ```
 """
 function addcellset!(grid::AbstractGrid, name::String, cellid::Union{Set{Int},Vector{Int}})
-    _check_setname(grid.cellsets,  name)
-    cells = Set(cellid)
-    _warn_emptyset(cells, name)
-    grid.cellsets[name] = cells
-    grid
+    _addset!(grid, name, cellid, grid.cellsets)
 end
 
 function addcellset!(grid::AbstractGrid, name::String, f::Function; all::Bool=true)
-    _check_setname(grid.cellsets, name)
-    cells = Set{Int}()
-    for (i, cell) in enumerate(getcells(grid))
-        pass = all
-        for node_idx in cell.nodes
-            node = grid.nodes[node_idx]
-            v = f(node.x)
-            all ? (!v && (pass = false; break)) : (v && (pass = true; break))
-        end
-        pass && push!(cells, i)
-    end
-    _warn_emptyset(cells, name)
-    grid.cellsets[name] = cells
-    grid
+    _addset!(grid, name, create_cellset(grid, f; all), grid.cellsets)
 end
 
 """
@@ -679,7 +658,7 @@ function push_entity_instances!(set::Set{BI}, grid::AbstractGrid, top, entity::B
 end
 
 function _create_boundaryset(f::Function, grid::AbstractGrid, top #=::ExclusiveTopology=#, ::Type{BI}; all = true) where {BI <: BoundaryIndex}
-    # Function barrier
+    # Function barrier as get_facet_facet_neighborhood is not always type stable
     function _makeset(ff_nh)
         set = Set{BI}()
         for (ff_nh_idx, neighborhood) in pairs(ff_nh)
@@ -689,29 +668,34 @@ function _create_boundaryset(f::Function, grid::AbstractGrid, top #=::ExclusiveT
             facet_nr = ff_nh_idx[2]
             cell = getcells(grid, cell_idx)
             facet_nodes = facets(cell)[facet_nr]
-            #println(FacetIndex(cell_idx, facet_nr), ", ", facet_nodes)
             for (subentity_idx, subentity_nodes) in pairs(boundaryfunction(BI)(cell))
                 if Base.all(n -> n in facet_nodes, subentity_nodes)
-                    #check_fun = all ? Base.all : any
-                    #pass = check_fun(node_idx -> f(get_node_coordinate(grid, node_idx)), subentity_nodes)
                     pass = all
                     for node_idx in subentity_nodes
                         v = f(get_node_coordinate(grid, node_idx))
                         all ? (!v && (pass = false; break)) : (v && (pass = true; break))
                     end
-                    if pass 
-                        index = BI(cell_idx, subentity_idx)
-                        push_entity_instances!(set, grid, top, index)
-                    end
+                    pass && push_entity_instances!(set, grid, top, BI(cell_idx, subentity_idx))
                 end
             end
         end
         return set
     end
-    return _makeset(get_facet_facet_neighborhood(top, grid))
+    return _makeset(get_facet_facet_neighborhood(top, grid))::Set{BI}
 end
 
-# Following julia style-guide, should be (f, grid; kwargs...), but doesn't match add<X>set!() already defined...
+function create_cellset(grid::AbstractGrid, f::Function; all::Bool=true)
+    cells = Set{Int}()
+    for (i, cell) in enumerate(getcells(grid))
+        pass = all
+        for node_idx in get_node_ids(cell)
+            v = f(get_node_coordinate(grid, node_idx))
+            all ? (!v && (pass = false; break)) : (v && (pass = true; break))
+        end
+        pass && push!(cells, i)
+    end
+    return cells 
+end
 create_vertexset(grid::AbstractGrid, f::Function; kwargs...) = _create_set(f, grid, VertexIndex; kwargs...)
 create_edgeset(  grid::AbstractGrid, f::Function; kwargs...) = _create_set(f, grid, EdgeIndex;   kwargs...)
 create_faceset(  grid::AbstractGrid, f::Function; kwargs...) = _create_set(f, grid, FaceIndex;   kwargs...)
@@ -721,7 +705,6 @@ create_boundaryvertexset(grid::AbstractGrid, top, f::Function; kwargs...) = _cre
 create_boundaryedgeset(  grid::AbstractGrid, top, f::Function; kwargs...) = _create_boundaryset(f, grid, top, EdgeIndex; kwargs...)
 create_boundaryfaceset(  grid::AbstractGrid, top, f::Function; kwargs...) = _create_boundaryset(f, grid, top, FaceIndex; kwargs...)
 create_boundaryfacetset( grid::AbstractGrid, top, f::Function; kwargs...) = _create_boundaryset(f, grid, top, FacetIndex; kwargs...)
-
 
 """
 addboundaryvertexset!(grid::AbstractGrid, topology::ExclusiveTopology, name::String, f::Function; all::Bool=true)
@@ -751,95 +734,6 @@ function addboundaryfacetset!(grid::AbstractGrid, top, name::String, f::Function
     set = create_boundaryfacetset(grid, top, f; kwargs...)
     return _addset!(grid, name, set, grid.facetsets)
 end
-
-#=
-"""
-    getfaceedges(grid::AbstractGrid, face::FaceIndex)
-    getfaceedges(cell::AbstractCell, face::FaceIndex)
-
-Returns the edges represented as `Set{EdgeIndex}` in a given face represented as
-`FaceIndex`.
-
-```julia-repl
-julia> using Ferrite; using Ferrite: getfaceedges
-
-julia> grid = generate_grid(Tetrahedron, (2,1,1));
-
-julia> getfaceedges(grid, FaceIndex(4,2))
-Set{EdgeIndex} with 3 elements:
-  EdgeIndex((4, 4))
-  EdgeIndex((4, 5))
-  EdgeIndex((4, 1))
-```
-"""
-function getfaceedges end
-
-"""
-    getfacevertices(grid::AbstractGrid, face::FaceIndex)
-    getfacevertices(cell::AbstractCell, face::FaceIndex)
-
-Returns the vertices represented as `Set{VertexIndex}` in a given face represented as
-`FaceIndex`.
-
-```julia-repl
-julia> using Ferrite; using Ferrite: getfacevertices
-
-julia> grid = generate_grid(Tetrahedron, (2,1,1));
-
-julia> getfacevertices(grid, FaceIndex(4,2))
-Set{VertexIndex} with 3 elements:
-  VertexIndex((4, 2))
-  VertexIndex((4, 4))
-  VertexIndex((4, 1))
-```
-"""
-function getfacevertices end
-
-"""
-    getedgevertices(grid::AbstractGrid, edge::EdgeIndex)
-    getedgevertices(cell::AbstractCell, edge::EdgeIndex)
-
-Returns the vertices represented as `Set{VertexIndex}` in a given edge represented as
-`EdgeIndex`.
-
-```julia-repl
-julia> using Ferrite; using Ferrite: getedgevertices
-
-julia> grid = generate_grid(Tetrahedron, (2,1,1));
-
-julia> getedgevertices(grid, EdgeIndex(4,2))
-Set{EdgeIndex} with 2 elements:
-  VertexIndex((4, 2))
-  VertexIndex((4, 3))
-```
-"""
-function getedgevertices end
-
-for (func,             entity_f, subentity_f, entity_t,   subentity_t) in (
-    (:getfaceedges,    :faces,   :edges,      :FaceIndex, :EdgeIndex),
-    (:getfacevertices, :faces,   :vertices,   :FaceIndex, :VertexIndex),
-    (:getedgevertices, :edges,   :vertices,   :EdgeIndex, :VertexIndex),
-)
-    @eval begin
-        function $(func)(grid::AbstractGrid, entity_idx::$(entity_t))
-            cell = getcells(grid)[entity_idx[1]]
-            return $(func)(cell, entity_idx)
-        end
-        function $(func)(cell::AbstractCell, entity_idx::$(entity_t))
-            _set = Set{$(subentity_t)}()
-            subentities = $(subentity_f)(cell)
-            entity = $(entity_f)(cell)[entity_idx[2]]
-            for (subentity_idx, subentity) in pairs(subentities)
-                if all(x -> x in entity, subentity)
-                    push!(_set, $(subentity_t)((entity_idx[1], subentity_idx)))
-                end
-            end
-            return _set
-        end
-    end
-end
-=#
-
 
 """
     addnodeset!(grid::AbstractGrid, name::String, nodeid::Union{Vector{Int},Set{Int}})
