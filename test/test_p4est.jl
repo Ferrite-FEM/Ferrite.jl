@@ -974,4 +974,15 @@ end
     @test getncells(adaptive_grid) == 16
     Ferrite.balanceforest!(adaptive_grid)
     @test getncells(adaptive_grid) == 9*4 + 3 + 4
+
+    # multiple corner connections in 3D by cylinder discretization
+    grid = Ferrite.generate_simple_disc_grid(Hexahedron,10)
+    adaptive_grid = ForestBWG(grid,3)
+    @test getncells(adaptive_grid) == 10
+    Ferrite.refine!(adaptive_grid.cells[1],adaptive_grid.cells[1].leaves[1])
+    @test getncells(adaptive_grid) == 17
+    Ferrite.refine!(adaptive_grid.cells[1],adaptive_grid.cells[1].leaves[3])
+    @test getncells(adaptive_grid) == 24
+    Ferrite.balanceforest!(adaptive_grid)
+    @test getncells(adaptive_grid) == 9*8 + 7 + 8
 end

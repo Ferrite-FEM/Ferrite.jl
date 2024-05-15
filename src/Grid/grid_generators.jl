@@ -566,7 +566,7 @@ function generate_grid(::Type{Tetrahedron}, cells_per_dim::NTuple{3,Int}, left::
     return Grid(cells, nodes, facesets=facesets, boundary_matrix=boundary_matrix)
 end
 
-function generate_simple_disc_grid(::Type{Quadrilateral}, n; radius= 1.0)
+function generate_simple_disc_grid(::Type{Quadrilateral}, n; radius = 1.0)
     nnodes = 2n + 1
     θ = deg2rad(360/2n)
 
@@ -581,4 +581,29 @@ function generate_simple_disc_grid(::Type{Quadrilateral}, n; radius= 1.0)
     )
     
     return Grid(elements, Node.(nodes); facesets=facesets)
+end
+
+function generate_simple_disc_grid(::Type{Hexahedron}, n; radius = 1.0, layers = 1, height = 1.0)
+    nnodes = 2n + 1
+    θ = deg2rad(360/2n)
+
+    nodepos_bottom = Vec((0.0,radius,0.0))
+    nodes = [rotate(nodepos_bottom, Vec{3}((0,0,1)), θ*i) for i ∈ 0:(2n-1)]
+    push!(nodes, Vec((0.0,0.0,0.0)))
+    
+    # TODO generalize for n layers by looping over layers
+    nodepos_layer  = Vec((0.0,radius,height))
+    nodes_layer = [rotate(nodepos_layer, Vec{3}((0,0,1)), θ*i) for i ∈ 0:(2n-1)]
+    push!(nodes_layer, Vec((0.0,0.0,1.0)))
+    nodes = vcat(nodes,nodes_layer)
+
+    elements = [Hexahedron((2i-1==0 ? nnodes-1 : 2i-1,2i,2i+1 == nnodes ? 1 : 2i+1,nnodes,2i-1==0 ? nnodes-1 : 2i-1+(2*n+1),2i+(2*n+1),2i+1 == nnodes ? (2*n+2) : 2i+1+(2*n+1),nnodes*(layers+1))) for i ∈ 1:n*layers]
+
+    facesets = Dict(
+        "side" => Set([FaceIndex(i,1) for i ∈ 1:n]) ∪ Set([FaceIndex(i,2) for i ∈ 1:n]),
+        "top" => Set([FaceIndex(i,5) for i ∈ 1:n]),
+        "bottom" => Set([FaceIndex(i,6) for i ∈ 1:n]),
+    )
+    
+    return Grid(elements, Node.(nodes))#; facesets=facesets)
 end

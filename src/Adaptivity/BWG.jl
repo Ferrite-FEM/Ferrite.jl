@@ -1055,11 +1055,11 @@ function balanceforest!(forest::ForestBWG{dim}) where dim
                                     continue
                                 end
                                 isempty(ec) && continue
-                                @assert length(ec) == 1
-                                !contains_edge(rootedges[s_i],pivot_edge) && continue
-                                ec = ec[1]
-                                k′, e′ = ec[1], edge_perm_inv[ec[2]]
-                                balance_edge(forest,k′,e′,o,s)
+                                for edge_connection in ec
+                                    !contains_edge(rootedges[s_i],pivot_edge) && continue
+                                    k′, e′ = edge_connection[1], edge_perm_inv[edge_connection[2]]
+                                    balance_edge(forest,k′,e′,o,s)
+                                end
                             end
                         end
                     end
