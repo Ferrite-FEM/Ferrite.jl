@@ -221,32 +221,32 @@ end;
 @show M .- Δt₀*K
 @show det(M .- Δt₀*K)
 
-u = copy(u₀)
-un = copy(u₀)
-du = copy(u₀)
-pvd = paraview_collection("stokes-debug.pvd");
-for t in 0.0:Δt₀:T
-    # Setup linear system
-    A = M .- Δt₀*K # K = J for linear problem
-    # apply!(A, ch) # This should happen here
-    # Setup residual
-    r = M*un
-    # Inner solve
-    u .= A \ r
-    @show u
-    # Rate update
-    du .= K*u #stokes!(du,u,p,t)
-    @show res = norm(M*(u - un)/Δt₀ - du)
-    # Update solution
-    un .= u
-    # Write back
-    vtk_grid("stokes-debug-$t.vtu", dh) do vtk
-        vtk_point_data(vtk,dh,u)
-        vtk_save(vtk)
-        pvd[t] = vtk
-    end
-end
-vtk_save(pvd);
+# u = copy(u₀)
+# un = copy(u₀)
+# du = copy(u₀)
+# pvd = paraview_collection("stokes-debug.pvd");
+# for t in 0.0:Δt₀:T
+#     # Setup linear system
+#     A = M .- Δt₀*K # K = J for linear problem
+#     # apply!(A, ch) # This should happen here
+#     # Setup residual
+#     r = M*un
+#     # Inner solve
+#     u .= A \ r
+#     @show u
+#     # Rate update
+#     du .= K*u #stokes!(du,u,p,t)
+#     @show res = norm(M*(u - un)/Δt₀ - du)
+#     # Update solution
+#     un .= u
+#     # Write back
+#     vtk_grid("stokes-debug-$t.vtu", dh) do vtk
+#         vtk_point_data(vtk,dh,u)
+#         vtk_save(vtk)
+#         pvd[t] = vtk
+#     end
+# end
+# vtk_save(pvd);
 
 rhs = ODEFunction(stokes!, mass_matrix=M; jac=stokes_jac!, jac_prototype=jac_sparsity)
 # rhs = ODEFunction(stokes!, mass_matrix=OrdinaryDiffEq.I; jac=stokes_jac!, jac_prototype=jac_sparsity)

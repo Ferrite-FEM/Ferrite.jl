@@ -10,8 +10,8 @@ using OrdinaryDiffEq
 
 # x_cells = round(Int, 55/3)                  #hide
 # y_cells = round(Int, 41/3)                  #hide
-x_cells = round(Int, 1)                  #hide
-y_cells = round(Int, 1)                  #hide
+x_cells = round(Int, 5)                  #hide
+y_cells = round(Int, 5)                  #hide
 grid = generate_grid(Quadrilateral, (x_cells, y_cells), Vec{2}((0.0, 0.0)), Vec{2}((0.55, 0.41)));   #hide
 
 # ### Function Space
@@ -83,7 +83,6 @@ function assemble_heat_matrix(cellvalues_v::CellValues, K::SparseMatrixCSC, dh::
         fill!(Kₑ, 0)
 
         Ferrite.reinit!(cellvalues_v, cell)
-        Ferrite.reinit!(cellvalues_p, cell)
 
         for q_point in 1:getnquadpoints(cellvalues_v)
             dΩ = getdetJdV(cellvalues_v, q_point)
@@ -126,7 +125,7 @@ jac_sparsity = create_sparsity_pattern(dh);
 ################################################################################# Unrolled Solver ##################################################################################
 ####################################################################################################################################################################################
 
-@show Matrix(M .- Δt₀*K)
+# @show Matrix(M .- Δt₀*K)
 @show cond(Matrix(M .- Δt₀*K))
 
 u = copy(u₀)
@@ -141,10 +140,10 @@ for t in 0.0:Δt₀:T
     r = M*un
     # Inner solve
     u .= A \ r
-    @show u
+    # @show u
     # Rate update
     du .= K*u #heat!(du,u,p,t)
-    @show res = norm(M*(u - un)/Δt₀ - du)
+    # @show res = norm(M*(u - un)/Δt₀ - du)
     # Update solution
     un .= u
     # Write back
@@ -180,9 +179,7 @@ end
 OrdinaryDiffEq.NonlinearSolve.LinearSolve.needs_concrete_A(::FerriteBackslash) = true
 function SciMLBase.solve!(cache::OrdinaryDiffEq.NonlinearSolve.LinearSolve.LinearCache, alg::FerriteBackslash; kwargs...)
     @unpack A,b,u = cache
-    if verbose == true
-        println("solving Ax=b")
-    end
+    println("solving Ax=b")
     apply_zero!(A,b,p.ch)
     u .= A \ b
     @show u
@@ -228,87 +225,35 @@ rhs = ODEFunction(heat!, mass_matrix=M; jac=heat_jac!, jac_prototype=jac_sparsit
 problem = ODEProblem(rhs, u₀, (0.0,T), p);
 
 # timestepper = ImplicitEuler(linsolve = FerriteBackslash(), step_limiter! = ferrite_limiter!)
-# timestepper = ImplicitEuler(linsolve = FerriteBackslash(), nlsolve=NonlinearSolveAlg(OrdinaryDiffEq.NonlinearSolve.NewtonRaphson(linsolve=FerriteBackslash())), step_limiter! = ferrite_limiter!) # Errors during AD, but jac is given
-timestepper = ImplicitEuler(step_limiter! = ferrite_limiter!)
+timestepper = ImplicitEuler(linsolve = FerriteBackslash(), nlsolve=NonlinearSolveAlg(OrdinaryDiffEq.NonlinearSolve.NewtonRaphson(autodiff=OrdinaryDiffEq.AutoFiniteDiff(), linsolve=FerriteBackslash())), step_limiter! = ferrite_limiter!) # Errors during AD, but jac is given
+# timestepper = ImplicitEuler(step_limiter! = ferrite_limiter!)
 
-integrator = init(
+# integrator = init(
+#     problem, timestepper, initializealg=NoInit(), dt=Δt₀,
+#     adaptive=false, abstol=1e-5, reltol=1e-4,
+#     progress=true, progress_steps=1,
+#     saveat=Δt_save, verbose=true,
+#     internalnorm=FreeDofErrorNorm(ch)
+# );
+# @show integrator.u
+# pvd = paraview_collection("heat.pvd");
+# integrator = TimeChoiceIterator(integrator, 0.0:Δt_save:T)
+# for (u,t) in integrator
+#     # We ignored the Dirichlet constraints in the solution vector up to now,
+#     # so we have to bring them back now.
+#     #+
+#     vtk_grid("heat-$t.vtu", dh) do vtk
+#         vtk_point_data(vtk,dh,u)
+#         vtk_save(vtk)
+#         pvd[t] = vtk
+#     end
+# end
+# vtk_save(pvd);
+
+solve(
     problem, timestepper, initializealg=NoInit(), dt=Δt₀,
-    adaptive=false, abstol=1e-5, reltol=1e-4,
+    adaptive=true, abstol=1e-5, reltol=1e-4,
     progress=true, progress_steps=1,
-    saveat=Δt_save, verbose=true,
+    verbose=true,
     internalnorm=FreeDofErrorNorm(ch)
 );
-
-pvd = paraview_collection("heat.pvd");
-integrator = TimeChoiceIterator(integrator, 0.0:Δt_save:T)
-for (u,t) in integrator
-    # We ignored the Dirichlet constraints in the solution vector up to now,
-    # so we have to bring them back now.
-    #+
-    vtk_grid("heat-$t.vtu", dh) do vtk
-        vtk_point_data(vtk,dh,u)
-        vtk_save(vtk)
-        pvd[t] = vtk
-    end
-end
-vtk_save(pvd);
-
-####################################################################################################################################################################################
-######################################################################## OrdinaryDiffEq without Mass ###############################################################################
-####################################################################################################################################################################################
-
-function heat_no_mass!(du,u_uc,p::RHSparams,t)
-    @show "rhs",t 
-    @unpack K,ch,dh,cellvalues_v,u = p
-
-    u .= u_uc
-    update!(ch, t)
-    apply!(u, ch)
-
-    mul!(du, K, u) # du .= K * u
-
-    Mdu = M \ du
-    # Ferrite.compute_dirichlet_rates!(du, ch, t)
-    du .= Mdu
-end;
-
-function heat_no_mass_jac!(J,u,p,t)
-    @show "jac", t
-
-    @unpack K = p
-
-    J .= Matrix(inv(Matrix(M))*Matrix(K))
-    @show typeof(J)
-    # apply!(J, ch)
-end;
-
-rhs = ODEFunction(heat_no_mass!, jac=heat_no_mass_jac!, jac_prototype=Matrix(jac_sparsity))
-# rhs = ODEFunction(heat_no_mass!, mass_matrix=OrdinaryDiffEq.I; jac=heat_no_mass_jac!, jac_prototype=jac_sparsity)
-# rhs = ODEFunction(heat_no_mass!, mass_matrix=M; jac_prototype=jac_sparsity)
-problem = ODEProblem(rhs, u₀, (0.0,T), p);
-
-# timestepper = ImplicitEuler(linsolve = FerriteBackslash(), step_limiter! = ferrite_limiter!)
-# timestepper = ImplicitEuler(linsolve = FerriteBackslash(), nlsolve=NonlinearSolveAlg(OrdinaryDiffEq.NonlinearSolve.NewtonRaphson(linsolve=FerriteBackslash())), step_limiter! = ferrite_limiter!) # Errors during AD, but jac is given
-timestepper = ImplicitEuler(step_limiter! = ferrite_limiter!)
-
-integrator = init(
-    problem, timestepper, initializealg=NoInit(), dt=Δt₀,
-    adaptive=false, abstol=1e-5, reltol=1e-4,
-    progress=true, progress_steps=1,
-    saveat=Δt_save, verbose=true,
-    internalnorm=FreeDofErrorNorm(ch)
-);
-
-pvd = paraview_collection("heat_no_mass.pvd");
-integrator = TimeChoiceIterator(integrator, 0.0:Δt_save:T)
-for (u,t) in integrator
-    # We ignored the Dirichlet constraints in the solution vector up to now,
-    # so we have to bring them back now.
-    #+
-    vtk_grid("heat-$t.vtu", dh) do vtk
-        vtk_point_data(vtk,dh,u)
-        vtk_save(vtk)
-        pvd[t] = vtk
-    end
-end
-vtk_save(pvd);
