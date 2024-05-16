@@ -143,9 +143,9 @@ gmsh.model.occ.synchronize()
 if false #hide
 gmsh.model.model.add_physical_group(dim-1,[5],6,"hole")
 end #hide
-gmsh.model.model.add_physical_group(dim-1,[2],7,"left")
-gmsh.model.model.add_physical_group(dim-1,[4],8,"top")
-gmsh.model.model.add_physical_group(dim-1,[3],9,"right")
+gmsh.model.model.add_physical_group(dim-1,[4],7,"left")
+gmsh.model.model.add_physical_group(dim-1,[3],8,"top")
+gmsh.model.model.add_physical_group(dim-1,[2],9,"right")
 gmsh.model.model.add_physical_group(dim-1,[1],10,"bottom")
 gmsh.model.model.add_physical_group(dim,[1],11,"domain");
 # Since we want a quad mesh, we specify the meshing algorithm to the quasi structured quad one.
@@ -160,12 +160,6 @@ gmsh.option.setNumber("Mesh.MeshSizeMax",0.1)                                   
 gmsh.model.mesh.generate(dim)
 grid = togrid()
 Gmsh.finalize()
-
-# x_cells = round(Int, 55/3)                  #hide
-# y_cells = round(Int, 41/3)                  #hide
-x_cells = round(Int, 1)                  #hide
-y_cells = round(Int, 1)                  #hide
-grid = generate_grid(Quadrilateral, (x_cells, y_cells), Vec{2}((0.0, 0.0)), Vec{2}((0.55, 0.41)));   #hide
 
 # ### Function Space
 # To ensure stability we utilize the Taylor-Hood element pair Q2-Q1.
@@ -377,67 +371,6 @@ function ferrite_limiter!(u, _, p, t)
 end
 
 function navierstokes!(du,u_uc,p::RHSparams,t)
-    @show "Alive?",t 
-    # Unpack the struct to save some allocations.
-    #+
-    @unpack K,ch,dh,cellvalues_v,u = p
-
-    # We start by applying the time-dependent Dirichlet BCs. Note that we are
-    # not allowed to mutate `u_uc`! We also can not pre-allocate this variable
-    # if we want to use AD to derive the Jacobian matrix, which appears in the
-    # utilized implicit Euler. If we hand over the Jacobian analytically to
-    # the solver, or when utilizing a method which does not require building the
-    # Jacobian, then we could also hand over a buffer for `u` in our RHSparams
-    # structure to save the allocations made here.
-    #+
-    u = u_uc
-    update!(ch, t)
-    apply!(u, ch)
-    apply!(u_uc, ch)
-
-    # Now we apply the rhs of the Navier-Stokes equations
-    #+
-    ## Linear contribution (Stokes operator)
-    mul!(du, K, u) # du .= K * u
-
-    ## nonlinear contribution
-    # v_range = dof_range(dh, :v)
-    # n_basefuncs = getnbasefunctions(cellvalues_v)
-    # vₑ = zeros(n_basefuncs)
-    # duₑ = zeros(n_basefuncs)
-    # for cell in CellIterator(dh)
-    #     Ferrite.reinit!(cellvalues_v, cell)
-    #     v_celldofs = celldofs(cell)[v_range]
-    #     vₑ .= u[v_celldofs]
-    #     fill!(duₑ, 0.0)
-    #     for q_point in 1:getnquadpoints(cellvalues_v)
-    #         dΩ = getdetJdV(cellvalues_v, q_point)
-    #         ∇v = function_gradient(cellvalues_v, q_point, vₑ)
-    #         v = function_value(cellvalues_v, q_point, vₑ)
-    #         for j in 1:n_basefuncs
-    #             φⱼ = shape_value(cellvalues_v, q_point, j)
-    #             # Note that in Tensors.jl the definition $\textrm{grad} v = \nabla v$ holds.
-    #             # With this information it can be quickly shown in index notation that
-    #             # ```math
-    #             # [(v \cdot \nabla) v]_{\textrm{i}} = v_{\textrm{j}} (\partial_{\textrm{j}} v_{\textrm{i}}) = [v (\nabla v)^{\textrm{T}}]_{\textrm{i}}
-    #             # ```
-    #             # where we should pay attentation to the transpose of the gradient.
-    #             #+
-    #             duₑ[j] -= v ⋅ ∇v' ⋅ φⱼ * dΩ
-    #         end
-    #     end
-    #     assemble!(du, v_celldofs, duₑ)
-    # end
-
-    # For now we have to ignore the evolution of the Dirichlet BCs.
-    # The DBC dofs in the solution vector will be corrected in a post-processing step.
-    #+
-    Ferrite.compute_dirichlet_rates!(du, ch, t)
-    # apply_zero!(du, ch)
-end;
-
-function navierstokes_jac!(J,u_uc,p,t)
-    @show "Alive"
     # Unpack the struct to save some allocations.
     #+
     @unpack K,ch,dh,cellvalues_v,u = p
@@ -457,8 +390,59 @@ function navierstokes_jac!(J,u_uc,p,t)
     # Now we apply the rhs of the Navier-Stokes equations
     #+
     ## Linear contribution (Stokes operator)
-    # mul!(du, K, u) # du .= K * u
-    J .= K
+    mul!(du, K, u) # du .= K * u
+
+    ## nonlinear contribution
+    v_range = dof_range(dh, :v)
+    n_basefuncs = getnbasefunctions(cellvalues_v)
+    vₑ = zeros(n_basefuncs)
+    duₑ = zeros(n_basefuncs)
+    for cell in CellIterator(dh)
+        Ferrite.reinit!(cellvalues_v, cell)
+        v_celldofs = celldofs(cell)[v_range]
+        vₑ .= @views u[v_celldofs]
+        fill!(duₑ, 0.0)
+        for q_point in 1:getnquadpoints(cellvalues_v)
+            dΩ = getdetJdV(cellvalues_v, q_point)
+            ∇v = function_gradient(cellvalues_v, q_point, vₑ)
+            v = function_value(cellvalues_v, q_point, vₑ)
+            for j in 1:n_basefuncs
+                φⱼ = shape_value(cellvalues_v, q_point, j)
+                # Note that in Tensors.jl the definition $\textrm{grad} v = \nabla v$ holds.
+                # With this information it can be quickly shown in index notation that
+                # ```math
+                # [(v \cdot \nabla) v]_{\textrm{i}} = v_{\textrm{j}} (\partial_{\textrm{j}} v_{\textrm{i}}) = [v (\nabla v)^{\textrm{T}}]_{\textrm{i}}
+                # ```
+                # where we should pay attentation to the transpose of the gradient.
+                #+
+                duₑ[j] -= v ⋅ ∇v' ⋅ φⱼ * dΩ
+            end
+        end
+        assemble!(du, v_celldofs, duₑ)
+    end
+end;
+
+function navierstokes_jac!(J,u_uc,p,t)
+    # Unpack the struct to save some allocations.
+    #+
+    @unpack K,ch,dh,cellvalues_v,u = p
+
+    # We start by applying the time-dependent Dirichlet BCs. Note that we are
+    # not allowed to mutate `u_uc`! We also can not pre-allocate this variable
+    # if we want to use AD to derive the Jacobian matrix, which appears in the
+    # utilized implicit Euler. If we hand over the Jacobian analytically to
+    # the solver, or when utilizing a method which does not require building the
+    # Jacobian, then we could also hand over a buffer for `u` in our RHSparams
+    # structure to save the allocations made here.
+    #+
+    u .= u_uc
+    update!(ch, t)
+    apply!(u, ch)
+
+    # Now we apply the rhs of the Navier-Stokes equations
+    #+
+    ## Linear contribution (Stokes operator)
+    nonzeros(J) .= nonzeros(K)
 
     assembler = start_assemble(J; fillzero=false)
 
@@ -467,66 +451,43 @@ function navierstokes_jac!(J,u_uc,p,t)
     Jₑ = zeros(n_basefuncs, n_basefuncs)
     vₑ = zeros(n_basefuncs)
     v_range = dof_range(dh, :v)
-    # for cell in CellIterator(dh)
-    #     Ferrite.reinit!(cellvalues_v, cell)
-    #     v_celldofs = celldofs(cell)[v_range]
+    for cell in CellIterator(dh)
+        Ferrite.reinit!(cellvalues_v, cell)
+        v_celldofs = celldofs(cell)[v_range]
 
-    #     vₑ .= @views u[v_celldofs]
-    #     fill!(Jₑ, 0.0)
-    #     for q_point in 1:getnquadpoints(cellvalues_v)
-    #         dΩ = getdetJdV(cellvalues_v, q_point)
-    #         ∇v = function_gradient(cellvalues_v, q_point, vₑ)
-    #         v = function_value(cellvalues_v, q_point, vₑ)
-    #         for j in 1:n_basefuncs
-    #             φⱼ = shape_value(cellvalues_v, q_point, j)
-    #             # Note that in Tensors.jl the definition $\textrm{grad} v = \nabla v$ holds.
-    #             # With this information it can be quickly shown in index notation that
-    #             # ```math
-    #             # [(v \cdot \nabla) v]_{\textrm{i}} = v_{\textrm{j}} (\partial_{\textrm{j}} v_{\textrm{i}}) = [v (\nabla v)^{\textrm{T}}]_{\textrm{i}}
-    #             # ```
-    #             # where we should pay attentation to the transpose of the gradient.
-    #             #+
-    #             for i in 1:n_basefuncs
-    #                 φᵢ = shape_value(cellvalues_v, q_point, i)
-    #                 ∇φᵢ = shape_gradient(cellvalues_v, q_point, i)
-    #                 Jₑ[j, i] -= (φᵢ ⋅ ∇v' + v ⋅ ∇φᵢ') ⋅ φⱼ * dΩ
-    #             end
-    #         end
-    #     end
+        vₑ .= @views u[v_celldofs]
+        fill!(Jₑ, 0.0)
+        for q_point in 1:getnquadpoints(cellvalues_v)
+            dΩ = getdetJdV(cellvalues_v, q_point)
+            ∇v = function_gradient(cellvalues_v, q_point, vₑ)
+            v = function_value(cellvalues_v, q_point, vₑ)
+            for j in 1:n_basefuncs
+                φⱼ = shape_value(cellvalues_v, q_point, j)
+                # Note that in Tensors.jl the definition $\textrm{grad} v = \nabla v$ holds.
+                # With this information it can be quickly shown in index notation that
+                # ```math
+                # [(v \cdot \nabla) v]_{\textrm{i}} = v_{\textrm{j}} (\partial_{\textrm{j}} v_{\textrm{i}}) = [v (\nabla v)^{\textrm{T}}]_{\textrm{i}}
+                # ```
+                # where we should pay attentation to the transpose of the gradient.
+                #+
+                for i in 1:n_basefuncs
+                    φᵢ = shape_value(cellvalues_v, q_point, i)
+                    ∇φᵢ = shape_gradient(cellvalues_v, q_point, i)
+                    Jₑ[j, i] -= (φᵢ ⋅ ∇v' + v ⋅ ∇φᵢ') ⋅ φⱼ * dΩ
+                end
+            end
+        end
 
-    #     assemble!(assembler, v_celldofs, Jₑ)
-    # end
+        assemble!(assembler, v_celldofs, Jₑ)
+    end
 
     apply!(J, ch)
 end;
 
-# J = copy(M)
-# u = copy(u₀)
-# un = copy(u₀)
-# du = copy(u₀)
-# pvd = paraview_collection("ns-debug.pvd");
-# for t in 0.0:Δt₀:T
-#     navierstokes_jac!(J,un,p,t)
-#     A = M .- Δt₀*J
-#     # r = (M*un)
-#     r = (un)
-#     u .= A \ r
-#     navierstokes!(du,u,p,t)
-#     @show res = norm(M*(u - un)/Δt₀ - du)
-#     un .= u
-#     vtk_grid("ns-debug-$t.vtu", dh) do vtk
-#         vtk_point_data(vtk,dh,u)
-#         vtk_save(vtk)
-#         pvd[t] = vtk
-#     end
-# end
-# vtk_save(pvd);
-
 # Finally, together with our pre-assembled mass matrix, we are now able to
 # define our problem in mass matrix form.
-# apply!(M,ch)
+apply!(M, ch) # Decouple the Dirichlet dofs from the remaining system. The correct solution will be enforced by step and stage limiters.
 rhs = ODEFunction(navierstokes!, mass_matrix=M; jac=navierstokes_jac!, jac_prototype=jac_sparsity)
-# rhs = ODEFunction(navierstokes!, mass_matrix=OrdinaryDiffEq.I; jac=navierstokes_jac!, jac_prototype=jac_sparsity)
 # rhs = ODEFunction(navierstokes!, mass_matrix=M; jac_prototype=jac_sparsity)
 problem = ODEProblem(rhs, u₀, (0.0,T), p);
 
@@ -554,22 +515,8 @@ end
 # To visualize the result we export the grid and our fields
 # to VTK-files, which can be viewed in [ParaView](https://www.paraview.org/)
 # by utilizing the corresponding pvd file.
-mutable struct FerriteBackslash
-end
-OrdinaryDiffEq.NonlinearSolve.LinearSolve.needs_concrete_A(::FerriteBackslash) = true
-function SciMLBase.solve!(cache::OrdinaryDiffEq.NonlinearSolve.LinearSolve.LinearCache, alg::FerriteBackslash; kwargs...)
-    @unpack A,b,u = cache
-    if verbose == true
-        println("solving Ax=b")
-    end
-    apply_zero!(A,b,p.ch)
-    u .= A \ b
-    @show u
-    return u
-end
-# timestepper = ImplicitEuler(linsolve = FerriteBackslash(), step_limiter! = ferrite_limiter!)
-# timestepper = ImplicitEuler(linsolve = FerriteBackslash(), nlsolve=NonlinearSolveAlg(OrdinaryDiffEq.NonlinearSolve.NewtonRaphson(linsolve=FerriteBackslash())), step_limiter! = ferrite_limiter!)
 timestepper = ImplicitEuler(step_limiter! = ferrite_limiter!)
+# timestepper = ImplicitEuler(nlsolve=NonlinearSolveAlg(OrdinaryDiffEq.NonlinearSolve.NewtonRaphson(autodiff=OrdinaryDiffEq.AutoFiniteDiff(), linsolve=FerriteBackslash()); max_iter=50), step_limiter! = ferrite_limiter!)
 #NOTE!   This is left for future reference                                 #src
 # function algebraicmultigrid(W,du,u,p,t,newW,Plprev,Prprev,solverdata)   #src
 #     if newW === nothing || newW                                         #src
@@ -583,15 +530,16 @@ timestepper = ImplicitEuler(step_limiter! = ferrite_limiter!)
 
 integrator = init(
     problem, timestepper, initializealg=NoInit(), dt=Δt₀,
-    adaptive=false, abstol=1e-5, reltol=1e-4,
+    adaptive=false, abstol=1e-5, reltol=1e-4, # FIXME turning adaptivity on results in a restart loop for the first time step
     progress=true, progress_steps=1,
-    saveat=Δt_save, verbose=true,
-    internalnorm=FreeDofErrorNorm(ch)
+    verbose=true, internalnorm=FreeDofErrorNorm(ch)
 );
 
 pvd = paraview_collection("vortex-street.pvd");
-integrator = TimeChoiceIterator(integrator, 0.0:Δt_save:T)
-for (u,t) in integrator
+# integrator = TimeChoiceIterator(integrator, 0.0:Δt_save:T)
+# for (u,t) in integrator # broken
+for (u,t) in intervals(integrator)
+    @show t
     # We ignored the Dirichlet constraints in the solution vector up to now,
     # so we have to bring them back now.
     #+
@@ -622,7 +570,7 @@ function compute_divergence(dh, u, cellvalues_v)                            #hid
     return divv                                                             #hide
 end                                                                         #hide
 @testset "INS OrdinaryDiffEq" begin                                         #hide
-    u = copy(integrator.integrator.u)                                       #hide
+    u = copy(integrator.u)                                       #hide
     apply!(u, ch)                                                           #hide
     Δdivv = abs(compute_divergence(dh, u, cellvalues_v))                    #hide
     @test isapprox(Δdivv, 0.0, atol=1e-12)                                  #hide
