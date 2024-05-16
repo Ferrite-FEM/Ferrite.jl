@@ -385,6 +385,93 @@ function _add!(ch::ConstraintHandler, dbc::Dirichlet, bcnodes::Set{Int}, interpo
 end
 
 """
+    compute_dirichlet_rates!(dudt::AbstractVector, ch::ConstraintHandler, time::Real)
+"""
+function compute_dirichlet_rates!(dudt::AbstractVector, ch::ConstraintHandler, time::Real)
+    @assert ch.closed[]
+    for (i, dbc) in pairs(ch.dbcs)
+        # If the BC function only accept one argument, i.e. f(x), we create a wrapper
+        # g(x, t) = f(x) that discards the second parameter so that _update! can always call
+        # the function with two arguments internally.
+        if hasmethod(dbc.f, Tuple{Any,Any})
+            # Function barrier
+            _compute_dirichlet_rates!(dudt, dbc.f, dbc.faces, dbc.local_face_dofs, dbc.local_face_dofs_offset,
+            dbc.components, ch.dh, ch.bcvalues[i], ch.dofmapping, ch.dofcoefficients, time)
+        else # Time independent function
+            dudt[dbc.components] .= 0.0
+        end
+    end
+end
+
+# for vertices, faces and edges
+function _compute_dirichlet_rates!(dudt::Vector{T}, f::Function, boundary_entities::Set{<:BoundaryIndex}, local_face_dofs::Vector{Int}, local_face_dofs_offset::Vector{Int},
+    components::Vector{Int}, dh::AbstractDofHandler, boundaryvalues::BCValues,
+    dofmapping::Dict{Int,Int}, dofcoefficients::Vector{Union{Nothing,DofCoefficients{T}}}, time::Real) where {T}
+
+    cc = CellCache(dh, UpdateFlags(; nodes=false, coords=true, dofs=true))
+    for (cellidx, entityidx) in boundary_entities
+        reinit!(cc, cellidx)
+
+        # no need to reinit!, enough to update current_entity since we only need geometric shape functions M
+        boundaryvalues.current_entity[] = entityidx
+
+        # local dof-range for this face
+        r = local_face_dofs_offset[entityidx]:(local_face_dofs_offset[entityidx+1]-1)
+        counter = 1
+        for location in 1:getnquadpoints(boundaryvalues)
+            x = spatial_coordinate(boundaryvalues, location, cc.coords)
+            bc_rate = if length(components) > 1
+                Vec(ntuple(i->ForwardDiff.derivative(t->f(x, t)[i], time), length(components))) # Whelp
+            else
+                ForwardDiff.derivative(t->f(x, t), time)
+            end
+            @assert length(bc_rate) == length(components)
+
+            for i in 1:length(components)
+                # find the global dof
+                globaldof = cc.dofs[local_face_dofs[r[counter]]]
+                counter += 1
+
+                dbc_index = dofmapping[globaldof]
+                # Only DBC dofs are currently update!-able so don't modify the rate
+                # for affine constraints
+                if dofcoefficients[dbc_index] === nothing
+                    dudt[globaldof] = bc_rate[i]
+                    @debug println("prescribing rate $(bc_rate[i]) on global dof $(globaldof)")
+                end
+            end
+        end
+    end
+end
+
+# for nodes
+function _compute_dirichlet_rates!(dudt::Vector{T}, f::Function, ::Set{Int}, nodeidxs::Vector{Int}, globaldofs::Vector{Int},
+                  components::Vector{Int}, dh::AbstractDofHandler, facevalues::BCValues,
+                  dofmapping::Dict{Int,Int}, dofcoefficients::Vector{Union{Nothing,DofCoefficients{T}}}, time::Real) where T
+    counter = 1
+    for nodenumber in nodeidxs
+        x = get_node_coordinate(get_grid(dh), nodenumber)
+        bc_rate = if length(components) > 1
+            Vec(ntuple(i->ForwardDiff.derivative(t->f(x, t)[i], time), length(components))) # Whelp
+        else
+            ForwardDiff.derivative(t->f(x, t), time)
+        end
+        @assert length(bc_rate) == length(components)
+        for v in bc_rate
+            globaldof = globaldofs[counter]
+            counter += 1
+            dbc_index = dofmapping[globaldof]
+            # Only DBC dofs are currently update!-able so don't modify inhomogeneities
+            # for affine constraints
+            if dofcoefficients[dbc_index] === nothing
+                dudt[globaldof] = v
+                @debug println("prescribing rate $(v) on global dof $(globaldof)")
+            end
+        end
+    end
+end
+
+"""
     update!(ch::ConstraintHandler, time::Real=0.0)
 
 Update time-dependent inhomogeneities for the new time. This calls `f(x)` or `f(x, t)` when
@@ -424,59 +511,6 @@ function update!(ch::ConstraintHandler, time::Real=0.0)
         ch.inhomogeneities[i] = h
     end
     return nothing
-end
-
-function compute_dirichlet_rates!(dudt::AbstractVector, ch::ConstraintHandler, time::Real)
-    @assert ch.closed[]
-    for (i, dbc) in pairs(ch.dbcs)
-        # If the BC function only accept one argument, i.e. f(x), we create a wrapper
-        # g(x, t) = f(x) that discards the second parameter so that _update! can always call
-        # the function with two arguments internally.
-        if hasmethod(dbc.f, Tuple{Any,Any})
-            # Function barrier
-            _compute_dirichlet_rates!(dudt, ch.inhomogeneities, wrapper_f, dbc.faces, dbc.field_name, dbc.local_face_dofs, dbc.local_face_dofs_offset,
-            dbc.components, ch.dh, ch.bcvalues[i], ch.dofmapping, ch.dofcoefficients, time)
-        else # Time independent function
-            dudt[dbc.components] .= 0.0
-        end
-    end
-end
-
-# for vertices, faces and edges
-function _compute_dirichlet_rates!(dudt::Vector{T}, inhomogeneities::Vector{T}, f::Function, boundary_entities::Set{<:BoundaryIndex}, field::Symbol, local_face_dofs::Vector{Int}, local_face_dofs_offset::Vector{Int},
-    components::Vector{Int}, dh::AbstractDofHandler, boundaryvalues::BCValues,
-    dofmapping::Dict{Int,Int}, dofcoefficients::Vector{Union{Nothing,DofCoefficients{T}}}, time::Real) where {T}
-
-    cc = CellCache(dh, UpdateFlags(; nodes=false, coords=true, dofs=true))
-    for (cellidx, entityidx) in boundary_entities
-        reinit!(cc, cellidx)
-
-        # no need to reinit!, enough to update current_entity since we only need geometric shape functions M
-        boundaryvalues.current_entity[] = entityidx
-
-        # local dof-range for this face
-        r = local_face_dofs_offset[entityidx]:(local_face_dofs_offset[entityidx+1]-1)
-        counter = 1
-        for location in 1:getnquadpoints(boundaryvalues)
-            x = spatial_coordinate(boundaryvalues, location, cc.coords)
-            bc_value = f(x, time)
-            @assert length(bc_value) == length(components)
-
-            for i in 1:length(components)
-                # find the global dof
-                globaldof = cc.dofs[local_face_dofs[r[counter]]]
-                counter += 1
-
-                dbc_index = dofmapping[globaldof]
-                # Only DBC dofs are currently update!-able so don't modify inhomogeneities
-                # for affine constraints
-                if dofcoefficients[dbc_index] === nothing
-                    inhomogeneities[dbc_index] = bc_value[i]
-                    @debug println("prescribing value $(bc_value[i]) on global dof $(globaldof)")
-                end
-            end
-        end
-    end
 end
 
 # for vertices, faces and edges

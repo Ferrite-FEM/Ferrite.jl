@@ -161,6 +161,12 @@ gmsh.model.mesh.generate(dim)
 grid = togrid()
 Gmsh.finalize()
 
+# x_cells = round(Int, 55/3)                  #hide
+# y_cells = round(Int, 41/3)                  #hide
+x_cells = round(Int, 1)                  #hide
+y_cells = round(Int, 1)                  #hide
+grid = generate_grid(Quadrilateral, (x_cells, y_cells), Vec{2}((0.0, 0.0)), Vec{2}((0.55, 0.41)));   #hide
+
 # ### Function Space
 # To ensure stability we utilize the Taylor-Hood element pair Q2-Q1.
 # We have to utilize the same quadrature rule for the pressure as for the velocity, because in the weak form the
@@ -187,7 +193,7 @@ nosplip_face_names = ["top", "bottom", "hole"];
 # No hole for the test present                                          #src
 nosplip_face_names = ["top", "bottom"]                                  #hide
 ∂Ω_noslip = union(getfaceset.((grid, ), nosplip_face_names)...);
-noslip_bc = Dirichlet(:v, ∂Ω_noslip, (x, t) -> [0,0], [1,2])
+noslip_bc = Dirichlet(:v, ∂Ω_noslip, (x, t) -> Vec((0.0,0.0)), [1,2])
 add!(ch, noslip_bc);
 
 # The left boundary has a parabolic inflow with peak velocity of 1.5. This
@@ -200,7 +206,7 @@ add!(ch, noslip_bc);
 ∂Ω_inflow = getfaceset(grid, "left");
 
 vᵢₙ(t) = 1.5/(1+exp(-2.0*(t-2.0)))  #inflow velocity
-parabolic_inflow_profile((x,y),t) = [4*vᵢₙ(t)*y*(0.41-y)/0.41^2, 0.0]
+parabolic_inflow_profile(x,t) = [4*vᵢₙ(t)*x[2]*(0.41-x[2])/0.41^2, 0.0] # TODO vec
 inflow_bc = Dirichlet(:v, ∂Ω_inflow, parabolic_inflow_profile, [1,2])
 add!(ch, inflow_bc);
 
@@ -312,8 +318,8 @@ end;
 # ### Solution of the semi-discretized system via DifferentialEquations.jl
 # First we assemble the linear portions for efficiency. These matrices are
 # assumed to be constant over time.
-T = 10.0
-Δt₀ = 0.01
+T = 5.0
+Δt₀ = 0.1
 Δt_save = 0.025
 
 M = create_sparsity_pattern(dh);
@@ -361,13 +367,20 @@ struct RHSparams
     ch::ConstraintHandler
     dh::DofHandler
     cellvalues_v::CellValues
+    u::Vector
 end
-p = RHSparams(K, ch, dh, cellvalues_v)
+p = RHSparams(K, ch, dh, cellvalues_v, copy(u₀))
 
-function navierstokes!(du,u_uc,p,t)
+function ferrite_limiter!(u, _, p, t)
+    update!(p.ch, t)
+    apply!(u, p.ch)
+end
+
+function navierstokes!(du,u_uc,p::RHSparams,t)
+    @show "Alive?",t 
     # Unpack the struct to save some allocations.
     #+
-    @unpack K,ch,dh,cellvalues_v = p
+    @unpack K,ch,dh,cellvalues_v,u = p
 
     # We start by applying the time-dependent Dirichlet BCs. Note that we are
     # not allowed to mutate `u_uc`! We also can not pre-allocate this variable
@@ -377,9 +390,10 @@ function navierstokes!(du,u_uc,p,t)
     # Jacobian, then we could also hand over a buffer for `u` in our RHSparams
     # structure to save the allocations made here.
     #+
-    u = copy(u_uc)
+    u = u_uc
     update!(ch, t)
     apply!(u, ch)
+    apply!(u_uc, ch)
 
     # Now we apply the rhs of the Navier-Stokes equations
     #+
@@ -387,40 +401,46 @@ function navierstokes!(du,u_uc,p,t)
     mul!(du, K, u) # du .= K * u
 
     ## nonlinear contribution
-    n_basefuncs = getnbasefunctions(cellvalues_v)
-    for cell in CellIterator(dh)
-        Ferrite.reinit!(cellvalues_v, cell)
-        all_celldofs = celldofs(cell)
-        v_celldofs = all_celldofs[dof_range(dh, :v)]
-        v_cell = u[v_celldofs]
-        for q_point in 1:getnquadpoints(cellvalues_v)
-            dΩ = getdetJdV(cellvalues_v, q_point)
-            ∇v = function_gradient(cellvalues_v, q_point, v_cell)
-            v = function_value(cellvalues_v, q_point, v_cell)
-            for j in 1:n_basefuncs
-                φⱼ = shape_value(cellvalues_v, q_point, j)
-                # Note that in Tensors.jl the definition $\textrm{grad} v = \nabla v$ holds.
-                # With this information it can be quickly shown in index notation that
-                # ```math
-                # [(v \cdot \nabla) v]_{\textrm{i}} = v_{\textrm{j}} (\partial_{\textrm{j}} v_{\textrm{i}}) = [v (\nabla v)^{\textrm{T}}]_{\textrm{i}}
-                # ```
-                # where we should pay attentation to the transpose of the gradient.
-                #+
-                du[v_celldofs[j]] -= v ⋅ ∇v' ⋅ φⱼ * dΩ
-            end
-        end
-    end
+    # v_range = dof_range(dh, :v)
+    # n_basefuncs = getnbasefunctions(cellvalues_v)
+    # vₑ = zeros(n_basefuncs)
+    # duₑ = zeros(n_basefuncs)
+    # for cell in CellIterator(dh)
+    #     Ferrite.reinit!(cellvalues_v, cell)
+    #     v_celldofs = celldofs(cell)[v_range]
+    #     vₑ .= u[v_celldofs]
+    #     fill!(duₑ, 0.0)
+    #     for q_point in 1:getnquadpoints(cellvalues_v)
+    #         dΩ = getdetJdV(cellvalues_v, q_point)
+    #         ∇v = function_gradient(cellvalues_v, q_point, vₑ)
+    #         v = function_value(cellvalues_v, q_point, vₑ)
+    #         for j in 1:n_basefuncs
+    #             φⱼ = shape_value(cellvalues_v, q_point, j)
+    #             # Note that in Tensors.jl the definition $\textrm{grad} v = \nabla v$ holds.
+    #             # With this information it can be quickly shown in index notation that
+    #             # ```math
+    #             # [(v \cdot \nabla) v]_{\textrm{i}} = v_{\textrm{j}} (\partial_{\textrm{j}} v_{\textrm{i}}) = [v (\nabla v)^{\textrm{T}}]_{\textrm{i}}
+    #             # ```
+    #             # where we should pay attentation to the transpose of the gradient.
+    #             #+
+    #             duₑ[j] -= v ⋅ ∇v' ⋅ φⱼ * dΩ
+    #         end
+    #     end
+    #     assemble!(du, v_celldofs, duₑ)
+    # end
 
     # For now we have to ignore the evolution of the Dirichlet BCs.
     # The DBC dofs in the solution vector will be corrected in a post-processing step.
     #+
-    apply_zero!(du, ch)
+    Ferrite.compute_dirichlet_rates!(du, ch, t)
+    # apply_zero!(du, ch)
 end;
 
 function navierstokes_jac!(J,u_uc,p,t)
+    @show "Alive"
     # Unpack the struct to save some allocations.
     #+
-    @unpack K,ch,dh,cellvalues_v = p
+    @unpack K,ch,dh,cellvalues_v,u = p
 
     # We start by applying the time-dependent Dirichlet BCs. Note that we are
     # not allowed to mutate `u_uc`! We also can not pre-allocate this variable
@@ -430,7 +450,7 @@ function navierstokes_jac!(J,u_uc,p,t)
     # Jacobian, then we could also hand over a buffer for `u` in our RHSparams
     # structure to save the allocations made here.
     #+
-    u = copy(u_uc)
+    u .= u_uc
     update!(ch, t)
     apply!(u, ch)
 
@@ -440,37 +460,74 @@ function navierstokes_jac!(J,u_uc,p,t)
     # mul!(du, K, u) # du .= K * u
     J .= K
 
+    assembler = start_assemble(J; fillzero=false)
+
     ## nonlinear contribution
     n_basefuncs = getnbasefunctions(cellvalues_v)
-    for cell in CellIterator(dh)
-        Ferrite.reinit!(cellvalues_v, cell)
-        all_celldofs = celldofs(cell)
-        v_celldofs = all_celldofs[dof_range(dh, :v)]
-        v_cell = u[v_celldofs]
-        for q_point in 1:getnquadpoints(cellvalues_v)
-            dΩ = getdetJdV(cellvalues_v, q_point)
-            ∇v = function_gradient(cellvalues_v, q_point, v_cell)
-            v = function_value(cellvalues_v, q_point, v_cell)
-            for j in 1:n_basefuncs
-                φⱼ = shape_value(cellvalues_v, q_point, j)
-                # Note that in Tensors.jl the definition $\textrm{grad} v = \nabla v$ holds.
-                # With this information it can be quickly shown in index notation that
-                # ```math
-                # [(v \cdot \nabla) v]_{\textrm{i}} = v_{\textrm{j}} (\partial_{\textrm{j}} v_{\textrm{i}}) = [v (\nabla v)^{\textrm{T}}]_{\textrm{i}}
-                # ```
-                # where we should pay attentation to the transpose of the gradient.
-                #+
-                # TODO J[v_celldofs[j]] -= v ⋅ ∇v' ⋅ φⱼ * dΩ
-            end
-        end
-    end
+    Jₑ = zeros(n_basefuncs, n_basefuncs)
+    vₑ = zeros(n_basefuncs)
+    v_range = dof_range(dh, :v)
+    # for cell in CellIterator(dh)
+    #     Ferrite.reinit!(cellvalues_v, cell)
+    #     v_celldofs = celldofs(cell)[v_range]
 
-    apply_zero!(J)
+    #     vₑ .= @views u[v_celldofs]
+    #     fill!(Jₑ, 0.0)
+    #     for q_point in 1:getnquadpoints(cellvalues_v)
+    #         dΩ = getdetJdV(cellvalues_v, q_point)
+    #         ∇v = function_gradient(cellvalues_v, q_point, vₑ)
+    #         v = function_value(cellvalues_v, q_point, vₑ)
+    #         for j in 1:n_basefuncs
+    #             φⱼ = shape_value(cellvalues_v, q_point, j)
+    #             # Note that in Tensors.jl the definition $\textrm{grad} v = \nabla v$ holds.
+    #             # With this information it can be quickly shown in index notation that
+    #             # ```math
+    #             # [(v \cdot \nabla) v]_{\textrm{i}} = v_{\textrm{j}} (\partial_{\textrm{j}} v_{\textrm{i}}) = [v (\nabla v)^{\textrm{T}}]_{\textrm{i}}
+    #             # ```
+    #             # where we should pay attentation to the transpose of the gradient.
+    #             #+
+    #             for i in 1:n_basefuncs
+    #                 φᵢ = shape_value(cellvalues_v, q_point, i)
+    #                 ∇φᵢ = shape_gradient(cellvalues_v, q_point, i)
+    #                 Jₑ[j, i] -= (φᵢ ⋅ ∇v' + v ⋅ ∇φᵢ') ⋅ φⱼ * dΩ
+    #             end
+    #         end
+    #     end
+
+    #     assemble!(assembler, v_celldofs, Jₑ)
+    # end
+
+    apply!(J, ch)
 end;
+
+# J = copy(M)
+# u = copy(u₀)
+# un = copy(u₀)
+# du = copy(u₀)
+# pvd = paraview_collection("ns-debug.pvd");
+# for t in 0.0:Δt₀:T
+#     navierstokes_jac!(J,un,p,t)
+#     A = M .- Δt₀*J
+#     # r = (M*un)
+#     r = (un)
+#     u .= A \ r
+#     navierstokes!(du,u,p,t)
+#     @show res = norm(M*(u - un)/Δt₀ - du)
+#     un .= u
+#     vtk_grid("ns-debug-$t.vtu", dh) do vtk
+#         vtk_point_data(vtk,dh,u)
+#         vtk_save(vtk)
+#         pvd[t] = vtk
+#     end
+# end
+# vtk_save(pvd);
 
 # Finally, together with our pre-assembled mass matrix, we are now able to
 # define our problem in mass matrix form.
+# apply!(M,ch)
 rhs = ODEFunction(navierstokes!, mass_matrix=M; jac=navierstokes_jac!, jac_prototype=jac_sparsity)
+# rhs = ODEFunction(navierstokes!, mass_matrix=OrdinaryDiffEq.I; jac=navierstokes_jac!, jac_prototype=jac_sparsity)
+# rhs = ODEFunction(navierstokes!, mass_matrix=M; jac_prototype=jac_sparsity)
 problem = ODEProblem(rhs, u₀, (0.0,T), p);
 
 # All norms must not depend on constrained dofs. A problem with the presented implementation
@@ -497,8 +554,22 @@ end
 # To visualize the result we export the grid and our fields
 # to VTK-files, which can be viewed in [ParaView](https://www.paraview.org/)
 # by utilizing the corresponding pvd file.
-timestepper = ImplicitEuler(linsolve = UMFPACKFactorization(reuse_symbolic=false))
-
+mutable struct FerriteBackslash
+end
+OrdinaryDiffEq.NonlinearSolve.LinearSolve.needs_concrete_A(::FerriteBackslash) = true
+function SciMLBase.solve!(cache::OrdinaryDiffEq.NonlinearSolve.LinearSolve.LinearCache, alg::FerriteBackslash; kwargs...)
+    @unpack A,b,u = cache
+    if verbose == true
+        println("solving Ax=b")
+    end
+    apply_zero!(A,b,p.ch)
+    u .= A \ b
+    @show u
+    return u
+end
+# timestepper = ImplicitEuler(linsolve = FerriteBackslash(), step_limiter! = ferrite_limiter!)
+# timestepper = ImplicitEuler(linsolve = FerriteBackslash(), nlsolve=NonlinearSolveAlg(OrdinaryDiffEq.NonlinearSolve.NewtonRaphson(linsolve=FerriteBackslash())), step_limiter! = ferrite_limiter!)
+timestepper = ImplicitEuler(step_limiter! = ferrite_limiter!)
 #NOTE!   This is left for future reference                                 #src
 # function algebraicmultigrid(W,du,u,p,t,newW,Plprev,Prprev,solverdata)   #src
 #     if newW === nothing || newW                                         #src
@@ -512,7 +583,7 @@ timestepper = ImplicitEuler(linsolve = UMFPACKFactorization(reuse_symbolic=false
 
 integrator = init(
     problem, timestepper, initializealg=NoInit(), dt=Δt₀,
-    adaptive=true, abstol=1e-5, reltol=1e-4,
+    adaptive=false, abstol=1e-5, reltol=1e-4,
     progress=true, progress_steps=1,
     saveat=Δt_save, verbose=true,
     internalnorm=FreeDofErrorNorm(ch)
@@ -520,13 +591,10 @@ integrator = init(
 
 pvd = paraview_collection("vortex-street.pvd");
 integrator = TimeChoiceIterator(integrator, 0.0:Δt_save:T)
-for (u_uc,t) in integrator
+for (u,t) in integrator
     # We ignored the Dirichlet constraints in the solution vector up to now,
     # so we have to bring them back now.
     #+
-    update!(ch, t)
-    u = copy(u_uc)
-    apply!(u, ch)
     vtk_grid("vortex-street-$t.vtu", dh) do vtk
         vtk_point_data(vtk,dh,u)
         vtk_save(vtk)
