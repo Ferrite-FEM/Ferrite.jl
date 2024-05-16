@@ -416,9 +416,61 @@ function navierstokes!(du,u_uc,p,t)
     #+
     apply_zero!(du, ch)
 end;
+
+function navierstokes_jac!(J,u_uc,p,t)
+    # Unpack the struct to save some allocations.
+    #+
+    @unpack K,ch,dh,cellvalues_v = p
+
+    # We start by applying the time-dependent Dirichlet BCs. Note that we are
+    # not allowed to mutate `u_uc`! We also can not pre-allocate this variable
+    # if we want to use AD to derive the Jacobian matrix, which appears in the
+    # utilized implicit Euler. If we hand over the Jacobian analytically to
+    # the solver, or when utilizing a method which does not require building the
+    # Jacobian, then we could also hand over a buffer for `u` in our RHSparams
+    # structure to save the allocations made here.
+    #+
+    u = copy(u_uc)
+    update!(ch, t)
+    apply!(u, ch)
+
+    # Now we apply the rhs of the Navier-Stokes equations
+    #+
+    ## Linear contribution (Stokes operator)
+    # mul!(du, K, u) # du .= K * u
+    J .= K
+
+    ## nonlinear contribution
+    n_basefuncs = getnbasefunctions(cellvalues_v)
+    for cell in CellIterator(dh)
+        Ferrite.reinit!(cellvalues_v, cell)
+        all_celldofs = celldofs(cell)
+        v_celldofs = all_celldofs[dof_range(dh, :v)]
+        v_cell = u[v_celldofs]
+        for q_point in 1:getnquadpoints(cellvalues_v)
+            dΩ = getdetJdV(cellvalues_v, q_point)
+            ∇v = function_gradient(cellvalues_v, q_point, v_cell)
+            v = function_value(cellvalues_v, q_point, v_cell)
+            for j in 1:n_basefuncs
+                φⱼ = shape_value(cellvalues_v, q_point, j)
+                # Note that in Tensors.jl the definition $\textrm{grad} v = \nabla v$ holds.
+                # With this information it can be quickly shown in index notation that
+                # ```math
+                # [(v \cdot \nabla) v]_{\textrm{i}} = v_{\textrm{j}} (\partial_{\textrm{j}} v_{\textrm{i}}) = [v (\nabla v)^{\textrm{T}}]_{\textrm{i}}
+                # ```
+                # where we should pay attentation to the transpose of the gradient.
+                #+
+                # TODO J[v_celldofs[j]] -= v ⋅ ∇v' ⋅ φⱼ * dΩ
+            end
+        end
+    end
+
+    apply_zero!(J)
+end;
+
 # Finally, together with our pre-assembled mass matrix, we are now able to
 # define our problem in mass matrix form.
-rhs = ODEFunction(navierstokes!, mass_matrix=M; jac_prototype=jac_sparsity)
+rhs = ODEFunction(navierstokes!, mass_matrix=M; jac=navierstokes_jac!, jac_prototype=jac_sparsity)
 problem = ODEProblem(rhs, u₀, (0.0,T), p);
 
 # All norms must not depend on constrained dofs. A problem with the presented implementation
