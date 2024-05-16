@@ -288,11 +288,16 @@ function test_export(;subset::Bool)
             write_projection(vtk, p, p_tens, "p_tens")
             write_projection(vtk, p, p_stens, "p_stens")
         end
-        @test bytes2hex(open(SHA.sha1, fname*".vtu", "r")) in (
-            subset ? ("261cfe21de7a478e14f455e783694651a91eeb60", "b3fef3de9f38ca9ddd92f2f67a1606d07ca56d67") :
-                     ("3b8ffb444db1b4cee1246a751da88136116fe49b", "bc2ec8f648f9b8bccccf172c1fc48bf03340329b")
-        )
+        # The following test may fail due to floating point inaccuracies
+        # These could occur due to e.g. changes in system architecture.
+        if Sys.islinux() && Sys.ARCH === :x86_64
+            @test bytes2hex(open(SHA.sha1, fname*".vtu", "r")) == (
+                subset ? "b3fef3de9f38ca9ddd92f2f67a1606d07ca56d67" :
+                         "bc2ec8f648f9b8bccccf172c1fc48bf03340329b"
+            )
+        end
     end
+
 end
 
 function test_show()
