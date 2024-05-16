@@ -12,14 +12,14 @@ for spatial_dim ∈ [2]
 
     geo_type = Quadrilateral
     grid = generate_grid(geo_type, ntuple(x->2, spatial_dim));
-    ref_type = FerriteBenchmarkHelper.default_refshape(geo_type)
+    ref_type = FerriteBenchmarkHelper.getrefshape(geo_type)
     ip_geo = Ferrite.default_interpolation(geo_type)
     order = 2
 
     # assemble a mass matrix to apply BCs on (because its cheap)
-    ip = Lagrange{spatial_dim, ref_type, order}()
-    qr = QuadratureRule{spatial_dim, ref_type}(2*order-1)
-    cellvalues = CellScalarValues(qr, ip, ip_geo);
+    ip = Lagrange{ref_type, order}()
+    qr = QuadratureRule{ref_type}(2*order-1)
+    cellvalues = CellValues(qr, ip, ip_geo);
     dh = DofHandler(grid)
     push!(dh, :u, 1, ip)
     close!(dh);

@@ -9,7 +9,6 @@ DocTestSetup = :(using Ferrite)
 ```@docs
 generate_grid
 Node
-Cell
 CellIndex
 VertexIndex
 EdgeIndex
@@ -26,19 +25,14 @@ getnodes
 getnnodes
 Ferrite.nnodes_per_cell
 getcellset
-getcellsets
 getnodeset
-getnodesets
 getfaceset
-getfacesets
 getedgeset
-getedgesets
 getvertexset
-getvertexsets
-compute_vertex_values
-transform!
+transform_coordinates!
 getcoordinates
 getcoordinates!
+Ferrite.get_node_coordinate
 ```
 
 ### Topology
@@ -47,6 +41,8 @@ getcoordinates!
 Ferrite.ExclusiveTopology
 Ferrite.getneighborhood
 Ferrite.faceskeleton
+Ferrite.vertex_star_stencils
+Ferrite.getstencil
 ```
 
 ### Grid Sets Utility
@@ -54,6 +50,9 @@ Ferrite.faceskeleton
 ```@docs
 addcellset!
 addfaceset!
+addboundaryfaceset!
+addboundaryedgeset!
+addboundaryvertexset!
 addnodeset!
 ```
 

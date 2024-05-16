@@ -3,41 +3,55 @@
 #####################################
 # Volume for the reference elements #
 #####################################
-reference_volume(::Interpolation{dim, RefCube}) where {dim} = 2^dim
-reference_volume(::Interpolation{dim, RefTetrahedron}) where {dim} = 1 / factorial(dim)
-reference_volume(::Interpolation{  3, RefPrism}) = 1/2
+reference_volume(::Interpolation{Ferrite.RefHypercube{dim}}) where {dim} = 2^dim
+reference_volume(::Interpolation{Ferrite.RefSimplex{dim}}) where {dim} = 1 / factorial(dim)
+reference_volume(::Interpolation{RefPrism}) = 1/2
+reference_volume(::Interpolation{RefPyramid}) = 1/3
 # For faces
-reference_volume(fs::Interpolation, ::Int) = reference_volume(Ferrite.getlowerdim(fs))
-reference_volume(fs::Interpolation{2, RefTetrahedron}, face::Int) = face == 1 ? sqrt(2) : 1.0
-reference_volume(fs::Interpolation{3, RefTetrahedron}, face::Int) = face == 3 ? sqrt(2 * 1.5) / 2.0 : 0.5
+reference_face_area(fs::VectorizedInterpolation, f::Int) = reference_face_area(fs.ip, f)
+reference_face_area(fs::Interpolation{Ferrite.RefHypercube{dim}}, face::Int) where {dim} = 2^(dim-1)
+reference_face_area(fs::Interpolation{RefTriangle}, face::Int) = face == 1 ? sqrt(2) : 1.0
+reference_face_area(fs::Interpolation{RefTetrahedron}, face::Int) = face == 3 ? sqrt(2 * 1.5) / 2.0 : 0.5
+function reference_face_area(fs::Interpolation{RefPrism}, face::Int) 
+    face == 4 && return √2
+    face ∈ [1,5] && return 0.5
+    face ∈ [2,3] && return 1.0
+end
+function reference_face_area(fs::Interpolation{RefPyramid}, face::Int) 
+    face == 1 && return 1.0
+    face ∈ [2,3] && return 0.5
+    face ∈ [4,5] && return sqrt(2)/2
+end
 
 ######################################################
 # Coordinates and normals for the reference elements #
 ######################################################
 
-# Lagrange{1, RefCube}
-function reference_normals(::Lagrange{1, RefCube})
+reference_normals(ip::VectorizedInterpolation) = reference_normals(ip.ip)
+
+# Lagrange{1, RefLine}
+function reference_normals(::Lagrange{RefLine})
     return [Vec{1, Float64}((-1.0,)),
             Vec{1, Float64}(( 1.0,))]
 end
 
-# Lagrange{2, RefCube}
-function reference_normals(::Lagrange{2, RefCube})
+# Lagrange{2, RefQuadrilateral}
+function reference_normals(::Lagrange{RefQuadrilateral})
     return [Vec{2, Float64}(( 0.0, -1.0)),
             Vec{2, Float64}(( 1.0,  0.0)),
             Vec{2, Float64}(( 0.0,  1.0,)),
             Vec{2, Float64}((-1.0,  0.0,))]
 end
 
-# Lagrange{2, RefTetrahedron}
-function reference_normals(::Lagrange{2, RefTetrahedron})
+# Lagrange{2, RefTriangle}
+function reference_normals(::Lagrange{RefTriangle})
     return [Vec{2, Float64}((1/√2, 1/√2)),
             Vec{2, Float64}((-1.0, 0.0)),
             Vec{2, Float64}((0.0, -1.0))]
 end
 
 # Lagrange{3, RefTetrahedron}
-function reference_normals(::Lagrange{3, RefTetrahedron})
+function reference_normals(::Lagrange{RefTetrahedron})
     return [Vec{3, Float64}((0.0, 0.0, -1.0)),
             Vec{3, Float64}((0.0 ,-1.0, 0.0)),
             Vec{3, Float64}((1/√3, 1/√3, 1/√3)),
@@ -45,7 +59,7 @@ function reference_normals(::Lagrange{3, RefTetrahedron})
 end
 
 # Lagrange{3, Cube}
-function reference_normals(::Lagrange{3, RefCube})
+function reference_normals(::Lagrange{RefHexahedron})
     return [Vec{3, Float64}(( 0.0,  0.0, -1.0)),
             Vec{3, Float64}(( 0.0, -1.0,  0.0)),
             Vec{3, Float64}(( 1.0,  0.0,  0.0)),
@@ -55,7 +69,7 @@ function reference_normals(::Lagrange{3, RefCube})
 end
 
 # Lagrange{3, Wedge}
-function reference_normals(::Lagrange{3, RefPrism})
+function reference_normals(::Lagrange{RefPrism})
     return [Vec{3, Float64}(( 0.0,  0.0, -1.0)),
             Vec{3, Float64}(( 0.0, -1.0,  0.0)),
             Vec{3, Float64}((-1.0,  0.0,  0.0)),
@@ -63,8 +77,17 @@ function reference_normals(::Lagrange{3, RefPrism})
             Vec{3, Float64}(( 0.0,  0.0,  1.0))]
 end
 
-# Serendipity{2, RefCube}
-reference_normals(::Serendipity{2, RefCube, 2}) = reference_normals(Lagrange{2, RefCube,1}())
+# Lagrange{3, RefPyramid}
+function reference_normals(::Lagrange{RefPyramid})
+    return [Vec{3, Float64}(( 0.0,  0.0, -1.0)),
+            Vec{3, Float64}(( 0.0, -1.0,  0.0)),
+            Vec{3, Float64}((-1.0,  0.0,  0.0)),
+            Vec{3, Float64}((1/√2, 0.0,  1/√2)),
+            Vec{3, Float64}((0.0, 1/√2,  1/√2)),]
+end
+
+# Serendipity{2, RefQuadrilateral}
+reference_normals(::Serendipity{RefQuadrilateral, 2}) = reference_normals(Lagrange{RefQuadrilateral, 1}())
 
 ##################################
 # Valid coordinates by expanding #
@@ -85,7 +108,7 @@ function rotmat(dim, θ=π/6)
     end
 end
 
-function valid_coordinates_and_normals(fs::Interpolation{dim, shape, order}) where {dim, shape, order}
+function valid_coordinates_and_normals(fs::Interpolation{shape, order}) where {dim, shape <: Ferrite.AbstractRefShape{dim}, order}
     x = Ferrite.reference_coordinates(fs)
     n = reference_normals(fs)
     R = rotmat(dim)
@@ -95,23 +118,26 @@ end
 #######################################
 # Volume of cells (with planar edges) #
 #######################################
-function calculate_volume(::Lagrange{1, RefCube, 1}, x::Vector{Vec{dim, T}}) where {T, dim}
+
+calculate_volume(ip::VectorizedInterpolation, x) = calculate_volume(ip.ip, x)
+
+function calculate_volume(::Lagrange{RefLine, 1}, x::Vector{Vec{dim, T}}) where {T, dim}
     vol = norm(x[2] - x[1])
     return vol
 end
 
-function calculate_volume(::Lagrange{1, RefCube, 2}, x::Vector{Vec{dim, T}}) where {T, dim}
+function calculate_volume(::Lagrange{RefLine, 2}, x::Vector{Vec{dim, T}}) where {T, dim}
     vol = norm(x[3] - x[1]) + norm(x[2]-x[3])
     return vol
 end
 
-function calculate_volume(::Lagrange{2, RefCube, 1}, x::Vector{Vec{dim, T}}) where {T, dim}
+function calculate_volume(::Lagrange{RefQuadrilateral, 1}, x::Vector{Vec{dim, T}}) where {T, dim}
     vol = norm((x[4] - x[1]) × (x[2] - x[1])) * 0.5 +
           norm((x[4] - x[3]) × (x[2] - x[3])) * 0.5
     return vol
 end
 
-function calculate_volume(::Lagrange{2, RefCube, 2}, x::Vector{Vec{dim, T}}) where {T, dim}
+function calculate_volume(::Lagrange{RefQuadrilateral, 2}, x::Vector{Vec{dim, T}}) where {T, dim}
     vol = norm((x[8] - x[1]) × (x[5] - x[1])) * 0.5 +
           norm((x[8] - x[9]) × (x[5] - x[9])) * 0.5 +
           norm((x[5] - x[2]) × (x[6] - x[2])) * 0.5 +
@@ -123,12 +149,12 @@ function calculate_volume(::Lagrange{2, RefCube, 2}, x::Vector{Vec{dim, T}}) whe
     return vol
 end
 
-function calculate_volume(::Lagrange{2, RefTetrahedron, 1}, x::Vector{Vec{dim, T}}) where {T, dim}
+function calculate_volume(::Lagrange{RefTriangle, 1}, x::Vector{Vec{dim, T}}) where {T, dim}
     vol = norm((x[1] - x[3]) × (x[2] - x[3])) * 0.5
     return vol
 end
 
-function calculate_volume(::Lagrange{2, RefTetrahedron, 2}, x::Vector{Vec{dim, T}}) where {T, dim}
+function calculate_volume(::Lagrange{RefTriangle, 2}, x::Vector{Vec{dim, T}}) where {T, dim}
     vol = norm((x[6] - x[3]) × (x[5] - x[3])) * 0.5 +
           norm((x[6] - x[4]) × (x[5] - x[4])) * 0.5 +
           norm((x[1] - x[6]) × (x[4] - x[6])) * 0.5 +
@@ -137,17 +163,17 @@ function calculate_volume(::Lagrange{2, RefTetrahedron, 2}, x::Vector{Vec{dim, T
 end
 
 # TODO: Only correct for linear sides
-function calculate_volume(::Lagrange{2, RefTetrahedron, O}, x::Vector{Vec{dim, T}}) where {T, dim, O}
+function calculate_volume(::Lagrange{RefTriangle, O}, x::Vector{Vec{dim, T}}) where {T, dim, O}
     vol = norm((x[1] - x[3]) × (x[2] - x[3])) * 0.5
     return vol
 end
 
-function calculate_volume(::Lagrange{3, RefTetrahedron, order}, x::Vector{Vec{3, T}}) where {T, order}
+function calculate_volume(::Lagrange{RefTetrahedron, order}, x::Vector{Vec{3, T}}) where {T, order}
     vol = norm((x[2] - x[1]) ⋅ ((x[3] - x[1]) × (x[4] - x[1]))) / 6.0
     return vol
 end
 
-function calculate_volume(::Lagrange{3, RefCube, 1}, x::Vector{Vec{3, T}}) where T
+function calculate_volume(::Lagrange{RefHexahedron, 1}, x::Vector{Vec{3, T}}) where T
     vol = norm((x[1] - x[5]) ⋅ ((x[2] - x[5]) × (x[4] - x[5]))) / 6.0 +
           norm((x[2] - x[7]) ⋅ ((x[3] - x[7]) × (x[4] - x[7]))) / 6.0 +
           norm((x[2] - x[7]) ⋅ ((x[4] - x[7]) × (x[5] - x[7]))) / 6.0 +
@@ -156,7 +182,17 @@ function calculate_volume(::Lagrange{3, RefCube, 1}, x::Vector{Vec{3, T}}) where
     return vol
 end
 
-function calculate_volume(::Serendipity{2, RefCube, 2}, x::Vector{Vec{2, T}}) where T
+function calculate_volume(::Lagrange{RefPrism, order}, x::Vector{Vec{3, T}}) where {T, order}
+    vol = norm((x[4] - x[1]) ⋅ ((x[2] - x[1]) × (x[3] - x[1]))) / 2.0 
+    return vol
+end
+
+function calculate_volume(::Lagrange{RefPyramid, order}, x::Vector{Vec{3, T}}) where {T, order}
+    vol = norm((x[5] - x[1]) ⋅ ((x[2] - x[1]) × (x[3] - x[1]))) / 3.0
+    return vol
+end
+
+function calculate_volume(::Serendipity{RefQuadrilateral, 2}, x::Vector{Vec{2, T}}) where T
     vol = norm((x[5] - x[1]) × (x[8] - x[1])) * 0.5 +
           norm((x[6] - x[2]) × (x[5] - x[2])) * 0.5 +
           norm((x[7] - x[3]) × (x[6] - x[3])) * 0.5 +
@@ -166,26 +202,95 @@ function calculate_volume(::Serendipity{2, RefCube, 2}, x::Vector{Vec{2, T}}) wh
     return vol
 end
 
-# For faces
-function calculate_volume(::Lagrange{0, RefCube, order}, ::Vector{Vec{1, T}}) where {order, T}
-    return one(T)
+function calculate_face_area(ip::Union{Lagrange{RefLine}, DiscontinuousLagrange{RefLine}}, x::Vector{<:Vec}, faceindex::Int)
+    return one(eltype(eltype(x)))
+end
+function calculate_face_area(ip::Union{Lagrange{RefQuadrilateral, order}, DiscontinuousLagrange{RefQuadrilateral, order}}, x::Vector{<:Vec}, faceindex::Int) where order
+    return calculate_volume(Lagrange{RefLine, order}(), x)
+end
+function calculate_face_area(ip::Union{Lagrange{RefTriangle, order}, DiscontinuousLagrange{RefTriangle, order}}, x::Vector{<:Vec}, faceindex::Int) where order
+    return calculate_volume(Lagrange{RefLine, order}(), x)
+end
+function calculate_face_area(ip::Union{Lagrange{RefHexahedron, order}, DiscontinuousLagrange{RefHexahedron, order}}, x::Vector{<:Vec}, faceindex::Int) where order
+    return calculate_volume(Lagrange{RefQuadrilateral, order}(), x)
+end
+function calculate_face_area(ip::Serendipity{RefQuadrilateral, order}, x::Vector{<:Vec}, faceindex::Int) where order
+    return calculate_volume(Lagrange{RefLine, order}(), x)
+end
+function calculate_face_area(p::Union{Lagrange{RefTetrahedron, order}, DiscontinuousLagrange{RefTetrahedron, order}}, x::Vector{<:Vec}, faceindex::Int) where order
+    return calculate_volume(Lagrange{RefTriangle, order}(), x)
+end
+function calculate_face_area(p::Union{Lagrange{RefPrism, order}, DiscontinuousLagrange{RefPrism, order}}, x::Vector{<:Vec}, faceindex::Int) where order
+    faceindex ∈ [1,5] && return calculate_volume(Lagrange{RefTriangle, order}(), x)
+    return calculate_volume(Lagrange{RefQuadrilateral, order}(), x)
+end
+function calculate_face_area(p::Union{Lagrange{RefPyramid, order}, DiscontinuousLagrange{RefPyramid, order}}, x::Vector{<:Vec}, faceindex::Int) where order
+    faceindex != 1 && return calculate_volume(Lagrange{RefTriangle, order}(), x)
+    return calculate_volume(Lagrange{RefQuadrilateral, order}(), x)
 end
 
-coords_on_faces(x, ::Lagrange{1, RefCube, 1}) = ([x[1]], [x[2]])
-coords_on_faces(x, ::Lagrange{1, RefCube, 2}) = ([x[1]], [x[2]])
-coords_on_faces(x, ::Lagrange{2, RefCube, 1}) =
+coords_on_faces(x, ::Lagrange{RefLine, 1}) = ([x[1]], [x[2]])
+coords_on_faces(x, ::Lagrange{RefLine, 2}) = ([x[1]], [x[2]])
+coords_on_faces(x, ::Lagrange{RefQuadrilateral, 1}) =
     ([x[1],x[2]], [x[2],x[3]], [x[3],x[4]], [x[1],x[4]])
-coords_on_faces(x, ::Lagrange{2, RefCube, 2}) =
+coords_on_faces(x, ::Lagrange{RefQuadrilateral, 2}) =
     ([x[1],x[2],x[5]], [x[2],x[3],x[6]], [x[3],x[4],x[7]], [x[1],x[4],x[8]])
-coords_on_faces(x, ::Lagrange{2, RefTetrahedron, 1}) =
+coords_on_faces(x, ::Lagrange{RefTriangle, 1}) =
     ([x[1],x[2]], [x[2],x[3]], [x[1],x[3]])
-coords_on_faces(x, ::Lagrange{2, RefTetrahedron, 2}) =
+coords_on_faces(x, ::Lagrange{RefTriangle, 2}) =
     ([x[1],x[2],x[4]], [x[2],x[3],x[5]], [x[1],x[3],x[6]])
-coords_on_faces(x, ::Lagrange{3, RefTetrahedron, 1}) =
+coords_on_faces(x, ::Lagrange{RefTetrahedron, 1}) =
     ([x[1],x[2],x[3]], [x[1],x[2],x[4]], [x[2],x[3],x[4]], [x[1],x[3],x[4]])
-coords_on_faces(x, ::Lagrange{3, RefTetrahedron, 2}) =
+coords_on_faces(x, ::Lagrange{RefTetrahedron, 2}) =
     ([x[1],x[2],x[3],x[5],x[6],x[7]], [x[1],x[2],x[4],x[5],x[8],x[9]], [x[2],x[3],x[4],x[6],x[9],x[10]], [x[1],x[3],x[4],x[7],x[8],x[10]])
-coords_on_faces(x, ::Lagrange{3, RefCube, 1}) =
+coords_on_faces(x, ::Lagrange{RefHexahedron, 1}) =
     ([x[1],x[2],x[3],x[4]], [x[1],x[2],x[5],x[6]], [x[2],x[3],x[6],x[7]],[x[3],x[4],x[7],x[8]],[x[1],x[4],x[5],x[8]],[x[5],x[6],x[7],x[8]])
-coords_on_faces(x, ::Serendipity{2, RefCube, 2}) =
+coords_on_faces(x, ::Serendipity{RefHexahedron, 2}) =
     ([x[1],x[2],x[5]], [x[2],x[3],x[6]], [x[3],x[4],x[7]], [x[1],x[4],x[8]])
+
+check_equal_or_nan(a::Any, b::Any) = a==b || (isnan(a) && isnan(b))
+check_equal_or_nan(a::Union{Tensor, Array}, b::Union{Tensor, Array}) = all(check_equal_or_nan.(a, b))
+
+# Hypercube is simply ⨂ᵈⁱᵐ Line :)
+sample_random_point(::Type{Ferrite.RefHypercube{ref_dim}}) where {ref_dim} = Vec{ref_dim}(2.0 .* rand(Vec{ref_dim}) .- 1.0)
+# Dirichlet type sampling
+function sample_random_point(::Type{Ferrite.RefSimplex{ref_dim}}) where {ref_dim} 
+    ξ = rand(ref_dim+1)
+    ξₜ = -log.(ξ)
+    return Vec{ref_dim}(ntuple(i->ξₜ[i], ref_dim) ./ sum(ξₜ))
+end
+# Wedge = Triangle ⊗ Line
+function sample_random_point(::Type{RefPrism})
+    (ξ₁, ξ₂) = sample_random_point(RefTriangle)
+    ξ₃ = rand(Float64)
+    return Vec{3}((ξ₁, ξ₂, ξ₃))
+end
+# TODO what to do here? The samplig is not uniform...
+function sample_random_point(::Type{RefPyramid})
+    ξ₃ = (1-1e-3)*rand(Float64) # Derivative is discontinuous at the top
+    # If we fix a z coordinate we get a Quad with extends (1-ξ₃)
+    (ξ₁, ξ₂) = (1.0 - ξ₃) .* rand(Vec{2})
+    return Vec{3}((ξ₁, ξ₂, ξ₃))
+end
+
+######################################################
+# Helpers for testing face_to_element_transformation #
+######################################################
+getfacerefshape(::Union{Quadrilateral, Triangle}, ::Int) = RefLine
+getfacerefshape(::Hexahedron, ::Int) = RefQuadrilateral
+getfacerefshape(::Tetrahedron, ::Int) = RefTriangle
+getfacerefshape(::Pyramid, face::Int) = face == 1 ? RefQuadrilateral : RefTriangle
+getfacerefshape(::Wedge, face::Int) = face ∈ (1,5) ? RefTriangle : RefQuadrilateral
+
+######################################################
+# Dummy RefShape to test get_transformation_matrix   #
+######################################################
+module DummyRefShapes
+    import Ferrite
+    struct RefDodecahedron  <: Ferrite.AbstractRefShape{3} end
+    function Ferrite.reference_faces(::Type{RefDodecahedron})
+        return (
+            (1, 5, 4, 3, 2), 
+        )
+    end
+end

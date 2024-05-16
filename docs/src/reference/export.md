@@ -13,14 +13,14 @@ project
 # Postprocessing
 ```@docs
 PointEvalHandler
-get_point_values
+evaluate_at_points
 Ferrite.PointValues
 PointIterator
 PointLocation
 ```
 
 ```@docs
-reshape_to_nodes
+evaluate_at_grid_nodes
 ```
 
 ## VTK Export

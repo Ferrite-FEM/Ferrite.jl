@@ -1,33 +1,56 @@
 module Ferrite
-using Reexport
+
+using Reexport: @reexport
 @reexport using Tensors
 @reexport using WriteVTK
 
-using LinearAlgebra
-using SparseArrays
-using Base: @propagate_inbounds
-using NearestNeighbors
-using EnumX
+using Base:
+    @propagate_inbounds
+using EnumX:
+    EnumX, @enumx
+using LinearAlgebra:
+    LinearAlgebra, Symmetric, Transpose, cholesky, det, issymmetric, norm,
+    pinv, tr
+using NearestNeighbors:
+    NearestNeighbors, KDTree, knn
+using SparseArrays:
+    SparseArrays, SparseMatrixCSC, nonzeros, nzrange, rowvals, sparse, spzeros
+using StaticArrays:
+    StaticArrays, MMatrix, SMatrix, SVector
+using Tensors:
+    Tensors, AbstractTensor, SecondOrderTensor, SymmetricTensor, Tensor, Vec, gradient,
+    rotation_tensor, symmetric, tovoigt!
+using WriteVTK:
+    WriteVTK, MeshCell, VTKCellTypes, vtk_cell_data, vtk_grid, vtk_point_data, vtk_save
 
 include("exports.jl")
 
 """
-Represents a reference shape which quadrature rules and interpolations are defined on.
-Currently, the only concrete types that subtype this type are `RefCube` in 1, 2 and 3 dimensions,
-and `RefTetrahedron` in 2 and 3 dimensions.
-"""
-abstract type AbstractRefShape end
+    AbstractRefShape{refdim}
 
-struct RefTetrahedron <: AbstractRefShape end
-struct RefCube <: AbstractRefShape end
-struct RefPrism <: AbstractRefShape end
+Supertype for all reference shapes, with reference dimension `refdim`. Reference shapes are
+used to define grid cells, shape functions, and quadrature rules. Currently existing
+reference shapes are: [`RefLine`](@ref), [`RefTriangle`](@ref), [`RefQuadrilateral`](@ref),
+[`RefTetrahedron`](@ref), [`RefHexahedron`](@ref), [`RefPrism`](@ref).
+"""
+abstract type AbstractRefShape{refdim} end
 
-"""
-Abstract type which has `CellValues` and `FaceValues` as subtypes
-"""
-abstract type Values{dim,T,refshape} end
-abstract type CellValues{dim,T,refshape} <: Values{dim,T,refshape} end
-abstract type FaceValues{dim,T,refshape} <: Values{dim,T,refshape} end
+# See src/docs.jl for detailed documentation
+struct RefHypercube{refdim} <: AbstractRefShape{refdim} end
+struct RefSimplex{refdim}   <: AbstractRefShape{refdim} end
+const RefLine          = RefHypercube{1}
+const RefQuadrilateral = RefHypercube{2}
+const RefHexahedron    = RefHypercube{3}
+const RefTriangle      = RefSimplex{2}
+const RefTetrahedron   = RefSimplex{3}
+struct RefPrism         <: AbstractRefShape{3} end
+struct RefPyramid       <: AbstractRefShape{3} end
+
+abstract type AbstractCell{refshape <: AbstractRefShape} end
+
+abstract type AbstractValues end
+abstract type AbstractCellValues <: AbstractValues end
+abstract type AbstractFaceValues <: AbstractValues end
 
 """
 Abstract type which is used as identifier for faces, edges and verices
@@ -74,14 +97,19 @@ include("interpolations.jl")
 include("Quadrature/quadrature.jl")
 
 # FEValues
-include("FEValues/cell_values.jl")
-include("FEValues/face_values.jl")
-include("PointEval/point_values.jl")
+include("FEValues/GeometryMapping.jl")
+include("FEValues/FunctionValues.jl")
+include("FEValues/CellValues.jl")
+include("FEValues/FaceValues.jl")
+include("FEValues/InterfaceValues.jl")
+include("FEValues/PointValues.jl")
 include("FEValues/common_values.jl")
 include("FEValues/face_integrals.jl")
 
 # Grid
 include("Grid/grid.jl")
+include("Grid/topology.jl")
+include("Grid/utils.jl")
 include("Grid/grid_generators.jl")
 include("Grid/coloring.jl")
 
@@ -104,9 +132,10 @@ include("L2_projection.jl")
 include("Export/VTK.jl")
 
 # Point Evaluation
-include("PointEval/PointEvalHandler.jl")
+include("PointEvalHandler.jl")
 
 # Other
 include("deprecations.jl")
+include("docs.jl")
 
 end # module
