@@ -294,6 +294,7 @@ function test_export(;subset::Bool)
                 subset ? "b3fef3de9f38ca9ddd92f2f67a1606d07ca56d67" :
                          "bc2ec8f648f9b8bccccf172c1fc48bf03340329b"
             )
+        end
     end
 
 end
