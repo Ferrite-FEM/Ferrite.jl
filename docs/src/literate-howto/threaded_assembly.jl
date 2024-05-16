@@ -91,7 +91,7 @@ function create_values(interpolation_space::Interpolation{refshape}, qr_order::I
     quadrature_rule = QuadratureRule{refshape}(qr_order)
     facet_quadrature_rule = FacetQuadratureRule{refshape}(qr_order)
     cellvalues = [CellValues(quadrature_rule, interpolation_space) for i in 1:Threads.nthreads()];
-    facetvalues = [FacetValues(face_quadrature_rule, interpolation_space) for i in 1:Threads.nthreads()];
+    facetvalues = [FacetValues(facet_quadrature_rule, interpolation_space) for i in 1:Threads.nthreads()];
     return cellvalues, facetvalues
 end;
 
