@@ -540,7 +540,7 @@ end
 # To visualize the result we export the grid and our fields
 # to VTK-files, which can be viewed in [ParaView](https://www.paraview.org/)
 # by utilizing the corresponding pvd file.
-timestepper = ImplicitEuler(step_limiter! = ferrite_limiter!)
+timestepper = ImplicitEuler(step_limiter! = ferrite_limiter!);
 # timestepper = ImplicitEuler(nlsolve=NonlinearSolveAlg(OrdinaryDiffEq.NonlinearSolve.NewtonRaphson(autodiff=OrdinaryDiffEq.AutoFiniteDiff(), linsolve=FerriteBackslash()); max_iter=50), step_limiter! = ferrite_limiter!)
 #NOTE!   This is left for future reference                                 #src
 # function algebraicmultigrid(W,du,u,p,t,newW,Plprev,Prprev,solverdata)   #src
