@@ -150,7 +150,7 @@ bottomtag = gmsh.model.model.add_physical_group(dim-1,[6],-1,"bottom")
 lefttag = gmsh.model.model.add_physical_group(dim-1,[7],-1,"left")
 righttag = gmsh.model.model.add_physical_group(dim-1,[8],-1,"right")
 toptag = gmsh.model.model.add_physical_group(dim-1,[9],-1,"top")
-holetag = gmsh.model.model.add_physical_group(dim-1,[5],-1,"hole")
+holetag = gmsh.model.model.add_physical_group(dim-1,[5],-1,"hole");
 else                                                                                                #hide
 gmsh.model.model.add_physical_group(dim-1,[4],7,"left")                                             #hide
 gmsh.model.model.add_physical_group(dim-1,[3],8,"top")                                              #hide
@@ -474,7 +474,7 @@ end
 function navierstokes_jac!(J,u_uc,p,t)
     # Unpack the struct to save some allocations.
     #+
-    @unpack K,ch,dh,cellvalues_v,u = p
+    @unpack K, ch, dh, cellvalues_v, u = p
 
     # We start by applying the time-dependent Dirichlet BCs. Note that we are
     # not allowed to mutate `u_uc`, so we use our buffer again.
