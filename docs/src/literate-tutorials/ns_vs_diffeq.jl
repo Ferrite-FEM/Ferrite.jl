@@ -139,7 +139,7 @@ circle_curve_tag = gmsh.model.occ.add_curve_loop([circle_tag])
 circle_surf_tag = gmsh.model.occ.add_plane_surface([circle_curve_tag])
 gmsh.model.occ.cut([(dim,rect_tag)],[(dim,circle_surf_tag)]);
 else                                                                                                #hide
-rect_tag = gmsh.model.occ.add_rectangle(0, 0, 0, 0.55, 0.41)                                        #hide
+rect_tag = gmsh.model.occ.add_rectangle(0, 0, 0, 0.55, 0.41);                                       #hide
 end                                                                                                 #hide
 # Now, the geometrical entities need to be synchronized in order to be available outside 
 # of `gmsh.model.occ`
@@ -155,7 +155,7 @@ else                                                                            
 gmsh.model.model.add_physical_group(dim-1,[4],7,"left")                                             #hide
 gmsh.model.model.add_physical_group(dim-1,[3],8,"top")                                              #hide
 gmsh.model.model.add_physical_group(dim-1,[2],9,"right")                                            #hide
-gmsh.model.model.add_physical_group(dim-1,[1],10,"bottom")                                          #hide
+gmsh.model.model.add_physical_group(dim-1,[1],10,"bottom");                                         #hide
 end # hide
 # Since we want a quad mesh, we specify the meshing algorithm to the quasi structured quad one.
 # For a complete list, [see the Gmsh docs](https://gmsh.info/doc/texinfo/gmsh.html#Mesh-options-list).
@@ -164,12 +164,12 @@ gmsh.option.setNumber("Mesh.MeshSizeFromCurvature",20)
 gmsh.option.setNumber("Mesh.MeshSizeMax",0.05)
 if IS_CI                                                                                             #hide
 gmsh.option.setNumber("Mesh.MeshSizeFromCurvature",20)                                               #hide
-gmsh.option.setNumber("Mesh.MeshSizeMax",0.15)                                                        #hide
+gmsh.option.setNumber("Mesh.MeshSizeMax",0.15)                                                       #hide
 end                                                                                                  #hide
 # In the next step, the mesh is generated and finally translated.
 gmsh.model.mesh.generate(dim)
 grid = togrid()
-Gmsh.finalize()
+Gmsh.finalize();
 
 #  ### Function Space
 #  To ensure stability we utilize the Taylor-Hood element pair Q2-Q1.
@@ -566,7 +566,6 @@ pvd = paraview_collection("vortex-street.pvd");
 # integrator = TimeChoiceIterator(integrator, 0.0:Δt_save:T)
 # for (u,t) in integrator # broken
 for (u,t) in intervals(integrator)
-    @show t
     # We ignored the Dirichlet constraints in the solution vector up to now,
     # so we have to bring them back now.
     #+
@@ -618,6 +617,7 @@ end                                                                         #hid
     end                                                                     #hide
     @test isapprox(sqrt(Δv), 0.0, atol=1e-3)                                #hide
 end;                                                                        #hide
+nothing                                                                     #hide
 
 #md # ## [Plain program](@id ns_vs_diffeq-plain-program)
 #md #
