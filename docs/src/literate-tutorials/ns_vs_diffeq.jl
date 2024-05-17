@@ -128,26 +128,20 @@ gmsh.option.set_number("General.Verbosity", 2)
 dim = 2;
 # We specify first the rectangle, the cylinder, the surface spanned by the cylinder and the boolean difference of rectangle and cylinder.
 # We check for laminar flow development in the CI #src
-if false #hide
 rect_tag = gmsh.model.occ.add_rectangle(0, 0, 0, 2.2, 0.41)
 circle_tag = gmsh.model.occ.add_circle(0.2, 0.2, 0, 0.05)
 circle_curve_tag = gmsh.model.occ.add_curve_loop([circle_tag])
 circle_surf_tag = gmsh.model.occ.add_plane_surface([circle_curve_tag])
 gmsh.model.occ.cut([(dim,rect_tag)],[(dim,circle_surf_tag)]);
-else #hide
 rect_tag = gmsh.model.occ.add_rectangle(0, 0, 0, 0.55, 0.41) #hide
-end #hide
 # Now, the geometrical entities need to be synchronized in order to be available outside of `gmsh.model.occ`
 gmsh.model.occ.synchronize()
 # In the next lines, we add the physical groups needed to define boundary conditions.
-if false #hide
-gmsh.model.model.add_physical_group(dim-1,[5],6,"hole")
-end #hide
-gmsh.model.model.add_physical_group(dim-1,[4],7,"left")
-gmsh.model.model.add_physical_group(dim-1,[3],8,"top")
-gmsh.model.model.add_physical_group(dim-1,[2],9,"right")
-gmsh.model.model.add_physical_group(dim-1,[1],10,"bottom")
-gmsh.model.model.add_physical_group(dim,[1],11,"domain");
+bottomtag = gmsh.model.model.add_physical_group(dim-1,[6],-1,"bottom")
+lefttag = gmsh.model.model.add_physical_group(dim-1,[7],-1,"left")
+righttag = gmsh.model.model.add_physical_group(dim-1,[8],-1,"right")
+toptag = gmsh.model.model.add_physical_group(dim-1,[9],-1,"top")
+holetag = gmsh.model.model.add_physical_group(dim-1,[5],-1,"hole")
 # Since we want a quad mesh, we specify the meshing algorithm to the quasi structured quad one.
 # For a complete list, [see the Gmsh docs](https://gmsh.info/doc/texinfo/gmsh.html#Mesh-options-list).
 gmsh.option.setNumber("Mesh.Algorithm",11)
@@ -161,10 +155,10 @@ gmsh.model.mesh.generate(dim)
 grid = togrid()
 Gmsh.finalize()
 
-# ### Function Space
-# To ensure stability we utilize the Taylor-Hood element pair Q2-Q1.
-# We have to utilize the same quadrature rule for the pressure as for the velocity, because in the weak form the
-# linear pressure term is tested against a quadratic function.
+ ### Function Space
+ To ensure stability we utilize the Taylor-Hood element pair Q2-Q1.
+ We have to utilize the same quadrature rule for the pressure as for the velocity, because in the weak form the
+ linear pressure term is tested against a quadratic function.
 ip_v = Lagrange{RefQuadrilateral, 2}()^dim
 qr = QuadratureRule{RefQuadrilateral}(4)
 cellvalues_v = CellValues(qr, ip_v);
