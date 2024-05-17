@@ -462,7 +462,7 @@ uuid = "29a986be-02c6-4525-aec4-84b980013641"
 version = "2.0.3"
 
 [[deps.Ferrite]]
-deps = ["EnumX", "ForwardDiff", "LinearAlgebra", "NearestNeighbors", "Preferences", "Reexport", "SparseArrays", "StaticArrays", "Tensors", "WriteVTK"]
+deps = ["EnumX", "LinearAlgebra", "NearestNeighbors", "Preferences", "Reexport", "SparseArrays", "StaticArrays", "Tensors", "WriteVTK"]
 path = ".."
 uuid = "c061ca5d-56c9-439f-9c0e-210fe06d3992"
 version = "0.3.14"
@@ -1304,9 +1304,7 @@ version = "1.6.3"
 
 [[deps.OrdinaryDiffEq]]
 deps = ["ADTypes", "Adapt", "ArrayInterface", "DataStructures", "DiffEqBase", "DocStringExtensions", "ExponentialUtilities", "FastBroadcast", "FastClosures", "FillArrays", "FiniteDiff", "ForwardDiff", "FunctionWrappersWrappers", "IfElse", "InteractiveUtils", "LineSearches", "LinearAlgebra", "LinearSolve", "Logging", "MacroTools", "MuladdMacro", "NonlinearSolve", "Polyester", "PreallocationTools", "PrecompileTools", "Preferences", "RecursiveArrayTools", "Reexport", "SciMLBase", "SciMLOperators", "SciMLStructures", "SimpleNonlinearSolve", "SimpleUnPack", "SparseArrays", "SparseDiffTools", "StaticArrayInterface", "StaticArrays", "TruncatedStacktraces"]
-git-tree-sha1 = "30e282d94bc859cf2d9abfa159d955cedda4ff68"
-repo-rev = "do/newton-itr-info"
-repo-url = "/home/dogiermann/Repos/OrdinaryDiffEq.jl-fork"
+git-tree-sha1 = "4cf03bfe9c6159f66b57cda85f169cd0eff0818d"
 uuid = "1dea7af3-3e70-54e6-95c3-0bf5283fa5ed"
 version = "6.76.0"
 
