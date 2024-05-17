@@ -47,9 +47,11 @@ getrefshape(::AbstractCell{refshape}) where refshape = refshape
 nvertices(c::AbstractCell) = length(vertices(c))
 nedges(   c::AbstractCell) = length(edges(c))
 nfaces(   c::AbstractCell) = length(faces(c))
+nfacets(  c::AbstractCell) = length(facets(c))
 nvertices(::Type{T}) where {T <: AbstractRefShape} = length(reference_vertices(T))
 nedges(   ::Type{T}) where {T <: AbstractRefShape} = length(reference_edges(T))
 nfaces(   ::Type{T}) where {T <: AbstractRefShape} = length(reference_faces(T))
+nfacets(  ::Type{T}) where {T <: AbstractRefShape} = length(reference_facets(T))
 nnodes(   c::AbstractCell) = length(get_node_ids(c))
 
 """
@@ -98,6 +100,35 @@ nodes spanning such that the normal to the face is pointing outwards.
 Note that the vertices are sufficient to define a face uniquely.
 """
 faces(::AbstractCell)
+
+"""
+    Ferrite.facets(::AbstractCell)
+
+Returns a tuple of n-tuples containing the ordered node indices (of the nodes in a grid) corresponding to
+the vertices that define an oriented facet. This function induces the 
+[`FacetIndex`](@ref), where the second index corresponds to the local index into this tuple.
+
+See also [`vertices`](@ref), [`edges`](@ref), and [`faces`](@ref)
+"""
+facets(::AbstractCell)
+
+@inline facets(c::AbstractCell{<:AbstractRefShape{1}}) = map(i -> (i,), vertices(c)) # facet always tuple of tuple
+@inline facets(c::AbstractCell{<:AbstractRefShape{2}}) = edges(c)
+@inline facets(c::AbstractCell{<:AbstractRefShape{3}}) = faces(c)
+
+"""
+    Ferrite.reference_facets(Type{<:AbstractRefShape})
+
+Returns a tuple of n-tuples containing the ordered local node indices corresponding to
+the vertices that define an oriented facet. 
+
+See also [`reference_vertices`](@ref), [`reference_edges`](@ref), and [`reference_faces`](@ref)
+"""
+reference_facets(::Type{<:AbstractRefShape})
+
+@inline reference_facets(refshape::Type{<:AbstractRefShape{1}}) = map(i -> (i,), reference_vertices(refshape)) 
+@inline reference_facets(refshape::Type{<:AbstractRefShape{2}}) = reference_edges(refshape)
+@inline reference_facets(refshape::Type{<:AbstractRefShape{3}}) = reference_faces(refshape)
 
 """
     Ferrite.default_interpolation(::AbstractCell)::Interpolation
@@ -971,21 +1002,4 @@ function OrientationInfo(surface::NTuple{N, Int}) where N
         flipped = surface[min_idx + 1] < surface[min_idx - 1]
     end
     return OrientationInfo(flipped, shift_index)
-end
-
-# Dispatches for facets
-
-@inline facets(c::AbstractCell{<:AbstractRefShape{1}}) = map(i -> (i,), vertices(c)) # facet always tuple of tuple
-@inline facets(c::AbstractCell{<:AbstractRefShape{2}}) = edges(c)
-@inline facets(c::AbstractCell{<:AbstractRefShape{3}}) = faces(c)
-
-@inline reference_facets(refshape::Type{<:AbstractRefShape{1}}) = map(i -> (i,), reference_vertices(refshape)) 
-@inline reference_facets(refshape::Type{<:AbstractRefShape{2}}) = reference_edges(refshape)
-@inline reference_facets(refshape::Type{<:AbstractRefShape{3}}) = reference_faces(refshape)
-nfacets(::Type{T}) where {T <: AbstractRefShape} = length(reference_facets(T))
-nfacets(c::AbstractCell) = length(facets(c))
-# Deprecation (TODO: Move to deprecated.jl)
-function getfaceset(grid::AbstractGrid, name::String)
-    @warn "getfaceset is deprecated, use getfacetset instead" maxlog=1
-    getfacetset(grid, name)
 end

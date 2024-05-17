@@ -758,14 +758,6 @@ end
 
 
 """
-    sortfacet(facet::NTuple{N, Int})
-
-Returns the unique representation of the `facet` by sorting its node indices. 
-Dispatches on `sortedges` or `sortfaces` depending on `N`
-"""
-function sortfacet end 
-
-"""
     sortfacet_fast(facet::NTuple{N, Int})
 
 Returns the unique representation of the `facet` by sorting its node indices. 
@@ -774,15 +766,11 @@ Dispatches on `sortedges_fast` or `sortfaces_fast` depending on `N`
 function sortfacet_fast end 
 
 # Vertex
-sortfacet(facet::Tuple{Int}) = facet
-sortfacet_fast(facet::Tuple{Int}) = (facet, nothing)
+sortfacet_fast(facet::Tuple{Int}) = facet
 # Edge 
-sortfacet(facet::NTuple{2, Int}) = sortedge(facet) # If exactly two vertices => edge 
 sortfacet_fast(facet::NTuple{2, Int}) = sortedge_fast(facet)
 # Face 
-sortfacet(facet::NTuple{3, Int}) = sortface(facet) # If exactly two vertices => edge 
 sortfacet_fast(facet::NTuple{3, Int}) = sortface_fast(facet)
-sortfacet(facet::NTuple{4, Int}) = sortface(facet) # More than two vertices => face
 sortfacet_fast(facet::NTuple{4, Int}) = sortface_fast(facet)
 
 """

@@ -1356,7 +1356,7 @@ function __collect_boundary_facets(grid::Grid)
     candidates = Dict{Tuple, FacetIndex}()
     for (ci, c) in enumerate(grid.cells)
         for (fi, fn) in enumerate(facets(c))
-            facet = first(sortfacet(fn))
+            facet = sortfacet_fast(fn)
             if haskey(candidates, facet)
                 delete!(candidates, facet)
             else
