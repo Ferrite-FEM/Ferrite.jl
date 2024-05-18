@@ -87,7 +87,7 @@ update!(dbcs, 0.0)
 
 K = create_sparsity_pattern(dh);
 
-function doassemble(cellvalues::CellValues, facetvaluesFacetValues,
+function doassemble(cellvalues::CellValues, facetvalues::FacetValues,
                          K::SparseMatrixCSC, dh::DofHandler)
     b = 1.0
     f = zeros(ndofs(dh))
