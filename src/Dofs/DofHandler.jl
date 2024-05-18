@@ -415,7 +415,7 @@ function _close_subdofhandler!(dh::DofHandler{sdim}, sdh::SubDofHandler, sdh_ind
                     next_dof_index += 1
                 end
             end
-            for dof_index ∈ celldof_interior_indices(interpolation)
+            for dof_index ∈ volumedof_interior_indices(interpolation)
                 @assert next_dof_index <= dof_index <= getnbasefunctions(interpolation) "Cell dof ordering not supported. Please consult the dev docs."
             end
         end
@@ -503,8 +503,8 @@ function _distribute_dofs_for_cell!(dh::DofHandler{sdim}, cell::AbstractCell, ip
     )
 
     # Distribute internal dofs for cells
-    nextdof = add_cell_dofs(
-        dh.cell_dofs, ip_info.ncelldofs, nextdof, ip_info.n_copies,
+    nextdof = add_volume_dofs(
+        dh.cell_dofs, ip_info.nvolumedofs, nextdof, ip_info.n_copies,
     )
 
     return nextdof
@@ -581,9 +581,9 @@ function add_edge_dofs(cell_dofs::Vector{Int}, cell::AbstractCell, edgedict::Dic
     return nextdof
 end
 
-function add_cell_dofs(cell_dofs::CD, ncelldofs::Int, nextdof::Int, n_copies::Int) where {CD}
-    @debug println("\t\tcelldofs #$nextdof:$(ncelldofs*n_copies-1)")
-    for _ in 1:ncelldofs, _ in 1:n_copies
+function add_volume_dofs(cell_dofs::CD, nvolumedofs::Int, nextdof::Int, n_copies::Int) where {CD}
+    @debug println("\t\tvolumedofs #$nextdof:$(nvolumedofs*n_copies-1)")
+    for _ in 1:nvolumedofs, _ in 1:n_copies
         push!(cell_dofs, nextdof)
         nextdof += 1
     end

@@ -105,7 +105,7 @@
     totaldofs = sum(length.(Ferrite.vertexdof_indices(interpolation));init=0)
     totaldofs += sum(length.(Ferrite.facedof_interior_indices(interpolation));init=0)
     totaldofs += sum(length.(Ferrite.edgedof_interior_indices(interpolation));init=0) 
-    totaldofs += length(Ferrite.celldof_interior_indices(interpolation))
+    totaldofs += length(Ferrite.volumedof_interior_indices(interpolation))
     @test totaldofs == n_basefuncs
 
     # The dof indices are valid.
@@ -114,7 +114,7 @@
     @test all([all(0 .< i .<= n_basefuncs) for i ∈ Ferrite.facedof_interior_indices(interpolation)])
     @test all([all(0 .< i .<= n_basefuncs) for i ∈ Ferrite.edgedof_indices(interpolation)])
     @test all([all(0 .< i .<= n_basefuncs) for i ∈ Ferrite.edgedof_interior_indices(interpolation)])
-    @test all([all(0 .< i .<= n_basefuncs) for i ∈ Ferrite.celldof_interior_indices(interpolation)])
+    @test all([all(0 .< i .<= n_basefuncs) for i ∈ Ferrite.volumedof_interior_indices(interpolation)])
 
         # Check for evaluation type correctness of interpolation
         @testset "return type correctness dof $dof" for dof in 1:n_basefuncs

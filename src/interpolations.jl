@@ -77,7 +77,7 @@ struct InterpolationInfo
     nvertexdofs::Vector{Int}
     nedgedofs::Vector{Int}
     nfacedofs::Vector{Int}
-    ncelldofs::Int
+    nvolumedofs::Int
     reference_dim::Int
     adjust_during_distribution::Bool
     n_copies::Int
@@ -88,7 +88,7 @@ function InterpolationInfo(interpolation::Interpolation{shape}, n_copies) where 
         [length(i) for i ∈ vertexdof_indices(interpolation)],
         [length(i) for i ∈ edgedof_interior_indices(interpolation)],
         [length(i) for i ∈ facedof_interior_indices(interpolation)],
-        length(celldof_interior_indices(interpolation)),
+        length(volumedof_interior_indices(interpolation)),
         rdim,
         adjust_dofs_during_distribution(interpolation),
         n_copies,
@@ -376,15 +376,15 @@ edge dofs are included here.
 facedof_interior_indices(::Interpolation) 
 
 """
-    celldof_interior_indices(ip::Interpolation)
+    volumedof_interior_indices(ip::Interpolation)
 
-Tuple containing the dof indices associated with the interior of the cell.
+Tuple containing the dof indices associated with the interior of a volume.
 
 !!! note
-    The dofs appearing in the tuple must be continuous and increasing! Celldofs are
+    The dofs appearing in the tuple must be continuous and increasing, volumedofs are
     enumerated last.
 """
-celldof_interior_indices(::Interpolation) = ()
+volumedof_interior_indices(::Interpolation) = ()
 
 # Some helpers to skip boilerplate
 edgedof_indices(ip::Interpolation) = ntuple(_ -> (), nedges(ip))
@@ -462,7 +462,7 @@ getnbasefunctions(::DiscontinuousLagrange{shape,order}) where {shape,order} = ge
 getnbasefunctions(::DiscontinuousLagrange{shape,0}) where {shape} = 1
 
 # This just moves all dofs into the interior of the element.
-celldof_interior_indices(ip::DiscontinuousLagrange) = ntuple(i->i, getnbasefunctions(ip))
+volumedof_interior_indices(ip::DiscontinuousLagrange) = ntuple(i->i, getnbasefunctions(ip))
 
 # Mirror the Lagrange element for now to avoid repeating.
 dirichlet_facedof_indices(ip::DiscontinuousLagrange{shape, order}) where {shape, order} = dirichlet_facedof_indices(Lagrange{shape, order}())
@@ -967,7 +967,7 @@ edgedof_interior_indices(::Lagrange{RefHexahedron,2}) = (
     (9,), (10,), (11,), (12,), (13,), (14,), (15,), (16,), (17), (18,), (19,), (20,)
 )
 
-celldof_interior_indices(::Lagrange{RefHexahedron,2}) = (27,)
+volumedof_interior_indices(::Lagrange{RefHexahedron,2}) = (27,)
 
 function reference_coordinates(::Lagrange{RefHexahedron,2})
            # vertex
