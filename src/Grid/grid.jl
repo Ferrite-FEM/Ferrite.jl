@@ -117,7 +117,7 @@ facets(::AbstractCell)
 @inline facets(c::AbstractCell{<:AbstractRefShape{3}}) = faces(c)
 
 """
-    Ferrite.reference_facets(Type{<:AbstractRefShape})
+    Ferrite.reference_facets(::Type{<:AbstractRefShape})
 
 Returns a tuple of n-tuples containing the ordered local node indices corresponding to
 the vertices that define an oriented facet. 
