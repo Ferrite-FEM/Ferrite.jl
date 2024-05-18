@@ -562,7 +562,7 @@ function add_face_dofs(cell_dofs::Vector{Int}, cell::AbstractCell, facedict::Dic
         sface, orientation = sortface(face)
         @debug println("\t\tface #$sface, $orientation")
         nextdof, dofs = get_or_create_dofs!(nextdof, nfacedofs[fi], n_copies, facedict, sface)
-        permute_and_push!(cell_dofs, dofs, orientation, adjust_during_distribution)
+        permute_and_push!(cell_dofs, dofs, orientation, adjust_during_distribution, getdim(cell)) # TODO: passing rdim of cell is temporary, simply to check if facedofs are internal to cell
         @debug println("\t\t\tadjusted dofs: $(cell_dofs[(end - nfacedofs[fi]*n_copies + 1):end])")
     end
     return nextdof
@@ -704,12 +704,10 @@ For more details we refer to [1] as we follow the methodology described therein.
 
     !!!TODO Investigate if we can somehow pass the interpolation into this function in a typestable way.
 """
-@inline function permute_and_push!(cell_dofs::Vector{Int}, dofs::StepRange{Int,Int}, orientation::SurfaceOrientationInfo, adjust_during_distribution::Bool)
-    #= TODO: Re-enable or check somewhere else
-    if adjust_during_distribution && length(dofs) > 1
+@inline function permute_and_push!(cell_dofs::Vector{Int}, dofs::StepRange{Int,Int}, ::SurfaceOrientationInfo, adjust_during_distribution::Bool, rdim::Int)
+    if rdim==3 && adjust_during_distribution && length(dofs) > 1
         error("Dof distribution for interpolations with multiple dofs per face not implemented yet.")
     end
-    =#
     n_copies = step(dofs)
     @assert n_copies > 0
     for dof in dofs
