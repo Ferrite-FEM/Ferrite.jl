@@ -491,6 +491,7 @@ end
     topology = ExclusiveTopology(grid)
     @test_throws ArgumentError Ferrite.facetskeleton(topology, grid)
     @test_throws ArgumentError getneighborhood(topology, grid, FacetIndex(1,1))
+    @test_throws ArgumentError Ferrite.get_facet_facet_neighborhood(topology, grid)
 
 #
 #                   +-----+-----+-----+
