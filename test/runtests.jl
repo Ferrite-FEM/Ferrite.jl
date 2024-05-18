@@ -20,8 +20,8 @@ end
 const RUN_JET_TESTS = VERSION >= v"1.9" && isempty(VERSION.prerelease)
 
 if RUN_JET_TESTS
-    #using Pkg: Pkg 
-    #Pkg.add("JET")
+    using Pkg: Pkg 
+    Pkg.add("JET")
     using JET: @test_call
 else
     # Just eat the macro on incompatible versions
