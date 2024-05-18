@@ -187,5 +187,11 @@
         grid = generate_grid(cell_type, ntuple(i->3, Ferrite.getdim(cell_type)))
         topology = ExclusiveTopology(grid)
         @test extractboundary(grid, topology) == extractboundarycheck(grid)
+
+        filter_function(x) = x[1] > 0
+        addboundaryvertexset!(grid, topology, "test_boundary_vertexset", filter_function)
+        @test getvertexset(grid, "test_boundary_vertexset") == Ferrite.create_boundaryvertexset(grid, topology, filter_function)
+        addboundaryfacetset!(grid, topology, "test_boundary_facetset", filter_function)
+        @test getfacetset(grid, "test_boundary_facetset") == Ferrite.create_boundaryfacetset(grid, topology, filter_function)
     end
 end
