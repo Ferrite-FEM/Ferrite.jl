@@ -76,12 +76,12 @@ mutable struct ExclusiveTopology <: AbstractTopology
 end
 
 function get_facet_facet_neighborhood(t::ExclusiveTopology, g::AbstractGrid)
-    return _get_facet_facet_neighborhood(t, Val(get_reference_dimensionality(g)))
+    return _get_facet_facet_neighborhood(t, Val(get_reference_dimension(g)))
 end
 _get_facet_facet_neighborhood(t::ExclusiveTopology, #=rdim=#::Val{1}) = t.vertex_vertex_neighbor
 _get_facet_facet_neighborhood(t::ExclusiveTopology, #=rdim=#::Val{2}) = t.edge_edge_neighbor
 _get_facet_facet_neighborhood(t::ExclusiveTopology, #=rdim=#::Val{3}) = t.face_face_neighbor
-function _get_facet_facet_neighborhood(t::ExclusiveTopology, #=rdim=#::Val{:mixed})
+function _get_facet_facet_neighborhood(::ExclusiveTopology, #=rdim=#::Val{nothing})
     throw(ArgumentError("get_facet_facet_neightborhood is only supported for grids containing cells with the same reference dimension.
     Access the `vertex_vertex_neighbor`, `edge_edge_neighbor`, or `face_face_neighbor` fields explicitly instead."))
 end
@@ -298,7 +298,7 @@ function getneighborhood(top::ExclusiveTopology, grid::AbstractGrid, edgeidx::Ed
 end
 
 function getneighborhood(top::ExclusiveTopology, grid::AbstractGrid, facetindex::FacetIndex, include_self=false)
-    rdim = get_reference_dimensionality(grid)
+    rdim = get_reference_dimension(grid)
     return _getneighborhood(Val(rdim), top, grid, facetindex, include_self)
 end
 _getneighborhood(::Val{1}, top, grid, facetindex::FacetIndex, include_self) = getneighborhood(top, grid, VertexIndex(facetindex...), include_self)
@@ -418,7 +418,7 @@ that all cells have the same reference dimension. For cells with different refer
 must be used explicitly. 
 """
 function facetskeleton(top::ExclusiveTopology, grid::AbstractGrid)
-    rdim = get_reference_dimensionality(grid)
+    rdim = get_reference_dimension(grid)
     return _facetskeleton(top, Val(rdim))
 end
 _facetskeleton(top::ExclusiveTopology, #=rdim=#::Val{1}) = vertexskeleton(top)

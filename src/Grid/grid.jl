@@ -453,15 +453,15 @@ getsdim(::AbstractGrid{sdim}) where sdim = sdim
 @inline getdim(g::AbstractGrid) = getsdim(g) # TODO: Deprecate
 
 """
-    get_reference_dimensionality(grid::AbstractGrid) -> Union{Int, Symbol}
+    get_reference_dimension(grid::AbstractGrid) -> Union{Int, Nothing}
 
 Get information about the reference dimensions of the cells in the grid. 
 If all cells have the same reference dimension, `rdim::Int` is returned. 
-Otherwise, the `Symbol` `:mixed` is returned indicating a mixed-rdimensionality grid.
+For grids with mixed reference dimensions, `nothing` is returned.
 """
-get_reference_dimensionality(g::AbstractGrid) = _get_reference_dimensionality(getcells(g))
-_get_reference_dimensionality(::AbstractVector{C}) where C <: AbstractCell{<:AbstractRefShape{rdim}} where rdim = rdim # Fast path for single rdim inferable from eltype 
-function _get_reference_dimensionality(cells::AbstractVector{<:AbstractCell})
+get_reference_dimension(g::AbstractGrid) = _get_reference_dimension(getcells(g))
+_get_reference_dimension(::AbstractVector{C}) where C <: AbstractCell{<:AbstractRefShape{rdim}} where rdim = rdim # Fast path for single rdim inferable from eltype 
+function _get_reference_dimension(cells::AbstractVector{<:AbstractCell})
     # Could make fast-path for eltype being union of cells with different rdims, but @KristofferC recommends against that,
     # https://discourse.julialang.org/t/iterating-through-types-of-a-union-in-a-type-stable-manner/58285/3
     # Note, this function is inherently type-instable.
@@ -470,7 +470,7 @@ function _get_reference_dimensionality(cells::AbstractVector{<:AbstractCell})
         push!(rdims, getdim(cell))
     end
     length(rdims) == 1 && return first(rdims)
-    return :mixed
+    return nothing
 end
 
 """
