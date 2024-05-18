@@ -362,7 +362,6 @@ function _create_skeleton(neighborhood::Matrix{EntityNeighborhood{BI}}) where BI
     end
     return skeleton
 end
-_create_skeleton(::Nothing) = nothing
 
 #TODO: For the specific entities the grid input is unused
 """

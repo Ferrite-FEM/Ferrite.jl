@@ -296,6 +296,7 @@ end
     @test getneighborhood(linetopo, linegrid, VertexIndex(2,2)) == [VertexIndex(3,1)]
     @test linetopo.vertex_vertex_neighbor[3,1] == Ferrite.EntityNeighborhood(VertexIndex(2,2))
     @test getneighborhood(linetopo, linegrid, VertexIndex(3,1)) == [VertexIndex(2,2)]
+    @test getneighborhood(linetopo, linegrid, FacetIndex(3,1)) == getneighborhood(linetopo, linegrid, VertexIndex(3,1))
 
     linefaceskeleton = Ferrite.vertexskeleton(linetopo, linegrid)
     quadlinegrid = generate_grid(QuadraticLine,(3,))
@@ -350,6 +351,8 @@ end
     @test topology.edge_edge_neighbor[6,3] == Ferrite.EntityNeighborhood(Ferrite.BoundaryIndex[])
     @test topology.edge_edge_neighbor[6,4] == Ferrite.EntityNeighborhood(EdgeIndex(5,2))
 
+    @test getneighborhood(topology, quadgrid, EdgeIndex(2,4)) == getneighborhood(topology, quadgrid, FacetIndex(2,4))
+
     quadquadgrid = generate_grid(QuadraticQuadrilateral,(2,3))
     quadtopology = ExclusiveTopology(quadquadgrid)
     quadfaceskeleton = Ferrite.edgeskeleton(quadtopology, quadquadgrid)
@@ -395,6 +398,8 @@ end
     @test getneighborhood(topology,hexgrid,FaceIndex((3,3))) == [FaceIndex((4,5))]
     @test getneighborhood(topology,hexgrid,FaceIndex((4,2))) == [FaceIndex((2,4))]
     @test getneighborhood(topology,hexgrid,FaceIndex((4,5))) == [FaceIndex((3,3))]
+
+    @test getneighborhood(topology, hexgrid, FaceIndex(2,4)) == getneighborhood(topology, hexgrid, FacetIndex(2,4))
 
     # regression for https://github.com/Ferrite-FEM/Ferrite.jl/issues/518
     serendipitygrid = generate_grid(SerendipityQuadraticHexahedron,(2,2,1))
@@ -485,6 +490,7 @@ end
     grid = Grid(cells, nodes)
     topology = ExclusiveTopology(grid)
     @test_throws ArgumentError Ferrite.facetskeleton(topology, grid)
+    @test_throws ArgumentError getneighborhood(topology, grid, FacetIndex(1,1))
 
 #
 #                   +-----+-----+-----+
