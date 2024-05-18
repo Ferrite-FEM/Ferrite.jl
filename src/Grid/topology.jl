@@ -304,7 +304,7 @@ end
 _getneighborhood(::Val{1}, top, grid, facetindex::FacetIndex, include_self) = getneighborhood(top, grid, VertexIndex(facetindex...), include_self)
 _getneighborhood(::Val{2}, top, grid, facetindex::FacetIndex, include_self) = getneighborhood(top, grid, EdgeIndex(facetindex...), include_self)
 _getneighborhood(::Val{3}, top, grid, facetindex::FacetIndex, include_self) = getneighborhood(top, grid, FaceIndex(facetindex...), include_self)
-function _getneighborhood(::Val{:mixed}, args...)
+function _getneighborhood(::Val{nothing}, args...)
     throw(ArgumentError("getneighborhood with FacetIndex is is only supported for grids containing cells with a common reference dimension.
     For mixed-dimensionality grid, use `VertexIndex`, `EdgeIndex`, and `FaceIndex` explicitly"))
 end
@@ -424,7 +424,7 @@ end
 _facetskeleton(top::ExclusiveTopology, #=rdim=#::Val{1}) = vertexskeleton(top)
 _facetskeleton(top::ExclusiveTopology, #=rdim=#::Val{2}) = edgeskeleton(top)
 _facetskeleton(top::ExclusiveTopology, #=rdim=#::Val{3}) = faceskeleton(top)
-function _facetskeleton(::ExclusiveTopology, #=rdim=#::Val{:mixed})
+function _facetskeleton(::ExclusiveTopology, #=rdim=#::Val{nothing})
     throw(ArgumentError("facetskeleton is only supported for grids containing cells with a common reference dimension.
     For mixed-dimensionality grid, use `faceskeleton`, `edgeskeleton`, and `vertexskeleton` explicitly"))
 end
