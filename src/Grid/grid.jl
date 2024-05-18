@@ -149,11 +149,9 @@ get_node_ids(c::AbstractCell) = c.nodes
 # Default implementations of <entity> = vertices/edges/faces that work as long as get_node_ids 
 # and `reference_<entity>` are correctly implemented for the cell / reference shape. 
 
-function faces(c::Ferrite.AbstractCell{RefShape}) where RefShape
+function vertices(c::Ferrite.AbstractCell{RefShape}) where RefShape
     ns = Ferrite.get_node_ids(c)
-    return map(Ferrite.reference_faces(RefShape)) do rf
-        map(i -> ns[i], rf)
-    end
+    return map(i -> ns[i], Ferrite.reference_vertices(RefShape))
 end
 
 function edges(c::Ferrite.AbstractCell{RefShape}) where RefShape
@@ -163,174 +161,64 @@ function edges(c::Ferrite.AbstractCell{RefShape}) where RefShape
     end
 end
 
-function vertices(c::Ferrite.AbstractCell{RefShape}) where RefShape
+function faces(c::Ferrite.AbstractCell{RefShape}) where RefShape
     ns = Ferrite.get_node_ids(c)
-    return map(i -> ns[i], Ferrite.reference_vertices(RefShape))
+    return map(Ferrite.reference_faces(RefShape)) do rf
+        map(i -> ns[i], rf)
+    end
 end
 
-# RefLine (refdim = 1): vertices for vertexdofs, faces for BC
-reference_faces(::Type{RefLine}) = ()
-reference_edges(::Type{RefLine}) = ((1, 2),)
+# RefLine (refdim = 1)
 reference_vertices(::Type{RefLine}) = (1, 2) 
+reference_edges(::Type{RefLine}) = ((1, 2),) # e1
+reference_faces(::Type{RefLine}) = () # - 
 
-# RefTriangle (refdim = 2): vertices for vertexdofs, faces for facedofs (edgedofs) and BC
-function vertices(c::AbstractCell{RefTriangle})
-    ns = get_node_ids(c)
-    return (ns[1], ns[2], ns[3]) # v1, v2, v3
-end
-function edges(c::AbstractCell{RefTriangle})
-    ns = get_node_ids(c)
-    return (
-        (ns[1], ns[2]), (ns[2], ns[3]), (ns[3], ns[1]), # e1, e2, e3
-    )
-end
-function faces(c::AbstractCell{RefTriangle})
-    ns = get_node_ids(c)
-    return (
-        (ns[1], ns[2], ns[3]), # f1
-    )
-end
-function reference_edges(::Type{RefTriangle})
-    return (
-        (1, 2), (2, 3), (3, 1), # e1, e2, e3
-    )
-end
+# RefTriangle (refdim = 2)
+reference_vertices(::Type{RefTriangle}) = (1, 2, 3)
+reference_edges(::Type{RefTriangle}) = ((1, 2), (2, 3), (3, 1)) # e1 ... e3
+reference_faces(::Type{RefTriangle}) = ((1, 2, 3),) # f1
 
-# RefQuadrilateral (refdim = 2): vertices for vertexdofs, faces for facedofs (edgedofs) and BC
-function vertices(c::AbstractCell{RefQuadrilateral})
-    ns = get_node_ids(c)
-    return (ns[1], ns[2], ns[3], ns[4]) # v1, v2, v3, v4
-end
-function edges(c::AbstractCell{RefQuadrilateral})
-    ns = get_node_ids(c)
-    return (
-        (ns[1], ns[2]), (ns[2], ns[3]), (ns[3], ns[4]), (ns[4], ns[1]), # e1, e2, e3, e4
-    )
-end
-function faces(c::AbstractCell{RefQuadrilateral})
-    ns = get_node_ids(c)
-    return (
-        (ns[1], ns[2], ns[3], ns[4]), # f1
-    )
-end
-function reference_edges(::Type{RefQuadrilateral})
-    return (
-        (1, 2), (2, 3), (3, 4), (4, 1), # e1, e2, e3, e4
-    )
-end
+# RefQuadrilateral (refdim = 2)
+reference_vertices(::Type{RefQuadrilateral}) = (1, 2, 3, 4)
+reference_edges(::Type{RefQuadrilateral}) = ((1, 2), (2, 3), (3, 4), (4, 1)) # e1 ... e4
+reference_faces(::Type{RefQuadrilateral}) = ((1, 2, 3, 4),) # f1
 
-# RefTetrahedron (refdim = 3): vertices for vertexdofs, edges for edgedofs, faces for facedofs and BC
-function vertices(c::AbstractCell{RefTetrahedron})
-    ns = get_node_ids(c)
-    return (ns[1], ns[2], ns[3], ns[4]) # v1, v2, v3, v4
-end
-function edges(c::AbstractCell{RefTetrahedron})
-    ns = get_node_ids(c)
-    return (
-        (ns[1], ns[2]), (ns[2], ns[3]), (ns[3], ns[1]), # e1, e2, e3
-        (ns[1], ns[4]), (ns[2], ns[4]), (ns[3], ns[4]), # e4, e5, e6
-    )
-end
-function faces(c::AbstractCell{RefTetrahedron})
-    ns = get_node_ids(c)
-    return (
-        (ns[1], ns[3], ns[2]), (ns[1], ns[2], ns[4]), # f1, f2
-        (ns[2], ns[3], ns[4]), (ns[1], ns[4], ns[3]), # f3, f4
-    )
-end
-function reference_faces(::Type{RefTetrahedron})
-    return (
-        (1, 3, 2), (1, 2, 4), # f1, f2
-        (2, 3, 4), (1, 4, 3), # f3, f4
-    )
-end
+# RefTetrahedron (refdim = 3)
+reference_vertices(::Type{RefTetrahedron}) = (1, 2, 3, 4)
+reference_edges(::Type{RefTetrahedron}) = ((1, 2), (2, 3), (3, 1), (1, 4), (2, 4), (3, 4)) # e1 ... e6
+reference_faces(::Type{RefTetrahedron}) = ((1, 3, 2), (1, 2, 4), (2, 3, 4), (1, 4, 3)) # f1 ... f4
 
-# RefHexahedron (refdim = 3): vertices for vertexdofs, edges for edgedofs, faces for facedofs and BC
-function vertices(c::AbstractCell{RefHexahedron})
-    ns = get_node_ids(c)
-    return (
-        ns[1], ns[2], ns[3], ns[4], ns[5], ns[6], ns[7], ns[8], # v1, ..., v8
-    )
-end
-function edges(c::AbstractCell{RefHexahedron})
-    ns = get_node_ids(c)
-    return (
-        (ns[1], ns[2]), (ns[2], ns[3]), (ns[3], ns[4]), (ns[4], ns[1]), # e1, e2, e3, e4
-        (ns[5], ns[6]), (ns[6], ns[7]), (ns[7], ns[8]), (ns[8], ns[5]), # e5, e6, e7, e8
-        (ns[1], ns[5]), (ns[2], ns[6]), (ns[3], ns[7]), (ns[4], ns[8]), # e9, e10, e11, e12
-    )
-end
-function faces(c::AbstractCell{RefHexahedron})
-    ns = get_node_ids(c)
-    return (
-        (ns[1], ns[4], ns[3], ns[2]), (ns[1], ns[2], ns[6], ns[5]), # f1, f2
-        (ns[2], ns[3], ns[7], ns[6]), (ns[3], ns[4], ns[8], ns[7]), # f3, f4
-        (ns[1], ns[5], ns[8], ns[4]), (ns[5], ns[6], ns[7], ns[8]), # f5, f6
-    )
+# RefHexahedron (refdim = 3)
+reference_vertices(::Type{RefHexahedron}) = (1, 2, 3, 4, 5, 6, 7, 8)
+function reference_edges(::Type{RefHexahedron})
+    return ((1, 2), (2, 3), (3, 4), (4, 1), (5, 6), (6, 7), # e1 ... e6
+            (7, 8), (8, 5), (1, 5), (2, 6), (3, 7), (4, 8)) # e7 ... e12
 end
 function reference_faces(::Type{RefHexahedron})
-    return (
-        (1, 4, 3, 2), (1, 2, 6, 5), # f1, f2
-        (2, 3, 7, 6), (3, 4, 8, 7), # f3, f4
-        (1, 5, 8, 4), (5, 6, 7, 8), # f5, f6
-    )
+    return ((1, 4, 3, 2), (1, 2, 6, 5), (2, 3, 7, 6), # f1, f2, f3 
+            (3, 4, 8, 7), (1, 5, 8, 4), (5, 6, 7, 8)) # f4, f5, f6
 end
 
-# RefPrism (refdim = 3): vertices for vertexdofs, edges for edgedofs, faces for facedofs and BC
-function vertices(c::AbstractCell{RefPrism})
-    ns = get_node_ids(c)
-    return (ns[1], ns[2], ns[3], ns[4], ns[5], ns[6]) # v1, ..., v6
-end
-function edges(c::AbstractCell{RefPrism})
-    ns = get_node_ids(c)
-    return (
-        (ns[2], ns[1]), (ns[1], ns[3]), (ns[1], ns[4]), (ns[3], ns[2]), # e1, e2, e3, e4
-        (ns[2], ns[5]), (ns[3], ns[6]), (ns[4], ns[5]), (ns[4], ns[6]), # e5, e6, e7, e8
-        (ns[6], ns[5]),                                                 # e9
-    )
-end
-function faces(c::AbstractCell{RefPrism})
-    ns = get_node_ids(c)
-    return (
-        (ns[1], ns[3], ns[2]),        (ns[1], ns[2], ns[5], ns[4]), # f1, f2
-        (ns[3], ns[1], ns[4], ns[6]), (ns[2], ns[3], ns[6], ns[5]), # f3, f4
-        (ns[4], ns[5], ns[6]),                                      # f5
-    )
+# RefPrism (refdim = 3)
+reference_vertices(::Type{RefPrism}) = (1, 2, 3, 4, 5, 6)
+function reference_edges(::Type{RefPrism})
+    return ((2, 1), (1, 3), (1, 4), (3, 2), (2, 5), # e1, e2, e3, e4, e5
+            (3, 6), (4, 5), (4, 6), (6, 5))         # e6, e7, e8, e9
 end
 function reference_faces(::Type{RefPrism})
-    return (
-        (1, 3, 2),    (1, 2, 5, 4), # f1, f2
-        (3, 1, 4, 6), (2, 3, 6, 5), # f3, f4
-        (4, 5, 6),                  # f5
-    )
+    return ((1, 3, 2), (1, 2, 5, 4), (3, 1, 4, 6), # f1, f2, f3 
+            (2, 3, 6, 5), (4, 5, 6))               # f4, f5
 end
 
-# RefPyramid (refdim = 3): vertices for vertexdofs, edges for edgedofs, faces for facedofs and BC
-function vertices(c::AbstractCell{RefPyramid})
-    ns = get_node_ids(c)
-    return (ns[1], ns[2], ns[3], ns[4], ns[5],) # v1, ..., v5
-end
-function edges(c::AbstractCell{RefPyramid})
-    ns = get_node_ids(c)
-    return (
-        (ns[1], ns[2]), (ns[1], ns[3]), (ns[1], ns[5]), (ns[2], ns[4]), 
-        (ns[2], ns[5]), (ns[4], ns[3]), (ns[3], ns[5]), (ns[4], ns[5]), 
-    )
-end
-function faces(c::AbstractCell{RefPyramid})
-    ns = get_node_ids(c)
-    return (
-        (ns[1], ns[3], ns[4], ns[2]), (ns[1], ns[2], ns[5]), 
-        (ns[1], ns[5], ns[3]), (ns[2], ns[4], ns[5]), 
-        (ns[3], ns[5], ns[4]),                                      
-    )
+# RefPyramid (refdim = 3)
+reference_vertices(::Type{RefPyramid}) = (1, 2, 3, 4, 5)
+function reference_edges(::Type{RefPyramid})
+    return ((1, 2), (1, 3), (1, 5), (2, 4), # e1 ... e4
+            (2, 5), (4, 3), (3, 5), (4, 5)) # e5 ... e8
 end
 function reference_faces(::Type{RefPyramid})
-    return (
-        (1, 3, 4, 2), (1, 2, 5), # f1, f2
-        (1, 5, 3), (2, 4, 5),    # f3, f4
-        (3, 5, 4),               # f5
-    )
+    return ((1, 3, 4, 2), (1, 2, 5), (1, 5, 3), # f1, f2, f3
+            (2, 4, 5), (3, 5, 4))               # f4, f5
 end
 
 ######################################################
