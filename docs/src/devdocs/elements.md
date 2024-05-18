@@ -26,8 +26,8 @@ Ferrite.get_coordinate_eltype(::Node)
 Ferrite.toglobal
 Ferrite.sortface
 Ferrite.sortedge
-Ferrite.element_to_face_transformation
-Ferrite.face_to_element_transformation
+Ferrite.element_to_facet_transformation
+Ferrite.facet_to_element_transformation
 Ferrite.InterfaceOrientationInfo
 Ferrite.transform_interface_points!
 ```

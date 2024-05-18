@@ -208,7 +208,7 @@ function FacetQuadratureRule{RefHexahedron, T}(quad_type::Symbol, order::Int) wh
 end
 function FacetQuadratureRule{RefTriangle, T}(quad_type::Symbol, order::Int) where T
     qr = QuadratureRule{RefLine, T}(quad_type, order)
-    # Interval scaled and shifted in face_to_element_transformation from (-1,1) to (0,1) -> half the length -> half quadrature weights
+    # Interval scaled and shifted in facet_to_element_transformation from (-1,1) to (0,1) -> half the length -> half quadrature weights
     return create_facet_quad_rule(RefTriangle, qr.weights/2, qr.points)
 end
 function FacetQuadratureRule{RefTetrahedron, T}(quad_type::Symbol, order::Int) where T
@@ -218,14 +218,14 @@ end
 function FacetQuadratureRule{RefPrism, T}(quad_type::Symbol, order::Int) where T
     qr_quad = QuadratureRule{RefQuadrilateral, T}(quad_type, order)
     qr_tri = QuadratureRule{RefTriangle, T}(quad_type, order)
-    # Interval scaled and shifted in face_to_element_transformation for quadrilateral faces from (-1,1)² to (0,1)² -> quarter the area -> quarter the quadrature weights
+    # Interval scaled and shifted in facet_to_element_transformation for quadrilateral faces from (-1,1)² to (0,1)² -> quarter the area -> quarter the quadrature weights
     return create_facet_quad_rule(RefPrism, [2,3,4], qr_quad.weights/4, qr_quad.points,
         [1,5], qr_tri.weights, qr_tri.points)
 end
 function FacetQuadratureRule{RefPyramid, T}(quad_type::Symbol, order::Int) where T
     qr_quad = QuadratureRule{RefQuadrilateral, T}(quad_type, order)
     qr_tri = QuadratureRule{RefTriangle, T}(quad_type, order)
-    # Interval scaled and shifted in face_to_element_transformation for quadrilateral faces from (-1,1)² to (0,1)² -> quarter the area -> quarter the quadrature weights
+    # Interval scaled and shifted in facet_to_element_transformation for quadrilateral faces from (-1,1)² to (0,1)² -> quarter the area -> quarter the quadrature weights
     return create_facet_quad_rule(RefPyramid, [1], qr_quad.weights/4, qr_quad.points,
         [2,3,4,5], qr_tri.weights, qr_tri.points)
 end

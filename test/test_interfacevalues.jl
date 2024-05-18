@@ -143,8 +143,8 @@
         @testset "error paths" begin
             cell = getcells(grid, 1)
             dim == 1 && @test_throws ErrorException("1D elements don't use transformations for interfaces.") Ferrite.InterfaceOrientationInfo(cell,cell,1,1)
-            @test_throws ArgumentError("unknown face number") Ferrite.element_to_face_transformation(Vec{dim,Float64}(ntuple(_->0.0, dim)), Ferrite.getrefshape(cell), 100)
-            @test_throws ArgumentError("unknown face number") Ferrite.face_to_element_transformation(Vec{dim-1,Float64}(ntuple(_->0.0, dim-1)), Ferrite.getrefshape(cell), 100)
+            @test_throws ArgumentError("unknown facet number") Ferrite.element_to_facet_transformation(Vec{dim,Float64}(ntuple(_->0.0, dim)), Ferrite.getrefshape(cell), 100)
+            @test_throws ArgumentError("unknown facet number") Ferrite.facet_to_element_transformation(Vec{dim-1,Float64}(ntuple(_->0.0, dim-1)), Ferrite.getrefshape(cell), 100)
         end
         func_interpol = scalar_interpol
         for func_interpol in (scalar_interpol, VectorizedInterpolation(scalar_interpol))
@@ -175,8 +175,8 @@
         end
         @testset "error paths" begin
             cell = getcells(grid, 1)
-            @test_throws ArgumentError("unknown face number") Ferrite.element_to_face_transformation(Vec{dim,Float64}(ntuple(_->0.0, dim)), Ferrite.getrefshape(cell), 100)
-            @test_throws ArgumentError("unknown face number") Ferrite.face_to_element_transformation(Vec{dim-1,Float64}(ntuple(_->0.0, dim-1)), Ferrite.getrefshape(cell), 100)
+            @test_throws ArgumentError("unknown facet number") Ferrite.element_to_facet_transformation(Vec{dim,Float64}(ntuple(_->0.0, dim)), Ferrite.getrefshape(cell), 100)
+            @test_throws ArgumentError("unknown facet number") Ferrite.facet_to_element_transformation(Vec{dim-1,Float64}(ntuple(_->0.0, dim-1)), Ferrite.getrefshape(cell), 100)
         end
         for func_interpol in (scalar_interpol, VectorizedInterpolation(scalar_interpol))
             iv = InterfaceValues(quad_rule, func_interpol)

@@ -17,7 +17,7 @@ if HAS_EXTENSIONS && MODULE_CAN_BE_TYPE_PARAMETER
     import Metis
 end
 
-const RUN_JET_TESTS = false#VERSION >= v"1.9"
+const RUN_JET_TESTS = VERSION >= v"1.9" && isempty(VERSION.prerelease)
 
 if RUN_JET_TESTS
     using JET: @test_call

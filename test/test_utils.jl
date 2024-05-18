@@ -274,7 +274,7 @@ function sample_random_point(::Type{RefPyramid})
 end
 
 ######################################################
-# Helpers for testing face_to_element_transformation #
+# Helpers for testing facet_to_element_transformation #
 ######################################################
 getfacerefshape(::Union{Quadrilateral, Triangle}, ::Int) = RefLine
 getfacerefshape(::Hexahedron, ::Int) = RefQuadrilateral

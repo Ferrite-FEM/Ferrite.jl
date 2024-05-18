@@ -558,9 +558,9 @@ function transform_interface_points!(dst::Vector{Vec{3, Float64}}, points::Vecto
 
     M = get_transformation_matrix(interface_transformation)
     for (idx, point) in pairs(points)
-        face_point = element_to_face_transformation(point, RefShapeA, face_a)
+        face_point = element_to_facet_transformation(point, RefShapeA, face_a)
         result = M * Vec(face_point[1],face_point[2], 1.0)
-        dst[idx] = face_to_element_transformation(Vec(result[1],result[2]), RefShapeB, face_b)
+        dst[idx] = facet_to_element_transformation(Vec(result[1],result[2]), RefShapeB, face_b)
     end
     return nothing
 end
@@ -571,9 +571,9 @@ function transform_interface_points!(dst::Vector{Vec{2, Float64}}, points::Vecto
     flipped = interface_transformation.flipped
 
     for (idx, point) in pairs(points)
-        face_point = element_to_face_transformation(point, RefShapeA, face_a)
+        face_point = element_to_facet_transformation(point, RefShapeA, face_a)
         flipped && (face_point *= -1)
-        dst[idx] = face_to_element_transformation(face_point, RefShapeB, face_b)
+        dst[idx] = facet_to_element_transformation(face_point, RefShapeB, face_b)
     end
     return nothing
 end

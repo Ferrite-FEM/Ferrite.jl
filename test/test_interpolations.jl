@@ -48,7 +48,7 @@
 
         # Note that not every element formulation exists for every order and dimension.
         applicable(Ferrite.getlowerorder, interpolation) && @test typeof(Ferrite.getlowerorder(interpolation)) <: Interpolation{ref_shape,func_order-1}
-        #=@testset "transform face points" begin
+        @testset "transform face points" begin
             # Test both center point and random points on the face
             ref_coord = Ferrite.reference_coordinates(Lagrange{ref_shape, 1}())
             for face in 1:nfacets(interpolation)
@@ -63,12 +63,12 @@
                 end
                 for point in (center_coord, rand_coord)
                     vec_point = Vec{ref_dim}(point)
-                    cell_to_face = Ferrite.element_to_face_transformation(vec_point, ref_shape, face)
-                    face_to_cell = Ferrite.face_to_element_transformation(cell_to_face, ref_shape, face)
+                    cell_to_face = Ferrite.element_to_facet_transformation(vec_point, ref_shape, face)
+                    face_to_cell = Ferrite.facet_to_element_transformation(cell_to_face, ref_shape, face)
                     @test vec_point ≈ face_to_cell
                 end
             end
-        end=#
+        end
         n_basefuncs = getnbasefunctions(interpolation)
         coords = Ferrite.reference_coordinates(interpolation)
         @test length(coords) == n_basefuncs
