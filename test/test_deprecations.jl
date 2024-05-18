@@ -88,4 +88,12 @@ end
     @test (@test_deprecated Ferrite.value(ip, 1, ξ)) == shape_value(ip, ξ, 1)
 end
 
+@testset "facesets" begin
+grid = generate_grid(Quadrilateral, (2,2))
+addfaceset!(grid, "right_face", x -> x[1] ≈ 1)
+@test getfacetset(grid, "right_face") == getfacetset(grid, "right")
+addfaceset!(grid, "right_face_explicit", Set(Ferrite.FaceIndex(fi[1], fi[2]) for fi in getfacetset(grid, "right")))
+@test getfacetset(grid, "right_face_explicit") == getfacetset(grid, "right")
+end
+
 end # testset deprecations

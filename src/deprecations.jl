@@ -353,8 +353,3 @@ function addfaceset!(grid, name, f::Function; kwargs...)
     @warn "addfaceset! is deprecated, using addfacetset! instead"
     return addfacetset!(grid, name, f; kwargs...)
 end
-
-function getfaceset(grid::AbstractGrid, name::String)
-    @warn "getfaceset is deprecated, use getfacetset instead" maxlog=1
-    getfacetset(grid, name)
-end
