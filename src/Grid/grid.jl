@@ -146,24 +146,32 @@ Default implementation: `c.nodes`.
 """
 get_node_ids(c::AbstractCell) = c.nodes
 
-# Default implementations of vertices/edges/faces that work as long as get_node_ids is
-# correctly implemented for the cell.
+# Default implementations of <entity> = vertices/edges/faces that work as long as get_node_ids 
+# and `reference_<entity>` are correctly implemented for the cell / reference shape. 
+
+function faces(c::Ferrite.AbstractCell{RefShape}) where RefShape
+    ns = Ferrite.get_node_ids(c)
+    return map(Ferrite.reference_faces(RefShape)) do rf
+        map(i -> ns[i], rf)
+    end
+end
+
+function edges(c::Ferrite.AbstractCell{RefShape}) where RefShape
+    ns = Ferrite.get_node_ids(c)
+    return map(Ferrite.reference_edges(RefShape)) do re
+        map(i -> ns[i], re)
+    end
+end
+
+function vertices(c::Ferrite.AbstractCell{RefShape}) where RefShape
+    ns = Ferrite.get_node_ids(c)
+    return map(i -> ns[i], Ferrite.reference_vertices(RefShape))
+end
 
 # RefLine (refdim = 1): vertices for vertexdofs, faces for BC
-function vertices(c::AbstractCell{RefLine})
-    ns = get_node_ids(c)
-    return (ns[1], ns[2]) # v1, v2
-end
-function edges(c::AbstractCell{RefLine})
-    ns = get_node_ids(c)
-    return ((ns[1],ns[2]),) # e1
-end
-function faces(c::AbstractCell{RefLine})
-    return ()
-end
-function reference_vertices(::Type{RefLine})
-    return (1, 2) 
-end
+reference_faces(::Type{RefLine}) = ()
+reference_edges(::Type{RefLine}) = ((1, 2),)
+reference_vertices(::Type{RefLine}) = (1, 2) 
 
 # RefTriangle (refdim = 2): vertices for vertexdofs, faces for facedofs (edgedofs) and BC
 function vertices(c::AbstractCell{RefTriangle})
