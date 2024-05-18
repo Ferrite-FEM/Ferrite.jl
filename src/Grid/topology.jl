@@ -81,7 +81,7 @@ end
 _get_facet_facet_neighborhood(t::ExclusiveTopology, #=rdim=#::Val{1}) = t.vertex_vertex_neighbor
 _get_facet_facet_neighborhood(t::ExclusiveTopology, #=rdim=#::Val{2}) = t.edge_edge_neighbor
 _get_facet_facet_neighborhood(t::ExclusiveTopology, #=rdim=#::Val{3}) = t.face_face_neighbor
-function _get_facet_facet_neighborhood(::ExclusiveTopology, #=rdim=#::Val{nothing})
+function _get_facet_facet_neighborhood(::ExclusiveTopology, #=rdim=#::Val{:mixed})
     throw(ArgumentError("get_facet_facet_neightborhood is only supported for grids containing cells with the same reference dimension.
     Access the `vertex_vertex_neighbor`, `edge_edge_neighbor`, or `face_face_neighbor` fields explicitly instead."))
 end
@@ -304,7 +304,7 @@ end
 _getneighborhood(::Val{1}, top, grid, facetindex::FacetIndex, include_self) = getneighborhood(top, grid, VertexIndex(facetindex...), include_self)
 _getneighborhood(::Val{2}, top, grid, facetindex::FacetIndex, include_self) = getneighborhood(top, grid, EdgeIndex(facetindex...), include_self)
 _getneighborhood(::Val{3}, top, grid, facetindex::FacetIndex, include_self) = getneighborhood(top, grid, FaceIndex(facetindex...), include_self)
-function _getneighborhood(::Val{nothing}, args...)
+function _getneighborhood(::Val{:mixed}, args...)
     throw(ArgumentError("getneighborhood with FacetIndex is is only supported for grids containing cells with a common reference dimension.
     For mixed-dimensionality grid, use `VertexIndex`, `EdgeIndex`, and `FaceIndex` explicitly"))
 end
@@ -424,7 +424,7 @@ end
 _facetskeleton(top::ExclusiveTopology, #=rdim=#::Val{1}) = vertexskeleton(top)
 _facetskeleton(top::ExclusiveTopology, #=rdim=#::Val{2}) = edgeskeleton(top)
 _facetskeleton(top::ExclusiveTopology, #=rdim=#::Val{3}) = faceskeleton(top)
-function _facetskeleton(::ExclusiveTopology, #=rdim=#::Val{nothing})
+function _facetskeleton(::ExclusiveTopology, #=rdim=#::Val{:mixed})
     throw(ArgumentError("facetskeleton is only supported for grids containing cells with a common reference dimension.
     For mixed-dimensionality grid, use `faceskeleton`, `edgeskeleton`, and `vertexskeleton` explicitly"))
 end
