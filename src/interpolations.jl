@@ -97,28 +97,9 @@ function InterpolationInfo(interpolation::Interpolation{shape}, n_copies) where 
 end
 InterpolationInfo(interpolation::Interpolation) = InterpolationInfo(interpolation, 1)
 
-# Some redundant information about the geometry of the reference cells.
-nfaces(::Interpolation{RefLine}) = 0
-nfaces(::Interpolation{RefQuadrilateral}) = 1
-nfaces(::Interpolation{RefHexahedron}) = 6
-nfaces(::Interpolation{RefTriangle}) = 1
-nfaces(::Interpolation{RefTetrahedron}) = 4
-nfaces(::Interpolation{RefPrism}) = 5
-nfaces(::Interpolation{RefPyramid}) = 5
-
-nedges(::Interpolation{RefLine}) = 1
-nedges(::Interpolation{RefQuadrilateral}) = 4
-nedges(::Interpolation{RefHexahedron}) = 12
-nedges(::Interpolation{RefTriangle}) = 3
-nedges(::Interpolation{RefTetrahedron}) = 6
-nedges(::Interpolation{RefPrism}) = 9
-nedges(::Interpolation{RefPyramid}) =  8
-
-nvertices(::Interpolation{RefHypercube{dim}}) where {dim} = 2^dim
-nvertices(::Interpolation{RefTriangle}) = 3
-nvertices(::Interpolation{RefTetrahedron}) = 4
-nvertices(::Interpolation{RefPrism}) = 6
-nvertices(::Interpolation{RefPyramid}) = 5
+nvertices(::Interpolation{RefShape}) where RefShape = nvertices(RefShape)
+nedges(::Interpolation{RefShape})    where RefShape = nedges(RefShape)
+nfaces(::Interpolation{RefShape})    where RefShape = nfaces(RefShape)
 
 Base.copy(ip::Interpolation) = ip
 
