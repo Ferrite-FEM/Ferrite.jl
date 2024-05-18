@@ -33,6 +33,7 @@ WriteVTK = "1.13"
 julia = "1.6"
 
 [extras]
+Pkg = "44cfe95a-1eb2-52ea-b672-e2afdf69b78f"
 BlockArrays = "8e7c35d0-a365-5155-bbbb-fb81a777f24e"
 Downloads = "f43a241f-c20a-4ad4-852c-f6b1247861c6"
 FerriteGmsh = "4f95f4f8-b27c-4ae5-9a39-ea55e634e36b"
@@ -49,4 +50,4 @@ Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 TimerOutputs = "a759f4b9-e2f1-59dc-863e-4aeb61b1ea8f"
 
 [targets]
-test = ["BlockArrays", "Downloads", "FerriteGmsh", "ForwardDiff", "Gmsh", "IterativeSolvers", "Metis", "NBInclude", "ProgressMeter", "Random", "SHA", "Test", "TimerOutputs", "Logging"]
+test = ["BlockArrays", "Downloads", "FerriteGmsh", "ForwardDiff", "Gmsh", "IterativeSolvers", "Metis", "Pkg", "NBInclude", "ProgressMeter", "Random", "SHA", "Test", "TimerOutputs", "Logging"]
