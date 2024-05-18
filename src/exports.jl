@@ -93,7 +93,6 @@ export
     getcoordinates,
     getcoordinates!,
     onboundary,
-    nfaces,
     nfacets,
     addnodeset!,
     addfacetset!,

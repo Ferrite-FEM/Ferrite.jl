@@ -8,7 +8,7 @@ using Random
 using LinearAlgebra
 using SparseArrays
 
-const HAS_EXTENSIONS = false#isdefined(Base, :get_extension)
+const HAS_EXTENSIONS = isdefined(Base, :get_extension)
 
 # https://github.com/JuliaLang/julia/pull/47749
 const MODULE_CAN_BE_TYPE_PARAMETER = VERSION >= v"1.10.0-DEV.90"
@@ -20,6 +20,8 @@ end
 const RUN_JET_TESTS = VERSION >= v"1.9" && isempty(VERSION.prerelease)
 
 if RUN_JET_TESTS
+    #using Pkg: Pkg 
+    #Pkg.add("JET")
     using JET: @test_call
 else
     # Just eat the macro on incompatible versions

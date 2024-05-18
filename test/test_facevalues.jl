@@ -30,7 +30,7 @@ for (scalar_interpol, quad_rule) in (
         xs, n = valid_coordinates_and_normals(func_interpol)
         for face in 1:Ferrite.nfacets(func_interpol)
             reinit!(fv, xs, face)
-            @test Ferrite.getcurrentface(fv) == face
+            @test Ferrite.getcurrentfacet(fv) == face
 
             # We test this by applying a given deformation gradient on all the nodes.
             # Since this is a linear deformation we should get back the exact values
@@ -114,12 +114,12 @@ for (scalar_interpol, quad_rule) in (
                     end
                 end
             end
-            # Test that qr, detJdV, normals, and current_face are copied as expected. 
+            # Test that qr, detJdV, normals, and current_facet are copied as expected. 
             # Note that qr remain aliased, as defined by `copy(qr)=qr`, see quadrature.jl.
             # Make it easy to test scalar wrapper equality
             _mock_isequal(a, b) = a == b
             _mock_isequal(a::T, b::T) where {T<:Ferrite.ScalarWrapper} = a[] == b[]
-            for fname in (:fqr, :detJdV, :normals, :current_face)
+            for fname in (:fqr, :detJdV, :normals, :current_facet)
                 v = getfield(fv, fname)
                 vc = getfield(fvc, fname)
                 if fname !== :fqr # Test unaliased

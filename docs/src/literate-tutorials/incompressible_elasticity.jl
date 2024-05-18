@@ -155,11 +155,11 @@ function assemble_up!(Ke, fe, cell, cellvalues_u, cellvalues_p, facetvalues_u, g
     symmetrize_lower!(Ke)
 
     ## We integrate the Neumann boundary using the FacetValues.
-    ## We loop over all the faces in the cell, then check if the face
-    ## is in our `"traction"` faceset.
-    for face in 1:nfaces(cell)
-        if onboundary(cell, face) && (cellid(cell), face) ∈ getfacetset(grid, "traction")
-            reinit!(facetvalues_u, cell, face)
+    ## We loop over all the facets in the cell, then check if the facet
+    ## is in our `"traction"` facetset.
+    for facet in 1:nfacets(cell)
+        if onboundary(cell, facet) && (cellid(cell), facet) ∈ getfacetset(grid, "traction")
+            reinit!(facetvalues_u, cell, facet)
             for q_point in 1:getnquadpoints(facetvalues_u)
                 dΓ = getdetJdV(facetvalues_u, q_point)
                 for i in 1:n_basefuncs_u

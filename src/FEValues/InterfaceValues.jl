@@ -82,9 +82,9 @@ function InterfaceValues(
         qr_there, ip_there, default_geometric_interpolation(ip_there),
     )
 end
-# From FaceValue(s)
-InterfaceValues(FacetValues_here::FVA, FacetValues_there::FVB = deepcopy(FacetValues_here)) where {FVA <: FacetValues, FVB <: FacetValues} =
-    InterfaceValues{FVA,FVB}(FacetValues_here, FacetValues_there)
+# From FacetValue(s)
+InterfaceValues(facetvalues_here::FVA, facetvalues_there::FVB = deepcopy(FacetValues_here)) where {FVA <: FacetValues, FVB <: FacetValues} =
+    InterfaceValues{FVA,FVB}(facetvalues_here, facetvalues_there)
 
 function Base.copy(iv::InterfaceValues)
     return InterfaceValues(copy(iv.here), copy(iv.there))
@@ -109,28 +109,28 @@ end
 """
     reinit!(
         iv::InterfaceValues,
-        cell_here::AbstractCell, coords_here::AbstractVector{Vec{dim, T}}, face_here::Int,
-        cell_there::AbstractCell, coords_there::AbstractVector{Vec{dim, T}}, face_there::Int
+        cell_here::AbstractCell, coords_here::AbstractVector{Vec{dim, T}}, facet_here::Int,
+        cell_there::AbstractCell, coords_there::AbstractVector{Vec{dim, T}}, facet_there::Int
     )
 
 Update the [`InterfaceValues`](@ref) for the interface between `cell_here` (with cell
 coordinates `coords_here`) and `cell_there` (with cell coordinates `coords_there`).
-`face_here` and `face_there` are the (local) face numbers for the respective cell.
+`facet_here` and `facet_there` are the (local) facet numbers for the respective cell.
 """
 function reinit!(
         iv::InterfaceValues,
-        cell_here::AbstractCell, coords_here::AbstractVector{Vec{dim, T}}, face_here::Int,
-        cell_there::AbstractCell, coords_there::AbstractVector{Vec{dim, T}}, face_there::Int
+        cell_here::AbstractCell, coords_here::AbstractVector{Vec{dim, T}}, facet_here::Int,
+        cell_there::AbstractCell, coords_there::AbstractVector{Vec{dim, T}}, facet_there::Int
     ) where {dim, T}
 
     # reinit! the here side as normal
-    reinit!(iv.here, cell_here, coords_here, face_here)
-    dim == 1 && return reinit!(iv.there, cell_there, coords_there, face_there)
+    reinit!(iv.here, cell_here, coords_here, facet_here)
+    dim == 1 && return reinit!(iv.there, cell_there, coords_there, facet_there)
     # Transform the quadrature points from the here side to the there side
-    set_current_face!(iv.there, face_there) # Includes boundscheck
-    interface_transformation = InterfaceOrientationInfo(cell_here, cell_there, face_here, face_there)
-    quad_points_a = getpoints(iv.here.fqr, face_here)
-    quad_points_b = getpoints(iv.there.fqr, face_there)
+    set_current_facet!(iv.there, facet_there) # Includes boundscheck
+    interface_transformation = InterfaceOrientationInfo(cell_here, cell_there, facet_here, facet_there)
+    quad_points_a = getpoints(iv.here.fqr, facet_here)
+    quad_points_b = getpoints(iv.there.fqr, facet_there)
     transform_interface_points!(quad_points_b, quad_points_a, interface_transformation)
     # TODO: This is the bottleneck, cache it?
     @assert length(quad_points_a) <= length(quad_points_b)
@@ -140,7 +140,7 @@ function reinit!(
     precompute_values!(get_geo_mapping(iv.there), quad_points_b)
     
     # reinit! the "there" side
-    reinit!(iv.there, cell_there, coords_there, face_there)
+    reinit!(iv.there, cell_there, coords_there, facet_there)
     return iv
 end
 
@@ -401,7 +401,7 @@ end
 
 Relative orientation information for 1D and 2D interfaces in 2D and 3D elements respectively.
 This information is used to construct the transformation matrix to
-transform the quadrature points from face_a to face_b achieving synced
+transform the quadrature points from facet_a to facet_b achieving synced
 spatial coordinates. Face B's orientation relative to Face A's can
 possibly be flipped (i.e. the vertices indices order is reversed)
 and the vertices can be rotated against each other.
@@ -414,22 +414,22 @@ struct InterfaceOrientationInfo{RefShapeA, RefShapeB}
     flipped::Bool
     shift_index::Int
     lowest_node_shift_index::Int
-    face_a::Int
-    face_b::Int
+    facet_a::Int
+    facet_b::Int
 end
 
 """
-    InterfaceOrientationInfo(cell_a::AbstractCell, cell_b::AbstractCell, face_a::Int, face_b::Int)
+    InterfaceOrientationInfo(cell_a::AbstractCell, cell_b::AbstractCell, facet_a::Int, facet_b::Int)
 
 Return the relative orientation info for face B with regards to face A.
 Relative orientation is computed using a [`OrientationInfo`](@ref) for each side of the interface.
 """
-function InterfaceOrientationInfo(cell_a::AbstractCell{RefShapeA}, cell_b::AbstractCell{RefShapeB}, face_a::Int, face_b::Int) where {RefShapeA <: AbstractRefShape, RefShapeB <: AbstractRefShape}
-    OI_a = OrientationInfo(facets(cell_a)[face_a])
-    OI_b = OrientationInfo(facets(cell_b)[face_b])
+function InterfaceOrientationInfo(cell_a::AbstractCell{RefShapeA}, cell_b::AbstractCell{RefShapeB}, facet_a::Int, facet_b::Int) where {RefShapeA <: AbstractRefShape, RefShapeB <: AbstractRefShape}
+    OI_a = OrientationInfo(facets(cell_a)[facet_a])
+    OI_b = OrientationInfo(facets(cell_b)[facet_b])
     flipped = OI_a.flipped != OI_b.flipped
     shift_index = OI_b.shift_index - OI_a.shift_index
-    return InterfaceOrientationInfo{RefShapeA, RefShapeB}(flipped, shift_index, OI_b.shift_index, face_a, face_b)
+    return InterfaceOrientationInfo{RefShapeA, RefShapeB}(flipped, shift_index, OI_b.shift_index, facet_a, facet_b)
 end
 
 function InterfaceOrientationInfo(_::AbstractCell{RefShapeA}, _::AbstractCell{RefShapeB}, _::Int, _::Int) where {RefShapeA <: AbstractRefShape{1}, RefShapeB <: AbstractRefShape{1}}
@@ -447,8 +447,8 @@ If the face is not flipped then the transformation is a function of relative ori
 get_transformation_matrix
 
 function get_transformation_matrix(interface_transformation::InterfaceOrientationInfo{RefShapeA}) where RefShapeA <: AbstractRefShape{3}
-    face_a = interface_transformation.face_a
-    facenodes = reference_facets(RefShapeA)[face_a]
+    facet_a = interface_transformation.facet_a
+    facenodes = reference_facets(RefShapeA)[facet_a]
     _get_transformation_matrix(facenodes, interface_transformation)
 end
 
@@ -553,27 +553,27 @@ y      |   \
 transform_interface_points!
 
 function transform_interface_points!(dst::Vector{Vec{3, Float64}}, points::Vector{Vec{3, Float64}}, interface_transformation::InterfaceOrientationInfo{RefShapeA, RefShapeB}) where {RefShapeA <: AbstractRefShape{3}, RefShapeB <: AbstractRefShape{3}}
-    face_a = interface_transformation.face_a
-    face_b = interface_transformation.face_b
+    facet_a = interface_transformation.facet_a
+    facet_b = interface_transformation.facet_b
 
     M = get_transformation_matrix(interface_transformation)
     for (idx, point) in pairs(points)
-        face_point = element_to_facet_transformation(point, RefShapeA, face_a)
+        face_point = element_to_facet_transformation(point, RefShapeA, facet_a)
         result = M * Vec(face_point[1],face_point[2], 1.0)
-        dst[idx] = facet_to_element_transformation(Vec(result[1],result[2]), RefShapeB, face_b)
+        dst[idx] = facet_to_element_transformation(Vec(result[1],result[2]), RefShapeB, facet_b)
     end
     return nothing
 end
 
 function transform_interface_points!(dst::Vector{Vec{2, Float64}}, points::Vector{Vec{2, Float64}}, interface_transformation::InterfaceOrientationInfo{RefShapeA, RefShapeB}) where {RefShapeA <: AbstractRefShape{2}, RefShapeB <: AbstractRefShape{2}}
-    face_a = interface_transformation.face_a
-    face_b = interface_transformation.face_b
+    facet_a = interface_transformation.facet_a
+    facet_b = interface_transformation.facet_b
     flipped = interface_transformation.flipped
 
     for (idx, point) in pairs(points)
-        face_point = element_to_facet_transformation(point, RefShapeA, face_a)
+        face_point = element_to_facet_transformation(point, RefShapeA, facet_a)
         flipped && (face_point *= -1)
-        dst[idx] = facet_to_element_transformation(face_point, RefShapeB, face_b)
+        dst[idx] = facet_to_element_transformation(face_point, RefShapeB, facet_b)
     end
     return nothing
 end

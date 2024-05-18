@@ -37,7 +37,7 @@ struct FacetValues{FV, GM, FQR, detT, nT, V_FV<:AbstractVector{FV}, V_GM<:Abstra
     fqr::FQR          # FacetQuadratureRule
     detJdV::detT      # AbstractVector{<:Number}
     normals::nT       # AbstractVector{<:Vec}
-    current_face::ScalarWrapper{Int}
+    current_facet::ScalarWrapper{Int}
 end
 
 function FacetValues(::Type{T}, fqr::FacetQuadratureRule, ip_fun::Interpolation, ip_geo::VectorizedInterpolation{sdim} = default_geometric_interpolation(ip_fun); 
@@ -63,12 +63,12 @@ end
 function Base.copy(fv::FacetValues)
     fun_values = map(copy, fv.fun_values)
     geo_mapping = map(copy, fv.geo_mapping)
-    return FacetValues(fun_values, geo_mapping, copy(fv.fqr), copy(fv.detJdV), copy(fv.normals), copy(fv.current_face))
+    return FacetValues(fun_values, geo_mapping, copy(fv.fqr), copy(fv.detJdV), copy(fv.normals), copy(fv.current_facet))
 end
 
 getngeobasefunctions(fv::FacetValues) = getngeobasefunctions(get_geo_mapping(fv))
 getnbasefunctions(fv::FacetValues) = getnbasefunctions(get_fun_values(fv))
-getnquadpoints(fv::FacetValues) = @inbounds getnquadpoints(fv.fqr, getcurrentface(fv))
+getnquadpoints(fv::FacetValues) = @inbounds getnquadpoints(fv.fqr, getcurrentfacet(fv))
 @propagate_inbounds getdetJdV(fv::FacetValues, q_point) = fv.detJdV[q_point]
 
 shape_value_type(fv::FacetValues) = shape_value_type(get_fun_values(fv))
@@ -77,37 +77,37 @@ function_interpolation(fv::FacetValues) = function_interpolation(get_fun_values(
 function_difforder(fv::FacetValues) = function_difforder(get_fun_values(fv))
 geometric_interpolation(fv::FacetValues) = geometric_interpolation(get_geo_mapping(fv))
 
-get_geo_mapping(fv::FacetValues) = @inbounds fv.geo_mapping[getcurrentface(fv)]
+get_geo_mapping(fv::FacetValues) = @inbounds fv.geo_mapping[getcurrentfacet(fv)]
 @propagate_inbounds geometric_value(fv::FacetValues, args...) = geometric_value(get_geo_mapping(fv), args...)
 
-get_fun_values(fv::FacetValues) = @inbounds fv.fun_values[getcurrentface(fv)]
+get_fun_values(fv::FacetValues) = @inbounds fv.fun_values[getcurrentfacet(fv)]
 
 @propagate_inbounds shape_value(fv::FacetValues, q_point::Int, i::Int) = shape_value(get_fun_values(fv), q_point, i)
 @propagate_inbounds shape_gradient(fv::FacetValues, q_point::Int, i::Int) = shape_gradient(get_fun_values(fv), q_point, i)
 @propagate_inbounds shape_symmetric_gradient(fv::FacetValues, q_point::Int, i::Int) = shape_symmetric_gradient(get_fun_values(fv), q_point, i)
 
 """
-    getcurrentface(fv::FacetValues)
+    getcurrentfacet(fv::FacetValues)
 
-Return the current active face of the `FacetValues` object (from last `reinit!`).
+Return the current active facet of the `FacetValues` object (from last `reinit!`).
 """
-getcurrentface(fv::FacetValues) = fv.current_face[]
+getcurrentfacet(fv::FacetValues) = fv.current_facet[]
 
 """
     getnormal(fv::FacetValues, qp::Int)
 
-Return the normal at the quadrature point `qp` for the active face of the
+Return the normal at the quadrature point `qp` for the active facet of the
 `FacetValues` object(from last `reinit!`).
 """
 getnormal(fv::FacetValues, qp::Int) = fv.normals[qp]
 
-nfaces(fv::FacetValues) = length(fv.geo_mapping)
+nfacets(fv::FacetValues) = length(fv.geo_mapping)
 
-function set_current_face!(fv::FacetValues, face_nr::Int)
-    # Checking face_nr before setting current_face allows us to use @inbounds 
-    # when indexing by getcurrentface(fv) in other places!
-    checkbounds(Bool, 1:nfaces(fv), face_nr) || throw(ArgumentError("Face index out of range."))
-    fv.current_face[] = face_nr
+function set_current_facet!(fv::FacetValues, face_nr::Int)
+    # Checking face_nr before setting current_facet allows us to use @inbounds 
+    # when indexing by getcurrentfacet(fv) in other places!
+    checkbounds(Bool, 1:nfacets(fv), face_nr) || throw(ArgumentError("Face index out of range."))
+    fv.current_facet[] = face_nr
 end
 
 @inline function reinit!(fv::FacetValues, x::AbstractVector, face_nr::Int)
@@ -116,7 +116,7 @@ end
 
 function reinit!(fv::FacetValues, cell::Union{AbstractCell, Nothing}, x::AbstractVector{Vec{dim, T}}, face_nr::Int) where {dim, T}
     check_reinit_sdim_consistency(:FacetValues, shape_gradient_type(fv), eltype(x))
-    set_current_face!(fv, face_nr)
+    set_current_facet!(fv, face_nr)
     n_geom_basefuncs = getngeobasefunctions(fv)
     if !checkbounds(Bool, x, 1:n_geom_basefuncs) || length(x) != n_geom_basefuncs
         throw_incompatible_coord_length(length(x), n_geom_basefuncs)
@@ -162,8 +162,8 @@ end
 """
     BCValues(func_interpol::Interpolation, geom_interpol::Interpolation, boundary_type::Union{Type{<:BoundaryIndex}})
 
-`BCValues` stores the shape values at all faces/edges/vertices (depending on `boundary_type`) for the geomatric interpolation (`geom_interpol`),
-for each dof-position determined by the `func_interpol`. Used mainly by the `ConstrainHandler`.
+`BCValues` stores the shape values at all facet/faces/edges/vertices (depending on `boundary_type`) for the geometric interpolation (`geom_interpol`),
+for each dof-position determined by the `func_interpol`. Used mainly by the `ConstraintHandler`.
 """
 struct BCValues{T}
     M::Array{T,3}

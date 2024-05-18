@@ -134,11 +134,11 @@ function doassemble(cellvalues::CellValues, facetvaluesFacetValues,
         # \int_{\Gamma_2} δu g_2 \, d\Gamma
         # ```
         #+
-        for face in 1:nfaces(cell)
-            if onboundary(cell, face) && 
-                   ((cellcount, face) ∈ getfacetset(grid, "left") || 
-                    (cellcount, face) ∈ getfacetset(grid, "bottom"))
-                reinit!(facetvalues, cell, face)
+        for facet in 1:nfacets(cell)
+            if onboundary(cell, facet) && 
+                   ((cellcount, facet) ∈ getfacetset(grid, "left") || 
+                    (cellcount, facet) ∈ getfacetset(grid, "bottom"))
+                reinit!(facetvalues, cell, facet)
                 for q_point in 1:getnquadpoints(facetvalues)
                     coords_qp = spatial_coordinate(facetvalues, q_point, coords)
                     n = getnormal(facetvalues, q_point)

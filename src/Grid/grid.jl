@@ -569,7 +569,7 @@ Returns all vertex sets of the grid.
 """
 @inline getvertexsets(grid::AbstractGrid) = grid.vertexsets
 
-n_faces_per_cell(grid::Grid) = nfaces(getcelltype(grid))
+n_facets_per_cell(grid::Grid) = nfacets(getcelltype(grid))
 
 # Transformations
 """

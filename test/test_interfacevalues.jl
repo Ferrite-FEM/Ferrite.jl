@@ -103,7 +103,7 @@
                     vol += getdetJdV(iv, i)
                 end
                 xs = here ? coords_here : coords_there
-                face = here ? Ferrite.getcurrentface(iv.here) : Ferrite.getcurrentface(iv.there)
+                face = here ? Ferrite.getcurrentfacet(iv.here) : Ferrite.getcurrentfacet(iv.there)
                 func_interpol = here ? ip_here : ip_there
                 let ip_base = func_interpol isa VectorizedInterpolation ? func_interpol.ip : func_interpol
                     x_face = xs[[Ferrite.dirichlet_facetdof_indices(ip_base)[face]...]]
@@ -133,12 +133,12 @@
         ip = scalar_interpol isa DiscontinuousLagrange ? Lagrange{Ferrite.getrefshape(scalar_interpol), Ferrite.getorder(scalar_interpol)}() : scalar_interpol
         @testset "faces nodes indices" begin
             cell = getcells(grid, 1)
-            geom_ip_faces_indices = Ferrite.facetdof_indices(ip)
-            Ferrite.getdim(ip) > 1 && (geom_ip_faces_indices = Tuple([face[collect(face .∉ Ref(interior))] for (face, interior) in [(geom_ip_faces_indices[i], Ferrite.facetdof_interior_indices(ip)[i]) for i in 1:Ferrite.nfacets(ip)]]))
-            faces_indices = Ferrite.reference_facets(Ferrite.getrefshape(Ferrite.default_interpolation(typeof(cell))))
+            geom_ip_facets_indices = Ferrite.facetdof_indices(ip)
+            Ferrite.getdim(ip) > 1 && (geom_ip_facets_indices = Tuple([facet[collect(facet .∉ Ref(interior))] for (facet, interior) in [(geom_ip_facets_indices[i], Ferrite.facetdof_interior_indices(ip)[i]) for i in 1:Ferrite.nfacets(ip)]]))
+            facets_indices = Ferrite.reference_facets(Ferrite.getrefshape(Ferrite.default_interpolation(typeof(cell))))
             node_ids = Ferrite.get_node_ids(cell)
             cellfacets = Ferrite.facets(cell)
-            @test getindex.(Ref(node_ids), collect.(faces_indices)) == cellfacets == getindex.(Ref(node_ids), collect.(geom_ip_faces_indices))
+            @test getindex.(Ref(node_ids), collect.(facets_indices)) == cellfacets == getindex.(Ref(node_ids), collect.(geom_ip_facets_indices))
         end
         @testset "error paths" begin
             cell = getcells(grid, 1)
@@ -167,11 +167,11 @@
         @testset "faces nodes indices" begin
             ip = scalar_interpol isa DiscontinuousLagrange ? Lagrange{Ferrite.getrefshape(scalar_interpol), Ferrite.getorder(scalar_interpol)}() : scalar_interpol
             cell = getcells(grid, 1)
-            geom_ip_faces_indices = Ferrite.facetdof_indices(ip)
-            Ferrite.getdim(ip) > 1 && (geom_ip_faces_indices = Tuple([face[collect(face .∉ Ref(interior))] for (face, interior) in [(geom_ip_faces_indices[i], Ferrite.facedof_interior_indices(ip)[i]) for i in 1:nfaces(ip)]]))
-            faces_indices = Ferrite.reference_facets(Ferrite.getrefshape(Ferrite.default_interpolation(typeof(cell))))
+            geom_ip_facets_indices = Ferrite.facetdof_indices(ip)
+            Ferrite.getdim(ip) > 1 && (geom_ip_facets_indices = Tuple([facet[collect(facet .∉ Ref(interior))] for (facet, interior) in [(geom_ip_facets_indices[i], Ferrite.facedof_interior_indices(ip)[i]) for i in 1:Ferrite.nfaces(ip)]]))
+            facets_indices = Ferrite.reference_facets(Ferrite.getrefshape(Ferrite.default_interpolation(typeof(cell))))
             node_ids = Ferrite.get_node_ids(cell)
-            @test getindex.(Ref(node_ids), collect.(faces_indices)) == Ferrite.faces(cell) == getindex.(Ref(node_ids), collect.(geom_ip_faces_indices))
+            @test getindex.(Ref(node_ids), collect.(facets_indices)) == Ferrite.faces(cell) == getindex.(Ref(node_ids), collect.(geom_ip_facets_indices))
         end
         @testset "error paths" begin
             cell = getcells(grid, 1)

@@ -42,7 +42,7 @@ spatial_coordinate
 In addition, there are some methods that are unique for `FacetValues`.
 
 ```@docs
-Ferrite.getcurrentface
+Ferrite.getcurrentfacet
 getnormal
 ```
 

@@ -269,9 +269,9 @@ function assemble_element!(ke, ge, cell, cv, fv, mp, ue, ΓN)
     end
 
     ## Surface integral for the traction
-    for face in 1:nfaces(cell)
-        if (cellid(cell), face) in ΓN
-            reinit!(fv, cell, face)
+    for facet in 1:nfacets(cell)
+        if (cellid(cell), facet) in ΓN
+            reinit!(fv, cell, facet)
             for q_point in 1:getnquadpoints(fv)
                 t = tn * getnormal(fv, q_point)
                 dΓ = getdetJdV(fv, q_point)

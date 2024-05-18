@@ -102,7 +102,7 @@ cellid(cc::CellCache) = cc.cellid[]
 celldofs!(v::Vector, cc::CellCache) = copyto!(v, cc.dofs) # celldofs!(v, cc.dh, cc.cellid[])
 
 # TODO: These should really be replaced with something better...
-nfaces(cc::CellCache) = nfaces(cc.grid.cells[cc.cellid[]])
+nfacets(cc::CellCache) = nfacets(cc.grid.cells[cc.cellid[]])
 onboundary(cc::CellCache, face::Int) = cc.grid.boundary_matrix[face, cc.cellid[]]
 
 
@@ -166,8 +166,8 @@ end
     InterfaceCache(dh::AbstractDofHandler)
 
 Create a cache object with pre-allocated memory for the nodes, coordinates, and dofs of an
-interface. The cache is updated for a new cell by calling `reinit!(cache, face_a, face_b)` where
-`face_a::FacetIndex` and `face_b::FacetIndex` are the two interface faces.
+interface. The cache is updated for a new cell by calling `reinit!(cache, facet_a, facet_b)` where
+`facet_a::FacetIndex` and `facet_b::FacetIndex` are the two interface faces.
 
 **Struct fields of `InterfaceCache`**
  - `ic.a :: FacetCache`: face cache for the first face of the interface
@@ -175,7 +175,7 @@ interface. The cache is updated for a new cell by calling `reinit!(cache, face_a
  - `ic.dofs :: Vector{Int}`: global dof ids for the interface (union of `ic.a.dofs` and `ic.b.dofs`)
 
 **Methods with `InterfaceCache`**
- - `reinit!(cache::InterfaceCache, face_a::FacetIndex, face_b::FacetIndex)`: reinitialize the cache for a new interface
+ - `reinit!(cache::InterfaceCache, facet_a::FacetIndex, facet_b::FacetIndex)`: reinitialize the cache for a new interface
  - `interfacedofs(ic)`: get the global dof ids of the interface
 
 See also [`InterfaceIterator`](@ref).
@@ -192,9 +192,9 @@ function InterfaceCache(gridordh::Union{AbstractGrid, AbstractDofHandler})
     return InterfaceCache(fc_a, fc_b, Int[])
 end
 
-function reinit!(cache::InterfaceCache, face_a::BoundaryIndex, face_b::BoundaryIndex)
-    reinit!(cache.a, face_a)
-    reinit!(cache.b, face_b)
+function reinit!(cache::InterfaceCache, facet_a::BoundaryIndex, facet_b::BoundaryIndex)
+    reinit!(cache.a, facet_a)
+    reinit!(cache.b, facet_b)
     resize!(cache.dofs, length(celldofs(cache.a)) + length(celldofs(cache.b)))
     for (i, d) in pairs(cache.a.dofs)
         cache.dofs[i] = d
@@ -373,14 +373,14 @@ function Base.iterate(ii::InterfaceIterator{<:Any, <:Grid{sdim}}, state...) wher
     while true
         it = iterate(facetskeleton(ii.topology, ii.grid), state...)
         it === nothing && return nothing
-        face_a, state = it
-        if isempty(neighborhood[face_a[1], face_a[2]])
+        facet_a, state = it
+        if isempty(neighborhood[facet_a[1], facet_a[2]])
             continue
         end
-        neighbors = neighborhood[face_a[1], face_a[2]].neighbor_info
+        neighbors = neighborhood[facet_a[1], facet_a[2]].neighbor_info
         length(neighbors) > 1 && error("multiple neighboring faces not supported yet")
-        face_b = neighbors[1]
-        reinit!(ii.cache, face_a, face_b)
+        facet_b = neighbors[1]
+        reinit!(ii.cache, facet_a, facet_b)
         return (ii.cache, state)
     end
 end

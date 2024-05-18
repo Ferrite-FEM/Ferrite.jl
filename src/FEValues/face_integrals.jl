@@ -37,28 +37,28 @@ cell has facets of different shapes (i.e. quadrilaterals and triangles) then eac
 facets indices, weights and points are passed separately.
 """
 function create_facet_quad_rule(::Type{RefShape}, w::Vector{T}, p::Vector{Vec{N, T}}) where {N, T, RefShape <: AbstractRefShape}
-    face_quad_rule = QuadratureRule{RefShape, T, getdim(AbstractCell{RefShape})}[]
-    for face in 1:nfacets(RefShape)
-        new_points = [facet_to_element_transformation(p[i], RefShape, face) for i in 1:length(w)]
-        push!(face_quad_rule, QuadratureRule{RefShape, T}(w, new_points))
+    facet_quad_rule = QuadratureRule{RefShape, T, getdim(AbstractCell{RefShape})}[]
+    for facet in 1:nfacets(RefShape)
+        new_points = [facet_to_element_transformation(p[i], RefShape, facet) for i in 1:length(w)]
+        push!(facet_quad_rule, QuadratureRule{RefShape, T}(w, new_points))
     end
-    return FacetQuadratureRule(face_quad_rule)
+    return FacetQuadratureRule(facet_quad_rule)
 end
 
 # For cells with mixed faces
 function create_facet_quad_rule(
     ::Type{RefShape},
-    quad_faces::Vector{Int}, w_quad::Vector{T}, p_quad::Vector{Vec{N, T}},
-    tri_faces::Vector{Int}, w_tri::Vector{T}, p_tri::Vector{Vec{N, T}}
+    quad_facets::Vector{Int}, w_quad::Vector{T}, p_quad::Vector{Vec{N, T}},
+    tri_facets::Vector{Int}, w_tri::Vector{T}, p_tri::Vector{Vec{N, T}}
 ) where {N, T, RefShape <: Union{RefPrism, RefPyramid}}
-    facet_quad_rule = Vector{QuadratureRule{RefShape, T, getdim(AbstractCell{RefShape})}}(undef, nfaces(RefShape))
-    for face in quad_faces
-        new_points = [facet_to_element_transformation(p_quad[i], RefShape, face) for i in 1:length(w_quad)]
-        facet_quad_rule[face] = QuadratureRule{RefShape, T}(w_quad, new_points)
+    facet_quad_rule = Vector{QuadratureRule{RefShape, T, getdim(AbstractCell{RefShape})}}(undef, nfacets(RefShape))
+    for facet in quad_facets
+        new_points = [facet_to_element_transformation(p_quad[i], RefShape, facet) for i in 1:length(w_quad)]
+        facet_quad_rule[facet] = QuadratureRule{RefShape, T}(w_quad, new_points)
     end
-    for face in tri_faces
-        new_points = [facet_to_element_transformation(p_tri[i], RefShape, face) for i in 1:length(w_tri)]
-        facet_quad_rule[face] = QuadratureRule{RefShape, T}(w_tri, new_points)
+    for facet in tri_facets
+        new_points = [facet_to_element_transformation(p_tri[i], RefShape, facet) for i in 1:length(w_tri)]
+        facet_quad_rule[facet] = QuadratureRule{RefShape, T}(w_tri, new_points)
     end
     return FacetQuadratureRule(facet_quad_rule)
 end
