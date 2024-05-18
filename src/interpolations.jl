@@ -383,7 +383,6 @@ boundarydof_indices(::Type{<:BoundaryIndex})
 boundarydof_indices(::Type{FaceIndex}) = Ferrite.facedof_indices
 boundarydof_indices(::Type{EdgeIndex}) = Ferrite.edgedof_indices
 boundarydof_indices(::Type{VertexIndex}) = Ferrite.vertexdof_indices
-boundarydof_indices(::Type{FacetIndex}) = facetdof_indices
 
 facetdof_indices(ip::InterpolationByDim{3}) = Ferrite.facedof_indices(ip)
 facetdof_indices(ip::InterpolationByDim{2}) = Ferrite.edgedof_indices(ip)
@@ -398,7 +397,6 @@ dirichlet_facetdof_indices(ip::InterpolationByDim{1}) = dirichlet_vertexdof_indi
 nfacets(ip::InterpolationByDim{3}) = nfaces(ip)
 nfacets(ip::InterpolationByDim{2}) = nedges(ip)
 nfacets(ip::InterpolationByDim{1}) = nvertices(ip)
-
 
 """
     is_discontinuous(::Interpolation)
