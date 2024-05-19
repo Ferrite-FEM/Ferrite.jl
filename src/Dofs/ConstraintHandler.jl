@@ -486,42 +486,6 @@ function _update!(inhomogeneities::Vector{T}, f::Function, ::Set{Int}, field::Sy
     end
 end
 
-# Saves the dirichlet boundary conditions to a vtkfile.
-# Values will have a 1 where bcs are active and 0 otherwise
-function WriteVTK.vtk_point_data(vtkfile, ch::ConstraintHandler)
-    unique_fields = []
-    for dbc in ch.dbcs
-        push!(unique_fields, dbc.field_name)
-    end
-    unique!(unique_fields)
-
-    for field in unique_fields
-        nd = getfielddim(ch.dh, field)
-        data = zeros(Float64, nd, getnnodes(get_grid(ch.dh)))
-        for dbc in ch.dbcs
-            dbc.field_name != field && continue
-            if eltype(dbc.facets) <: BoundaryIndex
-                functype = boundaryfunction(eltype(dbc.facets))
-                for (cellidx, facetidx) in dbc.facets
-                    for facetnode in functype(getcells(get_grid(ch.dh), cellidx))[facetidx]
-                        for component in dbc.components
-                            data[component, facetnode] = 1
-                        end
-                    end
-                end
-            else
-                for nodeidx in dbc.facets
-                    for component in dbc.components
-                        data[component, nodeidx] = 1
-                    end
-                end
-            end
-        end
-        vtk_point_data(vtkfile, data, string(field, "_bc"))
-    end
-    return vtkfile
-end
-
 """
 
     apply!(K::SparseMatrixCSC, rhs::AbstractVector, ch::ConstraintHandler)

@@ -59,6 +59,17 @@ Base.@deprecate_binding Line3D Line
 Base.@deprecate_binding Quadrilateral3D Quadrilateral
 export Line2D, Line3D, Quadrilateral3D
 
+using WriteVTK: vtk_grid 
+export vtk_grid # To give better error
+
+function WriteVTK.vtk_grid(::String, ::Union{AbstractGrid,AbstractDofHandler}; kwargs...)
+    error(join(("The vtk interface has been updated in Ferrite v1.0.",
+                "See https://github.com/Ferrite-FEM/Ferrite.jl/pull/679.",
+                "Use VTKFile to open a vtk file, and the functions",
+                "write_solution, write_cell_data, and write_projection to save data."), 
+            "\n"))
+end
+
 # Deprecation of auto-vectorized methods
 function add!(dh::DofHandler, name::Symbol, dim::Int)
     celltype = getcelltype(dh.grid)

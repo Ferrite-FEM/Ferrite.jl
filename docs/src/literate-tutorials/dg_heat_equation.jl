@@ -334,8 +334,8 @@ K, f = assemble_global(cellvalues, facetvalues, interfacevalues, K, dh, order, d
 
 apply!(K, f, ch)
 u = K \ f;
-vtk_grid("dg_heat_equation", dh) do vtk
-    vtk_point_data(vtk, dh, u)
+VTKFile("dg_heat_equation", dh) do vtk
+    write_solution(vtk, dh, u)
 end;
 
 ## test the result                #src

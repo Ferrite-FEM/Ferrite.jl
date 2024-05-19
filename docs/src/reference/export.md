@@ -24,10 +24,16 @@ evaluate_at_grid_nodes
 ```
 
 ## VTK Export
-
 ```@docs
-vtk_grid(filename::AbstractString, grid::Grid{dim,C,T}; compress::Bool) where {dim,C,T} 
-vtk_point_data
-vtk_cellset
-vtk_cell_data_colors
+VTKFile
+VTKFileCollection
+addstep!
+write_solution
+write_projection
+write_cell_data
+write_node_data
+Ferrite.write_cellset
+Ferrite.write_nodeset
+Ferrite.write_constraints
+Ferrite.write_cell_colors
 ```

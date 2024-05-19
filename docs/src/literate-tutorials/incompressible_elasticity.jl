@@ -270,13 +270,14 @@ function solve(ν, interpolation_u, interpolation_p)
     ## Export the solution and the stress
     filename = "cook_" * (interpolation_u == Lagrange{RefTriangle, 1}()^2 ? "linear" : "quadratic") *
                          "_linear"
-    vtk_grid(filename, dh) do vtkfile
-        vtk_point_data(vtkfile, dh, u)
+
+    VTKFile(filename, grid) do vtk
+        write_solution(vtk, dh, u)
         for i in 1:3, j in 1:3
             σij = [x[i, j] for x in σ]
-            vtk_cell_data(vtkfile, σij, "sigma_$(i)$(j)")
+            write_cell_data(vtk, σij, "sigma_$(i)$(j)")
         end
-        vtk_cell_data(vtkfile, σvM, "sigma von Mise")
+        write_cell_data(vtk, σvM, "sigma von Mises")
     end
     return u
 end

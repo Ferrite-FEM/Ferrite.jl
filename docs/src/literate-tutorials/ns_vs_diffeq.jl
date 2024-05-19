@@ -433,7 +433,7 @@ integrator = init(
     progress=true, progress_steps=1,
     saveat=Δt_save);
 
-pvd = paraview_collection("vortex-street.pvd");
+pvd = VTKFileCollection("vortex-street", grid);
 integrator = TimeChoiceIterator(integrator, 0.0:Δt_save:T)
 for (u_uc,t) in integrator
     # We ignored the Dirichlet constraints in the solution vector up to now,
@@ -442,13 +442,11 @@ for (u_uc,t) in integrator
     update!(ch, t)
     u = copy(u_uc)
     apply!(u, ch)
-    vtk_grid("vortex-street-$t.vtu", dh) do vtk
-        vtk_point_data(vtk,dh,u)
-        vtk_save(vtk)
-        pvd[t] = vtk
+    addstep!(pvd, t) do io
+        write_solution(io, dh, u)
     end
 end
-vtk_save(pvd);
+close(pvd);
 
 # Test the result for full proper development of the flow                   #src
 using Test                                                                  #hide

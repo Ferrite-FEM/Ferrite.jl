@@ -357,11 +357,11 @@ function test_2_element_heat_eq()
     gridfilename = "mixed_grid"
     addcellset!(grid, "cell-1", [1,])
     addcellset!(grid, "cell-2", [2,])
-    vtk_grid(gridfilename, grid) do vtk
-        vtk_cellset(vtk, grid, "cell-1")
-        vtk_cellset(vtk, grid, "cell-2")
-        vtk_point_data(vtk, dh, u)
-        # vtk_point_data(vtk, ch)  #FIXME
+    VTKFile(gridfilename, grid) do vtk
+        Ferrite.write_cellset(vtk, grid, "cell-1")
+        Ferrite.write_cellset(vtk, grid, "cell-2")
+        write_solution(vtk, dh, u)
+        # Ferrite.write_constraints(vtk, ch)  #FIXME
     end
     sha = bytes2hex(open(SHA.sha1, gridfilename*".vtu"))
     @test sha in ("e96732c000b0b385db7444f002461468b60b3b2c", "7b26edc27b5e59a2f60907374cd5a5790cc37a6a")
@@ -635,8 +635,8 @@ function test_vtk_export()
     close!(dh)
     u = collect(1:ndofs(dh))
     filename = "mixed_2d_grid"
-    vtk_grid(filename, dh) do vtk
-        vtk_point_data(vtk, dh, u)
+    VTKFile(filename, dh) do vtk
+        write_solution(vtk, dh, u)
     end
     sha = bytes2hex(open(SHA.sha1, filename*".vtu"))
     @test sha == "339ab8a8a613c2f38af684cccd695ae816671607"

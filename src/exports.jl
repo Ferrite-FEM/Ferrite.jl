@@ -106,7 +106,6 @@ export
 # Grid coloring
     create_coloring,
     ColoringAlgorithm,
-    vtk_cell_data_colors,
 
 # Dofs
     DofHandler,
@@ -159,14 +158,15 @@ export
     assemble!,
     finish_assemble,
 
-# VTK export
-    vtk_grid,
-    vtk_point_data,
-    vtk_cell_data,
-    vtk_nodeset,
-    vtk_cellset,
-    vtk_save,
-
+# exporting data
+    VTKFile,
+    write_solution,
+    write_cell_data,
+    write_projection,
+    write_node_data,
+    VTKFileCollection,
+    addstep!,
+    
 # L2 Projection
     project,
     L2Projector,

@@ -223,13 +223,6 @@ function _project(vars, proj::L2Projector, fe_values::AbstractValues, M::Integer
     return T[make_T(x) for x in eachrow(projected_vals)]
 end
 
-function WriteVTK.vtk_point_data(vtk::WriteVTK.DatasetFile, proj::L2Projector, vals::Vector{T}, name::AbstractString) where T
-    data = _evaluate_at_grid_nodes(proj, vals, #=vtk=# Val(true))::Matrix
-    @assert size(data, 2) == getnnodes(get_grid(proj.dh))
-    vtk_point_data(vtk, data, name; component_names=component_names(T))
-    return vtk
-end
-
 evaluate_at_grid_nodes(proj::L2Projector, vals::AbstractVector) =
     _evaluate_at_grid_nodes(proj, vals, Val(false))
 

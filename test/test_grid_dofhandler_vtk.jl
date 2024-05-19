@@ -38,10 +38,10 @@ end
         addnodeset!(grid, "middle-nodes", x -> norm(x) < radius)
 
         gridfilename = "grid-$(repr(celltype))"
-        vtk_grid(gridfilename, grid) do vtk
-            vtk_cellset(vtk, grid, "cell-1")
-            vtk_cellset(vtk, grid, "middle-cells")
-            vtk_nodeset(vtk, grid, "middle-nodes")
+        VTKFile(gridfilename, grid) do vtk
+            Ferrite.write_cellset(vtk, grid, "cell-1")
+            Ferrite.write_cellset(vtk, grid, "middle-cells")
+            Ferrite.write_nodeset(vtk, grid, "middle-nodes")
         end
 
         # test the sha of the file
@@ -77,9 +77,9 @@ end
         apply!(u, ch)
 
         dofhandlerfilename = "dofhandler-$(repr(celltype))"
-        vtk_grid(dofhandlerfilename, dofhandler) do vtk
-            vtk_point_data(vtk, ch)
-            vtk_point_data(vtk, dofhandler, u)
+        VTKFile(dofhandlerfilename, grid) do vtk
+            Ferrite.write_constraints(vtk, ch)
+            write_solution(vtk, dofhandler, u)
         end
 
         # test the sha of the file
@@ -118,10 +118,10 @@ close(csio)
     vector_data = [Vec{3}(ntuple(i->i, 3)) for j=1:8]
 
     filename_3d = "test_vtk_3d"
-    vtk_grid(filename_3d, grid) do vtk_file
-        vtk_point_data(vtk_file, sym_tensor_data, "symmetric tensor")
-        vtk_point_data(vtk_file, tensor_data, "tensor")
-        vtk_point_data(vtk_file, vector_data, "vector")
+    VTKFile(filename_3d, grid) do vtk
+        write_node_data(vtk, sym_tensor_data, "symmetric tensor")
+        write_node_data(vtk, tensor_data, "tensor")
+        write_node_data(vtk, vector_data, "vector")
     end
 
     # 2D grid
@@ -133,11 +133,11 @@ close(csio)
     vector_data = [Vec{2}(ntuple(i->i, 2)) for j=1:4]
 
     filename_2d = "test_vtk_2d"
-    vtk_grid(filename_2d, grid) do vtk_file
-        vtk_point_data(vtk_file, sym_tensor_data, "symmetric tensor")
-        vtk_point_data(vtk_file, tensor_data, "tensor")
-        vtk_point_data(vtk_file, tensor_data_1D, "tensor_1d")
-        vtk_point_data(vtk_file, vector_data, "vector")
+    VTKFile(filename_2d, grid) do vtk
+        write_node_data(vtk, sym_tensor_data, "symmetric tensor")
+        write_node_data(vtk, tensor_data, "tensor")
+        write_node_data(vtk, tensor_data_1D, "tensor_1d")
+        write_node_data(vtk, vector_data, "vector")
     end
 
     # test the shas of the files
@@ -707,5 +707,54 @@ end
         add!(dh2, :u, Lagrange{RefQuadrilateral,1}()^3)
         close!(dh2)
         @test dh1.cell_dofs == dh2.cell_dofs
+    end
+
+    @testset "VTKFileCollection" begin
+        @testset "equivalence of addstep methods" begin 
+            grid = generate_grid(Triangle, (2,2))
+            celldata = rand(getncells(grid))
+            fname = "addstep"
+            pvd1 = VTKFileCollection(fname, grid)
+            pvd2 = VTKFileCollection(fname, grid)
+            timesteps = 0:0.5:0.5
+            for (n, t) in pairs(timesteps)
+                addstep!(pvd1, t) do io
+                    write_cell_data(io, celldata*n, "celldata")
+                end
+                vtk = VTKFile(string(fname, "2_", n), grid)
+                write_cell_data(vtk, celldata*n, "celldata")
+                addstep!(pvd2, vtk, t)
+                @test !(isopen(vtk.vtk))
+            end
+            close.((pvd1, pvd2))
+            @test pvd1.step == pvd2.step # Same nr of steps added 
+            for (n, t) in pairs(timesteps)
+                fname1 = string(fname, "_", n, ".vtu")
+                fname2 = string(fname, "2_", n, ".vtu")
+                sha_vtk1 = bytes2hex(open(SHA.sha1, fname1))
+                sha_vtk2 = bytes2hex(open(SHA.sha1, fname2))
+                @test sha_vtk1 == sha_vtk2
+                rm.((fname1, fname2))
+            end
+            rm(string(fname, ".pvd"))
+            # Solving https://github.com/Ferrite-FEM/Ferrite.jl/issues/397
+            # would allow checking the pvd files as well. 
+        end
+        @testset "kwargs forwarding" begin
+            grid = generate_grid(Quadrilateral, (10,10))
+            file_sizes = Int[]
+            fname = "test_collection_kwargs"
+            for compress in (true, false)
+                pvd = VTKFileCollection(fname, grid)
+                addstep!(pvd, 0.0; compress) do io
+                    nothing
+                end
+                close(pvd)
+                push!(file_sizes, stat(string(fname, "_1.vtu")).size)
+                rm(string(fname, "_1.vtu"))
+            end
+            rm(string(fname, ".pvd"))
+            @test file_sizes[1] < file_sizes[2] # Check that compress=true gives smaller file size
+        end
     end
 end

@@ -2,7 +2,6 @@ module Ferrite
 
 using Reexport: @reexport
 @reexport using Tensors
-@reexport using WriteVTK
 
 using Base:
     @propagate_inbounds
@@ -17,11 +16,12 @@ using SparseArrays:
     SparseArrays, SparseMatrixCSC, nonzeros, nzrange, rowvals, sparse, spzeros
 using StaticArrays:
     StaticArrays, MMatrix, SMatrix, SVector
+using WriteVTK:
+    WriteVTK, VTKCellTypes
 using Tensors:
     Tensors, AbstractTensor, SecondOrderTensor, SymmetricTensor, Tensor, Vec, gradient,
     rotation_tensor, symmetric, tovoigt!
-using WriteVTK:
-    WriteVTK, MeshCell, VTKCellTypes, vtk_cell_data, vtk_grid, vtk_point_data, vtk_save
+
 
 include("exports.jl")
 
