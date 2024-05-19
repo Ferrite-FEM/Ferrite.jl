@@ -292,7 +292,6 @@ There are multiple helper structures to apply boundary conditions or define subd
 - `nodesets::Dict{String,Set{Int}}`: maps a `String` key to a `Set` of global node ids
 - `facetsets::Dict{String,Set{FacetIndex}}`: maps a `String` to a `Set` of `Set{FacetIndex} (global_cell_id, local_facet_id)`
 - `vertexsets::Dict{String,Set{VertexIndex}}`: maps a `String` key to a `Set` of local vertex ids
-- `boundary_matrix::SparseMatrixCSC{Bool,Int}`: optional, only needed by `onboundary` to check if a cell is on the boundary, see, e.g. Helmholtz example
 """
 mutable struct Grid{dim,C<:AbstractCell,T<:Real} <: AbstractGrid{dim}
     cells::Vector{C}
@@ -302,8 +301,6 @@ mutable struct Grid{dim,C<:AbstractCell,T<:Real} <: AbstractGrid{dim}
     nodesets::Dict{String,Set{Int}}
     facetsets::Dict{String,Set{FacetIndex}}
     vertexsets::Dict{String,Set{VertexIndex}}
-    # Boundary matrix (faces per cell × cell)
-    boundary_matrix::SparseMatrixCSC{Bool,Int} # TODO: Deprecate!
 end
 
 function Grid(cells::Vector{C},
@@ -313,7 +310,7 @@ function Grid(cells::Vector{C},
               facetsets::Dict{String,Set{FacetIndex}}=Dict{String,Set{FacetIndex}}(),
               facesets = nothing,
               vertexsets::Dict{String,Set{VertexIndex}}=Dict{String,Set{VertexIndex}}(),
-              boundary_matrix::SparseMatrixCSC{Bool,Int}=spzeros(Bool, 0, 0)) where {dim,C,T}
+              boundary_matrix = nothing) where {dim,C,T}
     if facesets !== nothing 
         if isempty(facetsets)
             @warn "facesets in Grid is deprecated, use facetsets instead" maxlog=1
@@ -324,7 +321,10 @@ function Grid(cells::Vector{C},
             error("facesets are deprecated, use only facetsets")
         end
     end
-    return Grid(cells, nodes, cellsets, nodesets, facetsets, vertexsets, boundary_matrix)
+    if boundary_matrix !== nothing
+        error("`boundary_matrix` is not part of the Grid anymore and thus not a supported keyword argument.")
+    end
+    return Grid(cells, nodes, cellsets, nodesets, facetsets, vertexsets)
 end
 
 ##########################

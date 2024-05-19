@@ -103,7 +103,6 @@ celldofs!(v::Vector, cc::CellCache) = copyto!(v, cc.dofs) # celldofs!(v, cc.dh, 
 
 # TODO: These should really be replaced with something better...
 nfacets(cc::CellCache) = nfacets(cc.grid.cells[cc.cellid[]])
-onboundary(cc::CellCache, face::Int) = cc.grid.boundary_matrix[face, cc.cellid[]]
 
 
 # TODO: Currently excluded from the docstring below. Should they be public?
@@ -155,7 +154,6 @@ for op = (:getnodes, :getcoordinates, :cellid, :celldofs)
 end
 # @inline faceid(fc::FacetCache) = fc.current_faceid[]
 @inline celldofs!(v::Vector, fc::FacetCache) = celldofs!(v, fc.cc)
-# @inline onboundary(fc::FacetCache) = onboundary(fc.cc, faceid(fc))
 # @inline faceindex(fc::FacetCache) = FaceIndex(cellid(fc), faceid(fc))
 @inline function reinit!(fv::FacetValues, fc::FacetCache)
     reinit!(fv, fc.cc, fc.current_facet_id[])

@@ -385,6 +385,17 @@ more discussion).
   now you can still use them by prefixing `Ferrite.`, e.g. `Ferrite.getweights`.)
   ([#754][github-754])
 
+- The `onboundary` function (and the associated `boundary_matrix` property of the `Grid`
+  datastructure) have been removed ([#924][github-924]). Instead of first checking
+  `onboundary` and then check whether a facet belong to a specific facetset, check the
+  facetset directly. For example:
+  ```diff
+  - if onboundary(cell, local_face_id) && (cell_id, local_face_id) in getfacesets(grid, "traction_boundary")
+  + if (cell_id, local_face_id) in getfacesets(grid, "traction_boundary")
+       # integrate the "traction_boundary" boundary
+    end
+  ```
+
 ### Fixed
 
 - Benchmarks now work with master branch. ([#751][github-#751], [#855][github-#855])
@@ -902,3 +913,4 @@ poking into Ferrite internals:
 [github-835]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/835
 [github-855]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/855
 [github-880]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/880
+[github-924]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/924

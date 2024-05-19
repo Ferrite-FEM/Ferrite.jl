@@ -351,7 +351,7 @@ function elmt!(Ke, re, element, cellvalues, facetvalues, grid, mp, ue, state)
     symmetrize_lower!(Ke)
 
     @inbounds for facet in 1:nfacets(getcells(grid, cellid(element))) 
-        if onboundary(element, facet) && (cellid(element), facet) ∈ getfacetset(grid, "traction")
+        if (cellid(element), facet) ∈ getfacetset(grid, "traction")
             reinit!(facetvalues, element, facet)
             t = Vec((0.0, -1.0)) # force pointing downwards
             for q_point in 1:getnquadpoints(facetvalues)
