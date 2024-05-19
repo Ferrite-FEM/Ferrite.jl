@@ -190,6 +190,11 @@ more discussion).
   + add!(dh, :u, Lagrange{RefTriangle, 1}())
   ```
 
+- **VTK export**: Ferrite no longer extends methods from `WriteVTK.jl`, instead the new types 
+  `VTKFile` and `VTKFileCollection` should be used instead. New methods exists for writing to 
+  a `VTKFile`, e.g. `write_solution`, `write_celldata`, `write_nodedata`, and `write_projection`.
+  See [#692][github-692].
+
 ### Added
 
 - `InterfaceValues` for computing jumps and averages over interfaces. ([#743][github-743])
@@ -858,6 +863,7 @@ poking into Ferrite internals:
 [github-684]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/684
 [github-687]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/687
 [github-688]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/688
+[github-692]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/692
 [github-694]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/694
 [github-695]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/695
 [github-697]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/697
@@ -896,4 +902,3 @@ poking into Ferrite internals:
 [github-835]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/835
 [github-855]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/855
 [github-880]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/880
-
