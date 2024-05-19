@@ -238,7 +238,7 @@ end
 """
     write_solution(vtk::VTKFile, dh::AbstractDofHandler, u::Vector, suffix="")
 
-Save the values at the nodes in the degree of freedom vector `u` to the stream.
+Save the values at the nodes in the degree of freedom vector `u` to `vtk`.
 Each field in `dh` will be saved separately, and `suffix` can be used to append 
 to the fieldname.
 
@@ -259,7 +259,7 @@ end
 """
     write_projection(vtk::VTKFile, proj::L2Projector, vals::Vector, name::AbstractString)
 
-Project `vals` to the grid nodes with `proj` and save to the stream.
+Project `vals` to the grid nodes with `proj` and save to `vtk`.
 """
 function write_projection(vtk::VTKFile, proj::L2Projector, vals, name)
     data = _evaluate_at_grid_nodes(proj, vals, #=vtk=# Val(true))::Matrix
@@ -281,7 +281,7 @@ end
     write_nodedata(vtk::VTKFile, nodedata::Vector{Real}, name)
     write_nodedata(vtk::VTKFile, nodedata::Vector{<:AbstractTensor}, name)
     
-Write the `nodedata` that is ordered by the nodes in the grid to the vtk stream.
+Write the `nodedata` that is ordered by the nodes in the grid to `vtk`.
 
 When `nodedata` contains `Tensors.Vec`s, each component is exported. 
 Two-dimensional vectors are padded with zeros.
