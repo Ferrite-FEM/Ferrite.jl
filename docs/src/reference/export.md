@@ -34,6 +34,6 @@ write_celldata
 write_nodedata
 Ferrite.write_cellset
 Ferrite.write_nodeset
-Ferrite.write_dirichlet
+Ferrite.write_constraints
 Ferrite.write_cellcolors
 ```

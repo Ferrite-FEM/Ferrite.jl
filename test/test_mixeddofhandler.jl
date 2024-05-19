@@ -361,7 +361,7 @@ function test_2_element_heat_eq()
         Ferrite.write_cellset(vtk, grid, "cell-1")
         Ferrite.write_cellset(vtk, grid, "cell-2")
         write_solution(vtk, dh, u)
-        # Ferrite.write_dirichlet(vtk, ch)  #FIXME
+        # Ferrite.write_constraints(vtk, ch)  #FIXME
     end
     sha = bytes2hex(open(SHA.sha1, gridfilename*".vtu"))
     @test sha in ("e96732c000b0b385db7444f002461468b60b3b2c", "7b26edc27b5e59a2f60907374cd5a5790cc37a6a")

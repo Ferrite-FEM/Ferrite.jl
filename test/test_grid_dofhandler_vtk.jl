@@ -78,7 +78,7 @@ end
 
         dofhandlerfilename = "dofhandler-$(repr(celltype))"
         VTKFile(dofhandlerfilename, grid) do vtk
-            Ferrite.write_dirichlet(vtk, ch)
+            Ferrite.write_constraints(vtk, ch)
             write_solution(vtk, dofhandler, u)
         end
 

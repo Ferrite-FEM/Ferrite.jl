@@ -28,7 +28,7 @@ where `write_solution` is just one example of the following functions that can b
 * [`write_projection`](@ref)
 * [`Ferrite.write_cellset`](@ref)
 * [`Ferrite.write_nodeset`](@ref)
-* [`Ferrite.write_dirichlet`](@ref)
+* [`Ferrite.write_constraints`](@ref)
 * [`Ferrite.write_cellcolors`](@ref)
 
 Instead of using the `do`-block, it is also possible to do

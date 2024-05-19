@@ -15,7 +15,7 @@ This file handler can be used to to write data with
 * [`write_nodedata`](@ref).
 * [`Ferrite.write_cellset`](@ref)
 * [`Ferrite.write_nodeset`](@ref)
-* [`Ferrite.write_dirichlet`](@ref)
+* [`Ferrite.write_constraints`](@ref)
 
 It is necessary to call `close(::VTKFile)` to save the data after writing 
 to the file handler. Using the supported `do`-block does this automatically:
@@ -327,12 +327,12 @@ end
 write_cellset(vtk, grid::AbstractGrid, cellset::String) = write_cellset(vtk, grid, [cellset])
 
 """
-    write_dirichlet(vtk::VTKFile, ch::ConstraintHandler)
+    write_constraints(vtk::VTKFile, ch::ConstraintHandler)
 
 Saves the dirichlet boundary conditions to a vtkfile.
 Values will have a 1 where bcs are active and 0 otherwise
 """
-function write_dirichlet(vtk, ch::ConstraintHandler)    
+function write_constraints(vtk, ch::ConstraintHandler)    
     unique_fields = []
     for dbc in ch.dbcs
         push!(unique_fields, dbc.field_name)
