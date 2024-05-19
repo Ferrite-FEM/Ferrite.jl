@@ -133,6 +133,8 @@ function test_2d_mixed_2_el()
     @test ndofs_per_cell(dh.subdofhandlers[1]) == 12
     @test ndofs_per_cell(dh, 2) == 9
     @test ndofs_per_cell(dh.subdofhandlers[2]) == 9
+    @test_throws ErrorException ndofs_per_cell(dh)
+    @test_throws ErrorException Ferrite.nnodes_per_cell(grid)
     @test celldofs(dh, 1) == [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
     @test celldofs(dh, 2) == [5, 6, 3, 4, 13, 14, 11, 10, 15]
 end
@@ -293,8 +295,8 @@ function test_2_element_heat_eq()
 
     # Create two Dirichlet boundary conditions - one for each field.
     ch = ConstraintHandler(dh);
-    ∂Ω1 = getfaceset(grid, "left")
-    ∂Ω2 = getfaceset(grid, "right")
+    ∂Ω1 = getfacetset(grid, "left")
+    ∂Ω2 = getfacetset(grid, "right")
     dbc1 = Dirichlet(:u, ∂Ω1, (x, t) -> 0)
     dbc2 = Dirichlet(:u, ∂Ω2, (x, t) -> 0)
     add!(ch, dbc1);
@@ -359,7 +361,7 @@ function test_2_element_heat_eq()
         Ferrite.write_cellset(vtk, grid, "cell-1")
         Ferrite.write_cellset(vtk, grid, "cell-2")
         write_solution(vtk, dh, u)
-        # Ferrite.write_dirichlet(vtk, ch)  #FIXME
+        # Ferrite.write_constraints(vtk, ch)  #FIXME
     end
     sha = bytes2hex(open(SHA.sha1, gridfilename*".vtu"))
     @test sha in ("e96732c000b0b385db7444f002461468b60b3b2c", "7b26edc27b5e59a2f60907374cd5a5790cc37a6a")
@@ -490,7 +492,7 @@ function test_subparametric_quad()
     close!(dh)
     
     ch = ConstraintHandler(dh)
-    dbc1 = Dirichlet(:u, getfaceset(grid, "left"), (x, t) -> 0.0, 2)
+    dbc1 = Dirichlet(:u, getfacetset(grid, "left"), (x, t) -> 0.0, 2)
     add!(ch, dbc1)
     close!(ch)
     update!(ch, 1.0)
@@ -509,7 +511,7 @@ function test_subparametric_triangle()
     close!(dh)
     
     ch = ConstraintHandler(dh)
-    dbc1 = Dirichlet(:u, getfaceset(grid, "left"), (x, t) -> 0.0, 2)
+    dbc1 = Dirichlet(:u, getfacetset(grid, "left"), (x, t) -> 0.0, 2)
     add!(ch, dbc1)
     close!(ch)
     update!(ch, 1.0)

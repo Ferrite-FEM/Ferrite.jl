@@ -17,9 +17,11 @@ if HAS_EXTENSIONS && MODULE_CAN_BE_TYPE_PARAMETER
     import Metis
 end
 
-const RUN_JET_TESTS = VERSION >= v"1.9"
+const RUN_JET_TESTS = VERSION >= v"1.9" && isempty(VERSION.prerelease)
 
 if RUN_JET_TESTS
+    using Pkg: Pkg 
+    Pkg.add("JET")
     using JET: @test_call
 else
     # Just eat the macro on incompatible versions
@@ -38,9 +40,10 @@ include("test_interfacevalues.jl")
 include("test_quadrules.jl")
 include("test_assemble.jl")
 include("test_dofs.jl")
-include("test_constraints.jl") 
+include("test_constraints.jl")
 include("test_grid_dofhandler_vtk.jl")
-include("test_abstractgrid.jl") 
+include("test_vtk_export.jl")
+include("test_abstractgrid.jl")
 include("test_grid_addboundaryset.jl")
 include("test_mixeddofhandler.jl")
 include("test_l2_projection.jl")
@@ -51,7 +54,13 @@ include("test_apply_analytical.jl")
 include("test_deprecations.jl")
 HAS_EXTENSIONS && include("blockarrays.jl")
 include("test_examples.jl")
+
 @test all(x -> isdefined(Ferrite, x), names(Ferrite))  # Test that all exported symbols are defined
+#= See which is not defined if fails 
+for name in names(Ferrite)
+    isdefined(Ferrite, name) || @warn "Ferrite.$name is not defined but $name is exported"
+end 
+=#
 
 # Integration tests
 include("integration/test_simple_scalar_convergence.jl")

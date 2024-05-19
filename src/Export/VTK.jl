@@ -11,19 +11,19 @@ The keyword arguments are forwarded to `WriteVTK.vtk_grid`, see
 This file handler can be used to to write data with
 
 * [`write_solution`](@ref)
-* [`write_celldata`](@ref)
+* [`write_cell_data`](@ref)
 * [`write_projection`](@ref)
-* [`write_nodedata`](@ref).
+* [`write_node_data`](@ref).
 * [`Ferrite.write_cellset`](@ref)
 * [`Ferrite.write_nodeset`](@ref)
-* [`Ferrite.write_dirichlet`](@ref)
+* [`Ferrite.write_constraints`](@ref)
 
 It is necessary to call `close(::VTKFile)` to save the data after writing 
 to the file handler. Using the supported `do`-block does this automatically:
 ```julia
 VTKFile(filename, grid) do vtk
     write_solution(vtk, dh, u)
-    write_celldata(vtk, celldata)
+    write_cell_data(vtk, celldata)
 end
 ```
 """
@@ -102,7 +102,7 @@ pvd = VTKFileCollection(filename, grid)
 for (n, t) in pairs(timevector)
     # Calculate, e.g., the solution `u` and the stress `σeff`
     addstep!(pvd, t) do io 
-        write_celldata(io, σeff, "Effective stress")
+        write_cell_data(io, σeff, "Effective stress")
         write_solution(io, dh, u)
     end
 end
@@ -129,7 +129,7 @@ pvd = VTKFileCollection(filename, grid)
 for (n, t) in pairs(timevector)
     # Calculate, e.g., the solution `u` and the stress `σeff`
     vtk = VTKFile(string(filename, "_", n), dh)
-    write_celldata(vtk, σeff, "Effective stress")
+    write_cell_data(vtk, σeff, "Effective stress")
     write_solution(vtk, dh, u)
     addstep!(pvd, vtk, t)
 end
@@ -217,7 +217,7 @@ function toparaview!(v, x::SecondOrderTensor)
     tovoigt!(v, x)
 end
 
-function _vtk_write_nodedata(
+function _vtk_write_node_data(
     vtk::WriteVTK.DatasetFile,
     nodedata::Vector{S},
     name::AbstractString
@@ -230,10 +230,10 @@ function _vtk_write_nodedata(
     end
     return WriteVTK.vtk_point_data(vtk, out, name; component_names=component_names(S))
 end
-function _vtk_write_nodedata(vtk::WriteVTK.DatasetFile, nodedata::Vector{<:Real}, name::AbstractString)
+function _vtk_write_node_data(vtk::WriteVTK.DatasetFile, nodedata::Vector{<:Real}, name::AbstractString)
     return WriteVTK.vtk_point_data(vtk, nodedata, name)
 end
-function _vtk_write_nodedata(vtk::WriteVTK.DatasetFile, nodedata::Matrix{<:Real}, name::AbstractString; component_names=nothing)
+function _vtk_write_node_data(vtk::WriteVTK.DatasetFile, nodedata::Matrix{<:Real}, name::AbstractString; component_names=nothing)
     return WriteVTK.vtk_point_data(vtk, nodedata, name; component_names=component_names)
 end
 
@@ -254,13 +254,13 @@ end
 """
     write_solution(vtk::VTKFile, dh::AbstractDofHandler, u::Vector, suffix="")
 
-Save the values at the nodes in the degree of freedom vector `u` to the stream.
+Save the values at the nodes in the degree of freedom vector `u` to `vtk`.
 Each field in `dh` will be saved separately, and `suffix` can be used to append 
 to the fieldname.
 
 `u` can also contain tensorial values, but each entry in `u` must correspond to a 
-degree of freedom in `dh`, see [`write_nodedata`](@ref write_nodedata) for details. 
-Use `write_nodedata` directly when exporting values that are already 
+degree of freedom in `dh`, see [`write_node_data`](@ref write_node_data) for details. 
+Use `write_node_data` directly when exporting values that are already 
 sorted by the nodes in the grid. 
 """
 function write_solution(vtk::VTKFile, dh::AbstractDofHandler, u::Vector, suffix="")
@@ -271,7 +271,7 @@ function write_solution(vtk::VTKFile, dh::AbstractDofHandler, u::Vector, suffix=
         else
             data = _evaluate_at_grid_nodes(dh, u, name, #=vtk=# Val(true))
         end
-        _vtk_write_nodedata(vtk.vtk, data, string(name, suffix))
+        _vtk_write_node_data(vtk.vtk, data, string(name, suffix))
     end
     return vtk
 end
@@ -279,29 +279,29 @@ end
 """
     write_projection(vtk::VTKFile, proj::L2Projector, vals::Vector, name::AbstractString)
 
-Project `vals` to the grid nodes with `proj` and save to the stream.
+Project `vals` to the grid nodes with `proj` and save to `vtk`.
 """
 function write_projection(vtk::VTKFile, proj::L2Projector, vals, name)
     data = _evaluate_at_grid_nodes(proj, vals, #=vtk=# Val(true))::Matrix
     @assert size(data, 2) == getnnodes(get_grid(proj.dh))
-    _vtk_write_nodedata(vtk.vtk, data, name; component_names=component_names(eltype(vals)))
+    _vtk_write_node_data(vtk.vtk, data, name; component_names=component_names(eltype(vals)))
     return vtk
 end
 
 """
-    write_celldata(vtk::VTKFile, celldata::AbstractVector, name::String)
+    write_cell_data(vtk::VTKFile, celldata::AbstractVector, name::String)
 
 Write the `celldata` that is ordered by the cells in the grid to the vtk file.
 """
-function write_celldata(vtk::VTKFile, celldata, name)
+function write_cell_data(vtk::VTKFile, celldata, name)
     WriteVTK.vtk_cell_data(vtk.vtk, celldata, name)
 end
 
 """
-    write_nodedata(vtk::VTKFile, nodedata::Vector{Real}, name)
-    write_nodedata(vtk::VTKFile, nodedata::Vector{<:AbstractTensor}, name)
+    write_node_data(vtk::VTKFile, nodedata::Vector{Real}, name)
+    write_node_data(vtk::VTKFile, nodedata::Vector{<:AbstractTensor}, name)
     
-Write the `nodedata` that is ordered by the nodes in the grid to the vtk stream.
+Write the `nodedata` that is ordered by the nodes in the grid to `vtk`.
 
 When `nodedata` contains `Tensors.Vec`s, each component is exported. 
 Two-dimensional vectors are padded with zeros.
@@ -309,8 +309,8 @@ Two-dimensional vectors are padded with zeros.
 When `nodedata` contains second order tensors, the index order, 
 `[11, 22, 33, 23, 13, 12, 32, 31, 21]`, follows the default Voigt order in Tensors.jl.
 """
-function write_nodedata(vtk::VTKFile, nodedata, name)
-    _vtk_write_nodedata(vtk.vtk, nodedata, name)
+function write_node_data(vtk::VTKFile, nodedata, name)
+    _vtk_write_node_data(vtk.vtk, nodedata, name)
 end
 
 
@@ -322,7 +322,7 @@ Write nodal values of 1 for nodes in `nodeset`, and 0 otherwise
 function write_nodeset(vtk, grid::AbstractGrid, nodeset::String)
     z = zeros(getnnodes(grid))
     z[collect(getnodeset(grid, nodeset))] .= 1.0
-    write_nodedata(vtk, z, nodeset)
+    write_node_data(vtk, z, nodeset)
     return vtk
 end
 
@@ -340,19 +340,19 @@ function write_cellset(vtk, grid::AbstractGrid, cellsets=keys(getcellsets(getgri
     for cellset in cellsets
         fill!(z, 0)
         z[collect(getcellset(grid, cellset))] .= 1.0
-        write_celldata(vtk, z, cellset)
+        write_cell_data(vtk, z, cellset)
     end
     return vtk
 end
 write_cellset(vtk, grid::AbstractGrid, cellset::String) = write_cellset(vtk, grid, [cellset])
 
 """
-    write_dirichlet(vtk::VTKFile, ch::ConstraintHandler)
+    write_constraints(vtk::VTKFile, ch::ConstraintHandler)
 
 Saves the dirichlet boundary conditions to a vtkfile.
 Values will have a 1 where bcs are active and 0 otherwise
 """
-function write_dirichlet(vtk, ch::ConstraintHandler)    
+function write_constraints(vtk, ch::ConstraintHandler)    
     unique_fields = []
     for dbc in ch.dbcs
         push!(unique_fields, dbc.field_name)
@@ -364,24 +364,24 @@ function write_dirichlet(vtk, ch::ConstraintHandler)
         data = zeros(Float64, nd, getnnodes(get_grid(ch.dh)))
         for dbc in ch.dbcs
             dbc.field_name != field && continue
-            if eltype(dbc.faces) <: BoundaryIndex
-                functype = boundaryfunction(eltype(dbc.faces))
-                for (cellidx, faceidx) in dbc.faces
-                    for facenode in functype(getcells(get_grid(ch.dh), cellidx))[faceidx]
+            if eltype(dbc.facets) <: BoundaryIndex
+                functype = boundaryfunction(eltype(dbc.facets))
+                for (cellidx, facetidx) in dbc.facets
+                    for facetnode in functype(getcells(get_grid(ch.dh), cellidx))[facetidx]
                         for component in dbc.components
-                            data[component, facenode] = 1
+                            data[component, facetnode] = 1
                         end
                     end
                 end
             else
-                for nodeidx in dbc.faces
+                for nodeidx in dbc.facets
                     for component in dbc.components
                         data[component, nodeidx] = 1
                     end
                 end
             end
         end
-        write_nodedata(vtk, data, string(field, "_bc"))
+        write_node_data(vtk, data, string(field, "_bc"))
     end
     return vtk
 end
@@ -400,5 +400,5 @@ function write_cell_colors(vtk, grid::AbstractGrid, cell_colors::AbstractVector{
             color_vector[cell] = i
         end
     end
-    write_celldata(vtk, color_vector, name)
+    write_cell_data(vtk, color_vector, name)
 end

@@ -72,8 +72,8 @@
                 ccoords = getcoordinates(grid, cellid)
                 Vec_t = Vec{dim,Float64}
                 Vec_face_t = Vec{dim-1,Float64}
-                for lfaceid in nfaces(refshape)
-                    facenodes = Ferrite.faces(cell)[lfaceid]
+                for lfaceid in Ferrite.nfacets(refshape)
+                    facenodes = Ferrite.facets(cell)[lfaceid]
                     fcoords = zeros(Vec_t, length(facenodes))
                     for (i,nodeid) in enumerate(facenodes)
                         x = grid.nodes[nodeid].x
@@ -83,7 +83,7 @@
                     ipface = Lagrange{getfacerefshape(cell,lfaceid),1}()
 
                     ξface = rand(Vec_face_t)/4
-                    ξcell = Ferrite.face_to_element_transformation(ξface, refshape, lfaceid)
+                    ξcell = Ferrite.facet_to_element_transformation(ξface, refshape, lfaceid)
 
                     xface = zero(Vec_t)
                     for i in 1:getnbasefunctions(ipface)
@@ -100,12 +100,12 @@
             end
         end
 
-        @testset "$ref_cell unknown face error path" begin
+        @testset "$ref_cell unknown facet error path" begin
             for face in (-1, 0, 100)
-                err = ArgumentError("unknown face number")
+                err = ArgumentError("unknown facet number")
                 @test_throws err Ferrite.weighted_normal(Tensor{2,dim}(zeros(dim^2)), refshape, face)
                 pt = Vec{dim-1, Float64}(ntuple(i -> 0.0, dim-1))
-                @test_throws err Ferrite.face_to_element_transformation(pt, refshape, face)
+                @test_throws err Ferrite.facet_to_element_transformation(pt, refshape, face)
             end
         end
     end

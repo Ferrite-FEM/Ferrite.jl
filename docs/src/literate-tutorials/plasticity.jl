@@ -139,13 +139,13 @@ end
 function create_values(interpolation)
     ## setup quadrature rules
     qr      = QuadratureRule{RefTetrahedron}(2)
-    face_qr = FaceQuadratureRule{RefTetrahedron}(3)
+    facet_qr = FacetQuadratureRule{RefTetrahedron}(3)
 
-    ## cell and facevalues for u
+    ## cell and facetvalues for u
     cellvalues_u = CellValues(qr, interpolation)
-    facevalues_u = FaceValues(face_qr, interpolation)
+    facetvalues_u = FacetValues(facet_qr, interpolation)
 
-    return cellvalues_u, facevalues_u
+    return cellvalues_u, facetvalues_u
 end;
 
 # ### Add degrees of freedom
@@ -161,7 +161,7 @@ function create_bc(dh, grid)
     dbcs = ConstraintHandler(dh)
     ## Clamped on the left side
     dofs = [1, 2, 3]
-    dbc = Dirichlet(:u, getfaceset(grid, "left"), (x,t) -> [0.0, 0.0, 0.0], dofs)
+    dbc = Dirichlet(:u, getfacetset(grid, "left"), (x,t) -> [0.0, 0.0, 0.0], dofs)
     add!(dbcs, dbc)
     close!(dbcs)
     return dbcs
@@ -229,17 +229,17 @@ function symmetrize_lower!(K)
     end
 end;
 
-function doassemble_neumann!(r, dh, faceset, facevalues, t)
-    n_basefuncs = getnbasefunctions(facevalues)
+function doassemble_neumann!(r, dh, faceset, facetvalues, t)
+    n_basefuncs = getnbasefunctions(facetvalues)
     re = zeros(n_basefuncs)                      # element residual vector
-    for fc in FaceIterator(dh, faceset)
+    for fc in FacetIterator(dh, faceset)
         ## Add traction as a negative contribution to the element residual `re`:
-        reinit!(facevalues, fc)
+        reinit!(facetvalues, fc)
         fill!(re, 0)
-        for q_point in 1:getnquadpoints(facevalues)
-            dΓ = getdetJdV(facevalues, q_point)
+        for q_point in 1:getnquadpoints(facetvalues)
+            dΓ = getdetJdV(facetvalues, q_point)
             for i in 1:n_basefuncs
-                δu = shape_value(facevalues, q_point, i)
+                δu = shape_value(facetvalues, q_point, i)
                 re[i] -= (δu ⋅ t) * dΓ
             end
         end
@@ -275,7 +275,7 @@ function solve()
     dh = create_dofhandler(grid, interpolation) # JuaFEM helper function
     dbcs = create_bc(dh, grid) # create Dirichlet boundary-conditions
 
-    cellvalues, facevalues = create_values(interpolation)
+    cellvalues, facetvalues = create_values(interpolation)
 
     ## Pre-allocate solution vectors, etc.
     n_dofs = ndofs(dh)  # total number of dofs
@@ -311,7 +311,7 @@ function solve()
             ## Tangent and residual contribution from the cells (volume integral)
             doassemble!(K, r, cellvalues, dh, material, u, states, states_old);
             ## Residual contribution from the Neumann boundary (surface integral)
-            doassemble_neumann!(r, dh, getfaceset(grid, "right"), facevalues, traction)
+            doassemble_neumann!(r, dh, getfacetset(grid, "right"), facetvalues, traction)
             norm_r = norm(r[Ferrite.free_dofs(dbcs)])
 
             print("Iteration: $newton_itr \tresidual: $(@sprintf("%.8f", norm_r))\n")
@@ -346,8 +346,8 @@ function solve()
     end
     VTKFile("plasticity", dh) do vtk
         write_solution(vtk, dh, u) # displacement field
-        write_celldata(vtk, mises_values, "von Mises [Pa]")
-        write_celldata(vtk, κ_values, "Drag stress [Pa]")
+        write_cell_data(vtk, mises_values, "von Mises [Pa]")
+        write_cell_data(vtk, κ_values, "Drag stress [Pa]")
     end
 
     return u_max, traction_magnitude

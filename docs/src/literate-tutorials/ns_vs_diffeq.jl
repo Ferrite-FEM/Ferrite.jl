@@ -135,20 +135,22 @@ grid = generate_grid(Quadrilateral, (x_cells, y_cells), Vec{2}((0.0, 0.0)), Vec{
 
 # Next we carve a hole $B_{0.05}(0.2,0.2)$ in the mesh by deleting the cells and update the boundary face sets.
 # This code will be replaced once a proper mesh interface is available.
-cell_indices = filter(ci->norm(mean(map(i->grid.nodes[i].x-[0.2,0.2], Ferrite.vertices(grid.cells[ci]))))>0.05, 1:length(grid.cells))
-hole_cell_indices = filter(ci->norm(mean(map(i->grid.nodes[i].x-[0.2,0.2], Ferrite.vertices(grid.cells[ci]))))<=0.05, 1:length(grid.cells));
-hole_face_ring = Set{FaceIndex}()
+hole_center = Vec((0.2, 0.2))
+hole_radius = 0.05
+cell_indices = filter(ci -> norm(mean(getcoordinates(grid, ci) .- (hole_center,))) > hole_radius, 1:length(grid.cells))
+hole_cell_indices = filter(ci -> norm(mean(getcoordinates(grid, ci) .- (hole_center,))) <= hole_radius, 1:length(grid.cells));
+hole_facet_ring = Set{FacetIndex}()
 for hci ∈ hole_cell_indices
-    push!(hole_face_ring, FaceIndex((hci+1, 4)))
-    push!(hole_face_ring, FaceIndex((hci-1, 2)))
-    push!(hole_face_ring, FaceIndex((hci-x_cells, 3)))
-    push!(hole_face_ring, FaceIndex((hci+x_cells, 1)))
+    push!(hole_facet_ring, FacetIndex((hci+1, 4)))
+    push!(hole_facet_ring, FacetIndex((hci-1, 2)))
+    push!(hole_facet_ring, FacetIndex((hci-x_cells, 3)))
+    push!(hole_facet_ring, FacetIndex((hci+x_cells, 1)))
 end
-grid.facesets["hole"] = Set(filter(x->x.idx[1] ∉ hole_cell_indices, collect(hole_face_ring)));
-cell_indices_map = map(ci->norm(mean(map(i->grid.nodes[i].x-[0.2,0.2], Ferrite.vertices(grid.cells[ci]))))>0.05 ? indexin([ci], cell_indices)[1] : 0, 1:length(grid.cells))
+addfacetset!(grid, "hole", Set(filter(x->x.idx[1] ∉ hole_cell_indices, collect(hole_facet_ring))))
+cell_indices_map = map(ci -> norm(mean(getcoordinates(grid, ci) .- (hole_center,))) > 0.05 ? indexin([ci], cell_indices)[1] : 0, 1:length(grid.cells))
 grid.cells = grid.cells[cell_indices]
-for facesetname in keys(grid.facesets)
-    grid.facesets[facesetname] = Set(map(fi -> FaceIndex( cell_indices_map[fi.idx[1]] ,fi.idx[2]), collect(grid.facesets[facesetname])))
+for facetsetname in keys(grid.facetsets)
+    grid.facetsets[facetsetname] = Set(map(fi -> FacetIndex( cell_indices_map[fi.idx[1]] ,fi.idx[2]), collect(grid.facetsets[facetsetname])))
 end;
 
 # We test against full development of the flow - so regenerate the grid                              #src
@@ -176,10 +178,10 @@ close!(dh);
 # fluid on this portion of the boundary is fixed to be zero.
 ch = ConstraintHandler(dh);
 
-nosplip_face_names = ["top", "bottom", "hole"];
+nosplip_facet_names = ["top", "bottom", "hole"];
 # No hole for the test present                                          #src
-nosplip_face_names = ["top", "bottom"]                                  #hide
-∂Ω_noslip = union(getfaceset.((grid, ), nosplip_face_names)...);
+nosplip_facet_names = ["top", "bottom"]                                  #hide
+∂Ω_noslip = union(getfacetset.((grid, ), nosplip_facet_names)...);
 noslip_bc = Dirichlet(:v, ∂Ω_noslip, (x, t) -> [0,0], [1,2])
 add!(ch, noslip_bc);
 
@@ -188,7 +190,7 @@ add!(ch, noslip_bc);
 # is already enough to obtain some simple vortex streets. By increasing the
 # velocity further we can obtain stronger vortices - which may need additional
 # refinement of the grid.
-∂Ω_inflow = getfaceset(grid, "left");
+∂Ω_inflow = getfacetset(grid, "left");
 
 vᵢₙ(t) = clamp(t, 0.0, 1.0)*1.0 #inflow velocity
 vᵢₙ(t) = clamp(t, 0.0, 1.0)*0.3 #hide
@@ -200,7 +202,7 @@ add!(ch, inflow_bc);
 # cylinder when the weak form has been derived by setting the boundary integral
 # to zero. It is also called the do-nothing condition. Other outflow conditions
 # are also possible.
-∂Ω_free = getfaceset(grid, "right");
+∂Ω_free = getfacetset(grid, "right");
 
 close!(ch)
 update!(ch, 0.0);

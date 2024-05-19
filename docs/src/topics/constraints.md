@@ -30,7 +30,7 @@ where $a_1$, $a_2$ etc. are system degrees of freedom. In Ferrite, we can accoun
 ```julia
 ch = ConstraintHandler(dh)
 lc1 = AffineConstraint(1, [2 => 5.0, 3 => 3.0], 1)
-lc2 = AffineConstraint(1, [3 => 2.0, 5 => 6.0], 0)
+lc2 = AffineConstraint(4, [3 => 2.0, 5 => 6.0], 0)
 add!(ch, lc1)
 add!(ch, lc2)
 ```

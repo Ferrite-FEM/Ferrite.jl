@@ -28,10 +28,10 @@ end
 """
     reinit!(cv::CellValues, cell::AbstractCell, x::Vector)
     reinit!(cv::CellValues, x::Vector)
-    reinit!(fv::FaceValues, cell::AbstractCell, x::Vector, face::Int)
-    reinit!(fv::FaceValues, x::Vector, face::Int)
+    reinit!(fv::FacetValues, cell::AbstractCell, x::Vector, face::Int)
+    reinit!(fv::FacetValues, x::Vector, face::Int)
 
-Update the `CellValues`/`FaceValues` object for a cell or face with coordinates `x`.
+Update the `CellValues`/`FacetValues` object for a cell or face with coordinates `x`.
 The derivatives of the shape functions, and the new integration weights are computed.
 For interpolations with non-identity mappings, the current `cell` is also required. 
 """
@@ -40,7 +40,7 @@ reinit!
 """
     getnquadpoints(fe_v::AbstractValues)
 
-Return the number of quadrature points. For `FaceValues`, 
+Return the number of quadrature points. For `FacetValues`, 
 this is the number for the current face.
 """
 function getnquadpoints end
@@ -105,6 +105,12 @@ end
 divergence_from_gradient(grad::Vec) = sum(grad)
 divergence_from_gradient(grad::Tensor{2}) = tr(grad)
 
+"""
+    shape_curl(fe_v::AbstractValues, q_point::Int, base_function::Int)
+
+Return the curl of shape function `base_function` evaluated in
+quadrature point `q_point`.
+"""
 function shape_curl(cv::AbstractValues, q_point::Int, base_func::Int)
     return curl_from_gradient(shape_gradient(cv, q_point, base_func))
 end

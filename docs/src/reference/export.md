@@ -30,10 +30,10 @@ VTKFileCollection
 addstep!
 write_solution
 write_projection
-write_celldata
-write_nodedata
+write_cell_data
+write_node_data
 Ferrite.write_cellset
 Ferrite.write_nodeset
-Ferrite.write_dirichlet
+Ferrite.write_constraints
 Ferrite.write_cell_colors
 ```

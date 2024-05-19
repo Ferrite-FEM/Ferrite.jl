@@ -26,8 +26,7 @@ getnnodes
 Ferrite.nnodes_per_cell
 getcellset
 getnodeset
-getfaceset
-getedgeset
+getfacetset
 getvertexset
 transform_coordinates!
 getcoordinates
@@ -49,9 +48,9 @@ Ferrite.getstencil
 
 ```@docs
 addcellset!
-addfaceset!
-addboundaryfaceset!
-addboundaryedgeset!
+addfacetset!
+addboundaryfacetset!
+addvertexset!
 addboundaryvertexset!
 addnodeset!
 ```

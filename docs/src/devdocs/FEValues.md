@@ -4,8 +4,8 @@
 * `AbstractValues`
   * `AbstractCellValues`
     * [`CellValues`](@ref)
-  * `AbstractFaceValues`
-    * [`FaceValues`](@ref)
+  * `AbstractFacetValues`
+    * [`FacetValues`](@ref)
     * [`BCValues`](@ref)
   * [`PointValues`](@ref)
   
@@ -31,7 +31,7 @@ Custom FEValues, `fe_v::AbstractValues`, should normally implement the [`reinit!
   * [`getnbasefunctions`](@ref)
 * [`spatial_coordinate`](@ref), requires
   * [`geometric_value`](@ref)
-  * [`getngeobasefunctions`](@ref)
+  * `getngeobasefunctions`
   * [`getnquadpoints`](@ref)
  
 

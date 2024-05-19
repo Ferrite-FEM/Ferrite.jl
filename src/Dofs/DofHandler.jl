@@ -168,9 +168,15 @@ Return the number of degrees of freedom for the cell with index `cell`.
 
 See also [`ndofs`](@ref).
 """
-function ndofs_per_cell(dh::DofHandler, cell::Int=1)
-    @boundscheck 1 <= cell <= getncells(get_grid(dh))
-    return @inbounds ndofs_per_cell(dh.subdofhandlers[dh.cell_to_subdofhandler[cell]])
+function ndofs_per_cell(dh::DofHandler)
+    if length(dh.subdofhandlers) > 1
+        error("There are more than one subdofhandler. Use `ndofs_per_cell(dh, cellid::Int)` instead.")
+    end
+    @assert length(dh.subdofhandlers) != 0
+    return @inbounds ndofs_per_cell(dh.subdofhandlers[1])
+end
+function ndofs_per_cell(dh::DofHandler, cell::Int)
+    return ndofs_per_cell(dh.subdofhandlers[dh.cell_to_subdofhandler[cell]])
 end
 ndofs_per_cell(sdh::SubDofHandler) = sdh.ndofs_per_cell[]
 ndofs_per_cell(sdh::SubDofHandler, ::Int) = sdh.ndofs_per_cell[] # for compatibility with DofHandler
@@ -348,16 +354,15 @@ function __close!(dh::DofHandler{dim}) where {dim}
     # TODO: No need to allocate this vector for fields that don't have vertex dofs
     vertexdicts = [zeros(Int, getnnodes(get_grid(dh))) for _ in 1:numfields]
 
-    # `edgedict` keeps track of the visited edges, this will only be used for a 3D problem.
+    # `edgedict` keeps track of the visited edges.
     # An edge is uniquely determined by two global vertices, with global direction going
-    # from low to high vertex number.
-    edgedicts = [Dict{Tuple{Int,Int}, Int}() for _ in 1:numfields]
+    # from low to high vertex node number, see sortedge
+    edgedicts = [Dict{NTuple{2, Int}, Int}() for _ in 1:numfields]
 
     # `facedict` keeps track of the visited faces. We only need to store the first dof we
-    # add to the face since currently more dofs per face isn't supported. In
-    # 2D a face (i.e. a line) is uniquely determined by 2 vertices, and in 3D a face (i.e. a
-    # surface) is uniquely determined by 3 vertices.
-    facedicts = [Dict{NTuple{dim,Int}, Int}() for _ in 1:numfields]
+    # add to the face since currently more dofs per face isn't supported. 
+    # A face is uniquely determined by 3 vertex nodes, see sortface
+    facedicts = [Dict{NTuple{3, Int}, Int}() for _ in 1:numfields]
 
     # Set initial values
     nextdof = 1  # next free dof to distribute
@@ -398,23 +403,19 @@ function _close_subdofhandler!(dh::DofHandler{sdim}, sdh::SubDofHandler, sdh_ind
                     next_dof_index += 1
                 end
             end
-            if getdim(interpolation) > 2
-                for vdofs ∈ edgedof_interior_indices(interpolation)
-                    for dof_index ∈ vdofs
-                        @assert dof_index == next_dof_index "Edge dof ordering not supported. Please consult the dev docs."
-                        next_dof_index += 1
-                    end
+            for vdofs ∈ edgedof_interior_indices(interpolation)
+                for dof_index ∈ vdofs
+                    @assert dof_index == next_dof_index "Edge dof ordering not supported. Please consult the dev docs."
+                    next_dof_index += 1
                 end
             end
-            if getdim(interpolation) > 1
-                for vdofs ∈ facedof_interior_indices(interpolation)
-                    for dof_index ∈ vdofs
-                        @assert dof_index == next_dof_index "Face dof ordering not supported. Please consult the dev docs."
-                        next_dof_index += 1
-                    end
+            for vdofs ∈ facedof_interior_indices(interpolation)
+                for dof_index ∈ vdofs
+                    @assert dof_index == next_dof_index "Face dof ordering not supported. Please consult the dev docs."
+                    next_dof_index += 1
                 end
             end
-            for dof_index ∈ celldof_interior_indices(interpolation)
+            for dof_index ∈ volumedof_interior_indices(interpolation)
                 @assert next_dof_index <= dof_index <= getnbasefunctions(interpolation) "Cell dof ordering not supported. Please consult the dev docs."
             end
         end
@@ -487,30 +488,23 @@ function _distribute_dofs_for_cell!(dh::DofHandler{sdim}, cell::AbstractCell, ip
         ip_info.nvertexdofs, nextdof, ip_info.n_copies,
     )
 
-    # Distribute dofs for edges (only applicable when dim is 3)
-    if sdim == 3 && (ip_info.reference_dim == 3 || ip_info.reference_dim == 2)
-        # Regular 3D element or 2D interpolation embedded in 3D space
-        nentitydofs = ip_info.reference_dim == 3 ? ip_info.nedgedofs : ip_info.nfacedofs
-        nextdof = add_edge_dofs(
-            dh.cell_dofs, cell, edgedict,
-            nentitydofs, nextdof,
-            ip_info.adjust_during_distribution, ip_info.n_copies,
-        )
-    end
+    # Distribute dofs for edges 
+    nextdof = add_edge_dofs(
+        dh.cell_dofs, cell, edgedict,
+        ip_info.nedgedofs, nextdof,
+        ip_info.adjust_during_distribution, ip_info.n_copies,
+    )
 
-    # Distribute dofs for faces. Filter out 2D interpolations in 3D space, since
-    # they are added above as edge dofs.
-    if ip_info.reference_dim == sdim && sdim > 1
-        nextdof = add_face_dofs(
-            dh.cell_dofs, cell, facedict,
-            ip_info.nfacedofs, nextdof,
-            ip_info.adjust_during_distribution, ip_info.n_copies,
-        )
-    end
+    # Distribute dofs for faces. 
+    nextdof = add_face_dofs(
+        dh.cell_dofs, cell, facedict,
+        ip_info.nfacedofs, nextdof,
+        ip_info.adjust_during_distribution, ip_info.n_copies,
+    )
 
     # Distribute internal dofs for cells
-    nextdof = add_cell_dofs(
-        dh.cell_dofs, ip_info.ncelldofs, nextdof, ip_info.n_copies,
+    nextdof = add_volume_dofs(
+        dh.cell_dofs, ip_info.nvolumedofs, nextdof, ip_info.n_copies,
     )
 
     return nextdof
@@ -568,7 +562,7 @@ function add_face_dofs(cell_dofs::Vector{Int}, cell::AbstractCell, facedict::Dic
         sface, orientation = sortface(face)
         @debug println("\t\tface #$sface, $orientation")
         nextdof, dofs = get_or_create_dofs!(nextdof, nfacedofs[fi], n_copies, facedict, sface)
-        permute_and_push!(cell_dofs, dofs, orientation, adjust_during_distribution)
+        permute_and_push!(cell_dofs, dofs, orientation, adjust_during_distribution, getdim(cell)) # TODO: passing rdim of cell is temporary, simply to check if facedofs are internal to cell
         @debug println("\t\t\tadjusted dofs: $(cell_dofs[(end - nfacedofs[fi]*n_copies + 1):end])")
     end
     return nextdof
@@ -587,9 +581,9 @@ function add_edge_dofs(cell_dofs::Vector{Int}, cell::AbstractCell, edgedict::Dic
     return nextdof
 end
 
-function add_cell_dofs(cell_dofs::CD, ncelldofs::Int, nextdof::Int, n_copies::Int) where {CD}
-    @debug println("\t\tcelldofs #$nextdof:$(ncelldofs*n_copies-1)")
-    for _ in 1:ncelldofs, _ in 1:n_copies
+function add_volume_dofs(cell_dofs::CD, nvolumedofs::Int, nextdof::Int, n_copies::Int) where {CD}
+    @debug println("\t\tvolumedofs #$nextdof:$(nvolumedofs*n_copies-1)")
+    for _ in 1:nvolumedofs, _ in 1:n_copies
         push!(cell_dofs, nextdof)
         nextdof += 1
     end
@@ -681,8 +675,7 @@ Here the unique representation is the sorted node index tuple.
 Note that in 3D we only need indices to uniquely identify a face,
 so the unique representation is always a tuple length 3.
 """
-sortface(face::Tuple{Int,Int}) = sortedge(face) # Face in 2D is the same as edge in 3D.
-
+function sortface end 
 
 """
     sortface_fast(face::Tuple{Int})
@@ -695,7 +688,7 @@ Here the unique representation is the sorted node index tuple.
 Note that in 3D we only need indices to uniquely identify a face,
 so the unique representation is always a tuple length 3.
 """
-sortface_fast(face::Tuple{Int,Int}) = sortedge_fast(face) # Face in 2D is the same as edge in 3D.
+function sortface_fast end
 
 """
     !!!NOTE TODO implement me.
@@ -711,8 +704,8 @@ For more details we refer to [1] as we follow the methodology described therein.
 
     !!!TODO Investigate if we can somehow pass the interpolation into this function in a typestable way.
 """
-@inline function permute_and_push!(cell_dofs::Vector{Int}, dofs::StepRange{Int,Int}, orientation::SurfaceOrientationInfo, adjust_during_distribution::Bool)
-    if adjust_during_distribution && length(dofs) > 1
+@inline function permute_and_push!(cell_dofs::Vector{Int}, dofs::StepRange{Int,Int}, ::SurfaceOrientationInfo, adjust_during_distribution::Bool, rdim::Int)
+    if rdim==3 && adjust_during_distribution && length(dofs) > 1
         error("Dof distribution for interpolations with multiple dofs per face not implemented yet.")
     end
     n_copies = step(dofs)
@@ -767,8 +760,21 @@ function sortface_fast(face::Tuple{Int,Int,Int,Int})
 end
 
 
-sortface(face::Tuple{Int}) = face, nothing
-sortface_fast(face::Tuple{Int}) = face
+"""
+    sortfacet_fast(facet::NTuple{N, Int})
+
+Returns the unique representation of the `facet` by sorting its node indices. 
+Dispatches on `sortedges_fast` or `sortfaces_fast` depending on `N`
+"""
+function sortfacet_fast end 
+
+# Vertex
+sortfacet_fast(facet::Tuple{Int}) = facet
+# Edge 
+sortfacet_fast(facet::NTuple{2, Int}) = sortedge_fast(facet)
+# Face 
+sortfacet_fast(facet::NTuple{3, Int}) = sortface_fast(facet)
+sortfacet_fast(facet::NTuple{4, Int}) = sortface_fast(facet)
 
 """
     find_field(dh::DofHandler, field_name::Symbol)::NTuple{2,Int}
