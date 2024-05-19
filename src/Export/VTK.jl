@@ -367,13 +367,13 @@ function write_dirichlet(vtk, ch::ConstraintHandler)
 end
 
 """
-    write_cell_colors(vtk::VTKFile, grid::AbstractGrid, cell_colors, name="coloring")
+    write_cellcolors(vtk::VTKFile, grid::AbstractGrid, cell_colors, name="coloring")
 
 Write cell colors (see [`create_coloring`](@ref)) to a VTK file for visualization.
 
 In case of coloring a subset, the cells which are not part of the subset are represented as color 0.
 """
-function write_cell_colors(vtk, grid::AbstractGrid, cell_colors::AbstractVector{<:AbstractVector{<:Integer}}, name="coloring")
+function write_cellcolors(vtk, grid::AbstractGrid, cell_colors::AbstractVector{<:AbstractVector{<:Integer}}, name="coloring")
     color_vector = zeros(Int, getncells(grid))
     for (i, cells_color) in enumerate(cell_colors)
         for cell in cells_color
