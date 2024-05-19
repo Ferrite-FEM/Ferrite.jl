@@ -493,7 +493,7 @@ function topopt(ra,ρ,n,filename; output=:false)
             filename_it = string(filename, "_", i)
 
             VTKFile(filename_it, grid) do vtk
-                write_celldata(vtk, χ, "density")
+                write_cell_data(vtk, χ, "density")
             end
         end
     end
@@ -501,7 +501,7 @@ function topopt(ra,ρ,n,filename; output=:false)
     ## export converged results
     if(!output)
         VTKFile(filename, grid) do vtk
-            write_celldata(vtk, χ, "density")
+            write_cell_data(vtk, χ, "density")
         end
     end
     @printf "Rel. stiffness: %.4f \n" compliance^(-1)/compliance_0^(-1)

@@ -119,9 +119,9 @@ close(csio)
 
     filename_3d = "test_vtk_3d"
     VTKFile(filename_3d, grid) do vtk
-        write_nodedata(vtk, sym_tensor_data, "symmetric tensor")
-        write_nodedata(vtk, tensor_data, "tensor")
-        write_nodedata(vtk, vector_data, "vector")
+        write_node_data(vtk, sym_tensor_data, "symmetric tensor")
+        write_node_data(vtk, tensor_data, "tensor")
+        write_node_data(vtk, vector_data, "vector")
     end
 
     # 2D grid
@@ -134,10 +134,10 @@ close(csio)
 
     filename_2d = "test_vtk_2d"
     VTKFile(filename_2d, grid) do vtk
-        write_nodedata(vtk, sym_tensor_data, "symmetric tensor")
-        write_nodedata(vtk, tensor_data, "tensor")
-        write_nodedata(vtk, tensor_data_1D, "tensor_1d")
-        write_nodedata(vtk, vector_data, "vector")
+        write_node_data(vtk, sym_tensor_data, "symmetric tensor")
+        write_node_data(vtk, tensor_data, "tensor")
+        write_node_data(vtk, tensor_data_1D, "tensor_1d")
+        write_node_data(vtk, vector_data, "vector")
     end
 
     # test the shas of the files
@@ -719,10 +719,10 @@ end
             timesteps = 0:0.5:0.5
             for (n, t) in pairs(timesteps)
                 addstep!(pvd1, t) do io
-                    write_celldata(io, celldata*n, "celldata")
+                    write_cell_data(io, celldata*n, "celldata")
                 end
                 vtk = VTKFile(string(fname, "2_", n), grid)
-                write_celldata(vtk, celldata*n, "celldata")
+                write_cell_data(vtk, celldata*n, "celldata")
                 addstep!(pvd2, vtk, t)
                 @test !(isopen(vtk.vtk))
             end

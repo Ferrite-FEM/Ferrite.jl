@@ -18,7 +18,7 @@
             colors = create_coloring(grid)
             fname = joinpath(tmp, "colors")
             VTKFile(fname, grid) do vtk
-                Ferrite.write_cellcolors(vtk, grid, colors)
+                Ferrite.write_cell_colors(vtk, grid, colors)
             end
             @test bytes2hex(open(SHA.sha1, fname*".vtu")) == "b804d0b064121b672d8e35bcff8446eda361cac3"
         end

@@ -192,7 +192,7 @@ more discussion).
 
 - **VTK export**: Ferrite no longer extends methods from `WriteVTK.jl`, instead the new types 
   `VTKFile` and `VTKFileCollection` should be used instead. New methods exists for writing to 
-  a `VTKFile`, e.g. `write_solution`, `write_celldata`, `write_nodedata`, and `write_projection`.
+  a `VTKFile`, e.g. `write_solution`, `write_cell_data`, `write_node_data`, and `write_projection`.
   See [#692][github-692].
 
 ### Added

@@ -161,9 +161,9 @@ export
 # exporting data
     VTKFile,
     write_solution,
-    write_celldata,
+    write_cell_data,
     write_projection,
-    write_nodedata,
+    write_node_data,
     VTKFileCollection,
     addstep!,
     
