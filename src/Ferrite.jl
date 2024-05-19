@@ -12,6 +12,8 @@ using LinearAlgebra:
     pinv, tr
 using NearestNeighbors:
     NearestNeighbors, KDTree, knn
+using OrderedCollections:
+    OrderedSet
 using SparseArrays:
     SparseArrays, SparseMatrixCSC, nonzeros, nzrange, rowvals, sparse, spzeros
 using StaticArrays:
@@ -91,6 +93,9 @@ A `FacetIndex` wraps an (Int, Int) and defines a local facet by pointing to a (c
 struct FacetIndex <: BoundaryIndex
     idx::Tuple{Int,Int} # cell and side
 end
+
+const AbstractVecOrSet{T} = Union{AbstractSet{T}, AbstractVector{T}}
+const IntegerCollection = AbstractVecOrSet{<:Integer}
 
 include("utils.jl")
 

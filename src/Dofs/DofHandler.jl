@@ -15,7 +15,7 @@ get_grid(dh::AbstractDofHandler)
 struct SubDofHandler{DH} <: AbstractDofHandler
     # From constructor
     dh::DH
-    cellset::Set{Int}
+    cellset::OrderedSet{Int}
     # Populated in add!
     field_names::Vector{Symbol}
     field_interpolations::Vector{Interpolation}
@@ -26,7 +26,7 @@ struct SubDofHandler{DH} <: AbstractDofHandler
 end
 
 """
-    SubDofHandler(dh::AbstractDofHandler, cellset::Set{Int})
+    SubDofHandler(dh::AbstractDofHandler, cellset::AbstractVecOrSet{Int})
 
 Create an `sdh::SubDofHandler` from the parent `dh`, pertaining to the 
 cells in `cellset`. This allows you to add fields to parts of the domain, or using 
@@ -53,7 +53,7 @@ add!(sdh_quad, :u, ip_quad)
 close!(dh) # Finalize by closing the parent 
 ```
 """
-function SubDofHandler(dh::DH, cellset) where {DH <: AbstractDofHandler}
+function SubDofHandler(dh::DH, cellset::AbstractVecOrSet{Int}) where {DH <: AbstractDofHandler}
     # TODO: Should be an inner constructor.
     isclosed(dh) && error("DofHandler already closed")
     # Compute the celltype and make sure all elements have the same one
@@ -68,7 +68,7 @@ function SubDofHandler(dh::DH, cellset) where {DH <: AbstractDofHandler}
         end
     end
     # Construct and insert into the parent dh
-    sdh = SubDofHandler{typeof(dh)}(dh, cellset, Symbol[], Interpolation[], Int[], ScalarWrapper(-1))
+    sdh = SubDofHandler{typeof(dh)}(dh, convert_to_orderedset(cellset), Symbol[], Interpolation[], Int[], ScalarWrapper(-1))
     push!(dh.subdofhandlers, sdh)
     return sdh
 end
@@ -298,7 +298,7 @@ function add!(dh::DofHandler, name::Symbol, ip::Interpolation)
     @assert isconcretetype(celltype)
     if isempty(dh.subdofhandlers)
         # Create a new SubDofHandler for all cells
-        sdh = SubDofHandler(dh, Set(1:getncells(get_grid(dh))))
+        sdh = SubDofHandler(dh, OrderedSet(1:getncells(get_grid(dh))))
     elseif length(dh.subdofhandlers) == 1
         # Add to existing SubDofHandler (if it covers all cells)
         sdh = dh.subdofhandlers[1]
@@ -437,8 +437,7 @@ function _close_subdofhandler!(dh::DofHandler{sdim}, sdh::SubDofHandler, sdh_ind
     global_fidxs = Int[findfirst(gname -> gname === lname, dh.field_names) for lname in sdh.field_names]
 
     # loop over all the cells, and distribute dofs for all the fields
-    # TODO: Remove BitSet construction when SubDofHandler ensures sorted collections
-    for ci in BitSet(sdh.cellset)
+    for ci in sdh.cellset
         @debug println("Creating dofs for cell #$ci")
 
         # TODO: _check_cellset_intersections can be removed in favor of this assertion

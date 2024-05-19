@@ -32,7 +32,7 @@ function test_1d_bar_beam()
     sdh1 = SubDofHandler(dh, Set(3))
     add!(sdh1, :u, ip^2)
     add!(sdh1, :θ, ip)
-    sdh2 = SubDofHandler(dh, Set((1,2)))
+    sdh2 = SubDofHandler(dh, OrderedSet((1,2)))
     add!(sdh2, :u, ip^2)
     close!(dh)
     @test ndofs(dh) == 8
@@ -386,7 +386,7 @@ function test_element_order()
 
     dh = DofHandler(grid);
     # Note the jump in cell numbers
-    sdh_tri = SubDofHandler(dh, Set((1,3)))
+    sdh_tri = SubDofHandler(dh, OrderedSet((1,3)))
     add!(sdh_tri, :u, Lagrange{RefTriangle,1}()^2)
     sdh_quad = SubDofHandler(dh, Set(2))
     add!(sdh_quad, :u, Lagrange{RefQuadrilateral,1}()^2)
@@ -447,8 +447,8 @@ function test_evaluate_at_grid_nodes()
     Triangle((3,4,6)),
     Triangle((3,6,5))]
     mesh = Grid(cells, nodes)
-    addcellset!(mesh, "quads", Set{Int}((1,)))
-    addcellset!(mesh, "tris", Set{Int}((2, 3)))
+    addcellset!(mesh, "quads", Set((1,)))
+    addcellset!(mesh, "tris", OrderedSet((2, 3)))
 
     ip_quad = Lagrange{RefQuadrilateral,1}()
     ip_tri = Lagrange{RefTriangle,1}()
@@ -554,8 +554,8 @@ function test_separate_fields_on_separate_domains()
             Triangle((3,4,5)),
             Triangle((4,6,5))]
     mesh = Grid(cells, nodes)
-    addcellset!(mesh, "quads", Set{Int}((1,)))
-    addcellset!(mesh, "tris", Set{Int}((2, 3)))
+    addcellset!(mesh, "quads", Set((1,)))
+    addcellset!(mesh, "tris", OrderedSet((2, 3)))
 
     ip_tri = Lagrange{RefTriangle,1}()
     ip_quad = Lagrange{RefQuadrilateral,1}()
@@ -578,8 +578,8 @@ end
 
 function test_unique_cellsets()
     grid = generate_grid(Quadrilateral, (2, 1))
-    set_u = Set(1:2)
-    set_v = Set(1:1)
+    set_u = OrderedSet(1:2)
+    set_v = OrderedSet(1:1)
 
     ip = Lagrange{RefQuadrilateral,1}()
 

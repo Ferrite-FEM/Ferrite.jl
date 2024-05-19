@@ -99,7 +99,7 @@
 using Ferrite, FerriteMeshParser, Tensors
 
 # Temporary overload
-function FerriteMeshParser.create_faceset(grid::Grid, nodeset::Set{Int}, cellset=1:getncells(grid))
+function FerriteMeshParser.create_faceset(grid::Grid, nodeset::Ferrite.OrderedSet{Int}, cellset=1:getncells(grid))
     faceset = sizehint!(Set{FaceIndex}(), length(nodeset))
     for (cellid, cell) in enumerate(getcells(grid))
         cellid ∈ cellset || continue

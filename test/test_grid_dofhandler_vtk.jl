@@ -188,9 +188,9 @@ end
     # FacetCache
     grid = generate_grid(Triangle, (3,3))
     fc = FacetCache(grid)
-    faceindex = first(getfacetset(grid, "left"))
-    cell_id, face_id = faceindex
-    reinit!(fc, faceindex)
+    facetindex = first(getfacetset(grid, "left"))
+    cell_id, facet_id = facetindex
+    reinit!(fc, facetindex)
     # @test Ferrite.faceindex(fc) == faceindex
     @test cellid(fc) == cell_id
     # @test Ferrite.faceid(fc) == face_id
@@ -205,11 +205,11 @@ end
         fqr = FacetQuadratureRule{Ferrite.RefHypercube{dim}}(2)
         fv = FacetValues(fqr, ip)
         dh = DofHandler(grid); add!(dh, :u, ip); close!(dh)
-        faceset = getfacetset(grid, "right")
+        facetset = getfacetset(grid, "right")
         for dh_or_grid in (grid, dh)
-            @test first(FacetIterator(dh_or_grid, faceset)) isa FacetCache
+            @test first(FacetIterator(dh_or_grid, facetset)) isa FacetCache
             area = 0.0
-            for face in FacetIterator(dh_or_grid, faceset)
+            for face in FacetIterator(dh_or_grid, facetset)
                 reinit!(fv, face)
                 for q_point in 1:getnquadpoints(fv)
                     area += getdetJdV(fv, q_point)
@@ -252,12 +252,12 @@ end
     mixed_grid = Grid([Quadrilateral((1, 2, 3, 4)),Triangle((3, 2, 5))],
                       [Node(coord) for coord in zeros(Vec{2,Float64}, 5)])
     cellset = Set(1:getncells(mixed_grid))
-    faceset = Set(FaceIndex(i, 1) for i in 1:getncells(mixed_grid))
+    facetset = Set(FacetIndex(i, 1) for i in 1:getncells(mixed_grid))
     @test_throws ErrorException Ferrite._check_same_celltype(mixed_grid, cellset)
-    @test_throws ErrorException Ferrite._check_same_celltype(mixed_grid, faceset)
+    @test_throws ErrorException Ferrite._check_same_celltype(mixed_grid, facetset)
     std_grid = generate_grid(Quadrilateral, (getncells(mixed_grid),1))
     @test Ferrite._check_same_celltype(std_grid, cellset) === nothing
-    @test Ferrite._check_same_celltype(std_grid, faceset) === nothing
+    @test Ferrite._check_same_celltype(std_grid, facetset) === nothing
 end
 
 @testset "Grid sets" begin
