@@ -1,6 +1,4 @@
-
-@testset "VTKFile" begin
-    #TODO: Move all vtk tests here 
+@testset "VTKFile" begin #TODO: Move all vtk tests here 
     @testset "show(::VTKFile)" begin
         mktempdir() do tmp    
             grid = generate_grid(Quadrilateral, (2,2))
