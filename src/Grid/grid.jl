@@ -466,8 +466,6 @@ Returns all vertex sets of the grid.
 """
 @inline getvertexsets(grid::AbstractGrid) = grid.vertexsets
 
-n_facets_per_cell(grid::Grid) = nfacets(getcelltype(grid)) # TODO: Not used, remove?
-
 # Transformations
 """
     transform_coordinates!(grid::Abstractgrid, f::Function)
