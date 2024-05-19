@@ -97,6 +97,23 @@
 # 
 # Required packages
 using Ferrite, FerriteMeshParser, Tensors
+
+# Temporary overload
+function FerriteMeshParser.create_faceset(grid::Grid, nodeset::Set{Int}, cellset=1:getncells(grid))
+    faceset = sizehint!(Set{FaceIndex}(), length(nodeset))
+    for (cellid, cell) in enumerate(getcells(grid))
+        cellid ∈ cellset || continue
+        if any(n-> n ∈ nodeset, cell.nodes)
+            for (faceid, face) in enumerate(Ferrite.facets(cell))
+                if all(n -> n ∈ nodeset, face)
+                    push!(faceset, FaceIndex(cellid, faceid))
+                end
+            end
+        end
+    end
+    return faceset
+end
+
 #
 # ### Elasticity
 # We start by defining the elastic material type, containing the elastic stiffness,
@@ -315,13 +332,13 @@ function setup_problem(;t_rise=0.1, u_max=-0.1)
     ## Boundary conditions
     ## Sliding for u, except top which is compressed 
     ## Sealed for p, except top with prescribed zero pressure 
-    addfaceset!(dh.grid, "sides", x -> x[1] < 1e-6 || x[1] ≈ 5.0)
-    addfaceset!(dh.grid, "top", x -> x[2]≈10.0)
+    addfacetset!(dh.grid, "sides", x -> x[1] < 1e-6 || x[1] ≈ 5.0)
+    addfacetset!(dh.grid, "top", x -> x[2]≈10.0)
     ch = ConstraintHandler(dh);
-    add!(ch, Dirichlet(:u, getfaceset(grid, "bottom"), (x, t) -> zero(Vec{1}), [2]))
-    add!(ch, Dirichlet(:u, getfaceset(grid, "sides"), (x, t) -> zero(Vec{1}), [1]))
-    add!(ch, Dirichlet(:u, getfaceset(grid, "top"), (x, t) -> u_max*clamp(t/t_rise, 0, 1), [2]))
-    add!(ch, Dirichlet(:p, getfaceset(grid, "top_p"), (x, t) -> 0.0))
+    add!(ch, Dirichlet(:u, getfacetset(grid, "bottom"), (x, t) -> zero(Vec{1}), [2]))
+    add!(ch, Dirichlet(:u, getfacetset(grid, "sides"), (x, t) -> zero(Vec{1}), [1]))
+    add!(ch, Dirichlet(:u, getfacetset(grid, "top"), (x, t) -> u_max*clamp(t/t_rise, 0, 1), [2]))
+    add!(ch, Dirichlet(:p, getfacetset(grid, "top_p"), (x, t) -> 0.0))
     close!(ch)
 
     return dh, ch, domains

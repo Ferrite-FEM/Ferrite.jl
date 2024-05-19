@@ -193,6 +193,21 @@ using Test #src
 # the [`FerriteGmsh`](https://github.com/Ferrite-FEM/FerriteGmsh.jl) package:
 
 using FerriteGmsh
+
+# Overload for specific elements in this tutorial.
+function FerriteGmsh.tofacesets(boundarydict::Dict{String,Vector}, elements::Vector{Triangle})
+    faces = Ferrite.facets.(elements)
+    facesets = Dict{String,Set{FaceIndex}}()
+    for (boundaryname, boundaryfaces) in boundarydict
+        facesettuple = Set{FaceIndex}()
+        for boundaryface in boundaryfaces
+            FerriteGmsh._add_to_facesettuple!(facesettuple, boundaryface, faces)
+        end
+        facesets[boundaryname] = facesettuple
+    end
+    return facesets
+end
+
 #src notebook: use coarse mesh to decrease build time
 #src   script: use the fine mesh
 #src markdown: use the coarse mesh to decrease build time, but make it look like the fine
@@ -231,7 +246,7 @@ close!(dh);
 ch_dirichlet = ConstraintHandler(dh)
 dirichlet = Dirichlet(
     :u,
-    union(getfaceset.(Ref(grid), ["left", "right", "top", "bottom"])...),
+    union(getfacetset.(Ref(grid), ["left", "right", "top", "bottom"])...),
     (x, t) ->  [0, 0],
     [1, 2]
 )

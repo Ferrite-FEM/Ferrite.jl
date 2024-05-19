@@ -12,10 +12,10 @@ using Ferrite, BlockArrays, SparseArrays, Test
     nd = ndofs(dh) ÷ 3
 
     ch = ConstraintHandler(dh)
-    periodic_faces = collect_periodic_faces(grid, "top", "bottom")
+    periodic_faces = collect_periodic_facets(grid, "top", "bottom")
     add!(ch, PeriodicDirichlet(:u, periodic_faces))
-    add!(ch, Dirichlet(:u, union(getfaceset(grid, "left"), getfaceset(grid, "top")), (x, t) -> [0, 0]))
-    add!(ch, Dirichlet(:p, getfaceset(grid, "left"), (x, t) -> 0))
+    add!(ch, Dirichlet(:u, union(getfacetset(grid, "left"), getfacetset(grid, "top")), (x, t) -> [0, 0]))
+    add!(ch, Dirichlet(:p, getfacetset(grid, "left"), (x, t) -> 0))
     close!(ch)
     update!(ch, 0)
 

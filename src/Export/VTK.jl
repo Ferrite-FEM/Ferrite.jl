@@ -344,17 +344,17 @@ function write_dirichlet(vtk, ch::ConstraintHandler)
         data = zeros(Float64, nd, getnnodes(get_grid(ch.dh)))
         for dbc in ch.dbcs
             dbc.field_name != field && continue
-            if eltype(dbc.faces) <: BoundaryIndex
-                functype = boundaryfunction(eltype(dbc.faces))
-                for (cellidx, faceidx) in dbc.faces
-                    for facenode in functype(getcells(get_grid(ch.dh), cellidx))[faceidx]
+            if eltype(dbc.facets) <: BoundaryIndex
+                functype = boundaryfunction(eltype(dbc.facets))
+                for (cellidx, facetidx) in dbc.facets
+                    for facetnode in functype(getcells(get_grid(ch.dh), cellidx))[facetidx]
                         for component in dbc.components
-                            data[component, facenode] = 1
+                            data[component, facetnode] = 1
                         end
                     end
                 end
             else
-                for nodeidx in dbc.faces
+                for nodeidx in dbc.facets
                     for component in dbc.components
                         data[component, nodeidx] = 1
                     end

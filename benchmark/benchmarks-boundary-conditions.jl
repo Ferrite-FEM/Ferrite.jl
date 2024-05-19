@@ -25,7 +25,7 @@ for spatial_dim ∈ [2]
     close!(dh);
 
     ch = ConstraintHandler(dh);
-    ∂Ω = union(getfaceset.((grid, ), ["left"])...);
+    ∂Ω = union(getfacetset.((grid, ), ["left"])...);
     dbc = Dirichlet(:u, ∂Ω, (x, t) -> 0)
     add!(ch, dbc);
     close!(ch);
