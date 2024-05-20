@@ -92,7 +92,6 @@ export
     get_node_coordinate,
     getcoordinates,
     getcoordinates!,
-    onboundary,
     nfacets,
     addnodeset!,
     addfacetset!,

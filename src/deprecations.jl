@@ -364,3 +364,8 @@ function addfaceset!(grid, name, f::Function; kwargs...)
     @warn "addfaceset! is deprecated, using addfacetset! instead"
     return addfacetset!(grid, name, f; kwargs...)
 end
+
+export onboundary
+function onboundary(::CellCache, ::Int)
+    error("`onboundary` is deprecated, check just the facetset instead of first checking `onboundary`.")
+end

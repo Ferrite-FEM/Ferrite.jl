@@ -101,4 +101,11 @@ end
     @test_throws ErrorException vtk_grid("old", generate_grid(Line, (1,)))
 end
 
+@testset "onboundary" begin
+    msg = "`onboundary` is deprecated, check just the facetset instead of first checking `onboundary`."
+    @test_throws ErrorException(msg) onboundary(first(CellIterator(generate_grid(Line, (2,)))), 1)
+    msg = "`boundary_matrix` is not part of the Grid anymore and thus not a supported keyword argument."
+    @test_throws ErrorException(msg) Grid(Triangle[], Node{2,Float64}[]; boundary_matrix = something)
+end
+
 end # testset deprecations
