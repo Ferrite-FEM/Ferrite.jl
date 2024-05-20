@@ -187,24 +187,10 @@ function ExclusiveTopology(cells::Vector{C}) where C <: AbstractCell
     end
 
     # Setup matrices
-    vertex_table = Matrix{EntityNeighborhood{VertexIndex}}(undef, length(cells), max_vertices)
-    for j = 1:size(vertex_table,2)
-        for i = 1:size(vertex_table,1)
-            vertex_table[i,j] = EntityNeighborhood{VertexIndex}(VertexIndex[])
-        end
-    end
-    face_table   = Matrix{EntityNeighborhood{FaceIndex}}(undef, length(cells), max_faces)
-    for j = 1:size(face_table,2)
-        for i = 1:size(face_table,1)
-            face_table[i,j] = EntityNeighborhood{FaceIndex}(FaceIndex[])
-        end
-    end
-    edge_table   = Matrix{EntityNeighborhood{EdgeIndex}}(undef, length(cells), max_edges)
-    for j = 1:size(edge_table,2)
-        for i = 1:size(edge_table,1)
-            edge_table[i,j] = EntityNeighborhood{EdgeIndex}(EdgeIndex[])
-        end
-    end
+    vertex_table = [EntityNeighborhood{VertexIndex}(VertexIndex[]) for _ in 1:length(cells), _ in 1:max_vertices]
+    edge_table   = [EntityNeighborhood{EdgeIndex  }(EdgeIndex[]  ) for _ in 1:length(cells), _ in 1:max_edges]
+    face_table   = [EntityNeighborhood{FaceIndex  }(FaceIndex[]  ) for _ in 1:length(cells), _ in 1:max_faces]
+
     cell_neighbor_table = Vector{EntityNeighborhood{CellIndex}}(undef, length(cells))
 
     _exclusive_topology_ctor(cells, vertex_cell_table, vertex_table, face_table, edge_table, cell_neighbor_table)
