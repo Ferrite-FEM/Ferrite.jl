@@ -107,9 +107,10 @@ function _num_shared_vertices(cell_a::C1, cell_b::C2) where {C1, C2}
 end
 
 function _exclusive_topology_ctor(cells::Vector{C}, vertex_cell_table::Array{Set{Int}}, vertex_table, face_table, edge_table, cell_neighbor_table) where C <: AbstractCell
+    cell_neighbor_ids = Set{Int}()
     for (cell_id, cell) in enumerate(cells)
         # Gather all cells which are connected via vertices
-        cell_neighbor_ids = Set{Int}()
+        empty!(cell_neighbor_ids)
         for vertex ∈ vertices(cell)
             for vertex_cell_id ∈ vertex_cell_table[vertex]
                 if vertex_cell_id != cell_id
@@ -117,7 +118,7 @@ function _exclusive_topology_ctor(cells::Vector{C}, vertex_cell_table::Array{Set
                 end
             end
         end
-        cell_neighbor_table[cell_id] = EntityNeighborhood(CellIndex.(collect(cell_neighbor_ids)))
+        cell_neighbor_table[cell_id] = EntityNeighborhood([CellIndex(cell_id) for cell_id in cell_neighbor_ids])
 
         # Any of the neighbors is now sorted in the respective categories
         for cell_neighbor_id ∈ cell_neighbor_ids
