@@ -679,3 +679,78 @@ end
     K_default = create_sparsity_pattern(dh)
     @test K == K_cont == K_default
 end
+
+
+@testset "shell on solid face" begin
+
+    # Node numbering:
+    # 3 ____ 4  4
+    # |      |  |   
+    # |      |  | (Beam attached to facet)    
+    # 1 ____ 2  2
+
+    dim = 2
+    grid = generate_grid(Quadrilateral, (1,1))
+    line1 = Line((2,4))
+    grid = Grid([grid.cells[1], line1], grid.nodes)
+
+    order = 2
+    ip_solid = Lagrange{RefQuadrilateral, order}()#^dim
+    ip_shell = Lagrange{RefLine, order}()
+
+    dh = DofHandler(grid)
+    sdh_solid = SubDofHandler(dh, Set(1))
+    add!(sdh_solid, :u, ip_solid)
+    sdh_shell = SubDofHandler(dh, Set(2))
+    add!(sdh_shell, :u, ip_shell)
+    close!(dh)
+
+    dofsquad = zeros(Int, ndofs_per_cell(dh, 1))
+    dofsbeam = zeros(Int, ndofs_per_cell(dh, 2))
+
+    celldofs!(dofsquad, dh, 1)
+    celldofs!(dofsbeam, dh, 2)
+    @test dofsbeam == [2, 3, 6]
+
+    # Node numbering:           
+    #            5--------7
+    #           /        /|
+    #          /        / |
+    #         6--------8  |
+    #         |        |  3   <-- Shell attached on face (4, 3, 7, 8)
+    #         |        | / 
+    #         |        |/  
+    #         2--------4   
+
+    dim = 2
+    grid = generate_grid(Hexahedron, (1,1,1))
+    shell = Quadrilateral((4,3,7,8))
+    grid = Grid([grid.cells[1], shell], grid.nodes)
+
+    order = 2
+    ip_solid = Lagrange{RefHexahedron, order}()#^dim
+    ip_shell = Lagrange{RefQuadrilateral, order}()
+
+    dh = DofHandler(grid)
+    sdh_solid = SubDofHandler(dh, Set(1))
+    add!(sdh_solid, :u, ip_solid)
+    sdh_shell = SubDofHandler(dh, Set(2))
+    add!(sdh_shell, :u, ip_shell)
+    Ferrite.close!(dh)
+
+    dofsolid = zeros(Int, ndofs_per_cell(dh, 1))
+    dofsshell = zeros(Int, ndofs_per_cell(dh, 2))
+
+    celldofs!(dofsolid, dh, 1)
+    celldofs!(dofsshell, dh, 2)
+
+    #Would be nice to have this utility:
+    #facedofs!(dofs, dh, FaceIndex(1,4))
+
+    #Shared node dofs
+    @test dofsshell[1:4] == [3,4,8,7]
+    #Shared edge dofs
+    @test dofsshell[5:8] == [11,20,15,19]
+    #Shared face dof
+    @test dofsshell[9] == 24
+end
