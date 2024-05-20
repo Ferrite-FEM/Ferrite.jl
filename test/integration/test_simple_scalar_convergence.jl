@@ -102,7 +102,7 @@ function check_and_compute_convergence_norms(dh, u, cellvalues, testatol)
             ∇uₐₙₐ    = gradient(x-> prod(cos, x*π/2), x)
             ∇uₐₚₚᵣₒₓ = function_gradient(cellvalues, q_point, uₑ)
             ∇L2norm += norm(∇uₐₙₐ-∇uₐₚₚᵣₒₓ)^2*dΩ
-            
+
             # Pointwise convergence
             @test uₐₙₐ ≈ uₐₚₚᵣₒₓ atol=testatol
         end
@@ -198,7 +198,7 @@ end
         dh, ch, cellvalues = ConvergenceTestHelper.setup_poisson_problem(grid, interpolation, interpolation_geo, qr)
         u = ConvergenceTestHelper.solve(dh, ch, cellvalues)
         L2₁, H1₁, _ = ConvergenceTestHelper.check_and_compute_convergence_norms(dh, u, cellvalues, 1e-2)
-        
+
         # "Fine case"
         N₂ = 2*N₁
         grid = generate_grid(geometry, ntuple(x->N₂, getdim(geometry)));

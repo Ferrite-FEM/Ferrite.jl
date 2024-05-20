@@ -217,7 +217,7 @@ function generate_grid(::Type{Hexahedron}, nel::NTuple{3,Int}, left::Vec{3,T}=Ve
     foreach(s -> sort!(s, by = x -> x.idx), values(facetsets))
 
     return Grid(cells, nodes, facetsets=facetsets)
-end 
+end
 
 # Wedge
 function generate_grid(::Type{Wedge}, nel::NTuple{3,Int}, left::Vec{3,T}=Vec{3}((-1.0,-1.0,-1.0)), right::Vec{3,T}=Vec{3}((1.0,1.0,1.0))) where {T}
@@ -238,9 +238,9 @@ function generate_grid(::Type{Wedge}, nel::NTuple{3,Int}, left::Vec{3,T}=Vec{3}(
     node_array = reshape(collect(1:n_nodes), (n_nodes_x, n_nodes_y, n_nodes_z))
     cells = Wedge[]
     for k in 1:nel_z, j in 1:nel_y, i in 1:nel_x
-        push!(cells, Wedge((node_array[i,j,k], node_array[i+1,j,k], node_array[i,j+1,k], 
+        push!(cells, Wedge((node_array[i,j,k], node_array[i+1,j,k], node_array[i,j+1,k],
                             node_array[i,j,k+1], node_array[i+1,j,k+1], node_array[i,j+1,k+1]))) # ◺
-        push!(cells, Wedge((node_array[i+1,j,k], node_array[i+1,j+1,k], node_array[i,j+1,k], 
+        push!(cells, Wedge((node_array[i+1,j,k], node_array[i+1,j+1,k], node_array[i,j+1,k],
                             node_array[i+1,j,k+1], node_array[i+1,j+1,k+1], node_array[i,j+1,k+1]))) # ◹
     end
 
@@ -249,7 +249,7 @@ function generate_grid(::Type{Wedge}, nel::NTuple{3,Int}, left::Vec{3,T}=Vec{3}(
 
     @views le = map(x -> FacetIndex(x,3), c_nxyz[1,   1, :, :][:])
     @views ri = map(x -> FacetIndex(x,2), c_nxyz[2, end, :, :][:])
-    @views fr = map(x -> FacetIndex(x,2), c_nxyz[1, :, 1, :][:])  
+    @views fr = map(x -> FacetIndex(x,2), c_nxyz[1, :, 1, :][:])
     @views ba = map(x -> FacetIndex(x,4), c_nxyz[2, :, end, :][:])
     @views bo = [map(x -> FacetIndex(x,1), c_nxyz[1, :, :, 1][:])   ; map(x -> FacetIndex(x,1), c_nxyz[2, :, :, 1][:])]
     @views to = [map(x -> FacetIndex(x,5), c_nxyz[1, :, :, end][:]) ; map(x -> FacetIndex(x,5), c_nxyz[2, :, :, end][:])]
@@ -265,7 +265,7 @@ function generate_grid(::Type{Wedge}, nel::NTuple{3,Int}, left::Vec{3,T}=Vec{3}(
     foreach(s -> sort!(s, by = x -> x.idx), values(facetsets))
 
     return Grid(cells, nodes, facetsets=facetsets)
-end 
+end
 
 #Pyramid
 function generate_grid(::Type{Pyramid}, nel::NTuple{3,Int}, left::Vec{3,T}=Vec{3}((-1.0,-1.0,-1.0)), right::Vec{3,T}=Vec{3}((1.0,1.0,1.0))) where {T}
@@ -288,20 +288,20 @@ function generate_grid(::Type{Pyramid}, nel::NTuple{3,Int}, left::Vec{3,T}=Vec{3
         midy = 0.5(coords_y[j+1] + coords_y[j])
         midz = 0.5(coords_z[k+1] + coords_z[k])
         push!(nodes, Node((midx, midy, midz)))
-    end 
+    end
 
     # Generate cells
     node_array = reshape(collect(1:n_nodes), (n_nodes_x, n_nodes_y, n_nodes_z))
     cells = Pyramid[]
-    midnodecounter = n_nodes_x*n_nodes_y*n_nodes_z 
+    midnodecounter = n_nodes_x*n_nodes_y*n_nodes_z
     for k in 1:nel_z, j in 1:nel_y, i in 1:nel_x
         midnodecounter += 1
         pyramid1 = Pyramid((node_array[i,j,k], node_array[i+1,j,k], node_array[i,j+1,k], node_array[i+1,j+1,k], midnodecounter )) # bottom
-        pyramid2 = Pyramid((node_array[i,j,k], node_array[i,j,k+1], node_array[i+1,j,k], node_array[i+1,j,k+1], midnodecounter )) # front 
+        pyramid2 = Pyramid((node_array[i,j,k], node_array[i,j,k+1], node_array[i+1,j,k], node_array[i+1,j,k+1], midnodecounter )) # front
         pyramid3 = Pyramid((node_array[i+1,j,k], node_array[i+1,j,k+1], node_array[i+1,j+1,k], node_array[i+1,j+1,k+1], midnodecounter )) # right
         pyramid4 = Pyramid((node_array[i,j+1,k], node_array[i+1,j+1,k], node_array[i,j+1,k+1], node_array[i+1,j+1,k+1], midnodecounter )) # back
-        pyramid5 = Pyramid((node_array[i,j,k], node_array[i,j+1,k], node_array[i,j,k+1], node_array[i,j+1,k+1], midnodecounter )) # left 
-        pyramid6 = Pyramid((node_array[i,j,k+1], node_array[i,j+1,k+1], node_array[i+1,j,k+1], node_array[i+1,j+1,k+1], midnodecounter )) # top 
+        pyramid5 = Pyramid((node_array[i,j,k], node_array[i,j+1,k], node_array[i,j,k+1], node_array[i,j+1,k+1], midnodecounter )) # left
+        pyramid6 = Pyramid((node_array[i,j,k+1], node_array[i,j+1,k+1], node_array[i+1,j,k+1], node_array[i+1,j+1,k+1], midnodecounter )) # top
         push!(cells, pyramid1, pyramid2, pyramid3, pyramid4, pyramid5, pyramid6)
     end
 
@@ -311,9 +311,9 @@ function generate_grid(::Type{Pyramid}, nel::NTuple{3,Int}, left::Vec{3,T}=Vec{3
 
     @views le = map(x -> FacetIndex(x,1), c_nxyz[5,   1, :, :][:])
     @views ri = map(x -> FacetIndex(x,1), c_nxyz[3, end, :, :][:])
-    @views fr = map(x -> FacetIndex(x,1), c_nxyz[2, :, 1, :][:])  
+    @views fr = map(x -> FacetIndex(x,1), c_nxyz[2, :, 1, :][:])
     @views ba = map(x -> FacetIndex(x,1), c_nxyz[4, :, end, :][:])
-    @views bo = map(x -> FacetIndex(x,1), c_nxyz[1, :, :, 1][:]) 
+    @views bo = map(x -> FacetIndex(x,1), c_nxyz[1, :, :, 1][:])
     @views to = map(x -> FacetIndex(x,1), c_nxyz[6, :, :, end][:])
 
     facetsets = Dict(
@@ -327,7 +327,7 @@ function generate_grid(::Type{Pyramid}, nel::NTuple{3,Int}, left::Vec{3,T}=Vec{3
     foreach(s -> sort!(s, by = x -> x.idx), values(facetsets))
 
     return Grid(cells, nodes, facetsets=facetsets)
-end 
+end
 
 function Ferrite.generate_grid(::Type{SerendipityQuadraticHexahedron}, nel::NTuple{3,Int}, left::Vec{3,T}=Vec{3}((-1.0,-1.0,-1.0)), right::Vec{3,T}=Vec{3}((1.0,1.0,1.0))) where {T}
     nel_x = nel[1]; nel_y = nel[2]; nel_z = nel[3]; nel_tot = nel_x*nel_y*nel_z
@@ -353,9 +353,9 @@ function Ferrite.generate_grid(::Type{SerendipityQuadraticHexahedron}, nel::NTup
 
     # Generate cells
     cells = SerendipityQuadraticHexahedron[]
-    for k in 1:2:2nel_z, j in 1:2:2nel_y, i in 1:2:2nel_x     
+    for k in 1:2:2nel_z, j in 1:2:2nel_y, i in 1:2:2nel_x
         push!(cells, SerendipityQuadraticHexahedron((
-                node_array[i,j,k], node_array[i+2,j,k], node_array[i+2,j+2,k], node_array[i,j+2,k], # vertices bot 
+                node_array[i,j,k], node_array[i+2,j,k], node_array[i+2,j+2,k], node_array[i,j+2,k], # vertices bot
                 node_array[i,j,k+2], node_array[i+2,j,k+2], node_array[i+2,j+2,k+2], node_array[i,j+2,k+2], # vertices top
                 node_array[i+1,j,k], node_array[i+2,j+1,k], node_array[i+1,j+2,k], node_array[i,j+1,k], # edges horizontal bottom
                 node_array[i+1,j,k+2], node_array[i+2,j+1,k+2], node_array[i+1,j+2,k+2], node_array[i,j+1,k+2], # edges horizontal top
@@ -383,7 +383,7 @@ function Ferrite.generate_grid(::Type{SerendipityQuadraticHexahedron}, nel::NTup
     facetsets["top"]    = OrderedSet{FacetIndex}(boundary[(1:length(cell_array[:,:,end][:])) .+ offset]); offset += length(cell_array[:,:,end][:])
     foreach(s -> sort!(s, by = x -> x.idx), values(facetsets))
 
-    return Grid(cells, nodes, facetsets=facetsets)   
+    return Grid(cells, nodes, facetsets=facetsets)
 end
 
 # Triangle

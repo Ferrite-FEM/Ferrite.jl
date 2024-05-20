@@ -110,7 +110,7 @@ function test_2d_mixed_1_el()
     @test ndofs(dh) == 12
     @test ndofs_per_cell(dh, 1) == 12
     @test celldofs(dh, 1) == [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
-    
+
     @test Set(Ferrite.getfieldnames(dh)) == Set(Ferrite.getfieldnames(dh.subdofhandlers[1]))
 end
 
@@ -430,12 +430,12 @@ end
 function test_evaluate_at_grid_nodes()
 
     # 5_______6
-    # |\      | 
+    # |\      |
     # |   \   |
     # 3______\4
     # |       |
     # |       |
-    # 1_______2 
+    # 1_______2
 
     nodes = [Node((0.0, 0.0)),
     Node((1.0, 0.0)),
@@ -481,16 +481,16 @@ function test_mixed_grid_show()
     @test occursin("2 Quadrilateral/Triangle cells", str)
 end
 
-# regression tests for https://github.com/KristofferC/JuAFEM.jl/issues/315 
+# regression tests for https://github.com/KristofferC/JuAFEM.jl/issues/315
 function test_subparametric_quad()
     #linear geometry
     grid = generate_grid(Quadrilateral, (1,1))
     ip      = Lagrange{RefQuadrilateral,2}()
-    
+
     dh = DofHandler(grid)
     add!(dh, :u, ip^2)
     close!(dh)
-    
+
     ch = ConstraintHandler(dh)
     dbc1 = Dirichlet(:u, getfacetset(grid, "left"), (x, t) -> 0.0, 2)
     add!(ch, dbc1)
@@ -505,11 +505,11 @@ function test_subparametric_triangle()
     grid = generate_grid(Triangle, (1,1))
 
     ip = Lagrange{RefTriangle,2}()
-    
+
     dh = DofHandler(grid)
     add!(dh, :u, ip^2)
     close!(dh)
-    
+
     ch = ConstraintHandler(dh)
     dbc1 = Dirichlet(:u, getfacetset(grid, "left"), (x, t) -> 0.0, 2)
     add!(ch, dbc1)
@@ -537,12 +537,12 @@ end
 
 function test_separate_fields_on_separate_domains()
     # 5_______6
-    # |\      | 
+    # |\      |
     # |   \   |
     # 3______\4
     # |       |
     # |       |
-    # 1_______2 
+    # 1_______2
     # Given: a vector field :q defined on the quad and a scalar field :t defined on the triangles
     nodes = [Node((0.0, 0.0)),
             Node((1.0, 0.0)),
@@ -640,7 +640,7 @@ function test_vtk_export()
     end
     sha = bytes2hex(open(SHA.sha1, filename*".vtu"))
     @test sha == "339ab8a8a613c2f38af684cccd695ae816671607"
-    rm(filename*".vtu") # clean up 
+    rm(filename*".vtu") # clean up
 end
 
 @testset "DofHandler" begin

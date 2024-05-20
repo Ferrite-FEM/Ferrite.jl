@@ -137,16 +137,16 @@ function dofhandler2(;three_dimensional=true)
         ip_f = Lagrange{RefHexahedron,2}()
         ip_f_v = ip_f^3
         qr = QuadratureRule{RefHexahedron}(3)
-    else 
+    else
         mesh = generate_grid(Quadrilateral, (20, 20))
         f_s = x ->  1.0 + x[1] + x[2] + x[1] * x[2]
         f_v = x -> Vec{2}((1.0 + x[1] + x[2] + x[1] * x[2], 2.0 - x[1] - x[2] - x[1] * x[2]))
         points = [Vec((x, x, )) for x in range(0; stop=1, length=100)]
         ip_f = Lagrange{RefQuadrilateral,2}()
         ip_f_v = ip_f^2
-        qr = QuadratureRule{RefQuadrilateral}(3)       
+        qr = QuadratureRule{RefQuadrilateral}(3)
     end
-   
+
     csv = CellValues(qr, ip_f)
     cvv = CellValues(qr, ip_f_v)
     dh = DofHandler(mesh);
@@ -160,7 +160,7 @@ function dofhandler2(;three_dimensional=true)
     fe = zeros(ndofs_per_cell(dh))
     s_dofs = dof_range(dh, :s)
     v_dofs = dof_range(dh, :v)
-    
+
     for cell in CellIterator(dh)
         fill!(me, 0)
         fill!(fe, 0)
@@ -219,15 +219,15 @@ function dofhandler2(;three_dimensional=true)
 end
 
 function mixed_grid()
-    ## Mixed grid where not all cells have the same fields 
+    ## Mixed grid where not all cells have the same fields
 
     # 5_______6
-    # |\      | 
+    # |\      |
     # |   \   |
     # 3______\4
     # |       |
     # |       |
-    # 1_______2 
+    # 1_______2
 
     nodes = [Node((0.0, 0.0)),
             Node((1.0, 0.0)),
@@ -261,7 +261,7 @@ function mixed_grid()
         end
     end
 
-    # construct projector 
+    # construct projector
     projector = L2Projector(ip_quad, mesh; set=getcellset(mesh, "quads"))
 
     points = [Vec((x, 2x)) for x in range(0.0; stop=1.0, length=10)]
@@ -330,7 +330,7 @@ function first_point_missing()
     mesh = generate_grid(Quadrilateral, (1, 1))
     points = [Vec(2.0, 0.0), Vec(0.0, 0.0)]
     ph = PointEvalHandler(mesh, points; warn=false)
-    
+
     @test isnothing(ph.local_coords[1])
     @test ph.local_coords[2] == Vec(0.0, 0.0)
 end

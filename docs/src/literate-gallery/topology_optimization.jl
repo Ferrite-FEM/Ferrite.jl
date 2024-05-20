@@ -14,10 +14,10 @@
 #
 # ## Introduction
 #
-# Topology optimization is the task of finding structures that are mechanically ideal. 
+# Topology optimization is the task of finding structures that are mechanically ideal.
 # In this example we cover the bending beam, where we specify a load, boundary conditions and the total mass. Then, our
 # objective is to find the most suitable geometry within the design space minimizing the compliance (i.e. the inverse stiffness) of the structure.
-# We shortly introduce our simplified model for regular meshes. A detailed derivation of the method and advanced techniques 
+# We shortly introduce our simplified model for regular meshes. A detailed derivation of the method and advanced techniques
 # can be found in [JanHacJun2019regularizedthermotopopt](@cite) and
 # [BlaJanJun2022taylorwlsthermotopopt](@cite).
 #
@@ -26,17 +26,17 @@
 # means bulk material. Then, we use a SIMP ansatz (solid isotropic material with penalization) for the stiffness tensor
 # $C(\chi) = \chi^p C_0$, where $C_0$ is the stiffness of the bulk material. The SIMP exponent $p>1$ ensures that the
 # model prefers the density values void and bulk before the intermediate values. The variational formulation then yields
-# the modified Gibbs energy 
+# the modified Gibbs energy
 # ```math
 # G = \int_{\Omega} \frac{1}{2} \chi^p \varepsilon : C : \varepsilon \; \text{d}V - \int_{\Omega} \boldsymbol{f} \cdot \boldsymbol{u} \; \text{d}V - \int_{\partial\Omega} \boldsymbol{t} \cdot \boldsymbol{u} \; \text{d}A.
 # ```
 # Furthermore, we receive the evolution equation of the density
 # and the additional Neumann boundary condition in the strong form
 # ```math
-# p_\chi + \eta \dot{\chi} + \lambda + \gamma - \beta \nabla^2 \chi \ni 0 \quad \forall \textbf{x} \in \Omega, 
+# p_\chi + \eta \dot{\chi} + \lambda + \gamma - \beta \nabla^2 \chi \ni 0 \quad \forall \textbf{x} \in \Omega,
 # ```
 # ```math
-# \beta \nabla \chi \cdot \textbf{n} = 0 \quad \forall \textbf{x} \in \partial \Omega, 
+# \beta \nabla \chi \cdot \textbf{n} = 0 \quad \forall \textbf{x} \in \partial \Omega,
 # ```
 # with the thermodynamic driving force
 # ```math
@@ -57,8 +57,8 @@
 # ```math
 # \nabla \chi_p \cdot \textbf{n} = \frac{1}{\Delta h} (\chi_w - \chi_e) = 0
 # ```
-# from which follows $\chi_w = \chi_e$. Thus for boundary elements we can replace the value for the missing neighbor by the value of the opposite neighbor. 
-# In order to find the corresponding neighbor elements, we will make use of Ferrites grid topology funcionalities. 
+# from which follows $\chi_w = \chi_e$. Thus for boundary elements we can replace the value for the missing neighbor by the value of the opposite neighbor.
+# In order to find the corresponding neighbor elements, we will make use of Ferrites grid topology funcionalities.
 #
 # ## Commented Program
 # We now solve the problem in Ferrite. What follows is a program spliced with comments.
@@ -70,16 +70,16 @@ using Ferrite, SparseArrays, LinearAlgebra, Tensors, Printf
 # to the left face set, called `clamped`. On the right face, we create a small set `traction`, where we
 # will later apply a force in negative y-direction.
 
-function create_grid(n) 
+function create_grid(n)
     corners = [Vec{2}((0.0, 0.0)),
                Vec{2}((2.0, 0.0)),
                Vec{2}((2.0, 1.0)),
                Vec{2}((0.0, 1.0))]
     grid = generate_grid(Quadrilateral, (2*n, n), corners);
-    
+
     ## node-/facesets for boundary conditions
     addnodeset!(grid, "clamped", x -> x[1] ≈ 0.0)
-    addfacetset!(grid, "traction", x -> x[1] ≈ 2.0 && norm(x[2]-0.5) <= 0.05); 
+    addfacetset!(grid, "traction", x -> x[1] ≈ 2.0 && norm(x[2]-0.5) <= 0.05);
     return grid
 end
 #md nothing # hide
@@ -95,7 +95,7 @@ function create_values()
     ip = Lagrange{RefQuadrilateral,1}()^2
     cellvalues = CellValues(qr, ip)
     facetvalues = FacetValues(facet_qr, ip)
-    
+
     return cellvalues, facetvalues
 end
 
@@ -106,7 +106,7 @@ function create_dofhandler(grid)
     return dh
 end
 
-function create_bc(dh) 
+function create_bc(dh)
     dbc = ConstraintHandler(dh)
     add!(dbc, Dirichlet(:u, getnodeset(dh.grid, "clamped"), (x,t) -> zero(Vec{2}), [1,2]))
     close!(dbc)
@@ -122,14 +122,14 @@ end
 
 struct MaterialParameters{T, S <: SymmetricTensor{4, 2, T}}
     C::S
-    χ_min::T 
+    χ_min::T
     p::T
     β::T
     η::T
 end
 #md nothing # hide
 
-function MaterialParameters(E, ν, χ_min, p, β, η) 
+function MaterialParameters(E, ν, χ_min, p, β, η)
     δ(i,j) = i == j ? 1.0 : 0.0 # helper function
 
     G = E / 2(1 + ν) # =μ
@@ -144,7 +144,7 @@ end
 # `MaterialState`. We add a constructor to initialize the struct. The function `update_material_states!`
 # updates the density values once we calculated the new values.
 
-mutable struct MaterialState{T, S <: AbstractArray{SymmetricTensor{2, 2, T}, 1}} 
+mutable struct MaterialState{T, S <: AbstractArray{SymmetricTensor{2, 2, T}, 1}}
     χ::T # density
     ε::S # strain in each quadrature point
 end
@@ -163,7 +163,7 @@ end
 # Next, we define a function to calculate the driving forces for all elements.
 # For this purpose, we iterate through all elements and calculate the average strain in each
 # element. Then, we compute the driving force from the formula introduced at the beginning.
-# We create a second function to collect the density in each element. 
+# We create a second function to collect the density in each element.
 
 function compute_driving_forces(states, mp, dh, χn)
     pΨ = zeros(length(states))
@@ -185,18 +185,18 @@ function compute_densities(states, dh)
 end
 #md nothing # hide
 
-# Now we calculate the Laplacian. For this purpose, we will later create the grid topology of 
+# Now we calculate the Laplacian. For this purpose, we will later create the grid topology of
 # the grid by using the function `ExclusiveTopology`. Then we iterate through each face of each element,
 # obtaining the neighboring element by using the `getneighborhood` function. For boundary faces,
 # the function call will return an empty object. In that case we use the dictionary to instead find the opposite
-# face, as discussed in the introduction. Then, the approximation of the Laplacian reduces to the sum below. 
+# face, as discussed in the introduction. Then, the approximation of the Laplacian reduces to the sum below.
 
 function approximate_laplacian(dh, topology, χn, Δh)
     ∇²χ = zeros(getncells(dh.grid))
     _nfacets = nfacets(dh.grid.cells[1])
     opp = Dict(1=>3, 2=>4, 3=>1, 4=>2)
     nbg = zeros(Int,_nfacets)
-    
+
     for element in CellIterator(dh)
         i = cellid(element)
         for j in 1:_nfacets
@@ -207,7 +207,7 @@ function approximate_laplacian(dh, topology, χn, Δh)
                 nbg[j] = first(getcells(getneighborhood(topology, dh.grid, FacetIndex(i,opp[j]))))
             end
         end
-        
+
         ∇²χ[i] = (χn[nbg[1]]+χn[nbg[2]]+χn[nbg[3]]+χn[nbg[4]]-4*χn[i])/(Δh^2)
     end
 
@@ -218,30 +218,30 @@ end
 # For the iterative computation of the solution, a function is needed to update the densities in each element.
 # To ensure that the mass is kept constant, we have to calculate the constraint
 # parameter $\lambda$, which we do via the bisection method. We repeat the calculation
-# until the difference between the average density (calculated from the element-wise trial densities) and the target density nearly vanishes. 
+# until the difference between the average density (calculated from the element-wise trial densities) and the target density nearly vanishes.
 # By using the extremal values of $\Delta \chi$ as the starting interval, we guarantee that the method converges eventually.
 
-function compute_χn1(χn, Δχ, ρ, ηs, χ_min) 
+function compute_χn1(χn, Δχ, ρ, ηs, χ_min)
     n_el = length(χn)
-    
+
     χ_trial = zeros(n_el)
     ρ_trial = 0.0
-    
+
     λ_lower = minimum(Δχ) - ηs
     λ_upper = maximum(Δχ) + ηs
     λ_trial = 0.0
-    
+
     while(abs(ρ-ρ_trial)>1e-7)
         for i in 1:n_el
             Δχt = 1/ηs * (Δχ[i] - λ_trial)
             χ_trial[i] = maximum([χ_min, minimum([1.0, χn[i]+Δχt])])
         end
-    
+
         ρ_trial = 0.0
         for i in 1:n_el
-            ρ_trial += χ_trial[i]/n_el 
+            ρ_trial += χ_trial[i]/n_el
         end
-        
+
         if(ρ_trial > ρ)
             λ_lower = λ_trial
         elseif(ρ_trial < ρ)
@@ -256,65 +256,65 @@ end
 
 # Lastly, we use the following helper function to compute the average driving force, which is later
 # used to normalize the driving forces. This makes the used material parameters and numerical parameters independent
-# of the problem. 
+# of the problem.
 
 function compute_average_driving_force(mp, pΨ, χn)
     n = length(pΨ)
     w = zeros(n)
-    
+
     for i in 1:n
         w[i] = (χn[i]-mp.χ_min)*(1-χn[i])
     end
-    
+
     p_Ω = sum(w.*pΨ)/sum(w) # average driving force
-    
+
     return p_Ω
 end
 #md nothing # hide
 
-# Finally, we put everything together to update the density. The loop ensures the stability of the 
+# Finally, we put everything together to update the density. The loop ensures the stability of the
 # updated solution.
 
 function update_density(dh, states, mp, ρ, topology, Δh)
     n_j = Int(ceil(6*mp.β/(mp.η*Δh^2))) # iterations needed for stability
-    χn = compute_densities(states, dh) # old density field    
+    χn = compute_densities(states, dh) # old density field
     χn1 = zeros(length(χn))
-    
+
     for j in 1:n_j
         ∇²χ = approximate_laplacian(dh, topology, χn, Δh) # Laplacian
         pΨ = compute_driving_forces(states, mp, dh, χn) # driving forces
         p_Ω = compute_average_driving_force(mp, pΨ, χn) # average driving force
-    
-        Δχ = pΨ/p_Ω + mp.β*∇²χ 
 
-        χn1 = compute_χn1(χn, Δχ, ρ, mp.η, mp.χ_min) 
+        Δχ = pΨ/p_Ω + mp.β*∇²χ
+
+        χn1 = compute_χn1(χn, Δχ, ρ, mp.η, mp.χ_min)
 
         if(j<n_j)
             χn[:] = χn1[:]
         end
     end
-    
+
     return χn1
 end
 #md nothing # hide
-    
+
 # Now, we move on to the Finite Element part of the program. We use the following function to assemble our linear system.
 
 function doassemble!(cellvalues::CellValues, facetvalues::FacetValues, K::SparseMatrixCSC, grid::Grid, dh::DofHandler, mp::MaterialParameters, u, states)
     r = zeros(ndofs(dh))
     assembler = start_assemble(K, r)
     nu = getnbasefunctions(cellvalues)
-    
+
     re = zeros(nu) # local residual vector
     Ke = zeros(nu,nu) # local stiffness matrix
 
     for (element, state) in zip(CellIterator(dh), states)
         fill!(Ke, 0)
         fill!(re, 0)
-        
+
         eldofs = celldofs(element)
         ue = u[eldofs]
-        
+
         elmt!(Ke, re, element, cellvalues, facetvalues, grid, mp, ue, state)
         assemble!(assembler, celldofs(element), re, Ke)
     end
@@ -329,20 +329,20 @@ end
 
 function elmt!(Ke, re, element, cellvalues, facetvalues, grid, mp, ue, state)
     n_basefuncs = getnbasefunctions(cellvalues)
-    reinit!(cellvalues, element)    
-    χ = state.χ    
-        
+    reinit!(cellvalues, element)
+    χ = state.χ
+
     ## We only assemble lower half triangle of the stiffness matrix and then symmetrize it.
     @inbounds for q_point in 1:getnquadpoints(cellvalues)
         dΩ = getdetJdV(cellvalues, q_point)
         state.ε[q_point] = function_symmetric_gradient(cellvalues, q_point, ue)
-        
+
         for i in 1:n_basefuncs
             δεi = shape_symmetric_gradient(cellvalues, q_point, i)
             δu = shape_value(cellvalues, q_point, i)
             for j in 1:i
                 δεj = shape_symmetric_gradient(cellvalues, q_point, j)
-                Ke[i,j] += (χ)^(mp.p) * (δεi ⊡ mp.C ⊡ δεj) * dΩ 
+                Ke[i,j] += (χ)^(mp.p) * (δεi ⊡ mp.C ⊡ δεj) * dΩ
             end
             re[i] += (-δεi ⊡ ((χ)^(mp.p) * mp.C ⊡ state.ε[q_point])) * dΩ
         end
@@ -350,7 +350,7 @@ function elmt!(Ke, re, element, cellvalues, facetvalues, grid, mp, ue, state)
 
     symmetrize_lower!(Ke)
 
-    @inbounds for facet in 1:nfacets(getcells(grid, cellid(element))) 
+    @inbounds for facet in 1:nfacets(getcells(grid, cellid(element)))
         if (cellid(element), facet) ∈ getfacetset(grid, "traction")
             reinit!(facetvalues, element, facet)
             t = Vec((0.0, -1.0)) # force pointing downwards
@@ -363,7 +363,7 @@ function elmt!(Ke, re, element, cellvalues, facetvalues, grid, mp, ue, state)
             end
         end
     end
-    
+
 end
 
 function symmetrize_lower!(K)
@@ -381,7 +381,7 @@ end
 # or every iteration step is saved.
 #
 # First, we compute the material parameters and create the grid, DofHandler, boundary condition and FE values.
-# Then we prepare the iterative Newton-Raphson method by pre-allocating all important vectors. Furthermore, 
+# Then we prepare the iterative Newton-Raphson method by pre-allocating all important vectors. Furthermore,
 # we create material states for each element and construct the topology of the grid.
 #
 # During each iteration step, first we solve our FE problem in the Newton-Raphson loop. With the solution of the
@@ -390,82 +390,82 @@ end
 # Finally, we output the results in paraview and calculate the relative stiffness of the final design, i.e. how much how
 # the stiffness increased compared to the starting point.
 
-function topopt(ra,ρ,n,filename; output=:false) 
+function topopt(ra,ρ,n,filename; output=:false)
     ## material
-    mp = MaterialParameters(210.e3, 0.3, 1.e-3, 3.0, ra^2, 15.0) 
+    mp = MaterialParameters(210.e3, 0.3, 1.e-3, 3.0, ra^2, 15.0)
 
     ## grid, dofhandler, boundary condition
     grid = create_grid(n)
     dh = create_dofhandler(grid)
     Δh = 1/n # element edge length
     dbc = create_bc(dh)
-    
+
     ## cellvalues
     cellvalues, facetvalues = create_values()
-    
+
     ## Pre-allocate solution vectors, etc.
     n_dofs = ndofs(dh) # total number of dofs
     u  = zeros(n_dofs) # solution vector
     un = zeros(n_dofs) # previous solution vector
-    
+
     Δu = zeros(n_dofs)  # previous displacement correction
     ΔΔu = zeros(n_dofs) # new displacement correction
-    
-    ## create material states  
+
+    ## create material states
     states = [MaterialState(ρ, getnquadpoints(cellvalues)) for _ in 1:getncells(dh.grid)]
-    
+
     χ = zeros(getncells(dh.grid))
-        
+
     r = zeros(n_dofs) # residual
     K = create_sparsity_pattern(dh) # stiffness matrix
-    
+
     i_max = 300 ## maximum number of iteration steps
     tol = 1e-4
     compliance = 0.0
     compliance_0 = 0.0
     compliance_n = 0.0
     conv = :false
-    
+
     topology = ExclusiveTopology(grid)
-    
+
     ## Newton-Raphson loop
     NEWTON_TOL = 1e-8
     print("\n Starting Newton iterations\n")
-    
-    for it in 1:i_max    
+
+    for it in 1:i_max
         apply_zero!(u, dbc)
         newton_itr = -1
-        
+
         while true; newton_itr += 1
-            
+
             if newton_itr > 10
                 error("Reached maximum Newton iterations, aborting")
                 break
             end
-        
+
             ## current guess
             u .= un .+ Δu
             K, r = doassemble!(cellvalues, facetvalues, K, grid, dh, mp, u, states);
-            norm_r = norm(r[Ferrite.free_dofs(dbc)]) 
+            norm_r = norm(r[Ferrite.free_dofs(dbc)])
 
             if (norm_r) < NEWTON_TOL
                 break
-            end  
+            end
 
             apply_zero!(K, r, dbc)
             ΔΔu = Symmetric(K) \ r
-            
+
             apply_zero!(ΔΔu, dbc)
             Δu .+= ΔΔu
-        end # of loop while NR-Iteration    
+        end # of loop while NR-Iteration
 
         ## calculate compliance
         compliance = 1/2 * u' * K * u
-        
+
         if(it==1)
             compliance_0 = compliance
         end
-        
+
         ## check convergence criterium (twice!)
         if(abs(compliance-compliance_n)/compliance < tol)
             if(conv)
@@ -477,16 +477,16 @@ function topopt(ra,ρ,n,filename; output=:false)
         else
             conv = :false
         end
-  
+
         ## update density
         χ = update_density(dh, states, mp, ρ, topology, Δh)
-        
+
         ## update old displacement, density and compliance
         un .= u
         Δu .= 0.0
         update_material_states!(χ, states, dh)
         compliance_n = compliance
-        
+
         ## output during calculation
         if(output)
             i = @sprintf("%3.3i", it)
@@ -505,13 +505,13 @@ function topopt(ra,ρ,n,filename; output=:false)
         end
     end
     @printf "Rel. stiffness: %.4f \n" compliance^(-1)/compliance_0^(-1)
-    
+
     return
 end
 #md nothing # hide
 
 # Lastly, we call our main function and compare the results. To create the
-# complete output with all iteration steps, it is possible to set the output 
+# complete output with all iteration steps, it is possible to set the output
 # parameter to `true`.
 
 topopt(0.02, 0.5, 60, "small_radius"; output=:false);

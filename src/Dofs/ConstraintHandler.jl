@@ -58,8 +58,8 @@ const DofCoefficients{T} = Vector{Pair{Int,T}}
 """
     AffineConstraint(constrained_dof::Int, entries::Vector{Pair{Int,T}}, b::T) where T
 
-Define an affine/linear constraint to constrain one degree of freedom, `u[i]`, 
-such that `u[i] = ∑(u[j] * a[j]) + b`, 
+Define an affine/linear constraint to constrain one degree of freedom, `u[i]`,
+such that `u[i] = ∑(u[j] * a[j]) + b`,
 where `i=constrained_dof` and each element in `entries` are `j => a[j]`
 """
 struct AffineConstraint{T}
@@ -177,7 +177,7 @@ isclosed(ch::ConstraintHandler) = ch.closed[]
 free_dofs(ch::ConstraintHandler) = ch.free_dofs
 prescribed_dofs(ch::ConstraintHandler) = ch.prescribed_dofs
 
-# Equivalent to `copy!(out, setdiff(1:n_entries, diff))`, but requires that 
+# Equivalent to `copy!(out, setdiff(1:n_entries, diff))`, but requires that
 # `issorted(diff)` and that `1 ≤ diff[1] ≤ diff[end] ≤ n_entries`
 function _sorted_setdiff!(out::Vector{Int}, n_entries::Int, diff::Vector{Int})
     n_diff = length(diff)
@@ -528,12 +528,12 @@ apply!
     apply_zero!(K::SparseMatrixCSC, rhs::AbstractVector, ch::ConstraintHandler)
 
 Adjust the matrix `K` and the right hand side `rhs` to account for prescribed Dirichlet
-boundary conditions and affine constraints such that `du = K \\ rhs` gives the expected 
+boundary conditions and affine constraints such that `du = K \\ rhs` gives the expected
 result (e.g. `du` zero for all prescribed degrees of freedom).
 
     apply_zero!(v::AbstractVector, ch::ConstraintHandler)
 
-Zero-out values in `v` corresponding to prescribed degrees of freedom and update values 
+Zero-out values in `v` corresponding to prescribed degrees of freedom and update values
 prescribed by affine constraints, such that if `a` fulfills the constraints,
 `a ± v` also will.
 
@@ -553,9 +553,9 @@ apply_zero!(ΔΔu, ch)        # Make sure values are exactly zero
 ```
 
 !!! note
-    The last call to `apply_zero!` is only strictly necessary for affine constraints. 
-    However, even if the Dirichlet boundary conditions should be fulfilled after 
-    `apply!(K, g, ch)`, solvers of linear systems are not exact. 
+    The last call to `apply_zero!` is only strictly necessary for affine constraints.
+    However, even if the Dirichlet boundary conditions should be fulfilled after
+    `apply!(K, g, ch)`, solvers of linear systems are not exact.
     `apply!(ΔΔu, ch)` can be used to make sure the values
     for the prescribed degrees of freedom are fulfilled exactly.
 """
@@ -1263,7 +1263,7 @@ system. For other types of periodicities the `transform` function can be used. T
 `transform` function is applied on the coordinates of the image facet, and is expected to
 transform the coordinates to the matching locations in the mirror set.
 
-The keyword `tol` specifies the tolerance (i.e. distance and deviation in facet-normals) 
+The keyword `tol` specifies the tolerance (i.e. distance and deviation in facet-normals)
 between a image-facet and mirror-facet, for them to be considered matched.
 
 See also: [`collect_periodic_facets!`](@ref), [`PeriodicDirichlet`](@ref).

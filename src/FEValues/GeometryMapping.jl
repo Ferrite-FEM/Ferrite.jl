@@ -1,9 +1,9 @@
 """
     MappingValues(J, H)
 
-The mapping values are calculated based on a 
+The mapping values are calculated based on a
 `geometric_mapping::GeometryMapping` along with the cell coordinates,
-and the stored jacobian, `J`, and potentially hessian, `H`, are 
+and the stored jacobian, `J`, and potentially hessian, `H`, are
 used when mapping the `FunctionValues` to the current cell during `reinit!`.
 """
 MappingValues
@@ -13,14 +13,14 @@ struct MappingValues{JT, HT}
     H::HT # dJ/dξ # Hessian
 end
 
-@inline getjacobian(mv::MappingValues{<:Union{AbstractTensor, SMatrix}}) = mv.J 
+@inline getjacobian(mv::MappingValues{<:Union{AbstractTensor, SMatrix}}) = mv.J
 # @inline gethessian(mv::MappingValues{<:Any,<:AbstractTensor}) = mv.H # PR798
 
 
 """
     GeometryMapping{DiffOrder}(::Type{T}, ip_geo, qr::QuadratureRule)
 
-Create a `GeometryMapping` object which contains the geometric 
+Create a `GeometryMapping` object which contains the geometric
 
 * shape values
 * gradient values (if DiffOrder ≥ 1)
@@ -31,7 +31,7 @@ Create a `GeometryMapping` object which contains the geometric
 GeometryMapping
 
 struct GeometryMapping{DiffOrder, IP, M_t, dMdξ_t, d2Mdξ2_t}
-    ip::IP             # ::Interpolation                Geometric interpolation 
+    ip::IP             # ::Interpolation                Geometric interpolation
     M::M_t             # ::AbstractMatrix{<:Number}     Values of geometric shape functions
     dMdξ::dMdξ_t       # ::AbstractMatrix{<:Vec}        Gradients of geometric shape functions in ref-domain
     d2Mdξ2::d2Mdξ2_t   # ::AbstractMatrix{<:Tensor{2}}  Hessians of geometric shape functions in ref-domain
@@ -47,8 +47,8 @@ struct GeometryMapping{DiffOrder, IP, M_t, dMdξ_t, d2Mdξ2_t}
         return new{1, IP, M_t, dMdξ_t, Nothing}(ip, M, dMdξ, nothing)
     end
 #=  function GeometryMapping(
-        ip::IP, M::M_t, dMdξ::dMdξ_t, d2Mdξ2::d2Mdξ2_t) where 
-        {IP <: ScalarInterpolation, M_t<:AbstractMatrix{<:Number}, 
+        ip::IP, M::M_t, dMdξ::dMdξ_t, d2Mdξ2::d2Mdξ2_t) where
+        {IP <: ScalarInterpolation, M_t<:AbstractMatrix{<:Number},
         dMdξ_t <: AbstractMatrix{<:Vec}, d2Mdξ2_t <: AbstractMatrix{<:Tensor{2}}}
         return new{2, IP, M_t, dMdξ_t, d2Mdξ2_t}(ip, M, dMdξ, d2Mdξ2)
     end =# # PR798
@@ -63,7 +63,7 @@ end
 function GeometryMapping{1}(::Type{T}, ip::ScalarInterpolation, qr::QuadratureRule) where T
     n_shape = getnbasefunctions(ip)
     n_qpoints = getnquadpoints(qr)
-    
+
     M    = zeros(T,                 n_shape, n_qpoints)
     dMdξ = zeros(Vec{getdim(ip),T}, n_shape, n_qpoints)
 
@@ -74,7 +74,7 @@ end
 #= function GeometryMapping{2}(::Type{T}, ip::ScalarInterpolation, qr::QuadratureRule) where T
     n_shape = getnbasefunctions(ip)
     n_qpoints = getnquadpoints(qr)
-    
+
     M      = zeros(T,                      n_shape, n_qpoints)
     dMdξ   = zeros(Vec{getdim(ip),T},      n_shape, n_qpoints)
     d2Mdξ2 = zeros(Tensor{2,getdim(ip),T}, n_shape, n_qpoints)

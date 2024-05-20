@@ -43,7 +43,7 @@ Ferrite.mapping_type
 ```
 
 for all entities which exist on that reference element. The dof functions default to having no
-dofs defined on a specific entity. Hence, not overloading of the dof functions will result in an 
-element with zero dofs. Also, it should always be double checked that everything is consistent as 
+dofs defined on a specific entity. Hence, not overloading of the dof functions will result in an
+element with zero dofs. Also, it should always be double checked that everything is consistent as
 specified in the docstring of the corresponding function, as inconsistent implementations can
 lead to bugs which are really difficult to track down.

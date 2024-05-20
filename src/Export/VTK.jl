@@ -3,8 +3,8 @@
     VTKFile(filename::AbstractString, grid::AbstractGrid; kwargs...)
     VTKFile(filename::AbstractString, dh::DofHandler; kwargs...)
 
-Create a `VTKFile` that contains an unstructured VTK grid. 
-The keyword arguments are forwarded to `WriteVTK.vtk_grid`, see 
+Create a `VTKFile` that contains an unstructured VTK grid.
+The keyword arguments are forwarded to `WriteVTK.vtk_grid`, see
 [Data Formatting Options](https://juliavtk.github.io/WriteVTK.jl/stable/grids/syntax/#Data-formatting-options)
 
 This file handler can be used to to write data with
@@ -17,7 +17,7 @@ This file handler can be used to to write data with
 * [`Ferrite.write_nodeset`](@ref)
 * [`Ferrite.write_constraints`](@ref)
 
-It is necessary to call `close(::VTKFile)` to save the data after writing 
+It is necessary to call `close(::VTKFile)` to save the data after writing
 to the file handler. Using the supported `do`-block does this automatically:
 ```julia
 VTKFile(filename, grid) do vtk
@@ -58,8 +58,8 @@ end
     VTKFileCollection(name::String, grid::AbstractGrid; kwargs...)
     VTKFileCollection(name::String, dh::DofHandler; kwargs...)
 
-Create a paraview data file (.pvd) that can be used to 
-save multiple vtk file along with a time stamp. The keyword arguments 
+Create a paraview data file (.pvd) that can be used to
+save multiple vtk file along with a time stamp. The keyword arguments
 are forwarded to `WriteVTK.paraview_collection`.
 
 See [`addstep!`](@ref) for examples for how to use `VTKFileCollection`.
@@ -81,7 +81,7 @@ Base.close(pvd::VTKFileCollection) = WriteVTK.vtk_save(pvd.pvd)
 """
     addstep!(f::Function, pvd::VTKFileCollection, t::Real, [grid_or_dh]; kwargs...)
 
-Add a step at time `t` by writing a `VTKFile` to `pvd`. 
+Add a step at time `t` by writing a `VTKFile` to `pvd`.
 The keyword arguments are forwarded to `WriteVTK.vtk_grid`.
 If required, a new grid can be used by supplying the grid or dofhandler as the last argument.
 Should be used in a do-block, e.g.
@@ -90,7 +90,7 @@ filename = "myoutput"
 pvd = VTKFileCollection(filename, grid)
 for (n, t) in pairs(timevector)
     # Calculate, e.g., the solution `u` and the stress `σeff`
-    addstep!(pvd, t) do io 
+    addstep!(pvd, t) do io
         write_cell_data(io, σeff, "Effective stress")
         write_solution(io, dh, u)
     end
@@ -109,8 +109,8 @@ end
 """
     addstep!(pvd::VTKFileCollection, vtk::VTKFile, t)
 
-As an alternative to using the `addstep!(pvd, t) do` block, it is 
-also possible to add a specific `vtk` at time `t` to `pvd`. 
+As an alternative to using the `addstep!(pvd, t) do` block, it is
+also possible to add a specific `vtk` at time `t` to `pvd`.
 Note that this will close the `vtk`. Example
 ```julia
 filename = "myoutput"
@@ -239,13 +239,13 @@ end
     write_solution(vtk::VTKFile, dh::AbstractDofHandler, u::Vector, suffix="")
 
 Save the values at the nodes in the degree of freedom vector `u` to `vtk`.
-Each field in `dh` will be saved separately, and `suffix` can be used to append 
+Each field in `dh` will be saved separately, and `suffix` can be used to append
 to the fieldname.
 
-`u` can also contain tensorial values, but each entry in `u` must correspond to a 
-degree of freedom in `dh`, see [`write_node_data`](@ref write_node_data) for details. 
-Use `write_node_data` directly when exporting values that are already 
-sorted by the nodes in the grid. 
+`u` can also contain tensorial values, but each entry in `u` must correspond to a
+degree of freedom in `dh`, see [`write_node_data`](@ref write_node_data) for details.
+Use `write_node_data` directly when exporting values that are already
+sorted by the nodes in the grid.
 """
 function write_solution(vtk::VTKFile, dh::AbstractDofHandler, u::Vector, suffix="")
     fieldnames = Ferrite.getfieldnames(dh)  # all primary fields
@@ -280,13 +280,13 @@ end
 """
     write_node_data(vtk::VTKFile, nodedata::Vector{Real}, name)
     write_node_data(vtk::VTKFile, nodedata::Vector{<:AbstractTensor}, name)
-    
+
 Write the `nodedata` that is ordered by the nodes in the grid to `vtk`.
 
-When `nodedata` contains `Tensors.Vec`s, each component is exported. 
+When `nodedata` contains `Tensors.Vec`s, each component is exported.
 Two-dimensional vectors are padded with zeros.
 
-When `nodedata` contains second order tensors, the index order, 
+When `nodedata` contains second order tensors, the index order,
 `[11, 22, 33, 23, 13, 12, 32, 31, 21]`, follows the default Voigt order in Tensors.jl.
 """
 function write_node_data(vtk::VTKFile, nodedata, name)
@@ -311,9 +311,9 @@ end
     write_cellset(vtk, grid::AbstractGrid, cellset::String)
     write_cellset(vtk, grid::AbstractGrid, cellsets::Union{AbstractVector{String},AbstractSet{String})
 
-Write all cell sets in the grid with name according to their keys and 
-celldata 1 if the cell is in the set, and 0 otherwise. It is also possible to 
-only export a single `cellset`, or multiple `cellsets`. 
+Write all cell sets in the grid with name according to their keys and
+celldata 1 if the cell is in the set, and 0 otherwise. It is also possible to
+only export a single `cellset`, or multiple `cellsets`.
 """
 function write_cellset(vtk, grid::AbstractGrid, cellsets=keys(getcellsets(getgrid(vtk))))
     z = zeros(getncells(grid))
@@ -332,7 +332,7 @@ write_cellset(vtk, grid::AbstractGrid, cellset::String) = write_cellset(vtk, gri
 Saves the dirichlet boundary conditions to a vtkfile.
 Values will have a 1 where bcs are active and 0 otherwise
 """
-function write_constraints(vtk, ch::ConstraintHandler)    
+function write_constraints(vtk, ch::ConstraintHandler)
     unique_fields = []
     for dbc in ch.dbcs
         push!(unique_fields, dbc.field_name)

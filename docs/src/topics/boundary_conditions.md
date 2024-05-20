@@ -297,9 +297,9 @@ pdbc = PeriodicDirichlet(
 
 ## Initial Conditions
 
-When solving time-dependent problems, initial conditions, different from zero, may be required. 
-For finite element formulations of ODE-type, 
-i.e. ``\boldsymbol{u}'(t) = \boldsymbol{f}(\boldsymbol{u}(t),t)``, 
+When solving time-dependent problems, initial conditions, different from zero, may be required.
+For finite element formulations of ODE-type,
+i.e. ``\boldsymbol{u}'(t) = \boldsymbol{f}(\boldsymbol{u}(t),t)``,
 where ``\boldsymbol{u}(t)`` are the degrees of freedom,
 initial conditions can be specified by the [`apply_analytical!`](@ref) function.
 For example, specify the initial pressure as a function of the y-coordinate
@@ -319,4 +319,3 @@ See also [Transient heat equation](@ref tutorial-transient-heat-equation) for on
     equations (DAEs) need extra care during initialization. We refer to the paper
     ["Consistent Initial Condition Calculation for Differential-Algebraic Systems" by Brown
     et al.](https://dx.doi.org/10.1137/S1064827595289996) for more details on this matter.
-

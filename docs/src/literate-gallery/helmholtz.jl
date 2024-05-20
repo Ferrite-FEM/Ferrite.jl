@@ -15,7 +15,7 @@
 # ```math
 # n \cdot \nabla u = g_2 \quad x \in \Gamma_2
 # ```
-# 
+#
 # Here Γ₁ is the union of the top and the right boundary of the square,
 # while Γ₂ is the union of the bottom and the left boundary.
 #
@@ -150,7 +150,7 @@ function doassemble(cellvalues::CellValues, facetvalues::FacetValues,
                 end
             end
         end
-   
+
         celldofs!(global_dofs, cell)
         assemble!(assembler, global_dofs, fe, Ke)
     end

@@ -104,7 +104,7 @@
                     @test v == vc
                 end
             end
-            # Test that qr and detJdV is copied as expected. 
+            # Test that qr and detJdV is copied as expected.
             # Note that qr remain aliased, as defined by `copy(qr)=qr`, see quadrature.jl.
             for fname in (:qr, :detJdV)
                 v = getfield(cv, fname)
@@ -147,13 +147,13 @@ end
     fsv = FacetValues(qr_f, ip)
     fvv = FacetValues(qr_f, VectorizedInterpolation(ip))
     fsv_embedded = FacetValues(qr_f, ip, ip^3)
-    
+
     x, n = valid_coordinates_and_normals(ip)
     reinit!(csv, x)
     reinit!(cvv, x)
     reinit!(fsv, x, 1)
     reinit!(fvv, x, 1)
-    
+
     # Wrong number of coordinates
     xx = [x; x]
     @test_throws ArgumentError reinit!(csv, xx)
@@ -166,7 +166,7 @@ end
     @test_throws ArgumentError spatial_coordinate(fsv, qp, xx)
     @test_throws ArgumentError spatial_coordinate(fvv, qp, xx)
 
-    # Wrong dimension of coordinates 
+    # Wrong dimension of coordinates
     @test_throws ArgumentError reinit!(csv_embedded, x)
     @test_throws ArgumentError reinit!(fsv_embedded, x, 1)
 
@@ -306,7 +306,7 @@ end
 
 @testset "CellValues constructor entry points" begin
     qr = QuadratureRule{RefTriangle}(1)
-    
+
     for fun_ip in (Lagrange{RefTriangle, 1}(), Lagrange{RefTriangle, 2}()^2)
         value_type(T) = fun_ip isa ScalarInterpolation ? T : Vec{2, T}
         grad_type(T) = fun_ip isa ScalarInterpolation ? Vec{2, T} : Tensor{2, 2, T, 4}
@@ -356,13 +356,13 @@ end
 end
 
 @testset "CustomCellValues" begin
-    
+
     @testset "SimpleCellValues" begin
         include(joinpath(@__DIR__, "../docs/src/topics/SimpleCellValues_literate.jl"))
     end
-    
+
     @testset "TestCustomCellValues" begin
-    
+
         struct TestCustomCellValues{CV<:CellValues} <: Ferrite.AbstractValues
             cv::CV
         end
@@ -382,7 +382,7 @@ end
         ae = rand(getnbasefunctions(cv))
         q_point = rand(1:getnquadpoints(cv))
         cv_custom = TestCustomCellValues(cv)
-        for fun in (function_value, function_gradient, 
+        for fun in (function_value, function_gradient,
                         function_divergence, function_symmetric_gradient, function_curl)
             @test fun(cv_custom, q_point, ae) == fun(cv, q_point, ae)
         end

@@ -68,7 +68,7 @@ end
 
 # See Appendix A in https://www.math.colostate.edu/%7Ebangerth/publications/2013-pattern.pdf
 function workstream_coloring(incidence_matrix, cellset)
-     
+
     if length(cellset) == 0
         return Vector{Int}[]
     elseif length(cellset) == 1
