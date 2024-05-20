@@ -97,7 +97,7 @@ addfaceset!(grid, "right_face_explicit", Set(Ferrite.FaceIndex(fi[1], fi[2]) for
 end
 
 @testset "vtk_grid" begin
-    # Ensure no MethodError on pre v1. 
+    # Ensure no MethodError on pre v1.
     @test_throws ErrorException vtk_grid("old", generate_grid(Line, (1,)))
 end
 

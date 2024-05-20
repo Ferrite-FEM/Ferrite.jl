@@ -6,8 +6,8 @@ DocTestSetup = :(using Ferrite)
 # FEValues
 
 ## Main types
-[`CellValues`](@ref) and [`FacetValues`](@ref) are the most common 
-subtypes of `Ferrite.AbstractValues`. For more details about how 
+[`CellValues`](@ref) and [`FacetValues`](@ref) are the most common
+subtypes of `Ferrite.AbstractValues`. For more details about how
 these work, please see the related [topic guide](@ref fevalues_topicguide).
 
 ```@docs

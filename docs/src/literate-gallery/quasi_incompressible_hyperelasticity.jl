@@ -334,7 +334,7 @@ function solve(interpolation_u, interpolation_p)
         end;
 
         ## Save the solution fields
-        addstep!(pvd, t) do io 
+        addstep!(pvd, t) do io
             write_solution(io, dh, w)
         end
     end;

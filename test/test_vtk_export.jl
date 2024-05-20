@@ -1,6 +1,6 @@
-@testset "VTKFile" begin #TODO: Move all vtk tests here 
+@testset "VTKFile" begin #TODO: Move all vtk tests here
     @testset "show(::VTKFile)" begin
-        mktempdir() do tmp    
+        mktempdir() do tmp
             grid = generate_grid(Quadrilateral, (2,2))
             vtk = VTKFile(joinpath(tmp, "showfile"), grid)
             showstring_open = sprint(show, MIME"text/plain"(), vtk)

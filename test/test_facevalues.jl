@@ -114,7 +114,7 @@ for (scalar_interpol, quad_rule) in (
                     end
                 end
             end
-            # Test that qr, detJdV, normals, and current_facet are copied as expected. 
+            # Test that qr, detJdV, normals, and current_facet are copied as expected.
             # Note that qr remain aliased, as defined by `copy(qr)=qr`, see quadrature.jl.
             # Make it easy to test scalar wrapper equality
             _mock_isequal(a, b) = a == b
@@ -132,7 +132,7 @@ for (scalar_interpol, quad_rule) in (
 end
 
 @testset "show" begin
-    # Just smoke test to make sure show doesn't error. 
+    # Just smoke test to make sure show doesn't error.
     fv = FacetValues(FacetQuadratureRule{RefQuadrilateral}(2), Lagrange{RefQuadrilateral,2}())
     showstring = sprint(show, MIME"text/plain"(), fv)
     @test startswith(showstring, "FacetValues(scalar, rdim=2, sdim=2): 2 quadrature points per face")

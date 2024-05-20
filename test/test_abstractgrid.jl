@@ -27,7 +27,7 @@
     ip = Lagrange{RefQuadrilateral, 1}()
     qr = QuadratureRule{RefQuadrilateral}(2)
     cellvalues = CellValues(qr, ip);
-    
+
     dhs = [DofHandler(grid) for grid in (subtype_grid, reference_grid)]
     u1 = Vector{Float64}(undef, 9)
     u2 = Vector{Float64}(undef, 9)

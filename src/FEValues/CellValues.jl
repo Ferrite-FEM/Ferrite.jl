@@ -41,9 +41,9 @@ struct CellValues{FV, GM, QR, detT} <: AbstractCellValues
     qr::QR         # QuadratureRule
     detJdV::detT   # AbstractVector{<:Number} or Nothing
 end
-function CellValues(::Type{T}, qr::QuadratureRule, ip_fun::Interpolation, ip_geo::VectorizedInterpolation; 
-        update_gradients::Union{Bool,Nothing} = nothing, update_detJdV::Union{Bool,Nothing} = nothing) where T 
-    
+function CellValues(::Type{T}, qr::QuadratureRule, ip_fun::Interpolation, ip_geo::VectorizedInterpolation;
+        update_gradients::Union{Bool,Nothing} = nothing, update_detJdV::Union{Bool,Nothing} = nothing) where T
+
     _update_detJdV = update_detJdV === nothing ? true : update_detJdV
     FunDiffOrder = update_gradients === nothing ? 1 : convert(Int, update_gradients) # Logic must change when supporting update_hessian kwargs
     GeoDiffOrder = max(required_geo_diff_order(mapping_type(ip_fun), FunDiffOrder), _update_detJdV)
@@ -70,7 +70,7 @@ geometric_interpolation(cv::CellValues) = geometric_interpolation(cv.geo_mapping
 getdetJdV(cv::CellValues, q_point::Int) = cv.detJdV[q_point]
 getdetJdV(::CellValues{<:Any, <:Any, <:Any, Nothing}, ::Int) = throw(ArgumentError("detJdV is not saved in CellValues"))
 
-# Accessors for function values 
+# Accessors for function values
 getnbasefunctions(cv::CellValues) = getnbasefunctions(cv.fun_values)
 function_interpolation(cv::CellValues) = function_interpolation(cv.fun_values)
 function_difforder(cv::CellValues) = function_difforder(cv.fun_values)
@@ -81,7 +81,7 @@ shape_gradient_type(cv::CellValues) = shape_gradient_type(cv.fun_values)
 @propagate_inbounds shape_gradient(cv::CellValues, q_point::Int, i::Int) = shape_gradient(cv.fun_values, q_point, i)
 @propagate_inbounds shape_symmetric_gradient(cv::CellValues, q_point::Int, i::Int) = shape_symmetric_gradient(cv.fun_values, q_point, i)
 
-# Access quadrature rule values 
+# Access quadrature rule values
 getnquadpoints(cv::CellValues) = getnquadpoints(cv.qr)
 
 @inline function _update_detJdV!(detJvec::AbstractVector, q_point::Int, w, mapping)
@@ -99,7 +99,7 @@ function reinit!(cv::CellValues, cell::Union{AbstractCell, Nothing}, x::Abstract
     geo_mapping = cv.geo_mapping
     fun_values = cv.fun_values
     n_geom_basefuncs = getngeobasefunctions(geo_mapping)
-    
+
     check_reinit_sdim_consistency(:CellValues, shape_gradient_type(cv), eltype(x))
     if cell === nothing && !isa(mapping_type(fun_values), IdentityMapping)
         throw(ArgumentError("The cell::AbstractCell input is required to reinit! non-identity function mappings"))
@@ -126,6 +126,6 @@ function Base.show(io::IO, d::MIME"text/plain", cv::CellValues)
     print(io, "CellValues(", vstr, ", rdim=$rdim, and sdim=$sdim): ")
     print(io, getnquadpoints(cv), " quadrature points")
     print(io, "\n Function interpolation: "); show(io, d, ip_fun)
-    print(io, "\nGeometric interpolation: "); 
+    print(io, "\nGeometric interpolation: ");
     sdim === nothing ? show(io, d, ip_geo) : show(io, d, ip_geo^sdim)
 end

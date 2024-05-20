@@ -87,7 +87,7 @@ end
 
 @testset "Dofs for quad in 3d (shell)" begin
 
-nodes = [Node{3,Float64}(Vec(0.0,0.0,0.0)), Node{3,Float64}(Vec(1.0,0.0,0.0)), 
+nodes = [Node{3,Float64}(Vec(0.0,0.0,0.0)), Node{3,Float64}(Vec(1.0,0.0,0.0)),
             Node{3,Float64}(Vec(1.0,1.0,0.0)), Node{3,Float64}(Vec(0.0,1.0,0.0)),
             Node{3,Float64}(Vec(2.0,0.0,0.0)), Node{3,Float64}(Vec(2.0,2.0,0.0))]
 
@@ -543,38 +543,38 @@ end
         # reshape.(Iterators.product(fill([true, false], 9)...) |> collect |> vec .|> collect, Ref((3,3))),
         [
             true  true  true
-            true  true  true 
-            true  true  true 
+            true  true  true
+            true  true  true
         ],
         [
             true   false  false
-            false  true  false 
-            false  false  true 
+            false  true  false
+            false  false  true
         ],
         [
             true   true  false
-            true  true  true 
-            false  true  true 
+            true  true  true
+            false  true  true
         ],
 
         # Component coupling
         [
             true    true    true    true
-            true    true    true    true 
             true    true    true    true
-            true    true    true    true 
+            true    true    true    true
+            true    true    true    true
         ],
         [
             true     false    false    false
-            false    true     false    false 
+            false    true     false    false
             false    false    true     false
-            false    false    false    true 
+            false    false    false    true
         ],
         [
             true    true    true    false
-            true    true    true    true 
             true    true    true    true
-            false    true    true    true 
+            true    true    true    true
+            false    true    true    true
         ],
     ]
     function is_stored(A, i, j)
@@ -589,7 +589,7 @@ end
             i_dofs = dof_range(sdh, field1_idx)
             ip1 = sdh.field_interpolations[field1_idx]
             vdim[1] = typeof(ip1) <: VectorizedInterpolation && size(coupling)[1] == 4 ? Ferrite.get_n_copies(ip1) : 1
-            for dim1 in 1:vdim[1] 
+            for dim1 in 1:vdim[1]
                 for cell2_idx in neighbors
                     sdh2 = dh.subdofhandlers[dh.cell_to_subdofhandler[cell2_idx]]
                     coupling_idx[2] = 1
@@ -638,7 +638,7 @@ end
     close!(dh)
     for coupling in couplings, cross_coupling in couplings
         K = create_sparsity_pattern(dh; coupling=coupling, topology = topology, cross_coupling = cross_coupling)
-        all(coupling) && @test K == create_sparsity_pattern(dh, topology = topology, cross_coupling = cross_coupling) 
+        all(coupling) && @test K == create_sparsity_pattern(dh, topology = topology, cross_coupling = cross_coupling)
         check_coupling(dh, topology, K, coupling, cross_coupling)
     end
 
@@ -646,7 +646,7 @@ end
     @test_throws ErrorException("coupling not square") create_sparsity_pattern(dh; coupling=[true true])
     @test_throws ErrorException("coupling not symmetric") create_symmetric_sparsity_pattern(dh; coupling=[true true; false true])
     @test_throws ErrorException("could not create coupling") create_symmetric_sparsity_pattern(dh; coupling=falses(100, 100))
- 
+
     # Test coupling with subdomains
     # Note: `check_coupling` works for this case only because the second domain has dofs from the first domain in order. Otherwise tests like in continuous ip are required.
     grid = generate_grid(Quadrilateral, (2, 1))
@@ -685,8 +685,8 @@ end
 
     # Node numbering:
     # 3 ____ 4  4
-    # |      |  |   
-    # |      |  | (Beam attached to facet)    
+    # |      |  |
+    # |      |  | (Beam attached to facet)
     # 1 ____ 2  2
 
     dim = 2
@@ -712,15 +712,15 @@ end
     celldofs!(dofsbeam, dh, 2)
     @test dofsbeam == [2, 3, 6]
 
-    # Node numbering:           
+    # Node numbering:
     #            5--------7
     #           /        /|
     #          /        / |
     #         6--------8  |
     #         |        |  3   <-- Shell attached on face (4, 3, 7, 8)
-    #         |        | / 
-    #         |        |/  
-    #         2--------4   
+    #         |        | /
+    #         |        |/
+    #         2--------4
 
     dim = 2
     grid = generate_grid(Hexahedron, (1,1,1))

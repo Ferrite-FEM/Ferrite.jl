@@ -190,8 +190,8 @@ more discussion).
   + add!(dh, :u, Lagrange{RefTriangle, 1}())
   ```
 
-- **VTK export**: Ferrite no longer extends methods from `WriteVTK.jl`, instead the new types 
-  `VTKFile` and `VTKFileCollection` should be used instead. New methods exists for writing to 
+- **VTK export**: Ferrite no longer extends methods from `WriteVTK.jl`, instead the new types
+  `VTKFile` and `VTKFileCollection` should be used instead. New methods exists for writing to
   a `VTKFile`, e.g. `write_solution`, `write_cell_data`, `write_node_data`, and `write_projection`.
   See [#692][github-692].
 
@@ -267,14 +267,14 @@ more discussion).
 
 - VTK export now work with `QuadraticHexahedron` elements. ([#714][github-714])
 
-- The function `bounding_box(::AbstractGrid)` has been added. It computes the bounding box for 
-  a given grid (based on its node coordinates), and returns the minimum and maximum vertices 
+- The function `bounding_box(::AbstractGrid)` has been added. It computes the bounding box for
+  a given grid (based on its node coordinates), and returns the minimum and maximum vertices
   of the bounding box. ([#880][github-880])
 
 ### Changed
 
 - `create_sparsity_pattern` now supports cross-element dof coupling by passing kwarg
-  `topology` along with an optional `cross_coupling` matrix that behaves similar to 
+  `topology` along with an optional `cross_coupling` matrix that behaves similar to
   the `coupling` kwarg. ([#710][github-#710])
 
 - The `AbstractCell` interface has been reworked. This change should not affect user code,

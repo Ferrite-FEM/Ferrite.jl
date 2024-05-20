@@ -237,7 +237,7 @@ end
     shape_hessian_gradient_and_value(ip::Interpolation, ξ::Vec, i::Int)
 
 Optimized version combining the evaluation [`Ferrite.shape_value(::Interpolation)`](@ref),
-[`Ferrite.shape_gradient(::Interpolation)`](@ref), and the gradient of the latter. 
+[`Ferrite.shape_gradient(::Interpolation)`](@ref), and the gradient of the latter.
 """
 function shape_hessian_gradient_and_value(ip::Interpolation, ξ::Vec, i::Int)
     return hessian(x -> shape_value(ip, x, i), ξ, :all)
@@ -252,7 +252,7 @@ and indices corresponding to the indices of a dof in [`vertices`](@ref), [`faces
 [`edges`](@ref).
 
     Only required for nodal interpolations.
-    
+
     TODO: Separate nodal and non-nodal interpolations.
 """
 reference_coordinates(::Interpolation)
@@ -354,7 +354,7 @@ edge dofs are included here.
     The dofs appearing in the tuple must be continuous and increasing! The first dof must be
     the computed via "last edge interior dof index + 1", if face dofs exist.
 """
-facedof_interior_indices(::Interpolation) 
+facedof_interior_indices(::Interpolation)
 
 """
     volumedof_interior_indices(ip::Interpolation)
@@ -389,7 +389,7 @@ facetdof_indices(ip::InterpolationByDim{2}) = Ferrite.edgedof_indices(ip)
 facetdof_indices(ip::InterpolationByDim{1}) = Ferrite.vertexdof_indices(ip)
 facetdof_interior_indices(ip::InterpolationByDim{3}) = Ferrite.facedof_interior_indices(ip)
 facetdof_interior_indices(ip::InterpolationByDim{2}) = Ferrite.edgedof_interior_indices(ip)
-facetdof_interior_indices(ip::InterpolationByDim{1}) = ntuple(_ -> (), nvertices(ip)) 
+facetdof_interior_indices(ip::InterpolationByDim{1}) = ntuple(_ -> (), nvertices(ip))
 dirichlet_facetdof_indices(ip::InterpolationByDim{3}) = dirichlet_facedof_indices(ip)
 dirichlet_facetdof_indices(ip::InterpolationByDim{2}) = dirichlet_edgedof_indices(ip)
 dirichlet_facetdof_indices(ip::InterpolationByDim{1}) = dirichlet_vertexdof_indices(ip)
@@ -1060,19 +1060,19 @@ end
 getnbasefunctions(::Lagrange{RefPrism,2}) = 18
 
 facedof_indices(::Lagrange{RefPrism,2}) = (
-    #Vertices| Edges  | Face 
+    #Vertices| Edges  | Face
     (1,3,2  , 8,10,7         ),
-    (1,2,5,4, 7,11,13,9,   16), 
+    (1,2,5,4, 7,11,13,9,   16),
     (3,1,4,6, 8,9,14,12,   17),
     (2,3,6,5, 10,12,15,11, 18),
     (4,5,6  , 13,15,14       ),
 )
 facedof_interior_indices(::Lagrange{RefPrism,2}) = (
-    #Vertices| Edges  | Face 
-    (), 
-    (16,), 
-    (17,), 
-    (18,), 
+    #Vertices| Edges  | Face
+    (),
+    (16,),
+    (17,),
+    (18,),
     (),
 )
 edgedof_indices(::Lagrange{RefPrism,2}) = (
@@ -1154,7 +1154,7 @@ end
 getnbasefunctions(::Lagrange{RefPyramid,1}) = 5
 facedof_indices(::Lagrange{RefPyramid,1}) = ((1,3,4,2), (1,2,5), (1,5,3), (2,4,5), (3,5,4), )
 edgedof_indices(::Lagrange{RefPyramid,1}) = ((1,2), (1,3), (1,5), (2,4), (2,5), (4,3), (3,5), (4,5))
- 
+
 function reference_coordinates(::Lagrange{RefPyramid,1})
     return [Vec{3, Float64}((0.0, 0.0, 0.0)),
             Vec{3, Float64}((1.0, 0.0, 0.0)),
@@ -1180,28 +1180,28 @@ end
 getnbasefunctions(::Lagrange{RefPyramid,2}) = 14
 
 facedof_indices(::Lagrange{RefPyramid,2}) = (
-    #Vertices | Edges  | Face 
-    (1,3,4,2, 7,11,9,6, 14), 
-    (1,2,5  , 6,10,8      ), 
-    (1,5,3  , 7,12,8      ), 
-    (2,4,5  , 9,13,10     ), 
-    (3,5,4  , 12,13,11    ), 
+    #Vertices | Edges  | Face
+    (1,3,4,2, 7,11,9,6, 14),
+    (1,2,5  , 6,10,8      ),
+    (1,5,3  , 7,12,8      ),
+    (2,4,5  , 9,13,10     ),
+    (3,5,4  , 12,13,11    ),
 )
 facedof_interior_indices(::Lagrange{RefPyramid,2}) = (
-    (14,), 
-    (), 
-    (), 
-    (), 
+    (14,),
+    (),
+    (),
+    (),
     (),
 )
 edgedof_indices(::Lagrange{RefPyramid,2}) = (
-    (1,2,6), 
-    (1,3,7), 
-    (1,5,8), 
-    (2,4,9), 
-    (2,5,10), 
-    (4,3,11), 
-    (3,5,12), 
+    (1,2,6),
+    (1,3,7),
+    (1,5,8),
+    (2,4,9),
+    (2,5,10),
+    (4,3,11),
+    (3,5,12),
     (4,5,13)
 )
 edgedof_interior_indices(::Lagrange{RefPyramid,2}) = (
@@ -1306,7 +1306,7 @@ struct Serendipity{shape, order, unused} <: ScalarInterpolation{shape,order}
     end
 end
 
-# Note that the edgedofs for high order serendipity elements are defined in terms of integral moments, 
+# Note that the edgedofs for high order serendipity elements are defined in terms of integral moments,
 # so no permutation exists in general. See e.g. Scroggs et al. [2022] for an example.
 # adjust_dofs_during_distribution(::Serendipity{refshape, order}) where {refshape, order} = false
 adjust_dofs_during_distribution(::Serendipity{<:Any, 2}) = false
@@ -1444,8 +1444,8 @@ end
 Classical non-conforming Crouzeix–Raviart element.
 
 For details we refer to the original paper:
-M. Crouzeix and P. Raviart. "Conforming and nonconforming finite element 
-methods for solving the stationary Stokes equations I." ESAIM: Mathematical Modelling 
+M. Crouzeix and P. Raviart. "Conforming and nonconforming finite element
+methods for solving the stationary Stokes equations I." ESAIM: Mathematical Modelling
 and Numerical Analysis-Modélisation Mathématique et Analyse Numérique 7.R3 (1973): 33-75.
 """
 struct CrouzeixRaviart{shape, order, unused} <: ScalarInterpolation{shape, order}
@@ -1467,7 +1467,7 @@ function reference_coordinates(::CrouzeixRaviart)
             Vec{2, Float64}((0.5, 0.0))]
 end
 
-function shape_value(ip::CrouzeixRaviart{RefTriangle, 1}, ξ::Vec{2}, i::Int) 
+function shape_value(ip::CrouzeixRaviart{RefTriangle, 1}, ξ::Vec{2}, i::Int)
     ξ_x = ξ[1]
     ξ_y = ξ[2]
     i == 1 && return 2*ξ_x + 2*ξ_y - 1
@@ -1550,7 +1550,7 @@ is_discontinuous(::Type{<:VectorizedInterpolation{<:Any, <:Any, <:Any, ip}}) whe
 Get the type of mapping from the reference cell to the real cell for an
 interpolation `ip`. Subtypes of `ScalarInterpolation` and `VectorizedInterpolation`
 return `IdentityMapping()`, but other non-scalar interpolations may request different
-mapping types. 
+mapping types.
 """
 function mapping_type end
 

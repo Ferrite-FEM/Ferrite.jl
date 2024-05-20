@@ -11,7 +11,7 @@ Adds a cellset to the grid with key `name`.
 Cellsets are typically used to define subdomains of the problem, e.g. two materials in the computational domain.
 The `DofHandler` can construct different fields which live not on the whole domain, but rather on a cellset.
 `all=true` implies that `f(x)` must return `true` for all nodal coordinates `x` in the cell if the cell
-should be added to the set, otherwise it suffices that `f(x)` returns `true` for one node. 
+should be added to the set, otherwise it suffices that `f(x)` returns `true` for one node.
 
 ```julia
 addcellset!(grid, "left", Set((1,3))) #add cells with id 1 and 3 to cellset left
@@ -28,41 +28,41 @@ end
 
 """
     addnodeset!(grid::AbstractGrid, name::String, nodeid::AbstractVecOrSet{Int})
-    addnodeset!(grid::AbstractGrid, name::String, f::Function)    
+    addnodeset!(grid::AbstractGrid, name::String, f::Function)
 
-Adds a `nodeset::OrderedSet{Int}` to the `grid`'s `nodesets` with key `name`. Has the same interface as `addcellset`. 
+Adds a `nodeset::OrderedSet{Int}` to the `grid`'s `nodesets` with key `name`. Has the same interface as `addcellset`.
 However, instead of mapping a cell id to the `String` key, a set of node ids is returned.
 """
-addnodeset!(grid::AbstractGrid, name::String, nodeid::AbstractVecOrSet{Int}) = 
+addnodeset!(grid::AbstractGrid, name::String, nodeid::AbstractVecOrSet{Int}) =
     _addset!(grid, name, nodeid, getnodesets(grid))
 
-addnodeset!(grid::AbstractGrid, name::String, f::Function) = 
+addnodeset!(grid::AbstractGrid, name::String, f::Function) =
     _addset!(grid, name, create_nodeset(grid, f), getnodesets(grid))
 
 """
     addfacetset!(grid::AbstractGrid, name::String, faceid::AbstractVecOrSet{FacetIndex})
-    addfacetset!(grid::AbstractGrid, name::String, f::Function; all::Bool=true) 
+    addfacetset!(grid::AbstractGrid, name::String, f::Function; all::Bool=true)
 
 Adds a facetset to the grid with key `name`.
 A facetset maps a `String` key to a `OrderedSet` of tuples corresponding to `(global_cell_id, local_facet_id)`.
 Facetsets can be used to initialize `Dirichlet` boundary conditions for the `ConstraintHandler`.
 `all=true` implies that `f(x)` must return `true` for all nodal coordinates `x` on the facet if the facet
-should be added to the set, otherwise it suffices that `f(x)` returns `true` for one node. 
+should be added to the set, otherwise it suffices that `f(x)` returns `true` for one node.
 
 ```julia
 addfacetset!(grid, "right", Set((FacetIndex(2,2), FacetIndex(4,2)))) #see grid manual example for reference
 addfacetset!(grid, "clamped", x -> norm(x[1]) ≈ 0.0) #see incompressible elasticity example for reference
 ```
 """
-addfacetset!(grid::AbstractGrid, name::String, set::AbstractVecOrSet{FacetIndex}) = 
+addfacetset!(grid::AbstractGrid, name::String, set::AbstractVecOrSet{FacetIndex}) =
     _addset!(grid, name, set, getfacetsets(grid))
 
-addfacetset!(grid::AbstractGrid, name::String, f::Function; all::Bool=true) = 
+addfacetset!(grid::AbstractGrid, name::String, f::Function; all::Bool=true) =
     _addset!(grid, name, create_facetset(grid, f; all=all), getfacetsets(grid))
 
 """
     addvertexset!(grid::AbstractGrid, name::String, faceid::AbstractVecOrSet{FaceIndex})
-    addvertexset!(grid::AbstractGrid, name::String, f::Function) 
+    addvertexset!(grid::AbstractGrid, name::String, f::Function)
 
 Adds a vertexset to the grid with key `name`.
 A vertexset maps a `String` key to a `OrderedSet` of tuples corresponding to `(global_cell_id, local_vertex_id)`.
@@ -73,10 +73,10 @@ addvertexset!(grid, "right", Set((VertexIndex(2,2), VertexIndex(4,2))))
 addvertexset!(grid, "clamped", x -> norm(x[1]) ≈ 0.0)
 ```
 """
-addvertexset!(grid::AbstractGrid, name::String, set::AbstractVecOrSet{VertexIndex}) = 
+addvertexset!(grid::AbstractGrid, name::String, set::AbstractVecOrSet{VertexIndex}) =
     _addset!(grid, name, set, getvertexsets(grid))
 
-addvertexset!(grid::AbstractGrid, name::String, f::Function) = 
+addvertexset!(grid::AbstractGrid, name::String, f::Function) =
     _addset!(grid, name, create_vertexset(grid, f; all=true), getvertexsets(grid))
 
 function _addset!(grid::AbstractGrid, name::String, _set::AbstractVecOrSet, dict::Dict)
@@ -133,7 +133,7 @@ function _create_set(f::Function, grid::AbstractGrid, ::Type{BI}; all=true) wher
     return set
 end
 
-# Given a boundary index, for example EdgeIndex(2, 1), add this to `set`, as well as any other `EdgeIndex` in the grid 
+# Given a boundary index, for example EdgeIndex(2, 1), add this to `set`, as well as any other `EdgeIndex` in the grid
 # pointing to the same edge (i.e. indices belong to neighboring cells)
 function push_entity_instances!(set::OrderedSet{BI}, grid::AbstractGrid, top::ExclusiveTopology, entity::BI) where {BI <: BoundaryIndex}
     push!(set, entity) # Add the given entity
@@ -150,11 +150,11 @@ function push_entity_instances!(set::OrderedSet{BI}, grid::AbstractGrid, top::Ex
     return set
 end
 
-# Create a `OrderedSet{BI}` whose entities are a subset of facets which do not have neighbors, i.e. that are on the boundary. 
-# Note that this may include entities from cells incident to the facet, e.g. 
+# Create a `OrderedSet{BI}` whose entities are a subset of facets which do not have neighbors, i.e. that are on the boundary.
+# Note that this may include entities from cells incident to the facet, e.g.
 # ____  consider the case of a vertex boundary set, with f(x) only true on the right side. Then also the VertexIndex
-# |\ |  belong to the lower left cell, in its lower right corner, is on the boundary, so this should be added too.  
-# |_\|  That is done by the `push_entity_instances!` function. 
+# |\ |  belong to the lower left cell, in its lower right corner, is on the boundary, so this should be added too.
+# |_\|  That is done by the `push_entity_instances!` function.
 function _create_boundaryset(f::Function, grid::AbstractGrid, top::ExclusiveTopology, ::Type{BI}; all = true) where {BI <: BoundaryIndex}
     # Function barrier as get_facet_facet_neighborhood is not always type stable
     function _makeset(ff_nh)
@@ -193,14 +193,14 @@ function create_cellset(grid::AbstractGrid, f::Function; all::Bool=true)
         end
         pass && push!(cells, i)
     end
-    return cells 
+    return cells
 end
 function create_nodeset(grid::AbstractGrid, f::Function)
     nodes = OrderedSet{Int}()
     for (i, n) in pairs(getnodes(grid))
         f(get_node_coordinate(n)) && push!(nodes, i)
     end
-    return nodes 
+    return nodes
 end
 create_vertexset(grid::AbstractGrid, f::Function; kwargs...) = _create_set(f, grid, VertexIndex; kwargs...)
 create_edgeset(  grid::AbstractGrid, f::Function; kwargs...) = _create_set(f, grid, EdgeIndex;   kwargs...)
@@ -215,7 +215,7 @@ create_boundaryfacetset( grid::AbstractGrid, top::ExclusiveTopology, f::Function
 """
     bounding_box(grid::AbstractGrid)
 
-Computes the axis-aligned bounding box for a given grid, based on its node coordinates. 
+Computes the axis-aligned bounding box for a given grid, based on its node coordinates.
 Returns the minimum and maximum vertex coordinates of the bounding box.
 """
 function bounding_box(grid::AbstractGrid{dim}) where {dim}
