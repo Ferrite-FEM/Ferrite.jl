@@ -292,30 +292,34 @@ There are multiple helper structures to apply boundary conditions or define subd
 - `nodesets::Dict{String,Set{Int}}`: maps a `String` key to a `Set` of global node ids
 - `facetsets::Dict{String,Set{FacetIndex}}`: maps a `String` to a `Set` of `Set{FacetIndex} (global_cell_id, local_facet_id)`
 - `vertexsets::Dict{String,Set{VertexIndex}}`: maps a `String` key to a `Set` of local vertex ids
+- `cellsets::Dict{String,OrderedSet{Int}}`: maps a `String` key to an `OrderedSet` of cell ids
+- `nodesets::Dict{String,OrderedSet{Int}}`: maps a `String` key to an `OrderedSet` of global node ids
+- `facetsets::Dict{String,OrderedSet{FacetIndex}}`: maps a `String` to an `OrderedSet` of `FacetIndex`
+- `vertexsets::Dict{String,OrderedSet{VertexIndex}}`: maps a `String` key to an `OrderedSet` of `VertexIndex`
 """
 mutable struct Grid{dim,C<:AbstractCell,T<:Real} <: AbstractGrid{dim}
     cells::Vector{C}
     nodes::Vector{Node{dim,T}}
     # Sets
-    cellsets::Dict{String,Set{Int}}
-    nodesets::Dict{String,Set{Int}}
-    facetsets::Dict{String,Set{FacetIndex}}
-    vertexsets::Dict{String,Set{VertexIndex}}
+    cellsets::Dict{String,OrderedSet{Int}}
+    nodesets::Dict{String,OrderedSet{Int}}
+    facetsets::Dict{String,OrderedSet{FacetIndex}}
+    vertexsets::Dict{String,OrderedSet{VertexIndex}}
 end
 
 function Grid(cells::Vector{C},
               nodes::Vector{Node{dim,T}};
-              cellsets::Dict{String,Set{Int}}=Dict{String,Set{Int}}(),
-              nodesets::Dict{String,Set{Int}}=Dict{String,Set{Int}}(),
-              facetsets::Dict{String,Set{FacetIndex}}=Dict{String,Set{FacetIndex}}(),
-              facesets = nothing,
-              vertexsets::Dict{String,Set{VertexIndex}}=Dict{String,Set{VertexIndex}}(),
+              cellsets::Dict{String, <:AbstractVecOrSet{Int}}=Dict{String,OrderedSet{Int}}(),
+              nodesets::Dict{String, <:AbstractVecOrSet{Int}}=Dict{String,OrderedSet{Int}}(),
+              facetsets::Dict{String, <:AbstractVecOrSet{FacetIndex}}=Dict{String,OrderedSet{FacetIndex}}(),
+              facesets=nothing, # deprecated
+              vertexsets::Dict{String, <:AbstractVecOrSet{VertexIndex}}=Dict{String,OrderedSet{VertexIndex}}(),
               boundary_matrix = nothing) where {dim,C,T}
     if facesets !== nothing 
         if isempty(facetsets)
             @warn "facesets in Grid is deprecated, use facetsets instead" maxlog=1
             for (key, set) in facesets
-                facetsets[key] = Set(FacetIndex(cellnr, facenr) for (cellnr, facenr) in set)
+                facetsets[key] = OrderedSet(FacetIndex(cellnr, facenr) for (cellnr, facenr) in set)
             end
         else
             error("facesets are deprecated, use only facetsets")
@@ -324,7 +328,14 @@ function Grid(cells::Vector{C},
     if boundary_matrix !== nothing
         error("`boundary_matrix` is not part of the Grid anymore and thus not a supported keyword argument.")
     end
-    return Grid(cells, nodes, cellsets, nodesets, facetsets, vertexsets)
+    return Grid(
+        cells,
+        nodes,
+        convert_to_orderedsets(cellsets),
+        convert_to_orderedsets(nodesets),
+        convert_to_orderedsets(facetsets),
+        convert_to_orderedsets(vertexsets),
+    )
 end
 
 ##########################
@@ -416,7 +427,7 @@ end
 """
     getcellset(grid::AbstractGrid, setname::String)
 
-Returns all cells as cellid in a `Set` of a given `setname`.
+Returns all cells as cellid in the set with name `setname`.
 """
 @inline getcellset(grid::AbstractGrid, setname::String) = grid.cellsets[setname]
 """
@@ -429,7 +440,7 @@ Returns all cellsets of the `grid`.
 """
     getnodeset(grid::AbstractGrid, setname::String)
 
-Returns all nodes as nodeid in a `Set` of a given `setname`.
+Returns all nodes as nodeid in the set with name `setname`.
 """
 @inline getnodeset(grid::AbstractGrid, setname::String) = grid.nodesets[setname]
 """
@@ -442,7 +453,7 @@ Returns all nodesets of the `grid`.
 """
     getfacetset(grid::AbstractGrid, setname::String)
 
-Returns all facets as `FacetIndex` in a `Set` of a given `setname`.
+Returns all faces as `FacetIndex` in the set with name `setname`.
 """
 @inline getfacetset(grid::AbstractGrid, setname::String) = grid.facetsets[setname]
 """
@@ -456,7 +467,7 @@ Returns all facet sets of the `grid`.
 """
     getvertexset(grid::AbstractGrid, setname::String)
 
-Returns all vertices as `VertexIndex` in a `Set` of a given `setname`.
+Returns all vertices as `VertexIndex` in the set with name `setname`.
 """
 @inline getvertexset(grid::AbstractGrid, setname::String) = grid.vertexsets[setname]
 """
@@ -535,7 +546,7 @@ function Base.show(io::IO, ::MIME"text/plain", grid::Grid)
     if isconcretetype(eltype(grid.cells))
         typestrs = [repr(eltype(grid.cells))]
     else
-        typestrs = sort!(repr.(Set(typeof(x) for x in grid.cells)))
+        typestrs = sort!(repr.(OrderedSet(typeof(x) for x in grid.cells)))
     end
     join(io, typestrs, '/')
     print(io, " cells and $(getnnodes(grid)) nodes")
