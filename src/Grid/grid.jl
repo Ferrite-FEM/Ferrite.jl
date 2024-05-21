@@ -9,10 +9,10 @@ A `Node` is a point in space.
 # Fields
 - `x::Vec{dim,T}`: stores the coordinates
 """
-struct Node{dim,T}
-    x::Vec{dim,T}
+struct Node{dim, T}
+    x::Vec{dim, T}
 end
-Node(x::NTuple{dim,T}) where {dim,T} = Node(Vec{dim,T}(x))
+Node(x::NTuple{dim, T}) where {dim,T} = Node(Vec{dim, T}(x))
 
 """
     get_node_coordinate(::Node)
@@ -26,14 +26,14 @@ get_node_coordinate(n::Node) = n.x
 
 Get the data type of the the node coordinate.
 """
-get_coordinate_type(::Node{dim,T}) where {dim,T}  = Vec{dim,T}
+get_coordinate_type(::Node{dim, T}) where {dim,T}  = Vec{dim, T}
 
 """
     get_coordinate_eltype(::Node)
 
 Get the data type of the components of the nodes coordinate.
 """
-get_coordinate_eltype(::Node{dim,T}) where {dim,T} = T
+get_coordinate_eltype(::Node{dim, T}) where {dim,T} = T
 
 ##########################
 # AbstractCell interface #
@@ -48,11 +48,12 @@ nvertices(c::AbstractCell) = length(vertices(c))
 nedges(   c::AbstractCell) = length(edges(c))
 nfaces(   c::AbstractCell) = length(faces(c))
 nfacets(  c::AbstractCell) = length(facets(c))
+nnodes(   c::AbstractCell) = length(get_node_ids(c))
+
 nvertices(::Type{T}) where {T <: AbstractRefShape} = length(reference_vertices(T))
 nedges(   ::Type{T}) where {T <: AbstractRefShape} = length(reference_edges(T))
 nfaces(   ::Type{T}) where {T <: AbstractRefShape} = length(reference_faces(T))
 nfacets(  ::Type{T}) where {T <: AbstractRefShape} = length(reference_facets(T))
-nnodes(   c::AbstractCell) = length(get_node_ids(c))
 
 """
     Ferrite.vertices(::AbstractCell)
@@ -270,7 +271,7 @@ Specifies for each subtype of AbstractCell how many nodes form an edge.
 """
 nvertices_on_edge(cell::AbstractCell, local_edge_index::Int) = length(edges(cell)[local_edge_index])
 
-getdim(::Union{AbstractCell{refshape},Type{<:AbstractCell{refshape}}}) where {refdim, refshape <: AbstractRefShape{refdim}} = refdim
+getdim(::Union{AbstractCell{RefShape}, Type{<:AbstractCell{RefShape}}}) where {refdim, RefShape <: AbstractRefShape{refdim}} = refdim
 
 
 ######################
