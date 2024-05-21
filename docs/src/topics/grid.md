@@ -86,9 +86,11 @@ boundary_facets = [(3, 6), (6, 9)]
 i.e. by using the node IDs of the reference shape vertices.
 
 The first of these can be found as the 2nd facet of the 2nd cell.
-```@example
+```@repl
+using Ferrite #hide
 Ferrite.facets(Quadrilateral((2, 3, 6, 5)))
 ```
+
 The unique representation of an entity is given by the sorted version of this tuple.
 While we could use this information to construct a facet set, Ferrite can construct this
 set by filtering based on the coordinates, using [`addfacetset!`](@ref).
