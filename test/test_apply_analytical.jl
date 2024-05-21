@@ -109,8 +109,8 @@
                     apply_analytical!(a, dh, :u, f)
                     @test sum(a)/length(a) ≈ num_udofs/(num_udofs+num_pdofs)
 
-                    # If not super/subparametric, compare with ConstraintHandler and node set 
-                    if ip_order_u==ip_order_p==getcellorder(CT)    
+                    # If not super/subparametric, compare with ConstraintHandler and node set
+                    if ip_order_u==ip_order_p==getcellorder(CT)
                         fill!(a, 0)
                         a_ch = copy(a)
                         fp(x) = norm(x)^2
@@ -126,8 +126,8 @@
                         apply_analytical!(a, dh, :u, fu)
                         apply_analytical!(a, dh, :p, fp)
 
-                        @test a ≈ a_ch 
-                    end 
+                        @test a ≈ a_ch
+                    end
                 end
             end
         end

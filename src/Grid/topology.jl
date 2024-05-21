@@ -43,7 +43,7 @@ abstract type AbstractTopology end
     ExclusiveTopology(grid::Grid)
 
 `ExclusiveTopology` saves topological (connectivity/neighborhood) data of the grid. The constructor works with an `AbstractCell`
-vector for all cells that dispatch `vertices`, `faces` and in 3D `edges`.
+vector for all cells that dispatch `vertices`, `edges`, and `faces`.
 The struct saves the highest dimensional neighborhood, i.e. if something is connected by a face and an
  edge only the face neighborhood is saved. The lower dimensional neighborhood is recomputed, if needed.
 
@@ -53,7 +53,7 @@ The struct saves the highest dimensional neighborhood, i.e. if something is conn
 - `face_neighbor::Matrix{EntityNeighborhood,Int}`: `face_neighbor[cellid,local_face_id]` -> neighboring face
 - `vertex_neighbor::Matrix{EntityNeighborhood,Int}`: `vertex_neighbor[cellid,local_vertex_id]` -> neighboring vertex
 - `edge_neighbor::Matrix{EntityNeighborhood,Int}`: `edge_neighbor[cellid_local_vertex_id]` -> neighboring edge
-- `face_skeleton::Union{Vector{FaceIndex}, Nothing}`: 
+- `face_skeleton::Union{Vector{FaceIndex}, Nothing}`:
 
 !!! note Currently mixed-dimensional queries do not work at the moment. They will be added back later.
 """
@@ -70,7 +70,20 @@ mutable struct ExclusiveTopology <: AbstractTopology
     edge_edge_neighbor::Matrix{EntityNeighborhood{EdgeIndex}}
     # lazy constructed face topology
     face_skeleton::Union{Vector{FaceIndex}, Nothing}
+    edge_skeleton::Union{Vector{EdgeIndex}, Nothing}
+    vertex_skeleton::Union{Vector{VertexIndex}, Nothing}
     # TODO reintroduce the codimensional connectivity, e.g. 3D edge to 2D face
+end
+
+function get_facet_facet_neighborhood(t::ExclusiveTopology, g::AbstractGrid)
+    return _get_facet_facet_neighborhood(t, Val(get_reference_dimension(g)))
+end
+_get_facet_facet_neighborhood(t::ExclusiveTopology, #=rdim=#::Val{1}) = t.vertex_vertex_neighbor
+_get_facet_facet_neighborhood(t::ExclusiveTopology, #=rdim=#::Val{2}) = t.edge_edge_neighbor
+_get_facet_facet_neighborhood(t::ExclusiveTopology, #=rdim=#::Val{3}) = t.face_face_neighbor
+function _get_facet_facet_neighborhood(::ExclusiveTopology, #=rdim=#::Val{:mixed})
+    throw(ArgumentError("get_facet_facet_neightborhood is only supported for grids containing cells with the same reference dimension.
+    Access the `vertex_vertex_neighbor`, `edge_edge_neighbor`, or `face_face_neighbor` fields explicitly instead."))
 end
 
 function Base.show(io::IO, ::MIME"text/plain", topology::ExclusiveTopology)
@@ -125,16 +138,10 @@ function _exclusive_topology_ctor(cells::Vector{C}, vertex_cell_table::Array{Set
                         end
                     end
                 end
-            # Shared path
+            # Shared edge
             elseif num_shared_vertices == 2
-                if getdim(cell) == 2
-                    _add_single_face_neighbor!(face_table, cell, cell_id, cell_neighbor, cell_neighbor_id)
-                elseif getdim(cell) == 3
-                    _add_single_edge_neighbor!(edge_table, cell, cell_id, cell_neighbor, cell_neighbor_id)
-                else
-                    @error "Case not implemented."
-                end
-            # Shared surface
+                _add_single_edge_neighbor!(edge_table, cell, cell_id, cell_neighbor, cell_neighbor_id)
+            # Shared face
             elseif num_shared_vertices >= 3
                 _add_single_face_neighbor!(face_table, cell, cell_id, cell_neighbor, cell_neighbor_id)
             else
@@ -165,8 +172,8 @@ function ExclusiveTopology(cells::Vector{C}) where C <: AbstractCell
         dim = getdim(cells[1])
 
         max_vertices = nvertices(cells[1])
-        dim > 1 && (max_faces = nfaces(cells[1]))
-        dim > 2 && (max_edges = nedges(cells[1]))
+        max_faces = nfaces(cells[1])
+        max_edges = nedges(cells[1])
     else
         celltypes = Set(typeof.(cells))
         for celltype in celltypes
@@ -174,8 +181,8 @@ function ExclusiveTopology(cells::Vector{C}) where C <: AbstractCell
             dim = getdim(cells[celltypeidx])
 
             max_vertices = max(max_vertices,nvertices(cells[celltypeidx]))
-            dim > 1 && (max_faces = max(max_faces, nfaces(cells[celltypeidx])))
-            dim > 2 && (max_edges = max(max_edges, nedges(cells[celltypeidx])))
+            max_faces = max(max_faces, nfaces(cells[celltypeidx]))
+            max_edges = max(max_edges, nedges(cells[celltypeidx]))
         end
     end
 
@@ -202,7 +209,7 @@ function ExclusiveTopology(cells::Vector{C}) where C <: AbstractCell
 
     _exclusive_topology_ctor(cells, vertex_cell_table, vertex_table, face_table, edge_table, cell_neighbor_table)
 
-    return ExclusiveTopology(vertex_cell_table,cell_neighbor_table,face_table,vertex_table,edge_table,nothing)
+    return ExclusiveTopology(vertex_cell_table,cell_neighbor_table,face_table,vertex_table,edge_table,nothing,nothing,nothing)
 end
 
 function _add_single_face_neighbor!(face_table, cell::C1, cell_id, cell_neighbor::C2, cell_neighbor_id) where {C1, C2}
@@ -271,14 +278,14 @@ function getneighborhood(top::ExclusiveTopology, grid::AbstractGrid, vertexidx::
     return self_reference_local
 end
 
-function getneighborhood(top::ExclusiveTopology, grid::AbstractGrid{3}, edgeidx::EdgeIndex, include_self=false)
+function getneighborhood(top::ExclusiveTopology, grid::AbstractGrid, edgeidx::EdgeIndex, include_self=false)
     cellid, local_edgeidx = edgeidx[1], edgeidx[2]
     cell_edges = edges(getcells(grid,cellid))
     nonlocal_edgeid = cell_edges[local_edgeidx]
     cell_neighbors = getneighborhood(top,grid,CellIndex(cellid))
     self_reference_local = EdgeIndex[]
     for cellid in cell_neighbors
-        local_neighbor_edgeid = findfirst(x->issubset(x,nonlocal_edgeid),edges(getcells(grid,cellid)))::Int
+        local_neighbor_edgeid = findfirst(x->issubset(x,nonlocal_edgeid),edges(getcells(grid,cellid)))
         local_neighbor_edgeid === nothing && continue
         local_edge = EdgeIndex(cellid,local_neighbor_edgeid)
         push!(self_reference_local, local_edge)
@@ -288,6 +295,18 @@ function getneighborhood(top::ExclusiveTopology, grid::AbstractGrid{3}, edgeidx:
     else
         return unique([top.edge_edge_neighbor[cellid, local_edgeidx].neighbor_info; self_reference_local])
     end
+end
+
+function getneighborhood(top::ExclusiveTopology, grid::AbstractGrid, facetindex::FacetIndex, include_self=false)
+    rdim = get_reference_dimension(grid)
+    return _getneighborhood(Val(rdim), top, grid, facetindex, include_self)
+end
+_getneighborhood(::Val{1}, top, grid, facetindex::FacetIndex, include_self) = getneighborhood(top, grid, VertexIndex(facetindex...), include_self)
+_getneighborhood(::Val{2}, top, grid, facetindex::FacetIndex, include_self) = getneighborhood(top, grid, EdgeIndex(facetindex...), include_self)
+_getneighborhood(::Val{3}, top, grid, facetindex::FacetIndex, include_self) = getneighborhood(top, grid, FaceIndex(facetindex...), include_self)
+function _getneighborhood(::Val{:mixed}, args...)
+    throw(ArgumentError("getneighborhood with FacetIndex is is only supported for grids containing cells with a common reference dimension.
+    For mixed-dimensionality grid, use `VertexIndex`, `EdgeIndex`, and `FaceIndex` explicitly"))
 end
 
 """
@@ -301,7 +320,7 @@ function vertex_star_stencils(top::ExclusiveTopology, grid::Grid)
     for (global_vertexid,cellset) ∈ enumerate(top.vertex_to_cell)
         vertex_neighbors_local = VertexIndex[]
         for cell ∈ cellset
-            neighbor_boundary = getdim(cells[cell]) > 2 ? collect(edges(cells[cell])) : collect(faces(cells[cell])) #get lowest dimension boundary
+            neighbor_boundary = edges(cells[cell])
             neighbor_connected_faces = neighbor_boundary[findall(x->global_vertexid ∈ x, neighbor_boundary)]
             this_local_vertex = findfirst(i->toglobal(grid, VertexIndex(cell, i)) == global_vertexid, 1:nvertices(cells[cell]))
             push!(vertex_neighbors_local, VertexIndex(cell, this_local_vertex))
@@ -325,33 +344,86 @@ function getstencil(top::Dict{Int, EntityNeighborhood{VertexIndex}}, grid::Grid,
 end
 
 """
-    _faceskeleton(topology::ExclusiveTopology, grid::Grid) -> Iterable{FaceIndex}
-Creates an iterateable face skeleton. The skeleton consists of `FaceIndex` that can be used to `reinit`
-`FaceValues`.
+    _create_skeleton(neighborhood::Matrix{EntityNeighborhood{BI}}) where BI <: Union{FaceIndex, EdgeIndex, VertexIndex}
+
+Materializes the skeleton from the `neighborhood` information by returning a `Vector{BI}` with `BI`s describing
+the unique entities in the grid.
+
+*Example:* With `BI=EdgeIndex`, and an edge between cells and 1 and 2, with vertices 2 and 5, could be described by either
+`EdgeIndex(1, 2)` or `EdgeIndex(2, 4)`, but only one of these will be in the vector returned by this function.
 """
-function _faceskeleton(top::ExclusiveTopology, grid::Grid)
-    cells = getcells(grid)
-    cell_dim = getdim(first(cells))
-    @assert all(cell -> getdim(cell) == cell_dim, cells) "Face skeleton construction requires all the elements to be of the same dimensionality"
+function _create_skeleton(neighborhood::Matrix{EntityNeighborhood{BI}}) where BI <: Union{FaceIndex, EdgeIndex, VertexIndex}
     i = 1
-    neighborhood = cell_dim == 1 ? top.vertex_vertex_neighbor : top.face_face_neighbor
-    face_skeleton_local = Array{FaceIndex}(undef, length(neighborhood) - count(neighbors -> !isempty(neighbors) , neighborhood) ÷ 2)
-    for (idx, face) in pairs(neighborhood)
-        isempty(face.neighbor_info) || face.neighbor_info[][1] > idx[1] || continue
-        face_skeleton_local[i] = FaceIndex(idx[1], idx[2])
+    skeleton = Vector{BI}(undef, length(neighborhood) - count(neighbors -> !isempty(neighbors) , neighborhood) ÷ 2)
+    for (idx, entity) in pairs(neighborhood)
+        isempty(entity.neighbor_info) || entity.neighbor_info[][1] > idx[1] || continue
+        skeleton[i] = BI(idx[1], idx[2])
         i += 1
     end
-    return face_skeleton_local
+    return skeleton
+end
+
+#TODO: For the specific entities the grid input is unused
+"""
+    vertexskeleton(top::ExclusiveTopology, ::AbstractGrid) -> Vector{VertexIndex}
+
+Materializes the skeleton from the `neighborhood` information by returning a `Vector{VertexIndex}`
+describing the unique vertices in the grid. (One unique vertex may have multiple `VertexIndex`, but only
+one is included in the returned `Vector`)
+"""
+function vertexskeleton(top::ExclusiveTopology, ::Union{AbstractGrid,Nothing}=nothing)
+    if top.vertex_skeleton === nothing
+        top.vertex_skeleton = _create_skeleton(top.vertex_vertex_neighbor)
+    end
+    return top.vertex_skeleton
 end
 
 """
-    face_skeleton(top::ExclusiveTopology, grid::Grid) -> Vector{FaceIndex}
-Creates an iterateable face skeleton. The skeleton consists of `FaceIndex` that can be used to `reinit`
-`FaceValues`.
+    edgeskeleton(top::ExclusiveTopology, ::AbstractGrid) -> Vector{EdgeIndex}
+
+Materializes the skeleton from the `neighborhood` information by returning a `Vector{EdgeIndex}`
+describing the unique edge in the grid. (One unique edge may have multiple `EdgeIndex`, but only
+one is included in the returned `Vector`)
 """
-function faceskeleton(top::ExclusiveTopology, grid::Grid)
+function edgeskeleton(top::ExclusiveTopology, ::Union{AbstractGrid,Nothing}=nothing)
+    if top.edge_skeleton === nothing
+        top.edge_skeleton = _create_skeleton(top.edge_edge_neighbor)
+    end
+    return top.edge_skeleton
+end
+
+"""
+    faceskeleton(top::ExclusiveTopology, ::AbstractGrid) -> Vector{FaceIndex}
+
+Materializes the skeleton from the `neighborhood` information by returning a `Vector{FaceIndex}`
+describing the unique faces in the grid. (One unique face may have multiple `FaceIndex`, but only
+one is included in the returned `Vector`)
+"""
+function faceskeleton(top::ExclusiveTopology, ::Union{AbstractGrid,Nothing}=nothing)
     if top.face_skeleton === nothing
-        top.face_skeleton = _faceskeleton(top, grid)
+        top.face_skeleton = _create_skeleton(top.face_face_neighbor)
     end
     return top.face_skeleton
+end
+
+"""
+    facetskeleton(top::ExclusiveTopology, grid::AbstractGrid)
+
+Materializes the skeleton from the `neighborhood` information by returning a `Vector{BI}` where
+`BI <: Union{VertexIndex, EdgeIndex, FaceIndex}`.
+It describes the unique facets in the grid, and allows for dimension-independent code in the case
+that all cells have the same reference dimension. For cells with different reference dimensions,
+[`Ferrite.vertexskeleton`](@ref), [`Ferrite.edgeskeleton`](@ref), or [`Ferrite.faceskeleton`](@ref)
+must be used explicitly.
+"""
+function facetskeleton(top::ExclusiveTopology, grid::AbstractGrid)
+    rdim = get_reference_dimension(grid)
+    return _facetskeleton(top, Val(rdim))
+end
+_facetskeleton(top::ExclusiveTopology, #=rdim=#::Val{1}) = vertexskeleton(top)
+_facetskeleton(top::ExclusiveTopology, #=rdim=#::Val{2}) = edgeskeleton(top)
+_facetskeleton(top::ExclusiveTopology, #=rdim=#::Val{3}) = faceskeleton(top)
+function _facetskeleton(::ExclusiveTopology, #=rdim=#::Val{:mixed})
+    throw(ArgumentError("facetskeleton is only supported for grids containing cells with a common reference dimension.
+    For mixed-dimensionality grid, use `faceskeleton`, `edgeskeleton`, and `vertexskeleton` explicitly"))
 end

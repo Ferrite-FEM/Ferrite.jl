@@ -55,7 +55,7 @@ function _get_cellcoords(points::AbstractVector{Vec{dim,T}}, grid::AbstractGrid,
 
     # set up tree structure for finding nearest nodes to points
     kdtree = KDTree(reinterpret(Vec{dim,T}, getnodes(grid)))
-    nearest_nodes, _ = knn(kdtree, points, search_nneighbors, true) 
+    nearest_nodes, _ = knn(kdtree, points, search_nneighbors, true)
 
     cells = Vector{Union{Nothing, Int}}(nothing, length(points))
     local_coords = Vector{Union{Nothing, Vec{dim, T}}}(nothing, length(points))
@@ -234,7 +234,7 @@ function _evaluate_at_points!(
     ph::PointEvalHandler,
     dh::AbstractDofHandler,
     pv::PointValues,
-    cellset::Union{Nothing, Set{Int}},
+    cellset::Union{Nothing, AbstractSet{Int}},
     dofrange::AbstractRange{Int},
     ) where {T2,T}
 

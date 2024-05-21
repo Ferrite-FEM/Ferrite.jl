@@ -436,11 +436,10 @@ struct ForestBWG{dim, C<:OctreeBWG, T<:Real} <: AbstractAdaptiveGrid{dim}
     cells::Vector{C}
     nodes::Vector{Node{dim,T}}
     # Sets
-    cellsets::Dict{String,Set{Int}}
-    nodesets::Dict{String,Set{Int}}
-    facesets::Dict{String,Set{Ferrite.FaceIndex}}
-    edgesets::Dict{String,Set{Ferrite.EdgeIndex}}
-    vertexsets::Dict{String,Set{Ferrite.VertexIndex}}
+    cellsets::Dict{String,OrderedSet{Int}}
+    nodesets::Dict{String,OrderedSet{Int}}
+    facetsets::Dict{String,OrderedSet{Ferrite.FacetIndex}}
+    vertexsets::Dict{String,OrderedSet{Ferrite.VertexIndex}}
     #Topology
     topology::ExclusiveTopology
 end
@@ -455,10 +454,13 @@ function ForestBWG(grid::Ferrite.AbstractGrid{dim},b=_maxlevel[dim-1]) where dim
     nodes =      getnodes(grid)
     cellsets =   Ferrite.getcellsets(grid)
     nodesets =   Ferrite.getnodesets(grid)
-    facesets =   Ferrite.getfacesets(grid)
-    edgesets =   Ferrite.getedgesets(grid)
+    facetsets =  Ferrite.getfacetsets(grid)
     vertexsets = Ferrite.getvertexsets(grid)
-    return ForestBWG(cells,nodes,cellsets,nodesets,facesets,edgesets,vertexsets,topology)
+    return ForestBWG(cells,nodes,cellsets,nodesets,facetsets,vertexsets,topology)
+end
+
+function Ferrite.get_facet_facet_neighborhood(g::ForestBWG{dim}) where dim
+    return Ferrite._get_facet_facet_neighborhood(g.topology,Val(dim))
 end
 
 function refine_all!(forest::ForestBWG,l)
@@ -595,6 +597,7 @@ function creategrid(forest::ForestBWG{dim,C,T}) where {dim,C,T}
     node_map_inv = dim < 3 ? node_map₂_inv : node_map₃_inv
     nodeids = Dict{Tuple{Int,NTuple{dim,Int32}},Int}()
     nodeowners = Dict{Tuple{Int,NTuple{dim,Int32}},Tuple{Int,NTuple{dim,Int32}}}()
+    facet_neighborhood = Ferrite.get_facet_facet_neighborhood(forest)
 
     # Phase 1: Assign node owners intra-octree
     pivot_nodeid = 1
@@ -635,12 +638,12 @@ function creategrid(forest::ForestBWG{dim,C,T}) where {dim,C,T}
             @debug println("Updating face neighbors for octree $k")
             for (f,fc) in enumerate(_faces) # f in p4est notation
                 f_axis_index, f_axis_sign = divrem(f-1,2)
-                face_neighbor_ = forest.topology.face_face_neighbor[k,_perm[f]]
-                if length(face_neighbor_) == 0
+                facet_neighbor_ = facet_neighborhood[k,_perm[f]]
+                if length(facet_neighbor_) == 0
                     continue
                 end
-                @debug @assert length(face_neighbor_) == 1
-                k′, f′_ferrite = face_neighbor_[1]
+                @debug @assert length(facet_neighbor_) == 1
+                k′, f′_ferrite = facet_neighbor_[1]
                 f′ = _perminv[f′_ferrite]
                 if k > k′ # Owner
                     tree′ = forest.cells[k′]
@@ -759,36 +762,37 @@ function creategrid(forest::ForestBWG{dim,C,T}) where {dim,C,T}
     end
 
     # Phase 5: Generate grid and haning nodes
-    facesets = reconstruct_facesets(forest) #TODO edge, node and cellsets
+    facetsets = reconstruct_facetsets(forest) #TODO edge, node and cellsets
+    #facesets_ordered = OrderedSet(facetsets)
     hnodes = hangingnodes(forest, nodeids, nodeowners)
     hnodes_dedup = Dict{Int64, Vector{Int64}}()
     for (constrained,constainers) in hnodes
         hnodes_dedup[nodeids_dedup[constrained]] = [nodeids_dedup[constainer] for constainer in constainers]
     end
-    return NonConformingGrid(cells, nodes_physical .|> Node, facesets=facesets, conformity_info=hnodes_dedup)
+    return NonConformingGrid(cells, nodes_physical .|> Node, facetsets=facetsets, conformity_info=hnodes_dedup)
 end
 
-function reconstruct_facesets(forest::ForestBWG{dim}) where dim
+function reconstruct_facetsets(forest::ForestBWG{dim}) where dim
     _perm = dim == 2 ? 𝒱₂_perm : 𝒱₃_perm
     _perm_inv = dim == 2 ? 𝒱₂_perm_inv : 𝒱₃_perm_inv
-    new_facesets = typeof(forest.facesets)()
-    for (facesetname, faceset) in forest.facesets
-        new_faceset = typeof(faceset)()
-        for faceidx in faceset
-            pivot_tree = forest.cells[faceidx[1]]
-            last_cellid = faceidx[1] != 1 ? sum(length,@view(forest.cells[1:(faceidx[1]-1)])) : 0
-            pivot_faceid = faceidx[2]
+    new_facesets = typeof(forest.facetsets)()
+    for (facetsetname, facetset) in forest.facetsets
+        new_facetset = typeof(facetset)()
+        for facetidx in facetset
+            pivot_tree = forest.cells[facetidx[1]]
+            last_cellid = facetidx[1] != 1 ? sum(length,@view(forest.cells[1:(facetidx[1]-1)])) : 0
+            pivot_faceid = facetidx[2]
             pivot_face = faces(root(dim),pivot_tree.b)[_perm_inv[pivot_faceid]]
             for (leaf_idx,leaf) in enumerate(pivot_tree.leaves)
                 for (leaf_face_idx,leaf_face) in enumerate(faces(leaf,pivot_tree.b))
-                    if contains_face(pivot_face,leaf_face)
+                    if contains_facet(pivot_face,leaf_face)
                         ferrite_leaf_face_idx = _perm[leaf_face_idx]
-                        push!(new_faceset,FaceIndex(last_cellid+leaf_idx,ferrite_leaf_face_idx))
+                        push!(new_facetset,FacetIndex(last_cellid+leaf_idx,ferrite_leaf_face_idx))
                     end
                 end
             end
         end
-       new_facesets[facesetname] = new_faceset
+       new_facesets[facetsetname] = new_facetset
     end
     return new_facesets
 end
@@ -803,6 +807,7 @@ function hangingnodes(forest::ForestBWG{dim}, nodeids, nodeowners) where dim
     facetable = dim == 2 ? 𝒱₂ : 𝒱₃
     opposite_face = dim == 2 ? opposite_face_2 : opposite_face_3
     hnodes = Dict{Int,Vector{Int}}()
+    facet_neighborhood = Ferrite.get_facet_facet_neighborhood(forest)
     for (k,tree) in enumerate(forest.cells)
         rootfaces = faces(root(dim),tree.b)
         for (l,leaf) in enumerate(tree.leaves)
@@ -839,11 +844,11 @@ function hangingnodes(forest::ForestBWG{dim}, nodeids, nodeowners) where dim
                             end
                         else #interoctree branch
                             for (ri,rf) in enumerate(rootfaces)
-                                face_neighbor_ =  forest.topology.face_face_neighbor[k,_perm[ri]]
+                                face_neighbor_ =  facet_neighborhood[k,_perm[ri]]
                                 if length(face_neighbor_) == 0
                                     continue
                                 end
-                                if contains_face(rf, pface)
+                                if contains_facet(rf, pface)
                                     k′ = face_neighbor_[1][1]
                                     ri′ = _perminv[face_neighbor_[1][2]]
                                     interoctree_neighbor = transform_face(forest, k′, ri′, neighbor_candidate)
@@ -964,6 +969,7 @@ function balanceforest!(forest::ForestBWG{dim}) where dim
     perm_corner_inv = dim == 2 ? node_map₂_inv : node_map₃_inv
     root_ = root(dim)
     nrefcells = 0
+    facet_neighborhood = Ferrite.get_facet_facet_neighborhood(forest)
     while nrefcells - getncells(forest) != 0
         for k in 1:length(forest.cells)
             tree = forest.cells[k]
@@ -993,9 +999,9 @@ function balanceforest!(forest::ForestBWG{dim}) where dim
                                     # TODO: enable a bool that either activates or deactivates the balancing over a corner
                                     for face_idx in participating_faces_idx
                                         face_idx = face_idx[1]
-                                        contained = contains_face(rootfaces[face_idx],pivot_faces[face_idx])
+                                        contained = contains_facet(rootfaces[face_idx],pivot_faces[face_idx])
                                         if contained
-                                            fc = forest.topology.face_face_neighbor[k,perm_face[face_idx]]
+                                            fc = facet_neighborhood[k,perm_face[face_idx]]
                                             isempty(fc) && continue
                                             @assert length(fc) == 1
                                             fc = fc[1]
@@ -1013,7 +1019,7 @@ function balanceforest!(forest::ForestBWG{dim}) where dim
                                 end
                             else # face neighbor, only true for 2D
                                 s_i -= 4
-                                fc = forest.topology.face_face_neighbor[k,perm_face[s_i]]
+                                fc = facet_neighborhood[k,perm_face[s_i]]
                                 isempty(fc) && continue
                                 @assert length(fc) == 1
                                 fc = fc[1]
@@ -1032,7 +1038,7 @@ function balanceforest!(forest::ForestBWG{dim}) where dim
                                 end
                             elseif 8 < s_i <= 14
                                 s_i -= 8
-                                fc = forest.topology.face_face_neighbor[k,perm_face[s_i]]
+                                fc = facet_neighborhood[k,perm_face[s_i]]
                                 isempty(fc) && continue
                                 @assert length(fc) == 1
                                 fc = fc[1]
@@ -1045,7 +1051,7 @@ function balanceforest!(forest::ForestBWG{dim}) where dim
                                 contained_face = findall(x->face_contains_edge(x,pivot_edge),rootfaces)
                                 if !isempty(contained_face) && !contains_edge(rootedges[s_i],pivot_edge) #check if pivot edge in interior of rootface and not octree edge
                                     for face_idx in contained_face
-                                        fc = forest.topology.face_face_neighbor[k,perm_face[face_idx]]
+                                        fc = facet_neighborhood[k,perm_face[face_idx]]
                                         isempty(fc) && continue
                                         @assert length(fc) == 1
                                         fc = fc[1]
@@ -1189,7 +1195,7 @@ function isancestor(o1,o2,b)
     return ancestor
 end
 
-function contains_face(mface::Tuple{Tuple{T1,T1},Tuple{T1,T1}},sface::Tuple{Tuple{T2,T2},Tuple{T2,T2}}) where {T1<:Integer,T2<:Integer}
+function contains_facet(mface::Tuple{Tuple{T1,T1},Tuple{T1,T1}},sface::Tuple{Tuple{T2,T2},Tuple{T2,T2}}) where {T1<:Integer,T2<:Integer}
     if mface[1][1] == sface[1][1] && mface[2][1] == sface[2][1] # vertical
         return mface[1][2] ≤ sface[1][2] ≤ sface[2][2] ≤ mface[2][2]
     elseif mface[1][2] == sface[1][2] && mface[2][2] == sface[2][2] # horizontal
@@ -1201,7 +1207,7 @@ end
 
 # currently checking if sface centroid lies in mface
 # TODO should be checked if applicaple in general, I guess yes
-function contains_face(mface::NTuple{4,Tuple{T1,T1,T1}}, sface::NTuple{4,Tuple{T2,T2,T2}}) where {T1<:Integer,T2<:Integer}
+function contains_facet(mface::NTuple{4,Tuple{T1,T1,T1}}, sface::NTuple{4,Tuple{T2,T2,T2}}) where {T1<:Integer,T2<:Integer}
     sface_center = center(sface)
     lower_left = ntuple(i->minimum(getindex.(mface,i)),3)
     top_right = ntuple(i->maximum(getindex.(mface,i)),3)
@@ -1371,7 +1377,7 @@ function compute_face_orientation(forest::ForestBWG{<:Any,<:OctreeBWG{dim,<:Any,
     n_perminv = (dim == 2 ? node_map₂_inv : node_map₃_inv)
 
     f_ferrite = f_perm[f]
-    k′, f′_ferrite = getneighborhood(forest,Ferrite.FaceIndex(k,f_ferrite))[1]
+    k′, f′_ferrite = dim == 2 ? forest.topology.edge_edge_neighbor[k,f_ferrite][1] : forest.topology.face_face_neighbor[k,f_ferrite][1]
     f′ = f_perminv[f′_ferrite]
     reffacenodes = reference_faces_bwg(Ferrite.RefHypercube{dim})
     nodes_f = [forest.cells[k].nodes[n_perm[ni]] for ni in reffacenodes[f]]
@@ -1434,7 +1440,7 @@ function transform_face_remote(forest::ForestBWG, k::T1, f::T1, o::OctantBWG{dim
     _two = T2(2)
     _perm = (dim == 2 ? 𝒱₂_perm : 𝒱₃_perm)
     _perminv = (dim == 2 ? 𝒱₂_perm_inv : 𝒱₃_perm_inv)
-    k′, f′ = getneighborhood(forest,FaceIndex(k,_perm[f]))[1]
+    k′, f′ = dim == 2 ? forest.topology.edge_edge_neighbor[k,_perm[f]][1] : forest.topology.face_face_neighbor[k,_perm[f]][1]
     f′ = _perminv[f′]
     s′ = _one - (((f - _one) & _one) ⊻ ((f′ - _one) & _one))
     s = zeros(T2,dim-1)
@@ -1497,7 +1503,7 @@ function transform_face(forest::ForestBWG, k::T1, f::T1, o::OctantBWG{2,<:Any,T2
     _two = T2(2)
     _perm = 𝒱₂_perm
     _perminv = 𝒱₂_perm_inv
-    k′, f′ = getneighborhood(forest,FaceIndex(k,_perm[f]))[1]
+    k′, f′ = forest.topology.edge_edge_neighbor[k,_perm[f]][1]
     f′ = _perminv[f′]
 
     r = compute_face_orientation(forest,k,f)
@@ -1537,7 +1543,7 @@ function transform_face(forest::ForestBWG, k::T1, f::T1, o::OctantBWG{3,<:Any,T2
     _two = T2(2)
     _perm = 𝒱₃_perm
     _perminv = 𝒱₃_perm_inv
-    k′, f′ = getneighborhood(forest,FaceIndex(k,_perm[f]))[1]
+    k′, f′ = forest.topology.face_face_neighbor[k,_perm[f]][1]
     f′ = _perminv[f′]
     s′ = _one - (((f - _one) & _one) ⊻ ((f′ - _one) & _one))
     r = compute_face_orientation(forest,k,f)

@@ -125,7 +125,7 @@ function setup_poisson_problem(grid, interpolation, interpolation_geo, qr, N)
 
     ch = ConstraintHandler(dh);
     ∂Ω = union(
-        values(Ferrite.getfacesets(grid))...
+        values(Ferrite.getfacetsets(grid))...
     );
     dbc = Dirichlet(:u, ∂Ω, (x, t) -> analytical_solution(x))
     add!(ch, dbc);

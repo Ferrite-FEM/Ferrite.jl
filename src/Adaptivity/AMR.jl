@@ -2,6 +2,7 @@ module AMR
 
 using .. Ferrite
 using SparseArrays
+using OrderedCollections
 
 include("BWG.jl")
 include("ncgrid.jl")

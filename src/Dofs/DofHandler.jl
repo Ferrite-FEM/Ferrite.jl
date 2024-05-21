@@ -6,7 +6,7 @@ abstract type AbstractDofHandler end
 Access some grid representation for the dof handler.
 
 !!! note
-    This API function is currently not well-defined. It acts as the interface between 
+    This API function is currently not well-defined. It acts as the interface between
     distributed assembly and assembly on a single process, because most parts of the
     functionality can be handled by only acting on the locally owned cell set.
 """
@@ -15,7 +15,7 @@ get_grid(dh::AbstractDofHandler)
 struct SubDofHandler{DH} <: AbstractDofHandler
     # From constructor
     dh::DH
-    cellset::Set{Int}
+    cellset::OrderedSet{Int}
     # Populated in add!
     field_names::Vector{Symbol}
     field_interpolations::Vector{Interpolation}
@@ -26,19 +26,19 @@ struct SubDofHandler{DH} <: AbstractDofHandler
 end
 
 """
-    SubDofHandler(dh::AbstractDofHandler, cellset::Set{Int})
+    SubDofHandler(dh::AbstractDofHandler, cellset::AbstractVecOrSet{Int})
 
-Create an `sdh::SubDofHandler` from the parent `dh`, pertaining to the 
-cells in `cellset`. This allows you to add fields to parts of the domain, or using 
-different interpolations or cell types (e.g. `Triangles` and `Quadrilaterals`). All 
+Create an `sdh::SubDofHandler` from the parent `dh`, pertaining to the
+cells in `cellset`. This allows you to add fields to parts of the domain, or using
+different interpolations or cell types (e.g. `Triangles` and `Quadrilaterals`). All
 fields and cell types must be the same in one `SubDofHandler`.
 
 After construction any number of discrete fields can be added to the SubDofHandler using
 [`add!`](@ref). Construction is finalized by calling [`close!`](@ref) on the parent `dh`.
 
 # Examples
-We assume we have a `grid` containing "Triangle" and "Quadrilateral" cells, 
-including the cellsets "triangles" and "quadilaterals" for to these cells. 
+We assume we have a `grid` containing "Triangle" and "Quadrilateral" cells,
+including the cellsets "triangles" and "quadilaterals" for to these cells.
 ```julia
 dh = DofHandler(grid)
 
@@ -50,10 +50,10 @@ sdh_quad = SubDofHandler(dh, getcellset(grid, "quadilaterals"))
 ip_quad = Lagrange{RefQuadrilateral, 2}()^2 # vector interpolation for a field u
 add!(sdh_quad, :u, ip_quad)
 
-close!(dh) # Finalize by closing the parent 
+close!(dh) # Finalize by closing the parent
 ```
 """
-function SubDofHandler(dh::DH, cellset) where {DH <: AbstractDofHandler}
+function SubDofHandler(dh::DH, cellset::AbstractVecOrSet{Int}) where {DH <: AbstractDofHandler}
     # TODO: Should be an inner constructor.
     isclosed(dh) && error("DofHandler already closed")
     # Compute the celltype and make sure all elements have the same one
@@ -68,7 +68,7 @@ function SubDofHandler(dh::DH, cellset) where {DH <: AbstractDofHandler}
         end
     end
     # Construct and insert into the parent dh
-    sdh = SubDofHandler{typeof(dh)}(dh, cellset, Symbol[], Interpolation[], Int[], ScalarWrapper(-1))
+    sdh = SubDofHandler{typeof(dh)}(dh, convert_to_orderedset(cellset), Symbol[], Interpolation[], Int[], ScalarWrapper(-1))
     push!(dh.subdofhandlers, sdh)
     return sdh
 end
@@ -283,7 +283,7 @@ function add!(sdh::SubDofHandler, name::Symbol, ip::Interpolation)
             # TODO: warn if interpolation type is not the same?
         end
     end
-    
+
     # Check that interpolation is compatible with cells it it added to
     refshape_sdh = getrefshape(getcells(sdh.dh.grid, first(sdh.cellset)))
     if refshape_sdh !== getrefshape(ip)
@@ -311,7 +311,7 @@ function add!(dh::DofHandler, name::Symbol, ip::Interpolation)
     @assert isconcretetype(celltype)
     if isempty(dh.subdofhandlers)
         # Create a new SubDofHandler for all cells
-        sdh = SubDofHandler(dh, Set(1:getncells(get_grid(dh))))
+        sdh = SubDofHandler(dh, OrderedSet(1:getncells(get_grid(dh))))
     elseif length(dh.subdofhandlers) == 1
         # Add to existing SubDofHandler (if it covers all cells)
         sdh = dh.subdofhandlers[1]
@@ -346,7 +346,7 @@ For the `DofHandler` each `SubDofHandler` is visited in the order they were adde
 For each field in the `SubDofHandler` create dofs for the cell.
 This means that dofs on a particular cell will be numbered in groups for each field,
 so first the dofs for field 1 are distributed, then field 2, etc.
-For each cell dofs are first distributed on its vertices, then on the interior of edges (if applicable), then on the 
+For each cell dofs are first distributed on its vertices, then on the interior of edges (if applicable), then on the
 interior of faces (if applicable), and finally on the cell interior.
 The entity ordering follows the geometrical ordering found in [`vertices`](@ref), [`faces`](@ref) and [`edges`](@ref).
 """
@@ -410,23 +410,19 @@ function _close_subdofhandler!(dh::DofHandler{sdim}, sdh::SubDofHandler, sdh_ind
                     next_dof_index += 1
                 end
             end
-            if getdim(interpolation) > 2
-                for vdofs ∈ edgedof_interior_indices(interpolation)
-                    for dof_index ∈ vdofs
-                        @assert dof_index == next_dof_index "Edge dof ordering not supported. Please consult the dev docs."
-                        next_dof_index += 1
-                    end
+            for vdofs ∈ edgedof_interior_indices(interpolation)
+                for dof_index ∈ vdofs
+                    @assert dof_index == next_dof_index "Edge dof ordering not supported. Please consult the dev docs."
+                    next_dof_index += 1
                 end
             end
-            if getdim(interpolation) > 1
-                for vdofs ∈ facedof_interior_indices(interpolation)
-                    for dof_index ∈ vdofs
-                        @assert dof_index == next_dof_index "Face dof ordering not supported. Please consult the dev docs."
-                        next_dof_index += 1
-                    end
+            for vdofs ∈ facedof_interior_indices(interpolation)
+                for dof_index ∈ vdofs
+                    @assert dof_index == next_dof_index "Face dof ordering not supported. Please consult the dev docs."
+                    next_dof_index += 1
                 end
             end
-            for dof_index ∈ celldof_interior_indices(interpolation)
+            for dof_index ∈ volumedof_interior_indices(interpolation)
                 @assert next_dof_index <= dof_index <= getnbasefunctions(interpolation) "Cell dof ordering not supported. Please consult the dev docs."
             end
         end
@@ -448,8 +444,7 @@ function _close_subdofhandler!(dh::DofHandler{sdim}, sdh::SubDofHandler, sdh_ind
     global_fidxs = Int[findfirst(gname -> gname === lname, dh.field_names) for lname in sdh.field_names]
 
     # loop over all the cells, and distribute dofs for all the fields
-    # TODO: Remove BitSet construction when SubDofHandler ensures sorted collections
-    for ci in BitSet(sdh.cellset)
+    for ci in sdh.cellset
         @debug println("Creating dofs for cell #$ci")
 
         # TODO: _check_cellset_intersections can be removed in favor of this assertion
@@ -499,30 +494,23 @@ function _distribute_dofs_for_cell!(dh::DofHandler{sdim}, cell::AbstractCell, ip
         ip_info.nvertexdofs, nextdof, ip_info.n_copies,
     )
 
-    # Distribute dofs for edges (only applicable when dim is 3)
-    if sdim == 3 && (ip_info.reference_dim == 3 || ip_info.reference_dim == 2)
-        # Regular 3D element or 2D interpolation embedded in 3D space
-        nentitydofs = ip_info.reference_dim == 3 ? ip_info.nedgedofs : ip_info.nfacedofs
-        nextdof = add_edge_dofs(
-            dh.cell_dofs, cell, edgedict,
-            nentitydofs, nextdof,
-            ip_info.adjust_during_distribution, ip_info.n_copies,
-        )
-    end
+    # Distribute dofs for edges
+    nextdof = add_edge_dofs(
+        dh.cell_dofs, cell, edgedict,
+        ip_info.nedgedofs, nextdof,
+        ip_info.adjust_during_distribution, ip_info.n_copies,
+    )
 
-    # Distribute dofs for faces. Filter out 2D interpolations in 3D space, since
-    # they are added above as edge dofs.
-    if ip_info.reference_dim == sdim && sdim > 1
-        nextdof = add_face_dofs(
-            dh.cell_dofs, cell, facedict,
-            ip_info.nfacedofs, nextdof,
-            ip_info.adjust_during_distribution, ip_info.n_copies,
-        )
-    end
+    # Distribute dofs for faces.
+    nextdof = add_face_dofs(
+        dh.cell_dofs, cell, facedict,
+        ip_info.nfacedofs, nextdof,
+        ip_info.adjust_during_distribution, ip_info.n_copies,
+    )
 
     # Distribute internal dofs for cells
-    nextdof = add_cell_dofs(
-        dh.cell_dofs, ip_info.ncelldofs, nextdof, ip_info.n_copies,
+    nextdof = add_volume_dofs(
+        dh.cell_dofs, ip_info.nvolumedofs, nextdof, ip_info.n_copies,
     )
 
     return nextdof
@@ -580,7 +568,7 @@ function add_face_dofs(cell_dofs::Vector{Int}, cell::AbstractCell, facedict::Dic
         sface, orientation = sortface(face)
         @debug println("\t\tface #$sface, $orientation")
         nextdof, dofs = get_or_create_dofs!(nextdof, nfacedofs[fi], n_copies, facedict, sface)
-        permute_and_push!(cell_dofs, dofs, orientation, adjust_during_distribution)
+        permute_and_push!(cell_dofs, dofs, orientation, adjust_during_distribution, getdim(cell)) # TODO: passing rdim of cell is temporary, simply to check if facedofs are internal to cell
         @debug println("\t\t\tadjusted dofs: $(cell_dofs[(end - nfacedofs[fi]*n_copies + 1):end])")
     end
     return nextdof
@@ -599,9 +587,9 @@ function add_edge_dofs(cell_dofs::Vector{Int}, cell::AbstractCell, edgedict::Dic
     return nextdof
 end
 
-function add_cell_dofs(cell_dofs::CD, ncelldofs::Int, nextdof::Int, n_copies::Int) where {CD}
-    @debug println("\t\tcelldofs #$nextdof:$(ncelldofs*n_copies-1)")
-    for _ in 1:ncelldofs, _ in 1:n_copies
+function add_volume_dofs(cell_dofs::CD, nvolumedofs::Int, nextdof::Int, n_copies::Int) where {CD}
+    @debug println("\t\tvolumedofs #$nextdof:$(nvolumedofs*n_copies-1)")
+    for _ in 1:nvolumedofs, _ in 1:n_copies
         push!(cell_dofs, nextdof)
         nextdof += 1
     end
@@ -693,8 +681,7 @@ Here the unique representation is the sorted node index tuple.
 Note that in 3D we only need indices to uniquely identify a face,
 so the unique representation is always a tuple length 3.
 """
-sortface(face::Tuple{Int,Int}) = sortedge(face) # Face in 2D is the same as edge in 3D.
-
+function sortface end
 
 """
     sortface_fast(face::Tuple{Int})
@@ -707,24 +694,24 @@ Here the unique representation is the sorted node index tuple.
 Note that in 3D we only need indices to uniquely identify a face,
 so the unique representation is always a tuple length 3.
 """
-sortface_fast(face::Tuple{Int,Int}) = sortedge_fast(face) # Face in 2D is the same as edge in 3D.
+function sortface_fast end
 
 """
     !!!NOTE TODO implement me.
 
 For more details we refer to [1] as we follow the methodology described therein.
 
-[1] Scroggs, M. W., Dokken, J. S., Richardson, C. N., & Wells, G. N. (2022). 
-    Construction of arbitrary order finite element degree-of-freedom maps on 
-    polygonal and polyhedral cell meshes. ACM Transactions on Mathematical 
+[1] Scroggs, M. W., Dokken, J. S., Richardson, C. N., & Wells, G. N. (2022).
+    Construction of arbitrary order finite element degree-of-freedom maps on
+    polygonal and polyhedral cell meshes. ACM Transactions on Mathematical
     Software (TOMS), 48(2), 1-23.
 
     !!!TODO citation via software.
 
     !!!TODO Investigate if we can somehow pass the interpolation into this function in a typestable way.
 """
-@inline function permute_and_push!(cell_dofs::Vector{Int}, dofs::StepRange{Int,Int}, orientation::SurfaceOrientationInfo, adjust_during_distribution::Bool)
-    if adjust_during_distribution && length(dofs) > 1
+@inline function permute_and_push!(cell_dofs::Vector{Int}, dofs::StepRange{Int,Int}, ::SurfaceOrientationInfo, adjust_during_distribution::Bool, rdim::Int)
+    if rdim==3 && adjust_during_distribution && length(dofs) > 1
         error("Dof distribution for interpolations with multiple dofs per face not implemented yet.")
     end
     n_copies = step(dofs)
@@ -779,8 +766,21 @@ function sortface_fast(face::Tuple{Int,Int,Int,Int})
 end
 
 
-sortface(face::Tuple{Int}) = face, nothing
-sortface_fast(face::Tuple{Int}) = face
+"""
+    sortfacet_fast(facet::NTuple{N, Int})
+
+Returns the unique representation of the `facet` by sorting its node indices.
+Dispatches on `sortedges_fast` or `sortfaces_fast` depending on `N`
+"""
+function sortfacet_fast end
+
+# Vertex
+sortfacet_fast(facet::Tuple{Int}) = facet
+# Edge
+sortfacet_fast(facet::NTuple{2, Int}) = sortedge_fast(facet)
+# Face
+sortfacet_fast(facet::NTuple{3, Int}) = sortface_fast(facet)
+sortfacet_fast(facet::NTuple{4, Int}) = sortface_fast(facet)
 
 """
     find_field(dh::DofHandler, field_name::Symbol)::NTuple{2,Int}
@@ -823,7 +823,7 @@ end
 """
     _find_field(sdh::SubDofHandler, field_name::Symbol)::Int
 
-Return the index of the field with name `field_name` in the `SubDofHandler` `sdh`. Return 
+Return the index of the field with name `field_name` in the `SubDofHandler` `sdh`. Return
 `nothing` if the field is not found.
 
 See also: [`find_field(dh::DofHandler, field_name::Symbol)`](@ref), [`find_field(sdh::SubDofHandler, field_name::Symbol)`](@ref).

@@ -84,10 +84,10 @@ ch = ConstraintHandler(dh);
 # homogeneous Dirichlet boundary conditions on the whole boundary, i.e.
 # the `union` of all the face sets on the boundary.
 ∂Ω = union(
-    getfaceset(grid, "left"),
-    getfaceset(grid, "right"),
-    getfaceset(grid, "top"),
-    getfaceset(grid, "bottom"),
+    getfacetset(grid, "left"),
+    getfacetset(grid, "right"),
+    getfacetset(grid, "top"),
+    getfacetset(grid, "bottom"),
 );
 
 # Now we are set up to define our constraint. We specify which field
@@ -213,8 +213,8 @@ u = K \ f;
 # ### Exporting to VTK
 # To visualize the result we export the grid and our field `u`
 # to a VTK-file, which can be viewed in e.g. [ParaView](https://www.paraview.org/).
-vtk_grid("heat_equation", dh) do vtk
-    vtk_point_data(vtk, dh, u)
+VTKFile("heat_equation", dh) do vtk
+    write_solution(vtk, dh, u)
 end
 
 ## test the result                #src

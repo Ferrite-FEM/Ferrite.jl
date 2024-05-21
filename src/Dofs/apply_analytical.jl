@@ -6,7 +6,7 @@ end
 
 """
     apply_analytical!(
-        a::AbstractVector, dh::AbstractDofHandler, fieldname::Symbol, 
+        a::AbstractVector, dh::AbstractDofHandler, fieldname::Symbol,
         f::Function, cellset=1:getncells(get_grid(dh)))
 
 Apply a solution `f(x)` by modifying the values in the degree of freedom vector `a`
@@ -18,7 +18,7 @@ and for vector fields with dimension `dim`, `f(x)::Vec{dim}`.
 This function can be used to apply initial conditions for time dependent problems.
 
 !!! note
-    
+
     This function only works for standard nodal finite element interpolations
     when the function value at the (algebraic) node is equal to the corresponding
     degree of freedom value.

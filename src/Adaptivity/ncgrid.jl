@@ -23,11 +23,10 @@ mutable struct NonConformingGrid{dim,C<:Ferrite.AbstractCell,T<:Real,CIT} <: Fer
     cells::Vector{C}
     nodes::Vector{Node{dim,T}}
     # Sets
-    cellsets::Dict{String,Set{Int}}
-    nodesets::Dict{String,Set{Int}}
-    facesets::Dict{String,Set{Ferrite.FaceIndex}}
-    edgesets::Dict{String,Set{Ferrite.EdgeIndex}}
-    vertexsets::Dict{String,Set{Ferrite.VertexIndex}}
+    cellsets::Dict{String,OrderedSet{Int}}
+    nodesets::Dict{String,OrderedSet{Int}}
+    facetsets::Dict{String,OrderedSet{Ferrite.FacetIndex}}
+    vertexsets::Dict{String,OrderedSet{Ferrite.VertexIndex}}
     conformity_info::CIT # TODO refine
     # Boundary matrix (faces per cell × cell)
     boundary_matrix::SparseMatrixCSC{Bool,Int}
@@ -36,20 +35,14 @@ end
 function NonConformingGrid(
     cells::Vector{C},
     nodes::Vector{Node{dim,T}};
-    cellsets::Dict{String,Set{Int}}=Dict{String,Set{Int}}(),
-    nodesets::Dict{String,Set{Int}}=Dict{String,Set{Int}}(),
-    facesets::Dict{String,Set{Ferrite.FaceIndex}}=Dict{String,Set{Ferrite.FaceIndex}}(),
-    edgesets::Dict{String,Set{Ferrite.EdgeIndex}}=Dict{String,Set{Ferrite.EdgeIndex}}(),
-    vertexsets::Dict{String,Set{Ferrite.VertexIndex}}=Dict{String,Set{Ferrite.VertexIndex}}(),
+    cellsets::Dict{String,OrderedSet{Int}}=Dict{String,OrderedSet{Int}}(),
+    nodesets::Dict{String,OrderedSet{Int}}=Dict{String,OrderedSet{Int}}(),
+    facetsets::Dict{String,OrderedSet{Ferrite.FacetIndex}}=Dict{String,OrderedSet{Ferrite.FacetIndex}}(),
+    vertexsets::Dict{String,OrderedSet{Ferrite.VertexIndex}}=Dict{String,OrderedSet{Ferrite.VertexIndex}}(),
     conformity_info,
     boundary_matrix::SparseMatrixCSC{Bool,Int}=spzeros(Bool, 0, 0)
     ) where {dim,C,T}
-    return NonConformingGrid(cells, nodes, cellsets, nodesets, facesets, edgesets, vertexsets, conformity_info, boundary_matrix)
+    return NonConformingGrid(cells, nodes, cellsets, nodesets, facetsets, vertexsets, conformity_info, boundary_matrix)
 end
 
 get_coordinate_type(::NonConformingGrid{dim,C,T}) where {dim,C,T} = Vec{dim,T}
-
-function transform_coordinates!(g::NonConformingGrid, f::Function)
-    replace!(n -> Node(f(get_node_coordinate(n))), g.nodes)
-    return g
-end

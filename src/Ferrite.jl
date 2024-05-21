@@ -2,7 +2,6 @@ module Ferrite
 
 using Reexport: @reexport
 @reexport using Tensors
-@reexport using WriteVTK
 
 using Base:
     @propagate_inbounds
@@ -13,15 +12,18 @@ using LinearAlgebra:
     pinv, tr
 using NearestNeighbors:
     NearestNeighbors, KDTree, knn
+using OrderedCollections:
+    OrderedSet
 using SparseArrays:
     SparseArrays, SparseMatrixCSC, nonzeros, nzrange, rowvals, sparse, spzeros
 using StaticArrays:
     StaticArrays, MMatrix, SMatrix, SVector
+using WriteVTK:
+    WriteVTK, VTKCellTypes
 using Tensors:
     Tensors, AbstractTensor, SecondOrderTensor, SymmetricTensor, Tensor, Vec, gradient,
     rotation_tensor, symmetric, tovoigt!
-using WriteVTK:
-    WriteVTK, MeshCell, VTKCellTypes, vtk_cell_data, vtk_grid, vtk_point_data, vtk_save
+
 
 include("exports.jl")
 
@@ -50,7 +52,7 @@ abstract type AbstractCell{refshape <: AbstractRefShape} end
 
 abstract type AbstractValues end
 abstract type AbstractCellValues <: AbstractValues end
-abstract type AbstractFaceValues <: AbstractValues end
+abstract type AbstractFacetValues <: AbstractValues end
 
 """
 Abstract type which is used as identifier for faces, edges and verices
@@ -85,6 +87,16 @@ struct VertexIndex <: BoundaryIndex
     idx::Tuple{Int,Int} # cell and side
 end
 
+"""
+A `FacetIndex` wraps an (Int, Int) and defines a local facet by pointing to a (cell, facet).
+"""
+struct FacetIndex <: BoundaryIndex
+    idx::Tuple{Int,Int} # cell and side
+end
+
+const AbstractVecOrSet{T} = Union{AbstractSet{T}, AbstractVector{T}}
+const IntegerCollection = AbstractVecOrSet{<:Integer}
+
 include("utils.jl")
 
 # Matrix/Vector utilities
@@ -100,7 +112,7 @@ include("Quadrature/quadrature.jl")
 include("FEValues/GeometryMapping.jl")
 include("FEValues/FunctionValues.jl")
 include("FEValues/CellValues.jl")
-include("FEValues/FaceValues.jl")
+include("FEValues/FacetValues.jl")
 include("FEValues/InterfaceValues.jl")
 include("FEValues/PointValues.jl")
 include("FEValues/common_values.jl")

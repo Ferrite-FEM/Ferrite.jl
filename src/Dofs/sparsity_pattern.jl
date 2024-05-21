@@ -130,8 +130,8 @@ Returns the updated value of `cnt`.
 Used internally for sparsity patterns with cross-element coupling.
 """
 function cross_element_coupling!(dh::DofHandler, ch::Union{ConstraintHandler, Nothing}, topology::ExclusiveTopology, sym::Bool, keep_constrained::Bool, couplings::AbstractVector{<:AbstractMatrix{Bool}}, cnt::Int, I::Vector{Int}, J::Vector{Int})
-    fca = FaceCache(CellCache(dh, UpdateFlags(false, false, true)), Int[], ScalarWrapper(0))
-    fcb = FaceCache(CellCache(dh, UpdateFlags(false, false, true)), Int[], ScalarWrapper(0))
+    fca = FacetCache(CellCache(dh, UpdateFlags(false, false, true)), Int[], ScalarWrapper(0))
+    fcb = FacetCache(CellCache(dh, UpdateFlags(false, false, true)), Int[], ScalarWrapper(0))
     ic = InterfaceCache(fca, fcb, Int[])
     for ic in InterfaceIterator(ic, dh.grid, topology)
         sdhs_idx = dh.cell_to_subdofhandler[cellid.([ic.a, ic.b])]
