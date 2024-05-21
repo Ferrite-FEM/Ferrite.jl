@@ -98,23 +98,6 @@
 # Required packages
 using Ferrite, FerriteMeshParser, Tensors
 
-# Temporary overload
-function FerriteMeshParser.create_faceset(grid::Grid, nodeset::Set{Int}, cellset=1:getncells(grid))
-    faceset = sizehint!(Set{FaceIndex}(), length(nodeset))
-    for (cellid, cell) in enumerate(getcells(grid))
-        cellid ∈ cellset || continue
-        if any(n-> n ∈ nodeset, cell.nodes)
-            for (faceid, face) in enumerate(Ferrite.facets(cell))
-                if all(n -> n ∈ nodeset, face)
-                    push!(faceset, FaceIndex(cellid, faceid))
-                end
-            end
-        end
-    end
-    return faceset
-end
-
-#
 # ### Elasticity
 # We start by defining the elastic material type, containing the elastic stiffness,
 # for the linear elastic impermeable solid aggregates.
