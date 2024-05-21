@@ -145,7 +145,7 @@
 
 using Ferrite, FerriteGmsh, Gmsh, Tensors, LinearAlgebra, SparseArrays
 using Test #src
-
+#=
 # Overload for specific elements in this tutorial.
 function FerriteGmsh.tofacesets(boundarydict::Dict{String,Vector}, elements::Vector{Triangle})
     faces = Ferrite.facets.(elements)
@@ -159,6 +159,7 @@ function FerriteGmsh.tofacesets(boundarydict::Dict{String,Vector}, elements::Vec
     end
     return facesets
 end
+=#
 
 # ### Geometry and mesh generation with `Gmsh.jl`
 #
