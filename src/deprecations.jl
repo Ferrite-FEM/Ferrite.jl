@@ -59,14 +59,14 @@ Base.@deprecate_binding Line3D Line
 Base.@deprecate_binding Quadrilateral3D Quadrilateral
 export Line2D, Line3D, Quadrilateral3D
 
-using WriteVTK: vtk_grid 
+using WriteVTK: vtk_grid
 export vtk_grid # To give better error
 
 function WriteVTK.vtk_grid(::String, ::Union{AbstractGrid,AbstractDofHandler}; kwargs...)
     error(join(("The vtk interface has been updated in Ferrite v1.0.",
                 "See https://github.com/Ferrite-FEM/Ferrite.jl/pull/679.",
                 "Use VTKFile to open a vtk file, and the functions",
-                "write_solution, write_cell_data, and write_projection to save data."), 
+                "write_solution, write_cell_data, and write_projection to save data."),
             "\n"))
 end
 
@@ -354,7 +354,7 @@ end
 @deprecate transform! transform_coordinates!
 
 export addfaceset! # deprecated, export for backwards compatibility.
-# Use warn to show for standard users.  
+# Use warn to show for standard users.
 function addfaceset!(grid::AbstractGrid, name, set::Union{Set{FaceIndex}, Vector{FaceIndex}})
     @warn "addfaceset! is deprecated, use addfacetset! instead. Interpreting FaceIndex as FacetIndex"
     new_set = Set(FacetIndex(idx[1], idx[2]) for idx in set)
@@ -363,4 +363,9 @@ end
 function addfaceset!(grid, name, f::Function; kwargs...)
     @warn "addfaceset! is deprecated, using addfacetset! instead"
     return addfacetset!(grid, name, f; kwargs...)
+end
+
+export onboundary
+function onboundary(::CellCache, ::Int)
+    error("`onboundary` is deprecated, check just the facetset instead of first checking `onboundary`.")
 end

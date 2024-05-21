@@ -16,7 +16,7 @@ Node(x::NTuple{dim,T}) where {dim,T} = Node(Vec{dim,T}(x))
 
 """
     get_node_coordinate(::Node)
-    
+
 Get the value of the node coordinate.
 """
 get_node_coordinate(n::Node) = n.x
@@ -58,7 +58,7 @@ nnodes(   c::AbstractCell) = length(get_node_ids(c))
     Ferrite.vertices(::AbstractCell)
 
 Returns a tuple with the node indices (of the nodes in a grid) for each vertex in a given cell.
-This function induces the [`VertexIndex`](@ref), where the second index 
+This function induces the [`VertexIndex`](@ref), where the second index
 corresponds to the local index into this tuple.
 """
 vertices(::AbstractCell)
@@ -67,7 +67,7 @@ vertices(::AbstractCell)
     Ferrite.edges(::AbstractCell)
 
 Returns a tuple of 2-tuples containing the ordered node indices (of the nodes in a grid) corresponding to
-the vertices that define an *oriented edge*. This function induces the 
+the vertices that define an *oriented edge*. This function induces the
 [`EdgeIndex`](@ref), where the second index corresponds to the local index into this tuple.
 
 Note that the vertices are sufficient to define an edge uniquely.
@@ -91,7 +91,7 @@ reference_faces(::AbstractRefShape)
     Ferrite.faces(::AbstractCell)
 
 Returns a tuple of n-tuples containing the ordered node indices (of the nodes in a grid) corresponding to
-the vertices that define an *oriented face*. This function induces the 
+the vertices that define an *oriented face*. This function induces the
 [`FaceIndex`](@ref), where the second index corresponds to the local index into this tuple.
 
 An *oriented face* is a face with the first node having the local index and the other
@@ -105,7 +105,7 @@ faces(::AbstractCell)
     Ferrite.facets(::AbstractCell)
 
 Returns a tuple of n-tuples containing the ordered node indices (of the nodes in a grid) corresponding to
-the vertices that define an oriented facet. This function induces the 
+the vertices that define an oriented facet. This function induces the
 [`FacetIndex`](@ref), where the second index corresponds to the local index into this tuple.
 
 See also [`vertices`](@ref), [`edges`](@ref), and [`faces`](@ref)
@@ -120,13 +120,13 @@ facets(::AbstractCell)
     Ferrite.reference_facets(::Type{<:AbstractRefShape})
 
 Returns a tuple of n-tuples containing the ordered local node indices corresponding to
-the vertices that define an oriented facet. 
+the vertices that define an oriented facet.
 
 See also [`reference_vertices`](@ref), [`reference_edges`](@ref), and [`reference_faces`](@ref)
 """
 reference_facets(::Type{<:AbstractRefShape})
 
-@inline reference_facets(refshape::Type{<:AbstractRefShape{1}}) = map(i -> (i,), reference_vertices(refshape)) 
+@inline reference_facets(refshape::Type{<:AbstractRefShape{1}}) = map(i -> (i,), reference_vertices(refshape))
 @inline reference_facets(refshape::Type{<:AbstractRefShape{2}}) = reference_edges(refshape)
 @inline reference_facets(refshape::Type{<:AbstractRefShape{3}}) = reference_faces(refshape)
 
@@ -146,8 +146,8 @@ Default implementation: `c.nodes`.
 """
 get_node_ids(c::AbstractCell) = c.nodes
 
-# Default implementations of <entity> = vertices/edges/faces that work as long as get_node_ids 
-# and `reference_<entity>` are correctly implemented for the cell / reference shape. 
+# Default implementations of <entity> = vertices/edges/faces that work as long as get_node_ids
+# and `reference_<entity>` are correctly implemented for the cell / reference shape.
 
 function vertices(c::Ferrite.AbstractCell{RefShape}) where RefShape
     ns = Ferrite.get_node_ids(c)
@@ -169,9 +169,9 @@ function faces(c::Ferrite.AbstractCell{RefShape}) where RefShape
 end
 
 # RefLine (refdim = 1)
-reference_vertices(::Type{RefLine}) = (1, 2) 
+reference_vertices(::Type{RefLine}) = (1, 2)
 reference_edges(::Type{RefLine}) = ((1, 2),) # e1
-reference_faces(::Type{RefLine}) = () # - 
+reference_faces(::Type{RefLine}) = () # -
 
 # RefTriangle (refdim = 2)
 reference_vertices(::Type{RefTriangle}) = (1, 2, 3)
@@ -195,7 +195,7 @@ function reference_edges(::Type{RefHexahedron})
             (7, 8), (8, 5), (1, 5), (2, 6), (3, 7), (4, 8)) # e7 ... e12
 end
 function reference_faces(::Type{RefHexahedron})
-    return ((1, 4, 3, 2), (1, 2, 6, 5), (2, 3, 7, 6), # f1, f2, f3 
+    return ((1, 4, 3, 2), (1, 2, 6, 5), (2, 3, 7, 6), # f1, f2, f3
             (3, 4, 8, 7), (1, 5, 8, 4), (5, 6, 7, 8)) # f4, f5, f6
 end
 
@@ -206,7 +206,7 @@ function reference_edges(::Type{RefPrism})
             (3, 6), (4, 5), (4, 6), (6, 5))         # e6, e7, e8, e9
 end
 function reference_faces(::Type{RefPrism})
-    return ((1, 3, 2), (1, 2, 5, 4), (3, 1, 4, 6), # f1, f2, f3 
+    return ((1, 3, 2), (1, 2, 5, 4), (3, 1, 4, 6), # f1, f2, f3
             (2, 3, 6, 5), (4, 5, 6))               # f4, f5
 end
 
@@ -292,39 +292,50 @@ There are multiple helper structures to apply boundary conditions or define subd
 - `nodesets::Dict{String,Set{Int}}`: maps a `String` key to a `Set` of global node ids
 - `facetsets::Dict{String,Set{FacetIndex}}`: maps a `String` to a `Set` of `Set{FacetIndex} (global_cell_id, local_facet_id)`
 - `vertexsets::Dict{String,Set{VertexIndex}}`: maps a `String` key to a `Set` of local vertex ids
-- `boundary_matrix::SparseMatrixCSC{Bool,Int}`: optional, only needed by `onboundary` to check if a cell is on the boundary, see, e.g. Helmholtz example
+- `cellsets::Dict{String,OrderedSet{Int}}`: maps a `String` key to an `OrderedSet` of cell ids
+- `nodesets::Dict{String,OrderedSet{Int}}`: maps a `String` key to an `OrderedSet` of global node ids
+- `facetsets::Dict{String,OrderedSet{FacetIndex}}`: maps a `String` to an `OrderedSet` of `FacetIndex`
+- `vertexsets::Dict{String,OrderedSet{VertexIndex}}`: maps a `String` key to an `OrderedSet` of `VertexIndex`
 """
 mutable struct Grid{dim,C<:AbstractCell,T<:Real} <: AbstractGrid{dim}
     cells::Vector{C}
     nodes::Vector{Node{dim,T}}
     # Sets
-    cellsets::Dict{String,Set{Int}}
-    nodesets::Dict{String,Set{Int}}
-    facetsets::Dict{String,Set{FacetIndex}}
-    vertexsets::Dict{String,Set{VertexIndex}}
-    # Boundary matrix (faces per cell × cell)
-    boundary_matrix::SparseMatrixCSC{Bool,Int} # TODO: Deprecate!
+    cellsets::Dict{String,OrderedSet{Int}}
+    nodesets::Dict{String,OrderedSet{Int}}
+    facetsets::Dict{String,OrderedSet{FacetIndex}}
+    vertexsets::Dict{String,OrderedSet{VertexIndex}}
 end
 
 function Grid(cells::Vector{C},
               nodes::Vector{Node{dim,T}};
-              cellsets::Dict{String,Set{Int}}=Dict{String,Set{Int}}(),
-              nodesets::Dict{String,Set{Int}}=Dict{String,Set{Int}}(),
-              facetsets::Dict{String,Set{FacetIndex}}=Dict{String,Set{FacetIndex}}(),
-              facesets = nothing,
-              vertexsets::Dict{String,Set{VertexIndex}}=Dict{String,Set{VertexIndex}}(),
-              boundary_matrix::SparseMatrixCSC{Bool,Int}=spzeros(Bool, 0, 0)) where {dim,C,T}
-    if facesets !== nothing 
+              cellsets::Dict{String, <:AbstractVecOrSet{Int}}=Dict{String,OrderedSet{Int}}(),
+              nodesets::Dict{String, <:AbstractVecOrSet{Int}}=Dict{String,OrderedSet{Int}}(),
+              facetsets::Dict{String, <:AbstractVecOrSet{FacetIndex}}=Dict{String,OrderedSet{FacetIndex}}(),
+              facesets=nothing, # deprecated
+              vertexsets::Dict{String, <:AbstractVecOrSet{VertexIndex}}=Dict{String,OrderedSet{VertexIndex}}(),
+              boundary_matrix = nothing) where {dim,C,T}
+    if facesets !== nothing
         if isempty(facetsets)
             @warn "facesets in Grid is deprecated, use facetsets instead" maxlog=1
             for (key, set) in facesets
-                facetsets[key] = Set(FacetIndex(cellnr, facenr) for (cellnr, facenr) in set)
+                facetsets[key] = OrderedSet(FacetIndex(cellnr, facenr) for (cellnr, facenr) in set)
             end
         else
             error("facesets are deprecated, use only facetsets")
         end
     end
-    return Grid(cells, nodes, cellsets, nodesets, facetsets, vertexsets, boundary_matrix)
+    if boundary_matrix !== nothing
+        error("`boundary_matrix` is not part of the Grid anymore and thus not a supported keyword argument.")
+    end
+    return Grid(
+        cells,
+        nodes,
+        convert_to_orderedsets(cellsets),
+        convert_to_orderedsets(nodesets),
+        convert_to_orderedsets(facetsets),
+        convert_to_orderedsets(vertexsets),
+    )
 end
 
 ##########################
@@ -351,13 +362,13 @@ getsdim(::AbstractGrid{sdim}) where sdim = sdim
 """
     get_reference_dimension(grid::AbstractGrid) -> Union{Int, Symbol}
 
-Get information about the reference dimensions of the cells in the grid. 
-If all cells have the same reference dimension, `rdim::Int` is returned. 
+Get information about the reference dimensions of the cells in the grid.
+If all cells have the same reference dimension, `rdim::Int` is returned.
 For grids with mixed reference dimensions, `:mixed` is returned.
 Used internally to dispatch facet-calls to the correct entity when `rdim isa Int`.
 """
 get_reference_dimension(g::AbstractGrid) = _get_reference_dimension(getcells(g))
-_get_reference_dimension(::AbstractVector{C}) where C <: AbstractCell{<:AbstractRefShape{rdim}} where rdim = rdim # Fast path for single rdim inferable from eltype 
+_get_reference_dimension(::AbstractVector{C}) where C <: AbstractCell{<:AbstractRefShape{rdim}} where rdim = rdim # Fast path for single rdim inferable from eltype
 function _get_reference_dimension(cells::AbstractVector{<:AbstractCell})
     # Could make fast-path for eltype being union of cells with different rdims, but @KristofferC recommends against that,
     # https://discourse.julialang.org/t/iterating-through-types-of-a-union-in-a-type-stable-manner/58285/3
@@ -402,7 +413,7 @@ to a Node.
 "Returns the number of nodes in the grid."
 @inline getnnodes(grid::AbstractGrid) = length(grid.nodes)
 "Returns the number of nodes of the `i`-th cell."
-function nnodes_per_cell(grid::AbstractGrid) 
+function nnodes_per_cell(grid::AbstractGrid)
     if !isconcretetype(getcelltype(grid))
         error("There are different celltypes in the `grid`. Use `nnodes_per_cell(grid, cellid::Int)` instead")
     end
@@ -416,7 +427,7 @@ end
 """
     getcellset(grid::AbstractGrid, setname::String)
 
-Returns all cells as cellid in a `Set` of a given `setname`.
+Returns all cells as cellid in the set with name `setname`.
 """
 @inline getcellset(grid::AbstractGrid, setname::String) = grid.cellsets[setname]
 """
@@ -429,7 +440,7 @@ Returns all cellsets of the `grid`.
 """
     getnodeset(grid::AbstractGrid, setname::String)
 
-Returns all nodes as nodeid in a `Set` of a given `setname`.
+Returns all nodes as nodeid in the set with name `setname`.
 """
 @inline getnodeset(grid::AbstractGrid, setname::String) = grid.nodesets[setname]
 """
@@ -442,7 +453,7 @@ Returns all nodesets of the `grid`.
 """
     getfacetset(grid::AbstractGrid, setname::String)
 
-Returns all facets as `FacetIndex` in a `Set` of a given `setname`.
+Returns all faces as `FacetIndex` in the set with name `setname`.
 """
 @inline getfacetset(grid::AbstractGrid, setname::String) = grid.facetsets[setname]
 """
@@ -456,7 +467,7 @@ Returns all facet sets of the `grid`.
 """
     getvertexset(grid::AbstractGrid, setname::String)
 
-Returns all vertices as `VertexIndex` in a `Set` of a given `setname`.
+Returns all vertices as `VertexIndex` in the set with name `setname`.
 """
 @inline getvertexset(grid::AbstractGrid, setname::String) = grid.vertexsets[setname]
 """
@@ -480,7 +491,7 @@ end
 """
     getcoordinates(grid::AbstractGrid, idx::Union{Int,CellIndex})
     getcoordinates(cache::CellCache)
-    
+
 Get a vector with the coordinates of the cell corresponding to `idx` or `cache`
 """
 @inline function getcoordinates(grid::AbstractGrid, idx::Int)
@@ -495,7 +506,7 @@ end
 """
     getcoordinates!(x::Vector{<:Vec}, grid::AbstractGrid, idx::Union{Int,CellIndex})
     getcoordinates!(x::Vector{<:Vec}, grid::AbstractGrid, cell::AbstractCell)
-    
+
 Mutate `x` to the coordinates of the cell corresponding to `idx` or `cell`.
 """
 @inline function getcoordinates!(x::Vector{Vec{dim,T}}, grid::Ferrite.AbstractGrid, cell::Ferrite.AbstractCell) where {dim,T}
@@ -505,7 +516,7 @@ Mutate `x` to the coordinates of the cell corresponding to `idx` or `cell`.
     end
     return x
 end
-@inline function getcoordinates!(x::Vector{Vec{dim,T}}, grid::Ferrite.AbstractGrid, cellid::Int) where {dim,T} 
+@inline function getcoordinates!(x::Vector{Vec{dim,T}}, grid::Ferrite.AbstractGrid, cellid::Int) where {dim,T}
     cell = getcells(grid, cellid)
     getcoordinates!(x, grid, cell)
 end
@@ -513,7 +524,7 @@ end
 
 """
     get_node_coordinate(grid::AbstractGrid, n::Int)
-    
+
 Return the coordinate of the `n`th node in `grid`
 """
 get_node_coordinate(grid, n) = get_node_coordinate(getnodes(grid, n))
@@ -535,7 +546,7 @@ function Base.show(io::IO, ::MIME"text/plain", grid::Grid)
     if isconcretetype(eltype(grid.cells))
         typestrs = [repr(eltype(grid.cells))]
     else
-        typestrs = sort!(repr.(Set(typeof(x) for x in grid.cells)))
+        typestrs = sort!(repr.(OrderedSet(typeof(x) for x in grid.cells)))
     end
     join(io, typestrs, '/')
     print(io, " cells and $(getnnodes(grid)) nodes")
@@ -554,12 +565,12 @@ boundaryfunction(::Type{VertexIndex}) = vertices
 boundaryfunction(::Type{FacetIndex}) = facets
 
 for INDEX in (:VertexIndex, :EdgeIndex, :FaceIndex, :FacetIndex)
-    @eval begin  
+    @eval begin
         #Constructor
         ($INDEX)(a::Int, b::Int) = ($INDEX)((a,b))
 
         Base.getindex(I::($INDEX), i::Int) = I.idx[i]
-        
+
         #To be able to do a,b = faceidx
         Base.iterate(I::($INDEX), state::Int=1) = (state==3) ?  nothing : (I[state], state+1)
 
@@ -599,8 +610,8 @@ end
 """
     SurfaceOrientationInfo
 
-Orientation information for 2D entities. Such an entity can be 
-possibly flipped (i.e. the defining vertex order is reverse to the 
+Orientation information for 2D entities. Such an entity can be
+possibly flipped (i.e. the defining vertex order is reverse to the
 spanning vertex order) and the vertices can be rotated against each other.
 Take for example the faces
 ```
@@ -614,7 +625,7 @@ which are rotated against each other by 90° (shift index is 1) or the faces
 | A | | B |
 4---3 3---4
 ```
-which are flipped against each other. Any combination of these can happen. 
+which are flipped against each other. Any combination of these can happen.
 The combination to map this local face to the defining face is encoded with
 this data structure via ``rotate \\circ flip`` where the rotation is indiced by
 the shift index.
@@ -641,7 +652,7 @@ is called *regular*, indicated by `flipped=false`, while the oriented path
 ```
 is called *inverted*, indicated by `flipped=true`.
 
-2D entities can be flipped (i.e. the defining vertex order is reverse to the 
+2D entities can be flipped (i.e. the defining vertex order is reverse to the
 spanning vertex order) and the vertices can be rotated against each other.
 
 The reference entity is a one with it's first node is the lowest index vertex

@@ -6,7 +6,7 @@ abstract type AbstractDofHandler end
 Access some grid representation for the dof handler.
 
 !!! note
-    This API function is currently not well-defined. It acts as the interface between 
+    This API function is currently not well-defined. It acts as the interface between
     distributed assembly and assembly on a single process, because most parts of the
     functionality can be handled by only acting on the locally owned cell set.
 """
@@ -15,7 +15,7 @@ get_grid(dh::AbstractDofHandler)
 struct SubDofHandler{DH} <: AbstractDofHandler
     # From constructor
     dh::DH
-    cellset::Set{Int}
+    cellset::OrderedSet{Int}
     # Populated in add!
     field_names::Vector{Symbol}
     field_interpolations::Vector{Interpolation}
@@ -26,19 +26,19 @@ struct SubDofHandler{DH} <: AbstractDofHandler
 end
 
 """
-    SubDofHandler(dh::AbstractDofHandler, cellset::Set{Int})
+    SubDofHandler(dh::AbstractDofHandler, cellset::AbstractVecOrSet{Int})
 
-Create an `sdh::SubDofHandler` from the parent `dh`, pertaining to the 
-cells in `cellset`. This allows you to add fields to parts of the domain, or using 
-different interpolations or cell types (e.g. `Triangles` and `Quadrilaterals`). All 
+Create an `sdh::SubDofHandler` from the parent `dh`, pertaining to the
+cells in `cellset`. This allows you to add fields to parts of the domain, or using
+different interpolations or cell types (e.g. `Triangles` and `Quadrilaterals`). All
 fields and cell types must be the same in one `SubDofHandler`.
 
 After construction any number of discrete fields can be added to the SubDofHandler using
 [`add!`](@ref). Construction is finalized by calling [`close!`](@ref) on the parent `dh`.
 
 # Examples
-We assume we have a `grid` containing "Triangle" and "Quadrilateral" cells, 
-including the cellsets "triangles" and "quadilaterals" for to these cells. 
+We assume we have a `grid` containing "Triangle" and "Quadrilateral" cells,
+including the cellsets "triangles" and "quadilaterals" for to these cells.
 ```julia
 dh = DofHandler(grid)
 
@@ -50,10 +50,10 @@ sdh_quad = SubDofHandler(dh, getcellset(grid, "quadilaterals"))
 ip_quad = Lagrange{RefQuadrilateral, 2}()^2 # vector interpolation for a field u
 add!(sdh_quad, :u, ip_quad)
 
-close!(dh) # Finalize by closing the parent 
+close!(dh) # Finalize by closing the parent
 ```
 """
-function SubDofHandler(dh::DH, cellset) where {DH <: AbstractDofHandler}
+function SubDofHandler(dh::DH, cellset::AbstractVecOrSet{Int}) where {DH <: AbstractDofHandler}
     # TODO: Should be an inner constructor.
     isclosed(dh) && error("DofHandler already closed")
     # Compute the celltype and make sure all elements have the same one
@@ -68,7 +68,7 @@ function SubDofHandler(dh::DH, cellset) where {DH <: AbstractDofHandler}
         end
     end
     # Construct and insert into the parent dh
-    sdh = SubDofHandler{typeof(dh)}(dh, cellset, Symbol[], Interpolation[], Int[], ScalarWrapper(-1))
+    sdh = SubDofHandler{typeof(dh)}(dh, convert_to_orderedset(cellset), Symbol[], Interpolation[], Int[], ScalarWrapper(-1))
     push!(dh.subdofhandlers, sdh)
     return sdh
 end
@@ -270,7 +270,7 @@ function add!(sdh::SubDofHandler, name::Symbol, ip::Interpolation)
             # TODO: warn if interpolation type is not the same?
         end
     end
-    
+
     # Check that interpolation is compatible with cells it it added to
     refshape_sdh = getrefshape(getcells(sdh.dh.grid, first(sdh.cellset)))
     if refshape_sdh !== getrefshape(ip)
@@ -298,7 +298,7 @@ function add!(dh::DofHandler, name::Symbol, ip::Interpolation)
     @assert isconcretetype(celltype)
     if isempty(dh.subdofhandlers)
         # Create a new SubDofHandler for all cells
-        sdh = SubDofHandler(dh, Set(1:getncells(get_grid(dh))))
+        sdh = SubDofHandler(dh, OrderedSet(1:getncells(get_grid(dh))))
     elseif length(dh.subdofhandlers) == 1
         # Add to existing SubDofHandler (if it covers all cells)
         sdh = dh.subdofhandlers[1]
@@ -333,7 +333,7 @@ For the `DofHandler` each `SubDofHandler` is visited in the order they were adde
 For each field in the `SubDofHandler` create dofs for the cell.
 This means that dofs on a particular cell will be numbered in groups for each field,
 so first the dofs for field 1 are distributed, then field 2, etc.
-For each cell dofs are first distributed on its vertices, then on the interior of edges (if applicable), then on the 
+For each cell dofs are first distributed on its vertices, then on the interior of edges (if applicable), then on the
 interior of faces (if applicable), and finally on the cell interior.
 The entity ordering follows the geometrical ordering found in [`vertices`](@ref), [`faces`](@ref) and [`edges`](@ref).
 """
@@ -360,7 +360,7 @@ function __close!(dh::DofHandler{dim}) where {dim}
     edgedicts = [Dict{NTuple{2, Int}, Int}() for _ in 1:numfields]
 
     # `facedict` keeps track of the visited faces. We only need to store the first dof we
-    # add to the face since currently more dofs per face isn't supported. 
+    # add to the face since currently more dofs per face isn't supported.
     # A face is uniquely determined by 3 vertex nodes, see sortface
     facedicts = [Dict{NTuple{3, Int}, Int}() for _ in 1:numfields]
 
@@ -437,8 +437,7 @@ function _close_subdofhandler!(dh::DofHandler{sdim}, sdh::SubDofHandler, sdh_ind
     global_fidxs = Int[findfirst(gname -> gname === lname, dh.field_names) for lname in sdh.field_names]
 
     # loop over all the cells, and distribute dofs for all the fields
-    # TODO: Remove BitSet construction when SubDofHandler ensures sorted collections
-    for ci in BitSet(sdh.cellset)
+    for ci in sdh.cellset
         @debug println("Creating dofs for cell #$ci")
 
         # TODO: _check_cellset_intersections can be removed in favor of this assertion
@@ -488,14 +487,14 @@ function _distribute_dofs_for_cell!(dh::DofHandler{sdim}, cell::AbstractCell, ip
         ip_info.nvertexdofs, nextdof, ip_info.n_copies,
     )
 
-    # Distribute dofs for edges 
+    # Distribute dofs for edges
     nextdof = add_edge_dofs(
         dh.cell_dofs, cell, edgedict,
         ip_info.nedgedofs, nextdof,
         ip_info.adjust_during_distribution, ip_info.n_copies,
     )
 
-    # Distribute dofs for faces. 
+    # Distribute dofs for faces.
     nextdof = add_face_dofs(
         dh.cell_dofs, cell, facedict,
         ip_info.nfacedofs, nextdof,
@@ -675,7 +674,7 @@ Here the unique representation is the sorted node index tuple.
 Note that in 3D we only need indices to uniquely identify a face,
 so the unique representation is always a tuple length 3.
 """
-function sortface end 
+function sortface end
 
 """
     sortface_fast(face::Tuple{Int})
@@ -695,9 +694,9 @@ function sortface_fast end
 
 For more details we refer to [1] as we follow the methodology described therein.
 
-[1] Scroggs, M. W., Dokken, J. S., Richardson, C. N., & Wells, G. N. (2022). 
-    Construction of arbitrary order finite element degree-of-freedom maps on 
-    polygonal and polyhedral cell meshes. ACM Transactions on Mathematical 
+[1] Scroggs, M. W., Dokken, J. S., Richardson, C. N., & Wells, G. N. (2022).
+    Construction of arbitrary order finite element degree-of-freedom maps on
+    polygonal and polyhedral cell meshes. ACM Transactions on Mathematical
     Software (TOMS), 48(2), 1-23.
 
     !!!TODO citation via software.
@@ -763,16 +762,16 @@ end
 """
     sortfacet_fast(facet::NTuple{N, Int})
 
-Returns the unique representation of the `facet` by sorting its node indices. 
+Returns the unique representation of the `facet` by sorting its node indices.
 Dispatches on `sortedges_fast` or `sortfaces_fast` depending on `N`
 """
-function sortfacet_fast end 
+function sortfacet_fast end
 
 # Vertex
 sortfacet_fast(facet::Tuple{Int}) = facet
-# Edge 
+# Edge
 sortfacet_fast(facet::NTuple{2, Int}) = sortedge_fast(facet)
-# Face 
+# Face
 sortfacet_fast(facet::NTuple{3, Int}) = sortface_fast(facet)
 sortfacet_fast(facet::NTuple{4, Int}) = sortface_fast(facet)
 
@@ -817,7 +816,7 @@ end
 """
     _find_field(sdh::SubDofHandler, field_name::Symbol)::Int
 
-Return the index of the field with name `field_name` in the `SubDofHandler` `sdh`. Return 
+Return the index of the field with name `field_name` in the `SubDofHandler` `sdh`. Return
 `nothing` if the field is not found.
 
 See also: [`find_field(dh::DofHandler, field_name::Symbol)`](@ref), [`find_field(sdh::SubDofHandler, field_name::Symbol)`](@ref).

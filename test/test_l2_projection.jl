@@ -133,7 +133,7 @@ function test_projection_mixedgrid()
     # use a SymmetricTensor here for testing the symmetric version of project
     f(x) = SymmetricTensor{2,2,Float64}((1 + x[1]^2, 2x[2]^2, x[1]*x[2]))
     xe = getcoordinates(mesh, 1)
-    
+
     # analytical values
     qp_values = [[f(spatial_coordinate(cv, qp, xe)) for qp in 1:getnquadpoints(cv)]]
     qp_values_matrix = reduce(hcat, qp_values)

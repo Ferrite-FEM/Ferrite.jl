@@ -103,7 +103,6 @@ celldofs!(v::Vector, cc::CellCache) = copyto!(v, cc.dofs) # celldofs!(v, cc.dh, 
 
 # TODO: These should really be replaced with something better...
 nfacets(cc::CellCache) = nfacets(cc.grid.cells[cc.cellid[]])
-onboundary(cc::CellCache, face::Int) = cc.grid.boundary_matrix[face, cc.cellid[]]
 
 
 # TODO: Currently excluded from the docstring below. Should they be public?
@@ -155,7 +154,6 @@ for op = (:getnodes, :getcoordinates, :cellid, :celldofs)
 end
 # @inline faceid(fc::FacetCache) = fc.current_faceid[]
 @inline celldofs!(v::Vector, fc::FacetCache) = celldofs!(v, fc.cc)
-# @inline onboundary(fc::FacetCache) = onboundary(fc.cc, faceid(fc))
 # @inline faceindex(fc::FacetCache) = FaceIndex(cellid(fc), faceid(fc))
 @inline function reinit!(fv::FacetValues, fc::FacetCache)
     reinit!(fv, fc.cc, fc.current_facet_id[])
@@ -225,9 +223,6 @@ getcoordinates(ic::InterfaceCache) = (getcoordinates(ic.a), getcoordinates(ic.b)
 ####################
 
 ## CellIterator ##
-
-const IntegerCollection = Union{Set{<:Integer}, AbstractVector{<:Integer}}
-
 """
     CellIterator(grid::Grid, cellset=1:getncells(grid))
     CellIterator(dh::AbstractDofHandler, cellset=1:getncells(dh))
@@ -289,7 +284,7 @@ FaceIterator(args...) = error("FaceIterator is deprecated, use FacetIterator ins
 
 # Leaving flags undocumented as for CellIterator
 """
-    FacetIterator(gridordh::Union{Grid,AbstractDofHandler}, faceset::Set{FacetIndex})
+    FacetIterator(gridordh::Union{Grid,AbstractDofHandler}, faceset::AbstractVecOrSet{FacetIndex})
 
 Create a `FacetIterator` to conveniently iterate over the faces in `faceset`. The elements of
 the iterator are [`FacetCache`](@ref)s which are properly `reinit!`ialized. See
@@ -311,11 +306,11 @@ end
 """
 struct FacetIterator{FC<:FacetCache}
     fc::FC
-    set::Set{FacetIndex}
+    set::OrderedSet{FacetIndex}
 end
 
 function FacetIterator(gridordh::Union{Grid,AbstractDofHandler},
-                      set::Set{FacetIndex}, flags::UpdateFlags=UpdateFlags())
+                      set::AbstractVecOrSet{FacetIndex}, flags::UpdateFlags=UpdateFlags())
     if gridordh isa DofHandler
         # Keep here to maintain same settings as for CellIterator
         _check_same_celltype(get_grid(gridordh), set)
@@ -410,7 +405,7 @@ function _check_same_celltype(grid::AbstractGrid, cellset::IntegerCollection)
     end
 end
 
-function _check_same_celltype(grid::AbstractGrid, facetset::Set{<:BoundaryIndex})
+function _check_same_celltype(grid::AbstractGrid, facetset::AbstractVecOrSet{<:BoundaryIndex})
     isconcretetype(getcelltype(grid)) && return nothing # Short circuit check
     celltype = getcelltype(grid, first(facetset)[1])
     if !all(getcelltype(grid, facet[1]) == celltype for facet in facetset)

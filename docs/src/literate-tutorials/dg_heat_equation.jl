@@ -71,7 +71,7 @@
 #     ```math
 #      \int_\Gamma q \boldsymbol{\phi} \cdot \boldsymbol{n} \,\mathrm{d}\Gamma = \int_\Gamma \llbracket q\rrbracket  \cdot \{\boldsymbol{\phi}\} \,\mathrm{d}\Gamma + \int_{\Gamma^0} \{q\} \llbracket \boldsymbol{\phi}\rrbracket  \,\mathrm{d}\Gamma^0,
 #     ```
-#     where $\Gamma^0 : \Gamma \setminus \partial \Omega$, and the jump of the vector-valued field $\boldsymbol{\phi}$ is defined as 
+#     where $\Gamma^0 : \Gamma \setminus \partial \Omega$, and the jump of the vector-valued field $\boldsymbol{\phi}$ is defined as
 #     ```math
 #      \llbracket \boldsymbol{\phi}\rrbracket  = \boldsymbol{\phi}^+ \cdot \boldsymbol{n}^+ + \boldsymbol{\phi}^- \cdot \boldsymbol{n}^-\\
 #     ```
@@ -99,7 +99,7 @@
 #     ```math
 #      \int_\Omega [\boldsymbol{\nabla} (u)] \cdot [\boldsymbol{\nabla} (\delta u)] \,\mathrm{d}\Omega + \int_\Gamma \llbracket \hat{u} - u\rrbracket  \cdot \{\boldsymbol{\nabla} (\delta u)\} \,\mathrm{d}\Gamma + \int_{\Gamma^0} \{\hat{u} - u\} \llbracket \boldsymbol{\nabla} (\delta u)\rrbracket  \,\mathrm{d}\Gamma^0 - \int_\Gamma \llbracket \delta u\rrbracket  \cdot \{\hat{\boldsymbol{\sigma}}\} \,\mathrm{d}\Gamma - \int_{\Gamma^0} \{\delta u\} \llbracket \hat{\boldsymbol{\sigma}}\rrbracket  \,\mathrm{d}\Gamma^0 = \int_\Omega \delta u \,\mathrm{d}\Omega,\\
 #     ```
-#     The numerical fluxes chosen for the interior penalty method are $\boldsymbol{\hat{\sigma}} = \{\boldsymbol{\nabla} (u)\} - \alpha(\llbracket u\rrbracket)$ on $\Gamma$, $\hat{u} = \{u\}$ on the interfaces between elements $\Gamma^0 : \Gamma \setminus \partial \Omega$, 
+#     The numerical fluxes chosen for the interior penalty method are $\boldsymbol{\hat{\sigma}} = \{\boldsymbol{\nabla} (u)\} - \alpha(\llbracket u\rrbracket)$ on $\Gamma$, $\hat{u} = \{u\}$ on the interfaces between elements $\Gamma^0 : \Gamma \setminus \partial \Omega$,
 #     and $\hat{u} = 0$ on $\partial \Omega$. Such choice results in $\{\hat{\boldsymbol{\sigma}}\} = \{\boldsymbol{\nabla} (u)\} - \alpha(\llbracket u\rrbracket)$, $\llbracket \hat{u}\rrbracket  = 0$, $\{\hat{u}\} = \{u\}$, $\llbracket \hat{\boldsymbol{\sigma}}\rrbracket  = 0$ and the equation becomes
 #     ```math
 #      \int_\Omega [\boldsymbol{\nabla} (u)] \cdot [\boldsymbol{\nabla} (\delta u)] \,\mathrm{d}\Omega - \int_\Gamma \llbracket u\rrbracket  \cdot \{\boldsymbol{\nabla} (\delta u)\}  \,\mathrm{d}\Gamma - \int_\Gamma \llbracket \delta u\rrbracket  \cdot \{\boldsymbol{\nabla} (u)\} - \llbracket \delta u\rrbracket  \cdot \alpha(\llbracket u\rrbracket)  \,\mathrm{d}\Gamma = \int_\Omega \delta u \,\mathrm{d}\Omega,\\
@@ -170,7 +170,7 @@ close!(dh);
 K = create_sparsity_pattern(dh, topology = topology, cross_coupling = trues(1,1));
 
 # ### Boundary conditions
-# The Dirichlet boundary conditions are treated 
+# The Dirichlet boundary conditions are treated
 # as usual by a `ConstraintHandler`.
 ch = ConstraintHandler(dh)
 add!(ch, Dirichlet(:u, getfacetset(grid, "right"), (x, t) -> 1.0))

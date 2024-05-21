@@ -116,7 +116,7 @@
     for (cell_shape, scalar_interpol, quad_rule) in (
                                         #TODO: update interfaces for lines
                                         (Line, DiscontinuousLagrange{RefLine, 1}(), FacetQuadratureRule{RefLine}(2)),
-                                        (QuadraticLine, DiscontinuousLagrange{RefLine, 2}(), FacetQuadratureRule{RefLine}(2)), 
+                                        (QuadraticLine, DiscontinuousLagrange{RefLine, 2}(), FacetQuadratureRule{RefLine}(2)),
                                         (Quadrilateral, DiscontinuousLagrange{RefQuadrilateral, 1}(), FacetQuadratureRule{RefQuadrilateral}(2)),
                                         (QuadraticQuadrilateral, DiscontinuousLagrange{RefQuadrilateral, 2}(), FacetQuadratureRule{RefQuadrilateral}(2)),
                                         (Triangle, DiscontinuousLagrange{RefTriangle, 1}(), FacetQuadratureRule{RefTriangle}(2)),
@@ -148,7 +148,7 @@
         end
         func_interpol = scalar_interpol
         for func_interpol in (scalar_interpol, VectorizedInterpolation(scalar_interpol))
-            iv = cell_shape ∈ (QuadraticLine, QuadraticQuadrilateral, QuadraticTriangle, QuadraticTetrahedron) ? 
+            iv = cell_shape ∈ (QuadraticLine, QuadraticQuadrilateral, QuadraticTriangle, QuadraticTetrahedron) ?
                 InterfaceValues(quad_rule, func_interpol, ip) : InterfaceValues(quad_rule, func_interpol)
             test_interfacevalues(grid, iv)
         end
@@ -199,10 +199,10 @@
     # end
     @testset "Unordered nodes 3D" begin
         dim = 2
-        nodes = [Node((-1.0, 0.0, 0.0)), Node((0.0, 0.0, 0.0)), Node((1.0, 0.0, 0.0)), 
-                Node((-1.0, 1.0, 0.0)), Node((0.0, 1.0, 0.0)), Node((1.0, 1.0, 0.0)), 
-                Node((-1.0, 0.0, 1.0)), Node((0.0, 0.0, 1.0)), Node((1.0, 0.0, 1.0)), 
-                Node((-1.0, 1.0, 1.0)), Node((0.0, 1.0, 1.0)), Node((1.0, 1.0, 1.0)), 
+        nodes = [Node((-1.0, 0.0, 0.0)), Node((0.0, 0.0, 0.0)), Node((1.0, 0.0, 0.0)),
+                Node((-1.0, 1.0, 0.0)), Node((0.0, 1.0, 0.0)), Node((1.0, 1.0, 0.0)),
+                Node((-1.0, 0.0, 1.0)), Node((0.0, 0.0, 1.0)), Node((1.0, 0.0, 1.0)),
+                Node((-1.0, 1.0, 1.0)), Node((0.0, 1.0, 1.0)), Node((1.0, 1.0, 1.0)),
                 ]
         cells = [
                     Hexahedron((1,2,5,4,7,8,11,10)),

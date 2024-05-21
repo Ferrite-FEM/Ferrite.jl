@@ -33,14 +33,14 @@ which applies the condition via [`apply!`](@ref) and/or [`apply_zero!`](@ref).
 """
 struct Dirichlet # <: Constraint
     f::Function # f(x) or f(x,t) -> value(s)
-    facets::Union{Set{Int},Set{FacetIndex},Set{FaceIndex},Set{EdgeIndex},Set{VertexIndex}}
+    facets::OrderedSet{T} where T <: Union{Int, FacetIndex, FaceIndex, EdgeIndex, VertexIndex}
     field_name::Symbol
     components::Vector{Int} # components of the field
     local_facet_dofs::Vector{Int}
     local_facet_dofs_offset::Vector{Int}
 end
-function Dirichlet(field_name::Symbol, facets::Set, f::Function, components=nothing)
-    return Dirichlet(f, facets, field_name, __to_components(components), Int[], Int[])
+function Dirichlet(field_name::Symbol, facets::AbstractVecOrSet, f::Function, components=nothing)
+    return Dirichlet(f, convert_to_orderedset(facets), field_name, __to_components(components), Int[], Int[])
 end
 
 # components=nothing is default and means that all components should be constrained
@@ -58,8 +58,8 @@ const DofCoefficients{T} = Vector{Pair{Int,T}}
 """
     AffineConstraint(constrained_dof::Int, entries::Vector{Pair{Int,T}}, b::T) where T
 
-Define an affine/linear constraint to constrain one degree of freedom, `u[i]`, 
-such that `u[i] = ∑(u[j] * a[j]) + b`, 
+Define an affine/linear constraint to constrain one degree of freedom, `u[i]`,
+such that `u[i] = ∑(u[j] * a[j]) + b`,
 where `i=constrained_dof` and each element in `entries` are `j => a[j]`
 """
 struct AffineConstraint{T}
@@ -177,7 +177,7 @@ isclosed(ch::ConstraintHandler) = ch.closed[]
 free_dofs(ch::ConstraintHandler) = ch.free_dofs
 prescribed_dofs(ch::ConstraintHandler) = ch.prescribed_dofs
 
-# Equivalent to `copy!(out, setdiff(1:n_entries, diff))`, but requires that 
+# Equivalent to `copy!(out, setdiff(1:n_entries, diff))`, but requires that
 # `issorted(diff)` and that `1 ≤ diff[1] ≤ diff[end] ≤ n_entries`
 function _sorted_setdiff!(out::Vector{Int}, n_entries::Int, diff::Vector{Int})
     n_diff = length(diff)
@@ -293,7 +293,7 @@ function add_prescribed_dof!(ch::ConstraintHandler, constrained_dof::Int, inhomo
 end
 
 # Dirichlet on (facet|face|edge|vertex)set
-function _add!(ch::ConstraintHandler, dbc::Dirichlet, bcfacets::Set{Index}, interpolation::Interpolation, field_dim::Int, offset::Int, bcvalue::BCValues, _) where {Index<:BoundaryIndex}
+function _add!(ch::ConstraintHandler, dbc::Dirichlet, bcfacets::AbstractVecOrSet{Index}, interpolation::Interpolation, field_dim::Int, offset::Int, bcvalue::BCValues, _) where {Index<:BoundaryIndex}
     local_facet_dofs, local_facet_dofs_offset =
         _local_facet_dofs_for_bc(interpolation, field_dim, dbc.components, offset, dirichlet_boundarydof_indices(eltype(bcfacets)))
     copy!(dbc.local_facet_dofs, local_facet_dofs)
@@ -335,7 +335,7 @@ function _local_facet_dofs_for_bc(interpolation, field_dim, components, offset, 
     return local_facet_dofs, local_facet_dofs_offset
 end
 
-function _add!(ch::ConstraintHandler, dbc::Dirichlet, bcnodes::Set{Int}, interpolation::Interpolation, field_dim::Int, offset::Int, bcvalue::BCValues, cellset::Set{Int}=Set{Int}(1:getncells(get_grid(ch.dh))))
+function _add!(ch::ConstraintHandler, dbc::Dirichlet, bcnodes::AbstractVecOrSet{Int}, interpolation::Interpolation, field_dim::Int, offset::Int, bcvalue::BCValues, cellset::AbstractVecOrSet{Int}=OrderedSet{Int}(1:getncells(get_grid(ch.dh))))
     grid = get_grid(ch.dh)
     if interpolation !== default_interpolation(getcelltype(grid, first(cellset)))
         @warn("adding constraint to nodeset is not recommended for sub/super-parametric approximations.")
@@ -427,7 +427,7 @@ function update!(ch::ConstraintHandler, time::Real=0.0)
 end
 
 # for facets, vertices, faces and edges
-function _update!(inhomogeneities::Vector{T}, f::Function, boundary_entities::Set{<:BoundaryIndex}, field::Symbol, local_facet_dofs::Vector{Int}, local_facet_dofs_offset::Vector{Int},
+function _update!(inhomogeneities::Vector{T}, f::Function, boundary_entities::AbstractVecOrSet{<:BoundaryIndex}, field::Symbol, local_facet_dofs::Vector{Int}, local_facet_dofs_offset::Vector{Int},
                   components::Vector{Int}, dh::AbstractDofHandler, boundaryvalues::BCValues,
                   dofmapping::Dict{Int,Int}, dofcoefficients::Vector{Union{Nothing,DofCoefficients{T}}}, time::Real) where {T}
 
@@ -464,7 +464,7 @@ function _update!(inhomogeneities::Vector{T}, f::Function, boundary_entities::Se
 end
 
 # for nodes
-function _update!(inhomogeneities::Vector{T}, f::Function, ::Set{Int}, field::Symbol, nodeidxs::Vector{Int}, globaldofs::Vector{Int},
+function _update!(inhomogeneities::Vector{T}, f::Function, ::AbstractVecOrSet{Int}, field::Symbol, nodeidxs::Vector{Int}, globaldofs::Vector{Int},
                   components::Vector{Int}, dh::AbstractDofHandler, facetvalues::BCValues,
                   dofmapping::Dict{Int,Int}, dofcoefficients::Vector{Union{Nothing,DofCoefficients{T}}}, time::Real) where T
     counter = 1
@@ -528,12 +528,12 @@ apply!
     apply_zero!(K::SparseMatrixCSC, rhs::AbstractVector, ch::ConstraintHandler)
 
 Adjust the matrix `K` and the right hand side `rhs` to account for prescribed Dirichlet
-boundary conditions and affine constraints such that `du = K \\ rhs` gives the expected 
+boundary conditions and affine constraints such that `du = K \\ rhs` gives the expected
 result (e.g. `du` zero for all prescribed degrees of freedom).
 
     apply_zero!(v::AbstractVector, ch::ConstraintHandler)
 
-Zero-out values in `v` corresponding to prescribed degrees of freedom and update values 
+Zero-out values in `v` corresponding to prescribed degrees of freedom and update values
 prescribed by affine constraints, such that if `a` fulfills the constraints,
 `a ± v` also will.
 
@@ -553,9 +553,9 @@ apply_zero!(ΔΔu, ch)        # Make sure values are exactly zero
 ```
 
 !!! note
-    The last call to `apply_zero!` is only strictly necessary for affine constraints. 
-    However, even if the Dirichlet boundary conditions should be fulfilled after 
-    `apply!(K, g, ch)`, solvers of linear systems are not exact. 
+    The last call to `apply_zero!` is only strictly necessary for affine constraints.
+    However, even if the Dirichlet boundary conditions should be fulfilled after
+    `apply!(K, g, ch)`, solvers of linear systems are not exact.
     `apply!(ΔΔu, ch)` can be used to make sure the values
     for the prescribed degrees of freedom are fulfilled exactly.
 """
@@ -859,7 +859,7 @@ end
 
 function filter_dbc_set(grid::AbstractGrid, fhset::AbstractSet{Int}, dbcset::AbstractSet{Int})
     ret = empty(dbcset)
-    nodes_in_fhset = Set{Int}()
+    nodes_in_fhset = OrderedSet{Int}()
     for cc in CellIterator(grid, fhset, UpdateFlags(; nodes=true, coords=false))
         union!(nodes_in_fhset, cc.nodes)
     end
@@ -1060,7 +1060,7 @@ function _add!(ch::ConstraintHandler, pdbc::PeriodicDirichlet, interpolation::In
         points = construct_cornerish(min_x, max_x)
         tree = KDTree(Tx[get_node_coordinate(grid, i) for i in all_node_idxs_v])
         idxs, _ = NearestNeighbors.nn(tree, points)
-        corner_set = Set{Int}(all_node_idxs_v[i] for i in idxs)
+        corner_set = OrderedSet{Int}(all_node_idxs_v[i] for i in idxs)
 
         dbc = Dirichlet(pdbc.field_name, corner_set,
             pdbc.func === nothing ? (x, _) -> pdbc.components * eltype(x)(0) : pdbc.func,
@@ -1087,7 +1087,7 @@ function _add!(ch::ConstraintHandler, pdbc::PeriodicDirichlet, interpolation::In
     if pdbc.func !== nothing
         # Create another temp constraint handler if we need to compute inhomogeneities
         chtmp2 = ConstraintHandler(ch.dh)
-        all_facets = Set{FacetIndex}()
+        all_facets = OrderedSet{FacetIndex}()
         union!(all_facets, (x.mirror for x in facet_map))
         union!(all_facets, (x.image for x in facet_map))
         dbc_all = Dirichlet(pdbc.field_name, all_facets, pdbc.func, pdbc.components)
@@ -1256,24 +1256,24 @@ dictionary which maps each mirror facet to a image facet. The result can then be
 [`PeriodicDirichlet`](@ref).
 
 `mset` and `iset` can be given as a `String` (an existing facet set in the grid) or as a
-`Set{FacetIndex}` directly.
+`AbstractSet{FacetIndex}` directly.
 
 By default this function looks for a matching facet in the directions of the coordinate
 system. For other types of periodicities the `transform` function can be used. The
 `transform` function is applied on the coordinates of the image facet, and is expected to
 transform the coordinates to the matching locations in the mirror set.
 
-The keyword `tol` specifies the tolerance (i.e. distance and deviation in facet-normals) 
+The keyword `tol` specifies the tolerance (i.e. distance and deviation in facet-normals)
 between a image-facet and mirror-facet, for them to be considered matched.
 
 See also: [`collect_periodic_facets!`](@ref), [`PeriodicDirichlet`](@ref).
 """
-function collect_periodic_facets(grid::Grid, mset::Union{Set{FacetIndex},String}, iset::Union{Set{FacetIndex},String}, transform::Union{Function,Nothing}=nothing; tol::Float64=1e-12)
+function collect_periodic_facets(grid::Grid, mset::Union{AbstractSet{FacetIndex},String}, iset::Union{AbstractSet{FacetIndex},String}, transform::Union{Function,Nothing}=nothing; tol::Float64=1e-12)
     return collect_periodic_facets!(PeriodicFacetPair[], grid, mset, iset, transform; tol)
 end
 
 """
-    collect_periodic_facets(grid::Grid, all_facets::Union{Set{FacetIndex},String,Nothing}=nothing; tol=1e-12)
+    collect_periodic_facets(grid::Grid, all_facets::Union{AbstractSet{FacetIndex},String,Nothing}=nothing; tol=1e-12)
 
 Split all facets in `all_facets` into image and mirror sets. For each matching pair, the facet
 located further along the vector `(1, 1, 1)` becomes the image facet.
@@ -1283,7 +1283,7 @@ have a neighbor) is used.
 
 See also: [`collect_periodic_facets!`](@ref), [`PeriodicDirichlet`](@ref).
 """
-function collect_periodic_facets(grid::Grid, all_facets::Union{Set{FacetIndex},String,Nothing}=nothing; tol::Float64=1e-12)
+function collect_periodic_facets(grid::Grid, all_facets::Union{AbstractSet{FacetIndex},String,Nothing}=nothing; tol::Float64=1e-12)
     return collect_periodic_facets!(PeriodicFacetPair[], grid, all_facets; tol)
 end
 
@@ -1293,7 +1293,7 @@ end
 
 Same as [`collect_periodic_facets`](@ref) but adds all matches to the existing `facet_map`.
 """
-function collect_periodic_facets!(facet_map::Vector{PeriodicFacetPair}, grid::Grid, mset::Union{Set{FacetIndex},String}, iset::Union{Set{FacetIndex},String}, transform::Union{Function,Nothing}=nothing; tol::Float64=1e-12)
+function collect_periodic_facets!(facet_map::Vector{PeriodicFacetPair}, grid::Grid, mset::Union{AbstractSet{FacetIndex},String}, iset::Union{AbstractSet{FacetIndex},String}, transform::Union{Function,Nothing}=nothing; tol::Float64=1e-12)
     mset = __to_facetset(grid, mset)
     iset = __to_facetset(grid, iset)
     if transform === nothing
@@ -1306,7 +1306,7 @@ function collect_periodic_facets!(facet_map::Vector{PeriodicFacetPair}, grid::Gr
     return facet_map
 end
 
-function collect_periodic_facets!(facet_map::Vector{PeriodicFacetPair}, grid::Grid, facetset::Union{Set{FacetIndex},String,Nothing}; tol::Float64=1e-12)
+function collect_periodic_facets!(facet_map::Vector{PeriodicFacetPair}, grid::Grid, facetset::Union{AbstractSet{FacetIndex},String,Nothing}; tol::Float64=1e-12)
     facetset = facetset === nothing ? __collect_boundary_facets(grid) : copy(__to_facetset(grid, facetset))
     if mod(length(facetset), 2) != 0
         error("uneven number of facets")
@@ -1314,7 +1314,7 @@ function collect_periodic_facets!(facet_map::Vector{PeriodicFacetPair}, grid::Gr
     return __collect_periodic_facets_bruteforce!(facet_map, grid, facetset, facetset, #=known_order=#false, tol)
 end
 
-__to_facetset(_, set::Set{FacetIndex}) = set
+__to_facetset(_, set::AbstractSet{FacetIndex}) = set
 __to_facetset(grid, set::String) = getfacetset(grid, set)
 function __collect_boundary_facets(grid::Grid)
     candidates = Dict{Tuple, FacetIndex}()
@@ -1328,7 +1328,7 @@ function __collect_boundary_facets(grid::Grid)
             end
         end
     end
-    return Set{FacetIndex}(values(candidates))
+    return OrderedSet{FacetIndex}(values(candidates))
 end
 
 function __collect_periodic_facets_tree!(facet_map::Vector{PeriodicFacetPair}, grid::Grid, mset::Vector{FacetIndex}, iset::Vector{FacetIndex}, transformation::F, tol::Float64) where F <: Function
@@ -1373,7 +1373,7 @@ function __collect_periodic_facets_tree!(facet_map::Vector{PeriodicFacetPair}, g
 end
 
 # This method empties mset and iset
-function __collect_periodic_facets_bruteforce!(facet_map::Vector{PeriodicFacetPair}, grid::Grid, mset::Set{FacetIndex}, iset::Set{FacetIndex}, known_order::Bool, tol::Float64)
+function __collect_periodic_facets_bruteforce!(facet_map::Vector{PeriodicFacetPair}, grid::Grid, mset::AbstractSet{FacetIndex}, iset::AbstractSet{FacetIndex}, known_order::Bool, tol::Float64)
     if length(mset) != length(iset)
         error("different facets in mirror and image")
     end
