@@ -9,10 +9,10 @@ A `Node` is a point in space.
 # Fields
 - `x::Vec{dim,T}`: stores the coordinates
 """
-struct Node{dim, T}
-    x::Vec{dim, T}
+struct Node{dim,T}
+    x::Vec{dim,T}
 end
-Node(x::NTuple{dim, T}) where {dim,T} = Node(Vec{dim, T}(x))
+Node(x::NTuple{dim,T}) where {dim,T} = Node(Vec{dim,T}(x))
 
 """
     get_node_coordinate(::Node)
@@ -26,7 +26,7 @@ get_node_coordinate(n::Node) = n.x
 
 Get the data type of the the node coordinate.
 """
-get_coordinate_type(::Node{dim, T}) where {dim,T}  = Vec{dim, T}
+get_coordinate_type(::Node{dim,T}) where {dim,T}  = Vec{dim,T}
 
 """
     get_coordinate_eltype(::Node)
@@ -271,7 +271,7 @@ Specifies for each subtype of AbstractCell how many nodes form an edge.
 """
 nvertices_on_edge(cell::AbstractCell, local_edge_index::Int) = length(edges(cell)[local_edge_index])
 
-getdim(::Union{AbstractCell{RefShape}, Type{<:AbstractCell{RefShape}}}) where {refdim, RefShape <: AbstractRefShape{refdim}} = refdim
+getdim(::Union{AbstractCell{refshape},Type{<:AbstractCell{refshape}}}) where {refdim, RefShape <: AbstractRefShape{refshape}} = refdim
 
 
 ######################
@@ -294,23 +294,23 @@ Helper structures for applying boundary conditions or define subdomains are gath
 - `facetsets::Dict{String, OrderedSet{FacetIndex}}`: maps a `String` to an `OrderedSet` of `FacetIndex`
 - `vertexsets::Dict{String, OrderedSet{VertexIndex}}`: maps a `String` key to an `OrderedSet` of `VertexIndex`
 """
-mutable struct Grid{dim, C<:AbstractCell, T<:Real} <: AbstractGrid{dim}
+mutable struct Grid{dim,C<:AbstractCell,T<:Real} <: AbstractGrid{dim}
     cells::Vector{C}
-    nodes::Vector{Node{dim, T}}
+    nodes::Vector{Node{dim,T}}
     # Sets
-    cellsets::Dict{String, OrderedSet{Int}}
-    nodesets::Dict{String, OrderedSet{Int}}
-    facetsets::Dict{String, OrderedSet{FacetIndex}}
-    vertexsets::Dict{String, OrderedSet{VertexIndex}}
+    cellsets::Dict{String,OrderedSet{Int}}
+    nodesets::Dict{String,OrderedSet{Int}}
+    facetsets::Dict{String,OrderedSet{FacetIndex}}
+    vertexsets::Dict{String,OrderedSet{VertexIndex}}
 end
 
 function Grid(cells::Vector{C},
               nodes::Vector{Node{dim, T}};
-              cellsets::Dict{String, <:AbstractVecOrSet{Int}}=Dict{String, OrderedSet{Int}}(),
-              nodesets::Dict{String, <:AbstractVecOrSet{Int}}=Dict{String, OrderedSet{Int}}(),
-              facetsets::Dict{String, <:AbstractVecOrSet{FacetIndex}}=Dict{String, OrderedSet{FacetIndex}}(),
+              cellsets::Dict{String, <:AbstractVecOrSet{Int}}=Dict{String,OrderedSet{Int}}(),
+              nodesets::Dict{String, <:AbstractVecOrSet{Int}}=Dict{String,OrderedSet{Int}}(),
+              facetsets::Dict{String, <:AbstractVecOrSet{FacetIndex}}=Dict{String,OrderedSet{FacetIndex}}(),
               facesets=nothing, # deprecated
-              vertexsets::Dict{String, <:AbstractVecOrSet{VertexIndex}}=Dict{String, OrderedSet{VertexIndex}}(),
+              vertexsets::Dict{String, <:AbstractVecOrSet{VertexIndex}}=Dict{String,OrderedSet{VertexIndex}}(),
               boundary_matrix = nothing) where {dim,C,T}
     if facesets !== nothing
         if isempty(facetsets)
@@ -343,15 +343,15 @@ end
 
 Get the datatype for a single point in the grid.
 """
-get_coordinate_type(::Grid{dim, C, T}) where {dim, C, T} = Vec{dim, T} # Node is baked into the mesh type.
+get_coordinate_type(::Grid{dim,C,T}) where {dim,C,T} = Vec{dim,T} # Node is baked into the mesh type.
 
 """
     toglobal(grid::AbstractGrid, vertexidx::VertexIndex) -> Int
     toglobal(grid::AbstractGrid, vertexidx::Vector{VertexIndex}) -> Vector{Int}
 This function takes the local vertex representation (a `VertexIndex`) and looks up the unique global id (an `Int`).
 """
-toglobal(grid::AbstractGrid, vertexidx::VertexIndex) = vertices(getcells(grid, vertexidx[1]))[vertexidx[2]]
-toglobal(grid::AbstractGrid, vertexidx::Vector{VertexIndex}) = unique(toglobal.((grid,), vertexidx))
+toglobal(grid::AbstractGrid, vertexidx::VertexIndex) = vertices(getcells(grid,vertexidx[1]))[vertexidx[2]]
+toglobal(grid::AbstractGrid, vertexidx::Vector{VertexIndex}) = unique(toglobal.((grid,),vertexidx))
 
 getsdim(::AbstractGrid{sdim}) where sdim = sdim
 @inline getdim(g::AbstractGrid) = getsdim(g) # TODO: Deprecate
@@ -405,7 +405,7 @@ The last option tries to call a `nodeset` of the `<:AbstractGrid`. `Collection{N
 to a Node.
 """
 @inline getnodes(grid::AbstractGrid) = grid.nodes
-@inline getnodes(grid::AbstractGrid, v::Union{Int, Vector{Int}}) = grid.nodes[v]
+@inline getnodes(grid::AbstractGrid, v::Union{Int,Vector{Int}}) = grid.nodes[v]
 @inline getnodes(grid::AbstractGrid, setname::String) = grid.nodes[collect(getnodeset(grid,setname))]
 "Returns the number of nodes in the grid."
 @inline getnnodes(grid::AbstractGrid) = length(grid.nodes)
@@ -506,18 +506,18 @@ end
 
 Mutate `x` to the coordinates of the cell corresponding to `idx` or `cell`.
 """
-@inline function getcoordinates!(x::Vector{Vec{dim, T}}, grid::AbstractGrid, cell::AbstractCell) where {dim, T}
+@inline function getcoordinates!(x::Vector{Vec{dim,T}}, grid::AbstractGrid, cell::AbstractCell) where {dim,T}
     node_ids = get_node_ids(cell)
     @inbounds for i in 1:length(x)
         x[i] = get_node_coordinate(grid, node_ids[i])
     end
     return x
 end
-@inline function getcoordinates!(x::Vector{Vec{dim, T}}, grid::AbstractGrid, cellid::Int) where {dim, T}
+@inline function getcoordinates!(x::Vector{Vec{dim,T}}, grid::AbstractGrid, cellid::Int) where {dim,T}
     cell = getcells(grid, cellid)
     getcoordinates!(x, grid, cell)
 end
-@inline getcoordinates!(x::Vector{Vec{dim, T}}, grid::AbstractGrid, cell::CellIndex) where {dim, T} = getcoordinates!(x, grid, cell.idx)
+@inline getcoordinates!(x::Vector{Vec{dim, T}}, grid::AbstractGrid, cell::CellIndex) where {dim,T} = getcoordinates!(x, grid, cell.idx)
 
 """
     get_node_coordinate(grid::AbstractGrid, n::Int)
