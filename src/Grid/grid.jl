@@ -149,21 +149,21 @@ get_node_ids(c::AbstractCell) = c.nodes
 # Default implementations of <entity> = vertices/edges/faces that work as long as get_node_ids
 # and `reference_<entity>` are correctly implemented for the cell / reference shape.
 
-function vertices(c::Ferrite.AbstractCell{RefShape}) where RefShape
-    ns = Ferrite.get_node_ids(c)
-    return map(i -> ns[i], Ferrite.reference_vertices(RefShape))
+function vertices(c::AbstractCell{RefShape}) where RefShape
+    ns = get_node_ids(c)
+    return map(i -> ns[i], reference_vertices(RefShape))
 end
 
-function edges(c::Ferrite.AbstractCell{RefShape}) where RefShape
-    ns = Ferrite.get_node_ids(c)
-    return map(Ferrite.reference_edges(RefShape)) do re
+function edges(c::AbstractCell{RefShape}) where RefShape
+    ns = get_node_ids(c)
+    return map(reference_edges(RefShape)) do re
         map(i -> ns[i], re)
     end
 end
 
-function faces(c::Ferrite.AbstractCell{RefShape}) where RefShape
-    ns = Ferrite.get_node_ids(c)
-    return map(Ferrite.reference_faces(RefShape)) do rf
+function faces(c::AbstractCell{RefShape}) where RefShape
+    ns = get_node_ids(c)
+    return map(reference_faces(RefShape)) do rf
         map(i -> ns[i], rf)
     end
 end
@@ -505,14 +505,14 @@ end
 
 Mutate `x` to the coordinates of the cell corresponding to `idx` or `cell`.
 """
-@inline function getcoordinates!(x::Vector{Vec{dim, T}}, grid::Ferrite.AbstractGrid, cell::Ferrite.AbstractCell) where {dim, T}
+@inline function getcoordinates!(x::Vector{Vec{dim, T}}, grid::AbstractGrid, cell::AbstractCell) where {dim, T}
     node_ids = get_node_ids(cell)
     @inbounds for i in 1:length(x)
         x[i] = get_node_coordinate(grid, node_ids[i])
     end
     return x
 end
-@inline function getcoordinates!(x::Vector{Vec{dim, T}}, grid::Ferrite.AbstractGrid, cellid::Int) where {dim, T}
+@inline function getcoordinates!(x::Vector{Vec{dim, T}}, grid::AbstractGrid, cellid::Int) where {dim, T}
     cell = getcells(grid, cellid)
     getcoordinates!(x, grid, cell)
 end
