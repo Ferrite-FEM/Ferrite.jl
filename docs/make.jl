@@ -62,6 +62,7 @@ bibtex_plugin = CitationBibliography(
         "Topic guides" => [
             "Topic guide overview" => "topics/index.md",
             "topics/fe_intro.md",
+            "topics/reference_shapes.md",
             "topics/FEValues.md",
             "topics/degrees_of_freedom.md",
             "topics/assembly.md",
