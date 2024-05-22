@@ -75,23 +75,23 @@ more discussion).
   + QuadratureRule{RefTetrahedron}(quadrature_order)
   ```
 
-- **Quadrature for face integration (FaceValues)**: replace `QuadratureRule{dim-1,
+- **Quadrature for face integration (FacetValues)**: replace `QuadratureRule{dim-1,
   reference_shape}(quadrature_order)` with
-  `FaceQuadratureRule{reference_shape}(quadrature_order)`.
+  `FacetQuadratureRule{reference_shape}(quadrature_order)`.
 
   Examples:
   ```diff
-  # Quadrature for the faces of a quadrilateral
+  # Quadrature for the facets of a quadrilateral
   - QuadratureRule{1, RefCube}(quadrature_order)
-  + FaceQuadratureRule{RefQuadrilateral}(quadrature_order)
+  + FacetQuadratureRule{RefQuadrilateral}(quadrature_order)
 
-  # Quadrature for the faces of a triangle
+  # Quadrature for the facets of a triangle
   - QuadratureRule{1, RefTetrahedron}(quadrature_order)
-  + FaceQuadratureRule{RefTriangle}(quadrature_order)
+  + FacetQuadratureRule{RefTriangle}(quadrature_order)
 
-  # Quadrature for the faces of a hexhedron
+  # Quadrature for the facets of a hexhedron
   - QuadratureRule{2, RefCube}(quadrature_order)
-  + FaceQuadratureRule{RefHexahedron}(quadrature_order)
+  + FacetQuadratureRule{RefHexahedron}(quadrature_order)
   ```
 
 - **CellValues**: replace usage of `CellScalarValues` *and* `CellVectorValues` with
@@ -148,28 +148,28 @@ more discussion).
   + cv = CellValues(qr, ip_function, ip_geometry)
   ```
 
-- **FaceValues**: replace usage of `FaceScalarValues` *and* `FaceVectorValues` with
-  `FaceValues`. For vector valued problems the interpolation passed to `CellValues` should
+- **FacetValues**: replace usage of `FaceScalarValues` *and* `FaceVectorValues` with
+  `FacetValues`. For vector valued problems the interpolation passed to `FacetValues` should
   be vectorized to a `VectorizedInterpolation` (see above). The input quadrature rule should
-  be a `FaceQuadratureRule` instead of a `QuadratureRule`.
+  be a `FacetQuadratureRule` instead of a `QuadratureRule`.
 
   Examples:
   ```diff
-  # FaceValues for a scalar problem with triangle elements
+  # FacetValues for a scalar problem with triangle elements
   - qr = QuadratureRule{1, RefTetrahedron}(quadrature_order)
   - ip = Lagrange{2, RefTetrahedron, 1}()
   - cv = FaceScalarValues(qr, ip)
-  + qr = FaceQuadratureRule{RefTriangle}(quadrature_order)
+  + qr = FacetQuadratureRule{RefTriangle}(quadrature_order)
   + ip = Lagrange{RefTriangle, 1}()
-  + cv = FaceValues(qr, ip)
+  + cv = FacetValues(qr, ip)
 
   # FaceValues for a vector problem with hexahedronal elements
   - qr = QuadratureRule{2, RefCube}(quadrature_order)
   - ip = Lagrange{3, RefCube, 1}()
   - cv = FaceVectorValues(qr, ip)
-  + qr = FaceQuadratureRule{RefHexahedron}(quadrature_order)
+  + qr = FacetQuadratureRule{RefHexahedron}(quadrature_order)
   + ip = Lagrange{RefHexahedron, 1}() ^ 3
-  + cv = FaceValues(qr, ip)
+  + cv = FacetValues(qr, ip)
   ```
 
 - **DofHandler construction**: it is now required to pass the interpolation explicitly when
