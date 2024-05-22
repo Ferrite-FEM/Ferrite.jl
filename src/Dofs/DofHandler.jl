@@ -368,7 +368,7 @@ function __close!(dh::DofHandler{dim}) where {dim}
     for fi in 1:numfields
         dh.vertexdicts[fi] = zeros(Int, nnodes)
         dh.edgedicts[fi] = Dict{Tuple{Int,Int}, Int}()
-        dh.facedicts[fi] = Dict{NTuple{dim,Int}, Int}()
+        dh.facedicts[fi] = Dict{NTuple{3,Int}, Int}()
     end
 
     # Set initial values
