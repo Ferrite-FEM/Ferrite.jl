@@ -190,11 +190,6 @@ more discussion).
   + add!(dh, :u, Lagrange{RefTriangle, 1}())
   ```
 
-- **VTK export**: Ferrite no longer extends methods from `WriteVTK.jl`, instead the new types
-  `VTKFile` and `VTKFileCollection` should be used instead. New methods exists for writing to
-  a `VTKFile`, e.g. `write_solution`, `write_cell_data`, `write_node_data`, and `write_projection`.
-  See [#692][github-692].
-
 ### Added
 
 - `InterfaceValues` for computing jumps and averages over interfaces. ([#743][github-743])
@@ -217,8 +212,8 @@ more discussion).
   `Ferrite.RefSimplex{dim}`. ([#679][github-679])
 
 - New methods for adding entitysets that are located on the boundary of the grid:
-  `addboundaryfaceset!`, `addboundaryedgeset!`, and `addboundaryvertexset!`. These work
-  similar to `addfaceset!`, `addedgeset!`, and `addvertexset!`, but filters out all
+  `addboundaryfacetset!` and `addboundaryvertexset!`. These work
+  similar to `addfacetset!` and `addvertexset!`, but filters out all
   instances not on the boundary (this can be used to avoid accidental inclusion of internal
   entities in sets used for boundary conditions, for example). ([#606][github-606])
 
@@ -238,9 +233,9 @@ more discussion).
 - `CellValues` now support (vector) interpolations with dimension different from the spatial
   dimension. ([#651][github-651])
 
-- `FaceQuadratureRule` have been added and should be used for `FaceValues`. A
-  `FaceQuadratureRule` for integration of the faces of e.g. a triangle can be constructed by
-  `FaceQuadratureRule{RefTriangle}(order)` (similar to how `QuadratureRule` is constructed).
+- `FacetQuadratureRule` have been added and should be used for `FacetValues`. A
+  `FacetQuadratureRule` for integration of the facets of e.g. a triangle can be constructed by
+  `FacetQuadratureRule{RefTriangle}(order)` (similar to how `QuadratureRule` is constructed).
   ([#716][github-716])
 
 - New methods `shape_value(::Interpolation, ξ::Vec, i::Int)` and
@@ -250,7 +245,7 @@ more discussion).
   corresponding methods for `CellValues` etc return the value/gradient wrt the spatial
   coordinate `x`. ([#721][github-721])
 
-- `FaceIterator` and `FaceCache` have been added. These work similarly to `CellIterator` and
+- `FacetIterator` and `FacetCache` have been added. These work similarly to `CellIterator` and
   `CellCache` but are used to iterate over (boundary) face sets instead. These simplify
   boundary integrals in general, and in particular Neumann boundary conditions are more
   convenient to implement now that you can loop directly over the face set instead of
@@ -285,7 +280,7 @@ more discussion).
   **To upgrade** replace any usage of `Cell{...}(...)` with calls to the concrete
   implementations.
 
-- The default geometric mapping in `CellValues` and `FaceValues` have changed. The new
+- The default geometric mapping in `CellValues` and `FacetValues` have changed. The new
   default is to always use `Lagrange{refshape, 1}()`, i.e. linear Lagrange polynomials, for
   the geometric interpolation. Previously, the function interpolation was (re) used also for
   the geometry interpolation. ([#695][github-695])
@@ -321,26 +316,31 @@ more discussion).
   `Lagrange{RefTriangle}(order)`, etc.
 
 - `CellScalarValues` and `CellVectorValues` have been merged into `CellValues`,
-  `FaceScalarValues` and `FaceVectorValues` have been merged into `FaceValues`, and
+  `FaceScalarValues` and `FaceVectorValues` have been merged into `FacetValues`, and
   `PointScalarValues` and `PointVectorValues` have been merged into `PointValues`. The
   differentiation between scalar and vector have thus been moved to the interpolation (see
   above). Note that previously `CellValues`, `FaceValues`, and `PointValues` where abstract
-  types, but they are now concrete implementations with *different type parameters*.
-  ([#708][github-708])
+  types, but they are now concrete implementations with *different type parameters*, except
+  `FaceValues` which is now `FacetValues` ([#708][github-708])
   **To upgrade**, for scalar problems, it is enough to replace `CellScalarValues` with
-  `CellValues`, `FaceScalarValues` with `FaceValues` and `PointScalarValues` with
+  `CellValues`, `FaceScalarValues` with `FacetValues` and `PointScalarValues` with
   `PointValues`, respectively. For vector problems, make sure to vectorize the interpolation
   (see above) and then replace `CellVectorValues` with `CellValues`, `FaceVectorValues` with
-  `FaceValues`, and `PointVectorValues` with `PointValues`.
+  `FacetValues`, and `PointVectorValues` with `PointValues`.
 
-- The quadrature rule passed to `FaceValues` should now be of type `FaceQuadratureRule`
+- The quadrature rule passed to `FacetValues` should now be of type `FacetQuadratureRule`
   rather than of type `QuadratureRule`. ([#716][github-716])
-  **To upgrade** replace the quadrature rule passed to `FaceValues` with a
-  `FaceQuadratureRule`.
+  **To upgrade** replace the quadrature rule passed to `FacetValues` with a
+  `FacetQuadratureRule`.
 
 - Checking if a face `(ele_id, local_face_id) ∈ faceset` has been previously implemented
   by type piracy. In order to be invariant to the underlying `Set` datatype as well as
   omitting type piracy, ([#835][github-835]) implemented `isequal` and `hash` for `BoundaryIndex` datatypes.
+
+- **VTK export**: Ferrite no longer extends methods from `WriteVTK.jl`, instead the new types
+  `VTKFile` and `VTKFileCollection` should be used instead. New methods exists for writing to
+  a `VTKFile`, e.g. `write_solution`, `write_cell_data`, `write_node_data`, and `write_projection`.
+  See [#692][github-692].
 
 ### Deprecated
 
