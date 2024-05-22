@@ -190,13 +190,76 @@ more discussion).
   + add!(dh, :u, Lagrange{RefTriangle, 1}())
   ```
 
+- **Boundary conditions**: The entity enclosing a cell was previously called `face`, but is now
+  denoted a `facet`. When applying boundary conditions, rename  `getfaceset` to `getfacetset` and
+  `addfaceset!` is now `addfacetset!`. These sets are now described by `FacetIndex` instead of `FaceIndex`.
+  When looping over the `facets` of a cell, change `nfaces` to `nfacets`.
+
+  Examples:
+  ```diff
+  # Dirichlet boundary conditions
+  - addfaceset!(grid, "dbc", x -> x[1] ≈ 1.0)
+  + addfacetset!(grid, "dbc", x -> x[1] ≈ 1.0)
+
+  - dbc = Dirichlet(:u, getfaceset(grid, "dbc"), Returns(0.0))
+  + dbc = Dirichlet(:u, getfacetset(grid, "dbc"), Returns(0.0))
+
+  # Neumann boundary conditions
+  - for facet in 1:nfaces(cell)
+  -     if (cellid(cell), facet) ∈ getfaceset(grid, "Neumann Boundary")
+  + for facet in 1:nfacets(cell)
+  +     if (cellid(cell), facet) ∈ getfacetset(grid, "Neumann Boundary")
+            reinit!(facetvalues, cell, facet)
+            for q_point in 1:getnquadpoints(facetvalues)
+                dΓ = getdetJdV(facetvalues, q_point)
+                for i in 1:getnbasefunctions(facetvalues)
+                    δu = shape_value(facetvalues, q_point, i)
+                    fe[i] += δu * qn * dΓ
+                end
+            end
+        end
+    end
+  ```
+
+- **VTK Export**: The VTK export has been changed to become and export backend [#692][github-692].
+  ```diff
+  - vtk_grid(name, dh) do vtk
+  + VTKFile(name, dh) do vtk
+  -     vtk_point_data(vtk, dh, a)
+  +     write_solution(vtk, dh, a)
+  -     vtk_point_data(vtk, nodal_data, "my node data")
+  +     write_node_data(vtk, nodal_data, "my node data")
+  -     vtk_point_data(vtk, proj, projected_data, "my projected data")
+  +     write_projection(vtk, proj, projected_data, "my projected data")
+  -     vtk_cell_data(vtk, proj, projected_data, "my projected data")
+  +     write_cell_data(vtk, cell_data, "my projected data")
+  end
+
+  # Using a collection for e.g. multiple timesteps
+  - pvd = paraview_collection("mypvd")
+  + pvd = VTKFileCollection("mypvd", grid);
+
+  for t in timesteps
+      # solve problem to find `u`
+  -   vtk_grid("transient-heat-$t", dh) do vtk
+  -       vtk_point_data(vtk, dh, u)
+  -       vtk_save(vtk)
+  -       pvd[t] = vtk
+  -   end
+  +   addstep!(pvd, t) do io
+  +       write_solution(io, dh, u)
+  +   end
+  end
+  ```
+
+
 ### Added
 
 - `InterfaceValues` for computing jumps and averages over interfaces. ([#743][github-743])
 
 - `InterfaceIterator` and `InterfaceCache` for iterating over interfaces. ([#747][github-747])
 
-- `FaceQuadratureRule` implementation for `RefPrism` and `RefPyramid`. ([#779][github-779])
+- `FacetQuadratureRule` implementation for `RefPrism` and `RefPyramid`. ([#779][github-779])
 
 - The `DofHandler` now support selectively adding fields on sub-domains (rather than the
   full domain). This new functionality is included with the new `SubDofHandler` struct,
@@ -253,9 +316,6 @@ more discussion).
 
 - The `ConstraintHandler` now support adding Dirichlet boundary conditions on discontinuous
   interpolations. ([#729][github-729])
-
-- All keyword arguments to `vtk_grid` are now passed on to `WriteVTK.vtk_grid` (only
-  `compress` was supported earlier). ([#687][github-687])
 
 - `collect_periodic_faces` now have a keyword argument `tol` that can be used to relax the
   default tolerance when necessary. ([#749][github-749])
@@ -341,6 +401,19 @@ more discussion).
   `VTKFile` and `VTKFileCollection` should be used instead. New methods exists for writing to
   a `VTKFile`, e.g. `write_solution`, `write_cell_data`, `write_node_data`, and `write_projection`.
   See [#692][github-692].
+
+- **Definitions**: Previously, `face` and `edge` referred to codimension 1 relative reference shape.
+  In Ferrite v1, `volume`, `face`, `edge`, and `vertex` refer to 3, 2, 1, and 0 dimensional entities,
+  and `facet` replaces the old definition of `face`. No direct replacement for `edges` exits. The main
+  implications of this change are
+  * `FaceIndex` -> `FacetIndex` (`FaceIndex` still exists, but has a different meaning)
+  * `FaceValues` -> `FacetValues`
+  * `nfaces` -> `nfacets` (`nfaces` is now an internal method with different meaning)
+  * `addfaceset!` -> `addfacetset`
+  * `getfaceset` -> `getfacetset`
+
+  Furthermore, subtypes of `Interpolation` should now define `vertexdof_indices`, `edgedof_indices`,
+  `facedof_indices`, `volumedof_indices` (and similar) according to these definitions.
 
 ### Deprecated
 
