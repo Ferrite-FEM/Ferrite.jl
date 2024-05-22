@@ -144,7 +144,7 @@ close!(dh)
 function DofHandler(grid::G) where {dim, G <: AbstractGrid{dim}}
     ncells = getncells(grid)
     sdhs = SubDofHandler{DofHandler{dim, G}}[]
-    DofHandler{dim, G}(sdhs, Symbol[], Int[], zeros(Int, ncells), zeros(Int, ncells), ScalarWrapper(false), grid, ScalarWrapper(-1), [Int[]], Dict{Tuple{Int,Int}}[], Dict{NTuple{dim,Int}}[])
+    DofHandler{dim, G}(sdhs, Symbol[], Int[], zeros(Int, ncells), zeros(Int, ncells), ScalarWrapper(false), grid, ScalarWrapper(-1), [Int[]], Dict{Tuple{Int,Int}}[], Dict{NTuple{3,Int}}[])
 end
 
 function Base.show(io::IO, mime::MIME"text/plain", dh::DofHandler)
