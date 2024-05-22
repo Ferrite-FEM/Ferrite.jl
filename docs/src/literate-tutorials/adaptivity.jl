@@ -75,8 +75,8 @@ function solve(grid)
 
     ch = ConstraintHandler(dh)
     add!(ch, Ferrite.ConformityConstraint(:u))
-    add!(ch, Dirichlet(:u, getfaceset(grid, "top"), (x, t) -> Vec{2}((0.0,0.0)), [1,2]))
-    add!(ch, Dirichlet(:u, getfaceset(grid, "right"), (x, t) -> 0.01, 2))
+    add!(ch, Dirichlet(:u, getfacetset(grid, "top"), (x, t) -> Vec{2}((0.0,0.0)), [1,2]))
+    add!(ch, Dirichlet(:u, getfacetset(grid, "right"), (x, t) -> 0.01, 2))
     close!(ch);
 
     K = create_sparsity_pattern(dh,ch)
@@ -153,19 +153,19 @@ function solve_adaptive(initial_grid)
             end
             push!(error_arr,error)
         end
-        vtk_grid("linear_elasticity-$i", dh) do vtk
-            vtk_point_data(vtk, dh, u)
-            vtk_point_data(vtk, projector, σ_dof, "stress")
-            vtk_cell_data(vtk, getindex.(collect(Iterators.flatten(σ_gp_sc)),1), "stress sc")
-            vtk_cell_data(vtk, error_arr, "error")
+        VTKFile("linear_elasticity-$i", dh) do vtk
+            write_solution(vtk, dh, u)
+            write_projection(vtk, projector, σ_dof, "stress")
+            write_cell_data(vtk, getindex.(collect(Iterators.flatten(σ_gp_sc)),1), "stress sc")
+            write_cell_data(vtk, error_arr, "error")
         end
 
         Ferrite.refine!(grid,cells_to_refine)
-        vtk_grid("unbalanced.vtu", dh) do vtk
+        VTKFile("unbalanced.vtu", dh) do vtk
         end
 
         Ferrite.balanceforest!(grid)
-        vtk_grid("balanced.vtu", dh) do vtk
+        VTKFile("balanced.vtu", dh) do vtk
         end
 
         i += 1

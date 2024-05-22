@@ -66,10 +66,10 @@ function solve(grid)
 
     ch = ConstraintHandler(dh)
     add!(ch, ConformityConstraint(:u))
-    add!(ch, Dirichlet(:u, getfaceset(grid, "top"), (x, t) -> 0.0))
-    add!(ch, Dirichlet(:u, getfaceset(grid, "right"), (x, t) -> 0.0))
-    add!(ch, Dirichlet(:u, getfaceset(grid, "left"), (x, t) -> 0.0))
-    add!(ch, Dirichlet(:u, getfaceset(grid, "bottom"), (x, t) -> 0.0))
+    add!(ch, Dirichlet(:u, getfacetset(grid, "top"), (x, t) -> 0.0))
+    add!(ch, Dirichlet(:u, getfacetset(grid, "right"), (x, t) -> 0.0))
+    add!(ch, Dirichlet(:u, getfacetset(grid, "left"), (x, t) -> 0.0))
+    add!(ch, Dirichlet(:u, getfacetset(grid, "bottom"), (x, t) -> 0.0))
     close!(ch);
 
     K = create_sparsity_pattern(dh,ch)
@@ -124,12 +124,10 @@ function solve_adaptive(initial_grid)
     finished = false
     i = 1
     grid = deepcopy(initial_grid)
-    pvd = paraview_collection("heat_amr.pvd");
+    pvd = VTKFileCollection("heat_amr.pvd",grid);
     while !finished && i<=10
         @show i
         transfered_grid = Ferrite.creategrid(grid)
-        vtk_grid("heat_amr-grid_$i", transfered_grid) do vtk
-        end
         u,dh,ch,cv = solve(transfered_grid)
         σ_gp, σ_gp_sc = compute_fluxes(u,dh)
         projector = L2Projector(Lagrange{RefQuadrilateral, 1}(), transfered_grid)
@@ -151,13 +149,12 @@ function solve_adaptive(initial_grid)
             push!(error_arr,error)
         end
 
-        vtk_grid("heat_amr-iteration_$i", dh) do vtk
-            vtk_point_data(vtk, dh, u)
-            vtk_point_data(vtk, projector, σ_dof, "flux")
-            vtk_cell_data(vtk, getindex.(collect(Iterators.flatten(σ_gp_sc)),1), "flux sc x")
-            vtk_cell_data(vtk, getindex.(collect(Iterators.flatten(σ_gp_sc)),2), "flux sc y")
-            vtk_cell_data(vtk, error_arr, "error")
-            pvd[i] = vtk
+        addstep!(pvd, i, dh) do vtk
+            write_solution(vtk, dh, u)
+            write_projection(vtk, projector, σ_dof, "flux")
+            write_cell_data(vtk, getindex.(collect(Iterators.flatten(σ_gp_sc)),1), "flux sc x")
+            write_cell_data(vtk, getindex.(collect(Iterators.flatten(σ_gp_sc)),2), "flux sc y")
+            write_cell_data(vtk, error_arr, "error")
         end
 
         Ferrite.refine!(grid, cells_to_refine)
@@ -168,7 +165,7 @@ function solve_adaptive(initial_grid)
             finished = true
         end
     end
-    vtk_save(pvd);
+    close(pvd);
 end
 
 solve_adaptive(grid)
