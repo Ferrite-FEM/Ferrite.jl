@@ -82,4 +82,4 @@ Ferrite.reference_facets(RefQuadrilateral)
     The functions `reference_vertices`, `reference_edges`, `reference_faces`, and `reference_facets`
     are not public and only shown here to explain the numbering concept.
     The specific ordering may also change, and is therefore only documented in the
-    [Developer documentation](/devdocs/reference_cells/).
+    [Developer documentation](../devdocs/reference_cells/).
