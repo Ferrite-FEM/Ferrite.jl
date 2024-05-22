@@ -115,6 +115,8 @@ include("FEValues/CellValues.jl")
 include("FEValues/FacetValues.jl")
 include("FEValues/InterfaceValues.jl")
 include("FEValues/PointValues.jl")
+include("FEValues/QuadratureValues.jl")
+include("FEValues/StaticCellValues.jl")
 include("FEValues/common_values.jl")
 include("FEValues/face_integrals.jl")
 
