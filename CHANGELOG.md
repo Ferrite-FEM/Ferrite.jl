@@ -404,8 +404,8 @@ more discussion).
 
 - **Definitions**: Previously, `face` and `edge` referred to codimension 1 relative reference shape.
   In Ferrite v1, `volume`, `face`, `edge`, and `vertex` refer to 3, 2, 1, and 0 dimensional entities,
-  and `facet` replaces the old definition of `face`. No direct replacement for `edges` exits. The main
-  implications of this change are
+  and `facet` replaces the old definition of `face`. No direct replacement for `edges` exits [#914][github-914]
+  The main implications of this change are
   * `FaceIndex` -> `FacetIndex` (`FaceIndex` still exists, but has a different meaning)
   * `FaceValues` -> `FacetValues`
   * `nfaces` -> `nfacets` (`nfaces` is now an internal method with different meaning)
@@ -986,4 +986,5 @@ poking into Ferrite internals:
 [github-835]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/835
 [github-855]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/855
 [github-880]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/880
+[github-914]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/914
 [github-924]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/924
