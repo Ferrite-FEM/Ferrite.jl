@@ -116,7 +116,7 @@ struct DofHandler{dim,G<:AbstractGrid{dim}} <: AbstractDofHandler
     # add to the face since currently more dofs per face isn't supported. In
     # 2D a face (i.e. a line) is uniquely determined by 2 vertices, and in 3D a face (i.e. a
     # surface) is uniquely determined by 3 vertices.
-    facedicts::Vector{Dict{NTuple{dim,Int}, Int}}
+    facedicts::Vector{Dict{NTuple{3,Int}, Int}}
 end
 
 """
