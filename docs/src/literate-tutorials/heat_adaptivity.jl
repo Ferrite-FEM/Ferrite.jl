@@ -24,7 +24,7 @@ function assemble_cell!(ke, fe, cellvalues, ue, coords)
         for i in 1:n_basefuncs
             Nᵢ = shape_value(cellvalues, q_point, i)
             ∇Nᵢ = shape_gradient(cellvalues, q_point, i)
-            fe[i] += analytical_rhs(x) * Nᵢ * dΩ 
+            fe[i] += analytical_rhs(x) * Nᵢ * dΩ
             for j in 1:n_basefuncs
                 ∇Nⱼ = shape_gradient(cellvalues, q_point, j)
                 ke[i, j] += ∇Nⱼ ⋅ ∇Nᵢ * dΩ
@@ -42,7 +42,7 @@ function assemble_global!(K, f, a, dh, cellvalues)
     assembler = start_assemble(K, f)
     ## Loop over all cells
     for cell in CellIterator(dh)
-        reinit!(cellvalues, cell) 
+        reinit!(cellvalues, cell)
         @views ue = a[celldofs(cell)]
         ## Compute element contribution
         coords = getcoordinates(cell)
@@ -55,7 +55,7 @@ end
 
 function solve(grid)
     dim = 2
-    order = 1 
+    order = 1
     ip = Lagrange{RefQuadrilateral, order}()
     qr = QuadratureRule{RefQuadrilateral}(2)
     cellvalues = CellValues(qr, ip);

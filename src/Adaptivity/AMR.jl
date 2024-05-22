@@ -8,7 +8,7 @@ include("BWG.jl")
 include("ncgrid.jl")
 include("constraints.jl")
 
-export ForestBWG, 
+export ForestBWG,
        refine!,
        refine_all!,
        coarsen!,

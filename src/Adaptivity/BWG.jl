@@ -559,7 +559,7 @@ function transform_pointBWG(forest::ForestBWG{dim}, k::Integer, vertex::NTuple{d
     tree = forest.cells[k]
     cellnodes = getnodes(forest,collect(tree.nodes)) .|> get_node_coordinate
     vertex = vertex .* (2/(2^tree.b)) .- 1
-    octant_physical_coordinates = sum(j-> cellnodes[j] * Ferrite.shape_value(Lagrange{Ferrite.RefHypercube{dim},1}(),Vec{dim}(vertex),j),1:length(cellnodes)) 
+    octant_physical_coordinates = sum(j-> cellnodes[j] * Ferrite.shape_value(Lagrange{Ferrite.RefHypercube{dim},1}(),Vec{dim}(vertex),j),1:length(cellnodes))
     return Vec{dim}(octant_physical_coordinates)
 end
 
@@ -580,7 +580,7 @@ computes based on the rotation indicator `r` ∈ {0,...,3} and a given corner in
 See Table 3 and Theorem 2.2 [BWG2011](@citet).
 """
 function rotation_permutation(f,f′,r,i)
-    return 𝒫[𝒬[ℛ[f,f′],r+1],i] 
+    return 𝒫[𝒬[ℛ[f,f′],r+1],i]
 end
 
 #TODO: this function should wrap the LNodes Iterator of [IBWG2015](@citet)
@@ -676,7 +676,7 @@ function creategrid(forest::ForestBWG{dim,C,T}) where {dim,C,T}
                             end
                         else
                             for i ∈ 1:ncorners_face3D
-                                rotated_ξ = rotation_permutation(f′,f,r,i) 
+                                rotated_ξ = rotation_permutation(f′,f,r,i)
                                 if haskey(nodeids, (k′,fnodes_neighbor[i]))
                                     nodeids[(k,fnodes[rotated_ξ])] = nodeids[(k′,fnodes_neighbor[i])]
                                     nodeowners[(k,fnodes[rotated_ξ])] = (k′,fnodes_neighbor[i])
@@ -1221,7 +1221,7 @@ end
 function face_contains_edge(f::NTuple{4,Tuple{T1,T1,T1}},e::Tuple{Tuple{T2,T2,T2},Tuple{T2,T2,T2}}) where {T1<:Integer,T2<:Integer}
     edge_center = center(e)
     lower_left = ntuple(i->minimum(getindex.(f,i)),3)
-    top_right = ntuple(i->maximum(getindex.(f,i)),3) 
+    top_right = ntuple(i->maximum(getindex.(f,i)),3)
     if (lower_left[1] ≤ edge_center[1] ≤ top_right[1]) && (lower_left[2] ≤ edge_center[2] ≤ top_right[2]) && (lower_left[3] ≤ edge_center[3] ≤ top_right[3])
         return true
     else
@@ -1510,13 +1510,13 @@ function transform_face(forest::ForestBWG, k::T1, f::T1, o::OctantBWG{2,<:Any,T2
     # Coordinate axes of f
     a = (
         f ≤ 2, # tangent
-        f > 2  # normal 
+        f > 2  # normal
     )
     a_sign = _two*((f - _one) & 1) - _one
     # Coordinate axes of f'
     b = (
         f′ ≤ 2, # tangent
-        f′ > 2  # normal 
+        f′ > 2  # normal
     )
     # b_sign = _two*(f′ & 1) - _one
 
@@ -1648,7 +1648,7 @@ transform_corner_remote(forest::ForestBWG,v::VertexIndex,oct::OctantBWG,inside) 
 Algorithm 10 in [BWG2011](@citet) to transform edge into different octree coordinate system.
 This function looks at the octant from the octree coordinate system of the neighbor that can be found at (k,e)
 """
-function transform_edge_remote(forest::ForestBWG,k::T1,e::T1,oct::OctantBWG{3,N,T2},inside::Bool) where {N,T1<:Integer,T2<:Integer}     
+function transform_edge_remote(forest::ForestBWG,k::T1,e::T1,oct::OctantBWG{3,N,T2},inside::Bool) where {N,T1<:Integer,T2<:Integer}
     _four = T2(4)
     _one = T2(1)
     _two = T2(2)
@@ -1667,7 +1667,7 @@ function transform_edge_remote(forest::ForestBWG,k::T1,e::T1,oct::OctantBWG{3,N,
     a₀ += _one #add it again
     b = forest.cells[k].b
     l = oct.l; g = _two^b - _two^(b-l)
-    h⁻ = inside ? z : -_two^(b-l); h⁺ = inside ? g : _two^b    
+    h⁻ = inside ? z : -_two^(b-l); h⁺ = inside ? g : _two^b
     s = compute_edge_orientation(forest,k,e)
     xyz = zeros(T2,3)
     xyz[𝐛[1]+_one] = s*g+(_one-(_two*s))*oct.xyz[a₀]
@@ -1706,7 +1706,7 @@ function transform_edge(forest::ForestBWG,k::T1,e::T1,oct::OctantBWG{3,N,T2},ins
     a₀ += _one #add it again
     b = forest.cells[k].b
     l = oct.l; g = _two^b - _two^(b-l)
-    h⁻ = inside ? z : -_two^(b-l); h⁺ = inside ? g : _two^b    
+    h⁻ = inside ? z : -_two^(b-l); h⁺ = inside ? g : _two^b
     s = compute_edge_orientation(forest,k′,e′)
     xyz = zeros(T2,3)
     xyz[𝐛[1]+_one] = s*g+(_one-(_two*s))*oct.xyz[a₀]
@@ -1731,7 +1731,7 @@ function edge_neighbor(octant::OctantBWG{3,N,T}, e::T, b::T=_maxlevel[2]) where 
     ox,oy,oz = octant.xyz
     𝐚 = (e ÷ 4,
          e < 4 ? 1 : 0,
-         e < 8 ? 2 : 1) 
+         e < 8 ? 2 : 1)
     xyz = zeros(T,3)
     xyz[𝐚[1]+_one] = octant.xyz[𝐚[1]+_one]
     xyz[𝐚[2]+_one] = octant.xyz[𝐚[2]+_one] + (_two*(e&_one)-_one)*h
@@ -1807,7 +1807,7 @@ _edge_corners(edge::Int,i::Int) = 𝒰[edge,i]
 # finds face corner ξ′ in f′ for two associated faces f,f′ in {1,...,6} and their orientation r in {1,...,4}}
 _neighbor_corner(f::Int,f′::Int,r::Int,ξ::Int) = 𝒫[𝒬[ℛ[f,f′],r],ξ]
 
-# map given `face` and `ξ` to corner `c`. Need to provide dim for different lookup 
+# map given `face` and `ξ` to corner `c`. Need to provide dim for different lookup
 function _face_corners(dim::Int,face::Int,ξ::Int)
     if dim == 2
         return 𝒱₂[face,ξ]

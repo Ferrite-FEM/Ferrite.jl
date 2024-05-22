@@ -7,10 +7,10 @@ function visualize_grid(forest::ForestBWG{dim}) where dim
             #request vertices and faces in octree coordinate system
             _vertices = Ferrite.vertices(leaf,tree.b)
             # transform from octree coordinate system to -1,1 by first shifting to 0,2 and later shift by -1
-            _vertices = broadcast.(x->x .* 2/(2^tree.b) .- 1, _vertices) 
+            _vertices = broadcast.(x->x .* 2/(2^tree.b) .- 1, _vertices)
             octant_physical_coordinates = zeros(length(_vertices),dim)
             for (i,v) in enumerate(_vertices)
-                octant_physical_coordinates[i,:] .= sum(j-> cellnodes[j] * Ferrite.shape_value(Lagrange{Ferrite.RefHypercube{dim},1}(),Vec{dim}(v),j),1:length(cellnodes)) 
+                octant_physical_coordinates[i,:] .= sum(j-> cellnodes[j] * Ferrite.shape_value(Lagrange{Ferrite.RefHypercube{dim},1}(),Vec{dim}(v),j),1:length(cellnodes))
             end
             GLMakie.scatter!(ax,octant_physical_coordinates,color=:black,markersize=25)
             center = sum(octant_physical_coordinates,dims=1) ./ 4

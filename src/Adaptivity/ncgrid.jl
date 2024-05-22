@@ -1,7 +1,7 @@
 """
     NonConformingGrid{dim, C<:AbstractCell, T<:Real, CIT} <: AbstractGrid}
 
-A `NonConformingGrid` is a collection of `Cells` and `Node`s which covers the computational domain, together with Sets of cells, nodes, faces 
+A `NonConformingGrid` is a collection of `Cells` and `Node`s which covers the computational domain, together with Sets of cells, nodes, faces
 and assocaited information about the conformity.
 There are multiple helper structures to apply boundary conditions or define subdomains. They are gathered in the `cellsets`, `nodesets`,
 `facesets`, `edgesets` and `vertexsets`.

@@ -40,4 +40,3 @@ function _add_conformity_constraint(ch::ConstraintHandler, field_index::Int, int
         end
     end
 end
-

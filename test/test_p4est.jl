@@ -375,7 +375,7 @@ end
     grid = generate_grid(Hexahedron,(2,2,2))
     adaptive_grid = ForestBWG(grid,3)
     o = adaptive_grid.cells[1].leaves[1]
-    
+
     # faces
     @test Ferrite.AMR.transform_face(adaptive_grid, FaceIndex(1,2), o) == Ferrite.AMR.OctantBWG(0,(8,0,0))
     @test Ferrite.AMR.transform_face_remote(adaptive_grid, FaceIndex(1,2), o) == Ferrite.AMR.OctantBWG(0,(-8,0,0))
@@ -447,7 +447,7 @@ end
     @test Ferrite.AMR.transform_edge(adaptive_grid, EdgeIndex(1,12), o, false) == Ferrite.AMR.OctantBWG(0,(8,8,0))
     @test Ferrite.AMR.transform_edge_remote(adaptive_grid, EdgeIndex(1,12), o, false) == Ferrite.AMR.OctantBWG(0,(-8,-8,0))
 
-    # Rotate three dimensional case 
+    # Rotate three dimensional case
     grid = generate_grid(Hexahedron,(2,2,2))
     # This is our root mesh top view
     # x-----------x-----------x
@@ -631,7 +631,7 @@ end
     Ferrite.AMR.balanceforest!(adaptive_grid)
     transfered_grid_ref = Ferrite.AMR.creategrid(adaptive_grid)
 
-    # Rotate three dimensional case 
+    # Rotate three dimensional case
     grid = generate_grid(Hexahedron,(2,2,2))
     # This is our root mesh top view
     # x-----------x-----------x
@@ -665,7 +665,7 @@ end
     transfered_grid = Ferrite.AMR.creategrid(adaptive_grid)
     @test length(transfered_grid.cells) == length(transfered_grid_ref.cells)
     @test length(transfered_grid.cells) == 92
-    
+
     # edge balancing for new introduced connection that is not within topology table
     grid = generate_grid(Hexahedron, (2,1,1));
     adaptive_grid  = ForestBWG(grid,3)
@@ -743,7 +743,7 @@ end
     #################################################
     ############ structured 2D examples #############
     #################################################
-    
+
     # 2D case with a single tree
     grid = generate_grid(Quadrilateral,(1,1))
     adaptive_grid = ForestBWG(grid,3)
@@ -780,7 +780,7 @@ end
     Ferrite.AMR.refine!(adaptive_grid.cells[7],adaptive_grid.cells[7].leaves[5])
     Ferrite.AMR.refine!(adaptive_grid.cells[9],adaptive_grid.cells[9].leaves[end])
     Ferrite.AMR.refine!(adaptive_grid.cells[9],adaptive_grid.cells[9].leaves[end])
-    Ferrite.AMR.refine!(adaptive_grid.cells[9],adaptive_grid.cells[9].leaves[end]) 
+    Ferrite.AMR.refine!(adaptive_grid.cells[9],adaptive_grid.cells[9].leaves[end])
     transfered_grid = Ferrite.AMR.creategrid(adaptive_grid)
     @test length(transfered_grid.cells) == 45
     @test length(transfered_grid.nodes) == 76
@@ -809,7 +809,7 @@ end
     @test length(transfered_grid.cells) == 16
     @test length(transfered_grid.nodes) == 45
     @test unique(transfered_grid.nodes) == transfered_grid.nodes
-    #rotate the case around 
+    #rotate the case around
     grid = generate_grid(Hexahedron,(1,2,1))
     adaptive_grid = ForestBWG(grid,3)
     Ferrite.AMR.refine_all!(adaptive_grid,1)
@@ -833,7 +833,7 @@ end
     @test length(transfered_grid.nodes) == 125 # 5 per edge
     @test unique(transfered_grid.nodes) == transfered_grid.nodes
 
-    # Rotate three dimensional case 
+    # Rotate three dimensional case
     grid = generate_grid(Hexahedron,(2,2,2))
     # Rotate face topologically
     grid.cells[2] = Hexahedron((grid.cells[2].nodes[2], grid.cells[2].nodes[3], grid.cells[2].nodes[4], grid.cells[2].nodes[1], grid.cells[2].nodes[4+2], grid.cells[2].nodes[4+3], grid.cells[2].nodes[4+4], grid.cells[2].nodes[4+1]))
@@ -890,7 +890,7 @@ end
     # x-----x-----x-----------x
     transfered_grid = Ferrite.AMR.creategrid(adaptive_grid)
     @test length(transfered_grid.conformity_info) == 12
-    
+
     # Easy Interoctree
     grid = generate_grid(Hexahedron,(2,2,2))
     adaptive_grid = ForestBWG(grid,3)

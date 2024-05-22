@@ -64,9 +64,9 @@ end
 
 function solve(grid)
     dim = 2
-    order = 1 
-    ip = Lagrange{RefQuadrilateral, order}()^dim 
-    qr = QuadratureRule{RefQuadrilateral}(2) 
+    order = 1
+    ip = Lagrange{RefQuadrilateral, order}()^dim
+    qr = QuadratureRule{RefQuadrilateral}(2)
     cellvalues = CellValues(qr, ip);
 
     dh = DofHandler(grid)

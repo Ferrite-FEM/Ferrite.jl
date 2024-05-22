@@ -554,7 +554,7 @@ function generate_simple_disc_grid(::Type{Quadrilateral}, n; radius = 1.0)
     facesets = Dict(
         "boundary" => Set([FaceIndex(i,1) for i ∈ 1:n]) ∪ Set([FaceIndex(i,2) for i ∈ 1:n]),
     )
-    
+
     return Grid(elements, Node.(nodes); facesets=facesets)
 end
 
@@ -565,7 +565,7 @@ function generate_simple_disc_grid(::Type{Hexahedron}, n; radius = 1.0, layers =
     nodepos_bottom = Vec((0.0,radius,0.0))
     nodes = [rotate(nodepos_bottom, Vec{3}((0,0,1)), θ*i) for i ∈ 0:(2n-1)]
     push!(nodes, Vec((0.0,0.0,0.0)))
-    
+
     # TODO generalize for n layers by looping over layers
     nodepos_layer  = Vec((0.0,radius,height))
     nodes_layer = [rotate(nodepos_layer, Vec{3}((0,0,1)), θ*i) for i ∈ 0:(2n-1)]
@@ -579,6 +579,6 @@ function generate_simple_disc_grid(::Type{Hexahedron}, n; radius = 1.0, layers =
         "top" => Set([FaceIndex(i,5) for i ∈ 1:n]),
         "bottom" => Set([FaceIndex(i,6) for i ∈ 1:n]),
     )
-    
+
     return Grid(elements, Node.(nodes))#; facesets=facesets)
 end
