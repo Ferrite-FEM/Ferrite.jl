@@ -13,6 +13,7 @@ CellIndex
 VertexIndex
 EdgeIndex
 FaceIndex
+FacetIndex
 Grid
 ```
 
