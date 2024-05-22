@@ -64,7 +64,7 @@ export vtk_grid # To give better error
 
 function WriteVTK.vtk_grid(::String, ::Union{AbstractGrid,AbstractDofHandler}; kwargs...)
     error(join(("The vtk interface has been updated in Ferrite v1.0.",
-                "See https://github.com/Ferrite-FEM/Ferrite.jl/pull/679.",
+                "See https://github.com/Ferrite-FEM/Ferrite.jl/pull/692.",
                 "Use VTKFile to open a vtk file, and the functions",
                 "write_solution, write_cell_data, and write_projection to save data."),
             "\n"))
