@@ -19,6 +19,7 @@ shape_gradient_type(::StaticQuadratureValues{<:Any, <:Any, dNdx_t}) where dNdx_t
 
 @propagate_inbounds shape_value(qv::StaticQuadratureValues, i::Int) = qv.N[i]
 @propagate_inbounds shape_gradient(qv::StaticQuadratureValues, i::Int) = qv.dNdx[i]
+@propagate_inbounds shape_gradient(qv::StaticQuadratureValues, i::Int32) = qv.dNdx[i] # Needed for GPU (threadIdx is Int32), otherwise it will throw a dynamic function invokation error
 @propagate_inbounds shape_symmetric_gradient(qv::StaticQuadratureValues, i::Int) = symmetric(qv.dNdx[i])
 
 @propagate_inbounds geometric_value(qv::StaticQuadratureValues, i::Int) = qv.M[i]
@@ -74,19 +75,19 @@ end
     return Nx, dNdx
 end
 
-struct StaticCellValues{FV, GM, Tx, Nqp, T}
+struct StaticCellValues{FV, GM, Nqp, T}
     fv::FV # StaticInterpolationValues
     gm::GM # StaticInterpolationValues
-    x::Tx  # AbstractVector{<:Vec} or Nothing
+    #x::Tx  # AbstractVector{<:Vec} or Nothing
     weights::NTuple{Nqp, T}
 end
-function StaticCellValues(cv::CellValues, ::Val{SaveCoords}=Val(true)) where SaveCoords
+function StaticCellValues(cv::CellValues) 
     fv = StaticInterpolationValues(cv.fun_values)
     gm = StaticInterpolationValues(cv.geo_mapping)
     sdim = sdim_from_gradtype(shape_gradient_type(cv))
-    x = SaveCoords ? fill(zero(Vec{sdim}), getngeobasefunctions(cv)) : nothing
+    #x = SaveCoords ? fill(zero(Vec{sdim}), getngeobasefunctions(cv)) : nothing
     weights = ntuple(i -> getweights(cv.qr)[i], getnquadpoints(cv))
-    return StaticCellValues(fv, gm, x, weights)
+    return StaticCellValues(fv, gm, weights)
 end
 
 getnquadpoints(cv::StaticCellValues) = length(cv.weights)
@@ -102,24 +103,31 @@ end
 end
 
 @inline function quadrature_point_values(fe_v::StaticCellValues{<:Any, <:Any, <:AbstractVector}, q_point::Int)
-    return _quadrature_point_values(fe_v, q_point, fe_v.x)
-end
-@inline function quadrature_point_values(fe_v::StaticCellValues{<:Any, <:Any, Nothing}, q_point::Int, cell_coords::AbstractVector)
-    return _quadrature_point_values(fe_v, q_point, cell_coords)
+    return _quadrature_point_values(fe_v, q_point, fe_v.x,detJ->throw_detJ_not_pos(detJ))
 end
 
-function _quadrature_point_values(fe_v::StaticCellValues, q_point::Int, cell_coords::AbstractVector)
+@inline function quadrature_point_values(fe_v::StaticCellValues{<:Any, <:Any}, q_point::Int, cell_coords::AbstractVector)
+    return _quadrature_point_values(fe_v, q_point, cell_coords,detJ->throw_detJ_not_pos(detJ))
+end
+
+@inline function quadrature_point_values(fe_v::StaticCellValues{<:Any, <:Any}, q_point::Int, cell_coords::SVector)
+    return _quadrature_point_values(fe_v, q_point, cell_coords,detJ->-1)
+end
+
+
+function _quadrature_point_values(fe_v::StaticCellValues, q_point::Int, cell_coords::AbstractVector,neg_detJ_err_fun::Function)
     #q_point bounds checked, ok to use @inbounds
     @inbounds begin
-        mapping = calculate_mapping(fe_v.gm, q_point, cell_coords)
+         mapping = calculate_mapping(fe_v.gm, q_point, cell_coords)
 
-        detJ = calculate_detJ(getjacobian(mapping))
-        detJ > 0.0 || throw_detJ_not_pos(detJ)
-        detJdV = detJ * fe_v.weights[q_point]
+         detJ = calculate_detJ(getjacobian(mapping))
+         detJ > 0.0 || neg_detJ_err_fun(detJ) # Cannot throw error on GPU, TODO: return error code instead
+         detJdV = detJ * fe_v.weights[q_point]
 
-        Nx, dNdx = calculate_mapped_values(fe_v.fv, q_point, mapping)
-        M = fe_v.gm.Nξ[:, q_point]
+         Nx, dNdx = calculate_mapped_values(fe_v.fv, q_point, mapping)
+         M = fe_v.gm.Nξ[:, q_point]
     end
-    return StaticQuadratureValues(detJdV, Nx, dNdx, M)
+     return StaticQuadratureValues(detJdV, Nx, dNdx, M)
 end
+
 

@@ -22,6 +22,9 @@ using Tensors:
     rotation_tensor, symmetric, tovoigt!
 using WriteVTK:
     WriteVTK, MeshCell, VTKCellTypes, vtk_cell_data, vtk_grid, vtk_point_data, vtk_save
+using CUDA
+using Adapt
+
 
 include("exports.jl")
 
@@ -87,6 +90,8 @@ end
 
 include("utils.jl")
 
+
+
 # Matrix/Vector utilities
 include("arrayutils.jl")
 
@@ -139,5 +144,10 @@ include("PointEvalHandler.jl")
 # Other
 include("deprecations.jl")
 include("docs.jl")
+
+# GPU support
+include("GPU/adapt.jl")
+include("Grid/gpu_grid.jl")
+include("Dofs/GPUDofHandler.jl")
 
 end # module

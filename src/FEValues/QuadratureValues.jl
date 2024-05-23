@@ -6,16 +6,17 @@ struct QuadratureValuesIterator{VT,XT}
         return new{V, Nothing}(v, nothing)
     end
     function QuadratureValuesIterator(v::V, cell_coords::VT) where {V, VT <: AbstractArray}
-        reinit!(v, cell_coords)
+        #reinit!(v, cell_coords) # Why we need that ?
         return new{V, VT}(v, cell_coords)
     end
 end
 
 function Base.iterate(iterator::QuadratureValuesIterator{<:Any, Nothing}, q_point=1)
     checkbounds(Bool, 1:getnquadpoints(iterator.v), q_point) || return nothing
-    qp_v = @inbounds quadrature_point_values(iterator.v, q_point)
+    qp_v = @inbounds quadrature_point_values(iterator.v, q_point) 
     return (qp_v, q_point+1)
 end
+
 function Base.iterate(iterator::QuadratureValuesIterator{<:Any, <:AbstractVector}, q_point=1)
     checkbounds(Bool, 1:getnquadpoints(iterator.v), q_point) || return nothing
     qp_v = @inbounds quadrature_point_values(iterator.v, q_point, iterator.cell_coords)

@@ -104,6 +104,7 @@ export
     addcellset!,
     transform_coordinates!,
     generate_grid,
+    GPUGrid,
 
 # Grid coloring
     create_coloring,
