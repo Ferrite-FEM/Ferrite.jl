@@ -209,29 +209,20 @@ more discussion).
   -     if (cellid(cell), facet) ∈ getfaceset(grid, "Neumann Boundary")
   + for facet in 1:nfacets(cell)
   +     if (cellid(cell), facet) ∈ getfacetset(grid, "Neumann Boundary")
-            reinit!(facetvalues, cell, facet)
-            for q_point in 1:getnquadpoints(facetvalues)
-                dΓ = getdetJdV(facetvalues, q_point)
-                for i in 1:getnbasefunctions(facetvalues)
-                    δu = shape_value(facetvalues, q_point, i)
-                    fe[i] += δu * qn * dΓ
-                end
-            end
-        end
-    end
+            # ...
   ```
 
 - **VTK Export**: The VTK export has been changed to become and export backend [#692][github-692].
   ```diff
   - vtk_grid(name, dh) do vtk
-  + VTKFile(name, dh) do vtk
   -     vtk_point_data(vtk, dh, a)
-  +     write_solution(vtk, dh, a)
   -     vtk_point_data(vtk, nodal_data, "my node data")
-  +     write_node_data(vtk, nodal_data, "my node data")
   -     vtk_point_data(vtk, proj, projected_data, "my projected data")
-  +     write_projection(vtk, proj, projected_data, "my projected data")
   -     vtk_cell_data(vtk, proj, projected_data, "my projected data")
+  + VTKFile(name, dh) do vtk
+  +     write_solution(vtk, dh, a)
+  +     write_node_data(vtk, nodal_data, "my node data")
+  +     write_projection(vtk, proj, projected_data, "my projected data")
   +     write_cell_data(vtk, cell_data, "my projected data")
   end
 
