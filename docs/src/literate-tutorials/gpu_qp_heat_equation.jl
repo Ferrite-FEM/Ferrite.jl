@@ -138,6 +138,7 @@ end
 function assemble_global_gpu(cellvalues,dh)
     Kgpu =   CUDA.zeros(dh.ndofs.x,dh.ndofs.x)
     n_base_funcs = getnbasefunctions(cellvalues) 
+    # each block represents a cell, and every (i,j) in the 2D threads represents an element in the local stiffness matrix. 
     @cuda blocks=length(dh.grid.cells) threads = (n_base_funcs,n_base_funcs) assemble_element_gpu!(Kgpu,cellvalues,dh)
     return Kgpu
 end
