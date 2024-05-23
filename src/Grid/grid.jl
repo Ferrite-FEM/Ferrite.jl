@@ -305,7 +305,7 @@ mutable struct Grid{dim,C<:AbstractCell,T<:Real} <: AbstractGrid{dim}
 end
 
 function Grid(cells::Vector{C},
-              nodes::Vector{Node{dim, T}};
+              nodes::Vector{Node{dim,T}};
               cellsets::Dict{String, <:AbstractVecOrSet{Int}}=Dict{String,OrderedSet{Int}}(),
               nodesets::Dict{String, <:AbstractVecOrSet{Int}}=Dict{String,OrderedSet{Int}}(),
               facetsets::Dict{String, <:AbstractVecOrSet{FacetIndex}}=Dict{String,OrderedSet{FacetIndex}}(),
