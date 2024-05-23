@@ -33,7 +33,7 @@ get_coordinate_type(::Node{dim,T}) where {dim,T}  = Vec{dim,T}
 
 Get the data type of the components of the nodes coordinate.
 """
-get_coordinate_eltype(::Node{dim, T}) where {dim,T} = T
+get_coordinate_eltype(::Node{dim,T}) where {dim,T} = T
 
 ##########################
 # AbstractCell interface #
@@ -350,8 +350,8 @@ get_coordinate_type(::Grid{dim,C,T}) where {dim,C,T} = Vec{dim,T} # Node is bake
     toglobal(grid::AbstractGrid, vertexidx::Vector{VertexIndex}) -> Vector{Int}
 This function takes the local vertex representation (a `VertexIndex`) and looks up the unique global id (an `Int`).
 """
-toglobal(grid::AbstractGrid, vertexidx::VertexIndex) = vertices(getcells(grid,vertexidx[1]))[vertexidx[2]]
-toglobal(grid::AbstractGrid, vertexidx::Vector{VertexIndex}) = unique(toglobal.((grid,),vertexidx))
+toglobal(grid::AbstractGrid,vertexidx::VertexIndex) = vertices(getcells(grid,vertexidx[1]))[vertexidx[2]]
+toglobal(grid::AbstractGrid,vertexidx::Vector{VertexIndex}) = unique(toglobal.((grid,),vertexidx))
 
 getsdim(::AbstractGrid{sdim}) where sdim = sdim
 @inline getdim(g::AbstractGrid) = getsdim(g) # TODO: Deprecate
@@ -380,7 +380,7 @@ end
 
 """
     getcells(grid::AbstractGrid)
-    getcells(grid::AbstractGrid, v::Union{Int, Vector{Int}}
+    getcells(grid::AbstractGrid, v::Union{Int,Vector{Int}}
     getcells(grid::AbstractGrid, setname::String)
 
 Returns either all `cells::Collection{C<:AbstractCell}` of a `<:AbstractGrid` or a subset based on an `Int`, `Vector{Int}` or `String`.
@@ -397,7 +397,7 @@ Whereas the last option tries to call a `cellset` of the `grid`. `Collection` ca
 
 """
     getnodes(grid::AbstractGrid)
-    getnodes(grid::AbstractGrid, v::Union{Int, Vector{Int}}
+    getnodes(grid::AbstractGrid, v::Union{Int,Vector{Int}}
     getnodes(grid::AbstractGrid, setname::String)
 
 Returns either all `nodes::Collection{N}` of a `<:AbstractGrid` or a subset based on an `Int`, `Vector{Int}` or `String`.
@@ -517,7 +517,7 @@ end
     cell = getcells(grid, cellid)
     getcoordinates!(x, grid, cell)
 end
-@inline getcoordinates!(x::Vector{Vec{dim, T}}, grid::AbstractGrid, cell::CellIndex) where {dim,T} = getcoordinates!(x, grid, cell.idx)
+@inline getcoordinates!(x::Vector{Vec{dim,T}}, grid::AbstractGrid, cell::CellIndex) where {dim,T} = getcoordinates!(x, grid, cell.idx)
 
 """
     get_node_coordinate(grid::AbstractGrid, n::Int)
