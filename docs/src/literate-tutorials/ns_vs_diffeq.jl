@@ -206,12 +206,16 @@ add!(ch, noslip_bc);
 # ensures that for the given geometry the Reynolds number is 100, which
 # is already enough to obtain some simple vortex streets. By increasing the
 # velocity further we can obtain stronger vortices - which may need additional
-# refinement of the grid. Note that we have to smoothly ramp up the velocity,
-# because the Dirichlet constraints cannot be properly enforced yet, causing
-# convergence issues.
+# refinement of the grid.
 ∂Ω_inflow = getfaceset(grid, "left");
 
-vᵢₙ(t) = 1.5/(1+exp(-2.0*(t-2.0)))  #inflow velocity
+# !!! note
+#     The adaptivity only works if the pressure field varies smoothly
+#     enough in time. Linearly ramping up the velocity will cause
+#     fluctuations in the pressure field which will mess up the error
+#     estimators.
+vᵢₙ(t) = t < 2.0 ? 1.5*(sin(-π/2 + t*π/2)+1)/2 : 1.5 #inflow velocity
+
 parabolic_inflow_profile(x,t) = Vec((4*vᵢₙ(t)*x[2]*(0.41-x[2])/0.41^2, 0.0))
 inflow_bc = Dirichlet(:v, ∂Ω_inflow, parabolic_inflow_profile, [1,2])
 add!(ch, inflow_bc);
@@ -540,8 +544,8 @@ end
 # To visualize the result we export the grid and our fields
 # to VTK-files, which can be viewed in [ParaView](https://www.paraview.org/)
 # by utilizing the corresponding pvd file.
-timestepper = ImplicitEuler(step_limiter! = ferrite_limiter!);
-# timestepper = ImplicitEuler(nlsolve=NonlinearSolveAlg(OrdinaryDiffEq.NonlinearSolve.NewtonRaphson(autodiff=OrdinaryDiffEq.AutoFiniteDiff(), linsolve=FerriteBackslash()); max_iter=50), step_limiter! = ferrite_limiter!)
+timestepper = Rodas5P(autodiff=false, step_limiter! = ferrite_limiter!);
+# timestepper = ImplicitEuler(nlsolve=NonlinearSolveAlg(OrdinaryDiffEq.NonlinearSolve.NewtonRaphson(autodiff=OrdinaryDiffEq.AutoFiniteDiff()); max_iter=50), step_limiter! = ferrite_limiter!)
 #NOTE!   This is left for future reference                                 #src
 # function algebraicmultigrid(W,du,u,p,t,newW,Plprev,Prprev,solverdata)   #src
 #     if newW === nothing || newW                                         #src
@@ -553,19 +557,18 @@ timestepper = ImplicitEuler(step_limiter! = ferrite_limiter!);
 # end                                                                     #src
 # timestepper = ImplicitEuler(linsolve = IterativeSolversJL_GMRES(; abstol=1e-8, reltol=1e-6), precs=algebraicmultigrid, concrete_jac=true) #src
 
-# !!! note "Adaptivity"
-#     In the used version [adaptivity with mass matrices is broken](https://github.com/SciML/OrdinaryDiffEq.jl/issues/2199).
+# !!! info "Debugging convergence issues"
+#     We can obtain some debug information from OrdinaryDiffEq by wrapping the following section into a [debug logger](https://docs.julialang.org/en/v1/stdlib/Logging/#Example:-Enable-debug-level-messages).
 integrator = init(
     problem, timestepper, initializealg=NoInit(), dt=Δt₀,
-    adaptive=false, abstol=1e-5, reltol=1e-4,
+    adaptive=true, abstol=1e-4, reltol=1e-5,
     progress=true, progress_steps=1,
     verbose=true, internalnorm=FreeDofErrorNorm(ch)
 );
 
 pvd = paraview_collection("vortex-street.pvd");
-# integrator = TimeChoiceIterator(integrator, 0.0:Δt_save:T)
-# for (u,t) in integrator # broken
-for (u,t) in intervals(integrator)
+
+for (u,t) in TimeChoiceIterator(integrator, 0.0:Δt_save:T)
     # We ignored the Dirichlet constraints in the solution vector up to now,
     # so we have to bring them back now.
     #+
