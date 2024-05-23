@@ -48,6 +48,13 @@ const RefTetrahedron   = RefSimplex{3}
 struct RefPrism         <: AbstractRefShape{3} end
 struct RefPyramid       <: AbstractRefShape{3} end
 
+"""
+    Ferrite.getrefdim(RefShape::Type{<:AbstractRefShape})
+
+Get the dimension of the reference shape
+"""
+getrefdim(::Type{<:AbstractRefShape{rdim}}) where rdim = rdim
+
 abstract type AbstractCell{refshape <: AbstractRefShape} end
 
 abstract type AbstractValues end

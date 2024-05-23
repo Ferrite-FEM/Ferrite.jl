@@ -144,7 +144,7 @@ end
 
 function Base.show(io::IO, d::MIME"text/plain", fv::FacetValues)
     ip_geo = geometric_interpolation(fv)
-    rdim = getdim(ip_geo)
+    rdim = getrefdim(ip_geo)
     vdim = isa(shape_value(fv, 1, 1), Vec) ? length(shape_value(fv, 1, 1)) : 0
     sdim = length(shape_gradient(fv, 1, 1)) ÷ length(shape_value(fv, 1, 1))
     vstr = vdim==0 ? "scalar" : "vdim=$vdim"

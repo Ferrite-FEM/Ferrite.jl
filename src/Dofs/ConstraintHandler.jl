@@ -1503,7 +1503,7 @@ function __check_periodic_facets(grid::Grid, fi::FacetIndex, fj::FacetIndex, kno
     end
 
     # Rotation is only relevant for 3D
-    if getdim(grid) == 3
+    if getspatialdim(grid) == 3
         node_rot = mod(node_rot, length(nodes_i))
     else
         node_rot = 0
@@ -1558,7 +1558,7 @@ function __check_periodic_facets_f(grid::Grid, fi::FacetIndex, fj::FacetIndex, x
     found || return nothing
 
     # 3. Rotation is only relevant for 3D.
-    if getdim(grid) == 3
+    if getspatialdim(grid) == 3
         node_rot = mod(node_rot, length(nodes_i))
     else
         node_rot = 0

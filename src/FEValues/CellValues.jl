@@ -118,7 +118,7 @@ end
 function Base.show(io::IO, d::MIME"text/plain", cv::CellValues)
     ip_geo = geometric_interpolation(cv)
     ip_fun = function_interpolation(cv)
-    rdim = getdim(ip_geo)
+    rdim = getrefdim(ip_geo)
     vdim = isa(shape_value(cv, 1, 1), Vec) ? length(shape_value(cv, 1, 1)) : 0
     GradT = shape_gradient_type(cv)
     sdim = GradT === nothing ? nothing : sdim_from_gradtype(GradT)

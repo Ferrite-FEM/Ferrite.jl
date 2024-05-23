@@ -104,11 +104,11 @@ nfaces(::Interpolation{RefShape})    where RefShape = nfaces(RefShape)
 Base.copy(ip::Interpolation) = ip
 
 """
-    Ferrite.getdim(::Interpolation)
+    Ferrite.getrefdim(::Interpolation)
 
 Return the dimension of the reference element for a given interpolation.
 """
-@inline getdim(::Interpolation{shape}) where {dim, shape <: AbstractRefShape{dim}} = dim
+@inline getrefdim(::Interpolation{RefShape}) where RefShape = getrefdim(RefShape)
 
 """
     Ferrite.getrefshape(::Interpolation)::AbstractRefShape

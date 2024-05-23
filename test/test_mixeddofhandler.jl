@@ -522,7 +522,7 @@ end
 function test_celliterator_subdomain()
     for celltype in (Line, Quadrilateral, Hexahedron)
         ip = Ferrite.default_interpolation(celltype)
-        dim = Ferrite.getdim(ip)
+        dim = Ferrite.getrefdim(ip)
         grid = generate_grid(celltype, ntuple(i->i==1 ? 2 : 1, dim)) # 2 cells
         dh = DofHandler(grid)
         sdh = SubDofHandler(dh, Set(2)) # only cell 2, cell 1 is not part of dh

@@ -270,7 +270,15 @@ Specifies for each subtype of AbstractCell how many nodes form an edge.
 """
 nvertices_on_edge(cell::AbstractCell, local_edge_index::Int) = length(edges(cell)[local_edge_index])
 
-getdim(::Union{AbstractCell{refshape},Type{<:AbstractCell{refshape}}}) where {refdim, refshape <: AbstractRefShape{refdim}} = refdim
+"""
+    Ferrite.getrefdim(cell::AbstractCell)
+    Ferrite.getrefdim(::Type{<:AbstractCell})
+
+Get the reference dimension of the cell, i.e. the dimension of the cell's
+reference shape.
+"""
+getrefdim(c::AbstractCell) = getrefdim(typeof(c))
+getrefdim(::Type{<:AbstractCell{RefShape}}) where RefShape = getrefdim(RefShape)
 
 
 ######################
@@ -356,8 +364,12 @@ This function takes the local vertex representation (a `VertexIndex`) and looks 
 toglobal(grid::AbstractGrid,vertexidx::VertexIndex) = vertices(getcells(grid,vertexidx[1]))[vertexidx[2]]
 toglobal(grid::AbstractGrid,vertexidx::Vector{VertexIndex}) = unique(toglobal.((grid,),vertexidx))
 
-getsdim(::AbstractGrid{sdim}) where sdim = sdim
-@inline getdim(g::AbstractGrid) = getsdim(g) # TODO: Deprecate
+"""
+    Ferrite.getspatialdim(grid::AbstractGrid)
+
+Get the spatial dimension of the grid, corresponding to the vector dimension of the grid's coordinates.
+"""
+getspatialdim(::AbstractGrid{sdim}) where sdim = sdim
 
 """
     get_reference_dimension(grid::AbstractGrid) -> Union{Int, Symbol}
@@ -375,7 +387,7 @@ function _get_reference_dimension(cells::AbstractVector{<:AbstractCell})
     # Note, this function is inherently type-instable.
     rdims = Set{Int}()
     for cell in cells
-        push!(rdims, getdim(cell))
+        push!(rdims, getrefdim(cell))
     end
     length(rdims) == 1 && return first(rdims)
     return :mixed

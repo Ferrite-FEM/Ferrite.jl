@@ -99,7 +99,7 @@
                 for ip_order_p in 1:2
                     dh = testdh(CT, ip_order_u, ip_order_p)
                     isnothing(dh) && continue # generate_grid not supported for this CT, or reference_coordinates not defined
-                    dim = Ferrite.getdim(dh.grid)
+                    dim = Ferrite.getspatialdim(dh.grid)
                     num_udofs = length(_global_dof_range(dh, :u))
                     num_pdofs = length(_global_dof_range(dh, :p))
 

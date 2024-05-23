@@ -21,7 +21,7 @@
         geom_interpol = scalar_interpol # Tests below assume this
         n_basefunc_base = getnbasefunctions(scalar_interpol)
         cv = @inferred CellValues(quad_rule, func_interpol, geom_interpol)
-        ndim = Ferrite.getdim(func_interpol)
+        ndim = Ferrite.getrefdim(func_interpol)
         n_basefuncs = getnbasefunctions(func_interpol)
 
         @test getnbasefunctions(cv) == n_basefuncs
