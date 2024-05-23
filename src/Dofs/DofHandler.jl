@@ -234,7 +234,7 @@ n_components(sdh::SubDofHandler, field_name::Symbol) = n_components(sdh, find_fi
     n_components(sdh::SubDofHandler, field_idx::Int)
     n_components(sdh::SubDofHandler, field_name::Symbol)
 
-Return the dimension (number of components) of a given field. The field can be specified by
+Return the number of components for a given field. The field can be specified by
 its index (see [`find_field`](@ref)) or its name.
 """
 function n_components(dh::DofHandler, field_idxs::NTuple{2, Int})
