@@ -417,8 +417,8 @@ function test_field_on_subdomain()
     close!(dh)
 
     # retrieve field dimensions
-    @test Ferrite.getfielddim(dh, :v) == 2
-    @test Ferrite.getfielddim(dh, :s) ==1
+    @test Ferrite.n_components(dh, :v) == 2
+    @test Ferrite.n_components(dh, :s) ==1
 
     # find field in SubDofHandler
     @test Ferrite.find_field(dh.subdofhandlers[1], :v) == 1
