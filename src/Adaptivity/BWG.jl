@@ -597,7 +597,7 @@ function creategrid(forest::ForestBWG{dim,C,T}) where {dim,C,T}
     node_map_inv = dim < 3 ? node_map₂_inv : node_map₃_inv
     nodeids = Dict{Tuple{Int,NTuple{dim,Int32}},Int}()
     nodeowners = Dict{Tuple{Int,NTuple{dim,Int32}},Tuple{Int,NTuple{dim,Int32}}}()
-    facet_neighborhood = Ferrite.get_facet_facet_neighborhood(forest)
+    facet_neighborhood = Ferrite.Ferrite.get_facet_facet_neighborhood(forest)
 
     # Phase 1: Assign node owners intra-octree
     pivot_nodeid = 1
@@ -807,7 +807,7 @@ function hangingnodes(forest::ForestBWG{dim}, nodeids, nodeowners) where dim
     facetable = dim == 2 ? 𝒱₂ : 𝒱₃
     opposite_face = dim == 2 ? opposite_face_2 : opposite_face_3
     hnodes = Dict{Int,Vector{Int}}()
-    facet_neighborhood = Ferrite.get_facet_facet_neighborhood(forest)
+    facet_neighborhood = Ferrite.Ferrite.get_facet_facet_neighborhood(forest)
     for (k,tree) in enumerate(forest.cells)
         rootfaces = faces(root(dim),tree.b)
         for (l,leaf) in enumerate(tree.leaves)
@@ -969,7 +969,7 @@ function balanceforest!(forest::ForestBWG{dim}) where dim
     perm_corner_inv = dim == 2 ? node_map₂_inv : node_map₃_inv
     root_ = root(dim)
     nrefcells = 0
-    facet_neighborhood = Ferrite.get_facet_facet_neighborhood(forest)
+    facet_neighborhood = Ferrite.Ferrite.get_facet_facet_neighborhood(forest)
     while nrefcells - getncells(forest) != 0
         for k in 1:length(forest.cells)
             tree = forest.cells[k]
@@ -1377,7 +1377,8 @@ function compute_face_orientation(forest::ForestBWG{<:Any,<:OctreeBWG{dim,<:Any,
     n_perminv = (dim == 2 ? node_map₂_inv : node_map₃_inv)
 
     f_ferrite = f_perm[f]
-    k′, f′_ferrite = dim == 2 ? forest.topology.edge_edge_neighbor[k,f_ferrite][1] : forest.topology.face_face_neighbor[k,f_ferrite][1]
+    facet_neighbor_table = Ferrite.get_facet_facet_neighborhood(forest)
+    k′, f′_ferrite = facet_neighbor_table[k,f_ferrite][1]
     f′ = f_perminv[f′_ferrite]
     reffacenodes = reference_faces_bwg(Ferrite.RefHypercube{dim})
     nodes_f = [forest.cells[k].nodes[n_perm[ni]] for ni in reffacenodes[f]]
@@ -1440,7 +1441,8 @@ function transform_face_remote(forest::ForestBWG, k::T1, f::T1, o::OctantBWG{dim
     _two = T2(2)
     _perm = (dim == 2 ? 𝒱₂_perm : 𝒱₃_perm)
     _perminv = (dim == 2 ? 𝒱₂_perm_inv : 𝒱₃_perm_inv)
-    k′, f′ = dim == 2 ? forest.topology.edge_edge_neighbor[k,_perm[f]][1] : forest.topology.face_face_neighbor[k,_perm[f]][1]
+    facet_neighbor_table = Ferrite.get_facet_facet_neighborhood(forest)
+    k′, f′ = facet_neighbor_table[k,_perm[f]][1]
     f′ = _perminv[f′]
     s′ = _one - (((f - _one) & _one) ⊻ ((f′ - _one) & _one))
     s = zeros(T2,dim-1)
