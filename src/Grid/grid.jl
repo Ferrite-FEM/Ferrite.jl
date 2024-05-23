@@ -405,7 +405,7 @@ The last option tries to call a `nodeset` of the `<:AbstractGrid`. `Collection{N
 to a Node.
 """
 @inline getnodes(grid::AbstractGrid) = grid.nodes
-@inline getnodes(grid::AbstractGrid, v::Union{Int,Vector{Int}}) = grid.nodes[v]
+@inline getnodes(grid::AbstractGrid, v::Union{Int, Vector{Int}}) = grid.nodes[v]
 @inline getnodes(grid::AbstractGrid, setname::String) = grid.nodes[collect(getnodeset(grid,setname))]
 "Returns the number of nodes in the grid."
 @inline getnnodes(grid::AbstractGrid) = length(grid.nodes)
@@ -517,7 +517,7 @@ end
     cell = getcells(grid, cellid)
     getcoordinates!(x, grid, cell)
 end
-@inline getcoordinates!(x::Vector{Vec{dim,T}}, grid::AbstractGrid, cell::CellIndex) where {dim,T} = getcoordinates!(x, grid, cell.idx)
+@inline getcoordinates!(x::Vector{Vec{dim,T}}, grid::AbstractGrid, cell::CellIndex) where {dim, T} = getcoordinates!(x, grid, cell.idx)
 
 """
     get_node_coordinate(grid::AbstractGrid, n::Int)
