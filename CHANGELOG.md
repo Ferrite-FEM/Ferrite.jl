@@ -342,6 +342,12 @@ more discussion).
   by type piracy. In order to be invariant to the underlying `Set` datatype as well as
   omitting type piracy, ([#835][github-835]) implemented `isequal` and `hash` for `BoundaryIndex` datatypes.
 
+- `Ferrite.getdim` has been changed into `Ferrite.getrefdim` for getting the dimension of the reference shape
+  and `Ferrite.getspatialdim` to get the spatial dimension (of the grid). [#943][github-943]
+
+- `Ferrite.getfielddim(::AbstractDofHandler, args...)` has been renamed to `Ferrite.n_components`.
+  [#943][github-943]
+
 ### Deprecated
 
 - The rarely (if ever) used methods of `function_value`, `function_gradient`,
@@ -914,3 +920,4 @@ poking into Ferrite internals:
 [github-855]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/855
 [github-880]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/880
 [github-924]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/924
+[github-943]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/943

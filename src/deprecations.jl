@@ -369,3 +369,6 @@ export onboundary
 function onboundary(::CellCache, ::Int)
     error("`onboundary` is deprecated, check just the facetset instead of first checking `onboundary`.")
 end
+
+getdim(args...) = error("`Ferrite.getdim` is deprecated, use `getrefdim` or `getspatialdim` instead")
+getfielddim(args...) = error("`Ferrite.getfielddim(::AbstractDofHandler, args...) is deprecated, use `n_components` instead")
