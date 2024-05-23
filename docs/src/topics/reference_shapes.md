@@ -23,7 +23,7 @@ Ferrite denotes the entities of a reference shape as follows
 | `Volume` | 3-dimensional entity enclosed by faces. |
 
 Note that a `Node` in Ferrite is not the same as a `Vertex`.
-Vertices denote endpoints of edges, while nodes may also be be located in the middle
+Vertices denote endpoints of edges, while nodes may also be located in the middle
 of edges (e.g. for a `QuadraticLine` cell).
 
 To write dimensionally independent code, Ferrite also denotes entities by their
