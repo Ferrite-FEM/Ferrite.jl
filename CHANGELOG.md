@@ -75,23 +75,23 @@ more discussion).
   + QuadratureRule{RefTetrahedron}(quadrature_order)
   ```
 
-- **Quadrature for face integration (FaceValues)**: replace `QuadratureRule{dim-1,
+- **Quadrature for face integration (FacetValues)**: replace `QuadratureRule{dim-1,
   reference_shape}(quadrature_order)` with
-  `FaceQuadratureRule{reference_shape}(quadrature_order)`.
+  `FacetQuadratureRule{reference_shape}(quadrature_order)`.
 
   Examples:
   ```diff
-  # Quadrature for the faces of a quadrilateral
+  # Quadrature for the facets of a quadrilateral
   - QuadratureRule{1, RefCube}(quadrature_order)
-  + FaceQuadratureRule{RefQuadrilateral}(quadrature_order)
+  + FacetQuadratureRule{RefQuadrilateral}(quadrature_order)
 
-  # Quadrature for the faces of a triangle
+  # Quadrature for the facets of a triangle
   - QuadratureRule{1, RefTetrahedron}(quadrature_order)
-  + FaceQuadratureRule{RefTriangle}(quadrature_order)
+  + FacetQuadratureRule{RefTriangle}(quadrature_order)
 
-  # Quadrature for the faces of a hexhedron
+  # Quadrature for the facets of a hexhedron
   - QuadratureRule{2, RefCube}(quadrature_order)
-  + FaceQuadratureRule{RefHexahedron}(quadrature_order)
+  + FacetQuadratureRule{RefHexahedron}(quadrature_order)
   ```
 
 - **CellValues**: replace usage of `CellScalarValues` *and* `CellVectorValues` with
@@ -148,28 +148,28 @@ more discussion).
   + cv = CellValues(qr, ip_function, ip_geometry)
   ```
 
-- **FaceValues**: replace usage of `FaceScalarValues` *and* `FaceVectorValues` with
-  `FaceValues`. For vector valued problems the interpolation passed to `CellValues` should
+- **FacetValues**: replace usage of `FaceScalarValues` *and* `FaceVectorValues` with
+  `FacetValues`. For vector valued problems the interpolation passed to `FacetValues` should
   be vectorized to a `VectorizedInterpolation` (see above). The input quadrature rule should
-  be a `FaceQuadratureRule` instead of a `QuadratureRule`.
+  be a `FacetQuadratureRule` instead of a `QuadratureRule`.
 
   Examples:
   ```diff
-  # FaceValues for a scalar problem with triangle elements
+  # FacetValues for a scalar problem with triangle elements
   - qr = QuadratureRule{1, RefTetrahedron}(quadrature_order)
   - ip = Lagrange{2, RefTetrahedron, 1}()
   - cv = FaceScalarValues(qr, ip)
-  + qr = FaceQuadratureRule{RefTriangle}(quadrature_order)
+  + qr = FacetQuadratureRule{RefTriangle}(quadrature_order)
   + ip = Lagrange{RefTriangle, 1}()
-  + cv = FaceValues(qr, ip)
+  + cv = FacetValues(qr, ip)
 
   # FaceValues for a vector problem with hexahedronal elements
   - qr = QuadratureRule{2, RefCube}(quadrature_order)
   - ip = Lagrange{3, RefCube, 1}()
   - cv = FaceVectorValues(qr, ip)
-  + qr = FaceQuadratureRule{RefHexahedron}(quadrature_order)
+  + qr = FacetQuadratureRule{RefHexahedron}(quadrature_order)
   + ip = Lagrange{RefHexahedron, 1}() ^ 3
-  + cv = FaceValues(qr, ip)
+  + cv = FacetValues(qr, ip)
   ```
 
 - **DofHandler construction**: it is now required to pass the interpolation explicitly when
@@ -190,10 +190,59 @@ more discussion).
   + add!(dh, :u, Lagrange{RefTriangle, 1}())
   ```
 
-- **VTK export**: Ferrite no longer extends methods from `WriteVTK.jl`, instead the new types
-  `VTKFile` and `VTKFileCollection` should be used instead. New methods exists for writing to
-  a `VTKFile`, e.g. `write_solution`, `write_cell_data`, `write_node_data`, and `write_projection`.
-  See [#692][github-692].
+- **Boundary conditions**: The entity enclosing a cell was previously called `face`, but is now
+  denoted a `facet`. When applying boundary conditions, rename  `getfaceset` to `getfacetset` and
+  `addfaceset!` is now `addfacetset!`. These sets are now described by `FacetIndex` instead of `FaceIndex`.
+  When looping over the `facets` of a cell, change `nfaces` to `nfacets`.
+
+  Examples:
+  ```diff
+  # Dirichlet boundary conditions
+  - addfaceset!(grid, "dbc", x -> x[1] ≈ 1.0)
+  + addfacetset!(grid, "dbc", x -> x[1] ≈ 1.0)
+
+  - dbc = Dirichlet(:u, getfaceset(grid, "dbc"), Returns(0.0))
+  + dbc = Dirichlet(:u, getfacetset(grid, "dbc"), Returns(0.0))
+
+  # Neumann boundary conditions
+  - for facet in 1:nfaces(cell)
+  -     if (cellid(cell), facet) ∈ getfaceset(grid, "Neumann Boundary")
+  + for facet in 1:nfacets(cell)
+  +     if (cellid(cell), facet) ∈ getfacetset(grid, "Neumann Boundary")
+            # ...
+  ```
+
+- **VTK Export**: The VTK export has been changed to become and export backend [#692][github-692].
+  ```diff
+  - vtk_grid(name, dh) do vtk
+  -     vtk_point_data(vtk, dh, a)
+  -     vtk_point_data(vtk, nodal_data, "my node data")
+  -     vtk_point_data(vtk, proj, projected_data, "my projected data")
+  -     vtk_cell_data(vtk, proj, projected_data, "my projected data")
+  + VTKFile(name, dh) do vtk
+  +     write_solution(vtk, dh, a)
+  +     write_node_data(vtk, nodal_data, "my node data")
+  +     write_projection(vtk, proj, projected_data, "my projected data")
+  +     write_cell_data(vtk, cell_data, "my projected data")
+  end
+
+  # Using a collection for e.g. multiple timesteps
+  - pvd = paraview_collection("mypvd")
+  + pvd = VTKFileCollection("mypvd", grid);
+
+  for t in timesteps
+      # solve problem to find `u`
+  -   vtk_grid("transient-heat-$t", dh) do vtk
+  -       vtk_point_data(vtk, dh, u)
+  -       vtk_save(vtk)
+  -       pvd[t] = vtk
+  -   end
+  +   addstep!(pvd, t) do io
+  +       write_solution(io, dh, u)
+  +   end
+  end
+  ```
+
 
 ### Added
 
@@ -201,7 +250,7 @@ more discussion).
 
 - `InterfaceIterator` and `InterfaceCache` for iterating over interfaces. ([#747][github-747])
 
-- `FaceQuadratureRule` implementation for `RefPrism` and `RefPyramid`. ([#779][github-779])
+- `FacetQuadratureRule` implementation for `RefPrism` and `RefPyramid`. ([#779][github-779])
 
 - The `DofHandler` now support selectively adding fields on sub-domains (rather than the
   full domain). This new functionality is included with the new `SubDofHandler` struct,
@@ -217,8 +266,8 @@ more discussion).
   `Ferrite.RefSimplex{dim}`. ([#679][github-679])
 
 - New methods for adding entitysets that are located on the boundary of the grid:
-  `addboundaryfaceset!`, `addboundaryedgeset!`, and `addboundaryvertexset!`. These work
-  similar to `addfaceset!`, `addedgeset!`, and `addvertexset!`, but filters out all
+  `addboundaryfacetset!` and `addboundaryvertexset!`. These work
+  similar to `addfacetset!` and `addvertexset!`, but filters out all
   instances not on the boundary (this can be used to avoid accidental inclusion of internal
   entities in sets used for boundary conditions, for example). ([#606][github-606])
 
@@ -238,9 +287,9 @@ more discussion).
 - `CellValues` now support (vector) interpolations with dimension different from the spatial
   dimension. ([#651][github-651])
 
-- `FaceQuadratureRule` have been added and should be used for `FaceValues`. A
-  `FaceQuadratureRule` for integration of the faces of e.g. a triangle can be constructed by
-  `FaceQuadratureRule{RefTriangle}(order)` (similar to how `QuadratureRule` is constructed).
+- `FacetQuadratureRule` have been added and should be used for `FacetValues`. A
+  `FacetQuadratureRule` for integration of the facets of e.g. a triangle can be constructed by
+  `FacetQuadratureRule{RefTriangle}(order)` (similar to how `QuadratureRule` is constructed).
   ([#716][github-716])
 
 - New methods `shape_value(::Interpolation, ξ::Vec, i::Int)` and
@@ -250,7 +299,7 @@ more discussion).
   corresponding methods for `CellValues` etc return the value/gradient wrt the spatial
   coordinate `x`. ([#721][github-721])
 
-- `FaceIterator` and `FaceCache` have been added. These work similarly to `CellIterator` and
+- `FacetIterator` and `FacetCache` have been added. These work similarly to `CellIterator` and
   `CellCache` but are used to iterate over (boundary) face sets instead. These simplify
   boundary integrals in general, and in particular Neumann boundary conditions are more
   convenient to implement now that you can loop directly over the face set instead of
@@ -258,9 +307,6 @@ more discussion).
 
 - The `ConstraintHandler` now support adding Dirichlet boundary conditions on discontinuous
   interpolations. ([#729][github-729])
-
-- All keyword arguments to `vtk_grid` are now passed on to `WriteVTK.vtk_grid` (only
-  `compress` was supported earlier). ([#687][github-687])
 
 - `collect_periodic_faces` now have a keyword argument `tol` that can be used to relax the
   default tolerance when necessary. ([#749][github-749])
@@ -285,7 +331,7 @@ more discussion).
   **To upgrade** replace any usage of `Cell{...}(...)` with calls to the concrete
   implementations.
 
-- The default geometric mapping in `CellValues` and `FaceValues` have changed. The new
+- The default geometric mapping in `CellValues` and `FacetValues` have changed. The new
   default is to always use `Lagrange{refshape, 1}()`, i.e. linear Lagrange polynomials, for
   the geometric interpolation. Previously, the function interpolation was (re) used also for
   the geometry interpolation. ([#695][github-695])
@@ -321,26 +367,45 @@ more discussion).
   `Lagrange{RefTriangle}(order)`, etc.
 
 - `CellScalarValues` and `CellVectorValues` have been merged into `CellValues`,
-  `FaceScalarValues` and `FaceVectorValues` have been merged into `FaceValues`, and
+  `FaceScalarValues` and `FaceVectorValues` have been merged into `FacetValues`, and
   `PointScalarValues` and `PointVectorValues` have been merged into `PointValues`. The
   differentiation between scalar and vector have thus been moved to the interpolation (see
   above). Note that previously `CellValues`, `FaceValues`, and `PointValues` where abstract
-  types, but they are now concrete implementations with *different type parameters*.
-  ([#708][github-708])
+  types, but they are now concrete implementations with *different type parameters*, except
+  `FaceValues` which is now `FacetValues` ([#708][github-708])
   **To upgrade**, for scalar problems, it is enough to replace `CellScalarValues` with
-  `CellValues`, `FaceScalarValues` with `FaceValues` and `PointScalarValues` with
+  `CellValues`, `FaceScalarValues` with `FacetValues` and `PointScalarValues` with
   `PointValues`, respectively. For vector problems, make sure to vectorize the interpolation
   (see above) and then replace `CellVectorValues` with `CellValues`, `FaceVectorValues` with
-  `FaceValues`, and `PointVectorValues` with `PointValues`.
+  `FacetValues`, and `PointVectorValues` with `PointValues`.
 
-- The quadrature rule passed to `FaceValues` should now be of type `FaceQuadratureRule`
+- The quadrature rule passed to `FacetValues` should now be of type `FacetQuadratureRule`
   rather than of type `QuadratureRule`. ([#716][github-716])
-  **To upgrade** replace the quadrature rule passed to `FaceValues` with a
-  `FaceQuadratureRule`.
+  **To upgrade** replace the quadrature rule passed to `FacetValues` with a
+  `FacetQuadratureRule`.
 
 - Checking if a face `(ele_id, local_face_id) ∈ faceset` has been previously implemented
   by type piracy. In order to be invariant to the underlying `Set` datatype as well as
   omitting type piracy, ([#835][github-835]) implemented `isequal` and `hash` for `BoundaryIndex` datatypes.
+
+- **VTK export**: Ferrite no longer extends methods from `WriteVTK.jl`, instead the new types
+  `VTKFile` and `VTKFileCollection` should be used instead. New methods exists for writing to
+  a `VTKFile`, e.g. `write_solution`, `write_cell_data`, `write_node_data`, and `write_projection`.
+  See [#692][github-692].
+
+- **Definitions**: Previously, `face` and `edge` referred to codimension 1 relative reference shape.
+  In Ferrite v1, `volume`, `face`, `edge`, and `vertex` refer to 3, 2, 1, and 0 dimensional entities,
+  and `facet` replaces the old definition of `face`. No direct replacement for `edges` exits.
+  See [#914][github-789] and [#914][github-914].
+  The main implications of this change are
+  * `FaceIndex` -> `FacetIndex` (`FaceIndex` still exists, but has a different meaning)
+  * `FaceValues` -> `FacetValues`
+  * `nfaces` -> `nfacets` (`nfaces` is now an internal method with different meaning)
+  * `addfaceset!` -> `addfacetset`
+  * `getfaceset` -> `getfacetset`
+
+  Furthermore, subtypes of `Interpolation` should now define `vertexdof_indices`, `edgedof_indices`,
+  `facedof_indices`, `volumedof_indices` (and similar) according to these definitions.
 
 ### Deprecated
 
@@ -910,7 +975,9 @@ poking into Ferrite internals:
 [github-756]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/756
 [github-759]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/759
 [github-779]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/779
+[github-789]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/789
 [github-835]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/835
 [github-855]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/855
 [github-880]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/880
+[github-914]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/914
 [github-924]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/924

@@ -48,11 +48,12 @@ nvertices(c::AbstractCell) = length(vertices(c))
 nedges(   c::AbstractCell) = length(edges(c))
 nfaces(   c::AbstractCell) = length(faces(c))
 nfacets(  c::AbstractCell) = length(facets(c))
+nnodes(   c::AbstractCell) = length(get_node_ids(c))
+
 nvertices(::Type{T}) where {T <: AbstractRefShape} = length(reference_vertices(T))
 nedges(   ::Type{T}) where {T <: AbstractRefShape} = length(reference_edges(T))
 nfaces(   ::Type{T}) where {T <: AbstractRefShape} = length(reference_faces(T))
 nfacets(  ::Type{T}) where {T <: AbstractRefShape} = length(reference_facets(T))
-nnodes(   c::AbstractCell) = length(get_node_ids(c))
 
 """
     Ferrite.vertices(::AbstractCell)
@@ -149,21 +150,21 @@ get_node_ids(c::AbstractCell) = c.nodes
 # Default implementations of <entity> = vertices/edges/faces that work as long as get_node_ids
 # and `reference_<entity>` are correctly implemented for the cell / reference shape.
 
-function vertices(c::Ferrite.AbstractCell{RefShape}) where RefShape
-    ns = Ferrite.get_node_ids(c)
-    return map(i -> ns[i], Ferrite.reference_vertices(RefShape))
+function vertices(c::AbstractCell{RefShape}) where RefShape
+    ns = get_node_ids(c)
+    return map(i -> ns[i], reference_vertices(RefShape))
 end
 
-function edges(c::Ferrite.AbstractCell{RefShape}) where RefShape
-    ns = Ferrite.get_node_ids(c)
-    return map(Ferrite.reference_edges(RefShape)) do re
+function edges(c::AbstractCell{RefShape}) where RefShape
+    ns = get_node_ids(c)
+    return map(reference_edges(RefShape)) do re
         map(i -> ns[i], re)
     end
 end
 
-function faces(c::Ferrite.AbstractCell{RefShape}) where RefShape
-    ns = Ferrite.get_node_ids(c)
-    return map(Ferrite.reference_faces(RefShape)) do rf
+function faces(c::AbstractCell{RefShape}) where RefShape
+    ns = get_node_ids(c)
+    return map(reference_faces(RefShape)) do rf
         map(i -> ns[i], rf)
     end
 end
@@ -281,21 +282,17 @@ abstract type AbstractGrid{dim} end
 """
     Grid{dim, C<:AbstractCell, T<:Real} <: AbstractGrid}
 
-A `Grid` is a collection of `Cells` and `Node`s which covers the computational domain, together with Sets of cells, nodes and faces.
-There are multiple helper structures to apply boundary conditions or define subdomains. They are gathered in the `cellsets`, `nodesets`,
-`facesets`, `edgesets` and `vertexsets`.
+A `Grid` is a collection of `Ferrite.AbstractCell`s and `Ferrite.Node`s which covers the computational domain.
+Helper structures for applying boundary conditions or define subdomains are gathered in `cellsets`, `nodesets`,
+`facetsets`, and `vertexsets`.
 
 # Fields
 - `cells::Vector{C}`: stores all cells of the grid
 - `nodes::Vector{Node{dim,T}}`: stores the `dim` dimensional nodes of the grid
-- `cellsets::Dict{String,Set{Int}}`: maps a `String` key to a `Set` of cell ids
-- `nodesets::Dict{String,Set{Int}}`: maps a `String` key to a `Set` of global node ids
-- `facetsets::Dict{String,Set{FacetIndex}}`: maps a `String` to a `Set` of `Set{FacetIndex} (global_cell_id, local_facet_id)`
-- `vertexsets::Dict{String,Set{VertexIndex}}`: maps a `String` key to a `Set` of local vertex ids
-- `cellsets::Dict{String,OrderedSet{Int}}`: maps a `String` key to an `OrderedSet` of cell ids
-- `nodesets::Dict{String,OrderedSet{Int}}`: maps a `String` key to an `OrderedSet` of global node ids
-- `facetsets::Dict{String,OrderedSet{FacetIndex}}`: maps a `String` to an `OrderedSet` of `FacetIndex`
-- `vertexsets::Dict{String,OrderedSet{VertexIndex}}`: maps a `String` key to an `OrderedSet` of `VertexIndex`
+- `cellsets::Dict{String, OrderedSet{Int}}`: maps a `String` key to an `OrderedSet` of cell ids
+- `nodesets::Dict{String, OrderedSet{Int}}`: maps a `String` key to an `OrderedSet` of global node ids
+- `facetsets::Dict{String, OrderedSet{FacetIndex}}`: maps a `String` to an `OrderedSet` of `FacetIndex`
+- `vertexsets::Dict{String, OrderedSet{VertexIndex}}`: maps a `String` key to an `OrderedSet` of `VertexIndex`
 """
 mutable struct Grid{dim,C<:AbstractCell,T<:Real} <: AbstractGrid{dim}
     cells::Vector{C}
@@ -509,14 +506,14 @@ end
 
 Mutate `x` to the coordinates of the cell corresponding to `idx` or `cell`.
 """
-@inline function getcoordinates!(x::Vector{Vec{dim,T}}, grid::Ferrite.AbstractGrid, cell::Ferrite.AbstractCell) where {dim,T}
+@inline function getcoordinates!(x::Vector{Vec{dim,T}}, grid::AbstractGrid, cell::AbstractCell) where {dim,T}
     node_ids = get_node_ids(cell)
     @inbounds for i in 1:length(x)
         x[i] = get_node_coordinate(grid, node_ids[i])
     end
     return x
 end
-@inline function getcoordinates!(x::Vector{Vec{dim,T}}, grid::Ferrite.AbstractGrid, cellid::Int) where {dim,T}
+@inline function getcoordinates!(x::Vector{Vec{dim,T}}, grid::AbstractGrid, cellid::Int) where {dim,T}
     cell = getcells(grid, cellid)
     getcoordinates!(x, grid, cell)
 end
