@@ -141,7 +141,14 @@ function Base.show(io::IO, mime::MIME"text/plain", dh::DofHandler)
     else
         println(io, "  Fields:")
         for fieldname in getfieldnames(dh)
-            println(io, "    ", repr(fieldname), ", dim: ", n_components(dh, fieldname))
+            ip = getfieldinterpolation(dh, find_field(dh, fieldname))
+            if ip isa ScalarInterpolation
+                field_type = "scalar"
+            elseif ip isa VectorInterpolation
+                _getvdim(::VectorInterpolation{vdim}) where vdim = vdim
+                field_type = "Vec{$(_getvdim(ip))}"
+            end
+            println(io, "    ", repr(fieldname), ", ", field_type)
         end
     end
     if !isclosed(dh)
@@ -239,8 +246,8 @@ its index (see [`find_field`](@ref)) or its name.
 """
 function n_components(dh::DofHandler, field_idxs::NTuple{2, Int})
     sdh_idx, field_idx = field_idxs
-    fielddim = n_components(dh.subdofhandlers[sdh_idx], field_idx)
-    return fielddim
+    n = n_components(dh.subdofhandlers[sdh_idx], field_idx)
+    return n
 end
 n_components(dh::DofHandler, name::Symbol) = n_components(dh, find_field(dh, name))
 
