@@ -2,7 +2,7 @@
     function test_interfacevalues(grid::Ferrite.AbstractGrid, iv::InterfaceValues; tol = 0)
         ip_here = Ferrite.function_interpolation(iv.here)
         ip_there = Ferrite.function_interpolation(iv.there)
-        ndim = Ferrite.getrefdim(ip_here)
+        rdim = Ferrite.getrefdim(ip_here)
         n_basefuncs = getnbasefunctions(ip_here) + getnbasefunctions(ip_there)
 
         @test getnbasefunctions(iv) == n_basefuncs
@@ -56,12 +56,12 @@
             nbf_a = Ferrite.getngeobasefunctions(iv.here)
             nbf_b = Ferrite.getngeobasefunctions(iv.there)
             for here in (true, false)
-                u_a = Vec{ndim, Float64}[zero(Tensor{1,ndim}) for i in 1: nbf_a]
-                u_b = Vec{ndim, Float64}[zero(Tensor{1,ndim}) for i in 1: nbf_b]
+                u_a = zeros(Vec{rdim, Float64}, nbf_a)
+                u_b = zeros(Vec{rdim, Float64}, nbf_b)
                 u_scal_a = zeros(nbf_a)
                 u_scal_b = zeros(nbf_b)
-                H = rand(Tensor{2, ndim})
-                V = rand(Tensor{1, ndim})
+                H = rand(Tensor{2, rdim})
+                V = rand(Tensor{1, rdim})
                 for i in 1:nbf_a
                     xs = coords_here
                     u_a[i] = H ⋅ xs[i]

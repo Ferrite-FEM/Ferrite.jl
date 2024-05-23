@@ -22,7 +22,7 @@ for (scalar_interpol, quad_rule) in (
         else # Type unstable on 1.6, but works at least for 1.9 and later. PR882
             FacetValues(quad_rule, func_interpol, geom_interpol)
         end
-        ndim = Ferrite.getrefdim(func_interpol)
+        rdim = Ferrite.getrefdim(func_interpol)
         n_basefuncs = getnbasefunctions(func_interpol)
 
         @test getnbasefunctions(fv) == n_basefuncs
@@ -35,10 +35,10 @@ for (scalar_interpol, quad_rule) in (
             # We test this by applying a given deformation gradient on all the nodes.
             # Since this is a linear deformation we should get back the exact values
             # from the interpolation.
-            u = Vec{ndim, Float64}[zero(Tensor{1,ndim}) for i in 1:n_basefunc_base]
+            u = zeros(Vec{rdim, Float64}, n_basefunc_base)
             u_scal = zeros(n_basefunc_base)
-            H = rand(Tensor{2, ndim})
-            V = rand(Tensor{1, ndim})
+            H = rand(Tensor{2, rdim})
+            V = rand(Tensor{1, rdim})
             for i in 1:n_basefunc_base
                 u[i] = H ⋅ xs[i]
                 u_scal[i] = V ⋅ xs[i]
@@ -52,7 +52,7 @@ for (scalar_interpol, quad_rule) in (
                     @test function_divergence(fv, i, u_scal) ≈ sum(V)
                     @test function_divergence(fv, i, u) ≈ tr(H)
                     @test function_gradient(fv, i, u_scal) ≈ V
-                    ndim == 3 && @test function_curl(fv, i, u) ≈ Ferrite.curl_from_gradient(H)
+                    rdim == 3 && @test function_curl(fv, i, u) ≈ Ferrite.curl_from_gradient(H)
                     function_value(fv, i, u)
                     function_value(fv, i, u_scal)
                 else # func_interpol isa Ferrite.VectorInterpolation
@@ -62,7 +62,7 @@ for (scalar_interpol, quad_rule) in (
                     @test (@test_deprecated function_symmetric_gradient(fv, i, u)) ≈ 0.5(H + H')
                     @test function_divergence(fv, i, u_vector) ≈ tr(H)
                     @test (@test_deprecated function_divergence(fv, i, u)) ≈ tr(H)
-                    if ndim == 3
+                    if rdim == 3
                         @test function_curl(fv, i, u_vector) ≈ Ferrite.curl_from_gradient(H)
                         @test (@test_deprecated function_curl(fv, i, u)) ≈ Ferrite.curl_from_gradient(H)
                     end
