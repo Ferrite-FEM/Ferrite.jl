@@ -225,7 +225,7 @@ end
     getfieldnames(dh::DofHandler)
     getfieldnames(sdh::SubDofHandler)
 
-Return a vector with the unique names of all fields. The order is the sam eas the order in
+Return a vector with the unique names of all fields. The order is the same as the order in
 which they were originally added to the (Sub)DofHandler. Can be used as an iterable over all
 the fields.
 """
