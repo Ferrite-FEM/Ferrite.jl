@@ -21,7 +21,7 @@
         geom_interpol = scalar_interpol # Tests below assume this
         n_basefunc_base = getnbasefunctions(scalar_interpol)
         cv = @inferred CellValues(quad_rule, func_interpol, geom_interpol)
-        ndim = Ferrite.getdim(func_interpol)
+        rdim = Ferrite.getrefdim(func_interpol)
         n_basefuncs = getnbasefunctions(func_interpol)
 
         @test getnbasefunctions(cv) == n_basefuncs
@@ -33,10 +33,10 @@
         # We test this by applying a given deformation gradient on all the nodes.
         # Since this is a linear deformation we should get back the exact values
         # from the interpolation.
-        u = Vec{ndim, Float64}[zero(Tensor{1,ndim}) for i in 1:n_basefunc_base]
+        u = zeros(Vec{rdim, Float64}, n_basefunc_base)
         u_scal = zeros(n_basefunc_base)
-        H = rand(Tensor{2, ndim})
-        V = rand(Tensor{1, ndim})
+        H = rand(Tensor{2, rdim})
+        V = rand(Tensor{1, rdim})
         for i in 1:n_basefunc_base
             u[i] = H ⋅ x[i]
             u_scal[i] = V ⋅ x[i]
@@ -50,7 +50,7 @@
                 @test function_divergence(cv, i, u_scal) ≈ sum(V)
                 @test function_divergence(cv, i, u) ≈ tr(H)
                 @test function_gradient(cv, i, u_scal) ≈ V
-                ndim == 3 && @test function_curl(cv, i, u) ≈ Ferrite.curl_from_gradient(H)
+                rdim == 3 && @test function_curl(cv, i, u) ≈ Ferrite.curl_from_gradient(H)
                 function_value(cv, i, u)
                 function_value(cv, i, u_scal)
             else# func_interpol isa Ferrite.VectorInterpolation
@@ -60,7 +60,7 @@
                 @test (@test_deprecated function_symmetric_gradient(cv, i, u)) ≈ 0.5(H + H')
                 @test function_divergence(cv, i, u_vector) ≈ tr(H)
                 @test (@test_deprecated function_divergence(cv, i, u)) ≈ tr(H)
-                if ndim == 3
+                if rdim == 3
                     @test function_curl(cv, i, u_vector) ≈ Ferrite.curl_from_gradient(H)
                     @test (@test_deprecated function_curl(cv, i, u)) ≈ Ferrite.curl_from_gradient(H)
                 end
@@ -104,7 +104,7 @@
                     @test v == vc
                 end
             end
-            # Test that qr and detJdV is copied as expected. 
+            # Test that qr and detJdV is copied as expected.
             # Note that qr remain aliased, as defined by `copy(qr)=qr`, see quadrature.jl.
             for fname in (:qr, :detJdV)
                 v = getfield(cv, fname)
@@ -147,13 +147,13 @@ end
     fsv = FacetValues(qr_f, ip)
     fvv = FacetValues(qr_f, VectorizedInterpolation(ip))
     fsv_embedded = FacetValues(qr_f, ip, ip^3)
-    
+
     x, n = valid_coordinates_and_normals(ip)
     reinit!(csv, x)
     reinit!(cvv, x)
     reinit!(fsv, x, 1)
     reinit!(fvv, x, 1)
-    
+
     # Wrong number of coordinates
     xx = [x; x]
     @test_throws ArgumentError reinit!(csv, xx)
@@ -166,7 +166,7 @@ end
     @test_throws ArgumentError spatial_coordinate(fsv, qp, xx)
     @test_throws ArgumentError spatial_coordinate(fvv, qp, xx)
 
-    # Wrong dimension of coordinates 
+    # Wrong dimension of coordinates
     @test_throws ArgumentError reinit!(csv_embedded, x)
     @test_throws ArgumentError reinit!(fsv_embedded, x, 1)
 
@@ -306,7 +306,7 @@ end
 
 @testset "CellValues constructor entry points" begin
     qr = QuadratureRule{RefTriangle}(1)
-    
+
     for fun_ip in (Lagrange{RefTriangle, 1}(), Lagrange{RefTriangle, 2}()^2)
         value_type(T) = fun_ip isa ScalarInterpolation ? T : Vec{2, T}
         grad_type(T) = fun_ip isa ScalarInterpolation ? Vec{2, T} : Tensor{2, 2, T, 4}
@@ -356,13 +356,13 @@ end
 end
 
 @testset "CustomCellValues" begin
-    
+
     @testset "SimpleCellValues" begin
         include(joinpath(@__DIR__, "../docs/src/topics/SimpleCellValues_literate.jl"))
     end
-    
+
     @testset "TestCustomCellValues" begin
-    
+
         struct TestCustomCellValues{CV<:CellValues} <: Ferrite.AbstractValues
             cv::CV
         end
@@ -382,7 +382,7 @@ end
         ae = rand(getnbasefunctions(cv))
         q_point = rand(1:getnquadpoints(cv))
         cv_custom = TestCustomCellValues(cv)
-        for fun in (function_value, function_gradient, 
+        for fun in (function_value, function_gradient,
                         function_divergence, function_symmetric_gradient, function_curl)
             @test fun(cv_custom, q_point, ae) == fun(cv, q_point, ae)
         end

@@ -17,7 +17,7 @@
     @test_throws ErrorException("components not sorted: [2, 1]") Dirichlet(:u, Γ, (x, t) -> 0, Int[2, 1])
     @test_throws ErrorException("components not unique: [2, 2]") Dirichlet(:u, Γ, (x, t) -> 0, Int[2, 2])
     @test_throws ErrorException("No dof prescribed for order 0 interpolations") add!(ch, Dirichlet(:z, Γ, (x, t) -> 0))
-    for (s, v) in [(:s, :v), (:sd, :vd)] 
+    for (s, v) in [(:s, :v), (:sd, :vd)]
         ## Scalar
         dbc = Dirichlet(s, Γ, (x, t) -> 0)
         add!(ch, dbc)
@@ -169,7 +169,7 @@ end
 
 
     #Shell mesh edge bcs
-    nodes = [Node{3,Float64}(Vec(0.0,0.0,0.0)), Node{3,Float64}(Vec(1.0,0.0,0.0)), 
+    nodes = [Node{3,Float64}(Vec(0.0,0.0,0.0)), Node{3,Float64}(Vec(1.0,0.0,0.0)),
              Node{3,Float64}(Vec(1.0,1.0,0.0)), Node{3,Float64}(Vec(0.0,1.0,0.0)),
              Node{3,Float64}(Vec(2.0,0.0,0.0)), Node{3,Float64}(Vec(2.0,2.0,0.0))]
 
@@ -217,7 +217,7 @@ end
 
     # This can be merged with the continuous test or removed.
     # Shell mesh edge bcs
-    nodes = [Node{3,Float64}(Vec(0.0,0.0,0.0)), Node{3,Float64}(Vec(1.0,0.0,0.0)), 
+    nodes = [Node{3,Float64}(Vec(0.0,0.0,0.0)), Node{3,Float64}(Vec(1.0,0.0,0.0)),
              Node{3,Float64}(Vec(1.0,1.0,0.0)), Node{3,Float64}(Vec(0.0,1.0,0.0)),
              Node{3,Float64}(Vec(2.0,0.0,0.0)), Node{3,Float64}(Vec(2.0,2.0,0.0))]
 
@@ -267,7 +267,7 @@ end
 #    grid = Grid(cells, nodes, cellsets=cellsets, facesets=facesets)
 
 #    # Create DofHandler based on grid
-#    dim = Ferrite.getdim(grid)  # 2
+#    dim = Ferrite.getspatialdim(grid)  # 2
 #    ip_quad = Lagrange{RefQuadrilateral,1}()
 #    ip_tria = Lagrange{RefTetrahedron,1}()
 #    dh = DofHandler(grid)
@@ -384,7 +384,7 @@ end
         @test a ≈ aa ≈ al ≈ a_rhs1 ≈ a_rhs2
     end
 
-    # Test nonlinear solution procedure (on linear problem) with affine constraints 
+    # Test nonlinear solution procedure (on linear problem) with affine constraints
     # using standard assembly (i.e. not local condensation)
     @testset "nonlinear" begin
         params = (k=1.0, f=1.0, a=1.0, b=0.2, tol=1e-10, maxiter=2)
@@ -392,7 +392,7 @@ end
         dh = DofHandler(grid); add!(dh, :u, Lagrange{RefLine,1}()); close!(dh)
 
         function doassemble!(K, r, dh, a, params)
-            # Spring elements 
+            # Spring elements
             k = params.k
             Ke = [k -k; -k k]
             # Quick and dirty assem
@@ -415,12 +415,12 @@ end
         a = zeros(ndofs(dh))
 
         # Nonlinear solution
-        apply!(a, ch) 
+        apply!(a, ch)
         for niter = 0:params.maxiter
             doassemble!(K, r, dh, a, params)
             apply_zero!(K, r, ch)
             norm(r) < params.tol && break
-            Δa = -K\r 
+            Δa = -K\r
             apply_zero!(Δa, ch)
             a .+= Δa
         end

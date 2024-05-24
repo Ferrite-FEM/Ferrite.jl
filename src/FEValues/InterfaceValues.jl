@@ -134,11 +134,11 @@ function reinit!(
     transform_interface_points!(quad_points_b, quad_points_a, interface_transformation)
     # TODO: This is the bottleneck, cache it?
     @assert length(quad_points_a) <= length(quad_points_b)
-    
+
     # Re-evaluate shape functions in the transformed quadrature points
     precompute_values!(get_fun_values(iv.there),  quad_points_b)
     precompute_values!(get_geo_mapping(iv.there), quad_points_b)
-    
+
     # reinit! the "there" side
     reinit!(iv.there, cell_there, coords_there, facet_there)
     return iv
@@ -485,7 +485,7 @@ end
 end
 
 @inline function _get_transformation_matrix(::NTuple{N,Int}, ::InterfaceOrientationInfo) where N
-    throw(ArgumentError("transformation is not implemented"))    
+    throw(ArgumentError("transformation is not implemented"))
 end
 
 @doc raw"""

@@ -53,7 +53,7 @@ The struct saves the highest dimensional neighborhood, i.e. if something is conn
 - `face_neighbor::Matrix{EntityNeighborhood,Int}`: `face_neighbor[cellid,local_face_id]` -> neighboring face
 - `vertex_neighbor::Matrix{EntityNeighborhood,Int}`: `vertex_neighbor[cellid,local_vertex_id]` -> neighboring vertex
 - `edge_neighbor::Matrix{EntityNeighborhood,Int}`: `edge_neighbor[cellid_local_vertex_id]` -> neighboring edge
-- `face_skeleton::Union{Vector{FaceIndex}, Nothing}`: 
+- `face_skeleton::Union{Vector{FaceIndex}, Nothing}`:
 
 !!! note Currently mixed-dimensional queries do not work at the moment. They will be added back later.
 """
@@ -124,7 +124,7 @@ function _exclusive_topology_ctor(cells::Vector{C}, vertex_cell_table::Array{Set
             # Buffer neighbor
             cell_neighbor = cells[cell_neighbor_id]
             # TODO handle mixed-dimensional case
-            getdim(cell_neighbor) == getdim(cell) || continue
+            getrefdim(cell_neighbor) == getrefdim(cell) || continue
 
             num_shared_vertices = _num_shared_vertices(cell, cell_neighbor)
 
@@ -169,8 +169,6 @@ function ExclusiveTopology(cells::Vector{C}) where C <: AbstractCell
     max_faces = 0
     max_edges = 0
     if isconcretetype(celltype)
-        dim = getdim(cells[1])
-
         max_vertices = nvertices(cells[1])
         max_faces = nfaces(cells[1])
         max_edges = nedges(cells[1])
@@ -178,8 +176,6 @@ function ExclusiveTopology(cells::Vector{C}) where C <: AbstractCell
         celltypes = Set(typeof.(cells))
         for celltype in celltypes
             celltypeidx = findfirst(x->typeof(x)==celltype,cells)
-            dim = getdim(cells[celltypeidx])
-
             max_vertices = max(max_vertices,nvertices(cells[celltypeidx]))
             max_faces = max(max_faces, nfaces(cells[celltypeidx]))
             max_edges = max(max_edges, nedges(cells[celltypeidx]))
@@ -346,11 +342,11 @@ end
 """
     _create_skeleton(neighborhood::Matrix{EntityNeighborhood{BI}}) where BI <: Union{FaceIndex, EdgeIndex, VertexIndex}
 
-Materializes the skeleton from the `neighborhood` information by returning a `Vector{BI}` with `BI`s describing 
-the unique entities in the grid. 
+Materializes the skeleton from the `neighborhood` information by returning a `Vector{BI}` with `BI`s describing
+the unique entities in the grid.
 
-*Example:* With `BI=EdgeIndex`, and an edge between cells and 1 and 2, with vertices 2 and 5, could be described by either 
-`EdgeIndex(1, 2)` or `EdgeIndex(2, 4)`, but only one of these will be in the vector returned by this function. 
+*Example:* With `BI=EdgeIndex`, and an edge between cells and 1 and 2, with vertices 2 and 5, could be described by either
+`EdgeIndex(1, 2)` or `EdgeIndex(2, 4)`, but only one of these will be in the vector returned by this function.
 """
 function _create_skeleton(neighborhood::Matrix{EntityNeighborhood{BI}}) where BI <: Union{FaceIndex, EdgeIndex, VertexIndex}
     i = 1
@@ -367,9 +363,9 @@ end
 """
     vertexskeleton(top::ExclusiveTopology, ::AbstractGrid) -> Vector{VertexIndex}
 
-Materializes the skeleton from the `neighborhood` information by returning a `Vector{VertexIndex}` 
-describing the unique vertices in the grid. (One unique vertex may have multiple `VertexIndex`, but only 
-one is included in the returned `Vector`) 
+Materializes the skeleton from the `neighborhood` information by returning a `Vector{VertexIndex}`
+describing the unique vertices in the grid. (One unique vertex may have multiple `VertexIndex`, but only
+one is included in the returned `Vector`)
 """
 function vertexskeleton(top::ExclusiveTopology, ::Union{AbstractGrid,Nothing}=nothing)
     if top.vertex_skeleton === nothing
@@ -381,9 +377,9 @@ end
 """
     edgeskeleton(top::ExclusiveTopology, ::AbstractGrid) -> Vector{EdgeIndex}
 
-Materializes the skeleton from the `neighborhood` information by returning a `Vector{EdgeIndex}` 
-describing the unique edge in the grid. (One unique edge may have multiple `EdgeIndex`, but only 
-one is included in the returned `Vector`) 
+Materializes the skeleton from the `neighborhood` information by returning a `Vector{EdgeIndex}`
+describing the unique edge in the grid. (One unique edge may have multiple `EdgeIndex`, but only
+one is included in the returned `Vector`)
 """
 function edgeskeleton(top::ExclusiveTopology, ::Union{AbstractGrid,Nothing}=nothing)
     if top.edge_skeleton === nothing
@@ -395,9 +391,9 @@ end
 """
     faceskeleton(top::ExclusiveTopology, ::AbstractGrid) -> Vector{FaceIndex}
 
-Materializes the skeleton from the `neighborhood` information by returning a `Vector{FaceIndex}` 
-describing the unique faces in the grid. (One unique face may have multiple `FaceIndex`, but only 
-one is included in the returned `Vector`) 
+Materializes the skeleton from the `neighborhood` information by returning a `Vector{FaceIndex}`
+describing the unique faces in the grid. (One unique face may have multiple `FaceIndex`, but only
+one is included in the returned `Vector`)
 """
 function faceskeleton(top::ExclusiveTopology, ::Union{AbstractGrid,Nothing}=nothing)
     if top.face_skeleton === nothing
@@ -409,12 +405,12 @@ end
 """
     facetskeleton(top::ExclusiveTopology, grid::AbstractGrid)
 
-Materializes the skeleton from the `neighborhood` information by returning a `Vector{BI}` where 
-`BI <: Union{VertexIndex, EdgeIndex, FaceIndex}`. 
-It describes the unique facets in the grid, and allows for dimension-independent code in the case 
-that all cells have the same reference dimension. For cells with different reference dimensions, 
+Materializes the skeleton from the `neighborhood` information by returning a `Vector{BI}` where
+`BI <: Union{VertexIndex, EdgeIndex, FaceIndex}`.
+It describes the unique facets in the grid, and allows for dimension-independent code in the case
+that all cells have the same reference dimension. For cells with different reference dimensions,
 [`Ferrite.vertexskeleton`](@ref), [`Ferrite.edgeskeleton`](@ref), or [`Ferrite.faceskeleton`](@ref)
-must be used explicitly. 
+must be used explicitly.
 """
 function facetskeleton(top::ExclusiveTopology, grid::AbstractGrid)
     rdim = get_reference_dimension(grid)

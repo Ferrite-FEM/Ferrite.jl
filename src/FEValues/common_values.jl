@@ -33,14 +33,14 @@ end
 
 Update the `CellValues`/`FacetValues` object for a cell or face with coordinates `x`.
 The derivatives of the shape functions, and the new integration weights are computed.
-For interpolations with non-identity mappings, the current `cell` is also required. 
+For interpolations with non-identity mappings, the current `cell` is also required.
 """
 reinit!
 
 """
     getnquadpoints(fe_v::AbstractValues)
 
-Return the number of quadrature points. For `FacetValues`, 
+Return the number of quadrature points. For `FacetValues`,
 this is the number for the current face.
 """
 function getnquadpoints end
@@ -71,7 +71,7 @@ shape_value(fe_v::AbstractValues, q_point::Int, base_function::Int)
 """
     geometric_value(fe_v::AbstractValues, q_point, base_function::Int)
 
-Return the value of the geometric shape function `base_function` evaluated in 
+Return the value of the geometric shape function `base_function` evaluated in
 quadrature point `q_point`.
 """
 geometric_value(fe_v::AbstractValues, q_point::Int, base_function::Int)
@@ -292,7 +292,7 @@ function spatial_coordinate(fe_v::AbstractValues, q_point::Int, x::AbstractVecto
 end
 
 
-# Utility functions used by GeometryMapping, FunctionValues 
+# Utility functions used by GeometryMapping, FunctionValues
 _copy_or_nothing(x) = copy(x)
 _copy_or_nothing(::Nothing) = nothing
 
@@ -315,4 +315,3 @@ function shape_hessians_gradients_and_values!(hessians::AbstractMatrix, gradient
     end
 end
 =#
-

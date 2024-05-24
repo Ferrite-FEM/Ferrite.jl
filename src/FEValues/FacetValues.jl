@@ -40,12 +40,12 @@ struct FacetValues{FV, GM, FQR, detT, nT, V_FV<:AbstractVector{FV}, V_GM<:Abstra
     current_facet::ScalarWrapper{Int}
 end
 
-function FacetValues(::Type{T}, fqr::FacetQuadratureRule, ip_fun::Interpolation, ip_geo::VectorizedInterpolation{sdim} = default_geometric_interpolation(ip_fun); 
-        update_gradients::Union{Bool,Nothing} = nothing) where {T,sdim} 
-    
+function FacetValues(::Type{T}, fqr::FacetQuadratureRule, ip_fun::Interpolation, ip_geo::VectorizedInterpolation{sdim} = default_geometric_interpolation(ip_fun);
+        update_gradients::Union{Bool,Nothing} = nothing) where {T,sdim}
+
     FunDiffOrder = update_gradients === nothing ? 1 : convert(Int, update_gradients) # Logic must change when supporting update_hessian kwargs
     GeoDiffOrder = max(required_geo_diff_order(mapping_type(ip_fun), FunDiffOrder), 1)
-    # Not sure why the type-asserts are required here but not for CellValues, 
+    # Not sure why the type-asserts are required here but not for CellValues,
     # but they solve the type-instability for FacetValues
     geo_mapping = [GeometryMapping{GeoDiffOrder}(T, ip_geo.ip, qr) for qr in fqr.face_rules]::Vector{<:GeometryMapping{GeoDiffOrder}}
     fun_values = [FunctionValues{FunDiffOrder}(T, ip_fun, qr, ip_geo) for qr in fqr.face_rules]::Vector{<:FunctionValues{FunDiffOrder}}
@@ -104,7 +104,7 @@ getnormal(fv::FacetValues, qp::Int) = fv.normals[qp]
 nfacets(fv::FacetValues) = length(fv.geo_mapping)
 
 function set_current_facet!(fv::FacetValues, face_nr::Int)
-    # Checking face_nr before setting current_facet allows us to use @inbounds 
+    # Checking face_nr before setting current_facet allows us to use @inbounds
     # when indexing by getcurrentfacet(fv) in other places!
     checkbounds(Bool, 1:nfacets(fv), face_nr) || throw(ArgumentError("Face index out of range."))
     fv.current_facet[] = face_nr
@@ -121,7 +121,7 @@ function reinit!(fv::FacetValues, cell::Union{AbstractCell, Nothing}, x::Abstrac
     if !checkbounds(Bool, x, 1:n_geom_basefuncs) || length(x) != n_geom_basefuncs
         throw_incompatible_coord_length(length(x), n_geom_basefuncs)
     end
-    
+
     geo_mapping = get_geo_mapping(fv)
     fun_values = get_fun_values(fv)
 
@@ -137,14 +137,14 @@ function reinit!(fv::FacetValues, cell::Union{AbstractCell, Nothing}, x::Abstrac
         detJ = norm(weight_norm)
         detJ > 0.0 || throw_detJ_not_pos(detJ)
         @inbounds fv.detJdV[q_point] = detJ * w
-        @inbounds fv.normals[q_point] = weight_norm / norm(weight_norm)       
+        @inbounds fv.normals[q_point] = weight_norm / norm(weight_norm)
         apply_mapping!(fun_values, q_point, mapping, cell)
     end
 end
 
 function Base.show(io::IO, d::MIME"text/plain", fv::FacetValues)
     ip_geo = geometric_interpolation(fv)
-    rdim = getdim(ip_geo)
+    rdim = getrefdim(ip_geo)
     vdim = isa(shape_value(fv, 1, 1), Vec) ? length(shape_value(fv, 1, 1)) : 0
     sdim = length(shape_gradient(fv, 1, 1)) ÷ length(shape_value(fv, 1, 1))
     vstr = vdim==0 ? "scalar" : "vdim=$vdim"

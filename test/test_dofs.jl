@@ -87,7 +87,7 @@ end
 
 @testset "Dofs for quad in 3d (shell)" begin
 
-nodes = [Node{3,Float64}(Vec(0.0,0.0,0.0)), Node{3,Float64}(Vec(1.0,0.0,0.0)), 
+nodes = [Node{3,Float64}(Vec(0.0,0.0,0.0)), Node{3,Float64}(Vec(1.0,0.0,0.0)),
             Node{3,Float64}(Vec(1.0,1.0,0.0)), Node{3,Float64}(Vec(0.0,1.0,0.0)),
             Node{3,Float64}(Vec(2.0,0.0,0.0)), Node{3,Float64}(Vec(2.0,2.0,0.0))]
 
@@ -543,38 +543,38 @@ end
         # reshape.(Iterators.product(fill([true, false], 9)...) |> collect |> vec .|> collect, Ref((3,3))),
         [
             true  true  true
-            true  true  true 
-            true  true  true 
+            true  true  true
+            true  true  true
         ],
         [
             true   false  false
-            false  true  false 
-            false  false  true 
+            false  true  false
+            false  false  true
         ],
         [
             true   true  false
-            true  true  true 
-            false  true  true 
+            true  true  true
+            false  true  true
         ],
 
         # Component coupling
         [
             true    true    true    true
-            true    true    true    true 
             true    true    true    true
-            true    true    true    true 
+            true    true    true    true
+            true    true    true    true
         ],
         [
             true     false    false    false
-            false    true     false    false 
+            false    true     false    false
             false    false    true     false
-            false    false    false    true 
+            false    false    false    true
         ],
         [
             true    true    true    false
-            true    true    true    true 
             true    true    true    true
-            false    true    true    true 
+            true    true    true    true
+            false    true    true    true
         ],
     ]
     function is_stored(A, i, j)
@@ -589,7 +589,7 @@ end
             i_dofs = dof_range(sdh, field1_idx)
             ip1 = sdh.field_interpolations[field1_idx]
             vdim[1] = typeof(ip1) <: VectorizedInterpolation && size(coupling)[1] == 4 ? Ferrite.get_n_copies(ip1) : 1
-            for dim1 in 1:vdim[1] 
+            for dim1 in 1:vdim[1]
                 for cell2_idx in neighbors
                     sdh2 = dh.subdofhandlers[dh.cell_to_subdofhandler[cell2_idx]]
                     coupling_idx[2] = 1
@@ -624,7 +624,7 @@ end
             # test inner coupling
             _check_dofs(K, dh, sdh, cell_idx, coupling, coupling_idx, vdim, [cell_idx], false)
             # test cross-element coupling
-            neighborhood = Ferrite.getdim(dh.grid.cells[1]) > 1 ? topology.face_face_neighbor : topology.vertex_vertex_neighbor
+            neighborhood = Ferrite.getrefdim(dh.grid.cells[1]) > 1 ? topology.face_face_neighbor : topology.vertex_vertex_neighbor
             neighbors = neighborhood[cell_idx, :]
             _check_dofs(K, dh, sdh, cell_idx, cross_coupling, cross_coupling_idx, vdim, [i[1][1] for i in  neighbors[.!isempty.(neighbors)]], true)
         end
@@ -638,7 +638,7 @@ end
     close!(dh)
     for coupling in couplings, cross_coupling in couplings
         K = create_sparsity_pattern(dh; coupling=coupling, topology = topology, cross_coupling = cross_coupling)
-        all(coupling) && @test K == create_sparsity_pattern(dh, topology = topology, cross_coupling = cross_coupling) 
+        all(coupling) && @test K == create_sparsity_pattern(dh, topology = topology, cross_coupling = cross_coupling)
         check_coupling(dh, topology, K, coupling, cross_coupling)
     end
 
@@ -646,7 +646,7 @@ end
     @test_throws ErrorException("coupling not square") create_sparsity_pattern(dh; coupling=[true true])
     @test_throws ErrorException("coupling not symmetric") create_symmetric_sparsity_pattern(dh; coupling=[true true; false true])
     @test_throws ErrorException("could not create coupling") create_symmetric_sparsity_pattern(dh; coupling=falses(100, 100))
- 
+
     # Test coupling with subdomains
     # Note: `check_coupling` works for this case only because the second domain has dofs from the first domain in order. Otherwise tests like in continuous ip are required.
     grid = generate_grid(Quadrilateral, (2, 1))
@@ -678,4 +678,79 @@ end
     K_cont = create_sparsity_pattern(dh; coupling=coupling, topology = topology, cross_coupling = falses(3,3))
     K_default = create_sparsity_pattern(dh)
     @test K == K_cont == K_default
+end
+
+
+@testset "shell on solid face" begin
+
+    # Node numbering:
+    # 3 ____ 4  4
+    # |      |  |
+    # |      |  | (Beam attached to facet)
+    # 1 ____ 2  2
+
+    dim = 2
+    grid = generate_grid(Quadrilateral, (1,1))
+    line1 = Line((2,4))
+    grid = Grid([grid.cells[1], line1], grid.nodes)
+
+    order = 2
+    ip_solid = Lagrange{RefQuadrilateral, order}()#^dim
+    ip_shell = Lagrange{RefLine, order}()
+
+    dh = DofHandler(grid)
+    sdh_solid = SubDofHandler(dh, Set(1))
+    add!(sdh_solid, :u, ip_solid)
+    sdh_shell = SubDofHandler(dh, Set(2))
+    add!(sdh_shell, :u, ip_shell)
+    close!(dh)
+
+    dofsquad = zeros(Int, ndofs_per_cell(dh, 1))
+    dofsbeam = zeros(Int, ndofs_per_cell(dh, 2))
+
+    celldofs!(dofsquad, dh, 1)
+    celldofs!(dofsbeam, dh, 2)
+    @test dofsbeam == [2, 3, 6]
+
+    # Node numbering:
+    #            5--------7
+    #           /        /|
+    #          /        / |
+    #         6--------8  |
+    #         |        |  3   <-- Shell attached on face (4, 3, 7, 8)
+    #         |        | /
+    #         |        |/
+    #         2--------4
+
+    dim = 2
+    grid = generate_grid(Hexahedron, (1,1,1))
+    shell = Quadrilateral((4,3,7,8))
+    grid = Grid([grid.cells[1], shell], grid.nodes)
+
+    order = 2
+    ip_solid = Lagrange{RefHexahedron, order}()#^dim
+    ip_shell = Lagrange{RefQuadrilateral, order}()
+
+    dh = DofHandler(grid)
+    sdh_solid = SubDofHandler(dh, Set(1))
+    add!(sdh_solid, :u, ip_solid)
+    sdh_shell = SubDofHandler(dh, Set(2))
+    add!(sdh_shell, :u, ip_shell)
+    Ferrite.close!(dh)
+
+    dofsolid = zeros(Int, ndofs_per_cell(dh, 1))
+    dofsshell = zeros(Int, ndofs_per_cell(dh, 2))
+
+    celldofs!(dofsolid, dh, 1)
+    celldofs!(dofsshell, dh, 2)
+
+    #Would be nice to have this utility:
+    #facedofs!(dofs, dh, FaceIndex(1,4))
+
+    #Shared node dofs
+    @test dofsshell[1:4] == [3,4,8,7]
+    #Shared edge dofs
+    @test dofsshell[5:8] == [11,20,15,19]
+    #Shared face dof
+    @test dofsshell[9] == 24
 end

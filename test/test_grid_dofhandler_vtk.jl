@@ -94,7 +94,7 @@ end
         minv, maxv = Ferrite.bounding_box(grid)
         @test minv ≈ 2left
         @test maxv ≈ 2right
-    
+
     end
 
 end # of testset
@@ -188,9 +188,9 @@ end
     # FacetCache
     grid = generate_grid(Triangle, (3,3))
     fc = FacetCache(grid)
-    faceindex = first(getfacetset(grid, "left"))
-    cell_id, face_id = faceindex
-    reinit!(fc, faceindex)
+    facetindex = first(getfacetset(grid, "left"))
+    cell_id, facet_id = facetindex
+    reinit!(fc, facetindex)
     # @test Ferrite.faceindex(fc) == faceindex
     @test cellid(fc) == cell_id
     # @test Ferrite.faceid(fc) == face_id
@@ -205,11 +205,11 @@ end
         fqr = FacetQuadratureRule{Ferrite.RefHypercube{dim}}(2)
         fv = FacetValues(fqr, ip)
         dh = DofHandler(grid); add!(dh, :u, ip); close!(dh)
-        faceset = getfacetset(grid, "right")
+        facetset = getfacetset(grid, "right")
         for dh_or_grid in (grid, dh)
-            @test first(FacetIterator(dh_or_grid, faceset)) isa FacetCache
+            @test first(FacetIterator(dh_or_grid, facetset)) isa FacetCache
             area = 0.0
-            for face in FacetIterator(dh_or_grid, faceset)
+            for face in FacetIterator(dh_or_grid, facetset)
                 reinit!(fv, face)
                 for q_point in 1:getnquadpoints(fv)
                     area += getdetJdV(fv, q_point)
@@ -241,7 +241,7 @@ end
     grid = Grid(cells, nodes)
     ip1 = DiscontinuousLagrange{RefQuadrilateral, 1}()
     ip2 = DiscontinuousLagrange{RefTriangle, 1}()
-    dh = DofHandler(grid); 
+    dh = DofHandler(grid);
     sdh1 = SubDofHandler(dh, Set([1])); add!(sdh1, :u, ip1);
     sdh2 = SubDofHandler(dh, Set([2])); add!(sdh2, :u, ip2);
     close!(dh)
@@ -252,12 +252,12 @@ end
     mixed_grid = Grid([Quadrilateral((1, 2, 3, 4)),Triangle((3, 2, 5))],
                       [Node(coord) for coord in zeros(Vec{2,Float64}, 5)])
     cellset = Set(1:getncells(mixed_grid))
-    faceset = Set(FaceIndex(i, 1) for i in 1:getncells(mixed_grid))
+    facetset = Set(FacetIndex(i, 1) for i in 1:getncells(mixed_grid))
     @test_throws ErrorException Ferrite._check_same_celltype(mixed_grid, cellset)
-    @test_throws ErrorException Ferrite._check_same_celltype(mixed_grid, faceset)
+    @test_throws ErrorException Ferrite._check_same_celltype(mixed_grid, facetset)
     std_grid = generate_grid(Quadrilateral, (getncells(mixed_grid),1))
     @test Ferrite._check_same_celltype(std_grid, cellset) === nothing
-    @test Ferrite._check_same_celltype(std_grid, faceset) === nothing
+    @test Ferrite._check_same_celltype(std_grid, facetset) === nothing
 end
 
 @testset "Grid sets" begin
@@ -304,7 +304,7 @@ end
     quadlinefaceskeleton = Ferrite.facetskeleton(quadlinetopo, quadlinegrid)
     # Test faceskeleton
     @test Set(linefaceskeleton) == Set(quadlinefaceskeleton) == Set([
-        VertexIndex(1,1), VertexIndex(1,2), VertexIndex(2,2),VertexIndex(3,2), 
+        VertexIndex(1,1), VertexIndex(1,2), VertexIndex(2,2),VertexIndex(3,2),
     ])
 
 #                           (11)
@@ -360,9 +360,9 @@ end
     @test Set(faceskeleton) == Set(quadfaceskeleton) == Set([
         EdgeIndex(1,1), EdgeIndex(1,2), EdgeIndex(1,3), EdgeIndex(1,4),
         EdgeIndex(2,1), EdgeIndex(2,2), EdgeIndex(2,3),
-                        EdgeIndex(3,2), EdgeIndex(3,3), EdgeIndex(3,4), 
+                        EdgeIndex(3,2), EdgeIndex(3,3), EdgeIndex(3,4),
                         EdgeIndex(4,2), EdgeIndex(4,3),
-                        EdgeIndex(5,2), EdgeIndex(5,3), EdgeIndex(5,4), 
+                        EdgeIndex(5,2), EdgeIndex(5,3), EdgeIndex(5,4),
                         EdgeIndex(6,2), EdgeIndex(6,3),
     ])
 
@@ -412,8 +412,8 @@ end
     @test Set(faceskeleton) == Set(sfaceskeleton) == Set([
         FaceIndex(1,1), FaceIndex(1,2), FaceIndex(1,3), FaceIndex(1,4), FaceIndex(1,5), FaceIndex(1,6),
         FaceIndex(2,1), FaceIndex(2,2), FaceIndex(2,3), FaceIndex(2,4),                 FaceIndex(2,6),
-        FaceIndex(3,1),                 FaceIndex(3,3), FaceIndex(3,4), FaceIndex(3,5), FaceIndex(3,6), 
-        FaceIndex(4,1),                 FaceIndex(4,3), FaceIndex(4,4),                 FaceIndex(4,6), 
+        FaceIndex(3,1),                 FaceIndex(3,3), FaceIndex(3,4), FaceIndex(3,5), FaceIndex(3,6),
+        FaceIndex(4,1),                 FaceIndex(4,3), FaceIndex(4,4),                 FaceIndex(4,6),
     ])
 
 #                   +-----+-----+
@@ -538,8 +538,8 @@ end
     quadratic_quadgrid = generate_grid(QuadraticQuadrilateral,(3,3))
     quadgrid_topology = ExclusiveTopology(quadratic_quadgrid)
     #quadface_skeleton = Ferrite.faceskeleton(topology, quadgrid)
-    #@test quadface_skeleton == face_skeleton 
-    
+    #@test quadface_skeleton == face_skeleton
+
     # add more regression for https://github.com/Ferrite-FEM/Ferrite.jl/issues/518
     @test all(quadgrid_topology.edge_edge_neighbor .== topology.edge_edge_neighbor)
     @test all(quadgrid_topology.vertex_vertex_neighbor .== topology.vertex_vertex_neighbor)
@@ -665,7 +665,7 @@ end
 
     @testset "1d" begin
         grid = generate_grid(Line, (2,))
-        
+
         Ferrite.vertexdof_indices(::VectorLagrangeTest{RefLine,1,2}) = ((1,2),(3,4))
         dh1 = DofHandler(grid)
         add!(dh1, :u, VectorLagrangeTest{RefLine,1,2}())
@@ -710,7 +710,7 @@ end
     end
 
     @testset "VTKFileCollection" begin
-        @testset "equivalence of addstep methods" begin 
+        @testset "equivalence of addstep methods" begin
             grid = generate_grid(Triangle, (2,2))
             celldata = rand(getncells(grid))
             fname = "addstep"
@@ -727,7 +727,7 @@ end
                 @test !(isopen(vtk.vtk))
             end
             close.((pvd1, pvd2))
-            @test pvd1.step == pvd2.step # Same nr of steps added 
+            @test pvd1.step == pvd2.step # Same nr of steps added
             for (n, t) in pairs(timesteps)
                 fname1 = string(fname, "_", n, ".vtu")
                 fname2 = string(fname, "2_", n, ".vtu")
@@ -738,7 +738,7 @@ end
             end
             rm(string(fname, ".pvd"))
             # Solving https://github.com/Ferrite-FEM/Ferrite.jl/issues/397
-            # would allow checking the pvd files as well. 
+            # would allow checking the pvd files as well.
         end
         @testset "kwargs forwarding" begin
             grid = generate_grid(Quadrilateral, (10,10))

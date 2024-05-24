@@ -42,3 +42,11 @@ end
 @inline Base.getindex(s::ScalarWrapper) = s.x
 @inline Base.setindex!(s::ScalarWrapper, v) = s.x = v
 Base.copy(s::ScalarWrapper{T}) where {T} = ScalarWrapper{T}(copy(s.x))
+
+convert_to_orderedset(set::AbstractVector{T}) where T = OrderedSet{T}(set)
+convert_to_orderedset(set::AbstractSet{T}) where T = convert(OrderedSet{T}, set)
+
+function convert_to_orderedsets(namedsets::Dict{String, <: AbstractVecOrSet{T}}) where T
+    return Dict{String,OrderedSet{T}}(k => convert_to_orderedset(v) for (k,v) in namedsets)
+end
+convert_to_orderedsets(namedsets::Dict{String, <: OrderedSet}) = namedsets

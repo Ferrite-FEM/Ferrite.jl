@@ -41,7 +41,7 @@
                       CrouzeixRaviart{RefTriangle, 1}(),
     )
         # Test of utility functions
-        ref_dim = Ferrite.getdim(interpolation)
+        ref_dim = Ferrite.getrefdim(interpolation)
         ref_shape = Ferrite.getrefshape(interpolation)
         func_order = Ferrite.getorder(interpolation)
         @test typeof(interpolation) <: Interpolation{ref_shape,func_order}
@@ -104,7 +104,7 @@
     # The total number of dofs must match the number of base functions
     totaldofs = sum(length.(Ferrite.vertexdof_indices(interpolation));init=0)
     totaldofs += sum(length.(Ferrite.facedof_interior_indices(interpolation));init=0)
-    totaldofs += sum(length.(Ferrite.edgedof_interior_indices(interpolation));init=0) 
+    totaldofs += sum(length.(Ferrite.edgedof_interior_indices(interpolation));init=0)
     totaldofs += length(Ferrite.volumedof_interior_indices(interpolation))
     @test totaldofs == n_basefuncs
 
@@ -164,7 +164,7 @@
         for (facenodes, normal) in zip(_bfunc, reference_normals(interpolation))
             @test __outward_normal(coords, facenodes) ≈ normal
         end
-    end 
+    end
 
     # regression for https://github.com/Ferrite-FEM/Ferrite.jl/issues/520
     #=interpolation_type = typeof(interpolation).name.wrapper

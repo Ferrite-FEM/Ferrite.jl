@@ -5,4 +5,7 @@ default: liveserver
 liveserver:
 	julia --project=${SRCDIR} ${SRCDIR}/liveserver.jl
 
-.PHONY: default liveserver
+clean:
+	julia ${SRCDIR}/clean.jl
+
+.PHONY: default liveserver clean

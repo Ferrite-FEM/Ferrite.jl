@@ -1,5 +1,5 @@
 using Ferrite, Test
-import Ferrite: getdim, default_interpolation
+import Ferrite: getrefdim, default_interpolation
 
 module ConvergenceTestHelper
 
@@ -102,7 +102,7 @@ function check_and_compute_convergence_norms(dh, u, cellvalues, testatol)
             ∇uₐₙₐ    = gradient(x-> prod(cos, x*π/2), x)
             ∇uₐₚₚᵣₒₓ = function_gradient(cellvalues, q_point, uₑ)
             ∇L2norm += norm(∇uₐₙₐ-∇uₐₚₚᵣₒₓ)^2*dΩ
-            
+
             # Pointwise convergence
             @test uₐₙₐ ≈ uₐₚₚᵣₒₓ atol=testatol
         end
@@ -160,7 +160,7 @@ end # module ConvergenceTestHelper
         geometry = ConvergenceTestHelper.get_geometry(interpolation)
         interpolation_geo = default_interpolation(geometry)
         N = ConvergenceTestHelper.get_num_elements(interpolation)
-        grid = generate_grid(geometry, ntuple(x->N, getdim(geometry)));
+        grid = generate_grid(geometry, ntuple(x->N, getrefdim(geometry)));
         # ... a suitable quadrature rule ...
         qr_order = ConvergenceTestHelper.get_quadrature_order(interpolation)
         qr = QuadratureRule{getrefshape(interpolation)}(qr_order)
@@ -190,7 +190,7 @@ end
         interpolation_geo = default_interpolation(geometry)
         # "Coarse case"
         N₁ = ConvergenceTestHelper.get_num_elements(interpolation)
-        grid = generate_grid(geometry, ntuple(x->N₁, getdim(geometry)));
+        grid = generate_grid(geometry, ntuple(x->N₁, getrefdim(geometry)));
         # ... a suitable quadrature rule ...
         qr_order = ConvergenceTestHelper.get_quadrature_order(interpolation)
         qr = QuadratureRule{getrefshape(interpolation)}(qr_order)
@@ -198,10 +198,10 @@ end
         dh, ch, cellvalues = ConvergenceTestHelper.setup_poisson_problem(grid, interpolation, interpolation_geo, qr)
         u = ConvergenceTestHelper.solve(dh, ch, cellvalues)
         L2₁, H1₁, _ = ConvergenceTestHelper.check_and_compute_convergence_norms(dh, u, cellvalues, 1e-2)
-        
+
         # "Fine case"
         N₂ = 2*N₁
-        grid = generate_grid(geometry, ntuple(x->N₂, getdim(geometry)));
+        grid = generate_grid(geometry, ntuple(x->N₂, getrefdim(geometry)));
         # ... a suitable quadrature rule ...
         qr_order = ConvergenceTestHelper.get_quadrature_order(interpolation)
         qr = QuadratureRule{getrefshape(interpolation)}(qr_order)
