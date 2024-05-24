@@ -65,7 +65,7 @@ Second order gradients of the shape functions are computed as
     \end{align}
     ```
 
-    Using the fact that $\frac{\mathrm{d}}{\mathrm{d}x_j} = J^{-1}_{sj}\frac{\mathrm{d}}{\mathrm{d}\xi_s}$, the first term in equation the equation above can be expressed as:
+    Using the fact that $\frac{\mathrm{d}}{\mathrm{d}x_j} = J^{-1}_{sj}\frac{\mathrm{d}}{\mathrm{d}\xi_s}$, the first term in the equation above can be expressed as:
 
     ```math
     \begin{align*} 

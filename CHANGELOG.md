@@ -317,6 +317,11 @@ more discussion).
   a given grid (based on its node coordinates), and returns the minimum and maximum vertices
   of the bounding box. ([#880][github-880])
 
+- CellValues and FacetValues can now store and map second order gradients (Hessians). The number
+  of gradients computed in CellValues/FacetValues is specified using the keyword arguments
+  `update_gradients::Bool` (default true) and `update_hessians::Bool` (default false) in the
+  constructors, i.e. `CellValues(...; update_hessians=true)`. 
+
 ### Changed
 
 - `create_sparsity_pattern` now supports cross-element dof coupling by passing kwarg

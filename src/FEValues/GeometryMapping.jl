@@ -35,7 +35,7 @@ struct GeometryMapping{DiffOrder, IP, M_t, dMdξ_t, d2Mdξ2_t}
     M::M_t             # ::AbstractMatrix{<:Number}     Values of geometric shape functions
     dMdξ::dMdξ_t       # ::AbstractMatrix{<:Vec}        Gradients of geometric shape functions in ref-domain
     d2Mdξ2::d2Mdξ2_t   # ::AbstractMatrix{<:Tensor{2}}  Hessians of geometric shape functions in ref-domain
-                       # ::Nothing                      When not required
+                       
     function GeometryMapping(
         ip::IP, M::M_t, ::Nothing, ::Nothing
         ) where {IP <: ScalarInterpolation, M_t<:AbstractMatrix{<:Number}}
