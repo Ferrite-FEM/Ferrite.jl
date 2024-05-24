@@ -4,13 +4,8 @@ include("vtk_discontinuous.jl")
     VTKFile(filename::AbstractString, grid::AbstractGrid; kwargs...)
     VTKFile(filename::AbstractString, dh::DofHandler; kwargs...)
 
-<<<<<<< HEAD
 Create a `VTKFile` that contains an unstructured VTK grid.
 The keyword arguments are forwarded to `WriteVTK.vtk_grid`, see
-=======
-Create a `VTKFile` that contains an unstructured VTK grid.
-The keyword arguments are forwarded to `WriteVTK.vtk_grid`, see
->>>>>>> master
 [Data Formatting Options](https://juliavtk.github.io/WriteVTK.jl/stable/grids/syntax/#Data-formatting-options)
 
 This file handler can be used to to write data with
@@ -23,11 +18,7 @@ This file handler can be used to to write data with
 * [`Ferrite.write_nodeset`](@ref)
 * [`Ferrite.write_constraints`](@ref)
 
-<<<<<<< HEAD
 It is necessary to call `close(::VTKFile)` to save the data after writing
-=======
-It is necessary to call `close(::VTKFile)` to save the data after writing
->>>>>>> master
 to the file handler. Using the supported `do`-block does this automatically:
 ```julia
 VTKFile(filename, grid) do vtk
