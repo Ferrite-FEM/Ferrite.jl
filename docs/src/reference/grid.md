@@ -33,7 +33,7 @@ getcoordinates
 getcoordinates!
 Ferrite.get_node_coordinate
 Ferrite.getspatialdim(::Ferrite.AbstractGrid)
-Ferrite.getrefdim(::Union{Ferrite.AbstractCell, Ferrite.AbstractRefShape})
+Ferrite.getrefdim
 ```
 
 ### Topology
