@@ -23,6 +23,8 @@ using WriteVTK:
 using Tensors:
     Tensors, AbstractTensor, SecondOrderTensor, SymmetricTensor, Tensor, Vec, gradient,
     rotation_tensor, symmetric, tovoigt!
+using ForwardDiff:
+    ForwardDiff
 
 
 include("exports.jl")

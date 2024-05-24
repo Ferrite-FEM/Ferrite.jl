@@ -1524,20 +1524,11 @@ function shape_gradient_and_value(ipv::VectorizedInterpolation{dim, shape}, ξ::
 end
 # vdim != refdim
 function shape_gradient_and_value(ipv::VectorizedInterpolation{vdim, shape}, ξ::V, I::Int) where {vdim, refdim, shape <: AbstractRefShape{refdim}, T, V <: Vec{refdim, T}}
-    # Load with dual numbers and compute the value
-    f = x -> shape_value(ipv, x, I)
-    ξd = Tensors._load(ξ, Tensors.Tag(f, V))
-    value_grad = f(ξd)
-    # Extract the value and gradient
-    val = Vec{vdim, T}(i -> Tensors.value(value_grad[i]))
-    grad = zero(MMatrix{vdim, refdim, T})
-    for (i, vi) in pairs(value_grad)
-        p = Tensors.partials(vi)
-        for (j, pj) in pairs(p)
-            grad[i, j] = pj
-        end
-    end
-    return SMatrix(grad), val
+    tosvec(v::Vec) = SVector((v...,))
+    tovec(sv::SVector) = Vec((sv...))
+    val = Ferrite.shape_value(ipv, ξ, I)
+    grad = ForwardDiff.jacobian(sv -> tosvec(Ferrite.shape_value(ipv, tovec(sv), I)), tosvec(ξ))
+    return grad, val
 end
 
 reference_coordinates(ip::VectorizedInterpolation) = reference_coordinates(ip.ip)
