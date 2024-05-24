@@ -201,7 +201,7 @@ end
     Jinv = calculate_Jinv(getjacobian(mapping_values))
 
     sdim, rdim = size(Jinv)
-    (rdim != sdim) && error("apply mapping for second order gradients and embedded elements not implemented")
+    (rdim != sdim) && error("apply_mapping! for second order gradients and embedded elements not implemented")
 
     H    = gethessian(mapping_values)
     is_vector_valued = first(funvals.Nx) isa Vec
