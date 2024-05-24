@@ -407,6 +407,12 @@ more discussion).
   Furthermore, subtypes of `Interpolation` should now define `vertexdof_indices`, `edgedof_indices`,
   `facedof_indices`, `volumedof_indices` (and similar) according to these definitions.
 
+- `Ferrite.getdim` has been changed into `Ferrite.getrefdim` for getting the dimension of the reference shape
+  and `Ferrite.getspatialdim` to get the spatial dimension (of the grid). [#943][github-943]
+
+- `Ferrite.getfielddim(::AbstractDofHandler, args...)` has been renamed to `Ferrite.n_components`.
+  [#943][github-943]
+
 ### Deprecated
 
 - The rarely (if ever) used methods of `function_value`, `function_gradient`,
@@ -981,3 +987,4 @@ poking into Ferrite internals:
 [github-880]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/880
 [github-914]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/914
 [github-924]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/924
+[github-943]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/943

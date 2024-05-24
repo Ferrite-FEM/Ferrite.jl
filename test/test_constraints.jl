@@ -267,7 +267,7 @@ end
 #    grid = Grid(cells, nodes, cellsets=cellsets, facesets=facesets)
 
 #    # Create DofHandler based on grid
-#    dim = Ferrite.getdim(grid)  # 2
+#    dim = Ferrite.getspatialdim(grid)  # 2
 #    ip_quad = Lagrange{RefQuadrilateral,1}()
 #    ip_tria = Lagrange{RefTetrahedron,1}()
 #    dh = DofHandler(grid)

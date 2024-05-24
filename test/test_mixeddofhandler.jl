@@ -417,8 +417,8 @@ function test_field_on_subdomain()
     close!(dh)
 
     # retrieve field dimensions
-    @test Ferrite.getfielddim(dh, :v) == 2
-    @test Ferrite.getfielddim(dh, :s) ==1
+    @test Ferrite.n_components(dh, :v) == 2
+    @test Ferrite.n_components(dh, :s) ==1
 
     # find field in SubDofHandler
     @test Ferrite.find_field(dh.subdofhandlers[1], :v) == 1
@@ -522,7 +522,7 @@ end
 function test_celliterator_subdomain()
     for celltype in (Line, Quadrilateral, Hexahedron)
         ip = Ferrite.default_interpolation(celltype)
-        dim = Ferrite.getdim(ip)
+        dim = Ferrite.getrefdim(ip)
         grid = generate_grid(celltype, ntuple(i->i==1 ? 2 : 1, dim)) # 2 cells
         dh = DofHandler(grid)
         sdh = SubDofHandler(dh, Set(2)) # only cell 2, cell 1 is not part of dh
@@ -607,7 +607,7 @@ function test_show()
     sdh_tri = SubDofHandler(dh, Set(2))
     add!(sdh_tri, :u, Lagrange{RefTriangle, 1}()^2)
     close!(dh)
-    @test repr("text/plain", dh) == repr(typeof(dh)) * "\n  Fields:\n    :u, dim: 2\n  Total dofs: 10"
+    @test repr("text/plain", dh) == repr(typeof(dh)) * "\n  Fields:\n    :u, Vec{2}\n  Total dofs: 10"
     @test repr("text/plain", dh.subdofhandlers[1]) == string(
         repr("text/plain", typeof(dh.subdofhandlers[1])), "\n  Cell type: Quadrilateral\n  Fields:\n    :u, ",
             repr("text/plain", dh.subdofhandlers[1].field_interpolations[1]), "\n  Dofs per cell: 8\n")

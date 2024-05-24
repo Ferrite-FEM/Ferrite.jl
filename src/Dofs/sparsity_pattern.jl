@@ -70,7 +70,7 @@ function _coupling_to_local_dof_coupling(dh::DofHandler, coupling::AbstractMatri
 
     # Return one matrix per (potential) sub-domain
     outs = Matrix{Bool}[]
-    field_dims = map(fieldname -> getfielddim(dh, fieldname), dh.field_names)
+    field_dims = map(fieldname -> n_components(dh, fieldname), dh.field_names)
 
     for sdh in dh.subdofhandlers
         out = zeros(Bool, ndofs_per_cell(sdh), ndofs_per_cell(sdh))

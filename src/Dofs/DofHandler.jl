@@ -141,7 +141,14 @@ function Base.show(io::IO, mime::MIME"text/plain", dh::DofHandler)
     else
         println(io, "  Fields:")
         for fieldname in getfieldnames(dh)
-            println(io, "    ", repr(fieldname), ", dim: ", getfielddim(dh, fieldname))
+            ip = getfieldinterpolation(dh, find_field(dh, fieldname))
+            if ip isa ScalarInterpolation
+                field_type = "scalar"
+            elseif ip isa VectorInterpolation
+                _getvdim(::VectorInterpolation{vdim}) where vdim = vdim
+                field_type = "Vec{$(_getvdim(ip))}"
+            end
+            println(io, "    ", repr(fieldname), ", ", field_type)
         end
     end
     if !isclosed(dh)
@@ -218,31 +225,31 @@ end
     getfieldnames(dh::DofHandler)
     getfieldnames(sdh::SubDofHandler)
 
-Return a vector with the unique names of all fields. The order is the sam eas the order in
+Return a vector with the unique names of all fields. The order is the same as the order in
 which they were originally added to the (Sub)DofHandler. Can be used as an iterable over all
 the fields.
 """
 getfieldnames(dh::DofHandler) = dh.field_names
 getfieldnames(sdh::SubDofHandler) = sdh.field_names
 
-getfielddim(sdh::SubDofHandler, field_idx::Int) = n_components(sdh.field_interpolations[field_idx])::Int
-getfielddim(sdh::SubDofHandler, field_name::Symbol) = getfielddim(sdh, find_field(sdh, field_name))
+n_components(sdh::SubDofHandler, field_idx::Int) = n_components(sdh.field_interpolations[field_idx])::Int
+n_components(sdh::SubDofHandler, field_name::Symbol) = n_components(sdh, find_field(sdh, field_name))
 
 """
-    getfielddim(dh::DofHandler, field_idxs::NTuple{2,Int})
-    getfielddim(dh::DofHandler, field_name::Symbol)
-    getfielddim(sdh::SubDofHandler, field_idx::Int)
-    getfielddim(sdh::SubDofHandler, field_name::Symbol)
+    n_components(dh::DofHandler, field_idxs::NTuple{2,Int})
+    n_components(dh::DofHandler, field_name::Symbol)
+    n_components(sdh::SubDofHandler, field_idx::Int)
+    n_components(sdh::SubDofHandler, field_name::Symbol)
 
-Return the dimension (number of components) of a given field. The field can be specified by
+Return the number of components for a given field. The field can be specified by
 its index (see [`find_field`](@ref)) or its name.
 """
-function getfielddim(dh::DofHandler, field_idxs::NTuple{2, Int})
+function n_components(dh::DofHandler, field_idxs::NTuple{2, Int})
     sdh_idx, field_idx = field_idxs
-    fielddim = getfielddim(dh.subdofhandlers[sdh_idx], field_idx)
-    return fielddim
+    n = n_components(dh.subdofhandlers[sdh_idx], field_idx)
+    return n
 end
-getfielddim(dh::DofHandler, name::Symbol) = getfielddim(dh, find_field(dh, name))
+n_components(dh::DofHandler, name::Symbol) = n_components(dh, find_field(dh, name))
 
 """
     add!(sdh::SubDofHandler, name::Symbol, ip::Interpolation)
@@ -561,7 +568,7 @@ function add_face_dofs(cell_dofs::Vector{Int}, cell::AbstractCell, facedict::Dic
         sface, orientation = sortface(face)
         @debug println("\t\tface #$sface, $orientation")
         nextdof, dofs = get_or_create_dofs!(nextdof, nfacedofs[fi], n_copies, facedict, sface)
-        permute_and_push!(cell_dofs, dofs, orientation, adjust_during_distribution, getdim(cell)) # TODO: passing rdim of cell is temporary, simply to check if facedofs are internal to cell
+        permute_and_push!(cell_dofs, dofs, orientation, adjust_during_distribution, getrefdim(cell)) # TODO: passing rdim of cell is temporary, simply to check if facedofs are internal to cell
         @debug println("\t\t\tadjusted dofs: $(cell_dofs[(end - nfacedofs[fi]*n_copies + 1):end])")
     end
     return nextdof

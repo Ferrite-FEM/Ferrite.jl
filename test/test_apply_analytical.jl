@@ -99,13 +99,12 @@
                 for ip_order_p in 1:2
                     dh = testdh(CT, ip_order_u, ip_order_p)
                     isnothing(dh) && continue # generate_grid not supported for this CT, or reference_coordinates not defined
-                    dim = Ferrite.getdim(dh.grid)
                     num_udofs = length(_global_dof_range(dh, :u))
                     num_pdofs = length(_global_dof_range(dh, :p))
 
                     # Test average value
                     a = zeros(ndofs(dh))
-                    f(x) = ones(Vec{dim})
+                    f(x) = ones(Ferrite.get_coordinate_type(dh.grid))
                     apply_analytical!(a, dh, :u, f)
                     @test sum(a)/length(a) ≈ num_udofs/(num_udofs+num_pdofs)
 
