@@ -43,7 +43,7 @@
     end
 
     @testset "discontinuous" begin
-        # Produce a u such that the overall shape is f(x, xc) = 2 * (x[1]^2 - x[2]^2) + (xc[1]^2 - xc[2]^2)
+        # Produce a u such that the overall shape is f(x, xc) = 2 * (x[1]^2 - x[2]^2) - (xc[1]^2 - xc[2]^2)
         # where xc is the center point of the cell. To avoid floating point issues for the hash,
         # we test that all values are approximately an integer, and round to integers before storing.
         function calculate_u(dh)
@@ -59,7 +59,7 @@
                     x = spatial_coordinate(cv, q_point, getcoordinates(cell))
                     for i in 1:getnbasefunctions(cv)
                         δu = shape_value(cv, q_point, i)
-                        val = δu * f(x) * 2 + f(xc)
+                        val = δu * (f(x) * 2 - f(xc))
                         intval = round(Int, val)
                         # Ensure output unaffected by floating point errors,
                         # as we will compare vtk output with a hash
@@ -82,7 +82,7 @@
 
             u_dg = calculate_u(dh_dg)
 
-            testhash = "aac3484ca583d8c27c925a468436876398c6b0c7"
+            testhash = "daf0cbe26ff709705f338526b19881ef5758f16b"
 
             fname1 = joinpath(tmp, "discont_kwarg")
             VTKFile(fname1, grid; write_discontinuous=true) do vtk
