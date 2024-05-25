@@ -1526,8 +1526,8 @@ end
 function shape_gradient_and_value(ipv::VectorizedInterpolation{vdim, shape}, ξ::V, I::Int) where {vdim, refdim, shape <: AbstractRefShape{refdim}, T, V <: Vec{refdim, T}}
     tosvec(v::Vec) = SVector((v...,))
     tovec(sv::SVector) = Vec((sv...))
-    val = Ferrite.shape_value(ipv, ξ, I)
-    grad = ForwardDiff.jacobian(sv -> tosvec(Ferrite.shape_value(ipv, tovec(sv), I)), tosvec(ξ))
+    val = shape_value(ipv, ξ, I)
+    grad = ForwardDiff.jacobian(sv -> tosvec(shape_value(ipv, tovec(sv), I)), tosvec(ξ))
     return grad, val
 end
 
