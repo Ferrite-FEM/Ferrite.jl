@@ -42,8 +42,8 @@
         end
     end
     @testset "write_cellset" begin
-        # sha1 tested in test_grid_dofhandler_vtk.jl, this just smoke tests that we get the same
-        # when taking all cellsets in the grid
+        # More tests in `test_grid_dofhandler_vtk.jl`, this just validates writing all sets in the grid
+        # which is not tested there, see https://github.com/Ferrite-FEM/Ferrite.jl/pull/948
         mktempdir() do tmp
             grid = generate_grid(Quadrilateral, (2,2))
             addcellset!(grid, "set1", 1:2)
