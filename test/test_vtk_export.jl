@@ -41,4 +41,22 @@
             @test bytes2hex(open(SHA.sha1, fname*".vtu")) == "31b506bd9729b11992f8bcb79a2191eb65d223bf"
         end
     end
+    @testset "write_cellset" begin
+        # sha1 tested in test_grid_dofhandler_vtk.jl, this just smoke tests that we get the same
+        # when taking all cellsets in the grid
+        mktempdir() do tmp
+            grid = generate_grid(Quadrilateral, (2,2))
+            addcellset!(grid, "set1", 1:2)
+            addcellset!(grid, "set2", 1:4)
+            manual = joinpath(tmp, "manual")
+            auto = joinpath(tmp, "auto")
+            VTKFile(manual, grid) do vtk
+                Ferrite.write_cellset(vtk, grid, keys(Ferrite.getcellsets(grid)))
+            end
+            VTKFile(auto, grid) do vtk
+                Ferrite.write_cellset(vtk, grid)
+            end
+            @test bytes2hex(open(SHA.sha1, manual*".vtu")) == bytes2hex(open(SHA.sha1, auto*".vtu"))
+        end
+    end
 end
