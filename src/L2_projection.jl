@@ -46,7 +46,7 @@ end
 
 function add!(proj::L2Projector, set, ip::Interpolation, qr_lhs = nothing)
     sdh = SubDofHandler(proj.dh, set)
-    add!(sdh, :_, ip)
+    add!(sdh, :_, ip isa VectorizedInterpolation ? ip.ip : ip)
     push!(proj.qrs_lhs, qr_lhs === nothing ? _mass_qr(ip) : qr_lhs)
     return proj
 end
