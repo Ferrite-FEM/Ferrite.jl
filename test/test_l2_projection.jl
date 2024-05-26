@@ -118,13 +118,14 @@ function make_mixedgrid_l2_tests()
     push!(cells, Triangle((2,3,6)))
     push!(cells, Triangle((2,6,5)))
 
-    return Grid(cells, nodes), (quadset = 1:1, triaset = 2:3)
+    quadset = 1:1
+    triaset = 2:3
+    return Grid(cells, nodes), quadset, triaset
 end
 
 # Test a mixed grid, where only a subset of the cells contains a field
 function test_projection_subset_of_mixedgrid()
-    mesh, sets = make_mixedgrid_l2_tests()
-    (;quadset, triaset) = sets
+    mesh, quadset, triaset = make_mixedgrid_l2_tests()
 
     order = 2
     ip = Lagrange{RefQuadrilateral, order}()
@@ -266,8 +267,7 @@ function test_add_projection_grid()
 end
 
 function test_projection_mixedgrid()
-    grid, sets = make_mixedgrid_l2_tests()
-    (;quadset, triaset) = sets
+    grid, quadset, triaset = make_mixedgrid_l2_tests()
 
     dh = DofHandler(grid)
     sdh_quad = SubDofHandler(dh, quadset)
