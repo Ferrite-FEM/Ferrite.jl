@@ -9,7 +9,9 @@ isclosed(proj::L2Projector) = isclosed(proj.dh)
 
 function Base.show(io::IO, ::MIME"text/plain", proj::L2Projector)
     dh = proj.dh
-    println(io, typeof(proj))
+    print(io, typeof(proj))
+    isclosed(proj) || (print(io, " (not closed)"); return nothing)
+    println(io)
     ncells = sum(length(sdh.cellset) for sdh in dh.subdofhandlers)
     println(io, "  projection on:           ", ncells, "/", getncells(get_grid(dh)), " cells in grid")
     if length(dh.subdofhandlers) == 1 # Same as before
@@ -17,8 +19,9 @@ function Base.show(io::IO, ::MIME"text/plain", proj::L2Projector)
         println(io, "  function interpolation:  ", only(sdh.field_interpolations))
         println(io, "  geometric interpolation: ", default_interpolation(getcelltype(sdh)))
     else
-        println(io, "  Split into ", length(dh.subdofhandlers), "sets")
+        println(io, "  Split into ", length(dh.subdofhandlers), " sets")
     end
+    return nothing
 end
 
 function L2Projector(grid::AbstractGrid)
@@ -52,7 +55,7 @@ function close!(proj::L2Projector)
     close!(proj.dh)
     M = _assemble_L2_matrix(proj.dh, proj.qrs_lhs)
     proj.M_cholesky = cholesky(M)
-    return proj
+    return M
 end
 
 # Quadrature sufficient for integrating a mass matrix
@@ -66,20 +69,19 @@ _mass_qr(ip::VectorizedInterpolation) = _mass_qr(ip.ip)
 
 function _assemble_L2_matrix(dh::DofHandler, qrs_lhs::Vector{<:QuadratureRule})
     M = create_symmetric_sparsity_pattern(dh)
+    assembler = start_assemble(M)
     for (sdh, qr_lhs) in zip(dh.subdofhandlers, qrs_lhs)
         ip_fun = only(sdh.field_interpolations)
         ip_geo = default_interpolation(getcelltype(sdh))
         cv = CellValues(qr_lhs, ip_fun, ip_geo)
-        _assemble_L2_matrix!(M, cv, sdh)
+        _assemble_L2_matrix!(assembler, cv, sdh)
     end
     return M
 end
 
-function _assemble_L2_matrix!(M, cellvalues::CellValues, sdh::SubDofHandler)
+function _assemble_L2_matrix!(assembler, cellvalues::CellValues, sdh::SubDofHandler)
 
     n = getnbasefunctions(cellvalues)
-    assembler = start_assemble(M)
-
     Me = zeros(n, n)
 
     function symmetrize_to_lower!(K)
@@ -109,7 +111,7 @@ function _assemble_L2_matrix!(M, cellvalues::CellValues, sdh::SubDofHandler)
         symmetrize_to_lower!(Me)
         assemble!(assembler, celldofs(cell), Me)
     end
-    return M
+    return assembler
 end
 
 """
@@ -154,6 +156,9 @@ function project(proj::L2Projector,
                  vars::Union{AbstractVector{TC}, AbstractDict{Int, TC}},
                  qrs_rhs::Vector{<:QuadratureRule}
                  ) where {TC <: AbstractVector{T}} where T <: Union{Number, AbstractTensor}
+
+    isclosed(proj) || error("The L2Projector is not closed")
+    length(qrs_rhs) == length(proj.dh.subdofhandlers) || error("Number of qrs_rhs must match the number of `add!`ed sets")
 
     M = T <: AbstractTensor ? Tensors.n_components(Tensors.get_base(T)) : 1
 
