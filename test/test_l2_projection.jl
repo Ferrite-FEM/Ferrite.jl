@@ -135,8 +135,12 @@ function test_projection_mixedgrid()
     xe = getcoordinates(mesh, 1)
 
     # analytical values
-    qp_values = [[f(spatial_coordinate(cv, qp, xe)) for qp in 1:getnquadpoints(cv)]]
-    qp_values_matrix = reduce(hcat, qp_values)
+    qp_value = [f(spatial_coordinate(cv, qp, xe)) for qp in 1:getnquadpoints(cv)]
+    qp_values = Vector{typeof(qp_value)}(undef, getncells(mesh))
+    qp_values[1] = copy(qp_value)
+    qp_values_matrix = fill(zero(eltype(qp_value)), getnquadpoints(cv), getncells(mesh))
+    qp_values_matrix[:, 1] .= qp_value
+    qp_values_dict = Dict(1 => copy(qp_value))
 
     # Now recover the nodal values using a L2 projection.
     # Assume f would only exist on the first cell, we project it to the nodes of the
@@ -145,6 +149,7 @@ function test_projection_mixedgrid()
     proj = L2Projector(ip, mesh; geom_ip=ip_geom, set=quadset)
     point_vars = project(proj, qp_values, qr)
     point_vars_2 = project(proj, qp_values_matrix, qr)
+    point_vars_3 = project(proj, qp_values_dict, qr)
     projection_at_nodes = evaluate_at_grid_nodes(proj, point_vars)
     for cellid in quadset
         for nodeid in mesh.cells[cellid].nodes
@@ -159,6 +164,7 @@ function test_projection_mixedgrid()
     end
     ae = reinterpret(reshape, SymmetricTensor{2,2,Float64,3}, ae)
     @test point_vars ≈ point_vars_2 ≈ ae
+    @test point_vars_3 ≈ ae
 
     # Do the same thing but for the triangle set
     ip = Lagrange{RefTriangle, order}()
@@ -167,14 +173,16 @@ function test_projection_mixedgrid()
     cv = CellValues(qr, ip, ip_geom)
     nqp = getnquadpoints(cv)
 
-    qp_values_tria = [zeros(SymmetricTensor{2,2}, nqp) for _ in triaset]
-    qp_values_matrix_tria = [zero(SymmetricTensor{2,2}) for _ in 1:nqp, _ in triaset]
+    qp_values_tria = [SymmetricTensor{2,2,Float64,3}[] for _ in 1:getncells(mesh)]
+    qp_values_matrix_tria = [zero(SymmetricTensor{2,2}) * NaN for _ in 1:nqp, _ in 1:getncells(mesh)]
+    qp_values_dict = Dict{Int, Vector{SymmetricTensor{2,2,Float64,3}}}()
     for (ic, cellid) in enumerate(triaset)
         xe = getcoordinates(mesh, cellid)
         # analytical values
         qp_values = [f(spatial_coordinate(cv, qp, xe)) for qp in 1:getnquadpoints(cv)]
-        qp_values_tria[ic] = qp_values
-        qp_values_matrix_tria[:, ic] .= qp_values
+        qp_values_tria[cellid] = qp_values
+        qp_values_matrix_tria[:, cellid] .= qp_values
+        qp_values_dict[cellid] = qp_values
     end
 
     #tria

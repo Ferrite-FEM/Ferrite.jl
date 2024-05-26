@@ -1,3 +1,4 @@
+abstract type AbstractProjector end
 
 mutable struct L2Projector <: Ferrite.AbstractProjector
     M_cholesky #::SuiteSparse.CHOLMOD.Factor{Float64}
@@ -5,6 +6,20 @@ mutable struct L2Projector <: Ferrite.AbstractProjector
     qrs_lhs::Vector{<:QuadratureRule}
 end
 isclosed(proj::L2Projector) = isclosed(proj.dh)
+
+function Base.show(io::IO, ::MIME"text/plain", proj::L2Projector)
+    dh = proj.dh
+    println(io, typeof(proj))
+    ncells = sum(length(sdh.cellset) for sdh in dh.subdofhandlers)
+    println(io, "  projection on:           ", ncells, "/", getncells(get_grid(dh)), " cells in grid")
+    if length(dh.subdofhandlers) == 1 # Same as before
+        sdh = dh.subdofhandlers[1]
+        println(io, "  function interpolation:  ", only(sdh.field_interpolations))
+        println(io, "  geometric interpolation: ", default_interpolation(getcelltype(sdh)))
+    else
+        println(io, "  Split into ", length(dh.subdofhandlers), "sets")
+    end
+end
 
 function L2Projector(grid::AbstractGrid)
     dh = DofHandler(grid)
@@ -15,9 +30,11 @@ end
 function L2Projector(
         func_ip::Interpolation,
         grid::AbstractGrid;
-        qr_lhs::QuadratureRule = nothing,
+        qr_lhs::Union{QuadratureRule, Nothing} = nothing,
         set = OrderedSet(1:getncells(grid)),
+        geom_ip = nothing,
     )
+    geom_ip === nothing || @warn("Providing geom_ip is deprecated, the geometric interpolation of the cells with always be used")
     proj = L2Projector(grid)
     add!(proj, set, func_ip, qr_lhs)
     close!(proj)
@@ -50,7 +67,7 @@ _mass_qr(ip::VectorizedInterpolation) = _mass_qr(ip.ip)
 function _assemble_L2_matrix(dh::DofHandler, qrs_lhs::Vector{<:QuadratureRule})
     M = create_symmetric_sparsity_pattern(dh)
     for (sdh, qr_lhs) in zip(dh.subdofhandlers, qrs_lhs)
-        ip_fun = field_interpolations[1]
+        ip_fun = only(sdh.field_interpolations)
         ip_geo = default_interpolation(getcelltype(sdh))
         cv = CellValues(qr_lhs, ip_fun, ip_geo)
         _assemble_L2_matrix!(M, cv, sdh)
@@ -79,12 +96,12 @@ function _assemble_L2_matrix!(M, cellvalues::CellValues, sdh::SubDofHandler)
         reinit!(cellvalues, cell)
 
         ## ∭( v ⋅ u )dΩ
-        for q_point = 1:getnquadpoints(fe_values)
-            dΩ = getdetJdV(fe_values, q_point)
+        for q_point = 1:getnquadpoints(cellvalues)
+            dΩ = getdetJdV(cellvalues, q_point)
             for j = 1:n
-                v = shape_value(fe_values, q_point, j)
+                v = shape_value(cellvalues, q_point, j)
                 for i = 1:j
-                    u = shape_value(fe_values, q_point, i)
+                    u = shape_value(cellvalues, q_point, i)
                     Me[i, j] += v ⋅ u * dΩ
                 end
             end
@@ -134,14 +151,15 @@ The order of the returned data correspond to the order of the `L2Projector`s int
 `DofHandler`. To export the result, use `vtk_point_data(vtk, proj, projected_data)`.
 """
 function project(proj::L2Projector,
-                 vars::AbstractVector{<:AbstractVector{T}},
-                 qrs_rhs::Vector{<:QuadratureRule}) where T <: Union{Number, AbstractTensor}
+                 vars::Union{AbstractVector{TC}, AbstractDict{Int, TC}},
+                 qrs_rhs::Vector{<:QuadratureRule}
+                 ) where {TC <: AbstractVector{T}} where T <: Union{Number, AbstractTensor}
 
-    M = T <: AbstractTensor ? length(vars[1][1].data) : 1
+    M = T <: AbstractTensor ? Tensors.n_components(Tensors.get_base(T)) : 1
 
     return _project(proj, qrs_rhs, vars, M, T)::Vector{T}
 end
-function project(p::L2Projector, vars::AbstractVector, qr_rhs::QuadratureRule)
+function project(p::L2Projector, vars::Union{AbstractVector, AbstractDict}, qr_rhs::QuadratureRule)
     return project(p, vars, [qr_rhs])
 end
 function project(p::L2Projector, vars::AbstractMatrix, qr_rhs)
@@ -149,10 +167,10 @@ function project(p::L2Projector, vars::AbstractMatrix, qr_rhs)
     return project(p, collect(eachcol(vars)), qr_rhs)
 end
 
-function _project(proj::L2Projector, qrs_rhs::Vector{<:QuadratureRule}, vars::AbstractVector, M::Integer, ::Type{T}) where T
+function _project(proj::L2Projector, qrs_rhs::Vector{<:QuadratureRule}, vars::Union{AbstractVector, AbstractDict}, M::Integer, ::Type{T}) where T
     f = zeros(ndofs(proj.dh), M)
     for (sdh, qr_rhs) in zip(proj.dh.subdofhandlers, qrs_rhs)
-        ip_fun = field_interpolations[1]
+        ip_fun = only(sdh.field_interpolations)
         ip_geo = default_interpolation(getcelltype(sdh))
         cv = CellValues(qr_rhs, ip_fun, ip_geo)
         assemble_proj_rhs!(f, cv, sdh, vars)
@@ -166,9 +184,10 @@ function _project(proj::L2Projector, qrs_rhs::Vector{<:QuadratureRule}, vars::Ab
     return T[make_T(x) for x in eachrow(projected_vals)]
 end
 
-function assemble_proj_rhs!(f::Matrix, cellvalues::CellValues, sdh::SubDofHandler, vars::AbstractVector)
+function assemble_proj_rhs!(f::Matrix, cellvalues::CellValues, sdh::SubDofHandler, vars::Union{AbstractVector, AbstractDict})
     # Assemble the multi-column rhs, f = ∭( v ⋅ x̂ )dΩ
     # The number of columns corresponds to the length of the data-tuple in the tensor x̂.
+    M = size(f, 2)
     n = getnbasefunctions(cellvalues)
     fe = zeros(n, M)
     nqp = getnquadpoints(cellvalues)
@@ -200,8 +219,6 @@ function assemble_proj_rhs!(f::Matrix, cellvalues::CellValues, sdh::SubDofHandle
     end
 end
 
-# Not checked !!
-
 evaluate_at_grid_nodes(proj::L2Projector, vals::AbstractVector) =
     _evaluate_at_grid_nodes(proj, vals, Val(false))
 
@@ -221,19 +238,23 @@ function _evaluate_at_grid_nodes(
         nout = S <: Vec{2} ? 3 : M # Pad 2D Vec to 3D
         data = fill(T(NaN), nout, getnnodes(get_grid(dh)))
     else
-        data = fill(NaN * zero(S), getnnodes(get_grid(dh)))
+        data = fill(T(NaN) * zero(S), getnnodes(get_grid(dh)))
     end
-    ip, gip = proj.func_ip, proj.geom_ip
-    refdim, refshape = getrefdim(ip), getrefshape(ip)
-    local_node_coords = reference_coordinates(gip)
-    qr = QuadratureRule{refshape}(zeros(length(local_node_coords)), local_node_coords)
-    cv = CellValues(qr, ip)
-    # Function barrier
-    return _evaluate_at_grid_nodes!(data, cv, dh, proj.set, vals)
+    for sdh in dh.subdofhandlers
+        ip = only(sdh.field_interpolations)
+        gip = default_interpolation(getcelltype(sdh))
+        RefShape = getrefshape(ip)
+        local_node_coords = reference_coordinates(gip)
+        qr = QuadratureRule{RefShape}(zeros(length(local_node_coords)), local_node_coords)
+        cv = CellValues(qr, ip, gip)
+        _evaluate_at_grid_nodes!(data, cv, sdh, vals)
+    end
+    return data
 end
-function _evaluate_at_grid_nodes!(data, cv, dh, set, u::AbstractVector{S}) where S
+
+function _evaluate_at_grid_nodes!(data, cv, sdh, u::AbstractVector{S}) where S
     ue = zeros(S, getnbasefunctions(cv))
-    for cell in CellIterator(dh, set)
+    for cell in CellIterator(sdh)
         @assert getnquadpoints(cv) == length(cell.nodes)
         for (i, I) in pairs(cell.dofs)
             ue[i] = u[I]
