@@ -1,6 +1,6 @@
 # This file is machine-generated - editing it directly is not advised
 
-julia_version = "1.10.2"
+julia_version = "1.10.3"
 manifest_format = "2.0"
 project_hash = "8722b6a67abf1b81e2c7808ddfcfb1d737cd0040"
 
@@ -230,7 +230,7 @@ weakdeps = ["Dates", "LinearAlgebra"]
 [[deps.CompilerSupportLibraries_jll]]
 deps = ["Artifacts", "Libdl"]
 uuid = "e66e0078-7015-5450-92f7-15fbd957f2ae"
-version = "1.1.0+0"
+version = "1.1.1+0"
 
 [[deps.CompositionsBase]]
 git-tree-sha1 = "802bb88cd69dfd1509f6670416bd4434015693ad"
@@ -477,9 +477,9 @@ version = "0.3.14"
 
 [[deps.FerriteGmsh]]
 deps = ["Ferrite", "Gmsh"]
-git-tree-sha1 = "5f8c0c1d788647df057508762af0aef90d368a3c"
+git-tree-sha1 = "0b4c93ea344bdbf5788758a6f214fdc1c3176f2f"
 uuid = "4f95f4f8-b27c-4ae5-9a39-ea55e634e36b"
-version = "1.1.0"
+version = "1.1.1"
 
 [[deps.FerriteMeshParser]]
 deps = ["Ferrite"]
