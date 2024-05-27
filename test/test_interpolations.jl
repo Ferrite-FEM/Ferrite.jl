@@ -232,6 +232,19 @@ end
         @test G ≈ G_sa
         @test H ≈ H_sa
     end
+    
+    ips = Lagrange{RefQuadrilateral,2}()
+    vdim = 3
+    ipv = ips^vdim
+    ξ = rand(Vec{2, Float64})
+    for ipv_ind in 1:getnbasefunctions(ipv)
+        ips_ind, v_ind = fldmod1(ipv_ind, vdim)
+        H, G, V = Ferrite.shape_hessian_gradient_and_value(ipv, ξ, ipv_ind)
+        h, g, v = Ferrite.shape_hessian_gradient_and_value(ips, ξ, ips_ind)
+        @test h ≈ H[v_ind, :, :]
+        @test g ≈ G[v_ind, :]
+        @test v ≈ V[v_ind]
+    end
 end
 
 end # testset

@@ -61,15 +61,15 @@ Second order gradients of the shape functions are computed as
 
     ```math
     \begin{align} 
-        \frac{\mathrm{d}^2 N}{\mathrm{d}x_i \mathrm{d}x_j} = \frac{\mathrm{d}}{\mathrm{d}x_j}(\frac{\mathrm{d} \hat N}{\mathrm{d}   \xi_r}) J^{-1}_{ri} + \frac{\mathrm{d} \hat N}{\mathrm{d} \xi_r} \frac{\mathrm{d}}{\mathrm{d}x_j}(J^{-1}_{ri})
+        \frac{\mathrm{d}^2 N}{\mathrm{d}x_i \mathrm{d}x_j} = \frac{\mathrm{d}}{\mathrm{d}x_j}\left[\frac{\mathrm{d} \hat N}{\mathrm{d}   \xi_r}\right] J^{-1}_{ri} + \frac{\mathrm{d} \hat N}{\mathrm{d} \xi_r} \frac{\mathrm{d}J^{-1}_{ri}}{\mathrm{d}x_j}
     \end{align}
     ```
 
-    Using the fact that $\frac{\mathrm{d}}{\mathrm{d}x_j} = J^{-1}_{sj}\frac{\mathrm{d}}{\mathrm{d}\xi_s}$, the first term in the equation above can be expressed as:
+    Using the fact that $\frac{\mathrm{d}\hat{f}(\boldsymbol{\xi})}{\mathrm{d}x_j} = \frac{\mathrm{d}\hat{f}(\boldsymbol{\xi})}{\mathrm{d}\xi_s} J^{-1}_{sj}$, the first term in the equation above can be expressed as:
 
     ```math
     \begin{align*} 
-        \frac{\mathrm{d}}{\mathrm{d}x_j}(\frac{\mathrm{d} \hat N}{\mathrm{d} \xi_r}) J^{-1}_{ri} = J^{-1}_{sj}\frac{\mathrm{d}}{\mathrm{d}\xi_s}(\frac{\mathrm{d} \hat N}{\mathrm{d} \xi_r}) J^{-1}_{ri} = J^{-1}_{sj}\frac{\mathrm{d}^2 \hat N}{\mathrm{d} \xi_s\mathrm{d} \xi_r} J^{-1}_{ri}
+        \frac{\mathrm{d}}{\mathrm{d}x_j}\left[\frac{\mathrm{d} \hat N}{\mathrm{d} \xi_r}\right] J^{-1}_{ri} = J^{-1}_{sj}\frac{\mathrm{d}}{\mathrm{d}\xi_s}\left[\frac{\mathrm{d} \hat N}{\mathrm{d} \xi_r}\right] J^{-1}_{ri} = J^{-1}_{sj}\left[\frac{\mathrm{d}^2 \hat N}{\mathrm{d} \xi_s\mathrm{d} \xi_r}\right] J^{-1}_{ri}
     \end{align*}
     ```
 

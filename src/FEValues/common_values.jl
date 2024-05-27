@@ -242,9 +242,6 @@ end
 function function_hessian_init(cv::AbstractValues, ::AbstractVector{T}) where {T}
     return zero(shape_hessian_type(cv)) * zero(T)
 end
-function function_hessian_init(cv::AbstractValues, ::AbstractVector{T}) where {T <: AbstractVector}
-    return zero(T) ⊗ zero(shape_hessian_type(cv))
-end
 
 """
     function_symmetric_gradient(fe_v::AbstractValues, q_point::Int, u::AbstractVector, [dof_range])
