@@ -189,7 +189,7 @@ These operations are useful to collect unique entities within a single octree or
 ```@docs
 Ferrite.AMR.corner_neighbor
 Ferrite.AMR.edge_neighbor
-Ferrite.AMR.face_neighbor
+Ferrite.AMR.facet_neighbor
 Ferrite.AMR.possibleneighbors
 ```
 
@@ -202,7 +202,7 @@ Thereby, one needs to account for topological connections between the octrees as
 ```@docs
 Ferrite.AMR.transform_corner
 Ferrite.AMR.transform_edge
-Ferrite.AMR.transform_face
+Ferrite.AMR.transform_facet
 ```
 
 Note that we flipped the input and to expected output logic a bit to the proposed algorithms of the paper.
@@ -211,7 +211,7 @@ However, the original proposed versions are implemented as well in:
 ```@docs
 Ferrite.AMR.transform_corner_remote
 Ferrite.AMR.transform_edge_remote
-Ferrite.AMR.transform_face_remote
+Ferrite.AMR.transform_facet_remote
 ```
 
 despite being never used in the code base so far.

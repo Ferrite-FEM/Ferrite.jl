@@ -172,7 +172,7 @@ end
         geometry = ConvergenceTestHelper.get_geometry(interpolation)
         interpolation_geo = interpolation
         N = ConvergenceTestHelper.get_N(interpolation)
-        grid = generate_grid(geometry, ntuple(x->10, Ferrite.getdim(geometry)));
+        grid = generate_grid(geometry, ntuple(x->10, Ferrite.getrefdim(geometry)));
         adaptive_grid = ForestBWG(grid,7)
         # ... a suitable quadrature rule ...
         qr_order = ConvergenceTestHelper.get_quadrature_order(interpolation)

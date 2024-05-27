@@ -820,7 +820,7 @@ function hangingnodes(forest::ForestBWG{dim}, nodeids, nodeowners) where dim
                 parentfaces = faces(parent_,tree.b)
                 for (pface_i, pface) in enumerate(parentfaces)
                     if iscenter(c,pface) #hanging node candidate
-                        neighbor_candidate = face_neighbor(parent_, pface_i, tree.b)
+                        neighbor_candidate = facet_neighbor(parent_, pface_i, tree.b)
                         if inside(tree,neighbor_candidate) #intraoctree branch
                             neighbor_candidate_idx = findfirst(x->x==neighbor_candidate,tree.leaves)
                             if neighbor_candidate_idx !== nothing
@@ -844,13 +844,13 @@ function hangingnodes(forest::ForestBWG{dim}, nodeids, nodeowners) where dim
                             end
                         else #interoctree branch
                             for (ri,rf) in enumerate(rootfaces)
-                                face_neighbor_ =  facet_neighborhood[k,_perm[ri]]
-                                if length(face_neighbor_) == 0
+                                facet_neighbor_ =  facet_neighborhood[k,_perm[ri]]
+                                if length(facet_neighbor_) == 0
                                     continue
                                 end
                                 if contains_facet(rf, pface)
-                                    k′ = face_neighbor_[1][1]
-                                    ri′ = _perminv[face_neighbor_[1][2]]
+                                    k′ = facet_neighbor_[1][1]
+                                    ri′ = _perminv[facet_neighbor_[1][2]]
                                     interoctree_neighbor = transform_facet(forest, k′, ri′, neighbor_candidate)
                                     interoctree_neighbor_candidate_idx = findfirst(x->x==interoctree_neighbor,forest.cells[k′].leaves)
                                     if interoctree_neighbor_candidate_idx !== nothing
@@ -1142,7 +1142,7 @@ function possibleneighbors(o::OctantBWG{2},l,b;insidetree=true)
     neighbors = ntuple(8) do i
         if i > 4
             j = i - 4
-            face_neighbor(o,j,b)
+            facet_neighbor(o,j,b)
         else
             corner_neighbor(o,i,b)
         end
@@ -1162,7 +1162,7 @@ function possibleneighbors(o::OctantBWG{3},l,b;insidetree=true)
     neighbors = ntuple(26) do i
         if 8 < i ≤ 14
             j = i - 8
-            face_neighbor(o,j,b)
+            facet_neighbor(o,j,b)
         elseif 14 < i ≤ 26
             j = i - 14
             edge_neighbor(o,j,b)
@@ -1318,7 +1318,7 @@ function descendants(octant::OctantBWG{dim,N,T}, b::Integer=_maxlevel[dim-1]) wh
 end
 
 """
-    face_neighbor(octant::OctantBWG{dim,N,T}, f::T, b::T=_maxlevel[2]) -> OctantBWG{3,N,T}
+    facet_neighbor(octant::OctantBWG{dim,N,T}, f::T, b::T=_maxlevel[2]) -> OctantBWG{dim,N,T}
 Intraoctree face neighbor for a given faceindex `f` (in p4est, i.e. z order convention) and specified maximum refinement level `b`.
 Implements Algorithm 5 of [BWG2011](@citet).
 
@@ -1337,7 +1337,7 @@ Then, the computed face neighbor will be octant 2 with `xyz=(1,0)`.
 Note that the function is not sensitive in terms of leaving the octree boundaries.
 For the above example, a query for face index 1 (marked as `o`) will return an octant outside of the octree with `xyz=(-1,0)`.
 """
-function face_neighbor(octant::OctantBWG{3,N,T}, f::T, b::T=_maxlevel[2]) where {N,T<:Integer}
+function facet_neighbor(octant::OctantBWG{3,N,T}, f::T, b::T=_maxlevel[2]) where {N,T<:Integer}
     l = octant.l
     h = T(_compute_size(b,octant.l))
     x,y,z = octant.xyz
@@ -1346,7 +1346,7 @@ function face_neighbor(octant::OctantBWG{3,N,T}, f::T, b::T=_maxlevel[2]) where 
     z += ((f == T(5)) ? -h : ((f == T(6)) ? h : zero(T)))
     return OctantBWG(l,(x,y,z))
 end
-function face_neighbor(octant::OctantBWG{2,N,T}, f::T, b::T=_maxlevel[1]) where {N,T<:Integer}
+function facet_neighbor(octant::OctantBWG{2,N,T}, f::T, b::T=_maxlevel[1]) where {N,T<:Integer}
     l = octant.l
     h = T(_compute_size(b,octant.l))
     x,y = octant.xyz
@@ -1354,7 +1354,7 @@ function face_neighbor(octant::OctantBWG{2,N,T}, f::T, b::T=_maxlevel[1]) where 
     y += ((f == T(3)) ? -h : ((f == T(4)) ? h : zero(T)))
     return OctantBWG(l,(x,y))
 end
-face_neighbor(o::OctantBWG{dim,N,T1}, f::T2, b::T3) where {dim,N,T1<:Integer,T2<:Integer,T3<:Integer} = face_neighbor(o,T1(f),T1(b))
+facet_neighbor(o::OctantBWG{dim,N,T1}, f::T2, b::T3) where {dim,N,T1<:Integer,T2<:Integer,T3<:Integer} = facet_neighbor(o,T1(f),T1(b))
 
 reference_faces_bwg(::Type{Ferrite.RefHypercube{2}}) = ((1,3) , (2,4), (1,2), (3,4))
 reference_faces_bwg(::Type{Ferrite.RefHypercube{3}}) = ((1,3,5,7) , (2,4,6,8), (1,2,5,6), (3,4,7,8), (1,2,3,4), (5,6,7,8)) # p4est consistent ordering
