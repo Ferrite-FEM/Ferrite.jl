@@ -184,7 +184,7 @@
         SerendipityQuadraticHexahedron
     ]
         # Grid tests - Regression test for https://github.com/Ferrite-FEM/Ferrite.jl/discussions/565
-        grid = generate_grid(cell_type, ntuple(i->3, Ferrite.getdim(cell_type)))
+        grid = generate_grid(cell_type, ntuple(i->3, Ferrite.getrefdim(cell_type)))
         topology = ExclusiveTopology(grid)
         @test extractboundary(grid, topology) == extractboundarycheck(grid)
 

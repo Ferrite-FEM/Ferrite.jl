@@ -36,7 +36,7 @@ function apply_analytical!(
         isnothing(_find_field(sdh, fieldname)) && continue
         field_idx = find_field(sdh, fieldname)
         ip_fun = getfieldinterpolation(sdh, field_idx)
-        field_dim = getfielddim(sdh, field_idx)
+        field_dim = n_components(sdh, field_idx)
         celldofinds = dof_range(sdh, fieldname)
         set_intersection = if length(cellset) == length(sdh.cellset) == getncells(get_grid(dh))
             BitSet(1:getncells(get_grid(dh)))

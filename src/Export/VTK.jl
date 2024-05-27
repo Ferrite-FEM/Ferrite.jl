@@ -340,7 +340,7 @@ function write_constraints(vtk, ch::ConstraintHandler)
     unique!(unique_fields)
 
     for field in unique_fields
-        nd = getfielddim(ch.dh, field)
+        nd = n_components(ch.dh, field)
         data = zeros(Float64, nd, getnnodes(get_grid(ch.dh)))
         for dbc in ch.dbcs
             dbc.field_name != field && continue
