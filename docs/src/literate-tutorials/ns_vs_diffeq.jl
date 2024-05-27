@@ -1,6 +1,6 @@
 # Putting this flag to false reproduces the figure shown in the example #src
 # We check for laminar flow development in the CI                       #src
-if !(@isdefined is_ci) #hide
+if @isdefined is_ci    #hide
     IS_CI = false      #hide
 else                   #hide
     IS_CI = true       #hide
