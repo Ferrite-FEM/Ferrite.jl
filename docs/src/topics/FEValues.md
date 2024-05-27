@@ -77,7 +77,7 @@ Second order gradients of the shape functions are computed as
 
     ```math
     \begin{align*} 
-        \frac{\mathrm{d} \hat N}{\mathrm{d} \xi_r}\frac{\mathrm{d}}{\mathrm{d}x_j}(J^{-1}_{ri}) = \frac{\mathrm{d} \hat N}{\mathrm{d} \xi_r}[\frac{\mathrm{d}J^{-1}_{ri}}{\mathrm{d}\xi_s}]J^{-1}_{sj} = \frac{\mathrm{d} \hat N}{\mathrm{d} \xi_r}[ - J^{-1}_{rk}\mathcal{H}_{kps} J^{-1}_{pi}]J^{-1}_{sj} = - \frac{\mathrm{d} \hat N}{\mathrm{d} x_k}\mathcal{H}_{kps} J^{-1}_{pi}J^{-1}_{sj} 
+        \frac{\mathrm{d} \hat N}{\mathrm{d} \xi_r}\frac{\mathrm{d}J^{-1}_{ri}}{\mathrm{d}x_j} = \frac{\mathrm{d} \hat N}{\mathrm{d} \xi_r}\left[\frac{\mathrm{d}J^{-1}_{ri}}{\mathrm{d}\xi_s}\right]J^{-1}_{sj} = \frac{\mathrm{d} \hat N}{\mathrm{d} \xi_r}\left[- J^{-1}_{rk}\mathcal{H}_{kps} J^{-1}_{pi}\right] J^{-1}_{sj} = - \frac{\mathrm{d} \hat N}{\mathrm{d} x_k}\mathcal{H}_{kps} J^{-1}_{pi}J^{-1}_{sj} 
     \end{align*}
     ```
 
