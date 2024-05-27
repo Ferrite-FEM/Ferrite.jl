@@ -215,7 +215,7 @@ end
     function_hessian(fe_v::AbstractValues{dim}, q_point::Int, u::AbstractVector{<:AbstractFloat}, [dof_range])
 
     Compute the hessian of the function in a quadrature point. `u` is a vector with values
-    for the degrees of freedom. 
+    for the degrees of freedom.
 """
 function function_hessian(fe_v::AbstractValues, q_point::Int, u::AbstractVector, dof_range = eachindex(u))
     n_base_funcs = getnbasefunctions(fe_v)

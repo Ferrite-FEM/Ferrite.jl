@@ -45,14 +45,14 @@ For scalar fields, we always use scalar base functions. For tensorial fields (no
 Second order gradients of the shape functions are computed as
 
 ```math
-\begin{align*} 
+\begin{align*}
     \mathrm{grad}(\mathrm{grad}(N(\boldsymbol{x}))) = \frac{\mathrm{d}^2 N}{\mathrm{d}\boldsymbol{x}^2} = \boldsymbol{J}^{-T} \cdot \frac{\mathrm{d}^2\hat{N}}{\mathrm{d}\boldsymbol{\xi}^2} \cdot \boldsymbol{J}^{-1} -  \boldsymbol{J}^{-T} \cdot\mathrm{grad}(N) \cdot \boldsymbol{\mathcal{H}}  \cdot \boldsymbol{J}^{-1}
 \end{align*}
 ```
 !!! details "Derivation"
     The gradient of the shape functions is obtained using the chain rule:
     ```math
-    \begin{align*} 
+    \begin{align*}
         \frac{\mathrm{d} N}{\mathrm{d}x_i} = \frac{\mathrm{d} \hat N}{\mathrm{d} \xi_r}\frac{\mathrm{d} \xi_r}{\mathrm{d} x_i} = \frac{\mathrm{d} \hat N}{\mathrm{d} \xi_r} J^{-1}_{ri}
     \end{align*}
     ```
@@ -60,7 +60,7 @@ Second order gradients of the shape functions are computed as
     For the second order gradients, we first use the product rule on the equation above:
 
     ```math
-    \begin{align} 
+    \begin{align}
         \frac{\mathrm{d}^2 N}{\mathrm{d}x_i \mathrm{d}x_j} = \frac{\mathrm{d}}{\mathrm{d}x_j}\left[\frac{\mathrm{d} \hat N}{\mathrm{d}   \xi_r}\right] J^{-1}_{ri} + \frac{\mathrm{d} \hat N}{\mathrm{d} \xi_r} \frac{\mathrm{d}J^{-1}_{ri}}{\mathrm{d}x_j}
     \end{align}
     ```
@@ -68,7 +68,7 @@ Second order gradients of the shape functions are computed as
     Using the fact that $\frac{\mathrm{d}\hat{f}(\boldsymbol{\xi})}{\mathrm{d}x_j} = \frac{\mathrm{d}\hat{f}(\boldsymbol{\xi})}{\mathrm{d}\xi_s} J^{-1}_{sj}$, the first term in the equation above can be expressed as:
 
     ```math
-    \begin{align*} 
+    \begin{align*}
         \frac{\mathrm{d}}{\mathrm{d}x_j}\left[\frac{\mathrm{d} \hat N}{\mathrm{d} \xi_r}\right] J^{-1}_{ri} = J^{-1}_{sj}\frac{\mathrm{d}}{\mathrm{d}\xi_s}\left[\frac{\mathrm{d} \hat N}{\mathrm{d} \xi_r}\right] J^{-1}_{ri} = J^{-1}_{sj}\left[\frac{\mathrm{d}^2 \hat N}{\mathrm{d} \xi_s\mathrm{d} \xi_r}\right] J^{-1}_{ri}
     \end{align*}
     ```
@@ -76,7 +76,7 @@ Second order gradients of the shape functions are computed as
     The second term can be written as:
 
     ```math
-    \begin{align*} 
+    \begin{align*}
         \frac{\mathrm{d} \hat N}{\mathrm{d} \xi_r}\frac{\mathrm{d}J^{-1}_{ri}}{\mathrm{d}x_j} = \frac{\mathrm{d} \hat N}{\mathrm{d} \xi_r}\left[\frac{\mathrm{d}J^{-1}_{ri}}{\mathrm{d}\xi_s}\right]J^{-1}_{sj} = \frac{\mathrm{d} \hat N}{\mathrm{d} \xi_r}\left[- J^{-1}_{rk}\mathcal{H}_{kps} J^{-1}_{pi}\right] J^{-1}_{sj} = - \frac{\mathrm{d} \hat N}{\mathrm{d} x_k}\mathcal{H}_{kps} J^{-1}_{pi}J^{-1}_{sj} 
     \end{align*}
     ```
@@ -84,13 +84,13 @@ Second order gradients of the shape functions are computed as
     where we have used that the inverse of the jacobian can be computed as:
     
     ```math
-    \begin{align*} 
+    \begin{align*}
     0 = \frac{\mathrm{d}}{\mathrm{d}\xi_s} (J_{kr} J^{-1}_{ri} ) = \frac{\mathrm{d}J_{kp}}{\mathrm{d}\xi_s} J^{-1}_{pi}  + J_{kr} \frac{\mathrm{d}J^{-1}_{ri}}{\mathrm{d}\xi_s} = 0 \quad \Rightarrow \\
     \end{align*}
     ```
 
     ```math
-    \begin{align*} 
+    \begin{align*}
     \frac{\mathrm{d}J^{-1}_{ri}}{\mathrm{d}\xi_s} = - J^{-1}_{rk}\frac{\mathrm{d}J_{kp}}{\mathrm{d}\xi_s} J^{-1}_{pi} = - J^{-1}_{rk}\mathcal{H}_{kps} J^{-1}_{pi}\\
     \end{align*}
     ```

@@ -47,9 +47,9 @@ struct CellValues{FV, GM, QR, detT} <: AbstractCellValues
     detJdV::detT   # AbstractVector{<:Number} or Nothing
 end
 function CellValues(::Type{T}, qr::QuadratureRule, ip_fun::Interpolation, ip_geo::VectorizedInterpolation; 
-        update_gradients ::Union{Bool,Nothing} = nothing, #Use Union{Bool,Nothing} to get type-stable code 
-        update_hessians  ::Union{Bool,Nothing} = nothing, 
-        update_detJdV    ::Union{Bool,Nothing} = nothing) where T 
+        update_gradients ::Union{Bool,Nothing} = nothing, #Use Union{Bool,Nothing} to get type-stable code
+        update_hessians  ::Union{Bool,Nothing} = nothing,
+        update_detJdV    ::Union{Bool,Nothing} = nothing) where T
 
     _update_gradients = update_gradients === nothing ? true  : update_gradients
     _update_hessians  = update_hessians  === nothing ? false : update_hessians

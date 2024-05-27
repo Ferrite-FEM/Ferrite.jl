@@ -45,7 +45,7 @@
             (rand(Tensor{1, rdim}), rand(Tensor{2, rdim}), Tensor{3, rdim}((i,j,k)-> i==j==k ? rand() : 0.0))
         end
 
-        u_funk(x,V,G,H) = begin 
+        u_funk(x,V,G,H) = begin
             if update_hessians
                 0.5*x⋅H⋅x + G⋅x + V
             else
@@ -63,7 +63,7 @@
             @test function_value(cv, i, ue) ≈ Vqp
             @test function_gradient(cv, i, ue) ≈ Gqp
             if update_hessians
-                #Note, the jacobian of the element is constant, which makes the hessian (of the mapping) 
+                #Note, the jacobian of the element is constant, which makes the hessian (of the mapping)
                 #zero. So this is not the optimal test
                 @test Ferrite.function_hessian(cv, i, ue) ≈ Hqp
             end

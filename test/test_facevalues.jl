@@ -63,7 +63,7 @@ for (scalar_interpol, quad_rule) in (
                 @test function_value(fv, i, ue) ≈ Vqp
                 @test function_gradient(fv, i, ue) ≈ Gqp
                 if update_hessians
-                    #Note, the jacobian of the element is constant, which makes the hessian (of the mapping) 
+                    #Note, the jacobian of the element is constant, which makes the hessian (of the mapping)
                     #zero. So this is not the optimal test
                     @test Ferrite.function_hessian(fv, i, ue) ≈ Hqp
                 end

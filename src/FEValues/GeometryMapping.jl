@@ -13,8 +13,8 @@ struct MappingValues{JT, HT}
     H::HT # dJ/dξ # Hessian
 end
 
-@inline getjacobian(mv::MappingValues{<:Union{AbstractTensor, SMatrix}}) = mv.J 
-@inline gethessian(mv::MappingValues{<:Any,<:AbstractTensor}) = mv.H 
+@inline getjacobian(mv::MappingValues{<:Union{AbstractTensor, SMatrix}}) = mv.J
+@inline gethessian(mv::MappingValues{<:Any,<:AbstractTensor}) = mv.H
 
 
 """
@@ -47,8 +47,8 @@ struct GeometryMapping{DiffOrder, IP, M_t, dMdξ_t, d2Mdξ2_t}
         return new{1, IP, M_t, dMdξ_t, Nothing}(ip, M, dMdξ, nothing)
     end
     function GeometryMapping(
-        ip::IP, M::M_t, dMdξ::dMdξ_t, d2Mdξ2::d2Mdξ2_t) where 
-        {IP <: ScalarInterpolation, M_t<:AbstractMatrix{<:Number}, 
+        ip::IP, M::M_t, dMdξ::dMdξ_t, d2Mdξ2::d2Mdξ2_t) where
+        {IP <: ScalarInterpolation, M_t<:AbstractMatrix{<:Number},
         dMdξ_t <: AbstractMatrix{<:Vec}, d2Mdξ2_t <: AbstractMatrix{<:Tensor{2}}}
         return new{2, IP, M_t, dMdξ_t, d2Mdξ2_t}(ip, M, dMdξ, d2Mdξ2)
     end

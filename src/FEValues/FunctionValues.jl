@@ -208,7 +208,7 @@ end
     Jinv_otimesu_Jinv = is_vector_valued ? otimesu(Jinv, Jinv) : nothing
     @inbounds for j in 1:getnbasefunctions(funvals)
         dNdx = dothelper(funvals.dNdξ[j, q_point], Jinv)
-        if is_vector_valued #TODO - combine with helper function ? 
+        if is_vector_valued #TODO - combine with helper function ?
             d2Ndx2 = (funvals.d2Ndξ2[j, q_point] - dNdx⋅H) ⊡ Jinv_otimesu_Jinv
         else
             d2Ndx2 = Jinv'⋅(funvals.d2Ndξ2[j, q_point] - dNdx⋅H)⋅Jinv
@@ -220,6 +220,6 @@ end
     return nothing
 end
 
-# TODO in PR798, apply_mapping! for 
+# TODO in PR798, apply_mapping! for
 # * CovariantPiolaMapping
 # * ContravariantPiolaMapping

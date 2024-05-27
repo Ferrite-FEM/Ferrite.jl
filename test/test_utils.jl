@@ -296,7 +296,7 @@ module DummyRefShapes
 end
 
 ############################################################
-# Inverse parametric mapping ξ = ϕ(x) for testing hessians #             
+# Inverse parametric mapping ξ = ϕ(x) for testing hessians #
 ############################################################
 function function_value_from_physical_coord(interpolation::Interpolation, cell_coordinates, X::Vec{dim,T}, ue) where {dim,T}
     n_basefuncs = getnbasefunctions(interpolation)

@@ -45,8 +45,8 @@ struct FacetValues{FV, GM, FQR, detT, nT, V_FV<:AbstractVector{FV}, V_GM<:Abstra
     current_facet::ScalarWrapper{Int}
 end
 
-function FacetValues(::Type{T}, fqr::FacetQuadratureRule, ip_fun::Interpolation, ip_geo::VectorizedInterpolation{sdim} = default_geometric_interpolation(ip_fun); 
-    update_gradients::Union{Bool,Nothing} = nothing, 
+function FacetValues(::Type{T}, fqr::FacetQuadratureRule, ip_fun::Interpolation, ip_geo::VectorizedInterpolation{sdim} = default_geometric_interpolation(ip_fun);
+    update_gradients::Union{Bool,Nothing} = nothing,
     update_hessians ::Union{Bool,Nothing} = nothing) where {T,sdim}
 
     _update_gradients = update_gradients === nothing ? true : update_gradients
