@@ -1,5 +1,5 @@
 """
-    CellValues([::Type{T},] quad_rule::QuadratureRule, func_interpol::Interpolation, [geom_interpol::Interpolation])
+    CellValues([::Type{T},] quad_rule::QuadratureRule, func_interpol::Interpolation, [geom_interpol::Interpolation]; update_detJdV=true, update_gradients=true, update_hessians=false)
 
 A `CellValues` object facilitates the process of evaluating values of shape functions, gradients of shape functions,
 values of nodal functions, gradients and divergences of nodal functions etc. in the finite element cell.
@@ -11,6 +11,11 @@ values of nodal functions, gradients and divergences of nodal functions etc. in 
 * `geom_interpol`: an optional instance of a [`Interpolation`](@ref) which is used to interpolate the geometry.
   By default linear Lagrange interpolation is used. For embedded elements the geometric interpolations should
   be vectorized to the spatial dimension.
+
+**Keyword arguments:**
+* `update_gradients`: Specifies if the gradients of the shape functions should be updated (default true)
+* `update_hessians`: Specifies if the hessians of the shape functions should be updated (default false)
+* `update_detJdV`: Specifies if the volume associated with each quadrature point should be updated (default true)
 
 **Common methods:**
 
@@ -42,7 +47,7 @@ struct CellValues{FV, GM, QR, detT} <: AbstractCellValues
     detJdV::detT   # AbstractVector{<:Number} or Nothing
 end
 function CellValues(::Type{T}, qr::QuadratureRule, ip_fun::Interpolation, ip_geo::VectorizedInterpolation; 
-        update_gradients ::Union{Bool,Nothing} = nothing, 
+        update_gradients ::Union{Bool,Nothing} = nothing, #Use Union{Bool,Nothing} to get type-stable code 
         update_hessians  ::Union{Bool,Nothing} = nothing, 
         update_detJdV    ::Union{Bool,Nothing} = nothing) where T 
 

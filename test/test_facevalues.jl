@@ -19,11 +19,13 @@ for (scalar_interpol, quad_rule) in (
         n_basefunc_base = getnbasefunctions(scalar_interpol)
         update_gradients = true
         update_hessians = (DiffOrder==2 && Ferrite.getorder(func_interpol) > 1)
-        fv = if VERSION ≥ v"1.9"
-            FacetValues(quad_rule, func_interpol, geom_interpol; update_gradients, update_hessians)
-        else # Type unstable on 1.6, but works at least for 1.9 and later. PR882
-            FacetValues(quad_rule, func_interpol, geom_interpol; update_gradients, update_hessians)
+
+        fv = FacetValues(quad_rule, func_interpol, geom_interpol; update_gradients, update_hessians)
+        if update_gradients && !update_hessians && VERSION ≥ v"1.9" # Check correct and type-stable default constructor
+            fv_default = FacetValues(quad_rule, func_interpol, geom_interpol)
+            @test typeof(fv) === typeof(fv_default)
         end
+
         rdim = Ferrite.getrefdim(func_interpol)
         n_basefuncs = getnbasefunctions(func_interpol)
 
