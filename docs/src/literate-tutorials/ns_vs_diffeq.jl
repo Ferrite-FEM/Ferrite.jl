@@ -213,7 +213,7 @@ add!(ch, noslip_bc);
 ∂Ω_inflow = getfacetset(grid, "left");
 
 # !!! note
-#     The adaptivity only works if the pressure field varies smoothly
+#     Temporal adaptivity only works if the pressure field varies smoothly
 #     enough in time. Linearly ramping up the velocity will cause
 #     fluctuations in the pressure field which will mess up the error
 #     estimators.
