@@ -132,11 +132,11 @@ reference_facets(::Type{<:AbstractRefShape})
 @inline reference_facets(refshape::Type{<:AbstractRefShape{3}}) = reference_faces(refshape)
 
 """
-    Ferrite.default_interpolation(::AbstractCell)::Interpolation
+    Ferrite.geometric_interpolation(::AbstractCell)::Interpolation
 
 Returns the interpolation which defines the geometry of a given cell.
 """
-default_interpolation(::AbstractCell)
+geometric_interpolation(::AbstractCell)
 
 """
     Ferrite.get_node_ids(c::AbstractCell)
@@ -240,25 +240,25 @@ struct QuadraticHexahedron    <: AbstractCell{RefHexahedron}    nodes::NTuple{27
 struct Wedge                  <: AbstractCell{RefPrism}         nodes::NTuple{ 6, Int} end
 struct Pyramid                <: AbstractCell{RefPyramid}       nodes::NTuple{ 5, Int} end
 
-default_interpolation(::Type{Line})                   = Lagrange{RefLine,          1}()
-default_interpolation(::Type{QuadraticLine})          = Lagrange{RefLine,          2}()
-default_interpolation(::Type{Triangle})               = Lagrange{RefTriangle,      1}()
-default_interpolation(::Type{QuadraticTriangle})      = Lagrange{RefTriangle,      2}()
-default_interpolation(::Type{Quadrilateral})          = Lagrange{RefQuadrilateral, 1}()
-default_interpolation(::Type{QuadraticQuadrilateral}) = Lagrange{RefQuadrilateral, 2}()
-default_interpolation(::Type{Tetrahedron})            = Lagrange{RefTetrahedron,   1}()
-default_interpolation(::Type{QuadraticTetrahedron})   = Lagrange{RefTetrahedron,   2}()
-default_interpolation(::Type{Hexahedron})             = Lagrange{RefHexahedron,    1}()
-default_interpolation(::Type{QuadraticHexahedron})    = Lagrange{RefHexahedron,    2}()
-default_interpolation(::Type{Wedge})                  = Lagrange{RefPrism,         1}()
-default_interpolation(::Type{Pyramid})                = Lagrange{RefPyramid,       1}()
+geometric_interpolation(::Type{Line})                   = Lagrange{RefLine,          1}()
+geometric_interpolation(::Type{QuadraticLine})          = Lagrange{RefLine,          2}()
+geometric_interpolation(::Type{Triangle})               = Lagrange{RefTriangle,      1}()
+geometric_interpolation(::Type{QuadraticTriangle})      = Lagrange{RefTriangle,      2}()
+geometric_interpolation(::Type{Quadrilateral})          = Lagrange{RefQuadrilateral, 1}()
+geometric_interpolation(::Type{QuadraticQuadrilateral}) = Lagrange{RefQuadrilateral, 2}()
+geometric_interpolation(::Type{Tetrahedron})            = Lagrange{RefTetrahedron,   1}()
+geometric_interpolation(::Type{QuadraticTetrahedron})   = Lagrange{RefTetrahedron,   2}()
+geometric_interpolation(::Type{Hexahedron})             = Lagrange{RefHexahedron,    1}()
+geometric_interpolation(::Type{QuadraticHexahedron})    = Lagrange{RefHexahedron,    2}()
+geometric_interpolation(::Type{Wedge})                  = Lagrange{RefPrism,         1}()
+geometric_interpolation(::Type{Pyramid})                = Lagrange{RefPyramid,       1}()
 
 # Serendipity interpolation based cells
 struct SerendipityQuadraticQuadrilateral <: AbstractCell{RefQuadrilateral} nodes::NTuple{ 8, Int} end
 struct SerendipityQuadraticHexahedron    <: AbstractCell{RefHexahedron}    nodes::NTuple{20, Int} end
 
-default_interpolation(::Type{SerendipityQuadraticQuadrilateral}) = Serendipity{RefQuadrilateral, 2}()
-default_interpolation(::Type{SerendipityQuadraticHexahedron})    = Serendipity{RefHexahedron,    2}()
+geometric_interpolation(::Type{SerendipityQuadraticQuadrilateral}) = Serendipity{RefQuadrilateral, 2}()
+geometric_interpolation(::Type{SerendipityQuadraticHexahedron})    = Serendipity{RefHexahedron,    2}()
 
 """
     nvertices_on_face(cell::AbstractCell, local_face_index::Int)

@@ -82,7 +82,7 @@ function add!(dh::DofHandler, name::Symbol, dim::Int)
         "fields. See CHANGELOG for more details.",
         :add!,
     )
-    ip = default_interpolation(celltype)
+    ip = geometric_interpolation(celltype)
     add!(dh, name, dim == 1 ? ip : VectorizedInterpolation{dim}(ip))
 end
 

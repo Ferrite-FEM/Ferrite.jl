@@ -9,7 +9,7 @@
         RefShape = Ferrite.getrefshape(ip)
         return B{RefShape,order}()
     end
-    getcellorder(CT) = Ferrite.getorder(Ferrite.default_interpolation(CT))
+    getcellorder(CT) = Ferrite.getorder(Ferrite.geometric_interpolation(CT))
     getcelltypedim(::Type{<:Ferrite.AbstractCell{shape}}) where {dim, shape <: Ferrite.AbstractRefShape{dim}} = dim
 
     # Functions to create dof handlers for testing
@@ -24,7 +24,7 @@
         end
 
         dh = DofHandler(grid)
-        default_ip = Ferrite.default_interpolation(CT)
+        default_ip = Ferrite.geometric_interpolation(CT)
         try
             add!(dh, :u, change_ip_order(default_ip, ip_order_u)^dim)
             add!(dh, :p, change_ip_order(default_ip, ip_order_p))
@@ -51,8 +51,8 @@
         else
             error("Only dim=1 & 2 supported")
         end
-        default_ip_A = Ferrite.default_interpolation(getcelltype(grid, first(getcellset(grid,"A"))))
-        default_ip_B = Ferrite.default_interpolation(getcelltype(grid, first(getcellset(grid,"B"))))
+        default_ip_A = Ferrite.geometric_interpolation(getcelltype(grid, first(getcellset(grid,"A"))))
+        default_ip_B = Ferrite.geometric_interpolation(getcelltype(grid, first(getcellset(grid,"B"))))
         dh = DofHandler(grid)
         sdh_A = SubDofHandler(dh, getcellset(grid, "A"))
         add!(sdh_A, :u, change_ip_order(default_ip_A, ip_order_u)^dim)
