@@ -1,3 +1,7 @@
+# Putting this flag to false reproduces the figure shown in the example #src
+# We check for laminar flow development in the CI                       #src
+IS_CI = true #hide
+
 # # [Incompressible Navier-Stokes equations via DifferentialEquations.jl](@id tutorial-ins-ordinarydiffeq)
 #
 # ![](https://user-images.githubusercontent.com/9196588/134514213-76d91d34-19ab-47c2-957e-16bb0c8669e1.gif)
@@ -126,45 +130,51 @@ using FerriteGmsh: Gmsh
 Gmsh.initialize()
 gmsh.option.set_number("General.Verbosity", 2)
 dim = 2;
-# We specify first the rectangle, the cylinder, the surface spanned by the cylinder and the boolean difference of rectangle and cylinder.
-# We check for laminar flow development in the CI #src
-if false #hide
-rect_tag = gmsh.model.occ.add_rectangle(0, 0, 0, 2.2, 0.41)
+# We specify first the rectangle, the cylinder, the surface spanned by the cylinder
+# and the boolean difference of rectangle and cylinder.
+if !IS_CI                                                                                           #hide
+rect_tag = gmsh.model.occ.add_rectangle(0, 0, 0, 1.1, 0.41)
 circle_tag = gmsh.model.occ.add_circle(0.2, 0.2, 0, 0.05)
 circle_curve_tag = gmsh.model.occ.add_curve_loop([circle_tag])
 circle_surf_tag = gmsh.model.occ.add_plane_surface([circle_curve_tag])
 gmsh.model.occ.cut([(dim,rect_tag)],[(dim,circle_surf_tag)]);
-else #hide
-rect_tag = gmsh.model.occ.add_rectangle(0, 0, 0, 0.55, 0.41) #hide
-end #hide
-# Now, the geometrical entities need to be synchronized in order to be available outside of `gmsh.model.occ`
+else                                                                                                #hide
+rect_tag = gmsh.model.occ.add_rectangle(0, 0, 0, 0.55, 0.41);                                       #hide
+end                                                                                                 #hide
+# Now, the geometrical entities need to be synchronized in order to be available outside 
+# of `gmsh.model.occ`
 gmsh.model.occ.synchronize()
 # In the next lines, we add the physical groups needed to define boundary conditions.
-if false #hide
-gmsh.model.model.add_physical_group(dim-1,[5],6,"hole")
-end #hide
-gmsh.model.model.add_physical_group(dim-1,[2],7,"left")
-gmsh.model.model.add_physical_group(dim-1,[4],8,"top")
-gmsh.model.model.add_physical_group(dim-1,[3],9,"right")
-gmsh.model.model.add_physical_group(dim-1,[1],10,"bottom")
-gmsh.model.model.add_physical_group(dim,[1],11,"domain");
+if !IS_CI                                                                                           #hide
+bottomtag = gmsh.model.model.add_physical_group(dim-1,[6],-1,"bottom")
+lefttag = gmsh.model.model.add_physical_group(dim-1,[7],-1,"left")
+righttag = gmsh.model.model.add_physical_group(dim-1,[8],-1,"right")
+toptag = gmsh.model.model.add_physical_group(dim-1,[9],-1,"top")
+holetag = gmsh.model.model.add_physical_group(dim-1,[5],-1,"hole");
+else                                                                                                #hide
+gmsh.model.model.add_physical_group(dim-1,[4],7,"left")                                             #hide
+gmsh.model.model.add_physical_group(dim-1,[3],8,"top")                                              #hide
+gmsh.model.model.add_physical_group(dim-1,[2],9,"right")                                            #hide
+gmsh.model.model.add_physical_group(dim-1,[1],10,"bottom");                                         #hide
+end # hide
 # Since we want a quad mesh, we specify the meshing algorithm to the quasi structured quad one.
 # For a complete list, [see the Gmsh docs](https://gmsh.info/doc/texinfo/gmsh.html#Mesh-options-list).
 gmsh.option.setNumber("Mesh.Algorithm",11)
 gmsh.option.setNumber("Mesh.MeshSizeFromCurvature",20)
 gmsh.option.setNumber("Mesh.MeshSizeMax",0.05)
-# remove fine mesh settings for CI. These settings also work to produce a vortex steet.              #src
+if IS_CI                                                                                             #hide
 gmsh.option.setNumber("Mesh.MeshSizeFromCurvature",20)                                               #hide
-gmsh.option.setNumber("Mesh.MeshSizeMax",0.1)                                                        #hide
+gmsh.option.setNumber("Mesh.MeshSizeMax",0.15)                                                       #hide
+end                                                                                                  #hide
 # In the next step, the mesh is generated and finally translated.
 gmsh.model.mesh.generate(dim)
 grid = togrid()
-Gmsh.finalize()
+Gmsh.finalize();
 
-# ### Function Space
-# To ensure stability we utilize the Taylor-Hood element pair Q2-Q1.
-# We have to utilize the same quadrature rule for the pressure as for the velocity, because in the weak form the
-# linear pressure term is tested against a quadratic function.
+#  ### Function Space
+#  To ensure stability we utilize the Taylor-Hood element pair Q2-Q1.
+#  We have to utilize the same quadrature rule for the pressure as for the velocity, because in the weak form the
+#  linear pressure term is tested against a quadratic function.
 ip_v = Lagrange{RefQuadrilateral, 2}()^dim
 qr = QuadratureRule{RefQuadrilateral}(4)
 cellvalues_v = CellValues(qr, ip_v);
@@ -185,22 +195,28 @@ ch = ConstraintHandler(dh);
 
 nosplip_face_names = ["top", "bottom", "hole"];
 # No hole for the test present                                          #src
+if IS_CI                                                                #hide
 nosplip_face_names = ["top", "bottom"]                                  #hide
+end                                                                     #hide
 ∂Ω_noslip = union(getfaceset.((grid, ), nosplip_face_names)...);
-noslip_bc = Dirichlet(:v, ∂Ω_noslip, (x, t) -> [0,0], [1,2])
+noslip_bc = Dirichlet(:v, ∂Ω_noslip, (x, t) -> Vec((0.0,0.0)), [1,2])
 add!(ch, noslip_bc);
 
 # The left boundary has a parabolic inflow with peak velocity of 1.5. This
 # ensures that for the given geometry the Reynolds number is 100, which
 # is already enough to obtain some simple vortex streets. By increasing the
 # velocity further we can obtain stronger vortices - which may need additional
-# refinement of the grid. Note that we have to smoothly ramp up the velocity,
-# because the Dirichlet constraints cannot be properly enforced yet, causing
-# convergence issues.
+# refinement of the grid.
 ∂Ω_inflow = getfaceset(grid, "left");
 
-vᵢₙ(t) = 1.5/(1+exp(-2.0*(t-2.0)))  #inflow velocity
-parabolic_inflow_profile((x,y),t) = [4*vᵢₙ(t)*y*(0.41-y)/0.41^2, 0.0]
+# !!! note
+#     The adaptivity only works if the pressure field varies smoothly
+#     enough in time. Linearly ramping up the velocity will cause
+#     fluctuations in the pressure field which will mess up the error
+#     estimators.
+vᵢₙ(t) = t < 2.0 ? 1.5*(sin(-π/2 + t*π/2)+1)/2 : 1.5 #inflow velocity
+
+parabolic_inflow_profile(x,t) = Vec((4*vᵢₙ(t)*x[2]*(0.41-x[2])/0.41^2, 0.0))
 inflow_bc = Dirichlet(:v, ∂Ω_inflow, parabolic_inflow_profile, [1,2])
 add!(ch, inflow_bc);
 
@@ -312,9 +328,17 @@ end;
 # ### Solution of the semi-discretized system via DifferentialEquations.jl
 # First we assemble the linear portions for efficiency. These matrices are
 # assumed to be constant over time.
-T = 10.0
-Δt₀ = 0.01
-Δt_save = 0.025
+# !!! note
+#     To obtain the vortex street a small time step is important to resolve
+#     the small oscillation forming. The mesh size becomes important to
+#     "only" resolve the smaller vertices forming, but less important for
+#     the initial formation.
+T = 6.0
+Δt₀ = 0.001
+if IS_CI                                                                #hide
+    Δt₀ = 0.1                                                           #hide
+end                                                                     #hide
+Δt_save = 0.1
 
 M = create_sparsity_pattern(dh);
 M = assemble_mass_matrix(cellvalues_v, cellvalues_p, M, dh);
@@ -339,45 +363,71 @@ jac_sparsity = sparse(K);
 
 # To apply the nonlinear portion of the Navier-Stokes problem we simply hand
 # over the dof handler and cell values to the right-hand-side (RHS) as a parameter.
-# Further the pre-assembled linear part (which is time independent) is
-# passed to save some runtime. To apply the time-dependent Dirichlet BCs, we
-# also hand over the constraint handler.
+# Furthermore the pre-assembled linear part, our Stokes opeartor (which is time independent)
+# is passed to save some additional runtime. To apply the time-dependent Dirichlet BCs, we
+# also need to hand over the constraint handler.
 # The basic idea to apply the Dirichlet BCs consistently is that we copy the
 # current solution `u`, apply the Dirichlet BCs on the copy, evaluate the
-# discretized RHS of the Navier-Stokes equations with this vector
-# and finally set the RHS to zero on every constraint. This way we obtain a
-# correct solution for all dofs which are not Dirichlet constrained. These
-# dofs are then corrected in a post-processing step, when evaluating the
-# solution vector at specific time points.
-# It should be finally noted that this **trick does not work** out of the box
-# **for constraining algebraic portion** of the DAE, i.e. if we would like to
-# put a Dirichlet BC on pressure dofs. As a workaround we have to set $f_{\textrm{i}} = 1$
-# instead of $f_{\textrm{i}} = 0$, because otherwise the equation system gets singular.
-# This is obvious when we remember that our mass matrix is zero for these
-# dofs, such that we obtain the equation $0 \cdot \mathrm{d}_t p_{\textrm{i}} = 1 \cdot p_{\textrm{i}}$, which
-# now has a unique solution.
+# discretized RHS of the Navier-Stokes equations with this vector. 
+# Furthermore we pass down the Jacobian assembly manually. For the Jacobian we eliminate all
+# rows and columns associated with constrained dofs. Also note that we eliminate the mass
+# matrix beforehand in a similar fashion. This decouples the time evolution of the constrained
+# dofs from the true unknowns. The correct solution is enforced by utilizing step and 
+# stage limiters. The correct norms are computed by passing down a custom norm which simply
+# ignores all constrained dofs.
+#
+# !!! Note
+#     An alternative strategy is to hook into the nonlinear and linear solvers and enforce
+#     the solution therein. However, this is not possible at the time of writing this tutorial.
+# 
+apply!(M, ch) 
+
 struct RHSparams
     K::SparseMatrixCSC
     ch::ConstraintHandler
     dh::DofHandler
     cellvalues_v::CellValues
+    u::Vector
 end
-p = RHSparams(K, ch, dh, cellvalues_v)
+p = RHSparams(K, ch, dh, cellvalues_v, copy(u₀))
 
-function navierstokes!(du,u_uc,p,t)
+function ferrite_limiter!(u, _, p, t)
+    update!(p.ch, t)
+    apply!(u, p.ch)
+end
+
+function navierstokes_rhs_element!(dvₑ, vₑ, cellvalues_v)
+    n_basefuncs = getnbasefunctions(cellvalues_v)
+    for q_point in 1:getnquadpoints(cellvalues_v)
+        dΩ = getdetJdV(cellvalues_v, q_point)
+        ∇v = function_gradient(cellvalues_v, q_point, vₑ)
+        v = function_value(cellvalues_v, q_point, vₑ)
+        for j in 1:n_basefuncs
+            φⱼ = shape_value(cellvalues_v, q_point, j)
+            # Note that in Tensors.jl the definition $\textrm{grad} v = \nabla v$ holds.
+            # With this information it can be quickly shown in index notation that
+            # ```math
+            # [(v \cdot \nabla) v]_{\textrm{i}} = v_{\textrm{j}} (\partial_{\textrm{j}} v_{\textrm{i}}) = [v (\nabla v)^{\textrm{T}}]_{\textrm{i}}
+            # ```
+            # where we should pay attentation to the transpose of the gradient.
+            #+
+            dvₑ[j] -= v ⋅ ∇v' ⋅ φⱼ * dΩ
+        end
+    end
+end
+
+function navierstokes!(du,u_uc,p::RHSparams,t)
     # Unpack the struct to save some allocations.
     #+
-    @unpack K,ch,dh,cellvalues_v = p
+    @unpack K,ch,dh,cellvalues_v,u = p
 
     # We start by applying the time-dependent Dirichlet BCs. Note that we are
-    # not allowed to mutate `u_uc`! We also can not pre-allocate this variable
-    # if we want to use AD to derive the Jacobian matrix, which appears in the
-    # utilized implicit Euler. If we hand over the Jacobian analytically to
-    # the solver, or when utilizing a method which does not require building the
-    # Jacobian, then we could also hand over a buffer for `u` in our RHSparams
-    # structure to save the allocations made here.
+    # not allowed to mutate `u_uc`! Furthermore not that we also can not pre-
+    # allocate a buffer for this variable variable if we want to use AD to derive
+    # the Jacobian matrix, which appears in stiff solvers.
+    # Therefore, for efficiency reasons, we simply pass down the jacobian analytically.
     #+
-    u = copy(u_uc)
+    u .= u_uc
     update!(ch, t)
     apply!(u, ch)
 
@@ -387,38 +437,88 @@ function navierstokes!(du,u_uc,p,t)
     mul!(du, K, u) # du .= K * u
 
     ## nonlinear contribution
+    v_range = dof_range(dh, :v)
     n_basefuncs = getnbasefunctions(cellvalues_v)
+    vₑ = zeros(n_basefuncs)
+    duₑ = zeros(n_basefuncs)
     for cell in CellIterator(dh)
         Ferrite.reinit!(cellvalues_v, cell)
-        all_celldofs = celldofs(cell)
-        v_celldofs = all_celldofs[dof_range(dh, :v)]
-        v_cell = u[v_celldofs]
-        for q_point in 1:getnquadpoints(cellvalues_v)
-            dΩ = getdetJdV(cellvalues_v, q_point)
-            ∇v = function_gradient(cellvalues_v, q_point, v_cell)
-            v = function_value(cellvalues_v, q_point, v_cell)
-            for j in 1:n_basefuncs
-                φⱼ = shape_value(cellvalues_v, q_point, j)
-                # Note that in Tensors.jl the definition $\textrm{grad} v = \nabla v$ holds.
-                # With this information it can be quickly shown in index notation that
-                # ```math
-                # [(v \cdot \nabla) v]_{\textrm{i}} = v_{\textrm{j}} (\partial_{\textrm{j}} v_{\textrm{i}}) = [v (\nabla v)^{\textrm{T}}]_{\textrm{i}}
-                # ```
-                # where we should pay attentation to the transpose of the gradient.
-                #+
-                du[v_celldofs[j]] -= v ⋅ ∇v' ⋅ φⱼ * dΩ
+        v_celldofs = @view celldofs(cell)[v_range]
+        vₑ .= @views u[v_celldofs]
+        fill!(duₑ, 0.0)
+        navierstokes_rhs_element!(duₑ, vₑ, cellvalues_v)
+        assemble!(du, v_celldofs, duₑ)
+    end
+end;
+
+function navierstokes_jac_element!(Jₑ, vₑ, cellvalues_v)
+    n_basefuncs = getnbasefunctions(cellvalues_v)
+    for q_point in 1:getnquadpoints(cellvalues_v)
+        dΩ = getdetJdV(cellvalues_v, q_point)
+        ∇v = function_gradient(cellvalues_v, q_point, vₑ)
+        v = function_value(cellvalues_v, q_point, vₑ)
+        for j in 1:n_basefuncs
+            φⱼ = shape_value(cellvalues_v, q_point, j)
+            # Note that in Tensors.jl the definition $\textrm{grad} v = \nabla v$ holds.
+            # With this information it can be quickly shown in index notation that
+            # ```math
+            # [(v \cdot \nabla) v]_{\textrm{i}} = v_{\textrm{j}} (\partial_{\textrm{j}} v_{\textrm{i}}) = [v (\nabla v)^{\textrm{T}}]_{\textrm{i}}
+            # ```
+            # where we should pay attentation to the transpose of the gradient.
+            #+
+            for i in 1:n_basefuncs
+                φᵢ = shape_value(cellvalues_v, q_point, i)
+                ∇φᵢ = shape_gradient(cellvalues_v, q_point, i)
+                Jₑ[j, i] -= (φᵢ ⋅ ∇v' + v ⋅ ∇φᵢ') ⋅ φⱼ * dΩ
             end
         end
     end
+end
 
-    # For now we have to ignore the evolution of the Dirichlet BCs.
-    # The DBC dofs in the solution vector will be corrected in a post-processing step.
+function navierstokes_jac!(J,u_uc,p,t)
+    # Unpack the struct to save some allocations.
     #+
-    apply_zero!(du, ch)
+    @unpack K, ch, dh, cellvalues_v, u = p
+
+    # We start by applying the time-dependent Dirichlet BCs. Note that we are
+    # not allowed to mutate `u_uc`, so we use our buffer again.
+    #+
+    u .= u_uc
+    update!(ch, t)
+    apply!(u, ch)
+
+    # Now we apply the Jacobian of the Navier-Stokes equations.
+    #+
+    ## Linear contribution (Stokes operator)
+    ## Here we assume that J has exactly the same structure as K by construction
+    nonzeros(J) .= nonzeros(K)
+
+    assembler = start_assemble(J; fillzero=false)
+
+    ## Assemble variation of the nonlinear term
+    n_basefuncs = getnbasefunctions(cellvalues_v)
+    Jₑ = zeros(n_basefuncs, n_basefuncs)
+    vₑ = zeros(n_basefuncs)
+    v_range = dof_range(dh, :v)
+    for cell in CellIterator(dh)
+        Ferrite.reinit!(cellvalues_v, cell)
+        v_celldofs = @view celldofs(cell)[v_range]
+
+        vₑ .= @views u[v_celldofs]
+        fill!(Jₑ, 0.0)
+        navierstokes_jac_element!(Jₑ, vₑ, cellvalues_v)
+        assemble!(assembler, v_celldofs, Jₑ)
+    end
+
+    # Finally we eliminate the constrained dofs from the Jacobian to
+    # decouple them in the nonlinear solver from the remaining system.
+    #+
+    apply!(J, ch)
 end;
+
 # Finally, together with our pre-assembled mass matrix, we are now able to
 # define our problem in mass matrix form.
-rhs = ODEFunction(navierstokes!, mass_matrix=M; jac_prototype=jac_sparsity)
+rhs = ODEFunction(navierstokes!, mass_matrix=M; jac=navierstokes_jac!, jac_prototype=jac_sparsity)
 problem = ODEProblem(rhs, u₀, (0.0,T), p);
 
 # All norms must not depend on constrained dofs. A problem with the presented implementation
@@ -433,20 +533,19 @@ end
 (fe_norm::FreeDofErrorNorm)(u::AbstractArray, t) = DiffEqBase.ODE_DEFAULT_NORM(u[fe_norm.ch.free_dofs], t)
 
 # Now we can put everything together by specifying how to solve the problem.
-# We want to use the adaptive implicit Euler method with our custom linear
-# solver, which helps in the enforcement of the Dirichlet BCs. Further we
+# We want to use an adaptive variant of the implicit Euler method. Further we
 # enable the progress bar with the `progress` and `progress_steps` arguments.
 # Finally we have to communicate the time step length and initialization
 # algorithm. Since we start with a valid initial state we do not use one of
 # DifferentialEquations.jl initialization algorithms.
 # !!! note "DAE initialization" 
-#          At the time of writing this [no Hessenberg index 2 initialization is implemented](https://github.com/SciML/OrdinaryDiffEq.jl/issues/1019).
+#     At the time of writing this [no Hessenberg index 2 initialization is implemented](https://github.com/SciML/OrdinaryDiffEq.jl/issues/1019).
 #
 # To visualize the result we export the grid and our fields
 # to VTK-files, which can be viewed in [ParaView](https://www.paraview.org/)
 # by utilizing the corresponding pvd file.
-timestepper = ImplicitEuler(linsolve = UMFPACKFactorization(reuse_symbolic=false))
-
+timestepper = Rodas5P(autodiff=false, step_limiter! = ferrite_limiter!);
+# timestepper = ImplicitEuler(nlsolve=NonlinearSolveAlg(OrdinaryDiffEq.NonlinearSolve.NewtonRaphson(autodiff=OrdinaryDiffEq.AutoFiniteDiff()); max_iter=50), step_limiter! = ferrite_limiter!)
 #NOTE!   This is left for future reference                                 #src
 # function algebraicmultigrid(W,du,u,p,t,newW,Plprev,Prprev,solverdata)   #src
 #     if newW === nothing || newW                                         #src
@@ -458,23 +557,21 @@ timestepper = ImplicitEuler(linsolve = UMFPACKFactorization(reuse_symbolic=false
 # end                                                                     #src
 # timestepper = ImplicitEuler(linsolve = IterativeSolversJL_GMRES(; abstol=1e-8, reltol=1e-6), precs=algebraicmultigrid, concrete_jac=true) #src
 
+# !!! info "Debugging convergence issues"
+#     We can obtain some debug information from OrdinaryDiffEq by wrapping the following section into a [debug logger](https://docs.julialang.org/en/v1/stdlib/Logging/#Example:-Enable-debug-level-messages).
 integrator = init(
     problem, timestepper, initializealg=NoInit(), dt=Δt₀,
-    adaptive=true, abstol=1e-5, reltol=1e-4,
+    adaptive=true, abstol=1e-4, reltol=1e-5,
     progress=true, progress_steps=1,
-    saveat=Δt_save, verbose=true,
-    internalnorm=FreeDofErrorNorm(ch)
+    verbose=true, internalnorm=FreeDofErrorNorm(ch)
 );
 
 pvd = paraview_collection("vortex-street.pvd");
-integrator = TimeChoiceIterator(integrator, 0.0:Δt_save:T)
-for (u_uc,t) in integrator
+
+for (u,t) in TimeChoiceIterator(integrator, 0.0:Δt_save:T)
     # We ignored the Dirichlet constraints in the solution vector up to now,
     # so we have to bring them back now.
     #+
-    update!(ch, t)
-    u = copy(u_uc)
-    apply!(u, ch)
     vtk_grid("vortex-street-$t.vtu", dh) do vtk
         vtk_point_data(vtk,dh,u)
         vtk_save(vtk)
@@ -502,7 +599,7 @@ function compute_divergence(dh, u, cellvalues_v)                            #hid
     return divv                                                             #hide
 end                                                                         #hide
 @testset "INS OrdinaryDiffEq" begin                                         #hide
-    u = copy(integrator.integrator.u)                                       #hide
+    u = copy(integrator.u)                                                  #hide
     apply!(u, ch)                                                           #hide
     Δdivv = abs(compute_divergence(dh, u, cellvalues_v))                    #hide
     @test isapprox(Δdivv, 0.0, atol=1e-12)                                  #hide
@@ -523,6 +620,7 @@ end                                                                         #hid
     end                                                                     #hide
     @test isapprox(sqrt(Δv), 0.0, atol=1e-3)                                #hide
 end;                                                                        #hide
+nothing                                                                     #hide
 
 #md # ## [Plain program](@id ns_vs_diffeq-plain-program)
 #md #
