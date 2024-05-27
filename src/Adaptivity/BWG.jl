@@ -1,5 +1,5 @@
 # TODO we should remove the mixture of indices. Maybe with these:
-# - struct FaceIndexBWG ... end
+# - struct FacetIndexBWG ... end
 # - struct QuadrilateralBWG ... end
 # - struct HexahedronBWG ... end
 
@@ -659,7 +659,7 @@ function creategrid(forest::ForestBWG{dim,C,T}) where {dim,C,T}
                                 continue
                             end
                         end
-                        neighbor_candidate = transform_face(forest,k′,f′,leaf)
+                        neighbor_candidate = transform_facet(forest,k′,f′,leaf)
                         # Candidate must be the face opposite to f'
                         f′candidate = ((f′ - 1) ⊻ 1) + 1
                         fnodes = face(leaf, f , tree.b)
@@ -851,7 +851,7 @@ function hangingnodes(forest::ForestBWG{dim}, nodeids, nodeowners) where dim
                                 if contains_facet(rf, pface)
                                     k′ = face_neighbor_[1][1]
                                     ri′ = _perminv[face_neighbor_[1][2]]
-                                    interoctree_neighbor = transform_face(forest, k′, ri′, neighbor_candidate)
+                                    interoctree_neighbor = transform_facet(forest, k′, ri′, neighbor_candidate)
                                     interoctree_neighbor_candidate_idx = findfirst(x->x==interoctree_neighbor,forest.cells[k′].leaves)
                                     if interoctree_neighbor_candidate_idx !== nothing
                                         r = compute_face_orientation(forest,k,pface_i)
@@ -937,8 +937,8 @@ end
 
 function balance_face(forest,k′,f′,o,s)
     o.l == 1 && return # no balancing needed for pivot octant level == 1
-    o′ = transform_face(forest,k′,f′,o)
-    s′ = transform_face(forest,k′,f′,s)
+    o′ = transform_facet(forest,k′,f′,o)
+    s′ = transform_facet(forest,k′,f′,s)
     neighbor_tree = forest.cells[k′]
     if s′ ∉ neighbor_tree.leaves && parent(s′, neighbor_tree.b) ∉ neighbor_tree.leaves
         if parent(parent(s′,neighbor_tree.b),neighbor_tree.b) ∈ neighbor_tree.leaves
@@ -1417,8 +1417,8 @@ function compute_edge_orientation(forest::ForestBWG{<:Any,<:OctreeBWG{3,<:Any,T2
 end
 
 """
-    transform_face_remote(forest::ForestBWG, k::T1, f::T1, o::OctantBWG{dim,N,T2}) -> OctantBWG{dim,N,T1,T2}
-    transform_face_remote(forest::ForestBWG, f::FaceIndex, o::OctantBWG{dim,N,T2}) -> OctantBWG{dim,N,T2}
+    transform_facet_remote(forest::ForestBWG, k::T1, f::T1, o::OctantBWG{dim,N,T2}) -> OctantBWG{dim,N,T1,T2}
+    transform_facet_remote(forest::ForestBWG, f::FacetIndex, o::OctantBWG{dim,N,T2}) -> OctantBWG{dim,N,T2}
 Interoctree coordinate transformation of an given octant `o` to the face-neighboring of octree `k` by virtually pushing `o`s coordinate system through `k`s face `f`.
 Implements Algorithm 8 of [BWG2011](@citet).
 
@@ -1436,7 +1436,7 @@ Consider 4 octrees with a single leaf each and a maximum refinement level of 1
 This function transforms octant 1 into the coordinate system of octant 2 by specifying `k=2` and `f=1`.
 While in the own octree coordinate system octant 1 is at `xyz=(0,0)`, the returned and transformed octant is located at `xyz=(-2,0)`
 """
-function transform_face_remote(forest::ForestBWG, k::T1, f::T1, o::OctantBWG{dim,N,T2}) where {dim,N,T1<:Integer,T2<:Integer}
+function transform_facet_remote(forest::ForestBWG, k::T1, f::T1, o::OctantBWG{dim,N,T2}) where {dim,N,T1<:Integer,T2<:Integer}
     _one = one(T2)
     _two = T2(2)
     _perm = (dim == 2 ? 𝒱₂_perm : 𝒱₃_perm)
@@ -1475,11 +1475,11 @@ function transform_face_remote(forest::ForestBWG, k::T1, f::T1, o::OctantBWG{dim
     end
 end
 
-transform_face_remote(forest::ForestBWG,f::FaceIndex,oct::OctantBWG) = transform_face_remote(forest,f[1],f[2],oct)
+transform_facet_remote(forest::ForestBWG,f::FacetIndex,oct::OctantBWG) = transform_facet_remote(forest,f[1],f[2],oct)
 
 """
-    transform_face(forest::ForestBWG, k', f', o::OctantBWG) -> OctantBWG
-    transform_face(forest::ForestBWG, f'::FaceIndex, o::OctantBWG) -> OctantBWG
+    transform_facet(forest::ForestBWG, k', f', o::OctantBWG) -> OctantBWG
+    transform_facet(forest::ForestBWG, f'::FacetIndex, o::OctantBWG) -> OctantBWG
 Interoctree coordinate transformation of an given octant `o` that lies outside of the pivot octree `k`, namely in neighbor octree `k'`.
 However, the coordinate of `o` is given in octree coordinates of `k`.
 Thus, this algorithm implements the transformation of the octree coordinates of `o` into the octree coordinates of `k'`.
@@ -1500,7 +1500,7 @@ Consider 4 octrees with a single leaf each and a maximum refinement level of 1
 This function transforms octant 1 into the coordinate system of octant 2 by specifying `k=1` and `f=2`.
 While from the perspective of octree coordinates `k=2` octant 1 is at `xyz=(-2,0)`, the returned and transformed octant is located at `xyz=(0,0)`
 """
-function transform_face(forest::ForestBWG, k::T1, f::T1, o::OctantBWG{2,<:Any,T2}) where {T1<:Integer,T2<:Integer}
+function transform_facet(forest::ForestBWG, k::T1, f::T1, o::OctantBWG{2,<:Any,T2}) where {T1<:Integer,T2<:Integer}
     _one = one(T2)
     _two = T2(2)
     _perm = 𝒱₂_perm
@@ -1540,7 +1540,7 @@ function transform_face(forest::ForestBWG, k::T1, f::T1, o::OctantBWG{2,<:Any,T2
     return OctantBWG(o.l,(xyz[a[1] + _one],xyz[a[2] + _one]))
 end
 
-function transform_face(forest::ForestBWG, k::T1, f::T1, o::OctantBWG{3,<:Any,T2}) where {T1<:Integer,T2<:Integer}
+function transform_facet(forest::ForestBWG, k::T1, f::T1, o::OctantBWG{3,<:Any,T2}) where {T1<:Integer,T2<:Integer}
     _one = one(T2)
     _two = T2(2)
     _perm = 𝒱₃_perm
@@ -1595,7 +1595,7 @@ function transform_face(forest::ForestBWG, k::T1, f::T1, o::OctantBWG{3,<:Any,T2
     # return OctantBWG(o.l,(xyz[a[1] + _one],xyz[a[2] + _one],xyz[a[3] + _one]))
 end
 
-transform_face(forest::ForestBWG,f::FaceIndex,oct::OctantBWG) = transform_face(forest,f[1],f[2],oct)
+transform_facet(forest::ForestBWG,f::FacetIndex,oct::OctantBWG) = transform_facet(forest,f[1],f[2],oct)
 
 """
     transform_corner(forest,k,c',oct,inside::Bool)
