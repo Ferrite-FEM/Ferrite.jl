@@ -21,7 +21,7 @@
         geom_interpol = scalar_interpol # Tests below assume this
         n_basefunc_base = getnbasefunctions(scalar_interpol)
         cv = @inferred CellValues(quad_rule, func_interpol, geom_interpol)
-        ndim = Ferrite.getdim(func_interpol)
+        rdim = Ferrite.getrefdim(func_interpol)
         n_basefuncs = getnbasefunctions(func_interpol)
 
         @test getnbasefunctions(cv) == n_basefuncs
@@ -33,10 +33,10 @@
         # We test this by applying a given deformation gradient on all the nodes.
         # Since this is a linear deformation we should get back the exact values
         # from the interpolation.
-        u = Vec{ndim, Float64}[zero(Tensor{1,ndim}) for i in 1:n_basefunc_base]
+        u = zeros(Vec{rdim, Float64}, n_basefunc_base)
         u_scal = zeros(n_basefunc_base)
-        H = rand(Tensor{2, ndim})
-        V = rand(Tensor{1, ndim})
+        H = rand(Tensor{2, rdim})
+        V = rand(Tensor{1, rdim})
         for i in 1:n_basefunc_base
             u[i] = H ⋅ x[i]
             u_scal[i] = V ⋅ x[i]
@@ -50,7 +50,7 @@
                 @test function_divergence(cv, i, u_scal) ≈ sum(V)
                 @test function_divergence(cv, i, u) ≈ tr(H)
                 @test function_gradient(cv, i, u_scal) ≈ V
-                ndim == 3 && @test function_curl(cv, i, u) ≈ Ferrite.curl_from_gradient(H)
+                rdim == 3 && @test function_curl(cv, i, u) ≈ Ferrite.curl_from_gradient(H)
                 function_value(cv, i, u)
                 function_value(cv, i, u_scal)
             else# func_interpol isa Ferrite.VectorInterpolation
@@ -60,7 +60,7 @@
                 @test (@test_deprecated function_symmetric_gradient(cv, i, u)) ≈ 0.5(H + H')
                 @test function_divergence(cv, i, u_vector) ≈ tr(H)
                 @test (@test_deprecated function_divergence(cv, i, u)) ≈ tr(H)
-                if ndim == 3
+                if rdim == 3
                     @test function_curl(cv, i, u_vector) ≈ Ferrite.curl_from_gradient(H)
                     @test (@test_deprecated function_curl(cv, i, u)) ≈ Ferrite.curl_from_gradient(H)
                 end

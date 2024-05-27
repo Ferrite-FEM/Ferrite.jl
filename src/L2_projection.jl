@@ -246,7 +246,7 @@ function _evaluate_at_grid_nodes(
         data = fill(NaN * zero(S), getnnodes(get_grid(dh)))
     end
     ip, gip = proj.func_ip, proj.geom_ip
-    refdim, refshape = getdim(ip), getrefshape(ip)
+    refdim, refshape = getrefdim(ip), getrefshape(ip)
     local_node_coords = reference_coordinates(gip)
     qr = QuadratureRule{refshape}(zeros(length(local_node_coords)), local_node_coords)
     cv = CellValues(qr, ip)

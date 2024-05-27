@@ -22,7 +22,7 @@ end;
 
 # Next, we create a constructor with the same input as `CellValues`
 function SimpleCellValues(qr::QuadratureRule, ip_fun::Interpolation, ip_geo::Interpolation)
-    dim = Ferrite.getdim(ip_fun)
+    dim = Ferrite.getrefdim(ip_fun)
     ## Quadrature weights and coordinates (in reference cell)
     weights = Ferrite.getweights(qr)
     n_qpoints = length(weights)

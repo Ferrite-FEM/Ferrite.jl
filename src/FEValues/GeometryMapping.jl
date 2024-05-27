@@ -65,7 +65,7 @@ function GeometryMapping{1}(::Type{T}, ip::ScalarInterpolation, qr::QuadratureRu
     n_qpoints = getnquadpoints(qr)
 
     M    = zeros(T,                 n_shape, n_qpoints)
-    dMdξ = zeros(Vec{getdim(ip),T}, n_shape, n_qpoints)
+    dMdξ = zeros(Vec{getrefdim(ip),T}, n_shape, n_qpoints)
 
     gm = GeometryMapping(ip, M, dMdξ, nothing)
     precompute_values!(gm, getpoints(qr))
@@ -76,8 +76,8 @@ end
     n_qpoints = getnquadpoints(qr)
 
     M      = zeros(T,                      n_shape, n_qpoints)
-    dMdξ   = zeros(Vec{getdim(ip),T},      n_shape, n_qpoints)
-    d2Mdξ2 = zeros(Tensor{2,getdim(ip),T}, n_shape, n_qpoints)
+    dMdξ   = zeros(Vec{getrefdim(ip),T},      n_shape, n_qpoints)
+    d2Mdξ2 = zeros(Tensor{2,getrefdim(ip),T}, n_shape, n_qpoints)
 
     gm = GeometryMapping(ip, M, dMdξ, d2Mdξ2)
     precompute_values!(gm, getpoints(qr))

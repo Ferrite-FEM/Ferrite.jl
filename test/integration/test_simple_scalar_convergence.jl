@@ -1,5 +1,5 @@
 using Ferrite, Test
-import Ferrite: getdim, default_interpolation
+import Ferrite: getrefdim, default_interpolation
 
 module ConvergenceTestHelper
 
@@ -160,7 +160,7 @@ end # module ConvergenceTestHelper
         geometry = ConvergenceTestHelper.get_geometry(interpolation)
         interpolation_geo = default_interpolation(geometry)
         N = ConvergenceTestHelper.get_num_elements(interpolation)
-        grid = generate_grid(geometry, ntuple(x->N, getdim(geometry)));
+        grid = generate_grid(geometry, ntuple(x->N, getrefdim(geometry)));
         # ... a suitable quadrature rule ...
         qr_order = ConvergenceTestHelper.get_quadrature_order(interpolation)
         qr = QuadratureRule{getrefshape(interpolation)}(qr_order)
@@ -190,7 +190,7 @@ end
         interpolation_geo = default_interpolation(geometry)
         # "Coarse case"
         N₁ = ConvergenceTestHelper.get_num_elements(interpolation)
-        grid = generate_grid(geometry, ntuple(x->N₁, getdim(geometry)));
+        grid = generate_grid(geometry, ntuple(x->N₁, getrefdim(geometry)));
         # ... a suitable quadrature rule ...
         qr_order = ConvergenceTestHelper.get_quadrature_order(interpolation)
         qr = QuadratureRule{getrefshape(interpolation)}(qr_order)
@@ -201,7 +201,7 @@ end
 
         # "Fine case"
         N₂ = 2*N₁
-        grid = generate_grid(geometry, ntuple(x->N₂, getdim(geometry)));
+        grid = generate_grid(geometry, ntuple(x->N₂, getrefdim(geometry)));
         # ... a suitable quadrature rule ...
         qr_order = ConvergenceTestHelper.get_quadrature_order(interpolation)
         qr = QuadratureRule{getrefshape(interpolation)}(qr_order)

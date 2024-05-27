@@ -41,7 +41,7 @@
                       CrouzeixRaviart{RefTriangle, 1}(),
     )
         # Test of utility functions
-        ref_dim = Ferrite.getdim(interpolation)
+        ref_dim = Ferrite.getrefdim(interpolation)
         ref_shape = Ferrite.getrefshape(interpolation)
         func_order = Ferrite.getorder(interpolation)
         @test typeof(interpolation) <: Interpolation{ref_shape,func_order}
