@@ -1,5 +1,10 @@
 # Putting this flag to false reproduces the figure shown in the example #src
 # We check for laminar flow development in the CI                       #src
+if @isdefined is_ci    #hide
+    IS_CI = false      #hide
+else                   #hide
+    IS_CI = true       #hide
+end                    #hide
 # # [Incompressible Navier-Stokes equations via DifferentialEquations.jl](@id tutorial-ins-ordinarydiffeq)
 #
 # ![](https://user-images.githubusercontent.com/9196588/134514213-76d91d34-19ab-47c2-957e-16bb0c8669e1.gif)
@@ -130,7 +135,7 @@ gmsh.option.set_number("General.Verbosity", 2)
 dim = 2;
 # We specify first the rectangle, the cylinder, the surface spanned by the cylinder
 # and the boolean difference of rectangle and cylinder.
-if !is_ci                                                                                           #hide
+if !IS_CI                                                                                           #hide
 rect_tag = gmsh.model.occ.add_rectangle(0, 0, 0, 1.1, 0.41)
 circle_tag = gmsh.model.occ.add_circle(0.2, 0.2, 0, 0.05)
 circle_curve_tag = gmsh.model.occ.add_curve_loop([circle_tag])
@@ -143,7 +148,7 @@ end                                                                             
 # of `gmsh.model.occ`
 gmsh.model.occ.synchronize()
 # In the next lines, we add the physical groups needed to define boundary conditions.
-if !is_ci                                                                                           #hide
+if !IS_CI                                                                                           #hide
 bottomtag = gmsh.model.model.add_physical_group(dim-1,[6],-1,"bottom")
 lefttag = gmsh.model.model.add_physical_group(dim-1,[7],-1,"left")
 righttag = gmsh.model.model.add_physical_group(dim-1,[8],-1,"right")
@@ -160,10 +165,10 @@ end # hide
 gmsh.option.setNumber("Mesh.Algorithm",11)
 gmsh.option.setNumber("Mesh.MeshSizeFromCurvature",20)
 gmsh.option.setNumber("Mesh.MeshSizeMax",0.05)
-if is_ci                                                                                             #hide
-gmsh.option.setNumber("Mesh.MeshSizeFromCurvature",20)                                               #hide
-gmsh.option.setNumber("Mesh.MeshSizeMax",0.15)                                                       #hide
-end                                                                                                  #hide
+if IS_CI                                                                                            #hide
+gmsh.option.setNumber("Mesh.MeshSizeFromCurvature",20)                                              #hide
+gmsh.option.setNumber("Mesh.MeshSizeMax",0.15)                                                      #hide
+end                                                                                                 #hide
 # In the next step, the mesh is generated and finally translated.
 gmsh.model.mesh.generate(dim)
 grid = togrid()
@@ -193,8 +198,8 @@ ch = ConstraintHandler(dh);
 
 nosplip_facet_names = ["top", "bottom", "hole"];
 # No hole for the test present                                          #src
-if is_ci                                                                #hide
-nosplip_facet_names = ["top", "bottom"]                                  #hide
+if IS_CI                                                                #hide
+nosplip_facet_names = ["top", "bottom"]                                 #hide
 end                                                                     #hide
 ∂Ω_noslip = union(getfacetset.((grid, ), nosplip_facet_names)...);
 noslip_bc = Dirichlet(:v, ∂Ω_noslip, (x, t) -> Vec((0.0,0.0)), [1,2])
@@ -333,7 +338,7 @@ end;
 #     the initial formation.
 T = 6.0
 Δt₀ = 0.001
-if is_ci                                                                #hide
+if IS_CI                                                                #hide
     Δt₀ = 0.1                                                           #hide
 end                                                                     #hide
 Δt_save = 0.1
@@ -544,7 +549,7 @@ end
 # by utilizing the corresponding pvd file.
 timestepper = Rodas5P(autodiff=false, step_limiter! = ferrite_limiter!);
 # timestepper = ImplicitEuler(nlsolve=NonlinearSolveAlg(OrdinaryDiffEq.NonlinearSolve.NewtonRaphson(autodiff=OrdinaryDiffEq.AutoFiniteDiff()); max_iter=50), step_limiter! = ferrite_limiter!)
-#NOTE!   This is left for future reference                                 #src
+#NOTE!   This is left for future reference                                #src
 # function algebraicmultigrid(W,du,u,p,t,newW,Plprev,Prprev,solverdata)   #src
 #     if newW === nothing || newW                                         #src
 #         Pl = aspreconditioner(ruge_stuben(convert(AbstractMatrix,W)))   #src
@@ -566,10 +571,15 @@ integrator = init(
 
 
 pvd = VTKFileCollection("vortex-street", grid);
-for (u,t) in TimeChoiceIterator(integrator, 0.0:Δt_save:T)
-    # We ignored the Dirichlet constraints in the solution vector up to now,
-    # so we have to bring them back now.
-    #+
+#for (u_uc,t) in TimeChoiceIterator(integrator, 0.0:Δt_save:T)
+#    #update!(ch, t)
+#    #u = copy(u_uc)
+#    #apply!(u, ch)
+#    addstep!(pvd, t) do io
+#        write_solution(io, dh, u_uc)
+#    end
+#end
+for (u,t) in tuples(integrator)
     addstep!(pvd, t) do io
         write_solution(io, dh, u)
     end
@@ -577,7 +587,7 @@ end
 close(pvd);
 
 # Test the result for full proper development of the flow                   #src
-if is_ci                                                                    #hide
+if IS_CI                                                                        #hide
     using Test                                                                  #hide
     function compute_divergence(dh, u, cellvalues_v)                            #hide
         divv = 0.0                                                              #hide
