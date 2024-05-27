@@ -193,12 +193,12 @@ close!(dh);
 # fluid on this portion of the boundary is fixed to be zero.
 ch = ConstraintHandler(dh);
 
-nosplip_face_names = ["top", "bottom", "hole"];
+nosplip_facet_names = ["top", "bottom", "hole"];
 # No hole for the test present                                          #src
 if IS_CI                                                                #hide
-nosplip_face_names = ["top", "bottom"]                                  #hide
+nosplip_facet_names = ["top", "bottom"]                                  #hide
 end                                                                     #hide
-∂Ω_noslip = union(getfaceset.((grid, ), nosplip_face_names)...);
+∂Ω_noslip = union(getfacetset.((grid, ), nosplip_facet_names)...);
 noslip_bc = Dirichlet(:v, ∂Ω_noslip, (x, t) -> Vec((0.0,0.0)), [1,2])
 add!(ch, noslip_bc);
 
@@ -207,7 +207,7 @@ add!(ch, noslip_bc);
 # is already enough to obtain some simple vortex streets. By increasing the
 # velocity further we can obtain stronger vortices - which may need additional
 # refinement of the grid.
-∂Ω_inflow = getfaceset(grid, "left");
+∂Ω_inflow = getfacetset(grid, "left");
 
 # !!! note
 #     The adaptivity only works if the pressure field varies smoothly
@@ -224,7 +224,7 @@ add!(ch, inflow_bc);
 # cylinder when the weak form has been derived by setting the boundary integral
 # to zero. It is also called the do-nothing condition. Other outflow conditions
 # are also possible.
-∂Ω_free = getfaceset(grid, "right");
+∂Ω_free = getfacetset(grid, "right");
 
 close!(ch)
 update!(ch, 0.0);
@@ -566,19 +566,21 @@ integrator = init(
     verbose=true, internalnorm=FreeDofErrorNorm(ch)
 );
 
-pvd = paraview_collection("vortex-street.pvd");
 
-for (u,t) in TimeChoiceIterator(integrator, 0.0:Δt_save:T)
+pvd = VTKFileCollection("vortex-street", grid);
+integrator = TimeChoiceIterator(integrator, 0.0:Δt_save:T)
+for (u_uc,t) in integrator
     # We ignored the Dirichlet constraints in the solution vector up to now,
     # so we have to bring them back now.
     #+
-    vtk_grid("vortex-street-$t.vtu", dh) do vtk
-        vtk_point_data(vtk,dh,u)
-        vtk_save(vtk)
-        pvd[t] = vtk
+    update!(ch, t)
+    u = copy(u_uc)
+    apply!(u, ch)
+    addstep!(pvd, t) do io
+        write_solution(io, dh, u)
     end
 end
-vtk_save(pvd);
+close(pvd);
 
 # Test the result for full proper development of the flow                   #src
 using Test                                                                  #hide

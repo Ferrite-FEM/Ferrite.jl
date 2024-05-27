@@ -462,7 +462,7 @@ uuid = "29a986be-02c6-4525-aec4-84b980013641"
 version = "2.0.3"
 
 [[deps.Ferrite]]
-deps = ["EnumX", "LinearAlgebra", "NearestNeighbors", "Preferences", "Reexport", "SparseArrays", "StaticArrays", "Tensors", "WriteVTK"]
+deps = ["EnumX", "ForwardDiff", "LinearAlgebra", "NearestNeighbors", "OrderedCollections", "Preferences", "Reexport", "SparseArrays", "StaticArrays", "Tensors", "WriteVTK"]
 path = ".."
 uuid = "c061ca5d-56c9-439f-9c0e-210fe06d3992"
 version = "0.3.14"
@@ -483,9 +483,9 @@ version = "1.1.0"
 
 [[deps.FerriteMeshParser]]
 deps = ["Ferrite"]
-git-tree-sha1 = "47a1215bc76454082e265cb5193cffc9700bccb7"
+git-tree-sha1 = "54a647bf423475c6a54d1960bf694880953d27e9"
 uuid = "0f8c756f-80dd-4a75-85c6-b0a5ab9d4620"
-version = "0.1.8"
+version = "0.2.0"
 
 [[deps.FileIO]]
 deps = ["Pkg", "Requires", "UUIDs"]

@@ -6,7 +6,7 @@ struct L2Projector <: AbstractProjector
     geom_ip::Interpolation
     M_cholesky #::SuiteSparse.CHOLMOD.Factor{Float64}
     dh::DofHandler
-    set::Vector{Int}
+    set::OrderedSet{Int}
 end
 
 """
@@ -36,7 +36,7 @@ function L2Projector(
         func_ip::Interpolation,
         grid::AbstractGrid;
         qr_lhs::QuadratureRule = _mass_qr(func_ip),
-        set = 1:getncells(grid),
+        set = OrderedSet(1:getncells(grid)),
         geom_ip::Interpolation = default_interpolation(getcelltype(grid, first(set))),
     )
 
@@ -46,19 +46,20 @@ function L2Projector(
     end
 
     _check_same_celltype(grid, set)
+    _set = convert_to_orderedset(set)
 
     fe_values_mass = CellValues(qr_lhs, func_ip, geom_ip)
 
     # Create an internal scalar valued field. This is enough since the projection is done on a component basis, hence a scalar field.
     dh = DofHandler(grid)
-    sdh = SubDofHandler(dh, Set(set))
+    sdh = SubDofHandler(dh, _set)
     add!(sdh, :_, func_ip) # we need to create the field, but the interpolation is not used here
     close!(dh)
 
-    M = _assemble_L2_matrix(fe_values_mass, set, dh)  # the "mass" matrix
+    M = _assemble_L2_matrix(fe_values_mass, _set, dh)  # the "mass" matrix
     M_cholesky = cholesky(M)
 
-    return L2Projector(func_ip, geom_ip, M_cholesky, dh, collect(set))
+    return L2Projector(func_ip, geom_ip, M_cholesky, dh, _set)
 end
 
 # Quadrature sufficient for integrating a mass matrix
@@ -223,13 +224,6 @@ function _project(vars, proj::L2Projector, fe_values::AbstractValues, M::Integer
     return T[make_T(x) for x in eachrow(projected_vals)]
 end
 
-function WriteVTK.vtk_point_data(vtk::WriteVTK.DatasetFile, proj::L2Projector, vals::Vector{T}, name::AbstractString) where T
-    data = _evaluate_at_grid_nodes(proj, vals, #=vtk=# Val(true))::Matrix
-    @assert size(data, 2) == getnnodes(get_grid(proj.dh))
-    vtk_point_data(vtk, data, name; component_names=component_names(T))
-    return vtk
-end
-
 evaluate_at_grid_nodes(proj::L2Projector, vals::AbstractVector) =
     _evaluate_at_grid_nodes(proj, vals, Val(false))
 
@@ -252,7 +246,7 @@ function _evaluate_at_grid_nodes(
         data = fill(NaN * zero(S), getnnodes(get_grid(dh)))
     end
     ip, gip = proj.func_ip, proj.geom_ip
-    refdim, refshape = getdim(ip), getrefshape(ip)
+    refdim, refshape = getrefdim(ip), getrefshape(ip)
     local_node_coords = reference_coordinates(gip)
     qr = QuadratureRule{refshape}(zeros(length(local_node_coords)), local_node_coords)
     cv = CellValues(qr, ip)

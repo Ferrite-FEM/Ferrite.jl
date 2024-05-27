@@ -133,7 +133,7 @@ function test_projection_mixedgrid()
     # use a SymmetricTensor here for testing the symmetric version of project
     f(x) = SymmetricTensor{2,2,Float64}((1 + x[1]^2, 2x[2]^2, x[1]*x[2]))
     xe = getcoordinates(mesh, 1)
-    
+
     # analytical values
     qp_values = [[f(spatial_coordinate(cv, qp, xe)) for qp in 1:getnquadpoints(cv)]]
     qp_values_matrix = reduce(hcat, qp_values)
@@ -281,16 +281,17 @@ function test_export(;subset::Bool)
     end
 
     mktempdir() do tmp
-        fname = vtk_grid(joinpath(tmp, "projected"), grid) do vtk
-            vtk_point_data(vtk, p, p_scalar, "p_scalar")
-            vtk_point_data(vtk, p, p_vec, "p_vec")
-            vtk_point_data(vtk, p, p_tens, "p_tens")
-            vtk_point_data(vtk, p, p_stens, "p_stens")
+        fname = joinpath(tmp, "projected")
+        VTKFile(fname, grid) do vtk
+            write_projection(vtk, p, p_scalar, "p_scalar")
+            write_projection(vtk, p, p_vec, "p_vec")
+            write_projection(vtk, p, p_tens, "p_tens")
+            write_projection(vtk, p, p_stens, "p_stens")
         end
         # The following test may fail due to floating point inaccuracies
         # These could occur due to e.g. changes in system architecture.
         if Sys.islinux() && Sys.ARCH === :x86_64
-            @test bytes2hex(open(SHA.sha1, fname[1], "r")) == (
+            @test bytes2hex(open(SHA.sha1, fname*".vtu", "r")) == (
                 subset ? "b3fef3de9f38ca9ddd92f2f67a1606d07ca56d67" :
                          "bc2ec8f648f9b8bccccf172c1fc48bf03340329b"
             )

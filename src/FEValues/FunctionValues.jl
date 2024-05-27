@@ -28,8 +28,8 @@ typeof_dNdξ(::Type{T}, ::VectorInterpolation{vdim}, ::VectorizedInterpolation{s
 """
     FunctionValues{DiffOrder}(::Type{T}, ip_fun, qr::QuadratureRule, ip_geo::VectorizedInterpolation)
 
-Create a `FunctionValues` object containing the shape values and gradients (up to order `DiffOrder`) 
-for both the reference cell (precalculated) and the real cell (updated in `reinit!`). 
+Create a `FunctionValues` object containing the shape values and gradients (up to order `DiffOrder`)
+for both the reference cell (precalculated) and the real cell (updated in `reinit!`).
 """
 FunctionValues
 
@@ -49,7 +49,7 @@ end
 function FunctionValues{DiffOrder}(::Type{T}, ip::Interpolation, qr::QuadratureRule, ip_geo::VectorizedInterpolation) where {DiffOrder, T}
     n_shape = getnbasefunctions(ip)
     n_qpoints = getnquadpoints(qr)
-    
+
     Nξ = zeros(typeof_N(T, ip, ip_geo), n_shape, n_qpoints)
     Nx = isa(mapping_type(ip), IdentityMapping) ? Nξ : similar(Nξ)
 
@@ -100,7 +100,7 @@ sdim_from_gradtype(::Type{<:SVector{sdim}}) where sdim = sdim
 sdim_from_gradtype(::Type{<:SMatrix{<:Any,sdim}}) where sdim = sdim
 
 # For performance, these must be fully inferable for the compiler.
-# args: valname (:CellValues or :FaceValues), shape_gradient_type, eltype(x)
+# args: valname (:CellValues or :FacetValues), shape_gradient_type, eltype(x)
 function check_reinit_sdim_consistency(valname, gradtype::Type, ::Type{<:Vec{sdim}}) where {sdim}
     check_reinit_sdim_consistency(valname, Val(sdim_from_gradtype(gradtype)), Val(sdim))
 end
@@ -110,21 +110,21 @@ function check_reinit_sdim_consistency(valname, ::Val{sdim_val}, ::Val{sdim_x}) 
     throw(ArgumentError("The $valname (sdim=$sdim_val) and coordinates (sdim=$sdim_x) have different spatial dimensions."))
 end
 
-# Mapping types 
-struct IdentityMapping end 
+# Mapping types
+struct IdentityMapping end
 # Not yet implemented:
 # struct CovariantPiolaMapping end # PR798
 # struct ContravariantPiolaMapping end # PR798
-# struct DoubleCovariantPiolaMapping end 
-# struct DoubleContravariantPiolaMapping end 
+# struct DoubleCovariantPiolaMapping end
+# struct DoubleContravariantPiolaMapping end
 
 mapping_type(fv::FunctionValues) = mapping_type(fv.ip)
 
 """
     required_geo_diff_order(fun_mapping, fun_diff_order::Int)
 
-Return the required order of geometric derivatives to map 
-the function values and gradients from the reference cell 
+Return the required order of geometric derivatives to map
+the function values and gradients from the reference cell
 to the physical cell geometry.
 """
 required_geo_diff_order(::IdentityMapping,           fun_diff_order::Int) = fun_diff_order
@@ -167,6 +167,6 @@ end
     return nothing
 end
 
-# TODO in PR798, apply_mapping! for 
+# TODO in PR798, apply_mapping! for
 # * CovariantPiolaMapping
 # * ContravariantPiolaMapping

@@ -126,9 +126,9 @@ Gmsh.
 
 #### [Tutorial 9: Porous media (SubDofHandler)](porous_media.md)
 
-This tutorial introduces how to solve a complex linear problem, where there are different 
+This tutorial introduces how to solve a complex linear problem, where there are different
 fields on different subdomains, and different cell types in the grid. This requires using
-the `SubDofHandler` interface. 
+the `SubDofHandler` interface.
 
 **Keywords**: Mixed grids, multiple fields, porous media, `SubDofHandler`
 

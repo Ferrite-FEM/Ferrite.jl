@@ -21,14 +21,14 @@ export
 
 # Quadrature
     QuadratureRule,
-    FaceQuadratureRule,
+    FacetQuadratureRule,
     getnquadpoints,
 
 # FEValues
     AbstractCellValues,
-    AbstractFaceValues,
+    AbstractFacetValues,
     CellValues,
-    FaceValues,
+    FacetValues,
     InterfaceValues,
     reinit!,
     shape_value,
@@ -74,6 +74,7 @@ export
     FaceIndex,
     EdgeIndex,
     VertexIndex,
+    FacetIndex,
     ExclusiveTopology,
     getneighborhood,
     faceskeleton,
@@ -86,19 +87,15 @@ export
     getcelltype,
     getcellset,
     getnodeset,
-    getfaceset,
-    getedgeset,
+    getfacetset,
     getvertexset,
     get_node_coordinate,
     getcoordinates,
     getcoordinates!,
-    onboundary,
-    nfaces,
+    nfacets,
     addnodeset!,
-    addfaceset!,
-    addboundaryfaceset!,
-    addedgeset!,
-    addboundaryedgeset!,
+    addfacetset!,
+    addboundaryfacetset!,
     addvertexset!,
     addboundaryvertexset!,
     addcellset!,
@@ -108,7 +105,6 @@ export
 # Grid coloring
     create_coloring,
     ColoringAlgorithm,
-    vtk_cell_data_colors,
 
 # Dofs
     DofHandler,
@@ -130,9 +126,9 @@ export
     ConstraintHandler,
     Dirichlet,
     PeriodicDirichlet,
-    collect_periodic_faces,
-    collect_periodic_faces!,
-    PeriodicFacePair,
+    collect_periodic_facets,
+    collect_periodic_facets!,
+    PeriodicFacetPair,
     AffineConstraint,
     update!,
     apply!,
@@ -148,8 +144,8 @@ export
 # iterators
     CellCache,
     CellIterator,
-    FaceCache,
-    FaceIterator,
+    FacetCache,
+    FacetIterator,
     InterfaceCache,
     InterfaceIterator,
     UpdateFlags,
@@ -161,13 +157,14 @@ export
     assemble!,
     finish_assemble,
 
-# VTK export
-    vtk_grid,
-    vtk_point_data,
-    vtk_cell_data,
-    vtk_nodeset,
-    vtk_cellset,
-    vtk_save,
+# exporting data
+    VTKFile,
+    write_solution,
+    write_cell_data,
+    write_projection,
+    write_node_data,
+    VTKFileCollection,
+    addstep!,
 
 # L2 Projection
     project,

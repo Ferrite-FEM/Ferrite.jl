@@ -54,12 +54,6 @@ n_components(::VectorInterpolation{vdim}) where {vdim} = vdim
 # Number of components that are allowed to prescribe in e.g. Dirichlet BC
 n_dbc_components(ip::Interpolation) = n_components(ip)
 
-# TODO: Remove: this is a hotfix to apply constraints to embedded elements.
-edges(ip::InterpolationByDim{2}) = faces(ip)
-edgedof_indices(ip::InterpolationByDim{2}) = facedof_indices(ip)
-edgedof_interior_indices(ip::InterpolationByDim{2}) = facedof_interior_indices(ip)
-facedof_indices(ip::InterpolationByDim{1}) = vertexdof_indices(ip)
-
 # TODO: Add a fallback that errors if there are multiple dofs per edge/face instead to force
 #       interpolations to opt-out instead of silently do nothing.
 """
@@ -83,43 +77,19 @@ struct InterpolationInfo
     nvertexdofs::Vector{Int}
     nedgedofs::Vector{Int}
     nfacedofs::Vector{Int}
-    ncelldofs::Int
+    nvolumedofs::Int
     reference_dim::Int
     adjust_during_distribution::Bool
     n_copies::Int
     is_discontinuous::Bool
 end
-function InterpolationInfo(interpolation::InterpolationByDim{3}, n_copies)
+function InterpolationInfo(interpolation::Interpolation{shape}, n_copies) where {rdim, shape<:AbstractRefShape{rdim}}
     InterpolationInfo(
         [length(i) for i ∈ vertexdof_indices(interpolation)],
         [length(i) for i ∈ edgedof_interior_indices(interpolation)],
         [length(i) for i ∈ facedof_interior_indices(interpolation)],
-        length(celldof_interior_indices(interpolation)),
-        3,
-        adjust_dofs_during_distribution(interpolation),
-        n_copies,
-        is_discontinuous(interpolation)
-    )
-end
-function InterpolationInfo(interpolation::InterpolationByDim{2}, n_copies)
-    InterpolationInfo(
-        [length(i) for i ∈ vertexdof_indices(interpolation)],
-        Int[],
-        [length(i) for i ∈ facedof_interior_indices(interpolation)],
-        length(celldof_interior_indices(interpolation)),
-        2,
-        adjust_dofs_during_distribution(interpolation),
-        n_copies,
-        is_discontinuous(interpolation)
-    )
-end
-function InterpolationInfo(interpolation::InterpolationByDim{1}, n_copies)
-    InterpolationInfo(
-        [length(i) for i ∈ vertexdof_indices(interpolation)],
-        Int[],
-        Int[],
-        length(celldof_interior_indices(interpolation)),
-        1,
+        length(volumedof_interior_indices(interpolation)),
+        rdim,
         adjust_dofs_during_distribution(interpolation),
         n_copies,
         is_discontinuous(interpolation)
@@ -127,35 +97,18 @@ function InterpolationInfo(interpolation::InterpolationByDim{1}, n_copies)
 end
 InterpolationInfo(interpolation::Interpolation) = InterpolationInfo(interpolation, 1)
 
-# Some redundant information about the geometry of the reference cells.
-nfaces(::Interpolation{RefHypercube{dim}}) where {dim} = 2*dim
-nfaces(::Interpolation{RefTriangle}) = 3
-nfaces(::Interpolation{RefTetrahedron}) = 4
-nfaces(::Interpolation{RefPrism}) = 5
-nfaces(::Interpolation{RefPyramid}) = 5
-
-nedges(::Interpolation{RefLine}) = 0
-nedges(::Interpolation{RefQuadrilateral}) = 0
-nedges(::Interpolation{RefHexahedron}) = 12
-nedges(::Interpolation{RefTriangle}) = 0
-nedges(::Interpolation{RefTetrahedron}) = 6
-nedges(::Interpolation{RefPrism}) = 9
-nedges(::Interpolation{RefPyramid}) =  8
-
-nvertices(::Interpolation{RefHypercube{dim}}) where {dim} = 2^dim
-nvertices(::Interpolation{RefTriangle}) = 3
-nvertices(::Interpolation{RefTetrahedron}) = 4
-nvertices(::Interpolation{RefPrism}) = 6
-nvertices(::Interpolation{RefPyramid}) = 5
+nvertices(::Interpolation{RefShape}) where RefShape = nvertices(RefShape)
+nedges(::Interpolation{RefShape})    where RefShape = nedges(RefShape)
+nfaces(::Interpolation{RefShape})    where RefShape = nfaces(RefShape)
 
 Base.copy(ip::Interpolation) = ip
 
 """
-    Ferrite.getdim(::Interpolation)
+    Ferrite.getrefdim(::Interpolation)
 
 Return the dimension of the reference element for a given interpolation.
 """
-@inline getdim(::Interpolation{shape}) where {dim, shape <: AbstractRefShape{dim}} = dim
+@inline getrefdim(::Interpolation{RefShape}) where RefShape = getrefdim(RefShape)
 
 """
     Ferrite.getrefshape(::Interpolation)::AbstractRefShape
@@ -284,7 +237,7 @@ end
     shape_hessian_gradient_and_value(ip::Interpolation, ξ::Vec, i::Int)
 
 Optimized version combining the evaluation [`Ferrite.shape_value(::Interpolation)`](@ref),
-[`Ferrite.shape_gradient(::Interpolation)`](@ref), and the gradient of the latter. 
+[`Ferrite.shape_gradient(::Interpolation)`](@ref), and the gradient of the latter.
 """
 function shape_hessian_gradient_and_value(ip::Interpolation, ξ::Vec, i::Int)
     return hessian(x -> shape_value(ip, x, i), ξ, :all)
@@ -299,7 +252,7 @@ and indices corresponding to the indices of a dof in [`vertices`](@ref), [`faces
 [`edges`](@ref).
 
     Only required for nodal interpolations.
-    
+
     TODO: Separate nodal and non-nodal interpolations.
 """
 reference_coordinates(::Interpolation)
@@ -401,24 +354,24 @@ edge dofs are included here.
     The dofs appearing in the tuple must be continuous and increasing! The first dof must be
     the computed via "last edge interior dof index + 1", if face dofs exist.
 """
-facedof_interior_indices(::Interpolation) 
+facedof_interior_indices(::Interpolation)
 
 """
-    celldof_interior_indices(ip::Interpolation)
+    volumedof_interior_indices(ip::Interpolation)
 
-Tuple containing the dof indices associated with the interior of the cell.
+Tuple containing the dof indices associated with the interior of a volume.
 
 !!! note
-    The dofs appearing in the tuple must be continuous and increasing! Celldofs are
+    The dofs appearing in the tuple must be continuous and increasing, volumedofs are
     enumerated last.
 """
-celldof_interior_indices(::Interpolation) = ()
+volumedof_interior_indices(::Interpolation) = ()
 
 # Some helpers to skip boilerplate
-edgedof_indices(ip::InterpolationByDim{3}) = ntuple(_ -> (), nedges(ip))
-edgedof_interior_indices(ip::InterpolationByDim{3}) = ntuple(_ -> (), nedges(ip))
-facedof_indices(ip::Union{InterpolationByDim{2}, InterpolationByDim{3}}) =  ntuple(_ -> (), nfaces(ip))
-facedof_interior_indices(ip::Union{InterpolationByDim{2}, InterpolationByDim{3}}) =  ntuple(_ -> (), nfaces(ip))
+edgedof_indices(ip::Interpolation) = ntuple(_ -> (), nedges(ip))
+edgedof_interior_indices(ip::Interpolation) = ntuple(_ -> (), nedges(ip))
+facedof_indices(ip::Interpolation) =  ntuple(_ -> (), nfaces(ip))
+facedof_interior_indices(ip::Interpolation) =  ntuple(_ -> (), nfaces(ip))
 
 """
     boundarydof_indices(::Type{<:BoundaryIndex})
@@ -430,6 +383,20 @@ boundarydof_indices(::Type{<:BoundaryIndex})
 boundarydof_indices(::Type{FaceIndex}) = Ferrite.facedof_indices
 boundarydof_indices(::Type{EdgeIndex}) = Ferrite.edgedof_indices
 boundarydof_indices(::Type{VertexIndex}) = Ferrite.vertexdof_indices
+
+facetdof_indices(ip::InterpolationByDim{3}) = Ferrite.facedof_indices(ip)
+facetdof_indices(ip::InterpolationByDim{2}) = Ferrite.edgedof_indices(ip)
+facetdof_indices(ip::InterpolationByDim{1}) = Ferrite.vertexdof_indices(ip)
+facetdof_interior_indices(ip::InterpolationByDim{3}) = Ferrite.facedof_interior_indices(ip)
+facetdof_interior_indices(ip::InterpolationByDim{2}) = Ferrite.edgedof_interior_indices(ip)
+facetdof_interior_indices(ip::InterpolationByDim{1}) = ntuple(_ -> (), nvertices(ip))
+dirichlet_facetdof_indices(ip::InterpolationByDim{3}) = dirichlet_facedof_indices(ip)
+dirichlet_facetdof_indices(ip::InterpolationByDim{2}) = dirichlet_edgedof_indices(ip)
+dirichlet_facetdof_indices(ip::InterpolationByDim{1}) = dirichlet_vertexdof_indices(ip)
+
+nfacets(ip::InterpolationByDim{3}) = nfaces(ip)
+nfacets(ip::InterpolationByDim{2}) = nedges(ip)
+nfacets(ip::InterpolationByDim{1}) = nvertices(ip)
 
 """
     is_discontinuous(::Interpolation)
@@ -451,6 +418,7 @@ dirichlet_boundarydof_indices(::Type{<:BoundaryIndex})
 dirichlet_boundarydof_indices(::Type{FaceIndex}) = Ferrite.dirichlet_facedof_indices
 dirichlet_boundarydof_indices(::Type{EdgeIndex}) = Ferrite.dirichlet_edgedof_indices
 dirichlet_boundarydof_indices(::Type{VertexIndex}) = Ferrite.dirichlet_vertexdof_indices
+dirichlet_boundarydof_indices(::Type{FacetIndex}) = dirichlet_facetdof_indices
 
 #########################
 # DiscontinuousLagrange #
@@ -473,7 +441,7 @@ getnbasefunctions(::DiscontinuousLagrange{shape,order}) where {shape,order} = ge
 getnbasefunctions(::DiscontinuousLagrange{shape,0}) where {shape} = 1
 
 # This just moves all dofs into the interior of the element.
-celldof_interior_indices(ip::DiscontinuousLagrange) = ntuple(i->i, getnbasefunctions(ip))
+volumedof_interior_indices(ip::DiscontinuousLagrange) = ntuple(i->i, getnbasefunctions(ip))
 
 # Mirror the Lagrange element for now to avoid repeating.
 dirichlet_facedof_indices(ip::DiscontinuousLagrange{shape, order}) where {shape, order} = dirichlet_facedof_indices(Lagrange{shape, order}())
@@ -538,6 +506,8 @@ getlowerorder(::Lagrange{shape,1}) where {shape} = DiscontinuousLagrange{shape,0
 ############################
 getnbasefunctions(::Lagrange{RefLine,1}) = 2
 
+edgedof_indices(::Lagrange{RefLine,1}) = ((1,2),)
+
 function reference_coordinates(::Lagrange{RefLine,1})
     return [Vec{1, Float64}((-1.0,)),
             Vec{1, Float64}(( 1.0,))]
@@ -555,8 +525,8 @@ end
 ############################
 getnbasefunctions(::Lagrange{RefLine,2}) = 3
 
-facedof_indices(::Lagrange{RefLine,2}) = ((1,), (2,))
-celldof_interior_indices(::Lagrange{RefLine,2}) = (3,)
+edgedof_indices(::Lagrange{RefLine,2}) = ((1,2,3),)
+edgedof_interior_indices(::Lagrange{RefLine,2}) = (3,)
 
 function reference_coordinates(::Lagrange{RefLine,2})
     return [Vec{1, Float64}((-1.0,)),
@@ -577,7 +547,8 @@ end
 #####################################
 getnbasefunctions(::Lagrange{RefQuadrilateral,1}) = 4
 
-facedof_indices(::Lagrange{RefQuadrilateral,1}) = ((1,2), (2,3), (3,4), (4,1))
+edgedof_indices(::Lagrange{RefQuadrilateral,1}) = ((1,2), (2,3), (3,4), (4,1))
+facedof_indices(ip::Lagrange{RefQuadrilateral,1}) = (ntuple(i->i, getnbasefunctions(ip)),)
 
 function reference_coordinates(::Lagrange{RefQuadrilateral,1})
     return [Vec{2, Float64}((-1.0, -1.0)),
@@ -601,9 +572,10 @@ end
 #####################################
 getnbasefunctions(::Lagrange{RefQuadrilateral,2}) = 9
 
-facedof_indices(::Lagrange{RefQuadrilateral,2}) = ((1,2, 5), (2,3, 6), (3,4, 7), (4,1, 8))
-facedof_interior_indices(::Lagrange{RefQuadrilateral,2}) = ((5,), (6,), (7,), (8,))
-celldof_interior_indices(::Lagrange{RefQuadrilateral,2}) = (9,)
+edgedof_indices(::Lagrange{RefQuadrilateral,2}) = ((1,2, 5), (2,3, 6), (3,4, 7), (4,1, 8))
+edgedof_interior_indices(::Lagrange{RefQuadrilateral,2}) = ((5,), (6,), (7,), (8,))
+facedof_indices(ip::Lagrange{RefQuadrilateral,2}) = (ntuple(i->i, getnbasefunctions(ip)),)
+facedof_interior_indices(::Lagrange{RefQuadrilateral,2}) = ((9,))
 
 function reference_coordinates(::Lagrange{RefQuadrilateral,2})
     return [Vec{2, Float64}((-1.0, -1.0)),
@@ -637,9 +609,10 @@ end
 #####################################
 getnbasefunctions(::Lagrange{RefQuadrilateral, 3}) = 16
 
-facedof_indices(::Lagrange{RefQuadrilateral, 3}) = ((1,2, 5,6), (2,3, 7,8), (3,4, 9,10), (4,1, 11,12))
-facedof_interior_indices(::Lagrange{RefQuadrilateral, 3}) = ((5,6), (7,8), (9,10), (11,12))
-celldof_interior_indices(::Lagrange{RefQuadrilateral, 3}) = (13,14,15,16)
+edgedof_indices(::Lagrange{RefQuadrilateral, 3}) = ((1,2, 5,6), (2,3, 7,8), (3,4, 9,10), (4,1, 11,12))
+edgedof_interior_indices(::Lagrange{RefQuadrilateral, 3}) = ((5,6), (7,8), (9,10), (11,12))
+facedof_indices(ip::Lagrange{RefQuadrilateral,3}) = (ntuple(i->i, getnbasefunctions(ip)),)
+facedof_interior_indices(::Lagrange{RefQuadrilateral, 3}) = ((13,14,15,16,),)
 
 function reference_coordinates(::Lagrange{RefQuadrilateral, 3})
     return [Vec{2, Float64}((-1.0, -1.0)),
@@ -689,7 +662,8 @@ end
 ################################
 getnbasefunctions(::Lagrange{RefTriangle,1}) = 3
 
-facedof_indices(::Lagrange{RefTriangle,1}) = ((1,2), (2,3), (3,1))
+edgedof_indices(::Lagrange{RefTriangle,1}) = ((1,2), (2,3), (3,1))
+facedof_indices(ip::Lagrange{RefTriangle,1}) = (ntuple(i->i, getnbasefunctions(ip)),)
 
 function reference_coordinates(::Lagrange{RefTriangle,1})
     return [Vec{2, Float64}((1.0, 0.0)),
@@ -711,8 +685,9 @@ end
 ################################
 getnbasefunctions(::Lagrange{RefTriangle,2}) = 6
 
-facedof_indices(::Lagrange{RefTriangle,2}) = ((1,2,4), (2,3,5), (3,1,6))
-facedof_interior_indices(::Lagrange{RefTriangle,2}) = ((4,), (5,), (6,))
+edgedof_indices(::Lagrange{RefTriangle,2}) = ((1,2,4), (2,3,5), (3,1,6))
+edgedof_interior_indices(::Lagrange{RefTriangle,2}) = ((4,), (5,), (6,))
+facedof_indices(ip::Lagrange{RefTriangle,2}) = (ntuple(i->i, getnbasefunctions(ip)),)
 
 function reference_coordinates(::Lagrange{RefTriangle,2})
     return [Vec{2, Float64}((1.0, 0.0)),
@@ -761,7 +736,7 @@ const permdof2DLagrange2Tri345 = Dict{Int,Vector{Int}}(
     5 => [6, 21, 1, 11, 15, 18, 20, 19, 16, 12, 7, 2, 3, 4, 5, 8, 9, 10, 13, 14, 17],
 )
 
-function facedof_indices(ip::Lagrange2Tri345)
+function edgedof_indices(ip::Lagrange2Tri345)
     order = getorder(ip)
     order == 1 && return ((1,2), (2,3), (3,1))
     order == 2 && return ((1,2,4), (2,3,5), (3,1,6))
@@ -772,7 +747,7 @@ function facedof_indices(ip::Lagrange2Tri345)
     throw(ArgumentError("Unsupported order $order for Lagrange on triangles."))
 end
 
-function facedof_interior_indices(ip::Lagrange2Tri345)
+function edgedof_interior_indices(ip::Lagrange2Tri345)
     order = getorder(ip)
     order == 1 && return ((), (), ())
     order == 2 && return ((4,), (5,), (6,))
@@ -782,11 +757,13 @@ function facedof_interior_indices(ip::Lagrange2Tri345)
     throw(ArgumentError("Unsupported order $order for Lagrange on triangles."))
 end
 
-function celldof_interior_indices(ip::Lagrange2Tri345)
+facedof_indices(ip::Lagrange2Tri345) = (ntuple(i->i, getnbasefunctions(ip)),)
+
+function facedof_interior_indices(ip::Lagrange2Tri345)
     order = getorder(ip)
     ncellintdofs = (order + 1) * (order + 2) ÷ 2 - 3 * order
     totaldofs = getnbasefunctions(ip)
-    return ntuple(i->totaldofs-ncellintdofs+i, ncellintdofs)
+    return (ntuple(i->totaldofs-ncellintdofs+i, ncellintdofs),)
 end
 
 function reference_coordinates(ip::Lagrange2Tri345)
@@ -969,7 +946,7 @@ edgedof_interior_indices(::Lagrange{RefHexahedron,2}) = (
     (9,), (10,), (11,), (12,), (13,), (14,), (15,), (16,), (17), (18,), (19,), (20,)
 )
 
-celldof_interior_indices(::Lagrange{RefHexahedron,2}) = (27,)
+volumedof_interior_indices(::Lagrange{RefHexahedron,2}) = (27,)
 
 function reference_coordinates(::Lagrange{RefHexahedron,2})
            # vertex
@@ -1083,19 +1060,19 @@ end
 getnbasefunctions(::Lagrange{RefPrism,2}) = 18
 
 facedof_indices(::Lagrange{RefPrism,2}) = (
-    #Vertices| Edges  | Face 
+    #Vertices| Edges  | Face
     (1,3,2  , 8,10,7         ),
-    (1,2,5,4, 7,11,13,9,   16), 
+    (1,2,5,4, 7,11,13,9,   16),
     (3,1,4,6, 8,9,14,12,   17),
     (2,3,6,5, 10,12,15,11, 18),
     (4,5,6  , 13,15,14       ),
 )
 facedof_interior_indices(::Lagrange{RefPrism,2}) = (
-    #Vertices| Edges  | Face 
-    (), 
-    (16,), 
-    (17,), 
-    (18,), 
+    #Vertices| Edges  | Face
+    (),
+    (16,),
+    (17,),
+    (18,),
     (),
 )
 edgedof_indices(::Lagrange{RefPrism,2}) = (
@@ -1177,7 +1154,7 @@ end
 getnbasefunctions(::Lagrange{RefPyramid,1}) = 5
 facedof_indices(::Lagrange{RefPyramid,1}) = ((1,3,4,2), (1,2,5), (1,5,3), (2,4,5), (3,5,4), )
 edgedof_indices(::Lagrange{RefPyramid,1}) = ((1,2), (1,3), (1,5), (2,4), (2,5), (4,3), (3,5), (4,5))
- 
+
 function reference_coordinates(::Lagrange{RefPyramid,1})
     return [Vec{3, Float64}((0.0, 0.0, 0.0)),
             Vec{3, Float64}((1.0, 0.0, 0.0)),
@@ -1203,28 +1180,28 @@ end
 getnbasefunctions(::Lagrange{RefPyramid,2}) = 14
 
 facedof_indices(::Lagrange{RefPyramid,2}) = (
-    #Vertices | Edges  | Face 
-    (1,3,4,2, 7,11,9,6, 14), 
-    (1,2,5  , 6,10,8      ), 
-    (1,5,3  , 7,12,8      ), 
-    (2,4,5  , 9,13,10     ), 
-    (3,5,4  , 12,13,11    ), 
+    #Vertices | Edges  | Face
+    (1,3,4,2, 7,11,9,6, 14),
+    (1,2,5  , 6,10,8      ),
+    (1,5,3  , 7,12,8      ),
+    (2,4,5  , 9,13,10     ),
+    (3,5,4  , 12,13,11    ),
 )
 facedof_interior_indices(::Lagrange{RefPyramid,2}) = (
-    (14,), 
-    (), 
-    (), 
-    (), 
+    (14,),
+    (),
+    (),
+    (),
     (),
 )
 edgedof_indices(::Lagrange{RefPyramid,2}) = (
-    (1,2,6), 
-    (1,3,7), 
-    (1,5,8), 
-    (2,4,9), 
-    (2,5,10), 
-    (4,3,11), 
-    (3,5,12), 
+    (1,2,6),
+    (1,3,7),
+    (1,5,8),
+    (2,4,9),
+    (2,5,10),
+    (4,3,11),
+    (3,5,12),
     (4,5,13)
 )
 edgedof_interior_indices(::Lagrange{RefPyramid,2}) = (
@@ -1299,8 +1276,9 @@ getnbasefunctions(::BubbleEnrichedLagrange{RefTriangle,1}) = 4
 adjust_dofs_during_distribution(::BubbleEnrichedLagrange{RefTriangle,1}) = false
 
 vertexdof_indices(::BubbleEnrichedLagrange{RefTriangle,1}) = ((1,), (2,), (3,))
-facedof_indices(::BubbleEnrichedLagrange{RefTriangle,1}) = ((1,2), (2,3), (3,1))
-celldof_interior_indices(::BubbleEnrichedLagrange{RefTriangle,1}) = (4,)
+edgedof_indices(::BubbleEnrichedLagrange{RefTriangle,1}) = ((1,2), (2,3), (3,1))
+facedof_indices(ip::BubbleEnrichedLagrange{RefTriangle,1}) = (ntuple(i->i, getnbasefunctions(ip)),)
+facedof_interior_indices(::BubbleEnrichedLagrange{RefTriangle,1}) = ((4,),)
 
 function reference_coordinates(::BubbleEnrichedLagrange{RefTriangle,1})
     return [Vec{2, Float64}((1.0, 0.0)),
@@ -1328,7 +1306,7 @@ struct Serendipity{shape, order, unused} <: ScalarInterpolation{shape,order}
     end
 end
 
-# Note that the edgedofs for high order serendipity elements are defined in terms of integral moments, 
+# Note that the edgedofs for high order serendipity elements are defined in terms of integral moments,
 # so no permutation exists in general. See e.g. Scroggs et al. [2022] for an example.
 # adjust_dofs_during_distribution(::Serendipity{refshape, order}) where {refshape, order} = false
 adjust_dofs_during_distribution(::Serendipity{<:Any, 2}) = false
@@ -1344,8 +1322,9 @@ vertexdof_indices(::Serendipity{RefHexahedron}) = ((1,),(2,),(3,),(4,),(5,),(6,)
 getnbasefunctions(::Serendipity{RefQuadrilateral,2}) = 8
 getlowerorder(::Serendipity{RefQuadrilateral,2}) = Lagrange{RefQuadrilateral,1}()
 
-facedof_indices(::Serendipity{RefQuadrilateral,2}) = ((1,2,5), (2,3,6), (3,4,7), (4,1,8))
-facedof_interior_indices(::Serendipity{RefQuadrilateral,2}) = ((5,), (6,), (7,), (8,))
+edgedof_indices(::Serendipity{RefQuadrilateral,2}) = ((1,2,5), (2,3,6), (3,4,7), (4,1,8))
+edgedof_interior_indices(::Serendipity{RefQuadrilateral,2}) = ((5,), (6,), (7,), (8,))
+facedof_indices(ip::Serendipity{RefQuadrilateral,2}) = (ntuple(i->i, getnbasefunctions(ip)),)
 
 function reference_coordinates(::Serendipity{RefQuadrilateral,2})
     return [Vec{2, Float64}((-1.0, -1.0)),
@@ -1465,8 +1444,8 @@ end
 Classical non-conforming Crouzeix–Raviart element.
 
 For details we refer to the original paper:
-M. Crouzeix and P. Raviart. "Conforming and nonconforming finite element 
-methods for solving the stationary Stokes equations I." ESAIM: Mathematical Modelling 
+M. Crouzeix and P. Raviart. "Conforming and nonconforming finite element
+methods for solving the stationary Stokes equations I." ESAIM: Mathematical Modelling
 and Numerical Analysis-Modélisation Mathématique et Analyse Numérique 7.R3 (1973): 33-75.
 """
 struct CrouzeixRaviart{shape, order, unused} <: ScalarInterpolation{shape, order}
@@ -1478,8 +1457,9 @@ adjust_dofs_during_distribution(::CrouzeixRaviart{<:Any, 1}) = false
 
 getnbasefunctions(::CrouzeixRaviart) = 3
 
-facedof_indices(::CrouzeixRaviart) = ((1,), (2,), (3,))
-facedof_interior_indices(::CrouzeixRaviart) = ((1,), (2,), (3,))
+edgedof_indices(::CrouzeixRaviart) = ((1,), (2,), (3,))
+edgedof_interior_indices(::CrouzeixRaviart) = ((1,), (2,), (3,))
+facedof_indices(ip::CrouzeixRaviart) = (ntuple(i->i, getnbasefunctions(ip)),)
 
 function reference_coordinates(::CrouzeixRaviart)
     return [Vec{2, Float64}((0.5, 0.5)),
@@ -1487,7 +1467,7 @@ function reference_coordinates(::CrouzeixRaviart)
             Vec{2, Float64}((0.5, 0.0))]
 end
 
-function shape_value(ip::CrouzeixRaviart{RefTriangle, 1}, ξ::Vec{2}, i::Int) 
+function shape_value(ip::CrouzeixRaviart{RefTriangle, 1}, ξ::Vec{2}, i::Int)
     ξ_x = ξ[1]
     ξ_y = ξ[2]
     i == 1 && return 2*ξ_x + 2*ξ_y - 1
@@ -1544,20 +1524,11 @@ function shape_gradient_and_value(ipv::VectorizedInterpolation{dim, shape}, ξ::
 end
 # vdim != refdim
 function shape_gradient_and_value(ipv::VectorizedInterpolation{vdim, shape}, ξ::V, I::Int) where {vdim, refdim, shape <: AbstractRefShape{refdim}, T, V <: Vec{refdim, T}}
-    # Load with dual numbers and compute the value
-    f = x -> shape_value(ipv, x, I)
-    ξd = Tensors._load(ξ, Tensors.Tag(f, V))
-    value_grad = f(ξd)
-    # Extract the value and gradient
-    val = Vec{vdim, T}(i -> Tensors.value(value_grad[i]))
-    grad = zero(MMatrix{vdim, refdim, T})
-    for (i, vi) in pairs(value_grad)
-        p = Tensors.partials(vi)
-        for (j, pj) in pairs(p)
-            grad[i, j] = pj
-        end
-    end
-    return SMatrix(grad), val
+    tosvec(v::Vec) = SVector((v...,))
+    tovec(sv::SVector) = Vec((sv...))
+    val = shape_value(ipv, ξ, I)
+    grad = ForwardDiff.jacobian(sv -> tosvec(shape_value(ipv, tovec(sv), I)), tosvec(ξ))
+    return grad, val
 end
 
 reference_coordinates(ip::VectorizedInterpolation) = reference_coordinates(ip.ip)
@@ -1570,7 +1541,7 @@ is_discontinuous(::Type{<:VectorizedInterpolation{<:Any, <:Any, <:Any, ip}}) whe
 Get the type of mapping from the reference cell to the real cell for an
 interpolation `ip`. Subtypes of `ScalarInterpolation` and `VectorizedInterpolation`
 return `IdentityMapping()`, but other non-scalar interpolations may request different
-mapping types. 
+mapping types.
 """
 function mapping_type end
 
