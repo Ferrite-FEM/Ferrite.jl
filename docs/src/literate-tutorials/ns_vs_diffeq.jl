@@ -141,7 +141,7 @@ gmsh.model.occ.cut([(dim,rect_tag)],[(dim,circle_surf_tag)]);
 else                                                                                                #hide
 rect_tag = gmsh.model.occ.add_rectangle(0, 0, 0, 0.55, 0.41);                                       #hide
 end                                                                                                 #hide
-# Now, the geometrical entities need to be synchronized in order to be available outside 
+# Now, the geometrical entities need to be synchronized in order to be available outside
 # of `gmsh.model.occ`
 gmsh.model.occ.synchronize()
 # In the next lines, we add the physical groups needed to define boundary conditions.
@@ -368,19 +368,19 @@ jac_sparsity = sparse(K);
 # also need to hand over the constraint handler.
 # The basic idea to apply the Dirichlet BCs consistently is that we copy the
 # current solution `u`, apply the Dirichlet BCs on the copy, evaluate the
-# discretized RHS of the Navier-Stokes equations with this vector. 
+# discretized RHS of the Navier-Stokes equations with this vector.
 # Furthermore we pass down the Jacobian assembly manually. For the Jacobian we eliminate all
 # rows and columns associated with constrained dofs. Also note that we eliminate the mass
 # matrix beforehand in a similar fashion. This decouples the time evolution of the constrained
-# dofs from the true unknowns. The correct solution is enforced by utilizing step and 
+# dofs from the true unknowns. The correct solution is enforced by utilizing step and
 # stage limiters. The correct norms are computed by passing down a custom norm which simply
 # ignores all constrained dofs.
 #
 # !!! Note
 #     An alternative strategy is to hook into the nonlinear and linear solvers and enforce
 #     the solution therein. However, this is not possible at the time of writing this tutorial.
-# 
-apply!(M, ch) 
+#
+apply!(M, ch)
 
 struct RHSparams
     K::SparseMatrixCSC
@@ -538,7 +538,7 @@ end
 # Finally we have to communicate the time step length and initialization
 # algorithm. Since we start with a valid initial state we do not use one of
 # DifferentialEquations.jl initialization algorithms.
-# !!! note "DAE initialization" 
+# !!! note "DAE initialization"
 #     At the time of writing this [no Hessenberg index 2 initialization is implemented](https://github.com/SciML/OrdinaryDiffEq.jl/issues/1019).
 #
 # To visualize the result we export the grid and our fields
