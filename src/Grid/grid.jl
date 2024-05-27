@@ -132,9 +132,10 @@ reference_facets(::Type{<:AbstractRefShape})
 @inline reference_facets(refshape::Type{<:AbstractRefShape{3}}) = reference_faces(refshape)
 
 """
-    geometric_interpolation(cell::AbstractCell)::Interpolation
+    geometric_interpolation(::AbstractCell)::Interpolation
 
-Returns the interpolation defining the geometry of the `cell`.
+Each `AbstractCell` type has a unique geometric interpolation describing its geometry.
+This function returns that interpolation.
 """
 geometric_interpolation(::AbstractCell)
 
