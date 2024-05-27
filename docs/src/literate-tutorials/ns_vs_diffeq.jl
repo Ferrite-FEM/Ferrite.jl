@@ -568,8 +568,7 @@ integrator = init(
 
 
 pvd = VTKFileCollection("vortex-street", grid);
-integrator = TimeChoiceIterator(integrator, 0.0:Δt_save:T)
-for (u_uc,t) in integrator
+for (u_uc,t) in TimeChoiceIterator(integrator, 0.0:Δt_save:T)
     # We ignored the Dirichlet constraints in the solution vector up to now,
     # so we have to bring them back now.
     #+
