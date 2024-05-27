@@ -105,7 +105,7 @@
 
             _ue_nl = [u_funk(coords_nl[i],V,G,H) for i in 1:n_basefunc_base]
             ue_nl = reinterpret(Float64, _ue_nl)
-            
+
             for i in 1:getnquadpoints(cv)
                 xqp = spatial_coordinate(cv, i, coords_nl)
                 Hqp, Gqp, Vqp = Tensors.hessian(x -> function_value_from_physical_coord(func_interpol, coords_nl, x, ue_nl), xqp, :all)

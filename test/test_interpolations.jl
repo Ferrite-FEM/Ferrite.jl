@@ -232,7 +232,7 @@ end
         @test G ≈ G_sa
         @test H ≈ H_sa
     end
-    
+
     ips = Lagrange{RefQuadrilateral,2}()
     vdim = 3
     ipv = ips^vdim

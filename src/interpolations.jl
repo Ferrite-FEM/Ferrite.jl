@@ -1557,12 +1557,12 @@ function _shape_hessian_gradient_and_value_static_array(ipv::VectorizedInterpola
     hess = zero(MArray{Tuple{vdim, refdim, refdim}, T})
     for (i, vi) in pairs(value_hess)
         hess_values = Tensors.value(vi)
-        
+
         hess_values_partials = Tensors.partials(hess_values)
         for (k, pk) in pairs(hess_values_partials)
             grad[i, k] = pk
         end
-    
+
         hess_partials = Tensors.partials(vi)
         for (j, partial_j) in pairs(hess_partials)
             hess_partials_partials = Tensors.partials(partial_j)

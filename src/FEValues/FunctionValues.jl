@@ -68,7 +68,7 @@ function FunctionValues{DiffOrder}(::Type{T}, ip::Interpolation, qr::QuadratureR
     Nξ = zeros(typeof_N(T, ip, ip_geo), n_shape, n_qpoints)
     Nx = isa(mapping_type(ip), IdentityMapping) ? Nξ : similar(Nξ)
     dNdξ = dNdx = d2Ndξ2 = d2Ndx2 = nothing
-    
+
     if DiffOrder >= 1
         dNdξ = zeros(typeof_dNdξ(T, ip, ip_geo),               n_shape, n_qpoints)
         dNdx = fill(zero(typeof_dNdx(T, ip, ip_geo)) * T(NaN), n_shape, n_qpoints)
