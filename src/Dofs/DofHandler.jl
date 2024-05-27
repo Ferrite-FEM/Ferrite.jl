@@ -948,7 +948,7 @@ function _evaluate_at_grid_nodes(dh::DofHandler, u::Vector{T}, fieldname::Symbol
         # Set up CellValues with the local node coords as quadrature points
         CT = getcelltype(sdh)
         ip = getfieldinterpolation(sdh, field_idx)
-        ip_geo = default_interpolation(CT)
+        ip_geo = geometric_interpolation(CT)
         local_node_coords = reference_coordinates(ip_geo)
         qr = QuadratureRule{getrefshape(ip)}(zeros(length(local_node_coords)), local_node_coords)
         if ip isa VectorizedInterpolation

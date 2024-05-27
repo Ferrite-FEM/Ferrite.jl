@@ -1,5 +1,5 @@
 using Ferrite, Test
-import Ferrite: getrefdim, default_interpolation
+import Ferrite: getrefdim, geometric_interpolation
 
 module ConvergenceTestHelper
 
@@ -158,7 +158,7 @@ end # module ConvergenceTestHelper
     )
         # Generate a grid ...
         geometry = ConvergenceTestHelper.get_geometry(interpolation)
-        interpolation_geo = default_interpolation(geometry)
+        interpolation_geo = geometric_interpolation(geometry)
         N = ConvergenceTestHelper.get_num_elements(interpolation)
         grid = generate_grid(geometry, ntuple(x->N, getrefdim(geometry)));
         # ... a suitable quadrature rule ...
@@ -187,7 +187,7 @@ end
     )
         # Generate a grid ...
         geometry = ConvergenceTestHelper.get_geometry(interpolation)
-        interpolation_geo = default_interpolation(geometry)
+        interpolation_geo = geometric_interpolation(geometry)
         # "Coarse case"
         N₁ = ConvergenceTestHelper.get_num_elements(interpolation)
         grid = generate_grid(geometry, ntuple(x->N₁, getrefdim(geometry)));
