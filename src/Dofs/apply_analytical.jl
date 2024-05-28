@@ -43,6 +43,7 @@ function apply_analytical!(
         else
             intersect(BitSet(sdh.cellset), BitSet(cellset))
         end
+        isempty(set_intersection) && continue
         _apply_analytical!(a, dh, celldofinds, field_dim, ip_fun, ip_geo, f, set_intersection)
     end
     return a
