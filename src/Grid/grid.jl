@@ -43,6 +43,7 @@ get_coordinate_eltype(::Node{dim,T}) where {dim,T} = T
 # abstract type AbstractCell{refshape <: AbstractRefShape} end
 
 getrefshape(::AbstractCell{refshape}) where refshape = refshape
+getrefshape(::Type{<:AbstractCell{refshape}}) where refshape = refshape
 
 nvertices(c::AbstractCell) = length(vertices(c))
 nedges(   c::AbstractCell) = length(edges(c))

@@ -4,6 +4,7 @@ mutable struct L2Projector <: Ferrite.AbstractProjector
     M_cholesky #::SuiteSparse.CHOLMOD.Factor{Float64}
     dh::DofHandler
     qrs_lhs::Vector{<:QuadratureRule}
+    qrs_rhs::Vector{<:QuadratureRule}
 end
 isclosed(proj::L2Projector) = isclosed(proj.dh)
 
@@ -24,38 +25,113 @@ function Base.show(io::IO, ::MIME"text/plain", proj::L2Projector)
     return nothing
 end
 
-function L2Projector(grid::AbstractGrid)
-    dh = DofHandler(grid)
-    return L2Projector(nothing, dh, QuadratureRule[])
+"""
+    L2Projector(grid::AbstractGrid)
+
+Initiate an `L2Projector` for projecting quadrature data onto
+a function space. To define the function space, add interpolations for
+differents cell sets with `add!` before `close!`ing the projector,
+see the example below.
+
+The `L2Projector` acts as the integrated left hand side of the projection equation:
+Find projection ``u \\in U_h(\\Omega) \\subset L_2(\\Omega)`` such that
+```math
+\\int v u \\ \\mathrm{d}\\Omega = \\int v f \\ \\mathrm{d}\\Omega \\quad \\forall v \\in U_h(\\Omega),
+```
+where ``f \\in L_2(\\Omega)`` is the data to project. The function space ``U_h(\\Omega)``
+is the finite element approximation given by the interpolations `add!`ed to the `L2Projector`.
+
+### Example
+```julia
+proj = L2Projector(grid)
+qr_quad = QuadratureRule{RefQuadrilateral}(2)
+add!(proj, Lagrange{RefQuadrilateral, 1}(), quad_set; qr_rhs = qr_quad)
+qr_tria = QuadratureRule{RefTriangle}(1)
+add!(proj, Lagrange{RefTriangle, 1}(), tria_set; qr_rhs = qr_tria)
+close!(proj)
+
+vals = Dict{Int, Vector{Float64}}() # Can also be Vector{Vector},
+                                    # indexed with cellnr
+for (set, qr) in ((quad_set, qr_quad), (tria_set, qr_tria))
+    nqp = getnquadpoints(qr)
+    for cellnr in set
+        vals[cellnr] = rand(nqp)
+    end
 end
 
-# Easy version (almost) same as old one
+projected = project(proj, vals)
+```
+where `projected` can be used in e.g. `evaluate_at_points` with the [`PointEvalHandler`](@ref),
+or with [`evaluate_at_grid_nodes`](@ref).
+"""
+function L2Projector(grid::AbstractGrid)
+    dh = DofHandler(grid)
+    return L2Projector(nothing, dh, QuadratureRule[], QuadratureRule[])
+end
+
+"""
+    L2Projector(ip::Interpolation, grid::AbstractGrid; [qr_lhs], [set])
+
+A quick way to initiate an `L2Projector`, add an interpolation `ip` on the `set` to
+it, and then `close!` it so that it can be used to `project`. The optional
+keyword argument `set` defaults to all cells in the `grid`, while `qr_lhs` defaults
+to a quadrature rule that integrates the mass matrix exactly for the interpolation `ip`.
+"""
 function L2Projector(
-        func_ip::Interpolation,
+        ip::Interpolation,
         grid::AbstractGrid;
-        qr_lhs::Union{QuadratureRule, Nothing} = nothing,
+        qr_lhs::QuadratureRule = _mass_qr(ip),
         set = OrderedSet(1:getncells(grid)),
         geom_ip = nothing,
     )
     geom_ip === nothing || @warn("Providing geom_ip is deprecated, the geometric interpolation of the cells with always be used")
     proj = L2Projector(grid)
-    add!(proj, set, func_ip, qr_lhs)
+    add!(proj, set, ip; qr_lhs, qr_rhs = nothing)
     close!(proj)
     return proj
 end
 
-function add!(proj::L2Projector, set, ip::Interpolation, qr_lhs = nothing)
+"""
+    add!(proj::L2Projector, ip::Interpolation, set::AbstractVecOrSet{Int};
+        qr_rhs, [qr_lhs])
+
+Add an interpolation `ip` on the cells in `set` to the `L2Projector` `proj`.
+
+* `qr_rhs` sets the quadrature rule used to later integrate the right-hand-side of the
+  projection equation, when calling [`project`](@ref). It should match the quadrature points used when
+  creating the quadrature-point variables to project.
+* The *optional* `qr_lhs` sets the quadrature rule used to integrate the left-hand-side of the projection equation,
+  and defaults to a quadrature rule that integrates the mass-matrix exactly for the given interpolation `ip`.
+
+"""
+function add!(proj::L2Projector, set::AbstractVecOrSet{Int}, ip::Interpolation;
+        qr_rhs::Union{QuadratureRule, Nothing}, qr_lhs::QuadratureRule = _mass_qr(ip)
+        )
+    # Validate user input
+    if qr_rhs !== nothing
+        getrefshape(ip) == getrefshape(qr_rhs) || error("The reference shape of the interpolation and the qr_rhs must be the same")
+        push!(proj.qrs_rhs, qr_rhs)
+    end
+    getrefshape(ip) == getrefshape(qr_lhs) || error("The reference shape of the interpolation and the qr_lhs must be the same")
+
     sdh = SubDofHandler(proj.dh, set)
     add!(sdh, :_, ip isa VectorizedInterpolation ? ip.ip : ip)
-    push!(proj.qrs_lhs, qr_lhs === nothing ? _mass_qr(ip) : qr_lhs)
+    push!(proj.qrs_lhs, qr_lhs)
+
     return proj
 end
 
+"""
+    close!(proj::L2Projector)
+
+Close `proj` which assembles and calculates the left-hand-side of the projection equation, before doing a Cholesky factorization
+of the mass-matrix.
+"""
 function close!(proj::L2Projector)
     close!(proj.dh)
     M = _assemble_L2_matrix(proj.dh, proj.qrs_lhs)
     proj.M_cholesky = cholesky(M)
-    return M
+    return proj
 end
 
 # Quadrature sufficient for integrating a mass matrix
@@ -73,7 +149,7 @@ function _assemble_L2_matrix(dh::DofHandler, qrs_lhs::Vector{<:QuadratureRule})
     for (sdh, qr_lhs) in zip(dh.subdofhandlers, qrs_lhs)
         ip_fun = only(sdh.field_interpolations)
         ip_geo = geometric_interpolation(getcelltype(sdh))
-        cv = CellValues(qr_lhs, ip_fun, ip_geo)
+        cv = CellValues(qr_lhs, ip_fun, ip_geo; update_gradients = false)
         _assemble_L2_matrix!(assembler, cv, sdh)
     end
     return M
@@ -115,22 +191,27 @@ function _assemble_L2_matrix!(assembler, cellvalues::CellValues, sdh::SubDofHand
 end
 
 """
-    project(proj::L2Projector, vals, qr_rhs::QuadratureRule)
+    project(proj::L2Projector, vals, [qr_rhs::QuadratureRule])
 
 Makes a L2 projection of data `vals` to the nodes of the grid using the projector `proj`
 (see [`L2Projector`](@ref)).
 
 `project` integrates the right hand side, and solves the projection ``u`` from the following projection equation:
-Find projection ``u \\in L_2(\\Omega)`` such that
+Find projection ``u \\in U_h(\\Omega) \\subset L_2(\\Omega)`` such that
 ```math
-\\int v u \\ \\mathrm{d}\\Omega = \\int v f \\ \\mathrm{d}\\Omega \\quad \\forall v \\in L_2(\\Omega),
+\\int v u \\ \\mathrm{d}\\Omega = \\int v f \\ \\mathrm{d}\\Omega \\quad \\forall v \\in U_h(\\Omega),
 ```
-where ``f`` is the data to project, i.e. `vals`.
+where ``f \\in L_2(\\Omega)`` is the data to project. The function space ``U_h(\\Omega)``
+is the finite element approximation given by the interpolations in `proj`.
 
-The data `vals` should be a vector, with length corresponding to number of elements, of vectors,
-with length corresponding to number of quadrature points per element, matching the number of points in `qr_rhs`.
-Alternatively, `vals` can be a matrix, with number of columns corresponding to number of elements,
-and number of rows corresponding to number of points in `qr_rhs`.
+The data `vals` should be an `AbstractVector` or `AbstractDict` that is indexed by the cell number.
+Each index in `vals` should give an `AbstractVector` with one element for each cell quadrature point.
+
+If `proj` was created by calling `L2Projector(ip, grid, set)`, `qr_rhs` must be given. Otherwise, this
+is added for each domain when calling `add!(proj, args...)`.
+
+Alternatively, `vals` can be a matrix, with the column index referring the cell number,
+and the row index corresponding to quadrature point number.
 Example (scalar) input data:
 ```julia
 vals = [
@@ -149,13 +230,28 @@ vals = [
 ```
 Supported data types to project are `Number`s and `AbstractTensor`s.
 
-The order of the returned data correspond to the order of the `L2Projector`s internal
-`DofHandler`. To export the result, use `vtk_point_data(vtk, proj, projected_data)`.
+!!! note
+    The order of the returned data correspond to the order of the `L2Projector`'s internal
+    `DofHandler`. The data can be further analyzed with [`evaluate_at_points`](@ref) and
+    [`evaluate_at_grid_nodes`](@ref). Use [`write_projected`](@ref) to export the result.
+
 """
-function project(proj::L2Projector,
-                 vars::Union{AbstractVector{TC}, AbstractDict{Int, TC}},
-                 qrs_rhs::Vector{<:QuadratureRule}
-                 ) where {TC <: AbstractVector{T}} where T <: Union{Number, AbstractTensor}
+function project(proj::L2Projector, vars::Union{AbstractVector, AbstractDict})
+    return _project(proj, vars, proj.qrs_rhs)
+end
+# Old-style providing quadrature rule to project
+function project(p::L2Projector, vars::Union{AbstractVector, AbstractDict}, qr_rhs::QuadratureRule)
+    length(p.dh.subdofhandlers) == 1 || error("For multiple domains, provide the right-hand-side quadrature rule to the L2Projector")
+    return _project(p, vars, [qr_rhs])
+end
+# Providing matrix data instead of Vector / Dict
+function project(p::L2Projector, vars::AbstractMatrix, args...)
+    # TODO: Random access into vars is required for now, hence the collect
+    return project(p, collect(eachcol(vars)), args...)
+end
+
+function _project(proj::L2Projector, vars::Union{AbstractVector{TC}, AbstractDict{Int, TC}}, qrs_rhs::Vector{<:QuadratureRule}) where
+        {TC <: AbstractVector{T}} where T <: Union{Number, AbstractTensor}
 
     # Sanity checks for user input
     isclosed(proj) || error("The L2Projector is not closed")
@@ -167,19 +263,12 @@ function project(proj::L2Projector,
     end
     # Catch if old input-style giving vars indexed by the set index, instead of the cell id
     if isa(vars, AbstractVector) && length(vars) != getncells(get_grid(proj.dh))
-        error("vars is indexed by the cellid, not the index in the set. length(vars) != number of cells")
+        error("vars is indexed by the cellid, not the index in the set: length(vars) != number of cells")
     end
 
     M = T <: AbstractTensor ? Tensors.n_components(Tensors.get_base(T)) : 1
 
     return _project(proj, qrs_rhs, vars, M, T)::Vector{T}
-end
-function project(p::L2Projector, vars::Union{AbstractVector, AbstractDict}, qr_rhs::QuadratureRule)
-    return project(p, vars, [qr_rhs])
-end
-function project(p::L2Projector, vars::AbstractMatrix, qr_rhs)
-    # TODO: Random access into vars is required for now, hence the collect
-    return project(p, collect(eachcol(vars)), qr_rhs)
 end
 
 function _project(proj::L2Projector, qrs_rhs::Vector{<:QuadratureRule}, vars::Union{AbstractVector, AbstractDict}, M::Integer, ::Type{T}) where T
@@ -187,7 +276,7 @@ function _project(proj::L2Projector, qrs_rhs::Vector{<:QuadratureRule}, vars::Un
     for (sdh, qr_rhs) in zip(proj.dh.subdofhandlers, qrs_rhs)
         ip_fun = only(sdh.field_interpolations)
         ip_geo = geometric_interpolation(getcelltype(sdh))
-        cv = CellValues(qr_rhs, ip_fun, ip_geo; update_detJdV=false, update_gradient=false)
+        cv = CellValues(qr_rhs, ip_fun, ip_geo; update_gradients = false)
         assemble_proj_rhs!(f, cv, sdh, vars)
     end
 
@@ -214,6 +303,7 @@ function assemble_proj_rhs!(f::Matrix, cellvalues::CellValues, sdh::SubDofHandle
     for cell in CellIterator(sdh)
         fill!(fe, 0)
         cell_vars = vars[cellid(cell)]
+        length(cell_vars) == nqp || error("The number of variables per cell doesn't match the number of quadrature points")
         reinit!(cellvalues, cell)
 
         for q_point = 1:nqp
@@ -261,7 +351,7 @@ function _evaluate_at_grid_nodes(
         RefShape = getrefshape(ip)
         local_node_coords = reference_coordinates(gip)
         qr = QuadratureRule{RefShape}(zeros(length(local_node_coords)), local_node_coords)
-        cv = CellValues(qr, ip, gip; update_detJdV=false, update_gradient=false)
+        cv = CellValues(qr, ip, gip; update_detJdV = false, update_gradients = false)
         _evaluate_at_grid_nodes!(data, cv, sdh, vals)
     end
     return data

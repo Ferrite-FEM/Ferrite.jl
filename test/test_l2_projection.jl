@@ -31,7 +31,7 @@ function test_projection(order, refshape)
     qp_values = analytical(f)
 
     # Now recover the nodal values using a L2 projection.
-    proj = L2Projector(ip, grid; geom_ip=ip_geom)
+    proj = L2Projector(ip, grid)
     point_vars = project(proj, qp_values, qr)
     qp_values_matrix = reduce(hcat, qp_values)
     point_vars_2 = project(proj, qp_values_matrix, qr)
@@ -99,7 +99,7 @@ function test_projection(order, refshape)
     else
         bad_order = 1
     end
-    @test_throws LinearAlgebra.PosDefException L2Projector(ip, grid; qr_lhs=QuadratureRule{refshape}(bad_order), geom_ip=ip_geom)
+    @test_throws LinearAlgebra.PosDefException L2Projector(ip, grid; qr_lhs=QuadratureRule{refshape}(bad_order))
 end
 
 function make_mixedgrid_l2_tests()
@@ -150,7 +150,7 @@ function test_projection_subset_of_mixedgrid()
     # Assume f would only exist on the first cell, we project it to the nodes of the
     # 1st cell while ignoring the rest of the domain. NaNs should be stored in all
     # nodes that do not belong to the 1st cell
-    proj = L2Projector(ip, mesh; geom_ip=ip_geom, set=quadset)
+    proj = L2Projector(ip, mesh; set=quadset)
     point_vars = project(proj, qp_values, qr)
     point_vars_2 = project(proj, qp_values_matrix, qr)
     point_vars_3 = project(proj, qp_values_dict, qr)
@@ -190,7 +190,7 @@ function test_projection_subset_of_mixedgrid()
     end
 
     #tria
-    proj = L2Projector(ip, mesh; geom_ip=ip_geom, set=triaset)
+    proj = L2Projector(ip, mesh; set=triaset)
     point_vars = project(proj, qp_values_tria, qr)
     point_vars_2 = project(proj, qp_values_matrix_tria, qr)
     projection_at_nodes = evaluate_at_grid_nodes(proj, point_vars)
@@ -246,15 +246,15 @@ function test_add_projection_grid()
 
     # Build the first L2Projector with two different sets
     proj1 = L2Projector(grid)
-    add!(proj1, set1, ip)
-    add!(proj1, set2, ip)
+    add!(proj1, set1, ip; qr_rhs = qr)
+    add!(proj1, set2, ip; qr_rhs = qr)
     close!(proj1)
 
-    # Build the second L2Projector with a single set
+    # Build the second L2Projector with a single set using the convenience function
     proj2 = L2Projector(ip, grid)
 
     # Project both cases
-    projected1 = project(proj1, qp_data, [qr, qr])
+    projected1 = project(proj1, qp_data)
     projected2 = project(proj2, qp_data, qr)
 
     # Evaluate at grid nodes to keep same numbering following the grid (dof distribution may be different)
@@ -298,12 +298,12 @@ function test_projection_mixedgrid()
 
     # Finally, let's build the L2Projector and check if we can project back the solution
     proj = L2Projector(grid)
-    add!(proj, triaset, ip_tria)
-    add!(proj, quadset, ip_quad)
+    add!(proj, triaset, ip_tria; qr_rhs = qr_tria)
+    add!(proj, quadset, ip_quad; qr_rhs = qr_quad)
     close!(proj)
 
     # Quadrature rules must be in the same order as ip's are added to proj.
-    projected = project(proj, qp_data, [qr_tria, qr_quad])
+    projected = project(proj, qp_data)
 
     # Evaluate at grid nodes to keep same numbering following the grid (dof distribution may be different)
     solution_at_nodes = evaluate_at_grid_nodes(dh, solution, :u)
