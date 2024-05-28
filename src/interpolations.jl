@@ -105,21 +105,21 @@ nfaces(::Interpolation{RefShape})    where RefShape = nfaces(RefShape)
 Base.copy(ip::Interpolation) = ip
 
 """
-    getrefdim(::Interpolation)
+    Ferrite.getrefdim(::Interpolation)
 
 Return the dimension of the reference element for a given interpolation.
 """
 @inline getrefdim(::Interpolation{RefShape}) where RefShape = getrefdim(RefShape)
 
 """
-    getrefshape(::Interpolation)::AbstractRefShape
+    Ferrite.getrefshape(::Interpolation)::AbstractRefShape
 
 Return the reference element shape of the interpolation.
 """
 @inline getrefshape(::Interpolation{shape}) where {shape} = shape
 
 """
-    getorder(::Interpolation)
+    Ferrite.getorder(::Interpolation)
 
 Return order of the interpolation.
 """
@@ -131,7 +131,7 @@ Return order of the interpolation.
 #####################
 
 """
-    getnbasefunctions(ip::Interpolation)
+    Ferrite.getnbasefunctions(ip::Interpolation)
 
 Return the number of base functions for the interpolation `ip`.
 """
