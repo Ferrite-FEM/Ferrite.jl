@@ -3,24 +3,23 @@ DocTestSetup = :(using Ferrite)
 ```
 # Postprocessing
 
-## Project to nodes
+## Projection of quadrature point data
 ```@docs
-L2Projector
+L2Projector(::AbstractGrid)
+add!(::L2Projector, args...)
+close!(::L2Projector)
+L2Projector(::Interpolation, ::AbstractGrid; kwargs...)
 project
 ```
 
-
-# Postprocessing
-```@docs
-PointEvalHandler
-evaluate_at_points
-Ferrite.PointValues
-PointIterator
-PointLocation
-```
-
+## Evaluation at points
 ```@docs
 evaluate_at_grid_nodes
+PointEvalHandler
+evaluate_at_points
+PointValues
+PointIterator
+PointLocation
 ```
 
 ## VTK Export
