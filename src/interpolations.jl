@@ -1549,34 +1549,34 @@ struct MatrixizedInterpolation{vdim1, vdim2, refshape, order, SI <: ScalarInterp
 end
 
 n_components(::MatrixizedInterpolation{vdim1, vdim2}) where {vdim1, vdim2} = vdim1*vdim2
-adjust_dofs_during_distribution(ip::MatrixizedInterpolation) = adjust_dofs_during_distribution(ip.ip)
+adjust_dofs_during_distribution(ipm::MatrixizedInterpolation) = adjust_dofs_during_distribution(ipm.ip)
 
 # Vectorize to reference dimension by default
 function MatrixizedInterpolation(ip::ScalarInterpolation{shape}) where {refdim, shape <: AbstractRefShape{refdim}}
     return MatrixizedInterpolation{refdim,refdim}(ip)
 end
 
-Base.:(^)(ip::VectorizedInterpolation{vdim1}, vdim2::Int) where {vdim1} = MatrixizedInterpolation{vdim1, vdim2}(ip)
-function Base.literal_pow(::typeof(^), ip::VectorizedInterpolation{vdim1}, ::Val{vdim2}) where {vdim1,vdim2}
-    return MatrixizedInterpolation{vdim1, vdim2}(ip.ip)
+Base.:(^)(ipv::VectorizedInterpolation{vdim1}, vdim2::Int) where {vdim1} = MatrixizedInterpolation{vdim1, vdim2}(ipv)
+function Base.literal_pow(::typeof(^), ipv::VectorizedInterpolation{vdim1}, ::Val{vdim2}) where {vdim1,vdim2}
+    return MatrixizedInterpolation{vdim1, vdim2}(ipv.ip)
 end
 
-function Base.show(io::IO, mime::MIME"text/plain", ip::MatrixizedInterpolation{vdim1, vdim2}) where {vdim1, vdim2}
-    show(io, mime, ip.ip)
+function Base.show(io::IO, mime::MIME"text/plain", ipm::MatrixizedInterpolation{vdim1, vdim2}) where {vdim1, vdim2}
+    show(io, mime, ipm.ip)
     print(io, "^", vdim1 , "×", vdim2)
 end
 
 # Helper to get number of copies for DoF distribution
 get_n_copies(::MatrixizedInterpolation{vdim1, vdim2}) where {vdim1, vdim2} = vdim1*vdim2
 
-function getnbasefunctions(ipv::MatrixizedInterpolation{vdim1, vdim2}) where {vdim1, vdim2}
-    return vdim1 * vdim2 * getnbasefunctions(ipv.ip)
+function getnbasefunctions(ipm::MatrixizedInterpolation{vdim1, vdim2}) where {vdim1, vdim2}
+    return vdim1 * vdim2 * getnbasefunctions(ipm.ip)
 end
-function shape_value(ipv::MatrixizedInterpolation{vdim, vdim, shape}, ξ::Tensors.Vec{refdim, T}, I::Int) where {vdim, refdim, shape <: AbstractRefShape{refdim}, T}
+function shape_value(ipm::MatrixizedInterpolation{vdim, vdim, shape}, ξ::Tensors.Vec{refdim, T}, I::Int) where {vdim, refdim, shape <: AbstractRefShape{refdim}, T}
     # First flatten to vector
     i0, c0 = divrem(I - 1, vdim^2)
     i = i0 + 1
-    v = shape_value(ipv.ip, ξ, i)
+    v = shape_value(ipm.ip, ξ, i)
 
     # Then compute matrix index
     ci0, cj0 = divrem(c0, vdim)
@@ -1585,11 +1585,11 @@ function shape_value(ipv::MatrixizedInterpolation{vdim, vdim, shape}, ξ::Tensor
     return Tensor{2, vdim, T}((k, l) -> k == cj && l == ci ? v : zero(v))
 end
 
-function shape_value(ipv::MatrixizedInterpolation{vdim1, vdim2, shape}, ξ::Tensors.Vec{refdim, T}, I::Int) where {vdim1, vdim2, refdim, shape <: AbstractRefShape{refdim}, T}
+function shape_value(ipm::MatrixizedInterpolation{vdim1, vdim2, shape}, ξ::Tensors.Vec{refdim, T}, I::Int) where {vdim1, vdim2, refdim, shape <: AbstractRefShape{refdim}, T}
     # First flatten to vector
     i0, c0 = divrem(I - 1, vdim1*vdim2)
     i = i0 + 1
-    v = shape_value(ipv.ip, ξ, i)
+    v = shape_value(ipm.ip, ξ, i)
 
     # Then compute matrix index
     ci0, cj0 = divrem(c0, vdim1)
@@ -1600,29 +1600,29 @@ function shape_value(ipv::MatrixizedInterpolation{vdim1, vdim2, shape}, ξ::Tens
 end
 
 # vdim1 == vdim2 == refdim
-function shape_gradient_and_value(ipv::MatrixizedInterpolation{dim, dim, shape}, ξ::Vec{dim}, I::Int) where {dim, shape <: AbstractRefShape{dim}}
-    return invoke(shape_gradient_and_value, Tuple{Interpolation, Vec, Int}, ipv, ξ, I)
+function shape_gradient_and_value(ipm::MatrixizedInterpolation{dim, dim, shape}, ξ::Vec{dim}, I::Int) where {dim, shape <: AbstractRefShape{dim}}
+    return invoke(shape_gradient_and_value, Tuple{Interpolation, Vec, Int}, ipm, ξ, I)
 end
 
 # vdim1 != vdim2 != refdim
-function shape_gradient_and_value(ipv::MatrixizedInterpolation{vdim1, vdim2, shape}, ξ::V, I::Int) where {vdim1, vdim2, refdim, shape <: AbstractRefShape{refdim}, T, V <: Vec{refdim, T}}
+function shape_gradient_and_value(ipm::MatrixizedInterpolation{vdim1, vdim2, shape}, ξ::V, I::Int) where {vdim1, vdim2, refdim, shape <: AbstractRefShape{refdim}, T, V <: Vec{refdim, T}}
     tosmat(v::Tensor{2}) = SMatrix{vdim1,vdim2}((v...,))
     tosmat(v::SMatrix) = v
     tosvec(v::Vec) = SVector((v...,))
     tovec(sv::SVector) = Vec((sv...))
-    val = shape_value(ipv, ξ, I)
-    grad = ForwardDiff.jacobian(sv -> tosmat(shape_value(ipv, tovec(sv), I)), tosvec(ξ))
+    val = shape_value(ipm, ξ, I)
+    grad = ForwardDiff.jacobian(sv -> tosmat(shape_value(ipm, tovec(sv), I)), tosvec(ξ))
     return grad, val
 end
 
-reference_coordinates(ip::MatrixizedInterpolation) = reference_coordinates(ip.ip)
+reference_coordinates(ipm::MatrixizedInterpolation) = reference_coordinates(ipm.ip)
 
 is_discontinuous(::Type{<:MatrixizedInterpolation{<:Any, <:Any, <:Any, <:Any, ip}}) where {ip} = is_discontinuous(ip)
 
 get_gradient_interpolation(::VectorizedInterpolation{vdim, shape, order, <:Lagrange{shape, order}}) where {sdim,vdim,shape<:AbstractRefShape{sdim},order} = MatrixizedInterpolation{vdim, sdim}(DiscontinuousLagrange{shape, order-1}())
 get_gradient_interpolation_type(::Type{VectorizedInterpolation{vdim, shape, order, <:Lagrange{shape, order}}}) where {sdim,vdim,shape<:AbstractRefShape{sdim},order} = MatrixizedInterpolation{vdim, sdim, shape, order-1, DiscontinuousLagrange{shape, order-1}}
 
-InterpolationInfo(ip::MatrixizedInterpolation) = InterpolationInfo(ip.ip, get_n_copies(ip))
+InterpolationInfo(ipm::MatrixizedInterpolation) = InterpolationInfo(ipm.ip, get_n_copies(ipm))
 
 
 """
