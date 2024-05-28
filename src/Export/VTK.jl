@@ -315,7 +315,7 @@ Write all cell sets in the grid with name according to their keys and
 celldata 1 if the cell is in the set, and 0 otherwise. It is also possible to
 only export a single `cellset`, or multiple `cellsets`.
 """
-function write_cellset(vtk, grid::AbstractGrid, cellsets=keys(getcellsets(getgrid(vtk))))
+function write_cellset(vtk, grid::AbstractGrid, cellsets=keys(getcellsets(grid)))
     z = zeros(getncells(grid))
     for cellset in cellsets
         fill!(z, 0)
