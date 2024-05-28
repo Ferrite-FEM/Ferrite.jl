@@ -317,6 +317,10 @@ more discussion).
   a given grid (based on its node coordinates), and returns the minimum and maximum vertices
   of the bounding box. ([#880][github-880])
 
+- A new function, `geometric_interpolation`, is exported, which gives the geometric interpolation
+  for each cell type. This is equivalent to the deprecated `Ferrite.default_interpolation` function.
+  ([#953][github-953])
+
 ### Changed
 
 - `create_sparsity_pattern` now supports cross-element dof coupling by passing kwarg
@@ -432,6 +436,8 @@ more discussion).
 
 - `transform!` have been deprecated in favor of `transform_coordinates!`.
   ([#754][github-754])
+
+- `Ferrite.default_interpolation` has been deprecated in favor of `geometric_interpolation` [#953][github-953]
 
 ### Removed
 
@@ -988,3 +994,4 @@ poking into Ferrite internals:
 [github-914]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/914
 [github-924]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/924
 [github-943]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/943
+[github-953]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/953
