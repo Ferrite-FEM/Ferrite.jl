@@ -15,14 +15,16 @@ using NearestNeighbors:
 using OrderedCollections:
     OrderedSet
 using SparseArrays:
-    SparseArrays, SparseMatrixCSC, nonzeros, nzrange, rowvals, sparse, spzeros
+    SparseArrays, SparseMatrixCSC, nonzeros, nzrange, rowvals, sparse
 using StaticArrays:
-    StaticArrays, MMatrix, SMatrix, SVector
+    StaticArrays, SMatrix, SVector
 using WriteVTK:
     WriteVTK, VTKCellTypes
 using Tensors:
     Tensors, AbstractTensor, SecondOrderTensor, SymmetricTensor, Tensor, Vec, gradient,
     rotation_tensor, symmetric, tovoigt!
+using ForwardDiff:
+    ForwardDiff
 
 
 include("exports.jl")

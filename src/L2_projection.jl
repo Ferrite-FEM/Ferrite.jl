@@ -17,7 +17,7 @@ function Base.show(io::IO, ::MIME"text/plain", proj::L2Projector)
     if length(dh.subdofhandlers) == 1 # Same as before
         sdh = dh.subdofhandlers[1]
         println(io, "  function interpolation:  ", only(sdh.field_interpolations))
-        println(io, "  geometric interpolation: ", default_interpolation(getcelltype(sdh)))
+        println(io, "  geometric interpolation: ", geometric_interpolation(getcelltype(sdh)))
     else
         println(io, "  Split into ", length(dh.subdofhandlers), " sets")
     end
@@ -72,7 +72,7 @@ function _assemble_L2_matrix(dh::DofHandler, qrs_lhs::Vector{<:QuadratureRule})
     assembler = start_assemble(M)
     for (sdh, qr_lhs) in zip(dh.subdofhandlers, qrs_lhs)
         ip_fun = only(sdh.field_interpolations)
-        ip_geo = default_interpolation(getcelltype(sdh))
+        ip_geo = geometric_interpolation(getcelltype(sdh))
         cv = CellValues(qr_lhs, ip_fun, ip_geo)
         _assemble_L2_matrix!(assembler, cv, sdh)
     end
@@ -176,7 +176,7 @@ function _project(proj::L2Projector, qrs_rhs::Vector{<:QuadratureRule}, vars::Un
     f = zeros(ndofs(proj.dh), M)
     for (sdh, qr_rhs) in zip(proj.dh.subdofhandlers, qrs_rhs)
         ip_fun = only(sdh.field_interpolations)
-        ip_geo = default_interpolation(getcelltype(sdh))
+        ip_geo = geometric_interpolation(getcelltype(sdh))
         cv = CellValues(qr_rhs, ip_fun, ip_geo)
         assemble_proj_rhs!(f, cv, sdh, vars)
     end
@@ -247,7 +247,7 @@ function _evaluate_at_grid_nodes(
     end
     for sdh in dh.subdofhandlers
         ip = only(sdh.field_interpolations)
-        gip = default_interpolation(getcelltype(sdh))
+        gip = geometric_interpolation(getcelltype(sdh))
         RefShape = getrefshape(ip)
         local_node_coords = reference_coordinates(gip)
         qr = QuadratureRule{RefShape}(zeros(length(local_node_coords)), local_node_coords)

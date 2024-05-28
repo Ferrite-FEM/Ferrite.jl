@@ -63,7 +63,7 @@ function _get_cellcoords(points::AbstractVector{Vec{dim,T}}, grid::AbstractGrid,
     for point_idx in 1:length(points)
         cell_found = false
         for (CT, node_cell_dict) in node_cell_dicts
-            geom_interpol = default_interpolation(CT)
+            geom_interpol = geometric_interpolation(CT)
             # loop over points
             for node in nearest_nodes[point_idx]
                 possible_cells = get(node_cell_dict, node, nothing)
@@ -219,7 +219,7 @@ function evaluate_at_points!(out_vals::Vector{T2},
         if ip !== nothing
             dofrange = dof_range(sdh, fname)
             cellset = sdh.cellset
-            ip_geo = default_interpolation(getcelltype(sdh))
+            ip_geo = geometric_interpolation(getcelltype(sdh))
             pv = PointValues(T_ph, ip, ip_geo; update_gradients = false)
             _evaluate_at_points!(out_vals, dof_vals, ph, dh, pv, cellset, dofrange)
         end
