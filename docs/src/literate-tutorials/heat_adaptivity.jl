@@ -53,7 +53,7 @@ function assemble_global!(K, f, a, dh, cellvalues)
     return K, f
 end
 
-function solve(grid)
+function solve(grid, field_name)
     dim = 2
     order = 1
     ip = Lagrange{RefQuadrilateral, order}()
@@ -61,15 +61,15 @@ function solve(grid)
     cellvalues = CellValues(qr, ip);
 
     dh = DofHandler(grid)
-    add!(dh, :u, ip)
+    add!(dh, field_name, ip)
     close!(dh);
 
     ch = ConstraintHandler(dh)
-    add!(ch, ConformityConstraint(:u))
-    add!(ch, Dirichlet(:u, getfacetset(grid, "top"), (x, t) -> 0.0))
-    add!(ch, Dirichlet(:u, getfacetset(grid, "right"), (x, t) -> 0.0))
-    add!(ch, Dirichlet(:u, getfacetset(grid, "left"), (x, t) -> 0.0))
-    add!(ch, Dirichlet(:u, getfacetset(grid, "bottom"), (x, t) -> 0.0))
+    add!(ch, ConformityConstraint(field_name))
+    add!(ch, Dirichlet(field_name, getfacetset(grid, "top"), (x, t) -> 0.0))
+    add!(ch, Dirichlet(field_name, getfacetset(grid, "right"), (x, t) -> 0.0))
+    add!(ch, Dirichlet(field_name, getfacetset(grid, "left"), (x, t) -> 0.0))
+    add!(ch, Dirichlet(field_name, getfacetset(grid, "bottom"), (x, t) -> 0.0))
     close!(ch);
 
     K = create_sparsity_pattern(dh,ch)
@@ -82,14 +82,30 @@ function solve(grid)
     return u,dh,ch,cellvalues
 end
 
-function compute_fluxes(u,dh)
-    ip = Lagrange{RefQuadrilateral, 1}()
-    ## Normal quadrature points
-    qr = QuadratureRule{RefQuadrilateral}(2)
-    cellvalues = CellValues(qr, ip);
+function _internal_cv_field(dh::AbstractDofHandler, field_name::Symbol)
+    @assert length(dh.field_names) == 1 "Multiple fields not supported yet for L2ZZErrorEstimator."
+    @assert length(dh.subdofhandlers) == 1 "Multiple subdofhandlers not supported yet for L2ZZErrorEstimator."
+    ip = dh.subdofhandlers[1].field_interpolations[1]
+    order = getorder(ip)
+    qr = QuadratureRule{getrefshape(ip)}(max(2order-1,2))
+    return CellValues(qr, ip)
+end
+
+function _internal_cv_flux(dh::AbstractDofHandler, field_name::Symbol)
+    @assert length(dh.field_names) == 1 "Multiple fields not supported yet for L2ZZErrorEstimator."
+    @assert length(dh.subdofhandlers) == 1 "Multiple subdofhandlers not supported yet for L2ZZErrorEstimator."
+    sdim = getdim(dh.grid)
+    ip = getlowerorder(dh.subdofhandlers[1].field_interpolations[1])^sdim
+    order = getorder(ip)
+    qr = QuadratureRule{getrefshape(ip)}(max(2order-1,2))
+    return CellValues(qr, ip)
+end
+
+function _zz_compute_fluxes(dh::AbstractDofHandler, u::AbstractVector, field_name::Symbol)
+    cellvalues = _internal_cv_flux(dh, field_name)
     ## Superconvergent point
     qr_sc = QuadratureRule{RefQuadrilateral}(1)
-    cellvalues_sc = CellValues(qr_sc, ip);
+    cellvalues_sc = CellValues(qr_sc, cellvalues);
     ## Buffers
     σ_gp = Vector{Vector{Vec{2,Float64}}}()
     σ_gp_loc = Vector{Vec{2,Float64}}()
@@ -117,7 +133,82 @@ function compute_fluxes(u,dh)
     return σ_gp, σ_gp_sc
 end
 
+"""
+    L2ZZErrorEstimator(dh::AbstractGrid)
+
+This strategy computes the error via nodal L2 projection of the fluxes.
+"""
+mutable struct L2ZZErrorEstimator{DHType <: Ferrite.AbstractDofHandler}
+    dh::DHType
+    errors::Vector{Float64}
+end
+
+function L2ZZErrorEstimator(dh::AbstractGrid)
+    L2ZZErrorEstimator(dh, Float64[])
+end
+
+function zz_flux_differencing!(errors, dh, field_name, σ1, σ2)
+    @assert length(dh.field_names) == 1 "Multiple fields not supported yet for L2ZZErrorEstimator."
+    @assert length(dh.subdofhandlers) == 1 "Multiple subdofhandlers not supported yet for L2ZZErrorEstimator."
+    ip = dh.subdofhandlers[1].field_interpolations[1]
+
+    sdim = getdim(dh.grid)
+    ip = Lagrange{RefQuadrilateral, 1}()^2
+    qr_sc = QuadratureRule{RefQuadrilateral}(1)
+    cellvalues_flux = _internal_cv_flux()
+    dh, field_name,
+    _zz_flux_differencing!
+end
+
+# Function barrier
+function _zz_flux_differencing!(errors, dh, field_name, cellvalues_flux, σ_projected, σ_superconvergent)
+    for (cellid,cell) in enumerate(CellIterator(dh))
+        reinit!(cv, cell)
+        @views σe = σ_projected[celldofs(cell)]
+        errors[cellid] = 0.0
+        for q_point in 1:getnquadpoints(cellvalues_flux)
+            σ_projected_at_sc = function_value(cellvalues_flux, q_point, σe)
+            errors[cellid] += norm((σ_superconvergent[cellid][q_point] - σ_projected_at_sc ))
+            errors[cellid] *= getdetJdV(cellvalues_flux,q_point)
+        end
+    end
+end
+
+function update_error_estimate!(estimator::L2ZZErrorEstimator, dh::AbstractDofHandler, u::AbstractVector, field_name::Symbol)
+    @assert length(dh.field_names) == 1 "Multiple fields not supported yet for L2ZZErrorEstimator."
+    @assert length(dh.subdofhandlers) == 1 "Multiple subdofhandlers not supported yet for L2ZZErrorEstimator."
+    @assert field_name ∈ dh.field_names "Field $field_name not found in dof handler with following fields: $(dh.field_names)."
+
+    errors = estimator.errors
+    grid = get_grid(dh)
+    resize!(errors, getncells(grid))
+    #Compute fluxes
+    σ_qp, σ_gp_sc = _zz_compute_fluxes(dh, u, field_name)
+
+    ip = dh.subdofhandlers[1].field_interpolations[1]
+    # Should be exact for all cases. We can query this via dispatch.
+    qr = QuadratureRule{getrefshape(ip)}(max(2getorder(ip)-1,2))
+
+    # Project fluxes to nodes
+    projector = L2Projector(ip, transfered_grid)
+    σ_dof = project(projector, σ_qp, qr)
+
+    zz_flux_differencing!(errors, dh, field_name, σ_gp_sc, σ_dof)
+
+    return nothing
+end
+
+get_errors(estimator::L2ZZErrorEstimator) = estimator.errors
+
+abstract type AbstractMarkingStrategy end
+struct ThresholdMarking <: AbstractMarkingStrategy
+    refinement_threshold::Float64
+    markers::Vector{Bool}
+end
+
 function solve_adaptive(initial_grid)
+    refinement_threshold = 0.001
+
     ip = Lagrange{RefQuadrilateral, 1}()^2
     qr_sc = QuadratureRule{RefQuadrilateral}(1)
     cellvalues_flux = CellValues(qr_sc, ip);
@@ -127,34 +218,26 @@ function solve_adaptive(initial_grid)
     pvd = VTKFileCollection("heat_amr.pvd",grid);
     while !finished && i<=10
         @show i
+        # Solve the problem
         transfered_grid = Ferrite.creategrid(grid)
-        u,dh,ch,cv = solve(transfered_grid)
-        σ_gp, σ_gp_sc = compute_fluxes(u,dh)
-        projector = L2Projector(Lagrange{RefQuadrilateral, 1}(), transfered_grid)
-        σ_dof = project(projector, σ_gp, QuadratureRule{RefQuadrilateral}(2))
-        cells_to_refine = Int[]
-        error_arr = Float64[]
-        for (cellid,cell) in enumerate(CellIterator(projector.dh))
-            reinit!(cellvalues_flux, cell)
-            @views σe = σ_dof[celldofs(cell)]
-            error = 0.0
-            for q_point in 1:getnquadpoints(cellvalues_flux)
-                σ_dof_at_sc = function_value(cellvalues_flux, q_point, σe)
-                error += norm((σ_gp_sc[cellid][q_point] - σ_dof_at_sc ))
-                error *= getdetJdV(cellvalues_flux,q_point)
-            end
-            if error > 0.001
+        u,dh,ch,cv = solve(transfered_grid, :u)
+
+        # Estimate the errors
+        estimator = L2ZZErrorEstimator(dh, u, :u)
+        errors = get_errors(estimator)
+        for (cellid,local_error) in 
+            cells_to_refine = Int[]
+            if errors > refinement_threshold
                 push!(cells_to_refine,cellid)
             end
-            push!(error_arr,error)
         end
 
         addstep!(pvd, i, dh) do vtk
             write_solution(vtk, dh, u)
-            write_projection(vtk, projector, σ_dof, "flux")
-            write_cell_data(vtk, getindex.(collect(Iterators.flatten(σ_gp_sc)),1), "flux sc x")
-            write_cell_data(vtk, getindex.(collect(Iterators.flatten(σ_gp_sc)),2), "flux sc y")
-            write_cell_data(vtk, error_arr, "error")
+            # write_projection(vtk, projector, σ_dof, "flux")
+            # write_cell_data(vtk, getindex.(collect(Iterators.flatten(σ_gp_sc)),1), "flux sc x")
+            # write_cell_data(vtk, getindex.(collect(Iterators.flatten(σ_gp_sc)),2), "flux sc y")
+            write_cell_data(vtk, errors, "error")
         end
 
         Ferrite.refine!(grid, cells_to_refine)
