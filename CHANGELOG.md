@@ -437,7 +437,7 @@ more discussion).
 - `transform!` have been deprecated in favor of `transform_coordinates!`.
   ([#754][github-754])
 
-- `Ferrite.default_interpolation` has been deprecated in favor of `geometric_interpolation` [#953][github-953]
+- `Ferrite.default_interpolation` has been deprecated in favor of `geometric_interpolation`. ([#953][github-953])
 
 ### Removed
 
