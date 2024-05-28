@@ -88,6 +88,7 @@ function_interpolation(cv::CellValues) = function_interpolation(cv.fun_values)
 function_difforder(cv::CellValues) = function_difforder(cv.fun_values)
 shape_value_type(cv::CellValues) = shape_value_type(cv.fun_values)
 shape_gradient_type(cv::CellValues) = shape_gradient_type(cv.fun_values)
+shape_hessian_type(cv::CellValues) = shape_hessian_type(cv.fun_values)
 
 @propagate_inbounds shape_value(cv::CellValues, q_point::Int, i::Int) = shape_value(cv.fun_values, q_point, i)
 @propagate_inbounds shape_gradient(cv::CellValues, q_point::Int, i::Int) = shape_gradient(cv.fun_values, q_point, i)
