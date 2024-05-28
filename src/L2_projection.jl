@@ -37,7 +37,7 @@ function L2Projector(
         grid::AbstractGrid;
         qr_lhs::QuadratureRule = _mass_qr(func_ip),
         set = OrderedSet(1:getncells(grid)),
-        geom_ip::Interpolation = default_interpolation(getcelltype(grid, first(set))),
+        geom_ip::Interpolation = geometric_interpolation(getcelltype(grid, first(set))),
     )
 
     # TODO: Maybe this should not be allowed? We always assume to project scalar entries.

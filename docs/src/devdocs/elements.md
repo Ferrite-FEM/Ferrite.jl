@@ -13,7 +13,7 @@ Ferrite.vertices(::Ferrite.AbstractCell)
 Ferrite.edges(::Ferrite.AbstractCell)
 Ferrite.reference_faces(::Ferrite.AbstractRefShape)
 Ferrite.faces(::Ferrite.AbstractCell)
-Ferrite.default_interpolation(::Ferrite.AbstractCell)
+Ferrite.geometric_interpolation(::Ferrite.AbstractCell)
 ```
 
 ### Common utilities and definitions when working with grids internally.

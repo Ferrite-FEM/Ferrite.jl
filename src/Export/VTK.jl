@@ -49,7 +49,7 @@ end
 Base.close(vtk::VTKFile) = WriteVTK.vtk_save(vtk.vtk)
 
 function Base.show(io::IO, ::MIME"text/plain", vtk::VTKFile)
-    open_str = WriteVTK.isopen(vtk.vtk) ? "open" : "closed"
+    open_str = isopen(vtk.vtk) ? "open" : "closed"
     filename = vtk.vtk.path
     print(io, "VTKFile for the $open_str file \"$(filename)\".")
 end
