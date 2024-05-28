@@ -352,6 +352,18 @@ end
             @test                            zeros(vdim) == function_gradient(csv3, 1, ue)[:, 3]
         end
     end
+
+    @testset "CellValues with hessians" begin
+        ip = Lagrange{RefQuadrilateral,2}()
+        qr = QuadratureRule{RefQuadrilateral}(2)
+        
+        cv_vector = CellValues(qr, ip^2, ip^3; update_hessians = true)
+        cv_scalar = CellValues(qr, ip, ip^3; update_hessians = true)
+
+        coords = [Vec{3}((x[1], x[2], 0.0)) for x in Ferrite.reference_coordinates(ip)]
+        @test_throws ErrorException reinit!(cv_vector, coords) #Not implemented for embedded elements
+        @test_throws ErrorException reinit!(cv_scalar, coords)
+    end
 end
 
 @testset "CellValues constructor entry points" begin
