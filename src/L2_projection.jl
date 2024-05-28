@@ -187,7 +187,7 @@ function _project(proj::L2Projector, qrs_rhs::Vector{<:QuadratureRule}, vars::Un
     for (sdh, qr_rhs) in zip(proj.dh.subdofhandlers, qrs_rhs)
         ip_fun = only(sdh.field_interpolations)
         ip_geo = geometric_interpolation(getcelltype(sdh))
-        cv = CellValues(qr_rhs, ip_fun, ip_geo)
+        cv = CellValues(qr_rhs, ip_fun, ip_geo; update_detJdV=false, update_gradient=false)
         assemble_proj_rhs!(f, cv, sdh, vars)
     end
 
@@ -261,7 +261,7 @@ function _evaluate_at_grid_nodes(
         RefShape = getrefshape(ip)
         local_node_coords = reference_coordinates(gip)
         qr = QuadratureRule{RefShape}(zeros(length(local_node_coords)), local_node_coords)
-        cv = CellValues(qr, ip, gip)
+        cv = CellValues(qr, ip, gip; update_detJdV=false, update_gradient=false)
         _evaluate_at_grid_nodes!(data, cv, sdh, vals)
     end
     return data
@@ -270,6 +270,7 @@ end
 function _evaluate_at_grid_nodes!(data, cv, sdh, u::AbstractVector{S}) where S
     ue = zeros(S, getnbasefunctions(cv))
     for cell in CellIterator(sdh)
+        reinit!(cv, cell)
         @assert getnquadpoints(cv) == length(cell.nodes)
         for (i, I) in pairs(cell.dofs)
             ue[i] = u[I]
