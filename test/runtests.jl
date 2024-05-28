@@ -9,6 +9,8 @@ using LinearAlgebra
 using SparseArrays
 using OrderedCollections
 
+import Ferrite: MatrixizedInterpolation
+
 const HAS_EXTENSIONS = isdefined(Base, :get_extension)
 
 # https://github.com/JuliaLang/julia/pull/47749
