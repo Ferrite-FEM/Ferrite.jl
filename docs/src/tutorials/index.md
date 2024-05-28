@@ -126,9 +126,9 @@ Gmsh.
 
 #### [Tutorial 9: Porous media (SubDofHandler)](porous_media.md)
 
-This tutorial introduces how to solve a complex linear problem, where there are different 
+This tutorial introduces how to solve a complex linear problem, where there are different
 fields on different subdomains, and different cell types in the grid. This requires using
-the `SubDofHandler` interface. 
+the `SubDofHandler` interface.
 
 **Keywords**: Mixed grids, multiple fields, porous media, `SubDofHandler`
 
@@ -153,3 +153,18 @@ Ferrite can be used for non-standard things and how to add "hacks" that build on
 Ferrite.
 
 **Keywords**: embedding, automatic differentiation
+
+---
+
+#### [Tutorial 11: Discontinuous Galerkin heat equation](@ref tutorial-dg-heat-equation)
+
+This tutorial guides you through the process of solving the linear stationary heat equation
+(i.e. Poisson's equation) on a unit square with inhomogeneous Dirichlet and Neumann boundary
+conditions using the interior penalty discontinuous Galerkin method. This tutorial follows
+the [heat equation tutorial](@ref tutorial-heat-equation), introducing face and interface
+iterators, jump and average operators, and cross-element coupling in sparsity patterns. This
+example was developed as part of the *Google Summer of Code* funded project ["Discontinuous
+Galerkin Infrastructure For the finite element toolbox
+Ferrite.jl"](https://summerofcode.withgoogle.com/programs/2023/projects/SLGbRNI5).
+
+**Keywords**: scalar-valued solution, Dirichlet boundary conditions, Discontinuous Galerkin, Interior penalty.

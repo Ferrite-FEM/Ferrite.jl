@@ -68,7 +68,7 @@ end
 
 # See Appendix A in https://www.math.colostate.edu/%7Ebangerth/publications/2013-pattern.pdf
 function workstream_coloring(incidence_matrix, cellset)
-     
+
     if length(cellset) == 0
         return Vector{Int}[]
     elseif length(cellset) == 1
@@ -204,21 +204,4 @@ function create_coloring(g::AbstractGrid, cellset=1:getncells(g); alg::ColoringA
     else
         error("impossible")
     end
-end
-
-"""
-    vtk_cell_data_colors(vtkfile, cell_colors, name="coloring")
-
-Write cell colors (see [`create_coloring`](@ref)) to a VTK file for visualization.
-
-In case of coloring a subset, the cells which are not part of the subset are represented as color 0.
-"""
-function vtk_cell_data_colors(vtkfile, cell_colors::AbstractVector{<:AbstractVector{<:Integer}}, name="coloring")
-    color_vector = zeros(Int, vtkfile.Ncls)
-    for (i, cells_color) in enumerate(cell_colors)
-        for cell in cells_color
-            color_vector[cell] = i
-        end
-    end
-    vtk_cell_data(vtkfile, color_vector, name)
 end

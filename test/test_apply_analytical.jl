@@ -9,7 +9,7 @@
         RefShape = Ferrite.getrefshape(ip)
         return B{RefShape,order}()
     end
-    getcellorder(CT) = Ferrite.getorder(Ferrite.default_interpolation(CT))
+    getcellorder(CT) = Ferrite.getorder(Ferrite.geometric_interpolation(CT))
     getcelltypedim(::Type{<:Ferrite.AbstractCell{shape}}) where {dim, shape <: Ferrite.AbstractRefShape{dim}} = dim
 
     # Functions to create dof handlers for testing
@@ -24,7 +24,7 @@
         end
 
         dh = DofHandler(grid)
-        default_ip = Ferrite.default_interpolation(CT)
+        default_ip = Ferrite.geometric_interpolation(CT)
         try
             add!(dh, :u, change_ip_order(default_ip, ip_order_u)^dim)
             add!(dh, :p, change_ip_order(default_ip, ip_order_p))
@@ -51,8 +51,8 @@
         else
             error("Only dim=1 & 2 supported")
         end
-        default_ip_A = Ferrite.default_interpolation(getcelltype(grid, first(getcellset(grid,"A"))))
-        default_ip_B = Ferrite.default_interpolation(getcelltype(grid, first(getcellset(grid,"B"))))
+        default_ip_A = Ferrite.geometric_interpolation(getcelltype(grid, first(getcellset(grid,"A"))))
+        default_ip_B = Ferrite.geometric_interpolation(getcelltype(grid, first(getcellset(grid,"B"))))
         dh = DofHandler(grid)
         sdh_A = SubDofHandler(dh, getcellset(grid, "A"))
         add!(sdh_A, :u, change_ip_order(default_ip_A, ip_order_u)^dim)
@@ -99,18 +99,17 @@
                 for ip_order_p in 1:2
                     dh = testdh(CT, ip_order_u, ip_order_p)
                     isnothing(dh) && continue # generate_grid not supported for this CT, or reference_coordinates not defined
-                    dim = Ferrite.getdim(dh.grid)
                     num_udofs = length(_global_dof_range(dh, :u))
                     num_pdofs = length(_global_dof_range(dh, :p))
 
                     # Test average value
                     a = zeros(ndofs(dh))
-                    f(x) = ones(Vec{dim})
+                    f(x) = ones(Ferrite.get_coordinate_type(dh.grid))
                     apply_analytical!(a, dh, :u, f)
                     @test sum(a)/length(a) ≈ num_udofs/(num_udofs+num_pdofs)
 
-                    # If not super/subparametric, compare with ConstraintHandler and node set 
-                    if ip_order_u==ip_order_p==getcellorder(CT)    
+                    # If not super/subparametric, compare with ConstraintHandler and node set
+                    if ip_order_u==ip_order_p==getcellorder(CT)
                         fill!(a, 0)
                         a_ch = copy(a)
                         fp(x) = norm(x)^2
@@ -126,8 +125,8 @@
                         apply_analytical!(a, dh, :u, fu)
                         apply_analytical!(a, dh, :p, fp)
 
-                        @test a ≈ a_ch 
-                    end 
+                        @test a ≈ a_ch
+                    end
                 end
             end
         end
@@ -145,6 +144,12 @@
                     a = zeros(ndofs(dh))
                     f(x) = ones(Vec{dim})
                     apply_analytical!(a, dh, :u, f)
+                    @test sum(a)/length(a) ≈ num_udofs/(num_udofs+num_pdofs)
+
+                    # Repeat test with calls for both subdomains separately
+                    a = zeros(ndofs(dh))
+                    apply_analytical!(a, dh, :u, f, getcellset(dh.grid, "A"))
+                    apply_analytical!(a, dh, :u, f, getcellset(dh.grid, "B"))
                     @test sum(a)/length(a) ≈ num_udofs/(num_udofs+num_pdofs)
                 end
             end

@@ -95,12 +95,12 @@ t_rise = 100
 ch = ConstraintHandler(dh);
 
 # Here, we define the boundary condition related to $\partial \Omega_1$.
-∂Ω₁ = union(getfaceset.((grid,), ["left", "right"])...)
+∂Ω₁ = union(getfacetset.((grid,), ["left", "right"])...)
 dbc = Dirichlet(:u, ∂Ω₁, (x, t) -> 0)
 add!(ch, dbc);
 # While the next code block corresponds to the linearly increasing temperature description on $\partial \Omega_2$
 # until `t=t_rise`, and then keep constant
-∂Ω₂ = union(getfaceset.((grid,), ["top", "bottom"])...)
+∂Ω₂ = union(getfacetset.((grid,), ["top", "bottom"])...)
 dbc = Dirichlet(:u, ∂Ω₂, (x, t) -> max_temp * clamp(t / t_rise, 0, 1))
 add!(ch, dbc)
 close!(ch)
@@ -182,20 +182,18 @@ A = (Δt .* K) + M;
 # by `get_rhs_data`. The function returns a `RHSData` struct, which contains all needed information to apply
 # the boundary conditions solely on the right-hand-side vector of the problem.
 rhsdata = get_rhs_data(ch, A);
-# We set the values at initial time step, denoted by uₙ, to a bubble-shape described by 
+# We set the values at initial time step, denoted by uₙ, to a bubble-shape described by
 # $(x_1^2-1)(x_2^2-1)$, such that it is zero at the boundaries and the maximum temperature in the center.
 uₙ = zeros(length(f));
 apply_analytical!(uₙ, dh, :u, x -> (x[1]^2 - 1) * (x[2]^2 - 1) * max_temp);
 # Here, we apply **once** the boundary conditions to the system matrix `A`.
 apply!(A, ch);
 
-# To store the solution, we initialize a `paraview_collection` (.pvd) file.
-pvd = paraview_collection("transient-heat.pvd");
+# To store the solution, we initialize a `VTKFileCollection` (.pvd) file.
+pvd = VTKFileCollection("transient-heat", grid);
 t = 0
-vtk_grid("transient-heat-$t", dh) do vtk
-    vtk_point_data(vtk, dh, uₙ)
-    vtk_save(vtk)
-    pvd[t] = vtk
+addstep!(pvd, t) do io
+    write_solution(io, dh, uₙ)
 end
 
 # At this point everything is set up and we can finally approach the time loop.
@@ -211,16 +209,14 @@ for t in Δt:Δt:T
     #Finally, we can solve the time step and save the solution afterwards.
     u = A \ b
 
-    vtk_grid("transient-heat-$t", dh) do vtk
-        vtk_point_data(vtk, dh, u)
-        vtk_save(vtk)
-        pvd[t] = vtk
+    addstep!(pvd, t) do io
+        write_solution(io, dh, u)
     end
     #At the end of the time loop, we set the previous solution to the current one and go to the next time step.
     uₙ .= u
 end
 # In order to use the .pvd file we need to store it to the disk, which is done by:
-vtk_save(pvd);
+close(pvd);
 
 #md # ## [Plain program](@id transient_heat_equation-plain-program)
 #md #

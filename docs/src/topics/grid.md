@@ -6,8 +6,8 @@ DocTestSetup = :(using Ferrite)
 
 ## Mesh Reading
 
-A Ferrite `Grid` can be generated with the [`generate_grid`](@ref) function. 
-More advanced meshes can be imported with the 
+A Ferrite `Grid` can be generated with the [`generate_grid`](@ref) function.
+More advanced meshes can be imported with the
 [`FerriteMeshParser.jl`](https://github.com/Ferrite-FEM/FerriteMeshParser.jl) (from Abaqus input files),
 or even created and translated with the [`Gmsh.jl`](https://github.com/JuliaFEM/Gmsh.jl) and [`FerriteGmsh.jl`](https://github.com/Ferrite-FEM/FerriteGmsh.jl) package, respectively.
 
@@ -43,7 +43,7 @@ FerriteMeshParser.get_ferrite_grid
 ```
 
 If you are missing the translation of an Abaqus element that is equivalent to a `Ferrite.Cell`,
-consider to open an [issue](https://github.com/Ferrite-FEM/FerriteMeshParser.jl/issues/new) or a pull request. 
+consider to open an [issue](https://github.com/Ferrite-FEM/FerriteMeshParser.jl/issues/new) or a pull request.
 
 ## `Grid` Datastructure
 
@@ -71,12 +71,12 @@ julia> cells = [
 ```
 
 where each Quadrilateral, which is a subtype of `AbstractCell` saves in the field `nodes` the tuple of node IDs.
-Additionally, the data structure `Grid` can hold node-, face- and cellsets. 
-All of these three sets are defined by a dictionary that maps a string key to a `Set`. 
-For the special case of node- and cellsets the dictionary's value is of type `Set{Int}`, i.e. a keyword is mapped to a node or cell ID, respectively. 
+Additionally, the data structure `Grid` can hold node-, face- and cellsets.
+All of these three sets are defined by a dictionary that maps a string key to a `Set`.
+For the special case of node- and cellsets the dictionary's value is of type `Set{Int}`, i.e. a keyword is mapped to a node or cell ID, respectively.
 
 Facesets are a more elaborate construction. They map a `String` key to a `Set{FaceIndex}`, where each `FaceIndex` consists of `(global_cell_id, local_face_id)`.
-In order to understand the `local_face_id` properly, one has to consider the reference space of the element, which typically is spanned by a product of the interval ``[-1, 1]`` and in this particular example ``[-1, 1] \times [-1, 1]``. 
+In order to understand the `local_face_id` properly, one has to consider the reference space of the element, which typically is spanned by a product of the interval ``[-1, 1]`` and in this particular example ``[-1, 1] \times [-1, 1]``.
 In this space a local numbering of nodes and faces exists, i.e.
 
 
@@ -113,13 +113,13 @@ julia> function compute_faceset(cells, global_faces, ip::Interpolation{dim}) whe
                    d[ntuple(i-> cell.nodes[face[i]], nodes_per_face)] = FaceIndex(c, f)
                end
            end
-       
+
            faces = Vector{FaceIndex}()
            for face in global_faces
                # lookup the element, local face combination for this face
                push!(faces, d[face])
            end
-       
+
            return faces
        end
 
@@ -171,11 +171,10 @@ Ferrite.getnnodes(grid::SmallGrid) = length(grid.nodes_test)
 Ferrite.get_coordinate_eltype(::SmallGrid) = Float64
 Ferrite.get_coordinate_type(::SmallGrid{dim}) where dim = Vec{dim,Float64}
 Ferrite.nnodes_per_cell(grid::SmallGrid, i::Int=1) = Ferrite.nnodes(grid.cells_test[i])
-Ferrite.n_faces_per_cell(grid::SmallGrid) = nfaces(eltype(grid.cells_test))
 ```
 
-These definitions make many of `Ferrite`s functions work out of the box, e.g. you can now call 
-`getcoordinates(grid, cellid)` on the `SmallGrid`. 
+These definitions make many of `Ferrite`s functions work out of the box, e.g. you can now call
+`getcoordinates(grid, cellid)` on the `SmallGrid`.
 
 Now, you would be able to assemble the heat equation example over the new custom `SmallGrid` type.
 Note that this particular subtype isn't able to handle boundary entity sets and so, you can't describe boundaries with it.

@@ -33,25 +33,25 @@ function create_cook_grid(nx, ny)
                Vec{2}(( 0.0, 44.0))]
     grid = generate_grid(Triangle, (nx, ny), corners)
     ## facesets for boundary conditions
-    addfaceset!(grid, "clamped", x -> norm(x[1]) ≈ 0.0)
-    addfaceset!(grid, "traction", x -> norm(x[1]) ≈ 48.0)
+    addfacetset!(grid, "clamped", x -> norm(x[1]) ≈ 0.0)
+    addfacetset!(grid, "traction", x -> norm(x[1]) ≈ 48.0)
     return grid
 end;
 
-# Next we define a function to set up our cell- and facevalues.
+# Next we define a function to set up our cell- and FacetValues.
 function create_values(interpolation_u, interpolation_p)
     ## quadrature rules
     qr      = QuadratureRule{RefTriangle}(3)
-    face_qr = FaceQuadratureRule{RefTriangle}(3)
+    facet_qr = FacetQuadratureRule{RefTriangle}(3)
 
-    ## cell and facevalues for u
+    ## cell and FacetValues for u
     cellvalues_u = CellValues(qr, interpolation_u)
-    facevalues_u = FaceValues(face_qr, interpolation_u)
+    facetvalues_u = FacetValues(facet_qr, interpolation_u)
 
     ## cellvalues for p
     cellvalues_p = CellValues(qr, interpolation_p)
 
-    return cellvalues_u, cellvalues_p, facevalues_u
+    return cellvalues_u, cellvalues_p, facetvalues_u
 end;
 
 
@@ -69,7 +69,7 @@ end;
 # We specify a homogeneous Dirichlet bc on the displacement field, `:u`.
 function create_bc(dh)
     dbc = ConstraintHandler(dh)
-    add!(dbc, Dirichlet(:u, getfaceset(dh.grid, "clamped"), x -> zero(x), [1, 2]))
+    add!(dbc, Dirichlet(:u, getfacetset(dh.grid, "clamped"), x -> zero(x), [1, 2]))
     close!(dbc)
     return dbc
 end;
@@ -85,9 +85,9 @@ end
 # use a `PseudoBlockArray` from `BlockArrays.jl`.
 
 function doassemble(
-    cellvalues_u::CellValues{<:VectorInterpolation},
-    cellvalues_p::CellValues{<:ScalarInterpolation},
-    facevalues_u::FaceValues{<:VectorInterpolation},
+    cellvalues_u::CellValues,
+    cellvalues_p::CellValues,
+    facetvalues_u::FacetValues,
     K::SparseMatrixCSC, grid::Grid, dh::DofHandler, mp::LinearElasticity
 )
     f = zeros(ndofs(dh))
@@ -106,7 +106,7 @@ function doassemble(
     for cell in CellIterator(dh)
         fill!(ke, 0)
         fill!(fe, 0)
-        assemble_up!(ke, fe, cell, cellvalues_u, cellvalues_p, facevalues_u, grid, mp, ɛdev, t)
+        assemble_up!(ke, fe, cell, cellvalues_u, cellvalues_p, facetvalues_u, grid, mp, ɛdev, t)
         assemble!(assembler, celldofs(cell), fe, ke)
     end
 
@@ -116,7 +116,7 @@ end;
 # The element routine integrates the local stiffness and force vector for all elements.
 # Since the problem results in a symmetric matrix we choose to only assemble the lower part,
 # and then symmetrize it after the loop over the quadrature points.
-function assemble_up!(Ke, fe, cell, cellvalues_u, cellvalues_p, facevalues_u, grid, mp, ɛdev, t)
+function assemble_up!(Ke, fe, cell, cellvalues_u, cellvalues_p, facetvalues_u, grid, mp, ɛdev, t)
 
     n_basefuncs_u = getnbasefunctions(cellvalues_u)
     n_basefuncs_p = getnbasefunctions(cellvalues_p)
@@ -154,16 +154,16 @@ function assemble_up!(Ke, fe, cell, cellvalues_u, cellvalues_p, facevalues_u, gr
 
     symmetrize_lower!(Ke)
 
-    ## We integrate the Neumann boundary using the facevalues.
-    ## We loop over all the faces in the cell, then check if the face
-    ## is in our `"traction"` faceset.
-    for face in 1:nfaces(cell)
-        if onboundary(cell, face) && (cellid(cell), face) ∈ getfaceset(grid, "traction")
-            reinit!(facevalues_u, cell, face)
-            for q_point in 1:getnquadpoints(facevalues_u)
-                dΓ = getdetJdV(facevalues_u, q_point)
+    ## We integrate the Neumann boundary using the FacetValues.
+    ## We loop over all the facets in the cell, then check if the facet
+    ## is in our `"traction"` facetset.
+    for facet in 1:nfacets(cell)
+        if (cellid(cell), facet) ∈ getfacetset(grid, "traction")
+            reinit!(facetvalues_u, cell, facet)
+            for q_point in 1:getnquadpoints(facetvalues_u)
+                dΓ = getdetJdV(facetvalues_u, q_point)
                 for i in 1:n_basefuncs_u
-                    δu = shape_value(facevalues_u, q_point, i)
+                    δu = shape_value(facetvalues_u, q_point, i)
                     fe[i] += (δu ⋅ t) * dΓ
                 end
             end
@@ -255,11 +255,11 @@ function solve(ν, interpolation_u, interpolation_p)
     dbc = create_bc(dh)
 
     ## CellValues
-    cellvalues_u, cellvalues_p, facevalues_u = create_values(interpolation_u, interpolation_p)
+    cellvalues_u, cellvalues_p, facetvalues_u = create_values(interpolation_u, interpolation_p)
 
     ## Assembly and solve
     K = create_sparsity_pattern(dh)
-    K, f = doassemble(cellvalues_u, cellvalues_p, facevalues_u, K, grid, dh, mp)
+    K, f = doassemble(cellvalues_u, cellvalues_p, facetvalues_u, K, grid, dh, mp)
     apply!(K, f, dbc)
     u = K \ f
 
@@ -270,13 +270,14 @@ function solve(ν, interpolation_u, interpolation_p)
     ## Export the solution and the stress
     filename = "cook_" * (interpolation_u == Lagrange{RefTriangle, 1}()^2 ? "linear" : "quadratic") *
                          "_linear"
-    vtk_grid(filename, dh) do vtkfile
-        vtk_point_data(vtkfile, dh, u)
+
+    VTKFile(filename, grid) do vtk
+        write_solution(vtk, dh, u)
         for i in 1:3, j in 1:3
             σij = [x[i, j] for x in σ]
-            vtk_cell_data(vtkfile, σij, "sigma_$(i)$(j)")
+            write_cell_data(vtk, σij, "sigma_$(i)$(j)")
         end
-        vtk_cell_data(vtkfile, σvM, "sigma von Mise")
+        write_cell_data(vtk, σvM, "sigma von Mises")
     end
     return u
 end

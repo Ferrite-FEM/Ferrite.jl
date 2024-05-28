@@ -32,7 +32,7 @@ function test_1d_bar_beam()
     sdh1 = SubDofHandler(dh, Set(3))
     add!(sdh1, :u, ip^2)
     add!(sdh1, :θ, ip)
-    sdh2 = SubDofHandler(dh, Set((1,2)))
+    sdh2 = SubDofHandler(dh, OrderedSet((1,2)))
     add!(sdh2, :u, ip^2)
     close!(dh)
     @test ndofs(dh) == 8
@@ -110,7 +110,7 @@ function test_2d_mixed_1_el()
     @test ndofs(dh) == 12
     @test ndofs_per_cell(dh, 1) == 12
     @test celldofs(dh, 1) == [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
-    
+
     @test Set(Ferrite.getfieldnames(dh)) == Set(Ferrite.getfieldnames(dh.subdofhandlers[1]))
 end
 
@@ -133,6 +133,8 @@ function test_2d_mixed_2_el()
     @test ndofs_per_cell(dh.subdofhandlers[1]) == 12
     @test ndofs_per_cell(dh, 2) == 9
     @test ndofs_per_cell(dh.subdofhandlers[2]) == 9
+    @test_throws ErrorException ndofs_per_cell(dh)
+    @test_throws ErrorException Ferrite.nnodes_per_cell(grid)
     @test celldofs(dh, 1) == [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
     @test celldofs(dh, 2) == [5, 6, 3, 4, 13, 14, 11, 10, 15]
 end
@@ -293,8 +295,8 @@ function test_2_element_heat_eq()
 
     # Create two Dirichlet boundary conditions - one for each field.
     ch = ConstraintHandler(dh);
-    ∂Ω1 = getfaceset(grid, "left")
-    ∂Ω2 = getfaceset(grid, "right")
+    ∂Ω1 = getfacetset(grid, "left")
+    ∂Ω2 = getfacetset(grid, "right")
     dbc1 = Dirichlet(:u, ∂Ω1, (x, t) -> 0)
     dbc2 = Dirichlet(:u, ∂Ω2, (x, t) -> 0)
     add!(ch, dbc1);
@@ -355,11 +357,11 @@ function test_2_element_heat_eq()
     gridfilename = "mixed_grid"
     addcellset!(grid, "cell-1", [1,])
     addcellset!(grid, "cell-2", [2,])
-    vtk_grid(gridfilename, grid) do vtk
-        vtk_cellset(vtk, grid, "cell-1")
-        vtk_cellset(vtk, grid, "cell-2")
-        vtk_point_data(vtk, dh, u)
-        # vtk_point_data(vtk, ch)  #FIXME
+    VTKFile(gridfilename, grid) do vtk
+        Ferrite.write_cellset(vtk, grid, "cell-1")
+        Ferrite.write_cellset(vtk, grid, "cell-2")
+        write_solution(vtk, dh, u)
+        # Ferrite.write_constraints(vtk, ch)  #FIXME
     end
     sha = bytes2hex(open(SHA.sha1, gridfilename*".vtu"))
     @test sha in ("e96732c000b0b385db7444f002461468b60b3b2c", "7b26edc27b5e59a2f60907374cd5a5790cc37a6a")
@@ -384,7 +386,7 @@ function test_element_order()
 
     dh = DofHandler(grid);
     # Note the jump in cell numbers
-    sdh_tri = SubDofHandler(dh, Set((1,3)))
+    sdh_tri = SubDofHandler(dh, OrderedSet((1,3)))
     add!(sdh_tri, :u, Lagrange{RefTriangle,1}()^2)
     sdh_quad = SubDofHandler(dh, Set(2))
     add!(sdh_quad, :u, Lagrange{RefQuadrilateral,1}()^2)
@@ -415,8 +417,8 @@ function test_field_on_subdomain()
     close!(dh)
 
     # retrieve field dimensions
-    @test Ferrite.getfielddim(dh, :v) == 2
-    @test Ferrite.getfielddim(dh, :s) ==1
+    @test Ferrite.n_components(dh, :v) == 2
+    @test Ferrite.n_components(dh, :s) ==1
 
     # find field in SubDofHandler
     @test Ferrite.find_field(dh.subdofhandlers[1], :v) == 1
@@ -428,12 +430,12 @@ end
 function test_evaluate_at_grid_nodes()
 
     # 5_______6
-    # |\      | 
+    # |\      |
     # |   \   |
     # 3______\4
     # |       |
     # |       |
-    # 1_______2 
+    # 1_______2
 
     nodes = [Node((0.0, 0.0)),
     Node((1.0, 0.0)),
@@ -445,8 +447,8 @@ function test_evaluate_at_grid_nodes()
     Triangle((3,4,6)),
     Triangle((3,6,5))]
     mesh = Grid(cells, nodes)
-    addcellset!(mesh, "quads", Set{Int}((1,)))
-    addcellset!(mesh, "tris", Set{Int}((2, 3)))
+    addcellset!(mesh, "quads", Set((1,)))
+    addcellset!(mesh, "tris", OrderedSet((2, 3)))
 
     ip_quad = Lagrange{RefQuadrilateral,1}()
     ip_tri = Lagrange{RefTriangle,1}()
@@ -479,18 +481,18 @@ function test_mixed_grid_show()
     @test occursin("2 Quadrilateral/Triangle cells", str)
 end
 
-# regression tests for https://github.com/KristofferC/JuAFEM.jl/issues/315 
+# regression tests for https://github.com/KristofferC/JuAFEM.jl/issues/315
 function test_subparametric_quad()
     #linear geometry
     grid = generate_grid(Quadrilateral, (1,1))
     ip      = Lagrange{RefQuadrilateral,2}()
-    
+
     dh = DofHandler(grid)
     add!(dh, :u, ip^2)
     close!(dh)
-    
+
     ch = ConstraintHandler(dh)
-    dbc1 = Dirichlet(:u, getfaceset(grid, "left"), (x, t) -> 0.0, 2)
+    dbc1 = Dirichlet(:u, getfacetset(grid, "left"), (x, t) -> 0.0, 2)
     add!(ch, dbc1)
     close!(ch)
     update!(ch, 1.0)
@@ -503,13 +505,13 @@ function test_subparametric_triangle()
     grid = generate_grid(Triangle, (1,1))
 
     ip = Lagrange{RefTriangle,2}()
-    
+
     dh = DofHandler(grid)
     add!(dh, :u, ip^2)
     close!(dh)
-    
+
     ch = ConstraintHandler(dh)
-    dbc1 = Dirichlet(:u, getfaceset(grid, "left"), (x, t) -> 0.0, 2)
+    dbc1 = Dirichlet(:u, getfacetset(grid, "left"), (x, t) -> 0.0, 2)
     add!(ch, dbc1)
     close!(ch)
     update!(ch, 1.0)
@@ -519,8 +521,8 @@ end
 
 function test_celliterator_subdomain()
     for celltype in (Line, Quadrilateral, Hexahedron)
-        ip = Ferrite.default_interpolation(celltype)
-        dim = Ferrite.getdim(ip)
+        ip = Ferrite.geometric_interpolation(celltype)
+        dim = Ferrite.getrefdim(ip)
         grid = generate_grid(celltype, ntuple(i->i==1 ? 2 : 1, dim)) # 2 cells
         dh = DofHandler(grid)
         sdh = SubDofHandler(dh, Set(2)) # only cell 2, cell 1 is not part of dh
@@ -535,12 +537,12 @@ end
 
 function test_separate_fields_on_separate_domains()
     # 5_______6
-    # |\      | 
+    # |\      |
     # |   \   |
     # 3______\4
     # |       |
     # |       |
-    # 1_______2 
+    # 1_______2
     # Given: a vector field :q defined on the quad and a scalar field :t defined on the triangles
     nodes = [Node((0.0, 0.0)),
             Node((1.0, 0.0)),
@@ -552,8 +554,8 @@ function test_separate_fields_on_separate_domains()
             Triangle((3,4,5)),
             Triangle((4,6,5))]
     mesh = Grid(cells, nodes)
-    addcellset!(mesh, "quads", Set{Int}((1,)))
-    addcellset!(mesh, "tris", Set{Int}((2, 3)))
+    addcellset!(mesh, "quads", Set((1,)))
+    addcellset!(mesh, "tris", OrderedSet((2, 3)))
 
     ip_tri = Lagrange{RefTriangle,1}()
     ip_quad = Lagrange{RefQuadrilateral,1}()
@@ -576,8 +578,8 @@ end
 
 function test_unique_cellsets()
     grid = generate_grid(Quadrilateral, (2, 1))
-    set_u = Set(1:2)
-    set_v = Set(1:1)
+    set_u = OrderedSet(1:2)
+    set_v = OrderedSet(1:1)
 
     ip = Lagrange{RefQuadrilateral,1}()
 
@@ -605,7 +607,7 @@ function test_show()
     sdh_tri = SubDofHandler(dh, Set(2))
     add!(sdh_tri, :u, Lagrange{RefTriangle, 1}()^2)
     close!(dh)
-    @test repr("text/plain", dh) == repr(typeof(dh)) * "\n  Fields:\n    :u, dim: 2\n  Total dofs: 10"
+    @test repr("text/plain", dh) == repr(typeof(dh)) * "\n  Fields:\n    :u, Vec{2}\n  Total dofs: 10"
     @test repr("text/plain", dh.subdofhandlers[1]) == string(
         repr("text/plain", typeof(dh.subdofhandlers[1])), "\n  Cell type: Quadrilateral\n  Fields:\n    :u, ",
             repr("text/plain", dh.subdofhandlers[1].field_interpolations[1]), "\n  Dofs per cell: 8\n")
@@ -633,12 +635,12 @@ function test_vtk_export()
     close!(dh)
     u = collect(1:ndofs(dh))
     filename = "mixed_2d_grid"
-    vtk_grid(filename, dh) do vtk
-        vtk_point_data(vtk, dh, u)
+    VTKFile(filename, dh) do vtk
+        write_solution(vtk, dh, u)
     end
     sha = bytes2hex(open(SHA.sha1, filename*".vtu"))
     @test sha == "339ab8a8a613c2f38af684cccd695ae816671607"
-    rm(filename*".vtu") # clean up 
+    rm(filename*".vtu") # clean up
 end
 
 @testset "DofHandler" begin

@@ -46,7 +46,7 @@ include("../tutorials/heat_equation.jl");
 # Next we define a function that computes the heat flux for each integration point in the domain.
 # Fourier's law is adopted, where the conductivity tensor is assumed to be isotropic with unit
 # conductivity ``\lambda = 1 ⇒ q = - \nabla u``, where ``u`` is the temperature.
-function compute_heat_fluxes(cellvalues::CellValues{<:ScalarInterpolation}, dh::DofHandler, a::AbstractVector{T}) where T
+function compute_heat_fluxes(cellvalues::CellValues, dh::DofHandler, a::AbstractVector{T}) where T
 
     n = getnbasefunctions(cellvalues)
     cell_dofs = zeros(Int, n)
@@ -87,8 +87,8 @@ q_projected = project(projector, q_gp, qr);
 # To visualize the heat flux, we export the projected field `q_projected`
 # to a VTK-file, which can be viewed in e.g. [ParaView](https://www.paraview.org/).
 # The result is also visualized in *Figure 1*.
-vtk_grid("heat_equation_flux", grid) do vtk
-    vtk_point_data(vtk, projector, q_projected, "q")
+VTKFile("heat_equation_flux", grid) do vtk
+    write_projection(vtk, projector, q_projected, "q")
 end;
 
 # ## Point Evaluation

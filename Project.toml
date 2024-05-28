@@ -4,8 +4,10 @@ version = "0.3.14"
 
 [deps]
 EnumX = "4e289a0a-7415-4d19-859d-a7e5c4648b56"
+ForwardDiff = "f6369f11-7733-5829-9624-2563aa707210"
 LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
 NearestNeighbors = "b8a86587-4115-5ab1-83bc-aa920d37bbce"
+OrderedCollections = "bac558e1-5e72-5ebc-8fee-abe8a469f55d"
 Preferences = "21216c6a-2e73-6563-6e65-726566657250"
 Reexport = "189a3867-3050-52da-a836-e630ba90ab69"
 SparseArrays = "2f01184e-e22b-5df5-ae63-d93ebab69eaf"
@@ -26,9 +28,10 @@ BlockArrays = "0.16"
 EnumX = "1"
 Metis = "1.3"
 NearestNeighbors = "0.4"
+OrderedCollections = "1"
 Preferences = "1"
 Reexport = "1"
-Tensors = "1"
+Tensors = "1.14"
 WriteVTK = "1.13"
 julia = "1.6"
 
@@ -42,6 +45,7 @@ IterativeSolvers = "42fd0dbc-a981-5370-80f2-aaf504508153"
 Logging = "56ddb016-857b-54e1-b83d-db4d58db5568"
 Metis = "2679e427-3c69-5b7f-982b-ece356f1e94b"
 NBInclude = "0db19996-df87-5ea3-a455-e3a50d440464"
+Pkg = "44cfe95a-1eb2-52ea-b672-e2afdf69b78f"
 ProgressMeter = "92933f4c-e287-5a05-a399-4b506db050ca"
 Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
 SHA = "ea8e919c-243c-51af-8825-aaa63cd721ce"
@@ -49,4 +53,4 @@ Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 TimerOutputs = "a759f4b9-e2f1-59dc-863e-4aeb61b1ea8f"
 
 [targets]
-test = ["BlockArrays", "Downloads", "FerriteGmsh", "ForwardDiff", "Gmsh", "IterativeSolvers", "Metis", "NBInclude", "ProgressMeter", "Random", "SHA", "Test", "TimerOutputs", "Logging"]
+test = ["BlockArrays", "Downloads", "FerriteGmsh", "ForwardDiff", "Gmsh", "IterativeSolvers", "Metis", "Pkg", "NBInclude", "ProgressMeter", "Random", "SHA", "Test", "TimerOutputs", "Logging"]
