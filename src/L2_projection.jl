@@ -157,8 +157,18 @@ function project(proj::L2Projector,
                  qrs_rhs::Vector{<:QuadratureRule}
                  ) where {TC <: AbstractVector{T}} where T <: Union{Number, AbstractTensor}
 
+    # Sanity checks for user input
     isclosed(proj) || error("The L2Projector is not closed")
     length(qrs_rhs) == length(proj.dh.subdofhandlers) || error("Number of qrs_rhs must match the number of `add!`ed sets")
+    for (qr_rhs, sdh) in zip(qrs_rhs, proj.dh.subdofhandlers)
+        if getrefshape(qr_rhs) !== getrefshape(getcelltype(sdh))
+            error("Reference shape of quadrature rule and cells doesn't match. Please ensure that `qrs_rhs` has the same order as sets are added to the L2Projector")
+        end
+    end
+    # Catch if old input-style giving vars indexed by the set index, instead of the cell id
+    if isa(vars, AbstractVector) && length(vars) != getncells(get_grid(proj.dh))
+        error("vars is indexed by the cellid, not the index in the set. length(vars) != number of cells")
+    end
 
     M = T <: AbstractTensor ? Tensors.n_components(Tensors.get_base(T)) : 1
 
