@@ -15,9 +15,9 @@ using NearestNeighbors:
 using OrderedCollections:
     OrderedSet
 using SparseArrays:
-    SparseArrays, SparseMatrixCSC, nonzeros, nzrange, rowvals, sparse, spzeros
+    SparseArrays, SparseMatrixCSC, nonzeros, nzrange, rowvals, sparse
 using StaticArrays:
-    StaticArrays, MMatrix, SMatrix, SVector
+    StaticArrays, SMatrix, SVector
 using WriteVTK:
     WriteVTK, VTKCellTypes
 using Tensors:
