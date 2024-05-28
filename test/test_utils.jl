@@ -119,7 +119,7 @@ end
 # Volume of cells (with planar edges) #
 #######################################
 
-calculate_volume(ip::VectorizedInterpolation, x) = calculate_volume(ip.ip, x)
+calculate_volume(ip::Union{VectorizedInterpolation, MatrixizedInterpolation}, x) = calculate_volume(ip.ip, x)
 
 function calculate_volume(::Lagrange{RefLine, 1}, x::Vector{Vec{dim, T}}) where {T, dim}
     vol = norm(x[2] - x[1])

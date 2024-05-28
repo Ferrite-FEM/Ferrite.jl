@@ -1582,7 +1582,7 @@ function shape_value(ipv::MatrixizedInterpolation{vdim, vdim, shape}, ξ::Tensor
     ci0, cj0 = divrem(c0, vdim)
     ci = ci0 + 1
     cj = cj0 + 1
-    return Tensor{2, vdim, T}((k, l) -> k == ci && l == cj ? v : zero(v))
+    return Tensor{2, vdim, T}((k, l) -> k == cj && l == ci ? v : zero(v))
 end
 
 function shape_value(ipv::MatrixizedInterpolation{vdim1, vdim2, shape}, ξ::Tensors.Vec{refdim, T}, I::Int) where {vdim1, vdim2, refdim, shape <: AbstractRefShape{refdim}, T}
@@ -1596,7 +1596,7 @@ function shape_value(ipv::MatrixizedInterpolation{vdim1, vdim2, shape}, ξ::Tens
     ci = ci0 + 1
     cj = cj0 + 1
 
-    return SMatrix{vdim1, vdim2, T}(ntuple(i_ -> i_ == (ci0*vdim1 + cj) ? v : zero(v), vdim1*vdim2))
+    return SMatrix{vdim1, vdim2, T}(ntuple(i_ -> i_ == (cj0*vdim2 + ci) ? v : zero(v), vdim1*vdim2))
 end
 
 # vdim1 == vdim2 == refdim

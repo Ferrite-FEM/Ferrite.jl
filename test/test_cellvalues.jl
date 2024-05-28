@@ -70,7 +70,7 @@
                 end
                 @test function_value(cv, i, u_vector) ≈ (@test_deprecated function_value(cv, i, u))
             else func_interpol isa Ferrite.MatrixInterpolation
-                @test broken=true function_gradient(cv, i, u_matrix) ≈ W
+                @test function_gradient(cv, i, u_matrix) ≈ W
                 @test_throws MethodError function_curl(cv, i, u_matrix)
                 @test_throws MethodError function_divergence(cv, i, u_matrix)
             end
