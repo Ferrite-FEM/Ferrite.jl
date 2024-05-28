@@ -1590,7 +1590,7 @@ function shape_value(ipv::MatrixizedInterpolation{vdim1, vdim2, shape}, ξ::Tens
     i0, c0 = divrem(I - 1, vdim1*vdim2)
     i = i0 + 1
     v = shape_value(ipv.ip, ξ, i)
-    
+
     # Then compute matrix index
     ci0, cj0 = divrem(c0, vdim1)
     ci = ci0 + 1
