@@ -302,33 +302,11 @@ function function_value_from_physical_coord(interpolation::Interpolation, cell_c
     n_basefuncs = getnbasefunctions(interpolation)
     scalar_ip = interpolation isa Ferrite.ScalarInterpolation ? interpolation : interpolation.ip
     @assert length(ue) == n_basefuncs
-    ξ = MAPPING(scalar_ip, cell_coordinates, X)
+    _, ξ = Ferrite.find_local_coordinate(scalar_ip, cell_coordinates, X; tol_norm=1e-16)
     u = zero(shape_value(interpolation, ξ, 1))
     for j in 1:n_basefuncs
         N = shape_value(interpolation, ξ, j)
         u += N * ue[j]
     end
     return u
-end
-
-function MAPPING(interpolation, cell_coordinates, global_coordinate::Vec{dim,T}) where {dim,T}
-    ξ = zero(global_coordinate)
-    n_basefuncs = getnbasefunctions(interpolation)
-    max_iters = 10
-    tol_norm = 1e-16
-    for _ in 1:max_iters
-        global_guess = zero(global_coordinate)
-        J = zero(Tensor{2,dim,T})
-        for j in 1:n_basefuncs
-            dNdξ, N = Ferrite.shape_gradient_and_value(interpolation, ξ, j)
-            global_guess += N * cell_coordinates[j]
-            J += cell_coordinates[j] ⊗ dNdξ
-        end
-        residual = global_guess - global_coordinate
-        if norm(residual) <= tol_norm
-            break
-        end
-        ξ -= inv(J) ⋅ residual
-    end
-    return ξ
 end

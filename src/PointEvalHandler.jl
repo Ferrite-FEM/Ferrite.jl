@@ -114,17 +114,16 @@ function _check_isoparametric_boundaries(::Type{RefSimplex{dim}}, x_local::Vec{d
 end
 
 # See https://discourse.julialang.org/t/finding-the-value-of-a-field-at-a-spatial-location-in-juafem/38975/2
-# TODO: should we make iteration params optional keyword arguments?
-function find_local_coordinate(interpolation, cell_coordinates::Vector{V}, global_coordinate::V) where {dim, T, V <: Vec{dim, T}}
+# TODO: should we make iteration params optional keyword arguments? 
+function find_local_coordinate(interpolation, cell_coordinates::Vector{V}, global_coordinate::V2; tol_norm = 1e-10) where {dim, T, T2, V <: Vec{dim, T}, V2 <: Vec{dim, T2}}
     n_basefuncs = getnbasefunctions(interpolation)
     @assert length(cell_coordinates) == n_basefuncs
-    local_guess = zero(V)
+    local_guess = zero(V2)
     max_iters = 10
-    tol_norm = 1e-10
     converged = false
     for _ in 1:max_iters
-        global_guess = zero(V)
-        J = zero(Tensor{2, dim, T})
+        global_guess = zero(V2)
+        J = zero(Tensor{2, dim, T2})
         # TODO batched eval after 764 is merged.
         for j in 1:n_basefuncs
             dNdξ, N = shape_gradient_and_value(interpolation, local_guess, j)
