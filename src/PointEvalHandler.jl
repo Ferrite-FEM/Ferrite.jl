@@ -114,7 +114,7 @@ function _check_isoparametric_boundaries(::Type{RefSimplex{dim}}, x_local::Vec{d
 end
 
 # See https://discourse.julialang.org/t/finding-the-value-of-a-field-at-a-spatial-location-in-juafem/38975/2
-# TODO: should we make iteration params optional keyword arguments? 
+# TODO: should we make iteration params optional keyword arguments?
 function find_local_coordinate(interpolation, cell_coordinates::Vector{V}, global_coordinate::V2; tol_norm = 1e-10) where {dim, T, T2, V <: Vec{dim, T}, V2 <: Vec{dim, T2}}
     n_basefuncs = getnbasefunctions(interpolation)
     @assert length(cell_coordinates) == n_basefuncs

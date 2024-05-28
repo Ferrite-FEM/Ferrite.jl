@@ -356,7 +356,7 @@ end
     @testset "CellValues with hessians" begin
         ip = Lagrange{RefQuadrilateral,2}()
         qr = QuadratureRule{RefQuadrilateral}(2)
-        
+
         cv_vector = CellValues(qr, ip^2, ip^3; update_hessians = true)
         cv_scalar = CellValues(qr, ip, ip^3; update_hessians = true)
 
