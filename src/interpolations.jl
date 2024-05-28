@@ -45,8 +45,9 @@ abstract type Interpolation{shape #=<: AbstractRefShape=#, order, unused} end
 
 const InterpolationByDim{dim} = Interpolation{<:AbstractRefShape{dim}}
 
-abstract type ScalarInterpolation{      refshape, order} <: Interpolation{refshape, order, Nothing} end
-abstract type VectorInterpolation{vdim, refshape, order} <: Interpolation{refshape, order, Nothing} end
+abstract type ScalarInterpolation{              refshape, order} <: Interpolation{refshape, order, Nothing} end
+abstract type VectorInterpolation{vdim,         refshape, order} <: Interpolation{refshape, order, Nothing} end
+abstract type MatrixInterpolation{vdim1, vdim2, refshape, order} <: Interpolation{refshape, order, Nothing} end
 
 # Number of components for the interpolation.
 n_components(::ScalarInterpolation)                    = 1
@@ -225,8 +226,8 @@ end
 """
     shape_gradient_and_value(ip::Interpolation, ξ::Vec, i::Int)
 
-Optimized version combining the evaluation [`Ferrite.shape_value(::Interpolation)`](@ref)
-and [`Ferrite.shape_gradient(::Interpolation)`](@ref).
+Optimized version combining the evaluation [`shape_value(::Interpolation)`](@ref)
+and [`shape_gradient(::Interpolation)`](@ref).
 """
 function shape_gradient_and_value(ip::Interpolation, ξ::Vec, i::Int)
     return gradient(x -> shape_value(ip, x, i), ξ, :all)
@@ -236,8 +237,8 @@ end
 """
     shape_hessian_gradient_and_value(ip::Interpolation, ξ::Vec, i::Int)
 
-Optimized version combining the evaluation [`Ferrite.shape_value(::Interpolation)`](@ref),
-[`Ferrite.shape_gradient(::Interpolation)`](@ref), and the gradient of the latter.
+Optimized version combining the evaluation [`shape_value(::Interpolation)`](@ref),
+[`shape_gradient(::Interpolation)`](@ref), and the gradient of the latter.
 """
 function shape_hessian_gradient_and_value(ip::Interpolation, ξ::Vec, i::Int)
     return hessian(x -> shape_value(ip, x, i), ξ, :all)
@@ -380,15 +381,15 @@ Helper function to generically dispatch on the correct dof sets of a boundary en
 """
 boundarydof_indices(::Type{<:BoundaryIndex})
 
-boundarydof_indices(::Type{FaceIndex}) = Ferrite.facedof_indices
-boundarydof_indices(::Type{EdgeIndex}) = Ferrite.edgedof_indices
-boundarydof_indices(::Type{VertexIndex}) = Ferrite.vertexdof_indices
+boundarydof_indices(::Type{FaceIndex}) = facedof_indices
+boundarydof_indices(::Type{EdgeIndex}) = edgedof_indices
+boundarydof_indices(::Type{VertexIndex}) = vertexdof_indices
 
-facetdof_indices(ip::InterpolationByDim{3}) = Ferrite.facedof_indices(ip)
-facetdof_indices(ip::InterpolationByDim{2}) = Ferrite.edgedof_indices(ip)
-facetdof_indices(ip::InterpolationByDim{1}) = Ferrite.vertexdof_indices(ip)
-facetdof_interior_indices(ip::InterpolationByDim{3}) = Ferrite.facedof_interior_indices(ip)
-facetdof_interior_indices(ip::InterpolationByDim{2}) = Ferrite.edgedof_interior_indices(ip)
+facetdof_indices(ip::InterpolationByDim{3}) = facedof_indices(ip)
+facetdof_indices(ip::InterpolationByDim{2}) = edgedof_indices(ip)
+facetdof_indices(ip::InterpolationByDim{1}) = vertexdof_indices(ip)
+facetdof_interior_indices(ip::InterpolationByDim{3}) = facedof_interior_indices(ip)
+facetdof_interior_indices(ip::InterpolationByDim{2}) = edgedof_interior_indices(ip)
 facetdof_interior_indices(ip::InterpolationByDim{1}) = ntuple(_ -> (), nvertices(ip))
 dirichlet_facetdof_indices(ip::InterpolationByDim{3}) = dirichlet_facedof_indices(ip)
 dirichlet_facetdof_indices(ip::InterpolationByDim{2}) = dirichlet_edgedof_indices(ip)
@@ -415,9 +416,9 @@ Used internally in [`ConstraintHandler`](@ref) and defaults to [`boundarydof_ind
 """
 dirichlet_boundarydof_indices(::Type{<:BoundaryIndex})
 
-dirichlet_boundarydof_indices(::Type{FaceIndex}) = Ferrite.dirichlet_facedof_indices
-dirichlet_boundarydof_indices(::Type{EdgeIndex}) = Ferrite.dirichlet_edgedof_indices
-dirichlet_boundarydof_indices(::Type{VertexIndex}) = Ferrite.dirichlet_vertexdof_indices
+dirichlet_boundarydof_indices(::Type{FaceIndex}) = dirichlet_facedof_indices
+dirichlet_boundarydof_indices(::Type{EdgeIndex}) = dirichlet_edgedof_indices
+dirichlet_boundarydof_indices(::Type{VertexIndex}) = dirichlet_vertexdof_indices
 dirichlet_boundarydof_indices(::Type{FacetIndex}) = dirichlet_facetdof_indices
 
 #########################
@@ -1535,6 +1536,95 @@ reference_coordinates(ip::VectorizedInterpolation) = reference_coordinates(ip.ip
 
 is_discontinuous(::Type{<:VectorizedInterpolation{<:Any, <:Any, <:Any, ip}}) where {ip} = is_discontinuous(ip)
 
+
+# Foundation block for https://github.com/Ferrite-FEM/Ferrite.jl/issues/398 - Remove this below after the issue is resolved.
+##################################################
+# MatrixizedInterpolation{<:ScalarInterpolation} #
+##################################################
+struct MatrixizedInterpolation{vdim1, vdim2, refshape, order, SI <: ScalarInterpolation{refshape, order}} <: MatrixInterpolation{vdim1, vdim2, refshape,order}
+    ip::SI
+    function MatrixizedInterpolation{vdim1, vdim2}(ip::SI) where {vdim1, vdim2, refshape, order, SI <: ScalarInterpolation{refshape, order}}
+        return new{vdim1, vdim2, refshape, order, SI}(ip)
+    end
+end
+
+n_components(::MatrixizedInterpolation{vdim1, vdim2}) where {vdim1, vdim2} = vdim1*vdim2
+adjust_dofs_during_distribution(ipm::MatrixizedInterpolation) = adjust_dofs_during_distribution(ipm.ip)
+
+# Vectorize to reference dimension by default
+function MatrixizedInterpolation(ip::ScalarInterpolation{shape}) where {refdim, shape <: AbstractRefShape{refdim}}
+    return MatrixizedInterpolation{refdim,refdim}(ip)
+end
+
+Base.:(^)(ipv::VectorizedInterpolation{vdim1}, vdim2::Int) where {vdim1} = MatrixizedInterpolation{vdim1, vdim2}(ipv)
+function Base.literal_pow(::typeof(^), ipv::VectorizedInterpolation{vdim1}, ::Val{vdim2}) where {vdim1,vdim2}
+    return MatrixizedInterpolation{vdim1, vdim2}(ipv.ip)
+end
+
+function Base.show(io::IO, mime::MIME"text/plain", ipm::MatrixizedInterpolation{vdim1, vdim2}) where {vdim1, vdim2}
+    show(io, mime, ipm.ip)
+    print(io, "^", vdim1 , "×", vdim2)
+end
+
+# Helper to get number of copies for DoF distribution
+get_n_copies(::MatrixizedInterpolation{vdim1, vdim2}) where {vdim1, vdim2} = vdim1*vdim2
+
+function getnbasefunctions(ipm::MatrixizedInterpolation{vdim1, vdim2}) where {vdim1, vdim2}
+    return vdim1 * vdim2 * getnbasefunctions(ipm.ip)
+end
+function shape_value(ipm::MatrixizedInterpolation{vdim, vdim, shape}, ξ::Tensors.Vec{refdim, T}, I::Int) where {vdim, refdim, shape <: AbstractRefShape{refdim}, T}
+    # First flatten to vector
+    i0, c0 = divrem(I - 1, vdim^2)
+    i = i0 + 1
+    v = shape_value(ipm.ip, ξ, i)
+
+    # Then compute matrix index
+    ci0, cj0 = divrem(c0, vdim)
+    ci = ci0 + 1
+    cj = cj0 + 1
+    return Tensor{2, vdim, T}((k, l) -> k == cj && l == ci ? v : zero(v))
+end
+
+function shape_value(ipm::MatrixizedInterpolation{vdim1, vdim2, shape}, ξ::Tensors.Vec{refdim, T}, I::Int) where {vdim1, vdim2, refdim, shape <: AbstractRefShape{refdim}, T}
+    # First flatten to vector
+    i0, c0 = divrem(I - 1, vdim1*vdim2)
+    i = i0 + 1
+    v = shape_value(ipm.ip, ξ, i)
+
+    # Then compute matrix index
+    ci0, cj0 = divrem(c0, vdim1)
+    ci = ci0 + 1
+    cj = cj0 + 1
+
+    return SMatrix{vdim1, vdim2, T}(ntuple(i_ -> i_ == (cj0*vdim2 + ci) ? v : zero(v), vdim1*vdim2))
+end
+
+# vdim1 == vdim2 == refdim
+function shape_gradient_and_value(ipm::MatrixizedInterpolation{dim, dim, shape}, ξ::Vec{dim}, I::Int) where {dim, shape <: AbstractRefShape{dim}}
+    return invoke(shape_gradient_and_value, Tuple{Interpolation, Vec, Int}, ipm, ξ, I)
+end
+
+# vdim1 != vdim2 != refdim
+function shape_gradient_and_value(ipm::MatrixizedInterpolation{vdim1, vdim2, shape}, ξ::V, I::Int) where {vdim1, vdim2, refdim, shape <: AbstractRefShape{refdim}, T, V <: Vec{refdim, T}}
+    tosmat(v::Tensor{2}) = SMatrix{vdim1,vdim2}((v...,))
+    tosmat(v::SMatrix) = v
+    tosvec(v::Vec) = SVector((v...,))
+    tovec(sv::SVector) = Vec((sv...))
+    val = shape_value(ipm, ξ, I)
+    grad = ForwardDiff.jacobian(sv -> tosmat(shape_value(ipm, tovec(sv), I)), tosvec(ξ))
+    return grad, val
+end
+
+reference_coordinates(ipm::MatrixizedInterpolation) = reference_coordinates(ipm.ip)
+
+is_discontinuous(::Type{<:MatrixizedInterpolation{<:Any, <:Any, <:Any, <:Any, ip}}) where {ip} = is_discontinuous(ip)
+
+get_gradient_interpolation(::VectorizedInterpolation{vdim, shape, order, <:Lagrange{shape, order}}) where {sdim,vdim,shape<:AbstractRefShape{sdim},order} = MatrixizedInterpolation{vdim, sdim}(DiscontinuousLagrange{shape, order-1}())
+get_gradient_interpolation_type(::Type{VectorizedInterpolation{vdim, shape, order, <:Lagrange{shape, order}}}) where {sdim,vdim,shape<:AbstractRefShape{sdim},order} = MatrixizedInterpolation{vdim, sdim, shape, order-1, DiscontinuousLagrange{shape, order-1}}
+
+InterpolationInfo(ipm::MatrixizedInterpolation) = InterpolationInfo(ipm.ip, get_n_copies(ipm))
+
+
 """
     mapping_type(ip::Interpolation)
 
@@ -1547,3 +1637,4 @@ function mapping_type end
 
 mapping_type(::ScalarInterpolation) = IdentityMapping()
 mapping_type(::VectorizedInterpolation) = IdentityMapping()
+mapping_type(::MatrixizedInterpolation) = IdentityMapping()

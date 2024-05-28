@@ -25,6 +25,16 @@ typeof_N(   ::Type{T}, ::VectorInterpolation{vdim}, ::VectorizedInterpolation{sd
 typeof_dNdx(::Type{T}, ::VectorInterpolation{vdim}, ::VectorizedInterpolation{sdim, <: AbstractRefShape{rdim}}) where {T, vdim, sdim, rdim} = SMatrix{vdim, sdim, T}
 typeof_dNdξ(::Type{T}, ::VectorInterpolation{vdim}, ::VectorizedInterpolation{sdim, <: AbstractRefShape{rdim}}) where {T, vdim, sdim, rdim} = SMatrix{vdim, rdim, T}
 
+# Matrix vdim == sdim == rdim
+typeof_N(   ::Type{T}, ::MatrixizedInterpolation{dim,dim}, ::VectorizedInterpolation{dim, <: AbstractRefShape{dim}}) where {T, dim} = Tensor{2, dim, T}
+typeof_dNdx(::Type{T}, ::MatrixizedInterpolation{dim,dim}, ::VectorizedInterpolation{dim, <: AbstractRefShape{dim}}) where {T, dim} = Tensor{3, dim, T}
+typeof_dNdξ(::Type{T}, ::MatrixizedInterpolation{dim,dim}, ::VectorizedInterpolation{dim, <: AbstractRefShape{dim}}) where {T, dim} = Tensor{3, dim, T}
+
+# Matrix vdim != sdim != rdim
+typeof_N(   ::Type{T}, ::MatrixizedInterpolation{vdim1,vdim2}, ::VectorizedInterpolation{sdim, <: AbstractRefShape{rdim}}) where {T, vdim1, vdim2, sdim, rdim} = SMatrix{vdim1, vdim2, T}
+typeof_dNdx(::Type{T}, ::MatrixizedInterpolation{vdim1,vdim2}, ::VectorizedInterpolation{sdim, <: AbstractRefShape{rdim}}) where {T, vdim1, vdim2, sdim, rdim} = SArray{Tuple{vdim1, vdim2, sdim}, T, 3, vdim1*vdim2*sdim}
+typeof_dNdξ(::Type{T}, ::MatrixizedInterpolation{vdim1,vdim2}, ::VectorizedInterpolation{sdim, <: AbstractRefShape{rdim}}) where {T, vdim1, vdim2, sdim, rdim} = SArray{Tuple{vdim1, vdim2, rdim}, T, 3, vdim1*vdim2*sdim}
+
 """
     FunctionValues{DiffOrder}(::Type{T}, ip_fun, qr::QuadratureRule, ip_geo::VectorizedInterpolation)
 
@@ -98,6 +108,7 @@ shape_gradient_type(::FunctionValues{0}) = nothing
 sdim_from_gradtype(::Type{<:AbstractTensor{<:Any,sdim}}) where sdim = sdim
 sdim_from_gradtype(::Type{<:SVector{sdim}}) where sdim = sdim
 sdim_from_gradtype(::Type{<:SMatrix{<:Any,sdim}}) where sdim = sdim
+sdim_from_gradtype(::Type{<:SArray{<:Tuple{<:Any,<:Any,sdim}}}) where sdim = sdim
 
 # For performance, these must be fully inferable for the compiler.
 # args: valname (:CellValues or :FacetValues), shape_gradient_type, eltype(x)

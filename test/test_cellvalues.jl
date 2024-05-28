@@ -17,7 +17,7 @@
                                     (Lagrange{RefPyramid, 2}(), QuadratureRule{RefPyramid}(2)),
                                    )
 
-    for func_interpol in (scalar_interpol, VectorizedInterpolation(scalar_interpol))
+    for func_interpol in (scalar_interpol, VectorizedInterpolation(scalar_interpol), MatrixizedInterpolation(scalar_interpol))
         geom_interpol = scalar_interpol # Tests below assume this
         n_basefunc_base = getnbasefunctions(scalar_interpol)
         cv = @inferred CellValues(quad_rule, func_interpol, geom_interpol)
@@ -26,7 +26,7 @@
 
         @test getnbasefunctions(cv) == n_basefuncs
 
-        x, n = valid_coordinates_and_normals(func_interpol)
+        x, n = valid_coordinates_and_normals(scalar_interpol)
         reinit!(cv, x)
         @test_call reinit!(cv, x)
 
@@ -34,14 +34,18 @@
         # Since this is a linear deformation we should get back the exact values
         # from the interpolation.
         u = zeros(Vec{rdim, Float64}, n_basefunc_base)
+        u2 = zeros(Tensor{2, rdim, Float64}, n_basefunc_base)
         u_scal = zeros(n_basefunc_base)
+        W = rand(Tensor{3, rdim})
         H = rand(Tensor{2, rdim})
         V = rand(Tensor{1, rdim})
         for i in 1:n_basefunc_base
+            u2[i] = W ⋅ x[i]
             u[i] = H ⋅ x[i]
             u_scal[i] = V ⋅ x[i]
         end
         u_vector = reinterpret(Float64, u)
+        u_matrix = reinterpret(Float64, u2)
 
         for i in 1:getnquadpoints(cv)
             if func_interpol isa Ferrite.ScalarInterpolation
@@ -53,7 +57,7 @@
                 rdim == 3 && @test function_curl(cv, i, u) ≈ Ferrite.curl_from_gradient(H)
                 function_value(cv, i, u)
                 function_value(cv, i, u_scal)
-            else# func_interpol isa Ferrite.VectorInterpolation
+            elseif func_interpol isa Ferrite.VectorInterpolation
                 @test function_gradient(cv, i, u_vector)  ≈ H
                 @test (@test_deprecated function_gradient(cv, i, u)) ≈ H
                 @test function_symmetric_gradient(cv, i, u_vector) ≈ 0.5(H + H')
@@ -65,6 +69,10 @@
                     @test (@test_deprecated function_curl(cv, i, u)) ≈ Ferrite.curl_from_gradient(H)
                 end
                 @test function_value(cv, i, u_vector) ≈ (@test_deprecated function_value(cv, i, u))
+            else func_interpol isa Ferrite.MatrixInterpolation
+                @test function_gradient(cv, i, u_matrix) ≈ W
+                @test_throws MethodError function_curl(cv, i, u_matrix)
+                @test_throws MethodError function_divergence(cv, i, u_matrix)
             end
         end
 
