@@ -317,6 +317,8 @@ more discussion).
   a given grid (based on its node coordinates), and returns the minimum and maximum vertices
   of the bounding box. ([#880][github-880])
 
+- `L2Projector` supports projecting on grids with mixed celltypes. ([#949][github-949])
+
 ### Changed
 
 - `create_sparsity_pattern` now supports cross-element dof coupling by passing kwarg
@@ -412,6 +414,11 @@ more discussion).
 
 - `Ferrite.getfielddim(::AbstractDofHandler, args...)` has been renamed to `Ferrite.n_components`.
   [#943][github-943]
+
+- `project(::L2Projector, data, qr_rhs)` now expects data to be indexed by the cellid, as opposed to
+  the index in the vector of cellids passed to the `L2Projector`. The data may be passed as an
+  `AbstractDict{Int, <:AbstractVector}`, as an alternative to `AbstractArray{<:AbstractVector}`.
+  ([#949][github-949])
 
 ### Deprecated
 
@@ -988,3 +995,4 @@ poking into Ferrite internals:
 [github-914]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/914
 [github-924]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/924
 [github-943]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/943
+[github-949]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/949
