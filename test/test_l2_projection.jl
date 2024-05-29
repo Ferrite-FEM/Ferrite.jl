@@ -209,10 +209,16 @@ function test_projection_subset_of_mixedgrid()
     @test point_vars ≈ point_vars_2 ≈ ae
 end
 
-function calculate_function_value_in_qpoint!(qvector::Vector, cv::CellValues, ae::Vector)
-    for q_point in 1:getnquadpoints(cv)
-        qvector[q_point] = function_value(cv, q_point, ae)
+function calculate_function_value_in_qpoints!(qp_data, sdh, cv, dofvector::Vector)
+    for cell in CellIterator(sdh)
+        qvector = qp_data[cellid(cell)]
+        ae = dofvector[celldofs(cell)]
+        resize!(qvector, getnquadpoints(cv))
+        for q_point in 1:getnquadpoints(cv)
+            qvector[q_point] = function_value(cv, q_point, ae)
+        end
     end
+    return qp_data
 end
 
 function test_add_projection_grid()
@@ -237,11 +243,7 @@ function test_add_projection_grid()
     # Fill qp_data with the interpolated values
     qp_data = [Float64[] for _ in 1:getncells(grid)]
     for (sdh, cv_) in ((sdh1, cv), (sdh2, cv))
-        for cell in CellIterator(sdh)
-            i = cellid(cell)
-            resize!(qp_data[i], getnquadpoints(cv_))
-            calculate_function_value_in_qpoint!(qp_data[i], cv_, solution[celldofs(cell)])
-        end
+        calculate_function_value_in_qpoints!(qp_data, sdh, cv_, solution)
     end
 
     # Build the first L2Projector with two different sets
@@ -289,11 +291,7 @@ function test_projection_mixedgrid()
     # Fill qp_data with the interpolated values
     qp_data = [Float64[] for _ in 1:getncells(grid)]
     for (sdh, cv) in ((sdh_quad, cv_quad), (sdh_tria, cv_tria))
-        for cell in CellIterator(sdh)
-            i = cellid(cell)
-            resize!(qp_data[i], getnquadpoints(cv))
-            calculate_function_value_in_qpoint!(qp_data[i], cv, solution[celldofs(cell)])
-        end
+        calculate_function_value_in_qpoints!(qp_data, sdh, cv, solution)
     end
 
     # Finally, let's build the L2Projector and check if we can project back the solution
