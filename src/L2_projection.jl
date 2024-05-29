@@ -255,6 +255,7 @@ function _project(proj::L2Projector, vars::Union{AbstractVector{TC}, AbstractDic
 
     # Sanity checks for user input
     isclosed(proj) || error("The L2Projector is not closed")
+    length(qrs_rhs) == 0 && error("The right-hand-side quadrature rule must be provided, unless already given to the L2Projector")
     length(qrs_rhs) == length(proj.dh.subdofhandlers) || error("Number of qrs_rhs must match the number of `add!`ed sets")
     for (qr_rhs, sdh) in zip(qrs_rhs, proj.dh.subdofhandlers)
         if getrefshape(qr_rhs) !== getrefshape(getcelltype(sdh))

@@ -429,17 +429,73 @@ function test_show()
     ip = Lagrange{RefTriangle, 1}()
     proj = L2Projector(ip, grid)
     @test repr("text/plain", proj) == repr(typeof(proj)) * "\n  projection on:           8/8 cells in grid\n  function interpolation:  Lagrange{RefTriangle, 1}()\n  geometric interpolation: Lagrange{RefTriangle, 1}()\n"
+
+    # Multi-domain setup
+    proj2 = L2Projector(grid)
+    @test sprint(show, MIME"text/plain"(), proj2) == "L2Projector (not closed)"
+    qr_rhs = QuadratureRule{RefTriangle}(2)
+    add!(proj2, Set(1:2), ip; qr_rhs)
+    add!(proj2, Set(3:4), ip; qr_rhs)
+    close!(proj2)
+    showstr = sprint(show, MIME"text/plain"(), proj2)
+    @test contains(showstr, "L2Projector")
+    @test contains(showstr, "4/8 cells in grid")
+    @test contains(showstr, "Split into 2 sets")
+end
+
+function test_l2proj_errorpaths()
+    grid = generate_grid(Triangle, (2,3))
+    ip = Lagrange{RefTriangle, 1}()
+    proj = L2Projector(grid)                        # Multiple subdomains
+    proj1 = L2Projector(ip, grid; set=collect(1:4)) # Single sub-domain case
+    qr_tria = QuadratureRule{RefTriangle}(2)
+    qr_quad = QuadratureRule{RefQuadrilateral}(2)
+
+    # Providing wrong quadrature rules
+    exception_rhs = ErrorException("The reference shape of the interpolation and the qr_rhs must be the same")
+    exception_lhs = ErrorException("The reference shape of the interpolation and the qr_lhs must be the same")
+    @test_throws exception_rhs add!(proj, Set(1:2), ip; qr_rhs = qr_quad)
+    @test_throws exception_lhs add!(proj, Set(1:2), ip; qr_rhs = qr_tria, qr_lhs = qr_quad)
+
+    # Build up a 2-domain case
+    add!(proj, Set(1:2), ip; qr_rhs = qr_tria)
+    add!(proj, Set(3:4), ip; qr_rhs = qr_tria)
+    data_valid = Dict(i => rand(getnquadpoints(qr_tria)) for i in 1:4)
+
+    # Try projecting when not closed
+    @test_throws ErrorException("The L2Projector is not closed") project(proj, data_valid)
+    close!(proj)
+
+    # Not giving quadrature rule
+    noquad_exception = ErrorException("The right-hand-side quadrature rule must be provided, unless already given to the L2Projector")
+    @test_throws noquad_exception project(proj1, data_valid)
+    # Providing wrong quadrature rule to project
+    wrongquad_exception = ErrorException("Reference shape of quadrature rule and cells doesn't match. Please ensure that `qrs_rhs` has the same order as sets are added to the L2Projector")
+    @test_throws wrongquad_exception project(proj1, data_valid, qr_quad)
+
+    # Giving data indexed by set index instead of cell index
+    data_invalid = [rand(getnquadpoints(qr_tria)) for _ in 1:4]
+    invalid_data_exception = ErrorException("vars is indexed by the cellid, not the index in the set: length(vars) != number of cells")
+    @test_throws invalid_data_exception project(proj1, data_invalid, qr_tria)
+    # Giving data with too many or too few quadrature points
+    data_invalid2 = [rand(getnquadpoints(qr_tria) + 1) for _ in 1:getncells(grid)]
+    data_invalid3 = [rand(getnquadpoints(qr_tria) - 1) for _ in 1:getncells(grid)]
+    wrongnqp_exception = ErrorException("The number of variables per cell doesn't match the number of quadrature points")
+    @test_throws wrongnqp_exception project(proj1, data_invalid2, qr_tria)
+    @test_throws wrongnqp_exception project(proj1, data_invalid3, qr_tria)
+
 end
 
 @testset "Test L2-Projection" begin
-    #=test_projection(1, RefQuadrilateral)
+    test_projection(1, RefQuadrilateral)
     test_projection(1, RefTriangle)
     test_projection(2, RefQuadrilateral)
-    test_projection(2, RefTriangle)=#
+    test_projection(2, RefTriangle)
     test_projection_subset_of_mixedgrid()
     test_add_projection_grid()
     test_projection_mixedgrid()
     test_export(subset=false)
     test_export(subset=true)
     test_show()
+    test_l2proj_errorpaths()
 end
