@@ -203,12 +203,12 @@ end
     sdim, rdim = size(Jinv)
     (rdim != sdim) && error("apply_mapping! for second order gradients and embedded elements not implemented")
 
-    H    = gethessian(mapping_values)
+    H = gethessian(mapping_values)
     is_vector_valued = first(funvals.Nx) isa Vec
     Jinv_otimesu_Jinv = is_vector_valued ? otimesu(Jinv, Jinv) : nothing
     @inbounds for j in 1:getnbasefunctions(funvals)
         dNdx = dothelper(funvals.dNdξ[j, q_point], Jinv)
-        if is_vector_valued #TODO - combine with helper function ?
+        if is_vector_valued
             d2Ndx2 = (funvals.d2Ndξ2[j, q_point] - dNdx⋅H) ⊡ Jinv_otimesu_Jinv
         else
             d2Ndx2 = Jinv'⋅(funvals.d2Ndξ2[j, q_point] - dNdx⋅H)⋅Jinv

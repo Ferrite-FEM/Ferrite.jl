@@ -12,7 +12,7 @@ values of nodal functions, gradients and divergences of nodal functions etc. in 
   By default linear Lagrange interpolation is used. For embedded elements the geometric interpolations should
   be vectorized to the spatial dimension.
 
-**Keyword arguments:**
+**Keyword arguments:** The following keyword arguments are experimental and may change in future minor releases
 * `update_gradients`: Specifies if the gradients of the shape functions should be updated (default true)
 * `update_hessians`: Specifies if the hessians of the shape functions should be updated (default false)
 * `update_detJdV`: Specifies if the volume associated with each quadrature point should be updated (default true)

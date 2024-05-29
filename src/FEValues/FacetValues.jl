@@ -1,5 +1,5 @@
 """
-    FacetValues([::Type{T}], quad_rule::FacetQuadratureRule, func_interpol::Interpolation, [geom_interpol::Interpolation]; ; update_gradients=true, update_hessians=false, )
+    FacetValues([::Type{T}], quad_rule::FacetQuadratureRule, func_interpol::Interpolation, [geom_interpol::Interpolation])
 
 A `FacetValues` object facilitates the process of evaluating values of shape functions, gradients of shape functions,
 values of nodal functions, gradients and divergences of nodal functions etc. on the facets of finite elements.
@@ -12,7 +12,7 @@ values of nodal functions, gradients and divergences of nodal functions etc. on 
 * `geom_interpol`: an optional instance of an [`Interpolation`](@ref) which is used to interpolate the geometry.
   By default linear Lagrange interpolation is used.
 
-**Keyword arguments:**
+**Keyword arguments:** The following keyword arguments are experimental and may change in future minor releases
 
 * `update_gradients`: Specifies if the gradients of the shape functions should be updated (default true)
 * `update_hessians`: Specifies if the hessians of the shape functions should be updated (default false)
