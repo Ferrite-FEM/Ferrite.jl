@@ -317,13 +317,11 @@ more discussion).
   a given grid (based on its node coordinates), and returns the minimum and maximum vertices
   of the bounding box. ([#880][github-880])
 
-<<<<<<< HEAD
-- `L2Projector` supports projecting on grids with mixed celltypes. ([#949][github-949])
-=======
 - A new function, `geometric_interpolation`, is exported, which gives the geometric interpolation
   for each cell type. This is equivalent to the deprecated `Ferrite.default_interpolation` function.
   ([#953][github-953])
->>>>>>> master
+
+- `L2Projector` supports projecting on grids with mixed celltypes. ([#949][github-949])
 
 ### Changed
 
