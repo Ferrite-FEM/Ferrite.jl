@@ -1,9 +1,9 @@
 """
     MappingValues(J, H)
 
-The mapping values are calculated based on a 
+The mapping values are calculated based on a
 `geometric_mapping::GeometryMapping` along with the cell coordinates,
-and the stored jacobian, `J`, and potentially hessian, `H`, are 
+and the stored jacobian, `J`, and potentially hessian, `H`, are
 used when mapping the `FunctionValues` to the current cell during `reinit!`.
 """
 MappingValues
@@ -13,14 +13,14 @@ struct MappingValues{JT, HT}
     H::HT # dJ/dξ # Hessian
 end
 
-@inline getjacobian(mv::MappingValues{<:Union{AbstractTensor, SMatrix}}) = mv.J 
-# @inline gethessian(mv::MappingValues{<:Any,<:AbstractTensor}) = mv.H # PR798
+@inline getjacobian(mv::MappingValues{<:Union{AbstractTensor, SMatrix}}) = mv.J
+@inline gethessian(mv::MappingValues{<:Any,<:AbstractTensor}) = mv.H
 
 
 """
     GeometryMapping{DiffOrder}(::Type{T}, ip_geo, qr::QuadratureRule)
 
-Create a `GeometryMapping` object which contains the geometric 
+Create a `GeometryMapping` object which contains the geometric
 
 * shape values
 * gradient values (if DiffOrder ≥ 1)
@@ -31,11 +31,11 @@ Create a `GeometryMapping` object which contains the geometric
 GeometryMapping
 
 struct GeometryMapping{DiffOrder, IP, M_t, dMdξ_t, d2Mdξ2_t}
-    ip::IP             # ::Interpolation                Geometric interpolation 
+    ip::IP             # ::Interpolation                Geometric interpolation
     M::M_t             # ::AbstractMatrix{<:Number}     Values of geometric shape functions
     dMdξ::dMdξ_t       # ::AbstractMatrix{<:Vec}        Gradients of geometric shape functions in ref-domain
     d2Mdξ2::d2Mdξ2_t   # ::AbstractMatrix{<:Tensor{2}}  Hessians of geometric shape functions in ref-domain
-                       # ::Nothing                      When not required
+                       # ::Nothing (dMdξ or d2Mdξ2 if not required)
     function GeometryMapping(
         ip::IP, M::M_t, ::Nothing, ::Nothing
         ) where {IP <: ScalarInterpolation, M_t<:AbstractMatrix{<:Number}}
@@ -46,12 +46,12 @@ struct GeometryMapping{DiffOrder, IP, M_t, dMdξ_t, d2Mdξ2_t}
         ) where {IP <: ScalarInterpolation, M_t<:AbstractMatrix{<:Number}, dMdξ_t <: AbstractMatrix{<:Vec}}
         return new{1, IP, M_t, dMdξ_t, Nothing}(ip, M, dMdξ, nothing)
     end
-#=  function GeometryMapping(
-        ip::IP, M::M_t, dMdξ::dMdξ_t, d2Mdξ2::d2Mdξ2_t) where 
-        {IP <: ScalarInterpolation, M_t<:AbstractMatrix{<:Number}, 
+    function GeometryMapping(
+        ip::IP, M::M_t, dMdξ::dMdξ_t, d2Mdξ2::d2Mdξ2_t) where
+        {IP <: ScalarInterpolation, M_t<:AbstractMatrix{<:Number},
         dMdξ_t <: AbstractMatrix{<:Vec}, d2Mdξ2_t <: AbstractMatrix{<:Tensor{2}}}
         return new{2, IP, M_t, dMdξ_t, d2Mdξ2_t}(ip, M, dMdξ, d2Mdξ2)
-    end =# # PR798
+    end
 end
 function GeometryMapping{0}(::Type{T}, ip::ScalarInterpolation, qr::QuadratureRule) where T
     n_shape = getnbasefunctions(ip)
@@ -63,26 +63,26 @@ end
 function GeometryMapping{1}(::Type{T}, ip::ScalarInterpolation, qr::QuadratureRule) where T
     n_shape = getnbasefunctions(ip)
     n_qpoints = getnquadpoints(qr)
-    
+
     M    = zeros(T,                 n_shape, n_qpoints)
-    dMdξ = zeros(Vec{getdim(ip),T}, n_shape, n_qpoints)
+    dMdξ = zeros(Vec{getrefdim(ip),T}, n_shape, n_qpoints)
 
     gm = GeometryMapping(ip, M, dMdξ, nothing)
     precompute_values!(gm, getpoints(qr))
     return gm
 end
-#= function GeometryMapping{2}(::Type{T}, ip::ScalarInterpolation, qr::QuadratureRule) where T
+function GeometryMapping{2}(::Type{T}, ip::ScalarInterpolation, qr::QuadratureRule) where T
     n_shape = getnbasefunctions(ip)
     n_qpoints = getnquadpoints(qr)
-    
+
     M      = zeros(T,                      n_shape, n_qpoints)
-    dMdξ   = zeros(Vec{getdim(ip),T},      n_shape, n_qpoints)
-    d2Mdξ2 = zeros(Tensor{2,getdim(ip),T}, n_shape, n_qpoints)
+    dMdξ   = zeros(Vec{getrefdim(ip),T},      n_shape, n_qpoints)
+    d2Mdξ2 = zeros(Tensor{2,getrefdim(ip),T}, n_shape, n_qpoints)
 
     gm = GeometryMapping(ip, M, dMdξ, d2Mdξ2)
     precompute_values!(gm, getpoints(qr))
     return gm
-end =# # PR798
+end
 
 function precompute_values!(gm::GeometryMapping{0}, qr_points::Vector{<:Vec})
     shape_values!(gm.M, gm.ip, qr_points)
@@ -90,9 +90,9 @@ end
 function precompute_values!(gm::GeometryMapping{1}, qr_points::Vector{<:Vec})
     shape_gradients_and_values!(gm.dMdξ, gm.M, gm.ip, qr_points)
 end
-#= function precompute_values!(gm::GeometryMapping{2}, qr_points::Vector{<:Vec})
+function precompute_values!(gm::GeometryMapping{2}, qr_points::Vector{<:Vec})
     shape_hessians_gradients_and_values!(gm.d2Mdξ2, gm.dMdξ, gm.M, gm.ip, qr_points)
-end =# # PR798
+end
 
 function Base.copy(v::GeometryMapping)
     return GeometryMapping(copy(v.ip), copy(v.M), _copy_or_nothing(v.dMdξ), _copy_or_nothing(v.d2Mdξ2))
@@ -117,9 +117,9 @@ end
 function otimes_returntype(#=typeof(x)=#::Type{<:Vec{dim,Tx}}, #=typeof(dMdξ)=#::Type{<:Vec{dim,TM}}) where {dim, Tx, TM}
     return Tensor{2,dim,promote_type(Tx,TM)}
 end
-#= function otimes_returntype(#=typeof(x)=#::Type{<:Vec{dim,Tx}}, #=typeof(d2Mdξ2)=#::Type{<:Tensor{2,dim,TM}}) where {dim, Tx, TM}
+function otimes_returntype(#=typeof(x)=#::Type{<:Vec{dim,Tx}}, #=typeof(d2Mdξ2)=#::Type{<:Tensor{2,dim,TM}}) where {dim, Tx, TM}
     return Tensor{3,dim,promote_type(Tx,TM)}
-end =# # PR798
+end
 
 @inline function calculate_mapping(::GeometryMapping{0}, q_point, x)
     return MappingValues(nothing, nothing)
@@ -134,15 +134,17 @@ end
     return MappingValues(fecv_J, nothing)
 end
 
-#= @inline function calculate_mapping(geo_mapping::GeometryMapping{2}, q_point, x)
+@inline function calculate_mapping(geo_mapping::GeometryMapping{2}, q_point, x)
     J = zero(otimes_returntype(eltype(x), eltype(geo_mapping.dMdξ)))
+    sdim, rdim = size(J)
+    (rdim != sdim) && error("hessian for embedded elements not implemented (rdim=$rdim, sdim=$sdim)")
     H = zero(otimes_returntype(eltype(x), eltype(geo_mapping.d2Mdξ2)))
     @inbounds for j in 1:getngeobasefunctions(geo_mapping)
         J += x[j] ⊗ geo_mapping.dMdξ[j, q_point]
         H += x[j] ⊗ geo_mapping.d2Mdξ2[j, q_point]
     end
     return MappingValues(J, H)
-end =# # PR798
+end
 
 calculate_detJ(J::Tensor{2}) = det(J)
 calculate_detJ(J::SMatrix) = embedding_det(J)

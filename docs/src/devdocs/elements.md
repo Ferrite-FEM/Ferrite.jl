@@ -13,7 +13,7 @@ Ferrite.vertices(::Ferrite.AbstractCell)
 Ferrite.edges(::Ferrite.AbstractCell)
 Ferrite.reference_faces(::Ferrite.AbstractRefShape)
 Ferrite.faces(::Ferrite.AbstractCell)
-Ferrite.default_interpolation(::Ferrite.AbstractCell)
+Ferrite.geometric_interpolation(::Ferrite.AbstractCell)
 ```
 
 ### Common utilities and definitions when working with grids internally.
@@ -26,17 +26,8 @@ Ferrite.get_coordinate_eltype(::Node)
 Ferrite.toglobal
 Ferrite.sortface
 Ferrite.sortedge
-Ferrite.getfaceedges
-Ferrite.getfacevertices
-Ferrite.getedgevertices
-Ferrite.getfaceinstances
-Ferrite.getedgeinstances
-Ferrite.getvertexinstances
-Ferrite.filterfaces
-Ferrite.filteredges
-Ferrite.filtervertices
-Ferrite.element_to_face_transformation
-Ferrite.face_to_element_transformation
+Ferrite.element_to_facet_transformation
+Ferrite.facet_to_element_transformation
 Ferrite.InterfaceOrientationInfo
 Ferrite.transform_interface_points!
 ```

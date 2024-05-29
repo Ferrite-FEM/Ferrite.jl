@@ -24,7 +24,7 @@ Create an `Assembler` object which can be used to assemble element contributions
 global sparse matrix. Use [`assemble!`](@ref) for each element, and [`finish_assemble`](@ref),
 to finalize the assembly and return the sparse matrix.
 
-Note that giving a sparse matrix as input can be more efficient. See below and 
+Note that giving a sparse matrix as input can be more efficient. See below and
 as described in the [manual](@ref man-assembly).
 
 !!! note

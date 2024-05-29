@@ -26,13 +26,14 @@ getnnodes
 Ferrite.nnodes_per_cell
 getcellset
 getnodeset
-getfaceset
-getedgeset
+getfacetset
 getvertexset
 transform_coordinates!
 getcoordinates
 getcoordinates!
 Ferrite.get_node_coordinate
+Ferrite.getspatialdim(::Ferrite.AbstractGrid)
+Ferrite.getrefdim
 ```
 
 ### Topology
@@ -49,9 +50,9 @@ Ferrite.getstencil
 
 ```@docs
 addcellset!
-addfaceset!
-addboundaryfaceset!
-addboundaryedgeset!
+addfacetset!
+addboundaryfacetset!
+addvertexset!
 addboundaryvertexset!
 addnodeset!
 ```

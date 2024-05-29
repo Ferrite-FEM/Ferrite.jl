@@ -55,5 +55,3 @@ module Cook
         end
     end
 end
-
-

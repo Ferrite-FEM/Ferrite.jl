@@ -28,19 +28,19 @@ end
 """
     reinit!(cv::CellValues, cell::AbstractCell, x::Vector)
     reinit!(cv::CellValues, x::Vector)
-    reinit!(fv::FaceValues, cell::AbstractCell, x::Vector, face::Int)
-    reinit!(fv::FaceValues, x::Vector, face::Int)
+    reinit!(fv::FacetValues, cell::AbstractCell, x::Vector, face::Int)
+    reinit!(fv::FacetValues, x::Vector, face::Int)
 
-Update the `CellValues`/`FaceValues` object for a cell or face with coordinates `x`.
+Update the `CellValues`/`FacetValues` object for a cell or face with coordinates `x`.
 The derivatives of the shape functions, and the new integration weights are computed.
-For interpolations with non-identity mappings, the current `cell` is also required. 
+For interpolations with non-identity mappings, the current `cell` is also required.
 """
 reinit!
 
 """
     getnquadpoints(fe_v::AbstractValues)
 
-Return the number of quadrature points. For `FaceValues`, 
+Return the number of quadrature points. For `FacetValues`,
 this is the number for the current face.
 """
 function getnquadpoints end
@@ -71,7 +71,7 @@ shape_value(fe_v::AbstractValues, q_point::Int, base_function::Int)
 """
     geometric_value(fe_v::AbstractValues, q_point, base_function::Int)
 
-Return the value of the geometric shape function `base_function` evaluated in 
+Return the value of the geometric shape function `base_function` evaluated in
 quadrature point `q_point`.
 """
 geometric_value(fe_v::AbstractValues, q_point::Int, base_function::Int)
@@ -105,6 +105,12 @@ end
 divergence_from_gradient(grad::Vec) = sum(grad)
 divergence_from_gradient(grad::Tensor{2}) = tr(grad)
 
+"""
+    shape_curl(fe_v::AbstractValues, q_point::Int, base_function::Int)
+
+Return the curl of shape function `base_function` evaluated in
+quadrature point `q_point`.
+"""
 function shape_curl(cv::AbstractValues, q_point::Int, base_func::Int)
     return curl_from_gradient(shape_gradient(cv, q_point, base_func))
 end
@@ -206,6 +212,38 @@ function function_gradient_init(cv::AbstractValues, ::AbstractVector{T}) where {
 end
 
 """
+    function_hessian(fe_v::AbstractValues{dim}, q_point::Int, u::AbstractVector{<:AbstractFloat}, [dof_range])
+
+    Compute the hessian of the function in a quadrature point. `u` is a vector with values
+    for the degrees of freedom.
+"""
+function function_hessian(fe_v::AbstractValues, q_point::Int, u::AbstractVector, dof_range = eachindex(u))
+    n_base_funcs = getnbasefunctions(fe_v)
+    length(dof_range) == n_base_funcs || throw_incompatible_dof_length(length(dof_range), n_base_funcs)
+    @boundscheck checkbounds(u, dof_range)
+    @boundscheck checkquadpoint(fe_v, q_point)
+    hess = function_hessian_init(fe_v, u)
+    @inbounds for (i, j) in pairs(dof_range)
+        hess += shape_hessian(fe_v, q_point, i) * u[j]
+    end
+    return hess
+end
+
+"""
+    shape_hessian_type(fe_v::AbstractValues)
+
+Return the type of `shape_hessian(fe_v, q_point, base_function)`
+"""
+function shape_hessian_type(fe_v::AbstractValues)
+    # Default fallback
+    return typeof(shape_hessian(fe_v, 1, 1))
+end
+
+function function_hessian_init(cv::AbstractValues, ::AbstractVector{T}) where {T}
+    return zero(shape_hessian_type(cv)) * zero(T)
+end
+
+"""
     function_symmetric_gradient(fe_v::AbstractValues, q_point::Int, u::AbstractVector, [dof_range])
 
 Compute the symmetric gradient of the function, see [`function_gradient`](@ref).
@@ -286,7 +324,7 @@ function spatial_coordinate(fe_v::AbstractValues, q_point::Int, x::AbstractVecto
 end
 
 
-# Utility functions used by GeometryMapping, FunctionValues 
+# Utility functions used by GeometryMapping, FunctionValues
 _copy_or_nothing(x) = copy(x)
 _copy_or_nothing(::Nothing) = nothing
 
@@ -302,11 +340,8 @@ function shape_gradients_and_values!(gradients::AbstractMatrix, values::Abstract
     end
 end
 
-#= PR798
 function shape_hessians_gradients_and_values!(hessians::AbstractMatrix, gradients::AbstractMatrix, values::AbstractMatrix, ip, qr_points::Vector{<:Vec})
     for (qp, ξ) in pairs(qr_points)
         shape_hessians_gradients_and_values!(@view(hessians[:, qp]), @view(gradients[:, qp]), @view(values[:, qp]), ip, ξ)
     end
 end
-=#
-

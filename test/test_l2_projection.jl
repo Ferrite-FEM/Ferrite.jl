@@ -133,7 +133,7 @@ function test_projection_mixedgrid()
     # use a SymmetricTensor here for testing the symmetric version of project
     f(x) = SymmetricTensor{2,2,Float64}((1 + x[1]^2, 2x[2]^2, x[1]*x[2]))
     xe = getcoordinates(mesh, 1)
-    
+
     # analytical values
     qp_values = [[f(spatial_coordinate(cv, qp, xe)) for qp in 1:getnquadpoints(cv)]]
     qp_values_matrix = reduce(hcat, qp_values)
@@ -145,6 +145,13 @@ function test_projection_mixedgrid()
     proj = L2Projector(ip, mesh; geom_ip=ip_geom, set=quadset)
     point_vars = project(proj, qp_values, qr)
     point_vars_2 = project(proj, qp_values_matrix, qr)
+    projection_at_nodes = evaluate_at_grid_nodes(proj, point_vars)
+    for cellid in quadset
+        for nodeid in mesh.cells[cellid].nodes
+            x = mesh.nodes[nodeid].x
+            @test projection_at_nodes[nodeid] ≈ f(x)
+        end
+    end
 
     ae = zeros(3, length(point_vars))
     for i in 1:3
@@ -154,7 +161,6 @@ function test_projection_mixedgrid()
     @test point_vars ≈ point_vars_2 ≈ ae
 
     # Do the same thing but for the triangle set
-    order = 2
     ip = Lagrange{RefTriangle, order}()
     ip_geom = Lagrange{RefTriangle, 1}()
     qr = QuadratureRule{RefTriangle}(4)
@@ -175,6 +181,14 @@ function test_projection_mixedgrid()
     proj = L2Projector(ip, mesh; geom_ip=ip_geom, set=triaset)
     point_vars = project(proj, qp_values_tria, qr)
     point_vars_2 = project(proj, qp_values_matrix_tria, qr)
+    projection_at_nodes = evaluate_at_grid_nodes(proj, point_vars)
+    for cellid in triaset
+        for nodeid in mesh.cells[cellid].nodes
+            x = mesh.nodes[nodeid].x
+            @test projection_at_nodes[nodeid] ≈ f(x)
+        end
+    end
+
     ae = zeros(3, length(point_vars))
     for i in 1:3
         apply_analytical!(@view(ae[i, :]), proj.dh, :_, x -> f(x).data[i], triaset)
@@ -267,17 +281,23 @@ function test_export(;subset::Bool)
     end
 
     mktempdir() do tmp
-        fname = vtk_grid(joinpath(tmp, "projected"), grid) do vtk
-            vtk_point_data(vtk, p, p_scalar, "p_scalar")
-            vtk_point_data(vtk, p, p_vec, "p_vec")
-            vtk_point_data(vtk, p, p_tens, "p_tens")
-            vtk_point_data(vtk, p, p_stens, "p_stens")
+        fname = joinpath(tmp, "projected")
+        VTKFile(fname, grid) do vtk
+            write_projection(vtk, p, p_scalar, "p_scalar")
+            write_projection(vtk, p, p_vec, "p_vec")
+            write_projection(vtk, p, p_tens, "p_tens")
+            write_projection(vtk, p, p_stens, "p_stens")
         end
-        @test bytes2hex(open(SHA.sha1, fname[1], "r")) in (
-            subset ? ("261cfe21de7a478e14f455e783694651a91eeb60", "b3fef3de9f38ca9ddd92f2f67a1606d07ca56d67") :
-                     ("3b8ffb444db1b4cee1246a751da88136116fe49b", "bc2ec8f648f9b8bccccf172c1fc48bf03340329b")
-        )
+        # The following test may fail due to floating point inaccuracies
+        # These could occur due to e.g. changes in system architecture.
+        if Sys.islinux() && Sys.ARCH === :x86_64
+            @test bytes2hex(open(SHA.sha1, fname*".vtu", "r")) == (
+                subset ? "b3fef3de9f38ca9ddd92f2f67a1606d07ca56d67" :
+                         "bc2ec8f648f9b8bccccf172c1fc48bf03340329b"
+            )
+        end
     end
+
 end
 
 function test_show()
