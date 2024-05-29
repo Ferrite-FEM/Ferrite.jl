@@ -1540,23 +1540,23 @@ end
 function _shape_hessian_gradient_and_value_static_array(ipv::VectorizedInterpolation{vdim, shape}, ξ::V, I::Int) where {vdim, refdim, shape <: AbstractRefShape{refdim}, T, V <: Vec{refdim, T}}
     # Load with dual numbers and compute the value
     f = x -> shape_value(ipv, x, I)
-    ξd =  Tensors._load(Tensors._load(ξ, Tensors.Tag(f, V)), Tensors.Tag(f, V))
+    ξd =  Tensors._load(Tensors._load(ξ, ForwardDiff.Tag(f, V)), ForwardDiff.Tag(f, V))
     value_hess = f(ξd)
     # Extract the value and gradient
-    val = Vec{vdim, T}(i -> Tensors.value(Tensors.value(value_hess[i])))
+    val = Vec{vdim, T}(i -> ForwardDiff.value(ForwardDiff.value(value_hess[i])))
     grad = zero(MMatrix{vdim, refdim, T})
     hess = zero(MArray{Tuple{vdim, refdim, refdim}, T})
     for (i, vi) in pairs(value_hess)
-        hess_values = Tensors.value(vi)
+        hess_values = ForwardDiff.value(vi)
 
-        hess_values_partials = Tensors.partials(hess_values)
+        hess_values_partials = ForwardDiff.partials(hess_values)
         for (k, pk) in pairs(hess_values_partials)
             grad[i, k] = pk
         end
 
-        hess_partials = Tensors.partials(vi)
+        hess_partials = ForwardDiff.partials(vi)
         for (j, partial_j) in pairs(hess_partials)
-            hess_partials_partials = Tensors.partials(partial_j)
+            hess_partials_partials = ForwardDiff.partials(partial_j)
             for (k, pk) in pairs(hess_partials_partials)
                 hess[i, j, k] = pk
             end
