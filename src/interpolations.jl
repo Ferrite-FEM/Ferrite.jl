@@ -182,7 +182,6 @@ function shape_gradients_and_values!(gradients::GAT, values::SAT, ip::IP, ξ::Ve
     end
 end
 
-#= PR798
 """
     shape_hessians_gradients_and_values!(hessians::AbstractVector, gradients::AbstractVector, values::AbstractVector, ip::Interpolation, ξ::Vec)
 
@@ -197,7 +196,7 @@ and store them in `hessians`, `gradients`, and `values`.
         hessians[i], gradients[i], values[i] = shape_hessian_gradient_and_value(ip, ξ, i)
     end
 end
-=#
+
 
 """
     shape_value(ip::Interpolation, ξ::Vec, i::Int)
@@ -232,7 +231,6 @@ function shape_gradient_and_value(ip::Interpolation, ξ::Vec, i::Int)
     return gradient(x -> shape_value(ip, x, i), ξ, :all)
 end
 
-#= PR798
 """
     shape_hessian_gradient_and_value(ip::Interpolation, ξ::Vec, i::Int)
 
@@ -242,7 +240,7 @@ Optimized version combining the evaluation [`Ferrite.shape_value(::Interpolation
 function shape_hessian_gradient_and_value(ip::Interpolation, ξ::Vec, i::Int)
     return hessian(x -> shape_value(ip, x, i), ξ, :all)
 end
-=#
+
 
 """
     reference_coordinates(ip::Interpolation)
@@ -1529,6 +1527,42 @@ function shape_gradient_and_value(ipv::VectorizedInterpolation{vdim, shape}, ξ:
     val = shape_value(ipv, ξ, I)
     grad = ForwardDiff.jacobian(sv -> tosvec(shape_value(ipv, tovec(sv), I)), tosvec(ξ))
     return grad, val
+end
+
+# vdim == refdim
+function shape_hessian_gradient_and_value(ipv::VectorizedInterpolation{dim, shape}, ξ::Vec{dim}, I::Int) where {dim, shape <: AbstractRefShape{dim}}
+    return invoke(shape_hessian_gradient_and_value, Tuple{Interpolation, Vec, Int}, ipv, ξ, I)
+end
+# vdim != refdim
+function shape_hessian_gradient_and_value(ipv::VectorizedInterpolation{vdim, shape}, ξ::V, I::Int) where {vdim, refdim, shape <: AbstractRefShape{refdim}, T, V <: Vec{refdim, T}}
+    _shape_hessian_gradient_and_value_static_array(ipv, ξ, I)
+end
+function _shape_hessian_gradient_and_value_static_array(ipv::VectorizedInterpolation{vdim, shape}, ξ::V, I::Int) where {vdim, refdim, shape <: AbstractRefShape{refdim}, T, V <: Vec{refdim, T}}
+    # Load with dual numbers and compute the value
+    f = x -> shape_value(ipv, x, I)
+    ξd =  Tensors._load(Tensors._load(ξ, ForwardDiff.Tag(f, V)), ForwardDiff.Tag(f, V))
+    value_hess = f(ξd)
+    # Extract the value and gradient
+    val = Vec{vdim, T}(i -> ForwardDiff.value(ForwardDiff.value(value_hess[i])))
+    grad = zero(MMatrix{vdim, refdim, T})
+    hess = zero(MArray{Tuple{vdim, refdim, refdim}, T})
+    for (i, vi) in pairs(value_hess)
+        hess_values = ForwardDiff.value(vi)
+
+        hess_values_partials = ForwardDiff.partials(hess_values)
+        for (k, pk) in pairs(hess_values_partials)
+            grad[i, k] = pk
+        end
+
+        hess_partials = ForwardDiff.partials(vi)
+        for (j, partial_j) in pairs(hess_partials)
+            hess_partials_partials = ForwardDiff.partials(partial_j)
+            for (k, pk) in pairs(hess_partials_partials)
+                hess[i, j, k] = pk
+            end
+        end
+    end
+    return SArray(hess), SMatrix(grad), val
 end
 
 reference_coordinates(ip::VectorizedInterpolation) = reference_coordinates(ip.ip)

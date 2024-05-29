@@ -115,15 +115,15 @@ end
 
 # See https://discourse.julialang.org/t/finding-the-value-of-a-field-at-a-spatial-location-in-juafem/38975/2
 # TODO: should we make iteration params optional keyword arguments?
-function find_local_coordinate(interpolation, cell_coordinates::Vector{V}, global_coordinate::V) where {dim, T, V <: Vec{dim, T}}
+function find_local_coordinate(interpolation, cell_coordinates::Vector{<:Vec{dim}}, global_coordinate::Vec{dim}; tol_norm = 1e-10) where dim
+    T = promote_type(eltype(cell_coordinates[1]), eltype(global_coordinate))
     n_basefuncs = getnbasefunctions(interpolation)
     @assert length(cell_coordinates) == n_basefuncs
-    local_guess = zero(V)
+    local_guess = zero(Vec{dim, T})
     max_iters = 10
-    tol_norm = 1e-10
     converged = false
     for _ in 1:max_iters
-        global_guess = zero(V)
+        global_guess = zero(Vec{dim, T})
         J = zero(Tensor{2, dim, T})
         # TODO batched eval after 764 is merged.
         for j in 1:n_basefuncs
