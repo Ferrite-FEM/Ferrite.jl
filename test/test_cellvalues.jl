@@ -93,7 +93,7 @@
                 if rdim == 3
                     @test (@test_deprecated function_curl(cv, i, ue_vec)) ≈ Ferrite.curl_from_gradient(G_vector)
                 end
-                @test_deprecated function_value(cv, i, ue_vec)
+                @test_deprecated function_value(cv, i, ue_vec) #no value to test against
             end
         end
 

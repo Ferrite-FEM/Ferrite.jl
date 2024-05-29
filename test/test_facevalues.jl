@@ -93,7 +93,7 @@ for (scalar_interpol, quad_rule) in (
                     if rdim == 3
                         @test (@test_deprecated function_curl(fv, i, ue_vec)) ≈ Ferrite.curl_from_gradient(G_vector)
                     end
-                    function_value(fv, i, ue_vec)
+                    @test_deprecated function_value(fv, i, ue_vec) #no value to test against
                 end
             end
 
