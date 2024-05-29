@@ -15,6 +15,12 @@ CellValues
 FacetValues
 ```
 
+!!! warning "Embedded API"
+    Currently, embedded `FEValues` returns `SArray`s, which behave differently
+    from the `Tensor`s for normal value. In the future, we expect to return
+    an `AbstractTensor`, this change may happen in a minor release, and the
+    API for embedded `FEValues` should therefore be considered experimental.
+
 ## Applicable functions
 The following functions are applicable to both `CellValues`
 and `FacetValues`.
