@@ -320,7 +320,7 @@ more discussion).
 - A new function, `geometric_interpolation`, is exported, which gives the geometric interpolation
   for each cell type. This is equivalent to the deprecated `Ferrite.default_interpolation` function.
   ([#953][github-953])
-  
+
 - CellValues and FacetValues can now store and map second order gradients (Hessians). The number
   of gradients computed in CellValues/FacetValues is specified using the keyword arguments
   `update_gradients::Bool` (default true) and `update_hessians::Bool` (default false) in the
