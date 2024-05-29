@@ -103,29 +103,25 @@ function test_projection(order, refshape)
 end
 
 function make_mixedgrid_l2_tests()
-    # generate a mesh with 1 quadrilateral and 2 triangular elements
-    dim = 2
-    nodes = Node{dim, Float64}[]
-    push!(nodes, Node((0.0, 0.0)))
-    push!(nodes, Node((1.0, 0.0)))
-    push!(nodes, Node((2.0, 0.0)))
-    push!(nodes, Node((0.0, 1.0)))
-    push!(nodes, Node((1.0, 1.0)))
-    push!(nodes, Node((2.0, 1.0)))
+    # generate a mesh with 2 quadrilateral and 2 triangular elements
+    # 5 --- 6 --- 7 --- 8
+    # |  1  | 2/3 |  4  |
+    # 1 --- 2 --- 3 --- 4
+    nodes = [Node(Float64.((x,y))) for (x, y) in
+    #         1,      2,      3,      4,      5,      6,      7,      8
+        ((0, 0), (1, 0), (2, 0), (3, 0), (0, 1), (1, 1), (2, 1), (3, 1))]
 
-    cells = Ferrite.AbstractCell[]
-    push!(cells, Quadrilateral((1,2,5,4)))
-    push!(cells, Triangle((2,3,6)))
-    push!(cells, Triangle((2,6,5)))
+    cells = [Quadrilateral((1, 2, 6, 5)), Triangle((2, 7, 6)), Triangle((2, 3, 7)), Quadrilateral((3, 4, 8, 7))]
 
     quadset = 1:1
     triaset = 2:3
-    return Grid(cells, nodes), quadset, triaset
+    quadset_right = 4:4
+    return Grid(cells, nodes), quadset, triaset, quadset_right
 end
 
 # Test a mixed grid, where only a subset of the cells contains a field
 function test_projection_subset_of_mixedgrid()
-    mesh, quadset, triaset = make_mixedgrid_l2_tests()
+    mesh, quadset, triaset, quadset_right = make_mixedgrid_l2_tests()
 
     order = 2
     ip = Lagrange{RefQuadrilateral, order}()
@@ -269,45 +265,60 @@ function test_add_projection_grid()
 end
 
 function test_projection_mixedgrid()
-    grid, quadset, triaset = make_mixedgrid_l2_tests()
+    grid, quadset_left, triaset, quadset_right = make_mixedgrid_l2_tests()
+    quadset_full = union(Set(quadset_left), quadset_right)
+    @assert getncells(grid) == length(triaset) + length(quadset_full)
+    # Test both for case with one cell excluded from projection, and will full grid included
+    for quadset in (quadset_left, quadset_full)
+        dh = DofHandler(grid)
+        sdh_quad = SubDofHandler(dh, quadset)
+        ip_quad = Lagrange{RefQuadrilateral, 1}()
+        add!(sdh_quad, :u, ip_quad)
+        sdh_tria = SubDofHandler(dh, triaset)
+        ip_tria = Lagrange{RefTriangle, 1}()
+        add!(sdh_tria, :u, ip_tria)
+        close!(dh)
 
-    dh = DofHandler(grid)
-    sdh_quad = SubDofHandler(dh, quadset)
-    ip_quad = Lagrange{RefQuadrilateral, 1}()
-    add!(sdh_quad, :u, ip_quad)
-    sdh_tria = SubDofHandler(dh, triaset)
-    ip_tria = Lagrange{RefTriangle, 1}()
-    add!(sdh_tria, :u, ip_tria)
-    close!(dh)
+        solution = zeros(ndofs(dh))
+        apply_analytical!(solution, dh, :u, x -> x[1]^2 - x[2]^2)
 
-    solution = zeros(ndofs(dh))
-    apply_analytical!(solution, dh, :u, x -> x[1]^2 - x[2]^2)
+        qr_quad = QuadratureRule{RefQuadrilateral}(2)
+        cv_quad = CellValues(qr_quad, ip_quad, ip_quad)
+        qr_tria = QuadratureRule{RefTriangle}(2)
+        cv_tria = CellValues(qr_tria, ip_tria, ip_tria)
 
-    qr_quad = QuadratureRule{RefQuadrilateral}(2)
-    cv_quad = CellValues(qr_quad, ip_quad, ip_quad)
-    qr_tria = QuadratureRule{RefTriangle}(2)
-    cv_tria = CellValues(qr_tria, ip_tria, ip_tria)
+        # Fill qp_data with the interpolated values
+        qp_data = [Float64[] for _ in 1:getncells(grid)]
+        for (sdh, cv) in ((sdh_quad, cv_quad), (sdh_tria, cv_tria))
+            calculate_function_value_in_qpoints!(qp_data, sdh, cv, solution)
+        end
 
-    # Fill qp_data with the interpolated values
-    qp_data = [Float64[] for _ in 1:getncells(grid)]
-    for (sdh, cv) in ((sdh_quad, cv_quad), (sdh_tria, cv_tria))
-        calculate_function_value_in_qpoints!(qp_data, sdh, cv, solution)
+        # Finally, let's build the L2Projector and check if we can project back the solution
+        proj = L2Projector(grid)
+        add!(proj, triaset, ip_tria; qr_rhs = qr_tria)
+        add!(proj, quadset, ip_quad; qr_rhs = qr_quad)
+        close!(proj)
+
+        # Quadrature rules must be in the same order as ip's are added to proj.
+        projected = project(proj, qp_data)
+
+        # Evaluate at grid nodes to keep same numbering following the grid (dof distribution may be different)
+        solution_at_nodes = evaluate_at_grid_nodes(dh, solution, :u)
+        projected_at_nodes = evaluate_at_grid_nodes(proj, projected)
+
+        # Since one part of the grid is excluded, nodes in this region will be NaN.
+        # So we only want to check those nodes attached to cells in the cellsets.
+        active_nodes = Set{Int}()
+        for cell in CellIterator(grid, union(quadset, triaset))
+            for n in Ferrite.getnodes(cell)
+                push!(active_nodes, n)
+            end
+        end
+        check_nodes = collect(active_nodes)
+
+        @test projected_at_nodes[check_nodes] ≈ solution_at_nodes[check_nodes]
+
     end
-
-    # Finally, let's build the L2Projector and check if we can project back the solution
-    proj = L2Projector(grid)
-    add!(proj, triaset, ip_tria; qr_rhs = qr_tria)
-    add!(proj, quadset, ip_quad; qr_rhs = qr_quad)
-    close!(proj)
-
-    # Quadrature rules must be in the same order as ip's are added to proj.
-    projected = project(proj, qp_data)
-
-    # Evaluate at grid nodes to keep same numbering following the grid (dof distribution may be different)
-    solution_at_nodes = evaluate_at_grid_nodes(dh, solution, :u)
-    projected_at_nodes = evaluate_at_grid_nodes(proj, projected)
-
-    @test projected_at_nodes ≈ solution_at_nodes
 end
 
 function test_export(;subset::Bool)
