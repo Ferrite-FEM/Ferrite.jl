@@ -145,6 +145,12 @@
                     f(x) = ones(Vec{dim})
                     apply_analytical!(a, dh, :u, f)
                     @test sum(a)/length(a) ≈ num_udofs/(num_udofs+num_pdofs)
+
+                    # Repeat test with calls for both subdomains separately
+                    a = zeros(ndofs(dh))
+                    apply_analytical!(a, dh, :u, f, getcellset(dh.grid, "A"))
+                    apply_analytical!(a, dh, :u, f, getcellset(dh.grid, "B"))
+                    @test sum(a)/length(a) ≈ num_udofs/(num_udofs+num_pdofs)
                 end
             end
         end
