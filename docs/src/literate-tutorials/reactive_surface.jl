@@ -243,11 +243,11 @@ function gray_scott_sphere(F, k, Δt, T, refinements)
 end
 
 ## This parametrization gives the spot pattern shown in the gif above.
-if !IS_CI #src
+if !IS_CI                                           #src
 gray_scott_sphere(0.06, 0.062, 10.0, 32000.0, 3)
-else #src
-gray_scott_sphere(0.06, 0.062, 10.0, 20.0, 0) #src
-end #src
+else                                                #src
+gray_scott_sphere(0.06, 0.062, 10.0, 20.0, 0)       #src
+end                                                 #src
 
 #md # ## [Plain program](@id reactive_surface-plain-program)
 #md #
