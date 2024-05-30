@@ -70,7 +70,7 @@ bibtex_plugin = CitationBibliography(
             "topics/grid.md",
             "topics/export.md"
         ],
-        "Reference" => [
+        "API reference" => [
             "Reference overview" => "reference/index.md",
             "reference/quadrature.md",
             "reference/interpolations.md",
@@ -96,7 +96,7 @@ bibtex_plugin = CitationBibliography(
         #     "gallery/topology_optimization.md",
         # ],
         "devdocs/index.md",
-        "references.md",
+        "cited-literature.md",
         ],
     plugins = [
         bibtex_plugin,
