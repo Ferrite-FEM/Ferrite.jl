@@ -1,10 +1,10 @@
 # Putting this flag to false reproduces the figure shown in the example #src
 # We check for laminar flow development in the CI                       #src
-if @isdefined is_ci    #hide
-    IS_CI = is_ci      #hide
-else                   #hide
-    IS_CI = false      #hide
-end                    #hide
+if isdefined(Main, :is_ci) #hide
+    IS_CI = Main.is_ci     #hide
+else                       #hide
+    IS_CI = false          #hide
+end                        #hide
 # # [Reactive Surface](@id tutorial-reactive-surface)
 #
 # ![](reactive_surface.gif)
