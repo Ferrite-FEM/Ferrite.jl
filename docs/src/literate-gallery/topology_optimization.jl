@@ -144,13 +144,13 @@ end
 # `MaterialState`. We add a constructor to initialize the struct. The function `update_material_states!`
 # updates the density values once we calculated the new values.
 
-mutable struct MaterialState{T, S <: AbstractArray{SymmetricTensor{2, 2, T}, 1}}
+mutable struct MaterialState{T, S <: AbstractArray{SymmetricTensor{2, 2, T, 3}, 1}}
     χ::T # density
     ε::S # strain in each quadrature point
 end
 
 function MaterialState(ρ, n_qp)
-    return MaterialState(ρ, Array{SymmetricTensor{2,2,Float64},1}(undef, n_qp))
+    return MaterialState(ρ, Array{SymmetricTensor{2,2,Float64,3},1}(undef, n_qp))
 end
 
 function update_material_states!(χn1, states, dh)
@@ -339,7 +339,6 @@ function elmt!(Ke, re, element, cellvalues, facetvalues, grid, mp, ue, state)
 
         for i in 1:n_basefuncs
             δεi = shape_symmetric_gradient(cellvalues, q_point, i)
-            δu = shape_value(cellvalues, q_point, i)
             for j in 1:i
                 δεj = shape_symmetric_gradient(cellvalues, q_point, j)
                 Ke[i,j] += (χ)^(mp.p) * (δεi ⊡ mp.C ⊡ δεj) * dΩ
