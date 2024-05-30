@@ -25,7 +25,9 @@ Ferrite.get_coordinate_eltype(::Ferrite.AbstractGrid)
 Ferrite.get_coordinate_eltype(::Node)
 Ferrite.toglobal
 Ferrite.sortface
+Ferrite.sortface_fast
 Ferrite.sortedge
+Ferrite.sortedge_fast
 Ferrite.element_to_facet_transformation
 Ferrite.facet_to_element_transformation
 Ferrite.InterfaceOrientationInfo
