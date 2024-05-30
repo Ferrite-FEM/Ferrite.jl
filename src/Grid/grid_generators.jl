@@ -23,6 +23,7 @@ generate_grid
 
 # Line
 function generate_grid(::Type{Line}, nel::NTuple{1,Int}, left::Vec{1,T}=Vec{1}((-1.0,)), right::Vec{1,T}=Vec{1}((1.0,))) where {T}
+    
     nel_x = nel[1]
     n_nodes = nel_x + 1
 
@@ -85,16 +86,19 @@ end
 
 function _generate_2d_nodes!(nodes, nx, ny, LL, LR, UR, UL)
       for i in 0:ny-1
-        ratio_bounds = i / (ny-1)
+        T = typeof(LL[1])
+
+
+        ratio_bounds = T(i / (ny-1))
 
         x0 = LL[1] * (1 - ratio_bounds) + ratio_bounds * UL[1]
         x1 = LR[1] * (1 - ratio_bounds) + ratio_bounds * UR[1]
 
         y0 = LL[2] * (1 - ratio_bounds) + ratio_bounds * UL[2]
         y1 = LR[2] * (1 - ratio_bounds) + ratio_bounds * UR[2]
-
+        
         for j in 0:nx-1
-            ratio = j / (nx-1)
+            ratio =T( j / (nx-1))
             x = x0 * (1 - ratio) + ratio * x1
             y = y0 * (1 - ratio) + ratio * y1
             push!(nodes, Node((x, y)))
@@ -108,6 +112,7 @@ function generate_grid(C::Type{<:AbstractCell{<:AbstractRefShape{2}}}, nel::NTup
 end
 
 function generate_grid(C::Type{<:AbstractCell{<:AbstractRefShape{2}}}, nel::NTuple{2,Int}, left::Vec{2,T}=Vec{2}((-1.0,-1.0)), right::Vec{2,T}=Vec{2}((1.0,1.0))) where {T}
+    
     LL = left
     UR = right
     LR = Vec{2}((UR[1], LL[2]))
@@ -117,6 +122,7 @@ end
 
 # Quadrilateral
 function generate_grid(C::Type{Quadrilateral}, nel::NTuple{2,Int}, LL::Vec{2,T}, LR::Vec{2,T}, UR::Vec{2,T}, UL::Vec{2,T}) where {T}
+
     nel_x = nel[1]; nel_y = nel[2]; nel_tot = nel_x*nel_y
     n_nodes_x = nel_x + 1; n_nodes_y = nel_y + 1
     n_nodes = n_nodes_x * n_nodes_y

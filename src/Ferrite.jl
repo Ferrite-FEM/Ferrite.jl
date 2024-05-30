@@ -146,6 +146,7 @@ include("deprecations.jl")
 include("docs.jl")
 
 # GPU support
+include("GPU/sparsematrix.jl")
 include("GPU/adapt.jl")
 include("Grid/gpu_grid.jl")
 include("Dofs/GPUDofHandler.jl")

@@ -26,7 +26,7 @@ get_coordinate_type(::GPUGrid{dim,CELLVEC,NODEVEC}) where
 @inline function getcoordinates(grid::Ferrite.GPUGrid)
     # b_idx is the block index which is the same as the cell index.
     # Each block corresponds to a cell, so we can use the block index to get the cell.
-    b_idx = blockIdx().x 
+    b_idx = blockIdx().x  # element index
 
     CT = get_coordinate_type(grid)
     cell = getcells(grid, b_idx)
@@ -39,9 +39,10 @@ get_coordinate_type(::GPUGrid{dim,CELLVEC,NODEVEC}) where
     # no. threads in y = no. of shape functions
     tx = threadIdx().x
     ty = threadIdx().y
+    q_point = threadIdx().z
 
     # no. of nodes <= no. of shape functions (and we need only one threads direction)
-    if ty == 1 && tx <=N 
+    if ty == 1 && q_point == 1  && tx <=N 
         arr[tx] = get_node_coordinate(grid, Ferrite.get_node_ids(cell)[tx]) 
     end
 
@@ -50,4 +51,5 @@ get_coordinate_type(::GPUGrid{dim,CELLVEC,NODEVEC}) where
     # return the array as a SVector, so that it can fit with the rest of the codebase. 
     return SVector{N,CT}(arr)
 end
+
 

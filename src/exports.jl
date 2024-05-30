@@ -179,4 +179,8 @@ export
     evaluate_at_points,
     PointIterator,
     PointLocation,
-    PointValues
+    PointValues,
+
+# GPU
+    GPUSparseMatrixCSC,
+    custom_atomic_add!

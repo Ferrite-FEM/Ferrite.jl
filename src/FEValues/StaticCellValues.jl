@@ -115,6 +115,7 @@ end
 end
 
 
+
 function _quadrature_point_values(fe_v::StaticCellValues, q_point::Int, cell_coords::AbstractVector,neg_detJ_err_fun::Function)
     #q_point bounds checked, ok to use @inbounds
     @inbounds begin
