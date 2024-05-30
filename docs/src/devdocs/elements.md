@@ -30,4 +30,5 @@ Ferrite.element_to_facet_transformation
 Ferrite.facet_to_element_transformation
 Ferrite.InterfaceOrientationInfo
 Ferrite.transform_interface_points!
+Ferrite.get_transformation_matrix
 ```
