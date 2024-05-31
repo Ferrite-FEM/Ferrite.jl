@@ -23,10 +23,7 @@ function Edge(grid::AbstractGrid, idx::EdgeIndex)
 end
 
 # A Vertex uniquely represented by its node number.
-
-Base.hash(x::Union{Face, Edge}, h::UInt) = hash(x.vertices, h)
-Base.isequal(x::E, y::E) where {E <: Union{Face, Edge}} = x.vertices == y.vertices
-
+#=
 # Helper to keep track of the current allocated space in `neighbors::Vector`
 # in GlobalNeighborInformation during construction.
 struct AdaptiveRange
@@ -47,10 +44,6 @@ struct GlobalNeighborInformation{ET, BI, CT}
 end
 
 getneighbors(gni::GlobalNeighborInformation{ET}, idx::ET) where ET = (gni.neighbors[i] for i in gni.indices[idx])
-
-_getsizehint(::AbstractGrid, ::Type{FaceIndex}) = 2
-_getsizehint(::AbstractGrid{dim}, ::Type{EdgeIndex}) where dim = dim^2
-_getsizehint(::AbstractGrid{dim}, ::Type{VertexIndex}) where dim = 2^dim
 
 function GlobalNeighborInformation(grid, IdxType::Type{<:BoundaryIndex}, ::Type{ET}; sizehint=_getsizehint(grid, IdxType)) where {ET<:Union{Edge, Face}}
     gni = GlobalNeighborInformation(IdxType[], OrderedDict{ET, UnitRange{Int}}())
@@ -108,6 +101,27 @@ function addneighbor!(gni::GlobalNeighborInformation{ET}, indices_buffer, item::
     return gni
 end
 
+function addneighbor!(gni::GlobalNeighborInformation{Int}, indices_buffer, item::Int, idx::VertexIndex, sizehint::Int)
+    r = indices_buffer[item]
+    n = length(gni.neighbors)
+    if r.start == 0 # Not previously added
+        resize!(gni.neighbors, n + sizehint)
+        gni.neighbors[n+1] = idx
+        indices_buffer[item] = AdaptiveRange(n + 1, 1, sizehint)
+    elseif r.ncurrent == r.nmax # We have used up our space, move data to the end of the vector.
+        resize!(gni.neighbors, n + r.nmax + sizehint)
+        for i in 1:r.ncurrent
+            gni.neighbors[n + i] = gni.neighbors[r.start + i - 1]
+        end
+        gni.neighbors[n + r.ncurrent + 1] = idx
+        indices_buffer[item] = AdaptiveRange(n + 1, r.ncurrent + 1, r.nmax + sizehint)
+    else # We have space in an already allocated section
+        gni.neighbors[r.start + r.ncurrent] = idx
+        indices_buffer[item] = AdaptiveRange(r.start, r.ncurrent + 1, r.nmax)
+    end
+    return gni
+end
+
 function compress_data!(gni::GlobalNeighborInformation{ET}, indices_buffer) where {ET<:Union{Edge, Face}}
     # indices_buffer values are of type AdaptiveRange and these are not overlapping. Sort by their first value.
     sort!(indices_buffer; byvalue=true, by = r -> r.start)
@@ -131,27 +145,6 @@ function compress_data!(gni::GlobalNeighborInformation{ET}, indices_buffer) wher
     return gni
 end
 
-function addneighbor!(gni::GlobalNeighborInformation{Int}, indices_buffer, item::Int, idx::VertexIndex, sizehint::Int)
-    r = indices_buffer[item]
-    n = length(gni.neighbors)
-    if r.start == 0 # Not previously added
-        resize!(gni.neighbors, n + sizehint)
-        gni.neighbors[n+1] = idx
-        indices_buffer[item] = AdaptiveRange(n + 1, 1, sizehint)
-    elseif r.ncurrent == r.nmax # We have used up our space, move data to the end of the vector.
-        resize!(gni.neighbors, n + r.nmax + sizehint)
-        for i in 1:r.ncurrent
-            gni.neighbors[n + i] = gni.neighbors[r.start + i - 1]
-        end
-        gni.neighbors[n + r.ncurrent + 1] = idx
-        indices_buffer[item] = AdaptiveRange(n + 1, r.ncurrent + 1, r.nmax + sizehint)
-    else # We have space in an already allocated section
-        gni.neighbors[r.start + r.ncurrent] = idx
-        indices_buffer[item] = AdaptiveRange(r.start, r.ncurrent + 1, r.nmax)
-    end
-    return gni
-end
-
 function compress_data!(gni::GlobalNeighborInformation{Int}, indices_buffer)
     # indices_buffer contain AdaptiveRange and these are not overlapping. Sort by their first value.
     sort!(indices_buffer; by = r -> r.start)
@@ -171,10 +164,18 @@ function compress_data!(gni::GlobalNeighborInformation{Int}, indices_buffer)
     return gni
 end
 
+=#
+
+include("../CollectionOfVectors.jl")
+
+_getsizehint(::AbstractGrid, ::Type{FaceIndex}) = 2
+_getsizehint(::AbstractGrid{dim}, ::Type{EdgeIndex}) where dim = dim^2
+_getsizehint(::AbstractGrid{dim}, ::Type{VertexIndex}) where dim = 2^dim
+
 struct MaterializedTopology <: AbstractTopology
-    faceneighbors::GlobalNeighborInformation{Face, FaceIndex, OrderedDict{Face, UnitRange{Int}}}
-    edgeneighbors::GlobalNeighborInformation{Edge, EdgeIndex, OrderedDict{Edge, UnitRange{Int}}}
-    vertexneighbors::GlobalNeighborInformation{Int, VertexIndex, Vector{UnitRange{Int}}}
+    faceneighbors::CollectionOfVectors{OrderedDict{Face, UnitRange{Int}}, FaceIndex}
+    edgeneighbors::CollectionOfVectors{OrderedDict{Edge, UnitRange{Int}}, EdgeIndex}
+    vertexneighbors::CollectionOfVectors{Vector{Int}, VertexIndex}
 end
 
 function MaterializedTopology(grid::AbstractGrid)
@@ -185,13 +186,13 @@ function MaterializedTopology(grid::AbstractGrid)
 end
 
 function getneighborhood(top::MaterializedTopology, grid::AbstractGrid, idx::FaceIndex)
-    return getneighbors(top.faceneighbors, Face(grid, idx))
+    return top.faceneighbors[Face(grid, idx)]
 end
 
 function getneighborhood(top::MaterializedTopology, grid::AbstractGrid, idx::EdgeIndex)
-    return getneighbors(top.edgeneighbors, Edge(grid, idx))
+    return top.edgeneighbors[Edge(grid, idx)]
 end
 
 function getneighborhood(top::MaterializedTopology, grid::AbstractGrid, idx::VertexIndex)
-    return getneighbors(top.vertexneighbors, toglobal(grid, idx))
+    return top.vertexneighbors[toglobal(grid, idx)]
 end
