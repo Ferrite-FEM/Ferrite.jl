@@ -6,7 +6,7 @@
     * [`CellValues`](@ref)
   * `AbstractFacetValues`
     * [`FacetValues`](@ref)
-    * [`BCValues`](@ref)
+    * [`BCValues`](@ref Ferrite.BCValues)
   * [`PointValues`](@ref)
   * [`InterfaceValues`](@ref)
 
