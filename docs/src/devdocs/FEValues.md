@@ -21,7 +21,7 @@ Ferrite.BCValues
 
 ## Internal utilities
 ```@docs
-Ferrite.embedded_det
+Ferrite.embedding_det
 Ferrite.shape_value_type
 Ferrite.shape_gradient_type
 ```
