@@ -657,7 +657,7 @@ function test_celliterator_on_true_subdomain_smoketest()
     for cell in CellIterator(sdh)
     end
 
-    for cell in CellIterator(dh, [1,2,3]) 
+    for cell in CellIterator(dh, [1,2,3])
     end
 
     for cell in CellIterator(dh)
