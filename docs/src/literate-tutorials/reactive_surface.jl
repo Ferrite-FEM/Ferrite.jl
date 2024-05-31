@@ -55,7 +55,7 @@ nothing                    #hide
 # ```math
 #   \partial_t \mathbf{r}^{\mathrm{\mathrm{A}}} = \mathcal{D}\mathbf{r}^{\mathrm{A}} \quad \textbf{x} \in \Omega
 # ```
-# with $\mathbf{r^{\mathrm{A}}(t_1) = \mathbf{r}(t_1)$ on the time interval $t_1$ to $t_2$ and use
+# with $\mathbf{r}^{\mathrm{A}}(t_1) = \mathbf{r}(t_1)$ on the time interval $t_1$ to $t_2$ and use
 # the solution as the initial condition to solve the reaction problem
 # ```math
 #   \partial_t \mathbf{r}^{\mathrm{B}} = R(\mathbf{r}^{\mathrm{B}}) \quad \textbf{x} \in \Omega
