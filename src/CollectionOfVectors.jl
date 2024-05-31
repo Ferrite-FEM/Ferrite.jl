@@ -4,6 +4,9 @@ struct CollectionOfVectors{IT<:Union{AbstractArray{UnitRange{Int}}, AbstractDict
 end
 
 Base.getindex(cv::CollectionOfVectors, index) = view(cv.data, cv.indices[index])
+Base.keys(cv::CollectionOfVectors) = keys(cv.indcies)
+Base.values(cv::CollectionOfVectors) = (view(cv.data, idx) for idx in values(cv.indices))
+nonempty_values(cv::CollectionOfVectors) = (view(cv.data, idx) for idx in values(cv.indices) if !isempty(idx))
 
 # Structure for building this efficiently
 struct AdaptiveRange

@@ -217,3 +217,15 @@ end
 function getneighborhood(top::MaterializedTopology, grid::AbstractGrid, idx::VertexIndex)
     return top.vertexneighbors[toglobal(grid, idx)]
 end
+
+function faceskeleton(top::MaterializedTopology, ::AbstractGrid)
+    return (first(n) for n in nonempty_values(top.faceneighbors))
+end
+
+function edgeskeleton(top::MaterializedTopology, ::AbstractGrid)
+    return (first(n) for n in nonempty_values(top.edgeneighbors))
+end
+
+function vertexskeleton(top::MaterializedTopology, ::AbstractGrid)
+    return (first(n) for n in nonempty_values(top.vertexneighbors))
+end
