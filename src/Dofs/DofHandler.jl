@@ -183,7 +183,9 @@ function ndofs_per_cell(dh::DofHandler)
     return @inbounds ndofs_per_cell(dh.subdofhandlers[1])
 end
 function ndofs_per_cell(dh::DofHandler, cell::Int)
-    return ndofs_per_cell(dh.subdofhandlers[dh.cell_to_subdofhandler[cell]])
+    sdhidx = dh.cell_to_subdofhandler[cell]
+    sdhidx ∉ 1:length(dh.subdofhandlers) && return 0 # Dof handler is just defined on a subdomain
+    return ndofs_per_cell(dh.subdofhandlers[sdhidx])
 end
 ndofs_per_cell(sdh::SubDofHandler) = sdh.ndofs_per_cell[]
 ndofs_per_cell(sdh::SubDofHandler, ::Int) = sdh.ndofs_per_cell[] # for compatibility with DofHandler

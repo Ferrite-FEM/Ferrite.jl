@@ -643,6 +643,27 @@ function test_vtk_export()
     rm(filename*".vtu") # clean up
 end
 
+function test_celliterator_on_true_subdomain_smoketest()
+    using Ferrite
+
+    grid = generate_grid(Hexahedron, (3,3,3))
+    using Ferrite
+
+    dh = DofHandler(grid)
+    sdh = SubDofHandler(dh, [1,2,3])
+    add!(sdh, :u, Lagrange{RefHexahedron,1}()^3)
+    close!(dh)
+
+    for cell in CellIterator(sdh)
+    end
+
+    for cell in CellIterator(dh, [1,2,3]) 
+    end
+
+    for cell in CellIterator(dh)
+    end
+end
+
 @testset "DofHandler" begin
     test_1d_bar_beam();
     test_2d_scalar();
@@ -670,4 +691,5 @@ end
     test_celliterator_subdomain()
     test_show()
     test_vtk_export()
+    test_celliterator_on_true_subdomain_smoketest()
 end
