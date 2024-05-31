@@ -80,7 +80,7 @@ using Ferrite, FerriteGmsh
 using BlockArrays, SparseArrays, LinearAlgebra
 
 # ### Assembly routines
-# Before we head into the assembly, we define a helper struct to control the dispatches. 
+# Before we head into the assembly, we define a helper struct to control the dispatches.
 struct GrayScottMaterial{T}
     D₁::T
     D₂::T
