@@ -65,6 +65,12 @@ end
 # The following assembly routines are written analogue to these found in previous tutorials.
 function assemble_element_mass!(Me::Matrix, cellvalues::CellValues)
     n_basefuncs = getnbasefunctions(cellvalues)
+    ## The mass matrices between the reactions are not coupled, so we get a blocked-strided matrix.
+    num_reactants = 2
+    r₁range = 1:num_reactants:num_reactants*n_basefuncs
+    r₂range = 2:num_reactants:num_reactants*n_basefuncs
+    Me₁ = @view Me[r₁range, r₁range]
+    Me₂ = @view Me[r₂range, r₂range]
     ## Reset to 0
     fill!(Me, 0)
     ## Loop over quadrature points
@@ -78,8 +84,8 @@ function assemble_element_mass!(Me::Matrix, cellvalues::CellValues)
             for j in 1:n_basefuncs
                 δuⱼ = shape_value(cellvalues, q_point, j)
                 ## Add contribution to Ke
-                Me[2*i-1, 2*j-1] += (δuᵢ * δuⱼ) * dΩ
-                Me[2*i  , 2*j  ] += (δuᵢ * δuⱼ) * dΩ
+                Me₁[i,j] += (δuᵢ * δuⱼ) * dΩ
+                Me₂[i,j] += (δuᵢ * δuⱼ) * dΩ
             end
         end
     end
