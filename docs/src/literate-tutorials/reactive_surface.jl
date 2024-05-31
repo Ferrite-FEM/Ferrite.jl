@@ -205,11 +205,9 @@ function setup_initial_conditions!(u₀::Vector, cellvalues::CellValues, dh::Dof
     u₀ .+= 0.01*rand(ndofs(dh))
 end;
 
-# ### Simulation routines
-# Now we define a function to setup and solve the problem with given feed and conversion rates
-# $F$ and $k$, as well as the time step length and for how long we want to solve the model.
-function gray_scott_sphere(material::GrayScottMaterial, Δt::Real, T::Real, refinements::Integer)
-    ## We start by setting up grid, dof handler and the matrices for the heat problem.
+# ### Mesh generation
+# In this section we define a routine to create a surface mesh with the help of FerriteGmsh.jl.
+function create_embedded_sphere(refinements)
     gmsh.initialize()
 
     ## Add a unit sphere in 3D space
@@ -230,6 +228,14 @@ function gray_scott_sphere(material::GrayScottMaterial, Δt::Real, T::Real, refi
     elements, _ = toelements(2)
     gmsh.finalize()
     grid = Grid(elements, nodes);
+end
+
+# ### Simulation routines
+# Now we define a function to setup and solve the problem with given feed and conversion rates
+# $F$ and $k$, as well as the time step length and for how long we want to solve the model.
+function gray_scott_on_sphere(material::GrayScottMaterial, Δt::Real, T::Real, refinements::Integer)
+    ## We start by setting up grid, dof handler and the matrices for the heat problem.
+    grid = create_embedded_sphere(refinements)
 
     ## Next we are creating our element assembly helper for surface elements.
     ## The only change which we need to introduce here is to pass in a geometrical
@@ -311,9 +317,9 @@ end
 ## This parametrization gives the spot pattern shown in the gif above.
 material = GrayScottMaterial(0.00016, 0.00008, 0.06, 0.062)
 if !IS_CI                                           #src
-gray_scott_sphere(material, 10.0, 32000.0, 3)
+gray_scott_on_sphere(material, 10.0, 32000.0, 3)
 else                                                #src
-gray_scott_sphere(material, 10.0, 20.0, 0)          #src
+gray_scott_on_sphere(material, 10.0, 20.0, 0)       #src
 end                                                 #src
 nothing                                             #src
 
