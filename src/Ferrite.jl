@@ -159,6 +159,6 @@ include("PointEvalHandler.jl")
 include("deprecations.jl")
 include("docs.jl")
 
-include("grid/topology2.jl")
+include("Grid/topology2.jl")
 
 end # module

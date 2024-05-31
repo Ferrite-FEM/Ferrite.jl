@@ -173,7 +173,7 @@ end
 
 struct MaterializedTopology <: AbstractTopology
     faceneighbors::GlobalNeighborInformation{Face, FaceIndex, OrderedDict{Face, UnitRange{Int}}}
-    edgesneighbors::GlobalNeighborInformation{Edge, EdgeIndex, OrderedDict{Edge, UnitRange{Int}}}
+    edgeneighbors::GlobalNeighborInformation{Edge, EdgeIndex, OrderedDict{Edge, UnitRange{Int}}}
     vertexneighbors::GlobalNeighborInformation{Int, VertexIndex, Vector{UnitRange{Int}}}
 end
 
