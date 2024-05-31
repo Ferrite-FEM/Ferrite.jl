@@ -42,6 +42,32 @@ nothing                    #hide
 # the classical reaction-diffusion split. In this method we split our problem in two problems, i.e. a heat
 # problem and a pointwise reaction problem, and solve them alternatingly to advance in time.
 #
+# ## Solver details
+#
+# The main idea for the Lie-Trotter-Godunov scheme is simple. We can write down the reaction diffusion
+# problem in an abstract way as
+# ```math
+#   \partial_t \mathbf{r} = \mathcal{D}\mathbf{r} + R(\mathbf{r}) \quad \textbf{x} \in \Omega
+# ```
+# where $\mathcal{D}$ is the diffusion operator and $R$ is the reaction operator. Notice that the right
+# hand side is just the sum of two operators. Now with our operator splitting scheme we can advance a
+# solution $\mathbf{r}(t_1)$ to $\mathbf{r}(t_2)$ by first solving a heat problem
+# ```math
+#   \partial_t \mathbf{r}^{\mathrm{\mathrm{A}}} = \mathcal{D}\mathbf{r}^{\mathrm{A}} \quad \textbf{x} \in \Omega
+# ```
+# with $\mathbf{r^{\mathrm{A}}(t_1) = \mathbf{r}(t_1)$ on the time interval $t_1$ to $t_2$ and use
+# the solution as the initial condition to solve the reaction problem
+# ```math
+#   \partial_t \mathbf{r}^{\mathrm{B}} = R(\mathbf{r}^{\mathrm{B}}) \quad \textbf{x} \in \Omega
+# ```
+# with $\mathbf{r}^{\mathrm{B}}(t_1) = \mathbf{r}^{\mathrm{A}}(t_2)$.
+# This way we obtain a solution approximation $\mathbf{r}(t_2) \approx \mathbf{r}^{\mathrm{B}}(t_2)$.
+#
+# !!! note
+#     The operator splitting itself is an approximation, so even if we solve the subproblems analytically
+#     we end up with having only a solution approximation. We also do not have a beginner friendly reference
+#     for the theory behind operator splitting and can only refer to the original papers for each method.
+#
 #-
 # ## Commented Program
 #
