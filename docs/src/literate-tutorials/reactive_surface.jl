@@ -184,25 +184,28 @@ function gray_scott_sphere(material::GrayScottMaterial, Δt::Real, T::Real, refi
     gmsh.model.occ.addSphere(0.0,0.0,0.0,1.0)
     gmsh.model.occ.synchronize()
 
-    gmsh.model.mesh.renumberNodes()
-    gmsh.model.mesh.renumberElements()
-
-    ## Generate surface elements and refine several times
+    ## Generate nodes and surface elements only, hence we need to pass 2 into generate
     gmsh.model.mesh.generate(2)
+
+    ## To get good solution quality refine the elements several times
     for _ in 1:refinements
         gmsh.model.mesh.refine()
     end
 
-    ## Create a grid out of it
+    ## Now we create a Ferrite grid out of it. Note that we also call toelements
+    ## with our surface element dimension to obtain these.
     nodes = tonodes()
     elements, _ = toelements(2)
     gmsh.finalize()
     grid = Grid(elements, nodes);
 
+    ## Next we are creating our element assembly helper for surface elements.
+    ## The only change which we need to introduce here is to pass in a geometrical
+    ## interpolation with the same dimension as the physical space into which our
+    ## elements are embedded into, which is in this example 3.
     ip = Lagrange{RefTriangle, 1}()
-    ip_geo = Lagrange{RefTriangle, 1}()
     qr = QuadratureRule{RefTriangle}(2)
-    cellvalues = CellValues(qr, ip, ip_geo^3);
+    cellvalues = CellValues(qr, ip, ip^3);
 
     ## We have two options to add the reactants to the dof handler, which will give us slightly
     ## different resulting dof distributions:
@@ -213,7 +216,8 @@ function gray_scott_sphere(material::GrayScottMaterial, Δt::Real, T::Real, refi
     ## to be specific for this tutorial, we use an isoparametric concept such that the nodes
     ## of our grid and the nodes of our solution approximation coincide. This way a reaction
     ## we can create simply reshape the solution vector u to a matrix where the inner index
-    ## corresponds to the index of the reactant.
+    ## corresponds to the index of the reactant. Note that we will still use the scalar
+    ## interpolation for the assembly procedure.
     dh = DofHandler(grid);
     add!(dh, :reactants, ip^2);
     close!(dh);
@@ -229,7 +233,6 @@ function gray_scott_sphere(material::GrayScottMaterial, Δt::Real, T::Real, refi
     cholA = cholesky(A)
 
     ## Now we setup buffers for the time dependent solution and fill the initial condition.
-    ## We can save some memory by telling the sparsity pattern that the matrices are not coupled.
     uₜ   = zeros(ndofs(dh))
     uₜ₋₁ = ones(ndofs(dh))
     setup_initial_conditions!(uₜ₋₁, cellvalues, dh)
