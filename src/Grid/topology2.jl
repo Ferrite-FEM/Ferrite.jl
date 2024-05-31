@@ -168,6 +168,27 @@ end
 
 include("../CollectionOfVectors.jl")
 
+function build_neighborhood(grid, ::Type{BI}, ::Type{ET}; sizehint=_getsizehint(grid, BI)) where {BI<:BoundaryIndex, ET<:Union{Edge, Face}}
+    return CollectionOfVectors(OrderedDict{ET}, BI; sizehint) do b
+        for (cellnr, cell) in enumerate(getcells(grid))
+            for (entitynr, entity_vertices) in enumerate(boundaryfunction(BI)(cell))
+                e = ET(entity_vertices)
+                b[e] = BI(cellnr, entitynr)
+            end
+        end
+    end
+end
+
+function build_neighborhood(grid, IdxType::Type{VertexIndex}, ::Type{Int}; sizehint=_getsizehint(grid, IdxType))
+    return CollectionOfVectors(Vector, VertexIndex; sizehint, dims=(getnnodes(grid),)) do b
+        for (cellnr, cell) in enumerate(getcells(grid))
+            for (vertexnr, global_vertex) in enumerate(vertices(cell))
+                b[global_vertex] = VertexIndex(cellnr, vertexnr)
+            end
+        end
+    end
+end
+
 _getsizehint(::AbstractGrid, ::Type{FaceIndex}) = 2
 _getsizehint(::AbstractGrid{dim}, ::Type{EdgeIndex}) where dim = dim^2
 _getsizehint(::AbstractGrid{dim}, ::Type{VertexIndex}) where dim = 2^dim
@@ -175,14 +196,14 @@ _getsizehint(::AbstractGrid{dim}, ::Type{VertexIndex}) where dim = 2^dim
 struct MaterializedTopology <: AbstractTopology
     faceneighbors::CollectionOfVectors{OrderedDict{Face, UnitRange{Int}}, FaceIndex}
     edgeneighbors::CollectionOfVectors{OrderedDict{Edge, UnitRange{Int}}, EdgeIndex}
-    vertexneighbors::CollectionOfVectors{Vector{Int}, VertexIndex}
+    vertexneighbors::CollectionOfVectors{Vector{UnitRange{Int}}, VertexIndex}
 end
 
 function MaterializedTopology(grid::AbstractGrid)
     return MaterializedTopology(
-        GlobalNeighborInformation(grid,   FaceIndex, Face), #TODO: Skip in 1d and 2d
-        GlobalNeighborInformation(grid,   EdgeIndex, Edge), #TODO: Skip in 1d
-        GlobalNeighborInformation(grid, VertexIndex, Int))
+        build_neighborhood(grid,   FaceIndex, Face), #TODO: Skip in 1d and 2d
+        build_neighborhood(grid,   EdgeIndex, Edge), #TODO: Skip in 1d
+        build_neighborhood(grid, VertexIndex, Int))
 end
 
 function getneighborhood(top::MaterializedTopology, grid::AbstractGrid, idx::FaceIndex)

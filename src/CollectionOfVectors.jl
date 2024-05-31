@@ -18,7 +18,7 @@ struct ConstructionBuffer{IT, DT}
     sizehint::Int
 end
 
-function ConstructionBuffer(::Type{<:Array}, data::Vector; dims = nothing, sizehint)
+function ConstructionBuffer(IT::Type{<:Array}, data::Vector; dims = nothing, sizehint)
     dims === nothing && error("dims must be given when indexed by an $IT")
     ndims(IT) == length(dims) || error("The number of dims must match IT's number of dimensions")
 
@@ -42,10 +42,10 @@ function Base.setindex!(b::ConstructionBuffer{<:Array}, val, indices...)
             b.data[n + i] = b.data[r.start + i - 1]
         end
         b.data[n + r.ncurrent + 1] = val
-        b.indices[item] = AdaptiveRange(n + 1, r.ncurrent + 1, r.nmax + sizehint)
+        setindex!(b.indices, AdaptiveRange(n + 1, r.ncurrent + 1, r.nmax + sizehint), indices...)
     else # We have space in an already allocated section
         b.data[r.start + r.ncurrent] = val
-        b.indices[item] = AdaptiveRange(r.start, r.ncurrent + 1, r.nmax)
+        setindex!(b.indices, AdaptiveRange(r.start, r.ncurrent + 1, r.nmax), indices...)
     end
     return b
 end
@@ -59,7 +59,7 @@ function Base.setindex!(b::ConstructionBuffer{<:AbstractDict}, val, key)
         b.data[n + 1] = val
         added_range
     end
-    r === added_range && return gni # We added `added_range` and can exit
+    r === added_range && return b # We added `added_range` and can exit
 
     # Otherwise, `added_range` already exists in `b.indices` and we
     # need to add more elements to this index.
@@ -79,7 +79,8 @@ function Base.setindex!(b::ConstructionBuffer{<:AbstractDict}, val, key)
 end
 
 function compress_data!(data, indices, sorted_iterator, buffer_indices)
-    for (index, r) in enumerate(sorted_iterator)
+    n = 0
+    for (index, r) in sorted_iterator
         nstop = r.start + r.ncurrent - 1
         for (iold, inew) in zip(nstop:-1:r.start, n .+ (r.ncurrent:-1:1))
             @assert inew ≤ iold # To not overwrite
@@ -95,9 +96,9 @@ function compress_data!(data, indices, sorted_iterator, buffer_indices)
     return data, indices
 end
 
-function CollectionOfVectors(f!::Function, IT, DT; sizehint = nothing, kwargs...)
+function CollectionOfVectors(f!::F, IT::Type, DT::Type; sizehint = nothing, kwargs...) where {F <: Function}
     sizehint === nothing && error("Providing sizehint is mandatory")
-    b = ConstructionBuffer(c, DT[]; sizehint, kwargs...)
+    b = ConstructionBuffer(IT, DT[]; sizehint, kwargs...)
     f!(b)
     return CollectionOfVectors(b)
 end
@@ -106,8 +107,8 @@ function CollectionOfVectors(b::ConstructionBuffer{<:Array})
     I = sortperm(reshape(b.indices, :); by = x -> x.start)
     sorted_iterator = enumerate(b.indices[idx] for idx in I if b.indices[idx].start != 0)
     indices = fill(1:0, size(b.indices))
-    compress_data!(data, indices, sorted_iterator, b.indices)
-    return CollectionOfVectors(indices, data)
+    compress_data!(b.data, indices, sorted_iterator, b.indices)
+    return CollectionOfVectors(indices, b.data)
 end
 
 
@@ -124,6 +125,6 @@ end
 function CollectionOfVectors(b::ConstructionBuffer{<:OrderedDict})
     sort!(b.indices; byvalue=true, by = r -> r.start)
     indices = _withnewvalues(b.indices, fill(1:0, length(b.indices)))
-    compress_data!(data, indices, b.indices, b.indices)
-    return CollectionOfVectors(indices, data)
+    compress_data!(b.data, indices, b.indices, b.indices)
+    return CollectionOfVectors(indices, b.data)
 end
