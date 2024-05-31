@@ -290,7 +290,7 @@ function gray_scott_on_sphere(material::GrayScottMaterial, Δt::Real, T::Real, r
 
         ## Then we solve the point-wise reaction problem with the solution of
         ## the heat problem as initial guess. 2 is the number of reactants.
-        num_individual_reaction_dofs = Int(ndofs(dh)/2)
+        num_individual_reaction_dofs = ndofs(dh) ÷ 2
         rvₜ = reshape(uₜ, (2, num_individual_reaction_dofs))
         for i ∈ 1:num_individual_reaction_dofs
             r₁ = rvₜ[1, i]
