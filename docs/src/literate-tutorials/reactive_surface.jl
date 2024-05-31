@@ -180,7 +180,7 @@ function gray_scott_sphere(material::GrayScottMaterial, Δt::Real, T::Real, refi
     ## We start by setting up grid, dof handler and the matrices for the heat problem.
     gmsh.initialize()
 
-    ## Add a unit sphere
+    ## Add a unit sphere in 3D space
     gmsh.model.occ.addSphere(0.0,0.0,0.0,1.0)
     gmsh.model.occ.synchronize()
 
@@ -278,7 +278,7 @@ material = GrayScottMaterial(0.00016, 0.00008, 0.06, 0.062)
 if !IS_CI                                           #src
 gray_scott_sphere(material, 10.0, 32000.0, 3)
 else                                                #src
-gray_scott_sphere(material, 10.0, 20.0, 0)       #src
+gray_scott_sphere(material, 10.0, 20.0, 0)          #src
 end                                                 #src
 
 #md # ## [Plain program](@id reactive_surface-plain-program)
