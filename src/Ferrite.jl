@@ -13,7 +13,7 @@ using LinearAlgebra:
 using NearestNeighbors:
     NearestNeighbors, KDTree, knn
 using OrderedCollections:
-    OrderedSet
+    OrderedSet, OrderedDict
 using SparseArrays:
     SparseArrays, SparseMatrixCSC, nonzeros, nzrange, rowvals, sparse
 using StaticArrays:
@@ -158,5 +158,7 @@ include("PointEvalHandler.jl")
 # Other
 include("deprecations.jl")
 include("docs.jl")
+
+include("grid/topology2.jl")
 
 end # module
