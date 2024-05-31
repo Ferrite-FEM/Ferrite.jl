@@ -90,6 +90,12 @@ function assemble_element_diffusion!(De::Matrix, cellvalues::CellValues, materia
     n_basefuncs = getnbasefunctions(cellvalues)
     D₁ = material.D₁
     D₂ = material.D₂
+    ## The diffusion between the reactions is not coupled, so we get a blocked-strided matrix.
+    num_reactants = 2
+    r₁range = 1:num_reactants:num_reactants*n_basefuncs
+    r₂range = 2:num_reactants:num_reactants*n_basefuncs
+    De₁ = @view De[r₁range, r₁range]
+    De₂ = @view De[r₂range, r₂range]
     ## Reset to 0
     fill!(De, 0)
     ## Loop over quadrature points
@@ -198,10 +204,21 @@ function gray_scott_sphere(material::GrayScottMaterial, Δt::Real, T::Real, refi
     qr = QuadratureRule{RefTriangle}(2)
     cellvalues = CellValues(qr, ip, ip_geo^3);
 
+    ## We have two options to add the reactants to the dof handler, which will give us slightly
+    ## different resulting dof distributions:
+    ## A) We can add a scalar-valued interpolation for each reactant.
+    ## B) We can add one vectorized interpolation whose dimension is the number of reactants
+    ##    number of reactants.
+    ## In this tutorial we opt for B, because the dofs are distributed per cell entity -- or
+    ## to be specific for this tutorial, we use an isoparametric concept such that the nodes
+    ## of our grid and the nodes of our solution approximation coincide. This way a reaction
+    ## we can create simply reshape the solution vector u to a matrix where the inner index
+    ## corresponds to the index of the reactant.
     dh = DofHandler(grid);
     add!(dh, :reactants, ip^2);
     close!(dh);
 
+    ## We can save some memory by telling the sparsity pattern that the matrices are not coupled.
     M = create_sparsity_pattern(dh; coupling=[true false;false true])
     D = create_sparsity_pattern(dh; coupling=[true false;false true])
 
@@ -212,6 +229,7 @@ function gray_scott_sphere(material::GrayScottMaterial, Δt::Real, T::Real, refi
     cholA = cholesky(A)
 
     ## Now we setup buffers for the time dependent solution and fill the initial condition.
+    ## We can save some memory by telling the sparsity pattern that the matrices are not coupled.
     uₜ   = zeros(ndofs(dh))
     uₜ₋₁ = ones(ndofs(dh))
     setup_initial_conditions!(uₜ₋₁, cellvalues, dh)
@@ -230,9 +248,10 @@ function gray_scott_sphere(material::GrayScottMaterial, Δt::Real, T::Real, refi
         uₜ .= cholA \ (M * uₜ₋₁)
 
         ## Then we solve the point-wise reaction problem with the solution of
-        ## the heat problem as initial guess.
-        rvₜ = reshape(uₜ, (2, length(grid.nodes)))
-        for i ∈ 1:length(grid.nodes)
+        ## the heat problem as initial guess. 2 is the number of reactants.
+        num_individual_reaction_dofs = Int(ndofs(dh)/2)
+        rvₜ = reshape(uₜ, (2, num_individual_reaction_dofs))
+        for i ∈ 1:num_individual_reaction_dofs
             r₁ = rvₜ[1, i]
             r₂ = rvₜ[2, i]
             rvₜ[1, i] += Δt*( -r₁*r₂^2 + F *(1 - r₁) )
