@@ -86,7 +86,7 @@ struct GrayScottMaterial{T}
     D₂::T
     F::T
     k::T
-end
+end;
 
 # The following assembly routines are written analogue to these found in previous tutorials.
 function assemble_element_mass!(Me::Matrix, cellvalues::CellValues)
@@ -171,7 +171,7 @@ function assemble_matrices!(M::SparseMatrixCSC, D::SparseMatrixCSC, cellvalues::
         assemble!(D_assembler, celldofs(cell), De)
     end
     return nothing
-end
+end;
 
 # ### Initial condition setup
 # Time-dependent problems always need an initial condition from which the time evolution starts.
@@ -203,7 +203,7 @@ function setup_initial_conditions!(u₀::Vector, cellvalues::CellValues, dh::Dof
     end
 
     u₀ .+= 0.01*rand(ndofs(dh))
-end
+end;
 
 # ### Simulation routines
 # Now we define a function to setup and solve the problem with given feed and conversion rates
@@ -315,6 +315,7 @@ gray_scott_sphere(material, 10.0, 32000.0, 3)
 else                                                #src
 gray_scott_sphere(material, 10.0, 20.0, 0)          #src
 end                                                 #src
+nothing                                             #src
 
 #md # ## [Plain program](@id reactive_surface-plain-program)
 #md #
