@@ -145,7 +145,7 @@ for the time-integration.
 
 ---
 
-#### [Tutorial 10: Reactive Surface](@ref tutorial-reactive-surface)
+#### [Tutorial 10: Reactive surface](@ref tutorial-reactive-surface)
 
 In this tutorial a reaction diffusion system on a sphere surface embedded in 3D is solved.
 Ferrite is used to assemble the diffusion operators and the mass matrices. The problem is
