@@ -54,8 +54,15 @@ using Ferrite, FerriteGmsh
 using BlockArrays, SparseArrays, LinearAlgebra
 
 # ### Assembly routines
-# The following assembly routines are similar to these found in previous tutorials.
+# Before we head into the assembly, we define a helper struct to control the dispatches. 
+struct GrayScottMaterial{T}
+    D₁::T
+    D₂::T
+    F::T
+    k::T
+end
 
+# The following assembly routines are written analogue to these found in previous tutorials.
 function assemble_element_mass!(Me::Matrix, cellvalues::CellValues)
     n_basefuncs = getnbasefunctions(cellvalues)
     ## Reset to 0
@@ -79,8 +86,10 @@ function assemble_element_mass!(Me::Matrix, cellvalues::CellValues)
     return nothing
 end
 
-function assemble_element_diffusion!(De::Matrix, cellvalues::CellValues)
+function assemble_element_diffusion!(De::Matrix, cellvalues::CellValues, material::GrayScottMaterial)
     n_basefuncs = getnbasefunctions(cellvalues)
+    D₁ = material.D₁
+    D₂ = material.D₂
     ## Reset to 0
     fill!(De, 0)
     ## Loop over quadrature points
@@ -94,15 +103,15 @@ function assemble_element_diffusion!(De::Matrix, cellvalues::CellValues)
             for j in 1:n_basefuncs
                 ∇δuⱼ = shape_gradient(cellvalues, q_point, j)
                 ## Add contribution to Ke
-                De[2*i-1, 2*j-1] += 2*0.00008 * (∇δuᵢ ⋅ ∇δuⱼ) * dΩ
-                De[2*i  , 2*j  ] += 2*0.00004 * (∇δuᵢ ⋅ ∇δuⱼ) * dΩ
+                De₁[i,j] += D₁ * (∇δuᵢ ⋅ ∇δuⱼ) * dΩ
+                De₂[i,j] += D₂ * (∇δuᵢ ⋅ ∇δuⱼ) * dΩ
             end
         end
     end
     return nothing
 end
 
-function assemble_matrices!(M::SparseMatrixCSC, D::SparseMatrixCSC, cellvalues::CellValues, dh::DofHandler)
+function assemble_matrices!(M::SparseMatrixCSC, D::SparseMatrixCSC, cellvalues::CellValues, dh::DofHandler, material::GrayScottMaterial)
     n_basefuncs = getnbasefunctions(cellvalues)
 
     ## Allocate the element stiffness matrix and element force vector
@@ -120,7 +129,7 @@ function assemble_matrices!(M::SparseMatrixCSC, D::SparseMatrixCSC, cellvalues::
         assemble_element_mass!(Me, cellvalues)
         assemble!(M_assembler, celldofs(cell), Me)
 
-        assemble_element_diffusion!(De, cellvalues)
+        assemble_element_diffusion!(De, cellvalues, material)
         assemble!(D_assembler, celldofs(cell), De)
     end
     return nothing
@@ -161,7 +170,7 @@ end
 # ### Simulation routines
 # Now we define a function to setup and solve the problem with given feed and conversion rates
 # $F$ and $k$, as well as the time step length and for how long we want to solve the model.
-function gray_scott_sphere(F, k, Δt, T, refinements)
+function gray_scott_sphere(material::GrayScottMaterial, Δt::Real, T::Real, refinements::Integer)
     ## We start by setting up grid, dof handler and the matrices for the heat problem.
     gmsh.initialize()
 
@@ -195,10 +204,10 @@ function gray_scott_sphere(F, k, Δt, T, refinements)
 
     M = create_sparsity_pattern(dh; coupling=[true false;false true])
     D = create_sparsity_pattern(dh; coupling=[true false;false true])
-    assemble_matrices!(M, D, cellvalues, dh);
 
     ## Since the heat problem is linear and has no time dependent parameters, we precompute the
     ## decomposition of the system matrix to speed up the linear system solver.
+    assemble_matrices!(M, D, cellvalues, dh, material);
     A = M + Δt .* D
     cholA = cholesky(A)
 
@@ -214,6 +223,8 @@ function gray_scott_sphere(F, k, Δt, T, refinements)
     end
 
     ## This is now the main solve loop.
+    F = material.F
+    k = material.k
     for (iₜ, t) ∈ enumerate(Δt:Δt:T)
         ## First we solve the heat problem
         uₜ .= cholA \ (M * uₜ₋₁)
@@ -244,10 +255,11 @@ function gray_scott_sphere(F, k, Δt, T, refinements)
 end
 
 ## This parametrization gives the spot pattern shown in the gif above.
+material = GrayScottMaterial(0.00016, 0.00008, 0.06, 0.062)
 if !IS_CI                                           #src
-gray_scott_sphere(0.06, 0.062, 10.0, 32000.0, 3)
+gray_scott_sphere(material, 10.0, 32000.0, 3)
 else                                                #src
-gray_scott_sphere(0.06, 0.062, 10.0, 20.0, 0)       #src
+gray_scott_sphere(material, 10.0, 20.0, 0)       #src
 end                                                 #src
 
 #md # ## [Plain program](@id reactive_surface-plain-program)
