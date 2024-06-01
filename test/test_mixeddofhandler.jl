@@ -644,10 +644,7 @@ function test_vtk_export()
 end
 
 function test_celliterator_on_true_subdomain_smoketest()
-    using Ferrite
-
     grid = generate_grid(Hexahedron, (3,3,3))
-    using Ferrite
 
     dh = DofHandler(grid)
     sdh = SubDofHandler(dh, [1,2,3])
