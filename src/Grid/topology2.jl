@@ -1,3 +1,10 @@
+include("../CollectionOfVectors.jl")
+
+
+# =============================================================================================== #
+# EntityTopology
+# =============================================================================================== #
+
 "Unique representation of a face"
 struct Face
     vertices::NTuple{3, Int}
@@ -23,157 +30,29 @@ function Edge(grid::AbstractGrid, idx::EdgeIndex)
 end
 
 # A Vertex uniquely represented by its node number.
-#=
-# Helper to keep track of the current allocated space in `neighbors::Vector`
-# in GlobalNeighborInformation during construction.
-struct AdaptiveRange
-    start::Int
-    ncurrent::Int   # Could be UInt8
-    nmax::Int       # Could be UInt8
+
+"""
+    Topology indexed by the entity, i.e. a `Face`, `Edge`, or `Vertex` where the
+    latter is just represented as an `Int`.
+"""
+struct EntityTopology <: AbstractTopology
+    faceneighbors::CollectionOfVectors{OrderedDict{Face, UnitRange{Int}}, FaceIndex}
+    edgeneighbors::CollectionOfVectors{OrderedDict{Edge, UnitRange{Int}}, EdgeIndex}
+    vertexneighbors::CollectionOfVectors{Vector{UnitRange{Int}}, VertexIndex}
 end
 
-struct GlobalNeighborInformation{ET, BI, CT}
-    neighbors::Vector{BI}
-    indices::CT             # ngbs = neighbors[indices[item]], where item is the unique representation of the entity.
-    function GlobalNeighborInformation(neighbors::Vector{VertexIndex}, indices::Vector{UnitRange{Int}})
-        return new{Int, VertexIndex, typeof(indices)}(neighbors, indices)
-    end
-    function GlobalNeighborInformation(neighbors::Vector{BI}, indices::OrderedDict{ET, UnitRange{Int}}) where {BI<:BoundaryIndex, ET}
-        return new{ET, BI, typeof(indices)}(neighbors, indices)
-    end
+function EntityTopology(grid::AbstractGrid)
+    return EntityTopology(
+        build_neighborhood(grid,   FaceIndex, Face), #TODO: Skip in 1d and 2d
+        build_neighborhood(grid,   EdgeIndex, Edge), #TODO: Skip in 1d
+        build_neighborhood(grid, VertexIndex, Int))
 end
-
-getneighbors(gni::GlobalNeighborInformation{ET}, idx::ET) where ET = (gni.neighbors[i] for i in gni.indices[idx])
-
-function GlobalNeighborInformation(grid, IdxType::Type{<:BoundaryIndex}, ::Type{ET}; sizehint=_getsizehint(grid, IdxType)) where {ET<:Union{Edge, Face}}
-    gni = GlobalNeighborInformation(IdxType[], OrderedDict{ET, UnitRange{Int}}())
-    indices_buffer = OrderedDict{ET, AdaptiveRange}()
-    # Fill the information
-    for (cellnr, cell) in enumerate(getcells(grid))
-        for (entitynr, entity_vertices) in enumerate(boundaryfunction(IdxType)(cell))
-            e = ET(entity_vertices)
-            addneighbor!(gni, indices_buffer, e, IdxType(cellnr, entitynr), sizehint)
-        end
-    end
-    # Compress the information by shifting all items in the vector to the beginning, and deleting unused space.
-    compress_data!(gni, indices_buffer)
-    return gni
-end
-
-function GlobalNeighborInformation(grid, IdxType::Type{VertexIndex}, ::Type{Int}; sizehint=_getsizehint(grid, IdxType))
-    indices = Vector{UnitRange{Int}}(undef, getnnodes(grid))
-    gni = GlobalNeighborInformation(IdxType[], indices)
-    indices_buffer = fill(AdaptiveRange(0, 0, 0), getnnodes(grid))
-    # Fill the information
-    for (cellnr, cell) in enumerate(getcells(grid))
-        for (vertexnr, global_vertex) in enumerate(vertices(cell))
-            addneighbor!(gni, indices_buffer, global_vertex, VertexIndex(cellnr, vertexnr), sizehint)
-        end
-    end
-    # Compress the information
-    compress_data!(gni, indices_buffer)
-    return gni
-end
-
-function addneighbor!(gni::GlobalNeighborInformation{ET}, indices_buffer, item::ET, idx::BoundaryIndex, sizehint::Int) where {ET<:Union{Edge, Face}}
-    n = length(gni.neighbors)
-    added_range = AdaptiveRange(n + 1, 1, sizehint)
-    r = get!(indices_buffer, item) do
-        # Enters only if item is not in indices_buffer
-        resize!(gni.neighbors, n + sizehint)
-        gni.neighbors[n+1] = idx
-        added_range
-    end
-    r === added_range && return gni # We added a new unique entity, can exit
-    # Otherwise, we need to add more neighbors to an existing entity:
-
-    if r.ncurrent == r.nmax # Need to move to the end of the vector
-        indices_buffer[item] = AdaptiveRange(n + 1, r.ncurrent + 1, r.nmax + sizehint)
-        resize!(gni.neighbors, n + r.nmax + sizehint)
-        for i in 1:r.ncurrent # TODO: Iterator for AdaptiveRange
-            gni.neighbors[n + i] = gni.neighbors[r.start + i - 1]
-        end
-        gni.neighbors[n + r.ncurrent + 1] = idx
-    else
-        indices_buffer[item] = AdaptiveRange(r.start, r.ncurrent + 1, r.nmax)
-        gni.neighbors[r.start + r.ncurrent] = idx
-    end
-    return gni
-end
-
-function addneighbor!(gni::GlobalNeighborInformation{Int}, indices_buffer, item::Int, idx::VertexIndex, sizehint::Int)
-    r = indices_buffer[item]
-    n = length(gni.neighbors)
-    if r.start == 0 # Not previously added
-        resize!(gni.neighbors, n + sizehint)
-        gni.neighbors[n+1] = idx
-        indices_buffer[item] = AdaptiveRange(n + 1, 1, sizehint)
-    elseif r.ncurrent == r.nmax # We have used up our space, move data to the end of the vector.
-        resize!(gni.neighbors, n + r.nmax + sizehint)
-        for i in 1:r.ncurrent
-            gni.neighbors[n + i] = gni.neighbors[r.start + i - 1]
-        end
-        gni.neighbors[n + r.ncurrent + 1] = idx
-        indices_buffer[item] = AdaptiveRange(n + 1, r.ncurrent + 1, r.nmax + sizehint)
-    else # We have space in an already allocated section
-        gni.neighbors[r.start + r.ncurrent] = idx
-        indices_buffer[item] = AdaptiveRange(r.start, r.ncurrent + 1, r.nmax)
-    end
-    return gni
-end
-
-function compress_data!(gni::GlobalNeighborInformation{ET}, indices_buffer) where {ET<:Union{Edge, Face}}
-    # indices_buffer values are of type AdaptiveRange and these are not overlapping. Sort by their first value.
-    sort!(indices_buffer; byvalue=true, by = r -> r.start)
-    sizehint!(gni.indices, length(indices_buffer))
-    # NOTE: gni.indices and indices_buffer have the same keys, this could probably be optimized
-    # as rehash etc. is taking some time...
-    n = 0
-    cnt = 1
-    for (entity, r) in indices_buffer
-        nstop = r.start + r.ncurrent - 1
-        for (iold, inew) in zip(nstop:-1:r.start, n .+ (r.ncurrent:-1:1))
-            @assert inew ≤ iold # To not overwrite
-            gni.neighbors[inew] = gni.neighbors[iold]
-        end
-        gni.indices[entity] = (n + 1):(n + r.ncurrent)
-        n += r.ncurrent
-        cnt += 1
-    end
-    empty!(indices_buffer)
-    resize!(gni.neighbors, n)
-    return gni
-end
-
-function compress_data!(gni::GlobalNeighborInformation{Int}, indices_buffer)
-    # indices_buffer contain AdaptiveRange and these are not overlapping. Sort by their first value.
-    sort!(indices_buffer; by = r -> r.start)
-    n = 0
-    for (entity, r) in enumerate(indices_buffer)
-        r.start == 0 && continue # E.g. a node not being a vertex.
-        nstop = r.start + r.ncurrent - 1
-        for (iold, inew) in zip(nstop:-1:r.start, n .+ (r.ncurrent:-1:1))
-            @assert inew ≤ iold # To not overwrite
-            gni.neighbors[inew] = gni.neighbors[iold]
-        end
-        gni.indices[entity] = (n + 1):(n + r.ncurrent)
-        n += r.ncurrent
-    end
-    empty!(indices_buffer)
-    resize!(gni.neighbors, n)
-    return gni
-end
-
-=#
-
-include("../CollectionOfVectors.jl")
 
 function build_neighborhood(grid, ::Type{BI}, ::Type{ET}; sizehint=_getsizehint(grid, BI)) where {BI<:BoundaryIndex, ET<:Union{Edge, Face}}
     return CollectionOfVectors(OrderedDict{ET}, BI; sizehint) do b
         for (cellnr, cell) in enumerate(getcells(grid))
             for (entitynr, entity_vertices) in enumerate(boundaryfunction(BI)(cell))
-                e = ET(entity_vertices)
-                b[e] = BI(cellnr, entitynr)
+                add!(b, BI(cellnr, entitynr), ET(entity_vertices))
             end
         end
     end
@@ -183,49 +62,281 @@ function build_neighborhood(grid, IdxType::Type{VertexIndex}, ::Type{Int}; sizeh
     return CollectionOfVectors(Vector, VertexIndex; sizehint, dims=(getnnodes(grid),)) do b
         for (cellnr, cell) in enumerate(getcells(grid))
             for (vertexnr, global_vertex) in enumerate(vertices(cell))
-                b[global_vertex] = VertexIndex(cellnr, vertexnr)
+                add!(b, VertexIndex(cellnr, vertexnr), global_vertex)
             end
         end
     end
 end
 
-_getsizehint(::AbstractGrid, ::Type{FaceIndex}) = 2
+# Guess of how many neighbors depending on grid dimension and index type.
+# This is just a performance optimization, and a good default is sufficient.
+_getsizehint(::AbstractGrid{3}, ::Type{FaceIndex}) = 2
+_getsizehint(::AbstractGrid, ::Type{FaceIndex}) = 0 # No faces exists in 2d or lower dim
 _getsizehint(::AbstractGrid{dim}, ::Type{EdgeIndex}) where dim = dim^2
 _getsizehint(::AbstractGrid{dim}, ::Type{VertexIndex}) where dim = 2^dim
-
-struct MaterializedTopology <: AbstractTopology
-    faceneighbors::CollectionOfVectors{OrderedDict{Face, UnitRange{Int}}, FaceIndex}
-    edgeneighbors::CollectionOfVectors{OrderedDict{Edge, UnitRange{Int}}, EdgeIndex}
-    vertexneighbors::CollectionOfVectors{Vector{UnitRange{Int}}, VertexIndex}
+_getsizehint(::AbstractGrid{1}, ::Type{CellIndex}) = 2
+_getsizehint(::AbstractGrid{2}, ::Type{CellIndex}) = 12
+function _getsizehint(g::AbstractGrid{3}, ::Type{CellIndex})
+    CT = getcelltype(g)
+    if isconcretetype(CT)
+        RS = getrefshape(CT)
+        RS === RefHexahedron && return 26
+        RS === RefTetrahedron && return 70
+    end
+    return 70 # Assume that there are some RefTetrahedron
 end
 
-function MaterializedTopology(grid::AbstractGrid)
-    return MaterializedTopology(
-        build_neighborhood(grid,   FaceIndex, Face), #TODO: Skip in 1d and 2d
-        build_neighborhood(grid,   EdgeIndex, Edge), #TODO: Skip in 1d
-        build_neighborhood(grid, VertexIndex, Int))
-end
-
-function getneighborhood(top::MaterializedTopology, grid::AbstractGrid, idx::FaceIndex)
+function getneighborhood(top::EntityTopology, grid::AbstractGrid, idx::FaceIndex)
     return top.faceneighbors[Face(grid, idx)]
 end
 
-function getneighborhood(top::MaterializedTopology, grid::AbstractGrid, idx::EdgeIndex)
+function getneighborhood(top::EntityTopology, grid::AbstractGrid, idx::EdgeIndex)
     return top.edgeneighbors[Edge(grid, idx)]
 end
 
-function getneighborhood(top::MaterializedTopology, grid::AbstractGrid, idx::VertexIndex)
+function getneighborhood(top::EntityTopology, grid::AbstractGrid, idx::VertexIndex)
     return top.vertexneighbors[toglobal(grid, idx)]
 end
 
-function faceskeleton(top::MaterializedTopology, ::AbstractGrid)
+function faceskeleton(top::EntityTopology, ::AbstractGrid)
     return (first(n) for n in nonempty_values(top.faceneighbors))
 end
 
-function edgeskeleton(top::MaterializedTopology, ::AbstractGrid)
+function edgeskeleton(top::EntityTopology, ::AbstractGrid)
     return (first(n) for n in nonempty_values(top.edgeneighbors))
 end
 
-function vertexskeleton(top::MaterializedTopology, ::AbstractGrid)
+function vertexskeleton(top::EntityTopology, ::AbstractGrid)
     return (first(n) for n in nonempty_values(top.vertexneighbors))
+end
+
+# =============================================================================================== #
+# ExclusiveTopology and CoverTopology utils
+# =============================================================================================== #
+"Return the highest number of vertices, edges, and faces per cell"
+function _max_nentities_per_cell(cells::Vector{C}) where C
+    if isconcretetype(C)
+        cell = first(cells)
+        return nvertices(cell), nedges(cell), nfaces(cell)
+    else
+        celltypes = Set(typeof.(cells))
+        max_vertices = 0
+        max_edges = 0
+        max_faces = 0
+        for celltype in celltypes
+            celltypeidx = findfirst(x -> isa(x, celltype), cells)
+            max_vertices = max(max_vertices, nvertices(cells[celltypeidx]))
+            max_edges = max(max_edges, nedges(cells[celltypeidx]))
+            max_faces = max(max_faces, nfaces(cells[celltypeidx]))
+        end
+        return max_vertices, max_edges, max_faces
+    end
+end
+
+function _add_single_face_neighbor!(face_table::ConstructionBuffer, cell::AbstractCell, cell_id::Int, cell_neighbor::AbstractCell, cell_neighbor_id::Int)
+    for (lfi, face) ∈ enumerate(faces(cell))
+        uniqueface = sortface_fast(face)
+        for (lfi2, face_neighbor) ∈ enumerate(faces(cell_neighbor))
+            uniqueface2 = sortface_fast(face_neighbor)
+            if uniqueface == uniqueface2
+                add!(face_table, FaceIndex(cell_neighbor_id, lfi2), cell_id, lfi)
+                return
+            end
+        end
+    end
+end
+
+function _add_single_edge_neighbor!(edge_table::ConstructionBuffer, cell::AbstractCell, cell_id::Int, cell_neighbor::AbstractCell, cell_neighbor_id::Int)
+    for (lei, edge) ∈ enumerate(edges(cell))
+        uniqueedge = sortedge_fast(edge)
+        for (lei2, edge_neighbor) ∈ enumerate(edges(cell_neighbor))
+            uniqueedge2 = sortedge_fast(edge_neighbor)
+            if uniqueedge == uniqueedge2
+                add!(edge_table, EdgeIndex(cell_neighbor_id, lei2), cell_id, lei)
+                return
+            end
+        end
+    end
+end
+
+function _add_single_vertex_neighbor!(vertex_table::ConstructionBuffer, cell::AbstractCell, cell_id::Int, cell_neighbor::AbstractCell, cell_neighbor_id::Int)
+    for (lvi, vertex) ∈ enumerate(vertices(cell))
+        for (lvi2, vertex_neighbor) ∈ enumerate(vertices(cell_neighbor))
+            if vertex_neighbor == vertex
+                add!(vertex_table, VertexIndex(cell_neighbor_id, lvi2), cell_id, lvi)
+                break
+            end
+        end
+    end
+end
+
+function build_vertex_to_cell(cells; max_vertices, nnodes)
+    vertex_to_cell = CollectionOfVectors(Vector, Int; sizehint=max_vertices, dims=(nnodes,)) do cov
+            for (cellid, cell) in enumerate(cells)
+                for vertex in vertices(cell)
+                    add!(cov, cellid, vertex)
+                end
+            end
+        end
+    return vertex_to_cell
+end
+
+function build_cell_neighbor(grid, cells, vertex_to_cell; ncells)
+    # Note: The following could be optimized, since we loop over the cells in order,
+    # there is no need to use the special adaptive indexing and then compress_data! in CollectionOfVectors.
+    return CollectionOfVectors(Vector, CellIndex; sizehint=_getsizehint(grid, CellIndex), dims=(ncells,)) do cov
+            cell_neighbor_ids = Set{Int}()
+            for (cell_id, cell) in enumerate(cells)
+                empty!(cell_neighbor_ids)
+                for vertex ∈ vertices(cell)
+                    for vertex_cell_id ∈ vertex_to_cell[vertex]
+                        if vertex_cell_id != cell_id
+                            push!(cell_neighbor_ids, vertex_cell_id)
+                        end
+                    end
+                end
+                # TODO: At least "appending" values should be supported for cov::ConstructionBuffer
+                for neighbor_id in cell_neighbor_ids
+                    add!(cov, CellIndex(neighbor_id), cell_id)
+                end
+            end
+        end
+end
+
+
+# =============================================================================================== #
+# ExclusiveTopology2
+# =============================================================================================== #
+"ExclusiveTopology2 by using `CollectionOfVectors`"
+struct ExclusiveTopology2
+    # maps a global vertex id to all cells containing the vertex
+    vertex_to_cell::CollectionOfVectors{Vector{UnitRange{Int}}, Int}
+    # index of the vector = cell id ->  all other connected cells
+    cell_neighbor::CollectionOfVectors{Vector{UnitRange{Int}}, CellIndex}
+    # face_face_neighbor[cellid,local_face_id] -> exclusive connected entities (not restricted to one entity)
+    face_face_neighbor::CollectionOfVectors{Matrix{UnitRange{Int}}, FaceIndex}
+    # edge_edge_neighbor[cellid,local_edge_id] -> exclusive connected entities of the given edge
+    edge_edge_neighbor::CollectionOfVectors{Matrix{UnitRange{Int}}, EdgeIndex}
+    # vertex_vertex_neighbor[cellid,local_vertex_id] -> exclusive connected entities to the given vertex
+    vertex_vertex_neighbor::CollectionOfVectors{Matrix{UnitRange{Int}}, VertexIndex}
+
+    # list of unique faces in the grid given as FaceIndex
+    face_skeleton::Union{Vector{FaceIndex}, Nothing}
+    # list of unique edges in the grid given as EdgeIndex
+    edge_skeleton::Union{Vector{FaceIndex}, Nothing}
+    # list of unique vertices in the grid given as VertexIndex
+    vertex_skeleton::Union{Vector{VertexIndex}, Nothing}
+end
+
+function ExclusiveTopology2(grid::AbstractGrid{sdim}) where sdim
+    sdim == get_reference_dimension(grid) || error("ExclusiveTopology2 is only tested for non-embedded grids")
+    cells = getcells(grid)
+    nnodes = getnnodes(grid)
+    ncells = length(cells)
+
+    max_vertices, max_edges, max_faces = _max_nentities_per_cell(cells)
+    vertex_to_cell = build_vertex_to_cell(cells; max_vertices, nnodes)
+    cell_neighbor = build_cell_neighbor(grid, cells, vertex_to_cell; ncells)
+
+    # Here we don't use the convenience constructor taking a function, since we want to do it simultaneously for 3 data-types
+    # This also allows giving a sizehint to the underlying vectors
+    facedata = sizehint!(FaceIndex[], ncells * max_faces * _getsizehint(grid, FaceIndex))
+    face_face_neighbor_buf = ConstructionBuffer(Matrix, facedata; dims=(ncells, max_faces), sizehint=_getsizehint(grid, FaceIndex))
+    edgedata = sizehint!(EdgeIndex[], ncells * max_edges * _getsizehint(grid, EdgeIndex))
+    edge_edge_neighbor_buf = ConstructionBuffer(Matrix, edgedata; dims=(ncells, max_edges), sizehint=_getsizehint(grid, EdgeIndex))
+    vertdata = sizehint!(VertexIndex[], ncells * max_vertices * _getsizehint(grid, VertexIndex))
+    vertex_vertex_neighbor_buf = ConstructionBuffer(Matrix, vertdata; dims=(ncells, max_vertices), sizehint=_getsizehint(grid, VertexIndex))
+
+    for (cell_id, cell) in enumerate(cells)
+        for neighbor_cell_idx in cell_neighbor[cell_id]
+            neighbor_cell_id = neighbor_cell_idx.idx
+            neighbor_cell = cells[neighbor_cell_id]
+            getrefdim(neighbor_cell) == getrefdim(cell) || error("Not supported")
+            num_shared_vertices = _num_shared_vertices(cell, neighbor_cell) # See grid/topology.jl
+            if num_shared_vertices == 1
+                _add_single_vertex_neighbor!(vertex_vertex_neighbor_buf, cell, cell_id, neighbor_cell, neighbor_cell_id)
+            # Shared edge
+            elseif num_shared_vertices == 2
+                _add_single_edge_neighbor!(edge_edge_neighbor_buf, cell, cell_id, neighbor_cell, neighbor_cell_id)
+            # Shared face
+            elseif num_shared_vertices >= 3
+                _add_single_face_neighbor!(face_face_neighbor_buf, cell, cell_id, neighbor_cell, neighbor_cell_id)
+            else
+                error("Found connected elements without shared vertex... Mesh broken?")
+            end
+        end
+    end
+    face_face_neighbor     = CollectionOfVectors(face_face_neighbor_buf)
+    edge_edge_neighbor     = CollectionOfVectors(edge_edge_neighbor_buf)
+    vertex_vertex_neighbor = CollectionOfVectors(vertex_vertex_neighbor_buf)
+    return ExclusiveTopology2(vertex_to_cell, cell_neighbor, face_face_neighbor, edge_edge_neighbor, vertex_vertex_neighbor, nothing, nothing, nothing)
+end
+
+# =============================================================================================== #
+# CoverTopology
+# =============================================================================================== #
+"CoverTopology (from FerriteDistributed) by using `CollectionOfVectors`"
+struct CoverTopology
+    # maps a global vertex id to all cells containing the vertex
+    vertex_to_cell::CollectionOfVectors{Vector{UnitRange{Int}}, Int}
+    # index of the vector = cell id ->  all other connected cells
+    cell_neighbor::CollectionOfVectors{Vector{UnitRange{Int}}, CellIndex}
+    # face_face_neighbor[cellid,local_face_id] -> exclusive connected entities (not restricted to one entity)
+    face_face_neighbor::CollectionOfVectors{Matrix{UnitRange{Int}}, FaceIndex}
+    # edge_edge_neighbor[cellid,local_edge_id] -> exclusive connected entities of the given edge
+    edge_edge_neighbor::CollectionOfVectors{Matrix{UnitRange{Int}}, EdgeIndex}
+    # vertex_vertex_neighbor[cellid,local_vertex_id] -> exclusive connected entities to the given vertex
+    vertex_vertex_neighbor::CollectionOfVectors{Matrix{UnitRange{Int}}, VertexIndex}
+
+    # list of unique faces in the grid given as FaceIndex
+    face_skeleton::Union{Vector{FaceIndex}, Nothing}
+    # list of unique edges in the grid given as EdgeIndex
+    edge_skeleton::Union{Vector{FaceIndex}, Nothing}
+    # list of unique vertices in the grid given as VertexIndex
+    vertex_skeleton::Union{Vector{VertexIndex}, Nothing}
+end
+
+function CoverTopology(grid::AbstractGrid{sdim}) where sdim
+    sdim == get_reference_dimension(grid) || error("CoverTopology is only tested for non-embedded grids")
+    cells = getcells(grid)
+    nnodes = getnnodes(grid)
+    ncells = length(cells)
+
+    max_vertices, max_edges, max_faces = _max_nentities_per_cell(cells)
+    vertex_to_cell = build_vertex_to_cell(cells; max_vertices, nnodes)
+    cell_neighbor = build_cell_neighbor(grid, cells, vertex_to_cell; ncells)
+
+    # Here we don't use the convenience constructor taking a function, since we want to do it simultaneously for 3 data-types
+    facedata = sizehint!(FaceIndex[], ncells * max_faces * _getsizehint(grid, FaceIndex))
+    face_face_neighbor_buf = ConstructionBuffer(Matrix, facedata; dims=(ncells, max_faces), sizehint=_getsizehint(grid, FaceIndex))
+    edgedata = sizehint!(EdgeIndex[], ncells * max_edges * _getsizehint(grid, EdgeIndex))
+    edge_edge_neighbor_buf = ConstructionBuffer(Matrix, edgedata; dims=(ncells, max_edges), sizehint=_getsizehint(grid, EdgeIndex))
+    vertdata = sizehint!(VertexIndex[], ncells * max_vertices * _getsizehint(grid, VertexIndex))
+    vertex_vertex_neighbor_buf = ConstructionBuffer(Matrix, vertdata; dims=(ncells, max_vertices), sizehint=_getsizehint(grid, VertexIndex))
+
+    for (cell_id, cell) in enumerate(cells)
+        for neighbor_cell_idx in cell_neighbor[cell_id]
+            neighbor_cell_id = neighbor_cell_idx.idx
+            neighbor_cell = cells[neighbor_cell_id]
+            getrefdim(neighbor_cell) == getrefdim(cell) || error("Not supported")
+            num_shared_vertices = _num_shared_vertices(cell, neighbor_cell) # See grid/topology.jl
+            if num_shared_vertices ≥ 1 # Shared vertex
+                _add_single_vertex_neighbor!(vertex_vertex_neighbor_buf, cell, cell_id, neighbor_cell, neighbor_cell_id)
+            end
+            if num_shared_vertices ≥ 2 # Shared edge
+                _add_single_edge_neighbor!(edge_edge_neighbor_buf, cell, cell_id, neighbor_cell, neighbor_cell_id)
+            end
+            # Shared face
+            if num_shared_vertices ≥ 3 # Shared face
+                _add_single_face_neighbor!(face_face_neighbor_buf, cell, cell_id, neighbor_cell, neighbor_cell_id)
+            end
+            if num_shared_vertices ≤ 0
+                error("Found connected elements without shared vertex... Mesh broken?")
+            end
+        end
+    end
+    face_face_neighbor     = CollectionOfVectors(face_face_neighbor_buf)
+    edge_edge_neighbor     = CollectionOfVectors(edge_edge_neighbor_buf)
+    vertex_vertex_neighbor = CollectionOfVectors(vertex_vertex_neighbor_buf)
+    return CoverTopology(vertex_to_cell, cell_neighbor, face_face_neighbor, edge_edge_neighbor, vertex_vertex_neighbor, nothing, nothing, nothing)
 end

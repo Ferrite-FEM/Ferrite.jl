@@ -32,7 +32,7 @@ function ConstructionBuffer(::Type{<:OrderedDict{K}}, data::Vector; sizehint::In
     return ConstructionBuffer(OrderedDict{K, AdaptiveRange}(), data, sizehint)
 end
 
-function Base.setindex!(b::ConstructionBuffer{<:Array}, val, indices...)
+function add!(b::ConstructionBuffer{<:Array}, val, indices...)
     r = getindex(b.indices, indices...)
     n = length(b.data)
     if r.start == 0 # Not previously added
@@ -40,12 +40,12 @@ function Base.setindex!(b::ConstructionBuffer{<:Array}, val, indices...)
         b.data[n+1] = val
         setindex!(b.indices, AdaptiveRange(n + 1, 1, b.sizehint), indices...)
     elseif r.ncurrent == r.nmax # We have used up our space, move data to the end of the vector.
-        resize!(b.data, n + r.nmax + sizehint)
+        resize!(b.data, n + r.nmax + b.sizehint)
         for i in 1:r.ncurrent
             b.data[n + i] = b.data[r.start + i - 1]
         end
         b.data[n + r.ncurrent + 1] = val
-        setindex!(b.indices, AdaptiveRange(n + 1, r.ncurrent + 1, r.nmax + sizehint), indices...)
+        setindex!(b.indices, AdaptiveRange(n + 1, r.ncurrent + 1, r.nmax + b.sizehint), indices...)
     else # We have space in an already allocated section
         b.data[r.start + r.ncurrent] = val
         setindex!(b.indices, AdaptiveRange(r.start, r.ncurrent + 1, r.nmax), indices...)
@@ -53,7 +53,7 @@ function Base.setindex!(b::ConstructionBuffer{<:Array}, val, indices...)
     return b
 end
 
-function Base.setindex!(b::ConstructionBuffer{<:AbstractDict}, val, key)
+function add!(b::ConstructionBuffer{<:AbstractDict}, val, key)
     n = length(b.data)
     added_range = AdaptiveRange(n + 1, 1, b.sizehint)
     r = get!(b.indices, key) do
@@ -69,7 +69,7 @@ function Base.setindex!(b::ConstructionBuffer{<:AbstractDict}, val, key)
 
     if r.ncurrent == r.nmax # Need to move to the end of the vector
         b.indices[key] = AdaptiveRange(n + 1, r.ncurrent + 1, r.nmax + b.sizehint)
-        resize!(b.data, n + r.nmax + sizehint)
+        resize!(b.data, n + r.nmax + b.sizehint)
         for i in 1:r.ncurrent
             b.data[n + i] = b.data[r.start + i - 1]
         end
@@ -85,7 +85,7 @@ function compress_data!(data, indices, sorted_iterator, buffer_indices)
     n = 0
     for (index, r) in sorted_iterator
         nstop = r.start + r.ncurrent - 1
-        for (iold, inew) in zip(nstop:-1:r.start, n .+ (r.ncurrent:-1:1))
+        for (iold, inew) in zip(r.start:nstop, (n + 1):(n + r.ncurrent))
             @assert inew ≤ iold # To not overwrite
             data[inew] = data[iold]
         end
@@ -94,8 +94,10 @@ function compress_data!(data, indices, sorted_iterator, buffer_indices)
     end
     resize!(data, n)
     sizehint!(data, n)      # Free memory
-    empty!(buffer_indices)
-    sizehint!(buffer_indices, 0) # Free memory
+    if buffer_indices isa Union{Vector, AbstractDict} # Higher-dim Array's don't support empty!/resize!
+        empty!(buffer_indices)
+        sizehint!(buffer_indices, 0) # Free memory
+    end
     return data, indices
 end
 
@@ -108,7 +110,7 @@ end
 
 function CollectionOfVectors(b::ConstructionBuffer{<:Array})
     I = sortperm(reshape(b.indices, :); by = x -> x.start)
-    sorted_iterator = enumerate(b.indices[idx] for idx in I if b.indices[idx].start != 0)
+    sorted_iterator = ((idx, b.indices[idx]) for idx in I if b.indices[idx].start != 0)
     indices = fill(1:0, size(b.indices))
     compress_data!(b.data, indices, sorted_iterator, b.indices)
     return CollectionOfVectors(indices, b.data)
