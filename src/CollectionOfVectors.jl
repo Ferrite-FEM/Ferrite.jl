@@ -21,9 +21,12 @@ struct ConstructionBuffer{IT, DT}
     sizehint::Int
 end
 
+# Note: Workaround since ndims(Vector) or (Array{T, N} where T) doesn't work on julia 1.6
+_ndims(::Type{<:Array{T, N} where T}) where N = N
+
 function ConstructionBuffer(IT::Type{<:Array}, data::Vector; dims = nothing, sizehint)
     dims === nothing && error("dims must be given when indexed by an $IT")
-    ndims(IT) == length(dims) || error("The number of dims must match IT's number of dimensions")
+    _ndims(IT) == length(dims) || error("The number of dims must match IT's number of dimensions")
 
     indices = fill(AdaptiveRange(0, 0, 0), dims)
     return ConstructionBuffer(indices, data, sizehint)
