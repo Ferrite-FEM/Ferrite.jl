@@ -119,7 +119,6 @@ function CollectionOfVectors(b::ConstructionBuffer{<:Array})
     return CollectionOfVectors(indices, b.data)
 end
 
-
 # Efficient creation of a new OrderedDict with new types of values
 function _withnewvalues(d::OrderedDict{K}, vals::Vector{V}) where {K, V}
     if d.ndel > 0
