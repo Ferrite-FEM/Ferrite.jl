@@ -1,6 +1,6 @@
 # Symmetric quadrature rules takes from
-#   Witherden, Freddie D., and Peter E. Vincent. "On the identification of 
-#   symmetric quadrature rules for finite element methods." Computers & 
+#   Witherden, Freddie D., and Peter E. Vincent. "On the identification of
+#   symmetric quadrature rules for finite element methods." Computers &
 #   Mathematics with Applications 69.10 (2015): 1232-1241.
 # Note that the original rule is defined on [-1,1]^3 while our reference prism is defined on [0,1]^3, hence we transform in the end.
 function _get_gauss_prismdata_polyquad(n::Int)

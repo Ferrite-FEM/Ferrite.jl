@@ -269,9 +269,9 @@ function assemble_element!(ke, ge, cell, cv, fv, mp, ue, ΓN)
     end
 
     ## Surface integral for the traction
-    for face in 1:nfaces(cell)
-        if (cellid(cell), face) in ΓN
-            reinit!(fv, cell, face)
+    for facet in 1:nfacets(cell)
+        if (cellid(cell), facet) in ΓN
+            reinit!(fv, cell, facet)
             for q_point in 1:getnquadpoints(fv)
                 t = tn * getnormal(fv, q_point)
                 dΓ = getdetJdV(fv, q_point)
@@ -328,9 +328,9 @@ function solve()
     ## Finite element base
     ip = Lagrange{RefTetrahedron, 1}()^3
     qr = QuadratureRule{RefTetrahedron}(1)
-    qr_face = FaceQuadratureRule{RefTetrahedron}(1)
+    qr_facet = FacetQuadratureRule{RefTetrahedron}(1)
     cv = CellValues(qr, ip)
-    fv = FaceValues(qr_face, ip)
+    fv = FacetValues(qr_facet, ip)
 
     ## DofHandler
     dh = DofHandler(grid)
@@ -349,9 +349,9 @@ function solve()
 
     dbcs = ConstraintHandler(dh)
     ## Add a homogeneous boundary condition on the "clamped" edge
-    dbc = Dirichlet(:u, getfaceset(grid, "right"), (x,t) -> [0.0, 0.0, 0.0], [1, 2, 3])
+    dbc = Dirichlet(:u, getfacetset(grid, "right"), (x,t) -> [0.0, 0.0, 0.0], [1, 2, 3])
     add!(dbcs, dbc)
-    dbc = Dirichlet(:u, getfaceset(grid, "left"), (x,t) -> rotation(x, t), [1, 2, 3])
+    dbc = Dirichlet(:u, getfacetset(grid, "left"), (x,t) -> rotation(x, t), [1, 2, 3])
     add!(dbcs, dbc)
     close!(dbcs)
     t = 0.5
@@ -359,10 +359,10 @@ function solve()
 
     ## Neumann part of the boundary
     ΓN = union(
-        getfaceset(grid, "top"),
-        getfaceset(grid, "bottom"),
-        getfaceset(grid, "front"),
-        getfaceset(grid, "back"),
+        getfacetset(grid, "top"),
+        getfacetset(grid, "bottom"),
+        getfacetset(grid, "front"),
+        getfacetset(grid, "back"),
     )
 
     ## Pre-allocation of vectors for the solution and Newton increments
@@ -408,8 +408,8 @@ function solve()
 
     ## Save the solution
     @timeit "export" begin
-        vtk_grid("hyperelasticity", dh) do vtkfile
-            vtk_point_data(vtkfile, dh, u)
+        VTKFile("hyperelasticity", dh) do vtk
+            write_solution(vtk, dh, u)
         end
     end
 

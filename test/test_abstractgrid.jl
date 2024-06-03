@@ -18,7 +18,6 @@
     Ferrite.get_coordinate_eltype(::SmallGrid) = Float64
     Ferrite.get_coordinate_type(::SmallGrid{dim}) where dim = Vec{dim,Float64}
     Ferrite.nnodes_per_cell(grid::SmallGrid, i::Int=1) = Ferrite.nnodes(grid.cells_test[i])
-    Ferrite.n_faces_per_cell(grid::SmallGrid) = nfaces(eltype(grid.cells_test))
 
     nodes = [(-1.0,-1.0); (0.0,-1.0); (1.0,-1.0); (-1.0,0.0); (0.0,0.0); (1.0,0.0); (-1.0,1.0); (0.0,1.0); (1.0,1.0)]
     cells = (Quadrilateral((1,2,5,4)), Quadrilateral((2,3,6,5)), Quadrilateral((4,5,8,7)), Quadrilateral((5,6,9,8)))
@@ -28,11 +27,11 @@
     ip = Lagrange{RefQuadrilateral, 1}()
     qr = QuadratureRule{RefQuadrilateral}(2)
     cellvalues = CellValues(qr, ip);
-    
+
     dhs = [DofHandler(grid) for grid in (subtype_grid, reference_grid)]
     u1 = Vector{Float64}(undef, 9)
     u2 = Vector{Float64}(undef, 9)
-    ∂Ω = union(getfaceset.((reference_grid, ), ["left", "right", "top", "bottom"])...)
+    ∂Ω = union(getfacetset.((reference_grid, ), ["left", "right", "top", "bottom"])...)
     dbc = Dirichlet(:u, ∂Ω, (x, t) -> 0)
 
     function doassemble!(cellvalues::CellValues, K::SparseMatrixCSC, dh::DofHandler)
