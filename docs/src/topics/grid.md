@@ -18,7 +18,7 @@ Either, a mesh is created on the fly with the gmsh API or a mesh in `.msh` or `.
 ```@docs
 FerriteGmsh.togrid
 ```
-`FerriteGmsh.jl` supports currently the translation of `cellsets` and `facesets`.
+`FerriteGmsh.jl` supports currently the translation of `cellsets` and `facetsets`.
 Such sets are defined in Gmsh as `PhysicalGroups` of dimension `dim` and `dim-1`, respectively.
 In case only a part of the mesh is the domain, the domain can be specified by providing the keyword argument `domain` the name of the `PhysicalGroups` in the [`FerriteGmsh.togrid`](@ref) function.
 
@@ -71,28 +71,28 @@ julia> cells = [
 ```
 
 where each Quadrilateral, which is a subtype of `AbstractCell` saves in the field `nodes` the tuple of node IDs.
-Additionally, the data structure `Grid` can hold node-, face- and cellsets.
+Additionally, the data structure `Grid` can hold node-, facet- and cellsets.
 All of these three sets are defined by a dictionary that maps a string key to a `Set`.
 For the special case of node- and cellsets the dictionary's value is of type `Set{Int}`, i.e. a keyword is mapped to a node or cell ID, respectively.
 
-Facesets are a more elaborate construction. They map a `String` key to a `Set{FaceIndex}`, where each `FaceIndex` consists of `(global_cell_id, local_face_id)`.
-In order to understand the `local_face_id` properly, one has to consider the reference space of the element, which typically is spanned by a product of the interval ``[-1, 1]`` and in this particular example ``[-1, 1] \times [-1, 1]``.
-In this space a local numbering of nodes and faces exists, i.e.
+Facesets are a more elaborate construction. They map a `String` key to a `Set{FaceIndex}`, where each `FaceIndex` consists of `(global_cell_id, local_facet_id)`.
+In order to understand the `local_facet_id` properly, one has to consider the reference space of the element, which typically is spanned by a product of the interval ``[-1, 1]`` and in this particular example ``[-1, 1] \times [-1, 1]``.
+In this space a local numbering of nodes and facets exists, i.e.
 
 
 ![local element](./assets/local_element.svg)
 
 
-The example shows a local face ID ordering, defined as:
+The example shows a local edge ordering, defined as:
 
 ```julia
-Ferrite.faces(::Lagrange{RefQuadrilateral, 1}) = ((1,2), (2,3), (3,4), (4,1))
+Ferrite.reference_facets(RefQuadrilateral) = ((1,2), (2,3), (3,4), (4,1))
 ```
 
-Other face ID definitions [can be found in the src files](https://github.com/Ferrite-FEM/Ferrite.jl/blob/8224282ab4d67cb523ef342e4a6ceb1716764ada/src/interpolations.jl#L154) in the corresponding `faces` dispatch.
+Other facet definitions can be found in the src file `src/Grid/grid.jl` in the corresponding dispatches for [`reference_facets`](@ref Ferrite.reference_facets). Furthermorem you can query specific information about subentities via [`reference_vertices`](@ref Ferrite.reference_vertices), [`reference_edges`](@ref Ferrite.reference_edges) and [`reference_faces`](@ref Ferrite.reference_faces).
 
 
-The highlighted face, i.e. the two lines from node ID 3 to 6 and from 6 to 9, on the right hand side of our test mesh can now be described as
+The highlighted edge, i.e. the two lines from node ID 3 to 6 and from 6 to 9, on the right hand side of our test mesh can now be described as
 
 ```julia
 julia> faces = [
