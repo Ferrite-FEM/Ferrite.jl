@@ -55,6 +55,16 @@ nedges(   ::Type{T}) where {T <: AbstractRefShape} = length(reference_edges(T))
 nfaces(   ::Type{T}) where {T <: AbstractRefShape} = length(reference_faces(T))
 nfacets(  ::Type{T}) where {T <: AbstractRefShape} = length(reference_facets(T))
 
+
+"""
+    reference_vertices(::AbstractRefShape)
+    reference_vertices(::AbstractCell)
+
+Returns a tuple of integers containing the ordered local vertex indices corresponding to
+the corners or endpoints of an element.
+"""
+reference_vertices(::AbstractRefShape)
+
 """
     Ferrite.vertices(::AbstractCell)
 
@@ -63,6 +73,20 @@ This function induces the [`VertexIndex`](@ref), where the second index
 corresponds to the local index into this tuple.
 """
 vertices(::AbstractCell)
+
+"""
+    reference_edges(::AbstractRefShape)
+    reference_edges(::AbstractCell)
+
+Returns a tuple of 2-tuples containing the ordered local node indices corresponding to
+the vertices that define an *oriented edge*.
+
+An *oriented edge* is an edge with the first node having the lowest local index and the other
+node the secon dindex.
+
+Note that the vertices are sufficient to define a face uniquely.
+"""
+reference_edges(::AbstractRefShape)
 
 """
     Ferrite.edges(::AbstractCell)
@@ -77,6 +101,7 @@ edges(::AbstractCell)
 
 """
     reference_faces(::AbstractRefShape)
+    reference_faces(::AbstractCell)
 
 Returns a tuple of n-tuples containing the ordered local node indices corresponding to
 the vertices that define an *oriented face*.
@@ -119,6 +144,7 @@ facets(::AbstractCell)
 
 """
     Ferrite.reference_facets(::Type{<:AbstractRefShape})
+    Ferrite.reference_facets(::AbstractCell)
 
 Returns a tuple of n-tuples containing the ordered local node indices corresponding to
 the vertices that define an oriented facet.
@@ -130,6 +156,11 @@ reference_facets(::Type{<:AbstractRefShape})
 @inline reference_facets(refshape::Type{<:AbstractRefShape{1}}) = map(i -> (i,), reference_vertices(refshape))
 @inline reference_facets(refshape::Type{<:AbstractRefShape{2}}) = reference_edges(refshape)
 @inline reference_facets(refshape::Type{<:AbstractRefShape{3}}) = reference_faces(refshape)
+
+@inline reference_faces(::AbstractCell{refshape}) where refshape <:AbstractRefShape = reference_faces(refshape)
+@inline reference_edges(::AbstractCell{refshape}) where refshape <:AbstractRefShape = reference_edges(refshape)
+@inline reference_vertices(::AbstractCell{refshape}) where refshape <:AbstractRefShape = reference_vertices(refshape)
+@inline reference_facets(::AbstractCell{refshape}) where refshape <:AbstractRefShape = reference_facets(refshape)
 
 """
     geometric_interpolation(::AbstractCell)::Interpolation

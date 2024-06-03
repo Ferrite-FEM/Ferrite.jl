@@ -2,17 +2,20 @@
 
 ## Type definitions
 
-Elements or cells are subtypes of `AbstractCell{dim,N,M}`. They are parametrized by
-the dimension of their nodes via `dim`, the number of nodes `N` and the number
-of faces `M`.
+Elements or cells are subtypes of `AbstractCell{<:AbstractRefShape}`. As shown, they are parametrized
+by the associated reference element.
 
 ### Required methods to implement for all subtypes of `AbstractCell` to define a new element
 
 ```@docs
+Ferrite.reference_vertices(::Ferrite.AbstractRefShape)
 Ferrite.vertices(::Ferrite.AbstractCell)
+Ferrite.reference_edges(::Ferrite.AbstractRefShape)
 Ferrite.edges(::Ferrite.AbstractCell)
 Ferrite.reference_faces(::Ferrite.AbstractRefShape)
 Ferrite.faces(::Ferrite.AbstractCell)
+Ferrite.reference_facets(::Ferrite.AbstractRefShape)
+Ferrite.facets(::Ferrite.AbstractCell)
 Ferrite.geometric_interpolation(::Ferrite.AbstractCell)
 ```
 
