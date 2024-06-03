@@ -63,7 +63,7 @@ nfacets(  ::Type{T}) where {T <: AbstractRefShape} = length(reference_facets(T))
 Returns a tuple of integers containing the ordered local vertex indices corresponding to
 the corners or endpoints of an element.
 """
-reference_vertices(::AbstractRefShape)
+reference_vertices(::Union{AbstractRefShape, AbstractCell})
 
 """
     Ferrite.vertices(::AbstractCell)
@@ -86,7 +86,7 @@ node the secon dindex.
 
 Note that the vertices are sufficient to define a face uniquely.
 """
-reference_edges(::AbstractRefShape)
+reference_edges(::Union{AbstractRefShape, AbstractCell})
 
 """
     Ferrite.edges(::AbstractCell)
@@ -111,7 +111,7 @@ nodes spanning such that the normal to the face is pointing outwards.
 
 Note that the vertices are sufficient to define a face uniquely.
 """
-reference_faces(::AbstractRefShape)
+reference_faces(::Union{AbstractRefShape, AbstractCell})
 
 """
     Ferrite.faces(::AbstractCell)
@@ -157,18 +157,19 @@ reference_facets(::Type{<:AbstractRefShape})
 @inline reference_facets(refshape::Type{<:AbstractRefShape{2}}) = reference_edges(refshape)
 @inline reference_facets(refshape::Type{<:AbstractRefShape{3}}) = reference_faces(refshape)
 
-@inline reference_faces(::AbstractCell{refshape}) where refshape <:AbstractRefShape = reference_faces(refshape)
-@inline reference_edges(::AbstractCell{refshape}) where refshape <:AbstractRefShape = reference_edges(refshape)
-@inline reference_vertices(::AbstractCell{refshape}) where refshape <:AbstractRefShape = reference_vertices(refshape)
-@inline reference_facets(::AbstractCell{refshape}) where refshape <:AbstractRefShape = reference_facets(refshape)
+@inline reference_faces(::AbstractCell{refshape})    where refshape = reference_faces(refshape)
+@inline reference_edges(::AbstractCell{refshape})    where refshape = reference_edges(refshape)
+@inline reference_vertices(::AbstractCell{refshape}) where refshape = reference_vertices(refshape)
+@inline reference_facets(::AbstractCell{refshape})   where refshape = reference_facets(refshape)
 
 """
     geometric_interpolation(::AbstractCell)::Interpolation
+    geometric_interpolation(::Type{AbstractCell})::Interpolation
 
 Each `AbstractCell` type has a unique geometric interpolation describing its geometry.
 This function returns that interpolation.
 """
-geometric_interpolation(::AbstractCell)
+geometric_interpolation(::T) where T <: AbstractCell = geometric_interpolation(T)
 
 """
     Ferrite.get_node_ids(c::AbstractCell)
