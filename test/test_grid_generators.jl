@@ -8,6 +8,7 @@ function test_generate_grid(T::Type)
     function check_grid_types(grid::Grid{dim, C, T}) where {dim, C <: Ferrite.AbstractCell, T}
         # Check nodes
         for node in grid.nodes
+            @test typeof(node) == Node{dim, T}
             @test typeof(get_node_coordinate(node)) == Vec{dim, T}
         end
         
