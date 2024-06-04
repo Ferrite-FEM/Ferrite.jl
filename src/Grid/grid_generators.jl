@@ -67,14 +67,14 @@ function generate_grid(::Type{QuadraticLine}, nel::NTuple{1,Int}, left::Vec{1,T}
     return Grid(cells, nodes, facetsets=facetsets)
 end
 
-function _generate_2d_nodes!(nodes, nx, ny, LL, LR, UR, UL)
+function _generate_2d_nodes!(nodes::Vector{Node{2, T}}, nx, ny, LL, LR, UR, UL) where T
       for i in 0:ny-1
 
         # This float division will be by default Float64, 
         # so we need to convert it to the same type as element type of LL
         # e.g. LL = Vec{2,Float16} -> eltype(LL) = Float16
         # ratio_bounds =  (i / (ny-1)) # old code
-        ratio_bounds = convert(eltype(LL), (i / (ny-1)))
+        ratio_bounds = convert(T, i) / (ny-1)
 
         x0 = LL[1] * (1 - ratio_bounds) + ratio_bounds * UL[1]
         x1 = LR[1] * (1 - ratio_bounds) + ratio_bounds * UR[1]
@@ -87,7 +87,7 @@ function _generate_2d_nodes!(nodes, nx, ny, LL, LR, UR, UL)
             # so we need to convert it to the same type as element type of LL
             # e.g. LL = Vec{2,Float16} -> eltype(LL) = Float16
             # ratio = j / (nx-1) # old code
-            ratio = convert(eltype(LL), j / (nx-1))
+            ratio = convert(T, j) / (nx-1)
             x = x0 * (1 - ratio) + ratio * x1
             y = y0 * (1 - ratio) + ratio * y1
             push!(nodes, Node((x, y)))
@@ -296,9 +296,9 @@ function generate_grid(::Type{Pyramid}, nel::NTuple{3,Int}, left::Vec{3,T}=Vec{3
         # midx = 0.5(coords_x[i+1] + coords_x[i]) # old code, this will be always Float64 regardless of the element type of left
         # midy = 0.5(coords_y[j+1] + coords_y[j]) # old code, this will be always Float64 regardless of the element type of left
         # midz = 0.5(coords_z[k+1] + coords_z[k]) # old code, this will be always Float64 regardless of the element type of left
-        midx = convert(eltype(left),0.5(coords_x[i+1] + coords_x[i]))
-        midy = convert(eltype(left),0.5(coords_y[j+1] + coords_y[j]))
-        midz = convert(eltype(left),0.5(coords_z[k+1] + coords_z[k]))
+        midx = convert(T, coords_x[i+1] + coords_x[i]) / 2
+        midy = convert(T, coords_y[j+1] + coords_y[j]) / 2
+        midz = convert(T, coords_z[k+1] + coords_z[k]) / 2
         push!(nodes, Node((midx, midy, midz)))
     end
 
