@@ -218,7 +218,7 @@ end
 
 
 function assemble_global_gpu(cellvalues,dh)
-    #Kgpu =   CUDA.zeros(dh.ndofs.x,dh.ndofs.x)
+    Kgpu =   CUDA.zeros(dh.ndofs.x,dh.ndofs.x)
     n_base_funcs = getnbasefunctions(cellvalues) 
 
     #K = create_sparsity_pattern(dh)
@@ -243,9 +243,6 @@ using BenchmarkTools
 
 
 Kgpu = @btime CUDA.@sync   assemble_global_gpu($cellvalues,$dh)
-
-
-
 #Kgpu =    assemble_global_gpu(cellvalues,dh)
  
 # sqrt(sum(abs2, Kgpu.nzval))
