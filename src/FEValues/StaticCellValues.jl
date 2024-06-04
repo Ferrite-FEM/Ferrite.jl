@@ -110,9 +110,14 @@ end
     return _quadrature_point_values(fe_v, q_point, cell_coords,detJ->throw_detJ_not_pos(detJ))
 end
 
-@inline function quadrature_point_values(fe_v::StaticCellValues{<:Any, <:Any}, q_point::Int, cell_coords::SVector)
-    return _quadrature_point_values(fe_v, q_point, cell_coords,detJ->-1)
-end
+# @inline function quadrature_point_values(fe_v::StaticCellValues{<:Any, <:Any}, q_point::Int32, cell_coords::SVector)
+#     dNdx = CuStaticSharedArray(Vec{2,Float64},4) # TODO: Use the correct type
+
+
+#     return _quadrature_point_values(fe_v, q_point, cell_coords,detJ->-1)
+# end
+
+
 
 
 
@@ -121,8 +126,8 @@ function _quadrature_point_values(fe_v::StaticCellValues, q_point::Int, cell_coo
     @inbounds begin
          mapping = calculate_mapping(fe_v.gm, q_point, cell_coords)
 
-         detJ = calculate_detJ(getjacobian(mapping))
-         detJ > 0.0 || neg_detJ_err_fun(detJ) # Cannot throw error on GPU, TODO: return error code instead
+         detJ = Float32(calculate_detJ(getjacobian(mapping)))
+         detJ > 0.0f0 || neg_detJ_err_fun(detJ) # Cannot throw error on GPU, TODO: return error code instead
          detJdV = detJ * fe_v.weights[q_point]
 
          Nx, dNdx = calculate_mapped_values(fe_v.fv, q_point, mapping)
@@ -130,5 +135,39 @@ function _quadrature_point_values(fe_v::StaticCellValues, q_point::Int, cell_coo
     end
      return StaticQuadratureValues(detJdV, Nx, dNdx, M)
 end
+
+
+## New Implementation for StaticQuadratureValues to suit the GPU code
+struct StaticQuadratureView{JT,HT,  N_Nodes,NODEVEC} <: AbstractQuadratureValues
+    mapping::MappingValues{JT, HT}
+    cell_coords::SVector{N_Nodes, NODEVEC}
+    q_point::Int32
+    cv::StaticCellValues
+end
+
+
+@inline function quadrature_point_values(fe_v::StaticCellValues{<:Any, <:Any}, q_point::Int32, cell_coords::SVector)
+    @inbounds begin
+        mapping = calculate_mapping(fe_v.gm, q_point, cell_coords)
+   end
+    return StaticQuadratureView(mapping, cell_coords, q_point, fe_v)
+end
+
+
+@inline function getdetJdV(qv::StaticQuadratureView)
+    detJ = Float32(calculate_detJ(getjacobian(qv.mapping)))
+    detJ > 0.0f0 || -1.f0 # Cannot throw error on GPU, TODO: return error code instead
+    detJdV = detJ * qv.cv.weights[qv.q_point]
+    return detJdV
+end
+
+@inline function shape_gradient(qv::StaticQuadratureView, i::Int32) 
+    @inbounds begin
+        Jinv = calculate_Jinv(getjacobian(qv.mapping))
+        #Nx = qv.cv.fv.Nξ[i, q_point]
+        dNdx =  dothelper(qv.cv.fv.dNdξ[i, qv.q_point], Jinv)
+        return  dNdx
+    end
+end 
 
 

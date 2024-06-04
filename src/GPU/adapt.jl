@@ -21,6 +21,13 @@ function Adapt.adapt_structure(to, qv::Ferrite.StaticQuadratureValues)
     M = Adapt.adapt_structure(to, qv.M)
     Ferrite.StaticQuadratureValues(det,N,dNdx,M)
 end
+function Adapt.adapt_structure(to, qv::StaticQuadratureView)
+    mapping = Adapt.adapt_structure(to, qv.mapping)
+    cell_coords = Adapt.adapt_structure(to, qv.cell_coords)
+    q_point = Adapt.adapt_structure(to, qv.q_point)
+    cv = Adapt.adapt_structure(to, qv.cv)
+    StaticQuadratureView(mapping,cell_coords,q_point,cv)
+end
 
 function Adapt.adapt_structure(to, grid::Grid)
     cells = Adapt.adapt_structure(to, cu(grid.cells))

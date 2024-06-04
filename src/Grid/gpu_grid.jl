@@ -42,6 +42,8 @@ get_coordinate_type(::GPUGrid{dim,CELLVEC,NODEVEC}) where
     q_point = threadIdx().z
 
     # no. of nodes <= no. of shape functions (and we need only one threads direction)
+    arr[tx] = get_node_coordinate(grid, Ferrite.get_node_ids(cell)[tx]) 
+
     if ty == 1 && q_point == 1  && tx <=N 
         arr[tx] = get_node_coordinate(grid, Ferrite.get_node_ids(cell)[tx]) 
     end
