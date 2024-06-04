@@ -34,7 +34,6 @@ end
 include("test_utils.jl")
 
 # Unit tests
-include("CollectionOfVectors.jl") # TODO: temp: Move to topology testing and extend testing
 include("test_interpolations.jl")
 include("test_cellvalues.jl")
 include("test_facevalues.jl")

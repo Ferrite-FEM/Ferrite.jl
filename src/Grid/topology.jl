@@ -1,4 +1,4 @@
-include("../CollectionOfVectors.jl")
+include("../ArrayOfVectorViews.jl")
 ############
 # Topology #
 ############
@@ -14,14 +14,38 @@ the given entity is included in the returned list as well.
 """
 getneighborhood
 
+#TODO: Remove
+struct EntityNeighborhood{T<:Union{BoundaryIndex,CellIndex}}
+    neighbor_info::Vector{T}
+end
+
+EntityNeighborhood(info::T) where T <: BoundaryIndex = EntityNeighborhood([info])
+Base.length(n::EntityNeighborhood) = length(n.neighbor_info)
+Base.getindex(n::EntityNeighborhood,i) = getindex(n.neighbor_info,i)
+Base.firstindex(n::EntityNeighborhood) = 1
+Base.lastindex(n::EntityNeighborhood) = length(n.neighbor_info)
+Base.:(==)(n1::EntityNeighborhood, n2::EntityNeighborhood) = n1.neighbor_info == n2.neighbor_info
+Base.iterate(n::EntityNeighborhood, state=1) = iterate(n.neighbor_info,state)
+
+function Base.show(io::IO, ::MIME"text/plain", n::EntityNeighborhood)
+    if length(n) == 0
+        println(io, "No EntityNeighborhood")
+    elseif length(n) == 1
+        println(io, "$(n.neighbor_info[1])")
+    else
+        println(io, "$(n.neighbor_info...)")
+    end
+end
+# End TODO remove
+
 abstract type AbstractTopology end
 
 # Guess of how many neighbors depending on grid dimension and index type.
 # This is just a performance optimization, and a good default is sufficient.
-_getsizehint(::AbstractGrid{3}, ::Type{FaceIndex}) = 2
+_getsizehint(::AbstractGrid{3}, ::Type{FaceIndex}) = 1 # 2
 _getsizehint(::AbstractGrid, ::Type{FaceIndex}) = 0 # No faces exists in 2d or lower dim
-_getsizehint(::AbstractGrid{dim}, ::Type{EdgeIndex}) where dim = dim^2
-_getsizehint(::AbstractGrid{dim}, ::Type{VertexIndex}) where dim = 2^dim
+_getsizehint(::AbstractGrid{dim}, ::Type{EdgeIndex}) where dim = 1 #dim^2
+_getsizehint(::AbstractGrid{dim}, ::Type{VertexIndex}) where dim = 1 # 2^dim
 _getsizehint(::AbstractGrid{1}, ::Type{CellIndex}) = 2
 _getsizehint(::AbstractGrid{2}, ::Type{CellIndex}) = 12
 function _getsizehint(g::AbstractGrid{3}, ::Type{CellIndex})
@@ -105,7 +129,7 @@ function _add_single_vertex_neighbor!(vertex_table::ConstructionBuffer, cell::Ab
 end
 
 function build_vertex_to_cell(cells; max_vertices, nnodes)
-    vertex_to_cell = CollectionOfVectors(Vector, Int; sizehint=max_vertices, dims=(nnodes,)) do cov
+    vertex_to_cell = ArrayOfVectorViews(Int[], (nnodes,); sizehint = max_vertices) do cov
             for (cellid, cell) in enumerate(cells)
                 for vertex in vertices(cell)
                     add!(cov, cellid, vertex)
@@ -117,8 +141,8 @@ end
 
 function build_cell_neighbor(grid, cells, vertex_to_cell; ncells)
     # Note: The following could be optimized, since we loop over the cells in order,
-    # there is no need to use the special adaptive indexing and then compress_data! in CollectionOfVectors.
-    return CollectionOfVectors(Vector, CellIndex; sizehint=_getsizehint(grid, CellIndex), dims=(ncells,)) do cov
+    # there is no need to use the special adaptive indexing and then compress_data! in ArrayOfVectorViews.
+    return ArrayOfVectorViews(CellIndex[], (ncells,); sizehint = _getsizehint(grid, CellIndex)) do cov
             cell_neighbor_ids = Set{Int}()
             for (cell_id, cell) in enumerate(cells)
                 empty!(cell_neighbor_ids)
@@ -155,22 +179,22 @@ The struct saves the highest dimensional neighborhood, i.e. if something is conn
 
 !!! note Currently mixed-dimensional queries do not work at the moment. They will be added back later.
 """
-struct ExclusiveTopology
+mutable struct ExclusiveTopology
     # maps a global vertex id to all cells containing the vertex
-    vertex_to_cell::CollectionOfVectors{Vector{UnitRange{Int}}, Int}
+    vertex_to_cell::ArrayOfVectorViews{Int, 1}
     # index of the vector = cell id ->  all other connected cells
-    cell_neighbor::CollectionOfVectors{Vector{UnitRange{Int}}, CellIndex}
+    cell_neighbor::ArrayOfVectorViews{CellIndex, 1}
     # face_face_neighbor[cellid,local_face_id] -> exclusive connected entities (not restricted to one entity)
-    face_face_neighbor::CollectionOfVectors{Matrix{UnitRange{Int}}, FaceIndex}
+    face_face_neighbor::ArrayOfVectorViews{FaceIndex, 2}
     # edge_edge_neighbor[cellid,local_edge_id] -> exclusive connected entities of the given edge
-    edge_edge_neighbor::CollectionOfVectors{Matrix{UnitRange{Int}}, EdgeIndex}
+    edge_edge_neighbor::ArrayOfVectorViews{EdgeIndex, 2}
     # vertex_vertex_neighbor[cellid,local_vertex_id] -> exclusive connected entities to the given vertex
-    vertex_vertex_neighbor::CollectionOfVectors{Matrix{UnitRange{Int}}, VertexIndex}
+    vertex_vertex_neighbor::ArrayOfVectorViews{VertexIndex, 2}
 
     # list of unique faces in the grid given as FaceIndex
     face_skeleton::Union{Vector{FaceIndex}, Nothing}
     # list of unique edges in the grid given as EdgeIndex
-    edge_skeleton::Union{Vector{FaceIndex}, Nothing}
+    edge_skeleton::Union{Vector{EdgeIndex}, Nothing}
     # list of unique vertices in the grid given as VertexIndex
     vertex_skeleton::Union{Vector{VertexIndex}, Nothing}
 end
@@ -188,11 +212,11 @@ function ExclusiveTopology(grid::AbstractGrid{sdim}) where sdim
     # Here we don't use the convenience constructor taking a function, since we want to do it simultaneously for 3 data-types
     # This also allows giving a sizehint to the underlying vectors
     facedata = sizehint!(FaceIndex[], ncells * max_faces * _getsizehint(grid, FaceIndex))
-    face_face_neighbor_buf = ConstructionBuffer(Matrix, facedata; dims=(ncells, max_faces), sizehint=_getsizehint(grid, FaceIndex))
+    face_face_neighbor_buf = ConstructionBuffer(facedata, (ncells, max_faces), _getsizehint(grid, FaceIndex))
     edgedata = sizehint!(EdgeIndex[], ncells * max_edges * _getsizehint(grid, EdgeIndex))
-    edge_edge_neighbor_buf = ConstructionBuffer(Matrix, edgedata; dims=(ncells, max_edges), sizehint=_getsizehint(grid, EdgeIndex))
+    edge_edge_neighbor_buf = ConstructionBuffer(edgedata, (ncells, max_edges), _getsizehint(grid, EdgeIndex))
     vertdata = sizehint!(VertexIndex[], ncells * max_vertices * _getsizehint(grid, VertexIndex))
-    vertex_vertex_neighbor_buf = ConstructionBuffer(Matrix, vertdata; dims=(ncells, max_vertices), sizehint=_getsizehint(grid, VertexIndex))
+    vertex_vertex_neighbor_buf = ConstructionBuffer(vertdata, (ncells, max_vertices), _getsizehint(grid, VertexIndex))
 
     for (cell_id, cell) in enumerate(cells)
         for neighbor_cell_idx in cell_neighbor[cell_id]
@@ -213,27 +237,59 @@ function ExclusiveTopology(grid::AbstractGrid{sdim}) where sdim
             end
         end
     end
-    face_face_neighbor     = CollectionOfVectors(face_face_neighbor_buf)
-    edge_edge_neighbor     = CollectionOfVectors(edge_edge_neighbor_buf)
-    vertex_vertex_neighbor = CollectionOfVectors(vertex_vertex_neighbor_buf)
+    face_face_neighbor     = ArrayOfVectorViews(face_face_neighbor_buf)
+    edge_edge_neighbor     = ArrayOfVectorViews(edge_edge_neighbor_buf)
+    vertex_vertex_neighbor = ArrayOfVectorViews(vertex_vertex_neighbor_buf)
     return ExclusiveTopology(vertex_to_cell, cell_neighbor, face_face_neighbor, edge_edge_neighbor, vertex_vertex_neighbor, nothing, nothing, nothing)
+end
+
+function get_facet_facet_neighborhood(t::ExclusiveTopology, g::AbstractGrid)
+    return _get_facet_facet_neighborhood(t, Val(get_reference_dimension(g)))
+end
+_get_facet_facet_neighborhood(t::ExclusiveTopology, #=rdim=#::Val{1}) = t.vertex_vertex_neighbor
+_get_facet_facet_neighborhood(t::ExclusiveTopology, #=rdim=#::Val{2}) = t.edge_edge_neighbor
+_get_facet_facet_neighborhood(t::ExclusiveTopology, #=rdim=#::Val{3}) = t.face_face_neighbor
+function _get_facet_facet_neighborhood(::ExclusiveTopology, #=rdim=#::Val{:mixed})
+    throw(ArgumentError("get_facet_facet_neightborhood is only supported for grids containing cells with the same reference dimension.
+    Access the `vertex_vertex_neighbor`, `edge_edge_neighbor`, or `face_face_neighbor` fields explicitly instead."))
 end
 
 function getneighborhood(top::ExclusiveTopology, grid::AbstractGrid, cellidx::CellIndex, include_self=false)
     patch = getcells(top.cell_neighbor[cellidx.idx])
     if include_self
-        return [patch; cellidx.idx]
+        return view(push!(collect(patch), cellidx.idx), 1:(length(patch) + 1))
     else
         return patch
     end
 end
 
 function getneighborhood(top::ExclusiveTopology, grid::AbstractGrid, faceidx::FaceIndex, include_self=false)
+    neighbors = top.face_face_neighbor[faceidx[1], faceidx[2]]
     if include_self
-        return [top.face_face_neighbor[faceidx[1],faceidx[2]].neighbor_info; faceidx]
+        return view(push!(collect(neighbors), faceidx), 1:(length(neighbors) + 1))
     else
-        return top.face_face_neighbor[faceidx[1],faceidx[2]].neighbor_info
+        return neighbors
     end
+end
+
+function getneighborhood(top::ExclusiveTopology, grid::AbstractGrid, edgeidx::EdgeIndex, include_self=false)
+    cellid, local_edgeidx = edgeidx[1], edgeidx[2]
+    cell_edges = edges(getcells(grid, cellid))
+    nonlocal_edgeid = cell_edges[local_edgeidx]
+    cell_neighbors = getneighborhood(top, grid, CellIndex(cellid))
+    self_reference_local = EdgeIndex[]
+    for cellid in cell_neighbors
+        local_neighbor_edgeid = findfirst(x -> issubset(x, nonlocal_edgeid), edges(getcells(grid, cellid)))
+        local_neighbor_edgeid === nothing && continue
+        local_edge = EdgeIndex(cellid,local_neighbor_edgeid)
+        push!(self_reference_local, local_edge)
+    end
+    if include_self
+        neighbors = unique([top.edge_edge_neighbor[cellid, local_edgeidx]; self_reference_local; edgeidx])
+    else
+        neighbors = unique([top.edge_edge_neighbor[cellid, local_edgeidx]; self_reference_local])
+    end
+    return view(neighbors, 1:length(neighbors))
 end
 
 function getneighborhood(top::ExclusiveTopology, grid::AbstractGrid, vertexidx::VertexIndex, include_self=false)
@@ -248,26 +304,7 @@ function getneighborhood(top::ExclusiveTopology, grid::AbstractGrid, vertexidx::
         !include_self && local_vertex == vertexidx && continue
         push!(self_reference_local, local_vertex)
     end
-    return self_reference_local
-end
-
-function getneighborhood(top::ExclusiveTopology, grid::AbstractGrid, edgeidx::EdgeIndex, include_self=false)
-    cellid, local_edgeidx = edgeidx[1], edgeidx[2]
-    cell_edges = edges(getcells(grid,cellid))
-    nonlocal_edgeid = cell_edges[local_edgeidx]
-    cell_neighbors = getneighborhood(top,grid,CellIndex(cellid))
-    self_reference_local = EdgeIndex[]
-    for cellid in cell_neighbors
-        local_neighbor_edgeid = findfirst(x->issubset(x,nonlocal_edgeid),edges(getcells(grid,cellid)))
-        local_neighbor_edgeid === nothing && continue
-        local_edge = EdgeIndex(cellid,local_neighbor_edgeid)
-        push!(self_reference_local, local_edge)
-    end
-    if include_self
-        return unique([top.edge_edge_neighbor[cellid, local_edgeidx].neighbor_info; self_reference_local; edgeidx])
-    else
-        return unique([top.edge_edge_neighbor[cellid, local_edgeidx].neighbor_info; self_reference_local])
-    end
+    return view(self_reference_local, 1:length(self_reference_local))
 end
 
 function getneighborhood(top::ExclusiveTopology, grid::AbstractGrid, facetindex::FacetIndex, include_self=false)
@@ -325,11 +362,11 @@ the unique entities in the grid.
 *Example:* With `BI=EdgeIndex`, and an edge between cells and 1 and 2, with vertices 2 and 5, could be described by either
 `EdgeIndex(1, 2)` or `EdgeIndex(2, 4)`, but only one of these will be in the vector returned by this function.
 """
-function _create_skeleton(neighborhood::Matrix{EntityNeighborhood{BI}}) where BI <: Union{FaceIndex, EdgeIndex, VertexIndex}
+function _create_skeleton(neighborhood::ArrayOfVectorViews{BI, 2}) where BI <: Union{FaceIndex, EdgeIndex, VertexIndex}
     i = 1
-    skeleton = Vector{BI}(undef, length(neighborhood) - count(neighbors -> !isempty(neighbors) , neighborhood) ÷ 2)
+    skeleton = Vector{BI}(undef, length(neighborhood) - count(neighbors -> !isempty(neighbors) , values(neighborhood)) ÷ 2)
     for (idx, entity) in pairs(neighborhood)
-        isempty(entity.neighbor_info) || entity.neighbor_info[][1] > idx[1] || continue
+        isempty(entity) || entity[][1] > idx[1] || continue
         skeleton[i] = BI(idx[1], idx[2])
         i += 1
     end
