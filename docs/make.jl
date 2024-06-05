@@ -56,6 +56,7 @@ bibtex_plugin = CitationBibliography(
             "tutorials/stokes-flow.md",
             "tutorials/porous_media.md",
             "tutorials/ns_vs_diffeq.md",
+            "tutorials/reactive_surface.md",
             "tutorials/linear_shell.md",
             "tutorials/dg_heat_equation.md",
         ],
@@ -70,7 +71,7 @@ bibtex_plugin = CitationBibliography(
             "topics/grid.md",
             "topics/export.md"
         ],
-        "Reference" => [
+        "API reference" => [
             "Reference overview" => "reference/index.md",
             "reference/quadrature.md",
             "reference/interpolations.md",
@@ -96,7 +97,7 @@ bibtex_plugin = CitationBibliography(
         #     "gallery/topology_optimization.md",
         # ],
         "devdocs/index.md",
-        "references.md",
+        "cited-literature.md",
         ],
     plugins = [
         bibtex_plugin,

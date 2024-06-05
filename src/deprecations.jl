@@ -82,7 +82,7 @@ function add!(dh::DofHandler, name::Symbol, dim::Int)
         "fields. See CHANGELOG for more details.",
         :add!,
     )
-    ip = default_interpolation(celltype)
+    ip = geometric_interpolation(celltype)
     add!(dh, name, dim == 1 ? ip : VectorizedInterpolation{dim}(ip))
 end
 
@@ -372,3 +372,8 @@ end
 
 getdim(args...) = error("`Ferrite.getdim` is deprecated, use `getrefdim` or `getspatialdim` instead")
 getfielddim(args...) = error("`Ferrite.getfielddim(::AbstractDofHandler, args...) is deprecated, use `n_components` instead")
+
+function default_interpolation(cell::AbstractCell)
+    @warn "Ferrite.default_interpolation is deprecated, use the exported `geometric_interpolation` instead" maxlog=1
+    return geometric_interpolation(cell)
+end

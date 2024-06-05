@@ -294,3 +294,19 @@ module DummyRefShapes
         )
     end
 end
+
+############################################################
+# Inverse parametric mapping ξ = ϕ(x) for testing hessians #
+############################################################
+function function_value_from_physical_coord(interpolation::Interpolation, cell_coordinates, X::Vec{dim,T}, ue) where {dim,T}
+    n_basefuncs = getnbasefunctions(interpolation)
+    scalar_ip = interpolation isa Ferrite.ScalarInterpolation ? interpolation : interpolation.ip
+    @assert length(ue) == n_basefuncs
+    _, ξ = Ferrite.find_local_coordinate(scalar_ip, cell_coordinates, X; tol_norm=1e-16)
+    u = zero(shape_value(interpolation, ξ, 1))
+    for j in 1:n_basefuncs
+        N = shape_value(interpolation, ξ, j)
+        u += N * ue[j]
+    end
+    return u
+end
