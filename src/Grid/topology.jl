@@ -142,7 +142,7 @@ end
 function build_cell_neighbor(grid, cells, vertex_to_cell; ncells)
     # Note: The following could be optimized, since we loop over the cells in order,
     # there is no need to use the special adaptive indexing and then compress_data! in ArrayOfVectorViews.
-    return ArrayOfVectorViews(CellIndex[], (ncells,); sizehint = _getsizehint(grid, CellIndex)) do cov
+    return ArrayOfVectorViews(Int[], (ncells,); sizehint = _getsizehint(grid, CellIndex)) do cov
             cell_neighbor_ids = Set{Int}()
             for (cell_id, cell) in enumerate(cells)
                 empty!(cell_neighbor_ids)
@@ -154,7 +154,7 @@ function build_cell_neighbor(grid, cells, vertex_to_cell; ncells)
                     end
                 end
                 for neighbor_id in cell_neighbor_ids
-                    add!(cov, CellIndex(neighbor_id), cell_id)
+                    add!(cov, neighbor_id, cell_id)
                 end
             end
         end
@@ -179,11 +179,11 @@ The struct saves the highest dimensional neighborhood, i.e. if something is conn
 
 !!! note Currently mixed-dimensional queries do not work at the moment. They will be added back later.
 """
-mutable struct ExclusiveTopology
+mutable struct ExclusiveTopology <: AbstractTopology
     # maps a global vertex id to all cells containing the vertex
     vertex_to_cell::ArrayOfVectorViews{Int, 1}
     # index of the vector = cell id ->  all other connected cells
-    cell_neighbor::ArrayOfVectorViews{CellIndex, 1}
+    cell_neighbor::ArrayOfVectorViews{Int, 1}
     # face_face_neighbor[cellid,local_face_id] -> exclusive connected entities (not restricted to one entity)
     face_face_neighbor::ArrayOfVectorViews{FaceIndex, 2}
     # edge_edge_neighbor[cellid,local_edge_id] -> exclusive connected entities of the given edge
@@ -219,8 +219,7 @@ function ExclusiveTopology(grid::AbstractGrid{sdim}) where sdim
     vertex_vertex_neighbor_buf = ConstructionBuffer(vertdata, (ncells, max_vertices), _getsizehint(grid, VertexIndex))
 
     for (cell_id, cell) in enumerate(cells)
-        for neighbor_cell_idx in cell_neighbor[cell_id]
-            neighbor_cell_id = neighbor_cell_idx.idx
+        for neighbor_cell_id in cell_neighbor[cell_id]
             neighbor_cell = cells[neighbor_cell_id]
             getrefdim(neighbor_cell) == getrefdim(cell) || error("Not supported")
             num_shared_vertices = _num_shared_vertices(cell, neighbor_cell) # See grid/topology.jl
@@ -255,7 +254,7 @@ function _get_facet_facet_neighborhood(::ExclusiveTopology, #=rdim=#::Val{:mixed
 end
 
 function getneighborhood(top::ExclusiveTopology, grid::AbstractGrid, cellidx::CellIndex, include_self=false)
-    patch = getcells(top.cell_neighbor[cellidx.idx])
+    patch = top.cell_neighbor[cellidx.idx]
     if include_self
         return view(push!(collect(patch), cellidx.idx), 1:(length(patch) + 1))
     else
