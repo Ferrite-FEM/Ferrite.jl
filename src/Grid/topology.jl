@@ -200,7 +200,9 @@ mutable struct ExclusiveTopology <: AbstractTopology
 end
 
 function ExclusiveTopology(grid::AbstractGrid{sdim}) where sdim
-    sdim == get_reference_dimension(grid) || error("ExclusiveTopology is only tested for non-embedded grids")
+    if sdim != get_reference_dimension(grid)
+        error("ExclusiveTopology does not support embedded cells (i.e. reference dimensions different from the spatial dimension)")
+    end
     cells = getcells(grid)
     nnodes = getnnodes(grid)
     ncells = length(cells)
