@@ -644,11 +644,12 @@ function test_vtk_export()
 end
 
 function test_celliterator_on_true_subdomain_smoketest()
-    grid = generate_grid(Hexahedron, (3,3,3))
+    grid = generate_grid(Hexahedron, (2,2,2))
 
     dh = DofHandler(grid)
     sdh = SubDofHandler(dh, [1,2,3])
-    add!(sdh, :u, Lagrange{RefHexahedron,1}()^3)
+    ip = Lagrange{RefHexahedron,1}()
+    add!(sdh, :u, ip)
     close!(dh)
 
     # The following statements just check that the iterator
@@ -660,6 +661,11 @@ function test_celliterator_on_true_subdomain_smoketest()
     end
 
     for cell in CellIterator(dh)
+        if cellid(cell) <= 3
+            @test length(celldofs(cell)) == getnbasefunctions(ip)
+        else
+            @test length(celldofs(cell)) == 0
+        end
     end
 end
 
