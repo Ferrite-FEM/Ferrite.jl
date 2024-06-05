@@ -651,7 +651,7 @@ function test_celliterator_on_true_subdomain_smoketest()
     add!(sdh, :u, Lagrange{RefHexahedron,1}()^3)
     close!(dh)
 
-    # The folloging statements just check that the iterator
+    # The following statements just check that the iterator
     # does not crash at least. Regression for #966
     for cell in CellIterator(sdh)
     end
