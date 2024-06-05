@@ -643,6 +643,32 @@ function test_vtk_export()
     rm(filename*".vtu") # clean up
 end
 
+function test_celliterator_on_true_subdomain_smoketest()
+    grid = generate_grid(Hexahedron, (2,2,2))
+
+    dh = DofHandler(grid)
+    sdh = SubDofHandler(dh, [1,2,3])
+    ip = Lagrange{RefHexahedron,1}()
+    add!(sdh, :u, ip)
+    close!(dh)
+
+    # The following statements just check that the iterator
+    # does not crash at least. Regression for #966
+    for cell in CellIterator(sdh)
+    end
+
+    for cell in CellIterator(dh, [1,2,3])
+    end
+
+    for cell in CellIterator(dh)
+        if cellid(cell) <= 3
+            @test length(celldofs(cell)) == getnbasefunctions(ip)
+        else
+            @test length(celldofs(cell)) == 0
+        end
+    end
+end
+
 @testset "DofHandler" begin
     test_1d_bar_beam();
     test_2d_scalar();
@@ -670,4 +696,5 @@ end
     test_celliterator_subdomain()
     test_show()
     test_vtk_export()
+    test_celliterator_on_true_subdomain_smoketest()
 end
