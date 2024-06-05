@@ -1,9 +1,9 @@
 # Putting this flag to false reproduces the figure shown in the example #src
 # We check for laminar flow development in the CI                       #src
 if @isdefined is_ci    #hide
-    IS_CI = false      #hide
+    IS_CI = is_ci      #hide
 else                   #hide
-    IS_CI = true       #hide
+    IS_CI = false      #hide
 end                    #hide
 # # [Incompressible Navier-Stokes equations via DifferentialEquations.jl](@id tutorial-ins-ordinarydiffeq)
 #
@@ -586,9 +586,9 @@ for (u,t) in tuples(integrator)
 end
 close(pvd);
 
-# Test the result for full proper development of the flow                   #src
+using Test                                                                      #hide
+# Test the result for full proper development of the flow                       #src
 if IS_CI                                                                        #hide
-    using Test                                                                  #hide
     function compute_divergence(dh, u, cellvalues_v)                            #hide
         divv = 0.0                                                              #hide
         for cell in CellIterator(dh)                                            #hide
