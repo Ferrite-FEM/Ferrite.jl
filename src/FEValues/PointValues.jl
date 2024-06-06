@@ -28,25 +28,20 @@ function PointValues(cv::CellValues)
     T = typeof(getdetJdV(cv, 1))
     ip_fun = function_interpolation(cv)
     ip_geo = geometric_interpolation(cv)
-    uf = ValuesUpdateFlags(ip_fun;
-        update_gradients = function_difforder(cv) ≥ 1,
-        update_hessians = function_difforder(cv) ≥ 2,
-        update_detJdV = false)
-
-    return PointValues(T, ip_fun, ip_geo, uf)
+    update_gradients = Val(function_difforder(cv) ≥ 1)
+    update_hessians  = Val(function_difforder(cv) ≥ 2)
+    return PointValues(T, ip_fun, ip_geo; update_gradients, update_hessians)
 end
-function PointValues(ip::Interpolation, ipg::Interpolation = default_geometric_interpolation(ip), args...)
-    return PointValues(Float64, ip, ipg, args...)
+function PointValues(ip::Interpolation, ipg::Interpolation = default_geometric_interpolation(ip); kwargs...)
+    return PointValues(Float64, ip, ipg; kwargs...)
 end
-
-function PointValues(::Type{T}, ip::IP, ipg::GIP = default_geometric_interpolation(ip),
-    uf::ValuesUpdateFlags = ValuesUpdateFlags{1, required_geo_diff_order(mapping_type(ip), 1), false}()) where {
+function PointValues(::Type{T}, ip::IP, ipg::GIP = default_geometric_interpolation(ip); kwargs...) where {
     T, dim, shape <: AbstractRefShape{dim},
     IP  <: Interpolation{shape},
     GIP <: Interpolation{shape}
 }
     qr = QuadratureRule{shape, T}([one(T)], [zero(Vec{dim, T})])
-    cv = CellValues(T, qr, ip, ipg, uf)
+    cv = CellValues(T, qr, ip, ipg; update_detJdV = Val(false), kwargs...)
     return PointValues{typeof(cv)}(cv)
 end
 

@@ -49,8 +49,7 @@ struct CellValues{FV<:FunctionValues, GM<:GeometryMapping, QR, detT} <: Abstract
     detJdV::detT   # AbstractVector{<:Number} or Nothing
 end
 function CellValues(::Type{T}, qr::QuadratureRule, ip_fun::Interpolation, ip_geo::VectorizedInterpolation,
-        update_flags::ValuesUpdateFlags{FunDiffOrder, GeoDiffOrder, DetJdV}
-        ) where {T, FunDiffOrder, GeoDiffOrder, DetJdV}
+        ::ValuesUpdateFlags{FunDiffOrder, GeoDiffOrder, DetJdV}) where {T, FunDiffOrder, GeoDiffOrder, DetJdV}
 
     geo_mapping = GeometryMapping{GeoDiffOrder}(T, ip_geo.ip, qr)
     fun_values = FunctionValues{FunDiffOrder}(T, ip_fun, qr, ip_geo)

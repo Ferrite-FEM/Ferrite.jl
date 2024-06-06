@@ -46,8 +46,7 @@ struct FacetValues{FV, GM, FQR, detT, nT, V_FV<:AbstractVector{FV}, V_GM<:Abstra
 end
 
 function FacetValues(::Type{T}, fqr::FacetQuadratureRule, ip_fun::Interpolation, ip_geo::VectorizedInterpolation{sdim},
-        update_flags::ValuesUpdateFlags{FunDiffOrder, GeoDiffOrder} = ValuesUpdateFlags{1, required_geo_diff_order(mapping_type(ip_fun), 1), true}()
-        ) where {T, sdim, FunDiffOrder, GeoDiffOrder}
+        ::ValuesUpdateFlags{FunDiffOrder, GeoDiffOrder}) where {T, sdim, FunDiffOrder, GeoDiffOrder}
 
     # max(GeoDiffOrder, 1) ensures that we get the jacobian needed to calculate the normal.
     geo_mapping = map(qr -> GeometryMapping{max(GeoDiffOrder, 1)}(T, ip_geo.ip, qr), fqr.face_rules)
@@ -59,12 +58,12 @@ function FacetValues(::Type{T}, fqr::FacetQuadratureRule, ip_fun::Interpolation,
     return FacetValues(fun_values, geo_mapping, fqr, detJdV, normals, ScalarWrapper(1))
 end
 
-FacetValues(qr::FacetQuadratureRule, ip::Interpolation, args...) = FacetValues(Float64, qr, ip, args...)
-function FacetValues(::Type{T}, qr::FacetQuadratureRule, ip::Interpolation, ip_geo::ScalarInterpolation, args...) where T
-    return FacetValues(T, qr, ip, VectorizedInterpolation(ip_geo), args...)
+FacetValues(qr::FacetQuadratureRule, ip::Interpolation, args...; kwargs...) = FacetValues(Float64, qr, ip, args...; kwargs...)
+function FacetValues(::Type{T}, qr::FacetQuadratureRule, ip::Interpolation, ip_geo::ScalarInterpolation; kwargs...) where T
+    return FacetValues(T, qr, ip, VectorizedInterpolation(ip_geo); kwargs...)
 end
-function FacetValues(::Type{T}, qr::FacetQuadratureRule, ip::Interpolation, ip_geo::VectorizedInterpolation = default_geometric_interpolation(ip), args...) where T
-    return FacetValues(T, qr, ip, ip_geo, args...)
+function FacetValues(::Type{T}, qr::FacetQuadratureRule, ip::Interpolation, ip_geo::VectorizedInterpolation = default_geometric_interpolation(ip); kwargs...) where T
+    return FacetValues(T, qr, ip, ip_geo, ValuesUpdateFlags(ip; kwargs...))
 end
 
 function Base.copy(fv::FacetValues)
