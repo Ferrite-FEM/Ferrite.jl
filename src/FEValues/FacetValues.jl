@@ -45,28 +45,26 @@ struct FacetValues{FV, GM, FQR, detT, nT, V_FV<:AbstractVector{FV}, V_GM<:Abstra
     current_facet::ScalarWrapper{Int}
 end
 
-function FacetValues(::Type{T}, fqr::FacetQuadratureRule, ip_fun::Interpolation, ip_geo::VectorizedInterpolation{sdim} = default_geometric_interpolation(ip_fun);
-    update_gradients::Union{Bool,Nothing} = nothing,
-    update_hessians ::Union{Bool,Nothing} = nothing) where {T,sdim}
+function FacetValues(::Type{T}, fqr::FacetQuadratureRule, ip_fun::Interpolation, ip_geo::VectorizedInterpolation{sdim},
+        update_flags::ValuesUpdateFlags{FunDiffOrder, GeoDiffOrder} = ValuesUpdateFlags{1, required_geo_diff_order(mapping_type(ip_fun), 1), true}()
+        ) where {T, sdim, FunDiffOrder, GeoDiffOrder}
 
-    _update_gradients = update_gradients === nothing ? true : update_gradients
-    _update_hessians  = update_hessians  === nothing ? false : update_hessians
-    _update_hessians && @assert _update_gradients
-
-    FunDiffOrder = _update_hessians ? 2 : (_update_gradients ? 1 : 0)
-    GeoDiffOrder = max(required_geo_diff_order(mapping_type(ip_fun), FunDiffOrder), 1)
-
-    geo_mapping = [GeometryMapping{GeoDiffOrder}(T, ip_geo.ip, qr) for qr in fqr.face_rules]::Vector{<:GeometryMapping{GeoDiffOrder}}
-    fun_values = [FunctionValues{FunDiffOrder}(T, ip_fun, qr, ip_geo) for qr in fqr.face_rules]::Vector{<:FunctionValues{FunDiffOrder}}
-    max_nquadpoints = maximum(qr->length(getweights(qr)), fqr.face_rules)
+    # max(GeoDiffOrder, 1) ensures that we get the jacobian needed to calculate the normal.
+    geo_mapping = map(qr -> GeometryMapping{max(GeoDiffOrder, 1)}(T, ip_geo.ip, qr), fqr.face_rules)
+    fun_values = map(qr -> FunctionValues{FunDiffOrder}(T, ip_fun, qr, ip_geo), fqr.face_rules)
+    max_nquadpoints = maximum(qr -> length(getweights(qr)), fqr.face_rules)
+    # detJdV always calculated, since we needed to calculate the jacobian anyways for the normal.
     detJdV  = fill(T(NaN), max_nquadpoints)
     normals = fill(zero(Vec{sdim, T}) * T(NaN), max_nquadpoints)
     return FacetValues(fun_values, geo_mapping, fqr, detJdV, normals, ScalarWrapper(1))
 end
 
 FacetValues(qr::FacetQuadratureRule, ip::Interpolation, args...; kwargs...) = FacetValues(Float64, qr, ip, args...; kwargs...)
-function FacetValues(::Type{T}, qr::FacetQuadratureRule, ip::Interpolation, ip_geo::ScalarInterpolation; kwargs...) where T
-    return FacetValues(T, qr, ip, VectorizedInterpolation(ip_geo); kwargs...)
+function FacetValues(::Type{T}, qr::FacetQuadratureRule, ip::Interpolation, ip_geo::ScalarInterpolation, args...; kwargs...) where T
+    return FacetValues(T, qr, ip, VectorizedInterpolation(ip_geo), args...; kwargs...)
+end
+function FacetValues(::Type{T}, qr::FacetQuadratureRule, ip::Interpolation, ip_geo::VectorizedInterpolation = default_geometric_interpolation(ip); kwargs...) where T
+    return FacetValues(T, qr, ip, ip_geo, ValuesUpdateFlags(ip; kwargs...))
 end
 
 function Base.copy(fv::FacetValues)
@@ -156,7 +154,8 @@ function Base.show(io::IO, d::MIME"text/plain", fv::FacetValues)
     ip_geo = geometric_interpolation(fv)
     rdim = getrefdim(ip_geo)
     vdim = isa(shape_value(fv, 1, 1), Vec) ? length(shape_value(fv, 1, 1)) : 0
-    sdim = length(shape_gradient(fv, 1, 1)) ÷ length(shape_value(fv, 1, 1))
+    GradT = shape_gradient_type(fv)
+    sdim = GradT === nothing ? nothing : sdim_from_gradtype(GradT)
     vstr = vdim==0 ? "scalar" : "vdim=$vdim"
     print(io, "FacetValues(", vstr, ", rdim=$rdim, sdim=$sdim): ")
     nqp = getnquadpoints.(fv.fqr.face_rules)
@@ -166,7 +165,8 @@ function Base.show(io::IO, d::MIME"text/plain", fv::FacetValues)
         println(io, tuple(nqp...), " quadrature points on each face")
     end
     print(io, " Function interpolation: "); show(io, d, function_interpolation(fv))
-    print(io, "\nGeometric interpolation: "); show(io, d, ip_geo^sdim)
+    print(io, "\nGeometric interpolation: ");
+    sdim === nothing ? show(io, d, ip_geo) : show(io, d, ip_geo^sdim)
 end
 
 """

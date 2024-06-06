@@ -25,6 +25,19 @@ end
     ))
 end
 
+struct ValuesUpdateFlags{FunDiffOrder, GeoDiffOrder, DetJdV} end
+"""
+    ValuesUpdateFlags(ip_fun::Interpolation; update_gradients = true, update_hessians = false, update_detJdV = true)
+
+Creates a singelton type for specifying what parts of the AbstractValues should be updated. Note that this is internal
+API used to get type-stable construction.
+"""
+function ValuesUpdateFlags(ip_fun::Interpolation; update_gradients = true, update_hessians = false, update_detJdV = true)
+    FunDiffOrder = update_hessians ? 2 : (update_gradients ? 1 : 0)
+    GeoDiffOrder = max(required_geo_diff_order(mapping_type(ip_fun), FunDiffOrder), update_detJdV)
+    return ValuesUpdateFlags{FunDiffOrder, GeoDiffOrder, update_detJdV}()
+end
+
 """
     reinit!(cv::CellValues, cell::AbstractCell, x::Vector)
     reinit!(cv::CellValues, x::Vector)

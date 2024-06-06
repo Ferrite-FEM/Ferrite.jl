@@ -46,28 +46,22 @@ struct CellValues{FV, GM, QR, detT} <: AbstractCellValues
     qr::QR         # QuadratureRule
     detJdV::detT   # AbstractVector{<:Number} or Nothing
 end
-function CellValues(::Type{T}, qr::QuadratureRule, ip_fun::Interpolation, ip_geo::VectorizedInterpolation;
-        update_gradients ::Union{Bool,Nothing} = nothing, #Use Union{Bool,Nothing} to get type-stable code
-        update_hessians  ::Union{Bool,Nothing} = nothing,
-        update_detJdV    ::Union{Bool,Nothing} = nothing) where T
-
-    _update_gradients = update_gradients === nothing ? true  : update_gradients
-    _update_hessians  = update_hessians  === nothing ? false : update_hessians
-    _update_detJdV    = update_detJdV    === nothing ? true  : update_detJdV
-    _update_hessians && @assert _update_gradients
-
-    FunDiffOrder = _update_hessians ? 2 : (_update_gradients ? 1 : 0)
-    GeoDiffOrder = max(required_geo_diff_order(mapping_type(ip_fun), FunDiffOrder), _update_detJdV)
+function CellValues(::Type{T}, qr::QuadratureRule, ip_fun::Interpolation, ip_geo::VectorizedInterpolation,
+        update_flags::ValuesUpdateFlags{FunDiffOrder, GeoDiffOrder, DetJdV} = ValuesUpdateFlags{1, required_geo_diff_order(mapping_type(ip_fun), 1), true}()
+        ) where {T, FunDiffOrder, GeoDiffOrder, DetJdV}
 
     geo_mapping = GeometryMapping{GeoDiffOrder}(T, ip_geo.ip, qr)
     fun_values = FunctionValues{FunDiffOrder}(T, ip_fun, qr, ip_geo)
-    detJdV = _update_detJdV ? fill(T(NaN), length(getweights(qr))) : nothing
+    detJdV = DetJdV ? fill(T(NaN), length(getweights(qr))) : nothing
     return CellValues(fun_values, geo_mapping, qr, detJdV)
 end
 
 CellValues(qr::QuadratureRule, ip::Interpolation, args...; kwargs...) = CellValues(Float64, qr, ip, args...; kwargs...)
-function CellValues(::Type{T}, qr, ip::Interpolation, ip_geo::ScalarInterpolation=default_geometric_interpolation(ip); kwargs...) where T
+function CellValues(::Type{T}, qr, ip::Interpolation, ip_geo::ScalarInterpolation; kwargs...) where T
     return CellValues(T, qr, ip, VectorizedInterpolation(ip_geo); kwargs...)
+end
+function CellValues(::Type{T}, qr::QuadratureRule, ip::Interpolation, ip_geo::VectorizedInterpolation = default_geometric_interpolation(ip); kwargs...) where T
+    return CellValues(T, qr, ip, ip_geo, ValuesUpdateFlags(ip; kwargs...))
 end
 
 function Base.copy(cv::CellValues)
