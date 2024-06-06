@@ -19,6 +19,9 @@
 #
 # ## Remarks on DifferentialEquations.jl
 #
+# !!! note "Required Version"
+#     This example will only work with OrdinaryDiffEq@v6.80.1.
+#
 # Many "time step solvers" of [DifferentialEquations.jl](https://github.com/SciML/DifferentialEquations.jl) assume that that the
 # problem is provided in mass matrix form. The incompressible Navier-Stokes
 # equations as stated above yield a DAE in this form after applying a spatial
@@ -216,11 +219,9 @@ add!(ch, noslip_bc);
 ∂Ω_inflow = getfacetset(grid, "left");
 
 # !!! note
-#     Temporal adaptivity only works if the pressure field varies smoothly
-#     enough in time. Linearly ramping up the velocity will cause
-#     fluctuations in the pressure field which will mess up the error
-#     estimators.
-vᵢₙ(t) = t < 2.0 ? 1.5*(sin(-π/2 + t*π/2)+1)/2 : 1.5 #inflow velocity
+#     The kink in the velocity profile will lead to a discontinuity in the pressure at $t=1$.
+#     This needs to be considered in the DiffEq `init` by providing the keyword argument `d_discontinuities=[1.0]`.
+vᵢₙ(t) = min(t*1.5, 1.5) #inflow velocity
 
 parabolic_inflow_profile(x,t) = Vec((4*vᵢₙ(t)*x[2]*(0.41-x[2])/0.41^2, 0.0))
 inflow_bc = Dirichlet(:v, ∂Ω_inflow, parabolic_inflow_profile, [1,2])
@@ -569,10 +570,13 @@ integrator = init(
     problem, timestepper; initializealg=NoInit(), dt=Δt₀,
     adaptive=true, abstol=1e-4, reltol=1e-5,
     progress=true, progress_steps=1,
-    verbose=true, internalnorm=FreeDofErrorNorm(ch),
+    verbose=true, internalnorm=FreeDofErrorNorm(ch), d_discontinuities=[1.0]
 );
 
 
+# !!! note "Export of solution"
+#     Exporting interpolated solutions of problems containing mass matrices is currently broken.
+#     Thus, the `intervals` iterator is used. Note that `solve` holds all solutions in the memory.
 pvd = VTKFileCollection("vortex-street", grid);
 for (u,t) in intervals(integrator)
     addstep!(pvd, t) do io
