@@ -17,6 +17,8 @@ values of nodal functions, gradients and divergences of nodal functions etc. in 
 * `update_hessians`: Specifies if the hessians of the shape functions should be updated (default false)
 * `update_detJdV`: Specifies if the volume associated with each quadrature point should be updated (default true)
 
+*Internal: Providing the keyword arguments as `Val(::Bool)` gives type-stable constructor*
+
 **Common methods:**
 
 * [`reinit!`](@ref)
@@ -40,14 +42,14 @@ function default_geometric_interpolation(::Interpolation{shape}) where {dim, sha
     return VectorizedInterpolation{dim}(Lagrange{shape, 1}())
 end
 
-struct CellValues{FV, GM, QR, detT} <: AbstractCellValues
+struct CellValues{FV<:FunctionValues, GM<:GeometryMapping, QR, detT} <: AbstractCellValues
     fun_values::FV # FunctionValues
     geo_mapping::GM # GeometryMapping
     qr::QR         # QuadratureRule
     detJdV::detT   # AbstractVector{<:Number} or Nothing
 end
 function CellValues(::Type{T}, qr::QuadratureRule, ip_fun::Interpolation, ip_geo::VectorizedInterpolation,
-        update_flags::ValuesUpdateFlags{FunDiffOrder, GeoDiffOrder, DetJdV} = ValuesUpdateFlags{1, required_geo_diff_order(mapping_type(ip_fun), 1), true}()
+        update_flags::ValuesUpdateFlags{FunDiffOrder, GeoDiffOrder, DetJdV}
         ) where {T, FunDiffOrder, GeoDiffOrder, DetJdV}
 
     geo_mapping = GeometryMapping{GeoDiffOrder}(T, ip_geo.ip, qr)

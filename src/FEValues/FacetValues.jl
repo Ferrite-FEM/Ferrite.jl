@@ -59,12 +59,12 @@ function FacetValues(::Type{T}, fqr::FacetQuadratureRule, ip_fun::Interpolation,
     return FacetValues(fun_values, geo_mapping, fqr, detJdV, normals, ScalarWrapper(1))
 end
 
-FacetValues(qr::FacetQuadratureRule, ip::Interpolation, args...; kwargs...) = FacetValues(Float64, qr, ip, args...; kwargs...)
-function FacetValues(::Type{T}, qr::FacetQuadratureRule, ip::Interpolation, ip_geo::ScalarInterpolation, args...; kwargs...) where T
-    return FacetValues(T, qr, ip, VectorizedInterpolation(ip_geo), args...; kwargs...)
+FacetValues(qr::FacetQuadratureRule, ip::Interpolation, args...) = FacetValues(Float64, qr, ip, args...)
+function FacetValues(::Type{T}, qr::FacetQuadratureRule, ip::Interpolation, ip_geo::ScalarInterpolation, args...) where T
+    return FacetValues(T, qr, ip, VectorizedInterpolation(ip_geo), args...)
 end
-function FacetValues(::Type{T}, qr::FacetQuadratureRule, ip::Interpolation, ip_geo::VectorizedInterpolation = default_geometric_interpolation(ip); kwargs...) where T
-    return FacetValues(T, qr, ip, ip_geo, ValuesUpdateFlags(ip; kwargs...))
+function FacetValues(::Type{T}, qr::FacetQuadratureRule, ip::Interpolation, ip_geo::VectorizedInterpolation = default_geometric_interpolation(ip), args...) where T
+    return FacetValues(T, qr, ip, ip_geo, args...)
 end
 
 function Base.copy(fv::FacetValues)

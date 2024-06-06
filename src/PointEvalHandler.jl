@@ -185,7 +185,7 @@ function evaluate_at_points(ph::PointEvalHandler{<:Any, dim, T1}, dh::AbstractDo
     npoints = length(ph.cells)
     # Figure out the value type by creating a dummy PointValues
     ip = getfieldinterpolation(dh, find_field(dh, fname))
-    pv = PointValues(T1, ip; update_gradients = false)
+    pv = PointValues(T1, ip, ValuesUpdateFlags(ip; update_gradients = false))
     zero_val = function_value_init(pv, dof_vals)
     # Allocate the output as NaNs
     nanv = convert(typeof(zero_val), NaN * zero_val)
@@ -220,7 +220,8 @@ function evaluate_at_points!(out_vals::Vector{T2},
             dofrange = dof_range(sdh, fname)
             cellset = sdh.cellset
             ip_geo = geometric_interpolation(getcelltype(sdh))
-            pv = PointValues(T_ph, ip, ip_geo; update_gradients = false)
+
+            pv = PointValues(T_ph, ip, ip_geo, ValuesUpdateFlags(ip; update_gradients = false, update_detJdV = false))
             _evaluate_at_points!(out_vals, dof_vals, ph, dh, pv, cellset, dofrange)
         end
     end

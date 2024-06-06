@@ -25,14 +25,19 @@ end
     ))
 end
 
-struct ValuesUpdateFlags{FunDiffOrder, GeoDiffOrder, DetJdV} end
 """
     ValuesUpdateFlags(ip_fun::Interpolation; update_gradients = true, update_hessians = false, update_detJdV = true)
 
 Creates a singelton type for specifying what parts of the AbstractValues should be updated. Note that this is internal
 API used to get type-stable construction.
 """
-function ValuesUpdateFlags(ip_fun::Interpolation; update_gradients = true, update_hessians = false, update_detJdV = true)
+function ValuesUpdateFlags(ip_fun::Interpolation; update_gradients = Val(true), update_hessians = Val(false), update_detJdV = Val(true))
+    toval(v::Bool) = Val(v)
+    toval(V::Val) = V
+    return ValuesUpdateFlags(ip_fun, toval(update_gradients), toval(update_hessians), toval(update_detJdV))
+end
+function ValuesUpdateFlags(ip_fun::Interpolation, ::Val{update_gradients}, ::Val{update_hessians}, ::Val{update_detJdV}
+        ) where {update_gradients, update_hessians, update_detJdV}
     FunDiffOrder = update_hessians ? 2 : (update_gradients ? 1 : 0)
     GeoDiffOrder = max(required_geo_diff_order(mapping_type(ip_fun), FunDiffOrder), update_detJdV)
     return ValuesUpdateFlags{FunDiffOrder, GeoDiffOrder, update_detJdV}()
