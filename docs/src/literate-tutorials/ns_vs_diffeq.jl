@@ -551,7 +551,7 @@ end
 # to VTK-files, which can be viewed in [ParaView](https://www.paraview.org/)
 # by utilizing the corresponding pvd file.
 timestepper = Rodas5P(autodiff=false, step_limiter! = ferrite_limiter!);
-# timestepper = ImplicitEuler(nlsolve=NonlinearSolveAlg(OrdinaryDiffEq.NonlinearSolve.NewtonRaphson(autodiff=OrdinaryDiffEq.AutoFiniteDiff()); max_iter=50), step_limiter! = ferrite_limiter!)
+# timestepper = ImplicitEuler(nlsolve=NonlinearSolveAlg(OrdinaryDiffEq.NonlinearSolve.NewtonRaphson(autodiff=OrdinaryDiffEq.AutoFiniteDiff()); max_iter=50), step_limiter! = ferrite_limiter!) #src
 #NOTE!   This is left for future reference                                #src
 # function algebraicmultigrid(W,du,u,p,t,newW,Plprev,Prprev,solverdata)   #src
 #     if newW === nothing || newW                                         #src
@@ -570,14 +570,13 @@ integrator = init(
     adaptive=true, abstol=1e-4, reltol=1e-5,
     progress=true, progress_steps=1,
     verbose=true, internalnorm=FreeDofErrorNorm(ch),
-    d_discontinuities=[2.0]
 );
 
 
 pvd = VTKFileCollection("vortex-street", grid);
-for (u_uc,t) in TimeChoiceIterator(integrator, 0.0:Δt_save:T)
+for (u,t) in intervals(integrator)
     addstep!(pvd, t) do io
-        write_solution(io, dh, u_uc)
+        write_solution(io, dh, u)
     end
 end
 close(pvd);
@@ -601,7 +600,7 @@ if IS_CI                                                                        
         end                                                                     #hide
         return divv                                                             #hide
     end                                                                         #hide
-    @testset "INS OrdinaryDiffEq" begin                                         #hide
+    begin                                                                       #hide
         u = copy(integrator.u)                                                  #hide
         apply!(u, ch)                                                           #hide
         Δdivv = abs(compute_divergence(dh, u, cellvalues_v))                    #hide
