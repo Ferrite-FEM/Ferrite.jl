@@ -62,14 +62,13 @@ function SubDofHandler(dh::DH, cellset::AbstractVecOrSet{Int}) where {DH <: Abst
         error("all cells in a SubDofHandler must be of the same type")
     end
     # Make sure this set is disjoint with all other existing
-    for sdh in dh.subdofhandlers
-        if !isdisjoint(cellset, sdh.cellset)
+    if !isdisjoint(cellset, dh.cellset)
             error("cellset not disjoint with sets in existing SubDofHandlers")
-        end
     end
     # Construct and insert into the parent dh
     sdh = SubDofHandler{typeof(dh)}(dh, convert_to_orderedset(cellset), Symbol[], Interpolation[], Int[], ScalarWrapper(-1))
     push!(dh.subdofhandlers, sdh)
+    union!(dh.cellset, cellset)
     return sdh
 end
 
@@ -95,6 +94,7 @@ end
 
 struct DofHandler{dim,G<:AbstractGrid{dim}} <: AbstractDofHandler
     subdofhandlers::Vector{SubDofHandler{DofHandler{dim, G}}}
+    cellset::OrderedSet{Int}
     field_names::Vector{Symbol}
     # Dofs for cell i are stored in cell_dofs at the range:
     #     cell_dofs_offset[i]:(cell_dofs_offset[i]+ndofs_per_cell(dh, i)-1)
@@ -131,7 +131,7 @@ close!(dh)
 function DofHandler(grid::G) where {dim, G <: AbstractGrid{dim}}
     ncells = getncells(grid)
     sdhs = SubDofHandler{DofHandler{dim, G}}[]
-    DofHandler{dim, G}(sdhs, Symbol[], Int[], zeros(Int, ncells), zeros(Int, ncells), ScalarWrapper(false), grid, ScalarWrapper(-1))
+    DofHandler{dim, G}(sdhs, OrderedSet{Int}(), Symbol[], Int[], zeros(Int, ncells), zeros(Int, ncells), ScalarWrapper(false), grid, ScalarWrapper(-1))
 end
 
 function Base.show(io::IO, mime::MIME"text/plain", dh::DofHandler)

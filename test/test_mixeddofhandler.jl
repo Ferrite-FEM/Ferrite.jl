@@ -661,11 +661,7 @@ function test_celliterator_on_true_subdomain_smoketest()
     end
 
     for cell in CellIterator(dh)
-        if cellid(cell) <= 3
-            @test length(celldofs(cell)) == getnbasefunctions(ip)
-        else
-            @test length(celldofs(cell)) == 0
-        end
+        @test cellid(cell) in [1,2,3]
     end
 end
 

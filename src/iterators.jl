@@ -254,20 +254,30 @@ struct CellIterator{CC<:CellCache, IC<:IntegerCollection}
     set::IC
 end
 
-function CellIterator(gridordh::Union{Grid,DofHandler},
+function CellIterator(grid::Grid,
                       set::Union{IntegerCollection,Nothing}=nothing,
                       flags::UpdateFlags=UpdateFlags())
     if set === nothing
-        grid = gridordh isa DofHandler ? get_grid(gridordh) : gridordh
         set = 1:getncells(grid)
     end
-    if gridordh isa DofHandler
-        # TODO: Since the CellCache is resizeable this is not really necessary to check
-        #       here, but might be useful to catch slow code paths?
-        _check_same_celltype(get_grid(gridordh), set)
-    end
-    return CellIterator(CellCache(gridordh, flags), set)
+
+    return CellIterator(CellCache(grid, flags), set)
 end
+
+function CellIterator(dh::DofHandler,
+                      set::Union{IntegerCollection,Nothing}=nothing,
+                      flags::UpdateFlags=UpdateFlags())
+    if set === nothing
+        set = dh.cellset
+    end
+
+    # TODO: Since the CellCache is resizeable this is not really necessary to check
+    #       here, but might be useful to catch slow code paths?
+    _check_same_celltype(get_grid(dh), set)
+
+    return CellIterator(CellCache(dh, flags), set)
+end
+
 function CellIterator(gridordh::Union{Grid,DofHandler}, flags::UpdateFlags)
     return CellIterator(gridordh, nothing, flags)
 end
