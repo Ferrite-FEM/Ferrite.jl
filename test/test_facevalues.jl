@@ -23,6 +23,7 @@ for (scalar_interpol, quad_rule) in (
         if update_gradients && !update_hessians # Check correct and type-stable default constructor
             fv_default = @inferred FacetValues(quad_rule, func_interpol, geom_interpol)
             @test typeof(fv) === typeof(fv_default)
+            @inferred FacetValues(quad_rule, func_interpol, geom_interpol; update_hessians=Val(true))
         end
 
         rdim = Ferrite.getrefdim(func_interpol)

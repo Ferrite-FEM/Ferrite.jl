@@ -17,8 +17,6 @@ values of nodal functions, gradients and divergences of nodal functions etc. in 
 * `update_hessians`: Specifies if the hessians of the shape functions should be updated (default false)
 * `update_detJdV`: Specifies if the volume associated with each quadrature point should be updated (default true)
 
-*Internal: Providing the keyword arguments as `Val(::Bool)` gives type-stable constructor*
-
 **Common methods:**
 
 * [`reinit!`](@ref)
