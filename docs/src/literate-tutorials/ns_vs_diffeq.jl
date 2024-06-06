@@ -8,7 +8,7 @@
  nothing                    #hide
 # # [Incompressible Navier-Stokes equations via DifferentialEquations.jl](@id tutorial-ins-ordinarydiffeq)
 #
-# ![](https://user-images.githubusercontent.com/9196588/134514213-76d91d34-19ab-47c2-957e-16bb0c8669e1.gif)
+# ![nsdiffeq](nsdiffeq.gif)
 #
 #
 # In this example we focus on a simple but visually appealing problem from
@@ -383,7 +383,7 @@ jac_sparsity = sparse(K);
 # stage limiters. The correct norms are computed by passing down a custom norm which simply
 # ignores all constrained dofs.
 #
-# !!! Note
+# !!! note
 #     An alternative strategy is to hook into the nonlinear and linear solvers and enforce
 #     the solution therein. However, this is not possible at the time of writing this tutorial.
 #
@@ -587,7 +587,6 @@ close(pvd);
 
 
 using Test                                                                      #hide
-# Test the result for full proper development of the flow                       #hide
 if IS_CI                                                                        #hide
     function compute_divergence(dh, u, cellvalues_v)                            #hide
         divv = 0.0                                                              #hide
