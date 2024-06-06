@@ -202,9 +202,9 @@ function cache_neighborhood(dh, topology)
         for j in 1:_nfacets
             nbg_cellid = getneighborhood(topology, dh.grid, FacetIndex(i,j))
             if(!isempty(nbg_cellid))
-                nbg[j] = first(nbg_cellid) # assuming only one face neighbor per cell
+                nbg[j] = first(nbg_cellid)[1] # assuming only one face neighbor per cell
             else # boundary face
-                nbg[j] = first(getneighborhood(topology, dh.grid, FacetIndex(i,opp[j])))
+                nbg[j] = first(getneighborhood(topology, dh.grid, FacetIndex(i,opp[j])))[1]
             end
         end
 
