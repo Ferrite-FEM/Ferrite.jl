@@ -20,7 +20,7 @@
 # ## Remarks on DifferentialEquations.jl
 #
 # !!! note "Required Version"
-#     This example will only work with OrdinaryDiffEq@v6.80.1.
+#     This example will only work with OrdinaryDiffEq@v6.80.1. or above
 #
 # Many "time step solvers" of [DifferentialEquations.jl](https://github.com/SciML/DifferentialEquations.jl) assume that that the
 # problem is provided in mass matrix form. The incompressible Navier-Stokes
