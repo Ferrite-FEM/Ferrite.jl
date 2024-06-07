@@ -67,9 +67,9 @@ function generate_grid(::Type{QuadraticLine}, nel::NTuple{1,Int}, left::Vec{1,T}
     return Grid(cells, nodes, facetsets=facetsets)
 end
 
-function _generate_2d_nodes!(nodes, nx, ny, LL, LR, UR, UL)
+function _generate_2d_nodes!(nodes::Vector{Node{2, T}}, nx, ny, LL, LR, UR, UL) where T
       for i in 0:ny-1
-        ratio_bounds = i / (ny-1)
+        ratio_bounds = convert(T, i) / (ny-1)
 
         x0 = LL[1] * (1 - ratio_bounds) + ratio_bounds * UL[1]
         x1 = LR[1] * (1 - ratio_bounds) + ratio_bounds * UR[1]
@@ -78,7 +78,7 @@ function _generate_2d_nodes!(nodes, nx, ny, LL, LR, UR, UL)
         y1 = LR[2] * (1 - ratio_bounds) + ratio_bounds * UR[2]
 
         for j in 0:nx-1
-            ratio = j / (nx-1)
+            ratio = convert(T, j) / (nx-1)
             x = x0 * (1 - ratio) + ratio * x1
             y = y0 * (1 - ratio) + ratio * y1
             push!(nodes, Node((x, y)))
@@ -284,9 +284,9 @@ function generate_grid(::Type{Pyramid}, nel::NTuple{3,Int}, left::Vec{3,T}=Vec{3
 
     #Center node in each "voxel"
     for k in 1:nel_z, j in 1:nel_y, i in 1:nel_x
-        midx = 0.5(coords_x[i+1] + coords_x[i])
-        midy = 0.5(coords_y[j+1] + coords_y[j])
-        midz = 0.5(coords_z[k+1] + coords_z[k])
+        midx = (coords_x[i+1] + coords_x[i]) / 2
+        midy = (coords_y[j+1] + coords_y[j]) / 2
+        midz = (coords_z[k+1] + coords_z[k]) / 2
         push!(nodes, Node((midx, midy, midz)))
     end
 
