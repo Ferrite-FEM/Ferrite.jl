@@ -8,8 +8,8 @@ function test_generate_grid(T::Type)
 
     # Loop over all cell types and test grid generation
     for CT in cell_types
-        rdim = Ferrite.getrefdim(CT) 
-        nels = ntuple(i -> 2, rdim)  
+        rdim = Ferrite.getrefdim(CT)
+        nels = ntuple(i -> 2, rdim)
         left = - ones(Vec{rdim,T})
         right =  ones(Vec{rdim,T})
         grid = generate_grid(CT, nels, left, right)
