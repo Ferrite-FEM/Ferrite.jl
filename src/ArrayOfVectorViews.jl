@@ -1,20 +1,25 @@
 struct ArrayOfVectorViews{T, N} <: AbstractArray{SubArray{T, 1, Vector{T}, Tuple{UnitRange{Int64}}, true}, N}
-    indices::Array{UnitRange{Int}, N}
+    indices::Vector{Int}
     data::Vector{T}
+    lin_idx::LinearIndices{N, NTuple{N, Base.OneTo{Int}}}
 end
 # AbstractArray interface (https://docs.julialang.org/en/v1/manual/interfaces/#man-interface-array)
-Base.size(cv::ArrayOfVectorViews) = size(cv.indices)
-function Base.getindex(cv::ArrayOfVectorViews, idx...)
-    return view(cv.data, getindex(cv.indices, idx...))
+Base.size(cv::ArrayOfVectorViews) = size(cv.lin_idx)
+@inline function Base.getindex(cv::ArrayOfVectorViews, linear_index::Int)
+    @boundscheck checkbounds(cv.lin_idx, linear_index)
+    return @inbounds view(cv.data, cv.indices[linear_index]:(cv.indices[linear_index+1]-1))
+end
+@inline function Base.getindex(cv::ArrayOfVectorViews, idx...)
+    linear_index = getindex(cv.lin_idx, idx...)
+    return @inbounds getindex(cv, linear_index)
 end
 Base.IndexStyle(::Type{ArrayOfVectorViews{<:Any, N}}) where N = Base.IndexStyle(Array{Int, N})
-
 
 # Structure for building this efficiently
 struct AdaptiveRange
     start::Int
-    ncurrent::Int   # These two could be UInt8 or similar in
-    nmax::Int       # many applications, but probably not worth.
+    ncurrent::Int
+    nmax::Int
 end
 
 struct ConstructionBuffer{T, N}
@@ -31,11 +36,13 @@ end
 function add!(b::ConstructionBuffer, val, indices...)
     r = getindex(b.indices, indices...)
     n = length(b.data)
-    if r.start == 0 # Not previously added
+    if r.start == 0
+        # `indices...` not previously added, allocate new space for it at the end of `b.data`
         resize!(b.data, n + b.sizehint)
         b.data[n+1] = val
         setindex!(b.indices, AdaptiveRange(n + 1, 1, b.sizehint), indices...)
-    elseif r.ncurrent == r.nmax # We have used up our space, move data to the end of the vector.
+    elseif r.ncurrent == r.nmax
+        # We have used up our space, move data associated with `indices...` to the end of `b.data`
         resize!(b.data, n + r.nmax + b.sizehint)
         for i in 1:r.ncurrent
             b.data[n + i] = b.data[r.start + i - 1]
@@ -49,26 +56,6 @@ function add!(b::ConstructionBuffer, val, indices...)
     return b
 end
 
-function compress_data!(data, indices, sorted_iterator, buffer_indices)
-    n = 0
-    for (index, r) in sorted_iterator
-        nstop = r.start + r.ncurrent - 1
-        for (iold, inew) in zip(r.start:nstop, (n + 1):(n + r.ncurrent))
-            @assert inew ≤ iold # To not overwrite
-            data[inew] = data[iold]
-        end
-        indices[index] = (n + 1):(n + r.ncurrent)
-        n += r.ncurrent
-    end
-    resize!(data, n)
-    sizehint!(data, n)      # Free memory
-    if buffer_indices isa Vector # Higher-dim Array's don't support empty!/resize!
-        empty!(buffer_indices)
-        sizehint!(buffer_indices, 0) # Free memory
-    end
-    return data, indices
-end
-
 function ArrayOfVectorViews(f!::F, data::Vector, dims::Tuple; sizehint = nothing) where {F <: Function}
     sizehint === nothing && error("Providing sizehint is mandatory")
     b = ConstructionBuffer(data, dims, sizehint)
@@ -76,10 +63,19 @@ function ArrayOfVectorViews(f!::F, data::Vector, dims::Tuple; sizehint = nothing
     return ArrayOfVectorViews(b)
 end
 
-function ArrayOfVectorViews(b::ConstructionBuffer)
-    I = sortperm(reshape(b.indices, :); by = x -> x.start)
-    sorted_iterator = ((idx, b.indices[idx]) for idx in I if b.indices[idx].start != 0)
-    indices = fill(1:0, size(b.indices))
-    compress_data!(b.data, indices, sorted_iterator, b.indices)
-    return ArrayOfVectorViews(indices, b.data)
+function ArrayOfVectorViews(b::ConstructionBuffer{T}) where T
+    indices = Vector{Int}(undef, length(b.indices) + 1)
+    lin_idx = LinearIndices(b.indices)
+    data_length = sum(ar.ncurrent for ar in b.indices)
+    data = Vector{T}(undef, data_length)
+    data_index = 1
+    for (idx, ar) in pairs(b.indices)
+        copyto!(data, data_index, b.data, ar.start, ar.ncurrent)
+        indices[lin_idx[idx]] = data_index
+        data_index += ar.ncurrent
+    end
+    indices[length(indices)] = data_index
+    resize!(b.data, 0); sizehint!(b.data, 0)
+    isa(b.indices, Vector) && (resize!(b.indices, 0); sizehint!(b.indices, 0))
+    return ArrayOfVectorViews(indices, data, lin_idx)
 end

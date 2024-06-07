@@ -129,7 +129,7 @@ function _add_single_vertex_neighbor!(vertex_table::ConstructionBuffer, cell::Ab
 end
 
 function build_vertex_to_cell(cells; max_vertices, nnodes)
-    vertex_to_cell = ArrayOfVectorViews(Int[], (nnodes,); sizehint = max_vertices) do cov
+    vertex_to_cell = ArrayOfVectorViews(sizehint!(Int[], max_vertices * nnodes), (nnodes,); sizehint = max_vertices) do cov
             for (cellid, cell) in enumerate(cells)
                 for vertex in vertices(cell)
                     add!(cov, cellid, vertex)
@@ -142,7 +142,8 @@ end
 function build_cell_neighbor(grid, cells, vertex_to_cell; ncells)
     # Note: The following could be optimized, since we loop over the cells in order,
     # there is no need to use the special adaptive indexing and then compress_data! in ArrayOfVectorViews.
-    return ArrayOfVectorViews(Int[], (ncells,); sizehint = _getsizehint(grid, CellIndex)) do cov
+    sizehint = _getsizehint(grid, CellIndex)
+    return ArrayOfVectorViews(sizehint!(Int[], ncells*sizehint), (ncells,); sizehint) do cov
             cell_neighbor_ids = Set{Int}()
             for (cell_id, cell) in enumerate(cells)
                 empty!(cell_neighbor_ids)
@@ -224,7 +225,7 @@ function ExclusiveTopology(grid::AbstractGrid{sdim}) where sdim
         for neighbor_cell_id in cell_neighbor[cell_id]
             neighbor_cell = cells[neighbor_cell_id]
             getrefdim(neighbor_cell) == getrefdim(cell) || error("Not supported")
-            num_shared_vertices = _num_shared_vertices(cell, neighbor_cell) # See grid/topology.jl
+            num_shared_vertices = _num_shared_vertices(cell, neighbor_cell)
             if num_shared_vertices == 1
                 _add_single_vertex_neighbor!(vertex_vertex_neighbor_buf, cell, cell_id, neighbor_cell, neighbor_cell_id)
             # Shared edge
