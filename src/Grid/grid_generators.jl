@@ -69,7 +69,6 @@ end
 
 function _generate_2d_nodes!(nodes::Vector{Node{2, T}}, nx, ny, LL, LR, UR, UL) where T
       for i in 0:ny-1
-
         ratio_bounds = convert(T, i) / (ny-1)
 
         x0 = LL[1] * (1 - ratio_bounds) + ratio_bounds * UL[1]
@@ -79,7 +78,6 @@ function _generate_2d_nodes!(nodes::Vector{Node{2, T}}, nx, ny, LL, LR, UR, UL) 
         y1 = LR[2] * (1 - ratio_bounds) + ratio_bounds * UR[2]
 
         for j in 0:nx-1
-           
             ratio = convert(T, j) / (nx-1)
             x = x0 * (1 - ratio) + ratio * x1
             y = y0 * (1 - ratio) + ratio * y1

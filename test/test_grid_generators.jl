@@ -1,8 +1,10 @@
 # Helper function to test grid generation for a given floating-point type
 function test_generate_grid(T::Type)
-
     # Define the cell types to test
-    cell_types = [Line, QuadraticLine, Quadrilateral,QuadraticQuadrilateral,Triangle,QuadraticTriangle,Hexahedron,Wedge,Pyramid,Tetrahedron,SerendipityQuadraticHexahedron]
+    cell_types = [
+        Line, QuadraticLine,
+        Quadrilateral, QuadraticQuadrilateral, Triangle, QuadraticTriangle,
+        Hexahedron, Wedge, Pyramid, Tetrahedron, SerendipityQuadraticHexahedron]
 
     # Loop over all cell types and test grid generation
     for CT in cell_types
