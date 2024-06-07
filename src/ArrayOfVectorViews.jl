@@ -66,7 +66,7 @@ end
 function ArrayOfVectorViews(b::ConstructionBuffer{T}) where T
     indices = Vector{Int}(undef, length(b.indices) + 1)
     lin_idx = LinearIndices(b.indices)
-    data_length = sum(ar.ncurrent for ar in b.indices)
+    data_length = sum(ar.ncurrent for ar in b.indices; init=0)
     data = Vector{T}(undef, data_length)
     data_index = 1
     for (idx, ar) in pairs(b.indices)
