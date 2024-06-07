@@ -15,7 +15,6 @@ function test_generate_grid(T::Type)
         grid = generate_grid(CT, nels, left, right)
         @test isa(grid, Grid{rdim, CT, T})
     end
-   
 end
 
 # Run tests for different floating-point types
