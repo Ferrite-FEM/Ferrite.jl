@@ -293,12 +293,12 @@ function generate_grid(::Type{Pyramid}, nel::NTuple{3,Int}, left::Vec{3,T}=Vec{3
 
     #Center node in each "voxel"
     for k in 1:nel_z, j in 1:nel_y, i in 1:nel_x
-        # midx = 0.5(coords_x[i+1] + coords_x[i]) # old code, this will be always Float64 regardless of the element type of left
-        # midy = 0.5(coords_y[j+1] + coords_y[j]) # old code, this will be always Float64 regardless of the element type of left
-        # midz = 0.5(coords_z[k+1] + coords_z[k]) # old code, this will be always Float64 regardless of the element type of left
-        midx = convert(T, coords_x[i+1] + coords_x[i]) / 2
-        midy = convert(T, coords_y[j+1] + coords_y[j]) / 2
-        midz = convert(T, coords_z[k+1] + coords_z[k]) / 2
+        # midx = 0.5(coords_x[i+1] + coords_x[i]) # old code, this will be always Float64 regardless of T
+        # midy = 0.5(coords_y[j+1] + coords_y[j]) # old code, this will be always Float64 regardless of T
+        # midz = 0.5(coords_z[k+1] + coords_z[k]) # old code, this will be always Float64 regardless of T
+        midx = (coords_x[i+1] + coords_x[i]) / 2
+        midy = (coords_y[j+1] + coords_y[j]) / 2
+        midz = (coords_z[k+1] + coords_z[k]) / 2
         push!(nodes, Node((midx, midy, midz)))
     end
 
