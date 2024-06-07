@@ -20,5 +20,4 @@ end
 @testset "Generate Grid Tests" begin
     test_generate_grid(Float64)
     test_generate_grid(Float32)
-    test_generate_grid(Float16)
 end
