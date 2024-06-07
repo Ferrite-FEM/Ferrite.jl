@@ -40,127 +40,6 @@ end
 
 abstract type AbstractTopology end
 
-# Guess of how many neighbors depending on grid dimension and index type.
-# This is just a performance optimization, and a good default is sufficient.
-_getsizehint(::AbstractGrid{3}, ::Type{FaceIndex}) = 1 # 2
-_getsizehint(::AbstractGrid, ::Type{FaceIndex}) = 0 # No faces exists in 2d or lower dim
-_getsizehint(::AbstractGrid{dim}, ::Type{EdgeIndex}) where dim = 1 #dim^2
-_getsizehint(::AbstractGrid{dim}, ::Type{VertexIndex}) where dim = 1 # 2^dim
-_getsizehint(::AbstractGrid{1}, ::Type{CellIndex}) = 2
-_getsizehint(::AbstractGrid{2}, ::Type{CellIndex}) = 12
-function _getsizehint(g::AbstractGrid{3}, ::Type{CellIndex})
-    CT = getcelltype(g)
-    if isconcretetype(CT)
-        RS = getrefshape(CT)
-        RS === RefHexahedron && return 26
-        RS === RefTetrahedron && return 70
-    end
-    return 70 # Assume that there are some RefTetrahedron
-end
-
-"Return the highest number of vertices, edges, and faces per cell"
-function _max_nentities_per_cell(cells::Vector{C}) where C
-    if isconcretetype(C)
-        cell = first(cells)
-        return nvertices(cell), nedges(cell), nfaces(cell)
-    else
-        celltypes = Set(typeof.(cells))
-        max_vertices = 0
-        max_edges = 0
-        max_faces = 0
-        for celltype in celltypes
-            celltypeidx = findfirst(x -> isa(x, celltype), cells)
-            max_vertices = max(max_vertices, nvertices(cells[celltypeidx]))
-            max_edges = max(max_edges, nedges(cells[celltypeidx]))
-            max_faces = max(max_faces, nfaces(cells[celltypeidx]))
-        end
-        return max_vertices, max_edges, max_faces
-    end
-end
-
-function _num_shared_vertices(cell_a::C1, cell_b::C2) where {C1, C2}
-    num_shared_vertices = 0
-    for vertex ∈ vertices(cell_a)
-        for vertex_neighbor ∈ vertices(cell_b)
-            if vertex_neighbor == vertex
-                num_shared_vertices += 1
-                continue
-            end
-        end
-    end
-    return num_shared_vertices
-end
-
-function _add_single_face_neighbor!(face_table::ConstructionBuffer, cell::AbstractCell, cell_id::Int, cell_neighbor::AbstractCell, cell_neighbor_id::Int)
-    for (lfi, face) ∈ enumerate(faces(cell))
-        uniqueface = sortface_fast(face)
-        for (lfi2, face_neighbor) ∈ enumerate(faces(cell_neighbor))
-            uniqueface2 = sortface_fast(face_neighbor)
-            if uniqueface == uniqueface2
-                add!(face_table, FaceIndex(cell_neighbor_id, lfi2), cell_id, lfi)
-                return
-            end
-        end
-    end
-end
-
-function _add_single_edge_neighbor!(edge_table::ConstructionBuffer, cell::AbstractCell, cell_id::Int, cell_neighbor::AbstractCell, cell_neighbor_id::Int)
-    for (lei, edge) ∈ enumerate(edges(cell))
-        uniqueedge = sortedge_fast(edge)
-        for (lei2, edge_neighbor) ∈ enumerate(edges(cell_neighbor))
-            uniqueedge2 = sortedge_fast(edge_neighbor)
-            if uniqueedge == uniqueedge2
-                add!(edge_table, EdgeIndex(cell_neighbor_id, lei2), cell_id, lei)
-                return
-            end
-        end
-    end
-end
-
-function _add_single_vertex_neighbor!(vertex_table::ConstructionBuffer, cell::AbstractCell, cell_id::Int, cell_neighbor::AbstractCell, cell_neighbor_id::Int)
-    for (lvi, vertex) ∈ enumerate(vertices(cell))
-        for (lvi2, vertex_neighbor) ∈ enumerate(vertices(cell_neighbor))
-            if vertex_neighbor == vertex
-                add!(vertex_table, VertexIndex(cell_neighbor_id, lvi2), cell_id, lvi)
-                break
-            end
-        end
-    end
-end
-
-function build_vertex_to_cell(cells; max_vertices, nnodes)
-    vertex_to_cell = ArrayOfVectorViews(sizehint!(Int[], max_vertices * nnodes), (nnodes,); sizehint = max_vertices) do cov
-            for (cellid, cell) in enumerate(cells)
-                for vertex in vertices(cell)
-                    add!(cov, cellid, vertex)
-                end
-            end
-        end
-    return vertex_to_cell
-end
-
-function build_cell_neighbor(grid, cells, vertex_to_cell; ncells)
-    # Note: The following could be optimized, since we loop over the cells in order,
-    # there is no need to use the special adaptive indexing and then compress_data! in ArrayOfVectorViews.
-    sizehint = _getsizehint(grid, CellIndex)
-    return ArrayOfVectorViews(sizehint!(Int[], ncells*sizehint), (ncells,); sizehint) do cov
-            cell_neighbor_ids = Set{Int}()
-            for (cell_id, cell) in enumerate(cells)
-                empty!(cell_neighbor_ids)
-                for vertex ∈ vertices(cell)
-                    for vertex_cell_id ∈ vertex_to_cell[vertex]
-                        if vertex_cell_id != cell_id
-                            push!(cell_neighbor_ids, vertex_cell_id)
-                        end
-                    end
-                end
-                for neighbor_id in cell_neighbor_ids
-                    add!(cov, neighbor_id, cell_id)
-                end
-            end
-        end
-end
-
 """
     ExclusiveTopology(cells::Vector{C}) where C <: AbstractCell
     ExclusiveTopology(grid::Grid)
@@ -254,6 +133,127 @@ _get_facet_facet_neighborhood(t::ExclusiveTopology, #=rdim=#::Val{3}) = t.face_f
 function _get_facet_facet_neighborhood(::ExclusiveTopology, #=rdim=#::Val{:mixed})
     throw(ArgumentError("get_facet_facet_neightborhood is only supported for grids containing cells with the same reference dimension.
     Access the `vertex_vertex_neighbor`, `edge_edge_neighbor`, or `face_face_neighbor` fields explicitly instead."))
+end
+
+# Guess of how many neighbors depending on grid dimension and index type.
+# This is just a performance optimization, and a good default is sufficient.
+_getsizehint(::AbstractGrid{3}, ::Type{FaceIndex}) = 1 # 2
+_getsizehint(::AbstractGrid, ::Type{FaceIndex}) = 0 # No faces exists in 2d or lower dim
+_getsizehint(::AbstractGrid{dim}, ::Type{EdgeIndex}) where dim = 1 #dim^2
+_getsizehint(::AbstractGrid{dim}, ::Type{VertexIndex}) where dim = 1 # 2^dim
+_getsizehint(::AbstractGrid{1}, ::Type{CellIndex}) = 2
+_getsizehint(::AbstractGrid{2}, ::Type{CellIndex}) = 12
+function _getsizehint(g::AbstractGrid{3}, ::Type{CellIndex})
+    CT = getcelltype(g)
+    if isconcretetype(CT)
+        RS = getrefshape(CT)
+        RS === RefHexahedron && return 26
+        RS === RefTetrahedron && return 70
+    end
+    return 70 # Assume that there are some RefTetrahedron
+end
+
+function _num_shared_vertices(cell_a::C1, cell_b::C2) where {C1, C2}
+    num_shared_vertices = 0
+    for vertex ∈ vertices(cell_a)
+        for vertex_neighbor ∈ vertices(cell_b)
+            if vertex_neighbor == vertex
+                num_shared_vertices += 1
+                continue
+            end
+        end
+    end
+    return num_shared_vertices
+end
+
+"Return the highest number of vertices, edges, and faces per cell"
+function _max_nentities_per_cell(cells::Vector{C}) where C
+    if isconcretetype(C)
+        cell = first(cells)
+        return nvertices(cell), nedges(cell), nfaces(cell)
+    else
+        celltypes = Set(typeof.(cells))
+        max_vertices = 0
+        max_edges = 0
+        max_faces = 0
+        for celltype in celltypes
+            celltypeidx = findfirst(x -> isa(x, celltype), cells)
+            max_vertices = max(max_vertices, nvertices(cells[celltypeidx]))
+            max_edges = max(max_edges, nedges(cells[celltypeidx]))
+            max_faces = max(max_faces, nfaces(cells[celltypeidx]))
+        end
+        return max_vertices, max_edges, max_faces
+    end
+end
+
+function _add_single_face_neighbor!(face_table::ConstructionBuffer, cell::AbstractCell, cell_id::Int, cell_neighbor::AbstractCell, cell_neighbor_id::Int)
+    for (lfi, face) ∈ enumerate(faces(cell))
+        uniqueface = sortface_fast(face)
+        for (lfi2, face_neighbor) ∈ enumerate(faces(cell_neighbor))
+            uniqueface2 = sortface_fast(face_neighbor)
+            if uniqueface == uniqueface2
+                add!(face_table, FaceIndex(cell_neighbor_id, lfi2), cell_id, lfi)
+                return
+            end
+        end
+    end
+end
+
+function _add_single_edge_neighbor!(edge_table::ConstructionBuffer, cell::AbstractCell, cell_id::Int, cell_neighbor::AbstractCell, cell_neighbor_id::Int)
+    for (lei, edge) ∈ enumerate(edges(cell))
+        uniqueedge = sortedge_fast(edge)
+        for (lei2, edge_neighbor) ∈ enumerate(edges(cell_neighbor))
+            uniqueedge2 = sortedge_fast(edge_neighbor)
+            if uniqueedge == uniqueedge2
+                add!(edge_table, EdgeIndex(cell_neighbor_id, lei2), cell_id, lei)
+                return
+            end
+        end
+    end
+end
+
+function _add_single_vertex_neighbor!(vertex_table::ConstructionBuffer, cell::AbstractCell, cell_id::Int, cell_neighbor::AbstractCell, cell_neighbor_id::Int)
+    for (lvi, vertex) ∈ enumerate(vertices(cell))
+        for (lvi2, vertex_neighbor) ∈ enumerate(vertices(cell_neighbor))
+            if vertex_neighbor == vertex
+                add!(vertex_table, VertexIndex(cell_neighbor_id, lvi2), cell_id, lvi)
+                break
+            end
+        end
+    end
+end
+
+function build_vertex_to_cell(cells; max_vertices, nnodes)
+    vertex_to_cell = ArrayOfVectorViews(sizehint!(Int[], max_vertices * nnodes), (nnodes,); sizehint = max_vertices) do cov
+            for (cellid, cell) in enumerate(cells)
+                for vertex in vertices(cell)
+                    add!(cov, cellid, vertex)
+                end
+            end
+        end
+    return vertex_to_cell
+end
+
+function build_cell_neighbor(grid, cells, vertex_to_cell; ncells)
+    # Note: The following could be optimized, since we loop over the cells in order,
+    # there is no need to use the special adaptive indexing and then compress_data! in ArrayOfVectorViews.
+    sizehint = _getsizehint(grid, CellIndex)
+    return ArrayOfVectorViews(sizehint!(Int[], ncells*sizehint), (ncells,); sizehint) do cov
+            cell_neighbor_ids = Set{Int}()
+            for (cell_id, cell) in enumerate(cells)
+                empty!(cell_neighbor_ids)
+                for vertex ∈ vertices(cell)
+                    for vertex_cell_id ∈ vertex_to_cell[vertex]
+                        if vertex_cell_id != cell_id
+                            push!(cell_neighbor_ids, vertex_cell_id)
+                        end
+                    end
+                end
+                for neighbor_id in cell_neighbor_ids
+                    add!(cov, neighbor_id, cell_id)
+                end
+            end
+        end
 end
 
 function getneighborhood(top::ExclusiveTopology, grid::AbstractGrid, cellidx::CellIndex, include_self=false)
