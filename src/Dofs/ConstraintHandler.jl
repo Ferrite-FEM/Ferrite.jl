@@ -238,6 +238,7 @@ function close!(ch::ConstraintHandler)
             i == 0 && continue
             icoeffs = ch.dofcoefficients[i]
             if !(icoeffs === nothing || isempty(icoeffs))
+                @debug @info "Nested affine constraint detected for $coeffs and $i"
                 error("nested affine constraints currently not supported")
             end
         end

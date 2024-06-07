@@ -69,7 +69,8 @@ bibtex_plugin = CitationBibliography(
             "topics/boundary_conditions.md",
             "topics/constraints.md",
             "topics/grid.md",
-            "topics/export.md"
+            "topics/export.md",
+            "topics/amr.md"
         ],
         "API reference" => [
             "Reference overview" => "reference/index.md",

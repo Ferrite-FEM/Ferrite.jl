@@ -103,6 +103,8 @@ export
     addcellset!,
     transform_coordinates!,
     generate_grid,
+# AdaptiveGrid
+    ForestBWG,
 
 # Grid coloring
     create_coloring,
@@ -132,6 +134,7 @@ export
     collect_periodic_facets!,
     PeriodicFacetPair,
     AffineConstraint,
+    ConformityConstraint,
     update!,
     apply!,
     apply_rhs!,

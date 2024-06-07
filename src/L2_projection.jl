@@ -6,6 +6,7 @@ struct L2Projector <: AbstractProjector
     geom_ip::Interpolation
     M_cholesky #::SuiteSparse.CHOLMOD.Factor{Float64}
     dh::DofHandler
+    ch::ConstraintHandler
     set::OrderedSet{Int}
 end
 
@@ -56,10 +57,15 @@ function L2Projector(
     add!(sdh, :_, func_ip) # we need to create the field, but the interpolation is not used here
     close!(dh)
 
-    M = _assemble_L2_matrix(fe_values_mass, _set, dh)  # the "mass" matrix
-    M_cholesky = cholesky(M)
+    ch_hanging = ConstraintHandler(dh)
+    if grid isa NonConformingGrid
+        add!(ch_hanging, ConformityConstraint(:_))
+    end
+    close!(ch_hanging);
+    M = _assemble_L2_matrix(fe_values_mass, set, dh, ch_hanging)  # the "mass" matrix
+    #apply!(M,ch_hanging)
 
-    return L2Projector(func_ip, geom_ip, M_cholesky, dh, _set)
+    return L2Projector(func_ip, geom_ip, M, dh, ch_hanging, _set)
 end
 
 # Quadrature sufficient for integrating a mass matrix
@@ -78,10 +84,10 @@ function Base.show(io::IO, ::MIME"text/plain", proj::L2Projector)
     println(io, "  geometric interpolation: ", proj.geom_ip)
 end
 
-function _assemble_L2_matrix(fe_values, set, dh)
+function _assemble_L2_matrix(fe_values, set, dh, ch)
 
     n = Ferrite.getnbasefunctions(fe_values)
-    M = create_symmetric_sparsity_pattern(dh)
+    M = create_sparsity_pattern(dh, ch)
     assembler = start_assemble(M)
 
     Me = zeros(n, n)
@@ -190,6 +196,7 @@ function _project(vars, proj::L2Projector, fe_values::AbstractValues, M::Integer
 
     get_data(x::AbstractTensor, i) = x.data[i]
     get_data(x::Number, i) = x
+    ch = proj.ch
 
     ## Assemble contributions from each cell
     for (ic,cellnum) in enumerate(proj.set)
@@ -216,8 +223,16 @@ function _project(vars, proj::L2Projector, fe_values::AbstractValues, M::Integer
         end
     end
 
-    # solve for the projected nodal values
-    projected_vals = proj.M_cholesky \ f
+    # Correctly apply affine constraints
+    projected_vals = similar(f)
+    rhsdata = get_rhs_data(ch,proj.M_cholesky)
+    apply!(proj.M_cholesky,ch)
+    for (i,col) in enumerate(eachcol(f))
+        apply_rhs!(rhsdata, col, ch)
+        u = proj.M_cholesky \ col
+        apply!(u, ch)
+        projected_vals[:,i] = u
+    end
 
     # Recast to original input type
     make_T(vals) = T <: AbstractTensor ? T(Tuple(vals)) : vals[1]
