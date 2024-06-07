@@ -274,6 +274,21 @@ function getneighborhood(top::ExclusiveTopology, grid::AbstractGrid, faceidx::Fa
     end
 end
 
+function getneighborhood(top::ExclusiveTopology, grid::AbstractGrid, vertexidx::VertexIndex, include_self=false)
+    cellid, local_vertexid = vertexidx[1], vertexidx[2]
+    cell_vertices = vertices(getcells(grid,cellid))
+    global_vertexid = cell_vertices[local_vertexid]
+    vertex_to_cell = top.vertex_to_cell[global_vertexid]
+    self_reference_local = Vector{VertexIndex}()
+    sizehint!(self_reference_local, length(vertex_to_cell))
+    for (i,cellid) in enumerate(vertex_to_cell)
+        local_vertex = VertexIndex(cellid,findfirst(x->x==global_vertexid,vertices(getcells(grid,cellid)))::Int)
+        !include_self && local_vertex == vertexidx && continue
+        push!(self_reference_local, local_vertex)
+    end
+    return view(self_reference_local, 1:length(self_reference_local))
+end
+
 function getneighborhood(top::ExclusiveTopology, grid::AbstractGrid, edgeidx::EdgeIndex, include_self=false)
     cellid, local_edgeidx = edgeidx[1], edgeidx[2]
     cell_edges = edges(getcells(grid, cellid))
@@ -292,21 +307,6 @@ function getneighborhood(top::ExclusiveTopology, grid::AbstractGrid, edgeidx::Ed
         neighbors = unique([top.edge_edge_neighbor[cellid, local_edgeidx]; self_reference_local])
     end
     return view(neighbors, 1:length(neighbors))
-end
-
-function getneighborhood(top::ExclusiveTopology, grid::AbstractGrid, vertexidx::VertexIndex, include_self=false)
-    cellid, local_vertexid = vertexidx[1], vertexidx[2]
-    cell_vertices = vertices(getcells(grid,cellid))
-    global_vertexid = cell_vertices[local_vertexid]
-    vertex_to_cell = top.vertex_to_cell[global_vertexid]
-    self_reference_local = Vector{VertexIndex}()
-    sizehint!(self_reference_local, length(vertex_to_cell))
-    for (i,cellid) in enumerate(vertex_to_cell)
-        local_vertex = VertexIndex(cellid,findfirst(x->x==global_vertexid,vertices(getcells(grid,cellid)))::Int)
-        !include_self && local_vertex == vertexidx && continue
-        push!(self_reference_local, local_vertex)
-    end
-    return view(self_reference_local, 1:length(self_reference_local))
 end
 
 function getneighborhood(top::ExclusiveTopology, grid::AbstractGrid, facetindex::FacetIndex, include_self=false)
