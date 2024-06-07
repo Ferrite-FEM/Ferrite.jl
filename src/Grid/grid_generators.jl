@@ -70,10 +70,6 @@ end
 function _generate_2d_nodes!(nodes::Vector{Node{2, T}}, nx, ny, LL, LR, UR, UL) where T
       for i in 0:ny-1
 
-        # This float division will be by default Float64, 
-        # so we need to convert it to the same type as element type of LL
-        # e.g. LL = Vec{2,Float16} -> eltype(LL) = Float16
-        # ratio_bounds =  (i / (ny-1)) # old code
         ratio_bounds = convert(T, i) / (ny-1)
 
         x0 = LL[1] * (1 - ratio_bounds) + ratio_bounds * UL[1]
@@ -83,10 +79,7 @@ function _generate_2d_nodes!(nodes::Vector{Node{2, T}}, nx, ny, LL, LR, UR, UL) 
         y1 = LR[2] * (1 - ratio_bounds) + ratio_bounds * UR[2]
 
         for j in 0:nx-1
-            # This float division will be by default Float64, 
-            # so we need to convert it to the same type as element type of LL
-            # e.g. LL = Vec{2,Float16} -> eltype(LL) = Float16
-            # ratio = j / (nx-1) # old code
+           
             ratio = convert(T, j) / (nx-1)
             x = x0 * (1 - ratio) + ratio * x1
             y = y0 * (1 - ratio) + ratio * y1
@@ -293,9 +286,6 @@ function generate_grid(::Type{Pyramid}, nel::NTuple{3,Int}, left::Vec{3,T}=Vec{3
 
     #Center node in each "voxel"
     for k in 1:nel_z, j in 1:nel_y, i in 1:nel_x
-        # midx = 0.5(coords_x[i+1] + coords_x[i]) # old code, this will be always Float64 regardless of T
-        # midy = 0.5(coords_y[j+1] + coords_y[j]) # old code, this will be always Float64 regardless of T
-        # midz = 0.5(coords_z[k+1] + coords_z[k]) # old code, this will be always Float64 regardless of T
         midx = (coords_x[i+1] + coords_x[i]) / 2
         midy = (coords_y[j+1] + coords_y[j]) / 2
         midz = (coords_z[k+1] + coords_z[k]) / 2
