@@ -235,25 +235,32 @@ function build_vertex_to_cell(cells; max_vertices, nnodes)
 end
 
 function build_cell_neighbor(grid, cells, vertex_to_cell; ncells)
-    # Note: The following could be optimized, since we loop over the cells in order,
-    # there is no need to use the special adaptive indexing and then compress_data! in ArrayOfVectorViews.
+    # In this case, we loop over the cells in order and all all neighbors at once.
+    # Then we can create ArrayOfVectorViews directly without the ConstructionBuffer
     sizehint = _getsizehint(grid, CellIndex)
-    return ArrayOfVectorViews(sizehint!(Int[], ncells*sizehint), (ncells,); sizehint) do cov
-            cell_neighbor_ids = Set{Int}()
-            for (cell_id, cell) in enumerate(cells)
-                empty!(cell_neighbor_ids)
-                for vertex ∈ vertices(cell)
-                    for vertex_cell_id ∈ vertex_to_cell[vertex]
-                        if vertex_cell_id != cell_id
-                            push!(cell_neighbor_ids, vertex_cell_id)
-                        end
-                    end
-                end
-                for neighbor_id in cell_neighbor_ids
-                    add!(cov, neighbor_id, cell_id)
+    data = empty!(Vector{Int}(undef, ncells * sizehint))
+
+    indices = Vector{Int}(undef, ncells + 1)
+    # cell_neighbor_ids = Set{Int}() #TODO: Remove, just show old version to make review easier
+    cell_neighbor_ids = Int[] # Faster than Set in combination with ∈ || check below
+    n = 1
+    for (cell_id, cell) in enumerate(cells)
+        empty!(cell_neighbor_ids)
+        for vertex ∈ vertices(cell)
+            for vertex_cell_id ∈ vertex_to_cell[vertex]
+                if vertex_cell_id != cell_id
+                    vertex_cell_id ∈ cell_neighbor_ids || push!(cell_neighbor_ids, vertex_cell_id)
+                    # push!(cell_neighbor_ids, vertex_cell_id) #TODO: Remove, just show old version to make review easier
                 end
             end
         end
+        indices[cell_id] = n
+        append!(data, cell_neighbor_ids)
+        n += length(cell_neighbor_ids)
+    end
+    indices[end] = n
+    sizehint!(data, length(data)) # Tell julia that we won't add more data
+    return ArrayOfVectorViews(indices, data, LinearIndices(1:ncells))
 end
 
 function getneighborhood(top::ExclusiveTopology, grid::AbstractGrid, cellidx::CellIndex, include_self=false)
