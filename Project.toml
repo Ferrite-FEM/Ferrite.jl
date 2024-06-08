@@ -24,7 +24,7 @@ FerriteBlockArrays = "BlockArrays"
 FerriteMetis = "Metis"
 
 [compat]
-BlockArrays = "0.16"
+BlockArrays = "0.16, 1"
 EnumX = "1"
 Metis = "1.3"
 NearestNeighbors = "0.4"
