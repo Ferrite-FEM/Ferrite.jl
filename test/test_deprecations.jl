@@ -122,4 +122,8 @@ end
     @test_throws ErrorException(msg) Ferrite.getfielddim(dh.subdofhandlers[1], :u)
 end
 
+@testset "default_interpolation" begin
+    @test (@test_deprecated Ferrite.default_interpolation(Triangle)) == Lagrange{RefTriangle, 1}
+end
+
 end # testset deprecations
