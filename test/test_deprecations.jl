@@ -123,7 +123,7 @@ end
 end
 
 @testset "default_interpolation" begin
-    @test (@test_deprecated Ferrite.default_interpolation(Triangle)) == Lagrange{RefTriangle, 1}()
+    @test Ferrite.default_interpolation(Triangle) == geometric_interpolation(Triangle)
 end
 
 end # testset deprecations
