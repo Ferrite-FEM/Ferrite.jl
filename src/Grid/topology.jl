@@ -91,8 +91,8 @@ function ExclusiveTopology(grid::AbstractGrid{sdim}) where sdim
     vertex_to_cell = build_vertex_to_cell(cells; max_vertices, nnodes)
     cell_neighbor = build_cell_neighbor(grid, cells, vertex_to_cell; ncells)
 
-    # Here we don't use the convenience constructor taking a function, since we want to do it simultaneously for 3 data-types
-    # This also allows giving a sizehint to the underlying vectors
+    # Here we don't use the convenience constructor taking a function,
+    # since we want to do it simultaneously for 3 data-types
     facedata = sizehint!(FaceIndex[], ncells * max_faces * _getsizehint(grid, FaceIndex))
     face_face_neighbor_buf = ConstructionBuffer(facedata, (ncells, max_faces), _getsizehint(grid, FaceIndex))
     edgedata = sizehint!(EdgeIndex[], ncells * max_edges * _getsizehint(grid, EdgeIndex))
