@@ -15,3 +15,19 @@ Ferrite.RefTetrahedron
 Ferrite.RefHexahedron
 Ferrite.RefPrism
 ```
+
+### Required methods to implement for all subtypes of `AbstractRefShape` to define a new reference element
+
+```@docs
+Ferrite.geometric_interpolation(::Ferrite.AbstractRefShape)
+Ferrite.reference_vertices(::Ferrite.AbstractRefShape)
+Ferrite.reference_edges(::Ferrite.AbstractRefShape)
+Ferrite.reference_faces(::Ferrite.AbstractRefShape)
+```
+
+which automatically defines
+
+
+```@docs
+Ferrite.reference_facets(::Ferrite.AbstractRefShape)
+```

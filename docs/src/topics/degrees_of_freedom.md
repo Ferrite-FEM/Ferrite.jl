@@ -25,8 +25,8 @@ need to specify number of components for the field. Here we add a vector field `
 (2 components for a 2D problem) and a scalar field `:p`.
 
 ```@example dofs
-add!(dh, :u, Lagrange{2,RefTetrahedron,1}()^2)
-add!(dh, :p, Lagrange{2,RefTetrahedron,1}())
+add!(dh, :u, Lagrange{RefTriangle, 1}()^2)
+add!(dh, :p, Lagrange{RefTriangle, 1}())
 # hide
 ```
 
@@ -53,12 +53,12 @@ quadratic interpolation, and our `:p` field with a linear approximation.
 
 ```@example dofs
 dh = DofHandler(grid) # hide
-add!(dh, :u, Lagrange{2,RefTetrahedron,2}()^2)
-add!(dh, :p, Lagrange{2,RefTetrahedron,1}())
+add!(dh, :u, Lagrange{RefTriangle, 2}()^2)
+add!(dh, :p, Lagrange{RefTriangle, 1}())
 # hide
 ```
 
 ## Ordering of Dofs
 
 ordered in the same order as we add to dofhandler
-nodes -> (edges ->) faces -> cells
+vertices -> edges -> faces -> volumes

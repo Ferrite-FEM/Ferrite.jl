@@ -18,7 +18,7 @@ Either, a mesh is created on the fly with the gmsh API or a mesh in `.msh` or `.
 ```@docs
 FerriteGmsh.togrid
 ```
-`FerriteGmsh.jl` supports currently the translation of `cellsets` and `facesets`.
+`FerriteGmsh.jl` supports currently the translation of `cellsets` and `facetsets`.
 Such sets are defined in Gmsh as `PhysicalGroups` of dimension `dim` and `dim-1`, respectively.
 In case only a part of the mesh is the domain, the domain can be specified by providing the keyword argument `domain` the name of the `PhysicalGroups` in the [`FerriteGmsh.togrid`](@ref) function.
 
@@ -71,67 +71,94 @@ julia> cells = [
 ```
 
 where each Quadrilateral, which is a subtype of `AbstractCell` saves in the field `nodes` the tuple of node IDs.
-Additionally, the data structure `Grid` can hold node-, face- and cellsets.
+Additionally, the data structure `Grid` can hold node-, facet- and cellsets.
 All of these three sets are defined by a dictionary that maps a string key to a `Set`.
 For the special case of node- and cellsets the dictionary's value is of type `Set{Int}`, i.e. a keyword is mapped to a node or cell ID, respectively.
 
-Facesets are a more elaborate construction. They map a `String` key to a `Set{FaceIndex}`, where each `FaceIndex` consists of `(global_cell_id, local_face_id)`.
-In order to understand the `local_face_id` properly, one has to consider the reference space of the element, which typically is spanned by a product of the interval ``[-1, 1]`` and in this particular example ``[-1, 1] \times [-1, 1]``.
-In this space a local numbering of nodes and faces exists, i.e.
+Facesets are a more elaborate construction. They map a `String` key to a `Set{FaceIndex}`, where each `FaceIndex` consists of `(global_cell_id, local_facet_id)`.
+In order to understand the `local_facet_id` properly, one has to consider the reference space of the element, which typically is spanned by a product of the interval ``[-1, 1]`` and in this particular example ``[-1, 1] \times [-1, 1]``.
+In this space a local numbering of nodes and facets exists, i.e.
 
 
 ![local element](./assets/local_element.svg)
 
 
-The example shows a local face ID ordering, defined as:
+The example shows a local edge ordering, defined as:
 
 ```julia
-faces(::Lagrange{2,RefCube,1}) = ((1,2), (2,3), (3,4), (4,1))
+Ferrite.reference_facets(RefQuadrilateral) = ((1,2), (2,3), (3,4), (4,1))
 ```
 
-Other face ID definitions [can be found in the src files](https://github.com/Ferrite-FEM/Ferrite.jl/blob/8224282ab4d67cb523ef342e4a6ceb1716764ada/src/interpolations.jl#L154) in the corresponding `faces` dispatch.
+Other facet definitions can be found in the src file `src/Grid/grid.jl` in the corresponding dispatches for [`reference_facets`](@ref Ferrite.reference_facets). Furthermorem you can query specific information about subentities via [`reference_vertices`](@ref Ferrite.reference_vertices), [`reference_edges`](@ref Ferrite.reference_edges) and [`reference_faces`](@ref Ferrite.reference_faces).
 
 
-The highlighted face, i.e. the two lines from node ID 3 to 6 and from 6 to 9, on the right hand side of our test mesh can now be described as
+The highlighted facet, i.e. the two lines from node ID 3 to 6 and from 6 to 9, on the right hand side of our test mesh can now be described as
 
 ```julia
-julia> faces = [
+julia> facets = [
            (3,6),
            (6,9)
        ]
 ```
 
-The local ID can be constructed based on elements, corresponding faces and chosen interpolation, since the face ordering is interpolation dependent.
+Now to a full example. Let us reconstruct the local facets of a grid boundary with the decsribed machinery to see how everything
+fits together:
 ```julia
-julia> function compute_faceset(cells, global_faces, ip::Interpolation{dim}) where {dim}
-           local_faces = Ferrite.faces(ip)
-           nodes_per_face = length(local_faces[1])
-           d = Dict{NTuple{nodes_per_face, Int}, FaceIndex}()
+julia> function recompute_facetset_on_boundary(cells, global_facets)
+           # Facets in 2D are edges and have two vertices
+           d = Dict{NTuple{2, Int}, FacetIndex}()
            for (c, cell) in enumerate(cells) # c is global cell number
-               for (f, face) in enumerate(local_faces) # f is local face number
-                   # store the global nodes for the particular element, local face combination
-                   d[ntuple(i-> cell.nodes[face[i]], nodes_per_face)] = FaceIndex(c, f)
+               # Grab all local facets
+               local_facets = Ferrite.reference_facets(cell)
+               for (f, facet) in enumerate(local_facets) # f is local facet number
+                   # Translate into global nodes
+                   global_facet = ntuple(i-> cell.nodes[facet[i]], length(facet))
+                   d[global_facet] = FacetIndex(c, f)
                end
            end
 
-           faces = Vector{FaceIndex}()
-           for face in global_faces
-               # lookup the element, local face combination for this face
-               push!(faces, d[face])
+           facets = Vector{FacetIndex}()
+           for facet in global_facets
+               # lookup the element, local facet combination for this facet
+               push!(facets, d[facet])
            end
 
-           return faces
+           return facets
        end
 
-julia> interpolation = Lagrange{2, RefCube, 1}()
-
-julia> compute_faceset(cells, faces, interpolation)
-Vector{FaceIndex} with 2 elements:
-  FaceIndex((2, 2))
-  FaceIndex((4, 2))
+julia> recompute_facetset_on_boundary(cells, facets)
+Vector{FacetIndex} with 2 elements:
+  FacetIndex((2, 2))
+  FacetIndex((4, 2))
 ```
 
-Ferrite considers edges only in the three dimensional space. However, they share the concepts of faces in terms of `(global_cell_id,local_edge_id)` identifier.
+Note that this example can be simplified by directly using `Ferrite.facets`:
+
+```julia
+julia> function recompute_facetset_on_boundary_alternative(cells, global_facets)
+           # Facets in 2D are edges and have two vertices
+           d = Dict{NTuple{2, Int}, FacetIndex}()
+           for (c, cell) in enumerate(cells) # c is global cell number
+               # Grab all local facets
+               for (f, global_facet) in enumerate(Ferrite.facets(cell)) # f is local facet number
+                   d[global_facet] = FacetIndex(c, f)
+               end
+           end
+
+           facets = Vector{FacetIndex}()
+           for facet in global_facets
+               # lookup the element, local facet combination for this facet
+               push!(facets, d[facet])
+           end
+
+           return facets
+       end
+
+julia> recompute_facetset_on_boundary_alternative(cells, facets)
+Vector{FacetIndex} with 2 elements:
+  FacetIndex((2, 2))
+  FacetIndex((4, 2))
+```
 
 ## AbstractGrid
 
@@ -182,6 +209,6 @@ In order to use boundaries, e.g. for Dirichlet constraints in the ConstraintHand
 
 ## Topology
 
-Ferrite.jl's `Grid` type offers experimental features w.r.t. topology information. The functions [`Ferrite.getneighborhood`](@ref) and [`Ferrite.faceskeleton`](@ref)
+Ferrite.jl's `Grid` type offers experimental features w.r.t. topology information. The functions [`Ferrite.getneighborhood`](@ref) and [`Ferrite.facetskeleton`](@ref)
 are the interface to obtain topological information. The [`Ferrite.getneighborhood`](@ref) can construct lists of directly connected entities based on a given entity (`CellIndex,FaceIndex,EdgeIndex,VertexIndex`).
-The [`Ferrite.faceskeleton`](@ref) function can be used to evaluate integrals over material interfaces or computing element interface values such as jumps.
+The [`Ferrite.facetskeleton`](@ref) function can be used to evaluate integrals over material interfaces or computing element interface values such as jumps.
