@@ -80,7 +80,7 @@ end
 
 function _assemble_L2_matrix(fe_values, set, dh)
 
-    n = Ferrite.getnbasefunctions(fe_values)
+    n = getnbasefunctions(fe_values)
     M = create_symmetric_sparsity_pattern(dh)
     assembler = start_assemble(M)
 
