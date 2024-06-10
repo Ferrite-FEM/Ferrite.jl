@@ -1,5 +1,5 @@
 using Ferrite, FerriteGmsh, SparseArrays
-#grid = togrid("l.msh");
+#grid = togrid("docs/src/literate-tutorials/l.msh");
 grid = generate_grid(Quadrilateral,(2,2))
 grid  = ForestBWG(grid,25)
 Ferrite.refine_all!(grid,1)
@@ -148,10 +148,14 @@ function solve_adaptive(initial_grid)
                 σ_dof_at_sc = function_value(cellvalues_tensorial, q_point, σe)
                 error += norm((σ_gp_sc[cellid][1] - σ_dof_at_sc )) * getdetJdV(cellvalues_tensorial,q_point)
             end
-            if error > 0.01
+            push!(error_arr,error)
+        end
+        η = maximum(error_arr)
+        θ = 0.8
+        for (cellid,cell_err) in enumerate(error_arr)
+            if cell_err > θ*η
                 push!(cells_to_refine,cellid)
             end
-            push!(error_arr,error)
         end
         VTKFile("linear_elasticity-$i", dh) do vtk
             write_solution(vtk, dh, u)
@@ -161,15 +165,10 @@ function solve_adaptive(initial_grid)
         end
 
         Ferrite.refine!(grid,cells_to_refine)
-        VTKFile("unbalanced.vtu", dh) do vtk
-        end
-
         Ferrite.balanceforest!(grid)
-        VTKFile("balanced.vtu", dh) do vtk
-        end
 
         i += 1
-        if isempty(cells_to_refine)
+        if isempty(cells_to_refine) || maximum(error_arr) < 0.01
             finished = true
         end
     end
