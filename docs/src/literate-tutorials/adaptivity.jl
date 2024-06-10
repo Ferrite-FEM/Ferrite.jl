@@ -132,6 +132,8 @@ function solve_adaptive(initial_grid)
     finished = false
     i = 1
     grid = initial_grid
+    transfered_grid = Ferrite.creategrid(grid)
+    pvd = VTKFileCollection("linear-elasticity.pvd",transfered_grid)
     while !finished
         transfered_grid = Ferrite.creategrid(grid)
         u,dh,ch,cv = solve(transfered_grid)
@@ -157,7 +159,7 @@ function solve_adaptive(initial_grid)
                 push!(cells_to_refine,cellid)
             end
         end
-        VTKFile("linear_elasticity-$i", dh) do vtk
+        addstep!(pvd,i,transfered_grid) do vtk
             write_solution(vtk, dh, u)
             write_projection(vtk, projector, σ_dof, "stress")
             write_cell_data(vtk, getindex.(collect(Iterators.flatten(σ_gp_sc)),1), "stress sc")
@@ -172,6 +174,7 @@ function solve_adaptive(initial_grid)
             finished = true
         end
     end
+    close(pvd)
 end
 
 solve_adaptive(grid)
