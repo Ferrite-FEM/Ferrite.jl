@@ -56,7 +56,8 @@ end
         # Create a DofHandler, add some things, write to file and
         # then check the resulting sha
         dofhandler = DofHandler(grid)
-        ip = Ferrite.geometric_interpolation(celltype)
+        ip = geometric_interpolation(celltype)
+        @test ip == geometric_interpolation(getcells(grid, 1)) # Test ::AbstractCell dispatch
         add!(dofhandler, :temperature, ip)
         add!(dofhandler, :displacement, ip^dim)
         close!(dofhandler)
