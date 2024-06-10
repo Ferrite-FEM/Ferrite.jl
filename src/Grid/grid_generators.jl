@@ -329,7 +329,7 @@ function generate_grid(::Type{Pyramid}, nel::NTuple{3,Int}, left::Vec{3,T}=Vec{3
     return Grid(cells, nodes, facetsets=facetsets)
 end
 
-function Ferrite.generate_grid(::Type{SerendipityQuadraticHexahedron}, nel::NTuple{3,Int}, left::Vec{3,T}=Vec{3}((-1.0,-1.0,-1.0)), right::Vec{3,T}=Vec{3}((1.0,1.0,1.0))) where {T}
+function generate_grid(::Type{SerendipityQuadraticHexahedron}, nel::NTuple{3,Int}, left::Vec{3,T}=Vec{3}((-1.0,-1.0,-1.0)), right::Vec{3,T}=Vec{3}((1.0,1.0,1.0))) where {T}
     nel_x = nel[1]; nel_y = nel[2]; nel_z = nel[3]; nel_tot = nel_x*nel_y*nel_z
     nnode_x = 2nel_x + 1; nnode_y = 2nel_y + 1; nnode_z = 2nel_z + 1 #Note: not the actually number of nodes in x/y/z, just a temporary variables
 
