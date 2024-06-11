@@ -51,7 +51,7 @@
 # a constant density of 1 for the fluid and negligible coupling between the velocity components.
 #
 # Our setup is derived from [Turek's DFG benchmark](http://www.mathematik.tu-dortmund.de/~featflow/en/benchmarks/cfdbenchmarking/flow/dfg_benchmark2_re100.html).
-# We model a channel with size $0.41 \times 2.2$ and a hole of radius $0.05$ centered at $(0.2, 0.2)$.
+# We model a channel with size $0.41 \times 1.1$ and a hole of radius $0.05$ centered at $(0.2, 0.2)$.
 # The left side has a parabolic inflow profile, which is ramped up over time, modeled as the time dependent
 # Dirichlet condition
 # ```math
