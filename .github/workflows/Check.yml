@@ -27,7 +27,7 @@ jobs:
         shell: julia {0}
         run: |
           using Pkg
-          Pkg.add("ExplicitImports")
+          Pkg.add(name = "ExplicitImports", version = "1.6")
       - name: ExplicitImports.jl code checks
         shell: julia --project {0}
         run: |
@@ -36,3 +36,4 @@ jobs:
           check_no_implicit_imports(Ferrite; allow_unanalyzable)
           check_no_stale_explicit_imports(Ferrite; allow_unanalyzable)
           check_all_qualified_accesses_via_owners(Ferrite)
+          check_no_self_qualified_accesses(Ferrite)

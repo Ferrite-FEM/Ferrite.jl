@@ -31,7 +31,8 @@ getvertexset
 transform_coordinates!
 getcoordinates
 getcoordinates!
-Ferrite.get_node_coordinate
+geometric_interpolation(::Ferrite.AbstractCell)
+get_node_coordinate
 Ferrite.getspatialdim(::Ferrite.AbstractGrid)
 Ferrite.getrefdim
 ```

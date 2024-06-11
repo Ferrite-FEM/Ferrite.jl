@@ -378,15 +378,15 @@ Helper function to generically dispatch on the correct dof sets of a boundary en
 """
 boundarydof_indices(::Type{<:BoundaryIndex})
 
-boundarydof_indices(::Type{FaceIndex}) = Ferrite.facedof_indices
-boundarydof_indices(::Type{EdgeIndex}) = Ferrite.edgedof_indices
-boundarydof_indices(::Type{VertexIndex}) = Ferrite.vertexdof_indices
+boundarydof_indices(::Type{FaceIndex}) = facedof_indices
+boundarydof_indices(::Type{EdgeIndex}) = edgedof_indices
+boundarydof_indices(::Type{VertexIndex}) = vertexdof_indices
 
-facetdof_indices(ip::InterpolationByDim{3}) = Ferrite.facedof_indices(ip)
-facetdof_indices(ip::InterpolationByDim{2}) = Ferrite.edgedof_indices(ip)
-facetdof_indices(ip::InterpolationByDim{1}) = Ferrite.vertexdof_indices(ip)
-facetdof_interior_indices(ip::InterpolationByDim{3}) = Ferrite.facedof_interior_indices(ip)
-facetdof_interior_indices(ip::InterpolationByDim{2}) = Ferrite.edgedof_interior_indices(ip)
+facetdof_indices(ip::InterpolationByDim{3}) = facedof_indices(ip)
+facetdof_indices(ip::InterpolationByDim{2}) = edgedof_indices(ip)
+facetdof_indices(ip::InterpolationByDim{1}) = vertexdof_indices(ip)
+facetdof_interior_indices(ip::InterpolationByDim{3}) = facedof_interior_indices(ip)
+facetdof_interior_indices(ip::InterpolationByDim{2}) = edgedof_interior_indices(ip)
 facetdof_interior_indices(ip::InterpolationByDim{1}) = ntuple(_ -> (), nvertices(ip))
 dirichlet_facetdof_indices(ip::InterpolationByDim{3}) = dirichlet_facedof_indices(ip)
 dirichlet_facetdof_indices(ip::InterpolationByDim{2}) = dirichlet_edgedof_indices(ip)
@@ -413,9 +413,9 @@ Used internally in [`ConstraintHandler`](@ref) and defaults to [`boundarydof_ind
 """
 dirichlet_boundarydof_indices(::Type{<:BoundaryIndex})
 
-dirichlet_boundarydof_indices(::Type{FaceIndex}) = Ferrite.dirichlet_facedof_indices
-dirichlet_boundarydof_indices(::Type{EdgeIndex}) = Ferrite.dirichlet_edgedof_indices
-dirichlet_boundarydof_indices(::Type{VertexIndex}) = Ferrite.dirichlet_vertexdof_indices
+dirichlet_boundarydof_indices(::Type{FaceIndex}) = dirichlet_facedof_indices
+dirichlet_boundarydof_indices(::Type{EdgeIndex}) = dirichlet_edgedof_indices
+dirichlet_boundarydof_indices(::Type{VertexIndex}) = dirichlet_vertexdof_indices
 dirichlet_boundarydof_indices(::Type{FacetIndex}) = dirichlet_facetdof_indices
 
 #########################
