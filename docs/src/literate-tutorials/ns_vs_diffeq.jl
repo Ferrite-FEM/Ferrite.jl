@@ -1,4 +1,3 @@
-# Putting this flag to false reproduces the figure shown in the example #src
 # We check for a divergence free velocity field in the CI                      #src
  if isdefined(Main, :is_ci) #hide
      IS_CI = Main.is_ci     #hide
