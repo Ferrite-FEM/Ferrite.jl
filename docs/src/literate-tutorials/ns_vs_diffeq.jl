@@ -163,7 +163,7 @@ gmsh.model.model.add_physical_group(dim-1,[4],7,"left")                         
 gmsh.model.model.add_physical_group(dim-1,[3],8,"top")                                              #hide
 gmsh.model.model.add_physical_group(dim-1,[2],9,"right")                                            #hide
 gmsh.model.model.add_physical_group(dim-1,[1],10,"bottom");                                         #hide
-end # hide
+end #hide
 nothing                                                                                             #hide
 # Since we want a quad mesh, we specify the meshing algorithm to the quasi structured quad one.
 # For a complete list, [see the Gmsh docs](https://gmsh.info/doc/texinfo/gmsh.html#Mesh-options-list).
