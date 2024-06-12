@@ -260,4 +260,4 @@ Ferrite.RefPrism
 [^1]: All figures from [DefElement](https://defelement.com/) are used under
       [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/). The figures are modified to
       follow Ferrite.jl numbering, to use (``\xi_1``, ``\xi_2``, ``\xi_3``) for the
-      coordinate axes, and to use julia logo colors.
+      coordinate axes, and to use Julia logo colors.
