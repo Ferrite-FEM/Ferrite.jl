@@ -92,7 +92,7 @@ end
 function compute_fluxes(u,dh)
     ip = Lagrange{RefQuadrilateral, 1}()^2
     ## Superconvergent points
-    qr = QuadratureRule{RefQuadrilateral}(1)
+    qr = QuadratureRule{RefQuadrilateral}(2)
     cellvalues_sc = CellValues(qr, ip);
     ## "Normal" quadrature points for the fluxes
     qr = QuadratureRule{RefQuadrilateral}(2)
@@ -127,7 +127,7 @@ end
 
 function solve_adaptive(initial_grid)
     ip = Lagrange{RefQuadrilateral, 1}()
-    qr = QuadratureRule{RefQuadrilateral}(1)
+    qr = QuadratureRule{RefQuadrilateral}(2)
     cellvalues_tensorial = CellValues(qr, ip);
     finished = false
     i = 1
@@ -153,7 +153,7 @@ function solve_adaptive(initial_grid)
             push!(error_arr,error)
         end
         η = maximum(error_arr)
-        θ = 0.8
+        θ = 0.5
         for (cellid,cell_err) in enumerate(error_arr)
             if cell_err > θ*η
                 push!(cells_to_refine,cellid)
@@ -170,7 +170,7 @@ function solve_adaptive(initial_grid)
         Ferrite.balanceforest!(grid)
 
         i += 1
-        if isempty(cells_to_refine) || maximum(error_arr) < 0.01
+        if isempty(cells_to_refine) || maximum(error_arr) < 0.05
             finished = true
         end
     end
