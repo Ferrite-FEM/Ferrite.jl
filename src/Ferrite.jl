@@ -28,98 +28,12 @@ using ForwardDiff:
 
 
 include("exports.jl")
-
-"""
-    AbstractRefShape{refdim}
-
-Supertype for all reference shapes with reference dimension `refdim`. Reference shapes are
-used to define grid cells, interpolations, and quadrature rules.
-
-Currently implemented reference shapes are: [`RefLine`](@ref), [`RefTriangle`](@ref),
-[`RefQuadrilateral`](@ref), [`RefTetrahedron`](@ref), [`RefHexahedron`](@ref),
-[`RefPrism`](@ref).
-
-# Examples
-```julia
-# Create a 1st order Lagrange interpolation on the reference triangle
-interpolation = Lagrange{2, RefTriangle, 1}()
-
-# Create a 2nd order quadrature rule for the reference quadrilateral
-quad_rule = Quadrature{2, RefQuadrilateral}(2)
-```
-
-Implementation details can be found in the devdocs section on [Reference cells](@ref).
-"""
-abstract type AbstractRefShape{refdim} end
-
-"""
-    RefHypercube{dim} <: AbstractRefShape{dim}
-
-Reference shape for a `dim`-dimensional hypercube. See [`AbstractRefShape`](@ref)
-documentation for details.
-"""
-struct RefHypercube{refdim} <: AbstractRefShape{refdim} end
-
-"""
-    RefSimplex{dim} <: AbstractRefShape{dim}
-
-Reference shape for a `dim`-dimensional simplex. See [`AbstractRefShape`](@ref)
-documentation for details.
-"""
-struct RefSimplex{refdim} <: AbstractRefShape{refdim} end
-
-"""
-    RefLine <: AbstractRefShape{1}
-
-Reference line/interval, alias for [`RefHypercube{1}`](@ref). See [`AbstractRefShape`](@ref)
-documentation for details.
-"""
-const RefLine = RefHypercube{1}
-
-"""
-    RefTriangle <: AbstractRefShape{2}
-
-Reference triangle, alias for [`RefSimplex{2}`](@ref). See [`AbstractRefShape`](@ref)
-documentation for details.
-"""
-const RefTriangle = RefSimplex{2}
-
-"""
-    RefQuadrilateral <: AbstractRefShape{2}
-
-Reference quadrilateral, alias for [`RefHypercube{2}`](@ref). See [`AbstractRefShape`](@ref)
-documentation for details.
-"""
-const RefQuadrilateral = RefHypercube{2}
-
-"""
-    RefTetrahedron <: AbstractRefShape{3}
-
-Reference tetrahedron, alias for [`RefSimplex{3}`](@ref). See [`AbstractRefShape`](@ref)
-documentation for details.
-"""
-const RefTetrahedron = RefSimplex{3}
-
-"""
-    RefHexahedron <: AbstractRefShape{3}
-
-Reference hexahedron, alias for [`RefHypercube{3}`](@ref). See [`AbstractRefShape`](@ref)
-documentation for details.
-"""
-const RefHexahedron = RefHypercube{3}
-
-"""
-    RefPrism <: AbstractRefShape{3}
-
-Reference prism. See [`AbstractRefShape`](@ref) documentation for details.
-"""
-struct RefPrism <: AbstractRefShape{3} end
-
+include("refshapes.jl")
 
 """
     Ferrite.getrefdim(RefShape::Type{<:AbstractRefShape})
 
-Get the dimension of the reference shape
+Get the dimension of the reference shape.
 """
 getrefdim(::Type{<:AbstractRefShape{rdim}}) where rdim = rdim
 
