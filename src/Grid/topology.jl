@@ -1,4 +1,3 @@
-include("../ArrayOfVectorViews.jl")
 ############
 # Topology #
 ############
@@ -94,11 +93,11 @@ function ExclusiveTopology(grid::AbstractGrid{sdim}) where sdim
     # Here we don't use the convenience constructor taking a function,
     # since we want to do it simultaneously for 3 data-types
     facedata = sizehint!(FaceIndex[], ncells * max_faces * _getsizehint(grid, FaceIndex))
-    face_face_neighbor_buf = ConstructionBuffer(facedata, (ncells, max_faces), _getsizehint(grid, FaceIndex))
+    face_face_neighbor_buf = CollectionsOfViews.ConstructionBuffer(facedata, (ncells, max_faces), _getsizehint(grid, FaceIndex))
     edgedata = sizehint!(EdgeIndex[], ncells * max_edges * _getsizehint(grid, EdgeIndex))
-    edge_edge_neighbor_buf = ConstructionBuffer(edgedata, (ncells, max_edges), _getsizehint(grid, EdgeIndex))
+    edge_edge_neighbor_buf = CollectionsOfViews.ConstructionBuffer(edgedata, (ncells, max_edges), _getsizehint(grid, EdgeIndex))
     vertdata = sizehint!(VertexIndex[], ncells * max_vertices * _getsizehint(grid, VertexIndex))
-    vertex_vertex_neighbor_buf = ConstructionBuffer(vertdata, (ncells, max_vertices), _getsizehint(grid, VertexIndex))
+    vertex_vertex_neighbor_buf = CollectionsOfViews.ConstructionBuffer(vertdata, (ncells, max_vertices), _getsizehint(grid, VertexIndex))
 
     for (cell_id, cell) in enumerate(cells)
         for neighbor_cell_id in cell_neighbor[cell_id]
@@ -192,7 +191,7 @@ function _add_single_face_neighbor!(face_table::ConstructionBuffer, cell::Abstra
         for (lfi2, face_neighbor) ∈ enumerate(faces(cell_neighbor))
             uniqueface2 = sortface_fast(face_neighbor)
             if uniqueface == uniqueface2
-                add!(face_table, FaceIndex(cell_neighbor_id, lfi2), cell_id, lfi)
+                push_at_index!(face_table, FaceIndex(cell_neighbor_id, lfi2), cell_id, lfi)
                 return
             end
         end
@@ -205,7 +204,7 @@ function _add_single_edge_neighbor!(edge_table::ConstructionBuffer, cell::Abstra
         for (lei2, edge_neighbor) ∈ enumerate(edges(cell_neighbor))
             uniqueedge2 = sortedge_fast(edge_neighbor)
             if uniqueedge == uniqueedge2
-                add!(edge_table, EdgeIndex(cell_neighbor_id, lei2), cell_id, lei)
+                push_at_index!(edge_table, EdgeIndex(cell_neighbor_id, lei2), cell_id, lei)
                 return
             end
         end
@@ -216,7 +215,7 @@ function _add_single_vertex_neighbor!(vertex_table::ConstructionBuffer, cell::Ab
     for (lvi, vertex) ∈ enumerate(vertices(cell))
         for (lvi2, vertex_neighbor) ∈ enumerate(vertices(cell_neighbor))
             if vertex_neighbor == vertex
-                add!(vertex_table, VertexIndex(cell_neighbor_id, lvi2), cell_id, lvi)
+                push_at_index!(vertex_table, VertexIndex(cell_neighbor_id, lvi2), cell_id, lvi)
                 break
             end
         end
@@ -227,7 +226,7 @@ function build_vertex_to_cell(cells; max_vertices, nnodes)
     vertex_to_cell = ArrayOfVectorViews(sizehint!(Int[], max_vertices * nnodes), (nnodes,); sizehint = max_vertices) do cov
             for (cellid, cell) in enumerate(cells)
                 for vertex in vertices(cell)
-                    add!(cov, cellid, vertex)
+                    push_at_index!(cov, cellid, vertex)
                 end
             end
         end
@@ -236,7 +235,7 @@ end
 
 function build_cell_neighbor(grid, cells, vertex_to_cell; ncells)
     # In this case, we loop over the cells in order and all all neighbors at once.
-    # Then we can create ArrayOfVectorViews directly without the ConstructionBuffer
+    # Then we can create ArrayOfVectorViews directly without the CollectionsOfViews.ConstructionBuffer
     sizehint = _getsizehint(grid, CellIndex)
     data = empty!(Vector{Int}(undef, ncells * sizehint))
 
