@@ -74,6 +74,10 @@ e_1 = (v_1, v_2), \quad
 e_2 = (v_2, v_3), \quad
 e_3 = (v_3, v_1)
 ```
+**Face identifier**
+```math
+f_1 = (v_1, v_2, v_3)
+```
 
 ### Reference quadrilateral
 
@@ -105,13 +109,18 @@ e_3 = (v_3, v_4), \quad
 e_4 = (v_4, v_1)
 ```
 
+**Face identifier**
+```math
+f_1 = (v_1, v_2, v_3, v_4)
+```
+
 ### Reference tetrahedron
 
 ```@raw html
 <figure>
 <img class="refcell" src="../../assets/ref-tetrahedron.svg" />
 <figcaption><em>
-Numbering of the vertices, edges, faces, and the cell for the reference tetrahedron. Source:
+Numbering of the vertices, edges, faces, and the volume for the reference tetrahedron. Source:
 <a href="https://defelement.com/img/ref-tetrahedron.html">DefElement</a> (<a
 href="https://creativecommons.org/licenses/by/4.0/">CC BY 4.0</a>) <sup
 class="footnote-reference"><a id="citeref-1" href="#footnote-1">[1]</a></sup>.
@@ -151,7 +160,7 @@ f_4 = (v_1, v_4, v_3)
 <figure>
 <img class="refcell" src="../../assets/ref-hexahedron.svg" />
 <figcaption><em>
-Numbering of the vertices, edges, faces, and the cell for the reference hexahedron. Source:
+Numbering of the vertices, edges, faces, and the volume for the reference hexahedron. Source:
 <a href="https://defelement.com/img/ref-hexahedron.html">DefElement</a> (<a
 href="https://creativecommons.org/licenses/by/4.0/">CC BY 4.0</a>) <sup
 class="footnote-reference"><a id="citeref-1" href="#footnote-1">[1]</a></sup>.
@@ -203,7 +212,7 @@ f_6 = (v_5, v_6, v_7, v_8)
 <figure>
 <img class="refcell" src="../../assets/ref-prism.svg" />
 <figcaption><em>
-Numbering of the vertices, edges, faces, and the cell for the reference prism. Source:
+Numbering of the vertices, edges, faces, and the volume for the reference prism. Source:
 <a href="https://defelement.com/img/ref-prism.html">DefElement</a> (<a
 href="https://creativecommons.org/licenses/by/4.0/">CC BY 4.0</a>) <sup
 class="footnote-reference"><a id="citeref-1" href="#footnote-1">[1]</a></sup>.
@@ -255,6 +264,7 @@ Ferrite.RefQuadrilateral
 Ferrite.RefTetrahedron
 Ferrite.RefHexahedron
 Ferrite.RefPrism
+Ferrite.RefPyramid
 ```
 
 [^1]: All figures from [DefElement](https://defelement.com/) are used under
