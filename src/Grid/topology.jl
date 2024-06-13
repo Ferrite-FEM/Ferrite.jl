@@ -1,6 +1,3 @@
-############
-# Topology #
-############
 
 """
     getneighborhood(topology, grid::AbstractGrid, cellidx::CellIndex, include_self=false)
@@ -77,6 +74,11 @@ function ExclusiveTopology(grid::AbstractGrid{sdim}) where sdim
     vertex_vertex_neighbor_buf = CollectionsOfViews.ConstructionBuffer(vertdata, (ncells, max_vertices), _getsizehint(grid, VertexIndex))
 
     for (cell_id, cell) in enumerate(cells)
+        # Add self
+        foreach(i -> push_at_index!(face_face_neighbor_buf,     FaceIndex( cell_id, i), cell_id, i), 1:nfaces(   cell))
+        foreach(i -> push_at_index!(edge_edge_neighbor_buf,     EdgeIndex( cell_id, i), cell_id, i), 1:nedges(   cell))
+        foreach(i -> push_at_index!(vertex_vertex_neighbor_buf, VerexIndex(cell_id, i), cell_id, i), 1:nvertices(cell))
+        # Add others
         for neighbor_cell_id in cell_neighbor[cell_id]
             neighbor_cell = cells[neighbor_cell_id]
             getrefdim(neighbor_cell) == getrefdim(cell) || error("Not supported")
@@ -221,11 +223,10 @@ function build_cell_neighbor(grid, cells, vertex_to_cell; ncells)
     n = 1
     for (cell_id, cell) in enumerate(cells)
         empty!(cell_neighbor_ids)
+        push!(cell_neighbor_ids, cell_id) # Add self first
         for vertex ∈ vertices(cell)
             for vertex_cell_id ∈ vertex_to_cell[vertex]
-                if vertex_cell_id != cell_id
-                    vertex_cell_id ∈ cell_neighbor_ids || push!(cell_neighbor_ids, vertex_cell_id)
-                end
+                vertex_cell_id ∈ cell_neighbor_ids || push!(cell_neighbor_ids, vertex_cell_id)
             end
         end
         indices[cell_id] = n
@@ -234,24 +235,24 @@ function build_cell_neighbor(grid, cells, vertex_to_cell; ncells)
     end
     indices[end] = n
     sizehint!(data, length(data)) # Tell julia that we won't add more data
-    return ArrayOfVectorViews(indices, data, LinearIndices(1:ncells))
+    return ArrayOfVectorViews(indices, data, LinearIndices(1:ncells); checkargs = false)
 end
 
 function getneighborhood(top::ExclusiveTopology, grid::AbstractGrid, cellidx::CellIndex, include_self=false)
     patch = top.cell_neighbor[cellidx.idx]
     if include_self
-        return view(push!(collect(patch), cellidx.idx), 1:(length(patch) + 1))
-    else
         return patch
+    else
+        return view(patch, 2:length(patch))
     end
 end
 
 function getneighborhood(top::ExclusiveTopology, grid::AbstractGrid, faceidx::FaceIndex, include_self=false)
     neighbors = top.face_face_neighbor[faceidx[1], faceidx[2]]
     if include_self
-        return view(push!(collect(neighbors), faceidx), 1:(length(neighbors) + 1))
-    else
         return neighbors
+    else
+        return view(neighbors, 2:length(neighbors))
     end
 end
 
@@ -282,10 +283,11 @@ function getneighborhood(top::ExclusiveTopology, grid::AbstractGrid, edgeidx::Ed
         local_edge = EdgeIndex(cellid,local_neighbor_edgeid)
         push!(self_reference_local, local_edge)
     end
+    exclusive_edges = top.edge_edge_neighbor[cellid, local_edgeidx]
     if include_self
-        neighbors = unique([top.edge_edge_neighbor[cellid, local_edgeidx]; self_reference_local; edgeidx])
+        neighbors = unique([exclusive_edges; self_reference_local])
     else
-        neighbors = unique([top.edge_edge_neighbor[cellid, local_edgeidx]; self_reference_local])
+        neighbors = unique([view(exclusive_edges, 2:length(exclusive_edges)); self_reference_local])
     end
     return view(neighbors, 1:length(neighbors))
 end
@@ -357,7 +359,6 @@ function _create_skeleton(neighborhood::ArrayOfVectorViews{BI, 2}) where BI <: U
     return skeleton
 end
 
-#TODO: For the specific entities the grid input is unused
 """
     vertexskeleton(top::ExclusiveTopology, ::AbstractGrid) -> Vector{VertexIndex}
 
