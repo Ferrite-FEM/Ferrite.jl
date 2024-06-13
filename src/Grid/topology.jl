@@ -217,8 +217,7 @@ function build_cell_neighbor(grid, cells, vertex_to_cell; ncells)
     data = empty!(Vector{Int}(undef, ncells * sizehint))
 
     indices = Vector{Int}(undef, ncells + 1)
-    # cell_neighbor_ids = Set{Int}() #TODO: Remove, just show old version to make review easier
-    cell_neighbor_ids = Int[] # Faster than Set in combination with ∈ || check below
+    cell_neighbor_ids = Int[]
     n = 1
     for (cell_id, cell) in enumerate(cells)
         empty!(cell_neighbor_ids)
@@ -226,7 +225,6 @@ function build_cell_neighbor(grid, cells, vertex_to_cell; ncells)
             for vertex_cell_id ∈ vertex_to_cell[vertex]
                 if vertex_cell_id != cell_id
                     vertex_cell_id ∈ cell_neighbor_ids || push!(cell_neighbor_ids, vertex_cell_id)
-                    # push!(cell_neighbor_ids, vertex_cell_id) #TODO: Remove, just show old version to make review easier
                 end
             end
         end
