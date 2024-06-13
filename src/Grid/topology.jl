@@ -13,35 +13,11 @@ the given entity is included in the returned list as well.
 """
 getneighborhood
 
-#TODO: Remove
-struct EntityNeighborhood{T<:Union{BoundaryIndex,CellIndex}}
-    neighbor_info::Vector{T}
-end
-
-EntityNeighborhood(info::T) where T <: BoundaryIndex = EntityNeighborhood([info])
-Base.length(n::EntityNeighborhood) = length(n.neighbor_info)
-Base.getindex(n::EntityNeighborhood,i) = getindex(n.neighbor_info,i)
-Base.firstindex(n::EntityNeighborhood) = 1
-Base.lastindex(n::EntityNeighborhood) = length(n.neighbor_info)
-Base.:(==)(n1::EntityNeighborhood, n2::EntityNeighborhood) = n1.neighbor_info == n2.neighbor_info
-Base.iterate(n::EntityNeighborhood, state=1) = iterate(n.neighbor_info,state)
-
-function Base.show(io::IO, ::MIME"text/plain", n::EntityNeighborhood)
-    if length(n) == 0
-        println(io, "No EntityNeighborhood")
-    elseif length(n) == 1
-        println(io, "$(n.neighbor_info[1])")
-    else
-        println(io, "$(n.neighbor_info...)")
-    end
-end
-# End TODO remove
 
 abstract type AbstractTopology end
 
 """
-    ExclusiveTopology(cells::Vector{C}) where C <: AbstractCell
-    ExclusiveTopology(grid::Grid)
+    ExclusiveTopology(grid::AbstractGrid)
 
 `ExclusiveTopology` saves topological (connectivity/neighborhood) data of the grid. The constructor works with an `AbstractCell`
 vector for all cells that dispatch `vertices`, `edges`, and `faces`.
@@ -49,19 +25,23 @@ The struct saves the highest dimensional neighborhood, i.e. if something is conn
  edge only the face neighborhood is saved. The lower dimensional neighborhood is recomputed, if needed.
 
 # Fields
-- `vertex_to_cell::Vector{Set{Int}}`: global vertex id to all cells containing the vertex
-- `cell_neighbor::Vector{EntityNeighborhood{CellIndex}}`: cellid to all connected cells
-- `face_neighbor::Matrix{EntityNeighborhood,Int}`: `face_neighbor[cellid,local_face_id]` -> neighboring face
-- `vertex_neighbor::Matrix{EntityNeighborhood,Int}`: `vertex_neighbor[cellid,local_vertex_id]` -> neighboring vertex
-- `edge_neighbor::Matrix{EntityNeighborhood,Int}`: `edge_neighbor[cellid_local_vertex_id]` -> neighboring edge
-- `face_skeleton::Union{Vector{FaceIndex}, Nothing}`:
+- `vertex_to_cell::ArrayOfVectorViews{Int, 1}`:           global vertex id to all cells containing the vertex
+- `cell_neighbor::ArrayOfVectorViews{Int, 1}`:            cellid to all connected cells
+- `face_neighbor::ArrayOfVectorViews{FaceIndex, 2}`:      `face_neighbor[cellid,   local_face_id]`   -> neighboring faces
+- `edge_neighbor::ArrayOfVectorViews{EdgeIndex, 2}`:      `edge_neighbor[cellid,   local_edge_id]`   -> neighboring edges
+- `vertex_neighbor::ArrayOfVectorViews{VertexIndex, 2}`:  `vertex_neighbor[cellid, local_vertex_id]` -> neighboring vertices
+- `face_skeleton::Union{Vector{FaceIndex}, Nothing}`:     List of unique faces in the grid given as `FaceIndex`
+- `edge_skeleton::Union{Vector{EdgeIndex}, Nothing}`:     List of unique edges in the grid given as `EdgeIndex`
+- `vertex_skeleton::Union{Vector{VertexIndex}, Nothing}`: List of unique vertices in the grid given as `VertexIndex`
 
-!!! note Currently mixed-dimensional queries do not work at the moment. They will be added back later.
+!!! warning
+    Non-conforming grids will silently not work.
+    Grids with embedded cells (different reference dimension compared
+    to the spatial dimension) is not supported, and will error on construction.
+
 """
 mutable struct ExclusiveTopology <: AbstractTopology
-    # maps a global vertex id to all cells containing the vertex
     vertex_to_cell::ArrayOfVectorViews{Int, 1}
-    # index of the vector = cell id ->  all other connected cells
     cell_neighbor::ArrayOfVectorViews{Int, 1}
     # face_face_neighbor[cellid,local_face_id] -> exclusive connected entities (not restricted to one entity)
     face_face_neighbor::ArrayOfVectorViews{FaceIndex, 2}
@@ -70,11 +50,8 @@ mutable struct ExclusiveTopology <: AbstractTopology
     # vertex_vertex_neighbor[cellid,local_vertex_id] -> exclusive connected entities to the given vertex
     vertex_vertex_neighbor::ArrayOfVectorViews{VertexIndex, 2}
 
-    # list of unique faces in the grid given as FaceIndex
     face_skeleton::Union{Vector{FaceIndex}, Nothing}
-    # list of unique edges in the grid given as EdgeIndex
     edge_skeleton::Union{Vector{EdgeIndex}, Nothing}
-    # list of unique vertices in the grid given as VertexIndex
     vertex_skeleton::Union{Vector{VertexIndex}, Nothing}
 end
 
@@ -328,41 +305,42 @@ function _getneighborhood(::Val{:mixed}, args...)
 end
 
 """
-    vertex_star_stencils(top::ExclusiveTopology, grid::Grid) -> Vector{Int, EntityNeighborhood{VertexIndex}}()
+    vertex_star_stencils(top::ExclusiveTopology, grid::Grid) -> AbstractVector{AbstractVector{VertexIndex}}
 Computes the stencils induced by the edge connectivity of the vertices.
 """
 function vertex_star_stencils(top::ExclusiveTopology, grid::Grid)
     cells = grid.cells
-    stencil_table = Dict{Int,EntityNeighborhood{VertexIndex}}()
-    # Vertex Connectivity
-    for (global_vertexid,cellset) ∈ enumerate(top.vertex_to_cell)
-        vertex_neighbors_local = VertexIndex[]
-        for cell ∈ cellset
-            neighbor_boundary = edges(cells[cell])
-            neighbor_connected_faces = neighbor_boundary[findall(x->global_vertexid ∈ x, neighbor_boundary)]
-            this_local_vertex = findfirst(i->toglobal(grid, VertexIndex(cell, i)) == global_vertexid, 1:nvertices(cells[cell]))
-            push!(vertex_neighbors_local, VertexIndex(cell, this_local_vertex))
-            other_vertices = findfirst.(x->x!=global_vertexid,neighbor_connected_faces)
-            any(other_vertices .=== nothing) && continue
-            neighbor_vertices_global = getindex.(neighbor_connected_faces, other_vertices)
-            neighbor_vertices_local = [VertexIndex(cell,local_vertex) for local_vertex ∈ findall(x->x ∈ neighbor_vertices_global, vertices(cells[cell]))]
-            append!(vertex_neighbors_local, neighbor_vertices_local)
+    stencil_table = ArrayOfVectorViews(VertexIndex[], (getnnodes(grid),); sizehint = 10) do buf
+        # Vertex Connectivity
+        for (global_vertexid,cellset) ∈ enumerate(top.vertex_to_cell)
+            for cell ∈ cellset
+                neighbor_boundary = edges(cells[cell])
+                neighbor_connected_faces = neighbor_boundary[findall(x->global_vertexid ∈ x, neighbor_boundary)]
+                this_local_vertex = findfirst(i->toglobal(grid, VertexIndex(cell, i)) == global_vertexid, 1:nvertices(cells[cell]))
+                push_at_index!(buf, VertexIndex(cell, this_local_vertex), global_vertexid)
+                other_vertices = findfirst.(x->x!=global_vertexid,neighbor_connected_faces)
+                any(other_vertices .=== nothing) && continue
+                neighbor_vertices_global = getindex.(neighbor_connected_faces, other_vertices)
+                neighbor_vertices_local = [VertexIndex(cell,local_vertex) for local_vertex ∈ findall(x->x ∈ neighbor_vertices_global, vertices(cells[cell]))]
+                for vertex_index in neighbor_vertices_local
+                    push_at_index!(buf, vertex_index, global_vertexid)
+                end
+            end
         end
-        stencil_table[global_vertexid] =  EntityNeighborhood(vertex_neighbors_local)
     end
     return stencil_table
 end
 
 """
-    getstencil(top::Dict{Int, EntityNeighborhood{VertexIndex}}, grid::AbstractGrid, vertex_idx::VertexIndex) -> EntityNeighborhood{VertexIndex}
+    getstencil(top::ArrayOfVectorViews{VertexIndex, 1}, grid::AbstractGrid, vertex_idx::VertexIndex) -> AbstractVector{VertexIndex}
 Get an iterateable over the stencil members for a given local entity.
 """
-function getstencil(top::Dict{Int, EntityNeighborhood{VertexIndex}}, grid::Grid, vertex_idx::VertexIndex)
-    return top[toglobal(grid, vertex_idx)].neighbor_info
+function getstencil(top::ArrayOfVectorViews{VertexIndex, 1}, grid::Grid, vertex_idx::VertexIndex)
+    return top[toglobal(grid, vertex_idx)]
 end
 
 """
-    _create_skeleton(neighborhood::Matrix{EntityNeighborhood{BI}}) where BI <: Union{FaceIndex, EdgeIndex, VertexIndex}
+    _create_skeleton(neighborhood::AbstractMatrix{AbstractVector{BI}}) where BI <: Union{FaceIndex, EdgeIndex, VertexIndex}
 
 Materializes the skeleton from the `neighborhood` information by returning a `Vector{BI}` with `BI`s describing
 the unique entities in the grid.

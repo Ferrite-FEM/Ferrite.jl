@@ -521,9 +521,9 @@ end
     @test Set(Ferrite.getstencil(stars, quadgrid, VertexIndex(1,1))) == Set([VertexIndex(1,2), VertexIndex(1,4), VertexIndex(1,1)])
     @test Set(Ferrite.getstencil(stars, quadgrid, VertexIndex(2,1))) == Set([VertexIndex(1,1), VertexIndex(1,3), VertexIndex(2,2), VertexIndex(2,4), VertexIndex(1,2), VertexIndex(2,1)])
     @test Set(Ferrite.getstencil(stars, quadgrid, VertexIndex(5,4))) == Set([VertexIndex(4,2), VertexIndex(4,4), VertexIndex(5,1), VertexIndex(5,3), VertexIndex(7,1), VertexIndex(7,3), VertexIndex(8,2), VertexIndex(8,4), VertexIndex(4,3), VertexIndex(5,4), VertexIndex(7,2), VertexIndex(8,1)])
-    @test Set(Ferrite.toglobal(quadgrid, Ferrite.getstencil(stars, quadgrid, VertexIndex(1,1)))) == Set([1,2,5])
-    @test Set(Ferrite.toglobal(quadgrid, Ferrite.getstencil(stars, quadgrid, VertexIndex(2,1)))) == Set([2,1,6,3])
-    @test Set(Ferrite.toglobal(quadgrid, Ferrite.getstencil(stars, quadgrid, VertexIndex(5,4)))) == Set([10,6,9,11,14])
+    @test Set(Ferrite.toglobal.((quadgrid,), Ferrite.getstencil(stars, quadgrid, VertexIndex(1,1)))) == Set([1,2,5])
+    @test Set(Ferrite.toglobal.((quadgrid,), Ferrite.getstencil(stars, quadgrid, VertexIndex(2,1)))) == Set([2,1,6,3])
+    @test Set(Ferrite.toglobal.((quadgrid,), Ferrite.getstencil(stars, quadgrid, VertexIndex(5,4)))) == Set([10,6,9,11,14])
 
     face_skeleton = Ferrite.edgeskeleton(topology, quadgrid)
     @test Set(face_skeleton) == Set([EdgeIndex(1,1),EdgeIndex(1,2),EdgeIndex(1,3),EdgeIndex(1,4),
