@@ -350,9 +350,9 @@ the unique entities in the grid.
 """
 function _create_skeleton(neighborhood::ArrayOfVectorViews{BI, 2}) where BI <: Union{FaceIndex, EdgeIndex, VertexIndex}
     i = 1
-    skeleton = Vector{BI}(undef, length(neighborhood) - count(neighbors -> !isempty(neighbors) , values(neighborhood)) ÷ 2)
+    skeleton = Vector{BI}(undef, length(neighborhood) - count(neighbors -> length(neighbors) > 1 , values(neighborhood)) ÷ 2)
     for (idx, entity) in pairs(neighborhood)
-        isempty(entity) || entity[][1] > idx[1] || continue
+        length(entity) == 1 || entity[2][1] > idx[1] || continue
         skeleton[i] = BI(idx[1], idx[2])
         i += 1
     end
