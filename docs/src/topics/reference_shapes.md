@@ -17,12 +17,12 @@ Ferrite denotes the entities of a reference shape as follows
 
 | Entity   | Description |
 | :------- | :---------- |
-| `Vertex` | 0-dimensional points in the reference shape. |
-| `Edge`   | 1-dimensional entities connecting two vertices. |
-| `Face`   | 2-dimensional entities whose boundary is defined by 3 or more edges. |
-| `Volume` | 3-dimensional entity enclosed by faces. |
+| Vertex | 0-dimensional entity in the reference shape. |
+| Edge   | 1-dimensional entity connecting two vertices. |
+| Face   | 2-dimensional entity enclosed by edges. |
+| Volume | 3-dimensional entity enclosed by faces. |
 
-Note that a `Node` in Ferrite is not the same as a `Vertex`.
+Note that a node in Ferrite is not the same as a vertex.
 Vertices denote endpoints of edges, while nodes may also be located in the middle
 of edges (e.g. for a `QuadraticLine` cell).
 
@@ -40,12 +40,16 @@ such as [`CellValues`](@ref) and [`FacetValues`](@ref).
 
 !!! note "Definition of codimension"
     In Ferrite, *codimension* is defined relative to the reference dimension of the specific entity.
-    Note that other Finite Element codes may define it differently
+    Note that other finite element codes may define it differently
     (e.g. relative the highest reference dimension in the grid).
 
 ## Entity numbering
-Each reference shape defines the numbering of its `Vertex`, `Edge`, and `Face` entities,
-where the `Edge` and `Face` entities are defined from their `Vertex` numbers.
+Each reference shape defines the numbering of its vertices, edges, and faces entities,
+where the edge and face entities are defined from their vertex numbers.
+
+!!! note
+    The numbering and identification of entities is (mostly) for internal use and typically
+    not something users of Ferrite need to interact with.
 
 ### Example
 The `RefQuadrilateral` is defined on the domain ``[-1, 1] \times [-1, 1]``
@@ -64,15 +68,15 @@ using Ferrite #hide
 Ferrite.reference_edges(RefQuadrilateral)
 ```
 where the numbers refer to the vertex number.
-Finally, this reference shape is 2-dimensional, so it only has a single `face`,
-corresponding to the `Cell`,
+Finally, this reference shape is 2-dimensional, so it only has a single face,
+corresponding to the cell itself,
 ```@example
 using Ferrite #hide
 Ferrite.reference_faces(RefQuadrilateral)
 ```
 also defined in terms of its vertices.
 
-As this is a 2-dimensional reference shape, the `facets` are the `edges`, i.e.
+As this is a 2-dimensional reference shape, the facets are the edges, i.e.
 ```@example
 using Ferrite #hide
 Ferrite.reference_facets(RefQuadrilateral)
