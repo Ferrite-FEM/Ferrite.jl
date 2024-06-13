@@ -971,6 +971,7 @@ function balanceforest!(forest::ForestBWG{dim}) where dim
     nrefcells = 0
     facet_neighborhood = Ferrite.Ferrite.get_facet_facet_neighborhood(forest)
     while nrefcells - getncells(forest) != 0
+        nrefcells = getncells(forest)
         for k in 1:length(forest.cells)
             tree = forest.cells[k]
             rootfaces = faces(root_,tree.b)
@@ -978,7 +979,6 @@ function balanceforest!(forest::ForestBWG{dim}) where dim
             rootvertices = vertices(root_,tree.b)
             balanced = balancetree(tree)
             forest.cells[k] = balanced
-            nrefcells = getncells(forest)
             for (o_i, o) in enumerate(forest.cells[k].leaves)
                 ss = possibleneighbors(o,o.l,tree.b,;insidetree=false)
                 isinside = inside.(ss,(tree.b,))
