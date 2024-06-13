@@ -77,7 +77,7 @@ function ExclusiveTopology(grid::AbstractGrid{sdim}) where sdim
         # Add self
         foreach(i -> push_at_index!(face_face_neighbor_buf,     FaceIndex( cell_id, i), cell_id, i), 1:nfaces(   cell))
         foreach(i -> push_at_index!(edge_edge_neighbor_buf,     EdgeIndex( cell_id, i), cell_id, i), 1:nedges(   cell))
-        foreach(i -> push_at_index!(vertex_vertex_neighbor_buf, VerexIndex(cell_id, i), cell_id, i), 1:nvertices(cell))
+        foreach(i -> push_at_index!(vertex_vertex_neighbor_buf, VertexIndex(cell_id, i), cell_id, i), 1:nvertices(cell))
         # Add others
         for neighbor_cell_id in cell_neighbor[cell_id]
             neighbor_cell = cells[neighbor_cell_id]
