@@ -626,7 +626,7 @@ end
             # test cross-element coupling
             neighborhood = Ferrite.get_facet_facet_neighborhood(topology, grid)
             neighbors = [neighborhood[cell_idx, i] for i in 2:size(neighborhood, 2)]
-            _check_dofs(K, dh, sdh, cell_idx, cross_coupling, cross_coupling_idx, vdim, [i[1][1] for i in  neighbors[.!isempty.(neighbors)]], true)
+            _check_dofs(K, dh, sdh, cell_idx, cross_coupling, cross_coupling_idx, vdim, [i[2][1] for i in  neighbors[length.(neighbors) .== 2]], true)
         end
     end
     grid = generate_grid(Quadrilateral, (2, 2))

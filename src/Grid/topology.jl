@@ -79,7 +79,8 @@ function ExclusiveTopology(grid::AbstractGrid{sdim}) where sdim
         foreach(i -> push_at_index!(edge_edge_neighbor_buf,     EdgeIndex( cell_id, i), cell_id, i), 1:nedges(   cell))
         foreach(i -> push_at_index!(vertex_vertex_neighbor_buf, VertexIndex(cell_id, i), cell_id, i), 1:nvertices(cell))
         # Add others
-        for neighbor_cell_id in cell_neighbor[cell_id]
+        nb_cells = cell_neighbor[cell_id]
+        for neighbor_cell_id in @view nb_cells[2:end]
             neighbor_cell = cells[neighbor_cell_id]
             getrefdim(neighbor_cell) == getrefdim(cell) || error("Not supported")
             num_shared_vertices = _num_shared_vertices(cell, neighbor_cell)
@@ -115,10 +116,9 @@ end
 
 # Guess of how many neighbors depending on grid dimension and index type.
 # This is just a performance optimization, and a good default is sufficient.
-_getsizehint(::AbstractGrid{3}, ::Type{FaceIndex}) = 1 # 2
-_getsizehint(::AbstractGrid, ::Type{FaceIndex}) = 0 # No faces exists in 2d or lower dim
-_getsizehint(::AbstractGrid{dim}, ::Type{EdgeIndex}) where dim = 1 #dim^2
-_getsizehint(::AbstractGrid{dim}, ::Type{VertexIndex}) where dim = 1 # 2^dim
+_getsizehint(::AbstractGrid{dim}, ::Type{FaceIndex}) where dim = dim - 1
+_getsizehint(::AbstractGrid{dim}, ::Type{EdgeIndex}) where dim = dim
+_getsizehint(::AbstractGrid, ::Type{VertexIndex}) = 2
 _getsizehint(::AbstractGrid{1}, ::Type{CellIndex}) = 2
 _getsizehint(::AbstractGrid{2}, ::Type{CellIndex}) = 12
 function _getsizehint(g::AbstractGrid{3}, ::Type{CellIndex})
@@ -350,9 +350,9 @@ the unique entities in the grid.
 """
 function _create_skeleton(neighborhood::ArrayOfVectorViews{BI, 2}) where BI <: Union{FaceIndex, EdgeIndex, VertexIndex}
     i = 1
-    skeleton = Vector{BI}(undef, length(neighborhood) - count(neighbors -> length(neighbors) > 1 , values(neighborhood)) ÷ 2)
+    skeleton = Vector{BI}(undef, count(neighbors -> length(neighbors) == 2 , values(neighborhood)) ÷ 2)
     for (idx, entity) in pairs(neighborhood)
-        length(entity) == 1 || entity[2][1] > idx[1] || continue
+        (length(entity) == 1 || entity[2][1] > idx[1]) && continue
         skeleton[i] = BI(idx[1], idx[2])
         i += 1
     end
