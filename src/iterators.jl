@@ -373,9 +373,7 @@ function Base.iterate(ii::InterfaceIterator{<:Any, <:Grid{sdim}}, state...) wher
             continue
         end
         neighbors = neighborhood[facet_a[1], facet_a[2]]
-        neighbors = neighborhood[facet_a[1], facet_a[2]]
         length(neighbors) > 1 && error("multiple neighboring faces not supported yet")
-        length(neighbors) == 1 && continue
         facet_b = neighbors[1]
         reinit!(ii.cache, facet_a, facet_b)
         return (ii.cache, state)
