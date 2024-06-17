@@ -288,13 +288,13 @@ end
 #
     linegrid = generate_grid(Line,(3,))
     linetopo = ExclusiveTopology(linegrid)
-    @test linetopo.vertex_vertex_neighbor[1,2][2:end] == [VertexIndex(2,1)]
+    @test linetopo.vertex_vertex_neighbor[1,2] == [VertexIndex(2,1)]
     @test getneighborhood(linetopo, linegrid, VertexIndex(1,2)) == [VertexIndex(2,1)]
-    @test linetopo.vertex_vertex_neighbor[2,1][2:end] == [VertexIndex(1,2)]
+    @test linetopo.vertex_vertex_neighbor[2,1] == [VertexIndex(1,2)]
     @test getneighborhood(linetopo, linegrid, VertexIndex(2,1)) == [VertexIndex(1,2)]
-    @test linetopo.vertex_vertex_neighbor[2,2][2:end] == [VertexIndex(3,1)]
+    @test linetopo.vertex_vertex_neighbor[2,2] == [VertexIndex(3,1)]
     @test getneighborhood(linetopo, linegrid, VertexIndex(2,2)) == [VertexIndex(3,1)]
-    @test linetopo.vertex_vertex_neighbor[3,1][2:end] == [VertexIndex(2,2)]
+    @test linetopo.vertex_vertex_neighbor[3,1] == [VertexIndex(2,2)]
     @test getneighborhood(linetopo, linegrid, VertexIndex(3,1)) == [VertexIndex(2,2)]
     @test getneighborhood(linetopo, linegrid, FacetIndex(3,1)) == getneighborhood(linetopo, linegrid, VertexIndex(3,1))
 
@@ -320,36 +320,36 @@ end
     topology = ExclusiveTopology(quadgrid)
     faceskeleton = Ferrite.edgeskeleton(topology, quadgrid)
     #test vertex neighbors maps cellid and local vertex id to neighbor id and neighbor local vertex id
-    @test topology.vertex_vertex_neighbor[1,3][2:end] == [VertexIndex(4,1)]
-    @test topology.vertex_vertex_neighbor[2,4][2:end] == [VertexIndex(3,2)]
+    @test topology.vertex_vertex_neighbor[1,3] == [VertexIndex(4,1)]
+    @test topology.vertex_vertex_neighbor[2,4] == [VertexIndex(3,2)]
     @test Set(getneighborhood(topology, quadgrid, VertexIndex(2,4))) == Set([VertexIndex(1,3), VertexIndex(3,2), VertexIndex(4,1)])
-    @test topology.vertex_vertex_neighbor[3,3][2:end] == [VertexIndex(6,1)]
-    @test topology.vertex_vertex_neighbor[3,2][2:end] == [VertexIndex(2,4)]
-    @test topology.vertex_vertex_neighbor[4,1][2:end] == [VertexIndex(1,3)]
-    @test topology.vertex_vertex_neighbor[4,4][2:end] == [VertexIndex(5,2)]
-    @test topology.vertex_vertex_neighbor[5,2][2:end] == [VertexIndex(4,4)]
-    @test topology.vertex_vertex_neighbor[6,1][2:end] == [VertexIndex(3,3)]
+    @test topology.vertex_vertex_neighbor[3,3] == [VertexIndex(6,1)]
+    @test topology.vertex_vertex_neighbor[3,2] == [VertexIndex(2,4)]
+    @test topology.vertex_vertex_neighbor[4,1] == [VertexIndex(1,3)]
+    @test topology.vertex_vertex_neighbor[4,4] == [VertexIndex(5,2)]
+    @test topology.vertex_vertex_neighbor[5,2] == [VertexIndex(4,4)]
+    @test topology.vertex_vertex_neighbor[6,1] == [VertexIndex(3,3)]
     @test isempty(getneighborhood(topology, quadgrid, VertexIndex(2,2)))
     @test length(getneighborhood(topology, quadgrid, VertexIndex(2,4))) == 3
     #test face neighbor maps cellid and local face id to neighbor id and neighbor local face id
-    @test topology.edge_edge_neighbor[1,2][2:end] == [EdgeIndex(2,4)]
-    @test topology.edge_edge_neighbor[1,3][2:end] == [EdgeIndex(3,1)]
-    @test topology.edge_edge_neighbor[2,3][2:end] == [EdgeIndex(4,1)]
-    @test topology.edge_edge_neighbor[2,4][2:end] == [EdgeIndex(1,2)]
-    @test topology.edge_edge_neighbor[3,1][2:end] == [EdgeIndex(1,3)]
-    @test topology.edge_edge_neighbor[3,2][2:end] == [EdgeIndex(4,4)]
-    @test topology.edge_edge_neighbor[3,3][2:end] == [EdgeIndex(5,1)]
-    @test topology.edge_edge_neighbor[4,1][2:end] == [EdgeIndex(2,3)]
-    @test topology.edge_edge_neighbor[4,3][2:end] == [EdgeIndex(6,1)]
-    @test topology.edge_edge_neighbor[4,4][2:end] == [EdgeIndex(3,2)]
-    @test topology.edge_edge_neighbor[5,1][2:end] == [EdgeIndex(3,3)]
-    @test topology.edge_edge_neighbor[5,2][2:end] == [EdgeIndex(6,4)]
-    @test topology.edge_edge_neighbor[5,3] == [EdgeIndex(5,3)]
-    @test topology.edge_edge_neighbor[5,4] == [EdgeIndex(5,4)]
-    @test topology.edge_edge_neighbor[6,1][2:end] == [EdgeIndex(4,3)]
-    @test topology.edge_edge_neighbor[6,2] == [EdgeIndex(6,2)]
-    @test topology.edge_edge_neighbor[6,3] == [EdgeIndex(6,3)]
-    @test topology.edge_edge_neighbor[6,4][2:end] == [EdgeIndex(5,2)]
+    @test topology.edge_edge_neighbor[1,2] == [EdgeIndex(2,4)]
+    @test topology.edge_edge_neighbor[1,3] == [EdgeIndex(3,1)]
+    @test topology.edge_edge_neighbor[2,3] == [EdgeIndex(4,1)]
+    @test topology.edge_edge_neighbor[2,4] == [EdgeIndex(1,2)]
+    @test topology.edge_edge_neighbor[3,1] == [EdgeIndex(1,3)]
+    @test topology.edge_edge_neighbor[3,2] == [EdgeIndex(4,4)]
+    @test topology.edge_edge_neighbor[3,3] == [EdgeIndex(5,1)]
+    @test topology.edge_edge_neighbor[4,1] == [EdgeIndex(2,3)]
+    @test topology.edge_edge_neighbor[4,3] == [EdgeIndex(6,1)]
+    @test topology.edge_edge_neighbor[4,4] == [EdgeIndex(3,2)]
+    @test topology.edge_edge_neighbor[5,1] == [EdgeIndex(3,3)]
+    @test topology.edge_edge_neighbor[5,2] == [EdgeIndex(6,4)]
+    @test topology.edge_edge_neighbor[5,3] == Ferrite.BoundaryIndex[]
+    @test topology.edge_edge_neighbor[5,4] == Ferrite.BoundaryIndex[]
+    @test topology.edge_edge_neighbor[6,1] == [EdgeIndex(4,3)]
+    @test topology.edge_edge_neighbor[6,2] == Ferrite.BoundaryIndex[]
+    @test topology.edge_edge_neighbor[6,3] == Ferrite.BoundaryIndex[]
+    @test topology.edge_edge_neighbor[6,4] == [EdgeIndex(5,2)]
 
     @test getneighborhood(topology, quadgrid, EdgeIndex(2,4)) == getneighborhood(topology, quadgrid, FacetIndex(2,4))
 
@@ -382,14 +382,14 @@ end
 #                        (11)
     hexgrid = generate_grid(Hexahedron,(2,2,1))
     topology = ExclusiveTopology(hexgrid)
-    @test topology.edge_edge_neighbor[1,11][2:end] == [EdgeIndex(4,9)]
+    @test topology.edge_edge_neighbor[1,11] == [EdgeIndex(4,9)]
     @test Set(getneighborhood(topology,hexgrid,EdgeIndex(1,11),true)) == Set([EdgeIndex(4,9),EdgeIndex(2,12),EdgeIndex(3,10),EdgeIndex(1,11)])
     @test Set(getneighborhood(topology,hexgrid,EdgeIndex(1,11),false)) == Set([EdgeIndex(4,9),EdgeIndex(2,12),EdgeIndex(3,10)])
-    @test topology.edge_edge_neighbor[2,12][2:end] == [EdgeIndex(3,10)]
+    @test topology.edge_edge_neighbor[2,12] == [EdgeIndex(3,10)]
     @test Set(getneighborhood(topology,hexgrid,EdgeIndex(2,12),true)) == Set([EdgeIndex(3,10),EdgeIndex(1,11),EdgeIndex(4,9),EdgeIndex(2,12)])
     @test Set(getneighborhood(topology,hexgrid,EdgeIndex(2,12),false)) == Set([EdgeIndex(3,10),EdgeIndex(1,11),EdgeIndex(4,9)])
-    @test topology.edge_edge_neighbor[3,10][2:end] == [EdgeIndex(2,12)]
-    @test topology.edge_edge_neighbor[4,9][2:end] == [EdgeIndex(1,11)]
+    @test topology.edge_edge_neighbor[3,10] == [EdgeIndex(2,12)]
+    @test topology.edge_edge_neighbor[4,9] == [EdgeIndex(1,11)]
     @test getneighborhood(topology,hexgrid,FaceIndex((1,3))) == [FaceIndex((2,5))]
     @test getneighborhood(topology,hexgrid,FaceIndex((1,4))) == [FaceIndex((3,2))]
     @test getneighborhood(topology,hexgrid,FaceIndex((2,4))) == [FaceIndex((4,2))]
@@ -428,7 +428,7 @@ end
 # test for multiple vertex_neighbors as in e.g. ele 3, local vertex 3 (middle node)
     trigrid = generate_grid(Triangle,(2,2))
     topology = ExclusiveTopology(trigrid)
-    @test topology.vertex_vertex_neighbor[3,3][2:end] == [VertexIndex(5,2),VertexIndex(6,1),VertexIndex(7,1)]
+    @test topology.vertex_vertex_neighbor[3,3] == [VertexIndex(5,2),VertexIndex(6,1),VertexIndex(7,1)]
 
     quadtrigrid = generate_grid(QuadraticTriangle,(2,2))
     quadtopology = ExclusiveTopology(trigrid)
@@ -472,8 +472,8 @@ end
     # topology = ExclusiveTopology(grid)
 
     # @test_throws ArgumentError Ferrite.facetskeleton(topology, grid)
-    # @test topology.face_face_neighbor[3,4][2:end] == [EdgeIndex(1,2))
-    # @test topology.edge_edge_neighbor[1,2][2:end] == [FaceIndex(3,4))
+    # @test topology.face_face_neighbor[3,4] == [EdgeIndex(1,2))
+    # @test topology.edge_edge_neighbor[1,2] == [FaceIndex(3,4))
     # # regression that it doesn't error for boundary faces, see https://github.com/Ferrite-FEM/Ferrite.jl/issues/518
     # @test topology.face_face_neighbor[1,6] == topology.face_face_neighbor[1,1] == zero(Ferrite.EntityNeighborhood{FaceIndex})
     # @test topology.edge_edge_neighbor[1,1] == topology.edge_edge_neighbor[1,3] == zero(Ferrite.EntityNeighborhood{FaceIndex})

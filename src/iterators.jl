@@ -340,8 +340,8 @@ is thus simply convenience for the following equivalent snippet for grids of dim
 ic = InterfaceCache(grid, topology)
 for face in topology.face_skeleton
     neighborhood = topology.face_face_neighbor[face[1], face[2]]
-    length(neighborhood) == 1 && continue
-    neighbor_face = neighborhood[2]
+    isempty(neighborhood) && continue
+    neighbor_face = neighborhood[1]
     reinit!(ic, face, neighbor_face)
     # ...
 end
