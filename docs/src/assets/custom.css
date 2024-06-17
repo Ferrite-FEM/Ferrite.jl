@@ -19,3 +19,6 @@ details.admonition.collapsible summary.admonition-header {
 details.admonition.collapsible {
     background-color: inherit;
 }
+html.theme--documenter-dark img.refcell {
+    filter: invert(1) hue-rotate(180deg);
+}
