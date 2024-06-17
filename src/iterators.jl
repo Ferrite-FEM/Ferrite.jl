@@ -369,10 +369,14 @@ function Base.iterate(ii::InterfaceIterator{<:Any, <:Grid{sdim}}, state...) wher
         it = iterate(facetskeleton(ii.topology, ii.grid), state...)
         it === nothing && return nothing
         facet_a, state = it
+        if isempty(neighborhood[facet_a[1], facet_a[2]])
+            continue
+        end
         neighbors = neighborhood[facet_a[1], facet_a[2]]
+        neighbors = neighborhood[facet_a[1], facet_a[2]]
+        length(neighbors) > 1 && error("multiple neighboring faces not supported yet")
         length(neighbors) == 1 && continue
-        length(neighbors)  > 2 && error("multiple neighboring faces not supported yet")
-        facet_b = neighbors[2]
+        facet_b = neighbors[1]
         reinit!(ii.cache, facet_a, facet_b)
         return (ii.cache, state)
     end
