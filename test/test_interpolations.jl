@@ -41,7 +41,7 @@
                       CrouzeixRaviart{RefTriangle, 1}(),
     )
         # Test of utility functions
-        ref_dim = Ferrite.getdim(interpolation)
+        ref_dim = Ferrite.getrefdim(interpolation)
         ref_shape = Ferrite.getrefshape(interpolation)
         func_order = Ferrite.getorder(interpolation)
         @test typeof(interpolation) <: Interpolation{ref_shape,func_order}
@@ -217,6 +217,34 @@
     @test Ferrite.is_discontinuous(ip_t) == false
     @test Ferrite.is_discontinuous(d_ip) == true
     @test Ferrite.is_discontinuous(d_ip_t) == true
+end
+
+@testset "Correctness of AD of embedded interpolations" begin
+    ip = Lagrange{RefHexahedron,2}()^3
+    ξ = rand(Vec{3,Float64})
+    for I in 1:getnbasefunctions(ip)
+        #Call StaticArray-version
+        H_sa, G_sa, V_sa = Ferrite._shape_hessian_gradient_and_value_static_array(ip, ξ, I)
+        #Call tensor AD version
+        H, G, V = Ferrite.shape_hessian_gradient_and_value(ip, ξ, I)
+
+        @test V ≈ V_sa
+        @test G ≈ G_sa
+        @test H ≈ H_sa
+    end
+
+    ips = Lagrange{RefQuadrilateral,2}()
+    vdim = 3
+    ipv = ips^vdim
+    ξ = rand(Vec{2, Float64})
+    for ipv_ind in 1:getnbasefunctions(ipv)
+        ips_ind, v_ind = fldmod1(ipv_ind, vdim)
+        H, G, V = Ferrite.shape_hessian_gradient_and_value(ipv, ξ, ipv_ind)
+        h, g, v = Ferrite.shape_hessian_gradient_and_value(ips, ξ, ips_ind)
+        @test h ≈ H[v_ind, :, :]
+        @test g ≈ G[v_ind, :]
+        @test v ≈ V[v_ind]
+    end
 end
 
 end # testset

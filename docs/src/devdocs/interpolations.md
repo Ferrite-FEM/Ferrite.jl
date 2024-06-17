@@ -8,7 +8,7 @@ parametrized by the reference element and its characteristic order.
 ### Fallback methods applicable for all subtypes of `Interpolation`
 
 ```@docs
-Ferrite.getdim(::Interpolation)
+Ferrite.getrefdim(::Interpolation)
 Ferrite.getrefshape(::Interpolation)
 Ferrite.getorder(::Interpolation)
 Ferrite.shape_gradient(::Interpolation, ::Vec, ::Int)

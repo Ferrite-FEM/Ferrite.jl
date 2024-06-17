@@ -48,11 +48,12 @@ nvertices(c::AbstractCell) = length(vertices(c))
 nedges(   c::AbstractCell) = length(edges(c))
 nfaces(   c::AbstractCell) = length(faces(c))
 nfacets(  c::AbstractCell) = length(facets(c))
+nnodes(   c::AbstractCell) = length(get_node_ids(c))
+
 nvertices(::Type{T}) where {T <: AbstractRefShape} = length(reference_vertices(T))
 nedges(   ::Type{T}) where {T <: AbstractRefShape} = length(reference_edges(T))
 nfaces(   ::Type{T}) where {T <: AbstractRefShape} = length(reference_faces(T))
 nfacets(  ::Type{T}) where {T <: AbstractRefShape} = length(reference_facets(T))
-nnodes(   c::AbstractCell) = length(get_node_ids(c))
 
 """
     Ferrite.vertices(::AbstractCell)
@@ -131,11 +132,13 @@ reference_facets(::Type{<:AbstractRefShape})
 @inline reference_facets(refshape::Type{<:AbstractRefShape{3}}) = reference_faces(refshape)
 
 """
-    Ferrite.default_interpolation(::AbstractCell)::Interpolation
+    geometric_interpolation(::AbstractCell)
+    geometric_interpolation(::Type{<:AbstractCell})
 
-Returns the interpolation which defines the geometry of a given cell.
+Each `AbstractCell` type has a unique geometric interpolation describing its geometry.
+This function returns that interpolation, which is always a scalar interpolation.
 """
-default_interpolation(::AbstractCell)
+geometric_interpolation(cell::AbstractCell) = geometric_interpolation(typeof(cell))
 
 """
     Ferrite.get_node_ids(c::AbstractCell)
@@ -149,21 +152,21 @@ get_node_ids(c::AbstractCell) = c.nodes
 # Default implementations of <entity> = vertices/edges/faces that work as long as get_node_ids
 # and `reference_<entity>` are correctly implemented for the cell / reference shape.
 
-function vertices(c::Ferrite.AbstractCell{RefShape}) where RefShape
-    ns = Ferrite.get_node_ids(c)
-    return map(i -> ns[i], Ferrite.reference_vertices(RefShape))
+function vertices(c::AbstractCell{RefShape}) where RefShape
+    ns = get_node_ids(c)
+    return map(i -> ns[i], reference_vertices(RefShape))
 end
 
-function edges(c::Ferrite.AbstractCell{RefShape}) where RefShape
-    ns = Ferrite.get_node_ids(c)
-    return map(Ferrite.reference_edges(RefShape)) do re
+function edges(c::AbstractCell{RefShape}) where RefShape
+    ns = get_node_ids(c)
+    return map(reference_edges(RefShape)) do re
         map(i -> ns[i], re)
     end
 end
 
-function faces(c::Ferrite.AbstractCell{RefShape}) where RefShape
-    ns = Ferrite.get_node_ids(c)
-    return map(Ferrite.reference_faces(RefShape)) do rf
+function faces(c::AbstractCell{RefShape}) where RefShape
+    ns = get_node_ids(c)
+    return map(reference_faces(RefShape)) do rf
         map(i -> ns[i], rf)
     end
 end
@@ -239,25 +242,25 @@ struct QuadraticHexahedron    <: AbstractCell{RefHexahedron}    nodes::NTuple{27
 struct Wedge                  <: AbstractCell{RefPrism}         nodes::NTuple{ 6, Int} end
 struct Pyramid                <: AbstractCell{RefPyramid}       nodes::NTuple{ 5, Int} end
 
-default_interpolation(::Type{Line})                   = Lagrange{RefLine,          1}()
-default_interpolation(::Type{QuadraticLine})          = Lagrange{RefLine,          2}()
-default_interpolation(::Type{Triangle})               = Lagrange{RefTriangle,      1}()
-default_interpolation(::Type{QuadraticTriangle})      = Lagrange{RefTriangle,      2}()
-default_interpolation(::Type{Quadrilateral})          = Lagrange{RefQuadrilateral, 1}()
-default_interpolation(::Type{QuadraticQuadrilateral}) = Lagrange{RefQuadrilateral, 2}()
-default_interpolation(::Type{Tetrahedron})            = Lagrange{RefTetrahedron,   1}()
-default_interpolation(::Type{QuadraticTetrahedron})   = Lagrange{RefTetrahedron,   2}()
-default_interpolation(::Type{Hexahedron})             = Lagrange{RefHexahedron,    1}()
-default_interpolation(::Type{QuadraticHexahedron})    = Lagrange{RefHexahedron,    2}()
-default_interpolation(::Type{Wedge})                  = Lagrange{RefPrism,         1}()
-default_interpolation(::Type{Pyramid})                = Lagrange{RefPyramid,       1}()
+geometric_interpolation(::Type{Line})                   = Lagrange{RefLine,          1}()
+geometric_interpolation(::Type{QuadraticLine})          = Lagrange{RefLine,          2}()
+geometric_interpolation(::Type{Triangle})               = Lagrange{RefTriangle,      1}()
+geometric_interpolation(::Type{QuadraticTriangle})      = Lagrange{RefTriangle,      2}()
+geometric_interpolation(::Type{Quadrilateral})          = Lagrange{RefQuadrilateral, 1}()
+geometric_interpolation(::Type{QuadraticQuadrilateral}) = Lagrange{RefQuadrilateral, 2}()
+geometric_interpolation(::Type{Tetrahedron})            = Lagrange{RefTetrahedron,   1}()
+geometric_interpolation(::Type{QuadraticTetrahedron})   = Lagrange{RefTetrahedron,   2}()
+geometric_interpolation(::Type{Hexahedron})             = Lagrange{RefHexahedron,    1}()
+geometric_interpolation(::Type{QuadraticHexahedron})    = Lagrange{RefHexahedron,    2}()
+geometric_interpolation(::Type{Wedge})                  = Lagrange{RefPrism,         1}()
+geometric_interpolation(::Type{Pyramid})                = Lagrange{RefPyramid,       1}()
 
 # Serendipity interpolation based cells
 struct SerendipityQuadraticQuadrilateral <: AbstractCell{RefQuadrilateral} nodes::NTuple{ 8, Int} end
 struct SerendipityQuadraticHexahedron    <: AbstractCell{RefHexahedron}    nodes::NTuple{20, Int} end
 
-default_interpolation(::Type{SerendipityQuadraticQuadrilateral}) = Serendipity{RefQuadrilateral, 2}()
-default_interpolation(::Type{SerendipityQuadraticHexahedron})    = Serendipity{RefHexahedron,    2}()
+geometric_interpolation(::Type{SerendipityQuadraticQuadrilateral}) = Serendipity{RefQuadrilateral, 2}()
+geometric_interpolation(::Type{SerendipityQuadraticHexahedron})    = Serendipity{RefHexahedron,    2}()
 
 """
     nvertices_on_face(cell::AbstractCell, local_face_index::Int)
@@ -270,7 +273,15 @@ Specifies for each subtype of AbstractCell how many nodes form an edge.
 """
 nvertices_on_edge(cell::AbstractCell, local_edge_index::Int) = length(edges(cell)[local_edge_index])
 
-getdim(::Union{AbstractCell{refshape},Type{<:AbstractCell{refshape}}}) where {refdim, refshape <: AbstractRefShape{refdim}} = refdim
+"""
+    Ferrite.getrefdim(cell::AbstractCell)
+    Ferrite.getrefdim(::Type{<:AbstractCell})
+
+Get the reference dimension of the cell, i.e. the dimension of the cell's
+reference shape.
+"""
+getrefdim(c::AbstractCell) = getrefdim(typeof(c))
+getrefdim(::Type{<:AbstractCell{RefShape}}) where RefShape = getrefdim(RefShape)
 
 
 ######################
@@ -281,21 +292,17 @@ abstract type AbstractGrid{dim} end
 """
     Grid{dim, C<:AbstractCell, T<:Real} <: AbstractGrid}
 
-A `Grid` is a collection of `Cells` and `Node`s which covers the computational domain, together with Sets of cells, nodes and faces.
-There are multiple helper structures to apply boundary conditions or define subdomains. They are gathered in the `cellsets`, `nodesets`,
-`facesets`, `edgesets` and `vertexsets`.
+A `Grid` is a collection of `Ferrite.AbstractCell`s and `Ferrite.Node`s which covers the computational domain.
+Helper structures for applying boundary conditions or define subdomains are gathered in `cellsets`, `nodesets`,
+`facetsets`, and `vertexsets`.
 
 # Fields
 - `cells::Vector{C}`: stores all cells of the grid
 - `nodes::Vector{Node{dim,T}}`: stores the `dim` dimensional nodes of the grid
-- `cellsets::Dict{String,Set{Int}}`: maps a `String` key to a `Set` of cell ids
-- `nodesets::Dict{String,Set{Int}}`: maps a `String` key to a `Set` of global node ids
-- `facetsets::Dict{String,Set{FacetIndex}}`: maps a `String` to a `Set` of `Set{FacetIndex} (global_cell_id, local_facet_id)`
-- `vertexsets::Dict{String,Set{VertexIndex}}`: maps a `String` key to a `Set` of local vertex ids
-- `cellsets::Dict{String,OrderedSet{Int}}`: maps a `String` key to an `OrderedSet` of cell ids
-- `nodesets::Dict{String,OrderedSet{Int}}`: maps a `String` key to an `OrderedSet` of global node ids
-- `facetsets::Dict{String,OrderedSet{FacetIndex}}`: maps a `String` to an `OrderedSet` of `FacetIndex`
-- `vertexsets::Dict{String,OrderedSet{VertexIndex}}`: maps a `String` key to an `OrderedSet` of `VertexIndex`
+- `cellsets::Dict{String, OrderedSet{Int}}`: maps a `String` key to an `OrderedSet` of cell ids
+- `nodesets::Dict{String, OrderedSet{Int}}`: maps a `String` key to an `OrderedSet` of global node ids
+- `facetsets::Dict{String, OrderedSet{FacetIndex}}`: maps a `String` to an `OrderedSet` of `FacetIndex`
+- `vertexsets::Dict{String, OrderedSet{VertexIndex}}`: maps a `String` key to an `OrderedSet` of `VertexIndex`
 """
 mutable struct Grid{dim,C<:AbstractCell,T<:Real} <: AbstractGrid{dim}
     cells::Vector{C}
@@ -356,8 +363,12 @@ This function takes the local vertex representation (a `VertexIndex`) and looks 
 toglobal(grid::AbstractGrid,vertexidx::VertexIndex) = vertices(getcells(grid,vertexidx[1]))[vertexidx[2]]
 toglobal(grid::AbstractGrid,vertexidx::Vector{VertexIndex}) = unique(toglobal.((grid,),vertexidx))
 
-getsdim(::AbstractGrid{sdim}) where sdim = sdim
-@inline getdim(g::AbstractGrid) = getsdim(g) # TODO: Deprecate
+"""
+    Ferrite.getspatialdim(grid::AbstractGrid)
+
+Get the spatial dimension of the grid, corresponding to the vector dimension of the grid's coordinates.
+"""
+getspatialdim(::AbstractGrid{sdim}) where sdim = sdim
 
 """
     get_reference_dimension(grid::AbstractGrid) -> Union{Int, Symbol}
@@ -375,7 +386,7 @@ function _get_reference_dimension(cells::AbstractVector{<:AbstractCell})
     # Note, this function is inherently type-instable.
     rdims = Set{Int}()
     for cell in cells
-        push!(rdims, getdim(cell))
+        push!(rdims, getrefdim(cell))
     end
     length(rdims) == 1 && return first(rdims)
     return :mixed
@@ -509,14 +520,14 @@ end
 
 Mutate `x` to the coordinates of the cell corresponding to `idx` or `cell`.
 """
-@inline function getcoordinates!(x::Vector{Vec{dim,T}}, grid::Ferrite.AbstractGrid, cell::Ferrite.AbstractCell) where {dim,T}
+@inline function getcoordinates!(x::Vector{Vec{dim,T}}, grid::AbstractGrid, cell::AbstractCell) where {dim,T}
     node_ids = get_node_ids(cell)
     @inbounds for i in 1:length(x)
         x[i] = get_node_coordinate(grid, node_ids[i])
     end
     return x
 end
-@inline function getcoordinates!(x::Vector{Vec{dim,T}}, grid::Ferrite.AbstractGrid, cellid::Int) where {dim,T}
+@inline function getcoordinates!(x::Vector{Vec{dim,T}}, grid::AbstractGrid, cellid::Int) where {dim,T}
     cell = getcells(grid, cellid)
     getcoordinates!(x, grid, cell)
 end

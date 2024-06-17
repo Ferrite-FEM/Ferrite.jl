@@ -12,6 +12,11 @@ values of nodal functions, gradients and divergences of nodal functions etc. in 
   By default linear Lagrange interpolation is used. For embedded elements the geometric interpolations should
   be vectorized to the spatial dimension.
 
+**Keyword arguments:** The following keyword arguments are experimental and may change in future minor releases
+* `update_gradients`: Specifies if the gradients of the shape functions should be updated (default true)
+* `update_hessians`: Specifies if the hessians of the shape functions should be updated (default false)
+* `update_detJdV`: Specifies if the volume associated with each quadrature point should be updated (default true)
+
 **Common methods:**
 
 * [`reinit!`](@ref)
@@ -42,11 +47,18 @@ struct CellValues{FV, GM, QR, detT} <: AbstractCellValues
     detJdV::detT   # AbstractVector{<:Number} or Nothing
 end
 function CellValues(::Type{T}, qr::QuadratureRule, ip_fun::Interpolation, ip_geo::VectorizedInterpolation;
-        update_gradients::Union{Bool,Nothing} = nothing, update_detJdV::Union{Bool,Nothing} = nothing) where T
+        update_gradients ::Union{Bool,Nothing} = nothing, #Use Union{Bool,Nothing} to get type-stable code
+        update_hessians  ::Union{Bool,Nothing} = nothing,
+        update_detJdV    ::Union{Bool,Nothing} = nothing) where T
 
-    _update_detJdV = update_detJdV === nothing ? true : update_detJdV
-    FunDiffOrder = update_gradients === nothing ? 1 : convert(Int, update_gradients) # Logic must change when supporting update_hessian kwargs
+    _update_gradients = update_gradients === nothing ? true  : update_gradients
+    _update_hessians  = update_hessians  === nothing ? false : update_hessians
+    _update_detJdV    = update_detJdV    === nothing ? true  : update_detJdV
+    _update_hessians && @assert _update_gradients
+
+    FunDiffOrder = _update_hessians ? 2 : (_update_gradients ? 1 : 0)
     GeoDiffOrder = max(required_geo_diff_order(mapping_type(ip_fun), FunDiffOrder), _update_detJdV)
+
     geo_mapping = GeometryMapping{GeoDiffOrder}(T, ip_geo.ip, qr)
     fun_values = FunctionValues{FunDiffOrder}(T, ip_fun, qr, ip_geo)
     detJdV = _update_detJdV ? fill(T(NaN), length(getweights(qr))) : nothing
@@ -76,9 +88,11 @@ function_interpolation(cv::CellValues) = function_interpolation(cv.fun_values)
 function_difforder(cv::CellValues) = function_difforder(cv.fun_values)
 shape_value_type(cv::CellValues) = shape_value_type(cv.fun_values)
 shape_gradient_type(cv::CellValues) = shape_gradient_type(cv.fun_values)
+shape_hessian_type(cv::CellValues) = shape_hessian_type(cv.fun_values)
 
 @propagate_inbounds shape_value(cv::CellValues, q_point::Int, i::Int) = shape_value(cv.fun_values, q_point, i)
 @propagate_inbounds shape_gradient(cv::CellValues, q_point::Int, i::Int) = shape_gradient(cv.fun_values, q_point, i)
+@propagate_inbounds shape_hessian(cv::CellValues, q_point::Int, i::Int) = shape_hessian(cv.fun_values, q_point, i)
 @propagate_inbounds shape_symmetric_gradient(cv::CellValues, q_point::Int, i::Int) = shape_symmetric_gradient(cv.fun_values, q_point, i)
 
 # Access quadrature rule values
@@ -118,7 +132,7 @@ end
 function Base.show(io::IO, d::MIME"text/plain", cv::CellValues)
     ip_geo = geometric_interpolation(cv)
     ip_fun = function_interpolation(cv)
-    rdim = getdim(ip_geo)
+    rdim = getrefdim(ip_geo)
     vdim = isa(shape_value(cv, 1, 1), Vec) ? length(shape_value(cv, 1, 1)) : 0
     GradT = shape_gradient_type(cv)
     sdim = GradT === nothing ? nothing : sdim_from_gradtype(GradT)

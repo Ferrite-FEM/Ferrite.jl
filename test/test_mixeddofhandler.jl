@@ -417,8 +417,8 @@ function test_field_on_subdomain()
     close!(dh)
 
     # retrieve field dimensions
-    @test Ferrite.getfielddim(dh, :v) == 2
-    @test Ferrite.getfielddim(dh, :s) ==1
+    @test Ferrite.n_components(dh, :v) == 2
+    @test Ferrite.n_components(dh, :s) ==1
 
     # find field in SubDofHandler
     @test Ferrite.find_field(dh.subdofhandlers[1], :v) == 1
@@ -521,8 +521,8 @@ end
 
 function test_celliterator_subdomain()
     for celltype in (Line, Quadrilateral, Hexahedron)
-        ip = Ferrite.default_interpolation(celltype)
-        dim = Ferrite.getdim(ip)
+        ip = Ferrite.geometric_interpolation(celltype)
+        dim = Ferrite.getrefdim(ip)
         grid = generate_grid(celltype, ntuple(i->i==1 ? 2 : 1, dim)) # 2 cells
         dh = DofHandler(grid)
         sdh = SubDofHandler(dh, Set(2)) # only cell 2, cell 1 is not part of dh
@@ -607,7 +607,7 @@ function test_show()
     sdh_tri = SubDofHandler(dh, Set(2))
     add!(sdh_tri, :u, Lagrange{RefTriangle, 1}()^2)
     close!(dh)
-    @test repr("text/plain", dh) == repr(typeof(dh)) * "\n  Fields:\n    :u, dim: 2\n  Total dofs: 10"
+    @test repr("text/plain", dh) == repr(typeof(dh)) * "\n  Fields:\n    :u, Vec{2}\n  Total dofs: 10"
     @test repr("text/plain", dh.subdofhandlers[1]) == string(
         repr("text/plain", typeof(dh.subdofhandlers[1])), "\n  Cell type: Quadrilateral\n  Fields:\n    :u, ",
             repr("text/plain", dh.subdofhandlers[1].field_interpolations[1]), "\n  Dofs per cell: 8\n")
@@ -643,6 +643,32 @@ function test_vtk_export()
     rm(filename*".vtu") # clean up
 end
 
+function test_celliterator_on_true_subdomain_smoketest()
+    grid = generate_grid(Hexahedron, (2,2,2))
+
+    dh = DofHandler(grid)
+    sdh = SubDofHandler(dh, [1,2,3])
+    ip = Lagrange{RefHexahedron,1}()
+    add!(sdh, :u, ip)
+    close!(dh)
+
+    # The following statements just check that the iterator
+    # does not crash at least. Regression for #966
+    for cell in CellIterator(sdh)
+    end
+
+    for cell in CellIterator(dh, [1,2,3])
+    end
+
+    for cell in CellIterator(dh)
+        if cellid(cell) <= 3
+            @test length(celldofs(cell)) == getnbasefunctions(ip)
+        else
+            @test length(celldofs(cell)) == 0
+        end
+    end
+end
+
 @testset "DofHandler" begin
     test_1d_bar_beam();
     test_2d_scalar();
@@ -670,4 +696,5 @@ end
     test_celliterator_subdomain()
     test_show()
     test_vtk_export()
+    test_celliterator_on_true_subdomain_smoketest()
 end

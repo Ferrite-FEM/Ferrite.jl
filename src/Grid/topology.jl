@@ -124,7 +124,7 @@ function _exclusive_topology_ctor(cells::Vector{C}, vertex_cell_table::Array{Set
             # Buffer neighbor
             cell_neighbor = cells[cell_neighbor_id]
             # TODO handle mixed-dimensional case
-            getdim(cell_neighbor) == getdim(cell) || continue
+            getrefdim(cell_neighbor) == getrefdim(cell) || continue
 
             num_shared_vertices = _num_shared_vertices(cell, cell_neighbor)
 
@@ -169,8 +169,6 @@ function ExclusiveTopology(cells::Vector{C}) where C <: AbstractCell
     max_faces = 0
     max_edges = 0
     if isconcretetype(celltype)
-        dim = getdim(cells[1])
-
         max_vertices = nvertices(cells[1])
         max_faces = nfaces(cells[1])
         max_edges = nedges(cells[1])
@@ -178,8 +176,6 @@ function ExclusiveTopology(cells::Vector{C}) where C <: AbstractCell
         celltypes = Set(typeof.(cells))
         for celltype in celltypes
             celltypeidx = findfirst(x->typeof(x)==celltype,cells)
-            dim = getdim(cells[celltypeidx])
-
             max_vertices = max(max_vertices,nvertices(cells[celltypeidx]))
             max_faces = max(max_faces, nfaces(cells[celltypeidx]))
             max_edges = max(max_edges, nedges(cells[celltypeidx]))

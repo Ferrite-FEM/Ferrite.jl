@@ -37,7 +37,7 @@ function L2Projector(
         grid::AbstractGrid;
         qr_lhs::QuadratureRule = _mass_qr(func_ip),
         set = OrderedSet(1:getncells(grid)),
-        geom_ip::Interpolation = default_interpolation(getcelltype(grid, first(set))),
+        geom_ip::Interpolation = geometric_interpolation(getcelltype(grid, first(set))),
     )
 
     # TODO: Maybe this should not be allowed? We always assume to project scalar entries.
@@ -80,7 +80,7 @@ end
 
 function _assemble_L2_matrix(fe_values, set, dh)
 
-    n = Ferrite.getnbasefunctions(fe_values)
+    n = getnbasefunctions(fe_values)
     M = create_symmetric_sparsity_pattern(dh)
     assembler = start_assemble(M)
 
@@ -246,7 +246,7 @@ function _evaluate_at_grid_nodes(
         data = fill(NaN * zero(S), getnnodes(get_grid(dh)))
     end
     ip, gip = proj.func_ip, proj.geom_ip
-    refdim, refshape = getdim(ip), getrefshape(ip)
+    refdim, refshape = getrefdim(ip), getrefshape(ip)
     local_node_coords = reference_coordinates(gip)
     qr = QuadratureRule{refshape}(zeros(length(local_node_coords)), local_node_coords)
     cv = CellValues(qr, ip)

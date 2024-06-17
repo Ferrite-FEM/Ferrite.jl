@@ -63,7 +63,7 @@ function _get_cellcoords(points::AbstractVector{Vec{dim,T}}, grid::AbstractGrid,
     for point_idx in 1:length(points)
         cell_found = false
         for (CT, node_cell_dict) in node_cell_dicts
-            geom_interpol = default_interpolation(CT)
+            geom_interpol = geometric_interpolation(CT)
             # loop over points
             for node in nearest_nodes[point_idx]
                 possible_cells = get(node_cell_dict, node, nothing)
@@ -115,15 +115,15 @@ end
 
 # See https://discourse.julialang.org/t/finding-the-value-of-a-field-at-a-spatial-location-in-juafem/38975/2
 # TODO: should we make iteration params optional keyword arguments?
-function find_local_coordinate(interpolation, cell_coordinates::Vector{V}, global_coordinate::V) where {dim, T, V <: Vec{dim, T}}
+function find_local_coordinate(interpolation, cell_coordinates::Vector{<:Vec{dim}}, global_coordinate::Vec{dim}; tol_norm = 1e-10) where dim
+    T = promote_type(eltype(cell_coordinates[1]), eltype(global_coordinate))
     n_basefuncs = getnbasefunctions(interpolation)
     @assert length(cell_coordinates) == n_basefuncs
-    local_guess = zero(V)
+    local_guess = zero(Vec{dim, T})
     max_iters = 10
-    tol_norm = 1e-10
     converged = false
     for _ in 1:max_iters
-        global_guess = zero(V)
+        global_guess = zero(Vec{dim, T})
         J = zero(Tensor{2, dim, T})
         # TODO batched eval after 764 is merged.
         for j in 1:n_basefuncs
@@ -219,7 +219,7 @@ function evaluate_at_points!(out_vals::Vector{T2},
         if ip !== nothing
             dofrange = dof_range(sdh, fname)
             cellset = sdh.cellset
-            ip_geo = default_interpolation(getcelltype(sdh))
+            ip_geo = geometric_interpolation(getcelltype(sdh))
             pv = PointValues(T_ph, ip, ip_geo; update_gradients = false)
             _evaluate_at_points!(out_vals, dof_vals, ph, dh, pv, cellset, dofrange)
         end

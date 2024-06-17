@@ -108,4 +108,22 @@ end
     @test_throws ErrorException(msg) Grid(Triangle[], Node{2,Float64}[]; boundary_matrix = something)
 end
 
+@testset "getdim" begin
+    msg = "`Ferrite.getdim` is deprecated, use `getrefdim` or `getspatialdim` instead"
+    @test_throws ErrorException(msg) Ferrite.getdim(generate_grid(Line, (1,)))
+    @test_throws ErrorException(msg) Ferrite.getdim(Lagrange{RefTriangle,1}())
+    @test_throws ErrorException(msg) Ferrite.getdim(Line((1,2)))
+end
+
+@testset "getfielddim" begin
+    msg = "`Ferrite.getfielddim(::AbstractDofHandler, args...) is deprecated, use `n_components` instead"
+    dh = close!(add!(DofHandler(generate_grid(Triangle, (1,1))), :u, Lagrange{RefTriangle,1}()))
+    @test_throws ErrorException(msg) Ferrite.getfielddim(dh, Ferrite.find_field(dh, :u))
+    @test_throws ErrorException(msg) Ferrite.getfielddim(dh.subdofhandlers[1], :u)
+end
+
+@testset "default_interpolation" begin
+    @test Ferrite.default_interpolation(Triangle) == geometric_interpolation(Triangle)
+end
+
 end # testset deprecations

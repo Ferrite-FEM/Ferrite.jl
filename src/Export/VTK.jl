@@ -49,7 +49,7 @@ end
 Base.close(vtk::VTKFile) = WriteVTK.vtk_save(vtk.vtk)
 
 function Base.show(io::IO, ::MIME"text/plain", vtk::VTKFile)
-    open_str = WriteVTK.isopen(vtk.vtk) ? "open" : "closed"
+    open_str = isopen(vtk.vtk) ? "open" : "closed"
     filename = vtk.vtk.path
     print(io, "VTKFile for the $open_str file \"$(filename)\".")
 end
@@ -182,7 +182,7 @@ nodes_to_vtkorder(cell::QuadraticHexahedron) = [
 function create_vtk_griddata(grid::Grid{dim,C,T}) where {dim,C,T}
     cls = WriteVTK.MeshCell[]
     for cell in getcells(grid)
-        celltype = Ferrite.cell_to_vtkcell(typeof(cell))
+        celltype = cell_to_vtkcell(typeof(cell))
         push!(cls, WriteVTK.MeshCell(celltype, nodes_to_vtkorder(cell)))
     end
     coords = reshape(reinterpret(T, getnodes(grid)), (dim, getnnodes(grid)))
@@ -248,7 +248,7 @@ Use `write_node_data` directly when exporting values that are already
 sorted by the nodes in the grid.
 """
 function write_solution(vtk::VTKFile, dh::AbstractDofHandler, u::Vector, suffix="")
-    fieldnames = Ferrite.getfieldnames(dh)  # all primary fields
+    fieldnames = getfieldnames(dh)  # all primary fields
     for name in fieldnames
         data = _evaluate_at_grid_nodes(dh, u, name, #=vtk=# Val(true))
         _vtk_write_node_data(vtk.vtk, data, string(name, suffix))
@@ -315,7 +315,7 @@ Write all cell sets in the grid with name according to their keys and
 celldata 1 if the cell is in the set, and 0 otherwise. It is also possible to
 only export a single `cellset`, or multiple `cellsets`.
 """
-function write_cellset(vtk, grid::AbstractGrid, cellsets=keys(getcellsets(getgrid(vtk))))
+function write_cellset(vtk, grid::AbstractGrid, cellsets=keys(getcellsets(grid)))
     z = zeros(getncells(grid))
     for cellset in cellsets
         fill!(z, 0)
@@ -340,7 +340,7 @@ function write_constraints(vtk, ch::ConstraintHandler)
     unique!(unique_fields)
 
     for field in unique_fields
-        nd = getfielddim(ch.dh, field)
+        nd = n_components(ch.dh, field)
         data = zeros(Float64, nd, getnnodes(get_grid(ch.dh)))
         for dbc in ch.dbcs
             dbc.field_name != field && continue

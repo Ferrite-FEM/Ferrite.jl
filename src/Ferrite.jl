@@ -15,14 +15,16 @@ using NearestNeighbors:
 using OrderedCollections:
     OrderedSet
 using SparseArrays:
-    SparseArrays, SparseMatrixCSC, nonzeros, nzrange, rowvals, sparse, spzeros
+    SparseArrays, SparseMatrixCSC, nonzeros, nzrange, rowvals, sparse
 using StaticArrays:
-    StaticArrays, MMatrix, SMatrix, SVector
+    StaticArrays, MArray, MMatrix, SArray, SMatrix, SVector
 using WriteVTK:
     WriteVTK, VTKCellTypes
 using Tensors:
     Tensors, AbstractTensor, SecondOrderTensor, SymmetricTensor, Tensor, Vec, gradient,
-    rotation_tensor, symmetric, tovoigt!
+    rotation_tensor, symmetric, tovoigt!, hessian, otimesu
+using ForwardDiff:
+    ForwardDiff
 
 
 include("exports.jl")
@@ -47,6 +49,13 @@ const RefTriangle      = RefSimplex{2}
 const RefTetrahedron   = RefSimplex{3}
 struct RefPrism         <: AbstractRefShape{3} end
 struct RefPyramid       <: AbstractRefShape{3} end
+
+"""
+    Ferrite.getrefdim(RefShape::Type{<:AbstractRefShape})
+
+Get the dimension of the reference shape
+"""
+getrefdim(::Type{<:AbstractRefShape{rdim}}) where rdim = rdim
 
 abstract type AbstractCell{refshape <: AbstractRefShape} end
 

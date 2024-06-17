@@ -1,6 +1,6 @@
 # abstract type Constraint end
 """
-    Dirichlet(u::Symbol, ∂Ω::Set, f::Function, components=nothing)
+    Dirichlet(u::Symbol, ∂Ω::AbstractVecOrSet, f::Function, components=nothing)
 
 Create a Dirichlet boundary condition on `u` on the `∂Ω` part of
 the boundary. `f` is a function of the form `f(x)` or `f(x, t)`
@@ -8,6 +8,13 @@ where `x` is the spatial coordinate and `t` is the current time,
 and returns the prescribed value. `components` specify the components
 of `u` that are prescribed by this condition. By default all components
 of `u` are prescribed.
+
+The set, `∂Ω`, can be an `AbstractSet` or `AbstractVector` with elements of
+type [`FacetIndex`](@ref), [`FaceIndex`](@ref), [`EdgeIndex`](@ref), [`VertexIndex`](@ref),
+or `Int`. For most cases, the element type is `FacetIndex`, as shown below.
+To constrain a single point, using `VertexIndex` is recommended, but it is also possible
+to constrain a specific nodes by giving the node numbers via `Int` elements.
+To constrain e.g. an edge in 3d `EdgeIndex` elements can be given.
 
 For example, here we create a
 Dirichlet condition for the `:u` field, on the facetset called
@@ -337,7 +344,7 @@ end
 
 function _add!(ch::ConstraintHandler, dbc::Dirichlet, bcnodes::AbstractVecOrSet{Int}, interpolation::Interpolation, field_dim::Int, offset::Int, bcvalue::BCValues, cellset::AbstractVecOrSet{Int}=OrderedSet{Int}(1:getncells(get_grid(ch.dh))))
     grid = get_grid(ch.dh)
-    if interpolation !== default_interpolation(getcelltype(grid, first(cellset)))
+    if interpolation !== geometric_interpolation(getcelltype(grid, first(cellset)))
         @warn("adding constraint to nodeset is not recommended for sub/super-parametric approximations.")
     end
 
@@ -834,7 +841,7 @@ function add!(ch::ConstraintHandler, dbc::Dirichlet)
             EntityType = FacetIndex
         end
         CT = getcelltype(sdh) # Same celltype enforced in SubDofHandler constructor
-        bcvalues = BCValues(interpolation, default_interpolation(CT), EntityType)
+        bcvalues = BCValues(interpolation, geometric_interpolation(CT), EntityType)
         # Recreate the Dirichlet(...) struct with the filtered set and call internal add!
         filtered_dbc = Dirichlet(dbc.field_name, filtered_set, dbc.f, components)
         _add!(
@@ -1503,7 +1510,7 @@ function __check_periodic_facets(grid::Grid, fi::FacetIndex, fj::FacetIndex, kno
     end
 
     # Rotation is only relevant for 3D
-    if getdim(grid) == 3
+    if getspatialdim(grid) == 3
         node_rot = mod(node_rot, length(nodes_i))
     else
         node_rot = 0
@@ -1558,7 +1565,7 @@ function __check_periodic_facets_f(grid::Grid, fi::FacetIndex, fj::FacetIndex, x
     found || return nothing
 
     # 3. Rotation is only relevant for 3D.
-    if getdim(grid) == 3
+    if getspatialdim(grid) == 3
         node_rot = mod(node_rot, length(nodes_i))
     else
         node_rot = 0
