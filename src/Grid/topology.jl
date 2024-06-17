@@ -113,10 +113,13 @@ end
 
 # Guess of how many neighbors depending on grid dimension and index type.
 # This is just a performance optimization, and a good default is sufficient.
-_getsizehint(::AbstractGrid{3}, ::Type{FaceIndex}) = 1 # 2
-_getsizehint(::AbstractGrid, ::Type{FaceIndex}) = 0 # No faces exists in 2d or lower dim
-_getsizehint(::AbstractGrid{dim}, ::Type{EdgeIndex}) where dim = 1 #dim^2
-_getsizehint(::AbstractGrid{dim}, ::Type{VertexIndex}) where dim = 1 # 2^dim
+# Data based on Simplex shapes from grid generators unless specified.
+_getsizehint(::AbstractGrid, ::Type{FaceIndex}) = 1
+_getsizehint(::AbstractGrid, ::Type{EdgeIndex}) = 1
+_getsizehint(::AbstractGrid{3}, ::Type{EdgeIndex}) = 3
+_getsizehint(::AbstractGrid{1}, ::Type{VertexIndex}) = 1
+_getsizehint(::AbstractGrid{2}, ::Type{VertexIndex}) = 3
+_getsizehint(::AbstractGrid{3}, ::Type{VertexIndex}) = 13
 _getsizehint(::AbstractGrid{1}, ::Type{CellIndex}) = 2
 _getsizehint(::AbstractGrid{2}, ::Type{CellIndex}) = 12
 function _getsizehint(g::AbstractGrid{3}, ::Type{CellIndex})
