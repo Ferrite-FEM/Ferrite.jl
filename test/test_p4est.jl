@@ -555,7 +555,7 @@ end
     transfered_grid = Ferrite.creategrid(adaptive_grid)
     @test unique(transfered_grid.nodes) == transfered_grid.nodes
     @test length(transfered_grid.nodes) == 5^3 + 2*(6 + 12 + 1)
-    @test length(transfered_grid.conformity_info) == 2*(6 + 12 + 1) - 2*3
+    @test length(transfered_grid.conformity_info) == 2*(6 + 12) - 2*3
 
     adaptive_grid = ForestBWG(grid,3)
     Ferrite.AMR.refine_all!(adaptive_grid,1)
@@ -563,8 +563,8 @@ end
     Ferrite.AMR.refine!(adaptive_grid.cells[8],adaptive_grid.cells[8].leaves[1])
     transfered_grid = Ferrite.creategrid(adaptive_grid)
     @test unique(transfered_grid.nodes) == transfered_grid.nodes
-    @test length(transfered_grid.nodes) == 5^3 + 4*(6 + 12 + 1)
-    @test length(transfered_grid.conformity_info) == 4*(6 + 12 + 1) - 2*3
+    @test length(transfered_grid.nodes) == 5^3 + 2*(6 + 12 + 1)
+    @test length(transfered_grid.conformity_info) == 2*(6 + 12) - 2*3
 
     # Combined
     adaptive_grid = ForestBWG(grid,3)
@@ -576,7 +576,7 @@ end
     transfered_grid = Ferrite.creategrid(adaptive_grid)
     @test unique(transfered_grid.nodes) == transfered_grid.nodes
     @test length(transfered_grid.nodes) == 5^3 + 4*(6 + 12 + 1)
-    @test length(transfered_grid.conformity_info) == 4*(6 + 12 + 1) - 2*3 - 2*3
+    @test length(transfered_grid.conformity_info) == 4*(6 + 12) - 2*3 - 2*3
 
     # Combined and rotated
     adaptive_grid = ForestBWG(grid,3)
@@ -588,7 +588,10 @@ end
     transfered_grid = Ferrite.creategrid(adaptive_grid)
     @test unique(transfered_grid.nodes) == transfered_grid.nodes
     @test length(transfered_grid.nodes) == 5^3 + 4*(6 + 12 + 1)
-    @test length(transfered_grid.conformity_info) == 4*(6 + 12 + 1) - 2*3 - 2*3
+    # 4*(6 + 12)    potential hanging nodes
+    # - 2           shared through common edge
+    # - 2* (2*3)    outer boundary face and edge nodes
+    @test length(transfered_grid.conformity_info) == 4*(6 + 12) - 2 - 2*3 - 2*3
 
     # Reproducer test for Fig.3 BWG 11
     grid = generate_grid(Hexahedron,(2,1,1))
