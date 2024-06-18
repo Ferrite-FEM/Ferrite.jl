@@ -127,7 +127,7 @@ function dofhandler()
 end
 
 function _pointeval_dofhandler2_manual_projection(dh, csv, cvv, f_s, f_v)
-    M = create_sparsity_pattern(dh)
+    M = allocate_matrix(dh)
     f = zeros(ndofs(dh))
     asm = start_assemble(M, f)
     me = zeros(ndofs_per_cell(dh), ndofs_per_cell(dh))

@@ -130,7 +130,7 @@ of the mass-matrix.
 function close!(proj::L2Projector)
     close!(proj.dh)
     M = _assemble_L2_matrix(proj.dh, proj.qrs_lhs)
-    proj.M_cholesky = cholesky(M)
+    proj.M_cholesky = cholesky(Symmetric(M))
     return proj
 end
 
@@ -144,7 +144,7 @@ end
 _mass_qr(ip::VectorizedInterpolation) = _mass_qr(ip.ip)
 
 function _assemble_L2_matrix(dh::DofHandler, qrs_lhs::Vector{<:QuadratureRule})
-    M = create_symmetric_sparsity_pattern(dh)
+    M = Symmetric(allocate_matrix(dh))
     assembler = start_assemble(M)
     for (sdh, qr_lhs) in zip(dh.subdofhandlers, qrs_lhs)
         ip_fun = only(sdh.field_interpolations)
@@ -160,7 +160,7 @@ function _assemble_L2_matrix!(assembler, cellvalues::CellValues, sdh::SubDofHand
     n = getnbasefunctions(cellvalues)
     Me = zeros(n, n)
 
-    function symmetrize_to_lower!(K)
+    function symmetrize_to_lower!(K::Matrix)
        for i in 1:size(K, 1)
            for j in i+1:size(K, 1)
                K[j, i] = K[i, j]
@@ -286,7 +286,7 @@ function _project(proj::L2Projector, qrs_rhs::Vector{<:QuadratureRule}, vars::Un
 
     # Recast to original input type
     make_T(vals) = T <: AbstractTensor ? T(Tuple(vals)) : vals[1]
-    return T[make_T(x) for x in eachrow(projected_vals)]
+    return T[make_T(x) for x in Base.eachrow(projected_vals)]
 end
 
 function assemble_proj_rhs!(f::Matrix, cellvalues::CellValues, sdh::SubDofHandler, vars::Union{AbstractVector, AbstractDict})

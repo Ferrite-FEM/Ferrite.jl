@@ -69,7 +69,7 @@
         add!(ch, dbc)
         close!(ch)
         update!(ch, 0.0)
-        K = create_sparsity_pattern(dh);
+        K = allocate_matrix(dh);
         K, f = doassemble!(cellvalues, K, dh);
         apply!(K, f, ch)
         sol = K \ f

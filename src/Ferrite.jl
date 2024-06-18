@@ -8,8 +8,7 @@ using Base:
 using EnumX:
     EnumX, @enumx
 using LinearAlgebra:
-    LinearAlgebra, Symmetric, Transpose, cholesky, det, issymmetric, norm,
-    pinv, tr
+    LinearAlgebra, Symmetric, Transpose, cholesky, det, norm, pinv, tr
 using NearestNeighbors:
     NearestNeighbors, KDTree, knn
 using OrderedCollections:
@@ -107,6 +106,7 @@ const AbstractVecOrSet{T} = Union{AbstractSet{T}, AbstractVector{T}}
 const IntegerCollection = AbstractVecOrSet{<:Integer}
 
 include("utils.jl")
+include("HeapAllocator.jl")
 
 # Matrix/Vector utilities
 include("arrayutils.jl")
@@ -139,6 +139,7 @@ include("Dofs/DofHandler.jl")
 include("Dofs/ConstraintHandler.jl")
 include("Dofs/apply_analytical.jl")
 include("Dofs/sparsity_pattern.jl")
+include("Dofs/block_sparsity_pattern.jl")
 include("Dofs/DofRenumbering.jl")
 
 include("iterators.jl")

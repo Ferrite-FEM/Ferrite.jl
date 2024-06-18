@@ -424,7 +424,7 @@ function test_export(;subset::Bool)
 
 end
 
-function test_show()
+function test_show_l2()
     grid = generate_grid(Triangle, (2,2))
     ip = Lagrange{RefTriangle, 1}()
     proj = L2Projector(ip, grid)
@@ -496,6 +496,6 @@ end
     test_projection_mixedgrid()
     test_export(subset=false)
     test_export(subset=true)
-    test_show()
+    test_show_l2()
     test_l2proj_errorpaths()
 end
