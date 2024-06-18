@@ -377,3 +377,5 @@ function default_interpolation(::Type{C}) where {C <: AbstractCell}
     @warn "Ferrite.default_interpolation is deprecated, use the exported `geometric_interpolation` instead" maxlog=1
     return geometric_interpolation(C)
 end
+
+@deprecate create_sparsity_pattern allocate_matrix
