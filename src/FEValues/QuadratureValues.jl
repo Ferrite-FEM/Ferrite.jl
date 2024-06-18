@@ -17,10 +17,12 @@ function Base.iterate(iterator::QuadratureValuesIterator{<:Any, Nothing}, q_poin
     return (qp_v, q_point+1)
 end
 
-function Base.iterate(iterator::QuadratureValuesIterator{<:Any, <:AbstractVector}, q_point=1)
+function Base.iterate(iterator::QuadratureValuesIterator{<:Any, <:StaticVector}, q_point=1)
     checkbounds(Bool, 1:getnquadpoints(iterator.v), q_point) || return nothing
+    #q_point < 5 || return nothing
     qp_v = @inbounds quadrature_point_values(iterator.v, q_point, iterator.cell_coords)
     return (qp_v, q_point+1)
+    #return (1, q_point+1)
 end
 Base.IteratorEltype(::Type{<:QuadratureValuesIterator}) = Base.EltypeUnknown()
 Base.length(iterator::QuadratureValuesIterator) = getnquadpoints(iterator.v)

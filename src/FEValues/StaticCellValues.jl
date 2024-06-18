@@ -110,15 +110,9 @@ end
     return _quadrature_point_values(fe_v, q_point, cell_coords,detJ->throw_detJ_not_pos(detJ))
 end
 
-# @inline function quadrature_point_values(fe_v::StaticCellValues{<:Any, <:Any}, q_point::Int32, cell_coords::SVector)
-#     dNdx = CuStaticSharedArray(Vec{2,Float64},4) # TODO: Use the correct type
-
-
-#     return _quadrature_point_values(fe_v, q_point, cell_coords,detJ->-1)
-# end
-
-
-
+@inline function quadrature_point_values(fe_v::StaticCellValues{<:Any, <:Any}, q_point::Int, cell_coords::StaticVector)
+    return _quadrature_point_values(fe_v, q_point, cell_coords,detJ->-1)
+end
 
 
 function _quadrature_point_values(fe_v::StaticCellValues, q_point::Int, cell_coords::AbstractVector,neg_detJ_err_fun::Function)
@@ -126,14 +120,14 @@ function _quadrature_point_values(fe_v::StaticCellValues, q_point::Int, cell_coo
     @inbounds begin
          mapping = calculate_mapping(fe_v.gm, q_point, cell_coords)
 
-         detJ = Float32(calculate_detJ(getjacobian(mapping)))
-         detJ > 0.0f0 || neg_detJ_err_fun(detJ) # Cannot throw error on GPU, TODO: return error code instead
-         detJdV = detJ * fe_v.weights[q_point]
+         detJ = calculate_detJ(getjacobian(mapping))
+        detJ > 0.0f0 || neg_detJ_err_fun(detJ) # Cannot throw error on GPU, TODO: return error code instead
+        detJdV = detJ * fe_v.weights[q_point]
 
-         Nx, dNdx = calculate_mapped_values(fe_v.fv, q_point, mapping)
-         M = fe_v.gm.Nξ[:, q_point]
+        Nx, dNdx = calculate_mapped_values(fe_v.fv, q_point, mapping)
+        M = fe_v.gm.Nξ[:, q_point]
     end
-     return StaticQuadratureValues(detJdV, Nx, dNdx, M)
+    return StaticQuadratureValues(detJdV, Nx, dNdx, M)
 end
 
 

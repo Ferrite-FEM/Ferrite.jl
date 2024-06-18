@@ -23,35 +23,21 @@ get_coordinate_type(::GPUGrid{dim,CELLVEC,NODEVEC}) where
 @inline getcells(grid::GPUGrid, v::Union{Int32, Vector{Int32}}) = grid.cells[v]
 
 # This function is used to get the coordinates of a cell on the GPU.
-@inline function getcoordinates(grid::Ferrite.GPUGrid)
-    # b_idx is the block index which is the same as the cell index.
-    # Each block corresponds to a cell, so we can use the block index to get the cell.
-    b_idx = blockIdx().x  # element index
+@inline function getcoordinates(grid::Ferrite.GPUGrid,e::Int)
+    # e is the element index.
 
     CT = get_coordinate_type(grid)
-    cell = getcells(grid, b_idx)
+    cell = getcells(grid, e)
     N = nnodes(cell)
 
-    # Create a CuStaticSharedArray to store the coordinates of the cell.
-    arr = CuStaticSharedArray(CT, N)
-    # We are using 2D threads (each (i,j) represents an element in local stiffness matrix), so we need to get the x and y thread indices.
-    # no. threads in x = no. of shape functions
-    # no. threads in y = no. of shape functions
-    tx = threadIdx().x
-    ty = threadIdx().y
-    q_point = threadIdx().z
-
-    # no. of nodes <= no. of shape functions (and we need only one threads direction)
-    arr[tx] = get_node_coordinate(grid, Ferrite.get_node_ids(cell)[tx]) 
-
-    if ty == 1 && q_point == 1  && tx <=N 
-        arr[tx] = get_node_coordinate(grid, Ferrite.get_node_ids(cell)[tx]) 
+    x = MVector{N, CT}(undef) # local array to store the coordinates of the nodes of the cell.
+    node_ids = get_node_ids(cell)
+    @inbounds for i in 1:length(x)
+        x[i] = get_node_coordinate(grid, node_ids[i])
     end
 
-    # Sync all threads to make sure all the values are written to the array.
-    sync_threads()
-    # return the array as a SVector, so that it can fit with the rest of the codebase. 
-    return SVector{N,CT}(arr)
+    return SVector(x...)
 end
+
 
 

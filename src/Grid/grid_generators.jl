@@ -84,26 +84,23 @@ function generate_grid(::Type{QuadraticLine}, nel::NTuple{1,Int}, left::Vec{1,T}
     return Grid(cells, nodes, facesets=facesets, boundary_matrix=boundary_matrix)
 end
 
-function _generate_2d_nodes!(nodes, nx, ny, LL, LR, UR, UL)
-      for i in 0:ny-1
-        T = typeof(LL[1])
+function _generate_2d_nodes!(nodes::Vector{Node{2, T}}, nx, ny, LL, LR, UR, UL) where T
+    for i in 0:ny-1
+      ratio_bounds = convert(T, i) / (ny-1)
 
+      x0 = LL[1] * (1 - ratio_bounds) + ratio_bounds * UL[1]
+      x1 = LR[1] * (1 - ratio_bounds) + ratio_bounds * UR[1]
 
-        ratio_bounds = T(i / (ny-1))
+      y0 = LL[2] * (1 - ratio_bounds) + ratio_bounds * UL[2]
+      y1 = LR[2] * (1 - ratio_bounds) + ratio_bounds * UR[2]
 
-        x0 = LL[1] * (1 - ratio_bounds) + ratio_bounds * UL[1]
-        x1 = LR[1] * (1 - ratio_bounds) + ratio_bounds * UR[1]
-
-        y0 = LL[2] * (1 - ratio_bounds) + ratio_bounds * UL[2]
-        y1 = LR[2] * (1 - ratio_bounds) + ratio_bounds * UR[2]
-        
-        for j in 0:nx-1
-            ratio =T( j / (nx-1))
-            x = x0 * (1 - ratio) + ratio * x1
-            y = y0 * (1 - ratio) + ratio * y1
-            push!(nodes, Node((x, y)))
-        end
-    end
+      for j in 0:nx-1
+          ratio = convert(T, j) / (nx-1)
+          x = x0 * (1 - ratio) + ratio * x1
+          y = y0 * (1 - ratio) + ratio * y1
+          push!(nodes, Node((x, y)))
+      end
+  end
 end
 
 function generate_grid(C::Type{<:AbstractCell{<:AbstractRefShape{2}}}, nel::NTuple{2,Int}, X::Vector{Vec{2,T}}) where {T}
