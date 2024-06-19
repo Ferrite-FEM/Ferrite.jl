@@ -35,11 +35,26 @@ function Adapt.adapt_structure(to, grid::Grid)
     GPUGrid(cells,nodes)
 end
 
+# function Adapt.adapt_structure(to, dh::DofHandler)
+#     cell_dofs = Adapt.adapt_structure(to, Int32.(dh.cell_dofs) |> cu)
+#     cells = Adapt.adapt_structure(to, cu(dh.grid.cells))
+#     nodes = Adapt.adapt_structure(to, cu(dh.grid.nodes))
+#     GPUDofHandler(cell_dofs, GPUGrid(cells,nodes))
+# end
+
+
+function get_ndofs_cell(dh::DofHandler)
+    ndofs_cell = [ndofs_per_cell(dh, i) for i in 1:(dh |> get_grid |> getncells)]
+    return ndofs_cell
+end
+
 function Adapt.adapt_structure(to, dh::DofHandler)
-    cell_dofs = Adapt.adapt_structure(to, Int32.(dh.cell_dofs) |> cu)
-    cells = Adapt.adapt_structure(to, cu(dh.grid.cells))
-    nodes = Adapt.adapt_structure(to, cu(dh.grid.nodes))
-    GPUDofHandler(cell_dofs, GPUGrid(cells,nodes))
+    cell_dofs = Adapt.adapt_structure(to, dh.cell_dofs |> cu)
+    cells = Adapt.adapt_structure(to, dh.grid.cells |> cu)
+    offsets = Adapt.adapt_structure(to, dh.cell_dofs_offset |> cu)
+    nodes = Adapt.adapt_structure(to, dh.grid.nodes |> cu)
+    ndofs_cell = Adapt.adapt_structure(to, get_ndofs_cell(dh) |> cu)
+    GPUDofHandler(cell_dofs, GPUGrid(cells,nodes),offsets, Ferrite.isclosed(dh), ndofs_cell)
 end
 
 

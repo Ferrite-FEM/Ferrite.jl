@@ -1,11 +1,12 @@
 using Ferrite, CUDA
+using StaticArrays
 
 
 
 left = Tensor{1,2,Float32}((0,-0)) # define the left bottom corner of the grid.
-right = Tensor{1,2,Float32}((100.0,100.0)) # define the right top corner of the grid.
+right = Tensor{1,2,Float32}((3.0,4.0)) # define the right top corner of the grid.
 
-grid = generate_grid(Quadrilateral, (100, 100),left,right); 
+grid = generate_grid(Quadrilateral, (3, 4),left,right); 
 
 colors = create_coloring(grid)
 
@@ -88,6 +89,7 @@ end
 
 
 # Standard global assembly
+
 function assemble_global!(cellvalues, dh::DofHandler,qp_iter::Val{QPiter}) where {QPiter}
     (;f, K, assembler, Ke, fe) = create_buffers(cellvalues,dh)
     # Loop over all cels
@@ -104,11 +106,14 @@ function assemble_global!(cellvalues, dh::DofHandler,qp_iter::Val{QPiter}) where
             assemble_element_std!(Ke, fe, cellvalues)
         end
         # Assemble Ke and fe into K and f
+        @show typeof(cell)
         assemble!(assembler, celldofs(cell), Ke, fe)
     end
     return K, f
 end
 
+
+celldofs(dh,2)
 
 
 ### Old impelementation that makes each threads over the quadrature points.
@@ -156,19 +161,21 @@ end
      
 #     return nothing
 # end
+getncells(get_grid(dh))
+grid.cells
 
-
-function assemble_element_gpu_ele_per_thread!(Kgpu,cv,dh,n_cells,eles_colored)
+function assemble_element_gpu_ele_per_thread!(Kgpu,cv,dh,n_cells_colored,eles_colored)
     tx = threadIdx().x 
     bx = blockIdx().x
     bd = blockDim().x
     e_color = tx + (bx-1)*bd # element number per color
-    e_color ≤ n_cells || return nothing # e here is the current element index.
+    e_color ≤ n_cells_colored || return nothing # e here is the current element index.
     n_basefuncs = getnbasefunctions(cv)
     e = eles_colored[e_color]
     cell_coords = getcoordinates(dh.grid, e)
 
-    dofs = dh.cell_dofs
+    ke = MMatrix{4,4,Float32}(undef) # Note: using n_basefuncs instead of 4 will throw an error because this type of dynamisim is not supported in GPU.
+    fill!(ke, 0.0f0)
      # Loop over quadrature points
      for qv in Ferrite.QuadratureValuesIterator(cv,cell_coords)
         ## Get the quadrature weight
@@ -178,19 +185,31 @@ function assemble_element_gpu_ele_per_thread!(Kgpu,cv,dh,n_cells,eles_colored)
             #δu  = shape_value(qv, i)
             ∇δu = shape_gradient(qv, i)
             ## Add contribution to fe
-            @inbounds ig = dofs[(e-1)*n_basefuncs+i]
+            #@inbounds ig = dofs[(e-1)*n_basefuncs+i] # TODO: encapsulate in assembler
             #fe[i] += δu * dΩ
             ## Loop over trial shape functions
             for j in 1:n_basefuncs
                 ∇u = shape_gradient(qv, j)
                 ## Add contribution to Ke
-                @inbounds jg = dofs[(e-1)*n_basefuncs+j]
-                Kgpu[ig, jg] += (∇δu ⋅ ∇u) * dΩ
+                #@inbounds jg = dofs[(e-1)*n_basefuncs+j] #TODO: encapsulate in assembler
+                #Kgpu[ig, jg] += (∇δu ⋅ ∇u) * dΩ  #TODO: use sparse matrix
+                ke[i,j] += (∇δu ⋅ ∇u) * dΩ
             end
         end
     end
+
+    ## Assemble Ke into Kgpu ##
+    ## TODO: in the future, we will use assembler to assemble the local matrix into global matrix.
+    cell_dofs = celldofs(dh,e)
+    for i in eachindex(cell_dofs),j in eachindex(cell_dofs)
+        ig = cell_dofs[i]
+        jg = cell_dofs[j]
+        Kgpu[ig, jg] += ke[i,j]
+    end
+
     return nothing
 end
+
 
 
 # function assemble_element_gpu!(Kgpu,cv,dh) 
@@ -290,12 +309,13 @@ using BenchmarkTools
 # using LinearAlgebra
 
 
-Kgpu = @btime CUDA.@sync   assemble_global_gpu_color($cellvalues,$dh)
+#Kgpu = @btime CUDA.@sync   assemble_global_gpu_color($cellvalues,$dh)
 Kgpu =    assemble_global_gpu_color(cellvalues,dh)
 
  
 norm(Kgpu)
 
-Kstd , Fstd = @btime stassy($cellvalues,$dh);
+#Kstd , Fstd = @btime stassy($cellvalues,$dh);
 Kstd , Fstd = stassy(cellvalues,dh);
 norm(Kstd)
+
