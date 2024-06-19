@@ -259,10 +259,11 @@ function getneighborhood(top::ExclusiveTopology, grid::AbstractGrid, faceidx::Fa
 end
 
 function getneighborhood(top::ExclusiveTopology, grid::AbstractGrid{2}, edgeidx::EdgeIndex, include_self=false)
+    neighbors = top.edge_edge_neighbor[edgeidx[1], edgeidx[2]]
     if include_self
-        return [top.edge_edge_neighbor[edgeidx[1],edgeidx[2]].neighbor_info; edgeidx]
+        return view(push!(collect(neighbors), edgeidx), 1:(length(neighbors) + 1))
     else
-        return top.edge_edge_neighbor[edgeidx[1],edgeidx[2]].neighbor_info
+        return neighbors
     end
 end
 
