@@ -12,6 +12,11 @@ values of nodal functions, gradients and divergences of nodal functions etc. on 
 * `geom_interpol`: an optional instance of an [`Interpolation`](@ref) which is used to interpolate the geometry.
   By default linear Lagrange interpolation is used.
 
+**Keyword arguments:** The following keyword arguments are experimental and may change in future minor releases
+
+* `update_gradients`: Specifies if the gradients of the shape functions should be updated (default true)
+* `update_hessians`: Specifies if the hessians of the shape functions should be updated (default false)
+
 **Common methods:**
 
 * [`reinit!`](@ref)
@@ -41,12 +46,16 @@ struct FacetValues{FV, GM, FQR, detT, nT, V_FV<:AbstractVector{FV}, V_GM<:Abstra
 end
 
 function FacetValues(::Type{T}, fqr::FacetQuadratureRule, ip_fun::Interpolation, ip_geo::VectorizedInterpolation{sdim} = default_geometric_interpolation(ip_fun);
-        update_gradients::Union{Bool,Nothing} = nothing) where {T,sdim}
+    update_gradients::Union{Bool,Nothing} = nothing,
+    update_hessians ::Union{Bool,Nothing} = nothing) where {T,sdim}
 
-    FunDiffOrder = update_gradients === nothing ? 1 : convert(Int, update_gradients) # Logic must change when supporting update_hessian kwargs
+    _update_gradients = update_gradients === nothing ? true : update_gradients
+    _update_hessians  = update_hessians  === nothing ? false : update_hessians
+    _update_hessians && @assert _update_gradients
+
+    FunDiffOrder = _update_hessians ? 2 : (_update_gradients ? 1 : 0)
     GeoDiffOrder = max(required_geo_diff_order(mapping_type(ip_fun), FunDiffOrder), 1)
-    # Not sure why the type-asserts are required here but not for CellValues,
-    # but they solve the type-instability for FacetValues
+
     geo_mapping = [GeometryMapping{GeoDiffOrder}(T, ip_geo.ip, qr) for qr in fqr.face_rules]::Vector{<:GeometryMapping{GeoDiffOrder}}
     fun_values = [FunctionValues{FunDiffOrder}(T, ip_fun, qr, ip_geo) for qr in fqr.face_rules]::Vector{<:FunctionValues{FunDiffOrder}}
     max_nquadpoints = maximum(qr->length(getweights(qr)), fqr.face_rules)
@@ -84,6 +93,7 @@ get_fun_values(fv::FacetValues) = @inbounds fv.fun_values[getcurrentfacet(fv)]
 
 @propagate_inbounds shape_value(fv::FacetValues, q_point::Int, i::Int) = shape_value(get_fun_values(fv), q_point, i)
 @propagate_inbounds shape_gradient(fv::FacetValues, q_point::Int, i::Int) = shape_gradient(get_fun_values(fv), q_point, i)
+@propagate_inbounds shape_hessian(fv::FacetValues, q_point::Int, i::Int) = shape_hessian(get_fun_values(fv), q_point, i)
 @propagate_inbounds shape_symmetric_gradient(fv::FacetValues, q_point::Int, i::Int) = shape_symmetric_gradient(get_fun_values(fv), q_point, i)
 
 """
@@ -132,7 +142,7 @@ function reinit!(fv::FacetValues, cell::Union{AbstractCell, Nothing}, x::Abstrac
     @inbounds for (q_point, w) in pairs(getweights(fv.fqr, face_nr))
         mapping = calculate_mapping(geo_mapping, q_point, x)
         J = getjacobian(mapping)
-        # See the `Ferrite.embedded_det` docstring for more background
+        # See the `Ferrite.embedding_det` docstring for more background
         weight_norm = weighted_normal(J, getrefshape(geo_mapping.ip), face_nr)
         detJ = norm(weight_norm)
         detJ > 0.0 || throw_detJ_not_pos(detJ)
@@ -171,10 +181,10 @@ struct BCValues{T}
     current_entity::ScalarWrapper{Int}
 end
 
-BCValues(func_interpol::Interpolation, geom_interpol::Interpolation, boundary_type::Type{<:BoundaryIndex} = Ferrite.FaceIndex) =
+BCValues(func_interpol::Interpolation, geom_interpol::Interpolation, boundary_type::Type{<:BoundaryIndex} = FaceIndex) =
     BCValues(Float64, func_interpol, geom_interpol, boundary_type)
 
-function BCValues(::Type{T}, func_interpol::Interpolation{refshape}, geom_interpol::Interpolation{refshape}, boundary_type::Type{<:BoundaryIndex} = Ferrite.FaceIndex) where {T,dim,refshape <: AbstractRefShape{dim}}
+function BCValues(::Type{T}, func_interpol::Interpolation{refshape}, geom_interpol::Interpolation{refshape}, boundary_type::Type{<:BoundaryIndex} = FaceIndex) where {T,dim,refshape <: AbstractRefShape{dim}}
     # set up quadrature rules for each boundary entity with dof-positions
     # (determined by func_interpol) as the quadrature points
     interpolation_coords = reference_coordinates(func_interpol)

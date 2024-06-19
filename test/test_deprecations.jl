@@ -122,4 +122,8 @@ end
     @test_throws ErrorException(msg) Ferrite.getfielddim(dh.subdofhandlers[1], :u)
 end
 
+@testset "default_interpolation" begin
+    @test Ferrite.default_interpolation(Triangle) == geometric_interpolation(Triangle)
+end
+
 end # testset deprecations

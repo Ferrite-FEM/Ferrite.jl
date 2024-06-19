@@ -17,12 +17,12 @@ using OrderedCollections:
 using SparseArrays:
     SparseArrays, SparseMatrixCSC, nonzeros, nzrange, rowvals, sparse
 using StaticArrays:
-    StaticArrays, SMatrix, SVector
+    StaticArrays, MArray, MMatrix, SArray, SMatrix, SVector
 using WriteVTK:
     WriteVTK, VTKCellTypes
 using Tensors:
     Tensors, AbstractTensor, SecondOrderTensor, SymmetricTensor, Tensor, Vec, gradient,
-    rotation_tensor, symmetric, tovoigt!
+    rotation_tensor, symmetric, tovoigt!, hessian, otimesu
 using ForwardDiff:
     ForwardDiff
 

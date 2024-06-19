@@ -133,12 +133,13 @@ reference_facets(::Type{<:AbstractRefShape})
 @inline reference_facets(refshape::Type{<:AbstractRefShape{3}}) = reference_faces(refshape)
 
 """
-    geometric_interpolation(::AbstractCell)::Interpolation
+    geometric_interpolation(::AbstractCell)
+    geometric_interpolation(::Type{<:AbstractCell})
 
 Each `AbstractCell` type has a unique geometric interpolation describing its geometry.
-This function returns that interpolation.
+This function returns that interpolation, which is always a scalar interpolation.
 """
-geometric_interpolation(::AbstractCell)
+geometric_interpolation(cell::AbstractCell) = geometric_interpolation(typeof(cell))
 
 """
     Ferrite.get_node_ids(c::AbstractCell)

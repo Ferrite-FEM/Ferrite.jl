@@ -321,6 +321,11 @@ more discussion).
   for each cell type. This is equivalent to the deprecated `Ferrite.default_interpolation` function.
   ([#953][github-953])
 
+- CellValues and FacetValues can now store and map second order gradients (Hessians). The number
+  of gradients computed in CellValues/FacetValues is specified using the keyword arguments
+  `update_gradients::Bool` (default true) and `update_hessians::Bool` (default false) in the
+  constructors, i.e. `CellValues(...; update_hessians=true)`. ([#953][github-938])
+
 - `L2Projector` supports projecting on grids with mixed celltypes. ([#949][github-949])
 
 ### Changed
@@ -1000,6 +1005,7 @@ poking into Ferrite internals:
 [github-880]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/880
 [github-914]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/914
 [github-924]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/924
+[github-938]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/938
 [github-943]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/943
 [github-949]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/949
 [github-953]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/953

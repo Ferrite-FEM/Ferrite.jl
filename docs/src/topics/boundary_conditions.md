@@ -8,6 +8,11 @@ Every PDE is accompanied with boundary conditions. There are different types of 
 conditions, and they need to be handled in different ways. Below we discuss how to handle
 the most common ones, Dirichlet and Neumann boundary conditions, and how to do it `Ferrite`.
 
+While boundary conditions can be applied directly to nodes, vertices, edges, or faces,
+they are most commonly applied to [facets](@ref Reference shapes). Each facet is described
+by a [`FacetIndex`](@ref).
+When adding boundary conditions to points instead, vertices are preferred over nodes.
+
 ## Dirichlet Boundary Conditions
 
 At a Dirichlet boundary the unknown field is prescribed to a given value. For the discrete
@@ -98,7 +103,7 @@ For complete examples that use Neumann boundary conditions, please see
 
 ### Using the `FacetIterator`
 A Neumann boundary contribution can be added by iterating over
-the relevant `faceset::Set{FaceIndex}` by using the [`FacetIterator`](@ref)
+the relevant `facetset` by using the [`FacetIterator`](@ref).
 For a scalar field, this can be done as
 
 ```julia
