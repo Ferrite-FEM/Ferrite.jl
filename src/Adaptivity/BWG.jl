@@ -831,7 +831,7 @@ function hangingnodes(forest::ForestBWG{dim}, nodeids, nodeowners) where dim
                                     vs = vertices(leaf,tree.b)
                                     for ξ ∈ 1:ncorners_face3D
                                         c′ = facetable[pface_i, ξ]
-                                        if c′ ∉ (c̃,c)
+                                        if c′ ∉ (c̃,ci)
                                             neighbor_candidate_edges = edges(neighbor_candidate,tree.b)
                                             ne = findfirst(x->iscenter(vs[c′],x),neighbor_candidate_edges)
                                             if ne !== nothing
