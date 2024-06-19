@@ -1,6 +1,6 @@
 abstract type AbstractProjector end
 
-mutable struct L2Projector <: Ferrite.AbstractProjector
+mutable struct L2Projector <: AbstractProjector
     M_cholesky #::SuiteSparse.CHOLMOD.Factor{Float64}
     dh::DofHandler
     qrs_lhs::Vector{<:QuadratureRule}
