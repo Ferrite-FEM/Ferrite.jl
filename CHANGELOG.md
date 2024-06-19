@@ -326,6 +326,7 @@ more discussion).
   `update_gradients::Bool` (default true) and `update_hessians::Bool` (default false) in the
   constructors, i.e. `CellValues(...; update_hessians=true)`. ([#953][github-938])
 
+- `L2Projector` supports projecting on grids with mixed celltypes. ([#949][github-949])
 
 ### Changed
 
@@ -422,6 +423,11 @@ more discussion).
 
 - `Ferrite.getfielddim(::AbstractDofHandler, args...)` has been renamed to `Ferrite.n_components`.
   [#943][github-943]
+
+- `project(::L2Projector, data, qr_rhs)` now expects data to be indexed by the cellid, as opposed to
+  the index in the vector of cellids passed to the `L2Projector`. The data may be passed as an
+  `AbstractDict{Int, <:AbstractVector}`, as an alternative to `AbstractArray{<:AbstractVector}`.
+  ([#949][github-949])
 
 ### Deprecated
 
@@ -999,5 +1005,7 @@ poking into Ferrite internals:
 [github-880]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/880
 [github-914]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/914
 [github-924]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/924
+[github-938]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/938
 [github-943]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/943
+[github-949]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/949
 [github-953]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/953

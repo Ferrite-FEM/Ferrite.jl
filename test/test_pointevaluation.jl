@@ -258,12 +258,13 @@ function mixed_grid()
     # compute values in quadrature points for quad
     qr = QuadratureRule{RefQuadrilateral}(2)
     cv = CellValues(qr, ip_quad)
-    qp_vals_quads = [Vector{Float64}(undef, getnquadpoints(cv)) for cell in getcellset(mesh, "quads")]
-    for (local_cellid, global_cellid) in enumerate(getcellset(mesh, "quads"))
+    qp_vals_quads = OrderedDict(cell => Vector{Float64}(undef, getnquadpoints(cv)) for cell in getcellset(mesh, "quads"))
+    for global_cellid in getcellset(mesh, "quads")
         xe = getcoordinates(mesh, global_cellid)
         reinit!(cv, xe)
+        cell_vals = qp_vals_quads[global_cellid]
         for qp in 1:getnquadpoints(cv)
-            qp_vals_quads[local_cellid][qp] = f(spatial_coordinate(cv, qp, xe))
+            cell_vals[qp] = f(spatial_coordinate(cv, qp, xe))
         end
     end
 

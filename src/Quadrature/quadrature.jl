@@ -289,5 +289,7 @@ julia> getpoints(qr)
 getpoints(qr::QuadratureRule) = qr.points
 getpoints(qr::FacetQuadratureRule, face::Int) = getpoints(qr.face_rules[face])
 
+getrefshape(::QuadratureRule{RefShape}) where RefShape = RefShape
+
 # TODO: This is used in copy(::(Cell|Face)Values), but it it useful to get an actual copy?
 Base.copy(qr::Union{QuadratureRule,FacetQuadratureRule}) = qr
