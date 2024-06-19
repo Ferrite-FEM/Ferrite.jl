@@ -102,7 +102,7 @@ cellid(cc::CellCache) = cc.cellid[]
 celldofs!(v::Vector, cc::CellCache) = copyto!(v, cc.dofs) # celldofs!(v, cc.dh, cc.cellid[])
 
 # TODO: These should really be replaced with something better...
-nfacets(cc::CellCache) = nfacets(cc.grid.cells[cc.cellid[]])
+nfacets(cc::CellCache) = nfacets(getcells(cc.grid, cc.cellid[]))
 
 
 # TODO: Currently excluded from the docstring below. Should they be public?

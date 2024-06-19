@@ -258,6 +258,14 @@ function getneighborhood(top::ExclusiveTopology, grid::AbstractGrid, faceidx::Fa
     end
 end
 
+function getneighborhood(top::ExclusiveTopology, grid::AbstractGrid{2}, edgeidx::EdgeIndex, include_self=false)
+    if include_self
+        return [top.edge_edge_neighbor[edgeidx[1],edgeidx[2]].neighbor_info; edgeidx]
+    else
+        return top.edge_edge_neighbor[edgeidx[1],edgeidx[2]].neighbor_info
+    end
+end
+
 function getneighborhood(top::ExclusiveTopology, grid::AbstractGrid, vertexidx::VertexIndex, include_self=false)
     cellid, local_vertexid = vertexidx[1], vertexidx[2]
     cell_vertices = vertices(getcells(grid,cellid))
@@ -273,7 +281,7 @@ function getneighborhood(top::ExclusiveTopology, grid::AbstractGrid, vertexidx::
     return view(self_reference_local, 1:length(self_reference_local))
 end
 
-function getneighborhood(top::ExclusiveTopology, grid::AbstractGrid, edgeidx::EdgeIndex, include_self=false)
+function getneighborhood(top::ExclusiveTopology, grid::AbstractGrid{3}, edgeidx::EdgeIndex, include_self=false)
     cellid, local_edgeidx = edgeidx[1], edgeidx[2]
     cell_edges = edges(getcells(grid, cellid))
     nonlocal_edgeid = cell_edges[local_edgeidx]
