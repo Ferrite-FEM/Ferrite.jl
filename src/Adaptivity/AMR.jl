@@ -1,6 +1,7 @@
 module AMR
 
 using .. Ferrite
+import Ferrite: @debug
 using SparseArrays
 using OrderedCollections
 

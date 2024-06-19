@@ -583,6 +583,9 @@ function rotation_permutation(f,f′,r,i)
     return 𝒫[𝒬[ℛ[f,f′],r+1],i]
 end
 
+p4est_opposite_face_index(f) = ((f - 1) ⊻  0b1) + 1
+p4est_opposite_edge_index(e) = ((e - 1) ⊻ 0b11) + 1
+
 #TODO: this function should wrap the LNodes Iterator of [IBWG2015](@citet)
 """
     creategrid(forest::ForestBWG) -> NonConformingGrid
@@ -637,7 +640,7 @@ function creategrid(forest::ForestBWG{dim,C,T}) where {dim,C,T}
             # Face neighbors
             @debug println("Updating face neighbors for octree $k")
             for (f,fc) in enumerate(_faces) # f in p4est notation
-                f_axis_index, f_axis_sign = divrem(f-1,2)
+                # Skip boundary edges
                 facet_neighbor_ = facet_neighborhood[k,_perm[f]]
                 if length(facet_neighbor_) == 0
                     continue
@@ -645,31 +648,26 @@ function creategrid(forest::ForestBWG{dim,C,T}) where {dim,C,T}
                 @debug @assert length(facet_neighbor_) == 1
                 k′, f′_ferrite = facet_neighbor_[1]
                 f′ = _perminv[f′_ferrite]
+                @debug println("  Neighboring tree: $k′, face $f′_ferrite (Ferrite)/$f′ (p4est)")
                 if k > k′ # Owner
                     tree′ = forest.cells[k′]
                     for leaf in tree.leaves
-                        if f_axis_sign == 1 # positive face
-                            if leaf.xyz[f_axis_index + 1] < 2^tree.b-2^(tree.b-leaf.l)
-                                @debug println("    Rejecting $leaf")
-                                continue
-                            end
-                        else # negative face
-                            if leaf.xyz[f_axis_index + 1] > 0
-                                @debug println("    Rejecting $leaf")
-                                continue
-                            end
+                        fnodes = face(leaf, f , tree.b)
+                        if !contains_facet(fc, fnodes)
+                            @debug println("  Rejecting leaf $leaf because its facet $fnodes is not on the octant boundary")
+                            continue
                         end
                         neighbor_candidate = transform_facet(forest,k′,f′,leaf)
                         # Candidate must be the face opposite to f'
-                        f′candidate = ((f′ - 1) ⊻ 1) + 1
-                        fnodes = face(leaf, f , tree.b)
+                        f′candidate = p4est_opposite_face_index(f′)
                         fnodes_neighbor = face(neighbor_candidate, f′candidate, tree′.b)
                         r = compute_face_orientation(forest,k,f)
-                        @debug println("    Matching $fnodes (local) to $fnodes_neighbor (neighbor)")
+                        @debug println("  Trying to match $fnodes (local) to $fnodes_neighbor (neighbor $neighbor_candidate)")
                         if dim == 2
                             for i ∈ 1:ncorners_face2D
                                 i′ = rotation_permutation(r,i)
                                 if haskey(nodeids, (k′,fnodes_neighbor[i′]))
+                                    @debug println("    Updating $((k,fnodes[i])) $(nodeids[(k,fnodes[i])]) -> $(nodeids[(k′,fnodes_neighbor[i′])])")
                                     nodeids[(k,fnodes[i])] = nodeids[(k′,fnodes_neighbor[i′])]
                                     nodeowners[(k,fnodes[i])] = (k′,fnodes_neighbor[i′])
                                 end
@@ -678,6 +676,7 @@ function creategrid(forest::ForestBWG{dim,C,T}) where {dim,C,T}
                             for i ∈ 1:ncorners_face3D
                                 rotated_ξ = rotation_permutation(f′,f,r,i)
                                 if haskey(nodeids, (k′,fnodes_neighbor[i]))
+                                    @debug println("    Updating $((k,fnodes[i])) $(nodeids[(k,fnodes[rotated_ξ])]) -> $(nodeids[(k′,fnodes_neighbor[i])])")
                                     nodeids[(k,fnodes[rotated_ξ])] = nodeids[(k′,fnodes_neighbor[i])]
                                     nodeowners[(k,fnodes[rotated_ξ])] = (k′,fnodes_neighbor[i])
                                 end
@@ -691,7 +690,7 @@ function creategrid(forest::ForestBWG{dim,C,T}) where {dim,C,T}
             # edge neighbors
             @debug println("Updating edge neighbors for octree $k")
             for (e,ec) in enumerate(edges(root(dim),tree.b)) # e in p4est notation
-                e_axis_index, e_axis_sign = divrem(e-1,4) #first axis 0 (x), 1 (y), 2(z), second positive or negative direction
+                # Skip boundary edges
                 edge_neighbor_ = forest.topology.edge_edge_neighbor[k,edge_perm[e]]
                 if length(edge_neighbor_) == 0
                     continue
@@ -699,31 +698,27 @@ function creategrid(forest::ForestBWG{dim,C,T}) where {dim,C,T}
                 @debug @assert length(edge_neighbor_) == 1
                 k′, e′_ferrite = edge_neighbor_[1]
                 e′ = edge_perm_inv[e′_ferrite]
+                @debug println("  Neighboring tree: $k′, edge $e′_ferrite (Ferrite)/$e′ (p4est)")
                 if k > k′ # Owner
                     tree′ = forest.cells[k′]
                     for leaf in tree.leaves
-                        #debugging checks; should be inbounds anyway due to iteration
-                        if e_axis_sign == 1 # positive edge
-                            if leaf.xyz[e_axis_index + 1] < 2^tree.b-2^(tree.b-leaf.l)
-                                @debug println("    Rejecting $leaf")
-                                continue
-                            end
-                        else # negative edge
-                            if leaf.xyz[e_axis_index + 1] > 0
-                                @debug println("    Rejecting $leaf")
-                                continue
-                            end
+                        # First we skip edges which are not on the current edge of the root element
+                        enodes = edge(leaf, e , tree.b)
+                        if !contains_edge(ec, enodes)
+                            @debug println("  Rejecting leaf $leaf because its edge $enodes is not on the octant boundary")
+                            continue
                         end
                         neighbor_candidate = transform_edge(forest,k′,e′,leaf, false)
                         # Candidate must be the edge opposite to e'
-                        e′candidate = ((e′ - 1) ⊻ 1) + 1
-                        enodes = edge(leaf, e , tree.b)
+                        e′candidate = p4est_opposite_edge_index(e′)
+                        
                         enodes_neighbor = edge(neighbor_candidate, e′candidate, tree′.b)
                         r = compute_edge_orientation(forest,k,e)
-                        @debug println("    Matching $enodes (local) to $enodes_neighbor (neighbor)")
+                        @debug println("  Trying to match $enodes (local) to $enodes_neighbor (neighbor $neighbor_candidate)")
                         for i ∈ 1:ncorners_edge
                             i′ = rotation_permutation(r,i)
                             if haskey(nodeids, (k′,enodes_neighbor[i′]))
+                                @debug println("    Updating $((k,enodes[i])) $(nodeids[(k,enodes[i])]) -> $(nodeids[(k′,enodes_neighbor[i′])])")
                                 nodeids[(k,enodes[i])] = nodeids[(k′,enodes_neighbor[i′])]
                                 nodeowners[(k,enodes[i])] = (k′,enodes_neighbor[i′])
                             end
