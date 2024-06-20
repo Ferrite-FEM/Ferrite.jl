@@ -408,7 +408,7 @@ end
     @test getneighborhood(topology,hexgrid,FaceIndex((3,3))) == [FaceIndex((4,5))]
     @test getneighborhood(topology,hexgrid,FaceIndex((4,2))) == [FaceIndex((2,4))]
     @test getneighborhood(topology,hexgrid,FaceIndex((4,5))) == [FaceIndex((3,3))]
-    @test Set(getneighborhood(topology,hexgrid,FaceIndex((4,5))), true) == Set([FaceIndex((3,3)), FaceIndex((4,5))])
+    @test Set(getneighborhood(topology, hexgrid, FaceIndex((4,5)), true)) == Set([FaceIndex((3,3)), FaceIndex((4,5))])
 
     @test getneighborhood(topology, hexgrid, FaceIndex(2,4)) == getneighborhood(topology, hexgrid, FacetIndex(2,4))
 
@@ -440,8 +440,8 @@ end
     trigrid = generate_grid(Triangle,(2,2))
     topology = ExclusiveTopology(trigrid)
     @test topology.vertex_vertex_neighbor[3,3] == [VertexIndex(5,2),VertexIndex(6,1),VertexIndex(7,1)]
-    @test Set(getneighborhood(topology, grid, VertexIndex(3,3)), false) == Set([VertexIndex(5,2),VertexIndex(6,1),VertexIndex(7,1)])
-    @test Set(getneighborhood(topology, grid, VertexIndex(3,3)), true) == Set([VertexIndex(3,3), VertexIndex(5,2),VertexIndex(6,1),VertexIndex(7,1)])
+    @test Set(getneighborhood(topology, trigrid, VertexIndex(3,3)), false) == Set([VertexIndex(5,2),VertexIndex(6,1),VertexIndex(7,1)])
+    @test Set(getneighborhood(topology, trigrid, VertexIndex(3,3)), true) == Set([VertexIndex(3,3), VertexIndex(5,2),VertexIndex(6,1),VertexIndex(7,1)])
 
     quadtrigrid = generate_grid(QuadraticTriangle,(2,2))
     quadtopology = ExclusiveTopology(trigrid)
