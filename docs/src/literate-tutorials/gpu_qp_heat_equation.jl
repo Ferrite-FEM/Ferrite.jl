@@ -14,9 +14,6 @@ colors = create_coloring(grid)
 
 ip = Lagrange{RefQuadrilateral, 1}() # define the interpolation function (i.e. Bilinear lagrange)
 
-# define the numerical integration rule 
-# (i.e. integrating over quad shape with two quadrature points per direction)
-
 
 qr = QuadratureRule{RefQuadrilateral,Float32}(2) 
 cellvalues = CellValues(Float32,qr, ip);
@@ -162,22 +159,12 @@ stassy(cv,dh) = assemble_global!(cv,dh,Val(false))
 
 
 using BenchmarkTools
-using Adapt
-# using LinearAlgebra
-
-
-
-using SparseArrays
-
-SparseArrays.AbstractSparseMatrixCSC
 
 
 #Kgpu = @btime CUDA.@sync   assemble_global_gpu_color($cellvalues,$dh)
 Kgpu =    assemble_global_gpu_color(cellvalues,dh)
 
 
-
-norm(Kgpu)
 
 #Kstd , Fstd = @btime stassy($cellvalues,$dh);
 Kstd , Fstd = stassy(cellvalues,dh);

@@ -183,4 +183,4 @@ export
 
 # GPU
     GPUSparseMatrixCSC,
-    custom_atomic_add!
+    gpu_sparse_norm
