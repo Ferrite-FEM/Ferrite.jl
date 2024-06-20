@@ -408,7 +408,7 @@ end
     @test getneighborhood(topology,hexgrid,FaceIndex((3,3))) == [FaceIndex((4,5))]
     @test getneighborhood(topology,hexgrid,FaceIndex((4,2))) == [FaceIndex((2,4))]
     @test getneighborhood(topology,hexgrid,FaceIndex((4,5))) == [FaceIndex((3,3))]
-    @test Set(getneighborhood(topology,hexgrid,FaceIndex((4,5)))) == Set([FaceIndex((3,3)), FaceIndex((4,5))])
+    @test Set(getneighborhood(topology,hexgrid,FaceIndex((4,5))), true) == Set([FaceIndex((3,3)), FaceIndex((4,5))])
 
     @test getneighborhood(topology, hexgrid, FaceIndex(2,4)) == getneighborhood(topology, hexgrid, FacetIndex(2,4))
 
