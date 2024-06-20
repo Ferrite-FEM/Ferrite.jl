@@ -473,6 +473,18 @@ end
         FaceIndex(5,1),                 FaceIndex(5,3), FaceIndex(5,4),
         FaceIndex(6,1),                 FaceIndex(6,3),
     ])
+# test grids with mixed celltypes of same refdim
+# (4)---(5)
+#  |     | \
+#  |  1  |2 \
+# (1)---(2)-(3)
+    tet_quad_grid = Grid(
+        [Quadrilateral((1, 2, 5, 4)), Triangle((2, 3, 5))],
+        [Node(Float64.((x, y))) for (x, y) in ((0,0), (1,0), (2,0), (0,1), (1,1))])
+    top = ExclusiveTopology(tet_quad_grid)
+    @test getneighborhood(top, tet_quad_grid, FacetIndex(1, 2)) == [EdgeIndex(2,3)]
+    @test Set(getneighborhood(top, tet_quad_grid, FacetIndex(1, 2), true)) == Set([EdgeIndex(1,2), EdgeIndex(2,3)])
+
 # test grids with mixed refdim
     cells = [
         Hexahedron((1, 2, 3, 4, 5, 6, 7, 8)),
