@@ -440,8 +440,8 @@ end
     trigrid = generate_grid(Triangle,(2,2))
     topology = ExclusiveTopology(trigrid)
     @test topology.vertex_vertex_neighbor[3,3] == [VertexIndex(5,2),VertexIndex(6,1),VertexIndex(7,1)]
-    @test Set(getneighborhood(topology, trigrid, VertexIndex(3,3)), false) == Set([VertexIndex(5,2),VertexIndex(6,1),VertexIndex(7,1)])
-    @test Set(getneighborhood(topology, trigrid, VertexIndex(3,3)), true) == Set([VertexIndex(3,3), VertexIndex(5,2),VertexIndex(6,1),VertexIndex(7,1)])
+    @test Set(getneighborhood(topology, trigrid, VertexIndex(3,3), false)) == Set([VertexIndex(5,2),VertexIndex(6,1),VertexIndex(7,1)])
+    @test Set(getneighborhood(topology, trigrid, VertexIndex(3,3), true)) == Set([VertexIndex(3,3), VertexIndex(5,2),VertexIndex(6,1),VertexIndex(7,1)])
 
     quadtrigrid = generate_grid(QuadraticTriangle,(2,2))
     quadtopology = ExclusiveTopology(trigrid)
