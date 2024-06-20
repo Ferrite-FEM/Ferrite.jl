@@ -25,16 +25,16 @@ The struct saves the highest dimensional neighborhood, i.e. if something is conn
  edge only the face neighborhood is saved. The lower dimensional neighborhood is recomputed, if needed.
 
 # Fields
-- `vertex_to_cell::ArrayOfVectorViews{Int, 1}`:           global vertex id to all cells containing the vertex
-- `cell_neighbor::ArrayOfVectorViews{Int, 1}`:            cellid to all connected cells
-- `face_neighbor::ArrayOfVectorViews{FaceIndex, 2}`:      `face_neighbor[cellid,   local_face_id]`   -> neighboring faces
-- `edge_neighbor::ArrayOfVectorViews{EdgeIndex, 2}`:      `edge_neighbor[cellid,   local_edge_id]`   -> neighboring edges
-- `vertex_neighbor::ArrayOfVectorViews{VertexIndex, 2}`:  `vertex_neighbor[cellid, local_vertex_id]` -> neighboring vertices
+- `vertex_to_cell::AbstractArray{AbstractVector{Int}, 1}`:           global vertex id to all cells containing the vertex
+- `cell_neighbor::AbstractArray{AbstractVector{Int}, 1}`:            cellid to all connected cells
+- `face_neighbor::AbstractArray{AbstractVector{FaceIndex}, 2}`:      `face_neighbor[cellid,   local_face_id]`   -> neighboring faces
+- `edge_neighbor::AbstractArray{AbstractVector{EdgeIndex}, 2}`:      `edge_neighbor[cellid,   local_edge_id]`   -> neighboring edges
+- `vertex_neighbor::AbstractArray{AbstractVector{VertexIndex}, 2}`:  `vertex_neighbor[cellid, local_vertex_id]` -> neighboring vertices
 - `face_skeleton::Union{Vector{FaceIndex}, Nothing}`:     List of unique faces in the grid given as `FaceIndex`
 - `edge_skeleton::Union{Vector{EdgeIndex}, Nothing}`:     List of unique edges in the grid given as `EdgeIndex`
 - `vertex_skeleton::Union{Vector{VertexIndex}, Nothing}`: List of unique vertices in the grid given as `VertexIndex`
 
-!!! warning
+!!! warning "Limitations"
     Non-conforming grids will silently not work.
     Grids with embedded cells (different reference dimension compared
     to the spatial dimension) is not supported, and will error on construction.
