@@ -418,10 +418,15 @@ more discussion).
   `facedof_indices`, `volumedof_indices` (and similar) according to these definitions.
 
 - `Ferrite.getdim` has been changed into `Ferrite.getrefdim` for getting the dimension of the reference shape
-  and `Ferrite.getspatialdim` to get the spatial dimension (of the grid). [#943][github-943]
+  and `Ferrite.getspatialdim` to get the spatial dimension (of the grid). ([#943][github-943])
 
 - `Ferrite.getfielddim(::AbstractDofHandler, args...)` has been renamed to `Ferrite.n_components`.
-  [#943][github-943]
+  ([#943][github-943])
+
+- `ExclusiveTopology` now use an internal data structure, `ArrayOfVectorViews`, to store the neighborhood
+  information more efficiently The datatype for the neighborhood has thus changed to a view of a vector,
+  instead of the now removed `EntityNeighborhood` container. This also applies to `vertex_star_stencils`.
+  ([#974][github-974])
 
 ### Deprecated
 
@@ -1001,3 +1006,4 @@ poking into Ferrite internals:
 [github-924]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/924
 [github-943]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/943
 [github-953]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/953
+[github-974]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/974
