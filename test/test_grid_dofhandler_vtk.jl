@@ -283,6 +283,13 @@ end
 end
 
 @testset "Grid topology" begin
+    # Error paths
+    mixed_rdim_grid = Grid([Triangle((1,2,3)), Line((2,3))], [Node((0.0, 0.0)), Node((1.0, 0.0)), Node((1.0, 1.1))])
+    @test_throws ErrorException ExclusiveTopology(mixed_rdim_grid)
+    top_line = ExclusiveTopology(generate_grid(Line, (3,)))
+    @test_throws ArgumentError Ferrite.get_facet_facet_neighborhood(top_line, mixed_rdim_grid)
+    @test_throws ArgumentError Ferrite.getneighborhood(top_line, mixed_rdim_grid, FacetIndex(1,2))
+
 #
 #      (1) (2) (3) (4)
 #       +---+---+---+
@@ -351,6 +358,8 @@ end
     @test topology.edge_edge_neighbor[6,2] == Ferrite.BoundaryIndex[]
     @test topology.edge_edge_neighbor[6,3] == Ferrite.BoundaryIndex[]
     @test topology.edge_edge_neighbor[6,4] == [EdgeIndex(5,2)]
+    @test getneighborhood(topology, quadgrid, EdgeIndex(6, 4), false) == [EdgeIndex(5,2)]
+    @test Set(getneighborhood(topology, quadgrid, EdgeIndex(6, 4), true)) == Set([EdgeIndex(6, 4), EdgeIndex(5,2)])
 
     @test getneighborhood(topology, quadgrid, EdgeIndex(2,4)) == getneighborhood(topology, quadgrid, FacetIndex(2,4))
 
@@ -464,7 +473,7 @@ end
         FaceIndex(5,1),                 FaceIndex(5,3), FaceIndex(5,4),
         FaceIndex(6,1),                 FaceIndex(6,3),
     ])
-# test mixed grid
+# test grids with mixed refdim
     cells = [
         Hexahedron((1, 2, 3, 4, 5, 6, 7, 8)),
         Hexahedron((11, 13, 14, 12, 15, 16, 17, 18)),
