@@ -15,9 +15,9 @@ If `topology` and `cross_coupling` are passed, dof of fields with discontinuous 
 
 See the [Sparsity Pattern](@ref) section of the manual.
 """
-function create_sparsity_pattern(dh::AbstractDofHandler; coupling=nothing,
-    topology::Union{Nothing, AbstractTopology} = nothing, cross_coupling = nothing)
-    return _create_sparsity_pattern(dh, nothing, false, true, coupling, topology, cross_coupling)
+function create_sparsity_pattern(dh::AbstractDofHandler,::Type{T} = Float64; coupling=nothing,
+    topology::Union{Nothing, AbstractTopology} = nothing, cross_coupling = nothing) where {T <: AbstractFloat}
+    return _create_sparsity_pattern(dh, nothing, false, true, coupling, topology, cross_coupling,T)
 end
 
 """
@@ -164,7 +164,7 @@ function cross_element_coupling!(dh::DofHandler, ch::Union{ConstraintHandler, No
 end
 
 function _create_sparsity_pattern(dh::AbstractDofHandler, ch#=::Union{ConstraintHandler, Nothing}=#, sym::Bool, keep_constrained::Bool, coupling::Union{AbstractMatrix{Bool},Nothing},
-    topology::Union{Nothing, AbstractTopology}, cross_coupling::Union{AbstractMatrix{Bool},Nothing})
+    topology::Union{Nothing, AbstractTopology}, cross_coupling::Union{AbstractMatrix{Bool},Nothing}, nz_type::Type{T} = Float64) where {T <: AbstractFloat}
     @assert isclosed(dh)
     if !keep_constrained
         @assert ch !== nothing && isclosed(ch)
@@ -227,7 +227,7 @@ function _create_sparsity_pattern(dh::AbstractDofHandler, ch#=::Union{Constraint
     end
     @assert length(I) == length(J) == cnt
 
-    K = spzeros!!(Float64, I, J, ndofs(dh), ndofs(dh))
+    K = spzeros!!(T, I, J, ndofs(dh), ndofs(dh))
 
     # If ConstraintHandler is given, create the condensation pattern due to affine constraints
     if ch !== nothing

@@ -6,6 +6,7 @@ using StaticArrays
 left = Tensor{1,2,Float32}((0,-0)) # define the left bottom corner of the grid.
 right = Tensor{1,2,Float32}((3.0,4.0)) # define the right top corner of the grid.
 
+
 grid = generate_grid(Quadrilateral, (3, 4),left,right); 
 
 colors = create_coloring(grid)
@@ -24,8 +25,14 @@ dh = DofHandler(grid)
 add!(dh, :u, ip)
 
 close!(dh);
+Float32 <: AbstractFloat
+K = create_sparsity_pattern(dh,Float32)
 
+function test2(x::String, ::Type{T}) where {T<:AbstractFloat}
+    @show T
+end
 
+test2("hello",Float32)
 
 # Standard assembly of the element.
 function assemble_element_std!(Ke::Matrix, fe::Vector, cellvalues::CellValues)
@@ -185,14 +192,11 @@ function assemble_element_gpu_ele_per_thread!(Kgpu,cv,dh,n_cells_colored,eles_co
             #δu  = shape_value(qv, i)
             ∇δu = shape_gradient(qv, i)
             ## Add contribution to fe
-            #@inbounds ig = dofs[(e-1)*n_basefuncs+i] # TODO: encapsulate in assembler
             #fe[i] += δu * dΩ
             ## Loop over trial shape functions
             for j in 1:n_basefuncs
                 ∇u = shape_gradient(qv, j)
                 ## Add contribution to Ke
-                #@inbounds jg = dofs[(e-1)*n_basefuncs+j] #TODO: encapsulate in assembler
-                #Kgpu[ig, jg] += (∇δu ⋅ ∇u) * dΩ  #TODO: use sparse matrix
                 ke[i,j] += (∇δu ⋅ ∇u) * dΩ
             end
         end
@@ -286,6 +290,8 @@ function assemble_global_gpu_color(cellvalues,dh)
     return Kgpu
 end
 
+K = create_sparsity_pattern(dh)
+dh
 
 # function assemble_global_gpu(cellvalues,dh)
 #     Kgpu =   CUDA.zeros(dh.ndofs.x,dh.ndofs.x)
@@ -319,3 +325,16 @@ norm(Kgpu)
 Kstd , Fstd = stassy(cellvalues,dh);
 norm(Kstd)
 
+
+struct Test{Tv,Ti}
+    x::Tv
+    y::Ti
+end
+
+
+function test_test(x::Test{Ti}) where {Ti}
+    @show Ti
+end
+
+test = Test{Float32,Int32}(1.0f0,2)
+test_test(test)
