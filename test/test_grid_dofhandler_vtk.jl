@@ -521,8 +521,8 @@ end
     @test issubset([4,5,8], patches[7])
     @test issubset([7,4,5,6,9], patches[8])
     @test issubset([8,5,6], patches[9])
-    @test CellIndex(5) ∉ getneighborhood(topology, quadgrid, CellIndex(5))
-    @test CellIndex(5) ∈ getneighborhood(topology, quadgrid, CellIndex(5), true)
+    @test 5 ∉ getneighborhood(topology, quadgrid, CellIndex(5))
+    @test 5 ∈ getneighborhood(topology, quadgrid, CellIndex(5), true)
 
 # test star stencils
     stars = Ferrite.vertex_star_stencils(topology, quadgrid)
