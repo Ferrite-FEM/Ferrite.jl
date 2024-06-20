@@ -1,6 +1,6 @@
-struct GPUAssemblerSparsityPattern{Tv,Ti} <: AbstractSparseAssembler
-    K::GPUSparseMatrixCSC{Tv,Ti}
-    f::AbstractVector{Tv}
+struct GPUAssemblerSparsityPattern{Tv,Ti,VEC_FLOAT<:AbstractVector{Tv},SPARSE_MAT<:GPUSparseMatrixCSC{Tv,Ti}} <: AbstractSparseAssembler
+    K::SPARSE_MAT
+    f::VEC_FLOAT
 end
 
 
@@ -16,12 +16,12 @@ function _assemble!(A::GPUAssemblerSparsityPattern, dofs::AbstractVector{Int}, K
     # Brute force assembly
     K = A.K
     f = A.f
-    for i in eachindex(dofs)
-        ig = cell_dofs[i]
+    for i= 1:length(dofs)
+        ig = dofs[i]
         f[ig] += fe[i]
-        for j in eachindex(dofs)
-            jg = cell_dofs[j]
-            K[ig, jg] += ke[i,j]
+        for j = 1:length(dofs)
+            jg = dofs[j]
+            K[ig, jg] += Ke[i,j]
         end
     end
 end

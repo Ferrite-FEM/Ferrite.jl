@@ -1,24 +1,22 @@
-using SparseArrays
-using CUDA
-struct GPUSparseMatrixCSC{Tv,VEC <: AbstractVector{Int32} , NZVEC <: AbstractVector{Tv}} 
-    m::Int32                  # Number of rows
-    n::Int32                  # Number of columns
-    colptr::VEC     # Column i is in colptr[i]:(colptr[i+1]-1)
-    rowval::VEC     # Row indices of stored values
-    nzval::NZVEC       # Stored values, typically nonzeros
+struct GPUSparseMatrixCSC{Tv,Ti, VEC_INT<:AbstractArray{Ti,1}, VEC_FLOAT<:AbstractArray{Tv,1}}
+    m::Ti   
+    n::Ti 
+    colptr::VEC_INT  
+    rowval::VEC_INT  
+    nzval::VEC_FLOAT      
 end
 
-function GPUSparseMatrixCSC{Tv}(m::Int32, n::Int32, colptr::AbstractVector{Int32},
-                        rowval:: AbstractVector{Int32}, nzval::AbstractVector{Tv}) where {Tv}
-    new(m, n, colptr, rowval, nzval)
-end
+# function GPUSparseMatrixCSC{Tv}(m::Int32, n::Int32, colptr::AbstractVector{Int32},
+#                         rowval:: AbstractVector{Int32}, nzval::AbstractVector{Tv}) where {Tv}
+#     new(m, n, colptr, rowval, nzval)
+# end
 
 function GPUSparseMatrixCSC{Tv}(A::SparseMatrixCSC{Tv}) where {Tv}
-    GPUSparseMatrixCSC(A.m, A.n, A.colptr, A.rowval, A.nzval)
+    GPUSparseMatrixCSC(A.m, A.n, A.colptr |> cu, A.rowval |> cu, A.nzval |> cu)
 end
 
 
-function Base.getindex(A::GPUSparseMatrixCSC{Tv}, i::Int32, j::Int32) where Tv 
+function Base.getindex(A::GPUSparseMatrixCSC{Tv}, i::Int, j::Int) where Tv 
     # TODO: Add bounds checking
 
     col_start = A.colptr[j] 
@@ -33,7 +31,7 @@ function Base.getindex(A::GPUSparseMatrixCSC{Tv}, i::Int32, j::Int32) where Tv
     return zero(Tv)
 end
 
-function Base.setindex!(A::GPUSparseMatrixCSC{T}, v::Float32, i::Int32, j::Int32) where T
+function Base.setindex!(A::GPUSparseMatrixCSC{Tv}, v::Tv, i::Int, j::Int) where Tv
     col_start = A.colptr[j]
     col_end = A.colptr[j + 1] - 1
 
@@ -47,19 +45,19 @@ function Base.setindex!(A::GPUSparseMatrixCSC{T}, v::Float32, i::Int32, j::Int32
 end
 
 
-function custom_atomic_add!(A::GPUSparseMatrixCSC{T}, v::Float32, i::Int32, j::Int32) where T
-    col_start = A.colptr[j]
-    col_end = A.colptr[j + 1] - 1
+# function custom_atomic_add!(A::GPUSparseMatrixCSC{T}, v::Float32, i::Int32, j::Int32) where T
+#     col_start = A.colptr[j]
+#     col_end = A.colptr[j + 1] - 1
 
-    for k in col_start:col_end
-        if A.rowval[k] == i
-            # Update the existing element
-            CUDA.@atomic A.nzval[k] += v
-            return
-        end
-    end
+#     for k in col_start:col_end
+#         if A.rowval[k] == i
+#             # Update the existing element
+#             CUDA.@atomic A.nzval[k] += v
+#             return
+#         end
+#     end
 
-end
+# end
 
 function gpu_sparse_norm(A::GPUSparseMatrixCSC{T}, p::Real=2) where T
     if p == 2  # Frobenius norm
@@ -82,7 +80,6 @@ function gpu_sparse_norm(A::GPUSparseMatrixCSC{T}, p::Real=2) where T
         end
         return maximum(row_sums)
     else
-        return -1.0f0
+        return -one(T)
     end
 end
-

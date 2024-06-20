@@ -67,6 +67,8 @@ function Adapt.adapt_structure(to, K::SparseMatrixCSC)
     GPUSparseMatrixCSC(m, n, colptr, rowval, nzval)
 end
 
+
+
 function Adapt.adapt_structure(to, K::GPUSparseMatrixCSC)
     m = Adapt.adapt_structure(to, K.m)
     n = Adapt.adapt_structure(to, K.n)
@@ -76,5 +78,9 @@ function Adapt.adapt_structure(to, K::GPUSparseMatrixCSC)
     GPUSparseMatrixCSC(m, n, colptr, rowval, nzval)
 end
 
-
+function Adapt.adapt_structure(to, assembler::Ferrite.GPUAssemblerSparsityPattern)
+    K = Adapt.adapt_structure(to, assembler.K)
+    f = Adapt.adapt_structure(to, assembler.f)
+    Ferrite.GPUAssemblerSparsityPattern(K, f)
+end
 
