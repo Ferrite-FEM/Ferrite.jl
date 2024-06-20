@@ -31,7 +31,7 @@ function ConstructionBuffer(data::Vector, dims::NTuple{<:Any, Int}, sizehint::In
 end
 
 """
-    push_at_index!(b::CollectionsOfViews.ConstructionBuffer, val, indices::Int...)
+    push_at_index!(b::ConstructionBuffer, val, indices::Int...)
 
 `push!` the value `val` to the `Vector` view at the index given by `indices`, typically called
 inside the [`ArrayOfVectorViews`](@ref) constructor do-block. But can also be used when manually
