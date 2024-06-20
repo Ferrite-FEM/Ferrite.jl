@@ -399,6 +399,7 @@ end
     @test getneighborhood(topology,hexgrid,FaceIndex((3,3))) == [FaceIndex((4,5))]
     @test getneighborhood(topology,hexgrid,FaceIndex((4,2))) == [FaceIndex((2,4))]
     @test getneighborhood(topology,hexgrid,FaceIndex((4,5))) == [FaceIndex((3,3))]
+    @test Set(getneighborhood(topology,hexgrid,FaceIndex((4,5)))) == Set([FaceIndex((3,3)), FaceIndex((4,5))])
 
     @test getneighborhood(topology, hexgrid, FaceIndex(2,4)) == getneighborhood(topology, hexgrid, FacetIndex(2,4))
 
@@ -430,6 +431,8 @@ end
     trigrid = generate_grid(Triangle,(2,2))
     topology = ExclusiveTopology(trigrid)
     @test topology.vertex_vertex_neighbor[3,3] == [VertexIndex(5,2),VertexIndex(6,1),VertexIndex(7,1)]
+    @test Set(getneighborhood(topology, grid, VertexIndex(3,3)), false) == Set([VertexIndex(5,2),VertexIndex(6,1),VertexIndex(7,1)])
+    @test Set(getneighborhood(topology, grid, VertexIndex(3,3)), true) == Set([VertexIndex(3,3), VertexIndex(5,2),VertexIndex(6,1),VertexIndex(7,1)])
 
     quadtrigrid = generate_grid(QuadraticTriangle,(2,2))
     quadtopology = ExclusiveTopology(trigrid)
@@ -470,6 +473,7 @@ end
         ]
     nodes = [Node(coord) for coord in zeros(Vec{3,Float64}, 18)]
     grid = Grid(cells, nodes)
+    @test_throws ErrorException ExclusiveTopology(grid)
     # topology = ExclusiveTopology(grid)
 
     # @test_throws ArgumentError Ferrite.facetskeleton(topology, grid)
@@ -489,6 +493,7 @@ end
         ]
     nodes = [Node(coord) for coord in zeros(Vec{2,Float64}, 18)]
     grid = Grid(cells, nodes)
+    @test_throws ErrorException ExclusiveTopology(grid)
     # topology = ExclusiveTopology(grid)
     # @test_throws ArgumentError Ferrite.facetskeleton(topology, grid)
     # @test_throws ArgumentError getneighborhood(topology, grid, FacetIndex(1,1))
@@ -516,6 +521,8 @@ end
     @test issubset([4,5,8], patches[7])
     @test issubset([7,4,5,6,9], patches[8])
     @test issubset([8,5,6], patches[9])
+    @test CellIndex(5) ∉ getneighborhood(topology, quadgrid, CellIndex(5))
+    @test CellIndex(5) ∈ getneighborhood(topology, quadgrid, CellIndex(5), true)
 
 # test star stencils
     stars = Ferrite.vertex_star_stencils(topology, quadgrid)
