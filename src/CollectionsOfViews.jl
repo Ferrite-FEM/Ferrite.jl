@@ -37,7 +37,7 @@ end
 inside the [`ArrayOfVectorViews`](@ref) constructor do-block. But can also be used when manually
 creating a `ConstructionBuffer`.
 """
-function push_at_index!(b::ConstructionBuffer, val, indices...)
+function push_at_index!(b::ConstructionBuffer, val, indices::Vararg{Int, N}) where {N}
     r = getindex(b.indices, indices...)
     n = length(b.data)
     if r.start == 0
