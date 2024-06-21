@@ -111,25 +111,30 @@ function _get_facet_facet_neighborhood(::ExclusiveTopology, #=rdim=#::Val{:mixed
 end
 
 # Guess of how many neighbors depending on grid dimension and index type.
-# This is just a performance optimization, and a good default is sufficient.
-# Data based on Simplex shapes from grid generators unless specified.
-_getsizehint(::AbstractGrid, ::Type{FaceIndex}) = 1
-_getsizehint(::AbstractGrid, ::Type{EdgeIndex}) = 1
-_getsizehint(::AbstractGrid{3}, ::Type{EdgeIndex}) = 3
-_getsizehint(::AbstractGrid{1}, ::Type{VertexIndex}) = 1
-_getsizehint(::AbstractGrid{2}, ::Type{VertexIndex}) = 3
-_getsizehint(::AbstractGrid{3}, ::Type{VertexIndex}) = 13
-_getsizehint(::AbstractGrid{1}, ::Type{CellIndex}) = 2
-_getsizehint(::AbstractGrid{2}, ::Type{CellIndex}) = 12
-function _getsizehint(g::AbstractGrid{3}, ::Type{CellIndex})
+# Better to guess a bit too high than a bit too low.
+function _getsizehint(g::AbstractGrid, ::Type{IDX}) where IDX
     CT = getcelltype(g)
-    if isconcretetype(CT)
-        RS = getrefshape(CT)
-        RS === RefHexahedron && return 26
-        RS === RefTetrahedron && return 70
-    end
-    return 70 # Assume that there are some RefTetrahedron
+    isconcretetype(CT) && return _getsizehint(getrefshape(CT)(), IDX)
+    rdim = get_reference_dimension(g)::Int
+    return _getsizehint(RefSimplex{rdim}(), IDX) # Simplex is "worst case", used as default.
 end
+_getsizehint(::AbstractRefShape,    ::Type{FaceIndex}) = 1 # Always 1 or zero if not mixed rdim
+
+_getsizehint(::AbstractRefShape{1}, ::Type{EdgeIndex}) = 1
+_getsizehint(::AbstractRefShape{2}, ::Type{EdgeIndex}) = 1
+_getsizehint(::AbstractRefShape{3}, ::Type{EdgeIndex}) = 3 # Number for RefTetrahedron
+_getsizehint(::RefHexahedron,       ::Type{EdgeIndex}) = 1 # Optim for RefHexahedron
+
+_getsizehint(::AbstractRefShape{1}, ::Type{VertexIndex}) = 1
+_getsizehint(::AbstractRefShape{2}, ::Type{VertexIndex}) = 3
+_getsizehint(::AbstractRefShape{3}, ::Type{VertexIndex}) = 13
+_getsizehint(::RefHypercube,        ::Type{VertexIndex}) = 1 # Optim for RefHypercube
+
+_getsizehint(::AbstractRefShape{1}, ::Type{CellIndex}) = 2
+_getsizehint(::AbstractRefShape{2}, ::Type{CellIndex}) = 12
+_getsizehint(::AbstractRefShape{3}, ::Type{CellIndex}) = 70
+_getsizehint(::RefQuadrilateral,    ::Type{CellIndex}) = 8
+_getsizehint(::RefHexahedron,       ::Type{CellIndex}) = 26
 
 function _num_shared_vertices(cell_a::C1, cell_b::C2) where {C1, C2}
     num_shared_vertices = 0
