@@ -79,7 +79,7 @@ end
     linear_index = getindex(cv.lin_idx, idx...)
     return @inbounds getindex(cv, linear_index)
 end
-Base.IndexStyle(::Type{ArrayOfVectorViews{<:Any, N}}) where N = Base.IndexStyle(Array{Int, N})
+Base.IndexStyle(::Type{<:ArrayOfVectorViews{<:Any, N}}) where N = Base.IndexStyle(Array{Int, N})
 
 # Constructors
 """
