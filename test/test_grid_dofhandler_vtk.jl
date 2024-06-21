@@ -439,9 +439,12 @@ end
 # test for multiple vertex_neighbors as in e.g. ele 3, local vertex 3 (middle node)
     trigrid = generate_grid(Triangle,(2,2))
     topology = ExclusiveTopology(trigrid)
-    @test topology.vertex_vertex_neighbor[3,3] == [VertexIndex(5,2),VertexIndex(6,1),VertexIndex(7,1)]
-    @test Set(getneighborhood(topology, trigrid, VertexIndex(3,3), false)) == Set([VertexIndex(5,2),VertexIndex(6,1),VertexIndex(7,1)])
-    @test Set(getneighborhood(topology, trigrid, VertexIndex(3,3), true)) == Set([VertexIndex(3,3), VertexIndex(5,2),VertexIndex(6,1),VertexIndex(7,1)])
+    tri_vert_nbset = Set([VertexIndex(5,2), VertexIndex(6,1), VertexIndex(7,1)]) # Exclusive neighbors
+    @test Set(topology.vertex_vertex_neighbor[3,3]) == tri_vert_nbset
+    union!(tri_vert_nbset, [VertexIndex(4, 3), VertexIndex(2, 2)]) # Add vertices shared via edges as well
+    @test Set(getneighborhood(topology, trigrid, VertexIndex(3,3), false)) == tri_vert_nbset
+    union!(tri_vert_nbset, [VertexIndex(3,3)]) # Add self
+    @test Set(getneighborhood(topology, trigrid, VertexIndex(3,3), true))  == tri_vert_nbset
 
     quadtrigrid = generate_grid(QuadraticTriangle,(2,2))
     quadtopology = ExclusiveTopology(trigrid)
