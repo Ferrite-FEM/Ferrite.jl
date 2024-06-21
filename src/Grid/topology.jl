@@ -373,7 +373,6 @@ function _create_skeleton(neighborhood::ArrayOfVectorViews{BI, 2}) where BI <: U
     return skeleton
 end
 
-#TODO: For the specific entities the grid input is unused
 """
     vertexskeleton(top::ExclusiveTopology, ::AbstractGrid) -> Vector{VertexIndex}
 
