@@ -1,5 +1,6 @@
 using Ferrite, CUDA
 using StaticArrays
+using SparseArrays
 
 
 
@@ -16,6 +17,7 @@ ip = Lagrange{RefQuadrilateral, 1}() # define the interpolation function (i.e. B
 
 
 qr = QuadratureRule{RefQuadrilateral,Float32}(2) 
+
 cellvalues = CellValues(Float32,qr, ip);
 
 
@@ -50,7 +52,6 @@ function assemble_element_std!(Ke::Matrix, fe::Vector, cellvalues::CellValues)
     end
     return Ke, fe
 end
-
 
 
 function create_buffers(cellvalues, dh)
@@ -130,12 +131,11 @@ function assemble_element_gpu_ele_per_thread!(assembler,cv,dh,n_cells_colored,el
 end
 
 
-
-
 function assemble_global_gpu_color(cellvalues,dh)
     #Kgpu =   CUDA.zeros(dh.ndofs.x,dh.ndofs.x)
     K = create_sparsity_pattern(dh,Float32)
-    Kgpu = GPUSparseMatrixCSC( K.m, K.n, K.colptr |> cu, K.rowval |> cu, K.nzval |> cu)
+    #Kgpu = GPUSparseMatrixCSC( K.m, K.n, K.colptr |> cu, K.rowval |> cu, K.nzval |> cu)
+    Kgpu = CUSPARSE.CuSparseMatrixCSC(K)
     fgpu = CUDA.zeros(ndofs(dh))
     assembler = start_assemble(Kgpu, fgpu)
     n_colors = length(colors)
@@ -158,12 +158,10 @@ stassy(cv,dh) = assemble_global!(cv,dh,Val(false))
 # qpassy(cv,dh) = assemble_global!(cv,dh,Val(true))
 
 
-using BenchmarkTools
-
 
 #Kgpu = @btime CUDA.@sync   assemble_global_gpu_color($cellvalues,$dh)
 Kgpu =    assemble_global_gpu_color(cellvalues,dh)
-
+norm(Kgpu)
 
 
 #Kstd , Fstd = @btime stassy($cellvalues,$dh);
