@@ -49,6 +49,7 @@ function get_ndofs_cell(dh::DofHandler)
 end
 
 function Adapt.adapt_structure(to, dh::DofHandler)
+    @show "Here"
     cell_dofs = Adapt.adapt_structure(to, dh.cell_dofs |> cu)
     cells = Adapt.adapt_structure(to, dh.grid.cells |> cu)
     offsets = Adapt.adapt_structure(to, dh.cell_dofs_offset |> cu)
@@ -58,25 +59,25 @@ function Adapt.adapt_structure(to, dh::DofHandler)
 end
 
 
-function Adapt.adapt_structure(to, K::SparseMatrixCSC)
-    m = Adapt.adapt_structure(to, Int32(K.m))
-    n = Adapt.adapt_structure(to, Int32(K.n))
-    colptr = Adapt.adapt_structure(to, Int32.(K.colptr)|>cu)
-    rowval = Adapt.adapt_structure(to, Int32.(K.rowval)|>cu)
-    nzval = Adapt.adapt_structure(to, Float32.(K.nzval) |> cu)
-    GPUSparseMatrixCSC(m, n, colptr, rowval, nzval)
-end
+# function Adapt.adapt_structure(to, K::SparseMatrixCSC)
+#     m = Adapt.adapt_structure(to, Int32(K.m))
+#     n = Adapt.adapt_structure(to, Int32(K.n))
+#     colptr = Adapt.adapt_structure(to, Int32.(K.colptr)|>cu)
+#     rowval = Adapt.adapt_structure(to, Int32.(K.rowval)|>cu)
+#     nzval = Adapt.adapt_structure(to, Float32.(K.nzval) |> cu)
+#     GPUSparseMatrixCSC(m, n, colptr, rowval, nzval)
+# end
 
 
 
-function Adapt.adapt_structure(to, K::GPUSparseMatrixCSC)
-    m = Adapt.adapt_structure(to, K.m)
-    n = Adapt.adapt_structure(to, K.n)
-    colptr = Adapt.adapt_structure(to, K.colptr)
-    rowval = Adapt.adapt_structure(to, K.rowval)
-    nzval = Adapt.adapt_structure(to, K.nzval)
-    GPUSparseMatrixCSC(m, n, colptr, rowval, nzval)
-end
+# function Adapt.adapt_structure(to, K::GPUSparseMatrixCSC)
+#     m = Adapt.adapt_structure(to, K.m)
+#     n = Adapt.adapt_structure(to, K.n)
+#     colptr = Adapt.adapt_structure(to, K.colptr)
+#     rowval = Adapt.adapt_structure(to, K.rowval)
+#     nzval = Adapt.adapt_structure(to, K.nzval)
+#     GPUSparseMatrixCSC(m, n, colptr, rowval, nzval)
+# end
 
 function Adapt.adapt_structure(to, assembler::Ferrite.GPUAssemblerSparsityPattern)
     K = Adapt.adapt_structure(to, assembler.K)
