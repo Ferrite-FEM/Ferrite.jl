@@ -33,15 +33,15 @@
                         @test shapevalue ≈ shape_value(iv.there, qp, i - getnbasefunctions(iv.here))
                         @test shapegrad ≈ shape_gradient(iv.there, qp, i - getnbasefunctions(iv.here))
 
-                        @test shape_jump ≈ -shapevalue
-                        @test shapegrad_jump ≈ -shapegrad
+                        @test shape_jump ≈ shapevalue
+                        @test shapegrad_jump ≈ shapegrad
                     else
                         normal = getnormal(iv, qp)
                         @test shapevalue ≈ shape_value(iv.here, qp, i)
                         @test shapegrad ≈ shape_gradient(iv.here, qp, i)
 
-                        @test shape_jump ≈ shapevalue
-                        @test shapegrad_jump ≈ shapegrad
+                        @test shape_jump ≈ -shapevalue
+                        @test shapegrad_jump ≈ -shapegrad
                     end
 
                     @test shape_avg ≈ 0.5 * shapevalue

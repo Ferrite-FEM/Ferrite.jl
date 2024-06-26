@@ -272,7 +272,7 @@ for (func,                      f_,               is_avg) in (
         function $(func)(iv::InterfaceValues, qp::Int, i::Int)
             f_here = $(f_)(iv, qp, i; here = true)
             f_there = $(f_)(iv, qp, i; here = false)
-            return $(is_avg ? :((f_here + f_there) / 2) : :(f_here - f_there))
+            return $(is_avg ? :((f_here + f_there) / 2) : :(f_there - f_here))
         end
     end
 end
@@ -365,7 +365,7 @@ for (func,                          f_,                     is_avg) in (
             dof_range_there = (1:getnbasefunctions(iv.there)) .+ getnbasefunctions(iv.here)
             f_here = $(f_)(iv.here, qp, @view(u[dof_range_here]))
             f_there = $(f_)(iv.there, qp, @view(u[dof_range_there]))
-            return $(is_avg ? :((f_here + f_there) / 2) : :(f_here - f_there))
+            return $(is_avg ? :((f_here + f_there) / 2) : :(f_there - f_here))
         end
         function $(func)(
                 iv::InterfaceValues, qp::Int,
@@ -374,7 +374,7 @@ for (func,                          f_,                     is_avg) in (
             )
             f_here = $(f_)(iv.here, qp, u, dof_range_here)
             f_there = $(f_)(iv.there, qp, u, dof_range_there)
-            return $(is_avg ? :((f_here + f_there) / 2) : :(f_here - f_there))
+            return $(is_avg ? :((f_here + f_there) / 2) : :(f_there - f_here))
         end
     end
 end
