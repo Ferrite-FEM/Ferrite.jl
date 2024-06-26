@@ -1,7 +1,7 @@
 using Ferrite, CUDA
 using StaticArrays
 using SparseArrays
-
+using Adapt
 
 
 left = Tensor{1,2,Float32}((0,-0)) # define the left bottom corner of the grid.
@@ -17,6 +17,7 @@ ip = Lagrange{RefQuadrilateral, 1}() # define the interpolation function (i.e. B
 
 
 qr = QuadratureRule{RefQuadrilateral,Float32}(2) 
+
 
 cellvalues = CellValues(Float32,qr, ip);
 
@@ -131,20 +132,25 @@ function assemble_element_gpu_ele_per_thread!(assembler,cv,dh,n_cells_colored,el
 end
 
 
+
+
 function assemble_global_gpu_color(cellvalues,dh)
-    #Kgpu =   CUDA.zeros(dh.ndofs.x,dh.ndofs.x)
     K = create_sparsity_pattern(dh,Float32)
-    #Kgpu = GPUSparseMatrixCSC( K.m, K.n, K.colptr |> cu, K.rowval |> cu, K.nzval |> cu)
     Kgpu = CUSPARSE.CuSparseMatrixCSC(K)
     fgpu = CUDA.zeros(ndofs(dh))
     assembler = start_assemble(Kgpu, fgpu)
     n_colors = length(colors)
+
+    # set up kernel adaption 
+    dh_gpu = Adapt.adapt_structure(CUDA.KernelAdaptor(), dh)
+    assembler_gpu = Adapt.adapt_structure(CUDA.KernelAdaptor(), assembler)
+    cellvalues_gpu = Adapt.adapt_structure(CUDA.KernelAdaptor(), cellvalues)
     for i in 1:n_colors
-        kernel = @cuda launch=false assemble_element_gpu_ele_per_thread!(assembler,cellvalues,dh,length(colors[i]),cu(colors[i]))
+        kernel = @cuda launch=false assemble_element_gpu_ele_per_thread!(assembler_gpu,cellvalues_gpu,dh_gpu,length(colors[i]),cu(colors[i]))
         config = launch_configuration(kernel.fun)
         threads = min(length(colors[i]), config.threads)
         blocks =  cld(length(colors[i]), threads)
-        kernel(assembler,cellvalues,dh,length(colors[i]),cu(colors[i]); threads=threads, blocks=blocks)
+        kernel(assembler_gpu,cellvalues,dh_gpu,length(colors[i]),cu(colors[i]); threads, blocks)
     end
     return Kgpu
 end
@@ -161,6 +167,8 @@ stassy(cv,dh) = assemble_global!(cv,dh,Val(false))
 
 #Kgpu = @btime CUDA.@sync   assemble_global_gpu_color($cellvalues,$dh)
 Kgpu =    assemble_global_gpu_color(cellvalues,dh)
+
+
 norm(Kgpu)
 
 

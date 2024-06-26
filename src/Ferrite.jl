@@ -147,9 +147,9 @@ include("docs.jl")
 
 # GPU support
 include("GPU/gpu_assembler.jl")
-include("GPU/adapt.jl")
 include("Grid/gpu_grid.jl")
 include("Dofs/GPUDofHandler.jl")
+include("GPU/adapt.jl")
 
 
 end # module
