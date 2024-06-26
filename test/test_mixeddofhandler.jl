@@ -480,7 +480,7 @@ function test_evaluate_at_grid_nodes()
                     [3., 4., 0.],
                     [7., 8., 0.],
                     [5., 6., 0.])
-                    
+
     # :v on a view into solution
     vv_nodes = evaluate_at_grid_nodes(dh, uv, :v)
     @test vv_nodes ≈ hcat(   [9., 10., 0.],
