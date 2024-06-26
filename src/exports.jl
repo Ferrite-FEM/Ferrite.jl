@@ -179,5 +179,8 @@ export
     evaluate_at_points,
     PointIterator,
     PointLocation,
-    PointValues
+    PointValues,
+
+# GPU
+    @run_gpu
 

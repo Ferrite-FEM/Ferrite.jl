@@ -92,7 +92,7 @@ function assemble_global!(cellvalues, dh::DofHandler,qp_iter::Val{QPiter}) where
 end
 
 
-function assemble_element_gpu_ele_per_thread!(assembler,cv,dh,n_cells_colored,eles_colored)
+function assemble_element_gpu!(assembler,cv,dh,n_cells_colored, eles_colored)
     tx = threadIdx().x 
     bx = blockIdx().x
     bd = blockDim().x
@@ -133,27 +133,37 @@ end
 
 
 
-
-function assemble_global_gpu_color(cellvalues,dh)
+function assemble_global_gpu_color(cellvalues,dh,colors)
     K = create_sparsity_pattern(dh,Float32)
     Kgpu = CUSPARSE.CuSparseMatrixCSC(K)
     fgpu = CUDA.zeros(ndofs(dh))
     assembler = start_assemble(Kgpu, fgpu)
     n_colors = length(colors)
-
     # set up kernel adaption 
     dh_gpu = Adapt.adapt_structure(CUDA.KernelAdaptor(), dh)
     assembler_gpu = Adapt.adapt_structure(CUDA.KernelAdaptor(), assembler)
     cellvalues_gpu = Adapt.adapt_structure(CUDA.KernelAdaptor(), cellvalues)
     for i in 1:n_colors
-        kernel = @cuda launch=false assemble_element_gpu_ele_per_thread!(assembler_gpu,cellvalues_gpu,dh_gpu,length(colors[i]),cu(colors[i]))
+        kernel = @cuda launch=false assemble_element_gpu!(assembler_gpu,cellvalues_gpu,dh_gpu,length(colors[i]),cu(colors[i]))
         config = launch_configuration(kernel.fun)
         threads = min(length(colors[i]), config.threads)
         blocks =  cld(length(colors[i]), threads)
-        kernel(assembler_gpu,cellvalues,dh_gpu,length(colors[i]),cu(colors[i]); threads, blocks)
+        kernel(assembler_gpu,cellvalues,dh_gpu,length(colors[i]),cu(colors[i]); threads = threads, blocks=blocks)
     end
-    return Kgpu
+    return Kgpu,fgpu
 end
+
+function assemble_global_gpu_color_macro(cellvalues,dh,colors)
+    K = create_sparsity_pattern(dh,Float32)
+    Kgpu = CUSPARSE.CuSparseMatrixCSC(K)
+    fgpu = CUDA.zeros(ndofs(dh))
+    assembler = start_assemble(Kgpu, fgpu)
+
+    # set up kernel adaption & launch the kernel
+    @run_gpu(assemble_element_gpu!, assembler, cellvalues, dh, colors)
+    return Kgpu,fgpu
+end
+
 
 
 
@@ -165,11 +175,11 @@ stassy(cv,dh) = assemble_global!(cv,dh,Val(false))
 
 
 
-#Kgpu = @btime CUDA.@sync   assemble_global_gpu_color($cellvalues,$dh)
-Kgpu =    assemble_global_gpu_color(cellvalues,dh)
+Kgpu, fgpu =    assemble_global_gpu_color(cellvalues,dh,colors)
+mKgpu, mfgpu =    assemble_global_gpu_color_macro(cellvalues,dh,colors)
 
 
-norm(Kgpu)
+norm(mKgpu)
 
 
 #Kstd , Fstd = @btime stassy($cellvalues,$dh);
