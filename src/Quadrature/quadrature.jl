@@ -42,18 +42,19 @@ julia> getpoints(qr)
  [0.33333333333333, 0.33333333333333]
 ```
 """
-struct QuadratureRule{shape,T,dim}
-    weights::Vector{T}
-    points::Vector{Vec{dim,T}}
-    function QuadratureRule{shape, T}(weights::Vector{T}, points::Vector{Vec{dim, T}}) where {dim, shape <: AbstractRefShape{dim}, T}
+# struct QuadratureRule{shape, T, rdim, WeightStorageType <: AbstractVector{T}, PointStorageType <: AbstractVector{<:Vec{rdim,T}}}
+struct QuadratureRule{shape, T, rdim, WeightStorageType <: AbstractVector{T}, PointStorageType <: AbstractVector} # The one above crashes the deprecation in deprecations.jl for some reason...
+    weights::WeightStorageType
+    points::PointStorageType
+    function QuadratureRule{shape, T}(weights::AbstractVector{T}, points::AbstractVector{Vec{rdim, T}}) where {rdim, shape <: AbstractRefShape{rdim}, T}
         if length(weights) != length(points)
             throw(ArgumentError("number of weights and number of points do not match"))
         end
-        new{shape, T, dim}(weights, points)
+        new{shape, T, rdim, typeof(weights), typeof(points)}(weights, points)
     end
 end
 
-function QuadratureRule{shape}(weights::Vector{T}, points::Vector{Vec{dim, T}}) where {dim, shape <: AbstractRefShape{dim}, T}
+function QuadratureRule{shape}(weights::AbstractVector{T}, points::AbstractVector{Vec{rdim, T}}) where {rdim, shape <: AbstractRefShape{rdim}, T}
     QuadratureRule{shape, T}(weights, points)
 end
 
@@ -169,15 +170,15 @@ the `:legendre` and `:lobatto` rules are implemented.
 
 `FacetQuadratureRule` is used as one of the components to create [`FacetValues`](@ref).
 """
-struct FacetQuadratureRule{shape, T, dim}
-    face_rules::Vector{QuadratureRule{shape, T, dim}}
-    function FacetQuadratureRule{shape, T, dim}(face_rules::Vector{QuadratureRule{shape, T, dim}}) where {shape, T, dim}
+struct FacetQuadratureRule{shape, T, dim, QRType <: QuadratureRule{shape, T, dim}, FacetRulesType <: Union{NTuple{<:Any, QRType}, AbstractVector{QRType}}}
+    face_rules::FacetRulesType
+    function FacetQuadratureRule{shape, T, dim}(face_rules::Union{AbstractVector{QRType}, NTuple{<:Any, QRType}}) where {shape, T, dim, QRType <:QuadratureRule{shape, T, dim}}
         # TODO: Verify length(face_rules) == nfaces(shape)
-        return new{shape, T, dim}(face_rules)
+        return new{shape, T, dim, QRType, typeof(face_rules)}(face_rules)
     end
 end
 
-function FacetQuadratureRule(face_rules::Vector{QuadratureRule{shape, T, dim}}) where {shape, T, dim}
+function FacetQuadratureRule(face_rules::Union{AbstractVector{QRType}, NTuple{<:Any, QRType}}) where {shape, T, dim, QRType <:QuadratureRule{shape, T, dim}}
     return FacetQuadratureRule{shape, T, dim}(face_rules)
 end
 
