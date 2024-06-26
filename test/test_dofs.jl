@@ -122,12 +122,21 @@ add!(dh, :v, Lagrange{RefQuadrilateral,1}()^2)
 add!(dh, :s, Lagrange{RefQuadrilateral,1}())
 close!(dh)
 
-u = [1.1, 1.2, 2.1, 2.2, 4.1, 4.2, 3.1, 3.2, 1.3, 2.3, 4.3, 3.3]
-
+u  = [1.1, 1.2, 2.1, 2.2, 4.1, 4.2, 3.1, 3.2, 1.3, 2.3, 4.3, 3.3]
+uv = @view u[1:end]
+# :s on solution
 s_nodes = evaluate_at_grid_nodes(dh, u, :s)
 @test s_nodes ≈ [i+0.3 for i=1:4]
+# :s on a view into solution
+sv_nodes = evaluate_at_grid_nodes(dh, uv, :s)
+@test sv_nodes ≈ [i+0.3 for i=1:4]
+# :v on solution
 v_nodes = evaluate_at_grid_nodes(dh, u, :v)
 @test v_nodes ≈ [Vec{2,Float64}(i -> j+i/10) for j = 1:4]
+# :v on a view into solution
+vv_nodes = evaluate_at_grid_nodes(dh, uv, :v)
+@test vv_nodes ≈ [Vec{2,Float64}(i -> j+i/10) for j = 1:4]
+
 end
 
 @testset "renumber!" begin
