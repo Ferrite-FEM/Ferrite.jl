@@ -2,8 +2,9 @@ module FerriteBlockArrays
 
 using BlockArrays: BlockArray, BlockIndex, BlockMatrix, BlockVector, block, blockaxes,
     blockindex, blocks, findblockindex
-using Ferrite
-using Ferrite: addindex!, fillzero!
+using Ferrite:
+    Ferrite, CellIterator, ConstraintHandler, DofHandler, addindex!, assemble!, celldofs,
+    create_sparsity_pattern, dof_range, fillzero!, ndofs
 
 # TODO: Move into Ferrite and enable for mixed grids / subdomains
 function global_dof_range(dh::DofHandler, f::Symbol)

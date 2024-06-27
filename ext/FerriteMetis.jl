@@ -4,7 +4,9 @@ module FerriteMetis
 # https://github.com/JuliaLang/julia/pull/47749
 if VERSION >= v"1.10.0-DEV.90"
 
-using Ferrite
+using Ferrite:
+    Ferrite, CellIterator, ConstraintHandler, DofHandler, DofOrder, celldofs, ndofs,
+    ndofs_per_cell
 using Metis.LibMetis: idx_t
 using Metis: Metis
 using SparseArrays: sparse
