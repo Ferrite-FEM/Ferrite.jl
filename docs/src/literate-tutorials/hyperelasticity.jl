@@ -105,7 +105,7 @@ using Ferrite, Tensors, TimerOutputs, ProgressMeter, IterativeSolvers
 # ```
 
 #md # ```@raw html
-#md # <details class="admonition collapsible">
+#md # <details class="admonition is-details">
 #md # <summary class="admonition-header">
 #md # Derivation of <span>$\partial \mathbf{P} / \partial \mathbf{F}$</span>
 #md # </summary>
