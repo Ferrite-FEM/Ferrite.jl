@@ -26,6 +26,7 @@
         if update_gradients && !update_hessians # Check correct and type-stable default constructor
             cv_default = @inferred CellValues(quad_rule, func_interpol, geom_interpol)
             @test typeof(cv) === typeof(cv_default)
+            @inferred CellValues(quad_rule, func_interpol, geom_interpol; update_gradients=Val(false), update_detJdV=Val(false))
         end
         rdim = Ferrite.getrefdim(func_interpol)
         n_basefuncs = getnbasefunctions(func_interpol)
