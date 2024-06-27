@@ -36,13 +36,13 @@ values of nodal functions, gradients and divergences of nodal functions etc. on 
 """
 FacetValues
 
-struct FacetValues{FV, GM, FQR, detT, nT, V_FV<:AbstractVector{FV}, V_GM<:AbstractVector{GM}} <: AbstractFacetValues
-    fun_values::V_FV  # AbstractVector{FunctionValues}
-    geo_mapping::V_GM # AbstractVector{GeometryMapping}
-    fqr::FQR          # FacetQuadratureRule
-    detJdV::detT      # AbstractVector{<:Number}
-    normals::nT       # AbstractVector{<:Vec}
-    current_facet::ScalarWrapper{Int}
+mutable struct FacetValues{FV, GM, FQR, detT, nT, V_FV<:AbstractVector{FV}, V_GM<:AbstractVector{GM}} <: AbstractFacetValues
+    const fun_values::V_FV  # AbstractVector{FunctionValues}
+    const geo_mapping::V_GM # AbstractVector{GeometryMapping}
+    const fqr::FQR          # FacetQuadratureRule
+    const detJdV::detT      # AbstractVector{<:Number}
+    const normals::nT       # AbstractVector{<:Vec}
+    current_facet::Int
 end
 
 function FacetValues(::Type{T}, fqr::FacetQuadratureRule, ip_fun::Interpolation, ip_geo::VectorizedInterpolation{sdim},
@@ -55,7 +55,7 @@ function FacetValues(::Type{T}, fqr::FacetQuadratureRule, ip_fun::Interpolation,
     # detJdV always calculated, since we needed to calculate the jacobian anyways for the normal.
     detJdV  = fill(T(NaN), max_nquadpoints)
     normals = fill(zero(Vec{sdim, T}) * T(NaN), max_nquadpoints)
-    return FacetValues(fun_values, geo_mapping, fqr, detJdV, normals, ScalarWrapper(1))
+    return FacetValues(fun_values, geo_mapping, fqr, detJdV, normals, 1)
 end
 
 FacetValues(qr::FacetQuadratureRule, ip::Interpolation, args...; kwargs...) = FacetValues(Float64, qr, ip, args...; kwargs...)
@@ -69,7 +69,7 @@ end
 function Base.copy(fv::FacetValues)
     fun_values = map(copy, fv.fun_values)
     geo_mapping = map(copy, fv.geo_mapping)
-    return FacetValues(fun_values, geo_mapping, copy(fv.fqr), copy(fv.detJdV), copy(fv.normals), copy(fv.current_facet))
+    return FacetValues(fun_values, geo_mapping, copy(fv.fqr), copy(fv.detJdV), copy(fv.normals), fv.current_facet)
 end
 
 getngeobasefunctions(fv::FacetValues) = getngeobasefunctions(get_geo_mapping(fv))
@@ -114,7 +114,7 @@ function set_current_facet!(fv::FacetValues, face_nr::Int)
     # Checking face_nr before setting current_facet allows us to use @inbounds
     # when indexing by getcurrentfacet(fv) in other places!
     checkbounds(Bool, 1:nfacets(fv), face_nr) || throw(ArgumentError("Face index out of range."))
-    fv.current_facet[] = face_nr
+    fv.current_facet = face_nr
 end
 
 @inline function reinit!(fv::FacetValues, x::AbstractVector, face_nr::Int)
@@ -174,10 +174,10 @@ end
 `BCValues` stores the shape values at all facet/faces/edges/vertices (depending on `boundary_type`) for the geometric interpolation (`geom_interpol`),
 for each dof-position determined by the `func_interpol`. Used mainly by the `ConstraintHandler`.
 """
-struct BCValues{T}
-    M::Array{T,3}
-    nqp::Array{Int}
-    current_entity::ScalarWrapper{Int}
+mutable struct BCValues{T}
+    const M::Array{T,3}
+    const nqp::Array{Int}
+    current_entity::Int
 end
 
 BCValues(func_interpol::Interpolation, geom_interpol::Interpolation, boundary_type::Type{<:BoundaryIndex} = FaceIndex) =
@@ -211,10 +211,10 @@ function BCValues(::Type{T}, func_interpol::Interpolation{refshape}, geom_interp
         nqp[n_boundary_entity] = length(qrs[n_boundary_entity].points)
     end
 
-    BCValues{T}(M, nqp, ScalarWrapper(0))
+    BCValues{T}(M, nqp, 0)
 end
 
-getnquadpoints(bcv::BCValues) = bcv.nqp[bcv.current_entity.x]
+getnquadpoints(bcv::BCValues) = bcv.nqp[bcv.current_entity]
 function spatial_coordinate(bcv::BCValues, q_point::Int, xh::AbstractVector{Vec{dim,T}}) where {dim,T}
     n_base_funcs = size(bcv.M, 1)
     length(xh) == n_base_funcs || throw_incompatible_coord_length(length(xh), n_base_funcs)
