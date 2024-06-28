@@ -1,3 +1,5 @@
+using Ferrite: reference_shape_value
+
 @testset "Quadrature testing" begin
     ref_tet_vol(dim) = 1 / factorial(dim)
     ref_square_vol(dim) = 2^dim
@@ -87,12 +89,12 @@
 
                     xface = zero(Vec_t)
                     for i in 1:getnbasefunctions(ipface)
-                        xface += Ferrite.shape_value(ipface, ξface, i) * fcoords[i]
+                        xface += reference_shape_value(ipface, ξface, i) * fcoords[i]
                     end
 
                     xcell = zero(Vec_t)
                     for i in 1:getnbasefunctions(ipcell)
-                        xcell += shape_value(ipcell, ξcell, i) * ccoords[i]
+                        xcell += reference_shape_value(ipcell, ξcell, i) * ccoords[i]
                     end
 
                     @test xcell ≈ xface

@@ -1,5 +1,7 @@
 # Some utility functions for testing Ferrite.jl
 
+using Ferrite: reference_shape_value
+
 #####################################
 # Volume for the reference elements #
 #####################################
@@ -303,9 +305,9 @@ function function_value_from_physical_coord(interpolation::Interpolation, cell_c
     scalar_ip = interpolation isa Ferrite.ScalarInterpolation ? interpolation : interpolation.ip
     @assert length(ue) == n_basefuncs
     _, ξ = Ferrite.find_local_coordinate(scalar_ip, cell_coordinates, X; tol_norm=1e-16)
-    u = zero(shape_value(interpolation, ξ, 1))
+    u = zero(reference_shape_value(interpolation, ξ, 1))
     for j in 1:n_basefuncs
-        N = shape_value(interpolation, ξ, j)
+        N = reference_shape_value(interpolation, ξ, j)
         u += N * ue[j]
     end
     return u
