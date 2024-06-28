@@ -912,7 +912,7 @@ getfieldinterpolation(sdh::SubDofHandler, field_idx::Int) = sdh.field_interpolat
 getfieldinterpolation(sdh::SubDofHandler, field_name::Symbol) = getfieldinterpolation(sdh, find_field(sdh, field_name))
 
 """
-    evaluate_at_grid_nodes(dh::AbstractDofHandler, u::Vector{T}, fieldname::Symbol) where T
+    evaluate_at_grid_nodes(dh::AbstractDofHandler, u::AbstractVector{T}, fieldname::Symbol) where T
 
 Evaluate the approximated solution for field `fieldname` at the node
 coordinates of the grid given the Dof handler `dh` and the solution vector `u`.
@@ -921,12 +921,12 @@ Return a vector of length `getnnodes(grid)` where entry `i` contains the evaluat
 approximation in the coordinate of node `i`. If the field does not live on parts of the
 grid, the corresponding values for those nodes will be returned as `NaN`s.
 """
-function evaluate_at_grid_nodes(dh::DofHandler, u::Vector, fieldname::Symbol)
+function evaluate_at_grid_nodes(dh::DofHandler, u::AbstractVector, fieldname::Symbol)
     return _evaluate_at_grid_nodes(dh, u, fieldname)
 end
 
 # Internal method that have the vtk option to allocate the output differently
-function _evaluate_at_grid_nodes(dh::DofHandler, u::Vector{T}, fieldname::Symbol, ::Val{vtk}=Val(false)) where {T, vtk}
+function _evaluate_at_grid_nodes(dh::DofHandler, u::AbstractVector{T}, fieldname::Symbol, ::Val{vtk}=Val(false)) where {T, vtk}
     # Make sure the field exists
     fieldname ∈ getfieldnames(dh) || error("Field $fieldname not found.")
     # Figure out the return type (scalar or vector)
@@ -968,7 +968,7 @@ end
 
 # Loop over the cells and use shape functions to compute the value
 function _evaluate_at_grid_nodes!(data::Union{Vector,Matrix}, sdh::SubDofHandler,
-        u::Vector{T}, cv::CellValues, drange::UnitRange, ::Type{RT}) where {T, RT}
+        u::AbstractVector{T}, cv::CellValues, drange::UnitRange, ::Type{RT}) where {T, RT}
     ue = zeros(T, length(drange))
     # TODO: Remove this hack when embedding works...
     if RT <: Vec && function_interpolation(cv) isa ScalarInterpolation

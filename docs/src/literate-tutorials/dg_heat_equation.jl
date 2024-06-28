@@ -167,7 +167,7 @@ close!(dh);
 # However, when generating the sparsity pattern we need to pass the topology and the cross-element coupling matrix when we're using
 # discontinuous interpolations. The cross-element coupling matrix is of size [1,1] in this case as
 # we have only one field and one DofHandler.
-K = create_sparsity_pattern(dh, topology = topology, cross_coupling = trues(1,1));
+K = allocate_matrix(dh, topology = topology, interface_coupling = trues(1,1));
 
 # ### Boundary conditions
 # The Dirichlet boundary conditions are treated
