@@ -25,6 +25,4 @@ Ferrite.find_field(dh::DofHandler, field_name::Symbol)
 Ferrite._close_subdofhandler!
 Ferrite._distribute_dofs_for_cell!
 Ferrite.permute_and_push!
-Ferrite.cross_element_coupling!
-Ferrite._add_cross_coupling
 ```

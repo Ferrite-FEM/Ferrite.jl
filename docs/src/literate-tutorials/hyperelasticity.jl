@@ -374,14 +374,14 @@ function solve()
     apply!(un, dbcs)
 
     ## Create sparse matrix and residual vector
-    K = create_sparsity_pattern(dh)
+    K = allocate_matrix(dh)
     g = zeros(_ndofs)
 
     ## Perform Newton iterations
     newton_itr = -1
     NEWTON_TOL = 1e-8
     NEWTON_MAXITER = 30
-    prog = ProgressMeter.ProgressThresh(NEWTON_TOL, "Solving:")
+    prog = ProgressMeter.ProgressThresh(NEWTON_TOL; desc = "Solving:")
 
     while true; newton_itr += 1
         ## Construct the current guess

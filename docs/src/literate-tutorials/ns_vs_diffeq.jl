@@ -346,10 +346,10 @@ if IS_CI                                                                #hide
 end                                                                     #hide
 Δt_save = 0.1
 
-M = create_sparsity_pattern(dh);
+M = allocate_matrix(dh);
 M = assemble_mass_matrix(cellvalues_v, cellvalues_p, M, dh);
 
-K = create_sparsity_pattern(dh);
+K = allocate_matrix(dh);
 K = assemble_stokes_matrix(cellvalues_v, cellvalues_p, ν, K, dh);
 
 # These are our initial conditions. We start from the zero solution, because it

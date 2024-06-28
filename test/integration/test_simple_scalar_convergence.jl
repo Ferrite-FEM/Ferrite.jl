@@ -112,7 +112,7 @@ end
 
 # Assemble and solve
 function solve(dh, ch, cellvalues)
-    K, f = assemble_global(cellvalues, create_sparsity_pattern(dh), dh);
+    K, f = assemble_global(cellvalues, allocate_matrix(dh), dh);
     apply!(K, f, ch)
     u = K \ f;
 end

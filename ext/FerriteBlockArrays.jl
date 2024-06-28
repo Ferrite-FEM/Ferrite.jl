@@ -2,59 +2,60 @@ module FerriteBlockArrays
 
 using BlockArrays: BlockArray, BlockIndex, BlockMatrix, BlockVector, block, blockaxes,
     blockindex, blocks, findblockindex
+using BlockArrays: Block, BlockArray, BlockIndex, BlockMatrix, BlockVector, block,
+    blockaxes, blockindex, blocks, findblockindex, undef_blocks
 using Ferrite:
-    Ferrite, CellIterator, ConstraintHandler, DofHandler, addindex!, assemble!, celldofs,
-    create_sparsity_pattern, dof_range, fillzero!, ndofs
+    Ferrite, BlockSparsityPattern, ConstraintHandler, addindex!, allocate_matrix, assemble!,
+    fillzero!
+using SparseArrays: SparseMatrixCSC
 
-# TODO: Move into Ferrite and enable for mixed grids / subdomains
-function global_dof_range(dh::DofHandler, f::Symbol)
-    set = Set{Int}()
-    frange = dof_range(dh, f)
-    for cc in CellIterator(dh)
-        union!(set, @view celldofs(cc)[frange])
-    end
-    dofmin, dofmax = extrema(set)
-    r = dofmin:dofmax
-    if length(set) != length(r)
-        error("renumber by blocks you donkey")
-    end
-    return r
+
+##############################
+## Instantiating the matrix ##
+##############################
+
+# function Ferrite.allocate_matrix(::Type{B}, dh, ch, ...) where B <: BlockMatrix
+#     # TODO: Create BSP from the induced field blocks in dh
+# end
+
+# Fill in missing matrix type, this allows allocate_matrix(BlockMatrix, sp)
+function Ferrite.allocate_matrix(::Type{<:BlockMatrix}, sp::BlockSparsityPattern)
+    return allocate_matrix(BlockMatrix{Float64, Matrix{SparseMatrixCSC{Float64, Int}}}, sp)
 end
 
-###################################
-## Creating the sparsity pattern ##
-###################################
+"""
+    allocate_matrix(::Type{BlockMatrix}, sp::BlockSparsityPattern)
+    allocate_matrix(::Type{BlockMatrix{T, Matrix{S}}}, sp::BlockSparsityPattern)
 
-# Note:
-# Creating the full unblocked matrix and then splitting into blocks inside the BlockArray
-# constructor (i.e. by `getindex(::SparseMatrixCSC, ::UnitRange, ::UnitRange)`) is
-# consistently faster than creating individual blocks directly. However, the latter approach
-# uses less than half of the memory (measured for a 2x2 block system and various problem
-# sizes), so might be useful in the future to provide an option on what algorithm to use.
+Instantiate a blocked sparse matrix from the blocked sparsity pattern `sp`.
 
-# TODO: Could potentially extract the element type and matrix type for the individual blocks
-#       by allowing e.g. create_sparsity_pattern(BlockMatrix{Float32}, ...) but that is not
-#       even supported by regular pattern right now.
-function Ferrite.create_sparsity_pattern(::Type{<:BlockMatrix}, dh, ch; kwargs...)
-    K = create_sparsity_pattern(dh, ch; kwargs...)
-    # Infer block sizes from the fields in the DofHandler
-    block_sizes = [length(global_dof_range(dh, f)) for f in dh.field_names]
-    return BlockArray(K, block_sizes, block_sizes)
+The type of the returned matrix is a `BlockMatrix` with blocks of type `S` (defaults to
+`SparseMatrixCSC{T, Int}`).
+
+# Examples
+```
+# Create a sparse matrix with default block type
+allocate_matrix(BlockMatrix, sparsity_pattern)
+
+# Create a sparse matrix with blocks of type SparseMatrixCSC{Float32, Int}
+allocate_matrix(BlockMatrix{Float32, Matrix{SparseMatrixCSC{Float32, Int}}}, sparsity_pattern)
+```
+
+!!! note "Package extension"
+    This functionality is only enabled when the package
+    [BlockArrays.jl](https://github.com/JuliaArrays/BlockArrays.jl) is installed (`pkg> add
+    BlockArrays`) and loaded (`using BlockArrays`) in the session.
+"""
+function Ferrite.allocate_matrix(::Type{<:BlockMatrix{T, Matrix{S}}}, sp::BlockSparsityPattern) where {T, S <: AbstractMatrix{T}}
+    @assert isconcretetype(S)
+    block_sizes = sp.block_sizes
+    K = BlockArray(undef_blocks, S, block_sizes, block_sizes)
+    for j in 1:length(block_sizes), i in 1:length(block_sizes)
+        K[Block(i), Block(j)] = allocate_matrix(S, sp.blocks[i, j])
+    end
+    return K
 end
 
-function Ferrite.create_sparsity_pattern(B::BlockMatrix, dh, ch; kwargs...)
-    if !(size(B, 1) == size(B, 2) == ndofs(dh))
-        error("size of input matrix ($(size(B))) does not match number of dofs ($(ndofs(dh)))")
-    end
-    K = create_sparsity_pattern(dh, ch; kwargs...)
-    ax = axes(B)
-    for block_j in blockaxes(B, 2), block_i in blockaxes(B, 1)
-        range_j = ax[2][block_j]
-        range_i = ax[1][block_i]
-        B[block_i, block_j] = K[range_i, range_j]
-    end
-    return B
-end
 
 ###########################################
 ## BlockAssembler and associated methods ##
