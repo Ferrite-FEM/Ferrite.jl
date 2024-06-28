@@ -187,9 +187,9 @@ end
     @test startswith(showstring, "FacetValues(scalar, rdim=2, sdim=2): 2 quadrature points per face")
     @test contains(showstring, "Function interpolation: Lagrange{RefQuadrilateral, 2}()")
     @test contains(showstring, "Geometric interpolation: Lagrange{RefQuadrilateral, 1}()^2")
-    fv.fqr.face_rules[1] = deepcopy(fv.fqr.face_rules[1])
-    push!(Ferrite.getweights(fv.fqr.face_rules[1]), 1)
-    showstring = sprint(show, MIME"text/plain"(), fv)
+    fv2 = copy(fv)
+    push!(Ferrite.getweights(fv2.fqr.face_rules[1]), 1)
+    showstring = sprint(show, MIME"text/plain"(), fv2)
     @test startswith(showstring, "FacetValues(scalar, rdim=2, sdim=2): (3, 2, 2, 2) quadrature points on each face")
 end
 
