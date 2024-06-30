@@ -188,13 +188,13 @@ function BCValues(::Type{T}, func_interpol::Interpolation{refshape}, geom_interp
     # (determined by func_interpol) as the quadrature points
     interpolation_coords = reference_coordinates(func_interpol)
 
-    qrs = QuadratureRule{refshape,T,dim}[]
+    qrs = QuadratureRule{refshape,Vector{T},Vector{Vec{dim,T}}}[]
     for boundarydofs in dirichlet_boundarydof_indices(boundary_type)(func_interpol)
         dofcoords = Vec{dim,T}[]
         for boundarydof in boundarydofs
             push!(dofcoords, interpolation_coords[boundarydof])
         end
-        qrf = QuadratureRule{refshape,T}(fill(T(NaN), length(dofcoords)), dofcoords) # weights will not be used
+        qrf = QuadratureRule{refshape}(fill(T(NaN), length(dofcoords)), dofcoords) # weights will not be used
         push!(qrs, qrf)
     end
 

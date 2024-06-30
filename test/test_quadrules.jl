@@ -110,5 +110,58 @@ using Ferrite: reference_shape_value
                 @test_throws err Ferrite.facet_to_element_transformation(pt, refshape, face)
             end
         end
+
+        @testset "Type checks for $refshape" begin
+            qr  = QuadratureRule{refshape}(1)
+            qrw = Ferrite.getweights(qr)
+            qrp = Ferrite.getpoints(qr)
+            @test qrw isa Vector
+            @test qrp isa Vector
+
+            sqr = QuadratureRule{refshape}(
+                SVector{length(qrw)}(qrw), SVector{length(qrp)}(qrp)
+            )
+            sqrw = Ferrite.getweights(sqr)
+            sqrp = Ferrite.getpoints(sqr)
+            @test sqrw isa SVector
+            @test sqrp isa SVector
+
+            fqr  = FacetQuadratureRule{refshape}(1)
+            for f in 1:nfacets(refshape)
+                fqrw = Ferrite.getweights(fqr, f)
+                fqrp = Ferrite.getpoints(fqr, f)
+                @test fqrw isa Vector
+                @test fqrp isa Vector
+            end
+
+            function sqr_for_facet(fqr, f)
+                fqrw = Ferrite.getweights(fqr, f)
+                fqrp = Ferrite.getpoints(fqr, f)
+                return QuadratureRule{refshape}(
+                    SVector{length(qrw)}(fqrw),
+                    SVector{length(qrp)}(fqrp),
+                )
+            end
+
+            sfqr = FacetQuadratureRule(
+                ntuple(f->sqr_for_facet(fqr, f), nfacets(refshape))
+            )
+            for f in 1:nfacets(refshape)
+                sfqrw = Ferrite.getweights(sfqr,f)
+                sfqrp = Ferrite.getpoints(sfqr, f)
+                @test sfqrw isa SVector
+                @test sfqrp isa SVector
+            end
+
+            sfqr2 = FacetQuadratureRule(
+                [sqr_for_facet(fqr, f) for f in 1:nfacets(refshape)]
+            )
+            for f in 1:nfacets(refshape)
+                sfqrw = Ferrite.getweights(sfqr2,f)
+                sfqrp = Ferrite.getpoints(sfqr2, f)
+                @test sfqrw isa SVector
+                @test sfqrp isa SVector
+            end
+        end
     end
 end

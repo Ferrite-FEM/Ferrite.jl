@@ -37,10 +37,10 @@ cell has facets of different shapes (i.e. quadrilaterals and triangles) then eac
 facets indices, weights and points are passed separately.
 """
 function create_facet_quad_rule(::Type{RefShape}, w::Vector{T}, p::Vector{Vec{N, T}}) where {N, T, RefShape <: AbstractRefShape}
-    facet_quad_rule = QuadratureRule{RefShape, T, getrefdim(RefShape)}[]
+    facet_quad_rule = QuadratureRule{RefShape, Vector{T}, Vector{Vec{N+1, T}}}[]
     for facet in 1:nfacets(RefShape)
         new_points = [facet_to_element_transformation(p[i], RefShape, facet) for i in 1:length(w)]
-        push!(facet_quad_rule, QuadratureRule{RefShape, T}(w, new_points))
+        push!(facet_quad_rule, QuadratureRule{RefShape}(copy(w), new_points))
     end
     return FacetQuadratureRule(facet_quad_rule)
 end
@@ -51,14 +51,14 @@ function create_facet_quad_rule(
     quad_facets::Vector{Int}, w_quad::Vector{T}, p_quad::Vector{Vec{N, T}},
     tri_facets::Vector{Int}, w_tri::Vector{T}, p_tri::Vector{Vec{N, T}}
 ) where {N, T, RefShape <: Union{RefPrism, RefPyramid}}
-    facet_quad_rule = Vector{QuadratureRule{RefShape, T, getrefdim(RefShape)}}(undef, nfacets(RefShape))
+    facet_quad_rule = Vector{QuadratureRule{RefShape, Vector{T}, Vector{Vec{N+1, T}}}}(undef, nfacets(RefShape))
     for facet in quad_facets
         new_points = [facet_to_element_transformation(p_quad[i], RefShape, facet) for i in 1:length(w_quad)]
-        facet_quad_rule[facet] = QuadratureRule{RefShape, T}(w_quad, new_points)
+        facet_quad_rule[facet] = QuadratureRule{RefShape}(copy(w_quad), new_points)
     end
     for facet in tri_facets
         new_points = [facet_to_element_transformation(p_tri[i], RefShape, facet) for i in 1:length(w_tri)]
-        facet_quad_rule[facet] = QuadratureRule{RefShape, T}(w_tri, new_points)
+        facet_quad_rule[facet] = QuadratureRule{RefShape}(copy(w_tri), new_points)
     end
     return FacetQuadratureRule(facet_quad_rule)
 end
