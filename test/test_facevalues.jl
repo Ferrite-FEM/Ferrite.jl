@@ -87,13 +87,13 @@ for (scalar_interpol, quad_rule) in (
                 if func_interpol isa Ferrite.ScalarInterpolation
                     @test function_gradient(fv, i, ue_vec) ≈ G_vector
                 else# func_interpol isa Ferrite.VectorInterpolation
-                    @test (@test_deprecated function_gradient(fv, i, ue_vec)) ≈ G_vector
-                    @test (@test_deprecated function_symmetric_gradient(fv, i, ue_vec)) ≈ 0.5(G_vector + G_vector')
-                    @test (@test_deprecated function_divergence(fv, i, ue_vec)) ≈ tr(G_vector)
+                    @test_throws Ferrite.DeprecationError function_gradient(fv, i, ue_vec)
+                    @test_throws Ferrite.DeprecationError function_symmetric_gradient(fv, i, ue_vec)
+                    @test_throws Ferrite.DeprecationError function_divergence(fv, i, ue_vec)
                     if rdim == 3
-                        @test (@test_deprecated function_curl(fv, i, ue_vec)) ≈ Ferrite.curl_from_gradient(G_vector)
+                        @test_throws Ferrite.DeprecationError function_curl(fv, i, ue_vec)
                     end
-                    @test_deprecated function_value(fv, i, ue_vec) #no value to test against
+                    @test_throws Ferrite.DeprecationError function_value(fv, i, ue_vec) #no value to test against
                 end
             end
 
