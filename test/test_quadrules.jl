@@ -138,8 +138,8 @@ using Ferrite: reference_shape_value
                 fqrw = Ferrite.getweights(fqr, f)
                 fqrp = Ferrite.getpoints(fqr, f)
                 return QuadratureRule{refshape}(
-                    SVector{length(qrw)}(qrw),
-                    SVector{length(qrp)}(qrp),
+                    SVector{length(qrw)}(fqrw),
+                    SVector{length(qrp)}(fqrp),
                 )
             end
 
