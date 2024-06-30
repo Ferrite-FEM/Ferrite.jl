@@ -167,7 +167,7 @@ Currently the :polyquad, `:legendre` and `:lobatto` rules are implemented, depen
 """
 struct FacetQuadratureRule{shape, FacetRulesType}
     face_rules::FacetRulesType # E.g. Tuple{QuadratureRule{RefLine,...}, QuadratureRule{RefLine,...}}
-    function FacetQuadratureRule(face_rules::NTuple{<:Any, QRType}) where {shape, QRType <:QuadratureRule{shape}}
+    function FacetQuadratureRule{shape}(face_rules::Union{NTuple{<:Any, QRType}, AbstractVector{QRType}}) where {shape, QRType <: QuadratureRule{shape}}
         if length(face_rules) != nfacets(shape)
             throw(ArgumentError("number of quadrature rules does not not match number of facets (#rules=$(length(face_rules)) != #facets=$(nfacets(shape)))"))
         end
@@ -175,8 +175,8 @@ struct FacetQuadratureRule{shape, FacetRulesType}
     end
 end
 
-function FacetQuadratureRule(face_rules::AbstractVector{QRType}) where {shape, QRType <: QuadratureRule{shape}}
-    return FacetQuadratureRule(ntuple(i->face_rules[i], length(face_rules)))
+function FacetQuadratureRule(face_rules::Union{NTuple{<:Any, QRType}, AbstractVector{QRType}}) where {shape, QRType <: QuadratureRule{shape}}
+    return FacetQuadratureRule{shape}(face_rules)
 end
 
 # Fill in defaults (Float64, :legendre)

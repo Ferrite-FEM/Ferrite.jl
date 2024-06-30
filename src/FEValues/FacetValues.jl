@@ -51,10 +51,6 @@ function FacetValues(::Type{T}, fqr::FacetQuadratureRule, ip_fun::Interpolation,
     # max(GeoDiffOrder, 1) ensures that we get the jacobian needed to calculate the normal.
     geo_mapping = map(qr -> GeometryMapping{max(GeoDiffOrder, 1)}(T, ip_geo.ip, qr), fqr.face_rules)
     fun_values = map(qr -> FunctionValues{FunDiffOrder}(T, ip_fun, qr, ip_geo), fqr.face_rules)
-    if !(typeof(fqr.face_rules) <: AbstractVector)
-        geo_mapping = collect(geo_mapping)
-        fun_values = collect(fun_values)
-    end
     max_nquadpoints = maximum(qr -> length(getweights(qr)), fqr.face_rules)
     # detJdV always calculated, since we needed to calculate the jacobian anyways for the normal.
     detJdV  = fill(T(NaN), max_nquadpoints)
