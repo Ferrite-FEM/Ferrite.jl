@@ -335,7 +335,7 @@ function test_2_element_heat_eq()
         end
     end
 
-    K = create_sparsity_pattern(dh)
+    K = allocate_matrix(dh)
     f = zeros(ndofs(dh));
     assembler = start_assemble(K, f);
     # Use the same assemble function since it is the same weak form for both cell-types
@@ -461,13 +461,29 @@ function test_evaluate_at_grid_nodes()
     add!(sdh_quad, :s, ip_quad) # scalar field :s only on quad
     close!(dh)
 
-    u = collect(1.:16.)
+    u  = collect(1.:16.)
+    uv = @view u[1:end]
 
+    # :s on thesolution
     s_nodes = evaluate_at_grid_nodes(dh, u, :s)
     @test s_nodes[1:4] ≈ [13., 14., 16., 15.]
     @test all(isnan.(s_nodes[5:6]))
-    v_nodes = evaluate_at_grid_nodes(dh, u, :v)
+    # :s on a view into solution
+    sv_nodes = evaluate_at_grid_nodes(dh, uv, :s)
+    @test sv_nodes[1:4] ≈ [13., 14., 16., 15.]
+    @test all(isnan.(sv_nodes[5:6]))
+    # :v on the solution
+    v_nodes  = evaluate_at_grid_nodes(dh, u, :v)
     @test v_nodes ≈ hcat(   [9., 10., 0.],
+                    [11., 12., 0.],
+                    [1., 2., 0.],
+                    [3., 4., 0.],
+                    [7., 8., 0.],
+                    [5., 6., 0.])
+
+    # :v on a view into solution
+    vv_nodes = evaluate_at_grid_nodes(dh, uv, :v)
+    @test vv_nodes ≈ hcat(   [9., 10., 0.],
                     [11., 12., 0.],
                     [1., 2., 0.],
                     [3., 4., 0.],

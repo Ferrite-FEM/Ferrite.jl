@@ -261,8 +261,8 @@ function gray_scott_on_sphere(material::GrayScottMaterial, Δt::Real, T::Real, r
     close!(dh);
 
     ## We can save some memory by telling the sparsity pattern that the matrices are not coupled.
-    M = create_sparsity_pattern(dh; coupling=[true false;false true])
-    D = create_sparsity_pattern(dh; coupling=[true false;false true])
+    M = allocate_matrix(dh; coupling=[true false; false true])
+    D = allocate_matrix(dh; coupling=[true false; false true])
 
     ## Since the heat problem is linear and has no time dependent parameters, we precompute the
     ## decomposition of the system matrix to speed up the linear system solver.

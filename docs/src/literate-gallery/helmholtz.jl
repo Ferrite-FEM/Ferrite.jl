@@ -85,7 +85,7 @@ add!(dbcs, dbc)
 close!(dbcs)
 update!(dbcs, 0.0)
 
-K = create_sparsity_pattern(dh);
+K = allocate_matrix(dh);
 
 function doassemble(cellvalues::CellValues, facetvalues::FacetValues,
                          K::SparseMatrixCSC, dh::DofHandler)
