@@ -110,7 +110,7 @@ for dim in 2:3
             elseif $dim == 2 && quad_type === :gaussjacobi && order > 8
                 data = _get_gaussjacobi_tridata(order)
             elseif $dim == 3 && quad_type === :jinyun
-                data = _get_gauss_tetdata(order)
+                data = _get_jinyun_tet_quadrature_data(order)
             else
                 throw(ArgumentError("unsupported quadrature rule"))
             end
