@@ -11,6 +11,7 @@ The following applies to all subtypes of `AbstractSparsityPattern`:
 
 ```@docs
 Ferrite.AbstractSparsityPattern
+init_sparsity_pattern
 add_sparsity_entries!
 add_cell_entries!
 add_interface_entries!
