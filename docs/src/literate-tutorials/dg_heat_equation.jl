@@ -239,13 +239,13 @@ function assemble_interface!(Ki::Matrix, iv::InterfaceValues, μ::Float64)
         dΓ = getdetJdV(iv, q_point)
         ## Loop over test shape functions
         for i in 1:getnbasefunctions(iv)
-            ## Multiply the jump by the normal, as the definition used in Ferrite doesn't include the normals.
-            δu_jump = shape_value_jump(iv, q_point, i) * normal
+            ## Multiply the jump by the negative normal to get the definition from the theory section.
+            δu_jump = shape_value_jump(iv, q_point, i) * (-normal)
             ∇δu_avg = shape_gradient_average(iv, q_point, i)
             ## Loop over trial shape functions
             for j in 1:getnbasefunctions(iv)
-                ## Multiply the jump by the normal, as the definition used in Ferrite doesn't include the normals.
-                u_jump = shape_value_jump(iv, q_point, j) * normal
+                ## Multiply the jump by the negative normal to get the definition from the theory section.
+                u_jump = shape_value_jump(iv, q_point, j) * (-normal)
                 ∇u_avg = shape_gradient_average(iv, q_point, j)
                 ## Add contribution to Ki
                 Ki[i, j] += -(δu_jump ⋅ ∇u_avg + ∇δu_avg ⋅ u_jump)*dΓ +  μ * (δu_jump ⋅ u_jump) * dΓ
