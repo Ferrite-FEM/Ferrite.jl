@@ -1,6 +1,5 @@
-# Patrick Keast, MODERATE-DEGREE TETRAHEDRAL QUADRATURE FORMULAS
-# http://mech.fsv.cvut.cz/oofem/resources/doc/oofemrefman/gaussintegrationrule_8C_source.html
-function _get_gauss_tetdata(n::Int)
+# Yu, Jinyun. Symmetric Gaussian Quadrature Formulae for Tetrahedronal Regions. 1984. CMAME.
+function _get_jinyun_tet_quadrature_data(n::Int)
     if n == 1
         a = 1. / 4.
         w = 1. / 6.
@@ -47,8 +46,10 @@ function _get_gauss_tetdata(n::Int)
               b3 a3 a3 w3
               b3 a3 b3 w3
               b3 b3 a3 w3]
+    elseif n == 5 || n == 6
+        throw(ArgumentError("not implemented quadrature order for Jinyun's Gauss quadrature rule (Tetrahedron)"))
     else
-        throw(ArgumentError("unsupported order for tetraheder gauss-legendre integration"))
+        throw(ArgumentError("unsupported order for Jinyun's Gauss quadrature rule (Tetrahedron)"))
     end
     return xw
 end

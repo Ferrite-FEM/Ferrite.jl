@@ -5,7 +5,7 @@
 #
 # Quadrature rules for orders 9 to 20 have been obtained using the
 # basix.make_quadrature(basix.CellType.triangle, n) calls of the
-# FEniCS / basix python package
+# FEniCS / basix python package, which corresponds to Gauss-Jacobi rules.
 #
 # see
 # https://docs.fenicsproject.org/basix/main/python/_autosummary/basix.html?highlight=quadraturetype#basix.make_quadrature

@@ -17,7 +17,10 @@ using Base.Cartesian: @nloops, @ntuple, @nexprs
 Create a `QuadratureRule` used for integration on the refshape `shape` (of type [`AbstractRefShape`](@ref)).
 `order` is the order of the quadrature rule.
 `quad_rule_type` is an optional argument determining the type of quadrature rule,
-currently the `:legendre` and `:lobatto` rules are implemented.
+currently the `:legendre` and `:lobatto` rules are implemented for hypercubes.
+For triangles up to order 8 the default rule is the one by `:dunavant` (see [Dun:1985:hde](@cite)) and for
+tetrahedra the default rule is by `:jinyun` (see [Jin:1984:sgq](@cite)). For quadrature on triangles above order 8
+are the default is a Gauss-Jacobi rule. Wedges and pyramids default to `:polyquad` (see [WitVin:2015:isq](@cite)).
 
 A `QuadratureRule` is used to approximate an integral on a domain by a weighted sum of
 function values at specific points:
@@ -57,13 +60,17 @@ function QuadratureRule{shape}(weights::Vector{T}, points::Vector{Vec{dim, T}}) 
     QuadratureRule{shape, T}(weights, points)
 end
 
+@inline _default_quadrature_rule(::RefHypercube) = :legendre
+@inline _default_quadrature_rule(::Union{RefPrism, RefPyramid}) = :polyquad
+@inline _default_quadrature_rule(::RefTriangle) = :dunavant
+@inline _default_quadrature_rule(::RefTetrahedron) = :jinyun
 
 # Fill in defaults (Float64, :legendre)
 function QuadratureRule{shape}(order::Int) where {shape <: AbstractRefShape}
     return QuadratureRule{shape, Float64}(order)
 end
 function QuadratureRule{shape, T}(order::Int) where {shape <: AbstractRefShape, T}
-    quad_type = (shape === RefPrism || shape === RefPyramid) ? (:polyquad) : (:legendre)
+    quad_type = _default_quadrature_rule(shape)
     return QuadratureRule{shape, T}(quad_type, order)
 end
 function QuadratureRule{shape}(quad_type::Symbol, order::Int) where {shape <: AbstractRefShape}
@@ -101,9 +108,11 @@ end
 for dim in 2:3
     @eval begin
         function QuadratureRule{RefSimplex{$dim}, T}(quad_type::Symbol, order::Int) where T
-            if $dim == 2 && quad_type === :legendre
+            if $dim == 2 && quad_type === :dunavant && order ≤ 8
                 data = _get_gauss_tridata(order)
-            elseif $dim == 3 && quad_type === :legendre
+            if $dim == 2 && quad_type === :gaussjacobi && order > 8
+                data = _get_gauss_tridata(order)
+            elseif $dim == 3 && quad_type === :jinyun
                 data = _get_gauss_tetdata(order)
             else
                 throw(ArgumentError("unsupported quadrature rule"))
