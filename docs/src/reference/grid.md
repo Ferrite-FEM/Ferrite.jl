@@ -41,11 +41,11 @@ Ferrite.getrefdim
 ### Topology
 
 ```@docs
-Ferrite.ExclusiveTopology
-Ferrite.getneighborhood
-Ferrite.faceskeleton
-Ferrite.vertex_star_stencils
-Ferrite.getstencil
+ExclusiveTopology
+getneighborhood
+facetskeleton
+vertex_star_stencils
+getstencil
 ```
 
 ### Grid Sets Utility

@@ -144,7 +144,7 @@ In order to use boundaries, e.g. for Dirichlet constraints in the ConstraintHand
 
 ## Topology
 
-Ferrite.jl's `Grid` type offers experimental features w.r.t. topology information. The functions [`Ferrite.getneighborhood`](@ref) and [`Ferrite.facetskeleton`](@ref)
-are the interface to obtain topological information. The [`Ferrite.getneighborhood`](@ref) can construct lists of directly connected entities based on a given entity
+Ferrite.jl's `Grid` type offers experimental features w.r.t. topology information. The functions [`getneighborhood`](@ref) and [`facetskeleton`](@ref)
+are the interface to obtain topological information. The [`getneighborhood`](@ref) can construct lists of directly connected entities based on a given entity
 (`CellIndex`, `FacetIndex`, `FaceIndex`, `EdgeIndex`, or `VertexIndex`).
-The [`Ferrite.facetskeleton`](@ref) function can be used to evaluate integrals over material interfaces or computing element interface values such as jumps.
+The [`facetskeleton`](@ref) function can be used to evaluate integrals over material interfaces or computing element interface values such as jumps.
