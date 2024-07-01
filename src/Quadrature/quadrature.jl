@@ -57,7 +57,7 @@ struct QuadratureRule{shape, WeightStorageType, PointStorageType}
     end
 end
 
-@inline _default_quadrature_rule(::Type{RefHypercube}) = :legendre
+@inline _default_quadrature_rule(::Type{<:RefHypercube}) = :legendre
 @inline _default_quadrature_rule(::Union{Type{RefPrism}, Type{RefPyramid}}) = :polyquad
 @inline _default_quadrature_rule(::Type{RefTriangle}) = :dunavant
 @inline _default_quadrature_rule(::Type{RefTetrahedron}) = :jinyun
