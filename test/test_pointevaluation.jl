@@ -127,7 +127,7 @@ function dofhandler()
 end
 
 function _pointeval_dofhandler2_manual_projection(dh, csv, cvv, f_s, f_v)
-    M = create_sparsity_pattern(dh)
+    M = allocate_matrix(dh)
     f = zeros(ndofs(dh))
     asm = start_assemble(M, f)
     me = zeros(ndofs_per_cell(dh), ndofs_per_cell(dh))
@@ -359,7 +359,7 @@ end
     x = Vec{2,Float64}.([(0.0, 0.0), (2.0, 0.5), (2.5, 2.5), (0.5, 2.0)])
     ξ₁ = Vec{2,Float64}((0.12, -0.34))
     ξ₂ = Vec{2,Float64}((0.56, -0.78))
-    qr = QuadratureRule{RefQuadrilateral,Float64}([2.0, 2.0], [ξ₁, ξ₂])
+    qr = QuadratureRule{RefQuadrilateral}([2.0, 2.0], [ξ₁, ξ₂])
 
     # PointScalarValues
     csv = CellValues(qr, ip_f)

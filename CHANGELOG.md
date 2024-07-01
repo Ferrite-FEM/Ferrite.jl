@@ -244,6 +244,22 @@ more discussion).
   ```
 
 
+- **Sparsity pattern and global matrix construction**: since there is now explicit support
+  for working with the sparsity pattern before instantiating a matrix the function
+  `create_sparsity_pattern` has been removed. To recover the old functionality that return a
+  sparse matrix from the DofHandler directly use `allocate_matrix` instead.
+
+  Examples:
+  ```diff
+  # Create sparse matrix from DofHandler
+  - K = create_sparsity_pattern(dh)
+  + K = allocate_matrix(dh)
+
+  # Create condensed sparse matrix from DofHandler + ConstraintHandler
+  - K = create_sparsity_pattern(dh, ch)
+  + K = allocate_matrix(dh, ch)
+  ```
+
 ### Added
 
 - `InterfaceValues` for computing jumps and averages over interfaces. ([#743][github-743])
@@ -292,12 +308,13 @@ more discussion).
   `FacetQuadratureRule{RefTriangle}(order)` (similar to how `QuadratureRule` is constructed).
   ([#716][github-716])
 
-- New methods `shape_value(::Interpolation, ξ::Vec, i::Int)` and
-  `shape_gradient(::Interpolation, ξ::Vec, i::Int)` for evaluating the value/gradient of the
-  `i`th shape function of an interpolation in local reference coordinate `ξ`. Note that
-  these methods return the value/gradient wrt. the reference coordinate `ξ`, whereas the
-  corresponding methods for `CellValues` etc return the value/gradient wrt the spatial
-  coordinate `x`. ([#721][github-721])
+- New functions `Ferrite.reference_shape_value(::Interpolation, ξ::Vec, i::Int)` and
+  `Ferrite.reference_shape_gradient(::Interpolation, ξ::Vec, i::Int)` for evaluating the
+  value/gradient of the `i`th shape function of an interpolation in local reference
+  coordinate `ξ`. These methods are public but not exported. (Note that these methods return
+  the value/gradient wrt. the reference coordinate `ξ`, whereas the corresponding methods
+  for `CellValues` etc return the value/gradient wrt the spatial coordinate `x`.)
+  ([#721][github-721])
 
 - `FacetIterator` and `FacetCache` have been added. These work similarly to `CellIterator` and
   `CellCache` but are used to iterate over (boundary) face sets instead. These simplify
@@ -317,6 +334,16 @@ more discussion).
   a given grid (based on its node coordinates), and returns the minimum and maximum vertices
   of the bounding box. ([#880][github-880])
 
+- Support for working with sparsity patterns has been added. This means that Ferrite exposes
+  the intermediate "state" between the DofHandler and the instantiated matrix as the new
+  struct `SparsityPattern`. This make it possible to insert custom equations or couplings in
+  the pattern before instantiating the matrix. The function `create_sparsity_pattern` have
+  been removed. The new function `allocate_matrix` is instead used to instantiate the
+  matrix. Refer to the documentation for more details. ([#888][github-888])
+
+  **To upgrade**: if you want to recover the old functionality and don't need to work with
+  the pattern, replace any usage of `create_sparsity_pattern` with `allocate_matrix`.
+
 - A new function, `geometric_interpolation`, is exported, which gives the geometric interpolation
   for each cell type. This is equivalent to the deprecated `Ferrite.default_interpolation` function.
   ([#953][github-953])
@@ -330,9 +357,9 @@ more discussion).
 
 ### Changed
 
-- `create_sparsity_pattern` now supports cross-element dof coupling by passing kwarg
-  `topology` along with an optional `cross_coupling` matrix that behaves similar to
-  the `coupling` kwarg. ([#710][github-#710])
+- It is now possible to create sparsity patterns with interface couplings, see the new
+  function `add_interface_entries!` and the rework of sparsity pattern construction.
+  ([#710][github-#710])
 
 - The `AbstractCell` interface has been reworked. This change should not affect user code,
   but may in some cases be relevant for code parsing external mesh files. In particular, the
@@ -1003,6 +1030,7 @@ poking into Ferrite internals:
 [github-835]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/835
 [github-855]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/855
 [github-880]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/880
+[github-888]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/888
 [github-914]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/914
 [github-924]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/924
 [github-938]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/938

@@ -26,6 +26,7 @@
         if update_gradients && !update_hessians # Check correct and type-stable default constructor
             cv_default = @inferred CellValues(quad_rule, func_interpol, geom_interpol)
             @test typeof(cv) === typeof(cv_default)
+            @inferred CellValues(quad_rule, func_interpol, geom_interpol; update_gradients=Val(false), update_detJdV=Val(false))
         end
         rdim = Ferrite.getrefdim(func_interpol)
         n_basefuncs = getnbasefunctions(func_interpol)
@@ -87,13 +88,13 @@
             if func_interpol isa Ferrite.ScalarInterpolation
                 @test function_gradient(cv, i, ue_vec) ≈ G_vector
             else# func_interpol isa Ferrite.VectorInterpolation
-                @test (@test_deprecated function_gradient(cv, i, ue_vec)) ≈ G_vector
-                @test (@test_deprecated function_symmetric_gradient(cv, i, ue_vec)) ≈ 0.5(G_vector + G_vector')
-                @test (@test_deprecated function_divergence(cv, i, ue_vec)) ≈ tr(G_vector)
+                @test_throws Ferrite.DeprecationError function_gradient(cv, i, ue_vec)
+                @test_throws Ferrite.DeprecationError function_symmetric_gradient(cv, i, ue_vec)
+                @test_throws Ferrite.DeprecationError function_divergence(cv, i, ue_vec)
                 if rdim == 3
-                    @test (@test_deprecated function_curl(cv, i, ue_vec)) ≈ Ferrite.curl_from_gradient(G_vector)
+                    @test_throws Ferrite.DeprecationError function_curl(cv, i, ue_vec)
                 end
-                @test_deprecated function_value(cv, i, ue_vec) #no value to test against
+                @test_throws Ferrite.DeprecationError function_value(cv, i, ue_vec) #no value to test against
             end
         end
 
