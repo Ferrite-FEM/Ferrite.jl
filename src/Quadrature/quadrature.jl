@@ -165,13 +165,14 @@ end
 ######################
 
 """
-    FacetQuadratureRule{shape}([::Type{T}, [quad_rule_type::Symbol|quad_rule_type::Tuple{Symbol},] order::Int)
+    FacetQuadratureRule{shape}([::Type{T}, [quad_rule_type::Symbol|quad_rule_type::NTuple{Symbol},] order::Int)
     FacetQuadratureRule{shape}(face_rules::NTuple{<:Any, <:QuadratureRule{shape}})
     FacetQuadratureRule{shape}(face_rules::AbstractVector{<:QuadratureRule{shape}})
 
 Create a `FacetQuadratureRule` used for integration of the faces of the refshape `shape` (of
 type [`AbstractRefShape`](@ref)). `order` is the order of the quadrature rule.
-It defaults to the default rules for the individual face reference elements.
+It defaults to the default rules for the individual face reference elements. Elements with mixed facet types
+requires passing a tuple of symbols for the rule, one for each facet type.
 
 `FacetQuadratureRule` is used as one of the components to create [`FacetValues`](@ref).
 """
