@@ -227,16 +227,16 @@ function FacetQuadratureRule{RefTetrahedron}(::Type{T}, quad_type::Symbol, order
 end
 FacetQuadratureRule{RefPrism}(::Type{T}, order::Int) where T = FacetQuadratureRule{RefPrism}(T,(_default_quadrature_rule(RefTriangle), _default_quadrature_rule(RefQuadrilateral)),order)
 function FacetQuadratureRule{RefPrism}(::Type{T}, quad_types::Tuple{Symbol,Symbol}, order::Int) where T
-    qr_quad = QuadratureRule{RefQuadrilateral}(T, quad_type[2], order)
-    qr_tri = QuadratureRule{RefTriangle}(T, quad_type[1], order)
+    qr_quad = QuadratureRule{RefQuadrilateral}(T, quad_types[2], order)
+    qr_tri = QuadratureRule{RefTriangle}(T, quad_types[1], order)
     # Interval scaled and shifted in facet_to_element_transformation for quadrilateral faces from (-1,1)² to (0,1)² -> quarter the area -> quarter the quadrature weights
     return create_facet_quad_rule(RefPrism, [2,3,4], qr_quad.weights/4, qr_quad.points,
         [1,5], qr_tri.weights, qr_tri.points)
 end
 FacetQuadratureRule{RefPyramid}(::Type{T}, order::Int) where T = FacetQuadratureRule{RefPyramid}(T,(_default_quadrature_rule(RefTriangle), _default_quadrature_rule(RefQuadrilateral)),order)
-function FacetQuadratureRule{RefPyramid}(::Type{T}, quad_type::Tuple{Symbol,Symbol}, order::Int) where T
-    qr_quad = QuadratureRule{RefQuadrilateral}(T, quad_type[2], order)
-    qr_tri = QuadratureRule{RefTriangle}(T, quad_type[1], order)
+function FacetQuadratureRule{RefPyramid}(::Type{T}, quad_types::Tuple{Symbol,Symbol}, order::Int) where T
+    qr_quad = QuadratureRule{RefQuadrilateral}(T, quad_types[2], order)
+    qr_tri = QuadratureRule{RefTriangle}(T, quad_types[1], order)
     # Interval scaled and shifted in facet_to_element_transformation for quadrilateral faces from (-1,1)² to (0,1)² -> quarter the area -> quarter the quadrature weights
     return create_facet_quad_rule(RefPyramid, [1], qr_quad.weights/4, qr_quad.points,
         [2,3,4,5], qr_tri.weights, qr_tri.points)
