@@ -352,11 +352,11 @@ end
     @test topology.edge_edge_neighbor[4,4] == [EdgeIndex(3,2)]
     @test topology.edge_edge_neighbor[5,1] == [EdgeIndex(3,3)]
     @test topology.edge_edge_neighbor[5,2] == [EdgeIndex(6,4)]
-    @test topology.edge_edge_neighbor[5,3] == Ferrite.BoundaryIndex[]
-    @test topology.edge_edge_neighbor[5,4] == Ferrite.BoundaryIndex[]
+    @test isempty(topology.edge_edge_neighbor[5,3])
+    @test isempty(topology.edge_edge_neighbor[5,4])
     @test topology.edge_edge_neighbor[6,1] == [EdgeIndex(4,3)]
-    @test topology.edge_edge_neighbor[6,2] == Ferrite.BoundaryIndex[]
-    @test topology.edge_edge_neighbor[6,3] == Ferrite.BoundaryIndex[]
+    @test isempty(topology.edge_edge_neighbor[6,2])
+    @test isempty(topology.edge_edge_neighbor[6,3])
     @test topology.edge_edge_neighbor[6,4] == [EdgeIndex(5,2)]
     @test getneighborhood(topology, quadgrid, EdgeIndex(6, 4), false) == [EdgeIndex(5,2)]
     @test Set(getneighborhood(topology, quadgrid, EdgeIndex(6, 4), true)) == Set([EdgeIndex(6, 4), EdgeIndex(5,2)])
