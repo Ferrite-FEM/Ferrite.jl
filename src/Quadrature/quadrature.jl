@@ -120,7 +120,7 @@ for dim in 2:3
             for p in 1:size(data, 1)
                 points[p] = Vec{$dim,T}(@ntuple $dim i -> data[p, i])
             end
-            weights = data[:, $dim + 1]
+            weights = T.(data[:, $dim + 1])
             QuadratureRule{RefSimplex{$dim}}(weights, points)
         end
     end
@@ -139,7 +139,7 @@ function QuadratureRule{RefPrism}(::Type{T}, quad_type::Symbol, order::Int) wher
     for p in 1:size(data, 1)
         points[p] = Vec{3,T}(@ntuple 3 i -> data[p, i])
     end
-    weights = data[:, 4]
+    weights = T.(data[:, 4])
     QuadratureRule{RefPrism}(weights, points)
 end
 
@@ -156,7 +156,7 @@ function QuadratureRule{RefPyramid}(::Type{T}, quad_type::Symbol, order::Int) wh
     for p in 1:size(data, 1)
         points[p] = Vec{3,T}(@ntuple 3 i -> data[p, i])
     end
-    weights = data[:, 4]
+    weights = T.(data[:, 4])
     QuadratureRule{RefPyramid}(weights, points)
 end
 
