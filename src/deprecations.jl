@@ -30,7 +30,7 @@ end
 
 for (a, b) in [(:vertices, :vertexdof_indices), (:faces, :facedof_indices), (:edges, :edgedof_indices)]
     @eval function $(a)(::Interpolation)
-        throw(DeprecationError("$(a)(ip::Interpolation)" => "`$(b)(ip)"))
+        throw(DeprecationError("$($(a))(ip::Interpolation)" => "`$($(b))(ip)"))
     end
 end
 
