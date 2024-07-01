@@ -211,13 +211,11 @@ function shape_value_average end
 """
     shape_value_jump(iv::InterfaceValues, qp::Int, i::Int)
 
-Compute the jump of the value of shape function `i` at quadrature point `qp` across the
-interface.
+Compute the jump of the value of shape function `i` at quadrature point `qp` across the interface in the default normal direction.
 
-This function uses the definition ``\\llbracket \\vec{v} \\rrbracket=\\vec{v}^\\text{here} -\\vec{v}^\\text{there}``. to obtain the form
-``\\llbracket \\vec{v} \\rrbracket=\\vec{v}^\\text{there} ⋅ \\vec{n}^\\text{there} + \\vec{v}^\\text{here} ⋅ \\vec{n}^\\text{here}``
-multiply by the outward facing normal to the first element's side of the interface (which is the default normal for [`getnormal`](@ref) with [`InterfaceValues`](@ref)).
-
+This function uses the definition ``\\llbracket \\vec{v} \\rrbracket=\\vec{v}^\\text{there} -\\vec{v}^\\text{here}``. To obtain the form,
+``\\llbracket \\vec{v} \\rrbracket=\\vec{v}^\\text{there} \\cdot \\vec{n}^\\text{there} + \\vec{v}^\\text{here} \\cdot \\vec{n}^\\text{here}``,
+multiply by minus the outward facing normal to the first element's side of the interface (which is the default normal for [`getnormal`](@ref) with [`InterfaceValues`](@ref)).
 """
 function shape_value_jump end
 
@@ -232,12 +230,11 @@ function shape_gradient_average end
 """
     shape_gradient_jump(iv::InterfaceValues, qp::Int, i::Int)
 
-Compute the jump of the gradient of shape function `i` at quadrature point `qp` across the
-interface.
+Compute the jump of the gradient of shape function `i` at quadrature point `qp` across the interface in the default normal direction.
 
-This function uses the definition ``\\llbracket \\vec{v} \\rrbracket=\\vec{v}^\\text{here} -\\vec{v}^\\text{there}``. to obtain the form
-``\\llbracket \\vec{v} \\rrbracket=\\vec{v}^\\text{there} ⋅ \\vec{n}^\\text{there} + \\vec{v}^\\text{here} ⋅ \\vec{n}^\\text{here}``
-multiply by the outward facing normal to the first element's side of the interface (which is the default normal for [`getnormal`](@ref) with [`InterfaceValues`](@ref)).
+This function uses the definition ``\\llbracket \\vec{v} \\rrbracket=\\vec{v}^\\text{there} -\\vec{v}^\\text{here}``. To obtain the form,
+``\\llbracket \\vec{v} \\rrbracket=\\vec{v}^\\text{there} ⋅ \\vec{n}^\\text{there} + \\vec{v}^\\text{here} ⋅ \\vec{n}^\\text{here}``,
+multiply by minus the outward facing normal to the first element's side of the interface (which is the default normal for [`getnormal`](@ref) with [`InterfaceValues`](@ref)).
 """
 function shape_gradient_jump end
 
@@ -275,7 +272,7 @@ for (func,                      f_,               is_avg) in (
         function $(func)(iv::InterfaceValues, qp::Int, i::Int)
             f_here = $(f_)(iv, qp, i; here = true)
             f_there = $(f_)(iv, qp, i; here = false)
-            return $(is_avg ? :((f_here + f_there) / 2) : :(f_here - f_there))
+            return $(is_avg ? :((f_here + f_there) / 2) : :(f_there - f_here))
         end
     end
 end
@@ -292,11 +289,11 @@ function function_value_average end
     function_value_jump(iv::InterfaceValues, q_point::Int, u)
     function_value_jump(iv::InterfaceValues, q_point::Int, u, dof_range_here, dof_range_there)
 
-Compute the jump of the function value at the quadrature point over the interface.
+Compute the jump of the function value at the quadrature point over the interface along the default normal direction.
 
-This function uses the definition ``\\llbracket \\vec{v} \\rrbracket=\\vec{v}^\\text{here} -\\vec{v}^\\text{there}``. to obtain the form
-``\\llbracket \\vec{v} \\rrbracket=\\vec{v}^\\text{there} ⋅ \\vec{n}^\\text{there} + \\vec{v}^\\text{here} ⋅ \\vec{n}^\\text{here}``
-multiply by the outward facing normal to the first element's side of the interface (which is the default normal for [`getnormal`](@ref) with [`InterfaceValues`](@ref)).
+This function uses the definition ``\\llbracket \\vec{v} \\rrbracket=\\vec{v}^\\text{there} -\\vec{v}^\\text{here}``. To obtain the form,
+``\\llbracket \\vec{v} \\rrbracket=\\vec{v}^\\text{there} ⋅ \\vec{n}^\\text{there} + \\vec{v}^\\text{here} ⋅ \\vec{n}^\\text{here}``,
+multiply by minus the outward facing normal to the first element's side of the interface (which is the default normal for [`getnormal`](@ref) with [`InterfaceValues`](@ref)).
 """
 function function_value_jump end
 
@@ -312,11 +309,11 @@ function function_gradient_average end
     function_gradient_jump(iv::InterfaceValues, q_point::Int, u)
     function_gradient_jump(iv::InterfaceValues, q_point::Int, u, dof_range_here, dof_range_there)
 
-Compute the jump of the function gradient at the quadrature point over the interface.
+Compute the jump of the function gradient at the quadrature point over the interface along the default normal direction.
 
-This function uses the definition ``\\llbracket \\vec{v} \\rrbracket=\\vec{v}^\\text{here} -\\vec{v}^\\text{there}``. to obtain the form
-``\\llbracket \\vec{v} \\rrbracket=\\vec{v}^\\text{there} ⋅ \\vec{n}^\\text{there} + \\vec{v}^\\text{here} ⋅ \\vec{n}^\\text{here}``
-multiply by the outward facing normal to the first element's side of the interface (which is the default normal for [`getnormal`](@ref) with [`InterfaceValues`](@ref)).
+This function uses the definition ``\\llbracket \\vec{v} \\rrbracket=\\vec{v}^\\text{there} -\\vec{v}^\\text{here}``. To obtain the form,
+``\\llbracket \\vec{v} \\rrbracket=\\vec{v}^\\text{there} ⋅ \\vec{n}^\\text{there} + \\vec{v}^\\text{here} ⋅ \\vec{n}^\\text{here}``,
+multiply by minus the outward facing normal to the first element's side of the interface (which is the default normal for [`getnormal`](@ref) with [`InterfaceValues`](@ref)).
 """
 function function_gradient_jump end
 
@@ -368,7 +365,7 @@ for (func,                          f_,                     is_avg) in (
             dof_range_there = (1:getnbasefunctions(iv.there)) .+ getnbasefunctions(iv.here)
             f_here = $(f_)(iv.here, qp, @view(u[dof_range_here]))
             f_there = $(f_)(iv.there, qp, @view(u[dof_range_there]))
-            return $(is_avg ? :((f_here + f_there) / 2) : :(f_here - f_there))
+            return $(is_avg ? :((f_here + f_there) / 2) : :(f_there - f_here))
         end
         function $(func)(
                 iv::InterfaceValues, qp::Int,
@@ -377,7 +374,7 @@ for (func,                          f_,                     is_avg) in (
             )
             f_here = $(f_)(iv.here, qp, u, dof_range_here)
             f_there = $(f_)(iv.there, qp, u, dof_range_there)
-            return $(is_avg ? :((f_here + f_there) / 2) : :(f_here - f_there))
+            return $(is_avg ? :((f_here + f_there) / 2) : :(f_there - f_here))
         end
     end
 end

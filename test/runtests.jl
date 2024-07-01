@@ -7,6 +7,7 @@ import SHA
 using Random
 using LinearAlgebra
 using SparseArrays
+using StaticArrays
 using OrderedCollections
 
 const HAS_EXTENSIONS = isdefined(Base, :get_extension)

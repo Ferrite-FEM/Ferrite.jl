@@ -347,20 +347,20 @@ end
 _copy_or_nothing(x) = copy(x)
 _copy_or_nothing(::Nothing) = nothing
 
-function shape_values!(values::AbstractMatrix, ip, qr_points::Vector{<:Vec})
+function reference_shape_values!(values::AbstractMatrix, ip, qr_points::Vector{<:Vec})
     for (qp, ξ) in pairs(qr_points)
-        shape_values!(@view(values[:, qp]), ip, ξ)
+        reference_shape_values!(@view(values[:, qp]), ip, ξ)
     end
 end
 
-function shape_gradients_and_values!(gradients::AbstractMatrix, values::AbstractMatrix, ip, qr_points::Vector{<:Vec})
+function reference_shape_gradients_and_values!(gradients::AbstractMatrix, values::AbstractMatrix, ip, qr_points::Vector{<:Vec})
     for (qp, ξ) in pairs(qr_points)
-        shape_gradients_and_values!(@view(gradients[:, qp]), @view(values[:, qp]), ip, ξ)
+        reference_shape_gradients_and_values!(@view(gradients[:, qp]), @view(values[:, qp]), ip, ξ)
     end
 end
 
-function shape_hessians_gradients_and_values!(hessians::AbstractMatrix, gradients::AbstractMatrix, values::AbstractMatrix, ip, qr_points::Vector{<:Vec})
+function reference_shape_hessians_gradients_and_values!(hessians::AbstractMatrix, gradients::AbstractMatrix, values::AbstractMatrix, ip, qr_points::Vector{<:Vec})
     for (qp, ξ) in pairs(qr_points)
-        shape_hessians_gradients_and_values!(@view(hessians[:, qp]), @view(gradients[:, qp]), @view(values[:, qp]), ip, ξ)
+        reference_shape_hessians_gradients_and_values!(@view(hessians[:, qp]), @view(gradients[:, qp]), @view(values[:, qp]), ip, ξ)
     end
 end

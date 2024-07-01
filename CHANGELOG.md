@@ -308,12 +308,13 @@ more discussion).
   `FacetQuadratureRule{RefTriangle}(order)` (similar to how `QuadratureRule` is constructed).
   ([#716][github-716])
 
-- New methods `shape_value(::Interpolation, ξ::Vec, i::Int)` and
-  `shape_gradient(::Interpolation, ξ::Vec, i::Int)` for evaluating the value/gradient of the
-  `i`th shape function of an interpolation in local reference coordinate `ξ`. Note that
-  these methods return the value/gradient wrt. the reference coordinate `ξ`, whereas the
-  corresponding methods for `CellValues` etc return the value/gradient wrt the spatial
-  coordinate `x`. ([#721][github-721])
+- New functions `Ferrite.reference_shape_value(::Interpolation, ξ::Vec, i::Int)` and
+  `Ferrite.reference_shape_gradient(::Interpolation, ξ::Vec, i::Int)` for evaluating the
+  value/gradient of the `i`th shape function of an interpolation in local reference
+  coordinate `ξ`. These methods are public but not exported. (Note that these methods return
+  the value/gradient wrt. the reference coordinate `ξ`, whereas the corresponding methods
+  for `CellValues` etc return the value/gradient wrt the spatial coordinate `x`.)
+  ([#721][github-721])
 
 - `FacetIterator` and `FacetCache` have been added. These work similarly to `CellIterator` and
   `CellCache` but are used to iterate over (boundary) face sets instead. These simplify

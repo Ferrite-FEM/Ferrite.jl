@@ -87,13 +87,13 @@ for (scalar_interpol, quad_rule) in (
                 if func_interpol isa Ferrite.ScalarInterpolation
                     @test function_gradient(fv, i, ue_vec) ≈ G_vector
                 else# func_interpol isa Ferrite.VectorInterpolation
-                    @test (@test_deprecated function_gradient(fv, i, ue_vec)) ≈ G_vector
-                    @test (@test_deprecated function_symmetric_gradient(fv, i, ue_vec)) ≈ 0.5(G_vector + G_vector')
-                    @test (@test_deprecated function_divergence(fv, i, ue_vec)) ≈ tr(G_vector)
+                    @test_throws Ferrite.DeprecationError function_gradient(fv, i, ue_vec)
+                    @test_throws Ferrite.DeprecationError function_symmetric_gradient(fv, i, ue_vec)
+                    @test_throws Ferrite.DeprecationError function_divergence(fv, i, ue_vec)
                     if rdim == 3
-                        @test (@test_deprecated function_curl(fv, i, ue_vec)) ≈ Ferrite.curl_from_gradient(G_vector)
+                        @test_throws Ferrite.DeprecationError function_curl(fv, i, ue_vec)
                     end
-                    @test_deprecated function_value(fv, i, ue_vec) #no value to test against
+                    @test_throws Ferrite.DeprecationError function_value(fv, i, ue_vec) #no value to test against
                 end
             end
 
@@ -163,18 +163,15 @@ for (scalar_interpol, quad_rule) in (
                     end
                 end
             end
-            # Test that qr, detJdV, normals, and current_facet are copied as expected.
+            # Test that fqr, detJdV, and normals, are copied as expected.
             # Note that qr remain aliased, as defined by `copy(qr)=qr`, see quadrature.jl.
-            # Make it easy to test scalar wrapper equality
-            _mock_isequal(a, b) = a == b
-            _mock_isequal(a::T, b::T) where {T<:Ferrite.ScalarWrapper} = a[] == b[]
-            for fname in (:fqr, :detJdV, :normals, :current_facet)
+            for fname in (:fqr, :detJdV, :normals)
                 v = getfield(fv, fname)
                 vc = getfield(fvc, fname)
                 if fname !== :fqr # Test unaliased
                     @test v !== vc
                 end
-                @test _mock_isequal(v, vc)
+                @test v == vc
             end
         end
     end
@@ -187,9 +184,9 @@ end
     @test startswith(showstring, "FacetValues(scalar, rdim=2, sdim=2): 2 quadrature points per face")
     @test contains(showstring, "Function interpolation: Lagrange{RefQuadrilateral, 2}()")
     @test contains(showstring, "Geometric interpolation: Lagrange{RefQuadrilateral, 1}()^2")
-    fv.fqr.face_rules[1] = deepcopy(fv.fqr.face_rules[1])
-    push!(Ferrite.getweights(fv.fqr.face_rules[1]), 1)
-    showstring = sprint(show, MIME"text/plain"(), fv)
+    fv2 = copy(fv)
+    push!(Ferrite.getweights(fv2.fqr.face_rules[1]), 1)
+    showstring = sprint(show, MIME"text/plain"(), fv2)
     @test startswith(showstring, "FacetValues(scalar, rdim=2, sdim=2): (3, 2, 2, 2) quadrature points on each face")
 end
 
