@@ -35,8 +35,14 @@ using Ferrite: reference_shape_value
     # Tetrahedron
     g = (x) -> sqrt(sum(x))
     dim = 2
-    for order in 1:15
-        qr = QuadratureRule{RefTriangle}(:legendre, order)
+    for order in 1:8
+        qr = QuadratureRule{RefTriangle}(:dunavant, order)
+        # http://www.wolframalpha.com/input/?i=integrate+sqrt(x%2By)+from+x+%3D+0+to+1,+y+%3D+0+to+1-x
+        @test integrate(qr, g) - 0.4 < 0.01
+        @test sum(qr.weights) ≈ ref_tet_vol(dim)
+    end
+    for order in 9:15
+        qr = QuadratureRule{RefTriangle}(:gaussjacobi, order)
         # http://www.wolframalpha.com/input/?i=integrate+sqrt(x%2By)+from+x+%3D+0+to+1,+y+%3D+0+to+1-x
         @test integrate(qr, g) - 0.4 < 0.01
         @test sum(qr.weights) ≈ ref_tet_vol(dim)
@@ -46,7 +52,7 @@ using Ferrite: reference_shape_value
 
     dim = 3
     for order in (1, 2, 3, 4)
-        qr = QuadratureRule{RefTetrahedron}(:legendre, order)
+        qr = QuadratureRule{RefTetrahedron}(:jinyun, order)
         # Table 1:
         # http://www.m-hikari.com/ijma/ijma-2011/ijma-1-4-2011/venkateshIJMA1-4-2011.pdf
         @test integrate(qr, g) - 0.14 < 0.01
