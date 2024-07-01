@@ -12,16 +12,16 @@ Access some grid representation for the dof handler.
 """
 get_grid(dh::AbstractDofHandler)
 
-struct SubDofHandler{DH} <: AbstractDofHandler
+mutable struct SubDofHandler{DH} <: AbstractDofHandler
     # From constructor
-    dh::DH
-    cellset::OrderedSet{Int}
+    const dh::DH
+    const cellset::OrderedSet{Int}
     # Populated in add!
-    field_names::Vector{Symbol}
-    field_interpolations::Vector{Interpolation}
-    field_n_components::Vector{Int} # Redundant with interpolations, remove?
+    const field_names::Vector{Symbol}
+    const field_interpolations::Vector{Interpolation}
+    const field_n_components::Vector{Int} # Redundant with interpolations, remove?
     # Computed in close!
-    ndofs_per_cell::ScalarWrapper{Int}
+    ndofs_per_cell::Int
     # const dof_ranges::Vector{UnitRange{Int}} # TODO: Why not?
 end
 
@@ -68,7 +68,7 @@ function SubDofHandler(dh::DH, cellset::AbstractVecOrSet{Int}) where {DH <: Abst
         end
     end
     # Construct and insert into the parent dh
-    sdh = SubDofHandler{typeof(dh)}(dh, convert_to_orderedset(cellset), Symbol[], Interpolation[], Int[], ScalarWrapper(-1))
+    sdh = SubDofHandler{typeof(dh)}(dh, convert_to_orderedset(cellset), Symbol[], Interpolation[], Int[], -1)
     push!(dh.subdofhandlers, sdh)
     return sdh
 end
@@ -93,17 +93,17 @@ function _print_field_information(io::IO, mime::MIME"text/plain", sdh::SubDofHan
     end
 end
 
-struct DofHandler{dim,G<:AbstractGrid{dim}} <: AbstractDofHandler
-    subdofhandlers::Vector{SubDofHandler{DofHandler{dim, G}}}
-    field_names::Vector{Symbol}
+mutable struct DofHandler{dim,G<:AbstractGrid{dim}} <: AbstractDofHandler
+    const subdofhandlers::Vector{SubDofHandler{DofHandler{dim, G}}}
+    const field_names::Vector{Symbol}
     # Dofs for cell i are stored in cell_dofs at the range:
     #     cell_dofs_offset[i]:(cell_dofs_offset[i]+ndofs_per_cell(dh, i)-1)
-    cell_dofs::Vector{Int}
-    cell_dofs_offset::Vector{Int}
-    cell_to_subdofhandler::Vector{Int} # maps cell id -> SubDofHandler id
-    closed::ScalarWrapper{Bool}
-    grid::G
-    ndofs::ScalarWrapper{Int}
+    const cell_dofs::Vector{Int}
+    const cell_dofs_offset::Vector{Int}
+    const cell_to_subdofhandler::Vector{Int} # maps cell id -> SubDofHandler id
+    closed::Bool
+    const grid::G
+    ndofs::Int
 end
 
 """
@@ -131,7 +131,7 @@ close!(dh)
 function DofHandler(grid::G) where {dim, G <: AbstractGrid{dim}}
     ncells = getncells(grid)
     sdhs = SubDofHandler{DofHandler{dim, G}}[]
-    DofHandler{dim, G}(sdhs, Symbol[], Int[], zeros(Int, ncells), zeros(Int, ncells), ScalarWrapper(false), grid, ScalarWrapper(-1))
+    DofHandler{dim, G}(sdhs, Symbol[], Int[], zeros(Int, ncells), zeros(Int, ncells), false, grid, -1)
 end
 
 function Base.show(io::IO, mime::MIME"text/plain", dh::DofHandler)
@@ -158,7 +158,7 @@ function Base.show(io::IO, mime::MIME"text/plain", dh::DofHandler)
     end
 end
 
-isclosed(dh::AbstractDofHandler) = dh.closed[]
+isclosed(dh::AbstractDofHandler) = dh.closed
 get_grid(dh::DofHandler) = dh.grid
 
 """
@@ -166,7 +166,7 @@ get_grid(dh::DofHandler) = dh.grid
 
 Return the number of degrees of freedom in `dh`
 """
-ndofs(dh::AbstractDofHandler) = dh.ndofs[]
+ndofs(dh::AbstractDofHandler) = dh.ndofs
 
 """
     ndofs_per_cell(dh::AbstractDofHandler[, cell::Int=1])
@@ -187,8 +187,8 @@ function ndofs_per_cell(dh::DofHandler, cell::Int)
     sdhidx ∉ 1:length(dh.subdofhandlers) && return 0 # Dof handler is just defined on a subdomain
     return ndofs_per_cell(dh.subdofhandlers[sdhidx])
 end
-ndofs_per_cell(sdh::SubDofHandler) = sdh.ndofs_per_cell[]
-ndofs_per_cell(sdh::SubDofHandler, ::Int) = sdh.ndofs_per_cell[] # for compatibility with DofHandler
+ndofs_per_cell(sdh::SubDofHandler) = sdh.ndofs_per_cell
+ndofs_per_cell(sdh::SubDofHandler, ::Int) = sdh.ndofs_per_cell # for compatibility with DofHandler
 
 """
     celldofs!(global_dofs::Vector{Int}, dh::AbstractDofHandler, i::Int)
@@ -388,8 +388,8 @@ function __close!(dh::DofHandler{dim}) where {dim}
             facedicts,
         )
     end
-    dh.ndofs[] = maximum(dh.cell_dofs; init=0)
-    dh.closed[] = true
+    dh.ndofs = maximum(dh.cell_dofs; init=0)
+    dh.closed = true
 
     return dh, vertexdicts, edgedicts, facedicts
 
@@ -473,7 +473,7 @@ function _close_subdofhandler!(dh::DofHandler{sdim}, sdh::SubDofHandler, sdh_ind
 
         if first_cell
             ndofs_per_cell = length(dh.cell_dofs) - len_cell_dofs_start
-            sdh.ndofs_per_cell[] = ndofs_per_cell
+            sdh.ndofs_per_cell = ndofs_per_cell
             first_cell = false
         else
             @assert ndofs_per_cell == length(dh.cell_dofs) - len_cell_dofs_start

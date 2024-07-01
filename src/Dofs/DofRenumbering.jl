@@ -108,7 +108,7 @@ function _renumber!(ch::ConstraintHandler, perm::AbstractVector{<:Integer})
         pdofs[i] = perm[pdofs[i]]
     end
     empty!(ch.dofmapping)
-    ch.closed[] = false
+    ch.closed = false
     close!(ch)
     return ch
 end

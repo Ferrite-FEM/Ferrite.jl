@@ -234,7 +234,6 @@
     @test typeof(iv) == typeof(ivc)
     for fname in fieldnames(typeof(iv))
         v = getfield(iv, fname)
-        v isa Ferrite.ScalarWrapper && continue
         vc = getfield(ivc, fname)
         if hasmethod(pointer, Tuple{typeof(v)})
             @test pointer(v) != pointer(vc)
@@ -242,7 +241,6 @@
         v isa FacetValues && continue
         for fname in fieldnames(typeof(vc))
             v2 = getfield(v, fname)
-            v2 isa Ferrite.ScalarWrapper && continue
             vc2 = getfield(vc, fname)
             if hasmethod(pointer, Tuple{typeof(v2)})
                 @test pointer(v2) != pointer(vc2)

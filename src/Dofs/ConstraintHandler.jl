@@ -81,21 +81,21 @@ end
 A collection of constraints associated with the dof handler `dh`.
 `T` is the numeric type for stored values.
 """
-struct ConstraintHandler{DH<:AbstractDofHandler,T}
-    dbcs::Vector{Dirichlet}
-    prescribed_dofs::Vector{Int}
-    free_dofs::Vector{Int}
-    inhomogeneities::Vector{T}
+mutable struct ConstraintHandler{DH<:AbstractDofHandler,T}
+    const dbcs::Vector{Dirichlet}
+    const prescribed_dofs::Vector{Int}
+    const free_dofs::Vector{Int}
+    const inhomogeneities::Vector{T}
     # Store the original constant inhomogeneities for affine constraints used to compute
     # "effective" inhomogeneities in `update!` and then stored in .inhomogeneities.
-    affine_inhomogeneities::Vector{Union{Nothing,T}}
+    const affine_inhomogeneities::Vector{Union{Nothing,T}}
     # `nothing` for pure DBC constraint, otherwise affine constraint
-    dofcoefficients::Vector{Union{Nothing, DofCoefficients{T}}}
+    const dofcoefficients::Vector{Union{Nothing, DofCoefficients{T}}}
     # global dof -> index into dofs and inhomogeneities and dofcoefficients
-    dofmapping::Dict{Int,Int}
-    bcvalues::Vector{BCValues{T}}
-    dh::DH
-    closed::ScalarWrapper{Bool}
+    const dofmapping::Dict{Int,Int}
+    const bcvalues::Vector{BCValues{T}}
+    const dh::DH
+    closed::Bool
 end
 
 ConstraintHandler(dh::AbstractDofHandler) = ConstraintHandler(Float64, dh)
@@ -104,7 +104,7 @@ function ConstraintHandler(::Type{T}, dh::AbstractDofHandler) where T <: Number
     @assert isclosed(dh)
     ConstraintHandler(
         Dirichlet[], Int[], Int[], T[], Union{Nothing,T}[], Union{Nothing,DofCoefficients{T}}[],
-        Dict{Int,Int}(), BCValues{T}[], dh, ScalarWrapper(false),
+        Dict{Int,Int}(), BCValues{T}[], dh, false,
     )
 end
 
@@ -180,7 +180,7 @@ function Base.show(io::IO, ::MIME"text/plain", ch::ConstraintHandler)
     end
 end
 
-isclosed(ch::ConstraintHandler) = ch.closed[]
+isclosed(ch::ConstraintHandler) = ch.closed
 free_dofs(ch::ConstraintHandler) = ch.free_dofs
 prescribed_dofs(ch::ConstraintHandler) = ch.prescribed_dofs
 
@@ -250,7 +250,7 @@ function close!(ch::ConstraintHandler)
         end
     end
 
-    ch.closed[] = true
+    ch.closed = true
 
     # Compute the prescribed values by calling update!: This should be cheap, and for the
     # common case where constraints does not depend on time it is annoying and easy to
@@ -401,7 +401,7 @@ compute the inhomogeneities.
 Note that this is called implicitly in `close!(::ConstraintHandler)`.
 """
 function update!(ch::ConstraintHandler, time::Real=0.0)
-    @assert ch.closed[]
+    @assert ch.closed
     for (i, dbc) in pairs(ch.dbcs)
         # If the BC function only accept one argument, i.e. f(x), we create a wrapper
         # g(x, t) = f(x) that discards the second parameter so that _update! can always call
@@ -443,7 +443,7 @@ function _update!(inhomogeneities::Vector{T}, f::Function, boundary_entities::Ab
         reinit!(cc, cellidx)
 
         # no need to reinit!, enough to update current_entity since we only need geometric shape functions M
-        boundaryvalues.current_entity[] = entityidx
+        boundaryvalues.current_entity = entityidx
 
         # local dof-range for this facet
         r = local_facet_dofs_offset[entityidx]:(local_facet_dofs_offset[entityidx+1]-1)
@@ -1214,22 +1214,6 @@ function mirror_local_dofs(local_facet_dofs, local_facet_dofs_offset, ip::Lagran
     end
     return ret
 end
-
-if VERSION < v"1.8.0"
-    function circshift!(x::AbstractVector, shift::Integer)
-        return circshift!(x, copy(x), shift)
-    end
-else
-    # See JuliaLang/julia#46759
-    const CIRCSHIFT_WRONG_DIRECTION = Base.circshift!([1, 2, 3], 1) != Base.circshift([1, 2, 3], 1)
-    function circshift!(x::AbstractVector, shift::Integer)
-        shift = CIRCSHIFT_WRONG_DIRECTION ? -shift : shift
-        return Base.circshift!(x, shift)
-    end
-end
-
-circshift!(args...) = Base.circshift!(args...)
-
 
 function rotate_local_dofs(local_facet_dofs, local_facet_dofs_offset, ip::Lagrange{<:Union{RefQuadrilateral,RefTriangle}}, ncomponents)
     return collect(1:length(local_facet_dofs)) # TODO: Return range?

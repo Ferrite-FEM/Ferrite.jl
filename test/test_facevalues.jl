@@ -163,18 +163,15 @@ for (scalar_interpol, quad_rule) in (
                     end
                 end
             end
-            # Test that qr, detJdV, normals, and current_facet are copied as expected.
+            # Test that fqr, detJdV, and normals, are copied as expected.
             # Note that qr remain aliased, as defined by `copy(qr)=qr`, see quadrature.jl.
-            # Make it easy to test scalar wrapper equality
-            _mock_isequal(a, b) = a == b
-            _mock_isequal(a::T, b::T) where {T<:Ferrite.ScalarWrapper} = a[] == b[]
-            for fname in (:fqr, :detJdV, :normals, :current_facet)
+            for fname in (:fqr, :detJdV, :normals)
                 v = getfield(fv, fname)
                 vc = getfield(fvc, fname)
                 if fname !== :fqr # Test unaliased
                     @test v !== vc
                 end
-                @test _mock_isequal(v, vc)
+                @test v == vc
             end
         end
     end
