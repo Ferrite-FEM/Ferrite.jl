@@ -110,7 +110,7 @@ function _get_facet_facet_neighborhood(::ExclusiveTopology, #=rdim=#::Val{:mixed
     Access the `vertex_vertex_neighbor`, `edge_edge_neighbor`, or `face_face_neighbor` fields explicitly instead."))
 end
 
-# Guess of how many neighbors depending on grid dimension and index type. 
+# Guess of how many neighbors depending on grid dimension and index type.
 # This could be possible to optimize further by studying connectivities of non-uniform
 # grids, see https://github.com/Ferrite-FEM/Ferrite.jl/pull/974#discussion_r1660838649
 function _getsizehint(g::AbstractGrid, ::Type{IDX}) where IDX

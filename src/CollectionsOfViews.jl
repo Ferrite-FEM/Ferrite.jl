@@ -127,7 +127,7 @@ function ArrayOfVectorViews(b::ConstructionBuffer{T}) where T
     end
     indices[length(indices)] = data_index
     # Since user-code in the constructor function has access to `b`, setting dimensions to
-    # zero here allows GC:ing the data in `b` even in cases when the compiler cannot 
+    # zero here allows GC:ing the data in `b` even in cases when the compiler cannot
     # guarantee that it is unreachable.
     resize!(b.data, 0); sizehint!(b.data, 0)
     isa(b.indices, Vector) && (resize!(b.indices, 0); sizehint!(b.indices, 0))
