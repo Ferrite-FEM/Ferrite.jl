@@ -21,6 +21,7 @@ currently the `:legendre` and `:lobatto` rules are implemented for hypercubes.
 For triangles up to order 8 the default rule is the one by `:dunavant` (see [Dun:1985:hde](@cite)) and for
 tetrahedra the default rule is by `:jinyun` (see [Jin:1984:sgq](@cite)). For quadrature on triangles above order 8
 are the default is a Gauss-Jacobi rule. Wedges and pyramids default to `:polyquad` (see [WitVin:2015:isq](@cite)).
+Higher order Gauss-Jacobi quadrature rules for triangles are also available via `:gaussjacobi`.
 
 A `QuadratureRule` is used to approximate an integral on a domain by a weighted sum of
 function values at specific points:
@@ -109,9 +110,9 @@ for dim in 2:3
     @eval begin
         function QuadratureRule{RefSimplex{$dim}, T}(quad_type::Symbol, order::Int) where T
             if $dim == 2 && quad_type === :dunavant && order ≤ 8
-                data = _get_gauss_tridata(order)
+                data = _get_dunavant_gauss_tridata(order)
             if $dim == 2 && quad_type === :gaussjacobi && order > 8
-                data = _get_gauss_tridata(order)
+                data = _get_gaussjacobi_tridata(order)
             elseif $dim == 3 && quad_type === :jinyun
                 data = _get_gauss_tetdata(order)
             else

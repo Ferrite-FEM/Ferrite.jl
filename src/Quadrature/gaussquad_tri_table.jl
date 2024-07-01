@@ -11,19 +11,19 @@
 # https://docs.fenicsproject.org/basix/main/python/_autosummary/basix.html?highlight=quadraturetype#basix.make_quadrature
 
 
-function _get_gauss_tridata(n::Int)
+function _get_dunavant_gauss_tridata(n::Int)
     if (n == 1)
         xw=[0.33333333333333 0.33333333333333 1.00000000000000 / 2.0];
     elseif (n == 2)
         xw=[0.16666666666667 0.16666666666667 0.33333333333333 / 2.0
         0.16666666666667 0.66666666666667 0.33333333333333 / 2.0
         0.66666666666667 0.16666666666667 0.33333333333333 / 2.0];
-        elseif (n == 3)
+    elseif (n == 3)
         xw=[0.33333333333333 0.33333333333333 -0.56250000000000 / 2.0
         0.20000000000000 0.20000000000000 0.52083333333333 / 2.0
         0.20000000000000 0.60000000000000 0.52083333333333 / 2.0
         0.60000000000000 0.20000000000000 0.52083333333333 / 2.0];
-        elseif (n == 4)
+    elseif (n == 4)
         xw=[0.44594849091597 0.44594849091597 0.22338158967801 / 2.0
         0.44594849091597 0.10810301816807 0.22338158967801 / 2.0
         0.10810301816807 0.44594849091597 0.22338158967801 / 2.0
@@ -82,7 +82,15 @@ function _get_gauss_tridata(n::Int)
         0.72849239295540 0.26311282963464 0.02723031417443 / 2.0
         0.26311282963464 0.00839477740996 0.02723031417443 / 2.0
         0.00839477740996 0.72849239295540 0.02723031417443 / 2.0];
-    elseif n == 9
+    else
+        throw(ArgumentError("unsupported order for Dunavant's triangle integration"))
+    end
+    return xw
+end
+
+
+function _get_gaussjacobi_tridata(n::Int)
+    if n == 9
         xw=[0.4171034443615992 0.4171034443615992 0.0136554632640511
         0.1803581162663707 0.1803581162663707 0.0131563152940090
         0.2857065024365867 0.2857065024365867 0.0188581185763976
@@ -833,7 +841,7 @@ function _get_gauss_tridata(n::Int)
         0.0080665857041666 0.5861680189969418 0.0018206702056404
         0.0001234468122874 0.8135558255123531 0.0003443363125209]
     else
-        throw(ArgumentError("unsupported order for triangle gauss-legendre integration"))
+        throw(ArgumentError("unsupported order for triangle Gauss-Jacobi integration"))
     end
     return xw
 end
