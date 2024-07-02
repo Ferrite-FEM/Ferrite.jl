@@ -26,12 +26,14 @@
 # of the fluxes to the nodes of the mesh. By doing this, we can more easily visualize
 # integration points quantities. Finally, we visualize the temperature field and the heat fluxes along a cut-line.
 #
-# The L2-projection is defined as follows: Find projection ``q(\boldsymbol{x}) \in L_2(\Omega)`` such that
+# The L2-projection is defined as follows: Find projection ``q(\boldsymbol{x}) \in U_h(\Omega)`` such that
 # ```math
-# \int v q \ \mathrm{d}\Omega = \int v d \ \mathrm{d}\Omega \quad \forall v \in L_2(\Omega),
+# \int v q \ \mathrm{d}\Omega = \int v d \ \mathrm{d}\Omega \quad \forall v \in U_h(\Omega),
 # ```
 # where ``d`` is the quadrature data to project. Since the flux is a vector the projection function
 # will be solved with multiple right hand sides, e.g. with ``d = q_x`` and ``d = q_y`` for this 2D problem.
+# In this example, we use standard Lagrange interpolations, and the finite element space ``U_h`` is then
+# a subset of the ``H^1`` space (continuous functions).
 #
 # Ferrite has functionality for doing much of this automatically, as displayed in the code below.
 # In particular [`L2Projector`](@ref) for assembling the left hand side, and
@@ -87,8 +89,8 @@ q_projected = project(projector, q_gp, qr);
 # To visualize the heat flux, we export the projected field `q_projected`
 # to a VTK-file, which can be viewed in e.g. [ParaView](https://www.paraview.org/).
 # The result is also visualized in *Figure 1*.
-vtk_grid("heat_equation_flux", grid) do vtk
-    vtk_point_data(vtk, projector, q_projected, "q")
+VTKFile("heat_equation_flux", grid) do vtk
+    write_projection(vtk, projector, q_projected, "q")
 end;
 
 # ## Point Evaluation

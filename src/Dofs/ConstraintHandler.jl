@@ -1,6 +1,6 @@
 # abstract type Constraint end
 """
-    Dirichlet(u::Symbol, ∂Ω::Set, f::Function, components=nothing)
+    Dirichlet(u::Symbol, ∂Ω::AbstractVecOrSet, f::Function, components=nothing)
 
 Create a Dirichlet boundary condition on `u` on the `∂Ω` part of
 the boundary. `f` is a function of the form `f(x)` or `f(x, t)`
@@ -9,14 +9,21 @@ and returns the prescribed value. `components` specify the components
 of `u` that are prescribed by this condition. By default all components
 of `u` are prescribed.
 
+The set, `∂Ω`, can be an `AbstractSet` or `AbstractVector` with elements of
+type [`FacetIndex`](@ref), [`FaceIndex`](@ref), [`EdgeIndex`](@ref), [`VertexIndex`](@ref),
+or `Int`. For most cases, the element type is `FacetIndex`, as shown below.
+To constrain a single point, using `VertexIndex` is recommended, but it is also possible
+to constrain a specific nodes by giving the node numbers via `Int` elements.
+To constrain e.g. an edge in 3d `EdgeIndex` elements can be given.
+
 For example, here we create a
-Dirichlet condition for the `:u` field, on the faceset called
+Dirichlet condition for the `:u` field, on the facetset called
 `∂Ω` and the value given by the `sin` function:
 
 *Examples*
 ```jldoctest
-# Obtain the faceset from the grid
-∂Ω = getfaceset(grid, "boundary-1")
+# Obtain the facetset from the grid
+∂Ω = getfacetset(grid, "boundary-1")
 
 # Prescribe scalar field :s on ∂Ω to sin(t)
 dbc = Dirichlet(:s, ∂Ω, (x, t) -> sin(t))
@@ -33,14 +40,14 @@ which applies the condition via [`apply!`](@ref) and/or [`apply_zero!`](@ref).
 """
 struct Dirichlet # <: Constraint
     f::Function # f(x) or f(x,t) -> value(s)
-    faces::Union{Set{Int},Set{FaceIndex},Set{EdgeIndex},Set{VertexIndex}}
+    facets::OrderedSet{T} where T <: Union{Int, FacetIndex, FaceIndex, EdgeIndex, VertexIndex}
     field_name::Symbol
     components::Vector{Int} # components of the field
-    local_face_dofs::Vector{Int}
-    local_face_dofs_offset::Vector{Int}
+    local_facet_dofs::Vector{Int}
+    local_facet_dofs_offset::Vector{Int}
 end
-function Dirichlet(field_name::Symbol, faces::Set, f::Function, components=nothing)
-    return Dirichlet(f, faces, field_name, __to_components(components), Int[], Int[])
+function Dirichlet(field_name::Symbol, facets::AbstractVecOrSet, f::Function, components=nothing)
+    return Dirichlet(f, convert_to_orderedset(facets), field_name, __to_components(components), Int[], Int[])
 end
 
 # components=nothing is default and means that all components should be constrained
@@ -58,8 +65,8 @@ const DofCoefficients{T} = Vector{Pair{Int,T}}
 """
     AffineConstraint(constrained_dof::Int, entries::Vector{Pair{Int,T}}, b::T) where T
 
-Define an affine/linear constraint to constrain one degree of freedom, `u[i]`, 
-such that `u[i] = ∑(u[j] * a[j]) + b`, 
+Define an affine/linear constraint to constrain one degree of freedom, `u[i]`,
+such that `u[i] = ∑(u[j] * a[j]) + b`,
 where `i=constrained_dof` and each element in `entries` are `j => a[j]`
 """
 struct AffineConstraint{T}
@@ -74,21 +81,21 @@ end
 A collection of constraints associated with the dof handler `dh`.
 `T` is the numeric type for stored values.
 """
-struct ConstraintHandler{DH<:AbstractDofHandler,T}
-    dbcs::Vector{Dirichlet}
-    prescribed_dofs::Vector{Int}
-    free_dofs::Vector{Int}
-    inhomogeneities::Vector{T}
+mutable struct ConstraintHandler{DH<:AbstractDofHandler,T}
+    const dbcs::Vector{Dirichlet}
+    const prescribed_dofs::Vector{Int}
+    const free_dofs::Vector{Int}
+    const inhomogeneities::Vector{T}
     # Store the original constant inhomogeneities for affine constraints used to compute
     # "effective" inhomogeneities in `update!` and then stored in .inhomogeneities.
-    affine_inhomogeneities::Vector{Union{Nothing,T}}
+    const affine_inhomogeneities::Vector{Union{Nothing,T}}
     # `nothing` for pure DBC constraint, otherwise affine constraint
-    dofcoefficients::Vector{Union{Nothing, DofCoefficients{T}}}
+    const dofcoefficients::Vector{Union{Nothing, DofCoefficients{T}}}
     # global dof -> index into dofs and inhomogeneities and dofcoefficients
-    dofmapping::Dict{Int,Int}
-    bcvalues::Vector{BCValues{T}}
-    dh::DH
-    closed::ScalarWrapper{Bool}
+    const dofmapping::Dict{Int,Int}
+    const bcvalues::Vector{BCValues{T}}
+    const dh::DH
+    closed::Bool
 end
 
 ConstraintHandler(dh::AbstractDofHandler) = ConstraintHandler(Float64, dh)
@@ -97,7 +104,7 @@ function ConstraintHandler(::Type{T}, dh::AbstractDofHandler) where T <: Number
     @assert isclosed(dh)
     ConstraintHandler(
         Dirichlet[], Int[], Int[], T[], Union{Nothing,T}[], Union{Nothing,DofCoefficients{T}}[],
-        Dict{Int,Int}(), BCValues{T}[], dh, ScalarWrapper(false),
+        Dict{Int,Int}(), BCValues{T}[], dh, false,
     )
 end
 
@@ -173,11 +180,11 @@ function Base.show(io::IO, ::MIME"text/plain", ch::ConstraintHandler)
     end
 end
 
-isclosed(ch::ConstraintHandler) = ch.closed[]
+isclosed(ch::ConstraintHandler) = ch.closed
 free_dofs(ch::ConstraintHandler) = ch.free_dofs
 prescribed_dofs(ch::ConstraintHandler) = ch.prescribed_dofs
 
-# Equivalent to `copy!(out, setdiff(1:n_entries, diff))`, but requires that 
+# Equivalent to `copy!(out, setdiff(1:n_entries, diff))`, but requires that
 # `issorted(diff)` and that `1 ≤ diff[1] ≤ diff[end] ≤ n_entries`
 function _sorted_setdiff!(out::Vector{Int}, n_entries::Int, diff::Vector{Int})
     n_diff = length(diff)
@@ -243,7 +250,7 @@ function close!(ch::ConstraintHandler)
         end
     end
 
-    ch.closed[] = true
+    ch.closed = true
 
     # Compute the prescribed values by calling update!: This should be cheap, and for the
     # common case where constraints does not depend on time it is annoying and easy to
@@ -292,21 +299,21 @@ function add_prescribed_dof!(ch::ConstraintHandler, constrained_dof::Int, inhomo
     return ch
 end
 
-# Dirichlet on (face|edge|vertex)set
-function _add!(ch::ConstraintHandler, dbc::Dirichlet, bcfaces::Set{Index}, interpolation::Interpolation, field_dim::Int, offset::Int, bcvalue::BCValues, _) where {Index<:BoundaryIndex}
-    local_face_dofs, local_face_dofs_offset =
-        _local_face_dofs_for_bc(interpolation, field_dim, dbc.components, offset, dirichlet_boundarydof_indices(eltype(bcfaces)))
-    copy!(dbc.local_face_dofs, local_face_dofs)
-    copy!(dbc.local_face_dofs_offset, local_face_dofs_offset)
+# Dirichlet on (facet|face|edge|vertex)set
+function _add!(ch::ConstraintHandler, dbc::Dirichlet, bcfacets::AbstractVecOrSet{Index}, interpolation::Interpolation, field_dim::Int, offset::Int, bcvalue::BCValues, _) where {Index<:BoundaryIndex}
+    local_facet_dofs, local_facet_dofs_offset =
+        _local_facet_dofs_for_bc(interpolation, field_dim, dbc.components, offset, dirichlet_boundarydof_indices(eltype(bcfacets)))
+    copy!(dbc.local_facet_dofs, local_facet_dofs)
+    copy!(dbc.local_facet_dofs_offset, local_facet_dofs_offset)
 
     # loop over all the faces in the set and add the global dofs to `constrained_dofs`
     constrained_dofs = Int[]
     cc = CellCache(ch.dh, UpdateFlags(; nodes=false, coords=false, dofs=true))
-    for (cellidx, faceidx) in bcfaces
+    for (cellidx, facetidx) in bcfacets
         reinit!(cc, cellidx)
-        r = local_face_dofs_offset[faceidx]:(local_face_dofs_offset[faceidx+1]-1)
-        append!(constrained_dofs, cc.dofs[local_face_dofs[r]]) # TODO: for-loop over r and simply push! to ch.prescribed_dofs
-        @debug println("adding dofs $(cc.dofs[local_face_dofs[r]]) to dbc")
+        r = local_facet_dofs_offset[facetidx]:(local_facet_dofs_offset[facetidx+1]-1)
+        append!(constrained_dofs, cc.dofs[local_facet_dofs[r]]) # TODO: for-loop over r and simply push! to ch.prescribed_dofs
+        @debug println("adding dofs $(cc.dofs[local_facet_dofs[r]]) to dbc")
     end
 
     # save it to the ConstraintHandler
@@ -318,26 +325,26 @@ function _add!(ch::ConstraintHandler, dbc::Dirichlet, bcfaces::Set{Index}, inter
     return ch
 end
 
-# Calculate which local dof index live on each face:
-# face `i` have dofs `local_face_dofs[local_face_dofs_offset[i]:local_face_dofs_offset[i+1]-1]
-function _local_face_dofs_for_bc(interpolation, field_dim, components, offset, boundaryfunc::F=dirichlet_facedof_indices) where F
+# Calculate which local dof index live on each facet:
+# facet `i` have dofs `local_facet_dofs[local_facet_dofs_offset[i]:local_facet_dofs_offset[i+1]-1]
+function _local_facet_dofs_for_bc(interpolation, field_dim, components, offset, boundaryfunc::F=dirichlet_facetdof_indices) where F
     @assert issorted(components)
-    local_face_dofs = Int[]
-    local_face_dofs_offset = Int[1]
-    for (_, face) in enumerate(boundaryfunc(interpolation))
-        for fdof in face, d in 1:field_dim
+    local_facet_dofs = Int[]
+    local_facet_dofs_offset = Int[1]
+    for (_, facet) in enumerate(boundaryfunc(interpolation))
+        for fdof in facet, d in 1:field_dim
             if d in components
-                push!(local_face_dofs, (fdof-1)*field_dim + d + offset)
+                push!(local_facet_dofs, (fdof-1)*field_dim + d + offset)
             end
         end
-        push!(local_face_dofs_offset, length(local_face_dofs) + 1)
+        push!(local_facet_dofs_offset, length(local_facet_dofs) + 1)
     end
-    return local_face_dofs, local_face_dofs_offset
+    return local_facet_dofs, local_facet_dofs_offset
 end
 
-function _add!(ch::ConstraintHandler, dbc::Dirichlet, bcnodes::Set{Int}, interpolation::Interpolation, field_dim::Int, offset::Int, bcvalue::BCValues, cellset::Set{Int}=Set{Int}(1:getncells(get_grid(ch.dh))))
+function _add!(ch::ConstraintHandler, dbc::Dirichlet, bcnodes::AbstractVecOrSet{Int}, interpolation::Interpolation, field_dim::Int, offset::Int, bcvalue::BCValues, cellset::AbstractVecOrSet{Int}=OrderedSet{Int}(1:getncells(get_grid(ch.dh))))
     grid = get_grid(ch.dh)
-    if interpolation !== default_interpolation(getcelltype(grid, first(cellset)))
+    if interpolation !== geometric_interpolation(getcelltype(grid, first(cellset)))
         @warn("adding constraint to nodeset is not recommended for sub/super-parametric approximations.")
     end
 
@@ -362,7 +369,7 @@ function _add!(ch::ConstraintHandler, dbc::Dirichlet, bcnodes::Set{Int}, interpo
 
     constrained_dofs = Int[]
     sizehint!(constrained_dofs, ncomps*length(bcnodes))
-    sizehint!(dbc.local_face_dofs, length(bcnodes))
+    sizehint!(dbc.local_facet_dofs, length(bcnodes))
     for node in bcnodes
         if !visited[node]
             # either the node belongs to another field handler or it does not have dofs in the constrained field
@@ -371,11 +378,11 @@ function _add!(ch::ConstraintHandler, dbc::Dirichlet, bcnodes::Set{Int}, interpo
         for i in 1:ncomps
             push!(constrained_dofs, node_dofs[i,node])
         end
-        push!(dbc.local_face_dofs, node) # use this field to store the node idx for each node
+        push!(dbc.local_facet_dofs, node) # use this field to store the node idx for each node
     end
 
     # save it to the ConstraintHandler
-    copy!(dbc.local_face_dofs_offset, constrained_dofs) # use this field to store the global dofs
+    copy!(dbc.local_facet_dofs_offset, constrained_dofs) # use this field to store the global dofs
     push!(ch.dbcs, dbc)
     push!(ch.bcvalues, bcvalue)
     for d in constrained_dofs
@@ -394,14 +401,14 @@ compute the inhomogeneities.
 Note that this is called implicitly in `close!(::ConstraintHandler)`.
 """
 function update!(ch::ConstraintHandler, time::Real=0.0)
-    @assert ch.closed[]
+    @assert ch.closed
     for (i, dbc) in pairs(ch.dbcs)
         # If the BC function only accept one argument, i.e. f(x), we create a wrapper
         # g(x, t) = f(x) that discards the second parameter so that _update! can always call
         # the function with two arguments internally.
         wrapper_f = hasmethod(dbc.f, Tuple{Any,Any}) ? dbc.f : (x, _) -> dbc.f(x)
         # Function barrier
-        _update!(ch.inhomogeneities, wrapper_f, dbc.faces, dbc.field_name, dbc.local_face_dofs, dbc.local_face_dofs_offset,
+        _update!(ch.inhomogeneities, wrapper_f, dbc.facets, dbc.field_name, dbc.local_facet_dofs, dbc.local_facet_dofs_offset,
                  dbc.components, ch.dh, ch.bcvalues[i], ch.dofmapping, ch.dofcoefficients, time)
     end
     # Compute effective inhomogeneity for affine constraints with prescribed dofs in the
@@ -426,8 +433,8 @@ function update!(ch::ConstraintHandler, time::Real=0.0)
     return nothing
 end
 
-# for vertices, faces and edges
-function _update!(inhomogeneities::Vector{T}, f::Function, boundary_entities::Set{<:BoundaryIndex}, field::Symbol, local_face_dofs::Vector{Int}, local_face_dofs_offset::Vector{Int},
+# for facets, vertices, faces and edges
+function _update!(inhomogeneities::Vector{T}, f::Function, boundary_entities::AbstractVecOrSet{<:BoundaryIndex}, field::Symbol, local_facet_dofs::Vector{Int}, local_facet_dofs_offset::Vector{Int},
                   components::Vector{Int}, dh::AbstractDofHandler, boundaryvalues::BCValues,
                   dofmapping::Dict{Int,Int}, dofcoefficients::Vector{Union{Nothing,DofCoefficients{T}}}, time::Real) where {T}
 
@@ -436,10 +443,10 @@ function _update!(inhomogeneities::Vector{T}, f::Function, boundary_entities::Se
         reinit!(cc, cellidx)
 
         # no need to reinit!, enough to update current_entity since we only need geometric shape functions M
-        boundaryvalues.current_entity[] = entityidx
+        boundaryvalues.current_entity = entityidx
 
-        # local dof-range for this face
-        r = local_face_dofs_offset[entityidx]:(local_face_dofs_offset[entityidx+1]-1)
+        # local dof-range for this facet
+        r = local_facet_dofs_offset[entityidx]:(local_facet_dofs_offset[entityidx+1]-1)
         counter = 1
         for location in 1:getnquadpoints(boundaryvalues)
             x = spatial_coordinate(boundaryvalues, location, cc.coords)
@@ -448,7 +455,7 @@ function _update!(inhomogeneities::Vector{T}, f::Function, boundary_entities::Se
 
             for i in 1:length(components)
                 # find the global dof
-                globaldof = cc.dofs[local_face_dofs[r[counter]]]
+                globaldof = cc.dofs[local_facet_dofs[r[counter]]]
                 counter += 1
 
                 dbc_index = dofmapping[globaldof]
@@ -464,8 +471,8 @@ function _update!(inhomogeneities::Vector{T}, f::Function, boundary_entities::Se
 end
 
 # for nodes
-function _update!(inhomogeneities::Vector{T}, f::Function, ::Set{Int}, field::Symbol, nodeidxs::Vector{Int}, globaldofs::Vector{Int},
-                  components::Vector{Int}, dh::AbstractDofHandler, facevalues::BCValues,
+function _update!(inhomogeneities::Vector{T}, f::Function, ::AbstractVecOrSet{Int}, field::Symbol, nodeidxs::Vector{Int}, globaldofs::Vector{Int},
+                  components::Vector{Int}, dh::AbstractDofHandler, facetvalues::BCValues,
                   dofmapping::Dict{Int,Int}, dofcoefficients::Vector{Union{Nothing,DofCoefficients{T}}}, time::Real) where T
     counter = 1
     for nodenumber in nodeidxs
@@ -484,42 +491,6 @@ function _update!(inhomogeneities::Vector{T}, f::Function, ::Set{Int}, field::Sy
             end
         end
     end
-end
-
-# Saves the dirichlet boundary conditions to a vtkfile.
-# Values will have a 1 where bcs are active and 0 otherwise
-function WriteVTK.vtk_point_data(vtkfile, ch::ConstraintHandler)
-    unique_fields = []
-    for dbc in ch.dbcs
-        push!(unique_fields, dbc.field_name)
-    end
-    unique!(unique_fields)
-
-    for field in unique_fields
-        nd = getfielddim(ch.dh, field)
-        data = zeros(Float64, nd, getnnodes(get_grid(ch.dh)))
-        for dbc in ch.dbcs
-            dbc.field_name != field && continue
-            if eltype(dbc.faces) <: BoundaryIndex
-                functype = boundaryfunction(eltype(dbc.faces))
-                for (cellidx, faceidx) in dbc.faces
-                    for facenode in functype(getcells(get_grid(ch.dh), cellidx))[faceidx]
-                        for component in dbc.components
-                            data[component, facenode] = 1
-                        end
-                    end
-                end
-            else
-                for nodeidx in dbc.faces
-                    for component in dbc.components
-                        data[component, nodeidx] = 1
-                    end
-                end
-            end
-        end
-        vtk_point_data(vtkfile, data, string(field, "_bc"))
-    end
-    return vtkfile
 end
 
 """
@@ -564,12 +535,12 @@ apply!
     apply_zero!(K::SparseMatrixCSC, rhs::AbstractVector, ch::ConstraintHandler)
 
 Adjust the matrix `K` and the right hand side `rhs` to account for prescribed Dirichlet
-boundary conditions and affine constraints such that `du = K \\ rhs` gives the expected 
+boundary conditions and affine constraints such that `du = K \\ rhs` gives the expected
 result (e.g. `du` zero for all prescribed degrees of freedom).
 
     apply_zero!(v::AbstractVector, ch::ConstraintHandler)
 
-Zero-out values in `v` corresponding to prescribed degrees of freedom and update values 
+Zero-out values in `v` corresponding to prescribed degrees of freedom and update values
 prescribed by affine constraints, such that if `a` fulfills the constraints,
 `a ± v` also will.
 
@@ -589,9 +560,9 @@ apply_zero!(ΔΔu, ch)        # Make sure values are exactly zero
 ```
 
 !!! note
-    The last call to `apply_zero!` is only strictly necessary for affine constraints. 
-    However, even if the Dirichlet boundary conditions should be fulfilled after 
-    `apply!(K, g, ch)`, solvers of linear systems are not exact. 
+    The last call to `apply_zero!` is only strictly necessary for affine constraints.
+    However, even if the Dirichlet boundary conditions should be fulfilled after
+    `apply!(K, g, ch)`, solvers of linear systems are not exact.
     `apply!(ΔΔu, ch)` can be used to make sure the values
     for the prescribed degrees of freedom are fulfilled exactly.
 """
@@ -869,7 +840,7 @@ function add!(ch::ConstraintHandler, dbc::Dirichlet)
         dbc.field_name in sdh.field_names || continue
         # Compute the intersection between dbc.set and the cellset of this
         # SubDofHandler and skip if the set is empty
-        filtered_set = filter_dbc_set(get_grid(ch.dh), sdh.cellset, dbc.faces)
+        filtered_set = filter_dbc_set(get_grid(ch.dh), sdh.cellset, dbc.facets)
         isempty(filtered_set) && continue
         # Fetch information about the field on this SubDofHandler
         field_idx = find_field(sdh, dbc.field_name)
@@ -885,18 +856,18 @@ function add!(ch::ConstraintHandler, dbc::Dirichlet)
         if !all(c -> 0 < c <= n_comp, components)
             error("components $(components) not within range of field :$(dbc.field_name) ($(n_comp) dimension(s))")
         end
-        # Create BCValues for coordinate evalutation at dof-locations
-        EntityType = eltype(dbc.faces) # (Face|Edge|Vertex)Index
+        # Create BCValues for coordinate evaluation at dof-locations
+        EntityType = eltype(dbc.facets) # (Facet|Face|Edge|Vertex)Index
         if EntityType <: Integer
-            # BCValues are just dummy for nodesets so set to FaceIndex
-            EntityType = FaceIndex
+            # BCValues are just dummy for nodesets so set to FacetIndex
+            EntityType = FacetIndex
         end
         CT = getcelltype(sdh) # Same celltype enforced in SubDofHandler constructor
-        bcvalues = BCValues(interpolation, default_interpolation(CT), EntityType)
+        bcvalues = BCValues(interpolation, geometric_interpolation(CT), EntityType)
         # Recreate the Dirichlet(...) struct with the filtered set and call internal add!
         filtered_dbc = Dirichlet(dbc.field_name, filtered_set, dbc.f, components)
         _add!(
-            ch, filtered_dbc, filtered_dbc.faces, interpolation, n_comp,
+            ch, filtered_dbc, filtered_dbc.facets, interpolation, n_comp,
             field_offset(sdh, field_idx), bcvalues, sdh.cellset,
         )
         dbc_added = true
@@ -917,7 +888,7 @@ end
 
 function filter_dbc_set(grid::AbstractGrid, fhset::AbstractSet{Int}, dbcset::AbstractSet{Int})
     ret = empty(dbcset)
-    nodes_in_fhset = Set{Int}()
+    nodes_in_fhset = OrderedSet{Int}()
     for cc in CellIterator(grid, fhset, UpdateFlags(; nodes=true, coords=false))
         union!(nodes_in_fhset, cc.nodes)
     end
@@ -927,27 +898,27 @@ function filter_dbc_set(grid::AbstractGrid, fhset::AbstractSet{Int}, dbcset::Abs
     return ret
 end
 
-struct PeriodicFacePair
-    mirror::FaceIndex
-    image::FaceIndex
-    rotation::UInt8 # relative rotation of the mirror face counter-clockwise the *image* normal (only relevant in 3D)
+struct PeriodicFacetPair
+    mirror::FacetIndex
+    image::FacetIndex
+    rotation::UInt8 # relative rotation of the mirror facet counter-clockwise the *image* normal (only relevant in 3D)
     mirrored::Bool  # mirrored => opposite normal vectors
 end
 
 """
-    PeriodicDirichlet(u::Symbol, face_mapping, components=nothing)
-    PeriodicDirichlet(u::Symbol, face_mapping, R::AbstractMatrix, components=nothing)
-    PeriodicDirichlet(u::Symbol, face_mapping, f::Function, components=nothing)
+    PeriodicDirichlet(u::Symbol, facet_mapping, components=nothing)
+    PeriodicDirichlet(u::Symbol, facet_mapping, R::AbstractMatrix, components=nothing)
+    PeriodicDirichlet(u::Symbol, facet_mapping, f::Function, components=nothing)
 
-Create a periodic Dirichlet boundary condition for the field `u` on the face-pairs given in
-`face_mapping`. The mapping can be computed with [`collect_periodic_faces`](@ref). The
-constraint ensures that degrees-of-freedom on the mirror face are constrained to the
-corresponding degrees-of-freedom on the image face. `components` specify the components of
+Create a periodic Dirichlet boundary condition for the field `u` on the facet-pairs given in
+`facet_mapping`. The mapping can be computed with [`collect_periodic_facets`](@ref). The
+constraint ensures that degrees-of-freedom on the mirror facet are constrained to the
+corresponding degrees-of-freedom on the image facet. `components` specify the components of
 `u` that are prescribed by this condition. By default all components of `u` are prescribed.
 
 If the mapping is not aligned with the coordinate axis (e.g. rotated) a rotation matrix `R`
-should be passed to the constructor. This matrix rotates dofs on the mirror face to the
-image face. Note that this is only applicable for vector-valued problems.
+should be passed to the constructor. This matrix rotates dofs on the mirror facet to the
+image facet. Note that this is only applicable for vector-valued problems.
 
 To construct an inhomogeneous periodic constraint it is possible to pass a function `f`.
 Note that this is currently only supported when the periodicity is aligned with the
@@ -958,24 +929,24 @@ See the manual section on [Periodic boundary conditions](@ref) for more informat
 struct PeriodicDirichlet
     field_name::Symbol
     components::Vector{Int} # components of the field
-    face_pairs::Vector{Pair{String,String}} # legacy that will populate face_map on add!
-    face_map::Vector{PeriodicFacePair}
+    facet_pairs::Vector{Pair{String,String}} # legacy that will populate facet_map on add!
+    facet_map::Vector{PeriodicFacetPair}
     func::Union{Function,Nothing}
     rotation_matrix::Union{Matrix{Float64},Nothing}
 end
 
 # Default to no inhomogeneity function/rotation
-PeriodicDirichlet(fn::Symbol, fp::Union{Vector{<:Pair},Vector{PeriodicFacePair}}, c=nothing) =
+PeriodicDirichlet(fn::Symbol, fp::Union{Vector{<:Pair},Vector{PeriodicFacetPair}}, c=nothing) =
     PeriodicDirichlet(fn, fp, nothing, c)
 
 # Basic constructor for the simple case where face_map will be populated in
 # add!(::ConstraintHandler, ...) instead
 function PeriodicDirichlet(fn::Symbol, fp::Vector{<:Pair}, f::Union{Function,Nothing}, c=nothing)
-    face_map = PeriodicFacePair[] # This will be populated in add!(::ConstraintHandler, ...) instead
-    return PeriodicDirichlet(fn, __to_components(c), fp, face_map, f, nothing)
+    facet_map = PeriodicFacetPair[] # This will be populated in add!(::ConstraintHandler, ...) instead
+    return PeriodicDirichlet(fn, __to_components(c), fp, facet_map, f, nothing)
 end
 
-function PeriodicDirichlet(fn::Symbol, fm::Vector{PeriodicFacePair}, f_or_r::Union{AbstractMatrix,Function,Nothing}, c=nothing)
+function PeriodicDirichlet(fn::Symbol, fm::Vector{PeriodicFacetPair}, f_or_r::Union{AbstractMatrix,Function,Nothing}, c=nothing)
     f = f_or_r isa Function ? f_or_r : nothing
     rotation_matrix = f_or_r isa AbstractMatrix ? f_or_r : nothing
     components = __to_components(c)
@@ -983,11 +954,11 @@ function PeriodicDirichlet(fn::Symbol, fm::Vector{PeriodicFacePair}, f_or_r::Uni
 end
 
 function add!(ch::ConstraintHandler, pdbc::PeriodicDirichlet)
-    # Legacy code: Might need to build the face_map
-    is_legacy = !isempty(pdbc.face_pairs) && isempty(pdbc.face_map)
+    # Legacy code: Might need to build the facet_map
+    is_legacy = !isempty(pdbc.facet_pairs) && isempty(pdbc.facet_map)
     if is_legacy
-        for (mset, iset) in pdbc.face_pairs
-            collect_periodic_faces!(pdbc.face_map, get_grid(ch.dh), mset, iset, identity) # TODO: Better transform
+        for (mset, iset) in pdbc.facet_pairs
+            collect_periodic_facets!(pdbc.facet_map, get_grid(ch.dh), mset, iset, identity) # TODO: Better transform
         end
     end
     field_idx = find_field(ch.dh, pdbc.field_name)
@@ -1029,37 +1000,37 @@ end
 function _add!(ch::ConstraintHandler, pdbc::PeriodicDirichlet, interpolation::Interpolation,
                field_dim::Int, offset::Int, is_legacy::Bool, rotation_matrix::Union{Matrix{T},Nothing}, ::Type{dof_map_t}, iterator_f::F) where {T, dof_map_t, F <: Function}
     grid = get_grid(ch.dh)
-    face_map = pdbc.face_map
+    facet_map = pdbc.facet_map
 
-    # Indices of the local dofs for the faces
-    local_face_dofs, local_face_dofs_offset =
-        _local_face_dofs_for_bc(interpolation, field_dim, pdbc.components, offset)
+    # Indices of the local dofs for the facets
+    local_facet_dofs, local_facet_dofs_offset =
+        _local_facet_dofs_for_bc(interpolation, field_dim, pdbc.components, offset)
     mirrored_indices =
-        mirror_local_dofs(local_face_dofs, local_face_dofs_offset, interpolation, length(pdbc.components))
-    rotated_indices = rotate_local_dofs(local_face_dofs, local_face_dofs_offset, interpolation, length(pdbc.components))
+        mirror_local_dofs(local_facet_dofs, local_facet_dofs_offset, interpolation, length(pdbc.components))
+    rotated_indices = rotate_local_dofs(local_facet_dofs, local_facet_dofs_offset, interpolation, length(pdbc.components))
 
     # Dof map for mirror dof => image dof
     dof_map = Dict{dof_map_t,dof_map_t}()
 
-    mirror_dofs = zeros(Int, ndofs_per_cell(ch.dh))
-     image_dofs = zeros(Int, ndofs_per_cell(ch.dh))
-    for face_pair in face_map
-        m = face_pair.mirror
-        i = face_pair.image
+    n = ndofs_per_cell(ch.dh, first(facet_map).mirror[1])
+    mirror_dofs = zeros(Int, n)
+    image_dofs  = zeros(Int, n)
+    for facet_pair in facet_map
+        m = facet_pair.mirror
+        i = facet_pair.image
         celldofs!(mirror_dofs, ch.dh, m[1])
         celldofs!( image_dofs, ch.dh, i[1])
 
-        mdof_range = local_face_dofs_offset[m[2]] : (local_face_dofs_offset[m[2] + 1] - 1)
-        idof_range = local_face_dofs_offset[i[2]] : (local_face_dofs_offset[i[2] + 1] - 1)
+        mdof_range = local_facet_dofs_offset[m[2]] : (local_facet_dofs_offset[m[2] + 1] - 1)
+        idof_range = local_facet_dofs_offset[i[2]] : (local_facet_dofs_offset[i[2] + 1] - 1)
 
         for (md, id) in zip(iterator_f(mdof_range), iterator_f(idof_range))
-            mdof = image_dofs[local_face_dofs[id]]
+            mdof = image_dofs[local_facet_dofs[id]]
             # Rotate the mirror index
-            rotated_md = rotated_indices[md, face_pair.rotation + 1]
+            rotated_md = rotated_indices[md, facet_pair.rotation + 1]
             # Mirror the mirror index (maybe) :)
-            mirrored_md = face_pair.mirrored ? mirrored_indices[rotated_md] : rotated_md
-            cdof = mirror_dofs[local_face_dofs[mirrored_md]]
-
+            mirrored_md = facet_pair.mirrored ? mirrored_indices[rotated_md] : rotated_md
+            cdof = mirror_dofs[local_facet_dofs[mirrored_md]]
             if haskey(dof_map, mdof)
                 mdof′ = dof_map[mdof]
                 # @info "$cdof => $mdof, but $mdof => $mdof′, remapping $cdof => $mdof′."
@@ -1104,9 +1075,9 @@ function _add!(ch::ConstraintHandler, pdbc::PeriodicDirichlet, interpolation::In
         Tx = get_coordinate_type(grid)
         min_x = Tx(i -> typemax(eltype(Tx)))
         max_x = Tx(i -> typemin(eltype(Tx)))
-        for facepair in face_map, faceidx in (facepair.mirror, facepair.image)
-            cellidx, faceidx = faceidx
-            nodes = faces(grid.cells[cellidx])[faceidx]
+        for facetpair in facet_map, facet_indices in (facetpair.mirror, facetpair.image)
+            cellidx, facetidx = facet_indices
+            nodes = facets(grid.cells[cellidx])[facetidx]
             union!(all_node_idxs, nodes)
             for n in nodes
                 x = get_node_coordinate(grid, n)
@@ -1118,7 +1089,7 @@ function _add!(ch::ConstraintHandler, pdbc::PeriodicDirichlet, interpolation::In
         points = construct_cornerish(min_x, max_x)
         tree = KDTree(Tx[get_node_coordinate(grid, i) for i in all_node_idxs_v])
         idxs, _ = NearestNeighbors.nn(tree, points)
-        corner_set = Set{Int}(all_node_idxs_v[i] for i in idxs)
+        corner_set = OrderedSet{Int}(all_node_idxs_v[i] for i in idxs)
 
         dbc = Dirichlet(pdbc.field_name, corner_set,
             pdbc.func === nothing ? (x, _) -> pdbc.components * eltype(x)(0) : pdbc.func,
@@ -1134,8 +1105,8 @@ function _add!(ch::ConstraintHandler, pdbc::PeriodicDirichlet, interpolation::In
         foreach(x -> delete!(dof_map, x), chtmp.prescribed_dofs)
 
         # Need to reset the internal of this DBC in order to add! it again...
-        resize!(dbc.local_face_dofs, 0)
-        resize!(dbc.local_face_dofs_offset, 0)
+        resize!(dbc.local_facet_dofs, 0)
+        resize!(dbc.local_facet_dofs_offset, 0)
 
         # Add the Dirichlet for the corners
         add!(ch, dbc)
@@ -1145,10 +1116,10 @@ function _add!(ch::ConstraintHandler, pdbc::PeriodicDirichlet, interpolation::In
     if pdbc.func !== nothing
         # Create another temp constraint handler if we need to compute inhomogeneities
         chtmp2 = ConstraintHandler(ch.dh)
-        all_faces = Set{FaceIndex}()
-        union!(all_faces, (x.mirror for x in face_map))
-        union!(all_faces, (x.image for x in face_map))
-        dbc_all = Dirichlet(pdbc.field_name, all_faces, pdbc.func, pdbc.components)
+        all_facets = OrderedSet{FacetIndex}()
+        union!(all_facets, (x.mirror for x in facet_map))
+        union!(all_facets, (x.image for x in facet_map))
+        dbc_all = Dirichlet(pdbc.field_name, all_facets, pdbc.func, pdbc.components)
         add!(chtmp2, dbc_all); close!(chtmp2)
         # Call update! here since we need it to construct the affine constraints...
         # TODO: This doesn't allow for time dependent constraints...
@@ -1218,11 +1189,11 @@ end
 function mirror_local_dofs(_, _, ::Lagrange{RefLine}, ::Int)
     # For 1D there is nothing to do
 end
-function mirror_local_dofs(local_face_dofs, local_face_dofs_offset, ip::Lagrange{<:Union{RefQuadrilateral,RefTriangle}}, n::Int)
+function mirror_local_dofs(local_facet_dofs, local_facet_dofs_offset, ip::Lagrange{<:Union{RefQuadrilateral,RefTriangle}}, n::Int)
     # For 2D we always permute since Ferrite defines dofs counter-clockwise
-    ret = collect(1:length(local_face_dofs))
-    for (i, f) in enumerate(dirichlet_facedof_indices(ip))
-        this_offset = local_face_dofs_offset[i]
+    ret = collect(1:length(local_facet_dofs))
+    for (i, f) in enumerate(dirichlet_facetdof_indices(ip))
+        this_offset = local_facet_dofs_offset[i]
         other_offset = this_offset + n
         for d in 1:n
             idx1 = this_offset + (d - 1)
@@ -1236,14 +1207,14 @@ function mirror_local_dofs(local_face_dofs, local_face_dofs_offset, ip::Lagrange
 end
 
 # TODO: Can probably be combined with the method above.
-function mirror_local_dofs(local_face_dofs, local_face_dofs_offset, ip::Lagrange{<:Union{RefHexahedron,RefTetrahedron},O}, n::Int) where O
+function mirror_local_dofs(local_facet_dofs, local_facet_dofs_offset, ip::Lagrange{<:Union{RefHexahedron,RefTetrahedron},O}, n::Int) where O
     @assert 1 <= O <= 2
     N = ip isa Lagrange{RefHexahedron} ? 4 : 3
-    ret = collect(1:length(local_face_dofs))
+    ret = collect(1:length(local_facet_dofs))
 
     # Mirror by changing from counter-clockwise to clockwise
-    for (i, f) in enumerate(dirichlet_facedof_indices(ip))
-        r = local_face_dofs_offset[i]:(local_face_dofs_offset[i+1] - 1)
+    for (i, f) in enumerate(dirichlet_facetdof_indices(ip))
+        r = local_facet_dofs_offset[i]:(local_facet_dofs_offset[i+1] - 1)
         # 1. Rotate the corners
         vertex_range = r[1:(N*n)]
         vlr = @view ret[vertex_range]
@@ -1266,39 +1237,23 @@ function mirror_local_dofs(local_face_dofs, local_face_dofs_offset, ip::Lagrange
     return ret
 end
 
-if VERSION < v"1.8.0"
-    function circshift!(x::AbstractVector, shift::Integer)
-        return circshift!(x, copy(x), shift)
-    end
-else
-    # See JuliaLang/julia#46759
-    const CIRCSHIFT_WRONG_DIRECTION = Base.circshift!([1, 2, 3], 1) != Base.circshift([1, 2, 3], 1)
-    function circshift!(x::AbstractVector, shift::Integer)
-        shift = CIRCSHIFT_WRONG_DIRECTION ? -shift : shift
-        return Base.circshift!(x, shift)
-    end
+function rotate_local_dofs(local_facet_dofs, local_facet_dofs_offset, ip::Lagrange{<:Union{RefQuadrilateral,RefTriangle}}, ncomponents)
+    return collect(1:length(local_facet_dofs)) # TODO: Return range?
 end
-
-circshift!(args...) = Base.circshift!(args...)
-
-
-function rotate_local_dofs(local_face_dofs, local_face_dofs_offset, ip::Lagrange{<:Union{RefQuadrilateral,RefTriangle}}, ncomponents)
-    return collect(1:length(local_face_dofs)) # TODO: Return range?
-end
-function rotate_local_dofs(local_face_dofs, local_face_dofs_offset, ip::Lagrange{<:Union{RefHexahedron,RefTetrahedron}, O}, ncomponents) where O
+function rotate_local_dofs(local_facet_dofs, local_facet_dofs_offset, ip::Lagrange{<:Union{RefHexahedron,RefTetrahedron}, O}, ncomponents) where O
     @assert 1 <= O <= 2
     N = ip isa Lagrange{RefHexahedron} ? 4 : 3
-    ret = similar(local_face_dofs, length(local_face_dofs), N)
-    ret[:, :] .= 1:length(local_face_dofs)
-    for f in 1:length(local_face_dofs_offset)-1
-        face_range = local_face_dofs_offset[f]:(local_face_dofs_offset[f+1]-1)
+    ret = similar(local_facet_dofs, length(local_facet_dofs), N)
+    ret[:, :] .= 1:length(local_facet_dofs)
+    for f in 1:length(local_facet_dofs_offset)-1
+        facet_range = local_facet_dofs_offset[f]:(local_facet_dofs_offset[f+1]-1)
         for i in 1:(N-1)
             # 1. Rotate the vertex dofs
-            vertex_range = face_range[1:(N*ncomponents)]
+            vertex_range = facet_range[1:(N*ncomponents)]
             circshift!(@view(ret[vertex_range, i+1]), @view(ret[vertex_range, i]), -ncomponents)
             # 2. Rotate the edge dofs
             if O > 1
-                edge_range = face_range[(N*ncomponents+1):(2N*ncomponents)]
+                edge_range = facet_range[(N*ncomponents+1):(2N*ncomponents)]
                 circshift!(@view(ret[edge_range, i+1]), @view(ret[edge_range, i]), -ncomponents)
             end
         end
@@ -1307,151 +1262,151 @@ function rotate_local_dofs(local_face_dofs, local_face_dofs_offset, ip::Lagrange
 end
 
 """
-    collect_periodic_faces(grid::Grid, mset, iset, transform::Union{Function,Nothing}=nothing; tol=1e-12)
+    collect_periodic_facets(grid::Grid, mset, iset, transform::Union{Function,Nothing}=nothing; tol=1e-12)
 
-Match all mirror faces in `mset` with a corresponding image face in `iset`. Return a
-dictionary which maps each mirror face to a image face. The result can then be passed to
+Match all mirror facets in `mset` with a corresponding image facet in `iset`. Return a
+dictionary which maps each mirror facet to a image facet. The result can then be passed to
 [`PeriodicDirichlet`](@ref).
 
-`mset` and `iset` can be given as a `String` (an existing face set in the grid) or as a
-`Set{FaceIndex}` directly.
+`mset` and `iset` can be given as a `String` (an existing facet set in the grid) or as a
+`AbstractSet{FacetIndex}` directly.
 
-By default this function looks for a matching face in the directions of the coordinate
+By default this function looks for a matching facet in the directions of the coordinate
 system. For other types of periodicities the `transform` function can be used. The
-`transform` function is applied on the coordinates of the image face, and is expected to
+`transform` function is applied on the coordinates of the image facet, and is expected to
 transform the coordinates to the matching locations in the mirror set.
 
-The keyword `tol` specifies the tolerence (i.e. distance and deviation in face-normals) 
-between a image-face and mirror-face, for them to be considered matched.
+The keyword `tol` specifies the tolerance (i.e. distance and deviation in facet-normals)
+between a image-facet and mirror-facet, for them to be considered matched.
 
-See also: [`collect_periodic_faces!`](@ref), [`PeriodicDirichlet`](@ref).
+See also: [`collect_periodic_facets!`](@ref), [`PeriodicDirichlet`](@ref).
 """
-function collect_periodic_faces(grid::Grid, mset::Union{Set{FaceIndex},String}, iset::Union{Set{FaceIndex},String}, transform::Union{Function,Nothing}=nothing; tol::Float64=1e-12)
-    return collect_periodic_faces!(PeriodicFacePair[], grid, mset, iset, transform; tol)
+function collect_periodic_facets(grid::Grid, mset::Union{AbstractSet{FacetIndex},String}, iset::Union{AbstractSet{FacetIndex},String}, transform::Union{Function,Nothing}=nothing; tol::Float64=1e-12)
+    return collect_periodic_facets!(PeriodicFacetPair[], grid, mset, iset, transform; tol)
 end
 
 """
-    collect_periodic_faces(grid::Grid, all_faces::Union{Set{FaceIndex},String,Nothing}=nothing; tol=1e-12)
+    collect_periodic_facets(grid::Grid, all_facets::Union{AbstractSet{FacetIndex},String,Nothing}=nothing; tol=1e-12)
 
-Split all faces in `all_faces` into image and mirror sets. For each matching pair, the face
-located further along the vector `(1, 1, 1)` becomes the image face.
+Split all facets in `all_facets` into image and mirror sets. For each matching pair, the facet
+located further along the vector `(1, 1, 1)` becomes the image facet.
 
-If no set is given, all faces on the outer boundary of the grid (i.e. all faces that do not
+If no set is given, all facets on the outer boundary of the grid (i.e. all facets that do not
 have a neighbor) is used.
 
-See also: [`collect_periodic_faces!`](@ref), [`PeriodicDirichlet`](@ref).
+See also: [`collect_periodic_facets!`](@ref), [`PeriodicDirichlet`](@ref).
 """
-function collect_periodic_faces(grid::Grid, all_faces::Union{Set{FaceIndex},String,Nothing}=nothing; tol::Float64=1e-12)
-    return collect_periodic_faces!(PeriodicFacePair[], grid, all_faces; tol)
+function collect_periodic_facets(grid::Grid, all_facets::Union{AbstractSet{FacetIndex},String,Nothing}=nothing; tol::Float64=1e-12)
+    return collect_periodic_facets!(PeriodicFacetPair[], grid, all_facets; tol)
 end
 
 
 """
-    collect_periodic_faces!(face_map::Vector{PeriodicFacePair}, grid::Grid, mset, iset, transform::Union{Function,Nothing}; tol=1e-12)
+    collect_periodic_facets!(facet_map::Vector{PeriodicFacetPair}, grid::Grid, mset, iset, transform::Union{Function,Nothing}; tol=1e-12)
 
-Same as [`collect_periodic_faces`](@ref) but adds all matches to the existing `face_map`.
+Same as [`collect_periodic_facets`](@ref) but adds all matches to the existing `facet_map`.
 """
-function collect_periodic_faces!(face_map::Vector{PeriodicFacePair}, grid::Grid, mset::Union{Set{FaceIndex},String}, iset::Union{Set{FaceIndex},String}, transform::Union{Function,Nothing}=nothing; tol::Float64=1e-12)
-    mset = __to_faceset(grid, mset)
-    iset = __to_faceset(grid, iset)
+function collect_periodic_facets!(facet_map::Vector{PeriodicFacetPair}, grid::Grid, mset::Union{AbstractSet{FacetIndex},String}, iset::Union{AbstractSet{FacetIndex},String}, transform::Union{Function,Nothing}=nothing; tol::Float64=1e-12)
+    mset = __to_facetset(grid, mset)
+    iset = __to_facetset(grid, iset)
     if transform === nothing
         # This method is destructive, hence the copy
-        __collect_periodic_faces_bruteforce!(face_map, grid, copy(mset), copy(iset), #=known_order=#true, tol)
+        __collect_periodic_facets_bruteforce!(facet_map, grid, copy(mset), copy(iset), #=known_order=#true, tol)
     else
         # This method relies on ordering, hence the collect
-        __collect_periodic_faces_tree!(face_map, grid, collect(mset), collect(iset), transform, tol)
+        __collect_periodic_facets_tree!(facet_map, grid, collect(mset), collect(iset), transform, tol)
     end
-    return face_map
+    return facet_map
 end
 
-function collect_periodic_faces!(face_map::Vector{PeriodicFacePair}, grid::Grid, faceset::Union{Set{FaceIndex},String,Nothing}; tol::Float64=1e-12)
-    faceset = faceset === nothing ? __collect_boundary_faces(grid) : copy(__to_faceset(grid, faceset))
-    if mod(length(faceset), 2) != 0
-        error("uneven number of faces")
+function collect_periodic_facets!(facet_map::Vector{PeriodicFacetPair}, grid::Grid, facetset::Union{AbstractSet{FacetIndex},String,Nothing}; tol::Float64=1e-12)
+    facetset = facetset === nothing ? __collect_boundary_facets(grid) : copy(__to_facetset(grid, facetset))
+    if mod(length(facetset), 2) != 0
+        error("uneven number of facets")
     end
-    return __collect_periodic_faces_bruteforce!(face_map, grid, faceset, faceset, #=known_order=#false, tol)
+    return __collect_periodic_facets_bruteforce!(facet_map, grid, facetset, facetset, #=known_order=#false, tol)
 end
 
-__to_faceset(_, set::Set{FaceIndex}) = set
-__to_faceset(grid, set::String) = getfaceset(grid, set)
-function __collect_boundary_faces(grid::Grid)
-    candidates = Dict{Tuple, FaceIndex}()
+__to_facetset(_, set::AbstractSet{FacetIndex}) = set
+__to_facetset(grid, set::String) = getfacetset(grid, set)
+function __collect_boundary_facets(grid::Grid)
+    candidates = Dict{Tuple, FacetIndex}()
     for (ci, c) in enumerate(grid.cells)
-        for (fi, fn) in enumerate(faces(c))
-            face = first(sortface(fn))
-            if haskey(candidates, face)
-                delete!(candidates, face)
+        for (fi, fn) in enumerate(facets(c))
+            facet = sortfacet_fast(fn)
+            if haskey(candidates, facet)
+                delete!(candidates, facet)
             else
-                candidates[face] = FaceIndex(ci, fi)
+                candidates[facet] = FacetIndex(ci, fi)
             end
         end
     end
-    return Set{FaceIndex}(values(candidates))
+    return OrderedSet{FacetIndex}(values(candidates))
 end
 
-function __collect_periodic_faces_tree!(face_map::Vector{PeriodicFacePair}, grid::Grid, mset::Vector{FaceIndex}, iset::Vector{FaceIndex}, transformation::F, tol::Float64) where F <: Function
+function __collect_periodic_facets_tree!(facet_map::Vector{PeriodicFacetPair}, grid::Grid, mset::Vector{FacetIndex}, iset::Vector{FacetIndex}, transformation::F, tol::Float64) where F <: Function
     if length(mset) != length(mset)
-        error("different number of faces in mirror and image set")
+        error("different number of facets in mirror and image set")
     end
     Tx = get_coordinate_type(grid)
 
     mirror_mean_x = Tx[]
     for (c, f) in mset
-        fn = faces(grid.cells[c])[f]
+        fn = facets(grid.cells[c])[f]
         push!(mirror_mean_x, sum(get_node_coordinate(grid,i) for i in fn) / length(fn))
     end
 
     # Same dance for the image
     image_mean_x = Tx[]
     for (c, f) in iset
-        fn = faces(grid.cells[c])[f]
+        fn = facets(grid.cells[c])[f]
         # Apply transformation to all coordinates
         push!(image_mean_x, sum(transformation(get_node_coordinate(grid,i))::Tx for i in fn) / length(fn))
     end
 
-    # Use KDTree to find closest face
+    # Use KDTree to find closest facet
     tree = KDTree(image_mean_x)
     idxs, _ = NearestNeighbors.nn(tree, mirror_mean_x)
     for (midx, iidx) in zip(eachindex(mset), idxs)
-        r = __check_periodic_faces_f(grid, mset[midx], iset[iidx], mirror_mean_x[midx], image_mean_x[iidx], transformation, tol)
+        r = __check_periodic_facets_f(grid, mset[midx], iset[iidx], mirror_mean_x[midx], image_mean_x[iidx], transformation, tol)
         if r === nothing
-            error("Could not find matching face for $(mset[midx])")
+            error("Could not find matching facet for $(mset[midx])")
         end
-        push!(face_map, r)
+        push!(facet_map, r)
     end
 
     # Make sure the mapping is unique
-    @assert all(x -> in(x, Set{FaceIndex}(p.mirror for p in face_map)), mset)
-    @assert all(x -> in(x, Set{FaceIndex}(p.image for p in face_map)), iset)
-    if !allunique(Set{FaceIndex}(p.image for p in face_map))
-        error("did not find a unique mapping between faces")
+    @assert all(x -> in(x, Set{FacetIndex}(p.mirror for p in facet_map)), mset)
+    @assert all(x -> in(x, Set{FacetIndex}(p.image for p in facet_map)), iset)
+    if !allunique(Set{FacetIndex}(p.image for p in facet_map))
+        error("did not find a unique mapping between facets")
     end
 
-    return face_map
+    return facet_map
 end
 
 # This method empties mset and iset
-function __collect_periodic_faces_bruteforce!(face_map::Vector{PeriodicFacePair}, grid::Grid, mset::Set{FaceIndex}, iset::Set{FaceIndex}, known_order::Bool, tol::Float64)
+function __collect_periodic_facets_bruteforce!(facet_map::Vector{PeriodicFacetPair}, grid::Grid, mset::AbstractSet{FacetIndex}, iset::AbstractSet{FacetIndex}, known_order::Bool, tol::Float64)
     if length(mset) != length(iset)
-        error("different faces in mirror and image")
+        error("different facets in mirror and image")
     end
     while length(mset) > 0
         fi = first(mset)
         found = false
         for fj in iset
             fi == fj && continue
-            r = __check_periodic_faces(grid, fi, fj, known_order, tol)
+            r = __check_periodic_facets(grid, fi, fj, known_order, tol)
             r === nothing && continue
-            push!(face_map, r)
+            push!(facet_map, r)
             delete!(mset, fi)
             delete!(iset, fj)
             found = true
             break
         end
-        found || error("did not find a corresponding periodic face")
+        found || error("did not find a corresponding periodic facet")
     end
     @assert isempty(mset) && isempty(iset)
-    return face_map
+    return facet_map
 end
 
 function __periodic_options(::T) where T <: Vec{2}
@@ -1501,22 +1456,22 @@ function circshift_tuple(x::T, n) where T
     Tuple(circshift!(collect(x), n))::T
 end
 
-# Check if two faces are periodic. This method assumes that the faces are mirrored and thus
+# Check if two facets are periodic. This method assumes that the facets are mirrored and thus
 # have opposing normal vectors
-function __check_periodic_faces(grid::Grid, fi::FaceIndex, fj::FaceIndex, known_order::Bool, tol::Float64)
+function __check_periodic_facets(grid::Grid, fi::FacetIndex, fj::FacetIndex, known_order::Bool, tol::Float64)
     cii, fii = fi
-    nodes_i = faces(grid.cells[cii])[fii]
+    nodes_i = facets(grid.cells[cii])[fii]
     cij, fij = fj
-    nodes_j = faces(grid.cells[cij])[fij]
+    nodes_j = facets(grid.cells[cij])[fij]
 
-    # 1. Check that normals are opposite TODO: Should use FaceValues here
+    # 1. Check that normals are opposite TODO: Should use FacetValues here
     ni = __outward_normal(grid, nodes_i)
     nj = __outward_normal(grid, nodes_j)
     if norm(ni + nj) >= tol
         return nothing
     end
 
-    # 2. Find the periodic direction using the vector between the midpoint of the faces
+    # 2. Find the periodic direction using the vector between the midpoint of the facets
     xmi = sum(get_node_coordinate(grid, i) for i in nodes_i) / length(nodes_i)
     xmj = sum(get_node_coordinate(grid, j) for j in nodes_j) / length(nodes_j)
     xmij = xmj - xmi
@@ -1534,7 +1489,7 @@ function __check_periodic_faces(grid::Grid, fi::FaceIndex, fj::FaceIndex, known_
     found || return nothing
 
     # 3. Check that the first node of fj have a corresponding node in fi
-    #    In this method faces are mirrored (opposite normal vectors) so reverse the nodes
+    #    In this method facets are mirrored (opposite normal vectors) so reverse the nodes
     nodes_i = circshift_tuple(reverse(nodes_i), 1)
     xj = get_node_coordinate(grid, nodes_j[1])
     node_rot = 0
@@ -1561,31 +1516,31 @@ function __check_periodic_faces(grid::Grid, fi::FaceIndex, fj::FaceIndex, known_
     end
 
     # Rotation is only relevant for 3D
-    if getdim(grid) == 3
+    if getspatialdim(grid) == 3
         node_rot = mod(node_rot, length(nodes_i))
     else
         node_rot = 0
     end
 
-    # 5. Faces match! Face below the diagonal become the mirror.
+    # 5. Facets match! Facet below the diagonal become the mirror.
     if known_order || len > 0
-        return PeriodicFacePair(fi, fj, node_rot, true)
+        return PeriodicFacetPair(fi, fj, node_rot, true)
     else
-        return PeriodicFacePair(fj, fi, node_rot, true)
+        return PeriodicFacetPair(fj, fi, node_rot, true)
     end
 end
 
-# This method is quite similar to __check_periodic_faces, but is used when user have passed
+# This method is quite similar to __check_periodic_facets, but is used when user have passed
 # a transformation function and we have then used the KDTree to find the matching pair of
-# faces. This function only need to i) check whether faces have aligned or opposite normal
+# facets. This function only need to i) check whether facets have aligned or opposite normal
 # vectors, and ii) compute the relative rotation.
-function __check_periodic_faces_f(grid::Grid, fi::FaceIndex, fj::FaceIndex, xmi, xmj, transformation::F, tol::Float64) where F
+function __check_periodic_facets_f(grid::Grid, fi::FacetIndex, fj::FacetIndex, xmi, xmj, transformation::F, tol::Float64) where F
     cii, fii = fi
-    nodes_i = faces(grid.cells[cii])[fii]
+    nodes_i = facets(grid.cells[cii])[fii]
     cij, fij = fj
-    nodes_j = faces(grid.cells[cij])[fij]
+    nodes_j = facets(grid.cells[cij])[fij]
 
-    # 1. Check if normals are aligned or opposite TODO: Should use FaceValues here
+    # 1. Check if normals are aligned or opposite TODO: Should use FacetValues here
     ni = __outward_normal(grid, nodes_i)
     nj = __outward_normal(grid, nodes_j, transformation)
     if norm(ni + nj) < tol
@@ -1616,13 +1571,13 @@ function __check_periodic_faces_f(grid::Grid, fi::FaceIndex, fj::FaceIndex, xmi,
     found || return nothing
 
     # 3. Rotation is only relevant for 3D.
-    if getdim(grid) == 3
+    if getspatialdim(grid) == 3
         node_rot = mod(node_rot, length(nodes_i))
     else
         node_rot = 0
     end
 
-    return PeriodicFacePair(fi, fj, node_rot, mirror)
+    return PeriodicFacetPair(fi, fj, node_rot, mirror)
 end
 
 

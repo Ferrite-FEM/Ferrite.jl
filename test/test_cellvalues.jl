@@ -1,5 +1,5 @@
 @testset "CellValues" begin
-@testset "ip=$scalar_interpol quad_rule=$(typeof(quad_rule))" for (scalar_interpol, quad_rule) in  (
+@testset "ip=$scalar_interpol" for (scalar_interpol, quad_rule) in  (
                                     (Lagrange{RefLine, 1}(), QuadratureRule{RefLine}(2)),
                                     (Lagrange{RefLine, 2}(), QuadratureRule{RefLine}(2)),
                                     (Lagrange{RefQuadrilateral, 1}(), QuadratureRule{RefQuadrilateral}(2)),
@@ -16,56 +16,107 @@
                                     (Lagrange{RefPrism, 2}(), QuadratureRule{RefPrism}(2)),
                                     (Lagrange{RefPyramid, 2}(), QuadratureRule{RefPyramid}(2)),
                                    )
-
-    for func_interpol in (scalar_interpol, VectorizedInterpolation(scalar_interpol))
+    for func_interpol in (scalar_interpol, VectorizedInterpolation(scalar_interpol)), DiffOrder in 1:2
+        (DiffOrder==2 && Ferrite.getorder(func_interpol)==1) && continue #No need to test linear interpolations again
         geom_interpol = scalar_interpol # Tests below assume this
         n_basefunc_base = getnbasefunctions(scalar_interpol)
-        cv = CellValues(quad_rule, func_interpol, geom_interpol)
-        ndim = Ferrite.getdim(func_interpol)
+        update_gradients = true
+        update_hessians = (DiffOrder==2 && Ferrite.getorder(func_interpol) > 1)
+        cv = CellValues(quad_rule, func_interpol, geom_interpol; update_gradients, update_hessians)
+        if update_gradients && !update_hessians # Check correct and type-stable default constructor
+            cv_default = @inferred CellValues(quad_rule, func_interpol, geom_interpol)
+            @test typeof(cv) === typeof(cv_default)
+            @inferred CellValues(quad_rule, func_interpol, geom_interpol; update_gradients=Val(false), update_detJdV=Val(false))
+        end
+        rdim = Ferrite.getrefdim(func_interpol)
         n_basefuncs = getnbasefunctions(func_interpol)
 
         @test getnbasefunctions(cv) == n_basefuncs
 
-        x, n = valid_coordinates_and_normals(func_interpol)
-        reinit!(cv, x)
-        @test_call reinit!(cv, x)
+        coords, n = valid_coordinates_and_normals(func_interpol)
+        reinit!(cv, coords)
+        @test_call reinit!(cv, coords)
 
         # We test this by applying a given deformation gradient on all the nodes.
         # Since this is a linear deformation we should get back the exact values
         # from the interpolation.
-        u = Vec{ndim, Float64}[zero(Tensor{1,ndim}) for i in 1:n_basefunc_base]
-        u_scal = zeros(n_basefunc_base)
-        H = rand(Tensor{2, ndim})
-        V = rand(Tensor{1, ndim})
-        for i in 1:n_basefunc_base
-            u[i] = H ⋅ x[i]
-            u_scal[i] = V ⋅ x[i]
+        V, G, H = if func_interpol isa Ferrite.ScalarInterpolation
+            (rand(), rand(Tensor{1, rdim}), Tensor{2, rdim}((i,j)-> i==j ? rand() : 0.0))
+        else
+            (rand(Tensor{1, rdim}), rand(Tensor{2, rdim}), Tensor{3, rdim}((i,j,k)-> i==j==k ? rand() : 0.0))
         end
-        u_vector = reinterpret(Float64, u)
+
+        u_funk(x,V,G,H) = begin
+            if update_hessians
+                0.5*x⋅H⋅x + G⋅x + V
+            else
+                G⋅x + V
+            end
+        end
+
+        _ue = [u_funk(coords[i],V,G,H) for i in 1:n_basefunc_base]
+        ue = reinterpret(Float64, _ue)
+
+        for i in 1:getnquadpoints(cv)
+            xqp = spatial_coordinate(cv, i, coords)
+            Hqp, Gqp, Vqp = Tensors.hessian(x -> u_funk(x,V,G,H), xqp, :all)
+
+            @test function_value(cv, i, ue) ≈ Vqp
+            @test function_gradient(cv, i, ue) ≈ Gqp
+            if update_hessians
+                #Note, the jacobian of the element is constant, which makes the hessian (of the mapping)
+                #zero. So this is not the optimal test
+                @test Ferrite.function_hessian(cv, i, ue) ≈ Hqp
+            end
+            if func_interpol isa Ferrite.VectorInterpolation
+                @test function_symmetric_gradient(cv, i, ue) ≈ 0.5(Gqp + Gqp')
+                @test function_divergence(cv, i, ue) ≈ tr(Gqp)
+                rdim == 3 && @test function_curl(cv, i, ue) ≈ Ferrite.curl_from_gradient(Gqp)
+            else
+                @test function_divergence(cv, i, ue) ≈ sum(Gqp)
+            end
+        end
+
+        #Test CellValues when input is a ::Vector{<:Vec} (most of which is deprecated)
+        ue_vec = [zero(Vec{rdim,Float64}) for i in 1:n_basefunc_base]
+        G_vector = rand(Tensor{2, rdim})
+        for i in 1:n_basefunc_base
+            ue_vec[i] = G_vector ⋅ coords[i]
+        end
 
         for i in 1:getnquadpoints(cv)
             if func_interpol isa Ferrite.ScalarInterpolation
-                @test function_gradient(cv, i, u) ≈ H
-                @test function_symmetric_gradient(cv, i, u) ≈ 0.5(H + H')
-                @test function_divergence(cv, i, u_scal) ≈ sum(V)
-                @test function_divergence(cv, i, u) ≈ tr(H)
-                @test function_gradient(cv, i, u_scal) ≈ V
-                ndim == 3 && @test function_curl(cv, i, u) ≈ Ferrite.curl_from_gradient(H)
-                function_value(cv, i, u)
-                function_value(cv, i, u_scal)
+                @test function_gradient(cv, i, ue_vec) ≈ G_vector
             else# func_interpol isa Ferrite.VectorInterpolation
-                @test function_gradient(cv, i, u_vector)  ≈ H
-                @test (@test_deprecated function_gradient(cv, i, u)) ≈ H
-                @test function_symmetric_gradient(cv, i, u_vector) ≈ 0.5(H + H')
-                @test (@test_deprecated function_symmetric_gradient(cv, i, u)) ≈ 0.5(H + H')
-                @test function_divergence(cv, i, u_vector) ≈ tr(H)
-                @test (@test_deprecated function_divergence(cv, i, u)) ≈ tr(H)
-                if ndim == 3
-                    @test function_curl(cv, i, u_vector) ≈ Ferrite.curl_from_gradient(H)
-                    @test (@test_deprecated function_curl(cv, i, u)) ≈ Ferrite.curl_from_gradient(H)
+                @test_throws Ferrite.DeprecationError function_gradient(cv, i, ue_vec)
+                @test_throws Ferrite.DeprecationError function_symmetric_gradient(cv, i, ue_vec)
+                @test_throws Ferrite.DeprecationError function_divergence(cv, i, ue_vec)
+                if rdim == 3
+                    @test_throws Ferrite.DeprecationError function_curl(cv, i, ue_vec)
                 end
-                @test function_value(cv, i, u_vector) ≈ (@test_deprecated function_value(cv, i, u))
+                @test_throws Ferrite.DeprecationError function_value(cv, i, ue_vec) #no value to test against
             end
+        end
+
+        #Check if the non-linear mapping is correct
+        #Only do this for one interpolation becuase it relise on AD on "iterative function"
+        if scalar_interpol === Lagrange{RefQuadrilateral, 2}()
+            coords_nl = [x+rand(x)*0.01 for x in coords] #add some displacement to nodes
+            reinit!(cv, coords_nl)
+
+            _ue_nl = [u_funk(coords_nl[i],V,G,H) for i in 1:n_basefunc_base]
+            ue_nl = reinterpret(Float64, _ue_nl)
+
+            for i in 1:getnquadpoints(cv)
+                xqp = spatial_coordinate(cv, i, coords_nl)
+                Hqp, Gqp, Vqp = Tensors.hessian(x -> function_value_from_physical_coord(func_interpol, coords_nl, x, ue_nl), xqp, :all)
+                @test function_value(cv, i, ue_nl) ≈ Vqp
+                @test function_gradient(cv, i, ue_nl) ≈ Gqp
+                if update_hessians
+                    @test Ferrite.function_hessian(cv, i, ue_nl) ≈ Hqp
+                end
+            end
+            reinit!(cv, coords) # reinit back to old coords
         end
 
         # Test of volume
@@ -73,11 +124,11 @@
         for i in 1:getnquadpoints(cv)
             vol += getdetJdV(cv,i)
         end
-        @test vol ≈ calculate_volume(func_interpol, x)
+        @test vol ≈ calculate_volume(func_interpol, coords)
 
         # Test quadrature rule after reinit! with ref. coords
-        x = Ferrite.reference_coordinates(func_interpol)
-        reinit!(cv, x)
+        coords = Ferrite.reference_coordinates(func_interpol)
+        reinit!(cv, coords)
         vol = 0.0
         for i in 1:getnquadpoints(cv)
             vol += getdetJdV(cv,i)
@@ -86,7 +137,7 @@
 
         # Test spatial coordinate (after reinit with ref.coords we should get back the quad_points)
         for (i, qp_x) in pairs(Ferrite.getpoints(quad_rule))
-            @test spatial_coordinate(cv, i, x) ≈ qp_x
+            @test spatial_coordinate(cv, i, coords) ≈ qp_x
         end
 
         @testset "copy(::CellValues)" begin
@@ -104,7 +155,7 @@
                     @test v == vc
                 end
             end
-            # Test that qr and detJdV is copied as expected. 
+            # Test that qr and detJdV is copied as expected.
             # Note that qr remain aliased, as defined by `copy(qr)=qr`, see quadrature.jl.
             for fname in (:qr, :detJdV)
                 v = getfield(cv, fname)
@@ -140,20 +191,20 @@ end
     qp = 1
     ip = Lagrange{RefTriangle,1}()
     qr = QuadratureRule{RefTriangle}(1)
-    qr_f = FaceQuadratureRule{RefTriangle}(1)
+    qr_f = FacetQuadratureRule{RefTriangle}(1)
     csv = CellValues(qr, ip)
     cvv = CellValues(qr, VectorizedInterpolation(ip))
     csv_embedded = CellValues(qr, ip, ip^3)
-    fsv = FaceValues(qr_f, ip)
-    fvv = FaceValues(qr_f, VectorizedInterpolation(ip))
-    fsv_embedded = FaceValues(qr_f, ip, ip^3)
-    
+    fsv = FacetValues(qr_f, ip)
+    fvv = FacetValues(qr_f, VectorizedInterpolation(ip))
+    fsv_embedded = FacetValues(qr_f, ip, ip^3)
+
     x, n = valid_coordinates_and_normals(ip)
     reinit!(csv, x)
     reinit!(cvv, x)
     reinit!(fsv, x, 1)
     reinit!(fvv, x, 1)
-    
+
     # Wrong number of coordinates
     xx = [x; x]
     @test_throws ArgumentError reinit!(csv, xx)
@@ -166,7 +217,7 @@ end
     @test_throws ArgumentError spatial_coordinate(fsv, qp, xx)
     @test_throws ArgumentError spatial_coordinate(fvv, qp, xx)
 
-    # Wrong dimension of coordinates 
+    # Wrong dimension of coordinates
     @test_throws ArgumentError reinit!(csv_embedded, x)
     @test_throws ArgumentError reinit!(fsv_embedded, x, 1)
 
@@ -302,11 +353,23 @@ end
             @test                            zeros(vdim) == function_gradient(csv3, 1, ue)[:, 3]
         end
     end
+
+    @testset "CellValues with hessians" begin
+        ip = Lagrange{RefQuadrilateral,2}()
+        qr = QuadratureRule{RefQuadrilateral}(2)
+
+        cv_vector = CellValues(qr, ip^2, ip^3; update_hessians = true)
+        cv_scalar = CellValues(qr, ip, ip^3; update_hessians = true)
+
+        coords = [Vec{3}((x[1], x[2], 0.0)) for x in Ferrite.reference_coordinates(ip)]
+        @test_throws ErrorException reinit!(cv_vector, coords) #Not implemented for embedded elements
+        @test_throws ErrorException reinit!(cv_scalar, coords)
+    end
 end
 
 @testset "CellValues constructor entry points" begin
     qr = QuadratureRule{RefTriangle}(1)
-    
+
     for fun_ip in (Lagrange{RefTriangle, 1}(), Lagrange{RefTriangle, 2}()^2)
         value_type(T) = fun_ip isa ScalarInterpolation ? T : Vec{2, T}
         grad_type(T) = fun_ip isa ScalarInterpolation ? Vec{2, T} : Tensor{2, 2, T, 4}
@@ -356,13 +419,13 @@ end
 end
 
 @testset "CustomCellValues" begin
-    
+
     @testset "SimpleCellValues" begin
         include(joinpath(@__DIR__, "../docs/src/topics/SimpleCellValues_literate.jl"))
     end
-    
+
     @testset "TestCustomCellValues" begin
-    
+
         struct TestCustomCellValues{CV<:CellValues} <: Ferrite.AbstractValues
             cv::CV
         end
@@ -382,7 +445,7 @@ end
         ae = rand(getnbasefunctions(cv))
         q_point = rand(1:getnquadpoints(cv))
         cv_custom = TestCustomCellValues(cv)
-        for fun in (function_value, function_gradient, 
+        for fun in (function_value, function_gradient,
                         function_divergence, function_symmetric_gradient, function_curl)
             @test fun(cv_custom, q_point, ae) == fun(cv, q_point, ae)
         end
