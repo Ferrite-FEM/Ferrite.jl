@@ -125,7 +125,7 @@ vector_handle(a::AssemblerSparsityPattern) = a.f
 
 Create a `AssemblerSparsityPattern` from the matrix `K` and optional vector `f`.
 
-`AssemblerSparsityPattern` allocate workspace necessary for efficient matrix assembly. To assemble 
+`AssemblerSparsityPattern` allocate workspace necessary for efficient matrix assembly. To assemble
  the contribution from an element, use [`assemble!`](@ref).
 
 The keyword argument `fillzero` can be set to `false` if `K` and `f` should not be zeroed
