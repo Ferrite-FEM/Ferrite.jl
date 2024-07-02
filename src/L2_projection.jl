@@ -108,6 +108,7 @@ function add!(proj::L2Projector, set::AbstractVecOrSet{Int}, ip::Interpolation;
         qr_rhs::Union{QuadratureRule, Nothing}, qr_lhs::QuadratureRule = _mass_qr(ip)
         )
     # Validate user input
+    isclosed(proj) && error("The L2Projector is already closed")
     if qr_rhs !== nothing
         getrefshape(ip) == getrefshape(qr_rhs) || error("The reference shape of the interpolation and the qr_rhs must be the same")
         push!(proj.qrs_rhs, qr_rhs)
