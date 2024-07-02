@@ -1517,6 +1517,9 @@ edgedof_interior_indices(::VectorizedInterpolation) = _entitydof_indices_vectori
 facedof_interior_indices(::VectorizedInterpolation) = _entitydof_indices_vectorized_ip_error(:facedof_interior_indices)
 volumedof_interior_indices(::VectorizedInterpolation) = _entitydof_indices_vectorized_ip_error(:volumedof_interior_indices)
 
+get_base_interpolation(ip::Interpolation) = ip
+get_base_interpolation(ip::VectorizedInterpolation) = ip.ip
+
 function getnbasefunctions(ipv::VectorizedInterpolation{vdim}) where vdim
     return vdim * getnbasefunctions(ipv.ip)
 end
