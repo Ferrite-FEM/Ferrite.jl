@@ -21,6 +21,9 @@ The following interpolations are implemented:
 * `Lagrange{RefTriangle,5}`
 * `BubbleEnrichedLagrange{RefTriangle,1}`
 * `CrouzeixRaviart{RefTriangle, 1}`
+* `CrouzeixRaviart{RefTetrahedron, 1}`
+* `RannacherTurek{RefQuadrilateral, 1}`
+* `RannacherTurek{RefHexahedron, 1}`
 * `Lagrange{RefHexahedron,1}`
 * `Lagrange{RefHexahedron,2}`
 * `Lagrange{RefTetrahedron,1}`
@@ -477,6 +480,11 @@ is_discontinuous(::Type{<:DiscontinuousLagrange}) = true
 ############
 # Lagrange #
 ############
+"""
+    Lagrange{refshape, order} <: ScalarInterpolation
+
+Standard continuous Lagrange polynomials with equidistant node placement.
+"""
 struct Lagrange{shape, order, unused} <: ScalarInterpolation{shape, order}
     function Lagrange{shape, order}() where {shape <: AbstractRefShape, order}
         new{shape, order, Nothing}()
@@ -1298,6 +1306,11 @@ end
 ###############
 # Serendipity #
 ###############
+"""
+    Serendipity{refshape, order} <: ScalarInterpolation
+
+Serendipity element on hypercubes. Currently only second order variants are implemented.
+"""
 struct Serendipity{shape, order, unused} <: ScalarInterpolation{shape,order}
     function Serendipity{shape, order}() where {shape <: AbstractRefShape, order}
         new{shape, order, Nothing}()
@@ -1439,27 +1452,33 @@ end
 # Crouzeix–Raviart Elements #
 #############################
 """
+    CrouzeixRaviart{refshape, order} <: ScalarInterpolation
+
 Classical non-conforming Crouzeix–Raviart element.
 
-For details we refer to the original paper:
-M. Crouzeix and P. Raviart. "Conforming and nonconforming finite element
-methods for solving the stationary Stokes equations I." ESAIM: Mathematical Modelling
-and Numerical Analysis-Modélisation Mathématique et Analyse Numérique 7.R3 (1973): 33-75.
+For details we refer to the original paper [CroRav:1973:cnf](@cite).
 """
 struct CrouzeixRaviart{shape, order, unused} <: ScalarInterpolation{shape, order}
     CrouzeixRaviart{RefTriangle, 1}() = new{RefTriangle, 1, Nothing}()
+    CrouzeixRaviart{RefTetrahedron, 1}() = new{RefTetrahedron, 1, Nothing}()
 end
+
+# CR elements are characterized by not having vertex dofs
+vertexdof_indices(ip::CrouzeixRaviart) = ntuple(i->(), nvertices(ip))
+
+#################################################
+# Non-conforming Crouzeix-Raviart dim 2 order 1 #
+#################################################
+getnbasefunctions(::CrouzeixRaviart{RefTriangle,1}) = 3
 
 adjust_dofs_during_distribution(::CrouzeixRaviart) = true
 adjust_dofs_during_distribution(::CrouzeixRaviart{<:Any, 1}) = false
 
-getnbasefunctions(::CrouzeixRaviart) = 3
+edgedof_indices(::CrouzeixRaviart{RefTriangle,1}) = ((1,), (2,), (3,))
+edgedof_interior_indices(::CrouzeixRaviart{RefTriangle,1}) = ((1,), (2,), (3,))
+facedof_indices(ip::CrouzeixRaviart{RefTriangle,1}) = (ntuple(i->i, getnbasefunctions(ip)),)
 
-edgedof_indices(::CrouzeixRaviart) = ((1,), (2,), (3,))
-edgedof_interior_indices(::CrouzeixRaviart) = ((1,), (2,), (3,))
-facedof_indices(ip::CrouzeixRaviart) = (ntuple(i->i, getnbasefunctions(ip)),)
-
-function reference_coordinates(::CrouzeixRaviart)
+function reference_coordinates(::CrouzeixRaviart{RefTriangle,1})
     return [Vec{2, Float64}((0.5, 0.5)),
             Vec{2, Float64}((0.0, 0.5)),
             Vec{2, Float64}((0.5, 0.0))]
@@ -1471,6 +1490,106 @@ function reference_shape_value(ip::CrouzeixRaviart{RefTriangle, 1}, ξ::Vec{2}, 
     i == 1 && return 2*ξ_x + 2*ξ_y - 1
     i == 2 && return 1 - 2*ξ_x
     i == 3 && return 1 - 2*ξ_y
+    throw(ArgumentError("no shape function $i for interpolation $ip"))
+end
+
+#################################################
+# Non-conforming Crouzeix-Raviart dim 3 order 1 #
+#################################################
+getnbasefunctions(::CrouzeixRaviart{RefTetrahedron,1}) = 4
+
+facedof_indices(::CrouzeixRaviart{RefTetrahedron,1}) = ((1,), (2,), (3,), (4,))
+facedof_interior_indices(::CrouzeixRaviart{RefTetrahedron,1}) = ((1,), (2,), (3,), (4,))
+
+function reference_coordinates(::CrouzeixRaviart{RefTetrahedron,1})
+    return [
+            Vec{3, Float64}((1/3, 1/3, 0.0)),
+            Vec{3, Float64}((1/3, 0.0, 1/3)),
+            Vec{3, Float64}((1/3, 1/3, 1/3)),
+            Vec{3, Float64}((0.0, 1/3, 1/3)),
+            ]
+end
+
+function reference_shape_value(ip::CrouzeixRaviart{RefTetrahedron,1}, ξ::Vec{3}, i::Int)
+    (x,y,z) = ξ
+    i == 1 && return 1 -3z
+    i == 2 && return 1 -3y
+    i == 3 && return 3x +3y +3z -2
+    i == 4 && return 1 -3x
+    return throw(ArgumentError("no shape function $i for interpolation $ip"))
+end
+
+"""
+    RannacherTurek{refshape, order} <: ScalarInterpolation
+
+Classical non-conforming Rannacher-Turek element.
+
+This element is basically the idea from Crouzeix and Raviart applied to
+hypercubes. For details see the original paper [RanTur:1992:snq](@cite).
+"""
+struct RannacherTurek{shape,order} <: ScalarInterpolation{shape,order} end
+
+# CR-type elements are characterized by not having vertex dofs
+vertexdof_indices(ip::RannacherTurek) = ntuple(i->(), nvertices(ip))
+
+adjust_dofs_during_distribution(::RannacherTurek) = true
+adjust_dofs_during_distribution(::RannacherTurek{<:Any, 1}) = false
+
+#################################
+# Rannacher-Turek dim 2 order 1 #
+#################################
+getnbasefunctions(::RannacherTurek{RefQuadrilateral,1}) = 4
+
+edgedof_indices(::RannacherTurek{RefQuadrilateral,1}) = ((1,), (2,), (3,), (4,))
+edgedof_interior_indices(::RannacherTurek{RefQuadrilateral,1}) = ((1,), (2,), (3,), (4,))
+facedof_indices(ip::RannacherTurek{RefQuadrilateral,1}) = (ntuple(i->i, getnbasefunctions(ip)),)
+
+function reference_coordinates(::RannacherTurek{RefQuadrilateral,1})
+    return [Vec{2, Float64}(( 0.0, -1.0)),
+            Vec{2, Float64}(( 1.0,  0.0)),
+            Vec{2, Float64}(( 0.0,  1.0)),
+            Vec{2, Float64}((-1.0,  0.0))]
+end
+
+function reference_shape_value(ip::RannacherTurek{RefQuadrilateral,1}, ξ::Vec{2,T},  i::Int) where T
+    (x,y) = ξ
+
+    i == 1 && return -(x+1)^2/4 +(y+1)^2/4 +(x+1)/2 -(y+1)   +T(3)/4
+    i == 2 && return  (x+1)^2/4 -(y+1)^2/4          +(y+1)/2 -T(1)/4
+    i == 3 && return -(x+1)^2/4 +(y+1)^2/4 +(x+1)/2          -T(1)/4
+    i == 4 && return  (x+1)^2/4 -(y+1)^2/4 -(x+1)   +(y+1)/2 +T(3)/4
+    throw(ArgumentError("no shape function $i for interpolation $ip"))
+end
+
+#################################
+# Rannacher-Turek dim 3 order 1 #
+#################################
+getnbasefunctions(::RannacherTurek{RefHexahedron,1}) = 6
+
+edgedof_indices(ip::RannacherTurek{RefHexahedron,1}) = ntuple(i->(), nedges(ip))
+edgedof_interior_indices(ip::RannacherTurek{RefHexahedron,1}) = ntuple(i->(), nedges(ip))
+facedof_indices(::RannacherTurek{RefHexahedron,1}) = ((1,), (2,), (3,), (4,), (5,), (6,))
+facedof_interior_indices(::RannacherTurek{RefHexahedron,1}) = ((1,), (2,), (3,), (4,), (5,), (6,))
+
+function reference_coordinates(::RannacherTurek{RefHexahedron,1})
+    return [Vec{3, Float64}(( 0.0,  0.0, -1.0)),
+            Vec{3, Float64}(( 0.0, -1.0,  0.0)),
+            Vec{3, Float64}(( 1.0,  0.0,  0.0)),
+            Vec{3, Float64}(( 0.0,  1.0,  0.0)),
+            Vec{3, Float64}((-1.0,  0.0,  0.0)),
+            Vec{3, Float64}(( 0.0,  0.0,  1.0)),]
+end
+
+function reference_shape_value(ip::RannacherTurek{RefHexahedron,1}, ξ::Vec{3,T}, i::Int) where T
+    (x,y,z) = ξ
+
+    i == 1 && return -2((x+1))^2/12 +1(x+1)/3 -2((y+1))^2/12 +1(y+1)/3 +4((z+1))^2/12 -7(z+1)/6 + T(2)/3
+    i == 2 && return -2((x+1))^2/12 +1(x+1)/3 +4((y+1))^2/12 -7(y+1)/6 -2((z+1))^2/12 +1(z+1)/3 + T(2)/3
+    i == 3 && return  4((x+1))^2/12 -1(x+1)/6 -2((y+1))^2/12 +1(y+1)/3 -2((z+1))^2/12 +1(z+1)/3 - T(1)/3
+    i == 4 && return -2((x+1))^2/12 +1(x+1)/3 +4((y+1))^2/12 -1(y+1)/6 -2((z+1))^2/12 +1(z+1)/3 - T(1)/3
+    i == 5 && return  4((x+1))^2/12 -7(x+1)/6 -2((y+1))^2/12 +1(y+1)/3 -2((z+1))^2/12 +1(z+1)/3 + T(2)/3
+    i == 6 && return -2((x+1))^2/12 +1(x+1)/3 -2((y+1))^2/12 +1(y+1)/3 +4((z+1))^2/12 -1(z+1)/6 - T(1)/3
+
     throw(ArgumentError("no shape function $i for interpolation $ip"))
 end
 

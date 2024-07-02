@@ -2,6 +2,7 @@ using Ferrite: reference_shape_value
 
 @testset "Quadrature testing" begin
     ref_tet_vol(dim) = 1 / factorial(dim)
+    ref_prism_vol() = 1 / 2
     ref_square_vol(dim) = 2^dim
 
     function integrate(qr::QuadratureRule, f::Function)
@@ -54,6 +55,13 @@ using Ferrite: reference_shape_value
     end
     @test_throws ArgumentError QuadratureRule{RefTetrahedron}(:einstein, 2)
     @test_throws ArgumentError QuadratureRule{RefTetrahedron}(0)
+
+    g = (x) -> sqrt(x[1] + x[2])*x[3]^2
+    for order in 1:10
+        qr = QuadratureRule{RefPrism}(:polyquad, order)
+        @test integrate(qr, g) - 2/15 < 0.01
+        @test sum(qr.weights) ≈ ref_prism_vol()
+    end
 
     @testset "Quadrature rules for $ref_cell" for ref_cell in (
         Line,
