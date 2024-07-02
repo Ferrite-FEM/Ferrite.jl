@@ -38,11 +38,13 @@ using SparseArrays, LinearAlgebra
 end
 
 @testset "assembly integration" begin
+    # Setup simple problem
     grid = generate_grid(Line, (2,))
     dh = DofHandler(grid)
     add!(dh, :u, Lagrange{RefLine, 1}())
     close!(dh)
 
+    # Check if the matrix is correctly allocated
     K = allocate_matrix(SparseMatrixCSR, dh)
     I = [1,1,2,2,2,3,3]
     J = [1,2,1,2,3,2,3]
@@ -50,32 +52,33 @@ end
     @test K == sparsecsr(I,J,V)
     f = zeros(3)
 
+    # Check that incuding the ch doesnot mess up the pattern
     ch = ConstraintHandler(dh)
     add!(ch, Dirichlet(:u, getfacetset(grid, "left"), (x, t) -> 1))
     close!(ch)
     @test K == allocate_matrix(SparseMatrixCSR, dh, ch)
 
+    # Check if assembly works
     assembler = start_assemble(K, f)
     ke = [-1.0 1.0; 2.0 -1.0]
     fe = [1.0,2.0]
     assemble!(assembler, [1,2], ke,fe)
     assemble!(assembler, [3,2], ke,fe)
-
     I = [1,1,2,2,2,3,3]
     J = [1,2,1,2,3,2,3]
     V = [-1.0,1.0,2.0,-2.0,2.0,1.0,-1.0]
     @test K ≈ sparsecsr(I,J,V)
     @test f ≈ [1.0,4.0,1.0]
 
+    # Check if constraint handler integration works
     apply!(K,f,ch)
-
     I = [1,1,2,2,2,3,3]
     J = [1,2,1,2,3,2,3]
     V = [4/3,0.0,0.0,-2.0,2.0,1.0,-1.0]
     @test K ≈ sparsecsr(I,J,V)
     @test f ≈ [4/3,2.0,1.0]
 
-
+    # Check if coupling works
     grid = generate_grid(Quadrilateral, (2,2))
     ip = Lagrange{RefQuadrilateral,1}()
     dh = DofHandler(grid)
