@@ -1,17 +1,51 @@
-Base.@deprecate_binding DirichletBoundaryConditions ConstraintHandler
-Base.@deprecate_binding DirichletBoundaryCondition Dirichlet
+struct DeprecationError <: Exception
+    msg::String
+end
+function DeprecationError(msg::Pair)
+    io = _iobuffer()
+    printstyled(io, "`$(msg.first)`", color=:red)
+    print(io, " is deprecated, use ")
+    printstyled(io, "`$(msg.second)`", color=:green)
+    print(io, " instead.")
+    DeprecationError(takestring(io))
+end
 
-import Base: push!
-@deprecate push!(dh::AbstractDofHandler, args...) add!(dh, args...)
+function Base.showerror(io::IO, err::DeprecationError)
+    print(io, "DeprecationError: ")
+    print(io, err.msg)
+end
 
-@deprecate vertices(ip::Interpolation) vertexdof_indices(ip) false
-@deprecate faces(ip::Interpolation) facedof_indices(ip) false
-@deprecate edges(ip::Interpolation) edgedof_indices(ip) false
-@deprecate nfields(dh::AbstractDofHandler) length(getfieldnames(dh)) false
-# @deprecate add!(ch::ConstraintHandler, fh::FieldHandler, dbc::Dirichlet) add!(ch, dbc)
+function _iobuffer()
+    io = IOBuffer()
+    ioc = IOContext(io, IOContext(stderr))
+    return ioc
+end
+function takestring(ioc)
+    String(take!(ioc.io))
+end
 
-@deprecate getcoordinates(node::Node) get_node_coordinate(node) true
-@deprecate cellcoords!(x::Vector, dh::DofHandler, args...) getcoordinates!(x, dh.grid, args...) false
+function Base.push!(::AbstractDofHandler, args...)
+    throw(DeprecationError("push!(dh::AbstractDofHandler, args...)" => "add!(dh, args...)"))
+end
+
+for (a, b) in [(:vertices, :vertexdof_indices), (:faces, :facedof_indices), (:edges, :edgedof_indices)]
+    @eval function $(a)(::Interpolation)
+        throw(DeprecationError("$($(a))(ip::Interpolation)" => "`$($(b))(ip)"))
+    end
+end
+
+function nfields(::AbstractDofHandler)
+    throw(DeprecationError("nfields(dh::AbstractDofHandler)" => "length(getfieldnames(dh))"))
+end
+
+export getcoordinates
+function getcoordinates(::Node)
+    throw(DeprecationError("getcoordinates(node::Node)" => "get_node_coordinate(node)"))
+end
+
+function cellcoords!(x::Vector, dh::DofHandler, args...)
+    throw(DeprecationError("cellcoords!(x::Vector, dh::DofHandler, args...)" => "getcoordinates!(x, dh.grid, args...)"))
+end
 
 struct Cell{refdim, nnodes, nfaces}
     function Cell{refdim, nnodes, nfaces}(nodes) where {refdim, nnodes, nfaces}
@@ -45,19 +79,30 @@ struct Cell{refdim, nnodes, nfaces}
             replacement = Wedge
         end
         if replacement === nothing
-            error("The AbstractCell interface have been changed, see https://github.com/Ferrite-FEM/Ferrite.jl/pull/679")
+            throw(DeprecationError("The AbstractCell interface have been changed, see https://github.com/Ferrite-FEM/Ferrite.jl/pull/679"))
         else
-            Base.depwarn("Use `$(replacement)(nodes)` instead of `Cell{$refdim, $nnodes, $nfaces}(nodes)`.", :Cell)
-            return replacement(nodes)
+            throw(DeprecationError("Cell{$refdim, $nnodes, $nfaces}(nodes)" => "$replacement(nodes)"))
         end
     end
 end
 export Cell
 
-Base.@deprecate_binding Line2D Line
-Base.@deprecate_binding Line3D Line
-Base.@deprecate_binding Quadrilateral3D Quadrilateral
+const Line2D = Cell{2,2,1}
+const Line3D = Cell{3,2,0}
+const Quadrilateral3D = Cell{3,4,1}
 export Line2D, Line3D, Quadrilateral3D
+
+using WriteVTK: vtk_grid
+export vtk_grid # To give better error
+
+function WriteVTK.vtk_grid(::String, ::Union{AbstractGrid,AbstractDofHandler}; kwargs...)
+    throw(DeprecationError(
+        "The vtk interface has been updated in Ferrite v1.0. " *
+        "See https://github.com/Ferrite-FEM/Ferrite.jl/pull/692. " *
+        "Use VTKFile to open a vtk file, and the functions " *
+        "write_solution, write_cell_data, and write_projection to save data."
+    ))
+end
 
 # Deprecation of auto-vectorized methods
 function add!(dh::DofHandler, name::Symbol, dim::Int)
@@ -65,38 +110,50 @@ function add!(dh::DofHandler, name::Symbol, dim::Int)
     if !isconcretetype(celltype)
         error("If you have more than one celltype in Grid, you must use add!(dh::DofHandler, fh::FieldHandler)")
     end
-    Base.depwarn(
-        "`add!(dh::DofHandler, name::Symbol, dim::Int)` is deprecated. Instead, pass the " *
-        "interpolation explicitly, and vectorize it to `dim` for vector-valued " *
-        "fields. See CHANGELOG for more details.",
-        :add!,
-    )
-    ip = default_interpolation(celltype)
-    add!(dh, name, dim == 1 ? ip : VectorizedInterpolation{dim}(ip))
+    io = _iobuffer()
+    printstyled(io, "`add!(dh::DofHandler, name::Symbol, dim::Int)`", color=:red)
+    print(io, " is deprecated. Instead, pass the interpolation explicitly, and vectorize it to `dim` for vector-valued fields.")
+    print(io, " See CHANGELOG for more details.")
+    throw(DeprecationError(takestring(io)))
 end
 
 function add!(dh::DofHandler, name::Symbol, dim::Int, ip::ScalarInterpolation)
-    Base.depwarn(
-        "`add!(dh::DofHandler, name::Symbol, dim::Int, ip::ScalarInterpolation)` is " *
-        "deprecated. Instead, vectorize the interpolation to the appropriate dimension " *
-        "and add it (`vip = ip^dim; add!(dh, name, vip)`). See CHANGELOG for more details.",
-        :add!
-    )
-    add!(dh, name, dim == 1 ? ip : VectorizedInterpolation{dim}(ip))
+    io = _iobuffer()
+    printstyled(io, "`add!(dh::DofHandler, name::Symbol, dim::Int, ip::ScalarInterpolation)`", color=:red)
+    print(io, " is deprecated. Instead, vectorize the interpolation to the appropriate dimension and then `add!` it.")
+    print(io, " See CHANGELOG for more details.")
+    throw(DeprecationError(takestring(io)))
 end
 
 # Deprecation of compute_vertex_values
-@deprecate compute_vertex_values(nodes::Vector{<:Node}, f::Function) map(n -> f(n.x), nodes)
-@deprecate compute_vertex_values(grid::AbstractGrid, f::Function) map(n -> f(n.x), getnodes(grid))
-@deprecate compute_vertex_values(grid::AbstractGrid, v::Vector{Int}, f::Function) map(n -> f(n.x), getnodes(grid, v))
-@deprecate compute_vertex_values(grid::AbstractGrid, set::String, f::Function) map(n -> f(n.x), getnodes(grid, set))
+export compute_vertex_values
+function compute_vertex_values(nodes::Vector{<:Node}, f::Function)
+    throw(DeprecationError("compute_vertex_values(nodes::Vector{<:Node}, f::Function)" => "map(n -> f(n.x), nodes)"))
+end
+function compute_vertex_values(grid::AbstractGrid, f::Function)
+    throw(DeprecationError("compute_vertex_values(grid::AbstractGrid, f::Function)" => "map(n -> f(n.x), getnodes(grid))"))
+end
+function compute_vertex_values(grid::AbstractGrid, v::Vector{Int}, f::Function)
+    throw(DeprecationError("compute_vertex_values(grid::AbstractGrid, v::Vector{Int}, f::Function)" => "map(n -> f(n.x), getnodes(grid, v))"))
+end
+function compute_vertex_values(grid::AbstractGrid, set::String, f::Function)
+    throw(DeprecationError("compute_vertex_values(grid::AbstractGrid, set::String, f::Function)" => "map(n -> f(n.x), getnodes(grid, set))"))
+end
 
-@deprecate reshape_to_nodes evaluate_at_grid_nodes
+function reshape_to_nodes(args...)
+    throw(DeprecationError("reshape_to_nodes(args...)" => "evaluate_at_grid_nodes(args...)"))
+end
 
-@deprecate start_assemble(f::Vector, K::Union{SparseMatrixCSC, Symmetric}; kwargs...) start_assemble(K, f; kwargs...)
+function start_assemble(f::Vector, K::Union{SparseMatrixCSC, Symmetric}; kwargs...)
+    throw(DeprecationError("start_assemble(f::Vector, K::Union{SparseMatrixCSC, Symmetric}; kwargs...)" => "start_assemble(K, f; kwargs...)"))
+end
 
-@deprecate shape_derivative shape_gradient
-@deprecate function_derivative function_gradient
+function shape_derivative(args...)
+    throw(DeprecationError("shape_derivative(args...)" => "shape_gradient(args...)"))
+end
+function function_derivative(args...)
+    throw(DeprecationError("function_derivative(args...)" => "function_gradient(args...)"))
+end
 
 # Deprecation of (Cell|Face|Point)(Scalar|Vector)Values.
 # Define dummy types so that loading old code doesn't directly error, and let
@@ -148,18 +205,27 @@ for VT in (
     end
     @eval begin
         function $(VT)(args...)
-            error($message)
+            throw(DeprecationError($message))
         end
         export $(VT)
     end
 end
 
+# TODO: Are these needed to be deprecated - harder? with the new parameterization
 # (Cell|Face)Values with vector dofs
-const _VectorValues = Union{CellValues{<:VectorInterpolation}, FaceValues{<:VectorInterpolation}}
-@deprecate      function_value(fe_v::_VectorValues, q_point::Int, u::AbstractVector{Vec{dim,T}}) where {dim,T}      function_value(fe_v, q_point, reinterpret(T, u))
-@deprecate   function_gradient(fe_v::_VectorValues, q_point::Int, u::AbstractVector{Vec{dim,T}}) where {dim,T}   function_gradient(fe_v, q_point, reinterpret(T, u))
-@deprecate function_divergence(fe_v::_VectorValues, q_point::Int, u::AbstractVector{Vec{dim,T}}) where {dim,T} function_divergence(fe_v, q_point, reinterpret(T, u))
-@deprecate       function_curl(fe_v::_VectorValues, q_point::Int, u::AbstractVector{Vec{dim,T}}) where {dim,T}       function_curl(fe_v, q_point, reinterpret(T, u))
+const _VectorValues = Union{CellValues{<:FV}, FacetValues{<:FV}} where {FV <: FunctionValues{<:Any,<:VectorInterpolation}}
+function function_value(::_VectorValues, ::Int, ::AbstractVector{Vec{dim,T}}) where {dim,T}
+    throw(DeprecationError("function_value(fe_v::VectorValues, q_point::Int, u::AbstractVector{Vec{dim,T}})" => "function_value(fe_v, q_point, reinterpret(T, u))"))
+end
+function function_gradient(::_VectorValues, ::Int, ::AbstractVector{Vec{dim,T}}) where {dim,T}
+    throw(DeprecationError("function_gradient(fe_v::VectorValues, q_point::Int, u::AbstractVector{Vec{dim,T}})" => "function_gradient(fe_v, q_point, reinterpret(T, u))"))
+end
+function function_divergence(::_VectorValues, ::Int, ::AbstractVector{Vec{dim,T}}) where {dim,T}
+    throw(DeprecationError("function_divergence(fe_v::VectorValues, q_point::Int, u::AbstractVector{Vec{dim,T}})" => "function_divergence(fe_v, q_point, reinterpret(T, u))"))
+end
+function function_curl(::_VectorValues, ::Int, ::AbstractVector{Vec{dim,T}}) where {dim,T}
+    throw(DeprecationError("function_curl(fe_v::VectorValues, q_point::Int, u::AbstractVector{Vec{dim,T}})" => "function_curl(fe_v, q_point, reinterpret(T, u))"))
+end
 
 # New reference shapes
 struct RefCube end
@@ -167,34 +233,27 @@ export RefCube
 
 function Lagrange{D, RefCube, O}() where {D, O}
     shape = D == 1 ? RefLine : D == 2 ? RefQuadrilateral : RefHexahedron
-    Base.depwarn("`Lagrange{$D, RefCube, $O}()` is deprecated, use `Lagrange{$(shape), $O}()` instead.", :Lagrange)
-    return Lagrange{shape, O}()
+    throw(DeprecationError("Lagrange{$D, RefCube, $O}()" => "Lagrange{$(shape), $O}()"))
 end
 function Lagrange{2, RefTetrahedron, O}() where {O}
-    Base.depwarn("`Lagrange{2, RefTetrahedron, $O}()` is deprecated, use `Lagrange{RefTriangle, $O}()` instead.", :Lagrange)
-    return Lagrange{RefTriangle, O}()
+    throw(DeprecationError("Lagrange{2, RefTetrahedron, $O}()" => "Lagrange{RefTriangle, $O}()"))
 end
 function DiscontinuousLagrange{D, RefCube, O}() where {D, O}
     shape = D == 1 ? RefLine : D == 2 ? RefQuadrilateral : RefHexahedron
-    Base.depwarn("`DiscontinuousLagrange{$D, RefCube, $O}()` is deprecated, use `DiscontinuousLagrange{$(shape), $O}()` instead.", :DiscontinuousLagrange)
-    return DiscontinuousLagrange{shape, O}()
+    throw(DeprecationError("DiscontinuousLagrange{$D, RefCube, $O}()" => "DiscontinuousLagrange{$(shape), $O}()"))
 end
 function BubbleEnrichedLagrange{2, RefTetrahedron, O}() where {O}
-    Base.depwarn("`BubbleEnrichedLagrange{2, RefTetrahedron, $O}()` is deprecated, use `BubbleEnrichedLagrange{RefTriangle, $O}()` instead.", :BubbleEnrichedLagrange)
-    return BubbleEnrichedLagrange{RefTriangle, O}()
+    throw(DeprecationError("BubbleEnrichedLagrange{2, RefTetrahedron, $O}()" => "BubbleEnrichedLagrange{RefTriangle, $O}()"))
 end
 function DiscontinuousLagrange{2, RefTetrahedron, O}() where {O}
-    Base.depwarn("`DiscontinuousLagrange{2, RefTetrahedron, $O}()` is deprecated, use `DiscontinuousLagrange{RefTriangle, $O}()` instead.", :DiscontinuousLagrange)
-    return DiscontinuousLagrange{RefTriangle, O}()
+    throw(DeprecationError("DiscontinuousLagrange{2, RefTetrahedron, $O}()" => "DiscontinuousLagrange{RefTriangle, $O}()"))
 end
 function Serendipity{D, RefCube, O}() where {D, O}
     shape = D == 1 ? RefLine : D == 2 ? RefQuadrilateral : RefHexahedron
-    Base.depwarn("`Serendipity{$D, RefCube, $O}()` is deprecated, use `Serendipity{$(shape), $O}()` instead.", :Serendipity)
-    return Serendipity{shape, O}()
+    throw(DeprecationError("Serendipity{$D, RefCube, $O}()" => "Serendipity{$(shape), $O}()"))
 end
 function CrouzeixRaviart{2, 1}()
-    Base.depwarn("`CrouzeixRaviart{2, 1}()` is deprecated, use `CrouzeixRaviart{RefTriangle, 1}()` instead.", :CrouzeixRaviart)
-    return CrouzeixRaviart{RefTriangle, 1}()
+    throw(DeprecationError("CrouzeixRaviart{2, 1}()" => "CrouzeixRaviart{RefTriangle, 1}()"))
 end
 
 # For the quadrature: Some will be wrong for face integration, so then we warn
@@ -203,75 +262,67 @@ end
 # QuadratureRule{1, RefCube}(...) -> QuadratureRule{RefLine}(...)
 # QuadratureRule{2, RefCube}(...) -> QuadratureRule{RefQuadrilateral}(...)
 # QuadratureRule{3, RefCube}(...) -> QuadratureRule{RefHexahedron}(...)
-# QuadratureRule{1, RefCube}(...) -> FaceQuadratureRule{RefQuadrilateral}(...)
-# QuadratureRule{2, RefCube}(...) -> FaceQuadratureRule{RefHexahedron}(...)
+# QuadratureRule{1, RefCube}(...) -> FacetQuadratureRule{RefQuadrilateral}(...)
+# QuadratureRule{2, RefCube}(...) -> FacetQuadratureRule{RefHexahedron}(...)
 function QuadratureRule{D, RefCube}(order::Int) where D
     shapes = (RefLine, RefQuadrilateral, RefHexahedron)
     msg = "`QuadratureRule{$D, RefCube}(order::Int)` is deprecated, use `QuadratureRule{$(shapes[D])}(order)` instead"
     if D == 1 || D == 2
-        msg *= " (or `FaceQuadratureRule{$(shapes[D+1])}(order)` if this is a face quadrature rule)"
+        msg *= " (or `FacetQuadratureRule{$(shapes[D+1])}(order)` if this is a face quadrature rule)"
     end
     msg *= "."
-    Base.depwarn(msg, :QuadratureRule)
-    return QuadratureRule{shapes[D]}(order)
+    throw(DeprecationError(msg))
 end
 function QuadratureRule{D, RefCube}(quad_type::Symbol, order::Int) where D
     shapes = (RefLine, RefQuadrilateral, RefHexahedron)
     msg = "`QuadratureRule{$D, RefCube}(quad_type::Symbol, order::Int)` is deprecated, use `QuadratureRule{$(shapes[D])}(quad_type, order)` instead"
     if D == 1 || D == 2
-        msg *= " (or `FaceQuadratureRule{$(shapes[D+1])}(quad_type, order)` if this is a face quadrature rule)"
+        msg *= " (or `FacetQuadratureRule{$(shapes[D+1])}(quad_type, order)` if this is a face quadrature rule)"
     end
     msg *= "."
-    Base.depwarn(msg, :QuadratureRule)
-    return QuadratureRule{shapes[D]}(quad_type, order)
+    throw(DeprecationError(msg))
 end
 
 # QuadratureRule{2, RefTetrahedron}(...) -> QuadratureRule{RefTriangle}(...)
 # QuadratureRule{3, RefTetrahedron}(...) -> QuadratureRule{RefTetrahedron}(...)
-# QuadratureRule{2, RefTetrahedron}(...) -> FaceQuadratureRule{RefTetrahedron}(...)
+# QuadratureRule{2, RefTetrahedron}(...) -> FacetQuadratureRule{RefTetrahedron}(...)
 function QuadratureRule{D, RefTetrahedron}(order::Int) where D
     shapes = (nothing, RefTriangle, RefTetrahedron)
     msg = "`QuadratureRule{$D, RefTetrahedron}(order::Int)` is deprecated, use `QuadratureRule{$(shapes[D])}(order)` instead"
     if D == 2
-        msg *= " (or `FaceQuadratureRule{RefTetrahedron)}(order)` if this is a face quadrature rule)"
+        msg *= " (or `FacetQuadratureRule{RefTetrahedron)}(order)` if this is a face quadrature rule)"
     end
     msg *= "."
-    Base.depwarn(msg, :QuadratureRule)
-    return QuadratureRule{shapes[D]}(order)
+    throw(DeprecationError(msg))
 end
 function QuadratureRule{D, RefTetrahedron}(quad_type::Symbol, order::Int) where D
     shapes = (nothing, RefTriangle, RefTetrahedron)
     msg = "`QuadratureRule{$D, RefTetrahedron}(quad_type::Symbol, order::Int)` is deprecated, use `QuadratureRule{$(shapes[D])}(quad_type, order)` instead"
     if D == 2
-        msg *= " (or `FaceQuadratureRule{RefTetrahedron)}(order)` if this is a face quadrature rule)"
+        msg *= " (or `FacetQuadratureRule{RefTetrahedron)}(order)` if this is a face quadrature rule)"
     end
     msg *= "."
-    Base.depwarn(msg, :QuadratureRule)
-    return QuadratureRule{shapes[D]}(quad_type, order)
+    throw(DeprecationError(msg))
 end
 
-# QuadratureRule{0, RefCube}(...) -> FaceQuadratureRule{RefLine}
+# QuadratureRule{0, RefCube}(...) -> FacetQuadratureRule{RefLine}
 function QuadratureRule{0, RefCube}(order::Int)
-    msg = "`QuadratureRule{0, RefCube}(order::Int)` is deprecated, use `FaceQuadratureRule{RefLine}(order)` instead."
-    Base.depwarn(msg, :QuadratureRule)
-    return FaceQuadratureRule{RefLine}(order)
+    msg = "`QuadratureRule{0, RefCube}(order::Int)` is deprecated, use `FacetQuadratureRule{RefLine}(order)` instead."
+    throw(DeprecationError(msg))
 end
 function QuadratureRule{0, RefCube}(quad_type::Symbol, order::Int)
-    msg = "`QuadratureRule{0, RefCube}(quad_type::Symbol, order::Int)` is deprecated, use `FaceQuadratureRule{RefLine}(quad_type, order)` instead."
-    Base.depwarn(msg, :QuadratureRule)
-    return FaceQuadratureRule{RefLine}(quad_type, order)
+    msg = "`QuadratureRule{0, RefCube}(quad_type::Symbol, order::Int)` is deprecated, use `FacetQuadratureRule{RefLine}(quad_type, order)` instead."
+    throw(DeprecationError(msg))
 end
 
-# QuadratureRule{1, RefTetrahedron}(...) -> FaceQuadratureRule{RefTriangle}
+# QuadratureRule{1, RefTetrahedron}(...) -> FacetQuadratureRule{RefTriangle}
 function QuadratureRule{1, RefTetrahedron}(order::Int)
-    msg = "`QuadratureRule{1, RefTetrahedron}(order::Int)` is deprecated, use `FaceQuadratureRule{RefTriangle}(order)` instead."
-    Base.depwarn(msg, :QuadratureRule)
-    return FaceQuadratureRule{RefTriangle}(order)
+    msg = "`QuadratureRule{1, RefTetrahedron}(order::Int)` is deprecated, use `FacetQuadratureRule{RefTriangle}(order)` instead."
+    throw(DeprecationError(msg))
 end
 function QuadratureRule{1, RefTetrahedron}(quad_type::Symbol, order::Int)
-    msg = "`QuadratureRule{1, RefTetrahedron}(quad_type::Symbol, order::Int)` is deprecated, use `FaceQuadratureRule{RefTriangle}(quad_type, order)` instead."
-    Base.depwarn(msg, :QuadratureRule)
-    return FaceQuadratureRule{RefTriangle}(quad_type, order)
+    msg = "`QuadratureRule{1, RefTetrahedron}(quad_type::Symbol, order::Int)` is deprecated, use `FacetQuadratureRule{RefTriangle}(quad_type, order)` instead."
+    throw(DeprecationError(msg))
 end
 
 # Catch remaining cases in (Cell|Face)Value constructors
@@ -279,38 +330,33 @@ function CellValues(
     ::Type{T}, qr::QuadratureRule{2, RefTetrahedron, TQ}, ip::Interpolation{RefTriangle},
     gip::Interpolation{RefTriangle} = default_geometric_interpolation(ip),
 ) where {T, TQ}
-    qr′ = QuadratureRule{2, RefTriangle, T}(qr.weights, qr.points)
-    Base.depwarn("The input quadrature rule have the wrong reference shape, likely this comes from a constructor like `QuadratureRule{2, RefTetrahedron}(...)` which have been deprecated in favor of `QuadratureRule{RefTriangle}(...)`.", :CellValues)
-    CellValues(T, qr′, ip, gip)
+    msg = "The input quadrature rule have the wrong reference shape, likely this comes from a constructor like `QuadratureRule{2, RefTetrahedron}(...)` which have been deprecated in favor of `QuadratureRule{RefTriangle}(...)`."
+    throw(DeprecationError(msg))
 end
-function FaceValues(qr::QuadratureRule, ip::Interpolation,
+function FacetValues(qr::QuadratureRule, ip::Interpolation,
                     gip::Interpolation = default_geometric_interpolation(ip))
-    return FaceValues(Float64, qr, ip, gip)
+    return FacetValues(Float64, qr, ip, gip)
 end
-function FaceValues(
+function FacetValues(
     ::Type{T}, qr::QuadratureRule{RefLine, TQ}, ip::Interpolation{RefQuadrilateral},
     gip::Interpolation{RefQuadrilateral} = default_geometric_interpolation(ip),
 ) where {T, TQ}
-    Base.depwarn("The input quadrature rule have the wrong reference shape, likely this comes from a constructor like `QuadratureRule{1, RefCube}(...)` which have been deprecated in favor of `FaceQuadratureRule{RefQuadrilateral}(...)`.", :FaceValues)
-    qr′ = create_face_quad_rule(RefQuadrilateral, qr.weights, qr.points)
-    FaceValues(T, qr′, ip, gip)
+    msg = "The input quadrature rule have the wrong reference shape, likely this comes from a constructor like `QuadratureRule{1, RefCube}(...)` which have been deprecated in favor of `FacetQuadratureRule{RefQuadrilateral}(...)`."
+    throw(DeprecationError(msg))
 end
-function FaceValues(
+function FacetValues(
     ::Type{T}, qr::QuadratureRule{RefQuadrilateral, TQ}, ip::Interpolation{RefHexahedron},
     gip::Interpolation{RefHexahedron} = default_geometric_interpolation(ip),
 ) where {T, TQ}
-    Base.depwarn("The input quadrature rule have the wrong reference shape, likely this comes from a constructor like `QuadratureRule{2, RefCube}(...)` which have been deprecated in favor of `FaceQuadratureRule{RefHexahedron}(...)`.", :FaceValues)
-    qr′ = create_face_quad_rule(RefHexahedron, qr.weights, qr.points)
-    FaceValues(T, qr′, ip, gip)
+    msg = "The input quadrature rule have the wrong reference shape, likely this comes from a constructor like `QuadratureRule{2, RefCube}(...)` which have been deprecated in favor of `FacetQuadratureRule{RefHexahedron}(...)`."
+    throw(DeprecationError(msg))
 end
-function FaceValues(
+function FacetValues(
     ::Type{T}, qr::QuadratureRule{RefTriangle, TQ}, ip::Interpolation{RefTetrahedron},
     gip::Interpolation{RefTetrahedron} = default_geometric_interpolation(ip),
 ) where {T, TQ}
-@info "fdjsfdsf"
-    Base.depwarn("The input quadrature rule have the wrong reference shape, likely this comes from a constructor like `QuadratureRule{2, RefTetrahedron}(...)` which have been deprecated in favor of `FaceQuadratureRule{RefTetrahedron}(...)`.", :FaceValues)
-    qr′ = create_face_quad_rule(RefTetrahedron, qr.weights, qr.points)
-    FaceValues(T, qr′, ip, gip)
+    msg = "The input quadrature rule have the wrong reference shape, likely this comes from a constructor like `QuadratureRule{2, RefTetrahedron}(...)` which have been deprecated in favor of `FacetQuadratureRule{RefTetrahedron}(...)`."
+    throw(DeprecationError(msg))
 end
 
 # Hide the last unused type param...
@@ -327,16 +373,63 @@ function Base.show(io::IO, ::CrouzeixRaviart{shape, order}) where {shape, order}
     print(io, "CrouzeixRaviart{$(shape), $(order)}()")
 end
 
-@deprecate value(ip::Interpolation, ξ::Vec) [shape_value(ip, ξ, i) for i in 1:getnbasefunctions(ip)] false
-@deprecate derivative(ip::Interpolation, ξ::Vec) [shape_gradient(ip, ξ, i) for i in 1:getnbasefunctions(ip)] false
-@deprecate value(ip::Interpolation, i::Int, ξ::Vec) shape_value(ip, ξ, i) false
+function value(ip::Interpolation, ξ::Vec)
+    throw(DeprecationError("value(ip::Interpolation, ξ::Vec)" => "[reference_shape_value(ip, ξ, i) for i in 1:getnbasefunctions(ip)]"))
+end
+function derivative(ip::Interpolation, ξ::Vec)
+    throw(DeprecationError("derivative(ip::Interpolation, ξ::Vec)" => "[reference_shape_gradient(ip, ξ, i) for i in 1:getnbasefunctions(ip)]"))
+end
+function value(ip::Interpolation, i::Int, ξ::Vec)
+    throw(DeprecationError("value(ip::Interpolation, i::Int, ξ::Vec)" => "reference_shape_value(ip, ξ, i)"))
+end
 
 export MixedDofHandler
 function MixedDofHandler(::AbstractGrid)
-    error("MixedDofHandler is the standard DofHandler in Ferrite now and has been renamed to DofHandler.
-Use DofHandler even for mixed grids and fields on subdomains.")
+    throw(DeprecationError(
+        "MixedDofHandler is the standard DofHandler in Ferrite now and has been renamed " *
+        "to DofHandler. Use DofHandler even for mixed grids and fields on subdomains.",
+    ))
 end
 
-@deprecate end_assemble finish_assemble
-@deprecate get_point_values evaluate_at_points
-@deprecate transform! transform_coordinates!
+export end_assemble
+function end_assemble(args...)
+    throw(DeprecationError("end_assemble(args...)" => "finish_assemble(args...)"))
+end
+
+export get_point_values
+function get_point_values(args...)
+    throw(DeprecationError("get_point_values(args...)" => "evaluate_at_points(args...)"))
+end
+
+export transform!
+function transform!(args...)
+    throw(DeprecationError("transform!(args...)" => "transform_coordinates!(args...)"))
+end
+
+export addfaceset! # deprecated, export for backwards compatibility.
+# Use warn to show for standard users.
+function addfaceset!(grid::AbstractGrid, name, set::Union{Set{FaceIndex}, Vector{FaceIndex}})
+    msg = "addfaceset! is deprecated, use addfacetset! instead and convert the set to FacetIndex."
+    throw(DeprecationError(msg))
+end
+function addfaceset!(grid, name, f::Function; kwargs...)
+    throw(DeprecationError("addfaceset!(args...)" => "addfacetset!(args...)"))
+end
+
+export onboundary
+function onboundary(::CellCache, ::Int)
+    throw(DeprecationError("`onboundary` is deprecated, check just the facetset instead of first checking `onboundary`."))
+end
+
+getdim(args...) = throw(DeprecationError("`Ferrite.getdim` is deprecated, use `getrefdim` or `getspatialdim` instead"))
+getfielddim(args...) = throw(DeprecationError("`Ferrite.getfielddim(::AbstractDofHandler, args...) is deprecated, use `n_components` instead"))
+
+function default_interpolation(::Type{C}) where {C <: AbstractCell}
+    msg = "Ferrite.default_interpolation is deprecated, use the exported `geometric_interpolation` instead"
+    throw(DeprecationError(msg))
+end
+
+export create_sparsity_pattern
+function create_sparsity_pattern(args...)
+    throw(DeprecationError("create_sparsity_pattern(args...)" => "allocate_matrix(args...; kwargs...)"))
+end

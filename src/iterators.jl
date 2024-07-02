@@ -33,46 +33,46 @@ cell. The cache is updated for a new cell by calling `reinit!(cache, cellid)` wh
  - `getnodes(cc)`: get the global node ids of the cell
  - `getcoordinates(cc)`: get the coordinates of the cell
  - `celldofs(cc)`: get the global dof ids of the cell
- - `reinit!(fev, cc)`: reinitialize [`CellValues`](@ref) or [`FaceValues`](@ref)
+ - `reinit!(fev, cc)`: reinitialize [`CellValues`](@ref) or [`FacetValues`](@ref)
 
 See also [`CellIterator`](@ref).
 """
-struct CellCache{X,G<:AbstractGrid,DH<:Union{AbstractDofHandler,Nothing}}
-    flags::UpdateFlags
-    grid::G
+mutable struct CellCache{X,G<:AbstractGrid,DH<:Union{AbstractDofHandler,Nothing}}
+    const flags::UpdateFlags
+    const grid::G
     # Pretty useless to store this since you have it already for the reinit! call, but
     # needed for the CellIterator(...) workflow since the user doesn't necessarily control
     # the loop order in the cell subset.
-    cellid::ScalarWrapper{Int}
-    nodes::Vector{Int}
-    coords::Vector{X}
-    dh::DH
-    dofs::Vector{Int}
+    cellid::Int
+    const nodes::Vector{Int}
+    const coords::Vector{X}
+    const dh::DH
+    const dofs::Vector{Int}
 end
 
 function CellCache(grid::Grid{dim,C,T}, flags::UpdateFlags=UpdateFlags()) where {dim,C,T}
-    N = nnodes_per_cell(grid)
+    N = nnodes_per_cell(grid, 1) # nodes and coords will be resized in `reinit!`
     nodes = zeros(Int, N)
     coords = zeros(Vec{dim,T}, N)
-    return CellCache(flags, grid, ScalarWrapper(-1), nodes, coords, nothing, Int[])
+    return CellCache(flags, grid, -1, nodes, coords, nothing, Int[])
 end
 
 function CellCache(dh::DofHandler{dim}, flags::UpdateFlags=UpdateFlags()) where {dim}
-    N = nnodes_per_cell(get_grid(dh))
+    n = ndofs_per_cell(dh.subdofhandlers[1]) # dofs and coords will be resized in `reinit!`
+    N = nnodes_per_cell(get_grid(dh), 1)
     nodes = zeros(Int, N)
     coords = zeros(Vec{dim, get_coordinate_eltype(get_grid(dh))}, N)
-    n = ndofs_per_cell(dh)
     celldofs = zeros(Int, n)
-    return CellCache(flags, get_grid(dh), ScalarWrapper(-1), nodes, coords, dh, celldofs)
+    return CellCache(flags, get_grid(dh), -1, nodes, coords, dh, celldofs)
 end
 
 function CellCache(sdh::SubDofHandler, flags::UpdateFlags=UpdateFlags())
-    dim = getdim(sdh.dh.grid)
-    CellCache(flags, sdh.dh.grid, ScalarWrapper(-1), Int[], Vec{dim,Float64}[], sdh, Int[])
+    Tv = get_coordinate_type(sdh.dh.grid)
+    CellCache(flags, sdh.dh.grid, -1, Int[], Tv[], sdh, Int[])
 end
 
 function reinit!(cc::CellCache, i::Int)
-    cc.cellid[] = i
+    cc.cellid = i
     if cc.flags.nodes
         resize!(cc.nodes, nnodes_per_cell(cc.grid, i))
         cellnodes!(cc.nodes, cc.grid, i)
@@ -90,23 +90,19 @@ end
 
 # reinit! FEValues with CellCache
 reinit!(cv::CellValues, cc::CellCache) = reinit!(cv, cc.coords)
-reinit!(fv::FaceValues, cc::CellCache, f::Int) = reinit!(fv, cc.coords, f) # TODO: Deprecate?
-# TODOL enable this after InterfaceValues are merges
-# reinit!(iv::InterfaceValues, ic::InterfaceCache) = reinit!(iv, FaceIndex(cellid(ic.face_a), ic.face_a.current_faceid[]), getcoordinates(ic.face_a),
-#     FaceIndex(cellid(ic.face_b), ic.face_b.current_faceid[]), getcoordinates(ic.face_b), ic.face_a.cc.grid)
+reinit!(fv::FacetValues, cc::CellCache, f::Int) = reinit!(fv, cc.coords, f) # TODO: Deprecate?
 
 # Accessor functions (TODO: Deprecate? We are so inconsistent with `getxx` vs `xx`...)
 getnodes(cc::CellCache) = cc.nodes
 getcoordinates(cc::CellCache) = cc.coords
 celldofs(cc::CellCache) = cc.dofs
-cellid(cc::CellCache) = cc.cellid[]
+cellid(cc::CellCache) = cc.cellid
 
 # TODO: This can definitely be deprecated
 celldofs!(v::Vector, cc::CellCache) = copyto!(v, cc.dofs) # celldofs!(v, cc.dh, cc.cellid[])
 
 # TODO: These should really be replaced with something better...
-nfaces(cc::CellCache) = nfaces(cc.grid.cells[cc.cellid[]])
-onboundary(cc::CellCache, face::Int) = cc.grid.boundary_matrix[face, cc.cellid[]]
+nfacets(cc::CellCache) = nfacets(getcells(cc.grid, cc.cellid))
 
 
 # TODO: Currently excluded from the docstring below. Should they be public?
@@ -114,54 +110,53 @@ onboundary(cc::CellCache, face::Int) = cc.grid.boundary_matrix[face, cc.cellid[]
 # - `Ferrite.faceid(fc)`: get the current faceid (`faceindex(fc)[2]`)
 
 """
-    FaceCache(grid::Grid)
-    FaceCache(dh::AbstractDofHandler)
+    FacetCache(grid::Grid)
+    FacetCache(dh::AbstractDofHandler)
 
 Create a cache object with pre-allocated memory for the nodes, coordinates, and dofs of a
 cell suitable for looping over *faces* in a grid. The cache is updated for a new face by
-calling `reinit!(cache, fi::FaceIndex)`.
+calling `reinit!(cache, fi::FacetIndex)`.
 
-**Methods with `fc::FaceCache`**
- - `reinit!(fc, fi)`: reinitialize the cache for face `fi::FaceIndex`
+**Methods with `fc::FacetCache`**
+ - `reinit!(fc, fi)`: reinitialize the cache for face `fi::FacetIndex`
  - `cellid(fc)`: get the current cellid (`faceindex(fc)[1]`)
  - `getnodes(fc)`: get the global node ids of the *cell*
  - `getcoordinates(fc)`: get the coordinates of the *cell*
  - `celldofs(fc)`: get the global dof ids of the *cell*
- - `reinit!(fv, fc)`: reinitialize [`FaceValues`](@ref)
+ - `reinit!(fv, fc)`: reinitialize [`FacetValues`](@ref)
 
-See also [`FaceIterator`](@ref).
+See also [`FacetIterator`](@ref).
 """
-struct FaceCache{CC<:CellCache}
-    cc::CC  # const for julia > 1.8
-    dofs::Vector{Int} # aliasing cc.dofs
-    current_faceid::ScalarWrapper{Int}
+mutable struct FacetCache{CC<:CellCache}
+    const cc::CC  # const for julia > 1.8
+    const dofs::Vector{Int} # aliasing cc.dofs
+    current_facet_id::Int
 end
-function FaceCache(args...)
+function FacetCache(args...)
     cc = CellCache(args...)
-    FaceCache(cc, cc.dofs, ScalarWrapper(0))
+    FacetCache(cc, cc.dofs, 0)
 end
 
-function reinit!(fc::FaceCache, face::FaceIndex)
-    cellid, faceid = face
+function reinit!(fc::FacetCache, facet::BoundaryIndex)
+    cellid, facetid = facet
     reinit!(fc.cc, cellid)
-    fc.current_faceid[] = faceid
+    fc.current_facet_id = facetid
     return nothing
 end
 
 # Delegate methods to the cell cache
 for op = (:getnodes, :getcoordinates, :cellid, :celldofs)
     @eval begin
-        function $op(fc::FaceCache, args...)
+        function $op(fc::FacetCache, args...)
             return $op(fc.cc, args...)
         end
     end
 end
-# @inline faceid(fc::FaceCache) = fc.current_faceid[]
-@inline celldofs!(v::Vector, fc::FaceCache) = celldofs!(v, fc.cc)
-# @inline onboundary(fc::FaceCache) = onboundary(fc.cc, faceid(fc))
-# @inline faceindex(fc::FaceCache) = FaceIndex(cellid(fc), faceid(fc))
-@inline function reinit!(fv::FaceValues, fc::FaceCache)
-    reinit!(fv, fc.cc, fc.current_faceid[])
+# @inline faceid(fc::FacetCache) = fc.current_faceid[]
+@inline celldofs!(v::Vector, fc::FacetCache) = celldofs!(v, fc.cc)
+# @inline faceindex(fc::FacetCache) = FaceIndex(cellid(fc), faceid(fc))
+@inline function reinit!(fv::FacetValues, fc::FacetCache)
+    reinit!(fv, fc.cc, fc.current_facet_id)
 end
 
 """
@@ -169,35 +164,35 @@ end
     InterfaceCache(dh::AbstractDofHandler)
 
 Create a cache object with pre-allocated memory for the nodes, coordinates, and dofs of an
-interface. The cache is updated for a new cell by calling `reinit!(cache, face_a, face_b)` where
-`face_a::FaceIndex` and `face_b::FaceIndex` are the two interface faces.
+interface. The cache is updated for a new cell by calling `reinit!(cache, facet_a, facet_b)` where
+`facet_a::FacetIndex` and `facet_b::FacetIndex` are the two interface faces.
 
 **Struct fields of `InterfaceCache`**
- - `ic.a :: FaceCache`: face cache for the first face of the interface
- - `ic.b :: FaceCache`: face cache for the second face of the interface
+ - `ic.a :: FacetCache`: face cache for the first face of the interface
+ - `ic.b :: FacetCache`: face cache for the second face of the interface
  - `ic.dofs :: Vector{Int}`: global dof ids for the interface (union of `ic.a.dofs` and `ic.b.dofs`)
 
 **Methods with `InterfaceCache`**
- - `reinit!(cache::InterfaceCache, face_a::FaceIndex, face_b::FaceIndex)`: reinitialize the cache for a new interface
+ - `reinit!(cache::InterfaceCache, facet_a::FacetIndex, facet_b::FacetIndex)`: reinitialize the cache for a new interface
  - `interfacedofs(ic)`: get the global dof ids of the interface
 
 See also [`InterfaceIterator`](@ref).
 """
-struct InterfaceCache{FC<:FaceCache}
+struct InterfaceCache{FC<:FacetCache}
     a::FC
     b::FC
     dofs::Vector{Int}
 end
 
 function InterfaceCache(gridordh::Union{AbstractGrid, AbstractDofHandler})
-    fc_a = FaceCache(gridordh)
-    fc_b = FaceCache(gridordh)
+    fc_a = FacetCache(gridordh)
+    fc_b = FacetCache(gridordh)
     return InterfaceCache(fc_a, fc_b, Int[])
 end
 
-function reinit!(cache::InterfaceCache, face_a::FaceIndex, face_b::FaceIndex)
-    reinit!(cache.a, face_a)
-    reinit!(cache.b, face_b)
+function reinit!(cache::InterfaceCache, facet_a::BoundaryIndex, facet_b::BoundaryIndex)
+    reinit!(cache.a, facet_a)
+    reinit!(cache.b, facet_b)
     resize!(cache.dofs, length(celldofs(cache.a)) + length(celldofs(cache.b)))
     for (i, d) in pairs(cache.a.dofs)
         cache.dofs[i] = d
@@ -208,16 +203,26 @@ function reinit!(cache::InterfaceCache, face_a::FaceIndex, face_b::FaceIndex)
     return cache
 end
 
+function reinit!(iv::InterfaceValues, ic::InterfaceCache)
+    return reinit!(iv,
+        getcells(ic.a.cc.grid, cellid(ic.a)),
+        getcoordinates(ic.a),
+        ic.a.current_facet_id[],
+        getcells(ic.b.cc.grid, cellid(ic.b)),
+        getcoordinates(ic.b),
+        ic.b.current_facet_id[],
+   )
+end
+
 interfacedofs(ic::InterfaceCache) = ic.dofs
+dof_range(ic::InterfaceCache, field::Symbol) = (dof_range(ic.a.cc.dh, field), dof_range(ic.b.cc.dh, field) .+ length(celldofs(ic.a)))
+getcoordinates(ic::InterfaceCache) = (getcoordinates(ic.a), getcoordinates(ic.b))
 
 ####################
 ## Grid iterators ##
 ####################
 
 ## CellIterator ##
-
-const IntegerCollection = Union{Set{<:Integer}, AbstractVector{<:Integer}}
-
 """
     CellIterator(grid::Grid, cellset=1:getncells(grid))
     CellIterator(dh::AbstractDofHandler, cellset=1:getncells(dh))
@@ -274,46 +279,48 @@ end
 @inline _getcache(ci::CellIterator) = ci.cc
 
 
-## FaceIterator ##
+## FacetIterator ##
+FaceIterator(args...) = error("FaceIterator is deprecated, use FacetIterator instead")
 
 # Leaving flags undocumented as for CellIterator
 """
-    FaceIterator(gridordh::Union{Grid,AbstractDofHandler}, faceset::Set{FaceIndex})
+    FacetIterator(gridordh::Union{Grid,AbstractDofHandler}, faceset::AbstractVecOrSet{FacetIndex})
 
-Create a `FaceIterator` to conveniently iterate over the faces in `faceset`. The elements of
-the iterator are [`FaceCache`](@ref)s which are properly `reinit!`ialized. See
-[`FaceCache`](@ref) for more details.
+Create a `FacetIterator` to conveniently iterate over the faces in `faceset`. The elements of
+the iterator are [`FacetCache`](@ref)s which are properly `reinit!`ialized. See
+[`FacetCache`](@ref) for more details.
 
-Looping over a `FaceIterator`, i.e.:
+Looping over a `FacetIterator`, i.e.:
 ```julia
-for fc in FaceIterator(grid, faceset)
+for fc in FacetIterator(grid, faceset)
     # ...
 end
 ```
 is thus simply convenience for the following equivalent snippet:
 ```julia
-fc = FaceCache(grid)
+fc = FacetCache(grid)
 for faceindex in faceset
     reinit!(fc, faceindex)
     # ...
 end
 """
-struct FaceIterator{FC<:FaceCache}
+struct FacetIterator{FC<:FacetCache}
     fc::FC
-    set::Set{FaceIndex}
+    set::OrderedSet{FacetIndex}
 end
 
-function FaceIterator(gridordh::Union{Grid,AbstractDofHandler},
-                      set, flags::UpdateFlags=UpdateFlags())
+function FacetIterator(gridordh::Union{Grid,AbstractDofHandler},
+                      set::AbstractVecOrSet{FacetIndex}, flags::UpdateFlags=UpdateFlags())
     if gridordh isa DofHandler
         # Keep here to maintain same settings as for CellIterator
         _check_same_celltype(get_grid(gridordh), set)
     end
-    return FaceIterator(FaceCache(gridordh, flags), set)
+    return FacetIterator(FacetCache(gridordh, flags), set)
 end
 
-@inline _getcache(fi::FaceIterator) = fi.fc
-@inline _getset(fi::FaceIterator) = fi.set
+@inline _getcache(fi::FacetIterator) = fi.fc
+@inline _getset(fi::FacetIterator) = fi.set
+
 
 """
     InterfaceIterator(grid::Grid, [topology::ExclusiveTopology])
@@ -356,28 +363,26 @@ function InterfaceIterator(gridordh::Union{Grid,AbstractDofHandler},
 end
 
 # Iterator interface
-function Base.iterate(ii::InterfaceIterator, state...)
-    grid_dim = getdim(ii.grid)
-    neighborhood = grid_dim == 1 ? ii.topology.vertex_vertex_neighbor : ii.topology.face_face_neighbor
+function Base.iterate(ii::InterfaceIterator{<:Any, <:Grid{sdim}}, state...) where sdim
+    neighborhood = get_facet_facet_neighborhood(ii.topology, ii.grid) # TODO: This could be moved to InterfaceIterator constructor (potentially type-instable for non-union or mixed grids)
     while true
-        it = iterate(faceskeleton(ii.topology, ii.grid), state...)
+        it = iterate(facetskeleton(ii.topology, ii.grid), state...)
         it === nothing && return nothing
-        face_a, state = it
-        if isempty(neighborhood[face_a[1], face_a[2]])
+        facet_a, state = it
+        if isempty(neighborhood[facet_a[1], facet_a[2]])
             continue
         end
-        neighbors = neighborhood[face_a[1], face_a[2]].neighbor_info
+        neighbors = neighborhood[facet_a[1], facet_a[2]].neighbor_info
         length(neighbors) > 1 && error("multiple neighboring faces not supported yet")
-        neighbor = neighbors[1]
-        face_b = grid_dim == 1 ? FaceIndex(neighbor[1], neighbor[2]) : neighbor
-        reinit!(ii.cache, face_a, face_b)
+        facet_b = neighbors[1]
+        reinit!(ii.cache, facet_a, facet_b)
         return (ii.cache, state)
     end
 end
 
 
-# Iterator interface for CellIterator/FaceIterator
-const GridIterators{C} = Union{CellIterator{C}, FaceIterator{C}, InterfaceIterator{C}}
+# Iterator interface for CellIterator/FacetIterator
+const GridIterators{C} = Union{CellIterator{C}, FacetIterator{C}, InterfaceIterator{C}}
 
 function Base.iterate(iterator::GridIterators, state_in...)
     it = iterate(_getset(iterator), state_in...)
@@ -400,10 +405,10 @@ function _check_same_celltype(grid::AbstractGrid, cellset::IntegerCollection)
     end
 end
 
-function _check_same_celltype(grid::AbstractGrid, faceset::Set{FaceIndex})
+function _check_same_celltype(grid::AbstractGrid, facetset::AbstractVecOrSet{<:BoundaryIndex})
     isconcretetype(getcelltype(grid)) && return nothing # Short circuit check
-    celltype = getcelltype(grid, first(faceset)[1])
-    if !all(getcelltype(grid, face[1]) == celltype for face in faceset)
-        error("The cells in the faceset are not all of the same celltype.")
+    celltype = getcelltype(grid, first(facetset)[1])
+    if !all(getcelltype(grid, facet[1]) == celltype for facet in facetset)
+        error("The cells in the set (set of $(eltype(facetset))) are not all of the same celltype.")
     end
 end

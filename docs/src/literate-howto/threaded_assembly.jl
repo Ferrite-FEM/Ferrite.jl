@@ -25,9 +25,9 @@ function create_example_2d_grid()
     grid = generate_grid(Quadrilateral, (10, 10), Vec{2}((0.0, 0.0)), Vec{2}((10.0, 10.0)))
     colors_workstream = create_coloring(grid; alg=ColoringAlgorithm.WorkStream)
     colors_greedy = create_coloring(grid; alg=ColoringAlgorithm.Greedy)
-    vtk_grid("colored", grid) do vtk
-        vtk_cell_data_colors(vtk, colors_workstream, "workstream-coloring")
-        vtk_cell_data_colors(vtk, colors_greedy, "greedy-coloring")
+    VTKFile("colored", grid) do vtk
+        Ferrite.write_cell_colors(vtk, grid, colors_workstream, "workstream-coloring")
+        Ferrite.write_cell_colors(vtk, grid, colors_greedy, "greedy-coloring")
     end
 end
 
@@ -73,33 +73,33 @@ end;
 #
 # ScratchValues is a thread-local collection of data that each thread needs to own,
 # since we need to be able to mutate the data in the threads independently
-struct ScratchValues{T, CV <: CellValues, FV <: FaceValues, TT <: AbstractTensor, dim, Ti}
+struct ScratchValues{T, CV <: CellValues, FV <: FacetValues, TT <: AbstractTensor, dim, Ti}
     Ke::Matrix{T}
     fe::Vector{T}
     cellvalues::CV
-    facevalues::FV
+    facetvalues::FV
     global_dofs::Vector{Int}
     ɛ::Vector{TT}
     coordinates::Vector{Vec{dim, T}}
     assembler::Ferrite.AssemblerSparsityPattern{T, Ti}
 end;
 
-# Each thread need its own CellValues and FaceValues (although, for this example we don't use
-# the FaceValues)
+# Each thread need its own CellValues and FacetValues (although, for this example we don't use
+# the FacetValues)
 function create_values(interpolation_space::Interpolation{refshape}, qr_order::Int) where {dim, refshape<:Ferrite.AbstractRefShape{dim}}
     ## Interpolations and values
     quadrature_rule = QuadratureRule{refshape}(qr_order)
-    face_quadrature_rule = FaceQuadratureRule{refshape}(qr_order)
+    facet_quadrature_rule = FacetQuadratureRule{refshape}(qr_order)
     cellvalues = [CellValues(quadrature_rule, interpolation_space) for i in 1:Threads.nthreads()];
-    facevalues = [FaceValues(face_quadrature_rule, interpolation_space) for i in 1:Threads.nthreads()];
-    return cellvalues, facevalues
+    facetvalues = [FacetValues(facet_quadrature_rule, interpolation_space) for i in 1:Threads.nthreads()];
+    return cellvalues, facetvalues
 end;
 
 # Create a `ScratchValues` for each thread with the thread local data
 function create_scratchvalues(K, f, dh::DofHandler{dim}, ip) where {dim}
     nthreads = Threads.nthreads()
     assemblers = [start_assemble(K, f) for i in 1:nthreads]
-    cellvalues, facevalues = create_values(ip, 2)
+    cellvalues, facetvalues = create_values(ip, 2)
 
     n_basefuncs = getnbasefunctions(cellvalues[1])
     global_dofs = [zeros(Int, ndofs_per_cell(dh)) for i in 1:nthreads]
@@ -111,7 +111,7 @@ function create_scratchvalues(K, f, dh::DofHandler{dim}, ip) where {dim}
 
     coordinates = [[zero(Vec{dim}) for i in 1:length(dh.grid.cells[1].nodes)] for i in 1:nthreads]
 
-    return [ScratchValues(Kes[i], fes[i], cellvalues[i], facevalues[i], global_dofs[i],
+    return [ScratchValues(Kes[i], fes[i], cellvalues[i], facetvalues[i], global_dofs[i],
                          ɛs[i], coordinates[i], assemblers[i]) for i in 1:nthreads]
 end;
 
@@ -140,8 +140,8 @@ function assemble_cell!(scratch::ScratchValues, cell::Int, K::SparseMatrixCSC,
                         grid::Grid, dh::DofHandler, C::SymmetricTensor{4, dim}, b::Vec{dim}) where {dim}
 
     ## Unpack our stuff from the scratch
-    Ke, fe, cellvalues, facevalues, global_dofs, ɛ, coordinates, assembler =
-         scratch.Ke, scratch.fe, scratch.cellvalues, scratch.facevalues,
+    Ke, fe, cellvalues, facetvalues, global_dofs, ɛ, coordinates, assembler =
+         scratch.Ke, scratch.fe, scratch.cellvalues, scratch.facetvalues,
          scratch.global_dofs, scratch.ɛ, scratch.coordinates, scratch.assembler
 
     fill!(Ke, 0)
@@ -182,7 +182,7 @@ function run_assemble()
     ip = Lagrange{RefHexahedron,1}()^3
     dh = create_dofhandler(grid, ip);
 
-    K = create_sparsity_pattern(dh);
+    K = allocate_matrix(dh);
     C = create_stiffness(Val{3}());
     ## compilation
     doassemble(K, colors, grid, dh, C, ip);

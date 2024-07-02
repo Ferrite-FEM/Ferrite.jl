@@ -4,7 +4,9 @@ module FerriteMetis
 # https://github.com/JuliaLang/julia/pull/47749
 if VERSION >= v"1.10.0-DEV.90"
 
-using Ferrite
+using Ferrite:
+    Ferrite, CellIterator, ConstraintHandler, DofHandler, DofOrder, celldofs, ndofs,
+    ndofs_per_cell
 using Metis.LibMetis: idx_t
 using Metis: Metis
 using SparseArrays: sparse
@@ -39,7 +41,7 @@ function Ferrite.compute_renumber_permutation(
     if coupling !== nothing
         # Set sym = true since Metis.permutation requires a symmetric graph.
         # TODO: Perhaps just symmetrize it: coupling = coupling' .| coupling
-        couplings = Ferrite._coupling_to_local_dof_coupling(dh, coupling, #= sym =# true)
+        couplings = Ferrite._coupling_to_local_dof_coupling(dh, coupling)
     end
 
     # Create the CSR (CSC, but pattern is symmetric so equivalent) using

@@ -1,3 +1,5 @@
+using Ferrite: reference_shape_value
+
 @testset "Quadrature testing" begin
     ref_tet_vol(dim) = 1 / factorial(dim)
     ref_square_vol(dim) = 2^dim
@@ -72,8 +74,8 @@
                 ccoords = getcoordinates(grid, cellid)
                 Vec_t = Vec{dim,Float64}
                 Vec_face_t = Vec{dim-1,Float64}
-                for lfaceid in nfaces(refshape)
-                    facenodes = Ferrite.faces(cell)[lfaceid]
+                for lfaceid in Ferrite.nfacets(refshape)
+                    facenodes = Ferrite.facets(cell)[lfaceid]
                     fcoords = zeros(Vec_t, length(facenodes))
                     for (i,nodeid) in enumerate(facenodes)
                         x = grid.nodes[nodeid].x
@@ -83,16 +85,16 @@
                     ipface = Lagrange{getfacerefshape(cell,lfaceid),1}()
 
                     ξface = rand(Vec_face_t)/4
-                    ξcell = Ferrite.face_to_element_transformation(ξface, refshape, lfaceid)
+                    ξcell = Ferrite.facet_to_element_transformation(ξface, refshape, lfaceid)
 
                     xface = zero(Vec_t)
                     for i in 1:getnbasefunctions(ipface)
-                        xface += Ferrite.shape_value(ipface, ξface, i) * fcoords[i]
+                        xface += reference_shape_value(ipface, ξface, i) * fcoords[i]
                     end
 
                     xcell = zero(Vec_t)
                     for i in 1:getnbasefunctions(ipcell)
-                        xcell += shape_value(ipcell, ξcell, i) * ccoords[i]
+                        xcell += reference_shape_value(ipcell, ξcell, i) * ccoords[i]
                     end
 
                     @test xcell ≈ xface
@@ -100,12 +102,65 @@
             end
         end
 
-        @testset "$ref_cell unknown face error path" begin
+        @testset "$ref_cell unknown facet error path" begin
             for face in (-1, 0, 100)
-                err = ArgumentError("unknown face number")
+                err = ArgumentError("unknown facet number")
                 @test_throws err Ferrite.weighted_normal(Tensor{2,dim}(zeros(dim^2)), refshape, face)
                 pt = Vec{dim-1, Float64}(ntuple(i -> 0.0, dim-1))
-                @test_throws err Ferrite.face_to_element_transformation(pt, refshape, face)
+                @test_throws err Ferrite.facet_to_element_transformation(pt, refshape, face)
+            end
+        end
+
+        @testset "Type checks for $refshape" begin
+            qr  = QuadratureRule{refshape}(1)
+            qrw = Ferrite.getweights(qr)
+            qrp = Ferrite.getpoints(qr)
+            @test qrw isa Vector
+            @test qrp isa Vector
+
+            sqr = QuadratureRule{refshape}(
+                SVector{length(qrw)}(qrw), SVector{length(qrp)}(qrp)
+            )
+            sqrw = Ferrite.getweights(sqr)
+            sqrp = Ferrite.getpoints(sqr)
+            @test sqrw isa SVector
+            @test sqrp isa SVector
+
+            fqr  = FacetQuadratureRule{refshape}(1)
+            for f in 1:nfacets(refshape)
+                fqrw = Ferrite.getweights(fqr, f)
+                fqrp = Ferrite.getpoints(fqr, f)
+                @test fqrw isa Vector
+                @test fqrp isa Vector
+            end
+
+            function sqr_for_facet(fqr, f)
+                fqrw = Ferrite.getweights(fqr, f)
+                fqrp = Ferrite.getpoints(fqr, f)
+                return QuadratureRule{refshape}(
+                    SVector{length(qrw)}(fqrw),
+                    SVector{length(qrp)}(fqrp),
+                )
+            end
+
+            sfqr = FacetQuadratureRule(
+                ntuple(f->sqr_for_facet(fqr, f), nfacets(refshape))
+            )
+            for f in 1:nfacets(refshape)
+                sfqrw = Ferrite.getweights(sfqr,f)
+                sfqrp = Ferrite.getpoints(sfqr, f)
+                @test sfqrw isa SVector
+                @test sfqrp isa SVector
+            end
+
+            sfqr2 = FacetQuadratureRule(
+                [sqr_for_facet(fqr, f) for f in 1:nfacets(refshape)]
+            )
+            for f in 1:nfacets(refshape)
+                sfqrw = Ferrite.getweights(sfqr2,f)
+                sfqrp = Ferrite.getpoints(sfqr2, f)
+                @test sfqrw isa SVector
+                @test sfqrp isa SVector
             end
         end
     end

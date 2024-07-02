@@ -1,5 +1,7 @@
 # Some utility functions for testing Ferrite.jl
 
+using Ferrite: reference_shape_value
+
 #####################################
 # Volume for the reference elements #
 #####################################
@@ -12,12 +14,12 @@ reference_face_area(fs::VectorizedInterpolation, f::Int) = reference_face_area(f
 reference_face_area(fs::Interpolation{Ferrite.RefHypercube{dim}}, face::Int) where {dim} = 2^(dim-1)
 reference_face_area(fs::Interpolation{RefTriangle}, face::Int) = face == 1 ? sqrt(2) : 1.0
 reference_face_area(fs::Interpolation{RefTetrahedron}, face::Int) = face == 3 ? sqrt(2 * 1.5) / 2.0 : 0.5
-function reference_face_area(fs::Interpolation{RefPrism}, face::Int) 
+function reference_face_area(fs::Interpolation{RefPrism}, face::Int)
     face == 4 && return √2
     face ∈ [1,5] && return 0.5
     face ∈ [2,3] && return 1.0
 end
-function reference_face_area(fs::Interpolation{RefPyramid}, face::Int) 
+function reference_face_area(fs::Interpolation{RefPyramid}, face::Int)
     face == 1 && return 1.0
     face ∈ [2,3] && return 0.5
     face ∈ [4,5] && return sqrt(2)/2
@@ -183,7 +185,7 @@ function calculate_volume(::Lagrange{RefHexahedron, 1}, x::Vector{Vec{3, T}}) wh
 end
 
 function calculate_volume(::Lagrange{RefPrism, order}, x::Vector{Vec{3, T}}) where {T, order}
-    vol = norm((x[4] - x[1]) ⋅ ((x[2] - x[1]) × (x[3] - x[1]))) / 2.0 
+    vol = norm((x[4] - x[1]) ⋅ ((x[2] - x[1]) × (x[3] - x[1]))) / 2.0
     return vol
 end
 
@@ -202,29 +204,29 @@ function calculate_volume(::Serendipity{RefQuadrilateral, 2}, x::Vector{Vec{2, T
     return vol
 end
 
-function calculate_face_area(ip::Lagrange{RefLine}, x::Vector{<:Vec}, faceindex::Int)
+function calculate_facet_area(ip::Union{Lagrange{RefLine}, DiscontinuousLagrange{RefLine}}, x::Vector{<:Vec}, faceindex::Int)
     return one(eltype(eltype(x)))
 end
-function calculate_face_area(ip::Lagrange{RefQuadrilateral, order}, x::Vector{<:Vec}, faceindex::Int) where order
+function calculate_facet_area(ip::Union{Lagrange{RefQuadrilateral, order}, DiscontinuousLagrange{RefQuadrilateral, order}}, x::Vector{<:Vec}, faceindex::Int) where order
     return calculate_volume(Lagrange{RefLine, order}(), x)
 end
-function calculate_face_area(ip::Lagrange{RefTriangle, order}, x::Vector{<:Vec}, faceindex::Int) where order
+function calculate_facet_area(ip::Union{Lagrange{RefTriangle, order}, DiscontinuousLagrange{RefTriangle, order}}, x::Vector{<:Vec}, faceindex::Int) where order
     return calculate_volume(Lagrange{RefLine, order}(), x)
 end
-function calculate_face_area(ip::Lagrange{RefHexahedron, order}, x::Vector{<:Vec}, faceindex::Int) where order
+function calculate_facet_area(ip::Union{Lagrange{RefHexahedron, order}, DiscontinuousLagrange{RefHexahedron, order}}, x::Vector{<:Vec}, faceindex::Int) where order
     return calculate_volume(Lagrange{RefQuadrilateral, order}(), x)
 end
-function calculate_face_area(ip::Serendipity{RefQuadrilateral, order}, x::Vector{<:Vec}, faceindex::Int) where order
+function calculate_facet_area(ip::Serendipity{RefQuadrilateral, order}, x::Vector{<:Vec}, faceindex::Int) where order
     return calculate_volume(Lagrange{RefLine, order}(), x)
 end
-function calculate_face_area(ip::Lagrange{RefTetrahedron, order}, x::Vector{<:Vec}, faceindex::Int) where order
+function calculate_facet_area(p::Union{Lagrange{RefTetrahedron, order}, DiscontinuousLagrange{RefTetrahedron, order}}, x::Vector{<:Vec}, faceindex::Int) where order
     return calculate_volume(Lagrange{RefTriangle, order}(), x)
 end
-function calculate_face_area(p::Union{Lagrange{RefPrism, order}, DiscontinuousLagrange{RefPrism, order}}, x::Vector{<:Vec}, faceindex::Int) where order
+function calculate_facet_area(p::Union{Lagrange{RefPrism, order}, DiscontinuousLagrange{RefPrism, order}}, x::Vector{<:Vec}, faceindex::Int) where order
     faceindex ∈ [1,5] && return calculate_volume(Lagrange{RefTriangle, order}(), x)
     return calculate_volume(Lagrange{RefQuadrilateral, order}(), x)
 end
-function calculate_face_area(p::Union{Lagrange{RefPyramid, order}, DiscontinuousLagrange{RefPyramid, order}}, x::Vector{<:Vec}, faceindex::Int) where order
+function calculate_facet_area(p::Union{Lagrange{RefPyramid, order}, DiscontinuousLagrange{RefPyramid, order}}, x::Vector{<:Vec}, faceindex::Int) where order
     faceindex != 1 && return calculate_volume(Lagrange{RefTriangle, order}(), x)
     return calculate_volume(Lagrange{RefQuadrilateral, order}(), x)
 end
@@ -254,7 +256,7 @@ check_equal_or_nan(a::Union{Tensor, Array}, b::Union{Tensor, Array}) = all(check
 # Hypercube is simply ⨂ᵈⁱᵐ Line :)
 sample_random_point(::Type{Ferrite.RefHypercube{ref_dim}}) where {ref_dim} = Vec{ref_dim}(2.0 .* rand(Vec{ref_dim}) .- 1.0)
 # Dirichlet type sampling
-function sample_random_point(::Type{Ferrite.RefSimplex{ref_dim}}) where {ref_dim} 
+function sample_random_point(::Type{Ferrite.RefSimplex{ref_dim}}) where {ref_dim}
     ξ = rand(ref_dim+1)
     ξₜ = -log.(ξ)
     return Vec{ref_dim}(ntuple(i->ξₜ[i], ref_dim) ./ sum(ξₜ))
@@ -274,10 +276,39 @@ function sample_random_point(::Type{RefPyramid})
 end
 
 ######################################################
-# Helpers for testing face_to_element_transformation #
+# Helpers for testing facet_to_element_transformation #
 ######################################################
 getfacerefshape(::Union{Quadrilateral, Triangle}, ::Int) = RefLine
 getfacerefshape(::Hexahedron, ::Int) = RefQuadrilateral
 getfacerefshape(::Tetrahedron, ::Int) = RefTriangle
 getfacerefshape(::Pyramid, face::Int) = face == 1 ? RefQuadrilateral : RefTriangle
 getfacerefshape(::Wedge, face::Int) = face ∈ (1,5) ? RefTriangle : RefQuadrilateral
+
+######################################################
+# Dummy RefShape to test get_transformation_matrix   #
+######################################################
+module DummyRefShapes
+    import Ferrite
+    struct RefDodecahedron  <: Ferrite.AbstractRefShape{3} end
+    function Ferrite.reference_faces(::Type{RefDodecahedron})
+        return (
+            (1, 5, 4, 3, 2),
+        )
+    end
+end
+
+############################################################
+# Inverse parametric mapping ξ = ϕ(x) for testing hessians #
+############################################################
+function function_value_from_physical_coord(interpolation::Interpolation, cell_coordinates, X::Vec{dim,T}, ue) where {dim,T}
+    n_basefuncs = getnbasefunctions(interpolation)
+    scalar_ip = interpolation isa Ferrite.ScalarInterpolation ? interpolation : interpolation.ip
+    @assert length(ue) == n_basefuncs
+    _, ξ = Ferrite.find_local_coordinate(scalar_ip, cell_coordinates, X; tol_norm=1e-16)
+    u = zero(reference_shape_value(interpolation, ξ, 1))
+    for j in 1:n_basefuncs
+        N = reference_shape_value(interpolation, ξ, j)
+        u += N * ue[j]
+    end
+    return u
+end

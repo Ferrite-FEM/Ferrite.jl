@@ -1,5 +1,5 @@
 using Ferrite, Test
-import Ferrite: getdim, default_interpolation
+import Ferrite: getrefdim, geometric_interpolation
 
 module ConvergenceTestHelper
 
@@ -14,23 +14,24 @@ get_geometry(::Ferrite.Interpolation{RefHexahedron}) = Hexahedron
 get_geometry(::Ferrite.Interpolation{RefTetrahedron}) = Tetrahedron
 get_geometry(::Ferrite.Interpolation{RefPyramid}) = Pyramid
 
-get_quadrature_order(::Lagrange{shape, order}) where {shape, order} = 2*order
-get_quadrature_order(::Serendipity{shape, order}) where {shape, order} = 2*order
-get_quadrature_order(::CrouzeixRaviart{shape, order}) where {shape, order} = 2*order+1
-get_quadrature_order(::RannacherTurek{shape, order}) where {shape, order} = 2*order+3
-get_quadrature_order(::BubbleEnrichedLagrange{shape, order}) where {shape, order} = 2*order
+get_quadrature_order(::Lagrange{shape, order}) where {shape, order} = max(2*order-1,2)
+get_quadrature_order(::Serendipity{shape, order}) where {shape, order} = max(2*order-1,2)
+get_quadrature_order(::CrouzeixRaviart{shape, order}) where {shape, order} = max(2*order-1,2)
+get_quadrature_order(::RannacherTurek{shape, order}) where {shape, order} = max(2*order-1,2)
+get_quadrature_order(::BubbleEnrichedLagrange{shape, order}) where {shape, order} = max(2*order-1,2)
 
 get_num_elements(::Ferrite.Interpolation{shape, 1}) where {shape} = 21
 get_num_elements(::Ferrite.Interpolation{shape, 2}) where {shape} = 7
 get_num_elements(::Ferrite.Interpolation{RefHexahedron, 1}) = 11
-get_num_elements(::Ferrite.RannacherTurek{RefQuadrilateral, 1}) = 30
+get_num_elements(::Ferrite.RannacherTurek{RefQuadrilateral, 1}) = 15
+get_num_elements(::Ferrite.RannacherTurek{RefHexahedron, 1}) = 13
 get_num_elements(::Ferrite.Interpolation{RefHexahedron, 2}) = 4
 get_num_elements(::Ferrite.Interpolation{shape, 3}) where {shape} = 8
 get_num_elements(::Ferrite.Interpolation{shape, 4}) where {shape} = 5
 get_num_elements(::Ferrite.Interpolation{shape, 5}) where {shape} = 3
 
 get_test_tolerance(ip) = 1e-2
-get_test_tolerance(ip::RannacherTurek) = 5e-2
+get_test_tolerance(ip::RannacherTurek) = 4e-2
 get_test_tolerance(ip::CrouzeixRaviart) = 4e-2
 
 analytical_solution(x) = prod(cos, x*π/2)
@@ -108,7 +109,7 @@ function check_and_compute_convergence_norms(dh, u, cellvalues, testatol)
             ∇uₐₙₐ    = gradient(x-> prod(cos, x*π/2), x)
             ∇uₐₚₚᵣₒₓ = function_gradient(cellvalues, q_point, uₑ)
             ∇L2norm += norm(∇uₐₙₐ-∇uₐₚₚᵣₒₓ)^2*dΩ
-            
+
             # Pointwise convergence
             @test uₐₙₐ ≈ uₐₚₚᵣₒₓ atol=testatol
         end
@@ -118,7 +119,7 @@ end
 
 # Assemble and solve
 function solve(dh, ch, cellvalues)
-    K, f = assemble_global(cellvalues, create_sparsity_pattern(dh), dh);
+    K, f = assemble_global(cellvalues, allocate_matrix(dh), dh);
     apply!(K, f, ch)
     u = K \ f;
 end
@@ -131,7 +132,7 @@ function setup_poisson_problem(grid, interpolation, interpolation_geo, qr)
 
     ch = ConstraintHandler(dh);
     ∂Ω = union(
-        values(grid.facesets)...
+        values(Ferrite.getfacetsets(grid))...
     );
     dbc = Dirichlet(:u, ∂Ω, (x, t) -> analytical_solution(x))
     add!(ch, dbc);
@@ -167,9 +168,9 @@ end # module ConvergenceTestHelper
     )
         # Generate a grid ...
         geometry = ConvergenceTestHelper.get_geometry(interpolation)
-        interpolation_geo = default_interpolation(geometry)
+        interpolation_geo = geometric_interpolation(geometry)
         N = ConvergenceTestHelper.get_num_elements(interpolation)
-        grid = generate_grid(geometry, ntuple(x->N, getdim(geometry)));
+        grid = generate_grid(geometry, ntuple(x->N, getrefdim(geometry)));
         # ... a suitable quadrature rule ...
         qr_order = ConvergenceTestHelper.get_quadrature_order(interpolation)
         qr = QuadratureRule{getrefshape(interpolation)}(qr_order)
@@ -200,10 +201,10 @@ end
     )
         # Generate a grid ...
         geometry = ConvergenceTestHelper.get_geometry(interpolation)
-        interpolation_geo = default_interpolation(geometry)
+        interpolation_geo = geometric_interpolation(geometry)
         # "Coarse case"
         N₁ = ConvergenceTestHelper.get_num_elements(interpolation)
-        grid = generate_grid(geometry, ntuple(x->N₁, getdim(geometry)));
+        grid = generate_grid(geometry, ntuple(x->N₁, getrefdim(geometry)));
         # ... a suitable quadrature rule ...
         qr_order = ConvergenceTestHelper.get_quadrature_order(interpolation)
         qr = QuadratureRule{getrefshape(interpolation)}(qr_order)
@@ -211,10 +212,10 @@ end
         dh, ch, cellvalues = ConvergenceTestHelper.setup_poisson_problem(grid, interpolation, interpolation_geo, qr)
         u = ConvergenceTestHelper.solve(dh, ch, cellvalues)
         L2₁, H1₁, _ = ConvergenceTestHelper.check_and_compute_convergence_norms(dh, u, cellvalues, 1e-2)
-        
+
         # "Fine case"
         N₂ = 2*N₁
-        grid = generate_grid(geometry, ntuple(x->N₂, getdim(geometry)));
+        grid = generate_grid(geometry, ntuple(x->N₂, getrefdim(geometry)));
         # ... a suitable quadrature rule ...
         qr_order = ConvergenceTestHelper.get_quadrature_order(interpolation)
         qr = QuadratureRule{getrefshape(interpolation)}(qr_order)

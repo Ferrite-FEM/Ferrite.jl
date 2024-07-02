@@ -6,8 +6,8 @@ DocTestSetup = :(using Ferrite)
 
 ## Mesh Reading
 
-A Ferrite `Grid` can be generated with the [`generate_grid`](@ref) function. 
-More advanced meshes can be imported with the 
+A Ferrite `Grid` can be generated with the [`generate_grid`](@ref) function.
+More advanced meshes can be imported with the
 [`FerriteMeshParser.jl`](https://github.com/Ferrite-FEM/FerriteMeshParser.jl) (from Abaqus input files),
 or even created and translated with the [`Gmsh.jl`](https://github.com/JuliaFEM/Gmsh.jl) and [`FerriteGmsh.jl`](https://github.com/Ferrite-FEM/FerriteGmsh.jl) package, respectively.
 
@@ -18,7 +18,7 @@ Either, a mesh is created on the fly with the gmsh API or a mesh in `.msh` or `.
 ```@docs
 FerriteGmsh.togrid
 ```
-`FerriteGmsh.jl` supports currently the translation of `cellsets` and `facesets`.
+`FerriteGmsh.jl` supports currently the translation of `cellsets` and `facetsets`.
 Such sets are defined in Gmsh as `PhysicalGroups` of dimension `dim` and `dim-1`, respectively.
 In case only a part of the mesh is the domain, the domain can be specified by providing the keyword argument `domain` the name of the `PhysicalGroups` in the [`FerriteGmsh.togrid`](@ref) function.
 
@@ -36,14 +36,14 @@ For an exemplary usage of `Gmsh.jl` and `FerriteGmsh.jl`, consider the [Stokes f
 ### FerriteMeshParser
 
 `FerriteMeshParser.jl` converts the mesh in an Abaqus input file (`.inp`) to a `Ferrite.Grid` with its function `get_ferrite_grid`.
-The translations for most of Abaqus' standard 2d and 3d continuum elements to a `Ferrite.Cell` are defined.
+The translations for most of Abaqus' standard 2d and 3d continuum elements to a `Ferrite.AbstractCell` are defined.
 Custom translations can be given as input, which can be used to import other (custom) elements or to override the default translation.
 ```@docs
 FerriteMeshParser.get_ferrite_grid
 ```
 
-If you are missing the translation of an Abaqus element that is equivalent to a `Ferrite.Cell`,
-consider to open an [issue](https://github.com/Ferrite-FEM/FerriteMeshParser.jl/issues/new) or a pull request. 
+If you are missing the translation of an Abaqus element that is equivalent to a `Ferrite.AbstractCell`,
+consider to open an [issue](https://github.com/Ferrite-FEM/FerriteMeshParser.jl/issues/new) or a pull request.
 
 ## `Grid` Datastructure
 
@@ -62,76 +62,38 @@ Consider the following 2D mesh:
 The cells of the grid can be described in the following way
 
 ```julia
-julia> cells = [
-              Quadrilateral((1,2,5,4)),
-              Quadrilateral((2,3,6,5)),
-              Quadrilateral((4,5,8,7)),
-              Quadrilateral((5,6,9,8))
-       ]
+cells = [Quadrilateral((1, 2, 5, 4)),
+         Quadrilateral((2, 3, 6, 5)),
+         Quadrilateral((4, 5, 8, 7)),
+         Quadrilateral((5, 6, 9, 8))]
 ```
 
-where each Quadrilateral, which is a subtype of `AbstractCell` saves in the field `nodes` the tuple of node IDs.
-Additionally, the data structure `Grid` can hold node-, face- and cellsets. 
-All of these three sets are defined by a dictionary that maps a string key to a `Set`. 
-For the special case of node- and cellsets the dictionary's value is of type `Set{Int}`, i.e. a keyword is mapped to a node or cell ID, respectively. 
+where each `Quadrilateral <: AbstractCell` is defined by the tuple of node IDs.
+Additionally, the data structure `Grid` contains node-, cell-, facet-, and vertexsets.
+Each of these sets is defined by a `Dict{String, OrderedSet}`.
 
-Facesets are a more elaborate construction. They map a `String` key to a `Set{FaceIndex}`, where each `FaceIndex` consists of `(global_cell_id, local_face_id)`.
-In order to understand the `local_face_id` properly, one has to consider the reference space of the element, which typically is spanned by a product of the interval ``[-1, 1]`` and in this particular example ``[-1, 1] \times [-1, 1]``. 
-In this space a local numbering of nodes and faces exists, i.e.
+Node- and cellsets are represented by an `OrderedSet{Int}`, giving a set of node or cell ID, respectively.
 
+Facet- and vertexsets are represented by `OrderedSet{<:BoundaryIndex}`, where `BoundaryIndex` is a `FacetIndex` or `VertexIndex` respectively.
+`FacetIndex` and `VertexIndex` wraps a `Tuple`, `(global_cell_id, local_facet_id)` and `(global_cell_id, local_vertex_id)`, where the local IDs
+are defined according to the reference shapes, see [Reference shapes](@ref).
 
-![local element](./assets/local_element.svg)
-
-
-The example shows a local face ID ordering, defined as:
+The highlighted facets, i.e. the two edges from node ID 3 to 6 and from 6 to 9, on the right hand side of our test mesh can now be described as
 
 ```julia
-faces(::Lagrange{2,RefCube,1}) = ((1,2), (2,3), (3,4), (4,1))
+boundary_facets = [(3, 6), (6, 9)]
+```
+i.e. by using the node IDs of the reference shape vertices.
+
+The first of these can be found as the 2nd facet of the 2nd cell.
+```@repl
+using Ferrite #hide
+Ferrite.facets(Quadrilateral((2, 3, 6, 5)))
 ```
 
-Other face ID definitions [can be found in the src files](https://github.com/Ferrite-FEM/Ferrite.jl/blob/8224282ab4d67cb523ef342e4a6ceb1716764ada/src/interpolations.jl#L154) in the corresponding `faces` dispatch.
-
-
-The highlighted face, i.e. the two lines from node ID 3 to 6 and from 6 to 9, on the right hand side of our test mesh can now be described as
-
-```julia
-julia> faces = [
-           (3,6),
-           (6,9)
-       ]
-```
-
-The local ID can be constructed based on elements, corresponding faces and chosen interpolation, since the face ordering is interpolation dependent.
-```julia
-julia> function compute_faceset(cells, global_faces, ip::Interpolation{dim}) where {dim}
-           local_faces = Ferrite.faces(ip)
-           nodes_per_face = length(local_faces[1])
-           d = Dict{NTuple{nodes_per_face, Int}, FaceIndex}()
-           for (c, cell) in enumerate(cells) # c is global cell number
-               for (f, face) in enumerate(local_faces) # f is local face number
-                   # store the global nodes for the particular element, local face combination
-                   d[ntuple(i-> cell.nodes[face[i]], nodes_per_face)] = FaceIndex(c, f)
-               end
-           end
-       
-           faces = Vector{FaceIndex}()
-           for face in global_faces
-               # lookup the element, local face combination for this face
-               push!(faces, d[face])
-           end
-       
-           return faces
-       end
-
-julia> interpolation = Lagrange{2, RefCube, 1}()
-
-julia> compute_faceset(cells, faces, interpolation)
-Vector{FaceIndex} with 2 elements:
-  FaceIndex((2, 2))
-  FaceIndex((4, 2))
-```
-
-Ferrite considers edges only in the three dimensional space. However, they share the concepts of faces in terms of `(global_cell_id,local_edge_id)` identifier.
+The unique representation of an entity is given by the sorted version of this tuple.
+While we could use this information to construct a facet set, Ferrite can construct this
+set by filtering based on the coordinates, using [`addfacetset!`](@ref).
 
 ## AbstractGrid
 
@@ -171,11 +133,10 @@ Ferrite.getnnodes(grid::SmallGrid) = length(grid.nodes_test)
 Ferrite.get_coordinate_eltype(::SmallGrid) = Float64
 Ferrite.get_coordinate_type(::SmallGrid{dim}) where dim = Vec{dim,Float64}
 Ferrite.nnodes_per_cell(grid::SmallGrid, i::Int=1) = Ferrite.nnodes(grid.cells_test[i])
-Ferrite.n_faces_per_cell(grid::SmallGrid) = nfaces(eltype(grid.cells_test))
 ```
 
-These definitions make many of `Ferrite`s functions work out of the box, e.g. you can now call 
-`getcoordinates(grid, cellid)` on the `SmallGrid`. 
+These definitions make many of `Ferrite`s functions work out of the box, e.g. you can now call
+`getcoordinates(grid, cellid)` on the `SmallGrid`.
 
 Now, you would be able to assemble the heat equation example over the new custom `SmallGrid` type.
 Note that this particular subtype isn't able to handle boundary entity sets and so, you can't describe boundaries with it.
@@ -183,6 +144,7 @@ In order to use boundaries, e.g. for Dirichlet constraints in the ConstraintHand
 
 ## Topology
 
-Ferrite.jl's `Grid` type offers experimental features w.r.t. topology information. The functions [`Ferrite.getneighborhood`](@ref) and [`Ferrite.faceskeleton`](@ref)
-are the interface to obtain topological information. The [`Ferrite.getneighborhood`](@ref) can construct lists of directly connected entities based on a given entity (`CellIndex,FaceIndex,EdgeIndex,VertexIndex`).
-The [`Ferrite.faceskeleton`](@ref) function can be used to evaluate integrals over material interfaces or computing element interface values such as jumps.
+Ferrite.jl's `Grid` type offers experimental features w.r.t. topology information. The functions [`Ferrite.getneighborhood`](@ref) and [`Ferrite.facetskeleton`](@ref)
+are the interface to obtain topological information. The [`Ferrite.getneighborhood`](@ref) can construct lists of directly connected entities based on a given entity
+(`CellIndex`, `FacetIndex`, `FaceIndex`, `EdgeIndex`, or `VertexIndex`).
+The [`Ferrite.facetskeleton`](@ref) function can be used to evaluate integrals over material interfaces or computing element interface values such as jumps.

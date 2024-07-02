@@ -98,14 +98,14 @@ function LandauModel(α, G, gridsize, left::Vec{DIM, T}, right::Vec{DIM, T}, elp
     startingconditions!(dofvector, dofhandler)
     boundaryconds = ConstraintHandler(dofhandler)
     #boundary conditions can be added but aren't necessary for optimization
-    #add!(boundaryconds, Dirichlet(:P, getfaceset(grid, "left"), (x, t) -> [0.0,0.0,0.53], [1,2,3]))
-    #add!(boundaryconds, Dirichlet(:P, getfaceset(grid, "right"), (x, t) -> [0.0,0.0,-0.53], [1,2,3]))
+    #add!(boundaryconds, Dirichlet(:P, getfacetset(grid, "left"), (x, t) -> [0.0,0.0,0.53], [1,2,3]))
+    #add!(boundaryconds, Dirichlet(:P, getfacetset(grid, "right"), (x, t) -> [0.0,0.0,-0.53], [1,2,3]))
     close!(boundaryconds)
     update!(boundaryconds, 0.0)
 
     apply!(dofvector, boundaryconds)
 
-    hessian = create_sparsity_pattern(dofhandler)
+    hessian = allocate_matrix(dofhandler)
     dpc = ndofs_per_cell(dofhandler)
     cpc = length(grid.cells[1].nodes)
     caches = [ThreadCache(dpc, cpc, copy(cvP), ModelParams(α, G), elpotential) for t=1:nthreads()]
@@ -113,10 +113,10 @@ function LandauModel(α, G, gridsize, left::Vec{DIM, T}, right::Vec{DIM, T}, elp
 end
 
 # utility to quickly save a model
-function Ferrite.vtk_save(path, model, dofs=model.dofs)
-    vtkfile = vtk_grid(path, model.dofhandler)
-    vtk_point_data(vtkfile, model.dofhandler, dofs)
-    vtk_save(vtkfile)
+function save_landau(path, model, dofs=model.dofs)
+    VTKFile(path, model.dofhandler) do vtk
+        write_solution(vtk, model.dofhandler, dofs)
+    end
 end
 
 # ## Assembly
@@ -193,7 +193,7 @@ function minimize!(model; kwargs...)
     dh = model.dofhandler
     dofs = model.dofs
     ∇f = fill(0.0, length(dofs))
-    ∇²f = create_sparsity_pattern(dh)
+    ∇²f = allocate_matrix(dh)
     function g!(storage, x)
         ∇F!(storage, x, model)
         apply_zero!(storage, model.boundaryconds)
@@ -253,9 +253,9 @@ left = Vec{3}((-75.,-25.,-2.))
 right = Vec{3}((75.,25.,2.))
 model = LandauModel(α, G, (50, 50, 2), left, right, element_potential)
 
-vtk_save("landauorig", model)
+save_landau("landauorig", model)
 @time minimize!(model)
-vtk_save("landaufinal", model)
+save_landau("landaufinal", model)
 
 # as we can see this runs very quickly even for relatively large gridsizes.
 # The key to get high performance like this is to minimize the allocations inside the threaded loops,

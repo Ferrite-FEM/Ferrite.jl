@@ -126,9 +126,9 @@ Gmsh.
 
 #### [Tutorial 9: Porous media (SubDofHandler)](porous_media.md)
 
-This tutorial introduces how to solve a complex linear problem, where there are different 
+This tutorial introduces how to solve a complex linear problem, where there are different
 fields on different subdomains, and different cell types in the grid. This requires using
-the `SubDofHandler` interface. 
+the `SubDofHandler` interface.
 
 **Keywords**: Mixed grids, multiple fields, porous media, `SubDofHandler`
 
@@ -145,6 +145,16 @@ for the time-integration.
 
 ---
 
+#### [Tutorial 10: Reactive surface](@ref tutorial-reactive-surface)
+
+In this tutorial a reaction diffusion system on a sphere surface embedded in 3D is solved.
+Ferrite is used to assemble the diffusion operators and the mass matrices. The problem is
+solved by using the usual first order reaction diffusion operator splitting.
+
+**Keywords**: embedded elements, operator splitting, gmsh
+
+---
+
 #### [Tutorial 11: Linear shell](@ref tutorial-linear-shell)
 
 In this tutorial a linear shell element formulation is set up as a two-dimensional domain
@@ -152,4 +162,19 @@ embedded in three-dimensional space. This will teach, and perhaps inspire, you o
 Ferrite can be used for non-standard things and how to add "hacks" that build on top of
 Ferrite.
 
-**Keywords**: embedding, automatic differentiation
+**Keywords**: shell elements, automatic differentiation
+
+---
+
+#### [Tutorial 12: Discontinuous Galerkin heat equation](@ref tutorial-dg-heat-equation)
+
+This tutorial guides you through the process of solving the linear stationary heat equation
+(i.e. Poisson's equation) on a unit square with inhomogeneous Dirichlet and Neumann boundary
+conditions using the interior penalty discontinuous Galerkin method. This tutorial follows
+the [heat equation tutorial](@ref tutorial-heat-equation), introducing face and interface
+iterators, jump and average operators, and cross-element coupling in sparsity patterns. This
+example was developed as part of the *Google Summer of Code* funded project ["Discontinuous
+Galerkin Infrastructure For the finite element toolbox
+Ferrite.jl"](https://summerofcode.withgoogle.com/programs/2023/projects/SLGbRNI5).
+
+**Keywords**: scalar-valued solution, Dirichlet boundary conditions, Discontinuous Galerkin, Interior penalty

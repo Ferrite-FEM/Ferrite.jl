@@ -18,7 +18,6 @@
     Ferrite.get_coordinate_eltype(::SmallGrid) = Float64
     Ferrite.get_coordinate_type(::SmallGrid{dim}) where dim = Vec{dim,Float64}
     Ferrite.nnodes_per_cell(grid::SmallGrid, i::Int=1) = Ferrite.nnodes(grid.cells_test[i])
-    Ferrite.n_faces_per_cell(grid::SmallGrid) = nfaces(eltype(grid.cells_test))
 
     nodes = [(-1.0,-1.0); (0.0,-1.0); (1.0,-1.0); (-1.0,0.0); (0.0,0.0); (1.0,0.0); (-1.0,1.0); (0.0,1.0); (1.0,1.0)]
     cells = (Quadrilateral((1,2,5,4)), Quadrilateral((2,3,6,5)), Quadrilateral((4,5,8,7)), Quadrilateral((5,6,9,8)))
@@ -28,11 +27,11 @@
     ip = Lagrange{RefQuadrilateral, 1}()
     qr = QuadratureRule{RefQuadrilateral}(2)
     cellvalues = CellValues(qr, ip);
-    
+
     dhs = [DofHandler(grid) for grid in (subtype_grid, reference_grid)]
     u1 = Vector{Float64}(undef, 9)
     u2 = Vector{Float64}(undef, 9)
-    ∂Ω = union(getfaceset.((reference_grid, ), ["left", "right", "top", "bottom"])...)
+    ∂Ω = union(getfacetset.((reference_grid, ), ["left", "right", "top", "bottom"])...)
     dbc = Dirichlet(:u, ∂Ω, (x, t) -> 0)
 
     function doassemble!(cellvalues::CellValues, K::SparseMatrixCSC, dh::DofHandler)
@@ -70,7 +69,7 @@
         add!(ch, dbc)
         close!(ch)
         update!(ch, 0.0)
-        K = create_sparsity_pattern(dh);
+        K = allocate_matrix(dh);
         K, f = doassemble!(cellvalues, K, dh);
         apply!(K, f, ch)
         sol = K \ f
@@ -81,6 +80,10 @@
     @test Ferrite.celldofs(dhs[1],3) == Ferrite.celldofs(dhs[2],3)
     @test Ferrite.ndofs(dhs[1]) == Ferrite.ndofs(dhs[2])
     @test isapprox(u1,u2,atol=1e-8)
+
+    minv, maxv = Ferrite.bounding_box(subtype_grid)
+    @test minv ≈ Vec((-1.0,-1.0))
+    @test maxv ≈ Vec((+1.0,+1.0))
 
     colors1 = Ferrite.create_coloring(subtype_grid, alg = ColoringAlgorithm.WorkStream)
     colors2 = Ferrite.create_coloring(reference_grid, alg = ColoringAlgorithm.WorkStream)
