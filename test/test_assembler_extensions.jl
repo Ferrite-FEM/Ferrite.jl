@@ -82,11 +82,11 @@ end
     add!(dh, :u, ip)
     add!(dh, :v, ip)
     close!(dh)
-    
+
     Ke_zeros = zeros(ndofs_per_cell(dh,1), ndofs_per_cell(dh,1))
     Ke_rand = rand(ndofs_per_cell(dh,1), ndofs_per_cell(dh,1))
     dofs = celldofs(dh,1)
-    
+
     for c1 ∈ [true, false], c2 ∈ [true, false], c3 ∈ [true, false], c4 ∈ [true, false]
         coupling = [c1; c2;; c3; c4]
         K = create_sparsity_pattern(SparseMatrixCSR, dh; coupling)
