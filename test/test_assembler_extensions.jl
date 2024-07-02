@@ -11,7 +11,7 @@ using SparseArrays, LinearAlgebra
     add!(dh, :u, Lagrange{RefLine,1}())
     close!(dh)
     ch = ConstraintHandler(dh)
-    add!(ch, Dirichlet(:u, getfaceset(grid, "left"), x -> 1))
+    add!(ch, Dirichlet(:u, getfacetset(grid, "left"), x -> 1))
     close!(ch)
     K0 = sparse(rand(3, 3))
     K0 = K0'*K0
@@ -43,7 +43,7 @@ end
     add!(dh, :u, Lagrange{RefLine, 1}())
     close!(dh)
 
-    K = create_sparsity_pattern(SparseMatrixCSR, dh)
+    K = allocate_matrix(SparseMatrixCSR, dh)
     I = [1,1,2,2,2,3,3]
     J = [1,2,1,2,3,2,3]
     V = zeros(7)
@@ -51,9 +51,9 @@ end
     f = zeros(3)
 
     ch = ConstraintHandler(dh)
-    add!(ch, Dirichlet(:u, getfaceset(grid, "left"), (x, t) -> 1))
+    add!(ch, Dirichlet(:u, getfacetset(grid, "left"), (x, t) -> 1))
     close!(ch)
-    @test K == create_sparsity_pattern(SparseMatrixCSR, dh, ch)
+    @test K == allocate_matrix(SparseMatrixCSR, dh, ch)
 
     assembler = start_assemble(K, f)
     ke = [-1.0 1.0; 2.0 -1.0]
@@ -89,7 +89,7 @@ end
 
     for c1 ∈ [true, false], c2 ∈ [true, false], c3 ∈ [true, false], c4 ∈ [true, false]
         coupling = [c1; c2;; c3; c4]
-        K = create_sparsity_pattern(SparseMatrixCSR, dh; coupling)
+        K = allocate_matrix(SparseMatrixCSR, dh; coupling)
         a = start_assemble(K)
         assemble!(a, dofs, Ke_zeros)
         if all(coupling)

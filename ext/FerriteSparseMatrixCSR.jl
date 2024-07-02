@@ -1,6 +1,7 @@
 module FerriteSparseMatrixCSR
 
 using Ferrite, SparseArrays, SparseMatricesCSR
+import Ferrite: AbstractSparsityPattern
 import Base: @propagate_inbounds
 
 @propagate_inbounds function Ferrite._assemble_inner!(K::SparseMatrixCSR, Ke::AbstractMatrix, dofs::AbstractVector, sorteddofs::AbstractVector, permutation::AbstractVector, sym::Bool)
@@ -63,18 +64,16 @@ function Ferrite.zero_out_columns!(K::SparseMatrixCSR, ch::ConstraintHandler)
     end
 end
 
-function Ferrite.create_sparsity_pattern(::Type{<:SparseMatrixCSR}, dh, ch; kwargs...)
-    # create SparseMatrixCSC
-    K = create_sparsity_pattern(dh, ch; kwargs...)
-    # transform to SparseMatrixCSR
-    return SparseMatrixCSR(transpose(sparse(transpose(K))))
+
+function Ferrite.allocate_matrix(::Type{SparseMatrixCSR}, sp::AbstractSparsityPattern)
+    return allocate_matrix(SparseMatrixCSR{1,Float64,Int}, sp)
 end
 
-function Ferrite.create_sparsity_pattern(::Type{<:SparseMatrixCSR}, dh; kwargs...)
-    # create SparseMatrixCSC
-    K = create_sparsity_pattern(dh; kwargs...)
-    # transform to SparseMatrixCSR
-    return SparseMatrixCSR(transpose(sparse(transpose(K))))
+function Ferrite.allocate_matrix(::Type{MatrixType}, sp::AbstractSparsityPattern) where {Bi, Tv, Ti, MatrixType <: SparseMatrixCSR{Bi, Tv, Ti}}
+    # Allocate CSC first ...
+    K = allocate_matrix(SparseMatrixCSC{Tv, Ti}, sp)
+    # ... and transform to SparseMatrixCSR
+    return SparseMatrixCSR{Bi}(transpose(sparse(transpose(K))))
 end
 
 end
