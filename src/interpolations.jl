@@ -481,6 +481,8 @@ is_discontinuous(::Type{<:DiscontinuousLagrange}) = true
 # Lagrange #
 ############
 """
+    Lagrange{refshape, order} <: ScalarInterpolation
+
 Standard continuous Lagrange polynomials with equidistant node placement.
 """
 struct Lagrange{shape, order, unused} <: ScalarInterpolation{shape, order}
@@ -1305,6 +1307,8 @@ end
 # Serendipity #
 ###############
 """
+    Serendipity{refshape, order} <: ScalarInterpolation
+
 Serendipity element on hypercubes. Currently only second order variants are implemented.
 """
 struct Serendipity{shape, order, unused} <: ScalarInterpolation{shape,order}
@@ -1448,6 +1452,8 @@ end
 # Crouzeix–Raviart Elements #
 #############################
 """
+    CrouzeixRaviart{refshape, order} <: ScalarInterpolation
+
 Classical non-conforming Crouzeix–Raviart element.
 
 For details we refer to the original paper [CroRav:1973:cnf](@cite).
@@ -1514,6 +1520,8 @@ function reference_shape_value(ip::CrouzeixRaviart{RefTetrahedron,1}, ξ::Vec{3}
 end
 
 """
+    RannacherTurek{refshape, order} <: ScalarInterpolation
+
 Classical non-conforming Rannacher-Turek element.
 
 This element is basically the idea from Crouzeix and Raviart applied to
