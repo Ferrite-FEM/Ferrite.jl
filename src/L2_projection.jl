@@ -45,9 +45,9 @@ is the finite element approximation given by the interpolations `add!`ed to the 
 ```julia
 proj = L2Projector(grid)
 qr_quad = QuadratureRule{RefQuadrilateral}(2)
-add!(proj, Lagrange{RefQuadrilateral, 1}(), quad_set; qr_rhs = qr_quad)
+add!(proj, quad_set, Lagrange{RefQuadrilateral, 1}(); qr_rhs = qr_quad)
 qr_tria = QuadratureRule{RefTriangle}(1)
-add!(proj, Lagrange{RefTriangle, 1}(), tria_set; qr_rhs = qr_tria)
+add!(proj, tria_set, Lagrange{RefTriangle, 1}(); qr_rhs = qr_tria)
 close!(proj)
 
 vals = Dict{Int, Vector{Float64}}() # Can also be Vector{Vector},
@@ -92,7 +92,7 @@ function L2Projector(
 end
 
 """
-    add!(proj::L2Projector, ip::Interpolation, set::AbstractVecOrSet{Int};
+    add!(proj::L2Projector, set::AbstractVecOrSet{Int}, ip::Interpolation;
         qr_rhs, [qr_lhs])
 
 Add an interpolation `ip` on the cells in `set` to the `L2Projector` `proj`.
@@ -108,6 +108,7 @@ function add!(proj::L2Projector, set::AbstractVecOrSet{Int}, ip::Interpolation;
         qr_rhs::Union{QuadratureRule, Nothing}, qr_lhs::QuadratureRule = _mass_qr(ip)
         )
     # Validate user input
+    isclosed(proj) && error("The L2Projector is already closed")
     if qr_rhs !== nothing
         getrefshape(ip) == getrefshape(qr_rhs) || error("The reference shape of the interpolation and the qr_rhs must be the same")
         push!(proj.qrs_rhs, qr_rhs)
