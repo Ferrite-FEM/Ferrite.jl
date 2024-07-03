@@ -5,12 +5,13 @@ using Adapt
 
 
 left = Tensor{1,2,Float32}((0,-0)) # define the left bottom corner of the grid.
-right = Tensor{1,2,Float32}((3.0,4.0)) # define the right top corner of the grid.
+right = Tensor{1,2,Float32}((4.0,4.0)) # define the right top corner of the grid.
 
 
-grid = generate_grid(Quadrilateral, (3, 4),left,right); 
+grid = generate_grid(Quadrilateral, (4, 4),left,right) 
 
-colors = create_coloring(grid)
+
+colors = create_coloring(grid) .|> (x -> Int32.(x)) # convert to Int32 to reduce number of registers
 
 
 ip = Lagrange{RefQuadrilateral, 1}() # define the interpolation function (i.e. Bilinear lagrange)
@@ -19,7 +20,7 @@ ip = Lagrange{RefQuadrilateral, 1}() # define the interpolation function (i.e. B
 qr = QuadratureRule{RefQuadrilateral,Float32}(2) 
 
 
-cellvalues = CellValues(Float32,qr, ip);
+cellvalues = CellValues(Float32,qr, ip)
 
 
 dh = DofHandler(grid)

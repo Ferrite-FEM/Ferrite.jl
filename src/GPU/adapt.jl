@@ -30,7 +30,9 @@ function Adapt.adapt_structure(to, qv::StaticQuadratureView)
 end
 
 function Adapt.adapt_structure(to, grid::Grid)
-    cells = Adapt.adapt_structure(to, cu(grid.cells))
+    # map Int64 to Int32 to reduce number of registers
+    cu_cells = grid.cells .|> (x -> Int32.(x.nodes)) .|> Quadrilateral |> cu
+    cells = Adapt.adapt_structure(to, cu_cells)
     nodes = Adapt.adapt_structure(to, cu(grid.nodes))
     GPUGrid(cells,nodes)
 end
