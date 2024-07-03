@@ -16,7 +16,7 @@ the exporting.
 
 The following structure can be used to write various output to a vtk-file:
 ```@example export
-VTKFile("my_solution", grid) do vtk
+VTKGridFile("my_solution", grid) do vtk
     write_solution(vtk, dh, u)
 end;
 ```
@@ -33,7 +33,7 @@ where `write_solution` is just one example of the following functions that can b
 
 Instead of using the `do`-block, it is also possible to do
 ```@example export
-vtk = VTKFile("my_solution", grid)
+vtk = VTKGridFile("my_solution", grid)
 write_solution(vtk, dh, u)
 # etc.
 close(vtk);
@@ -44,7 +44,7 @@ The data written by `write_solution`, `write_cell_data`, `write_node_data`, and 
 For simulations with multiple time steps, typically one `VTK` (`.vtu`) file is written
 for each time step. In order to connect the actual time with each of these files,
 a `VTKFileCollection` can be used, which will write one paraview datafile (`.pvd`)
-file and one `VTKFile` (`.vtu`) for each time step.
+file and one `VTKGridFile` (`.vtu`) for each time step.
 
 ```@example export
 pvd = VTKFileCollection("my_results", grid)

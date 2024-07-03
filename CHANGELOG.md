@@ -219,7 +219,7 @@ more discussion).
   -     vtk_point_data(vtk, nodal_data, "my node data")
   -     vtk_point_data(vtk, proj, projected_data, "my projected data")
   -     vtk_cell_data(vtk, proj, projected_data, "my projected data")
-  + VTKFile(name, dh) do vtk
+  + VTKGridFile(name, dh) do vtk
   +     write_solution(vtk, dh, a)
   +     write_node_data(vtk, nodal_data, "my node data")
   +     write_projection(vtk, proj, projected_data, "my projected data")
@@ -427,8 +427,8 @@ more discussion).
   omitting type piracy, ([#835][github-835]) implemented `isequal` and `hash` for `BoundaryIndex` datatypes.
 
 - **VTK export**: Ferrite no longer extends methods from `WriteVTK.jl`, instead the new types
-  `VTKFile` and `VTKFileCollection` should be used instead. New methods exists for writing to
-  a `VTKFile`, e.g. `write_solution`, `write_cell_data`, `write_node_data`, and `write_projection`.
+  `VTKGridFile` and `VTKFileCollection` should be used instead. New methods exists for writing to
+  a `VTKGridFile`, e.g. `write_solution`, `write_cell_data`, `write_node_data`, and `write_projection`.
   See [#692][github-692].
 
 - **Definitions**: Previously, `face` and `edge` referred to codimension 1 relative reference shape.

@@ -1,9 +1,9 @@
 
 """
-    VTKFile(filename::AbstractString, grid::AbstractGrid; kwargs...)
-    VTKFile(filename::AbstractString, dh::DofHandler; kwargs...)
+    VTKGridFile(filename::AbstractString, grid::AbstractGrid; kwargs...)
+    VTKGridFile(filename::AbstractString, dh::DofHandler; kwargs...)
 
-Create a `VTKFile` that contains an unstructured VTK grid.
+Create a `VTKGridFile` that contains an unstructured VTK grid.
 The keyword arguments are forwarded to `WriteVTK.vtk_grid`, see
 [Data Formatting Options](https://juliavtk.github.io/WriteVTK.jl/stable/grids/syntax/#Data-formatting-options)
 
@@ -17,28 +17,28 @@ This file handler can be used to to write data with
 * [`Ferrite.write_nodeset`](@ref)
 * [`Ferrite.write_constraints`](@ref)
 
-It is necessary to call `close(::VTKFile)` to save the data after writing
+It is necessary to call `close(::VTKGridFile)` to save the data after writing
 to the file handler. Using the supported `do`-block does this automatically:
 ```julia
-VTKFile(filename, grid) do vtk
+VTKGridFile(filename, grid) do vtk
     write_solution(vtk, dh, u)
     write_cell_data(vtk, celldata)
 end
 ```
 """
-struct VTKFile{VTK<:WriteVTK.VTKFile}
+struct VTKGridFile{VTK<:WriteVTK.VTKGridFile}
     vtk::VTK
 end
-function VTKFile(filename::String, dh::DofHandler; kwargs...)
-    return VTKFile(filename, get_grid(dh); kwargs...)
+function VTKGridFile(filename::String, dh::DofHandler; kwargs...)
+    return VTKGridFile(filename, get_grid(dh); kwargs...)
 end
-function VTKFile(filename::String, grid::AbstractGrid; kwargs...)
+function VTKGridFile(filename::String, grid::AbstractGrid; kwargs...)
     vtk = create_vtk_grid(filename, grid; kwargs...)
-    return VTKFile(vtk)
+    return VTKGridFile(vtk)
 end
 # Makes it possible to use the `do`-block syntax
-function VTKFile(f::Function, args...; kwargs...)
-    vtk = VTKFile(args...; kwargs...)
+function VTKGridFile(f::Function, args...; kwargs...)
+    vtk = VTKGridFile(args...; kwargs...)
     try
         f(vtk)
     finally
@@ -46,12 +46,12 @@ function VTKFile(f::Function, args...; kwargs...)
     end
 end
 
-Base.close(vtk::VTKFile) = WriteVTK.vtk_save(vtk.vtk)
+Base.close(vtk::VTKGridFile) = WriteVTK.vtk_save(vtk.vtk)
 
-function Base.show(io::IO, ::MIME"text/plain", vtk::VTKFile)
+function Base.show(io::IO, ::MIME"text/plain", vtk::VTKGridFile)
     open_str = isopen(vtk.vtk) ? "open" : "closed"
     filename = vtk.vtk.path
-    print(io, "VTKFile for the $open_str file \"$(filename)\".")
+    print(io, "VTKGridFile for the $open_str file \"$(filename)\".")
 end
 
 """
@@ -81,7 +81,7 @@ Base.close(pvd::VTKFileCollection) = WriteVTK.vtk_save(pvd.pvd)
 """
     addstep!(f::Function, pvd::VTKFileCollection, t::Real, [grid_or_dh]; kwargs...)
 
-Add a step at time `t` by writing a `VTKFile` to `pvd`.
+Add a step at time `t` by writing a `VTKGridFile` to `pvd`.
 The keyword arguments are forwarded to `WriteVTK.vtk_grid`.
 If required, a new grid can be used by supplying the grid or dofhandler as the last argument.
 Should be used in a do-block, e.g.
@@ -100,14 +100,14 @@ close(pvd)
 """
 function addstep!(f::Function, pvd::VTKFileCollection, t, grid=pvd.grid_or_dh; kwargs...)
     pvd.step += 1
-    VTKFile(string(pvd.name, "_", pvd.step), grid; kwargs...) do vtk
+    VTKGridFile(string(pvd.name, "_", pvd.step), grid; kwargs...) do vtk
         f(vtk)
         pvd.pvd[t] = vtk.vtk # Add to collection
     end
 end
 
 """
-    addstep!(pvd::VTKFileCollection, vtk::VTKFile, t)
+    addstep!(pvd::VTKFileCollection, vtk::VTKGridFile, t)
 
 As an alternative to using the `addstep!(pvd, t) do` block, it is
 also possible to add a specific `vtk` at time `t` to `pvd`.
@@ -117,7 +117,7 @@ filename = "myoutput"
 pvd = VTKFileCollection(filename, grid)
 for (n, t) in pairs(timevector)
     # Calculate, e.g., the solution `u` and the stress `σeff`
-    vtk = VTKFile(string(filename, "_", n), dh)
+    vtk = VTKGridFile(string(filename, "_", n), dh)
     write_cell_data(vtk, σeff, "Effective stress")
     write_solution(vtk, dh, u)
     addstep!(pvd, vtk, t)
@@ -125,7 +125,7 @@ end
 close(pvd)
 ```
 """
-function addstep!(pvd::VTKFileCollection, vtk::VTKFile, t)
+function addstep!(pvd::VTKFileCollection, vtk::VTKGridFile, t)
     pvd.step += 1
     pvd.pvd[t] = vtk.vtk
 end
@@ -236,7 +236,7 @@ function component_names(::Type{S}) where S
 end
 
 """
-    write_solution(vtk::VTKFile, dh::AbstractDofHandler, u::Vector, suffix="")
+    write_solution(vtk::VTKGridFile, dh::AbstractDofHandler, u::Vector, suffix="")
 
 Save the values at the nodes in the degree of freedom vector `u` to `vtk`.
 Each field in `dh` will be saved separately, and `suffix` can be used to append
@@ -247,7 +247,7 @@ degree of freedom in `dh`, see [`write_node_data`](@ref write_node_data) for det
 Use `write_node_data` directly when exporting values that are already
 sorted by the nodes in the grid.
 """
-function write_solution(vtk::VTKFile, dh::AbstractDofHandler, u::Vector, suffix="")
+function write_solution(vtk::VTKGridFile, dh::AbstractDofHandler, u::Vector, suffix="")
     fieldnames = getfieldnames(dh)  # all primary fields
     for name in fieldnames
         data = _evaluate_at_grid_nodes(dh, u, name, #=vtk=# Val(true))
@@ -257,11 +257,11 @@ function write_solution(vtk::VTKFile, dh::AbstractDofHandler, u::Vector, suffix=
 end
 
 """
-    write_projection(vtk::VTKFile, proj::L2Projector, vals::Vector, name::AbstractString)
+    write_projection(vtk::VTKGridFile, proj::L2Projector, vals::Vector, name::AbstractString)
 
 Project `vals` to the grid nodes with `proj` and save to `vtk`.
 """
-function write_projection(vtk::VTKFile, proj::L2Projector, vals, name)
+function write_projection(vtk::VTKGridFile, proj::L2Projector, vals, name)
     data = _evaluate_at_grid_nodes(proj, vals, #=vtk=# Val(true))::Matrix
     @assert size(data, 2) == getnnodes(get_grid(proj.dh))
     _vtk_write_node_data(vtk.vtk, data, name; component_names=component_names(eltype(vals)))
@@ -269,17 +269,17 @@ function write_projection(vtk::VTKFile, proj::L2Projector, vals, name)
 end
 
 """
-    write_cell_data(vtk::VTKFile, celldata::AbstractVector, name::String)
+    write_cell_data(vtk::VTKGridFile, celldata::AbstractVector, name::String)
 
 Write the `celldata` that is ordered by the cells in the grid to the vtk file.
 """
-function write_cell_data(vtk::VTKFile, celldata, name)
+function write_cell_data(vtk::VTKGridFile, celldata, name)
     WriteVTK.vtk_cell_data(vtk.vtk, celldata, name)
 end
 
 """
-    write_node_data(vtk::VTKFile, nodedata::Vector{Real}, name)
-    write_node_data(vtk::VTKFile, nodedata::Vector{<:AbstractTensor}, name)
+    write_node_data(vtk::VTKGridFile, nodedata::Vector{Real}, name)
+    write_node_data(vtk::VTKGridFile, nodedata::Vector{<:AbstractTensor}, name)
 
 Write the `nodedata` that is ordered by the nodes in the grid to `vtk`.
 
@@ -289,13 +289,13 @@ Two-dimensional vectors are padded with zeros.
 When `nodedata` contains second order tensors, the index order,
 `[11, 22, 33, 23, 13, 12, 32, 31, 21]`, follows the default Voigt order in Tensors.jl.
 """
-function write_node_data(vtk::VTKFile, nodedata, name)
+function write_node_data(vtk::VTKGridFile, nodedata, name)
     _vtk_write_node_data(vtk.vtk, nodedata, name)
 end
 
 
 """
-    write_nodeset(vtk::VTKFile, grid::AbstractGrid, nodeset::String)
+    write_nodeset(vtk::VTKGridFile, grid::AbstractGrid, nodeset::String)
 
 Write nodal values of 1 for nodes in `nodeset`, and 0 otherwise
 """
@@ -327,7 +327,7 @@ end
 write_cellset(vtk, grid::AbstractGrid, cellset::String) = write_cellset(vtk, grid, [cellset])
 
 """
-    write_constraints(vtk::VTKFile, ch::ConstraintHandler)
+    write_constraints(vtk::VTKGridFile, ch::ConstraintHandler)
 
 Saves the dirichlet boundary conditions to a vtkfile.
 Values will have a 1 where bcs are active and 0 otherwise
@@ -367,7 +367,7 @@ function write_constraints(vtk, ch::ConstraintHandler)
 end
 
 """
-    write_cell_colors(vtk::VTKFile, grid::AbstractGrid, cell_colors, name="coloring")
+    write_cell_colors(vtk::VTKGridFile, grid::AbstractGrid, cell_colors, name="coloring")
 
 Write cell colors (see [`create_coloring`](@ref)) to a VTK file for visualization.
 

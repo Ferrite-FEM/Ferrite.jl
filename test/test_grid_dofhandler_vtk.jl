@@ -38,7 +38,7 @@ end
         addnodeset!(grid, "middle-nodes", x -> norm(x) < radius)
 
         gridfilename = "grid-$(repr(celltype))"
-        VTKFile(gridfilename, grid) do vtk
+        VTKGridFile(gridfilename, grid) do vtk
             Ferrite.write_cellset(vtk, grid, "cell-1")
             Ferrite.write_cellset(vtk, grid, "middle-cells")
             Ferrite.write_nodeset(vtk, grid, "middle-nodes")
@@ -78,7 +78,7 @@ end
         apply!(u, ch)
 
         dofhandlerfilename = "dofhandler-$(repr(celltype))"
-        VTKFile(dofhandlerfilename, grid) do vtk
+        VTKGridFile(dofhandlerfilename, grid) do vtk
             Ferrite.write_constraints(vtk, ch)
             write_solution(vtk, dofhandler, u)
         end
@@ -119,7 +119,7 @@ close(csio)
     vector_data = [Vec{3}(ntuple(i->i, 3)) for j=1:8]
 
     filename_3d = "test_vtk_3d"
-    VTKFile(filename_3d, grid) do vtk
+    VTKGridFile(filename_3d, grid) do vtk
         write_node_data(vtk, sym_tensor_data, "symmetric tensor")
         write_node_data(vtk, tensor_data, "tensor")
         write_node_data(vtk, vector_data, "vector")
@@ -134,7 +134,7 @@ close(csio)
     vector_data = [Vec{2}(ntuple(i->i, 2)) for j=1:4]
 
     filename_2d = "test_vtk_2d"
-    VTKFile(filename_2d, grid) do vtk
+    VTKGridFile(filename_2d, grid) do vtk
         write_node_data(vtk, sym_tensor_data, "symmetric tensor")
         write_node_data(vtk, tensor_data, "tensor")
         write_node_data(vtk, tensor_data_1D, "tensor_1d")
@@ -722,7 +722,7 @@ end
                 addstep!(pvd1, t) do io
                     write_cell_data(io, celldata*n, "celldata")
                 end
-                vtk = VTKFile(string(fname, "2_", n), grid)
+                vtk = VTKGridFile(string(fname, "2_", n), grid)
                 write_cell_data(vtk, celldata*n, "celldata")
                 addstep!(pvd2, vtk, t)
                 @test !(isopen(vtk.vtk))
