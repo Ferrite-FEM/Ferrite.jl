@@ -26,7 +26,7 @@ VTKGridFile(filename, grid) do vtk
 end
 ```
 """
-struct VTKGridFile{VTK<:WriteVTK.VTKGridFile}
+struct VTKGridFile{VTK<:WriteVTK.DatasetFile}
     vtk::VTK
 end
 function VTKGridFile(filename::String, dh::DofHandler; kwargs...)
