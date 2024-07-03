@@ -102,6 +102,63 @@ end # of testset
 
 close(csio)
 
+@testset "DofHandler: global dofs" begin
+    grid = generate_grid(Quadrilateral, (5, 5))
+    ip = Lagrange{RefQuadrilateral, 1}()
+
+    # dh1: One standard field
+    dh1 = close!(add!(DofHandler(grid), :u, ip))
+
+    # dh1a: dh1 + one global dofs entry
+    dh1a = DofHandler(grid)
+    add!(dh1a, :u, ip)
+    Ferrite.add_global_dofs!(dh1a, :λ, 2)
+    @test_throws ArgumentError Ferrite.add_global_dofs!(dh1a, :λ, 3) # Field already existing
+    @test_throws AssertionError Ferrite.get_global_dofs(dh1a, :λ)    # Not closed
+    close!(dh1a)
+    @test_throws AssertionError Ferrite.add_global_dofs!(dh1a, :x, 2) # Closed
+    @test ndofs(dh1a) == ndofs(dh1) + 2
+    @test Ferrite.get_global_dofs(dh1a, :λ) == (ndofs(dh1)+1):(ndofs(dh1)+2) # global dofs added at the end
+
+    showstring = sprint(show, MIME"text/plain"(), dh1a)
+    @test contains(showstring, "Global dofs: λ (2)")
+
+    # dh1b: dh1 + two global dofs entries, added before and after standard field.
+    dh1b = DofHandler(grid)
+    Ferrite.add_global_dofs!(dh1b, :λ1, 2)
+    add!(dh1b, :u, ip)
+    Ferrite.add_global_dofs!(dh1b, :λ2, 1)
+    close!(dh1b)
+    @test ndofs(dh1b) == ndofs(dh1) + 3
+    @test Ferrite.get_global_dofs(dh1b, :λ1) == (ndofs(dh1)+1):(ndofs(dh1)+2)
+    @test Ferrite.get_global_dofs(dh1b, :λ2) == (ndofs(dh1)+3):(ndofs(dh1)+3)
+
+    showstring = sprint(show, MIME"text/plain"(), dh1b)
+    @test contains(showstring, "Global dofs: λ1 (2), λ2 (1)")
+
+    # dh2: Use subdofhandlers, dh2a adds global fields in addition to the standard fields in dh2
+    domain1 = Ferrite.create_cellset(grid, x -> norm(x) < 0.75)
+    domain2 = setdiff!(Set(1:getncells(grid)), domain1)
+
+    (dh2, dh2a) = map((false, true)) do add_globals
+        dh = DofHandler(grid)
+        add_globals && Ferrite.add_global_dofs!(dh, :λ1, 1)
+        sdh1 = SubDofHandler(dh, domain1)
+        add!(sdh1, :s, ip)
+        add!(sdh1, :v, ip^2)
+        add_globals && Ferrite.add_global_dofs!(dh, :λ2, 2)
+        sdh2 = SubDofHandler(dh, domain2)
+        add!(sdh2, :v, ip^2)
+        add_globals && Ferrite.add_global_dofs!(dh, :λ3, 3)
+        close!(dh)
+        dh
+    end
+    @test ndofs(dh2a) == ndofs(dh2) + 6
+    @test Ferrite.get_global_dofs(dh2a, :λ1) == ndofs(dh2) .+ (1:1)
+    @test Ferrite.get_global_dofs(dh2a, :λ2) == ndofs(dh2) .+ (2:3)
+    @test Ferrite.get_global_dofs(dh2a, :λ3) == ndofs(dh2) .+ (4:6)
+end
+
 @testset "vtk tensor export" begin
     # open files
     checksums_file_tensors = joinpath(dirname(@__FILE__), "checksums2.sha1")

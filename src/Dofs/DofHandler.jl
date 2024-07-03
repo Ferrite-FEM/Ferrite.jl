@@ -96,6 +96,7 @@ end
 mutable struct DofHandler{dim,G<:AbstractGrid{dim}} <: AbstractDofHandler
     const subdofhandlers::Vector{SubDofHandler{DofHandler{dim, G}}}
     const field_names::Vector{Symbol}
+    const global_dofs::OrderedDict{Symbol, UnitRange{Int}}
     # Dofs for cell i are stored in cell_dofs at the range:
     #     cell_dofs_offset[i]:(cell_dofs_offset[i]+ndofs_per_cell(dh, i)-1)
     const cell_dofs::Vector{Int}
@@ -131,7 +132,8 @@ close!(dh)
 function DofHandler(grid::G) where {dim, G <: AbstractGrid{dim}}
     ncells = getncells(grid)
     sdhs = SubDofHandler{DofHandler{dim, G}}[]
-    DofHandler{dim, G}(sdhs, Symbol[], Int[], zeros(Int, ncells), zeros(Int, ncells), false, grid, -1)
+    global_dofs = OrderedDict{Symbol, UnitRange{Int}}()
+    DofHandler{dim, G}(sdhs, Symbol[], global_dofs, Int[], zeros(Int, ncells), zeros(Int, ncells), false, grid, -1)
 end
 
 function Base.show(io::IO, mime::MIME"text/plain", dh::DofHandler)
@@ -150,6 +152,10 @@ function Base.show(io::IO, mime::MIME"text/plain", dh::DofHandler)
             end
             println(io, "    ", repr(fieldname), ", ", field_type)
         end
+    end
+    if length(dh.global_dofs) > 0
+        gdof_str = join([string(key, " (", length(r), ")") for (key, r) in dh.global_dofs], ", ")
+        println(io, "  Global dofs: ", gdof_str)
     end
     if !isclosed(dh)
         print(io, "  Not closed!")
@@ -323,6 +329,29 @@ function add!(dh::DofHandler, name::Symbol, ip::Interpolation)
 end
 
 """
+    add_global_dofs!(dh::DofHandler, name::Symbol, n::Int)
+
+Add `n` global degrees of freedom to `dh`. The degree of freedom numbers can be obtained
+after closing `dh` with [`get_global_dofs`](@ref).
+"""
+function add_global_dofs!(dh::DofHandler, name::Symbol, n::Int)
+    @assert !isclosed(dh)
+    haskey(dh.global_dofs, name) && throw(ArgumentError(string(":", name, " is already a global dof")))
+    dh.global_dofs[name] = (-n):(-1) # Range shifted in close
+end
+
+"""
+    get_global_dofs(dh::DofHandler, name::Symbol)
+
+Get a `UnitRange{Int}` describing the global dofs associated with `name`.
+Such dofs can be added with [`add_global_dofs!`](@ref).
+"""
+function get_global_dofs(dh::DofHandler, name::Symbol)
+    @assert isclosed(dh)
+    return dh.global_dofs[name]
+end
+
+"""
     close!(dh::AbstractDofHandler)
 
 Closes `dh` and creates degrees of freedom for each cell.
@@ -388,7 +417,12 @@ function __close!(dh::DofHandler{dim}) where {dim}
             facedicts,
         )
     end
-    dh.ndofs = maximum(dh.cell_dofs; init=0)
+    n_dofs = maximum(dh.cell_dofs; init=0)
+    for (key, dofs) in dh.global_dofs
+        dh.global_dofs[key] = n_dofs .+ (1:length(dofs))
+        n_dofs += length(dofs)
+    end
+    dh.ndofs = n_dofs
     dh.closed = true
 
     return dh, vertexdicts, edgedicts, facedicts
