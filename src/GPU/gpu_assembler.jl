@@ -8,11 +8,11 @@ function start_assemble(K::AbstractSparseArray{Tv}, f::AbstractVector{Tv}) where
     return GPUAssemblerSparsityPattern(K, f)
 end
 
-@propagate_inbounds function assemble!(A::GPUAssemblerSparsityPattern, dofs::AbstractVector{Int}, Ke::AbstractMatrix, fe::AbstractVector)
+@propagate_inbounds function assemble!(A::GPUAssemblerSparsityPattern, dofs::AbstractVector{Int32}, Ke::AbstractMatrix, fe::AbstractVector)
     _assemble!(A, dofs, Ke, fe)
 end
 
-function _assemble!(A::GPUAssemblerSparsityPattern, dofs::AbstractVector{Int}, Ke::AbstractMatrix, fe::AbstractVector)
+function _assemble!(A::GPUAssemblerSparsityPattern, dofs::AbstractVector{Int32}, Ke::AbstractMatrix, fe::AbstractVector)
     # Brute force assembly
     K = A.K
     f = A.f
@@ -27,7 +27,7 @@ function _assemble!(A::GPUAssemblerSparsityPattern, dofs::AbstractVector{Int}, K
     end
 end
 
-@inline function _add_to_index!(K::AbstractSparseArray{Tv,Ti}, v::Tv, i::Int, j::Int) where {Tv,Ti}
+@inline function _add_to_index!(K::AbstractSparseArray{Tv,Ti}, v::Tv, i::Int32, j::Int32) where {Tv,Ti}
     col_start = K.colPtr[j]
     col_end = K.colPtr[j + 1] - 1
 

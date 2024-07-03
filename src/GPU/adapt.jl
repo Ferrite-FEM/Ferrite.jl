@@ -46,14 +46,14 @@ end
 
 
 function get_ndofs_cell(dh::DofHandler)
-    ndofs_cell = [ndofs_per_cell(dh, i) for i in 1:(dh |> get_grid |> getncells)]
+    ndofs_cell = [Int32(ndofs_per_cell(dh, i)) for i in 1:(dh |> get_grid |> getncells)]
     return ndofs_cell
 end
 
 function Adapt.adapt_structure(to, dh::DofHandler)
-    cell_dofs = Adapt.adapt_structure(to, dh.cell_dofs |> cu)
+    cell_dofs = Adapt.adapt_structure(to, dh.cell_dofs .|> Int32 |> cu)
     cells = Adapt.adapt_structure(to, dh.grid.cells |> cu)
-    offsets = Adapt.adapt_structure(to, dh.cell_dofs_offset |> cu)
+    offsets = Adapt.adapt_structure(to, dh.cell_dofs_offset .|> Int32 |> cu)
     nodes = Adapt.adapt_structure(to, dh.grid.nodes |> cu)
     ndofs_cell = Adapt.adapt_structure(to, get_ndofs_cell(dh) |> cu)
     GPUDofHandler(cell_dofs, GPUGrid(cells,nodes),offsets, Ferrite.isclosed(dh), ndofs_cell)

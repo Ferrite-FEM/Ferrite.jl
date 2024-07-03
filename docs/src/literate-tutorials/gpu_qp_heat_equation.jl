@@ -25,6 +25,7 @@ cellvalues = CellValues(Float32,qr, ip)
 
 dh = DofHandler(grid)
 
+
 add!(dh, :u, ip)
 
 close!(dh);
@@ -86,7 +87,6 @@ function assemble_global!(cellvalues, dh::DofHandler,qp_iter::Val{QPiter}) where
             assemble_element_std!(Ke, fe, cellvalues)
         end
         # Assemble Ke and fe into K and f
-        @show typeof(cell)
         assemble!(assembler, celldofs(cell), Ke, fe)
     end
     return K, f
@@ -97,7 +97,7 @@ function assemble_element_gpu!(assembler,cv,dh,n_cells_colored, eles_colored)
     tx = threadIdx().x 
     bx = blockIdx().x
     bd = blockDim().x
-    e_color = tx + (bx-1)*bd # element number per color
+    e_color = tx + (bx-Int32(1))*bd # element number per color
     e_color ≤ n_cells_colored || return nothing # e here is the current element index.
     n_basefuncs = getnbasefunctions(cv)
     e = eles_colored[e_color]
@@ -145,11 +145,12 @@ function assemble_global_gpu_color(cellvalues,dh,colors)
     assembler_gpu = Adapt.adapt_structure(CUDA.KernelAdaptor(), assembler)
     cellvalues_gpu = Adapt.adapt_structure(CUDA.KernelAdaptor(), cellvalues)
     for i in 1:n_colors
-        kernel = @cuda launch=false assemble_element_gpu!(assembler_gpu,cellvalues_gpu,dh_gpu,length(colors[i]),cu(colors[i]))
+        kernel = @cuda launch=false assemble_element_gpu!(assembler_gpu,cellvalues_gpu,dh_gpu,Int32(length(colors[i])),cu(colors[i]))
+        #@show CUDA.registers(kernel)
         config = launch_configuration(kernel.fun)
         threads = min(length(colors[i]), config.threads)
         blocks =  cld(length(colors[i]), threads)
-        kernel(assembler_gpu,cellvalues,dh_gpu,length(colors[i]),cu(colors[i]); threads = threads, blocks=blocks)
+        kernel(assembler_gpu,cellvalues,dh_gpu,Int32(length(colors[i])),cu(colors[i]);  threads, blocks)
     end
     return Kgpu,fgpu
 end
@@ -172,6 +173,7 @@ end
 stassy(cv,dh) = assemble_global!(cv,dh,Val(false))
 
 
+
 # qpassy(cv,dh) = assemble_global!(cv,dh,Val(true))
 
 
@@ -180,10 +182,10 @@ Kgpu, fgpu =    assemble_global_gpu_color(cellvalues,dh,colors)
 mKgpu, mfgpu =    assemble_global_gpu_color_macro(cellvalues,dh,colors)
 
 
-norm(mKgpu)
+norm(Kgpu)
 
 
 #Kstd , Fstd = @btime stassy($cellvalues,$dh);
-Kstd , Fstd = stassy(cellvalues,dh);
+Kstd , Fstd =  stassy(cellvalues,dh);
 norm(Kstd)
 

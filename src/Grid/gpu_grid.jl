@@ -23,7 +23,7 @@ get_coordinate_type(::GPUGrid{dim,CELLVEC,NODEVEC}) where
 @inline getcells(grid::GPUGrid, v::Union{Int32, Vector{Int32}}) = grid.cells[v]
 
 # This function is used to get the coordinates of a cell on the GPU.
-@inline function getcoordinates(grid::Ferrite.GPUGrid,e::Int)
+@inline function getcoordinates(grid::Ferrite.GPUGrid,e::Int32)
     # e is the element index.
 
     CT = get_coordinate_type(grid)
