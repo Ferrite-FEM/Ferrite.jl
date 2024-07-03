@@ -332,7 +332,7 @@ end
     add_global_dofs!(dh::DofHandler, name::Symbol, n::Int)
 
 Add `n` global degrees of freedom to `dh`. The degree of freedom numbers can be obtained
-after closing `dh` with [`get_global_dofs`](@ref).
+after closing `dh` with [`global_dof_range`](@ref).
 """
 function add_global_dofs!(dh::DofHandler, name::Symbol, n::Int)
     @assert !isclosed(dh)
@@ -341,12 +341,12 @@ function add_global_dofs!(dh::DofHandler, name::Symbol, n::Int)
 end
 
 """
-    get_global_dofs(dh::DofHandler, name::Symbol)
+    global_dof_range(dh::DofHandler, name::Symbol)
 
 Get a `UnitRange{Int}` describing the global dofs associated with `name`.
 Such dofs can be added with [`add_global_dofs!`](@ref).
 """
-function get_global_dofs(dh::DofHandler, name::Symbol)
+function global_dof_range(dh::DofHandler, name::Symbol)
     @assert isclosed(dh)
     return dh.global_dofs[name]
 end

@@ -114,11 +114,11 @@ close(csio)
     add!(dh1a, :u, ip)
     Ferrite.add_global_dofs!(dh1a, :λ, 2)
     @test_throws ArgumentError Ferrite.add_global_dofs!(dh1a, :λ, 3) # Field already existing
-    @test_throws AssertionError Ferrite.get_global_dofs(dh1a, :λ)    # Not closed
+    @test_throws AssertionError Ferrite.global_dof_range(dh1a, :λ)    # Not closed
     close!(dh1a)
     @test_throws AssertionError Ferrite.add_global_dofs!(dh1a, :x, 2) # Closed
     @test ndofs(dh1a) == ndofs(dh1) + 2
-    @test Ferrite.get_global_dofs(dh1a, :λ) == (ndofs(dh1)+1):(ndofs(dh1)+2) # global dofs added at the end
+    @test Ferrite.global_dof_range(dh1a, :λ) == (ndofs(dh1)+1):(ndofs(dh1)+2) # global dofs added at the end
 
     showstring = sprint(show, MIME"text/plain"(), dh1a)
     @test contains(showstring, "Global dofs: λ (2)")
@@ -130,8 +130,8 @@ close(csio)
     Ferrite.add_global_dofs!(dh1b, :λ2, 1)
     close!(dh1b)
     @test ndofs(dh1b) == ndofs(dh1) + 3
-    @test Ferrite.get_global_dofs(dh1b, :λ1) == (ndofs(dh1)+1):(ndofs(dh1)+2)
-    @test Ferrite.get_global_dofs(dh1b, :λ2) == (ndofs(dh1)+3):(ndofs(dh1)+3)
+    @test Ferrite.global_dof_range(dh1b, :λ1) == (ndofs(dh1)+1):(ndofs(dh1)+2)
+    @test Ferrite.global_dof_range(dh1b, :λ2) == (ndofs(dh1)+3):(ndofs(dh1)+3)
 
     showstring = sprint(show, MIME"text/plain"(), dh1b)
     @test contains(showstring, "Global dofs: λ1 (2), λ2 (1)")
@@ -154,9 +154,9 @@ close(csio)
         dh
     end
     @test ndofs(dh2a) == ndofs(dh2) + 6
-    @test Ferrite.get_global_dofs(dh2a, :λ1) == ndofs(dh2) .+ (1:1)
-    @test Ferrite.get_global_dofs(dh2a, :λ2) == ndofs(dh2) .+ (2:3)
-    @test Ferrite.get_global_dofs(dh2a, :λ3) == ndofs(dh2) .+ (4:6)
+    @test Ferrite.global_dof_range(dh2a, :λ1) == ndofs(dh2) .+ (1:1)
+    @test Ferrite.global_dof_range(dh2a, :λ2) == ndofs(dh2) .+ (2:3)
+    @test Ferrite.global_dof_range(dh2a, :λ3) == ndofs(dh2) .+ (4:6)
 end
 
 @testset "vtk tensor export" begin
