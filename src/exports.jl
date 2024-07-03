@@ -151,7 +151,6 @@ export
     apply_assemble!,
     add!,
     free_dofs,
-    ApplyStrategy,
 
 # iterators
     CellCache,
