@@ -8,10 +8,10 @@ using Adapt
 
 
 left = Tensor{1,2,Float32}((0,-0)) # define the left bottom corner of the grid.
-right = Tensor{1,2,Float32}((3.0,4.0)) # define the right top corner of the grid.
+right = Tensor{1,2,Float32}((100.0,100.0)) # define the right top corner of the grid.
 
 
-grid = generate_grid(Quadrilateral, (3, 4),left,right) 
+grid = generate_grid(Quadrilateral, (100, 100),left,right) 
 
 
 colors = create_coloring(grid) .|> (x -> Int32.(x)) # convert to Int32 to reduce number of registers
@@ -116,29 +116,27 @@ function assemble_element_gpu!(assembler,cv,dh,n_cells_colored, eles_colored)
     fill!(ke, 0.0f0)
     fe = MVector{4,Float32}(undef)
     fill!(fe, 0.0f0)
-     # Loop over quadrature points
-    #  for qv in Ferrite.QuadratureValuesIterator(cv,cell_coords)
-    #     ## Get the quadrature weight
-    #     dΩ = getdetJdV(qv)
-    #     ## Loop over test shape functions
-    #     for i in 1:n_basefuncs
-    #         δu  = shape_value(qv, i)
-    #         ∇δu = shape_gradient(qv, i)
-    #         ## Add contribution to fe
-    #         fe[i] += δu * dΩ
-    #         ## Loop over trial shape functions
-    #         for j in 1:n_basefuncs
-    #             ∇u = shape_gradient(qv, j)
-    #             ## Add contribution to Ke
-    #             ke[i,j] += (∇δu ⋅ ∇u) * dΩ
-    #         end
-    #     end
-    # end
-    if(tx == 1 && bx == 1)
-        @cushow 100
+     #Loop over quadrature points
+     for qv in Ferrite.QuadratureValuesIterator(cv,cell_coords)
+        ## Get the quadrature weight
+        dΩ = getdetJdV(qv)
+        ## Loop over test shape functions
+        for i in 1:n_basefuncs
+            δu  = shape_value(qv, i)
+            ∇δu = shape_gradient(qv, i)
+            ## Add contribution to fe
+            fe[i] += δu * dΩ
+            ## Loop over trial shape functions
+            for j in 1:n_basefuncs
+                ∇u = shape_gradient(qv, j)
+                ## Add contribution to Ke
+                ke[i,j] += (∇δu ⋅ ∇u) * dΩ
+            end
+        end
     end
+   
     ## Assemble Ke into Kgpu ##
-    #assemble!(assembler, celldofs(dh,e),SMatrix(ke),SVector(fe)) # when passin mutable objects, throws and error
+    assemble!(assembler, celldofs(dh,e),SMatrix(ke),SVector(fe)) # when passin mutable objects, throws and error
 
     return nothing
 end
@@ -193,6 +191,10 @@ stassy(cv,dh) = assemble_global!(cv,dh,Val(false))
 
 
 Kgpu, fgpu = CUDA.@profile    assemble_global_gpu_color(cellvalues,dh,colors)
+# to benchmark the code using nsight compute use the following command: ncu --mode=launch julia
+# Open nsight compute and attach the profiler to the julia instance
+# ref: https://cuda.juliagpu.org/v2.2/development/profiling/#NVIDIA-Nsight-Compute
+
 #mKgpu, mfgpu =    assemble_global_gpu_color_macro(cellvalues,dh,colors)
 
 
