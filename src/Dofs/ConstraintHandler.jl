@@ -406,7 +406,7 @@ function update!(ch::ConstraintHandler, time::Real=0.0)
         # If the BC function only accept one argument, i.e. f(x), we create a wrapper
         # g(x, t) = f(x) that discards the second parameter so that _update! can always call
         # the function with two arguments internally.
-        wrapper_f = hasmethod(dbc.f, Tuple{get_coordinate_type(get_grid(ch.dh), typeof(time)}) ? dbc.f : (x, _) -> dbc.f(x)
+        wrapper_f = hasmethod(dbc.f, Tuple{get_coordinate_type(get_grid(ch.dh)), typeof(time)}) ? dbc.f : (x, _) -> dbc.f(x)
         # Function barrier
         _update!(ch.inhomogeneities, wrapper_f, dbc.facets, dbc.field_name, dbc.local_facet_dofs, dbc.local_facet_dofs_offset,
                  dbc.components, ch.dh, ch.bcvalues[i], ch.dofmapping, ch.dofcoefficients, time)
