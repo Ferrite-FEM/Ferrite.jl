@@ -433,3 +433,8 @@ export create_sparsity_pattern
 function create_sparsity_pattern(args...)
     throw(DeprecationError("create_sparsity_pattern(args...)" => "allocate_matrix(args...; kwargs...)"))
 end
+
+export VTKFile
+function VTKFile(args...)
+    throw(DeprecationError("VTKFile(args...)" => "VTKGridFile(args...)"))
+end
