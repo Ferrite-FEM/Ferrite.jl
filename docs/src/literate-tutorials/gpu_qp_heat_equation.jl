@@ -5,10 +5,10 @@ using Adapt
 
 
 left = Tensor{1,2,Float32}((0,-0)) # define the left bottom corner of the grid.
-right = Tensor{1,2,Float32}((4.0,4.0)) # define the right top corner of the grid.
+right = Tensor{1,2,Float32}((3.0,4.0)) # define the right top corner of the grid.
 
 
-grid = generate_grid(Quadrilateral, (4, 4),left,right) 
+grid = generate_grid(Quadrilateral, (3, 4),left,right) 
 
 
 colors = create_coloring(grid) .|> (x -> Int32.(x)) # convert to Int32 to reduce number of registers
@@ -56,6 +56,8 @@ function assemble_element_std!(Ke::Matrix, fe::Vector, cellvalues::CellValues)
     return Ke, fe
 end
 
+cell = getcells(grid, 1)
+cell.nodes
 
 function create_buffers(cellvalues, dh)
     f = zeros(ndofs(dh))
@@ -98,9 +100,13 @@ function assemble_element_gpu!(assembler,cv,dh,n_cells_colored, eles_colored)
     bx = blockIdx().x
     bd = blockDim().x
     e_color = tx + (bx-Int32(1))*bd # element number per color
+   
     e_color ≤ n_cells_colored || return nothing # e here is the current element index.
     n_basefuncs = getnbasefunctions(cv)
     e = eles_colored[e_color]
+    if(tx == 1 && bx == 1)
+        @cushow n_basefuncs
+    end
     cell_coords = getcoordinates(dh.grid, e)
 
     ke = MMatrix{4,4,Float32}(undef) # Note: using n_basefuncs instead of 4 will throw an error because this type of dynamisim is not supported in GPU.
@@ -108,31 +114,31 @@ function assemble_element_gpu!(assembler,cv,dh,n_cells_colored, eles_colored)
     fe = MVector{4,Float32}(undef)
     fill!(fe, 0.0f0)
      # Loop over quadrature points
-     for qv in Ferrite.QuadratureValuesIterator(cv,cell_coords)
-        ## Get the quadrature weight
-        dΩ = getdetJdV(qv)
-        ## Loop over test shape functions
-        for i in 1:n_basefuncs
-            δu  = shape_value(qv, i)
-            ∇δu = shape_gradient(qv, i)
-            ## Add contribution to fe
-            fe[i] += δu * dΩ
-            ## Loop over trial shape functions
-            for j in 1:n_basefuncs
-                ∇u = shape_gradient(qv, j)
-                ## Add contribution to Ke
-                ke[i,j] += (∇δu ⋅ ∇u) * dΩ
-            end
-        end
+    #  for qv in Ferrite.QuadratureValuesIterator(cv,cell_coords)
+    #     ## Get the quadrature weight
+    #     dΩ = getdetJdV(qv)
+    #     ## Loop over test shape functions
+    #     for i in 1:n_basefuncs
+    #         δu  = shape_value(qv, i)
+    #         ∇δu = shape_gradient(qv, i)
+    #         ## Add contribution to fe
+    #         fe[i] += δu * dΩ
+    #         ## Loop over trial shape functions
+    #         for j in 1:n_basefuncs
+    #             ∇u = shape_gradient(qv, j)
+    #             ## Add contribution to Ke
+    #             ke[i,j] += (∇δu ⋅ ∇u) * dΩ
+    #         end
+    #     end
+    # end
+    if(tx == 1 && bx == 1)
+        @cushow 100
     end
-
     ## Assemble Ke into Kgpu ##
-    assemble!(assembler, celldofs(dh,e),SMatrix(ke),SVector(fe)) # when passin mutable objects, throws and error
+    #assemble!(assembler, celldofs(dh,e),SMatrix(ke),SVector(fe)) # when passin mutable objects, throws and error
 
     return nothing
 end
-
-
 
 function assemble_global_gpu_color(cellvalues,dh,colors)
     K = create_sparsity_pattern(dh,Float32)
@@ -141,6 +147,8 @@ function assemble_global_gpu_color(cellvalues,dh,colors)
     assembler = start_assemble(Kgpu, fgpu)
     n_colors = length(colors)
     # set up kernel adaption 
+    dh_gpu = Adapt.adapt_structure(CUDA.KernelAdaptor(), dh)
+    dh_gpu = Adapt.adapt_structure(CUDA.KernelAdaptor(), dh)
     dh_gpu = Adapt.adapt_structure(CUDA.KernelAdaptor(), dh)
     assembler_gpu = Adapt.adapt_structure(CUDA.KernelAdaptor(), assembler)
     cellvalues_gpu = Adapt.adapt_structure(CUDA.KernelAdaptor(), cellvalues)
@@ -177,12 +185,11 @@ stassy(cv,dh) = assemble_global!(cv,dh,Val(false))
 # qpassy(cv,dh) = assemble_global!(cv,dh,Val(true))
 
 
-
 Kgpu, fgpu =    assemble_global_gpu_color(cellvalues,dh,colors)
 mKgpu, mfgpu =    assemble_global_gpu_color_macro(cellvalues,dh,colors)
 
 
-norm(Kgpu)
+norm(mKgpu)
 
 
 #Kstd , Fstd = @btime stassy($cellvalues,$dh);

@@ -12,6 +12,8 @@ macro run_gpu(fun_expr, assembler, cellvalues, dh, colors)
             local assembler_gpu = Adapt.adapt_structure(CUDA.KernelAdaptor(), $esc_assembler)
             local cellvalues_gpu = Adapt.adapt_structure(CUDA.KernelAdaptor(), $esc_cellvalues)
             local dh_gpu = Adapt.adapt_structure(CUDA.KernelAdaptor(), $esc_dh)
+            local dh_gpu = Adapt.adapt_structure(CUDA.KernelAdaptor(), $esc_dh)
+            local dh_gpu = Adapt.adapt_structure(CUDA.KernelAdaptor(), $esc_dh)
 
             # Configure the kernel
             local kernel = @cuda launch=false $esc_fun_expr(assembler_gpu, cellvalues_gpu, dh_gpu,length($esc_colors[i]), cu($esc_colors[i]))

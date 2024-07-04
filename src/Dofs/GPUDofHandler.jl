@@ -6,6 +6,9 @@ struct GPUDofHandler{CDOFS<:AbstractArray{<:Number,1},VEC_INT<:AbstractArray{Int
     ndofs_cell::VEC_INT
 end
 
+
+
+
 isclosed(dh::GPUDofHandler) = dh.closed
 
 ndofs_per_cell(dh::GPUDofHandler, i::Int32)= dh.ndofs_cell[i]
@@ -13,7 +16,7 @@ ndofs_per_cell(dh::GPUDofHandler, i::Int32)= dh.ndofs_cell[i]
 function celldofs(dh::GPUDofHandler, i::Int32)
     offset = dh.cell_dofs_offset[i]
     ndofs = ndofs_per_cell(dh, i)
-   return @view dh.cell_dofs[offset:offset+ndofs-1]
+   return @view dh.cell_dofs[offset:(offset+ndofs-Int32(1))]
 end
 
 # function celldofs(dh::GPUDofHandler, i::Int)

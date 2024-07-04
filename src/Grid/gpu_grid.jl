@@ -25,17 +25,15 @@ get_coordinate_type(::GPUGrid{dim,CELLVEC,NODEVEC}) where
 # This function is used to get the coordinates of a cell on the GPU.
 @inline function getcoordinates(grid::Ferrite.GPUGrid,e::Int32)
     # e is the element index.
-
     CT = get_coordinate_type(grid)
     cell = getcells(grid, e)
     N = nnodes(cell)
-
     x = MVector{N, CT}(undef) # local array to store the coordinates of the nodes of the cell.
     node_ids = get_node_ids(cell)
-    @inbounds for i in 1:length(x)
+    
+    for i in 1:length(x)
         x[i] = get_node_coordinate(grid, node_ids[i])
     end
-
     return SVector(x...)
 end
 

@@ -56,9 +56,18 @@ function Adapt.adapt_structure(to, dh::DofHandler)
     offsets = Adapt.adapt_structure(to, dh.cell_dofs_offset .|> Int32 |> cu)
     nodes = Adapt.adapt_structure(to, dh.grid.nodes |> cu)
     ndofs_cell = Adapt.adapt_structure(to, get_ndofs_cell(dh) |> cu)
+    #ndofs_cell = Adapt.adapt_structure(to, cu(Int32[4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4]) )
     GPUDofHandler(cell_dofs, GPUGrid(cells,nodes),offsets, Ferrite.isclosed(dh), ndofs_cell)
 end
 
+# function Adapt.adapt_structure(to, dh::GPUDofHandler)
+    
+#     GPUDofHandler(Adapt.adapt_structure(to, dh.cell_dofs |> cu),
+#                   Adapt.adapt_structure(to, dh.grid),
+#                   Adapt.adapt_structure(to, dh.cell_dofs_offset |> cu),
+#                   dh.closed,
+#                   Adapt.adapt_structure(to, dh.ndofs_cell |> cu))
+# end
 
 
 function Adapt.adapt_structure(to, assembler::Ferrite.GPUAssemblerSparsityPattern)

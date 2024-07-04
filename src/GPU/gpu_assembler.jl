@@ -16,7 +16,7 @@ function _assemble!(A::GPUAssemblerSparsityPattern, dofs::AbstractVector{Int32},
     # Brute force assembly
     K = A.K
     f = A.f
-    for i= 1:length(dofs)
+    for i = 1:length(dofs)
         ig = dofs[i]
         f[ig] += fe[i]
         for j = 1:length(dofs)
@@ -29,7 +29,7 @@ end
 
 @inline function _add_to_index!(K::AbstractSparseArray{Tv,Ti}, v::Tv, i::Int32, j::Int32) where {Tv,Ti}
     col_start = K.colPtr[j]
-    col_end = K.colPtr[j + 1] - 1
+    col_end = K.colPtr[j + Int32(1)] - Int32(1)
 
     for k in col_start:col_end
         if K.rowVal[k] == i
