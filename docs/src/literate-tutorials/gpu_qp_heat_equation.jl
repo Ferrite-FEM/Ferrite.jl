@@ -1,3 +1,6 @@
+import Pkg;
+Pkg.activate("")
+Pkg.instantiate()
 using Ferrite, CUDA
 using StaticArrays
 using SparseArrays
@@ -189,14 +192,14 @@ stassy(cv,dh) = assemble_global!(cv,dh,Val(false))
 # qpassy(cv,dh) = assemble_global!(cv,dh,Val(true))
 
 
-Kgpu, fgpu =    assemble_global_gpu_color(cellvalues,dh,colors)
-mKgpu, mfgpu =    assemble_global_gpu_color_macro(cellvalues,dh,colors)
+Kgpu, fgpu = CUDA.@profile    assemble_global_gpu_color(cellvalues,dh,colors)
+#mKgpu, mfgpu =    assemble_global_gpu_color_macro(cellvalues,dh,colors)
 
 
-norm(mKgpu)
+# norm(mKgpu)
 
 
-#Kstd , Fstd = @btime stassy($cellvalues,$dh);
-Kstd , Fstd =  stassy(cellvalues,dh);
-norm(Kstd)
+# #Kstd , Fstd = @btime stassy($cellvalues,$dh);
+# Kstd , Fstd =  stassy(cellvalues,dh);
+# norm(Kstd)
 
