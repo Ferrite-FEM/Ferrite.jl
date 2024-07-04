@@ -710,52 +710,17 @@ end
         @test dh1.cell_dofs == dh2.cell_dofs
     end
 
-    @testset "VTKFileCollection" begin
-        @testset "equivalence of addstep methods" begin
-            grid = generate_grid(Triangle, (2,2))
-            celldata = rand(getncells(grid))
-            fname = "addstep"
-            pvd1 = VTKFileCollection(fname, grid)
-            pvd2 = VTKFileCollection(fname, grid)
-            timesteps = 0:0.5:0.5
-            for (n, t) in pairs(timesteps)
-                addstep!(pvd1, t) do io
-                    write_cell_data(io, celldata*n, "celldata")
-                end
-                vtk = VTKGridFile(string(fname, "2_", n), grid)
-                write_cell_data(vtk, celldata*n, "celldata")
-                addstep!(pvd2, vtk, t)
-                @test !(isopen(vtk.vtk))
-            end
-            close.((pvd1, pvd2))
-            @test pvd1.step == pvd2.step # Same nr of steps added
-            for (n, t) in pairs(timesteps)
-                fname1 = string(fname, "_", n, ".vtu")
-                fname2 = string(fname, "2_", n, ".vtu")
-                sha_vtk1 = bytes2hex(open(SHA.sha1, fname1))
-                sha_vtk2 = bytes2hex(open(SHA.sha1, fname2))
-                @test sha_vtk1 == sha_vtk2
-                rm.((fname1, fname2))
-            end
-            rm(string(fname, ".pvd"))
-            # Solving https://github.com/Ferrite-FEM/Ferrite.jl/issues/397
-            # would allow checking the pvd files as well.
-        end
-        @testset "kwargs forwarding" begin
-            grid = generate_grid(Quadrilateral, (10,10))
-            file_sizes = Int[]
-            fname = "test_collection_kwargs"
-            for compress in (true, false)
-                pvd = VTKFileCollection(fname, grid)
-                addstep!(pvd, 0.0; compress) do io
-                    nothing
-                end
-                close(pvd)
-                push!(file_sizes, stat(string(fname, "_1.vtu")).size)
-                rm(string(fname, "_1.vtu"))
-            end
-            rm(string(fname, ".pvd"))
-            @test file_sizes[1] < file_sizes[2] # Check that compress=true gives smaller file size
-        end
+    @testset "paraview_collection" begin
+        grid = generate_grid(Triangle, (2,2))
+        celldata = rand(getncells(grid))
+        pvd = WriteVTK.paraview_collection("collection")
+        vtk1 = VTKGridFile("file1", grid)
+        write_cell_data(vtk1, celldata, "celldata")
+        @assert isopen(vtk1.vtk)
+        pvd[0.5] = vtk1
+        @test !isopen(vtk1.vtk) # Should be closed when adding it
+        vtk2 = VTKGridFile("file2", grid)
+        WriteVTK.collection_add_timestep(pvd, vtk2, 1.0)
+        @test !isopen(vtk2.vtk) # Should be closed when adding it
     end
 end
