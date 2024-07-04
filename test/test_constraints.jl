@@ -86,8 +86,9 @@ end
     add!(dh, :p, Lagrange{RefTriangle,1}())
     close!(dh)
     ch = ConstraintHandler(dh)
-    dbc1 = Dirichlet(:u, getnodeset(grid, "nodeset"), (x,t) -> x, [1, 2])
-    dbc2 = Dirichlet(:p, getnodeset(grid, "nodeset"), (x,t) -> 0, 1)
+    dbc1 = Dirichlet(:u, getnodeset(grid, "nodeset"), (x, t) -> x, [1, 2])
+    # Add type-spec to function, test https://github.com/Ferrite-FEM/Ferrite.jl/issues/1006
+    dbc2 = Dirichlet(:p, getnodeset(grid, "nodeset"), (x::Vec, t::Real) -> 0, 1)
     add!(ch, dbc1)
     add!(ch, dbc2)
     close!(ch)
