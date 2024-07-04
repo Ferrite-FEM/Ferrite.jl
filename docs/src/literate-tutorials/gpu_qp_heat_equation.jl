@@ -150,6 +150,10 @@ function assemble_global_gpu_color(cellvalues,dh,colors)
     dh_gpu = Adapt.adapt_structure(CUDA.KernelAdaptor(), dh)
     dh_gpu = Adapt.adapt_structure(CUDA.KernelAdaptor(), dh)
     dh_gpu = Adapt.adapt_structure(CUDA.KernelAdaptor(), dh)
+    # Note: The previous three lines are necessary to circumvent getting rubbish values.
+    # Sofar, I have not been able to figure out why this is the case.
+    # discorse ref: https://discourse.julialang.org/t/rubbish-values-from-gpu-kernel/116632
+
     assembler_gpu = Adapt.adapt_structure(CUDA.KernelAdaptor(), assembler)
     cellvalues_gpu = Adapt.adapt_structure(CUDA.KernelAdaptor(), cellvalues)
     for i in 1:n_colors
