@@ -45,10 +45,10 @@ function ValuesUpdateFlags(ip_fun::Interpolation, ::Val{update_gradients}, ::Val
 end
 
 """
-    reinit!(cv::CellValues, cell::AbstractCell, x::Vector)
-    reinit!(cv::CellValues, x::Vector)
-    reinit!(fv::FacetValues, cell::AbstractCell, x::Vector, face::Int)
-    reinit!(fv::FacetValues, x::Vector, face::Int)
+    reinit!(cv::CellValues, cell::AbstractCell, x::AbstractVector)
+    reinit!(cv::CellValues, x::AbstractVector)
+    reinit!(fv::FacetValues, cell::AbstractCell, x::AbstractVector, face::Int)
+    reinit!(fv::FacetValues, x::AbstractVector, face::Int)
 
 Update the `CellValues`/`FacetValues` object for a cell or face with coordinates `x`.
 The derivatives of the shape functions, and the new integration weights are computed.
@@ -347,19 +347,19 @@ end
 _copy_or_nothing(x) = copy(x)
 _copy_or_nothing(::Nothing) = nothing
 
-function reference_shape_values!(values::AbstractMatrix, ip, qr_points::Vector{<:Vec})
+function reference_shape_values!(values::AbstractMatrix, ip, qr_points::AbstractVector{<:Vec})
     for (qp, ξ) in pairs(qr_points)
         reference_shape_values!(@view(values[:, qp]), ip, ξ)
     end
 end
 
-function reference_shape_gradients_and_values!(gradients::AbstractMatrix, values::AbstractMatrix, ip, qr_points::Vector{<:Vec})
+function reference_shape_gradients_and_values!(gradients::AbstractMatrix, values::AbstractMatrix, ip, qr_points::AbstractVector{<:Vec})
     for (qp, ξ) in pairs(qr_points)
         reference_shape_gradients_and_values!(@view(gradients[:, qp]), @view(values[:, qp]), ip, ξ)
     end
 end
 
-function reference_shape_hessians_gradients_and_values!(hessians::AbstractMatrix, gradients::AbstractMatrix, values::AbstractMatrix, ip, qr_points::Vector{<:Vec})
+function reference_shape_hessians_gradients_and_values!(hessians::AbstractMatrix, gradients::AbstractMatrix, values::AbstractMatrix, ip, qr_points::AbstractVector{<:Vec})
     for (qp, ξ) in pairs(qr_points)
         reference_shape_hessians_gradients_and_values!(@view(hessians[:, qp]), @view(gradients[:, qp]), @view(values[:, qp]), ip, ξ)
     end
