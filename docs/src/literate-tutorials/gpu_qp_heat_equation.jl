@@ -1,6 +1,3 @@
-import Pkg;
-Pkg.activate("")
-Pkg.instantiate()
 using Ferrite, CUDA
 using StaticArrays
 using SparseArrays
