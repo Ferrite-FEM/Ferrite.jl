@@ -14,9 +14,9 @@ using NearestNeighbors:
 using OrderedCollections:
     OrderedSet
 using SparseArrays:
-    SparseArrays, SparseMatrixCSC, nonzeros, nzrange, rowvals, sparse
+    AbstractSparseArray,SparseArrays, SparseMatrixCSC, nonzeros, nzrange, rowvals, sparse
 using StaticArrays:
-    StaticArrays, MArray, MMatrix, SArray, SMatrix, SVector
+    StaticVector,StaticArrays,MVector, MArray, MMatrix, SArray, SMatrix, SVector
 using WriteVTK:
     WriteVTK, VTKCellTypes
 using Tensors:
@@ -24,6 +24,8 @@ using Tensors:
     rotation_tensor, symmetric, tovoigt!, hessian, otimesu
 using ForwardDiff:
     ForwardDiff
+using CUDA
+using Adapt
 
 
 include("exports.jl")
