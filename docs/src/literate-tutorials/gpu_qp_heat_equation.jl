@@ -5,6 +5,7 @@ using Ferrite, CUDA
 using StaticArrays
 using SparseArrays
 using Adapt
+using Test
 
 
 left = Tensor{1,2,Float32}((0,-0)) # define the left bottom corner of the grid.
@@ -33,6 +34,9 @@ dh = DofHandler(grid)
 add!(dh, :u, ip)
 
 close!(dh);
+
+
+
 
 
 # Standard assembly of the element.
@@ -149,7 +153,7 @@ function assemble_global_gpu_color(cellvalues,dh,colors)
     # second call will fix the first issue but will give rubbish values for node_ids[i] (ref: see `gpu_grid.jl`)
     # third call will fix everything.
     dh_gpu = Adapt.adapt_structure(CUDA.KernelAdaptor(), dh)
-    #dh_gpu = Adapt.adapt_structure(CUDA.KernelAdaptor(), dh)
+    dh_gpu = Adapt.adapt_structure(CUDA.KernelAdaptor(), dh)
     #dh_gpu = Adapt.adapt_structure(CUDA.KernelAdaptor(), dh)
     # Note: The previous three lines are necessary to circumvent getting rubbish values.
     # Sofar, I have not been able to figure out why this is the case.
@@ -192,7 +196,7 @@ end
 # qpassy(cv,dh) = assemble_global!(cv,dh,Val(true))
 
 
-Kgpu, fgpu = CUDA.@profile    assemble_global_gpu_color(cellvalues,dh,colors)
+#Kgpu, fgpu = CUDA.@profile    assemble_global_gpu_color(cellvalues,dh,colors)
 # to benchmark the code using nsight compute use the following command: ncu --mode=launch julia
 # Open nsight compute and attach the profiler to the julia instance
 # ref: https://cuda.juliagpu.org/v2.2/development/profiling/#NVIDIA-Nsight-Compute
@@ -207,3 +211,51 @@ Kgpu, fgpu = CUDA.@profile    assemble_global_gpu_color(cellvalues,dh,colors)
 # Kstd , Fstd =  stassy(cellvalues,dh);
 # norm(Kstd)
 
+
+@testset "GPU Heat Equation" begin
+    
+    for i = 1:100 
+        
+        bl_x = rand(Float32,-100,-1)
+        bl_y = rand(Float32,-100,-1)
+        tr_x = rand(Float32,0,100)
+        tr_y = rand(Float32,0,100)
+
+        n_x = rand(Int,1,100)
+        n_y = rand(Int,1,100)
+
+        left = Tensor{1,2,Float32}((bl_x,bl_y)) # define the left bottom corner of the grid.
+        right = Tensor{1,2,Float32}((tr_x,tr_y)) # define the right top corner of the grid.
+
+
+        grid = generate_grid(Quadrilateral, (n_x, n_y),left,right) 
+
+
+        colors = create_coloring(grid) .|> (x -> Int32.(x)) # convert to Int32 to reduce number of registers
+
+
+        ip = Lagrange{RefQuadrilateral, 1}() # define the interpolation function (i.e. Bilinear lagrange)
+
+
+        qr = QuadratureRule{RefQuadrilateral,Float32}(2) 
+
+
+        cellvalues = CellValues(Float32,qr, ip)
+
+
+        dh = DofHandler(grid)
+
+
+
+        add!(dh, :u, ip)
+
+        close!(dh);
+        # The CPU version:
+        Kstd , Fstd =  stassy(cellvalues,dh);
+
+        # The GPU version
+        Kgpu, fgpu =  assemble_global_gpu_color(cellvalues,dh,colors)
+
+        @test norm(Kstd) ≈ norm(Kgpu)
+    end
+end
