@@ -8,18 +8,18 @@ and gradients of shape functions and function on the interfaces between elements
 The first element of the interface is denoted "here" and the second element "there".
 
 **Constructors**
-* `InterfaceValues(qr::FaceQuadratureRule, ip::Interpolation)`: same quadrature rule and
+* `InterfaceValues(qr::FacetQuadratureRule, ip::Interpolation)`: same quadrature rule and
   interpolation on both sides, default linear Lagrange geometric interpolation.
-* `InterfaceValues(qr::FaceQuadratureRule, ip::Interpolation, ip_geo::Interpolation)`: same
+* `InterfaceValues(qr::FacetQuadratureRule, ip::Interpolation, ip_geo::Interpolation)`: same
   as above but with given geometric interpolation.
-* `InterfaceValues(qr_here::FaceQuadratureRule, ip_here::Interpolation, qr_there::FaceQuadratureRule, ip_there::Interpolation)`:
+* `InterfaceValues(qr_here::FacetQuadratureRule, ip_here::Interpolation, qr_there::FacetQuadratureRule, ip_there::Interpolation)`:
   different quadrature rule and interpolation on the two sides, default linear Lagrange
   geometric interpolation.
-* `InterfaceValues(qr_here::FaceQuadratureRule, ip_here::Interpolation, ip_geo_here::Interpolation, qr_there::FaceQuadratureRule, ip_there::Interpolation, ip_geo_there::Interpolation)`:
+* `InterfaceValues(qr_here::FacetQuadratureRule, ip_here::Interpolation, ip_geo_here::Interpolation, qr_there::FacetQuadratureRule, ip_there::Interpolation, ip_geo_there::Interpolation)`:
   same as above but with given geometric interpolation.
-* `InterfaceValues(fv::FaceValues)`: quadrature rule and interpolations from face values
+* `InterfaceValues(fv::FacetValues)`: quadrature rule and interpolations from face values
   (same on both sides).
-* `InterfaceValues(fv_here::FaceValues, fv_there::FaceValues)`: quadrature rule and
+* `InterfaceValues(fv_here::FacetValues, fv_there::FacetValues)`: quadrature rule and
   interpolations from the face values.
 
 **Associated methods:**
@@ -47,7 +47,7 @@ The first element of the interface is denoted "here" and the second element "the
 """
 InterfaceValues
 
-struct InterfaceValues{FVA <: FaceValues, FVB <: FaceValues} <: AbstractValues
+struct InterfaceValues{FVA <: FacetValues, FVB <: FacetValues} <: AbstractValues
     here::FVA
     there::FVB
     function InterfaceValues{FVA, FVB}(here::FVA, there::FVB) where {FVA, FVB}
@@ -57,34 +57,34 @@ struct InterfaceValues{FVA <: FaceValues, FVB <: FaceValues} <: AbstractValues
 end
 
 function InterfaceValues(
-        qr_here::FaceQuadratureRule, ip_here::Interpolation, ipg_here::Interpolation,
-        qr_there::FaceQuadratureRule, ip_there::Interpolation, ipg_there::Interpolation
+        qr_here::FacetQuadratureRule, ip_here::Interpolation, ipg_here::Interpolation,
+        qr_there::FacetQuadratureRule, ip_there::Interpolation, ipg_there::Interpolation
         )
-    # FaceValues constructor enforces that refshape matches for all arguments
-    here = FaceValues(qr_here, ip_here, ipg_here)
-    there = FaceValues(qr_there, ip_there, ipg_there)
+    # FacetValues constructor enforces that refshape matches for all arguments
+    here = FacetValues(qr_here, ip_here, ipg_here)
+    there = FacetValues(qr_there, ip_there, ipg_there)
     return InterfaceValues{typeof(here), typeof(there)}(here, there)
 end
 
 # Same on both sides, default geometric mapping
-InterfaceValues(qr_here::FaceQuadratureRule, ip_here::Interpolation) =
+InterfaceValues(qr_here::FacetQuadratureRule, ip_here::Interpolation) =
     InterfaceValues(qr_here, ip_here, deepcopy(qr_here), ip_here)
 # Same on both sides, given geometric mapping
-InterfaceValues(qr_here::FaceQuadratureRule, ip_here::Interpolation, ipg_here::Interpolation) =
+InterfaceValues(qr_here::FacetQuadratureRule, ip_here::Interpolation, ipg_here::Interpolation) =
     InterfaceValues(qr_here, ip_here, ipg_here, deepcopy(qr_here), ip_here, ipg_here)
 # Different on both sides, default geometric mapping
 function InterfaceValues(
-        qr_here::FaceQuadratureRule, ip_here::Interpolation,
-        qr_there::FaceQuadratureRule, ip_there::Interpolation,
+        qr_here::FacetQuadratureRule, ip_here::Interpolation,
+        qr_there::FacetQuadratureRule, ip_there::Interpolation,
     )
     return InterfaceValues(
         qr_here, ip_here, default_geometric_interpolation(ip_here),
         qr_there, ip_there, default_geometric_interpolation(ip_there),
     )
 end
-# From FaceValue(s)
-InterfaceValues(facevalues_here::FVA, facevalues_there::FVB = deepcopy(facevalues_here)) where {FVA <: FaceValues, FVB <: FaceValues} =
-    InterfaceValues{FVA,FVB}(facevalues_here, facevalues_there)
+# From FacetValue(s)
+InterfaceValues(facetvalues_here::FVA, facetvalues_there::FVB = deepcopy(FacetValues_here)) where {FVA <: FacetValues, FVB <: FacetValues} =
+    InterfaceValues{FVA,FVB}(facetvalues_here, facetvalues_there)
 
 function Base.copy(iv::InterfaceValues)
     return InterfaceValues(copy(iv.here), copy(iv.there))
@@ -109,38 +109,38 @@ end
 """
     reinit!(
         iv::InterfaceValues,
-        cell_here::AbstractCell, coords_here::AbstractVector{Vec{dim, T}}, face_here::Int,
-        cell_there::AbstractCell, coords_there::AbstractVector{Vec{dim, T}}, face_there::Int
+        cell_here::AbstractCell, coords_here::AbstractVector{Vec{dim, T}}, facet_here::Int,
+        cell_there::AbstractCell, coords_there::AbstractVector{Vec{dim, T}}, facet_there::Int
     )
 
 Update the [`InterfaceValues`](@ref) for the interface between `cell_here` (with cell
 coordinates `coords_here`) and `cell_there` (with cell coordinates `coords_there`).
-`face_here` and `face_there` are the (local) face numbers for the respective cell.
+`facet_here` and `facet_there` are the (local) facet numbers for the respective cell.
 """
 function reinit!(
         iv::InterfaceValues,
-        cell_here::AbstractCell, coords_here::AbstractVector{Vec{dim, T}}, face_here::Int,
-        cell_there::AbstractCell, coords_there::AbstractVector{Vec{dim, T}}, face_there::Int
+        cell_here::AbstractCell, coords_here::AbstractVector{Vec{dim, T}}, facet_here::Int,
+        cell_there::AbstractCell, coords_there::AbstractVector{Vec{dim, T}}, facet_there::Int
     ) where {dim, T}
 
     # reinit! the here side as normal
-    reinit!(iv.here, cell_here, coords_here, face_here)
-    dim == 1 && return reinit!(iv.there, cell_there, coords_there, face_there)
+    reinit!(iv.here, cell_here, coords_here, facet_here)
+    dim == 1 && return reinit!(iv.there, cell_there, coords_there, facet_there)
     # Transform the quadrature points from the here side to the there side
-    set_current_face!(iv.there, face_there) # Includes boundscheck
-    interface_transformation = InterfaceOrientationInfo(cell_here, cell_there, face_here, face_there)
-    quad_points_a = getpoints(iv.here.fqr, face_here)
-    quad_points_b = getpoints(iv.there.fqr, face_there)
+    set_current_facet!(iv.there, facet_there) # Includes boundscheck
+    interface_transformation = InterfaceOrientationInfo(cell_here, cell_there, facet_here, facet_there)
+    quad_points_a = getpoints(iv.here.fqr, facet_here)
+    quad_points_b = getpoints(iv.there.fqr, facet_there)
     transform_interface_points!(quad_points_b, quad_points_a, interface_transformation)
     # TODO: This is the bottleneck, cache it?
     @assert length(quad_points_a) <= length(quad_points_b)
-    
+
     # Re-evaluate shape functions in the transformed quadrature points
     precompute_values!(get_fun_values(iv.there),  quad_points_b)
     precompute_values!(get_geo_mapping(iv.there), quad_points_b)
-    
+
     # reinit! the "there" side
-    reinit!(iv.there, cell_there, coords_there, face_there)
+    reinit!(iv.there, cell_there, coords_there, facet_there)
     return iv
 end
 
@@ -211,13 +211,11 @@ function shape_value_average end
 """
     shape_value_jump(iv::InterfaceValues, qp::Int, i::Int)
 
-Compute the jump of the value of shape function `i` at quadrature point `qp` across the
-interface.
+Compute the jump of the value of shape function `i` at quadrature point `qp` across the interface in the default normal direction.
 
-This function uses the definition ``\\llbracket \\vec{v} \\rrbracket=\\vec{v}^\\text{here} -\\vec{v}^\\text{there}``. to obtain the form
-``\\llbracket \\vec{v} \\rrbracket=\\vec{v}^\\text{there} ⋅ \\vec{n}^\\text{there} + \\vec{v}^\\text{here} ⋅ \\vec{n}^\\text{here}``
-multiply by the outward facing normal to the first element's side of the interface (which is the default normal for [`getnormal`](@ref) with [`InterfaceValues`](@ref)).
-
+This function uses the definition ``\\llbracket \\vec{v} \\rrbracket=\\vec{v}^\\text{there} -\\vec{v}^\\text{here}``. To obtain the form,
+``\\llbracket \\vec{v} \\rrbracket=\\vec{v}^\\text{there} \\cdot \\vec{n}^\\text{there} + \\vec{v}^\\text{here} \\cdot \\vec{n}^\\text{here}``,
+multiply by minus the outward facing normal to the first element's side of the interface (which is the default normal for [`getnormal`](@ref) with [`InterfaceValues`](@ref)).
 """
 function shape_value_jump end
 
@@ -232,12 +230,11 @@ function shape_gradient_average end
 """
     shape_gradient_jump(iv::InterfaceValues, qp::Int, i::Int)
 
-Compute the jump of the gradient of shape function `i` at quadrature point `qp` across the
-interface.
+Compute the jump of the gradient of shape function `i` at quadrature point `qp` across the interface in the default normal direction.
 
-This function uses the definition ``\\llbracket \\vec{v} \\rrbracket=\\vec{v}^\\text{here} -\\vec{v}^\\text{there}``. to obtain the form
-``\\llbracket \\vec{v} \\rrbracket=\\vec{v}^\\text{there} ⋅ \\vec{n}^\\text{there} + \\vec{v}^\\text{here} ⋅ \\vec{n}^\\text{here}``
-multiply by the outward facing normal to the first element's side of the interface (which is the default normal for [`getnormal`](@ref) with [`InterfaceValues`](@ref)).
+This function uses the definition ``\\llbracket \\vec{v} \\rrbracket=\\vec{v}^\\text{there} -\\vec{v}^\\text{here}``. To obtain the form,
+``\\llbracket \\vec{v} \\rrbracket=\\vec{v}^\\text{there} ⋅ \\vec{n}^\\text{there} + \\vec{v}^\\text{here} ⋅ \\vec{n}^\\text{here}``,
+multiply by minus the outward facing normal to the first element's side of the interface (which is the default normal for [`getnormal`](@ref) with [`InterfaceValues`](@ref)).
 """
 function shape_gradient_jump end
 
@@ -275,7 +272,7 @@ for (func,                      f_,               is_avg) in (
         function $(func)(iv::InterfaceValues, qp::Int, i::Int)
             f_here = $(f_)(iv, qp, i; here = true)
             f_there = $(f_)(iv, qp, i; here = false)
-            return $(is_avg ? :((f_here + f_there) / 2) : :(f_here - f_there))
+            return $(is_avg ? :((f_here + f_there) / 2) : :(f_there - f_here))
         end
     end
 end
@@ -292,11 +289,11 @@ function function_value_average end
     function_value_jump(iv::InterfaceValues, q_point::Int, u)
     function_value_jump(iv::InterfaceValues, q_point::Int, u, dof_range_here, dof_range_there)
 
-Compute the jump of the function value at the quadrature point over the interface.
+Compute the jump of the function value at the quadrature point over the interface along the default normal direction.
 
-This function uses the definition ``\\llbracket \\vec{v} \\rrbracket=\\vec{v}^\\text{here} -\\vec{v}^\\text{there}``. to obtain the form
-``\\llbracket \\vec{v} \\rrbracket=\\vec{v}^\\text{there} ⋅ \\vec{n}^\\text{there} + \\vec{v}^\\text{here} ⋅ \\vec{n}^\\text{here}``
-multiply by the outward facing normal to the first element's side of the interface (which is the default normal for [`getnormal`](@ref) with [`InterfaceValues`](@ref)).
+This function uses the definition ``\\llbracket \\vec{v} \\rrbracket=\\vec{v}^\\text{there} -\\vec{v}^\\text{here}``. To obtain the form,
+``\\llbracket \\vec{v} \\rrbracket=\\vec{v}^\\text{there} ⋅ \\vec{n}^\\text{there} + \\vec{v}^\\text{here} ⋅ \\vec{n}^\\text{here}``,
+multiply by minus the outward facing normal to the first element's side of the interface (which is the default normal for [`getnormal`](@ref) with [`InterfaceValues`](@ref)).
 """
 function function_value_jump end
 
@@ -312,11 +309,11 @@ function function_gradient_average end
     function_gradient_jump(iv::InterfaceValues, q_point::Int, u)
     function_gradient_jump(iv::InterfaceValues, q_point::Int, u, dof_range_here, dof_range_there)
 
-Compute the jump of the function gradient at the quadrature point over the interface.
+Compute the jump of the function gradient at the quadrature point over the interface along the default normal direction.
 
-This function uses the definition ``\\llbracket \\vec{v} \\rrbracket=\\vec{v}^\\text{here} -\\vec{v}^\\text{there}``. to obtain the form
-``\\llbracket \\vec{v} \\rrbracket=\\vec{v}^\\text{there} ⋅ \\vec{n}^\\text{there} + \\vec{v}^\\text{here} ⋅ \\vec{n}^\\text{here}``
-multiply by the outward facing normal to the first element's side of the interface (which is the default normal for [`getnormal`](@ref) with [`InterfaceValues`](@ref)).
+This function uses the definition ``\\llbracket \\vec{v} \\rrbracket=\\vec{v}^\\text{there} -\\vec{v}^\\text{here}``. To obtain the form,
+``\\llbracket \\vec{v} \\rrbracket=\\vec{v}^\\text{there} ⋅ \\vec{n}^\\text{there} + \\vec{v}^\\text{here} ⋅ \\vec{n}^\\text{here}``,
+multiply by minus the outward facing normal to the first element's side of the interface (which is the default normal for [`getnormal`](@ref) with [`InterfaceValues`](@ref)).
 """
 function function_gradient_jump end
 
@@ -368,7 +365,7 @@ for (func,                          f_,                     is_avg) in (
             dof_range_there = (1:getnbasefunctions(iv.there)) .+ getnbasefunctions(iv.here)
             f_here = $(f_)(iv.here, qp, @view(u[dof_range_here]))
             f_there = $(f_)(iv.there, qp, @view(u[dof_range_there]))
-            return $(is_avg ? :((f_here + f_there) / 2) : :(f_here - f_there))
+            return $(is_avg ? :((f_here + f_there) / 2) : :(f_there - f_here))
         end
         function $(func)(
                 iv::InterfaceValues, qp::Int,
@@ -377,7 +374,7 @@ for (func,                          f_,                     is_avg) in (
             )
             f_here = $(f_)(iv.here, qp, u, dof_range_here)
             f_there = $(f_)(iv.there, qp, u, dof_range_there)
-            return $(is_avg ? :((f_here + f_there) / 2) : :(f_here - f_there))
+            return $(is_avg ? :((f_here + f_there) / 2) : :(f_there - f_here))
         end
     end
 end
@@ -401,7 +398,7 @@ end
 
 Relative orientation information for 1D and 2D interfaces in 2D and 3D elements respectively.
 This information is used to construct the transformation matrix to
-transform the quadrature points from face_a to face_b achieving synced
+transform the quadrature points from facet_a to facet_b achieving synced
 spatial coordinates. Face B's orientation relative to Face A's can
 possibly be flipped (i.e. the vertices indices order is reversed)
 and the vertices can be rotated against each other.
@@ -414,22 +411,22 @@ struct InterfaceOrientationInfo{RefShapeA, RefShapeB}
     flipped::Bool
     shift_index::Int
     lowest_node_shift_index::Int
-    face_a::Int
-    face_b::Int
+    facet_a::Int
+    facet_b::Int
 end
 
 """
-    InterfaceOrientationInfo(cell_a::AbstractCell, cell_b::AbstractCell, face_a::Int, face_b::Int)
+    InterfaceOrientationInfo(cell_a::AbstractCell, cell_b::AbstractCell, facet_a::Int, facet_b::Int)
 
 Return the relative orientation info for face B with regards to face A.
 Relative orientation is computed using a [`OrientationInfo`](@ref) for each side of the interface.
 """
-function InterfaceOrientationInfo(cell_a::AbstractCell{RefShapeA}, cell_b::AbstractCell{RefShapeB}, face_a::Int, face_b::Int) where {RefShapeA <: AbstractRefShape, RefShapeB <: AbstractRefShape}
-    OI_a = OrientationInfo(faces(cell_a)[face_a])
-    OI_b = OrientationInfo(faces(cell_b)[face_b])
+function InterfaceOrientationInfo(cell_a::AbstractCell{RefShapeA}, cell_b::AbstractCell{RefShapeB}, facet_a::Int, facet_b::Int) where {RefShapeA <: AbstractRefShape, RefShapeB <: AbstractRefShape}
+    OI_a = OrientationInfo(facets(cell_a)[facet_a])
+    OI_b = OrientationInfo(facets(cell_b)[facet_b])
     flipped = OI_a.flipped != OI_b.flipped
     shift_index = OI_b.shift_index - OI_a.shift_index
-    return InterfaceOrientationInfo{RefShapeA, RefShapeB}(flipped, shift_index, OI_b.shift_index, face_a, face_b)
+    return InterfaceOrientationInfo{RefShapeA, RefShapeB}(flipped, shift_index, OI_b.shift_index, facet_a, facet_b)
 end
 
 function InterfaceOrientationInfo(_::AbstractCell{RefShapeA}, _::AbstractCell{RefShapeB}, _::Int, _::Int) where {RefShapeA <: AbstractRefShape{1}, RefShapeB <: AbstractRefShape{1}}
@@ -447,8 +444,8 @@ If the face is not flipped then the transformation is a function of relative ori
 get_transformation_matrix
 
 function get_transformation_matrix(interface_transformation::InterfaceOrientationInfo{RefShapeA}) where RefShapeA <: AbstractRefShape{3}
-    face_a = interface_transformation.face_a
-    facenodes = reference_faces(RefShapeA)[face_a]
+    facet_a = interface_transformation.facet_a
+    facenodes = reference_facets(RefShapeA)[facet_a]
     _get_transformation_matrix(facenodes, interface_transformation)
 end
 
@@ -485,7 +482,7 @@ end
 end
 
 @inline function _get_transformation_matrix(::NTuple{N,Int}, ::InterfaceOrientationInfo) where N
-    throw(ArgumentError("transformation is not implemented"))    
+    throw(ArgumentError("transformation is not implemented"))
 end
 
 @doc raw"""
@@ -553,27 +550,27 @@ y      |   \
 transform_interface_points!
 
 function transform_interface_points!(dst::Vector{Vec{3, Float64}}, points::Vector{Vec{3, Float64}}, interface_transformation::InterfaceOrientationInfo{RefShapeA, RefShapeB}) where {RefShapeA <: AbstractRefShape{3}, RefShapeB <: AbstractRefShape{3}}
-    face_a = interface_transformation.face_a
-    face_b = interface_transformation.face_b
+    facet_a = interface_transformation.facet_a
+    facet_b = interface_transformation.facet_b
 
     M = get_transformation_matrix(interface_transformation)
     for (idx, point) in pairs(points)
-        face_point = element_to_face_transformation(point, RefShapeA, face_a)
+        face_point = element_to_facet_transformation(point, RefShapeA, facet_a)
         result = M * Vec(face_point[1],face_point[2], 1.0)
-        dst[idx] = face_to_element_transformation(Vec(result[1],result[2]), RefShapeB, face_b)
+        dst[idx] = facet_to_element_transformation(Vec(result[1],result[2]), RefShapeB, facet_b)
     end
     return nothing
 end
 
 function transform_interface_points!(dst::Vector{Vec{2, Float64}}, points::Vector{Vec{2, Float64}}, interface_transformation::InterfaceOrientationInfo{RefShapeA, RefShapeB}) where {RefShapeA <: AbstractRefShape{2}, RefShapeB <: AbstractRefShape{2}}
-    face_a = interface_transformation.face_a
-    face_b = interface_transformation.face_b
+    facet_a = interface_transformation.facet_a
+    facet_b = interface_transformation.facet_b
     flipped = interface_transformation.flipped
 
     for (idx, point) in pairs(points)
-        face_point = element_to_face_transformation(point, RefShapeA, face_a)
+        face_point = element_to_facet_transformation(point, RefShapeA, facet_a)
         flipped && (face_point *= -1)
-        dst[idx] = face_to_element_transformation(face_point, RefShapeB, face_b)
+        dst[idx] = facet_to_element_transformation(face_point, RefShapeB, facet_b)
     end
     return nothing
 end

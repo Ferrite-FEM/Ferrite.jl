@@ -13,7 +13,7 @@ for spatial_dim ∈ [2]
     geo_type = Quadrilateral
     grid = generate_grid(geo_type, ntuple(x->2, spatial_dim));
     ref_type = FerriteBenchmarkHelper.getrefshape(geo_type)
-    ip_geo = Ferrite.default_interpolation(geo_type)
+    ip_geo = Ferrite.geometric_interpolation(geo_type)
     order = 2
 
     # assemble a mass matrix to apply BCs on (because its cheap)
@@ -25,7 +25,7 @@ for spatial_dim ∈ [2]
     close!(dh);
 
     ch = ConstraintHandler(dh);
-    ∂Ω = union(getfaceset.((grid, ), ["left"])...);
+    ∂Ω = union(getfacetset.((grid, ), ["left"])...);
     dbc = Dirichlet(:u, ∂Ω, (x, t) -> 0)
     add!(ch, dbc);
     close!(ch);

@@ -24,7 +24,7 @@ Create an `Assembler` object which can be used to assemble element contributions
 global sparse matrix. Use [`assemble!`](@ref) for each element, and [`finish_assemble`](@ref),
 to finalize the assembly and return the sparse matrix.
 
-Note that giving a sparse matrix as input can be more efficient. See below and 
+Note that giving a sparse matrix as input can be more efficient. See below and
 as described in the [manual](@ref man-assembly).
 
 !!! note
@@ -50,7 +50,7 @@ end
 
 Assembles the matrix `Ke` into `a` according to the dofs specified by `rowdofs` and `coldofs`.
 """
-function assemble!(a::Ferrite.Assembler{T}, rowdofs::AbstractVector{Int}, coldofs::AbstractVector{Int}, Ke::AbstractMatrix{T}) where {T}
+function assemble!(a::Assembler{T}, rowdofs::AbstractVector{Int}, coldofs::AbstractVector{Int}, Ke::AbstractMatrix{T}) where {T}
     nrows = length(rowdofs)
     ncols = length(coldofs)
 

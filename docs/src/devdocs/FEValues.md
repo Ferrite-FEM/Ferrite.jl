@@ -4,11 +4,12 @@
 * `AbstractValues`
   * `AbstractCellValues`
     * [`CellValues`](@ref)
-  * `AbstractFaceValues`
-    * [`FaceValues`](@ref)
-    * [`BCValues`](@ref)
+  * `AbstractFacetValues`
+    * [`FacetValues`](@ref)
+    * [`BCValues`](@ref Ferrite.BCValues)
   * [`PointValues`](@ref)
-  
+  * [`InterfaceValues`](@ref)
+
 
 ## Internal types
 ```@docs
@@ -18,9 +19,17 @@ Ferrite.FunctionValues
 Ferrite.BCValues
 ```
 
+## Internal utilities
+```@docs
+Ferrite.embedding_det
+Ferrite.shape_value_type
+Ferrite.shape_gradient_type
+Ferrite.ValuesUpdateFlags
+```
+
 ## Custom FEValues
 Custom FEValues, `fe_v::AbstractValues`, should normally implement the [`reinit!`](@ref) method. Subtypes of `AbstractValues` have default implementations for some functions, but require some lower-level access functions, specifically
-  
+
 * [`function_value`](@ref), requires
   * [`shape_value`](@ref)
   * [`getnquadpoints`](@ref)
@@ -33,7 +42,7 @@ Custom FEValues, `fe_v::AbstractValues`, should normally implement the [`reinit!
   * [`geometric_value`](@ref)
   * `getngeobasefunctions`
   * [`getnquadpoints`](@ref)
- 
+
 
 ### Array bounds
 * Asking for the `n`th quadrature point must be inside array bounds if `1 <= n <= getnquadpoints(fe_v)`. (`checkquadpoint` can, alternatively, be dispatched to check that `n` is inbounds.)

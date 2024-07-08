@@ -12,8 +12,8 @@ Pages = ["boundary_conditions.md"]
 ConstraintHandler
 Dirichlet
 PeriodicDirichlet
-collect_periodic_faces
-collect_periodic_faces!
+collect_periodic_facets
+collect_periodic_facets!
 add!
 close!
 update!

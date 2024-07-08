@@ -1,13 +1,13 @@
-# Order 1 to 8 heights points / wheights have been suggested in 
+# Order 1 to 8 heights points / wheights have been suggested in
 # Dunavant, D. A. (1985), High degree  efficient symmetrical Gaussian quadrature
 # rules for the triangle. Int. J. Numer. Meth. Engng., 21: 1129–1148. doi:
 # 10.1002/nme.1620210612
 #
 # Quadrature rules for orders 9 to 20 have been obtained using the
-# basix.make_quadrature(basix.CellType.triangle, n) calls of the  
+# basix.make_quadrature(basix.CellType.triangle, n) calls of the
 # FEniCS / basix python package
 #
-# see 
+# see
 # https://docs.fenicsproject.org/basix/main/python/_autosummary/basix.html?highlight=quadraturetype#basix.make_quadrature
 
 

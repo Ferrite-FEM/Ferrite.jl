@@ -26,21 +26,40 @@ end
 end
 
 """
+    ValuesUpdateFlags(ip_fun::Interpolation; update_gradients = Val(true), update_hessians = Val(false), update_detJdV = Val(true))
+
+Creates a singelton type for specifying what parts of the AbstractValues should be updated. Note that this is internal
+API used to get type-stable construction. Keyword arguments in `AbstractValues` constructors are forwarded, and the public API
+is passing these as `Bool`, while the `ValuesUpdateFlags` method supports both boolean and `Val(::Bool)` keyword args.
+"""
+function ValuesUpdateFlags(ip_fun::Interpolation; update_gradients = Val(true), update_hessians = Val(false), update_detJdV = Val(true))
+    toval(v::Bool) = Val(v)
+    toval(V::Val) = V
+    return ValuesUpdateFlags(ip_fun, toval(update_gradients), toval(update_hessians), toval(update_detJdV))
+end
+function ValuesUpdateFlags(ip_fun::Interpolation, ::Val{update_gradients}, ::Val{update_hessians}, ::Val{update_detJdV}
+        ) where {update_gradients, update_hessians, update_detJdV}
+    FunDiffOrder = update_hessians ? 2 : (update_gradients ? 1 : 0)
+    GeoDiffOrder = max(required_geo_diff_order(mapping_type(ip_fun), FunDiffOrder), update_detJdV)
+    return ValuesUpdateFlags{FunDiffOrder, GeoDiffOrder, update_detJdV}()
+end
+
+"""
     reinit!(cv::CellValues, cell::AbstractCell, x::Vector)
     reinit!(cv::CellValues, x::Vector)
-    reinit!(fv::FaceValues, cell::AbstractCell, x::Vector, face::Int)
-    reinit!(fv::FaceValues, x::Vector, face::Int)
+    reinit!(fv::FacetValues, cell::AbstractCell, x::Vector, face::Int)
+    reinit!(fv::FacetValues, x::Vector, face::Int)
 
-Update the `CellValues`/`FaceValues` object for a cell or face with coordinates `x`.
+Update the `CellValues`/`FacetValues` object for a cell or face with coordinates `x`.
 The derivatives of the shape functions, and the new integration weights are computed.
-For interpolations with non-identity mappings, the current `cell` is also required. 
+For interpolations with non-identity mappings, the current `cell` is also required.
 """
 reinit!
 
 """
     getnquadpoints(fe_v::AbstractValues)
 
-Return the number of quadrature points. For `FaceValues`, 
+Return the number of quadrature points. For `FacetValues`,
 this is the number for the current face.
 """
 function getnquadpoints end
@@ -71,7 +90,7 @@ shape_value(fe_v::AbstractValues, q_point::Int, base_function::Int)
 """
     geometric_value(fe_v::AbstractValues, q_point, base_function::Int)
 
-Return the value of the geometric shape function `base_function` evaluated in 
+Return the value of the geometric shape function `base_function` evaluated in
 quadrature point `q_point`.
 """
 geometric_value(fe_v::AbstractValues, q_point::Int, base_function::Int)
@@ -212,6 +231,38 @@ function function_gradient_init(cv::AbstractValues, ::AbstractVector{T}) where {
 end
 
 """
+    function_hessian(fe_v::AbstractValues{dim}, q_point::Int, u::AbstractVector{<:AbstractFloat}, [dof_range])
+
+    Compute the hessian of the function in a quadrature point. `u` is a vector with values
+    for the degrees of freedom.
+"""
+function function_hessian(fe_v::AbstractValues, q_point::Int, u::AbstractVector, dof_range = eachindex(u))
+    n_base_funcs = getnbasefunctions(fe_v)
+    length(dof_range) == n_base_funcs || throw_incompatible_dof_length(length(dof_range), n_base_funcs)
+    @boundscheck checkbounds(u, dof_range)
+    @boundscheck checkquadpoint(fe_v, q_point)
+    hess = function_hessian_init(fe_v, u)
+    @inbounds for (i, j) in pairs(dof_range)
+        hess += shape_hessian(fe_v, q_point, i) * u[j]
+    end
+    return hess
+end
+
+"""
+    shape_hessian_type(fe_v::AbstractValues)
+
+Return the type of `shape_hessian(fe_v, q_point, base_function)`
+"""
+function shape_hessian_type(fe_v::AbstractValues)
+    # Default fallback
+    return typeof(shape_hessian(fe_v, 1, 1))
+end
+
+function function_hessian_init(cv::AbstractValues, ::AbstractVector{T}) where {T}
+    return zero(shape_hessian_type(cv)) * zero(T)
+end
+
+"""
     function_symmetric_gradient(fe_v::AbstractValues, q_point::Int, u::AbstractVector, [dof_range])
 
 Compute the symmetric gradient of the function, see [`function_gradient`](@ref).
@@ -292,27 +343,24 @@ function spatial_coordinate(fe_v::AbstractValues, q_point::Int, x::AbstractVecto
 end
 
 
-# Utility functions used by GeometryMapping, FunctionValues 
+# Utility functions used by GeometryMapping, FunctionValues
 _copy_or_nothing(x) = copy(x)
 _copy_or_nothing(::Nothing) = nothing
 
-function shape_values!(values::AbstractMatrix, ip, qr_points::Vector{<:Vec})
+function reference_shape_values!(values::AbstractMatrix, ip, qr_points::Vector{<:Vec})
     for (qp, ξ) in pairs(qr_points)
-        shape_values!(@view(values[:, qp]), ip, ξ)
+        reference_shape_values!(@view(values[:, qp]), ip, ξ)
     end
 end
 
-function shape_gradients_and_values!(gradients::AbstractMatrix, values::AbstractMatrix, ip, qr_points::Vector{<:Vec})
+function reference_shape_gradients_and_values!(gradients::AbstractMatrix, values::AbstractMatrix, ip, qr_points::Vector{<:Vec})
     for (qp, ξ) in pairs(qr_points)
-        shape_gradients_and_values!(@view(gradients[:, qp]), @view(values[:, qp]), ip, ξ)
+        reference_shape_gradients_and_values!(@view(gradients[:, qp]), @view(values[:, qp]), ip, ξ)
     end
 end
 
-#= PR798
-function shape_hessians_gradients_and_values!(hessians::AbstractMatrix, gradients::AbstractMatrix, values::AbstractMatrix, ip, qr_points::Vector{<:Vec})
+function reference_shape_hessians_gradients_and_values!(hessians::AbstractMatrix, gradients::AbstractMatrix, values::AbstractMatrix, ip, qr_points::Vector{<:Vec})
     for (qp, ξ) in pairs(qr_points)
-        shape_hessians_gradients_and_values!(@view(hessians[:, qp]), @view(gradients[:, qp]), @view(values[:, qp]), ip, ξ)
+        reference_shape_hessians_gradients_and_values!(@view(hessians[:, qp]), @view(gradients[:, qp]), @view(values[:, qp]), ip, ξ)
     end
 end
-=#
-

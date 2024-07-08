@@ -33,15 +33,15 @@ end
         radius = 2*1.5
         addcellset!(grid, "cell-1", [1,])
         addcellset!(grid, "middle-cells", x -> norm(x) < radius)
-        addfaceset!(grid, "middle-faceset", x -> norm(x) < radius)
-        addfaceset!(grid, "right-faceset", getfaceset(grid, "right"))
+        addfacetset!(grid, "middle-facetset", x -> norm(x) < radius)
+        addfacetset!(grid, "right-facetset", getfacetset(grid, "right"))
         addnodeset!(grid, "middle-nodes", x -> norm(x) < radius)
 
         gridfilename = "grid-$(repr(celltype))"
-        vtk_grid(gridfilename, grid) do vtk
-            vtk_cellset(vtk, grid, "cell-1")
-            vtk_cellset(vtk, grid, "middle-cells")
-            vtk_nodeset(vtk, grid, "middle-nodes")
+        VTKFile(gridfilename, grid) do vtk
+            Ferrite.write_cellset(vtk, grid, "cell-1")
+            Ferrite.write_cellset(vtk, grid, "middle-cells")
+            Ferrite.write_nodeset(vtk, grid, "middle-nodes")
         end
 
         # test the sha of the file
@@ -56,17 +56,18 @@ end
         # Create a DofHandler, add some things, write to file and
         # then check the resulting sha
         dofhandler = DofHandler(grid)
-        ip = Ferrite.default_interpolation(celltype)
+        ip = geometric_interpolation(celltype)
+        @test ip == geometric_interpolation(getcells(grid, 1)) # Test ::AbstractCell dispatch
         add!(dofhandler, :temperature, ip)
         add!(dofhandler, :displacement, ip^dim)
         close!(dofhandler)
         ch = ConstraintHandler(dofhandler)
-        dbc = Dirichlet(:temperature, getfaceset(grid, "right-faceset"), (x,t)->1)
+        dbc = Dirichlet(:temperature, getfacetset(grid, "right-facetset"), (x,t)->1)
         add!(ch, dbc)
-        dbc = Dirichlet(:temperature, getfaceset(grid, "left"), (x,t)->4)
+        dbc = Dirichlet(:temperature, getfacetset(grid, "left"), (x,t)->4)
         add!(ch, dbc)
         for d in 1:dim
-            dbc = Dirichlet(:displacement, union(getfaceset(grid, "left")), (x,t) -> d, d)
+            dbc = Dirichlet(:displacement, union(getfacetset(grid, "left")), (x,t) -> d, d)
             add!(ch, dbc)
         end
         close!(ch)
@@ -77,9 +78,9 @@ end
         apply!(u, ch)
 
         dofhandlerfilename = "dofhandler-$(repr(celltype))"
-        vtk_grid(dofhandlerfilename, dofhandler) do vtk
-            vtk_point_data(vtk, ch)
-            vtk_point_data(vtk, dofhandler, u)
+        VTKFile(dofhandlerfilename, grid) do vtk
+            Ferrite.write_constraints(vtk, ch)
+            write_solution(vtk, dofhandler, u)
         end
 
         # test the sha of the file
@@ -94,7 +95,7 @@ end
         minv, maxv = Ferrite.bounding_box(grid)
         @test minv ≈ 2left
         @test maxv ≈ 2right
-    
+
     end
 
 end # of testset
@@ -118,10 +119,10 @@ close(csio)
     vector_data = [Vec{3}(ntuple(i->i, 3)) for j=1:8]
 
     filename_3d = "test_vtk_3d"
-    vtk_grid(filename_3d, grid) do vtk_file
-        vtk_point_data(vtk_file, sym_tensor_data, "symmetric tensor")
-        vtk_point_data(vtk_file, tensor_data, "tensor")
-        vtk_point_data(vtk_file, vector_data, "vector")
+    VTKFile(filename_3d, grid) do vtk
+        write_node_data(vtk, sym_tensor_data, "symmetric tensor")
+        write_node_data(vtk, tensor_data, "tensor")
+        write_node_data(vtk, vector_data, "vector")
     end
 
     # 2D grid
@@ -133,11 +134,11 @@ close(csio)
     vector_data = [Vec{2}(ntuple(i->i, 2)) for j=1:4]
 
     filename_2d = "test_vtk_2d"
-    vtk_grid(filename_2d, grid) do vtk_file
-        vtk_point_data(vtk_file, sym_tensor_data, "symmetric tensor")
-        vtk_point_data(vtk_file, tensor_data, "tensor")
-        vtk_point_data(vtk_file, tensor_data_1D, "tensor_1d")
-        vtk_point_data(vtk_file, vector_data, "vector")
+    VTKFile(filename_2d, grid) do vtk
+        write_node_data(vtk, sym_tensor_data, "symmetric tensor")
+        write_node_data(vtk, tensor_data, "tensor")
+        write_node_data(vtk, tensor_data_1D, "tensor_1d")
+        write_node_data(vtk, vector_data, "vector")
     end
 
     # test the shas of the files
@@ -185,12 +186,12 @@ end
     end
     @test n == div(getncells(grid)*(getncells(grid) + 1), 2)
 
-    # FaceCache
+    # FacetCache
     grid = generate_grid(Triangle, (3,3))
-    fc = FaceCache(grid)
-    faceindex = first(getfaceset(grid, "left"))
-    cell_id, face_id = faceindex
-    reinit!(fc, faceindex)
+    fc = FacetCache(grid)
+    facetindex = first(getfacetset(grid, "left"))
+    cell_id, facet_id = facetindex
+    reinit!(fc, facetindex)
     # @test Ferrite.faceindex(fc) == faceindex
     @test cellid(fc) == cell_id
     # @test Ferrite.faceid(fc) == face_id
@@ -198,18 +199,18 @@ end
     @test getcoordinates(fc) == getcoordinates(grid, cell_id)
     @test length(celldofs(fc)) == 0 # Empty because no DofHandler given
 
-    # FaceIterator, also tests `reinit!(fv::FaceValues, fc::FaceCache)`
+    # FacetIterator, also tests `reinit!(fv::FacetValues, fc::FacetCache)`
     for (dim, celltype) in ((1, Line), (2, Quadrilateral), (3, Hexahedron))
         grid = generate_grid(celltype, ntuple(_ -> 3, dim))
         ip = Lagrange{Ferrite.RefHypercube{dim}, 1}()^dim
-        fqr = FaceQuadratureRule{Ferrite.RefHypercube{dim}}(2)
-        fv = FaceValues(fqr, ip)
+        fqr = FacetQuadratureRule{Ferrite.RefHypercube{dim}}(2)
+        fv = FacetValues(fqr, ip)
         dh = DofHandler(grid); add!(dh, :u, ip); close!(dh)
-        faceset = getfaceset(grid, "right")
+        facetset = getfacetset(grid, "right")
         for dh_or_grid in (grid, dh)
-            @test first(FaceIterator(dh_or_grid, faceset)) isa FaceCache
+            @test first(FacetIterator(dh_or_grid, facetset)) isa FacetCache
             area = 0.0
-            for face in FaceIterator(dh_or_grid, faceset)
+            for face in FacetIterator(dh_or_grid, facetset)
                 reinit!(fv, face)
                 for q_point in 1:getnquadpoints(fv)
                     area += getdetJdV(fv, q_point)
@@ -241,7 +242,7 @@ end
     grid = Grid(cells, nodes)
     ip1 = DiscontinuousLagrange{RefQuadrilateral, 1}()
     ip2 = DiscontinuousLagrange{RefTriangle, 1}()
-    dh = DofHandler(grid); 
+    dh = DofHandler(grid);
     sdh1 = SubDofHandler(dh, Set([1])); add!(sdh1, :u, ip1);
     sdh2 = SubDofHandler(dh, Set([2])); add!(sdh2, :u, ip2);
     close!(dh)
@@ -252,12 +253,12 @@ end
     mixed_grid = Grid([Quadrilateral((1, 2, 3, 4)),Triangle((3, 2, 5))],
                       [Node(coord) for coord in zeros(Vec{2,Float64}, 5)])
     cellset = Set(1:getncells(mixed_grid))
-    faceset = Set(FaceIndex(i, 1) for i in 1:getncells(mixed_grid))
+    facetset = Set(FacetIndex(i, 1) for i in 1:getncells(mixed_grid))
     @test_throws ErrorException Ferrite._check_same_celltype(mixed_grid, cellset)
-    @test_throws ErrorException Ferrite._check_same_celltype(mixed_grid, faceset)
+    @test_throws ErrorException Ferrite._check_same_celltype(mixed_grid, facetset)
     std_grid = generate_grid(Quadrilateral, (getncells(mixed_grid),1))
     @test Ferrite._check_same_celltype(std_grid, cellset) === nothing
-    @test Ferrite._check_same_celltype(std_grid, faceset) === nothing
+    @test Ferrite._check_same_celltype(std_grid, facetset) === nothing
 end
 
 @testset "Grid sets" begin
@@ -266,18 +267,17 @@ end
     #Test manual add
     addcellset!(grid, "cell_set", [1]);
     addnodeset!(grid, "node_set", [1])
-    addfaceset!(grid, "face_set", [FaceIndex(1,1)])
-    addedgeset!(grid, "edge_set", [EdgeIndex(1,1)])
+    addfacetset!(grid, "face_set", [FacetIndex(1,1)])
     addvertexset!(grid, "vert_set", [VertexIndex(1,1)])
 
     #Test function add
-    addfaceset!(grid, "left_face", (x)-> x[1] ≈ 0.0)
-    addedgeset!(grid, "left_lower_edge", (x)-> x[1] ≈ 0.0 && x[3] ≈ 0.0)
+    addfacetset!(grid, "left_face", (x)-> x[1] ≈ 0.0)
+    left_lower_edge = Ferrite.create_edgeset(grid, (x)-> x[1] ≈ 0.0 && x[3] ≈ 0.0)
     addvertexset!(grid, "left_corner", (x)-> x[1] ≈ 0.0 && x[2] ≈ 0.0 && x[3] ≈ 0.0)
 
     @test 1 in Ferrite.getnodeset(grid, "node_set")
-    @test FaceIndex(1,5) in getfaceset(grid, "left_face")
-    @test EdgeIndex(1,4) in getedgeset(grid, "left_lower_edge")
+    @test FacetIndex(1,5) in getfacetset(grid, "left_face")
+    @test EdgeIndex(1,4) in left_lower_edge
     @test VertexIndex(1,1) in getvertexset(grid, "left_corner")
 
 end
@@ -297,15 +297,15 @@ end
     @test getneighborhood(linetopo, linegrid, VertexIndex(2,2)) == [VertexIndex(3,1)]
     @test linetopo.vertex_vertex_neighbor[3,1] == Ferrite.EntityNeighborhood(VertexIndex(2,2))
     @test getneighborhood(linetopo, linegrid, VertexIndex(3,1)) == [VertexIndex(2,2)]
-    linefaceskeleton = Ferrite.faceskeleton(linetopo, linegrid)
+    @test getneighborhood(linetopo, linegrid, FacetIndex(3,1)) == getneighborhood(linetopo, linegrid, VertexIndex(3,1))
+
+    linefaceskeleton = Ferrite.vertexskeleton(linetopo, linegrid)
     quadlinegrid = generate_grid(QuadraticLine,(3,))
     quadlinetopo = ExclusiveTopology(quadlinegrid)
-    quadlinefaceskeleton = Ferrite.faceskeleton(quadlinetopo, quadlinegrid)
+    quadlinefaceskeleton = Ferrite.facetskeleton(quadlinetopo, quadlinegrid)
     # Test faceskeleton
     @test Set(linefaceskeleton) == Set(quadlinefaceskeleton) == Set([
-        FaceIndex(1,1), FaceIndex(1,2),
-                        FaceIndex(2,2),
-                        FaceIndex(3,2), 
+        VertexIndex(1,1), VertexIndex(1,2), VertexIndex(2,2),VertexIndex(3,2),
     ])
 
 #                           (11)
@@ -319,7 +319,7 @@ end
 #                            (2)
     quadgrid = generate_grid(Quadrilateral,(2,3))
     topology = ExclusiveTopology(quadgrid)
-    faceskeleton = Ferrite.faceskeleton(topology, quadgrid)
+    faceskeleton = Ferrite.edgeskeleton(topology, quadgrid)
     #test vertex neighbors maps cellid and local vertex id to neighbor id and neighbor local vertex id
     @test topology.vertex_vertex_neighbor[1,3] == Ferrite.EntityNeighborhood(VertexIndex(4,1))
     @test topology.vertex_vertex_neighbor[2,4] == Ferrite.EntityNeighborhood(VertexIndex(3,2))
@@ -333,54 +333,38 @@ end
     @test isempty(getneighborhood(topology, quadgrid, VertexIndex(2,2)))
     @test length(getneighborhood(topology, quadgrid, VertexIndex(2,4))) == 3
     #test face neighbor maps cellid and local face id to neighbor id and neighbor local face id
-    @test topology.face_face_neighbor[1,2] == Ferrite.EntityNeighborhood(FaceIndex(2,4))
-    @test getneighborhood(topology, quadgrid, FaceIndex(1,2)) == [FaceIndex(2,4)]
-    @test topology.face_face_neighbor[1,3] == Ferrite.EntityNeighborhood(FaceIndex(3,1))
-    @test getneighborhood(topology, quadgrid, FaceIndex(1,3)) == [FaceIndex(3,1)]
-    @test topology.face_face_neighbor[2,3] == Ferrite.EntityNeighborhood(FaceIndex(4,1))
-    @test getneighborhood(topology, quadgrid, FaceIndex(2,3)) == [FaceIndex(4,1)]
-    @test topology.face_face_neighbor[2,4] == Ferrite.EntityNeighborhood(FaceIndex(1,2))
-    @test getneighborhood(topology, quadgrid, FaceIndex(2,4)) == [FaceIndex(1,2)]
-    @test topology.face_face_neighbor[3,1] == Ferrite.EntityNeighborhood(FaceIndex(1,3))
-    @test getneighborhood(topology, quadgrid, FaceIndex(3,1)) == [FaceIndex(1,3)]
-    @test topology.face_face_neighbor[3,2] == Ferrite.EntityNeighborhood(FaceIndex(4,4))
-    @test getneighborhood(topology, quadgrid, FaceIndex(3,2)) == [FaceIndex(4,4)]
-    @test topology.face_face_neighbor[3,3] == Ferrite.EntityNeighborhood(FaceIndex(5,1))
-    @test getneighborhood(topology, quadgrid, FaceIndex(3,3)) == [FaceIndex(5,1)]
-    @test topology.face_face_neighbor[4,1] == Ferrite.EntityNeighborhood(FaceIndex(2,3))
-    @test getneighborhood(topology, quadgrid, FaceIndex(4,1)) == [FaceIndex(2,3)]
-    @test topology.face_face_neighbor[4,3] == Ferrite.EntityNeighborhood(FaceIndex(6,1))
-    @test getneighborhood(topology, quadgrid, FaceIndex(4,3)) == [FaceIndex(6,1)]
-    @test topology.face_face_neighbor[4,4] == Ferrite.EntityNeighborhood(FaceIndex(3,2))
-    @test getneighborhood(topology, quadgrid, FaceIndex(1,2)) == [FaceIndex(2,4)]
-    @test topology.face_face_neighbor[5,1] == Ferrite.EntityNeighborhood(FaceIndex(3,3))
-    @test getneighborhood(topology, quadgrid, FaceIndex(5,1)) == [FaceIndex(3,3)]
-    @test topology.face_face_neighbor[5,2] == Ferrite.EntityNeighborhood(FaceIndex(6,4))
-    @test getneighborhood(topology, quadgrid, FaceIndex(5,2)) == [FaceIndex(6,4)]
-    @test topology.face_face_neighbor[5,3] == Ferrite.EntityNeighborhood(Ferrite.BoundaryIndex[])
-    @test getneighborhood(topology, quadgrid, FaceIndex(5,3)) == FaceIndex[]
-    @test topology.face_face_neighbor[5,4] == Ferrite.EntityNeighborhood(Ferrite.BoundaryIndex[])
-    @test getneighborhood(topology, quadgrid, FaceIndex(5,4)) == FaceIndex[]
-    @test topology.face_face_neighbor[6,1] == Ferrite.EntityNeighborhood(FaceIndex(4,3))
-    @test getneighborhood(topology, quadgrid, FaceIndex(6,1)) == [FaceIndex(4,3)]
-    @test topology.face_face_neighbor[6,2] == Ferrite.EntityNeighborhood(Ferrite.BoundaryIndex[])
-    @test getneighborhood(topology, quadgrid, FaceIndex(6,2)) == FaceIndex[]
-    @test topology.face_face_neighbor[6,3] == Ferrite.EntityNeighborhood(Ferrite.BoundaryIndex[])
-    @test getneighborhood(topology, quadgrid, FaceIndex(6,3)) == FaceIndex[]
-    @test topology.face_face_neighbor[6,4] == Ferrite.EntityNeighborhood(FaceIndex(5,2))
-    @test getneighborhood(topology, quadgrid, FaceIndex(6,4)) == [FaceIndex(5,2)]
-    
+    @test topology.edge_edge_neighbor[1,2] == Ferrite.EntityNeighborhood(EdgeIndex(2,4))
+    @test topology.edge_edge_neighbor[1,3] == Ferrite.EntityNeighborhood(EdgeIndex(3,1))
+    @test topology.edge_edge_neighbor[2,3] == Ferrite.EntityNeighborhood(EdgeIndex(4,1))
+    @test topology.edge_edge_neighbor[2,4] == Ferrite.EntityNeighborhood(EdgeIndex(1,2))
+    @test topology.edge_edge_neighbor[3,1] == Ferrite.EntityNeighborhood(EdgeIndex(1,3))
+    @test topology.edge_edge_neighbor[3,2] == Ferrite.EntityNeighborhood(EdgeIndex(4,4))
+    @test topology.edge_edge_neighbor[3,3] == Ferrite.EntityNeighborhood(EdgeIndex(5,1))
+    @test topology.edge_edge_neighbor[4,1] == Ferrite.EntityNeighborhood(EdgeIndex(2,3))
+    @test topology.edge_edge_neighbor[4,3] == Ferrite.EntityNeighborhood(EdgeIndex(6,1))
+    @test topology.edge_edge_neighbor[4,4] == Ferrite.EntityNeighborhood(EdgeIndex(3,2))
+    @test topology.edge_edge_neighbor[5,1] == Ferrite.EntityNeighborhood(EdgeIndex(3,3))
+    @test topology.edge_edge_neighbor[5,2] == Ferrite.EntityNeighborhood(EdgeIndex(6,4))
+    @test topology.edge_edge_neighbor[5,3] == Ferrite.EntityNeighborhood(Ferrite.BoundaryIndex[])
+    @test topology.edge_edge_neighbor[5,4] == Ferrite.EntityNeighborhood(Ferrite.BoundaryIndex[])
+    @test topology.edge_edge_neighbor[6,1] == Ferrite.EntityNeighborhood(EdgeIndex(4,3))
+    @test topology.edge_edge_neighbor[6,2] == Ferrite.EntityNeighborhood(Ferrite.BoundaryIndex[])
+    @test topology.edge_edge_neighbor[6,3] == Ferrite.EntityNeighborhood(Ferrite.BoundaryIndex[])
+    @test topology.edge_edge_neighbor[6,4] == Ferrite.EntityNeighborhood(EdgeIndex(5,2))
+
+    @test getneighborhood(topology, quadgrid, EdgeIndex(2,4)) == getneighborhood(topology, quadgrid, FacetIndex(2,4))
+
     quadquadgrid = generate_grid(QuadraticQuadrilateral,(2,3))
     quadtopology = ExclusiveTopology(quadquadgrid)
-    quadfaceskeleton = Ferrite.faceskeleton(quadtopology, quadquadgrid)
+    quadfaceskeleton = Ferrite.edgeskeleton(quadtopology, quadquadgrid)
     # Test faceskeleton
     @test Set(faceskeleton) == Set(quadfaceskeleton) == Set([
-        FaceIndex(1,1), FaceIndex(1,2), FaceIndex(1,3), FaceIndex(1,4),
-        FaceIndex(2,1), FaceIndex(2,2), FaceIndex(2,3),
-                        FaceIndex(3,2), FaceIndex(3,3), FaceIndex(3,4), 
-                        FaceIndex(4,2), FaceIndex(4,3),
-                        FaceIndex(5,2), FaceIndex(5,3), FaceIndex(5,4), 
-                        FaceIndex(6,2), FaceIndex(6,3),
+        EdgeIndex(1,1), EdgeIndex(1,2), EdgeIndex(1,3), EdgeIndex(1,4),
+        EdgeIndex(2,1), EdgeIndex(2,2), EdgeIndex(2,3),
+                        EdgeIndex(3,2), EdgeIndex(3,3), EdgeIndex(3,4),
+                        EdgeIndex(4,2), EdgeIndex(4,3),
+                        EdgeIndex(5,2), EdgeIndex(5,3), EdgeIndex(5,4),
+                        EdgeIndex(6,2), EdgeIndex(6,3),
     ])
 
 #                         (8)
@@ -416,6 +400,8 @@ end
     @test getneighborhood(topology,hexgrid,FaceIndex((4,2))) == [FaceIndex((2,4))]
     @test getneighborhood(topology,hexgrid,FaceIndex((4,5))) == [FaceIndex((3,3))]
 
+    @test getneighborhood(topology, hexgrid, FaceIndex(2,4)) == getneighborhood(topology, hexgrid, FacetIndex(2,4))
+
     # regression for https://github.com/Ferrite-FEM/Ferrite.jl/issues/518
     serendipitygrid = generate_grid(SerendipityQuadraticHexahedron,(2,2,1))
     stopology = ExclusiveTopology(serendipitygrid)
@@ -427,8 +413,8 @@ end
     @test Set(faceskeleton) == Set(sfaceskeleton) == Set([
         FaceIndex(1,1), FaceIndex(1,2), FaceIndex(1,3), FaceIndex(1,4), FaceIndex(1,5), FaceIndex(1,6),
         FaceIndex(2,1), FaceIndex(2,2), FaceIndex(2,3), FaceIndex(2,4),                 FaceIndex(2,6),
-        FaceIndex(3,1),                 FaceIndex(3,3), FaceIndex(3,4), FaceIndex(3,5), FaceIndex(3,6), 
-        FaceIndex(4,1),                 FaceIndex(4,3), FaceIndex(4,4),                 FaceIndex(4,6), 
+        FaceIndex(3,1),                 FaceIndex(3,3), FaceIndex(3,4), FaceIndex(3,5), FaceIndex(3,6),
+        FaceIndex(4,1),                 FaceIndex(4,3), FaceIndex(4,4),                 FaceIndex(4,6),
     ])
 
 #                   +-----+-----+
@@ -451,17 +437,17 @@ end
     @test all(quadtopology.face_face_neighbor .== topology.face_face_neighbor)
     @test all(quadtopology.vertex_vertex_neighbor .== topology.vertex_vertex_neighbor)
     # Test faceskeleton
-    trifaceskeleton = Ferrite.faceskeleton(topology, trigrid)
-    quadtrifaceskeleton = Ferrite.faceskeleton(quadtopology, quadtrigrid)
+    trifaceskeleton = Ferrite.edgeskeleton(topology, trigrid)
+    quadtrifaceskeleton = Ferrite.edgeskeleton(quadtopology, quadtrigrid)
     @test Set(trifaceskeleton) == Set(quadtrifaceskeleton) == Set([
-        FaceIndex(1,1), FaceIndex(1,2), FaceIndex(1,3),
-        FaceIndex(2,1), FaceIndex(2,2),
-        FaceIndex(3,1), FaceIndex(3,2),
-        FaceIndex(4,1), FaceIndex(4,2),
-                        FaceIndex(5,2), FaceIndex(5,3),
-        FaceIndex(6,1), FaceIndex(6,2),
-                        FaceIndex(7,2),
-        FaceIndex(8,1), FaceIndex(8,2),
+        EdgeIndex(1,1), EdgeIndex(1,2), EdgeIndex(1,3),
+        EdgeIndex(2,1), EdgeIndex(2,2),
+        EdgeIndex(3,1), EdgeIndex(3,2),
+        EdgeIndex(4,1), EdgeIndex(4,2),
+                        EdgeIndex(5,2), EdgeIndex(5,3),
+        EdgeIndex(6,1), EdgeIndex(6,2),
+                        EdgeIndex(7,2),
+        EdgeIndex(8,1), EdgeIndex(8,2),
     ])
 # Test tetrahedron faceskeleton
     tetgrid = generate_grid(Tetrahedron, (1,1,1))
@@ -486,7 +472,7 @@ end
     grid = Grid(cells, nodes)
     topology = ExclusiveTopology(grid)
 
-    @test_throws AssertionError("Face skeleton construction requires all the elements to be of the same dimensionality") Ferrite.faceskeleton(topology, grid)
+    @test_throws ArgumentError Ferrite.facetskeleton(topology, grid)
     # @test topology.face_face_neighbor[3,4] == Ferrite.EntityNeighborhood(EdgeIndex(1,2))
     # @test topology.edge_edge_neighbor[1,2] == Ferrite.EntityNeighborhood(FaceIndex(3,4))
     # # regression that it doesn't error for boundary faces, see https://github.com/Ferrite-FEM/Ferrite.jl/issues/518
@@ -504,7 +490,9 @@ end
     nodes = [Node(coord) for coord in zeros(Vec{2,Float64}, 18)]
     grid = Grid(cells, nodes)
     topology = ExclusiveTopology(grid)
-    @test_throws AssertionError("Face skeleton construction requires all the elements to be of the same dimensionality") Ferrite.faceskeleton(topology, grid)
+    @test_throws ArgumentError Ferrite.facetskeleton(topology, grid)
+    @test_throws ArgumentError getneighborhood(topology, grid, FacetIndex(1,1))
+    @test_throws ArgumentError Ferrite.get_facet_facet_neighborhood(topology, grid)
 
 #
 #                   +-----+-----+-----+
@@ -538,22 +526,23 @@ end
     @test Set(Ferrite.toglobal(quadgrid, Ferrite.getstencil(stars, quadgrid, VertexIndex(2,1)))) == Set([2,1,6,3])
     @test Set(Ferrite.toglobal(quadgrid, Ferrite.getstencil(stars, quadgrid, VertexIndex(5,4)))) == Set([10,6,9,11,14])
 
-    face_skeleton = Ferrite.faceskeleton(topology, quadgrid)
-    @test Set(face_skeleton) == Set([FaceIndex(1,1),FaceIndex(1,2),FaceIndex(1,3),FaceIndex(1,4),
-                                          FaceIndex(2,1),FaceIndex(2,2),FaceIndex(2,3),
-                                          FaceIndex(3,1),FaceIndex(3,2),FaceIndex(3,3),
-                                          FaceIndex(4,2),FaceIndex(4,3),FaceIndex(4,4),
-                                          FaceIndex(5,2),FaceIndex(5,3),FaceIndex(6,2),FaceIndex(6,3),
-                                          FaceIndex(7,2),FaceIndex(7,3),FaceIndex(7,4),
-                                          FaceIndex(8,2),FaceIndex(8,3),FaceIndex(9,2),FaceIndex(9,3)])
+    face_skeleton = Ferrite.edgeskeleton(topology, quadgrid)
+    @test Set(face_skeleton) == Set([EdgeIndex(1,1),EdgeIndex(1,2),EdgeIndex(1,3),EdgeIndex(1,4),
+        EdgeIndex(2,1),EdgeIndex(2,2),EdgeIndex(2,3),
+        EdgeIndex(3,1),EdgeIndex(3,2),EdgeIndex(3,3),
+        EdgeIndex(4,2),EdgeIndex(4,3),EdgeIndex(4,4),
+        EdgeIndex(5,2),EdgeIndex(5,3),EdgeIndex(6,2),EdgeIndex(6,3),
+        EdgeIndex(7,2),EdgeIndex(7,3),EdgeIndex(7,4),
+        EdgeIndex(8,2),EdgeIndex(8,3),EdgeIndex(9,2),EdgeIndex(9,3)])
     @test length(face_skeleton) == 4*3 + 3*4
 
     quadratic_quadgrid = generate_grid(QuadraticQuadrilateral,(3,3))
     quadgrid_topology = ExclusiveTopology(quadratic_quadgrid)
-    quadface_skeleton = Ferrite.faceskeleton(topology, quadgrid)
-    @test quadface_skeleton == face_skeleton
+    #quadface_skeleton = Ferrite.faceskeleton(topology, quadgrid)
+    #@test quadface_skeleton == face_skeleton
+
     # add more regression for https://github.com/Ferrite-FEM/Ferrite.jl/issues/518
-    @test all(quadgrid_topology.face_face_neighbor .== topology.face_face_neighbor)
+    @test all(quadgrid_topology.edge_edge_neighbor .== topology.edge_edge_neighbor)
     @test all(quadgrid_topology.vertex_vertex_neighbor .== topology.vertex_vertex_neighbor)
     quadratic_patches = Vector{Int}[Ferrite.getneighborhood(quadgrid_topology, quadratic_quadgrid, CellIndex(i)) for i in 1:getncells(quadratic_quadgrid)]
     @test all(patches .== quadratic_patches)
@@ -568,8 +557,8 @@ end
 #                   +-----+-----+-----+
 # test application: integrate jump across element boundary 5
     ip = DiscontinuousLagrange{RefQuadrilateral, 1}()^2
-    qr_face = FaceQuadratureRule{RefQuadrilateral}(2)
-    iv = InterfaceValues(qr_face, ip)
+    qr_facet = FacetQuadratureRule{RefQuadrilateral}(2)
+    iv = InterfaceValues(qr_facet, ip)
     dh = DofHandler(quadgrid)
     add!(dh, :u, ip)
     close!(dh)
@@ -677,7 +666,7 @@ end
 
     @testset "1d" begin
         grid = generate_grid(Line, (2,))
-        
+
         Ferrite.vertexdof_indices(::VectorLagrangeTest{RefLine,1,2}) = ((1,2),(3,4))
         dh1 = DofHandler(grid)
         add!(dh1, :u, VectorLagrangeTest{RefLine,1,2}())
@@ -719,5 +708,54 @@ end
         add!(dh2, :u, Lagrange{RefQuadrilateral,1}()^3)
         close!(dh2)
         @test dh1.cell_dofs == dh2.cell_dofs
+    end
+
+    @testset "VTKFileCollection" begin
+        @testset "equivalence of addstep methods" begin
+            grid = generate_grid(Triangle, (2,2))
+            celldata = rand(getncells(grid))
+            fname = "addstep"
+            pvd1 = VTKFileCollection(fname, grid)
+            pvd2 = VTKFileCollection(fname, grid)
+            timesteps = 0:0.5:0.5
+            for (n, t) in pairs(timesteps)
+                addstep!(pvd1, t) do io
+                    write_cell_data(io, celldata*n, "celldata")
+                end
+                vtk = VTKFile(string(fname, "2_", n), grid)
+                write_cell_data(vtk, celldata*n, "celldata")
+                addstep!(pvd2, vtk, t)
+                @test !(isopen(vtk.vtk))
+            end
+            close.((pvd1, pvd2))
+            @test pvd1.step == pvd2.step # Same nr of steps added
+            for (n, t) in pairs(timesteps)
+                fname1 = string(fname, "_", n, ".vtu")
+                fname2 = string(fname, "2_", n, ".vtu")
+                sha_vtk1 = bytes2hex(open(SHA.sha1, fname1))
+                sha_vtk2 = bytes2hex(open(SHA.sha1, fname2))
+                @test sha_vtk1 == sha_vtk2
+                rm.((fname1, fname2))
+            end
+            rm(string(fname, ".pvd"))
+            # Solving https://github.com/Ferrite-FEM/Ferrite.jl/issues/397
+            # would allow checking the pvd files as well.
+        end
+        @testset "kwargs forwarding" begin
+            grid = generate_grid(Quadrilateral, (10,10))
+            file_sizes = Int[]
+            fname = "test_collection_kwargs"
+            for compress in (true, false)
+                pvd = VTKFileCollection(fname, grid)
+                addstep!(pvd, 0.0; compress) do io
+                    nothing
+                end
+                close(pvd)
+                push!(file_sizes, stat(string(fname, "_1.vtu")).size)
+                rm(string(fname, "_1.vtu"))
+            end
+            rm(string(fname, ".pvd"))
+            @test file_sizes[1] < file_sizes[2] # Check that compress=true gives smaller file size
+        end
     end
 end

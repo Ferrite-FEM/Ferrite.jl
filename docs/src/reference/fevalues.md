@@ -6,18 +6,24 @@ DocTestSetup = :(using Ferrite)
 # FEValues
 
 ## Main types
-[`CellValues`](@ref) and [`FaceValues`](@ref) are the most common 
-subtypes of `Ferrite.AbstractValues`. For more details about how 
+[`CellValues`](@ref) and [`FacetValues`](@ref) are the most common
+subtypes of `Ferrite.AbstractValues`. For more details about how
 these work, please see the related [topic guide](@ref fevalues_topicguide).
 
 ```@docs
 CellValues
-FaceValues
+FacetValues
 ```
+
+!!! warning "Embedded API"
+    Currently, embedded `FEValues` returns `SArray`s, which behave differently
+    from the `Tensor`s for normal value. In the future, we expect to return
+    an `AbstractTensor`, this change may happen in a minor release, and the
+    API for embedded `FEValues` should therefore be considered experimental.
 
 ## Applicable functions
 The following functions are applicable to both `CellValues`
-and `FaceValues`.
+and `FacetValues`.
 
 ```@docs
 reinit!
@@ -39,16 +45,16 @@ function_curl
 spatial_coordinate
 ```
 
-In addition, there are some methods that are unique for `FaceValues`.
+In addition, there are some methods that are unique for `FacetValues`.
 
 ```@docs
-Ferrite.getcurrentface
+Ferrite.getcurrentfacet
 getnormal
 ```
 
 ## [InterfaceValues](@id reference-interfacevalues)
 
-All of the methods for [`FaceValues`](@ref) apply for `InterfaceValues` as well.
+All of the methods for [`FacetValues`](@ref) apply for `InterfaceValues` as well.
 In addition, there are some methods that are unique for `InterfaceValues`:
 
 ```@docs
