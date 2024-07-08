@@ -22,8 +22,13 @@ get_coordinate_type(::GPUGrid{dim,CELLVEC,NODEVEC}) where
 # otherwise the compiler will not be able to infer the type of the argument and throw a dynamic function invokation error.   
 @inline getcells(grid::GPUGrid, v::Union{Int32, Vector{Int32}}) = grid.cells[v]
 
-# This function is used to get the coordinates of a cell on the GPU.
-@inline function getcoordinates(grid::Ferrite.GPUGrid,e::Int32)
+
+@inline """
+    getcoordinates(grid::Ferrite.GPUGrid,e::Int32)
+
+Return the coordinates of the nodes of the element `e` in the `GPUGrid` `grid`.
+"""
+function getcoordinates(grid::Ferrite.GPUGrid,e::Int32)
     # e is the element index.
     CT = get_coordinate_type(grid)
     cell = getcells(grid, e)

@@ -198,7 +198,7 @@ end
     resize!(sorteddofs, ld)
     copyto!(sorteddofs, dofs)
     # sort permutation according to sorteddofs (e.g. sorteddofs = [2,5,3,6] -> permutation = [1,3,2,4])
-    sortperm2!(sorteddofs, permutation) 
+    sortperm2!(sorteddofs, permutation)
     ## ############################################################## ##
     
     current_col = 1
