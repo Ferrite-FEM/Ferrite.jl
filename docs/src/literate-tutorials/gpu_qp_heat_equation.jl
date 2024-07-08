@@ -141,6 +141,12 @@ function assemble_element_gpu!(assembler,cv,dh,n_cells_colored, eles_colored)
     return nothing
 end
 
+Adapt.@adapt_structure Ferrite.GPUGrid
+Adapt.@adapt_structure Ferrite.GPUDofHandler
+Adapt.@adapt_structure Ferrite.GPUAssemblerSparsityPattern
+
+
+
 function assemble_global_gpu_color(cellvalues,dh,colors)
     K = create_sparsity_pattern(dh,Float32)
     Kgpu = CUSPARSE.CuSparseMatrixCSC(K)
@@ -152,15 +158,15 @@ function assemble_global_gpu_color(cellvalues,dh,colors)
     # one call will make dofs[i] give 6 instead of 4. (ref: see `gpu_assembler.jl`)
     # second call will fix the first issue but will give rubbish values for node_ids[i] (ref: see `gpu_grid.jl`)
     # third call will fix everything.
-    dh_gpu = Adapt.adapt_structure(CUDA.KernelAdaptor(), dh)
-    dh_gpu = Adapt.adapt_structure(CUDA.KernelAdaptor(), dh)
+    dh_gpu = Adapt.adapt_structure(CuArray, dh)
+    #dh_gpu = Adapt.adapt_structure(CUDA.KernelAdaptor(), dh)
     #dh_gpu = Adapt.adapt_structure(CUDA.KernelAdaptor(), dh)
     # Note: The previous three lines are necessary to circumvent getting rubbish values.
     # Sofar, I have not been able to figure out why this is the case.
     # discorse ref: https://discourse.julialang.org/t/rubbish-values-from-gpu-kernel/116632
 
     assembler_gpu = Adapt.adapt_structure(CUDA.KernelAdaptor(), assembler)
-    cellvalues_gpu = Adapt.adapt_structure(CUDA.KernelAdaptor(), cellvalues)
+    cellvalues_gpu = Adapt.adapt_structure(CuArray, cellvalues)
     for i in 1:n_colors
         kernel = @cuda launch=false assemble_element_gpu!(assembler_gpu,cellvalues_gpu,dh_gpu,Int32(length(colors[i])),cu(colors[i]))
         #@show CUDA.registers(kernel)
@@ -189,13 +195,14 @@ end
 
 
 
-#stassy(cv,dh) = assemble_global!(cv,dh,Val(false))
+stassy(cv,dh) = assemble_global!(cv,dh,Val(false))
 
 
 
 # qpassy(cv,dh) = assemble_global!(cv,dh,Val(true))
 
 
+Kgpu, fgpu =  assemble_global_gpu_color(cellvalues,dh,colors)
 #Kgpu, fgpu = CUDA.@profile    assemble_global_gpu_color(cellvalues,dh,colors)
 # to benchmark the code using nsight compute use the following command: ncu --mode=launch julia
 # Open nsight compute and attach the profiler to the julia instance
@@ -204,12 +211,12 @@ end
 #mKgpu, mfgpu =    assemble_global_gpu_color_macro(cellvalues,dh,colors)
 
 
-# norm(mKgpu)
+norm(Kgpu)
 
 
 # #Kstd , Fstd = @btime stassy($cellvalues,$dh);
-# Kstd , Fstd =  stassy(cellvalues,dh);
-# norm(Kstd)
+Kstd , Fstd =  stassy(cellvalues,dh);
+ norm(Kstd)
 
 
 @testset "GPU Heat Equation" begin
