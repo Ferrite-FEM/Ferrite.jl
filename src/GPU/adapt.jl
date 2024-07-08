@@ -58,4 +58,3 @@ function Adapt.adapt_structure(to, assembler::Ferrite.GPUAssemblerSparsityPatter
     f = Adapt.adapt_structure(to, assembler.f)
     Ferrite.GPUAssemblerSparsityPattern(K, f)
 end
-
