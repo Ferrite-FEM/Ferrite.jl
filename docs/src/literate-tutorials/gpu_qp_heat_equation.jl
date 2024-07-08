@@ -139,11 +139,11 @@ end
     return nothing
 end
 
+
+
 Adapt.@adapt_structure Ferrite.GPUGrid
 Adapt.@adapt_structure Ferrite.GPUDofHandler
 Adapt.@adapt_structure Ferrite.GPUAssemblerSparsityPattern
-
-
 
 #=NVTX.@annotate=# function assemble_global_gpu_color(cellvalues,dh,colors)
     K = allocate_matrix(SparseMatrixCSC{Float32, Int32},dh) 

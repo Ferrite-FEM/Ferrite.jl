@@ -8,9 +8,22 @@ function start_assemble(K::AbstractSparseArray{Tv}, f::AbstractVector{Tv}) where
     return GPUAssemblerSparsityPattern(K, f)
 end
 
+"""
+    assemble!(A::GPUAssemblerSparsityPattern, dofs::AbstractVector{Int32}, Ke::AbstractMatrix, fe::AbstractVector)
+
+Assembles the global stiffness matrix `Ke` and the global force vector `fe` into the the global stiffness matrix `K` and the global force vector `f` of the `GPUAssemblerSparsityPattern` object `A`.
+
+# Arguments
+- `A::GPUAssemblerSparsityPattern`: incorporate the global stiffness matrix and the global force vector.
+- `dofs::AbstractVector{Int32}`: The degrees of freedom associated with each element.
+- `Ke::AbstractMatrix`: The element stiffness matrix.
+- `fe::AbstractVector`: The element force vector.
+
+"""
 @propagate_inbounds function assemble!(A::GPUAssemblerSparsityPattern, dofs::AbstractVector{Int32}, Ke::AbstractMatrix, fe::AbstractVector)
     _assemble!(A, dofs, Ke, fe)
 end
+
 
 function _assemble!(A::GPUAssemblerSparsityPattern, dofs::AbstractVector{Int32}, Ke::AbstractMatrix, fe::AbstractVector)
     # Brute force assembly
