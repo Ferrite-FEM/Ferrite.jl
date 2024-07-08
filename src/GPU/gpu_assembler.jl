@@ -16,6 +16,8 @@ function _assemble!(A::GPUAssemblerSparsityPattern, dofs::AbstractVector{Int32},
     # Brute force assembly
     K = A.K
     f = A.f
+
+
     for i = 1:length(dofs)
         ig = dofs[i]
         f[ig] += fe[i]

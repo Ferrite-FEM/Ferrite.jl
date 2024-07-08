@@ -8,10 +8,10 @@ using Adapt
 
 
 left = Tensor{1,2,Float32}((0,-0)) # define the left bottom corner of the grid.
-right = Tensor{1,2,Float32}((100.0,100.0)) # define the right top corner of the grid.
+right = Tensor{1,2,Float32}((3.0,4.0)) # define the right top corner of the grid.
 
 
-grid = generate_grid(Quadrilateral, (100, 100),left,right) 
+grid = generate_grid(Quadrilateral, (3, 3),left,right) 
 
 
 colors = create_coloring(grid) .|> (x -> Int32.(x)) # convert to Int32 to reduce number of registers
@@ -27,6 +27,7 @@ cellvalues = CellValues(Float32,qr, ip)
 
 
 dh = DofHandler(grid)
+
 
 
 add!(dh, :u, ip)
@@ -59,8 +60,6 @@ function assemble_element_std!(Ke::Matrix, fe::Vector, cellvalues::CellValues)
     return Ke, fe
 end
 
-cell = getcells(grid, 1)
-cell.nodes
 
 function create_buffers(cellvalues, dh)
     f = zeros(ndofs(dh))
@@ -107,9 +106,6 @@ function assemble_element_gpu!(assembler,cv,dh,n_cells_colored, eles_colored)
     e_color ≤ n_cells_colored || return nothing # e here is the current element index.
     n_basefuncs = getnbasefunctions(cv)
     e = eles_colored[e_color]
-    if(tx == 1 && bx == 1)
-        @cushow n_basefuncs
-    end
     cell_coords = getcoordinates(dh.grid, e)
 
     ke = MMatrix{4,4,Float32}(undef) # Note: using n_basefuncs instead of 4 will throw an error because this type of dynamisim is not supported in GPU.
@@ -148,9 +144,13 @@ function assemble_global_gpu_color(cellvalues,dh,colors)
     assembler = start_assemble(Kgpu, fgpu)
     n_colors = length(colors)
     # set up kernel adaption 
+    # FIXME: The following three lines are necessary to circumvent getting rubbish values.
+    # one call will make dofs[i] give 6 instead of 4. (ref: see `gpu_assembler.jl`)
+    # second call will fix the first issue but will give rubbish values for node_ids[i] (ref: see `gpu_grid.jl`)
+    # third call will fix everything.
     dh_gpu = Adapt.adapt_structure(CUDA.KernelAdaptor(), dh)
-    dh_gpu = Adapt.adapt_structure(CUDA.KernelAdaptor(), dh)
-    dh_gpu = Adapt.adapt_structure(CUDA.KernelAdaptor(), dh)
+    #dh_gpu = Adapt.adapt_structure(CUDA.KernelAdaptor(), dh)
+    #dh_gpu = Adapt.adapt_structure(CUDA.KernelAdaptor(), dh)
     # Note: The previous three lines are necessary to circumvent getting rubbish values.
     # Sofar, I have not been able to figure out why this is the case.
     # discorse ref: https://discourse.julialang.org/t/rubbish-values-from-gpu-kernel/116632
@@ -168,6 +168,8 @@ function assemble_global_gpu_color(cellvalues,dh,colors)
     return Kgpu,fgpu
 end
 
+
+# an alternative way to call the kernel using a macro
 function assemble_global_gpu_color_macro(cellvalues,dh,colors)
     K = create_sparsity_pattern(dh,Float32)
     Kgpu = CUSPARSE.CuSparseMatrixCSC(K)
@@ -183,7 +185,7 @@ end
 
 
 
-stassy(cv,dh) = assemble_global!(cv,dh,Val(false))
+#stassy(cv,dh) = assemble_global!(cv,dh,Val(false))
 
 
 
