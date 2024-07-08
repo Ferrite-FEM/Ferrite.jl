@@ -32,10 +32,6 @@ get_coordinate_type(::GPUGrid{dim,CELLVEC,NODEVEC}) where
     node_ids = get_node_ids(cell)
     
     for i in 1:length(x)
-        #FIXME: Code for debugging only #[Rubbish No. 2]
-        # Rubbish value for (node_ids[i])
-        @cushow node_ids[i]
-
         x[i] = get_node_coordinate(grid, node_ids[i])
     end
 

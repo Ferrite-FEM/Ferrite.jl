@@ -16,11 +16,6 @@ ndofs_per_cell(dh::GPUDofHandler, i::Int32)= dh.ndofs_cell[i]
 function celldofs(dh::GPUDofHandler, i::Int32)
     offset = dh.cell_dofs_offset[i]
     ndofs = ndofs_per_cell(dh, i)
-
-    #FIXME: Code for debugging only #[Rubbish No. 1]
-    # dofs[i] gives other values instead of 4, even thought in the adapt_structure function, it is set to 4
-    @cushow ndofs
-
    return @view dh.cell_dofs[offset:(offset+ndofs-Int32(1))]
 end
 
