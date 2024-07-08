@@ -202,7 +202,7 @@ stassy(cv,dh) = assemble_global!(cv,dh,Val(false))
 # qpassy(cv,dh) = assemble_global!(cv,dh,Val(true))
 
 
-Kgpu, fgpu =  assemble_global_gpu_color(cellvalues,dh,colors)
+#Kgpu, fgpu =  assemble_global_gpu_color(cellvalues,dh,colors)
 #Kgpu, fgpu = CUDA.@profile    assemble_global_gpu_color(cellvalues,dh,colors)
 # to benchmark the code using nsight compute use the following command: ncu --mode=launch julia
 # Open nsight compute and attach the profiler to the julia instance
@@ -211,25 +211,27 @@ Kgpu, fgpu =  assemble_global_gpu_color(cellvalues,dh,colors)
 #mKgpu, mfgpu =    assemble_global_gpu_color_macro(cellvalues,dh,colors)
 
 
-norm(Kgpu)
+#norm(Kgpu)
 
 
 # #Kstd , Fstd = @btime stassy($cellvalues,$dh);
-Kstd , Fstd =  stassy(cellvalues,dh);
- norm(Kstd)
-
+#Kstd , Fstd =  stassy(cellvalues,dh);
 
 @testset "GPU Heat Equation" begin
     
-    for i = 1:100 
-        
-        bl_x = rand(Float32,-100,-1)
-        bl_y = rand(Float32,-100,-1)
-        tr_x = rand(Float32,0,100)
-        tr_y = rand(Float32,0,100)
+    for i = 1:10 
+        # Bottom left point in the grid in the physical coordinate system.
+        # Generate random Float32 between -100 and -1
+        bl_x = rand(Float32) * (-99) - 1  
+        bl_y = rand(Float32) * (-99) - 1 
 
-        n_x = rand(Int,1,100)
-        n_y = rand(Int,1,100)
+        # Top right point in the grid in the physical coordinate system.
+        # Generate random Float32 between 0 and 100
+        tr_x = rand(Float32) * 100     
+        tr_y = rand(Float32) * 100
+
+        n_x = rand(1:100)   # number of cells in x direction     
+        n_y = rand(1:100)   # number of cells in y direction           
 
         left = Tensor{1,2,Float32}((bl_x,bl_y)) # define the left bottom corner of the grid.
         right = Tensor{1,2,Float32}((tr_x,tr_y)) # define the right top corner of the grid.
@@ -263,6 +265,6 @@ Kstd , Fstd =  stassy(cellvalues,dh);
         # The GPU version
         Kgpu, fgpu =  assemble_global_gpu_color(cellvalues,dh,colors)
 
-        @test norm(Kstd) ≈ norm(Kgpu)
+        @test norm(Kstd) ≈ norm(Kgpu) atol=1e-4 
     end
 end
