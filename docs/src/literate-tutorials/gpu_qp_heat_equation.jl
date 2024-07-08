@@ -153,18 +153,8 @@ function assemble_global_gpu_color(cellvalues,dh,colors)
     fgpu = CUDA.zeros(ndofs(dh))
     assembler = start_assemble(Kgpu, fgpu)
     n_colors = length(colors)
-    # set up kernel adaption 
-    # FIXME: The following three lines are necessary to circumvent getting rubbish values.
-    # one call will make dofs[i] give 6 instead of 4. (ref: see `gpu_assembler.jl`)
-    # second call will fix the first issue but will give rubbish values for node_ids[i] (ref: see `gpu_grid.jl`)
-    # third call will fix everything.
+    # set up kernel adaption & launch the kernel
     dh_gpu = Adapt.adapt_structure(CuArray, dh)
-    #dh_gpu = Adapt.adapt_structure(CUDA.KernelAdaptor(), dh)
-    #dh_gpu = Adapt.adapt_structure(CUDA.KernelAdaptor(), dh)
-    # Note: The previous three lines are necessary to circumvent getting rubbish values.
-    # Sofar, I have not been able to figure out why this is the case.
-    # discorse ref: https://discourse.julialang.org/t/rubbish-values-from-gpu-kernel/116632
-
     assembler_gpu = Adapt.adapt_structure(CUDA.KernelAdaptor(), assembler)
     cellvalues_gpu = Adapt.adapt_structure(CuArray, cellvalues)
     for i in 1:n_colors
