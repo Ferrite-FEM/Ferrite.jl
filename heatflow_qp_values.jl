@@ -143,12 +143,12 @@ using Test
     for (k, K, f) in (("qpo", K_qp_o, f_qp_o), ("qpi", K_qp_i, f_qp_i), ("so", Ks_o, fs_o), ("si", Ks_i, fs_i))
         @testset "$k" begin
           @test K ≈ Kstd
-          @test f ≈ fstd    
+          @test f ≈ fstd
         end
     end
 end
 
-# Benchmarking 
+# Benchmarking
 using BenchmarkTools
 if n ≤ 100
     print("Standard: ")
@@ -175,4 +175,3 @@ else
     @time qp_inside(buffer, cvs_i, dh)
 end
 nothing
-

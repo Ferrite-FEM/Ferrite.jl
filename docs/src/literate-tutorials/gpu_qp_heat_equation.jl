@@ -11,7 +11,7 @@ left = Tensor{1,2,Float32}((0,-0)) # define the left bottom corner of the grid.
 right = Tensor{1,2,Float32}((3.0,4.0)) # define the right top corner of the grid.
 
 
-grid = generate_grid(Quadrilateral, (3, 4),left,right) 
+grid = generate_grid(Quadrilateral, (3, 4),left,right)
 
 
 colors = create_coloring(grid) .|> (x -> Int32.(x)) # convert to Int32 to reduce number of registers
@@ -19,7 +19,7 @@ colors = create_coloring(grid) .|> (x -> Int32.(x)) # convert to Int32 to reduce
 
 ip = Lagrange{RefQuadrilateral, 1}() # define the interpolation function (i.e. Bilinear lagrange)
 
-qr = QuadratureRule{RefQuadrilateral}(Float32,2) 
+qr = QuadratureRule{RefQuadrilateral}(Float32,2)
 
 
 cellvalues = CellValues(Float32,qr, ip)
@@ -65,7 +65,7 @@ end
 
 function create_buffers(cellvalues, dh)
     f = zeros(ndofs(dh))
-    K = allocate_matrix(dh) 
+    K = allocate_matrix(dh)
     assembler = start_assemble(K, f)
     ## Local quantities
     n_basefuncs = getnbasefunctions(cellvalues)
@@ -100,11 +100,11 @@ end
 
 
 #=NVTX.@annotate=# function assemble_element_gpu!(assembler,cv,dh,n_cells_colored, eles_colored)
-    tx = threadIdx().x 
+    tx = threadIdx().x
     bx = blockIdx().x
     bd = blockDim().x
     e_color = tx + (bx-Int32(1))*bd # element number per color
-   
+
     e_color ≤ n_cells_colored || return nothing # e here is the current element index.
     n_basefuncs = getnbasefunctions(cv)
     e = eles_colored[e_color]
@@ -132,7 +132,7 @@ end
             end
         end
     end
-   
+
     ## Assemble Ke into Kgpu ##
     assemble!(assembler, celldofs(dh,e),SMatrix(ke),SVector(fe)) # when passin mutable objects, throws and error
 
@@ -146,7 +146,7 @@ Adapt.@adapt_structure Ferrite.GPUDofHandler
 Adapt.@adapt_structure Ferrite.GPUAssemblerSparsityPattern
 
 #=NVTX.@annotate=# function assemble_global_gpu_color(cellvalues,dh,colors)
-    K = allocate_matrix(SparseMatrixCSC{Float32, Int32},dh) 
+    K = allocate_matrix(SparseMatrixCSC{Float32, Int32},dh)
     Kgpu = CUSPARSE.CuSparseMatrixCSC(K)
     fgpu = CUDA.zeros(ndofs(dh))
     assembler = start_assemble(Kgpu, fgpu)
@@ -169,7 +169,7 @@ end
 
 # an alternative way to call the kernel using a macro
 function assemble_global_gpu_color_macro(cellvalues,dh,colors)
-    K = allocate_matrix(SparseMatrixCSC{Float32, Int32},dh) 
+    K = allocate_matrix(SparseMatrixCSC{Float32, Int32},dh)
     Kgpu = CUSPARSE.CuSparseMatrixCSC(K)
     fgpu = CUDA.zeros(ndofs(dh))
     assembler = start_assemble(Kgpu, fgpu)
@@ -188,7 +188,7 @@ stassy(cv,dh) = assemble_global!(cv,dh,Val(false))
 
 
 
-# qpassy(cv,dh) = assemble_global!(cv,dh,Val(true)) 
+# qpassy(cv,dh) = assemble_global!(cv,dh,Val(true))
 
 
 Kgpu, fgpu =  assemble_global_gpu_color(cellvalues,dh,colors)
@@ -196,7 +196,7 @@ Kgpu, fgpu =  assemble_global_gpu_color(cellvalues,dh,colors)
 # to benchmark the code using nsight compute use the following command: ncu --mode=launch julia
 # Open nsight compute and attach the profiler to the julia instance
 # ref: https://cuda.juliagpu.org/v2.2/development/profiling/#NVIDIA-Nsight-Compute
-# to benchmark using nsight system use the following command: # nsys profile --trace=nvtx julia rmse_kernel_v1.jl 
+# to benchmark using nsight system use the following command: # nsys profile --trace=nvtx julia rmse_kernel_v1.jl
 
 
 
@@ -211,26 +211,26 @@ Kstd , Fstd =  stassy(cellvalues,dh);
 norm(Kstd)
 
 @testset "GPU Heat Equation" begin
-    
-    for i = 1:10 
+
+    for i = 1:10
         # Bottom left point in the grid in the physical coordinate system.
         # Generate random Float32 between -100 and -1
-        bl_x = rand(Float32) * (-99) - 1  
-        bl_y = rand(Float32) * (-99) - 1 
+        bl_x = rand(Float32) * (-99) - 1
+        bl_y = rand(Float32) * (-99) - 1
 
         # Top right point in the grid in the physical coordinate system.
         # Generate random Float32 between 0 and 100
-        tr_x = rand(Float32) * 100     
+        tr_x = rand(Float32) * 100
         tr_y = rand(Float32) * 100
 
-        n_x = rand(1:100)   # number of cells in x direction     
-        n_y = rand(1:100)   # number of cells in y direction           
+        n_x = rand(1:100)   # number of cells in x direction
+        n_y = rand(1:100)   # number of cells in y direction
 
         left = Tensor{1,2,Float32}((bl_x,bl_y)) # define the left bottom corner of the grid.
         right = Tensor{1,2,Float32}((tr_x,tr_y)) # define the right top corner of the grid.
 
 
-        grid = generate_grid(Quadrilateral, (n_x, n_y),left,right) 
+        grid = generate_grid(Quadrilateral, (n_x, n_y),left,right)
 
 
         colors = create_coloring(grid) .|> (x -> Int32.(x)) # convert to Int32 to reduce number of registers
@@ -239,7 +239,7 @@ norm(Kstd)
         ip = Lagrange{RefQuadrilateral, 1}() # define the interpolation function (i.e. Bilinear lagrange)
 
 
-        qr = QuadratureRule{RefQuadrilateral,Float32}(2) 
+        qr = QuadratureRule{RefQuadrilateral,Float32}(2)
 
 
         cellvalues = CellValues(Float32,qr, ip)
@@ -258,6 +258,6 @@ norm(Kstd)
         # The GPU version
         Kgpu, fgpu =  assemble_global_gpu_color(cellvalues,dh,colors)
 
-        @test norm(Kstd) ≈ norm(Kgpu) atol=1e-4 
+        @test norm(Kstd) ≈ norm(Kgpu) atol=1e-4
     end
 end

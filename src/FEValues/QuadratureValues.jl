@@ -13,7 +13,7 @@ end
 
 function Base.iterate(iterator::QuadratureValuesIterator{<:Any, Nothing}, q_point=1)
     checkbounds(Bool, 1:getnquadpoints(iterator.v), q_point) || return nothing
-    qp_v = @inbounds quadrature_point_values(iterator.v, q_point) 
+    qp_v = @inbounds quadrature_point_values(iterator.v, q_point)
     return (qp_v, q_point+1)
 end
 
@@ -99,7 +99,7 @@ geometric_interpolation(qv::QuadratureValues) = geometric_interpolation(qv.v)
 
 getdetJdV(qv::QuadratureValues) = @inbounds getdetJdV(qv.v, qv.q_point)
 
-# Accessors for function values 
+# Accessors for function values
 getnbasefunctions(qv::QuadratureValues) = getnbasefunctions(qv.v)
 function_interpolation(qv::QuadratureValues) = function_interpolation(qv.v)
 function_difforder(qv::QuadratureValues) = function_difforder(qv.v)
@@ -112,7 +112,7 @@ shape_gradient_type(qv::QuadratureValues) = shape_gradient_type(qv.v)
 
 
 
-#= Proposed syntax, for heatflow in general 
+#= Proposed syntax, for heatflow in general
 function assemble_element!(Ke::Matrix, fe::Vector, cellvalues)
     n_basefuncs = getnbasefunctions(cellvalues)
     for qv in Ferrite.QuadratureValuesIterator(cellvalues)
@@ -130,13 +130,13 @@ function assemble_element!(Ke::Matrix, fe::Vector, cellvalues)
     return Ke, fe
 end
 
-Where the default for a QuadratureValuesIterator would be to return a 
-`QuadratureValues` as above, but custom `AbstractValues` can be created where 
-for example the element type would be a static QuadPointValue type which doesn't 
-use heap allocated buffers, e.g. by only saving the cell and coordinates during reinit, 
-and then calculating all values for each element in the iterator. 
+Where the default for a QuadratureValuesIterator would be to return a
+`QuadratureValues` as above, but custom `AbstractValues` can be created where
+for example the element type would be a static QuadPointValue type which doesn't
+use heap allocated buffers, e.g. by only saving the cell and coordinates during reinit,
+and then calculating all values for each element in the iterator.
 
-References: 
+References:
 https://github.com/termi-official/Thunderbolt.jl/pull/53/files#diff-2b486be5a947c02ef2a38ff3f82af3141193af0b6f01ed9d5129b914ed1d84f6
 https://github.com/Ferrite-FEM/Ferrite.jl/compare/master...kam/StaticValues2
 =#

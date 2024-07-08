@@ -11,7 +11,7 @@ end
 
 getdetJdV(qv::StaticQuadratureValues) = qv.detJdV
 
-# Accessors for function values 
+# Accessors for function values
 getnbasefunctions(qv::StaticQuadratureValues) = length(qv.N)
 # function_interpolation(qv::StaticQuadratureValues) = function_interpolation(qv.v) # Not included
 shape_value_type(::StaticQuadratureValues{<:Any, N_t}) where N_t = N_t
@@ -25,7 +25,7 @@ shape_gradient_type(::StaticQuadratureValues{<:Any, <:Any, dNdx_t}) where dNdx_t
 @propagate_inbounds geometric_value(qv::StaticQuadratureValues, i::Int) = qv.M[i]
 
 # StaticInterpolationValues: interpolation and precalculated values for all quadrature points
-# Can be both for function and geometric shape functions. 
+# Can be both for function and geometric shape functions.
 # DiffOrder parameter?
 # TODO: Could perhaps denote this just InterpolationValues and replace GeometryMapping
 # Just need to make Nξ::AbstractMatrix instead as in GeometryMapping to make it equivalent (except fieldnames)
@@ -52,7 +52,7 @@ end
 
 getnbasefunctions(siv::StaticInterpolationValues) = getnbasefunctions(siv.ip)
 
-# Dispatch on DiffOrder parameter? 
+# Dispatch on DiffOrder parameter?
 # Reuse functions for GeometryMapping - same signature but need access functions
 # Or merge GeometryMapping and StaticInterpolationValues => InterpolationValues
 @propagate_inbounds @inline function calculate_mapping(ip_values::StaticInterpolationValues{<:Any, N}, q_point, x) where N
@@ -81,7 +81,7 @@ struct StaticCellValues{FV, GM, Nqp, T}
     #x::Tx  # AbstractVector{<:Vec} or Nothing
     weights::NTuple{Nqp, T}
 end
-function StaticCellValues(cv::CellValues) 
+function StaticCellValues(cv::CellValues)
     fv = StaticInterpolationValues(cv.fun_values)
     gm = StaticInterpolationValues(cv.geo_mapping)
     sdim = sdim_from_gradtype(shape_gradient_type(cv))
@@ -155,13 +155,11 @@ end
     return detJdV
 end
 
-@inline function shape_gradient(qv::StaticQuadratureView, i::Int32) 
+@inline function shape_gradient(qv::StaticQuadratureView, i::Int32)
     @inbounds begin
         Jinv = calculate_Jinv(getjacobian(qv.mapping))
         #Nx = qv.cv.fv.Nξ[i, q_point]
         dNdx =  dothelper(qv.cv.fv.dNdξ[i, qv.q_point], Jinv)
         return  dNdx
     end
-end 
-
-
+end

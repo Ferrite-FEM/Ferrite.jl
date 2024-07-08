@@ -9,7 +9,7 @@ generate_grid
 
 # Line
 function generate_grid(::Type{Line}, nel::NTuple{1,Int}, left::Vec{1,T}=Vec{1}((-1.0,)), right::Vec{1,T}=Vec{1}((1.0,))) where {T}
-    
+
     nel_x = nel[1]
     n_nodes = nel_x + 1
 
@@ -93,7 +93,7 @@ function generate_grid(C::Type{<:AbstractCell{<:AbstractRefShape{2}}}, nel::NTup
 end
 
 function generate_grid(C::Type{<:AbstractCell{<:AbstractRefShape{2}}}, nel::NTuple{2,Int}, left::Vec{2,T}=Vec{2}((-1.0,-1.0)), right::Vec{2,T}=Vec{2}((1.0,1.0))) where {T}
-    
+
     LL = left
     UR = right
     LR = Vec{2}((UR[1], LL[2]))

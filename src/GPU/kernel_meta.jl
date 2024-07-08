@@ -6,7 +6,7 @@ macro run_gpu(fun_expr, assembler, cellvalues, dh, colors)
     local esc_dh = esc(dh)
     local esc_colors = esc(colors)
 
-    :(begin 
+    :(begin
         local n_colors = length($esc_colors)
         for i in 1:n_colors
             local assembler_gpu = Adapt.adapt_structure(CUDA.KernelAdaptor(), $esc_assembler)
