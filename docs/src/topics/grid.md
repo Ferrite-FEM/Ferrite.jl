@@ -114,65 +114,6 @@ The unique representation of an entity is given by the sorted version of this tu
 While we could use this information to construct a facet set, Ferrite can construct this
 set by filtering based on the coordinates, using [`addfacetset!`](@ref).
 
-Now to a full example. Let us reconstruct the local facets of a grid boundary with the described machinery to see how everything
-fits together:
-```julia
-julia> function recompute_facetset_on_boundary(cells, global_facets)
-           # Facets in 2D are edges and have two vertices
-           d = Dict{NTuple{2, Int}, FacetIndex}()
-           for (c, cell) in enumerate(cells) # c is global cell number
-               # Grab all local facets
-               local_facets = Ferrite.reference_facets(cell)
-               for (f, facet) in enumerate(local_facets) # f is local facet number
-                   # Translate into global nodes
-                   global_facet = ntuple(i-> cell.nodes[facet[i]], length(facet))
-                   d[global_facet] = FacetIndex(c, f)
-               end
-           end
-
-           facets = Vector{FacetIndex}()
-           for facet in global_facets
-               # lookup the element, local facet combination for this facet
-               push!(facets, d[facet])
-           end
-
-           return facets
-       end
-
-julia> recompute_facetset_on_boundary(cells, facets)
-Vector{FacetIndex} with 2 elements:
-  FacetIndex((2, 2))
-  FacetIndex((4, 2))
-```
-
-Note that this example can be simplified by directly using `Ferrite.facets`:
-
-```julia
-julia> function recompute_facetset_on_boundary_alternative(cells, global_facets)
-           # Facets in 2D are edges and have two vertices
-           d = Dict{NTuple{2, Int}, FacetIndex}()
-           for (c, cell) in enumerate(cells) # c is global cell number
-               # Grab all local facets
-               for (f, global_facet) in enumerate(Ferrite.facets(cell)) # f is local facet number
-                   d[global_facet] = FacetIndex(c, f)
-               end
-           end
-
-           facets = Vector{FacetIndex}()
-           for facet in global_facets
-               # lookup the element, local facet combination for this facet
-               push!(facets, d[facet])
-           end
-
-           return facets
-       end
-
-julia> recompute_facetset_on_boundary_alternative(cells, facets)
-Vector{FacetIndex} with 2 elements:
-  FacetIndex((2, 2))
-  FacetIndex((4, 2))
-```
-
 ## AbstractGrid
 
 It can be very useful to use a grid type for a certain special case, e.g. mixed cell types, adaptivity, IGA, etc.
