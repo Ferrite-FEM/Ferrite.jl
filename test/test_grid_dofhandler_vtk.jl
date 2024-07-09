@@ -306,13 +306,13 @@ end
     @test getneighborhood(linetopo, linegrid, VertexIndex(3,1)) == [VertexIndex(2,2)]
     @test getneighborhood(linetopo, linegrid, FacetIndex(3,1)) == getneighborhood(linetopo, linegrid, VertexIndex(3,1))
 
-    linefaceskeleton = Ferrite.vertexskeleton(linetopo, linegrid)
+    linefaceskeleton = Ferrite.facetskeleton(linetopo, linegrid)
     quadlinegrid = generate_grid(QuadraticLine,(3,))
     quadlinetopo = ExclusiveTopology(quadlinegrid)
     quadlinefaceskeleton = Ferrite.facetskeleton(quadlinetopo, quadlinegrid)
     # Test faceskeleton
     @test Set(linefaceskeleton) == Set(quadlinefaceskeleton) == Set([
-        VertexIndex(1,1), VertexIndex(1,2), VertexIndex(2,2),VertexIndex(3,2),
+        FacetIndex(1,1), FacetIndex(1,2), FacetIndex(2,2),FacetIndex(3,2),
     ])
 
 #                           (11)
@@ -326,7 +326,7 @@ end
 #                            (2)
     quadgrid = generate_grid(Quadrilateral,(2,3))
     topology = ExclusiveTopology(quadgrid)
-    faceskeleton = Ferrite.edgeskeleton(topology, quadgrid)
+    faceskeleton = Ferrite.facetskeleton(topology, quadgrid)
     #test vertex neighbors maps cellid and local vertex id to neighbor id and neighbor local vertex id
     @test topology.vertex_vertex_neighbor[1,3] == [VertexIndex(4,1)]
     @test topology.vertex_vertex_neighbor[2,4] == [VertexIndex(3,2)]
@@ -365,15 +365,15 @@ end
 
     quadquadgrid = generate_grid(QuadraticQuadrilateral,(2,3))
     quadtopology = ExclusiveTopology(quadquadgrid)
-    quadfaceskeleton = Ferrite.edgeskeleton(quadtopology, quadquadgrid)
+    quadfaceskeleton = Ferrite.facetskeleton(quadtopology, quadquadgrid)
     # Test faceskeleton
     @test Set(faceskeleton) == Set(quadfaceskeleton) == Set([
-        EdgeIndex(1,1), EdgeIndex(1,2), EdgeIndex(1,3), EdgeIndex(1,4),
-        EdgeIndex(2,1), EdgeIndex(2,2), EdgeIndex(2,3),
-                        EdgeIndex(3,2), EdgeIndex(3,3), EdgeIndex(3,4),
-                        EdgeIndex(4,2), EdgeIndex(4,3),
-                        EdgeIndex(5,2), EdgeIndex(5,3), EdgeIndex(5,4),
-                        EdgeIndex(6,2), EdgeIndex(6,3),
+        FacetIndex(1,1), FacetIndex(1,2), FacetIndex(1,3), FacetIndex(1,4),
+        FacetIndex(2,1), FacetIndex(2,2), FacetIndex(2,3),
+                        FacetIndex(3,2), FacetIndex(3,3), FacetIndex(3,4),
+                        FacetIndex(4,2), FacetIndex(4,3),
+                        FacetIndex(5,2), FacetIndex(5,3), FacetIndex(5,4),
+                        FacetIndex(6,2), FacetIndex(6,3),
     ])
 
 #                         (8)
@@ -418,13 +418,13 @@ end
     @test all(stopology.face_face_neighbor .== topology.face_face_neighbor)
     @test all(stopology.vertex_vertex_neighbor .== topology.vertex_vertex_neighbor)
     # Test faceskeleton
-    faceskeleton = Ferrite.faceskeleton(topology, hexgrid)
-    sfaceskeleton = Ferrite.faceskeleton(stopology, serendipitygrid)
+    faceskeleton = Ferrite.facetskeleton(topology, hexgrid)
+    sfaceskeleton = Ferrite.facetskeleton(stopology, serendipitygrid)
     @test Set(faceskeleton) == Set(sfaceskeleton) == Set([
-        FaceIndex(1,1), FaceIndex(1,2), FaceIndex(1,3), FaceIndex(1,4), FaceIndex(1,5), FaceIndex(1,6),
-        FaceIndex(2,1), FaceIndex(2,2), FaceIndex(2,3), FaceIndex(2,4),                 FaceIndex(2,6),
-        FaceIndex(3,1),                 FaceIndex(3,3), FaceIndex(3,4), FaceIndex(3,5), FaceIndex(3,6),
-        FaceIndex(4,1),                 FaceIndex(4,3), FaceIndex(4,4),                 FaceIndex(4,6),
+        FacetIndex(1,1), FacetIndex(1,2), FacetIndex(1,3), FacetIndex(1,4), FacetIndex(1,5), FacetIndex(1,6),
+        FacetIndex(2,1), FacetIndex(2,2), FacetIndex(2,3), FacetIndex(2,4),                 FacetIndex(2,6),
+        FacetIndex(3,1),                 FacetIndex(3,3), FacetIndex(3,4), FacetIndex(3,5), FacetIndex(3,6),
+        FacetIndex(4,1),                 FacetIndex(4,3), FacetIndex(4,4),                 FacetIndex(4,6),
     ])
 
 #                   +-----+-----+
@@ -452,29 +452,29 @@ end
     @test all(quadtopology.face_face_neighbor .== topology.face_face_neighbor)
     @test all(quadtopology.vertex_vertex_neighbor .== topology.vertex_vertex_neighbor)
     # Test faceskeleton
-    trifaceskeleton = Ferrite.edgeskeleton(topology, trigrid)
-    quadtrifaceskeleton = Ferrite.edgeskeleton(quadtopology, quadtrigrid)
+    trifaceskeleton = Ferrite.facetskeleton(topology, trigrid)
+    quadtrifaceskeleton = Ferrite.facetskeleton(quadtopology, quadtrigrid)
     @test Set(trifaceskeleton) == Set(quadtrifaceskeleton) == Set([
-        EdgeIndex(1,1), EdgeIndex(1,2), EdgeIndex(1,3),
-        EdgeIndex(2,1), EdgeIndex(2,2),
-        EdgeIndex(3,1), EdgeIndex(3,2),
-        EdgeIndex(4,1), EdgeIndex(4,2),
-                        EdgeIndex(5,2), EdgeIndex(5,3),
-        EdgeIndex(6,1), EdgeIndex(6,2),
-                        EdgeIndex(7,2),
-        EdgeIndex(8,1), EdgeIndex(8,2),
+        FacetIndex(1,1), FacetIndex(1,2), FacetIndex(1,3),
+        FacetIndex(2,1), FacetIndex(2,2),
+        FacetIndex(3,1), FacetIndex(3,2),
+        FacetIndex(4,1), FacetIndex(4,2),
+                        FacetIndex(5,2), FacetIndex(5,3),
+        FacetIndex(6,1), FacetIndex(6,2),
+                        FacetIndex(7,2),
+        FacetIndex(8,1), FacetIndex(8,2),
     ])
 # Test tetrahedron faceskeleton
     tetgrid = generate_grid(Tetrahedron, (1,1,1))
     topology = ExclusiveTopology(tetgrid)
-    tetfaceskeleton = Ferrite.faceskeleton(topology, tetgrid)
+    tetfaceskeleton = Ferrite.facetskeleton(topology, tetgrid)
     @test Set(tetfaceskeleton) == Set([
-        FaceIndex(1,1), FaceIndex(1,2), FaceIndex(1,3), FaceIndex(1,4),
-        FaceIndex(2,1), FaceIndex(2,2), FaceIndex(2,3),
-        FaceIndex(3,1), FaceIndex(3,2), FaceIndex(3,3),
-        FaceIndex(4,1), FaceIndex(4,2), FaceIndex(4,3),
-        FaceIndex(5,1),                 FaceIndex(5,3), FaceIndex(5,4),
-        FaceIndex(6,1),                 FaceIndex(6,3),
+        FacetIndex(1,1), FacetIndex(1,2), FacetIndex(1,3), FacetIndex(1,4),
+        FacetIndex(2,1), FacetIndex(2,2), FacetIndex(2,3),
+        FacetIndex(3,1), FacetIndex(3,2), FacetIndex(3,3),
+        FacetIndex(4,1), FacetIndex(4,2), FacetIndex(4,3),
+        FacetIndex(5,1),                 FacetIndex(5,3), FacetIndex(5,4),
+        FacetIndex(6,1),                 FacetIndex(6,3),
     ])
 # test grids with mixed celltypes of same refdim
 # (4)---(5)
@@ -557,19 +557,19 @@ end
     @test Set(Ferrite.toglobal.((quadgrid,), Ferrite.getstencil(stars, quadgrid, VertexIndex(2,1)))) == Set([2,1,6,3])
     @test Set(Ferrite.toglobal.((quadgrid,), Ferrite.getstencil(stars, quadgrid, VertexIndex(5,4)))) == Set([10,6,9,11,14])
 
-    face_skeleton = Ferrite.edgeskeleton(topology, quadgrid)
-    @test Set(face_skeleton) == Set([EdgeIndex(1,1),EdgeIndex(1,2),EdgeIndex(1,3),EdgeIndex(1,4),
-        EdgeIndex(2,1),EdgeIndex(2,2),EdgeIndex(2,3),
-        EdgeIndex(3,1),EdgeIndex(3,2),EdgeIndex(3,3),
-        EdgeIndex(4,2),EdgeIndex(4,3),EdgeIndex(4,4),
-        EdgeIndex(5,2),EdgeIndex(5,3),EdgeIndex(6,2),EdgeIndex(6,3),
-        EdgeIndex(7,2),EdgeIndex(7,3),EdgeIndex(7,4),
-        EdgeIndex(8,2),EdgeIndex(8,3),EdgeIndex(9,2),EdgeIndex(9,3)])
+    face_skeleton = Ferrite.facetskeleton(topology, quadgrid)
+    @test Set(face_skeleton) == Set([FacetIndex(1,1),FacetIndex(1,2),FacetIndex(1,3),FacetIndex(1,4),
+        FacetIndex(2,1),FacetIndex(2,2),FacetIndex(2,3),
+        FacetIndex(3,1),FacetIndex(3,2),FacetIndex(3,3),
+        FacetIndex(4,2),FacetIndex(4,3),FacetIndex(4,4),
+        FacetIndex(5,2),FacetIndex(5,3),FacetIndex(6,2),FacetIndex(6,3),
+        FacetIndex(7,2),FacetIndex(7,3),FacetIndex(7,4),
+        FacetIndex(8,2),FacetIndex(8,3),FacetIndex(9,2),FacetIndex(9,3)])
     @test length(face_skeleton) == 4*3 + 3*4
 
     quadratic_quadgrid = generate_grid(QuadraticQuadrilateral,(3,3))
     quadgrid_topology = ExclusiveTopology(quadratic_quadgrid)
-    #quadface_skeleton = Ferrite.faceskeleton(topology, quadgrid)
+    #quadface_skeleton = Ferrite.facetskeleton(topology, quadgrid)
     #@test quadface_skeleton == face_skeleton
 
     # add more regression for https://github.com/Ferrite-FEM/Ferrite.jl/issues/518

@@ -48,10 +48,7 @@ mutable struct ExclusiveTopology <: AbstractTopology
     edge_edge_neighbor::ArrayOfVectorViews{EdgeIndex, 2}
     # vertex_vertex_neighbor[cellid,local_vertex_id] -> exclusive connected entities to the given vertex
     vertex_vertex_neighbor::ArrayOfVectorViews{VertexIndex, 2}
-
-    face_skeleton::Union{Vector{FaceIndex}, Nothing}
-    edge_skeleton::Union{Vector{EdgeIndex}, Nothing}
-    vertex_skeleton::Union{Vector{VertexIndex}, Nothing}
+    facet_skeleton::Union{Vector{FacetIndex}, Nothing}
 end
 
 function ExclusiveTopology(grid::AbstractGrid{sdim}) where sdim
@@ -96,7 +93,7 @@ function ExclusiveTopology(grid::AbstractGrid{sdim}) where sdim
     face_face_neighbor     = ArrayOfVectorViews(face_face_neighbor_buf)
     edge_edge_neighbor     = ArrayOfVectorViews(edge_edge_neighbor_buf)
     vertex_vertex_neighbor = ArrayOfVectorViews(vertex_vertex_neighbor_buf)
-    return ExclusiveTopology(vertex_to_cell, cell_neighbor, face_face_neighbor, edge_edge_neighbor, vertex_vertex_neighbor, nothing, nothing, nothing)
+    return ExclusiveTopology(vertex_to_cell, cell_neighbor, face_face_neighbor, edge_edge_neighbor, vertex_vertex_neighbor, nothing)
 end
 
 function get_facet_facet_neighborhood(t::ExclusiveTopology, g::AbstractGrid)
@@ -355,85 +352,43 @@ function getstencil(top::ArrayOfVectorViews{VertexIndex, 1}, grid::Grid, vertex_
 end
 
 """
-    _create_skeleton(neighborhood::AbstractMatrix{AbstractVector{BI}}) where BI <: Union{FaceIndex, EdgeIndex, VertexIndex}
+    _create_facet_skeleton(neighborhood::AbstractMatrix{AbstractVector{BI}}) where BI <: Union{FaceIndex, EdgeIndex, VertexIndex}
 
-Materializes the skeleton from the `neighborhood` information by returning a `Vector{BI}` with `BI`s describing
-the unique entities in the grid.
+Materializes the skeleton from the `neighborhood` information by returning a `Vector{FacetIndex}` describing the
+unique facets in the grid.
 
 *Example:* With `BI=EdgeIndex`, and an edge between cells and 1 and 2, with vertices 2 and 5, could be described by either
 `EdgeIndex(1, 2)` or `EdgeIndex(2, 4)`, but only one of these will be in the vector returned by this function.
 """
-function _create_skeleton(neighborhood::ArrayOfVectorViews{BI, 2}) where BI <: Union{FaceIndex, EdgeIndex, VertexIndex}
+function _create_facet_skeleton(neighborhood::ArrayOfVectorViews{BI, 2}) where BI <: Union{FaceIndex, EdgeIndex, VertexIndex}
     i = 1
-    skeleton = Vector{BI}(undef, length(neighborhood) - count(neighbors -> !isempty(neighbors) , values(neighborhood)) ÷ 2)
+    skeleton = Vector{FacetIndex}(undef, length(neighborhood) - count(neighbors -> !isempty(neighbors) , values(neighborhood)) ÷ 2)
     for (idx, entity) in pairs(neighborhood)
         isempty(entity) || entity[][1] > idx[1] || continue
-        skeleton[i] = BI(idx[1], idx[2])
+        skeleton[i] = FacetIndex(idx[1], idx[2])
         i += 1
     end
     return skeleton
 end
 
 """
-    vertexskeleton(top::ExclusiveTopology, ::AbstractGrid) -> Vector{VertexIndex}
-
-Materializes the skeleton from the `neighborhood` information by returning a `Vector{VertexIndex}`
-describing the unique vertices in the grid. (One unique vertex may have multiple `VertexIndex`, but only
-one is included in the returned `Vector`)
-"""
-function vertexskeleton(top::ExclusiveTopology, ::Union{AbstractGrid,Nothing}=nothing)
-    if top.vertex_skeleton === nothing
-        top.vertex_skeleton = _create_skeleton(top.vertex_vertex_neighbor)
-    end
-    return top.vertex_skeleton
-end
-
-"""
-    edgeskeleton(top::ExclusiveTopology, ::AbstractGrid) -> Vector{EdgeIndex}
-
-Materializes the skeleton from the `neighborhood` information by returning a `Vector{EdgeIndex}`
-describing the unique edge in the grid. (One unique edge may have multiple `EdgeIndex`, but only
-one is included in the returned `Vector`)
-"""
-function edgeskeleton(top::ExclusiveTopology, ::Union{AbstractGrid,Nothing}=nothing)
-    if top.edge_skeleton === nothing
-        top.edge_skeleton = _create_skeleton(top.edge_edge_neighbor)
-    end
-    return top.edge_skeleton
-end
-
-"""
-    faceskeleton(top::ExclusiveTopology, ::AbstractGrid) -> Vector{FaceIndex}
-
-Materializes the skeleton from the `neighborhood` information by returning a `Vector{FaceIndex}`
-describing the unique faces in the grid. (One unique face may have multiple `FaceIndex`, but only
-one is included in the returned `Vector`)
-"""
-function faceskeleton(top::ExclusiveTopology, ::Union{AbstractGrid,Nothing}=nothing)
-    if top.face_skeleton === nothing
-        top.face_skeleton = _create_skeleton(top.face_face_neighbor)
-    end
-    return top.face_skeleton
-end
-
-"""
     facetskeleton(top::ExclusiveTopology, grid::AbstractGrid)
 
-Materializes the skeleton from the `neighborhood` information by returning a `Vector{BI}` where
-`BI <: Union{VertexIndex, EdgeIndex, FaceIndex}`.
-It describes the unique facets in the grid, and allows for dimension-independent code in the case
-that all cells have the same reference dimension. For cells with different reference dimensions,
-[`Ferrite.vertexskeleton`](@ref), [`Ferrite.edgeskeleton`](@ref), or [`Ferrite.faceskeleton`](@ref)
-must be used explicitly.
+Materializes the skeleton from the `neighborhood` information by returning an iterable over the
+unique facets in the grid, described by `FacetIndex`.
 """
 function facetskeleton(top::ExclusiveTopology, grid::AbstractGrid)
-    rdim = get_reference_dimension(grid)
-    return _facetskeleton(top, Val(rdim))
-end
-_facetskeleton(top::ExclusiveTopology, #=rdim=#::Val{1}) = vertexskeleton(top)
-_facetskeleton(top::ExclusiveTopology, #=rdim=#::Val{2}) = edgeskeleton(top)
-_facetskeleton(top::ExclusiveTopology, #=rdim=#::Val{3}) = faceskeleton(top)
-function _facetskeleton(::ExclusiveTopology, #=rdim=#::Val{:mixed})
-    throw(ArgumentError("facetskeleton is only supported for grids containing cells with a common reference dimension.
-    For mixed-dimensionality grid, use `faceskeleton`, `edgeskeleton`, and `vertexskeleton` explicitly"))
+    if top.facet_skeleton === nothing
+        rdim = get_reference_dimension(grid)
+        top.facet_skeleton = if rdim == 1
+            _create_facet_skeleton(top.vertex_vertex_neighbor)
+        elseif rdim == 2
+            _create_facet_skeleton(top.edge_edge_neighbor)
+        elseif rdim == 3
+            _create_facet_skeleton(top.face_face_neighbor)
+        else
+            throw(ArgumentError("facetskeleton not supported for refdim = $rdim"))
+        end
+    end
+    return top.facet_skeleton
 end
