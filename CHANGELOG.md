@@ -451,10 +451,13 @@ more discussion).
 - `Ferrite.getfielddim(::AbstractDofHandler, args...)` has been renamed to `Ferrite.n_components`.
   ([#943][github-943])
 
-- `ExclusiveTopology` now use an internal data structure, `ArrayOfVectorViews`, to store the neighborhood
+- The constructor for `ExclusiveTopology` only accept an `AbstractGrid` as input,
+  removing the alternative of providing a `Vector{<:AbstractCell}`, as knowing the
+  spatial dimension is required for correct code paths.
+  Furthermore, it uses a new internal data structure, `ArrayOfVectorViews`, to store the neighborhood
   information more efficiently The datatype for the neighborhood has thus changed to a view of a vector,
   instead of the now removed `EntityNeighborhood` container. This also applies to `vertex_star_stencils`.
-  ([#974][github-974])
+  ([#974][github-974]).
 
 - `project(::L2Projector, data, qr_rhs)` now expects data to be indexed by the cellid, as opposed to
   the index in the vector of cellids passed to the `L2Projector`. The data may be passed as an
