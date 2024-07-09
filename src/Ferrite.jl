@@ -25,8 +25,12 @@ using Tensors:
 using ForwardDiff:
     ForwardDiff
 
+include("CollectionsOfViews.jl")
+using .CollectionsOfViews:
+    CollectionsOfViews, ArrayOfVectorViews, push_at_index!, ConstructionBuffer
 
 include("exports.jl")
+
 
 """
     AbstractRefShape{refdim}

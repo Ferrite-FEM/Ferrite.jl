@@ -659,8 +659,8 @@ end
             # test inner coupling
             _check_dofs(K, dh, sdh, cell_idx, coupling, coupling_idx, vdim, [cell_idx], false)
             # test cross-element coupling
-            neighborhood = Ferrite.getrefdim(dh.grid.cells[1]) > 1 ? topology.face_face_neighbor : topology.vertex_vertex_neighbor
-            neighbors = neighborhood[cell_idx, :]
+            neighborhood = Ferrite.get_facet_facet_neighborhood(topology, grid)
+            neighbors = [neighborhood[cell_idx, i] for i in 1:size(neighborhood, 2)]
             _check_dofs(K, dh, sdh, cell_idx, interface_coupling, interface_coupling_idx, vdim, [i[1][1] for i in  neighbors[.!isempty.(neighbors)]], true)
         end
     end
