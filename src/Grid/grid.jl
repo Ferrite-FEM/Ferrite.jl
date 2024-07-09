@@ -43,6 +43,7 @@ get_coordinate_eltype(::Node{dim,T}) where {dim,T} = T
 # abstract type AbstractCell{refshape <: AbstractRefShape} end
 
 getrefshape(::AbstractCell{refshape}) where refshape = refshape
+getrefshape(::Type{<:AbstractCell{refshape}}) where refshape = refshape
 
 nvertices(c::AbstractCell) = length(vertices(c))
 nedges(   c::AbstractCell) = length(edges(c))
@@ -163,11 +164,11 @@ reference_facets(::Type{<:AbstractRefShape})
 @inline reference_facets(::AbstractCell{refshape})   where refshape = reference_facets(refshape)
 
 """
-    geometric_interpolation(::AbstractCell)::Interpolation
-    geometric_interpolation(::Type{AbstractCell})::Interpolation
+    geometric_interpolation(::AbstractCell)::ScalarInterpolation
+    geometric_interpolation(::Type{AbstractCell})::ScalarInterpolation
 
 Each `AbstractCell` type has a unique geometric interpolation describing its geometry.
-This function returns that interpolation.
+This function returns that interpolation, which is always a scalar interpolation.
 """
 geometric_interpolation(::T) where T <: AbstractCell = geometric_interpolation(T)
 
@@ -364,7 +365,7 @@ function Grid(cells::Vector{C},
         end
     end
     if boundary_matrix !== nothing
-        error("`boundary_matrix` is not part of the Grid anymore and thus not a supported keyword argument.")
+        throw(DeprecationError("`boundary_matrix` is not part of the Grid anymore and thus not a supported keyword argument."))
     end
     return Grid(
         cells,

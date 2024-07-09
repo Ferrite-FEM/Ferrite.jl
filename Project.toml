@@ -24,7 +24,7 @@ FerriteBlockArrays = "BlockArrays"
 FerriteMetis = "Metis"
 
 [compat]
-BlockArrays = "0.16"
+BlockArrays = "0.16, 1"
 EnumX = "1"
 Metis = "1.3"
 NearestNeighbors = "0.4"
@@ -33,7 +33,7 @@ Preferences = "1"
 Reexport = "1"
 Tensors = "1.14"
 WriteVTK = "1.13"
-julia = "1.6"
+julia = "1.9"
 
 [extras]
 BlockArrays = "8e7c35d0-a365-5155-bbbb-fb81a777f24e"

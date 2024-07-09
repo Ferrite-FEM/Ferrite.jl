@@ -9,14 +9,12 @@ by the associated reference element.
 
 ```@docs
 Ferrite.get_node_ids
+Ferrite.vertices(::Ferrite.AbstractCell)
+Ferrite.reference_edges(::Ferrite.AbstractRefShape)
+Ferrite.edges(::Ferrite.AbstractCell)
+Ferrite.reference_faces(::Ferrite.AbstractRefShape)
+Ferrite.faces(::Ferrite.AbstractCell)
 ```
-
-Please note that if your cell holds a single tuple called `nodes` to carry the node numbers, then
-this method will work automatically. Almost all functions work automatically with the information
-provided by the reference element.
-
-Please note that if you want to implement a custom element which does not have a reference shape,
-then the relevant functions below need to be dispatched.
 
 ### Common utilities and definitions when working with grids internally.
 
@@ -41,9 +39,12 @@ Ferrite.get_coordinate_eltype(::Ferrite.AbstractGrid)
 Ferrite.get_coordinate_eltype(::Node)
 Ferrite.toglobal
 Ferrite.sortface
+Ferrite.sortface_fast
 Ferrite.sortedge
+Ferrite.sortedge_fast
 Ferrite.element_to_facet_transformation
 Ferrite.facet_to_element_transformation
 Ferrite.InterfaceOrientationInfo
 Ferrite.transform_interface_points!
+Ferrite.get_transformation_matrix
 ```

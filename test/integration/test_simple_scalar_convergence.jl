@@ -14,18 +14,26 @@ get_geometry(::Ferrite.Interpolation{RefHexahedron}) = Hexahedron
 get_geometry(::Ferrite.Interpolation{RefTetrahedron}) = Tetrahedron
 get_geometry(::Ferrite.Interpolation{RefPyramid}) = Pyramid
 
-get_quadrature_order(::Lagrange{shape, order}) where {shape, order} = 2*order
-get_quadrature_order(::Serendipity{shape, order}) where {shape, order} = 2*order
-get_quadrature_order(::CrouzeixRaviart{shape, order}) where {shape, order} = 2*order+1
-get_quadrature_order(::BubbleEnrichedLagrange{shape, order}) where {shape, order} = 2*order
+get_quadrature_order(::Lagrange{shape, order}) where {shape, order} = max(2*order-1,2)
+get_quadrature_order(::Lagrange{RefPrism, order}) where order = 2*order # Don't know why
+get_quadrature_order(::Serendipity{shape, order}) where {shape, order} = max(2*order-1,2)
+get_quadrature_order(::CrouzeixRaviart{shape, order}) where {shape, order} = max(2*order-1,2)
+get_quadrature_order(::RannacherTurek{shape, order}) where {shape, order} = max(2*order-1,2)
+get_quadrature_order(::BubbleEnrichedLagrange{shape, order}) where {shape, order} = max(2*order-1,2)
 
 get_num_elements(::Ferrite.Interpolation{shape, 1}) where {shape} = 21
 get_num_elements(::Ferrite.Interpolation{shape, 2}) where {shape} = 7
 get_num_elements(::Ferrite.Interpolation{RefHexahedron, 1}) = 11
+get_num_elements(::Ferrite.RannacherTurek{RefQuadrilateral, 1}) = 15
+get_num_elements(::Ferrite.RannacherTurek{RefHexahedron, 1}) = 13
 get_num_elements(::Ferrite.Interpolation{RefHexahedron, 2}) = 4
 get_num_elements(::Ferrite.Interpolation{shape, 3}) where {shape} = 8
 get_num_elements(::Ferrite.Interpolation{shape, 4}) where {shape} = 5
 get_num_elements(::Ferrite.Interpolation{shape, 5}) where {shape} = 3
+
+get_test_tolerance(ip) = 1e-2
+get_test_tolerance(ip::RannacherTurek) = 4e-2
+get_test_tolerance(ip::CrouzeixRaviart) = 4e-2
 
 analytical_solution(x) = prod(cos, x*π/2)
 analytical_rhs(x) = -Tensors.laplace(analytical_solution,x)
@@ -112,7 +120,7 @@ end
 
 # Assemble and solve
 function solve(dh, ch, cellvalues)
-    K, f = assemble_global(cellvalues, create_sparsity_pattern(dh), dh);
+    K, f = assemble_global(cellvalues, allocate_matrix(dh), dh);
     apply!(K, f, ch)
     u = K \ f;
 end
@@ -140,7 +148,7 @@ end # module ConvergenceTestHelper
 
 # These test only for convergence within margins
 @testset "convergence analysis" begin
-    @testset "$interpolation" for interpolation in (
+    @testset failfast=true "$interpolation" for interpolation in (
         Lagrange{RefTriangle, 3}(),
         Lagrange{RefTriangle, 4}(),
         Lagrange{RefTriangle, 5}(),
@@ -154,7 +162,10 @@ end # module ConvergenceTestHelper
         #
         BubbleEnrichedLagrange{RefTriangle, 1}(),
         #
-        CrouzeixRaviart{RefTriangle, 1}(),
+        CrouzeixRaviart{RefTriangle,1}(),
+        CrouzeixRaviart{RefTetrahedron,1}(),
+        RannacherTurek{RefQuadrilateral,1}(),
+        RannacherTurek{RefHexahedron,1}(),
     )
         # Generate a grid ...
         geometry = ConvergenceTestHelper.get_geometry(interpolation)
@@ -173,7 +184,7 @@ end
 
 # These test also for correct convergence rates
 @testset "convergence rate" begin
-    @testset "$interpolation" for interpolation in (
+    @testset failfast=true  "$interpolation" for interpolation in (
         Lagrange{RefLine, 1}(),
         Lagrange{RefLine, 2}(),
         Lagrange{RefQuadrilateral, 1}(),
@@ -184,6 +195,10 @@ end
         Lagrange{RefHexahedron, 2}(),
         Lagrange{RefTetrahedron, 2}(),
         Lagrange{RefPrism, 2}(),
+        CrouzeixRaviart{RefTriangle,1}(),
+        CrouzeixRaviart{RefTetrahedron,1}(),
+        RannacherTurek{RefQuadrilateral,1}(),
+        RannacherTurek{RefHexahedron,1}(),
     )
         # Generate a grid ...
         geometry = ConvergenceTestHelper.get_geometry(interpolation)

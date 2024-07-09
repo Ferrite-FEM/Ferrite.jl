@@ -167,7 +167,7 @@ close!(dh);
 # However, when generating the sparsity pattern we need to pass the topology and the cross-element coupling matrix when we're using
 # discontinuous interpolations. The cross-element coupling matrix is of size [1,1] in this case as
 # we have only one field and one DofHandler.
-K = create_sparsity_pattern(dh, topology = topology, cross_coupling = trues(1,1));
+K = allocate_matrix(dh, topology = topology, interface_coupling = trues(1,1));
 
 # ### Boundary conditions
 # The Dirichlet boundary conditions are treated
@@ -239,13 +239,13 @@ function assemble_interface!(Ki::Matrix, iv::InterfaceValues, μ::Float64)
         dΓ = getdetJdV(iv, q_point)
         ## Loop over test shape functions
         for i in 1:getnbasefunctions(iv)
-            ## Multiply the jump by the normal, as the definition used in Ferrite doesn't include the normals.
-            δu_jump = shape_value_jump(iv, q_point, i) * normal
+            ## Multiply the jump by the negative normal to get the definition from the theory section.
+            δu_jump = shape_value_jump(iv, q_point, i) * (-normal)
             ∇δu_avg = shape_gradient_average(iv, q_point, i)
             ## Loop over trial shape functions
             for j in 1:getnbasefunctions(iv)
-                ## Multiply the jump by the normal, as the definition used in Ferrite doesn't include the normals.
-                u_jump = shape_value_jump(iv, q_point, j) * normal
+                ## Multiply the jump by the negative normal to get the definition from the theory section.
+                u_jump = shape_value_jump(iv, q_point, j) * (-normal)
                 ∇u_avg = shape_gradient_average(iv, q_point, j)
                 ## Add contribution to Ki
                 Ki[i, j] += -(δu_jump ⋅ ∇u_avg + ∇δu_avg ⋅ u_jump)*dΓ +  μ * (δu_jump ⋅ u_jump) * dΓ

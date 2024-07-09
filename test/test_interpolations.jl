@@ -1,3 +1,5 @@
+using Ferrite: reference_shape_value, reference_shape_gradient
+
 @testset "interpolations" begin
 
 @testset "Value Type $value_type" for value_type in (Float32, Float64)
@@ -38,7 +40,10 @@
                       #
                       BubbleEnrichedLagrange{RefTriangle, 1}(),
                       #
-                      CrouzeixRaviart{RefTriangle, 1}(),
+                      CrouzeixRaviart{RefTriangle,1}(),
+                      CrouzeixRaviart{RefTetrahedron,1}(),
+                      RannacherTurek{RefQuadrilateral,1}(),
+                      RannacherTurek{RefHexahedron,1}(),
     )
         # Test of utility functions
         ref_dim = Ferrite.getrefdim(interpolation)
@@ -72,7 +77,7 @@
         n_basefuncs = getnbasefunctions(interpolation)
         coords = Ferrite.reference_coordinates(interpolation)
         @test length(coords) == n_basefuncs
-        f(x) = [shape_value(interpolation, Tensor{1, ref_dim}(x), i) for i in 1:n_basefuncs]
+        f(x) = [reference_shape_value(interpolation, Tensor{1, ref_dim}(x), i) for i in 1:n_basefuncs]
 
         #TODO prefer this test style after 1.6 is removed from CI
         # @testset let x = sample_random_point(ref_shape) # not compatible with Julia 1.6
@@ -80,13 +85,13 @@
         random_point_testset = @testset "Random point test" begin
             # Check gradient evaluation
             @test vec(ForwardDiff.jacobian(f, Array(x))') ≈
-                reinterpret(value_type, [shape_gradient(interpolation, x, i) for i in 1:n_basefuncs])
+                reinterpret(value_type, [reference_shape_gradient(interpolation, x, i) for i in 1:n_basefuncs])
             # Check partition of unity at random point.
-            @test sum([shape_value(interpolation, x, i) for i in 1:n_basefuncs]) ≈ 1.0
+            @test sum([reference_shape_value(interpolation, x, i) for i in 1:n_basefuncs]) ≈ 1.0
             # Check if the important functions are consistent
-            @test_throws ArgumentError shape_value(interpolation, x, n_basefuncs+1)
+            @test_throws ArgumentError reference_shape_value(interpolation, x, n_basefuncs+1)
             # Idempotency test
-            @test shape_value(interpolation, x, n_basefuncs) == shape_value(interpolation, x, n_basefuncs)
+            @test reference_shape_value(interpolation, x, n_basefuncs) == reference_shape_value(interpolation, x, n_basefuncs)
         end
         # Remove after 1.6 is removed from CI (see above)
         # Show coordinate in case failure (see issue #811)
@@ -118,14 +123,14 @@
 
         # Check for evaluation type correctness of interpolation
         @testset "return type correctness dof $dof" for dof in 1:n_basefuncs
-            @test (@inferred shape_value(interpolation, x, dof)) isa value_type
-            @test (@inferred shape_gradient(interpolation, x, dof)) isa Vec{ref_dim, value_type}
+            @test (@inferred reference_shape_value(interpolation, x, dof)) isa value_type
+            @test (@inferred reference_shape_gradient(interpolation, x, dof)) isa Vec{ref_dim, value_type}
         end
 
         # Check for dirac delta property of interpolation
         @testset "dirac delta property of dof $dof" for dof in 1:n_basefuncs
             for k in 1:n_basefuncs
-                N_dof = shape_value(interpolation, coords[dof], k)
+                N_dof = reference_shape_value(interpolation, coords[dof], k)
                 if k == dof
                     @test N_dof ≈ 1.0
                 else
@@ -196,8 +201,8 @@
         # Check for evaluation type correctness of vectorized interpolation
         v_interpolation_3 = interpolation^ref_dim
         @testset "vectorized case of return type correctness of dof $dof" for dof in 1:n_basefuncs
-            @test @inferred(shape_value(v_interpolation_1, x, dof)) isa Vec{2, value_type}
-            @test @inferred(shape_gradient(v_interpolation_3, x, dof)) isa Tensor{2, ref_dim, value_type}
+            @test @inferred(reference_shape_value(v_interpolation_1, x, dof)) isa Vec{2, value_type}
+            @test @inferred(reference_shape_gradient(v_interpolation_3, x, dof)) isa Tensor{2, ref_dim, value_type}
         end
     end # correctness testset
 
@@ -224,9 +229,9 @@ end
     ξ = rand(Vec{3,Float64})
     for I in 1:getnbasefunctions(ip)
         #Call StaticArray-version
-        H_sa, G_sa, V_sa = Ferrite._shape_hessian_gradient_and_value_static_array(ip, ξ, I)
+        H_sa, G_sa, V_sa = Ferrite._reference_shape_hessian_gradient_and_value_static_array(ip, ξ, I)
         #Call tensor AD version
-        H, G, V = Ferrite.shape_hessian_gradient_and_value(ip, ξ, I)
+        H, G, V = Ferrite.reference_shape_hessian_gradient_and_value(ip, ξ, I)
 
         @test V ≈ V_sa
         @test G ≈ G_sa
@@ -239,12 +244,26 @@ end
     ξ = rand(Vec{2, Float64})
     for ipv_ind in 1:getnbasefunctions(ipv)
         ips_ind, v_ind = fldmod1(ipv_ind, vdim)
-        H, G, V = Ferrite.shape_hessian_gradient_and_value(ipv, ξ, ipv_ind)
-        h, g, v = Ferrite.shape_hessian_gradient_and_value(ips, ξ, ips_ind)
+        H, G, V = Ferrite.reference_shape_hessian_gradient_and_value(ipv, ξ, ipv_ind)
+        h, g, v = Ferrite.reference_shape_hessian_gradient_and_value(ips, ξ, ips_ind)
         @test h ≈ H[v_ind, :, :]
         @test g ≈ G[v_ind, :]
         @test v ≈ V[v_ind]
     end
 end
+
+@testset "Errors for entitydof_indices on VectorizedInterpolations" begin
+    ip = Lagrange{RefQuadrilateral,2}()^2
+    @test_throws ArgumentError Ferrite.vertexdof_indices(ip)
+    @test_throws ArgumentError Ferrite.edgedof_indices(ip)
+    @test_throws ArgumentError Ferrite.facedof_indices(ip)
+    @test_throws ArgumentError Ferrite.facetdof_indices(ip)
+
+    @test_throws ArgumentError Ferrite.edgedof_interior_indices(ip)
+    @test_throws ArgumentError Ferrite.facedof_interior_indices(ip)
+    @test_throws ArgumentError Ferrite.volumedof_interior_indices(ip)
+    @test_throws ArgumentError Ferrite.facetdof_interior_indices(ip)
+end
+
 
 end # testset

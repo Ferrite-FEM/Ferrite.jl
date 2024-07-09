@@ -335,7 +335,7 @@ function test_2_element_heat_eq()
         end
     end
 
-    K = create_sparsity_pattern(dh)
+    K = allocate_matrix(dh)
     f = zeros(ndofs(dh));
     assembler = start_assemble(K, f);
     # Use the same assemble function since it is the same weak form for both cell-types
@@ -461,13 +461,29 @@ function test_evaluate_at_grid_nodes()
     add!(sdh_quad, :s, ip_quad) # scalar field :s only on quad
     close!(dh)
 
-    u = collect(1.:16.)
+    u  = collect(1.:16.)
+    uv = @view u[1:end]
 
+    # :s on thesolution
     s_nodes = evaluate_at_grid_nodes(dh, u, :s)
     @test s_nodes[1:4] ≈ [13., 14., 16., 15.]
     @test all(isnan.(s_nodes[5:6]))
-    v_nodes = evaluate_at_grid_nodes(dh, u, :v)
+    # :s on a view into solution
+    sv_nodes = evaluate_at_grid_nodes(dh, uv, :s)
+    @test sv_nodes[1:4] ≈ [13., 14., 16., 15.]
+    @test all(isnan.(sv_nodes[5:6]))
+    # :v on the solution
+    v_nodes  = evaluate_at_grid_nodes(dh, u, :v)
     @test v_nodes ≈ hcat(   [9., 10., 0.],
+                    [11., 12., 0.],
+                    [1., 2., 0.],
+                    [3., 4., 0.],
+                    [7., 8., 0.],
+                    [5., 6., 0.])
+
+    # :v on a view into solution
+    vv_nodes = evaluate_at_grid_nodes(dh, uv, :v)
+    @test vv_nodes ≈ hcat(   [9., 10., 0.],
                     [11., 12., 0.],
                     [1., 2., 0.],
                     [3., 4., 0.],
@@ -643,6 +659,32 @@ function test_vtk_export()
     rm(filename*".vtu") # clean up
 end
 
+function test_celliterator_on_true_subdomain_smoketest()
+    grid = generate_grid(Hexahedron, (2,2,2))
+
+    dh = DofHandler(grid)
+    sdh = SubDofHandler(dh, [1,2,3])
+    ip = Lagrange{RefHexahedron,1}()
+    add!(sdh, :u, ip)
+    close!(dh)
+
+    # The following statements just check that the iterator
+    # does not crash at least. Regression for #966
+    for cell in CellIterator(sdh)
+    end
+
+    for cell in CellIterator(dh, [1,2,3])
+    end
+
+    for cell in CellIterator(dh)
+        if cellid(cell) <= 3
+            @test length(celldofs(cell)) == getnbasefunctions(ip)
+        else
+            @test length(celldofs(cell)) == 0
+        end
+    end
+end
+
 @testset "DofHandler" begin
     test_1d_bar_beam();
     test_2d_scalar();
@@ -670,4 +712,5 @@ end
     test_celliterator_subdomain()
     test_show()
     test_vtk_export()
+    test_celliterator_on_true_subdomain_smoketest()
 end

@@ -36,13 +36,13 @@ For an exemplary usage of `Gmsh.jl` and `FerriteGmsh.jl`, consider the [Stokes f
 ### FerriteMeshParser
 
 `FerriteMeshParser.jl` converts the mesh in an Abaqus input file (`.inp`) to a `Ferrite.Grid` with its function `get_ferrite_grid`.
-The translations for most of Abaqus' standard 2d and 3d continuum elements to a `Ferrite.Cell` are defined.
+The translations for most of Abaqus' standard 2d and 3d continuum elements to a `Ferrite.AbstractCell` are defined.
 Custom translations can be given as input, which can be used to import other (custom) elements or to override the default translation.
 ```@docs
 FerriteMeshParser.get_ferrite_grid
 ```
 
-If you are missing the translation of an Abaqus element that is equivalent to a `Ferrite.Cell`,
+If you are missing the translation of an Abaqus element that is equivalent to a `Ferrite.AbstractCell`,
 consider to open an [issue](https://github.com/Ferrite-FEM/FerriteMeshParser.jl/issues/new) or a pull request.
 
 ## `Grid` Datastructure
@@ -62,23 +62,25 @@ Consider the following 2D mesh:
 The cells of the grid can be described in the following way
 
 ```julia
-julia> cells = [
-              Quadrilateral((1,2,5,4)),
-              Quadrilateral((2,3,6,5)),
-              Quadrilateral((4,5,8,7)),
-              Quadrilateral((5,6,9,8))
-       ]
+cells = [Quadrilateral((1, 2, 5, 4)),
+         Quadrilateral((2, 3, 6, 5)),
+         Quadrilateral((4, 5, 8, 7)),
+         Quadrilateral((5, 6, 9, 8))]
 ```
 
-where each Quadrilateral, which is a subtype of `AbstractCell` saves in the field `nodes` the tuple of node IDs.
-Additionally, the data structure `Grid` can hold node-, facet- and cellsets.
-All of these three sets are defined by a dictionary that maps a string key to a `Set`.
-For the special case of node- and cellsets the dictionary's value is of type `Set{Int}`, i.e. a keyword is mapped to a node or cell ID, respectively.
+where each `Quadrilateral <: AbstractCell` is defined by the tuple of node IDs.
+Additionally, the data structure `Grid` contains node-, cell-, facet-, and vertexsets.
+Each of these sets is defined by a `Dict{String, OrderedSet}`.
 
-Facesets are a more elaborate construction. They map a `String` key to a `Set{FaceIndex}`, where each `FaceIndex` consists of `(global_cell_id, local_facet_id)`.
+Node- and cellsets are represented by an `OrderedSet{Int}`, giving a set of node or cell ID, respectively.
+
+Facet- and vertexsets are represented by `OrderedSet{<:BoundaryIndex}`, where `BoundaryIndex` is a `FacetIndex` or `VertexIndex` respectively.
+`FacetIndex` and `VertexIndex` wraps a `Tuple`, `(global_cell_id, local_facet_id)` and `(global_cell_id, local_vertex_id)`, where the local IDs
+are defined according to the reference shapes, see [Reference shapes](@ref).
+
+Facetsets are a more elaborate construction. They map a `String` key to a `Set{FaceIndex}`, where each `FaceIndex` consists of `(global_cell_id, local_facet_id)`.
 In order to understand the `local_facet_id` properly, one has to consider the reference space of the element, which typically is spanned by a product of the interval ``[-1, 1]`` and in this particular example ``[-1, 1] \times [-1, 1]``.
 In this space a local numbering of nodes and facets exists, i.e.
-
 
 ![local element](./assets/local_element.svg)
 
@@ -92,16 +94,27 @@ Ferrite.reference_facets(RefQuadrilateral) = ((1,2), (2,3), (3,4), (4,1))
 Other facet definitions can be found in the src file `src/Grid/grid.jl` in the corresponding dispatches for [`reference_facets`](@ref Ferrite.reference_facets). Furthermorem you can query specific information about subentities via [`reference_vertices`](@ref Ferrite.reference_vertices), [`reference_edges`](@ref Ferrite.reference_edges) and [`reference_faces`](@ref Ferrite.reference_faces).
 
 
-The highlighted facet, i.e. the two lines from node ID 3 to 6 and from 6 to 9, on the right hand side of our test mesh can now be described as
+The highlighted facets, i.e. the two edges from node ID 3 to 6 and from 6 to 9, on the right hand side of our test mesh can now be described as
 
 ```julia
-julia> facets = [
+julia> boundary_facets = [
            (3,6),
            (6,9)
        ]
 ```
+i.e. by using the node IDs of the reference shape vertices.
 
-Now to a full example. Let us reconstruct the local facets of a grid boundary with the decsribed machinery to see how everything
+The first of these can be found as the 2nd facet of the 2nd cell.
+```@repl
+using Ferrite #hide
+Ferrite.facets(Quadrilateral((2, 3, 6, 5)))
+```
+
+The unique representation of an entity is given by the sorted version of this tuple.
+While we could use this information to construct a facet set, Ferrite can construct this
+set by filtering based on the coordinates, using [`addfacetset!`](@ref).
+
+Now to a full example. Let us reconstruct the local facets of a grid boundary with the described machinery to see how everything
 fits together:
 ```julia
 julia> function recompute_facetset_on_boundary(cells, global_facets)
@@ -209,6 +222,7 @@ In order to use boundaries, e.g. for Dirichlet constraints in the ConstraintHand
 
 ## Topology
 
-Ferrite.jl's `Grid` type offers experimental features w.r.t. topology information. The functions [`Ferrite.getneighborhood`](@ref) and [`Ferrite.facetskeleton`](@ref)
-are the interface to obtain topological information. The [`Ferrite.getneighborhood`](@ref) can construct lists of directly connected entities based on a given entity (`CellIndex,FaceIndex,EdgeIndex,VertexIndex`).
-The [`Ferrite.facetskeleton`](@ref) function can be used to evaluate integrals over material interfaces or computing element interface values such as jumps.
+Ferrite.jl's `Grid` type offers experimental features w.r.t. topology information. The functions [`getneighborhood`](@ref) and [`facetskeleton`](@ref)
+are the interface to obtain topological information. The [`getneighborhood`](@ref) can construct lists of directly connected entities based on a given entity
+(`CellIndex`, `FacetIndex`, `FaceIndex`, `EdgeIndex`, or `VertexIndex`).
+The [`facetskeleton`](@ref) function can be used to evaluate integrals over material interfaces or computing element interface values such as jumps.

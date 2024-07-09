@@ -200,11 +200,11 @@ function cache_neighborhood(dh, topology)
         nbg = zeros(Int,_nfacets)
         i = cellid(element)
         for j in 1:_nfacets
-            nbg_cellid = getcells(getneighborhood(topology, dh.grid, FacetIndex(i,j)))
+            nbg_cellid = getneighborhood(topology, dh.grid, FacetIndex(i,j))
             if(!isempty(nbg_cellid))
-                nbg[j] = first(nbg_cellid) # assuming only one face neighbor per cell
+                nbg[j] = first(nbg_cellid)[1] # assuming only one face neighbor per cell
             else # boundary face
-                nbg[j] = first(getcells(getneighborhood(topology, dh.grid, FacetIndex(i,opp[j]))))
+                nbg[j] = first(getneighborhood(topology, dh.grid, FacetIndex(i,opp[j])))[1]
             end
         end
 
@@ -428,7 +428,7 @@ function topopt(ra,ρ,n,filename; output=:false)
     χ = zeros(getncells(dh.grid))
 
     r = zeros(n_dofs) # residual
-    K = create_sparsity_pattern(dh) # stiffness matrix
+    K = allocate_matrix(dh) # stiffness matrix
 
     i_max = 300 ## maximum number of iteration steps
     tol = 1e-4

@@ -26,13 +26,32 @@ jobs:
       - name: Install dependencies
         shell: julia {0}
         run: |
+          # Add ExplicitImports.jl and packages that Ferrite has extensions for
           using Pkg
-          Pkg.add("ExplicitImports")
+          Pkg.add([
+            PackageSpec(name = "ExplicitImports", version = "1.6"),
+            PackageSpec(name = "Metis"),
+            PackageSpec(name = "BlockArrays"),
+          ])
       - name: ExplicitImports.jl code checks
         shell: julia --project {0}
         run: |
-          using Ferrite, ExplicitImports
+          using Ferrite, ExplicitImports, Metis, BlockArrays
+          # Check Ferrite
           allow_unanalyzable = (ApplyStrategy, ColoringAlgorithm) # baremodules
           check_no_implicit_imports(Ferrite; allow_unanalyzable)
           check_no_stale_explicit_imports(Ferrite; allow_unanalyzable)
           check_all_qualified_accesses_via_owners(Ferrite)
+          check_no_self_qualified_accesses(Ferrite)
+          # Check extension modules
+          for ext in (:FerriteBlockArrays, :FerriteMetis)
+              extmod = Base.get_extension(Ferrite, ext)
+              if extmod !== nothing
+                  check_no_implicit_imports(extmod)
+                  check_no_stale_explicit_imports(extmod)
+                  check_all_qualified_accesses_via_owners(extmod)
+                  check_no_self_qualified_accesses(extmod)
+              else
+                  @warn "$(ext) extensions not available."
+              end
+          end

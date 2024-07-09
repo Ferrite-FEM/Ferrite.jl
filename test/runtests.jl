@@ -7,6 +7,7 @@ import SHA
 using Random
 using LinearAlgebra
 using SparseArrays
+using StaticArrays
 using OrderedCollections
 
 const HAS_EXTENSIONS = isdefined(Base, :get_extension)
@@ -34,6 +35,7 @@ end
 include("test_utils.jl")
 
 # Unit tests
+include("test_collectionsofviews.jl")
 include("test_interpolations.jl")
 include("test_cellvalues.jl")
 include("test_facevalues.jl")
@@ -41,10 +43,12 @@ include("test_interfacevalues.jl")
 include("test_quadrules.jl")
 include("test_assemble.jl")
 include("test_dofs.jl")
+include("test_sparsity_patterns.jl")
 include("test_constraints.jl")
 include("test_grid_dofhandler_vtk.jl")
 include("test_vtk_export.jl")
 include("test_abstractgrid.jl")
+include("test_grid_generators.jl")
 include("test_grid_addboundaryset.jl")
 include("test_mixeddofhandler.jl")
 include("test_l2_projection.jl")
@@ -52,6 +56,7 @@ include("test_pointevaluation.jl")
 # include("test_notebooks.jl")
 include("test_apply_rhs.jl")
 include("test_apply_analytical.jl")
+include("PoolAllocator.jl")
 include("test_deprecations.jl")
 HAS_EXTENSIONS && include("blockarrays.jl")
 include("test_examples.jl")

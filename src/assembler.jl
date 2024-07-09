@@ -50,7 +50,7 @@ end
 
 Assembles the matrix `Ke` into `a` according to the dofs specified by `rowdofs` and `coldofs`.
 """
-function assemble!(a::Ferrite.Assembler{T}, rowdofs::AbstractVector{Int}, coldofs::AbstractVector{Int}, Ke::AbstractMatrix{T}) where {T}
+function assemble!(a::Assembler{T}, rowdofs::AbstractVector{Int}, coldofs::AbstractVector{Int}, Ke::AbstractMatrix{T}) where {T}
     nrows = length(rowdofs)
     ncols = length(coldofs)
 

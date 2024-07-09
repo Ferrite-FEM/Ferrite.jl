@@ -252,8 +252,8 @@ function assemble_global!(K::SparseMatrixCSC, f, cellvalues_u::CellValues,
     np = getnbasefunctions(cellvalues_p)
 
     ## start_assemble resets K and f
-    fe = PseudoBlockArray(zeros(nu + np), [nu, np]) # local force vector
-    ke = PseudoBlockArray(zeros(nu + np, nu + np), [nu, np], [nu, np]) # local stiffness matrix
+    fe = BlockedArray(zeros(nu + np), [nu, np]) # local force vector
+    ke = BlockedArray(zeros(nu + np, nu + np), [nu, np], [nu, np]) # local stiffness matrix
 
     assembler = start_assemble(K, f)
     ## Loop over all cells in the grid
@@ -296,7 +296,7 @@ function solve(interpolation_u, interpolation_p)
     apply!(w, dbc)
 
     ## Create the sparse matrix and residual vector
-    K = create_sparsity_pattern(dh)
+    K = allocate_matrix(dh)
     f = zeros(_ndofs)
 
     ## We run the simulation parameterized by a time like parameter. `Tf` denotes the final value

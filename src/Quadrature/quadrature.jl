@@ -11,13 +11,13 @@ using Base.Cartesian: @nloops, @ntuple, @nexprs
 ##################
 
 """
-    QuadratureRule{shape}([quad_rule_type::Symbol], order::Int)
-    QuadratureRule{shape, T}([quad_rule_type::Symbol], order::Int)
+    QuadratureRule{shape}([::Type{T},] [quad_rule_type::Symbol,] order::Int)
+    QuadratureRule{shape}(weights::AbstractVector{T}, points::AbstractVector{Vec{rdim, T}})
 
 Create a `QuadratureRule` used for integration on the refshape `shape` (of type [`AbstractRefShape`](@ref)).
 `order` is the order of the quadrature rule.
-`quad_rule_type` is an optional argument determining the type of quadrature rule,
-currently the `:legendre` and `:lobatto` rules are implemented.
+`quad_rule_type` is an optional argument determining the type of quadrature rule.
+Currently the :polyquad, `:legendre` and `:lobatto` rules are implemented, depending on the reference element.
 
 A `QuadratureRule` is used to approximate an integral on a domain by a weighted sum of
 function values at specific points:
@@ -42,39 +42,34 @@ julia> getpoints(qr)
  [0.33333333333333, 0.33333333333333]
 ```
 """
-struct QuadratureRule{shape,T,dim}
-    weights::Vector{T}
-    points::Vector{Vec{dim,T}}
-    function QuadratureRule{shape, T}(weights::Vector{T}, points::Vector{Vec{dim, T}}) where {dim, shape <: AbstractRefShape{dim}, T}
+struct QuadratureRule{shape, WeightStorageType, PointStorageType}
+    weights::WeightStorageType  # E.g. Vector{Float64}
+    points::PointStorageType    # E.g. Vector{Vec{3, Float64}}
+    function QuadratureRule{shape}(weights::AbstractVector{T}, points::AbstractVector{Vec{rdim, T}}) where {rdim, shape <: AbstractRefShape{rdim}, T}
         if length(weights) != length(points)
-            throw(ArgumentError("number of weights and number of points do not match"))
+            throw(ArgumentError("number of weights and number of points do not match (#weights=$(length(weights)) != #points=$(length(points)))"))
         end
-        new{shape, T, dim}(weights, points)
+        new{shape, typeof(weights), typeof(points)}(weights, points)
     end
 end
 
-function QuadratureRule{shape}(weights::Vector{T}, points::Vector{Vec{dim, T}}) where {dim, shape <: AbstractRefShape{dim}, T}
-    QuadratureRule{shape, T}(weights, points)
-end
-
-
 # Fill in defaults (Float64, :legendre)
 function QuadratureRule{shape}(order::Int) where {shape <: AbstractRefShape}
-    return QuadratureRule{shape, Float64}(order)
+    return QuadratureRule{shape}(Float64, order)
 end
-function QuadratureRule{shape, T}(order::Int) where {shape <: AbstractRefShape, T}
+function QuadratureRule{shape}(::Type{T}, order::Int) where {shape <: AbstractRefShape, T}
     quad_type = (shape === RefPrism || shape === RefPyramid) ? (:polyquad) : (:legendre)
-    return QuadratureRule{shape, T}(quad_type, order)
+    return QuadratureRule{shape}(T, quad_type, order)
 end
 function QuadratureRule{shape}(quad_type::Symbol, order::Int) where {shape <: AbstractRefShape}
-    return QuadratureRule{shape, Float64}(quad_type, order)
+    return QuadratureRule{shape}(Float64, quad_type, order)
 end
 
 # Generate Gauss quadrature rules on hypercubes by doing an outer product
 # over all dimensions
 for dim in 1:3
     @eval begin
-        function QuadratureRule{RefHypercube{$dim}, T}(quad_type::Symbol, order::Int) where T
+        function QuadratureRule{RefHypercube{$dim}}(::Type{T}, quad_type::Symbol, order::Int) where T
             if quad_type === :legendre
                 p, w = GaussQuadrature.legendre(T, order)
             elseif quad_type === :lobatto
@@ -93,14 +88,14 @@ for dim in 1:3
                 weights[count] = weight
                 count += 1
             end
-            return QuadratureRule{RefHypercube{$dim}, T}(weights, points)
+            return QuadratureRule{RefHypercube{$dim}}(weights, points)
         end
     end
 end
 
 for dim in 2:3
     @eval begin
-        function QuadratureRule{RefSimplex{$dim}, T}(quad_type::Symbol, order::Int) where T
+        function QuadratureRule{RefSimplex{$dim}}(::Type{T}, quad_type::Symbol, order::Int) where T
             if $dim == 2 && quad_type === :legendre
                 data = _get_gauss_tridata(order)
             elseif $dim == 3 && quad_type === :legendre
@@ -115,13 +110,13 @@ for dim in 2:3
                 points[p] = Vec{$dim,T}(@ntuple $dim i -> data[p, i])
             end
             weights = data[:, $dim + 1]
-            QuadratureRule{RefSimplex{$dim}, T}(weights, points)
+            QuadratureRule{RefSimplex{$dim}}(weights, points)
         end
     end
 end
 
 # Grab prism quadrature rule from table
-function QuadratureRule{RefPrism, T}(quad_type::Symbol, order::Int) where T
+function QuadratureRule{RefPrism}(::Type{T}, quad_type::Symbol, order::Int) where T
     if quad_type == :polyquad
         data = _get_gauss_prismdata_polyquad(order)
     else
@@ -134,11 +129,11 @@ function QuadratureRule{RefPrism, T}(quad_type::Symbol, order::Int) where T
         points[p] = Vec{3,T}(@ntuple 3 i -> data[p, i])
     end
     weights = data[:, 4]
-    QuadratureRule{RefPrism,T}(weights, points)
+    QuadratureRule{RefPrism}(weights, points)
 end
 
 # Grab pyramid quadrature rule from table
-function QuadratureRule{RefPyramid, T}(quad_type::Symbol, order::Int) where T
+function QuadratureRule{RefPyramid}(::Type{T}, quad_type::Symbol, order::Int) where T
     if quad_type == :polyquad
         data = _get_gauss_pyramiddata_polyquad(order)
     else
@@ -151,7 +146,7 @@ function QuadratureRule{RefPyramid, T}(quad_type::Symbol, order::Int) where T
         points[p] = Vec{3,T}(@ntuple 3 i -> data[p, i])
     end
     weights = data[:, 4]
-    QuadratureRule{RefPyramid,T}(weights, points)
+    QuadratureRule{RefPyramid}(weights, points)
 end
 
 ######################
@@ -159,72 +154,75 @@ end
 ######################
 
 """
-    FacetQuadratureRule{shape}([quad_rule_type::Symbol], order::Int)
-    FacetQuadratureRule{shape, T}([quad_rule_type::Symbol], order::Int)
+    FacetQuadratureRule{shape}([::Type{T}, [quad_rule_type::Symbol,] order::Int)
+    FacetQuadratureRule{shape}(face_rules::NTuple{<:Any, <:QuadratureRule{shape}})
+    FacetQuadratureRule{shape}(face_rules::AbstractVector{<:QuadratureRule{shape}})
 
 Create a `FacetQuadratureRule` used for integration of the faces of the refshape `shape` (of
 type [`AbstractRefShape`](@ref)). `order` is the order of the quadrature rule.
-`quad_rule_type` is an optional argument determining the type of quadrature rule, currently
-the `:legendre` and `:lobatto` rules are implemented.
+`quad_rule_type` is an optional argument determining the type of quadrature rule.
+Currently the :polyquad, `:legendre` and `:lobatto` rules are implemented, depending on the reference element.
 
 `FacetQuadratureRule` is used as one of the components to create [`FacetValues`](@ref).
 """
-struct FacetQuadratureRule{shape, T, dim}
-    face_rules::Vector{QuadratureRule{shape, T, dim}}
-    function FacetQuadratureRule{shape, T, dim}(face_rules::Vector{QuadratureRule{shape, T, dim}}) where {shape, T, dim}
-        # TODO: Verify length(face_rules) == nfaces(shape)
-        return new{shape, T, dim}(face_rules)
+struct FacetQuadratureRule{shape, FacetRulesType}
+    face_rules::FacetRulesType # E.g. Tuple{QuadratureRule{RefLine,...}, QuadratureRule{RefLine,...}}
+    function FacetQuadratureRule{shape}(face_rules::Union{NTuple{<:Any, QRType}, AbstractVector{QRType}}) where {shape, QRType <: QuadratureRule{shape}}
+        if length(face_rules) != nfacets(shape)
+            throw(ArgumentError("number of quadrature rules does not not match number of facets (#rules=$(length(face_rules)) != #facets=$(nfacets(shape)))"))
+        end
+        return new{shape, typeof(face_rules)}(face_rules)
     end
 end
 
-function FacetQuadratureRule(face_rules::Vector{QuadratureRule{shape, T, dim}}) where {shape, T, dim}
-    return FacetQuadratureRule{shape, T, dim}(face_rules)
+function FacetQuadratureRule(face_rules::Union{NTuple{<:Any, QRType}, AbstractVector{QRType}}) where {shape, QRType <: QuadratureRule{shape}}
+    return FacetQuadratureRule{shape}(face_rules)
 end
 
 # Fill in defaults (Float64, :legendre)
 function FacetQuadratureRule{shape}(order::Int) where {shape <: AbstractRefShape}
-    return FacetQuadratureRule{shape, Float64}(order)
+    return FacetQuadratureRule{shape}(Float64, order)
 end
-function FacetQuadratureRule{shape, T}(order::Int) where {shape <: AbstractRefShape, T}
-    return FacetQuadratureRule{shape, T}(:legendre, order)
+function FacetQuadratureRule{shape}(::Type{T}, order::Int) where {shape <: AbstractRefShape, T}
+    return FacetQuadratureRule{shape}(T, :legendre, order)
 end
 function FacetQuadratureRule{shape}(quad_type::Symbol, order::Int) where {shape <: AbstractRefShape}
-    return FacetQuadratureRule{shape, Float64}(quad_type, order)
+    return FacetQuadratureRule{shape}(Float64, quad_type, order)
 end
 
 # For RefShapes with equal face-shapes: generate quad rule for the face shape
 # and expand to each face
-function FacetQuadratureRule{RefLine, T}(::Symbol, ::Int) where T
+function FacetQuadratureRule{RefLine}(::Type{T}, ::Symbol, ::Int) where T
     w, p = T[1], Vec{0, T}[Vec{0, T}(())]
     return create_facet_quad_rule(RefLine, w, p)
 end
-function FacetQuadratureRule{RefQuadrilateral, T}(quad_type::Symbol, order::Int) where T
-    qr = QuadratureRule{RefLine, T}(quad_type, order)
+function FacetQuadratureRule{RefQuadrilateral}(::Type{T}, quad_type::Symbol, order::Int) where T
+    qr = QuadratureRule{RefLine}(T, quad_type, order)
     return create_facet_quad_rule(RefQuadrilateral, qr.weights, qr.points)
 end
-function FacetQuadratureRule{RefHexahedron, T}(quad_type::Symbol, order::Int) where T
-    qr = QuadratureRule{RefQuadrilateral, T}(quad_type, order)
+function FacetQuadratureRule{RefHexahedron}(::Type{T}, quad_type::Symbol, order::Int) where T
+    qr = QuadratureRule{RefQuadrilateral}(T, quad_type, order)
     return create_facet_quad_rule(RefHexahedron, qr.weights, qr.points)
 end
-function FacetQuadratureRule{RefTriangle, T}(quad_type::Symbol, order::Int) where T
-    qr = QuadratureRule{RefLine, T}(quad_type, order)
+function FacetQuadratureRule{RefTriangle}(::Type{T}, quad_type::Symbol, order::Int) where T
+    qr = QuadratureRule{RefLine}(T, quad_type, order)
     # Interval scaled and shifted in facet_to_element_transformation from (-1,1) to (0,1) -> half the length -> half quadrature weights
     return create_facet_quad_rule(RefTriangle, qr.weights/2, qr.points)
 end
-function FacetQuadratureRule{RefTetrahedron, T}(quad_type::Symbol, order::Int) where T
-    qr = QuadratureRule{RefTriangle, T}(quad_type, order)
+function FacetQuadratureRule{RefTetrahedron}(::Type{T}, quad_type::Symbol, order::Int) where T
+    qr = QuadratureRule{RefTriangle}(T, quad_type, order)
     return create_facet_quad_rule(RefTetrahedron, qr.weights, qr.points)
 end
-function FacetQuadratureRule{RefPrism, T}(quad_type::Symbol, order::Int) where T
-    qr_quad = QuadratureRule{RefQuadrilateral, T}(quad_type, order)
-    qr_tri = QuadratureRule{RefTriangle, T}(quad_type, order)
+function FacetQuadratureRule{RefPrism}(::Type{T}, quad_type::Symbol, order::Int) where T
+    qr_quad = QuadratureRule{RefQuadrilateral}(T, quad_type, order)
+    qr_tri = QuadratureRule{RefTriangle}(T, quad_type, order)
     # Interval scaled and shifted in facet_to_element_transformation for quadrilateral faces from (-1,1)² to (0,1)² -> quarter the area -> quarter the quadrature weights
     return create_facet_quad_rule(RefPrism, [2,3,4], qr_quad.weights/4, qr_quad.points,
         [1,5], qr_tri.weights, qr_tri.points)
 end
-function FacetQuadratureRule{RefPyramid, T}(quad_type::Symbol, order::Int) where T
-    qr_quad = QuadratureRule{RefQuadrilateral, T}(quad_type, order)
-    qr_tri = QuadratureRule{RefTriangle, T}(quad_type, order)
+function FacetQuadratureRule{RefPyramid}(::Type{T}, quad_type::Symbol, order::Int) where T
+    qr_quad = QuadratureRule{RefQuadrilateral}(T, quad_type, order)
+    qr_tri = QuadratureRule{RefTriangle}(T, quad_type, order)
     # Interval scaled and shifted in facet_to_element_transformation for quadrilateral faces from (-1,1)² to (0,1)² -> quarter the area -> quarter the quadrature weights
     return create_facet_quad_rule(RefPyramid, [1], qr_quad.weights/4, qr_quad.points,
         [2,3,4,5], qr_tri.weights, qr_tri.points)
@@ -289,5 +287,7 @@ julia> getpoints(qr)
 getpoints(qr::QuadratureRule) = qr.points
 getpoints(qr::FacetQuadratureRule, face::Int) = getpoints(qr.face_rules[face])
 
+getrefshape(::QuadratureRule{RefShape}) where RefShape = RefShape
+
 # TODO: This is used in copy(::(Cell|Face)Values), but it it useful to get an actual copy?
-Base.copy(qr::Union{QuadratureRule,FacetQuadratureRule}) = qr
+Base.copy(qr::Union{QuadratureRule, FacetQuadratureRule}) = qr

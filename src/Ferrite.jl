@@ -8,8 +8,7 @@ using Base:
 using EnumX:
     EnumX, @enumx
 using LinearAlgebra:
-    LinearAlgebra, Symmetric, Transpose, cholesky, det, issymmetric, norm,
-    pinv, tr
+    LinearAlgebra, Symmetric, Transpose, cholesky, det, norm, pinv, tr
 using NearestNeighbors:
     NearestNeighbors, KDTree, knn
 using OrderedCollections:
@@ -26,8 +25,12 @@ using Tensors:
 using ForwardDiff:
     ForwardDiff
 
+include("CollectionsOfViews.jl")
+using .CollectionsOfViews:
+    CollectionsOfViews, ArrayOfVectorViews, push_at_index!, ConstructionBuffer
 
 include("exports.jl")
+
 
 """
     AbstractRefShape{refdim}
@@ -107,6 +110,7 @@ const AbstractVecOrSet{T} = Union{AbstractSet{T}, AbstractVector{T}}
 const IntegerCollection = AbstractVecOrSet{<:Integer}
 
 include("utils.jl")
+include("PoolAllocator.jl")
 
 # Matrix/Vector utilities
 include("arrayutils.jl")
@@ -118,6 +122,7 @@ include("interpolations.jl")
 include("Quadrature/quadrature.jl")
 
 # FEValues
+struct ValuesUpdateFlags{FunDiffOrder, GeoDiffOrder, DetJdV} end # Default constructor in common_values.jl
 include("FEValues/GeometryMapping.jl")
 include("FEValues/FunctionValues.jl")
 include("FEValues/CellValues.jl")
@@ -139,6 +144,7 @@ include("Dofs/DofHandler.jl")
 include("Dofs/ConstraintHandler.jl")
 include("Dofs/apply_analytical.jl")
 include("Dofs/sparsity_pattern.jl")
+include("Dofs/block_sparsity_pattern.jl")
 include("Dofs/DofRenumbering.jl")
 
 include("iterators.jl")

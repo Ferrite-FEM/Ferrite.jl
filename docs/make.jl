@@ -10,7 +10,10 @@ if liveserver
     @timeit dto "Revise.revise()" Revise.revise()
 end
 
-using Documenter, DocumenterCitations, Ferrite, FerriteGmsh, FerriteMeshParser
+using Documenter, DocumenterCitations, Ferrite, FerriteGmsh, FerriteMeshParser, SparseArrays, LinearAlgebra
+
+using BlockArrays
+const FerriteBlockArrays = Base.get_extension(Ferrite, :FerriteBlockArrays)
 
 const is_ci = haskey(ENV, "GITHUB_ACTIONS")
 
@@ -63,8 +66,10 @@ bibtex_plugin = CitationBibliography(
         "Topic guides" => [
             "Topic guide overview" => "topics/index.md",
             "topics/fe_intro.md",
+            "topics/reference_shapes.md",
             "topics/FEValues.md",
             "topics/degrees_of_freedom.md",
+            "topics/sparse_matrix.md",
             "topics/assembly.md",
             "topics/boundary_conditions.md",
             "topics/constraints.md",
@@ -77,6 +82,7 @@ bibtex_plugin = CitationBibliography(
             "reference/interpolations.md",
             "reference/fevalues.md",
             "reference/dofhandler.md",
+            "reference/sparsity_pattern.md",
             "reference/assembly.md",
             "reference/boundary_conditions.md",
             "reference/grid.md",

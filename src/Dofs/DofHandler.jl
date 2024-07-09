@@ -12,16 +12,16 @@ Access some grid representation for the dof handler.
 """
 get_grid(dh::AbstractDofHandler)
 
-struct SubDofHandler{DH} <: AbstractDofHandler
+mutable struct SubDofHandler{DH} <: AbstractDofHandler
     # From constructor
-    dh::DH
-    cellset::OrderedSet{Int}
+    const dh::DH
+    const cellset::OrderedSet{Int}
     # Populated in add!
-    field_names::Vector{Symbol}
-    field_interpolations::Vector{Interpolation}
-    field_n_components::Vector{Int} # Redundant with interpolations, remove?
+    const field_names::Vector{Symbol}
+    const field_interpolations::Vector{Interpolation}
+    const field_n_components::Vector{Int} # Redundant with interpolations, remove?
     # Computed in close!
-    ndofs_per_cell::ScalarWrapper{Int}
+    ndofs_per_cell::Int
     # const dof_ranges::Vector{UnitRange{Int}} # TODO: Why not?
 end
 
@@ -68,7 +68,7 @@ function SubDofHandler(dh::DH, cellset::AbstractVecOrSet{Int}) where {DH <: Abst
         end
     end
     # Construct and insert into the parent dh
-    sdh = SubDofHandler{typeof(dh)}(dh, convert_to_orderedset(cellset), Symbol[], Interpolation[], Int[], ScalarWrapper(-1))
+    sdh = SubDofHandler{typeof(dh)}(dh, convert_to_orderedset(cellset), Symbol[], Interpolation[], Int[], -1)
     push!(dh.subdofhandlers, sdh)
     return sdh
 end
@@ -93,17 +93,17 @@ function _print_field_information(io::IO, mime::MIME"text/plain", sdh::SubDofHan
     end
 end
 
-struct DofHandler{dim,G<:AbstractGrid{dim}} <: AbstractDofHandler
-    subdofhandlers::Vector{SubDofHandler{DofHandler{dim, G}}}
-    field_names::Vector{Symbol}
+mutable struct DofHandler{dim,G<:AbstractGrid{dim}} <: AbstractDofHandler
+    const subdofhandlers::Vector{SubDofHandler{DofHandler{dim, G}}}
+    const field_names::Vector{Symbol}
     # Dofs for cell i are stored in cell_dofs at the range:
     #     cell_dofs_offset[i]:(cell_dofs_offset[i]+ndofs_per_cell(dh, i)-1)
-    cell_dofs::Vector{Int}
-    cell_dofs_offset::Vector{Int}
-    cell_to_subdofhandler::Vector{Int} # maps cell id -> SubDofHandler id
-    closed::ScalarWrapper{Bool}
-    grid::G
-    ndofs::ScalarWrapper{Int}
+    const cell_dofs::Vector{Int}
+    const cell_dofs_offset::Vector{Int}
+    const cell_to_subdofhandler::Vector{Int} # maps cell id -> SubDofHandler id
+    closed::Bool
+    const grid::G
+    ndofs::Int
 end
 
 """
@@ -131,7 +131,7 @@ close!(dh)
 function DofHandler(grid::G) where {dim, G <: AbstractGrid{dim}}
     ncells = getncells(grid)
     sdhs = SubDofHandler{DofHandler{dim, G}}[]
-    DofHandler{dim, G}(sdhs, Symbol[], Int[], zeros(Int, ncells), zeros(Int, ncells), ScalarWrapper(false), grid, ScalarWrapper(-1))
+    DofHandler{dim, G}(sdhs, Symbol[], Int[], zeros(Int, ncells), zeros(Int, ncells), false, grid, -1)
 end
 
 function Base.show(io::IO, mime::MIME"text/plain", dh::DofHandler)
@@ -158,7 +158,7 @@ function Base.show(io::IO, mime::MIME"text/plain", dh::DofHandler)
     end
 end
 
-isclosed(dh::AbstractDofHandler) = dh.closed[]
+isclosed(dh::AbstractDofHandler) = dh.closed
 get_grid(dh::DofHandler) = dh.grid
 
 """
@@ -166,7 +166,7 @@ get_grid(dh::DofHandler) = dh.grid
 
 Return the number of degrees of freedom in `dh`
 """
-ndofs(dh::AbstractDofHandler) = dh.ndofs[]
+ndofs(dh::AbstractDofHandler) = dh.ndofs
 
 """
     ndofs_per_cell(dh::AbstractDofHandler[, cell::Int=1])
@@ -183,10 +183,12 @@ function ndofs_per_cell(dh::DofHandler)
     return @inbounds ndofs_per_cell(dh.subdofhandlers[1])
 end
 function ndofs_per_cell(dh::DofHandler, cell::Int)
-    return ndofs_per_cell(dh.subdofhandlers[dh.cell_to_subdofhandler[cell]])
+    sdhidx = dh.cell_to_subdofhandler[cell]
+    sdhidx ∉ 1:length(dh.subdofhandlers) && return 0 # Dof handler is just defined on a subdomain
+    return ndofs_per_cell(dh.subdofhandlers[sdhidx])
 end
-ndofs_per_cell(sdh::SubDofHandler) = sdh.ndofs_per_cell[]
-ndofs_per_cell(sdh::SubDofHandler, ::Int) = sdh.ndofs_per_cell[] # for compatibility with DofHandler
+ndofs_per_cell(sdh::SubDofHandler) = sdh.ndofs_per_cell
+ndofs_per_cell(sdh::SubDofHandler, ::Int) = sdh.ndofs_per_cell # for compatibility with DofHandler
 
 """
     celldofs!(global_dofs::Vector{Int}, dh::AbstractDofHandler, i::Int)
@@ -386,8 +388,8 @@ function __close!(dh::DofHandler{dim}) where {dim}
             facedicts,
         )
     end
-    dh.ndofs[] = maximum(dh.cell_dofs; init=0)
-    dh.closed[] = true
+    dh.ndofs = maximum(dh.cell_dofs; init=0)
+    dh.closed = true
 
     return dh, vertexdicts, edgedicts, facedicts
 
@@ -402,28 +404,29 @@ function _close_subdofhandler!(dh::DofHandler{sdim}, sdh::SubDofHandler, sdh_ind
     ip_infos = InterpolationInfo[]
     for interpolation in sdh.field_interpolations
         ip_info = InterpolationInfo(interpolation)
+        base_ip = get_base_interpolation(interpolation)
         begin
             next_dof_index = 1
-            for vdofs ∈ vertexdof_indices(interpolation)
+            for vdofs ∈ vertexdof_indices(base_ip)
                 for dof_index ∈ vdofs
                     @assert dof_index == next_dof_index "Vertex dof ordering not supported. Please consult the dev docs."
                     next_dof_index += 1
                 end
             end
-            for vdofs ∈ edgedof_interior_indices(interpolation)
+            for vdofs ∈ edgedof_interior_indices(base_ip)
                 for dof_index ∈ vdofs
                     @assert dof_index == next_dof_index "Edge dof ordering not supported. Please consult the dev docs."
                     next_dof_index += 1
                 end
             end
-            for vdofs ∈ facedof_interior_indices(interpolation)
+            for vdofs ∈ facedof_interior_indices(base_ip)
                 for dof_index ∈ vdofs
                     @assert dof_index == next_dof_index "Face dof ordering not supported. Please consult the dev docs."
                     next_dof_index += 1
                 end
             end
-            for dof_index ∈ volumedof_interior_indices(interpolation)
-                @assert next_dof_index <= dof_index <= getnbasefunctions(interpolation) "Cell dof ordering not supported. Please consult the dev docs."
+            for dof_index ∈ volumedof_interior_indices(base_ip)
+                @assert next_dof_index <= dof_index <= getnbasefunctions(base_ip) "Cell dof ordering not supported. Please consult the dev docs."
             end
         end
         push!(ip_infos, ip_info)
@@ -471,7 +474,7 @@ function _close_subdofhandler!(dh::DofHandler{sdim}, sdh::SubDofHandler, sdh_ind
 
         if first_cell
             ndofs_per_cell = length(dh.cell_dofs) - len_cell_dofs_start
-            sdh.ndofs_per_cell[] = ndofs_per_cell
+            sdh.ndofs_per_cell = ndofs_per_cell
             first_cell = false
         else
             @assert ndofs_per_cell == length(dh.cell_dofs) - len_cell_dofs_start
@@ -910,7 +913,7 @@ getfieldinterpolation(sdh::SubDofHandler, field_idx::Int) = sdh.field_interpolat
 getfieldinterpolation(sdh::SubDofHandler, field_name::Symbol) = getfieldinterpolation(sdh, find_field(sdh, field_name))
 
 """
-    evaluate_at_grid_nodes(dh::AbstractDofHandler, u::Vector{T}, fieldname::Symbol) where T
+    evaluate_at_grid_nodes(dh::AbstractDofHandler, u::AbstractVector{T}, fieldname::Symbol) where T
 
 Evaluate the approximated solution for field `fieldname` at the node
 coordinates of the grid given the Dof handler `dh` and the solution vector `u`.
@@ -919,12 +922,12 @@ Return a vector of length `getnnodes(grid)` where entry `i` contains the evaluat
 approximation in the coordinate of node `i`. If the field does not live on parts of the
 grid, the corresponding values for those nodes will be returned as `NaN`s.
 """
-function evaluate_at_grid_nodes(dh::DofHandler, u::Vector, fieldname::Symbol)
+function evaluate_at_grid_nodes(dh::DofHandler, u::AbstractVector, fieldname::Symbol)
     return _evaluate_at_grid_nodes(dh, u, fieldname)
 end
 
 # Internal method that have the vtk option to allocate the output differently
-function _evaluate_at_grid_nodes(dh::DofHandler, u::Vector{T}, fieldname::Symbol, ::Val{vtk}=Val(false)) where {T, vtk}
+function _evaluate_at_grid_nodes(dh::DofHandler, u::AbstractVector{T}, fieldname::Symbol, ::Val{vtk}=Val(false)) where {T, vtk}
     # Make sure the field exists
     fieldname ∈ getfieldnames(dh) || error("Field $fieldname not found.")
     # Figure out the return type (scalar or vector)
@@ -966,7 +969,7 @@ end
 
 # Loop over the cells and use shape functions to compute the value
 function _evaluate_at_grid_nodes!(data::Union{Vector,Matrix}, sdh::SubDofHandler,
-        u::Vector{T}, cv::CellValues, drange::UnitRange, ::Type{RT}) where {T, RT}
+        u::AbstractVector{T}, cv::CellValues, drange::UnitRange, ::Type{RT}) where {T, RT}
     ue = zeros(T, length(drange))
     # TODO: Remove this hack when embedding works...
     if RT <: Vec && function_interpolation(cv) isa ScalarInterpolation

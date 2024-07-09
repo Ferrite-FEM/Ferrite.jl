@@ -82,7 +82,7 @@ end
 
 # Now to the assembling of the stiffness matrix. This mixed formulation leads to a blocked
 # element matrix. Since Ferrite does not force us to use any particular matrix type we will
-# use a `PseudoBlockArray` from `BlockArrays.jl`.
+# use a `BlockedArray` from `BlockArrays.jl`.
 
 function doassemble(
     cellvalues_u::CellValues,
@@ -95,8 +95,8 @@ function doassemble(
     nu = getnbasefunctions(cellvalues_u)
     np = getnbasefunctions(cellvalues_p)
 
-    fe = PseudoBlockArray(zeros(nu + np), [nu, np]) # local force vector
-    ke = PseudoBlockArray(zeros(nu + np, nu + np), [nu, np], [nu, np]) # local stiffness matrix
+    fe = BlockedArray(zeros(nu + np), [nu, np]) # local force vector
+    ke = BlockedArray(zeros(nu + np, nu + np), [nu, np], [nu, np]) # local stiffness matrix
 
     ## traction vector
     t = Vec{2}((0.0, 1 / 16))
@@ -258,7 +258,7 @@ function solve(ν, interpolation_u, interpolation_p)
     cellvalues_u, cellvalues_p, facetvalues_u = create_values(interpolation_u, interpolation_p)
 
     ## Assembly and solve
-    K = create_sparsity_pattern(dh)
+    K = allocate_matrix(dh)
     K, f = doassemble(cellvalues_u, cellvalues_p, facetvalues_u, K, grid, dh, mp)
     apply!(K, f, dbc)
     u = K \ f
