@@ -219,7 +219,7 @@ function build_vertex_to_cell(cells; max_vertices, nnodes)
 end
 
 function build_cell_neighbor(grid, cells, vertex_to_cell; ncells)
-    # In this case, we loop over the cells in order and all all neighbors at once.
+    # In this case, we loop over the cells in order and all neighbors at once.
     # Then we can create ArrayOfVectorViews directly without the CollectionsOfViews.ConstructionBuffer
     sizehint = _getsizehint(grid, CellIndex)
     data = empty!(Vector{Int}(undef, ncells * sizehint))
