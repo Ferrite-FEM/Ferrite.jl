@@ -89,13 +89,13 @@ function FunctionValues{DiffOrder}(::Type{T}, ip::Interpolation, qr::QuadratureR
 end
 
 function precompute_values!(fv::FunctionValues{0}, qr_points::Vector{<:Vec})
-    shape_values!(fv.Nξ, fv.ip, qr_points)
+    reference_shape_values!(fv.Nξ, fv.ip, qr_points)
 end
 function precompute_values!(fv::FunctionValues{1}, qr_points::Vector{<:Vec})
-    shape_gradients_and_values!(fv.dNdξ, fv.Nξ, fv.ip, qr_points)
+    reference_shape_gradients_and_values!(fv.dNdξ, fv.Nξ, fv.ip, qr_points)
 end
 function precompute_values!(fv::FunctionValues{2}, qr_points::Vector{<:Vec})
-    shape_hessians_gradients_and_values!(fv.d2Ndξ2, fv.dNdξ, fv.Nξ, fv.ip, qr_points)
+    reference_shape_hessians_gradients_and_values!(fv.d2Ndξ2, fv.dNdξ, fv.Nξ, fv.ip, qr_points)
 end
 
 function Base.copy(v::FunctionValues)

@@ -34,7 +34,7 @@ edge, only the face neighborhood is saved. The lower dimensional neighborhood is
 - `vertex_skeleton::Union{Vector{VertexIndex}, Nothing}`: List of unique vertices in the grid given as `VertexIndex`
 
 !!! warning "Limitations"
-    Non-conforming grids will silently not work.
+    The implementation only works with conforming grids, i.e. grids without "hanging nodes". Non-conforming grids will give unexpected results.
     Grids with embedded cells (different reference dimension compared
     to the spatial dimension) are not supported, and will error on construction.
 
@@ -108,7 +108,8 @@ function _get_facet_facet_neighborhood(::ExclusiveTopology, #=rdim=#::Val{:mixed
 end
 
 # Guess of how many neighbors depending on grid dimension and index type.
-# Better to guess a bit too high than a bit too low.
+# This could be possible to optimize further by studying connectivities of non-uniform
+# grids, see https://github.com/Ferrite-FEM/Ferrite.jl/pull/974#discussion_r1660838649
 function _getsizehint(g::AbstractGrid, ::Type{IDX}) where IDX
     CT = getcelltype(g)
     isconcretetype(CT) && return _getsizehint(getrefshape(CT)(), IDX)
@@ -215,7 +216,7 @@ function build_vertex_to_cell(cells; max_vertices, nnodes)
 end
 
 function build_cell_neighbor(grid, cells, vertex_to_cell; ncells)
-    # In this case, we loop over the cells in order and all all neighbors at once.
+    # In this case, we loop over the cells in order and all neighbors at once.
     # Then we can create ArrayOfVectorViews directly without the CollectionsOfViews.ConstructionBuffer
     sizehint = _getsizehint(grid, CellIndex)
     data = empty!(Vector{Int}(undef, ncells * sizehint))

@@ -334,7 +334,7 @@ function Grid(cells::Vector{C},
         end
     end
     if boundary_matrix !== nothing
-        error("`boundary_matrix` is not part of the Grid anymore and thus not a supported keyword argument.")
+        throw(DeprecationError("`boundary_matrix` is not part of the Grid anymore and thus not a supported keyword argument."))
     end
     return Grid(
         cells,

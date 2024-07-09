@@ -308,12 +308,13 @@ more discussion).
   `FacetQuadratureRule{RefTriangle}(order)` (similar to how `QuadratureRule` is constructed).
   ([#716][github-716])
 
-- New methods `shape_value(::Interpolation, ξ::Vec, i::Int)` and
-  `shape_gradient(::Interpolation, ξ::Vec, i::Int)` for evaluating the value/gradient of the
-  `i`th shape function of an interpolation in local reference coordinate `ξ`. Note that
-  these methods return the value/gradient wrt. the reference coordinate `ξ`, whereas the
-  corresponding methods for `CellValues` etc return the value/gradient wrt the spatial
-  coordinate `x`. ([#721][github-721])
+- New functions `Ferrite.reference_shape_value(::Interpolation, ξ::Vec, i::Int)` and
+  `Ferrite.reference_shape_gradient(::Interpolation, ξ::Vec, i::Int)` for evaluating the
+  value/gradient of the `i`th shape function of an interpolation in local reference
+  coordinate `ξ`. These methods are public but not exported. (Note that these methods return
+  the value/gradient wrt. the reference coordinate `ξ`, whereas the corresponding methods
+  for `CellValues` etc return the value/gradient wrt the spatial coordinate `x`.)
+  ([#721][github-721])
 
 - `FacetIterator` and `FacetCache` have been added. These work similarly to `CellIterator` and
   `CellCache` but are used to iterate over (boundary) face sets instead. These simplify
@@ -450,10 +451,13 @@ more discussion).
 - `Ferrite.getfielddim(::AbstractDofHandler, args...)` has been renamed to `Ferrite.n_components`.
   ([#943][github-943])
 
-- `ExclusiveTopology` now use an internal data structure, `ArrayOfVectorViews`, to store the neighborhood
+- The constructor for `ExclusiveTopology` only accept an `AbstractGrid` as input,
+  removing the alternative of providing a `Vector{<:AbstractCell}`, as knowing the
+  spatial dimension is required for correct code paths.
+  Furthermore, it uses a new internal data structure, `ArrayOfVectorViews`, to store the neighborhood
   information more efficiently The datatype for the neighborhood has thus changed to a view of a vector,
   instead of the now removed `EntityNeighborhood` container. This also applies to `vertex_star_stencils`.
-  ([#974][github-974])
+  ([#974][github-974]).
 
 - `project(::L2Projector, data, qr_rhs)` now expects data to be indexed by the cellid, as opposed to
   the index in the vector of cellids passed to the `L2Projector`. The data may be passed as an

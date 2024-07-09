@@ -37,24 +37,24 @@ cell. The cache is updated for a new cell by calling `reinit!(cache, cellid)` wh
 
 See also [`CellIterator`](@ref).
 """
-struct CellCache{X,G<:AbstractGrid,DH<:Union{AbstractDofHandler,Nothing}}
-    flags::UpdateFlags
-    grid::G
+mutable struct CellCache{X,G<:AbstractGrid,DH<:Union{AbstractDofHandler,Nothing}}
+    const flags::UpdateFlags
+    const grid::G
     # Pretty useless to store this since you have it already for the reinit! call, but
     # needed for the CellIterator(...) workflow since the user doesn't necessarily control
     # the loop order in the cell subset.
-    cellid::ScalarWrapper{Int}
-    nodes::Vector{Int}
-    coords::Vector{X}
-    dh::DH
-    dofs::Vector{Int}
+    cellid::Int
+    const nodes::Vector{Int}
+    const coords::Vector{X}
+    const dh::DH
+    const dofs::Vector{Int}
 end
 
 function CellCache(grid::Grid{dim,C,T}, flags::UpdateFlags=UpdateFlags()) where {dim,C,T}
     N = nnodes_per_cell(grid, 1) # nodes and coords will be resized in `reinit!`
     nodes = zeros(Int, N)
     coords = zeros(Vec{dim,T}, N)
-    return CellCache(flags, grid, ScalarWrapper(-1), nodes, coords, nothing, Int[])
+    return CellCache(flags, grid, -1, nodes, coords, nothing, Int[])
 end
 
 function CellCache(dh::DofHandler{dim}, flags::UpdateFlags=UpdateFlags()) where {dim}
@@ -63,16 +63,16 @@ function CellCache(dh::DofHandler{dim}, flags::UpdateFlags=UpdateFlags()) where 
     nodes = zeros(Int, N)
     coords = zeros(Vec{dim, get_coordinate_eltype(get_grid(dh))}, N)
     celldofs = zeros(Int, n)
-    return CellCache(flags, get_grid(dh), ScalarWrapper(-1), nodes, coords, dh, celldofs)
+    return CellCache(flags, get_grid(dh), -1, nodes, coords, dh, celldofs)
 end
 
 function CellCache(sdh::SubDofHandler, flags::UpdateFlags=UpdateFlags())
     Tv = get_coordinate_type(sdh.dh.grid)
-    CellCache(flags, sdh.dh.grid, ScalarWrapper(-1), Int[], Tv[], sdh, Int[])
+    CellCache(flags, sdh.dh.grid, -1, Int[], Tv[], sdh, Int[])
 end
 
 function reinit!(cc::CellCache, i::Int)
-    cc.cellid[] = i
+    cc.cellid = i
     if cc.flags.nodes
         resize!(cc.nodes, nnodes_per_cell(cc.grid, i))
         cellnodes!(cc.nodes, cc.grid, i)
@@ -96,13 +96,13 @@ reinit!(fv::FacetValues, cc::CellCache, f::Int) = reinit!(fv, cc.coords, f) # TO
 getnodes(cc::CellCache) = cc.nodes
 getcoordinates(cc::CellCache) = cc.coords
 celldofs(cc::CellCache) = cc.dofs
-cellid(cc::CellCache) = cc.cellid[]
+cellid(cc::CellCache) = cc.cellid
 
 # TODO: This can definitely be deprecated
 celldofs!(v::Vector, cc::CellCache) = copyto!(v, cc.dofs) # celldofs!(v, cc.dh, cc.cellid[])
 
 # TODO: These should really be replaced with something better...
-nfacets(cc::CellCache) = nfacets(getcells(cc.grid, cc.cellid[]))
+nfacets(cc::CellCache) = nfacets(getcells(cc.grid, cc.cellid))
 
 
 # TODO: Currently excluded from the docstring below. Should they be public?
@@ -127,20 +127,20 @@ calling `reinit!(cache, fi::FacetIndex)`.
 
 See also [`FacetIterator`](@ref).
 """
-struct FacetCache{CC<:CellCache}
-    cc::CC  # const for julia > 1.8
-    dofs::Vector{Int} # aliasing cc.dofs
-    current_facet_id::ScalarWrapper{Int}
+mutable struct FacetCache{CC<:CellCache}
+    const cc::CC  # const for julia > 1.8
+    const dofs::Vector{Int} # aliasing cc.dofs
+    current_facet_id::Int
 end
 function FacetCache(args...)
     cc = CellCache(args...)
-    FacetCache(cc, cc.dofs, ScalarWrapper(0))
+    FacetCache(cc, cc.dofs, 0)
 end
 
 function reinit!(fc::FacetCache, facet::BoundaryIndex)
     cellid, facetid = facet
     reinit!(fc.cc, cellid)
-    fc.current_facet_id[] = facetid
+    fc.current_facet_id = facetid
     return nothing
 end
 
@@ -156,7 +156,7 @@ end
 @inline celldofs!(v::Vector, fc::FacetCache) = celldofs!(v, fc.cc)
 # @inline faceindex(fc::FacetCache) = FaceIndex(cellid(fc), faceid(fc))
 @inline function reinit!(fv::FacetValues, fc::FacetCache)
-    reinit!(fv, fc.cc, fc.current_facet_id[])
+    reinit!(fv, fc.cc, fc.current_facet_id)
 end
 
 """

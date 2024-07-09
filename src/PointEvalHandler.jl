@@ -127,7 +127,7 @@ function find_local_coordinate(interpolation, cell_coordinates::Vector{<:Vec{dim
         J = zero(Tensor{2, dim, T})
         # TODO batched eval after 764 is merged.
         for j in 1:n_basefuncs
-            dNdξ, N = shape_gradient_and_value(interpolation, local_guess, j)
+            dNdξ, N = reference_shape_gradient_and_value(interpolation, local_guess, j)
             global_guess += N * cell_coordinates[j]
             J += cell_coordinates[j] ⊗ dNdξ
         end
