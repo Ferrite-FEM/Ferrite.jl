@@ -81,10 +81,7 @@ are defined according to the reference shapes, see [Reference shapes](@ref).
 The highlighted facets, i.e. the two edges from node ID 3 to 6 and from 6 to 9, on the right hand side of our test mesh can now be described as
 
 ```julia
-julia> boundary_facets = [
-           (3,6),
-           (6,9)
-       ]
+boundary_facets = [(3, 6), (6, 9)]
 ```
 i.e. by using the node IDs of the reference shape vertices.
 
