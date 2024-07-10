@@ -61,8 +61,8 @@ nfacets(  ::Type{T}) where {T <: AbstractRefShape} = length(reference_facets(T))
     reference_vertices(::Type{<:AbstractRefShape})
     reference_vertices(::AbstractCell)
 
-Returns a tuple of integers containing the ordered local vertex indices corresponding to
-the corners or endpoints of an element.
+Returns a tuple of integers containing the local node indices corresponding to
+the vertices (i.e. corners or endpoints) of the cell.
 """
 reference_vertices(::Union{Type{<:AbstractRefShape}, AbstractCell})
 

@@ -78,22 +78,6 @@ Facet- and vertexsets are represented by `OrderedSet{<:BoundaryIndex}`, where `B
 `FacetIndex` and `VertexIndex` wraps a `Tuple`, `(global_cell_id, local_facet_id)` and `(global_cell_id, local_vertex_id)`, where the local IDs
 are defined according to the reference shapes, see [Reference shapes](@ref).
 
-Facetsets are a more elaborate construction. They map a `String` key to a `Set{FaceIndex}`, where each `FaceIndex` consists of `(global_cell_id, local_facet_id)`.
-In order to understand the `local_facet_id` properly, one has to consider the reference space of the element, which typically is spanned by a product of the interval ``[-1, 1]`` and in this particular example ``[-1, 1] \times [-1, 1]``.
-In this space a local numbering of nodes and facets exists, i.e.
-
-![local element](./assets/local_element.svg)
-
-
-The example shows a local edge ordering, defined as:
-
-```julia
-Ferrite.reference_facets(RefQuadrilateral) = ((1,2), (2,3), (3,4), (4,1))
-```
-
-Other facet definitions can be found in the src file `src/Grid/grid.jl` in the corresponding dispatches for [`reference_facets`](@ref Ferrite.reference_facets). Furthermorem you can query specific information about subentities via [`reference_vertices`](@ref Ferrite.reference_vertices), [`reference_edges`](@ref Ferrite.reference_edges) and [`reference_faces`](@ref Ferrite.reference_faces).
-
-
 The highlighted facets, i.e. the two edges from node ID 3 to 6 and from 6 to 9, on the right hand side of our test mesh can now be described as
 
 ```julia
