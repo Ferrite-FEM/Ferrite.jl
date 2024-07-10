@@ -58,13 +58,13 @@ nfacets(  ::Type{T}) where {T <: AbstractRefShape} = length(reference_facets(T))
 
 
 """
-    reference_vertices(::AbstractRefShape)
+    reference_vertices(::Type{<:AbstractRefShape})
     reference_vertices(::AbstractCell)
 
 Returns a tuple of integers containing the ordered local vertex indices corresponding to
 the corners or endpoints of an element.
 """
-reference_vertices(::Union{AbstractRefShape, AbstractCell})
+reference_vertices(::Union{Type{<:AbstractRefShape}, AbstractCell})
 
 """
     Ferrite.vertices(::AbstractCell)
@@ -76,7 +76,7 @@ corresponds to the local index into this tuple.
 vertices(::AbstractCell)
 
 """
-    reference_edges(::AbstractRefShape)
+    reference_edges(::Type{<:AbstractRefShape})
     reference_edges(::AbstractCell)
 
 Returns a tuple of 2-tuples containing the ordered local node indices corresponding to
@@ -87,7 +87,7 @@ node the secon dindex.
 
 Note that the vertices are sufficient to define a face uniquely.
 """
-reference_edges(::Union{AbstractRefShape, AbstractCell})
+reference_edges(::Union{Type{<:AbstractRefShape}, AbstractCell})
 
 """
     Ferrite.edges(::AbstractCell)
@@ -101,7 +101,7 @@ Note that the vertices are sufficient to define an edge uniquely.
 edges(::AbstractCell)
 
 """
-    reference_faces(::AbstractRefShape)
+    reference_faces(::Type{<:AbstractRefShape})
     reference_faces(::AbstractCell)
 
 Returns a tuple of n-tuples containing the ordered local node indices corresponding to
@@ -112,7 +112,7 @@ nodes spanning such that the normal to the face is pointing outwards.
 
 Note that the vertices are sufficient to define a face uniquely.
 """
-reference_faces(::Union{AbstractRefShape, AbstractCell})
+reference_faces(::Union{Type{<:AbstractRefShape}, AbstractCell})
 
 """
     Ferrite.faces(::AbstractCell)
