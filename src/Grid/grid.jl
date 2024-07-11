@@ -79,13 +79,8 @@ vertices(::AbstractCell)
     reference_edges(::Type{<:AbstractRefShape})
     reference_edges(::AbstractCell)
 
-Returns a tuple of 2-tuples containing the ordered local node indices corresponding to
-the vertices that define an *oriented edge*.
-
-An *oriented edge* is an edge with the first node having the lowest local index and the other
-node the secon dindex.
-
-Note that the vertices are sufficient to define a face uniquely.
+Returns a tuple of 2-tuples containing the ordered local node indices
+(corresponding to the vertices) that define an edge.
 """
 reference_edges(::Union{Type{<:AbstractRefShape}, AbstractCell})
 
@@ -104,8 +99,8 @@ edges(::AbstractCell)
     reference_faces(::Type{<:AbstractRefShape})
     reference_faces(::AbstractCell)
 
-Returns a tuple of n-tuples containing the ordered local node indices corresponding to
-the vertices that define an *oriented face*.
+Returns a tuple of n-tuples containing the ordered local node indices
+(corresponding to the vertices) that define a face.
 
 An *oriented face* is a face with the first node having the local index and the other
 nodes spanning such that the normal to the face is pointing outwards.
@@ -147,10 +142,10 @@ facets(::AbstractCell)
     Ferrite.reference_facets(::Type{<:AbstractRefShape})
     Ferrite.reference_facets(::AbstractCell)
 
-Returns a tuple of n-tuples containing the ordered local node indices corresponding to
-the vertices that define an oriented facet.
+Returns a tuple of n-tuples containing the ordered local node indices
+(corresponding to the vertices) that define a facet.
 
-See also [`reference_vertices`](@ref), [`reference_edges`](@ref), and [`reference_faces`](@ref)
+See also [`reference_vertices`](@ref), [`reference_edges`](@ref), and [`reference_faces`](@ref).
 """
 reference_facets(::Type{<:AbstractRefShape})
 
