@@ -101,11 +101,6 @@ edges(::AbstractCell)
 
 Returns a tuple of n-tuples containing the ordered local node indices
 (corresponding to the vertices) that define a face.
-
-An *oriented face* is a face with the first node having the local index and the other
-nodes spanning such that the normal to the face is pointing outwards.
-
-Note that the vertices are sufficient to define a face uniquely.
 """
 reference_faces(::Union{Type{<:AbstractRefShape}, AbstractCell})
 
