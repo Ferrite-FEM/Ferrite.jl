@@ -9,11 +9,6 @@ by the associated reference element.
 
 ```@docs
 Ferrite.get_node_ids
-Ferrite.vertices(::Ferrite.AbstractCell)
-Ferrite.reference_edges(::Ferrite.AbstractRefShape)
-Ferrite.edges(::Ferrite.AbstractCell)
-Ferrite.reference_faces(::Ferrite.AbstractRefShape)
-Ferrite.faces(::Ferrite.AbstractCell)
 ```
 
 ### Common utilities and definitions when working with grids internally.
