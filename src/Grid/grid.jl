@@ -56,6 +56,16 @@ nedges(   ::Type{T}) where {T <: AbstractRefShape} = length(reference_edges(T))
 nfaces(   ::Type{T}) where {T <: AbstractRefShape} = length(reference_faces(T))
 nfacets(  ::Type{T}) where {T <: AbstractRefShape} = length(reference_facets(T))
 
+
+"""
+    reference_vertices(::Type{<:AbstractRefShape})
+    reference_vertices(::AbstractCell)
+
+Returns a tuple of integers containing the local node indices corresponding to
+the vertices (i.e. corners or endpoints) of the cell.
+"""
+reference_vertices(::Union{Type{<:AbstractRefShape}, AbstractCell})
+
 """
     Ferrite.vertices(::AbstractCell)
 
@@ -64,6 +74,15 @@ This function induces the [`VertexIndex`](@ref), where the second index
 corresponds to the local index into this tuple.
 """
 vertices(::AbstractCell)
+
+"""
+    reference_edges(::Type{<:AbstractRefShape})
+    reference_edges(::AbstractCell)
+
+Returns a tuple of 2-tuples containing the ordered local node indices
+(corresponding to the vertices) that define an edge.
+"""
+reference_edges(::Union{Type{<:AbstractRefShape}, AbstractCell})
 
 """
     Ferrite.edges(::AbstractCell)
@@ -77,17 +96,13 @@ Note that the vertices are sufficient to define an edge uniquely.
 edges(::AbstractCell)
 
 """
-    reference_faces(::AbstractRefShape)
+    reference_faces(::Type{<:AbstractRefShape})
+    reference_faces(::AbstractCell)
 
-Returns a tuple of n-tuples containing the ordered local node indices corresponding to
-the vertices that define an *oriented face*.
-
-An *oriented face* is a face with the first node having the local index and the other
-nodes spanning such that the normal to the face is pointing outwards.
-
-Note that the vertices are sufficient to define a face uniquely.
+Returns a tuple of n-tuples containing the ordered local node indices
+(corresponding to the vertices) that define a face.
 """
-reference_faces(::AbstractRefShape)
+reference_faces(::Union{Type{<:AbstractRefShape}, AbstractCell})
 
 """
     Ferrite.faces(::AbstractCell)
@@ -120,11 +135,12 @@ facets(::AbstractCell)
 
 """
     Ferrite.reference_facets(::Type{<:AbstractRefShape})
+    Ferrite.reference_facets(::AbstractCell)
 
-Returns a tuple of n-tuples containing the ordered local node indices corresponding to
-the vertices that define an oriented facet.
+Returns a tuple of n-tuples containing the ordered local node indices
+(corresponding to the vertices) that define a facet.
 
-See also [`reference_vertices`](@ref), [`reference_edges`](@ref), and [`reference_faces`](@ref)
+See also [`reference_vertices`](@ref), [`reference_edges`](@ref), and [`reference_faces`](@ref).
 """
 reference_facets(::Type{<:AbstractRefShape})
 
@@ -132,9 +148,14 @@ reference_facets(::Type{<:AbstractRefShape})
 @inline reference_facets(refshape::Type{<:AbstractRefShape{2}}) = reference_edges(refshape)
 @inline reference_facets(refshape::Type{<:AbstractRefShape{3}}) = reference_faces(refshape)
 
+@inline reference_faces(::AbstractCell{refshape})    where refshape = reference_faces(refshape)
+@inline reference_edges(::AbstractCell{refshape})    where refshape = reference_edges(refshape)
+@inline reference_vertices(::AbstractCell{refshape}) where refshape = reference_vertices(refshape)
+@inline reference_facets(::AbstractCell{refshape})   where refshape = reference_facets(refshape)
+
 """
-    geometric_interpolation(::AbstractCell)
-    geometric_interpolation(::Type{<:AbstractCell})
+    geometric_interpolation(::AbstractCell)::ScalarInterpolation
+    geometric_interpolation(::Type{<:AbstractCell})::ScalarInterpolation
 
 Each `AbstractCell` type has a unique geometric interpolation describing its geometry.
 This function returns that interpolation, which is always a scalar interpolation.

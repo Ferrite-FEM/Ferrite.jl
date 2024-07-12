@@ -43,4 +43,4 @@ close!(dh)
 ## Ordering of Dofs
 
 ordered in the same order as we add to dofhandler
-nodes -> (edges ->) faces -> cells
+vertices -> edges -> faces -> volumes

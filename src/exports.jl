@@ -80,7 +80,7 @@ export
     geometric_interpolation,
     ExclusiveTopology,
     getneighborhood,
-    faceskeleton,
+    facetskeleton,
     vertex_star_stencils,
     getstencil,
     getcells,
