@@ -63,7 +63,7 @@ end
 @inline _default_quadrature_rule(::Type{<:RefHypercube}) = :legendre
 @inline _default_quadrature_rule(::Union{Type{RefPrism}, Type{RefPyramid}}) = :polyquad
 @inline _default_quadrature_rule(::Type{RefTriangle}) = :dunavant
-@inline _default_quadrature_rule(::Type{RefTetrahedron}) = :jinyun
+@inline _default_quadrature_rule(::Type{RefTetrahedron}) = :keast_minimal
 
 # Fill in defaults with T=Float64
 function QuadratureRule{shape}(order::Int) where {shape <: AbstractRefShape}
