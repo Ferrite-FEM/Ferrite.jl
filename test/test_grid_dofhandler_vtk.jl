@@ -96,6 +96,11 @@ end
         @test minv ≈ 2left
         @test maxv ≈ 2right
 
+        # Consistency check for topological queries
+        @test Ferrite.reference_vertices(getcells(grid,1)) == Ferrite.reference_vertices(Ferrite.getrefshape(celltype))
+        @test Ferrite.reference_edges(getcells(grid,1))    == Ferrite.reference_edges(Ferrite.getrefshape(celltype))
+        @test Ferrite.reference_faces(getcells(grid,1))    == Ferrite.reference_faces(Ferrite.getrefshape(celltype))
+        @test Ferrite.reference_facets(getcells(grid,1))   == Ferrite.reference_facets(Ferrite.getrefshape(celltype))
     end
 
 end # of testset
