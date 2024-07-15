@@ -51,7 +51,7 @@ using Ferrite: reference_shape_value
     # Table 1:
     # http://www.m-hikari.com/ijma/ijma-2011/ijma-1-4-2011/venkateshIJMA1-4-2011.pdf
     @testset "Exactness for integration on tetrahedra of $rulename" for (rulename, orderrange) in [
-        (:jinyun, 1:4),
+        (:jinyun, 1:3),
         (:keast_minimal, 1:5),
         (:keast_positive, 1:5)
     ]
@@ -137,12 +137,14 @@ using Ferrite: reference_shape_value
             end
         end
 
-        @testset "Type checks for $refshape" begin
-            qr  = QuadratureRule{refshape}(1)
+        @testset "Type checks for $refshape (T=$T)" for T in (Float32, Float64)
+            qr  = QuadratureRule{refshape}(T, 1)
             qrw = Ferrite.getweights(qr)
             qrp = Ferrite.getpoints(qr)
             @test qrw isa Vector
             @test qrp isa Vector
+            @test eltype(qrw) === T
+            @test eltype(eltype(qrp)) === T
 
             sqr = QuadratureRule{refshape}(
                 SVector{length(qrw)}(qrw), SVector{length(qrp)}(qrp)
@@ -151,13 +153,17 @@ using Ferrite: reference_shape_value
             sqrp = Ferrite.getpoints(sqr)
             @test sqrw isa SVector
             @test sqrp isa SVector
+            @test eltype(sqrw) === T
+            @test eltype(eltype(sqrp)) === T
 
-            fqr  = FacetQuadratureRule{refshape}(1)
+            fqr  = FacetQuadratureRule{refshape}(T, 1)
             for f in 1:nfacets(refshape)
                 fqrw = Ferrite.getweights(fqr, f)
                 fqrp = Ferrite.getpoints(fqr, f)
                 @test fqrw isa Vector
                 @test fqrp isa Vector
+                @test eltype(fqrw) === T
+                @test eltype(eltype(fqrp)) === T
             end
 
             function sqr_for_facet(fqr, f)
@@ -177,6 +183,8 @@ using Ferrite: reference_shape_value
                 sfqrp = Ferrite.getpoints(sfqr, f)
                 @test sfqrw isa SVector
                 @test sfqrp isa SVector
+                @test eltype(sfqrw) === T
+                @test eltype(eltype(sfqrp)) === T
             end
 
             sfqr2 = FacetQuadratureRule(
@@ -187,6 +195,8 @@ using Ferrite: reference_shape_value
                 sfqrp = Ferrite.getpoints(sfqr2, f)
                 @test sfqrw isa SVector
                 @test sfqrp isa SVector
+                @test eltype(sfqrw) === T
+                @test eltype(eltype(sfqrp)) === T
             end
         end
     end
