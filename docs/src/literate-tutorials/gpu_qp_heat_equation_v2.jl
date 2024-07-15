@@ -17,6 +17,7 @@ grid = generate_grid(Quadrilateral, (100, 100),left,right)
 colors = create_coloring(grid) .|> (x -> Int32.(x)) # convert to Int32 to reduce number of registers
 
 
+
 ip = Lagrange{RefQuadrilateral, 1}() # define the interpolation function (i.e. Bilinear lagrange)
 
 qr = QuadratureRule{RefQuadrilateral}(Float32,2)
@@ -32,6 +33,7 @@ dh = DofHandler(grid)
 add!(dh, :u, ip)
 
 close!(dh);
+
 
 
 # Standard assembly of the element.
@@ -97,20 +99,24 @@ end
 
 
 
-#=NVTX.@annotate=# function assemble_element_gpu!(assembler,cv,dh,n_cells_colored, eles_colored)
+#=NVTX.@annotate=# function assemble_element_gpu!(ke_colors,fe_colors,assembler,cv,dh,n_cells_colored, eles_colored)
     tx = threadIdx().x
     bx = blockIdx().x
     bd = blockDim().x
+    # e_color is the global index of the thread in the GPU scheme.
     e_color = tx + (bx-Int32(1))*bd # element number per color
 
-    e_color ≤ n_cells_colored || return nothing # e here is the current element index.
+    e_color ≤ n_cells_colored || return nothing
     n_basefuncs = getnbasefunctions(cv)
+    # e is the global index of the finite element in the grid.
     e = eles_colored[e_color]
     cell_coords = getcoordinates(dh.grid, e)
 
-    ke = MMatrix{4,4,Float32}(undef) # Note: using n_basefuncs instead of 4 will throw an error because this type of dynamisim is not supported in GPU.
+    start_row_index = (e_color-1)*n_basefuncs + 1
+    end_row_index = start_row_index+(n_basefuncs-1)
+    ke = @view ke_colors[start_row_index:end_row_index,1:n_basefuncs] # local stiffness matrix
     fill!(ke, 0.0f0)
-    fe = MVector{4,Float32}(undef)
+    fe = @view fe_colors[start_row_index:end_row_index] # local force vector
     fill!(fe, 0.0f0)
      #Loop over quadrature points
      for qv in Ferrite.QuadratureValuesIterator(cv,cell_coords)
@@ -132,11 +138,23 @@ end
     end
 
     ## Assemble Ke into Kgpu ##
-    assemble!(assembler, celldofs(dh,e),SMatrix(ke),SVector(fe)) # when passin mutable objects, throws and error
+    assemble!(assembler, celldofs(dh,e),ke,fe) # when passin mutable objects, throws and error
 
     return nothing
 end
 
+
+function allocate_local_matrices(colors,cv)
+    max_color_size = colors .|> length |> maximum
+    n_basefuncs = getnbasefunctions(cv)
+    cols = n_basefuncs
+    rows = n_basefuncs * max_color_size
+    # allocate maximum possible memory to incorporate all local matrices for each color.
+    # It will be mutated in each color.
+    ke = CUDA.zeros(Float32, rows, cols)
+    fe = CUDA.zeros(Float32, rows)
+    return ke,fe
+end
 
 
 Adapt.@adapt_structure Ferrite.GPUGrid
@@ -144,6 +162,7 @@ Adapt.@adapt_structure Ferrite.GPUDofHandler
 Adapt.@adapt_structure Ferrite.GPUAssemblerSparsityPattern
 
 #=NVTX.@annotate=# function assemble_global_gpu_color(cellvalues,dh,colors)
+    ke_colors,fe_colors = allocate_local_matrices(colors,cellvalues)
     K = allocate_matrix(SparseMatrixCSC{Float32, Int32},dh)
     Kgpu = CUSPARSE.CuSparseMatrixCSC(K)
     fgpu = CUDA.zeros(ndofs(dh))
@@ -154,30 +173,15 @@ Adapt.@adapt_structure Ferrite.GPUAssemblerSparsityPattern
     assembler_gpu = Adapt.adapt_structure(CUDA.KernelAdaptor(), assembler)
     cellvalues_gpu = Adapt.adapt_structure(CuArray, cellvalues)
     for i in 1:n_colors
-        kernel = @cuda launch=false assemble_element_gpu!(assembler_gpu,cellvalues_gpu,dh_gpu,Int32(length(colors[i])),cu(colors[i]))
+        kernel = @cuda launch=false assemble_element_gpu!(ke_colors,fe_colors,assembler_gpu,cellvalues_gpu,dh_gpu,Int32(length(colors[i])),cu(colors[i]))
         #@show CUDA.registers(kernel)
         config = launch_configuration(kernel.fun)
         threads = min(length(colors[i]), config.threads)
         blocks =  cld(length(colors[i]), threads)
-        kernel(assembler_gpu,cellvalues,dh_gpu,Int32(length(colors[i])),cu(colors[i]);  threads, blocks)
+        kernel(ke_colors,fe_colors,assembler_gpu,cellvalues,dh_gpu,Int32(length(colors[i])),cu(colors[i]);  threads, blocks)
     end
     return Kgpu,fgpu
 end
-
-
-# an alternative way to call the kernel using a macro
-function assemble_global_gpu_color_macro(cellvalues,dh,colors)
-    K = allocate_matrix(SparseMatrixCSC{Float32, Int32},dh)
-    Kgpu = CUSPARSE.CuSparseMatrixCSC(K)
-    fgpu = CUDA.zeros(ndofs(dh))
-    assembler = start_assemble(Kgpu, fgpu)
-
-    # set up kernel adaption & launch the kernel
-    @run_gpu(assemble_element_gpu!, assembler, cellvalues, dh, colors)
-    return Kgpu,fgpu
-end
-
-
 
 
 
@@ -188,7 +192,8 @@ stassy(cv,dh) = assemble_global!(cv,dh,Val(false))
 
 # qpassy(cv,dh) = assemble_global!(cv,dh,Val(true))
 
-Kgpu, fgpu = @btime CUDA.@sync  assemble_global_gpu_color($cellvalues,$dh,colors);
+
+Kgpu, fgpu =  assemble_global_gpu_color(cellvalues,dh,colors)
 #Kgpu, fgpu = CUDA.@profile    assemble_global_gpu_color(cellvalues,dh,colors)
 # to benchmark the code using nsight compute use the following command: ncu --mode=launch julia
 # Open nsight compute and attach the profiler to the julia instance
@@ -196,14 +201,10 @@ Kgpu, fgpu = @btime CUDA.@sync  assemble_global_gpu_color($cellvalues,$dh,colors
 # to benchmark using nsight system use the following command: # nsys profile --trace=nvtx julia rmse_kernel_v1.jl
 
 
-#mKgpu, mfgpu =    assemble_global_gpu_color_macro(cellvalues,dh,colors)
-
-
-
 norm(Kgpu)
 
 
-#Kstd , Fstd = @btime stassy($cellvalues,$dh);
+
 Kstd , Fstd =  stassy(cellvalues,dh);
 norm(Kstd)
 
