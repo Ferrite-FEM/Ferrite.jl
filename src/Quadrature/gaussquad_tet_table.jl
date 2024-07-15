@@ -23,33 +23,10 @@ function _get_jinyun_tet_quadrature_data(n::Int)
               b2 a2 b2 w2
               b2 b2 a2 w2
               b2 b2 b2 w2]
-    elseif n == 4
-        a1 = 1. / 4.;
-        w1 = -74. / 5625.;
-
-        a2 = 5. / 70.;
-        b2 = 11. / 14.;
-        w2 = 343. / 45000.;
-
-        a3 = ( 1. + √(5. / 14.) ) / 4.;
-        b3 = ( 1. - √(5. / 14.) ) / 4.;
-        w3 = 28. / 1125.;
-
-        xw = [a1 a1 a1 w1
-              b2 a2 a2 w2
-              a2 b2 a2 w2
-              a2 a2 b2 w2
-              a2 a2 a2 w2
-              a3 a3 b3 w3
-              a3 b3 a3 w3
-              a3 b3 b3 w3
-              b3 a3 a3 w3
-              b3 a3 b3 w3
-              b3 b3 a3 w3]
     elseif 4 ≤ n ≤ 6
-        throw(ArgumentError("not implemented quadrature order for Jinyun's Gauss quadrature rule (Tetrahedron)"))
+        throw(ArgumentError("Jinyun's Gauss quadrature rule (RefTetrahedron) is not implemented for orders 4 and 6"))
     else
-        throw(ArgumentError("unsupported quadrature order for Jinyun's Gauss quadrature rule (Tetrahedron)"))
+        throw(ArgumentError("unsupported quadrature order $n for Jinyun's Gauss quadrature rule (RefTetrahedron). Supported orders are 1 to 3."))
     end
     return xw
 end
@@ -58,6 +35,7 @@ end
 # Minimal points
 function _get_keast_a_tet_quadrature_data(n::Int)
     if 1 ≤ n ≤ 3
+        # The rules of Jinyin and Keast are identical for order 1 to 3, as stated in the Keast paper.
         xw = _get_jinyun_tet_quadrature_data(n)
     elseif n == 4
         a1 = 1. / 4.;
@@ -114,9 +92,9 @@ function _get_keast_a_tet_quadrature_data(n::Int)
               b4 a4 b4 w4
               b4 b4 a4 w4]
     elseif 6 ≤ n ≤ 8
-        throw(ArgumentError("not implement quadrature order for Keast's Gauss quadrature rule (Tetrahedron)"))
+        throw(ArgumentError("Keast's Gauss quadrature rule (RefTetrahedron) not implement for order 6 to 8"))
     else
-        throw(ArgumentError("unsupported order for Keast's Gauss quadrature rule (Tetrahedron)"))
+        throw(ArgumentError("unsupported order $n for Keast's Gauss quadrature rule (RefTetrahedron). Supported orders are 1 to 5."))
     end
     return xw
 end

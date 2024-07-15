@@ -3,12 +3,6 @@
 # rules for the triangle. Int. J. Numer. Meth. Engng., 21: 1129–1148. doi:
 # 10.1002/nme.1620210612
 #
-# Quadrature rules for orders 9 to 20 have been obtained using the
-# basix.make_quadrature(basix.CellType.triangle, n) calls of the
-# FEniCS / basix python package, which corresponds to Gauss-Jacobi rules.
-#
-# see
-# https://docs.fenicsproject.org/basix/main/python/_autosummary/basix.html?highlight=quadraturetype#basix.make_quadrature
 
 
 function _get_dunavant_gauss_tridata(n::Int)
@@ -88,7 +82,16 @@ function _get_dunavant_gauss_tridata(n::Int)
     return xw
 end
 
-
+# TheseqQuadrature rules for orders 9 to 20 have been obtained using the
+# basix.make_quadrature(basix.CellType.triangle, n) calls of the
+# FEniCS / basix python package, which corresponds to Gauss-Jacobi rules.
+#
+# see
+# https://docs.fenicsproject.org/basix/main/python/_autosummary/basix.html?highlight=quadraturetype#basix.make_quadrature
+#
+# The original paper for this rule is:
+# Jacobi, Carl Gustav Jakob. "Ueber Gauss neue Methode, die Werthe der Integrale
+# näherungsweise zu finden." (1826): 301-308.
 function _get_gaussjacobi_tridata(n::Int)
     if n == 9
         xw=[0.4171034443615992 0.4171034443615992 0.0136554632640511

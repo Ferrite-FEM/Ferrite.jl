@@ -23,8 +23,8 @@ tetrahedra the default rule is `keast_positive` (see [Keast:1986:mtq](@cite)). W
 to `:polyquad` (see [WitVin:2015:isq](@cite)).
 Furthermore we have implemented
 * `:gaussjacobi` for triangles (order 9-15)
-* `:jinyun` (see [Jin:1984:sgq](@cite)) for tetrahedra (order 1-4)
-* `:keast_minimal` (see [Keast:1986:mtq](@cite)) for tetrahedra (order 1-5)
+* `:keast_minimal` (see [Keast:1986:mtq](@cite)) for tetrahedra (order 1-5), containing negative weights
+* `:keast_positive` (see [Keast:1986:mtq](@cite)) for tetrahedra (order 1-5), containing only positive weights
 
 A `QuadratureRule` is used to approximate an integral on a domain by a weighted sum of
 function values at specific points:
@@ -178,8 +178,9 @@ end
 
 Create a `FacetQuadratureRule` used for integration of the faces of the refshape `shape` (of
 type [`AbstractRefShape`](@ref)). `order` is the order of the quadrature rule.
-It defaults to the default rules for the individual face reference elements. Elements with mixed facet types
-do not have a way of specifying the quadrature rule via symbol for now.
+If no symbol is provided, the default `quad_rule_type` for each facet's reference shape is used (see [QuadratureRule](@ref)).
+For non-default `quad_rule_type`s on cells with mixed facet types (e.g. `RefPrism` and `RefPyramid`), the
+`face_rules` must be provided explicitly. 
 
 `FacetQuadratureRule` is used as one of the components to create [`FacetValues`](@ref).
 """
