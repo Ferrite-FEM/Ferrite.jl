@@ -193,4 +193,4 @@ export
 
 # GPU
     @run_gpu,
-    assemble_block!
+    assemble_atomic!

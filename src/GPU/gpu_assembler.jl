@@ -9,23 +9,22 @@ function start_assemble(K::AbstractSparseArray{Tv}, f::AbstractVector{Tv}) where
 end
 
 
-@propagate_inbounds function assemble_block!(A::GPUAssemblerSparsityPattern, dofs::AbstractVector{Int32}, ke_block::AbstractMatrix, fe_block::AbstractVector)
-     # Brute force assembly
-     K = A.K
-     f = A.f
-     n_basefuncs = length(dofs)
-     tx = threadIdx().x
-     for m = 1:n_basefuncs
-        i = (tx-1)*n_basefuncs + m
-        ig = dofs[i]
-        f[ig] += fe_block[i]
-        for j = 1:length(dofs)
-            jg = dofs[j]
-            # set the value of the global matrix
-            _add_to_index!(K, ke_block[i,j], ig, jg)
-        end
-     end
+@inline @propagate_inbounds function assemble_atomic!(A::GPUAssemblerSparsityPattern, ke_val::Float32, fe_val::Float32 , ig::Int32, jg::Int32)
+    # Brute force assembly
+    K = A.K
+    f = A.f
+    CUDA.@atomic f[ig] += fe_val
+    # set the value of the global matrix
+     _add_to_index_atomic!(K, ke_val, ig, jg)
 end
+
+@inline @propagate_inbounds function assemble_atomic!(A::GPUAssemblerSparsityPattern, ke_val::Float32 , ig::Int32, jg::Int32)
+    # Brute force assembly
+    K = A.K
+    # set the value of the global matrix
+     _add_to_index_atomic!(K, ke_val, ig, jg)
+end
+
 
 
 """
@@ -62,6 +61,20 @@ end
         if K.rowVal[k] == i
             # Update the existing element
                 K.nzVal[k] += v
+            return
+        end
+    end
+end
+
+
+@inline function _add_to_index_atomic!(K::AbstractSparseArray{Tv,Ti}, v::Tv, i::Int32, j::Int32) where {Tv,Ti}
+    col_start = K.colPtr[j]
+    col_end = K.colPtr[j + Int32(1)] - Int32(1)
+
+    for k in col_start:col_end
+        if K.rowVal[k] == i
+            # Update the existing element
+            CUDA.@atomic  K.nzVal[k] += v
             return
         end
     end

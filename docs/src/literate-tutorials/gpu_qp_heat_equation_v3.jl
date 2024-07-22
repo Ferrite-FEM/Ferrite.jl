@@ -13,10 +13,10 @@ using NVTX
 
 
 left = Tensor{1,2,Float32}((0,-0)) # define the left bottom corner of the grid.
-right = Tensor{1,2,Float32}((3.0,4.0)) # define the right top corner of the grid.
+right = Tensor{1,2,Float32}((100.0,100.0)) # define the right top corner of the grid.
 
 
-grid = generate_grid(Quadrilateral, (3, 4),left,right)
+grid = generate_grid(Quadrilateral, (100, 100),left,right)
 
 
 ip = Lagrange{RefQuadrilateral, 1}() # define the interpolation function (i.e. Bilinear lagrange)
@@ -139,7 +139,36 @@ end
             end
         end
     end
+    return nothing
+end
 
+
+@inline function get_element_index(i,n_basefunc)
+    return (i-1)÷n_basefunc + 1 |> Int32
+end
+
+@inline function get_local_i_index(is,e,n_basefunc)
+    # `is`` is the index in the big local matrix (which incorporates all local matrices)
+    return is - (e-Int32(1))*n_basefunc
+end
+
+function assemble_global_gpu!(assembler,kes,fes,dh,n_basefuncs,n_cells)
+    tx = threadIdx().x
+    ty = threadIdx().y # will take value from 1 to n_basefuncs
+    bx = blockIdx().x
+    bd = blockDim().x
+    # e is the global index of the finite element in the grid.
+    is = tx + (bx-Int32(1))*bd
+    e = get_element_index(is,n_basefuncs)
+    e ≤ n_cells || return nothing
+    dofs = celldofs(dh, e)
+    jg = dofs[ty]
+    ig = dofs[get_local_i_index(is,e,n_basefuncs)]
+    if ty == Int32(1)
+        assemble_atomic!(assembler,kes[is,ty],fes[is],ig,jg)
+    else
+        assemble_atomic!(assembler,kes[is,ty],ig,jg)
+    end
     return nothing
 end
 
@@ -172,15 +201,25 @@ Adapt.@adapt_structure Ferrite.GPUAssemblerSparsityPattern
     dh_gpu = Adapt.adapt_structure(CuArray, dh)
     assembler_gpu = Adapt.adapt_structure(CUDA.KernelAdaptor(), assembler)
     cellvalues_gpu = Adapt.adapt_structure(CuArray, cellvalues)
-    kernel = @cuda launch=false assemble_local_gpu(kes,fes,cellvalues_gpu,dh_gpu,n_cells)
+    # assemble the local matrices in kes and fes
+    kernel_local = @cuda launch=false assemble_local_gpu(kes,fes,cellvalues_gpu,dh_gpu,n_cells)
     #@show CUDA.registers(kernel)
-    config = launch_configuration(kernel.fun)
+    config = launch_configuration(kernel_local.fun)
     threads = min(n_cells, config.threads)
     blocks =  cld(n_cells, threads)
-    kernel(kes,fes,cellvalues,dh_gpu,n_cells;  threads, blocks)
+    kernel_local(kes,fes,cellvalues,dh_gpu,n_cells;  threads, blocks)
+
+    # assemble the global matrix
+    n_basefuncs = getnbasefunctions(cellvalues)
+    kernel_global = @cuda launch=false assemble_global_gpu!(assembler_gpu,kes,fes,dh_gpu,n_basefuncs,n_cells)
+    #@show CUDA.registers(kernel)
+    config = launch_configuration(kernel_local.fun)
+    threads = min(length(fes), config.threads ÷ n_basefuncs)
+    blocks =  cld(length(fes), threads)
+    kernel_global(assembler_gpu,kes,fes,dh_gpu,n_basefuncs,n_cells;  threads = (threads,n_basefuncs), blocks)
+
     return Kgpu,fgpu
 end
-
 
 
 stassy(cv,dh) = assemble_global!(cv,dh,Val(false))
@@ -191,7 +230,7 @@ stassy(cv,dh) = assemble_global!(cv,dh,Val(false))
 # qpassy(cv,dh) = assemble_global!(cv,dh,Val(true))
 
 
-Kgpu, fgpu =  assemble_global_gpu(cellvalues,dh)
+Kgpu, fgpu =  assemble_global_gpu(cellvalues,dh);
 #Kgpu, fgpu = CUDA.@profile    assemble_global_gpu_color(cellvalues,dh,colors)
 # to benchmark the code using nsight compute use the following command: ncu --mode=launch julia
 # Open nsight compute and attach the profiler to the julia instance
