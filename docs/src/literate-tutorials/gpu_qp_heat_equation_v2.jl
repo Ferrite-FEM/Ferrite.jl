@@ -98,6 +98,18 @@ function assemble_global!(cellvalues, dh::DofHandler,qp_iter::Val{QPiter}) where
 end
 
 
+"""
+    get_local_sides(e_color,n_basefuncs)
+
+Get the local stiffness matrix and force vector for the element `e_color` in the grid.
+"""
+@inline function get_local_sides(ke_colors, fe_colors,e_color,n_basefuncs)
+    start_row_index = (e_color-1)*n_basefuncs + 1
+    end_row_index = start_row_index+(n_basefuncs-1)
+    start_row_index, end_row_index
+    return @view ke_colors[start_row_index:end_row_index,1:n_basefuncs], @view fe_colors[start_row_index:end_row_index]
+end
+
 
 #=NVTX.@annotate=# function assemble_element_gpu!(ke_colors,fe_colors,assembler,cv,dh,n_cells_colored, eles_colored)
     tx = threadIdx().x
@@ -112,11 +124,8 @@ end
     e = eles_colored[e_color]
     cell_coords = getcoordinates(dh.grid, e)
 
-    start_row_index = (e_color-1)*n_basefuncs + 1
-    end_row_index = start_row_index+(n_basefuncs-1)
-    ke = @view ke_colors[start_row_index:end_row_index,1:n_basefuncs] # local stiffness matrix
+    ke,fe = get_local_sides(ke_colors, fe_colors,e_color,n_basefuncs)
     fill!(ke, 0.0f0)
-    fe = @view fe_colors[start_row_index:end_row_index] # local force vector
     fill!(fe, 0.0f0)
      #Loop over quadrature points
      for qv in Ferrite.QuadratureValuesIterator(cv,cell_coords)
@@ -138,7 +147,7 @@ end
     end
 
     ## Assemble Ke into Kgpu ##
-    assemble!(assembler, celldofs(dh,e),ke,fe) # when passin mutable objects, throws and error
+    assemble!(assembler, celldofs(dh,e),ke,fe)
 
     return nothing
 end
