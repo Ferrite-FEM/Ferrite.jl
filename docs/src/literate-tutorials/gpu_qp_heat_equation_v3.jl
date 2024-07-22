@@ -13,14 +13,10 @@ using NVTX
 
 
 left = Tensor{1,2,Float32}((0,-0)) # define the left bottom corner of the grid.
-right = Tensor{1,2,Float32}((100.0,100.0)) # define the right top corner of the grid.
+right = Tensor{1,2,Float32}((3.0,4.0)) # define the right top corner of the grid.
 
 
-grid = generate_grid(Quadrilateral, (100, 100),left,right)
-
-
-colors = create_coloring(grid) .|> (x -> Int32.(x)) # convert to Int32 to reduce number of registers
-
+grid = generate_grid(Quadrilateral, (3, 4),left,right)
 
 
 ip = Lagrange{RefQuadrilateral, 1}() # define the interpolation function (i.e. Bilinear lagrange)
@@ -103,35 +99,28 @@ function assemble_global!(cellvalues, dh::DofHandler,qp_iter::Val{QPiter}) where
 end
 
 
-"""
-    get_local_sides(e_color,n_basefuncs)
 
-Get the local stiffness matrix and force vector for the element `e_color` in the grid.
-"""
-@inline function get_local_sides(ke_colors, fe_colors,e_color,n_basefuncs)
-    start_row_index = (e_color-1)*n_basefuncs + 1
+@inline function get_local_sides(kes, fes,e,n_basefuncs)
+    start_row_index = (e-1)*n_basefuncs + 1
     end_row_index = start_row_index+(n_basefuncs-1)
     start_row_index, end_row_index
-    return @view ke_colors[start_row_index:end_row_index,1:n_basefuncs], @view fe_colors[start_row_index:end_row_index]
+    return @view(kes[start_row_index:end_row_index,1:n_basefuncs]), @view(fes[start_row_index:end_row_index])
 end
 
 
-#=NVTX.@annotate=# function assemble_element_gpu!(ke_colors,fe_colors,assembler,cv,dh,n_cells_colored, eles_colored)
+#=NVTX.@annotate=# function assemble_local_gpu(kes,fes,cv,dh,n_cells)
     tx = threadIdx().x
     bx = blockIdx().x
     bd = blockDim().x
-    # e_color is the global index of the thread in the GPU scheme.
-    e_color = tx + (bx-Int32(1))*bd # element number per color
+    # e is the global index of the finite element in the grid.
+    e = tx + (bx-Int32(1))*bd
 
-    e_color ≤ n_cells_colored || return nothing
+    e ≤ n_cells || return nothing
     n_basefuncs = getnbasefunctions(cv)
     # e is the global index of the finite element in the grid.
-    e = eles_colored[e_color]
     cell_coords = getcoordinates(dh.grid, e)
 
-    ke,fe = get_local_sides(ke_colors, fe_colors,e_color,n_basefuncs)
-    fill!(ke, 0.0f0)
-    fill!(fe, 0.0f0)
+    ke,fe = get_local_sides(kes, fes ,e,n_basefuncs)
      #Loop over quadrature points
      for qv in Ferrite.QuadratureValuesIterator(cv,cell_coords)
         ## Get the quadrature weight
@@ -151,18 +140,14 @@ end
         end
     end
 
-    ## Assemble Ke into Kgpu ##
-    assemble!(assembler, celldofs(dh,e),ke,fe)
-
     return nothing
 end
 
 
-function allocate_local_matrices(colors,cv)
-    max_color_size = colors .|> length |> maximum
+function allocate_local_matrices(n_cells,cv)
     n_basefuncs = getnbasefunctions(cv)
     cols = n_basefuncs
-    rows = n_basefuncs * max_color_size
+    rows = n_basefuncs * n_cells
     # allocate maximum possible memory to incorporate all local matrices for each color.
     # It will be mutated in each color.
     ke = CUDA.zeros(Float32, rows, cols)
@@ -175,25 +160,24 @@ Adapt.@adapt_structure Ferrite.GPUGrid
 Adapt.@adapt_structure Ferrite.GPUDofHandler
 Adapt.@adapt_structure Ferrite.GPUAssemblerSparsityPattern
 
-#=NVTX.@annotate=# function assemble_global_gpu_color(cellvalues,dh,colors)
-    ke_colors,fe_colors = allocate_local_matrices(colors,cellvalues)
+
+#=NVTX.@annotate=# function assemble_global_gpu(cellvalues,dh)
+    n_cells = dh |> get_grid |> getncells |> Int32
+    kes,fes = allocate_local_matrices(n_cells,cellvalues)
     K = allocate_matrix(SparseMatrixCSC{Float32, Int32},dh)
     Kgpu = CUSPARSE.CuSparseMatrixCSC(K)
     fgpu = CUDA.zeros(ndofs(dh))
     assembler = start_assemble(Kgpu, fgpu)
-    n_colors = length(colors)
     # set up kernel adaption & launch the kernel
     dh_gpu = Adapt.adapt_structure(CuArray, dh)
     assembler_gpu = Adapt.adapt_structure(CUDA.KernelAdaptor(), assembler)
     cellvalues_gpu = Adapt.adapt_structure(CuArray, cellvalues)
-    for i in 1:n_colors
-        kernel = @cuda launch=false assemble_element_gpu!(ke_colors,fe_colors,assembler_gpu,cellvalues_gpu,dh_gpu,Int32(length(colors[i])),cu(colors[i]))
-        #@show CUDA.registers(kernel)
-        config = launch_configuration(kernel.fun)
-        threads = min(length(colors[i]), config.threads)
-        blocks =  cld(length(colors[i]), threads)
-        kernel(ke_colors,fe_colors,assembler_gpu,cellvalues,dh_gpu,Int32(length(colors[i])),cu(colors[i]);  threads, blocks)
-    end
+    kernel = @cuda launch=false assemble_local_gpu(kes,fes,cellvalues_gpu,dh_gpu,n_cells)
+    #@show CUDA.registers(kernel)
+    config = launch_configuration(kernel.fun)
+    threads = min(n_cells, config.threads)
+    blocks =  cld(n_cells, threads)
+    kernel(kes,fes,cellvalues,dh_gpu,n_cells;  threads, blocks)
     return Kgpu,fgpu
 end
 
@@ -207,7 +191,7 @@ stassy(cv,dh) = assemble_global!(cv,dh,Val(false))
 # qpassy(cv,dh) = assemble_global!(cv,dh,Val(true))
 
 
-Kgpu, fgpu =  assemble_global_gpu_color(cellvalues,dh,colors)
+Kgpu, fgpu =  assemble_global_gpu(cellvalues,dh)
 #Kgpu, fgpu = CUDA.@profile    assemble_global_gpu_color(cellvalues,dh,colors)
 # to benchmark the code using nsight compute use the following command: ncu --mode=launch julia
 # Open nsight compute and attach the profiler to the julia instance
@@ -268,7 +252,7 @@ norm(Kstd)
         Kstd , Fstd =  stassy(cellvalues,dh);
 
         # The GPU version
-        Kgpu, fgpu =  assemble_global_gpu_color(cellvalues,dh,colors)
+        Kgpu, fgpu =  assemble_global_gpu(cellvalues,dh,colors)
 
         @test norm(Kstd) ≈ norm(Kgpu) atol=1e-4
     end

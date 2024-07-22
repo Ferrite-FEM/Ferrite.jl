@@ -123,6 +123,7 @@ export
     DofOrder,
     evaluate_at_grid_nodes,
     apply_analytical!,
+    get_grid,
 
 # Sparsity pattern
     # AbstractSparsityPattern,
@@ -191,4 +192,5 @@ export
     PointValues,
 
 # GPU
-    @run_gpu
+    @run_gpu,
+    assemble_block!

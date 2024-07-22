@@ -8,6 +8,26 @@ function start_assemble(K::AbstractSparseArray{Tv}, f::AbstractVector{Tv}) where
     return GPUAssemblerSparsityPattern(K, f)
 end
 
+
+@propagate_inbounds function assemble_block!(A::GPUAssemblerSparsityPattern, dofs::AbstractVector{Int32}, ke_block::AbstractMatrix, fe_block::AbstractVector)
+     # Brute force assembly
+     K = A.K
+     f = A.f
+     n_basefuncs = length(dofs)
+     tx = threadIdx().x
+     for m = 1:n_basefuncs
+        i = (tx-1)*n_basefuncs + m
+        ig = dofs[i]
+        f[ig] += fe_block[i]
+        for j = 1:length(dofs)
+            jg = dofs[j]
+            # set the value of the global matrix
+            _add_to_index!(K, ke_block[i,j], ig, jg)
+        end
+     end
+end
+
+
 """
     assemble!(A::GPUAssemblerSparsityPattern, dofs::AbstractVector{Int32}, Ke::AbstractMatrix, fe::AbstractVector)
 
