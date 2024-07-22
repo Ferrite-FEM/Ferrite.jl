@@ -112,7 +112,7 @@ Get the local stiffness matrix and force vector for the element `e_color` in the
     start_row_index = (e_color-1)*n_basefuncs + 1
     end_row_index = start_row_index+(n_basefuncs-1)
     start_row_index, end_row_index
-    return @view ke_colors[start_row_index:end_row_index,1:n_basefuncs], @view fe_colors[start_row_index:end_row_index]
+    return @view(ke_colors[start_row_index:end_row_index,1:n_basefuncs]), @view(fe_colors[start_row_index:end_row_index])
 end
 
 
@@ -206,8 +206,7 @@ stassy(cv,dh) = assemble_global!(cv,dh,Val(false))
 
 # qpassy(cv,dh) = assemble_global!(cv,dh,Val(true))
 
-
-Kgpu, fgpu =  assemble_global_gpu_color(cellvalues,dh,colors)
+Kgpu, fgpu =  assemble_global_gpu_color(cellvalues,dh,colors);
 #Kgpu, fgpu = CUDA.@profile    assemble_global_gpu_color(cellvalues,dh,colors)
 # to benchmark the code using nsight compute use the following command: ncu --mode=launch julia
 # Open nsight compute and attach the profiler to the julia instance
