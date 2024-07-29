@@ -587,11 +587,9 @@ function _add_constraint_entries!(
     return sp
 end
 
-function _add_interface_entry(sp::SparsityPattern, coupling_sdh::Matrix{Bool}, dof_i::Int, dof_j::Int,
+function _add_interface_entry(sp::SparsityPattern,
         cell_field_dofs::Union{Vector{Int}, SubArray}, neighbor_field_dofs::Union{Vector{Int}, SubArray},
         i::Int, j::Int, keep_constrained::Bool, ch::Union{ConstraintHandler, Nothing})
-
-    coupling_sdh[dof_i, dof_j] || return
     dofi = cell_field_dofs[i]
     dofj = neighbor_field_dofs[j]
     # sym && (dofj > dofi && return cnt)
@@ -611,6 +609,7 @@ function _add_interface_entries!(
         #       the cells are in the same subdofhandler
         sdhs_idx = dh.cell_to_subdofhandler[cellid.([ic.a, ic.b])]
         sdhs = dh.subdofhandlers[sdhs_idx]
+        to_check = Dict{Int, Vector{Int}}()
         for (i, sdh) in pairs(sdhs)
             sdh_idx = sdhs_idx[i]
             coupling_sdh = couplings[sdh_idx]
@@ -624,14 +623,22 @@ function _add_interface_entries!(
                     dofrange2 = dof_range(sdh2, neighbor_field)
                     neighbor_dofs = celldofs(sdh_idx == 2 ? ic.a : ic.b)
                     neighbor_field_dofs = @view neighbor_dofs[dofrange2]
-                    # Typical coupling procedure
-                    for (j, dof_j) in pairs(dofrange2)
+
+                    empty!(to_check)
+                    for (j, dof_j) in enumerate(dofrange2)
+                        for (i, dof_i) in enumerate(dofrange1)
+                            coupling_sdh[dof_i, dof_j] || continue
+                            push!(get!(Vector{Int}, to_check, j), i)
+                        end
+                    end
+
+                    for (j, is) in to_check
                         # Avoid coupling the shared dof in continuous interpolations as cross-element. They're coupled in the local coupling matrix.
                         neighbor_field_dofs[j] ∈ cell_dofs && continue
-                        for (i, dof_i) in pairs(dofrange1)
+                        for i in is
                             cell_field_dofs[i] ∈ neighbor_dofs && continue
-                            _add_interface_entry(sp, coupling_sdh, dof_i, dof_j, cell_field_dofs, neighbor_field_dofs, i, j, keep_constrained, ch)
-                            _add_interface_entry(sp, coupling_sdh, dof_j, dof_i, neighbor_field_dofs, cell_field_dofs, j, i, keep_constrained, ch)
+                            _add_interface_entry(sp, cell_field_dofs, neighbor_field_dofs, i, j, keep_constrained, ch)
+                            _add_interface_entry(sp, neighbor_field_dofs, cell_field_dofs, j, i, keep_constrained, ch)
                         end
                     end
                 end
