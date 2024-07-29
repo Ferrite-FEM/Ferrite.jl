@@ -625,11 +625,14 @@ function _add_interface_entries!(
                     neighbor_dofs = celldofs(sdh_idx == 2 ? ic.a : ic.b)
                     neighbor_field_dofs = @view neighbor_dofs[dofrange2]
                     # Typical coupling procedure
-                    for (j, dof_j) in pairs(dofrange2), (i, dof_i) in pairs(dofrange1)
-                        # This line to avoid coupling the shared dof in continuous interpolations as cross-element. They're coupled in the local coupling matrix.
-                        (cell_field_dofs[i] ∈ neighbor_dofs || neighbor_field_dofs[j] ∈ cell_dofs) && continue
-                        _add_interface_entry(sp, coupling_sdh, dof_i, dof_j, cell_field_dofs, neighbor_field_dofs, i, j, keep_constrained, ch)
-                        _add_interface_entry(sp, coupling_sdh, dof_j, dof_i, neighbor_field_dofs, cell_field_dofs, j, i, keep_constrained, ch)
+                    for (j, dof_j) in pairs(dofrange2)
+                        # Avoid coupling the shared dof in continuous interpolations as cross-element. They're coupled in the local coupling matrix.
+                        neighbor_field_dofs[j] ∈ cell_dofs && continue
+                        for (i, dof_i) in pairs(dofrange1)
+                            cell_field_dofs[i] ∈ neighbor_dofs && continue
+                            _add_interface_entry(sp, coupling_sdh, dof_i, dof_j, cell_field_dofs, neighbor_field_dofs, i, j, keep_constrained, ch)
+                            _add_interface_entry(sp, coupling_sdh, dof_j, dof_i, neighbor_field_dofs, cell_field_dofs, j, i, keep_constrained, ch)
+                        end
                     end
                 end
             end
