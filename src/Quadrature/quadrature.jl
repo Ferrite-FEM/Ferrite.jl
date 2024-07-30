@@ -19,7 +19,7 @@ Create a `QuadratureRule` used for integration on the refshape `shape` (of type 
 `quad_rule_type` is an optional argument determining the type of quadrature rule,
 currently the `:legendre` and `:lobatto` rules are implemented for hypercubes.
 For triangles up to order 8 the default rule is the one by `:dunavant` (see [Dun:1985:hde](@cite)) and for
-tetrahedra the default rule is `keast_positive` (see [Keast:1986:mtq](@cite)). Wedges and pyramids default
+tetrahedra the default rule is `keast_minimal` (see [Keast:1986:mtq](@cite)). Wedges and pyramids default
 to `:polyquad` (see [WitVin:2015:isq](@cite)).
 Furthermore we have implemented
 * `:gaussjacobi` for triangles (order 9-15)

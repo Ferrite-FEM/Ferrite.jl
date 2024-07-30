@@ -200,4 +200,40 @@ using Ferrite: reference_shape_value
             end
         end
     end
+
+    # Check explicitly if the defaults changed, as this might affect users negatively
+    @testset "Volume defaults for $refshape" for (refshape, sym) in (
+        (RefLine, :legendre),
+        (RefQuadrilateral, :legendre),
+        (RefHexahedron, :legendre),
+        (RefTriangle, :dunavant),
+        (RefTetrahedron, :keast_minimal),
+        (RefPrism, :polyquad),
+        (RefPyramid, :polyquad),
+    )
+        for order in 1:3
+            qr  = QuadratureRule{refshape}(sym, order)
+            qr_default = QuadratureRule{refshape}(order)
+            @test Ferrite.getweights(qr) == Ferrite.getweights(qr_default)
+            @test Ferrite.getpoints(qr) == Ferrite.getpoints(qr_default)
+        end
+    end
+    @testset "Facet defaults for $refshape" for (refshape, sym) in (
+        # (RefLine, :legendre), # There is no choice for the rule on lines, as it only is a point eval
+        (RefQuadrilateral, :legendre),
+        (RefHexahedron, :legendre),
+        (RefTriangle, :legendre),
+        (RefTetrahedron, :dunavant),
+        # (RefPrism, ...), # Not implemented yet (see discussion in #1007)
+        # (RefPyramid, ...), # Not implement yet (see discussion in #1007)
+    )
+        for order in 1:3
+            fqr  = FacetQuadratureRule{refshape}(sym, order)
+            fqr_default = FacetQuadratureRule{refshape}(order)
+            for f in 1:nfacets(refshape)
+                @test Ferrite.getweights(fqr,f) == Ferrite.getweights(fqr_default,f)
+                @test Ferrite.getpoints(fqr,f) == Ferrite.getpoints(fqr_default,f)
+            end
+        end
+    end
 end
