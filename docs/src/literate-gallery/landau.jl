@@ -68,7 +68,7 @@ function ThreadCache(dpc::Int, nodespercell, cvP::CellValues, modelparams, elpot
     element_coords   = zeros(Vec{3, Float64}, nodespercell)
     potfunc          = x -> elpotential(x, cvP, modelparams)
     gradconf         = GradientConfig(potfunc, zeros(dpc), Chunk{12}())
-    hessconf         = HessianConfig(potfunc, zeros(dpc), Chunk{12}())
+    hessconf         = HessianConfig(potfunc, zeros(dpc), Chunk{4}())
     return ThreadCache(cvP, element_indices, element_dofs, element_gradient, element_hessian, element_coords, potfunc, gradconf, hessconf)
 end
 
