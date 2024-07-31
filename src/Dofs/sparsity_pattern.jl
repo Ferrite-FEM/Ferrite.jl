@@ -1,3 +1,45 @@
+
+
+
+abstract type AbstractDynamicSparsityPattern end
+
+"""
+    add_entry!(dsp::AbstractDynamicSparsityPattern, row::Int, col::Int)
+
+Add an entry to the dynamic sparsity pattern `sp` at row `row` and column `col`.
+"""
+add_entry!(dsp::AbstractDynamicSparsityPattern, row::Int, col::Int)
+
+#=
+struct DofEntry
+    col::Int
+    row::Int
+end
+Base.isless(p::DofEntry, q::DofEntry) = ifelse(!isequal(p.col,q.col), isless(p.col,q.col),
+                                                                     isless(p.row,q.row))
+=#
+
+"""
+    struct DynamicSparsityPattern <: AbstractDynamicSparsityPattern
+
+"""
+struct DynamicSparsityPattern <: AbstractDynamicSparsityPattern
+    nrows::Int
+    ncols::Int
+    entries::Vector{Pair{Int, Int}} # DofEntry}
+end
+getnrows(dsp::DynamicSparsityPattern) = dsp.nrows
+getncols(dsp::DynamicSparsityPattern) = dsp.ncols
+
+function DynamicSparsityPattern(nrows::Int, ncols::Int; nz::Int=0)
+    entries = Pair{Int, Int}[]
+    sizehint!(entries, nz)
+    return DynamicSparsityPattern(nrows, ncols, entries)
+end
+
+add_entry!(dsp::DynamicSparsityPattern, row::Int, col::Int) = push!(dsp.entries, col => row)
+
+
 ###########################
 # AbstractSparsityPattern #
 ###########################
@@ -23,13 +65,6 @@ getnrows(sp::AbstractSparsityPattern)
 Return the number of columns in the sparsity pattern `sp`.
 """
 getncols(sp::AbstractSparsityPattern)
-
-"""
-    add_entry!(sp::AbstractSparsityPattern, row::Int, col::Int)
-
-Add an entry to the sparsity pattern `sp` at row `row` and column `col`.
-"""
-add_entry!(sp::AbstractSparsityPattern, row::Int, col::Int)
 
 # This is necessary to avoid warning about not importing Base.eachrow when
 # adding docstring before the definitions further down.
@@ -80,8 +115,8 @@ documentation.
 struct SparsityPattern <: AbstractSparsityPattern
     nrows::Int
     ncols::Int
-    mempool::PoolAllocator.MemoryPool{Int}
-    rows::Vector{PoolAllocator.PoolVector{Int}}
+    colptr::Vector{Int}
+    rowval::Vector{Int}
 end
 
 """
@@ -114,14 +149,44 @@ more details):
  - [`allocate_matrix`](@ref allocate_matrix(::SparsityPattern)): instantiate a matrix from
    the pattern. The default matrix type is `SparseMatrixCSC{Float64, Int}`.
 """
-function SparsityPattern(nrows::Int, ncols::Int; nnz_per_row::Int = 8)
-    mempool = PoolAllocator.MemoryPool{Int}()
-    rows = Vector{PoolAllocator.PoolVector{Int}}(undef, nrows)
-    for i in 1:nrows
-        rows[i] = PoolAllocator.resize(PoolAllocator.malloc(mempool, nnz_per_row), 0)
-    end
-    sp = SparsityPattern(nrows, ncols, mempool, rows)
+function SparsityPattern(dsp::DynamicSparsityPattern)
+    colptr, rowval = IJ_to_sparsitypattern!(dsp)
+    sp = SparsityPattern(dsp.ncols, dsp.nrows, colptr, rowval)
     return sp
+end
+
+function IJ_to_sparsitypattern!(dsp::DynamicSparsityPattern)
+    entries = dsp.entries
+    ncols = dsp.ncols
+    colptr = Vector{Int}(undef, ncols+1)
+    rowval = Vector{Int}(undef, length(entries)) # This size is an upper bound
+    sort!(entries)
+    colptr = zeros(Int, ncols+1)
+
+    n_entries = 0
+
+    row = 1
+    colptr[1] = 1
+    offset = 1
+    while true
+        col = entries[offset].first
+        while entries[offset].first == col
+            offset += 1
+            offset > length(entries) && break
+        end
+
+        row += 1
+        colptr[row] = offset
+        range = colptr[row-1]:(offset-1)
+
+        # TODO: duplicates
+        for i in range
+            rowval[i] = entries[i].second
+        end
+
+        offset > length(entries) && break
+    end
+    return colptr, rowval
 end
 
 function Base.show(io::IO, ::MIME"text/plain", sp::SparsityPattern)
@@ -157,13 +222,6 @@ end
 getnrows(sp::SparsityPattern) = sp.nrows
 getncols(sp::SparsityPattern) = sp.ncols
 
-@inline function add_entry!(sp::SparsityPattern, row::Int, col::Int)
-    @boundscheck (1 <= row <= getnrows(sp) && 1 <= col <= getncols(sp)) || throw(BoundsError(sp, (row, col)))
-    r = @inbounds sp.rows[row]
-    r = insert_sorted(r, col)
-    @inbounds sp.rows[row] = r
-    return
-end
 
 @inline function insert_sorted(x::PoolAllocator.PoolVector{Int}, item::Int)
     k = searchsortedfirst(x, item)
@@ -182,7 +240,7 @@ eachrow(sp::SparsityPattern, row::Int) = sp.rows[row]
 ################################################
 
 """
-    init_sparsity_pattern(dh::DofHandler; nnz_per_row::Int)
+    init_dynamic_sparsity_pattern(dh::DofHandler; nnz_per_row::Int)
 
 Initialize an empty [`SparsityPattern`](@ref) with `ndofs(dh)` rows and `ndofs(dh)` columns.
 
@@ -190,12 +248,14 @@ Initialize an empty [`SparsityPattern`](@ref) with `ndofs(dh)` rows and `ndofs(d
  - `nnz_per_row`: memory optimization hint for the number of non-zero entries per row that
    will be added to the pattern.
 """
-function init_sparsity_pattern(
+function init_dynamic_sparsity_pattern(
         dh::DofHandler;
         # TODO: What is a good estimate for nnz_per_row?
         nnz_per_row::Int = 2 * ndofs_per_cell(dh.subdofhandlers[1]), # FIXME
     )
-    sp = SparsityPattern(ndofs(dh), ndofs(dh); nnz_per_row = nnz_per_row)
+    nz = nnz_per_row * ndofs(dh)
+    sp = DynamicSparsityPattern(ndofs(dh), ndofs(dh); nz)
+
     return sp
 end
 
@@ -220,7 +280,7 @@ arguments are passed:
 For more details about arguments and keyword arguments, see the respective functions.
 """
 function add_sparsity_entries!(
-        sp::AbstractSparsityPattern, dh::DofHandler,
+        sp::AbstractDynamicSparsityPattern, dh::DofHandler,
         ch::Union{ConstraintHandler, Nothing} = nothing;
         keep_constrained::Bool = true,
         coupling::Union{AbstractMatrix{Bool}, Nothing} = nothing,
@@ -264,7 +324,7 @@ described by the DofHandler `dh`.
    (`coupling = nothing`) it is assumed that all DoFs in each cell couple with each other.
 """
 function add_cell_entries!(
-        sp::AbstractSparsityPattern,
+        sp::AbstractDynamicSparsityPattern,
         dh::DofHandler, ch::Union{ConstraintHandler, Nothing} = nothing;
         keep_constrained::Bool = true, coupling::Union{AbstractMatrix{Bool}, Nothing} = nothing,
     )
@@ -333,7 +393,7 @@ function add_constraint_entries!(
     return _add_constraint_entries!(sp, ch.dofcoefficients, ch.dofmapping, keep_constrained)
 end
 
-function add_diagonal_entries!(sp::AbstractSparsityPattern)
+function add_diagonal_entries!(sp::AbstractDynamicSparsityPattern)
     for d in 1:min(getnrows(sp), getncols(sp))
         add_entry!(sp, d, d)
     end
@@ -480,7 +540,7 @@ function _coupling_to_local_dof_coupling(dh::DofHandler, coupling::AbstractMatri
 end
 
 function _add_cell_entries!(
-        sp::AbstractSparsityPattern, dh::DofHandler, ch::Union{ConstraintHandler, Nothing},
+        dsp::AbstractDynamicSparsityPattern, dh::DofHandler, ch::Union{ConstraintHandler, Nothing},
         keep_constrained::Bool, coupling::Union{Vector{<:AbstractMatrix{Bool}}, Nothing},
     )
     # Add all connections between dofs for every cell while filtering based
@@ -502,16 +562,16 @@ function _add_cell_entries!(
                     # a) check constraint for col
                     !keep_constrained && haskey(ch.dofmapping, col) && continue
                     # Insert col as a non zero index for this row
-                    add_entry!(sp, row, col)
+                    add_entry!(dsp, row, col)
                 end
             end
         end
     end
-    return sp
+    return dsp
 end
 
 function _add_constraint_entries!(
-        sp::AbstractSparsityPattern, dofcoefficients::Vector{Union{DofCoefficients{T}, Nothing}},
+        sp::AbstractDynamicSparsityPattern, dofcoefficients::Vector{Union{DofCoefficients{T}, Nothing}},
         dofmapping::Dict{Int,Int}, keep_constrained::Bool,
     ) where {T}
 
@@ -587,7 +647,7 @@ function _add_constraint_entries!(
     return sp
 end
 
-function _add_interface_entry(sp::SparsityPattern, coupling_sdh::Matrix{Bool}, dof_i::Int, dof_j::Int,
+function _add_interface_entry(dsp::AbstractDynamicSparsityPattern, coupling_sdh::Matrix{Bool}, dof_i::Int, dof_j::Int,
         cell_field_dofs::Union{Vector{Int}, SubArray}, neighbor_field_dofs::Union{Vector{Int}, SubArray},
         i::Int, j::Int, keep_constrained::Bool, ch::Union{ConstraintHandler, Nothing})
 
@@ -596,12 +656,12 @@ function _add_interface_entry(sp::SparsityPattern, coupling_sdh::Matrix{Bool}, d
     dofj = neighbor_field_dofs[j]
     # sym && (dofj > dofi && return cnt)
     !keep_constrained && (haskey(ch.dofmapping, dofi) || haskey(ch.dofmapping, dofj)) && return
-    add_entry!(sp, dofi, dofj)
+    add_entry!(dsp, dofi, dofj)
     return
 end
 
 function _add_interface_entries!(
-        sp::SparsityPattern, dh::DofHandler, ch::Union{ConstraintHandler, Nothing},
+        dsp::AbstractDynamicSparsityPattern, dh::DofHandler, ch::Union{ConstraintHandler, Nothing},
         topology::ExclusiveTopology, keep_constrained::Bool,
         interface_coupling::AbstractMatrix{Bool},
     )
@@ -630,8 +690,8 @@ function _add_interface_entries!(
                         neighbor_field_dofs[j] ∈ cell_dofs && continue
                         for (i, dof_i) in pairs(dofrange1)
                             cell_field_dofs[i] ∈ neighbor_dofs && continue
-                            _add_interface_entry(sp, coupling_sdh, dof_i, dof_j, cell_field_dofs, neighbor_field_dofs, i, j, keep_constrained, ch)
-                            _add_interface_entry(sp, coupling_sdh, dof_j, dof_i, neighbor_field_dofs, cell_field_dofs, j, i, keep_constrained, ch)
+                            _add_interface_entry(dsp, coupling_sdh, dof_i, dof_j, cell_field_dofs, neighbor_field_dofs, i, j, keep_constrained, ch)
+                            _add_interface_entry(dsp, coupling_sdh, dof_j, dof_i, neighbor_field_dofs, cell_field_dofs, j, i, keep_constrained, ch)
                         end
                     end
                 end
@@ -642,7 +702,12 @@ function _add_interface_entries!(
 end
 
 # Internal matrix instantiation for SparseMatrixCSC and Symmetric{SparseMatrixCSC}
-function _allocate_matrix(::Type{SparseMatrixCSC{Tv, Ti}}, sp::AbstractSparsityPattern, sym::Bool) where {Tv, Ti}
+function _allocate_matrix(::Type{SparseMatrixCSC{Tv, Ti}}, sp::SparsityPattern, sym::Bool) where {Tv, Ti}
+    nzval = zeros(Tv, length(sp.rowval))
+    return SparseMatrixCSC(getnrows(sp), getncols(sp), sp.colptr, sp.rowval, nzval)
+end
+
+function _allocate_matrix(::Type{SparseMatrixCSC{Tv, Ti}}, sp::AbstractDynamicSparsityPattern, sym::Bool) where {Tv, Ti}
     # 1. Setup colptr
     colptr = zeros(Ti, getncols(sp) + 1)
     colptr[1] = 1
