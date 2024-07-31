@@ -32,12 +32,10 @@ for spatial_dim ∈ [2]
 
     # Non-symmetric application
     M, f = FerriteAssemblyHelper._assemble_mass(dh, cellvalues, false);
-    DIRICHLET_SUITE["global"]["apply!(M,f,APPLY_TRANSPOSE)"] = @benchmarkable apply!($M, $f, $ch; strategy=$(Ferrite.APPLY_TRANSPOSE));
-    DIRICHLET_SUITE["global"]["apply!(M,f,APPLY_INPLACE)"] = @benchmarkable apply!($M, $f, $ch; strategy=$(Ferrite.APPLY_INPLACE));
+    DIRICHLET_SUITE["global"]["apply!(M,f)"] = @benchmarkable apply!($M, $f, $ch);
     # Symmetric application
     M, f = FerriteAssemblyHelper._assemble_mass(dh, cellvalues, true);
-    DIRICHLET_SUITE["global"]["apply!(M_sym,f,APPLY_TRANSPOSE)"] = @benchmarkable apply!($M, $f, $ch; strategy=$(Ferrite.APPLY_TRANSPOSE));
-    DIRICHLET_SUITE["global"]["apply!(M_sym,f,APPLY_INPLACE)"] = @benchmarkable apply!($M, $f, $ch; strategy=$(Ferrite.APPLY_INPLACE));
+    DIRICHLET_SUITE["global"]["apply!(M_sym,f)"] = @benchmarkable apply!($M, $f, $ch);
 
     DIRICHLET_SUITE["global"]["apply!(f)"] = @benchmarkable apply!($f, $ch);
     DIRICHLET_SUITE["global"]["apply_zero!(f)"] = @benchmarkable apply!($f, $ch);

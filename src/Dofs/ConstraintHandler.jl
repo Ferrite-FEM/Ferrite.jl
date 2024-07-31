@@ -595,13 +595,7 @@ function apply_zero!(K::Union{SparseMatrixCSC,Symmetric}, f::AbstractVector, ch:
     apply!(K, f, ch, true)
 end
 
-# For backwards compatibility, not used anymore
-@enumx ApplyStrategy Transpose Inplace
-const APPLY_TRANSPOSE = ApplyStrategy.Transpose
-const APPLY_INPLACE = ApplyStrategy.Inplace
-
-function apply!(KK::Union{SparseMatrixCSC,Symmetric}, f::AbstractVector, ch::ConstraintHandler, applyzero::Bool=false;
-                strategy::ApplyStrategy.T=ApplyStrategy.Transpose)
+function apply!(KK::Union{SparseMatrixCSC,Symmetric}, f::AbstractVector, ch::ConstraintHandler, applyzero::Bool=false)
     @assert isclosed(ch)
     sym = isa(KK, Symmetric)
     K = sym ? KK.data : KK
