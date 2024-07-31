@@ -12,15 +12,46 @@ using Test
 using NVTX
 
 
+struct DofToElements{DofType <: Int32, VEC_INT<:AbstractVector{Int32}}
+    dof:: DofType
+    elements:: VEC_INT # elements contain this global dof
+    local_dofs::VEC_INT # local dofs of the global dof in each element
+end
+
+
+function map_dof_to_elements(dh::DofHandler, dof::Int)
+    elements = []
+    local_dofs = []
+    ncells = dh |> get_grid |> getncells |> Int32
+    for cell in 1:ncells
+        dofs = celldofs(dh,cell)
+        if dof ∈ dofs
+            push!(elements, cell |> Int32)
+            index = findfirst(e->e == dof, dofs) |> Int32
+            push!(local_dofs,index)
+        end
+    end
+    return DofToElements{Int32,Vector{Int32}}(Int32(dof), elements, local_dofs)
+end
+
+
+function map_dofs_to_elements(dh::DofHandler)
+    dofs = ndofs(dh)
+    dofs_to_elements = range(1,dofs) .|> (dof -> map_dof_to_elements(dh, dof))
+    return dofs_to_elements
+end
+
+
 
 left = Tensor{1,2,Float32}((0,-0)) # define the left bottom corner of the grid.
-right = Tensor{1,2,Float32}((10000.0,1000.0)) # define the right top corner of the grid.
+right = Tensor{1,2,Float32}((2,1)) # define the right top corner of the grid.
 
 
-grid = generate_grid(Quadrilateral, (10000, 1000),left,right)
+grid = generate_grid(Quadrilateral, (2, 1),left,right)
 
 
 ip = Lagrange{RefQuadrilateral, 1}() # define the interpolation function (i.e. Bilinear lagrange)
+
 
 qr = QuadratureRule{RefQuadrilateral}(Float32,2)
 
@@ -31,10 +62,10 @@ cellvalues = CellValues(Float32,qr, ip)
 dh = DofHandler(grid)
 
 
-
 add!(dh, :u, ip)
 
 close!(dh);
+
 
 
 
