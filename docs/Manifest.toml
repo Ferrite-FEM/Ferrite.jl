@@ -2,7 +2,7 @@
 
 julia_version = "1.10.4"
 manifest_format = "2.0"
-project_hash = "8722b6a67abf1b81e2c7808ddfcfb1d737cd0040"
+project_hash = "6f75568b4b6adf310d9c6b4556b4e69e4f996f31"
 
 [[deps.ADTypes]]
 git-tree-sha1 = "3a6511b6e54550bcbc986c560921a8cd7761fcd8"
@@ -103,6 +103,18 @@ weakdeps = ["SparseArrays"]
     [deps.ArrayLayouts.extensions]
     ArrayLayoutsSparseArraysExt = "SparseArrays"
 
+[[deps.ArraysOfArrays]]
+deps = ["Statistics"]
+git-tree-sha1 = "ad745f4bc2cfc5fe58484e53e49c3e650103e4bd"
+uuid = "65a8f2f4-9b39-5baf-92e2-a9cc46fdf018"
+version = "0.6.5"
+weakdeps = ["Adapt", "ChainRulesCore", "StaticArraysCore"]
+
+    [deps.ArraysOfArrays.extensions]
+    ArraysOfArraysAdaptExt = "Adapt"
+    ArraysOfArraysChainRulesCoreExt = "ChainRulesCore"
+    ArraysOfArraysStaticArraysCoreExt = "StaticArraysCore"
+
 [[deps.Artifacts]]
 uuid = "56f22d72-fd6d-98f1-02f0-08ddc0907c33"
 
@@ -139,7 +151,7 @@ version = "0.1.5"
 
 [[deps.BlockArrays]]
 deps = ["ArrayLayouts", "FillArrays", "LinearAlgebra"]
-git-tree-sha1 = "5c0ffe1dff8cb7112de075f1b1cb32191675fcba"
+path = "dev/BlockArrays"
 uuid = "8e7c35d0-a365-5155-bbbb-fb81a777f24e"
 version = "1.1.0"
 
