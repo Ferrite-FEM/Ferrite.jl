@@ -14,10 +14,10 @@ using NVTX
 
 
 left = Tensor{1,2,Float32}((0,-0)) # define the left bottom corner of the grid.
-right = Tensor{1,2,Float32}((10000.0,1000.0)) # define the right top corner of the grid.
+right = Tensor{1,2,Float32}((100.0,100.0)) # define the right top corner of the grid.
 
 
-grid = generate_grid(Quadrilateral, (10000, 1000),left,right)
+grid = generate_grid(Quadrilateral, (100, 100),left,right)
 
 
 ip = Lagrange{RefQuadrilateral, 1}() # define the interpolation function (i.e. Bilinear lagrange)
@@ -101,12 +101,12 @@ end
 
 
 
-@inline function get_local_sides(kes, fes,e,n_basefuncs)
-    start_row_index = (e-1)*n_basefuncs + 1
-    end_row_index = start_row_index+(n_basefuncs-1)
-    start_row_index, end_row_index
-    return @view(kes[start_row_index:end_row_index,1:n_basefuncs]), @view(fes[start_row_index:end_row_index])
-end
+# @inline function get_local_sides(kes, fes,e,n_basefuncs)
+#     start_row_index = (e-1)*n_basefuncs + 1
+#     end_row_index = start_row_index+(n_basefuncs-1)
+#     start_row_index, end_row_index
+#     return @view(kes[start_row_index:end_row_index,1:n_basefuncs]), @view(fes[start_row_index:end_row_index])
+# end
 
 
 #=NVTX.@annotate=# function assemble_local_gpu(kes,fes,cv,dh,n_cells)
@@ -121,7 +121,8 @@ end
     # e is the global index of the finite element in the grid.
     cell_coords = getcoordinates(dh.grid, e)
 
-    ke,fe = get_local_sides(kes, fes ,e,n_basefuncs)
+    ke = @view kes[e,:,:]
+    fe = @view fes[e,:]
      #Loop over quadrature points
      for qv in Ferrite.QuadratureValuesIterator(cv,cell_coords)
         ## Get the quadrature weight
@@ -144,31 +145,24 @@ end
 end
 
 
-@inline function get_element_index(i,n_basefunc)
-    return (i-1)÷n_basefunc + 1 |> Int32
-end
 
-@inline function get_local_i_index(is,e,n_basefunc)
-    # `is`` is the index in the big local matrix (which incorporates all local matrices)
-    return is - (e-Int32(1))*n_basefunc
-end
-
-function assemble_global_gpu!(assembler,kes,fes,dh,n_basefuncs,n_cells)
-    tx = threadIdx().x
-    ty = threadIdx().y # will take value from 1 to n_basefuncs
+function assemble_global_gpu!(assembler,kes,fes,dh,n_cells)
+    tx = threadIdx().x # potential element index
+    ty = threadIdx().y # rows of local matrix
+    tz= threadIdx().z # columns of local matrix
     bx = blockIdx().x
     bd = blockDim().x
     # e is the global index of the finite element in the grid.
-    is = tx + (bx-Int32(1))*bd
-    e = get_element_index(is,n_basefuncs)
+    e = tx + (bx-Int32(1))*bd
+    #e = get_element_index(is,n_basefuncs)
     e ≤ n_cells || return nothing
     dofs = celldofs(dh, e)
     jg = dofs[ty]
-    ig = dofs[get_local_i_index(is,e,n_basefuncs)]
-    if ty == Int32(1)
-        assemble_atomic!(assembler,kes[is,ty],fes[is],ig,jg)
+    ig = dofs[tz]
+    if tz == Int32(1)
+        assemble_atomic!(assembler,kes[e,ty,tz],fes[e,ty],ig,jg)
     else
-        assemble_atomic!(assembler,kes[is,ty],ig,jg)
+        assemble_atomic!(assembler,kes[e,ty,tz],ig,jg)
     end
     return nothing
 end
@@ -176,12 +170,10 @@ end
 
 function allocate_local_matrices(n_cells,cv)
     n_basefuncs = getnbasefunctions(cv)
-    cols = n_basefuncs
-    rows = n_basefuncs * n_cells
     # allocate maximum possible memory to incorporate all local matrices for each color.
     # It will be mutated in each color.
-    ke = CUDA.zeros(Float32, rows, cols)
-    fe = CUDA.zeros(Float32, rows)
+    ke = CUDA.zeros(Float32,n_cells , n_basefuncs, n_basefuncs)
+    fe = CUDA.zeros(Float32,n_cells, n_basefuncs)
     return ke,fe
 end
 
@@ -212,12 +204,13 @@ Adapt.@adapt_structure Ferrite.GPUAssemblerSparsityPattern
 
     # assemble the global matrix
     n_basefuncs = getnbasefunctions(cellvalues)
-    kernel_global = @cuda launch=false assemble_global_gpu!(assembler_gpu,kes,fes,dh_gpu,n_basefuncs,n_cells)
+    kernel_global = @cuda launch=false assemble_global_gpu!(assembler_gpu,kes,fes,dh_gpu,n_cells)
     #@show CUDA.registers(kernel)
     config = launch_configuration(kernel_local.fun)
-    threads = min(length(fes), config.threads ÷ n_basefuncs)
-    blocks =  cld(length(fes), threads)
-    kernel_global(assembler_gpu,kes,fes,dh_gpu,n_basefuncs,n_cells;  threads = (threads,n_basefuncs), blocks)
+    threads_eles = min(size(fes)[1], config.threads ÷ (n_basefuncs*n_basefuncs))
+    blocks =  cld(size(fes)[1], threads_eles)
+    # x-direction is the element index, y & z are the local indices of the local matrices
+    kernel_global(assembler_gpu,kes,fes,dh_gpu,n_cells;  threads = (threads_eles,n_basefuncs,n_basefuncs), blocks)
 
     return Kgpu,fgpu
 end
