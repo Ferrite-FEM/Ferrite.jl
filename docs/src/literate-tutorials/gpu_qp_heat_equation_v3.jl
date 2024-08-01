@@ -101,13 +101,6 @@ end
 
 
 
-# @inline function get_local_sides(kes, fes,e,n_basefuncs)
-#     start_row_index = (e-1)*n_basefuncs + 1
-#     end_row_index = start_row_index+(n_basefuncs-1)
-#     start_row_index, end_row_index
-#     return @view(kes[start_row_index:end_row_index,1:n_basefuncs]), @view(fes[start_row_index:end_row_index])
-# end
-
 
 #=NVTX.@annotate=# function assemble_local_gpu(kes,fes,cv,dh,n_cells)
     tx = threadIdx().x
@@ -170,8 +163,6 @@ end
 
 function allocate_local_matrices(n_cells,cv)
     n_basefuncs = getnbasefunctions(cv)
-    # allocate maximum possible memory to incorporate all local matrices for each color.
-    # It will be mutated in each color.
     ke = CUDA.zeros(Float32,n_cells , n_basefuncs, n_basefuncs)
     fe = CUDA.zeros(Float32,n_cells, n_basefuncs)
     return ke,fe

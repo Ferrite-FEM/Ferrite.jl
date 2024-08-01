@@ -26,6 +26,23 @@ end
 end
 
 
+@inline @propagate_inbounds function assemble!(A::GPUAssemblerSparsityPattern, ke_val::Float32, fe_val::Float32 , ig::Int32, jg::Int32)
+    # Brute force assembly
+    K = A.K
+    f = A.f
+    CUDA.@atomic f[ig] += fe_val
+    # set the value of the global matrix
+     _add_to_index!(K, ke_val, ig, jg)
+end
+
+@inline @propagate_inbounds function assemble!(A::GPUAssemblerSparsityPattern, ke_val::Float32 , ig::Int32, jg::Int32)
+    # Brute force assembly
+    K = A.K
+    # set the value of the global matrix
+     _add_to_index!(K, ke_val, ig, jg)
+end
+
+
 
 """
     assemble!(A::GPUAssemblerSparsityPattern, dofs::AbstractVector{Int32}, Ke::AbstractMatrix, fe::AbstractVector)
