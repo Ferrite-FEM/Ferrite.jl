@@ -41,12 +41,11 @@ end
 # end
 
 module TestComputationalHomogenization
-    include(joinpath(@__DIR__, "../docs/download_resources.jl"))
     mktempdir() do dir
         cd(dir) do
-            cp(joinpath(@__DIR__, "../docs/src/tutorials/periodic-rve.msh"),
-               joinpath(dir, "periodic-rve.msh")
-            )
+            # Add already downloaded file to allow running test suite offline
+            mesh_file = joinpath(@__DIR__, "../docs/src/tutorials/periodic-rve.msh")
+            isfile(mesh_file) && cp(mesh_file, joinpath(dir, basename(mesh_file)))
             include(joinpath(@__DIR__, "../docs/src/literate-tutorials/computational_homogenization.jl"))
         end
     end
