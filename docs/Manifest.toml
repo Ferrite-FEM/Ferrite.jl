@@ -151,7 +151,7 @@ version = "0.1.5"
 
 [[deps.BlockArrays]]
 deps = ["ArrayLayouts", "FillArrays", "LinearAlgebra"]
-path = "dev/BlockArrays"
+git-tree-sha1 = "5c0ffe1dff8cb7112de075f1b1cb32191675fcba"
 uuid = "8e7c35d0-a365-5155-bbbb-fb81a777f24e"
 version = "1.1.0"
 
