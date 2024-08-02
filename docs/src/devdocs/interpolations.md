@@ -27,7 +27,7 @@ Ferrite.reference_shape_hessians_gradients_and_values!
 Depending on the dimension of the reference element the following functions have to be implemented
 
 ```@docs
-Ferrite.shape_value(::Interpolation, ::Vec, ::Int)
+Ferrite.reference_shape_value(::Interpolation, ::Vec, ::Int)
 Ferrite.vertexdof_indices(::Interpolation)
 Ferrite.dirichlet_vertexdof_indices(::Interpolation)
 Ferrite.facedof_indices(::Interpolation)
