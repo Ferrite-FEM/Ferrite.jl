@@ -58,7 +58,10 @@ struct RefPyramid       <: AbstractRefShape{3} end
 
 Get the dimension of the reference shape
 """
+getrefdim(::Type{<:AbstractRefShape}) # To get correct doc filtering
+
 getrefdim(::Type{<:AbstractRefShape{rdim}}) where rdim = rdim
+
 
 abstract type AbstractCell{refshape <: AbstractRefShape} end
 
