@@ -33,5 +33,5 @@ Ferrite.reference_facets(::Type{<:Ferrite.AbstractRefShape})
 
 ### Applicable methods to `AbstractRefShape`s
 ```@docs
-getrefdim(::Type{<:AbstractRefShape})
+Ferrite.getrefdim(::Type{<:AbstractRefShape})
 ```
