@@ -15,7 +15,7 @@ nothing                    #hide
 #-
 #md # !!! tip
 #md #     This example is also available as a Jupyter notebook:
-#md #     [`reactive_surface.ipynb`](@__NBVIEWER_ROOT_URL__/examples/reactive_surface.ipynb).
+#md #     [`reactive_surface.ipynb`](@__NBVIEWER_ROOT_URL__/tutorials/reactive_surface.ipynb).
 #-
 #
 # ## Introduction
