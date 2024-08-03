@@ -43,15 +43,16 @@ The data written by `write_solution`, `write_cell_data`, `write_node_data`, and 
 
 For simulations with multiple time steps, typically one `VTK` (`.vtu`) file is written
 for each time step. In order to connect the actual time with each of these files,
-a `VTKFileCollection` can be used, which will write one paraview datafile (`.pvd`)
-file and one `VTKGridFile` (`.vtu`) for each time step.
+the `paraview_collection` can function from `WriteVTK.jl` can be used. This will create
+one paraview datafile (`.pvd`) file and one `VTKGridFile` (`.vtu`) for each time step.
 
 ```@example export
-pvd = VTKFileCollection("my_results", grid)
-for t in range(0, 1, 5)
+pvd = paraview_collection("my_results")
+for (step, t) in enumerate(range(0, 1, 5))
     # Do calculations to update u
-    addstep!(pvd, t) do vtk
+    VTKGridFile("my_results_$step", dh) do vtk
         write_solution(vtk, dh, u)
+        pvd[t] = vtk
     end
 end
 close(pvd);
