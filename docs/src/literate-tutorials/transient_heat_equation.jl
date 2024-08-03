@@ -58,7 +58,7 @@
 #md # The full program, without comments, can be found in the next [section](@ref heat_equation-plain-program).
 #
 # First we load Ferrite, and some other packages we need.
-using Ferrite, SparseArrays
+using Ferrite, SparseArrays, WriteVTK
 # We create the same grid as in the heat equation example.
 grid = generate_grid(Quadrilateral, (100, 100));
 
