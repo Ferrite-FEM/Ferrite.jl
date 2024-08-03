@@ -96,7 +96,7 @@
 #md # the final [section](@ref porous-media-plain-program)
 #
 # Required packages
-using Ferrite, FerriteMeshParser, Tensors
+using Ferrite, FerriteMeshParser, Tensors, Downloads
 
 # ### Elasticity
 # We start by defining the elastic material type, containing the elastic stiffness,
