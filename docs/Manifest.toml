@@ -2,7 +2,7 @@
 
 julia_version = "1.10.4"
 manifest_format = "2.0"
-project_hash = "8722b6a67abf1b81e2c7808ddfcfb1d737cd0040"
+project_hash = "2283fea1dfcfa0f2c82cdecbc5750875c26d6009"
 
 [[deps.ADTypes]]
 git-tree-sha1 = "3a6511b6e54550bcbc986c560921a8cd7761fcd8"
@@ -1987,9 +1987,9 @@ version = "1.31.0+0"
 
 [[deps.WriteVTK]]
 deps = ["Base64", "CodecZlib", "FillArrays", "LightXML", "TranscodingStreams", "VTKBase"]
-git-tree-sha1 = "48b9e8e9c83865e99e57f027d4edfa94e0acddae"
+git-tree-sha1 = "46664bb833f24e4fe561192e3753c9168c3b71b2"
 uuid = "64499a7a-5c06-52f2-abe2-ccb03c286192"
-version = "1.19.1"
+version = "1.19.2"
 
 [[deps.XML2_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl", "Libiconv_jll", "Zlib_jll"]
