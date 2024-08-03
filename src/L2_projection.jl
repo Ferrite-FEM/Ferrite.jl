@@ -234,7 +234,7 @@ Supported data types to project are `Number`s and `AbstractTensor`s.
 !!! note
     The order of the returned data correspond to the order of the `L2Projector`'s internal
     `DofHandler`. The data can be further analyzed with [`evaluate_at_points`](@ref) and
-    [`evaluate_at_grid_nodes`](@ref). Use [`write_projected`](@ref) to export the result.
+    [`evaluate_at_grid_nodes`](@ref). Use [`write_projection`](@ref) to export the result.
 
 """
 function project(proj::L2Projector, vars::Union{AbstractVector, AbstractDict})
