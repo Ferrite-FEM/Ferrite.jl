@@ -26,3 +26,12 @@ this shows how to use grid coloring and "scratch values" in order to use multi-t
 without running into race-conditions.
 
 ---
+
+### [Mesh generation with DelaunayTriangulation.jl](delaunay.md)
+
+This guide shows how triangulations generated using [DelaunayTriangulation.jl](https://github.com/JuliaGeometry/DelaunayTriangulation.jl) can be used to define `Grid`s. We demonstrate this using a 
+heat equation example modified from [Tutorial 1: Heat equation](../tutorials/heat_equation.md),
+defining a mesh of an annulus. More complicated domains could be easily defined following this example 
+together with the tutorials from [DelaunayTriangulation.jl](https://github.com/JuliaGeometry/DelaunayTriangulation.jl).
+
+---
