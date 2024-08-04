@@ -289,15 +289,18 @@ for (key, color) in colors
     end
 end
 
+# And then we save to the vtk file.
+
 VTKFile("linear_elasticity", dh) do vtk
     write_solution(vtk, dh, u)
     write_cell_data(vtk, color_data, "colors")
 end
-#md nothing # hide
 
-using Test                          #hide
-@test norm(u) ≈ 0.3179358535755679  #hide
-nothing                             #hide
+using Test                              #hide
+if Sys.islinux() # gmsh not os stable   #hide
+    @test norm(u) ≈ 0.31742879147646924 #hide
+end                                     #hide
+nothing                                 #hide
 
 #md # ## [Plain program](@id linear_elasticity-plain-program)
 #md #
