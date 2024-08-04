@@ -19,7 +19,7 @@
 # ```
 # Our domain $\Omega$ will be the annulus $\Omega = \{\textbf{x} \in \mathbb{R}^2 : R_1 < \|\textbf{x}\| < R_2\}$, 
 # where $R_1 = 1$ and $R_2 = 2$. For the boundary conditions, we let $u(\textbf{x}) = 0$ on 
-# $\|\textbf{x}\| = R_1$ and $u(\textbf{x}) = x_1^2y_1^2$ on $\|\textbf{x}\| = R_2$. This equation can be 
+# $\|\textbf{x}\| = R_1$ and $u(\textbf{x}) = x_1^2x_2^2$ on $\|\textbf{x}\| = R_2$. This equation can be 
 # converted to weak form as demonstrated in the [heat equation tutorial](@ref tutorial-heat-equation).
 
 # ## Implementation 
@@ -73,7 +73,7 @@ function get_cells(tri::Triangulation)
     end
     return cells, cell_map
 end
-# md nothing # hide
+#md nothing # hide
 
 # The `sort_triangle` function rotates a triangle `(i, j, k)` so that the last vertex is the smallest, while 
 # preserving the orientation. This allows us to not have to check whether the triangle we have is stored 
@@ -88,7 +88,7 @@ function get_nodes(tri::Triangulation)
     end
     return nodes
 end
-# md nothing # hide
+#md nothing # hide
 
 # We iterate over `each_point_index` here rather than `each_solid_vertex` since not all points may 
 # be in the triangulation, but we still need to store them to make sure the vertices in `cells`
@@ -137,7 +137,7 @@ function get_facetsets(tri::Triangulation, cell_map)
     end
     return facetsets
 end
-# md nothing # hide
+#md nothing # hide
 
 # The `nc == 1` and `nc == ns == 1` checks are not used for the mesh we have generated, but they are needed 
 # for simpler meshes. The `g` variable is used to keep track of the associated ghost vertex. We now 
