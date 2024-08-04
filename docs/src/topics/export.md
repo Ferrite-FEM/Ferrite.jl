@@ -47,6 +47,7 @@ the `paraview_collection` can function from `WriteVTK.jl` can be used. This will
 one paraview datafile (`.pvd`) file and one `VTKGridFile` (`.vtu`) for each time step.
 
 ```@example export
+using WriteVTK
 pvd = paraview_collection("my_results")
 for (step, t) in enumerate(range(0, 1, 5))
     # Do calculations to update u
