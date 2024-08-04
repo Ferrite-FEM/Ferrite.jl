@@ -26,7 +26,9 @@
 # ```
 # where $\boldsymbol{\sigma}$ is the (Cauchy) stress tensor and $\boldsymbol{b}$ the body force.
 # The domain, $\Omega$, has the boundary $\Gamma$, consisting of a Dirichlet part, $\Gamma_\mathrm{D}$, and
-# a Neumann part, $\Gamma_\mathrm{N}$.
+# a Neumann part, $\Gamma_\mathrm{N}$, with outward pointing normal vector $\boldsymbol{n}$.
+# $\boldsymbol{u}_\mathrm{D}$ denotes prescribed displacements on $\Gamma_\mathrm{D}$,
+# while $\boldsymbol{t}_\mathrm{N}$ the known tractions on $\Gamma_\mathrm{N}$.
 #
 # In this example, we use linear elasticity, such that
 # ```math
@@ -48,7 +50,7 @@
 #   \left(\delta \boldsymbol{u} \otimes \boldsymbol{\nabla} \right) : \boldsymbol{\sigma}
 # \, \mathrm{d}V
 # =
-# \int_{\partial\Omega}
+# \int_{\Gamma}
 #   \delta \boldsymbol{u} \cdot \boldsymbol{t}
 # \, \mathrm{d}A
 # +
@@ -67,7 +69,7 @@
 #   \left(\delta \boldsymbol{u} \otimes \boldsymbol{\nabla} \right) : \boldsymbol{\sigma}
 # \, \mathrm{d}V
 # =
-# \int_{\partial\Omega}
+# \int_{\Gamma}
 #   \delta \boldsymbol{u} \cdot \boldsymbol{t}
 # \, \mathrm{d}A \,.
 # ```
