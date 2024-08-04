@@ -84,13 +84,13 @@ function GeometryMapping{2}(::Type{T}, ip::ScalarInterpolation, qr::QuadratureRu
     return gm
 end
 
-function precompute_values!(gm::GeometryMapping{0}, qr_points::Vector{<:Vec})
+function precompute_values!(gm::GeometryMapping{0}, qr_points::AbstractVector{<:Vec})
     reference_shape_values!(gm.M, gm.ip, qr_points)
 end
-function precompute_values!(gm::GeometryMapping{1}, qr_points::Vector{<:Vec})
+function precompute_values!(gm::GeometryMapping{1}, qr_points::AbstractVector{<:Vec})
     reference_shape_gradients_and_values!(gm.dMdξ, gm.M, gm.ip, qr_points)
 end
-function precompute_values!(gm::GeometryMapping{2}, qr_points::Vector{<:Vec})
+function precompute_values!(gm::GeometryMapping{2}, qr_points::AbstractVector{<:Vec})
     reference_shape_hessians_gradients_and_values!(gm.d2Mdξ2, gm.dMdξ, gm.M, gm.ip, qr_points)
 end
 

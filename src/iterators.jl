@@ -372,7 +372,7 @@ function Base.iterate(ii::InterfaceIterator{<:Any, <:Grid{sdim}}, state...) wher
         if isempty(neighborhood[facet_a[1], facet_a[2]])
             continue
         end
-        neighbors = neighborhood[facet_a[1], facet_a[2]].neighbor_info
+        neighbors = neighborhood[facet_a[1], facet_a[2]]
         length(neighbors) > 1 && error("multiple neighboring faces not supported yet")
         facet_b = neighbors[1]
         reinit!(ii.cache, facet_a, facet_b)

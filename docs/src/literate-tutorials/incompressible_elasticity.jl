@@ -3,7 +3,7 @@
 #-
 #md # !!! tip
 #md #     This example is also available as a Jupyter notebook:
-#md #     [`incompressible_elasticity.ipynb`](@__NBVIEWER_ROOT_URL__/examples/incompressible_elasticity.ipynb).
+#md #     [`incompressible_elasticity.ipynb`](@__NBVIEWER_ROOT_URL__/tutorials/incompressible_elasticity.ipynb).
 #-
 #
 # ## Introduction

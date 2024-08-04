@@ -80,7 +80,7 @@ export
     geometric_interpolation,
     ExclusiveTopology,
     getneighborhood,
-    faceskeleton,
+    facetskeleton,
     vertex_star_stencils,
     getstencil,
     getcells,
@@ -151,7 +151,6 @@ export
     apply_assemble!,
     add!,
     free_dofs,
-    ApplyStrategy,
 
 # iterators
     CellCache,

@@ -8,7 +8,7 @@
 #-
 #md # !!! tip
 #md #     This example is also available as a Jupyter notebook:
-#md #     [`postprocessing.ipynb`](@__NBVIEWER_ROOT_URL__/examples/postprocessing.ipynb).
+#md #     [`postprocessing.ipynb`](@__NBVIEWER_ROOT_URL__/howto/postprocessing.ipynb).
 #-
 #
 # ## Introduction

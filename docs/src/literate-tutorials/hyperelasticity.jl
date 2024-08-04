@@ -11,7 +11,7 @@
 #-
 #md # !!! tip
 #md #     This example is also available as a Jupyter notebook:
-#md #     [`hyperelasticity.ipynb`](@__NBVIEWER_ROOT_URL__/examples/hyperelasticity.ipynb).
+#md #     [`hyperelasticity.ipynb`](@__NBVIEWER_ROOT_URL__/tutorials/hyperelasticity.ipynb).
 #-
 # ## Introduction
 #

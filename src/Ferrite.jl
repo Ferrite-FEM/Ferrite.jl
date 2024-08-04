@@ -8,7 +8,7 @@ using Base:
 using EnumX:
     EnumX, @enumx
 using LinearAlgebra:
-    LinearAlgebra, Symmetric, Transpose, cholesky, det, norm, pinv, tr
+    LinearAlgebra, Symmetric, cholesky, det, norm, pinv, tr
 using NearestNeighbors:
     NearestNeighbors, KDTree, knn
 using OrderedCollections:
@@ -25,8 +25,12 @@ using Tensors:
 using ForwardDiff:
     ForwardDiff
 
+include("CollectionsOfViews.jl")
+using .CollectionsOfViews:
+    CollectionsOfViews, ArrayOfVectorViews, push_at_index!, ConstructionBuffer
 
 include("exports.jl")
+
 
 """
     AbstractRefShape{refdim}
