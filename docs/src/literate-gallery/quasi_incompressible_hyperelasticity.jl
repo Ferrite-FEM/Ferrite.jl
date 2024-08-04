@@ -4,13 +4,13 @@
 #-
 #md # !!! tip
 #md #     This example is also available as a Jupyter notebook:
-#md #     [`quasi_incompressible_hyperelasticity.ipynb`](@__NBVIEWER_ROOT_URL__/examples/quasi_incompressible_hyperelasticity.ipynb)
+#md #     [`quasi_incompressible_hyperelasticity.ipynb`](@__NBVIEWER_ROOT_URL__/gallery/quasi_incompressible_hyperelasticity.ipynb)
 #-
 # ## Introduction
 #
 # In this example we study quasi- or nearly-incompressible hyperelasticity using the stable Taylor-Hood approximation. In spirit, this example is the nonlinear analogue of
-# [`incompressible_elasticity`](@__NBVIEWER_ROOT_URL__/examples/incompressible_elasticity.ipynb) and the incompressible analogue of
-# [`hyperelasticity`](@__NBVIEWER_ROOT_URL__/examples/hyperelasticity.ipynb). Much of the code therefore follows from the above two examples.
+# [`incompressible_elasticity`](@__NBVIEWER_ROOT_URL__/tutorials/incompressible_elasticity.ipynb) and the incompressible analogue of
+# [`hyperelasticity`](@__NBVIEWER_ROOT_URL__/tutorials/hyperelasticity.ipynb). Much of the code therefore follows from the above two examples.
 # The problem is formulated in the undeformed or reference configuration with the displacement $\mathbf{u}$ and pressure $p$ being the unknown fields. We now briefly outline
 # the formulation. Consider the standard hyperelasticity problem
 #

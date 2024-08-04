@@ -9,7 +9,7 @@
 #-
 #md # !!! tip
 #md #     This example is also available as a Jupyter notebook:
-#md #     [`dg_heat_equation.ipynb`](@__NBVIEWER_ROOT_URL__/examples/dg_heat_equation.ipynb).
+#md #     [`dg_heat_equation.ipynb`](@__NBVIEWER_ROOT_URL__/tutorials/dg_heat_equation.ipynb).
 #-
 #
 # This example was developed

@@ -9,7 +9,7 @@
 #-
 #md # !!! tip
 #md #     This example is also available as a Jupyter notebook:
-#md #     [`topology_optimization.ipynb`](@__NBVIEWER_ROOT_URL__/examples/topology_optimization.ipynb).
+#md #     [`topology_optimization.ipynb`](@__NBVIEWER_ROOT_URL__/gallery/topology_optimization.ipynb).
 #-
 #
 # ## Introduction

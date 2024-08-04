@@ -10,7 +10,7 @@
 #-
 #md # !!! tip
 #md #     This example is also available as a Jupyter notebook:
-#md #     [`transient_heat_equation.ipynb`](@__NBVIEWER_ROOT_URL__/examples/transient_heat_equation.ipynb).
+#md #     [`transient_heat_equation.ipynb`](@__NBVIEWER_ROOT_URL__/tutorials/transient_heat_equation.ipynb).
 #-
 #
 # ## Introduction
