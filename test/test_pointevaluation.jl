@@ -11,7 +11,7 @@ function scalar_field()
     cv = CellValues(qr, ip_f, ip_g)
     qp_vals = [Vector{Float64}(undef, getnquadpoints(cv)) for _ in 1:getncells(mesh)]
     for cellid in eachindex(mesh.cells)
-        xe = get_cell_coordinates(mesh, cellid)
+        xe = getcoordinates(mesh, cellid)
         reinit!(cv, xe)
         for qp in 1:getnquadpoints(cv)
             qp_vals[cellid][qp] = f(spatial_coordinate(cv, qp, xe))
@@ -50,7 +50,7 @@ function vector_field()
     cv = CellValues(qr, ip_f, ip_g)
     qp_vals = [Vector{Vec{2,Float64}}(undef, getnquadpoints(cv)) for i=1:getncells(mesh)]
     for cellid in eachindex(mesh.cells)
-        xe = get_cell_coordinates(mesh, cellid)
+        xe = getcoordinates(mesh, cellid)
         reinit!(cv, xe)
         for qp in 1:getnquadpoints(cv)
             qp_vals[cellid][qp] = f(spatial_coordinate(cv, qp, xe))
@@ -86,7 +86,7 @@ function superparametric()
     cv = CellValues(qr, ip_f)
     qp_vals = [Vector{Vec{2,Float64}}(undef, getnquadpoints(cv)) for i=1:getncells(mesh)]
     for cellid in eachindex(mesh.cells)
-        xe = get_cell_coordinates(mesh, cellid)
+        xe = getcoordinates(mesh, cellid)
         reinit!(cv, xe)
         for qp in 1:getnquadpoints(cv)
             qp_vals[cellid][qp] = f(spatial_coordinate(cv, qp, xe))
@@ -126,41 +126,15 @@ function dofhandler()
     # @test vals ≈ 1.0:9.0
 end
 
-function dofhandler2(;three_dimensional=true)
-    # Computes the L2 projection of a quadratic field exactly
-    # but not using L2Projector since we want the DofHandler dofs
-    if (three_dimensional)
-        mesh = generate_grid(Hexahedron, (10, 10, 10))
-        f_s = x -> 1.0 + x[1] + x[2] + x[1] * x[2] + x[2] * x[3]
-        f_v = x ->  Vec{3}((1.0 + x[1] + x[2] + x[1] * x[2], 2.0 - x[1] - x[2] - x[1] * x[2], 4.0 + x[1] - x[2] + x[3] - x[1] * x[3] - x[2] * x[3]))
-        points = [Vec((x, x, x)) for x in range(0; stop=1, length=100)]
-        ip_f = Lagrange{RefHexahedron,2}()
-        ip_f_v = ip_f^3
-        qr = QuadratureRule{RefHexahedron}(3)
-    else 
-        mesh = generate_grid(Quadrilateral, (20, 20))
-        f_s = x ->  1.0 + x[1] + x[2] + x[1] * x[2]
-        f_v = x -> Vec{2}((1.0 + x[1] + x[2] + x[1] * x[2], 2.0 - x[1] - x[2] - x[1] * x[2]))
-        points = [Vec((x, x, )) for x in range(0; stop=1, length=100)]
-        ip_f = Lagrange{RefQuadrilateral,2}()
-        ip_f_v = ip_f^2
-        qr = QuadratureRule{RefQuadrilateral}(3)       
-    end
-   
-    csv = CellValues(qr, ip_f)
-    cvv = CellValues(qr, ip_f_v)
-    dh = DofHandler(mesh);
-    add!(dh, :s, ip_f)
-    add!(dh, :v, ip_f_v)
-    close!(dh)
-    M = create_sparsity_pattern(dh)
+function _pointeval_dofhandler2_manual_projection(dh, csv, cvv, f_s, f_v)
+    M = allocate_matrix(dh)
     f = zeros(ndofs(dh))
     asm = start_assemble(M, f)
     me = zeros(ndofs_per_cell(dh), ndofs_per_cell(dh))
     fe = zeros(ndofs_per_cell(dh))
     s_dofs = dof_range(dh, :s)
     v_dofs = dof_range(dh, :v)
-    
+
     for cell in CellIterator(dh)
         fill!(me, 0)
         fill!(fe, 0)
@@ -168,7 +142,7 @@ function dofhandler2(;three_dimensional=true)
         reinit!(cvv, cell)
         for qp in 1:getnquadpoints(csv)
             dΩ = getdetJdV(csv, qp)
-            x = spatial_coordinate(csv, qp, get_cell_coordinates(cell))
+            x = spatial_coordinate(csv, qp, getcoordinates(cell))
             for i in 1:getnbasefunctions(csv)
                 δui = shape_value(csv, qp, i)
                 fe[s_dofs[i]] += ( δui * f_s(x) ) * dΩ
@@ -188,7 +162,39 @@ function dofhandler2(;three_dimensional=true)
         end
         assemble!(asm, celldofs(cell), me, fe)
     end
-    uh = M \ f
+    return M \ f
+end
+
+function dofhandler2(;three_dimensional=true)
+    # Computes the L2 projection of a quadratic field exactly
+    # but not using L2Projector since we want the DofHandler dofs
+    if (three_dimensional)
+        mesh = generate_grid(Hexahedron, (10, 10, 10))
+        f_s = x -> 1.0 + x[1] + x[2] + x[1] * x[2] + x[2] * x[3]
+        f_v = x ->  Vec{3}((1.0 + x[1] + x[2] + x[1] * x[2], 2.0 - x[1] - x[2] - x[1] * x[2], 4.0 + x[1] - x[2] + x[3] - x[1] * x[3] - x[2] * x[3]))
+        points = [Vec((x, x, x)) for x in range(0; stop=1, length=100)]
+        ip_f = Lagrange{RefHexahedron,2}()
+        ip_f_v = ip_f^3
+        qr = QuadratureRule{RefHexahedron}(3)
+    else
+        mesh = generate_grid(Quadrilateral, (20, 20))
+        f_s = x ->  1.0 + x[1] + x[2] + x[1] * x[2]
+        f_v = x -> Vec{2}((1.0 + x[1] + x[2] + x[1] * x[2], 2.0 - x[1] - x[2] - x[1] * x[2]))
+        points = [Vec((x, x, )) for x in range(0; stop=1, length=100)]
+        ip_f = Lagrange{RefQuadrilateral,2}()
+        ip_f_v = ip_f^2
+        qr = QuadratureRule{RefQuadrilateral}(3)
+    end
+
+    csv = CellValues(qr, ip_f)
+    cvv = CellValues(qr, ip_f_v)
+    dh = DofHandler(mesh);
+    add!(dh, :s, ip_f)
+    add!(dh, :v, ip_f_v)
+    close!(dh)
+    s_dofs = dof_range(dh, :s)
+    v_dofs = dof_range(dh, :v)
+    uh = _pointeval_dofhandler2_manual_projection(dh, csv, cvv, f_s, f_v)
 
     ph = PointEvalHandler(mesh, points)
     @test all(x -> x !== nothing, ph.cells)
@@ -219,15 +225,15 @@ function dofhandler2(;three_dimensional=true)
 end
 
 function mixed_grid()
-    ## Mixed grid where not all cells have the same fields 
+    ## Mixed grid where not all cells have the same fields
 
     # 5_______6
-    # |\      | 
+    # |\      |
     # |   \   |
     # 3______\4
     # |       |
     # |       |
-    # 1_______2 
+    # 1_______2
 
     nodes = [Node((0.0, 0.0)),
             Node((1.0, 0.0)),
@@ -252,16 +258,17 @@ function mixed_grid()
     # compute values in quadrature points for quad
     qr = QuadratureRule{RefQuadrilateral}(2)
     cv = CellValues(qr, ip_quad)
-    qp_vals_quads = [Vector{Float64}(undef, getnquadpoints(cv)) for cell in getcellset(mesh, "quads")]
-    for (local_cellid, global_cellid) in enumerate(getcellset(mesh, "quads"))
-        xe = get_cell_coordinates(mesh, global_cellid)
+    qp_vals_quads = OrderedDict(cell => Vector{Float64}(undef, getnquadpoints(cv)) for cell in getcellset(mesh, "quads"))
+    for global_cellid in getcellset(mesh, "quads")
+        xe = getcoordinates(mesh, global_cellid)
         reinit!(cv, xe)
+        cell_vals = qp_vals_quads[global_cellid]
         for qp in 1:getnquadpoints(cv)
-            qp_vals_quads[local_cellid][qp] = f(spatial_coordinate(cv, qp, xe))
+            cell_vals[qp] = f(spatial_coordinate(cv, qp, xe))
         end
     end
 
-    # construct projector 
+    # construct projector
     projector = L2Projector(ip_quad, mesh; set=getcellset(mesh, "quads"))
 
     points = [Vec((x, 2x)) for x in range(0.0; stop=1.0, length=10)]
@@ -301,7 +308,7 @@ function oneD()
     cv = CellValues(qr, ip_f)
     qp_vals = [Vector{Float64}(undef, getnquadpoints(cv)) for i=1:getncells(mesh)]
     for cellid in eachindex(mesh.cells)
-        xe = get_cell_coordinates(mesh, cellid)
+        xe = getcoordinates(mesh, cellid)
         reinit!(cv, xe)
         for qp in 1:getnquadpoints(cv)
             qp_vals[cellid][qp] = f(spatial_coordinate(cv, qp, xe))
@@ -330,7 +337,7 @@ function first_point_missing()
     mesh = generate_grid(Quadrilateral, (1, 1))
     points = [Vec(2.0, 0.0), Vec(0.0, 0.0)]
     ph = PointEvalHandler(mesh, points; warn=false)
-    
+
     @test isnothing(ph.local_coords[1])
     @test ph.local_coords[2] == Vec(0.0, 0.0)
 end
@@ -352,7 +359,7 @@ end
     x = Vec{2,Float64}.([(0.0, 0.0), (2.0, 0.5), (2.5, 2.5), (0.5, 2.0)])
     ξ₁ = Vec{2,Float64}((0.12, -0.34))
     ξ₂ = Vec{2,Float64}((0.56, -0.78))
-    qr = QuadratureRule{RefQuadrilateral,Float64}([2.0, 2.0], [ξ₁, ξ₂])
+    qr = QuadratureRule{RefQuadrilateral}([2.0, 2.0], [ξ₁, ξ₂])
 
     # PointScalarValues
     csv = CellValues(qr, ip_f)

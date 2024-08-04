@@ -87,7 +87,7 @@ end
 
 @testset "Dofs for quad in 3d (shell)" begin
 
-nodes = [Node{3,Float64}(Vec(0.0,0.0,0.0)), Node{3,Float64}(Vec(1.0,0.0,0.0)), 
+nodes = [Node{3,Float64}(Vec(0.0,0.0,0.0)), Node{3,Float64}(Vec(1.0,0.0,0.0)),
             Node{3,Float64}(Vec(1.0,1.0,0.0)), Node{3,Float64}(Vec(0.0,1.0,0.0)),
             Node{3,Float64}(Vec(2.0,0.0,0.0)), Node{3,Float64}(Vec(2.0,2.0,0.0))]
 
@@ -122,12 +122,21 @@ add!(dh, :v, Lagrange{RefQuadrilateral,1}()^2)
 add!(dh, :s, Lagrange{RefQuadrilateral,1}())
 close!(dh)
 
-u = [1.1, 1.2, 2.1, 2.2, 4.1, 4.2, 3.1, 3.2, 1.3, 2.3, 4.3, 3.3]
-
+u  = [1.1, 1.2, 2.1, 2.2, 4.1, 4.2, 3.1, 3.2, 1.3, 2.3, 4.3, 3.3]
+uv = @view u[1:end]
+# :s on solution
 s_nodes = evaluate_at_grid_nodes(dh, u, :s)
 @test s_nodes ≈ [i+0.3 for i=1:4]
+# :s on a view into solution
+sv_nodes = evaluate_at_grid_nodes(dh, uv, :s)
+@test sv_nodes ≈ [i+0.3 for i=1:4]
+# :v on solution
 v_nodes = evaluate_at_grid_nodes(dh, u, :v)
 @test v_nodes ≈ [Vec{2,Float64}(i -> j+i/10) for j = 1:4]
+# :v on a view into solution
+vv_nodes = evaluate_at_grid_nodes(dh, uv, :v)
+@test vv_nodes ≈ [Vec{2,Float64}(i -> j+i/10) for j = 1:4]
+
 end
 
 @testset "renumber!" begin
@@ -145,9 +154,9 @@ end
         add!(sdh2, :u, Lagrange{RefTriangle,1}())
         close!(mdh)
         ch = ConstraintHandler(dh)
-        add!(ch, Dirichlet(:u, getfaceset(grid, "left"), (x, t) -> 0))
-        add!(ch, Dirichlet(:u, getfaceset(grid, "right"), (x, t) -> 2))
-        face_map = collect_periodic_faces(grid, "bottom", "top")
+        add!(ch, Dirichlet(:u, getfacetset(grid, "left"), (x, t) -> 0))
+        add!(ch, Dirichlet(:u, getfacetset(grid, "right"), (x, t) -> 2))
+        face_map = collect_periodic_facets(grid, "bottom", "top")
         add!(ch, PeriodicDirichlet(:u, face_map))
         close!(ch)
         update!(ch, 0)
@@ -180,12 +189,12 @@ end
     @test original_dofcoefficients == ch.dofcoefficients
 
     # Integration tests
-    K = create_sparsity_pattern(dh, ch)
+    K = allocate_matrix(dh, ch)
     f = zeros(ndofs(dh))
     a = start_assemble(K, f)
     dhp, _, chp = dhmdhch()
     renumber!(dhp, chp, perm)
-    Kp = create_sparsity_pattern(dhp, chp)
+    Kp = allocate_matrix(dhp, chp)
     fp = zeros(ndofs(dhp))
     ap = start_assemble(Kp, fp)
     for cellid in 1:getncells(dh.grid)
@@ -215,8 +224,8 @@ end
         add!(dh, :s, Lagrange{RefQuadrilateral,1}())
         close!(dh)
         ch = ConstraintHandler(dh)
-        add!(ch, Dirichlet(:v, getfaceset(grid, "left"), (x, t) -> 0, [2]))
-        add!(ch, Dirichlet(:s, getfaceset(grid, "left"), (x, t) -> 0))
+        add!(ch, Dirichlet(:v, getfacetset(grid, "left"), (x, t) -> 0, [2]))
+        add!(ch, Dirichlet(:s, getfacetset(grid, "left"), (x, t) -> 0))
         add!(ch, AffineConstraint(13, [15 => 0.5, 16 => 0.5], 0.0))
         close!(ch)
         return dh, ch
@@ -305,8 +314,8 @@ end
         add!(sdh2, :v, ip^2)
         close!(dh)
         ch = ConstraintHandler(dh)
-        add!(ch, Dirichlet(:v, getfaceset(grid, "left"), (x, t) -> 0, [2]))
-        add!(ch, Dirichlet(:s, getfaceset(grid, "left"), (x, t) -> 0))
+        add!(ch, Dirichlet(:v, getfacetset(grid, "left"), (x, t) -> 0, [2]))
+        add!(ch, Dirichlet(:s, getfacetset(grid, "left"), (x, t) -> 0))
         add!(ch, AffineConstraint(13, [15 => 0.5, 16 => 0.5], 0.0))
         close!(ch)
         return dh, ch
@@ -429,10 +438,17 @@ end
         end
         return false
     end
+    function is_stored(sparsity_pattern::SparsityPattern, i, j)
+        return findfirst(k -> k == j, sparsity_pattern.rows[i]) !== nothing
+    end
 
     # Full coupling (default)
-    K = create_sparsity_pattern(dh)
+    sparsity_pattern = init_sparsity_pattern(dh)
+    add_sparsity_entries!(sparsity_pattern, dh)
+    K = allocate_matrix(sparsity_pattern)
+    @test eltype(K) == Float64
     for j in 1:ndofs(dh), i in 1:ndofs(dh)
+        @test is_stored(sparsity_pattern, i, j)
         @test is_stored(K, i, j)
     end
 
@@ -442,25 +458,30 @@ end
         true true  # v
         true false # q
     ]
-    K = create_sparsity_pattern(dh; coupling=coupling)
-    Kch = create_sparsity_pattern(dh, ch; coupling=coupling)
-    @test K.rowval == Kch.rowval
-    @test K.colptr == Kch.colptr
-    KS = create_symmetric_sparsity_pattern(dh; coupling=coupling)
-    KSch = create_symmetric_sparsity_pattern(dh, ch; coupling=coupling)
-    @test KS.data.rowval == KSch.data.rowval
-    @test KS.data.colptr == KSch.data.colptr
+    sparsity_pattern = init_sparsity_pattern(dh)
+    add_sparsity_entries!(sparsity_pattern, dh; coupling=coupling)
+    K = allocate_matrix(sparsity_pattern)
+    # Kch = allocate_matrix(dh, ch; coupling=coupling)
+    # @test K.rowval == Kch.rowval
+    # @test K.colptr == Kch.colptr
+    # KS = create_symmetric_sparsity_pattern(dh; coupling=coupling)
+    # KSch = create_symmetric_sparsity_pattern(dh, ch; coupling=coupling)
+    # @test KS.data.rowval == KSch.data.rowval
+    # @test KS.data.colptr == KSch.data.colptr
     for j in udofs, i in Iterators.flatten((vdofs, qdofs))
+        @test is_stored(sparsity_pattern, i, j)
         @test is_stored(K, i, j)
-        @test is_stored(KS, i, j) == (i <= j)
+        # @test is_stored(KS, i, j) == (i <= j)
     end
     for j in pdofs, i in vdofs
+        @test is_stored(sparsity_pattern, i, j)
         @test is_stored(K, i, j)
-        @test is_stored(KS, i, j)
+        # @test is_stored(KS, i, j)
     end
     for j in pdofs, i in qdofs
+        @test is_stored(sparsity_pattern, i, j) == (i == j)
         @test is_stored(K, i, j) == (i == j)
-        @test is_stored(KS, i, j) == (i == j)
+        # @test is_stored(KS, i, j) == (i == j)
     end
 
     # Component coupling
@@ -470,37 +491,45 @@ end
         true  false true  # v2
         false true  true  # q
     ]
-    K = create_sparsity_pattern(dh; coupling=coupling)
-    KS = create_symmetric_sparsity_pattern(dh; coupling=coupling)
+    sparsity_pattern = init_sparsity_pattern(dh)
+    add_sparsity_entries!(sparsity_pattern, dh; coupling=coupling)
+    K = allocate_matrix(sparsity_pattern)
+    # KS = create_symmetric_sparsity_pattern(dh; coupling=coupling)
     for j in u1dofs, i in vdofs
+        @test is_stored(sparsity_pattern, i, j)
         @test is_stored(K, i, j)
-        @test is_stored(KS, i, j) == (i <= j)
+        # @test is_stored(KS, i, j) == (i <= j)
     end
     for j in u1dofs, i in qdofs
+        @test !is_stored(sparsity_pattern, i, j)
         @test !is_stored(K, i, j)
-        @test !is_stored(KS, i, j)
+        # @test !is_stored(KS, i, j)
     end
     for j in u2dofs, i in Iterators.flatten((v1dofs, qdofs))
+        @test is_stored(sparsity_pattern, i, j)
         @test is_stored(K, i, j)
-        @test is_stored(KS, i, j) == (i <= j)
+        # @test is_stored(KS, i, j) == (i <= j)
     end
     for j in u2dofs, i in v2dofs
+        @test is_stored(sparsity_pattern, i, j) == (i == j)
         @test is_stored(K, i, j) == (i == j)
-        @test is_stored(KS, i, j) == (i == j)
+        # @test is_stored(KS, i, j) == (i == j)
     end
     for j in pdofs, i in v1dofs
+        @test !is_stored(sparsity_pattern, i, j)
         @test !is_stored(K, i, j)
-        @test !is_stored(KS, i, j)
+        # @test !is_stored(KS, i, j)
     end
     for j in pdofs, i in Iterators.flatten((v2dofs, qdofs))
+        @test is_stored(sparsity_pattern, i, j)
         @test is_stored(K, i, j)
-        @test is_stored(KS, i, j) == (i <= j)
+        # @test is_stored(KS, i, j) == (i <= j)
     end
 
     # Error paths
-    @test_throws ErrorException("coupling not square") create_sparsity_pattern(dh; coupling=[true true])
-    @test_throws ErrorException("coupling not symmetric") create_symmetric_sparsity_pattern(dh; coupling=[true true; false true])
-    @test_throws ErrorException("could not create coupling") create_symmetric_sparsity_pattern(dh; coupling=falses(100, 100))
+    @test_throws ErrorException("coupling not square") allocate_matrix(dh; coupling=[true true])
+    # @test_throws ErrorException("coupling not symmetric") create_symmetric_sparsity_pattern(dh; coupling=[true true; false true])
+    # @test_throws ErrorException("could not create coupling") create_symmetric_sparsity_pattern(dh; coupling=falses(100, 100))
 
     # Test coupling with subdomains
     grid = generate_grid(Quadrilateral, (1, 2))
@@ -511,28 +540,35 @@ end
     sdh2 = SubDofHandler(dh, Set(2))
     add!(sdh2, :u, Lagrange{RefQuadrilateral,1}()^2)
     close!(dh)
-    K = create_sparsity_pattern(dh; coupling = [true true; true false])
-    KS = create_symmetric_sparsity_pattern(dh; coupling = [true true; true false])
+
+    sparsity_pattern = init_sparsity_pattern(dh)
+    add_sparsity_entries!(sparsity_pattern, dh; coupling = [true true; true false])
+    K = allocate_matrix(sparsity_pattern)
+    KS = Symmetric(allocate_matrix(dh; #= symmetric=true, =# coupling = [true true; true false]))
     # Subdomain 1: u and p
     udofs = celldofs(dh, 1)[dof_range(sdh1, :u)]
     pdofs = celldofs(dh, 1)[dof_range(sdh1, :p)]
     for j in udofs, i in Iterators.flatten((udofs, pdofs))
+        @test is_stored(sparsity_pattern, i, j)
         @test is_stored(K, i, j)
-        @test is_stored(KS, i, j) == (i <= j)
+        # @test is_stored(KS, i, j) == (i <= j)
     end
     for j in pdofs, i in udofs
+        @test is_stored(sparsity_pattern, i, j)
         @test is_stored(K, i, j)
-        @test is_stored(KS, i, j)
+        # @test is_stored(KS, i, j)
     end
     for j in pdofs, i in pdofs
+        @test is_stored(sparsity_pattern, i, j) == (i == j)
         @test is_stored(K, i, j) == (i == j)
-        @test is_stored(KS, i, j) == (i == j)
+        # @test is_stored(KS, i, j) == (i == j)
     end
     # Subdomain 2: u
     udofs = celldofs(dh, 2)[dof_range(sdh2, :u)]
     for j in udofs, i in udofs
+        @test is_stored(sparsity_pattern, i, j)
         @test is_stored(K, i, j)
-        @test is_stored(KS, i, j) == (i <= j)
+        # @test is_stored(KS, i, j) == (i <= j)
     end
 end
 
@@ -542,38 +578,38 @@ end
         # reshape.(Iterators.product(fill([true, false], 9)...) |> collect |> vec .|> collect, Ref((3,3))),
         [
             true  true  true
-            true  true  true 
-            true  true  true 
+            true  true  true
+            true  true  true
         ],
         [
             true   false  false
-            false  true  false 
-            false  false  true 
+            false  true  false
+            false  false  true
         ],
         [
             true   true  false
-            true  true  true 
-            false  true  true 
+            true  true  true
+            false  true  true
         ],
 
         # Component coupling
         [
             true    true    true    true
-            true    true    true    true 
             true    true    true    true
-            true    true    true    true 
+            true    true    true    true
+            true    true    true    true
         ],
         [
             true     false    false    false
-            false    true     false    false 
+            false    true     false    false
             false    false    true     false
-            false    false    false    true 
+            false    false    false    true
         ],
         [
             true    true    true    false
-            true    true    true    true 
             true    true    true    true
-            false    true    true    true 
+            true    true    true    true
+            false    true    true    true
         ],
     ]
     function is_stored(A, i, j)
@@ -588,7 +624,7 @@ end
             i_dofs = dof_range(sdh, field1_idx)
             ip1 = sdh.field_interpolations[field1_idx]
             vdim[1] = typeof(ip1) <: VectorizedInterpolation && size(coupling)[1] == 4 ? Ferrite.get_n_copies(ip1) : 1
-            for dim1 in 1:vdim[1] 
+            for dim1 in 1:vdim[1]
                 for cell2_idx in neighbors
                     sdh2 = dh.subdofhandlers[dh.cell_to_subdofhandler[cell2_idx]]
                     coupling_idx[2] = 1
@@ -614,18 +650,18 @@ end
             end
         end
     end
-    function check_coupling(dh, topology, K, coupling, cross_coupling)
+    function check_coupling(dh, topology, K, coupling, interface_coupling)
         for cell_idx in eachindex(getcells(dh.grid))
             sdh = dh.subdofhandlers[dh.cell_to_subdofhandler[cell_idx]]
             coupling_idx = [1,1]
-            cross_coupling_idx = [1,1]
+            interface_coupling_idx = [1,1]
             vdim = [1,1]
             # test inner coupling
             _check_dofs(K, dh, sdh, cell_idx, coupling, coupling_idx, vdim, [cell_idx], false)
             # test cross-element coupling
-            neighborhood = Ferrite.getdim(dh.grid.cells[1]) > 1 ? topology.face_face_neighbor : topology.vertex_vertex_neighbor
-            neighbors = neighborhood[cell_idx, :]
-            _check_dofs(K, dh, sdh, cell_idx, cross_coupling, cross_coupling_idx, vdim, [i[1][1] for i in  neighbors[.!isempty.(neighbors)]], true)
+            neighborhood = Ferrite.get_facet_facet_neighborhood(topology, grid)
+            neighbors = [neighborhood[cell_idx, i] for i in 1:size(neighborhood, 2)]
+            _check_dofs(K, dh, sdh, cell_idx, interface_coupling, interface_coupling_idx, vdim, [i[1][1] for i in  neighbors[.!isempty.(neighbors)]], true)
         end
     end
     grid = generate_grid(Quadrilateral, (2, 2))
@@ -635,17 +671,17 @@ end
     add!(dh, :p, DiscontinuousLagrange{RefQuadrilateral,1}())
     add!(dh, :w, Lagrange{RefQuadrilateral,1}())
     close!(dh)
-    for coupling in couplings, cross_coupling in couplings
-        K = create_sparsity_pattern(dh; coupling=coupling, topology = topology, cross_coupling = cross_coupling)
-        all(coupling) && @test K == create_sparsity_pattern(dh, topology = topology, cross_coupling = cross_coupling) 
-        check_coupling(dh, topology, K, coupling, cross_coupling)
+    for coupling in couplings, interface_coupling in couplings
+        K = allocate_matrix(dh; coupling=coupling, topology = topology, interface_coupling = interface_coupling)
+        all(coupling) && @test K == allocate_matrix(dh, topology = topology, interface_coupling = interface_coupling)
+        check_coupling(dh, topology, K, coupling, interface_coupling)
     end
 
     # Error paths
-    @test_throws ErrorException("coupling not square") create_sparsity_pattern(dh; coupling=[true true])
-    @test_throws ErrorException("coupling not symmetric") create_symmetric_sparsity_pattern(dh; coupling=[true true; false true])
-    @test_throws ErrorException("could not create coupling") create_symmetric_sparsity_pattern(dh; coupling=falses(100, 100))
- 
+    @test_throws ErrorException("coupling not square") allocate_matrix(dh; coupling=[true true])
+    # @test_throws ErrorException("coupling not symmetric") allocate_matrix(dh; coupling=[true true; false true])
+    @test_throws ErrorException("could not create coupling") allocate_matrix(dh; coupling=falses(100, 100))
+
     # Test coupling with subdomains
     # Note: `check_coupling` works for this case only because the second domain has dofs from the first domain in order. Otherwise tests like in continuous ip are required.
     grid = generate_grid(Quadrilateral, (2, 1))
@@ -660,10 +696,10 @@ end
     add!(sdh2, :u, DiscontinuousLagrange{RefQuadrilateral,1}()^2)
     close!(dh)
 
-    for coupling in couplings, cross_coupling in couplings
-        K = create_sparsity_pattern(dh; coupling=coupling, topology = topology, cross_coupling = cross_coupling)
-        all(coupling) && @test K == create_sparsity_pattern(dh, topology = topology, cross_coupling = cross_coupling)
-        check_coupling(dh, topology, K, coupling, cross_coupling)
+    for coupling in couplings, interface_coupling in couplings
+        K = allocate_matrix(dh; coupling=coupling, topology = topology, interface_coupling = interface_coupling)
+        all(coupling) && @test K == allocate_matrix(dh, topology = topology, interface_coupling = interface_coupling)
+        check_coupling(dh, topology, K, coupling, interface_coupling)
     end
 
     # Testing Crouzeix-Raviart coupling
@@ -673,8 +709,83 @@ end
     add!(dh, :u, CrouzeixRaviart{RefTriangle,1}())
     close!(dh)
     coupling = trues(3,3)
-    K = create_sparsity_pattern(dh; coupling=coupling, topology = topology, cross_coupling = coupling)
-    K_cont = create_sparsity_pattern(dh; coupling=coupling, topology = topology, cross_coupling = falses(3,3))
-    K_default = create_sparsity_pattern(dh)
+    K = allocate_matrix(dh; coupling=coupling, topology = topology, interface_coupling = coupling)
+    K_cont = allocate_matrix(dh; coupling=coupling, topology = topology, interface_coupling = falses(3,3))
+    K_default = allocate_matrix(dh)
     @test K == K_cont == K_default
+end
+
+
+@testset "shell on solid face" begin
+
+    # Node numbering:
+    # 3 ____ 4  4
+    # |      |  |
+    # |      |  | (Beam attached to facet)
+    # 1 ____ 2  2
+
+    dim = 2
+    grid = generate_grid(Quadrilateral, (1,1))
+    line1 = Line((2,4))
+    grid = Grid([grid.cells[1], line1], grid.nodes)
+
+    order = 2
+    ip_solid = Lagrange{RefQuadrilateral, order}()#^dim
+    ip_shell = Lagrange{RefLine, order}()
+
+    dh = DofHandler(grid)
+    sdh_solid = SubDofHandler(dh, Set(1))
+    add!(sdh_solid, :u, ip_solid)
+    sdh_shell = SubDofHandler(dh, Set(2))
+    add!(sdh_shell, :u, ip_shell)
+    close!(dh)
+
+    dofsquad = zeros(Int, ndofs_per_cell(dh, 1))
+    dofsbeam = zeros(Int, ndofs_per_cell(dh, 2))
+
+    celldofs!(dofsquad, dh, 1)
+    celldofs!(dofsbeam, dh, 2)
+    @test dofsbeam == [2, 3, 6]
+
+    # Node numbering:
+    #            5--------7
+    #           /        /|
+    #          /        / |
+    #         6--------8  |
+    #         |        |  3   <-- Shell attached on face (4, 3, 7, 8)
+    #         |        | /
+    #         |        |/
+    #         2--------4
+
+    dim = 2
+    grid = generate_grid(Hexahedron, (1,1,1))
+    shell = Quadrilateral((4,3,7,8))
+    grid = Grid([grid.cells[1], shell], grid.nodes)
+
+    order = 2
+    ip_solid = Lagrange{RefHexahedron, order}()#^dim
+    ip_shell = Lagrange{RefQuadrilateral, order}()
+
+    dh = DofHandler(grid)
+    sdh_solid = SubDofHandler(dh, Set(1))
+    add!(sdh_solid, :u, ip_solid)
+    sdh_shell = SubDofHandler(dh, Set(2))
+    add!(sdh_shell, :u, ip_shell)
+    Ferrite.close!(dh)
+
+    dofsolid = zeros(Int, ndofs_per_cell(dh, 1))
+    dofsshell = zeros(Int, ndofs_per_cell(dh, 2))
+
+    celldofs!(dofsolid, dh, 1)
+    celldofs!(dofsshell, dh, 2)
+
+    #Would be nice to have this utility:
+    #facedofs!(dofs, dh, FaceIndex(1,4))
+
+    #Shared node dofs
+    @test dofsshell[1:4] == [3,4,8,7]
+    #Shared edge dofs
+    @test dofsshell[5:8] == [11,20,15,19]
+    #Shared face dof
+    @test dofsshell[9] == 24
 end

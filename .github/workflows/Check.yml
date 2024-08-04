@@ -1,0 +1,57 @@
+name: Code checks
+
+on:
+  pull_request:
+  push:
+    branches: ["master"]
+
+jobs:
+
+  pre-commit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pre-commit/action@2c7b3805fd2a0fd8c1884dcaebf91fc102a13ecd # v3.0.1
+
+  explicit-imports:
+    runs-on: ubuntu-latest
+    name: "ExplicitImports.jl"
+    steps:
+      - uses: actions/checkout@v4
+      # - uses: julia-actions/setup-julia@v2
+      #   with:
+      #     version: '1'
+      - uses: julia-actions/cache@v2
+      - uses: julia-actions/julia-buildpkg@v1
+      - name: Install dependencies
+        shell: julia {0}
+        run: |
+          # Add ExplicitImports.jl and packages that Ferrite has extensions for
+          using Pkg
+          Pkg.add([
+            PackageSpec(name = "ExplicitImports", version = "1.6"),
+            PackageSpec(name = "Metis"),
+            PackageSpec(name = "BlockArrays"),
+          ])
+      - name: ExplicitImports.jl code checks
+        shell: julia --project {0}
+        run: |
+          using Ferrite, ExplicitImports, Metis, BlockArrays
+          # Check Ferrite
+          allow_unanalyzable = (ColoringAlgorithm,) # baremodules
+          check_no_implicit_imports(Ferrite; allow_unanalyzable)
+          check_no_stale_explicit_imports(Ferrite; allow_unanalyzable)
+          check_all_qualified_accesses_via_owners(Ferrite)
+          check_no_self_qualified_accesses(Ferrite)
+          # Check extension modules
+          for ext in (:FerriteBlockArrays, :FerriteMetis)
+              extmod = Base.get_extension(Ferrite, ext)
+              if extmod !== nothing
+                  check_no_implicit_imports(extmod)
+                  check_no_stale_explicit_imports(extmod)
+                  check_all_qualified_accesses_via_owners(extmod)
+                  check_no_self_qualified_accesses(extmod)
+              else
+                  @warn "$(ext) extensions not available."
+              end
+          end

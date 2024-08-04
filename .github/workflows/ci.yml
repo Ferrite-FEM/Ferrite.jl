@@ -14,7 +14,7 @@ jobs:
     continue-on-error: ${{ matrix.julia-version == 'nightly' }}
     strategy:
       matrix:
-        julia-version: ['1.6', '1', 'nightly']
+        julia-version: ['1.9', '1', 'nightly']
         os: ['ubuntu-latest']
         include:
           - os: windows-latest
@@ -22,34 +22,31 @@ jobs:
           - os: macOS-latest
             julia-version: '1'
     steps:
-      - uses: actions/checkout@v3
-      - uses: julia-actions/setup-julia@v1
+      - uses: actions/checkout@v4
+      - uses: julia-actions/setup-julia@v2
         with:
           version: ${{ matrix.julia-version }}
+      - uses: julia-actions/cache@v2
       - uses: julia-actions/julia-buildpkg@v1
       - uses: julia-actions/julia-runtest@v1
       - uses: julia-actions/julia-processcoverage@v1
         with:
           directories: 'src,ext'
-      - uses: codecov/codecov-action@v3
+      - uses: codecov/codecov-action@v4
         with:
           file: lcov.info
+        env:
+          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
   docs:
     name: Documentation
     runs-on: ubuntu-latest
-    timeout-minutes: 40
+    timeout-minutes: 60
     steps:
-      - uses: actions/checkout@v3
-      - uses: julia-actions/setup-julia@v1
+      - uses: actions/checkout@v4
+      - uses: julia-actions/setup-julia@v2
         with:
           version: '1'
-      - uses: actions/cache@v3
-        with:
-          path: |
-            ~/.julia/artifacts
-            ~/.julia/packages
-            ~/.julia/registries
-          key: .julia-docs-${{ hashFiles('docs/Project.toml', 'docs/Manifest.toml') }}
+      - uses: julia-actions/cache@v2
       - name: Install dependencies
         run: julia --project=docs -e 'using Pkg; Pkg.instantiate(); Pkg.precompile()'
       - name: Build and deploy

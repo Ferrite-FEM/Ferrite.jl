@@ -146,7 +146,6 @@
 using Ferrite, FerriteGmsh, Gmsh, Tensors, LinearAlgebra, SparseArrays
 using Test #src
 
-
 # ### Geometry and mesh generation with `Gmsh.jl`
 #
 # In the `setup_grid` function below we use the
@@ -212,6 +211,15 @@ function setup_grid(h=0.05)
     ## Finalize the Gmsh library
     Gmsh.finalize()
 
+    ## Temp fix for FerriteGmsh
+    ## for setname in ["Γ1", "Γ2", "Γ3", "Γ4"]
+    ##    faceset = grid.facesets[setname]
+    ##    edgeset = Set([EdgeIndex(f[1], f[2]) for f in faceset])
+    ##    grid.edgesets[setname] = edgeset
+    ##    delete!(grid.facesets, setname)
+    ## end
+    ## =#
+
     return grid
 end
 #md nothing #hide
@@ -231,8 +239,8 @@ function setup_fevalues(ipu, ipp, ipg)
     qr = QuadratureRule{RefTriangle}(2)
     cvu = CellValues(qr, ipu, ipg)
     cvp = CellValues(qr, ipp, ipg)
-    qr_face = FaceQuadratureRule{RefTriangle}(2)
-    fvp = FaceValues(qr_face, ipp, ipg)
+    qr_facet = FacetQuadratureRule{RefTriangle}(2)
+    fvp = FacetValues(qr_facet, ipp, ipg)
     return cvu, cvp, fvp
 end
 #md nothing #hide
@@ -288,10 +296,10 @@ function setup_mean_constraint(dh, fvp)
     assembler = start_assemble()
     ## All external boundaries
     set = union(
-        getfaceset(dh.grid, "Γ1"),
-        getfaceset(dh.grid, "Γ2"),
-        getfaceset(dh.grid, "Γ3"),
-        getfaceset(dh.grid, "Γ4"),
+        getfacetset(dh.grid, "Γ1"),
+        getfacetset(dh.grid, "Γ2"),
+        getfacetset(dh.grid, "Γ3"),
+        getfacetset(dh.grid, "Γ4"),
     )
     ## Allocate buffers
     range_p = dof_range(dh, :p)
@@ -302,7 +310,7 @@ function setup_mean_constraint(dh, fvp)
     ## Loop over all the boundaries
     for (ci, fi) in set
         Ce .= 0
-        get_cell_coordinates!(element_coords, dh.grid, ci)
+        getcoordinates!(element_coords, dh.grid, ci)
         reinit!(fvp, element_coords, fi)
         celldofs!(element_dofs, dh, ci)
         for qp in 1:getnquadpoints(fvp)
@@ -339,7 +347,7 @@ end
 # outlet ``\Gamma_3`` to be the mirror. The necessary transformation to apply then becomes a
 # rotation of ``\pi/2`` radians around the out-of-plane axis. We set up the rotation matrix
 # `R`, and then compute the mapping between mirror and image faces using
-# [`collect_periodic_faces`](@ref) where the rotation is applied to the coordinates. In the
+# [`collect_periodic_facets`](@ref) where the rotation is applied to the coordinates. In the
 # next step we construct the constraint using the [`PeriodicDirichlet`](@ref) constructor.
 # We pass the constructor the computed mapping, and also the rotation matrix. This matrix is
 # used to rotate the dofs on the mirror surface such that we properly constrain
@@ -354,11 +362,11 @@ function setup_constraints(dh, fvp)
     ch = ConstraintHandler(dh)
     ## Periodic BC
     R = rotation_tensor(π / 2)
-    periodic_faces = collect_periodic_faces(dh.grid, "Γ3", "Γ1", x -> R ⋅ x)
+    periodic_faces = collect_periodic_facets(dh.grid, "Γ3", "Γ1", x -> R ⋅ x)
     periodic = PeriodicDirichlet(:u, periodic_faces, R, [1, 2])
     add!(ch, periodic)
     ## Dirichlet BC
-    Γ24 = union(getfaceset(dh.grid, "Γ2"), getfaceset(dh.grid, "Γ4"))
+    Γ24 = union(getfacetset(dh.grid, "Γ2"), getfacetset(dh.grid, "Γ4"))
     dbc = Dirichlet(:u, Γ24, (x, t) -> [0, 0], [1, 2])
     add!(ch, dbc)
     ## Compute mean value constraint and add it
@@ -419,7 +427,7 @@ function assemble_system!(K, f, dh, cvu, cvp)
             end
             ## rhs
             for (i, I) in pairs(range_u)
-                x = spatial_coordinate(cvu, qp, get_cell_coordinates(cell))
+                x = spatial_coordinate(cvu, qp, getcoordinates(cell))
                 b = exp(-100 * norm(x - Vec{2}((0.75, 0.1)))^2)
                 bv = Vec{2}((b, 0.0))
                 fe[I] += (ϕᵤ[i] ⋅ bv) * dΩ
@@ -439,8 +447,8 @@ end
 function check_mean_constraint(dh, fvp, u)                                  #src
     ## All external boundaries                                              #src
     set = union(                                                            #src
-        getfaceset(dh.grid, "Γ1"), getfaceset(dh.grid, "Γ2"),               #src
-        getfaceset(dh.grid, "Γ3"), getfaceset(dh.grid, "Γ4"),               #src
+        getfacetset(dh.grid, "Γ1"), getfacetset(dh.grid, "Γ2"),             #src
+        getfacetset(dh.grid, "Γ3"), getfacetset(dh.grid, "Γ4"),             #src
     )                                                                       #src
     range_p = dof_range(dh, :p)                                             #src
     cc = CellCache(dh)                                                      #src
@@ -497,7 +505,7 @@ function main()
     ch = setup_constraints(dh, fvp)
     ## Global tangent matrix and rhs
     coupling = [true true; true false] # no coupling between pressure test/trial functions
-    K = create_sparsity_pattern(dh, ch; coupling=coupling)
+    K = allocate_matrix(dh, ch; coupling=coupling)
     f = zeros(ndofs(dh))
     ## Assemble system
     assemble_system!(K, f, dh, cvu, cvp)
@@ -506,8 +514,8 @@ function main()
     u = K \ f
     apply!(u, ch)
     ## Export the solution
-    vtk_grid("stokes-flow", grid) do vtk
-        vtk_point_data(vtk, dh, u)
+    VTKFile("stokes-flow", grid) do vtk
+        write_solution(vtk, dh, u)
     end
 
     ## Check the result                #src

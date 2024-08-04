@@ -13,6 +13,7 @@ CellIndex
 VertexIndex
 EdgeIndex
 FaceIndex
+FacetIndex
 Grid
 ```
 
@@ -26,31 +27,34 @@ getnnodes
 Ferrite.nnodes_per_cell
 getcellset
 getnodeset
-getfaceset
-getedgeset
+getfacetset
 getvertexset
 transform_coordinates!
-get_cell_coordinates
-get_cell_coordinates!
+getcoordinates
+getcoordinates!
+geometric_interpolation(::Ferrite.AbstractCell)
+get_node_coordinate
+Ferrite.getspatialdim(::Ferrite.AbstractGrid)
+Ferrite.getrefdim
 ```
 
 ### Topology
 
 ```@docs
-Ferrite.ExclusiveTopology
-Ferrite.getneighborhood
-Ferrite.faceskeleton
-Ferrite.vertex_star_stencils
-Ferrite.getstencil
+ExclusiveTopology
+getneighborhood
+facetskeleton
+vertex_star_stencils
+getstencil
 ```
 
 ### Grid Sets Utility
 
 ```@docs
 addcellset!
-addfaceset!
-addboundaryfaceset!
-addboundaryedgeset!
+addfacetset!
+addboundaryfacetset!
+addvertexset!
 addboundaryvertexset!
 addnodeset!
 ```

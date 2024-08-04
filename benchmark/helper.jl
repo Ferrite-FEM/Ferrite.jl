@@ -1,6 +1,7 @@
 module FerriteBenchmarkHelper
 
 using Ferrite
+using LinearAlgebra: Symmetric
 
 function geo_types_for_spatial_dim(spatial_dim)
     spatial_dim == 1 && return [Line, QuadraticLine]
@@ -23,7 +24,7 @@ function _generalized_ritz_galerkin_assemble_local_matrix(grid::Ferrite.Abstract
 
     Ke = zeros(n_basefuncs, n_basefuncs)
 
-    X = get_cell_coordinates(grid, 1)
+    X = getcoordinates(grid, 1)
     reinit!(cellvalues, X)
 
     for q_point in 1:getnquadpoints(cellvalues)
@@ -40,22 +41,22 @@ function _generalized_ritz_galerkin_assemble_local_matrix(grid::Ferrite.Abstract
     Ke
 end
 
-function _generalized_ritz_galerkin_assemble_local_matrix(grid::Ferrite.AbstractGrid, facevalues::FaceValues, f_shape, f_test, op)
-    n_basefuncs = getnbasefunctions(facevalues)
+function _generalized_ritz_galerkin_assemble_local_matrix(grid::Ferrite.AbstractGrid, facetvalues::FacetValues, f_shape, f_test, op)
+    n_basefuncs = getnbasefunctions(facetvalues)
 
     f = zeros(n_basefuncs)
 
-    X = get_cell_coordinates(grid, 1)
-    for face in 1:nfaces(getcells(grid)[1])
-        reinit!(facevalues, X, face)
+    X = getcoordinates(grid, 1)
+    for facet in 1:nfacets(getcells(grid)[1])
+        reinit!(facetvalues, X, facet)
 
-        for q_point in 1:getnquadpoints(facevalues)
-            n = getnormal(facevalues, q_point)
-            dΓ = getdetJdV(facevalues, q_point)
+        for q_point in 1:getnquadpoints(facetvalues)
+            n = getnormal(facetvalues, q_point)
+            dΓ = getdetJdV(facetvalues, q_point)
             for i in 1:n_basefuncs
-                test = f_test(facevalues, q_point, i)
+                test = f_test(facetvalues, q_point, i)
                 for j in 1:n_basefuncs
-                    shape = f_shape(facevalues, q_point, j)
+                    shape = f_shape(facetvalues, q_point, j)
                     f[i] += op(test, shape) ⋅ n * dΓ
                 end
             end
@@ -65,19 +66,43 @@ function _generalized_ritz_galerkin_assemble_local_matrix(grid::Ferrite.Abstract
     f
 end
 
+function _generalized_ritz_galerkin_assemble_interfaces(dh::Ferrite.AbstractDofHandler, interfacevalues::InterfaceValues, f_shape, f_test, op)
+    n_basefuncs = getnbasefunctions(interfacevalues)
+
+    K = zeros(ndofs(dh), ndofs(dh))
+
+    for ic in InterfaceIterator(dh)
+        reinit!(interfacevalues, ic)
+        for q_point in 1:getnquadpoints(interfacevalues)
+            dΓ = getdetJdV(interfacevalues, q_point)
+            for i in 1:n_basefuncs
+                test = f_test(interfacevalues, q_point, i)
+                f_test == shape_value_jump && (test *= getnormal(interfacevalues, q_point))
+                for j in 1:n_basefuncs
+                    shape = f_shape(interfacevalues, q_point, j)
+                    f_shape == shape_value_jump && (shape *= getnormal(interfacevalues, q_point))
+                    K[interfacedofs(ic)[i], interfacedofs(ic)[j]] += op(test, shape) * dΓ
+                end
+            end
+        end
+    end
+
+    K
+end
+
 # Minimal Petrov-Galerkin type local assembly loop. We assume that both function spaces share the same integration rule. Test is applied from the left.
-function _generalized_petrov_galerkin_assemble_local_matrix(grid::Ferrite.AbstractGrid, cellvalues_shape::CellValues{<: Ferrite.InterpolationByDim{dim}}, f_shape, cellvalues_test::CellValues{<: Ferrite.InterpolationByDim{dim}}, f_test, op) where {dim}
+function _generalized_petrov_galerkin_assemble_local_matrix(grid::Ferrite.AbstractGrid, cellvalues_shape::CellValues, f_shape, cellvalues_test::CellValues, f_test, op)
     n_basefuncs_shape = getnbasefunctions(cellvalues_shape)
     n_basefuncs_test = getnbasefunctions(cellvalues_test)
     Ke = zeros(n_basefuncs_test, n_basefuncs_shape)
 
     #implicit assumption: Same geometry!
-    X_shape = zeros(Vec{dim,Float64}, Ferrite.getngeobasefunctions(cellvalues_shape))
-    get_cell_coordinates!(X_shape, grid, 1)
+    X_shape = zeros(Ferrite.get_coordinate_type(grid), Ferrite.getngeobasefunctions(cellvalues_shape))
+    getcoordinates!(X_shape, grid, 1)
     reinit!(cellvalues_shape, X_shape)
 
-    X_test = zeros(Vec{dim,Float64}, Ferrite.getngeobasefunctions(cellvalues_test))
-    get_cell_coordinates!(X_test, grid, 1)
+    X_test = zeros(Ferrite.get_coordinate_type(grid), Ferrite.getngeobasefunctions(cellvalues_test))
+    getcoordinates!(X_test, grid, 1)
     reinit!(cellvalues_test, X_test)
 
     for q_point in 1:getnquadpoints(cellvalues_test) #assume same quadrature rule
@@ -94,25 +119,25 @@ function _generalized_petrov_galerkin_assemble_local_matrix(grid::Ferrite.Abstra
     Ke
 end
 
-function _generalized_petrov_galerkin_assemble_local_matrix(grid::Ferrite.AbstractGrid, facevalues_shape::FaceValues, f_shape, facevalues_test::FaceValues, f_test, op)
-    n_basefuncs_shape = getnbasefunctions(facevalues_shape)
-    n_basefuncs_test = getnbasefunctions(facevalues_test)
+function _generalized_petrov_galerkin_assemble_local_matrix(grid::Ferrite.AbstractGrid, facetvalues_shape::FacetValues, f_shape, facetvalues_test::FacetValues, f_test, op)
+    n_basefuncs_shape = getnbasefunctions(facetvalues_shape)
+    n_basefuncs_test = getnbasefunctions(facetvalues_test)
 
     f = zeros(n_basefuncs_test)
 
-    X_shape = get_cell_coordinates(grid, 1)
-    X_test = get_cell_coordinates(grid, 1)
-    for face in 1:nfaces(getcells(grid)[1])
-        reinit!(facevalues_shape, X_shape, face)
-        reinit!(facevalues_test, X_test, face)
+    X_shape = getcoordinates(grid, 1)
+    X_test = getcoordinates(grid, 1)
+    for facet in 1:nfacets(getcells(grid)[1])
+        reinit!(facetvalues_shape, X_shape, facet)
+        reinit!(facetvalues_test, X_test, facet)
 
-        for q_point in 1:getnquadpoints(facevalues_shape)
-            n = getnormal(facevalues_test, q_point)
-            dΓ = getdetJdV(facevalues_test, q_point)
+        for q_point in 1:getnquadpoints(facetvalues_shape)
+            n = getnormal(facetvalues_test, q_point)
+            dΓ = getdetJdV(facetvalues_test, q_point)
             for i in 1:n_basefuncs_test
-                test = f_test(facevalues_test, q_point, i)
+                test = f_test(facetvalues_test, q_point, i)
                 for j in 1:n_basefuncs_shape
-                    shape = f_shape(facevalues_shape, q_point, j)
+                    shape = f_shape(facetvalues_shape, q_point, j)
                     f[i] += op(test, shape) ⋅ n * dΓ
                 end
             end
@@ -122,12 +147,38 @@ function _generalized_petrov_galerkin_assemble_local_matrix(grid::Ferrite.Abstra
     f
 end
 
+function _generalized_petrov_galerkin_assemble_interfaces(dh::Ferrite.AbstractDofHandler, interfacevalues_shape::InterfaceValues, f_shape, interfacevalues_test::InterfaceValues, f_test, op)
+    n_basefuncs_shape = getnbasefunctions(interfacevalues_shape)
+    n_basefuncs_test = getnbasefunctions(interfacevalues_test)
+
+    K = zeros(ndofs(dh), ndofs(dh))
+
+    for ic in InterfaceIterator(dh)
+        reinit!(interfacevalues_shape, ic)
+        reinit!(interfacevalues_test, ic)
+        for q_point in 1:getnquadpoints(interfacevalues_shape)
+            dΓ = getdetJdV(interfacevalues_test, q_point)
+            for i in 1:n_basefuncs_test
+                test = f_test(interfacevalues_test, q_point, i)
+                f_test == shape_value_jump && (test *= getnormal(interfacevalues_test, q_point))
+                for j in 1:n_basefuncs_shape
+                    shape = f_shape(interfacevalues_shape, q_point, j)
+                    f_shape == shape_value_jump && (shape *= getnormal(interfacevalues_shape, q_point))
+                    K[interfacedofs(ic)[i], interfacedofs(ic)[j]] += op(test, shape) * dΓ
+                end
+            end
+        end
+    end
+
+    K
+end
+
 function _assemble_mass(dh, cellvalues, sym)
     n_basefuncs = getnbasefunctions(cellvalues)
     Me = zeros(n_basefuncs, n_basefuncs)
     fe = zeros(n_basefuncs)
 
-    M = sym ? create_symmetric_sparsity_pattern(dh) : create_sparsity_pattern(dh);
+    M = sym ? Symmetric(allocate_matrix(dh)) : allocate_matrix(dh);
     f = zeros(ndofs(dh))
 
     assembler = start_assemble(M, f);

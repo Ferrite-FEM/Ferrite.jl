@@ -86,10 +86,10 @@ end
 # to later assign Dirichlet boundary conditions
 function importTestGrid()
     grid = generate_grid(Tetrahedron, (5, 5, 5), zero(Vec{3}), ones(Vec{3}));
-    addfaceset!(grid, "myBottom", x -> norm(x[2]) ≈ 0.0);
-    addfaceset!(grid, "myBack", x -> norm(x[3]) ≈ 0.0);
-    addfaceset!(grid, "myRight", x -> norm(x[1]) ≈ 1.0);
-    addfaceset!(grid, "myLeft", x -> norm(x[1]) ≈ 0.0);
+    addfacetset!(grid, "myBottom", x -> norm(x[2]) ≈ 0.0);
+    addfacetset!(grid, "myBack", x -> norm(x[3]) ≈ 0.0);
+    addfacetset!(grid, "myRight", x -> norm(x[1]) ≈ 1.0);
+    addfacetset!(grid, "myLeft", x -> norm(x[1]) ≈ 0.0);
     return grid
 end;
 
@@ -98,16 +98,16 @@ end;
 function create_values(interpolation_u, interpolation_p)
     ## quadrature rules
     qr      = QuadratureRule{RefTetrahedron}(4)
-    face_qr = FaceQuadratureRule{RefTetrahedron}(4)
+    facet_qr = FacetQuadratureRule{RefTetrahedron}(4)
 
-    ## cell and facevalues for u
+    ## cell and facetvalues for u
     cellvalues_u = CellValues(qr, interpolation_u)
-    facevalues_u = FaceValues(face_qr, interpolation_u)
+    facetvalues_u = FacetValues(facet_qr, interpolation_u)
 
     ## cellvalues for p
     cellvalues_p = CellValues(qr, interpolation_p)
 
-    return cellvalues_u, cellvalues_p, facevalues_u
+    return cellvalues_u, cellvalues_p, facetvalues_u
 end;
 
 # We now create the function for Ψ*
@@ -145,10 +145,10 @@ end;
 # of the loading.
 function create_bc(dh)
     dbc = ConstraintHandler(dh)
-    add!(dbc, Dirichlet(:u, getfaceset(dh.grid, "myLeft"), (x,t) -> zero(Vec{1}), [1]))
-    add!(dbc, Dirichlet(:u, getfaceset(dh.grid, "myBottom"), (x,t) -> zero(Vec{1}), [2]))
-    add!(dbc, Dirichlet(:u, getfaceset(dh.grid, "myBack"), (x,t) -> zero(Vec{1}), [3]))
-    add!(dbc, Dirichlet(:u, getfaceset(dh.grid, "myRight"), (x,t) -> t*ones(Vec{1}), [1]))
+    add!(dbc, Dirichlet(:u, getfacetset(dh.grid, "myLeft"), (x,t) -> zero(Vec{1}), [1]))
+    add!(dbc, Dirichlet(:u, getfacetset(dh.grid, "myBottom"), (x,t) -> zero(Vec{1}), [2]))
+    add!(dbc, Dirichlet(:u, getfacetset(dh.grid, "myBack"), (x,t) -> zero(Vec{1}), [3]))
+    add!(dbc, Dirichlet(:u, getfacetset(dh.grid, "myRight"), (x,t) -> t*ones(Vec{1}), [1]))
     close!(dbc)
     Ferrite.update!(dbc, 0.0)
     return dbc
@@ -252,8 +252,8 @@ function assemble_global!(K::SparseMatrixCSC, f, cellvalues_u::CellValues,
     np = getnbasefunctions(cellvalues_p)
 
     ## start_assemble resets K and f
-    fe = PseudoBlockArray(zeros(nu + np), [nu, np]) # local force vector
-    ke = PseudoBlockArray(zeros(nu + np, nu + np), [nu, np], [nu, np]) # local stiffness matrix
+    fe = BlockedArray(zeros(nu + np), [nu, np]) # local force vector
+    ke = BlockedArray(zeros(nu + np, nu + np), [nu, np], [nu, np]) # local stiffness matrix
 
     assembler = start_assemble(K, f)
     ## Loop over all cells in the grid
@@ -284,7 +284,7 @@ function solve(interpolation_u, interpolation_p)
 
     ## Create the DofHandler and CellValues
     dh = create_dofhandler(grid, interpolation_u, interpolation_p)
-    cellvalues_u, cellvalues_p, facevalues_u = create_values(interpolation_u, interpolation_p)
+    cellvalues_u, cellvalues_p, facetvalues_u = create_values(interpolation_u, interpolation_p)
 
     ## Create the DirichletBCs
     dbc = create_bc(dh)
@@ -296,7 +296,7 @@ function solve(interpolation_u, interpolation_p)
     apply!(w, dbc)
 
     ## Create the sparse matrix and residual vector
-    K = create_sparsity_pattern(dh)
+    K = allocate_matrix(dh)
     f = zeros(_ndofs)
 
     ## We run the simulation parameterized by a time like parameter. `Tf` denotes the final value
@@ -305,7 +305,7 @@ function solve(interpolation_u, interpolation_p)
     Δt = 0.1;
     NEWTON_TOL = 1e-8
 
-    pvd = paraview_collection("hyperelasticity_incomp_mixed.pvd");
+    pvd = VTKFileCollection("hyperelasticity_incomp_mixed", grid);
     for t ∈ 0.0:Δt:Tf
         ## Perform Newton iterations
         Ferrite.update!(dbc, t)
@@ -334,13 +334,11 @@ function solve(interpolation_u, interpolation_p)
         end;
 
         ## Save the solution fields
-        vtk_grid("hyperelasticity_incomp_mixed_$t.vtu", dh) do vtkfile
-            vtk_point_data(vtkfile, dh, w)
-            vtk_save(vtkfile)
-            pvd[t] = vtkfile
+        addstep!(pvd, t) do io
+            write_solution(io, dh, w)
         end
     end;
-    vtk_save(pvd);
+    close(pvd);
     vol_def = calculate_volume_deformed_mesh(w, dh, cellvalues_u);
     print("Deformed volume is $vol_def")
     return vol_def;

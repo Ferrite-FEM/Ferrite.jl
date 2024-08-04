@@ -2,38 +2,44 @@
 
 ## Type definitions
 
-Elements or cells are subtypes of `AbstractCell{dim,N,M}`. They are parametrized by
-the dimension of their nodes via `dim`, the number of nodes `N` and the number
-of faces `M`.
+Elements or cells are subtypes of `AbstractCell{<:AbstractRefShape}`. As shown, they are parametrized
+by the associated reference element.
 
 ### Required methods to implement for all subtypes of `AbstractCell` to define a new element
 
 ```@docs
-Ferrite.vertices(::Ferrite.AbstractCell)
-Ferrite.edges(::Ferrite.AbstractCell)
-Ferrite.reference_faces(::Ferrite.AbstractRefShape)
-Ferrite.faces(::Ferrite.AbstractCell)
-Ferrite.default_interpolation(::Ferrite.AbstractCell)
+Ferrite.get_node_ids
 ```
 
 ### Common utilities and definitions when working with grids internally.
 
+First we have some topological queries on the element
+
+```@docs
+Ferrite.vertices(::Ferrite.AbstractCell)
+Ferrite.edges(::Ferrite.AbstractCell)
+Ferrite.faces(::Ferrite.AbstractCell)
+Ferrite.facets(::Ferrite.AbstractCell)
+Ferrite.boundaryfunction(::Type{<:Ferrite.BoundaryIndex})
+Ferrite.reference_vertices(::Ferrite.AbstractCell)
+Ferrite.reference_edges(::Ferrite.AbstractCell)
+Ferrite.reference_faces(::Ferrite.AbstractCell)
+```
+
+and some generic utils which are commonly found in finite element codes
+
 ```@docs
 Ferrite.BoundaryIndex
-Ferrite.boundaryfunction(::Type{<:Ferrite.BoundaryIndex})
 Ferrite.get_coordinate_eltype(::Ferrite.AbstractGrid)
 Ferrite.get_coordinate_eltype(::Node)
 Ferrite.toglobal
 Ferrite.sortface
+Ferrite.sortface_fast
 Ferrite.sortedge
-Ferrite.getfaceedges
-Ferrite.getfacevertices
-Ferrite.getedgevertices
-Ferrite.getfaceinstances
-Ferrite.getedgeinstances
-Ferrite.getvertexinstances
-Ferrite.filterfaces
-Ferrite.filteredges
-Ferrite.filtervertices
+Ferrite.sortedge_fast
+Ferrite.element_to_facet_transformation
+Ferrite.facet_to_element_transformation
+Ferrite.InterfaceOrientationInfo
+Ferrite.transform_interface_points!
+Ferrite.get_transformation_matrix
 ```
-

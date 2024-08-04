@@ -12,16 +12,19 @@ using Ferrite, BlockArrays, SparseArrays, Test
     nd = ndofs(dh) ÷ 3
 
     ch = ConstraintHandler(dh)
-    periodic_faces = collect_periodic_faces(grid, "top", "bottom")
+    periodic_faces = collect_periodic_facets(grid, "top", "bottom")
     add!(ch, PeriodicDirichlet(:u, periodic_faces))
-    add!(ch, Dirichlet(:u, union(getfaceset(grid, "left"), getfaceset(grid, "top")), (x, t) -> [0, 0]))
-    add!(ch, Dirichlet(:p, getfaceset(grid, "left"), (x, t) -> 0))
+    add!(ch, Dirichlet(:u, union(getfacetset(grid, "left"), getfacetset(grid, "top")), (x, t) -> [0, 0]))
+    add!(ch, Dirichlet(:p, getfacetset(grid, "left"), (x, t) -> 0))
     close!(ch)
     update!(ch, 0)
 
-    K = create_sparsity_pattern(dh, ch)
+    K = allocate_matrix(dh, ch)
     f = zeros(axes(K, 1))
-    KB = create_sparsity_pattern(BlockMatrix, dh, ch)
+    # TODO: allocate_matrix(BlockMatrix, ...) should work and default to field blocking
+    bsp = BlockSparsityPattern([2nd, 1nd])
+    add_sparsity_entries!(bsp, dh, ch)
+    KB = allocate_matrix(BlockMatrix, bsp)
     @test KB isa BlockMatrix
     @test blocksize(KB) == (2, 2)
     @test size(KB[Block(1), Block(1)]) == (2nd, 2nd)
@@ -66,16 +69,16 @@ using Ferrite, BlockArrays, SparseArrays, Test
     # Global application of BC not supported yet
     @test_throws ErrorException apply!(KB, fB, ch)
 
-    # Custom blocking by passing a partially initialized matrix
+    # Custom blocking
     perm = invperm([ch.free_dofs; ch.prescribed_dofs])
     renumber!(dh, ch, perm)
     nfree = length(ch.free_dofs)
     npres = length(ch.prescribed_dofs)
-    K = create_sparsity_pattern(dh, ch)
+    K = allocate_matrix(dh, ch)
     block_sizes = [nfree, npres]
-    KBtmp = BlockArray(undef_blocks, SparseMatrixCSC{Float64, Int}, block_sizes, block_sizes)
-    KB = create_sparsity_pattern(KBtmp, dh, ch)
-    @test KBtmp === KB
+    bsp = BlockSparsityPattern(block_sizes)
+    add_sparsity_entries!(bsp, dh, ch)
+    KB = allocate_matrix(BlockMatrix, bsp)
     @test blocksize(KB) == (2, 2)
     @test size(KB[Block(1), Block(1)]) == (nfree, nfree)
     @test size(KB[Block(2), Block(1)]) == (npres, nfree)

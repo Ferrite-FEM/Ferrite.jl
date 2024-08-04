@@ -22,7 +22,7 @@ function test_projection(order, refshape)
         qp_values = []
         for cell in CellIterator(grid)
             reinit!(cv, cell)
-            r = [f(spatial_coordinate(cv, qp, get_cell_coordinates(cell))) for qp in 1:getnquadpoints(cv)]
+            r = [f(spatial_coordinate(cv, qp, getcoordinates(cell))) for qp in 1:getnquadpoints(cv)]
             push!(qp_values, r)
         end
         return identity.(qp_values) # Tighten the type
@@ -31,7 +31,7 @@ function test_projection(order, refshape)
     qp_values = analytical(f)
 
     # Now recover the nodal values using a L2 projection.
-    proj = L2Projector(ip, grid; geom_ip=ip_geom)
+    proj = L2Projector(ip, grid)
     point_vars = project(proj, qp_values, qr)
     qp_values_matrix = reduce(hcat, qp_values)
     point_vars_2 = project(proj, qp_values_matrix, qr)
@@ -99,29 +99,29 @@ function test_projection(order, refshape)
     else
         bad_order = 1
     end
-    @test_throws LinearAlgebra.PosDefException L2Projector(ip, grid; qr_lhs=QuadratureRule{refshape}(bad_order), geom_ip=ip_geom)
+    @test_throws LinearAlgebra.PosDefException L2Projector(ip, grid; qr_lhs=QuadratureRule{refshape}(bad_order))
 end
 
-# Test a mixed grid, where only a subset of the cells contains a field
-function test_projection_mixedgrid()
-    # generate a mesh with 1 quadrilateral and 2 triangular elements
-    dim = 2
-    nodes = Node{dim, Float64}[]
-    push!(nodes, Node((0.0, 0.0)))
-    push!(nodes, Node((1.0, 0.0)))
-    push!(nodes, Node((2.0, 0.0)))
-    push!(nodes, Node((0.0, 1.0)))
-    push!(nodes, Node((1.0, 1.0)))
-    push!(nodes, Node((2.0, 1.0)))
+function make_mixedgrid_l2_tests()
+    # generate a mesh with 2 quadrilateral and 2 triangular elements
+    # 5 --- 6 --- 7 --- 8
+    # |  1  | 2/3 |  4  |
+    # 1 --- 2 --- 3 --- 4
+    nodes = [Node(Float64.((x,y))) for (x, y) in
+    #         1,      2,      3,      4,      5,      6,      7,      8
+        ((0, 0), (1, 0), (2, 0), (3, 0), (0, 1), (1, 1), (2, 1), (3, 1))]
 
-    cells = Ferrite.AbstractCell[]
-    push!(cells, Quadrilateral((1,2,5,4)))
-    push!(cells, Triangle((2,3,6)))
-    push!(cells, Triangle((2,6,5)))
+    cells = [Quadrilateral((1, 2, 6, 5)), Triangle((2, 7, 6)), Triangle((2, 3, 7)), Quadrilateral((3, 4, 8, 7))]
 
     quadset = 1:1
     triaset = 2:3
-    mesh = Grid(cells, nodes)
+    quadset_right = 4:4
+    return Grid(cells, nodes), quadset, triaset, quadset_right
+end
+
+# Test a mixed grid, where only a subset of the cells contains a field
+function test_projection_subset_of_mixedgrid()
+    mesh, quadset, triaset, quadset_right = make_mixedgrid_l2_tests()
 
     order = 2
     ip = Lagrange{RefQuadrilateral, order}()
@@ -132,19 +132,31 @@ function test_projection_mixedgrid()
     # Create node values for the 1st cell
     # use a SymmetricTensor here for testing the symmetric version of project
     f(x) = SymmetricTensor{2,2,Float64}((1 + x[1]^2, 2x[2]^2, x[1]*x[2]))
-    xe = get_cell_coordinates(mesh, 1)
-    
+    xe = getcoordinates(mesh, 1)
+
     # analytical values
-    qp_values = [[f(spatial_coordinate(cv, qp, xe)) for qp in 1:getnquadpoints(cv)]]
-    qp_values_matrix = reduce(hcat, qp_values)
+    qp_value = [f(spatial_coordinate(cv, qp, xe)) for qp in 1:getnquadpoints(cv)]
+    qp_values = Vector{typeof(qp_value)}(undef, getncells(mesh))
+    qp_values[1] = copy(qp_value)
+    qp_values_matrix = fill(zero(eltype(qp_value)), getnquadpoints(cv), getncells(mesh))
+    qp_values_matrix[:, 1] .= qp_value
+    qp_values_dict = Dict(1 => copy(qp_value))
 
     # Now recover the nodal values using a L2 projection.
     # Assume f would only exist on the first cell, we project it to the nodes of the
     # 1st cell while ignoring the rest of the domain. NaNs should be stored in all
     # nodes that do not belong to the 1st cell
-    proj = L2Projector(ip, mesh; geom_ip=ip_geom, set=quadset)
+    proj = L2Projector(ip, mesh; set=quadset)
     point_vars = project(proj, qp_values, qr)
     point_vars_2 = project(proj, qp_values_matrix, qr)
+    point_vars_3 = project(proj, qp_values_dict, qr)
+    projection_at_nodes = evaluate_at_grid_nodes(proj, point_vars)
+    for cellid in quadset
+        for nodeid in mesh.cells[cellid].nodes
+            x = mesh.nodes[nodeid].x
+            @test projection_at_nodes[nodeid] ≈ f(x)
+        end
+    end
 
     ae = zeros(3, length(point_vars))
     for i in 1:3
@@ -152,35 +164,161 @@ function test_projection_mixedgrid()
     end
     ae = reinterpret(reshape, SymmetricTensor{2,2,Float64,3}, ae)
     @test point_vars ≈ point_vars_2 ≈ ae
+    @test point_vars_3 ≈ ae
 
     # Do the same thing but for the triangle set
-    order = 2
     ip = Lagrange{RefTriangle, order}()
     ip_geom = Lagrange{RefTriangle, 1}()
     qr = QuadratureRule{RefTriangle}(4)
     cv = CellValues(qr, ip, ip_geom)
     nqp = getnquadpoints(cv)
 
-    qp_values_tria = [zeros(SymmetricTensor{2,2}, nqp) for _ in triaset]
-    qp_values_matrix_tria = [zero(SymmetricTensor{2,2}) for _ in 1:nqp, _ in triaset]
+    qp_values_tria = [SymmetricTensor{2,2,Float64,3}[] for _ in 1:getncells(mesh)]
+    qp_values_matrix_tria = [zero(SymmetricTensor{2,2}) * NaN for _ in 1:nqp, _ in 1:getncells(mesh)]
+    qp_values_dict = Dict{Int, Vector{SymmetricTensor{2,2,Float64,3}}}()
     for (ic, cellid) in enumerate(triaset)
-        xe = get_cell_coordinates(mesh, cellid)
+        xe = getcoordinates(mesh, cellid)
         # analytical values
         qp_values = [f(spatial_coordinate(cv, qp, xe)) for qp in 1:getnquadpoints(cv)]
-        qp_values_tria[ic] = qp_values
-        qp_values_matrix_tria[:, ic] .= qp_values
+        qp_values_tria[cellid] = qp_values
+        qp_values_matrix_tria[:, cellid] .= qp_values
+        qp_values_dict[cellid] = qp_values
     end
 
     #tria
-    proj = L2Projector(ip, mesh; geom_ip=ip_geom, set=triaset)
+    proj = L2Projector(ip, mesh; set=triaset)
     point_vars = project(proj, qp_values_tria, qr)
     point_vars_2 = project(proj, qp_values_matrix_tria, qr)
+    projection_at_nodes = evaluate_at_grid_nodes(proj, point_vars)
+    for cellid in triaset
+        for nodeid in mesh.cells[cellid].nodes
+            x = mesh.nodes[nodeid].x
+            @test projection_at_nodes[nodeid] ≈ f(x)
+        end
+    end
+
     ae = zeros(3, length(point_vars))
     for i in 1:3
         apply_analytical!(@view(ae[i, :]), proj.dh, :_, x -> f(x).data[i], triaset)
     end
     ae = reinterpret(reshape, SymmetricTensor{2,2,Float64,3}, ae)
     @test point_vars ≈ point_vars_2 ≈ ae
+end
+
+function calculate_function_value_in_qpoints!(qp_data, sdh, cv, dofvector::Vector)
+    for cell in CellIterator(sdh)
+        qvector = qp_data[cellid(cell)]
+        ae = dofvector[celldofs(cell)]
+        resize!(qvector, getnquadpoints(cv))
+        for q_point in 1:getnquadpoints(cv)
+            qvector[q_point] = function_value(cv, q_point, ae)
+        end
+    end
+    return qp_data
+end
+
+function test_add_projection_grid()
+    grid = generate_grid(Triangle, (3,3))
+    set1 = Set(1:getncells(grid)÷2)
+    set2 = setdiff(1:getncells(grid), set1)
+
+    dh = DofHandler(grid)
+    ip = Lagrange{RefTriangle, 1}()
+    sdh1 = SubDofHandler(dh, set1)
+    add!(sdh1, :u, ip)
+    sdh2 = SubDofHandler(dh, set2)
+    add!(sdh2, :u, ip)
+    close!(dh)
+
+    solution = zeros(ndofs(dh))
+    apply_analytical!(solution, dh, :u, x -> x[1]^2 - x[2]^2)
+
+    qr = QuadratureRule{RefTriangle}(2)
+    cv = CellValues(qr, ip, ip)
+
+    # Fill qp_data with the interpolated values
+    qp_data = [Float64[] for _ in 1:getncells(grid)]
+    for (sdh, cv_) in ((sdh1, cv), (sdh2, cv))
+        calculate_function_value_in_qpoints!(qp_data, sdh, cv_, solution)
+    end
+
+    # Build the first L2Projector with two different sets
+    proj1 = L2Projector(grid)
+    add!(proj1, set1, ip; qr_rhs = qr)
+    add!(proj1, set2, ip; qr_rhs = qr)
+    close!(proj1)
+
+    # Build the second L2Projector with a single set using the convenience function
+    proj2 = L2Projector(ip, grid)
+
+    # Project both cases
+    projected1 = project(proj1, qp_data)
+    projected2 = project(proj2, qp_data, qr)
+
+    # Evaluate at grid nodes to keep same numbering following the grid (dof distribution may be different)
+    solution_at_nodes = evaluate_at_grid_nodes(dh, solution, :u)
+    projected1_at_nodes = evaluate_at_grid_nodes(proj1, projected1)
+    projected2_at_nodes = evaluate_at_grid_nodes(proj2, projected2)
+
+    @test projected1_at_nodes ≈ solution_at_nodes
+    @test projected2_at_nodes ≈ solution_at_nodes
+end
+
+function test_projection_mixedgrid()
+    grid, quadset_left, triaset, quadset_right = make_mixedgrid_l2_tests()
+    quadset_full = union(Set(quadset_left), quadset_right)
+    @assert getncells(grid) == length(triaset) + length(quadset_full)
+    # Test both for case with one cell excluded from projection, and will full grid included
+    for quadset in (quadset_left, quadset_full)
+        dh = DofHandler(grid)
+        sdh_quad = SubDofHandler(dh, quadset)
+        ip_quad = Lagrange{RefQuadrilateral, 1}()
+        add!(sdh_quad, :u, ip_quad)
+        sdh_tria = SubDofHandler(dh, triaset)
+        ip_tria = Lagrange{RefTriangle, 1}()
+        add!(sdh_tria, :u, ip_tria)
+        close!(dh)
+
+        solution = zeros(ndofs(dh))
+        apply_analytical!(solution, dh, :u, x -> x[1]^2 - x[2]^2)
+
+        qr_quad = QuadratureRule{RefQuadrilateral}(2)
+        cv_quad = CellValues(qr_quad, ip_quad, ip_quad)
+        qr_tria = QuadratureRule{RefTriangle}(2)
+        cv_tria = CellValues(qr_tria, ip_tria, ip_tria)
+
+        # Fill qp_data with the interpolated values
+        qp_data = [Float64[] for _ in 1:getncells(grid)]
+        for (sdh, cv) in ((sdh_quad, cv_quad), (sdh_tria, cv_tria))
+            calculate_function_value_in_qpoints!(qp_data, sdh, cv, solution)
+        end
+
+        # Finally, let's build the L2Projector and check if we can project back the solution
+        proj = L2Projector(grid)
+        add!(proj, triaset, ip_tria; qr_rhs = qr_tria)
+        add!(proj, quadset, ip_quad; qr_rhs = qr_quad)
+        close!(proj)
+
+        # Quadrature rules must be in the same order as ip's are added to proj.
+        projected = project(proj, qp_data)
+
+        # Evaluate at grid nodes to keep same numbering following the grid (dof distribution may be different)
+        solution_at_nodes = evaluate_at_grid_nodes(dh, solution, :u)
+        projected_at_nodes = evaluate_at_grid_nodes(proj, projected)
+
+        # Since one part of the grid is excluded, nodes in this region will be NaN.
+        # So we only want to check those nodes attached to cells in the cellsets.
+        active_nodes = Set{Int}()
+        for cell in CellIterator(grid, union(quadset, triaset))
+            for n in Ferrite.getnodes(cell)
+                push!(active_nodes, n)
+            end
+        end
+        check_nodes = collect(active_nodes)
+
+        @test projected_at_nodes[check_nodes] ≈ solution_at_nodes[check_nodes]
+
+    end
 end
 
 function test_export(;subset::Bool)
@@ -202,7 +340,7 @@ function test_export(;subset::Bool)
     end
     for cell in CellIterator(grid)
         reinit!(cv, cell)
-        xh = get_cell_coordinates(cell)
+        xh = getcoordinates(cell)
         for qp in 1:getnquadpoints(cv)
             x = spatial_coordinate(cv, qp, xh)
             qpdata_scalar[cellid(cell)][qp] = f(x)
@@ -267,24 +405,85 @@ function test_export(;subset::Bool)
     end
 
     mktempdir() do tmp
-        fname = vtk_grid(joinpath(tmp, "projected"), grid) do vtk
-            vtk_point_data(vtk, p, p_scalar, "p_scalar")
-            vtk_point_data(vtk, p, p_vec, "p_vec")
-            vtk_point_data(vtk, p, p_tens, "p_tens")
-            vtk_point_data(vtk, p, p_stens, "p_stens")
+        fname = joinpath(tmp, "projected")
+        VTKFile(fname, grid) do vtk
+            write_projection(vtk, p, p_scalar, "p_scalar")
+            write_projection(vtk, p, p_vec, "p_vec")
+            write_projection(vtk, p, p_tens, "p_tens")
+            write_projection(vtk, p, p_stens, "p_stens")
         end
-        @test bytes2hex(open(SHA.sha1, fname[1], "r")) in (
-            subset ? ("261cfe21de7a478e14f455e783694651a91eeb60", "b3fef3de9f38ca9ddd92f2f67a1606d07ca56d67") :
-                     ("3b8ffb444db1b4cee1246a751da88136116fe49b", "bc2ec8f648f9b8bccccf172c1fc48bf03340329b")
-        )
+        # The following test may fail due to floating point inaccuracies
+        # These could occur due to e.g. changes in system architecture.
+        if Sys.islinux() && Sys.ARCH === :x86_64
+            @test bytes2hex(open(SHA.sha1, fname*".vtu", "r")) == (
+                subset ? "b3fef3de9f38ca9ddd92f2f67a1606d07ca56d67" :
+                         "bc2ec8f648f9b8bccccf172c1fc48bf03340329b"
+            )
+        end
     end
+
 end
 
-function test_show()
+function test_show_l2()
     grid = generate_grid(Triangle, (2,2))
     ip = Lagrange{RefTriangle, 1}()
     proj = L2Projector(ip, grid)
     @test repr("text/plain", proj) == repr(typeof(proj)) * "\n  projection on:           8/8 cells in grid\n  function interpolation:  Lagrange{RefTriangle, 1}()\n  geometric interpolation: Lagrange{RefTriangle, 1}()\n"
+
+    # Multi-domain setup
+    proj2 = L2Projector(grid)
+    @test sprint(show, MIME"text/plain"(), proj2) == "L2Projector (not closed)"
+    qr_rhs = QuadratureRule{RefTriangle}(2)
+    add!(proj2, Set(1:2), ip; qr_rhs)
+    add!(proj2, Set(3:4), ip; qr_rhs)
+    close!(proj2)
+    showstr = sprint(show, MIME"text/plain"(), proj2)
+    @test contains(showstr, "L2Projector")
+    @test contains(showstr, "4/8 cells in grid")
+    @test contains(showstr, "Split into 2 sets")
+end
+
+function test_l2proj_errorpaths()
+    grid = generate_grid(Triangle, (2,3))
+    ip = Lagrange{RefTriangle, 1}()
+    proj = L2Projector(grid)                        # Multiple subdomains
+    proj1 = L2Projector(ip, grid; set=collect(1:4)) # Single sub-domain case
+    qr_tria = QuadratureRule{RefTriangle}(2)
+    qr_quad = QuadratureRule{RefQuadrilateral}(2)
+
+    # Providing wrong quadrature rules
+    exception_rhs = ErrorException("The reference shape of the interpolation and the qr_rhs must be the same")
+    exception_lhs = ErrorException("The reference shape of the interpolation and the qr_lhs must be the same")
+    @test_throws exception_rhs add!(proj, Set(1:2), ip; qr_rhs = qr_quad)
+    @test_throws exception_lhs add!(proj, Set(1:2), ip; qr_rhs = qr_tria, qr_lhs = qr_quad)
+
+    # Build up a 2-domain case
+    add!(proj, Set(1:2), ip; qr_rhs = qr_tria)
+    add!(proj, Set(3:4), ip; qr_rhs = qr_tria)
+    data_valid = Dict(i => rand(getnquadpoints(qr_tria)) for i in 1:4)
+
+    # Try projecting when not closed
+    @test_throws ErrorException("The L2Projector is not closed") project(proj, data_valid)
+    close!(proj)
+
+    # Not giving quadrature rule
+    noquad_exception = ErrorException("The right-hand-side quadrature rule must be provided, unless already given to the L2Projector")
+    @test_throws noquad_exception project(proj1, data_valid)
+    # Providing wrong quadrature rule to project
+    wrongquad_exception = ErrorException("Reference shape of quadrature rule and cells doesn't match. Please ensure that `qrs_rhs` has the same order as sets are added to the L2Projector")
+    @test_throws wrongquad_exception project(proj1, data_valid, qr_quad)
+
+    # Giving data indexed by set index instead of cell index
+    data_invalid = [rand(getnquadpoints(qr_tria)) for _ in 1:4]
+    invalid_data_exception = ErrorException("vars is indexed by the cellid, not the index in the set: length(vars) != number of cells")
+    @test_throws invalid_data_exception project(proj1, data_invalid, qr_tria)
+    # Giving data with too many or too few quadrature points
+    data_invalid2 = [rand(getnquadpoints(qr_tria) + 1) for _ in 1:getncells(grid)]
+    data_invalid3 = [rand(getnquadpoints(qr_tria) - 1) for _ in 1:getncells(grid)]
+    wrongnqp_exception = ErrorException("The number of variables per cell doesn't match the number of quadrature points")
+    @test_throws wrongnqp_exception project(proj1, data_invalid2, qr_tria)
+    @test_throws wrongnqp_exception project(proj1, data_invalid3, qr_tria)
+
 end
 
 @testset "Test L2-Projection" begin
@@ -292,8 +491,11 @@ end
     test_projection(1, RefTriangle)
     test_projection(2, RefQuadrilateral)
     test_projection(2, RefTriangle)
+    test_projection_subset_of_mixedgrid()
+    test_add_projection_grid()
     test_projection_mixedgrid()
     test_export(subset=false)
     test_export(subset=true)
-    test_show()
+    test_show_l2()
+    test_l2proj_errorpaths()
 end

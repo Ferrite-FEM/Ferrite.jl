@@ -12,6 +12,7 @@ SubDofHandler
 ## Adding fields to the DofHandlers
 ```@docs
 add!(::DofHandler, ::Symbol, ::Interpolation)
+add!(::SubDofHandler, ::Symbol, ::Interpolation)
 close!(::DofHandler)
 ```
 
@@ -35,8 +36,8 @@ celldofs!
 ```@docs
 CellCache
 CellIterator
-FaceCache
-FaceIterator
+FacetCache
+FacetIterator
 InterfaceCache
 InterfaceIterator
 ```

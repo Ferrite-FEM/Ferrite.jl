@@ -8,6 +8,11 @@ Every PDE is accompanied with boundary conditions. There are different types of 
 conditions, and they need to be handled in different ways. Below we discuss how to handle
 the most common ones, Dirichlet and Neumann boundary conditions, and how to do it `Ferrite`.
 
+While boundary conditions can be applied directly to nodes, vertices, edges, or faces,
+they are most commonly applied to [facets](@ref Reference shapes). Each facet is described
+by a [`FacetIndex`](@ref).
+When adding boundary conditions to points instead, vertices are preferred over nodes.
+
 ## Dirichlet Boundary Conditions
 
 At a Dirichlet boundary the unknown field is prescribed to a given value. For the discrete
@@ -25,9 +30,9 @@ for computing the prescribed value. Example:
 
 ```julia
 dbc1 = Dirichlet(
-    :u,                       # Name of the field
-    getfaceset(grid, "left"), # Part of the boundary
-    x -> 1.0,                 # Function mapping coordinate to a prescribed value
+    :u,                        # Name of the field
+    getfacetset(grid, "left"), # Part of the boundary
+    x -> 1.0,                  # Function mapping coordinate to a prescribed value
 )
 ```
 
@@ -40,9 +45,9 @@ function computing the prescribed value should be of the form `f(x)` or `f(x, t)
     To apply a constraint on multiple face sets in the grid you can use `union` to join
     them, for example
     ```julia
-    left_right = union(getfaceset(grid, "left"), getfaceset(grid, "right"))
+    left_right = union(getfacetset(grid, "left"), getfacetset(grid, "right"))
     ```
-    creates a new face set containing all faces in the `"left"` and "`right`" face sets,
+    creates a new facetset containing all facets in the `"left"` and "`right`" facetsets,
     which can be passed to the `Dirichlet` constructor.
 
 By default the constraint is added to all components of the given field. To add the
@@ -52,10 +57,10 @@ vector field `:u`:
 
 ```julia
 dbc2 = Dirichlet(
-    :u,                       # Name of the field
-    getfaceset(grid, "left"), # Part of the boundary
-    x -> [0.0, 0.0],          # Function mapping coordinate to prescribed values
-    [1, 3],                   # Components
+    :u,                        # Name of the field
+    getfacetset(grid, "left"), # Part of the boundary
+    x -> [0.0, 0.0],           # Function mapping coordinate to prescribed values
+    [1, 3],                    # Components
 )
 ```
 
@@ -96,19 +101,19 @@ For complete examples that use Neumann boundary conditions, please see
 - [von-Mises-plasticity](@ref tutorial-plasticity)
 - [Hyperelasticity](@ref tutorial-hyperelasticity)
 
-### Using the `FaceIterator`
+### Using the `FacetIterator`
 A Neumann boundary contribution can be added by iterating over
-the relevant `faceset::Set{FaceIndex}` by using the [`FaceIterator`](@ref)
+the relevant `facetset` by using the [`FacetIterator`](@ref).
 For a scalar field, this can be done as
 
 ```julia
 grid = generate_grid(Quadrilateral, (3,3))
 dh = DofHandler(grid); push!(dh, :u, 1); close!(dh)
-fv = FaceValues(QuadratureRule{RefQuadrilateral}(2), Lagrange{RefQuadrilateral, 1}())
+fv = FacetValues(QuadratureRule{RefQuadrilateral}(2), Lagrange{RefQuadrilateral, 1}())
 f = zeros(ndofs(dh))
 fe = zeros(ndofs_per_cell(dh))
 qn = 1.0    # Normal flux
-for fc in FaceIterator(dh, getfaceset(grid, "right"))
+for fc in FacetIterator(dh, getfacetset(grid, "right"))
     reinit!(fv, fc)
     fill!(fe, 0)
     for q_point in 1:getnquadpoints(fv)
@@ -137,13 +142,13 @@ Alternatively, the following code snippet can be included in the element routine
 to evaluate the boundary integral:
 
 ```julia
-for face in 1:nfaces(cell)
-    if (cellid(cell), face) ∈ getfaceset(grid, "Neumann Boundary")
-        reinit!(facevalues, cell, face)
-        for q_point in 1:getnquadpoints(facevalues)
-            dΓ = getdetJdV(facevalues, q_point)
-            for i in 1:getnbasefunctions(facevalues)
-                δu = shape_value(facevalues, q_point, i)
+for facet in 1:nfacets(cell)
+    if (cellid(cell), facet) ∈ getfacetset(grid, "Neumann Boundary")
+        reinit!(facetvalues, cell, facet)
+        for q_point in 1:getnquadpoints(facetvalues)
+            dΓ = getdetJdV(facetvalues, q_point)
+            for i in 1:getnbasefunctions(facetvalues)
+                δu = shape_value(facetvalues, q_point, i)
                 fe[i] += δu * qn * dΓ
             end
         end
@@ -154,8 +159,8 @@ end
 We start by looping over all the faces of the cell, next we check if this particular face is
 located on our faceset of interest called `"Neumann Boundary"`. If we have determined
 that the current face is indeed on the boundary and in our faceset, then we
-reinitialize `facevalues` for this face, using [`reinit!`](@ref). When `reinit!`ing
-`facevalues` we also need to give the face number in addition to the cell.
+reinitialize `FacetValues` for this face, using [`reinit!`](@ref). When `reinit!`ing
+`FacetValues` we also need to give the face number in addition to the cell.
 Next we simply loop over the quadrature points of the face, and then loop over
 all the test functions and assemble the contribution to the force vector.
 
@@ -205,7 +210,7 @@ simply a translation (e.g. sides of a cube) this matrix will be the identity mat
 In `Ferrite` this type of periodic Dirichlet boundary conditions can be added to the
 `ConstraintHandler` by constructing an instance of [`PeriodicDirichlet`](@ref). This is
 usually done it two steps. First we compute the mapping between mirror and image faces using
-[`collect_periodic_faces`](@ref). Here we specify the mirror set and image sets (the sets
+[`collect_periodic_facets`](@ref). Here we specify the mirror set and image sets (the sets
 are usually known or can be constructed easily ) and the mapping ``\varphi``. Second we
 construct the constraint using the `PeriodicDirichlet` constructor. Here we specify which
 components of the function that should be constrained, and the rotation matrix
@@ -223,7 +228,7 @@ ch = ConstraintHandler(dofhandler)
 
 # Compute the face mapping
 φ(x) = x - Vec{2}((1.0, 0.0))
-face_mapping = collect_periodic_faces(grid, "left", "right", φ)
+face_mapping = collect_periodic_facets(grid, "left", "right", φ)
 
 # Construct the periodic constraint for field :u
 pdbc = PeriodicDirichlet(:u, face_mapping, [1, 2])
@@ -297,9 +302,9 @@ pdbc = PeriodicDirichlet(
 
 ## Initial Conditions
 
-When solving time-dependent problems, initial conditions, different from zero, may be required. 
-For finite element formulations of ODE-type, 
-i.e. ``\boldsymbol{u}'(t) = \boldsymbol{f}(\boldsymbol{u}(t),t)``, 
+When solving time-dependent problems, initial conditions, different from zero, may be required.
+For finite element formulations of ODE-type,
+i.e. ``\boldsymbol{u}'(t) = \boldsymbol{f}(\boldsymbol{u}(t),t)``,
 where ``\boldsymbol{u}(t)`` are the degrees of freedom,
 initial conditions can be specified by the [`apply_analytical!`](@ref) function.
 For example, specify the initial pressure as a function of the y-coordinate
@@ -314,7 +319,8 @@ apply_analytical!(u, dh, :p, x -> ρ * g * x[2])
 See also [Transient heat equation](@ref tutorial-transient-heat-equation) for one example.
 
 !!! note "Consistency"
-    `apply_analytical!` does not enforce consistency of the applied solution with the system of 
-    equations. Some problems, like for example differential-algebraic systems of equations (DAEs)
-    need extra care during initialization. We refer to the paper ["Consistent Initial Condition Calculation for Differential-Algebraic Systems"  by Brown et al.](dx.doi.org/10.1137/S1064827595289996) for more details on this matter.
-
+    `apply_analytical!` does not enforce consistency of the applied solution with the system
+    of equations. Some problems, like for example differential-algebraic systems of
+    equations (DAEs) need extra care during initialization. We refer to the paper
+    ["Consistent Initial Condition Calculation for Differential-Algebraic Systems" by Brown
+    et al.](https://dx.doi.org/10.1137/S1064827595289996) for more details on this matter.

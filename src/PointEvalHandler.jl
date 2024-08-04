@@ -55,7 +55,7 @@ function _get_cellcoords(points::AbstractVector{Vec{dim,T}}, grid::AbstractGrid,
 
     # set up tree structure for finding nearest nodes to points
     kdtree = KDTree(reinterpret(Vec{dim,T}, getnodes(grid)))
-    nearest_nodes, _ = knn(kdtree, points, search_nneighbors, true) 
+    nearest_nodes, _ = knn(kdtree, points, search_nneighbors, true)
 
     cells = Vector{Union{Nothing, Int}}(nothing, length(points))
     local_coords = Vector{Union{Nothing, Vec{dim, T}}}(nothing, length(points))
@@ -63,13 +63,13 @@ function _get_cellcoords(points::AbstractVector{Vec{dim,T}}, grid::AbstractGrid,
     for point_idx in 1:length(points)
         cell_found = false
         for (CT, node_cell_dict) in node_cell_dicts
-            geom_interpol = default_interpolation(CT)
+            geom_interpol = geometric_interpolation(CT)
             # loop over points
             for node in nearest_nodes[point_idx]
                 possible_cells = get(node_cell_dict, node, nothing)
                 possible_cells === nothing && continue # if node is not part of the subdofhandler, try the next node
                 for cell in possible_cells
-                    cell_coords = get_cell_coordinates(grid, cell)
+                    cell_coords = getcoordinates(grid, cell)
                     is_in_cell, local_coord = point_in_cell(geom_interpol, cell_coords, points[point_idx])
                     if is_in_cell
                         cell_found = true
@@ -115,18 +115,19 @@ end
 
 # See https://discourse.julialang.org/t/finding-the-value-of-a-field-at-a-spatial-location-in-juafem/38975/2
 # TODO: should we make iteration params optional keyword arguments?
-function find_local_coordinate(interpolation, cell_coordinates::Vector{V}, global_coordinate::V) where {dim, T, V <: Vec{dim, T}}
+function find_local_coordinate(interpolation, cell_coordinates::Vector{<:Vec{dim}}, global_coordinate::Vec{dim}; tol_norm = 1e-10) where dim
+    T = promote_type(eltype(cell_coordinates[1]), eltype(global_coordinate))
     n_basefuncs = getnbasefunctions(interpolation)
     @assert length(cell_coordinates) == n_basefuncs
-    local_guess = zero(V)
+    local_guess = zero(Vec{dim, T})
     max_iters = 10
-    tol_norm = 1e-10
     converged = false
     for _ in 1:max_iters
-        global_guess = zero(V)
+        global_guess = zero(Vec{dim, T})
         J = zero(Tensor{2, dim, T})
+        # TODO batched eval after 764 is merged.
         for j in 1:n_basefuncs
-            dNdξ, N = shape_gradient_and_value(interpolation, local_guess, j)
+            dNdξ, N = reference_shape_gradient_and_value(interpolation, local_guess, j)
             global_guess += N * cell_coordinates[j]
             J += cell_coordinates[j] ⊗ dNdξ
         end
@@ -182,9 +183,9 @@ end
 function evaluate_at_points(ph::PointEvalHandler{<:Any, dim, T1}, dh::AbstractDofHandler, dof_vals::AbstractVector{T2},
                            fname::Symbol=find_single_field(dh)) where {dim, T1, T2}
     npoints = length(ph.cells)
-    # Figure out the value type by creating a dummy PointValuesInternal
+    # Figure out the value type by creating a dummy PointValues
     ip = getfieldinterpolation(dh, find_field(dh, fname))
-    pv = PointValuesInternal(zero(Vec{dim, T1}), ip)
+    pv = PointValues(T1, ip; update_gradients = Val(false))
     zero_val = function_value_init(pv, dof_vals)
     # Allocate the output as NaNs
     nanv = convert(typeof(zero_val), NaN * zero_val)
@@ -203,12 +204,12 @@ end
 
 # values in dof-order. They must be obtained from the same DofHandler that was used for constructing the PointEvalHandler
 function evaluate_at_points!(out_vals::Vector{T2},
-    ph::PointEvalHandler,
+    ph::PointEvalHandler{<:Any, <:Any, T_ph},
     dh::DofHandler,
     dof_vals::Vector{T},
     fname::Symbol,
     func_interpolations
-    ) where {T2, T}
+    ) where {T2, T_ph, T}
 
     # TODO: I don't think this is correct??
     length(dof_vals) == ndofs(dh) || error("You must supply values for all $(ndofs(dh)) dofs.")
@@ -218,32 +219,38 @@ function evaluate_at_points!(out_vals::Vector{T2},
         if ip !== nothing
             dofrange = dof_range(sdh, fname)
             cellset = sdh.cellset
-            _evaluate_at_points!(out_vals, dof_vals, ph, dh, ip, cellset, dofrange)
+            ip_geo = geometric_interpolation(getcelltype(sdh))
+
+            pv = PointValues(T_ph, ip, ip_geo; update_gradients = Val(false))
+            _evaluate_at_points!(out_vals, dof_vals, ph, dh, pv, cellset, dofrange)
         end
     end
     return out_vals
 end
 
-# function barrier with concrete type of interpolation
+# function barrier with concrete type of PointValues
 function _evaluate_at_points!(
     out_vals::Vector{T2},
     dof_vals::Vector{T},
     ph::PointEvalHandler,
     dh::AbstractDofHandler,
-    ip::Interpolation,
-    cellset::Union{Nothing, Set{Int}},
+    pv::PointValues,
+    cellset::Union{Nothing, AbstractSet{Int}},
     dofrange::AbstractRange{Int},
     ) where {T2,T}
 
     # extract variables
     local_coords = ph.local_coords
+
     # preallocate some stuff specific to this cellset
     idx = findfirst(!isnothing, local_coords)
     idx === nothing && return out_vals
-    pv = PointValuesInternal(local_coords[idx], ip)
+
+    grid = get_grid(dh)
     first_cell = cellset === nothing ? 1 : first(cellset)
     cell_dofs = Vector{Int}(undef, ndofs_per_cell(dh, first_cell))
     u_e = Vector{T}(undef, ndofs_per_cell(dh, first_cell))
+    x = getcoordinates(grid, first_cell)
 
     # compute point values
     for pointid in eachindex(ph.cells)
@@ -254,7 +261,8 @@ function _evaluate_at_points!(
         for (i, I) in pairs(cell_dofs)
             u_e[i] = dof_vals[I]
         end
-        reinit!(pv, local_coords[pointid])
+        getcoordinates!(x, grid, cellid)
+        reinit!(pv, x, local_coords[pointid])
         out_vals[pointid] = function_value(pv, 1, u_e, dofrange)
     end
     return out_vals
@@ -332,7 +340,7 @@ function Base.iterate(p::PointIterator, state = 1)
         cid = (p.ph.cells[state])::Int
         local_coord = (p.ph.local_coords[state])::Vec
         n = nnodes_per_cell(p.ph.grid, cid)
-        get_cell_coordinates!(resize!(p.coords, n), p.ph.grid, cid)
+        getcoordinates!(resize!(p.coords, n), p.ph.grid, cid)
         point = PointLocation(cid, local_coord, p.coords)
         return (point, state + 1)
     end

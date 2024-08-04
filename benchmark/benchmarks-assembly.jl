@@ -12,8 +12,9 @@ for spatial_dim ∈ 1:3
     for geo_type ∈ FerriteBenchmarkHelper.geo_types_for_spatial_dim(spatial_dim)
         COMMON_LOCAL_ASSEMBLY["spatial-dim",spatial_dim][string(geo_type)] = BenchmarkGroup()
 
-        grid = generate_grid(geo_type, tuple(repeat([1], spatial_dim)...));
-        ip_geo = Ferrite.default_interpolation(geo_type)
+        grid = generate_grid(geo_type, tuple(repeat([2], spatial_dim)...));
+        topology = ExclusiveTopology(grid)
+        ip_geo = Ferrite.geometric_interpolation(geo_type)
         ref_type = FerriteBenchmarkHelper.getrefshape(geo_type)
 
         # Nodal interpolation tests
@@ -60,12 +61,26 @@ for spatial_dim ∈ 1:3
             LAGRANGE_SUITE["petrov-galerkin"]["pressure-velocity"] = @benchmarkable FerriteAssemblyHelper._generalized_petrov_galerkin_assemble_local_matrix($grid, $cvv, shape_divergence, $csv, shape_value, *)
 
             if spatial_dim > 1
-                qr_face = FaceQuadratureRule{ref_type}(2*order-1)
-                fsv = FaceValues(qr_face, ip, ip_geo);
-                fsv2 = FaceValues(qr_face, ip, ip_geo);
+                qr_facet = FacetQuadratureRule{ref_type}(2*order-1)
+                fsv = FacetValues(qr_facet, ip, ip_geo);
+                fsv2 = FacetValues(qr_facet, ip, ip_geo);
 
                 LAGRANGE_SUITE["ritz-galerkin"]["face-flux"] = @benchmarkable FerriteAssemblyHelper._generalized_ritz_galerkin_assemble_local_matrix($grid, $fsv, shape_gradient, shape_value, *)
                 LAGRANGE_SUITE["petrov-galerkin"]["face-flux"] = @benchmarkable FerriteAssemblyHelper._generalized_petrov_galerkin_assemble_local_matrix($grid, $fsv, shape_gradient, $fsv2, shape_value, *)
+
+                ip = DiscontinuousLagrange{ref_type, order}()
+                isv = InterfaceValues(qr_facet, ip, ip_geo);
+                isv2 = InterfaceValues(qr_facet, ip, ip_geo);
+                dh = DofHandler(grid)
+                add!(dh, :u, ip)
+                close!(dh)
+
+                LAGRANGE_SUITE["ritz-galerkin"]["interface-{grad}⋅[[val]]"] = @benchmarkable FerriteAssemblyHelper._generalized_ritz_galerkin_assemble_interfaces($dh, $isv, shape_gradient_average, shape_value_jump, ⋅)
+                LAGRANGE_SUITE["petrov-galerkin"]["interface-{grad}⋅[[val]]"] = @benchmarkable FerriteAssemblyHelper._generalized_petrov_galerkin_assemble_interfaces($dh, $isv, shape_gradient_average, $isv2, shape_value_jump, ⋅)
+
+                LAGRANGE_SUITE["ritz-galerkin"]["interface-interior-penalty"] = @benchmarkable FerriteAssemblyHelper._generalized_ritz_galerkin_assemble_interfaces($dh, $isv, shape_value_jump, shape_value_jump, ⋅)
+                LAGRANGE_SUITE["petrov-galerkin"]["interface-interior-penalty"] = @benchmarkable FerriteAssemblyHelper._generalized_petrov_galerkin_assemble_interfaces($dh, $isv, shape_value_jump, $isv2, shape_value_jump, ⋅)
+
             end
         end
     end
