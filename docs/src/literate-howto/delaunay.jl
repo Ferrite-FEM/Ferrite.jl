@@ -3,7 +3,7 @@
 #-
 #md # !!! tip
 #md #     This example is also available as a Jupyter notebook:
-#md #     [`postprocessing.ipynb`](@__NBVIEWER_ROOT_URL__/howto/delaunay.ipynb).
+#md #     [`delaunay.ipynb`](@__NBVIEWER_ROOT_URL__/howto/delaunay.ipynb).
 #-
 #
 # ## Introduction 
