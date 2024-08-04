@@ -98,14 +98,14 @@ addfacetset!(grid, "bottom", x -> abs(x[2]) < 1e-6);
 # The grid is composed of triangular elements, thus we need the Lagrange functions defined on `RefTriangle`.
 # All currently available interpolations can be found under [`Interpolation`](@ref).
 #
-# Since the displacement field $\boldsymbol{u}$ is vector valued, we use vector valued shape functions $\boldsymbol{N}_i$
+# Since the displacement field, $\boldsymbol{u}$, is vector valued, we use vector valued shape functions $\boldsymbol{N}_i$
 # to approximate the test and trial functions:
 # ```math
 # \boldsymbol{u} \approx \sum_{i=1}^N \boldsymbol{N}_i \left(\boldsymbol{x}\right) \, \hat{u}_i
 # \qquad
 # \delta \boldsymbol{u} \approx \sum_{i=1}^N \boldsymbol{N}_i \left(\boldsymbol{x}\right) \, \delta \hat{u}_i
 # ```
-# Here $N$ is the number of nodal variables and $\hat{u}_i$ / $\delta\hat{u}_i$ represent the i-th nodal value.
+# Here $N$ is the number of nodal variables, with $\hat{u}_i$ and $\delta\hat{u}_i$ representing the $i$-th nodal value.
 # Using the Einstein summation convention, we can write this in short form as
 # $\boldsymbol{u} \approx \boldsymbol{N}_i \, \hat{u}_i$ and $\delta\boldsymbol{u} \approx \boldsymbol{N}_i \, \delta\hat{u}_i$.
 #
@@ -198,14 +198,14 @@ E4 = gradient(ϵ -> 2 * Gmod * dev(ϵ) + 3 * Kmod * vol(ϵ), zero(SymmetricTenso
 # ### Element routine
 # The stiffness matrix follows from the weak form such that
 # ```math
-# \left(\underline{\underline{K}}\right)_{ij}
+# K_{ij}
 # =
 # \int_\Omega
-#   \boldsymbol{\nabla} \boldsymbol{N}_i
 #   \left(
+#       (\boldsymbol{N}_i \otimes \boldsymbol{\nabla}) :
 #       \frac{\partial \boldsymbol{\sigma}}{\partial \boldsymbol{\varepsilon}}
 #       :
-#       \boldsymbol{\nabla}^\mathrm{sym} \boldsymbol{N}_j
+#       (\boldsymbol{N}_j \otimes \boldsymbol{\nabla})^\mathrm{sym}
 #   \right)
 #
 # \, \mathrm{d}V
@@ -213,7 +213,7 @@ E4 = gradient(ϵ -> 2 * Gmod * dev(ϵ) + 3 * Kmod * vol(ϵ), zero(SymmetricTenso
 # The element routine computes the local stiffness matrix `ke`
 # for a single element. `ke` is pre-allocated and reused for all elements.
 #
-# Note that the elastic stiffness tensor $\boldsymbol{\mathrm{E}}$ is constant.
+# Note that the elastic stiffness tensor $\boldsymbol{\mathsf{E}}$ is constant.
 # Thus is needs to be computed and once and can then be used for all integration points.
 function assemble_cell!(ke, cellvalues, ∂σ∂ε)
     fill!(ke, 0.0)
@@ -272,9 +272,10 @@ apply!(K, f_ext, ch)
 u = K \ f_ext;
 
 # ### Exporting to VTK
-# To visualize the result we export the grid and our field `u`
+# To visualize the result we export the grid and our field, `u`,
 # to a VTK-file, which can be viewed in e.g. [ParaView](https://www.paraview.org/).
-# For fun, to color the logo, we create cell data with numbers according to the color.
+# For fun we'll color the logo, and thus create cell data with numbers according
+# to the logo colors.
 color_data = zeros(Int, getncells(grid))
 colors = Dict(
     "1" => 1, "5" => 1, # purple
