@@ -1553,7 +1553,7 @@ end # testset
             @test norm(u_dbc) ≈ 3.8249286998373586
             @test norm(u_p) ≈ 3.7828270430540893
         end
-        # VTKFile("local_application_azero_$(azero)", grid) do vtk
+        # VTKGridFile("local_application_azero_$(azero)", grid) do vtk
         #     write_solution(vtk, dh, u_dbc, "_dbc")
         #     write_solution(vtk, dh, u_p, "_p")
         # end

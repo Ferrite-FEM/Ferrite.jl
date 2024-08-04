@@ -357,7 +357,7 @@ function test_2_element_heat_eq()
     gridfilename = "mixed_grid"
     addcellset!(grid, "cell-1", [1,])
     addcellset!(grid, "cell-2", [2,])
-    VTKFile(gridfilename, grid) do vtk
+    VTKGridFile(gridfilename, grid) do vtk
         Ferrite.write_cellset(vtk, grid, "cell-1")
         Ferrite.write_cellset(vtk, grid, "cell-2")
         write_solution(vtk, dh, u)
@@ -651,7 +651,7 @@ function test_vtk_export()
     close!(dh)
     u = collect(1:ndofs(dh))
     filename = "mixed_2d_grid"
-    VTKFile(filename, dh) do vtk
+    VTKGridFile(filename, dh) do vtk
         write_solution(vtk, dh, u)
     end
     sha = bytes2hex(open(SHA.sha1, filename*".vtu"))
