@@ -24,7 +24,8 @@
 
 # ## Implementation 
 # We first load the packages we will need.
-using Ferrite, DelaunayTriangulation, CairoMakie, OrderedCollections, SparseArrays
+using Ferrite, DelaunayTriangulation, OrderedCollections, SparseArrays
+import CairoMakie: triplot, tricontourf
 
 # ### Mesh generation
 # Next, we need to define a mesh for $\Omega$ using DelaunayTriangulation.jl. The annulus can be 
