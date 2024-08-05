@@ -210,7 +210,7 @@ function assemble_global_gpu!(assembler,kes,fes,ndofs,dofs_to_elements)
             end
         end
     end
-   
+
     assemble!( assembler, k_val, dof_x, dof_y)
     return nothing
 end
@@ -252,7 +252,7 @@ Adapt.@adapt_structure Ferrite.GPUAssemblerSparsityPattern
     # `dofs_to_elements` contains nested arrays so in order to keep alive we use the macro @preserve
     # ref: https://discourse.julialang.org/t/arrays-of-arrays-and-arrays-of-structures-in-cuda-kernels-cause-random-errors/69739/3?page=2
     GC.@preserve  dofs_to_elements begin
-    
+
         dofs_to_elements = CuArray(cudaconvert.(dofs_to_elements))
         n_dofs = ndofs(dh)
         kernel_global = @cuda launch=false assemble_global_gpu!(assembler_gpu,kes,fes,n_dofs,dofs_to_elements)
