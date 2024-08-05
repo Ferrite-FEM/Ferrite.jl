@@ -59,10 +59,10 @@ end
 
 
 left = Tensor{1,2,Float32}((0,-0)) # define the left bottom corner of the grid.
-right = Tensor{1,2,Float32}((100.0,100.0)) # define the right top corner of the grid.
+right = Tensor{1,2,Float32}((4.0,4.0)) # define the right top corner of the grid.
 
 
-grid = generate_grid(Quadrilateral, (100, 100),left,right)
+grid = generate_grid(Quadrilateral, (4, 4),left,right)
 
 
 ip = Lagrange{RefQuadrilateral, 1}() # define the interpolation function (i.e. Bilinear lagrange)
@@ -210,11 +210,8 @@ function assemble_global_gpu!(assembler,kes,fes,ndofs,dofs_to_elements)
             end
         end
     end
-    if ty == 1
-        assemble!( assembler, k_val, f_val, dof_x, dof_y)
-    else
-        assemble!( assembler, k_val, dof_x, dof_y)
-    end
+   
+    assemble!( assembler, k_val, dof_x, dof_y)
     return nothing
 end
 
@@ -252,9 +249,10 @@ Adapt.@adapt_structure Ferrite.GPUAssemblerSparsityPattern
 
     dofs_to_elements = map_dofs_to_elements(dh)
     # assemble the global matrix
+    # `dofs_to_elements` contains nested arrays so in order to keep alive we use the macro @preserve
+    # ref: https://discourse.julialang.org/t/arrays-of-arrays-and-arrays-of-structures-in-cuda-kernels-cause-random-errors/69739/3?page=2
     GC.@preserve  dofs_to_elements begin
-
-        #dofs_to_elements = map_dofs_to_elements(dh) |> cu # map dofs to elements (element index, local dof index)
+    
         dofs_to_elements = CuArray(cudaconvert.(dofs_to_elements))
         n_dofs = ndofs(dh)
         kernel_global = @cuda launch=false assemble_global_gpu!(assembler_gpu,kes,fes,n_dofs,dofs_to_elements)
@@ -264,7 +262,7 @@ Adapt.@adapt_structure Ferrite.GPUAssemblerSparsityPattern
         threads_dofs = min(n_dofs, config.threads |> sqrt |> floor |> Int32)
         blocks =  cld(n_dofs, threads_dofs)
         kernel_global(assembler_gpu,kes,fes,n_dofs,dofs_to_elements;  threads = (threads_dofs,threads_dofs), blocks)
-
+        @show blocks threads_dofs
         return Kgpu,fgpu
     end
 end
