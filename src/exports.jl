@@ -169,7 +169,7 @@ export
     finish_assemble,
 
 # exporting data
-    VTKFile,
+    VTKGridFile,
     write_solution,
     write_cell_data,
     write_projection,
