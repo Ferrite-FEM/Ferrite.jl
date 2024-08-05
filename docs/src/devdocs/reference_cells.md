@@ -30,3 +30,8 @@ which automatically defines
 ```@docs
 Ferrite.reference_facets(::Type{<:Ferrite.AbstractRefShape})
 ```
+
+### Applicable methods to `AbstractRefShape`s
+```@docs
+Ferrite.getrefdim(::Type{<:Ferrite.AbstractRefShape})
+```

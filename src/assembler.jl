@@ -241,7 +241,7 @@ function _missing_sparsity_pattern_error(Krow::Int, Kcol::Int)
     throw(ErrorException(
         "You are trying to assemble values in to K[$(Krow), $(Kcol)], but K[$(Krow), " *
         "$(Kcol)] is missing in the sparsity pattern. Make sure you have called `K = " *
-        "create_sparsity_pattern(dh)` or `K = create_sparsity_pattern(dh, ch)` if you " *
+        "allocate_matrix(dh)` or `K = allocate_matrix(dh, ch)` if you " *
         "have affine constraints. This error might also happen if you are using " *
         "`::AssemblerSparsityPattern` in a threaded assembly loop (you need to create an " *
         "`assembler::AssemblerSparsityPattern` for each task)."

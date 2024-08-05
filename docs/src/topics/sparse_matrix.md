@@ -33,10 +33,10 @@ precision (`Float64`, 8 bytes) it would require 8 TB of memory. If instead the s
 99.9973% (which is the case when solving the heat equation on a three dimensional hypercube
 with linear Lagrange interpolation) this would be reduced to 216 MB.
 
-[1]: Structurally nonzero means that there is a possibility of a nonzero value even though
+[^1]: Structurally nonzero means that there is a possibility of a nonzero value even though
      the computed value might become zero in the end for various reasons.
 
-[2]: At least for most practical problems using low order interpolations.
+[^2]: At least for most practical problems using low order interpolations.
 
 
 !!! details "Sparsity pattern example"
