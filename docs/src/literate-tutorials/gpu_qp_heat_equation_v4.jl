@@ -20,6 +20,7 @@ struct DofToElements{Ti, VEC_INT<:AbstractVector{Ti}}
     dof:: Ti
     elements:: VEC_INT # elements contain this global dof
     local_dofs::VEC_INT # local dofs of the global dof in each element
+    n_elements::Ti
 end
 
 
@@ -27,7 +28,8 @@ function Adapt.adapt_structure(to, dh::DofToElements)
     dof = Adapt.adapt_structure(to, dh.dof)
     elements = Adapt.adapt_structure(to, dh.elements |> cu)
     local_dofs = Adapt.adapt_structure(to, dh.local_dofs |> cu)
-    DofToElements(dof, elements, local_dofs)
+    n_elements = Adapt.adapt_structure(to, dh.n_elements)
+    DofToElements(dof, elements, local_dofs, n_elements)
 end
 
 
@@ -43,7 +45,8 @@ function map_dof_to_elements(dh::DofHandler, dof::Int)
             push!(local_dofs,index)
         end
     end
-    return DofToElements{Int32,Vector{Int32}}(Int32(dof), elements, local_dofs)
+    
+    return DofToElements{Int32,Vector{Int32}}(Int32(dof), elements, local_dofs,length(elements) |> Int32)
 end
 
 
@@ -56,10 +59,10 @@ end
 
 
 left = Tensor{1,2,Float32}((0,-0)) # define the left bottom corner of the grid.
-right = Tensor{1,2,Float32}((2.0,1.0)) # define the right top corner of the grid.
+right = Tensor{1,2,Float32}((100.0,100.0)) # define the right top corner of the grid.
 
 
-grid = generate_grid(Quadrilateral, (2, 1),left,right)
+grid = generate_grid(Quadrilateral, (100, 100),left,right)
 
 
 ip = Lagrange{RefQuadrilateral, 1}() # define the interpolation function (i.e. Bilinear lagrange)
@@ -193,15 +196,17 @@ function assemble_global_gpu!(assembler,kes,fes,ndofs,dofs_to_elements)
     f_val = 0.0f0
     dof_x_map = dofs_to_elements[dof_x]
     dof_y_map = dofs_to_elements[dof_y]
-    for i in 1:length(dof_x_map.elements)
+    nx = dof_x_map.n_elements
+    ny = dof_y_map.n_elements
+    for i in 1:nx
         e_x = dof_x_map.elements[i]
-        for j in 1:length(dof_y_map.elements)
+        for j in 1:ny
             e_y = dof_y_map.elements[j]
             if e_x == e_y
                 local_dof_x = dof_x_map.local_dofs[i]
                 local_dof_y = dof_y_map.local_dofs[j]
                 k_val += kes[e_x,local_dof_x,local_dof_y]
-                f_val += fes[e_x,local_dof_x]
+                #f_val += fes[e_x,local_dof_x]
             end
         end
     end
@@ -245,17 +250,23 @@ Adapt.@adapt_structure Ferrite.GPUAssemblerSparsityPattern
     blocks =  cld(n_cells, threads)
     kernel_local(kes,fes,cellvalues,dh_gpu,n_cells;  threads, blocks)
 
+    dofs_to_elements = map_dofs_to_elements(dh) 
     # assemble the global matrix
-    dofs_to_elements = map_dofs_to_elements(dh) |> cu # map dofs to elements (element index, local dof index)
-    n_dofs = ndofs(dh)
-    kernel_global = @cuda launch=false assemble_global_gpu!(assembler_gpu,kes,fes,n_dofs,dofs_to_elements)
-    #@show CUDA.registers(kernel)
-    config = launch_configuration(kernel_local.fun)
-    threads_dofs = min(n_dofs, config.threads |> sqrt |> floor |> Int32)
-    blocks =  cld(n_dofs, threads_dofs)
-    kernel_global(assembler_gpu,kes,fes,n_dofs,dofs_to_elements;  threads = (threads_dofs,threads_dofs), blocks)
-
-    return Kgpu,fgpu
+    GC.@preserve  dofs_to_elements begin
+        
+        #dofs_to_elements = map_dofs_to_elements(dh) |> cu # map dofs to elements (element index, local dof index)
+        dofs_to_elements = CuArray(cudaconvert.(dofs_to_elements))
+        n_dofs = ndofs(dh)
+        kernel_global = @cuda launch=false assemble_global_gpu!(assembler_gpu,kes,fes,n_dofs,dofs_to_elements)
+        #CUDA.@device_code_warntype @cuda launch=false assemble_global_gpu!(assembler_gpu,kes,fes,n_dofs,dofs_to_elements)
+        #@show CUDA.registers(kernel)
+        config = launch_configuration(kernel_local.fun)
+        threads_dofs = min(n_dofs, config.threads |> sqrt |> floor |> Int32)
+        blocks =  cld(n_dofs, threads_dofs)
+        kernel_global(assembler_gpu,kes,fes,n_dofs,dofs_to_elements;  threads = (threads_dofs,threads_dofs), blocks)
+    
+        return Kgpu,fgpu
+    end
 end
 
 
