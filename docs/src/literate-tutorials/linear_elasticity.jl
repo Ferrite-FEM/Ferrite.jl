@@ -293,7 +293,7 @@ for (key, color) in colors
 end
 
 # And then we save to the vtk file.
-VTKFile("linear_elasticity", dh) do vtk
+VTKGridFile("linear_elasticity", dh) do vtk
     write_solution(vtk, dh, u)
     write_cell_data(vtk, color_data, "colors")
 end
