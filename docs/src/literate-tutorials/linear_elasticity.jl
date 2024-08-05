@@ -87,6 +87,7 @@ isfile(logo_mesh) || download(string(asset_url, logo_mesh), logo_mesh)
 FerriteGmsh.Gmsh.initialize() # hide
 FerriteGmsh.Gmsh.gmsh.option.set_number("General.Verbosity", 2) #hide
 grid = togrid(logo_mesh);
+FerriteGmsh.Gmsh.finalize();
 #md nothing # hide
 # By default the grid lacks the facetsets for the boundaries, so we add them by Ferrite here.
 # [`addfacetset!`](@ref) allows to add facetsets to the grid based on coordinates.
