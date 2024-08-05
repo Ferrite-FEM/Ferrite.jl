@@ -45,7 +45,7 @@ function map_dof_to_elements(dh::DofHandler, dof::Int)
             push!(local_dofs,index)
         end
     end
-    
+
     return DofToElements{Int32,Vector{Int32}}(Int32(dof), elements, local_dofs,length(elements) |> Int32)
 end
 
@@ -250,10 +250,10 @@ Adapt.@adapt_structure Ferrite.GPUAssemblerSparsityPattern
     blocks =  cld(n_cells, threads)
     kernel_local(kes,fes,cellvalues,dh_gpu,n_cells;  threads, blocks)
 
-    dofs_to_elements = map_dofs_to_elements(dh) 
+    dofs_to_elements = map_dofs_to_elements(dh)
     # assemble the global matrix
     GC.@preserve  dofs_to_elements begin
-        
+
         #dofs_to_elements = map_dofs_to_elements(dh) |> cu # map dofs to elements (element index, local dof index)
         dofs_to_elements = CuArray(cudaconvert.(dofs_to_elements))
         n_dofs = ndofs(dh)
@@ -264,7 +264,7 @@ Adapt.@adapt_structure Ferrite.GPUAssemblerSparsityPattern
         threads_dofs = min(n_dofs, config.threads |> sqrt |> floor |> Int32)
         blocks =  cld(n_dofs, threads_dofs)
         kernel_global(assembler_gpu,kes,fes,n_dofs,dofs_to_elements;  threads = (threads_dofs,threads_dofs), blocks)
-    
+
         return Kgpu,fgpu
     end
 end
