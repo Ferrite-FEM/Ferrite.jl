@@ -1,13 +1,14 @@
+Base.@kwdef struct NewtonLineSearchPointFinder{T}
+    max_iters::Int = 10
+    max_line_searches::Int = 5
+    residual_tolerance::T = 1e-10
+end
+
 """
     PointEvalHandler(grid::Grid, points::AbstractVector{Vec{dim,T}}; kwargs...) where {dim, T}
 
 The `PointEvalHandler` can be used for function evaluation in *arbitrary points* in the
 domain -- not just in quadrature points or nodes.
-
-The `PointEvalHandler` takes the following keyword arguments:
- - `search_nneighbors`: How many nodes should be found in the nearest neighbor search for each
-   point. Usually there is no need to change this setting. Default value: `3`.
- - `warn`: Show a warning if a point is not found. Default value: `true`.
 
 The constructor takes a grid and a vector of coordinates for the points. The
 `PointEvalHandler` computes i) the corresponding cell, and ii) the (local) coordinate
@@ -28,10 +29,10 @@ There are two ways to use the `PointEvalHandler` to evaluate functions:
 """
 PointEvalHandler
 
-struct PointEvalHandler{G,dim,T<:Real}
+struct PointEvalHandler{G,T<:Real}
     grid::G
     cells::Vector{Union{Nothing, Int}}
-    local_coords::Vector{Union{Nothing, Vec{dim,T}}}
+    local_coords::Vector{Union{Nothing, Vec{1,T},Vec{2,T},Vec{3,T}}}
 end
 
 function Base.show(io::IO, ::MIME"text/plain", ph::PointEvalHandler)
@@ -45,20 +46,27 @@ function Base.show(io::IO, ::MIME"text/plain", ph::PointEvalHandler)
     end
 end
 
-function PointEvalHandler(grid::AbstractGrid, points::AbstractVector{Vec{dim,T}}; search_nneighbors=3, warn=true) where {dim, T}
+# Internals:
+# `PointEvalHandler` takes the following keyword arguments:
+#  - `search_nneighbors`: How many nodes should be found in the nearest neighbor search for each
+#    point. Usually there is no need to change this setting. Default value: `3`.
+#  - `warn::Bool`: Show a warning if a point is not found. Default value: `true`.
+#  - `newton_max_iters::Int`: Maximum number of inner Newton iterations. Default value: `10`.
+#  - `newton_residual_tolerance`: Tolerance for the residual norm to indicate convergence in the
+#    inner Newton solver. Default value: `1e-10`.
+function PointEvalHandler(grid::AbstractGrid{dim}, points::AbstractVector{Vec{dim,T}}; search_nneighbors=3, warn::Bool=true, strategy = NewtonLineSearchPointFinder()) where {dim, T}
     node_cell_dicts = _get_node_cell_map(grid)
-    cells, local_coords = _get_cellcoords(points, grid, node_cell_dicts, search_nneighbors, warn)
+    cells, local_coords = _get_cellcoords(points, grid, node_cell_dicts, search_nneighbors, warn, strategy)
     return PointEvalHandler(grid, cells, local_coords)
 end
 
-function _get_cellcoords(points::AbstractVector{Vec{dim,T}}, grid::AbstractGrid, node_cell_dicts::Dict{C,Dict{Int, Vector{Int}}}, search_nneighbors, warn) where {dim, T<:Real, C}
-
+function _get_cellcoords(points::AbstractVector{Vec{dim,T}}, grid::AbstractGrid, node_cell_dicts::Dict{C,Dict{Int, Vector{Int}}}, search_nneighbors, warn, strategy::NewtonLineSearchPointFinder) where {dim, T<:Real, C}
     # set up tree structure for finding nearest nodes to points
     kdtree = KDTree(reinterpret(Vec{dim,T}, getnodes(grid)))
     nearest_nodes, _ = knn(kdtree, points, search_nneighbors, true)
 
     cells = Vector{Union{Nothing, Int}}(nothing, length(points))
-    local_coords = Vector{Union{Nothing, Vec{dim, T}}}(nothing, length(points))
+    local_coords = Vector{Union{Nothing, Vec{1, T},Vec{2, T},Vec{3, T}}}(nothing, length(points))
 
     for point_idx in 1:length(points)
         cell_found = false
@@ -70,7 +78,7 @@ function _get_cellcoords(points::AbstractVector{Vec{dim,T}}, grid::AbstractGrid,
                 possible_cells === nothing && continue # if node is not part of the subdofhandler, try the next node
                 for cell in possible_cells
                     cell_coords = getcoordinates(grid, cell)
-                    is_in_cell, local_coord = point_in_cell(geom_interpol, cell_coords, points[point_idx])
+                    is_in_cell, local_coord = find_local_coordinate(geom_interpol, cell_coords, points[point_idx], strategy; warn)
                     if is_in_cell
                         cell_found = true
                         cells[point_idx] = cell
@@ -89,54 +97,85 @@ function _get_cellcoords(points::AbstractVector{Vec{dim,T}}, grid::AbstractGrid,
     return cells, local_coords
 end
 
-# check if point is inside a cell based on physical coordinate
-function point_in_cell(geom_interpol::Interpolation{shape}, cell_coordinates, global_coordinate) where {shape}
-    converged, x_local = find_local_coordinate(geom_interpol, cell_coordinates, global_coordinate)
-    if converged
-        return _check_isoparametric_boundaries(shape, x_local), x_local
-    else
-        return false, x_local
-    end
+# check if point is inside a cell based on isoparametric coordinate
+function check_isoparametric_boundaries(::Type{RefHypercube{dim}}, x_local::Vec{dim, T}, tol) where {dim, T}
+    # All in the range [-1, 1]^dim
+    return all(x -> abs(x) - 1 ≤ tol, x_local)
 end
 
 # check if point is inside a cell based on isoparametric coordinate
-function _check_isoparametric_boundaries(::Type{RefHypercube{dim}}, x_local::Vec{dim, T}) where {dim, T}
-    tol = sqrt(eps(T))
-    # All in the range [-1, 1]
-    return all(x -> abs(x) - 1 < tol, x_local)
-end
-
-# check if point is inside a cell based on isoparametric coordinate
-function _check_isoparametric_boundaries(::Type{RefSimplex{dim}}, x_local::Vec{dim, T}) where {dim, T}
-    tol = sqrt(eps(T))
+function check_isoparametric_boundaries(::Type{RefSimplex{dim}}, x_local::Vec{dim, T}, tol) where {dim, T}
     # Positive and below the plane 1 - ξx - ξy - ξz
     return all(x -> x > -tol, x_local) && sum(x_local) - 1 < tol
 end
 
+cellcenter(::Type{<:RefHypercube{dim}}, _::Type{T}) where {dim, T} = zero(Vec{dim, T})
+cellcenter(::Type{<:RefSimplex{dim}}, _::Type{T}) where {dim, T} = Vec{dim, T}((ntuple(d->1/3, dim)))
+
+_solve_helper(A::Tensor{2,dim}, b::Vec{dim}) where {dim} = inv(A) ⋅ b
+_solve_helper(A::SMatrix{idim, odim}, b::Vec{idim,T}) where {odim, idim, T} = Vec{odim,T}(pinv(A) * b)
+
 # See https://discourse.julialang.org/t/finding-the-value-of-a-field-at-a-spatial-location-in-juafem/38975/2
-# TODO: should we make iteration params optional keyword arguments?
-function find_local_coordinate(interpolation, cell_coordinates::Vector{<:Vec{dim}}, global_coordinate::Vec{dim}; tol_norm = 1e-10) where dim
+function find_local_coordinate(interpolation::Interpolation{refshape}, cell_coordinates::Vector{<:Vec{sdim}}, global_coordinate::Vec{sdim}, strategy::NewtonLineSearchPointFinder; warn::Bool = false) where {sdim, refshape}
+    boundary_tolerance = √(strategy.residual_tolerance)
+
     T = promote_type(eltype(cell_coordinates[1]), eltype(global_coordinate))
     n_basefuncs = getnbasefunctions(interpolation)
     @assert length(cell_coordinates) == n_basefuncs
-    local_guess = zero(Vec{dim, T})
-    max_iters = 10
+    local_guess = cellcenter(refshape, T)
     converged = false
-    for _ in 1:max_iters
-        global_guess = zero(Vec{dim, T})
-        J = zero(Tensor{2, dim, T})
-        # TODO batched eval after 764 is merged.
-        for j in 1:n_basefuncs
-            dNdξ, N = reference_shape_gradient_and_value(interpolation, local_guess, j)
-            global_guess += N * cell_coordinates[j]
-            J += cell_coordinates[j] ⊗ dNdξ
-        end
+    for iter in 1:strategy.max_iters
+        # Setup J(ξ) and x(ξ)
+        J, global_guess = calculate_jacobian_and_spatial_coordinate(interpolation, local_guess, cell_coordinates)
+        # Check if converged
         residual = global_guess - global_coordinate
-        if norm(residual) <= tol_norm
-            converged = true
+        best_residual_norm = norm(residual) # for line search below
+        # Early convergence check
+        if best_residual_norm ≤ strategy.residual_tolerance
+            converged = check_isoparametric_boundaries(refshape, local_guess, boundary_tolerance)
+            if converged
+                @debug println("Local point finder converged in $iter iterations with residual $best_residual_norm to $local_guess")
+            else
+                @debug println("Local point finder converged in $iter iterations with residual $best_residual_norm to a point outside the element: $local_guess")
+            end
             break
         end
-        local_guess -= inv(J) ⋅ residual
+        if calculate_detJ(J) ≤ 0.0
+            warn && @warn "det(J) negative! Aborting! $(calculate_detJ(J))"
+            break
+        end
+        Δξ = _solve_helper(J, residual) # J \ b throws an error. TODO clean up when https://github.com/Ferrite-FEM/Tensors.jl/pull/188 is merged.
+        # Do line search if the new guess is outside the element
+        best_index = 1
+        new_local_guess = local_guess - Δξ
+        global_guess = spatial_coordinate(interpolation, new_local_guess, cell_coordinates)
+        best_residual_norm = norm(global_guess - global_coordinate)
+        if !check_isoparametric_boundaries(refshape, new_local_guess, boundary_tolerance)
+            # Search for the residual minimizer, which is still inside the element
+            for next_index ∈ 2:strategy.max_line_searches
+                new_local_guess = local_guess - Δξ/2^(next_index-1)
+                global_guess = spatial_coordinate(interpolation, new_local_guess, cell_coordinates)
+                residual_norm = norm(global_guess - global_coordinate)
+                if residual_norm < best_residual_norm && check_isoparametric_boundaries(refshape, new_local_guess, boundary_tolerance)
+                    best_residual_norm = residual_norm
+                    best_index = next_index
+                end
+            end
+        end
+        local_guess -= Δξ / 2^(best_index-1)
+        # Late convergence check
+        if best_residual_norm ≤ strategy.residual_tolerance
+            converged = check_isoparametric_boundaries(refshape, local_guess, boundary_tolerance)
+            if converged
+                @debug println("Local point finder converged in $iter iterations with residual $best_residual_norm to $local_guess")
+            else
+                @debug println("Local point finder converged in $iter iterations with residual $best_residual_norm to a point outside the element: $local_guess")
+            end
+            break
+        end
+        if iter == strategy.max_iters
+            @debug println("Failed to converge in $(strategy.max_iters) iterations")
+        end
     end
     return converged, local_guess
 end
@@ -180,8 +219,8 @@ function evaluate_at_points(ph::PointEvalHandler, proj::L2Projector, dof_vals::A
     evaluate_at_points(ph, proj.dh, dof_vals)
 end
 
-function evaluate_at_points(ph::PointEvalHandler{<:Any, dim, T1}, dh::AbstractDofHandler, dof_vals::AbstractVector{T2},
-                           fname::Symbol=find_single_field(dh)) where {dim, T1, T2}
+function evaluate_at_points(ph::PointEvalHandler{<:Any, T1}, dh::AbstractDofHandler, dof_vals::AbstractVector{T2},
+                           fname::Symbol=find_single_field(dh)) where {T1, T2}
     npoints = length(ph.cells)
     # Figure out the value type by creating a dummy PointValues
     ip = getfieldinterpolation(dh, find_field(dh, fname))
@@ -204,7 +243,7 @@ end
 
 # values in dof-order. They must be obtained from the same DofHandler that was used for constructing the PointEvalHandler
 function evaluate_at_points!(out_vals::Vector{T2},
-    ph::PointEvalHandler{<:Any, <:Any, T_ph},
+    ph::PointEvalHandler{<:Any, T_ph},
     dh::DofHandler,
     dof_vals::Vector{T},
     fname::Symbol,
