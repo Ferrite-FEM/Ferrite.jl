@@ -167,6 +167,27 @@
     end
 end
 
+@testset "GeometryMapping" begin
+    grid = generate_grid(Quadrilateral, (1,1))
+    cc = first(CellIterator(grid))
+
+    qr = QuadratureRule{RefQuadrilateral}(1)
+    ξ = first(Ferrite.getpoints(qr))
+    ip = Lagrange{RefQuadrilateral,1}()
+
+    cv0 = CellValues(Float64, qr, ip, ip^2; update_detJdV=false, update_gradients=false, update_hessians=false)
+    reinit!(cv0, cc)
+    @test Ferrite.calculate_mapping(cv0.geo_mapping, 1, cc.coords) == Ferrite.calculate_mapping(ip, ξ, cc.coords, Val(0))
+
+    cv1 = CellValues(Float64, qr, ip, ip^2; update_detJdV=false, update_gradients=true,  update_hessians=false)
+    reinit!(cv1, cc)
+    @test Ferrite.calculate_mapping(cv1.geo_mapping, 1, cc.coords) == Ferrite.calculate_mapping(ip, ξ, cc.coords, Val(1))
+
+    cv2 = CellValues(Float64, qr, ip, ip^2; update_detJdV=false, update_gradients=false, update_hessians=true)
+    reinit!(cv2, cc)
+    @test Ferrite.calculate_mapping(cv2.geo_mapping, 1, cc.coords) == Ferrite.calculate_mapping(ip, ξ, cc.coords, Val(2))
+end
+
 @testset "#265: error message for incompatible geometric interpolation" begin
     dim = 1
     deg = 1
