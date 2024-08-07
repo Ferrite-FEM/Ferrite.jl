@@ -9,6 +9,7 @@ using LinearAlgebra
 using SparseArrays
 using StaticArrays
 using OrderedCollections
+using WriteVTK
 
 const HAS_EXTENSIONS = isdefined(Base, :get_extension)
 

@@ -54,80 +54,11 @@ function Base.show(io::IO, ::MIME"text/plain", vtk::VTKGridFile)
     print(io, "VTKGridFile for the $open_str file \"$(filename)\".")
 end
 
-"""
-    VTKFileCollection(name::String, grid::AbstractGrid; kwargs...)
-    VTKFileCollection(name::String, dh::DofHandler; kwargs...)
-
-Create a paraview data file (.pvd) that can be used to
-save multiple vtk file along with a time stamp. The keyword arguments
-are forwarded to `WriteVTK.paraview_collection`.
-
-See [`addstep!`](@ref) for examples for how to use `VTKFileCollection`.
-```
-"""
-mutable struct VTKFileCollection{P<:WriteVTK.CollectionFile,G_DH}
-    pvd::P
-    grid_or_dh::G_DH
-    name::String
-    step::Int
+function WriteVTK.collection_add_timestep(pvd::WriteVTK.CollectionFile, datfile::VTKGridFile, time::Real)
+    WriteVTK.collection_add_timestep(pvd, datfile.vtk, time)
 end
-function VTKFileCollection(name::String, grid_or_dh::Union{AbstractGrid,AbstractDofHandler}; kwargs...)
-    pvd = WriteVTK.paraview_collection(name; kwargs...)
-    basename = string(first(split(pvd.path, ".pvd")))
-    return VTKFileCollection(pvd, grid_or_dh, basename, 0)
-end
-Base.close(pvd::VTKFileCollection) = WriteVTK.vtk_save(pvd.pvd)
-
-"""
-    addstep!(f::Function, pvd::VTKFileCollection, t::Real, [grid_or_dh]; kwargs...)
-
-Add a step at time `t` by writing a `VTKGridFile` to `pvd`.
-The keyword arguments are forwarded to `WriteVTK.vtk_grid`.
-If required, a new grid can be used by supplying the grid or dofhandler as the last argument.
-Should be used in a do-block, e.g.
-```julia
-filename = "myoutput"
-pvd = VTKFileCollection(filename, grid)
-for (n, t) in pairs(timevector)
-    # Calculate, e.g., the solution `u` and the stress `σeff`
-    addstep!(pvd, t) do io
-        write_cell_data(io, σeff, "Effective stress")
-        write_solution(io, dh, u)
-    end
-end
-close(pvd)
-```
-"""
-function addstep!(f::Function, pvd::VTKFileCollection, t, grid=pvd.grid_or_dh; kwargs...)
-    pvd.step += 1
-    VTKGridFile(string(pvd.name, "_", pvd.step), grid; kwargs...) do vtk
-        f(vtk)
-        pvd.pvd[t] = vtk.vtk # Add to collection
-    end
-end
-
-"""
-    addstep!(pvd::VTKFileCollection, vtk::VTKGridFile, t)
-
-As an alternative to using the `addstep!(pvd, t) do` block, it is
-also possible to add a specific `vtk` at time `t` to `pvd`.
-Note that this will close the `vtk`. Example
-```julia
-filename = "myoutput"
-pvd = VTKFileCollection(filename, grid)
-for (n, t) in pairs(timevector)
-    # Calculate, e.g., the solution `u` and the stress `σeff`
-    vtk = VTKGridFile(string(filename, "_", n), dh)
-    write_cell_data(vtk, σeff, "Effective stress")
-    write_solution(vtk, dh, u)
-    addstep!(pvd, vtk, t)
-end
-close(pvd)
-```
-"""
-function addstep!(pvd::VTKFileCollection, vtk::VTKGridFile, t)
-    pvd.step += 1
-    pvd.pvd[t] = vtk.vtk
+function Base.setindex!(pvd::WriteVTK.CollectionFile, datfile::VTKGridFile, time::Real)
+    WriteVTK.collection_add_timestep(pvd, datfile.vtk, time)
 end
 
 cell_to_vtkcell(::Type{Line}) = VTKCellTypes.VTK_LINE

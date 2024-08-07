@@ -212,7 +212,7 @@ more discussion).
             # ...
   ```
 
-- **VTK Export**: The VTK export has been changed to become and export backend [#692][github-692].
+- **VTK Export**: The VTK export has been changed [#692][github-692].
   ```diff
   - vtk_grid(name, dh) do vtk
   -     vtk_point_data(vtk, dh, a)
@@ -225,24 +225,10 @@ more discussion).
   +     write_projection(vtk, proj, projected_data, "my projected data")
   +     write_cell_data(vtk, cell_data, "my projected data")
   end
-
-  # Using a collection for e.g. multiple timesteps
-  - pvd = paraview_collection("mypvd")
-  + pvd = VTKFileCollection("mypvd", grid);
-
-  for t in timesteps
-      # solve problem to find `u`
-  -   vtk_grid("transient-heat-$t", dh) do vtk
-  -       vtk_point_data(vtk, dh, u)
-  -       vtk_save(vtk)
-  -       pvd[t] = vtk
-  -   end
-  +   addstep!(pvd, t) do io
-  +       write_solution(io, dh, u)
-  +   end
-  end
   ```
-
+  When using a `paraview_collection` collection for e.g. multiple timesteps
+  the `VTKGridFile` object can be used instead of the previous type returned
+  from `vtk_grid`.
 
 - **Sparsity pattern and global matrix construction**: since there is now explicit support
   for working with the sparsity pattern before instantiating a matrix the function
@@ -426,8 +412,8 @@ more discussion).
   by type piracy. In order to be invariant to the underlying `Set` datatype as well as
   omitting type piracy, ([#835][github-835]) implemented `isequal` and `hash` for `BoundaryIndex` datatypes.
 
-- **VTK export**: Ferrite no longer extends methods from `WriteVTK.jl`, instead the new types
-  `VTKGridFile` and `VTKFileCollection` should be used instead. New methods exists for writing to
+- **VTK export**: Ferrite no longer extends `WriteVTK.vtk_grid` and associated functions,
+  instead the new type `VTKGridFile` should be used instead. New methods exists for writing to
   a `VTKGridFile`, e.g. `write_solution`, `write_cell_data`, `write_node_data`, and `write_projection`.
   See [#692][github-692].
 
