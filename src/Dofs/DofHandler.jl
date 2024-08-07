@@ -938,10 +938,10 @@ function _evaluate_at_grid_nodes(dh::DofHandler, u::AbstractVector{T}, fieldname
         # VTK output of solution field (or L2 projected scalar data)
         n_c = n_components(ip)
         vtk_dim = n_c == 2 ? 3 : n_c # VTK wants vectors padded to 3D
-        data = fill(NaN * zero(T), vtk_dim, getnnodes(get_grid(dh)))
+        data = fill(T(NaN) * zero(T), vtk_dim, getnnodes(get_grid(dh)))
     else
         # Just evaluation at grid nodes
-        data = fill(NaN * zero(RT), getnnodes(get_grid(dh)))
+        data = fill(T(NaN) * zero(RT), getnnodes(get_grid(dh)))
     end
     # Loop over the subdofhandlers
     for sdh in dh.subdofhandlers
