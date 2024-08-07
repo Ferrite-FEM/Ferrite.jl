@@ -14,7 +14,8 @@ using NearestNeighbors:
 using OrderedCollections:
     OrderedSet
 using SparseArrays:
-    SparseArrays, SparseMatrixCSC, nonzeros, nzrange, rowvals, sparse
+    SparseArrays, SparseMatrixCSC, nonzeros, nzrange, rowvals, sparse,
+    AbstractSparseMatrixCSC
 using StaticArrays:
     StaticArrays, MArray, MMatrix, SArray, SMatrix, SVector
 using WriteVTK:
