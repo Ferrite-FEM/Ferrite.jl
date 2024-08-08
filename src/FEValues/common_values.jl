@@ -329,7 +329,10 @@ Compute the spatial coordinate in a quadrature point. `x` contains the nodal
 coordinates of the cell.
 
 The coordinate is computed, using the geometric interpolation, as
-``\\mathbf{x} = \\sum\\limits_{i = 1}^n M_i (\\mathbf{x}) \\mathbf{\\hat{x}}_i``
+``\\mathbf{x} = \\sum\\limits_{i = 1}^n M_i (\\mathbf{\\xi}) \\mathbf{\\hat{x}}_i``.
+
+where ``\\xi``is the coordinate of the given quadrature point `q_point` of the associated
+quadrature rule.
 """
 function spatial_coordinate(fe_v::AbstractValues, q_point::Int, x::AbstractVector{<:Vec})
     n_base_funcs = getngeobasefunctions(fe_v)
@@ -342,6 +345,24 @@ function spatial_coordinate(fe_v::AbstractValues, q_point::Int, x::AbstractVecto
     return vec
 end
 
+"""
+    spatial_coordinate(ip::ScalarInterpolation, ξ::Vec, x::AbstractVector{<:Vec{sdim, T}})
+
+Compute the spatial coordinate in a given quadrature point. `x` contains the nodal coordinates of the cell.
+
+The coordinate is computed, using the geometric interpolation, as
+``\\mathbf{x} = \\sum\\limits_{i = 1}^n M_i (\\mathbf{\\xi}) \\mathbf{\\hat{x}}_i``
+"""
+function spatial_coordinate(interpolation::ScalarInterpolation, ξ::Vec, x::AbstractVector{<:Vec})
+    n_basefuncs = getnbasefunctions(interpolation)
+    @boundscheck checkbounds(x, Base.OneTo(n_basefuncs))
+    vec = zero(eltype(x))
+    @inbounds for j in 1:n_basefuncs
+        M = reference_shape_value(interpolation, ξ, j)
+        vec += M * x[j]
+    end
+    return vec
+end
 
 # Utility functions used by GeometryMapping, FunctionValues
 _copy_or_nothing(x) = copy(x)

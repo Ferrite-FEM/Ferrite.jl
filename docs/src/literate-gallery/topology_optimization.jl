@@ -541,7 +541,7 @@ end
 
 #md # ## References
 #md # ```@bibliography
-#md # Pages = ["gallery/topology_optimization.md"]
+#md # Pages = ["topology_optimization.md"]
 #md # Canonical = false
 #md # ```
 

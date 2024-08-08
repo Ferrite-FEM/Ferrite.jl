@@ -344,7 +344,7 @@ using Test                        #src
 
 #md # ## References
 #md # ```@bibliography
-#md # Pages = ["tutorials/dg_heat_equation.md"]
+#md # Pages = ["dg_heat_equation.md"]
 #md # Canonical = false
 #md # ```
 

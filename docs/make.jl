@@ -42,7 +42,7 @@ bibtex_plugin = CitationBibliography(
     ),
     sitename = "Ferrite.jl",
     doctest = false,
-    warnonly = true,
+    warnonly = is_ci ? false : [:cross_references], # Local build exception required for Literate's `@__NBVIEWER_ROOT_URL__`
     draft = liveserver,
     pages = Any[
         "Home" => "index.md",

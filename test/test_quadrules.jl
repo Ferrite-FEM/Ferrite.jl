@@ -14,17 +14,14 @@ using Ferrite: reference_shape_value
     end
 
     # Hypercube
-    for (dim, shape) = ((1, RefLine), (2, RefQuadrilateral), (3, RefHexahedron))
-        for order in (1,2,3,4)
-            f = (x, p) -> sum([x[i]^p for i in 1:length(x)])
-            # Legendre
-            qr = QuadratureRule{shape}(:legendre, order)
-            @test integrate(qr, (x) -> f(x, 2*order-1)) < 1e-14
-            @test sum(qr.weights) ≈ ref_square_vol(dim)
-            @test sum(Ferrite.getweights(qr)) ≈ ref_square_vol(dim)
-            # Lobatto
-            if order > 1
-                qr = QuadratureRule{shape}(:lobatto, order)
+    @testset "Exactness for integration on hypercube of $rulename" for (rulename, orderrange) in [
+        (:legendre, 1:4),
+        (:lobatto, 2:4),
+    ]
+        for (dim, shape) = ((1, RefLine), (2, RefQuadrilateral), (3, RefHexahedron))
+            for order in orderrange
+                f = (x, p) -> sum([x[i]^p for i in 1:length(x)])
+                qr = QuadratureRule{shape}(rulename, order)
                 @test integrate(qr, (x) -> f(x, 2*order-1)) < 1e-14
                 @test sum(qr.weights) ≈ ref_square_vol(dim)
                 @test sum(Ferrite.getweights(qr)) ≈ ref_square_vol(dim)
@@ -33,37 +30,58 @@ using Ferrite: reference_shape_value
     end
     @test_throws ArgumentError QuadratureRule{RefLine}(:einstein, 2)
 
-    # Tetrahedron
-    g = (x) -> sqrt(sum(x))
-    dim = 2
-    for order in 1:15
-        qr = QuadratureRule{RefTriangle}(:legendre, order)
-        # http://www.wolframalpha.com/input/?i=integrate+sqrt(x%2By)+from+x+%3D+0+to+1,+y+%3D+0+to+1-x
-        @test integrate(qr, g) - 0.4 < 0.01
-        @test sum(qr.weights) ≈ ref_tet_vol(dim)
+    # Triangle
+    # http://www.wolframalpha.com/input/?i=integrate+sqrt(x%2By)+from+x+%3D+0+to+1,+y+%3D+0+to+1-x
+    @testset "Exactness for integration on triangles of $rulename" for (rulename, orderrange) in [
+        (:dunavant, 1:8),
+        (:gaussjacobi, 9:15),
+    ]
+        g = (x) -> sqrt(sum(x))
+        dim = 2
+        for order in orderrange
+            qr = QuadratureRule{RefTriangle}(rulename, order)
+            @test integrate(qr, g) - 0.4 < 0.01
+            @test sum(qr.weights) ≈ ref_tet_vol(dim)
+        end
     end
     @test_throws ArgumentError QuadratureRule{RefTriangle}(:einstein, 2)
     @test_throws ArgumentError QuadratureRule{RefTriangle}(0)
 
-    dim = 3
-    for order in (1, 2, 3, 4)
-        qr = QuadratureRule{RefTetrahedron}(:legendre, order)
-        # Table 1:
-        # http://www.m-hikari.com/ijma/ijma-2011/ijma-1-4-2011/venkateshIJMA1-4-2011.pdf
-        @test integrate(qr, g) - 0.14 < 0.01
-        @test sum(qr.weights) ≈ ref_tet_vol(dim)
+    # Tetrahedron
+    # Table 1:
+    # http://www.m-hikari.com/ijma/ijma-2011/ijma-1-4-2011/venkateshIJMA1-4-2011.pdf
+    @testset "Exactness for integration on tetrahedra of $rulename" for (rulename, orderrange) in [
+        (:jinyun, 1:3),
+        (:keast_minimal, 1:5),
+        (:keast_positive, 1:5)
+    ]
+        g = (x) -> sqrt(sum(x))
+        dim = 3
+        for order in orderrange
+            qr = QuadratureRule{RefTetrahedron}(rulename, order)
+            @test integrate(qr, g) - 0.14 < 0.01
+            @test sum(qr.weights) ≈ ref_tet_vol(dim)
+        end
     end
     @test_throws ArgumentError QuadratureRule{RefTetrahedron}(:einstein, 2)
     @test_throws ArgumentError QuadratureRule{RefTetrahedron}(0)
 
-    g = (x) -> sqrt(x[1] + x[2])*x[3]^2
-    for order in 1:10
-        qr = QuadratureRule{RefPrism}(:polyquad, order)
-        @test integrate(qr, g) - 2/15 < 0.01
-        @test sum(qr.weights) ≈ ref_prism_vol()
+    # Wedge
+    # ∫ √(x₁ + x₂) x₃²
+    @testset "Exactness for integration on prisms of $rulename" for (rulename, orderrange) in [
+        (:polyquad, 1:10),
+    ]
+        g = (x) -> √(x[1] + x[2])*x[3]^2
+        for order in 1:10
+            qr = QuadratureRule{RefPrism}(:polyquad, order)
+            @test integrate(qr, g) - 2/15 < 0.01
+            @test sum(qr.weights) ≈ ref_prism_vol()
+        end
     end
+    @test_throws ArgumentError QuadratureRule{RefPrism}(:einstein, 2)
+    @test_throws ArgumentError QuadratureRule{RefPrism}(0)
 
-    @testset "Quadrature rules for $ref_cell" for ref_cell in (
+    @testset "Generic quadrature rule properties for $ref_cell" for ref_cell in (
         Line,
         Quadrilateral,
         Triangle,
@@ -119,12 +137,14 @@ using Ferrite: reference_shape_value
             end
         end
 
-        @testset "Type checks for $refshape" begin
-            qr  = QuadratureRule{refshape}(1)
+        @testset "Type checks for $refshape (T=$T)" for T in (Float32, Float64)
+            qr  = QuadratureRule{refshape}(T, 1)
             qrw = Ferrite.getweights(qr)
             qrp = Ferrite.getpoints(qr)
             @test qrw isa Vector
             @test qrp isa Vector
+            @test eltype(qrw) === T
+            @test eltype(eltype(qrp)) === T
 
             sqr = QuadratureRule{refshape}(
                 SVector{length(qrw)}(qrw), SVector{length(qrp)}(qrp)
@@ -133,13 +153,17 @@ using Ferrite: reference_shape_value
             sqrp = Ferrite.getpoints(sqr)
             @test sqrw isa SVector
             @test sqrp isa SVector
+            @test eltype(sqrw) === T
+            @test eltype(eltype(sqrp)) === T
 
-            fqr  = FacetQuadratureRule{refshape}(1)
+            fqr  = FacetQuadratureRule{refshape}(T, 1)
             for f in 1:nfacets(refshape)
                 fqrw = Ferrite.getweights(fqr, f)
                 fqrp = Ferrite.getpoints(fqr, f)
                 @test fqrw isa Vector
                 @test fqrp isa Vector
+                @test eltype(fqrw) === T
+                @test eltype(eltype(fqrp)) === T
             end
 
             function sqr_for_facet(fqr, f)
@@ -159,6 +183,8 @@ using Ferrite: reference_shape_value
                 sfqrp = Ferrite.getpoints(sfqr, f)
                 @test sfqrw isa SVector
                 @test sfqrp isa SVector
+                @test eltype(sfqrw) === T
+                @test eltype(eltype(sfqrp)) === T
             end
 
             sfqr2 = FacetQuadratureRule(
@@ -169,6 +195,44 @@ using Ferrite: reference_shape_value
                 sfqrp = Ferrite.getpoints(sfqr2, f)
                 @test sfqrw isa SVector
                 @test sfqrp isa SVector
+                @test eltype(sfqrw) === T
+                @test eltype(eltype(sfqrp)) === T
+            end
+        end
+    end
+
+    # Check explicitly if the defaults changed, as this might affect users negatively
+    @testset "Volume defaults for $refshape" for (refshape, sym) in (
+        (RefLine, :legendre),
+        (RefQuadrilateral, :legendre),
+        (RefHexahedron, :legendre),
+        (RefTriangle, :dunavant),
+        (RefTetrahedron, :keast_minimal),
+        (RefPrism, :polyquad),
+        (RefPyramid, :polyquad),
+    )
+        for order in 1:3
+            qr  = QuadratureRule{refshape}(sym, order)
+            qr_default = QuadratureRule{refshape}(order)
+            @test Ferrite.getweights(qr) == Ferrite.getweights(qr_default)
+            @test Ferrite.getpoints(qr) == Ferrite.getpoints(qr_default)
+        end
+    end
+    @testset "Facet defaults for $refshape" for (refshape, sym) in (
+        # (RefLine, :legendre), # There is no choice for the rule on lines, as it only is a point eval
+        (RefQuadrilateral, :legendre),
+        (RefHexahedron, :legendre),
+        (RefTriangle, :legendre),
+        (RefTetrahedron, :dunavant),
+        # (RefPrism, ...), # Not implemented yet (see discussion in #1007)
+        # (RefPyramid, ...), # Not implement yet (see discussion in #1007)
+    )
+        for order in 1:3
+            fqr  = FacetQuadratureRule{refshape}(sym, order)
+            fqr_default = FacetQuadratureRule{refshape}(order)
+            for f in 1:nfacets(refshape)
+                @test Ferrite.getweights(fqr,f) == Ferrite.getweights(fqr_default,f)
+                @test Ferrite.getpoints(fqr,f) == Ferrite.getpoints(fqr_default,f)
             end
         end
     end

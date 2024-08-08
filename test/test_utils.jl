@@ -253,28 +253,6 @@ coords_on_faces(x, ::Serendipity{RefHexahedron, 2}) =
 check_equal_or_nan(a::Any, b::Any) = a==b || (isnan(a) && isnan(b))
 check_equal_or_nan(a::Union{Tensor, Array}, b::Union{Tensor, Array}) = all(check_equal_or_nan.(a, b))
 
-# Hypercube is simply ⨂ᵈⁱᵐ Line :)
-sample_random_point(::Type{Ferrite.RefHypercube{ref_dim}}) where {ref_dim} = Vec{ref_dim}(2.0 .* rand(Vec{ref_dim}) .- 1.0)
-# Dirichlet type sampling
-function sample_random_point(::Type{Ferrite.RefSimplex{ref_dim}}) where {ref_dim}
-    ξ = rand(ref_dim+1)
-    ξₜ = -log.(ξ)
-    return Vec{ref_dim}(ntuple(i->ξₜ[i], ref_dim) ./ sum(ξₜ))
-end
-# Wedge = Triangle ⊗ Line
-function sample_random_point(::Type{RefPrism})
-    (ξ₁, ξ₂) = sample_random_point(RefTriangle)
-    ξ₃ = rand(Float64)
-    return Vec{3}((ξ₁, ξ₂, ξ₃))
-end
-# TODO what to do here? The samplig is not uniform...
-function sample_random_point(::Type{RefPyramid})
-    ξ₃ = (1-1e-3)*rand(Float64) # Derivative is discontinuous at the top
-    # If we fix a z coordinate we get a Quad with extends (1-ξ₃)
-    (ξ₁, ξ₂) = (1.0 - ξ₃) .* rand(Vec{2})
-    return Vec{3}((ξ₁, ξ₂, ξ₃))
-end
-
 ######################################################
 # Helpers for testing facet_to_element_transformation #
 ######################################################
@@ -283,6 +261,18 @@ getfacerefshape(::Hexahedron, ::Int) = RefQuadrilateral
 getfacerefshape(::Tetrahedron, ::Int) = RefTriangle
 getfacerefshape(::Pyramid, face::Int) = face == 1 ? RefQuadrilateral : RefTriangle
 getfacerefshape(::Wedge, face::Int) = face ∈ (1,5) ? RefTriangle : RefQuadrilateral
+
+function perturbate_standard_grid!(grid::Ferrite.AbstractGrid{dim}, strength) where dim
+    function perturbate(x::Vec{dim}) where dim
+        for d in 1:dim
+            if x[d] ≈ 1.0 || x[d] ≈ -1.0
+                return x
+            end
+        end
+        return x + Vec{dim}(0.5*strength .* (2 .* rand(Vec{dim}) .- 1.0))
+    end
+    transform_coordinates!(grid, perturbate)
+end
 
 ######################################################
 # Dummy RefShape to test get_transformation_matrix   #
@@ -297,6 +287,41 @@ module DummyRefShapes
     end
 end
 
+# Hypercube is simply ⨂ᵈⁱᵐ Line :)
+sample_random_point(::Type{Ferrite.RefHypercube{ref_dim}}) where {ref_dim} = Vec{ref_dim}(ntuple(_ -> 2.0*rand()-1.0, ref_dim))
+
+# Dirichlet type sampling
+#
+# The idea behind this sampling is that the d-Simplex (i.e. a generalized triangle in d dimensions)
+# is just a surface in d+1 dimensions, that can be characterized by two constraints:
+# 1. All coordinates are between 0 and 1
+# 2. The sum of all coordinates is exactly 1
+# This way we can just sample from the d+1 dimensional hypercube, transform the hypercube
+# logarithmically to get a "normal distribution" over our simplex and enforce that the coordinates
+# sum to 1. By dropping the last coordinate in this sample we finally obtain d numbers which lies in
+# the d-simplex.
+#
+# A nice geometric sketch of this process is given in this stackexchange post: https://stats.stackexchange.com/a/296779
+function sample_random_point(::Type{Ferrite.RefSimplex{ref_dim}}) where {ref_dim} # Note that "ref_dim = d" in the text above
+    ξₜ = ntuple(_ -> -log(rand()), ref_dim+1)
+    return Vec{ref_dim}(ntuple(i->ξₜ[i], ref_dim) ./ sum(ξₜ))
+end
+
+# Wedge = Triangle ⊗ Line
+function sample_random_point(::Type{RefPrism})
+    (ξ₁, ξ₂) = sample_random_point(RefTriangle)
+    ξ₃ = rand(Float64)
+    return Vec{3}((ξ₁, ξ₂, ξ₃))
+end
+
+# TODO what to do here? The samplig is not uniform...
+function sample_random_point(::Type{RefPyramid})
+    ξ₃ = (1-1e-3)*rand(Float64) # Derivative is discontinuous at the top
+    # If we fix a z coordinate we get a Quad with extends (1-ξ₃)
+    (ξ₁, ξ₂) = (1.0 - ξ₃) .* Vec{2}(ntuple(_ -> rand(), 2))
+    return Vec{3}((ξ₁, ξ₂, ξ₃))
+end
+
 ############################################################
 # Inverse parametric mapping ξ = ϕ(x) for testing hessians #
 ############################################################
@@ -304,7 +329,7 @@ function function_value_from_physical_coord(interpolation::Interpolation, cell_c
     n_basefuncs = getnbasefunctions(interpolation)
     scalar_ip = interpolation isa Ferrite.ScalarInterpolation ? interpolation : interpolation.ip
     @assert length(ue) == n_basefuncs
-    _, ξ = Ferrite.find_local_coordinate(scalar_ip, cell_coordinates, X; tol_norm=1e-16)
+    _, ξ = Ferrite.find_local_coordinate(scalar_ip, cell_coordinates, X, Ferrite.NewtonLineSearchPointFinder(residual_tolerance=1e-16))
     u = zero(reference_shape_value(interpolation, ξ, 1))
     for j in 1:n_basefuncs
         N = reference_shape_value(interpolation, ξ, j)

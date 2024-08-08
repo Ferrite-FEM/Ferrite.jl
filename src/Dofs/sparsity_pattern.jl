@@ -391,7 +391,7 @@ allocate_matrix(MatrixType, sp)
 ````
 
 Refer to [`allocate_matrix`](@ref allocate_matrix(::Type{<:Any}, ::SparsityPattern)) for
-supported matrix types, and to [`create_sparsity_pattern`](@ref) for details about supported
+supported matrix types, and to [`init_sparsity_pattern`](@ref) for details about supported
 arguments `args` and keyword arguments `kwargs`.
 
 !!! note
