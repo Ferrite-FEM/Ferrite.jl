@@ -192,10 +192,14 @@ end
     permutation = A.permutation
     sorteddofs = A.sorteddofs
     @boundscheck checkbounds(K, dofs, dofs)
+
+    ## This code is not okay on the GPU (i.e. has to be static code)##
     resize!(permutation, ld)
     resize!(sorteddofs, ld)
     copyto!(sorteddofs, dofs)
+    # sort permutation according to sorteddofs (e.g. sorteddofs = [2,5,3,6] -> permutation = [1,3,2,4])
     sortperm2!(sorteddofs, permutation)
+    ## ############################################################## ##
 
     current_col = 1
     @inbounds for Kcol in sorteddofs

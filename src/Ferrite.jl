@@ -14,9 +14,9 @@ using NearestNeighbors:
 using OrderedCollections:
     OrderedSet
 using SparseArrays:
-    SparseArrays, SparseMatrixCSC, nonzeros, nzrange, rowvals, sparse
+    AbstractSparseArray,SparseArrays, SparseMatrixCSC, nonzeros, nzrange, rowvals, sparse
 using StaticArrays:
-    StaticArrays, MArray, MMatrix, SArray, SMatrix, SVector
+    StaticVector,StaticArrays,MVector, MArray, MMatrix, SArray, SMatrix, SVector
 using WriteVTK:
     WriteVTK, VTKCellTypes
 using Tensors:
@@ -24,6 +24,8 @@ using Tensors:
     rotation_tensor, symmetric, tovoigt!, hessian, otimesu
 using ForwardDiff:
     ForwardDiff
+using CUDA
+using Adapt
 
 include("CollectionsOfViews.jl")
 using .CollectionsOfViews:
@@ -130,6 +132,8 @@ include("FEValues/CellValues.jl")
 include("FEValues/FacetValues.jl")
 include("FEValues/InterfaceValues.jl")
 include("FEValues/PointValues.jl")
+include("FEValues/QuadratureValues.jl")
+include("FEValues/StaticCellValues.jl")
 include("FEValues/common_values.jl")
 include("FEValues/face_integrals.jl")
 
@@ -165,5 +169,13 @@ include("PointEvalHandler.jl")
 # Other
 include("deprecations.jl")
 include("docs.jl")
+
+# GPU support
+include("GPU/kernel_meta.jl")
+include("GPU/gpu_assembler.jl")
+include("Grid/gpu_grid.jl")
+include("Dofs/GPUDofHandler.jl")
+include("GPU/adapt.jl")
+
 
 end # module
