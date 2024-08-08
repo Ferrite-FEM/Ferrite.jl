@@ -13,15 +13,16 @@
 #
 # The classical first finite element problem to solve in solid mechanics is a linear balance
 # of momentum problem. We will use this to introduce a vector valued field, the displacements
-# $\boldsymbol{u}$. In addition, some features of the
+# $\boldsymbol{u}(\boldsymbol{x})$. In addition, some features of the
 # [`Tensors.jl`](https://github.com/Ferrite-FEM/Tensors.jl) toolbox is demonstrated.
 #
+# ### Strong form
 # The strong form of the balance of momentum for quasi-static loading is given by
 # ```math
 # \begin{align*}
 #  \boldsymbol{\sigma} \cdot \boldsymbol{\nabla} + \boldsymbol{b} &= 0 \quad \boldsymbol{x} \in \Omega \\
 #  \boldsymbol{u} &= \boldsymbol{u}_\mathrm{D} \quad \boldsymbol{x} \in \Gamma_\mathrm{D} \\
-#  \boldsymbol{n} \cdot \boldsymbol{\sigma} &= \boldsymbol{t}_\mathrm{N} \quad \boldsymbol{x} \in \Gamma_\mathrm{N} \\
+#  \boldsymbol{n} \cdot \boldsymbol{\sigma} &= \boldsymbol{t}_\mathrm{N} \quad \boldsymbol{x} \in \Gamma_\mathrm{N}
 # \end{align*}
 # ```
 # where $\boldsymbol{\sigma}$ is the (Cauchy) stress tensor and $\boldsymbol{b}$ the body force.
@@ -32,49 +33,66 @@
 #
 # In this example, we use linear elasticity, such that
 # ```math
-# \boldsymbol{\sigma} = \boldsymbol{\mathsf{E}} : \boldsymbol{\varepsilon}
+# \boldsymbol{\sigma} = \boldsymbol{\mathsf{E}} : \boldsymbol{\varepsilon}, \quad
+# \boldsymbol{\varepsilon} = \left(\boldsymbol{u} \otimes \boldsymbol{\nabla}\right)^\mathrm{sym}
 # ```
 # where $\boldsymbol{\mathsf{E}}$ is the elastic stiffness tensor and $\boldsymbol{\varepsilon}$ is
-# the small strain tensor,
-# ```math
-# \boldsymbol{\varepsilon} = \frac{1}{2} \left(
-#   \boldsymbol{\nabla} \otimes \boldsymbol{u}
-#   +
-#   \boldsymbol{u} \otimes \boldsymbol{\nabla}
-# \right)
-# ```
+# the small strain tensor.
 #
+# ### Weak form
 # The resulting weak form is given given as follows: Find ``\boldsymbol{u} \in \mathbb{U}`` such that
 # ```math
 # \int_\Omega
 #   \left(\delta \boldsymbol{u} \otimes \boldsymbol{\nabla} \right) : \boldsymbol{\sigma}
-# \, \mathrm{d}V
+# \, \mathrm{d}\Omega
 # =
 # \int_{\Gamma}
 #   \delta \boldsymbol{u} \cdot \boldsymbol{t}
-# \, \mathrm{d}A
+# \, \mathrm{d}\Gamma
 # +
 # \int_\Omega
 #   \delta \boldsymbol{u} \cdot \boldsymbol{b}
-# \, \mathrm{d}V
+# \, \mathrm{d}\Omega
 # \quad \forall \, \delta \boldsymbol{u} \in \mathbb{T},
 # ```
-# where $\delta \boldsymbol{u}$ is a vector valued test function, and where $\mathbb{U}$ and
-# $\mathbb{T}$ are suitable trial and test function sets, respectively. The boundary traction
-# is denoted $\boldsymbol{t}$ and body forces are denoted $\boldsymbol{b}$.
-#
-# However, for this example we will neglect body foces and thus the weak form reads:
+# where $\delta \boldsymbol{u}$ is a vector valued test function and
+# $\boldsymbol{t} = \boldsymbol{\sigma}\cdot\boldsymbol{n}$ is the boundary traction.
+# $\mathbb{U}$ and $\mathbb{T}$ denote suitable trial and test function spaces.
+# In this example, we will neglect body foces and the weak form reduces to
 # ```math
 # \int_\Omega
 #   \left(\delta \boldsymbol{u} \otimes \boldsymbol{\nabla} \right) : \boldsymbol{\sigma}
-# \, \mathrm{d}V
+# \, \mathrm{d}\Omega
 # =
 # \int_{\Gamma}
 #   \delta \boldsymbol{u} \cdot \boldsymbol{t}
-# \, \mathrm{d}A \,.
+# \, \mathrm{d}\Gamma \,.
 # ```
 #
-# Finally, we choose to operate on a 2-dimensional problem under plain strain conditions.
+# ### Finite element form
+# Finally, the finite element form is obtained by introducing the finite element shape functions.
+# Since the displacement field, $\boldsymbol{u}$, is vector valued, we use vector valued shape functions
+# $\delta\boldsymbol{N}_i$ and $\boldsymbol{N}_i$ to approximate the test and trial functions:
+# ```math
+# \boldsymbol{u} \approx \sum_{i=1}^N \boldsymbol{N}_i \left(\boldsymbol{x}\right) \, \hat{u}_i
+# \qquad
+# \delta \boldsymbol{u} \approx \sum_{i=1}^N \delta\boldsymbol{N}_i \left(\boldsymbol{x}\right) \, \delta \hat{u}_i
+# ```
+# Here $N$ is the number of nodal variables, with $\hat{u}_i$ and $\delta\hat{u}_i$ representing the $i$-th nodal values.
+# Using the Einstein summation convention, we can write this in short form as
+# $\boldsymbol{u} \approx \boldsymbol{N}_i \, \hat{u}_i$ and $\delta\boldsymbol{u} \approx \delta\boldsymbol{N}_i \, \delta\hat{u}_i$.
+#
+# Inserting the these into the weak form, and noting that that the equation should hold for all $\delta \hat{u}_i$, we get
+# ```math
+# \underbrace{\int_\Omega \left(\delta \boldsymbol{N}_i \otimes \boldsymbol{\nabla}\right) : \boldsymbol{\sigma}\ \mathrm{d}\Omega}_{f_i^\mathrm{int}} = \underbrace{\int_\Gamma \delta \boldsymbol{N}_i \cdot \boldsymbol{t}\ \mathrm{d}\Gamma}_{f_i^\mathrm{ext}}
+# ```
+# Inserting the linear constitutive relationship, $\boldsymbol{\sigma} = \boldsymbol{\mathsf{E}}:\boldsymbol{\varepsilon}$,
+# in the internal force vector, $f_i^\mathrm{int}$, yields the linear equation
+# ```math
+# \underbrace{\left(\int_\Omega \left(\delta \boldsymbol{N}_i \otimes \boldsymbol{\nabla}\right) : \boldsymbol{\mathsf{E}} : \left(\boldsymbol{N}_j \otimes \boldsymbol{\nabla}\right)^\mathrm{sym}\ \mathrm{d}\Omega\right)}_{K_{ij}}\ \hat{u}_j = f_i^\mathrm{ext}
+# ```
+#
+# ## Implementation
 # First we load Ferrite, and some other packages we need.
 using Ferrite, FerriteGmsh, SparseArrays
 # Like for the Heat Equation example, we will use a unit square - but here we'll load the grid of the Ferrite logo!
@@ -88,7 +106,7 @@ FerriteGmsh.Gmsh.initialize() # hide
 FerriteGmsh.Gmsh.gmsh.option.set_number("General.Verbosity", 2) #hide
 grid = togrid(logo_mesh);
 FerriteGmsh.Gmsh.finalize();
-#md nothing # hide
+#md nothing #hide
 # By default the grid lacks the facetsets for the boundaries, so we add them by Ferrite here.
 # [`addfacetset!`](@ref) allows to add facetsets to the grid based on coordinates.
 # Note that approximate comparison to 0.0 doesn't work well, so we use a tolerance instead.
@@ -97,32 +115,28 @@ addfacetset!(grid, "left",   x -> abs(x[1]) < 1e-6)
 addfacetset!(grid, "bottom", x -> abs(x[2]) < 1e-6);
 
 # ### Trial and test functions
-# We use linear Lagrange functions as test and trial functions.
-# The grid is composed of triangular elements, thus we need the Lagrange functions defined on `RefTriangle`.
-# All currently available interpolations can be found under [`Interpolation`](@ref).
+# In this tutorial, we use linear Lagrange functions, and apply the same functions as test and trial,
+# $\delta\boldsymbol{N}_i = \boldsymbol{N}_i$, following Galerkin's method.
+# As our grid is composed of triangular elements, we need the Lagrange functions defined
+# on a `RefTriangle`. All currently available interpolations can be found under [`Interpolation`](@ref).
 #
-# Since the displacement field, $\boldsymbol{u}$, is vector valued, we use vector valued shape functions $\boldsymbol{N}_i$
-# to approximate the test and trial functions:
-# ```math
-# \boldsymbol{u} \approx \sum_{i=1}^N \boldsymbol{N}_i \left(\boldsymbol{x}\right) \, \hat{u}_i
-# \qquad
-# \delta \boldsymbol{u} \approx \sum_{i=1}^N \boldsymbol{N}_i \left(\boldsymbol{x}\right) \, \delta \hat{u}_i
-# ```
-# Here $N$ is the number of nodal variables, with $\hat{u}_i$ and $\delta\hat{u}_i$ representing the $i$-th nodal value.
-# Using the Einstein summation convention, we can write this in short form as
-# $\boldsymbol{u} \approx \boldsymbol{N}_i \, \hat{u}_i$ and $\delta\boldsymbol{u} \approx \boldsymbol{N}_i \, \delta\hat{u}_i$.
-#
-# Here we use linear triangular elements (also called constant strain triangles) with a single
-# quadrature point.
+# Here we use linear triangular elements (also called constant strain triangles).
 # The vector valued shape functions are constructed by raising the interpolation
 # to the power `dim` (the dimension) since the displacement field has one component in each
 # spatial dimension.
 dim = 2
 order = 1 # linear interpolation
-ip = Lagrange{RefTriangle, order}()^dim # vector valued interpolation
+ip = Lagrange{RefTriangle, order}()^dim; # vector valued interpolation
+
+# In order to evaluate the integrals, we need to specify the quadrature rules to use. Due to the
+# linear interpolation, a single quadrature point suffices, both inside the cell and on the facet.
+# In 2d, a facet is the edge of the element.
 qr = QuadratureRule{RefTriangle}(1) # 1 quadrature point
+qr_face = FacetQuadratureRule{RefTriangle}(1);
+
+# Finally, we collect the interpolations and quadrature rules into the `CellValues` and `FacetValues`
+# buffers, which we will later use to evaluate the integrals over the cells and facets.
 cellvalues = CellValues(qr, ip)
-qr_face = FacetQuadratureRule{RefTriangle}(1)
 facetvalues = FacetValues(qr_face, ip);
 
 # ### Degrees of freedom
@@ -146,29 +160,37 @@ close!(ch);
 # ```math
 # \boldsymbol{t}_\mathrm{N}(\boldsymbol{x}) = (20e3) x_1 \boldsymbol{e}_2
 # ```
-# On the right boundary, we don't do anything. This becomes a Neumann boundary
-# with zero traction.
 traction(x) = Vec(0.0, 20e3 * x[1])
 
+# On the right boundary, we don't do anything, resulting in a zero traction Neumann boundary.
+# In order to assemble the external forces, $f_i^\mathrm{ext}$, we need to iterate over all
+# facets in the relevant facetset. We do this by using the [`FacetIterator`](@ref).
+
 function assemble_external_forces!(f_ext, dh, facetset, facetvalues, prescribed_traction)
+    ## Create a temporary array for the facet's local contributions to the external force vector
     fe_ext = zeros(getnbasefunctions(facetvalues))
     for face in FacetIterator(dh, facetset)
+        ## Update the facetvalues to the correct facet number
         reinit!(facetvalues, face)
+        ## Reset the temporary array for the next facet
         fill!(fe_ext, 0.0)
         for qp in 1:getnquadpoints(facetvalues)
-            X = spatial_coordinate(facetvalues, qp, getcoordinates(face))
-            tₚ = prescribed_traction(X)
+            ## Calculate the global coordinate of the quadrature point.
+            x = spatial_coordinate(facetvalues, qp, getcoordinates(face))
+            tₚ = prescribed_traction(x)
+            ## Get the integration weight for the current quadrature point.
             dΓ = getdetJdV(facetvalues, qp)
             for i in 1:getnbasefunctions(facetvalues)
                 Nᵢ = shape_value(facetvalues, qp, i)
                 fe_ext[i] += tₚ ⋅ Nᵢ * dΓ
             end
         end
+        ## Add the local contributions to the correct indices in the global external force vector
         assemble!(f_ext, celldofs(face), fe_ext)
     end
     return f_ext
 end
-#md nothing # hide
+#md nothing #hide
 
 # ### Material behavior
 # Next, we need to define the material behavior.
@@ -180,7 +202,7 @@ end
 # and deviatoric, $\boldsymbol{\varepsilon}^\mathrm{dev}$ strains, are defined as
 # ```math
 # \begin{align*}
-# \boldsymbol{\varepsilon}^\mathrm{vol} &= \frac{\mathrm{tr}(\boldsymbol{\varepsilon})}{3}\boldsymbol{I}
+# \boldsymbol{\varepsilon}^\mathrm{vol} &= \frac{\mathrm{tr}(\boldsymbol{\varepsilon})}{3}\boldsymbol{I}, \quad
 # \boldsymbol{\varepsilon}^\mathrm{dev} &= \boldsymbol{\varepsilon} - \boldsymbol{\varepsilon}^\mathrm{vol}
 # \end{align*}
 # ```
@@ -198,43 +220,54 @@ Gmod = Emod / (2(1 + ν))  # Shear modulus
 Kmod = Emod / (3(1 - 2ν)) # Bulk modulus
 E4 = gradient(ϵ -> 2 * Gmod * dev(ϵ) + 3 * Kmod * vol(ϵ), zero(SymmetricTensor{2,2}));
 
+#md # !!! details "Plane stress instead of plane strain?"
+#md #     In order to change this example to consider plane stress instead of plane strain,
+#md #     the stiffness tensor should be changed to reflect this. For example, the plane stress
+#md #     elasticity stiffness in voigt notation, using engineering strains, is given as
+#md #     ```math
+#md #     \underline{\underline{\boldsymbol{E}}} = \frac{E}{1 - \nu^2}\begin{bmatrix}
+#md #     1 & \nu & 0 \\
+#md #     \nu & 1 & 0 \\
+#md #     0 & 0 & (1 - \nu)/2
+#md #     \end{bmatrix}
+#md #     ```
+#md #     Which can be converted into a 4th order tensor as
+#md #     ```julia
+#md #     E_voigt = Emod * [1.0 ν 0.0; ν 1.0 0.0; 0.0 0.0 (1-ν)/2] / (1 - ν^2)
+#md #     E4 = fromvoigt(SymmetricTensor{4,2}, E_voigt)
+#md #     ```
+#md #
 # ### Element routine
-# The stiffness matrix follows from the weak form such that
-# ```math
-# K_{ij}
-# =
-# \int_\Omega
-#   \left(
-#       (\boldsymbol{N}_i \otimes \boldsymbol{\nabla}) :
-#       \frac{\partial \boldsymbol{\sigma}}{\partial \boldsymbol{\varepsilon}}
-#       :
-#       (\boldsymbol{N}_j \otimes \boldsymbol{\nabla})^\mathrm{sym}
-#   \right)
-#
-# \, \mathrm{d}V
-# ```
-# The element routine computes the local stiffness matrix `ke`
-# for a single element. `ke` is pre-allocated and reused for all elements.
+# To calculate the global stiffness matrix, $K_{ij}$, the element routine computes the
+# local stiffness matrix `ke` for a single element and assembles it into the global matrix.
+# `ke` is pre-allocated and reused for all elements.
 #
 # Note that the elastic stiffness tensor $\boldsymbol{\mathsf{E}}$ is constant.
 # Thus is needs to be computed and once and can then be used for all integration points.
 function assemble_cell!(ke, cellvalues, ∂σ∂ε)
-    fill!(ke, 0.0)
-    n_basefuncs = getnbasefunctions(cellvalues)
     for q_point in 1:getnquadpoints(cellvalues)
+        ## Get the integration weight for the quadrature point
         dΩ = getdetJdV(cellvalues, q_point)
-        for i in 1:n_basefuncs
-            ∇Nᵢ = shape_gradient(cellvalues, q_point, i)# shape_symmetric_gradient(cellvalues, q_point, i)
-            for j in 1:n_basefuncs
+        for i in 1:getnbasefunctions(cellvalues)
+            ## Gradient of the test function
+            ∇Nᵢ = shape_gradient(cellvalues, q_point, i)
+            for j in 1:getnbasefunctions(cellvalues)
+                ## Symmetric gradient of the trial function
                 ∇ˢʸᵐNⱼ = shape_symmetric_gradient(cellvalues, q_point, j)
-                ke[i, j] += (∂σ∂ε ⊡ ∇ˢʸᵐNⱼ) ⊡ ∇Nᵢ * dΩ
+                ke[i, j] += (∇Nᵢ ⊡ ∂σ∂ε ⊡ ∇ˢʸᵐNⱼ) * dΩ
             end
         end
     end
     return ke
 end
-#md nothing # hide
-
+#md nothing #hide
+#
+#md # !!! details "Performance tips"
+#md #     1. In this example, $\mathsf{\boldsymbol{E}}$, is symmetric, and we could have used
+#md #        the symmetric part of test function gradient above.
+#md #     2. The product `∇Nᵢ ⊡ ∂σ∂ε` can be done outside the "j"-loop, but is kept inside here
+#md #        to highlight the similarity to the finite element form.
+#md #
 # ### Global assembly
 # We define the function `assemble_global` to loop over the elements and do the global
 # assembly. The function takes the preallocated sparse matrix `K`, our DofHandler `dh`, our
@@ -250,14 +283,16 @@ function assemble_global!(K, dh, cellvalues, ∂σ∂ε)
     for cell in CellIterator(dh)
         ## Update the shape function gradients based on the cell coordinates
         reinit!(cellvalues, cell)
+        ## Reset the element stiffness matrix
+        fill!(ke, 0.0)
         ## Compute element contribution
         assemble_cell!(ke, cellvalues, ∂σ∂ε)
-        ## Assemble ke and fe into K and f
+        ## Assemble ke into K
         assemble!(assembler, celldofs(cell), ke)
     end
     return K
 end
-#md nothing # hide
+#md nothing #hide
 
 # ### Solution of the system
 # The last step is to solve the system. First we allocate the global stiffness matrix `K`
@@ -266,7 +301,7 @@ K = allocate_matrix(dh)
 assemble_global!(K, dh, cellvalues, E4);
 # Then we allocate and assemble the external force vector.
 f_ext = zeros(ndofs(dh))
-assemble_external_forces!(f_ext, dh, getfacetset(grid, "top"), facetvalues, x->Vec(0.0, 20e3*x[1]));
+assemble_external_forces!(f_ext, dh, getfacetset(grid, "top"), facetvalues, traction);
 
 # To account for the Dirichlet boundary conditions we use the `apply!` function.
 # This modifies elements in `K` and `f` respectively, such that we can get the
@@ -291,6 +326,7 @@ for (key, color) in colors
         color_data[i] = color
     end
 end
+#md nothing #hide
 
 # And then we save to the vtk file.
 VTKGridFile("linear_elasticity", dh) do vtk
@@ -298,11 +334,14 @@ VTKGridFile("linear_elasticity", dh) do vtk
     write_cell_data(vtk, color_data, "colors")
 end
 
-using Test                              #hide
-if Sys.islinux() # gmsh not os stable   #hide
-    @test norm(u) ≈ 0.31742879147646924 #hide
-end                                     #hide
-nothing                                 #hide
+# The mesh produced by gmsh is not stable between different OS        #hide
+# For linux, we therefore test carefully, and for other OS we provide #hide
+# a coarse test to indicate introduced errors before running CI.      #hide
+using Test                                                            #hide
+linux_result = 0.31742879147646924                                    #hide
+@test abs(norm(u) - linux_result) < 0.01                              #hide
+Sys.islinux() && @test norm(u) ≈ linux_result                         #hide
+nothing                                                               #hide
 
 #md # ## [Plain program](@id linear_elasticity-plain-program)
 #md #
