@@ -65,7 +65,7 @@
 #md # The full program, without comments, can be found in the next [section](@ref topology_optimization-plain-program).
 #
 # First we load all necessary packages.
-using Ferrite, SparseArrays, LinearAlgebra, Tensors, Printf
+using Ferrite, SparseArrays, LinearAlgebra, Tensors, Printf, ArraysOfArrays
 # Next, we create a simple square grid of the size 2x1. We apply a fixed Dirichlet boundary condition
 # to the left face set, called `clamped`. On the right face, we create a small set `traction`, where we
 # will later apply a force in negative y-direction.
@@ -106,9 +106,9 @@ function create_dofhandler(grid)
     return dh
 end
 
-function create_bc(dh)
+function create_bc(dh, grid)
     dbc = ConstraintHandler(dh)
-    add!(dbc, Dirichlet(:u, getnodeset(dh.grid, "clamped"), (x,t) -> zero(Vec{2}), [1,2]))
+    add!(dbc, Dirichlet(:u, getnodeset(grid, "clamped"), (x,t) -> zero(Vec{2}), [1,2]))
     close!(dbc)
     t = 0.0
     update!(dbc, t)
@@ -191,26 +191,25 @@ end
 # the function call will return an empty object. In that case we use the dictionary to instead find the opposite
 # face, as discussed in the introduction.
 
-function cache_neighborhood(dh, topology)
-    nbgs = Vector{Vector{Int}}(undef, getncells(dh.grid))
-    _nfacets = nfacets(dh.grid.cells[1])
-    opp = Dict(1=>3, 2=>4, 3=>1, 4=>2)
-
+function compute_neighborhood(dh, grid, topology)
+    opp = (3, 4, 1, 2)
+    neighborhood = Ferrite.get_facet_facet_neighborhood(topology, grid)
+    nbgs = VectorOfArrays{Int, 1}()
+    nbg = Int[]
     for element in CellIterator(dh)
-        nbg = zeros(Int,_nfacets)
+        _nfacets = nfacets(element)
+        resize!(nbg, _nfacets)
         i = cellid(element)
         for j in 1:_nfacets
-            nbg_cellid = getneighborhood(topology, dh.grid, FacetIndex(i,j))
-            if(!isempty(nbg_cellid))
-                nbg[j] = first(nbg_cellid)[1] # assuming only one face neighbor per cell
+            neighbor_facet = neighborhood[i, j]
+            if(!isempty(neighbor_facet))
+                nbg[j] = neighbor_facet[1][1] # assuming only one face neighbor per cell
             else # boundary face
-                nbg[j] = first(getneighborhood(topology, dh.grid, FacetIndex(i,opp[j])))[1]
+                nbg[j] = neighborhood[i, opp[j]][1][1]
             end
         end
-
-        nbgs[i] = nbg
+        push!(nbgs, nbg)
     end
-
     return nbgs
 end
 #md nothing # hide
@@ -287,13 +286,13 @@ end
 # Finally, we put everything together to update the density. The loop ensures the stability of the
 # updated solution.
 
-function update_density(dh, states, mp, ρ,  neighboorhoods, Δh)
+function update_density(dh, states, mp, ρ,  neighborhoods, Δh)
     n_j = Int(ceil(6*mp.β/(mp.η*Δh^2))) # iterations needed for stability
     χn = compute_densities(states, dh) # old density field
     χn1 = zeros(length(χn))
 
     for j in 1:n_j
-        ∇²χ = approximate_laplacian(neighboorhoods, χn, Δh) # Laplacian
+        ∇²χ = approximate_laplacian(neighborhoods, χn, Δh) # Laplacian
         pΨ = compute_driving_forces(states, mp, dh, χn) # driving forces
         p_Ω = compute_average_driving_force(mp, pΨ, χn) # average driving force
 
@@ -409,7 +408,7 @@ function topopt(ra,ρ,n,filename; output=:false)
     grid = create_grid(n)
     dh = create_dofhandler(grid)
     Δh = 1/n # element edge length
-    dbc = create_bc(dh)
+    dbc = create_bc(dh, grid)
 
     ## cellvalues
     cellvalues, facetvalues = create_values()
@@ -423,9 +422,9 @@ function topopt(ra,ρ,n,filename; output=:false)
     ΔΔu = zeros(n_dofs) # new displacement correction
 
     ## create material states
-    states = [MaterialState(ρ, getnquadpoints(cellvalues)) for _ in 1:getncells(dh.grid)]
+    states = [MaterialState(ρ, getnquadpoints(cellvalues)) for _ in 1:getncells(grid)]
 
-    χ = zeros(getncells(dh.grid))
+    χ = zeros(getncells(grid))
 
     r = zeros(n_dofs) # residual
     K = allocate_matrix(dh) # stiffness matrix
@@ -438,7 +437,7 @@ function topopt(ra,ρ,n,filename; output=:false)
     conv = :false
 
     topology = ExclusiveTopology(grid)
-    neighboorhoods = cache_neighborhood(dh, topology)
+    neighborhoods = compute_neighborhood(dh, grid, topology)
 
     ## Newton-Raphson loop
     NEWTON_TOL = 1e-8
@@ -491,7 +490,7 @@ function topopt(ra,ρ,n,filename; output=:false)
         end
 
         ## update density
-        χ = update_density(dh, states, mp, ρ, neighboorhoods, Δh)
+        χ = update_density(dh, states, mp, ρ, neighborhoods, Δh)
 
         ## update old displacement, density and compliance
         un .= u
