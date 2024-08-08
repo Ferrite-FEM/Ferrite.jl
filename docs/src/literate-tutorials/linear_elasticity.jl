@@ -118,7 +118,8 @@ addfacetset!(grid, "bottom", x -> abs(x[2]) < 1e-6);
 # In this tutorial, we use linear Lagrange functions, and apply the same functions as test and trial,
 # $\delta\boldsymbol{N}_i = \boldsymbol{N}_i$, following Galerkin's method.
 # As our grid is composed of triangular elements, we need the Lagrange functions defined
-# on a `RefTriangle`. All currently available interpolations can be found under [`Interpolation`](@ref).
+# on a `RefTriangle`. All currently available interpolations can be found under
+# [`Interpolation`](@ref reference-interpolation).
 #
 # Here we use linear triangular elements (also called constant strain triangles).
 # The vector valued shape functions are constructed by raising the interpolation
@@ -334,9 +335,9 @@ VTKGridFile("linear_elasticity", dh) do vtk
     write_cell_data(vtk, color_data, "colors")
 end
 
-# The mesh produced by gmsh is not stable between different OS        #hide
-# For linux, we therefore test carefully, and for other OS we provide #hide
-# a coarse test to indicate introduced errors before running CI.      #hide
+# The mesh produced by gmsh is not stable between different OS        #src
+# For linux, we therefore test carefully, and for other OS we provide #src
+# a coarse test to indicate introduced errors before running CI.      #src
 using Test                                                            #hide
 linux_result = 0.31742879147646924                                    #hide
 @test abs(norm(u) - linux_result) < 0.01                              #hide
@@ -346,7 +347,7 @@ nothing                                                               #hide
 #md # ## [Plain program](@id linear_elasticity-plain-program)
 #md #
 #md # Here follows a version of the program without any comments.
-#md # The file is also available here: [`linear_elasticity.jl`](linear_elasticity).
+#md # The file is also available here: [`linear_elasticity.jl`](linear_elasticity.jl).
 #md #
 #md # ```julia
 #md # @__CODE__
