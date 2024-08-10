@@ -42,10 +42,10 @@ function SimpleCellValues(qr::QuadratureRule, ip_fun::Interpolation, ip_geo::Int
     ## Precalculate function and geometric shape values and gradients
     for (qp, ξ) in pairs(Ferrite.getpoints(qr))
         for i in 1:n_func_basefuncs
-            dNdξ[i, qp], N[i, qp] = Ferrite.shape_gradient_and_value(ip_fun, ξ, i)
+            dNdξ[i, qp], N[i, qp] = Ferrite.reference_shape_gradient_and_value(ip_fun, ξ, i)
         end
         for i in 1:n_geom_basefuncs
-            dMdξ[i, qp], M[i, qp] = Ferrite.shape_gradient_and_value(ip_geo, ξ, i)
+            dMdξ[i, qp], M[i, qp] = Ferrite.reference_shape_gradient_and_value(ip_geo, ξ, i)
         end
     end
 

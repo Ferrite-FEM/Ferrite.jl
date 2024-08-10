@@ -9,7 +9,7 @@
 #-
 #md # !!! tip
 #md #     This example is also available as a Jupyter notebook:
-#md #     [`computational_homogenization.ipynb`](@__NBVIEWER_ROOT_URL__/examples/computational_homogenization.ipynb).
+#md #     [`computational_homogenization.ipynb`](@__NBVIEWER_ROOT_URL__/tutorials/computational_homogenization.ipynb).
 #-
 #
 # ## Introduction
@@ -194,20 +194,6 @@ using Test #src
 
 using FerriteGmsh
 
-# Overload for specific elements in this tutorial.
-function FerriteGmsh.tofacesets(boundarydict::Dict{String,Vector}, elements::Vector{Triangle})
-    faces = Ferrite.facets.(elements)
-    facesets = Dict{String,Set{FaceIndex}}()
-    for (boundaryname, boundaryfaces) in boundarydict
-        facesettuple = Set{FaceIndex}()
-        for boundaryface in boundaryfaces
-            FerriteGmsh._add_to_facesettuple!(facesettuple, boundaryface, faces)
-        end
-        facesets[boundaryname] = facesettuple
-    end
-    return facesets
-end
-
 #src notebook: use coarse mesh to decrease build time
 #src   script: use the fine mesh
 #src markdown: use the coarse mesh to decrease build time, but make it look like the fine
@@ -291,8 +277,8 @@ ch = (dirichlet = ch_dirichlet, periodic = ch_periodic);
 # and the constraint handler.
 
 K = (
-    dirichlet = create_sparsity_pattern(dh),
-    periodic  = create_sparsity_pattern(dh, ch.periodic),
+    dirichlet = allocate_matrix(dh),
+    periodic  = allocate_matrix(dh, ch.periodic),
 );
 
 # We define the fourth order elasticity tensor for the matrix material, and define the
@@ -533,7 +519,7 @@ round.(ev; digits=-8)
 
 uM = zeros(ndofs(dh))
 
-VTKFile("homogenization", dh) do vtk
+VTKGridFile("homogenization", dh) do vtk
     for i in 1:3
         ## Compute macroscopic solution
         apply_analytical!(uM, dh, :u, x -> εᴹ[i] ⋅ x)

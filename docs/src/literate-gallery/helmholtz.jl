@@ -85,7 +85,7 @@ add!(dbcs, dbc)
 close!(dbcs)
 update!(dbcs, 0.0)
 
-K = create_sparsity_pattern(dh);
+K = allocate_matrix(dh);
 
 function doassemble(cellvalues::CellValues, facetvalues::FacetValues,
                          K::SparseMatrixCSC, dh::DofHandler)
@@ -161,7 +161,7 @@ K, f = doassemble(cellvalues, facetvalues, K, dh);
 apply!(K, f, dbcs)
 u = Symmetric(K) \ f;
 
-vtk = VTKFile("helmholtz", dh)
+vtk = VTKGridFile("helmholtz", dh)
 write_solution(vtk, dh, u)
 close(vtk)
 using Test #src

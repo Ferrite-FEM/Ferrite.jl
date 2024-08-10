@@ -1,6 +1,7 @@
 module FerriteBenchmarkHelper
 
 using Ferrite
+using LinearAlgebra: Symmetric
 
 function geo_types_for_spatial_dim(spatial_dim)
     spatial_dim == 1 && return [Line, QuadraticLine]
@@ -177,7 +178,7 @@ function _assemble_mass(dh, cellvalues, sym)
     Me = zeros(n_basefuncs, n_basefuncs)
     fe = zeros(n_basefuncs)
 
-    M = sym ? create_symmetric_sparsity_pattern(dh) : create_sparsity_pattern(dh);
+    M = sym ? Symmetric(allocate_matrix(dh)) : allocate_matrix(dh);
     f = zeros(ndofs(dh))
 
     assembler = start_assemble(M, f);

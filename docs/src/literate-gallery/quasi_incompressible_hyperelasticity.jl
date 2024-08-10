@@ -4,13 +4,13 @@
 #-
 #md # !!! tip
 #md #     This example is also available as a Jupyter notebook:
-#md #     [`quasi_incompressible_hyperelasticity.ipynb`](@__NBVIEWER_ROOT_URL__/examples/quasi_incompressible_hyperelasticity.ipynb)
+#md #     [`quasi_incompressible_hyperelasticity.ipynb`](@__NBVIEWER_ROOT_URL__/gallery/quasi_incompressible_hyperelasticity.ipynb)
 #-
 # ## Introduction
 #
 # In this example we study quasi- or nearly-incompressible hyperelasticity using the stable Taylor-Hood approximation. In spirit, this example is the nonlinear analogue of
-# [`incompressible_elasticity`](@__NBVIEWER_ROOT_URL__/examples/incompressible_elasticity.ipynb) and the incompressible analogue of
-# [`hyperelasticity`](@__NBVIEWER_ROOT_URL__/examples/hyperelasticity.ipynb). Much of the code therefore follows from the above two examples.
+# [`incompressible_elasticity`](@__NBVIEWER_ROOT_URL__/tutorials/incompressible_elasticity.ipynb) and the incompressible analogue of
+# [`hyperelasticity`](@__NBVIEWER_ROOT_URL__/tutorials/hyperelasticity.ipynb). Much of the code therefore follows from the above two examples.
 # The problem is formulated in the undeformed or reference configuration with the displacement $\mathbf{u}$ and pressure $p$ being the unknown fields. We now briefly outline
 # the formulation. Consider the standard hyperelasticity problem
 #
@@ -72,7 +72,7 @@
 # ## Implementation
 # We now get to the actual code. First, we import the respective packages
 
-using Ferrite, Tensors, ProgressMeter
+using Ferrite, Tensors, ProgressMeter, WriteVTK
 using BlockArrays, SparseArrays, LinearAlgebra
 
 # and the corresponding `struct` to store our material properties.
@@ -252,8 +252,8 @@ function assemble_global!(K::SparseMatrixCSC, f, cellvalues_u::CellValues,
     np = getnbasefunctions(cellvalues_p)
 
     ## start_assemble resets K and f
-    fe = PseudoBlockArray(zeros(nu + np), [nu, np]) # local force vector
-    ke = PseudoBlockArray(zeros(nu + np, nu + np), [nu, np], [nu, np]) # local stiffness matrix
+    fe = BlockedArray(zeros(nu + np), [nu, np]) # local force vector
+    ke = BlockedArray(zeros(nu + np, nu + np), [nu, np], [nu, np]) # local stiffness matrix
 
     assembler = start_assemble(K, f)
     ## Loop over all cells in the grid
@@ -296,7 +296,7 @@ function solve(interpolation_u, interpolation_p)
     apply!(w, dbc)
 
     ## Create the sparse matrix and residual vector
-    K = create_sparsity_pattern(dh)
+    K = allocate_matrix(dh)
     f = zeros(_ndofs)
 
     ## We run the simulation parameterized by a time like parameter. `Tf` denotes the final value
@@ -305,8 +305,8 @@ function solve(interpolation_u, interpolation_p)
     Δt = 0.1;
     NEWTON_TOL = 1e-8
 
-    pvd = VTKFileCollection("hyperelasticity_incomp_mixed", grid);
-    for t ∈ 0.0:Δt:Tf
+    pvd = paraview_collection("hyperelasticity_incomp_mixed");
+    for (step, t) ∈ enumerate(0.0:Δt:Tf)
         ## Perform Newton iterations
         Ferrite.update!(dbc, t)
         apply!(w, dbc)
@@ -334,8 +334,9 @@ function solve(interpolation_u, interpolation_p)
         end;
 
         ## Save the solution fields
-        addstep!(pvd, t) do io
-            write_solution(io, dh, w)
+        VTKGridFile("hyperelasticity_incomp_mixed_$step", grid) do vtk
+            write_solution(vtk, dh, w)
+            pvd[t] = vtk
         end
     end;
     close(pvd);

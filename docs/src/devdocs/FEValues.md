@@ -6,8 +6,9 @@
     * [`CellValues`](@ref)
   * `AbstractFacetValues`
     * [`FacetValues`](@ref)
-    * [`BCValues`](@ref)
+    * [`BCValues`](@ref Ferrite.BCValues)
   * [`PointValues`](@ref)
+  * [`InterfaceValues`](@ref)
 
 
 ## Internal types
@@ -16,6 +17,14 @@ Ferrite.GeometryMapping
 Ferrite.MappingValues
 Ferrite.FunctionValues
 Ferrite.BCValues
+```
+
+## Internal utilities
+```@docs
+Ferrite.embedding_det
+Ferrite.shape_value_type
+Ferrite.shape_gradient_type
+Ferrite.ValuesUpdateFlags
 ```
 
 ## Custom FEValues
@@ -30,7 +39,7 @@ Custom FEValues, `fe_v::AbstractValues`, should normally implement the [`reinit!
   * [`getnquadpoints`](@ref)
   * [`getnbasefunctions`](@ref)
 * [`spatial_coordinate`](@ref), requires
-  * [`geometric_value`](@ref)
+  * [`geometric_value`](@ref Ferrite.geometric_value)
   * `getngeobasefunctions`
   * [`getnquadpoints`](@ref)
 

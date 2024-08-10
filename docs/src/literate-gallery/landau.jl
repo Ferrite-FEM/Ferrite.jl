@@ -68,7 +68,7 @@ function ThreadCache(dpc::Int, nodespercell, cvP::CellValues, modelparams, elpot
     element_coords   = zeros(Vec{3, Float64}, nodespercell)
     potfunc          = x -> elpotential(x, cvP, modelparams)
     gradconf         = GradientConfig(potfunc, zeros(dpc), Chunk{12}())
-    hessconf         = HessianConfig(potfunc, zeros(dpc), Chunk{12}())
+    hessconf         = HessianConfig(potfunc, zeros(dpc), Chunk{4}())
     return ThreadCache(cvP, element_indices, element_dofs, element_gradient, element_hessian, element_coords, potfunc, gradconf, hessconf)
 end
 
@@ -105,7 +105,7 @@ function LandauModel(α, G, gridsize, left::Vec{DIM, T}, right::Vec{DIM, T}, elp
 
     apply!(dofvector, boundaryconds)
 
-    hessian = create_sparsity_pattern(dofhandler)
+    hessian = allocate_matrix(dofhandler)
     dpc = ndofs_per_cell(dofhandler)
     cpc = length(grid.cells[1].nodes)
     caches = [ThreadCache(dpc, cpc, copy(cvP), ModelParams(α, G), elpotential) for t=1:nthreads()]
@@ -114,7 +114,7 @@ end
 
 # utility to quickly save a model
 function save_landau(path, model, dofs=model.dofs)
-    VTKFile(path, model.dofhandler) do vtk
+    VTKGridFile(path, model.dofhandler) do vtk
         write_solution(vtk, model.dofhandler, dofs)
     end
 end
@@ -193,7 +193,7 @@ function minimize!(model; kwargs...)
     dh = model.dofhandler
     dofs = model.dofs
     ∇f = fill(0.0, length(dofs))
-    ∇²f = create_sparsity_pattern(dh)
+    ∇²f = allocate_matrix(dh)
     function g!(storage, x)
         ∇F!(storage, x, model)
         apply_zero!(storage, model.boundaryconds)

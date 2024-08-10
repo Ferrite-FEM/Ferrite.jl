@@ -212,37 +212,39 @@ more discussion).
             # ...
   ```
 
-- **VTK Export**: The VTK export has been changed to become and export backend [#692][github-692].
+- **VTK Export**: The VTK export has been changed [#692][github-692].
   ```diff
   - vtk_grid(name, dh) do vtk
   -     vtk_point_data(vtk, dh, a)
   -     vtk_point_data(vtk, nodal_data, "my node data")
   -     vtk_point_data(vtk, proj, projected_data, "my projected data")
   -     vtk_cell_data(vtk, proj, projected_data, "my projected data")
-  + VTKFile(name, dh) do vtk
+  + VTKGridFile(name, dh) do vtk
   +     write_solution(vtk, dh, a)
   +     write_node_data(vtk, nodal_data, "my node data")
   +     write_projection(vtk, proj, projected_data, "my projected data")
   +     write_cell_data(vtk, cell_data, "my projected data")
   end
-
-  # Using a collection for e.g. multiple timesteps
-  - pvd = paraview_collection("mypvd")
-  + pvd = VTKFileCollection("mypvd", grid);
-
-  for t in timesteps
-      # solve problem to find `u`
-  -   vtk_grid("transient-heat-$t", dh) do vtk
-  -       vtk_point_data(vtk, dh, u)
-  -       vtk_save(vtk)
-  -       pvd[t] = vtk
-  -   end
-  +   addstep!(pvd, t) do io
-  +       write_solution(io, dh, u)
-  +   end
-  end
   ```
+  When using a `paraview_collection` collection for e.g. multiple timesteps
+  the `VTKGridFile` object can be used instead of the previous type returned
+  from `vtk_grid`.
 
+- **Sparsity pattern and global matrix construction**: since there is now explicit support
+  for working with the sparsity pattern before instantiating a matrix the function
+  `create_sparsity_pattern` has been removed. To recover the old functionality that return a
+  sparse matrix from the DofHandler directly use `allocate_matrix` instead.
+
+  Examples:
+  ```diff
+  # Create sparse matrix from DofHandler
+  - K = create_sparsity_pattern(dh)
+  + K = allocate_matrix(dh)
+
+  # Create condensed sparse matrix from DofHandler + ConstraintHandler
+  - K = create_sparsity_pattern(dh, ch)
+  + K = allocate_matrix(dh, ch)
+  ```
 
 ### Added
 
@@ -292,12 +294,13 @@ more discussion).
   `FacetQuadratureRule{RefTriangle}(order)` (similar to how `QuadratureRule` is constructed).
   ([#716][github-716])
 
-- New methods `shape_value(::Interpolation, ξ::Vec, i::Int)` and
-  `shape_gradient(::Interpolation, ξ::Vec, i::Int)` for evaluating the value/gradient of the
-  `i`th shape function of an interpolation in local reference coordinate `ξ`. Note that
-  these methods return the value/gradient wrt. the reference coordinate `ξ`, whereas the
-  corresponding methods for `CellValues` etc return the value/gradient wrt the spatial
-  coordinate `x`. ([#721][github-721])
+- New functions `Ferrite.reference_shape_value(::Interpolation, ξ::Vec, i::Int)` and
+  `Ferrite.reference_shape_gradient(::Interpolation, ξ::Vec, i::Int)` for evaluating the
+  value/gradient of the `i`th shape function of an interpolation in local reference
+  coordinate `ξ`. These methods are public but not exported. (Note that these methods return
+  the value/gradient wrt. the reference coordinate `ξ`, whereas the corresponding methods
+  for `CellValues` etc return the value/gradient wrt the spatial coordinate `x`.)
+  ([#721][github-721])
 
 - `FacetIterator` and `FacetCache` have been added. These work similarly to `CellIterator` and
   `CellCache` but are used to iterate over (boundary) face sets instead. These simplify
@@ -317,11 +320,32 @@ more discussion).
   a given grid (based on its node coordinates), and returns the minimum and maximum vertices
   of the bounding box. ([#880][github-880])
 
+- Support for working with sparsity patterns has been added. This means that Ferrite exposes
+  the intermediate "state" between the DofHandler and the instantiated matrix as the new
+  struct `SparsityPattern`. This make it possible to insert custom equations or couplings in
+  the pattern before instantiating the matrix. The function `create_sparsity_pattern` have
+  been removed. The new function `allocate_matrix` is instead used to instantiate the
+  matrix. Refer to the documentation for more details. ([#888][github-888])
+
+  **To upgrade**: if you want to recover the old functionality and don't need to work with
+  the pattern, replace any usage of `create_sparsity_pattern` with `allocate_matrix`.
+
+- A new function, `geometric_interpolation`, is exported, which gives the geometric interpolation
+  for each cell type. This is equivalent to the deprecated `Ferrite.default_interpolation` function.
+  ([#953][github-953])
+
+- CellValues and FacetValues can now store and map second order gradients (Hessians). The number
+  of gradients computed in CellValues/FacetValues is specified using the keyword arguments
+  `update_gradients::Bool` (default true) and `update_hessians::Bool` (default false) in the
+  constructors, i.e. `CellValues(...; update_hessians=true)`. ([#953][github-938])
+
+- `L2Projector` supports projecting on grids with mixed celltypes. ([#949][github-949])
+
 ### Changed
 
-- `create_sparsity_pattern` now supports cross-element dof coupling by passing kwarg
-  `topology` along with an optional `cross_coupling` matrix that behaves similar to
-  the `coupling` kwarg. ([#710][github-#710])
+- It is now possible to create sparsity patterns with interface couplings, see the new
+  function `add_interface_entries!` and the rework of sparsity pattern construction.
+  ([#710][github-#710])
 
 - The `AbstractCell` interface has been reworked. This change should not affect user code,
   but may in some cases be relevant for code parsing external mesh files. In particular, the
@@ -388,9 +412,9 @@ more discussion).
   by type piracy. In order to be invariant to the underlying `Set` datatype as well as
   omitting type piracy, ([#835][github-835]) implemented `isequal` and `hash` for `BoundaryIndex` datatypes.
 
-- **VTK export**: Ferrite no longer extends methods from `WriteVTK.jl`, instead the new types
-  `VTKFile` and `VTKFileCollection` should be used instead. New methods exists for writing to
-  a `VTKFile`, e.g. `write_solution`, `write_cell_data`, `write_node_data`, and `write_projection`.
+- **VTK export**: Ferrite no longer extends `WriteVTK.vtk_grid` and associated functions,
+  instead the new type `VTKGridFile` should be used instead. New methods exists for writing to
+  a `VTKGridFile`, e.g. `write_solution`, `write_cell_data`, `write_node_data`, and `write_projection`.
   See [#692][github-692].
 
 - **Definitions**: Previously, `face` and `edge` referred to codimension 1 relative reference shape.
@@ -408,10 +432,23 @@ more discussion).
   `facedof_indices`, `volumedof_indices` (and similar) according to these definitions.
 
 - `Ferrite.getdim` has been changed into `Ferrite.getrefdim` for getting the dimension of the reference shape
-  and `Ferrite.getspatialdim` to get the spatial dimension (of the grid). [#943][github-943]
+  and `Ferrite.getspatialdim` to get the spatial dimension (of the grid). ([#943][github-943])
 
 - `Ferrite.getfielddim(::AbstractDofHandler, args...)` has been renamed to `Ferrite.n_components`.
-  [#943][github-943]
+  ([#943][github-943])
+
+- The constructor for `ExclusiveTopology` only accept an `AbstractGrid` as input,
+  removing the alternative of providing a `Vector{<:AbstractCell}`, as knowing the
+  spatial dimension is required for correct code paths.
+  Furthermore, it uses a new internal data structure, `ArrayOfVectorViews`, to store the neighborhood
+  information more efficiently The datatype for the neighborhood has thus changed to a view of a vector,
+  instead of the now removed `EntityNeighborhood` container. This also applies to `vertex_star_stencils`.
+  ([#974][github-974]).
+
+- `project(::L2Projector, data, qr_rhs)` now expects data to be indexed by the cellid, as opposed to
+  the index in the vector of cellids passed to the `L2Projector`. The data may be passed as an
+  `AbstractDict{Int, <:AbstractVector}`, as an alternative to `AbstractArray{<:AbstractVector}`.
+  ([#949][github-949])
 
 ### Deprecated
 
@@ -432,6 +469,8 @@ more discussion).
 
 - `transform!` have been deprecated in favor of `transform_coordinates!`.
   ([#754][github-754])
+
+- `Ferrite.default_interpolation` has been deprecated in favor of `geometric_interpolation`. ([#953][github-953])
 
 ### Removed
 
@@ -985,6 +1024,11 @@ poking into Ferrite internals:
 [github-835]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/835
 [github-855]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/855
 [github-880]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/880
+[github-888]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/888
 [github-914]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/914
 [github-924]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/924
+[github-938]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/938
 [github-943]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/943
+[github-949]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/949
+[github-953]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/953
+[github-974]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/974

@@ -14,7 +14,7 @@ for spatial_dim ∈ 1:3
 
         grid = generate_grid(geo_type, tuple(repeat([2], spatial_dim)...));
         topology = ExclusiveTopology(grid)
-        ip_geo = Ferrite.default_interpolation(geo_type)
+        ip_geo = Ferrite.geometric_interpolation(geo_type)
         ref_type = FerriteBenchmarkHelper.getrefshape(geo_type)
 
         # Nodal interpolation tests

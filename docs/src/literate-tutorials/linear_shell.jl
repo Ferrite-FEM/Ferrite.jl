@@ -84,7 +84,7 @@ data = (thickness = 1.0, C = C); #Named tuple
 nnodes = getnbasefunctions(ip)
 ndofs_shell = ndofs_per_cell(dh)
 
-K = create_sparsity_pattern(dh)
+K = allocate_matrix(dh)
 f = zeros(Float64, ndofs(dh))
 
 ke = zeros(ndofs_shell, ndofs_shell)
@@ -113,7 +113,7 @@ a = K\f
 
 # Output results.
 #+
-VTKFile("linear_shell", dh) do vtk
+VTKGridFile("linear_shell", dh) do vtk
     write_solution(vtk, dh, a)
 end
 

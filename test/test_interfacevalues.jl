@@ -33,15 +33,15 @@
                         @test shapevalue ≈ shape_value(iv.there, qp, i - getnbasefunctions(iv.here))
                         @test shapegrad ≈ shape_gradient(iv.there, qp, i - getnbasefunctions(iv.here))
 
-                        @test shape_jump ≈ -shapevalue
-                        @test shapegrad_jump ≈ -shapegrad
+                        @test shape_jump ≈ shapevalue
+                        @test shapegrad_jump ≈ shapegrad
                     else
                         normal = getnormal(iv, qp)
                         @test shapevalue ≈ shape_value(iv.here, qp, i)
                         @test shapegrad ≈ shape_gradient(iv.here, qp, i)
 
-                        @test shape_jump ≈ shapevalue
-                        @test shapegrad_jump ≈ shapegrad
+                        @test shape_jump ≈ -shapevalue
+                        @test shapegrad_jump ≈ -shapegrad
                     end
 
                     @test shape_avg ≈ 0.5 * shapevalue
@@ -135,7 +135,7 @@
             cell = getcells(grid, 1)
             geom_ip_facets_indices = Ferrite.facetdof_indices(ip)
             Ferrite.getrefdim(ip) > 1 && (geom_ip_facets_indices = Tuple([facet[collect(facet .∉ Ref(interior))] for (facet, interior) in [(geom_ip_facets_indices[i], Ferrite.facetdof_interior_indices(ip)[i]) for i in 1:Ferrite.nfacets(ip)]]))
-            facets_indices = Ferrite.reference_facets(Ferrite.getrefshape(Ferrite.default_interpolation(typeof(cell))))
+            facets_indices = Ferrite.reference_facets(Ferrite.getrefshape(Ferrite.geometric_interpolation(typeof(cell))))
             node_ids = Ferrite.get_node_ids(cell)
             cellfacets = Ferrite.facets(cell)
             @test getindex.(Ref(node_ids), collect.(facets_indices)) == cellfacets == getindex.(Ref(node_ids), collect.(geom_ip_facets_indices))
@@ -169,7 +169,7 @@
             cell = getcells(grid, 1)
             geom_ip_facets_indices = Ferrite.facetdof_indices(ip)
             Ferrite.getrefdim(ip) > 1 && (geom_ip_facets_indices = Tuple([facet[collect(facet .∉ Ref(interior))] for (facet, interior) in [(geom_ip_facets_indices[i], Ferrite.facedof_interior_indices(ip)[i]) for i in 1:Ferrite.nfaces(ip)]]))
-            facets_indices = Ferrite.reference_facets(Ferrite.getrefshape(Ferrite.default_interpolation(typeof(cell))))
+            facets_indices = Ferrite.reference_facets(Ferrite.getrefshape(Ferrite.geometric_interpolation(typeof(cell))))
             node_ids = Ferrite.get_node_ids(cell)
             @test getindex.(Ref(node_ids), collect.(facets_indices)) == Ferrite.faces(cell) == getindex.(Ref(node_ids), collect.(geom_ip_facets_indices))
         end
@@ -234,7 +234,6 @@
     @test typeof(iv) == typeof(ivc)
     for fname in fieldnames(typeof(iv))
         v = getfield(iv, fname)
-        v isa Ferrite.ScalarWrapper && continue
         vc = getfield(ivc, fname)
         if hasmethod(pointer, Tuple{typeof(v)})
             @test pointer(v) != pointer(vc)
@@ -242,7 +241,6 @@
         v isa FacetValues && continue
         for fname in fieldnames(typeof(vc))
             v2 = getfield(v, fname)
-            v2 isa Ferrite.ScalarWrapper && continue
             vc2 = getfield(vc, fname)
             if hasmethod(pointer, Tuple{typeof(v2)})
                 @test pointer(v2) != pointer(vc2)

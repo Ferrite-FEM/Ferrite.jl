@@ -8,24 +8,29 @@ using Base:
 using EnumX:
     EnumX, @enumx
 using LinearAlgebra:
-    LinearAlgebra, Symmetric, Transpose, cholesky, det, issymmetric, norm,
-    pinv, tr
+    LinearAlgebra, Symmetric, cholesky, det, norm, pinv, tr
 using NearestNeighbors:
     NearestNeighbors, KDTree, knn
 using OrderedCollections:
     OrderedSet
 using SparseArrays:
-    SparseArrays, SparseMatrixCSC, nonzeros, nzrange, rowvals, sparse, spzeros
+    SparseArrays, SparseMatrixCSC, nonzeros, nzrange, rowvals, sparse
 using StaticArrays:
-    StaticArrays, MMatrix, SMatrix, SVector
+    StaticArrays, MArray, MMatrix, SArray, SMatrix, SVector
 using WriteVTK:
     WriteVTK, VTKCellTypes
 using Tensors:
     Tensors, AbstractTensor, SecondOrderTensor, SymmetricTensor, Tensor, Vec, gradient,
-    rotation_tensor, symmetric, tovoigt!
+    rotation_tensor, symmetric, tovoigt!, hessian, otimesu
+using ForwardDiff:
+    ForwardDiff
 
+include("CollectionsOfViews.jl")
+using .CollectionsOfViews:
+    CollectionsOfViews, ArrayOfVectorViews, push_at_index!, ConstructionBuffer
 
 include("exports.jl")
+
 
 """
     AbstractRefShape{refdim}
@@ -53,6 +58,7 @@ struct RefPyramid       <: AbstractRefShape{3} end
 
 Get the dimension of the reference shape
 """
+getrefdim(::Type{<:AbstractRefShape}) # To get correct doc filtering
 getrefdim(::Type{<:AbstractRefShape{rdim}}) where rdim = rdim
 
 abstract type AbstractCell{refshape <: AbstractRefShape} end
@@ -105,6 +111,7 @@ const AbstractVecOrSet{T} = Union{AbstractSet{T}, AbstractVector{T}}
 const IntegerCollection = AbstractVecOrSet{<:Integer}
 
 include("utils.jl")
+include("PoolAllocator.jl")
 
 # Matrix/Vector utilities
 include("arrayutils.jl")
@@ -116,6 +123,7 @@ include("interpolations.jl")
 include("Quadrature/quadrature.jl")
 
 # FEValues
+struct ValuesUpdateFlags{FunDiffOrder, GeoDiffOrder, DetJdV} end # Default constructor in common_values.jl
 include("FEValues/GeometryMapping.jl")
 include("FEValues/FunctionValues.jl")
 include("FEValues/CellValues.jl")
@@ -137,6 +145,7 @@ include("Dofs/DofHandler.jl")
 include("Dofs/ConstraintHandler.jl")
 include("Dofs/apply_analytical.jl")
 include("Dofs/sparsity_pattern.jl")
+include("Dofs/block_sparsity_pattern.jl")
 include("Dofs/DofRenumbering.jl")
 
 include("iterators.jl")

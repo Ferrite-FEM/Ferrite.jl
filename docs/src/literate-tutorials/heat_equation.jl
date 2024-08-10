@@ -8,7 +8,7 @@
 #-
 #md # !!! tip
 #md #     This example is also available as a Jupyter notebook:
-#md #     [`heat_equation.ipynb`](@__NBVIEWER_ROOT_URL__/examples/heat_equation.ipynb).
+#md #     [`heat_equation.ipynb`](@__NBVIEWER_ROOT_URL__/tutorials/heat_equation.ipynb).
 #-
 #
 # ## Introduction
@@ -71,9 +71,9 @@ add!(dh, :u, ip)
 close!(dh);
 
 # Now that we have distributed all our dofs we can create our tangent matrix,
-# using `create_sparsity_pattern`. This function returns a sparse matrix
+# using `allocate_matrix`. This function returns a sparse matrix
 # with the correct entries stored.
-K = create_sparsity_pattern(dh)
+K = allocate_matrix(dh)
 
 # ### Boundary conditions
 # In Ferrite constraints like Dirichlet boundary conditions
@@ -213,7 +213,7 @@ u = K \ f;
 # ### Exporting to VTK
 # To visualize the result we export the grid and our field `u`
 # to a VTK-file, which can be viewed in e.g. [ParaView](https://www.paraview.org/).
-VTKFile("heat_equation", dh) do vtk
+VTKGridFile("heat_equation", dh) do vtk
     write_solution(vtk, dh, u)
 end
 

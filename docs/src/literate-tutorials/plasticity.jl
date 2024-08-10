@@ -9,7 +9,7 @@
 #-
 #md # !!! tip
 #md #     This example is also available as a Jupyter notebook:
-#md #     [`plasticity.ipynb`](@__NBVIEWER_ROOT_URL__/examples/plasticity.ipynb).
+#md #     [`plasticity.ipynb`](@__NBVIEWER_ROOT_URL__/tutorials/plasticity.ipynb).
 #-
 #
 # ## Introduction
@@ -282,7 +282,7 @@ function solve()
     u  = zeros(n_dofs)  # solution vector
     Δu = zeros(n_dofs)  # displacement correction
     r = zeros(n_dofs)   # residual
-    K = create_sparsity_pattern(dh); # tangent stiffness matrix
+    K = allocate_matrix(dh); # tangent stiffness matrix
 
     ## Create material states. One array for each cell, where each element is an array of material-
     ## states - one for each integration point
@@ -344,7 +344,7 @@ function solve()
         mises_values[el] /= length(cell_states) # average von Mises stress
         κ_values[el] /= length(cell_states)     # average drag stress
     end
-    VTKFile("plasticity", dh) do vtk
+    VTKGridFile("plasticity", dh) do vtk
         write_solution(vtk, dh, u) # displacement field
         write_cell_data(vtk, mises_values, "von Mises [Pa]")
         write_cell_data(vtk, κ_values, "Drag stress [Pa]")

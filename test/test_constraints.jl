@@ -86,8 +86,9 @@ end
     add!(dh, :p, Lagrange{RefTriangle,1}())
     close!(dh)
     ch = ConstraintHandler(dh)
-    dbc1 = Dirichlet(:u, getnodeset(grid, "nodeset"), (x,t) -> x, [1, 2])
-    dbc2 = Dirichlet(:p, getnodeset(grid, "nodeset"), (x,t) -> 0, 1)
+    dbc1 = Dirichlet(:u, getnodeset(grid, "nodeset"), (x, t) -> x, [1, 2])
+    # Add type-spec to function, test https://github.com/Ferrite-FEM/Ferrite.jl/issues/1006
+    dbc2 = Dirichlet(:p, getnodeset(grid, "nodeset"), (x::Vec, t::Real) -> 0, 1)
     add!(ch, dbc1)
     add!(ch, dbc2)
     close!(ch)
@@ -343,9 +344,9 @@ end
         C, g = Ferrite.create_constraint_matrix(ch)
 
         # Assemble
-        K = create_sparsity_pattern(dh, ch)
+        K = allocate_matrix(dh, ch)
         f = zeros(ndofs(dh)); f[end] = 1.0
-        Kl = create_sparsity_pattern(dh, ch)
+        Kl = allocate_matrix(dh, ch)
         fl = copy(f)
         assembler = start_assemble(Kl, fl)
         for cell in CellIterator(dh)
@@ -410,7 +411,7 @@ end
         add!(ch, AffineConstraint(1, [3=>params.a], params.b))
         close!(ch)
 
-        K = create_sparsity_pattern(dh, ch)
+        K = allocate_matrix(dh, ch)
         r = zeros(ndofs(dh))
         a = zeros(ndofs(dh))
 
@@ -1293,10 +1294,10 @@ end # testset
     close!(ch2)
     update!(ch2, 0)
 
-    K1 = create_sparsity_pattern(dh, ch1)
+    K1 = allocate_matrix(dh, ch1)
     f1 = zeros(ndofs(dh))
     a1 = start_assemble(K1, f1)
-    K2 = create_sparsity_pattern(dh, ch2)
+    K2 = allocate_matrix(dh, ch2)
     f2 = zeros(ndofs(dh))
     a2 = start_assemble(K2, f2)
 
@@ -1333,9 +1334,9 @@ end # subtestset
     add!(ch2, Dirichlet(:u, getfacetset(grid, "right"), (x, t) -> 2.0t))
     close!(ch2)
 
-    K1 = create_sparsity_pattern(dh, ch1)
+    K1 = allocate_matrix(dh, ch1)
     f1 = zeros(ndofs(dh))
-    K2 = create_sparsity_pattern(dh, ch2)
+    K2 = allocate_matrix(dh, ch2)
     f2 = zeros(ndofs(dh))
 
     for t in (1.0, 2.0)
@@ -1415,7 +1416,7 @@ end # testset
 
     for azero in (nothing, false, true)
 
-        S = create_sparsity_pattern(dh)
+        S = allocate_matrix(dh)
         f = zeros(ndofs(dh))
 
         K_dbc_standard = copy(S)
@@ -1428,7 +1429,7 @@ end # testset
         f_dbc_local = copy(f)
         assembler_dbc_local = start_assemble(K_dbc_local, f_dbc_local)
 
-        S = create_sparsity_pattern(dh, ch_ac)
+        S = allocate_matrix(dh, ch_ac)
 
         K_ac_standard = copy(S)
         f_ac_standard = copy(f)
@@ -1440,7 +1441,7 @@ end # testset
         f_ac_local = copy(f)
         assembler_ac_local = start_assemble(K_ac_local, f_ac_local)
 
-        S = create_sparsity_pattern(dh, ch_p)
+        S = allocate_matrix(dh, ch_p)
 
         K_p_standard = copy(S)
         f_p_standard = copy(f)
@@ -1553,7 +1554,7 @@ end # testset
             @test norm(u_dbc) ≈ 3.8249286998373586
             @test norm(u_p) ≈ 3.7828270430540893
         end
-        # VTKFile("local_application_azero_$(azero)", grid) do vtk
+        # VTKGridFile("local_application_azero_$(azero)", grid) do vtk
         #     write_solution(vtk, dh, u_dbc, "_dbc")
         #     write_solution(vtk, dh, u_p, "_p")
         # end
@@ -1573,8 +1574,8 @@ end # testset
     ch = ConstraintHandler(dh)
     add!(ch, Dirichlet(:u, getfacetset(grid, "left"), (x, t) -> 0))
     close!(ch)
-    Kfull = create_sparsity_pattern(dh, ch)
-    K = create_sparsity_pattern(dh, ch; keep_constrained=false)
+    Kfull = allocate_matrix(dh, ch)
+    K = allocate_matrix(dh, ch; keep_constrained=false)
     # Pattern tests
     nonzero_edges = Set(
         (i, j) for d in 1:getncells(grid)

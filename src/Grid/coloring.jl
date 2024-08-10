@@ -179,7 +179,7 @@ Two different algorithms are available, specified with the `alg` keyword argumen
  - `alg = ColoringAlgorithm.Greedy`: greedy algorithm that works well for structured quadrilateral grids such as
    e.g. quadrilateral grids from `generate_grid`.
 
-The resulting colors can be visualized using [`vtk_cell_data_colors`](@ref).
+The resulting colors can be visualized using [`Ferrite.write_cell_colors`](@ref).
 
 !!! note "Cell to color mapping"
     In a previous version of Ferrite this function returned a dictionary mapping

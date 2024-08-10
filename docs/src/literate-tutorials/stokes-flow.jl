@@ -4,7 +4,7 @@
 #-
 #md # !!! tip
 #md #     This example is also available as a Jupyter notebook:
-#md #     [`stokes-flow.ipynb`](@__NBVIEWER_ROOT_URL__/examples/stokes-flow.ipynb).
+#md #     [`stokes-flow.ipynb`](@__NBVIEWER_ROOT_URL__/tutorials/stokes-flow.ipynb).
 #-
 #
 # ![](stokes-flow.png)
@@ -145,20 +145,6 @@
 
 using Ferrite, FerriteGmsh, Gmsh, Tensors, LinearAlgebra, SparseArrays
 using Test #src
-
-# Overload for specific elements in this tutorial.
-function FerriteGmsh.tofacesets(boundarydict::Dict{String,Vector}, elements::Vector{Triangle})
-    faces = Ferrite.facets.(elements)
-    facesets = Dict{String,Set{FaceIndex}}()
-    for (boundaryname, boundaryfaces) in boundarydict
-        facesettuple = Set{FaceIndex}()
-        for boundaryface in boundaryfaces
-            FerriteGmsh._add_to_facesettuple!(facesettuple, boundaryface, faces)
-        end
-        facesets[boundaryname] = facesettuple
-    end
-    return facesets
-end
 
 # ### Geometry and mesh generation with `Gmsh.jl`
 #
@@ -519,7 +505,7 @@ function main()
     ch = setup_constraints(dh, fvp)
     ## Global tangent matrix and rhs
     coupling = [true true; true false] # no coupling between pressure test/trial functions
-    K = create_sparsity_pattern(dh, ch; coupling=coupling)
+    K = allocate_matrix(dh, ch; coupling=coupling)
     f = zeros(ndofs(dh))
     ## Assemble system
     assemble_system!(K, f, dh, cvu, cvp)
@@ -528,7 +514,7 @@ function main()
     u = K \ f
     apply!(u, ch)
     ## Export the solution
-    VTKFile("stokes-flow", grid) do vtk
+    VTKGridFile("stokes-flow", grid) do vtk
         write_solution(vtk, dh, u)
     end
 

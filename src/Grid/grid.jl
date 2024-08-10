@@ -43,6 +43,7 @@ get_coordinate_eltype(::Node{dim,T}) where {dim,T} = T
 # abstract type AbstractCell{refshape <: AbstractRefShape} end
 
 getrefshape(::AbstractCell{refshape}) where refshape = refshape
+getrefshape(::Type{<:AbstractCell{refshape}}) where refshape = refshape
 
 nvertices(c::AbstractCell) = length(vertices(c))
 nedges(   c::AbstractCell) = length(edges(c))
@@ -55,6 +56,16 @@ nedges(   ::Type{T}) where {T <: AbstractRefShape} = length(reference_edges(T))
 nfaces(   ::Type{T}) where {T <: AbstractRefShape} = length(reference_faces(T))
 nfacets(  ::Type{T}) where {T <: AbstractRefShape} = length(reference_facets(T))
 
+
+"""
+    reference_vertices(::Type{<:AbstractRefShape})
+    reference_vertices(::AbstractCell)
+
+Returns a tuple of integers containing the local node indices corresponding to
+the vertices (i.e. corners or endpoints) of the cell.
+"""
+reference_vertices(::Union{Type{<:AbstractRefShape}, AbstractCell})
+
 """
     Ferrite.vertices(::AbstractCell)
 
@@ -63,6 +74,15 @@ This function induces the [`VertexIndex`](@ref), where the second index
 corresponds to the local index into this tuple.
 """
 vertices(::AbstractCell)
+
+"""
+    reference_edges(::Type{<:AbstractRefShape})
+    reference_edges(::AbstractCell)
+
+Returns a tuple of 2-tuples containing the ordered local node indices
+(corresponding to the vertices) that define an edge.
+"""
+reference_edges(::Union{Type{<:AbstractRefShape}, AbstractCell})
 
 """
     Ferrite.edges(::AbstractCell)
@@ -76,17 +96,13 @@ Note that the vertices are sufficient to define an edge uniquely.
 edges(::AbstractCell)
 
 """
-    reference_faces(::AbstractRefShape)
+    reference_faces(::Type{<:AbstractRefShape})
+    reference_faces(::AbstractCell)
 
-Returns a tuple of n-tuples containing the ordered local node indices corresponding to
-the vertices that define an *oriented face*.
-
-An *oriented face* is a face with the first node having the local index and the other
-nodes spanning such that the normal to the face is pointing outwards.
-
-Note that the vertices are sufficient to define a face uniquely.
+Returns a tuple of n-tuples containing the ordered local node indices
+(corresponding to the vertices) that define a face.
 """
-reference_faces(::AbstractRefShape)
+reference_faces(::Union{Type{<:AbstractRefShape}, AbstractCell})
 
 """
     Ferrite.faces(::AbstractCell)
@@ -119,11 +135,12 @@ facets(::AbstractCell)
 
 """
     Ferrite.reference_facets(::Type{<:AbstractRefShape})
+    Ferrite.reference_facets(::AbstractCell)
 
-Returns a tuple of n-tuples containing the ordered local node indices corresponding to
-the vertices that define an oriented facet.
+Returns a tuple of n-tuples containing the ordered local node indices
+(corresponding to the vertices) that define a facet.
 
-See also [`reference_vertices`](@ref), [`reference_edges`](@ref), and [`reference_faces`](@ref)
+See also [`reference_vertices`](@ref), [`reference_edges`](@ref), and [`reference_faces`](@ref).
 """
 reference_facets(::Type{<:AbstractRefShape})
 
@@ -131,12 +148,19 @@ reference_facets(::Type{<:AbstractRefShape})
 @inline reference_facets(refshape::Type{<:AbstractRefShape{2}}) = reference_edges(refshape)
 @inline reference_facets(refshape::Type{<:AbstractRefShape{3}}) = reference_faces(refshape)
 
-"""
-    Ferrite.default_interpolation(::AbstractCell)::Interpolation
+@inline reference_faces(::AbstractCell{refshape})    where refshape = reference_faces(refshape)
+@inline reference_edges(::AbstractCell{refshape})    where refshape = reference_edges(refshape)
+@inline reference_vertices(::AbstractCell{refshape}) where refshape = reference_vertices(refshape)
+@inline reference_facets(::AbstractCell{refshape})   where refshape = reference_facets(refshape)
 
-Returns the interpolation which defines the geometry of a given cell.
 """
-default_interpolation(::AbstractCell)
+    geometric_interpolation(::AbstractCell)::ScalarInterpolation
+    geometric_interpolation(::Type{<:AbstractCell})::ScalarInterpolation
+
+Each `AbstractCell` type has a unique geometric interpolation describing its geometry.
+This function returns that interpolation, which is always a scalar interpolation.
+"""
+geometric_interpolation(cell::AbstractCell) = geometric_interpolation(typeof(cell))
 
 """
     Ferrite.get_node_ids(c::AbstractCell)
@@ -240,25 +264,25 @@ struct QuadraticHexahedron    <: AbstractCell{RefHexahedron}    nodes::NTuple{27
 struct Wedge                  <: AbstractCell{RefPrism}         nodes::NTuple{ 6, Int} end
 struct Pyramid                <: AbstractCell{RefPyramid}       nodes::NTuple{ 5, Int} end
 
-default_interpolation(::Type{Line})                   = Lagrange{RefLine,          1}()
-default_interpolation(::Type{QuadraticLine})          = Lagrange{RefLine,          2}()
-default_interpolation(::Type{Triangle})               = Lagrange{RefTriangle,      1}()
-default_interpolation(::Type{QuadraticTriangle})      = Lagrange{RefTriangle,      2}()
-default_interpolation(::Type{Quadrilateral})          = Lagrange{RefQuadrilateral, 1}()
-default_interpolation(::Type{QuadraticQuadrilateral}) = Lagrange{RefQuadrilateral, 2}()
-default_interpolation(::Type{Tetrahedron})            = Lagrange{RefTetrahedron,   1}()
-default_interpolation(::Type{QuadraticTetrahedron})   = Lagrange{RefTetrahedron,   2}()
-default_interpolation(::Type{Hexahedron})             = Lagrange{RefHexahedron,    1}()
-default_interpolation(::Type{QuadraticHexahedron})    = Lagrange{RefHexahedron,    2}()
-default_interpolation(::Type{Wedge})                  = Lagrange{RefPrism,         1}()
-default_interpolation(::Type{Pyramid})                = Lagrange{RefPyramid,       1}()
+geometric_interpolation(::Type{Line})                   = Lagrange{RefLine,          1}()
+geometric_interpolation(::Type{QuadraticLine})          = Lagrange{RefLine,          2}()
+geometric_interpolation(::Type{Triangle})               = Lagrange{RefTriangle,      1}()
+geometric_interpolation(::Type{QuadraticTriangle})      = Lagrange{RefTriangle,      2}()
+geometric_interpolation(::Type{Quadrilateral})          = Lagrange{RefQuadrilateral, 1}()
+geometric_interpolation(::Type{QuadraticQuadrilateral}) = Lagrange{RefQuadrilateral, 2}()
+geometric_interpolation(::Type{Tetrahedron})            = Lagrange{RefTetrahedron,   1}()
+geometric_interpolation(::Type{QuadraticTetrahedron})   = Lagrange{RefTetrahedron,   2}()
+geometric_interpolation(::Type{Hexahedron})             = Lagrange{RefHexahedron,    1}()
+geometric_interpolation(::Type{QuadraticHexahedron})    = Lagrange{RefHexahedron,    2}()
+geometric_interpolation(::Type{Wedge})                  = Lagrange{RefPrism,         1}()
+geometric_interpolation(::Type{Pyramid})                = Lagrange{RefPyramid,       1}()
 
 # Serendipity interpolation based cells
 struct SerendipityQuadraticQuadrilateral <: AbstractCell{RefQuadrilateral} nodes::NTuple{ 8, Int} end
 struct SerendipityQuadraticHexahedron    <: AbstractCell{RefHexahedron}    nodes::NTuple{20, Int} end
 
-default_interpolation(::Type{SerendipityQuadraticQuadrilateral}) = Serendipity{RefQuadrilateral, 2}()
-default_interpolation(::Type{SerendipityQuadraticHexahedron})    = Serendipity{RefHexahedron,    2}()
+geometric_interpolation(::Type{SerendipityQuadraticQuadrilateral}) = Serendipity{RefQuadrilateral, 2}()
+geometric_interpolation(::Type{SerendipityQuadraticHexahedron})    = Serendipity{RefHexahedron,    2}()
 
 """
     nvertices_on_face(cell::AbstractCell, local_face_index::Int)
@@ -331,7 +355,7 @@ function Grid(cells::Vector{C},
         end
     end
     if boundary_matrix !== nothing
-        error("`boundary_matrix` is not part of the Grid anymore and thus not a supported keyword argument.")
+        throw(DeprecationError("`boundary_matrix` is not part of the Grid anymore and thus not a supported keyword argument."))
     end
     return Grid(
         cells,
