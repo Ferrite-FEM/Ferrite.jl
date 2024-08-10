@@ -96,6 +96,7 @@
             end
             @test bytes2hex(open(SHA.sha1, fname2*".vtu")) == testhash
         end
+    end
 
     @testset "write_cellset" begin
         # More tests in `test_grid_dofhandler_vtk.jl`, this just validates writing all sets in the grid
