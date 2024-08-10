@@ -577,9 +577,7 @@ integrator = init(
 #     Exporting interpolated solutions of problems containing mass matrices is currently broken.
 #     Thus, the `intervals` iterator is used. Note that `solve` holds all solutions in the memory.
 pvd = paraview_collection("vortex-street")
-step = 0
-for (u,t) in intervals(integrator)
-    step += 1
+for (step, (u,t)) in enumerate(intervals(integrator))
     VTKGridFile("vortex-street-$step", dh) do vtk
         write_solution(vtk, dh, u)
         pvd[t] = vtk
