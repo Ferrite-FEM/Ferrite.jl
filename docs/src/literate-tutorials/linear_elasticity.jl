@@ -1,11 +1,11 @@
 # # [Linear elasticity](@id tutorial-linear-elasticity)
 #
-# ![](linear_elasticity.png)
+# ![](linear_elasticity.svg)
 #
 # *Figure 1*: Linear elastically deformed Ferrite logo.
 #
 #md # !!! tip
-#md #     This example is also available as a Jupyter notebook:
+#md #     This tutorial is also available as a Jupyter notebook:
 #md #     [`linear_elasticity.ipynb`](@__NBVIEWER_ROOT_URL__/tutorials/linear_elasticity.ipynb).
 #-
 #
@@ -14,16 +14,16 @@
 # The classical first finite element problem to solve in solid mechanics is a linear balance
 # of momentum problem. We will use this to introduce a vector valued field, the displacements
 # $\boldsymbol{u}(\boldsymbol{x})$. In addition, some features of the
-# [`Tensors.jl`](https://github.com/Ferrite-FEM/Tensors.jl) toolbox is demonstrated.
+# [`Tensors.jl`](https://github.com/Ferrite-FEM/Tensors.jl) toolbox are demonstrated.
 #
 # ### Strong form
 # The strong form of the balance of momentum for quasi-static loading is given by
 # ```math
-# \begin{align*}
-#  \boldsymbol{\sigma} \cdot \boldsymbol{\nabla} + \boldsymbol{b} &= 0 \quad \boldsymbol{x} \in \Omega \\
-#  \boldsymbol{u} &= \boldsymbol{u}_\mathrm{D} \quad \boldsymbol{x} \in \Gamma_\mathrm{D} \\
-#  \boldsymbol{n} \cdot \boldsymbol{\sigma} &= \boldsymbol{t}_\mathrm{N} \quad \boldsymbol{x} \in \Gamma_\mathrm{N}
-# \end{align*}
+# \begin{alignat*}{2}
+#   \boldsymbol{\sigma} \cdot \boldsymbol{\nabla} + \boldsymbol{b} &= 0 \quad &&\boldsymbol{x} \in \Omega \\
+#   \boldsymbol{u} &= \boldsymbol{u}_\mathrm{D} \quad &&\boldsymbol{x} \in \Gamma_\mathrm{D} \\
+#   \boldsymbol{n} \cdot \boldsymbol{\sigma} &= \boldsymbol{t}_\mathrm{N} \quad &&\boldsymbol{x} \in \Gamma_\mathrm{N}
+# \end{alignat*}
 # ```
 # where $\boldsymbol{\sigma}$ is the (Cauchy) stress tensor and $\boldsymbol{b}$ the body force.
 # The domain, $\Omega$, has the boundary $\Gamma$, consisting of a Dirichlet part, $\Gamma_\mathrm{D}$, and
@@ -31,7 +31,7 @@
 # $\boldsymbol{u}_\mathrm{D}$ denotes prescribed displacements on $\Gamma_\mathrm{D}$,
 # while $\boldsymbol{t}_\mathrm{N}$ the known tractions on $\Gamma_\mathrm{N}$.
 #
-# In this example, we use linear elasticity, such that
+# In this tutorial, we use linear elasticity, such that
 # ```math
 # \boldsymbol{\sigma} = \boldsymbol{\mathsf{E}} : \boldsymbol{\varepsilon}, \quad
 # \boldsymbol{\varepsilon} = \left(\boldsymbol{u} \otimes \boldsymbol{\nabla}\right)^\mathrm{sym}
@@ -58,7 +58,7 @@
 # where $\delta \boldsymbol{u}$ is a vector valued test function and
 # $\boldsymbol{t} = \boldsymbol{\sigma}\cdot\boldsymbol{n}$ is the boundary traction.
 # $\mathbb{U}$ and $\mathbb{T}$ denote suitable trial and test function spaces.
-# In this example, we will neglect body foces and the weak form reduces to
+# In this tutorial, we will neglect body foces and the weak form reduces to
 # ```math
 # \int_\Omega
 #   \left(\delta \boldsymbol{u} \otimes \boldsymbol{\nabla} \right) : \boldsymbol{\sigma}
@@ -95,20 +95,20 @@
 # ## Implementation
 # First we load Ferrite, and some other packages we need.
 using Ferrite, FerriteGmsh, SparseArrays
-# Like for the Heat Equation example, we will use a unit square - but here we'll load the grid of the Ferrite logo!
+# As in the heat equation tutorial, we will use a unit square - but here we'll load the grid of the Ferrite logo!
 # This is done by downloading [`logo.geo`](logo.geo) and loading it using [`FerriteGmsh.jl`](https://github.com/Ferrite-FEM/FerriteGmsh.jl),
 using Downloads: download
 logo_mesh = "logo.geo"
 asset_url = "https://raw.githubusercontent.com/Ferrite-FEM/Ferrite.jl/gh-pages/assets/"
 isfile(logo_mesh) || download(string(asset_url, logo_mesh), logo_mesh)
 
-FerriteGmsh.Gmsh.initialize() # hide
+FerriteGmsh.Gmsh.initialize() #hide
 FerriteGmsh.Gmsh.gmsh.option.set_number("General.Verbosity", 2) #hide
 grid = togrid(logo_mesh);
-FerriteGmsh.Gmsh.finalize();
+FerriteGmsh.Gmsh.finalize(); #hide
 #md nothing #hide
-# By default the grid lacks the facetsets for the boundaries, so we add them by Ferrite here.
-# [`addfacetset!`](@ref) allows to add facetsets to the grid based on coordinates.
+# The generated grid lacks the facetsets for the boundaries, so we add them by using Ferrite's
+# [`addfacetset!`](@ref). It allows us to add facetsets to the grid based on coordinates.
 # Note that approximate comparison to 0.0 doesn't work well, so we use a tolerance instead.
 addfacetset!(grid, "top",    x -> x[2] ≈ 1.0) # faces for which x[2] ≈ 1.0 for all nodes
 addfacetset!(grid, "left",   x -> abs(x[1]) < 1e-6)
@@ -161,7 +161,7 @@ close!(ch);
 # ```math
 # \boldsymbol{t}_\mathrm{N}(\boldsymbol{x}) = (20e3) x_1 \boldsymbol{e}_2
 # ```
-traction(x) = Vec(0.0, 20e3 * x[1])
+traction(x) = Vec(0.0, 20e3 * x[1]);
 
 # On the right boundary, we don't do anything, resulting in a zero traction Neumann boundary.
 # In order to assemble the external forces, $f_i^\mathrm{ext}$, we need to iterate over all
@@ -195,7 +195,7 @@ end
 
 # ### Material behavior
 # Next, we need to define the material behavior.
-# In this example, we use plane strain linear isotropic elasticity, with Hooke's law as
+# In this tutorial, we use plane strain linear isotropic elasticity, with Hooke's law as
 # ```math
 # \boldsymbol{\sigma} = 2G \boldsymbol{\varepsilon}^\mathrm{dev} + 3K \boldsymbol{\varepsilon}^\mathrm{vol}
 # ```
@@ -222,9 +222,9 @@ Kmod = Emod / (3(1 - 2ν)) # Bulk modulus
 E4 = gradient(ϵ -> 2 * Gmod * dev(ϵ) + 3 * Kmod * vol(ϵ), zero(SymmetricTensor{2,2}));
 
 #md # !!! details "Plane stress instead of plane strain?"
-#md #     In order to change this example to consider plane stress instead of plane strain,
-#md #     the stiffness tensor should be changed to reflect this. For example, the plane stress
-#md #     elasticity stiffness in voigt notation, using engineering strains, is given as
+#md #     In order to change this tutorial to consider plane stress instead of plane strain,
+#md #     the stiffness tensor should be changed to reflect this. The plane stress elasticity
+#md #     stiffness matrix in Voigt notation for engineering shear strains, is given as
 #md #     ```math
 #md #     \underline{\underline{\boldsymbol{E}}} = \frac{E}{1 - \nu^2}\begin{bmatrix}
 #md #     1 & \nu & 0 \\
@@ -232,7 +232,7 @@ E4 = gradient(ϵ -> 2 * Gmod * dev(ϵ) + 3 * Kmod * vol(ϵ), zero(SymmetricTenso
 #md #     0 & 0 & (1 - \nu)/2
 #md #     \end{bmatrix}
 #md #     ```
-#md #     Which can be converted into a 4th order tensor as
+#md #     This matrix can be converted into the 4th order stiffness tensor as
 #md #     ```julia
 #md #     E_voigt = Emod * [1.0 ν 0.0; ν 1.0 0.0; 0.0 0.0 (1-ν)/2] / (1 - ν^2)
 #md #     E4 = fromvoigt(SymmetricTensor{4,2}, E_voigt)
@@ -264,7 +264,7 @@ end
 #md nothing #hide
 #
 #md # !!! details "Performance tips"
-#md #     1. In this example, $\mathsf{\boldsymbol{E}}$, is symmetric, and we could have used
+#md #     1. In this tutorial, `∂σ∂ε`, is minor symmetric, and we could have used
 #md #        the symmetric part of test function gradient above.
 #md #     2. The product `∇Nᵢ ⊡ ∂σ∂ε` can be done outside the "j"-loop, but is kept inside here
 #md #        to highlight the similarity to the finite element form.
@@ -305,8 +305,8 @@ f_ext = zeros(ndofs(dh))
 assemble_external_forces!(f_ext, dh, getfacetset(grid, "top"), facetvalues, traction);
 
 # To account for the Dirichlet boundary conditions we use the `apply!` function.
-# This modifies elements in `K` and `f` respectively, such that we can get the
-# correct solution vector `u` by using solving the linear equation system $K_{ij} u_j = f^\mathrm{ext}_i$,
+# This modifies elements in `K` and `f`, such that we can get the
+# correct solution vector `u` by using solving the linear equation system $K_{ij} \hat{u}_j = f^\mathrm{ext}_i$,
 apply!(K, f_ext, ch)
 u = K \ f_ext;
 
