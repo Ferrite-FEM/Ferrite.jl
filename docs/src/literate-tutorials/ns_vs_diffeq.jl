@@ -119,7 +119,7 @@
 # The full program, without comments, can be found in the next [section](@ref ns_vs_diffeq-plain-program).
 #
 # First we load Ferrite and some other packages we need
-using Ferrite, SparseArrays, BlockArrays, LinearAlgebra, UnPack, LinearSolve
+using Ferrite, SparseArrays, BlockArrays, LinearAlgebra, UnPack, LinearSolve, WriteVTK
 # Since we do not need the complete DifferentialEquations suite, we just load the required ODE infrastructure, which can also handle
 # DAEs in mass matrix form.
 using OrdinaryDiffEq
@@ -576,10 +576,13 @@ integrator = init(
 # !!! note "Export of solution"
 #     Exporting interpolated solutions of problems containing mass matrices is currently broken.
 #     Thus, the `intervals` iterator is used. Note that `solve` holds all solutions in the memory.
-pvd = VTKFileCollection("vortex-street", grid);
+pvd = paraview_collection("vortex-street")
+step = 0
 for (u,t) in intervals(integrator)
-    addstep!(pvd, t) do io
-        write_solution(io, dh, u)
+    step += 1
+    VTKGridFile("vortex-street-$step", dh) do vtk
+        write_solution(vtk, dh, u)
+        pvd[t] = vtk
     end
 end
 close(pvd);

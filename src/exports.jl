@@ -174,8 +174,6 @@ export
     write_cell_data,
     write_projection,
     write_node_data,
-    VTKFileCollection,
-    addstep!,
 
 # L2 Projection
     project,
