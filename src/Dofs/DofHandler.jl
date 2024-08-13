@@ -817,7 +817,7 @@ See also: [`find_field(dh::DofHandler, field_name::Symbol)`](@ref), [`_find_fiel
 function find_field(sdh::SubDofHandler, field_name::Symbol)
     field_idx = _find_field(sdh, field_name)
     if field_idx === nothing
-        error("Did not find field :$field_name in SubDofHandler (existing fields: $(sdh.field_names))")
+        error("Did not find field :$field_name in SubDofHandler (existing fields: $(sdh.field_names)).")
     end
     return field_idx
 end
