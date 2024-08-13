@@ -15,7 +15,7 @@
 # ## Introduction
 #
 # Topology optimization is the task of finding structures that are mechanically ideal.
-# In this example we cover the bending beam, where we specify a load, boundary conditions and the total mass. Then, our
+# In this example we cover the bending beam, where we specify a load, boundary conditions, and the total mass. Then, our
 # objective is to find the most suitable geometry within the design space minimizing the compliance (i.e. the inverse stiffness) of the structure.
 # We shortly introduce our simplified model for regular meshes. A detailed derivation of the method and advanced techniques
 # can be found in [JanHacJun2019regularizedthermotopopt](@cite) and
@@ -47,18 +47,18 @@
 # the value of the density field $\chi$. The advantage of this "split" approach is the very high computation speed.
 # The evolution equation consists of the driving force, the damping parameter $\eta$, the regularization parameter $\beta$ times the Laplacian,
 # which is necessary to avoid numerical issues like mesh dependence or checkerboarding, and the constraint parameters $\lambda$, to keep the mass constant,
-# and $\gamma$, to avoid leaving the set $[\chi_{\text{min}}, 1]$. By including gradient regularization, it becomes necessary to calculate the Laplacian.
+#, and $\gamma$, to avoid leaving the set $[\chi_{\text{min}}, 1]$. By including gradient regularization, it becomes necessary to calculate the Laplacian.
 # The Finite Difference Method for square meshes with the edge length $\Delta h$ approximates the Laplacian as follows:
 # ```math
 # \nabla^2 \chi_p = \frac{1}{(\Delta h)^2} (\chi_n + \chi_s + \chi_w + \chi_e - 4 \chi_p)
 # ```
-# Here, the indices refer to the different cardinal directions. Boundary element do not have neighbors in each direction. However, we can calculate
-# the central difference to fulfill Neumann boundary condition. For example, if the element is on the left boundary, we have to fulfill
+# Here, the indices refer to the different cardinal directions. Boundary elements do not have neighbors in each direction. However, we can calculate
+# the central difference to fulfill the Neumann boundary condition. For example, if the element is on the left boundary, we have to fulfill
 # ```math
 # \nabla \chi_p \cdot \textbf{n} = \frac{1}{\Delta h} (\chi_w - \chi_e) = 0
 # ```
-# from which follows $\chi_w = \chi_e$. Thus for boundary elements we can replace the value for the missing neighbor by the value of the opposite neighbor.
-# In order to find the corresponding neighbor elements, we will make use of Ferrites grid topology funcionalities.
+# from which follows $\chi_w = \chi_e$. Thus for boundary elements, we can replace the value for the missing neighbor with the value of the opposite neighbor.
+# In order to find the corresponding neighbor elements, we will make use of Ferrites grid topology functionalities.
 #
 # ## Commented Program
 # We now solve the problem in Ferrite. What follows is a program spliced with comments.
@@ -68,7 +68,7 @@
 using Ferrite, SparseArrays, LinearAlgebra, Tensors, Printf, ArraysOfArrays
 # Next, we create a simple square grid of the size 2x1. We apply a fixed Dirichlet boundary condition
 # to the left face set, called `clamped`. On the right face, we create a small set `traction`, where we
-# will later apply a force in negative y-direction.
+# will later apply a force in the negative y-direction.
 
 function create_grid(n)
     corners = [Vec{2}((0.0, 0.0)),
@@ -84,7 +84,7 @@ function create_grid(n)
 end
 #md nothing # hide
 
-# Next, we create the FE values, the DofHandler and the Dirichlet boundary condition.
+# Next, we create the FE values, the DofHandler, and the Dirichlet boundary condition.
 
 function create_values()
     ## quadrature rules
@@ -142,7 +142,7 @@ end
 
 # To store the density and the strain required to calculate the driving forces, we create the struct
 # `MaterialState`. We add a constructor to initialize the struct. The function `update_material_states!`
-# updates the density values once we calculated the new values.
+# updates the density values once we calculate the new values.
 
 mutable struct MaterialState{T, S <: AbstractArray{SymmetricTensor{2, 2, T, 3}, 1}}
     χ::T # density
@@ -185,10 +185,10 @@ function compute_densities(states, dh)
 end
 #md nothing # hide
 
-# For the Laplacian we need some neighboorhood information which is constant throughout the analysis so we compute it once and cache it.
+# For the Laplacian we need some neighborhood information which is constant throughout the analysis so we compute it once and cache it.
 # We iterate through each face of each element,
 # obtaining the neighboring element by using the `getneighborhood` function. For boundary faces,
-# the function call will return an empty object. In that case we use the dictionary to instead find the opposite
+# the function call will return an empty object. In that case, we use the `opp` tuple to find instead the opposite
 # face, as discussed in the introduction.
 
 function compute_neighborhood(dh, grid, topology)
@@ -214,7 +214,7 @@ function compute_neighborhood(dh, grid, topology)
 end
 #md nothing # hide
 
-# Now we calculate the Laplacian using the previously cached neighboorhood information.
+# Now we calculate the Laplacian using the previously cached neighborhood information.
 function approximate_laplacian(nbgs, χn, Δh)
     ∇²χ = zeros(length(nbgs))
     for i in 1:length(nbgs)
@@ -386,18 +386,18 @@ end
 #md nothing # hide
 
 # We put everything together in the main function. Here the user may choose the radius parameter, which
-# is related to the regularization parameter as $\beta = ra^2$, the starting density, the number of elements in vertical direction and finally the
+# is related to the regularization parameter as $\beta = ra^2$, the starting density, the number of elements in the vertical direction, and finally the
 # name of the output. Additionally, the user may choose whether only the final design (default)
 # or every iteration step is saved.
 #
-# First, we compute the material parameters and create the grid, DofHandler, boundary condition and FE values.
+# First, we compute the material parameters and create the grid, DofHandler, boundary condition, and FE values.
 # Then we prepare the iterative Newton-Raphson method by pre-allocating all important vectors. Furthermore,
 # we create material states for each element and construct the topology of the grid.
 #
 # During each iteration step, first we solve our FE problem in the Newton-Raphson loop. With the solution of the
-# elastomechanic problem, we check for convergence of our topology design. The criteria has to be fulfilled twice in
+# elastomechanic problem, we check for convergence of our topology design. The criteria have to be fulfilled twice in
 # a row to avoid oscillations. If no convergence is reached yet, we update our design and prepare the next iteration step.
-# Finally, we output the results in paraview and calculate the relative stiffness of the final design, i.e. how much how
+# Finally, we output the results in paraview and calculate the relative stiffness of the final design, i.e. how much
 # the stiffness increased compared to the starting point.
 
 function topopt(ra,ρ,n,filename; output=:false)
@@ -534,7 +534,7 @@ end
 #
 # ![](bending.png)
 #
-# *Figure 2*: Optimization results of the bending beam for smaller (left) and larger (right) value of the regularization parameter $\beta$.
+# *Figure 2*: Optimization results of the bending beam for smaller (left) and larger (right) values of the regularization parameter $\beta$.
 #
 # To prove mesh independence, the user could vary the mesh resolution and compare the results.
 
