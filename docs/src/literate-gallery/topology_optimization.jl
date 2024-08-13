@@ -201,9 +201,9 @@ function compute_neighborhood(dh, grid, topology)
         resize!(nbg, _nfacets)
         i = cellid(element)
         for j in 1:_nfacets
-            neighbor_facet = neighborhood[i, j]
-            if(!isempty(neighbor_facet))
-                nbg[j] = neighbor_facet[1][1] # assuming only one face neighbor per cell
+            neighbor_facets = neighborhood[i, j]
+            if(!isempty(neighbor_facets))
+                nbg[j] = neighbor_facets[1][1] # assuming only one facet neighbor per cell
             else # boundary face
                 nbg[j] = neighborhood[i, opp[j]][1][1]
             end
