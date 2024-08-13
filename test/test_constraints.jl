@@ -729,41 +729,39 @@ end
     ])
 end # testset
 
-@testset "periodic bc: dof mapping" begin
-    grid = generate_grid(Quadrilateral, (2, 2))
-
-    function get_dof_map(ch)
-        m = Dict{Int,Any}()
-        for (mdof,b,entries) in zip(ch.prescribed_dofs, ch.inhomogeneities, ch.dofcoefficients)
-            if entries !== nothing
-                @test b == 0
-                if length(entries) == 1
-                    idof, weight = first(entries)
-                    @test weight == 1
-                    m[mdof] = idof
-                else
-                    m[mdof] = entries
-                end
+function get_dof_map(ch)
+    m = Dict{Int,Any}()
+    for (mdof,b,entries) in zip(ch.prescribed_dofs, ch.inhomogeneities, ch.dofcoefficients)
+        if entries !== nothing
+            @test b == 0
+            if length(entries) == 1
+                idof, weight = first(entries)
+                @test weight == 1
+                m[mdof] = idof
+            else
+                m[mdof] = entries
             end
         end
-        return m
     end
-    function compare_by_dbc(dh, pdbc, dbc1, dbc2)
-        ch = ConstraintHandler(dh)
-        add!(ch, pdbc)
-        close!(ch)
-        ch1 = ConstraintHandler(dh)
-        add!(ch1, dbc1)
-        close!(ch1)
-        ch2 = ConstraintHandler(dh)
-        add!(ch2, dbc2)
-        close!(ch2)
-        dof_map = get_dof_map(ch)
-        @test issetequal(keys(dof_map), ch1.prescribed_dofs)
-        @test issetequal(values(dof_map), ch2.prescribed_dofs)
-    end
+    return m
+end
+function compare_by_dbc(dh, pdbc, dbc1, dbc2)
+    ch = ConstraintHandler(dh)
+    add!(ch, pdbc)
+    close!(ch)
+    ch1 = ConstraintHandler(dh)
+    add!(ch1, dbc1)
+    close!(ch1)
+    ch2 = ConstraintHandler(dh)
+    add!(ch2, dbc2)
+    close!(ch2)
+    dof_map = get_dof_map(ch)
+    @test issetequal(keys(dof_map), ch1.prescribed_dofs)
+    @test issetequal(values(dof_map), ch2.prescribed_dofs)
+end
 
-
+@testset "periodic bc: dof mapping" begin
+    grid = generate_grid(Quadrilateral, (2, 2))
     #             Distributed dofs
     #       Scalar                Vector
     #  8───────7───────9   15,16───13,14───17,18
