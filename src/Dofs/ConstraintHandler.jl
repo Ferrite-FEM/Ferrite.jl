@@ -933,9 +933,21 @@ function add!(ch::ConstraintHandler, pdbc::PeriodicDirichlet)
             collect_periodic_facets!(pdbc.facet_map, get_grid(ch.dh), mset, iset, identity) # TODO: Better transform
         end
     end
-    field_idx = find_field(ch.dh, pdbc.field_name)
-    interpolation = getfieldinterpolation(ch.dh, field_idx)
+    length(pdbc.facet_map) == 0 && return ch #notting to add
+
+    cellid_mirror = first(pdbc.facet_map).mirror[1]
+    cellid_image = first(pdbc.facet_map).image[1]
+    if getcelltype(get_grid(ch.dh), cellid_image) != getcelltype(get_grid(ch.dh), cellid_mirror)
+        throw(ArgumentError("mirror is not the same celltype as the image"))
+    end
+    sdhidx = ch.dh.cell_to_subdofhandler[cellid_mirror]
+    @assert sdhidx ∈ 1:length(ch.dh.subdofhandlers)
+    sdh = ch.dh.subdofhandlers[sdhidx]
+
+    field_idx = find_field(sdh, pdbc.field_name)
+    interpolation = getfieldinterpolation(sdh, field_idx)
     n_comp = n_dbc_components(interpolation)
+    offset = field_offset(sdh, field_idx)
     if interpolation isa VectorizedInterpolation
         interpolation = interpolation.ip
     end
@@ -965,7 +977,7 @@ function add!(ch::ConstraintHandler, pdbc::PeriodicDirichlet)
         dof_map_t = Vector{Int}
         iterator_f = x -> Iterators.partition(x, nc)
     end
-    _add!(ch, pdbc, interpolation, n_comp, field_offset(ch.dh.subdofhandlers[field_idx[1]], field_idx[2]), is_legacy, pdbc.rotation_matrix, dof_map_t, iterator_f)
+    _add!(ch, pdbc, interpolation, n_comp, offset, is_legacy, pdbc.rotation_matrix, dof_map_t, iterator_f)
     return ch
 end
 
