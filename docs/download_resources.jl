@@ -13,7 +13,8 @@ for (file, url) in [
         "porous_media_0p25.inp" => "https://raw.githubusercontent.com/Ferrite-FEM/Ferrite.jl/gh-pages/assets/porous_media_0p25.inp",
         "reactive_surface.gif" => "https://raw.githubusercontent.com/Ferrite-FEM/Ferrite.jl/gh-pages/assets/reactive_surface.gif",
         "nsdiffeq.gif" => "https://raw.githubusercontent.com/Ferrite-FEM/Ferrite.jl/gh-pages/assets/nsdiffeq.gif",
-        "linear_elasticity.svg" => "https://raw.githubusercontent.com/Ferrite-FEM/Ferrite.jl/bbc742bf3f04352df5ba941e3097c1ea19b43807/assets/linear_elasticity.svg",
+        "linear_elasticity.svg" => "https://raw.githubusercontent.com/Ferrite-FEM/Ferrite.jl/gh-pages/assets/linear_elasticity.svg",
+        "linear_elasticity_stress.png" => "https://raw.githubusercontent.com/Ferrite-FEM/Ferrite.jl/gh-pages/assets/linear_elasticity_stress.png",
     ]
     afile = joinpath(directory, file)
     if !isfile(afile)
