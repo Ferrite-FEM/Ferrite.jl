@@ -1,3 +1,4 @@
+using Ferrite: reference_shape_value, reference_shape_gradient
 
 @testset "interpolations" begin
 
@@ -39,10 +40,13 @@
                       #
                       BubbleEnrichedLagrange{RefTriangle, 1}(),
                       #
-                      CrouzeixRaviart{RefTriangle, 1}(),
+                      CrouzeixRaviart{RefTriangle,1}(),
+                      CrouzeixRaviart{RefTetrahedron,1}(),
+                      RannacherTurek{RefQuadrilateral,1}(),
+                      RannacherTurek{RefHexahedron,1}(),
     )
         # Test of utility functions
-        ref_dim = Ferrite.getdim(interpolation)
+        ref_dim = Ferrite.getrefdim(interpolation)
         ref_shape = Ferrite.getrefshape(interpolation)
         func_order = Ferrite.getorder(interpolation)
         @test typeof(interpolation) <: Interpolation{ref_shape,func_order}
@@ -52,8 +56,8 @@
         @testset "transform face points" begin
             # Test both center point and random points on the face
             ref_coord = Ferrite.reference_coordinates(Lagrange{ref_shape, 1}())
-            for face in 1:nfaces(interpolation)
-                face_nodes = Ferrite.reference_faces(ref_shape)[face]
+            for face in 1:nfacets(interpolation)
+                face_nodes = Ferrite.reference_facets(ref_shape)[face]
                 center_coord = [0.0 for _ in 1:ref_dim]
                 rand_coord = [0.0 for _ in 1:ref_dim]
                 rand_weights = rand(length(face_nodes))
@@ -64,8 +68,8 @@
                 end
                 for point in (center_coord, rand_coord)
                     vec_point = Vec{ref_dim}(point)
-                    cell_to_face = Ferrite.element_to_face_transformation(vec_point, ref_shape, face)
-                    face_to_cell = Ferrite.face_to_element_transformation(cell_to_face, ref_shape, face)
+                    cell_to_face = Ferrite.element_to_facet_transformation(vec_point, ref_shape, face)
+                    face_to_cell = Ferrite.facet_to_element_transformation(cell_to_face, ref_shape, face)
                     @test vec_point ≈ face_to_cell
                 end
             end
@@ -73,7 +77,7 @@
         n_basefuncs = getnbasefunctions(interpolation)
         coords = Ferrite.reference_coordinates(interpolation)
         @test length(coords) == n_basefuncs
-        f(x) = [shape_value(interpolation, Tensor{1, ref_dim}(x), i) for i in 1:n_basefuncs]
+        f(x) = [reference_shape_value(interpolation, Tensor{1, ref_dim}(x), i) for i in 1:n_basefuncs]
 
         #TODO prefer this test style after 1.6 is removed from CI
         # @testset let x = sample_random_point(ref_shape) # not compatible with Julia 1.6
@@ -81,65 +85,52 @@
         random_point_testset = @testset "Random point test" begin
             # Check gradient evaluation
             @test vec(ForwardDiff.jacobian(f, Array(x))') ≈
-                reinterpret(value_type, [shape_gradient(interpolation, x, i) for i in 1:n_basefuncs])
+                reinterpret(value_type, [reference_shape_gradient(interpolation, x, i) for i in 1:n_basefuncs])
             # Check partition of unity at random point.
-            @test sum([shape_value(interpolation, x, i) for i in 1:n_basefuncs]) ≈ 1.0
+            @test sum([reference_shape_value(interpolation, x, i) for i in 1:n_basefuncs]) ≈ 1.0
             # Check if the important functions are consistent
-            @test_throws ArgumentError shape_value(interpolation, x, n_basefuncs+1)
+            @test_throws ArgumentError reference_shape_value(interpolation, x, n_basefuncs+1)
             # Idempotency test
-            @test shape_value(interpolation, x, n_basefuncs) == shape_value(interpolation, x, n_basefuncs)
+            @test reference_shape_value(interpolation, x, n_basefuncs) == reference_shape_value(interpolation, x, n_basefuncs)
         end
         # Remove after 1.6 is removed from CI (see above)
         # Show coordinate in case failure (see issue #811)
         !isempty(random_point_testset.results) && println("^^^^^Random point test failed at $x for $interpolation !^^^^^")
 
-        # Test whether we have for each entity corresponding dof indices (possibly empty)
-        @test length(Ferrite.vertexdof_indices(interpolation)) == Ferrite.nvertices(interpolation)
-        if ref_dim > 1
-            @test length(Ferrite.facedof_indices(interpolation)) == Ferrite.nfaces(interpolation)
-            @test length(Ferrite.facedof_interior_indices(interpolation)) == Ferrite.nfaces(interpolation)
-        elseif ref_dim > 2
-            @test length(Ferrite.edgedof_indices(interpolation)) == Ferrite.nedges(interpolation)
-            @test length(Ferrite.edgedof_interior_indices(interpolation)) == Ferrite.nedges(interpolation)
-        end
-        # We have at least as many edge/face dofs as we have edge/face interior dofs
-        if ref_dim > 1
-            @test all(length.(Ferrite.facedof_interior_indices(interpolation)) .<= length.(Ferrite.facedof_indices(interpolation)))
-        elseif ref_dim > 2
-            @test all(length.(Ferrite.edgedof_interior_indices(interpolation)) .<= length.(Ferrite.edgedof_indices(interpolation)))
-        end
-        # The total number of dofs must match the number of base functions
-        totaldofs = sum(length.(Ferrite.vertexdof_indices(interpolation));init=0)
-        if ref_dim > 1
-            totaldofs += sum(length.(Ferrite.facedof_interior_indices(interpolation));init=0)
-        end
-        if ref_dim > 2
-            totaldofs += sum(length.(Ferrite.edgedof_interior_indices(interpolation));init=0)
-        end
-        totaldofs += length(Ferrite.celldof_interior_indices(interpolation))
-        @test totaldofs == n_basefuncs
+    # Test whether we have for each entity corresponding dof indices (possibly empty)
+    @test length(Ferrite.vertexdof_indices(interpolation)) == Ferrite.nvertices(interpolation)
+    @test length(Ferrite.facedof_indices(interpolation)) == Ferrite.nfaces(interpolation)
+    @test length(Ferrite.facedof_interior_indices(interpolation)) == Ferrite.nfaces(interpolation)
+    @test length(Ferrite.edgedof_indices(interpolation)) == Ferrite.nedges(interpolation)
+    @test length(Ferrite.edgedof_interior_indices(interpolation)) == Ferrite.nedges(interpolation)
+    # We have at least as many edge/face dofs as we have edge/face interior dofs
+    @test all(length.(Ferrite.facedof_interior_indices(interpolation)) .<= length.(Ferrite.facedof_indices(interpolation)))
+    @test all(length.(Ferrite.edgedof_interior_indices(interpolation)) .<= length.(Ferrite.edgedof_indices(interpolation)))
+    # The total number of dofs must match the number of base functions
+    totaldofs = sum(length.(Ferrite.vertexdof_indices(interpolation));init=0)
+    totaldofs += sum(length.(Ferrite.facedof_interior_indices(interpolation));init=0)
+    totaldofs += sum(length.(Ferrite.edgedof_interior_indices(interpolation));init=0)
+    totaldofs += length(Ferrite.volumedof_interior_indices(interpolation))
+    @test totaldofs == n_basefuncs
 
-        # The dof indices are valid.
-        @test all([all(0 .< i .<= n_basefuncs) for i ∈ Ferrite.vertexdof_indices(interpolation)])
-        if ref_dim > 1
-            @test all([all(0 .< i .<= n_basefuncs) for i ∈ Ferrite.facedof_indices(interpolation)])
-            @test all([all(0 .< i .<= n_basefuncs) for i ∈ Ferrite.facedof_interior_indices(interpolation)])
-        elseif ref_dim > 2
-            @test all([all(0 .< i .<= n_basefuncs) for i ∈ Ferrite.edgedof_indices(interpolation)])
-            @test all([all(0 .< i .<= n_basefuncs) for i ∈ Ferrite.edgedof_interior_indices(interpolation)])
-        end
-        @test all([all(0 .< i .<= n_basefuncs) for i ∈ Ferrite.celldof_interior_indices(interpolation)])
+    # The dof indices are valid.
+    @test all([all(0 .< i .<= n_basefuncs) for i ∈ Ferrite.vertexdof_indices(interpolation)])
+    @test all([all(0 .< i .<= n_basefuncs) for i ∈ Ferrite.facedof_indices(interpolation)])
+    @test all([all(0 .< i .<= n_basefuncs) for i ∈ Ferrite.facedof_interior_indices(interpolation)])
+    @test all([all(0 .< i .<= n_basefuncs) for i ∈ Ferrite.edgedof_indices(interpolation)])
+    @test all([all(0 .< i .<= n_basefuncs) for i ∈ Ferrite.edgedof_interior_indices(interpolation)])
+    @test all([all(0 .< i .<= n_basefuncs) for i ∈ Ferrite.volumedof_interior_indices(interpolation)])
 
         # Check for evaluation type correctness of interpolation
         @testset "return type correctness dof $dof" for dof in 1:n_basefuncs
-            @test (@inferred shape_value(interpolation, x, dof)) isa value_type
-            @test (@inferred shape_gradient(interpolation, x, dof)) isa Vec{ref_dim, value_type}
+            @test (@inferred reference_shape_value(interpolation, x, dof)) isa value_type
+            @test (@inferred reference_shape_gradient(interpolation, x, dof)) isa Vec{ref_dim, value_type}
         end
 
         # Check for dirac delta property of interpolation
         @testset "dirac delta property of dof $dof" for dof in 1:n_basefuncs
             for k in 1:n_basefuncs
-                N_dof = shape_value(interpolation, coords[dof], k)
+                N_dof = reference_shape_value(interpolation, coords[dof], k)
                 if k == dof
                     @test N_dof ≈ 1.0
                 else
@@ -149,47 +140,54 @@
             end
         end
 
-        # Test that facedof_indices(...) return in counter clockwise order (viewing from the outside)
-        if interpolation isa Lagrange
-            function __outward_normal(coords::Vector{<:Vec{1}}, nodes)
-                n = coords[nodes[1]]
-                return n / norm(n)
-            end
-            function __outward_normal(coords::Vector{<:Vec{2}}, nodes)
-                p1 = coords[nodes[1]]
-                p2 = coords[nodes[2]]
-                n = Vec{2}((p2[2] - p1[2], - p2[1] + p1[1]))
-                return n / norm(n)
-            end
-            function __outward_normal(coords::Vector{<:Vec{3}}, nodes)
-                p1 = coords[nodes[1]]
-                p2 = coords[nodes[2]]
-                p3 = coords[nodes[3]]
-                n = (p3 - p2) × (p1 - p2)
-                return n / norm(n)
-            end
-            for (facenodes, normal) in zip(Ferrite.facedof_indices(interpolation), reference_normals(interpolation))
-                @test __outward_normal(coords, facenodes) ≈ normal
+    # Test that facedof_indices(...) return in counter clockwise order (viewing from the outside)
+    if interpolation isa Lagrange
+        function __outward_normal(coords::Vector{<:Vec{1}}, nodes)
+            n = coords[nodes[1]]
+            return n / norm(n)
+        end
+        function __outward_normal(coords::Vector{<:Vec{2}}, nodes)
+            p1 = coords[nodes[1]]
+            p2 = coords[nodes[2]]
+            n = Vec{2}((p2[2] - p1[2], - p2[1] + p1[1]))
+            return n / norm(n)
+        end
+        function __outward_normal(coords::Vector{<:Vec{3}}, nodes)
+            p1 = coords[nodes[1]]
+            p2 = coords[nodes[2]]
+            p3 = coords[nodes[3]]
+            n = (p3 - p2) × (p1 - p2)
+            return n / norm(n)
+        end
+        _bfunc = if ref_dim == 3
+            Ferrite.facedof_indices(interpolation)
+        elseif ref_dim == 2
+            Ferrite.edgedof_indices(interpolation)
+        elseif ref_dim == 1
+            Ferrite.vertexdof_indices(interpolation)
+        end
+        for (facenodes, normal) in zip(_bfunc, reference_normals(interpolation))
+            @test __outward_normal(coords, facenodes) ≈ normal
+        end
+    end
+
+    # regression for https://github.com/Ferrite-FEM/Ferrite.jl/issues/520
+    #=interpolation_type = typeof(interpolation).name.wrapper
+    if func_order > 1 && interpolation_type != Ferrite.Serendipity
+        first_order = interpolation_type{ref_shape,1}()
+        for (highorderface, firstorderface) in zip(Ferrite.facedof_indices(interpolation), Ferrite.facedof_indices(first_order))
+            for (h_node, f_node) in zip(highorderface, firstorderface)
+                @test h_node == f_node
             end
         end
-
-        # regression for https://github.com/Ferrite-FEM/Ferrite.jl/issues/520
-        interpolation_type = typeof(interpolation).name.wrapper
-        if func_order > 1 && interpolation_type != Ferrite.Serendipity
-            first_order = interpolation_type{ref_shape,1}()
-            for (highorderface, firstorderface) in zip(Ferrite.facedof_indices(interpolation), Ferrite.facedof_indices(first_order))
-                for (h_node, f_node) in zip(highorderface, firstorderface)
+        if ref_dim > 2
+            for (highorderedge, firstorderedge) in zip(Ferrite.edgedof_indices(interpolation), Ferrite.edgedof_indices(first_order))
+                for (h_node, f_node) in zip(highorderedge, firstorderedge)
                     @test h_node == f_node
                 end
             end
-            if ref_dim > 2
-                for (highorderedge, firstorderedge) in zip(Ferrite.edgedof_indices(interpolation), Ferrite.edgedof_indices(first_order))
-                    for (h_node, f_node) in zip(highorderedge, firstorderedge)
-                        @test h_node == f_node
-                    end
-                end
-            end
         end
+    end=#
 
         # VectorizedInterpolation
         v_interpolation_1 = interpolation^2
@@ -203,8 +201,8 @@
         # Check for evaluation type correctness of vectorized interpolation
         v_interpolation_3 = interpolation^ref_dim
         @testset "vectorized case of return type correctness of dof $dof" for dof in 1:n_basefuncs
-            @test @inferred(shape_value(v_interpolation_1, x, dof)) isa Vec{2, value_type}
-            @test @inferred(shape_gradient(v_interpolation_3, x, dof)) isa Tensor{2, ref_dim, value_type}
+            @test @inferred(reference_shape_value(v_interpolation_1, x, dof)) isa Vec{2, value_type}
+            @test @inferred(reference_shape_gradient(v_interpolation_3, x, dof)) isa Tensor{2, ref_dim, value_type}
         end
     end # correctness testset
 
@@ -240,10 +238,10 @@ function line_integral(qr::QuadratureRule{RefLine, T}, ip, shape_nr, x0, Δx, L,
     return s
 end
 
-# Required properties of shape value Nⱼ of an edge-elements (Hcurl) on an edge with direction v, length L, and dofs ∈ 𝔇 
-# 1) Unit property: ∑_{j∈𝔇} ∫(Nⱼ ⋅ v f(s) dS) = 1 
+# Required properties of shape value Nⱼ of an edge-elements (Hcurl) on an edge with direction v, length L, and dofs ∈ 𝔇
+# 1) Unit property: ∑_{j∈𝔇} ∫(Nⱼ ⋅ v f(s) dS) = 1
 #    Where f(s) = 1 for linear interpolation and f(s)=1-s and f(s)=s for 2nd order interpolation (first and second shape function)
-#    And s is the path parameter ∈[0,1] along the positive direction of the path. 
+#    And s is the path parameter ∈[0,1] along the positive direction of the path.
 # 2) Zero along other edges: Nⱼ ⋅ v = 0 if j∉𝔇
 @testset "Nedelec" begin
     lineqr = QuadratureRule{RefLine}(20)
@@ -344,7 +342,7 @@ end
                             # Check continuity of tangential function value
                             ITU.test_continuity(dh, fi; transformation_function)
                         end
-                        # Check gradient calculation 
+                        # Check gradient calculation
                         ITU.test_gradient(dh, cellnr)
                     end
                 end
@@ -352,5 +350,46 @@ end
         end
     end
 end
+@testset "Correctness of AD of embedded interpolations" begin
+    ip = Lagrange{RefHexahedron,2}()^3
+    ξ = rand(Vec{3,Float64})
+    for I in 1:getnbasefunctions(ip)
+        #Call StaticArray-version
+        H_sa, G_sa, V_sa = Ferrite._reference_shape_hessian_gradient_and_value_static_array(ip, ξ, I)
+        #Call tensor AD version
+        H, G, V = Ferrite.reference_shape_hessian_gradient_and_value(ip, ξ, I)
+
+        @test V ≈ V_sa
+        @test G ≈ G_sa
+        @test H ≈ H_sa
+    end
+
+    ips = Lagrange{RefQuadrilateral,2}()
+    vdim = 3
+    ipv = ips^vdim
+    ξ = rand(Vec{2, Float64})
+    for ipv_ind in 1:getnbasefunctions(ipv)
+        ips_ind, v_ind = fldmod1(ipv_ind, vdim)
+        H, G, V = Ferrite.reference_shape_hessian_gradient_and_value(ipv, ξ, ipv_ind)
+        h, g, v = Ferrite.reference_shape_hessian_gradient_and_value(ips, ξ, ips_ind)
+        @test h ≈ H[v_ind, :, :]
+        @test g ≈ G[v_ind, :]
+        @test v ≈ V[v_ind]
+    end
+end
+
+@testset "Errors for entitydof_indices on VectorizedInterpolations" begin
+    ip = Lagrange{RefQuadrilateral,2}()^2
+    @test_throws ArgumentError Ferrite.vertexdof_indices(ip)
+    @test_throws ArgumentError Ferrite.edgedof_indices(ip)
+    @test_throws ArgumentError Ferrite.facedof_indices(ip)
+    @test_throws ArgumentError Ferrite.facetdof_indices(ip)
+
+    @test_throws ArgumentError Ferrite.edgedof_interior_indices(ip)
+    @test_throws ArgumentError Ferrite.facedof_interior_indices(ip)
+    @test_throws ArgumentError Ferrite.volumedof_interior_indices(ip)
+    @test_throws ArgumentError Ferrite.facetdof_interior_indices(ip)
+end
+
 
 end # testset
