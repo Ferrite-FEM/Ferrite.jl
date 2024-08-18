@@ -347,12 +347,12 @@ function calculate_stresses(grid, dh, cv, u, C)
     return qp_stresses, avg_cell_stresses
 end
 
-qp_stresses, avg_cell_stresses = calculate_stresses(grid, dh, cellvalues, u, C)
+qp_stresses, avg_cell_stresses = calculate_stresses(grid, dh, cellvalues, u, C);
 
 # We now use the the L2Projector to project the stress-field onto the piecewise linear
 # finite element space that we used to solve the problem.
 proj = L2Projector(Lagrange{RefTriangle, 1}(), grid)
-stress_field = project(proj, qp_stresses, qr)
+stress_field = project(proj, qp_stresses, qr);
 
 # Export also values for each color in the logo. #src
 color_data = zeros(Int, getncells(grid))         #hide
@@ -368,7 +368,7 @@ for (key, color) in colors                       #hide
     end                                          #hide
 end                                              #hide
 #md nothing                                      #hide
-
+#
 # To visualize the result we export to a VTK-file. Specifically, an unstructured
 # grid file, `.vtu`, is created, which can be viewed in e.g.
 # [ParaView](https://www.paraview.org/).
