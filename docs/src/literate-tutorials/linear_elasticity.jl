@@ -33,13 +33,13 @@
 #
 # In this tutorial, we use linear elasticity, such that
 # ```math
-# \boldsymbol{\sigma} = \boldsymbol{\mathbb{C}} : \boldsymbol{\varepsilon}, \quad
+# \boldsymbol{\sigma} = \mathsf{C} : \boldsymbol{\varepsilon}, \quad
 # \boldsymbol{\varepsilon} = \left[\mathrm{grad}(\boldsymbol{u})\right]^\mathrm{sym}
 # ```
-# where $\boldsymbol{\mathbb{C}}$ is the 4th order elastic stiffness tensor and
+# where $\mathsf{C}$ is the 4th order elastic stiffness tensor and
 # $\boldsymbol{\varepsilon}$ the small strain tensor.
 # The colon, $:$, represents the double contraction,
-# $\sigma_{ij} = \mathbb{C}_{ijkl} \varepsilon_{kl}$, and the superscript $\mathrm{sym}$
+# $\sigma_{ij} = \mathsf{C}_{ijkl} \varepsilon_{kl}$, and the superscript $\mathrm{sym}$
 # denotes the symmetric part.
 #
 # ### Weak form
@@ -89,10 +89,10 @@
 # ```math
 # \underbrace{\int_\Omega \mathrm{grad}(\delta \boldsymbol{N}_i) : \boldsymbol{\sigma}\ \mathrm{d}\Omega}_{f_i^\mathrm{int}} = \underbrace{\int_\Gamma \delta \boldsymbol{N}_i \cdot \boldsymbol{t}\ \mathrm{d}\Gamma}_{f_i^\mathrm{ext}}
 # ```
-# Inserting the linear constitutive relationship, $\boldsymbol{\sigma} = \boldsymbol{\mathbb{C}}:\boldsymbol{\varepsilon}$,
+# Inserting the linear constitutive relationship, $\boldsymbol{\sigma} = \mathsf{C}:\boldsymbol{\varepsilon}$,
 # in the internal force vector, $f_i^\mathrm{int}$, yields the linear equation
 # ```math
-# \underbrace{\left[\int_\Omega \mathrm{grad}(\delta \boldsymbol{N}_i) : \boldsymbol{\mathbb{C}} : \left[\mathrm{grad}(\boldsymbol{N}_j)\right]^\mathrm{sym}\ \mathrm{d}\Omega\right]}_{K_{ij}}\ \hat{u}_j = f_i^\mathrm{ext}
+# \underbrace{\left[\int_\Omega \mathrm{grad}(\delta \boldsymbol{N}_i) : \mathsf{C} : \left[\mathrm{grad}(\boldsymbol{N}_j)\right]^\mathrm{sym}\ \mathrm{d}\Omega\right]}_{K_{ij}}\ \hat{u}_j = f_i^\mathrm{ext}
 # ```
 #
 # ## Implementation
@@ -199,15 +199,15 @@ end
 #md nothing #hide
 
 # ### Material behavior
-# Next, we need to define the material behavior, specifically the elastic stiffness tensor, $\mathbb{C}$.
+# Next, we need to define the material behavior, specifically the elastic stiffness tensor, $\mathsf{C}$.
 # In this tutorial, we use plane strain linear isotropic elasticity, with Hooke's law as
 # ```math
 # \boldsymbol{\sigma} = 2G \boldsymbol{\varepsilon}^\mathrm{dev} + 3K \boldsymbol{\varepsilon}^\mathrm{vol}
 # ```
 # where $G$ is the shear modulus and $K$ the bulk modulus. This expression can be written as
-# $\boldsymbol{\sigma} = \mathbb{C}:\boldsymbol{\varepsilon}$, with
+# $\boldsymbol{\sigma} = \mathsf{C}:\boldsymbol{\varepsilon}$, with
 # ```math
-#  \mathbb{C} := \frac{\partial \boldsymbol{\sigma}}{\partial \boldsymbol{\varepsilon}}
+#  \mathsf{C} := \frac{\partial \boldsymbol{\sigma}}{\partial \boldsymbol{\varepsilon}}
 # ```
 # The volumetric, $\boldsymbol{\varepsilon}^\mathrm{vol}$,
 # and deviatoric, $\boldsymbol{\varepsilon}^\mathrm{dev}$ strains, are defined as
@@ -254,7 +254,7 @@ C = gradient(ϵ -> 2 * Gmod * dev(ϵ) + 3 * Kmod * vol(ϵ), zero(SymmetricTensor
 # local stiffness matrix `ke` for a single element and assembles it into the global matrix.
 # `ke` is pre-allocated and reused for all elements.
 #
-# Note that the elastic stiffness tensor $\boldsymbol{\mathbb{C}}$ is constant.
+# Note that the elastic stiffness tensor $\mathsf{C}$ is constant.
 # Thus is needs to be computed and once and can then be used for all integration points.
 function assemble_cell!(ke, cellvalues, C)
     for q_point in 1:getnquadpoints(cellvalues)
