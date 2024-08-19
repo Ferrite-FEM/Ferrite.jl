@@ -274,8 +274,6 @@ function assemble_cell!(ke, cellvalues, C)
     return ke
 end
 #md nothing #hide
-# *Performance tip:* The product `∇Nᵢ ⊡ ∂σ∂ε` can be done outside the "j"-loop,
-# but is kept inside here to highlight the similarity to the finite element form.
 #
 # ### Global assembly
 # We define the function `assemble_global` to loop over the elements and do the global
