@@ -61,7 +61,7 @@
 # where $\mathbb{U}$ and $\mathbb{T}$ denote suitable trial and test function spaces.
 # $\delta \boldsymbol{u}$ is a vector valued test function and
 # $\boldsymbol{t} = \boldsymbol{\sigma}\cdot\boldsymbol{n}$ is the traction vector on
-# the boundary. In this tutorial, we will neglect body foces and the weak form reduces to
+# the boundary. In this tutorial, we will neglect body forces (i.e. $\boldsymbol{b} = \boldsymbol{0}$) and the weak form reduces to
 # ```math
 # \int_\Omega
 #   \mathrm{grad}(\delta \boldsymbol{u}) : \boldsymbol{\sigma}
@@ -81,7 +81,7 @@
 # \qquad
 # \delta \boldsymbol{u} \approx \sum_{i=1}^N \delta\boldsymbol{N}_i (\boldsymbol{x}) \, \delta \hat{u}_i
 # ```
-# Here $N$ is the number of nodal variables, with $\hat{u}_i$ and $\delta\hat{u}_i$ representing the $i$-th nodal values.
+# Here $N$ is the number of nodal variables, with $\hat{u}_i$ and $\delta\hat{u}_i$ representing the $i$-th nodal value.
 # Using the Einstein summation convention, we can write this in short form as
 # $\boldsymbol{u} \approx \boldsymbol{N}_i \, \hat{u}_i$ and $\delta\boldsymbol{u} \approx \delta\boldsymbol{N}_i \, \delta\hat{u}_i$.
 #
