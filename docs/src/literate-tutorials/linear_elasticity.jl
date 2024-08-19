@@ -33,13 +33,13 @@
 #
 # In this tutorial, we use linear elasticity, such that
 # ```math
-# \boldsymbol{\sigma} = \boldsymbol{\mathsf{C}} : \boldsymbol{\varepsilon}, \quad
+# \boldsymbol{\sigma} = \boldsymbol{\mathbb{C}} : \boldsymbol{\varepsilon}, \quad
 # \boldsymbol{\varepsilon} = \left[\mathrm{grad}(\boldsymbol{u})\right]^\mathrm{sym}
 # ```
-# where $\boldsymbol{\mathsf{C}}$ is the 4th order elastic stiffness tensor and
+# where $\boldsymbol{\mathbb{C}}$ is the 4th order elastic stiffness tensor and
 # $\boldsymbol{\varepsilon}$ the small strain tensor.
 # The colon, $:$, represents the double contraction,
-# $\sigma_{ij} = \mathsf{C}_{ijkl} \varepsilon_{kl}$, and the superscript $\mathrm{sym}$
+# $\sigma_{ij} = \mathbb{C}_{ijkl} \varepsilon_{kl}$, and the superscript $\mathrm{sym}$
 # denotes the symmetric part.
 #
 # ### Weak form
@@ -89,10 +89,10 @@
 # ```math
 # \underbrace{\int_\Omega \mathrm{grad}(\delta \boldsymbol{N}_i) : \boldsymbol{\sigma}\ \mathrm{d}\Omega}_{f_i^\mathrm{int}} = \underbrace{\int_\Gamma \delta \boldsymbol{N}_i \cdot \boldsymbol{t}\ \mathrm{d}\Gamma}_{f_i^\mathrm{ext}}
 # ```
-# Inserting the linear constitutive relationship, $\boldsymbol{\sigma} = \boldsymbol{\mathsf{C}}:\boldsymbol{\varepsilon}$,
+# Inserting the linear constitutive relationship, $\boldsymbol{\sigma} = \boldsymbol{\mathbb{C}}:\boldsymbol{\varepsilon}$,
 # in the internal force vector, $f_i^\mathrm{int}$, yields the linear equation
 # ```math
-# \underbrace{\left[\int_\Omega \mathrm{grad}(\delta \boldsymbol{N}_i) : \boldsymbol{\mathsf{C}} : \left[\mathrm{grad}(\boldsymbol{N}_j)\right]^\mathrm{sym}\ \mathrm{d}\Omega\right]}_{K_{ij}}\ \hat{u}_j = f_i^\mathrm{ext}
+# \underbrace{\left[\int_\Omega \mathrm{grad}(\delta \boldsymbol{N}_i) : \boldsymbol{\mathbb{C}} : \left[\mathrm{grad}(\boldsymbol{N}_j)\right]^\mathrm{sym}\ \mathrm{d}\Omega\right]}_{K_{ij}}\ \hat{u}_j = f_i^\mathrm{ext}
 # ```
 #
 # ## Implementation
@@ -199,16 +199,15 @@ end
 #md nothing #hide
 
 # ### Material behavior
-# Next, we need to define the material behavior, specifically the elasticity tensor $\mathsf{C}$.
+# Next, we need to define the material behavior, specifically the elastic stiffness tensor, $\mathbb{C}$.
 # In this tutorial, we use plane strain linear isotropic elasticity, with Hooke's law as
 # ```math
 # \boldsymbol{\sigma} = 2G \boldsymbol{\varepsilon}^\mathrm{dev} + 3K \boldsymbol{\varepsilon}^\mathrm{vol}
 # ```
-# where $G$ is the shear modulus and $K$ the bulk modulus. The linearity of this expression implies that
-# can be represented by the general expression, $\boldsymbol{\sigma} = \mathsf{C}:\boldsymbol{\varepsilon}$,
-# from above, with
+# where $G$ is the shear modulus and $K$ the bulk modulus. This expression can be written as
+# $\boldsymbol{\sigma} = \mathbb{C}:\boldsymbol{\varepsilon}$, with
 # ```math
-#  \mathsf{C} := \frac{\partial \boldsymbol{\sigma}}{\partial \boldsymbol{\varepsilon}}
+#  \mathbb{C} := \frac{\partial \boldsymbol{\sigma}}{\partial \boldsymbol{\varepsilon}}
 # ```
 # The volumetric, $\boldsymbol{\varepsilon}^\mathrm{vol}$,
 # and deviatoric, $\boldsymbol{\varepsilon}^\mathrm{dev}$ strains, are defined as
@@ -230,12 +229,12 @@ Gmod = Emod / (2(1 + ν))  # Shear modulus
 Kmod = Emod / (3(1 - 2ν)) # Bulk modulus
 
 # Finally, we demonstrate `Tensors.jl`'s automatic differentiation capabilities when
-# calculating the stiffness tensor
+# calculating the elastic stiffness tensor
 C = gradient(ϵ -> 2 * Gmod * dev(ϵ) + 3 * Kmod * vol(ϵ), zero(SymmetricTensor{2,2}));
 
 #md # !!! details "Plane stress instead of plane strain?"
 #md #     In order to change this tutorial to consider plane stress instead of plane strain,
-#md #     the stiffness tensor should be changed to reflect this. The plane stress elasticity
+#md #     the elastic stiffness tensor should be changed to reflect this. The plane stress elasticity
 #md #     stiffness matrix in Voigt notation for engineering shear strains, is given as
 #md #     ```math
 #md #     \underline{\underline{\boldsymbol{E}}} = \frac{E}{1 - \nu^2}\begin{bmatrix}
@@ -244,7 +243,7 @@ C = gradient(ϵ -> 2 * Gmod * dev(ϵ) + 3 * Kmod * vol(ϵ), zero(SymmetricTensor
 #md #     0 & 0 & (1 - \nu)/2
 #md #     \end{bmatrix}
 #md #     ```
-#md #     This matrix can be converted into the 4th order stiffness tensor as
+#md #     This matrix can be converted into the 4th order elastic stiffness tensor as
 #md #     ```julia
 #md #     C_voigt = Emod * [1.0 ν 0.0; ν 1.0 0.0; 0.0 0.0 (1-ν)/2] / (1 - ν^2)
 #md #     C = fromvoigt(SymmetricTensor{4,2}, E_voigt)
@@ -255,7 +254,7 @@ C = gradient(ϵ -> 2 * Gmod * dev(ϵ) + 3 * Kmod * vol(ϵ), zero(SymmetricTensor
 # local stiffness matrix `ke` for a single element and assembles it into the global matrix.
 # `ke` is pre-allocated and reused for all elements.
 #
-# Note that the elastic stiffness tensor $\boldsymbol{\mathsf{C}}$ is constant.
+# Note that the elastic stiffness tensor $\boldsymbol{\mathbb{C}}$ is constant.
 # Thus is needs to be computed and once and can then be used for all integration points.
 function assemble_cell!(ke, cellvalues, C)
     for q_point in 1:getnquadpoints(cellvalues)
@@ -278,9 +277,9 @@ end
 # ### Global assembly
 # We define the function `assemble_global` to loop over the elements and do the global
 # assembly. The function takes the preallocated sparse matrix `K`, our DofHandler `dh`, our
-# `cellvalues` and the elastic stiffness tensor `∂σ∂ε` as input arguments and computes the
+# `cellvalues` and the elastic stiffness tensor `C` as input arguments and computes the
 # global stiffness matrix `K`.
-function assemble_global!(K, dh, cellvalues, ∂σ∂ε)
+function assemble_global!(K, dh, cellvalues, C)
     ## Allocate the element stiffness matrix
     n_basefuncs = getnbasefunctions(cellvalues)
     ke = zeros(n_basefuncs, n_basefuncs)
@@ -293,7 +292,7 @@ function assemble_global!(K, dh, cellvalues, ∂σ∂ε)
         ## Reset the element stiffness matrix
         fill!(ke, 0.0)
         ## Compute element contribution
-        assemble_cell!(ke, cellvalues, ∂σ∂ε)
+        assemble_cell!(ke, cellvalues, C)
         ## Assemble ke into K
         assemble!(assembler, celldofs(cell), ke)
     end
