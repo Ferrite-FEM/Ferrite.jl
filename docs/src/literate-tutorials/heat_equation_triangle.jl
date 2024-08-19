@@ -216,8 +216,8 @@ end
 # ### Postprocessing the total flux
 
 function calculate_flux_lag(dh, dΩ, ip, a)
-    qr = FaceQuadratureRule{RefTriangle}(2)
-    fv = FaceValues(qr, ip, Lagrange{RefTriangle,1}())
+    qr = FacetQuadratureRule{RefTriangle}(2)
+    fv = FacetValues(qr, ip, Lagrange{RefTriangle,1}())
     grid = dh.grid
     dofrange = dof_range(dh, :u)
     flux = 0.0

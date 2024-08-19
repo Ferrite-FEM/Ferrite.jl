@@ -7,7 +7,7 @@
 # \boldsymbol{q}\cdot \boldsymbol{n} = q_n \in \Gamma_\mathrm{N}\\
 # u = u_\mathrm{D} \in \Gamma_\mathrm{D}
 # ```
-# 
+#
 # ## Weak form
 # ### Part 1
 # ```math
@@ -15,13 +15,13 @@
 # \int_{\Gamma} \delta u \boldsymbol{n} \cdot \boldsymbol{q}\ \mathrm{d}\Gamma -
 # \int_{\Omega} \nabla (\delta u) \cdot \boldsymbol{q}\ \mathrm{d}\Omega = \int_{\Omega} \delta u\ h\ \mathrm{d}\Omega \\
 # ```
-# 
+#
 # ### Part 2
 # ```math
 # \int_{\Omega} \boldsymbol{\delta q} \cdot \boldsymbol{q}\ \mathrm{d}\Omega = - \int_{\Omega} \boldsymbol{\delta q} \cdot \left[k\ \nabla u\right]\ \mathrm{d}\Omega
 # ```
-# where no Green-Gauss theorem is applied. 
-# 
+# where no Green-Gauss theorem is applied.
+#
 # ### Summary
 # The weak form becomes, find $u\in H^1$ and $\boldsymbol{q} \in H\mathrm{(div)}$, such that
 # ```math
@@ -34,7 +34,7 @@
 #  \quad \forall\ \boldsymbol{\delta q} \in \delta H\mathrm{(div)}
 # \end{align*}
 # ```
-# 
+#
 # ## Commented Program
 #
 # Now we solve the problem in Ferrite. What follows is a program spliced with comments.
@@ -56,11 +56,11 @@ grid = generate_grid(Triangle, (20, 20));
 # based on the two-dimensional reference quadrilateral. We also define a quadrature rule based on
 # the same reference element. We combine the interpolation and the quadrature rule
 # to a `CellValues` object.
-ip_geo = Ferrite.default_interpolation(getcelltype(grid))
+ip_geo = geometric_interpolation(getcelltype(grid))
 ipu = Lagrange{RefTriangle, 1}() # Why does it "explode" for 2nd order ipu?
 ipq = RaviartThomas{2,RefTriangle,1}()
 qr = QuadratureRule{RefTriangle}(2)
-cellvalues = (u=CellValues(qr, ipu, ip_geo), q=CellValues(qr, ipq, ip_geo)) 
+cellvalues = (u=CellValues(qr, ipu, ip_geo), q=CellValues(qr, ipq, ip_geo))
 
 # ### Degrees of freedom
 # Next we need to define a `DofHandler`, which will take care of numbering
@@ -77,7 +77,7 @@ close!(dh);
 # Now that we have distributed all our dofs we can create our tangent matrix,
 # using `create_sparsity_pattern`. This function returns a sparse matrix
 # with the correct entries stored.
-K = create_sparsity_pattern(dh)
+K = allocate_matrix(dh)
 
 # ### Boundary conditions
 # In Ferrite constraints like Dirichlet boundary conditions
@@ -86,12 +86,12 @@ ch = ConstraintHandler(dh);
 
 # Next we need to add constraints to `ch`. For this problem we define
 # homogeneous Dirichlet boundary conditions on the whole boundary, i.e.
-# the `union` of all the face sets on the boundary.
+# the `union` of all the boundary facet sets.
 ∂Ω = union(
-    getfaceset(grid, "left"),
-    getfaceset(grid, "right"),
-    getfaceset(grid, "top"),
-    getfaceset(grid, "bottom"),
+    getfacetset(grid, "left"),
+    getfacetset(grid, "right"),
+    getfacetset(grid, "top"),
+    getfacetset(grid, "bottom"),
 );
 
 # Now we are set up to define our constraint. We specify which field
@@ -241,12 +241,12 @@ u = K \ f;
 # to a VTK-file, which can be viewed in e.g. [ParaView](https://www.paraview.org/).
 u_nodes = evaluate_at_grid_nodes(dh, u, :u)
 ∂Ω_cells = zeros(Int, getncells(grid))
-for (cellnr, facenr) in ∂Ω
+for (cellnr, _) in ∂Ω
     ∂Ω_cells[cellnr] = 1
 end
-vtk_grid("heat_equation_rt", dh) do vtk
-    vtk_point_data(vtk, u_nodes, "u")
-    vtk_cell_data(vtk, ∂Ω_cells, "dO")
+VTKGridFile("heat_equation_rt", dh) do vtk
+    write_node_data(vtk, u_nodes, "u")
+    write_cell_data(vtk, ∂Ω_cells, "dO")
 end
 
 @show norm(u_nodes)/length(u_nodes)
@@ -254,10 +254,10 @@ end
 # ## Postprocess the total flux
 function calculate_flux(dh, dΩ, ip, a)
     grid = dh.grid
-    qr = FaceQuadratureRule{RefTriangle}(4)
-    ip_geo = Ferrite.default_interpolation(getcelltype(grid))
-    fv = FaceValues(qr, ip, ip_geo)
-    
+    qr = FacetQuadratureRule{RefTriangle}(4)
+    ip_geo = geometric_interpolation(getcelltype(grid))
+    fv = FacetValues(qr, ip, ip_geo)
+
     dofrange = dof_range(dh, :q)
     flux = 0.0
     dofs = celldofs(dh, 1)
@@ -281,9 +281,9 @@ end
 
 function calculate_flux_lag(dh, dΩ, ip, a)
     grid = dh.grid
-    qr = FaceQuadratureRule{RefTriangle}(4)
-    ip_geo = Ferrite.default_interpolation(getcelltype(grid))
-    fv = FaceValues(qr, ip, ip_geo)
+    qr = FacetQuadratureRule{RefTriangle}(4)
+    ip_geo = geometric_interpolation(getcelltype(grid))
+    fv = FacetValues(qr, ip, ip_geo)
     dofrange = dof_range(dh, :u)
     flux = 0.0
     dofs = celldofs(dh, 1)

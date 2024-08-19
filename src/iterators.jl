@@ -92,7 +92,7 @@ end
 # TODO: Should we provide a fast path if the cell is not required for reinit?
 #reinit!(cv::CellValues, cc::CellCache) = reinit!(cv, cc.coords)
 reinit!(cv::CellValues, cc::CellCache) = reinit!(cv, getcells(cc.grid, cellid(cc)), cc.coords)
-reinit!(fv::FaceValues, cc::CellCache, f::Int) = reinit!(fv, cc.coords, f) # TODO: Deprecate?
+reinit!(fv::FacetValues, cc::CellCache, f::Int) = reinit!(fv, cc.coords, f) # TODO: Deprecate?
 
 
 # Accessor functions (TODO: Deprecate? We are so inconsistent with `getxx` vs `xx`...)

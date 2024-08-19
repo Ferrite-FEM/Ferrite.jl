@@ -229,11 +229,11 @@ reference_cell(::Type{RefQuadrilateral}) = Quadrilateral((1,2,3,4))
 reference_cell(::Type{RefTetrahedron}) = Tetrahedron((1,2,3,4))
 reference_cell(::Type{RefHexahedron}) = Hexahedron((ntuple(identity, 8)))
 
-function line_integral(qr::QuadratureRule{RefLine, T}, ip, shape_nr, x0, Δx, L, v, f) where T
-    s = zero(T)
+function line_integral(qr::QuadratureRule{RefLine}, ip, shape_nr, x0, Δx, L, v, f)
+    s = 0.0
     for (ξ1d, w) in zip(Ferrite.getpoints(qr), Ferrite.getweights(qr))
         ξ = x0 + (ξ1d[1]/2) * Δx
-        s += (shape_value(ip, ξ, shape_nr) ⋅ v) * (w*L/2) * f((ξ1d[1]+1)/2)
+        s += (reference_shape_value(ip, ξ, shape_nr) ⋅ v) * (w*L/2) * f((ξ1d[1]+1)/2)
     end
     return s
 end
@@ -247,9 +247,9 @@ end
     lineqr = QuadratureRule{RefLine}(20)
     for ip in (Nedelec{2,RefTriangle,1}(), Nedelec{2,RefTriangle,2}(), Nedelec{3,RefTetrahedron,1}(), Nedelec{3,RefHexahedron,1}())
         cell = reference_cell(getrefshape(ip))
-        edges = Ferrite.getdim(ip) == 2 ? Ferrite.faces(cell) : Ferrite.edges(cell)
-        dofs = Ferrite.getdim(ip) == 2 ? Ferrite.facedof_interior_indices(ip) : Ferrite.edgedof_interior_indices(ip)
-        x = Ferrite.reference_coordinates(Ferrite.default_interpolation(typeof(cell)))
+        edges = Ferrite.edges(cell)
+        dofs = Ferrite.edgedof_interior_indices(ip)
+        x = Ferrite.reference_coordinates(geometric_interpolation(typeof(cell)))
         @testset "$(getrefshape(ip)), order=$(Ferrite.getorder(ip))" begin
             for (edge_nr, (i1, i2)) in enumerate(edges)
                 Δx = x[i2]-x[i1]
@@ -266,7 +266,7 @@ end
                     j_edge == edge_nr && continue
                     for shape_nr in shape_nrs
                         for ξ in (x[i1] + r*Δx for r in [0.0, rand(3)..., 1.0])
-                            @test abs(shape_value(ip, ξ, shape_nr) ⋅ v) < eps()*100
+                            @test abs(reference_shape_value(ip, ξ, shape_nr) ⋅ v) < eps()*100
                         end
                     end
                 end
@@ -313,7 +313,7 @@ end
         Nedelec=>(v,n)-> v - n*(v⋅n),   # Hcurl (tangent continuity)
         RaviartThomas=>(v,n) -> v ⋅ n)  # Hdiv (normal continuity)
     for CT in (Triangle, QuadraticTriangle, Tetrahedron, Hexahedron)
-        dim = Ferrite.getdim(CT)
+        dim = Ferrite.getrefdim(CT) # dim = sdim = rdim
         p1, p2 = (rand(Vec{dim}), ones(Vec{dim})+rand(Vec{dim}))
         grid = generate_grid(CT, ntuple(_->nel, dim), p1, p2)
         # Smoothly distort grid (to avoid spuriously badly deformed elements).
@@ -330,15 +330,15 @@ end
                 IPT == RaviartThomas && (dim == 3 || order > 1) && continue
                 IPT == RaviartThomas && (RefShape == RefHexahedron) && continue
                 transformation_function=transformation_functions[IPT]
-                ip = IPT{dim,RefShape,order}()
+                ip = IPT{dim, RefShape, order}()
                 @testset "$CT, $ip" begin
                     for testcell in cell_permutations(basecell)
                         grid.cells[cellnr] = testcell
                         dh = DofHandler(grid)
                         add!(dh, :u, ip)
                         close!(dh)
-                        for facenr in 1:nfaces(RefShape)
-                            fi = FaceIndex(cellnr, facenr)
+                        for facetnr in 1:nfacets(RefShape)
+                            fi = FacetIndex(cellnr, facetnr)
                             # Check continuity of tangential function value
                             ITU.test_continuity(dh, fi; transformation_function)
                         end
