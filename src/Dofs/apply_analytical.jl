@@ -1,12 +1,12 @@
-function _default_interpolations(dh::DofHandler)
+function _geometric_interpolations(dh::DofHandler)
     sdhs = dh.subdofhandlers
     getcelltype(i) = typeof(getcells(get_grid(dh), first(sdhs[i].cellset)))
-    ntuple(i -> default_interpolation(getcelltype(i)), length(sdhs))
+    ntuple(i -> geometric_interpolation(getcelltype(i)), length(sdhs))
 end
 
 """
     apply_analytical!(
-        a::AbstractVector, dh::AbstractDofHandler, fieldname::Symbol, 
+        a::AbstractVector, dh::AbstractDofHandler, fieldname::Symbol,
         f::Function, cellset=1:getncells(get_grid(dh)))
 
 Apply a solution `f(x)` by modifying the values in the degree of freedom vector `a`
@@ -18,7 +18,7 @@ and for vector fields with dimension `dim`, `f(x)::Vec{dim}`.
 This function can be used to apply initial conditions for time dependent problems.
 
 !!! note
-    
+
     This function only works for standard nodal finite element interpolations
     when the function value at the (algebraic) node is equal to the corresponding
     degree of freedom value.
@@ -30,19 +30,20 @@ function apply_analytical!(
     cellset = 1:getncells(get_grid(dh)))
 
     fieldname ∉ getfieldnames(dh) && error("The fieldname $fieldname was not found in the dof handler")
-    ip_geos = _default_interpolations(dh)
+    ip_geos = _geometric_interpolations(dh)
 
     for (sdh, ip_geo) in zip(dh.subdofhandlers, ip_geos)
         isnothing(_find_field(sdh, fieldname)) && continue
         field_idx = find_field(sdh, fieldname)
         ip_fun = getfieldinterpolation(sdh, field_idx)
-        field_dim = getfielddim(sdh, field_idx)
+        field_dim = n_components(sdh, field_idx)
         celldofinds = dof_range(sdh, fieldname)
         set_intersection = if length(cellset) == length(sdh.cellset) == getncells(get_grid(dh))
             BitSet(1:getncells(get_grid(dh)))
         else
             intersect(BitSet(sdh.cellset), BitSet(cellset))
         end
+        isempty(set_intersection) && continue
         _apply_analytical!(a, dh, celldofinds, field_dim, ip_fun, ip_geo, f, set_intersection)
     end
     return a

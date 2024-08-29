@@ -20,13 +20,15 @@ dh = DofHandler(grid)
 ## Fields
 
 Before we can distribute the dofs we need to specify fields. A field is simply the unknown
-function(s) we are solving for. To add a field we need a name (a `Symbol`) and we also
-need to specify number of components for the field. Here we add a vector field `:u`
-(2 components for a 2D problem) and a scalar field `:p`.
+function(s) we are solving for. To add a field we need a name (a `Symbol`) and the the
+interpolation describing the shape functions for the field. Here we add a scalar field `:p`,
+interpolated using linear (degree 1) shape functions on a triangle, and a vector field `:u`,
+also interpolated with linear shape functions on a triangle, but raised to the power 2 to
+indicate that it is a vector field with 2 components (for a 2D problem).
 
 ```@example dofs
-add!(dh, :u, Lagrange{2,RefTetrahedron,1}()^2)
-add!(dh, :p, Lagrange{2,RefTetrahedron,1}())
+add!(dh, :p, Lagrange{RefTriangle, 1}())
+add!(dh, :u, Lagrange{RefTriangle, 1}()^2)
 # hide
 ```
 
@@ -38,27 +40,7 @@ dofs for the fields we added.
 close!(dh)
 ```
 
-### Specifying interpolation for a field
-
-In the example above we did not specify which interpolation should be used for our fields
-`:u` and `:p`. By default iso-parametric elements will be used meaning that the
-interpolation that matches the grid will be used -- for a linear grid a linear
-interpolation will be used etc. It is sometimes useful to separate the grid interpolation
-from the interpolation that is used to approximate our fields
-(e.g. sub- and super-parametric elements).
-
-We can specify which interpolation that should be used for the approximation when we add
-the fields to the dofhandler. For example, here we add our vector field `:u` with a
-quadratic interpolation, and our `:p` field with a linear approximation.
-
-```@example dofs
-dh = DofHandler(grid) # hide
-add!(dh, :u, Lagrange{2,RefTetrahedron,2}()^2)
-add!(dh, :p, Lagrange{2,RefTetrahedron,1}())
-# hide
-```
-
 ## Ordering of Dofs
 
 ordered in the same order as we add to dofhandler
-nodes -> (edges ->) faces -> cells
+vertices -> edges -> faces -> volumes

@@ -1,8 +1,8 @@
 # Symmetric quadrature rules takes from
-#   Witherden, Freddie D., and Peter E. Vincent. "On the identification of 
-#   symmetric quadrature rules for finite element methods." Computers & 
+#   Witherden, Freddie D., and Peter E. Vincent. "On the identification of
+#   symmetric quadrature rules for finite element methods." Computers &
 #   Mathematics with Applications 69.10 (2015): 1232-1241.
-# TODO: Implement quadrature data from: 
+# TODO: Implement quadrature data from:
 # https://www.sciencedirect.com/science/article/pii/S0168874X1200203X?via%3Dihub#s0065
 function _get_gauss_pyramiddata_polyquad(n::Int)
   if n == 1
@@ -85,7 +85,7 @@ function _get_gauss_pyramiddata_polyquad(n::Int)
   else
       throw(ArgumentError("unsupported order for prism polyquad integration"))
   end
-    # 
+    #
     # The above quadrature rule is defined for a pyramid spanning [-1,1] × [-1,1] × [-1,1], with volume 8/3 and with 5th node in center.
     # The reference pyramid in ferrite spans [0,1] × [0,1] × [0,1], with volume 1/3 and with 5th node in corner.
     # Here we map thequadrature points to the pyramid defined in Ferrite.

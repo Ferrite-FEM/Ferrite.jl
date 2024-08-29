@@ -18,7 +18,7 @@ function ferrite_logo(; bounding_box=true, mesh=true)
     ## Tessalation
     success(`neper -T -dim 2 -n 6 -id 4 -reg 1`)
     ## Meshing
-    success(`neper -M n6-id4.tess -dim 2 -rcl 2`)
+    success(`neper -M n6-id4.tess -dim 2 -order 1 -rcl 2`)
     ## Read the mesh
     grid = redirect_stdout(devnull) do
         saved_file_to_grid("n6-id4.msh")
@@ -30,12 +30,12 @@ function ferrite_logo(; bounding_box=true, mesh=true)
         println(io, "\\node [] (N$(i)) at $(n.x.data) {};")
     end
     colormap = Dict(
-        "1" => "julia-purple",
-        "2" => "julia-red",
-        "3" => "julia-red",
-        "4" => "julia-blue",
-        "5" => "julia-purple",
-        "6" => "julia-green"
+        "face1" => "julia-purple",
+        "face2" => "julia-red",
+        "face3" => "julia-red",
+        "face4" => "julia-blue",
+        "face5" => "julia-purple",
+        "face6" => "julia-green"
     )
     for (setk, setv) in grid.cellsets
         color = colormap[setk]

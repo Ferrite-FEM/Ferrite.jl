@@ -13,7 +13,7 @@ for spatial_dim ∈ [2]
     geo_type = Quadrilateral
     grid = generate_grid(geo_type, ntuple(x->2, spatial_dim));
     ref_type = FerriteBenchmarkHelper.getrefshape(geo_type)
-    ip_geo = Ferrite.default_interpolation(geo_type)
+    ip_geo = Ferrite.geometric_interpolation(geo_type)
     order = 2
 
     # assemble a mass matrix to apply BCs on (because its cheap)
@@ -25,19 +25,17 @@ for spatial_dim ∈ [2]
     close!(dh);
 
     ch = ConstraintHandler(dh);
-    ∂Ω = union(getfaceset.((grid, ), ["left"])...);
+    ∂Ω = union(getfacetset.((grid, ), ["left"])...);
     dbc = Dirichlet(:u, ∂Ω, (x, t) -> 0)
     add!(ch, dbc);
     close!(ch);
 
     # Non-symmetric application
     M, f = FerriteAssemblyHelper._assemble_mass(dh, cellvalues, false);
-    DIRICHLET_SUITE["global"]["apply!(M,f,APPLY_TRANSPOSE)"] = @benchmarkable apply!($M, $f, $ch; strategy=$(Ferrite.APPLY_TRANSPOSE));
-    DIRICHLET_SUITE["global"]["apply!(M,f,APPLY_INPLACE)"] = @benchmarkable apply!($M, $f, $ch; strategy=$(Ferrite.APPLY_INPLACE));
+    DIRICHLET_SUITE["global"]["apply!(M,f)"] = @benchmarkable apply!($M, $f, $ch);
     # Symmetric application
     M, f = FerriteAssemblyHelper._assemble_mass(dh, cellvalues, true);
-    DIRICHLET_SUITE["global"]["apply!(M_sym,f,APPLY_TRANSPOSE)"] = @benchmarkable apply!($M, $f, $ch; strategy=$(Ferrite.APPLY_TRANSPOSE));
-    DIRICHLET_SUITE["global"]["apply!(M_sym,f,APPLY_INPLACE)"] = @benchmarkable apply!($M, $f, $ch; strategy=$(Ferrite.APPLY_INPLACE));
+    DIRICHLET_SUITE["global"]["apply!(M_sym,f)"] = @benchmarkable apply!($M, $f, $ch);
 
     DIRICHLET_SUITE["global"]["apply!(f)"] = @benchmarkable apply!($f, $ch);
     DIRICHLET_SUITE["global"]["apply_zero!(f)"] = @benchmarkable apply!($f, $ch);
