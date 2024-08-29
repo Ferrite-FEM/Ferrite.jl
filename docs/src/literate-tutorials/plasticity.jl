@@ -24,7 +24,7 @@
 #
 # To illustrate the use of the plasticity model, we setup and solve a FE-problem
 # consisting of a cantilever beam loaded at its free end. But first, we shortly
-# describe the parts of the implementation deadling with the material modeling.
+# describe the parts of the implementation dealing with the material modeling.
 
 # ## Material modeling
 # This section describes the `struct`s and methods used to implement the material
