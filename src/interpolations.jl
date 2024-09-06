@@ -1594,6 +1594,31 @@ function reference_shape_value(ip::RannacherTurek{RefHexahedron,1}, ξ::Vec{3,T}
     throw(ArgumentError("no shape function $i for interpolation $ip"))
 end
 
+#################################
+# Hermitian dim 1 order 3 #
+#################################
+struct Hermitian{shape, order} <: ScalarInterpolation{shape, order} end 
+
+adjust_dofs_during_distribution(::Hermitian{RefLine,3}) = false
+vertexdof_indices(::Hermitian{RefLine,3}) = ((1,2),(3,4))
+getnbasefunctions(::Hermitian{RefLine,3}) = 4
+edgedof_indices(::Hermitian{RefLine,3}) = ((1,2,3,4),)
+
+function reference_coordinates(::Hermitian{RefLine,1})
+return [Vec{1, Float64}((-1.0,)),
+        Vec{1, Float64}(( 1.0,))] #Not sure
+end
+
+function Ferrite.reference_shape_value(ip::Hermitian{RefLine,3}, ξ::Vec{1}, i::Int)
+    ξ_x = (ξ[1]+1)/2
+    i == 1 && return 2*ξ_x^3 - 3*ξ_x^2 + 1
+    i == 2 && return 2ξ_x*(ξ_x^2 - 2*ξ_x + 1) #note scale with 2
+    i == 3 && return ξ_x^2*(3-2*ξ_x)
+    i == 4 && return 2ξ_x^2*(ξ_x-1) #note scale with 2
+    throw(ArgumentError("no shape function $i for interpolation $ip"))
+end
+mapping_type(::Hermitian) = HermiteMapping()
+
 ##################################################
 # VectorizedInterpolation{<:ScalarInterpolation} #
 ##################################################
