@@ -142,6 +142,7 @@ end
 
 # Mapping types
 struct IdentityMapping end
+struct HermiteMapping end
 # Not yet implemented:
 # struct CovariantPiolaMapping end # PR798
 # struct ContravariantPiolaMapping end # PR798
@@ -157,7 +158,8 @@ Return the required order of geometric derivatives to map
 the function values and gradients from the reference cell
 to the physical cell geometry.
 """
-required_geo_diff_order(::IdentityMapping,           fun_diff_order::Int) = fun_diff_order
+required_geo_diff_order(::IdentityMapping, fun_diff_order::Int)   = fun_diff_order
+required_geo_diff_order(::HermiteMapping,  fun_diff_order::Int64) = fun_diff_order
 #required_geo_diff_order(::ContravariantPiolaMapping, fun_diff_order::Int) = 1 + fun_diff_order # PR798
 #required_geo_diff_order(::CovariantPiolaMapping,     fun_diff_order::Int) = 1 + fun_diff_order # PR798
 
@@ -217,6 +219,43 @@ end
         funvals.dNdx[j, q_point]   = dNdx
         funvals.d2Ndx2[j, q_point] = d2Ndx2
     end
+    return nothing
+end
+
+@inline function apply_mapping!(funvals::FunctionValues{2}, ::HermiteMapping, q_point::Int, mapping_values, args...)
+    J = getjacobian(mapping_values)
+    Jinv = calculate_Jinv(J)
+    sdim, rdim = size(Jinv)
+    #TODO Generalize to 2d/3d
+    @assert sdim == 1 && rdim == 1
+    
+    (rdim != sdim) && error("apply_mapping! for second order gradients and embedded elements not implemented")
+
+    H = gethessian(mapping_values)
+    is_vector_valued = first(funvals.Nx) isa Vec
+    Jinv_otimesu_Jinv = is_vector_valued ? otimesu(Jinv, Jinv) : nothing
+    @inbounds for j in 1:2:getnbasefunctions(funvals)
+        dNdx = dothelper(funvals.dNdξ[j, q_point], Jinv)
+        if is_vector_valued
+            d2Ndx2 = (funvals.d2Ndξ2[j, q_point] - dNdx⋅H) ⊡ Jinv_otimesu_Jinv
+        else
+            d2Ndx2 = Jinv'⋅(funvals.d2Ndξ2[j, q_point] - dNdx⋅H)⋅Jinv
+        end
+
+        funvals.Nx[j, q_point] = funvals.Nξ[j, q_point]
+        funvals.dNdx[j, q_point]   = dNdx
+        funvals.d2Ndx2[j, q_point] = d2Ndx2
+    end
+
+    @inbounds for j in 2:2:getnbasefunctions(funvals)
+        N = funvals.Nξ[j, q_point]*det(J)
+        d2Ndx2 = funvals.d2Ndξ2[j, q_point] ⋅ Jinv
+
+        funvals.Nx[j, q_point]   = N
+        funvals.dNdx[j, q_point] = funvals.dNdξ[j, q_point]
+        funvals.d2Ndx2[j, q_point] = d2Ndx2
+    end
+
     return nothing
 end
 
