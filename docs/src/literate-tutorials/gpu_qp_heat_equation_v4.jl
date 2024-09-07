@@ -15,7 +15,9 @@ using NVTX
 
 
 
-
+"""
+encapsulates all the elements that share the global dof and the local dofs of the global dof in each element.
+"""
 struct DofToElements{Ti, VEC_INT<:AbstractVector{Ti}}
     dof:: Ti
     elements:: VEC_INT # elements contain this global dof
@@ -59,10 +61,10 @@ end
 
 
 left = Tensor{1,2,Float32}((0,-0)) # define the left bottom corner of the grid.
-right = Tensor{1,2,Float32}((4.0,4.0)) # define the right top corner of the grid.
+right = Tensor{1,2,Float32}((100.0,100.0)) # define the right top corner of the grid.
 
 
-grid = generate_grid(Quadrilateral, (4, 4),left,right)
+grid = generate_grid(Quadrilateral, (100, 100),left,right)
 
 
 ip = Lagrange{RefQuadrilateral, 1}() # define the interpolation function (i.e. Bilinear lagrange)
@@ -80,8 +82,6 @@ dh = DofHandler(grid)
 add!(dh, :u, ip)
 
 close!(dh);
-
-
 
 
 # Standard assembly of the element.
@@ -186,10 +186,12 @@ function assemble_global_gpu!(assembler,kes,fes,ndofs,dofs_to_elements)
     tx = threadIdx().x
     ty = threadIdx().y
     bx = blockIdx().x
-    bd = blockDim().x
+    by = blockIdx().y
+    bdx = blockDim().x
+    bdy = blockDim().y
 
-    dof_x = tx + (bx-Int32(1))*bd
-    dof_y = ty + (bx-Int32(1))*bd
+    dof_x = tx + (bx-Int32(1))*bdx
+    dof_y = ty + (by-Int32(1))*bdy
     dof_x ≤ ndofs || return nothing
     dof_y ≤ ndofs || return nothing
     k_val = 0.0f0
@@ -252,17 +254,16 @@ Adapt.@adapt_structure Ferrite.GPUAssemblerSparsityPattern
     # `dofs_to_elements` contains nested arrays so in order to keep alive we use the macro @preserve
     # ref: https://discourse.julialang.org/t/arrays-of-arrays-and-arrays-of-structures-in-cuda-kernels-cause-random-errors/69739/3?page=2
     GC.@preserve  dofs_to_elements begin
-
         dofs_to_elements = CuArray(cudaconvert.(dofs_to_elements))
         n_dofs = ndofs(dh)
         kernel_global = @cuda launch=false assemble_global_gpu!(assembler_gpu,kes,fes,n_dofs,dofs_to_elements)
         #CUDA.@device_code_warntype @cuda launch=false assemble_global_gpu!(assembler_gpu,kes,fes,n_dofs,dofs_to_elements)
         #@show CUDA.registers(kernel)
-        config = launch_configuration(kernel_local.fun)
+        config = launch_configuration(kernel_global.fun)
         threads_dofs = min(n_dofs, config.threads |> sqrt |> floor |> Int32)
         blocks =  cld(n_dofs, threads_dofs)
-        kernel_global(assembler_gpu,kes,fes,n_dofs,dofs_to_elements;  threads = (threads_dofs,threads_dofs), blocks)
-        @show blocks threads_dofs
+        @show blocks threads_dofs,config.threads
+        kernel_global(assembler_gpu,kes,fes,n_dofs,dofs_to_elements;  threads = (threads_dofs,threads_dofs), blocks=(blocks,blocks))
         return Kgpu,fgpu
     end
 end
@@ -270,12 +271,11 @@ end
 
 stassy(cv,dh) = assemble_global!(cv,dh,Val(false))
 
-
-
+mapp = map_dofs_to_elements(dh)
 
 # qpassy(cv,dh) = assemble_global!(cv,dh,Val(true))
 
-Kgpu, fgpu =assemble_global_gpu(cellvalues,dh);
+Kgpu, fgpu = CUDA.@sync assemble_global_gpu(cellvalues,dh);
 #Kgpu, fgpu = CUDA.@profile    assemble_global_gpu_color(cellvalues,dh,colors)
 # to benchmark the code using nsight compute use the following command: ncu --mode=launch julia
 # Open nsight compute and attach the profiler to the julia instance
