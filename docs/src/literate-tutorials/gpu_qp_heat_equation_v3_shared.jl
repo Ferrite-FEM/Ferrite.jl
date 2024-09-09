@@ -107,15 +107,18 @@ end
     bx = blockIdx().x
     bd = blockDim().x
     # e is the global index of the finite element in the grid.
+    n_basefuncs = getnbasefunctions(cv)
+    ke_shared = @cuDynamicSharedMem(Float32,(bd,n_basefuncs,n_basefuncs))
+    fill!(ke_shared,0.0f0)
+    sync_threads()
+
     e = tx + (bx-Int32(1))*bd
 
     e ≤ n_cells || return nothing
-    n_basefuncs = getnbasefunctions(cv)
     # e is the global index of the finite element in the grid.
     cell_coords = getcoordinates(dh.grid, e)
-
     ke = @view kes[e,:,:]
-    fe = @view fes[e,:]
+    #fe = @view fes[e,:]
      #Loop over quadrature points
      for qv in Ferrite.QuadratureValuesIterator(cv,cell_coords)
         ## Get the quadrature weight
@@ -125,13 +128,21 @@ end
             δu  = shape_value(qv, j)
             ∇δu = shape_gradient(qv, j)
             ## Add contribution to fe
-            fe[j] += δu * dΩ
+            #fe[j] += δu * dΩ
             ## Loop over trial shape functions
             for i in 1:n_basefuncs
                 ∇u = shape_gradient(qv, i)
                 ## Add contribution to Ke
-                ke[i,j] += (∇δu ⋅ ∇u) * dΩ
+                ke_shared[tx,i,j] += (∇δu ⋅ ∇u) * dΩ
+                #ke[i,j] += (∇δu ⋅ ∇u) * dΩ
             end
+        end
+    end
+
+    # copy the shared memory to the global memory
+    for j in 1:n_basefuncs
+        for i in 1:n_basefuncs
+            ke[i,j] = ke_shared[tx,i,j]
         end
     end
     return nothing
@@ -175,6 +186,7 @@ Adapt.@adapt_structure Ferrite.GPUAssemblerSparsityPattern
 
 
 #=NVTX.@annotate=# function assemble_global_gpu(cellvalues,dh)
+    n_basefuncs = getnbasefunctions(cellvalues)
     n_cells = dh |> get_grid |> getncells |> Int32
     kes,fes = allocate_local_matrices(n_cells,cellvalues)
     K = allocate_matrix(SparseMatrixCSC{Float32, Int32},dh)
@@ -191,10 +203,10 @@ Adapt.@adapt_structure Ferrite.GPUAssemblerSparsityPattern
     config = launch_configuration(kernel_local.fun)
     threads = min(n_cells, config.threads)
     blocks =  cld(n_cells, threads)
-    kernel_local(kes,fes,cellvalues,dh_gpu,n_cells;  threads, blocks)
+    shared_mem = sizeof(Float32) * (threads) * ( n_basefuncs) * n_basefuncs
+    kernel_local(kes,fes,cellvalues,dh_gpu,n_cells;  threads, blocks, shmem=shared_mem)
 
     # assemble the global matrix
-    n_basefuncs = getnbasefunctions(cellvalues)
     kernel_global = @cuda launch=false assemble_global_gpu!(assembler_gpu,kes,fes,dh_gpu,n_cells)
     #@show CUDA.registers(kernel)
     config = launch_configuration(kernel_local.fun)
