@@ -109,7 +109,9 @@ end
     # e is the global index of the finite element in the grid.
     n_basefuncs = getnbasefunctions(cv)
     ke_shared = @cuDynamicSharedMem(Float32,(bd,n_basefuncs,n_basefuncs))
+    fe_shared = @cuDynamicSharedMem(Float32,(bd,n_basefuncs))
     fill!(ke_shared,0.0f0)
+    fill!(fe_shared,0.0f0)
     sync_threads()
 
     e = tx + (bx-Int32(1))*bd
@@ -118,7 +120,7 @@ end
     # e is the global index of the finite element in the grid.
     cell_coords = getcoordinates(dh.grid, e)
     ke = @view kes[e,:,:]
-    #fe = @view fes[e,:]
+    fe = @view fes[e,:]
      #Loop over quadrature points
      for qv in Ferrite.QuadratureValuesIterator(cv,cell_coords)
         ## Get the quadrature weight
@@ -128,7 +130,7 @@ end
             δu  = shape_value(qv, j)
             ∇δu = shape_gradient(qv, j)
             ## Add contribution to fe
-            #fe[j] += δu * dΩ
+            fe[j] += δu * dΩ
             ## Loop over trial shape functions
             for i in 1:n_basefuncs
                 ∇u = shape_gradient(qv, i)
@@ -141,6 +143,7 @@ end
 
     # copy the shared memory to the global memory
     for j in 1:n_basefuncs
+        fe[j] = fe_shared[tx,j]
         for i in 1:n_basefuncs
             ke[i,j] = ke_shared[tx,i,j]
         end
@@ -185,6 +188,28 @@ Adapt.@adapt_structure Ferrite.GPUDofHandler
 Adapt.@adapt_structure Ferrite.GPUAssemblerSparsityPattern
 
 
+function optimize_threads_for_dynshmem(max_threads, n_basefuncs)
+    MAX_DYN_SHMEM = 48 * 1024 # TODO: get the maximum shared memory per block from the device (48KB for now, currently I don't know how to get this value)
+    shmem_needed = sizeof(Float32) * (max_threads) * ( n_basefuncs) * n_basefuncs + sizeof(Float32) * (max_threads) * n_basefuncs
+    if(shmem_needed < MAX_DYN_SHMEM)
+        return max_threads, shmem_needed
+    else
+        # solve for threads
+        max_possible = Int32(MAX_DYN_SHMEM ÷ (sizeof(Float32) * ( n_basefuncs) * n_basefuncs + sizeof(Float32) * n_basefuncs))
+        dev = device()
+        warp_size = CUDA.attribute(dev, CUDA.CU_DEVICE_ATTRIBUTE_WARP_SIZE)
+        # approximate the number of threads to be a multiple of warp size (mostly 32)
+        nearest_no_warps = max_possible ÷ warp_size
+        if(nearest_no_warps < 4)
+            throw(ArgumentError("Bad implementation (less than 4 warps per block, wasted resources)"))
+        else
+            possiple_threads = nearest_no_warps * warp_size
+            shmem_needed = sizeof(Float32) * (possiple_threads) * ( n_basefuncs) * n_basefuncs + sizeof(Float32) * (possiple_threads) * n_basefuncs
+            return possiple_threads, shmem_needed
+        end
+    end
+end
+
 #=NVTX.@annotate=# function assemble_global_gpu(cellvalues,dh)
     n_basefuncs = getnbasefunctions(cellvalues)
     n_cells = dh |> get_grid |> getncells |> Int32
@@ -201,9 +226,10 @@ Adapt.@adapt_structure Ferrite.GPUAssemblerSparsityPattern
     kernel_local = @cuda launch=false assemble_local_gpu(kes,fes,cellvalues_gpu,dh_gpu,n_cells)
     #@show CUDA.registers(kernel)
     config = launch_configuration(kernel_local.fun)
-    threads = min(n_cells, config.threads)
+    max_threads = min(n_cells, config.threads)
+    threads, shared_mem = optimize_threads_for_dynshmem(max_threads, n_basefuncs)
     blocks =  cld(n_cells, threads)
-    shared_mem = sizeof(Float32) * (threads) * ( n_basefuncs) * n_basefuncs
+    @show threads, blocks, shared_mem
     kernel_local(kes,fes,cellvalues,dh_gpu,n_cells;  threads, blocks, shmem=shared_mem)
 
     # assemble the global matrix
