@@ -151,29 +151,6 @@ end
 
 
 
-function assemble_global_gpu!(assembler,kes,fes,dh,n_cells)
-    tx = threadIdx().x # potential element index
-    ty = threadIdx().y # rows of local matrix
-    tz= threadIdx().z # columns of local matrix
-    bx = blockIdx().x
-    bd = blockDim().x
-    # e is the global index of the finite element in the grid.
-    e = tx + (bx-Int32(1))*bd
-    #e = get_element_index(is,n_basefuncs)
-    e ≤ n_cells || return nothing
-    dofs = celldofs(dh, e)
-    jg = dofs[ty]
-    ig = dofs[tz]
-    if tz == Int32(1)
-        assemble_atomic!(assembler,kes[e,ty,tz],fes[e,ty],ig,jg)
-    else
-        assemble_atomic!(assembler,kes[e,ty,tz],ig,jg)
-    end
-    return nothing
-end
-
-
-
 Adapt.@adapt_structure Ferrite.GPUGrid
 Adapt.@adapt_structure Ferrite.GPUDofHandler
 Adapt.@adapt_structure Ferrite.GPUAssemblerSparsityPattern

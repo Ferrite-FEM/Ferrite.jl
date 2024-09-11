@@ -109,7 +109,7 @@ end
     # e is the global index of the finite element in the grid.
     n_basefuncs = getnbasefunctions(cv)
     ke_shared = @cuDynamicSharedMem(Float32,(bd,n_basefuncs,n_basefuncs))
-    fe_shared = @cuDynamicSharedMem(Float32,(bd,n_basefuncs))
+    fe_shared = @cuDynamicSharedMem(Float32,(bd,n_basefuncs),sizeof(Float32)*bd*n_basefuncs*n_basefuncs)
     fill!(ke_shared,0.0f0)
     fill!(fe_shared,0.0f0)
     sync_threads()
@@ -130,13 +130,12 @@ end
             δu  = shape_value(qv, j)
             ∇u = shape_gradient(qv, j)
             ## Add contribution to fe
-            fe[j] += δu * dΩ
+            fe_shared[tx,j] += δu * dΩ
             ## Loop over trial shape functions
             for i in 1:n_basefuncs
                 ∇δu = shape_gradient(qv, i)
                 ## Add contribution to Ke
                 ke_shared[tx,i,j] += (∇δu ⋅ ∇u) * dΩ
-                #ke[i,j] += (∇δu ⋅ ∇u) * dΩ
             end
         end
     end
