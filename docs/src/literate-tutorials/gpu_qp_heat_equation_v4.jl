@@ -271,11 +271,14 @@ end
 
 stassy(cv,dh) = assemble_global!(cv,dh,Val(false))
 
-mapp = map_dofs_to_elements(dh)
+
 
 # qpassy(cv,dh) = assemble_global!(cv,dh,Val(true))
 
-Kgpu, fgpu = CUDA.@sync assemble_global_gpu(cellvalues,dh);
+#Kgpu, fgpu = CUDA.@sync assemble_global_gpu(cellvalues,dh);
+using BenchmarkTools
+
+Kgpu, fgpu = @btime CUDA.@sync    assemble_global_gpu($cellvalues,$dh);
 #Kgpu, fgpu = CUDA.@profile    assemble_global_gpu_color(cellvalues,dh,colors)
 # to benchmark the code using nsight compute use the following command: ncu --mode=launch julia
 # Open nsight compute and attach the profiler to the julia instance

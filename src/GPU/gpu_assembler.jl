@@ -18,6 +18,13 @@ end
      _add_to_index_atomic!(K, ke_val, ig, jg)
 end
 
+@inline @propagate_inbounds function assemble_atomic!(A::GPUAssemblerSparsityPattern,  fe_val::Float32 , ig::Int32)
+    # Brute force assembly
+    f = A.f
+    CUDA.@atomic f[ig] += fe_val
+end
+
+
 @inline @propagate_inbounds function assemble_atomic!(A::GPUAssemblerSparsityPattern, ke_val::Float32 , ig::Int32, jg::Int32)
     # Brute force assembly
     K = A.K
@@ -77,7 +84,7 @@ end
     for k in col_start:col_end
         if K.rowVal[k] == i
             # Update the existing element
-                K.nzVal[k] += v
+              K.nzVal[k] += v
             return
         end
     end

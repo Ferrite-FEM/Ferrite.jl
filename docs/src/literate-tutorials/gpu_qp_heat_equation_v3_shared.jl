@@ -128,12 +128,12 @@ end
         ## Loop over test shape functions
         for j in 1:n_basefuncs
             δu  = shape_value(qv, j)
-            ∇δu = shape_gradient(qv, j)
+            ∇u = shape_gradient(qv, j)
             ## Add contribution to fe
             fe[j] += δu * dΩ
             ## Loop over trial shape functions
             for i in 1:n_basefuncs
-                ∇u = shape_gradient(qv, i)
+                ∇δu = shape_gradient(qv, i)
                 ## Add contribution to Ke
                 ke_shared[tx,i,j] += (∇δu ⋅ ∇u) * dΩ
                 #ke[i,j] += (∇δu ⋅ ∇u) * dΩ
@@ -229,7 +229,6 @@ end
     max_threads = min(n_cells, config.threads)
     threads, shared_mem = optimize_threads_for_dynshmem(max_threads, n_basefuncs)
     blocks =  cld(n_cells, threads)
-    @show threads, blocks, shared_mem
     kernel_local(kes,fes,cellvalues,dh_gpu,n_cells;  threads, blocks, shmem=shared_mem)
 
     # assemble the global matrix
@@ -253,6 +252,9 @@ stassy(cv,dh) = assemble_global!(cv,dh,Val(false))
 # qpassy(cv,dh) = assemble_global!(cv,dh,Val(true))
 
 Kgpu, fgpu =assemble_global_gpu(cellvalues,dh);
+#using BenchmarkTools
+
+#Kgpu, fgpu = @btime CUDA.@sync    assemble_global_gpu($cellvalues,$dh);
 #Kgpu, fgpu = CUDA.@profile    assemble_global_gpu_color(cellvalues,dh,colors)
 # to benchmark the code using nsight compute use the following command: ncu --mode=launch julia
 # Open nsight compute and attach the profiler to the julia instance

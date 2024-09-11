@@ -1,7 +1,3 @@
-#=
-Implementation of heat equation on GPU using one mutable CuArray for each color to store the local stiffness matrix and force vector.
-e.g. for a color with 5 elements, the colors container for local stiffness matrices will be of size 5*n_basefuncs x n_basefuncs.
-=#
 
 using Ferrite, CUDA
 using StaticArrays
@@ -13,14 +9,10 @@ using NVTX
 
 
 left = Tensor{1,2,Float32}((0,-0)) # define the left bottom corner of the grid.
-right = Tensor{1,2,Float32}((1000.0,1000.0)) # define the right top corner of the grid.
+right = Tensor{1,2,Float32}((100.0,100.0)) # define the right top corner of the grid.
 
 
-grid = generate_grid(Quadrilateral, (1000, 1000),left,right)
-
-
-colors = create_coloring(grid) .|> (x -> Int32.(x)) # convert to Int32 to reduce number of registers
-
+grid = generate_grid(Quadrilateral, (100, 100),left,right)
 
 
 ip = Lagrange{RefQuadrilateral, 1}() # define the interpolation function (i.e. Bilinear lagrange)
@@ -103,100 +95,134 @@ function assemble_global!(cellvalues, dh::DofHandler,qp_iter::Val{QPiter}) where
 end
 
 
-"""
-    get_local_sides(e_color,n_basefuncs)
-
-Get the local stiffness matrix and force vector for the element `e_color` in the grid.
-"""
-@inline function get_local_sides(ke_colors, fe_colors,e_color,n_basefuncs)
-    start_row_index = (e_color-1)*n_basefuncs + 1
-    end_row_index = start_row_index+(n_basefuncs-1)
-    start_row_index, end_row_index
-    return @view(ke_colors[start_row_index:end_row_index,1:n_basefuncs]), @view(fe_colors[start_row_index:end_row_index])
-end
 
 
-#=NVTX.@annotate=# function assemble_element_gpu!(ke_colors,fe_colors,assembler,cv,dh,n_cells_colored, eles_colored)
+#=NVTX.@annotate=# function assemble_gpu!(assembler,cv,dh,n_cells)
     tx = threadIdx().x
     bx = blockIdx().x
     bd = blockDim().x
-    # e_color is the global index of the thread in the GPU scheme.
-    e_color = tx + (bx-Int32(1))*bd # element number per color
-
-    e_color ≤ n_cells_colored || return nothing
-    n_basefuncs = getnbasefunctions(cv)
     # e is the global index of the finite element in the grid.
-    e = eles_colored[e_color]
-    cell_coords = getcoordinates(dh.grid, e)
+    n_basefuncs = getnbasefunctions(cv)
+    ke_shared = @cuDynamicSharedMem(Float32,(bd,n_basefuncs,n_basefuncs))
+    fe_shared = @cuDynamicSharedMem(Float32,(bd,n_basefuncs),sizeof(Float32)*bd*n_basefuncs*n_basefuncs)
+    fill!(ke_shared,0.0f0)
+    fill!(fe_shared,0.0f0)
+    sync_threads()
 
-    ke,fe = get_local_sides(ke_colors, fe_colors,e_color,n_basefuncs)
-    fill!(ke, 0.0f0)
-    fill!(fe, 0.0f0)
+    e = tx + (bx-Int32(1))*bd
+
+    e ≤ n_cells || return nothing
+    # e is the global index of the finite element in the grid.
+    cell_coords = getcoordinates(dh.grid, e)
      #Loop over quadrature points
      for qv in Ferrite.QuadratureValuesIterator(cv,cell_coords)
         ## Get the quadrature weight
         dΩ = getdetJdV(qv)
         ## Loop over test shape functions
-        for i in 1:n_basefuncs
-            δu  = shape_value(qv, i)
-            ∇δu = shape_gradient(qv, i)
+        for j in 1:n_basefuncs
+            δu  = shape_value(qv, j)
+            ∇u = shape_gradient(qv, j)
             ## Add contribution to fe
-            fe[i] += δu * dΩ
+            #fe[j] += δu * dΩ
+            fe_shared[tx,j] += δu * dΩ
             ## Loop over trial shape functions
-            for j in 1:n_basefuncs
-                ∇u = shape_gradient(qv, j)
+            for i in 1:n_basefuncs
+                ∇δu = shape_gradient(qv, i)
                 ## Add contribution to Ke
-                ke[i,j] += (∇δu ⋅ ∇u) * dΩ
+                ke_shared[tx,i,j] += (∇δu ⋅ ∇u) * dΩ
+                #ke[i,j] += (∇δu ⋅ ∇u) * dΩ
             end
         end
     end
 
-    ## Assemble Ke into Kgpu ##
-    assemble!(assembler, celldofs(dh,e),ke,fe)
 
+    # copy the shared memory to the global memory
+    dofs = celldofs(dh, e)
+    for j in 1:n_basefuncs
+        jg = dofs[j]
+        assemble_atomic!(assembler,fe_shared[tx,j],jg)
+        for i in 1:n_basefuncs
+            ig = dofs[i]
+            assemble_atomic!(assembler,ke_shared[tx,i,j],ig,jg)
+        end
+    end
     return nothing
 end
 
 
-function allocate_local_matrices(colors,cv)
-    max_color_size = colors .|> length |> maximum
-    n_basefuncs = getnbasefunctions(cv)
-    cols = n_basefuncs
-    rows = n_basefuncs * max_color_size
-    # allocate maximum possible memory to incorporate all local matrices for each color.
-    # It will be mutated in each color.
-    ke = CUDA.zeros(Float32, rows, cols)
-    fe = CUDA.zeros(Float32, rows)
-    return ke,fe
+
+function assemble_global_gpu!(assembler,kes,fes,dh,n_cells)
+    tx = threadIdx().x # potential element index
+    ty = threadIdx().y # rows of local matrix
+    tz= threadIdx().z # columns of local matrix
+    bx = blockIdx().x
+    bd = blockDim().x
+    # e is the global index of the finite element in the grid.
+    e = tx + (bx-Int32(1))*bd
+    #e = get_element_index(is,n_basefuncs)
+    e ≤ n_cells || return nothing
+    dofs = celldofs(dh, e)
+    jg = dofs[ty]
+    ig = dofs[tz]
+    if tz == Int32(1)
+        assemble_atomic!(assembler,kes[e,ty,tz],fes[e,ty],ig,jg)
+    else
+        assemble_atomic!(assembler,kes[e,ty,tz],ig,jg)
+    end
+    return nothing
 end
+
 
 
 Adapt.@adapt_structure Ferrite.GPUGrid
 Adapt.@adapt_structure Ferrite.GPUDofHandler
 Adapt.@adapt_structure Ferrite.GPUAssemblerSparsityPattern
 
-#=NVTX.@annotate=# function assemble_global_gpu_color(cellvalues,dh,colors)
-    ke_colors,fe_colors = allocate_local_matrices(colors,cellvalues)
+
+function optimize_threads_for_dynshmem(max_threads, n_basefuncs)
+    MAX_DYN_SHMEM = 48 * 1024 # TODO: get the maximum shared memory per block from the device (48KB for now, currently I don't know how to get this value)
+    shmem_needed = sizeof(Float32) * (max_threads) * ( n_basefuncs) * n_basefuncs + sizeof(Float32) * (max_threads) * n_basefuncs
+    if(shmem_needed < MAX_DYN_SHMEM)
+        return max_threads, shmem_needed
+    else
+        # solve for threads
+        max_possible = Int32(MAX_DYN_SHMEM ÷ (sizeof(Float32) * ( n_basefuncs) * n_basefuncs + sizeof(Float32) * n_basefuncs))
+        dev = device()
+        warp_size = CUDA.attribute(dev, CUDA.CU_DEVICE_ATTRIBUTE_WARP_SIZE)
+        # approximate the number of threads to be a multiple of warp size (mostly 32)
+        nearest_no_warps = max_possible ÷ warp_size
+        if(nearest_no_warps < 4)
+            throw(ArgumentError("Bad implementation (less than 4 warps per block, wasted resources)"))
+        else
+            possiple_threads = nearest_no_warps * warp_size
+            shmem_needed = sizeof(Float32) * (possiple_threads) * ( n_basefuncs) * n_basefuncs + sizeof(Float32) * (possiple_threads) * n_basefuncs
+            return possiple_threads, shmem_needed
+        end
+    end
+end
+
+#=NVTX.@annotate=# function assemble_gpu(cellvalues,dh)
+    n_basefuncs = getnbasefunctions(cellvalues)
+    n_cells = dh |> get_grid |> getncells |> Int32
+    #kes,fes = allocate_local_matrices(n_cells,cellvalues)
     K = allocate_matrix(SparseMatrixCSC{Float32, Int32},dh)
     Kgpu = CUSPARSE.CuSparseMatrixCSC(K)
     fgpu = CUDA.zeros(ndofs(dh))
     assembler = start_assemble(Kgpu, fgpu)
-    n_colors = length(colors)
     # set up kernel adaption & launch the kernel
     dh_gpu = Adapt.adapt_structure(CuArray, dh)
     assembler_gpu = Adapt.adapt_structure(CUDA.KernelAdaptor(), assembler)
     cellvalues_gpu = Adapt.adapt_structure(CuArray, cellvalues)
-    for i in 1:n_colors
-        kernel = @cuda launch=false assemble_element_gpu!(ke_colors,fe_colors,assembler_gpu,cellvalues_gpu,dh_gpu,Int32(length(colors[i])),cu(colors[i]))
-        #@show CUDA.registers(kernel)
-        config = launch_configuration(kernel.fun)
-        threads = min(length(colors[i]), config.threads)
-        blocks =  cld(length(colors[i]), threads)
-        kernel(ke_colors,fe_colors,assembler_gpu,cellvalues,dh_gpu,Int32(length(colors[i])),cu(colors[i]);  threads, blocks)
-    end
+    # assemble the local matrices in kes and fes
+    kernel = @cuda launch=false assemble_gpu!(assembler_gpu,cellvalues_gpu,dh_gpu,n_cells)
+    #@show CUDA.registers(kernel)
+    config = launch_configuration(kernel.fun)
+    max_threads = min(n_cells, config.threads)
+    threads, shared_mem = optimize_threads_for_dynshmem(max_threads, n_basefuncs)
+    blocks =  cld(n_cells, threads)
+    kernel(assembler_gpu,cellvalues,dh_gpu,n_cells;  threads, blocks, shmem=shared_mem)
     return Kgpu,fgpu
 end
-
 
 
 stassy(cv,dh) = assemble_global!(cv,dh,Val(false))
@@ -206,10 +232,11 @@ stassy(cv,dh) = assemble_global!(cv,dh,Val(false))
 
 # qpassy(cv,dh) = assemble_global!(cv,dh,Val(true))
 
-#Kgpu, fgpu =  assemble_global_gpu_color(cellvalues,dh,colors);
-using BenchmarkTools
-Kgpu, fgpu = @btime CUDA.@sync    assemble_global_gpu_color(cellvalues,dh,colors);
-#Kgpu, fgpu = CUDA.@profile    assemble_global_gpu_color(cellvalues,dh,colors)
+Kgpu, fgpu =assemble_gpu(cellvalues,dh);
+#using BenchmarkTools
+
+#Kgpu, fgpu = @btime CUDA.@sync    assemble_global_gpu($cellvalues,$dh);
+#Kstd , Fstd =@btime  stassy($cellvalues,$dh);
 # to benchmark the code using nsight compute use the following command: ncu --mode=launch julia
 # Open nsight compute and attach the profiler to the julia instance
 # ref: https://cuda.juliagpu.org/v2.2/development/profiling/#NVIDIA-Nsight-Compute
@@ -218,9 +245,7 @@ Kgpu, fgpu = @btime CUDA.@sync    assemble_global_gpu_color(cellvalues,dh,colors
 
 norm(Kgpu)
 
-
-
-Kstd , Fstd =  stassy(cellvalues,dh);
+Kstd , Fstd =stassy(cellvalues,dh);
 norm(Kstd)
 
 @testset "GPU Heat Equation" begin
@@ -246,9 +271,6 @@ norm(Kstd)
         grid = generate_grid(Quadrilateral, (n_x, n_y),left,right)
 
 
-        colors = create_coloring(grid) .|> (x -> Int32.(x)) # convert to Int32 to reduce number of registers
-
-
         ip = Lagrange{RefQuadrilateral, 1}() # define the interpolation function (i.e. Bilinear lagrange)
 
 
@@ -269,7 +291,7 @@ norm(Kstd)
         Kstd , Fstd =  stassy(cellvalues,dh);
 
         # The GPU version
-        Kgpu, fgpu =  assemble_global_gpu_color(cellvalues,dh,colors)
+        Kgpu, fgpu =  assemble_gpu(cellvalues,dh)
 
         @test norm(Kstd) ≈ norm(Kgpu) atol=1e-4
     end

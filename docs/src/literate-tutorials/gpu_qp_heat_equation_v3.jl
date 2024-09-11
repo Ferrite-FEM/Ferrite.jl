@@ -14,10 +14,10 @@ using NVTX
 
 
 left = Tensor{1,2,Float32}((0,-0)) # define the left bottom corner of the grid.
-right = Tensor{1,2,Float32}((100.0,100.0)) # define the right top corner of the grid.
+right = Tensor{1,2,Float32}((1000.0,1000.0)) # define the right top corner of the grid.
 
 
-grid = generate_grid(Quadrilateral, (100, 100),left,right)
+grid = generate_grid(Quadrilateral, (1000, 1000),left,right)
 
 
 ip = Lagrange{RefQuadrilateral, 1}() # define the interpolation function (i.e. Bilinear lagrange)
@@ -214,8 +214,12 @@ stassy(cv,dh) = assemble_global!(cv,dh,Val(false))
 
 # qpassy(cv,dh) = assemble_global!(cv,dh,Val(true))
 
-Kgpu, fgpu =assemble_global_gpu(cellvalues,dh);
-#Kgpu, fgpu = CUDA.@profile    assemble_global_gpu_color(cellvalues,dh,colors)
+#Kgpu, fgpu =assemble_global_gpu(cellvalues,dh);
+
+using BenchmarkTools
+
+Kgpu, fgpu = @btime CUDA.@sync    assemble_global_gpu($cellvalues,$dh);
+Kstd , Fstd =@btime  stassy($cellvalues,$dh);
 # to benchmark the code using nsight compute use the following command: ncu --mode=launch julia
 # Open nsight compute and attach the profiler to the julia instance
 # ref: https://cuda.juliagpu.org/v2.2/development/profiling/#NVIDIA-Nsight-Compute
