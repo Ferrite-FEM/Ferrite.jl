@@ -121,20 +121,20 @@ function otimes_returntype(#=typeof(x)=#::Type{<:Vec{dim,Tx}}, #=typeof(d2Mdξ2)
     return Tensor{3,dim,promote_type(Tx,TM)}
 end
 
-@inline function calculate_mapping(::GeometryMapping{0}, q_point, x)
+@inline function calculate_mapping(::GeometryMapping{0}, q_point::Int, x::AbstractVector{<:Vec})
     return MappingValues(nothing, nothing)
 end
 
-@inline function calculate_mapping(geo_mapping::GeometryMapping{1}, q_point, x)
-    fecv_J = zero(otimes_returntype(eltype(x), eltype(geo_mapping.dMdξ)))
+@inline function calculate_mapping(geo_mapping::GeometryMapping{1}, q_point::Int, x::AbstractVector{<:Vec})
+    J = zero(otimes_returntype(eltype(x), eltype(geo_mapping.dMdξ)))
     @inbounds for j in 1:getngeobasefunctions(geo_mapping)
-        #fecv_J += x[j] ⊗ geo_mapping.dMdξ[j, q_point]
-        fecv_J += otimes_helper(x[j], geo_mapping.dMdξ[j, q_point])
+        # J += x[j] ⊗ geo_mapping.dMdξ[j, q_point]
+        J += otimes_helper(x[j], geo_mapping.dMdξ[j, q_point])
     end
-    return MappingValues(fecv_J, nothing)
+    return MappingValues(J, nothing)
 end
 
-@inline function calculate_mapping(geo_mapping::GeometryMapping{2}, q_point, x)
+@inline function calculate_mapping(geo_mapping::GeometryMapping{2}, q_point::Int, x::AbstractVector{<:Vec})
     J = zero(otimes_returntype(eltype(x), eltype(geo_mapping.dMdξ)))
     sdim, rdim = size(J)
     (rdim != sdim) && error("hessian for embedded elements not implemented (rdim=$rdim, sdim=$sdim)")
@@ -146,8 +146,54 @@ end
     return MappingValues(J, H)
 end
 
+@inline function calculate_mapping(gip::ScalarInterpolation, ξ::Vec, x::AbstractVector{<:Vec}, ::Val{0})
+    return MappingValues(nothing, nothing)
+end
+
+@inline function calculate_mapping(gip::ScalarInterpolation, ξ::Vec{rdim,T}, x::AbstractVector{<:Vec{sdim}}, ::Val{1}) where {T,rdim, sdim}
+    n_basefuncs = getnbasefunctions(gip)
+    @boundscheck checkbounds(x, Base.OneTo(n_basefuncs))
+
+    J = zero(otimes_returntype(Vec{sdim,T}, Vec{rdim,T}))
+    @inbounds for j in 1:n_basefuncs
+        dMdξ = reference_shape_gradient(gip, ξ, j)
+        # J += x[j] ⊗ dMdξ # https://github.com/Ferrite-FEM/Tensors.jl/pull/188
+        J += otimes_helper(x[j], dMdξ)
+    end
+    return MappingValues(J, nothing)
+end
+
+@inline function calculate_mapping(gip::ScalarInterpolation, ξ::Vec{rdim,T}, x::AbstractVector{<:Vec{sdim}}, ::Val{2}) where {T,rdim, sdim}
+    n_basefuncs = getnbasefunctions(gip)
+    @boundscheck checkbounds(x, Base.OneTo(n_basefuncs))
+    (rdim != sdim) && error("hessian for embedded elements not implemented (rdim=$rdim, sdim=$sdim)")
+    J = zero(otimes_returntype(Vec{sdim,T}, Vec{rdim,T}))
+    H = zero(otimes_returntype(eltype(x), typeof(J)))
+    @inbounds for j in 1:n_basefuncs
+        d2Mdξ2, dMdξ, _ = reference_shape_hessian_gradient_and_value(gip, ξ, j)
+        J += x[j] ⊗ dMdξ
+        H += x[j] ⊗ d2Mdξ2
+    end
+    return MappingValues(J, H)
+end
+
 calculate_detJ(J::Tensor{2}) = det(J)
 calculate_detJ(J::SMatrix) = embedding_det(J)
+
+function calculate_jacobian_and_spatial_coordinate(gip::ScalarInterpolation, ξ::Vec{rdim,Tξ}, x::AbstractVector{<:Vec{sdim, Tx}}) where {Tξ, Tx, rdim, sdim}
+    n_basefuncs = getnbasefunctions(gip)
+    @boundscheck checkbounds(x, Base.OneTo(n_basefuncs))
+
+    fecv_J = zero(otimes_returntype(Vec{sdim,Tx}, Vec{rdim,Tξ}))
+    sx = zero(Vec{sdim, Tx})
+    @inbounds for j in 1:n_basefuncs
+        dMdξ, M = reference_shape_gradient_and_value(gip, ξ, j)
+        sx += M * x[j]
+        fecv_J += otimes_helper(x[j], dMdξ)
+    end
+    return fecv_J, sx
+end
+
 
 # Embedded
 

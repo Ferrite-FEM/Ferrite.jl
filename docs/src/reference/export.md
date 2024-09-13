@@ -24,9 +24,7 @@ PointLocation
 
 ## VTK Export
 ```@docs
-VTKFile
-VTKFileCollection
-addstep!
+VTKGridFile
 write_solution
 write_projection
 write_cell_data

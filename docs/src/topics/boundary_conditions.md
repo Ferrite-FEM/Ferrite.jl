@@ -9,7 +9,7 @@ conditions, and they need to be handled in different ways. Below we discuss how 
 the most common ones, Dirichlet and Neumann boundary conditions, and how to do it `Ferrite`.
 
 While boundary conditions can be applied directly to nodes, vertices, edges, or faces,
-they are most commonly applied to [facets](@ref Reference shapes). Each facet is described
+they are most commonly applied to [facets](@ref "Reference shapes"). Each facet is described
 by a [`FacetIndex`](@ref).
 When adding boundary conditions to points instead, vertices are preferred over nodes.
 

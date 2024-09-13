@@ -24,7 +24,7 @@
 #
 # To illustrate the use of the plasticity model, we setup and solve a FE-problem
 # consisting of a cantilever beam loaded at its free end. But first, we shortly
-# describe the parts of the implementation deadling with the material modeling.
+# describe the parts of the implementation dealing with the material modeling.
 
 # ## Material modeling
 # This section describes the `struct`s and methods used to implement the material
@@ -344,7 +344,7 @@ function solve()
         mises_values[el] /= length(cell_states) # average von Mises stress
         κ_values[el] /= length(cell_states)     # average drag stress
     end
-    VTKFile("plasticity", dh) do vtk
+    VTKGridFile("plasticity", dh) do vtk
         write_solution(vtk, dh, u) # displacement field
         write_cell_data(vtk, mises_values, "von Mises [Pa]")
         write_cell_data(vtk, κ_values, "Drag stress [Pa]")

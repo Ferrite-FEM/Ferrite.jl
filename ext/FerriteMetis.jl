@@ -21,7 +21,7 @@ end
 Fill-reducing permutation order from [Metis.jl](https://github.com/JuliaSparse/Metis.jl).
 
 Since computing the permutation involves constructing the structural couplings between all
-DoFs the field/component coupling can be provided; see [`create_sparsity_pattern`](@ref) for
+DoFs the field/component coupling can be provided; see [`allocate_matrix`](@ref) for
 details.
 """
 function DofOrder.Ext{Metis}(;

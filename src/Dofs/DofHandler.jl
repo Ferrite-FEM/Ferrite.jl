@@ -796,7 +796,7 @@ field was found and the 2nd entry is the index of the field within the `SubDofHa
     Always finds the 1st occurrence of a field within `DofHandler`.
 
 See also: [`find_field(sdh::SubDofHandler, field_name::Symbol)`](@ref),
-[`_find_field(sdh::SubDofHandler, field_name::Symbol)`](@ref).
+[`Ferrite._find_field(sdh::SubDofHandler, field_name::Symbol)`](@ref).
 """
 function find_field(dh::DofHandler, field_name::Symbol)
     for (sdh_idx, sdh) in pairs(dh.subdofhandlers)

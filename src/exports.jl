@@ -169,13 +169,11 @@ export
     finish_assemble,
 
 # exporting data
-    VTKFile,
+    VTKGridFile,
     write_solution,
     write_cell_data,
     write_projection,
     write_node_data,
-    VTKFileCollection,
-    addstep!,
 
 # L2 Projection
     project,

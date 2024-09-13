@@ -271,7 +271,7 @@ function solve(ν, interpolation_u, interpolation_p)
     filename = "cook_" * (interpolation_u == Lagrange{RefTriangle, 1}()^2 ? "linear" : "quadratic") *
                          "_linear"
 
-    VTKFile(filename, grid) do vtk
+    VTKGridFile(filename, grid) do vtk
         write_solution(vtk, dh, u)
         for i in 1:3, j in 1:3
             σij = [x[i, j] for x in σ]

@@ -24,8 +24,8 @@ into the sparse matrix `K` directly. Therefore we will instead use an
 matrix and the global force vector. It is also often convenient to create the
 sparse matrix just once, and reuse the allocated matrix. This is useful for
 e.g. iterative solvers or time dependent problems where the sparse matrix
-structure, or [Sparsity Pattern](@ref) will stay the same in every iteration/
-time step.
+structure, or [Sparsity Pattern](@ref "Sparsity pattern and sparse matrices")
+will stay the same in every iteration/time step.
 
 ## `Assembler`
 

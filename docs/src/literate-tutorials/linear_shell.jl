@@ -113,7 +113,7 @@ a = K\f
 
 # Output results.
 #+
-VTKFile("linear_shell", dh) do vtk
+VTKGridFile("linear_shell", dh) do vtk
     write_solution(vtk, dh, a)
 end
 

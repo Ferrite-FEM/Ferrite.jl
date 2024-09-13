@@ -111,6 +111,7 @@ Base.copy(ip::Interpolation) = ip
 
 Return the dimension of the reference element for a given interpolation.
 """
+getrefdim(::Interpolation) # To make doc-filtering work
 @inline getrefdim(::Interpolation{RefShape}) where RefShape = getrefdim(RefShape)
 
 """
