@@ -105,7 +105,7 @@ end
 
 @kernel function assemble_local_gpu(kes,fes,cv,dh)
 
-    e = Int32(@index(Global))
+    e = @index(Global) |> Int32
     n_basefuncs = getnbasefunctions(cv)
     # e is the global index of the finite element in the grid.
     cell_coords = getcoordinates(dh.grid, e)
@@ -137,8 +137,9 @@ end
 @kernel function assemble_global_gpu!(assembler,kes,fes,dh)
     # e is element index
     # ty, tz are local indices of the local matrices
-    e, ty, tz = @index(Global)
+    e, ty, tz = @index(Global,NTuple) .|> Int32
     dofs = celldofs(dh, e)
+
     jg = dofs[ty]
     ig = dofs[tz]
     if tz == Int32(1)
@@ -177,14 +178,10 @@ Adapt.@adapt_structure Ferrite.GPUAssemblerSparsityPattern
     kernel_local = assemble_local_gpu(backend)
     kernel_local(kes,fes,cellvalues,dh_gpu;  ndrange =n_cells)
     # assemble the global matrix
-    #n_basefuncs = getnbasefunctions(cellvalues)
-    #kernel_global = assemble_global_gpu!(backend)
-    #@show CUDA.registers(kernel)
-    #config = launch_configuration(kernel_local.fun)
-    #threads_eles = min(size(fes)[1], config.threads ÷ (n_basefuncs*n_basefuncs))
-    #blocks =  cld(size(fes)[1], threads_eles)
-    # x-direction is the element index, y & z are the local indices of the local matrices
-    #kernel_global(assembler_gpu,kes,fes,dh_gpu;  ndrange = (n_cells,n_basefuncs,n_basefuncs))
+    n_basefuncs = getnbasefunctions(cellvalues)
+    kernel_global = assemble_global_gpu!(backend)
+
+    kernel_global(assembler_gpu,kes,fes,dh_gpu;  ndrange = (n_cells,n_basefuncs,n_basefuncs))
 
     return Kgpu,fgpu
 end
@@ -196,6 +193,7 @@ stassy(cv,dh) = assemble_global!(cv,dh,Val(false))
 
 
 # qpassy(cv,dh) = assemble_global!(cv,dh,Val(true))
+
 backend  = CUDABackend();
 Kgpu, fgpu =assemble_global_gpu(backend,cellvalues,dh);
 
