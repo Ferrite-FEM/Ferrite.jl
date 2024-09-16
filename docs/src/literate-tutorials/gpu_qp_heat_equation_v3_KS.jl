@@ -167,21 +167,17 @@ Adapt.@adapt_structure Ferrite.GPUAssemblerSparsityPattern
     n_cells = dh |> get_grid |> getncells |> Int32
     kes,fes = allocate_local_matrices(backend,n_cells,cellvalues)
     K = allocate_matrix(SparseMatrixCSC{Float32, Int32},dh)
-    Kgpu = CUSPARSE.CuSparseMatrixCSC(K)
+    Kgpu = CUSPARSE.CuSparseMatrixCSC(K) # CUDA dependency
     fgpu = KernelAbstractions.zeros(backend,Float32,ndofs(dh))
     assembler = start_assemble(Kgpu, fgpu)
-    # set up kernel adaption & launch the kernel
-    dh_gpu = Adapt.adapt_structure(CuArray, dh)
-    assembler_gpu = Adapt.adapt_structure(CUDA.KernelAdaptor(), assembler)
-    cellvalues_gpu = Adapt.adapt_structure(CuArray, cellvalues)
-    # assemble the local matrices in kes and fes
+
     kernel_local = assemble_local_gpu(backend)
-    kernel_local(kes,fes,cellvalues,dh_gpu;  ndrange =n_cells)
+    kernel_local(kes,fes,cellvalues,dh;  ndrange =n_cells)
     # assemble the global matrix
     n_basefuncs = getnbasefunctions(cellvalues)
     kernel_global = assemble_global_gpu!(backend)
 
-    kernel_global(assembler_gpu,kes,fes,dh_gpu;  ndrange = (n_cells,n_basefuncs,n_basefuncs))
+    kernel_global(assembler,kes,fes,dh;  ndrange = (n_cells,n_basefuncs,n_basefuncs))
 
     return Kgpu,fgpu
 end
