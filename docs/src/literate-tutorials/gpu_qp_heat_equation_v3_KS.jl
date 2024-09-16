@@ -15,10 +15,10 @@ using NVTX
 
 
 left = Tensor{1,2,Float32}((0,-0)) # define the left bottom corner of the grid.
-right = Tensor{1,2,Float32}((1000.0,1000.0)) # define the right top corner of the grid.
+right = Tensor{1,2,Float32}((10.0,10.0)) # define the right top corner of the grid.
 
 
-grid = generate_grid(Quadrilateral, (1000, 1000),left,right)
+grid = generate_grid(Quadrilateral, (10, 10),left,right)
 
 
 ip = Lagrange{RefQuadrilateral, 1}() # define the interpolation function (i.e. Bilinear lagrange)
@@ -103,18 +103,16 @@ end
 
 
 
-@kernel function assemble_local_gpu(kes,fes,cv,dh,n_cells)
+@kernel function assemble_local_gpu(kes,fes,cv,dh)
 
-    e = @index(Global)
-
-    #e ≤ n_cells || return nothing
+    e = Int32(@index(Global))
     n_basefuncs = getnbasefunctions(cv)
     # e is the global index of the finite element in the grid.
     cell_coords = getcoordinates(dh.grid, e)
 
     ke = @view kes[e,:,:]
     fe = @view fes[e,:]
-     #Loop over quadrature points
+    # Loop over quadrature points
      for qv in Ferrite.QuadratureValuesIterator(cv,cell_coords)
         ## Get the quadrature weight
         dΩ = getdetJdV(qv)
@@ -132,21 +130,14 @@ end
             end
         end
     end
-    return nothing
 end
 
 
 
-function assemble_global_gpu!(assembler,kes,fes,dh,n_cells)
-    tx = threadIdx().x # potential element index
-    ty = threadIdx().y # rows of local matrix
-    tz= threadIdx().z # columns of local matrix
-    bx = blockIdx().x
-    bd = blockDim().x
-    # e is the global index of the finite element in the grid.
-    e = tx + (bx-Int32(1))*bd
-    #e = get_element_index(is,n_basefuncs)
-    e ≤ n_cells || return nothing
+@kernel function assemble_global_gpu!(assembler,kes,fes,dh)
+    # e is element index
+    # ty, tz are local indices of the local matrices
+    e, ty, tz = @index(Global)
     dofs = celldofs(dh, e)
     jg = dofs[ty]
     ig = dofs[tz]
@@ -155,14 +146,13 @@ function assemble_global_gpu!(assembler,kes,fes,dh,n_cells)
     else
         assemble_atomic!(assembler,kes[e,ty,tz],ig,jg)
     end
-    return nothing
 end
 
 
-function allocate_local_matrices(n_cells,cv)
+function allocate_local_matrices(backend,n_cells,cv)
     n_basefuncs = getnbasefunctions(cv)
-    ke = CUDA.zeros(Float32,n_cells , n_basefuncs, n_basefuncs)
-    fe = CUDA.zeros(Float32,n_cells, n_basefuncs)
+    ke = KernelAbstractions.zeros(backend,Float32,n_cells , n_basefuncs, n_basefuncs)
+    fe = KernelAbstractions.zeros(backend,Float32,n_cells, n_basefuncs)
     return ke,fe
 end
 
@@ -172,34 +162,29 @@ Adapt.@adapt_structure Ferrite.GPUDofHandler
 Adapt.@adapt_structure Ferrite.GPUAssemblerSparsityPattern
 
 
-#=NVTX.@annotate=# function assemble_global_gpu(cellvalues,dh)
+#=NVTX.@annotate=# function assemble_global_gpu(backend,cellvalues,dh)
     n_cells = dh |> get_grid |> getncells |> Int32
-    kes,fes = allocate_local_matrices(n_cells,cellvalues)
+    kes,fes = allocate_local_matrices(backend,n_cells,cellvalues)
     K = allocate_matrix(SparseMatrixCSC{Float32, Int32},dh)
     Kgpu = CUSPARSE.CuSparseMatrixCSC(K)
-    fgpu = CUDA.zeros(ndofs(dh))
+    fgpu = KernelAbstractions.zeros(backend,Float32,ndofs(dh))
     assembler = start_assemble(Kgpu, fgpu)
     # set up kernel adaption & launch the kernel
     dh_gpu = Adapt.adapt_structure(CuArray, dh)
     assembler_gpu = Adapt.adapt_structure(CUDA.KernelAdaptor(), assembler)
     cellvalues_gpu = Adapt.adapt_structure(CuArray, cellvalues)
     # assemble the local matrices in kes and fes
-    kernel_local = @cuda launch=false assemble_local_gpu(kes,fes,cellvalues_gpu,dh_gpu,n_cells)
-    #@show CUDA.registers(kernel)
-    config = launch_configuration(kernel_local.fun)
-    threads = min(n_cells, config.threads)
-    blocks =  cld(n_cells, threads)
-    kernel_local(kes,fes,cellvalues,dh_gpu,n_cells;  threads, blocks)
-
+    kernel_local = assemble_local_gpu(backend)
+    kernel_local(kes,fes,cellvalues,dh_gpu;  ndrange =n_cells)
     # assemble the global matrix
-    n_basefuncs = getnbasefunctions(cellvalues)
-    kernel_global = @cuda launch=false assemble_global_gpu!(assembler_gpu,kes,fes,dh_gpu,n_cells)
+    #n_basefuncs = getnbasefunctions(cellvalues)
+    #kernel_global = assemble_global_gpu!(backend)
     #@show CUDA.registers(kernel)
-    config = launch_configuration(kernel_local.fun)
-    threads_eles = min(size(fes)[1], config.threads ÷ (n_basefuncs*n_basefuncs))
-    blocks =  cld(size(fes)[1], threads_eles)
+    #config = launch_configuration(kernel_local.fun)
+    #threads_eles = min(size(fes)[1], config.threads ÷ (n_basefuncs*n_basefuncs))
+    #blocks =  cld(size(fes)[1], threads_eles)
     # x-direction is the element index, y & z are the local indices of the local matrices
-    kernel_global(assembler_gpu,kes,fes,dh_gpu,n_cells;  threads = (threads_eles,n_basefuncs,n_basefuncs), blocks)
+    #kernel_global(assembler_gpu,kes,fes,dh_gpu;  ndrange = (n_cells,n_basefuncs,n_basefuncs))
 
     return Kgpu,fgpu
 end
@@ -211,13 +196,13 @@ stassy(cv,dh) = assemble_global!(cv,dh,Val(false))
 
 
 # qpassy(cv,dh) = assemble_global!(cv,dh,Val(true))
+backend  = CUDABackend();
+Kgpu, fgpu =assemble_global_gpu(backend,cellvalues,dh);
 
-#Kgpu, fgpu =assemble_global_gpu(cellvalues,dh);
+#using BenchmarkTools
 
-using BenchmarkTools
-
-Kgpu, fgpu = @btime CUDA.@sync    assemble_global_gpu($cellvalues,$dh);
-Kstd , Fstd =@btime  stassy($cellvalues,$dh);
+#Kgpu, fgpu = @btime CUDA.@sync    assemble_global_gpu($cellvalues,$dh);
+#Kstd , Fstd =@btime  stassy($cellvalues,$dh);
 # to benchmark the code using nsight compute use the following command: ncu --mode=launch julia
 # Open nsight compute and attach the profiler to the julia instance
 # ref: https://cuda.juliagpu.org/v2.2/development/profiling/#NVIDIA-Nsight-Compute
