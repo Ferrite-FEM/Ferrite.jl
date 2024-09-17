@@ -3,7 +3,6 @@ struct GPUAssemblerSparsityPattern{Tv,Ti,VEC_FLOAT<:AbstractVector{Tv},SPARSE_MA
     f::VEC_FLOAT
 end
 
-
 function start_assemble(K::AbstractSparseArray{Tv}, f::AbstractVector{Tv}) where {Tv}
     return GPUAssemblerSparsityPattern(K, f)
 end

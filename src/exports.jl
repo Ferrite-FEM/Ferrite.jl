@@ -193,4 +193,7 @@ export
 
 # GPU
     @run_gpu,
-    assemble_atomic!
+    assemble_atomic!,
+    allocate_gpu_matrix,
+    #GPUSparseMatrixCSC,
+    gpu_sparse_norm

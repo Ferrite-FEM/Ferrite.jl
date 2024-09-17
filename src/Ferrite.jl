@@ -26,6 +26,7 @@ using ForwardDiff:
     ForwardDiff
 using CUDA
 using Adapt
+using KernelAbstractions
 
 
 include("exports.jl")
@@ -170,6 +171,7 @@ include("GPU/kernel_meta.jl")
 include("GPU/gpu_assembler.jl")
 include("Grid/gpu_grid.jl")
 include("Dofs/GPUDofHandler.jl")
+include("GPU/gpu_sparsematrix.jl")
 include("GPU/adapt.jl")
 
 

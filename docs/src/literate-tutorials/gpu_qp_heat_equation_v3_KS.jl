@@ -14,6 +14,11 @@ using NVTX
 
 
 
+
+
+
+
+
 left = Tensor{1,2,Float32}((0,-0)) # define the left bottom corner of the grid.
 right = Tensor{1,2,Float32}((10.0,10.0)) # define the right top corner of the grid.
 
@@ -145,7 +150,7 @@ end
     if tz == Int32(1)
         assemble_atomic!(assembler,kes[e,ty,tz],fes[e,ty],ig,jg)
     else
-        assemble_atomic!(assembler,kes[e,ty,tz],ig,jg)
+       assemble_atomic!(assembler,kes[e,ty,tz],ig,jg)
     end
 end
 
@@ -160,14 +165,19 @@ end
 
 Adapt.@adapt_structure Ferrite.GPUGrid
 Adapt.@adapt_structure Ferrite.GPUDofHandler
+Adapt.@adapt_structure Ferrite.GPUSparseMatrixCSC
 Adapt.@adapt_structure Ferrite.GPUAssemblerSparsityPattern
+
+
+
+
 
 
 #=NVTX.@annotate=# function assemble_global_gpu(backend,cellvalues,dh)
     n_cells = dh |> get_grid |> getncells |> Int32
     kes,fes = allocate_local_matrices(backend,n_cells,cellvalues)
     K = allocate_matrix(SparseMatrixCSC{Float32, Int32},dh)
-    Kgpu = CUSPARSE.CuSparseMatrixCSC(K) # CUDA dependency
+    Kgpu = allocate_gpu_matrix(backend,K)
     fgpu = KernelAbstractions.zeros(backend,Float32,ndofs(dh))
     assembler = start_assemble(Kgpu, fgpu)
 
@@ -203,8 +213,8 @@ Kgpu, fgpu =assemble_global_gpu(backend,cellvalues,dh);
 # to benchmark using nsight system use the following command: # nsys profile --trace=nvtx julia rmse_kernel_v1.jl
 
 
-norm(Kgpu)
-
+#norm(Kgpu)
+gpu_sparse_norm(Kgpu)
 
 Kstd , Fstd =stassy(cellvalues,dh);
 norm(Kstd)
