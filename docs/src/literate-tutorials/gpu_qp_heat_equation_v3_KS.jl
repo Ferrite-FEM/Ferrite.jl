@@ -170,9 +170,6 @@ Adapt.@adapt_structure Ferrite.GPUAssemblerSparsityPattern
 
 
 
-
-
-
 #=NVTX.@annotate=# function assemble_global_gpu(backend,cellvalues,dh)
     n_cells = dh |> get_grid |> getncells |> Int32
     kes,fes = allocate_local_matrices(backend,n_cells,cellvalues)
@@ -181,13 +178,18 @@ Adapt.@adapt_structure Ferrite.GPUAssemblerSparsityPattern
     fgpu = KernelAbstractions.zeros(backend,Float32,ndofs(dh))
     assembler = start_assemble(Kgpu, fgpu)
 
+
+    dh_gpu = adapt(backend,dh)
+    assembler_gpu = adapt(backend,assembler)
+    cellvalues_gpu = adapt(backend,cellvalues)
+
     kernel_local = assemble_local_gpu(backend)
-    kernel_local(kes,fes,cellvalues,dh;  ndrange =n_cells)
+    kernel_local(kes,fes,cellvalues_gpu,dh_gpu;  ndrange =n_cells)
     # assemble the global matrix
     n_basefuncs = getnbasefunctions(cellvalues)
     kernel_global = assemble_global_gpu!(backend)
 
-    kernel_global(assembler,kes,fes,dh;  ndrange = (n_cells,n_basefuncs,n_basefuncs))
+    kernel_global(assembler_gpu,kes,fes,dh_gpu;  ndrange = (n_cells,n_basefuncs,n_basefuncs))
 
     return Kgpu,fgpu
 end
