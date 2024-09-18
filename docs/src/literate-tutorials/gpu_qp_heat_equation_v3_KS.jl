@@ -179,6 +179,8 @@ Adapt.@adapt_structure Ferrite.GPUAssemblerSparsityPattern
     assembler = start_assemble(Kgpu, fgpu)
 
 
+    # adapt structs based on the backend
+    # ref: https://discourse.julialang.org/t/using-custom-structs-with-kernelabstractions/102278/6?u=abdelrahman912
     dh_gpu = adapt(backend,dh)
     assembler_gpu = adapt(backend,assembler)
     cellvalues_gpu = adapt(backend,cellvalues)
