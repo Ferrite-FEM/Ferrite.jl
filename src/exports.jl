@@ -174,7 +174,6 @@ export
     write_cell_data,
     write_projection,
     write_node_data,
-
 # L2 Projection
     project,
     L2Projector,

@@ -1,3 +1,4 @@
+include("vtk_discontinuous.jl")
 
 """
     VTKGridFile(filename::AbstractString, grid::AbstractGrid; kwargs...)
@@ -28,13 +29,21 @@ end
 """
 struct VTKGridFile{VTK<:WriteVTK.DatasetFile}
     vtk::VTK
+    cellnodes::Vector{UnitRange{Int}}
 end
 function VTKGridFile(filename::String, dh::DofHandler; kwargs...)
+    for sdh in dh.subdofhandlers
+        for ip in sdh.field_interpolations
+            if is_discontinuous(ip)
+                return VTKGridFile(filename, get_grid(dh); write_discontinuous=true, kwargs...)
+            end
+        end
+    end
     return VTKGridFile(filename, get_grid(dh); kwargs...)
 end
-function VTKGridFile(filename::String, grid::AbstractGrid; kwargs...)
-    vtk = create_vtk_grid(filename, grid; kwargs...)
-    return VTKGridFile(vtk)
+function VTKGridFile(filename::String, grid::AbstractGrid; write_discontinuous=false, kwargs...)
+    vtk, cellnodes = create_vtk_grid(filename, grid, write_discontinuous; kwargs...)
+    return VTKGridFile(vtk, cellnodes)
 end
 # Makes it possible to use the `do`-block syntax
 function VTKGridFile(f::Function, args...; kwargs...)
@@ -45,6 +54,8 @@ function VTKGridFile(f::Function, args...; kwargs...)
         close(vtk)
     end
 end
+
+write_discontinuous(vtk::VTKGridFile) = length(vtk.cellnodes) > 0
 
 Base.close(vtk::VTKGridFile) = WriteVTK.vtk_save(vtk.vtk)
 
@@ -120,9 +131,14 @@ function create_vtk_griddata(grid::Grid{dim,C,T}) where {dim,C,T}
     return coords, cls
 end
 
-function create_vtk_grid(filename::AbstractString, grid::Grid{dim,C,T}; kwargs...) where {dim,C,T}
-    coords, cls = create_vtk_griddata(grid)
-    return WriteVTK.vtk_grid(filename, coords, cls; kwargs...)
+function create_vtk_grid(filename::AbstractString, grid::Grid{dim,C,T}, write_discontinuous; kwargs...) where {dim,C,T}
+    if write_discontinuous
+        coords, cls, cellnodes = create_discontinuous_vtk_griddata(grid)
+    else
+        coords, cls = create_vtk_griddata(grid)
+        cellnodes = Vector{UnitRange{Int}}(undef, 0)
+    end
+    return WriteVTK.vtk_grid(filename, coords, cls; kwargs...), cellnodes
 end
 
 function toparaview!(v, x::Vec{D}) where D
@@ -181,7 +197,11 @@ sorted by the nodes in the grid.
 function write_solution(vtk::VTKGridFile, dh::AbstractDofHandler, u::Vector, suffix="")
     fieldnames = getfieldnames(dh)  # all primary fields
     for name in fieldnames
-        data = _evaluate_at_grid_nodes(dh, u, name, #=vtk=# Val(true))
+        if write_discontinuous(vtk)
+            data = evaluate_at_discontinuous_vtkgrid_nodes(dh, u, name, vtk.cellnodes)
+        else
+            data = _evaluate_at_grid_nodes(dh, u, name, #=vtk=# Val(true))
+        end
         _vtk_write_node_data(vtk.vtk, data, string(name, suffix))
     end
     return vtk
