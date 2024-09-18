@@ -339,7 +339,7 @@ function solve(interpolation_u, interpolation_p)
             pvd[t] = vtk
         end
     end;
-    close(pvd);
+    vtk_save(pvd);
     vol_def = calculate_volume_deformed_mesh(w, dh, cellvalues_u);
     print("Deformed volume is $vol_def")
     return vol_def;
