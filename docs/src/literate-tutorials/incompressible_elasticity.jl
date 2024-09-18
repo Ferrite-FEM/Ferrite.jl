@@ -65,7 +65,7 @@ function create_dofhandler(grid, ipu, ipp)
     return dh
 end;
 
-# We also need to add Dirichlet boundary conditions on the `"clamped"` faceset.
+# We also need to add Dirichlet boundary conditions on the `"clamped"` facetset.
 # We specify a homogeneous Dirichlet bc on the displacement field, `:u`.
 function create_bc(dh)
     dbc = ConstraintHandler(dh)

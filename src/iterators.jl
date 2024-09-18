@@ -284,22 +284,22 @@ FaceIterator(args...) = error("FaceIterator is deprecated, use FacetIterator ins
 
 # Leaving flags undocumented as for CellIterator
 """
-    FacetIterator(gridordh::Union{Grid,AbstractDofHandler}, faceset::AbstractVecOrSet{FacetIndex})
+    FacetIterator(gridordh::Union{Grid,AbstractDofHandler}, facetset::AbstractVecOrSet{FacetIndex})
 
-Create a `FacetIterator` to conveniently iterate over the faces in `faceset`. The elements of
+Create a `FacetIterator` to conveniently iterate over the faces in `facestet`. The elements of
 the iterator are [`FacetCache`](@ref)s which are properly `reinit!`ialized. See
 [`FacetCache`](@ref) for more details.
 
 Looping over a `FacetIterator`, i.e.:
 ```julia
-for fc in FacetIterator(grid, faceset)
+for fc in FacetIterator(grid, facetset)
     # ...
 end
 ```
 is thus simply convenience for the following equivalent snippet:
 ```julia
 fc = FacetCache(grid)
-for faceindex in faceset
+for faceindex in facetset
     reinit!(fc, faceindex)
     # ...
 end

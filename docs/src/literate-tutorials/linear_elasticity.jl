@@ -113,7 +113,7 @@ FerriteGmsh.Gmsh.finalize(); #hide
 # The generated grid lacks the facetsets for the boundaries, so we add them by using Ferrite's
 # [`addfacetset!`](@ref). It allows us to add facetsets to the grid based on coordinates.
 # Note that approximate comparison to 0.0 doesn't work well, so we use a tolerance instead.
-addfacetset!(grid, "top",    x -> x[2] ≈ 1.0) # faces for which x[2] ≈ 1.0 for all nodes
+addfacetset!(grid, "top",    x -> x[2] ≈ 1.0) # facets for which x[2] ≈ 1.0 for all nodes
 addfacetset!(grid, "left",   x -> abs(x[1]) < 1e-6)
 addfacetset!(grid, "bottom", x -> abs(x[2]) < 1e-6);
 
@@ -173,13 +173,13 @@ traction(x) = Vec(0.0, 20e3 * x[1]);
 function assemble_external_forces!(f_ext, dh, facetset, facetvalues, prescribed_traction)
     ## Create a temporary array for the facet's local contributions to the external force vector
     fe_ext = zeros(getnbasefunctions(facetvalues))
-    for face in FacetIterator(dh, facetset)
+    for facet in FacetIterator(dh, facetset)
         ## Update the facetvalues to the correct facet number
-        reinit!(facetvalues, face)
+        reinit!(facetvalues, facet)
         ## Reset the temporary array for the next facet
         fill!(fe_ext, 0.0)
         ## Access the cell's coordinates
-        cell_coordinates = getcoordinates(face)
+        cell_coordinates = getcoordinates(facet)
         for qp in 1:getnquadpoints(facetvalues)
             ## Calculate the global coordinate of the quadrature point.
             x = spatial_coordinate(facetvalues, qp, cell_coordinates)
@@ -192,7 +192,7 @@ function assemble_external_forces!(f_ext, dh, facetset, facetvalues, prescribed_
             end
         end
         ## Add the local contributions to the correct indices in the global external force vector
-        assemble!(f_ext, celldofs(face), fe_ext)
+        assemble!(f_ext, celldofs(facet), fe_ext)
     end
     return f_ext
 end

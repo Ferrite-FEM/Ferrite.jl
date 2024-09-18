@@ -141,7 +141,7 @@ function create_dofhandler(grid, ipu, ipp)
 end;
 
 # We are simulating a uniaxial tensile loading of a unit cube. Hence we apply a displacement field (`:u`) in `x` direction on the right face.
-# The left, bottom and back faces are fixed in the `x`, `y` and `z` components of the displacement so as to emulate the uniaxial nature
+# The left, bottom and back facets are fixed in the `x`, `y` and `z` components of the displacement so as to emulate the uniaxial nature
 # of the loading.
 function create_bc(dh)
     dbc = ConstraintHandler(dh)
