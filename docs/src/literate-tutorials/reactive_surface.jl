@@ -313,7 +313,7 @@ function gray_scott_on_sphere(material::GrayScottMaterial, Δt::Real, T::Real, r
         uₜ₋₁ .= uₜ
     end
 
-    close(pvd);
+    vtk_save(pvd);
 end
 
 ## This parametrization gives the spot pattern shown in the gif above.

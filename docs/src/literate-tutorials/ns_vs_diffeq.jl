@@ -583,7 +583,7 @@ for (step, (u,t)) in enumerate(intervals(integrator))
         pvd[t] = vtk
     end
 end
-close(pvd);
+vtk_save(pvd);
 
 
 using Test                                                                      #hide
