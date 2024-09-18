@@ -229,10 +229,10 @@ function symmetrize_lower!(K)
     end
 end;
 
-function doassemble_neumann!(r, dh, faceset, facetvalues, t)
+function doassemble_neumann!(r, dh, facetset, facetvalues, t)
     n_basefuncs = getnbasefunctions(facetvalues)
     re = zeros(n_basefuncs)                      # element residual vector
-    for fc in FacetIterator(dh, faceset)
+    for fc in FacetIterator(dh, facetset)
         ## Add traction as a negative contribution to the element residual `re`:
         reinit!(facetvalues, fc)
         fill!(re, 0)

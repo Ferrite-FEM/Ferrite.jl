@@ -241,8 +241,8 @@ close!(ch_dirichlet)
 update!(ch_dirichlet, 0.0)
 
 # For periodic boundary conditions we use the [`PeriodicDirichlet`](@ref) constraint type,
-# which is very similar to the `Dirichlet` type, but instead of a passing a faceset we pass
-# a vector with "face pairs", i.e. the mapping between mirror and image parts of the
+# which is very similar to the `Dirichlet` type, but instead of a passing a facetset we pass
+# a vector with "facet pairs", i.e. the mapping between mirror and image parts of the
 # boundary. In this example the `"left"` and `"bottom"` boundaries are mirrors, and the
 # `"right"` and `"top"` boundaries are the mirrors.
 

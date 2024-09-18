@@ -211,15 +211,6 @@ function setup_grid(h=0.05)
     ## Finalize the Gmsh library
     Gmsh.finalize()
 
-    ## Temp fix for FerriteGmsh
-    ## for setname in ["Γ1", "Γ2", "Γ3", "Γ4"]
-    ##    faceset = grid.facesets[setname]
-    ##    edgeset = Set([EdgeIndex(f[1], f[2]) for f in faceset])
-    ##    grid.edgesets[setname] = edgeset
-    ##    delete!(grid.facesets, setname)
-    ## end
-    ## =#
-
     return grid
 end
 #md nothing #hide
@@ -232,7 +223,7 @@ end
 # velocity and `ipp` for the pressure. Note that we specify linear geometric mapping
 # (`ipg`) for both the velocity and pressure because our grid contains linear
 # triangles. However, since linear mapping is default this could have been skipped.
-# We also construct face-values for the pressure since we need to integrate along
+# We also construct facet-values for the pressure since we need to integrate along
 # the boundary when assembling the constraint matrix ``\underline{\underline{C}}``.
 
 function setup_fevalues(ipu, ipp, ipg)
@@ -267,7 +258,7 @@ end
 # Let's first discuss the assembly of the constraint matrix ``\underline{\underline{C}}``
 # and how to create an `AffineConstraint` from it. This is done in the
 # `setup_mean_constraint` function below. Assembling this is not so different from standard
-# assembly in Ferrite: we loop over all the faces, loop over the quadrature points, and loop
+# assembly in Ferrite: we loop over all the facets, loop over the quadrature points, and loop
 # over the shape functions. Note that since there is only one constraint the matrix will
 # only have one row.
 # After assembling `C` we construct an `AffineConstraint` from it. We select the constrained
@@ -339,14 +330,14 @@ end
 
 # We now setup all the boundary conditions in the `setup_constraints` function below.
 # Since the periodicity constraint for this example is between two boundaries which are not
-# parallel to each other we need to i) compute the mapping between each mirror face and the
-# corresponding image face (on the element level) and ii) describe the dof relation between
-# dofs on these two faces. In Ferrite this is done by defining a transformation of entities
+# parallel to each other we need to i) compute the mapping between each mirror facet and the
+# corresponding image facet (on the element level) and ii) describe the dof relation between
+# dofs on these two facets. In Ferrite this is done by defining a transformation of entities
 # on the image boundary such that they line up with the matching entities on the mirror
 # boundary. In this example we consider the inlet ``\Gamma_1`` to be the image, and the
 # outlet ``\Gamma_3`` to be the mirror. The necessary transformation to apply then becomes a
 # rotation of ``\pi/2`` radians around the out-of-plane axis. We set up the rotation matrix
-# `R`, and then compute the mapping between mirror and image faces using
+# `R`, and then compute the mapping between mirror and image facets using
 # [`collect_periodic_facets`](@ref) where the rotation is applied to the coordinates. In the
 # next step we construct the constraint using the [`PeriodicDirichlet`](@ref) constructor.
 # We pass the constructor the computed mapping, and also the rotation matrix. This matrix is
