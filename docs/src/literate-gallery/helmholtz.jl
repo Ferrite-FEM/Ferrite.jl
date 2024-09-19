@@ -152,7 +152,7 @@ function doassemble(cellvalues::CellValues, facetvalues::FacetValues,
         end
 
         celldofs!(global_dofs, cell)
-        assemble!(assembler, global_dofs, fe, Ke)
+        assemble!(assembler, global_dofs, Ke, fe)
     end
     return K, f
 end;

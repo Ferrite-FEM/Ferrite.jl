@@ -331,7 +331,7 @@ function test_2_element_heat_eq()
                     end
                 end
             end
-            assemble!(assembler, eldofs, fe, Ke)
+            assemble!(assembler, eldofs, Ke, fe)
         end
     end
 

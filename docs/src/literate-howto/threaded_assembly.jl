@@ -173,7 +173,7 @@ function assemble_cell!(scratch::ScratchValues, cell::Int, K::SparseMatrixCSC,
     end
 
     celldofs!(global_dofs, dh, cell)
-    assemble!(assembler, global_dofs, fe, Ke)
+    assemble!(assembler, global_dofs, Ke, fe)
 end;
 
 function run_assemble()
