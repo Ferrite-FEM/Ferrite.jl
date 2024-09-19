@@ -2,58 +2,98 @@ abstract type AbstractAssembler end
 abstract type AbstractCSCAssembler <: AbstractAssembler end
 
 """
-This assembler creates a COO (**coo**rdinate format) representation of a sparse matrix during
-assembly and converts it into a `SparseMatrixCSC{T}` on finalization.
+    struct COOAssembler{Tv, Ti}
+
+This assembler creates a COO (**coo**rdinate format) representation of a sparse matrix
+during assembly and converts it into a `SparseMatrixCSC{Tv, Ti}` on finalization.
 """
-struct COOAssembler{T} # <: AbstractAssembler
-    I::Vector{Int}
-    J::Vector{Int}
-    V::Vector{T}
+struct COOAssembler{Tv, Ti} # <: AbstractAssembler
+    nrows::Int
+    ncols::Int
+    f::Vector{Tv}
+    I::Vector{Ti}
+    J::Vector{Ti}
+    V::Vector{Tv}
 end
 
-COOAssembler(N) = COOAssembler(Float64, N)
-
-function COOAssembler(::Type{T}, N) where T
+function COOAssembler{Tv, Ti}(nrows::Int, ncols::Int; sizehint::Int = 0) where {Tv, Ti}
     I = Int[]
     J = Int[]
-    V = T[]
-    sizehint!(I, N)
-    sizehint!(J, N)
-    sizehint!(V, N)
-
-    COOAssembler(I, J, V)
+    V = Tv[]
+    sizehint!(I, sizehint)
+    sizehint!(J, sizehint)
+    sizehint!(V, sizehint)
+    f = Tv[]
+    return COOAssembler{Tv, Ti}(nrows, ncols, f, I, J, V)
 end
 
 """
-    start_assemble([N=0]) -> COOAssembler
+    COOAssembler(nrows::Int, ncols::Int; sizehint::Int = 0)
 
-Create an `Assembler` object which can be used to assemble element contributions to the
-global sparse matrix. Use [`assemble!`](@ref) for each element, and [`finish_assemble`](@ref),
-to finalize the assembly and return the sparse matrix.
-
-Note that giving a sparse matrix as input can be more efficient. See below and
-as described in the [manual](@ref man-assembly).
-
-!!! note
-    When the same matrix pattern is used multiple times (for e.g. multiple time steps or
-    Newton iterations) it is more efficient to create the sparse matrix **once** and reuse
-    the same pattern. See the [manual section](@ref man-assembly) on assembly.
+Create a new assembler.
 """
-function start_assemble(N::Int=0)
-    return start_assemble(Float64, N)
+function COOAssembler(nrows::Int, ncols::Int; sizehint::Int = 0)
+    return COOAssembler{Float64, Int}(nrows, ncols; sizehint = sizehint)
 end
+COOAssembler(; sizehint::Int = 0) = COOAssembler(-1, -1; sizehint = sizehint)
 
-function start_assemble(t::Type{T}, N::Int=0) where T
-    return COOAssembler(t, N)
-end
+# """
+#     start_assemble(; sizehint::Int = 0) -> COOAssembler
+#     start_assemble(nrows::Int, ncols::Int; sizehint::Int = 0) -> COOAssembler
+
+# Create an `COOAssembler` which can be used to assemble element contributions to a global
+# sparse matrix and vector. `nrows` is the number of rows in the final matrix and `ncols` the
+# number of columns. If `nrows` and `ncols` are not passed they are inferred from the
+# maximum indices added to the assembler during assembly. `sizehint` is a hint for how many
+# entries in total will be added to the assembler and can be passed to optimize for
+# allocations.
+
+# Use [`assemble!`](@ref) to insert element contributions, and [`finish_assemble`](@ref), to
+# finalize the assembly and return the sparse matrix (and optionally vector).
+
+# Note that allocating a sparse matrix and assemble into it is generally preferred. See below
+# and the [manual section on assembly](@ref man-assembly).
+
+# !!! note
+#     When the same matrix pattern is used multiple times (for e.g. multiple time steps or
+#     Newton iterations) it is more efficient to create the sparse matrix **once** and reuse
+#     the same pattern. See the [manual section](@ref man-assembly) on assembly.
+# """
+# function start_assemble(nrows::Int, ncols::Int; sizehint::Int = 0)
+#     return COOAssembler{Float64, Int}(nrows, ncols; sizehint = sizehint)
+# end
+
+# function start_assemble(; sizehint::Int = 0)
+#     return COOAssembler{Float64, Int}(-1, -1; sizehint = sizehint)
+# end
 
 """
     assemble!(a::COOAssembler, dofs, Ke)
+    assemble!(a::COOAssembler, dofs, Ke, fe)
 
-Assembles the element matrix `Ke` into `a`.
+Assembles the element matrix `Ke` and element vector `fe` into `a`.
 """
-function assemble!(a::COOAssembler{T}, dofs::AbstractVector{Int}, Ke::AbstractMatrix{T}) where {T}
+function assemble!(a::COOAssembler{T}, dofs::AbstractVector{Int}, Ke::AbstractMatrix{T}, fe::Union{AbstractVector{T}, Nothing} = nothing) where {T}
     assemble!(a, dofs, dofs, Ke)
+    if fe !== nothing
+        # If the final number of rows is unknown we grow the vector lazily,
+        # otherwise we resize it directly to nrows.
+        if a.nrows == -1
+            m = maximum(dofs; init = 0)
+            lf = length(a.f)
+            if lf < m
+                resize!(a.f, m)
+                for i in (lf + 1):m
+                    a.f[i] = 0
+                end
+            end
+        elseif isempty(a.f)
+            resize!(a.f, a.nrows)
+            fill!(a.f, 0)
+        end
+        assemble!(a.f, dofs, fe)
+    end
+    return
 end
 
 """
@@ -78,13 +118,31 @@ function assemble!(a::COOAssembler{T}, rowdofs::AbstractVector{Int}, coldofs::Ab
 end
 
 """
-    finish_assemble(a::Assembler) -> K
+    finish_assemble(a::COOAssembler) -> K, f
 
-Finalizes an assembly. Returns a sparse matrix with the
-assembled values. Note that this step is not necessary for `AbstractAssembler`s.
+Finalize the assembly and return the sparse matrix `K::SparseMatrixCSC` and vector
+`f::Vector`. If the assembler have not been used for vector assembly, `f` is an empty
+vector.
 """
 function finish_assemble(a::COOAssembler)
-    return sparse(a.I, a.J, a.V)
+    # Create the matrix
+    nrows = a.nrows == -1 ? maximum(a.I) : a.nrows
+    ncols = a.ncols == -1 ? maximum(a.J) : a.ncols
+    K = sparse(a.I, a.J, a.V, nrows, ncols)
+    # Finalize the vector
+    f = a.f
+    if !isempty(f)
+        # There have been things assembled, make sure it is resized correctly
+        lf = length(f)
+        @assert lf <= nrows
+        if lf < nrows
+            resize!(f, nrows)
+            for i in (lf + 1):nrows
+                f[i] = 0
+            end
+        end
+    end
+    return K, f
 end
 
 """
@@ -173,7 +231,7 @@ function start_assemble(K::Symmetric{T,<:SparseMatrixCSC}, f::Vector=T[]; fillze
 end
 
 function finish_assemble(a::Union{CSCAssembler, SymmetricCSCAssembler})
-    return a.K, isempty(a.f) ? nothing : a.f
+    return a.K, a.f
 end
 
 """
