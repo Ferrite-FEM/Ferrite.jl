@@ -188,16 +188,10 @@ stiffness matrix and `f` the global force/residual vector, but more efficient.
 """
 assemble!(::AbstractAssembler, ::AbstractVector{<:Integer}, ::AbstractMatrix, ::AbstractVector)
 
-@propagate_inbounds function assemble!(A::AbstractAssembler, dofs::AbstractVector{<:Integer}, Ke::AbstractMatrix)
-    assemble!(A, dofs, Ke, eltype(Ke)[])
-end
-@propagate_inbounds function assemble!(A::AbstractAssembler, dofs::AbstractVector{<:Integer}, fe::AbstractVector, Ke::AbstractMatrix)
-    assemble!(A, dofs, Ke, fe)
-end
-@propagate_inbounds function assemble!(A::AbstractAssembler, dofs::AbstractVector{<:Integer}, Ke::AbstractMatrix, fe::AbstractVector)
+@propagate_inbounds function assemble!(A::AbstractAssembler, dofs::AbstractVector{<:Integer}, Ke::AbstractMatrix, fe::Union{AbstractVector, Nothing} = nothing)
     _assemble!(A, dofs, Ke, fe, false)
 end
-@propagate_inbounds function assemble!(A::SymmetricCSCAssembler, dofs::AbstractVector{<:Integer}, Ke::AbstractMatrix, fe::AbstractVector)
+@propagate_inbounds function assemble!(A::SymmetricCSCAssembler, dofs::AbstractVector{<:Integer}, Ke::AbstractMatrix, fe::Union{AbstractVector, Nothing} = nothing)
     _assemble!(A, dofs, Ke, fe, true)
 end
 
@@ -215,10 +209,10 @@ Sorts the dofs into a separate buffer and returns it together with a permutation
     return sorteddofs, permutation
 end
 
-@propagate_inbounds function _assemble!(A::AbstractCSCAssembler, dofs::AbstractVector{<:Integer}, Ke::AbstractMatrix, fe::AbstractVector, sym::Bool)
+@propagate_inbounds function _assemble!(A::AbstractCSCAssembler, dofs::AbstractVector{<:Integer}, Ke::AbstractMatrix, fe::Union{AbstractVector, Nothing}, sym::Bool)
     ld = length(dofs)
     @boundscheck checkbounds(Ke, keys(dofs), keys(dofs))
-    if length(fe) != 0
+    if fe !== nothing
         @boundscheck checkbounds(fe, keys(dofs))
         @boundscheck checkbounds(A.f, dofs)
         @inbounds assemble!(A.f, dofs, fe)

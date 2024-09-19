@@ -462,6 +462,9 @@ more discussion).
 - `start_assemble(f, K)` have been deprecated in favor of the "canonical" `start_assemble(K,
   f)`. ([#707][github-707])
 
+- `assemble!(assembler, dofs, fe, Ke)` have been deprecated in favor of the "canonical"
+  `assemble!(assembler, dofs, Ke, fe)`. ([#1059][github-1059])
+
 - `end_assemble` have been deprecated in favor of `finish_assemble`. ([#754][github-754])
 
 - `get_point_values` have been deprecated in favor of `evaluate_at_points`.
@@ -1032,3 +1035,4 @@ poking into Ferrite internals:
 [github-949]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/949
 [github-953]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/953
 [github-974]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/974
+[github-1059]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/1059
