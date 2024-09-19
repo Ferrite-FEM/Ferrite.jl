@@ -311,7 +311,7 @@ function solve(interpolation_u, interpolation_p)
         Ferrite.update!(dbc, t)
         apply!(w, dbc)
         newton_itr = -1
-        prog = ProgressMeter.ProgressThresh(NEWTON_TOL, "Solving @ time $t of $Tf;")
+        prog = ProgressMeter.ProgressThresh(NEWTON_TOL; desc = "Solving @ time $t of $Tf;")
         fill!(ΔΔw, 0.0);
         while true; newton_itr += 1
             assemble_global!(K, f, cellvalues_u, cellvalues_p, dh, mp, w)
