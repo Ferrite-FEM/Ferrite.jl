@@ -1,11 +1,11 @@
-abstract type AbstractSparseAssembler end
-abstract type AbstractSparseCSCAssembler <: AbstractSparseAssembler end
+abstract type AbstractAssembler end
+abstract type AbstractCSCAssembler <: AbstractAssembler end
 
 """
 This assembler creates a COO (**coo**rdinate format) representation of a sparse matrix during
 assembly and converts it into a `SparseMatrixCSC{T}` on finalization.
 """
-struct COOAssembler{T}
+struct COOAssembler{T} # <: AbstractAssembler
     I::Vector{Int}
     J::Vector{Int}
     V::Vector{T}
@@ -78,10 +78,10 @@ function assemble!(a::COOAssembler{T}, rowdofs::AbstractVector{Int}, coldofs::Ab
 end
 
 """
-    finish_assemble(a::COOAssembler) -> K
+    finish_assemble(a::Assembler) -> K
 
 Finalizes an assembly. Returns a sparse matrix with the
-assembled values. Note that this step is not necessary for the standard `AbstractSparseAssembler`s.
+assembled values. Note that this step is not necessary for `AbstractSparseAssembler`s.
 """
 function finish_assemble(a::COOAssembler)
     return sparse(a.I, a.J, a.V)
@@ -110,21 +110,9 @@ assembly operations.
 matrix_handle, vector_handle
 
 """
-    get_matrix(a::AbstractSparseAssembler)
-    get_vector(a::AbstractSparseAssembler)
-
-Return a reference to the matrix into which we assemble.
-The returned object might differ from [`matrix_handle`](@ref).
-"""
-get_matrix, get_vector
-
-get_vector(a::AbstractSparseAssembler) = a.f
-get_matrix(a::AbstractSparseAssembler) = a.K
-
-"""
 Assembler for sparse matrix with CSC storage type.
 """
-struct CSCAssembler{Tv,Ti,MT<:AbstractSparseMatrixCSC{Tv,Ti}} <: AbstractSparseCSCAssembler
+struct CSCAssembler{Tv,Ti,MT<:AbstractSparseMatrixCSC{Tv,Ti}} <: AbstractCSCAssembler
     K::MT
     f::Vector{Tv}
     permutation::Vector{Int}
@@ -134,26 +122,26 @@ end
 """
 Assembler for symmetric sparse matrix with CSC storage type.
 """
-struct SymmetricCSCAssembler{Tv,Ti, MT <: Symmetric{Tv,<:AbstractSparseMatrixCSC{Tv,Ti}}} <: AbstractSparseCSCAssembler
+struct SymmetricCSCAssembler{Tv,Ti, MT <: Symmetric{Tv,<:AbstractSparseMatrixCSC{Tv,Ti}}} <: AbstractCSCAssembler
     K::MT
     f::Vector{Tv}
     permutation::Vector{Int}
     sorteddofs::Vector{Int}
 end
 
-function Base.show(io::IO, ::MIME"text/plain", a::AbstractSparseAssembler)
+function Base.show(io::IO, ::MIME"text/plain", a::Union{CSCAssembler, SymmetricCSCAssembler})
     print(io, typeof(a), " for assembling into:\n - ")
-    summary(io, get_matrix(a))
-    f = get_vector(a)
+    summary(io, a.K)
+    f = a.f
     if !isempty(f)
         print(io, "\n - ")
         summary(io, f)
     end
 end
 
-matrix_handle(a::AbstractSparseCSCAssembler) = a.K
+matrix_handle(a::AbstractCSCAssembler) = a.K
 matrix_handle(a::SymmetricCSCAssembler) = a.K.data
-vector_handle(a::AbstractSparseCSCAssembler) = a.f
+vector_handle(a::AbstractCSCAssembler) = a.f
 
 """
     start_assemble(K::AbstractSparseMatrixCSC;            fillzero::Bool=true, maxcelldofs_hint::Int=0) -> CSCAssembler
@@ -186,7 +174,9 @@ function start_assemble(K::Symmetric{T,<:SparseMatrixCSC}, f::Vector=T[]; fillze
     return SymmetricCSCAssembler(K, f, zeros(Int,maxcelldofs_hint), zeros(Int,maxcelldofs_hint))
 end
 
-finish_assemble(a::AbstractSparseCSCAssembler) = get_matrix(a)
+function finish_assemble(a::Union{CSCAssembler, SymmetricCSCAssembler})
+    return a.K, isempty(a.f) ? nothing : a.f
+end
 
 """
     assemble!(A::AbstractSparseAssembler, dofs::AbstractVector{Int}, Ke::AbstractMatrix)
@@ -198,15 +188,15 @@ stiffness (and force) in `A`, given the element degrees of freedom `dofs`.
 This is equivalent to `K[dofs, dofs] += Ke` and `f[dofs] += fe`, where `K` is the global
 stiffness matrix and `f` the global force/residual vector, but more efficient.
 """
-assemble!(::AbstractSparseAssembler, ::AbstractVector{<:Integer}, ::AbstractMatrix, ::AbstractVector)
+assemble!(::AbstractAssembler, ::AbstractVector{<:Integer}, ::AbstractMatrix, ::AbstractVector)
 
-@propagate_inbounds function assemble!(A::AbstractSparseAssembler, dofs::AbstractVector{<:Integer}, Ke::AbstractMatrix)
+@propagate_inbounds function assemble!(A::AbstractAssembler, dofs::AbstractVector{<:Integer}, Ke::AbstractMatrix)
     assemble!(A, dofs, Ke, eltype(Ke)[])
 end
-@propagate_inbounds function assemble!(A::AbstractSparseAssembler, dofs::AbstractVector{<:Integer}, fe::AbstractVector, Ke::AbstractMatrix)
+@propagate_inbounds function assemble!(A::AbstractAssembler, dofs::AbstractVector{<:Integer}, fe::AbstractVector, Ke::AbstractMatrix)
     assemble!(A, dofs, Ke, fe)
 end
-@propagate_inbounds function assemble!(A::AbstractSparseAssembler, dofs::AbstractVector{<:Integer}, Ke::AbstractMatrix, fe::AbstractVector)
+@propagate_inbounds function assemble!(A::AbstractAssembler, dofs::AbstractVector{<:Integer}, Ke::AbstractMatrix, fe::AbstractVector)
     _assemble!(A, dofs, Ke, fe, false)
 end
 @propagate_inbounds function assemble!(A::SymmetricCSCAssembler, dofs::AbstractVector{<:Integer}, Ke::AbstractMatrix, fe::AbstractVector)
@@ -214,14 +204,12 @@ end
 end
 
 """
-    _sortdofs_for_assembly(A::AbstractSparseAssembler, dofs::AbstractVector) -> sorteddofs, permutation
+    _sortdofs_for_assembly!(permutation::Vector{Int}, sorteddofs::Vector{Int}, dofs::AbstractVector)
 
 Sorts the dofs into a separate buffer and returns it together with a permutation vector.
 """
-@propagate_inbounds function _sortdofs_for_assembly(A::AbstractSparseAssembler, dofs::AbstractVector)
+@propagate_inbounds function _sortdofs_for_assembly!(permutation::Vector{Int}, sorteddofs::Vector{Int}, dofs::AbstractVector)
     ld = length(dofs)
-    permutation = A.permutation
-    sorteddofs = A.sorteddofs
     resize!(permutation, ld)
     resize!(sorteddofs, ld)
     copyto!(sorteddofs, dofs)
@@ -229,7 +217,7 @@ Sorts the dofs into a separate buffer and returns it together with a permutation
     return sorteddofs, permutation
 end
 
-@propagate_inbounds function _assemble!(A::AbstractSparseCSCAssembler, dofs::AbstractVector{<:Integer}, Ke::AbstractMatrix, fe::AbstractVector, sym::Bool)
+@propagate_inbounds function _assemble!(A::AbstractCSCAssembler, dofs::AbstractVector{<:Integer}, Ke::AbstractMatrix, fe::AbstractVector, sym::Bool)
     ld = length(dofs)
     @boundscheck checkbounds(Ke, keys(dofs), keys(dofs))
     if length(fe) != 0
@@ -246,7 +234,7 @@ end
     # We assume that the input dofs are not sorted, because the cells need the dofs in
     # a specific order, which might not be the sorted order. Hence we sort them.
     # Note that we are not allowed to mutate `dofs` in the process.
-    sorteddofs, permutation = _sortdofs_for_assembly(A, dofs)
+    sorteddofs, permutation = _sortdofs_for_assembly!(A.permutation, A.sorteddofs, dofs)
 
     current_col = 1
     @inbounds for Kcol in sorteddofs
@@ -322,7 +310,7 @@ When the keyword argument `apply_zero` is `true` all inhomogeneities are set to 
 Note that this method is destructive since it modifies `local_matrix` and `local_vector`.
 """
 function apply_assemble!(
-        assembler::AbstractSparseAssembler, ch::ConstraintHandler,
+        assembler::AbstractAssembler, ch::ConstraintHandler,
         global_dofs::AbstractVector{Int},
         local_matrix::AbstractMatrix, local_vector::AbstractVector;
         apply_zero::Bool = false
