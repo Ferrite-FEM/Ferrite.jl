@@ -81,7 +81,7 @@ end
     finish_assemble(a::Assembler) -> K
 
 Finalizes an assembly. Returns a sparse matrix with the
-assembled values. Note that this step is not necessary for `AbstractSparseAssembler`s.
+assembled values. Note that this step is not necessary for `AbstractAssembler`s.
 """
 function finish_assemble(a::COOAssembler)
     return sparse(a.I, a.J, a.V)
@@ -101,8 +101,8 @@ Assembles the element residual `ge` into the global residual vector `g`.
 end
 
 """
-    matrix_handle(a::AbstractSparseAssembler)
-    vector_handle(a::AbstractSparseAssembler)
+    matrix_handle(a::AbstractAssembler)
+    vector_handle(a::AbstractAssembler)
 
 Return a reference to the underlying matrix/vector of the assembler used during
 assembly operations.
@@ -177,8 +177,8 @@ function finish_assemble(a::Union{CSCAssembler, SymmetricCSCAssembler})
 end
 
 """
-    assemble!(A::AbstractSparseAssembler, dofs::AbstractVector{Int}, Ke::AbstractMatrix)
-    assemble!(A::AbstractSparseAssembler, dofs::AbstractVector{Int}, Ke::AbstractMatrix, fe::AbstractVector)
+    assemble!(A::AbstractAssembler, dofs::AbstractVector{Int}, Ke::AbstractMatrix)
+    assemble!(A::AbstractAssembler, dofs::AbstractVector{Int}, Ke::AbstractMatrix, fe::AbstractVector)
 
 Assemble the element stiffness matrix `Ke` (and optional force vector `fe`) into the global
 stiffness (and force) in `A`, given the element degrees of freedom `dofs`.
@@ -289,7 +289,7 @@ end
 
 """
     apply_assemble!(
-        assembler::AbstractSparseAssembler, ch::ConstraintHandler,
+        assembler::AbstractAssembler, ch::ConstraintHandler,
         global_dofs::AbstractVector{Int},
         local_matrix::AbstractMatrix, local_vector::AbstractVector;
         apply_zero::Bool = false
