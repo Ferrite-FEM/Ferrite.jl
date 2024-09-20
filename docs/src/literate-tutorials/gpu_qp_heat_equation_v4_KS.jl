@@ -5,6 +5,7 @@ assembled in the global matrix by a thread.
 =#
 
 using Ferrite, CUDA
+using KernelAbstractions
 using StaticArrays
 using SparseArrays
 using Adapt
@@ -146,14 +147,8 @@ function assemble_global!(cellvalues, dh::DofHandler,qp_iter::Val{QPiter}) where
 end
 
 
-#=NVTX.@annotate=# function assemble_local_gpu(kes,fes,cv,dh,n_cells)
-    tx = threadIdx().x
-    bx = blockIdx().x
-    bd = blockDim().x
-    # e is the global index of the finite element in the grid.
-    e = tx + (bx-Int32(1))*bd
-
-    e ≤ n_cells || return nothing
+@kernel function assemble_local_gpu!(kes,fes,cv,dh)
+    e = @index(Global) |> Int32
     n_basefuncs = getnbasefunctions(cv)
     # e is the global index of the finite element in the grid.
     cell_coords = getcoordinates(dh.grid, e)
@@ -178,22 +173,14 @@ end
             end
         end
     end
-    return nothing
 end
 
 
-function assemble_global_gpu!(assembler,kes,fes,ndofs,dofs_to_elements)
-    tx = threadIdx().x
-    ty = threadIdx().y
-    bx = blockIdx().x
-    by = blockIdx().y
-    bdx = blockDim().x
-    bdy = blockDim().y
+@kernel function assemble_global_gpu!(assembler,kes,fes,dofs_to_elements)
 
-    dof_x = tx + (bx-Int32(1))*bdx
-    dof_y = ty + (by-Int32(1))*bdy
-    dof_x ≤ ndofs || return nothing
-    dof_y ≤ ndofs || return nothing
+
+    dof_x, dof_y = @index(Global,NTuple) .|> Int32
+
     k_val = 0.0f0
     f_val = 0.0f0
     dof_x_map = dofs_to_elements[dof_x]
@@ -208,20 +195,19 @@ function assemble_global_gpu!(assembler,kes,fes,ndofs,dofs_to_elements)
                 local_dof_x = dof_x_map.local_dofs[i]
                 local_dof_y = dof_y_map.local_dofs[j]
                 k_val += kes[e_x,local_dof_x,local_dof_y]
-                #f_val += fes[e_x,local_dof_x]
+                f_val += fes[e_x,local_dof_x]
             end
         end
     end
 
     assemble!( assembler, k_val, dof_x, dof_y)
-    return nothing
 end
 
 
-function allocate_local_matrices(n_cells,cv)
+function allocate_local_matrices(backend,n_cells,cv)
     n_basefuncs = getnbasefunctions(cv)
-    ke = CUDA.zeros(Float32,n_cells, n_basefuncs, n_basefuncs)
-    fe = CUDA.zeros(Float32,n_cells, n_basefuncs)
+    ke = KernelAbstractions.zeros(backend,Float32,n_cells , n_basefuncs, n_basefuncs)
+    fe = KernelAbstractions.zeros(backend,Float32,n_cells, n_basefuncs)
     return ke,fe
 end
 
@@ -230,39 +216,35 @@ Adapt.@adapt_structure Ferrite.GPUGrid
 Adapt.@adapt_structure Ferrite.GPUDofHandler
 Adapt.@adapt_structure Ferrite.GPUAssemblerSparsityPattern
 
-#=NVTX.@annotate=# function assemble_global_gpu(cellvalues,dh)
+#=NVTX.@annotate=# function assemble_global_gpu(backend,cellvalues,dh)
     n_cells = dh |> get_grid |> getncells |> Int32
-    kes,fes = allocate_local_matrices(n_cells,cellvalues)
+    kes,fes = allocate_local_matrices(backend,n_cells,cellvalues)
     K = allocate_matrix(SparseMatrixCSC{Float32, Int32},dh)
-    Kgpu = CUSPARSE.CuSparseMatrixCSC(K)
-    fgpu = CUDA.zeros(ndofs(dh))
+    Kgpu = allocate_gpu_matrix(backend,K)
+    fgpu = KernelAbstractions.zeros(backend,Float32,ndofs(dh))
     assembler = start_assemble(Kgpu, fgpu)
-    # set up kernel adaption & launch the kernel
-    dh_gpu = Adapt.adapt_structure(CuArray, dh)
-    assembler_gpu = Adapt.adapt_structure(CUDA.KernelAdaptor(), assembler)
-    cellvalues_gpu = Adapt.adapt_structure(CuArray, cellvalues)
+
+    # adapt structs based on the backend
+    # ref: https://discourse.julialang.org/t/using-custom-structs-with-kernelabstractions/102278/6?u=abdelrahman912
+    dh_gpu = adapt(backend,dh)
+    assembler_gpu = adapt(backend,assembler)
+    cellvalues_gpu = adapt(backend,cellvalues)
+
+
     # assemble the local matrices in kes and fes
-    kernel_local = @cuda launch=false assemble_local_gpu(kes,fes,cellvalues_gpu,dh_gpu,n_cells)
-    #@show CUDA.registers(kernel)
-    config = launch_configuration(kernel_local.fun)
-    threads = min(n_cells, config.threads)
-    blocks =  cld(n_cells, threads)
-    kernel_local(kes,fes,cellvalues,dh_gpu,n_cells;  threads, blocks)
+    kernel_local =assemble_local_gpu!(backend)
+    kernel_local(kes,fes,cellvalues_gpu,dh_gpu;  ndrange=n_cells)
 
     dofs_to_elements = map_dofs_to_elements(dh)
     # assemble the global matrix
     # `dofs_to_elements` contains nested arrays so in order to keep alive we use the macro @preserve
     # ref: https://discourse.julialang.org/t/arrays-of-arrays-and-arrays-of-structures-in-cuda-kernels-cause-random-errors/69739/3?page=2
     GC.@preserve  dofs_to_elements begin
+
         dofs_to_elements = CuArray(cudaconvert.(dofs_to_elements))
         n_dofs = ndofs(dh)
-        kernel_global = @cuda launch=false assemble_global_gpu!(assembler_gpu,kes,fes,n_dofs,dofs_to_elements)
-        #CUDA.@device_code_warntype @cuda launch=false assemble_global_gpu!(assembler_gpu,kes,fes,n_dofs,dofs_to_elements)
-        #@show CUDA.registers(kernel)
-        config = launch_configuration(kernel_global.fun)
-        threads_dofs = min(n_dofs, config.threads |> sqrt |> floor |> Int32)
-        blocks =  cld(n_dofs, threads_dofs)
-        kernel_global(assembler_gpu,kes,fes,n_dofs,dofs_to_elements;  threads = (threads_dofs,threads_dofs), blocks=(blocks,blocks))
+        kernel_global = assemble_global_gpu!(backend)
+        kernel_global(assembler_gpu,kes,fes,dofs_to_elements;  ndrange=(n_dofs,n_dofs))
         return Kgpu,fgpu
     end
 end
@@ -273,19 +255,18 @@ stassy(cv,dh) = assemble_global!(cv,dh,Val(false))
 
 
 # qpassy(cv,dh) = assemble_global!(cv,dh,Val(true))
+backend  = CUDABackend();
+Kgpu, fgpu =  assemble_global_gpu(backend,cellvalues,dh);
+#using BenchmarkTools
 
-#Kgpu, fgpu = CUDA.@sync assemble_global_gpu(cellvalues,dh);
-using BenchmarkTools
-
-Kgpu, fgpu = @btime CUDA.@sync    assemble_global_gpu($cellvalues,$dh);
+#Kgpu, fgpu = @btime CUDA.@sync    assemble_global_gpu($cellvalues,$dh);
 #Kgpu, fgpu = CUDA.@profile    assemble_global_gpu_color(cellvalues,dh,colors)
 # to benchmark the code using nsight compute use the following command: ncu --mode=launch julia
 # Open nsight compute and attach the profiler to the julia instance
 # ref: https://cuda.juliagpu.org/v2.2/development/profiling/#NVIDIA-Nsight-Compute
 # to benchmark using nsight system use the following command: # nsys profile --trace=nvtx julia rmse_kernel_v1.jl
 
-
-norm(Kgpu)
+gpu_sparse_norm(Kgpu)
 
 
 Kstd , Fstd =stassy(cellvalues,dh);
