@@ -27,6 +27,7 @@ using ForwardDiff:
 using CUDA
 using Adapt
 using KernelAbstractions
+using Atomix
 
 
 include("exports.jl")

@@ -36,7 +36,7 @@ end
     # Brute force assembly
     K = A.K
     f = A.f
-    CUDA.@atomic f[ig] += fe_val
+    Atomix.@atomic f[ig] += fe_val
     # set the value of the global matrix
      _add_to_index!(K, ke_val, ig, jg)
 end
@@ -97,7 +97,7 @@ end
     for k in col_start:col_end
         if K.rowVal[k] == i
             # Update the existing element
-            CUDA.@atomic  K.nzVal[k] += v
+            Atomix.@atomic  K.nzVal[k] += v
             return
         end
     end
