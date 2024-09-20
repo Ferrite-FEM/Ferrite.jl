@@ -10,7 +10,8 @@ if liveserver
     @timeit dto "Revise.revise()" Revise.revise()
 end
 
-using Documenter, DocumenterCitations, Ferrite, FerriteGmsh, FerriteMeshParser, SparseArrays, LinearAlgebra
+using Documenter, DocumenterCitations, Ferrite, FerriteGmsh, FerriteMeshParser,
+    SparseArrays, LinearAlgebra, Changelog
 
 using BlockArrays
 const FerriteBlockArrays = Base.get_extension(Ferrite, :FerriteBlockArrays)
@@ -21,8 +22,12 @@ const is_ci = haskey(ENV, "GITHUB_ACTIONS")
 include("generate.jl")
 
 # Changelog
-include("changelog.jl")
-create_documenter_changelog()
+Changelog.generate(
+    Changelog.Documenter(),
+    joinpath(@__DIR__, "..", "CHANGELOG.md"),
+    joinpath(@__DIR__, "src", "changelog.md");
+    repo = "Ferrite-FEM/Ferrite.jl",
+)
 
 bibtex_plugin = CitationBibliography(
     joinpath(@__DIR__, "src", "assets", "references.bib"),
@@ -46,7 +51,7 @@ bibtex_plugin = CitationBibliography(
     draft = liveserver,
     pages = Any[
         "Home" => "index.md",
-        # hide("Changelog" => "changelog.md"),
+        hide("Changelog" => "changelog.md"),
         "Tutorials" => [
             "Tutorials overview" => "tutorials/index.md",
             "tutorials/heat_equation.md",
