@@ -1,8 +1,8 @@
 # This file is machine-generated - editing it directly is not advised
 
-julia_version = "1.10.4"
+julia_version = "1.10.5"
 manifest_format = "2.0"
-project_hash = "2283fea1dfcfa0f2c82cdecbc5750875c26d6009"
+project_hash = "864d1d29886fc101f4919a6d1c30efd8f4e2ca2e"
 
 [[deps.ADTypes]]
 git-tree-sha1 = "ae44a0c3d68a420d4ac0fa1f7e0c034ccecb6dc5"
@@ -176,6 +176,11 @@ weakdeps = ["SparseArrays"]
 
     [deps.ChainRulesCore.extensions]
     ChainRulesCoreSparseArraysExt = "SparseArrays"
+
+[[deps.Changelog]]
+git-tree-sha1 = "e579c6157598169ad4ef17263bdf3452b4a3e316"
+uuid = "5217a498-cd5d-4ec6-b8c2-9b85a09b6e3e"
+version = "1.1.0"
 
 [[deps.CloseOpenIntervals]]
 deps = ["Static", "StaticArrayInterface"]
