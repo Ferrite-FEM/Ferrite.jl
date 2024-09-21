@@ -9,7 +9,7 @@ function create_incidence_matrix(g::AbstractGrid, cellset=1:getncells(g))
         end
     end
 
-    I, J, V = Int[], Int[], Bool[]
+    I, J = Int[], Int[]
     for (_, cells) in cell_containing_node
         for cell1 in cells # All these cells have a neighboring node
             for cell2 in cells
@@ -17,13 +17,13 @@ function create_incidence_matrix(g::AbstractGrid, cellset=1:getncells(g))
                 if cell1 != cell2
                     push!(I, cell1)
                     push!(J, cell2)
-                    push!(V, true)
                 end
             end
         end
     end
 
-    incidence_matrix = sparse(I, J, V, getncells(g), getncells(g))
+    incidence_matrix = spzeros!!(Bool, I, J, getncells(g), getncells(g))
+    fill!(incidence_matrix.nzval, true)
     return incidence_matrix
 end
 
