@@ -1,4 +1,6 @@
-struct GPUDofHandler{CDOFS<:AbstractArray{<:Number,1},VEC_INT<:AbstractArray{Int32,1},GRID<:AbstractGrid}<: AbstractDofHandler
+abstract type AbstractGPUDofHandler <:AbstractDofHandler  end
+
+struct GPUDofHandler{CDOFS<:AbstractArray{<:Number,1},VEC_INT<:AbstractArray{Int32,1},GRID<:AbstractGrid}<: AbstractGPUDofHandler
     cell_dofs::CDOFS
     grid::GRID
     cell_dofs_offset::VEC_INT

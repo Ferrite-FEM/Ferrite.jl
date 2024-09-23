@@ -214,7 +214,7 @@ stassy(cv,dh) = assemble_global!(cv,dh,Val(false))
 
 #Kgpu, fgpu = @btime CUDA.@sync    assemble_global_gpu($cellvalues,$dh);
 #Kstd , Fstd =@btime  stassy($cellvalues,$dh);
-Kgpu, fgpu = CUDA.@profile    assemble_global_gpu($cellvalues,$dh);
+Kgpu, fgpu = CUDA.@profile  assemble_gpu(cellvalues,dh);
 # to benchmark the code using nsight compute use the following command: ncu --mode=launch julia
 # Open nsight compute and attach the profiler to the julia instance
 # ref: https://cuda.juliagpu.org/v2.2/development/profiling/#NVIDIA-Nsight-Compute

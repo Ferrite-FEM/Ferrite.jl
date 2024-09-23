@@ -29,8 +29,8 @@ end
 
 function Adapt.adapt_structure(to, dh::DofToElements)
     dof = Adapt.adapt_structure(to, dh.dof)
-    elements = Adapt.adapt_structure(to, dh.elements |> cu)
-    local_dofs = Adapt.adapt_structure(to, dh.local_dofs |> cu)
+    elements = Adapt.adapt_structure(to, dh.elements )
+    local_dofs = Adapt.adapt_structure(to, dh.local_dofs )
     n_elements = Adapt.adapt_structure(to, dh.n_elements)
     DofToElements(dof, elements, local_dofs, n_elements)
 end
@@ -62,10 +62,10 @@ end
 
 
 left = Tensor{1,2,Float32}((0,-0)) # define the left bottom corner of the grid.
-right = Tensor{1,2,Float32}((100.0,100.0)) # define the right top corner of the grid.
+right = Tensor{1,2,Float32}((4.0,4.0)) # define the right top corner of the grid.
 
 
-grid = generate_grid(Quadrilateral, (100, 100),left,right)
+grid = generate_grid(Quadrilateral, (4, 4),left,right)
 
 
 ip = Lagrange{RefQuadrilateral, 1}() # define the interpolation function (i.e. Bilinear lagrange)
@@ -178,7 +178,6 @@ end
 
 @kernel function assemble_global_gpu!(assembler,kes,fes,dofs_to_elements)
 
-
     dof_x, dof_y = @index(Global,NTuple) .|> Int32
 
     k_val = 0.0f0
@@ -187,6 +186,7 @@ end
     dof_y_map = dofs_to_elements[dof_y]
     nx = dof_x_map.n_elements
     ny = dof_y_map.n_elements
+    #@cushow nx,ny
     for i in 1:nx
         e_x = dof_x_map.elements[i]
         for j in 1:ny
@@ -239,9 +239,10 @@ Adapt.@adapt_structure Ferrite.GPUAssemblerSparsityPattern
     # assemble the global matrix
     # `dofs_to_elements` contains nested arrays so in order to keep alive we use the macro @preserve
     # ref: https://discourse.julialang.org/t/arrays-of-arrays-and-arrays-of-structures-in-cuda-kernels-cause-random-errors/69739/3?page=2
-    GC.@preserve  dofs_to_elements begin
+   GC.@preserve  dofs_to_elements begin
 
-        dofs_to_elements = CuArray(cudaconvert.(dofs_to_elements))
+        dofs_to_elements = CuArray(cudaconvert.(dofs_to_elements)) # CUDA dependant
+        #dofs_to_elements=  adapt(backend,map((e-> adapt(backend,e)),dofs_to_elements))  #not working (not sure why)
         n_dofs = ndofs(dh)
         kernel_global = assemble_global_gpu!(backend)
         kernel_global(assembler_gpu,kes,fes,dofs_to_elements;  ndrange=(n_dofs,n_dofs))
