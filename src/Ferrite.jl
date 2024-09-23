@@ -16,7 +16,7 @@ using OrderedCollections:
 using SparseArrays:
     AbstractSparseArray,SparseArrays, SparseMatrixCSC, nonzeros, nzrange, rowvals, sparse
 using StaticArrays:
-    StaticVector,StaticArrays,MVector, MArray, MMatrix, SArray, SMatrix, SVector
+    StaticVector,StaticArrays,MVector, MArray, MMatrix, SArray, SMatrix, SVector, @SVector
 using WriteVTK:
     WriteVTK, VTKCellTypes
 using Tensors:

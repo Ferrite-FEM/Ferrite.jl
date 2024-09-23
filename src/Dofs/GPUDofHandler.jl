@@ -22,5 +22,6 @@ Return the cell degrees of freedom for the given cell index `i` in the `GPUDofHa
 function celldofs(dh::GPUDofHandler, i::Int32)
     offset = cell_dof_offset(dh, i)
     ndofs = ndofs_per_cell(dh, i)
-    return @view dh.cell_dofs[offset:(offset+ndofs-Int32(1))]
+     view =  @view dh.cell_dofs[offset:(offset+ndofs-Int32(1))]
+    return view
 end

@@ -1,6 +1,6 @@
 
 using Ferrite, CUDA
-using StaticArrays
+ using StaticArrays
 using SparseArrays
 using Adapt
 using Test
@@ -8,11 +8,12 @@ using NVTX
 
 
 
+
 left = Tensor{1,2,Float32}((0,-0)) # define the left bottom corner of the grid.
-right = Tensor{1,2,Float32}((4.0,4.0)) # define the right top corner of the grid.
+right = Tensor{1,2,Float32}((10.0,10.0)) # define the right top corner of the grid.
 
 
-grid = generate_grid(Quadrilateral, (4, 4),left,right)
+grid = generate_grid(Quadrilateral, (10, 10),left,right)
 
 
 ip = Lagrange{RefQuadrilateral, 1}() # define the interpolation function (i.e. Bilinear lagrange)
@@ -151,8 +152,10 @@ end
 
 
 
+
 Adapt.@adapt_structure Ferrite.GPUGrid
 Adapt.@adapt_structure Ferrite.GPUDofHandler
+
 Adapt.@adapt_structure Ferrite.GPUAssemblerSparsityPattern
 
 
@@ -210,18 +213,15 @@ stassy(cv,dh) = assemble_global!(cv,dh,Val(false))
 # qpassy(cv,dh) = assemble_global!(cv,dh,Val(true))
 
 Kgpu, fgpu =assemble_gpu(cellvalues,dh);
+
+
+
 #using BenchmarkTools
 
-#Kgpu, fgpu = @btime CUDA.@sync    assemble_global_gpu($cellvalues,$dh);
+#Kgpu, fgpu = @btime CUDA.@sync    assemble_gpu($cellvalues,$dh);
 #Kstd , Fstd =@btime  stassy($cellvalues,$dh);
-#Kgpu, fgpu = CUDA.@profile  assemble_gpu(cellvalues,dh);
+#CUDA.@profile trace = true  assemble_gpu(cellvalues,dh)
 # to benchmark the code using nsight compute use the following command: ncu --mode=launch julia
 # Open nsight compute and attach the profiler to the julia instance
 # ref: https://cuda.juliagpu.org/v2.2/development/profiling/#NVIDIA-Nsight-Compute
 # to benchmark using nsight system use the following command: # nsys profile --trace=nvtx julia rmse_kernel_v1.jl
-
-
-norm(Kgpu)
-
-Kstd , Fstd =stassy(cellvalues,dh);
-norm(Kstd)
