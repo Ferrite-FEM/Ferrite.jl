@@ -87,9 +87,13 @@ function Ferrite.compute_renumber_permutation(
     G = Metis.Graph(idx_t(N), S.colptr, S.rowval)
 
     # Compute the permutation
-    _, perm = Metis.permutation(G)
-
-    return perm
+    # The permutation returned by Metis is defined such that `A[perm, perm]`, for the
+    # eventual matrix `A`, minimizes fill in. This means that the new dof `i` can be
+    # determined by `perm[i]`. However, to renumber efficiently, we want the reverse
+    # mapping, i.e. `iperm`, so that we can easily lookup the new number for a given dof:
+    # dof `i`s new number is `iperm[i]`.
+    perm, iperm = Metis.permutation(G)
+    return iperm
 end
 
 end # VERSION check
