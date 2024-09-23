@@ -1,6 +1,8 @@
 # This file defines the GPUGrid type, which is a grid that is stored on the GPU. It is a subtype of AbstractGrid.
 # TODO: Refactor type parameters to be more consistent with the rest of the codebase.
-struct GPUGrid{dim,CELLVEC<:AbstractArray,NODEVEC<:AbstractArray}<: Ferrite.AbstractGrid{dim}
+abstract type AbstractGPUGrid{dim} <: Ferrite.AbstractGrid{dim} end
+
+struct GPUGrid{dim,CELLVEC<:AbstractArray,NODEVEC<:AbstractArray}<: AbstractGPUGrid{dim}
     cells::CELLVEC
     nodes::NODEVEC
 end

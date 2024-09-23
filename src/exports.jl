@@ -197,4 +197,5 @@ export
     allocate_gpu_matrix,
     #GPUSparseMatrixCSC,
     gpu_sparse_norm,
-    makecache
+    cellcache,
+    ncells

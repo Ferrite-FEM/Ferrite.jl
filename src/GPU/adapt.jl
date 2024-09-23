@@ -38,6 +38,13 @@ end
 # end
 
 
+function Adapt.adapt_structure(to,iterator::GPUCellIterator)
+    grid = Adapt.adapt_structure(to, iterator.grid)
+    dh = Adapt.adapt_structure(to, iterator.dh)
+    ncells = Adapt.adapt_structure(to, iterator.n_cells)
+    GPUCellIterator(dh,grid, ncells)
+end
+
 function Adapt.adapt_structure(to, grid::Grid)
     # map Int64 to Int32 to reduce number of registers
     cu_cells = grid.cells .|> (x -> Int32.(x.nodes)) .|> Quadrilateral

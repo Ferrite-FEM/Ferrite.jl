@@ -1,6 +1,6 @@
 
 using Ferrite, CUDA
- using StaticArrays
+using StaticArrays
 using SparseArrays
 using Adapt
 using Test
@@ -14,6 +14,7 @@ right = Tensor{1,2,Float32}((10.0,10.0)) # define the right top corner of the gr
 
 
 grid = generate_grid(Quadrilateral, (10, 10),left,right)
+
 
 
 ip = Lagrange{RefQuadrilateral, 1}() # define the interpolation function (i.e. Bilinear lagrange)
@@ -35,6 +36,7 @@ close!(dh);
 
 
 # Standard assembly of the element.
+
 function assemble_element_std!(Ke::Matrix, fe::Vector, cellvalues::CellValues)
     n_basefuncs = getnbasefunctions(cellvalues)
 
@@ -98,12 +100,13 @@ end
 
 
 
-#=NVTX.@annotate=# function assemble_gpu!(assembler,cv,dh,n_cells)
+#=NVTX.@annotate=# function assemble_gpu!(assembler,cv,iterator)
     tx = threadIdx().x
     bx = blockIdx().x
     bd = blockDim().x
     # e is the global index of the finite element in the grid.
     n_basefuncs = getnbasefunctions(cv)
+    n_cells = ncells(iterator)
     ke_shared = @cuDynamicSharedMem(Float32,(bd,n_basefuncs,n_basefuncs))
     fe_shared = @cuDynamicSharedMem(Float32,(bd,n_basefuncs),sizeof(Float32)*bd*n_basefuncs*n_basefuncs)
     fill!(ke_shared,0.0f0)
@@ -113,9 +116,8 @@ end
     e = tx + (bx-Int32(1))*bd
 
     e ≤ n_cells || return nothing
-    # e is the global index of the finite element in the grid.
-    # cell_coords = getcoordinates(dh.grid, e)
-    cell = makecache(dh,e)
+
+    cell = cellcache(iterator,e)
      #Loop over quadrature points
      for qv in Ferrite.QuadratureValuesIterator(cv,getcoordinates(cell))
         ## Get the quadrature weight
@@ -183,7 +185,6 @@ end
 
 #=NVTX.@annotate=# function assemble_gpu(cellvalues,dh)
     n_basefuncs = getnbasefunctions(cellvalues)
-    n_cells = dh |> get_grid |> getncells |> Int32
     #kes,fes = allocate_local_matrices(n_cells,cellvalues)
     K = allocate_matrix(SparseMatrixCSC{Float32, Int32},dh)
     Kgpu = CUSPARSE.CuSparseMatrixCSC(K)
@@ -193,14 +194,16 @@ end
     dh_gpu = Adapt.adapt_structure(CuArray, dh)
     assembler_gpu = Adapt.adapt_structure(CUDA.KernelAdaptor(), assembler)
     cellvalues_gpu = Adapt.adapt_structure(CuArray, cellvalues)
+    iterator = CellIterator(dh_gpu)
+    n_cells = ncells(iterator)
     # assemble the local matrices in kes and fes
-    kernel = @cuda launch=false assemble_gpu!(assembler_gpu,cellvalues_gpu,dh_gpu,n_cells)
+    kernel = @cuda launch=false assemble_gpu!(assembler_gpu,cellvalues_gpu,iterator)
     #@show CUDA.registers(kernel)
     config = launch_configuration(kernel.fun)
     max_threads = min(n_cells, config.threads)
     threads, shared_mem = optimize_threads_for_dynshmem(max_threads, n_basefuncs)
     blocks =  cld(n_cells, threads)
-    kernel(assembler_gpu,cellvalues,dh_gpu,n_cells;  threads, blocks, shmem=shared_mem)
+    kernel(assembler_gpu,cellvalues,iterator;  threads, blocks, shmem=shared_mem)
     return Kgpu,fgpu
 end
 
@@ -214,7 +217,7 @@ stassy(cv,dh) = assemble_global!(cv,dh,Val(false))
 
 Kgpu, fgpu =assemble_gpu(cellvalues,dh);
 
-
+norm(Kgpu)
 
 #using BenchmarkTools
 
