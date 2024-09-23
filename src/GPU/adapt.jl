@@ -42,7 +42,7 @@ function Adapt.adapt_structure(to, grid::Grid)
     # map Int64 to Int32 to reduce number of registers
     cu_cells = grid.cells .|> (x -> Int32.(x.nodes)) .|> Quadrilateral
     cells = Adapt.adapt_structure(to, cu_cells)
-    nodes = Adapt.adapt_structure(to, grid.nodes)
+    nodes = Adapt.adapt_structure(to, convert.(Int32,grid.nodes))
     GPUGrid(cells,nodes)
 end
 

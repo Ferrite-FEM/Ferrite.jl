@@ -173,6 +173,7 @@ include("GPU/gpu_assembler.jl")
 include("Grid/gpu_grid.jl")
 include("Dofs/GPUDofHandler.jl")
 include("GPU/gpu_sparsematrix.jl")
+include("iterators_prototype.jl")
 include("GPU/adapt.jl")
 
 

@@ -12,7 +12,7 @@ end
 
 @inline ndofs_per_cell(dh::GPUDofHandler, i::Int32)= dh.ndofs_cell[i]
 @inline cell_dof_offset(dh::GPUDofHandler, i::Int32) = dh.cell_dofs_offset[i]
-
+@inline get_grid(dh::GPUDofHandler) = dh.grid
 
 """
     celldofs(dh::GPUDofHandler, i::Int32)

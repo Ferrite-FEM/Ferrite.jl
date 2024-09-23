@@ -21,7 +21,7 @@ get_coordinate_type(::GPUGrid{dim,CELLVEC,NODEVEC}) where
 # Note: For functions that takes blockIdx as an argument, we need to use Int32 explicitly,
 # otherwise the compiler will not be able to infer the type of the argument and throw a dynamic function invokation error.
 @inline getcells(grid::GPUGrid, v::Union{Int32, Vector{Int32}}) = grid.cells[v]
-
+@inline getnodes(grid::GPUGrid, v::Int32) = grid.nodes[v]
 
 @inline """
     getcoordinates(grid::Ferrite.GPUGrid,e::Int32)

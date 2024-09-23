@@ -196,4 +196,5 @@ export
     assemble_atomic!,
     allocate_gpu_matrix,
     #GPUSparseMatrixCSC,
-    gpu_sparse_norm
+    gpu_sparse_norm,
+    makecache
