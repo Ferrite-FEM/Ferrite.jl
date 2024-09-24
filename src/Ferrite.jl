@@ -25,6 +25,8 @@ using Tensors:
     rotation_tensor, symmetric, tovoigt!, hessian, otimesu
 using ForwardDiff:
     ForwardDiff
+using TaskLocalValues:
+    TaskLocalValue
 
 include("CollectionsOfViews.jl")
 using .CollectionsOfViews:
