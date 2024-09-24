@@ -56,7 +56,7 @@
     pdbc = PeriodicDirichlet(:s, face_map, [1, 2])
     @test_throws ErrorException("components [1, 2] not within range of field :s (1 dimension(s))") add!(ConstraintHandler(dh), pdbc)
     pdbc = PeriodicDirichlet(:p, face_map)
-    @test_throws ErrorException("Did not find field :p in DofHandler (existing fields: [:s, :v, :z, :sd, :vd]).") add!(ConstraintHandler(dh), pdbc)
+    @test_throws ErrorException("Did not find field :p in SubDofHandler (existing fields: [:s, :v, :z, :sd, :vd]).") add!(ConstraintHandler(dh), pdbc)
     ## Vector
     pdbc = PeriodicDirichlet(:v, face_map)
     add!(ConstraintHandler(dh), pdbc)
@@ -729,41 +729,39 @@ end
     ])
 end # testset
 
-@testset "periodic bc: dof mapping" begin
-    grid = generate_grid(Quadrilateral, (2, 2))
-
-    function get_dof_map(ch)
-        m = Dict{Int,Any}()
-        for (mdof,b,entries) in zip(ch.prescribed_dofs, ch.inhomogeneities, ch.dofcoefficients)
-            if entries !== nothing
-                @test b == 0
-                if length(entries) == 1
-                    idof, weight = first(entries)
-                    @test weight == 1
-                    m[mdof] = idof
-                else
-                    m[mdof] = entries
-                end
+function get_dof_map(ch)
+    m = Dict{Int,Any}()
+    for (mdof,b,entries) in zip(ch.prescribed_dofs, ch.inhomogeneities, ch.dofcoefficients)
+        if entries !== nothing
+            @test b == 0
+            if length(entries) == 1
+                idof, weight = first(entries)
+                @test weight == 1
+                m[mdof] = idof
+            else
+                m[mdof] = entries
             end
         end
-        return m
     end
-    function compare_by_dbc(dh, pdbc, dbc1, dbc2)
-        ch = ConstraintHandler(dh)
-        add!(ch, pdbc)
-        close!(ch)
-        ch1 = ConstraintHandler(dh)
-        add!(ch1, dbc1)
-        close!(ch1)
-        ch2 = ConstraintHandler(dh)
-        add!(ch2, dbc2)
-        close!(ch2)
-        dof_map = get_dof_map(ch)
-        @test issetequal(keys(dof_map), ch1.prescribed_dofs)
-        @test issetequal(values(dof_map), ch2.prescribed_dofs)
-    end
+    return m
+end
+function compare_by_dbc(dh, pdbc, dbc1, dbc2)
+    ch = ConstraintHandler(dh)
+    add!(ch, pdbc)
+    close!(ch)
+    ch1 = ConstraintHandler(dh)
+    add!(ch1, dbc1)
+    close!(ch1)
+    ch2 = ConstraintHandler(dh)
+    add!(ch2, dbc2)
+    close!(ch2)
+    dof_map = get_dof_map(ch)
+    @test issetequal(keys(dof_map), ch1.prescribed_dofs)
+    @test issetequal(values(dof_map), ch2.prescribed_dofs)
+end
 
-
+@testset "periodic bc: dof mapping" begin
+    grid = generate_grid(Quadrilateral, (2, 2))
     #             Distributed dofs
     #       Scalar                Vector
     #  8───────7───────9   15,16───13,14───17,18
@@ -1235,6 +1233,60 @@ end # testset
     end
 
 end # testset
+
+@testset "PeriodicDirichlet for mixed grids" begin
+
+    # Note: it currently not possible to couple facets of quads to facets of triangles.
+    # It is however possible to couple facets of quads to each other in mixed grid (and if they belong to the same subdofhandler)
+
+    # 4_____3  8_______7
+    # |     |  |\      |
+    # |     |  |   \   |
+    # 1_____2  5______\6
+    cells = [
+        Quadrilateral((1, 2, 3, 4)),
+        Triangle((5, 6, 8)), Triangle((6,7,8)),
+        ]
+    coords = [Vec((0.0,0.0)), Vec((1.0,0.0)), Vec((1.0,1.0)), Vec((0.0,1.0)),
+              Vec((2.0,0.0)), Vec((3.0,0.0)), Vec((3.0,1.0)), Vec((2.0,1.0))]
+    nodes = [Node(coord) for coord in coords]
+    grid = Grid(cells,nodes)
+    addfacetset!(grid, "left_quad", x->x[1]≈0.0)
+    addfacetset!(grid, "right_quad", x->x[1]≈1.0)
+    addfacetset!(grid, "left_tria", x->x[1]≈2.0)
+    addfacetset!(grid, "right_tria", x->x[1]≈3.0)
+    
+    dh = DofHandler(grid);
+    sdh1 = SubDofHandler(dh, Set(1))
+    add!(sdh1, :u, Lagrange{RefQuadrilateral,1}())
+    sdh2 = SubDofHandler(dh, Set([2,3]))
+    add!(sdh2, :u, Lagrange{RefTriangle,1}())
+    close!(dh)
+
+    face_map_quad = collect_periodic_facets(grid, "left_quad", "right_quad", x->x-Vec((1.0,0.0)))
+    face_map_tria = collect_periodic_facets(grid, "left_tria", "right_tria", x->x-Vec((1.0,0.0)))
+    face_map_error= collect_periodic_facets(grid, "left_quad", "right_tria", x->x-Vec((3.0,0.0)))
+    
+    ch = ConstraintHandler(dh)
+    @test_throws ArgumentError add!(ch, PeriodicDirichlet(:u, face_map_error))
+    close!(ch)
+    
+    compare_by_dbc(
+        dh,
+        PeriodicDirichlet(:u, face_map_quad),
+        Dirichlet(:u, getfacetset(grid, "left_quad"), (x,t) -> 0),
+        Dirichlet(:u, getfacetset(grid, "right_quad"), (x,t) -> 0),
+    )
+
+    compare_by_dbc(
+        dh,
+        PeriodicDirichlet(:u, face_map_tria),
+        Dirichlet(:u, getfacetset(grid, "left_tria"), (x,t) -> 0),
+        Dirichlet(:u, getfacetset(grid, "right_tria"), (x,t) -> 0),
+    )
+
+
+end
 
 @testset "Affine constraints with master dofs that are prescribed" begin
     grid = generate_grid(Quadrilateral, (2, 2))
