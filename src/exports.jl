@@ -198,4 +198,6 @@ export
     #GPUSparseMatrixCSC,
     gpu_sparse_norm,
     cellcache,
-    ncells
+    ncells,
+    cellke,
+    cellfe

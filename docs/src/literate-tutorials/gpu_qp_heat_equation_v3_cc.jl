@@ -62,6 +62,7 @@ function assemble_element_std!(Ke::Matrix, fe::Vector, cellvalues::CellValues)
 end
 
 
+
 function create_buffers(cellvalues, dh)
     f = zeros(ndofs(dh))
     K = allocate_matrix(dh)
@@ -100,54 +101,36 @@ end
 
 
 
-#=NVTX.@annotate=# function assemble_gpu!(assembler,cv,iterator)
-    tx = threadIdx().x
-    bx = blockIdx().x
-    bd = blockDim().x
-    # e is the global index of the finite element in the grid.
+function assemble_element!(Ke,fe,cv,cell)
     n_basefuncs = getnbasefunctions(cv)
-    n_cells = ncells(iterator)
-    ke_shared = @cuDynamicSharedMem(Float32,(bd,n_basefuncs,n_basefuncs))
-    fe_shared = @cuDynamicSharedMem(Float32,(bd,n_basefuncs),sizeof(Float32)*bd*n_basefuncs*n_basefuncs)
-    fill!(ke_shared,0.0f0)
-    fill!(fe_shared,0.0f0)
-    sync_threads()
-
-    e = tx + (bx-Int32(1))*bd
-
-    e ≤ n_cells || return nothing
-
-    cell = cellcache(iterator,e)
-     #Loop over quadrature points
-     for qv in Ferrite.QuadratureValuesIterator(cv,getcoordinates(cell))
+    for qv in Ferrite.QuadratureValuesIterator(cv,getcoordinates(cell))
         ## Get the quadrature weight
         dΩ = getdetJdV(qv)
         ## Loop over test shape functions
-        for j in 1:n_basefuncs
-            δu  = shape_value(qv, j)
-            ∇u = shape_gradient(qv, j)
+        for i in 1:n_basefuncs
+            δu  = shape_value(qv, i)
+            ∇u = shape_gradient(qv, i)
             ## Add contribution to fe
-            #fe[j] += δu * dΩ
-            fe_shared[tx,j] += δu * dΩ
+            fe[i] += δu * dΩ
+            #fe_shared[tx,i] += δu * dΩ
             ## Loop over trial shape functions
-            for i in 1:n_basefuncs
-                ∇δu = shape_gradient(qv, i)
+            for j in 1:n_basefuncs
+                ∇δu = shape_gradient(qv, j)
                 ## Add contribution to Ke
-                ke_shared[tx,i,j] += (∇δu ⋅ ∇u) * dΩ
-                #ke[i,j] += (∇δu ⋅ ∇u) * dΩ
+                Ke[i,j] += (∇δu ⋅ ∇u) * dΩ
             end
         end
     end
+end
 
 
-    dofs = celldofs(cell)
-    for j in 1:n_basefuncs
-        jg = dofs[j]
-        assemble_atomic!(assembler,fe_shared[tx,j],jg)
-        for i in 1:n_basefuncs
-            ig = dofs[i]
-            assemble_atomic!(assembler,ke_shared[tx,i,j],ig,jg)
-        end
+function assemble_gpu!(assembler, cv, dh)
+    n_basefuncs = getnbasefunctions(cv)
+    for cell in CellIterator(dh, convert(Int32,n_basefuncs))
+        Ke = cellke(cell)
+        fe = cellfe(cell)
+        assemble_element!(Ke, fe, cv, cell)
+        assemble!(assembler, celldofs(cell), Ke, fe)
     end
     return nothing
 end
@@ -157,7 +140,6 @@ end
 
 Adapt.@adapt_structure Ferrite.GPUGrid
 Adapt.@adapt_structure Ferrite.GPUDofHandler
-
 Adapt.@adapt_structure Ferrite.GPUAssemblerSparsityPattern
 
 
@@ -194,16 +176,17 @@ end
     dh_gpu = Adapt.adapt_structure(CuArray, dh)
     assembler_gpu = Adapt.adapt_structure(CUDA.KernelAdaptor(), assembler)
     cellvalues_gpu = Adapt.adapt_structure(CuArray, cellvalues)
-    iterator = CellIterator(dh_gpu)
-    n_cells = ncells(iterator)
+    n_cells = 100 |> Int32
     # assemble the local matrices in kes and fes
-    kernel = @cuda launch=false assemble_gpu!(assembler_gpu,cellvalues_gpu,iterator)
+    kernel = @cuda launch=false assemble_gpu!(assembler_gpu,cellvalues_gpu,dh_gpu)
     #@show CUDA.registers(kernel)
     config = launch_configuration(kernel.fun)
     max_threads = min(n_cells, config.threads)
     threads, shared_mem = optimize_threads_for_dynshmem(max_threads, n_basefuncs)
     blocks =  cld(n_cells, threads)
-    kernel(assembler_gpu,cellvalues,iterator;  threads, blocks, shmem=shared_mem)
+    blocks = 1
+    threads = 32
+    kernel(assembler_gpu,cellvalues,dh_gpu;  threads, blocks, shmem=shared_mem)
     return Kgpu,fgpu
 end
 
@@ -218,6 +201,8 @@ stassy(cv,dh) = assemble_global!(cv,dh,Val(false))
 Kgpu, fgpu =assemble_gpu(cellvalues,dh);
 
 norm(Kgpu)
+Kstd , Fstd = stassy(cellvalues,dh);
+norm(Kstd)
 
 #using BenchmarkTools
 
