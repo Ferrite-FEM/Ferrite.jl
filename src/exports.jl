@@ -200,4 +200,5 @@ export
     cellcache,
     ncells,
     cellke,
-    cellfe
+    cellfe,
+    launch_kernel

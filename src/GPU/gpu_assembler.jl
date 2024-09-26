@@ -56,12 +56,12 @@ end
 Assembles the global stiffness matrix `Ke` and the global force vector `fe` into the the global stiffness matrix `K` and the global force vector `f` of the `GPUAssemblerSparsityPattern` object `A`.
 
 """
-@propagate_inbounds function assemble!(A::GPUAssemblerSparsityPattern, dofs::AbstractVector{Int32}, Ke, fe)
+@propagate_inbounds function assemble!(A::GPUAssemblerSparsityPattern, dofs::AbstractVector{Int32}, Ke::MATRIX, fe::VECTOR) where {MATRIX, VECTOR}
     _assemble!(A, dofs, Ke, fe)
 end
 
 
-function _assemble!(A::GPUAssemblerSparsityPattern, dofs::AbstractVector{Int32}, Ke, fe)
+function _assemble!(A::GPUAssemblerSparsityPattern, dofs::AbstractVector{Int32}, Ke::MATRIX, fe::VECTOR) where {MATRIX, VECTOR}
     # Brute force assembly
     K = A.K
     f = A.f

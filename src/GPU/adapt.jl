@@ -23,19 +23,19 @@ function Adapt.adapt_structure(to, qv::Ferrite.StaticQuadratureValues)
 end
 function Adapt.adapt_structure(to, qv::StaticQuadratureView)
     mapping = Adapt.adapt_structure(to, qv.mapping)
-    cell_coords = Adapt.adapt_structure(to, qv.cell_coords)
+    cell_coords = Adapt.adapt_structure(to, qv.cell_coords |> cu)
     q_point = Adapt.adapt_structure(to, qv.q_point)
     cv = Adapt.adapt_structure(to, qv.cv)
     StaticQuadratureView(mapping,cell_coords,q_point,cv)
 end
 
-# function Adapt.adapt_structure(to, grid::Grid)
-#     # map Int64 to Int32 to reduce number of registers
-#     cu_cells = grid.cells .|> (x -> Int32.(x.nodes)) .|> Quadrilateral |> cu
-#     cells = Adapt.adapt_structure(to, cu_cells)
-#     nodes = Adapt.adapt_structure(to, cu(grid.nodes))
-#     GPUGrid(cells,nodes)
-# end
+function Adapt.adapt_structure(to, grid::Grid)
+    # map Int64 to Int32 to reduce number of registers
+    cu_cells = grid.cells .|> (x -> Int32.(x.nodes)) .|> Quadrilateral |> cu
+    cells = Adapt.adapt_structure(to, cu_cells)
+    nodes = Adapt.adapt_structure(to, cu(grid.nodes))
+    GPUGrid(cells,nodes)
+end
 
 
 function Adapt.adapt_structure(to,iterator::GPUCellIterator)
@@ -45,13 +45,7 @@ function Adapt.adapt_structure(to,iterator::GPUCellIterator)
     GPUCellIterator(dh,grid, ncells)
 end
 
-function Adapt.adapt_structure(to, grid::Grid)
-    # map Int64 to Int32 to reduce number of registers
-    cu_cells = grid.cells .|> (x -> Int32.(x.nodes)) .|> Quadrilateral
-    cells = Adapt.adapt_structure(to, cu_cells)
-    nodes = Adapt.adapt_structure(to, convert.(Int32,grid.nodes))
-    GPUGrid(cells,nodes)
-end
+
 
 
 
@@ -70,12 +64,12 @@ end
 # end
 
 function Adapt.adapt_structure(to, dh::DofHandler)
-    cell_dofs = Adapt.adapt_structure(to, dh.cell_dofs .|> Int32 )
-    cells = Adapt.adapt_structure(to, dh.grid.cells )
-    offsets = Adapt.adapt_structure(to, dh.cell_dofs_offset .|> Int32 )
-    nodes = Adapt.adapt_structure(to, dh.grid.nodes )
-    ndofs_cell = Adapt.adapt_structure(to, get_ndofs_cell(dh))
-    GPUDofHandler(cell_dofs, GPUGrid(cells,nodes),offsets, Ferrite.isclosed(dh), ndofs_cell)
+    cell_dofs = Adapt.adapt_structure(to, dh.cell_dofs .|> Int32 |> cu)
+    cells = Adapt.adapt_structure(to, dh.grid.cells |> cu)
+    offsets = Adapt.adapt_structure(to, dh.cell_dofs_offset .|> Int32 |> cu)
+    nodes = Adapt.adapt_structure(to, dh.grid.nodes |> cu)
+    ndofs_cell = Adapt.adapt_structure(to, get_ndofs_cell(dh) |> cu)
+    GPUDofHandler(cell_dofs, GPUGrid(cells,nodes),offsets, ndofs_cell)
 end
 
 

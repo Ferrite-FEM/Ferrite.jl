@@ -175,6 +175,7 @@ include("Dofs/GPUDofHandler.jl")
 include("GPU/gpu_sparsematrix.jl")
 include("iterators_prototype.jl")
 include("GPU/adapt.jl")
+include("GPU/cuda.jl")
 
 
 end # module

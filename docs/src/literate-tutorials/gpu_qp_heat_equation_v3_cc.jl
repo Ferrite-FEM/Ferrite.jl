@@ -1,4 +1,3 @@
-
 using Ferrite, CUDA
 using StaticArrays
 using SparseArrays
@@ -10,10 +9,10 @@ using NVTX
 
 
 left = Tensor{1,2,Float32}((0,-0)) # define the left bottom corner of the grid.
-right = Tensor{1,2,Float32}((10.0,10.0)) # define the right top corner of the grid.
+right = Tensor{1,2,Float32}((100.0,100.0)) # define the right top corner of the grid.
 
 
-grid = generate_grid(Quadrilateral, (10, 10),left,right)
+grid = generate_grid(Quadrilateral, (100, 100),left,right)
 
 
 
@@ -23,6 +22,7 @@ qr = QuadratureRule{RefQuadrilateral}(Float32,2)
 
 
 cellvalues = CellValues(Float32,qr, ip)
+
 
 
 dh = DofHandler(grid)
@@ -77,6 +77,8 @@ end
 
 # Standard global assembly
 
+
+
 function assemble_global!(cellvalues, dh::DofHandler,qp_iter::Val{QPiter}) where {QPiter}
     (;f, K, assembler, Ke, fe) = create_buffers(cellvalues,dh)
     # Loop over all cels
@@ -124,8 +126,9 @@ function assemble_element!(Ke,fe,cv,cell)
 end
 
 
-function assemble_gpu!(assembler, cv, dh)
+function assemble_gpu!(Kgpu,fgpu, cv, dh)
     n_basefuncs = getnbasefunctions(cv)
+    assembler = start_assemble(Kgpu, fgpu)
     for cell in CellIterator(dh, convert(Int32,n_basefuncs))
         Ke = cellke(cell)
         fe = cellfe(cell)
@@ -137,79 +140,34 @@ end
 
 
 
+n_basefuncs = getnbasefunctions(cellvalues)
+K = allocate_matrix(SparseMatrixCSC{Float32, Int32},dh)
+Kgpu = CUSPARSE.CuSparseMatrixCSC(K)
+fgpu = CUDA.zeros(ndofs(dh))
+
+n_cells = getncells(dh.grid)
+
+
+#using BenchmarkTools
 
 Adapt.@adapt_structure Ferrite.GPUGrid
 Adapt.@adapt_structure Ferrite.GPUDofHandler
 Adapt.@adapt_structure Ferrite.GPUAssemblerSparsityPattern
 
 
-function optimize_threads_for_dynshmem(max_threads, n_basefuncs)
-    MAX_DYN_SHMEM = 48 * 1024 # TODO: get the maximum shared memory per block from the device (48KB for now, currently I don't know how to get this value)
-    shmem_needed = sizeof(Float32) * (max_threads) * ( n_basefuncs) * n_basefuncs + sizeof(Float32) * (max_threads) * n_basefuncs
-    if(shmem_needed < MAX_DYN_SHMEM)
-        return max_threads, shmem_needed
-    else
-        # solve for threads
-        max_possible = Int32(MAX_DYN_SHMEM ÷ (sizeof(Float32) * ( n_basefuncs) * n_basefuncs + sizeof(Float32) * n_basefuncs))
-        dev = device()
-        warp_size = CUDA.attribute(dev, CUDA.CU_DEVICE_ATTRIBUTE_WARP_SIZE)
-        # approximate the number of threads to be a multiple of warp size (mostly 32)
-        nearest_no_warps = max_possible ÷ warp_size
-        if(nearest_no_warps < 4)
-            throw(ArgumentError("Bad implementation (less than 4 warps per block, wasted resources)"))
-        else
-            possiple_threads = nearest_no_warps * warp_size
-            shmem_needed = sizeof(Float32) * (possiple_threads) * ( n_basefuncs) * n_basefuncs + sizeof(Float32) * (possiple_threads) * n_basefuncs
-            return possiple_threads, shmem_needed
-        end
-    end
-end
+dh_gpu = Adapt.adapt_structure(CuArray, dh)
+assembler_gpu = Adapt.adapt_structure(CUDA.KernelAdaptor(), assembler)
+cellvalues_gpu = Adapt.adapt_structure(CuArray, cellvalues)
 
-#=NVTX.@annotate=# function assemble_gpu(cellvalues,dh)
-    n_basefuncs = getnbasefunctions(cellvalues)
-    #kes,fes = allocate_local_matrices(n_cells,cellvalues)
-    K = allocate_matrix(SparseMatrixCSC{Float32, Int32},dh)
-    Kgpu = CUSPARSE.CuSparseMatrixCSC(K)
-    fgpu = CUDA.zeros(ndofs(dh))
-    assembler = start_assemble(Kgpu, fgpu)
-    # set up kernel adaption & launch the kernel
-    dh_gpu = Adapt.adapt_structure(CuArray, dh)
-    assembler_gpu = Adapt.adapt_structure(CUDA.KernelAdaptor(), assembler)
-    cellvalues_gpu = Adapt.adapt_structure(CuArray, cellvalues)
-    n_cells = 100 |> Int32
-    # assemble the local matrices in kes and fes
-    kernel = @cuda launch=false assemble_gpu!(assembler_gpu,cellvalues_gpu,dh_gpu)
-    #@show CUDA.registers(kernel)
-    config = launch_configuration(kernel.fun)
-    max_threads = min(n_cells, config.threads)
-    threads, shared_mem = optimize_threads_for_dynshmem(max_threads, n_basefuncs)
-    blocks =  cld(n_cells, threads)
-    blocks = 1
-    threads = 32
-    kernel(assembler_gpu,cellvalues,dh_gpu;  threads, blocks, shmem=shared_mem)
-    return Kgpu,fgpu
-end
+launch_kernel(assemble_gpu!, (Kgpu,fgpu, cellvalues, dh) , n_cells, n_basefuncs)
+#@btime CUDA.@sync launch_kernel($assemble_gpu!, ($Kgpu,$fgpu, $cellvalues, $dh) , $n_cells, $n_basefuncs)
+
 
 
 stassy(cv,dh) = assemble_global!(cv,dh,Val(false))
 
 
 
-
-# qpassy(cv,dh) = assemble_global!(cv,dh,Val(true))
-
-Kgpu, fgpu =assemble_gpu(cellvalues,dh);
-
 norm(Kgpu)
 Kstd , Fstd = stassy(cellvalues,dh);
 norm(Kstd)
-
-#using BenchmarkTools
-
-#Kgpu, fgpu = @btime CUDA.@sync    assemble_gpu($cellvalues,$dh);
-#Kstd , Fstd =@btime  stassy($cellvalues,$dh);
-#CUDA.@profile trace = true  assemble_gpu(cellvalues,dh)
-# to benchmark the code using nsight compute use the following command: ncu --mode=launch julia
-# Open nsight compute and attach the profiler to the julia instance
-# ref: https://cuda.juliagpu.org/v2.2/development/profiling/#NVIDIA-Nsight-Compute
-# to benchmark using nsight system use the following command: # nsys profile --trace=nvtx julia rmse_kernel_v1.jl
