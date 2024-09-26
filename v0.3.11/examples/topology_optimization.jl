@@ -1,0 +1,353 @@
+using Ferrite, SparseArrays, LinearAlgebra, Tensors, Printf
+
+function create_grid(n)
+    corners = [Vec{2}((0.0, 0.0)),
+               Vec{2}((2.0, 0.0)),
+               Vec{2}((2.0, 1.0)),
+               Vec{2}((0.0, 1.0))]
+    grid = generate_grid(Quadrilateral, (2*n, n), corners);
+
+    # node-/facesets for boundary conditions
+    addnodeset!(grid, "clamped", x -> x[1] ≈ 0.0)
+    addfaceset!(grid, "traction", x -> x[1] ≈ 2.0 && norm(x[2]-0.5) <= 0.05);
+    return grid
+end
+
+function create_values()
+    # quadrature rules
+    qr      = QuadratureRule{2,RefCube}(2)
+    face_qr = QuadratureRule{1,RefCube}(2)
+
+    # geometric interpolation
+    interpolation_geom = Lagrange{2,RefCube,1}()
+
+    # cell and facevalues for u
+    cellvalues = CellVectorValues(qr, Lagrange{2,RefCube,1}(), Lagrange{2,RefCube,1}())
+    facevalues = FaceVectorValues(face_qr, Lagrange{2,RefCube,1}(), Lagrange{2,RefCube,1}())
+
+    return cellvalues, facevalues
+end
+
+function create_dofhandler(grid)
+    dh = DofHandler(grid)
+    add!(dh, :u, 2, Lagrange{2,RefCube,1}()) ## displacement
+    close!(dh)
+    return dh
+end
+
+function create_bc(dh)
+    dbc = ConstraintHandler(dh)
+    add!(dbc, Dirichlet(:u, getnodeset(dh.grid, "clamped"), (x,t) -> zero(Vec{2}), [1,2]))
+    close!(dbc)
+    t = 0.0
+    update!(dbc, t)
+    return dbc
+end
+
+struct MaterialParameters{T, S <: SymmetricTensor{4, 2, T}}
+    C::S
+    χ_min::T
+    p::T
+    β::T
+    η::T
+end
+
+function MaterialParameters(E, ν, χ_min, p, β, η)
+    δ(i,j) = i == j ? 1.0 : 0.0 ## helper function
+
+    G = E / 2(1 + ν) ## =μ
+    λ = E*ν/(1-ν^2) ## correction for plane stress included
+
+    C = SymmetricTensor{4, 2}((i,j,k,l) -> λ * δ(i,j)*δ(k,l) + G* (δ(i,k)*δ(j,l) + δ(i,l)*δ(j,k)))
+    return MaterialParameters(C, χ_min, p, β, η)
+end
+
+mutable struct MaterialState{T, S <: AbstractArray{SymmetricTensor{2, 2, T}, 1}}
+    χ::T ## density
+    ε::S ## strain in each quadrature point
+end
+
+function MaterialState(ρ, n_qp)
+    return MaterialState(ρ, Array{SymmetricTensor{2,2,Float64},1}(undef, n_qp))
+end
+
+function update_material_states!(χn1, states, dh)
+    for (element, state) in zip(CellIterator(dh),states)
+        state.χ = χn1[cellid(element)]
+    end
+end
+
+function compute_driving_forces(states, mp, dh)
+    pΨ = zeros(length(states))
+    χn = zeros(length(states))
+    for (element, state) in zip(CellIterator(dh), states)
+        i = cellid(element)
+        ε = sum(state.ε)/length(state.ε) ## average element strain
+        pΨ[i] = 1/2 * mp.p * state.χ^(mp.p-1) * (ε ⊡ mp.C ⊡ ε)
+        χn[i] = state.χ
+    end
+    return pΨ, χn
+end
+
+function approximate_laplacian(dh, topology, χn, Δh)
+    ∇²χ = zeros(getncells(dh.grid))
+    _nfaces = nfaces(dh.grid.cells[1])
+    opp = Dict(1=>3, 2=>4, 3=>1, 4=>2)
+    nbg = zeros(Int,_nfaces)
+
+    for element in CellIterator(dh)
+        i = cellid(element)
+        for j in 1:_nfaces
+            nbg_cellid = getcells(getneighborhood(topology, dh.grid, FaceIndex(i,j)))
+            if(!isempty(nbg_cellid))
+                nbg[j] = first(nbg_cellid) ## assuming only one face neighbor per cell
+            else ## boundary face
+                nbg[j] = first(getcells(getneighborhood(topology, dh.grid, FaceIndex(i,opp[j]))))
+            end
+        end
+
+        ∇²χ[i] = (χn[nbg[1]]+χn[nbg[2]]+χn[nbg[3]]+χn[nbg[4]]-4*χn[i])/(Δh^2)
+    end
+
+    return ∇²χ
+end
+
+function compute_χn1(χn, Δχ, ρ, ηs, χ_min)
+    n_el = length(χn)
+
+    χ_trial = zeros(n_el)
+    ρ_trial = 0.0
+
+    λ_lower = minimum(Δχ) - ηs
+    λ_upper = maximum(Δχ) + ηs
+    λ_trial = 0.0
+
+    while(abs(ρ-ρ_trial)>1e-7)
+        for i in 1:n_el
+            Δχt = 1/ηs * (Δχ[i] - λ_trial)
+            χ_trial[i] = maximum([χ_min, minimum([1.0, χn[i]+Δχt])])
+        end
+
+        ρ_trial = 0.0
+        for i in 1:n_el
+            ρ_trial += χ_trial[i]/n_el
+        end
+
+        if(ρ_trial > ρ)
+            λ_lower = λ_trial
+        elseif(ρ_trial < ρ)
+            λ_upper = λ_trial
+        end
+        λ_trial = 1/2*(λ_upper+λ_lower)
+    end
+
+    return χ_trial
+end
+
+function update_density(dh, states, mp, ρ, topology, Δh)
+    pΨ, χn = compute_driving_forces(states, mp, dh) ## driving forces, old density field
+    ∇²χ = approximate_laplacian(dh, topology, χn, Δh) ## Laplacian
+
+    p_Ω = sum(pΨ)/length(pΨ) ## average driving force
+
+    Δχ = pΨ + mp.β*p_Ω*∇²χ
+
+    χn1 = compute_χn1(χn, Δχ, ρ, mp.η*p_Ω, mp.χ_min)
+
+    return χn1
+end
+
+function doassemble!(cellvalues::CellVectorValues{dim}, facevalues::FaceVectorValues{dim}, K::SparseMatrixCSC, grid::Grid, dh::DofHandler, mp::MaterialParameters, u, states) where {dim}
+    r = zeros(ndofs(dh))
+    assembler = start_assemble(K, r)
+    nu = getnbasefunctions(cellvalues)
+
+    re = zeros(nu) ## local residual vector
+    Ke = zeros(nu,nu) ## local stiffness matrix
+
+    for (element, state) in zip(CellIterator(dh), states)
+        fill!(Ke, 0)
+        fill!(re, 0)
+
+        eldofs = celldofs(element)
+        ue = u[eldofs]
+
+        elmt!(Ke, re, element, cellvalues, facevalues, grid, mp, ue, state)
+        assemble!(assembler, celldofs(element), re, Ke)
+    end
+
+    return K, r
+end
+
+function elmt!(Ke, re, element, cellvalues, facevalues, grid, mp, ue, state)
+    n_basefuncs = getnbasefunctions(cellvalues)
+    reinit!(cellvalues, element)
+    χ = state.χ
+
+    # We only assemble lower half triangle of the stiffness matrix and then symmetrize it.
+    @inbounds for q_point in 1:getnquadpoints(cellvalues)
+        dΩ = getdetJdV(cellvalues, q_point)
+        state.ε[q_point] = function_symmetric_gradient(cellvalues, q_point, ue)
+
+        for i in 1:n_basefuncs
+            δεi = shape_symmetric_gradient(cellvalues, q_point, i)
+            δu = shape_value(cellvalues, q_point, i)
+            for j in 1:i
+                δεj = shape_symmetric_gradient(cellvalues, q_point, j)
+                Ke[i,j] += (χ)^(mp.p) * (δεi ⊡ mp.C ⊡ δεj) * dΩ
+            end
+            re[i] += (-δεi ⊡ ((χ)^(mp.p) * mp.C ⊡ state.ε[q_point])) * dΩ
+        end
+    end
+
+    symmetrize_lower!(Ke)
+
+    @inbounds for face in 1:nfaces(element)
+        if onboundary(element, face) && (cellid(element), face) ∈ getfaceset(grid, "traction")
+            reinit!(facevalues, element, face)
+            t = Vec((0.0, -1.0)) ## force pointing downwards
+            for q_point in 1:getnquadpoints(facevalues)
+                dΓ = getdetJdV(facevalues, q_point)
+                for i in 1:n_basefuncs
+                    δu = shape_value(facevalues, q_point, i)
+                    re[i] += (δu ⋅ t) * dΓ
+                end
+            end
+        end
+    end
+
+end
+
+function symmetrize_lower!(K)
+    for i in 1:size(K,1)
+        for j in i+1:size(K,1)
+            K[i,j] = K[j,i]
+        end
+    end
+end
+
+function topopt(β,ρ,n,filename; output=:false)
+    # material
+    mp = MaterialParameters(210.e3, 0.3, 1.e-3, 3.0, β, 20.0)
+
+    # grid, dofhandler, boundary condition
+    grid = create_grid(n)
+    dh = create_dofhandler(grid)
+    Δh = 1/n ## element edge length
+    dbc = create_bc(dh)
+
+    # cellvalues
+    cellvalues, facevalues = create_values()
+
+    # Pre-allocate solution vectors, etc.
+    n_dofs = ndofs(dh) ## total number of dofs
+    u  = zeros(n_dofs) ## solution vector
+    un = zeros(n_dofs) ## previous solution vector
+
+    Δu = zeros(n_dofs)  ## previous displacement correction
+    ΔΔu = zeros(n_dofs) ## new displacement correction
+
+    # create material states
+    states = [MaterialState(ρ, getnquadpoints(cellvalues)) for _ in 1:getncells(dh.grid)]
+
+    χ = zeros(getncells(dh.grid))
+
+    r = zeros(n_dofs) ## residual
+    K = create_sparsity_pattern(dh) ## stiffness matrix
+
+    i_max = 300 ## maximum number of iteration steps
+    tol = 1e-4
+    compliance = 0.0
+    compliance_0 = 0.0
+    compliance_n = 0.0
+    conv = :false
+
+    topology = ExclusiveTopology(grid)
+
+    # Newton-Raphson loop
+    NEWTON_TOL = 1e-8
+    print("\n Starting Newton iterations\n")
+
+    for it in 1:i_max
+        apply_zero!(u, dbc)
+        newton_itr = -1
+
+        while true; newton_itr += 1
+
+            if newton_itr > 10
+                error("Reached maximum Newton iterations, aborting")
+                break
+            end
+
+            # current guess
+            u .= un .+ Δu
+            K, r = doassemble!(cellvalues, facevalues, K, grid, dh, mp, u, states);
+            norm_r = norm(r[Ferrite.free_dofs(dbc)])
+
+            if (norm_r) < NEWTON_TOL
+                break
+            end
+
+            apply_zero!(K, r, dbc)
+            ΔΔu = Symmetric(K) \ r
+
+            apply_zero!(ΔΔu, dbc)
+            Δu .+= ΔΔu
+        end ## of loop while NR-Iteration
+
+        # calculate compliance
+        compliance = 1/2 * u' * K * u
+
+        if(it==1)
+            compliance_0 = compliance
+        end
+
+        # check convergence criterium (twice!)
+        if(abs(compliance-compliance_n)/compliance < tol)
+            if(conv)
+                println("Converged at iteration number: ", it)
+                break
+            else
+                conv = :true
+            end
+        else
+            conv = :false
+        end
+
+        # update density
+        χ = update_density(dh, states, mp, ρ, topology, Δh)
+
+        # update old displacement, density and compliance
+        un .= u
+        Δu .= 0.0
+        update_material_states!(χ, states, dh)
+        compliance_n = compliance
+
+        # output during calculation
+        if(output)
+            i = @sprintf("%3.3i", it)
+            filename_it = string(filename, "_", i)
+
+            vtk_grid(filename_it, grid) do vtk
+                vtk_cell_data(vtk, χ, "density")
+            end
+        end
+    end
+
+    # export converged results
+    if(!output)
+        vtk_grid(filename, grid) do vtk
+            vtk_cell_data(vtk, χ, "density")
+        end
+    end
+    @printf "Rel. stiffness: %.4f \n" compliance^(-1)/compliance_0^(-1)
+
+    return
+end
+
+topopt(0.5*1e-3, 0.5, 60, "betasmall"; output=:false);
+topopt(1.0*1e-3, 0.5, 60, "betalarge"; output=:false);
+# topopt(1.0*1e-3, 0.5, 60, "topopt_animation"; output=:true); # can be used to create animations
+
+# This file was generated using Literate.jl, https://github.com/fredrikekre/Literate.jl
+
