@@ -1,0 +1,465 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/><title>Computational homogenization · Ferrite.jl</title><script data-outdated-warner src="../../assets/warner.js"></script><link href="https://cdnjs.cloudflare.com/ajax/libs/lato-font/3.0.0/css/lato-font.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/juliamono/0.044/juliamono.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/fontawesome.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/solid.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/brands.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.13.11/katex.min.css" rel="stylesheet" type="text/css"/><script>documenterBaseURL="../.."</script><script src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.6/require.min.js" data-main="../../assets/documenter.js"></script><script src="../../siteinfo.js"></script><script src="../../../versions.js"></script><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/documenter-dark.css" data-theme-name="documenter-dark" data-theme-primary-dark/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/documenter-light.css" data-theme-name="documenter-light" data-theme-primary/><script src="../../assets/themeswap.js"></script></head><body><div id="documenter"><nav class="docs-sidebar"><div class="docs-package-name"><span class="docs-autofit"><a href="../../">Ferrite.jl</a></span></div><form class="docs-search" action="../../search/"><input class="docs-search-query" id="documenter-search-query" name="q" type="text" placeholder="Search docs"/></form><ul class="docs-menu"><li><a class="tocitem" href="../../">Home</a></li><li><a class="tocitem" href="../../manual/fe_intro/">Introduction to FEM</a></li><li><span class="tocitem">Manual</span><ul><li><a class="tocitem" href="../../manual/degrees_of_freedom/">Degrees of Freedom</a></li><li><a class="tocitem" href="../../manual/assembly/">Assembly</a></li><li><a class="tocitem" href="../../manual/boundary_conditions/">Boundary Conditions</a></li><li><a class="tocitem" href="../../manual/constraints/">Constraints</a></li><li><a class="tocitem" href="../../manual/grid/">Grid</a></li><li><a class="tocitem" href="../../manual/export/">Export</a></li></ul></li><li><span class="tocitem">Examples</span><ul><li><a class="tocitem" href="../heat_equation/">Heat Equation</a></li><li><a class="tocitem" href="../postprocessing/">Postprocessing</a></li><li><a class="tocitem" href="../helmholtz/">Helmholtz equation</a></li><li><a class="tocitem" href="../incompressible_elasticity/">Incompressible Elasticity</a></li><li><a class="tocitem" href="../hyperelasticity/">Hyperelasticity</a></li><li><a class="tocitem" href="../threaded_assembly/">Threaded Assembly</a></li><li><a class="tocitem" href="../plasticity/">von Mises plasticity</a></li><li><a class="tocitem" href="../transient_heat_equation/">Time Dependent Problems</a></li><li><a class="tocitem" href="../landau/">Ginzburg-Landau model energy minimization</a></li><li><a class="tocitem" href="../linear_shell/">Linear shell</a></li><li><a class="tocitem" href="../quasi_incompressible_hyperelasticity/">Nearly Incompressible Hyperelasticity</a></li><li><a class="tocitem" href="../ns_vs_diffeq/">Incompressible Navier-Stokes Equations via DifferentialEquations.jl</a></li><li class="is-active"><a class="tocitem" href>Computational homogenization</a><ul class="internal"><li><a class="tocitem" href="#Introduction"><span>Introduction</span></a></li><li><a class="tocitem" href="#Commented-program"><span>Commented program</span></a></li><li><a class="tocitem" href="#homogenization-plain-program"><span>Plain program</span></a></li></ul></li></ul></li><li><span class="tocitem">API Reference</span><ul><li><a class="tocitem" href="../../reference/quadrature/">Quadrature</a></li><li><a class="tocitem" href="../../reference/interpolations/">Interpolation</a></li><li><a class="tocitem" href="../../reference/fevalues/">FEValues</a></li><li><a class="tocitem" href="../../reference/dofhandler/">Degrees of Freedom</a></li><li><a class="tocitem" href="../../reference/assembly/">Assembly</a></li><li><a class="tocitem" href="../../reference/boundary_conditions/">Boundary Conditions</a></li><li><a class="tocitem" href="../../reference/grid/">Grid &amp; AbstractGrid</a></li><li><a class="tocitem" href="../../reference/export/">Postprocessing</a></li></ul></li></ul><div class="docs-version-selector field has-addons"><div class="control"><span class="docs-label button is-static is-size-7">Version</span></div><div class="docs-selector control is-expanded"><div class="select is-fullwidth is-size-7"><select id="documenter-version-selector"></select></div></div></div></nav><div class="docs-main"><header class="docs-navbar"><nav class="breadcrumb"><ul class="is-hidden-mobile"><li><a class="is-disabled">Examples</a></li><li class="is-active"><a href>Computational homogenization</a></li></ul><ul class="is-hidden-tablet"><li class="is-active"><a href>Computational homogenization</a></li></ul></nav><div class="docs-right"><a class="docs-edit-link" href="https://github.com/Ferrite-FEM/Ferrite.jl/blob/master/docs/src/literate/computational_homogenization.jl" title="Edit on GitHub"><span class="docs-icon fab"></span><span class="docs-label is-hidden-touch">Edit on GitHub</span></a><a class="docs-settings-button fas fa-cog" id="documenter-settings-button" href="#" title="Settings"></a><a class="docs-sidebar-button fa fa-bars is-hidden-desktop" id="documenter-sidebar-button" href="#"></a></div></header><article class="content" id="documenter-page"><h1 id="Computational-homogenization"><a class="docs-heading-anchor" href="#Computational-homogenization">Computational homogenization</a><a id="Computational-homogenization-1"></a><a class="docs-heading-anchor-permalink" href="#Computational-homogenization" title="Permalink"></a></h1><p><img src="../rve_homogenization.png" alt/></p><p><em>Figure 1</em>: von Mises stress in an RVE with 5 stiff inclusions embedded in a softer matrix material that is loaded in shear. The problem is solved by using homogeneous Dirichlet boundary conditions (left) and (strong) periodic boundary conditions (right).</p><div class="admonition is-success"><header class="admonition-header">Tip</header><div class="admonition-body"><p>This example is also available as a Jupyter notebook: <a href="https://nbviewer.jupyter.org/github/Ferrite-FEM/Ferrite.jl/blob/gh-pages/v0.3.6/examples/computational_homogenization.ipynb"><code>computational_homogenization.ipynb</code></a>.</p></div></div><h2 id="Introduction"><a class="docs-heading-anchor" href="#Introduction">Introduction</a><a id="Introduction-1"></a><a class="docs-heading-anchor-permalink" href="#Introduction" title="Permalink"></a></h2><p>In this example we will solve the Representative Volume Element (RVE) problem for computational homogenization of linear elasticity and compute the effective/homogenized stiffness of an RVE with 5 stiff circular inclusions embedded in a softer matrix material (see Figure 1).</p><p>It is possible to obtain upper and lower bounds on the stiffness analytically, see for example <a href="https://en.wikipedia.org/wiki/Rule_of_mixtures">Rule of mixtures</a>. An upper bound is obtained from the Voigt model, where the <em>strain</em> is assumed to be the same in the two constituents,</p><p class="math-container">\[\mathsf{E}_\mathrm{Voigt} = v_\mathrm{m} \mathsf{E}_\mathrm{m} +
+(1 - v_\mathrm{m}) \mathsf{E}_\mathrm{i}\]</p><p>where <span>$v_\mathrm{m}$</span> is the volume fraction of the matrix material, and where <span>$\mathsf{E}_\mathrm{m}$</span> and <span>$\mathsf{E}_\mathrm{i}$</span> are the individual stiffness for the matrix material and the inclusions, respectively. The lower bound is obtained from the Reuss model, where the <em>stress</em> is assumed to be the same in the two constituents,</p><p class="math-container">\[\mathsf{E}_\mathrm{Reuss} = \left(v_\mathrm{m} \mathsf{E}_\mathrm{m}^{-1} +
+(1 - v_\mathrm{m}) \mathsf{E}_\mathrm{i}^{-1} \right)^{-1}.\]</p><p>However, neither of these assumptions are, in general, very close to the &quot;truth&quot; which is why it is of interest to computationally find the homogenized properties for a given RVE.</p><p>The canonical version of the RVE problem can be formulated as follows: For given homogenized field <span>$\bar{\boldsymbol{u}}$</span>, <span>$\bar{\boldsymbol{\varepsilon}} = \boldsymbol{\varepsilon}[\bar{\boldsymbol{u}}]$</span>, find <span>$\boldsymbol{u} \in \mathbb{U}_\Box$</span>, <span>$\boldsymbol{t} \in \mathbb{T}_\Box$</span> such that</p><p class="math-container">\[\frac{1}{|\Omega_\Box|} \int_{\Omega_\Box}\boldsymbol{\varepsilon}[\delta\boldsymbol{u}]
+: \mathsf{E} : \boldsymbol{\varepsilon}[\boldsymbol{u}]\ \mathrm{d}\Omega
+- \frac{1}{|\Omega_\Box|} \int_{\Gamma_\Box}\delta \boldsymbol{u} \cdot
+\boldsymbol{t}\ \mathrm{d}\Gamma = 0 \quad
+\forall \delta \boldsymbol{u} \in \mathbb{U}_\Box,\quad (1\mathrm{a})\\
+- \frac{1}{|\Omega_\Box|} \int_{\Gamma_\Box}\delta \boldsymbol{t} \cdot
+\boldsymbol{u}\ \mathrm{d}\Gamma = - \bar{\boldsymbol{\varepsilon}} :
+\left[ \frac{1}{|\Omega_\Box|} \int_{\Gamma_\Box}\delta \boldsymbol{t} \otimes
+[\boldsymbol{x} - \bar{\boldsymbol{x}}]\ \mathrm{d}\Gamma \right]
+\quad \forall \delta \boldsymbol{t} \in \mathbb{T}_\Box, \quad (1\mathrm{b})\]</p><p>where <span>$\boldsymbol{u} = \bar{\boldsymbol{\varepsilon}} \cdot [\boldsymbol{x} - \bar{\boldsymbol{x}}] + \boldsymbol{u}^\mu$</span>, where <span>$\Omega_\Box$</span> and <span>$|\Omega_\Box|$</span> are the domain and volume of the RVE, where <span>$\Gamma_\Box$</span> is the boundary, and where <span>$\mathbb{U}_\Box$</span>, <span>$\mathbb{T}_\Box$</span> are set of &quot;sufficiently regular&quot; functions defined on the RVE.</p><p>This system is not solvable without introducing extra restrictions on <span>$\mathbb{U}_\Box$</span>, <span>$\mathbb{T}_\Box$</span>. In this example we will consider the common cases of Dirichlet boundary conditions and (strong) periodic boundary conditions.</p><p><strong>Dirichlet boundary conditions</strong></p><p>We can introduce the more restrictive sets of <span>$\mathbb{U}_\Box$</span>:</p><p class="math-container">\[\begin{align*}
+\mathbb{U}_\Box^\mathrm{D} &amp;:= \left\{\boldsymbol{u} \in \mathbb{U}_\Box|\ \boldsymbol{u}
+= \bar{\boldsymbol{\varepsilon}} \cdot [\boldsymbol{x} - \bar{\boldsymbol{x}}]
+\ \mathrm{on}\ \Gamma_\Box\right\},\\
+\mathbb{U}_\Box^{\mathrm{D},0} &amp;:= \left\{\boldsymbol{u} \in \mathbb{U}_\Box|\ \boldsymbol{u}
+= \boldsymbol{0}\ \mathrm{on}\ \Gamma_\Box\right\},
+\end{align*}\]</p><p>and use these as trial and test sets to obtain a solvable RVE problem pertaining to Dirichlet boundary conditions. Eq. <span>$(1\mathrm{b})$</span> is trivially fulfilled, the second term of Eq. <span>$(1\mathrm{a})$</span> vanishes, and we are left with the following problem: Find <span>$\boldsymbol{u} \in \mathbb{U}_\Box^\mathrm{D}$</span> that solve</p><p class="math-container">\[\frac{1}{|\Omega_\Box|} \int_{\Omega_\Box}\boldsymbol{\varepsilon}[\delta\boldsymbol{u}]
+: \mathsf{E} : \boldsymbol{\varepsilon}[\boldsymbol{u}]\ \mathrm{d}\Omega = 0
+\quad \forall \delta \boldsymbol{u} \in \mathbb{U}_\Box^{\mathrm{D},0}.\]</p><p>Note that, since <span>$\boldsymbol{u} = \bar{\boldsymbol{\varepsilon}} \cdot [\boldsymbol{x} - \bar{\boldsymbol{x}}] + \boldsymbol{u}^\mu$</span>, this problem is equivalent to solving for <span>$\boldsymbol{u}^\mu \in \mathbb{U}_\Box^{\mathrm{D},0}$</span>, which is what we will do in the implementation.</p><p><strong>Periodic boundary conditions</strong></p><p>The RVE problem pertaining to periodic boundary conditions is obtained by restricting <span>$\boldsymbol{u}^\mu$</span> to be periodic, and <span>$\boldsymbol{t}$</span> anti-periodic across the RVE. Similarly as for Dirichlet boundary conditions, Eq. <span>$(1\mathrm{b})$</span> is directly fulfilled, and the second term in Eq. <span>$(1\mathrm{a})$</span> vanishes, with these restrictions, and we are left with the following problem: Find <span>$\boldsymbol{u}^\mu \in \mathbb{U}_\Box^{\mathrm{P},0}$</span> such that</p><p class="math-container">\[\frac{1}{|\Omega_\Box|} \int_{\Omega_\Box}\boldsymbol{\varepsilon}[\delta\boldsymbol{u}]
+: \mathsf{E} : (\bar{\boldsymbol{\varepsilon}} + \boldsymbol{\varepsilon}
+[\boldsymbol{u}^\mu])\ \mathrm{d}\Omega = 0
+\quad \forall \delta \boldsymbol{u} \in \mathbb{U}_\Box^{\mathrm{P},0},\]</p><p>where</p><p class="math-container">\[\mathbb{U}_\Box^{\mathrm{P},0} := \left\{\boldsymbol{u} \in \mathbb{U}_\Box|
+\ \llbracket \boldsymbol{u} \rrbracket_\Box = \boldsymbol{0}
+\ \mathrm{on}\ \Gamma_\Box^+\right\}\]</p><p>where <span>$\llbracket \bullet \rrbracket_\Box = \bullet(\boldsymbol{x}^+) - \bullet(\boldsymbol{x}^-)$</span> defines the &quot;jump&quot; over the RVE, i.e. the difference between the value on the image part <span>$\Gamma_\Box^+$</span> (coordinate <span>$\boldsymbol{x}^+$</span>) and the mirror part <span>$\Gamma_\Box^-$</span> (coordinate <span>$\boldsymbol{x}^-$</span>) of the boundary. To make sure this restriction holds in a strong sense we need a periodic mesh.</p><p>Note that it would be possible to solve for the total <span>$\boldsymbol{u}$</span> directly by instead enforcing the jump to be equal to the jump in the macroscopic part, <span>$\boldsymbol{u}^\mathrm{M}$</span>, i.e.</p><p class="math-container">\[\llbracket \boldsymbol{u} \rrbracket_\Box =
+\llbracket \boldsymbol{u}^\mathrm{M} \rrbracket_\Box =
+\llbracket \bar{\boldsymbol{\varepsilon}} \cdot [\boldsymbol{x} - \bar{\boldsymbol{x}}]
+\rrbracket_\Box =
+\bar{\boldsymbol{\varepsilon}} \cdot [\boldsymbol{x}^+ - \boldsymbol{x}^-].\]</p><p><strong>Homogenization of effective properties</strong></p><p>In general it is necessary to compute the homogenized stress and the stiffness on the fly, but since we in this example consider linear elasticity it is possible to compute the effective properties once and for all for a given RVE configuration. We do this by computing sensitivity fields for every independent strain component (6 in 3D, 3 in 2D). Thus, for a 2D problem, as in the implementation below, we compute sensitivities <span>$\hat{\boldsymbol{u}}_{11}$</span>, <span>$\hat{\boldsymbol{u}}_{22}$</span>, and <span>$\hat{\boldsymbol{u}}_{12} = \hat{\boldsymbol{u}}_{21}$</span> by using</p><p class="math-container">\[\bar{\boldsymbol{\varepsilon}} = \begin{pmatrix}1 &amp; 0\\ 0 &amp; 0\end{pmatrix}, \quad
+\bar{\boldsymbol{\varepsilon}} = \begin{pmatrix}0 &amp; 0\\ 0 &amp; 1\end{pmatrix}, \quad
+\bar{\boldsymbol{\varepsilon}} = \begin{pmatrix}0 &amp; 0.5\\ 0.5 &amp; 0\end{pmatrix}\]</p><p>as the input to the RVE problem. When the sensitivies are solved we can compute the entries of the homogenized stiffness as follows</p><p class="math-container">\[\mathsf{E}_{ijkl} = \frac{\partial\ \bar{\sigma}_{ij}}{\partial\ \bar{\varepsilon}_{kl}}
+= \bar{\sigma}_{ij}(\hat{\boldsymbol{u}}_{kl}),\]</p><p>where the homogenized stress, <span>$\bar{\boldsymbol{\sigma}}(\boldsymbol{u})$</span>, is computed as the volume average of the stress in the RVE, i.e.</p><p class="math-container">\[\bar{\boldsymbol{\sigma}}(\boldsymbol{u}) :=
+\frac{1}{|\Omega_\Box|} \int_{\Omega_\Box} \boldsymbol{\sigma}\ \mathrm{d}\Omega =
+\frac{1}{|\Omega_\Box|} \int_{\Omega_\Box}
+\mathsf{E} : \boldsymbol{\varepsilon}[\boldsymbol{u}]\ \mathrm{d}\Omega.\]</p><h2 id="Commented-program"><a class="docs-heading-anchor" href="#Commented-program">Commented program</a><a id="Commented-program-1"></a><a class="docs-heading-anchor-permalink" href="#Commented-program" title="Permalink"></a></h2><p>Now we will see how this can be implemented in <code>Ferrite</code>. What follows is a program with comments in between which describe the different steps. You can also find the same program without comments at the end of the page, see <a href="#homogenization-plain-program">Plain program</a>.</p><pre><code class="language-julia hljs">using Ferrite, SparseArrays, LinearAlgebra</code></pre><p>We first load the mesh file <a href="../periodic-rve.msh"><code>periodic-rve.msh</code></a> (<a href="../periodic-rve-coarse.msh"><code>periodic-rve-coarse.msh</code></a> for a coarser mesh). The mesh is generated with <a href="https://gmsh.info/"><code>gmsh</code></a>, and we read it in as a <code>Ferrite</code> grid using the <a href="https://github.com/Ferrite-FEM/FerriteGmsh.jl"><code>FerriteGmsh</code></a> package:</p><pre><code class="language-julia hljs">using FerriteGmsh
+grid = saved_file_to_grid(&quot;periodic-rve.msh&quot;)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">Grid{2, Triangle, Float64} with 11904 Triangle cells and 6097 nodes</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">Grid{2, Triangle, Float64} with 186 Triangle cells and 112 nodes</code></pre><p>Next we construct the interpolation and quadrature rule, and combining them into cellvalues as usual:</p><pre><code class="language-julia hljs">dim = 2
+ip = Lagrange{dim, RefTetrahedron, 1}()
+qr = QuadratureRule{dim, RefTetrahedron}(2)
+cellvalues = CellVectorValues(qr, ip);</code></pre><p>We define a dof handler with a displacement field <code>:u</code>:</p><pre><code class="language-julia hljs">dh = DofHandler(grid)
+push!(dh, :u, 2)
+close!(dh);</code></pre><p>Now we need to define boundary conditions. As discussed earlier we will solve the problem using (i) homogeneous Dirichlet boundary conditions, and (ii) periodic Dirichlet boundary conditions. We construct two different constraint handlers, one for each case. The <a href="../../reference/boundary_conditions/#Ferrite.Dirichlet"><code>Dirichlet</code></a> boundary condition we have seen in many other examples. Here we simply define the condition that the field, <code>:u</code>, should have both components prescribed to <code>0</code> on the full boundary:</p><pre><code class="language-julia hljs">ch_dirichlet = ConstraintHandler(dh)
+dirichlet = Dirichlet(
+    :u,
+    union(getfaceset.(Ref(grid), [&quot;left&quot;, &quot;right&quot;, &quot;top&quot;, &quot;bottom&quot;])...),
+    (x, t) -&gt;  [0, 0],
+    [1, 2]
+)
+add!(ch_dirichlet, dirichlet)
+close!(ch_dirichlet)
+update!(ch_dirichlet, 0.0)</code></pre><p>For periodic boundary conditions we use the <a href="../../reference/boundary_conditions/#Ferrite.PeriodicDirichlet"><code>PeriodicDirichlet</code></a> constraint type, which is very similar to the <code>Dirichlet</code> type, but instead of a passing a faceset we pass a vector with &quot;face pairs&quot;, i.e. the mapping between mirror and image parts of the boundary. In this example the <code>&quot;left&quot;</code> and <code>&quot;bottom&quot;</code> boundaries are mirrors, and the <code>&quot;right&quot;</code> and <code>&quot;top&quot;</code> boundaries are the mirrors.</p><pre><code class="language-julia hljs">ch_periodic = ConstraintHandler(dh);
+periodic = PeriodicDirichlet(
+    :u,
+    [&quot;left&quot; =&gt; &quot;right&quot;, &quot;bottom&quot; =&gt; &quot;top&quot;],
+    [1, 2]
+)
+add!(ch_periodic, periodic)
+close!(ch_periodic)
+update!(ch_periodic, 0.0)</code></pre><p>This will now constrain any degrees of freedom located on the mirror boundaries to the matching degree of freedom on the image boundaries. Internally this will create a number of <a href="examples/@ref"><code>AffineConstraint</code></a>s of the form <code>u_i = 1 * u_j + 0</code>:</p><pre><code class="language-julia hljs">a = AffineConstraint(u_m, [u_i =&gt; 1], 0)</code></pre><p>where <code>u_m</code> is the degree of freedom on the mirror and <code>u_i</code> the matching one on the image part. <code>PeriodicDirichlet</code> is thus simply just a more convenient way of constructing such affine constraints since it computes the degree of freedom mapping automatically.</p><p>To simplify things we group the constraint handlers into a named tuple</p><pre><code class="language-julia hljs">ch = (dirichlet = ch_dirichlet, periodic = ch_periodic);</code></pre><p>We can now construct the sparse matrix. Note that, since we are using affine constraints, which need to modify the matrix sparsity pattern in order to account for the constraint equations, we construct the matrix for the periodic case by passing both the dof handler and the constraint handler.</p><pre><code class="language-julia hljs">K = (
+    dirichlet = create_sparsity_pattern(dh),
+    periodic  = create_sparsity_pattern(dh, ch.periodic),
+);</code></pre><p>We define the fourth order elasticity tensor for the matrix material, and define the inclusions to have 10 times higher stiffness</p><pre><code class="language-julia hljs">λ, μ = 1e10, 7e9 # Lamé parameters
+δ(i,j) = i == j ? 1.0 : 0.0
+Em = SymmetricTensor{4, 2}(
+    (i,j,k,l) -&gt; λ * δ(i,j) * δ(k,l) + μ * (δ(i,k) * δ(j,l) + δ(i,l) * δ(j,k))
+)
+Ei = 10 * Em;</code></pre><p>As mentioned above, in order to compute the apparent/homogenized stiffness we will solve the problem repeatedly with different macroscale strain tensors to compute the sensitvity of the homogenized stress, <span>$\bar{\boldsymbol{\sigma}}$</span>, w.r.t. the macroscopic strain, <span>$\bar{\boldsymbol{\varepsilon}}$</span>. The corresponding unit strains are defined below, and will result in three different right-hand-sides:</p><pre><code class="language-julia hljs">εᴹ = [
+      SymmetricTensor{2,2}([1.0 0.0; 0.0 0.0]), # ε_11 loading
+      SymmetricTensor{2,2}([0.0 0.0; 0.0 1.0]), # ε_22 loading
+      SymmetricTensor{2,2}([0.0 0.5; 0.5 0.0]), # ε_12/ε_21 loading
+];</code></pre><p>The assembly function is nothing strange, and in particular there is no impact from the choice of boundary conditions, so the same function can be used for both cases. Since we want to solve the system 3 times, once for each macroscopic strain component, we assemble 3 right-hand-sides.</p><pre><code class="language-julia hljs">function doassemble!(cellvalues::CellVectorValues, K::SparseMatrixCSC, dh::DofHandler, εᴹ)
+
+    n_basefuncs = getnbasefunctions(cellvalues)
+    ndpc = ndofs_per_cell(dh)
+    Ke = zeros(ndpc, ndpc)
+    fe = zeros(ndpc, length(εᴹ))
+    f = zeros(ndofs(dh), length(εᴹ))
+    assembler = start_assemble(K)
+
+    for cell in CellIterator(dh)
+
+        E = cellid(cell) in getcellset(dh.grid, &quot;inclusions&quot;) ? Ei : Em
+        reinit!(cellvalues, cell)
+        fill!(Ke, 0)
+        fill!(fe, 0)
+
+        for q_point in 1:getnquadpoints(cellvalues)
+            dΩ = getdetJdV(cellvalues, q_point)
+            for i in 1:n_basefuncs
+                δεi = shape_symmetric_gradient(cellvalues, q_point, i)
+                for j in 1:n_basefuncs
+                    δεj = shape_symmetric_gradient(cellvalues, q_point, j)
+                    Ke[i, j] += (δεi ⊡ E ⊡ δεj) * dΩ
+                end
+                for (rhs, ε) in enumerate(εᴹ)
+                    σᴹ = E ⊡ ε
+                    fe[i, rhs] += ( - δεi ⊡ σᴹ) * dΩ
+               end
+            end
+        end
+
+        cdofs = celldofs(cell)
+        assemble!(assembler, cdofs, Ke)
+        f[cdofs, :] .+= fe
+    end
+    return f
+end;</code></pre><p>We can now assemble the system. The assembly function modifies the matrix in-place, but return the right hand side(s) which we collect in another named tuple.</p><pre><code class="language-julia hljs">rhs = (
+    dirichlet = doassemble!(cellvalues, K.dirichlet, dh, εᴹ),
+    periodic  = doassemble!(cellvalues, K.periodic,  dh, εᴹ),
+);</code></pre><p>The next step is to solve the systems. Since application of boundary conditions, using the <a href="../../reference/boundary_conditions/#Ferrite.apply!"><code>apply!</code></a> function, modifies both the matrix and the right hand sides we can not use it directly in this case since we want to reuse the matrix again for the next right hand sides. We could of course re-assemble the matrix for every right hand side, but that would not be very efficient. Instead we will use the <a href="../../reference/boundary_conditions/#Ferrite.get_rhs_data"><code>get_rhs_data</code></a> function, together with <a href="../../reference/boundary_conditions/#Ferrite.apply_rhs!"><code>apply_rhs!</code></a> in a later step. This will extract the necessary data from the matrix such that we can apply it for all the different right hand sides. Note that we call <code>apply!</code> with just the matrix and no right hand side.</p><pre><code class="language-julia hljs">rhsdata = (
+    dirichlet = get_rhs_data(ch.dirichlet, K.dirichlet),
+    periodic  = get_rhs_data(ch.periodic,  K.periodic),
+)
+
+apply!(K.dirichlet, ch.dirichlet)
+apply!(K.periodic,  ch.periodic)</code></pre><p>We can now solve the problem(s). Note that we only use <code>apply_rhs!</code> in the loops below. The boundary conditions are already applied to the matrix above, so we only need to modify the right hand side.</p><pre><code class="language-julia hljs">u = (
+    dirichlet = Vector{Float64}[],
+    periodic  = Vector{Float64}[],
+)
+
+for i in 1:size(rhs.dirichlet, 2)
+    rhs_i = @view rhs.dirichlet[:, i]                  # Extract this RHS
+    apply_rhs!(rhsdata.dirichlet, rhs_i, ch.dirichlet) # Apply BC
+    u_i = cholesky(Symmetric(K.dirichlet)) \ rhs_i     # Solve
+    apply!(u_i, ch.dirichlet)                          # Apply BC on the solution
+    push!(u.dirichlet, u_i)                            # Save the solution vector
+end
+
+for i in 1:size(rhs.periodic, 2)
+    rhs_i = @view rhs.periodic[:, i]                   # Extract this RHS
+    apply_rhs!(rhsdata.periodic, rhs_i, ch.periodic)   # Apply BC
+    u_i = cholesky(Symmetric(K.periodic)) \ rhs_i      # Solve
+    apply!(u_i, ch.periodic)                           # Apply BC on the solution
+    push!(u.periodic, u_i)                             # Save the solution vector
+end</code></pre><p>When the solution(s) are known we can compute the averaged stress, <span>$\bar{\boldsymbol{\sigma}}$</span> in the RVE. We define a function that does this, and also returns the von Mise stress in every quadrature point for visualization.</p><pre><code class="language-julia hljs">function compute_stress(cellvalues::CellVectorValues, dh::DofHandler, u, εᴹ)
+    σvM_qpdata = zeros(getnquadpoints(cellvalues), getncells(dh.grid))
+    σ̄Ω = zero(SymmetricTensor{2,2})
+    Ω = 0.0 # Total volume
+    for cell in CellIterator(dh)
+        E = cellid(cell) in getcellset(dh.grid, &quot;inclusions&quot;) ? Ei : Em
+        reinit!(cellvalues, cell)
+        for q_point in 1:getnquadpoints(cellvalues)
+            dΩ = getdetJdV(cellvalues, q_point)
+            εμ = function_symmetric_gradient(cellvalues, q_point, u[celldofs(cell)])
+            σ = E ⊡ (εᴹ + εμ)
+            σvM_qpdata[q_point, cellid(cell)] = sqrt(3/2 * dev(σ) ⊡ dev(σ))
+            Ω += dΩ # Update total volume
+            σ̄Ω += σ * dΩ # Update integrated stress
+        end
+    end
+    σ̄ = σ̄Ω / Ω
+    return σvM_qpdata, σ̄
+end;</code></pre><p>We now compute the homogenized stress and von Mise stress for all cases</p><pre><code class="language-julia hljs">σ̄ = (
+    dirichlet = SymmetricTensor{2,2}[],
+    periodic  = SymmetricTensor{2,2}[],
+)
+σ = (
+     dirichlet = Vector{Float64}[],
+     periodic  = Vector{Float64}[],
+)
+
+projector = L2Projector(ip, grid)
+
+for i in 1:3
+    σ_qp, σ̄_i = compute_stress(cellvalues, dh, u.dirichlet[i], εᴹ[i])
+    proj = project(projector, σ_qp, qr; project_to_nodes=false)
+    push!(σ.dirichlet, proj)
+    push!(σ̄.dirichlet, σ̄_i)
+end
+
+for i in 1:3
+    σ_qp, σ̄_i = compute_stress(cellvalues, dh, u.periodic[i], εᴹ[i])
+    proj = project(projector, σ_qp, qr; project_to_nodes=false)
+    push!(σ.periodic, proj)
+    push!(σ̄.periodic, σ̄_i)
+end</code></pre><p>The remaining thing is to compute the homogenized stiffness. As mentioned in the introduction we can find all the components from the average stress of the sensitivity fields that we have solved for</p><p class="math-container">\[\mathsf{E}_{ijkl} = \bar{\sigma}_{ij}(\hat{\boldsymbol{u}}_{kl}).\]</p><p>So we have now already computed all the components, and just need to gather the data in a fourth order tensor:</p><pre><code class="language-julia hljs">E_dirichlet = SymmetricTensor{4,2}((i, j, k, l) -&gt; begin
+    if k == l == 1
+        σ̄.dirichlet[1][i, j] # ∂σ∂ε_**11
+    elseif k == l == 2
+        σ̄.dirichlet[2][i, j] # ∂σ∂ε_**22
+    else
+        σ̄.dirichlet[3][i, j] # ∂σ∂ε_**12 and ∂σ∂ε_**21
+    end
+end)
+
+E_periodic = SymmetricTensor{4,2}((i, j, k, l) -&gt; begin
+    if k == l == 1
+        σ̄.periodic[1][i, j]
+    elseif k == l == 2
+        σ̄.periodic[2][i, j]
+    else
+        σ̄.periodic[3][i, j]
+    end
+end);</code></pre><p>We can check that the result are what we expect, namely that the stiffness with Dirichlet boundary conditions is higher than when using periodic boundary conditions, and that the Reuss assumption is an lower bound, and the Voigt assumption a upper bound. We first compute the volume fraction of the matrix, and then the Voigt and Reuss bounds:</p><pre><code class="language-julia hljs">function matrix_volume_fraction(grid, cellvalues)
+    V  = 0.0 # Total volume
+    Vm = 0.0 # Volume of the matrix
+    for c in CellIterator(grid)
+        reinit!(cellvalues, c)
+        is_matrix = !(cellid(c) in getcellset(grid, &quot;inclusions&quot;))
+        for qp in 1:getnquadpoints(cellvalues)
+            dΩ = getdetJdV(cellvalues, qp)
+            V += dΩ
+            if is_matrix
+                Vm += dΩ
+            end
+        end
+    end
+    return Vm / V
+end
+
+vm = matrix_volume_fraction(grid, cellvalues)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">0.64796265456868</code></pre><pre><code class="language-julia hljs">E_voigt = vm * Em + (1-vm) * Ei
+E_reuss = inv(vm * inv(Em) + (1-vm) * inv(Ei));</code></pre><p>We can now compare the different computed stiffness tensors. We expect <span>$E_\mathrm{Reuss} \leq E_\mathrm{PeriodicBC} \leq E_\mathrm{DirichletBC} \leq E_\mathrm{Voigt}$</span>. A simple thing to compare are the eigenvalues of the tensors. Here we look at the first eigenvalue:</p><pre><code class="language-julia hljs">ev = (first ∘ eigvals).((E_reuss, E_periodic, E_dirichlet, E_voigt))
+round.(ev; digits=-8)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">(2.05e10, 2.34e10, 2.82e10, 5.84e10)</code></pre><p>Finally, we export the solution and the stress field to a VTK file. For the export we also compute the macroscopic part of the displacement.</p><pre><code class="language-julia hljs">chM = ConstraintHandler(dh)
+add!(chM, Dirichlet(:u, Set(1:getnnodes(grid)), (x, t) -&gt; εᴹ[Int(t)] ⋅ x, [1, 2]))
+close!(chM)
+uM = zeros(ndofs(dh))
+
+vtk_grid(&quot;homogenization&quot;, dh) do vtk
+    for i in 1:3
+        # Compute macroscopic solution
+        update!(chM, i)
+        apply!(uM, chM)
+        # Dirichlet
+        vtk_point_data(vtk, dh, uM + u.dirichlet[i], &quot;_dirichlet_$i&quot;)
+        vtk_point_data(vtk, projector, σ.dirichlet[i], &quot;σvM_dirichlet_$i&quot;)
+        # Periodic
+        vtk_point_data(vtk, dh, uM + u.periodic[i], &quot;_periodic_$i&quot;)
+        vtk_point_data(vtk, projector, σ.periodic[i], &quot;σvM_periodic_$i&quot;)
+    end
+end;</code></pre><h2 id="homogenization-plain-program"><a class="docs-heading-anchor" href="#homogenization-plain-program">Plain program</a><a id="homogenization-plain-program-1"></a><a class="docs-heading-anchor-permalink" href="#homogenization-plain-program" title="Permalink"></a></h2><p>Here follows a version of the program without any comments. The file is also available here: <a href="../computational_homogenization.jl"><code>computational_homogenization.jl</code></a>.</p><pre><code class="language-julia hljs">using Ferrite, SparseArrays, LinearAlgebra
+
+using FerriteGmsh
+# grid = saved_file_to_grid(&quot;periodic-rve-coarse.msh&quot;)
+grid = saved_file_to_grid(&quot;periodic-rve.msh&quot;)
+
+dim = 2
+ip = Lagrange{dim, RefTetrahedron, 1}()
+qr = QuadratureRule{dim, RefTetrahedron}(2)
+cellvalues = CellVectorValues(qr, ip);
+
+dh = DofHandler(grid)
+push!(dh, :u, 2)
+close!(dh);
+
+ch_dirichlet = ConstraintHandler(dh)
+dirichlet = Dirichlet(
+    :u,
+    union(getfaceset.(Ref(grid), [&quot;left&quot;, &quot;right&quot;, &quot;top&quot;, &quot;bottom&quot;])...),
+    (x, t) -&gt;  [0, 0],
+    [1, 2]
+)
+add!(ch_dirichlet, dirichlet)
+close!(ch_dirichlet)
+update!(ch_dirichlet, 0.0)
+
+ch_periodic = ConstraintHandler(dh);
+periodic = PeriodicDirichlet(
+    :u,
+    [&quot;left&quot; =&gt; &quot;right&quot;, &quot;bottom&quot; =&gt; &quot;top&quot;],
+    [1, 2]
+)
+add!(ch_periodic, periodic)
+close!(ch_periodic)
+update!(ch_periodic, 0.0)
+
+ch = (dirichlet = ch_dirichlet, periodic = ch_periodic);
+
+K = (
+    dirichlet = create_sparsity_pattern(dh),
+    periodic  = create_sparsity_pattern(dh, ch.periodic),
+);
+
+λ, μ = 1e10, 7e9 # Lamé parameters
+δ(i,j) = i == j ? 1.0 : 0.0
+Em = SymmetricTensor{4, 2}(
+    (i,j,k,l) -&gt; λ * δ(i,j) * δ(k,l) + μ * (δ(i,k) * δ(j,l) + δ(i,l) * δ(j,k))
+)
+Ei = 10 * Em;
+
+εᴹ = [
+      SymmetricTensor{2,2}([1.0 0.0; 0.0 0.0]), # ε_11 loading
+      SymmetricTensor{2,2}([0.0 0.0; 0.0 1.0]), # ε_22 loading
+      SymmetricTensor{2,2}([0.0 0.5; 0.5 0.0]), # ε_12/ε_21 loading
+];
+
+function doassemble!(cellvalues::CellVectorValues, K::SparseMatrixCSC, dh::DofHandler, εᴹ)
+
+    n_basefuncs = getnbasefunctions(cellvalues)
+    ndpc = ndofs_per_cell(dh)
+    Ke = zeros(ndpc, ndpc)
+    fe = zeros(ndpc, length(εᴹ))
+    f = zeros(ndofs(dh), length(εᴹ))
+    assembler = start_assemble(K)
+
+    for cell in CellIterator(dh)
+
+        E = cellid(cell) in getcellset(dh.grid, &quot;inclusions&quot;) ? Ei : Em
+        reinit!(cellvalues, cell)
+        fill!(Ke, 0)
+        fill!(fe, 0)
+
+        for q_point in 1:getnquadpoints(cellvalues)
+            dΩ = getdetJdV(cellvalues, q_point)
+            for i in 1:n_basefuncs
+                δεi = shape_symmetric_gradient(cellvalues, q_point, i)
+                for j in 1:n_basefuncs
+                    δεj = shape_symmetric_gradient(cellvalues, q_point, j)
+                    Ke[i, j] += (δεi ⊡ E ⊡ δεj) * dΩ
+                end
+                for (rhs, ε) in enumerate(εᴹ)
+                    σᴹ = E ⊡ ε
+                    fe[i, rhs] += ( - δεi ⊡ σᴹ) * dΩ
+               end
+            end
+        end
+
+        cdofs = celldofs(cell)
+        assemble!(assembler, cdofs, Ke)
+        f[cdofs, :] .+= fe
+    end
+    return f
+end;
+
+rhs = (
+    dirichlet = doassemble!(cellvalues, K.dirichlet, dh, εᴹ),
+    periodic  = doassemble!(cellvalues, K.periodic,  dh, εᴹ),
+);
+
+rhsdata = (
+    dirichlet = get_rhs_data(ch.dirichlet, K.dirichlet),
+    periodic  = get_rhs_data(ch.periodic,  K.periodic),
+)
+
+apply!(K.dirichlet, ch.dirichlet)
+apply!(K.periodic,  ch.periodic)
+
+u = (
+    dirichlet = Vector{Float64}[],
+    periodic  = Vector{Float64}[],
+)
+
+for i in 1:size(rhs.dirichlet, 2)
+    rhs_i = @view rhs.dirichlet[:, i]                  # Extract this RHS
+    apply_rhs!(rhsdata.dirichlet, rhs_i, ch.dirichlet) # Apply BC
+    u_i = cholesky(Symmetric(K.dirichlet)) \ rhs_i     # Solve
+    apply!(u_i, ch.dirichlet)                          # Apply BC on the solution
+    push!(u.dirichlet, u_i)                            # Save the solution vector
+end
+
+for i in 1:size(rhs.periodic, 2)
+    rhs_i = @view rhs.periodic[:, i]                   # Extract this RHS
+    apply_rhs!(rhsdata.periodic, rhs_i, ch.periodic)   # Apply BC
+    u_i = cholesky(Symmetric(K.periodic)) \ rhs_i      # Solve
+    apply!(u_i, ch.periodic)                           # Apply BC on the solution
+    push!(u.periodic, u_i)                             # Save the solution vector
+end
+
+function compute_stress(cellvalues::CellVectorValues, dh::DofHandler, u, εᴹ)
+    σvM_qpdata = zeros(getnquadpoints(cellvalues), getncells(dh.grid))
+    σ̄Ω = zero(SymmetricTensor{2,2})
+    Ω = 0.0 # Total volume
+    for cell in CellIterator(dh)
+        E = cellid(cell) in getcellset(dh.grid, &quot;inclusions&quot;) ? Ei : Em
+        reinit!(cellvalues, cell)
+        for q_point in 1:getnquadpoints(cellvalues)
+            dΩ = getdetJdV(cellvalues, q_point)
+            εμ = function_symmetric_gradient(cellvalues, q_point, u[celldofs(cell)])
+            σ = E ⊡ (εᴹ + εμ)
+            σvM_qpdata[q_point, cellid(cell)] = sqrt(3/2 * dev(σ) ⊡ dev(σ))
+            Ω += dΩ # Update total volume
+            σ̄Ω += σ * dΩ # Update integrated stress
+        end
+    end
+    σ̄ = σ̄Ω / Ω
+    return σvM_qpdata, σ̄
+end;
+
+σ̄ = (
+    dirichlet = SymmetricTensor{2,2}[],
+    periodic  = SymmetricTensor{2,2}[],
+)
+σ = (
+     dirichlet = Vector{Float64}[],
+     periodic  = Vector{Float64}[],
+)
+
+projector = L2Projector(ip, grid)
+
+for i in 1:3
+    σ_qp, σ̄_i = compute_stress(cellvalues, dh, u.dirichlet[i], εᴹ[i])
+    proj = project(projector, σ_qp, qr; project_to_nodes=false)
+    push!(σ.dirichlet, proj)
+    push!(σ̄.dirichlet, σ̄_i)
+end
+
+for i in 1:3
+    σ_qp, σ̄_i = compute_stress(cellvalues, dh, u.periodic[i], εᴹ[i])
+    proj = project(projector, σ_qp, qr; project_to_nodes=false)
+    push!(σ.periodic, proj)
+    push!(σ̄.periodic, σ̄_i)
+end
+
+E_dirichlet = SymmetricTensor{4,2}((i, j, k, l) -&gt; begin
+    if k == l == 1
+        σ̄.dirichlet[1][i, j] # ∂σ∂ε_**11
+    elseif k == l == 2
+        σ̄.dirichlet[2][i, j] # ∂σ∂ε_**22
+    else
+        σ̄.dirichlet[3][i, j] # ∂σ∂ε_**12 and ∂σ∂ε_**21
+    end
+end)
+
+E_periodic = SymmetricTensor{4,2}((i, j, k, l) -&gt; begin
+    if k == l == 1
+        σ̄.periodic[1][i, j]
+    elseif k == l == 2
+        σ̄.periodic[2][i, j]
+    else
+        σ̄.periodic[3][i, j]
+    end
+end);
+
+function matrix_volume_fraction(grid, cellvalues)
+    V  = 0.0 # Total volume
+    Vm = 0.0 # Volume of the matrix
+    for c in CellIterator(grid)
+        reinit!(cellvalues, c)
+        is_matrix = !(cellid(c) in getcellset(grid, &quot;inclusions&quot;))
+        for qp in 1:getnquadpoints(cellvalues)
+            dΩ = getdetJdV(cellvalues, qp)
+            V += dΩ
+            if is_matrix
+                Vm += dΩ
+            end
+        end
+    end
+    return Vm / V
+end
+
+vm = matrix_volume_fraction(grid, cellvalues)
+
+E_voigt = vm * Em + (1-vm) * Ei
+E_reuss = inv(vm * inv(Em) + (1-vm) * inv(Ei));
+
+ev = (first ∘ eigvals).((E_reuss, E_periodic, E_dirichlet, E_voigt))
+round.(ev; digits=-8)
+
+chM = ConstraintHandler(dh)
+add!(chM, Dirichlet(:u, Set(1:getnnodes(grid)), (x, t) -&gt; εᴹ[Int(t)] ⋅ x, [1, 2]))
+close!(chM)
+uM = zeros(ndofs(dh))
+
+vtk_grid(&quot;homogenization&quot;, dh) do vtk
+    for i in 1:3
+        # Compute macroscopic solution
+        update!(chM, i)
+        apply!(uM, chM)
+        # Dirichlet
+        vtk_point_data(vtk, dh, uM + u.dirichlet[i], &quot;_dirichlet_$i&quot;)
+        vtk_point_data(vtk, projector, σ.dirichlet[i], &quot;σvM_dirichlet_$i&quot;)
+        # Periodic
+        vtk_point_data(vtk, dh, uM + u.periodic[i], &quot;_periodic_$i&quot;)
+        vtk_point_data(vtk, projector, σ.periodic[i], &quot;σvM_periodic_$i&quot;)
+    end
+end;</code></pre><hr/><p><em>This page was generated using <a href="https://github.com/fredrikekre/Literate.jl">Literate.jl</a>.</em></p></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../ns_vs_diffeq/">« Incompressible Navier-Stokes Equations via DifferentialEquations.jl</a><a class="docs-footer-nextpage" href="../../reference/quadrature/">Quadrature »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 0.27.19 on <span class="colophon-date" title="Thursday 30 June 2022 13:08">Thursday 30 June 2022</span>. Using Julia version 1.7.3.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>

@@ -1,0 +1,518 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/><title>Nearly Incompressible Hyperelasticity · Ferrite.jl</title><script data-outdated-warner src="../../assets/warner.js"></script><link href="https://cdnjs.cloudflare.com/ajax/libs/lato-font/3.0.0/css/lato-font.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/juliamono/0.039/juliamono-regular.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/fontawesome.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/solid.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/brands.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.13.11/katex.min.css" rel="stylesheet" type="text/css"/><script>documenterBaseURL="../.."</script><script src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.6/require.min.js" data-main="../../assets/documenter.js"></script><script src="../../siteinfo.js"></script><script src="../../../versions.js"></script><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/documenter-dark.css" data-theme-name="documenter-dark" data-theme-primary-dark/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/documenter-light.css" data-theme-name="documenter-light" data-theme-primary/><script src="../../assets/themeswap.js"></script></head><body><div id="documenter"><nav class="docs-sidebar"><div class="docs-package-name"><span class="docs-autofit"><a href="../../">Ferrite.jl</a></span></div><form class="docs-search" action="../../search/"><input class="docs-search-query" id="documenter-search-query" name="q" type="text" placeholder="Search docs"/></form><ul class="docs-menu"><li><a class="tocitem" href="../../">Home</a></li><li><a class="tocitem" href="../../manual/fe_intro/">Introduction to FEM</a></li><li><span class="tocitem">Manual</span><ul><li><a class="tocitem" href="../../manual/degrees_of_freedom/">Degrees of Freedom</a></li><li><a class="tocitem" href="../../manual/assembly/">Assembly</a></li><li><a class="tocitem" href="../../manual/boundary_conditions/">Boundary Conditions</a></li><li><a class="tocitem" href="../../manual/grid/">Grid</a></li><li><a class="tocitem" href="../../manual/export/">Export</a></li></ul></li><li><span class="tocitem">Examples</span><ul><li><a class="tocitem" href="../heat_equation/">Heat Equation</a></li><li><a class="tocitem" href="../postprocessing/">Postprocessing</a></li><li><a class="tocitem" href="../helmholtz/">Helmholtz equation</a></li><li><a class="tocitem" href="../incompressible_elasticity/">Incompressible Elasticity</a></li><li><a class="tocitem" href="../hyperelasticity/">Hyperelasticity</a></li><li><a class="tocitem" href="../threaded_assembly/">Threaded Assembly</a></li><li><a class="tocitem" href="../plasticity/">von Mises plasticity</a></li><li><a class="tocitem" href="../transient_heat_equation/">Time Dependent Problems</a></li><li><a class="tocitem" href="../landau/">Ginzburg-Landau model energy minimization</a></li><li><a class="tocitem" href="../linear_shell/">Linear shell</a></li><li class="is-active"><a class="tocitem" href>Nearly Incompressible Hyperelasticity</a><ul class="internal"><li><a class="tocitem" href="#Introduction"><span>Introduction</span></a></li><li><a class="tocitem" href="#References"><span>References</span></a></li><li><a class="tocitem" href="#Plain-Program"><span>Plain Program</span></a></li></ul></li><li><a class="tocitem" href="../ns_vs_diffeq/">Incompressible Navier-Stokes Equations via DifferentialEquations.jl</a></li></ul></li><li><span class="tocitem">API Reference</span><ul><li><a class="tocitem" href="../../reference/quadrature/">Quadrature</a></li><li><a class="tocitem" href="../../reference/interpolations/">Interpolation</a></li><li><a class="tocitem" href="../../reference/fevalues/">FEValues</a></li><li><a class="tocitem" href="../../reference/dofhandler/">DofHandler</a></li><li><a class="tocitem" href="../../reference/assembly/">Assembly</a></li><li><a class="tocitem" href="../../reference/boundary_conditions/">Boundary Conditions</a></li><li><a class="tocitem" href="../../reference/grid/">Grid &amp; AbstractGrid</a></li><li><a class="tocitem" href="../../reference/export/">Postprocessing</a></li></ul></li></ul><div class="docs-version-selector field has-addons"><div class="control"><span class="docs-label button is-static is-size-7">Version</span></div><div class="docs-selector control is-expanded"><div class="select is-fullwidth is-size-7"><select id="documenter-version-selector"></select></div></div></div></nav><div class="docs-main"><header class="docs-navbar"><nav class="breadcrumb"><ul class="is-hidden-mobile"><li><a class="is-disabled">Examples</a></li><li class="is-active"><a href>Nearly Incompressible Hyperelasticity</a></li></ul><ul class="is-hidden-tablet"><li class="is-active"><a href>Nearly Incompressible Hyperelasticity</a></li></ul></nav><div class="docs-right"><a class="docs-edit-link" href="https://github.com/Ferrite-FEM/Ferrite.jl/blob/master/docs/src/literate/quasi_incompressible_hyperelasticity.jl" title="Edit on GitHub"><span class="docs-icon fab"></span><span class="docs-label is-hidden-touch">Edit on GitHub</span></a><a class="docs-settings-button fas fa-cog" id="documenter-settings-button" href="#" title="Settings"></a><a class="docs-sidebar-button fa fa-bars is-hidden-desktop" id="documenter-sidebar-button" href="#"></a></div></header><article class="content" id="documenter-page"><h1 id="Nearly-Incompressible-Hyperelasticity"><a class="docs-heading-anchor" href="#Nearly-Incompressible-Hyperelasticity">Nearly Incompressible Hyperelasticity</a><a id="Nearly-Incompressible-Hyperelasticity-1"></a><a class="docs-heading-anchor-permalink" href="#Nearly-Incompressible-Hyperelasticity" title="Permalink"></a></h1><p><img src="../quasi_incompressible_hyperelasticity.gif" alt/></p><div class="admonition is-success"><header class="admonition-header">Tip</header><div class="admonition-body"><p>This example is also available as a Jupyter notebook: <a href="https://nbviewer.jupyter.org/github/Ferrite-FEM/Ferrite.jl/blob/gh-pages/v0.3.3/examples/quasi_incompressible_hyperelasticity.ipynb"><code>quasi_incompressible_hyperelasticity.ipynb</code></a></p></div></div><h2 id="Introduction"><a class="docs-heading-anchor" href="#Introduction">Introduction</a><a id="Introduction-1"></a><a class="docs-heading-anchor-permalink" href="#Introduction" title="Permalink"></a></h2><p>In this example we study quasi- or nearly-incompressible hyperelasticity using the stable Taylor-Hood approximation. In spirit, this example is the nonlinear analogue of <a href="https://nbviewer.jupyter.org/github/Ferrite-FEM/Ferrite.jl/blob/gh-pages/v0.3.3/examples/incompressible_elasticity.ipynb"><code>incompressible_elasticity</code></a> and the incompressible analogue of <a href="https://nbviewer.jupyter.org/github/Ferrite-FEM/Ferrite.jl/blob/gh-pages/v0.3.3/examples/hyperelasticity.ipynb"><code>hyperelasticity</code></a>. Much of the code therefore follows from the above two examples. The problem is formulated in the undeformed or reference configuration with the displacement <code>u</code> and pressure <code>p</code> being the unknown fields. We now briefly outline the formulation. Consider the standard hyperelasticity problem</p><p class="math-container">\[  u = \argmin_{v\in\mathcal{K}}\Pi(v),\quad \text{where}\quad \Pi(v)  = \int_\Omega \Psi(v) \ \mathrm{d}\Omega\ .\]</p><p>For clarity of presentation we ignore any non-zero surface tractions and body forces and instead consider only applied displacements (i.e. non-homogeneous dirichlet boundary conditions). Moreover we stick our attention to the standard Neo-Hookean stored energy density</p><p class="math-container">\[    \Psi(u) = \frac{\mu}{2}\left(I_1 - 3 \right) - \mu \log(J) + \frac{\lambda}{2}\left( J - 1\right){}^2,\]</p><p>where <span>$I_1 = F:F = F_{ij}F_{ij}$</span> and J = det(F) denote the standard invariants of the deformation gradient tensor <span>$F = \mathbb{I}+\nabla u$</span>. The above problem is ill-posed in the limit of incompressibility (or near-incompressibility), namely when</p><p class="math-container">\[    \lambda/\mu \rightarrow +\infty.\]</p><p>In order to alleviate the problem, we consider the partial legendre transform of the strain energy density Ψ with respect to J = det(F), namely</p><p class="math-container">\[  \widehat{\Psi}(u, p) = \sup_{J} \left[ p(J - 1) - \frac{\mu}{2}\left(I_1 - 3 \right) + \mu \log(J) - \frac{\lambda}{2}\left( J - 1\right){}^2 \right].\]</p><p>The supremum, say <span>$J^\star$</span>, can be calculated in closed form by the first order optimailty condition <span>$\partial\widehat{\Psi}/\partial J = 0$</span>. This gives</p><p class="math-container">\[  J^\star(p) = \frac{\lambda + p + \sqrt{(\lambda + p){}^2 + 4 \lambda \mu }}{(2 \lambda)}.\]</p><p>Furthermore, taking the partial legendre transform of <span>$\widehat{\Psi}$</span> once again, gives us back the original problem, i.e.</p><p class="math-container">\[    \Psi(u) = \Psi^\star(u, p) = \sup_{p} \left[ p(J - 1) - p(J^\star - 1) + \frac{\mu}{2}\left(I_1 - 3 \right) - \mu \log(J^\star) + \frac{\lambda}{2}\left( J^\star - 1\right){}^2 \right].\]</p><p>Therefore our original hyperelasticity problem can now be reformulated as</p><p class="math-container">\[  \inf_{u\in\mathcal{K}}\sup_{p} \int_\Omega\Psi^{\star} (u, p) \ \mathrm{d}\Omega.\]</p><p>The total (modified) energy <span>$\Pi^\star$</span> can then be written as</p><p class="math-container">\[  \Pi^\star(u, p) = \int_\Omega p (J - J^\star) \ \mathrm{d}\Omega + \int_\Omega \frac{\mu}{2} \left( I_1 - 3\right) \ \mathrm{d}\Omega - \int_\Omega \mu\log(J^\star)\ \mathrm{d}\Omega + \int_\Omega \frac{\lambda}{2}\left( J^\star - 1 \right){}^2\ \mathrm{d}\Omega\]</p><p>The euler-lagrange equations corresponding to the above energy give us our governing PDEs in the weak form, namely</p><p class="math-container">\[  \int_\Omega \frac{\partial\Psi^\star}{\partial F}:\delta F \ \mathrm{d}\Omega = 0\]</p><p>and</p><p class="math-container">\[  \int_\Omega \frac{\partial \Psi^\star}{\partial p}\delta p \ \mathrm{d}\Omega = 0,\]</p><p>where δF = δ∇u = ∇(δu) and δu and δp denote arbitrary variations with respect to displacement and pressure (or the test functions). See the references below for a more detailed explanation of the above mathematical trick. Now, in order to apply Newton&#39;s method to the above problem, we further need to linearize the above equations and calculate the respective hessians (or tangents), namely, <span>$\partial^2\Psi^\star/\partial F^2$</span>, <span>$\partial^2\Psi^\star/\partial p^2$</span> and <span>$\partial^2\Psi^\star/\partial F\partial p$</span> which, using <code>Tensors.jl</code>, can be determined conveniently using automatic differentiation (see the code below). Hence we only need to define the above potential. The remaineder of the example follows similarly.</p><h2 id="References"><a class="docs-heading-anchor" href="#References">References</a><a id="References-1"></a><a class="docs-heading-anchor-permalink" href="#References" title="Permalink"></a></h2><ol><li><a href="http://pamies.cee.illinois.edu/Publications_files/CMAME_2016.pdf">A paradigm for higher-order polygonal elements in finite elasticity using a gradient correction scheme, CMAME 2016, 306, 216–251</a></li><li><a href="https://link.springer.com/content/pdf/10.1007/s00466-013-0869-0.pdf">Approximation of incompressible large deformation elastic problems: some unresolved issues, Computational Mechanics, 2013</a></li></ol><p>We now get to the actual code. First, we import the respective packages</p><pre><code class="language-julia hljs">using Ferrite, Tensors, ProgressMeter
+using BlockArrays, SparseArrays, LinearAlgebra</code></pre><p>and the corresponding <code>struct</code> to store our material properties.</p><pre><code class="language-julia hljs">struct NeoHooke
+    μ::Float64
+    λ::Float64
+end</code></pre><p>We then create a function to generate a simple test mesh on which to compute FE solution. We also mark the boundaries to later assign Dirichlet boundary conditions</p><pre><code class="language-julia hljs">function importTestGrid()
+    grid = generate_grid(Tetrahedron, (5, 5, 5), zero(Vec{3}), ones(Vec{3}));
+    addfaceset!(grid, &quot;myBottom&quot;, x -&gt; norm(x[2]) ≈ 0.0);
+    addfaceset!(grid, &quot;myBack&quot;, x -&gt; norm(x[3]) ≈ 0.0);
+    addfaceset!(grid, &quot;myRight&quot;, x -&gt; norm(x[1]) ≈ 1.0);
+    addfaceset!(grid, &quot;myLeft&quot;, x -&gt; norm(x[1]) ≈ 0.0);
+    return grid
+end;</code></pre><p>The function to create corresponding cellvalues for the displacement field <code>u</code> and pressure <code>p</code> follows in a similar fashion from the <code>incompressible_elasticity</code> example</p><pre><code class="language-julia hljs">function create_values(interpolation_u, interpolation_p)
+    # quadrature rules
+    qr      = QuadratureRule{3,RefTetrahedron}(4)
+    face_qr = QuadratureRule{2,RefTetrahedron}(4)
+
+    # geometric interpolation
+    interpolation_geom = Lagrange{3,RefTetrahedron,1}()
+
+    # cell and facevalues for u
+    cellvalues_u = CellVectorValues(qr, interpolation_u, interpolation_geom)
+    facevalues_u = FaceVectorValues(face_qr, interpolation_u, interpolation_geom)
+
+    # cellvalues for p
+    cellvalues_p = CellScalarValues(qr, interpolation_p, interpolation_geom)
+
+    return cellvalues_u, cellvalues_p, facevalues_u
+end;</code></pre><p>We now create the function for Ψ*</p><pre><code class="language-julia hljs">function Ψ(F, p, mp::NeoHooke)
+    μ = mp.μ
+    λ = mp.λ
+    Ic = tr(tdot(F))
+    J = det(F)
+    Js = (λ + p + sqrt((λ + p)^2. + 4. * λ * μ ))/(2. * λ)
+    return p * (Js - J) + μ / 2 * (Ic - 3) - μ * log(Js) + λ / 2 * (Js - 1)^2
+end;</code></pre><p>and it&#39;s derivatives (required in computing the jacobian and hessian respectively)</p><pre><code class="language-julia hljs">function constitutive_driver(F, p, mp::NeoHooke)
+    # Compute all derivatives in one function call
+    ∂²Ψ∂F², ∂Ψ∂F = Tensors.hessian(y -&gt; Ψ(y, p, mp), F, :all)
+    ∂²Ψ∂p², ∂Ψ∂p = Tensors.hessian(y -&gt; Ψ(F, y, mp), p, :all)
+    ∂²Ψ∂F∂p = Tensors.gradient(q -&gt; Tensors.gradient(y -&gt; Ψ(y, q, mp), F), p)
+    return ∂Ψ∂F, ∂²Ψ∂F², ∂Ψ∂p, ∂²Ψ∂p², ∂²Ψ∂F∂p
+end;</code></pre><p>The functions to create the <code>DofHandler</code> and <code>ConstraintHandler</code> (to assign corresponding boundary conditions) follow likewise from the incompressible elasticity example, namely</p><pre><code class="language-julia hljs">function create_dofhandler(grid, ipu, ipp)
+    dh = DofHandler(grid)
+    push!(dh, :u, 3, ipu) # displacement dim = 3
+    push!(dh, :p, 1, ipp) # pressure dim = 1
+    close!(dh)
+    return dh
+end;</code></pre><p>We are simulating a uniaxial tensile loading of a unit cube. Hence we apply a displacement field (<code>:u</code>) in <code>x</code> direction on the right face. The left, bottom and back faces are fixed in the <code>x</code>, <code>y</code> and <code>z</code> components of the displacement so as to emulate the uniaxial nature of the loading.</p><pre><code class="language-julia hljs">function create_bc(dh)
+    dbc = ConstraintHandler(dh)
+    add!(dbc, Dirichlet(:u, getfaceset(dh.grid, &quot;myLeft&quot;), (x,t) -&gt; zero(Vec{1}), [1]))
+    add!(dbc, Dirichlet(:u, getfaceset(dh.grid, &quot;myBottom&quot;), (x,t) -&gt; zero(Vec{1}), [2]))
+    add!(dbc, Dirichlet(:u, getfaceset(dh.grid, &quot;myBack&quot;), (x,t) -&gt; zero(Vec{1}), [3]))
+    add!(dbc, Dirichlet(:u, getfaceset(dh.grid, &quot;myRight&quot;), (x,t) -&gt; t*ones(Vec{1}), [1]))
+    close!(dbc)
+    Ferrite.update!(dbc, 0.0)
+    return dbc
+end;</code></pre><p>Also, since we are considering incompressible hyperelasticity, an interesting quantity that we can compute is the deformed volume of the solid. It is easy to show that this is equal to ∫J*dΩ where J=det(F). This can be done at the level of each element (cell)</p><pre><code class="language-julia hljs">function calculate_element_volume(cell, cellvalues_u, ue)
+    reinit!(cellvalues_u, cell)
+    evol::Float64=0.0;
+    @inbounds for qp in 1:getnquadpoints(cellvalues_u)
+        dΩ = getdetJdV(cellvalues_u, qp)
+        ∇u = function_gradient(cellvalues_u, qp, ue)
+        F = one(∇u) + ∇u
+        J = det(F)
+        evol += J * dΩ
+    end
+    return evol
+end;</code></pre><p>and then assembled over all the cells (elements)</p><pre><code class="language-julia hljs">function calculate_volume_deformed_mesh(w, dh::DofHandler, cellvalues_u)
+    evol::Float64 = 0.0;
+    @inbounds for cell in CellIterator(dh)
+        global_dofs = celldofs(cell)
+        nu = getnbasefunctions(cellvalues_u)
+        global_dofs_u = global_dofs[1:nu]
+        ue = w[global_dofs_u]
+        δevol = calculate_element_volume(cell, cellvalues_u, ue)
+        evol += δevol;
+    end
+    return evol
+end;</code></pre><p>The function to assemble the element stiffness matrix for each element in the mesh now has a block structure like in <code>incompressible_elasticity</code>.</p><pre><code class="language-julia hljs">function assemble_element!(Ke, fe, cell, cellvalues_u, cellvalues_p, mp, ue, pe)
+    # Reinitialize cell values, and reset output arrays
+    ublock, pblock = 1, 2
+    reinit!(cellvalues_u, cell)
+    reinit!(cellvalues_p, cell)
+    fill!(Ke, 0.0)
+    fill!(fe, 0.0)
+
+    n_basefuncs_u = getnbasefunctions(cellvalues_u)
+    n_basefuncs_p = getnbasefunctions(cellvalues_p)
+
+    @inbounds for qp in 1:getnquadpoints(cellvalues_u)
+        dΩ = getdetJdV(cellvalues_u, qp)
+        # Compute deformation gradient F
+        ∇u = function_gradient(cellvalues_u, qp, ue)
+        p = function_value(cellvalues_p, qp, pe)
+        F = one(∇u) + ∇u
+
+        # Compute first Piola-Kirchhoff stress and tangent modulus
+        ∂Ψ∂F, ∂²Ψ∂F², ∂Ψ∂p, ∂²Ψ∂p², ∂²Ψ∂F∂p = constitutive_driver(F, p, mp)
+
+        # Loop over the `u`-test functions to calculate the `u`-`u` and `u`-`p` blocks
+        for i in 1:n_basefuncs_u
+            # gradient of the test function
+            ∇δui = shape_gradient(cellvalues_u, qp, i)
+            # Add contribution to the residual from this test function
+            fe[BlockIndex((ublock), (i))] += ( ∇δui ⊡ ∂Ψ∂F) * dΩ
+
+            ∇δui∂S∂F = ∇δui ⊡ ∂²Ψ∂F²
+            for j in 1:n_basefuncs_u
+                ∇δuj = shape_gradient(cellvalues_u, qp, j)
+
+                # Add contribution to the tangent
+                Ke[BlockIndex((ublock, ublock), (i, j))] += ( ∇δui∂S∂F ⊡ ∇δuj ) * dΩ
+            end
+            # Loop over the `p`-test functions
+            for j in 1:n_basefuncs_p
+                δp = shape_value(cellvalues_p, qp, j)
+                # Add contribution to the tangent
+                Ke[BlockIndex((ublock, pblock), (i, j))] += ( ∂²Ψ∂F∂p ⊡ ∇δui ) * δp * dΩ
+            end
+        end
+        # Loop over the `p`-test functions to calculate the `p-`u` and `p`-`p` blocks
+        for i in 1:n_basefuncs_p
+            δp = shape_value(cellvalues_p, qp, i)
+            fe[BlockIndex((pblock), (i))] += ( δp * ∂Ψ∂p) * dΩ
+
+            for j in 1:n_basefuncs_u
+                ∇δuj = shape_gradient(cellvalues_u, qp, j)
+                Ke[BlockIndex((pblock, ublock), (i, j))] += ∇δuj ⊡ ∂²Ψ∂F∂p * δp * dΩ
+            end
+            for j in 1:n_basefuncs_p
+                δp = shape_value(cellvalues_p, qp, j)
+                Ke[BlockIndex((pblock, pblock), (i, j))] += δp * ∂²Ψ∂p² * δp * dΩ
+            end
+        end
+    end
+end;</code></pre><p>The only thing that changes in the assembly of the global stiffness matrix is slicing the corresponding element dofs for the displacement (see <code>global_dofsu</code>) and pressure (<code>global_dofsp</code>).</p><pre><code class="language-julia hljs">function assemble_global!(K::SparseMatrixCSC, f, cellvalues_u::CellVectorValues{dim},
+                         cellvalues_p::CellScalarValues{dim}, dh::DofHandler, mp::NeoHooke, w) where {dim}
+    nu = getnbasefunctions(cellvalues_u)
+    np = getnbasefunctions(cellvalues_p)
+
+    # start_assemble resets K and f
+    fe = PseudoBlockArray(zeros(nu + np), [nu, np]) # local force vector
+    ke = PseudoBlockArray(zeros(nu + np, nu + np), [nu, np], [nu, np]) # local stiffness matrix
+
+    assembler = start_assemble(K, f)
+    # Loop over all cells in the grid
+    for cell in CellIterator(dh)
+        global_dofs = celldofs(cell)
+        global_dofsu = global_dofs[1:nu]; # first nu dofs are displacement
+        global_dofsp = global_dofs[nu + 1:end]; # last np dofs are pressure
+        @assert size(global_dofs, 1) == nu + np # sanity check
+        ue = w[global_dofsu] # displacement dofs for the current cell
+        pe = w[global_dofsp] # pressure dofs for the current cell
+        assemble_element!(ke, fe, cell, cellvalues_u, cellvalues_p, mp, ue, pe)
+        assemble!(assembler, global_dofs, fe, ke)
+    end
+end;</code></pre><p>We now define a main function <code>solve</code>. For nonlinear quasistatic problems we often like to parameterize the solution in terms of a pseudo time like parameter, which in this case is used to gradually apply the boundary displacement on the right face. Also for definitenessm we consider λ/μ = 10⁴</p><pre><code class="language-julia hljs">function solve(interpolation_u, interpolation_p)
+
+    # import the mesh
+    grid = importTestGrid()
+
+    # Material parameters
+    μ = 1.
+    λ = 1.E4 * μ
+    mp = NeoHooke(μ, λ)
+
+    # Create the DofHandler and CellValues
+    dh = create_dofhandler(grid, interpolation_u, interpolation_p)
+    cellvalues_u, cellvalues_p, facevalues_u = create_values(interpolation_u, interpolation_p)
+
+    # Create the DirichletBCs
+    dbc = create_bc(dh)
+
+    # Pre-allocation of vectors for the solution and Newton increments
+    _ndofs = ndofs(dh)
+    w  = zeros(_ndofs)
+    ΔΔw = zeros(_ndofs)
+    apply!(w, dbc)
+
+    # Create the sparse matrix and residual vector
+    K = create_sparsity_pattern(dh)
+    f = zeros(_ndofs)
+
+    # We run the simulation parameterized by a time like parameter. `Tf` denotes the final value
+    # of this parameter, and Δt denotes its increment in each step
+    Tf = 2.0;
+    Δt = 0.1;
+    NEWTON_TOL = 1e-8
+
+    pvd = paraview_collection(&quot;hyperelasticity_incomp_mixed.pvd&quot;);
+    for t ∈ 0.0:Δt:Tf
+        # Perform Newton iterations
+        Ferrite.update!(dbc, t)
+        apply!(w, dbc)
+        newton_itr = -1
+        prog = ProgressMeter.ProgressThresh(NEWTON_TOL, &quot;Solving @ time $t of $Tf;&quot;)
+        fill!(ΔΔw, 0.0);
+        while true; newton_itr += 1
+            assemble_global!(K, f, cellvalues_u, cellvalues_p, dh, mp, w)
+            norm_res = norm(f[Ferrite.free_dofs(dbc)])
+            apply_zero!(K, f, dbc)
+            # Only display output at specific load steps
+            if t%(5*Δt) == 0
+                ProgressMeter.update!(prog, norm_res; showvalues = [(:iter, newton_itr)])
+            end
+            if norm_res &lt; NEWTON_TOL
+                break
+            elseif newton_itr &gt; 30
+                error(&quot;Reached maximum Newton iterations, aborting&quot;)
+            end
+            # Compute the incremental `dof`-vector (both displacement and pressure)
+            ΔΔw .= K\f;
+
+            apply_zero!(ΔΔw, dbc)
+            w .-= ΔΔw
+        end;
+
+        # Save the solution fields
+        vtk_grid(&quot;hyperelasticity_incomp_mixed_$t.vtu&quot;, dh, compress=false) do vtkfile
+            vtk_point_data(vtkfile, dh, w)
+            vtk_save(vtkfile)
+            pvd[t] = vtkfile
+        end
+    end;
+    vtk_save(pvd);
+    vol_def = calculate_volume_deformed_mesh(w, dh, cellvalues_u);
+    print(&quot;Deformed volume is $vol_def&quot;)
+    return vol_def;
+end;</code></pre><p>We can now test the solution using the Taylor-Hood approximation</p><pre><code class="language-julia hljs">quadratic = Lagrange{3, RefTetrahedron, 2}()
+linear = Lagrange{3, RefTetrahedron, 1}()
+vol_def = solve(quadratic, linear);</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">Solving @ time 0.0 of 2.0; (thresh = 1e-08, value = 4.78011e-05)
+  iter:  1
+Solving @ time 0.0 of 2.0; Time: 0:00:01 (3 iterations)
+  iter:  2
+Solving @ time 0.5 of 2.0; (thresh = 1e-08, value = 0.00164904)
+  iter:  1
+Solving @ time 0.5 of 2.0; (thresh = 1e-08, value = 5.74317e-05)
+  iter:  2
+Solving @ time 0.5 of 2.0; (thresh = 1e-08, value = 1.07293e-08)
+  iter:  3
+Solving @ time 0.5 of 2.0; Time: 0:00:01 (5 iterations)
+  iter:  4
+Solving @ time 1.0 of 2.0; (thresh = 1e-08, value = 0.000819569)
+  iter:  1
+Solving @ time 1.0 of 2.0; (thresh = 1e-08, value = 2.60479e-05)
+  iter:  2
+Solving @ time 1.0 of 2.0; Time: 0:00:01 (4 iterations)
+  iter:  3
+Solving @ time 1.5 of 2.0; (thresh = 1e-08, value = 0.000500654)
+  iter:  1
+Solving @ time 1.5 of 2.0; (thresh = 1e-08, value = 1.30232e-05)
+  iter:  2
+Solving @ time 1.5 of 2.0; Time: 0:00:01 (4 iterations)
+  iter:  3
+Solving @ time 2.0 of 2.0; (thresh = 1e-08, value = 0.000339016)
+  iter:  1
+Solving @ time 2.0 of 2.0; (thresh = 1e-08, value = 6.94365e-06)
+  iter:  2
+Solving @ time 2.0 of 2.0; Time: 0:00:01 (4 iterations)
+  iter:  3
+Deformed volume is 1.000199977169989</code></pre><p>We can also check that the deformed volume is indeed close to 1 (as should be for a nearly incompressible material)</p><h2 id="Plain-Program"><a class="docs-heading-anchor" href="#Plain-Program">Plain Program</a><a id="Plain-Program-1"></a><a class="docs-heading-anchor-permalink" href="#Plain-Program" title="Permalink"></a></h2><p>Below follows a version of the program without any comments. The file is also available here: <a href="../quasi_incompressible_hyperelasticity.jl"><code>quasi_incompressible_hyperelasticity.jl</code></a></p><pre><code class="language-julia hljs">using Ferrite, Tensors, ProgressMeter
+using BlockArrays, SparseArrays, LinearAlgebra
+
+struct NeoHooke
+    μ::Float64
+    λ::Float64
+end
+
+function importTestGrid()
+    grid = generate_grid(Tetrahedron, (5, 5, 5), zero(Vec{3}), ones(Vec{3}));
+    addfaceset!(grid, &quot;myBottom&quot;, x -&gt; norm(x[2]) ≈ 0.0);
+    addfaceset!(grid, &quot;myBack&quot;, x -&gt; norm(x[3]) ≈ 0.0);
+    addfaceset!(grid, &quot;myRight&quot;, x -&gt; norm(x[1]) ≈ 1.0);
+    addfaceset!(grid, &quot;myLeft&quot;, x -&gt; norm(x[1]) ≈ 0.0);
+    return grid
+end;
+
+function create_values(interpolation_u, interpolation_p)
+    # quadrature rules
+    qr      = QuadratureRule{3,RefTetrahedron}(4)
+    face_qr = QuadratureRule{2,RefTetrahedron}(4)
+
+    # geometric interpolation
+    interpolation_geom = Lagrange{3,RefTetrahedron,1}()
+
+    # cell and facevalues for u
+    cellvalues_u = CellVectorValues(qr, interpolation_u, interpolation_geom)
+    facevalues_u = FaceVectorValues(face_qr, interpolation_u, interpolation_geom)
+
+    # cellvalues for p
+    cellvalues_p = CellScalarValues(qr, interpolation_p, interpolation_geom)
+
+    return cellvalues_u, cellvalues_p, facevalues_u
+end;
+
+function Ψ(F, p, mp::NeoHooke)
+    μ = mp.μ
+    λ = mp.λ
+    Ic = tr(tdot(F))
+    J = det(F)
+    Js = (λ + p + sqrt((λ + p)^2. + 4. * λ * μ ))/(2. * λ)
+    return p * (Js - J) + μ / 2 * (Ic - 3) - μ * log(Js) + λ / 2 * (Js - 1)^2
+end;
+
+function constitutive_driver(F, p, mp::NeoHooke)
+    # Compute all derivatives in one function call
+    ∂²Ψ∂F², ∂Ψ∂F = Tensors.hessian(y -&gt; Ψ(y, p, mp), F, :all)
+    ∂²Ψ∂p², ∂Ψ∂p = Tensors.hessian(y -&gt; Ψ(F, y, mp), p, :all)
+    ∂²Ψ∂F∂p = Tensors.gradient(q -&gt; Tensors.gradient(y -&gt; Ψ(y, q, mp), F), p)
+    return ∂Ψ∂F, ∂²Ψ∂F², ∂Ψ∂p, ∂²Ψ∂p², ∂²Ψ∂F∂p
+end;
+
+function create_dofhandler(grid, ipu, ipp)
+    dh = DofHandler(grid)
+    push!(dh, :u, 3, ipu) # displacement dim = 3
+    push!(dh, :p, 1, ipp) # pressure dim = 1
+    close!(dh)
+    return dh
+end;
+
+function create_bc(dh)
+    dbc = ConstraintHandler(dh)
+    add!(dbc, Dirichlet(:u, getfaceset(dh.grid, &quot;myLeft&quot;), (x,t) -&gt; zero(Vec{1}), [1]))
+    add!(dbc, Dirichlet(:u, getfaceset(dh.grid, &quot;myBottom&quot;), (x,t) -&gt; zero(Vec{1}), [2]))
+    add!(dbc, Dirichlet(:u, getfaceset(dh.grid, &quot;myBack&quot;), (x,t) -&gt; zero(Vec{1}), [3]))
+    add!(dbc, Dirichlet(:u, getfaceset(dh.grid, &quot;myRight&quot;), (x,t) -&gt; t*ones(Vec{1}), [1]))
+    close!(dbc)
+    Ferrite.update!(dbc, 0.0)
+    return dbc
+end;
+
+function calculate_element_volume(cell, cellvalues_u, ue)
+    reinit!(cellvalues_u, cell)
+    evol::Float64=0.0;
+    @inbounds for qp in 1:getnquadpoints(cellvalues_u)
+        dΩ = getdetJdV(cellvalues_u, qp)
+        ∇u = function_gradient(cellvalues_u, qp, ue)
+        F = one(∇u) + ∇u
+        J = det(F)
+        evol += J * dΩ
+    end
+    return evol
+end;
+
+function calculate_volume_deformed_mesh(w, dh::DofHandler, cellvalues_u)
+    evol::Float64 = 0.0;
+    @inbounds for cell in CellIterator(dh)
+        global_dofs = celldofs(cell)
+        nu = getnbasefunctions(cellvalues_u)
+        global_dofs_u = global_dofs[1:nu]
+        ue = w[global_dofs_u]
+        δevol = calculate_element_volume(cell, cellvalues_u, ue)
+        evol += δevol;
+    end
+    return evol
+end;
+
+function assemble_element!(Ke, fe, cell, cellvalues_u, cellvalues_p, mp, ue, pe)
+    # Reinitialize cell values, and reset output arrays
+    ublock, pblock = 1, 2
+    reinit!(cellvalues_u, cell)
+    reinit!(cellvalues_p, cell)
+    fill!(Ke, 0.0)
+    fill!(fe, 0.0)
+
+    n_basefuncs_u = getnbasefunctions(cellvalues_u)
+    n_basefuncs_p = getnbasefunctions(cellvalues_p)
+
+    @inbounds for qp in 1:getnquadpoints(cellvalues_u)
+        dΩ = getdetJdV(cellvalues_u, qp)
+        # Compute deformation gradient F
+        ∇u = function_gradient(cellvalues_u, qp, ue)
+        p = function_value(cellvalues_p, qp, pe)
+        F = one(∇u) + ∇u
+
+        # Compute first Piola-Kirchhoff stress and tangent modulus
+        ∂Ψ∂F, ∂²Ψ∂F², ∂Ψ∂p, ∂²Ψ∂p², ∂²Ψ∂F∂p = constitutive_driver(F, p, mp)
+
+        # Loop over the `u`-test functions to calculate the `u`-`u` and `u`-`p` blocks
+        for i in 1:n_basefuncs_u
+            # gradient of the test function
+            ∇δui = shape_gradient(cellvalues_u, qp, i)
+            # Add contribution to the residual from this test function
+            fe[BlockIndex((ublock), (i))] += ( ∇δui ⊡ ∂Ψ∂F) * dΩ
+
+            ∇δui∂S∂F = ∇δui ⊡ ∂²Ψ∂F²
+            for j in 1:n_basefuncs_u
+                ∇δuj = shape_gradient(cellvalues_u, qp, j)
+
+                # Add contribution to the tangent
+                Ke[BlockIndex((ublock, ublock), (i, j))] += ( ∇δui∂S∂F ⊡ ∇δuj ) * dΩ
+            end
+            # Loop over the `p`-test functions
+            for j in 1:n_basefuncs_p
+                δp = shape_value(cellvalues_p, qp, j)
+                # Add contribution to the tangent
+                Ke[BlockIndex((ublock, pblock), (i, j))] += ( ∂²Ψ∂F∂p ⊡ ∇δui ) * δp * dΩ
+            end
+        end
+        # Loop over the `p`-test functions to calculate the `p-`u` and `p`-`p` blocks
+        for i in 1:n_basefuncs_p
+            δp = shape_value(cellvalues_p, qp, i)
+            fe[BlockIndex((pblock), (i))] += ( δp * ∂Ψ∂p) * dΩ
+
+            for j in 1:n_basefuncs_u
+                ∇δuj = shape_gradient(cellvalues_u, qp, j)
+                Ke[BlockIndex((pblock, ublock), (i, j))] += ∇δuj ⊡ ∂²Ψ∂F∂p * δp * dΩ
+            end
+            for j in 1:n_basefuncs_p
+                δp = shape_value(cellvalues_p, qp, j)
+                Ke[BlockIndex((pblock, pblock), (i, j))] += δp * ∂²Ψ∂p² * δp * dΩ
+            end
+        end
+    end
+end;
+
+function assemble_global!(K::SparseMatrixCSC, f, cellvalues_u::CellVectorValues{dim},
+                         cellvalues_p::CellScalarValues{dim}, dh::DofHandler, mp::NeoHooke, w) where {dim}
+    nu = getnbasefunctions(cellvalues_u)
+    np = getnbasefunctions(cellvalues_p)
+
+    # start_assemble resets K and f
+    fe = PseudoBlockArray(zeros(nu + np), [nu, np]) # local force vector
+    ke = PseudoBlockArray(zeros(nu + np, nu + np), [nu, np], [nu, np]) # local stiffness matrix
+
+    assembler = start_assemble(K, f)
+    # Loop over all cells in the grid
+    for cell in CellIterator(dh)
+        global_dofs = celldofs(cell)
+        global_dofsu = global_dofs[1:nu]; # first nu dofs are displacement
+        global_dofsp = global_dofs[nu + 1:end]; # last np dofs are pressure
+        @assert size(global_dofs, 1) == nu + np # sanity check
+        ue = w[global_dofsu] # displacement dofs for the current cell
+        pe = w[global_dofsp] # pressure dofs for the current cell
+        assemble_element!(ke, fe, cell, cellvalues_u, cellvalues_p, mp, ue, pe)
+        assemble!(assembler, global_dofs, fe, ke)
+    end
+end;
+
+function solve(interpolation_u, interpolation_p)
+
+    # import the mesh
+    grid = importTestGrid()
+
+    # Material parameters
+    μ = 1.
+    λ = 1.E4 * μ
+    mp = NeoHooke(μ, λ)
+
+    # Create the DofHandler and CellValues
+    dh = create_dofhandler(grid, interpolation_u, interpolation_p)
+    cellvalues_u, cellvalues_p, facevalues_u = create_values(interpolation_u, interpolation_p)
+
+    # Create the DirichletBCs
+    dbc = create_bc(dh)
+
+    # Pre-allocation of vectors for the solution and Newton increments
+    _ndofs = ndofs(dh)
+    w  = zeros(_ndofs)
+    ΔΔw = zeros(_ndofs)
+    apply!(w, dbc)
+
+    # Create the sparse matrix and residual vector
+    K = create_sparsity_pattern(dh)
+    f = zeros(_ndofs)
+
+    # We run the simulation parameterized by a time like parameter. `Tf` denotes the final value
+    # of this parameter, and Δt denotes its increment in each step
+    Tf = 2.0;
+    Δt = 0.1;
+    NEWTON_TOL = 1e-8
+
+    pvd = paraview_collection(&quot;hyperelasticity_incomp_mixed.pvd&quot;);
+    for t ∈ 0.0:Δt:Tf
+        # Perform Newton iterations
+        Ferrite.update!(dbc, t)
+        apply!(w, dbc)
+        newton_itr = -1
+        prog = ProgressMeter.ProgressThresh(NEWTON_TOL, &quot;Solving @ time $t of $Tf;&quot;)
+        fill!(ΔΔw, 0.0);
+        while true; newton_itr += 1
+            assemble_global!(K, f, cellvalues_u, cellvalues_p, dh, mp, w)
+            norm_res = norm(f[Ferrite.free_dofs(dbc)])
+            apply_zero!(K, f, dbc)
+            # Only display output at specific load steps
+            if t%(5*Δt) == 0
+                ProgressMeter.update!(prog, norm_res; showvalues = [(:iter, newton_itr)])
+            end
+            if norm_res &lt; NEWTON_TOL
+                break
+            elseif newton_itr &gt; 30
+                error(&quot;Reached maximum Newton iterations, aborting&quot;)
+            end
+            # Compute the incremental `dof`-vector (both displacement and pressure)
+            ΔΔw .= K\f;
+
+            apply_zero!(ΔΔw, dbc)
+            w .-= ΔΔw
+        end;
+
+        # Save the solution fields
+        vtk_grid(&quot;hyperelasticity_incomp_mixed_$t.vtu&quot;, dh, compress=false) do vtkfile
+            vtk_point_data(vtkfile, dh, w)
+            vtk_save(vtkfile)
+            pvd[t] = vtkfile
+        end
+    end;
+    vtk_save(pvd);
+    vol_def = calculate_volume_deformed_mesh(w, dh, cellvalues_u);
+    print(&quot;Deformed volume is $vol_def&quot;)
+    return vol_def;
+end;
+
+quadratic = Lagrange{3, RefTetrahedron, 2}()
+linear = Lagrange{3, RefTetrahedron, 1}()
+vol_def = solve(quadratic, linear);
+
+# This file was generated using Literate.jl, https://github.com/fredrikekre/Literate.jl</code></pre><hr/><p><em>This page was generated using <a href="https://github.com/fredrikekre/Literate.jl">Literate.jl</a>.</em></p></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../linear_shell/">« Linear shell</a><a class="docs-footer-nextpage" href="../ns_vs_diffeq/">Incompressible Navier-Stokes Equations via DifferentialEquations.jl »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 0.27.10 on <span class="colophon-date" title="Friday 4 February 2022 13:20">Friday 4 February 2022</span>. Using Julia version 1.7.1.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>

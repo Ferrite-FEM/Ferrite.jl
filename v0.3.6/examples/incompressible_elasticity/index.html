@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/><title>Incompressible Elasticity · Ferrite.jl</title><script data-outdated-warner src="../../assets/warner.js"></script><link href="https://cdnjs.cloudflare.com/ajax/libs/lato-font/3.0.0/css/lato-font.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/juliamono/0.044/juliamono.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/fontawesome.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/solid.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/brands.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.13.11/katex.min.css" rel="stylesheet" type="text/css"/><script>documenterBaseURL="../.."</script><script src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.6/require.min.js" data-main="../../assets/documenter.js"></script><script src="../../siteinfo.js"></script><script src="../../../versions.js"></script><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/documenter-dark.css" data-theme-name="documenter-dark" data-theme-primary-dark/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/documenter-light.css" data-theme-name="documenter-light" data-theme-primary/><script src="../../assets/themeswap.js"></script></head><body><div id="documenter"><nav class="docs-sidebar"><div class="docs-package-name"><span class="docs-autofit"><a href="../../">Ferrite.jl</a></span></div><form class="docs-search" action="../../search/"><input class="docs-search-query" id="documenter-search-query" name="q" type="text" placeholder="Search docs"/></form><ul class="docs-menu"><li><a class="tocitem" href="../../">Home</a></li><li><a class="tocitem" href="../../manual/fe_intro/">Introduction to FEM</a></li><li><span class="tocitem">Manual</span><ul><li><a class="tocitem" href="../../manual/degrees_of_freedom/">Degrees of Freedom</a></li><li><a class="tocitem" href="../../manual/assembly/">Assembly</a></li><li><a class="tocitem" href="../../manual/boundary_conditions/">Boundary Conditions</a></li><li><a class="tocitem" href="../../manual/constraints/">Constraints</a></li><li><a class="tocitem" href="../../manual/grid/">Grid</a></li><li><a class="tocitem" href="../../manual/export/">Export</a></li></ul></li><li><span class="tocitem">Examples</span><ul><li><a class="tocitem" href="../heat_equation/">Heat Equation</a></li><li><a class="tocitem" href="../postprocessing/">Postprocessing</a></li><li><a class="tocitem" href="../helmholtz/">Helmholtz equation</a></li><li class="is-active"><a class="tocitem" href>Incompressible Elasticity</a><ul class="internal"><li><a class="tocitem" href="#Introduction"><span>Introduction</span></a></li><li><a class="tocitem" href="#Commented-program"><span>Commented program</span></a></li><li><a class="tocitem" href="#incompressible_elasticity-plain-program"><span>Plain program</span></a></li></ul></li><li><a class="tocitem" href="../hyperelasticity/">Hyperelasticity</a></li><li><a class="tocitem" href="../threaded_assembly/">Threaded Assembly</a></li><li><a class="tocitem" href="../plasticity/">von Mises plasticity</a></li><li><a class="tocitem" href="../transient_heat_equation/">Time Dependent Problems</a></li><li><a class="tocitem" href="../landau/">Ginzburg-Landau model energy minimization</a></li><li><a class="tocitem" href="../linear_shell/">Linear shell</a></li><li><a class="tocitem" href="../quasi_incompressible_hyperelasticity/">Nearly Incompressible Hyperelasticity</a></li><li><a class="tocitem" href="../ns_vs_diffeq/">Incompressible Navier-Stokes Equations via DifferentialEquations.jl</a></li><li><a class="tocitem" href="../computational_homogenization/">Computational homogenization</a></li></ul></li><li><span class="tocitem">API Reference</span><ul><li><a class="tocitem" href="../../reference/quadrature/">Quadrature</a></li><li><a class="tocitem" href="../../reference/interpolations/">Interpolation</a></li><li><a class="tocitem" href="../../reference/fevalues/">FEValues</a></li><li><a class="tocitem" href="../../reference/dofhandler/">Degrees of Freedom</a></li><li><a class="tocitem" href="../../reference/assembly/">Assembly</a></li><li><a class="tocitem" href="../../reference/boundary_conditions/">Boundary Conditions</a></li><li><a class="tocitem" href="../../reference/grid/">Grid &amp; AbstractGrid</a></li><li><a class="tocitem" href="../../reference/export/">Postprocessing</a></li></ul></li></ul><div class="docs-version-selector field has-addons"><div class="control"><span class="docs-label button is-static is-size-7">Version</span></div><div class="docs-selector control is-expanded"><div class="select is-fullwidth is-size-7"><select id="documenter-version-selector"></select></div></div></div></nav><div class="docs-main"><header class="docs-navbar"><nav class="breadcrumb"><ul class="is-hidden-mobile"><li><a class="is-disabled">Examples</a></li><li class="is-active"><a href>Incompressible Elasticity</a></li></ul><ul class="is-hidden-tablet"><li class="is-active"><a href>Incompressible Elasticity</a></li></ul></nav><div class="docs-right"><a class="docs-edit-link" href="https://github.com/Ferrite-FEM/Ferrite.jl/blob/master/docs/src/literate/incompressible_elasticity.jl" title="Edit on GitHub"><span class="docs-icon fab"></span><span class="docs-label is-hidden-touch">Edit on GitHub</span></a><a class="docs-settings-button fas fa-cog" id="documenter-settings-button" href="#" title="Settings"></a><a class="docs-sidebar-button fa fa-bars is-hidden-desktop" id="documenter-sidebar-button" href="#"></a></div></header><article class="content" id="documenter-page"><h1 id="Incompressible-Elasticity"><a class="docs-heading-anchor" href="#Incompressible-Elasticity">Incompressible Elasticity</a><a id="Incompressible-Elasticity-1"></a><a class="docs-heading-anchor-permalink" href="#Incompressible-Elasticity" title="Permalink"></a></h1><div class="admonition is-success"><header class="admonition-header">Tip</header><div class="admonition-body"><p>This example is also available as a Jupyter notebook: <a href="https://nbviewer.jupyter.org/github/Ferrite-FEM/Ferrite.jl/blob/gh-pages/v0.3.6/examples/incompressible_elasticity.ipynb"><code>incompressible_elasticity.ipynb</code></a>.</p></div></div><h2 id="Introduction"><a class="docs-heading-anchor" href="#Introduction">Introduction</a><a id="Introduction-1"></a><a class="docs-heading-anchor-permalink" href="#Introduction" title="Permalink"></a></h2><p>Mixed elements can be used to overcome locking when the material becomes incompressible. However, for an element to be stable, it needs to fulfill the LBB condition. In this example we will consider two different element formulations</p><ul><li>linear displacement with linear pressure approximation (does <em>not</em> fulfill LBB)</li><li>quadratic displacement with linear pressure approximation (does fulfill LBB)</li></ul><p>The quadratic/linear element is also known as the Taylor-Hood element. We will consider Cook&#39;s Membrane with an applied traction on the right hand side.</p><h2 id="Commented-program"><a class="docs-heading-anchor" href="#Commented-program">Commented program</a><a id="Commented-program-1"></a><a class="docs-heading-anchor-permalink" href="#Commented-program" title="Permalink"></a></h2><p>What follows is a program spliced with comments. The full program, without comments, can be found in the next <a href="#incompressible_elasticity-plain-program">section</a>.</p><pre><code class="language-julia hljs">using Ferrite
+using BlockArrays, SparseArrays, LinearAlgebra</code></pre><p>First we generate a simple grid, specifying the 4 corners of Cooks membrane.</p><pre><code class="language-julia hljs">function create_cook_grid(nx, ny)
+    corners = [Vec{2}((0.0,   0.0)),
+               Vec{2}((48.0, 44.0)),
+               Vec{2}((48.0, 60.0)),
+               Vec{2}((0.0,  44.0))]
+    grid = generate_grid(Triangle, (nx, ny), corners);
+    # facesets for boundary conditions
+    addfaceset!(grid, &quot;clamped&quot;, x -&gt; norm(x[1]) ≈ 0.0);
+    addfaceset!(grid, &quot;traction&quot;, x -&gt; norm(x[1]) ≈ 48.0);
+    return grid
+end;</code></pre><p>Next we define a function to set up our cell- and facevalues.</p><pre><code class="language-julia hljs">function create_values(interpolation_u, interpolation_p)
+    # quadrature rules
+    qr      = QuadratureRule{2,RefTetrahedron}(3)
+    face_qr = QuadratureRule{1,RefTetrahedron}(3)
+
+    # geometric interpolation
+    interpolation_geom = Lagrange{2,RefTetrahedron,1}()
+
+    # cell and facevalues for u
+    cellvalues_u = CellVectorValues(qr, interpolation_u, interpolation_geom)
+    facevalues_u = FaceVectorValues(face_qr, interpolation_u, interpolation_geom)
+
+    # cellvalues for p
+    cellvalues_p = CellScalarValues(qr, interpolation_p, interpolation_geom)
+
+    return cellvalues_u, cellvalues_p, facevalues_u
+end;</code></pre><p>We create a DofHandler, with two fields, <code>:u</code> and <code>:p</code>, with possibly different interpolations</p><pre><code class="language-julia hljs">function create_dofhandler(grid, ipu, ipp)
+    dh = DofHandler(grid)
+    push!(dh, :u, 2, ipu) # displacement
+    push!(dh, :p, 1, ipp) # pressure
+    close!(dh)
+    return dh
+end;</code></pre><p>We also need to add Dirichlet boundary conditions on the <code>&quot;clamped&quot;</code> faceset. We specify a homogeneous Dirichlet bc on the displacement field, <code>:u</code>.</p><pre><code class="language-julia hljs">function create_bc(dh)
+    dbc = ConstraintHandler(dh)
+    add!(dbc, Dirichlet(:u, getfaceset(dh.grid, &quot;clamped&quot;), (x,t) -&gt; zero(Vec{2}), [1,2]))
+    close!(dbc)
+    t = 0.0
+    update!(dbc, t)
+    return dbc
+end;</code></pre><p>The material is linear elastic, which is here specified by the shear and bulk moduli</p><pre><code class="language-julia hljs">struct LinearElasticity{T}
+    G::T
+    K::T
+end</code></pre><p>Now to the assembling of the stiffness matrix. This mixed formulation leads to a blocked element matrix. Since Ferrite does not force us to use any particular matrix type we will use a <code>PseudoBlockArray</code> from <code>BlockArrays.jl</code>.</p><pre><code class="language-julia hljs">function doassemble(cellvalues_u::CellVectorValues{dim}, cellvalues_p::CellScalarValues{dim},
+                    facevalues_u::FaceVectorValues{dim}, K::SparseMatrixCSC, grid::Grid,
+                    dh::DofHandler, mp::LinearElasticity) where {dim}
+
+    f = zeros(ndofs(dh))
+    assembler = start_assemble(K, f)
+    nu = getnbasefunctions(cellvalues_u)
+    np = getnbasefunctions(cellvalues_p)
+
+    fe = PseudoBlockArray(zeros(nu + np), [nu, np]) # local force vector
+    ke = PseudoBlockArray(zeros(nu + np, nu + np), [nu, np], [nu, np]) # local stiffness matrix
+
+    # traction vector
+    t = Vec{2}((0.0, 1/16))
+    # cache ɛdev outside the element routine to avoid some unnecessary allocations
+    ɛdev = [zero(SymmetricTensor{2, dim}) for i in 1:getnbasefunctions(cellvalues_u)]
+
+    for cell in CellIterator(dh)
+        fill!(ke, 0)
+        fill!(fe, 0)
+        assemble_up!(ke, fe, cell, cellvalues_u, cellvalues_p, facevalues_u, grid, mp, ɛdev, t)
+        assemble!(assembler, celldofs(cell), fe, ke)
+    end
+
+    return K, f
+end;</code></pre><p>The element routine integrates the local stiffness and force vector for all elements. Since the problem results in a symmetric matrix we choose to only assemble the lower part, and then symmetrize it after the loop over the quadrature points.</p><pre><code class="language-julia hljs">function assemble_up!(Ke, fe, cell, cellvalues_u, cellvalues_p, facevalues_u, grid, mp, ɛdev, t)
+
+    n_basefuncs_u = getnbasefunctions(cellvalues_u)
+    n_basefuncs_p = getnbasefunctions(cellvalues_p)
+    u▄, p▄ = 1, 2
+    reinit!(cellvalues_u, cell)
+    reinit!(cellvalues_p, cell)
+
+    # We only assemble lower half triangle of the stiffness matrix and then symmetrize it.
+    @inbounds for q_point in 1:getnquadpoints(cellvalues_u)
+        for i in 1:n_basefuncs_u
+            ɛdev[i] = dev(symmetric(shape_gradient(cellvalues_u, q_point, i)))
+        end
+        dΩ = getdetJdV(cellvalues_u, q_point)
+        for i in 1:n_basefuncs_u
+            divδu = shape_divergence(cellvalues_u, q_point, i)
+            δu = shape_value(cellvalues_u, q_point, i)
+            for j in 1:i
+                Ke[BlockIndex((u▄, u▄), (i, j))] += 2 * mp.G * ɛdev[i] ⊡ ɛdev[j] * dΩ
+            end
+        end
+
+        for i in 1:n_basefuncs_p
+            δp = shape_value(cellvalues_p, q_point, i)
+            for j in 1:n_basefuncs_u
+                divδu = shape_divergence(cellvalues_u, q_point, j)
+                Ke[BlockIndex((p▄, u▄), (i, j))] += -δp * divδu * dΩ
+            end
+            for j in 1:i
+                p = shape_value(cellvalues_p, q_point, j)
+                Ke[BlockIndex((p▄, p▄), (i, j))] += - 1/mp.K * δp * p * dΩ
+            end
+
+        end
+    end
+
+    symmetrize_lower!(Ke)
+
+    # We integrate the Neumann boundary using the facevalues.
+    # We loop over all the faces in the cell, then check if the face
+    # is in our `&quot;traction&quot;` faceset.
+    @inbounds for face in 1:nfaces(cell)
+        if onboundary(cell, face) &amp;&amp; (cellid(cell), face) ∈ getfaceset(grid, &quot;traction&quot;)
+            reinit!(facevalues_u, cell, face)
+            for q_point in 1:getnquadpoints(facevalues_u)
+                dΓ = getdetJdV(facevalues_u, q_point)
+                for i in 1:n_basefuncs_u
+                    δu = shape_value(facevalues_u, q_point, i)
+                    fe[i] += (δu ⋅ t) * dΓ
+                end
+            end
+        end
+    end
+end
+
+function symmetrize_lower!(K)
+    for i in 1:size(K,1)
+        for j in i+1:size(K,1)
+            K[i,j] = K[j,i]
+        end
+    end
+end;</code></pre><p>Now we have constructed all the necessary components, we just need a function to put it all together.</p><pre><code class="language-julia hljs">function solve(ν, interpolation_u, interpolation_p)
+    # material
+    Emod = 1.
+    Gmod = Emod / 2(1 + ν)
+    Kmod = Emod * ν / ((1+ν) * (1-2ν))
+    mp = LinearElasticity(Gmod, Kmod)
+
+    # grid, dofhandler, boundary condition
+    n = 50
+    grid = create_cook_grid(n, n)
+    dh = create_dofhandler(grid, interpolation_u, interpolation_p)
+    dbc = create_bc(dh)
+
+    # cellvalues
+    cellvalues_u, cellvalues_p, facevalues_u = create_values(interpolation_u, interpolation_p)
+
+    # assembly and solve
+    K = create_sparsity_pattern(dh);
+    K, f = doassemble(cellvalues_u, cellvalues_p, facevalues_u, K, grid, dh, mp);
+    apply!(K, f, dbc)
+    u = Symmetric(K) \ f;
+
+    # export
+    filename = &quot;cook_&quot; * (isa(interpolation_u, Lagrange{2,RefTetrahedron,1}) ? &quot;linear&quot; : &quot;quadratic&quot;) *
+                         &quot;_linear&quot;
+    vtk_grid(filename, dh) do vtkfile
+        vtk_point_data(vtkfile, dh, u)
+    end
+    return u
+end</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">solve (generic function with 1 method)</code></pre><p>All that is left is to solve the problem. We choose a value of Poissons ratio that is near incompressibility – <span>$ν = 0.5$</span> – and thus expect the linear/linear approximation to return garbage, and the quadratic/linear approximation to be stable.</p><pre><code class="language-julia hljs">linear    = Lagrange{2,RefTetrahedron,1}()
+quadratic = Lagrange{2,RefTetrahedron,2}()
+
+u1 = solve(0.4999999, linear, linear)
+u2 = solve(0.4999999, quadratic, linear);</code></pre><h2 id="incompressible_elasticity-plain-program"><a class="docs-heading-anchor" href="#incompressible_elasticity-plain-program">Plain program</a><a id="incompressible_elasticity-plain-program-1"></a><a class="docs-heading-anchor-permalink" href="#incompressible_elasticity-plain-program" title="Permalink"></a></h2><p>Here follows a version of the program without any comments. The file is also available here: <a href="../incompressible_elasticity.jl"><code>incompressible_elasticity.jl</code></a>.</p><pre><code class="language-julia hljs">using Ferrite
+using BlockArrays, SparseArrays, LinearAlgebra
+
+function create_cook_grid(nx, ny)
+    corners = [Vec{2}((0.0,   0.0)),
+               Vec{2}((48.0, 44.0)),
+               Vec{2}((48.0, 60.0)),
+               Vec{2}((0.0,  44.0))]
+    grid = generate_grid(Triangle, (nx, ny), corners);
+    # facesets for boundary conditions
+    addfaceset!(grid, &quot;clamped&quot;, x -&gt; norm(x[1]) ≈ 0.0);
+    addfaceset!(grid, &quot;traction&quot;, x -&gt; norm(x[1]) ≈ 48.0);
+    return grid
+end;
+
+function create_values(interpolation_u, interpolation_p)
+    # quadrature rules
+    qr      = QuadratureRule{2,RefTetrahedron}(3)
+    face_qr = QuadratureRule{1,RefTetrahedron}(3)
+
+    # geometric interpolation
+    interpolation_geom = Lagrange{2,RefTetrahedron,1}()
+
+    # cell and facevalues for u
+    cellvalues_u = CellVectorValues(qr, interpolation_u, interpolation_geom)
+    facevalues_u = FaceVectorValues(face_qr, interpolation_u, interpolation_geom)
+
+    # cellvalues for p
+    cellvalues_p = CellScalarValues(qr, interpolation_p, interpolation_geom)
+
+    return cellvalues_u, cellvalues_p, facevalues_u
+end;
+
+function create_dofhandler(grid, ipu, ipp)
+    dh = DofHandler(grid)
+    push!(dh, :u, 2, ipu) # displacement
+    push!(dh, :p, 1, ipp) # pressure
+    close!(dh)
+    return dh
+end;
+
+function create_bc(dh)
+    dbc = ConstraintHandler(dh)
+    add!(dbc, Dirichlet(:u, getfaceset(dh.grid, &quot;clamped&quot;), (x,t) -&gt; zero(Vec{2}), [1,2]))
+    close!(dbc)
+    t = 0.0
+    update!(dbc, t)
+    return dbc
+end;
+
+struct LinearElasticity{T}
+    G::T
+    K::T
+end
+
+function doassemble(cellvalues_u::CellVectorValues{dim}, cellvalues_p::CellScalarValues{dim},
+                    facevalues_u::FaceVectorValues{dim}, K::SparseMatrixCSC, grid::Grid,
+                    dh::DofHandler, mp::LinearElasticity) where {dim}
+
+    f = zeros(ndofs(dh))
+    assembler = start_assemble(K, f)
+    nu = getnbasefunctions(cellvalues_u)
+    np = getnbasefunctions(cellvalues_p)
+
+    fe = PseudoBlockArray(zeros(nu + np), [nu, np]) # local force vector
+    ke = PseudoBlockArray(zeros(nu + np, nu + np), [nu, np], [nu, np]) # local stiffness matrix
+
+    # traction vector
+    t = Vec{2}((0.0, 1/16))
+    # cache ɛdev outside the element routine to avoid some unnecessary allocations
+    ɛdev = [zero(SymmetricTensor{2, dim}) for i in 1:getnbasefunctions(cellvalues_u)]
+
+    for cell in CellIterator(dh)
+        fill!(ke, 0)
+        fill!(fe, 0)
+        assemble_up!(ke, fe, cell, cellvalues_u, cellvalues_p, facevalues_u, grid, mp, ɛdev, t)
+        assemble!(assembler, celldofs(cell), fe, ke)
+    end
+
+    return K, f
+end;
+
+function assemble_up!(Ke, fe, cell, cellvalues_u, cellvalues_p, facevalues_u, grid, mp, ɛdev, t)
+
+    n_basefuncs_u = getnbasefunctions(cellvalues_u)
+    n_basefuncs_p = getnbasefunctions(cellvalues_p)
+    u▄, p▄ = 1, 2
+    reinit!(cellvalues_u, cell)
+    reinit!(cellvalues_p, cell)
+
+    # We only assemble lower half triangle of the stiffness matrix and then symmetrize it.
+    @inbounds for q_point in 1:getnquadpoints(cellvalues_u)
+        for i in 1:n_basefuncs_u
+            ɛdev[i] = dev(symmetric(shape_gradient(cellvalues_u, q_point, i)))
+        end
+        dΩ = getdetJdV(cellvalues_u, q_point)
+        for i in 1:n_basefuncs_u
+            divδu = shape_divergence(cellvalues_u, q_point, i)
+            δu = shape_value(cellvalues_u, q_point, i)
+            for j in 1:i
+                Ke[BlockIndex((u▄, u▄), (i, j))] += 2 * mp.G * ɛdev[i] ⊡ ɛdev[j] * dΩ
+            end
+        end
+
+        for i in 1:n_basefuncs_p
+            δp = shape_value(cellvalues_p, q_point, i)
+            for j in 1:n_basefuncs_u
+                divδu = shape_divergence(cellvalues_u, q_point, j)
+                Ke[BlockIndex((p▄, u▄), (i, j))] += -δp * divδu * dΩ
+            end
+            for j in 1:i
+                p = shape_value(cellvalues_p, q_point, j)
+                Ke[BlockIndex((p▄, p▄), (i, j))] += - 1/mp.K * δp * p * dΩ
+            end
+
+        end
+    end
+
+    symmetrize_lower!(Ke)
+
+    # We integrate the Neumann boundary using the facevalues.
+    # We loop over all the faces in the cell, then check if the face
+    # is in our `&quot;traction&quot;` faceset.
+    @inbounds for face in 1:nfaces(cell)
+        if onboundary(cell, face) &amp;&amp; (cellid(cell), face) ∈ getfaceset(grid, &quot;traction&quot;)
+            reinit!(facevalues_u, cell, face)
+            for q_point in 1:getnquadpoints(facevalues_u)
+                dΓ = getdetJdV(facevalues_u, q_point)
+                for i in 1:n_basefuncs_u
+                    δu = shape_value(facevalues_u, q_point, i)
+                    fe[i] += (δu ⋅ t) * dΓ
+                end
+            end
+        end
+    end
+end
+
+function symmetrize_lower!(K)
+    for i in 1:size(K,1)
+        for j in i+1:size(K,1)
+            K[i,j] = K[j,i]
+        end
+    end
+end;
+
+function solve(ν, interpolation_u, interpolation_p)
+    # material
+    Emod = 1.
+    Gmod = Emod / 2(1 + ν)
+    Kmod = Emod * ν / ((1+ν) * (1-2ν))
+    mp = LinearElasticity(Gmod, Kmod)
+
+    # grid, dofhandler, boundary condition
+    n = 50
+    grid = create_cook_grid(n, n)
+    dh = create_dofhandler(grid, interpolation_u, interpolation_p)
+    dbc = create_bc(dh)
+
+    # cellvalues
+    cellvalues_u, cellvalues_p, facevalues_u = create_values(interpolation_u, interpolation_p)
+
+    # assembly and solve
+    K = create_sparsity_pattern(dh);
+    K, f = doassemble(cellvalues_u, cellvalues_p, facevalues_u, K, grid, dh, mp);
+    apply!(K, f, dbc)
+    u = Symmetric(K) \ f;
+
+    # export
+    filename = &quot;cook_&quot; * (isa(interpolation_u, Lagrange{2,RefTetrahedron,1}) ? &quot;linear&quot; : &quot;quadratic&quot;) *
+                         &quot;_linear&quot;
+    vtk_grid(filename, dh) do vtkfile
+        vtk_point_data(vtkfile, dh, u)
+    end
+    return u
+end
+
+linear    = Lagrange{2,RefTetrahedron,1}()
+quadratic = Lagrange{2,RefTetrahedron,2}()
+
+u1 = solve(0.4999999, linear, linear)
+u2 = solve(0.4999999, quadratic, linear);</code></pre><hr/><p><em>This page was generated using <a href="https://github.com/fredrikekre/Literate.jl">Literate.jl</a>.</em></p></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../helmholtz/">« Helmholtz equation</a><a class="docs-footer-nextpage" href="../hyperelasticity/">Hyperelasticity »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 0.27.19 on <span class="colophon-date" title="Thursday 30 June 2022 13:08">Thursday 30 June 2022</span>. Using Julia version 1.7.3.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>

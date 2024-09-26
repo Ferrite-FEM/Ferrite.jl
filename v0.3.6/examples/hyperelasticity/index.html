@@ -1,0 +1,406 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/><title>Hyperelasticity · Ferrite.jl</title><script data-outdated-warner src="../../assets/warner.js"></script><link href="https://cdnjs.cloudflare.com/ajax/libs/lato-font/3.0.0/css/lato-font.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/juliamono/0.044/juliamono.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/fontawesome.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/solid.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/brands.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.13.11/katex.min.css" rel="stylesheet" type="text/css"/><script>documenterBaseURL="../.."</script><script src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.6/require.min.js" data-main="../../assets/documenter.js"></script><script src="../../siteinfo.js"></script><script src="../../../versions.js"></script><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/documenter-dark.css" data-theme-name="documenter-dark" data-theme-primary-dark/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/documenter-light.css" data-theme-name="documenter-light" data-theme-primary/><script src="../../assets/themeswap.js"></script></head><body><div id="documenter"><nav class="docs-sidebar"><div class="docs-package-name"><span class="docs-autofit"><a href="../../">Ferrite.jl</a></span></div><form class="docs-search" action="../../search/"><input class="docs-search-query" id="documenter-search-query" name="q" type="text" placeholder="Search docs"/></form><ul class="docs-menu"><li><a class="tocitem" href="../../">Home</a></li><li><a class="tocitem" href="../../manual/fe_intro/">Introduction to FEM</a></li><li><span class="tocitem">Manual</span><ul><li><a class="tocitem" href="../../manual/degrees_of_freedom/">Degrees of Freedom</a></li><li><a class="tocitem" href="../../manual/assembly/">Assembly</a></li><li><a class="tocitem" href="../../manual/boundary_conditions/">Boundary Conditions</a></li><li><a class="tocitem" href="../../manual/constraints/">Constraints</a></li><li><a class="tocitem" href="../../manual/grid/">Grid</a></li><li><a class="tocitem" href="../../manual/export/">Export</a></li></ul></li><li><span class="tocitem">Examples</span><ul><li><a class="tocitem" href="../heat_equation/">Heat Equation</a></li><li><a class="tocitem" href="../postprocessing/">Postprocessing</a></li><li><a class="tocitem" href="../helmholtz/">Helmholtz equation</a></li><li><a class="tocitem" href="../incompressible_elasticity/">Incompressible Elasticity</a></li><li class="is-active"><a class="tocitem" href>Hyperelasticity</a><ul class="internal"><li><a class="tocitem" href="#Introduction"><span>Introduction</span></a></li><li><a class="tocitem" href="#Hyperelastic-material-model"><span>Hyperelastic material model</span></a></li><li><a class="tocitem" href="#Newton&#39;s-Method"><span>Newton&#39;s Method</span></a></li><li><a class="tocitem" href="#Finite-element-assembly"><span>Finite element assembly</span></a></li><li><a class="tocitem" href="#Plain-program"><span>Plain program</span></a></li></ul></li><li><a class="tocitem" href="../threaded_assembly/">Threaded Assembly</a></li><li><a class="tocitem" href="../plasticity/">von Mises plasticity</a></li><li><a class="tocitem" href="../transient_heat_equation/">Time Dependent Problems</a></li><li><a class="tocitem" href="../landau/">Ginzburg-Landau model energy minimization</a></li><li><a class="tocitem" href="../linear_shell/">Linear shell</a></li><li><a class="tocitem" href="../quasi_incompressible_hyperelasticity/">Nearly Incompressible Hyperelasticity</a></li><li><a class="tocitem" href="../ns_vs_diffeq/">Incompressible Navier-Stokes Equations via DifferentialEquations.jl</a></li><li><a class="tocitem" href="../computational_homogenization/">Computational homogenization</a></li></ul></li><li><span class="tocitem">API Reference</span><ul><li><a class="tocitem" href="../../reference/quadrature/">Quadrature</a></li><li><a class="tocitem" href="../../reference/interpolations/">Interpolation</a></li><li><a class="tocitem" href="../../reference/fevalues/">FEValues</a></li><li><a class="tocitem" href="../../reference/dofhandler/">Degrees of Freedom</a></li><li><a class="tocitem" href="../../reference/assembly/">Assembly</a></li><li><a class="tocitem" href="../../reference/boundary_conditions/">Boundary Conditions</a></li><li><a class="tocitem" href="../../reference/grid/">Grid &amp; AbstractGrid</a></li><li><a class="tocitem" href="../../reference/export/">Postprocessing</a></li></ul></li></ul><div class="docs-version-selector field has-addons"><div class="control"><span class="docs-label button is-static is-size-7">Version</span></div><div class="docs-selector control is-expanded"><div class="select is-fullwidth is-size-7"><select id="documenter-version-selector"></select></div></div></div></nav><div class="docs-main"><header class="docs-navbar"><nav class="breadcrumb"><ul class="is-hidden-mobile"><li><a class="is-disabled">Examples</a></li><li class="is-active"><a href>Hyperelasticity</a></li></ul><ul class="is-hidden-tablet"><li class="is-active"><a href>Hyperelasticity</a></li></ul></nav><div class="docs-right"><a class="docs-edit-link" href="https://github.com/Ferrite-FEM/Ferrite.jl/blob/master/docs/src/literate/hyperelasticity.jl" title="Edit on GitHub"><span class="docs-icon fab"></span><span class="docs-label is-hidden-touch">Edit on GitHub</span></a><a class="docs-settings-button fas fa-cog" id="documenter-settings-button" href="#" title="Settings"></a><a class="docs-sidebar-button fa fa-bars is-hidden-desktop" id="documenter-sidebar-button" href="#"></a></div></header><article class="content" id="documenter-page"><h1 id="Hyperelasticity"><a class="docs-heading-anchor" href="#Hyperelasticity">Hyperelasticity</a><a id="Hyperelasticity-1"></a><a class="docs-heading-anchor-permalink" href="#Hyperelasticity" title="Permalink"></a></h1><p><strong>Keywords</strong>: <em>hyperelasticity</em>, <em>finite strain</em>, <em>large deformations</em>, <em>Newton&#39;s method</em>, <em>conjugate gradient</em>, <em>automatic differentiation</em></p><p><img src="../hyperelasticity.png" alt="hyperelasticity.png"/></p><p><em>Figure 1</em>: Cube loaded in torsion modeled with a hyperelastic material model and finite strain.</p><div class="admonition is-success"><header class="admonition-header">Tip</header><div class="admonition-body"><p>This example is also available as a Jupyter notebook: <a href="https://nbviewer.jupyter.org/github/Ferrite-FEM/Ferrite.jl/blob/gh-pages/v0.3.6/examples/hyperelasticity.ipynb"><code>hyperelasticity.ipynb</code></a>.</p></div></div><h2 id="Introduction"><a class="docs-heading-anchor" href="#Introduction">Introduction</a><a id="Introduction-1"></a><a class="docs-heading-anchor-permalink" href="#Introduction" title="Permalink"></a></h2><p>In this example we will solve a problem in a finite strain setting using an hyperelastic material model. In order to compute the stress we will use automatic differentiation, to solve the non-linear system we use Newton&#39;s method, and for solving the Newton increment we use conjugate gradients.</p><p>The weak form is expressed in terms of the first Piola-Kirchoff stress <span>$\mathbf{P}$</span> as follows: Find <span>$u \in \mathbb{U}$</span> such that</p><p class="math-container">\[\int_{\Omega} \nabla_{\mathbf{X}} \delta \mathbf{u} : \mathbf{P}(\mathbf{u})\ \mathrm{d}\Omega =
+\int_{\Omega} \delta \mathbf{u} \cdot \mathbf{b}\ \mathrm{d}\Omega + \int_{\Gamma^\mathrm{N}}
+\delta \mathbf{u} \cdot \mathbf{t}\ \mathrm{d}\Gamma
+\quad \forall \delta \mathbf{u} \in \mathbb{U}^0,\]</p><p>where <span>$\mathbf{u}$</span> is the unknown displacement field, <span>$\mathbf{b}$</span> is the body force acting on the reference domain, <span>$\mathbf{t}$</span> is the traction acting on the Neumann part of the reference domain&#39;s boundary, and where <span>$\mathbb{U}$</span> and <span>$\mathbb{U}^0$</span> are suitable trial and test sets. <span>$\Omega$</span> denotes the reference domain, which is also called reference or material domain. Gradients are defined with respect to the reference domain, here denoted with  an <span>$X$</span>. Formally this is expressed as <span>$(\nabla_{\mathbf{X}} \bullet)_{ij} := \frac{\partial(\bullet)_i}{\partial X_j}$</span>. Note that for large deformation problems it is also possibile that gradients and integrals are defined on the deformed domain, which is also called the current or spatial domain, depending on the specific formulation.</p><pre><code class="language-julia hljs">using Ferrite, Tensors, TimerOutputs, ProgressMeter
+import KrylovMethods, IterativeSolvers</code></pre><h2 id="Hyperelastic-material-model"><a class="docs-heading-anchor" href="#Hyperelastic-material-model">Hyperelastic material model</a><a id="Hyperelastic-material-model-1"></a><a class="docs-heading-anchor-permalink" href="#Hyperelastic-material-model" title="Permalink"></a></h2><p>The stress can be derived from an energy potential, defined in terms of the right Cauchy-Green tensor <span>$\mathbf{C} = \mathbf{F}^{\mathrm{T}} \mathbf{F}$</span>, where <span>$\mathbf{F} = \mathbf{I} + \nabla_{\mathbf{X}} \mathbf{u}$</span> is the deformation gradient. We shall use a neo-Hookean model, where the potential can be written as</p><p class="math-container">\[\Psi(\mathbf{C}) = \frac{\mu}{2} (I_1 - 3) - \mu \ln(J) + \frac{\lambda}{2} \ln(J)^2,\]</p><p>where <span>$I_1 = \mathrm{tr}(\mathbf{C})$</span> is the first invariant, <span>$J = \sqrt{\det(\mathbf{C})}$</span> and <span>$\mu$</span> and <span>$\lambda$</span> material parameters. From the potential we obtain the second Piola-Kirchoff stress <span>$\mathbf{S}$</span> as</p><p class="math-container">\[\mathbf{S} = 2 \frac{\partial \Psi}{\partial \mathbf{C}},\]</p><p>and the tangent of <span>$\mathbf{S}$</span> as</p><p class="math-container">\[\frac{\partial \mathbf{S}}{\partial \mathbf{C}} = 4 \frac{\partial \Psi}{\partial \mathbf{C}}.\]</p><p>We can implement the material model as follows, where we utilize automatic differentiation for the stress and the tangent, and thus only define the potential:</p><pre><code class="language-julia hljs">struct NeoHooke
+    μ::Float64
+    λ::Float64
+end
+
+function Ψ(C, mp::NeoHooke)
+    μ = mp.μ
+    λ = mp.λ
+    Ic = tr(C)
+    J = sqrt(det(C))
+    return μ / 2 * (Ic - 3) - μ * log(J) + λ / 2 * log(J)^2
+end
+
+function constitutive_driver(C, mp::NeoHooke)
+    # Compute all derivatives in one function call
+    ∂²Ψ∂C², ∂Ψ∂C = Tensors.hessian(y -&gt; Ψ(y, mp), C, :all)
+    S = 2.0 * ∂Ψ∂C
+    ∂S∂C = 4.0 * ∂²Ψ∂C²
+    return S, ∂S∂C
+end;</code></pre><p>Finally, for the finite element problem we need <span>$\mathbf{P}$</span> and <span>$\frac{\partial \mathbf{P}}{\partial \mathbf{F}}$</span>, which can be obtained by using the following relations:</p><p class="math-container">\[\begin{align*}
+\mathbf{P} &amp;= \mathbf{F} \cdot \mathbf{S},\\
+\frac{\partial \mathbf{P}}{\partial \mathbf{F}} &amp;= [\mathbf{F} \bar{\otimes} \mathbf{I}] :
+\frac{\partial \mathbf{S}}{\partial \mathbf{C}} : [\mathbf{F}^\mathrm{T} \bar{\otimes} \mathbf{I}]
++ \mathbf{I} \bar{\otimes} \mathbf{S}.
+\end{align*}\]</p><h2 id="Newton&#39;s-Method"><a class="docs-heading-anchor" href="#Newton&#39;s-Method">Newton&#39;s Method</a><a id="Newton&#39;s-Method-1"></a><a class="docs-heading-anchor-permalink" href="#Newton&#39;s-Method" title="Permalink"></a></h2><p>As mentioned above, to deal with the non-linear weak form we first linearize the problem such that we can apply Newton&#39;s method, and then apply the FEM to discretize the problem. Skipping a detailed derivation, Newton&#39;s method can be expressed as: Given some initial guess <span>$\mathbf{u}^0$</span>, find a sequence <span>$\mathbf{u}^{k}$</span> by iterating</p><p class="math-container">\[\mathbf{u}^{k+1} = \mathbf{u}^{k} - \Delta \mathbf{u}^{k}\]</p><p>until some termination condition has been met. Therein we determine <span>$\Delta \mathbf{u}^{k}$</span></p><p class="math-container">\[\mathbf{K}(\mathbf{u}^{k}) \Delta \mathbf{u}^{k} = \mathbf{g}(\mathbf{u}^{k})\]</p><p>where <span>$\mathbf{g}$</span> is the global residual and <span>$\mathbf{K} = \frac{\partial g}{\partial u}$</span> the Jacobi matrix, such that</p><p class="math-container">\[K_{ij} = \int_{\Omega} \nabla_{\mathbf{X}} \delta \mathbf{u}_{i} : \frac{\partial \mathbf{P}}{\partial \mathbf{F}} : \nabla_{\mathbf{X}} \delta \mathbf{u}_{j} \, \mathrm{d} \Omega\]</p><p>and</p><p class="math-container">\[g_{i} = \int_{\Omega} \nabla_{\mathbf{X}} \delta \mathbf{u}_{i} : \mathbf{P} - \delta \mathbf{u}_{i} \cdot \mathbf{b} \, \mathrm{d} \Omega\]</p><p>A detailed derivation can be found in every continuum mechanics book, which has a chapter about finite elasticity theory. We used &quot;Nonlinear solid mechanics: a continuum approach for engineering science.&quot; by Gerhard Holzapfel (chapter 8) as a reference.</p><h2 id="Finite-element-assembly"><a class="docs-heading-anchor" href="#Finite-element-assembly">Finite element assembly</a><a id="Finite-element-assembly-1"></a><a class="docs-heading-anchor-permalink" href="#Finite-element-assembly" title="Permalink"></a></h2><p>The element routine for assembling the residual and tangent stiffness is implemented as usual, with loops over quadrature points and shape functions:</p><pre><code class="language-julia hljs">function assemble_element!(ke, ge, cell, cv, fv, mp, ue)
+    # Reinitialize cell values, and reset output arrays
+    reinit!(cv, cell)
+    fill!(ke, 0.0)
+    fill!(ge, 0.0)
+
+    b = Vec{3}((0.0, -0.5, 0.0)) # Body force
+    t = Vec{3}((0.1, 0.0, 0.0)) # Traction
+    ndofs = getnbasefunctions(cv)
+
+    for qp in 1:getnquadpoints(cv)
+        dΩ = getdetJdV(cv, qp)
+        # Compute deformation gradient F and right Cauchy-Green tensor C
+        ∇u = function_gradient(cv, qp, ue)
+        F = one(∇u) + ∇u
+        C = tdot(F)
+        # Compute stress and tangent
+        S, ∂S∂C = constitutive_driver(C, mp)
+        P = F ⋅ S
+        I = one(S)
+        ∂P∂F = otimesu(F, I) ⊡ ∂S∂C ⊡ otimesu(F&#39;, I) + otimesu(I, S)
+
+        # Loop over test functions
+        for i in 1:ndofs
+            # Test function + gradient
+            δui = shape_value(cv, qp, i)
+            ∇δui = shape_gradient(cv, qp, i)
+            # Add contribution to the residual from this test function
+            ge[i] += ( ∇δui ⊡ P - δui ⋅ b ) * dΩ
+
+            ∇δui∂P∂F = ∇δui ⊡ ∂P∂F # Hoisted computation
+            for j in 1:ndofs
+                ∇δuj = shape_gradient(cv, qp, j)
+                # Add contribution to the tangent
+                ke[i, j] += ( ∇δui∂P∂F ⊡ ∇δuj ) * dΩ
+            end
+        end
+    end
+
+    # Surface integral for the traction
+    for face in 1:nfaces(cell)
+        if onboundary(cell, face)
+            reinit!(fv, cell, face)
+            for q_point in 1:getnquadpoints(fv)
+                dΓ = getdetJdV(fv, q_point)
+                for i in 1:ndofs
+                    δui = shape_value(fv, q_point, i)
+                    ge[i] -= (δui ⋅ t) * dΓ
+                end
+            end
+        end
+    end
+end;</code></pre><p>Assembling global residual and tangent</p><pre><code class="language-julia hljs">function assemble_global!(K, f, dh, cv, fv, mp, u)
+    n = ndofs_per_cell(dh)
+    ke = zeros(n, n)
+    ge = zeros(n)
+
+    # start_assemble resets K and f
+    assembler = start_assemble(K, f)
+
+    # Loop over all cells in the grid
+    @timeit &quot;assemble&quot; for cell in CellIterator(dh)
+        global_dofs = celldofs(cell)
+        ue = u[global_dofs] # element dofs
+        @timeit &quot;element assemble&quot; assemble_element!(ke, ge, cell, cv, fv, mp, ue)
+        assemble!(assembler, global_dofs, ge, ke)
+    end
+end;</code></pre><p>Define a main function, with a loop for Newton iterations</p><pre><code class="language-julia hljs">function solve()
+    reset_timer!()
+
+    # Generate a grid
+    N = 10
+    L = 1.0
+    left = zero(Vec{3})
+    right = L * ones(Vec{3})
+    grid = generate_grid(Tetrahedron, (N, N, N), left, right)
+
+    # Material parameters
+    E = 10.0
+    ν = 0.3
+    μ = E / (2(1 + ν))
+    λ = (E * ν) / ((1 + ν) * (1 - 2ν))
+    mp = NeoHooke(μ, λ)
+
+    # Finite element base
+    ip = Lagrange{3, RefTetrahedron, 1}()
+    qr = QuadratureRule{3, RefTetrahedron}(1)
+    qr_face = QuadratureRule{2, RefTetrahedron}(1)
+    cv = CellVectorValues(qr, ip)
+    fv = FaceVectorValues(qr_face, ip)
+
+    # DofHandler
+    dh = DofHandler(grid)
+    push!(dh, :u, 3) # Add a displacement field
+    close!(dh)
+
+    function rotation(X, t, θ = deg2rad(60.0))
+        x, y, z = X
+        return t * Vec{3}(
+            (0.0,
+            L/2 - y + (y-L/2)*cos(θ) - (z-L/2)*sin(θ),
+            L/2 - z + (y-L/2)*sin(θ) + (z-L/2)*cos(θ)
+            ))
+    end
+
+    dbcs = ConstraintHandler(dh)
+    # Add a homogenous boundary condition on the &quot;clamped&quot; edge
+    dbc = Dirichlet(:u, getfaceset(grid, &quot;right&quot;), (x,t) -&gt; [0.0, 0.0, 0.0], [1, 2, 3])
+    add!(dbcs, dbc)
+    dbc = Dirichlet(:u, getfaceset(grid, &quot;left&quot;), (x,t) -&gt; rotation(x, t), [1, 2, 3])
+    add!(dbcs, dbc)
+    close!(dbcs)
+    t = 0.5
+    Ferrite.update!(dbcs, t)
+
+    # Pre-allocation of vectors for the solution and Newton increments
+    _ndofs = ndofs(dh)
+    un = zeros(_ndofs) # previous solution vector
+    u  = zeros(_ndofs)
+    Δu = zeros(_ndofs)
+    ΔΔu = zeros(_ndofs)
+    apply!(un, dbcs)
+
+    # Create sparse matrix and residual vector
+    K = create_sparsity_pattern(dh)
+    g = zeros(_ndofs)
+
+
+    # Perform Newton iterations
+    newton_itr = -1
+    NEWTON_TOL = 1e-8
+    prog = ProgressMeter.ProgressThresh(NEWTON_TOL, &quot;Solving:&quot;)
+
+    while true; newton_itr += 1
+        u .= un .+ Δu # Current guess
+        assemble_global!(K, g, dh, cv, fv, mp, u)
+        normg = norm(g[Ferrite.free_dofs(dbcs)])
+        apply_zero!(K, g, dbcs)
+        ProgressMeter.update!(prog, normg; showvalues = [(:iter, newton_itr)])
+
+        if normg &lt; NEWTON_TOL
+            break
+        elseif newton_itr &gt; 30
+            error(&quot;Reached maximum Newton iterations, aborting&quot;)
+        end
+
+        # Compute increment using cg! from IterativeSolvers.jl
+        @timeit &quot;linear solve (KrylovMethods.cg)&quot; ΔΔu′, flag, relres, iter, resvec = KrylovMethods.cg(K, g; maxIter = 1000)
+        @assert flag == 0
+        @timeit &quot;linear solve (IterativeSolvers.cg!)&quot; IterativeSolvers.cg!(ΔΔu, K, g; maxiter=1000)
+
+        apply_zero!(ΔΔu, dbcs)
+        Δu .-= ΔΔu
+    end
+
+    # Save the solution
+    @timeit &quot;export&quot; begin
+        vtk_grid(&quot;hyperelasticity&quot;, dh) do vtkfile
+            vtk_point_data(vtkfile, dh, u)
+        end
+    end
+
+    print_timer(title = &quot;Analysis with $(getncells(grid)) elements&quot;, linechars = :ascii)
+    return u
+end</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">solve (generic function with 1 method)</code></pre><p>Run the simulation</p><pre><code class="language-julia hljs">u = solve();</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">Solving: (thresh = 1e-08, value = 0.013799)
+  iter:  2
+Solving: (thresh = 1e-08, value = 1.92988e-07)
+  iter:  4
+Solving: Time: 0:00:00 (6 iterations)
+  iter:  5
+ --------------------------------------------------------------------------------
+  Analysis with 6000 elements           Time                    Allocations
+                               -----------------------   ------------------------
+       Tot / % measured:            519ms /  59.1%           81.9MiB /  16.3%
+
+ Section               ncalls     time    %tot     avg     alloc    %tot      avg
+ --------------------------------------------------------------------------------
+ assemble                   6    127ms   41.3%  21.1ms   7.60MiB   56.9%  1.27MiB
+   element assemble     36.0k   80.6ms   26.3%  2.24μs     0.00B    0.0%    0.00B
+ linear solve (Iter...      5    112ms   36.6%  22.4ms    473KiB    3.5%  94.6KiB
+ linear solve (Kryl...      5   35.3ms   11.5%  7.07ms    670KiB    4.9%   134KiB
+ export                     1   32.6ms   10.6%  32.6ms   4.64MiB   34.7%  4.64MiB
+ --------------------------------------------------------------------------------</code></pre><h2 id="Plain-program"><a class="docs-heading-anchor" href="#Plain-program">Plain program</a><a id="Plain-program-1"></a><a class="docs-heading-anchor-permalink" href="#Plain-program" title="Permalink"></a></h2><p>Here follows a version of the program without any comments. The file is also available here: <a href="../hyperelasticity.jl"><code>hyperelasticity.jl</code></a>.</p><pre><code class="language-julia hljs">using Ferrite, Tensors, TimerOutputs, ProgressMeter
+import KrylovMethods, IterativeSolvers
+
+struct NeoHooke
+    μ::Float64
+    λ::Float64
+end
+
+function Ψ(C, mp::NeoHooke)
+    μ = mp.μ
+    λ = mp.λ
+    Ic = tr(C)
+    J = sqrt(det(C))
+    return μ / 2 * (Ic - 3) - μ * log(J) + λ / 2 * log(J)^2
+end
+
+function constitutive_driver(C, mp::NeoHooke)
+    # Compute all derivatives in one function call
+    ∂²Ψ∂C², ∂Ψ∂C = Tensors.hessian(y -&gt; Ψ(y, mp), C, :all)
+    S = 2.0 * ∂Ψ∂C
+    ∂S∂C = 4.0 * ∂²Ψ∂C²
+    return S, ∂S∂C
+end;
+
+function assemble_element!(ke, ge, cell, cv, fv, mp, ue)
+    # Reinitialize cell values, and reset output arrays
+    reinit!(cv, cell)
+    fill!(ke, 0.0)
+    fill!(ge, 0.0)
+
+    b = Vec{3}((0.0, -0.5, 0.0)) # Body force
+    t = Vec{3}((0.1, 0.0, 0.0)) # Traction
+    ndofs = getnbasefunctions(cv)
+
+    for qp in 1:getnquadpoints(cv)
+        dΩ = getdetJdV(cv, qp)
+        # Compute deformation gradient F and right Cauchy-Green tensor C
+        ∇u = function_gradient(cv, qp, ue)
+        F = one(∇u) + ∇u
+        C = tdot(F)
+        # Compute stress and tangent
+        S, ∂S∂C = constitutive_driver(C, mp)
+        P = F ⋅ S
+        I = one(S)
+        ∂P∂F = otimesu(F, I) ⊡ ∂S∂C ⊡ otimesu(F&#39;, I) + otimesu(I, S)
+
+        # Loop over test functions
+        for i in 1:ndofs
+            # Test function + gradient
+            δui = shape_value(cv, qp, i)
+            ∇δui = shape_gradient(cv, qp, i)
+            # Add contribution to the residual from this test function
+            ge[i] += ( ∇δui ⊡ P - δui ⋅ b ) * dΩ
+
+            ∇δui∂P∂F = ∇δui ⊡ ∂P∂F # Hoisted computation
+            for j in 1:ndofs
+                ∇δuj = shape_gradient(cv, qp, j)
+                # Add contribution to the tangent
+                ke[i, j] += ( ∇δui∂P∂F ⊡ ∇δuj ) * dΩ
+            end
+        end
+    end
+
+    # Surface integral for the traction
+    for face in 1:nfaces(cell)
+        if onboundary(cell, face)
+            reinit!(fv, cell, face)
+            for q_point in 1:getnquadpoints(fv)
+                dΓ = getdetJdV(fv, q_point)
+                for i in 1:ndofs
+                    δui = shape_value(fv, q_point, i)
+                    ge[i] -= (δui ⋅ t) * dΓ
+                end
+            end
+        end
+    end
+end;
+
+function assemble_global!(K, f, dh, cv, fv, mp, u)
+    n = ndofs_per_cell(dh)
+    ke = zeros(n, n)
+    ge = zeros(n)
+
+    # start_assemble resets K and f
+    assembler = start_assemble(K, f)
+
+    # Loop over all cells in the grid
+    @timeit &quot;assemble&quot; for cell in CellIterator(dh)
+        global_dofs = celldofs(cell)
+        ue = u[global_dofs] # element dofs
+        @timeit &quot;element assemble&quot; assemble_element!(ke, ge, cell, cv, fv, mp, ue)
+        assemble!(assembler, global_dofs, ge, ke)
+    end
+end;
+
+function solve()
+    reset_timer!()
+
+    # Generate a grid
+    N = 10
+    L = 1.0
+    left = zero(Vec{3})
+    right = L * ones(Vec{3})
+    grid = generate_grid(Tetrahedron, (N, N, N), left, right)
+
+    # Material parameters
+    E = 10.0
+    ν = 0.3
+    μ = E / (2(1 + ν))
+    λ = (E * ν) / ((1 + ν) * (1 - 2ν))
+    mp = NeoHooke(μ, λ)
+
+    # Finite element base
+    ip = Lagrange{3, RefTetrahedron, 1}()
+    qr = QuadratureRule{3, RefTetrahedron}(1)
+    qr_face = QuadratureRule{2, RefTetrahedron}(1)
+    cv = CellVectorValues(qr, ip)
+    fv = FaceVectorValues(qr_face, ip)
+
+    # DofHandler
+    dh = DofHandler(grid)
+    push!(dh, :u, 3) # Add a displacement field
+    close!(dh)
+
+    function rotation(X, t, θ = deg2rad(60.0))
+        x, y, z = X
+        return t * Vec{3}(
+            (0.0,
+            L/2 - y + (y-L/2)*cos(θ) - (z-L/2)*sin(θ),
+            L/2 - z + (y-L/2)*sin(θ) + (z-L/2)*cos(θ)
+            ))
+    end
+
+    dbcs = ConstraintHandler(dh)
+    # Add a homogenous boundary condition on the &quot;clamped&quot; edge
+    dbc = Dirichlet(:u, getfaceset(grid, &quot;right&quot;), (x,t) -&gt; [0.0, 0.0, 0.0], [1, 2, 3])
+    add!(dbcs, dbc)
+    dbc = Dirichlet(:u, getfaceset(grid, &quot;left&quot;), (x,t) -&gt; rotation(x, t), [1, 2, 3])
+    add!(dbcs, dbc)
+    close!(dbcs)
+    t = 0.5
+    Ferrite.update!(dbcs, t)
+
+    # Pre-allocation of vectors for the solution and Newton increments
+    _ndofs = ndofs(dh)
+    un = zeros(_ndofs) # previous solution vector
+    u  = zeros(_ndofs)
+    Δu = zeros(_ndofs)
+    ΔΔu = zeros(_ndofs)
+    apply!(un, dbcs)
+
+    # Create sparse matrix and residual vector
+    K = create_sparsity_pattern(dh)
+    g = zeros(_ndofs)
+
+
+    # Perform Newton iterations
+    newton_itr = -1
+    NEWTON_TOL = 1e-8
+    prog = ProgressMeter.ProgressThresh(NEWTON_TOL, &quot;Solving:&quot;)
+
+    while true; newton_itr += 1
+        u .= un .+ Δu # Current guess
+        assemble_global!(K, g, dh, cv, fv, mp, u)
+        normg = norm(g[Ferrite.free_dofs(dbcs)])
+        apply_zero!(K, g, dbcs)
+        ProgressMeter.update!(prog, normg; showvalues = [(:iter, newton_itr)])
+
+        if normg &lt; NEWTON_TOL
+            break
+        elseif newton_itr &gt; 30
+            error(&quot;Reached maximum Newton iterations, aborting&quot;)
+        end
+
+        # Compute increment using cg! from IterativeSolvers.jl
+        @timeit &quot;linear solve (KrylovMethods.cg)&quot; ΔΔu′, flag, relres, iter, resvec = KrylovMethods.cg(K, g; maxIter = 1000)
+        @assert flag == 0
+        @timeit &quot;linear solve (IterativeSolvers.cg!)&quot; IterativeSolvers.cg!(ΔΔu, K, g; maxiter=1000)
+
+        apply_zero!(ΔΔu, dbcs)
+        Δu .-= ΔΔu
+    end
+
+    # Save the solution
+    @timeit &quot;export&quot; begin
+        vtk_grid(&quot;hyperelasticity&quot;, dh) do vtkfile
+            vtk_point_data(vtkfile, dh, u)
+        end
+    end
+
+    print_timer(title = &quot;Analysis with $(getncells(grid)) elements&quot;, linechars = :ascii)
+    return u
+end
+
+u = solve();</code></pre><hr/><p><em>This page was generated using <a href="https://github.com/fredrikekre/Literate.jl">Literate.jl</a>.</em></p></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../incompressible_elasticity/">« Incompressible Elasticity</a><a class="docs-footer-nextpage" href="../threaded_assembly/">Threaded Assembly »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 0.27.19 on <span class="colophon-date" title="Thursday 30 June 2022 13:08">Thursday 30 June 2022</span>. Using Julia version 1.7.3.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
