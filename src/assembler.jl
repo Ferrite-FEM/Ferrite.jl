@@ -115,8 +115,8 @@ Assembler for sparse matrix with CSC storage type.
 struct CSCAssembler{Tv,Ti,MT<:AbstractSparseMatrixCSC{Tv,Ti}} <: AbstractCSCAssembler
     K::MT
     f::Vector{Tv}
-    permutation::Vector{Int}
-    sorteddofs::Vector{Int}
+    permutation::TaskLocalValue{Vector{Int}}
+    sorteddofs::TaskLocalValue{Vector{Int}}
 end
 
 """
@@ -125,8 +125,8 @@ Assembler for symmetric sparse matrix with CSC storage type.
 struct SymmetricCSCAssembler{Tv,Ti, MT <: Symmetric{Tv,<:AbstractSparseMatrixCSC{Tv,Ti}}} <: AbstractCSCAssembler
     K::MT
     f::Vector{Tv}
-    permutation::Vector{Int}
-    sorteddofs::Vector{Int}
+    permutation::TaskLocalValue{Vector{Int}}
+    sorteddofs::TaskLocalValue{Vector{Int}}
 end
 
 function Base.show(io::IO, ::MIME"text/plain", a::Union{CSCAssembler, SymmetricCSCAssembler})
@@ -165,11 +165,15 @@ start_assemble(K::Union{AbstractSparseMatrixCSC, Symmetric{<:Any,<:AbstractSpars
 
 function start_assemble(K::AbstractSparseMatrixCSC{T}, f::Vector=T[]; fillzero::Bool=true, maxcelldofs_hint::Int=0) where {T}
     fillzero && (fillzero!(K); fillzero!(f))
-    return CSCAssembler(K, f, zeros(Int,maxcelldofs_hint), zeros(Int,maxcelldofs_hint))
+    permutation = TaskLocalValue{Vector{Int}}(() -> Vector{Int}(undef, maxcelldofs_hint))
+    sorteddofs = TaskLocalValue{Vector{Int}}(() -> Vector{Int}(undef, maxcelldofs_hint))
+    return CSCAssembler(K, f, permutation, sorteddofs)
 end
 function start_assemble(K::Symmetric{T,<:SparseMatrixCSC}, f::Vector=T[]; fillzero::Bool=true, maxcelldofs_hint::Int=0) where T
     fillzero && (fillzero!(K); fillzero!(f))
-    return SymmetricCSCAssembler(K, f, zeros(Int,maxcelldofs_hint), zeros(Int,maxcelldofs_hint))
+    permutation = TaskLocalValue{Vector{Int}}(() -> Vector{Int}(undef, maxcelldofs_hint))
+    sorteddofs = TaskLocalValue{Vector{Int}}(() -> Vector{Int}(undef, maxcelldofs_hint))
+    return SymmetricCSCAssembler(K, f, permutation, sorteddofs)
 end
 
 function finish_assemble(a::Union{CSCAssembler, SymmetricCSCAssembler})
@@ -226,7 +230,7 @@ end
     # We assume that the input dofs are not sorted, because the cells need the dofs in
     # a specific order, which might not be the sorted order. Hence we sort them.
     # Note that we are not allowed to mutate `dofs` in the process.
-    sorteddofs, permutation = _sortdofs_for_assembly!(A.permutation, A.sorteddofs, dofs)
+    sorteddofs, permutation = _sortdofs_for_assembly!(A.permutation[], A.sorteddofs[], dofs)
 
     current_col = 1
     @inbounds for Kcol in sorteddofs

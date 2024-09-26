@@ -73,7 +73,7 @@ end;
 #
 # ScratchValues is a thread-local collection of data that each thread needs to own,
 # since we need to be able to mutate the data in the threads independently
-struct ScratchValues{T, CV <: CellValues, FV <: FacetValues, TT <: AbstractTensor, dim, AT}
+struct ScratchValues{T, CV <: CellValues, FV <: FacetValues, TT <: AbstractTensor, dim}
     Ke::Matrix{T}
     fe::Vector{T}
     cellvalues::CV
@@ -81,7 +81,6 @@ struct ScratchValues{T, CV <: CellValues, FV <: FacetValues, TT <: AbstractTenso
     global_dofs::Vector{Int}
     ɛ::Vector{TT}
     coordinates::Vector{Vec{dim, T}}
-    assembler::AT
 end;
 
 # Each thread need its own CellValues and FacetValues (although, for this example we don't use
@@ -96,9 +95,8 @@ function create_values(interpolation_space::Interpolation{refshape}, qr_order::I
 end;
 
 # Create a `ScratchValues` for each thread with the thread local data
-function create_scratchvalues(K, f, dh::DofHandler{dim}, ip) where {dim}
+function create_scratchvalues(dh::DofHandler{dim}, ip) where {dim}
     nthreads = Threads.nthreads()
-    assemblers = [start_assemble(K, f) for i in 1:nthreads]
     cellvalues, facetvalues = create_values(ip, 2)
 
     n_basefuncs = getnbasefunctions(cellvalues[1])
@@ -112,7 +110,7 @@ function create_scratchvalues(K, f, dh::DofHandler{dim}, ip) where {dim}
     coordinates = [[zero(Vec{dim}) for i in 1:length(dh.grid.cells[1].nodes)] for i in 1:nthreads]
 
     return [ScratchValues(Kes[i], fes[i], cellvalues[i], facetvalues[i], global_dofs[i],
-                         ɛs[i], coordinates[i], assemblers[i]) for i in 1:nthreads]
+                         ɛs[i], coordinates[i]) for i in 1:nthreads]
 end;
 
 # ## Threaded assemble
@@ -121,13 +119,15 @@ end;
 function doassemble(K::SparseMatrixCSC, colors, grid::Grid, dh::DofHandler, C::SymmetricTensor{4, dim}, ip) where {dim}
 
     f = zeros(ndofs(dh))
-    scratches = create_scratchvalues(K, f, dh, ip)
+    assembler = start_assemble(K, f)
+
+    scratches = create_scratchvalues(dh, ip)
     b = Vec{3}((0.0, 0.0, 0.0)) # Body force
 
     for color in colors
         ## Each color is safe to assemble threaded
         Threads.@threads :static for i in 1:length(color)
-            assemble_cell!(scratches[Threads.threadid()], color[i], K, grid, dh, C, b)
+            assemble_cell!(scratches[Threads.threadid()], color[i], assembler, grid, dh, C, b)
         end
     end
 
@@ -136,13 +136,13 @@ end
 
 # The cell assembly function is written the same way as if it was a single threaded example.
 # The only difference is that we unpack the variables from our `scratch`.
-function assemble_cell!(scratch::ScratchValues, cell::Int, K::SparseMatrixCSC,
+function assemble_cell!(scratch::ScratchValues, cell::Int, assembler,
                         grid::Grid, dh::DofHandler, C::SymmetricTensor{4, dim}, b::Vec{dim}) where {dim}
 
     ## Unpack our stuff from the scratch
-    Ke, fe, cellvalues, facetvalues, global_dofs, ɛ, coordinates, assembler =
+    Ke, fe, cellvalues, facetvalues, global_dofs, ɛ, coordinates =
          scratch.Ke, scratch.fe, scratch.cellvalues, scratch.facetvalues,
-         scratch.global_dofs, scratch.ɛ, scratch.coordinates, scratch.assembler
+         scratch.global_dofs, scratch.ɛ, scratch.coordinates
 
     fill!(Ke, 0)
     fill!(fe, 0)
