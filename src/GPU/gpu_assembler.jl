@@ -62,7 +62,7 @@ end
 
 
 function _assemble!(A::GPUAssemblerSparsityPattern, dofs::AbstractVector{Int32}, Ke::MATRIX, fe::VECTOR) where {MATRIX, VECTOR}
-    # Brute force assembly
+    # # Brute force assembly
     K = A.K
     f = A.f
     for i = 1:length(dofs)

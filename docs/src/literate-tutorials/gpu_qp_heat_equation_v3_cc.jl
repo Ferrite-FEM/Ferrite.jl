@@ -9,10 +9,10 @@ using NVTX
 
 
 left = Tensor{1,2,Float32}((0,-0)) # define the left bottom corner of the grid.
-right = Tensor{1,2,Float32}((100.0,100.0)) # define the right top corner of the grid.
+right = Tensor{1,2,Float32}((10.0,10.0)) # define the right top corner of the grid.
 
 
-grid = generate_grid(Quadrilateral, (100, 100),left,right)
+grid = generate_grid(Quadrilateral, (10, 10),left,right)
 
 
 
@@ -126,6 +126,8 @@ function assemble_element!(Ke,fe,cv,cell)
 end
 
 
+
+
 function assemble_gpu!(Kgpu,fgpu, cv, dh)
     n_basefuncs = getnbasefunctions(cv)
     assembler = start_assemble(Kgpu, fgpu)
@@ -150,14 +152,7 @@ n_cells = getncells(dh.grid)
 
 #using BenchmarkTools
 
-Adapt.@adapt_structure Ferrite.GPUGrid
-Adapt.@adapt_structure Ferrite.GPUDofHandler
-Adapt.@adapt_structure Ferrite.GPUAssemblerSparsityPattern
 
-
-dh_gpu = Adapt.adapt_structure(CuArray, dh)
-assembler_gpu = Adapt.adapt_structure(CUDA.KernelAdaptor(), assembler)
-cellvalues_gpu = Adapt.adapt_structure(CuArray, cellvalues)
 
 launch_kernel(assemble_gpu!, (Kgpu,fgpu, cellvalues, dh) , n_cells, n_basefuncs)
 #@btime CUDA.@sync launch_kernel($assemble_gpu!, ($Kgpu,$fgpu, $cellvalues, $dh) , $n_cells, $n_basefuncs)

@@ -18,7 +18,7 @@ struct GPUCellIterator{DH<:AbstractGPUDofHandler,GRID<: AbstractGPUGrid,KDynamic
     n_cells::Int32
     block_ke:: KDynamicSharedMem # dynamic shared memory for the block (3rd order tensor (e,i,j))
     block_fe:: FDynamicSharedMem # dynamic shared memory for the block (2nd order tensor (e,i))
-    thread_id::Int32 # global thread id (i.e. cell id in the first iteration)
+    thread_id::Int32 # local thread id (maps to the index of the element in block_ke and block_fe)
 end
 
 
@@ -28,14 +28,14 @@ function CellIterator(dh::AbstractGPUDofHandler,n_basefuncs::Int32)
     bd = blockDim().x
     ke_shared = @cuDynamicSharedMem(Float32,(bd,n_basefuncs,n_basefuncs))
     fe_shared = @cuDynamicSharedMem(Float32,(bd,n_basefuncs),sizeof(Float32)*bd*n_basefuncs*n_basefuncs)
-    i = (blockIdx().x - Int32(1)) * blockDim().x + threadIdx().x
-    GPUCellIterator(dh, grid,n_cells,ke_shared,fe_shared,i)
+    local_thread_id = threadIdx().x
+    GPUCellIterator(dh, grid,n_cells,ke_shared,fe_shared,local_thread_id)
 end
 
 ncells(iterator::GPUCellIterator) = iterator.n_cells
 
 function Base.iterate(iterator::GPUCellIterator)
-    i = iterator.thread_id
+    i = (blockIdx().x - Int32(1)) * blockDim().x + threadIdx().x
     i <= iterator.n_cells || return nothing
     return (_makecache(iterator, i), i)
 end
@@ -61,16 +61,16 @@ struct GPUCellCache{ DOFS <: AbstractVector{Int32},NN,NODES <: SVector{NN,Int32}
 end
 
 
-function _makecache(iterator::GPUCellIterator, i::Int32)
+function _makecache(iterator::GPUCellIterator, e::Int32)
     # Note: here required fields are all extracted in one single functions,
     # although there are seperate functions to extract each field, because
     # On GPU, we want to minimize the number of memomry accesses.
     dh = iterator.dh
     grid = iterator.grid
-    cellid = i
-    cell = getcells(grid,i);
+    cellid = e
+    cell = getcells(grid,e);
     nodes = SVector(convert.(Int32,Ferrite.get_node_ids(cell))...)
-    dofs = celldofs(dh, i)  # cannot be a SVectors, because the size is not known at compile time.
+    dofs = celldofs(dh, e)
 
 
     # get the coordinates of the nodes of the cell.
@@ -84,7 +84,7 @@ function _makecache(iterator::GPUCellIterator, i::Int32)
     return GPUCellCache(coords, dofs, cellid, nodes, (@view iterator.block_ke[iterator.thread_id,:,:]), (@view iterator.block_fe[iterator.thread_id,:,:]))
 end
 
-# Accessor functions (TODO: Deprecate? We are so inconsistent with `getxx` vs `xx`...)
+
 getnodes(cc::GPUCellCache) = cc.nodes
 getcoordinates(cc::GPUCellCache) = cc.coords
 celldofs(cc::GPUCellCache) = cc.dofs
@@ -92,6 +92,7 @@ cellid(cc::GPUCellCache) = cc.cellid
 @inline function cellke(cc::GPUCellCache)
     ke =  cc.ke
     fill!(ke, 0.0f0)
+
 end
 
 @inline function cellfe(cc::GPUCellCache)

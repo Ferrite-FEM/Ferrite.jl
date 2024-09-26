@@ -39,5 +39,5 @@ function optimize_nblocks()
     # number of blocks is usually multiple of number of SMs
     # occupancy test should be done on threads and blocks
     # the goal is to calculate how many active block per SM and multiply it by the number of SMs
-    return 2 #* no_sms
+    return 2 * no_sms
 end
