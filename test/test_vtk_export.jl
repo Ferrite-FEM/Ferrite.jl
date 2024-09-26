@@ -17,9 +17,10 @@
             grid = generate_grid(Quadrilateral, (4, 4))
             colors = create_coloring(grid)
             fname = joinpath(tmp, "colors")
-            VTKGridFile(fname, grid) do vtk
-                Ferrite.write_cell_colors(vtk, grid, colors)
+            v = VTKGridFile(fname, grid) do vtk::VTKGridFile
+                @test Ferrite.write_cell_colors(vtk, grid, colors) === vtk
             end
+            @test v isa VTKGridFile
             @test bytes2hex(open(SHA.sha1, fname*".vtu")) == "b804d0b064121b672d8e35bcff8446eda361cac3"
         end
     end
@@ -35,9 +36,10 @@
             add!(ch, Dirichlet(:u, getnodeset(grid, "nodeset"), x -> 0.0))
             close!(ch)
             fname = joinpath(tmp, "constraints")
-            VTKGridFile(fname, grid) do vtk
-                Ferrite.write_constraints(vtk, ch)
+            v = VTKGridFile(fname, grid) do vtk::VTKGridFile
+                @test Ferrite.write_constraints(vtk, ch) === vtk
             end
+            @test v isa VTKGridFile
             @test bytes2hex(open(SHA.sha1, fname*".vtu")) == "31b506bd9729b11992f8bcb79a2191eb65d223bf"
         end
     end
@@ -50,12 +52,14 @@
             addcellset!(grid, "set2", 1:4)
             manual = joinpath(tmp, "manual")
             auto = joinpath(tmp, "auto")
-            VTKGridFile(manual, grid) do vtk
-                Ferrite.write_cellset(vtk, grid, keys(Ferrite.getcellsets(grid)))
+            v = VTKGridFile(manual, grid) do vtk::VTKGridFile
+                @test Ferrite.write_cellset(vtk, grid, keys(Ferrite.getcellsets(grid))) === vtk
             end
-            VTKGridFile(auto, grid) do vtk
-                Ferrite.write_cellset(vtk, grid)
+            @test v isa VTKGridFile
+            v = VTKGridFile(auto, grid) do vtk::VTKGridFile
+                @test Ferrite.write_cellset(vtk, grid) === vtk
             end
+            @test v isa VTKGridFile
             @test bytes2hex(open(SHA.sha1, manual*".vtu")) == bytes2hex(open(SHA.sha1, auto*".vtu"))
         end
     end
