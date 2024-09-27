@@ -19,8 +19,8 @@
 # flow on a quarter circle. In particular it shows how to use periodic boundary conditions,
 # how to solve a problem with multiple unknown fields, and how to enforce a specific mean
 # value of the solution. For the mesh generation we use
-# [`Gmsh.jl`](https://github.com/JuliaFEM/Gmsh.jl) and then use
-# [`FerriteGmsh.jl`](https://github.com/Ferrite-FEM/FerriteGmsh.jl) to import the mesh into
+# [Gmsh.jl](https://github.com/JuliaFEM/Gmsh.jl) and then use
+# [FerriteGmsh.jl](https://github.com/Ferrite-FEM/FerriteGmsh.jl) to import the mesh into
 # Ferrite's format.
 #
 # The strong form of Stokes flow with velocity ``\boldsymbol{u}`` and pressure ``p`` can be

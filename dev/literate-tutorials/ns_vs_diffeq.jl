@@ -13,7 +13,7 @@
 # In this example we focus on a simple but visually appealing problem from
 # fluid dynamics, namely vortex shedding. This problem is also known as
 # [von-Karman vortex streets](https://en.wikipedia.org/wiki/K%C3%A1rm%C3%A1n_vortex_street). Within this example, we show how to utilize [DifferentialEquations.jl](https://github.com/SciML/DifferentialEquations.jl)
-# in tandem with Ferrite.jl to solve this space-time problem. To keep things simple we use a naive approach
+# in tandem with Ferrite to solve this space-time problem. To keep things simple we use a naive approach
 # to discretize the system.
 #
 # ## Remarks on DifferentialEquations.jl
@@ -128,7 +128,7 @@ using OrdinaryDiffEq
 ν = 1.0/1000.0; #dynamic viscosity
 
 # Next a rectangular grid with a cylinder in it has to be generated.
-# We use `Gmsh` for the creation of the mesh and `FerriteGmsh` to translate it to a `Ferrite.Grid`.
+# We use Gmsh.jl for the creation of the mesh and FerriteGmsh.jl to translate it to a `Ferrite.Grid`.
 # Note that the mesh is pretty fine, leading to a high memory consumption when
 # feeding the equation system to direct solvers.
 using FerriteGmsh
@@ -195,7 +195,7 @@ add!(dh, :v, ip_v)
 add!(dh, :p, ip_p)
 close!(dh);
 
-# ### Boundary Conditions
+# ### Boundary conditions
 # As in the DFG benchmark we apply no-slip conditions to the top, bottom and
 # cylinder boundary. The no-slip condition states that the velocity of the
 # fluid on this portion of the boundary is fixed to be zero.

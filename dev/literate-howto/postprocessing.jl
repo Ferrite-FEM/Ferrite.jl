@@ -93,7 +93,7 @@ VTKGridFile("heat_equation_flux", grid) do vtk
     write_projection(vtk, projector, q_projected, "q")
 end;
 
-# ## Point Evaluation
+# ## Point evaluation
 # ![](heat_square_pointevaluation.png)
 #
 # *Figure 2*: Visualization of the cut line where we want to compute
