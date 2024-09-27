@@ -26,10 +26,10 @@ welcome. See [CONTRIBUTING](CONTRIBUTING.md) for more details.
 
 ## Questions
 
-If you have questions about Ferrite.jl you're welcome to reach out to us on the [Julia
+If you have questions about Ferrite you're welcome to reach out to us on the [Julia
 Slack][julia-slack] under `#ferrite-fem` or on [Zulip][julia-zulip] under `#Ferrite.jl`.
 Alternatively you can start a [new discussion][gh-discussion] in the discussion forum on the
-repository. Feel free to ask us even if you are not sure the problem is with Ferrite.jl.
+repository. Feel free to ask us even if you are not sure the problem is with Ferrite.
 
 If you encounter what you think is a bug please report it, see
 [CONTRIBUTING.md](CONTRIBUTING.md#reporting-issues) for more information.
@@ -40,7 +40,7 @@ Please keep in mind that we are part of the Julia community and adhere to the
 [Julia Community Standards][standards].
 
 ## Related packages
-The following registered packages are part of the `Ferrite.jl` ecosystem in addition to Ferrite itself:
+The following registered packages are part of the Ferrite ecosystem in addition to Ferrite itself:
 * [Tensors.jl][Tensors]: Used throughout Ferrite for efficient tensor manipulation.
 * [FerriteViz.jl][FerriteViz]: [Makie.jl][Makie]-based visualization of Ferrite data.
 * [FerriteGmsh.jl][FerriteGmsh]: Create, interact with, and import [Gmsh][Gmsh] meshes into Ferrite.

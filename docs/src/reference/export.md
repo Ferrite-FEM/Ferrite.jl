@@ -22,7 +22,7 @@ PointIterator
 PointLocation
 ```
 
-## VTK Export
+## VTK export
 ```@docs
 VTKGridFile
 write_solution

@@ -1,6 +1,6 @@
 # Developer documentation
 
-Here you can find some documentation of the internals of Ferrite.jl which are useful when
+Here you can find some documentation of the internals of Ferrite which are useful when
 developing the library.
 
 ```@contents

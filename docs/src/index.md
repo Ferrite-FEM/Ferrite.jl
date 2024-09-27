@@ -97,4 +97,4 @@ Ferrite is still under active development. If you find a bug, or have ideas for
 improvements, you are encouraged to interact with the developers on the [Ferrite GitHub
 repository](https://github.com/Ferrite-FEM/Ferrite.jl). There is also a thorough contributor
 guide which can be found in
-[`CONTRIBUTING.md`](https://github.com/Ferrite-FEM/Ferrite.jl/blob/master/CONTRIBUTING.md).
+[CONTRIBUTING.md](https://github.com/Ferrite-FEM/Ferrite.jl/blob/master/CONTRIBUTING.md).
