@@ -301,7 +301,7 @@ function assemble_global!(K, g, dh, cv, fv, mp, u, ΓN)
         global_dofs = celldofs(cell)
         ue = u[global_dofs] # element dofs
         @timeit "element assemble" assemble_element!(ke, ge, cell, cv, fv, mp, ue, ΓN)
-        assemble!(assembler, global_dofs, ge, ke)
+        assemble!(assembler, global_dofs, ke, ge)
     end
 end;
 

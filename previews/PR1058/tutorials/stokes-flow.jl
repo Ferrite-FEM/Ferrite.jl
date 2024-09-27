@@ -76,7 +76,7 @@ function setup_dofs(grid, ipu, ipp)
 end
 
 function setup_mean_constraint(dh, fvp)
-    assembler = start_assemble()
+    assembler = Ferrite.COOAssembler()
     # All external boundaries
     set = union(
         getfacetset(dh.grid, "Γ1"),

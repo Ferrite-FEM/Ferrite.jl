@@ -126,7 +126,7 @@ function doassemble!(K::SparseMatrixCSC, r::Vector, cellvalues::CellValues, dh::
         state = @view states[:, i]
         state_old = @view states_old[:, i]
         assemble_cell!(ke, re, cell, cellvalues, material, ue, state, state_old)
-        assemble!(assembler, eldofs, re, ke)
+        assemble!(assembler, eldofs, ke, re)
     end
     return K, r
 end

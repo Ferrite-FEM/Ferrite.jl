@@ -170,7 +170,7 @@ function assemble_global!(K::SparseMatrixCSC, f, cellvalues_u::CellValues,
         ue = w[global_dofsu] # displacement dofs for the current cell
         pe = w[global_dofsp] # pressure dofs for the current cell
         assemble_element!(ke, fe, cell, cellvalues_u, cellvalues_p, mp, ue, pe)
-        assemble!(assembler, global_dofs, fe, ke)
+        assemble!(assembler, global_dofs, ke, fe)
     end
 end;
 

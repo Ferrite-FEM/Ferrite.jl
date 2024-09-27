@@ -71,7 +71,7 @@ function doassemble(
         fill!(ke, 0)
         fill!(fe, 0)
         assemble_up!(ke, fe, cell, cellvalues_u, cellvalues_p, facetvalues_u, grid, mp, ɛdev, t)
-        assemble!(assembler, celldofs(cell), fe, ke)
+        assemble!(assembler, celldofs(cell), ke, fe)
     end
 
     return K, f

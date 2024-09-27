@@ -2,148 +2,137 @@ using Ferrite, SparseArrays
 
 function create_example_2d_grid()
     grid = generate_grid(Quadrilateral, (10, 10), Vec{2}((0.0, 0.0)), Vec{2}((10.0, 10.0)))
-    colors_workstream = create_coloring(grid; alg=ColoringAlgorithm.WorkStream)
-    colors_greedy = create_coloring(grid; alg=ColoringAlgorithm.Greedy)
+    colors_workstream = create_coloring(grid; alg = ColoringAlgorithm.WorkStream)
+    colors_greedy = create_coloring(grid; alg = ColoringAlgorithm.Greedy)
     VTKGridFile("colored", grid) do vtk
         Ferrite.write_cell_colors(vtk, grid, colors_workstream, "workstream-coloring")
         Ferrite.write_cell_colors(vtk, grid, colors_greedy, "greedy-coloring")
     end
 end
 
-create_example_2d_grid();
+create_example_2d_grid()
 
-function create_colored_cantilever_grid(celltype, n)
-    grid = generate_grid(celltype, (10*n, n, n), Vec{3}((0.0, 0.0, 0.0)), Vec{3}((10.0, 1.0, 1.0)))
-    colors = create_coloring(grid)
-    return grid, colors
-end;
-
-function create_dofhandler(grid::Grid{dim}, ip) where {dim}
-    dh = DofHandler(grid)
-    add!(dh, :u, ip) # Add a displacement field
-    close!(dh)
-end;
-
-function create_stiffness(::Val{dim}) where {dim}
-    E = 200e9
-    ν = 0.3
-    λ = E*ν / ((1+ν) * (1 - 2ν))
-    μ = E / (2(1+ν))
-    δ(i,j) = i == j ? 1.0 : 0.0
-    g(i,j,k,l) = λ*δ(i,j)*δ(k,l) + μ*(δ(i,k)*δ(j,l) + δ(i,l)*δ(j,k))
-    C = SymmetricTensor{4, dim}(g);
-    return C
-end;
-
-struct ScratchValues{T, CV <: CellValues, FV <: FacetValues, TT <: AbstractTensor, dim, AT}
-    Ke::Matrix{T}
-    fe::Vector{T}
-    cellvalues::CV
-    facetvalues::FV
-    global_dofs::Vector{Int}
-    ɛ::Vector{TT}
-    coordinates::Vector{Vec{dim, T}}
-    assembler::AT
-end;
-
-function create_values(interpolation_space::Interpolation{refshape}, qr_order::Int) where {dim, refshape<:Ferrite.AbstractRefShape{dim}}
-    # Interpolations and values
-    quadrature_rule = QuadratureRule{refshape}(qr_order)
-    facet_quadrature_rule = FacetQuadratureRule{refshape}(qr_order)
-    cellvalues = [CellValues(quadrature_rule, interpolation_space) for i in 1:Threads.nthreads()];
-    facetvalues = [FacetValues(facet_quadrature_rule, interpolation_space) for i in 1:Threads.nthreads()];
-    return cellvalues, facetvalues
-end;
-
-function create_scratchvalues(K, f, dh::DofHandler{dim}, ip) where {dim}
-    nthreads = Threads.nthreads()
-    assemblers = [start_assemble(K, f) for i in 1:nthreads]
-    cellvalues, facetvalues = create_values(ip, 2)
-
-    n_basefuncs = getnbasefunctions(cellvalues[1])
-    global_dofs = [zeros(Int, ndofs_per_cell(dh)) for i in 1:nthreads]
-
-    fes = [zeros(n_basefuncs) for i in 1:nthreads] # Local force vector
-    Kes = [zeros(n_basefuncs, n_basefuncs) for i in 1:nthreads]
-
-    ɛs = [[zero(SymmetricTensor{2, dim}) for i in 1:n_basefuncs] for i in 1:nthreads]
-
-    coordinates = [[zero(Vec{dim}) for i in 1:length(dh.grid.cells[1].nodes)] for i in 1:nthreads]
-
-    return [ScratchValues(Kes[i], fes[i], cellvalues[i], facetvalues[i], global_dofs[i],
-                         ɛs[i], coordinates[i], assemblers[i]) for i in 1:nthreads]
-end;
-
-function doassemble(K::SparseMatrixCSC, colors, grid::Grid, dh::DofHandler, C::SymmetricTensor{4, dim}, ip) where {dim}
-
-    f = zeros(ndofs(dh))
-    scratches = create_scratchvalues(K, f, dh, ip)
-    b = Vec{3}((0.0, 0.0, 0.0)) # Body force
-
-    for color in colors
-        # Each color is safe to assemble threaded
-        Threads.@threads :static for i in 1:length(color)
-            assemble_cell!(scratches[Threads.threadid()], color[i], K, grid, dh, C, b)
-        end
-    end
-
-    return K, f
-end
-
-function assemble_cell!(scratch::ScratchValues, cell::Int, K::SparseMatrixCSC,
-                        grid::Grid, dh::DofHandler, C::SymmetricTensor{4, dim}, b::Vec{dim}) where {dim}
-
-    # Unpack our stuff from the scratch
-    Ke, fe, cellvalues, facetvalues, global_dofs, ɛ, coordinates, assembler =
-         scratch.Ke, scratch.fe, scratch.cellvalues, scratch.facetvalues,
-         scratch.global_dofs, scratch.ɛ, scratch.coordinates, scratch.assembler
-
+# Element routine
+function assemble_cell!(Ke::Matrix, fe::Vector, cellvalues::CellValues, C::SymmetricTensor, b::Vec)
     fill!(Ke, 0)
     fill!(fe, 0)
-
-    n_basefuncs = getnbasefunctions(cellvalues)
-
-    # Fill up the coordinates
-    nodeids = grid.cells[cell].nodes
-    for j in 1:length(coordinates)
-        coordinates[j] = grid.nodes[nodeids[j]].x
-    end
-
-    reinit!(cellvalues, coordinates)
-
     for q_point in 1:getnquadpoints(cellvalues)
-        for i in 1:n_basefuncs
-            ɛ[i] = symmetric(shape_gradient(cellvalues, q_point, i))
-        end
         dΩ = getdetJdV(cellvalues, q_point)
-        for i in 1:n_basefuncs
-            δu = shape_value(cellvalues, q_point, i)
-            fe[i] += (δu ⋅ b) * dΩ
-            ɛC = ɛ[i] ⊡ C
-            for j in 1:n_basefuncs
-                Ke[i, j] += (ɛC ⊡ ɛ[j]) * dΩ
+        for i in 1:getnbasefunctions(cellvalues)
+            δui = shape_value(cellvalues, q_point, i)
+            fe[i] += (δui ⋅ b) * dΩ
+            ∇δui = shape_symmetric_gradient(cellvalues, q_point, i)
+            for j in 1:getnbasefunctions(cellvalues)
+                ∇uj = shape_symmetric_gradient(cellvalues, q_point, j)
+                Ke[i, j] += (∇δui ⊡ C ⊡ ∇uj) * dΩ
             end
         end
     end
-
-    celldofs!(global_dofs, dh, cell)
-    assemble!(assembler, global_dofs, fe, Ke)
-end;
-
-function run_assemble()
-    n = 20
-    grid, colors = create_colored_cantilever_grid(Hexahedron, n);
-    ip = Lagrange{RefHexahedron,1}()^3
-    dh = create_dofhandler(grid, ip);
-
-    K = allocate_matrix(dh);
-    C = create_stiffness(Val{3}());
-    # compilation
-    doassemble(K, colors, grid, dh, C, ip);
-    b = @elapsed @time K, f = doassemble(K, colors, grid, dh, C, ip);
-    return b
+    return Ke, fe
 end
 
-run_assemble()
+# Material stiffness
+function create_material_stiffness()
+    E = 200.0e9
+    ν = 0.3
+    λ = E * ν / ((1 + ν) * (1 - 2ν))
+    μ = E / (2(1 + ν))
+    δ(i, j) = i == j ? 1.0 : 0.0
+    C = SymmetricTensor{4, 3}() do i, j, k, l
+        return λ * δ(i, j) * δ(k, l) + μ * (δ(i, k) * δ(j, l) + δ(i, l) * δ(j, k))
+    end
+    return C
+end
+
+# Grid and grid coloring
+function create_cantilever_grid(n::Int)
+    xmin = Vec{3}((0.0, 0.0, 0.0))
+    xmax = Vec{3}((10.0, 1.0, 1.0))
+    grid = generate_grid(Hexahedron, (10 * n, n, n), xmin, xmax)
+    colors = create_coloring(grid)
+    return grid, colors
+end
+
+# DofHandler with displacement field u
+function create_dofhandler(grid::Grid, interpolation::VectorInterpolation)
+    dh = DofHandler(grid)
+    add!(dh, :u, interpolation)
+    close!(dh)
+    return dh
+end
+nothing # hide
+
+struct ScratchData{CC, CV, T, A}
+    cell_cache::CC
+    cellvalues::CV
+    Ke::Matrix{T}
+    fe::Vector{T}
+    assembler::A
+end
+
+function ScratchData(dh::DofHandler, K::SparseMatrixCSC, f::Vector, cellvalues::CellValues)
+    cell_cache = CellCache(dh)
+    n = ndofs_per_cell(dh)
+    Ke = zeros(n, n)
+    fe = zeros(n)
+    asm = start_assemble(K, f; fillzero = false)
+    return ScratchData(cell_cache, copy(cellvalues), Ke, fe, asm)
+end
+nothing # hide
+
+using OhMyThreads, TaskLocalValues
+
+function assemble_global!(
+        K::SparseMatrixCSC, f::Vector, dh::DofHandler, colors,
+        cellvalues_template::CellValues; ntasks = Threads.nthreads()
+    )
+    # Zero-out existing data in K and f
+    _ = start_assemble(K, f)
+    # Body force and material stiffness
+    b = Vec{3}((0.0, 0.0, -1.0))
+    C = create_material_stiffness()
+    # Loop over the colors
+    for color in colors
+        # Dynamic scheduler spawning `ntasks` tasks where each task will process a chunk of
+        # (roughly) equal number of cells (`length(color) ÷ ntasks`).
+        scheduler = OhMyThreads.DynamicScheduler(; ntasks)
+        # Parallelize the loop over the cells in this color
+        OhMyThreads.@tasks for cellidx in color
+            # Tell the @tasks loop to use the scheduler defined above
+            @set scheduler = scheduler
+            # Obtain a task local scratch and unpack it
+            @local scratch = ScratchData(dh, K, f, cellvalues_template)
+            (; cell_cache, cellvalues, Ke, fe, assembler) = scratch
+            # Reinitialize the cell cache and then the cellvalues
+            reinit!(cell_cache, cellidx)
+            reinit!(cellvalues, cell_cache)
+            # Compute the local contribution of the cell
+            assemble_cell!(Ke, fe, cellvalues, C, b)
+            # Assemble local contribution
+            assemble!(assembler, celldofs(cell_cache), Ke, fe)
+        end
+    end
+    return K, f
+end
+nothing # hide
+
+function main(; n = 20, ntasks = Threads.nthreads())
+    # Interpolation, quadrature and cellvalues
+    interpolation = Lagrange{RefHexahedron, 1}()^3
+    quadrature = QuadratureRule{RefHexahedron}(2)
+    cellvalues = CellValues(quadrature, interpolation)
+    # Grid, colors and DofHandler
+    grid, colors = create_cantilever_grid(n)
+    dh = create_dofhandler(grid, interpolation)
+    # Global matrix and vector
+    K = allocate_matrix(dh)
+    f = zeros(ndofs(dh))
+    # Compile it
+    assemble_global!(K, f, dh, colors, cellvalues; ntasks = ntasks)
+    # Time it
+    @time assemble_global!(K, f, dh, colors, cellvalues; ntasks = ntasks)
+    return
+end
+nothing # hide
 
 # This file was generated using Literate.jl, https://github.com/fredrikekre/Literate.jl

@@ -68,7 +68,7 @@ for cell in CellIterator(grid)
     #Call the element routine
     integrate_shell!(ke, cv, qr_ooplane, cellcoords, data)
 
-    assemble!(assembler, celldofs, fe, ke)
+    assemble!(assembler, celldofs, ke, fe)
 end
 
 apply!(K, f, ch)

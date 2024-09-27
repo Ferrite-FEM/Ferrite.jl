@@ -137,7 +137,7 @@ function doassemble_K!(K::SparseMatrixCSC, f::Vector, cellvalues::CellValues, dh
             end
         end
 
-        assemble!(assembler, celldofs(cell), fe, Ke)
+        assemble!(assembler, celldofs(cell), Ke, fe)
     end
     return K, f
 end

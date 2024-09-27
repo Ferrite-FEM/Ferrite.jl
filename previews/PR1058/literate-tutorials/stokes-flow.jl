@@ -284,7 +284,7 @@ end
 #     example](https://www.dealii.org/current/doxygen/deal.II/step_11.html).
 
 function setup_mean_constraint(dh, fvp)
-    assembler = start_assemble()
+    assembler = Ferrite.COOAssembler()
     ## All external boundaries
     set = union(
         getfacetset(dh.grid, "Γ1"),

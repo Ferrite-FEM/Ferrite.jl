@@ -328,7 +328,7 @@ function doassemble!(cellvalues::CellValues, facetvalues::FacetValues, K::Sparse
         ue = u[eldofs]
 
         elmt!(Ke, re, element, cellvalues, facetvalues, grid, mp, ue, state)
-        assemble!(assembler, celldofs(element), re, Ke)
+        assemble!(assembler, celldofs(element), Ke, re)
     end
 
     return K, r
