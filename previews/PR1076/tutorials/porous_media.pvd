@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="utf-8"?>
+<VTKFile type="Collection" version="1.0" byte_order="LittleEndian" compressor="vtkZLibDataCompressor">
+  <Collection>
+    <DataSet timestep="0.0" part="0" file="porous_media_1.vtu"/>
+    <DataSet timestep="0.025" part="0" file="porous_media_2.vtu"/>
+    <DataSet timestep="0.05" part="0" file="porous_media_3.vtu"/>
+    <DataSet timestep="0.075" part="0" file="porous_media_4.vtu"/>
+    <DataSet timestep="0.1" part="0" file="porous_media_5.vtu"/>
+    <DataSet timestep="0.125" part="0" file="porous_media_6.vtu"/>
+    <DataSet timestep="0.15" part="0" file="porous_media_7.vtu"/>
+    <DataSet timestep="0.175" part="0" file="porous_media_8.vtu"/>
+    <DataSet timestep="0.2" part="0" file="porous_media_9.vtu"/>
+    <DataSet timestep="0.225" part="0" file="porous_media_10.vtu"/>
+    <DataSet timestep="0.25" part="0" file="porous_media_11.vtu"/>
+    <DataSet timestep="0.275" part="0" file="porous_media_12.vtu"/>
+    <DataSet timestep="0.3" part="0" file="porous_media_13.vtu"/>
+    <DataSet timestep="0.325" part="0" file="porous_media_14.vtu"/>
+    <DataSet timestep="0.35" part="0" file="porous_media_15.vtu"/>
+    <DataSet timestep="0.375" part="0" file="porous_media_16.vtu"/>
+    <DataSet timestep="0.4" part="0" file="porous_media_17.vtu"/>
+    <DataSet timestep="0.425" part="0" file="porous_media_18.vtu"/>
+    <DataSet timestep="0.45" part="0" file="porous_media_19.vtu"/>
+    <DataSet timestep="0.475" part="0" file="porous_media_20.vtu"/>
+    <DataSet timestep="0.5" part="0" file="porous_media_21.vtu"/>
+    <DataSet timestep="0.525" part="0" file="porous_media_22.vtu"/>
+    <DataSet timestep="0.55" part="0" file="porous_media_23.vtu"/>
+    <DataSet timestep="0.575" part="0" file="porous_media_24.vtu"/>
+    <DataSet timestep="0.6" part="0" file="porous_media_25.vtu"/>
+    <DataSet timestep="0.625" part="0" file="porous_media_26.vtu"/>
+    <DataSet timestep="0.65" part="0" file="porous_media_27.vtu"/>
+    <DataSet timestep="0.675" part="0" file="porous_media_28.vtu"/>
+    <DataSet timestep="0.7" part="0" file="porous_media_29.vtu"/>
+    <DataSet timestep="0.725" part="0" file="porous_media_30.vtu"/>
+    <DataSet timestep="0.75" part="0" file="porous_media_31.vtu"/>
+    <DataSet timestep="0.775" part="0" file="porous_media_32.vtu"/>
+    <DataSet timestep="0.8" part="0" file="porous_media_33.vtu"/>
+    <DataSet timestep="0.825" part="0" file="porous_media_34.vtu"/>
+    <DataSet timestep="0.85" part="0" file="porous_media_35.vtu"/>
+    <DataSet timestep="0.875" part="0" file="porous_media_36.vtu"/>
+    <DataSet timestep="0.9" part="0" file="porous_media_37.vtu"/>
+    <DataSet timestep="0.925" part="0" file="porous_media_38.vtu"/>
+    <DataSet timestep="0.95" part="0" file="porous_media_39.vtu"/>
+    <DataSet timestep="0.975" part="0" file="porous_media_40.vtu"/>
+    <DataSet timestep="1.0" part="0" file="porous_media_41.vtu"/>
+  </Collection>
+</VTKFile>
