@@ -245,7 +245,7 @@ function doassemble!(assembler, domain::FEDomain, a, a_old, Δt)
 end;
 
 # ### Mesh import
-# In this example, we import the mesh from the Abaqus input file, [`porous_media_0p25.inp`](porous_media_0p25.inp) using `FerriteMeshParser`'s
+# In this example, we import the mesh from the Abaqus input file, [`porous_media_0p25.inp`](porous_media_0p25.inp) using FerriteMeshParser's
 # `get_ferrite_grid` function. We then create one cellset for each phase (solid and porous)
 # for each element type. These 4 sets will later be used in their own `SubDofHandler`
 function get_grid()

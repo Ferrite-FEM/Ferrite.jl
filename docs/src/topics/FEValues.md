@@ -1,5 +1,5 @@
 # [FEValues](@id fevalues_topicguide)
-A key type of object in `Ferrite.jl` is the so-called `FEValues`, where the most common ones are `CellValues` and `FacetValues`. These objects are used inside the element routines and are used to query the integration weights, shape function values and gradients, and much more; see [`CellValues`](@ref) and [`FacetValues`](@ref). For these values to be correct, it is necessary to reinitialize these for the current cell by using the [`reinit!`](@ref) function. This function maps the values from the reference cell to the actual cell, a process described in detail below, see [Mapping of finite elements](@ref mapping_theory). After that, we show an implementation of a [`SimpleCellValues`](@ref SimpleCellValues) type to illustrate how `CellValues` work for the most standard case, excluding the generalizations and optimization that complicates the actual code.
+A key type of object in Ferrite is the so-called `FEValues`, where the most common ones are `CellValues` and `FacetValues`. These objects are used inside the element routines and are used to query the integration weights, shape function values and gradients, and much more; see [`CellValues`](@ref) and [`FacetValues`](@ref). For these values to be correct, it is necessary to reinitialize these for the current cell by using the [`reinit!`](@ref) function. This function maps the values from the reference cell to the actual cell, a process described in detail below, see [Mapping of finite elements](@ref mapping_theory). After that, we show an implementation of a [`SimpleCellValues`](@ref SimpleCellValues) type to illustrate how `CellValues` work for the most standard case, excluding the generalizations and optimization that complicates the actual code.
 
 ## [Mapping of finite elements](@id mapping_theory)
 The shape functions and gradients stored in an `FEValues` object, are reinitialized for each cell by calling the `reinit!` function.
@@ -161,7 +161,7 @@ This gives the gradient
 
 ## [Walkthrough: Creating `SimpleCellValues`](@id SimpleCellValues)
 In the following, we walk through how to create a `SimpleCellValues` type which
-works similar to `Ferrite.jl`'s `CellValues`, but is not performance optimized and not as general. The main purpose is to explain how the `CellValues` works for the standard case of `IdentityMapping` described above.
+works similar to Ferrite's `CellValues`, but is not performance optimized and not as general. The main purpose is to explain how the `CellValues` works for the standard case of `IdentityMapping` described above.
 Please note that several internal functions are used, and these may change without a major version increment. Please see the [Developer documentation](@ref) for their documentation.
 
 ```@eval

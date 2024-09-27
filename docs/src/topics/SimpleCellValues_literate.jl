@@ -1,4 +1,4 @@
-# We start by including `Ferrite` and `Test` (to check our implementation).
+# We start by including Ferrite and Test (to check our implementation).
 using Ferrite, Test
 
 # Then, we define a simple version of the cell values object, which only supports
@@ -93,7 +93,7 @@ reinit!(simple_cv, x)
 reinit!(cv, x);
 
 # If we now pretend we are inside an element routine and have a vector of element degree of freedom values,
-# `ue`. Then, we can check that our function values and gradients match `Ferrite`'s builtin `CellValues`:
+# `ue`. Then, we can check that our function values and gradients match Ferrite's builtin `CellValues`:
 ue = rand(getnbasefunctions(simple_cv))
 q_point = 2
 @test function_value(cv, q_point, ue) ≈ function_value(simple_cv, q_point, ue)

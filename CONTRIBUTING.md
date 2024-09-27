@@ -48,7 +48,7 @@ almost instant feedback in the browser.
 
 ## Reporting issues
 
-If you have found a bug or a problem with Ferrite.jl you can open an [issue][new-issue]. Try
+If you have found a bug or a problem with Ferrite you can open an [issue][new-issue]. Try
 to include as much information about the problem as possible and preferably some code that
 can be copy-pasted to reproduce it (see [How to create a Minimal, Reproducible
 Example][so-mre]).

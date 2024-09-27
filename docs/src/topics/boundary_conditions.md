@@ -2,18 +2,18 @@
 DocTestSetup = :(using Ferrite)
 ```
 
-# Initial and Boundary Conditions
+# Boundary and initial conditions
 
 Every PDE is accompanied with boundary conditions. There are different types of boundary
 conditions, and they need to be handled in different ways. Below we discuss how to handle
-the most common ones, Dirichlet and Neumann boundary conditions, and how to do it `Ferrite`.
+the most common ones, Dirichlet and Neumann boundary conditions, and how to do it in Ferrite.
 
 While boundary conditions can be applied directly to nodes, vertices, edges, or faces,
 they are most commonly applied to [facets](@ref "Reference shapes"). Each facet is described
 by a [`FacetIndex`](@ref).
 When adding boundary conditions to points instead, vertices are preferred over nodes.
 
-## Dirichlet Boundary Conditions
+## Dirichlet boundary conditions
 
 At a Dirichlet boundary the unknown field is prescribed to a given value. For the discrete
 FE-solution this means that there are some degrees of freedom that are fixed. To handle
@@ -94,7 +94,7 @@ end
     Equation](@ref tutorial-heat-equation).
 
 
-## Neumann Boundary Conditions
+## Neumann boundary conditions
 At the Neumann part of the boundary we know something about the gradient of the solution.
 Two different methods for applying these are described below.
 For complete examples that use Neumann boundary conditions, please see
@@ -207,7 +207,7 @@ general be written as
 where ``\boldsymbol{R}`` is a rotation matrix. If the mapping between mirror and image is
 simply a translation (e.g. sides of a cube) this matrix will be the identity matrix.
 
-In `Ferrite` this type of periodic Dirichlet boundary conditions can be added to the
+In Ferrite this type of periodic Dirichlet boundary conditions can be added to the
 `ConstraintHandler` by constructing an instance of [`PeriodicDirichlet`](@ref). This is
 usually done it two steps. First we compute the mapping between mirror and image facets using
 [`collect_periodic_facets`](@ref). Here we specify the mirror set and image sets (the sets
@@ -300,7 +300,7 @@ pdbc = PeriodicDirichlet(
     )
     ```
 
-## Initial Conditions
+## Initial conditions
 
 When solving time-dependent problems, initial conditions, different from zero, may be required.
 For finite element formulations of ODE-type,
