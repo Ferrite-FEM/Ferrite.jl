@@ -9,6 +9,7 @@ using NVTX
 
 
 left = Tensor{1,2,Float32}((0,-0)) # define the left bottom corner of the grid.
+
 right = Tensor{1,2,Float32}((1000.0,1000.0)) # define the right top corner of the grid.
 
 
