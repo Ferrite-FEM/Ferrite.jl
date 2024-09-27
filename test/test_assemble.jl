@@ -1,31 +1,55 @@
 @testset "assemble" begin
     dofs = [1, 3, 5, 7]
+    maxd = maximum(dofs)
 
-    # residual
+    # Vector assembly
     ge = rand(4)
     g = zeros(8)
     assemble!(g, dofs, ge)
-    @test g[1] == ge[1]
-    @test g[3] == ge[2]
-    @test g[5] == ge[3]
-    @test g[7] == ge[4]
+    @test g[dofs] == ge
 
-    # stiffness
-    a = start_assemble()
+    # COOAssembler: matrix only, inferred size
+    a = Ferrite.COOAssembler()
     Ke = rand(4, 4)
     assemble!(a, dofs, Ke)
-    K = finish_assemble(a)
-    @test K[1,1] == Ke[1,1]
-    @test K[1,5] == Ke[1,3]
-    @test K[5,1] == Ke[3,1]
+    K, f = finish_assemble(a)
+    @test K[dofs, dofs] == Ke
+    @test size(K) == (maxd, maxd)
+    @test isempty(f)
+
+    # COOAssembler: matrix only, given size
+    a = Ferrite.COOAssembler(10, 10)
+    assemble!(a, dofs, Ke)
+    K, f = finish_assemble(a)
+    @test K[dofs, dofs] == Ke
+    @test size(K) == (10, 10)
+    @test isempty(f)
+
+    # COOAssembler: matrix and vector, inferred size
+    a = Ferrite.COOAssembler()
+    assemble!(a, dofs, Ke, ge)
+    K, f = finish_assemble(a)
+    @test K[dofs, dofs] == Ke
+    @test f[dofs] == ge
+    @test size(K) == (maxd, maxd)
+    @test length(f) == maxd
+
+    # COOAssembler: matrix and vector, given size
+    a = Ferrite.COOAssembler(10, 10)
+    assemble!(a, dofs, Ke, ge)
+    K, f = finish_assemble(a)
+    @test K[dofs, dofs] == Ke
+    @test f[dofs] == ge
+    @test size(K) == (10, 10)
+    @test length(f) == 10
 
     # assemble with different row and col dofs
     rdofs = [1,4,6]
     cdofs = [1,7]
-    a = start_assemble()
+    a = Ferrite.COOAssembler()
     Ke = rand(length(rdofs), length(cdofs))
     assemble!(a, rdofs, cdofs, Ke)
-    K = finish_assemble(a)
+    K, _ = finish_assemble(a)
     @test (K[rdofs,cdofs] .== Ke) |> all
 
     # SparseMatrix assembler
