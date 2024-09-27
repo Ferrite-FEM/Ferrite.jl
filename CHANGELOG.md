@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [v1.0.0] - Work in progress, release date TBD
+## [v1.0.0] - 2024-09-30
 
 Ferrite version 1.0 is a relatively large release, with a lot of new features, improvements,
 deprecations and some removals. These changes are made to make the code base more consistent
@@ -18,6 +18,11 @@ include a lot of other information as well (new features, internal changes, ...)
 also a dedicated section about upgrading code from Ferrite 0.3 to 1.0 (see below) which
 include the most common changes that are required. In addition, in all cases where possible,
 you will be presented with a descriptive error message telling you what needs to change.
+
+Deprecations for 1.0 will be removed during the 1.x release series. When upgrading old code
+it is therefore recommended to use Ferrite 1.0 as a first stepping stone since this release
+contain descriptive deprecation error messages that might not exist in e.g. Ferrite version
+1.2.
 
 ### Upgrading code from Ferrite 0.3 to 1.0
 
