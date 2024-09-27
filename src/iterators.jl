@@ -4,10 +4,11 @@ struct UpdateFlags
     nodes::Bool
     coords::Bool
     dofs::Bool
+    cell::Bool
 end
 
-UpdateFlags(; nodes::Bool=true, coords::Bool=true, dofs::Bool=true) =
-    UpdateFlags(nodes, coords, dofs)
+UpdateFlags(; nodes::Bool=true, coords::Bool=true, dofs::Bool=true, cell::Bool=true) =
+    UpdateFlags(nodes, coords, dofs, cell)
 
 
 ###############
@@ -37,13 +38,14 @@ cell. The cache is updated for a new cell by calling `reinit!(cache, cellid)` wh
 
 See also [`CellIterator`](@ref).
 """
-mutable struct CellCache{X,G<:AbstractGrid,DH<:Union{AbstractDofHandler,Nothing}}
+mutable struct CellCache{X,G<:AbstractGrid,DH<:Union{AbstractDofHandler,Nothing}, CT}
     const flags::UpdateFlags
     const grid::G
     # Pretty useless to store this since you have it already for the reinit! call, but
     # needed for the CellIterator(...) workflow since the user doesn't necessarily control
     # the loop order in the cell subset.
     cellid::Int
+    cell::CT
     const nodes::Vector{Int}
     const coords::Vector{X}
     const dh::DH
@@ -54,7 +56,7 @@ function CellCache(grid::Grid{dim,C,T}, flags::UpdateFlags=UpdateFlags()) where 
     N = nnodes_per_cell(grid, 1) # nodes and coords will be resized in `reinit!`
     nodes = zeros(Int, N)
     coords = zeros(Vec{dim,T}, N)
-    return CellCache(flags, grid, -1, nodes, coords, nothing, Int[])
+    return CellCache(flags, grid, -1, nothing, nodes, coords, nothing, Int[])
 end
 
 function CellCache(dh::DofHandler{dim}, flags::UpdateFlags=UpdateFlags()) where {dim}
@@ -63,12 +65,14 @@ function CellCache(dh::DofHandler{dim}, flags::UpdateFlags=UpdateFlags()) where 
     nodes = zeros(Int, N)
     coords = zeros(Vec{dim, get_coordinate_eltype(get_grid(dh))}, N)
     celldofs = zeros(Int, n)
-    return CellCache(flags, get_grid(dh), -1, nodes, coords, dh, celldofs)
+    return CellCache(flags, get_grid(dh), -1, nothing, nodes, coords, dh, celldofs)
 end
 
 function CellCache(sdh::SubDofHandler, flags::UpdateFlags=UpdateFlags())
     Tv = get_coordinate_type(sdh.dh.grid)
-    CellCache(flags, sdh.dh.grid, -1, Int[], Tv[], sdh, Int[])
+    n = nnodes_per_cell(sdh.dh.grid, first(sdh.cellset))
+    cell = getcelltype(sdh)(ntuple(i -> -1, n))
+    CellCache(flags, sdh.dh.grid, -1, cell, Int[], Tv[], sdh, Int[])
 end
 
 function reinit!(cc::CellCache, i::Int)
@@ -85,12 +89,28 @@ function reinit!(cc::CellCache, i::Int)
         resize!(cc.dofs, ndofs_per_cell(cc.dh, i))
         celldofs!(cc.dofs, cc.dh, i)
     end
+    if cc.cell !== nothing && cc.flags.cell
+        cc.cell = getcells(cc.grid, i)
+    end
     return cc
 end
 
 # reinit! FEValues with CellCache
-reinit!(cv::CellValues, cc::CellCache) = reinit!(cv, cc.coords)
-reinit!(fv::FacetValues, cc::CellCache, f::Int) = reinit!(fv, cc.coords, f) # TODO: Deprecate?
+function reinit!(cv::CellValues, cc::CellCache)
+    if cc.cell === nothing
+        reinit!(cv, cc.coords)
+    else
+        reinit!(cv, cc.cell, cc.coords)
+    end
+end
+
+function reinit!(fv::FacetValues, cc::CellCache, f::Int) # TODO: Deprecate?
+    if cc.cell === nothing
+        reinit!(fv, cc.coords, f)
+    else
+        reinit!(fv, cc.cell, cc.coords, f)
+    end
+end
 
 # Accessor functions (TODO: Deprecate? We are so inconsistent with `getxx` vs `xx`...)
 getnodes(cc::CellCache) = cc.nodes
