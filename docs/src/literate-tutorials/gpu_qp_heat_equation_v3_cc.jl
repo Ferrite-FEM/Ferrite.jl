@@ -9,16 +9,20 @@ using NVTX
 
 
 left = Tensor{1,2,Float32}((0,-0)) # define the left bottom corner of the grid.
-right = Tensor{1,2,Float32}((10.0,10.0)) # define the right top corner of the grid.
+right = Tensor{1,2,Float32}((1000.0,1000.0)) # define the right top corner of the grid.
 
 
-grid = generate_grid(Quadrilateral, (10, 10),left,right)
+grid = generate_grid(Quadrilateral, (1000, 1000),left,right)
+
 
 
 
 ip = Lagrange{RefQuadrilateral, 1}() # define the interpolation function (i.e. Bilinear lagrange)
 
+
+
 qr = QuadratureRule{RefQuadrilateral}(Float32,2)
+
 
 
 cellvalues = CellValues(Float32,qr, ip)
@@ -37,9 +41,9 @@ close!(dh);
 
 # Standard assembly of the element.
 
+
 function assemble_element_std!(Ke::Matrix, fe::Vector, cellvalues::CellValues)
     n_basefuncs = getnbasefunctions(cellvalues)
-
     # Loop over quadrature points
     for q_point in 1:getnquadpoints(cellvalues)
         # Get the quadrature weight
@@ -60,6 +64,7 @@ function assemble_element_std!(Ke::Matrix, fe::Vector, cellvalues::CellValues)
     end
     return Ke, fe
 end
+
 
 
 
@@ -128,6 +133,8 @@ end
 
 
 
+
+
 function assemble_gpu!(Kgpu,fgpu, cv, dh)
     n_basefuncs = getnbasefunctions(cv)
     assembler = start_assemble(Kgpu, fgpu)
@@ -147,17 +154,17 @@ K = allocate_matrix(SparseMatrixCSC{Float32, Int32},dh)
 Kgpu = CUSPARSE.CuSparseMatrixCSC(K)
 fgpu = CUDA.zeros(ndofs(dh))
 
+
 n_cells = getncells(dh.grid)
 
 
-#using BenchmarkTools
+
+
+
 
 
 
 launch_kernel(assemble_gpu!, (Kgpu,fgpu, cellvalues, dh) , n_cells, n_basefuncs)
-#@btime CUDA.@sync launch_kernel($assemble_gpu!, ($Kgpu,$fgpu, $cellvalues, $dh) , $n_cells, $n_basefuncs)
-
-
 
 stassy(cv,dh) = assemble_global!(cv,dh,Val(false))
 
@@ -166,3 +173,15 @@ stassy(cv,dh) = assemble_global!(cv,dh,Val(false))
 norm(Kgpu)
 Kstd , Fstd = stassy(cellvalues,dh);
 norm(Kstd)
+
+
+### Benchmarking ###
+using BenchmarkTools
+function benchmark_gpu()
+    Kgpu = CUSPARSE.CuSparseMatrixCSC(K)
+    fgpu = CUDA.zeros(ndofs(dh))
+     launch_kernel(assemble_gpu!, (Kgpu,fgpu, cellvalues, dh) , n_cells, n_basefuncs)
+    #return (;Kgpu,fgpu)
+end
+
+CUDA.@profile benchmark_gpu()

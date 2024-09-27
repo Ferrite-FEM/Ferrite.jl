@@ -92,7 +92,6 @@ cellid(cc::GPUCellCache) = cc.cellid
 @inline function cellke(cc::GPUCellCache)
     ke =  cc.ke
     fill!(ke, 0.0f0)
-
 end
 
 @inline function cellfe(cc::GPUCellCache)
