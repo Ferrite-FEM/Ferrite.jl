@@ -218,14 +218,14 @@ using OhMyThreads, TaskLocalValues
 
 function assemble_global!(
         K::SparseMatrixCSC, f::Vector, dh::DofHandler, colors,
-        cellvalues_template::CellValues; ntasks = Threads.nthreads()
+        cellvalues::CellValues; ntasks = Threads.nthreads()
     )
     ## Body force and material stiffness
     b = Vec{3}((0.0, 0.0, -1.0))
     C = create_material_stiffness()
     ## Scratch data
-    scratch_template = ScratchData(
-        CellCache(dh), cellvalues_template,
+    scratch = ScratchData(
+        CellCache(dh), cellvalues,
         zeros(ndofs_per_cell(dh), ndofs_per_cell(dh)), zeros(ndofs_per_cell(dh)),
         start_assemble(K, f)
     )
@@ -239,8 +239,8 @@ function assemble_global!(
             ## Tell the @tasks loop to use the scheduler defined above
             @set scheduler = scheduler
             ## Obtain a task local scratch and unpack it
-            @local scratch = task_local(scratch_template)
-            (; cell_cache, cellvalues, Ke, fe, assembler) = scratch
+            @local scratch = task_local(scratch)
+            local (; cell_cache, cellvalues, Ke, fe, assembler) = scratch
             ## Reinitialize the cell cache and then the cellvalues
             reinit!(cell_cache, cellidx)
             reinit!(cellvalues, cell_cache)
