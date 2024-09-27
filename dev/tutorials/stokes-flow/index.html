@@ -116,7 +116,7 @@ end</code></pre><p>The <code>setup_dofs</code> function creates the <code>DofHan
     close!(dh)
     return dh
 end</code></pre><h3 id="Boundary-conditions-and-constraints"><a class="docs-heading-anchor" href="#Boundary-conditions-and-constraints">Boundary conditions and constraints</a><a id="Boundary-conditions-and-constraints-1"></a><a class="docs-heading-anchor-permalink" href="#Boundary-conditions-and-constraints" title="Permalink"></a></h3><p>Now it is time to setup the <code>ConstraintHandler</code> and add our boundary conditions and the mean value constraint. This is perhaps the most interesting section in this example, and deserves some attention.</p><p>Let&#39;s first discuss the assembly of the constraint matrix <span>$\underline{\underline{C}}$</span> and how to create an <code>AffineConstraint</code> from it. This is done in the <code>setup_mean_constraint</code> function below. Assembling this is not so different from standard assembly in Ferrite: we loop over all the facets, loop over the quadrature points, and loop over the shape functions. Note that since there is only one constraint the matrix will only have one row. After assembling <code>C</code> we construct an <code>AffineConstraint</code> from it. We select the constrained dof to be the one with the highest weight (just to avoid selecting one with 0 or a very small weight), then move the remaining to the right hand side. As an example, consider the case where the constraint equation <span>$\underline{\underline{C}}_p\ \underline{a}_p$</span> is</p><p class="math-container">\[w_{10} p_{10} + w_{23} p_{23} + w_{154} p_{154} = 0\]</p><p>i.e. dofs 10, 23, and 154, are the ones located on the boundary (all other dofs naturally gives 0 contribution). If <span>$w_{23}$</span> is the largest weight, then we select <span>$p_{23}$</span> to be the constrained one, and thus reorder the constraint to the form</p><p class="math-container">\[p_{23} = -\frac{w_{10}}{w_{23}} p_{10} -\frac{w_{154}}{w_{23}} p_{154} + 0,\]</p><p>which is the form the <code>AffineConstraint</code> constructor expects.</p><div class="admonition is-info"><header class="admonition-header">Note</header><div class="admonition-body"><p>If all nodes along the boundary are equidistant all the weights would be the same. In this case we can construct the constraint without having to do any integration by simply finding all degrees of freedom that are located along the boundary (and using 1 as the weight). This is what is done in the <a href="https://www.dealii.org/current/doxygen/deal.II/step_11.html">deal.ii step-11 example</a>.</p></div></div><pre><code class="language-julia hljs">function setup_mean_constraint(dh, fvp)
-    assembler = start_assemble()
+    assembler = Ferrite.COOAssembler()
     # All external boundaries
     set = union(
         getfacetset(dh.grid, &quot;Γ1&quot;),
@@ -145,7 +145,7 @@ end</code></pre><h3 id="Boundary-conditions-and-constraints"><a class="docs-head
         # Assemble to row 1
         assemble!(assembler, [1], element_dofs_p, Ce)
     end
-    C = finish_assemble(assembler)
+    C, _ = finish_assemble(assembler)
     # Create an AffineConstraint from the C-matrix
     _, J, V = findnz(C)
     _, constrained_dof_idx = findmax(abs2, V)
@@ -334,7 +334,7 @@ function setup_dofs(grid, ipu, ipp)
 end
 
 function setup_mean_constraint(dh, fvp)
-    assembler = start_assemble()
+    assembler = Ferrite.COOAssembler()
     # All external boundaries
     set = union(
         getfacetset(dh.grid, &quot;Γ1&quot;),
@@ -363,7 +363,7 @@ function setup_mean_constraint(dh, fvp)
         # Assemble to row 1
         assemble!(assembler, [1], element_dofs_p, Ce)
     end
-    C = finish_assemble(assembler)
+    C, _ = finish_assemble(assembler)
     # Create an AffineConstraint from the C-matrix
     _, J, V = findnz(C)
     _, constrained_dof_idx = findmax(abs2, V)
@@ -482,4 +482,4 @@ function main()
     return
 end
 
-main()</code></pre><hr/><p><em>This page was generated using <a href="https://github.com/fredrikekre/Literate.jl">Literate.jl</a>.</em></p></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../computational_homogenization/">« Computational homogenization</a><a class="docs-footer-nextpage" href="../porous_media/">Porous media »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option><option value="catppuccin-latte">catppuccin-latte</option><option value="catppuccin-frappe">catppuccin-frappe</option><option value="catppuccin-macchiato">catppuccin-macchiato</option><option value="catppuccin-mocha">catppuccin-mocha</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.7.0 on <span class="colophon-date" title="Friday 27 September 2024 09:52">Friday 27 September 2024</span>. Using Julia version 1.10.5.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
+main()</code></pre><hr/><p><em>This page was generated using <a href="https://github.com/fredrikekre/Literate.jl">Literate.jl</a>.</em></p></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../computational_homogenization/">« Computational homogenization</a><a class="docs-footer-nextpage" href="../porous_media/">Porous media »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option><option value="catppuccin-latte">catppuccin-latte</option><option value="catppuccin-frappe">catppuccin-frappe</option><option value="catppuccin-macchiato">catppuccin-macchiato</option><option value="catppuccin-mocha">catppuccin-mocha</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.7.0 on <span class="colophon-date" title="Friday 27 September 2024 11:51">Friday 27 September 2024</span>. Using Julia version 1.10.5.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>

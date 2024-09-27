@@ -76,7 +76,7 @@ function setup_dofs(grid, ipu, ipp)
 end
 
 function setup_mean_constraint(dh, fvp)
-    assembler = start_assemble()
+    assembler = Ferrite.COOAssembler()
     # All external boundaries
     set = union(
         getfacetset(dh.grid, "Γ1"),
@@ -105,7 +105,7 @@ function setup_mean_constraint(dh, fvp)
         # Assemble to row 1
         assemble!(assembler, [1], element_dofs_p, Ce)
     end
-    C = finish_assemble(assembler)
+    C, _ = finish_assemble(assembler)
     # Create an AffineConstraint from the C-matrix
     _, J, V = findnz(C)
     _, constrained_dof_idx = findmax(abs2, V)
