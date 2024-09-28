@@ -22,11 +22,6 @@ Create a cache object with pre-allocated memory for the nodes, coordinates, and 
 cell. The cache is updated for a new cell by calling `reinit!(cache, cellid)` where
 `cellid::Int` is the cell id.
 
-**Struct fields of `CellCache`**
- - `cc.nodes :: Vector{Int}`: global node ids
- - `cc.coords :: Vector{<:Vec}`: node coordinates
- - `cc.dofs :: Vector{Int}`: global dof ids (empty when constructing the cache from a grid)
-
 **Methods with `CellCache`**
  - `reinit!(cc, i)`: reinitialize the cache for cell `i`
  - `cellid(cc)`: get the cell id of the currently cached cell
@@ -105,10 +100,6 @@ celldofs!(v::Vector, cc::CellCache) = copyto!(v, cc.dofs) # celldofs!(v, cc.dh, 
 nfacets(cc::CellCache) = nfacets(getcells(cc.grid, cc.cellid))
 
 
-# TODO: Currently excluded from the docstring below. Should they be public?
-# - `Ferrite.faceindex(fc)`: get the `FaceIndex` of the currently cached face
-# - `Ferrite.faceid(fc)`: get the current faceid (`faceindex(fc)[2]`)
-
 """
     FacetCache(grid::Grid)
     FacetCache(dh::AbstractDofHandler)
@@ -119,7 +110,7 @@ calling `reinit!(cache, fi::FacetIndex)`.
 
 **Methods with `fc::FacetCache`**
  - `reinit!(fc, fi)`: reinitialize the cache for face `fi::FacetIndex`
- - `cellid(fc)`: get the current cellid (`faceindex(fc)[1]`)
+ - `cellid(fc)`: get the current cellid
  - `getnodes(fc)`: get the global node ids of the *cell*
  - `getcoordinates(fc)`: get the coordinates of the *cell*
  - `celldofs(fc)`: get the global dof ids of the *cell*
@@ -152,9 +143,8 @@ for op = (:getnodes, :getcoordinates, :cellid, :celldofs)
         end
     end
 end
-# @inline faceid(fc::FacetCache) = fc.current_faceid[]
+
 @inline celldofs!(v::Vector, fc::FacetCache) = celldofs!(v, fc.cc)
-# @inline faceindex(fc::FacetCache) = FaceIndex(cellid(fc), faceid(fc))
 @inline function reinit!(fv::FacetValues, fc::FacetCache)
     reinit!(fv, fc.cc, fc.current_facet_id)
 end
