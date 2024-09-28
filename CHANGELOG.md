@@ -456,6 +456,8 @@ more discussion).
 - The function `reshape_to_nodes` have been deprecated in favor of `evaluate_at_grid_nodes`.
   ([#703])
 
+- `start_assemble([n::Int])` has been deprecated in favor of calling `COOAssembler()` directly ([#916], [#1058]).
+
 - `start_assemble(f, K)` have been deprecated in favor of the "canonical" `start_assemble(K,
   f)`. ([#707])
 
@@ -1000,9 +1002,11 @@ poking into Ferrite internals:
 [#880]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/880
 [#888]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/888
 [#914]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/914
+[#916]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/916
 [#924]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/924
 [#943]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/943
 [#949]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/949
 [#953]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/953
 [#974]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/974
+[#1058]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1058
 [#1059]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1059
