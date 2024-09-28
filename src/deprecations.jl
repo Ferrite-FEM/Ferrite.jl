@@ -446,3 +446,6 @@ end
 
 start_assemble(::Int) = throw(DeprecationError("start_assemble(n::Int)" => "Ferrite.COOAssembler(nrows, ncols)"))
 start_assemble() = throw(DeprecationError("start_assemble()" => "Ferrite.COOAssembler()"))
+
+export getfaceset
+getfaceset(args...) = throw(DeprecationError("getfaceset(...)" => "getfacetset(...)"))
