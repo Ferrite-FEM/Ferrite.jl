@@ -124,4 +124,9 @@ end
     @test_throws Ferrite.DeprecationError Ferrite.default_interpolation(Triangle)
 end
 
+@testset "start_assemble" begin
+    @test_throws Ferrite.DeprecationError start_assemble()
+    @test_throws Ferrite.DeprecationError start_assemble(10)
+end
+
 end # testset deprecations
