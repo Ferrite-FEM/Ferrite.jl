@@ -443,3 +443,9 @@ end
 function assemble!(::AbstractAssembler, ::AbstractVector{<:Integer}, ::AbstractVector, ::AbstractMatrix)
     throw(DeprecationError("assemble!(assembler, dofs, fe, Ke)" => "assemble!(assembler, dofs, Ke, fe)"))
 end
+
+start_assemble(::Int) = throw(DeprecationError("start_assemble(n::Int)" => "Ferrite.COOAssembler(; sizehint = n)"))
+start_assemble() = throw(DeprecationError("start_assemble()" => "Ferrite.COOAssembler()"))
+
+export getfaceset
+getfaceset(args...) = throw(DeprecationError("getfaceset(...)" => "getfacetset(...)"))
