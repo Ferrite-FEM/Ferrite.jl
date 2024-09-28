@@ -447,8 +447,8 @@ function check_mean_constraint(dh, fvp, u)                                  #src
     ∫pdΓ, Γ= 0.0, 0.0                                                       #src
     for (ci, fi) in set                                                     #src
         reinit!(cc, ci)                                                     #src
-        reinit!(fvp, cc.coords, fi)                                         #src
-        ue = u[cc.dofs]                                                     #src
+        reinit!(fvp, cc, fi)                                                #src
+        ue = u[celldofs(cc)]                                                #src
         for qp in 1:getnquadpoints(fvp)                                     #src
             dΓ = getdetJdV(fvp, qp)                                         #src
             ∫pdΓ += function_value(fvp, qp, ue, range_p) * dΓ               #src
@@ -466,7 +466,7 @@ function check_L2(dh, cvu, cvp, u)                                          #src
     for cell in CellIterator(dh)                                            #src
         reinit!(cvu, cell)                                                  #src
         reinit!(cvp, cell)                                                  #src
-        ue = u[cell.dofs]                                                   #src
+        ue = u[celldofs(cell)]                                              #src
         for qp in 1:getnquadpoints(cvu)                                     #src
             dΩ = getdetJdV(cvu, qp)                                         #src
             uh = function_value(cvu, qp, ue, range_u)                       #src
