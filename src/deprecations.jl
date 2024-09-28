@@ -445,4 +445,4 @@ function assemble!(::AbstractAssembler, ::AbstractVector{<:Integer}, ::AbstractV
 end
 
 start_assemble(::Int) = throw(DeprecationError("start_assemble(n::Int)" => "Ferrite.COOAssembler(nrows, ncols)"))
-start_assemble() = throw(DeprecationError("start_assemble(n::Int)" => "Ferrite.COOAssembler()"))
+start_assemble() = throw(DeprecationError("start_assemble()" => "Ferrite.COOAssembler()"))
