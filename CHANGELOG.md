@@ -456,7 +456,7 @@ more discussion).
 - The function `reshape_to_nodes` have been deprecated in favor of `evaluate_at_grid_nodes`.
   ([#703])
 
-- `start_assemble([n::Int])` has been deprecated in favor of calling `COOAssembler()` directly ([#916], [#1058]).
+- `start_assemble([n::Int])` has been deprecated in favor of calling `Ferrite.COOAssembler()` directly ([#916], [#1058]).
 
 - `start_assemble(f, K)` have been deprecated in favor of the "canonical" `start_assemble(K,
   f)`. ([#707])
