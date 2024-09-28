@@ -153,7 +153,7 @@ function compute_stresses(cellvalues_u::CellValues, cellvalues_p::CellValues,
         reinit!(cellvalues_u, cc)
         reinit!(cellvalues_p, cc)
         # Extract the cell local part of the solution
-        for (i, I) in pairs(cc.dofs)
+        for (i, I) in pairs(celldofs(cc))
             ae[i] = a[I]
         end
         # Loop over the quadrature points
