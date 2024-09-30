@@ -1,9 +1,9 @@
 # [Assembly](@id devdocs-assembly)
 
-The assembler handles the insertion of the element matrices and element vectors into the system matrix and right hand side. While the CSC and CSR formats are the most common sparse matrix formats in practice, users might want to have optimized custom matrix formats for their specific use-case. The default assembler [`AssemblerSparsityPattern`](@ref) should be able to handle most cases in practice. To support a custom format users have to dispatch the following functions:
+The assembler handles the insertion of the element matrices and element vectors into the system matrix and right hand side. While the CSC and CSR formats are the most common sparse matrix formats in practice, users might want to have optimized custom matrix formats for their specific use-case. The default assemblers [`CSCAssembler`](@ref) and [`CSRAssembler`](@ref) should be able to handle most cases in practice. To support a custom format users have to dispatch the following functions on their new assembler and matrix type:
 
 ```@docs
-Ferrite._assemble_inner!
+Ferrite.allocate_matrix!
 Ferrite.zero_out_rows!
 Ferrite.zero_out_columns!
 ```
@@ -21,9 +21,9 @@ In case the default assembler is insufficient, users can implement a custom asse
 ```@docs
 Ferrite.matrix_handle
 Ferrite.vector_handle
-start_assemble!
-finish_assemble!
-assemble!
+Ferrite.start_assemble!
+Ferrite.finish_assemble!
+Ferrite.assemble!
 ```
 
 For local elimination support the following functions might also need custom dispatches

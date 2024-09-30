@@ -793,6 +793,17 @@ function create_constraint_matrix(ch::ConstraintHandler{dh,T}) where {dh,T}
 
     return C, g
 end
+"""
+    zero_out_columns!(K::AbstractMatrix, ch::ConstraintHandler)
+Set the values of all columns associated with constrained dofs to zero.
+"""
+zero_out_columns!
+
+"""
+    zero_out_rows!(K::AbstractMatrix, ch::ConstraintHandler)
+Set the values of all rows associated with constrained dofs to zero.
+"""
+zero_out_rows!
 
 # columns need to be stored entries, this is not checked
 function zero_out_columns!(K::SparseArrays.AbstractSparseMatrixCSC, ch::ConstraintHandler) # can be removed in 0.7 with #24711 merged
