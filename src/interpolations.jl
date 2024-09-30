@@ -105,6 +105,7 @@ nedges(::Interpolation{RefShape})    where RefShape = nedges(RefShape)
 nfaces(::Interpolation{RefShape})    where RefShape = nfaces(RefShape)
 
 Base.copy(ip::Interpolation) = ip
+task_local(ip::Interpolation) = ip
 
 """
     Ferrite.getrefdim(::Interpolation)

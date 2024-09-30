@@ -66,6 +66,12 @@ end
 function Base.copy(cv::CellValues)
     return CellValues(copy(cv.fun_values), copy(cv.geo_mapping), copy(cv.qr), _copy_or_nothing(cv.detJdV))
 end
+function task_local(cv::CellValues)
+    return CellValues(
+        task_local(cv.fun_values), task_local(cv.geo_mapping), task_local(cv.qr),
+        task_local(cv.detJdV)
+    )
+end
 
 # Access geometry values
 @propagate_inbounds getngeobasefunctions(cv::CellValues) = getngeobasefunctions(cv.geo_mapping)

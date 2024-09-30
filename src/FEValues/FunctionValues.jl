@@ -107,6 +107,14 @@ function Base.copy(v::FunctionValues)
     d2Ndξ2_copy = _copy_or_nothing(v.d2Ndξ2)
     return FunctionValues(copy(v.ip), Nx_copy, Nξ_copy, dNdx_copy, dNdξ_copy, d2Ndx2_copy, d2Ndξ2_copy)
 end
+function task_local(v::FunctionValues)
+    Nξ = task_local(v.Nξ)
+    Nx = v.Nξ === v.Nx ? Nξ : task_local(v.Nx) # Preserve aliasing
+    return FunctionValues(
+        task_local(v.ip), Nx, Nξ, task_local(v.dNdx), task_local(v.dNdξ),
+        task_local(v.d2Ndx2), task_local(v.d2Ndξ2)
+    )
+end
 
 getnbasefunctions(funvals::FunctionValues) = size(funvals.Nx, 1)
 @propagate_inbounds shape_value(funvals::FunctionValues, q_point::Int, base_func::Int) = funvals.Nx[base_func, q_point]

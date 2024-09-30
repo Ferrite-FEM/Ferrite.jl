@@ -313,3 +313,4 @@ getrefshape(::QuadratureRule{RefShape}) where RefShape = RefShape
 
 # TODO: This is used in copy(::(Cell|Face)Values), but it it useful to get an actual copy?
 Base.copy(qr::Union{QuadratureRule, FacetQuadratureRule}) = qr
+task_local(qr::Union{QuadratureRule, FacetQuadratureRule}) = copy(qr)

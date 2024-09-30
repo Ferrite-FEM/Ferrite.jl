@@ -83,6 +83,13 @@ function reinit!(cc::CellCache, i::Int)
     return cc
 end
 
+function task_local(cc::CellCache)
+    return CellCache(
+        cc.flags, cc.grid, cc.cellid, task_local(cc.nodes), task_local(cc.coords), cc.dh,
+        task_local(cc.dofs)
+    )
+end
+
 # reinit! FEValues with CellCache
 reinit!(cv::CellValues, cc::CellCache) = reinit!(cv, cc.coords)
 reinit!(fv::FacetValues, cc::CellCache, f::Int) = reinit!(fv, cc.coords, f)
