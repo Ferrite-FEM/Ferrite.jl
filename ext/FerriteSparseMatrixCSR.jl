@@ -1,8 +1,14 @@
 module FerriteSparseMatrixCSR
 
 using Ferrite, SparseArrays, SparseMatricesCSR
-import Ferrite: AbstractSparsityPattern
+import Ferrite: AbstractSparsityPattern, CSRAssembler
 import Base: @propagate_inbounds
+
+#FIXME https://github.com/JuliaSparse/SparseArrays.jl/pull/546
+function Ferrite.start_assemble(K::SparseMatrixCSR{<:Any,T}, f::Vector=T[]; fillzero::Bool=true, maxcelldofs_hint::Int=0) where {T}
+    fillzero && (Ferrite.fillzero!(K); Ferrite.fillzero!(f))
+    return CSRAssembler(K, f, zeros(Int,maxcelldofs_hint), zeros(Int,maxcelldofs_hint))
+end
 
 @propagate_inbounds function Ferrite._assemble_inner!(K::SparseMatrixCSR, Ke::AbstractMatrix, dofs::AbstractVector, sorteddofs::AbstractVector, permutation::AbstractVector, sym::Bool)
     current_row = 1

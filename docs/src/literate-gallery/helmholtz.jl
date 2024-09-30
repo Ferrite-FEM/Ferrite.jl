@@ -94,7 +94,6 @@ function doassemble(cellvalues::CellValues, facetvalues::FacetValues,
     assembler = start_assemble(K, f)
 
     n_basefuncs = getnbasefunctions(cellvalues)
-    global_dofs = zeros(Int, ndofs_per_cell(dh))
 
     fe = zeros(n_basefuncs) # Local force vector
     Ke = zeros(n_basefuncs, n_basefuncs) # Local stiffness mastrix
@@ -151,8 +150,7 @@ function doassemble(cellvalues::CellValues, facetvalues::FacetValues,
             end
         end
 
-        celldofs!(global_dofs, cell)
-        assemble!(assembler, global_dofs, fe, Ke)
+        assemble!(assembler, celldofs(cell), Ke, fe)
     end
     return K, f
 end;
@@ -161,7 +159,7 @@ K, f = doassemble(cellvalues, facetvalues, K, dh);
 apply!(K, f, dbcs)
 u = Symmetric(K) \ f;
 
-vtk = VTKFile("helmholtz", dh)
+vtk = VTKGridFile("helmholtz", dh)
 write_solution(vtk, dh, u)
 close(vtk)
 using Test #src

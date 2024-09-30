@@ -40,7 +40,10 @@ using Ferrite: reference_shape_value, reference_shape_gradient
                       #
                       BubbleEnrichedLagrange{RefTriangle, 1}(),
                       #
-                      CrouzeixRaviart{RefTriangle, 1}(),
+                      CrouzeixRaviart{RefTriangle,1}(),
+                      CrouzeixRaviart{RefTetrahedron,1}(),
+                      RannacherTurek{RefQuadrilateral,1}(),
+                      RannacherTurek{RefHexahedron,1}(),
     )
         # Test of utility functions
         ref_dim = Ferrite.getrefdim(interpolation)
@@ -248,5 +251,19 @@ end
         @test v ≈ V[v_ind]
     end
 end
+
+@testset "Errors for entitydof_indices on VectorizedInterpolations" begin
+    ip = Lagrange{RefQuadrilateral,2}()^2
+    @test_throws ArgumentError Ferrite.vertexdof_indices(ip)
+    @test_throws ArgumentError Ferrite.edgedof_indices(ip)
+    @test_throws ArgumentError Ferrite.facedof_indices(ip)
+    @test_throws ArgumentError Ferrite.facetdof_indices(ip)
+
+    @test_throws ArgumentError Ferrite.edgedof_interior_indices(ip)
+    @test_throws ArgumentError Ferrite.facedof_interior_indices(ip)
+    @test_throws ArgumentError Ferrite.volumedof_interior_indices(ip)
+    @test_throws ArgumentError Ferrite.facetdof_interior_indices(ip)
+end
+
 
 end # testset

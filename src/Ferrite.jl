@@ -8,13 +8,14 @@ using Base:
 using EnumX:
     EnumX, @enumx
 using LinearAlgebra:
-    LinearAlgebra, Symmetric, Transpose, cholesky, det, norm, pinv, tr
+    LinearAlgebra, Symmetric, cholesky, det, norm, pinv, tr
 using NearestNeighbors:
     NearestNeighbors, KDTree, knn
 using OrderedCollections:
     OrderedSet
 using SparseArrays:
-    AbstractSparseMatrix, SparseArrays, SparseMatrixCSC, nonzeros, nzrange, rowvals, sparse, sparsevec
+    SparseArrays, SparseMatrixCSC, nonzeros, nzrange, rowvals,
+    AbstractSparseMatrix, AbstractSparseMatrixCSC, sparsevec
 using StaticArrays:
     StaticArrays, MArray, MMatrix, SArray, SMatrix, SVector
 using WriteVTK:
@@ -25,8 +26,12 @@ using Tensors:
 using ForwardDiff:
     ForwardDiff
 
+include("CollectionsOfViews.jl")
+using .CollectionsOfViews:
+    CollectionsOfViews, ArrayOfVectorViews, push_at_index!, ConstructionBuffer
 
 include("exports.jl")
+
 
 """
     AbstractRefShape{refdim}
@@ -54,6 +59,7 @@ struct RefPyramid       <: AbstractRefShape{3} end
 
 Get the dimension of the reference shape
 """
+getrefdim(::Type{<:AbstractRefShape}) # To get correct doc filtering
 getrefdim(::Type{<:AbstractRefShape{rdim}}) where rdim = rdim
 
 abstract type AbstractCell{refshape <: AbstractRefShape} end

@@ -13,6 +13,7 @@ export
     RefPyramid,
     BubbleEnrichedLagrange,
     CrouzeixRaviart,
+    RannacherTurek,
     Lagrange,
     DiscontinuousLagrange,
     Serendipity,
@@ -79,7 +80,7 @@ export
     geometric_interpolation,
     ExclusiveTopology,
     getneighborhood,
-    faceskeleton,
+    facetskeleton,
     vertex_star_stencils,
     getstencil,
     getcells,
@@ -150,7 +151,6 @@ export
     apply_assemble!,
     add!,
     free_dofs,
-    ApplyStrategy,
 
 # iterators
     CellCache,
@@ -169,13 +169,11 @@ export
     finish_assemble,
 
 # exporting data
-    VTKFile,
+    VTKGridFile,
     write_solution,
     write_cell_data,
     write_projection,
     write_node_data,
-    VTKFileCollection,
-    addstep!,
 
 # L2 Projection
     project,

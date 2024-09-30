@@ -22,11 +22,9 @@ PointIterator
 PointLocation
 ```
 
-## VTK Export
+## VTK export
 ```@docs
-VTKFile
-VTKFileCollection
-addstep!
+VTKGridFile
 write_solution
 write_projection
 write_cell_data

@@ -38,7 +38,7 @@ jobs:
         run: |
           using Ferrite, ExplicitImports, Metis, BlockArrays
           # Check Ferrite
-          allow_unanalyzable = (ApplyStrategy, ColoringAlgorithm) # baremodules
+          allow_unanalyzable = (ColoringAlgorithm,) # baremodules
           check_no_implicit_imports(Ferrite; allow_unanalyzable)
           check_no_stale_explicit_imports(Ferrite; allow_unanalyzable)
           check_all_qualified_accesses_via_owners(Ferrite)

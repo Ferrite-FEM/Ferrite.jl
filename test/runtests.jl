@@ -9,6 +9,7 @@ using LinearAlgebra
 using SparseArrays
 using StaticArrays
 using OrderedCollections
+using WriteVTK
 
 const HAS_EXTENSIONS = isdefined(Base, :get_extension)
 
@@ -35,6 +36,7 @@ end
 include("test_utils.jl")
 
 # Unit tests
+include("test_collectionsofviews.jl")
 include("test_interpolations.jl")
 include("test_cellvalues.jl")
 include("test_facevalues.jl")
@@ -62,11 +64,10 @@ HAS_EXTENSIONS && include("test_assembler_extensions.jl")
 include("test_examples.jl")
 
 @test all(x -> isdefined(Ferrite, x), names(Ferrite))  # Test that all exported symbols are defined
-#= See which is not defined if fails
-for name in names(Ferrite)
-    isdefined(Ferrite, name) || @warn "Ferrite.$name is not defined but $name is exported"
-end
-=#
+# # See which is not defined if fails
+# for name in names(Ferrite)
+#     isdefined(Ferrite, name) || @warn "Ferrite.$name is not defined but $name is exported"
+# end
 
 # Integration tests
 include("integration/test_simple_scalar_convergence.jl")

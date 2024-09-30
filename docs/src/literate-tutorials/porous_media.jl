@@ -96,7 +96,7 @@
 #md # the final [section](@ref porous-media-plain-program)
 #
 # Required packages
-using Ferrite, FerriteMeshParser, Tensors
+using Ferrite, FerriteMeshParser, Tensors, WriteVTK
 
 # ### Elasticity
 # We start by defining the elastic material type, containing the elastic stiffness,
@@ -245,7 +245,7 @@ function doassemble!(assembler, domain::FEDomain, a, a_old, Δt)
 end;
 
 # ### Mesh import
-# In this example, we import the mesh from the Abaqus input file, [`porous_media_0p25.inp`](porous_media_0p25.inp) using `FerriteMeshParser`'s
+# In this example, we import the mesh from the Abaqus input file, [`porous_media_0p25.inp`](porous_media_0p25.inp) using FerriteMeshParser's
 # `get_ferrite_grid` function. We then create one cellset for each phase (solid and porous)
 # for each element type. These 4 sets will later be used in their own `SubDofHandler`
 function get_grid()
@@ -335,7 +335,8 @@ function solve(dh, ch, domains; Δt=0.025, t_total=1.0)
     r = zeros(ndofs(dh))
     a = zeros(ndofs(dh))
     a_old = copy(a)
-    pvd = VTKFileCollection("porous_media.pvd", dh);
+    pvd = paraview_collection("porous_media")
+    step = 0
     for t in 0:Δt:t_total
         if t>0
             update!(ch, t)
@@ -347,11 +348,13 @@ function solve(dh, ch, domains; Δt=0.025, t_total=1.0)
             a .+= Δa
             copyto!(a_old, a)
         end
-        addstep!(pvd, t) do io
-            write_solution(io, dh, a)
+        step += 1
+        VTKGridFile("porous_media_$step", dh) do vtk
+            write_solution(vtk, dh, a)
+            pvd[t] = vtk
         end
     end
-    close(pvd);
+    vtk_save(pvd);
 end;
 
 # Finally we call the functions to actually run the code

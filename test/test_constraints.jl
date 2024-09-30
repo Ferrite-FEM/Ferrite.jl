@@ -86,8 +86,9 @@ end
     add!(dh, :p, Lagrange{RefTriangle,1}())
     close!(dh)
     ch = ConstraintHandler(dh)
-    dbc1 = Dirichlet(:u, getnodeset(grid, "nodeset"), (x,t) -> x, [1, 2])
-    dbc2 = Dirichlet(:p, getnodeset(grid, "nodeset"), (x,t) -> 0, 1)
+    dbc1 = Dirichlet(:u, getnodeset(grid, "nodeset"), (x, t) -> x, [1, 2])
+    # Add type-spec to function, test https://github.com/Ferrite-FEM/Ferrite.jl/issues/1006
+    dbc2 = Dirichlet(:p, getnodeset(grid, "nodeset"), (x::Vec, t::Real) -> 0, 1)
     add!(ch, dbc1)
     add!(ch, dbc2)
     close!(ch)
@@ -1553,7 +1554,7 @@ end # testset
             @test norm(u_dbc) ≈ 3.8249286998373586
             @test norm(u_p) ≈ 3.7828270430540893
         end
-        # VTKFile("local_application_azero_$(azero)", grid) do vtk
+        # VTKGridFile("local_application_azero_$(azero)", grid) do vtk
         #     write_solution(vtk, dh, u_dbc, "_dbc")
         #     write_solution(vtk, dh, u_p, "_p")
         # end

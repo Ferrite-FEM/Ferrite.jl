@@ -124,4 +124,24 @@ end
     @test_throws Ferrite.DeprecationError Ferrite.default_interpolation(Triangle)
 end
 
+@testset "start_assemble" begin
+    @test_throws Ferrite.DeprecationError start_assemble()
+    @test_throws Ferrite.DeprecationError start_assemble(10)
+end
+
+@testset "celldofs!(::Vector, ::Cache)" begin
+    grid = generate_grid(Quadrilateral, (1, 1))
+    dh = DofHandler(grid)
+    ip = Lagrange{RefQuadrilateral, 1}()
+    add!(dh, :u, ip)
+    close!(dh)
+    cc = CellCache(dh)
+    reinit!(cc, 1)
+    v = Int[]
+    @test_throws Ferrite.DeprecationError celldofs!(v, cc)
+    fc = FacetCache(dh)
+    reinit!(fc, FacetIndex(1, 1))
+    @test_throws Ferrite.DeprecationError celldofs!(v, fc)
+end
+
 end # testset deprecations

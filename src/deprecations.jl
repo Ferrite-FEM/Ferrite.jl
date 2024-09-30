@@ -99,7 +99,7 @@ function WriteVTK.vtk_grid(::String, ::Union{AbstractGrid,AbstractDofHandler}; k
     throw(DeprecationError(
         "The vtk interface has been updated in Ferrite v1.0. " *
         "See https://github.com/Ferrite-FEM/Ferrite.jl/pull/692. " *
-        "Use VTKFile to open a vtk file, and the functions " *
+        "Use VTKGridFile to open a vtk file, and the functions " *
         "write_solution, write_cell_data, and write_projection to save data."
     ))
 end
@@ -432,4 +432,27 @@ end
 export create_sparsity_pattern
 function create_sparsity_pattern(args...)
     throw(DeprecationError("create_sparsity_pattern(args...)" => "allocate_matrix(args...; kwargs...)"))
+end
+
+export VTKFile
+function VTKFile(args...)
+    throw(DeprecationError("VTKFile(args...)" => "VTKGridFile(args...)"))
+end
+
+# assemble with vector first
+function assemble!(::AbstractAssembler, ::AbstractVector{<:Integer}, ::AbstractVector, ::AbstractMatrix)
+    throw(DeprecationError("assemble!(assembler, dofs, fe, Ke)" => "assemble!(assembler, dofs, Ke, fe)"))
+end
+
+start_assemble(::Int) = throw(DeprecationError("start_assemble(n::Int)" => "Ferrite.COOAssembler(; sizehint = n)"))
+start_assemble() = throw(DeprecationError("start_assemble()" => "Ferrite.COOAssembler()"))
+
+export getfaceset
+getfaceset(args...) = throw(DeprecationError("getfaceset(...)" => "getfacetset(...)"))
+
+function celldofs!(::Vector, ::CellCache)
+    throw(DeprecationError("celldofs!(v::Vector, cc::CellCache)" => "celldofs!(v, celldofs(cc))"))
+end
+function celldofs!(::Vector, ::FacetCache)
+    throw(DeprecationError("celldofs!(v::Vector, fs::FacetCache)" => "celldofs!(v, celldofs(fc))"))
 end

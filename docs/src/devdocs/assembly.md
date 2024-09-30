@@ -1,4 +1,4 @@
-# [Assembler](@id devdocs-assembler)
+# [Assembly](@id devdocs-assembly)
 
 The assembler handles the insertion of the element matrices and element vectors into the system matrix and right hand side. While the CSC and CSR formats are the most common sparse matrix formats in practice, users might want to have optimized custom matrix formats for their specific use-case. The default assembler [`AssemblerSparsityPattern`](@ref) should be able to handle most cases in practice. To support a custom format users have to dispatch the following functions:
 
@@ -32,6 +32,19 @@ For local elimination support the following functions might also need custom dis
 Ferrite._condense_local!
 ```
 
-## Custom Matrix Type Sparsity Pattern
+## Type definitions
 
-TODO `create_sparsity_pattern`
+```@docs
+Ferrite.COOAssembler
+Ferrite.CSCAssembler
+Ferrite.SymmetricCSCAssembler
+```
+
+## Utility functions
+
+```@docs
+Ferrite.matrix_handle
+Ferrite.vector_handle
+Ferrite._sortdofs_for_assembly!
+Ferrite.sortperm2!
+```

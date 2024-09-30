@@ -9,7 +9,7 @@ function create_incidence_matrix(g::AbstractGrid, cellset=1:getncells(g))
         end
     end
 
-    I, J, V = Int[], Int[], Bool[]
+    I, J = Int[], Int[]
     for (_, cells) in cell_containing_node
         for cell1 in cells # All these cells have a neighboring node
             for cell2 in cells
@@ -17,13 +17,13 @@ function create_incidence_matrix(g::AbstractGrid, cellset=1:getncells(g))
                 if cell1 != cell2
                     push!(I, cell1)
                     push!(J, cell2)
-                    push!(V, true)
                 end
             end
         end
     end
 
-    incidence_matrix = sparse(I, J, V, getncells(g), getncells(g))
+    incidence_matrix = spzeros!!(Bool, I, J, getncells(g), getncells(g))
+    fill!(incidence_matrix.nzval, true)
     return incidence_matrix
 end
 
@@ -179,7 +179,7 @@ Two different algorithms are available, specified with the `alg` keyword argumen
  - `alg = ColoringAlgorithm.Greedy`: greedy algorithm that works well for structured quadrilateral grids such as
    e.g. quadrilateral grids from `generate_grid`.
 
-The resulting colors can be visualized using [`vtk_cell_data_colors`](@ref).
+The resulting colors can be visualized using [`Ferrite.write_cell_colors`](@ref).
 
 !!! note "Cell to color mapping"
     In a previous version of Ferrite this function returned a dictionary mapping
