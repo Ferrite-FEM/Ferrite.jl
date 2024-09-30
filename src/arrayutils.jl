@@ -87,15 +87,14 @@ function fillzero!(A::Symmetric{T,<:SparseMatrixCSC}) where T
 end
 
 # Compat and convenience layer around SparseArrays.spzeros! (SparseArrays.jl#284, SparseArrays.jl#315)
-function spzeros!!(::Type{Tv}, I::Vector{Ti}, J::Vector{Ti}, m::Int, n::Int) where {Tv, Ti <: Integer}
-    @assert length(I) == length(J)
-    @static if isdefined(SparseArrays, :spzeros!)
-        klasttouch = Vector{Ti}(undef, n)
-        csrrowptr  = Vector{Ti}(undef, m + 1)
-        csrcolval  = Vector{Ti}(undef, length(I))
-        S = SparseArrays.spzeros!(Tv, I, J, m, n, klasttouch, csrrowptr, csrcolval, I, J)
-    else
-        S = sparse(I, J, zeros(Tv, length(I)), m, n)
+if VERSION >= v"1.10.0"
+    const sparse!! = SparseArrays.sparse!
+    const spzeros!! = SparseArrays.spzeros!
+else
+    function sparse!!(I::AbstractVector, J::AbstractVector, V::AbstractVector, m::Integer, n::Integer)
+        return SparseArrays.sparse(I, J, V, m, n)
     end
-    return S
+    function spzeros!!(::Type{T}, I::AbstractVector, J::AbstractVector, m::Integer, n::Integer) where T
+        return sparse!!(I, J, zeros(T, length(I)), m, n)
+    end
 end

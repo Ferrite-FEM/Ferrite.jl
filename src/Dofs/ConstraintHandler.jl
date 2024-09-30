@@ -767,7 +767,7 @@ function create_constraint_matrix(ch::ConstraintHandler{dh,T}) where {dh,T}
     end
     g[ch.prescribed_dofs] .= ch.inhomogeneities
 
-    C = sparse(I, J,  V, ndofs(ch.dh), length(ch.free_dofs))
+    C = sparse!!(I, J, V, ndofs(ch.dh), length(ch.free_dofs))
 
     return C, g
 end
