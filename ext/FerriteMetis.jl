@@ -6,10 +6,9 @@ if VERSION >= v"1.10.0-DEV.90"
 
 using Ferrite:
     Ferrite, CellIterator, ConstraintHandler, DofHandler, DofOrder, celldofs, ndofs,
-    ndofs_per_cell
+    ndofs_per_cell, spzeros!!
 using Metis.LibMetis: idx_t
 using Metis: Metis
-using SparseArrays: sparse
 
 struct MetisOrder <: DofOrder.Ext{Metis}
     coupling::Union{Matrix{Bool},Nothing}
@@ -75,8 +74,7 @@ function Ferrite.compute_renumber_permutation(
     end
     @assert length(I) == length(J) == idx
     N = ndofs(dh)
-    # TODO: Use spzeros! in Julia 1.10.
-    S = sparse(I, J, zeros(Float32, length(I)), N, N)
+    S = spzeros!!(Float32, I, J, N, N)
 
     # Add entries from affine constraints
     if ch !== nothing
