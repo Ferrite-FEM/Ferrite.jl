@@ -22,10 +22,10 @@ jobs:
         julia-version: [1.9]
         os: [ubuntu-latest]
         package:
-          - {user: Ferrite-FEM, repo: FerriteDistributed.jl}
+          # - {user: Ferrite-FEM, repo: FerriteDistributed.jl} # Requires more efforts to be updated to 1.0
           - {user: Ferrite-FEM, repo: FerriteGmsh.jl}
           - {user: Ferrite-FEM, repo: FerriteMeshParser.jl}
-          - {user: Ferrite-FEM, repo: FerriteViz.jl}
+          # - {user: Ferrite-FEM, repo: FerriteViz.jl} # Requires release
 
     steps:
       - uses: actions/checkout@v3
