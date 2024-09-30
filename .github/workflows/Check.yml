@@ -32,11 +32,12 @@ jobs:
             PackageSpec(name = "ExplicitImports", version = "1.6"),
             PackageSpec(name = "Metis"),
             PackageSpec(name = "BlockArrays"),
+            PackageSpec(name = "HYPRE"),
           ])
       - name: ExplicitImports.jl code checks
         shell: julia --project {0}
         run: |
-          using Ferrite, ExplicitImports, Metis, BlockArrays
+          using Ferrite, ExplicitImports, Metis, BlockArrays, HYPRE
           # Check Ferrite
           allow_unanalyzable = (ColoringAlgorithm,) # baremodules
           check_no_implicit_imports(Ferrite; allow_unanalyzable)
@@ -44,7 +45,7 @@ jobs:
           check_all_qualified_accesses_via_owners(Ferrite)
           check_no_self_qualified_accesses(Ferrite)
           # Check extension modules
-          for ext in (:FerriteBlockArrays, :FerriteMetis)
+          for ext in (:FerriteBlockArrays, :FerriteHYPRE, :FerriteMetis)
               extmod = Base.get_extension(Ferrite, ext)
               if extmod !== nothing
                   check_no_implicit_imports(extmod)

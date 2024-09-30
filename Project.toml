@@ -17,15 +17,20 @@ WriteVTK = "64499a7a-5c06-52f2-abe2-ccb03c286192"
 
 [weakdeps]
 BlockArrays = "8e7c35d0-a365-5155-bbbb-fb81a777f24e"
+HYPRE = "b5ffcf37-a2bd-41ab-a3da-4bd9bc8ad771"
+MPI = "da04e1cc-30fd-572f-bb4f-1f8673147195"
 Metis = "2679e427-3c69-5b7f-982b-ece356f1e94b"
 
 [extensions]
 FerriteBlockArrays = "BlockArrays"
+FerriteHYPRE = ["HYPRE", "MPI"]
 FerriteMetis = "Metis"
 
 [compat]
 BlockArrays = "0.16, 1"
 EnumX = "1"
+HYPRE = "1.3"
+MPI = "0.20"
 Metis = "1.3"
 NearestNeighbors = "0.4"
 OrderedCollections = "1"
@@ -37,6 +42,7 @@ julia = "1.9"
 
 [extras]
 BlockArrays = "8e7c35d0-a365-5155-bbbb-fb81a777f24e"
+HYPRE = "b5ffcf37-a2bd-41ab-a3da-4bd9bc8ad771"
 Downloads = "f43a241f-c20a-4ad4-852c-f6b1247861c6"
 FerriteGmsh = "4f95f4f8-b27c-4ae5-9a39-ea55e634e36b"
 ForwardDiff = "f6369f11-7733-5829-9624-2563aa707210"
@@ -55,4 +61,4 @@ Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 TimerOutputs = "a759f4b9-e2f1-59dc-863e-4aeb61b1ea8f"
 
 [targets]
-test = ["BlockArrays", "Downloads", "FerriteGmsh", "ForwardDiff", "Gmsh", "IterativeSolvers", "Metis", "Pkg", "NBInclude", "OhMyThreads", "ProgressMeter", "Random", "SHA", "TaskLocalValues", "Test", "TimerOutputs", "Logging"]
+test = ["BlockArrays", "Downloads", "FerriteGmsh", "ForwardDiff", "Gmsh", "HYPRE", "IterativeSolvers", "Metis", "Pkg", "NBInclude", "OhMyThreads", "ProgressMeter", "Random", "SHA", "TaskLocalValues", "Test", "TimerOutputs", "Logging"]
