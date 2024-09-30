@@ -85,16 +85,13 @@ end
 
 # reinit! FEValues with CellCache
 reinit!(cv::CellValues, cc::CellCache) = reinit!(cv, cc.coords)
-reinit!(fv::FacetValues, cc::CellCache, f::Int) = reinit!(fv, cc.coords, f) # TODO: Deprecate?
+reinit!(fv::FacetValues, cc::CellCache, f::Int) = reinit!(fv, cc.coords, f)
 
-# Accessor functions (TODO: Deprecate? We are so inconsistent with `getxx` vs `xx`...)
+# Accessor functions
 getnodes(cc::CellCache) = cc.nodes
 getcoordinates(cc::CellCache) = cc.coords
 celldofs(cc::CellCache) = cc.dofs
 cellid(cc::CellCache) = cc.cellid
-
-# TODO: This can definitely be deprecated
-celldofs!(v::Vector, cc::CellCache) = copyto!(v, cc.dofs) # celldofs!(v, cc.dh, cc.cellid[])
 
 # TODO: These should really be replaced with something better...
 nfacets(cc::CellCache) = nfacets(getcells(cc.grid, cc.cellid))
@@ -144,7 +141,6 @@ for op = (:getnodes, :getcoordinates, :cellid, :celldofs)
     end
 end
 
-@inline celldofs!(v::Vector, fc::FacetCache) = celldofs!(v, fc.cc)
 @inline function reinit!(fv::FacetValues, fc::FacetCache)
     reinit!(fv, fc.cc, fc.current_facet_id)
 end

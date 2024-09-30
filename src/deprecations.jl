@@ -449,3 +449,10 @@ start_assemble() = throw(DeprecationError("start_assemble()" => "Ferrite.COOAsse
 
 export getfaceset
 getfaceset(args...) = throw(DeprecationError("getfaceset(...)" => "getfacetset(...)"))
+
+function celldofs!(::Vector, ::CellCache)
+    throw(DeprecationError("celldofs!(v::Vector, cc::CellCache)" => "celldofs!(v, celldofs(cc))"))
+end
+function celldofs!(::Vector, ::FacetCache)
+    throw(DeprecationError("celldofs!(v::Vector, fs::FacetCache)" => "celldofs!(v, celldofs(fc))"))
+end
