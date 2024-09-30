@@ -1678,9 +1678,15 @@ function _apply_local!(local_matrix::AbstractMatrix, local_vector::AbstractVecto
     return
 end
 
-# Condensation of affine constraints on element level. If possible this function only
-# modifies the local arrays.
 @noinline missing_global() = error("can not condense constraint without the global matrix and vector")
+"""
+    _condense_local!(local_matrix::AbstractMatrix, local_vector::AbstractVector,
+                    global_matrix#=::SparseMatrixCSC=#, global_vector#=::Vector=#,
+                    global_dofs::AbstractVector, dofmapping::Dict, dofcoefficients::Vector)
+
+Condensation of affine constraints on element level. If possible this function only
+modifies the local arrays.
+"""
 function _condense_local!(local_matrix::AbstractMatrix, local_vector::AbstractVector,
                           global_matrix#=::SparseMatrixCSC=#, global_vector#=::Vector=#,
                           global_dofs::AbstractVector, dofmapping::Dict, dofcoefficients::Vector)

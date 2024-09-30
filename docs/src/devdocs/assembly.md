@@ -18,9 +18,7 @@ Ferrite.add_inhomogeneities!
 
 In case the default assembler is insufficient, users can implement a custom assemblers. For this, they can create a custom type and dispatch the following functions.
 
-```@docs
-Ferrite.matrix_handle
-Ferrite.vector_handle
+```
 Ferrite.start_assemble!
 Ferrite.finish_assemble!
 Ferrite.assemble!
