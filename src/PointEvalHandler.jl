@@ -140,7 +140,9 @@ function find_local_coordinate(interpolation::Interpolation{refshape}, cell_coor
             end
             break
         end
-        if calculate_detJ(J) ≤ 0.0
+        # Report if the element is geometrically broken at the converged point
+        if converged && calculate_detJ(J) ≤ 0.0
+            converged = false
             warn && @warn "det(J) negative! Aborting! $(calculate_detJ(J))"
             break
         end
