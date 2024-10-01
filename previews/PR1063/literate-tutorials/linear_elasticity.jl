@@ -99,7 +99,7 @@
 # First we load Ferrite, and some other packages we need.
 using Ferrite, FerriteGmsh, SparseArrays
 # As in the heat equation tutorial, we will use a unit square - but here we'll load the grid of the Ferrite logo!
-# This is done by downloading [`logo.geo`](logo.geo) and loading it using [`FerriteGmsh.jl`](https://github.com/Ferrite-FEM/FerriteGmsh.jl),
+# This is done by downloading [`logo.geo`](logo.geo) and loading it using [FerriteGmsh.jl](https://github.com/Ferrite-FEM/FerriteGmsh.jl),
 using Downloads: download
 logo_mesh = "logo.geo"
 asset_url = "https://raw.githubusercontent.com/Ferrite-FEM/Ferrite.jl/gh-pages/assets/"

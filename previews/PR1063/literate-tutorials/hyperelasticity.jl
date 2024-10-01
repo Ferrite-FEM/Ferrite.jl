@@ -51,7 +51,7 @@
 # and print a summary at the end,
 # [ProgressMeter.jl](https://github.com/timholy/ProgressMeter.jl) for showing a simple
 # progress bar, and
-# [IterativeSolvers](https://github.com/JuliaLinearAlgebra/IterativeSolvers.jl) for solving
+# [IterativeSolvers.jl](https://github.com/JuliaLinearAlgebra/IterativeSolvers.jl) for solving
 # the linear system using conjugate gradients.
 
 using Ferrite, Tensors, TimerOutputs, ProgressMeter, IterativeSolvers
