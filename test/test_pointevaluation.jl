@@ -32,6 +32,7 @@ function test_pe_scalar_field()
     projector_vals = project(projector, qp_vals, qr)
 
     # set up PointEvalHandler and retrieve values
+    @test_logs min_level=Logging.Warn PointEvalHandler(mesh, points)
     ph = PointEvalHandler(mesh, points)
     @test all(x -> x !== nothing, ph.cells)
 
@@ -76,6 +77,7 @@ function test_pe_embedded()
     projector_vals = project(projector, qp_vals, qr)
 
     # set up PointEvalHandler and retrieve values
+    @test_logs min_level=Logging.Warn PointEvalHandler(mesh, points)
     ph = PointEvalHandler(mesh, points)
     @test all(x -> x !== nothing, ph.cells)
 
@@ -115,6 +117,7 @@ function test_pe_vector_field()
     points = [Vec((x, 0.52)) for x in range(0.0; stop=1.0, length=100)]
 
     # set up PointEvalHandler and retrieve values
+    @test_logs min_level=Logging.Warn PointEvalHandler(mesh, points)
     ph = PointEvalHandler(mesh, points)
     @test all(x -> x !== nothing, ph.cells)
     vals = evaluate_at_points(ph, projector, projector_vals)
@@ -152,6 +155,7 @@ function test_pe_superparametric()
     points = [Vec((x, 0.52)) for x in range(0.0; stop=1.0, length=100)]
 
     # set up PointEvalHandler and retrieve values
+    @test_logs min_level=Logging.Warn PointEvalHandler(mesh, points)
     ph = PointEvalHandler(mesh, points)
     @test all(x -> x !== nothing, ph.cells)
     vals = evaluate_at_points(ph, projector, projector_vals)
@@ -170,6 +174,7 @@ function test_pe_dofhandler()
     add!(dh, :s, Lagrange{RefQuadrilateral,1}()) # a scalar field
     close!(dh)
 
+    @test_logs min_level=Logging.Warn PointEvalHandler(mesh, points)
     ph = PointEvalHandler(mesh, points)
     @test all(x -> x !== nothing, ph.cells)
     vals = evaluate_at_points(ph, dh, dof_vals, :s)
@@ -254,6 +259,7 @@ function test_pe_dofhandler2(;three_dimensional=true)
     v_dofs = dof_range(dh, :v)
     uh = _pointeval_dofhandler2_manual_projection(dh, csv, cvv, f_s, f_v)
 
+    @test_logs min_level=Logging.Warn PointEvalHandler(mesh, points)
     ph = PointEvalHandler(mesh, points)
     @test all(x -> x !== nothing, ph.cells)
     psv = PointValues(ip_f)
@@ -333,6 +339,7 @@ function test_pe_mixed_grid()
 
     # first alternative: L2Projection to dofs
     projector_values = project(projector, qp_vals_quads, qr)
+    @test_logs min_level=Logging.Warn PointEvalHandler(mesh, points)
     ph = PointEvalHandler(mesh, points)
     @test all(x -> x !== nothing, ph.cells)
     vals = evaluate_at_points(ph, projector, projector_values)
@@ -349,6 +356,7 @@ function test_pe_mixed_grid()
 
     dof_vals = [1., 1., 2., 2., 4., 4., 3., 3., 6., 6., 5., 5.]
     points = [node.x for node in mesh.nodes]
+    @test_logs min_level=Logging.Warn PointEvalHandler(mesh, points)
     ph = PointEvalHandler(mesh, points)
     @test all(x -> x !== nothing, ph.cells)
     vals = evaluate_at_points(ph, dh, dof_vals, :v)
@@ -384,6 +392,7 @@ function test_pe_oneD()
     points = [Vec((x,)) for x in range(-1.0; stop=1.0, length=5)]
 
     # set up PointEvalHandler and retrieve values
+    @test_logs min_level=Logging.Warn PointEvalHandler(mesh, points)
     ph = PointEvalHandler(mesh, points)
     @test all(x -> x !== nothing, ph.cells)
     vals = evaluate_at_points(ph, projector, projector_values)
@@ -398,6 +407,7 @@ end
 function test_pe_first_point_missing()
     mesh = generate_grid(Quadrilateral, (1, 1))
     points = [Vec(2.0, 0.0), Vec(0.0, 0.0)]
+    @test_logs min_level=Logging.Warn PointEvalHandler(mesh, points; warn=false)
     ph = PointEvalHandler(mesh, points; warn=false)
 
     @test isnothing(ph.local_coords[1])
