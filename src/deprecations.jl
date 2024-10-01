@@ -231,31 +231,6 @@ end
 struct RefCube end
 export RefCube
 
-function Lagrange{D, RefCube, O}() where {D, O}
-    shape = D == 1 ? RefLine : D == 2 ? RefQuadrilateral : RefHexahedron
-    throw(DeprecationError("Lagrange{$D, RefCube, $O}()" => "Lagrange{$(shape), $O}()"))
-end
-function Lagrange{2, RefTetrahedron, O}() where {O}
-    throw(DeprecationError("Lagrange{2, RefTetrahedron, $O}()" => "Lagrange{RefTriangle, $O}()"))
-end
-function DiscontinuousLagrange{D, RefCube, O}() where {D, O}
-    shape = D == 1 ? RefLine : D == 2 ? RefQuadrilateral : RefHexahedron
-    throw(DeprecationError("DiscontinuousLagrange{$D, RefCube, $O}()" => "DiscontinuousLagrange{$(shape), $O}()"))
-end
-function BubbleEnrichedLagrange{2, RefTetrahedron, O}() where {O}
-    throw(DeprecationError("BubbleEnrichedLagrange{2, RefTetrahedron, $O}()" => "BubbleEnrichedLagrange{RefTriangle, $O}()"))
-end
-function DiscontinuousLagrange{2, RefTetrahedron, O}() where {O}
-    throw(DeprecationError("DiscontinuousLagrange{2, RefTetrahedron, $O}()" => "DiscontinuousLagrange{RefTriangle, $O}()"))
-end
-function Serendipity{D, RefCube, O}() where {D, O}
-    shape = D == 1 ? RefLine : D == 2 ? RefQuadrilateral : RefHexahedron
-    throw(DeprecationError("Serendipity{$D, RefCube, $O}()" => "Serendipity{$(shape), $O}()"))
-end
-function CrouzeixRaviart{2, 1}()
-    throw(DeprecationError("CrouzeixRaviart{2, 1}()" => "CrouzeixRaviart{RefTriangle, 1}()"))
-end
-
 # For the quadrature: Some will be wrong for face integration, so then we warn
 # in the FaceValue constructor...
 
@@ -357,20 +332,6 @@ function FacetValues(
 ) where {T, TQ}
     msg = "The input quadrature rule have the wrong reference shape, likely this comes from a constructor like `QuadratureRule{2, RefTetrahedron}(...)` which have been deprecated in favor of `FacetQuadratureRule{RefTetrahedron}(...)`."
     throw(DeprecationError(msg))
-end
-
-# Hide the last unused type param...
-function Base.show(io::IO, ::DiscontinuousLagrange{shape, order}) where {shape, order}
-    print(io, "DiscontinuousLagrange{$(shape), $(order)}()")
-end
-function Base.show(io::IO, ::Lagrange{shape, order}) where {shape, order}
-    print(io, "Lagrange{$(shape), $(order)}()")
-end
-function Base.show(io::IO, ::Serendipity{shape, order}) where {shape, order}
-    print(io, "Serendipity{$(shape), $(order)}()")
-end
-function Base.show(io::IO, ::CrouzeixRaviart{shape, order}) where {shape, order}
-    print(io, "CrouzeixRaviart{$(shape), $(order)}()")
 end
 
 function value(ip::Interpolation, ξ::Vec)
