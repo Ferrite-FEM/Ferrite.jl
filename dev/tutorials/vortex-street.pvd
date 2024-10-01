@@ -3,37 +3,37 @@
   <Collection>
     <DataSet timestep="0.0" part="0" file="vortex-street-1.vtu"/>
     <DataSet timestep="0.1" part="0" file="vortex-street-2.vtu"/>
-    <DataSet timestep="0.14597876477292368" part="0" file="vortex-street-3.vtu"/>
-    <DataSet timestep="0.2244183721961861" part="0" file="vortex-street-4.vtu"/>
-    <DataSet timestep="0.2872123435970963" part="0" file="vortex-street-5.vtu"/>
-    <DataSet timestep="0.3644967476735316" part="0" file="vortex-street-6.vtu"/>
-    <DataSet timestep="0.44178115174996685" part="0" file="vortex-street-7.vtu"/>
-    <DataSet timestep="0.519086369545332" part="0" file="vortex-street-8.vtu"/>
-    <DataSet timestep="0.5963915873406973" part="0" file="vortex-street-9.vtu"/>
-    <DataSet timestep="0.6736968051360626" part="0" file="vortex-street-10.vtu"/>
-    <DataSet timestep="0.7510020229314278" part="0" file="vortex-street-11.vtu"/>
-    <DataSet timestep="0.8283072407267931" part="0" file="vortex-street-12.vtu"/>
-    <DataSet timestep="0.9056124585221583" part="0" file="vortex-street-13.vtu"/>
-    <DataSet timestep="0.9829176763175236" part="0" file="vortex-street-14.vtu"/>
+    <DataSet timestep="0.14598096019986248" part="0" file="vortex-street-3.vtu"/>
+    <DataSet timestep="0.2244209275630487" part="0" file="vortex-street-4.vtu"/>
+    <DataSet timestep="0.2872166053817942" part="0" file="vortex-street-5.vtu"/>
+    <DataSet timestep="0.3645013646930226" part="0" file="vortex-street-6.vtu"/>
+    <DataSet timestep="0.44178612400425094" part="0" file="vortex-street-7.vtu"/>
+    <DataSet timestep="0.5190902069115413" part="0" file="vortex-street-8.vtu"/>
+    <DataSet timestep="0.5963942898188316" part="0" file="vortex-street-9.vtu"/>
+    <DataSet timestep="0.6736983727261219" part="0" file="vortex-street-10.vtu"/>
+    <DataSet timestep="0.7510024556334122" part="0" file="vortex-street-11.vtu"/>
+    <DataSet timestep="0.8283065385407025" part="0" file="vortex-street-12.vtu"/>
+    <DataSet timestep="0.9056106214479928" part="0" file="vortex-street-13.vtu"/>
+    <DataSet timestep="0.982914704355283" part="0" file="vortex-street-14.vtu"/>
     <DataSet timestep="1.0" part="0" file="vortex-street-15.vtu"/>
-    <DataSet timestep="1.042989454870608" part="0" file="vortex-street-16.vtu"/>
-    <DataSet timestep="1.0663143360030034" part="0" file="vortex-street-17.vtu"/>
-    <DataSet timestep="1.0977245956022514" part="0" file="vortex-street-18.vtu"/>
-    <DataSet timestep="1.1302444134037812" part="0" file="vortex-street-19.vtu"/>
-    <DataSet timestep="1.16687320575286" part="0" file="vortex-street-20.vtu"/>
-    <DataSet timestep="1.2073310112226798" part="0" file="vortex-street-21.vtu"/>
-    <DataSet timestep="1.2523118524984076" part="0" file="vortex-street-22.vtu"/>
-    <DataSet timestep="1.3020944792374691" part="0" file="vortex-street-23.vtu"/>
-    <DataSet timestep="1.3571963735801809" part="0" file="vortex-street-24.vtu"/>
-    <DataSet timestep="1.4183752311942706" part="0" file="vortex-street-25.vtu"/>
-    <DataSet timestep="1.4893118258701774" part="0" file="vortex-street-26.vtu"/>
-    <DataSet timestep="1.581303381531498" part="0" file="vortex-street-27.vtu"/>
-    <DataSet timestep="1.6975807811985275" part="0" file="vortex-street-28.vtu"/>
-    <DataSet timestep="1.8457877326434824" part="0" file="vortex-street-29.vtu"/>
-    <DataSet timestep="2.028285038294205" part="0" file="vortex-street-30.vtu"/>
-    <DataSet timestep="2.250010654516233" part="0" file="vortex-street-31.vtu"/>
-    <DataSet timestep="2.5426163566181743" part="0" file="vortex-street-32.vtu"/>
-    <DataSet timestep="3.043543695060065" part="0" file="vortex-street-33.vtu"/>
-    <DataSet timestep="3.9030196679807023" part="0" file="vortex-street-34.vtu"/>
+    <DataSet timestep="1.042979985533868" part="0" file="vortex-street-16.vtu"/>
+    <DataSet timestep="1.0663070364178564" part="0" file="vortex-street-17.vtu"/>
+    <DataSet timestep="1.0977177387007742" part="0" file="vortex-street-18.vtu"/>
+    <DataSet timestep="1.130239071789246" part="0" file="vortex-street-19.vtu"/>
+    <DataSet timestep="1.166868688320646" part="0" file="vortex-street-20.vtu"/>
+    <DataSet timestep="1.20732662577583" part="0" file="vortex-street-21.vtu"/>
+    <DataSet timestep="1.2523075409282713" part="0" file="vortex-street-22.vtu"/>
+    <DataSet timestep="1.302090037793079" part="0" file="vortex-street-23.vtu"/>
+    <DataSet timestep="1.3571928749415958" part="0" file="vortex-street-24.vtu"/>
+    <DataSet timestep="1.4183730852487355" part="0" file="vortex-street-25.vtu"/>
+    <DataSet timestep="1.4893106382661303" part="0" file="vortex-street-26.vtu"/>
+    <DataSet timestep="1.5813029468732105" part="0" file="vortex-street-27.vtu"/>
+    <DataSet timestep="1.6975960079437342" part="0" file="vortex-street-28.vtu"/>
+    <DataSet timestep="1.84582967834571" part="0" file="vortex-street-29.vtu"/>
+    <DataSet timestep="2.028375530752659" part="0" file="vortex-street-30.vtu"/>
+    <DataSet timestep="2.2501310981871114" part="0" file="vortex-street-31.vtu"/>
+    <DataSet timestep="2.5428253138911034" part="0" file="vortex-street-32.vtu"/>
+    <DataSet timestep="3.0439170800224655" part="0" file="vortex-street-33.vtu"/>
+    <DataSet timestep="3.903840211731642" part="0" file="vortex-street-34.vtu"/>
   </Collection>
 </VTKFile>
