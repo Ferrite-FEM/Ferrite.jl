@@ -273,9 +273,9 @@ nothing                             # hide
 using BenchmarkTools
 
 @btime assemble_v1(assembler, K, dofs, Ke) evals = 10 setup = fill!(K, 0)
-@btime assemble_v2(assembler, K, dofs, Ke) evals = 10 setup = Ferrite.fillzero!(K)
-@btime assemble_v3(assembler, K, dofs, Ke) evals = 10 setup = Ferrite.fillzero!(K)
-@btime assemble_v4(assembler, K, dofs, Ke) evals = 10 setup = Ferrite.fillzero!(K)
+@btime assemble_v2(assembler, K, dofs, Ke) evals = 10 setup = fill!(K, 0)
+@btime assemble_v3(assembler, K, dofs, Ke) evals = 10 setup = fill!(K, 0)
+@btime assemble_v4(assembler, K, dofs, Ke) evals = 10 setup = fill!(K, 0)
 ```
 
 The results below are obtained on an Macbook Pro with an Apple M3 CPU.
