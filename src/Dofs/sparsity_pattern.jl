@@ -118,7 +118,7 @@ function SparsityPattern(nrows::Int, ncols::Int; nnz_per_row::Int = 8)
     mempool = PoolAllocator.MemoryPool{Int}()
     rows = Vector{PoolAllocator.PoolVector{Int}}(undef, nrows)
     for i in 1:nrows
-        rows[i] = PoolAllocator.resize(PoolAllocator.malloc(mempool, nnz_per_row), 0)
+        rows[i] = PoolAllocator.resize(mempool, PoolAllocator.malloc(mempool, nnz_per_row), 0)
     end
     sp = SparsityPattern(nrows, ncols, mempool, rows)
     return sp
@@ -160,15 +160,15 @@ getncols(sp::SparsityPattern) = sp.ncols
 @inline function add_entry!(sp::SparsityPattern, row::Int, col::Int)
     @boundscheck (1 <= row <= getnrows(sp) && 1 <= col <= getncols(sp)) || throw(BoundsError(sp, (row, col)))
     r = @inbounds sp.rows[row]
-    r = insert_sorted(r, col)
+    r = insert_sorted(sp.mempool, r, col)
     @inbounds sp.rows[row] = r
     return
 end
 
-@inline function insert_sorted(x::PoolAllocator.PoolVector{Int}, item::Int)
+@inline function insert_sorted(mempool::PoolAllocator.MemoryPool, x::PoolAllocator.PoolVector{Int}, item::Int)
     k = searchsortedfirst(x, item)
     if k == length(x) + 1 || @inbounds(x[k]) != item
-        x = PoolAllocator.insert(x, k, item)
+        x = PoolAllocator.insert(mempool, x, k, item)
     end
     return x
 end

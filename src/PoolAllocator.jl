@@ -155,14 +155,12 @@ function malloc(mempool::MemoryPool{T}, dims::NTuple{N, Int}) where {T, N}
     end
     page, offset = _malloc(book, blocksize)
 
-    return PoolArray{T, N}(mempool, page, offset, dims)
+    return PoolArray{T, N}(page, offset, dims)
 end
 
 
-# PoolArray is a view into a page that also has a reference to the MemoryPool so that it can
-# be resized/reallocated.
+# PoolArray is a view into a page
 struct PoolArray{T, N} <: AbstractArray{T, N}
-    mempool::MemoryPool{T}
     page::Page{T}
     offset::Int
     size::NTuple{N, Int}
@@ -184,13 +182,13 @@ function free(x::PoolArray)
     return
 end
 
-function realloc(x::PoolArray{T}, newsize::Int) where T
+function realloc(mempool::MemoryPool, x::PoolArray{T}, newsize::Int) where T
     @assert newsize > length(x) # TODO: Allow shrinkage?
     @assert newsize <= PAGE_SIZE ÷ sizeof(T) # TODO: Might be required
     # Find the page for the block to make sure it was allocated in this mempool
     # page = find_page(x.mempool, )
     # Allocate the new block
-    x′ = malloc(x.mempool, newsize)
+    x′ = malloc(mempool, newsize)
     # Copy the data
     copyto!(x′, x)
     # Free the old block and return
@@ -213,18 +211,18 @@ end
 end
 
 # Utilities needed for the sparsity pattern
-@inline function resize(x::PoolVector{T}, n::Int) where T
+@inline function resize(mempool::MemoryPool, x::PoolVector{T}, n::Int) where T
     if n > allocated_length(x)
-        return realloc(x, n)
+        return realloc(mempool, x, n)
     else
-        return PoolVector{T}(x.mempool, x.page, x.offset, (n, ))
+        return PoolVector{T}(x.page, x.offset, (n, ))
     end
 end
 
-@inline function insert(x::PoolVector{T}, k::Int, item::T) where T
+@inline function insert(mempool::MemoryPool, x::PoolVector{T}, k::Int, item::T) where T
     lx = length(x)
     # Make room
-    x = resize(x, lx + 1)
+    x = resize(mempool, x, lx + 1)
     # Shift elements after the insertion point to the back
     @inbounds for i in lx:-1:k
         x[i + 1] = x[i]
