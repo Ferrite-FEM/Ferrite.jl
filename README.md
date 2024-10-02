@@ -6,6 +6,7 @@
 
 ![Build Status](https://github.com/Ferrite-FEM/Ferrite.jl/workflows/CI/badge.svg?event=push)
 [![codecov.io](https://codecov.io/github/Ferrite-FEM/Ferrite.jl/coverage.svg?branch=master)](https://codecov.io/github/Ferrite-FEM/Ferrite.jl?branch=master)
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.13862652.svg)](https://doi.org/10.5281/zenodo.13862652)
 
 A finite element toolbox written in Julia.
 
