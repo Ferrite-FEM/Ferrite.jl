@@ -101,7 +101,7 @@ scenario we compare the full matrix assembly including the integration of all th
     due to the sparse data structure so this method is not even considered.
 
 For the comparison we need a representative global matrix to assemble into. In the following
-setup code we create grid with triangles and a DofHandler with a quadratic scalar field.
+setup code we create a grid with triangles and a DofHandler with a quadratic scalar field.
 From this we instantiate the global matrix.
 
 ```@example assembly-perf
@@ -135,7 +135,7 @@ end
 nothing # hide
 ```
 
-This looks very simple but it is very inefficient (as the numbers will show later). To
+This looks very simple, but it is very inefficient (as the numbers will show later). To
 understand why the operation `K[dofs, dofs] += Ke` (with `K` being a sparse matrix) is so
 slow we can dig into the details.
 
@@ -159,7 +159,7 @@ Now the problem with this strategy becomes a bit more obvious:
    `K` to copy elements from `K` to `tmp1`. Both of these operations are rather costly:
    allocations should always be minimized in tight loops, and indexing into a sparse matrix
    is non-trivial due to the data structure. In addition, since the `dofs` vector contains
-   the global indices (which are not sorted nor consecutive) we have a random access
+   the global indices (which are neither sorted nor consecutive) we have a random access
    pattern.
  - In line 2 there is another allocation of a matrix (`tmp2`) for the result of the addition
    of `tmp1` and `Ke`.
@@ -207,8 +207,7 @@ we still lookup the same location in `K` twice, and we still have a random acces
 #### Strategy 3: scalar indexing with single lookup
 
 To improve on the second strategy we will get rid of the double lookup into the sparse
-matrix `K`. While Julia doesn't have a "`+=`"-operation there is a `addindex!`-function in
-Ferrite which does exactly what we want: it adds a value to a specific location in a sparse
+matrix `K`. While Julia doesn't have a "`+=`"-operation, Ferrite has an internal `addindex!`-function which does exactly what we want: it adds a value to a specific location in a sparse
 matrix using a single lookup.
 
 ```@example assembly-perf
@@ -273,7 +272,7 @@ nothing                             # hide
 ```julia
 using BenchmarkTools
 
-@btime assemble_v1(assembler, K, dofs, Ke) evals = 10 setup = Ferrite.fillzero!(K)
+@btime assemble_v1(assembler, K, dofs, Ke) evals = 10 setup = fill!(K, 0)
 @btime assemble_v2(assembler, K, dofs, Ke) evals = 10 setup = Ferrite.fillzero!(K)
 @btime assemble_v3(assembler, K, dofs, Ke) evals = 10 setup = Ferrite.fillzero!(K)
 @btime assemble_v4(assembler, K, dofs, Ke) evals = 10 setup = Ferrite.fillzero!(K)
