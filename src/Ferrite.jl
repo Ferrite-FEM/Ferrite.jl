@@ -8,13 +8,13 @@ using Base:
 using EnumX:
     EnumX, @enumx
 using LinearAlgebra:
-    LinearAlgebra, Symmetric, Transpose, cholesky, det, norm, pinv, tr
+    LinearAlgebra, Symmetric, cholesky, det, norm, pinv, tr
 using NearestNeighbors:
     NearestNeighbors, KDTree, knn
 using OrderedCollections:
     OrderedSet
 using SparseArrays:
-    AbstractSparseArray,SparseArrays, SparseMatrixCSC, nonzeros, nzrange, rowvals, sparse
+    SparseArrays, SparseMatrixCSC, nonzeros, nzrange, rowvals, AbstractSparseMatrixCSC, AbstractSparseArray
 using StaticArrays:
     StaticVector,StaticArrays,MVector, MArray, MMatrix, SArray, SMatrix, SVector, @SVector
 using WriteVTK:
@@ -26,11 +26,13 @@ using ForwardDiff:
     ForwardDiff
 using CUDA
 using Adapt
-using KernelAbstractions
-using Atomix
 
+include("CollectionsOfViews.jl")
+using .CollectionsOfViews:
+    CollectionsOfViews, ArrayOfVectorViews, push_at_index!, ConstructionBuffer
 
 include("exports.jl")
+
 
 """
     AbstractRefShape{refdim}
@@ -58,6 +60,7 @@ struct RefPyramid       <: AbstractRefShape{3} end
 
 Get the dimension of the reference shape
 """
+getrefdim(::Type{<:AbstractRefShape}) # To get correct doc filtering
 getrefdim(::Type{<:AbstractRefShape{rdim}}) where rdim = rdim
 
 abstract type AbstractCell{refshape <: AbstractRefShape} end
@@ -172,7 +175,6 @@ include("GPU/kernel_meta.jl")
 include("GPU/gpu_assembler.jl")
 include("Grid/gpu_grid.jl")
 include("Dofs/GPUDofHandler.jl")
-include("GPU/gpu_sparsematrix.jl")
 include("iterators_prototype.jl")
 include("GPU/adapt.jl")
 include("GPU/cuda.jl")

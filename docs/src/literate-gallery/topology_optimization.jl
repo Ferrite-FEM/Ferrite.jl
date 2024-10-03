@@ -9,7 +9,7 @@
 #-
 #md # !!! tip
 #md #     This example is also available as a Jupyter notebook:
-#md #     [`topology_optimization.ipynb`](@__NBVIEWER_ROOT_URL__/examples/topology_optimization.ipynb).
+#md #     [`topology_optimization.ipynb`](@__NBVIEWER_ROOT_URL__/gallery/topology_optimization.ipynb).
 #-
 #
 # ## Introduction
@@ -67,7 +67,7 @@
 # First we load all necessary packages.
 using Ferrite, SparseArrays, LinearAlgebra, Tensors, Printf
 # Next, we create a simple square grid of the size 2x1. We apply a fixed Dirichlet boundary condition
-# to the left face set, called `clamped`. On the right face, we create a small set `traction`, where we
+# to the left facet set, called `clamped`. On the right facet, we create a small set `traction`, where we
 # will later apply a force in negative y-direction.
 
 function create_grid(n)
@@ -186,10 +186,10 @@ end
 #md nothing # hide
 
 # For the Laplacian we need some neighboorhood information which is constant throughout the analysis so we compute it once and cache it.
-# We iterate through each face of each element,
-# obtaining the neighboring element by using the `getneighborhood` function. For boundary faces,
+# We iterate through each facet of each element,
+# obtaining the neighboring element by using the `getneighborhood` function. For boundary facets,
 # the function call will return an empty object. In that case we use the dictionary to instead find the opposite
-# face, as discussed in the introduction.
+# facet, as discussed in the introduction.
 
 function cache_neighborhood(dh, topology)
     nbgs = Vector{Vector{Int}}(undef, getncells(dh.grid))
@@ -200,11 +200,11 @@ function cache_neighborhood(dh, topology)
         nbg = zeros(Int,_nfacets)
         i = cellid(element)
         for j in 1:_nfacets
-            nbg_cellid = getcells(getneighborhood(topology, dh.grid, FacetIndex(i,j)))
+            nbg_cellid = getneighborhood(topology, dh.grid, FacetIndex(i,j))
             if(!isempty(nbg_cellid))
-                nbg[j] = first(nbg_cellid) # assuming only one face neighbor per cell
-            else # boundary face
-                nbg[j] = first(getcells(getneighborhood(topology, dh.grid, FacetIndex(i,opp[j]))))
+                nbg[j] = first(nbg_cellid)[1] # assuming only one facet neighbor per cell
+            else # boundary facet
+                nbg[j] = first(getneighborhood(topology, dh.grid, FacetIndex(i,opp[j])))[1]
             end
         end
 
@@ -328,7 +328,7 @@ function doassemble!(cellvalues::CellValues, facetvalues::FacetValues, K::Sparse
         ue = u[eldofs]
 
         elmt!(Ke, re, element, cellvalues, facetvalues, grid, mp, ue, state)
-        assemble!(assembler, celldofs(element), re, Ke)
+        assemble!(assembler, celldofs(element), Ke, re)
     end
 
     return K, r
@@ -504,7 +504,7 @@ function topopt(ra,ρ,n,filename; output=:false)
             i = @sprintf("%3.3i", it)
             filename_it = string(filename, "_", i)
 
-            VTKFile(filename_it, grid) do vtk
+            VTKGridFile(filename_it, grid) do vtk
                 write_cell_data(vtk, χ, "density")
             end
         end
@@ -512,7 +512,7 @@ function topopt(ra,ρ,n,filename; output=:false)
 
     ## export converged results
     if(!output)
-        VTKFile(filename, grid) do vtk
+        VTKGridFile(filename, grid) do vtk
             write_cell_data(vtk, χ, "density")
         end
     end
@@ -541,7 +541,7 @@ end
 
 #md # ## References
 #md # ```@bibliography
-#md # Pages = ["gallery/topology_optimization.md"]
+#md # Pages = ["topology_optimization.md"]
 #md # Canonical = false
 #md # ```
 

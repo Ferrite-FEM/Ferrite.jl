@@ -486,7 +486,7 @@ end
 end
 
 @doc raw"""
-    transform_interface_points!(dst::Vector{Vec{3, Float64}}, points::Vector{Vec{3, Float64}}, interface_transformation::InterfaceOrientationInfo)
+    transform_interface_points!(dst::AbstractVector{Vec{3, Float64}}, points::AbstractVector{Vec{3, Float64}}, interface_transformation::InterfaceOrientationInfo)
 
 Transform the points from face A to face B using the orientation information of the interface and store it in the vector dst.
 For 3D, the faces are transformed into regular polygons such that the rotation angle is the shift in reference node index × 2π ÷ number of edges in face.
@@ -549,7 +549,7 @@ y      |   \
 """
 transform_interface_points!
 
-function transform_interface_points!(dst::Vector{Vec{3, Float64}}, points::Vector{Vec{3, Float64}}, interface_transformation::InterfaceOrientationInfo{RefShapeA, RefShapeB}) where {RefShapeA <: AbstractRefShape{3}, RefShapeB <: AbstractRefShape{3}}
+function transform_interface_points!(dst::AbstractVector{Vec{3, Float64}}, points::AbstractVector{Vec{3, Float64}}, interface_transformation::InterfaceOrientationInfo{RefShapeA, RefShapeB}) where {RefShapeA <: AbstractRefShape{3}, RefShapeB <: AbstractRefShape{3}}
     facet_a = interface_transformation.facet_a
     facet_b = interface_transformation.facet_b
 
@@ -562,7 +562,7 @@ function transform_interface_points!(dst::Vector{Vec{3, Float64}}, points::Vecto
     return nothing
 end
 
-function transform_interface_points!(dst::Vector{Vec{2, Float64}}, points::Vector{Vec{2, Float64}}, interface_transformation::InterfaceOrientationInfo{RefShapeA, RefShapeB}) where {RefShapeA <: AbstractRefShape{2}, RefShapeB <: AbstractRefShape{2}}
+function transform_interface_points!(dst::AbstractVector{Vec{2, Float64}}, points::AbstractVector{Vec{2, Float64}}, interface_transformation::InterfaceOrientationInfo{RefShapeA, RefShapeB}) where {RefShapeA <: AbstractRefShape{2}, RefShapeB <: AbstractRefShape{2}}
     facet_a = interface_transformation.facet_a
     facet_b = interface_transformation.facet_b
     flipped = interface_transformation.flipped

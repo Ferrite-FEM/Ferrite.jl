@@ -1,62 +1,31 @@
-struct GPUAssemblerSparsityPattern{Tv,Ti,VEC_FLOAT<:AbstractVector{Tv},SPARSE_MAT<:AbstractSparseArray{Tv,Ti}} <: AbstractSparseAssembler
+## GPU Assembler ###
+### First abstract types and interfaces ###
+
+abstract type GPUAbstractSparseAssembler{Tv,Ti} end
+
+function assemble!(A::GPUAbstractSparseAssembler, dofs::AbstractVector{Int32}, Ke::MATRIX, fe::VECTOR) where {MATRIX, VECTOR}
+    throw(NotImplementedError("A concrete implementation of assemble! is required"))
+end
+
+
+struct GPUAssemblerSparsityPattern{Tv,Ti,VEC_FLOAT<:AbstractVector{Tv},SPARSE_MAT<:AbstractSparseArray{Tv,Ti}} <: GPUAbstractSparseAssembler{Tv,Ti}
     K::SPARSE_MAT
     f::VEC_FLOAT
 end
 
-function start_assemble(K::AbstractSparseArray{Tv}, f::AbstractVector{Tv}) where {Tv}
+function start_assemble(K::AbstractSparseArray{Tv,Ti}, f::AbstractVector{Tv}) where {Tv,Ti}
     return GPUAssemblerSparsityPattern(K, f)
 end
 
 
-@inline @propagate_inbounds function assemble_atomic!(A::GPUAssemblerSparsityPattern, ke_val::Float32, fe_val::Float32 , ig::Int32, jg::Int32)
-    # Brute force assembly
-    K = A.K
-    f = A.f
-    CUDA.@atomic f[ig] += fe_val
-    # set the value of the global matrix
-     _add_to_index_atomic!(K, ke_val, ig, jg)
-end
-
-@inline @propagate_inbounds function assemble_atomic!(A::GPUAssemblerSparsityPattern,  fe_val::Float32 , ig::Int32)
-    # Brute force assembly
-    f = A.f
-    CUDA.@atomic f[ig] += fe_val
-end
-
-
-@inline @propagate_inbounds function assemble_atomic!(A::GPUAssemblerSparsityPattern, ke_val::Float32 , ig::Int32, jg::Int32)
-    # Brute force assembly
-    K = A.K
-    # set the value of the global matrix
-     _add_to_index_atomic!(K, ke_val, ig, jg)
-end
-
-
-@inline @propagate_inbounds function assemble!(A::GPUAssemblerSparsityPattern, ke_val::Float32, fe_val::Float32 , ig::Int32, jg::Int32)
-    # Brute force assembly
-    K = A.K
-    f = A.f
-    Atomix.@atomic f[ig] += fe_val
-    # set the value of the global matrix
-     _add_to_index!(K, ke_val, ig, jg)
-end
-
-@inline @propagate_inbounds function assemble!(A::GPUAssemblerSparsityPattern, ke_val::Float32 , ig::Int32, jg::Int32)
-    # Brute force assembly
-    K = A.K
-    # set the value of the global matrix
-     _add_to_index!(K, ke_val, ig, jg)
-end
-
-
-
 """
-    assemble!(A::GPUAssemblerSparsityPattern, dofs::AbstractVector{Int32}, Ke::AbstractMatrix, fe::AbstractVector)
+    assemble!(A::GPUAssemblerSparsityPattern, dofs::AbstractVector{Int32}, Ke::MATRIX, fe::VECTOR)
 
 Assembles the global stiffness matrix `Ke` and the global force vector `fe` into the the global stiffness matrix `K` and the global force vector `f` of the `GPUAssemblerSparsityPattern` object `A`.
 
 """
 @propagate_inbounds function assemble!(A::GPUAssemblerSparsityPattern, dofs::AbstractVector{Int32}, Ke::MATRIX, fe::VECTOR) where {MATRIX, VECTOR}
+    # Note: MATRIX and VECTOR are cuda dynamic shared memory
     _assemble!(A, dofs, Ke, fe)
 end
 
@@ -67,11 +36,11 @@ function _assemble!(A::GPUAssemblerSparsityPattern, dofs::AbstractVector{Int32},
     f = A.f
     for i = 1:length(dofs)
         ig = dofs[i]
-        f[ig] += fe[i]
+        CUDA.@atomic f[ig] += fe[i]
         for j = 1:length(dofs)
             jg = dofs[j]
             # set the value of the global matrix
-            _add_to_index_atomic!(K, Ke[i,j], ig, jg)
+            _add_to_index!(K, Ke[i,j], ig, jg)
         end
     end
 end
@@ -83,21 +52,7 @@ end
     for k in col_start:col_end
         if K.rowVal[k] == i
             # Update the existing element
-              K.nzVal[k] += v
-            return
-        end
-    end
-end
-
-
-@inline function _add_to_index_atomic!(K::AbstractSparseArray{Tv,Ti}, v::Tv, i::Int32, j::Int32) where {Tv,Ti}
-    col_start = K.colPtr[j]
-    col_end = K.colPtr[j + Int32(1)] - Int32(1)
-
-    for k in col_start:col_end
-        if K.rowVal[k] == i
-            # Update the existing element
-            Atomix.@atomic  K.nzVal[k] += v
+              CUDA.@atomic K.nzVal[k] += v
             return
         end
     end

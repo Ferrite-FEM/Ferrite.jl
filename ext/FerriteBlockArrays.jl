@@ -61,7 +61,7 @@ end
 ## BlockAssembler and associated methods ##
 ###########################################
 
-struct BlockAssembler{BM, Bv} <: Ferrite.AbstractSparseAssembler
+struct BlockAssembler{BM, Bv} <: Ferrite.AbstractAssembler
     K::BM
     f::Bv
     blockindices::Vector{BlockIndex{1}}

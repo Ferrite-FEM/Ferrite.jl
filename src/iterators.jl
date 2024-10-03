@@ -22,11 +22,6 @@ Create a cache object with pre-allocated memory for the nodes, coordinates, and 
 cell. The cache is updated for a new cell by calling `reinit!(cache, cellid)` where
 `cellid::Int` is the cell id.
 
-**Struct fields of `CellCache`**
- - `cc.nodes :: Vector{Int}`: global node ids
- - `cc.coords :: Vector{<:Vec}`: node coordinates
- - `cc.dofs :: Vector{Int}`: global dof ids (empty when constructing the cache from a grid)
-
 **Methods with `CellCache`**
  - `reinit!(cc, i)`: reinitialize the cache for cell `i`
  - `cellid(cc)`: get the cell id of the currently cached cell
@@ -90,24 +85,17 @@ end
 
 # reinit! FEValues with CellCache
 reinit!(cv::CellValues, cc::CellCache) = reinit!(cv, cc.coords)
-reinit!(fv::FacetValues, cc::CellCache, f::Int) = reinit!(fv, cc.coords, f) # TODO: Deprecate?
+reinit!(fv::FacetValues, cc::CellCache, f::Int) = reinit!(fv, cc.coords, f)
 
-# Accessor functions (TODO: Deprecate? We are so inconsistent with `getxx` vs `xx`...)
+# Accessor functions
 getnodes(cc::CellCache) = cc.nodes
 getcoordinates(cc::CellCache) = cc.coords
 celldofs(cc::CellCache) = cc.dofs
 cellid(cc::CellCache) = cc.cellid
 
-# TODO: This can definitely be deprecated
-celldofs!(v::Vector, cc::CellCache) = copyto!(v, cc.dofs) # celldofs!(v, cc.dh, cc.cellid[])
-
 # TODO: These should really be replaced with something better...
 nfacets(cc::CellCache) = nfacets(getcells(cc.grid, cc.cellid))
 
-
-# TODO: Currently excluded from the docstring below. Should they be public?
-# - `Ferrite.faceindex(fc)`: get the `FaceIndex` of the currently cached face
-# - `Ferrite.faceid(fc)`: get the current faceid (`faceindex(fc)[2]`)
 
 """
     FacetCache(grid::Grid)
@@ -119,7 +107,7 @@ calling `reinit!(cache, fi::FacetIndex)`.
 
 **Methods with `fc::FacetCache`**
  - `reinit!(fc, fi)`: reinitialize the cache for face `fi::FacetIndex`
- - `cellid(fc)`: get the current cellid (`faceindex(fc)[1]`)
+ - `cellid(fc)`: get the current cellid
  - `getnodes(fc)`: get the global node ids of the *cell*
  - `getcoordinates(fc)`: get the coordinates of the *cell*
  - `celldofs(fc)`: get the global dof ids of the *cell*
@@ -152,9 +140,7 @@ for op = (:getnodes, :getcoordinates, :cellid, :celldofs)
         end
     end
 end
-# @inline faceid(fc::FacetCache) = fc.current_faceid[]
-@inline celldofs!(v::Vector, fc::FacetCache) = celldofs!(v, fc.cc)
-# @inline faceindex(fc::FacetCache) = FaceIndex(cellid(fc), faceid(fc))
+
 @inline function reinit!(fv::FacetValues, fc::FacetCache)
     reinit!(fv, fc.cc, fc.current_facet_id)
 end
@@ -284,22 +270,22 @@ FaceIterator(args...) = error("FaceIterator is deprecated, use FacetIterator ins
 
 # Leaving flags undocumented as for CellIterator
 """
-    FacetIterator(gridordh::Union{Grid,AbstractDofHandler}, faceset::AbstractVecOrSet{FacetIndex})
+    FacetIterator(gridordh::Union{Grid,AbstractDofHandler}, facetset::AbstractVecOrSet{FacetIndex})
 
-Create a `FacetIterator` to conveniently iterate over the faces in `faceset`. The elements of
+Create a `FacetIterator` to conveniently iterate over the faces in `facestet`. The elements of
 the iterator are [`FacetCache`](@ref)s which are properly `reinit!`ialized. See
 [`FacetCache`](@ref) for more details.
 
 Looping over a `FacetIterator`, i.e.:
 ```julia
-for fc in FacetIterator(grid, faceset)
+for fc in FacetIterator(grid, facetset)
     # ...
 end
 ```
 is thus simply convenience for the following equivalent snippet:
 ```julia
 fc = FacetCache(grid)
-for faceindex in faceset
+for faceindex in facetset
     reinit!(fc, faceindex)
     # ...
 end
@@ -372,7 +358,7 @@ function Base.iterate(ii::InterfaceIterator{<:Any, <:Grid{sdim}}, state...) wher
         if isempty(neighborhood[facet_a[1], facet_a[2]])
             continue
         end
-        neighbors = neighborhood[facet_a[1], facet_a[2]].neighbor_info
+        neighbors = neighborhood[facet_a[1], facet_a[2]]
         length(neighbors) > 1 && error("multiple neighboring faces not supported yet")
         facet_b = neighbors[1]
         reinit!(ii.cache, facet_a, facet_b)

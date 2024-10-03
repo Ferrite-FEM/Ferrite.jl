@@ -44,12 +44,12 @@ julia> getnbasefunctions(ip)
 6
 ```
 """
-abstract type Interpolation{shape #=<: AbstractRefShape=#, order, unused} end
+abstract type Interpolation{shape #=<: AbstractRefShape=#, order} end
 
 const InterpolationByDim{dim} = Interpolation{<:AbstractRefShape{dim}}
 
-abstract type ScalarInterpolation{      refshape, order} <: Interpolation{refshape, order, Nothing} end
-abstract type VectorInterpolation{vdim, refshape, order} <: Interpolation{refshape, order, Nothing} end
+abstract type ScalarInterpolation{      refshape, order} <: Interpolation{refshape, order} end
+abstract type VectorInterpolation{vdim, refshape, order} <: Interpolation{refshape, order} end
 
 # Number of components for the interpolation.
 n_components(::ScalarInterpolation)                    = 1
@@ -111,6 +111,7 @@ Base.copy(ip::Interpolation) = ip
 
 Return the dimension of the reference element for a given interpolation.
 """
+getrefdim(::Interpolation) # To make doc-filtering work
 @inline getrefdim(::Interpolation{RefShape}) where RefShape = getrefdim(RefShape)
 
 """
@@ -428,9 +429,9 @@ dirichlet_boundarydof_indices(::Type{FacetIndex}) = dirichlet_facetdof_indices
 """
 Piecewise discontinuous Lagrange basis via Gauss-Lobatto points.
 """
-struct DiscontinuousLagrange{shape, order, unused} <: ScalarInterpolation{shape, order}
+struct DiscontinuousLagrange{shape, order} <: ScalarInterpolation{shape, order}
     function DiscontinuousLagrange{shape, order}() where {shape <: AbstractRefShape, order}
-        new{shape, order, Nothing}()
+        new{shape, order}()
     end
 end
 
@@ -485,9 +486,9 @@ is_discontinuous(::Type{<:DiscontinuousLagrange}) = true
 
 Standard continuous Lagrange polynomials with equidistant node placement.
 """
-struct Lagrange{shape, order, unused} <: ScalarInterpolation{shape, order}
+struct Lagrange{shape, order} <: ScalarInterpolation{shape, order}
     function Lagrange{shape, order}() where {shape <: AbstractRefShape, order}
-        new{shape, order, Nothing}()
+        new{shape, order}()
     end
 end
 
@@ -1268,9 +1269,9 @@ end
 """
 Lagrange element with bubble stabilization.
 """
-struct BubbleEnrichedLagrange{shape, order, unused} <: ScalarInterpolation{shape, order}
+struct BubbleEnrichedLagrange{shape, order} <: ScalarInterpolation{shape, order}
     function BubbleEnrichedLagrange{shape, order}() where {shape <: AbstractRefShape, order}
-        new{shape, order, Nothing}()
+        new{shape, order}()
     end
 end
 
@@ -1311,9 +1312,9 @@ end
 
 Serendipity element on hypercubes. Currently only second order variants are implemented.
 """
-struct Serendipity{shape, order, unused} <: ScalarInterpolation{shape,order}
+struct Serendipity{shape, order} <: ScalarInterpolation{shape,order}
     function Serendipity{shape, order}() where {shape <: AbstractRefShape, order}
-        new{shape, order, Nothing}()
+        new{shape, order}()
     end
 end
 
@@ -1458,9 +1459,9 @@ Classical non-conforming Crouzeix–Raviart element.
 
 For details we refer to the original paper [CroRav:1973:cnf](@cite).
 """
-struct CrouzeixRaviart{shape, order, unused} <: ScalarInterpolation{shape, order}
-    CrouzeixRaviart{RefTriangle, 1}() = new{RefTriangle, 1, Nothing}()
-    CrouzeixRaviart{RefTetrahedron, 1}() = new{RefTetrahedron, 1, Nothing}()
+struct CrouzeixRaviart{shape, order} <: ScalarInterpolation{shape, order}
+    CrouzeixRaviart{RefTriangle, 1}() = new{RefTriangle, 1}()
+    CrouzeixRaviart{RefTetrahedron, 1}() = new{RefTetrahedron, 1}()
 end
 
 # CR elements are characterized by not having vertex dofs

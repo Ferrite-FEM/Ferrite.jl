@@ -15,8 +15,9 @@ right = Tensor{1,2,Float32}((1000.0,1000.0)) # define the right top corner of th
 
 grid = generate_grid(Quadrilateral, (1000, 1000),left,right)
 
-
-
+propertynames(grid)
+grid.cells
+grid.nodes
 
 ip = Lagrange{RefQuadrilateral, 1}() # define the interpolation function (i.e. Bilinear lagrange)
 
@@ -27,17 +28,17 @@ qr = QuadratureRule{RefQuadrilateral}(Float32,2)
 
 
 cellvalues = CellValues(Float32,qr, ip)
-
-
+propertynames(cellvalues)
+cellvalues.fun_values
 
 dh = DofHandler(grid)
-
-
 
 add!(dh, :u, ip)
 
 close!(dh);
 
+propertynames(dh)
+dh.cell_dofs
 
 
 # Standard assembly of the element.
@@ -157,10 +158,6 @@ fgpu = CUDA.zeros(ndofs(dh))
 
 
 n_cells = getncells(dh.grid)
-
-
-
-
 
 
 

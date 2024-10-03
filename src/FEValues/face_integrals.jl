@@ -25,18 +25,18 @@ align to the facet's local axis.
 function weighted_normal end
 
 """
-    create_facet_quad_rule(::Type{RefShape}, w::Vector{T}, p::Vector{Vec{N, T}})
+    create_facet_quad_rule(::Type{RefShape}, w::AbstractVectorä{T}, p::AbstractVectorä{Vec{N, T}})
     create_facet_quad_rule(
         ::Type{RefShape},
-        quad_faces::Vector{Int}, w_quad::Vector{T}, p_quad::Vector{Vec{N, T}},
-        tri_faces::Vector{Int}, w_tri::Vector{T}, p_tri::Vector{Vec{N, T}}
+        quad_faces::AbstractVectorä{Int}, w_quad::AbstractVector{T}, p_quad::AbstractVector{Vec{N, T}},
+        tri_faces::AbstractVector{Int}, w_tri::AbstractVector{T}, p_tri::AbstractVector{Vec{N, T}}
     )
 
 Create a ["FacetQuadratureRule"](@ref) for the given cell type, weights and points. If the
 cell has facets of different shapes (i.e. quadrilaterals and triangles) then each shape's
 facets indices, weights and points are passed separately.
 """
-function create_facet_quad_rule(::Type{RefShape}, w::Vector{T}, p::Vector{Vec{N, T}}) where {N, T, RefShape <: AbstractRefShape}
+function create_facet_quad_rule(::Type{RefShape}, w::AbstractVector{T}, p::AbstractVector{Vec{N, T}}) where {N, T, RefShape <: AbstractRefShape}
     facet_quad_rule = QuadratureRule{RefShape, Vector{T}, Vector{Vec{N+1, T}}}[]
     for facet in 1:nfacets(RefShape)
         new_points = [facet_to_element_transformation(p[i], RefShape, facet) for i in 1:length(w)]
@@ -48,8 +48,8 @@ end
 # For cells with mixed faces
 function create_facet_quad_rule(
     ::Type{RefShape},
-    quad_facets::Vector{Int}, w_quad::Vector{T}, p_quad::Vector{Vec{N, T}},
-    tri_facets::Vector{Int}, w_tri::Vector{T}, p_tri::Vector{Vec{N, T}}
+    quad_facets::AbstractVector{Int}, w_quad::AbstractVector{T}, p_quad::AbstractVector{Vec{N, T}},
+    tri_facets::AbstractVector{Int}, w_tri::AbstractVector{T}, p_tri::AbstractVector{Vec{N, T}}
 ) where {N, T, RefShape <: Union{RefPrism, RefPyramid}}
     facet_quad_rule = Vector{QuadratureRule{RefShape, Vector{T}, Vector{Vec{N+1, T}}}}(undef, nfacets(RefShape))
     for facet in quad_facets

@@ -13,7 +13,7 @@
 # In this example we focus on a simple but visually appealing problem from
 # fluid dynamics, namely vortex shedding. This problem is also known as
 # [von-Karman vortex streets](https://en.wikipedia.org/wiki/K%C3%A1rm%C3%A1n_vortex_street). Within this example, we show how to utilize [DifferentialEquations.jl](https://github.com/SciML/DifferentialEquations.jl)
-# in tandem with Ferrite.jl to solve this space-time problem. To keep things simple we use a naive approach
+# in tandem with Ferrite to solve this space-time problem. To keep things simple we use a naive approach
 # to discretize the system.
 #
 # ## Remarks on DifferentialEquations.jl
@@ -119,7 +119,7 @@
 # The full program, without comments, can be found in the next [section](@ref ns_vs_diffeq-plain-program).
 #
 # First we load Ferrite and some other packages we need
-using Ferrite, SparseArrays, BlockArrays, LinearAlgebra, UnPack, LinearSolve
+using Ferrite, SparseArrays, BlockArrays, LinearAlgebra, UnPack, LinearSolve, WriteVTK
 # Since we do not need the complete DifferentialEquations suite, we just load the required ODE infrastructure, which can also handle
 # DAEs in mass matrix form.
 using OrdinaryDiffEq
@@ -128,7 +128,7 @@ using OrdinaryDiffEq
 ν = 1.0/1000.0; #dynamic viscosity
 
 # Next a rectangular grid with a cylinder in it has to be generated.
-# We use `Gmsh` for the creation of the mesh and `FerriteGmsh` to translate it to a `Ferrite.Grid`.
+# We use Gmsh.jl for the creation of the mesh and FerriteGmsh.jl to translate it to a `Ferrite.Grid`.
 # Note that the mesh is pretty fine, leading to a high memory consumption when
 # feeding the equation system to direct solvers.
 using FerriteGmsh
@@ -195,7 +195,7 @@ add!(dh, :v, ip_v)
 add!(dh, :p, ip_p)
 close!(dh);
 
-# ### Boundary Conditions
+# ### Boundary conditions
 # As in the DFG benchmark we apply no-slip conditions to the top, bottom and
 # cylinder boundary. The no-slip condition states that the velocity of the
 # fluid on this portion of the boundary is fixed to be zero.
@@ -576,13 +576,14 @@ integrator = init(
 # !!! note "Export of solution"
 #     Exporting interpolated solutions of problems containing mass matrices is currently broken.
 #     Thus, the `intervals` iterator is used. Note that `solve` holds all solutions in the memory.
-pvd = VTKFileCollection("vortex-street", grid);
-for (u,t) in intervals(integrator)
-    addstep!(pvd, t) do io
-        write_solution(io, dh, u)
+pvd = paraview_collection("vortex-street")
+for (step, (u,t)) in enumerate(intervals(integrator))
+    VTKGridFile("vortex-street-$step", dh) do vtk
+        write_solution(vtk, dh, u)
+        pvd[t] = vtk
     end
 end
-close(pvd);
+vtk_save(pvd);
 
 
 using Test                                                                      #hide

@@ -56,7 +56,7 @@ function test_apply_rhs()
                 end
             end
 
-            assemble!(assembler, celldofs(cell), fe, Ke)
+            assemble!(assembler, celldofs(cell), Ke, fe)
         end
         return K, f
     end

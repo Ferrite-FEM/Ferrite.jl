@@ -160,7 +160,7 @@ function _create_boundaryset(f::Function, grid::AbstractGrid, top::ExclusiveTopo
     function _makeset(ff_nh)
         set = OrderedSet{BI}()
         for (ff_nh_idx, neighborhood) in pairs(ff_nh)
-            # ff_nh_idx::CartesianIndex into Matrix{<:EntityNeighborhood}
+            # ff_nh_idx::CartesianIndex into AbstractMatrix{AbstractVector{BI}}
             isempty(neighborhood) || continue # Skip any facets with neighbors (not on boundary)
             cell_idx  = ff_nh_idx[1]
             facet_nr = ff_nh_idx[2]

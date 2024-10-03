@@ -57,7 +57,7 @@
                     end
                 end
             end
-            assemble!(assembler, celldofs(dh,cellid), fe, Ke)
+            assemble!(assembler, celldofs(dh,cellid), Ke, fe)
         end
         return K, f
     end

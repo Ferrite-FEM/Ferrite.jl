@@ -38,23 +38,6 @@ end
 end
 
 @testset "Deprecation of old RefShapes" begin
-    # Interpolations
-    for order in 1:2
-        @test_throws Ferrite.DeprecationError Lagrange{1, RefCube, order}()
-    end
-    for order in 1:5
-        @test_throws Ferrite.DeprecationError Lagrange{2, RefTetrahedron, order}()
-    end
-    for order in 1:2
-        @test_throws Ferrite.DeprecationError Lagrange{2, RefCube, order}()
-    end
-    for order in 1:2
-        @test_throws Ferrite.DeprecationError Lagrange{3, RefCube, order}()
-    end
-    @test_throws Ferrite.DeprecationError Serendipity{2, RefCube, 2}()
-    @test_throws Ferrite.DeprecationError Serendipity{3, RefCube, 2}()
-    @test_throws Ferrite.DeprecationError CrouzeixRaviart{2, 1}()
-    @test_throws Ferrite.DeprecationError BubbleEnrichedLagrange{2, RefTetrahedron, 1}()
     # Quadrature/(Cell|Face)Value combinations (sometimes warns in the QR constructor, sometimes it the FEValues constructor)
     function test_combo(constructor, qdim, qshape, qargs, ip)
         qr = QuadratureRule{qdim, qshape}(qargs...)
@@ -122,6 +105,26 @@ end
 
 @testset "default_interpolation" begin
     @test_throws Ferrite.DeprecationError Ferrite.default_interpolation(Triangle)
+end
+
+@testset "start_assemble" begin
+    @test_throws Ferrite.DeprecationError start_assemble()
+    @test_throws Ferrite.DeprecationError start_assemble(10)
+end
+
+@testset "celldofs!(::Vector, ::Cache)" begin
+    grid = generate_grid(Quadrilateral, (1, 1))
+    dh = DofHandler(grid)
+    ip = Lagrange{RefQuadrilateral, 1}()
+    add!(dh, :u, ip)
+    close!(dh)
+    cc = CellCache(dh)
+    reinit!(cc, 1)
+    v = Int[]
+    @test_throws Ferrite.DeprecationError celldofs!(v, cc)
+    fc = FacetCache(dh)
+    reinit!(fc, FacetIndex(1, 1))
+    @test_throws Ferrite.DeprecationError celldofs!(v, fc)
 end
 
 end # testset deprecations

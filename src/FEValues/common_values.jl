@@ -45,12 +45,12 @@ function ValuesUpdateFlags(ip_fun::Interpolation, ::Val{update_gradients}, ::Val
 end
 
 """
-    reinit!(cv::CellValues, cell::AbstractCell, x::Vector)
-    reinit!(cv::CellValues, x::Vector)
-    reinit!(fv::FacetValues, cell::AbstractCell, x::Vector, face::Int)
-    reinit!(fv::FacetValues, x::Vector, face::Int)
+    reinit!(cv::CellValues, cell::AbstractCell, x::AbstractVector)
+    reinit!(cv::CellValues, x::AbstractVector)
+    reinit!(fv::FacetValues, cell::AbstractCell, x::AbstractVector, facet::Int)
+    reinit!(fv::FacetValues, x::AbstractVector, function_gradient::Int)
 
-Update the `CellValues`/`FacetValues` object for a cell or face with coordinates `x`.
+Update the `CellValues`/`FacetValues` object for a cell or facet with cell coordinates `x`.
 The derivatives of the shape functions, and the new integration weights are computed.
 For interpolations with non-identity mappings, the current `cell` is also required.
 """
@@ -60,7 +60,7 @@ reinit!
     getnquadpoints(fe_v::AbstractValues)
 
 Return the number of quadrature points. For `FacetValues`,
-this is the number for the current face.
+this is the number for the current facet.
 """
 function getnquadpoints end
 
@@ -71,7 +71,7 @@ Return the product between the determinant of the Jacobian and the quadrature
 point weight for the given quadrature point: ``\\det(J(\\mathbf{x})) w_q``.
 
 This value is typically used when one integrates a function on a
-finite element cell or face as
+finite element cell or facet as
 
 ``\\int\\limits_\\Omega f(\\mathbf{x}) d \\Omega \\approx \\sum\\limits_{q = 1}^{n_q} f(\\mathbf{x}_q) \\det(J(\\mathbf{x})) w_q``
 ``\\int\\limits_\\Gamma f(\\mathbf{x}) d \\Gamma \\approx \\sum\\limits_{q = 1}^{n_q} f(\\mathbf{x}_q) \\det(J(\\mathbf{x})) w_q``
@@ -329,7 +329,10 @@ Compute the spatial coordinate in a quadrature point. `x` contains the nodal
 coordinates of the cell.
 
 The coordinate is computed, using the geometric interpolation, as
-``\\mathbf{x} = \\sum\\limits_{i = 1}^n M_i (\\mathbf{x}) \\mathbf{\\hat{x}}_i``
+``\\mathbf{x} = \\sum\\limits_{i = 1}^n M_i (\\mathbf{\\xi}) \\mathbf{\\hat{x}}_i``.
+
+where ``\\xi``is the coordinate of the given quadrature point `q_point` of the associated
+quadrature rule.
 """
 function spatial_coordinate(fe_v::AbstractValues, q_point::Int, x::AbstractVector{<:Vec})
     n_base_funcs = getngeobasefunctions(fe_v)
@@ -342,24 +345,42 @@ function spatial_coordinate(fe_v::AbstractValues, q_point::Int, x::AbstractVecto
     return vec
 end
 
+"""
+    spatial_coordinate(ip::ScalarInterpolation, ξ::Vec, x::AbstractVector{<:Vec{sdim, T}})
+
+Compute the spatial coordinate in a given quadrature point. `x` contains the nodal coordinates of the cell.
+
+The coordinate is computed, using the geometric interpolation, as
+``\\mathbf{x} = \\sum\\limits_{i = 1}^n M_i (\\mathbf{\\xi}) \\mathbf{\\hat{x}}_i``
+"""
+function spatial_coordinate(interpolation::ScalarInterpolation, ξ::Vec, x::AbstractVector{<:Vec})
+    n_basefuncs = getnbasefunctions(interpolation)
+    @boundscheck checkbounds(x, Base.OneTo(n_basefuncs))
+    vec = zero(eltype(x))
+    @inbounds for j in 1:n_basefuncs
+        M = reference_shape_value(interpolation, ξ, j)
+        vec += M * x[j]
+    end
+    return vec
+end
 
 # Utility functions used by GeometryMapping, FunctionValues
 _copy_or_nothing(x) = copy(x)
 _copy_or_nothing(::Nothing) = nothing
 
-function reference_shape_values!(values::AbstractMatrix, ip, qr_points::Vector{<:Vec})
+function reference_shape_values!(values::AbstractMatrix, ip, qr_points::AbstractVector{<:Vec})
     for (qp, ξ) in pairs(qr_points)
         reference_shape_values!(@view(values[:, qp]), ip, ξ)
     end
 end
 
-function reference_shape_gradients_and_values!(gradients::AbstractMatrix, values::AbstractMatrix, ip, qr_points::Vector{<:Vec})
+function reference_shape_gradients_and_values!(gradients::AbstractMatrix, values::AbstractMatrix, ip, qr_points::AbstractVector{<:Vec})
     for (qp, ξ) in pairs(qr_points)
         reference_shape_gradients_and_values!(@view(gradients[:, qp]), @view(values[:, qp]), ip, ξ)
     end
 end
 
-function reference_shape_hessians_gradients_and_values!(hessians::AbstractMatrix, gradients::AbstractMatrix, values::AbstractMatrix, ip, qr_points::Vector{<:Vec})
+function reference_shape_hessians_gradients_and_values!(hessians::AbstractMatrix, gradients::AbstractMatrix, values::AbstractMatrix, ip, qr_points::AbstractVector{<:Vec})
     for (qp, ξ) in pairs(qr_points)
         reference_shape_hessians_gradients_and_values!(@view(hessians[:, qp]), @view(gradients[:, qp]), @view(values[:, qp]), ip, ξ)
     end

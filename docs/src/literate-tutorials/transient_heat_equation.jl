@@ -10,7 +10,7 @@
 #-
 #md # !!! tip
 #md #     This example is also available as a Jupyter notebook:
-#md #     [`transient_heat_equation.ipynb`](@__NBVIEWER_ROOT_URL__/examples/transient_heat_equation.ipynb).
+#md #     [`transient_heat_equation.ipynb`](@__NBVIEWER_ROOT_URL__/tutorials/transient_heat_equation.ipynb).
 #-
 #
 # ## Introduction
@@ -58,7 +58,7 @@
 #md # The full program, without comments, can be found in the next [section](@ref heat_equation-plain-program).
 #
 # First we load Ferrite, and some other packages we need.
-using Ferrite, SparseArrays
+using Ferrite, SparseArrays, WriteVTK
 # We create the same grid as in the heat equation example.
 grid = generate_grid(Quadrilateral, (100, 100));
 
@@ -137,7 +137,7 @@ function doassemble_K!(K::SparseMatrixCSC, f::Vector, cellvalues::CellValues, dh
             end
         end
 
-        assemble!(assembler, celldofs(cell), fe, Ke)
+        assemble!(assembler, celldofs(cell), Ke, fe)
     end
     return K, f
 end
@@ -189,15 +189,15 @@ apply_analytical!(uₙ, dh, :u, x -> (x[1]^2 - 1) * (x[2]^2 - 1) * max_temp);
 # Here, we apply **once** the boundary conditions to the system matrix `A`.
 apply!(A, ch);
 
-# To store the solution, we initialize a `VTKFileCollection` (.pvd) file.
-pvd = VTKFileCollection("transient-heat", grid);
-t = 0
-addstep!(pvd, t) do io
-    write_solution(io, dh, uₙ)
+# To store the solution, we initialize a paraview collection (.pvd) file,
+pvd = paraview_collection("transient-heat")
+VTKGridFile("transient-heat-0", dh) do vtk
+    write_solution(vtk, dh, uₙ)
+    pvd[0.0] = vtk
 end
 
 # At this point everything is set up and we can finally approach the time loop.
-for t in Δt:Δt:T
+for (step, t) in enumerate(Δt:Δt:T)
     #First of all, we need to update the Dirichlet boundary condition values.
     update!(ch, t)
 
@@ -209,14 +209,15 @@ for t in Δt:Δt:T
     #Finally, we can solve the time step and save the solution afterwards.
     u = A \ b
 
-    addstep!(pvd, t) do io
-        write_solution(io, dh, u)
+    VTKGridFile("transient-heat-$step", dh) do vtk
+        write_solution(vtk, dh, u)
+        pvd[t] = vtk
     end
     #At the end of the time loop, we set the previous solution to the current one and go to the next time step.
     uₙ .= u
 end
 # In order to use the .pvd file we need to store it to the disk, which is done by:
-close(pvd);
+vtk_save(pvd);
 
 #md # ## [Plain program](@id transient_heat_equation-plain-program)
 #md #
