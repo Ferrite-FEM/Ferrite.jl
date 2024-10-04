@@ -1,19 +1,19 @@
 ## GPU Assembler ###
 ### First abstract types and interfaces ###
 
-abstract type GPUAbstractSparseAssembler{Tv,Ti} end
+abstract type AbstractGPUSparseAssembler{Tv,Ti} end
 
-function assemble!(A::GPUAbstractSparseAssembler, dofs::AbstractVector{Int32}, Ke::MATRIX, fe::VECTOR) where {MATRIX, VECTOR}
+function Ferrite.assemble!(A::AbstractGPUSparseAssembler, dofs::AbstractVector{Int32}, Ke::MATRIX, fe::VECTOR) where {MATRIX, VECTOR}
     throw(NotImplementedError("A concrete implementation of assemble! is required"))
 end
 
 
-struct GPUAssemblerSparsityPattern{Tv,Ti,VEC_FLOAT<:AbstractVector{Tv},SPARSE_MAT<:AbstractSparseArray{Tv,Ti}} <: GPUAbstractSparseAssembler{Tv,Ti}
+struct GPUAssemblerSparsityPattern{Tv,Ti,VEC_FLOAT<:AbstractVector{Tv},SPARSE_MAT<:AbstractSparseArray{Tv,Ti}} <: AbstractGPUSparseAssembler{Tv,Ti}
     K::SPARSE_MAT
     f::VEC_FLOAT
 end
 
-function start_assemble(K::AbstractSparseArray{Tv,Ti}, f::AbstractVector{Tv}) where {Tv,Ti}
+function Ferrite.start_assemble(K::CUSPARSE.CuSparseDeviceMatrixCSC{Tv,Ti}, f::CuDeviceVector{Tv}) where {Tv,Ti}
     return GPUAssemblerSparsityPattern(K, f)
 end
 
@@ -24,7 +24,7 @@ end
 Assembles the global stiffness matrix `Ke` and the global force vector `fe` into the the global stiffness matrix `K` and the global force vector `f` of the `GPUAssemblerSparsityPattern` object `A`.
 
 """
-@propagate_inbounds function assemble!(A::GPUAssemblerSparsityPattern, dofs::AbstractVector{Int32}, Ke::MATRIX, fe::VECTOR) where {MATRIX, VECTOR}
+@propagate_inbounds function Ferrite.assemble!(A::GPUAssemblerSparsityPattern, dofs::AbstractVector{Int32}, Ke::MATRIX, fe::VECTOR) where {MATRIX, VECTOR}
     # Note: MATRIX and VECTOR are cuda dynamic shared memory
     _assemble!(A, dofs, Ke, fe)
 end

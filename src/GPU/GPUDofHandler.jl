@@ -1,6 +1,6 @@
-abstract type AbstractGPUDofHandler <:AbstractDofHandler  end
+abstract type AbstractGPUDofHandler <:Ferrite.AbstractDofHandler  end
 
-struct GPUDofHandler{CDOFS<:AbstractArray{<:Number,1},VEC_INT<:AbstractArray{Int32,1},GRID<:AbstractGrid}<: AbstractGPUDofHandler
+struct GPUDofHandler{CDOFS<:AbstractArray{<:Number,1},VEC_INT<:AbstractArray{Int32,1},GRID<:Ferrite.AbstractGrid}<: AbstractGPUDofHandler
     cell_dofs::CDOFS
     grid::GRID
     cell_dofs_offset::VEC_INT
@@ -19,9 +19,6 @@ Return the cell degrees of freedom for the given cell index `i` in the `GPUDofHa
 function celldofs(dh::GPUDofHandler, i::Int32)
     offset = cell_dof_offset(dh, i)
     ndofs = ndofs_per_cell(dh, i)
-    if ndofs ≠ 4
-        @cushow ndofs
-    end
-     view =  @view dh.cell_dofs[offset:(offset+ndofs-Int32(1))]
+    view =  @view dh.cell_dofs[offset:(offset+ndofs-Int32(1))]
     return view
 end

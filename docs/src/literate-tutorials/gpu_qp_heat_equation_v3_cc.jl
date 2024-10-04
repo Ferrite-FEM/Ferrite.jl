@@ -1,23 +1,20 @@
 using Ferrite, CUDA
 using StaticArrays
 using SparseArrays
-using Adapt
-using Test
-using NVTX
+
+
 
 
 
 
 left = Tensor{1,2,Float32}((0,-0)) # define the left bottom corner of the grid.
 
-right = Tensor{1,2,Float32}((1000.0,1000.0)) # define the right top corner of the grid.
+right = Tensor{1,2,Float32}((100.0,100.0)) # define the right top corner of the grid.
 
 
-grid = generate_grid(Quadrilateral, (1000, 1000),left,right)
+grid = generate_grid(Quadrilateral, (100, 100),left,right)
 
-propertynames(grid)
-grid.cells
-grid.nodes
+
 
 ip = Lagrange{RefQuadrilateral, 1}() # define the interpolation function (i.e. Bilinear lagrange)
 
@@ -28,8 +25,7 @@ qr = QuadratureRule{RefQuadrilateral}(Float32,2)
 
 
 cellvalues = CellValues(Float32,qr, ip)
-propertynames(cellvalues)
-cellvalues.fun_values
+
 
 dh = DofHandler(grid)
 
@@ -37,8 +33,7 @@ add!(dh, :u, ip)
 
 close!(dh);
 
-propertynames(dh)
-dh.cell_dofs
+
 
 
 # Standard assembly of the element.
@@ -83,9 +78,6 @@ end
 
 
 # Standard global assembly
-
-
-
 function assemble_global!(cellvalues, dh::DofHandler,qp_iter::Val{QPiter}) where {QPiter}
     (;f, K, assembler, Ke, fe) = create_buffers(cellvalues,dh)
     # Loop over all cels
@@ -134,9 +126,6 @@ end
 
 
 
-
-
-
 function assemble_gpu!(Kgpu,fgpu, cv, dh)
     n_basefuncs = getnbasefunctions(cv)
     assembler = start_assemble(Kgpu, fgpu)
@@ -152,17 +141,15 @@ end
 
 
 n_basefuncs = getnbasefunctions(cellvalues)
-K = allocate_matrix(SparseMatrixCSC{Float32, Int32},dh)
-Kgpu = CUSPARSE.CuSparseMatrixCSC(K)
-fgpu = CUDA.zeros(ndofs(dh))
-
+K = allocate_matrix(SparseMatrixCSC{Float32, Int32},dh);
+Kgpu = CUSPARSE.CuSparseMatrixCSC(K);
+fgpu = CUDA.zeros(ndofs(dh));
 
 n_cells = getncells(dh.grid)
 
+kernel_config = CUDAKernelLauncher(n_cells, n_basefuncs, assemble_gpu!, (Kgpu,fgpu, cellvalues, dh));
 
-
-
-launch_kernel(assemble_gpu!, (Kgpu,fgpu, cellvalues, dh) , n_cells, n_basefuncs)
+launch_kernel!(kernel_config);
 
 stassy(cv,dh) = assemble_global!(cv,dh,Val(false))
 

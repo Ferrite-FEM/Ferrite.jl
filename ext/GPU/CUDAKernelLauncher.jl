@@ -1,5 +1,10 @@
-function launch_kernel(f::Function , args::Tuple,n_cells::Int, n_basefuncs::Int)
-    kernel = @cuda launch=false f(args...)
+
+function Ferrite.launch_kernel!(kernel_config::CUDAKernelLauncher{Ti}) where Ti
+    n_cells = kernel_config.n_cells
+    n_basefuncs = kernel_config.n_basefuncs
+    ker = kernel_config.kernel
+    args = kernel_config.args
+    kernel = @cuda launch=false ker(args...)
     config = launch_configuration(kernel.fun)
     threads = min(n_cells, config.threads,256)
     shared_mem = _calculate_shared_memory(threads ,n_basefuncs)

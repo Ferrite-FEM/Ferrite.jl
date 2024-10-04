@@ -38,7 +38,7 @@ function Adapt.adapt_structure(to, grid::Grid)
 end
 
 
-function Adapt.adapt_structure(to,iterator::GPUCellIterator)
+function Adapt.adapt_structure(to,iterator::CUDACellIterator)
     grid = Adapt.adapt_structure(to, iterator.grid)
     dh = Adapt.adapt_structure(to, iterator.dh)
     ncells = Adapt.adapt_structure(to, iterator.n_cells)
@@ -50,7 +50,7 @@ end
 
 
 function get_ndofs_cell(dh::DofHandler)
-    ndofs_cell = [Int32(ndofs_per_cell(dh, i)) for i in 1:(dh |> get_grid |> getncells)]
+    ndofs_cell = [Int32(Ferrite.ndofs_per_cell(dh, i)) for i in 1:(dh |> Ferrite.get_grid |> Ferrite.getncells)]
     return ndofs_cell
 end
 
@@ -73,7 +73,7 @@ function Adapt.adapt_structure(to, dh::DofHandler)
 end
 
 
-function Adapt.adapt_structure(to, assembler::Ferrite.GPUAssemblerSparsityPattern)
+function Adapt.adapt_structure(to, assembler::GPUAssemblerSparsityPattern)
     K = Adapt.adapt_structure(to, assembler.K)
     f = Adapt.adapt_structure(to, assembler.f)
     Ferrite.GPUAssemblerSparsityPattern(K, f)

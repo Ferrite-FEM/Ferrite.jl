@@ -24,8 +24,6 @@ using Tensors:
     rotation_tensor, symmetric, tovoigt!, hessian, otimesu
 using ForwardDiff:
     ForwardDiff
-using CUDA
-using Adapt
 
 include("CollectionsOfViews.jl")
 using .CollectionsOfViews:
@@ -171,13 +169,10 @@ include("deprecations.jl")
 include("docs.jl")
 
 # GPU support
-include("GPU/kernel_meta.jl")
-include("GPU/gpu_assembler.jl")
-include("Grid/gpu_grid.jl")
-include("Dofs/GPUDofHandler.jl")
-include("iterators_prototype.jl")
-include("GPU/adapt.jl")
-include("GPU/cuda.jl")
+include("GPU/GPUKernelLauncher.jl")
+include("GPU/gpu_grid.jl")
+include("GPU/GPUDofHandler.jl")
+include("GPU/gpu_iterator.jl")
 
 
 end # module

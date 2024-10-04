@@ -189,13 +189,15 @@ export
     PointValues,
 
 # GPU
-    @run_gpu,
-    assemble_atomic!,
-    allocate_gpu_matrix,
-    #GPUSparseMatrixCSC,
-    gpu_sparse_norm,
-    cellcache,
-    ncells,
+    CUDAKernelLauncher,
+    StaticQuadratureView,
+    StaticInterpolationValues,
+    launch_kernel!,
+    getweights,
+    get_grid,
+    get_ndofs_cell,
+    getncells,
     cellke,
     cellfe,
-    launch_kernel
+    GPUDofHandler,
+    GPUGrid
