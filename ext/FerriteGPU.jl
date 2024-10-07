@@ -1,4 +1,6 @@
 module FerriteGPU
+# This module represnets an extenssion of Ferrite.jl that uses GPU backend for assembly, namely CUDA.jl
+
 using Ferrite
 using CUDA
 using Adapt

@@ -1,4 +1,12 @@
 
+"""
+    Ferrite.launch_kernel!(kernel_config::CUDAKernelLauncher{Ti}) where Ti
+
+Launch a CUDA kernel with the given configuration.
+
+Arguments:
+- `kernel_config`: The `CUDAKernelLauncher` object containing a higher level fields for kernel configuration.
+"""
 function Ferrite.launch_kernel!(kernel_config::CUDAKernelLauncher{Ti}) where Ti
     n_cells = kernel_config.n_cells
     n_basefuncs = kernel_config.n_basefuncs
@@ -39,6 +47,11 @@ end
 #     end
 # end
 
+"""
+    _calculate_nblocks(threads::Int, n_cells::Int)
+
+Calculate the number of blocks to be used in the kernel launch.
+"""
 function _calculate_nblocks(threads::Int, n_cells::Int)
     dev = device()
     no_sms = CUDA.attribute(dev, CUDA.CU_DEVICE_ATTRIBUTE_MULTIPROCESSOR_COUNT)

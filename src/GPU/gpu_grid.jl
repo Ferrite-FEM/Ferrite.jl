@@ -1,5 +1,6 @@
-# This file defines the GPUGrid type, which is a grid that is stored on the GPU. It is a subtype of AbstractGrid.
-# TODO: Refactor type parameters to be more consistent with the rest of the codebase.
+# This file defines the GPUGrid type, which is a grid that is stored on the GPU. Therefore most of the
+# functions are same as the ones defined in grid.jl, but executable on the GPU.
+
 abstract type AbstractGPUGrid{dim} <: Ferrite.AbstractGrid{dim} end
 
 struct GPUGrid{dim,CELLVEC<:AbstractArray,NODEVEC<:AbstractArray}<: AbstractGPUGrid{dim}
@@ -25,7 +26,7 @@ get_coordinate_type(::GPUGrid{dim,CELLVEC,NODEVEC}) where
 @inline getcells(grid::GPUGrid, v::Union{Int32, Vector{Int32}}) = grid.cells[v]
 @inline getnodes(grid::GPUGrid, v::Int32) = grid.nodes[v]
 
-@inline """
+"""
     getcoordinates(grid::Ferrite.GPUGrid,e::Int32)
 
 Return the coordinates of the nodes of the element `e` in the `GPUGrid` `grid`.

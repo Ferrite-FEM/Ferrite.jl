@@ -1,3 +1,6 @@
+# This file defines the `GPUDofHandler` type, which is a degree of freedom handler that is stored on the GPU.
+# Therefore most of the functions are same as the ones defined in dof_handler.jl, but executable on the GPU.
+
 abstract type AbstractGPUDofHandler <:Ferrite.AbstractDofHandler  end
 
 struct GPUDofHandler{CDOFS<:AbstractArray{<:Number,1},VEC_INT<:AbstractArray{Int32,1},GRID<:Ferrite.AbstractGrid}<: AbstractGPUDofHandler
