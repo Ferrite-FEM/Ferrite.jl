@@ -25,6 +25,19 @@ module DofOrder
         ComponentWise(x=Int[]) = new(_check_target_blocks(x))
     end
 
+    struct CellWise{V} # <: DofOrdering
+        cellids::V
+        function CellWise(x::AbstractVector{Int})
+            if !isempty(x) && !allunique(x)
+                error("cell list must be unique")
+            end
+            return new(x)
+        end
+        function CellWise()
+            return new(nothing)
+        end
+    end
+
     """
         DofOrder.Ext{T}
 
@@ -222,6 +235,42 @@ function compute_renumber_permutation(dh::DofHandler, _, order::DofOrder.Compone
     end
     # Construct permutation
     perm = invperm(iperm)
+    return perm
+end
+
+"""
+    DofOrder.CellWise(cellids)
+
+Dof order passed to [`renumber!`](@ref) to renumber global dofs in cell order as given by
+`cellids`. By default the global cell order is used.
+
+Note that, unless all fields are discontinuous,
+"""
+DofOrder.CellWise
+
+function compute_renumber_permutation(dh::DofHandler, _, order::DofOrder.CellWise{T}) where T
+    if T === Nothing
+        cellids = 1:getncells(dh.grid)
+    else
+        cellids = order.cellids
+        @assert allunique(cellids) # checked in constructor
+        if length(cellids) != getncells(dh.grid)
+            error("length of cell ids does not match number of cells in DofHandler")
+        end
+    end
+    perm = zeros(Int, ndofs(dh))
+    next = 0
+    cache = CellCache(dh, UpdateFlags(dofs = true, nodes = false, coords = false))
+    for cellid in cellids
+        reinit!(cache, cellid)
+        for d in celldofs(cache)
+            if perm[d] == 0
+                perm[d] = next += 1
+            end
+        end
+    end
+    @assert next == ndofs(dh)
+    @assert all(!iszero, perm)
     return perm
 end
 
