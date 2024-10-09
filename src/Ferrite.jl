@@ -12,7 +12,7 @@ using LinearAlgebra:
 using NearestNeighbors:
     NearestNeighbors, KDTree, knn
 using OrderedCollections:
-    OrderedSet
+    OrderedSet, OrderedDict
 using SparseArrays:
     SparseArrays, SparseMatrixCSC, nonzeros, nzrange, rowvals, AbstractSparseMatrixCSC
 using StaticArrays:
