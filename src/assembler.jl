@@ -128,7 +128,7 @@ function finish_assemble(a::COOAssembler)
     # Create the matrix
     nrows = a.nrows == -1 ? maximum(a.I) : a.nrows
     ncols = a.ncols == -1 ? maximum(a.J) : a.ncols
-    K = sparse!!(a.I, a.J, a.V, nrows, ncols)
+    K = SparseArrays.sparse!(a.I, a.J, a.V, nrows, ncols)
     # Finalize the vector
     f = a.f
     if !isempty(f)

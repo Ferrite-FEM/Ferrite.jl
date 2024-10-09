@@ -27,6 +27,14 @@ jobs:
       - uses: julia-actions/cache@v2
       - uses: julia-actions/julia-buildpkg@v1
       - uses: julia-actions/julia-runtest@v1
+      - name: JET tests
+        shell: julia --color=yes --project=@jet {0}
+        run: |
+          using Pkg
+          Pkg.add("JET")
+          Pkg.develop(path = pwd())
+          include(joinpath(pwd(), "test/jet.jl"))
+        if: ${{ matrix.os == 'ubuntu-latest' && matrix.julia-version != 'nightly' }}
       - uses: julia-actions/julia-processcoverage@v1
         with:
           directories: 'src,ext'
