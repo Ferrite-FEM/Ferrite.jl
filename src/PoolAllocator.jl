@@ -3,22 +3,14 @@ module PoolAllocator
 # Checkmate LanguageServer.jl
 const var"@propagate_inbounds" = Base.var"@propagate_inbounds"
 
-@eval macro $(Symbol("const"))(field)
-    if VERSION >= v"1.8.0-DEV.1148"
-        Expr(:const, esc(field))
-    else
-        return esc(field)
-    end
-end
-
 const PAGE_SIZE = 4 * 1024 * 1024 # 4 MiB
 
 # A page corresponds to a memory block of size `PAGE_SIZE` bytes.
 # Allocations of arrays are views into this block.
 mutable struct Page{T}
-    @const buf::Vector{T}      # data buffer (TODO: Memory in recent Julias?)
-    @const blocksize::Int      # blocksize for this page
-    @const freelist::BitVector # block is free/used
+    const buf::Vector{T}      # data buffer (TODO: Memory in recent Julias?)
+    const blocksize::Int      # blocksize for this page
+    const freelist::BitVector # block is free/used
     n_free::Int               # number of free blocks
     function Page{T}(blocksize::Int) where T
         @assert isbitstype(T)

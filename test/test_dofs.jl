@@ -408,14 +408,12 @@ end
     end
 
     # Metis ordering
-    if HAS_EXTENSIONS && MODULE_CAN_BE_TYPE_PARAMETER
-        # TODO: Should probably test that the new order result in less fill-in
-        dh, ch = testdhch()
-        renumber!(dh, DofOrder.Ext{Metis}())
-        @test_throws ErrorException renumber!(dh, ch, DofOrder.Ext{Metis}())
-        renumber!(dh, DofOrder.Ext{Metis}(coupling=[true true; true false]))
-        @test_throws ErrorException renumber!(dh, ch, DofOrder.Ext{Metis}(coupling=[true true; true false]))
-    end
+    # TODO: Should probably test that the new order result in less fill-in
+    dh, ch = testdhch()
+    renumber!(dh, DofOrder.Ext{Metis}())
+    @test_throws ErrorException renumber!(dh, ch, DofOrder.Ext{Metis}())
+    renumber!(dh, DofOrder.Ext{Metis}(coupling=[true true; true false]))
+    @test_throws ErrorException renumber!(dh, ch, DofOrder.Ext{Metis}(coupling=[true true; true false]))
 end
 
 @testset "dof coupling" begin

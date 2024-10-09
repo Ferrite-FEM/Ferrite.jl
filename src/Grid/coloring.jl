@@ -22,7 +22,7 @@ function create_incidence_matrix(g::AbstractGrid, cellset=1:getncells(g))
         end
     end
 
-    incidence_matrix = spzeros!!(Bool, I, J, getncells(g), getncells(g))
+    incidence_matrix = SparseArrays.spzeros!(Bool, I, J, getncells(g), getncells(g))
     fill!(incidence_matrix.nzval, true)
     return incidence_matrix
 end
