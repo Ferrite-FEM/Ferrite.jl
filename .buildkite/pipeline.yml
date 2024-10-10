@@ -1,5 +1,6 @@
 env:
   SECRET_CODECOV_TOKEN: "z6LGkbwwCYO3tfyKMlhqpDWi2xYoxEUe08LJadj8uNPrauloZLm8WedTr401kfG0qJ3cn8B+8VxtqmdPqFslR3HyQ6tR3jce/7HPil6M2//zASmFDa0q1SNdkpCdW8P40hUb3B/TWzuDerpIVRF2ZlT2o1c89moJKsnHzXZ1tiRmfV9bbi0sxwDjiOMKH/+zCE98qbrgAxT4fCd0mJygQ8DYgssqcx2F4K/9gxPwjnGqXnN1Naqecm6qX4u7cKUzhUk3j7rRSR9nsAoRuudPPC2z3Kxqi6Ck+miao7anVZsjKjiQRwXaz0XO5J+c6qELhR/Q6qCaIi3gDGyon9S5Rg==;U2FsdGVkX18YJRg3/sVemL2NXTl0m+AElZmGQ2zH64beto1uHlwqOB52ZY0xetmcJNw/vWKb0VCP1e2FX8JcoA=="
+  JULIA_DEBUG: "all"
 
 steps:
   - label: "Julia v1"
