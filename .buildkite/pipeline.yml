@@ -1,0 +1,22 @@
+env:
+  SECRET_CODECOV_TOKEN: "V1W6eELqofOWx59dQvD1s1Blp64SgjCdW2PtPGrdTjK4iyysFtdmFZGslR004DbgOfqzFHG2yacOtRHt08NiGQy4OqglHPKG2wcPryPE1KbrlWVKbNrrGJDofN8CKwt7a+KWbrxbldKPNMq4kpaaLyDIVxGHyzyPOvIyOWLTsmfZYvfQEY0c0W6rGzox0BR8hI5o6DJXm3GFg2VpCwMJ7YIhbU1uqb0A9zZVC/iRjNVsHgDQuJ2ybtoPsMiZmg3C7DrXAAh1EANsA5nVRHTGVReITtV/plfTwe5fkQ/KpNbhmpj5s0MXS4Z2kLZOHI3OI9NU2swy4sJoXgDGBlAWOA==;U2FsdGVkX19JPGOjpPNnwLMs+yhJ+xvhRahrJ5J+jtdUKwZnt4273Cq0bgjGCkqPuOO9iQlphSvlNK7uip+/+A=="
+
+steps:
+  - label: ":julia: Julia v1"
+    notify:
+      - github_commit_status:
+          context: "Test GPU / Julia 1"
+    plugins:
+      - JuliaCI/julia#v1:
+          version: "1"
+      # - JuliaCI/julia-test#v1: ~
+      - JuliaCI/julia-coverage#v1:
+          dirs: ["src", "ext"]
+    command: |
+      julia --code-coverage=@ --project=test/GPU -e 'using Pkg; Pkg.instantiate()'
+      julia --code-coverage=@ --project=test/GPU test/GPU/runtests.jl
+    agents:
+      queue: "juliagpu"
+      cuda: "*"
+    if: build.message !~ /\[skip tests\]/
+    timeout_in_minutes: 60
