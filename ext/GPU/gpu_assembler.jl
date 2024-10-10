@@ -52,7 +52,7 @@ end
     for k in col_start:col_end
         if K.rowVal[k] == i
             # Update the existing element
-              CUDA.@atomic K.nzVal[k] += v
+            CUDA.@atomic K.nzVal[k] += v
             return
         end
     end
