@@ -1,0 +1,21 @@
+env:
+  SECRET_CODECOV_TOKEN: "z6LGkbwwCYO3tfyKMlhqpDWi2xYoxEUe08LJadj8uNPrauloZLm8WedTr401kfG0qJ3cn8B+8VxtqmdPqFslR3HyQ6tR3jce/7HPil6M2//zASmFDa0q1SNdkpCdW8P40hUb3B/TWzuDerpIVRF2ZlT2o1c89moJKsnHzXZ1tiRmfV9bbi0sxwDjiOMKH/+zCE98qbrgAxT4fCd0mJygQ8DYgssqcx2F4K/9gxPwjnGqXnN1Naqecm6qX4u7cKUzhUk3j7rRSR9nsAoRuudPPC2z3Kxqi6Ck+miao7anVZsjKjiQRwXaz0XO5J+c6qELhR/Q6qCaIi3gDGyon9S5Rg==;U2FsdGVkX18YJRg3/sVemL2NXTl0m+AElZmGQ2zH64beto1uHlwqOB52ZY0xetmcJNw/vWKb0VCP1e2FX8JcoA=="
+  # SECRET_CODECOV_TOKEN: "V1W6eELqofOWx59dQvD1s1Blp64SgjCdW2PtPGrdTjK4iyysFtdmFZGslR004DbgOfqzFHG2yacOtRHt08NiGQy4OqglHPKG2wcPryPE1KbrlWVKbNrrGJDofN8CKwt7a+KWbrxbldKPNMq4kpaaLyDIVxGHyzyPOvIyOWLTsmfZYvfQEY0c0W6rGzox0BR8hI5o6DJXm3GFg2VpCwMJ7YIhbU1uqb0A9zZVC/iRjNVsHgDQuJ2ybtoPsMiZmg3C7DrXAAh1EANsA5nVRHTGVReITtV/plfTwe5fkQ/KpNbhmpj5s0MXS4Z2kLZOHI3OI9NU2swy4sJoXgDGBlAWOA==;U2FsdGVkX19JPGOjpPNnwLMs+yhJ+xvhRahrJ5J+jtdUKwZnt4273Cq0bgjGCkqPuOO9iQlphSvlNK7uip+/+A=="
+
+steps:
+  - label: "Julia v1"
+    plugins:
+      - JuliaCI/julia#v1:
+          version: "1"
+      # - JuliaCI/julia-test#v1: ~
+      - JuliaCI/julia-coverage#fe/buildkite-org-token:
+          codecov: true
+    command: |
+      julia --version
+      julia --code-coverage=@ --project=. -e 'using Pkg; Pkg.instantiate()'
+      julia --code-coverage=@ --project=. -e 'using Ferrite; generate_grid(Triangle, (2, 2))'
+    agents:
+      queue: "juliagpu"
+      cuda: "*"
+    if: build.message !~ /\[skip tests\]/
+    timeout_in_minutes: 60
