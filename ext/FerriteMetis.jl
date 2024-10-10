@@ -1,12 +1,9 @@
 module FerriteMetis
 
-# This extension requires modules as type parameters
-# https://github.com/JuliaLang/julia/pull/47749
-if VERSION >= v"1.10.0-DEV.90"
-
 using Ferrite:
     Ferrite, CellIterator, ConstraintHandler, DofHandler, DofOrder, celldofs, ndofs,
-    ndofs_per_cell, spzeros!!
+    ndofs_per_cell
+using SparseArrays: SparseArrays
 using Metis.LibMetis: idx_t
 using Metis: Metis
 
@@ -74,7 +71,7 @@ function Ferrite.compute_renumber_permutation(
     end
     @assert length(I) == length(J) == idx
     N = ndofs(dh)
-    S = spzeros!!(Float32, I, J, N, N)
+    S = SparseArrays.spzeros!(Float32, I, J, N, N)
 
     # Add entries from affine constraints
     if ch !== nothing
@@ -93,7 +90,5 @@ function Ferrite.compute_renumber_permutation(
     perm, iperm = Metis.permutation(G)
     return iperm
 end
-
-end # VERSION check
 
 end # module FerriteMetis

@@ -85,16 +85,3 @@ function fillzero!(A::Symmetric{T,<:SparseMatrixCSC}) where T
     fillzero!(A.data)
     return A
 end
-
-# Compat and convenience layer around SparseArrays.spzeros! (SparseArrays.jl#284, SparseArrays.jl#315)
-if VERSION >= v"1.10.0"
-    const sparse!! = SparseArrays.sparse!
-    const spzeros!! = SparseArrays.spzeros!
-else
-    function sparse!!(I::AbstractVector, J::AbstractVector, V::AbstractVector, m::Integer, n::Integer)
-        return SparseArrays.sparse(I, J, V, m, n)
-    end
-    function spzeros!!(::Type{T}, I::AbstractVector, J::AbstractVector, m::Integer, n::Integer) where T
-        return sparse!!(I, J, zeros(T, length(I)), m, n)
-    end
-end
