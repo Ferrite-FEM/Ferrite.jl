@@ -104,6 +104,7 @@ export
     addcellset!,
     transform_coordinates!,
     generate_grid,
+    GPUGrid,
 
 # Grid coloring
     create_coloring,
@@ -122,6 +123,7 @@ export
     DofOrder,
     evaluate_at_grid_nodes,
     apply_analytical!,
+    get_grid,
 
 # Sparsity pattern
     # AbstractSparsityPattern,
@@ -184,4 +186,18 @@ export
     evaluate_at_points,
     PointIterator,
     PointLocation,
-    PointValues
+    PointValues,
+
+# GPU
+    CUDAKernelLauncher,
+    StaticQuadratureView,
+    StaticInterpolationValues,
+    launch_kernel!,
+    getweights,
+    get_grid,
+    get_ndofs_cell,
+    getncells,
+    cellke,
+    cellfe,
+    GPUDofHandler,
+    GPUGrid
