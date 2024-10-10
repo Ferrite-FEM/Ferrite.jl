@@ -11,6 +11,8 @@ steps:
           codecov: true
     command: |
       julia --version
+      julia --code-coverage=@ --project=. -e 'using Pkg; Pkg.instantiate()'
+      julia --code-coverage=@ --project=. -e 'using Ferrite; generate_grid(Triangle, (2, 2))'
     agents:
       queue: "juliagpu"
       cuda: "*"
