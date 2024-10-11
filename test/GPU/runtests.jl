@@ -51,28 +51,20 @@ end
 
 
 
-function init_dh()
+function generate_problem()
     left = Tensor{1,2,Float32}((0, -0))
 
     right = Tensor{1, 2, Float32}((rand(1.0:1000.0), rand(1.0:1000.0)))
 
     grid_dims = (rand(1:1000), rand(5:1000))
 
-
     grid = generate_grid(Quadrilateral, grid_dims, left, right)
 
+    ip = Lagrange{RefQuadrilateral, 1}() # define the interpolation function (i.e. Bilinear lagrange)
 
+    qr = QuadratureRule{RefQuadrilateral}(Float32,2)
 
-    ip = Lagrange{RefQuadrilateral,1}() # define the interpolation function (i.e. Bilinear lagrange)
-
-
-
-    qr = QuadratureRule{RefQuadrilateral}(Float32, 2)
-
-
-
-    cellvalues = CellValues(Float32, qr, ip)
-
+    cellvalues = CellValues(Float32,qr, ip)
 
     dh = DofHandler(grid)
 
@@ -80,7 +72,7 @@ function init_dh()
 
     close!(dh)
 
-    return dh
+    return dh, cellvalues
 end
 
 function getalldofs(dh)
@@ -89,7 +81,9 @@ function getalldofs(dh)
 end
 
 
-function dof_kernel!(dofs, dh)
+function dof_kernel_kernel!(dofs, dh)
+    # this kernel is used to get all the dofs of the grid, which then
+    # can be validated against the correct dofs (i.e. CPU version).
     for cell in CellIterator(dh, convert(Int32, 4))
         cid = cellid(cell)
         cdofs = celldofs(cell)
@@ -100,13 +94,94 @@ function dof_kernel!(dofs, dh)
     return nothing
 end
 
+
+function assemble_element_gpu!(Ke,fe,cv,cell)
+    n_basefuncs = getnbasefunctions(cv)
+    for qv in Ferrite.QuadratureValuesIterator(cv,getcoordinates(cell))
+        ## Get the quadrature weight
+        dΩ = getdetJdV(qv)
+        ## Loop over test shape functions
+        for i in 1:n_basefuncs
+            δu  = shape_value(qv, i)
+            ∇u = shape_gradient(qv, i)
+            ## Add contribution to fe
+            fe[i] += δu * dΩ
+            #fe_shared[tx,i] += δu * dΩ
+            ## Loop over trial shape functions
+            for j in 1:n_basefuncs
+                ∇δu = shape_gradient(qv, j)
+                ## Add contribution to Ke
+                Ke[i,j] += (∇δu ⋅ ∇u) * dΩ
+            end
+        end
+    end
+end
+
+
+function assemble_element_cpu!(Ke, fe, cellvalues)
+    n_basefuncs = getnbasefunctions(cellvalues)
+    # Loop over quadrature points
+    for q_point in 1:getnquadpoints(cellvalues)
+        # Get the quadrature weight
+        dΩ = getdetJdV(cellvalues, q_point)
+        # Loop over test shape functions
+        for i in 1:n_basefuncs
+            δu  = shape_value(cellvalues, q_point, i)
+            ∇δu = shape_gradient(cellvalues, q_point, i)
+            # Add contribution to fe
+            fe[i] += δu * dΩ
+            # Loop over trial shape functions
+            for j in 1:n_basefuncs
+                ∇u = shape_gradient(cellvalues, q_point, j)
+                # Add contribution to Ke
+                Ke[i, j] += (∇δu ⋅ ∇u) * dΩ
+            end
+        end
+    end
+    return Ke, fe
+end
+
+function localkefe_kernel!(kes,fes,cv,dh)
+    for cell in CellIterator(dh, convert(Int32, 4))
+        Ke = cellke(cell)
+        fe = cellfe(cell)
+        assemble_element_gpu!(Ke, fe, cv, cell)
+        kes[cellid(cell),:,:] .= Ke
+        fes[cellid(cell),:] .= fe
+    end
+    return nothing
+end
+
+function get_cpu_kefe(dh, cellvalues)
+    ncells = dh |> get_grid |> getncells
+    kes = zeros(Float32, ncells, 4, 4)
+    fes = zeros(Float32, ncells, 4)
+    for cell in CellIterator(dh)
+        cid = cellid(cell)
+        reinit!(cellvalues, cell)
+        # Compute element contribution
+        assemble_element_cpu!((@view kes[cid,:,:]),(@view fes[cid,:,:]), cellvalues)
+    end
+    return kes |> cu , fes |> cu
+end
+
 @testset "Test iterators" begin
-    dh = init_dh()
+    dh, cellvalues  = generate_problem()
+    # 1. Test that dofs for each cell in the grid are correctly computed
     ncells = dh |> get_grid |> getncells
     dofs = CUDA.fill(Int32(0),4,ncells)
     correct_dofs = getalldofs(dh)
-    kernel_config = CUDAKernelLauncher(ncells, 4, dof_kernel!, (dofs, dh));
+    kernel_config = CUDAKernelLauncher(ncells, 4, dof_kernel_kernel!, (dofs, dh));
     launch_kernel!(kernel_config);
     @test all(dofs .≈ correct_dofs)
+
+    # 2. Test that local ke and fe are correctly computed
+    kes_gpu = CUDA.fill(0.0f0, ncells, 4, 4)
+    fes_gpu = CUDA.fill(0.0f0, ncells, 4)
+    kernel_config = CUDAKernelLauncher(ncells, 4, localkefe_kernel!, (kes_gpu, fes_gpu, cellvalues, dh));
+    launch_kernel!(kernel_config);
+    kes_cpu, fes_cpu = get_cpu_kefe(dh, cellvalues)
+    @test all(kes_gpu .≈ kes_cpu)
+    @test all(fes_gpu .≈ fes_cpu)
 
 end
