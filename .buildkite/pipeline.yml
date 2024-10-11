@@ -10,8 +10,7 @@ steps:
       - JuliaCI/julia#v1:
           version: "1"
       # - JuliaCI/julia-test#v1: ~
-      - JuliaCI/julia-coverage#v1:
-          dirs: ["src", "ext"]
+      - JuliaCI/julia-coverage#fe/buildkite-org-token: ~
     command: |
       julia --code-coverage=@ --project=test/GPU -e 'using Pkg; Pkg.instantiate()'
       julia --code-coverage=@ --project=test/GPU test/GPU/runtests.jl
