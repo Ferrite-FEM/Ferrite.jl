@@ -33,7 +33,7 @@ function Ferrite.CellIterator(dh::Ferrite.AbstractGPUDofHandler, n_basefuncs::In
     grid = get_grid(dh)
     n_cells = grid |> getncells |> Int32
     bd = blockDim().x
-    ke_shared = @cuDynamicSharedMem(Float32, (bd, n_basefuncs, n_basefuncs))
+    ke_shared =@cuDynamicSharedMem(Float32, (bd, n_basefuncs, n_basefuncs))
     fe_shared = @cuDynamicSharedMem(Float32, (bd, n_basefuncs), sizeof(Float32) * bd * n_basefuncs * n_basefuncs)
     local_thread_id = threadIdx().x
     CUDACellIterator(dh, grid, n_cells, ke_shared, fe_shared, local_thread_id)
@@ -117,7 +117,7 @@ function _makecache(iterator::CUDACellIterator, e::Int32)
     coords = SVector(x...)
 
     # Return the GPUCellCache containing the cell's data.
-    return GPUCellCache(coords, dofs, cellid, nodes, (@view iterator.block_ke[iterator.thread_id, :, :]), (@view iterator.block_fe[iterator.thread_id, :, :]))
+    return  GPUCellCache(coords, dofs, cellid, nodes, (@view iterator.block_ke[iterator.thread_id, :, :]), (@view iterator.block_fe[iterator.thread_id, :, :]))
 end
 
 """
@@ -170,7 +170,7 @@ Arguments:
 Returns:
 - The ID of the current cell.
 """
-cellid(cc::GPUCellCache) = cc.cellid
+Ferrite.cellid(cc::GPUCellCache) = cc.cellid
 
 """
     Ferrite.cellke(cc::GPUCellCache)

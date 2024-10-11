@@ -35,7 +35,6 @@ close!(dh);
 
 
 
-
 # Standard assembly of the element.
 
 
@@ -139,13 +138,11 @@ function assemble_gpu!(Kgpu,fgpu, cv, dh)
 end
 
 
-
 n_basefuncs = getnbasefunctions(cellvalues)
 K = allocate_matrix(SparseMatrixCSC{Float32, Int32},dh);
 Kgpu = CUSPARSE.CuSparseMatrixCSC(K);
 fgpu = CUDA.zeros(ndofs(dh));
 
-n_cells = getncells(dh.grid)
 
 kernel_config = CUDAKernelLauncher(n_cells, n_basefuncs, assemble_gpu!, (Kgpu,fgpu, cellvalues, dh));
 
@@ -158,6 +155,8 @@ stassy(cv,dh) = assemble_global!(cv,dh,Val(false))
 norm(Kgpu)
 Kstd , Fstd = stassy(cellvalues,dh);
 norm(Kstd)
+
+
 
 
 ### Benchmarking ###

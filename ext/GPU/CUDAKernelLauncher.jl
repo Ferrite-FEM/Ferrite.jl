@@ -17,7 +17,7 @@ function Ferrite.launch_kernel!(kernel_config::CUDAKernelLauncher{Ti}) where Ti
     threads = min(n_cells, config.threads,256)
     shared_mem = _calculate_shared_memory(threads ,n_basefuncs)
     blocks = _calculate_nblocks(threads, n_cells)
-    kernel(args...;  threads, blocks, shmem=shared_mem)
+    kernel(args...; threads, blocks, shmem=shared_mem)
 end
 
 function _calculate_shared_memory(threads::Int, n_basefuncs::Int)
