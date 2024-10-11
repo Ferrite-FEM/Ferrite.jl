@@ -288,6 +288,17 @@ git-tree-sha1 = "ae52d1c52048455e85a387fbee9be553ec2b68d0"
 uuid = "f70d9fcc-98c5-4d4a-abd7-e4cdeebd8ca8"
 version = "1.0.0"
 
+
+[[deps.CompositionsBase]]
+git-tree-sha1 = "802bb88cd69dfd1509f6670416bd4434015693ad"
+uuid = "a33af91c-f02d-484b-be07-31d278c5ca2b"
+version = "0.1.2"
+weakdeps = ["InverseFunctions"]
+
+    [deps.CompositionsBase.extensions]
+    CompositionsBaseInverseFunctionsExt = "InverseFunctions"
+
+
 [[deps.Compat]]
 deps = ["TOML", "UUIDs"]
 git-tree-sha1 = "8ae8d32e09f0dcf42a36b90d4e17f5dd2e4c4215"
