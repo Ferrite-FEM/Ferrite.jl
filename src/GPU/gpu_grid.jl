@@ -1,7 +1,7 @@
 # This file defines the GPUGrid type, which is a grid that is stored on the GPU. Therefore most of the
 # functions are same as the ones defined in grid.jl, but executable on the GPU.
 
-abstract type AbstractGPUGrid{dim} <: Ferrite.AbstractGrid{dim} end
+abstract type AbstractGPUGrid{dim} <: AbstractGrid{dim} end
 
 struct GPUGrid{dim,CELLVEC<:AbstractArray,NODEVEC<:AbstractArray}<: AbstractGPUGrid{dim}
     cells::CELLVEC
