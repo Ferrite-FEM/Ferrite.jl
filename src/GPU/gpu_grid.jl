@@ -9,12 +9,12 @@ struct GPUGrid{dim,CELLVEC<:AbstractArray,NODEVEC<:AbstractArray}<: AbstractGPUG
 end
 
 function GPUGrid(cells::CELLVEC,
-                 nodes::NODEVEC) where {C<:Ferrite.AbstractCell,CELLVEC<:AbstractArray{C,1},NODEVEC<:AbstractArray{Node{dim,T}}} where {dim,T}
+                 nodes::NODEVEC) where {C<:AbstractCell,CELLVEC<:AbstractArray{C,1},NODEVEC<:AbstractArray{Node{dim,T}}} where {dim,T}
     GPUGrid{dim,CELLVEC,NODEVEC}(cells,nodes)
 end
 
 get_coordinate_type(::GPUGrid{dim,CELLVEC,NODEVEC}) where
-    {C<:Ferrite.AbstractCell,CELLVEC<:AbstractArray{C,1},NODEVEC<:AbstractArray{Node{dim,T}}} where
+    {C<:AbstractCell,CELLVEC<:AbstractArray{C,1},NODEVEC<:AbstractArray{Node{dim,T}}} where
     {dim,T} = Vec{dim,T} # Node is baked into the mesh type.
 
 
