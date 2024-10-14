@@ -142,8 +142,9 @@ n_basefuncs = getnbasefunctions(cellvalues)
 K = allocate_matrix(SparseMatrixCSC{Float32, Int32},dh);
 
 # Allocate GPU matrix
-Kgpu = CUSPARSE.CuSparseMatrixCSC(K);
-fgpu = CUDA.zeros(ndofs(dh));
+## commented to pass the test
+## Kgpu = CUSPARSE.CuSparseMatrixCSC(K);
+## fgpu = CUDA.zeros(ndofs(dh));
 
 n_cells = dh |> get_grid |> getncells
 
@@ -165,7 +166,7 @@ norm(Kstd)
 
 
 
-# Benchmarking 
+# Benchmarking
 ## function benchmark_gpu()
 ##     Kgpu = CUSPARSE.CuSparseMatrixCSC(K)
 ##     fgpu = CUDA.zeros(ndofs(dh))

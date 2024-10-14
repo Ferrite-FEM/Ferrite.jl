@@ -193,7 +193,6 @@ export
     StaticQuadratureView,
     StaticInterpolationValues,
     launch_kernel!,
-    get_ndofs_cell,
     cellke,
     cellfe,
     GPUDofHandler,
