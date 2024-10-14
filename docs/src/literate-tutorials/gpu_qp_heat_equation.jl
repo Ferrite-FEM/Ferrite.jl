@@ -39,27 +39,26 @@ close!(dh);
 # Standard assembly of the element.
 function assemble_element_std!(Ke::Matrix, fe::Vector, cellvalues::CellValues)
     n_basefuncs = getnbasefunctions(cellvalues)
-    # Loop over quadrature points
+    ## Loop over quadrature points
     for q_point in 1:getnquadpoints(cellvalues)
-        # Get the quadrature weight
+        ## Get the quadrature weight
         dΩ = getdetJdV(cellvalues, q_point)
-        # Loop over test shape functions
+        ## Loop over test shape functions
         for i in 1:n_basefuncs
             δu  = shape_value(cellvalues, q_point, i)
             ∇δu = shape_gradient(cellvalues, q_point, i)
-            # Add contribution to fe
+            ## Add contribution to fe
             fe[i] += δu * dΩ
-            # Loop over trial shape functions
+            ## Loop over trial shape functions
             for j in 1:n_basefuncs
                 ∇u = shape_gradient(cellvalues, q_point, j)
-                # Add contribution to Ke
+                ## Add contribution to Ke
                 Ke[i, j] += (∇δu ⋅ ∇u) * dΩ
             end
         end
     end
     return Ke, fe
 end
-
 
 
 
@@ -78,20 +77,20 @@ end
 # Standard global assembly
 function assemble_global!(cellvalues, dh::DofHandler,qp_iter::Val{QPiter}) where {QPiter}
     (;f, K, assembler, Ke, fe) = create_buffers(cellvalues,dh)
-    # Loop over all cels
+    ## Loop over all cels
     for cell in CellIterator(dh)
         fill!(Ke, 0)
         fill!(fe, 0)
         if QPiter
-            #reinit!(cellvalues, getcoordinates(cell))
+            ## reinit!(cellvalues, getcoordinates(cell))
             assemble_element_qpiter!(Ke, fe, cellvalues,getcoordinates(cell))
         else
-            # Reinitialize cellvalues for this cell
+            ## Reinitialize cellvalues for this cell
             reinit!(cellvalues, cell)
-            # Compute element contribution
+            ## Compute element contribution
             assemble_element_std!(Ke, fe, cellvalues)
         end
-        # Assemble Ke and fe into K and f
+        ## Assemble Ke and fe into K and f
         assemble!(assembler, celldofs(cell), Ke, fe)
     end
     return K, f
@@ -99,7 +98,7 @@ end
 
 
 
-# gpu version of element assembly
+## gpu version of element assembly
 function assemble_element!(Ke,fe,cv,cell)
     n_basefuncs = getnbasefunctions(cv)
     for qv in Ferrite.QuadratureValuesIterator(cv,getcoordinates(cell))
@@ -111,7 +110,7 @@ function assemble_element!(Ke,fe,cv,cell)
             ∇u = shape_gradient(qv, i)
             ## Add contribution to fe
             fe[i] += δu * dΩ
-            #fe_shared[tx,i] += δu * dΩ
+            ## fe_shared[tx,i] += δu * dΩ
             ## Loop over trial shape functions
             for j in 1:n_basefuncs
                 ∇δu = shape_gradient(qv, j)
