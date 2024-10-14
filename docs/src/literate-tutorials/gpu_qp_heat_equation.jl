@@ -37,8 +37,6 @@ close!(dh);
 
 
 # Standard assembly of the element.
-
-
 function assemble_element_std!(Ke::Matrix, fe::Vector, cellvalues::CellValues)
     n_basefuncs = getnbasefunctions(cellvalues)
     # Loop over quadrature points
@@ -101,7 +99,7 @@ end
 
 
 
-
+# gpu version of element assembly
 function assemble_element!(Ke,fe,cv,cell)
     n_basefuncs = getnbasefunctions(cv)
     for qv in Ferrite.QuadratureValuesIterator(cv,getcoordinates(cell))
@@ -125,7 +123,7 @@ function assemble_element!(Ke,fe,cv,cell)
 end
 
 
-
+# gpu version of global assembly
 function assemble_gpu!(Kgpu,fgpu, cv, dh)
     n_basefuncs = getnbasefunctions(cv)
     assembler = start_assemble(Kgpu, fgpu)

@@ -131,6 +131,6 @@ end
     kernel_config = CUDAKernelLauncher(ncells, n_basefuncs, localkefe_kernel!, (kes_gpu, fes_gpu, cellvalues, dh));
     launch_kernel!(kernel_config);
     kes_cpu, fes_cpu = get_cpu_kefe(dh, cellvalues);
-    @test all(abs.(kes_gpu .- kes_cpu) .< 1e-2) #TODO: This needs further investigation
+    @test all(abs.(kes_gpu .- kes_cpu) .< 1e-3) #TODO: This needs further investigation
     @test all(fes_gpu .≈ fes_cpu)
 end
