@@ -8,6 +8,15 @@ Arguments:
 - `kernel_config`: The `CUDAKernelLauncher` object containing a higher level fields for kernel configuration.
 """
 function Ferrite.launch_kernel!(kernel_config::CUDAKernelLauncher{Ti}) where Ti
+    if CUDA.functional()
+        _launch_kernel!(kernel_config)
+    else
+        throw(ArgumentError("CUDA is not functional, please check your GPU driver and CUDA installation"))
+    end
+end
+
+
+function _launch_kernel!(kernel_config::CUDAKernelLauncher{Ti}) where Ti
     n_cells = kernel_config.n_cells
     n_basefuncs = kernel_config.n_basefuncs
     ker = kernel_config.kernel

@@ -197,4 +197,5 @@ export
     cellke,
     cellfe,
     GPUDofHandler,
-    GPUGrid
+    GPUGrid,
+    getweights
