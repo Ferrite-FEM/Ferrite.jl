@@ -16,7 +16,7 @@ using OrderedCollections:
 using SparseArrays:
     SparseArrays, SparseMatrixCSC, nonzeros, nzrange, rowvals, AbstractSparseMatrixCSC
 using StaticArrays:
-    StaticArrays, MArray, MMatrix, SArray, SMatrix, SVector
+    StaticVector,StaticArrays,MVector, MArray, MMatrix, SArray, SMatrix, SVector, @SVector
 using WriteVTK:
     WriteVTK, VTKCellTypes
 using Tensors:
@@ -130,6 +130,8 @@ include("FEValues/CellValues.jl")
 include("FEValues/FacetValues.jl")
 include("FEValues/InterfaceValues.jl")
 include("FEValues/PointValues.jl")
+include("FEValues/QuadratureValues.jl")
+include("FEValues/StaticCellValues.jl")
 include("FEValues/common_values.jl")
 include("FEValues/face_integrals.jl")
 
@@ -165,5 +167,12 @@ include("PointEvalHandler.jl")
 # Other
 include("deprecations.jl")
 include("docs.jl")
+
+# GPU support
+include("GPU/GPUKernelLauncher.jl")
+include("GPU/gpu_grid.jl")
+include("GPU/GPUDofHandler.jl")
+include("GPU/gpu_iterator.jl")
+
 
 end # module
