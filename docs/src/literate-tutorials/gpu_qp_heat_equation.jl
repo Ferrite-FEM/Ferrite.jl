@@ -160,4 +160,3 @@ stassy(cv,dh) = assemble_global!(cv,dh,Val(false))
 ## norm(Kgpu)
 Kstd , Fstd = stassy(cellvalues,dh);
 norm(Kstd)
-

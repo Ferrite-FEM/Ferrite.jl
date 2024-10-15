@@ -1,4 +1,4 @@
-#= 
+#=
 This file defines the interface between the GPU backend (extension) and the Ferrite package.
 It provides abstract types, function signatures, and concrete types for managing GPU kernels
 and backends, serving as a foundation for GPU-accelerated computations.
