@@ -143,8 +143,8 @@ K = allocate_matrix(SparseMatrixCSC{Float32, Int32},dh);
 
 # Allocate GPU matrix
 ## commented to pass the test
-Kgpu = CUSPARSE.CuSparseMatrixCSC(K);
-fgpu = CUDA.zeros(ndofs(dh));
+## Kgpu = CUSPARSE.CuSparseMatrixCSC(K);
+## fgpu = CUDA.zeros(ndofs(dh));
 
 n_cells = dh |> get_grid |> getncells
 

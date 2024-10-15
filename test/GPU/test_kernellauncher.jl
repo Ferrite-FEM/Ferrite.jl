@@ -20,16 +20,15 @@ end
     A = CUDA.fill(1.0f0, N)
     B = CUDA.fill(2.0f0, N)
     C = CUDA.fill(0.0f0, N)
-    
+
     # Test with Int32
     test_launch_kernel!(Int32(N), Int32(2), A, B, C, N)
     CUDA.synchronize()
     @test all(Array(C) .== 3.0f0)
-    
+
     # Test with Int64
     fill!(C, 0.0f0)  # reset C array
     test_launch_kernel!(Int64(N), Int64(2), A, B, C, N)
     CUDA.synchronize()
     @test all(Array(C) .== 3.0f0)
 end
-
