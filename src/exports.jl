@@ -189,12 +189,15 @@ export
     PointValues,
 
 # GPU
-    CUDAKernelLauncher,
+    GPUKernel,
     StaticQuadratureView,
     StaticInterpolationValues,
-    launch_kernel!,
+    init_gpu_kernel,
+    launch!,
     cellke,
     cellfe,
     GPUDofHandler,
     GPUGrid,
-    getweights
+    getweights,
+    getbackend,
+    BackendCUDA

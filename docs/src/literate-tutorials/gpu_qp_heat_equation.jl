@@ -143,17 +143,15 @@ K = allocate_matrix(SparseMatrixCSC{Float32, Int32},dh);
 
 # Allocate GPU matrix
 ## commented to pass the test
-## Kgpu = CUSPARSE.CuSparseMatrixCSC(K);
-## fgpu = CUDA.zeros(ndofs(dh));
+Kgpu = CUSPARSE.CuSparseMatrixCSC(K);
+fgpu = CUDA.zeros(ndofs(dh));
 
 n_cells = dh |> get_grid |> getncells
 
 # Kernel configuration
-kernel_config = CUDAKernelLauncher(n_cells, n_basefuncs, assemble_gpu!, (Kgpu,fgpu, cellvalues, dh));
-
-# Launch kernel
 ## commented to pass the test
-## launch_kernel!(kernel_config);
+## init_gpu_kernel(BackendCUDA,n_cells,n_basefuncs,assemble_gpu!, (Kgpu,fgpu, cellvalues, dh)) |> launch!
+
 
 stassy(cv,dh) = assemble_global!(cv,dh,Val(false))
 

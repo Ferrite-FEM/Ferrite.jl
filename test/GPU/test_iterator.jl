@@ -1,26 +1,4 @@
-function generate_problem()
-    left = Tensor{1,2,Float32}((0, -0))
 
-    right = Tensor{1, 2, Float32}((rand(10.0:100000.0), rand(10.0:100000.0)))
-
-    grid_dims = (rand(1:1000), rand(1:1000))
-
-    grid = generate_grid(Quadrilateral, grid_dims, left, right)
-
-    ip = Lagrange{RefQuadrilateral, 1}() # define the interpolation function (i.e. Bilinear lagrange)
-
-    qr = QuadratureRule{RefQuadrilateral}(Float32,2)
-
-    cellvalues = CellValues(Float32,qr, ip)
-
-    dh = DofHandler(grid)
-
-    add!(dh, :u, ip)
-
-    close!(dh)
-
-    return dh, cellvalues
-end
 
 function getalldofs(dh)
     ncells = dh |> get_grid |> getncells
@@ -121,15 +99,13 @@ end
     ncells = dh |> get_grid |> getncells
     dofs = CUDA.fill(Int32(0),n_basefuncs,ncells)
     correct_dofs = getalldofs(dh)
-    kernel_config = CUDAKernelLauncher(ncells, n_basefuncs, dof_kernel_kernel!, (dofs, dh,n_basefuncs));
-    launch_kernel!(kernel_config);
+    init_gpu_kernel(BackendCUDA, ncells, n_basefuncs, dof_kernel_kernel!, (dofs, dh,n_basefuncs)) |> launch!
     @test all(dofs .≈ correct_dofs)
 
     # 2. Test that local ke and fe are correctly computed
     kes_gpu = CUDA.fill(0.0f0, ncells, n_basefuncs, n_basefuncs);
     fes_gpu = CUDA.fill(0.0f0, ncells, n_basefuncs);
-    kernel_config = CUDAKernelLauncher(ncells, n_basefuncs, localkefe_kernel!, (kes_gpu, fes_gpu, cellvalues, dh));
-    launch_kernel!(kernel_config);
+    init_gpu_kernel(BackendCUDA, ncells, n_basefuncs, localkefe_kernel!, (kes_gpu, fes_gpu, cellvalues, dh)) |> launch!
     kes_cpu, fes_cpu = get_cpu_kefe(dh, cellvalues);
     @test all(abs.(kes_gpu .- kes_cpu) .< 1e-3) #TODO: This needs further investigation
     @test all(fes_gpu .≈ fes_cpu)
