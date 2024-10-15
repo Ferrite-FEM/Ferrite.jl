@@ -161,15 +161,3 @@ stassy(cv,dh) = assemble_global!(cv,dh,Val(false))
 Kstd , Fstd = stassy(cellvalues,dh);
 norm(Kstd)
 
-
-
-
-# Benchmarking
-## function benchmark_gpu()
-##     Kgpu = CUSPARSE.CuSparseMatrixCSC(K)
-##     fgpu = CUDA.zeros(ndofs(dh))
-##      launch_kernel(assemble_gpu!, (Kgpu,fgpu, cellvalues, dh) , n_cells, n_basefuncs)
-##     #return (;Kgpu,fgpu)
-## end
-
-## CUDA.@profile benchmark_gpu()
