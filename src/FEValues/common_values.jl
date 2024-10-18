@@ -47,10 +47,10 @@ end
 """
     reinit!(cv::CellValues, cell::AbstractCell, x::AbstractVector)
     reinit!(cv::CellValues, x::AbstractVector)
-    reinit!(fv::FacetValues, cell::AbstractCell, x::AbstractVector, face::Int)
-    reinit!(fv::FacetValues, x::AbstractVector, face::Int)
+    reinit!(fv::FacetValues, cell::AbstractCell, x::AbstractVector, facet::Int)
+    reinit!(fv::FacetValues, x::AbstractVector, function_gradient::Int)
 
-Update the `CellValues`/`FacetValues` object for a cell or face with coordinates `x`.
+Update the `CellValues`/`FacetValues` object for a cell or facet with cell coordinates `x`.
 The derivatives of the shape functions, and the new integration weights are computed.
 For interpolations with non-identity mappings, the current `cell` is also required.
 """
@@ -60,7 +60,7 @@ reinit!
     getnquadpoints(fe_v::AbstractValues)
 
 Return the number of quadrature points. For `FacetValues`,
-this is the number for the current face.
+this is the number for the current facet.
 """
 function getnquadpoints end
 
@@ -71,7 +71,7 @@ Return the product between the determinant of the Jacobian and the quadrature
 point weight for the given quadrature point: ``\\det(J(\\mathbf{x})) w_q``.
 
 This value is typically used when one integrates a function on a
-finite element cell or face as
+finite element cell or facet as
 
 ``\\int\\limits_\\Omega f(\\mathbf{x}) d \\Omega \\approx \\sum\\limits_{q = 1}^{n_q} f(\\mathbf{x}_q) \\det(J(\\mathbf{x})) w_q``
 ``\\int\\limits_\\Gamma f(\\mathbf{x}) d \\Gamma \\approx \\sum\\limits_{q = 1}^{n_q} f(\\mathbf{x}_q) \\det(J(\\mathbf{x})) w_q``

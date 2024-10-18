@@ -24,7 +24,7 @@
 #
 # To illustrate the use of the plasticity model, we setup and solve a FE-problem
 # consisting of a cantilever beam loaded at its free end. But first, we shortly
-# describe the parts of the implementation deadling with the material modeling.
+# describe the parts of the implementation dealing with the material modeling.
 
 # ## Material modeling
 # This section describes the `struct`s and methods used to implement the material
@@ -187,7 +187,7 @@ function doassemble!(K::SparseMatrixCSC, r::Vector, cellvalues::CellValues, dh::
         state = @view states[:, i]
         state_old = @view states_old[:, i]
         assemble_cell!(ke, re, cell, cellvalues, material, ue, state, state_old)
-        assemble!(assembler, eldofs, re, ke)
+        assemble!(assembler, eldofs, ke, re)
     end
     return K, r
 end
@@ -229,10 +229,10 @@ function symmetrize_lower!(K)
     end
 end;
 
-function doassemble_neumann!(r, dh, faceset, facetvalues, t)
+function doassemble_neumann!(r, dh, facetset, facetvalues, t)
     n_basefuncs = getnbasefunctions(facetvalues)
     re = zeros(n_basefuncs)                      # element residual vector
-    for fc in FacetIterator(dh, faceset)
+    for fc in FacetIterator(dh, facetset)
         ## Add traction as a negative contribution to the element residual `re`:
         reinit!(facetvalues, fc)
         fill!(re, 0)

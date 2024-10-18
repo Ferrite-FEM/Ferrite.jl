@@ -141,7 +141,7 @@ function create_dofhandler(grid, ipu, ipp)
 end;
 
 # We are simulating a uniaxial tensile loading of a unit cube. Hence we apply a displacement field (`:u`) in `x` direction on the right face.
-# The left, bottom and back faces are fixed in the `x`, `y` and `z` components of the displacement so as to emulate the uniaxial nature
+# The left, bottom and back facets are fixed in the `x`, `y` and `z` components of the displacement so as to emulate the uniaxial nature
 # of the loading.
 function create_bc(dh)
     dbc = ConstraintHandler(dh)
@@ -265,7 +265,7 @@ function assemble_global!(K::SparseMatrixCSC, f, cellvalues_u::CellValues,
         ue = w[global_dofsu] # displacement dofs for the current cell
         pe = w[global_dofsp] # pressure dofs for the current cell
         assemble_element!(ke, fe, cell, cellvalues_u, cellvalues_p, mp, ue, pe)
-        assemble!(assembler, global_dofs, fe, ke)
+        assemble!(assembler, global_dofs, ke, fe)
     end
 end;
 
@@ -311,7 +311,7 @@ function solve(interpolation_u, interpolation_p)
         Ferrite.update!(dbc, t)
         apply!(w, dbc)
         newton_itr = -1
-        prog = ProgressMeter.ProgressThresh(NEWTON_TOL, "Solving @ time $t of $Tf;")
+        prog = ProgressMeter.ProgressThresh(NEWTON_TOL; desc = "Solving @ time $t of $Tf;")
         fill!(ΔΔw, 0.0);
         while true; newton_itr += 1
             assemble_global!(K, f, cellvalues_u, cellvalues_p, dh, mp, w)
@@ -339,7 +339,7 @@ function solve(interpolation_u, interpolation_p)
             pvd[t] = vtk
         end
     end;
-    close(pvd);
+    vtk_save(pvd);
     vol_def = calculate_volume_deformed_mesh(w, dh, cellvalues_u);
     print("Deformed volume is $vol_def")
     return vol_def;

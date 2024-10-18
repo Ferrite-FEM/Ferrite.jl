@@ -33,7 +33,7 @@ function values at specific points:
 
 The quadrature rule consists of ``n_q`` points in space ``\\mathbf{x}_q`` with corresponding weights ``w_q``.
 
-In `Ferrite`, the `QuadratureRule` type is mostly used as one of the components to create [`CellValues`](@ref).
+In Ferrite, the `QuadratureRule` type is mostly used as one of the components to create [`CellValues`](@ref).
 
 **Common methods:**
 * [`getpoints`](@ref) : the points of the quadrature rule

@@ -1,4 +1,4 @@
-# Some utility functions for testing Ferrite.jl
+# Some utility functions for testing Ferrite
 
 using Ferrite: reference_shape_value
 

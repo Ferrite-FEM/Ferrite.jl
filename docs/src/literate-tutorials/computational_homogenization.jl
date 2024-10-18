@@ -179,7 +179,7 @@
 
 # ## Commented program
 #
-# Now we will see how this can be implemented in `Ferrite`. What follows is a program
+# Now we will see how this can be implemented in Ferrite. What follows is a program
 # with comments in between which describe the different steps.
 #md # You can also find the same program without comments at the end of the page,
 #md # see [Plain program](@ref homogenization-plain-program).
@@ -189,8 +189,8 @@ using Test #src
 
 # We first load the mesh file [`periodic-rve.msh`](periodic-rve.msh)
 # ([`periodic-rve-coarse.msh`](periodic-rve-coarse.msh) for a coarser mesh). The mesh is
-# generated with [`gmsh`](https://gmsh.info/), and we read it in as a `Ferrite` grid using
-# the [`FerriteGmsh`](https://github.com/Ferrite-FEM/FerriteGmsh.jl) package:
+# generated with [Gmsh](https://gmsh.info/), and we read it in as a Ferrite `Grid` using
+# the [FerriteGmsh.jl](https://github.com/Ferrite-FEM/FerriteGmsh.jl) package:
 
 using FerriteGmsh
 
@@ -241,8 +241,8 @@ close!(ch_dirichlet)
 update!(ch_dirichlet, 0.0)
 
 # For periodic boundary conditions we use the [`PeriodicDirichlet`](@ref) constraint type,
-# which is very similar to the `Dirichlet` type, but instead of a passing a faceset we pass
-# a vector with "face pairs", i.e. the mapping between mirror and image parts of the
+# which is very similar to the `Dirichlet` type, but instead of a passing a facetset we pass
+# a vector with "facet pairs", i.e. the mapping between mirror and image parts of the
 # boundary. In this example the `"left"` and `"bottom"` boundaries are mirrors, and the
 # `"right"` and `"top"` boundaries are the mirrors.
 

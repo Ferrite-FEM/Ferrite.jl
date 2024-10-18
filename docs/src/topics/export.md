@@ -56,6 +56,6 @@ for (step, t) in enumerate(range(0, 1, 5))
         pvd[t] = vtk
     end
 end
-close(pvd);
+vtk_save(pvd);
 ```
 See [Transient heat equation](@ref tutorial-transient-heat-equation) for an example

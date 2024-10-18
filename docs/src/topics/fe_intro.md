@@ -56,7 +56,7 @@ Find $u \in \mathbb{U}$ s.t.
 ```math
 \int_\Omega \nabla \delta u \cdot (k \nabla u) \, \mathrm{d}\Omega =
 \int_{\Gamma_\mathrm{N}} \delta u \, q^\mathrm{p} \, \mathrm{d}\Gamma +
-\int_\Omega \delta u \, b \, \mathrm{d}\Omega \quad \forall \, \delta u \in \mathbb{T}
+\int_\Omega \delta u \, f \, \mathrm{d}\Omega \quad \forall \, \delta u \in \mathbb{T}
 ```
 
 where $\mathbb{U}, \mathbb{T}$ are suitable function spaces with sufficiently regular
@@ -75,7 +75,7 @@ and denote it with $\Omega_h$. In this example the corners of the triangles are 
 Next we introduce the finite element approximation $u_\mathrm{h} \approx u$ as a sum of N nodal
 *shape functions*, where we denote each of these function by $\phi_i$ and the corresponding
 *nodal values* $\hat{u}_i$. Note that *shape functions* are sometimes referred to as
-*base functions* or *trial functions*, and instead of $\phi_i$ they are sometimes denoted $N_i$.
+*basis functions* or *trial functions*, and instead of $\phi_i$ they are sometimes denoted $N_i$.
 In this example we choose to approximate the test function in the same way. This approach is known
 as the *Galerkin finite element method*. Formally we write the evaluation of our approximations
 at a specific point $\mathbf{x}$ in our domain $\Omega$ as:
@@ -161,7 +161,7 @@ On an intuitive level, and to explain the notation used in the implementation, w
 ```
 being the chosen approximation when changing from the integral to the finite summation.
 
-For an example of the implementation to solve a heat problem with `Ferrite` check out [this
+For an example of the implementation to solve a heat problem with Ferrite check out [this
 thoroughly commented example](@ref tutorial-heat-equation).
 
 ## More details

@@ -65,7 +65,7 @@ function create_dofhandler(grid, ipu, ipp)
     return dh
 end;
 
-# We also need to add Dirichlet boundary conditions on the `"clamped"` faceset.
+# We also need to add Dirichlet boundary conditions on the `"clamped"` facetset.
 # We specify a homogeneous Dirichlet bc on the displacement field, `:u`.
 function create_bc(dh)
     dbc = ConstraintHandler(dh)
@@ -107,7 +107,7 @@ function doassemble(
         fill!(ke, 0)
         fill!(fe, 0)
         assemble_up!(ke, fe, cell, cellvalues_u, cellvalues_p, facetvalues_u, grid, mp, ɛdev, t)
-        assemble!(assembler, celldofs(cell), fe, ke)
+        assemble!(assembler, celldofs(cell), ke, fe)
     end
 
     return K, f
@@ -214,7 +214,7 @@ function compute_stresses(cellvalues_u::CellValues, cellvalues_p::CellValues,
         reinit!(cellvalues_u, cc)
         reinit!(cellvalues_p, cc)
         ## Extract the cell local part of the solution
-        for (i, I) in pairs(cc.dofs)
+        for (i, I) in pairs(celldofs(cc))
             ae[i] = a[I]
         end
         ## Loop over the quadrature points

@@ -177,7 +177,7 @@ add!(ch, Dirichlet(:u, getfacetset(grid, "right"), (x, t) -> 1.0))
 add!(ch, Dirichlet(:u, getfacetset(grid, "left"), (x, t) -> -1.0))
 close!(ch);
 
-# Furthermore, we define $\partial \Omega_N$ as the `union` of the face sets with Neumann boundary conditions for later use
+# Furthermore, we define $\partial \Omega_N$ as the `union` of the facet sets with Neumann boundary conditions for later use
 ∂Ωₙ = union(
     getfacetset(grid, "top"),
     getfacetset(grid, "bottom"),
@@ -189,7 +189,7 @@ close!(ch);
 # Now we have all the pieces needed to assemble the linear system, $K u = f$. Assembling of
 # the global system is done by looping over i) all the elements in order to compute the
 # element contributions ``K_e`` and ``f_e``, ii) all the interfaces to compute their
-# contributions ``K_i``, and iii) all the Neumann boundary faces to compute their
+# contributions ``K_i``, and iii) all the Neumann boundary facets to compute their
 # contributions ``f_e``. All these local contributions are then assembled into the
 # appropriate place in the global ``K`` and ``f``.
 #
@@ -200,7 +200,7 @@ close!(ch);
 # * `assemble_interface!` to compute the contribution ``K_i`` of surface integrals over an
 #   interface using `interfacevalues`.
 # * `assemble_boundary!` to compute the contribution ``f_e`` of surface integrals over a
-#   boundary face using `FacetValues`.
+#   boundary facet using `FacetValues`.
 
 function assemble_element!(Ke::Matrix, fe::Vector, cellvalues::CellValues)
     n_basefuncs = getnbasefunctions(cellvalues)
@@ -233,7 +233,7 @@ function assemble_interface!(Ki::Matrix, iv::InterfaceValues, μ::Float64)
     fill!(Ki, 0)
     ## Loop over quadrature points
     for q_point in 1:getnquadpoints(iv)
-        ## Get the normal to face A
+        ## Get the normal to facet A
         normal = getnormal(iv, q_point)
         ## Get the quadrature weight
         dΓ = getdetJdV(iv, q_point)
@@ -260,7 +260,7 @@ function assemble_boundary!(fe::Vector, fv::FacetValues)
     fill!(fe, 0)
     ## Loop over quadrature points
     for q_point in 1:getnquadpoints(fv)
-        ## Get the normal to face A
+        ## Get the normal to facet A
         normal = getnormal(fv, q_point)
         ## Get the quadrature weight
         ∂Ω = getdetJdV(fv, q_point)
@@ -277,8 +277,8 @@ end
 
 # #### Global assembly
 #
-# We define the function `assemble_global` to loop over all elements and internal faces
-# (interfaces), as well as the external faces involved in Neumann boundary conditions.
+# We define the function `assemble_global` to loop over all elements and internal facets
+# (interfaces), as well as the external facets involved in Neumann boundary conditions.
 
 function assemble_global(cellvalues::CellValues, facetvalues::FacetValues, interfacevalues::InterfaceValues, K::SparseMatrixCSC, dh::DofHandler, order::Int, dim::Int)
     ## Allocate the element stiffness matrix and element force vector
@@ -315,9 +315,9 @@ function assemble_global(cellvalues::CellValues, facetvalues::FacetValues, inter
     end
     ## Loop over domain boundaries with Neumann boundary conditions
     for fc in FacetIterator(dh, ∂Ωₙ)
-        ## Reinitialize face_values_a for this boundary face
+        ## Reinitialize facetvalues for this boundary facet
         reinit!(facetvalues, fc)
-        ## Compute boundary face surface integrals contribution
+        ## Compute boundary facet surface integrals contribution
         assemble_boundary!(fe, facetvalues)
         ## Assemble fe into f
         assemble!(f, celldofs(fc), fe)

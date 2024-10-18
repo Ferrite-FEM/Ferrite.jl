@@ -2,7 +2,7 @@
 DocTestSetup = :(using Ferrite)
 ```
 
-# Boundary Conditions
+# Boundary conditions
 
 ```@index
 Pages = ["boundary_conditions.md"]

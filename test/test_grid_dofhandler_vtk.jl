@@ -38,10 +38,10 @@ end
         addnodeset!(grid, "middle-nodes", x -> norm(x) < radius)
 
         gridfilename = "grid-$(repr(celltype))"
-        VTKGridFile(gridfilename, grid) do vtk
-            Ferrite.write_cellset(vtk, grid, "cell-1")
-            Ferrite.write_cellset(vtk, grid, "middle-cells")
-            Ferrite.write_nodeset(vtk, grid, "middle-nodes")
+        VTKGridFile(gridfilename, grid) do vtk::VTKGridFile
+            @test Ferrite.write_cellset(vtk, grid, "cell-1") === vtk
+            @test Ferrite.write_cellset(vtk, grid, "middle-cells") === vtk
+            @test Ferrite.write_nodeset(vtk, grid, "middle-nodes") === vtk
         end
 
         # test the sha of the file
@@ -78,9 +78,9 @@ end
         apply!(u, ch)
 
         dofhandlerfilename = "dofhandler-$(repr(celltype))"
-        VTKGridFile(dofhandlerfilename, grid) do vtk
-            Ferrite.write_constraints(vtk, ch)
-            write_solution(vtk, dofhandler, u)
+        VTKGridFile(dofhandlerfilename, grid) do vtk::VTKGridFile
+            @test Ferrite.write_constraints(vtk, ch) === vtk
+            @test write_solution(vtk, dofhandler, u) === vtk
         end
 
         # test the sha of the file
@@ -124,10 +124,10 @@ close(csio)
     vector_data = [Vec{3}(ntuple(i->i, 3)) for j=1:8]
 
     filename_3d = "test_vtk_3d"
-    VTKGridFile(filename_3d, grid) do vtk
-        write_node_data(vtk, sym_tensor_data, "symmetric tensor")
-        write_node_data(vtk, tensor_data, "tensor")
-        write_node_data(vtk, vector_data, "vector")
+    VTKGridFile(filename_3d, grid) do vtk::VTKGridFile
+        @test write_node_data(vtk, sym_tensor_data, "symmetric tensor") === vtk
+        @test write_node_data(vtk, tensor_data, "tensor") === vtk
+        @test write_node_data(vtk, vector_data, "vector") === vtk
     end
 
     # 2D grid
@@ -139,11 +139,11 @@ close(csio)
     vector_data = [Vec{2}(ntuple(i->i, 2)) for j=1:4]
 
     filename_2d = "test_vtk_2d"
-    VTKGridFile(filename_2d, grid) do vtk
-        write_node_data(vtk, sym_tensor_data, "symmetric tensor")
-        write_node_data(vtk, tensor_data, "tensor")
-        write_node_data(vtk, tensor_data_1D, "tensor_1d")
-        write_node_data(vtk, vector_data, "vector")
+    VTKGridFile(filename_2d, grid) do vtk::VTKGridFile
+        @test write_node_data(vtk, sym_tensor_data, "symmetric tensor") === vtk
+        @test write_node_data(vtk, tensor_data, "tensor") === vtk
+        @test write_node_data(vtk, tensor_data_1D, "tensor_1d") === vtk
+        @test write_node_data(vtk, vector_data, "vector") === vtk
     end
 
     # test the shas of the files
@@ -751,7 +751,7 @@ end
         celldata = rand(getncells(grid))
         pvd = WriteVTK.paraview_collection("collection")
         vtk1 = VTKGridFile("file1", grid)
-        write_cell_data(vtk1, celldata, "celldata")
+        @test write_cell_data(vtk1, celldata, "celldata") === vtk1
         @assert isopen(vtk1.vtk)
         pvd[0.5] = vtk1
         @test !isopen(vtk1.vtk) # Should be closed when adding it

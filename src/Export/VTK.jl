@@ -44,9 +44,13 @@ function VTKGridFile(f::Function, args...; kwargs...)
     finally
         close(vtk)
     end
+    return vtk
 end
 
-Base.close(vtk::VTKGridFile) = WriteVTK.vtk_save(vtk.vtk)
+function Base.close(vtk::VTKGridFile)
+    WriteVTK.vtk_save(vtk.vtk)
+    return vtk
+end
 
 function Base.show(io::IO, ::MIME"text/plain", vtk::VTKGridFile)
     open_str = isopen(vtk.vtk) ? "open" : "closed"
@@ -55,10 +59,10 @@ function Base.show(io::IO, ::MIME"text/plain", vtk::VTKGridFile)
 end
 
 function WriteVTK.collection_add_timestep(pvd::WriteVTK.CollectionFile, datfile::VTKGridFile, time::Real)
-    WriteVTK.collection_add_timestep(pvd, datfile.vtk, time)
+    return WriteVTK.collection_add_timestep(pvd, datfile.vtk, time)
 end
 function Base.setindex!(pvd::WriteVTK.CollectionFile, datfile::VTKGridFile, time::Real)
-    WriteVTK.collection_add_timestep(pvd, datfile.vtk, time)
+    return WriteVTK.collection_add_timestep(pvd, datfile, time)
 end
 
 cell_to_vtkcell(::Type{Line}) = VTKCellTypes.VTK_LINE
@@ -206,6 +210,7 @@ Write the `celldata` that is ordered by the cells in the grid to the vtk file.
 """
 function write_cell_data(vtk::VTKGridFile, celldata, name)
     WriteVTK.vtk_cell_data(vtk.vtk, celldata, name)
+    return vtk
 end
 
 """
@@ -222,6 +227,7 @@ When `nodedata` contains second order tensors, the index order,
 """
 function write_node_data(vtk::VTKGridFile, nodedata, name)
     _vtk_write_node_data(vtk.vtk, nodedata, name)
+    return vtk
 end
 
 
@@ -312,4 +318,5 @@ function write_cell_colors(vtk, grid::AbstractGrid, cell_colors::AbstractVector{
         end
     end
     write_cell_data(vtk, color_vector, name)
+    return vtk
 end

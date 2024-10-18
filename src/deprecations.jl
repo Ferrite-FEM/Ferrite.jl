@@ -231,31 +231,6 @@ end
 struct RefCube end
 export RefCube
 
-function Lagrange{D, RefCube, O}() where {D, O}
-    shape = D == 1 ? RefLine : D == 2 ? RefQuadrilateral : RefHexahedron
-    throw(DeprecationError("Lagrange{$D, RefCube, $O}()" => "Lagrange{$(shape), $O}()"))
-end
-function Lagrange{2, RefTetrahedron, O}() where {O}
-    throw(DeprecationError("Lagrange{2, RefTetrahedron, $O}()" => "Lagrange{RefTriangle, $O}()"))
-end
-function DiscontinuousLagrange{D, RefCube, O}() where {D, O}
-    shape = D == 1 ? RefLine : D == 2 ? RefQuadrilateral : RefHexahedron
-    throw(DeprecationError("DiscontinuousLagrange{$D, RefCube, $O}()" => "DiscontinuousLagrange{$(shape), $O}()"))
-end
-function BubbleEnrichedLagrange{2, RefTetrahedron, O}() where {O}
-    throw(DeprecationError("BubbleEnrichedLagrange{2, RefTetrahedron, $O}()" => "BubbleEnrichedLagrange{RefTriangle, $O}()"))
-end
-function DiscontinuousLagrange{2, RefTetrahedron, O}() where {O}
-    throw(DeprecationError("DiscontinuousLagrange{2, RefTetrahedron, $O}()" => "DiscontinuousLagrange{RefTriangle, $O}()"))
-end
-function Serendipity{D, RefCube, O}() where {D, O}
-    shape = D == 1 ? RefLine : D == 2 ? RefQuadrilateral : RefHexahedron
-    throw(DeprecationError("Serendipity{$D, RefCube, $O}()" => "Serendipity{$(shape), $O}()"))
-end
-function CrouzeixRaviart{2, 1}()
-    throw(DeprecationError("CrouzeixRaviart{2, 1}()" => "CrouzeixRaviart{RefTriangle, 1}()"))
-end
-
 # For the quadrature: Some will be wrong for face integration, so then we warn
 # in the FaceValue constructor...
 
@@ -359,20 +334,6 @@ function FacetValues(
     throw(DeprecationError(msg))
 end
 
-# Hide the last unused type param...
-function Base.show(io::IO, ::DiscontinuousLagrange{shape, order}) where {shape, order}
-    print(io, "DiscontinuousLagrange{$(shape), $(order)}()")
-end
-function Base.show(io::IO, ::Lagrange{shape, order}) where {shape, order}
-    print(io, "Lagrange{$(shape), $(order)}()")
-end
-function Base.show(io::IO, ::Serendipity{shape, order}) where {shape, order}
-    print(io, "Serendipity{$(shape), $(order)}()")
-end
-function Base.show(io::IO, ::CrouzeixRaviart{shape, order}) where {shape, order}
-    print(io, "CrouzeixRaviart{$(shape), $(order)}()")
-end
-
 function value(ip::Interpolation, ξ::Vec)
     throw(DeprecationError("value(ip::Interpolation, ξ::Vec)" => "[reference_shape_value(ip, ξ, i) for i in 1:getnbasefunctions(ip)]"))
 end
@@ -437,4 +398,22 @@ end
 export VTKFile
 function VTKFile(args...)
     throw(DeprecationError("VTKFile(args...)" => "VTKGridFile(args...)"))
+end
+
+# assemble with vector first
+function assemble!(::AbstractAssembler, ::AbstractVector{<:Integer}, ::AbstractVector, ::AbstractMatrix)
+    throw(DeprecationError("assemble!(assembler, dofs, fe, Ke)" => "assemble!(assembler, dofs, Ke, fe)"))
+end
+
+start_assemble(::Int) = throw(DeprecationError("start_assemble(n::Int)" => "Ferrite.COOAssembler(; sizehint = n)"))
+start_assemble() = throw(DeprecationError("start_assemble()" => "Ferrite.COOAssembler()"))
+
+export getfaceset
+getfaceset(args...) = throw(DeprecationError("getfaceset(...)" => "getfacetset(...)"))
+
+function celldofs!(::Vector, ::CellCache)
+    throw(DeprecationError("celldofs!(v::Vector, cc::CellCache)" => "celldofs!(v, celldofs(cc))"))
+end
+function celldofs!(::Vector, ::FacetCache)
+    throw(DeprecationError("celldofs!(v::Vector, fs::FacetCache)" => "celldofs!(v, celldofs(fc))"))
 end

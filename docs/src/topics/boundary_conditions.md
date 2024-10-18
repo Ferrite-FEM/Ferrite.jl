@@ -2,18 +2,18 @@
 DocTestSetup = :(using Ferrite)
 ```
 
-# Initial and Boundary Conditions
+# Boundary and initial conditions
 
 Every PDE is accompanied with boundary conditions. There are different types of boundary
 conditions, and they need to be handled in different ways. Below we discuss how to handle
-the most common ones, Dirichlet and Neumann boundary conditions, and how to do it `Ferrite`.
+the most common ones, Dirichlet and Neumann boundary conditions, and how to do it in Ferrite.
 
 While boundary conditions can be applied directly to nodes, vertices, edges, or faces,
 they are most commonly applied to [facets](@ref "Reference shapes"). Each facet is described
 by a [`FacetIndex`](@ref).
 When adding boundary conditions to points instead, vertices are preferred over nodes.
 
-## Dirichlet Boundary Conditions
+## Dirichlet boundary conditions
 
 At a Dirichlet boundary the unknown field is prescribed to a given value. For the discrete
 FE-solution this means that there are some degrees of freedom that are fixed. To handle
@@ -37,12 +37,12 @@ dbc1 = Dirichlet(
 ```
 
 The field name is given as a symbol, just like when the field was added to the dof handler,
-the part of the boundary where this constraint is active is given as a face set, and the
+the part of the boundary where this constraint is active is given as a facet set, and the
 function computing the prescribed value should be of the form `f(x)` or `f(x, t)`
 (coordinate `x` and time `t`) and return the prescribed value(s).
 
 !!! note "Multiple sets"
-    To apply a constraint on multiple face sets in the grid you can use `union` to join
+    To apply a constraint on multiple facet sets in the grid you can use `union` to join
     them, for example
     ```julia
     left_right = union(getfacetset(grid, "left"), getfacetset(grid, "right"))
@@ -94,7 +94,7 @@ end
     Equation](@ref tutorial-heat-equation).
 
 
-## Neumann Boundary Conditions
+## Neumann boundary conditions
 At the Neumann part of the boundary we know something about the gradient of the solution.
 Two different methods for applying these are described below.
 For complete examples that use Neumann boundary conditions, please see
@@ -156,12 +156,12 @@ for facet in 1:nfacets(cell)
 end
 ```
 
-We start by looping over all the faces of the cell, next we check if this particular face is
-located on our faceset of interest called `"Neumann Boundary"`. If we have determined
-that the current face is indeed on the boundary and in our faceset, then we
-reinitialize `FacetValues` for this face, using [`reinit!`](@ref). When `reinit!`ing
-`FacetValues` we also need to give the face number in addition to the cell.
-Next we simply loop over the quadrature points of the face, and then loop over
+We start by looping over all the facets of the cell, next we check if this particular facet is
+located on our facetset of interest called `"Neumann Boundary"`. If we have determined
+that the current facet is indeed on the boundary and in our facetset, then we
+reinitialize `FacetValues` for this facet, using [`reinit!`](@ref). When `reinit!`ing
+`FacetValues` we also need to give the facet number in addition to the cell.
+Next we simply loop over the quadrature points of the facet, and then loop over
 all the test functions and assemble the contribution to the force vector.
 
 
@@ -207,9 +207,9 @@ general be written as
 where ``\boldsymbol{R}`` is a rotation matrix. If the mapping between mirror and image is
 simply a translation (e.g. sides of a cube) this matrix will be the identity matrix.
 
-In `Ferrite` this type of periodic Dirichlet boundary conditions can be added to the
+In Ferrite this type of periodic Dirichlet boundary conditions can be added to the
 `ConstraintHandler` by constructing an instance of [`PeriodicDirichlet`](@ref). This is
-usually done it two steps. First we compute the mapping between mirror and image faces using
+usually done it two steps. First we compute the mapping between mirror and image facets using
 [`collect_periodic_facets`](@ref). Here we specify the mirror set and image sets (the sets
 are usually known or can be constructed easily ) and the mapping ``\varphi``. Second we
 construct the constraint using the `PeriodicDirichlet` constructor. Here we specify which
@@ -226,7 +226,7 @@ in the ``x``-direction (as seen by the mapping `φ`):
 # Create a constraint handler from the dof handler
 ch = ConstraintHandler(dofhandler)
 
-# Compute the face mapping
+# Compute the facet mapping
 φ(x) = x - Vec{2}((1.0, 0.0))
 face_mapping = collect_periodic_facets(grid, "left", "right", φ)
 
@@ -242,8 +242,8 @@ close!(ch)
 
 !!! note
     `PeriodicDirichlet` constraints are imposed in a strong sense, so note that this
-    requires a periodic mesh such that it is possible to compute the face mapping between
-    faces on the mirror and boundary.
+    requires a periodic mesh such that it is possible to compute the facet mapping between
+    facets on the mirror and boundary.
 
 !!! note "Examples"
     Periodic boundary conditions are used in the following examples [Computational
@@ -300,7 +300,7 @@ pdbc = PeriodicDirichlet(
     )
     ```
 
-## Initial Conditions
+## Initial conditions
 
 When solving time-dependent problems, initial conditions, different from zero, may be required.
 For finite element formulations of ODE-type,
