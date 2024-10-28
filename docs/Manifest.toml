@@ -1,6 +1,6 @@
 # This file is machine-generated - editing it directly is not advised
 
-julia_version = "1.11.0"
+julia_version = "1.11.1"
 manifest_format = "2.0"
 project_hash = "4e52f4aa4cee9f66ec4f633f0ae538fbd227ac5e"
 
@@ -1158,9 +1158,9 @@ version = "2.35.0"
 
 [[deps.Literate]]
 deps = ["Base64", "IOCapture", "JSON", "REPL"]
-git-tree-sha1 = "b9b38448af801760a608b7a7f895f7dcf166f4a5"
+git-tree-sha1 = "da046be6d63304f7ba9c1bb04820fb306ba1ab12"
 uuid = "98b081ad-f1c9-55d3-8b20-4c87d4299306"
-version = "2.19.1"
+version = "2.20.1"
 
 [[deps.LiveServer]]
 deps = ["HTTP", "LoggingExtras", "MIMEs", "Pkg", "Sockets", "Test"]
