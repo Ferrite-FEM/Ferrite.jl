@@ -265,5 +265,54 @@ end
     @test_throws ArgumentError Ferrite.facetdof_interior_indices(ip)
 end
 
+@testset "Test Hermitian" begin
+
+    grid = generate_grid(Line, (1,), Vec(0.0), Vec(5.0))
+
+    ip = Ferrite.Hermitian{RefLine,3}()
+
+    dh = DofHandler(grid)
+    add!(dh, :u, ip)
+    close!(dh)
+    
+    qr = QuadratureRule{RefLine}(5)
+    cv = CellValues(qr, ip; update_hessians = true)
+    
+    function ebbeam(cv)
+        Ke = zeros(4,4)
+        fe = zeros(4)
+        for qp in 1:getnquadpoints(cv)
+            dV = getdetJdV(cv,qp)
+            for i in 1:getnbasefunctions(cv)
+                dNi = shape_hessian(cv,qp,i)
+                fe[i] += shape_value(cv, qp, i) * dV
+                for j in 1:getnbasefunctions(cv)
+                    dNj = shape_hessian(cv,qp,j)
+                    Ke[i,j] += dNi⊡dNj*dV
+                end
+            end
+        end
+        return Ke, fe
+    end
+    function ebbeam_anlytical(L)
+        ke = [12 6L -12 6L;
+         6L 4L^2 -6L 2L^2;
+         -12 -6L 12 -6L;
+         6L 2L^2 -6L 4L^2] * (1/L^3)
+        fe = [0.5L, 1/12*L^2, 0.5L, -1/12*L^2]
+        return ke, fe
+    end
+
+    coords = getcoordinates(grid, 1)
+    reinit!(cv, coords)
+    L = norm(coords[2] - coords[1])
+    
+    ke, fe = ebbeam(cv)
+    kea, fea = ebbeam_anlytical(L)
+
+    @test ke ≈ kea
+    @test fe ≈ fea
+
+end
 
 end # testset

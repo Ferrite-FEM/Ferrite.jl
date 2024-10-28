@@ -108,7 +108,7 @@ function reinit!(cv::CellValues, cell::Union{AbstractCell, Nothing}, x::Abstract
     n_geom_basefuncs = getngeobasefunctions(geo_mapping)
 
     check_reinit_sdim_consistency(:CellValues, shape_gradient_type(cv), eltype(x))
-    if cell === nothing && !isa(mapping_type(fun_values), IdentityMapping)
+    if cell === nothing && !isa(mapping_type(fun_values), IdentityMapping) && !isa(mapping_type(fun_values), HermiteMapping)
         throw(ArgumentError("The cell::AbstractCell input is required to reinit! non-identity function mappings"))
     end
     if !checkbounds(Bool, x, 1:n_geom_basefuncs) || length(x) != n_geom_basefuncs
