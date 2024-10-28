@@ -112,8 +112,7 @@ using Ferrite, Tensors, TimerOutputs, ProgressMeter, IterativeSolvers
 #     following:
 #     ```math
 #     \begin{aligned}
-#     \frac{\partial \mathbf{P}}{\partial \mathbf{F}} &=
-#     \frac{\partial P_{ij}}{\partial F_{kl}} \\ &=
+#     \frac{\partial P_{ij}}{\partial F_{kl}} &= \\
 #     \frac{\partial (F_{im}S_{mj})}{\partial F_{kl}} \\ &=
 #     \frac{\partial F_{im}}{\partial F_{kl}}S_{mj} +
 #     F_{im}\frac{\partial S_{mj}}{\partial F_{kl}} \\ &=
@@ -136,7 +135,8 @@ using Ferrite, Tensors, TimerOutputs, ProgressMeter, IterativeSolvers
 #     (F^\mathrm{T}_{ok} \delta_{nl} + F^\mathrm{T}_{nk} \delta_{ol}) \\ &=
 #     \delta_{ik}S_{jl} +
 #     2\, F_{im} \frac{\partial S_{mj}}{\partial C_{no}}
-#     F^\mathrm{T}_{nk} \delta_{ol} \\ &=
+#     F^\mathrm{T}_{nk} \delta_{ol} \\
+#     \frac{\partial \mathbf{P}}{\partial \mathbf{F}} &=
 #     \mathbf{I}\bar{\otimes}\mathbf{S} +
 #     2\, \mathbf{F} \cdot \frac{\partial \mathbf{S}}{\partial \mathbf{C}}
 #     : \mathbf{F}^\mathrm{T} \bar{\otimes} \mathbf{I},
