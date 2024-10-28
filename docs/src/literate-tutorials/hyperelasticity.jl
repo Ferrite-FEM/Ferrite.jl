@@ -51,7 +51,7 @@
 # and print a summary at the end,
 # [ProgressMeter.jl](https://github.com/timholy/ProgressMeter.jl) for showing a simple
 # progress bar, and
-# [IterativeSolvers](https://github.com/JuliaLinearAlgebra/IterativeSolvers.jl) for solving
+# [IterativeSolvers.jl](https://github.com/JuliaLinearAlgebra/IterativeSolvers.jl) for solving
 # the linear system using conjugate gradients.
 
 using Ferrite, Tensors, TimerOutputs, ProgressMeter, IterativeSolvers
@@ -106,45 +106,45 @@ using Ferrite, Tensors, TimerOutputs, ProgressMeter, IterativeSolvers
 # \end{align*}
 # ```
 
-#md # !!! details "Derivation of $\partial \mathbf{P} / \partial \mathbf{F}$"
-#md #     Using the product rule, the chain rule, and the relations ``\mathbf{P} = \mathbf{F} \cdot
-#md #     \mathbf{S}`` and ``\mathbf{C} = \mathbf{F}^\mathrm{T} \cdot \mathbf{F}``, we obtain the
-#md #     following:
-#md #     ```math
-#md #     \begin{aligned}
-#md #     \frac{\partial \mathbf{P}}{\partial \mathbf{F}} &=
-#md #     \frac{\partial P_{ij}}{\partial F_{kl}} \\ &=
-#md #     \frac{\partial (F_{im}S_{mj})}{\partial F_{kl}} \\ &=
-#md #     \frac{\partial F_{im}}{\partial F_{kl}}S_{mj} +
-#md #     F_{im}\frac{\partial S_{mj}}{\partial F_{kl}} \\ &=
-#md #     \delta_{ik}\delta_{ml} S_{mj} +
-#md #     F_{im}\frac{\partial S_{mj}}{\partial C_{no}}\frac{\partial C_{no}}{\partial F_{kl}} \\ &=
-#md #     \delta_{ik}S_{lj} +
-#md #     F_{im}\frac{\partial S_{mj}}{\partial C_{no}}
-#md #     \frac{\partial (F^\mathrm{T}_{np}F_{po})}{\partial F_{kl}} \\ &=
-#md #     \delta_{ik}S^\mathrm{T}_{jl} +
-#md #     F_{im}\frac{\partial S_{mj}}{\partial C_{no}}
-#md #     \left(
-#md #     \frac{\partial F^\mathrm{T}_{np}}{\partial F_{kl}}F_{po} +
-#md #     F^\mathrm{T}_{np}\frac{\partial F_{po}}{\partial F_{kl}}
-#md #     \right) \\ &=
-#md #     \delta_{ik}S_{jl} +
-#md #     F_{im}\frac{\partial S_{mj}}{\partial C_{no}}
-#md #     (\delta_{nl} \delta_{pk} F_{po} + F^\mathrm{T}_{np}\delta_{pk} \delta_{ol}) \\ &=
-#md #     \delta_{ik}S_{lj} +
-#md #     F_{im}\frac{\partial S_{mj}}{\partial C_{no}}
-#md #     (F^\mathrm{T}_{ok} \delta_{nl} + F^\mathrm{T}_{nk} \delta_{ol}) \\ &=
-#md #     \delta_{ik}S_{jl} +
-#md #     2\, F_{im} \frac{\partial S_{mj}}{\partial C_{no}}
-#md #     F^\mathrm{T}_{nk} \delta_{ol} \\ &=
-#md #     \mathbf{I}\bar{\otimes}\mathbf{S} +
-#md #     2\, \mathbf{F} \cdot \frac{\partial \mathbf{S}}{\partial \mathbf{C}}
-#md #     : \mathbf{F}^\mathrm{T} \bar{\otimes} \mathbf{I},
-#md #     \end{aligned}
-#md #     ```
-#md #     where we used the fact that ``\mathbf{S}`` is symmetric (``S_{lj} = S_{jl}``) and that
-#md #     ``\frac{\partial \mathbf{S}}{\partial \mathbf{C}}`` is *minor* symmetric (``\frac{\partial
-#md #     S_{mj}}{\partial C_{no}} = \frac{\partial S_{mj}}{\partial C_{on}}``).
+# !!! details "Derivation of $\partial \mathbf{P} / \partial \mathbf{F}$"
+#     Using the product rule, the chain rule, and the relations ``\mathbf{P} = \mathbf{F} \cdot
+#     \mathbf{S}`` and ``\mathbf{C} = \mathbf{F}^\mathrm{T} \cdot \mathbf{F}``, we obtain the
+#     following:
+#     ```math
+#     \begin{aligned}
+#     \frac{\partial \mathbf{P}}{\partial \mathbf{F}} &=
+#     \frac{\partial P_{ij}}{\partial F_{kl}} \\ &=
+#     \frac{\partial (F_{im}S_{mj})}{\partial F_{kl}} \\ &=
+#     \frac{\partial F_{im}}{\partial F_{kl}}S_{mj} +
+#     F_{im}\frac{\partial S_{mj}}{\partial F_{kl}} \\ &=
+#     \delta_{ik}\delta_{ml} S_{mj} +
+#     F_{im}\frac{\partial S_{mj}}{\partial C_{no}}\frac{\partial C_{no}}{\partial F_{kl}} \\ &=
+#     \delta_{ik}S_{lj} +
+#     F_{im}\frac{\partial S_{mj}}{\partial C_{no}}
+#     \frac{\partial (F^\mathrm{T}_{np}F_{po})}{\partial F_{kl}} \\ &=
+#     \delta_{ik}S^\mathrm{T}_{jl} +
+#     F_{im}\frac{\partial S_{mj}}{\partial C_{no}}
+#     \left(
+#     \frac{\partial F^\mathrm{T}_{np}}{\partial F_{kl}}F_{po} +
+#     F^\mathrm{T}_{np}\frac{\partial F_{po}}{\partial F_{kl}}
+#     \right) \\ &=
+#     \delta_{ik}S_{jl} +
+#     F_{im}\frac{\partial S_{mj}}{\partial C_{no}}
+#     (\delta_{nl} \delta_{pk} F_{po} + F^\mathrm{T}_{np}\delta_{pk} \delta_{ol}) \\ &=
+#     \delta_{ik}S_{lj} +
+#     F_{im}\frac{\partial S_{mj}}{\partial C_{no}}
+#     (F^\mathrm{T}_{ok} \delta_{nl} + F^\mathrm{T}_{nk} \delta_{ol}) \\ &=
+#     \delta_{ik}S_{jl} +
+#     2\, F_{im} \frac{\partial S_{mj}}{\partial C_{no}}
+#     F^\mathrm{T}_{nk} \delta_{ol} \\ &=
+#     \mathbf{I}\bar{\otimes}\mathbf{S} +
+#     2\, \mathbf{F} \cdot \frac{\partial \mathbf{S}}{\partial \mathbf{C}}
+#     : \mathbf{F}^\mathrm{T} \bar{\otimes} \mathbf{I},
+#     \end{aligned}
+#     ```
+#     where we used the fact that ``\mathbf{S}`` is symmetric (``S_{lj} = S_{jl}``) and that
+#     ``\frac{\partial \mathbf{S}}{\partial \mathbf{C}}`` is *minor* symmetric (``\frac{\partial
+#     S_{mj}}{\partial C_{no}} = \frac{\partial S_{mj}}{\partial C_{on}}``).
 
 
 # ### Implementation of material model using automatic differentiation
@@ -275,9 +275,9 @@ function assemble_element!(ke, ge, cell, cv, fv, mp, ue, ΓN)
     end
 
     ## Surface integral for the traction
-    for face in 1:nfaces(cell)
-        if (cellid(cell), face) in ΓN
-            reinit!(fv, cell, face)
+    for facet in 1:nfacets(cell)
+        if (cellid(cell), facet) in ΓN
+            reinit!(fv, cell, facet)
             for q_point in 1:getnquadpoints(fv)
                 t = tn * getnormal(fv, q_point)
                 dΓ = getdetJdV(fv, q_point)
@@ -307,7 +307,7 @@ function assemble_global!(K, g, dh, cv, fv, mp, u, ΓN)
         global_dofs = celldofs(cell)
         ue = u[global_dofs] # element dofs
         @timeit "element assemble" assemble_element!(ke, ge, cell, cv, fv, mp, ue, ΓN)
-        assemble!(assembler, global_dofs, ge, ke)
+        assemble!(assembler, global_dofs, ke, ge)
     end
 end;
 
@@ -334,9 +334,9 @@ function solve()
     ## Finite element base
     ip = Lagrange{RefTetrahedron, 1}()^3
     qr = QuadratureRule{RefTetrahedron}(1)
-    qr_face = FaceQuadratureRule{RefTetrahedron}(1)
+    qr_facet = FacetQuadratureRule{RefTetrahedron}(1)
     cv = CellValues(qr, ip)
-    fv = FaceValues(qr_face, ip)
+    fv = FacetValues(qr_facet, ip)
 
     ## DofHandler
     dh = DofHandler(grid)
@@ -355,9 +355,9 @@ function solve()
 
     dbcs = ConstraintHandler(dh)
     ## Add a homogeneous boundary condition on the "clamped" edge
-    dbc = Dirichlet(:u, getfaceset(grid, "right"), (x,t) -> [0.0, 0.0, 0.0], [1, 2, 3])
+    dbc = Dirichlet(:u, getfacetset(grid, "right"), (x,t) -> [0.0, 0.0, 0.0], [1, 2, 3])
     add!(dbcs, dbc)
-    dbc = Dirichlet(:u, getfaceset(grid, "left"), (x,t) -> rotation(x, t), [1, 2, 3])
+    dbc = Dirichlet(:u, getfacetset(grid, "left"), (x,t) -> rotation(x, t), [1, 2, 3])
     add!(dbcs, dbc)
     close!(dbcs)
     t = 0.5
@@ -365,10 +365,10 @@ function solve()
 
     ## Neumann part of the boundary
     ΓN = union(
-        getfaceset(grid, "top"),
-        getfaceset(grid, "bottom"),
-        getfaceset(grid, "front"),
-        getfaceset(grid, "back"),
+        getfacetset(grid, "top"),
+        getfacetset(grid, "bottom"),
+        getfacetset(grid, "front"),
+        getfacetset(grid, "back"),
     )
 
     ## Pre-allocation of vectors for the solution and Newton increments
@@ -380,14 +380,14 @@ function solve()
     apply!(un, dbcs)
 
     ## Create sparse matrix and residual vector
-    K = create_sparsity_pattern(dh)
+    K = allocate_matrix(dh)
     g = zeros(_ndofs)
 
     ## Perform Newton iterations
     newton_itr = -1
     NEWTON_TOL = 1e-8
     NEWTON_MAXITER = 30
-    prog = ProgressMeter.ProgressThresh(NEWTON_TOL, "Solving:")
+    prog = ProgressMeter.ProgressThresh(NEWTON_TOL; desc = "Solving:")
 
     while true; newton_itr += 1
         ## Construct the current guess
@@ -414,8 +414,8 @@ function solve()
 
     ## Save the solution
     @timeit "export" begin
-        vtk_grid("hyperelasticity", dh) do vtkfile
-            vtk_point_data(vtkfile, dh, u)
+        VTKGridFile("hyperelasticity", dh) do vtk
+            write_solution(vtk, dh, u)
         end
     end
 

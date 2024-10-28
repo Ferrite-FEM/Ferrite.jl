@@ -7,9 +7,9 @@ DocTestSetup = :(using Ferrite)
 
 ```@docs
 QuadratureRule
-FaceQuadratureRule
+FacetQuadratureRule
 getnquadpoints(::QuadratureRule)
-getnquadpoints(::FaceQuadratureRule, ::Int)
+getnquadpoints(::FacetQuadratureRule, ::Int)
 getpoints
 getweights
 ```

@@ -10,7 +10,7 @@
 #-
 #md # !!! tip
 #md #     This example is also available as a Jupyter notebook:
-#md #     [`transient_heat_equation.ipynb`](@__NBVIEWER_ROOT_URL__/examples/transient_heat_equation.ipynb).
+#md #     [`transient_heat_equation.ipynb`](@__NBVIEWER_ROOT_URL__/tutorials/transient_heat_equation.ipynb).
 #-
 #
 # ## Introduction
@@ -58,7 +58,7 @@
 #md # The full program, without comments, can be found in the next [section](@ref heat_equation-plain-program).
 #
 # First we load Ferrite, and some other packages we need.
-using Ferrite, SparseArrays
+using Ferrite, SparseArrays, WriteVTK
 # We create the same grid as in the heat equation example.
 grid = generate_grid(Quadrilateral, (100, 100));
 
@@ -80,8 +80,8 @@ close!(dh);
 # M_{ij} = \int_{\Omega} v_i \, u_j \ \mathrm{d}\Omega,
 # ```
 # where $u_i$ and $v_j$ are trial and test functions, respectively.
-K = create_sparsity_pattern(dh);
-M = create_sparsity_pattern(dh);
+K = allocate_matrix(dh);
+M = allocate_matrix(dh);
 # We also preallocate the right hand side
 f = zeros(ndofs(dh));
 
@@ -95,12 +95,12 @@ t_rise = 100
 ch = ConstraintHandler(dh);
 
 # Here, we define the boundary condition related to $\partial \Omega_1$.
-∂Ω₁ = union(getfaceset.((grid,), ["left", "right"])...)
+∂Ω₁ = union(getfacetset.((grid,), ["left", "right"])...)
 dbc = Dirichlet(:u, ∂Ω₁, (x, t) -> 0)
 add!(ch, dbc);
 # While the next code block corresponds to the linearly increasing temperature description on $\partial \Omega_2$
 # until `t=t_rise`, and then keep constant
-∂Ω₂ = union(getfaceset.((grid,), ["top", "bottom"])...)
+∂Ω₂ = union(getfacetset.((grid,), ["top", "bottom"])...)
 dbc = Dirichlet(:u, ∂Ω₂, (x, t) -> max_temp * clamp(t / t_rise, 0, 1))
 add!(ch, dbc)
 close!(ch)
@@ -137,7 +137,7 @@ function doassemble_K!(K::SparseMatrixCSC, f::Vector, cellvalues::CellValues, dh
             end
         end
 
-        assemble!(assembler, celldofs(cell), fe, Ke)
+        assemble!(assembler, celldofs(cell), Ke, fe)
     end
     return K, f
 end
@@ -182,24 +182,22 @@ A = (Δt .* K) + M;
 # by `get_rhs_data`. The function returns a `RHSData` struct, which contains all needed information to apply
 # the boundary conditions solely on the right-hand-side vector of the problem.
 rhsdata = get_rhs_data(ch, A);
-# We set the values at initial time step, denoted by uₙ, to a bubble-shape described by 
+# We set the values at initial time step, denoted by uₙ, to a bubble-shape described by
 # $(x_1^2-1)(x_2^2-1)$, such that it is zero at the boundaries and the maximum temperature in the center.
 uₙ = zeros(length(f));
 apply_analytical!(uₙ, dh, :u, x -> (x[1]^2 - 1) * (x[2]^2 - 1) * max_temp);
 # Here, we apply **once** the boundary conditions to the system matrix `A`.
 apply!(A, ch);
 
-# To store the solution, we initialize a `paraview_collection` (.pvd) file.
-pvd = paraview_collection("transient-heat.pvd");
-t = 0
-vtk_grid("transient-heat-$t", dh) do vtk
-    vtk_point_data(vtk, dh, uₙ)
-    vtk_save(vtk)
-    pvd[t] = vtk
+# To store the solution, we initialize a paraview collection (.pvd) file,
+pvd = paraview_collection("transient-heat")
+VTKGridFile("transient-heat-0", dh) do vtk
+    write_solution(vtk, dh, uₙ)
+    pvd[0.0] = vtk
 end
 
 # At this point everything is set up and we can finally approach the time loop.
-for t in Δt:Δt:T
+for (step, t) in enumerate(Δt:Δt:T)
     #First of all, we need to update the Dirichlet boundary condition values.
     update!(ch, t)
 
@@ -211,9 +209,8 @@ for t in Δt:Δt:T
     #Finally, we can solve the time step and save the solution afterwards.
     u = A \ b
 
-    vtk_grid("transient-heat-$t", dh) do vtk
-        vtk_point_data(vtk, dh, u)
-        vtk_save(vtk)
+    VTKGridFile("transient-heat-$step", dh) do vtk
+        write_solution(vtk, dh, u)
         pvd[t] = vtk
     end
     #At the end of the time loop, we set the previous solution to the current one and go to the next time step.

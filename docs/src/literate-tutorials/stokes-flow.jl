@@ -4,7 +4,7 @@
 #-
 #md # !!! tip
 #md #     This example is also available as a Jupyter notebook:
-#md #     [`stokes-flow.ipynb`](@__NBVIEWER_ROOT_URL__/examples/stokes-flow.ipynb).
+#md #     [`stokes-flow.ipynb`](@__NBVIEWER_ROOT_URL__/tutorials/stokes-flow.ipynb).
 #-
 #
 # ![](stokes-flow.png)
@@ -19,8 +19,8 @@
 # flow on a quarter circle. In particular it shows how to use periodic boundary conditions,
 # how to solve a problem with multiple unknown fields, and how to enforce a specific mean
 # value of the solution. For the mesh generation we use
-# [`Gmsh.jl`](https://github.com/JuliaFEM/Gmsh.jl) and then use
-# [`FerriteGmsh.jl`](https://github.com/Ferrite-FEM/FerriteGmsh.jl) to import the mesh into
+# [Gmsh.jl](https://github.com/JuliaFEM/Gmsh.jl) and then use
+# [FerriteGmsh.jl](https://github.com/Ferrite-FEM/FerriteGmsh.jl) to import the mesh into
 # Ferrite's format.
 #
 # The strong form of Stokes flow with velocity ``\boldsymbol{u}`` and pressure ``p`` can be
@@ -146,7 +146,6 @@
 using Ferrite, FerriteGmsh, Gmsh, Tensors, LinearAlgebra, SparseArrays
 using Test #src
 
-
 # ### Geometry and mesh generation with `Gmsh.jl`
 #
 # In the `setup_grid` function below we use the
@@ -224,15 +223,15 @@ end
 # velocity and `ipp` for the pressure. Note that we specify linear geometric mapping
 # (`ipg`) for both the velocity and pressure because our grid contains linear
 # triangles. However, since linear mapping is default this could have been skipped.
-# We also construct face-values for the pressure since we need to integrate along
+# We also construct facet-values for the pressure since we need to integrate along
 # the boundary when assembling the constraint matrix ``\underline{\underline{C}}``.
 
 function setup_fevalues(ipu, ipp, ipg)
     qr = QuadratureRule{RefTriangle}(2)
     cvu = CellValues(qr, ipu, ipg)
     cvp = CellValues(qr, ipp, ipg)
-    qr_face = FaceQuadratureRule{RefTriangle}(2)
-    fvp = FaceValues(qr_face, ipp, ipg)
+    qr_facet = FacetQuadratureRule{RefTriangle}(2)
+    fvp = FacetValues(qr_facet, ipp, ipg)
     return cvu, cvp, fvp
 end
 #md nothing #hide
@@ -259,7 +258,7 @@ end
 # Let's first discuss the assembly of the constraint matrix ``\underline{\underline{C}}``
 # and how to create an `AffineConstraint` from it. This is done in the
 # `setup_mean_constraint` function below. Assembling this is not so different from standard
-# assembly in Ferrite: we loop over all the faces, loop over the quadrature points, and loop
+# assembly in Ferrite: we loop over all the facets, loop over the quadrature points, and loop
 # over the shape functions. Note that since there is only one constraint the matrix will
 # only have one row.
 # After assembling `C` we construct an `AffineConstraint` from it. We select the constrained
@@ -285,13 +284,13 @@ end
 #     example](https://www.dealii.org/current/doxygen/deal.II/step_11.html).
 
 function setup_mean_constraint(dh, fvp)
-    assembler = start_assemble()
+    assembler = Ferrite.COOAssembler()
     ## All external boundaries
     set = union(
-        getfaceset(dh.grid, "Γ1"),
-        getfaceset(dh.grid, "Γ2"),
-        getfaceset(dh.grid, "Γ3"),
-        getfaceset(dh.grid, "Γ4"),
+        getfacetset(dh.grid, "Γ1"),
+        getfacetset(dh.grid, "Γ2"),
+        getfacetset(dh.grid, "Γ3"),
+        getfacetset(dh.grid, "Γ4"),
     )
     ## Allocate buffers
     range_p = dof_range(dh, :p)
@@ -314,7 +313,7 @@ function setup_mean_constraint(dh, fvp)
         ## Assemble to row 1
         assemble!(assembler, [1], element_dofs_p, Ce)
     end
-    C = finish_assemble(assembler)
+    C, _ = finish_assemble(assembler)
     ## Create an AffineConstraint from the C-matrix
     _, J, V = findnz(C)
     _, constrained_dof_idx = findmax(abs2, V)
@@ -331,15 +330,15 @@ end
 
 # We now setup all the boundary conditions in the `setup_constraints` function below.
 # Since the periodicity constraint for this example is between two boundaries which are not
-# parallel to each other we need to i) compute the mapping between each mirror face and the
-# corresponding image face (on the element level) and ii) describe the dof relation between
-# dofs on these two faces. In Ferrite this is done by defining a transformation of entities
+# parallel to each other we need to i) compute the mapping between each mirror facet and the
+# corresponding image facet (on the element level) and ii) describe the dof relation between
+# dofs on these two facets. In Ferrite this is done by defining a transformation of entities
 # on the image boundary such that they line up with the matching entities on the mirror
 # boundary. In this example we consider the inlet ``\Gamma_1`` to be the image, and the
 # outlet ``\Gamma_3`` to be the mirror. The necessary transformation to apply then becomes a
 # rotation of ``\pi/2`` radians around the out-of-plane axis. We set up the rotation matrix
-# `R`, and then compute the mapping between mirror and image faces using
-# [`collect_periodic_faces`](@ref) where the rotation is applied to the coordinates. In the
+# `R`, and then compute the mapping between mirror and image facets using
+# [`collect_periodic_facets`](@ref) where the rotation is applied to the coordinates. In the
 # next step we construct the constraint using the [`PeriodicDirichlet`](@ref) constructor.
 # We pass the constructor the computed mapping, and also the rotation matrix. This matrix is
 # used to rotate the dofs on the mirror surface such that we properly constrain
@@ -354,11 +353,11 @@ function setup_constraints(dh, fvp)
     ch = ConstraintHandler(dh)
     ## Periodic BC
     R = rotation_tensor(π / 2)
-    periodic_faces = collect_periodic_faces(dh.grid, "Γ3", "Γ1", x -> R ⋅ x)
+    periodic_faces = collect_periodic_facets(dh.grid, "Γ3", "Γ1", x -> R ⋅ x)
     periodic = PeriodicDirichlet(:u, periodic_faces, R, [1, 2])
     add!(ch, periodic)
     ## Dirichlet BC
-    Γ24 = union(getfaceset(dh.grid, "Γ2"), getfaceset(dh.grid, "Γ4"))
+    Γ24 = union(getfacetset(dh.grid, "Γ2"), getfacetset(dh.grid, "Γ4"))
     dbc = Dirichlet(:u, Γ24, (x, t) -> [0, 0], [1, 2])
     add!(ch, dbc)
     ## Compute mean value constraint and add it
@@ -439,8 +438,8 @@ end
 function check_mean_constraint(dh, fvp, u)                                  #src
     ## All external boundaries                                              #src
     set = union(                                                            #src
-        getfaceset(dh.grid, "Γ1"), getfaceset(dh.grid, "Γ2"),               #src
-        getfaceset(dh.grid, "Γ3"), getfaceset(dh.grid, "Γ4"),               #src
+        getfacetset(dh.grid, "Γ1"), getfacetset(dh.grid, "Γ2"),             #src
+        getfacetset(dh.grid, "Γ3"), getfacetset(dh.grid, "Γ4"),             #src
     )                                                                       #src
     range_p = dof_range(dh, :p)                                             #src
     cc = CellCache(dh)                                                      #src
@@ -448,8 +447,8 @@ function check_mean_constraint(dh, fvp, u)                                  #src
     ∫pdΓ, Γ= 0.0, 0.0                                                       #src
     for (ci, fi) in set                                                     #src
         reinit!(cc, ci)                                                     #src
-        reinit!(fvp, cc.coords, fi)                                         #src
-        ue = u[cc.dofs]                                                     #src
+        reinit!(fvp, cc, fi)                                                #src
+        ue = u[celldofs(cc)]                                                #src
         for qp in 1:getnquadpoints(fvp)                                     #src
             dΓ = getdetJdV(fvp, qp)                                         #src
             ∫pdΓ += function_value(fvp, qp, ue, range_p) * dΓ               #src
@@ -467,7 +466,7 @@ function check_L2(dh, cvu, cvp, u)                                          #src
     for cell in CellIterator(dh)                                            #src
         reinit!(cvu, cell)                                                  #src
         reinit!(cvp, cell)                                                  #src
-        ue = u[cell.dofs]                                                   #src
+        ue = u[celldofs(cell)]                                              #src
         for qp in 1:getnquadpoints(cvu)                                     #src
             dΩ = getdetJdV(cvu, qp)                                         #src
             uh = function_value(cvu, qp, ue, range_u)                       #src
@@ -497,7 +496,7 @@ function main()
     ch = setup_constraints(dh, fvp)
     ## Global tangent matrix and rhs
     coupling = [true true; true false] # no coupling between pressure test/trial functions
-    K = create_sparsity_pattern(dh, ch; coupling=coupling)
+    K = allocate_matrix(dh, ch; coupling=coupling)
     f = zeros(ndofs(dh))
     ## Assemble system
     assemble_system!(K, f, dh, cvu, cvp)
@@ -506,8 +505,8 @@ function main()
     u = K \ f
     apply!(u, ch)
     ## Export the solution
-    vtk_grid("stokes-flow", grid) do vtk
-        vtk_point_data(vtk, dh, u)
+    VTKGridFile("stokes-flow", grid) do vtk
+        write_solution(vtk, dh, u)
     end
 
     ## Check the result                #src

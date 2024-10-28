@@ -9,7 +9,7 @@
 #-
 #md # !!! tip
 #md #     This example is also available as a Jupyter notebook:
-#md #     [`computational_homogenization.ipynb`](@__NBVIEWER_ROOT_URL__/examples/computational_homogenization.ipynb).
+#md #     [`computational_homogenization.ipynb`](@__NBVIEWER_ROOT_URL__/tutorials/computational_homogenization.ipynb).
 #-
 #
 # ## Introduction
@@ -179,7 +179,7 @@
 
 # ## Commented program
 #
-# Now we will see how this can be implemented in `Ferrite`. What follows is a program
+# Now we will see how this can be implemented in Ferrite. What follows is a program
 # with comments in between which describe the different steps.
 #md # You can also find the same program without comments at the end of the page,
 #md # see [Plain program](@ref homogenization-plain-program).
@@ -189,10 +189,11 @@ using Test #src
 
 # We first load the mesh file [`periodic-rve.msh`](periodic-rve.msh)
 # ([`periodic-rve-coarse.msh`](periodic-rve-coarse.msh) for a coarser mesh). The mesh is
-# generated with [`gmsh`](https://gmsh.info/), and we read it in as a `Ferrite` grid using
-# the [`FerriteGmsh`](https://github.com/Ferrite-FEM/FerriteGmsh.jl) package:
+# generated with [Gmsh](https://gmsh.info/), and we read it in as a Ferrite `Grid` using
+# the [FerriteGmsh.jl](https://github.com/Ferrite-FEM/FerriteGmsh.jl) package:
 
 using FerriteGmsh
+
 #src notebook: use coarse mesh to decrease build time
 #src   script: use the fine mesh
 #src markdown: use the coarse mesh to decrease build time, but make it look like the fine
@@ -231,7 +232,7 @@ close!(dh);
 ch_dirichlet = ConstraintHandler(dh)
 dirichlet = Dirichlet(
     :u,
-    union(getfaceset.(Ref(grid), ["left", "right", "top", "bottom"])...),
+    union(getfacetset.(Ref(grid), ["left", "right", "top", "bottom"])...),
     (x, t) ->  [0, 0],
     [1, 2]
 )
@@ -240,8 +241,8 @@ close!(ch_dirichlet)
 update!(ch_dirichlet, 0.0)
 
 # For periodic boundary conditions we use the [`PeriodicDirichlet`](@ref) constraint type,
-# which is very similar to the `Dirichlet` type, but instead of a passing a faceset we pass
-# a vector with "face pairs", i.e. the mapping between mirror and image parts of the
+# which is very similar to the `Dirichlet` type, but instead of a passing a facetset we pass
+# a vector with "facet pairs", i.e. the mapping between mirror and image parts of the
 # boundary. In this example the `"left"` and `"bottom"` boundaries are mirrors, and the
 # `"right"` and `"top"` boundaries are the mirrors.
 
@@ -276,8 +277,8 @@ ch = (dirichlet = ch_dirichlet, periodic = ch_periodic);
 # and the constraint handler.
 
 K = (
-    dirichlet = create_sparsity_pattern(dh),
-    periodic  = create_sparsity_pattern(dh, ch.periodic),
+    dirichlet = allocate_matrix(dh),
+    periodic  = allocate_matrix(dh, ch.periodic),
 );
 
 # We define the fourth order elasticity tensor for the matrix material, and define the
@@ -518,16 +519,16 @@ round.(ev; digits=-8)
 
 uM = zeros(ndofs(dh))
 
-vtk_grid("homogenization", dh) do vtk
+VTKGridFile("homogenization", dh) do vtk
     for i in 1:3
         ## Compute macroscopic solution
         apply_analytical!(uM, dh, :u, x -> εᴹ[i] ⋅ x)
         ## Dirichlet
-        vtk_point_data(vtk, dh, uM + u.dirichlet[i], "_dirichlet_$i")
-        vtk_point_data(vtk, projector, σ.dirichlet[i], "σvM_dirichlet_$i")
+        write_solution(vtk, dh, uM + u.dirichlet[i], "_dirichlet_$i")
+        write_projection(vtk, projector, σ.dirichlet[i], "σvM_dirichlet_$i")
         ## Periodic
-        vtk_point_data(vtk, dh, uM + u.periodic[i], "_periodic_$i")
-        vtk_point_data(vtk, projector, σ.periodic[i], "σvM_periodic_$i")
+        write_solution(vtk, dh, uM + u.periodic[i], "_periodic_$i")
+        write_projection(vtk, projector, σ.periodic[i], "σvM_periodic_$i")
     end
 end;
 

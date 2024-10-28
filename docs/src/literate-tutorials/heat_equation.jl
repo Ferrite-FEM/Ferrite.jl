@@ -8,7 +8,7 @@
 #-
 #md # !!! tip
 #md #     This example is also available as a Jupyter notebook:
-#md #     [`heat_equation.ipynb`](@__NBVIEWER_ROOT_URL__/examples/heat_equation.ipynb).
+#md #     [`heat_equation.ipynb`](@__NBVIEWER_ROOT_URL__/tutorials/heat_equation.ipynb).
 #-
 #
 # ## Introduction
@@ -71,9 +71,9 @@ add!(dh, :u, ip)
 close!(dh);
 
 # Now that we have distributed all our dofs we can create our tangent matrix,
-# using `create_sparsity_pattern`. This function returns a sparse matrix
+# using `allocate_matrix`. This function returns a sparse matrix
 # with the correct entries stored.
-K = create_sparsity_pattern(dh)
+K = allocate_matrix(dh)
 
 # ### Boundary conditions
 # In Ferrite constraints like Dirichlet boundary conditions
@@ -82,16 +82,16 @@ ch = ConstraintHandler(dh);
 
 # Next we need to add constraints to `ch`. For this problem we define
 # homogeneous Dirichlet boundary conditions on the whole boundary, i.e.
-# the `union` of all the face sets on the boundary.
+# the `union` of all the facet sets on the boundary.
 ∂Ω = union(
-    getfaceset(grid, "left"),
-    getfaceset(grid, "right"),
-    getfaceset(grid, "top"),
-    getfaceset(grid, "bottom"),
+    getfacetset(grid, "left"),
+    getfacetset(grid, "right"),
+    getfacetset(grid, "top"),
+    getfacetset(grid, "bottom"),
 );
 
 # Now we are set up to define our constraint. We specify which field
-# the condition is for, and our combined face set `∂Ω`. The last
+# the condition is for, and our combined facet set `∂Ω`. The last
 # argument is a function of the form $f(\textbf{x})$ or $f(\textbf{x}, t)$,
 # where $\textbf{x}$ is the spatial coordinate and
 # $t$ the current time, and returns the prescribed value. Since the boundary condition in
@@ -213,8 +213,8 @@ u = K \ f;
 # ### Exporting to VTK
 # To visualize the result we export the grid and our field `u`
 # to a VTK-file, which can be viewed in e.g. [ParaView](https://www.paraview.org/).
-vtk_grid("heat_equation", dh) do vtk
-    vtk_point_data(vtk, dh, u)
+VTKGridFile("heat_equation", dh) do vtk
+    write_solution(vtk, dh, u)
 end
 
 ## test the result                #src
