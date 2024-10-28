@@ -112,7 +112,7 @@ using Ferrite, Tensors, TimerOutputs, ProgressMeter, IterativeSolvers
 #     following:
 #     ```math
 #     \begin{aligned}
-#     \frac{\partial P_{ij}}{\partial F_{kl}} &= \\
+#     \frac{\partial P_{ij}}{\partial F_{kl}} &=
 #     \frac{\partial (F_{im}S_{mj})}{\partial F_{kl}} \\ &=
 #     \frac{\partial F_{im}}{\partial F_{kl}}S_{mj} +
 #     F_{im}\frac{\partial S_{mj}}{\partial F_{kl}} \\ &=
@@ -145,7 +145,6 @@ using Ferrite, Tensors, TimerOutputs, ProgressMeter, IterativeSolvers
 #     where we used the fact that ``\mathbf{S}`` is symmetric (``S_{lj} = S_{jl}``) and that
 #     ``\frac{\partial \mathbf{S}}{\partial \mathbf{C}}`` is *minor* symmetric (``\frac{\partial
 #     S_{mj}}{\partial C_{no}} = \frac{\partial S_{mj}}{\partial C_{on}}``).
-
 
 # ### Implementation of material model using automatic differentiation
 # We can implement the material model as follows, where we utilize automatic differentiation
