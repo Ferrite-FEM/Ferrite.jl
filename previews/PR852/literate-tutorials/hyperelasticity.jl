@@ -70,17 +70,17 @@ using Ferrite, Tensors, TimerOutputs, ProgressMeter, IterativeSolvers
 # where ``I_1 = \mathrm{tr}(\mathbf{C})`` is the first invariant, ``J = \sqrt{\det(\mathbf{C})}``
 # and ``\mu`` and ``\lambda`` material parameters.
 
-#md # !!! details "Extra details on compressible neo-Hookean formulations"
-#md #     The Neo-Hooke model is only a well defined terminology in the incompressible case.
-#md #     Thus, only $W(\mathbf{C})$ specifies the neo-Hookean behavior, the volume penalty $U(J)$ can vary in different formulations.
-#md #     In order to obtain a well-posed problem, it is crucial to choose a convex formulation of $U(J)$.
-#md #     Other examples for $U(J)$ can be found, e.g. in [Hol:2000:nsm; Eq. (6.138)](@cite)
-#md #     ```math
-#md #      \beta^{-2} (\beta \ln J + J^{-\beta} -1)
-#md #     ```
-#md #     where [SimMie:1992:act; Eq. (2.37)](@cite) published a non-generalized version with $\beta=-2$.
-#md #     This shows the possible variety of $U(J)$ while all of them refer to compressible neo-Hookean models.
-#md #     Sometimes the modified first invariant $\overline{I}_1=\frac{I_1}{I_3^{1/3}}$ is used in $W(\mathbf{C})$ instead of $I_1$.
+# !!! details "Extra details on compressible neo-Hookean formulations"
+#     The Neo-Hooke model is only a well defined terminology in the incompressible case.
+#     Thus, only $W(\mathbf{C})$ specifies the neo-Hookean behavior, the volume penalty $U(J)$ can vary in different formulations.
+#     In order to obtain a well-posed problem, it is crucial to choose a convex formulation of $U(J)$.
+#     Other examples for $U(J)$ can be found, e.g. in [Hol:2000:nsm; Eq. (6.138)](@cite)
+#     ```math
+#      \beta^{-2} (\beta \ln J + J^{-\beta} -1)
+#     ```
+#     where [SimMie:1992:act; Eq. (2.37)](@cite) published a non-generalized version with $\beta=-2$.
+#     This shows the possible variety of $U(J)$ while all of them refer to compressible neo-Hookean models.
+#     Sometimes the modified first invariant $\overline{I}_1=\frac{I_1}{I_3^{1/3}}$ is used in $W(\mathbf{C})$ instead of $I_1$.
 
 # From the potential we obtain the second Piola-Kirchoff stress ``\mathbf{S}`` as
 #
