@@ -69,6 +69,7 @@ using Ferrite, Tensors, TimerOutputs, ProgressMeter, IterativeSolvers
 #
 # where ``I_1 = \mathrm{tr}(\mathbf{C})`` is the first invariant, ``J = \sqrt{\det(\mathbf{C})}``
 # and ``\mu`` and ``\lambda`` material parameters.
+
 # !!! details "Extra details on compressible neo-Hookean formulations"
 #     The Neo-Hooke model is only a well defined terminology in the incompressible case.
 #     Thus, only $W(\mathbf{C})$ specifies the neo-Hookean behavior, the volume penalty $U(J)$ can vary in different formulations.
@@ -80,6 +81,7 @@ using Ferrite, Tensors, TimerOutputs, ProgressMeter, IterativeSolvers
 #     where [SimMie:1992:act; Eq. (2.37)](@cite) published a non-generalized version with $\beta=-2$.
 #     This shows the possible variety of $U(J)$ while all of them refer to compressible neo-Hookean models.
 #     Sometimes the modified first invariant $\overline{I}_1=\frac{I_1}{I_3^{1/3}}$ is used in $W(\mathbf{C})$ instead of $I_1$.
+
 # From the potential we obtain the second Piola-Kirchoff stress ``\mathbf{S}`` as
 #
 # ```math
@@ -99,60 +101,53 @@ using Ferrite, Tensors, TimerOutputs, ProgressMeter, IterativeSolvers
 # ```math
 # \begin{align*}
 # \mathbf{P} &= \mathbf{F} \cdot \mathbf{S},\\
-# \frac{\partial \mathbf{P}}{\partial \mathbf{F}} &= \mathbf{I} \bar{\otimes} \mathbf{S} + 2\, \mathbf{F} \bar{\otimes} \mathbf{I} :
+# \frac{\partial \mathbf{P}}{\partial \mathbf{F}} &= \mathbf{I} \bar{\otimes} \mathbf{S} + 2\, \mathbf{F} \cdot
 # \frac{\partial \mathbf{S}}{\partial \mathbf{C}} : \mathbf{F}^\mathrm{T} \bar{\otimes} \mathbf{I}.
 # \end{align*}
 # ```
 
-#md # ```@raw html
-#md # <details class="admonition is-details">
-#md # <summary class="admonition-header">
-#md # Derivation of <span>$\partial \mathbf{P} / \partial \mathbf{F}$</span>
-#md # </summary>
-#md # <div class="admonition-body">
-#md # ```
-#nb # ### Derivation of ``\partial \mathbf{P} / \partial \mathbf{F}``
-# Using the product rule, the chain rule, and the relations ``\mathbf{P} = \mathbf{F} \cdot
-# \mathbf{S}`` and ``\mathbf{C} = \mathbf{F}^\mathrm{T} \cdot \mathbf{F}``, we obtain the
-# following:
-# ```math
-# \begin{aligned}
-# \frac{\partial \mathbf{P}}{\partial \mathbf{F}} &=
-# \frac{\partial P_{ij}}{\partial F_{kl}} \\ &=
-# \frac{\partial (F_{im}S_{mj})}{\partial F_{kl}} \\ &=
-# \frac{\partial F_{im}}{\partial F_{kl}}S_{mj} +
-# F_{im}\frac{\partial S_{mj}}{\partial F_{kl}} \\ &=
-# \delta_{ik}\delta_{ml} S_{mj} +
-# F_{im}\frac{\partial S_{mj}}{\partial C_{no}}\frac{\partial C_{no}}{\partial F_{kl}} \\ &=
-# \delta_{ik}S_{lj} +
-# F_{im}\frac{\partial S_{mj}}{\partial C_{no}}
-# \frac{\partial (F^\mathrm{T}_{np}F_{po})}{\partial F_{kl}} \\ &=
-# \delta_{ik}S^\mathrm{T}_{jl} +
-# F_{im}\delta_{jq}\frac{\partial S_{mq}}{\partial C_{no}}
-# \left(
-# \frac{\partial F^\mathrm{T}_{np}}{\partial F_{kl}}F_{po} +
-# F^\mathrm{T}_{np}\frac{\partial F_{po}}{\partial F_{kl}}
-# \right) \\ &=
-# \delta_{ik}S_{jl} +
-# F_{im}\delta_{jq}\frac{\partial S_{mq}}{\partial C_{no}}
-# (\delta_{nl} \delta_{pk} F_{po} + F^\mathrm{T}_{np}\delta_{pk} \delta_{ol}) \\ &=
-# \delta_{ik}S_{lj} +
-# F_{im}\delta_{jq}\frac{\partial S_{mq}}{\partial C_{no}}
-# (F^\mathrm{T}_{ok} \delta_{nl} + F^\mathrm{T}_{nk} \delta_{ol}) \\ &=
-# \delta_{ik}S_{jl} +
-# 2\, F_{im}\delta_{jq} \frac{\partial S_{mq}}{\partial C_{no}}
-# F^\mathrm{T}_{nk} \delta_{ol} \\ &=
-# \mathbf{I}\bar{\otimes}\mathbf{S} +
-# 2\, \mathbf{F}\bar{\otimes}\mathbf{I} : \frac{\partial \mathbf{S}}{\partial \mathbf{C}}
-# : \mathbf{F}^\mathrm{T} \bar{\otimes} \mathbf{I},
-# \end{aligned}
-# ```
-# where we used the fact that ``\mathbf{S}`` is symmetric (``S_{lj} = S_{jl}``) and that
-# ``\frac{\partial \mathbf{S}}{\partial \mathbf{C}}`` is *minor* symmetric (``\frac{\partial
-# S_{mq}}{\partial C_{no}} = \frac{\partial S_{mq}}{\partial C_{on}}``).
-#md # ```@raw html
-#md # </div></details>
-#md # ```
+# !!! details "Derivation of $\partial \mathbf{P} / \partial \mathbf{F}$"
+#     *Tip:* See [knutam.github.io/tensors](https://knutam.github.io/tensors/Theory/IndexNotation/) for
+#     an explanation of the index notation used in this derivation.
+#md #
+#     Using the product rule, the chain rule, and the relations ``\mathbf{P} = \mathbf{F} \cdot
+#     \mathbf{S}`` and ``\mathbf{C} = \mathbf{F}^\mathrm{T} \cdot \mathbf{F}``, we obtain the
+#     following:
+#     ```math
+#     \begin{aligned}
+#     \frac{\partial P_{ij}}{\partial F_{kl}} &=
+#     \frac{\partial (F_{im}S_{mj})}{\partial F_{kl}} \\ &=
+#     \frac{\partial F_{im}}{\partial F_{kl}}S_{mj} +
+#     F_{im}\frac{\partial S_{mj}}{\partial F_{kl}} \\ &=
+#     \delta_{ik}\delta_{ml} S_{mj} +
+#     F_{im}\frac{\partial S_{mj}}{\partial C_{no}}\frac{\partial C_{no}}{\partial F_{kl}} \\ &=
+#     \delta_{ik}S_{lj} +
+#     F_{im}\frac{\partial S_{mj}}{\partial C_{no}}
+#     \frac{\partial (F^\mathrm{T}_{np}F_{po})}{\partial F_{kl}} \\ &=
+#     \delta_{ik}S^\mathrm{T}_{jl} +
+#     F_{im}\frac{\partial S_{mj}}{\partial C_{no}}
+#     \left(
+#     \frac{\partial F^\mathrm{T}_{np}}{\partial F_{kl}}F_{po} +
+#     F^\mathrm{T}_{np}\frac{\partial F_{po}}{\partial F_{kl}}
+#     \right) \\ &=
+#     \delta_{ik}S_{jl} +
+#     F_{im}\frac{\partial S_{mj}}{\partial C_{no}}
+#     (\delta_{nl} \delta_{pk} F_{po} + F^\mathrm{T}_{np}\delta_{pk} \delta_{ol}) \\ &=
+#     \delta_{ik}S_{lj} +
+#     F_{im}\frac{\partial S_{mj}}{\partial C_{no}}
+#     (F^\mathrm{T}_{ok} \delta_{nl} + F^\mathrm{T}_{nk} \delta_{ol}) \\ &=
+#     \delta_{ik}S_{jl} +
+#     2\, F_{im} \frac{\partial S_{mj}}{\partial C_{no}}
+#     F^\mathrm{T}_{nk} \delta_{ol} \\
+#     \frac{\partial \mathbf{P}}{\partial \mathbf{F}} &=
+#     \mathbf{I}\bar{\otimes}\mathbf{S} +
+#     2\, \mathbf{F} \cdot \frac{\partial \mathbf{S}}{\partial \mathbf{C}}
+#     : \mathbf{F}^\mathrm{T} \bar{\otimes} \mathbf{I},
+#     \end{aligned}
+#     ```
+#     where we used the fact that ``\mathbf{S}`` is symmetric (``S_{lj} = S_{jl}``) and that
+#     ``\frac{\partial \mathbf{S}}{\partial \mathbf{C}}`` is *minor* symmetric (``\frac{\partial
+#     S_{mj}}{\partial C_{no}} = \frac{\partial S_{mj}}{\partial C_{on}}``).
 
 # ### Implementation of material model using automatic differentiation
 # We can implement the material model as follows, where we utilize automatic differentiation
@@ -178,6 +173,19 @@ function constitutive_driver(C, mp::NeoHooke)
     ∂S∂C = 2.0 * ∂²Ψ∂C²
     return S, ∂S∂C
 end;
+
+## Test the derivation                                        #src
+using Test                                                    #src
+F = rand(Tensor{2,3})                                         #src
+mp = NeoHooke(rand(2)...)                                     #src
+S, ∂S∂C = constitutive_driver(tdot(F), mp)                    #src
+P = F ⋅ S                                                      #src
+I = one(S)                                                    #src
+∂P∂F =  otimesu(I, S) + 2 * F ⋅ ∂S∂C ⊡ otimesu(F', I)         #src
+∂P∂F_ad, P_ad = Tensors.hessian(x -> Ψ(tdot(x), mp), F, :all) #src
+@test P ≈ P_ad                                                #src
+@test ∂P∂F ≈ ∂P∂F_ad                                          #src
+nothing                                                       #src
 
 # ## Newton's method
 #
@@ -249,7 +257,7 @@ function assemble_element!(ke, ge, cell, cv, fv, mp, ue, ΓN)
         S, ∂S∂C = constitutive_driver(C, mp)
         P = F ⋅ S
         I = one(S)
-        ∂P∂F =  otimesu(I, S) + 2 * otimesu(F, I) ⊡ ∂S∂C ⊡ otimesu(F', I)
+        ∂P∂F =  otimesu(I, S) + 2 * F ⋅ ∂S∂C ⊡ otimesu(F', I)
 
         ## Loop over test functions
         for i in 1:ndofs
