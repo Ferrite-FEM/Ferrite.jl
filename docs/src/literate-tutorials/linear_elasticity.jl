@@ -223,7 +223,7 @@ end
 # G = \frac{E}{2(1 + \nu)}, \quad K = \frac{E}{3(1 - 2\nu)}
 # ```
 Emod = 200.0e3 # Young's modulus [MPa]
-ν = 0.3      # Poisson's ratio [-]
+ν = 0.3        # Poisson's ratio [-]
 
 Gmod = Emod / (2(1 + ν))  # Shear modulus
 Kmod = Emod / (3(1 - 2ν)) # Bulk modulus
@@ -358,8 +358,8 @@ colors = [                                       #hide
     "1" => 1, "5" => 1, # purple                 #hide
     "2" => 2, "3" => 2, # red                    #hide
     "4" => 3,           # blue                   #hide
-    "6" => 4,            # green                  #hide
-]                                            #hide
+    "6" => 4,           # green                  #hide
+]                                                #hide
 for (key, color) in colors                       #hide
     for i in getcellset(grid, key)               #hide
         color_data[i] = color                    #hide

@@ -12,7 +12,8 @@ end
 
 function Base.showerror(io::IO, err::DeprecationError)
     print(io, "DeprecationError: ")
-    return print(io, err.msg)
+    print(io, err.msg)
+    return
 end
 
 function _iobuffer()
@@ -78,11 +79,12 @@ struct Cell{refdim, nnodes, nfaces}
         elseif params == (3, 6, 5)
             replacement = Wedge
         end
-        return if replacement === nothing
+        if replacement === nothing
             throw(DeprecationError("The AbstractCell interface have been changed, see https://github.com/Ferrite-FEM/Ferrite.jl/pull/679"))
         else
             throw(DeprecationError("Cell{$refdim, $nnodes, $nfaces}(nodes)" => "$replacement(nodes)"))
         end
+        return
     end
 end
 export Cell
@@ -96,14 +98,11 @@ using WriteVTK: vtk_grid
 export vtk_grid # To give better error
 
 function WriteVTK.vtk_grid(::String, ::Union{AbstractGrid, AbstractDofHandler}; kwargs...)
-    throw(
-        DeprecationError(
-            "The vtk interface has been updated in Ferrite v1.0. " *
-                "See https://github.com/Ferrite-FEM/Ferrite.jl/pull/692. " *
-                "Use VTKGridFile to open a vtk file, and the functions " *
-                "write_solution, write_cell_data, and write_projection to save data."
-        )
-    )
+    msg = "The vtk interface has been updated in Ferrite v1.0. " *
+        "See https://github.com/Ferrite-FEM/Ferrite.jl/pull/692. " *
+        "Use VTKGridFile to open a vtk file, and the functions " *
+        "write_solution, write_cell_data, and write_projection to save data."
+    throw(DeprecationError(msg))
 end
 
 # Deprecation of auto-vectorized methods
@@ -171,7 +170,8 @@ for VT in (
     str_new = replace(str_scalar, "Scalar" => "")
     io = IOBuffer()
     print(
-        io, """
+        io,
+        """
         The `$(str)` interface has been reworked for Ferrite.jl 0.4.0:
 
          - `$(str_scalar)` and `$(str_vector)` have been merged into a single type: `$(str_new)`

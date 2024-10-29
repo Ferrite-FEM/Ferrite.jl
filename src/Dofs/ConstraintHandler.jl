@@ -155,7 +155,7 @@ function apply_rhs!(data::RHSData, f::AbstractVector, ch::ConstraintHandler, app
             end
         end
     end
-    return @inbounds for (i, pdof) in pairs(ch.prescribed_dofs)
+    @inbounds for (i, pdof) in pairs(ch.prescribed_dofs)
         dofcoef = ch.dofcoefficients[i]
         b = ch.inhomogeneities[i]
         if dofcoef !== nothing # if affine constraint
@@ -166,11 +166,12 @@ function apply_rhs!(data::RHSData, f::AbstractVector, ch::ConstraintHandler, app
         bz = applyzero ? zero(eltype(f)) : b
         f[pdof] = bz * m
     end
+    return
 end
 
 function Base.show(io::IO, ::MIME"text/plain", ch::ConstraintHandler)
     println(io, "ConstraintHandler:")
-    return if !isclosed(ch)
+    if !isclosed(ch)
         print(io, "  Not closed!")
     else
         print(io, "  BCs:")
@@ -178,6 +179,7 @@ function Base.show(io::IO, ::MIME"text/plain", ch::ConstraintHandler)
             print(io, "\n    ", "Field: ", dbc.field_name, ", ", "Components: ", dbc.components)
         end
     end
+    return
 end
 
 isclosed(ch::ConstraintHandler) = ch.closed
@@ -269,7 +271,8 @@ function add!(ch::ConstraintHandler, ac::AffineConstraint)
     # TODO: Would be nice to pass nothing if ac.entries is empty, but then we lose the fact
     #       that this constraint is an AffineConstraint which is currently needed in update!
     #       in order to not update inhomogeneities for affine constraints
-    return add_prescribed_dof!(ch, ac.constrained_dof, ac.b, #=isempty(ac.entries) ? nothing : =# ac.entries)
+    add_prescribed_dof!(ch, ac.constrained_dof, ac.b, #=isempty(ac.entries) ? nothing : =# ac.entries)
+    return ch
 end
 
 """
@@ -653,7 +656,7 @@ function apply!(KK::Union{SparseMatrixCSC, Symmetric}, f::AbstractVector, ch::Co
     zero_out_rows!(K, ch.dofmapping)
 
     # Add meandiag to constraint dofs
-    return @inbounds for i in 1:length(ch.inhomogeneities)
+    @inbounds for i in 1:length(ch.inhomogeneities)
         d = ch.prescribed_dofs[i]
         K[d, d] = m
         if length(f) != 0
@@ -661,6 +664,7 @@ function apply!(KK::Union{SparseMatrixCSC, Symmetric}, f::AbstractVector, ch::Co
             f[d] = vz * m
         end
     end
+    return
 end
 
 # Fetch dof coefficients for a dof prescribed by an affine constraint. Return nothing if the
@@ -738,7 +742,8 @@ function _add_or_grow(cnt::Int, I::Vector{Int}, J::Vector{Int}, dofi::Int, dofj:
         resize!(J, trunc(Int, length(J) * 1.5))
     end
     I[cnt] = dofi
-    return J[cnt] = dofj
+    J[cnt] = dofj
+    return
 end
 
 """
@@ -794,11 +799,12 @@ end
 function zero_out_rows!(K, dofmapping)
     rowval = K.rowval
     nzval = K.nzval
-    return @inbounds for i in eachindex(rowval, nzval)
+    @inbounds for i in eachindex(rowval, nzval)
         if haskey(dofmapping, rowval[i])
             nzval[i] = 0
         end
     end
+    return
 end
 
 function meandiag(K::AbstractMatrix)

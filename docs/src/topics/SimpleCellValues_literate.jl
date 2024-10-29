@@ -7,17 +7,24 @@ using Ferrite, Test
 # * The cell shape has the same dimension as the physical space (excludes so-called embedded cells).
 
 struct SimpleCellValues{T, dim} <: Ferrite.AbstractCellValues
-    N::Matrix{T}             # Precalculated shape values, N[i, q_point] where i is the
+    ## Precalculated shape values, N[i, q_point] where i is the
     ## shape function number and q_point the integration point
-    dNdξ::Matrix{Vec{dim, T}} # Precalculated shape gradients in the reference domain, dNdξ[i, q_point]
-    dNdx::Matrix{Vec{dim, T}} # Cache for shape gradients in the physical domain, dNdx[i, q_point]
-    M::Matrix{T}             # Precalculated geometric shape values, M[j, q_point] where j is the
+    N::Matrix{T}
+    ## Precalculated shape gradients in the reference domain, dNdξ[i, q_point]
+    dNdξ::Matrix{Vec{dim, T}}
+    ## Cache for shape gradients in the physical domain, dNdx[i, q_point]
+    dNdx::Matrix{Vec{dim, T}}
+    ## Precalculated geometric shape values, M[j, q_point] where j is the
     ## geometric shape function number
-    dMdξ::Matrix{Vec{dim, T}} # Precalculated geometric shape gradients, dMdξ[j, q_point]
-    weights::Vector{T}       # Given quadrature weights in the reference domain, weights[q_point]
-    detJdV::Vector{T}        # Cache for quadrature weights in the physical domain, detJdV[q_point], i.e.
+    M::Matrix{T}
+    ## Precalculated geometric shape gradients, dMdξ[j, q_point]
+    dMdξ::Matrix{Vec{dim, T}}
+    ## Given quadrature weights in the reference domain, weights[q_point]
+    weights::Vector{T}
+    ## Cache for quadrature weights in the physical domain, detJdV[q_point], i.e.
     ## det(J)*weight[q_point], where J is the jacobian of the geometric mapping
     ## at the quadrature point, q_point.
+    detJdV::Vector{T}
 end;
 
 # Next, we create a constructor with the same input as `CellValues`

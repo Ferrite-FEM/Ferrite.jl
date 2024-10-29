@@ -262,8 +262,8 @@ function assemble_global!(
     ## Loop over all cells in the grid
     for cell in CellIterator(dh)
         global_dofs = celldofs(cell)
-        global_dofsu = global_dofs[1:nu]  # first nu dofs are displacement
-        global_dofsp = global_dofs[(nu + 1):end]  # last np dofs are pressure
+        global_dofsu = global_dofs[1:nu] # first nu dofs are displacement
+        global_dofsp = global_dofs[(nu + 1):end] # last np dofs are pressure
         @assert size(global_dofs, 1) == nu + np # sanity check
         ue = w[global_dofsu] # displacement dofs for the current cell
         pe = w[global_dofsp] # pressure dofs for the current cell

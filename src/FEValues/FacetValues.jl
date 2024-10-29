@@ -116,7 +116,8 @@ function set_current_facet!(fv::FacetValues, face_nr::Int)
     # Checking face_nr before setting current_facet allows us to use @inbounds
     # when indexing by getcurrentfacet(fv) in other places!
     checkbounds(Bool, 1:nfacets(fv), face_nr) || throw(ArgumentError("Face index out of range."))
-    return fv.current_facet = face_nr
+    fv.current_facet = face_nr
+    return
 end
 
 @inline function reinit!(fv::FacetValues, x::AbstractVector, face_nr::Int)
@@ -138,7 +139,7 @@ function reinit!(fv::FacetValues, cell::Union{AbstractCell, Nothing}, x::Abstrac
         throw(ArgumentError("The cell::AbstractCell input is required to reinit! non-identity function mappings"))
     end
 
-    return @inbounds for (q_point, w) in pairs(getweights(fv.fqr, face_nr))
+    @inbounds for (q_point, w) in pairs(getweights(fv.fqr, face_nr))
         mapping = calculate_mapping(geo_mapping, q_point, x)
         J = getjacobian(mapping)
         # See the `Ferrite.embedding_det` docstring for more background
@@ -149,6 +150,7 @@ function reinit!(fv::FacetValues, cell::Union{AbstractCell, Nothing}, x::Abstrac
         @inbounds fv.normals[q_point] = weight_norm / norm(weight_norm)
         apply_mapping!(fun_values, q_point, mapping, cell)
     end
+    return
 end
 
 function Base.show(io::IO, d::MIME"text/plain", fv::FacetValues)
@@ -168,6 +170,8 @@ function Base.show(io::IO, d::MIME"text/plain", fv::FacetValues)
     print(io, " Function interpolation: "); show(io, d, function_interpolation(fv))
     print(io, "\nGeometric interpolation: ")
     return sdim === nothing ? show(io, d, ip_geo) : show(io, d, ip_geo^sdim)
+    sdim === nothing ? show(io, d, ip_geo) : show(io, d, ip_geo^sdim)
+    return
 end
 
 """

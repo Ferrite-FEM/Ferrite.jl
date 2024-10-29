@@ -87,7 +87,7 @@ struct InterpolationInfo
     is_discontinuous::Bool
 end
 function InterpolationInfo(interpolation::Interpolation{shape}, n_copies) where {rdim, shape <: AbstractRefShape{rdim}}
-    return InterpolationInfo(
+    info = InterpolationInfo(
         [length(i) for i in vertexdof_indices(interpolation)],
         [length(i) for i in edgedof_interior_indices(interpolation)],
         [length(i) for i in facedof_interior_indices(interpolation)],
@@ -97,6 +97,7 @@ function InterpolationInfo(interpolation::Interpolation{shape}, n_copies) where 
         n_copies,
         is_discontinuous(interpolation)
     )
+    return info
 end
 InterpolationInfo(interpolation::Interpolation) = InterpolationInfo(interpolation, 1)
 
@@ -154,9 +155,10 @@ Evaluate all shape functions of `ip` at once at the reference point `ξ` and sto
 """
 @propagate_inbounds function reference_shape_values!(values::AT, ip::IP, ξ::Vec) where {IP <: Interpolation, AT <: AbstractArray}
     @boundscheck checkbounds(values, 1:getnbasefunctions(ip))
-    return @inbounds for i in 1:getnbasefunctions(ip)
+    @inbounds for i in 1:getnbasefunctions(ip)
         values[i] = reference_shape_value(ip, ξ, i)
     end
+    return
 end
 
 """
@@ -167,9 +169,10 @@ them in `gradients`.
 """
 function reference_shape_gradients!(gradients::AT, ip::IP, ξ::Vec) where {IP <: Interpolation, AT <: AbstractArray}
     @boundscheck checkbounds(gradients, 1:getnbasefunctions(ip))
-    return @inbounds for i in 1:getnbasefunctions(ip)
+    @inbounds for i in 1:getnbasefunctions(ip)
         gradients[i] = reference_shape_gradient(ip, ξ, i)
     end
+    return
 end
 
 """
@@ -181,9 +184,10 @@ and store them in `values`.
 function reference_shape_gradients_and_values!(gradients::GAT, values::SAT, ip::IP, ξ::Vec) where {IP <: Interpolation, SAT <: AbstractArray, GAT <: AbstractArray}
     @boundscheck checkbounds(gradients, 1:getnbasefunctions(ip))
     @boundscheck checkbounds(values, 1:getnbasefunctions(ip))
-    return @inbounds for i in 1:getnbasefunctions(ip)
+    @inbounds for i in 1:getnbasefunctions(ip)
         gradients[i], values[i] = reference_shape_gradient_and_value(ip, ξ, i)
     end
+    return
 end
 
 """
@@ -196,9 +200,10 @@ and store them in `hessians`, `gradients`, and `values`.
     @boundscheck checkbounds(hessians, 1:getnbasefunctions(ip))
     @boundscheck checkbounds(gradients, 1:getnbasefunctions(ip))
     @boundscheck checkbounds(values, 1:getnbasefunctions(ip))
-    return @inbounds for i in 1:getnbasefunctions(ip)
+    @inbounds for i in 1:getnbasefunctions(ip)
         hessians[i], gradients[i], values[i] = reference_shape_hessian_gradient_and_value(ip, ξ, i)
     end
+    return
 end
 
 
@@ -976,18 +981,18 @@ edgedof_interior_indices(::Lagrange{RefHexahedron, 2}) = (
 volumedof_interior_indices(::Lagrange{RefHexahedron, 2}) = (27,)
 
 function reference_coordinates(::Lagrange{RefHexahedron, 2})
-    # vertex
     return [
-        Vec{3, Float64}((-1.0, -1.0, -1.0)), #  1
-        Vec{3, Float64}((1.0, -1.0, -1.0)), #  2
-        Vec{3, Float64}((1.0, 1.0, -1.0)), #  3
-        Vec{3, Float64}((-1.0, 1.0, -1.0)), #  4
-        Vec{3, Float64}((-1.0, -1.0, 1.0)), #  5
-        Vec{3, Float64}((1.0, -1.0, 1.0)), #  6
-        Vec{3, Float64}((1.0, 1.0, 1.0)), #  7
-        Vec{3, Float64}((-1.0, 1.0, 1.0)), #  8
+        # vertex
+        Vec{3, Float64}((-1.0, -1.0, -1.0)), # 1
+        Vec{3, Float64}((1.0, -1.0, -1.0)), # 2
+        Vec{3, Float64}((1.0, 1.0, -1.0)), # 3
+        Vec{3, Float64}((-1.0, 1.0, -1.0)), # 4
+        Vec{3, Float64}((-1.0, -1.0, 1.0)), # 5
+        Vec{3, Float64}((1.0, -1.0, 1.0)), # 6
+        Vec{3, Float64}((1.0, 1.0, 1.0)), # 7
+        Vec{3, Float64}((-1.0, 1.0, 1.0)), # 8
         # edge
-        Vec{3, Float64}((0.0, -1.0, -1.0)), #  9
+        Vec{3, Float64}((0.0, -1.0, -1.0)), # 9
         Vec{3, Float64}((1.0, 0.0, -1.0)),
         Vec{3, Float64}((0.0, 1.0, -1.0)),
         Vec{3, Float64}((-1.0, 0.0, -1.0)),
@@ -1006,7 +1011,7 @@ function reference_coordinates(::Lagrange{RefHexahedron, 2})
         Vec{3, Float64}((-1.0, 0.0, 0.0)),
         Vec{3, Float64}((0.0, 0.0, 1.0)), # 26
         # interior
-        Vec{3, Float64}((0.0, 0.0, 0.0)),    # 27
+        Vec{3, Float64}((0.0, 0.0, 0.0)), # 27
     ]
 end
 
@@ -1090,7 +1095,7 @@ end
 getnbasefunctions(::Lagrange{RefPrism, 2}) = 18
 
 facedof_indices(::Lagrange{RefPrism, 2}) = (
-    #Vertices| Edges  | Face
+    # Vertices, Edges, Face
     (1, 3, 2, 8, 10, 7),
     (1, 2, 5, 4, 7, 11, 13, 9, 16),
     (3, 1, 4, 6, 8, 9, 14, 12, 17),
@@ -1098,7 +1103,7 @@ facedof_indices(::Lagrange{RefPrism, 2}) = (
     (4, 5, 6, 13, 15, 14),
 )
 facedof_interior_indices(::Lagrange{RefPrism, 2}) = (
-    #Vertices| Edges  | Face
+    # Face
     (),
     (16,),
     (17,),
@@ -1106,7 +1111,7 @@ facedof_interior_indices(::Lagrange{RefPrism, 2}) = (
     (),
 )
 edgedof_indices(::Lagrange{RefPrism, 2}) = (
-    #Vert|Edge
+    # Vertices, Edge
     (2, 1, 7),
     (1, 3, 8),
     (1, 4, 9),
@@ -1118,7 +1123,7 @@ edgedof_indices(::Lagrange{RefPrism, 2}) = (
     (6, 5, 15),
 )
 edgedof_interior_indices(::Lagrange{RefPrism, 2}) = (
-    #Vert|Edge
+    # Edge
     (7,),
     (8,),
     (9,),
@@ -1138,18 +1143,18 @@ function reference_coordinates(::Lagrange{RefPrism, 2})
         Vec{3, Float64}((0.0, 0.0, 1.0)),
         Vec{3, Float64}((1.0, 0.0, 1.0)),
         Vec{3, Float64}((0.0, 1.0, 1.0)),
-        Vec{3, Float64}((1 / 2, 0.0, 0.0)),
-        Vec{3, Float64}((0.0, 1 / 2, 0.0)),
-        Vec{3, Float64}((0.0, 0.0, 1 / 2)),
-        Vec{3, Float64}((1 / 2, 1 / 2, 0.0)),
-        Vec{3, Float64}((1.0, 0.0, 1 / 2)),
-        Vec{3, Float64}((0.0, 1.0, 1 / 2)),
-        Vec{3, Float64}((1 / 2, 0.0, 1.0)),
-        Vec{3, Float64}((0.0, 1 / 2, 1.0)),
-        Vec{3, Float64}((1 / 2, 1 / 2, 1.0)),
-        Vec{3, Float64}((1 / 2, 0.0, 1 / 2)),
-        Vec{3, Float64}((0.0, 1 / 2, 1 / 2)),
-        Vec{3, Float64}((1 / 2, 1 / 2, 1 / 2)),
+        Vec{3, Float64}((0.5, 0.0, 0.0)),
+        Vec{3, Float64}((0.0, 0.5, 0.0)),
+        Vec{3, Float64}((0.0, 0.0, 0.5)),
+        Vec{3, Float64}((0.5, 0.5, 0.0)),
+        Vec{3, Float64}((1.0, 0.0, 0.5)),
+        Vec{3, Float64}((0.0, 1.0, 0.5)),
+        Vec{3, Float64}((0.5, 0.0, 1.0)),
+        Vec{3, Float64}((0.0, 0.5, 1.0)),
+        Vec{3, Float64}((0.5, 0.5, 1.0)),
+        Vec{3, Float64}((0.5, 0.0, 0.5)),
+        Vec{3, Float64}((0.0, 0.5, 0.5)),
+        Vec{3, Float64}((0.5, 0.5, 0.5)),
     ]
 end
 
@@ -1214,7 +1219,7 @@ end
 getnbasefunctions(::Lagrange{RefPyramid, 2}) = 14
 
 facedof_indices(::Lagrange{RefPyramid, 2}) = (
-    #Vertices | Edges  | Face
+    # Vertices, Edges, Face
     (1, 3, 4, 2, 7, 11, 9, 6, 14),
     (1, 2, 5, 6, 10, 8),
     (1, 5, 3, 7, 12, 8),
@@ -1659,7 +1664,8 @@ end
 
 function Base.show(io::IO, mime::MIME"text/plain", ip::VectorizedInterpolation{vdim}) where {vdim}
     show(io, mime, ip.ip)
-    return print(io, "^", vdim)
+    print(io, "^", vdim)
+    return
 end
 
 # Helper to get number of copies for DoF distribution

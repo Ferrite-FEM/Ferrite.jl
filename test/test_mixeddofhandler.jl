@@ -38,13 +38,14 @@ function test_1d_bar_beam()
     @test ndofs(dh) == 8
     @test celldofs(dh, 3) == collect(1:6)
     @test celldofs(dh, 1) == [1, 2, 7, 8]
-    return @test celldofs(dh, 2) == [7, 8, 3, 4]
+    @test celldofs(dh, 2) == [7, 8, 3, 4]
 
     #        7,8
     #       /   \
     #     /      \
     #   /_________\
     # 1,2,5       3,4,6
+    return
 end
 
 function test_2d_scalar()
@@ -62,7 +63,8 @@ function test_2d_scalar()
     @test ndofs(dh) == 5
     @test dh.cell_dofs == [1, 2, 3, 4, 3, 2, 5]
     @test celldofs(dh, 1) == [1, 2, 3, 4]
-    return @test celldofs(dh, 2) == [3, 2, 5]
+    @test celldofs(dh, 2) == [3, 2, 5]
+    return
 end
 
 function test_2d_error()
@@ -76,7 +78,8 @@ function test_2d_error()
     @test_throws ErrorException add!(sdh2, :u, Lagrange{RefQuadrilateral, 1}())
 
     # all cells within a SubDofHandler should be of the same celltype
-    return @test_throws ErrorException SubDofHandler(dh, Set((1, 2)))
+    @test_throws ErrorException SubDofHandler(dh, Set((1, 2)))
+    return
 end
 
 function test_2d_vector()
@@ -93,8 +96,8 @@ function test_2d_vector()
     # THEN: we expect 10 dofs and dof 3-6 being shared
     @test ndofs(dh) == 10
     @test celldofs(dh, 1) == [1, 2, 3, 4, 5, 6, 7, 8]
-    return @test celldofs(dh, 2) == [5, 6, 3, 4, 9, 10]
-
+    @test celldofs(dh, 2) == [5, 6, 3, 4, 9, 10]
+    return
 end
 
 function test_2d_mixed_1_el()
@@ -111,7 +114,8 @@ function test_2d_mixed_1_el()
     @test ndofs_per_cell(dh, 1) == 12
     @test celldofs(dh, 1) == [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
 
-    return @test Set(Ferrite.getfieldnames(dh)) == Set(Ferrite.getfieldnames(dh.subdofhandlers[1]))
+    @test Set(Ferrite.getfieldnames(dh)) == Set(Ferrite.getfieldnames(dh.subdofhandlers[1]))
+    return
 end
 
 function test_2d_mixed_2_el()
@@ -136,7 +140,8 @@ function test_2d_mixed_2_el()
     @test_throws ErrorException ndofs_per_cell(dh)
     @test_throws ErrorException Ferrite.nnodes_per_cell(grid)
     @test celldofs(dh, 1) == [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
-    return @test celldofs(dh, 2) == [5, 6, 3, 4, 13, 14, 11, 10, 15]
+    @test celldofs(dh, 2) == [5, 6, 3, 4, 13, 14, 11, 10, 15]
+    return
 end
 
 function test_face_dofs_2_tri()
@@ -153,7 +158,8 @@ function test_face_dofs_2_tri()
     # THEN:
     @test ndofs(dh) == 18
     @test celldofs(dh, 1) == [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
-    return @test celldofs(dh, 2) == [3, 4, 13, 14, 5, 6, 15, 16, 17, 18, 9, 10]
+    @test celldofs(dh, 2) == [3, 4, 13, 14, 5, 6, 15, 16, 17, 18, 9, 10]
+    return
 end
 
 function test_3d_tetrahedrons()
@@ -196,7 +202,8 @@ function test_face_dofs_quad_tri()
     # THEN:
     @test ndofs(dh) == 24
     @test celldofs(dh, 1) == [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18]
-    return @test celldofs(dh, 2) == [5, 6, 3, 4, 19, 20, 11, 12, 21, 22, 23, 24]
+    @test celldofs(dh, 2) == [5, 6, 3, 4, 19, 20, 11, 12, 21, 22, 23, 24]
+    return
 end
 
 function test_serendipity_quad_tri()
@@ -213,7 +220,8 @@ function test_serendipity_quad_tri()
     # THEN:
     @test ndofs(dh) == 22
     @test celldofs(dh, 1) == [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]
-    return @test celldofs(dh, 2) == [5, 6, 3, 4, 17, 18, 11, 12, 19, 20, 21, 22]
+    @test celldofs(dh, 2) == [5, 6, 3, 4, 17, 18, 11, 12, 19, 20, 21, 22]
+    return
 end
 
 function test_2d_mixed_field_triangles()
@@ -232,7 +240,8 @@ function test_2d_mixed_field_triangles()
     close!(dh)
     @test ndofs(dh) == 22
     @test celldofs(dh, 1) == collect(1:15)
-    return @test celldofs(dh, 2) == [3, 4, 16, 17, 5, 6, 18, 19, 20, 21, 9, 10, 14, 22, 15]
+    @test celldofs(dh, 2) == [3, 4, 16, 17, 5, 6, 18, 19, 20, 21, 9, 10, 14, 22, 15]
+    return
 end
 
 function test_2d_mixed_field_mixed_celltypes()
@@ -251,7 +260,8 @@ function test_2d_mixed_field_mixed_celltypes()
     close!(dh)
     @test ndofs(dh) == 29
     @test celldofs(dh, 1) == collect(1:22)
-    return @test celldofs(dh, 2) == [5, 6, 3, 4, 23, 24, 11, 12, 25, 26, 27, 28, 21, 20, 29]
+    @test celldofs(dh, 2) == [5, 6, 3, 4, 23, 24, 11, 12, 25, 26, 27, 28, 21, 20, 29]
+    return
 end
 
 function test_3d_mixed_field_mixed_celltypes()
@@ -278,7 +288,8 @@ function test_3d_mixed_field_mixed_celltypes()
 
     @test ndofs(dh) == 42
     @test celldofs(dh, 1) == collect(1:24)
-    return @test celldofs(dh, 2) == [7, 8, 9, 4, 5, 6, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42]
+    @test celldofs(dh, 2) == [7, 8, 9, 4, 5, 6, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42]
+    return
 end
 
 function test_2_element_heat_eq()
@@ -366,8 +377,8 @@ function test_2_element_heat_eq()
         # Ferrite.write_constraints(vtk, ch)  #FIXME
     end
     sha = bytes2hex(open(SHA.sha1, gridfilename * ".vtu"))
-    return @test sha in ("e96732c000b0b385db7444f002461468b60b3b2c", "7b26edc27b5e59a2f60907374cd5a5790cc37a6a")
-
+    @test sha in ("e96732c000b0b385db7444f002461468b60b3b2c", "7b26edc27b5e59a2f60907374cd5a5790cc37a6a")
+    return
 end
 
 
@@ -398,7 +409,8 @@ function test_element_order()
     @test ndofs(dh) == 12
     @test celldofs(dh, 1) == collect(1:6)
     @test celldofs(dh, 2) == [3, 4, 7, 8, 11, 12, 5, 6]
-    return @test celldofs(dh, 3) == [7, 8, 9, 10, 11, 12]
+    @test celldofs(dh, 3) == [7, 8, 9, 10, 11, 12]
+    return
 end
 
 function test_field_on_subdomain()
@@ -426,7 +438,8 @@ function test_field_on_subdomain()
     @test Ferrite.find_field(dh.subdofhandlers[1], :v) == 1
     @test Ferrite.find_field(dh.subdofhandlers[2], :v) == 1
     @test Ferrite.find_field(dh.subdofhandlers[2], :s) == 2
-    return @test_throws ErrorException Ferrite.find_field(dh.subdofhandlers[1], :s)
+    @test_throws ErrorException Ferrite.find_field(dh.subdofhandlers[1], :s)
+    return
 end
 
 function test_evaluate_at_grid_nodes()
@@ -491,7 +504,7 @@ function test_evaluate_at_grid_nodes()
 
     # :v on a view into solution
     vv_nodes = evaluate_at_grid_nodes(dh, uv, :v)
-    return @test vv_nodes ≈ hcat(
+    @test vv_nodes ≈ hcat(
         [9.0, 10.0, 0.0],
         [11.0, 12.0, 0.0],
         [1.0, 2.0, 0.0],
@@ -499,12 +512,14 @@ function test_evaluate_at_grid_nodes()
         [7.0, 8.0, 0.0],
         [5.0, 6.0, 0.0]
     )
+    return
 end
 
 function test_mixed_grid_show()
     grid = get_2d_grid()
     str = sprint(show, MIME("text/plain"), grid)
-    return @test occursin("2 Quadrilateral/Triangle cells", str)
+    @test occursin("2 Quadrilateral/Triangle cells", str)
+    return
 end
 
 # regression tests for https://github.com/KristofferC/JuAFEM.jl/issues/315
@@ -523,7 +538,8 @@ function test_subparametric_quad()
     close!(ch)
     update!(ch, 1.0)
     @test getnbasefunctions(Ferrite.getfieldinterpolation(dh.subdofhandlers[1], 1)) == 18 # algebraic nbasefunctions
-    return @test celldofs(dh, 1) == [i for i in 1:18]
+    @test celldofs(dh, 1) == [i for i in 1:18]
+    return
 end
 
 function test_subparametric_triangle()
@@ -542,7 +558,8 @@ function test_subparametric_triangle()
     close!(ch)
     update!(ch, 1.0)
     @test getnbasefunctions(Ferrite.getfieldinterpolation(dh.subdofhandlers[1], 1)) == 12 # algebraic nbasefunctions
-    return @test celldofs(dh, 1) == [i for i in 1:12]
+    @test celldofs(dh, 1) == [i for i in 1:12]
+    return
 end
 
 function test_celliterator_subdomain()
@@ -603,8 +620,8 @@ function test_separate_fields_on_separate_domains()
     @test ndofs(dh) == 12
     @test celldofs(dh, 1) == [i for i in 1:8]
     @test celldofs(dh, 2) == [9, 10, 11]
-    return @test celldofs(dh, 3) == [10, 12, 11]
-
+    @test celldofs(dh, 3) == [10, 12, 11]
+    return
 end
 
 function test_unique_cellsets()
@@ -617,7 +634,8 @@ function test_unique_cellsets()
     # bug
     dh = DofHandler(grid)
     sdh_u = SubDofHandler(dh, set_u)
-    return @test_throws ErrorException SubDofHandler(dh, set_v)
+    @test_throws ErrorException SubDofHandler(dh, set_v)
+    return
 end
 
 function test_show()
@@ -640,10 +658,11 @@ function test_show()
     add!(sdh_tri, :u, Lagrange{RefTriangle, 1}()^2)
     close!(dh)
     @test repr("text/plain", dh) == repr(typeof(dh)) * "\n  Fields:\n    :u, Vec{2}\n  Total dofs: 10"
-    return @test repr("text/plain", dh.subdofhandlers[1]) == string(
+    @test repr("text/plain", dh.subdofhandlers[1]) == string(
         repr("text/plain", typeof(dh.subdofhandlers[1])), "\n  Cell type: Quadrilateral\n  Fields:\n    :u, ",
         repr("text/plain", dh.subdofhandlers[1].field_interpolations[1]), "\n  Dofs per cell: 8\n"
     )
+    return
 end
 
 function test_vtk_export()

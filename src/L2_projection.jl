@@ -253,8 +253,9 @@ function project(p::L2Projector, vars::AbstractMatrix, args...)
     return project(p, collect(eachcol(vars)), args...)
 end
 
-function _project(proj::L2Projector, vars::Union{AbstractVector{TC}, AbstractDict{Int, TC}}, qrs_rhs::Vector{<:QuadratureRule}) where
-    {TC <: AbstractVector{T}} where {T <: Union{Number, AbstractTensor}}
+function _project(proj::L2Projector, vars::Union{AbstractVector{TC}, AbstractDict{Int, TC}}, qrs_rhs::Vector{<:QuadratureRule}) where {
+        T <: Union{Number, AbstractTensor}, TC <: AbstractVector{T},
+    }
 
     # Sanity checks for user input
     isclosed(proj) || error("The L2Projector is not closed")

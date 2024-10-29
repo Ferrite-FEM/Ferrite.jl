@@ -54,7 +54,8 @@ end
 function Base.show(io::IO, ::MIME"text/plain", vtk::VTKGridFile)
     open_str = isopen(vtk.vtk) ? "open" : "closed"
     filename = vtk.vtk.path
-    return print(io, "VTKGridFile for the $open_str file \"$(filename)\".")
+    print(io, "VTKGridFile for the $open_str file \"$(filename)\".")
+    return
 end
 
 function WriteVTK.collection_add_timestep(pvd::WriteVTK.CollectionFile, datfile::VTKGridFile, time::Real)
@@ -129,10 +130,12 @@ function create_vtk_grid(filename::AbstractString, grid::Grid{dim, C, T}; kwargs
 end
 
 function toparaview!(v, x::Vec{D}) where {D}
-    return v[1:D] .= x
+    v[1:D] .= x
+    return v
 end
 function toparaview!(v, x::SecondOrderTensor)
-    return tovoigt!(v, x)
+    tovoigt!(v, x)
+    return v
 end
 
 function _vtk_write_node_data(

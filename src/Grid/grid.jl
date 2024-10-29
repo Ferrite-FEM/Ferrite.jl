@@ -218,14 +218,14 @@ reference_vertices(::Type{RefHexahedron}) = (1, 2, 3, 4, 5, 6, 7, 8)
 function reference_edges(::Type{RefHexahedron})
     return (
         (1, 2), (2, 3), (3, 4), (4, 1), (5, 6), (6, 7), # e1 ... e6
-        (7, 8), (8, 5), (1, 5), (2, 6), (3, 7), (4, 8),
-    ) # e7 ... e12
+        (7, 8), (8, 5), (1, 5), (2, 6), (3, 7), (4, 8), # e7 ... e12
+    )
 end
 function reference_faces(::Type{RefHexahedron})
     return (
         (1, 4, 3, 2), (1, 2, 6, 5), (2, 3, 7, 6), # f1, f2, f3
-        (3, 4, 8, 7), (1, 5, 8, 4), (5, 6, 7, 8),
-    ) # f4, f5, f6
+        (3, 4, 8, 7), (1, 5, 8, 4), (5, 6, 7, 8), # f4, f5, f6
+    )
 end
 
 # RefPrism (refdim = 3)
@@ -233,14 +233,14 @@ reference_vertices(::Type{RefPrism}) = (1, 2, 3, 4, 5, 6)
 function reference_edges(::Type{RefPrism})
     return (
         (2, 1), (1, 3), (1, 4), (3, 2), (2, 5), # e1, e2, e3, e4, e5
-        (3, 6), (4, 5), (4, 6), (6, 5),
-    )         # e6, e7, e8, e9
+        (3, 6), (4, 5), (4, 6), (6, 5), # e6, e7, e8, e9
+    )
 end
 function reference_faces(::Type{RefPrism})
     return (
         (1, 3, 2), (1, 2, 5, 4), (3, 1, 4, 6), # f1, f2, f3
-        (2, 3, 6, 5), (4, 5, 6),
-    )               # f4, f5
+        (2, 3, 6, 5), (4, 5, 6), # f4, f5
+    )
 end
 
 # RefPyramid (refdim = 3)
@@ -248,14 +248,14 @@ reference_vertices(::Type{RefPyramid}) = (1, 2, 3, 4, 5)
 function reference_edges(::Type{RefPyramid})
     return (
         (1, 2), (1, 3), (1, 5), (2, 4), # e1 ... e4
-        (2, 5), (4, 3), (3, 5), (4, 5),
-    ) # e5 ... e8
+        (2, 5), (4, 3), (3, 5), (4, 5), # e5 ... e8
+    )
 end
 function reference_faces(::Type{RefPyramid})
     return (
         (1, 3, 4, 2), (1, 2, 5), (1, 5, 3), # f1, f2, f3
-        (2, 4, 5), (3, 5, 4),
-    )               # f4, f5
+        (2, 4, 5), (3, 5, 4), # f4, f5
+    )
 end
 
 ######################################################
@@ -606,7 +606,8 @@ get_node_coordinate(grid, n) = get_node_coordinate(getnodes(grid, n))
 
 function cellnodes!(global_nodes::Vector{Int}, grid::AbstractGrid, i::Int)
     cell = getcells(grid, i)
-    return _cellnodes!(global_nodes, cell)
+    _cellnodes!(global_nodes, cell)
+    return global_nodes
 end
 function _cellnodes!(global_nodes::Vector{Int}, cell::AbstractCell)
     @assert length(global_nodes) == nnodes(cell)
@@ -624,7 +625,8 @@ function Base.show(io::IO, ::MIME"text/plain", grid::Grid)
         typestrs = sort!(repr.(OrderedSet(typeof(x) for x in grid.cells)))
     end
     join(io, typestrs, '/')
-    return print(io, " cells and $(getnnodes(grid)) nodes")
+    print(io, " cells and $(getnnodes(grid)) nodes")
+    return
 end
 
 """

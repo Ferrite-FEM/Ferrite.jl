@@ -96,7 +96,8 @@ getnquadpoints(cv::CellValues) = getnquadpoints(cv.qr)
 @inline function _update_detJdV!(detJvec::AbstractVector, q_point::Int, w, mapping)
     detJ = calculate_detJ(getjacobian(mapping))
     detJ > 0.0 || throw_detJ_not_pos(detJ)
-    return @inbounds detJvec[q_point] = detJ * w
+    @inbounds detJvec[q_point] = detJ * w
+    return
 end
 @inline _update_detJdV!(::Nothing, q_point, w, mapping) = nothing
 
@@ -136,5 +137,6 @@ function Base.show(io::IO, d::MIME"text/plain", cv::CellValues)
     print(io, getnquadpoints(cv), " quadrature points")
     print(io, "\n Function interpolation: "); show(io, d, ip_fun)
     print(io, "\nGeometric interpolation: ")
-    return sdim === nothing ? show(io, d, ip_geo) : show(io, d, ip_geo^sdim)
+    sdim === nothing ? show(io, d, ip_geo) : show(io, d, ip_geo^sdim)
+    return
 end

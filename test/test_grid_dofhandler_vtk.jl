@@ -300,8 +300,8 @@ end
     @test_throws ArgumentError Ferrite.getneighborhood(top_line, mixed_rdim_grid, FacetIndex(1, 2))
 
     #
-    #      (1) (2) (3) (4)
-    #       +---+---+---+
+    # (1) (2) (3) (4)
+    #  +---+---+---+
     #
     linegrid = generate_grid(Line, (3,))
     linetopo = ExclusiveTopology(linegrid)
@@ -326,15 +326,15 @@ end
             ]
         )
 
-    #                           (11)
-    #                   (10)+-----+-----+(12)
-    #                       |  5  |  6  |
-    #                   (7) +-----+-----+(9)
-    #                       |  3  |  4  |
-    #                   (4) +-----+-----+(6)
-    #                       |  1  |  2  |
-    #                   (1) +-----+-----+(3)
-    #                            (2)
+    #          (11)
+    #  (10)+-----+-----+(12)
+    #      |  5  |  6  |
+    #  (7) +-----+-----+(9)
+    #      |  3  |  4  |
+    #  (4) +-----+-----+(6)
+    #      |  1  |  2  |
+    #  (1) +-----+-----+(3)
+    #           (2)
     quadgrid = generate_grid(Quadrilateral, (2, 3))
     topology = ExclusiveTopology(quadgrid)
     faceskeleton = Ferrite.facetskeleton(topology, quadgrid)
@@ -389,20 +389,20 @@ end
             ]
         )
 
-    #                         (8)
-    #                (7) +-----+-----+(9)
-    #                    |  3  |  4  |
-    #                (4) +-----+-----+(6) bottom view
-    #                    |  1  |  2  |
-    #                (1) +-----+-----+(3)
-    #                         (2)
-    #                         (15)
-    #               (16) +-----+-----+(17)
-    #                    |  3  |  4  |
-    #               (13) +-----+-----+(15) top view
-    #                    |  1  |  2  |
-    #               (10) +-----+-----+(12)
-    #                        (11)
+    #            (8)
+    #   (7) +-----+-----+(9)
+    #       |  3  |  4  |
+    #   (4) +-----+-----+(6) bottom view
+    #       |  1  |  2  |
+    #   (1) +-----+-----+(3)
+    #            (2)
+    #            (15)
+    #  (16) +-----+-----+(17)
+    #       |  3  |  4  |
+    #  (13) +-----+-----+(15) top view
+    #       |  1  |  2  |
+    #  (10) +-----+-----+(12)
+    #           (11)
     hexgrid = generate_grid(Hexahedron, (2, 2, 1))
     topology = ExclusiveTopology(hexgrid)
     @test topology.edge_edge_neighbor[1, 11] == [EdgeIndex(4, 9)]
@@ -442,15 +442,15 @@ end
             ]
         )
 
-    #                   +-----+-----+
-    #                   |\  6 |\  8 |
-    #                   |  \  |  \  |
-    #                   |  5 \| 7  \|
-    #                   +-----+-----+
-    #                   |\  2 |\  4 |
-    #                   |  \  |  \  |
-    #                   |  1 \| 3  \|
-    #                   +-----+-----+
+    #  +-----+-----+
+    #  |\  6 |\  8 |
+    #  |  \  |  \  |
+    #  |  5 \| 7  \|
+    #  +-----+-----+
+    #  |\  2 |\  4 |
+    #  |  \  |  \  |
+    #  |  1 \| 3  \|
+    #  +-----+-----+
     # test for multiple vertex_neighbors as in e.g. ele 3, local vertex 3 (middle node)
     trigrid = generate_grid(Triangle, (2, 2))
     topology = ExclusiveTopology(trigrid)
@@ -544,13 +544,13 @@ end
     # @test_throws ArgumentError Ferrite.get_facet_facet_neighborhood(topology, grid)
 
     #
-    #                   +-----+-----+-----+
-    #                   |  7  |  8  |  9  |
-    #                   +-----+-----+-----+
-    #                   |  4  |  5  |  6  |
-    #                   +-----+-----+-----+
-    #                   |  1  |  2  |  3  |
-    #                   +-----+-----+-----+
+    # +-----+-----+-----+
+    # |  7  |  8  |  9  |
+    # +-----+-----+-----+
+    # |  4  |  5  |  6  |
+    # +-----+-----+-----+
+    # |  1  |  2  |  3  |
+    # +-----+-----+-----+
     # test application: form level 1 neighborhood patches of elements
     quadgrid = generate_grid(Quadrilateral, (3, 3))
     topology = ExclusiveTopology(quadgrid)
@@ -603,13 +603,13 @@ end
     @test all(patches .== quadratic_patches)
 
     #
-    #                   +-----+-----+-----+
-    #                   |  7  |  8  |  9  |
-    #                   +-----+-----+-----+
-    #                   |  4  |  5  |  6  |
-    #                   +-----+-----+-----+
-    #                   |  1  |  2  |  3  |
-    #                   +-----+-----+-----+
+    # +-----+-----+-----+
+    # |  7  |  8  |  9  |
+    # +-----+-----+-----+
+    # |  4  |  5  |  6  |
+    # +-----+-----+-----+
+    # |  1  |  2  |  3  |
+    # +-----+-----+-----+
     # test application: integrate jump across element boundary 5
     ip = DiscontinuousLagrange{RefQuadrilateral, 1}()^2
     qr_facet = FacetQuadratureRule{RefQuadrilateral}(2)

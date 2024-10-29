@@ -77,5 +77,6 @@ end
 
 function Base.show(io::IO, d::MIME"text/plain", cv::PointValues)
     println(io, "PointValues containing a")
-    return show(io, d, cv.cv)
+    show(io, d, cv.cv)
+    return
 end

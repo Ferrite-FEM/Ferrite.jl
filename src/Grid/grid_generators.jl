@@ -28,12 +28,10 @@ function generate_grid(::Type{Line}, nel::NTuple{1, Int}, left::Vec{1, T} = Vec{
 
 
     # Cell faces
-    boundary = Vector(
-        [
-            FacetIndex(1, 1),
-            FacetIndex(nel_x, 2),
-        ]
-    )
+    boundary = [
+        FacetIndex(1, 1),
+        FacetIndex(nel_x, 2),
+    ]
 
     # Cell face sets
     facetsets = Dict(
@@ -162,15 +160,14 @@ function generate_grid(::Type{QuadraticQuadrilateral}, nel::NTuple{2, Int}, LL::
     node_array = reshape(collect(1:n_nodes), (n_nodes_x, n_nodes_y))
     cells = QuadraticQuadrilateral[]
     for j in 1:nel_y, i in 1:nel_x
-        push!(
-            cells, QuadraticQuadrilateral(
-                (
-                    node_array[2 * i - 1, 2 * j - 1], node_array[2 * i + 1, 2 * j - 1], node_array[2 * i + 1, 2 * j + 1], node_array[2 * i - 1, 2 * j + 1],
-                    node_array[2 * i, 2 * j - 1], node_array[2 * i + 1, 2 * j], node_array[2 * i, 2 * j + 1], node_array[2 * i - 1, 2 * j],
-                    node_array[2 * i, 2 * j],
-                )
+        cell = QuadraticQuadrilateral(
+            (
+                node_array[2 * i - 1, 2 * j - 1], node_array[2 * i + 1, 2 * j - 1], node_array[2 * i + 1, 2 * j + 1], node_array[2 * i - 1, 2 * j + 1],
+                node_array[2 * i, 2 * j - 1], node_array[2 * i + 1, 2 * j], node_array[2 * i, 2 * j + 1], node_array[2 * i - 1, 2 * j],
+                node_array[2 * i, 2 * j],
             )
         )
+        push!(cells, cell)
     end
 
     # Cell faces
@@ -213,14 +210,13 @@ function generate_grid(::Type{Hexahedron}, nel::NTuple{3, Int}, left::Vec{3, T} 
     node_array = reshape(collect(1:n_nodes), (n_nodes_x, n_nodes_y, n_nodes_z))
     cells = Hexahedron[]
     for k in 1:nel_z, j in 1:nel_y, i in 1:nel_x
-        push!(
-            cells, Hexahedron(
-                (
-                    node_array[i, j, k], node_array[i + 1, j, k], node_array[i + 1, j + 1, k], node_array[i, j + 1, k],
-                    node_array[i, j, k + 1], node_array[i + 1, j, k + 1], node_array[i + 1, j + 1, k + 1], node_array[i, j + 1, k + 1],
-                )
+        cell = Hexahedron(
+            (
+                node_array[i, j, k], node_array[i + 1, j, k], node_array[i + 1, j + 1, k], node_array[i, j + 1, k],
+                node_array[i, j, k + 1], node_array[i + 1, j, k + 1], node_array[i + 1, j + 1, k + 1], node_array[i, j + 1, k + 1],
             )
         )
+        push!(cells, cell)
     end
 
     # Cell faces
@@ -267,22 +263,22 @@ function generate_grid(::Type{Wedge}, nel::NTuple{3, Int}, left::Vec{3, T} = Vec
     node_array = reshape(collect(1:n_nodes), (n_nodes_x, n_nodes_y, n_nodes_z))
     cells = Wedge[]
     for k in 1:nel_z, j in 1:nel_y, i in 1:nel_x
-        push!(
-            cells, Wedge(
-                (
-                    node_array[i, j, k], node_array[i + 1, j, k], node_array[i, j + 1, k],
-                    node_array[i, j, k + 1], node_array[i + 1, j, k + 1], node_array[i, j + 1, k + 1],
-                )
+        # ◺
+        wedge1 = Wedge(
+            (
+                node_array[i, j, k], node_array[i + 1, j, k], node_array[i, j + 1, k],
+                node_array[i, j, k + 1], node_array[i + 1, j, k + 1], node_array[i, j + 1, k + 1],
             )
-        ) # ◺
-        push!(
-            cells, Wedge(
-                (
-                    node_array[i + 1, j, k], node_array[i + 1, j + 1, k], node_array[i, j + 1, k],
-                    node_array[i + 1, j, k + 1], node_array[i + 1, j + 1, k + 1], node_array[i, j + 1, k + 1],
-                )
+        )
+        push!(cells, wedge1)
+        # ◹
+        wedge2 = Wedge(
+            (
+                node_array[i + 1, j, k], node_array[i + 1, j + 1, k], node_array[i, j + 1, k],
+                node_array[i + 1, j, k + 1], node_array[i + 1, j + 1, k + 1], node_array[i, j + 1, k + 1],
             )
-        ) # ◹
+        )
+        push!(cells, wedge2)
     end
 
     # Order the cells as c_nxyz[2, x, y, z] such that we can look up boundary cells
@@ -395,17 +391,16 @@ function generate_grid(::Type{SerendipityQuadraticHexahedron}, nel::NTuple{3, In
     # Generate cells
     cells = SerendipityQuadraticHexahedron[]
     for k in 1:2:2nel_z, j in 1:2:2nel_y, i in 1:2:2nel_x
-        push!(
-            cells, SerendipityQuadraticHexahedron(
-                (
-                    node_array[i, j, k], node_array[i + 2, j, k], node_array[i + 2, j + 2, k], node_array[i, j + 2, k], # vertices bot
-                    node_array[i, j, k + 2], node_array[i + 2, j, k + 2], node_array[i + 2, j + 2, k + 2], node_array[i, j + 2, k + 2], # vertices top
-                    node_array[i + 1, j, k], node_array[i + 2, j + 1, k], node_array[i + 1, j + 2, k], node_array[i, j + 1, k], # edges horizontal bottom
-                    node_array[i + 1, j, k + 2], node_array[i + 2, j + 1, k + 2], node_array[i + 1, j + 2, k + 2], node_array[i, j + 1, k + 2], # edges horizontal top
-                    node_array[i, j, k + 1], node_array[i + 2, j, k + 1], node_array[i + 2, j + 2, k + 1], node_array[i, j + 2, k + 1],
-                )
-            )  # edges vertical
+        cell = SerendipityQuadraticHexahedron(
+            (
+                node_array[i, j, k], node_array[i + 2, j, k], node_array[i + 2, j + 2, k], node_array[i, j + 2, k], # vertices bot
+                node_array[i, j, k + 2], node_array[i + 2, j, k + 2], node_array[i + 2, j + 2, k + 2], node_array[i, j + 2, k + 2], # vertices top
+                node_array[i + 1, j, k], node_array[i + 2, j + 1, k], node_array[i + 1, j + 2, k], node_array[i, j + 1, k], # edges horizontal bottom
+                node_array[i + 1, j, k + 2], node_array[i + 2, j + 1, k + 2], node_array[i + 1, j + 2, k + 2], node_array[i, j + 1, k + 2], # edges horizontal top
+                node_array[i, j, k + 1], node_array[i + 2, j, k + 1], node_array[i + 2, j + 2, k + 1], node_array[i, j + 2, k + 1], # edges vertical
+            )
         )
+        push!(cells, cell)
     end
 
     # Cell faces
@@ -486,22 +481,22 @@ function generate_grid(::Type{QuadraticTriangle}, nel::NTuple{2, Int}, LL::Vec{2
     node_array = reshape(collect(1:n_nodes), (n_nodes_x, n_nodes_y))
     cells = QuadraticTriangle[]
     for j in 1:nel_y, i in 1:nel_x
-        push!(
-            cells, QuadraticTriangle(
-                (
-                    node_array[2 * i - 1, 2 * j - 1], node_array[2 * i + 1, 2 * j - 1], node_array[2 * i - 1, 2 * j + 1],
-                    node_array[2 * i, 2 * j - 1], node_array[2 * i, 2 * j], node_array[2 * i - 1, 2 * j],
-                )
+        # ◺
+        triangle1 = QuadraticTriangle(
+            (
+                node_array[2 * i - 1, 2 * j - 1], node_array[2 * i + 1, 2 * j - 1], node_array[2 * i - 1, 2 * j + 1],
+                node_array[2 * i, 2 * j - 1], node_array[2 * i, 2 * j], node_array[2 * i - 1, 2 * j],
             )
-        ) # ◺
-        push!(
-            cells, QuadraticTriangle(
-                (
-                    node_array[2 * i + 1, 2 * j - 1], node_array[2 * i + 1, 2 * j + 1], node_array[2 * i - 1, 2 * j + 1],
-                    node_array[2 * i + 1, 2 * j], node_array[2 * i, 2 * j + 1], node_array[2 * i, 2 * j],
-                )
+        )
+        push!(cells, triangle1)
+        # ◹
+        triangle2 = QuadraticTriangle(
+            (
+                node_array[2 * i + 1, 2 * j - 1], node_array[2 * i + 1, 2 * j + 1], node_array[2 * i - 1, 2 * j + 1],
+                node_array[2 * i + 1, 2 * j], node_array[2 * i, 2 * j + 1], node_array[2 * i, 2 * j],
             )
-        ) # ◹
+        )
+        push!(cells, triangle2)
     end
 
     # Cell faces

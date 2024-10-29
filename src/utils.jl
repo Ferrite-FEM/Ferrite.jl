@@ -11,7 +11,7 @@ Debug mode influences `Ferrite.@debug expr`: when debug mode is enabled, `expr` 
 evaluated, and when debug mode is disabled `expr` is ignored.
 """
 function debug_mode(; enable = true)
-    return if DEBUG == enable == true
+    if DEBUG == enable == true
         @info "Debug mode already enabled."
     elseif DEBUG == enable == false
         @info "Debug mode already disabled."
@@ -19,6 +19,7 @@ function debug_mode(; enable = true)
         Preferences.@set_preferences!("use_debug" => enable)
         @info "Debug mode $(enable ? "en" : "dis")abled. Restart the Julia session for this change to take effect!"
     end
+    return
 end
 
 @static if DEBUG

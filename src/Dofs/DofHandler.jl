@@ -78,7 +78,8 @@ end
 function Base.show(io::IO, mime::MIME"text/plain", sdh::SubDofHandler)
     println(io, typeof(sdh))
     println(io, "  Cell type: ", getcelltype(sdh))
-    return _print_field_information(io, mime, sdh)
+    _print_field_information(io, mime, sdh)
+    return
 end
 
 function _print_field_information(io::IO, mime::MIME"text/plain", sdh::SubDofHandler)
@@ -86,11 +87,12 @@ function _print_field_information(io::IO, mime::MIME"text/plain", sdh::SubDofHan
     for (i, fieldname) in pairs(sdh.field_names)
         println(io, "    ", repr(mime, fieldname), ", ", repr(mime, sdh.field_interpolations[i]))
     end
-    return if !isclosed(sdh.dh)
+    if !isclosed(sdh.dh)
         print(io, "  Not closed!")
     else
         println(io, "  Dofs per cell: ", ndofs_per_cell(sdh))
     end
+    return
 end
 
 mutable struct DofHandler{dim, G <: AbstractGrid{dim}} <: AbstractDofHandler
@@ -151,11 +153,12 @@ function Base.show(io::IO, mime::MIME"text/plain", dh::DofHandler)
             println(io, "    ", repr(fieldname), ", ", field_type)
         end
     end
-    return if !isclosed(dh)
+    if !isclosed(dh)
         print(io, "  Not closed!")
     else
         print(io, "  Total dofs: ", ndofs(dh))
     end
+    return
 end
 
 isclosed(dh::AbstractDofHandler) = dh.closed
@@ -659,7 +662,7 @@ if the edge is flipped.
 """
 function sortedge(edge::Tuple{Int, Int})
     a, b = edge
-    return a < b ? (return (edge, PathOrientationInfo(true))) : (return ((b, a), PathOrientationInfo(false)))
+    return a < b ? (edge, PathOrientationInfo(true)) : ((b, a), PathOrientationInfo(false))
 end
 
 """
@@ -670,7 +673,7 @@ Here the unique representation is the sorted node index tuple.
 """
 function sortedge_fast(edge::Tuple{Int, Int})
     a, b = edge
-    return a < b ? (return edge) : (return (b, a))
+    return a < b ? edge : (b, a)
 end
 
 """

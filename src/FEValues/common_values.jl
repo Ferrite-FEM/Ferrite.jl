@@ -10,23 +10,17 @@ function checkquadpoint(fe_v::AbstractValues, qp::Int)
 end
 
 @noinline function throw_incompatible_dof_length(length_ue, n_base_funcs)
-    throw(
-        ArgumentError(
-            "the number of base functions ($(n_base_funcs)) does not match the length " *
-                "of the vector ($(length_ue)). Perhaps you passed the global vector, " *
-                "or forgot to pass a dof_range?"
-        )
-    )
+    msg = "the number of base functions ($(n_base_funcs)) does not match the length " *
+        "of the vector ($(length_ue)). Perhaps you passed the global vector, " *
+        "or forgot to pass a dof_range?"
+    throw(ArgumentError(msg))
 end
 @noinline function throw_incompatible_coord_length(length_x, n_base_funcs)
-    throw(
-        ArgumentError(
-            "the number of (geometric) base functions ($(n_base_funcs)) does not match " *
-                "the number of coordinates in the vector ($(length_x)). Perhaps you forgot to " *
-                "use an appropriate geometric interpolation when creating FE values? See " *
-                "https://github.com/Ferrite-FEM/Ferrite.jl/issues/265 for more details."
-        )
-    )
+    msg = "the number of (geometric) base functions ($(n_base_funcs)) does not match " *
+        "the number of coordinates in the vector ($(length_x)). Perhaps you forgot to " *
+        "use an appropriate geometric interpolation when creating FE values? See " *
+        "https://github.com/Ferrite-FEM/Ferrite.jl/issues/265 for more details."
+    throw(ArgumentError(msg))
 end
 
 """
@@ -139,7 +133,7 @@ function shape_curl(cv::AbstractValues, q_point::Int, base_func::Int)
     return curl_from_gradient(shape_gradient(cv, q_point, base_func))
 end
 curl_from_gradient(∇v::SecondOrderTensor{3}) = Vec{3}((∇v[3, 2] - ∇v[2, 3], ∇v[1, 3] - ∇v[3, 1], ∇v[2, 1] - ∇v[1, 2]))
-curl_from_gradient(∇v::SecondOrderTensor{2}) = Vec{1}((∇v[2, 1] - ∇v[1, 2],)) # Alternatively define as Vec{3}((0,0,v))
+curl_from_gradient(∇v::SecondOrderTensor{2}) = Vec{1}((∇v[2, 1] - ∇v[1, 2],)) # Alternatively define as Vec{3}((0, 0, v))
 
 """
     function_value(fe_v::AbstractValues, q_point::Int, u::AbstractVector, [dof_range])

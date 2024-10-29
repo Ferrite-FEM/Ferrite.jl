@@ -306,12 +306,13 @@ function assemble_global!(K, g, dh, cv, fv, mp, u, ΓN)
     assembler = start_assemble(K, g)
 
     ## Loop over all cells in the grid
-    return @timeit "assemble" for cell in CellIterator(dh)
+    @timeit "assemble" for cell in CellIterator(dh)
         global_dofs = celldofs(cell)
         ue = u[global_dofs] # element dofs
         @timeit "element assemble" assemble_element!(ke, ge, cell, cv, fv, mp, ue, ΓN)
         assemble!(assembler, global_dofs, ke, ge)
     end
+    return
 end;
 
 # Finally, we define a main function which sets up everything and then performs Newton

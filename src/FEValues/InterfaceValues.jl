@@ -317,10 +317,7 @@ multiply by minus the outward facing normal to the first element's side of the i
 """
 function function_gradient_jump end
 
-for (func,) in (
-        (:function_value,),
-        (:function_gradient,),
-    )
+for func in (:function_value, :function_gradient)
     @eval begin
         function $(func)(
                 iv::InterfaceValues, q_point::Int, u::AbstractVector;
@@ -430,7 +427,7 @@ function InterfaceOrientationInfo(cell_a::AbstractCell{RefShapeA}, cell_b::Abstr
 end
 
 function InterfaceOrientationInfo(_::AbstractCell{RefShapeA}, _::AbstractCell{RefShapeB}, _::Int, _::Int) where {RefShapeA <: AbstractRefShape{1}, RefShapeB <: AbstractRefShape{1}}
-    return (error("1D elements don't use transformations for interfaces."))
+    error("1D elements don't use transformations for interfaces.")
 end
 
 """
@@ -581,5 +578,6 @@ function Base.show(io::IO, m::MIME"text/plain", iv::InterfaceValues)
     show(io, m, iv.here)
     println(io)
     print(io, "{There} ")
-    return show(io, m, iv.there)
+    show(io, m, iv.there)
+    return
 end

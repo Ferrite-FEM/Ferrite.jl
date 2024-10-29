@@ -123,7 +123,7 @@ module ConvergenceTestHelper
     function solve(dh, ch, cellvalues)
         K, f = assemble_global(cellvalues, allocate_matrix(dh), dh)
         apply!(K, f, ch)
-        return u = K \ f
+        return K \ f
     end
 
     function setup_poisson_problem(grid, interpolation, interpolation_geo, qr)

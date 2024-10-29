@@ -37,11 +37,12 @@ function test_pe_scalar_field()
     @test all(x -> x !== nothing, ph.cells)
 
     vals = evaluate_at_points(ph, projector, projector_vals)
-    return @test f.(points) ≈ vals
+    @test f.(points) ≈ vals
 
     # alternatively retrieve vals from nodal values TODO: make this work?
     # vals = evaluate_at_points(ph, nodal_vals)
     # @test f.(points) ≈ vals
+    return
 end
 
 function test_pe_embedded()
@@ -82,7 +83,8 @@ function test_pe_embedded()
     @test all(x -> x !== nothing, ph.cells)
 
     vals = evaluate_at_points(ph, projector, projector_vals)
-    return @test f.(points) ≈ vals
+    @test f.(points) ≈ vals
+    return
 end
 
 function test_pe_vector_field()
@@ -121,11 +123,12 @@ function test_pe_vector_field()
     ph = PointEvalHandler(mesh, points)
     @test all(x -> x !== nothing, ph.cells)
     vals = evaluate_at_points(ph, projector, projector_vals)
-    return @test f.(points) ≈ vals
+    @test f.(points) ≈ vals
 
     # alternatively retrieve vals from nodal values# TODO
     # vals = evaluate_at_points(ph, nodal_vals)
     # @test f.(points) ≈ vals
+    return
 end
 
 function test_pe_superparametric()
@@ -161,7 +164,8 @@ function test_pe_superparametric()
     vals = evaluate_at_points(ph, projector, projector_vals)
 
     # can recover a quadratic field by a quadratic approximation
-    return @test f.(points) ≈ vals
+    @test f.(points) ≈ vals
+    return
 end
 
 function test_pe_dofhandler()
@@ -178,11 +182,12 @@ function test_pe_dofhandler()
     ph = PointEvalHandler(mesh, points)
     @test all(x -> x !== nothing, ph.cells)
     vals = evaluate_at_points(ph, dh, dof_vals, :s)
-    return @test vals ≈ 1.0:9.0
+    @test vals ≈ 1.0:9.0
 
     # TODO
     # vals = evaluate_at_points(ph, collect(1.0:9.0))
     # @test vals ≈ 1.0:9.0
+    return
 end
 
 function _pointeval_dofhandler2_manual_projection(dh, csv, cvv, f_s, f_v)
@@ -365,7 +370,8 @@ function test_pe_mixed_grid()
     ph = PointEvalHandler(mesh, points)
     @test all(x -> x !== nothing, ph.cells)
     vals = evaluate_at_points(ph, dh, dof_vals, :v)
-    return @test vals ≈ [Vec((i, i)) for i in 1.0:6.0]
+    @test vals ≈ [Vec((i, i)) for i in 1.0:6.0]
+    return
 end
 
 function test_pe_oneD()
@@ -401,12 +407,13 @@ function test_pe_oneD()
     ph = PointEvalHandler(mesh, points)
     @test all(x -> x !== nothing, ph.cells)
     vals = evaluate_at_points(ph, projector, projector_values)
-    return @test f.(points) ≈ vals
+    @test f.(points) ≈ vals
 
     # alternatively retrieve vals from nodal values
     # TODO
     # vals = evaluate_at_points(ph, nodal_vals)
     # @test f.(points) ≈ vals
+    return
 end
 
 function test_pe_first_point_missing()
@@ -416,7 +423,8 @@ function test_pe_first_point_missing()
     ph = PointEvalHandler(mesh, points; warn = false)
 
     @test isnothing(ph.local_coords[1])
-    return @test ph.local_coords[2] ≈ Vec(0.0, 0.0)
+    @test ph.local_coords[2] ≈ Vec(0.0, 0.0)
+    return
 end
 
 @testset "PointEvalHandler" begin

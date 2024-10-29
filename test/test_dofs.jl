@@ -83,8 +83,8 @@ end # testset
     @test celldofs(dh, 1) == collect(1:18)
     @test celldofs(dh, 2) == [
         4, 5, 6, 19, 20, 21, 22, 23, 24,    # u
-        13, 14, 15, 25, 26, 27, 28, 29, 30,
-    ] # θ
+        13, 14, 15, 25, 26, 27, 28, 29, 30, # θ
+    ]
 end
 
 @testset "Dofs for quad in 3d (shell)" begin
@@ -106,9 +106,9 @@ end
 
     @test celldofs(dh, 1) == collect(1:24)
     @test celldofs(dh, 2) == [
-        4, 5, 6, 25, 26, 27, 28, 29, 30, 7, 8, 9, # u
-        16, 17, 18, 31, 32, 33, 34, 35, 36, 19, 20, 21,
-    ] # θ
+        4, 5, 6, 25, 26, 27, 28, 29, 30, 7, 8, 9,       # u
+        16, 17, 18, 31, 32, 33, 34, 35, 36, 19, 20, 21, # θ
+    ]
 
     #3d quads with two quadratic interpolations fields
     #Only 1 dim per field for simplicity...
@@ -458,7 +458,7 @@ end
 
     # Field coupling
     coupling = [
-        #   u    p
+        # u    p
         true true  # v
         true false # q
     ]
@@ -490,7 +490,7 @@ end
 
     # Component coupling
     coupling = [
-        #   u1    u2    p
+        # u1   u2    p
         true  true  false # v1
         true  false true  # v2
         false true  true  # q

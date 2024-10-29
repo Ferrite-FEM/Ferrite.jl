@@ -98,7 +98,8 @@ function test_projection(order, refshape)
     else
         bad_order = 1
     end
-    return @test_throws LinearAlgebra.PosDefException L2Projector(ip, grid; qr_lhs = QuadratureRule{refshape}(bad_order))
+    @test_throws LinearAlgebra.PosDefException L2Projector(ip, grid; qr_lhs = QuadratureRule{refshape}(bad_order))
+    return
 end
 
 function make_mixedgrid_l2_tests()
@@ -108,7 +109,7 @@ function make_mixedgrid_l2_tests()
     # 1 --- 2 --- 3 --- 4
     nodes = [
         Node(Float64.((x, y))) for (x, y) in
-            #         1,      2,      3,      4,      5,      6,      7,      8
+            #    1,      2,      3,      4,      5,      6,      7,      8
             ((0, 0), (1, 0), (2, 0), (3, 0), (0, 1), (1, 1), (2, 1), (3, 1))
     ]
 
@@ -203,7 +204,8 @@ function test_projection_subset_of_mixedgrid()
         apply_analytical!(@view(ae[i, :]), proj.dh, :_, x -> f(x).data[i], triaset)
     end
     ae = reinterpret(reshape, SymmetricTensor{2, 2, Float64, 3}, ae)
-    return @test point_vars ≈ point_vars_2 ≈ ae
+    @test point_vars ≈ point_vars_2 ≈ ae
+    return
 end
 
 function calculate_function_value_in_qpoints!(qp_data, sdh, cv, dofvector::Vector)
@@ -262,7 +264,8 @@ function test_add_projection_grid()
     projected2_at_nodes = evaluate_at_grid_nodes(proj2, projected2)
 
     @test projected1_at_nodes ≈ solution_at_nodes
-    return @test projected2_at_nodes ≈ solution_at_nodes
+    @test projected2_at_nodes ≈ solution_at_nodes
+    return
 end
 
 function test_projection_mixedgrid()
@@ -406,7 +409,7 @@ function test_export(; subset::Bool)
         @test all(isnan, rv[:, nindex])
     end
 
-    return mktempdir() do tmp
+    mktempdir() do tmp
         fname = joinpath(tmp, "projected")
         VTKGridFile(fname, grid) do vtk
             write_projection(vtk, p, p_scalar, "p_scalar")
@@ -424,6 +427,7 @@ function test_export(; subset::Bool)
         end
     end
 
+    return
 end
 
 function test_show_l2()
@@ -442,7 +446,8 @@ function test_show_l2()
     showstr = sprint(show, MIME"text/plain"(), proj2)
     @test contains(showstr, "L2Projector")
     @test contains(showstr, "4/8 cells in grid")
-    return @test contains(showstr, "Split into 2 sets")
+    @test contains(showstr, "Split into 2 sets")
+    return
 end
 
 function test_l2proj_errorpaths()
@@ -484,8 +489,8 @@ function test_l2proj_errorpaths()
     data_invalid3 = [rand(getnquadpoints(qr_tria) - 1) for _ in 1:getncells(grid)]
     wrongnqp_exception = ErrorException("The number of variables per cell doesn't match the number of quadrature points")
     @test_throws wrongnqp_exception project(proj1, data_invalid2, qr_tria)
-    return @test_throws wrongnqp_exception project(proj1, data_invalid3, qr_tria)
-
+    @test_throws wrongnqp_exception project(proj1, data_invalid3, qr_tria)
+    return
 end
 
 @testset "Test L2-Projection" begin

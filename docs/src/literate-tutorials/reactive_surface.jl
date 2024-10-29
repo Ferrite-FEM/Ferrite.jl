@@ -202,7 +202,8 @@ function setup_initial_conditions!(u₀::Vector, cellvalues::CellValues, dh::Dof
         end
     end
 
-    return u₀ .+= 0.01 * rand(ndofs(dh))
+    u₀ .+= 0.01 * rand(ndofs(dh))
+    return
 end;
 
 # ### Mesh generation
@@ -227,7 +228,7 @@ function create_embedded_sphere(refinements)
     nodes = tonodes()
     elements, _ = toelements(2)
     gmsh.finalize()
-    return grid = Grid(elements, nodes)
+    return Grid(elements, nodes)
 end
 
 # ### Simulation routines
@@ -312,8 +313,8 @@ function gray_scott_on_sphere(material::GrayScottMaterial, Δt::Real, T::Real, r
         ## Finally we totate the solution to initialize the next timestep.
         uₜ₋₁ .= uₜ
     end
-
-    return vtk_save(pvd)
+    vtk_save(pvd)
+    return
 end
 
 ## This parametrization gives the spot pattern shown in the gif above.

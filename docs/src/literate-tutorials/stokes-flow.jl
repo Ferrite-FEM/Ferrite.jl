@@ -444,7 +444,7 @@ function check_mean_constraint(dh, fvp, u)                                  #src
     range_p = dof_range(dh, :p)                                             #src
     cc = CellCache(dh)                                                      #src
     ## Loop over all the boundaries and compute the integrated pressure     #src
-    ∫pdΓ, Γ = 0.0, 0.0                                                       #src
+    ∫pdΓ, Γ = 0.0, 0.0                                                      #src
     for (ci, fi) in set                                                     #src
         reinit!(cc, ci)                                                     #src
         reinit!(fvp, cc, fi)                                                #src
@@ -452,10 +452,11 @@ function check_mean_constraint(dh, fvp, u)                                  #src
         for qp in 1:getnquadpoints(fvp)                                     #src
             dΓ = getdetJdV(fvp, qp)                                         #src
             ∫pdΓ += function_value(fvp, qp, ue, range_p) * dΓ               #src
-            Γ += dΓ                                                      #src
+            Γ += dΓ                                                         #src
         end                                                                 #src
     end                                                                     #src
-    return @test ∫pdΓ / Γ ≈ 0.0 atol = 1.0e-16                                         #src
+    @test ∫pdΓ / Γ ≈ 0.0 atol = 1.0e-16                                     #src
+    return                                                                  #src
 end                                                                         #src
 
 function check_L2(dh, cvu, cvp, u)                                          #src
@@ -473,11 +474,12 @@ function check_L2(dh, cvu, cvp, u)                                          #src
             ph = function_value(cvp, qp, ue, range_p)                       #src
             ∫uudΩ += (uh ⋅ uh) * dΩ                                         #src
             ∫ppdΩ += (ph * ph) * dΩ                                         #src
-            Ω += dΩ                                                      #src
+            Ω += dΩ                                                         #src
         end                                                                 #src
     end                                                                     #src
-    @test √(∫uudΩ) / Ω ≈ 0.0007255988117907926 atol = 1.0e-7                    #src
-    return @test √(∫ppdΩ) / Ω ≈ 0.02169683180923709   atol = 1.0e-5                    #src
+    @test √(∫uudΩ) / Ω ≈ 0.0007255988117907926 atol = 1.0e-7                #src
+    @test √(∫ppdΩ) / Ω ≈ 0.02169683180923709   atol = 1.0e-5                #src
+    return                                                                  #src
 end                                                                         #src
 
 function main()
@@ -486,7 +488,7 @@ function main()
     grid = setup_grid(h)
     ## Interpolations
     ipu = Lagrange{RefTriangle, 2}()^2 # quadratic
-    ipp = Lagrange{RefTriangle, 1}()     # linear
+    ipp = Lagrange{RefTriangle, 1}()   # linear
     ## Dofs
     dh = setup_dofs(grid, ipu, ipp)
     ## FE values

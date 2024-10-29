@@ -394,15 +394,17 @@ Base.length(iterator::GridIterators) = length(_getset(iterator))
 function _check_same_celltype(grid::AbstractGrid, cellset::IntegerCollection)
     isconcretetype(getcelltype(grid)) && return nothing # Short circuit check
     celltype = getcelltype(grid, first(cellset))
-    return if !all(getcelltype(grid, i) == celltype for i in cellset)
+    if !all(getcelltype(grid, i) == celltype for i in cellset)
         error("The cells in the cellset are not all of the same celltype.")
     end
+    return
 end
 
 function _check_same_celltype(grid::AbstractGrid, facetset::AbstractVecOrSet{<:BoundaryIndex})
     isconcretetype(getcelltype(grid)) && return nothing # Short circuit check
     celltype = getcelltype(grid, first(facetset)[1])
-    return if !all(getcelltype(grid, facet[1]) == celltype for facet in facetset)
+    if !all(getcelltype(grid, facet[1]) == celltype for facet in facetset)
         error("The cells in the set (set of $(eltype(facetset))) are not all of the same celltype.")
     end
+    return
 end

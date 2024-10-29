@@ -79,11 +79,9 @@ function ExclusiveTopology(grid::AbstractGrid{sdim}) where {sdim}
             num_shared_vertices = _num_shared_vertices(cell, neighbor_cell)
             if num_shared_vertices == 1
                 _add_single_vertex_neighbor!(vertex_vertex_neighbor_buf, cell, cell_id, neighbor_cell, neighbor_cell_id)
-                # Shared edge
-            elseif num_shared_vertices == 2
+            elseif num_shared_vertices == 2 # Shared edge
                 _add_single_edge_neighbor!(edge_edge_neighbor_buf, cell, cell_id, neighbor_cell, neighbor_cell_id)
-                # Shared face
-            elseif num_shared_vertices >= 3
+            elseif num_shared_vertices >= 3 # Shared face
                 _add_single_face_neighbor!(face_face_neighbor_buf, cell, cell_id, neighbor_cell, neighbor_cell_id)
             else
                 error("Found connected elements without shared vertex... Mesh broken?")

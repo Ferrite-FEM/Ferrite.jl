@@ -17,12 +17,14 @@ reference_face_area(fs::Interpolation{RefTetrahedron}, face::Int) = face == 3 ? 
 function reference_face_area(fs::Interpolation{RefPrism}, face::Int)
     face == 4 && return √2
     face ∈ [1, 5] && return 0.5
-    return face ∈ [2, 3] && return 1.0
+    face ∈ [2, 3] && return 1.0
+    error("Invalid face index")
 end
 function reference_face_area(fs::Interpolation{RefPyramid}, face::Int)
     face == 1 && return 1.0
     face ∈ [2, 3] && return 0.5
-    return face ∈ [4, 5] && return sqrt(2) / 2
+    face ∈ [4, 5] && return sqrt(2) / 2
+    error("Invalid face index")
 end
 
 ######################################################

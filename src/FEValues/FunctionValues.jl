@@ -5,14 +5,14 @@
 # vdim = vector dimension (dimension of the field)              #
 #################################################################
 
-# Scalar, sdim == rdim                                                 sdim                     rdim
+# Scalar, sdim == rdim                                              sdim                    rdim
 typeof_N(::Type{T}, ::ScalarInterpolation, ::VectorizedInterpolation{dim, <:AbstractRefShape{dim}}) where {T, dim} = T
 typeof_dNdx(::Type{T}, ::ScalarInterpolation, ::VectorizedInterpolation{dim, <:AbstractRefShape{dim}}) where {T, dim} = Vec{dim, T}
 typeof_dNdξ(::Type{T}, ::ScalarInterpolation, ::VectorizedInterpolation{dim, <:AbstractRefShape{dim}}) where {T, dim} = Vec{dim, T}
 typeof_d2Ndx2(::Type{T}, ::ScalarInterpolation, ::VectorizedInterpolation{dim, <:AbstractRefShape{dim}}) where {T, dim} = Tensor{2, dim, T}
 typeof_d2Ndξ2(::Type{T}, ::ScalarInterpolation, ::VectorizedInterpolation{dim, <:AbstractRefShape{dim}}) where {T, dim} = Tensor{2, dim, T}
 
-# Vector, vdim == sdim == rdim              vdim                            sdim                     rdim
+# Vector, vdim == sdim == rdim           vdim                            sdim                    rdim
 typeof_N(::Type{T}, ::VectorInterpolation{dim}, ::VectorizedInterpolation{dim, <:AbstractRefShape{dim}}) where {T, dim} = Vec{dim, T}
 typeof_dNdx(::Type{T}, ::VectorInterpolation{dim}, ::VectorizedInterpolation{dim, <:AbstractRefShape{dim}}) where {T, dim} = Tensor{2, dim, T}
 typeof_dNdξ(::Type{T}, ::VectorInterpolation{dim}, ::VectorizedInterpolation{dim, <:AbstractRefShape{dim}}) where {T, dim} = Tensor{2, dim, T}
@@ -132,7 +132,8 @@ sdim_from_gradtype(::Type{<:SMatrix{<:Any, sdim}}) where {sdim} = sdim
 # For performance, these must be fully inferable for the compiler.
 # args: valname (:CellValues or :FacetValues), shape_gradient_type, eltype(x)
 function check_reinit_sdim_consistency(valname, gradtype::Type, ::Type{<:Vec{sdim}}) where {sdim}
-    return check_reinit_sdim_consistency(valname, Val(sdim_from_gradtype(gradtype)), Val(sdim))
+    check_reinit_sdim_consistency(valname, Val(sdim_from_gradtype(gradtype)), Val(sdim))
+    return
 end
 check_reinit_sdim_consistency(_, ::Nothing, ::Type{<:Vec}) = nothing # gradient not stored, cannot check
 check_reinit_sdim_consistency(_, ::Val{sdim}, ::Val{sdim}) where {sdim} = nothing

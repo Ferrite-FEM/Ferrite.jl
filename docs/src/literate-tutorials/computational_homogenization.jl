@@ -458,29 +458,25 @@ end
 # So we have now already computed all the components, and just need to gather the data in
 # a fourth order tensor:
 
-E_dirichlet = SymmetricTensor{4, 2}(
-    (i, j, k, l) -> begin
-        if k == l == 1
-            σ̄.dirichlet[1][i, j] # ∂σ∂ε_**11
-        elseif k == l == 2
-            σ̄.dirichlet[2][i, j] # ∂σ∂ε_**22
-        else
-            σ̄.dirichlet[3][i, j] # ∂σ∂ε_**12 and ∂σ∂ε_**21
-        end
+E_dirichlet = SymmetricTensor{4, 2}() do i, j, k, l
+    if k == l == 1
+        σ̄.dirichlet[1][i, j] # ∂σ∂ε_**11
+    elseif k == l == 2
+        σ̄.dirichlet[2][i, j] # ∂σ∂ε_**22
+    else
+        σ̄.dirichlet[3][i, j] # ∂σ∂ε_**12 and ∂σ∂ε_**21
     end
-)
+end
 
-E_periodic = SymmetricTensor{4, 2}(
-    (i, j, k, l) -> begin
-        if k == l == 1
-            σ̄.periodic[1][i, j]
-        elseif k == l == 2
-            σ̄.periodic[2][i, j]
-        else
-            σ̄.periodic[3][i, j]
-        end
+E_periodic = SymmetricTensor{4, 2}() do i, j, k, l
+    if k == l == 1
+        σ̄.periodic[1][i, j]
+    elseif k == l == 2
+        σ̄.periodic[2][i, j]
+    else
+        σ̄.periodic[3][i, j]
     end
-);
+end
 
 # We can check that the result are what we expect, namely that the stiffness with Dirichlet
 # boundary conditions is higher than when using periodic boundary conditions, and that
@@ -538,7 +534,7 @@ end;
 
 # Just another way to compute the stiffness for testing purposes               #src
 function homogenize_test(u::Matrix, dh, cv, E_incl, E_mat)                     #src
-    ĒΩ = zero(SymmetricTensor{4, 2})                                            #src
+    ĒΩ = zero(SymmetricTensor{4, 2})                                           #src
     Ω = 0.0                                                                    #src
     ue = zeros(ndofs_per_cell(dh), 3)                                          #src
     for cell in CellIterator(dh)                                               #src
@@ -553,17 +549,15 @@ function homogenize_test(u::Matrix, dh, cv, E_incl, E_mat)                     #
             dΩ = getdetJdV(cv, qp)                                             #src
             Ω += dΩ                                                            #src
             ## compute u^ij and u^kl                                           #src
-            Ē′ = SymmetricTensor{4, 2}( #src
-                (i, j, k, l) -> begin                    #src
-                    ij = i == j == 1 ? 1 : i == j == 2 ? 2 : 3                     #src
-                    kl = k == l == 1 ? 1 : k == l == 2 ? 2 : 3                     #src
-                    εij = function_symmetric_gradient(cv, qp, view(ue, :, ij)) + #src
-                        symmetric((basevec(Vec{2}, i) ⊗ basevec(Vec{2}, j))) #src
-                    εkl = function_symmetric_gradient(cv, qp, view(ue, :, kl)) + #src
-                        symmetric((basevec(Vec{2}, k) ⊗ basevec(Vec{2}, l))) #src
-                    return (εij ⊡ E ⊡ εkl) * dΩ                                    #src
-                end #src
-            )                                                               #src
+            Ē′ = SymmetricTensor{4, 2}() do i, j, k, l                         #src
+                ij = i == j == 1 ? 1 : i == j == 2 ? 2 : 3                     #src
+                kl = k == l == 1 ? 1 : k == l == 2 ? 2 : 3                     #src
+                εij = function_symmetric_gradient(cv, qp, view(ue, :, ij)) +   #src
+                    symmetric((basevec(Vec{2}, i) ⊗ basevec(Vec{2}, j)))       #src
+                εkl = function_symmetric_gradient(cv, qp, view(ue, :, kl)) +   #src
+                    symmetric((basevec(Vec{2}, k) ⊗ basevec(Vec{2}, l)))       #src
+                return (εij ⊡ E ⊡ εkl) * dΩ                                    #src
+            end                                                                #src
             ĒΩ += Ē′                                                           #src
         end                                                                    #src
     end                                                                        #src

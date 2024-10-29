@@ -1,24 +1,20 @@
 @testset "grid boundary" begin
     function _extractboundary(grid::Ferrite.AbstractGrid{3}, topology::ExclusiveTopology, _ftype::Function)
         return union(
-            (
-                _ftype(grid, topology, x -> x[3] ≈ -1.0),
-                _ftype(grid, topology, x -> x[3] ≈ 1.0),
-                _ftype(grid, topology, x -> x[1] ≈ 1.0),
-                _ftype(grid, topology, x -> x[1] ≈ -1.0),
-                _ftype(grid, topology, x -> x[2] ≈ 1.0),
-                _ftype(grid, topology, x -> x[2] ≈ -1.0),
-            )...
+            _ftype(grid, topology, x -> x[3] ≈ -1.0),
+            _ftype(grid, topology, x -> x[3] ≈ 1.0),
+            _ftype(grid, topology, x -> x[1] ≈ 1.0),
+            _ftype(grid, topology, x -> x[1] ≈ -1.0),
+            _ftype(grid, topology, x -> x[2] ≈ 1.0),
+            _ftype(grid, topology, x -> x[2] ≈ -1.0),
         )
     end
     function _extractboundary(grid::Ferrite.AbstractGrid{2}, topology::ExclusiveTopology, _ftype::Function)
         return union(
-            (
-                _ftype(grid, topology, x -> x[1] ≈ 1.0),
-                _ftype(grid, topology, x -> x[1] ≈ -1.0),
-                _ftype(grid, topology, x -> x[2] ≈ 1.0),
-                _ftype(grid, topology, x -> x[2] ≈ -1.0),
-            )...
+            _ftype(grid, topology, x -> x[1] ≈ 1.0),
+            _ftype(grid, topology, x -> x[1] ≈ -1.0),
+            _ftype(grid, topology, x -> x[2] ≈ 1.0),
+            _ftype(grid, topology, x -> x[2] ≈ -1.0),
         )
     end
     function extractboundary(grid::Ferrite.AbstractGrid{3}, topology::ExclusiveTopology)
@@ -36,24 +32,20 @@
     end
     function _extractboundarycheck(grid::Ferrite.AbstractGrid{3}, _ftype::Function)
         return union(
-            (
-                _ftype(grid, x -> x[3] ≈ -1.0),
-                _ftype(grid, x -> x[3] ≈ 1.0),
-                _ftype(grid, x -> x[1] ≈ 1.0),
-                _ftype(grid, x -> x[1] ≈ -1.0),
-                _ftype(grid, x -> x[2] ≈ 1.0),
-                _ftype(grid, x -> x[2] ≈ -1.0),
-            )...
+            _ftype(grid, x -> x[3] ≈ -1.0),
+            _ftype(grid, x -> x[3] ≈ 1.0),
+            _ftype(grid, x -> x[1] ≈ 1.0),
+            _ftype(grid, x -> x[1] ≈ -1.0),
+            _ftype(grid, x -> x[2] ≈ 1.0),
+            _ftype(grid, x -> x[2] ≈ -1.0),
         )
     end
     function _extractboundarycheck(grid::Ferrite.AbstractGrid{2}, _ftype::Function)
         return union(
-            (
-                _ftype(grid, x -> x[1] ≈ 1.0),
-                _ftype(grid, x -> x[1] ≈ -1.0),
-                _ftype(grid, x -> x[2] ≈ 1.0),
-                _ftype(grid, x -> x[2] ≈ -1.0),
-            )...
+            _ftype(grid, x -> x[1] ≈ 1.0),
+            _ftype(grid, x -> x[1] ≈ -1.0),
+            _ftype(grid, x -> x[2] ≈ 1.0),
+            _ftype(grid, x -> x[2] ≈ -1.0),
         )
     end
     function extractboundarycheck(grid::Ferrite.AbstractGrid{3})

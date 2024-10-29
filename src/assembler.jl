@@ -109,12 +109,13 @@ function assemble!(a::COOAssembler{T}, rowdofs::AbstractVector{Int}, coldofs::Ab
     @assert(size(Ke, 2) == ncols)
 
     append!(a.V, Ke)
-    return @inbounds for i in 1:ncols
+    @inbounds for i in 1:ncols
         append!(a.I, rowdofs)
         for _ in 1:nrows
             push!(a.J, coldofs[i])
         end
     end
+    return
 end
 
 """
@@ -153,9 +154,10 @@ Assembles the element residual `ge` into the global residual vector `g`.
 @propagate_inbounds function assemble!(g::AbstractVector{T}, dofs::AbstractVector{Int}, ge::AbstractVector{T}) where {T}
     @boundscheck checkbounds(g, dofs)
     @boundscheck checkbounds(ge, keys(dofs))
-    return @inbounds for (i, dof) in pairs(dofs)
+    @inbounds for (i, dof) in pairs(dofs)
         addindex!(g, ge[i], dof)
     end
+    return
 end
 
 """
@@ -191,10 +193,11 @@ function Base.show(io::IO, ::MIME"text/plain", a::Union{CSCAssembler, SymmetricC
     print(io, typeof(a), " for assembling into:\n - ")
     summary(io, a.K)
     f = a.f
-    return if !isempty(f)
+    if !isempty(f)
         print(io, "\n - ")
         summary(io, f)
     end
+    return
 end
 
 matrix_handle(a::AbstractCSCAssembler) = a.K
@@ -287,7 +290,7 @@ end
     sorteddofs, permutation = _sortdofs_for_assembly!(A.permutation, A.sorteddofs, dofs)
 
     current_col = 1
-    return @inbounds for Kcol in sorteddofs
+    @inbounds for Kcol in sorteddofs
         maxlookups = sym ? current_col : ld
         Kecol = permutation[current_col]
         ri = 1 # row index pointer for the local matrix
@@ -324,19 +327,17 @@ end
         end
         current_col += 1
     end
+    return
 end
 
 function _missing_sparsity_pattern_error(Krow::Int, Kcol::Int)
-    throw(
-        ErrorException(
-            "You are trying to assemble values in to K[$(Krow), $(Kcol)], but K[$(Krow), " *
-                "$(Kcol)] is missing in the sparsity pattern. Make sure you have called `K = " *
-                "allocate_matrix(dh)` or `K = allocate_matrix(dh, ch)` if you " *
-                "have affine constraints. This error might also happen if you are using " *
-                "the assembler in a threaded assembly loop (you need to create one " *
-                "`assembler` for each task)."
-        )
-    )
+    msg = "You are trying to assemble values in to K[$(Krow), $(Kcol)], but K[$(Krow), " *
+        "$(Kcol)] is missing in the sparsity pattern. Make sure you have called `K = " *
+        "allocate_matrix(dh)` or `K = allocate_matrix(dh, ch)` if you " *
+        "have affine constraints. This error might also happen if you are using " *
+        "the assembler in a threaded assembly loop (you need to create one " *
+        "`assembler` for each task)."
+    throw(ErrorException(msg))
 end
 
 ## assemble! with local condensation ##

@@ -14,7 +14,7 @@
             (Lagrange{RefPrism, 2}(), FacetQuadratureRule{RefPrism}(2)),
         )
         for func_interpol in (scalar_interpol, VectorizedInterpolation(scalar_interpol)), DiffOrder in 1:2
-            (DiffOrder == 2 && Ferrite.getorder(func_interpol) == 1) && continue #No need to test linear interpolations again
+            (DiffOrder == 2 && Ferrite.getorder(func_interpol) == 1) && continue # No need to test linear interpolations again
             geom_interpol = scalar_interpol # Tests below assume this
             n_basefunc_base = getnbasefunctions(scalar_interpol)
             update_gradients = true
@@ -45,7 +45,7 @@
                     (rand(Tensor{1, rdim}), rand(Tensor{2, rdim}), Tensor{3, rdim}((i, j, k) -> i == j == k ? rand() : 0.0))
                 end
 
-                u_funk(x, V, G, H) = begin
+                function u_funk(x, V, G, H)
                     if update_hessians
                         0.5 * x ⋅ H ⋅ x + G ⋅ x + V
                     else
@@ -63,8 +63,8 @@
                     @test function_value(fv, i, ue) ≈ Vqp
                     @test function_gradient(fv, i, ue) ≈ Gqp
                     if update_hessians
-                        #Note, the jacobian of the element is constant, which makes the hessian (of the mapping)
-                        #zero. So this is not the optimal test
+                        # Note, the jacobian of the element is constant, which makes the hessian (of the mapping)
+                        # zero. So this is not the optimal test
                         @test Ferrite.function_hessian(fv, i, ue) ≈ Hqp
                     end
                     if func_interpol isa Ferrite.VectorInterpolation
@@ -76,7 +76,7 @@
                     end
                 end
 
-                #Test CellValues when input is a ::Vector{<:Vec} (most of which is deprecated)
+                # Test CellValues when input is a ::Vector{<:Vec} (most of which is deprecated)
                 ue_vec = [zero(Vec{rdim, Float64}) for i in 1:n_basefunc_base]
                 G_vector = rand(Tensor{2, rdim})
                 for i in 1:n_basefunc_base
@@ -93,14 +93,14 @@
                         if rdim == 3
                             @test_throws Ferrite.DeprecationError function_curl(fv, i, ue_vec)
                         end
-                        @test_throws Ferrite.DeprecationError function_value(fv, i, ue_vec) #no value to test against
+                        @test_throws Ferrite.DeprecationError function_value(fv, i, ue_vec) # no value to test against
                     end
                 end
 
-                #Check if the non-linear mapping is correct
-                #Only do this for one interpolation becuase it relise on AD on "iterative function"
+                # Check if the non-linear mapping is correct
+                # Only do this for one interpolation becuase it relise on AD on "iterative function"
                 if scalar_interpol === Lagrange{RefQuadrilateral, 2}()
-                    coords_nl = [x + rand(x) * 0.01 for x in coords] #add some displacement to nodes
+                    coords_nl = [x + rand(x) * 0.01 for x in coords] # add some displacement to nodes
                     reinit!(fv, coords_nl, face)
 
                     _ue_nl = [u_funk(coords_nl[i], V, G, H) for i in 1:n_basefunc_base]
@@ -139,10 +139,10 @@
                 @test vol ≈ reference_face_area(func_interpol, face)
 
                 # Test spatial coordinate (after reinit with ref.coords we should get back the quad_points)
-                # TODO: Renable somehow after quad rule is no longer stored in FacetValues
-                #for (i, qp_x) in enumerate(getpoints(quad_rule))
-                #    @test spatial_coordinate(fv, i, x) ≈ qp_x
-                #end
+                # # TODO: Renable somehow after quad rule is no longer stored in FacetValues
+                # for (i, qp_x) in enumerate(getpoints(quad_rule))
+                #     @test spatial_coordinate(fv, i, x) ≈ qp_x
+                # end
 
             end
 
