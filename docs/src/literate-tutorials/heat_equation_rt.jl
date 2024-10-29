@@ -1,4 +1,29 @@
 # # [Heat equation (Mixed, RaviartThomas)](@id tutorial-heat-equation-rt)
+# Note, there are a lot to consider here it seems like. Good ref,
+# @book{Gatica2014,
+# title = {A Simple Introduction to the Mixed Finite Element Method: Theory and Applications},
+# ISBN = {9783319036953},
+# ISSN = {2191-8201},
+# url = {http://dx.doi.org/10.1007/978-3-319-03695-3},
+# DOI = {10.1007/978-3-319-03695-3},
+# journal = {SpringerBriefs in Mathematics},
+# publisher = {Springer International Publishing},
+# author = {Gatica,  Gabriel N.},
+# year = {2014}
+# }
+# See also,
+# @book{Boffi2013,
+#   title = {Mixed Finite Element Methods and Applications},
+#   ISBN = {9783642365195},
+#   ISSN = {0179-3632},
+#   url = {http://dx.doi.org/10.1007/978-3-642-36519-5},
+#   DOI = {10.1007/978-3-642-36519-5},
+#   journal = {Springer Series in Computational Mathematics},
+#   publisher = {Springer Berlin Heidelberg},
+#   author = {Boffi,  Daniele and Brezzi,  Franco and Fortin,  Michel},
+#   year = {2013}
+# }
+# for a(n even) more comprehensive book.
 #
 # ## Strong form
 # ```math
@@ -58,7 +83,7 @@ grid = generate_grid(Triangle, (20, 20));
 # to a `CellValues` object.
 ip_geo = geometric_interpolation(getcelltype(grid))
 ipu = Lagrange{RefTriangle, 1}() # Why does it "explode" for 2nd order ipu?
-ipq = RaviartThomas{2,RefTriangle,1}()
+ipq = RaviartThomas{2,RefTriangle, 1}()
 qr = QuadratureRule{RefTriangle}(2)
 cellvalues = (u=CellValues(qr, ipu, ip_geo), q=CellValues(qr, ipq, ip_geo))
 
