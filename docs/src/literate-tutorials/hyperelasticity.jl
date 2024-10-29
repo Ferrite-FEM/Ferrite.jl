@@ -107,6 +107,9 @@ using Ferrite, Tensors, TimerOutputs, ProgressMeter, IterativeSolvers
 # ```
 
 # !!! details "Derivation of $\partial \mathbf{P} / \partial \mathbf{F}$"
+#     *Tip:* See [knutam.github.io/tensors](https://knutam.github.io/tensors/Theory/IndexNotation/) for
+#     an explanation of the index notation used in this derivation
+#
 #     Using the product rule, the chain rule, and the relations ``\mathbf{P} = \mathbf{F} \cdot
 #     \mathbf{S}`` and ``\mathbf{C} = \mathbf{F}^\mathrm{T} \cdot \mathbf{F}``, we obtain the
 #     following:
