@@ -930,13 +930,13 @@ function evaluate_at_grid_nodes(dh::DofHandler, u::AbstractVector, fieldname::Sy
 end
 
 # Internal method that have the vtk option to allocate the output differently
-function _evaluate_at_grid_nodes(dh::DofHandler, u::AbstractVector{T}, fieldname::Symbol, ::Val{vtk} = Val(false)) where {T, vtk}
+function _evaluate_at_grid_nodes(dh::DofHandler{sdim}, u::AbstractVector{T}, fieldname::Symbol, ::Val{vtk}=Val(false)) where {T, vtk, sdim}
     # Make sure the field exists
     fieldname ∈ getfieldnames(dh) || error("Field $fieldname not found.")
     # Figure out the return type (scalar or vector)
     field_idx = find_field(dh, fieldname)
     ip = getfieldinterpolation(dh, field_idx)
-    RT = ip isa ScalarInterpolation ? T : Vec{n_components(ip), T}
+    RT = shape_value_type(ip, T)
     if vtk
         # VTK output of solution field (or L2 projected scalar data)
         n_c = n_components(ip)
@@ -957,31 +957,18 @@ function _evaluate_at_grid_nodes(dh::DofHandler, u::AbstractVector{T}, fieldname
         ip_geo = geometric_interpolation(CT)
         local_node_coords = reference_coordinates(ip_geo)
         qr = QuadratureRule{getrefshape(ip)}(zeros(length(local_node_coords)), local_node_coords)
-        if ip isa VectorizedInterpolation
-            # TODO: Remove this hack when embedding works...
-            cv = CellValues(qr, ip.ip, ip_geo)
-        else
-            cv = CellValues(qr, ip, ip_geo)
-        end
+        cv = CellValues(qr, ip, ip_geo^sdim; update_gradients = Val(false), update_hessians = Val(false), update_detJdV = Val(false))
         drange = dof_range(sdh, field_idx)
         # Function barrier
-        _evaluate_at_grid_nodes!(data, sdh, u, cv, drange, RT)
+        _evaluate_at_grid_nodes!(data, sdh, u, cv, drange)
     end
     return data
 end
 
 # Loop over the cells and use shape functions to compute the value
-function _evaluate_at_grid_nodes!(
-        data::Union{Vector, Matrix}, sdh::SubDofHandler,
-        u::AbstractVector{T}, cv::CellValues, drange::UnitRange, ::Type{RT}
-    ) where {T, RT}
+function _evaluate_at_grid_nodes!(data::Union{Vector,Matrix}, sdh::SubDofHandler,
+        u::AbstractVector{T}, cv::CellValues, drange::UnitRange) where {T}
     ue = zeros(T, length(drange))
-    # TODO: Remove this hack when embedding works...
-    if RT <: Vec && function_interpolation(cv) isa ScalarInterpolation
-        uer = reinterpret(RT, ue)
-    else
-        uer = ue
-    end
     for cell in CellIterator(sdh)
         # Note: We are only using the shape functions: no reinit!(cv, cell) necessary
         @assert getnquadpoints(cv) == length(cell.nodes)
@@ -989,7 +976,7 @@ function _evaluate_at_grid_nodes!(
             ue[i] = u[cell.dofs[I]]
         end
         for (qp, nodeid) in pairs(cell.nodes)
-            val = function_value(cv, qp, uer)
+            val = function_value(cv, qp, ue)
             if data isa Matrix # VTK
                 data[1:length(val), nodeid] .= val
                 data[(length(val) + 1):end, nodeid] .= 0 # purge the NaN

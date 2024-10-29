@@ -57,6 +57,10 @@ n_components(::VectorInterpolation{vdim}) where {vdim} = vdim
 # Number of components that are allowed to prescribe in e.g. Dirichlet BC
 n_dbc_components(ip::Interpolation) = n_components(ip)
 
+shape_value_type(::ScalarInterpolation, T::Type) = T
+shape_value_type(::VectorInterpolation{vdim}, T::Type) where {vdim} = Vec{vdim,T}
+#shape_value_type(::MatrixInterpolation, T::Type) = Tensor  #958
+
 # TODO: Add a fallback that errors if there are multiple dofs per edge/face instead to force
 #       interpolations to opt-out instead of silently do nothing.
 """
