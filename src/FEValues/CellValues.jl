@@ -46,8 +46,10 @@ struct CellValues{FV, GM, QR, detT} <: AbstractCellValues
     qr::QR         # QuadratureRule
     detJdV::detT   # AbstractVector{<:Number} or Nothing
 end
-function CellValues(::Type{T}, qr::QuadratureRule, ip_fun::Interpolation, ip_geo::VectorizedInterpolation,
-        ::ValuesUpdateFlags{FunDiffOrder, GeoDiffOrder, DetJdV}) where {T, FunDiffOrder, GeoDiffOrder, DetJdV}
+function CellValues(
+        ::Type{T}, qr::QuadratureRule, ip_fun::Interpolation, ip_geo::VectorizedInterpolation,
+        ::ValuesUpdateFlags{FunDiffOrder, GeoDiffOrder, DetJdV}
+    ) where {T, FunDiffOrder, GeoDiffOrder, DetJdV}
 
     geo_mapping = GeometryMapping{GeoDiffOrder}(T, ip_geo.ip, qr)
     fun_values = FunctionValues{FunDiffOrder}(T, ip_fun, qr, ip_geo)
@@ -56,10 +58,10 @@ function CellValues(::Type{T}, qr::QuadratureRule, ip_fun::Interpolation, ip_geo
 end
 
 CellValues(qr::QuadratureRule, ip::Interpolation, args...; kwargs...) = CellValues(Float64, qr, ip, args...; kwargs...)
-function CellValues(::Type{T}, qr, ip::Interpolation, ip_geo::ScalarInterpolation; kwargs...) where T
+function CellValues(::Type{T}, qr, ip::Interpolation, ip_geo::ScalarInterpolation; kwargs...) where {T}
     return CellValues(T, qr, ip, VectorizedInterpolation(ip_geo); kwargs...)
 end
-function CellValues(::Type{T}, qr::QuadratureRule, ip::Interpolation, ip_geo::VectorizedInterpolation = default_geometric_interpolation(ip); kwargs...) where T
+function CellValues(::Type{T}, qr::QuadratureRule, ip::Interpolation, ip_geo::VectorizedInterpolation = default_geometric_interpolation(ip); kwargs...) where {T}
     return CellValues(T, qr, ip, ip_geo, ValuesUpdateFlags(ip; kwargs...))
 end
 
@@ -94,7 +96,7 @@ getnquadpoints(cv::CellValues) = getnquadpoints(cv.qr)
 @inline function _update_detJdV!(detJvec::AbstractVector, q_point::Int, w, mapping)
     detJ = calculate_detJ(getjacobian(mapping))
     detJ > 0.0 || throw_detJ_not_pos(detJ)
-    @inbounds detJvec[q_point] = detJ * w
+    return @inbounds detJvec[q_point] = detJ * w
 end
 @inline _update_detJdV!(::Nothing, q_point, w, mapping) = nothing
 
@@ -129,10 +131,10 @@ function Base.show(io::IO, d::MIME"text/plain", cv::CellValues)
     vdim = isa(shape_value(cv, 1, 1), Vec) ? length(shape_value(cv, 1, 1)) : 0
     GradT = shape_gradient_type(cv)
     sdim = GradT === nothing ? nothing : sdim_from_gradtype(GradT)
-    vstr = vdim==0 ? "scalar" : "vdim=$vdim"
+    vstr = vdim == 0 ? "scalar" : "vdim=$vdim"
     print(io, "CellValues(", vstr, ", rdim=$rdim, and sdim=$sdim): ")
     print(io, getnquadpoints(cv), " quadrature points")
     print(io, "\n Function interpolation: "); show(io, d, ip_fun)
-    print(io, "\nGeometric interpolation: ");
-    sdim === nothing ? show(io, d, ip_geo) : show(io, d, ip_geo^sdim)
+    print(io, "\nGeometric interpolation: ")
+    return sdim === nothing ? show(io, d, ip_geo) : show(io, d, ip_geo^sdim)
 end

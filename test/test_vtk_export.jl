@@ -1,7 +1,7 @@
 @testset "VTKGridFile" begin #TODO: Move all vtk tests here
     @testset "show(::VTKGridFile)" begin
         mktempdir() do tmp
-            grid = generate_grid(Quadrilateral, (2,2))
+            grid = generate_grid(Quadrilateral, (2, 2))
             vtk = VTKGridFile(joinpath(tmp, "showfile"), grid)
             showstring_open = sprint(show, MIME"text/plain"(), vtk)
             @test startswith(showstring_open, "VTKGridFile for the open file")
@@ -21,7 +21,7 @@
                 @test Ferrite.write_cell_colors(vtk, grid, colors) === vtk
             end
             @test v isa VTKGridFile
-            @test bytes2hex(open(SHA.sha1, fname*".vtu")) == "b804d0b064121b672d8e35bcff8446eda361cac3"
+            @test bytes2hex(open(SHA.sha1, fname * ".vtu")) == "b804d0b064121b672d8e35bcff8446eda361cac3"
         end
     end
     @testset "constraints" begin
@@ -40,14 +40,14 @@
                 @test Ferrite.write_constraints(vtk, ch) === vtk
             end
             @test v isa VTKGridFile
-            @test bytes2hex(open(SHA.sha1, fname*".vtu")) == "31b506bd9729b11992f8bcb79a2191eb65d223bf"
+            @test bytes2hex(open(SHA.sha1, fname * ".vtu")) == "31b506bd9729b11992f8bcb79a2191eb65d223bf"
         end
     end
     @testset "write_cellset" begin
         # More tests in `test_grid_dofhandler_vtk.jl`, this just validates writing all sets in the grid
         # which is not tested there, see https://github.com/Ferrite-FEM/Ferrite.jl/pull/948
         mktempdir() do tmp
-            grid = generate_grid(Quadrilateral, (2,2))
+            grid = generate_grid(Quadrilateral, (2, 2))
             addcellset!(grid, "set1", 1:2)
             addcellset!(grid, "set2", 1:4)
             manual = joinpath(tmp, "manual")
@@ -60,7 +60,7 @@
                 @test Ferrite.write_cellset(vtk, grid) === vtk
             end
             @test v isa VTKGridFile
-            @test bytes2hex(open(SHA.sha1, manual*".vtu")) == bytes2hex(open(SHA.sha1, auto*".vtu"))
+            @test bytes2hex(open(SHA.sha1, manual * ".vtu")) == bytes2hex(open(SHA.sha1, auto * ".vtu"))
         end
     end
 end

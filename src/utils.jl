@@ -11,7 +11,7 @@ Debug mode influences `Ferrite.@debug expr`: when debug mode is enabled, `expr` 
 evaluated, and when debug mode is disabled `expr` is ignored.
 """
 function debug_mode(; enable = true)
-    if DEBUG == enable == true
+    return if DEBUG == enable == true
         @info "Debug mode already enabled."
     elseif DEBUG == enable == false
         @info "Debug mode already disabled."
@@ -28,17 +28,17 @@ end
         end
     end
 else
-     @eval begin
+    @eval begin
         macro debug(ex)
             return nothing
         end
     end
 end
 
-convert_to_orderedset(set::AbstractVector{T}) where T = OrderedSet{T}(set)
-convert_to_orderedset(set::AbstractSet{T}) where T = convert(OrderedSet{T}, set)
+convert_to_orderedset(set::AbstractVector{T}) where {T} = OrderedSet{T}(set)
+convert_to_orderedset(set::AbstractSet{T}) where {T} = convert(OrderedSet{T}, set)
 
-function convert_to_orderedsets(namedsets::Dict{String, <: AbstractVecOrSet{T}}) where T
-    return Dict{String,OrderedSet{T}}(k => convert_to_orderedset(v) for (k,v) in namedsets)
+function convert_to_orderedsets(namedsets::Dict{String, <:AbstractVecOrSet{T}}) where {T}
+    return Dict{String, OrderedSet{T}}(k => convert_to_orderedset(v) for (k, v) in namedsets)
 end
-convert_to_orderedsets(namedsets::Dict{String, <: OrderedSet}) = namedsets
+convert_to_orderedsets(namedsets::Dict{String, <:OrderedSet}) = namedsets

@@ -156,7 +156,7 @@ using Test #src
 # the "inlet" and "outlet" parts using `gmsh.model.set_periodic`. This is necessary to later
 # on apply a periodicity constraint for the approximated velocity field.
 
-function setup_grid(h=0.05)
+function setup_grid(h = 0.05)
     ## Initialize gmsh
     Gmsh.initialize()
     gmsh.option.set_number("General.Verbosity", 2)
@@ -321,7 +321,7 @@ function setup_mean_constraint(dh, fvp)
     V ./= V[constrained_dof_idx]
     mean_value_constraint = AffineConstraint(
         constrained_dof,
-        Pair{Int,Float64}[J[i] => -V[i] for i in 1:length(J) if J[i] != constrained_dof],
+        Pair{Int, Float64}[J[i] => -V[i] for i in 1:length(J) if J[i] != constrained_dof],
         0.0,
     )
     return mean_value_constraint
@@ -385,8 +385,8 @@ function assemble_system!(K, f, dh, cvu, cvp)
     ndofs_u = length(range_u)
     range_p = dof_range(dh, :p)
     ndofs_p = length(range_p)
-    ϕᵤ = Vector{Vec{2,Float64}}(undef, ndofs_u)
-    ∇ϕᵤ = Vector{Tensor{2,2,Float64,4}}(undef, ndofs_u)
+    ϕᵤ = Vector{Vec{2, Float64}}(undef, ndofs_u)
+    ∇ϕᵤ = Vector{Tensor{2, 2, Float64, 4}}(undef, ndofs_u)
     divϕᵤ = Vector{Float64}(undef, ndofs_u)
     ϕₚ = Vector{Float64}(undef, ndofs_p)
     for cell in CellIterator(dh)
@@ -406,15 +406,15 @@ function assemble_system!(K, f, dh, cvu, cvp)
             end
             ## u-u
             for (i, I) in pairs(range_u), (j, J) in pairs(range_u)
-                ke[I, J] += ( ∇ϕᵤ[i] ⊡ ∇ϕᵤ[j] ) * dΩ
+                ke[I, J] += (∇ϕᵤ[i] ⊡ ∇ϕᵤ[j]) * dΩ
             end
             ## u-p
             for (i, I) in pairs(range_u), (j, J) in pairs(range_p)
-                ke[I, J] += ( -divϕᵤ[i] * ϕₚ[j] ) * dΩ
+                ke[I, J] += (-divϕᵤ[i] * ϕₚ[j]) * dΩ
             end
             ## p-u
             for (i, I) in pairs(range_p), (j, J) in pairs(range_u)
-                ke[I, J] += ( -divϕᵤ[j] * ϕₚ[i] ) * dΩ
+                ke[I, J] += (-divϕᵤ[j] * ϕₚ[i]) * dΩ
             end
             ## rhs
             for (i, I) in pairs(range_u)
@@ -444,7 +444,7 @@ function check_mean_constraint(dh, fvp, u)                                  #src
     range_p = dof_range(dh, :p)                                             #src
     cc = CellCache(dh)                                                      #src
     ## Loop over all the boundaries and compute the integrated pressure     #src
-    ∫pdΓ, Γ= 0.0, 0.0                                                       #src
+    ∫pdΓ, Γ = 0.0, 0.0                                                       #src
     for (ci, fi) in set                                                     #src
         reinit!(cc, ci)                                                     #src
         reinit!(fvp, cc, fi)                                                #src
@@ -452,10 +452,10 @@ function check_mean_constraint(dh, fvp, u)                                  #src
         for qp in 1:getnquadpoints(fvp)                                     #src
             dΓ = getdetJdV(fvp, qp)                                         #src
             ∫pdΓ += function_value(fvp, qp, ue, range_p) * dΓ               #src
-            Γ    += dΓ                                                      #src
+            Γ += dΓ                                                      #src
         end                                                                 #src
     end                                                                     #src
-    @test ∫pdΓ / Γ ≈ 0.0 atol=1e-16                                         #src
+    return @test ∫pdΓ / Γ ≈ 0.0 atol = 1.0e-16                                         #src
 end                                                                         #src
 
 function check_L2(dh, cvu, cvp, u)                                          #src
@@ -473,11 +473,11 @@ function check_L2(dh, cvu, cvp, u)                                          #src
             ph = function_value(cvp, qp, ue, range_p)                       #src
             ∫uudΩ += (uh ⋅ uh) * dΩ                                         #src
             ∫ppdΩ += (ph * ph) * dΩ                                         #src
-            Ω    += dΩ                                                      #src
+            Ω += dΩ                                                      #src
         end                                                                 #src
     end                                                                     #src
-    @test √(∫uudΩ) / Ω ≈ 0.0007255988117907926 atol=1e-7                    #src
-    @test √(∫ppdΩ) / Ω ≈ 0.02169683180923709   atol=1e-5                    #src
+    @test √(∫uudΩ) / Ω ≈ 0.0007255988117907926 atol = 1.0e-7                    #src
+    return @test √(∫ppdΩ) / Ω ≈ 0.02169683180923709   atol = 1.0e-5                    #src
 end                                                                         #src
 
 function main()
@@ -485,18 +485,18 @@ function main()
     h = 0.05 # approximate element size
     grid = setup_grid(h)
     ## Interpolations
-    ipu = Lagrange{RefTriangle,2}() ^ 2 # quadratic
-    ipp = Lagrange{RefTriangle,1}()     # linear
+    ipu = Lagrange{RefTriangle, 2}()^2 # quadratic
+    ipp = Lagrange{RefTriangle, 1}()     # linear
     ## Dofs
     dh = setup_dofs(grid, ipu, ipp)
     ## FE values
-    ipg = Lagrange{RefTriangle,1}() # linear geometric interpolation
+    ipg = Lagrange{RefTriangle, 1}() # linear geometric interpolation
     cvu, cvp, fvp = setup_fevalues(ipu, ipp, ipg)
     ## Boundary conditions
     ch = setup_constraints(dh, fvp)
     ## Global tangent matrix and rhs
     coupling = [true true; true false] # no coupling between pressure test/trial functions
-    K = allocate_matrix(dh, ch; coupling=coupling)
+    K = allocate_matrix(dh, ch; coupling = coupling)
     f = zeros(ndofs(dh))
     ## Assemble system
     assemble_system!(K, f, dh, cvu, cvp)

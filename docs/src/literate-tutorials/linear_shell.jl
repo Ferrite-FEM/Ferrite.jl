@@ -14,115 +14,117 @@ using ForwardDiff
 
 function main() #wrap everything in a function...
 
-# First we generate a flat rectangular mesh. There is currently no built-in function for generating
-# shell meshes in Ferrite, so we have to create our own simple mesh generator (see the
-# function `generate_shell_grid` further down in this file).
-#+
-nels = (10,10)
-size = (10.0, 10.0)
-grid = generate_shell_grid(nels, size)
+    # First we generate a flat rectangular mesh. There is currently no built-in function for generating
+    # shell meshes in Ferrite, so we have to create our own simple mesh generator (see the
+    # function `generate_shell_grid` further down in this file).
+    #+
+    nels = (10, 10)
+    size = (10.0, 10.0)
+    grid = generate_shell_grid(nels, size)
 
-# Here we define the bi-linear interpolation used for the geometrical description of the shell.
-# We also create two quadrature rules for the in-plane and out-of-plane directions. Note that we use
-# under integration for the inplane integration, to avoid shear locking.
-#+
-ip = Lagrange{RefQuadrilateral,1}()
-qr_inplane = QuadratureRule{RefQuadrilateral}(1)
-qr_ooplane = QuadratureRule{RefLine}(2)
-cv = CellValues(qr_inplane, ip, ip^3)
+    # Here we define the bi-linear interpolation used for the geometrical description of the shell.
+    # We also create two quadrature rules for the in-plane and out-of-plane directions. Note that we use
+    # under integration for the inplane integration, to avoid shear locking.
+    #+
+    ip = Lagrange{RefQuadrilateral, 1}()
+    qr_inplane = QuadratureRule{RefQuadrilateral}(1)
+    qr_ooplane = QuadratureRule{RefLine}(2)
+    cv = CellValues(qr_inplane, ip, ip^3)
 
-# Next we distribute displacement dofs,`:u = (x,y,z)` and rotational dofs, `:θ = (θ₁,  θ₂)`.
-#+
-dh = DofHandler(grid)
-add!(dh, :u, ip^3)
-add!(dh, :θ, ip^2)
-close!(dh)
+    # Next we distribute displacement dofs,`:u = (x,y,z)` and rotational dofs, `:θ = (θ₁,  θ₂)`.
+    #+
+    dh = DofHandler(grid)
+    add!(dh, :u, ip^3)
+    add!(dh, :θ, ip^2)
+    close!(dh)
 
-# In order to apply our boundary conditions, we first need to create some facet- and vertex-sets. This
-# is done with `addfacetset!` and `addvertexset!`
-#+
-addfacetset!(grid, "left",  (x) -> x[1] ≈ 0.0)
-addfacetset!(grid, "right", (x) -> x[1] ≈ size[1])
-addvertexset!(grid, "corner", (x) -> x[1] ≈ 0.0 && x[2] ≈ 0.0 && x[3] ≈ 0.0)
+    # In order to apply our boundary conditions, we first need to create some facet- and vertex-sets. This
+    # is done with `addfacetset!` and `addvertexset!`
+    #+
+    addfacetset!(grid, "left", (x) -> x[1] ≈ 0.0)
+    addfacetset!(grid, "right", (x) -> x[1] ≈ size[1])
+    addvertexset!(grid, "corner", (x) -> x[1] ≈ 0.0 && x[2] ≈ 0.0 && x[3] ≈ 0.0)
 
-# Here we define the boundary conditions. On the left edge, we lock the displacements in the x- and z- directions, and all the rotations.
-#+
-ch = ConstraintHandler(dh)
-add!(ch,  Dirichlet(:u, getfacetset(grid, "left"), (x, t) -> (0.0, 0.0), [1,3])  )
-add!(ch,  Dirichlet(:θ, getfacetset(grid, "left"), (x, t) -> (0.0, 0.0), [1,2])  )
+    # Here we define the boundary conditions. On the left edge, we lock the displacements in the x- and z- directions, and all the rotations.
+    #+
+    ch = ConstraintHandler(dh)
+    add!(ch, Dirichlet(:u, getfacetset(grid, "left"), (x, t) -> (0.0, 0.0), [1, 3]))
+    add!(ch, Dirichlet(:θ, getfacetset(grid, "left"), (x, t) -> (0.0, 0.0), [1, 2]))
 
-# On the right edge, we also lock the displacements in the x- and z- directions, but apply a precribed rotation.
-#+
-add!(ch,  Dirichlet(:u, getfacetset(grid, "right"), (x, t) -> (0.0, 0.0), [1,3])  )
-add!(ch,  Dirichlet(:θ, getfacetset(grid, "right"), (x, t) -> (0.0, pi/10), [1,2])  )
+    # On the right edge, we also lock the displacements in the x- and z- directions, but apply a precribed rotation.
+    #+
+    add!(ch, Dirichlet(:u, getfacetset(grid, "right"), (x, t) -> (0.0, 0.0), [1, 3]))
+    add!(ch, Dirichlet(:θ, getfacetset(grid, "right"), (x, t) -> (0.0, pi / 10), [1, 2]))
 
-# In order to not get rigid body motion, we lock the y-displacement in one of the corners.
-#+
-add!(ch,  Dirichlet(:θ, getvertexset(grid, "corner"), (x, t) -> (0.0), [2])  )
+    # In order to not get rigid body motion, we lock the y-displacement in one of the corners.
+    #+
+    add!(ch, Dirichlet(:θ, getvertexset(grid, "corner"), (x, t) -> (0.0), [2]))
 
-close!(ch)
-update!(ch, 0.0)
+    close!(ch)
+    update!(ch, 0.0)
 
-# Next we define relevant data for the shell, such as shear correction factor and stiffness matrix for the material.
-# In this linear shell, plane stress is assumed, ie $\\sigma_{zz} = 0$. Therefor, the stiffness matrix is 5x5 (opposed to the normal 6x6).
-#+
-κ = 5/6 # Shear correction factor
-E = 210.0
-ν = 0.3
-a = (1-ν)/2
-C = E/(1-ν^2) * [1 ν 0   0   0;
-                ν 1 0   0   0;
-                0 0 a*κ 0   0;
-                0 0 0   a*κ 0;
-                0 0 0   0   a*κ]
+    # Next we define relevant data for the shell, such as shear correction factor and stiffness matrix for the material.
+    # In this linear shell, plane stress is assumed, ie $\\sigma_{zz} = 0$. Therefor, the stiffness matrix is 5x5 (opposed to the normal 6x6).
+    #+
+    κ = 5 / 6 # Shear correction factor
+    E = 210.0
+    ν = 0.3
+    a = (1 - ν) / 2
+    C = E / (1 - ν^2) * [
+        1 ν 0   0   0;
+        ν 1 0   0   0;
+        0 0 a * κ 0   0;
+        0 0 0   a * κ 0;
+        0 0 0   0   a * κ
+    ]
 
 
-data = (thickness = 1.0, C = C); #Named tuple
+    data = (thickness = 1.0, C = C)  #Named tuple
 
-# We now assemble the problem in standard finite element fashion
-#+
-nnodes = getnbasefunctions(ip)
-ndofs_shell = ndofs_per_cell(dh)
+    # We now assemble the problem in standard finite element fashion
+    #+
+    nnodes = getnbasefunctions(ip)
+    ndofs_shell = ndofs_per_cell(dh)
 
-K = allocate_matrix(dh)
-f = zeros(Float64, ndofs(dh))
+    K = allocate_matrix(dh)
+    f = zeros(Float64, ndofs(dh))
 
-ke = zeros(ndofs_shell, ndofs_shell)
-fe = zeros(ndofs_shell)
+    ke = zeros(ndofs_shell, ndofs_shell)
+    fe = zeros(ndofs_shell)
 
-celldofs = zeros(Int, ndofs_shell)
-cellcoords = zeros(Vec{3,Float64}, nnodes)
+    celldofs = zeros(Int, ndofs_shell)
+    cellcoords = zeros(Vec{3, Float64}, nnodes)
 
-assembler = start_assemble(K, f)
-for cell in CellIterator(grid)
-    fill!(ke, 0.0)
-    reinit!(cv, cell)
-    celldofs!(celldofs, dh, cellid(cell))
-    getcoordinates!(cellcoords, grid, cellid(cell))
+    assembler = start_assemble(K, f)
+    for cell in CellIterator(grid)
+        fill!(ke, 0.0)
+        reinit!(cv, cell)
+        celldofs!(celldofs, dh, cellid(cell))
+        getcoordinates!(cellcoords, grid, cellid(cell))
 
-    #Call the element routine
-    integrate_shell!(ke, cv, qr_ooplane, cellcoords, data)
+        #Call the element routine
+        integrate_shell!(ke, cv, qr_ooplane, cellcoords, data)
 
-    assemble!(assembler, celldofs, ke, fe)
-end
+        assemble!(assembler, celldofs, ke, fe)
+    end
 
-# Apply BC and solve.
-#+
-apply!(K, f, ch)
-a = K\f
+    # Apply BC and solve.
+    #+
+    apply!(K, f, ch)
+    a = K \ f
 
-# Output results.
-#+
-VTKGridFile("linear_shell", dh) do vtk
-    write_solution(vtk, dh, a)
-end
+    # Output results.
+    #+
+    return VTKGridFile("linear_shell", dh) do vtk
+        write_solution(vtk, dh, a)
+    end
 
 end; #end main functions
 
 # Below is the function that creates the shell mesh. It simply generates a 2d-quadrature mesh, and appends
 # a third coordinate (z-direction) to the node-positions.
 function generate_shell_grid(nels, size)
-    _grid = generate_grid(Quadrilateral, nels, Vec((0.0,0.0)), Vec(size))
+    _grid = generate_grid(Quadrilateral, nels, Vec((0.0, 0.0)), Vec(size))
     nodes = [(n.x[1], n.x[2], 0.0) |> Vec{3} |> Node  for n in _grid.nodes]
 
     grid = Grid(_grid.cells, nodes)
@@ -143,16 +145,20 @@ end;
 # The element uses two coordinate systems. The first coordianate system, called the fiber system, is created for each
 # element node, and is used as a reference frame for the rotations. The function below implements an algorithm that return the
 # fiber directions, $\boldsymbol{e}^{f}_{a1}$, $\boldsymbol{e}^{f}_{a2}$ and $\boldsymbol{e}^{f}_{a3}$, at each node $a$.
-function fiber_coordsys(Ps::Vector{Vec{3,Float64}})
+function fiber_coordsys(Ps::Vector{Vec{3, Float64}})
 
-    ef1 = Vec{3,Float64}[]
-    ef2 = Vec{3,Float64}[]
-    ef3 = Vec{3,Float64}[]
+    ef1 = Vec{3, Float64}[]
+    ef2 = Vec{3, Float64}[]
+    ef3 = Vec{3, Float64}[]
     for P in Ps
         a = abs.(P)
         j = 1
-        if a[1] > a[3]; a[3] = a[1]; j = 2; end
-        if a[2] > a[3]; j = 3; end
+        if a[1] > a[3]
+            a[3] = a[1]; j = 2
+        end
+        if a[2] > a[3]
+            j = 3
+        end
 
         e3 = P
         e2 = Tensors.cross(P, basevec(Vec{3}, j))
@@ -178,26 +184,26 @@ function lamina_coordsys(dNdξ, ζ, x, p, h)
     e2 = zero(Vec{3})
 
     for i in 1:length(dNdξ)
-        e1 += dNdξ[i][1] * x[i] + 0.5*h*ζ * dNdξ[i][1] * p[i]
-        e2 += dNdξ[i][2] * x[i] + 0.5*h*ζ * dNdξ[i][1] * p[i]
+        e1 += dNdξ[i][1] * x[i] + 0.5 * h * ζ * dNdξ[i][1] * p[i]
+        e2 += dNdξ[i][2] * x[i] + 0.5 * h * ζ * dNdξ[i][1] * p[i]
     end
 
     e1 /= norm(e1)
     e2 /= norm(e2)
 
-    ez = Tensors.cross(e1,e2)
+    ez = Tensors.cross(e1, e2)
     ez /= norm(ez)
 
-    a = 0.5*(e1 + e2)
+    a = 0.5 * (e1 + e2)
     a /= norm(a)
 
-    b = Tensors.cross(ez,a)
+    b = Tensors.cross(ez, a)
     b /= norm(b)
 
-    ex = sqrt(2)/2 * (a - b)
-    ey = sqrt(2)/2 * (a + b)
+    ex = sqrt(2) / 2 * (a - b)
+    ey = sqrt(2) / 2 * (a + b)
 
-    return Tensor{2,3}(hcat(ex,ey,ez))
+    return Tensor{2, 3}(hcat(ex, ey, ez))
 end;
 
 
@@ -214,18 +220,18 @@ end;
 # J_{ij} = \frac{\partial x_i}{\partial \xi_j},
 # ```
 function getjacobian(q, N, dNdξ, ζ, X, p, h)
-    J = zeros(3,3)
+    J = zeros(3, 3)
     for a in 1:length(N)
         for i in 1:3, j in 1:3
-            _dNdξ = (j==3) ? 0.0 : dNdξ[a][j]
-            _dζdξ = (j==3) ? 1.0 : 0.0
+            _dNdξ = (j == 3) ? 0.0 : dNdξ[a][j]
+            _dζdξ = (j == 3) ? 1.0 : 0.0
             _N = N[a]
 
-            J[i,j] += _dNdξ * X[a][i]  +  (_dNdξ*ζ + _N*_dζdξ) * h/2 * p[a][i]
+            J[i, j] += _dNdξ * X[a][i] + (_dNdξ * ζ + _N * _dζdξ) * h / 2 * p[a][i]
         end
     end
 
-    return (q' * J) |> Tensor{2,3,Float64}
+    return (q' * J) |> Tensor{2, 3, Float64}
 end;
 
 # ##### Strains
@@ -244,20 +250,20 @@ end;
 # \frac{\partial u_{i}}{\partial x_j} = \sum_{m=1}^3 q_{im} \sum_{a=1}^{N_{\text{nodes}}} \frac{\partial N_a}{\partial x_j} \bar{u}_{am} +
 #  \frac{\partial(N_a ζ)}{\partial x_j} \frac{h}{2} (\theta_{a2} e^{f}_{am1} - \theta_{a1} e^{f}_{am2})
 # ```
-function strain(dofvec::Vector{T}, N, dNdx, ζ, dζdx, q, ef1, ef2, h) where T
+function strain(dofvec::Vector{T}, N, dNdx, ζ, dζdx, q, ef1, ef2, h) where {T}
 
-    u = reinterpret(Vec{3,T}, dofvec[1:12])
-    θ = reinterpret(Vec{2,T}, dofvec[13:20])
+    u = reinterpret(Vec{3, T}, dofvec[1:12])
+    θ = reinterpret(Vec{2, T}, dofvec[13:20])
 
     dudx = zeros(T, 3, 3)
     for m in 1:3, j in 1:3
         for a in 1:length(N)
-            dudx[m,j] += dNdx[a][j] * u[a][m] + h/2 * (dNdx[a][j]*ζ + N[a]*dζdx[j]) * (θ[a][2]*ef1[a][m] - θ[a][1]*ef2[a][m])
+            dudx[m, j] += dNdx[a][j] * u[a][m] + h / 2 * (dNdx[a][j] * ζ + N[a] * dζdx[j]) * (θ[a][2] * ef1[a][m] - θ[a][1] * ef2[a][m])
         end
     end
 
-    dudx = q*dudx
-    ε = [dudx[1,1], dudx[2,2], dudx[1,2]+dudx[2,1], dudx[2,3]+dudx[3,2], dudx[1,3]+dudx[3,1]]
+    dudx = q * dudx
+    ε = [dudx[1, 1], dudx[2, 2], dudx[1, 2] + dudx[2, 1], dudx[2, 3] + dudx[3, 2], dudx[1, 3] + dudx[3, 1]]
     return ε
 end;
 
@@ -268,7 +274,7 @@ shape_reference_gradient(cv::CellValues, q_point, i) = cv.fun_values.dNdξ[i, q_
 
 function integrate_shell!(ke, cv, qr_ooplane, X, data)
     nnodes = getnbasefunctions(cv)
-    ndofs = nnodes*5
+    ndofs = nnodes * 5
     h = data.thickness
 
     #Create the directors in each node.
@@ -277,7 +283,7 @@ function integrate_shell!(ke, cv, qr_ooplane, X, data)
     p = zeros(Vec{3}, nnodes)
     for i in 1:nnodes
         a = Vec{3}((0.0, 0.0, 1.0))
-        p[i] = a/norm(a)
+        p[i] = a / norm(a)
     end
 
     ef1, ef2, ef3 = fiber_coordsys(p)
@@ -297,12 +303,14 @@ function integrate_shell!(ke, cv, qr_ooplane, X, data)
 
             #For simplicity, use automatic differentiation to construct the B-matrix from the strain.
             B = ForwardDiff.jacobian(
-                (a) -> strain(a, N, dNdx, ζ, dζdx, q, ef1, ef2, h), zeros(Float64, ndofs) )
+                (a) -> strain(a, N, dNdx, ζ, dζdx, q, ef1, ef2, h), zeros(Float64, ndofs)
+            )
 
             dV = qr_ooplane.weights[oqp] * getdetJdV(cv, iqp)
-            ke .+= B'*data.C*B * dV
+            ke .+= B' * data.C * B * dV
         end
     end
+    return
 end;
 
 # Run everything:

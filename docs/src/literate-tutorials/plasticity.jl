@@ -47,12 +47,12 @@ end;
 
 # Next, we define a constructor for the material instance.
 function J2Plasticity(E, ν, σ₀, H)
-    δ(i,j) = i == j ? 1.0 : 0.0 # helper function
+    δ(i, j) = i == j ? 1.0 : 0.0 # helper function
     G = E / 2(1 + ν)
     K = E / 3(1 - 2ν)
 
-    Isymdev(i,j,k,l) = 0.5*(δ(i,k)*δ(j,l) + δ(i,l)*δ(j,k)) - 1.0/3.0*δ(i,j)*δ(k,l)
-    temp(i,j,k,l) = 2.0G *( 0.5*(δ(i,k)*δ(j,l) + δ(i,l)*δ(j,k)) + ν/(1.0-2.0ν)*δ(i,j)*δ(k,l))
+    Isymdev(i, j, k, l) = 0.5 * (δ(i, k) * δ(j, l) + δ(i, l) * δ(j, k)) - 1.0 / 3.0 * δ(i, j) * δ(k, l)
+    temp(i, j, k, l) = 2.0G * (0.5 * (δ(i, k) * δ(j, l) + δ(i, l) * δ(j, k)) + ν / (1.0 - 2.0ν) * δ(i, j) * δ(k, l))
     Dᵉ = SymmetricTensor{4, 3}(temp)
     return J2Plasticity(G, K, σ₀, H, Dᵉ)
 end;
@@ -73,16 +73,17 @@ end
 # Constructor for initializing a material state. Every quantity is set to zero.
 function MaterialState()
     return MaterialState(
-                zero(SymmetricTensor{2, 3}),
-                zero(SymmetricTensor{2, 3}),
-                0.0)
+        zero(SymmetricTensor{2, 3}),
+        zero(SymmetricTensor{2, 3}),
+        0.0
+    )
 end
 
 # For later use, during the post-processing step, we define a function to
 # compute the von Mises effective stress.
 function vonMises(σ)
     s = dev(σ)
-    return sqrt(3.0/2.0 * s ⊡ s)
+    return sqrt(3.0 / 2.0 * s ⊡ s)
 end;
 
 # ## Constitutive driver
@@ -99,16 +100,16 @@ function compute_stress_tangent(ϵ::SymmetricTensor{2, 3}, material::J2Plasticit
     σᵗ = material.Dᵉ ⊡ (ϵ - state.ϵᵖ) # trial-stress
     sᵗ = dev(σᵗ)         # deviatoric part of trial-stress
     J₂ = 0.5 * sᵗ ⊡ sᵗ   # second invariant of sᵗ
-    σᵗₑ = sqrt(3.0*J₂)   # effective trial-stress (von Mises stress)
+    σᵗₑ = sqrt(3.0 * J₂)   # effective trial-stress (von Mises stress)
     σʸ = material.σ₀ + H * state.k # Previous yield limit
 
-    φᵗ  = σᵗₑ - σʸ # Trial-value of the yield surface
+    φᵗ = σᵗₑ - σʸ # Trial-value of the yield surface
 
     if φᵗ < 0.0 # elastic loading
         return σᵗ, material.Dᵉ, MaterialState(state.ϵᵖ, σᵗ, state.k)
     else # plastic loading
         h = H + 3G
-        μ =  φᵗ / h   # plastic multiplier
+        μ = φᵗ / h   # plastic multiplier
 
         c1 = 1 - 3G * μ / σᵗₑ
         s = c1 * sᵗ           # updated deviatoric stress
@@ -118,16 +119,16 @@ function compute_stress_tangent(ϵ::SymmetricTensor{2, 3}, material::J2Plasticit
         κ = H * (state.k + μ) # drag stress
         σₑ = material.σ₀ + κ  # updated yield surface
 
-        δ(i,j) = i == j ? 1.0 : 0.0
-        Isymdev(i,j,k,l)  = 0.5*(δ(i,k)*δ(j,l) + δ(i,l)*δ(j,k)) - 1.0/3.0*δ(i,j)*δ(k,l)
-        Q(i,j,k,l) = Isymdev(i,j,k,l) - 3.0 / (2.0*σₑ^2) * s[i,j]*s[k,l]
-        b = (3G*μ/σₑ) / (1.0 + 3G*μ/σₑ)
+        δ(i, j) = i == j ? 1.0 : 0.0
+        Isymdev(i, j, k, l) = 0.5 * (δ(i, k) * δ(j, l) + δ(i, l) * δ(j, k)) - 1.0 / 3.0 * δ(i, j) * δ(k, l)
+        Q(i, j, k, l) = Isymdev(i, j, k, l) - 3.0 / (2.0 * σₑ^2) * s[i, j] * s[k, l]
+        b = (3G * μ / σₑ) / (1.0 + 3G * μ / σₑ)
 
-        Dtemp(i,j,k,l) = -2G*b * Q(i,j,k,l) - 9G^2 / (h*σₑ^2) * s[i,j]*s[k,l]
+        Dtemp(i, j, k, l) = -2G * b * Q(i, j, k, l) - 9G^2 / (h * σₑ^2) * s[i, j] * s[k, l]
         D = material.Dᵉ + SymmetricTensor{4, 3}(Dtemp)
 
         ## Return new state
-        Δϵᵖ = 3/2 * μ / σₑ * s # plastic strain
+        Δϵᵖ = 3 / 2 * μ / σₑ * s # plastic strain
         ϵᵖ = state.ϵᵖ + Δϵᵖ    # plastic strain
         k = state.k + μ        # hardening variable
         return σ, D, MaterialState(ϵᵖ, σ, k)
@@ -138,7 +139,7 @@ end
 # What follows are methods for assembling and and solving the FE-problem.
 function create_values(interpolation)
     ## setup quadrature rules
-    qr      = QuadratureRule{RefTetrahedron}(2)
+    qr = QuadratureRule{RefTetrahedron}(2)
     facet_qr = FacetQuadratureRule{RefTetrahedron}(3)
 
     ## cell and facetvalues for u
@@ -161,7 +162,7 @@ function create_bc(dh, grid)
     dbcs = ConstraintHandler(dh)
     ## Clamped on the left side
     dofs = [1, 2, 3]
-    dbc = Dirichlet(:u, getfacetset(grid, "left"), (x,t) -> [0.0, 0.0, 0.0], dofs)
+    dbc = Dirichlet(:u, getfacetset(grid, "left"), (x, t) -> [0.0, 0.0, 0.0], dofs)
     add!(dbcs, dbc)
     close!(dbcs)
     return dbcs
@@ -172,8 +173,10 @@ end;
 #
 # * Residual vector `r`
 # * Tangent stiffness `K`
-function doassemble!(K::SparseMatrixCSC, r::Vector, cellvalues::CellValues, dh::DofHandler,
-                     material::J2Plasticity, u, states, states_old)
+function doassemble!(
+        K::SparseMatrixCSC, r::Vector, cellvalues::CellValues, dh::DofHandler,
+        material::J2Plasticity, u, states, states_old
+    )
     assembler = start_assemble(K, r)
     nu = getnbasefunctions(cellvalues)
     re = zeros(nu)     # element residual vector
@@ -197,8 +200,10 @@ end
 #md #     Due to symmetry, we only compute the lower half of the tangent
 #md #     and then symmetrize it.
 #md #
-function assemble_cell!(Ke, re, cell, cellvalues, material,
-                        ue, state, state_old)
+function assemble_cell!(
+        Ke, re, cell, cellvalues, material,
+        ue, state, state_old
+    )
     n_basefuncs = getnbasefunctions(cellvalues)
     reinit!(cellvalues, cell)
 
@@ -217,16 +222,17 @@ function assemble_cell!(Ke, re, cell, cellvalues, material,
             end
         end
     end
-    symmetrize_lower!(Ke)
+    return symmetrize_lower!(Ke)
 end
 
 # Helper function to symmetrize the material tangent
 function symmetrize_lower!(K)
-    for i in 1:size(K,1)
-        for j in i+1:size(K,1)
-            K[i,j] = K[j,i]
+    for i in 1:size(K, 1)
+        for j in (i + 1):size(K, 1)
+            K[i, j] = K[j, i]
         end
     end
+    return
 end;
 
 function doassemble_neumann!(r, dh, facetset, facetvalues, t)
@@ -252,9 +258,9 @@ end
 function solve()
     ## Define material parameters
     E = 200.0e9 # [Pa]
-    H = E/20   # [Pa]
+    H = E / 20   # [Pa]
     ν = 0.3     # [-]
-    σ₀ = 200e6  # [Pa]
+    σ₀ = 200.0e6  # [Pa]
     material = J2Plasticity(E, ν, σ₀, H)
 
     L = 10.0 # beam length [m]
@@ -262,7 +268,7 @@ function solve()
     h = 1.0  # beam height[m]
     n_timesteps = 10
     u_max = zeros(n_timesteps)
-    traction_magnitude = 1.e7 * range(0.5, 1.0, length=n_timesteps)
+    traction_magnitude = 1.0e7 * range(0.5, 1.0, length = n_timesteps)
 
     ## Create geometry, dofs and boundary conditions
     n = 2
@@ -279,10 +285,10 @@ function solve()
 
     ## Pre-allocate solution vectors, etc.
     n_dofs = ndofs(dh)  # total number of dofs
-    u  = zeros(n_dofs)  # solution vector
+    u = zeros(n_dofs)  # solution vector
     Δu = zeros(n_dofs)  # displacement correction
     r = zeros(n_dofs)   # residual
-    K = allocate_matrix(dh); # tangent stiffness matrix
+    K = allocate_matrix(dh)  # tangent stiffness matrix
 
     ## Create material states. One array for each cell, where each element is an array of material-
     ## states - one for each integration point
@@ -302,14 +308,15 @@ function solve()
         update!(dbcs, t) # evaluates the D-bndc at time t
         apply!(u, dbcs)  # set the prescribed values in the solution vector
 
-        while true; newton_itr += 1
+        while true
+            newton_itr += 1
 
             if newton_itr > 8
                 error("Reached maximum Newton iterations, aborting")
                 break
             end
             ## Tangent and residual contribution from the cells (volume integral)
-            doassemble!(K, r, cellvalues, dh, material, u, states, states_old);
+            doassemble!(K, r, cellvalues, dh, material, u, states, states_old)
             ## Residual contribution from the Neumann boundary (surface integral)
             doassemble_neumann!(r, dh, getfacetset(grid, "right"), facetvalues, traction)
             norm_r = norm(r[Ferrite.free_dofs(dbcs)])
@@ -339,7 +346,7 @@ function solve()
     for (el, cell_states) in enumerate(eachcol(states))
         for state in cell_states
             mises_values[el] += vonMises(state.σ)
-            κ_values[el] += state.k*material.H
+            κ_values[el] += state.k * material.H
         end
         mises_values[el] /= length(cell_states) # average von Mises stress
         κ_values[el] /= length(cell_states)     # average drag stress
@@ -362,11 +369,11 @@ using Plots
 plot(
     vcat(0.0, u_max),                # add the origin as a point
     vcat(0.0, traction_magnitude),
-    linewidth=2,
-    title="Traction-displacement",
-    label=nothing,
-    markershape=:auto
-    )
+    linewidth = 2,
+    title = "Traction-displacement",
+    label = nothing,
+    markershape = :auto
+)
 ylabel!("Traction [Pa]")
 xlabel!("Maximum deflection [m]")
 

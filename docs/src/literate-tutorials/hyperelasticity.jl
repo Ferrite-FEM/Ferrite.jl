@@ -176,12 +176,12 @@ end;
 
 ## Test the derivation                                        #src
 using Test                                                    #src
-F = rand(Tensor{2,3})                                         #src
+F = rand(Tensor{2, 3})                                         #src
 mp = NeoHooke(rand(2)...)                                     #src
 S, ∂S∂C = constitutive_driver(tdot(F), mp)                    #src
 P = F ⋅ S                                                      #src
 I = one(S)                                                    #src
-∂P∂F =  otimesu(I, S) + 2 * F ⋅ ∂S∂C ⊡ otimesu(F', I)         #src
+∂P∂F = otimesu(I, S) + 2 * F ⋅ ∂S∂C ⊡ otimesu(F', I)         #src
 ∂P∂F_ad, P_ad = Tensors.hessian(x -> Ψ(tdot(x), mp), F, :all) #src
 @test P ≈ P_ad                                                #src
 @test ∂P∂F ≈ ∂P∂F_ad                                          #src
@@ -257,7 +257,7 @@ function assemble_element!(ke, ge, cell, cv, fv, mp, ue, ΓN)
         S, ∂S∂C = constitutive_driver(C, mp)
         P = F ⋅ S
         I = one(S)
-        ∂P∂F =  otimesu(I, S) + 2 * F ⋅ ∂S∂C ⊡ otimesu(F', I)
+        ∂P∂F = otimesu(I, S) + 2 * F ⋅ ∂S∂C ⊡ otimesu(F', I)
 
         ## Loop over test functions
         for i in 1:ndofs
@@ -265,13 +265,13 @@ function assemble_element!(ke, ge, cell, cv, fv, mp, ue, ΓN)
             δui = shape_value(cv, qp, i)
             ∇δui = shape_gradient(cv, qp, i)
             ## Add contribution to the residual from this test function
-            ge[i] += ( ∇δui ⊡ P - δui ⋅ b ) * dΩ
+            ge[i] += (∇δui ⊡ P - δui ⋅ b) * dΩ
 
             ∇δui∂P∂F = ∇δui ⊡ ∂P∂F # Hoisted computation
             for j in 1:ndofs
                 ∇δuj = shape_gradient(cv, qp, j)
                 ## Add contribution to the tangent
-                ke[i, j] += ( ∇δui∂P∂F ⊡ ∇δuj ) * dΩ
+                ke[i, j] += (∇δui∂P∂F ⊡ ∇δuj) * dΩ
             end
         end
     end
@@ -290,6 +290,7 @@ function assemble_element!(ke, ge, cell, cv, fv, mp, ue, ΓN)
             end
         end
     end
+    return
 end;
 
 # Assembling global residual and tangent is also done in the usual way, just looping over
@@ -305,7 +306,7 @@ function assemble_global!(K, g, dh, cv, fv, mp, u, ΓN)
     assembler = start_assemble(K, g)
 
     ## Loop over all cells in the grid
-    @timeit "assemble" for cell in CellIterator(dh)
+    return @timeit "assemble" for cell in CellIterator(dh)
         global_dofs = celldofs(cell)
         ue = u[global_dofs] # element dofs
         @timeit "element assemble" assemble_element!(ke, ge, cell, cv, fv, mp, ue, ΓN)
@@ -348,18 +349,20 @@ function solve()
     function rotation(X, t)
         θ = pi / 3 # 60°
         x, y, z = X
-        return t * Vec{3}((
-            0.0,
-            L/2 - y + (y-L/2)*cos(θ) - (z-L/2)*sin(θ),
-            L/2 - z + (y-L/2)*sin(θ) + (z-L/2)*cos(θ)
-        ))
+        return t * Vec{3}(
+            (
+                0.0,
+                L / 2 - y + (y - L / 2) * cos(θ) - (z - L / 2) * sin(θ),
+                L / 2 - z + (y - L / 2) * sin(θ) + (z - L / 2) * cos(θ),
+            )
+        )
     end
 
     dbcs = ConstraintHandler(dh)
     ## Add a homogeneous boundary condition on the "clamped" edge
-    dbc = Dirichlet(:u, getfacetset(grid, "right"), (x,t) -> [0.0, 0.0, 0.0], [1, 2, 3])
+    dbc = Dirichlet(:u, getfacetset(grid, "right"), (x, t) -> [0.0, 0.0, 0.0], [1, 2, 3])
     add!(dbcs, dbc)
-    dbc = Dirichlet(:u, getfacetset(grid, "left"), (x,t) -> rotation(x, t), [1, 2, 3])
+    dbc = Dirichlet(:u, getfacetset(grid, "left"), (x, t) -> rotation(x, t), [1, 2, 3])
     add!(dbcs, dbc)
     close!(dbcs)
     t = 0.5
@@ -376,7 +379,7 @@ function solve()
     ## Pre-allocation of vectors for the solution and Newton increments
     _ndofs = ndofs(dh)
     un = zeros(_ndofs) # previous solution vector
-    u  = zeros(_ndofs)
+    u = zeros(_ndofs)
     Δu = zeros(_ndofs)
     ΔΔu = zeros(_ndofs)
     apply!(un, dbcs)
@@ -387,11 +390,12 @@ function solve()
 
     ## Perform Newton iterations
     newton_itr = -1
-    NEWTON_TOL = 1e-8
+    NEWTON_TOL = 1.0e-8
     NEWTON_MAXITER = 30
     prog = ProgressMeter.ProgressThresh(NEWTON_TOL; desc = "Solving:")
 
-    while true; newton_itr += 1
+    while true
+        newton_itr += 1
         ## Construct the current guess
         u .= un .+ Δu
         ## Compute residual and tangent for current guess
@@ -408,7 +412,7 @@ function solve()
         end
 
         ## Compute increment using conjugate gradients
-        @timeit "linear solve" IterativeSolvers.cg!(ΔΔu, K, g; maxiter=1000)
+        @timeit "linear solve" IterativeSolvers.cg!(ΔΔu, K, g; maxiter = 1000)
 
         apply_zero!(ΔΔu, dbcs)
         Δu .-= ΔΔu
