@@ -41,7 +41,7 @@ function assemble_element!(ke, ge, cell, cv, fv, mp, ue, ΓN)
         S, ∂S∂C = constitutive_driver(C, mp)
         P = F ⋅ S
         I = one(S)
-        ∂P∂F =  otimesu(I, S) + 2 * otimesu(F, I) ⊡ ∂S∂C ⊡ otimesu(F', I)
+        ∂P∂F =  otimesu(I, S) + 2 * F ⋅ ∂S∂C ⊡ otimesu(F', I)
 
         # Loop over test functions
         for i in 1:ndofs
