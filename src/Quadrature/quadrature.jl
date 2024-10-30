@@ -15,8 +15,8 @@ using Base.Cartesian: @nloops, @ntuple, @nexprs
     QuadratureRule{shape}(weights::AbstractVector{T}, points::AbstractVector{Vec{rdim, T}})
 
 Create a `QuadratureRule` used for integration on the refshape `shape` (of type [`AbstractRefShape`](@ref)).
-`order` is the order of the quadrature rule.
-`quad_rule_type` is an optional argument determining the type of quadrature rule,
+`order` is related to the number of quadrature points per direction (i.e. a `QuadratureRule{RefQuadrilateral}(2)` 
+uses 2 quadrature points per direction). `quad_rule_type` is an optional argument determining the type of quadrature rule,
 currently the `:legendre` and `:lobatto` rules are implemented for hypercubes.
 For triangles up to order 8 the default rule is the one by `:dunavant` (see [Dun:1985:hde](@cite)) and for
 tetrahedra the default rule is `keast_minimal` (see [Keast:1986:mtq](@cite)). Wedges and pyramids default
