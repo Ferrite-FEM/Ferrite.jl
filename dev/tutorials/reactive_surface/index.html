@@ -222,10 +222,10 @@ end
 material = GrayScottMaterial(0.00016, 0.00008, 0.06, 0.062)
     gray_scott_on_sphere(material, 10.0, 32000.0, 3)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">Info    : Meshing 1D...
 Info    : [ 40%] Meshing curve 2 (Circle)
-Info    : Done meshing 1D (Wall 9.3145e-05s, CPU 9.4e-05s)
+Info    : Done meshing 1D (Wall 9.1791e-05s, CPU 9.3e-05s)
 Info    : Meshing 2D...
 Info    : Meshing surface 1 (Sphere, Frontal-Delaunay)
-Info    : Done meshing 2D (Wall 0.00912737s, CPU 0.009112s)
+Info    : Done meshing 2D (Wall 0.0093057s, CPU 0.009287s)
 Info    : 160 nodes 328 elements
 Info    : Refining mesh...
 Info    : Meshing order 2 (curvilinear on)...
@@ -235,8 +235,8 @@ Info    : [ 50%] Meshing curve 3 order 2
 Info    : [ 70%] Meshing surface 1 order 2
 Info    : [ 90%] Meshing volume 1 order 2
 Info    : Surface mesh: worst distortion = 0.970866 (0 elements in ]0, 0.2]); worst gamma = 0.433887
-Info    : Done meshing order 2 (Wall 0.00111998s, CPU 0.001105s)
-Info    : Done refining mesh (Wall 0.00144887s, CPU 0.00143s)
+Info    : Done meshing order 2 (Wall 0.00121959s, CPU 0.001219s)
+Info    : Done refining mesh (Wall 0.0015696s, CPU 0.001569s)
 Info    : Refining mesh...
 Info    : Meshing order 2 (curvilinear on)...
 Info    : [  0%] Meshing curve 1 order 2
@@ -245,8 +245,8 @@ Info    : [ 50%] Meshing curve 3 order 2
 Info    : [ 70%] Meshing surface 1 order 2
 Info    : [ 90%] Meshing volume 1 order 2
 Info    : Surface mesh: worst distortion = 0.992408 (0 elements in ]0, 0.2]); worst gamma = 0.421451
-Info    : Done meshing order 2 (Wall 0.00431415s, CPU 0.004313s)
-Info    : Done refining mesh (Wall 0.00556049s, CPU 0.005559s)
+Info    : Done meshing order 2 (Wall 0.00470096s, CPU 0.0047s)
+Info    : Done refining mesh (Wall 0.00604596s, CPU 0.006045s)
 Info    : Refining mesh...
 Info    : Meshing order 2 (curvilinear on)...
 Info    : [  0%] Meshing curve 1 order 2
@@ -255,8 +255,8 @@ Info    : [ 50%] Meshing curve 3 order 2
 Info    : [ 70%] Meshing surface 1 order 2
 Info    : [ 90%] Meshing volume 1 order 2
 Info    : Surface mesh: worst distortion = 0.998082 (0 elements in ]0, 0.2]); worst gamma = 0.418317
-Info    : Done meshing order 2 (Wall 0.0164627s, CPU 0.016461s)
-Info    : Done refining mesh (Wall 0.0216829s, CPU 0.021681s)</code></pre><h2 id="reactive_surface-plain-program"><a class="docs-heading-anchor" href="#reactive_surface-plain-program">Plain program</a><a id="reactive_surface-plain-program-1"></a><a class="docs-heading-anchor-permalink" href="#reactive_surface-plain-program" title="Permalink"></a></h2><p>Here follows a version of the program without any comments. The file is also available here: <a href="../reactive_surface.jl"><code>reactive_surface.jl</code></a>.</p><pre><code class="language-julia hljs">using Ferrite, FerriteGmsh
+Info    : Done meshing order 2 (Wall 0.0176423s, CPU 0.017639s)
+Info    : Done refining mesh (Wall 0.0233299s, CPU 0.02333s)</code></pre><h2 id="reactive_surface-plain-program"><a class="docs-heading-anchor" href="#reactive_surface-plain-program">Plain program</a><a id="reactive_surface-plain-program-1"></a><a class="docs-heading-anchor-permalink" href="#reactive_surface-plain-program" title="Permalink"></a></h2><p>Here follows a version of the program without any comments. The file is also available here: <a href="../reactive_surface.jl"><code>reactive_surface.jl</code></a>.</p><pre><code class="language-julia hljs">using Ferrite, FerriteGmsh
 using BlockArrays, SparseArrays, LinearAlgebra, WriteVTK
 
 struct GrayScottMaterial{T}
@@ -484,4 +484,4 @@ end
 
 # This parametrization gives the spot pattern shown in the gif above.
 material = GrayScottMaterial(0.00016, 0.00008, 0.06, 0.062)
-    gray_scott_on_sphere(material, 10.0, 32000.0, 3)</code></pre><hr/><p><em>This page was generated using <a href="https://github.com/fredrikekre/Literate.jl">Literate.jl</a>.</em></p></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../ns_vs_diffeq/">« Incompressible Navier-Stokes equations via DifferentialEquations.jl</a><a class="docs-footer-nextpage" href="../linear_shell/">Linear shell »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option><option value="catppuccin-latte">catppuccin-latte</option><option value="catppuccin-frappe">catppuccin-frappe</option><option value="catppuccin-macchiato">catppuccin-macchiato</option><option value="catppuccin-mocha">catppuccin-mocha</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.7.0 on <span class="colophon-date" title="Thursday 31 October 2024 12:23">Thursday 31 October 2024</span>. Using Julia version 1.11.1.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
+    gray_scott_on_sphere(material, 10.0, 32000.0, 3)</code></pre><hr/><p><em>This page was generated using <a href="https://github.com/fredrikekre/Literate.jl">Literate.jl</a>.</em></p></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../ns_vs_diffeq/">« Incompressible Navier-Stokes equations via DifferentialEquations.jl</a><a class="docs-footer-nextpage" href="../linear_shell/">Linear shell »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option><option value="catppuccin-latte">catppuccin-latte</option><option value="catppuccin-frappe">catppuccin-frappe</option><option value="catppuccin-macchiato">catppuccin-macchiato</option><option value="catppuccin-mocha">catppuccin-mocha</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.7.0 on <span class="colophon-date" title="Thursday 31 October 2024 22:26">Thursday 31 October 2024</span>. Using Julia version 1.11.1.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
