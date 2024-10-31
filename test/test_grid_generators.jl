@@ -4,17 +4,19 @@ function test_generate_grid(T::Type)
     cell_types = [
         Line, QuadraticLine,
         Quadrilateral, QuadraticQuadrilateral, Triangle, QuadraticTriangle,
-        Hexahedron, Wedge, Pyramid, Tetrahedron, SerendipityQuadraticHexahedron]
+        Hexahedron, Wedge, Pyramid, Tetrahedron, SerendipityQuadraticHexahedron,
+    ]
 
     # Loop over all cell types and test grid generation
     for CT in cell_types
         rdim = Ferrite.getrefdim(CT)
         nels = ntuple(i -> 2, rdim)
-        left = - ones(Vec{rdim,T})
-        right =  ones(Vec{rdim,T})
+        left = - ones(Vec{rdim, T})
+        right = ones(Vec{rdim, T})
         grid = generate_grid(CT, nels, left, right)
         @test isa(grid, Grid{rdim, CT, T})
     end
+    return
 end
 
 # Run tests for different floating-point types

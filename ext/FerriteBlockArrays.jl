@@ -70,7 +70,7 @@ end
 Ferrite.matrix_handle(ba::BlockAssembler) = ba.K
 Ferrite.vector_handle(ba::BlockAssembler) = ba.f
 
-function Ferrite.start_assemble(K::BlockMatrix, f; fillzero::Bool=true)
+function Ferrite.start_assemble(K::BlockMatrix, f; fillzero::Bool = true)
     fillzero && (fillzero!(K); fillzero!(f))
     return BlockAssembler(K, f, BlockIndex{1}[])
 end
@@ -122,7 +122,7 @@ end
 function Ferrite.apply!(::BlockMatrix, ::AbstractVector, ::ConstraintHandler)
     error(
         "Condensation of constraints with `apply!` after assembling not supported yet " *
-        "for BlockMatrix, use local condensation with `apply_assemble!` instead."
+            "for BlockMatrix, use local condensation with `apply_assemble!` instead."
     )
 end
 
@@ -131,7 +131,7 @@ end
 ## Overloaded assembly pieces from src/arrayutils.jl ##
 #######################################################
 
-function Ferrite.addindex!(B::BlockMatrix{Tv}, v::Tv, i::Int, j::Int) where Tv
+function Ferrite.addindex!(B::BlockMatrix{Tv}, v::Tv, i::Int, j::Int) where {Tv}
     @boundscheck checkbounds(B, i, j)
     Bi, li = splindex(findblockindex(axes(B, 1), i))
     Bj, lj = splindex(findblockindex(axes(B, 2), j))
@@ -140,7 +140,7 @@ function Ferrite.addindex!(B::BlockMatrix{Tv}, v::Tv, i::Int, j::Int) where Tv
     return B
 end
 
-function Ferrite.fillzero!(B::Union{BlockVector,BlockMatrix})
+function Ferrite.fillzero!(B::Union{BlockVector, BlockMatrix})
     for blk in blocks(B)
         fillzero!(blk)
     end

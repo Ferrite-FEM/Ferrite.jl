@@ -1,3 +1,4 @@
+# runic: off
 # Order 1 to 8 heights points / wheights have been suggested in
 # Dunavant, D. A. (1985), High degree  efficient symmetrical Gaussian quadrature
 # rules for the triangle. Int. J. Numer. Meth. Engng., 21: 1129–1148. doi:

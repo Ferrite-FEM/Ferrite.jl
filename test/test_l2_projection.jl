@@ -1,9 +1,8 @@
-
 # Tests a L2-projection of integration point values (to nodal values),
 # determined from the function y = 1 + x[1]^2 + (2x[2])^2
 function test_projection(order, refshape)
     element = refshape == RefQuadrilateral ? Quadrilateral : Triangle
-    grid = generate_grid(element, (1, 1), Vec((0.,0.)), Vec((1.,1.)))
+    grid = generate_grid(element, (1, 1), Vec((0.0, 0.0)), Vec((1.0, 1.0)))
 
     ip = Lagrange{refshape, order}()
     ip_geom = Lagrange{refshape, 1}()
@@ -47,49 +46,49 @@ function test_projection(order, refshape)
     @test point_vars ≈ point_vars_2 ≈ ae
 
     # Vec
-    f_vector(x) = Vec{1,Float64}((f(x),))
+    f_vector(x) = Vec{1, Float64}((f(x),))
     qp_values = analytical(f_vector)
     point_vars = project(proj, qp_values, qr)
     if order == 1
-        ae = [Vec{1,Float64}((f_approx(j),)) for j in 1:4]
+        ae = [Vec{1, Float64}((f_approx(j),)) for j in 1:4]
     elseif order == 2
         ae = zeros(length(point_vars))
         apply_analytical!(ae, proj.dh, :_, x -> f_vector(x)[1])
-        ae = reinterpret(Vec{1,Float64}, ae)
+        ae = reinterpret(Vec{1, Float64}, ae)
     end
     @test point_vars ≈ ae
 
     # Tensor
-    f_tensor(x) = Tensor{2,2,Float64}((f(x),2*f(x),3*f(x),4*f(x)))
+    f_tensor(x) = Tensor{2, 2, Float64}((f(x), 2 * f(x), 3 * f(x), 4 * f(x)))
     qp_values = analytical(f_tensor)
     qp_values_matrix = reduce(hcat, qp_values)::Matrix
     point_vars = project(proj, qp_values, qr)
     point_vars_2 = project(proj, qp_values_matrix, qr)
     if order == 1
-        ae = [Tensor{2,2,Float64}((f_approx(i),2*f_approx(i),3*f_approx(i),4*f_approx(i))) for i in 1:4]
+        ae = [Tensor{2, 2, Float64}((f_approx(i), 2 * f_approx(i), 3 * f_approx(i), 4 * f_approx(i))) for i in 1:4]
     elseif order == 2
         ae = zeros(4, length(point_vars))
         for i in 1:4
             apply_analytical!(@view(ae[i, :]), proj.dh, :_, x -> f_tensor(x)[i])
         end
-        ae = reinterpret(reshape, Tensor{2,2,Float64,4}, ae)
+        ae = reinterpret(reshape, Tensor{2, 2, Float64, 4}, ae)
     end
     @test point_vars ≈ point_vars_2 ≈ ae
 
     # SymmetricTensor
-    f_stensor(x) = SymmetricTensor{2,2,Float64}((f(x),2*f(x),3*f(x)))
+    f_stensor(x) = SymmetricTensor{2, 2, Float64}((f(x), 2 * f(x), 3 * f(x)))
     qp_values = analytical(f_stensor)
     qp_values_matrix = reduce(hcat, qp_values)
     point_vars = project(proj, qp_values, qr)
     point_vars_2 = project(proj, qp_values_matrix, qr)
     if order == 1
-        ae = [SymmetricTensor{2,2,Float64}((f_approx(i),2*f_approx(i),3*f_approx(i))) for i in 1:4]
+        ae = [SymmetricTensor{2, 2, Float64}((f_approx(i), 2 * f_approx(i), 3 * f_approx(i))) for i in 1:4]
     elseif order == 2
         ae = zeros(3, length(point_vars))
         for i in 1:3
             apply_analytical!(@view(ae[i, :]), proj.dh, :_, x -> f_stensor(x).data[i])
         end
-        ae = reinterpret(reshape, SymmetricTensor{2,2,Float64,3}, ae)
+        ae = reinterpret(reshape, SymmetricTensor{2, 2, Float64, 3}, ae)
     end
     @test point_vars ≈ point_vars_2 ≈ ae
 
@@ -99,7 +98,8 @@ function test_projection(order, refshape)
     else
         bad_order = 1
     end
-    @test_throws LinearAlgebra.PosDefException L2Projector(ip, grid; qr_lhs=QuadratureRule{refshape}(bad_order))
+    @test_throws LinearAlgebra.PosDefException L2Projector(ip, grid; qr_lhs = QuadratureRule{refshape}(bad_order))
+    return
 end
 
 function make_mixedgrid_l2_tests()
@@ -107,9 +107,11 @@ function make_mixedgrid_l2_tests()
     # 5 --- 6 --- 7 --- 8
     # |  1  | 2/3 |  4  |
     # 1 --- 2 --- 3 --- 4
-    nodes = [Node(Float64.((x,y))) for (x, y) in
-    #         1,      2,      3,      4,      5,      6,      7,      8
-        ((0, 0), (1, 0), (2, 0), (3, 0), (0, 1), (1, 1), (2, 1), (3, 1))]
+    nodes = [
+        Node(Float64.((x, y))) for (x, y) in
+            #    1,      2,      3,      4,      5,      6,      7,      8
+            ((0, 0), (1, 0), (2, 0), (3, 0), (0, 1), (1, 1), (2, 1), (3, 1))
+    ]
 
     cells = [Quadrilateral((1, 2, 6, 5)), Triangle((2, 7, 6)), Triangle((2, 3, 7)), Quadrilateral((3, 4, 8, 7))]
 
@@ -126,12 +128,12 @@ function test_projection_subset_of_mixedgrid()
     order = 2
     ip = Lagrange{RefQuadrilateral, order}()
     ip_geom = Lagrange{RefQuadrilateral, 1}()
-    qr = QuadratureRule{RefQuadrilateral}(order+1)
+    qr = QuadratureRule{RefQuadrilateral}(order + 1)
     cv = CellValues(qr, ip, ip_geom)
 
     # Create node values for the 1st cell
     # use a SymmetricTensor here for testing the symmetric version of project
-    f(x) = SymmetricTensor{2,2,Float64}((1 + x[1]^2, 2x[2]^2, x[1]*x[2]))
+    f(x) = SymmetricTensor{2, 2, Float64}((1 + x[1]^2, 2x[2]^2, x[1] * x[2]))
     xe = getcoordinates(mesh, 1)
 
     # analytical values
@@ -146,7 +148,7 @@ function test_projection_subset_of_mixedgrid()
     # Assume f would only exist on the first cell, we project it to the nodes of the
     # 1st cell while ignoring the rest of the domain. NaNs should be stored in all
     # nodes that do not belong to the 1st cell
-    proj = L2Projector(ip, mesh; set=quadset)
+    proj = L2Projector(ip, mesh; set = quadset)
     point_vars = project(proj, qp_values, qr)
     point_vars_2 = project(proj, qp_values_matrix, qr)
     point_vars_3 = project(proj, qp_values_dict, qr)
@@ -162,7 +164,7 @@ function test_projection_subset_of_mixedgrid()
     for i in 1:3
         apply_analytical!(@view(ae[i, :]), proj.dh, :_, x -> f(x).data[i], quadset)
     end
-    ae = reinterpret(reshape, SymmetricTensor{2,2,Float64,3}, ae)
+    ae = reinterpret(reshape, SymmetricTensor{2, 2, Float64, 3}, ae)
     @test point_vars ≈ point_vars_2 ≈ ae
     @test point_vars_3 ≈ ae
 
@@ -173,9 +175,9 @@ function test_projection_subset_of_mixedgrid()
     cv = CellValues(qr, ip, ip_geom)
     nqp = getnquadpoints(cv)
 
-    qp_values_tria = [SymmetricTensor{2,2,Float64,3}[] for _ in 1:getncells(mesh)]
-    qp_values_matrix_tria = [zero(SymmetricTensor{2,2}) * NaN for _ in 1:nqp, _ in 1:getncells(mesh)]
-    qp_values_dict = Dict{Int, Vector{SymmetricTensor{2,2,Float64,3}}}()
+    qp_values_tria = [SymmetricTensor{2, 2, Float64, 3}[] for _ in 1:getncells(mesh)]
+    qp_values_matrix_tria = [zero(SymmetricTensor{2, 2}) * NaN for _ in 1:nqp, _ in 1:getncells(mesh)]
+    qp_values_dict = Dict{Int, Vector{SymmetricTensor{2, 2, Float64, 3}}}()
     for (ic, cellid) in enumerate(triaset)
         xe = getcoordinates(mesh, cellid)
         # analytical values
@@ -186,7 +188,7 @@ function test_projection_subset_of_mixedgrid()
     end
 
     #tria
-    proj = L2Projector(ip, mesh; set=triaset)
+    proj = L2Projector(ip, mesh; set = triaset)
     point_vars = project(proj, qp_values_tria, qr)
     point_vars_2 = project(proj, qp_values_matrix_tria, qr)
     projection_at_nodes = evaluate_at_grid_nodes(proj, point_vars)
@@ -201,8 +203,9 @@ function test_projection_subset_of_mixedgrid()
     for i in 1:3
         apply_analytical!(@view(ae[i, :]), proj.dh, :_, x -> f(x).data[i], triaset)
     end
-    ae = reinterpret(reshape, SymmetricTensor{2,2,Float64,3}, ae)
+    ae = reinterpret(reshape, SymmetricTensor{2, 2, Float64, 3}, ae)
     @test point_vars ≈ point_vars_2 ≈ ae
+    return
 end
 
 function calculate_function_value_in_qpoints!(qp_data, sdh, cv, dofvector::Vector)
@@ -218,8 +221,8 @@ function calculate_function_value_in_qpoints!(qp_data, sdh, cv, dofvector::Vecto
 end
 
 function test_add_projection_grid()
-    grid = generate_grid(Triangle, (3,3))
-    set1 = Set(1:getncells(grid)÷2)
+    grid = generate_grid(Triangle, (3, 3))
+    set1 = Set(1:(getncells(grid) ÷ 2))
     set2 = setdiff(1:getncells(grid), set1)
 
     dh = DofHandler(grid)
@@ -262,6 +265,7 @@ function test_add_projection_grid()
 
     @test projected1_at_nodes ≈ solution_at_nodes
     @test projected2_at_nodes ≈ solution_at_nodes
+    return
 end
 
 function test_projection_mixedgrid()
@@ -319,18 +323,19 @@ function test_projection_mixedgrid()
         @test projected_at_nodes[check_nodes] ≈ solution_at_nodes[check_nodes]
 
     end
+    return
 end
 
-function test_export(;subset::Bool)
+function test_export(; subset::Bool)
     grid = generate_grid(Quadrilateral, (2, 1))
     qr = QuadratureRule{RefQuadrilateral}(2)
-    ip = Lagrange{RefQuadrilateral,1}()
+    ip = Lagrange{RefQuadrilateral, 1}()
     cv = CellValues(qr, ip)
     nqp = getnquadpoints(cv)
     qpdata_scalar = [zeros(nqp) for _ in 1:getncells(grid)]
     qpdata_vec = [zeros(Vec{2}, nqp) for _ in 1:getncells(grid)]
-    qpdata_tens = [zeros(Tensor{2,2}, nqp) for _ in 1:getncells(grid)]
-    qpdata_stens = [zeros(SymmetricTensor{2,2}, nqp) for _ in 1:getncells(grid)]
+    qpdata_tens = [zeros(Tensor{2, 2}, nqp) for _ in 1:getncells(grid)]
+    qpdata_stens = [zeros(SymmetricTensor{2, 2}, nqp) for _ in 1:getncells(grid)]
     function f(x)
         if subset && x[1] > 0.001
             return NaN
@@ -345,15 +350,15 @@ function test_export(;subset::Bool)
             x = spatial_coordinate(cv, qp, xh)
             qpdata_scalar[cellid(cell)][qp] = f(x)
             qpdata_vec[cellid(cell)][qp] = Vec{2}(i -> i * f(x))
-            qpdata_tens[cellid(cell)][qp] = Tensor{2,2}((i,j) -> i * j * f(x))
-            qpdata_stens[cellid(cell)][qp] = SymmetricTensor{2,2}((i,j) -> i * j * f(x))
+            qpdata_tens[cellid(cell)][qp] = Tensor{2, 2}((i, j) -> i * j * f(x))
+            qpdata_stens[cellid(cell)][qp] = SymmetricTensor{2, 2}((i, j) -> i * j * f(x))
         end
     end
-    p = subset ? L2Projector(ip, grid; set=1:1) : L2Projector(ip, grid)
+    p = subset ? L2Projector(ip, grid; set = 1:1) : L2Projector(ip, grid)
     p_scalar = project(p, qpdata_scalar, qr)::Vector{Float64}
     p_vec = project(p, qpdata_vec, qr)::Vector{<:Vec{2}}
-    p_tens = project(p, qpdata_tens, qr)::Vector{<:Tensor{2,2}}
-    p_stens = project(p, qpdata_stens, qr)::Vector{<:SymmetricTensor{2,2}}
+    p_tens = project(p, qpdata_tens, qr)::Vector{<:Tensor{2, 2}}
+    p_stens = project(p, qpdata_stens, qr)::Vector{<:SymmetricTensor{2, 2}}
 
     # reshaping for export with evaluate_at_grid_nodes
     fnodes = [f(x.x) for x in grid.nodes]
@@ -372,7 +377,7 @@ function test_export(;subset::Bool)
     let r = evaluate_at_grid_nodes(p, p_vec),
         rv = Ferrite._evaluate_at_grid_nodes(p, p_vec, Val(true))
         @test size(r) == (6,)
-        @test getindex.(r[findex], 1) ≈  fnodes[findex]
+        @test getindex.(r[findex], 1) ≈ fnodes[findex]
         @test getindex.(r[findex], 2) ≈ 2fnodes[findex]
         @test all(y -> all(isnan, y), r[nindex])
         @test rv[1:2, findex] ≈ reshape(reinterpret(Float64, r), (2, 6))[:, findex]
@@ -382,7 +387,7 @@ function test_export(;subset::Bool)
     let r = evaluate_at_grid_nodes(p, p_tens),
         rv = Ferrite._evaluate_at_grid_nodes(p, p_tens, Val(true))
         @test size(r) == (6,)
-        @test getindex.(r[findex], 1) ≈  fnodes[findex] # 11-components
+        @test getindex.(r[findex], 1) ≈ fnodes[findex] # 11-components
         @test getindex.(r[findex], 2) ≈ 2fnodes[findex] # 12-components
         @test getindex.(r[findex], 3) ≈ 2fnodes[findex] # 21-components
         @test getindex.(r[findex], 4) ≈ 4fnodes[findex] # 22-components
@@ -394,7 +399,7 @@ function test_export(;subset::Bool)
     let r = evaluate_at_grid_nodes(p, p_stens),
         rv = Ferrite._evaluate_at_grid_nodes(p, p_stens, Val(true))
         @test size(r) == (6,)
-        @test getindex.(r[findex], 1) ≈  fnodes[findex] # 11-components
+        @test getindex.(r[findex], 1) ≈ fnodes[findex] # 11-components
         @test getindex.(r[findex], 2) ≈ 2fnodes[findex] # 21-components
         @test getindex.(r[findex], 3) ≈ 2fnodes[findex] # 12-components
         @test getindex.(r[findex], 4) ≈ 4fnodes[findex] # 22-components
@@ -415,17 +420,18 @@ function test_export(;subset::Bool)
         # The following test may fail due to floating point inaccuracies
         # These could occur due to e.g. changes in system architecture.
         if Sys.islinux() && Sys.ARCH === :x86_64
-            @test bytes2hex(open(SHA.sha1, fname*".vtu", "r")) == (
+            @test bytes2hex(open(SHA.sha1, fname * ".vtu", "r")) == (
                 subset ? "b3fef3de9f38ca9ddd92f2f67a1606d07ca56d67" :
-                         "bc2ec8f648f9b8bccccf172c1fc48bf03340329b"
+                    "bc2ec8f648f9b8bccccf172c1fc48bf03340329b"
             )
         end
     end
 
+    return
 end
 
 function test_show_l2()
-    grid = generate_grid(Triangle, (2,2))
+    grid = generate_grid(Triangle, (2, 2))
     ip = Lagrange{RefTriangle, 1}()
     proj = L2Projector(ip, grid)
     @test repr("text/plain", proj) == repr(typeof(proj)) * "\n  projection on:           8/8 cells in grid\n  function interpolation:  Lagrange{RefTriangle, 1}()\n  geometric interpolation: Lagrange{RefTriangle, 1}()\n"
@@ -441,13 +447,14 @@ function test_show_l2()
     @test contains(showstr, "L2Projector")
     @test contains(showstr, "4/8 cells in grid")
     @test contains(showstr, "Split into 2 sets")
+    return
 end
 
 function test_l2proj_errorpaths()
-    grid = generate_grid(Triangle, (2,3))
+    grid = generate_grid(Triangle, (2, 3))
     ip = Lagrange{RefTriangle, 1}()
     proj = L2Projector(grid)                        # Multiple subdomains
-    proj1 = L2Projector(ip, grid; set=collect(1:4)) # Single sub-domain case
+    proj1 = L2Projector(ip, grid; set = collect(1:4)) # Single sub-domain case
     qr_tria = QuadratureRule{RefTriangle}(2)
     qr_quad = QuadratureRule{RefQuadrilateral}(2)
 
@@ -483,7 +490,7 @@ function test_l2proj_errorpaths()
     wrongnqp_exception = ErrorException("The number of variables per cell doesn't match the number of quadrature points")
     @test_throws wrongnqp_exception project(proj1, data_invalid2, qr_tria)
     @test_throws wrongnqp_exception project(proj1, data_invalid3, qr_tria)
-
+    return
 end
 
 @testset "Test L2-Projection" begin
@@ -494,8 +501,8 @@ end
     test_projection_subset_of_mixedgrid()
     test_add_projection_grid()
     test_projection_mixedgrid()
-    test_export(subset=false)
-    test_export(subset=true)
+    test_export(subset = false)
+    test_export(subset = true)
     test_show_l2()
     test_l2proj_errorpaths()
 end

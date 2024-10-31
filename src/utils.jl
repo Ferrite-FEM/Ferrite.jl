@@ -19,6 +19,7 @@ function debug_mode(; enable = true)
         Preferences.@set_preferences!("use_debug" => enable)
         @info "Debug mode $(enable ? "en" : "dis")abled. Restart the Julia session for this change to take effect!"
     end
+    return
 end
 
 @static if DEBUG
@@ -28,17 +29,17 @@ end
         end
     end
 else
-     @eval begin
+    @eval begin
         macro debug(ex)
             return nothing
         end
     end
 end
 
-convert_to_orderedset(set::AbstractVector{T}) where T = OrderedSet{T}(set)
-convert_to_orderedset(set::AbstractSet{T}) where T = convert(OrderedSet{T}, set)
+convert_to_orderedset(set::AbstractVector{T}) where {T} = OrderedSet{T}(set)
+convert_to_orderedset(set::AbstractSet{T}) where {T} = convert(OrderedSet{T}, set)
 
-function convert_to_orderedsets(namedsets::Dict{String, <: AbstractVecOrSet{T}}) where T
-    return Dict{String,OrderedSet{T}}(k => convert_to_orderedset(v) for (k,v) in namedsets)
+function convert_to_orderedsets(namedsets::Dict{String, <:AbstractVecOrSet{T}}) where {T}
+    return Dict{String, OrderedSet{T}}(k => convert_to_orderedset(v) for (k, v) in namedsets)
 end
-convert_to_orderedsets(namedsets::Dict{String, <: OrderedSet}) = namedsets
+convert_to_orderedsets(namedsets::Dict{String, <:OrderedSet}) = namedsets
