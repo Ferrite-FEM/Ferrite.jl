@@ -44,7 +44,7 @@ close!(dh);</code></pre><p>Now we need to define boundary conditions. As discuss
 dirichlet = Dirichlet(
     :u,
     union(getfacetset.(Ref(grid), [&quot;left&quot;, &quot;right&quot;, &quot;top&quot;, &quot;bottom&quot;])...),
-    (x, t) -&gt;  [0, 0],
+    (x, t) -&gt; [0, 0],
     [1, 2]
 )
 add!(ch_dirichlet, dirichlet)
@@ -59,16 +59,16 @@ add!(ch_periodic, periodic)
 close!(ch_periodic)
 update!(ch_periodic, 0.0)</code></pre><p>This will now constrain any degrees of freedom located on the mirror boundaries to the matching degree of freedom on the image boundaries. Internally this will create a number of <code>AffineConstraint</code>s of the form <code>u_i = 1 * u_j + 0</code>:</p><pre><code class="language-julia hljs">a = AffineConstraint(u_m, [u_i =&gt; 1], 0)</code></pre><p>where <code>u_m</code> is the degree of freedom on the mirror and <code>u_i</code> the matching one on the image part. <code>PeriodicDirichlet</code> is thus simply just a more convenient way of constructing such affine constraints since it computes the degree of freedom mapping automatically.</p><p>To simplify things we group the constraint handlers into a named tuple</p><pre><code class="language-julia hljs">ch = (dirichlet = ch_dirichlet, periodic = ch_periodic);</code></pre><p>We can now construct the sparse matrix. Note that, since we are using affine constraints, which need to modify the matrix sparsity pattern in order to account for the constraint equations, we construct the matrix for the periodic case by passing both the dof handler and the constraint handler.</p><pre><code class="language-julia hljs">K = (
     dirichlet = allocate_matrix(dh),
-    periodic  = allocate_matrix(dh, ch.periodic),
-);</code></pre><p>We define the fourth order elasticity tensor for the matrix material, and define the inclusions to have 10 times higher stiffness</p><pre><code class="language-julia hljs">λ, μ = 1e10, 7e9 # Lamé parameters
-δ(i,j) = i == j ? 1.0 : 0.0
+    periodic = allocate_matrix(dh, ch.periodic),
+);</code></pre><p>We define the fourth order elasticity tensor for the matrix material, and define the inclusions to have 10 times higher stiffness</p><pre><code class="language-julia hljs">λ, μ = 1.0e10, 7.0e9 # Lamé parameters
+δ(i, j) = i == j ? 1.0 : 0.0
 Em = SymmetricTensor{4, 2}(
-    (i,j,k,l) -&gt; λ * δ(i,j) * δ(k,l) + μ * (δ(i,k) * δ(j,l) + δ(i,l) * δ(j,k))
+    (i, j, k, l) -&gt; λ * δ(i, j) * δ(k, l) + μ * (δ(i, k) * δ(j, l) + δ(i, l) * δ(j, k))
 )
 Ei = 10 * Em;</code></pre><p>As mentioned above, in order to compute the apparent/homogenized stiffness we will solve the problem repeatedly with different macroscale strain tensors to compute the sensitvity of the homogenized stress, <span>$\bar{\boldsymbol{\sigma}}$</span>, w.r.t. the macroscopic strain, <span>$\bar{\boldsymbol{\varepsilon}}$</span>. The corresponding unit strains are defined below, and will result in three different right-hand-sides:</p><pre><code class="language-julia hljs">εᴹ = [
-      SymmetricTensor{2,2}([1.0 0.0; 0.0 0.0]), # ε_11 loading
-      SymmetricTensor{2,2}([0.0 0.0; 0.0 1.0]), # ε_22 loading
-      SymmetricTensor{2,2}([0.0 0.5; 0.5 0.0]), # ε_12/ε_21 loading
+    SymmetricTensor{2, 2}([1.0 0.0; 0.0 0.0]), # ε_11 loading
+    SymmetricTensor{2, 2}([0.0 0.0; 0.0 1.0]), # ε_22 loading
+    SymmetricTensor{2, 2}([0.0 0.5; 0.5 0.0]), # ε_12/ε_21 loading
 ];</code></pre><p>The assembly function is nothing strange, and in particular there is no impact from the choice of boundary conditions, so the same function can be used for both cases. Since we want to solve the system 3 times, once for each macroscopic strain component, we assemble 3 right-hand-sides.</p><pre><code class="language-julia hljs">function doassemble!(cellvalues::CellValues, K::SparseMatrixCSC, dh::DofHandler, εᴹ)
 
     n_basefuncs = getnbasefunctions(cellvalues)
@@ -95,8 +95,8 @@ Ei = 10 * Em;</code></pre><p>As mentioned above, in order to compute the apparen
                 end
                 for (rhs, ε) in enumerate(εᴹ)
                     σᴹ = E ⊡ ε
-                    fe[i, rhs] += ( - δεi ⊡ σᴹ) * dΩ
-               end
+                    fe[i, rhs] += (- δεi ⊡ σᴹ) * dΩ
+                end
             end
         end
 
@@ -107,16 +107,16 @@ Ei = 10 * Em;</code></pre><p>As mentioned above, in order to compute the apparen
     return f
 end;</code></pre><p>We can now assemble the system. The assembly function modifies the matrix in-place, but return the right hand side(s) which we collect in another named tuple.</p><pre><code class="language-julia hljs">rhs = (
     dirichlet = doassemble!(cellvalues, K.dirichlet, dh, εᴹ),
-    periodic  = doassemble!(cellvalues, K.periodic,  dh, εᴹ),
+    periodic = doassemble!(cellvalues, K.periodic, dh, εᴹ),
 );</code></pre><p>The next step is to solve the systems. Since application of boundary conditions, using the <a href="../../reference/boundary_conditions/#Ferrite.apply!"><code>apply!</code></a> function, modifies both the matrix and the right hand sides we can not use it directly in this case since we want to reuse the matrix again for the next right hand sides. We could of course re-assemble the matrix for every right hand side, but that would not be very efficient. Instead we will use the <a href="../../reference/boundary_conditions/#Ferrite.get_rhs_data"><code>get_rhs_data</code></a> function, together with <a href="../../reference/boundary_conditions/#Ferrite.apply_rhs!"><code>apply_rhs!</code></a> in a later step. This will extract the necessary data from the matrix such that we can apply it for all the different right hand sides. Note that we call <code>apply!</code> with just the matrix and no right hand side.</p><pre><code class="language-julia hljs">rhsdata = (
     dirichlet = get_rhs_data(ch.dirichlet, K.dirichlet),
-    periodic  = get_rhs_data(ch.periodic,  K.periodic),
+    periodic = get_rhs_data(ch.periodic, K.periodic),
 )
 
 apply!(K.dirichlet, ch.dirichlet)
-apply!(K.periodic,  ch.periodic)</code></pre><p>We can now solve the problem(s). Note that we only use <code>apply_rhs!</code> in the loops below. The boundary conditions are already applied to the matrix above, so we only need to modify the right hand side.</p><pre><code class="language-julia hljs">u = (
+apply!(K.periodic, ch.periodic)</code></pre><p>We can now solve the problem(s). Note that we only use <code>apply_rhs!</code> in the loops below. The boundary conditions are already applied to the matrix above, so we only need to modify the right hand side.</p><pre><code class="language-julia hljs">u = (
     dirichlet = Vector{Float64}[],
-    periodic  = Vector{Float64}[],
+    periodic = Vector{Float64}[],
 )
 
 for i in 1:size(rhs.dirichlet, 2)
@@ -135,7 +135,7 @@ for i in 1:size(rhs.periodic, 2)
     push!(u.periodic, u_i)                             # Save the solution vector
 end</code></pre><p>When the solution(s) are known we can compute the averaged stress, <span>$\bar{\boldsymbol{\sigma}}$</span> in the RVE. We define a function that does this, and also returns the von Mise stress in every quadrature point for visualization.</p><pre><code class="language-julia hljs">function compute_stress(cellvalues::CellValues, dh::DofHandler, u, εᴹ)
     σvM_qpdata = zeros(getnquadpoints(cellvalues), getncells(dh.grid))
-    σ̄Ω = zero(SymmetricTensor{2,2})
+    σ̄Ω = zero(SymmetricTensor{2, 2})
     Ω = 0.0 # Total volume
     for cell in CellIterator(dh)
         E = cellid(cell) in getcellset(dh.grid, &quot;inclusions&quot;) ? Ei : Em
@@ -144,7 +144,7 @@ end</code></pre><p>When the solution(s) are known we can compute the averaged st
             dΩ = getdetJdV(cellvalues, q_point)
             εμ = function_symmetric_gradient(cellvalues, q_point, u[celldofs(cell)])
             σ = E ⊡ (εᴹ + εμ)
-            σvM_qpdata[q_point, cellid(cell)] = sqrt(3/2 * dev(σ) ⊡ dev(σ))
+            σvM_qpdata[q_point, cellid(cell)] = sqrt(3 / 2 * dev(σ) ⊡ dev(σ))
             Ω += dΩ # Update total volume
             σ̄Ω += σ * dΩ # Update integrated stress
         end
@@ -152,12 +152,12 @@ end</code></pre><p>When the solution(s) are known we can compute the averaged st
     σ̄ = σ̄Ω / Ω
     return σvM_qpdata, σ̄
 end;</code></pre><p>We now compute the homogenized stress and von Mise stress for all cases</p><pre><code class="language-julia hljs">σ̄ = (
-    dirichlet = SymmetricTensor{2,2}[],
-    periodic  = SymmetricTensor{2,2}[],
+    dirichlet = SymmetricTensor{2, 2}[],
+    periodic = SymmetricTensor{2, 2}[],
 )
 σ = (
-     dirichlet = Vector{Float64}[],
-     periodic  = Vector{Float64}[],
+    dirichlet = Vector{Float64}[],
+    periodic = Vector{Float64}[],
 )
 
 projector = L2Projector(ip, grid)
@@ -174,7 +174,7 @@ for i in 1:3
     proj = project(projector, σ_qp, qr)
     push!(σ.periodic, proj)
     push!(σ̄.periodic, σ̄_i)
-end</code></pre><p>The remaining thing is to compute the homogenized stiffness. As mentioned in the introduction we can find all the components from the average stress of the sensitivity fields that we have solved for</p><p class="math-container">\[\mathsf{E}_{ijkl} = \bar{\sigma}_{ij}(\hat{\boldsymbol{u}}_{kl}).\]</p><p>So we have now already computed all the components, and just need to gather the data in a fourth order tensor:</p><pre><code class="language-julia hljs">E_dirichlet = SymmetricTensor{4,2}((i, j, k, l) -&gt; begin
+end</code></pre><p>The remaining thing is to compute the homogenized stiffness. As mentioned in the introduction we can find all the components from the average stress of the sensitivity fields that we have solved for</p><p class="math-container">\[\mathsf{E}_{ijkl} = \bar{\sigma}_{ij}(\hat{\boldsymbol{u}}_{kl}).\]</p><p>So we have now already computed all the components, and just need to gather the data in a fourth order tensor:</p><pre><code class="language-julia hljs">E_dirichlet = SymmetricTensor{4, 2}() do i, j, k, l
     if k == l == 1
         σ̄.dirichlet[1][i, j] # ∂σ∂ε_**11
     elseif k == l == 2
@@ -182,9 +182,9 @@ end</code></pre><p>The remaining thing is to compute the homogenized stiffness. 
     else
         σ̄.dirichlet[3][i, j] # ∂σ∂ε_**12 and ∂σ∂ε_**21
     end
-end)
+end
 
-E_periodic = SymmetricTensor{4,2}((i, j, k, l) -&gt; begin
+E_periodic = SymmetricTensor{4, 2}() do i, j, k, l
     if k == l == 1
         σ̄.periodic[1][i, j]
     elseif k == l == 2
@@ -192,8 +192,23 @@ E_periodic = SymmetricTensor{4,2}((i, j, k, l) -&gt; begin
     else
         σ̄.periodic[3][i, j]
     end
-end);</code></pre><p>We can check that the result are what we expect, namely that the stiffness with Dirichlet boundary conditions is higher than when using periodic boundary conditions, and that the Reuss assumption is an lower bound, and the Voigt assumption a upper bound. We first compute the volume fraction of the matrix, and then the Voigt and Reuss bounds:</p><pre><code class="language-julia hljs">function matrix_volume_fraction(grid, cellvalues)
-    V  = 0.0 # Total volume
+end</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">2×2×2×2 SymmetricTensor{4, 2, Float64, 9}:
+[:, :, 1, 1] =
+       4.30443e10  -809961.0
+ -809961.0               1.43401e10
+
+[:, :, 2, 1] =
+ -809961.0          1.16827e10
+       1.16827e10  -2.18543e6
+
+[:, :, 1, 2] =
+ -809961.0          1.16827e10
+       1.16827e10  -2.18543e6
+
+[:, :, 2, 2] =
+  1.43401e10  -2.18543e6
+ -2.18543e6    4.30725e10</code></pre><p>We can check that the result are what we expect, namely that the stiffness with Dirichlet boundary conditions is higher than when using periodic boundary conditions, and that the Reuss assumption is an lower bound, and the Voigt assumption a upper bound. We first compute the volume fraction of the matrix, and then the Voigt and Reuss bounds:</p><pre><code class="language-julia hljs">function matrix_volume_fraction(grid, cellvalues)
+    V = 0.0 # Total volume
     Vm = 0.0 # Volume of the matrix
     for c in CellIterator(grid)
         reinit!(cellvalues, c)
@@ -209,9 +224,9 @@ end);</code></pre><p>We can check that the result are what we expect, namely tha
     return Vm / V
 end
 
-vm = matrix_volume_fraction(grid, cellvalues)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">0.64796265456868</code></pre><pre><code class="language-julia hljs">E_voigt = vm * Em + (1-vm) * Ei
-E_reuss = inv(vm * inv(Em) + (1-vm) * inv(Ei));</code></pre><p>We can now compare the different computed stiffness tensors. We expect <span>$E_\mathrm{Reuss} \leq E_\mathrm{PeriodicBC} \leq E_\mathrm{DirichletBC} \leq E_\mathrm{Voigt}$</span>. A simple thing to compare are the eigenvalues of the tensors. Here we look at the first eigenvalue:</p><pre><code class="language-julia hljs">ev = (first ∘ eigvals).((E_reuss, E_periodic, E_dirichlet, E_voigt))
-round.(ev; digits=-8)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">(2.05e10, 2.34e10, 2.82e10, 5.84e10)</code></pre><p>Finally, we export the solution and the stress field to a VTK file. For the export we also compute the macroscopic part of the displacement.</p><pre><code class="language-julia hljs">uM = zeros(ndofs(dh))
+vm = matrix_volume_fraction(grid, cellvalues)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">0.64796265456868</code></pre><pre><code class="language-julia hljs">E_voigt = vm * Em + (1 - vm) * Ei
+E_reuss = inv(vm * inv(Em) + (1 - vm) * inv(Ei));</code></pre><p>We can now compare the different computed stiffness tensors. We expect <span>$E_\mathrm{Reuss} \leq E_\mathrm{PeriodicBC} \leq E_\mathrm{DirichletBC} \leq E_\mathrm{Voigt}$</span>. A simple thing to compare are the eigenvalues of the tensors. Here we look at the first eigenvalue:</p><pre><code class="language-julia hljs">ev = (first ∘ eigvals).((E_reuss, E_periodic, E_dirichlet, E_voigt))
+round.(ev; digits = -8)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">(2.05e10, 2.34e10, 2.82e10, 5.84e10)</code></pre><p>Finally, we export the solution and the stress field to a VTK file. For the export we also compute the macroscopic part of the displacement.</p><pre><code class="language-julia hljs">uM = zeros(ndofs(dh))
 
 VTKGridFile(&quot;homogenization&quot;, dh) do vtk
     for i in 1:3
@@ -244,7 +259,7 @@ ch_dirichlet = ConstraintHandler(dh)
 dirichlet = Dirichlet(
     :u,
     union(getfacetset.(Ref(grid), [&quot;left&quot;, &quot;right&quot;, &quot;top&quot;, &quot;bottom&quot;])...),
-    (x, t) -&gt;  [0, 0],
+    (x, t) -&gt; [0, 0],
     [1, 2]
 )
 add!(ch_dirichlet, dirichlet)
@@ -265,20 +280,20 @@ ch = (dirichlet = ch_dirichlet, periodic = ch_periodic);
 
 K = (
     dirichlet = allocate_matrix(dh),
-    periodic  = allocate_matrix(dh, ch.periodic),
+    periodic = allocate_matrix(dh, ch.periodic),
 );
 
-λ, μ = 1e10, 7e9 # Lamé parameters
-δ(i,j) = i == j ? 1.0 : 0.0
+λ, μ = 1.0e10, 7.0e9 # Lamé parameters
+δ(i, j) = i == j ? 1.0 : 0.0
 Em = SymmetricTensor{4, 2}(
-    (i,j,k,l) -&gt; λ * δ(i,j) * δ(k,l) + μ * (δ(i,k) * δ(j,l) + δ(i,l) * δ(j,k))
+    (i, j, k, l) -&gt; λ * δ(i, j) * δ(k, l) + μ * (δ(i, k) * δ(j, l) + δ(i, l) * δ(j, k))
 )
 Ei = 10 * Em;
 
 εᴹ = [
-      SymmetricTensor{2,2}([1.0 0.0; 0.0 0.0]), # ε_11 loading
-      SymmetricTensor{2,2}([0.0 0.0; 0.0 1.0]), # ε_22 loading
-      SymmetricTensor{2,2}([0.0 0.5; 0.5 0.0]), # ε_12/ε_21 loading
+    SymmetricTensor{2, 2}([1.0 0.0; 0.0 0.0]), # ε_11 loading
+    SymmetricTensor{2, 2}([0.0 0.0; 0.0 1.0]), # ε_22 loading
+    SymmetricTensor{2, 2}([0.0 0.5; 0.5 0.0]), # ε_12/ε_21 loading
 ];
 
 function doassemble!(cellvalues::CellValues, K::SparseMatrixCSC, dh::DofHandler, εᴹ)
@@ -307,8 +322,8 @@ function doassemble!(cellvalues::CellValues, K::SparseMatrixCSC, dh::DofHandler,
                 end
                 for (rhs, ε) in enumerate(εᴹ)
                     σᴹ = E ⊡ ε
-                    fe[i, rhs] += ( - δεi ⊡ σᴹ) * dΩ
-               end
+                    fe[i, rhs] += (- δεi ⊡ σᴹ) * dΩ
+                end
             end
         end
 
@@ -321,20 +336,20 @@ end;
 
 rhs = (
     dirichlet = doassemble!(cellvalues, K.dirichlet, dh, εᴹ),
-    periodic  = doassemble!(cellvalues, K.periodic,  dh, εᴹ),
+    periodic = doassemble!(cellvalues, K.periodic, dh, εᴹ),
 );
 
 rhsdata = (
     dirichlet = get_rhs_data(ch.dirichlet, K.dirichlet),
-    periodic  = get_rhs_data(ch.periodic,  K.periodic),
+    periodic = get_rhs_data(ch.periodic, K.periodic),
 )
 
 apply!(K.dirichlet, ch.dirichlet)
-apply!(K.periodic,  ch.periodic)
+apply!(K.periodic, ch.periodic)
 
 u = (
     dirichlet = Vector{Float64}[],
-    periodic  = Vector{Float64}[],
+    periodic = Vector{Float64}[],
 )
 
 for i in 1:size(rhs.dirichlet, 2)
@@ -355,7 +370,7 @@ end
 
 function compute_stress(cellvalues::CellValues, dh::DofHandler, u, εᴹ)
     σvM_qpdata = zeros(getnquadpoints(cellvalues), getncells(dh.grid))
-    σ̄Ω = zero(SymmetricTensor{2,2})
+    σ̄Ω = zero(SymmetricTensor{2, 2})
     Ω = 0.0 # Total volume
     for cell in CellIterator(dh)
         E = cellid(cell) in getcellset(dh.grid, &quot;inclusions&quot;) ? Ei : Em
@@ -364,7 +379,7 @@ function compute_stress(cellvalues::CellValues, dh::DofHandler, u, εᴹ)
             dΩ = getdetJdV(cellvalues, q_point)
             εμ = function_symmetric_gradient(cellvalues, q_point, u[celldofs(cell)])
             σ = E ⊡ (εᴹ + εμ)
-            σvM_qpdata[q_point, cellid(cell)] = sqrt(3/2 * dev(σ) ⊡ dev(σ))
+            σvM_qpdata[q_point, cellid(cell)] = sqrt(3 / 2 * dev(σ) ⊡ dev(σ))
             Ω += dΩ # Update total volume
             σ̄Ω += σ * dΩ # Update integrated stress
         end
@@ -374,12 +389,12 @@ function compute_stress(cellvalues::CellValues, dh::DofHandler, u, εᴹ)
 end;
 
 σ̄ = (
-    dirichlet = SymmetricTensor{2,2}[],
-    periodic  = SymmetricTensor{2,2}[],
+    dirichlet = SymmetricTensor{2, 2}[],
+    periodic = SymmetricTensor{2, 2}[],
 )
 σ = (
-     dirichlet = Vector{Float64}[],
-     periodic  = Vector{Float64}[],
+    dirichlet = Vector{Float64}[],
+    periodic = Vector{Float64}[],
 )
 
 projector = L2Projector(ip, grid)
@@ -398,7 +413,7 @@ for i in 1:3
     push!(σ̄.periodic, σ̄_i)
 end
 
-E_dirichlet = SymmetricTensor{4,2}((i, j, k, l) -&gt; begin
+E_dirichlet = SymmetricTensor{4, 2}() do i, j, k, l
     if k == l == 1
         σ̄.dirichlet[1][i, j] # ∂σ∂ε_**11
     elseif k == l == 2
@@ -406,9 +421,9 @@ E_dirichlet = SymmetricTensor{4,2}((i, j, k, l) -&gt; begin
     else
         σ̄.dirichlet[3][i, j] # ∂σ∂ε_**12 and ∂σ∂ε_**21
     end
-end)
+end
 
-E_periodic = SymmetricTensor{4,2}((i, j, k, l) -&gt; begin
+E_periodic = SymmetricTensor{4, 2}() do i, j, k, l
     if k == l == 1
         σ̄.periodic[1][i, j]
     elseif k == l == 2
@@ -416,10 +431,10 @@ E_periodic = SymmetricTensor{4,2}((i, j, k, l) -&gt; begin
     else
         σ̄.periodic[3][i, j]
     end
-end);
+end
 
 function matrix_volume_fraction(grid, cellvalues)
-    V  = 0.0 # Total volume
+    V = 0.0 # Total volume
     Vm = 0.0 # Volume of the matrix
     for c in CellIterator(grid)
         reinit!(cellvalues, c)
@@ -437,11 +452,11 @@ end
 
 vm = matrix_volume_fraction(grid, cellvalues)
 
-E_voigt = vm * Em + (1-vm) * Ei
-E_reuss = inv(vm * inv(Em) + (1-vm) * inv(Ei));
+E_voigt = vm * Em + (1 - vm) * Ei
+E_reuss = inv(vm * inv(Em) + (1 - vm) * inv(Ei));
 
 ev = (first ∘ eigvals).((E_reuss, E_periodic, E_dirichlet, E_voigt))
-round.(ev; digits=-8)
+round.(ev; digits = -8)
 
 uM = zeros(ndofs(dh))
 
@@ -456,4 +471,4 @@ VTKGridFile(&quot;homogenization&quot;, dh) do vtk
         write_solution(vtk, dh, uM + u.periodic[i], &quot;_periodic_$i&quot;)
         write_projection(vtk, projector, σ.periodic[i], &quot;σvM_periodic_$i&quot;)
     end
-end;</code></pre><hr/><p><em>This page was generated using <a href="https://github.com/fredrikekre/Literate.jl">Literate.jl</a>.</em></p></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../transient_heat_equation/">« Transient heat equation</a><a class="docs-footer-nextpage" href="../stokes-flow/">Stokes flow »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option><option value="catppuccin-latte">catppuccin-latte</option><option value="catppuccin-frappe">catppuccin-frappe</option><option value="catppuccin-macchiato">catppuccin-macchiato</option><option value="catppuccin-mocha">catppuccin-mocha</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.7.0 on <span class="colophon-date" title="Tuesday 29 October 2024 18:49">Tuesday 29 October 2024</span>. Using Julia version 1.11.1.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
+end;</code></pre><hr/><p><em>This page was generated using <a href="https://github.com/fredrikekre/Literate.jl">Literate.jl</a>.</em></p></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../transient_heat_equation/">« Transient heat equation</a><a class="docs-footer-nextpage" href="../stokes-flow/">Stokes flow »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option><option value="catppuccin-latte">catppuccin-latte</option><option value="catppuccin-frappe">catppuccin-frappe</option><option value="catppuccin-macchiato">catppuccin-macchiato</option><option value="catppuccin-mocha">catppuccin-mocha</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.7.0 on <span class="colophon-date" title="Thursday 31 October 2024 12:23">Thursday 31 October 2024</span>. Using Julia version 1.11.1.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>

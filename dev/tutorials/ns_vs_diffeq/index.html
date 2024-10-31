@@ -31,21 +31,21 @@
  \begin{bmatrix}
      N(\hat{v}, \hat{v}, \hat{\varphi}) \\
      0
- \end{bmatrix}\]</p><p>Here <span>$M$</span> is the singular block mass matrix, <span>$K$</span> is the discretized Stokes operator and <span>$N$</span> the nonlinear advection term, which is also called trilinear form. <span>$\hat{v}$</span> and <span>$\hat{p}$</span> represent the time-dependent vectors of nodal values of the discretizations of <span>$v$</span> and <span>$p$</span> respectively, while <span>$\hat{\varphi}$</span> is the choice for the test function in the discretization. The hats are dropped in the implementation and only stated for clarity in this section.</p><h2 id="Commented-implementation"><a class="docs-heading-anchor" href="#Commented-implementation">Commented implementation</a><a id="Commented-implementation-1"></a><a class="docs-heading-anchor-permalink" href="#Commented-implementation" title="Permalink"></a></h2><p>Now we solve the problem with Ferrite and <a href="https://github.com/SciML/DifferentialEquations.jl">DifferentialEquations.jl</a>. What follows is a program spliced with comments. The full program, without comments, can be found in the next <a href="#ns_vs_diffeq-plain-program">section</a>.</p><p>First we load Ferrite and some other packages we need</p><pre><code class="language-julia hljs">using Ferrite, SparseArrays, BlockArrays, LinearAlgebra, UnPack, LinearSolve, WriteVTK</code></pre><p>Since we do not need the complete DifferentialEquations suite, we just load the required ODE infrastructure, which can also handle DAEs in mass matrix form.</p><pre><code class="language-julia hljs">using OrdinaryDiffEq</code></pre><p>We start off by defining our only material parameter.</p><pre><code class="language-julia hljs">ν = 1.0/1000.0; #dynamic viscosity</code></pre><p>Next a rectangular grid with a cylinder in it has to be generated. We use Gmsh.jl for the creation of the mesh and FerriteGmsh.jl to translate it to a <code>Ferrite.Grid</code>. Note that the mesh is pretty fine, leading to a high memory consumption when feeding the equation system to direct solvers.</p><pre><code class="language-julia hljs">using FerriteGmsh
+ \end{bmatrix}\]</p><p>Here <span>$M$</span> is the singular block mass matrix, <span>$K$</span> is the discretized Stokes operator and <span>$N$</span> the nonlinear advection term, which is also called trilinear form. <span>$\hat{v}$</span> and <span>$\hat{p}$</span> represent the time-dependent vectors of nodal values of the discretizations of <span>$v$</span> and <span>$p$</span> respectively, while <span>$\hat{\varphi}$</span> is the choice for the test function in the discretization. The hats are dropped in the implementation and only stated for clarity in this section.</p><h2 id="Commented-implementation"><a class="docs-heading-anchor" href="#Commented-implementation">Commented implementation</a><a id="Commented-implementation-1"></a><a class="docs-heading-anchor-permalink" href="#Commented-implementation" title="Permalink"></a></h2><p>Now we solve the problem with Ferrite and <a href="https://github.com/SciML/DifferentialEquations.jl">DifferentialEquations.jl</a>. What follows is a program spliced with comments. The full program, without comments, can be found in the next <a href="#ns_vs_diffeq-plain-program">section</a>.</p><p>First we load Ferrite and some other packages we need</p><pre><code class="language-julia hljs">using Ferrite, SparseArrays, BlockArrays, LinearAlgebra, UnPack, LinearSolve, WriteVTK</code></pre><p>Since we do not need the complete DifferentialEquations suite, we just load the required ODE infrastructure, which can also handle DAEs in mass matrix form.</p><pre><code class="language-julia hljs">using OrdinaryDiffEq</code></pre><p>We start off by defining our only material parameter.</p><pre><code class="language-julia hljs">ν = 1.0 / 1000.0; #dynamic viscosity</code></pre><p>Next a rectangular grid with a cylinder in it has to be generated. We use Gmsh.jl for the creation of the mesh and FerriteGmsh.jl to translate it to a <code>Ferrite.Grid</code>. Note that the mesh is pretty fine, leading to a high memory consumption when feeding the equation system to direct solvers.</p><pre><code class="language-julia hljs">using FerriteGmsh
 using FerriteGmsh: Gmsh
 Gmsh.initialize()
 gmsh.option.set_number(&quot;General.Verbosity&quot;, 2)
-dim = 2;</code></pre><p>We specify first the rectangle, the cylinder, the surface spanned by the cylinder and the boolean difference of rectangle and cylinder.</p><pre><code class="language-julia hljs">rect_tag = gmsh.model.occ.add_rectangle(0, 0, 0, 1.1, 0.41)
-circle_tag = gmsh.model.occ.add_circle(0.2, 0.2, 0, 0.05)
-circle_curve_tag = gmsh.model.occ.add_curve_loop([circle_tag])
-circle_surf_tag = gmsh.model.occ.add_plane_surface([circle_curve_tag])
-gmsh.model.occ.cut([(dim,rect_tag)],[(dim,circle_surf_tag)]);</code></pre><p>Now, the geometrical entities need to be synchronized in order to be available outside of <code>gmsh.model.occ</code></p><pre><code class="language-julia hljs">gmsh.model.occ.synchronize()</code></pre><p>In the next lines, we add the physical groups needed to define boundary conditions.</p><pre><code class="language-julia hljs">bottomtag = gmsh.model.model.add_physical_group(dim-1,[6],-1,&quot;bottom&quot;)
-lefttag = gmsh.model.model.add_physical_group(dim-1,[7],-1,&quot;left&quot;)
-righttag = gmsh.model.model.add_physical_group(dim-1,[8],-1,&quot;right&quot;)
-toptag = gmsh.model.model.add_physical_group(dim-1,[9],-1,&quot;top&quot;)
-holetag = gmsh.model.model.add_physical_group(dim-1,[5],-1,&quot;hole&quot;);</code></pre><p>Since we want a quad mesh, we specify the meshing algorithm to the quasi structured quad one. For a complete list, <a href="https://gmsh.info/doc/texinfo/gmsh.html#Mesh-options-list">see the Gmsh docs</a>.</p><pre><code class="language-julia hljs">gmsh.option.setNumber(&quot;Mesh.Algorithm&quot;,11)
-gmsh.option.setNumber(&quot;Mesh.MeshSizeFromCurvature&quot;,20)
-gmsh.option.setNumber(&quot;Mesh.MeshSizeMax&quot;,0.05)</code></pre><p>In the next step, the mesh is generated and finally translated.</p><pre><code class="language-julia hljs">gmsh.model.mesh.generate(dim)
+dim = 2;</code></pre><p>We specify first the rectangle, the cylinder, the surface spanned by the cylinder and the boolean difference of rectangle and cylinder.</p><pre><code class="language-julia hljs">    rect_tag = gmsh.model.occ.add_rectangle(0, 0, 0, 1.1, 0.41)
+    circle_tag = gmsh.model.occ.add_circle(0.2, 0.2, 0, 0.05)
+    circle_curve_tag = gmsh.model.occ.add_curve_loop([circle_tag])
+    circle_surf_tag = gmsh.model.occ.add_plane_surface([circle_curve_tag])
+    gmsh.model.occ.cut([(dim, rect_tag)], [(dim, circle_surf_tag)])</code></pre><p>Now, the geometrical entities need to be synchronized in order to be available outside of <code>gmsh.model.occ</code></p><pre><code class="language-julia hljs">gmsh.model.occ.synchronize()</code></pre><p>In the next lines, we add the physical groups needed to define boundary conditions.</p><pre><code class="language-julia hljs">    bottomtag = gmsh.model.model.add_physical_group(dim - 1, [6], -1, &quot;bottom&quot;)
+    lefttag = gmsh.model.model.add_physical_group(dim - 1, [7], -1, &quot;left&quot;)
+    righttag = gmsh.model.model.add_physical_group(dim - 1, [8], -1, &quot;right&quot;)
+    toptag = gmsh.model.model.add_physical_group(dim - 1, [9], -1, &quot;top&quot;)
+    holetag = gmsh.model.model.add_physical_group(dim - 1, [5], -1, &quot;hole&quot;)</code></pre><p>Since we want a quad mesh, we specify the meshing algorithm to the quasi structured quad one. For a complete list, <a href="https://gmsh.info/doc/texinfo/gmsh.html#Mesh-options-list">see the Gmsh docs</a>.</p><pre><code class="language-julia hljs">gmsh.option.setNumber(&quot;Mesh.Algorithm&quot;, 11)
+gmsh.option.setNumber(&quot;Mesh.MeshSizeFromCurvature&quot;, 20)
+gmsh.option.setNumber(&quot;Mesh.MeshSizeMax&quot;, 0.05)</code></pre><p>In the next step, the mesh is generated and finally translated.</p><pre><code class="language-julia hljs">gmsh.model.mesh.generate(dim)
 grid = togrid()
 Gmsh.finalize();</code></pre><h3 id="Function-Space"><a class="docs-heading-anchor" href="#Function-Space">Function Space</a><a id="Function-Space-1"></a><a class="docs-heading-anchor-permalink" href="#Function-Space" title="Permalink"></a></h3><p>To ensure stability we utilize the Taylor-Hood element pair Q2-Q1.  We have to utilize the same quadrature rule for the pressure as for the velocity, because in the weak form the  linear pressure term is tested against a quadratic function.</p><pre><code class="language-julia hljs">ip_v = Lagrange{RefQuadrilateral, 2}()^dim
 qr = QuadratureRule{RefQuadrilateral}(4)
@@ -60,12 +60,12 @@ add!(dh, :p, ip_p)
 close!(dh);</code></pre><h3 id="Boundary-conditions"><a class="docs-heading-anchor" href="#Boundary-conditions">Boundary conditions</a><a id="Boundary-conditions-1"></a><a class="docs-heading-anchor-permalink" href="#Boundary-conditions" title="Permalink"></a></h3><p>As in the DFG benchmark we apply no-slip conditions to the top, bottom and cylinder boundary. The no-slip condition states that the velocity of the fluid on this portion of the boundary is fixed to be zero.</p><pre><code class="language-julia hljs">ch = ConstraintHandler(dh);
 
 nosplip_facet_names = [&quot;top&quot;, &quot;bottom&quot;, &quot;hole&quot;];
-∂Ω_noslip = union(getfacetset.((grid, ), nosplip_facet_names)...);
-noslip_bc = Dirichlet(:v, ∂Ω_noslip, (x, t) -&gt; Vec((0.0,0.0)), [1,2])
-add!(ch, noslip_bc);</code></pre><p>The left boundary has a parabolic inflow with peak velocity of 1.5. This ensures that for the given geometry the Reynolds number is 100, which is already enough to obtain some simple vortex streets. By increasing the velocity further we can obtain stronger vortices - which may need additional refinement of the grid.</p><pre><code class="language-julia hljs">∂Ω_inflow = getfacetset(grid, &quot;left&quot;);</code></pre><div class="admonition is-info"><header class="admonition-header">Note</header><div class="admonition-body"><p>The kink in the velocity profile will lead to a discontinuity in the pressure at <span>$t=1$</span>. This needs to be considered in the DiffEq <code>init</code> by providing the keyword argument <code>d_discontinuities=[1.0]</code>.</p></div></div><pre><code class="language-julia hljs">vᵢₙ(t) = min(t*1.5, 1.5) #inflow velocity
+∂Ω_noslip = union(getfacetset.((grid,), nosplip_facet_names)...);
+noslip_bc = Dirichlet(:v, ∂Ω_noslip, (x, t) -&gt; Vec((0.0, 0.0)), [1, 2])
+add!(ch, noslip_bc);</code></pre><p>The left boundary has a parabolic inflow with peak velocity of 1.5. This ensures that for the given geometry the Reynolds number is 100, which is already enough to obtain some simple vortex streets. By increasing the velocity further we can obtain stronger vortices - which may need additional refinement of the grid.</p><pre><code class="language-julia hljs">∂Ω_inflow = getfacetset(grid, &quot;left&quot;);</code></pre><div class="admonition is-info"><header class="admonition-header">Note</header><div class="admonition-body"><p>The kink in the velocity profile will lead to a discontinuity in the pressure at <span>$t=1$</span>. This needs to be considered in the DiffEq <code>init</code> by providing the keyword argument <code>d_discontinuities=[1.0]</code>.</p></div></div><pre><code class="language-julia hljs">vᵢₙ(t) = min(t * 1.5, 1.5) #inflow velocity
 
-parabolic_inflow_profile(x,t) = Vec((4*vᵢₙ(t)*x[2]*(0.41-x[2])/0.41^2, 0.0))
-inflow_bc = Dirichlet(:v, ∂Ω_inflow, parabolic_inflow_profile, [1,2])
+parabolic_inflow_profile(x, t) = Vec((4 * vᵢₙ(t) * x[2] * (0.41 - x[2]) / 0.41^2, 0.0))
+inflow_bc = Dirichlet(:v, ∂Ω_inflow, parabolic_inflow_profile, [1, 2])
 add!(ch, inflow_bc);</code></pre><p>The outflow boundary condition has been applied on the right side of the cylinder when the weak form has been derived by setting the boundary integral to zero. It is also called the do-nothing condition. Other outflow conditions are also possible.</p><pre><code class="language-julia hljs">∂Ω_free = getfacetset(grid, &quot;right&quot;);
 
 close!(ch)
@@ -162,7 +162,7 @@ p = RHSparams(K, ch, dh, cellvalues_v, copy(u₀))
 
 function ferrite_limiter!(u, _, p, t)
     update!(p.ch, t)
-    apply!(u, p.ch)
+    return apply!(u, p.ch)
 end
 
 function navierstokes_rhs_element!(dvₑ, vₑ, cellvalues_v)
@@ -175,9 +175,10 @@ function navierstokes_rhs_element!(dvₑ, vₑ, cellvalues_v)
             φⱼ = shape_value(cellvalues_v, q_point, j)</code></pre><p>Note that in Tensors.jl the definition <span>$\textrm{grad} v = \nabla v$</span> holds. With this information it can be quickly shown in index notation that</p><p class="math-container">\[[(v \cdot \nabla) v]_{\textrm{i}} = v_{\textrm{j}} (\partial_{\textrm{j}} v_{\textrm{i}}) = [v (\nabla v)^{\textrm{T}}]_{\textrm{i}}\]</p><p>where we should pay attentation to the transpose of the gradient.</p><pre><code class="language-julia hljs">            dvₑ[j] -= v ⋅ ∇v&#39; ⋅ φⱼ * dΩ
         end
     end
+    return
 end
 
-function navierstokes!(du,u_uc,p::RHSparams,t)</code></pre><p>Unpack the struct to save some allocations.</p><pre><code class="language-julia hljs">    @unpack K,ch,dh,cellvalues_v,u = p</code></pre><p>We start by applying the time-dependent Dirichlet BCs. Note that we are not allowed to mutate <code>u_uc</code>! Furthermore not that we also can not pre- allocate a buffer for this variable variable if we want to use AD to derive the Jacobian matrix, which appears in stiff solvers. Therefore, for efficiency reasons, we simply pass down the jacobian analytically.</p><pre><code class="language-julia hljs">    u .= u_uc
+function navierstokes!(du, u_uc, p::RHSparams, t)</code></pre><p>Unpack the struct to save some allocations.</p><pre><code class="language-julia hljs">    @unpack K, ch, dh, cellvalues_v, u = p</code></pre><p>We start by applying the time-dependent Dirichlet BCs. Note that we are not allowed to mutate <code>u_uc</code>! Furthermore not that we also can not pre- allocate a buffer for this variable variable if we want to use AD to derive the Jacobian matrix, which appears in stiff solvers. Therefore, for efficiency reasons, we simply pass down the jacobian analytically.</p><pre><code class="language-julia hljs">    u .= u_uc
     update!(ch, t)
     apply!(u, ch)</code></pre><p>Now we apply the rhs of the Navier-Stokes equations</p><pre><code class="language-julia hljs">    # Linear contribution (Stokes operator)
     mul!(du, K, u) # du .= K * u
@@ -195,6 +196,7 @@ function navierstokes!(du,u_uc,p::RHSparams,t)</code></pre><p>Unpack the struct 
         navierstokes_rhs_element!(duₑ, vₑ, cellvalues_v)
         assemble!(du, v_celldofs, duₑ)
     end
+    return
 end;
 
 function navierstokes_jac_element!(Jₑ, vₑ, cellvalues_v)
@@ -211,15 +213,16 @@ function navierstokes_jac_element!(Jₑ, vₑ, cellvalues_v)
             end
         end
     end
+    return
 end
 
-function navierstokes_jac!(J,u_uc,p,t)</code></pre><p>Unpack the struct to save some allocations.</p><pre><code class="language-julia hljs">    @unpack K, ch, dh, cellvalues_v, u = p</code></pre><p>We start by applying the time-dependent Dirichlet BCs. Note that we are not allowed to mutate <code>u_uc</code>, so we use our buffer again.</p><pre><code class="language-julia hljs">    u .= u_uc
+function navierstokes_jac!(J, u_uc, p, t)</code></pre><p>Unpack the struct to save some allocations.</p><pre><code class="language-julia hljs">    @unpack K, ch, dh, cellvalues_v, u = p</code></pre><p>We start by applying the time-dependent Dirichlet BCs. Note that we are not allowed to mutate <code>u_uc</code>, so we use our buffer again.</p><pre><code class="language-julia hljs">    u .= u_uc
     update!(ch, t)
     apply!(u, ch)</code></pre><p>Now we apply the Jacobian of the Navier-Stokes equations.</p><pre><code class="language-julia hljs">    # Linear contribution (Stokes operator)
     # Here we assume that J has exactly the same structure as K by construction
     nonzeros(J) .= nonzeros(K)
 
-    assembler = start_assemble(J; fillzero=false)
+    assembler = start_assemble(J; fillzero = false)
 
     # Assemble variation of the nonlinear term
     n_basefuncs = getnbasefunctions(cellvalues_v)
@@ -234,19 +237,19 @@ function navierstokes_jac!(J,u_uc,p,t)</code></pre><p>Unpack the struct to save 
         fill!(Jₑ, 0.0)
         navierstokes_jac_element!(Jₑ, vₑ, cellvalues_v)
         assemble!(assembler, v_celldofs, Jₑ)
-    end</code></pre><p>Finally we eliminate the constrained dofs from the Jacobian to decouple them in the nonlinear solver from the remaining system.</p><pre><code class="language-julia hljs">    apply!(J, ch)
-end;</code></pre><p>Finally, together with our pre-assembled mass matrix, we are now able to define our problem in mass matrix form.</p><pre><code class="language-julia hljs">rhs = ODEFunction(navierstokes!, mass_matrix=M; jac=navierstokes_jac!, jac_prototype=jac_sparsity)
-problem = ODEProblem(rhs, u₀, (0.0,T), p);</code></pre><p>All norms must not depend on constrained dofs. A problem with the presented implementation is that we are currently unable to strictly enforce constraint everywhere in the internal time integration process of <a href="https://github.com/SciML/DifferentialEquations.jl">DifferentialEquations.jl</a>, hence the values might differ, resulting in worse error estimates. We try to resolve this issue in the future. Volunteers are also welcome to take a look into this!</p><pre><code class="language-julia hljs">struct FreeDofErrorNorm
+    end</code></pre><p>Finally we eliminate the constrained dofs from the Jacobian to decouple them in the nonlinear solver from the remaining system.</p><pre><code class="language-julia hljs">    return apply!(J, ch)
+end;</code></pre><p>Finally, together with our pre-assembled mass matrix, we are now able to define our problem in mass matrix form.</p><pre><code class="language-julia hljs">rhs = ODEFunction(navierstokes!, mass_matrix = M; jac = navierstokes_jac!, jac_prototype = jac_sparsity)
+problem = ODEProblem(rhs, u₀, (0.0, T), p);</code></pre><p>All norms must not depend on constrained dofs. A problem with the presented implementation is that we are currently unable to strictly enforce constraint everywhere in the internal time integration process of <a href="https://github.com/SciML/DifferentialEquations.jl">DifferentialEquations.jl</a>, hence the values might differ, resulting in worse error estimates. We try to resolve this issue in the future. Volunteers are also welcome to take a look into this!</p><pre><code class="language-julia hljs">struct FreeDofErrorNorm
     ch::ConstraintHandler
 end
 (fe_norm::FreeDofErrorNorm)(u::Union{AbstractFloat, Complex}, t) = DiffEqBase.ODE_DEFAULT_NORM(u, t)
-(fe_norm::FreeDofErrorNorm)(u::AbstractArray, t) = DiffEqBase.ODE_DEFAULT_NORM(u[fe_norm.ch.free_dofs], t)</code></pre><p>Now we can put everything together by specifying how to solve the problem. We want to use an adaptive variant of the implicit Euler method. Further we enable the progress bar with the <code>progress</code> and <code>progress_steps</code> arguments. Finally we have to communicate the time step length and initialization algorithm. Since we start with a valid initial state we do not use one of DifferentialEquations.jl initialization algorithms.</p><div class="admonition is-info"><header class="admonition-header">DAE initialization</header><div class="admonition-body"><p>At the time of writing this <a href="https://github.com/SciML/OrdinaryDiffEq.jl/issues/1019">no Hessenberg index 2 initialization is implemented</a>.</p></div></div><p>To visualize the result we export the grid and our fields to VTK-files, which can be viewed in <a href="https://www.paraview.org/">ParaView</a> by utilizing the corresponding pvd file.</p><pre><code class="language-julia hljs">timestepper = Rodas5P(autodiff=false, step_limiter! = ferrite_limiter!);</code></pre><div class="admonition is-info"><header class="admonition-header">Debugging convergence issues</header><div class="admonition-body"><p>We can obtain some debug information from OrdinaryDiffEq by wrapping the following section into a <a href="https://docs.julialang.org/en/v1/stdlib/Logging/#Example:-Enable-debug-level-messages">debug logger</a>.</p></div></div><pre><code class="language-julia hljs">integrator = init(
-    problem, timestepper; initializealg=NoInit(), dt=Δt₀,
-    adaptive=true, abstol=1e-4, reltol=1e-5,
-    progress=true, progress_steps=1,
-    verbose=true, internalnorm=FreeDofErrorNorm(ch), d_discontinuities=[1.0]
+(fe_norm::FreeDofErrorNorm)(u::AbstractArray, t) = DiffEqBase.ODE_DEFAULT_NORM(u[fe_norm.ch.free_dofs], t)</code></pre><p>Now we can put everything together by specifying how to solve the problem. We want to use an adaptive variant of the implicit Euler method. Further we enable the progress bar with the <code>progress</code> and <code>progress_steps</code> arguments. Finally we have to communicate the time step length and initialization algorithm. Since we start with a valid initial state we do not use one of DifferentialEquations.jl initialization algorithms.</p><div class="admonition is-info"><header class="admonition-header">DAE initialization</header><div class="admonition-body"><p>At the time of writing this <a href="https://github.com/SciML/OrdinaryDiffEq.jl/issues/1019">no Hessenberg index 2 initialization is implemented</a>.</p></div></div><p>To visualize the result we export the grid and our fields to VTK-files, which can be viewed in <a href="https://www.paraview.org/">ParaView</a> by utilizing the corresponding pvd file.</p><pre><code class="language-julia hljs">timestepper = Rodas5P(autodiff = false, step_limiter! = ferrite_limiter!);</code></pre><div class="admonition is-info"><header class="admonition-header">Debugging convergence issues</header><div class="admonition-body"><p>We can obtain some debug information from OrdinaryDiffEq by wrapping the following section into a <a href="https://docs.julialang.org/en/v1/stdlib/Logging/#Example:-Enable-debug-level-messages">debug logger</a>.</p></div></div><pre><code class="language-julia hljs">integrator = init(
+    problem, timestepper; initializealg = NoInit(), dt = Δt₀,
+    adaptive = true, abstol = 1.0e-4, reltol = 1.0e-5,
+    progress = true, progress_steps = 1,
+    verbose = true, internalnorm = FreeDofErrorNorm(ch), d_discontinuities = [1.0]
 );</code></pre><div class="admonition is-info"><header class="admonition-header">Export of solution</header><div class="admonition-body"><p>Exporting interpolated solutions of problems containing mass matrices is currently broken. Thus, the <code>intervals</code> iterator is used. Note that <code>solve</code> holds all solutions in the memory.</p></div></div><pre><code class="language-julia hljs">pvd = paraview_collection(&quot;vortex-street&quot;)
-for (step, (u,t)) in enumerate(intervals(integrator))
+for (step, (u, t)) in enumerate(intervals(integrator))
     VTKGridFile(&quot;vortex-street-$step&quot;, dh) do vtk
         write_solution(vtk, dh, u)
         pvd[t] = vtk
@@ -256,7 +259,7 @@ vtk_save(pvd);</code></pre><h2 id="ns_vs_diffeq-plain-program"><a class="docs-he
 
 using OrdinaryDiffEq
 
-ν = 1.0/1000.0; #dynamic viscosity
+ν = 1.0 / 1000.0; #dynamic viscosity
 
 using FerriteGmsh
 using FerriteGmsh: Gmsh
@@ -264,23 +267,23 @@ Gmsh.initialize()
 gmsh.option.set_number(&quot;General.Verbosity&quot;, 2)
 dim = 2;
 
-rect_tag = gmsh.model.occ.add_rectangle(0, 0, 0, 1.1, 0.41)
-circle_tag = gmsh.model.occ.add_circle(0.2, 0.2, 0, 0.05)
-circle_curve_tag = gmsh.model.occ.add_curve_loop([circle_tag])
-circle_surf_tag = gmsh.model.occ.add_plane_surface([circle_curve_tag])
-gmsh.model.occ.cut([(dim,rect_tag)],[(dim,circle_surf_tag)]);
+    rect_tag = gmsh.model.occ.add_rectangle(0, 0, 0, 1.1, 0.41)
+    circle_tag = gmsh.model.occ.add_circle(0.2, 0.2, 0, 0.05)
+    circle_curve_tag = gmsh.model.occ.add_curve_loop([circle_tag])
+    circle_surf_tag = gmsh.model.occ.add_plane_surface([circle_curve_tag])
+    gmsh.model.occ.cut([(dim, rect_tag)], [(dim, circle_surf_tag)])
 
 gmsh.model.occ.synchronize()
 
-bottomtag = gmsh.model.model.add_physical_group(dim-1,[6],-1,&quot;bottom&quot;)
-lefttag = gmsh.model.model.add_physical_group(dim-1,[7],-1,&quot;left&quot;)
-righttag = gmsh.model.model.add_physical_group(dim-1,[8],-1,&quot;right&quot;)
-toptag = gmsh.model.model.add_physical_group(dim-1,[9],-1,&quot;top&quot;)
-holetag = gmsh.model.model.add_physical_group(dim-1,[5],-1,&quot;hole&quot;);
+    bottomtag = gmsh.model.model.add_physical_group(dim - 1, [6], -1, &quot;bottom&quot;)
+    lefttag = gmsh.model.model.add_physical_group(dim - 1, [7], -1, &quot;left&quot;)
+    righttag = gmsh.model.model.add_physical_group(dim - 1, [8], -1, &quot;right&quot;)
+    toptag = gmsh.model.model.add_physical_group(dim - 1, [9], -1, &quot;top&quot;)
+    holetag = gmsh.model.model.add_physical_group(dim - 1, [5], -1, &quot;hole&quot;)
 
-gmsh.option.setNumber(&quot;Mesh.Algorithm&quot;,11)
-gmsh.option.setNumber(&quot;Mesh.MeshSizeFromCurvature&quot;,20)
-gmsh.option.setNumber(&quot;Mesh.MeshSizeMax&quot;,0.05)
+gmsh.option.setNumber(&quot;Mesh.Algorithm&quot;, 11)
+gmsh.option.setNumber(&quot;Mesh.MeshSizeFromCurvature&quot;, 20)
+gmsh.option.setNumber(&quot;Mesh.MeshSizeMax&quot;, 0.05)
 
 gmsh.model.mesh.generate(dim)
 grid = togrid()
@@ -301,16 +304,16 @@ close!(dh);
 ch = ConstraintHandler(dh);
 
 nosplip_facet_names = [&quot;top&quot;, &quot;bottom&quot;, &quot;hole&quot;];
-∂Ω_noslip = union(getfacetset.((grid, ), nosplip_facet_names)...);
-noslip_bc = Dirichlet(:v, ∂Ω_noslip, (x, t) -&gt; Vec((0.0,0.0)), [1,2])
+∂Ω_noslip = union(getfacetset.((grid,), nosplip_facet_names)...);
+noslip_bc = Dirichlet(:v, ∂Ω_noslip, (x, t) -&gt; Vec((0.0, 0.0)), [1, 2])
 add!(ch, noslip_bc);
 
 ∂Ω_inflow = getfacetset(grid, &quot;left&quot;);
 
-vᵢₙ(t) = min(t*1.5, 1.5) #inflow velocity
+vᵢₙ(t) = min(t * 1.5, 1.5) #inflow velocity
 
-parabolic_inflow_profile(x,t) = Vec((4*vᵢₙ(t)*x[2]*(0.41-x[2])/0.41^2, 0.0))
-inflow_bc = Dirichlet(:v, ∂Ω_inflow, parabolic_inflow_profile, [1,2])
+parabolic_inflow_profile(x, t) = Vec((4 * vᵢₙ(t) * x[2] * (0.41 - x[2]) / 0.41^2, 0.0))
+inflow_bc = Dirichlet(:v, ∂Ω_inflow, parabolic_inflow_profile, [1, 2])
 add!(ch, inflow_bc);
 
 ∂Ω_free = getfacetset(grid, &quot;right&quot;);
@@ -422,7 +425,7 @@ p = RHSparams(K, ch, dh, cellvalues_v, copy(u₀))
 
 function ferrite_limiter!(u, _, p, t)
     update!(p.ch, t)
-    apply!(u, p.ch)
+    return apply!(u, p.ch)
 end
 
 function navierstokes_rhs_element!(dvₑ, vₑ, cellvalues_v)
@@ -437,11 +440,12 @@ function navierstokes_rhs_element!(dvₑ, vₑ, cellvalues_v)
             dvₑ[j] -= v ⋅ ∇v&#39; ⋅ φⱼ * dΩ
         end
     end
+    return
 end
 
-function navierstokes!(du,u_uc,p::RHSparams,t)
+function navierstokes!(du, u_uc, p::RHSparams, t)
 
-    @unpack K,ch,dh,cellvalues_v,u = p
+    @unpack K, ch, dh, cellvalues_v, u = p
 
     u .= u_uc
     update!(ch, t)
@@ -463,6 +467,7 @@ function navierstokes!(du,u_uc,p::RHSparams,t)
         navierstokes_rhs_element!(duₑ, vₑ, cellvalues_v)
         assemble!(du, v_celldofs, duₑ)
     end
+    return
 end;
 
 function navierstokes_jac_element!(Jₑ, vₑ, cellvalues_v)
@@ -481,9 +486,10 @@ function navierstokes_jac_element!(Jₑ, vₑ, cellvalues_v)
             end
         end
     end
+    return
 end
 
-function navierstokes_jac!(J,u_uc,p,t)
+function navierstokes_jac!(J, u_uc, p, t)
 
     @unpack K, ch, dh, cellvalues_v, u = p
 
@@ -495,7 +501,7 @@ function navierstokes_jac!(J,u_uc,p,t)
     # Here we assume that J has exactly the same structure as K by construction
     nonzeros(J) .= nonzeros(K)
 
-    assembler = start_assemble(J; fillzero=false)
+    assembler = start_assemble(J; fillzero = false)
 
     # Assemble variation of the nonlinear term
     n_basefuncs = getnbasefunctions(cellvalues_v)
@@ -512,11 +518,11 @@ function navierstokes_jac!(J,u_uc,p,t)
         assemble!(assembler, v_celldofs, Jₑ)
     end
 
-    apply!(J, ch)
+    return apply!(J, ch)
 end;
 
-rhs = ODEFunction(navierstokes!, mass_matrix=M; jac=navierstokes_jac!, jac_prototype=jac_sparsity)
-problem = ODEProblem(rhs, u₀, (0.0,T), p);
+rhs = ODEFunction(navierstokes!, mass_matrix = M; jac = navierstokes_jac!, jac_prototype = jac_sparsity)
+problem = ODEProblem(rhs, u₀, (0.0, T), p);
 
 struct FreeDofErrorNorm
     ch::ConstraintHandler
@@ -524,20 +530,20 @@ end
 (fe_norm::FreeDofErrorNorm)(u::Union{AbstractFloat, Complex}, t) = DiffEqBase.ODE_DEFAULT_NORM(u, t)
 (fe_norm::FreeDofErrorNorm)(u::AbstractArray, t) = DiffEqBase.ODE_DEFAULT_NORM(u[fe_norm.ch.free_dofs], t)
 
-timestepper = Rodas5P(autodiff=false, step_limiter! = ferrite_limiter!);
+timestepper = Rodas5P(autodiff = false, step_limiter! = ferrite_limiter!);
 
 integrator = init(
-    problem, timestepper; initializealg=NoInit(), dt=Δt₀,
-    adaptive=true, abstol=1e-4, reltol=1e-5,
-    progress=true, progress_steps=1,
-    verbose=true, internalnorm=FreeDofErrorNorm(ch), d_discontinuities=[1.0]
+    problem, timestepper; initializealg = NoInit(), dt = Δt₀,
+    adaptive = true, abstol = 1.0e-4, reltol = 1.0e-5,
+    progress = true, progress_steps = 1,
+    verbose = true, internalnorm = FreeDofErrorNorm(ch), d_discontinuities = [1.0]
 );
 
 pvd = paraview_collection(&quot;vortex-street&quot;)
-for (step, (u,t)) in enumerate(intervals(integrator))
+for (step, (u, t)) in enumerate(intervals(integrator))
     VTKGridFile(&quot;vortex-street-$step&quot;, dh) do vtk
         write_solution(vtk, dh, u)
         pvd[t] = vtk
     end
 end
-vtk_save(pvd);</code></pre><hr/><p><em>This page was generated using <a href="https://github.com/fredrikekre/Literate.jl">Literate.jl</a>.</em></p></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../porous_media/">« Porous media</a><a class="docs-footer-nextpage" href="../reactive_surface/">Reactive surface »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option><option value="catppuccin-latte">catppuccin-latte</option><option value="catppuccin-frappe">catppuccin-frappe</option><option value="catppuccin-macchiato">catppuccin-macchiato</option><option value="catppuccin-mocha">catppuccin-mocha</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.7.0 on <span class="colophon-date" title="Tuesday 29 October 2024 18:49">Tuesday 29 October 2024</span>. Using Julia version 1.11.1.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
+vtk_save(pvd);</code></pre><hr/><p><em>This page was generated using <a href="https://github.com/fredrikekre/Literate.jl">Literate.jl</a>.</em></p></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../porous_media/">« Porous media</a><a class="docs-footer-nextpage" href="../reactive_surface/">Reactive surface »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option><option value="catppuccin-latte">catppuccin-latte</option><option value="catppuccin-frappe">catppuccin-frappe</option><option value="catppuccin-macchiato">catppuccin-macchiato</option><option value="catppuccin-mocha">catppuccin-mocha</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.7.0 on <span class="colophon-date" title="Thursday 31 October 2024 12:23">Thursday 31 October 2024</span>. Using Julia version 1.11.1.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>

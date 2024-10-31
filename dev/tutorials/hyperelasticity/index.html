@@ -79,7 +79,7 @@ end;</code></pre><h2 id="Newton&#39;s-method"><a class="docs-heading-anchor" hre
         S, ∂S∂C = constitutive_driver(C, mp)
         P = F ⋅ S
         I = one(S)
-        ∂P∂F =  otimesu(I, S) + 2 * F ⋅ ∂S∂C ⊡ otimesu(F&#39;, I)
+        ∂P∂F = otimesu(I, S) + 2 * F ⋅ ∂S∂C ⊡ otimesu(F&#39;, I)
 
         # Loop over test functions
         for i in 1:ndofs
@@ -87,13 +87,13 @@ end;</code></pre><h2 id="Newton&#39;s-method"><a class="docs-heading-anchor" hre
             δui = shape_value(cv, qp, i)
             ∇δui = shape_gradient(cv, qp, i)
             # Add contribution to the residual from this test function
-            ge[i] += ( ∇δui ⊡ P - δui ⋅ b ) * dΩ
+            ge[i] += (∇δui ⊡ P - δui ⋅ b) * dΩ
 
             ∇δui∂P∂F = ∇δui ⊡ ∂P∂F # Hoisted computation
             for j in 1:ndofs
                 ∇δuj = shape_gradient(cv, qp, j)
                 # Add contribution to the tangent
-                ke[i, j] += ( ∇δui∂P∂F ⊡ ∇δuj ) * dΩ
+                ke[i, j] += (∇δui∂P∂F ⊡ ∇δuj) * dΩ
             end
         end
     end
@@ -112,6 +112,7 @@ end;</code></pre><h2 id="Newton&#39;s-method"><a class="docs-heading-anchor" hre
             end
         end
     end
+    return
 end;</code></pre><p>Assembling global residual and tangent is also done in the usual way, just looping over the elements, call the element routine and assemble in the the global matrix K and residual g.</p><pre><code class="language-julia hljs">function assemble_global!(K, g, dh, cv, fv, mp, u, ΓN)
     n = ndofs_per_cell(dh)
     ke = zeros(n, n)
@@ -127,6 +128,7 @@ end;</code></pre><p>Assembling global residual and tangent is also done in the u
         @timeit &quot;element assemble&quot; assemble_element!(ke, ge, cell, cv, fv, mp, ue, ΓN)
         assemble!(assembler, global_dofs, ke, ge)
     end
+    return
 end;</code></pre><p>Finally, we define a main function which sets up everything and then performs Newton iterations until convergence.</p><pre><code class="language-julia hljs">function solve()
     reset_timer!()
 
@@ -159,18 +161,20 @@ end;</code></pre><p>Finally, we define a main function which sets up everything 
     function rotation(X, t)
         θ = pi / 3 # 60°
         x, y, z = X
-        return t * Vec{3}((
-            0.0,
-            L/2 - y + (y-L/2)*cos(θ) - (z-L/2)*sin(θ),
-            L/2 - z + (y-L/2)*sin(θ) + (z-L/2)*cos(θ)
-        ))
+        return t * Vec{3}(
+            (
+                0.0,
+                L / 2 - y + (y - L / 2) * cos(θ) - (z - L / 2) * sin(θ),
+                L / 2 - z + (y - L / 2) * sin(θ) + (z - L / 2) * cos(θ),
+            )
+        )
     end
 
     dbcs = ConstraintHandler(dh)
     # Add a homogeneous boundary condition on the &quot;clamped&quot; edge
-    dbc = Dirichlet(:u, getfacetset(grid, &quot;right&quot;), (x,t) -&gt; [0.0, 0.0, 0.0], [1, 2, 3])
+    dbc = Dirichlet(:u, getfacetset(grid, &quot;right&quot;), (x, t) -&gt; [0.0, 0.0, 0.0], [1, 2, 3])
     add!(dbcs, dbc)
-    dbc = Dirichlet(:u, getfacetset(grid, &quot;left&quot;), (x,t) -&gt; rotation(x, t), [1, 2, 3])
+    dbc = Dirichlet(:u, getfacetset(grid, &quot;left&quot;), (x, t) -&gt; rotation(x, t), [1, 2, 3])
     add!(dbcs, dbc)
     close!(dbcs)
     t = 0.5
@@ -187,7 +191,7 @@ end;</code></pre><p>Finally, we define a main function which sets up everything 
     # Pre-allocation of vectors for the solution and Newton increments
     _ndofs = ndofs(dh)
     un = zeros(_ndofs) # previous solution vector
-    u  = zeros(_ndofs)
+    u = zeros(_ndofs)
     Δu = zeros(_ndofs)
     ΔΔu = zeros(_ndofs)
     apply!(un, dbcs)
@@ -198,11 +202,12 @@ end;</code></pre><p>Finally, we define a main function which sets up everything 
 
     # Perform Newton iterations
     newton_itr = -1
-    NEWTON_TOL = 1e-8
+    NEWTON_TOL = 1.0e-8
     NEWTON_MAXITER = 30
     prog = ProgressMeter.ProgressThresh(NEWTON_TOL; desc = &quot;Solving:&quot;)
 
-    while true; newton_itr += 1
+    while true
+        newton_itr += 1
         # Construct the current guess
         u .= un .+ Δu
         # Compute residual and tangent for current guess
@@ -219,7 +224,7 @@ end;</code></pre><p>Finally, we define a main function which sets up everything 
         end
 
         # Compute increment using conjugate gradients
-        @timeit &quot;linear solve&quot; IterativeSolvers.cg!(ΔΔu, K, g; maxiter=1000)
+        @timeit &quot;linear solve&quot; IterativeSolvers.cg!(ΔΔu, K, g; maxiter = 1000)
 
         apply_zero!(ΔΔu, dbcs)
         Δu .-= ΔΔu
@@ -241,14 +246,14 @@ end</code></pre><pre class="documenter-example-output"><code class="nohighlight 
 <span class="sgr1">-------------------------------------------------------------------------------</span>
 <span class="sgr1"> Analysis with 6000 elements </span>         Time                    Allocations
                              -----------------------   ------------------------
-      Tot / % measured:           300ms /  66.3%           29.6MiB /  33.4%
+      Tot / % measured:           294ms /  66.9%           29.6MiB /  33.4%
 
 Section              ncalls     time    %tot     avg     alloc    %tot      avg
 -------------------------------------------------------------------------------
-assemble                  6    111ms   55.7%  18.4ms   5.50MiB   55.5%   938KiB
-  element assemble    36.0k   63.0ms   31.7%  1.75μs     0.00B    0.0%    0.00B
-linear solve              5   74.0ms   37.3%  14.8ms    473KiB    4.7%  94.6KiB
-export                    1   13.9ms    7.0%  13.9ms   3.94MiB   39.8%  3.94MiB
+assemble                  6    109ms   55.6%  18.2ms   5.50MiB   55.5%   938KiB
+  element assemble    36.0k   63.0ms   32.0%  1.75μs     0.00B    0.0%    0.00B
+linear solve              5   73.5ms   37.3%  14.7ms    473KiB    4.7%  94.6KiB
+export                    1   13.9ms    7.1%  13.9ms   3.94MiB   39.8%  3.94MiB
 <span class="sgr1">-------------------------------------------------------------------------------</span></code></pre><h2 id="Plain-program"><a class="docs-heading-anchor" href="#Plain-program">Plain program</a><a id="Plain-program-1"></a><a class="docs-heading-anchor-permalink" href="#Plain-program" title="Permalink"></a></h2><p>Here follows a version of the program without any comments. The file is also available here: <a href="../hyperelasticity.jl"><code>hyperelasticity.jl</code></a>.</p><pre><code class="language-julia hljs">using Ferrite, Tensors, TimerOutputs, ProgressMeter, IterativeSolvers
 
 struct NeoHooke
@@ -292,7 +297,7 @@ function assemble_element!(ke, ge, cell, cv, fv, mp, ue, ΓN)
         S, ∂S∂C = constitutive_driver(C, mp)
         P = F ⋅ S
         I = one(S)
-        ∂P∂F =  otimesu(I, S) + 2 * F ⋅ ∂S∂C ⊡ otimesu(F&#39;, I)
+        ∂P∂F = otimesu(I, S) + 2 * F ⋅ ∂S∂C ⊡ otimesu(F&#39;, I)
 
         # Loop over test functions
         for i in 1:ndofs
@@ -300,13 +305,13 @@ function assemble_element!(ke, ge, cell, cv, fv, mp, ue, ΓN)
             δui = shape_value(cv, qp, i)
             ∇δui = shape_gradient(cv, qp, i)
             # Add contribution to the residual from this test function
-            ge[i] += ( ∇δui ⊡ P - δui ⋅ b ) * dΩ
+            ge[i] += (∇δui ⊡ P - δui ⋅ b) * dΩ
 
             ∇δui∂P∂F = ∇δui ⊡ ∂P∂F # Hoisted computation
             for j in 1:ndofs
                 ∇δuj = shape_gradient(cv, qp, j)
                 # Add contribution to the tangent
-                ke[i, j] += ( ∇δui∂P∂F ⊡ ∇δuj ) * dΩ
+                ke[i, j] += (∇δui∂P∂F ⊡ ∇δuj) * dΩ
             end
         end
     end
@@ -325,6 +330,7 @@ function assemble_element!(ke, ge, cell, cv, fv, mp, ue, ΓN)
             end
         end
     end
+    return
 end;
 
 function assemble_global!(K, g, dh, cv, fv, mp, u, ΓN)
@@ -342,6 +348,7 @@ function assemble_global!(K, g, dh, cv, fv, mp, u, ΓN)
         @timeit &quot;element assemble&quot; assemble_element!(ke, ge, cell, cv, fv, mp, ue, ΓN)
         assemble!(assembler, global_dofs, ke, ge)
     end
+    return
 end;
 
 function solve()
@@ -376,18 +383,20 @@ function solve()
     function rotation(X, t)
         θ = pi / 3 # 60°
         x, y, z = X
-        return t * Vec{3}((
-            0.0,
-            L/2 - y + (y-L/2)*cos(θ) - (z-L/2)*sin(θ),
-            L/2 - z + (y-L/2)*sin(θ) + (z-L/2)*cos(θ)
-        ))
+        return t * Vec{3}(
+            (
+                0.0,
+                L / 2 - y + (y - L / 2) * cos(θ) - (z - L / 2) * sin(θ),
+                L / 2 - z + (y - L / 2) * sin(θ) + (z - L / 2) * cos(θ),
+            )
+        )
     end
 
     dbcs = ConstraintHandler(dh)
     # Add a homogeneous boundary condition on the &quot;clamped&quot; edge
-    dbc = Dirichlet(:u, getfacetset(grid, &quot;right&quot;), (x,t) -&gt; [0.0, 0.0, 0.0], [1, 2, 3])
+    dbc = Dirichlet(:u, getfacetset(grid, &quot;right&quot;), (x, t) -&gt; [0.0, 0.0, 0.0], [1, 2, 3])
     add!(dbcs, dbc)
-    dbc = Dirichlet(:u, getfacetset(grid, &quot;left&quot;), (x,t) -&gt; rotation(x, t), [1, 2, 3])
+    dbc = Dirichlet(:u, getfacetset(grid, &quot;left&quot;), (x, t) -&gt; rotation(x, t), [1, 2, 3])
     add!(dbcs, dbc)
     close!(dbcs)
     t = 0.5
@@ -404,7 +413,7 @@ function solve()
     # Pre-allocation of vectors for the solution and Newton increments
     _ndofs = ndofs(dh)
     un = zeros(_ndofs) # previous solution vector
-    u  = zeros(_ndofs)
+    u = zeros(_ndofs)
     Δu = zeros(_ndofs)
     ΔΔu = zeros(_ndofs)
     apply!(un, dbcs)
@@ -415,11 +424,12 @@ function solve()
 
     # Perform Newton iterations
     newton_itr = -1
-    NEWTON_TOL = 1e-8
+    NEWTON_TOL = 1.0e-8
     NEWTON_MAXITER = 30
     prog = ProgressMeter.ProgressThresh(NEWTON_TOL; desc = &quot;Solving:&quot;)
 
-    while true; newton_itr += 1
+    while true
+        newton_itr += 1
         # Construct the current guess
         u .= un .+ Δu
         # Compute residual and tangent for current guess
@@ -436,7 +446,7 @@ function solve()
         end
 
         # Compute increment using conjugate gradients
-        @timeit &quot;linear solve&quot; IterativeSolvers.cg!(ΔΔu, K, g; maxiter=1000)
+        @timeit &quot;linear solve&quot; IterativeSolvers.cg!(ΔΔu, K, g; maxiter = 1000)
 
         apply_zero!(ΔΔu, dbcs)
         Δu .-= ΔΔu
@@ -453,4 +463,4 @@ function solve()
     return u
 end
 
-u = solve();</code></pre><hr/><p><em>This page was generated using <a href="https://github.com/fredrikekre/Literate.jl">Literate.jl</a>.</em></p></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../incompressible_elasticity/">« Incompressible elasticity</a><a class="docs-footer-nextpage" href="../plasticity/">Von Mises plasticity »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option><option value="catppuccin-latte">catppuccin-latte</option><option value="catppuccin-frappe">catppuccin-frappe</option><option value="catppuccin-macchiato">catppuccin-macchiato</option><option value="catppuccin-mocha">catppuccin-mocha</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.7.0 on <span class="colophon-date" title="Tuesday 29 October 2024 18:49">Tuesday 29 October 2024</span>. Using Julia version 1.11.1.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
+u = solve();</code></pre><hr/><p><em>This page was generated using <a href="https://github.com/fredrikekre/Literate.jl">Literate.jl</a>.</em></p></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../incompressible_elasticity/">« Incompressible elasticity</a><a class="docs-footer-nextpage" href="../plasticity/">Von Mises plasticity »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option><option value="catppuccin-latte">catppuccin-latte</option><option value="catppuccin-frappe">catppuccin-frappe</option><option value="catppuccin-macchiato">catppuccin-macchiato</option><option value="catppuccin-mocha">catppuccin-mocha</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.7.0 on <span class="colophon-date" title="Thursday 31 October 2024 12:23">Thursday 31 October 2024</span>. Using Julia version 1.11.1.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>

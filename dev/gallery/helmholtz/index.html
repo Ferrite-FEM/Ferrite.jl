@@ -25,27 +25,30 @@ close!(dh)</code></pre><pre class="documenter-example-output"><code class="nohig
     :u, Lagrange{RefQuadrilateral, 1}()
   Dofs per cell: 4
   Total dofs: 22801</code></pre><p>We will set things up, so that a known analytic solution is approximately reproduced. This is a good testing strategy for PDE codes and known as the method of manufactured solutions.</p><pre><code class="language-julia hljs">function u_ana(x::Vec{2, T}) where {T}
-    xs = (Vec{2}((-0.5,  0.5)),
-          Vec{2}((-0.5, -0.5)),
-          Vec{2}(( 0.5,  -0.5)))
-    σ = 1/8
+    xs = (
+        Vec{2}((-0.5, 0.5)),
+        Vec{2}((-0.5, -0.5)),
+        Vec{2}((0.5, -0.5)),
+    )
+    σ = 1 / 8
     s = zero(eltype(x))
     for i in 1:3
         s += exp(- norm(x - xs[i])^2 / σ^2)
     end
-    return max(1e-15 * one(T), s) # Denormals, be gone
+    return max(1.0e-15 * one(T), s) # Denormals, be gone
 end;
 
 dbcs = ConstraintHandler(dh)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">ConstraintHandler:
-  Not closed!</code></pre><p>The (strong) Dirichlet boundary condition can be handled automatically by the Ferrite library.</p><pre><code class="language-julia hljs">dbc = Dirichlet(:u, union(getfacetset(grid, &quot;top&quot;), getfacetset(grid, &quot;right&quot;)), (x,t) -&gt; u_ana(x))
+  Not closed!</code></pre><p>The (strong) Dirichlet boundary condition can be handled automatically by the Ferrite library.</p><pre><code class="language-julia hljs">dbc = Dirichlet(:u, union(getfacetset(grid, &quot;top&quot;), getfacetset(grid, &quot;right&quot;)), (x, t) -&gt; u_ana(x))
 add!(dbcs, dbc)
 close!(dbcs)
 update!(dbcs, 0.0)
 
 K = allocate_matrix(dh);
 
-function doassemble(cellvalues::CellValues, facetvalues::FacetValues,
-                         K::SparseMatrixCSC, dh::DofHandler)
+function doassemble(
+        cellvalues::CellValues, facetvalues::FacetValues, K::SparseMatrixCSC, dh::DofHandler
+    )
     b = 1.0
     f = zeros(ndofs(dh))
     assembler = start_assemble(K, f)
@@ -78,7 +81,7 @@ function doassemble(cellvalues::CellValues, facetvalues::FacetValues,
             end
         end</code></pre><p>Now we manually add the von Neumann boundary terms</p><p class="math-container">\[\int_{\Gamma_2} δu g_2 \, d\Gamma\]</p><pre><code class="language-julia hljs">        for facet in 1:nfacets(cell)
             if (cellcount, facet) ∈ getfacetset(grid, &quot;left&quot;) ||
-               (cellcount, facet) ∈ getfacetset(grid, &quot;bottom&quot;)
+                    (cellcount, facet) ∈ getfacetset(grid, &quot;bottom&quot;)
                 reinit!(facetvalues, cell, facet)
                 for q_point in 1:getnquadpoints(facetvalues)
                     coords_qp = spatial_coordinate(facetvalues, q_point, coords)
@@ -105,4 +108,4 @@ u = Symmetric(K) \ f;
 vtk = VTKGridFile(&quot;helmholtz&quot;, dh)
 write_solution(vtk, dh, u)
 close(vtk)
-println(&quot;Helmholtz successful&quot;)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">Helmholtz successful</code></pre><hr/><p><em>This page was generated using <a href="https://github.com/fredrikekre/Literate.jl">Literate.jl</a>.</em></p></article><nav class="docs-footer"><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option><option value="catppuccin-latte">catppuccin-latte</option><option value="catppuccin-frappe">catppuccin-frappe</option><option value="catppuccin-macchiato">catppuccin-macchiato</option><option value="catppuccin-mocha">catppuccin-mocha</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.7.0 on <span class="colophon-date" title="Tuesday 29 October 2024 18:49">Tuesday 29 October 2024</span>. Using Julia version 1.11.1.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
+println(&quot;Helmholtz successful&quot;)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">Helmholtz successful</code></pre><hr/><p><em>This page was generated using <a href="https://github.com/fredrikekre/Literate.jl">Literate.jl</a>.</em></p></article><nav class="docs-footer"><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option><option value="catppuccin-latte">catppuccin-latte</option><option value="catppuccin-frappe">catppuccin-frappe</option><option value="catppuccin-macchiato">catppuccin-macchiato</option><option value="catppuccin-mocha">catppuccin-mocha</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.7.0 on <span class="colophon-date" title="Thursday 31 October 2024 12:23">Thursday 31 October 2024</span>. Using Julia version 1.11.1.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>

@@ -6,12 +6,12 @@
     H::T  # Hardening modulus
     Dᵉ::S # Elastic stiffness tensor
 end;</code></pre><p>Next, we define a constructor for the material instance.</p><pre><code class="language-julia hljs">function J2Plasticity(E, ν, σ₀, H)
-    δ(i,j) = i == j ? 1.0 : 0.0 # helper function
+    δ(i, j) = i == j ? 1.0 : 0.0 # helper function
     G = E / 2(1 + ν)
     K = E / 3(1 - 2ν)
 
-    Isymdev(i,j,k,l) = 0.5*(δ(i,k)*δ(j,l) + δ(i,l)*δ(j,k)) - 1.0/3.0*δ(i,j)*δ(k,l)
-    temp(i,j,k,l) = 2.0G *( 0.5*(δ(i,k)*δ(j,l) + δ(i,l)*δ(j,k)) + ν/(1.0-2.0ν)*δ(i,j)*δ(k,l))
+    Isymdev(i, j, k, l) = 0.5 * (δ(i, k) * δ(j, l) + δ(i, l) * δ(j, k)) - 1.0 / 3.0 * δ(i, j) * δ(k, l)
+    temp(i, j, k, l) = 2.0G * (0.5 * (δ(i, k) * δ(j, l) + δ(i, l) * δ(j, k)) + ν / (1.0 - 2.0ν) * δ(i, j) * δ(k, l))
     Dᵉ = SymmetricTensor{4, 3}(temp)
     return J2Plasticity(G, K, σ₀, H, Dᵉ)
 end;</code></pre><div class="admonition is-info"><header class="admonition-header">Note</header><div class="admonition-body"><p>Above, we defined a constructor <code>J2Plasticity(E, ν, σ₀, H)</code> in terms of the more common material parameters <span>$E$</span> and <span>$ν$</span> - simply as a convenience for the user.</p></div></div><p>Define a <code>struct</code> to store the material state for a Gauss point.</p><pre><code class="language-julia hljs">struct MaterialState{T, S &lt;: SecondOrderTensor{3, T}}
@@ -21,12 +21,13 @@ end;</code></pre><div class="admonition is-info"><header class="admonition-heade
     k::T # hardening variable
 end</code></pre><p>Constructor for initializing a material state. Every quantity is set to zero.</p><pre><code class="language-julia hljs">function MaterialState()
     return MaterialState(
-                zero(SymmetricTensor{2, 3}),
-                zero(SymmetricTensor{2, 3}),
-                0.0)
+        zero(SymmetricTensor{2, 3}),
+        zero(SymmetricTensor{2, 3}),
+        0.0
+    )
 end</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">Main.MaterialState</code></pre><p>For later use, during the post-processing step, we define a function to compute the von Mises effective stress.</p><pre><code class="language-julia hljs">function vonMises(σ)
     s = dev(σ)
-    return sqrt(3.0/2.0 * s ⊡ s)
+    return sqrt(3.0 / 2.0 * s ⊡ s)
 end;</code></pre><h2 id="Constitutive-driver"><a class="docs-heading-anchor" href="#Constitutive-driver">Constitutive driver</a><a id="Constitutive-driver-1"></a><a class="docs-heading-anchor-permalink" href="#Constitutive-driver" title="Permalink"></a></h2><p>This is the actual method which computes the stress and material tangent stiffness in a given integration point. Input is the current strain and the material state from the previous timestep.</p><pre><code class="language-julia hljs">function compute_stress_tangent(ϵ::SymmetricTensor{2, 3}, material::J2Plasticity, state::MaterialState)
     # unpack some material parameters
     G = material.G
@@ -36,16 +37,16 @@ end;</code></pre><h2 id="Constitutive-driver"><a class="docs-heading-anchor" hre
     σᵗ = material.Dᵉ ⊡ (ϵ - state.ϵᵖ) # trial-stress
     sᵗ = dev(σᵗ)         # deviatoric part of trial-stress
     J₂ = 0.5 * sᵗ ⊡ sᵗ   # second invariant of sᵗ
-    σᵗₑ = sqrt(3.0*J₂)   # effective trial-stress (von Mises stress)
+    σᵗₑ = sqrt(3.0 * J₂) # effective trial-stress (von Mises stress)
     σʸ = material.σ₀ + H * state.k # Previous yield limit
 
-    φᵗ  = σᵗₑ - σʸ # Trial-value of the yield surface
+    φᵗ = σᵗₑ - σʸ # Trial-value of the yield surface
 
     if φᵗ &lt; 0.0 # elastic loading
         return σᵗ, material.Dᵉ, MaterialState(state.ϵᵖ, σᵗ, state.k)
     else # plastic loading
         h = H + 3G
-        μ =  φᵗ / h   # plastic multiplier
+        μ = φᵗ / h # plastic multiplier
 
         c1 = 1 - 3G * μ / σᵗₑ
         s = c1 * sᵗ           # updated deviatoric stress
@@ -55,23 +56,23 @@ end;</code></pre><h2 id="Constitutive-driver"><a class="docs-heading-anchor" hre
         κ = H * (state.k + μ) # drag stress
         σₑ = material.σ₀ + κ  # updated yield surface
 
-        δ(i,j) = i == j ? 1.0 : 0.0
-        Isymdev(i,j,k,l)  = 0.5*(δ(i,k)*δ(j,l) + δ(i,l)*δ(j,k)) - 1.0/3.0*δ(i,j)*δ(k,l)
-        Q(i,j,k,l) = Isymdev(i,j,k,l) - 3.0 / (2.0*σₑ^2) * s[i,j]*s[k,l]
-        b = (3G*μ/σₑ) / (1.0 + 3G*μ/σₑ)
+        δ(i, j) = i == j ? 1.0 : 0.0
+        Isymdev(i, j, k, l) = 0.5 * (δ(i, k) * δ(j, l) + δ(i, l) * δ(j, k)) - 1.0 / 3.0 * δ(i, j) * δ(k, l)
+        Q(i, j, k, l) = Isymdev(i, j, k, l) - 3.0 / (2.0 * σₑ^2) * s[i, j] * s[k, l]
+        b = (3G * μ / σₑ) / (1.0 + 3G * μ / σₑ)
 
-        Dtemp(i,j,k,l) = -2G*b * Q(i,j,k,l) - 9G^2 / (h*σₑ^2) * s[i,j]*s[k,l]
+        Dtemp(i, j, k, l) = -2G * b * Q(i, j, k, l) - 9G^2 / (h * σₑ^2) * s[i, j] * s[k, l]
         D = material.Dᵉ + SymmetricTensor{4, 3}(Dtemp)
 
         # Return new state
-        Δϵᵖ = 3/2 * μ / σₑ * s # plastic strain
-        ϵᵖ = state.ϵᵖ + Δϵᵖ    # plastic strain
-        k = state.k + μ        # hardening variable
+        Δϵᵖ = 3 / 2 * μ / σₑ * s # plastic strain
+        ϵᵖ = state.ϵᵖ + Δϵᵖ      # plastic strain
+        k = state.k + μ          # hardening variable
         return σ, D, MaterialState(ϵᵖ, σ, k)
     end
 end</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">compute_stress_tangent (generic function with 1 method)</code></pre><h2 id="FE-problem"><a class="docs-heading-anchor" href="#FE-problem">FE-problem</a><a id="FE-problem-1"></a><a class="docs-heading-anchor-permalink" href="#FE-problem" title="Permalink"></a></h2><p>What follows are methods for assembling and and solving the FE-problem.</p><pre><code class="language-julia hljs">function create_values(interpolation)
     # setup quadrature rules
-    qr      = QuadratureRule{RefTetrahedron}(2)
+    qr = QuadratureRule{RefTetrahedron}(2)
     facet_qr = FacetQuadratureRule{RefTetrahedron}(3)
 
     # cell and facetvalues for u
@@ -88,12 +89,14 @@ end</code></pre><pre class="documenter-example-output"><code class="nohighlight 
     dbcs = ConstraintHandler(dh)
     # Clamped on the left side
     dofs = [1, 2, 3]
-    dbc = Dirichlet(:u, getfacetset(grid, &quot;left&quot;), (x,t) -&gt; [0.0, 0.0, 0.0], dofs)
+    dbc = Dirichlet(:u, getfacetset(grid, &quot;left&quot;), (x, t) -&gt; [0.0, 0.0, 0.0], dofs)
     add!(dbcs, dbc)
     close!(dbcs)
     return dbcs
-end;</code></pre><h3 id="Assembling-of-element-contributions"><a class="docs-heading-anchor" href="#Assembling-of-element-contributions">Assembling of element contributions</a><a id="Assembling-of-element-contributions-1"></a><a class="docs-heading-anchor-permalink" href="#Assembling-of-element-contributions" title="Permalink"></a></h3><ul><li>Residual vector <code>r</code></li><li>Tangent stiffness <code>K</code></li></ul><pre><code class="language-julia hljs">function doassemble!(K::SparseMatrixCSC, r::Vector, cellvalues::CellValues, dh::DofHandler,
-                     material::J2Plasticity, u, states, states_old)
+end;</code></pre><h3 id="Assembling-of-element-contributions"><a class="docs-heading-anchor" href="#Assembling-of-element-contributions">Assembling of element contributions</a><a id="Assembling-of-element-contributions-1"></a><a class="docs-heading-anchor-permalink" href="#Assembling-of-element-contributions" title="Permalink"></a></h3><ul><li>Residual vector <code>r</code></li><li>Tangent stiffness <code>K</code></li></ul><pre><code class="language-julia hljs">function doassemble!(
+        K::SparseMatrixCSC, r::Vector, cellvalues::CellValues, dh::DofHandler,
+        material::J2Plasticity, u, states, states_old
+    )
     assembler = start_assemble(K, r)
     nu = getnbasefunctions(cellvalues)
     re = zeros(nu)     # element residual vector
@@ -110,8 +113,7 @@ end;</code></pre><h3 id="Assembling-of-element-contributions"><a class="docs-hea
         assemble!(assembler, eldofs, ke, re)
     end
     return K, r
-end</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">doassemble! (generic function with 1 method)</code></pre><p>Compute element contribution to the residual and the tangent.</p><div class="admonition is-info"><header class="admonition-header">Note</header><div class="admonition-body"><p>Due to symmetry, we only compute the lower half of the tangent and then symmetrize it.</p></div></div><pre><code class="language-julia hljs">function assemble_cell!(Ke, re, cell, cellvalues, material,
-                        ue, state, state_old)
+end</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">doassemble! (generic function with 1 method)</code></pre><p>Compute element contribution to the residual and the tangent.</p><div class="admonition is-info"><header class="admonition-header">Note</header><div class="admonition-body"><p>Due to symmetry, we only compute the lower half of the tangent and then symmetrize it.</p></div></div><pre><code class="language-julia hljs">function assemble_cell!(Ke, re, cell, cellvalues, material, ue, state, state_old)
     n_basefuncs = getnbasefunctions(cellvalues)
     reinit!(cellvalues, cell)
 
@@ -131,12 +133,14 @@ end</code></pre><pre class="documenter-example-output"><code class="nohighlight 
         end
     end
     symmetrize_lower!(Ke)
+    return
 end</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">assemble_cell! (generic function with 1 method)</code></pre><p>Helper function to symmetrize the material tangent</p><pre><code class="language-julia hljs">function symmetrize_lower!(K)
-    for i in 1:size(K,1)
-        for j in i+1:size(K,1)
-            K[i,j] = K[j,i]
+    for i in 1:size(K, 1)
+        for j in (i + 1):size(K, 1)
+            K[i, j] = K[j, i]
         end
     end
+    return
 end;
 
 function doassemble_neumann!(r, dh, facetset, facetvalues, t)
@@ -158,10 +162,10 @@ function doassemble_neumann!(r, dh, facetset, facetvalues, t)
     return r
 end</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">doassemble_neumann! (generic function with 1 method)</code></pre><p>Define a function which solves the FE-problem.</p><pre><code class="language-julia hljs">function solve()
     # Define material parameters
-    E = 200.0e9 # [Pa]
-    H = E/20   # [Pa]
-    ν = 0.3     # [-]
-    σ₀ = 200e6  # [Pa]
+    E = 200.0e9  # [Pa]
+    H = E / 20   # [Pa]
+    ν = 0.3      # [-]
+    σ₀ = 200.0e6 # [Pa]
     material = J2Plasticity(E, ν, σ₀, H)
 
     L = 10.0 # beam length [m]
@@ -169,7 +173,7 @@ end</code></pre><pre class="documenter-example-output"><code class="nohighlight 
     h = 1.0  # beam height[m]
     n_timesteps = 10
     u_max = zeros(n_timesteps)
-    traction_magnitude = 1.e7 * range(0.5, 1.0, length=n_timesteps)
+    traction_magnitude = 1.0e7 * range(0.5, 1.0, length = n_timesteps)
 
     # Create geometry, dofs and boundary conditions
     n = 2
@@ -186,10 +190,10 @@ end</code></pre><pre class="documenter-example-output"><code class="nohighlight 
 
     # Pre-allocate solution vectors, etc.
     n_dofs = ndofs(dh)  # total number of dofs
-    u  = zeros(n_dofs)  # solution vector
+    u = zeros(n_dofs)   # solution vector
     Δu = zeros(n_dofs)  # displacement correction
     r = zeros(n_dofs)   # residual
-    K = allocate_matrix(dh); # tangent stiffness matrix
+    K = allocate_matrix(dh) # tangent stiffness matrix
 
     # Create material states. One array for each cell, where each element is an array of material-
     # states - one for each integration point
@@ -209,14 +213,14 @@ end</code></pre><pre class="documenter-example-output"><code class="nohighlight 
         update!(dbcs, t) # evaluates the D-bndc at time t
         apply!(u, dbcs)  # set the prescribed values in the solution vector
 
-        while true; newton_itr += 1
-
+        while true
+            newton_itr += 1
             if newton_itr &gt; 8
                 error(&quot;Reached maximum Newton iterations, aborting&quot;)
                 break
             end
             # Tangent and residual contribution from the cells (volume integral)
-            doassemble!(K, r, cellvalues, dh, material, u, states, states_old);
+            doassemble!(K, r, cellvalues, dh, material, u, states, states_old)
             # Residual contribution from the Neumann boundary (surface integral)
             doassemble_neumann!(r, dh, getfacetset(grid, &quot;right&quot;), facetvalues, traction)
             norm_r = norm(r[Ferrite.free_dofs(dbcs)])
@@ -246,7 +250,7 @@ end</code></pre><pre class="documenter-example-output"><code class="nohighlight 
     for (el, cell_states) in enumerate(eachcol(states))
         for state in cell_states
             mises_values[el] += vonMises(state.σ)
-            κ_values[el] += state.k*material.H
+            κ_values[el] += state.k * material.H
         end
         mises_values[el] /= length(cell_states) # average von Mises stress
         κ_values[el] /= length(cell_states)     # average drag stress
@@ -336,13 +340,13 @@ Iteration: 5 	residual: 0.00005322</code></pre><p>Finally we plot the load-displ
 plot(
     vcat(0.0, u_max),                # add the origin as a point
     vcat(0.0, traction_magnitude),
-    linewidth=2,
-    title=&quot;Traction-displacement&quot;,
-    label=nothing,
-    markershape=:auto
-    )
+    linewidth = 2,
+    title = &quot;Traction-displacement&quot;,
+    label = nothing,
+    markershape = :auto
+)
 ylabel!(&quot;Traction [Pa]&quot;)
-xlabel!(&quot;Maximum deflection [m]&quot;)</code></pre><img src="a1572be4.svg" alt="Example block output"/><p><em>Figure 2.</em> Load-displacement-curve for the beam, showing a clear decrease in stiffness as more material starts to yield.</p><h2 id="plasticity-plain-program"><a class="docs-heading-anchor" href="#plasticity-plain-program">Plain program</a><a id="plasticity-plain-program-1"></a><a class="docs-heading-anchor-permalink" href="#plasticity-plain-program" title="Permalink"></a></h2><p>Here follows a version of the program without any comments. The file is also available here: <a href="../plasticity.jl"><code>plasticity.jl</code></a>.</p><pre><code class="language-julia hljs">using Ferrite, Tensors, SparseArrays, LinearAlgebra, Printf
+xlabel!(&quot;Maximum deflection [m]&quot;)</code></pre><img src="c79b7a9e.svg" alt="Example block output"/><p><em>Figure 2.</em> Load-displacement-curve for the beam, showing a clear decrease in stiffness as more material starts to yield.</p><h2 id="plasticity-plain-program"><a class="docs-heading-anchor" href="#plasticity-plain-program">Plain program</a><a id="plasticity-plain-program-1"></a><a class="docs-heading-anchor-permalink" href="#plasticity-plain-program" title="Permalink"></a></h2><p>Here follows a version of the program without any comments. The file is also available here: <a href="../plasticity.jl"><code>plasticity.jl</code></a>.</p><pre><code class="language-julia hljs">using Ferrite, Tensors, SparseArrays, LinearAlgebra, Printf
 
 struct J2Plasticity{T, S &lt;: SymmetricTensor{4, 3, T}}
     G::T  # Shear modulus
@@ -353,12 +357,12 @@ struct J2Plasticity{T, S &lt;: SymmetricTensor{4, 3, T}}
 end;
 
 function J2Plasticity(E, ν, σ₀, H)
-    δ(i,j) = i == j ? 1.0 : 0.0 # helper function
+    δ(i, j) = i == j ? 1.0 : 0.0 # helper function
     G = E / 2(1 + ν)
     K = E / 3(1 - 2ν)
 
-    Isymdev(i,j,k,l) = 0.5*(δ(i,k)*δ(j,l) + δ(i,l)*δ(j,k)) - 1.0/3.0*δ(i,j)*δ(k,l)
-    temp(i,j,k,l) = 2.0G *( 0.5*(δ(i,k)*δ(j,l) + δ(i,l)*δ(j,k)) + ν/(1.0-2.0ν)*δ(i,j)*δ(k,l))
+    Isymdev(i, j, k, l) = 0.5 * (δ(i, k) * δ(j, l) + δ(i, l) * δ(j, k)) - 1.0 / 3.0 * δ(i, j) * δ(k, l)
+    temp(i, j, k, l) = 2.0G * (0.5 * (δ(i, k) * δ(j, l) + δ(i, l) * δ(j, k)) + ν / (1.0 - 2.0ν) * δ(i, j) * δ(k, l))
     Dᵉ = SymmetricTensor{4, 3}(temp)
     return J2Plasticity(G, K, σ₀, H, Dᵉ)
 end;
@@ -372,14 +376,15 @@ end
 
 function MaterialState()
     return MaterialState(
-                zero(SymmetricTensor{2, 3}),
-                zero(SymmetricTensor{2, 3}),
-                0.0)
+        zero(SymmetricTensor{2, 3}),
+        zero(SymmetricTensor{2, 3}),
+        0.0
+    )
 end
 
 function vonMises(σ)
     s = dev(σ)
-    return sqrt(3.0/2.0 * s ⊡ s)
+    return sqrt(3.0 / 2.0 * s ⊡ s)
 end;
 
 function compute_stress_tangent(ϵ::SymmetricTensor{2, 3}, material::J2Plasticity, state::MaterialState)
@@ -391,16 +396,16 @@ function compute_stress_tangent(ϵ::SymmetricTensor{2, 3}, material::J2Plasticit
     σᵗ = material.Dᵉ ⊡ (ϵ - state.ϵᵖ) # trial-stress
     sᵗ = dev(σᵗ)         # deviatoric part of trial-stress
     J₂ = 0.5 * sᵗ ⊡ sᵗ   # second invariant of sᵗ
-    σᵗₑ = sqrt(3.0*J₂)   # effective trial-stress (von Mises stress)
+    σᵗₑ = sqrt(3.0 * J₂) # effective trial-stress (von Mises stress)
     σʸ = material.σ₀ + H * state.k # Previous yield limit
 
-    φᵗ  = σᵗₑ - σʸ # Trial-value of the yield surface
+    φᵗ = σᵗₑ - σʸ # Trial-value of the yield surface
 
     if φᵗ &lt; 0.0 # elastic loading
         return σᵗ, material.Dᵉ, MaterialState(state.ϵᵖ, σᵗ, state.k)
     else # plastic loading
         h = H + 3G
-        μ =  φᵗ / h   # plastic multiplier
+        μ = φᵗ / h # plastic multiplier
 
         c1 = 1 - 3G * μ / σᵗₑ
         s = c1 * sᵗ           # updated deviatoric stress
@@ -410,25 +415,25 @@ function compute_stress_tangent(ϵ::SymmetricTensor{2, 3}, material::J2Plasticit
         κ = H * (state.k + μ) # drag stress
         σₑ = material.σ₀ + κ  # updated yield surface
 
-        δ(i,j) = i == j ? 1.0 : 0.0
-        Isymdev(i,j,k,l)  = 0.5*(δ(i,k)*δ(j,l) + δ(i,l)*δ(j,k)) - 1.0/3.0*δ(i,j)*δ(k,l)
-        Q(i,j,k,l) = Isymdev(i,j,k,l) - 3.0 / (2.0*σₑ^2) * s[i,j]*s[k,l]
-        b = (3G*μ/σₑ) / (1.0 + 3G*μ/σₑ)
+        δ(i, j) = i == j ? 1.0 : 0.0
+        Isymdev(i, j, k, l) = 0.5 * (δ(i, k) * δ(j, l) + δ(i, l) * δ(j, k)) - 1.0 / 3.0 * δ(i, j) * δ(k, l)
+        Q(i, j, k, l) = Isymdev(i, j, k, l) - 3.0 / (2.0 * σₑ^2) * s[i, j] * s[k, l]
+        b = (3G * μ / σₑ) / (1.0 + 3G * μ / σₑ)
 
-        Dtemp(i,j,k,l) = -2G*b * Q(i,j,k,l) - 9G^2 / (h*σₑ^2) * s[i,j]*s[k,l]
+        Dtemp(i, j, k, l) = -2G * b * Q(i, j, k, l) - 9G^2 / (h * σₑ^2) * s[i, j] * s[k, l]
         D = material.Dᵉ + SymmetricTensor{4, 3}(Dtemp)
 
         # Return new state
-        Δϵᵖ = 3/2 * μ / σₑ * s # plastic strain
-        ϵᵖ = state.ϵᵖ + Δϵᵖ    # plastic strain
-        k = state.k + μ        # hardening variable
+        Δϵᵖ = 3 / 2 * μ / σₑ * s # plastic strain
+        ϵᵖ = state.ϵᵖ + Δϵᵖ      # plastic strain
+        k = state.k + μ          # hardening variable
         return σ, D, MaterialState(ϵᵖ, σ, k)
     end
 end
 
 function create_values(interpolation)
     # setup quadrature rules
-    qr      = QuadratureRule{RefTetrahedron}(2)
+    qr = QuadratureRule{RefTetrahedron}(2)
     facet_qr = FacetQuadratureRule{RefTetrahedron}(3)
 
     # cell and facetvalues for u
@@ -449,14 +454,16 @@ function create_bc(dh, grid)
     dbcs = ConstraintHandler(dh)
     # Clamped on the left side
     dofs = [1, 2, 3]
-    dbc = Dirichlet(:u, getfacetset(grid, &quot;left&quot;), (x,t) -&gt; [0.0, 0.0, 0.0], dofs)
+    dbc = Dirichlet(:u, getfacetset(grid, &quot;left&quot;), (x, t) -&gt; [0.0, 0.0, 0.0], dofs)
     add!(dbcs, dbc)
     close!(dbcs)
     return dbcs
 end;
 
-function doassemble!(K::SparseMatrixCSC, r::Vector, cellvalues::CellValues, dh::DofHandler,
-                     material::J2Plasticity, u, states, states_old)
+function doassemble!(
+        K::SparseMatrixCSC, r::Vector, cellvalues::CellValues, dh::DofHandler,
+        material::J2Plasticity, u, states, states_old
+    )
     assembler = start_assemble(K, r)
     nu = getnbasefunctions(cellvalues)
     re = zeros(nu)     # element residual vector
@@ -475,8 +482,7 @@ function doassemble!(K::SparseMatrixCSC, r::Vector, cellvalues::CellValues, dh::
     return K, r
 end
 
-function assemble_cell!(Ke, re, cell, cellvalues, material,
-                        ue, state, state_old)
+function assemble_cell!(Ke, re, cell, cellvalues, material, ue, state, state_old)
     n_basefuncs = getnbasefunctions(cellvalues)
     reinit!(cellvalues, cell)
 
@@ -496,14 +502,16 @@ function assemble_cell!(Ke, re, cell, cellvalues, material,
         end
     end
     symmetrize_lower!(Ke)
+    return
 end
 
 function symmetrize_lower!(K)
-    for i in 1:size(K,1)
-        for j in i+1:size(K,1)
-            K[i,j] = K[j,i]
+    for i in 1:size(K, 1)
+        for j in (i + 1):size(K, 1)
+            K[i, j] = K[j, i]
         end
     end
+    return
 end;
 
 function doassemble_neumann!(r, dh, facetset, facetvalues, t)
@@ -527,10 +535,10 @@ end
 
 function solve()
     # Define material parameters
-    E = 200.0e9 # [Pa]
-    H = E/20   # [Pa]
-    ν = 0.3     # [-]
-    σ₀ = 200e6  # [Pa]
+    E = 200.0e9  # [Pa]
+    H = E / 20   # [Pa]
+    ν = 0.3      # [-]
+    σ₀ = 200.0e6 # [Pa]
     material = J2Plasticity(E, ν, σ₀, H)
 
     L = 10.0 # beam length [m]
@@ -538,7 +546,7 @@ function solve()
     h = 1.0  # beam height[m]
     n_timesteps = 10
     u_max = zeros(n_timesteps)
-    traction_magnitude = 1.e7 * range(0.5, 1.0, length=n_timesteps)
+    traction_magnitude = 1.0e7 * range(0.5, 1.0, length = n_timesteps)
 
     # Create geometry, dofs and boundary conditions
     n = 2
@@ -555,10 +563,10 @@ function solve()
 
     # Pre-allocate solution vectors, etc.
     n_dofs = ndofs(dh)  # total number of dofs
-    u  = zeros(n_dofs)  # solution vector
+    u = zeros(n_dofs)   # solution vector
     Δu = zeros(n_dofs)  # displacement correction
     r = zeros(n_dofs)   # residual
-    K = allocate_matrix(dh); # tangent stiffness matrix
+    K = allocate_matrix(dh) # tangent stiffness matrix
 
     # Create material states. One array for each cell, where each element is an array of material-
     # states - one for each integration point
@@ -578,14 +586,14 @@ function solve()
         update!(dbcs, t) # evaluates the D-bndc at time t
         apply!(u, dbcs)  # set the prescribed values in the solution vector
 
-        while true; newton_itr += 1
-
+        while true
+            newton_itr += 1
             if newton_itr &gt; 8
                 error(&quot;Reached maximum Newton iterations, aborting&quot;)
                 break
             end
             # Tangent and residual contribution from the cells (volume integral)
-            doassemble!(K, r, cellvalues, dh, material, u, states, states_old);
+            doassemble!(K, r, cellvalues, dh, material, u, states, states_old)
             # Residual contribution from the Neumann boundary (surface integral)
             doassemble_neumann!(r, dh, getfacetset(grid, &quot;right&quot;), facetvalues, traction)
             norm_r = norm(r[Ferrite.free_dofs(dbcs)])
@@ -615,7 +623,7 @@ function solve()
     for (el, cell_states) in enumerate(eachcol(states))
         for state in cell_states
             mises_values[el] += vonMises(state.σ)
-            κ_values[el] += state.k*material.H
+            κ_values[el] += state.k * material.H
         end
         mises_values[el] /= length(cell_states) # average von Mises stress
         κ_values[el] /= length(cell_states)     # average drag stress
@@ -635,10 +643,10 @@ using Plots
 plot(
     vcat(0.0, u_max),                # add the origin as a point
     vcat(0.0, traction_magnitude),
-    linewidth=2,
-    title=&quot;Traction-displacement&quot;,
-    label=nothing,
-    markershape=:auto
-    )
+    linewidth = 2,
+    title = &quot;Traction-displacement&quot;,
+    label = nothing,
+    markershape = :auto
+)
 ylabel!(&quot;Traction [Pa]&quot;)
-xlabel!(&quot;Maximum deflection [m]&quot;)</code></pre><hr/><p><em>This page was generated using <a href="https://github.com/fredrikekre/Literate.jl">Literate.jl</a>.</em></p></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../hyperelasticity/">« Hyperelasticity</a><a class="docs-footer-nextpage" href="../transient_heat_equation/">Transient heat equation »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option><option value="catppuccin-latte">catppuccin-latte</option><option value="catppuccin-frappe">catppuccin-frappe</option><option value="catppuccin-macchiato">catppuccin-macchiato</option><option value="catppuccin-mocha">catppuccin-mocha</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.7.0 on <span class="colophon-date" title="Tuesday 29 October 2024 18:49">Tuesday 29 October 2024</span>. Using Julia version 1.11.1.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
+xlabel!(&quot;Maximum deflection [m]&quot;)</code></pre><hr/><p><em>This page was generated using <a href="https://github.com/fredrikekre/Literate.jl">Literate.jl</a>.</em></p></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../hyperelasticity/">« Hyperelasticity</a><a class="docs-footer-nextpage" href="../transient_heat_equation/">Transient heat equation »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option><option value="catppuccin-latte">catppuccin-latte</option><option value="catppuccin-frappe">catppuccin-frappe</option><option value="catppuccin-macchiato">catppuccin-macchiato</option><option value="catppuccin-mocha">catppuccin-mocha</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.7.0 on <span class="colophon-date" title="Thursday 31 October 2024 12:23">Thursday 31 October 2024</span>. Using Julia version 1.11.1.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>

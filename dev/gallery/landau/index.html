@@ -5,48 +5,48 @@ using Ferrite
 using Optim, LineSearches
 using SparseArrays
 using Tensors
-using Base.Threads</code></pre><h2 id="Energy-terms"><a class="docs-heading-anchor" href="#Energy-terms">Energy terms</a><a id="Energy-terms-1"></a><a class="docs-heading-anchor-permalink" href="#Energy-terms" title="Permalink"></a></h2><h3 id="4th-order-Landau-free-energy"><a class="docs-heading-anchor" href="#4th-order-Landau-free-energy">4th order Landau free energy</a><a id="4th-order-Landau-free-energy-1"></a><a class="docs-heading-anchor-permalink" href="#4th-order-Landau-free-energy" title="Permalink"></a></h3><pre><code class="language-julia hljs">function Fl(P::Vec{3, T}, α::Vec{3}) where T
+using Base.Threads</code></pre><h2 id="Energy-terms"><a class="docs-heading-anchor" href="#Energy-terms">Energy terms</a><a id="Energy-terms-1"></a><a class="docs-heading-anchor-permalink" href="#Energy-terms" title="Permalink"></a></h2><h3 id="4th-order-Landau-free-energy"><a class="docs-heading-anchor" href="#4th-order-Landau-free-energy">4th order Landau free energy</a><a id="4th-order-Landau-free-energy-1"></a><a class="docs-heading-anchor-permalink" href="#4th-order-Landau-free-energy" title="Permalink"></a></h3><pre><code class="language-julia hljs">function Fl(P::Vec{3, T}, α::Vec{3}) where {T}
     P2 = Vec{3, T}((P[1]^2, P[2]^2, P[3]^2))
-    return (α[1] * sum(P2) +
-           α[2] * (P[1]^4 + P[2]^4 + P[3]^4)) +
-           α[3] * ((P2[1] * P2[2]  + P2[2]*P2[3]) + P2[1]*P2[3])
-end</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">Fl (generic function with 1 method)</code></pre><h3 id="Ginzburg-free-energy"><a class="docs-heading-anchor" href="#Ginzburg-free-energy">Ginzburg free energy</a><a id="Ginzburg-free-energy-1"></a><a class="docs-heading-anchor-permalink" href="#Ginzburg-free-energy" title="Permalink"></a></h3><pre><code class="language-julia hljs">@inline Fg(∇P, G) = 0.5(∇P ⊡ G) ⊡ ∇P</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">Fg (generic function with 1 method)</code></pre><h3 id="GL-free-energy"><a class="docs-heading-anchor" href="#GL-free-energy">GL free energy</a><a id="GL-free-energy-1"></a><a class="docs-heading-anchor-permalink" href="#GL-free-energy" title="Permalink"></a></h3><pre><code class="language-julia hljs">F(P, ∇P, params)  = Fl(P, params.α) + Fg(∇P, params.G)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">F (generic function with 1 method)</code></pre><h3 id="Parameters-that-characterize-the-model"><a class="docs-heading-anchor" href="#Parameters-that-characterize-the-model">Parameters that characterize the model</a><a id="Parameters-that-characterize-the-model-1"></a><a class="docs-heading-anchor-permalink" href="#Parameters-that-characterize-the-model" title="Permalink"></a></h3><pre><code class="language-julia hljs">struct ModelParams{V, T}
+    return α[1] * sum(P2) +
+        α[2] * (P[1]^4 + P[2]^4 + P[3]^4) +
+        α[3] * ((P2[1] * P2[2] + P2[2] * P2[3]) + P2[1] * P2[3])
+end</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">Fl (generic function with 1 method)</code></pre><h3 id="Ginzburg-free-energy"><a class="docs-heading-anchor" href="#Ginzburg-free-energy">Ginzburg free energy</a><a id="Ginzburg-free-energy-1"></a><a class="docs-heading-anchor-permalink" href="#Ginzburg-free-energy" title="Permalink"></a></h3><pre><code class="language-julia hljs">@inline Fg(∇P, G) = 0.5(∇P ⊡ G) ⊡ ∇P</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">Fg (generic function with 1 method)</code></pre><h3 id="GL-free-energy"><a class="docs-heading-anchor" href="#GL-free-energy">GL free energy</a><a id="GL-free-energy-1"></a><a class="docs-heading-anchor-permalink" href="#GL-free-energy" title="Permalink"></a></h3><pre><code class="language-julia hljs">F(P, ∇P, params) = Fl(P, params.α) + Fg(∇P, params.G)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">F (generic function with 1 method)</code></pre><h3 id="Parameters-that-characterize-the-model"><a class="docs-heading-anchor" href="#Parameters-that-characterize-the-model">Parameters that characterize the model</a><a id="Parameters-that-characterize-the-model-1"></a><a class="docs-heading-anchor-permalink" href="#Parameters-that-characterize-the-model" title="Permalink"></a></h3><pre><code class="language-julia hljs">struct ModelParams{V, T}
     α::V
     G::T
 end</code></pre><h3 id="ThreadCache"><a class="docs-heading-anchor" href="#ThreadCache">ThreadCache</a><a id="ThreadCache-1"></a><a class="docs-heading-anchor-permalink" href="#ThreadCache" title="Permalink"></a></h3><p>This holds the values that each thread will use during the assembly.</p><pre><code class="language-julia hljs">struct ThreadCache{CV, T, DIM, F &lt;: Function, GC &lt;: GradientConfig, HC &lt;: HessianConfig}
-    cvP              ::CV
-    element_indices  ::Vector{Int}
-    element_dofs     ::Vector{T}
-    element_gradient ::Vector{T}
-    element_hessian  ::Matrix{T}
-    element_coords   ::Vector{Vec{DIM, T}}
+    cvP::CV
+    element_indices::Vector{Int}
+    element_dofs::Vector{T}
+    element_gradient::Vector{T}
+    element_hessian::Matrix{T}
+    element_coords::Vector{Vec{DIM, T}}
     element_potential::F
-    gradconf         ::GC
-    hessconf         ::HC
+    gradconf::GC
+    hessconf::HC
 end
 function ThreadCache(dpc::Int, nodespercell, cvP::CellValues, modelparams, elpotential)
-    element_indices  = zeros(Int, dpc)
-    element_dofs     = zeros(dpc)
+    element_indices = zeros(Int, dpc)
+    element_dofs = zeros(dpc)
     element_gradient = zeros(dpc)
-    element_hessian  = zeros(dpc, dpc)
-    element_coords   = zeros(Vec{3, Float64}, nodespercell)
-    potfunc          = x -&gt; elpotential(x, cvP, modelparams)
-    gradconf         = GradientConfig(potfunc, zeros(dpc), Chunk{12}())
-    hessconf         = HessianConfig(potfunc, zeros(dpc), Chunk{4}())
+    element_hessian = zeros(dpc, dpc)
+    element_coords = zeros(Vec{3, Float64}, nodespercell)
+    potfunc = x -&gt; elpotential(x, cvP, modelparams)
+    gradconf = GradientConfig(potfunc, zeros(dpc), Chunk{12}())
+    hessconf = HessianConfig(potfunc, zeros(dpc), Chunk{4}())
     return ThreadCache(cvP, element_indices, element_dofs, element_gradient, element_hessian, element_coords, potfunc, gradconf, hessconf)
 end</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">Main.ThreadCache</code></pre><h2 id="The-Model"><a class="docs-heading-anchor" href="#The-Model">The Model</a><a id="The-Model-1"></a><a class="docs-heading-anchor-permalink" href="#The-Model" title="Permalink"></a></h2><p>everything is combined into a model.</p><pre><code class="language-julia hljs">mutable struct LandauModel{T, DH &lt;: DofHandler, CH &lt;: ConstraintHandler, TC &lt;: ThreadCache}
-    dofs          ::Vector{T}
-    dofhandler    ::DH
-    boundaryconds ::CH
-    threadindices ::Vector{Vector{Int}}
-    threadcaches  ::Vector{TC}
+    dofs::Vector{T}
+    dofhandler::DH
+    boundaryconds::CH
+    threadindices::Vector{Vector{Int}}
+    threadcaches::Vector{TC}
 end
 
 function LandauModel(α, G, gridsize, left::Vec{DIM, T}, right::Vec{DIM, T}, elpotential) where {DIM, T}
     grid = generate_grid(Tetrahedron, gridsize, left, right)
     threadindices = Ferrite.create_coloring(grid)
 
-    qr  = QuadratureRule{RefTetrahedron}(2)
+    qr = QuadratureRule{RefTetrahedron}(2)
     ipP = Lagrange{RefTetrahedron, 1}()^3
     cvP = CellValues(qr, ipP)
 
@@ -68,55 +68,60 @@ function LandauModel(α, G, gridsize, left::Vec{DIM, T}, right::Vec{DIM, T}, elp
     hessian = allocate_matrix(dofhandler)
     dpc = ndofs_per_cell(dofhandler)
     cpc = length(grid.cells[1].nodes)
-    caches = [ThreadCache(dpc, cpc, copy(cvP), ModelParams(α, G), elpotential) for t=1:nthreads()]
+    caches = [ThreadCache(dpc, cpc, copy(cvP), ModelParams(α, G), elpotential) for t in 1:nthreads()]
     return LandauModel(dofvector, dofhandler, boundaryconds, threadindices, caches)
-end</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">Main.LandauModel</code></pre><p>utility to quickly save a model</p><pre><code class="language-julia hljs">function save_landau(path, model, dofs=model.dofs)
+end</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">Main.LandauModel</code></pre><p>utility to quickly save a model</p><pre><code class="language-julia hljs">function save_landau(path, model, dofs = model.dofs)
     VTKGridFile(path, model.dofhandler) do vtk
         write_solution(vtk, model.dofhandler, dofs)
     end
+    return
 end</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">save_landau (generic function with 2 methods)</code></pre><h2 id="Assembly"><a class="docs-heading-anchor" href="#Assembly">Assembly</a><a id="Assembly-1"></a><a class="docs-heading-anchor-permalink" href="#Assembly" title="Permalink"></a></h2><p>This macro defines most of the assembly step, since the structure is the same for the energy, gradient and Hessian calculations.</p><pre><code class="language-julia hljs">macro assemble!(innerbody)
-    esc(quote
-        dofhandler = model.dofhandler
-        for indices in model.threadindices
-            @threads for i in indices
-                cache     = model.threadcaches[threadid()]
-                eldofs    = cache.element_dofs
-                nodeids   = dofhandler.grid.cells[i].nodes
-                for j=1:length(cache.element_coords)
-                    cache.element_coords[j] = dofhandler.grid.nodes[nodeids[j]].x
-                end
-                reinit!(cache.cvP, cache.element_coords)
+    return esc(
+        quote
+            dofhandler = model.dofhandler
+            for indices in model.threadindices
+                @threads for i in indices
+                    cache = model.threadcaches[threadid()]
+                    eldofs = cache.element_dofs
+                    nodeids = dofhandler.grid.cells[i].nodes
+                    for j in 1:length(cache.element_coords)
+                        cache.element_coords[j] = dofhandler.grid.nodes[nodeids[j]].x
+                    end
+                    reinit!(cache.cvP, cache.element_coords)
 
-                celldofs!(cache.element_indices, dofhandler, i)
-                for j=1:length(cache.element_dofs)
-                    eldofs[j] = dofvector[cache.element_indices[j]]
+                    celldofs!(cache.element_indices, dofhandler, i)
+                    for j in 1:length(cache.element_dofs)
+                        eldofs[j] = dofvector[cache.element_indices[j]]
+                    end
+                    $innerbody
                 end
-                $innerbody
             end
         end
-    end)
-end</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">@assemble! (macro with 1 method)</code></pre><p>This calculates the total energy calculation of the grid</p><pre><code class="language-julia hljs">function F(dofvector::Vector{T}, model) where T
+    )
+end</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">@assemble! (macro with 1 method)</code></pre><p>This calculates the total energy calculation of the grid</p><pre><code class="language-julia hljs">function F(dofvector::Vector{T}, model) where {T}
     outs = fill(zero(T), nthreads())
     @assemble! begin
         outs[threadid()] += cache.element_potential(eldofs)
     end
     return sum(outs)
-end</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">F (generic function with 2 methods)</code></pre><p>The gradient calculation for each dof</p><pre><code class="language-julia hljs">function ∇F!(∇f::Vector{T}, dofvector::Vector{T}, model::LandauModel{T}) where T
+end</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">F (generic function with 2 methods)</code></pre><p>The gradient calculation for each dof</p><pre><code class="language-julia hljs">function ∇F!(∇f::Vector{T}, dofvector::Vector{T}, model::LandauModel{T}) where {T}
     fill!(∇f, zero(T))
     @assemble! begin
         ForwardDiff.gradient!(cache.element_gradient, cache.element_potential, eldofs, cache.gradconf)
         @inbounds assemble!(∇f, cache.element_indices, cache.element_gradient)
     end
-end</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">∇F! (generic function with 1 method)</code></pre><p>The Hessian calculation for the whole grid</p><pre><code class="language-julia hljs">function ∇²F!(∇²f::SparseMatrixCSC, dofvector::Vector{T}, model::LandauModel{T}) where T
-    assemblers = [start_assemble(∇²f) for t=1:nthreads()]
+    return
+end</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">∇F! (generic function with 1 method)</code></pre><p>The Hessian calculation for the whole grid</p><pre><code class="language-julia hljs">function ∇²F!(∇²f::SparseMatrixCSC, dofvector::Vector{T}, model::LandauModel{T}) where {T}
+    assemblers = [start_assemble(∇²f) for t in 1:nthreads()]
     @assemble! begin
         ForwardDiff.hessian!(cache.element_hessian, cache.element_potential, eldofs, cache.hessconf)
         @inbounds assemble!(assemblers[threadid()], cache.element_indices, cache.element_hessian)
     end
-end</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">∇²F! (generic function with 1 method)</code></pre><p>We can also calculate all things in one go!</p><pre><code class="language-julia hljs">function calcall(∇²f::SparseMatrixCSC, ∇f::Vector{T}, dofvector::Vector{T}, model::LandauModel{T}) where T
+    return
+end</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">∇²F! (generic function with 1 method)</code></pre><p>We can also calculate all things in one go!</p><pre><code class="language-julia hljs">function calcall(∇²f::SparseMatrixCSC, ∇f::Vector{T}, dofvector::Vector{T}, model::LandauModel{T}) where {T}
     outs = fill(zero(T), nthreads())
     fill!(∇f, zero(T))
-    assemblers = [start_assemble(∇²f, ∇f) for t=1:nthreads()]
+    assemblers = [start_assemble(∇²f, ∇f) for t in 1:nthreads()]
     @assemble! begin
         outs[threadid()] += cache.element_potential(eldofs)
         ForwardDiff.hessian!(cache.element_hessian, cache.element_potential, eldofs, cache.hessconf)
@@ -131,11 +136,11 @@ end</code></pre><pre class="documenter-example-output"><code class="nohighlight 
     ∇²f = allocate_matrix(dh)
     function g!(storage, x)
         ∇F!(storage, x, model)
-        apply_zero!(storage, model.boundaryconds)
+        return apply_zero!(storage, model.boundaryconds)
     end
     function h!(storage, x)
-        ∇²F!(storage, x, model)
-        #apply!(storage, model.boundaryconds)
+        return ∇²F!(storage, x, model)
+        # apply!(storage, model.boundaryconds)
     end
     f(x) = F(x, model)
 
@@ -147,13 +152,13 @@ end</code></pre><pre class="documenter-example-output"><code class="nohighlight 
     # model.dofs .= res.minimizer
     # to get the final convergence, Newton&#39;s method is more ideal since the energy landscape should be almost parabolic
     ##+
-    res = optimize(od, model.dofs, Newton(linesearch=BackTracking()), Optim.Options(show_trace=true, show_every=1, g_tol=1e-20))
+    res = optimize(od, model.dofs, Newton(linesearch = BackTracking()), Optim.Options(show_trace = true, show_every = 1, g_tol = 1.0e-20))
     model.dofs .= res.minimizer
     return res
-end</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">minimize! (generic function with 1 method)</code></pre><h2 id="Testing-it"><a class="docs-heading-anchor" href="#Testing-it">Testing it</a><a id="Testing-it-1"></a><a class="docs-heading-anchor-permalink" href="#Testing-it" title="Permalink"></a></h2><p>This calculates the contribution of each element to the total energy, it is also the function that will be put through ForwardDiff for the gradient and Hessian.</p><pre><code class="language-julia hljs">function element_potential(eldofs::AbstractVector{T}, cvP, params) where T
+end</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">minimize! (generic function with 1 method)</code></pre><h2 id="Testing-it"><a class="docs-heading-anchor" href="#Testing-it">Testing it</a><a id="Testing-it-1"></a><a class="docs-heading-anchor-permalink" href="#Testing-it" title="Permalink"></a></h2><p>This calculates the contribution of each element to the total energy, it is also the function that will be put through ForwardDiff for the gradient and Hessian.</p><pre><code class="language-julia hljs">function element_potential(eldofs::AbstractVector{T}, cvP, params) where {T}
     energy = zero(T)
-    for qp=1:getnquadpoints(cvP)
-        P  = function_value(cvP, qp, eldofs)
+    for qp in 1:getnquadpoints(cvP)
+        P = function_value(cvP, qp, eldofs)
         ∇P = function_gradient(cvP, qp, eldofs)
         energy += F(P, ∇P, params) * getdetJdV(cvP, qp)
     end
@@ -162,24 +167,52 @@ end</code></pre><pre class="documenter-example-output"><code class="nohighlight 
     for cell in CellIterator(dofhandler)
         globaldofs = celldofs(cell)
         it = 1
-        for i=1:3:length(globaldofs)
-            dofvector[globaldofs[i]]   = -2.0
-            dofvector[globaldofs[i+1]] = 2.0
-            dofvector[globaldofs[i+2]] = -2.0tanh(cell.coords[it][1]/20)
+        for i in 1:3:length(globaldofs)
+            dofvector[globaldofs[i]] = -2.0
+            dofvector[globaldofs[i + 1]] = 2.0
+            dofvector[globaldofs[i + 2]] = -2.0tanh(cell.coords[it][1] / 20)
             it += 1
         end
     end
+    return
 end
 
 δ(i, j) = i == j ? one(i) : zero(i)
-V2T(p11, p12, p44) = Tensor{4, 3}((i,j,k,l) -&gt; p11 * δ(i,j)*δ(k,l)*δ(i,k) + p12*δ(i,j)*δ(k,l)*(1 - δ(i,k)) + p44*δ(i,k)*δ(j,l)*(1 - δ(i,j)))
+V2T(p11, p12, p44) = Tensor{4, 3}((i, j, k, l) -&gt; p11 * δ(i, j) * δ(k, l) * δ(i, k) + p12 * δ(i, j) * δ(k, l) * (1 - δ(i, k)) + p44 * δ(i, k) * δ(j, l) * (1 - δ(i, j)))
 
 G = V2T(1.0e2, 0.0, 1.0e2)
 α = Vec{3}((-1.0, 1.0, 1.0))
-left = Vec{3}((-75.,-25.,-2.))
-right = Vec{3}((75.,25.,2.))
+left = Vec{3}((-75.0, -25.0, -2.0))
+right = Vec{3}((75.0, 25.0, 2.0))
 model = LandauModel(α, G, (50, 50, 2), left, right, element_potential)
 
 save_landau(&quot;landauorig&quot;, model)
 @time minimize!(model)
-save_landau(&quot;landaufinal&quot;, model)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">VTKGridFile for the closed file &quot;landaufinal.vtu&quot;.</code></pre><p>as we can see this runs very quickly even for relatively large gridsizes. The key to get high performance like this is to minimize the allocations inside the threaded loops, ideally to 0.</p><hr/><p><em>This page was generated using <a href="https://github.com/fredrikekre/Literate.jl">Literate.jl</a>.</em></p></article><nav class="docs-footer"><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option><option value="catppuccin-latte">catppuccin-latte</option><option value="catppuccin-frappe">catppuccin-frappe</option><option value="catppuccin-macchiato">catppuccin-macchiato</option><option value="catppuccin-mocha">catppuccin-mocha</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.7.0 on <span class="colophon-date" title="Tuesday 29 October 2024 18:49">Tuesday 29 October 2024</span>. Using Julia version 1.11.1.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
+save_landau(&quot;landaufinal&quot;, model)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">Iter     Function value   Gradient norm
+     0     2.127588e+06     3.597094e+02
+ * time: 8.0108642578125e-5
+     1     3.786155e+05     1.047687e+02
+ * time: 3.00718092918396
+     2     5.306125e+04     2.978953e+01
+ * time: 5.972348928451538
+     3    -2.642320e+03     7.943136e+00
+ * time: 8.967026948928833
+     4    -1.027484e+04     1.752693e+00
+ * time: 11.930897951126099
+     5    -1.084925e+04     2.157295e-01
+ * time: 14.90699291229248
+     6    -1.085880e+04     5.288877e-03
+ * time: 17.908245086669922
+     7    -1.085881e+04     3.478176e-06
+ * time: 20.873888969421387
+     8    -1.085881e+04     1.596091e-12
+ * time: 23.840137004852295
+     9    -1.085881e+04     1.444882e-12
+ * time: 26.82974600791931
+    10    -1.085881e+04     1.548831e-13
+ * time: 29.811112880706787
+    11    -1.085881e+04     1.548831e-13
+ * time: 32.886884927749634
+    12    -1.085881e+04     1.508030e-13
+ * time: 33.335050106048584
+ 39.435530 seconds (11.20 M allocations: 3.879 GiB, 0.43% gc time, 8.41% compilation time)</code></pre><p>as we can see this runs very quickly even for relatively large gridsizes. The key to get high performance like this is to minimize the allocations inside the threaded loops, ideally to 0.</p><hr/><p><em>This page was generated using <a href="https://github.com/fredrikekre/Literate.jl">Literate.jl</a>.</em></p></article><nav class="docs-footer"><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option><option value="catppuccin-latte">catppuccin-latte</option><option value="catppuccin-frappe">catppuccin-frappe</option><option value="catppuccin-macchiato">catppuccin-macchiato</option><option value="catppuccin-mocha">catppuccin-mocha</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.7.0 on <span class="colophon-date" title="Thursday 31 October 2024 12:23">Thursday 31 October 2024</span>. Using Julia version 1.11.1.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>

@@ -8,6 +8,7 @@ function create_example_2d_grid()
         Ferrite.write_cell_colors(vtk, grid, colors_workstream, "workstream-coloring")
         Ferrite.write_cell_colors(vtk, grid, colors_greedy, "greedy-coloring")
     end
+    return
 end
 
 create_example_2d_grid()

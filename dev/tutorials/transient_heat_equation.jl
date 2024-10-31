@@ -55,7 +55,7 @@ function doassemble_K!(K::SparseMatrixCSC, f::Vector, cellvalues::CellValues, dh
                 fe[i] += 0.1 * v * dΩ
                 for j in 1:n_basefuncs
                     ∇u = shape_gradient(cellvalues, q_point, j)
-                    Ke[i, j] += 1e-3 * (∇v ⋅ ∇u) * dΩ
+                    Ke[i, j] += 1.0e-3 * (∇v ⋅ ∇u) * dΩ
                 end
             end
         end
