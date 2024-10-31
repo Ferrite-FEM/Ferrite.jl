@@ -35,15 +35,15 @@
 using FerriteGmsh: Gmsh
 Gmsh.initialize()
 gmsh.option.set_number(&quot;General.Verbosity&quot;, 2)
-dim = 2;</code></pre><p>We specify first the rectangle, the cylinder, the surface spanned by the cylinder and the boolean difference of rectangle and cylinder.</p><pre><code class="language-julia hljs">    rect_tag = gmsh.model.occ.add_rectangle(0, 0, 0, 1.1, 0.41)
-    circle_tag = gmsh.model.occ.add_circle(0.2, 0.2, 0, 0.05)
-    circle_curve_tag = gmsh.model.occ.add_curve_loop([circle_tag])
-    circle_surf_tag = gmsh.model.occ.add_plane_surface([circle_curve_tag])
-    gmsh.model.occ.cut([(dim, rect_tag)], [(dim, circle_surf_tag)])</code></pre><p>Now, the geometrical entities need to be synchronized in order to be available outside of <code>gmsh.model.occ</code></p><pre><code class="language-julia hljs">gmsh.model.occ.synchronize()</code></pre><p>In the next lines, we add the physical groups needed to define boundary conditions.</p><pre><code class="language-julia hljs">    bottomtag = gmsh.model.model.add_physical_group(dim - 1, [6], -1, &quot;bottom&quot;)
-    lefttag = gmsh.model.model.add_physical_group(dim - 1, [7], -1, &quot;left&quot;)
-    righttag = gmsh.model.model.add_physical_group(dim - 1, [8], -1, &quot;right&quot;)
-    toptag = gmsh.model.model.add_physical_group(dim - 1, [9], -1, &quot;top&quot;)
-    holetag = gmsh.model.model.add_physical_group(dim - 1, [5], -1, &quot;hole&quot;)</code></pre><p>Since we want a quad mesh, we specify the meshing algorithm to the quasi structured quad one. For a complete list, <a href="https://gmsh.info/doc/texinfo/gmsh.html#Mesh-options-list">see the Gmsh docs</a>.</p><pre><code class="language-julia hljs">gmsh.option.setNumber(&quot;Mesh.Algorithm&quot;, 11)
+dim = 2;</code></pre><p>We specify first the rectangle, the cylinder, the surface spanned by the cylinder and the boolean difference of rectangle and cylinder.</p><pre><code class="language-julia hljs">rect_tag = gmsh.model.occ.add_rectangle(0, 0, 0, 1.1, 0.41)
+circle_tag = gmsh.model.occ.add_circle(0.2, 0.2, 0, 0.05)
+circle_curve_tag = gmsh.model.occ.add_curve_loop([circle_tag])
+circle_surf_tag = gmsh.model.occ.add_plane_surface([circle_curve_tag])
+gmsh.model.occ.cut([(dim, rect_tag)], [(dim, circle_surf_tag)])</code></pre><p>Now, the geometrical entities need to be synchronized in order to be available outside of <code>gmsh.model.occ</code></p><pre><code class="language-julia hljs">gmsh.model.occ.synchronize()</code></pre><p>In the next lines, we add the physical groups needed to define boundary conditions.</p><pre><code class="language-julia hljs">bottomtag = gmsh.model.model.add_physical_group(dim - 1, [6], -1, &quot;bottom&quot;)
+lefttag = gmsh.model.model.add_physical_group(dim - 1, [7], -1, &quot;left&quot;)
+righttag = gmsh.model.model.add_physical_group(dim - 1, [8], -1, &quot;right&quot;)
+toptag = gmsh.model.model.add_physical_group(dim - 1, [9], -1, &quot;top&quot;)
+holetag = gmsh.model.model.add_physical_group(dim - 1, [5], -1, &quot;hole&quot;)</code></pre><p>Since we want a quad mesh, we specify the meshing algorithm to the quasi structured quad one. For a complete list, <a href="https://gmsh.info/doc/texinfo/gmsh.html#Mesh-options-list">see the Gmsh docs</a>.</p><pre><code class="language-julia hljs">gmsh.option.setNumber(&quot;Mesh.Algorithm&quot;, 11)
 gmsh.option.setNumber(&quot;Mesh.MeshSizeFromCurvature&quot;, 20)
 gmsh.option.setNumber(&quot;Mesh.MeshSizeMax&quot;, 0.05)</code></pre><p>In the next step, the mesh is generated and finally translated.</p><pre><code class="language-julia hljs">gmsh.model.mesh.generate(dim)
 grid = togrid()
@@ -267,19 +267,19 @@ Gmsh.initialize()
 gmsh.option.set_number(&quot;General.Verbosity&quot;, 2)
 dim = 2;
 
-    rect_tag = gmsh.model.occ.add_rectangle(0, 0, 0, 1.1, 0.41)
-    circle_tag = gmsh.model.occ.add_circle(0.2, 0.2, 0, 0.05)
-    circle_curve_tag = gmsh.model.occ.add_curve_loop([circle_tag])
-    circle_surf_tag = gmsh.model.occ.add_plane_surface([circle_curve_tag])
-    gmsh.model.occ.cut([(dim, rect_tag)], [(dim, circle_surf_tag)])
+rect_tag = gmsh.model.occ.add_rectangle(0, 0, 0, 1.1, 0.41)
+circle_tag = gmsh.model.occ.add_circle(0.2, 0.2, 0, 0.05)
+circle_curve_tag = gmsh.model.occ.add_curve_loop([circle_tag])
+circle_surf_tag = gmsh.model.occ.add_plane_surface([circle_curve_tag])
+gmsh.model.occ.cut([(dim, rect_tag)], [(dim, circle_surf_tag)])
 
 gmsh.model.occ.synchronize()
 
-    bottomtag = gmsh.model.model.add_physical_group(dim - 1, [6], -1, &quot;bottom&quot;)
-    lefttag = gmsh.model.model.add_physical_group(dim - 1, [7], -1, &quot;left&quot;)
-    righttag = gmsh.model.model.add_physical_group(dim - 1, [8], -1, &quot;right&quot;)
-    toptag = gmsh.model.model.add_physical_group(dim - 1, [9], -1, &quot;top&quot;)
-    holetag = gmsh.model.model.add_physical_group(dim - 1, [5], -1, &quot;hole&quot;)
+bottomtag = gmsh.model.model.add_physical_group(dim - 1, [6], -1, &quot;bottom&quot;)
+lefttag = gmsh.model.model.add_physical_group(dim - 1, [7], -1, &quot;left&quot;)
+righttag = gmsh.model.model.add_physical_group(dim - 1, [8], -1, &quot;right&quot;)
+toptag = gmsh.model.model.add_physical_group(dim - 1, [9], -1, &quot;top&quot;)
+holetag = gmsh.model.model.add_physical_group(dim - 1, [5], -1, &quot;hole&quot;)
 
 gmsh.option.setNumber(&quot;Mesh.Algorithm&quot;, 11)
 gmsh.option.setNumber(&quot;Mesh.MeshSizeFromCurvature&quot;, 20)
@@ -546,4 +546,4 @@ for (step, (u, t)) in enumerate(intervals(integrator))
         pvd[t] = vtk
     end
 end
-vtk_save(pvd);</code></pre><hr/><p><em>This page was generated using <a href="https://github.com/fredrikekre/Literate.jl">Literate.jl</a>.</em></p></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../porous_media/">« Porous media</a><a class="docs-footer-nextpage" href="../reactive_surface/">Reactive surface »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option><option value="catppuccin-latte">catppuccin-latte</option><option value="catppuccin-frappe">catppuccin-frappe</option><option value="catppuccin-macchiato">catppuccin-macchiato</option><option value="catppuccin-mocha">catppuccin-mocha</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.7.0 on <span class="colophon-date" title="Thursday 31 October 2024 15:47">Thursday 31 October 2024</span>. Using Julia version 1.11.1.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
+vtk_save(pvd);</code></pre><hr/><p><em>This page was generated using <a href="https://github.com/fredrikekre/Literate.jl">Literate.jl</a>.</em></p></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../porous_media/">« Porous media</a><a class="docs-footer-nextpage" href="../reactive_surface/">Reactive surface »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option><option value="catppuccin-latte">catppuccin-latte</option><option value="catppuccin-frappe">catppuccin-frappe</option><option value="catppuccin-macchiato">catppuccin-macchiato</option><option value="catppuccin-mocha">catppuccin-mocha</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.7.0 on <span class="colophon-date" title="Thursday 31 October 2024 17:33">Thursday 31 October 2024</span>. Using Julia version 1.11.1.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
