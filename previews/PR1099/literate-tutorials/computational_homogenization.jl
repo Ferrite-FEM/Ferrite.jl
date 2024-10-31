@@ -552,9 +552,9 @@ function homogenize_test(u::Matrix, dh, cv, E_incl, E_mat)                     #
             Ē′ = SymmetricTensor{4, 2}() do i, j, k, l                         #src
                 ij = i == j == 1 ? 1 : i == j == 2 ? 2 : 3                     #src
                 kl = k == l == 1 ? 1 : k == l == 2 ? 2 : 3                     #src
-                εij = function_symmetric_gradient(cv, qp, view(ue, :, ij)) +   #src
+                εij = function_symmetric_gradient(cv, qp, view(ue, :, ij)) + #src
                     symmetric((basevec(Vec{2}, i) ⊗ basevec(Vec{2}, j)))       #src
-                εkl = function_symmetric_gradient(cv, qp, view(ue, :, kl)) +   #src
+                εkl = function_symmetric_gradient(cv, qp, view(ue, :, kl)) + #src
                     symmetric((basevec(Vec{2}, k) ⊗ basevec(Vec{2}, l)))       #src
                 return (εij ⊡ E ⊡ εkl) * dΩ                                    #src
             end                                                                #src
