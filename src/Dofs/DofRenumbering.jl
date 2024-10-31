@@ -17,12 +17,12 @@ module DofOrder
 
     struct FieldWise # <: DofOrdering
         target_blocks::Vector{Int}
-        FieldWise(x=Int[]) = new(_check_target_blocks(x))
+        FieldWise(x = Int[]) = new(_check_target_blocks(x))
     end
 
     struct ComponentWise # <: DofOrdering
         target_blocks::Vector{Int}
-        ComponentWise(x=Int[]) = new(_check_target_blocks(x))
+        ComponentWise(x = Int[]) = new(_check_target_blocks(x))
     end
 
     """
@@ -33,7 +33,7 @@ module DofOrder
       [Metis.jl](https://github.com/JuliaSparse/Metis.jl).
     """
     abstract type Ext{T} end
-    function Ext{T}(args...; kwargs...) where T
+    function Ext{T}(args...; kwargs...) where {T}
         throw(ArgumentError("Unknown external order DofOrder.Ext{$T}. See documentation for `DofOrder.Ext` for details."))
     end
 
@@ -70,7 +70,7 @@ renumber!(dh::AbstractDofHandler, ch::ConstraintHandler, order) = _renumber!(dh,
 # `compute_renumber_permutation(::DofHandler, ::ConstraintHandler, ::O)` returning the dof
 # permutation or `_renumber!(::DofHandler, ::ConstraintHandler, ::O)`.
 
-function _renumber!(dh::AbstractDofHandler, ch::Union{ConstraintHandler,Nothing}, order)
+function _renumber!(dh::AbstractDofHandler, ch::Union{ConstraintHandler, Nothing}, order)
     @assert ch === nothing || ch.dh === dh
     perm = compute_renumber_permutation(dh, ch, order)
     @assert isperm(perm) && length(perm) == ndofs(dh)
@@ -192,7 +192,7 @@ function compute_renumber_permutation(dh::DofHandler, _, order::DofOrder.Compone
     nblocks = maximum(target_blocks)
     dofs_for_blocks = [Set{Int}() for _ in 1:nblocks]
     component_offsets = pushfirst!(cumsum(field_dims), 0)
-    flags = UpdateFlags(nodes=false, coords=false, dofs=true)
+    flags = UpdateFlags(nodes = false, coords = false, dofs = true)
     for sdh in dh.subdofhandlers
         dof_ranges = [dof_range(sdh, f) for f in eachindex(sdh.field_names)]
         global_idxs = [findfirst(x -> x === f, dh.field_names) for f in sdh.field_names]
@@ -225,6 +225,6 @@ function compute_renumber_permutation(dh::DofHandler, _, order::DofOrder.Compone
     return perm
 end
 
-function compute_renumber_permutation(dh::AbstractDofHandler, ::Union{ConstraintHandler,Nothing}, ::DofOrder.Ext{M}) where M
+function compute_renumber_permutation(dh::AbstractDofHandler, ::Union{ConstraintHandler, Nothing}, ::DofOrder.Ext{M}) where {M}
     error("Renumbering extension based on package $M not available.")
 end

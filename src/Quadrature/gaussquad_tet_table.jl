@@ -1,3 +1,4 @@
+# runic: off
 # Yu, Jinyun. Symmetric Gaussian Quadrature Formulae for Tetrahedronal Regions. 1984. CMAME.
 function _get_jinyun_tet_quadrature_data(n::Int)
     if n == 1

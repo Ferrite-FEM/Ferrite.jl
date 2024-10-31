@@ -1,5 +1,5 @@
 export
-# Interpolations
+    # Interpolations
     Interpolation,
     VectorInterpolation,
     ScalarInterpolation,
@@ -22,12 +22,12 @@ export
     getnbasefunctions,
     getrefshape,
 
-# Quadrature
+    # Quadrature
     QuadratureRule,
     FacetQuadratureRule,
     getnquadpoints,
 
-# FEValues
+    # FEValues
     AbstractCellValues,
     AbstractFacetValues,
     CellValues,
@@ -57,7 +57,7 @@ export
     function_gradient_average,
     function_gradient_jump,
 
-# Grid
+    # Grid
     Grid,
     Node,
     Line,
@@ -107,11 +107,11 @@ export
     transform_coordinates!,
     generate_grid,
 
-# Grid coloring
+    # Grid coloring
     create_coloring,
     ColoringAlgorithm,
 
-# Dofs
+    # Dofs
     DofHandler,
     SubDofHandler,
     close!,
@@ -125,7 +125,7 @@ export
     evaluate_at_grid_nodes,
     apply_analytical!,
 
-# Sparsity pattern
+    # Sparsity pattern
     # AbstractSparsityPattern,
     SparsityPattern,
     BlockSparsityPattern,
@@ -136,7 +136,7 @@ export
     add_constraint_entries!,
     allocate_matrix,
 
-# Constraints
+    # Constraints
     ConstraintHandler,
     Dirichlet,
     PeriodicDirichlet,
@@ -154,7 +154,7 @@ export
     add!,
     free_dofs,
 
-# iterators
+    # iterators
     CellCache,
     CellIterator,
     FacetCache,
@@ -165,23 +165,23 @@ export
     cellid,
     interfacedofs,
 
-# assembly
+    # assembly
     start_assemble,
     assemble!,
     finish_assemble,
 
-# exporting data
+    # exporting data
     VTKGridFile,
     write_solution,
     write_cell_data,
     write_projection,
     write_node_data,
 
-# L2 Projection
+    # L2 Projection
     project,
     L2Projector,
 
-# Point Evaluation
+    # Point Evaluation
     PointEvalHandler,
     evaluate_at_points,
     PointIterator,

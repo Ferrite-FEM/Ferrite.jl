@@ -29,17 +29,17 @@ function PointValues(cv::CellValues)
     ip_fun = function_interpolation(cv)
     ip_geo = geometric_interpolation(cv)
     update_gradients = Val(function_difforder(cv) ≥ 1)
-    update_hessians  = Val(function_difforder(cv) ≥ 2)
+    update_hessians = Val(function_difforder(cv) ≥ 2)
     return PointValues(T, ip_fun, ip_geo; update_gradients, update_hessians)
 end
 function PointValues(ip::Interpolation, ipg::Interpolation = default_geometric_interpolation(ip); kwargs...)
     return PointValues(Float64, ip, ipg; kwargs...)
 end
 function PointValues(::Type{T}, ip::IP, ipg::GIP = default_geometric_interpolation(ip); kwargs...) where {
-    T, dim, shape <: AbstractRefShape{dim},
-    IP  <: Interpolation{shape},
-    GIP <: Interpolation{shape}
-}
+        T, dim, shape <: AbstractRefShape{dim},
+        IP <: Interpolation{shape},
+        GIP <: Interpolation{shape},
+    }
     qr = QuadratureRule{shape}([one(T)], [zero(Vec{dim, T})])
     cv = CellValues(T, qr, ip, ipg; update_detJdV = Val(false), kwargs...)
     return PointValues{typeof(cv)}(cv)
@@ -78,4 +78,5 @@ end
 function Base.show(io::IO, d::MIME"text/plain", cv::PointValues)
     println(io, "PointValues containing a")
     show(io, d, cv.cv)
+    return
 end

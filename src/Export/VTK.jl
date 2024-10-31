@@ -1,4 +1,3 @@
-
 """
     VTKGridFile(filename::AbstractString, grid::AbstractGrid; kwargs...)
     VTKGridFile(filename::AbstractString, dh::DofHandler; kwargs...)
@@ -26,7 +25,7 @@ VTKGridFile(filename, grid) do vtk
 end
 ```
 """
-struct VTKGridFile{VTK<:WriteVTK.DatasetFile}
+struct VTKGridFile{VTK <: WriteVTK.DatasetFile}
     vtk::VTK
 end
 function VTKGridFile(filename::String, dh::DofHandler; kwargs...)
@@ -56,6 +55,7 @@ function Base.show(io::IO, ::MIME"text/plain", vtk::VTKGridFile)
     open_str = isopen(vtk.vtk) ? "open" : "closed"
     filename = vtk.vtk.path
     print(io, "VTKGridFile for the $open_str file \"$(filename)\".")
+    return
 end
 
 function WriteVTK.collection_add_timestep(pvd::WriteVTK.CollectionFile, datfile::VTKGridFile, time::Real)
@@ -83,7 +83,7 @@ cell_to_vtkcell(::Type{Wedge}) = VTKCellTypes.VTK_WEDGE
 cell_to_vtkcell(::Type{Pyramid}) = VTKCellTypes.VTK_PYRAMID
 
 nodes_to_vtkorder(cell::AbstractCell) = collect(cell.nodes)
-nodes_to_vtkorder(cell::Pyramid) = cell.nodes[[1,2,4,3,5]]
+nodes_to_vtkorder(cell::Pyramid) = cell.nodes[[1, 2, 4, 3, 5]]
 nodes_to_vtkorder(cell::QuadraticHexahedron) = [
     cell.nodes[1], # faces
     cell.nodes[2],
@@ -114,7 +114,7 @@ nodes_to_vtkorder(cell::QuadraticHexahedron) = [
     cell.nodes[27], # interior
 ]
 
-function create_vtk_griddata(grid::Grid{dim,C,T}) where {dim,C,T}
+function create_vtk_griddata(grid::Grid{dim, C, T}) where {dim, C, T}
     cls = WriteVTK.MeshCell[]
     for cell in getcells(grid)
         celltype = cell_to_vtkcell(typeof(cell))
@@ -124,22 +124,24 @@ function create_vtk_griddata(grid::Grid{dim,C,T}) where {dim,C,T}
     return coords, cls
 end
 
-function create_vtk_grid(filename::AbstractString, grid::Grid{dim,C,T}; kwargs...) where {dim,C,T}
+function create_vtk_grid(filename::AbstractString, grid::Grid{dim, C, T}; kwargs...) where {dim, C, T}
     coords, cls = create_vtk_griddata(grid)
     return WriteVTK.vtk_grid(filename, coords, cls; kwargs...)
 end
 
-function toparaview!(v, x::Vec{D}) where D
+function toparaview!(v, x::Vec{D}) where {D}
     v[1:D] .= x
+    return v
 end
 function toparaview!(v, x::SecondOrderTensor)
     tovoigt!(v, x)
+    return v
 end
 
 function _vtk_write_node_data(
-    vtk::WriteVTK.DatasetFile,
-    nodedata::Vector{S},
-    name::AbstractString
+        vtk::WriteVTK.DatasetFile,
+        nodedata::Vector{S},
+        name::AbstractString
     ) where {O, D, T, M, S <: Union{Tensor{O, D, T, M}, SymmetricTensor{O, D, T, M}}}
     noutputs = S <: Vec{2} ? 3 : M # Pad 2D Vec to 3D
     npoints = length(nodedata)
@@ -147,26 +149,26 @@ function _vtk_write_node_data(
     for i in 1:npoints
         toparaview!(@view(out[:, i]), nodedata[i])
     end
-    return WriteVTK.vtk_point_data(vtk, out, name; component_names=component_names(S))
+    return WriteVTK.vtk_point_data(vtk, out, name; component_names = component_names(S))
 end
 function _vtk_write_node_data(vtk::WriteVTK.DatasetFile, nodedata::Vector{<:Real}, name::AbstractString)
     return WriteVTK.vtk_point_data(vtk, nodedata, name)
 end
-function _vtk_write_node_data(vtk::WriteVTK.DatasetFile, nodedata::Matrix{<:Real}, name::AbstractString; component_names=nothing)
-    return WriteVTK.vtk_point_data(vtk, nodedata, name; component_names=component_names)
+function _vtk_write_node_data(vtk::WriteVTK.DatasetFile, nodedata::Matrix{<:Real}, name::AbstractString; component_names = nothing)
+    return WriteVTK.vtk_point_data(vtk, nodedata, name; component_names = component_names)
 end
 
-function component_names(::Type{S}) where S
+function component_names(::Type{S}) where {S}
     names =
-        S <:             Vec{1}   ? ["x"] :
-        S <:             Vec      ? ["x", "y", "z"] : # Pad 2D Vec to 3D
-        S <:          Tensor{2,1} ? ["xx"] :
-        S <: SymmetricTensor{2,1} ? ["xx"] :
-        S <:          Tensor{2,2} ? ["xx", "yy", "xy", "yx"] :
-        S <: SymmetricTensor{2,2} ? ["xx", "yy", "xy"] :
-        S <:          Tensor{2,3} ? ["xx", "yy", "zz", "yz", "xz", "xy", "zy", "zx", "yx"] :
-        S <: SymmetricTensor{2,3} ? ["xx", "yy", "zz", "yz", "xz", "xy"] :
-                                    nothing
+        S <: Vec{1} ? ["x"] :
+        S <: Vec ? ["x", "y", "z"] : # Pad 2D Vec to 3D
+        S <: Tensor{2, 1} ? ["xx"] :
+        S <: SymmetricTensor{2, 1} ? ["xx"] :
+        S <: Tensor{2, 2} ? ["xx", "yy", "xy", "yx"] :
+        S <: SymmetricTensor{2, 2} ? ["xx", "yy", "xy"] :
+        S <: Tensor{2, 3} ? ["xx", "yy", "zz", "yz", "xz", "xy", "zy", "zx", "yx"] :
+        S <: SymmetricTensor{2, 3} ? ["xx", "yy", "zz", "yz", "xz", "xy"] :
+        nothing
     return names
 end
 
@@ -182,7 +184,7 @@ degree of freedom in `dh`, see [`write_node_data`](@ref write_node_data) for det
 Use `write_node_data` directly when exporting values that are already
 sorted by the nodes in the grid.
 """
-function write_solution(vtk::VTKGridFile, dh::AbstractDofHandler, u::Vector, suffix="")
+function write_solution(vtk::VTKGridFile, dh::AbstractDofHandler, u::Vector, suffix = "")
     fieldnames = getfieldnames(dh)  # all primary fields
     for name in fieldnames
         data = _evaluate_at_grid_nodes(dh, u, name, #=vtk=# Val(true))
@@ -199,7 +201,7 @@ Project `vals` to the grid nodes with `proj` and save to `vtk`.
 function write_projection(vtk::VTKGridFile, proj::L2Projector, vals, name)
     data = _evaluate_at_grid_nodes(proj, vals, #=vtk=# Val(true))::Matrix
     @assert size(data, 2) == getnnodes(get_grid(proj.dh))
-    _vtk_write_node_data(vtk.vtk, data, name; component_names=component_names(eltype(vals)))
+    _vtk_write_node_data(vtk.vtk, data, name; component_names = component_names(eltype(vals)))
     return vtk
 end
 
@@ -252,7 +254,7 @@ Write all cell sets in the grid with name according to their keys and
 celldata 1 if the cell is in the set, and 0 otherwise. It is also possible to
 only export a single `cellset`, or multiple `cellsets`.
 """
-function write_cellset(vtk, grid::AbstractGrid, cellsets=keys(getcellsets(grid)))
+function write_cellset(vtk, grid::AbstractGrid, cellsets = keys(getcellsets(grid)))
     z = zeros(getncells(grid))
     for cellset in cellsets
         fill!(z, 0)
@@ -310,7 +312,7 @@ Write cell colors (see [`create_coloring`](@ref)) to a VTK file for visualizatio
 
 In case of coloring a subset, the cells which are not part of the subset are represented as color 0.
 """
-function write_cell_colors(vtk, grid::AbstractGrid, cell_colors::AbstractVector{<:AbstractVector{<:Integer}}, name="coloring")
+function write_cell_colors(vtk, grid::AbstractGrid, cell_colors::AbstractVector{<:AbstractVector{<:Integer}}, name = "coloring")
     color_vector = zeros(Int, getncells(grid))
     for (i, cells_color) in enumerate(cell_colors)
         for cell in cells_color

@@ -44,14 +44,14 @@ abstract type AbstractRefShape{refdim} end
 
 # See src/docs.jl for detailed documentation
 struct RefHypercube{refdim} <: AbstractRefShape{refdim} end
-struct RefSimplex{refdim}   <: AbstractRefShape{refdim} end
-const RefLine          = RefHypercube{1}
+struct RefSimplex{refdim} <: AbstractRefShape{refdim} end
+const RefLine = RefHypercube{1}
 const RefQuadrilateral = RefHypercube{2}
-const RefHexahedron    = RefHypercube{3}
-const RefTriangle      = RefSimplex{2}
-const RefTetrahedron   = RefSimplex{3}
-struct RefPrism         <: AbstractRefShape{3} end
-struct RefPyramid       <: AbstractRefShape{3} end
+const RefHexahedron = RefHypercube{3}
+const RefTriangle = RefSimplex{2}
+const RefTetrahedron = RefSimplex{3}
+struct RefPrism <: AbstractRefShape{3} end
+struct RefPyramid <: AbstractRefShape{3} end
 
 """
     Ferrite.getrefdim(RefShape::Type{<:AbstractRefShape})
@@ -59,7 +59,7 @@ struct RefPyramid       <: AbstractRefShape{3} end
 Get the dimension of the reference shape
 """
 getrefdim(::Type{<:AbstractRefShape}) # To get correct doc filtering
-getrefdim(::Type{<:AbstractRefShape{rdim}}) where rdim = rdim
+getrefdim(::Type{<:AbstractRefShape{rdim}}) where {rdim} = rdim
 
 abstract type AbstractCell{refshape <: AbstractRefShape} end
 
@@ -83,28 +83,28 @@ end
 A `FaceIndex` wraps an (Int, Int) and defines a local face by pointing to a (cell, face).
 """
 struct FaceIndex <: BoundaryIndex
-    idx::Tuple{Int,Int} # cell and side
+    idx::Tuple{Int, Int} # cell and side
 end
 
 """
 A `EdgeIndex` wraps an (Int, Int) and defines a local edge by pointing to a (cell, edge).
 """
 struct EdgeIndex <: BoundaryIndex
-    idx::Tuple{Int,Int} # cell and side
+    idx::Tuple{Int, Int} # cell and side
 end
 
 """
 A `VertexIndex` wraps an (Int, Int) and defines a local vertex by pointing to a (cell, vert).
 """
 struct VertexIndex <: BoundaryIndex
-    idx::Tuple{Int,Int} # cell and side
+    idx::Tuple{Int, Int} # cell and side
 end
 
 """
 A `FacetIndex` wraps an (Int, Int) and defines a local facet by pointing to a (cell, facet).
 """
 struct FacetIndex <: BoundaryIndex
-    idx::Tuple{Int,Int} # cell and side
+    idx::Tuple{Int, Int} # cell and side
 end
 
 const AbstractVecOrSet{T} = Union{AbstractSet{T}, AbstractVector{T}}
