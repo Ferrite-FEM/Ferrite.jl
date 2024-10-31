@@ -77,9 +77,9 @@ function testit(nshape=1)
     return fig
 end
 
-# Possible tests 
-#= 
+# Possible tests
+#=
 1) Check shape_value(ip, ξ, i) ⋅ v_edge[i] = |shape_value(ip, ξ, i)| (checks alignment)
-2) Check ∫ Ni ⋅ v dL = 1 on each edge 
-3) Check shape_value(ip, ξ, i) ⋅ v_edge[j] = 0 for i≠j 
+2) Check ∫ Ni ⋅ v dL = 1 on each edge
+3) Check shape_value(ip, ξ, i) ⋅ v_edge[j] = 0 for i≠j
 =#
