@@ -8,10 +8,8 @@ using Base.Threads
 
 function Fl(P::Vec{3, T}, α::Vec{3}) where {T}
     P2 = Vec{3, T}((P[1]^2, P[2]^2, P[3]^2))
-    return (
-        α[1] * sum(P2) +
-            α[2] * (P[1]^4 + P[2]^4 + P[3]^4)
-    ) +
+    return α[1] * sum(P2) +
+        α[2] * (P[1]^4 + P[2]^4 + P[3]^4) +
         α[3] * ((P2[1] * P2[2] + P2[2] * P2[3]) + P2[1] * P2[3])
 end
 
@@ -86,9 +84,10 @@ function LandauModel(α, G, gridsize, left::Vec{DIM, T}, right::Vec{DIM, T}, elp
 end
 
 function save_landau(path, model, dofs = model.dofs)
-    return VTKGridFile(path, model.dofhandler) do vtk
+    VTKGridFile(path, model.dofhandler) do vtk
         write_solution(vtk, model.dofhandler, dofs)
     end
+    return
 end
 
 macro assemble!(innerbody)
@@ -126,18 +125,20 @@ end
 
 function ∇F!(∇f::Vector{T}, dofvector::Vector{T}, model::LandauModel{T}) where {T}
     fill!(∇f, zero(T))
-    return @assemble! begin
+    @assemble! begin
         ForwardDiff.gradient!(cache.element_gradient, cache.element_potential, eldofs, cache.gradconf)
         @inbounds assemble!(∇f, cache.element_indices, cache.element_gradient)
     end
+    return
 end
 
 function ∇²F!(∇²f::SparseMatrixCSC, dofvector::Vector{T}, model::LandauModel{T}) where {T}
     assemblers = [start_assemble(∇²f) for t in 1:nthreads()]
-    return @assemble! begin
+    @assemble! begin
         ForwardDiff.hessian!(cache.element_hessian, cache.element_potential, eldofs, cache.hessconf)
         @inbounds assemble!(assemblers[threadid()], cache.element_indices, cache.element_hessian)
     end
+    return
 end
 
 function calcall(∇²f::SparseMatrixCSC, ∇f::Vector{T}, dofvector::Vector{T}, model::LandauModel{T}) where {T}
@@ -164,7 +165,7 @@ function minimize!(model; kwargs...)
     end
     function h!(storage, x)
         return ∇²F!(storage, x, model)
-        #apply!(storage, model.boundaryconds)
+        # apply!(storage, model.boundaryconds)
     end
     f(x) = F(x, model)
 

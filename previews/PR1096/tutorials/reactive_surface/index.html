@@ -112,7 +112,8 @@ end;</code></pre><h3 id="Initial-condition-setup"><a class="docs-heading-anchor"
         end
     end
 
-    return u₀ .+= 0.01 * rand(ndofs(dh))
+    u₀ .+= 0.01 * rand(ndofs(dh))
+    return
 end;</code></pre><h3 id="Mesh-generation"><a class="docs-heading-anchor" href="#Mesh-generation">Mesh generation</a><a id="Mesh-generation-1"></a><a class="docs-heading-anchor-permalink" href="#Mesh-generation" title="Permalink"></a></h3><p>In this section we define a routine to create a surface mesh with the help of FerriteGmsh.jl.</p><pre><code class="language-julia hljs">function create_embedded_sphere(refinements)
     gmsh.initialize()
 
@@ -133,7 +134,7 @@ end;</code></pre><h3 id="Mesh-generation"><a class="docs-heading-anchor" href="#
     nodes = tonodes()
     elements, _ = toelements(2)
     gmsh.finalize()
-    return grid = Grid(elements, nodes)
+    return Grid(elements, nodes)
 end</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">create_embedded_sphere (generic function with 1 method)</code></pre><h3 id="Simulation-routines"><a class="docs-heading-anchor" href="#Simulation-routines">Simulation routines</a><a id="Simulation-routines-1"></a><a class="docs-heading-anchor-permalink" href="#Simulation-routines" title="Permalink"></a></h3><p>Now we define a function to setup and solve the problem with given feed and conversion rates <span>$F$</span> and <span>$k$</span>, as well as the time step length and for how long we want to solve the model.</p><pre><code class="language-julia hljs">function gray_scott_on_sphere(material::GrayScottMaterial, Δt::Real, T::Real, refinements::Integer)
     # We start by setting up grid, dof handler and the matrices for the heat problem.
     grid = create_embedded_sphere(refinements)
@@ -213,33 +214,49 @@ end</code></pre><pre class="documenter-example-output"><code class="nohighlight 
         # Finally we totate the solution to initialize the next timestep.
         uₜ₋₁ .= uₜ
     end
-
-    return vtk_save(pvd)
+    vtk_save(pvd)
+    return
 end
 
 # This parametrization gives the spot pattern shown in the gif above.
 material = GrayScottMaterial(0.00016, 0.00008, 0.06, 0.062)
-    gray_scott_on_sphere(material, 10.0, 32000.0, 3)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">322-element Vector{String}:
- &quot;reactive-surface.pvd&quot;
- &quot;reactive-surface-0.vtu&quot;
- &quot;reactive-surface-10.vtu&quot;
- &quot;reactive-surface-20.vtu&quot;
- &quot;reactive-surface-30.vtu&quot;
- &quot;reactive-surface-40.vtu&quot;
- &quot;reactive-surface-50.vtu&quot;
- &quot;reactive-surface-60.vtu&quot;
- &quot;reactive-surface-70.vtu&quot;
- &quot;reactive-surface-80.vtu&quot;
- ⋮
- &quot;reactive-surface-3120.vtu&quot;
- &quot;reactive-surface-3130.vtu&quot;
- &quot;reactive-surface-3140.vtu&quot;
- &quot;reactive-surface-3150.vtu&quot;
- &quot;reactive-surface-3160.vtu&quot;
- &quot;reactive-surface-3170.vtu&quot;
- &quot;reactive-surface-3180.vtu&quot;
- &quot;reactive-surface-3190.vtu&quot;
- &quot;reactive-surface-3200.vtu&quot;</code></pre><h2 id="reactive_surface-plain-program"><a class="docs-heading-anchor" href="#reactive_surface-plain-program">Plain program</a><a id="reactive_surface-plain-program-1"></a><a class="docs-heading-anchor-permalink" href="#reactive_surface-plain-program" title="Permalink"></a></h2><p>Here follows a version of the program without any comments. The file is also available here: <a href="../reactive_surface.jl"><code>reactive_surface.jl</code></a>.</p><pre><code class="language-julia hljs">using Ferrite, FerriteGmsh
+    gray_scott_on_sphere(material, 10.0, 32000.0, 3)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">Info    : Meshing 1D...
+Info    : [ 40%] Meshing curve 2 (Circle)
+Info    : Done meshing 1D (Wall 8.9508e-05s, CPU 9.1e-05s)
+Info    : Meshing 2D...
+Info    : Meshing surface 1 (Sphere, Frontal-Delaunay)
+Info    : Done meshing 2D (Wall 0.00921163s, CPU 0.009198s)
+Info    : 160 nodes 328 elements
+Info    : Refining mesh...
+Info    : Meshing order 2 (curvilinear on)...
+Info    : [  0%] Meshing curve 1 order 2
+Info    : [ 30%] Meshing curve 2 order 2
+Info    : [ 50%] Meshing curve 3 order 2
+Info    : [ 70%] Meshing surface 1 order 2
+Info    : [ 90%] Meshing volume 1 order 2
+Info    : Surface mesh: worst distortion = 0.970866 (0 elements in ]0, 0.2]); worst gamma = 0.433887
+Info    : Done meshing order 2 (Wall 0.00115008s, CPU 0.001138s)
+Info    : Done refining mesh (Wall 0.00152758s, CPU 0.001515s)
+Info    : Refining mesh...
+Info    : Meshing order 2 (curvilinear on)...
+Info    : [  0%] Meshing curve 1 order 2
+Info    : [ 30%] Meshing curve 2 order 2
+Info    : [ 50%] Meshing curve 3 order 2
+Info    : [ 70%] Meshing surface 1 order 2
+Info    : [ 90%] Meshing volume 1 order 2
+Info    : Surface mesh: worst distortion = 0.992408 (0 elements in ]0, 0.2]); worst gamma = 0.421451
+Info    : Done meshing order 2 (Wall 0.0044962s, CPU 0.004496s)
+Info    : Done refining mesh (Wall 0.00586156s, CPU 0.005861s)
+Info    : Refining mesh...
+Info    : Meshing order 2 (curvilinear on)...
+Info    : [  0%] Meshing curve 1 order 2
+Info    : [ 30%] Meshing curve 2 order 2
+Info    : [ 50%] Meshing curve 3 order 2
+Info    : [ 70%] Meshing surface 1 order 2
+Info    : [ 90%] Meshing volume 1 order 2
+Info    : Surface mesh: worst distortion = 0.998082 (0 elements in ]0, 0.2]); worst gamma = 0.418317
+Info    : Done meshing order 2 (Wall 0.0173649s, CPU 0.017363s)
+Info    : Done refining mesh (Wall 0.0230621s, CPU 0.023062s)</code></pre><h2 id="reactive_surface-plain-program"><a class="docs-heading-anchor" href="#reactive_surface-plain-program">Plain program</a><a id="reactive_surface-plain-program-1"></a><a class="docs-heading-anchor-permalink" href="#reactive_surface-plain-program" title="Permalink"></a></h2><p>Here follows a version of the program without any comments. The file is also available here: <a href="../reactive_surface.jl"><code>reactive_surface.jl</code></a>.</p><pre><code class="language-julia hljs">using Ferrite, FerriteGmsh
 using BlockArrays, SparseArrays, LinearAlgebra, WriteVTK
 
 struct GrayScottMaterial{T}
@@ -355,7 +372,8 @@ function setup_initial_conditions!(u₀::Vector, cellvalues::CellValues, dh::Dof
         end
     end
 
-    return u₀ .+= 0.01 * rand(ndofs(dh))
+    u₀ .+= 0.01 * rand(ndofs(dh))
+    return
 end;
 
 function create_embedded_sphere(refinements)
@@ -378,7 +396,7 @@ function create_embedded_sphere(refinements)
     nodes = tonodes()
     elements, _ = toelements(2)
     gmsh.finalize()
-    return grid = Grid(elements, nodes)
+    return Grid(elements, nodes)
 end
 
 function gray_scott_on_sphere(material::GrayScottMaterial, Δt::Real, T::Real, refinements::Integer)
@@ -460,10 +478,10 @@ function gray_scott_on_sphere(material::GrayScottMaterial, Δt::Real, T::Real, r
         # Finally we totate the solution to initialize the next timestep.
         uₜ₋₁ .= uₜ
     end
-
-    return vtk_save(pvd)
+    vtk_save(pvd)
+    return
 end
 
 # This parametrization gives the spot pattern shown in the gif above.
 material = GrayScottMaterial(0.00016, 0.00008, 0.06, 0.062)
-    gray_scott_on_sphere(material, 10.0, 32000.0, 3)</code></pre><hr/><p><em>This page was generated using <a href="https://github.com/fredrikekre/Literate.jl">Literate.jl</a>.</em></p></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../ns_vs_diffeq/">« Incompressible Navier-Stokes equations via DifferentialEquations.jl</a><a class="docs-footer-nextpage" href="../linear_shell/">Linear shell »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option><option value="catppuccin-latte">catppuccin-latte</option><option value="catppuccin-frappe">catppuccin-frappe</option><option value="catppuccin-macchiato">catppuccin-macchiato</option><option value="catppuccin-mocha">catppuccin-mocha</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.7.0 on <span class="colophon-date" title="Tuesday 29 October 2024 12:10">Tuesday 29 October 2024</span>. Using Julia version 1.11.1.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
+    gray_scott_on_sphere(material, 10.0, 32000.0, 3)</code></pre><hr/><p><em>This page was generated using <a href="https://github.com/fredrikekre/Literate.jl">Literate.jl</a>.</em></p></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../ns_vs_diffeq/">« Incompressible Navier-Stokes equations via DifferentialEquations.jl</a><a class="docs-footer-nextpage" href="../linear_shell/">Linear shell »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option><option value="catppuccin-latte">catppuccin-latte</option><option value="catppuccin-frappe">catppuccin-frappe</option><option value="catppuccin-macchiato">catppuccin-macchiato</option><option value="catppuccin-mocha">catppuccin-mocha</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.7.0 on <span class="colophon-date" title="Thursday 31 October 2024 12:08">Thursday 31 October 2024</span>. Using Julia version 1.11.1.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>

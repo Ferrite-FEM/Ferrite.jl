@@ -90,8 +90,7 @@ update!(dbcs, 0.0)
 K = allocate_matrix(dh);
 
 function doassemble(
-        cellvalues::CellValues, facetvalues::FacetValues,
-        K::SparseMatrixCSC, dh::DofHandler
+        cellvalues::CellValues, facetvalues::FacetValues, K::SparseMatrixCSC, dh::DofHandler
     )
     b = 1.0
     f = zeros(ndofs(dh))
@@ -171,6 +170,6 @@ using Test #src
 #src the true maximum is slightly bigger then 1.0
 @test maximum(u) ≈ 0.9952772469054607 #src
 @test u_ana(Vec{2}((-0.5, -0.5))) ≈ 1 #src
-@test u_ana(Vec{2}((0.5, -0.5))) ≈ 1 #src
-@test u_ana(Vec{2}((-0.5, 0.5))) ≈ 1 #src
+@test u_ana(Vec{2}((0.5, -0.5))) ≈ 1  #src
+@test u_ana(Vec{2}((-0.5, 0.5))) ≈ 1  #src
 println("Helmholtz successful")

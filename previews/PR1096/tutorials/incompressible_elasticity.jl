@@ -210,7 +210,8 @@ function solve(ν, interpolation_u, interpolation_p)
     σvM = map(x -> √(3 / 2 * dev(x) ⊡ dev(x)), σ) # von Mise effective stress
 
     # Export the solution and the stress
-    filename = "cook_" * (interpolation_u == Lagrange{RefTriangle, 1}()^2 ? "linear" : "quadratic") *
+    filename = "cook_" *
+        (interpolation_u == Lagrange{RefTriangle, 1}()^2 ? "linear" : "quadratic") *
         "_linear"
 
     VTKGridFile(filename, grid) do vtk

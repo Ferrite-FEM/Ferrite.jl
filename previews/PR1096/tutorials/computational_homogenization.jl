@@ -172,29 +172,25 @@ for i in 1:3
     push!(σ̄.periodic, σ̄_i)
 end
 
-E_dirichlet = SymmetricTensor{4, 2}(
-    (i, j, k, l) -> begin
-        if k == l == 1
-            σ̄.dirichlet[1][i, j] # ∂σ∂ε_**11
-        elseif k == l == 2
-            σ̄.dirichlet[2][i, j] # ∂σ∂ε_**22
-        else
-            σ̄.dirichlet[3][i, j] # ∂σ∂ε_**12 and ∂σ∂ε_**21
-        end
+E_dirichlet = SymmetricTensor{4, 2}() do i, j, k, l
+    if k == l == 1
+        σ̄.dirichlet[1][i, j] # ∂σ∂ε_**11
+    elseif k == l == 2
+        σ̄.dirichlet[2][i, j] # ∂σ∂ε_**22
+    else
+        σ̄.dirichlet[3][i, j] # ∂σ∂ε_**12 and ∂σ∂ε_**21
     end
-)
+end
 
-E_periodic = SymmetricTensor{4, 2}(
-    (i, j, k, l) -> begin
-        if k == l == 1
-            σ̄.periodic[1][i, j]
-        elseif k == l == 2
-            σ̄.periodic[2][i, j]
-        else
-            σ̄.periodic[3][i, j]
-        end
+E_periodic = SymmetricTensor{4, 2}() do i, j, k, l
+    if k == l == 1
+        σ̄.periodic[1][i, j]
+    elseif k == l == 2
+        σ̄.periodic[2][i, j]
+    else
+        σ̄.periodic[3][i, j]
     end
-);
+end
 
 function matrix_volume_fraction(grid, cellvalues)
     V = 0.0 # Total volume

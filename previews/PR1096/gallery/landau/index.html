@@ -7,10 +7,8 @@ using SparseArrays
 using Tensors
 using Base.Threads</code></pre><h2 id="Energy-terms"><a class="docs-heading-anchor" href="#Energy-terms">Energy terms</a><a id="Energy-terms-1"></a><a class="docs-heading-anchor-permalink" href="#Energy-terms" title="Permalink"></a></h2><h3 id="4th-order-Landau-free-energy"><a class="docs-heading-anchor" href="#4th-order-Landau-free-energy">4th order Landau free energy</a><a id="4th-order-Landau-free-energy-1"></a><a class="docs-heading-anchor-permalink" href="#4th-order-Landau-free-energy" title="Permalink"></a></h3><pre><code class="language-julia hljs">function Fl(P::Vec{3, T}, α::Vec{3}) where {T}
     P2 = Vec{3, T}((P[1]^2, P[2]^2, P[3]^2))
-    return (
-        α[1] * sum(P2) +
-            α[2] * (P[1]^4 + P[2]^4 + P[3]^4)
-    ) +
+    return α[1] * sum(P2) +
+        α[2] * (P[1]^4 + P[2]^4 + P[3]^4) +
         α[3] * ((P2[1] * P2[2] + P2[2] * P2[3]) + P2[1] * P2[3])
 end</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">Fl (generic function with 1 method)</code></pre><h3 id="Ginzburg-free-energy"><a class="docs-heading-anchor" href="#Ginzburg-free-energy">Ginzburg free energy</a><a id="Ginzburg-free-energy-1"></a><a class="docs-heading-anchor-permalink" href="#Ginzburg-free-energy" title="Permalink"></a></h3><pre><code class="language-julia hljs">@inline Fg(∇P, G) = 0.5(∇P ⊡ G) ⊡ ∇P</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">Fg (generic function with 1 method)</code></pre><h3 id="GL-free-energy"><a class="docs-heading-anchor" href="#GL-free-energy">GL free energy</a><a id="GL-free-energy-1"></a><a class="docs-heading-anchor-permalink" href="#GL-free-energy" title="Permalink"></a></h3><pre><code class="language-julia hljs">F(P, ∇P, params) = Fl(P, params.α) + Fg(∇P, params.G)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">F (generic function with 1 method)</code></pre><h3 id="Parameters-that-characterize-the-model"><a class="docs-heading-anchor" href="#Parameters-that-characterize-the-model">Parameters that characterize the model</a><a id="Parameters-that-characterize-the-model-1"></a><a class="docs-heading-anchor-permalink" href="#Parameters-that-characterize-the-model" title="Permalink"></a></h3><pre><code class="language-julia hljs">struct ModelParams{V, T}
     α::V
@@ -73,9 +71,10 @@ function LandauModel(α, G, gridsize, left::Vec{DIM, T}, right::Vec{DIM, T}, elp
     caches = [ThreadCache(dpc, cpc, copy(cvP), ModelParams(α, G), elpotential) for t in 1:nthreads()]
     return LandauModel(dofvector, dofhandler, boundaryconds, threadindices, caches)
 end</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">Main.LandauModel</code></pre><p>utility to quickly save a model</p><pre><code class="language-julia hljs">function save_landau(path, model, dofs = model.dofs)
-    return VTKGridFile(path, model.dofhandler) do vtk
+    VTKGridFile(path, model.dofhandler) do vtk
         write_solution(vtk, model.dofhandler, dofs)
     end
+    return
 end</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">save_landau (generic function with 2 methods)</code></pre><h2 id="Assembly"><a class="docs-heading-anchor" href="#Assembly">Assembly</a><a id="Assembly-1"></a><a class="docs-heading-anchor-permalink" href="#Assembly" title="Permalink"></a></h2><p>This macro defines most of the assembly step, since the structure is the same for the energy, gradient and Hessian calculations.</p><pre><code class="language-julia hljs">macro assemble!(innerbody)
     return esc(
         quote
@@ -107,16 +106,18 @@ end</code></pre><pre class="documenter-example-output"><code class="nohighlight 
     return sum(outs)
 end</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">F (generic function with 2 methods)</code></pre><p>The gradient calculation for each dof</p><pre><code class="language-julia hljs">function ∇F!(∇f::Vector{T}, dofvector::Vector{T}, model::LandauModel{T}) where {T}
     fill!(∇f, zero(T))
-    return @assemble! begin
+    @assemble! begin
         ForwardDiff.gradient!(cache.element_gradient, cache.element_potential, eldofs, cache.gradconf)
         @inbounds assemble!(∇f, cache.element_indices, cache.element_gradient)
     end
+    return
 end</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">∇F! (generic function with 1 method)</code></pre><p>The Hessian calculation for the whole grid</p><pre><code class="language-julia hljs">function ∇²F!(∇²f::SparseMatrixCSC, dofvector::Vector{T}, model::LandauModel{T}) where {T}
     assemblers = [start_assemble(∇²f) for t in 1:nthreads()]
-    return @assemble! begin
+    @assemble! begin
         ForwardDiff.hessian!(cache.element_hessian, cache.element_potential, eldofs, cache.hessconf)
         @inbounds assemble!(assemblers[threadid()], cache.element_indices, cache.element_hessian)
     end
+    return
 end</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">∇²F! (generic function with 1 method)</code></pre><p>We can also calculate all things in one go!</p><pre><code class="language-julia hljs">function calcall(∇²f::SparseMatrixCSC, ∇f::Vector{T}, dofvector::Vector{T}, model::LandauModel{T}) where {T}
     outs = fill(zero(T), nthreads())
     fill!(∇f, zero(T))
@@ -139,7 +140,7 @@ end</code></pre><pre class="documenter-example-output"><code class="nohighlight 
     end
     function h!(storage, x)
         return ∇²F!(storage, x, model)
-        #apply!(storage, model.boundaryconds)
+        # apply!(storage, model.boundaryconds)
     end
     f(x) = F(x, model)
 
@@ -187,4 +188,31 @@ model = LandauModel(α, G, (50, 50, 2), left, right, element_potential)
 
 save_landau(&quot;landauorig&quot;, model)
 @time minimize!(model)
-save_landau(&quot;landaufinal&quot;, model)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">VTKGridFile for the closed file &quot;landaufinal.vtu&quot;.</code></pre><p>as we can see this runs very quickly even for relatively large gridsizes. The key to get high performance like this is to minimize the allocations inside the threaded loops, ideally to 0.</p><hr/><p><em>This page was generated using <a href="https://github.com/fredrikekre/Literate.jl">Literate.jl</a>.</em></p></article><nav class="docs-footer"><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option><option value="catppuccin-latte">catppuccin-latte</option><option value="catppuccin-frappe">catppuccin-frappe</option><option value="catppuccin-macchiato">catppuccin-macchiato</option><option value="catppuccin-mocha">catppuccin-mocha</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.7.0 on <span class="colophon-date" title="Tuesday 29 October 2024 12:10">Tuesday 29 October 2024</span>. Using Julia version 1.11.1.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
+save_landau(&quot;landaufinal&quot;, model)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">Iter     Function value   Gradient norm
+     0     2.127588e+06     3.597094e+02
+ * time: 8.893013000488281e-5
+     1     3.786155e+05     1.047687e+02
+ * time: 3.3736979961395264
+     2     5.306125e+04     2.978953e+01
+ * time: 6.358555793762207
+     3    -2.642320e+03     7.943136e+00
+ * time: 9.308557987213135
+     4    -1.027484e+04     1.752693e+00
+ * time: 12.248273849487305
+     5    -1.084925e+04     2.157295e-01
+ * time: 15.229424953460693
+     6    -1.085880e+04     5.288877e-03
+ * time: 18.1901638507843
+     7    -1.085881e+04     3.478176e-06
+ * time: 21.136974811553955
+     8    -1.085881e+04     1.596091e-12
+ * time: 24.103304862976074
+     9    -1.085881e+04     1.444882e-12
+ * time: 27.063945770263672
+    10    -1.085881e+04     1.548831e-13
+ * time: 30.02093195915222
+    11    -1.085881e+04     1.548831e-13
+ * time: 33.09149980545044
+    12    -1.085881e+04     1.508030e-13
+ * time: 33.53430700302124
+ 39.623621 seconds (11.20 M allocations: 3.879 GiB, 1.43% gc time, 8.25% compilation time)</code></pre><p>as we can see this runs very quickly even for relatively large gridsizes. The key to get high performance like this is to minimize the allocations inside the threaded loops, ideally to 0.</p><hr/><p><em>This page was generated using <a href="https://github.com/fredrikekre/Literate.jl">Literate.jl</a>.</em></p></article><nav class="docs-footer"><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option><option value="catppuccin-latte">catppuccin-latte</option><option value="catppuccin-frappe">catppuccin-frappe</option><option value="catppuccin-macchiato">catppuccin-macchiato</option><option value="catppuccin-mocha">catppuccin-mocha</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.7.0 on <span class="colophon-date" title="Thursday 31 October 2024 12:08">Thursday 31 October 2024</span>. Using Julia version 1.11.1.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>

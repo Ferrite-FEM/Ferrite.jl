@@ -197,7 +197,7 @@ function main()
     grid = setup_grid(h)
     # Interpolations
     ipu = Lagrange{RefTriangle, 2}()^2 # quadratic
-    ipp = Lagrange{RefTriangle, 1}()     # linear
+    ipp = Lagrange{RefTriangle, 1}()   # linear
     # Dofs
     dh = setup_dofs(grid, ipu, ipp)
     # FE values

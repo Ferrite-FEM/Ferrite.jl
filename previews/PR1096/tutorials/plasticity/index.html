@@ -37,7 +37,7 @@ end;</code></pre><h2 id="Constitutive-driver"><a class="docs-heading-anchor" hre
     σᵗ = material.Dᵉ ⊡ (ϵ - state.ϵᵖ) # trial-stress
     sᵗ = dev(σᵗ)         # deviatoric part of trial-stress
     J₂ = 0.5 * sᵗ ⊡ sᵗ   # second invariant of sᵗ
-    σᵗₑ = sqrt(3.0 * J₂)   # effective trial-stress (von Mises stress)
+    σᵗₑ = sqrt(3.0 * J₂) # effective trial-stress (von Mises stress)
     σʸ = material.σ₀ + H * state.k # Previous yield limit
 
     φᵗ = σᵗₑ - σʸ # Trial-value of the yield surface
@@ -46,7 +46,7 @@ end;</code></pre><h2 id="Constitutive-driver"><a class="docs-heading-anchor" hre
         return σᵗ, material.Dᵉ, MaterialState(state.ϵᵖ, σᵗ, state.k)
     else # plastic loading
         h = H + 3G
-        μ = φᵗ / h   # plastic multiplier
+        μ = φᵗ / h # plastic multiplier
 
         c1 = 1 - 3G * μ / σᵗₑ
         s = c1 * sᵗ           # updated deviatoric stress
@@ -66,8 +66,8 @@ end;</code></pre><h2 id="Constitutive-driver"><a class="docs-heading-anchor" hre
 
         # Return new state
         Δϵᵖ = 3 / 2 * μ / σₑ * s # plastic strain
-        ϵᵖ = state.ϵᵖ + Δϵᵖ    # plastic strain
-        k = state.k + μ        # hardening variable
+        ϵᵖ = state.ϵᵖ + Δϵᵖ      # plastic strain
+        k = state.k + μ          # hardening variable
         return σ, D, MaterialState(ϵᵖ, σ, k)
     end
 end</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">compute_stress_tangent (generic function with 1 method)</code></pre><h2 id="FE-problem"><a class="docs-heading-anchor" href="#FE-problem">FE-problem</a><a id="FE-problem-1"></a><a class="docs-heading-anchor-permalink" href="#FE-problem" title="Permalink"></a></h2><p>What follows are methods for assembling and and solving the FE-problem.</p><pre><code class="language-julia hljs">function create_values(interpolation)
@@ -113,10 +113,7 @@ end;</code></pre><h3 id="Assembling-of-element-contributions"><a class="docs-hea
         assemble!(assembler, eldofs, ke, re)
     end
     return K, r
-end</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">doassemble! (generic function with 1 method)</code></pre><p>Compute element contribution to the residual and the tangent.</p><div class="admonition is-info"><header class="admonition-header">Note</header><div class="admonition-body"><p>Due to symmetry, we only compute the lower half of the tangent and then symmetrize it.</p></div></div><pre><code class="language-julia hljs">function assemble_cell!(
-        Ke, re, cell, cellvalues, material,
-        ue, state, state_old
-    )
+end</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">doassemble! (generic function with 1 method)</code></pre><p>Compute element contribution to the residual and the tangent.</p><div class="admonition is-info"><header class="admonition-header">Note</header><div class="admonition-body"><p>Due to symmetry, we only compute the lower half of the tangent and then symmetrize it.</p></div></div><pre><code class="language-julia hljs">function assemble_cell!(Ke, re, cell, cellvalues, material, ue, state, state_old)
     n_basefuncs = getnbasefunctions(cellvalues)
     reinit!(cellvalues, cell)
 
@@ -135,7 +132,8 @@ end</code></pre><pre class="documenter-example-output"><code class="nohighlight 
             end
         end
     end
-    return symmetrize_lower!(Ke)
+    symmetrize_lower!(Ke)
+    return
 end</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">assemble_cell! (generic function with 1 method)</code></pre><p>Helper function to symmetrize the material tangent</p><pre><code class="language-julia hljs">function symmetrize_lower!(K)
     for i in 1:size(K, 1)
         for j in (i + 1):size(K, 1)
@@ -164,10 +162,10 @@ function doassemble_neumann!(r, dh, facetset, facetvalues, t)
     return r
 end</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">doassemble_neumann! (generic function with 1 method)</code></pre><p>Define a function which solves the FE-problem.</p><pre><code class="language-julia hljs">function solve()
     # Define material parameters
-    E = 200.0e9 # [Pa]
+    E = 200.0e9  # [Pa]
     H = E / 20   # [Pa]
-    ν = 0.3     # [-]
-    σ₀ = 200.0e6  # [Pa]
+    ν = 0.3      # [-]
+    σ₀ = 200.0e6 # [Pa]
     material = J2Plasticity(E, ν, σ₀, H)
 
     L = 10.0 # beam length [m]
@@ -192,10 +190,10 @@ end</code></pre><pre class="documenter-example-output"><code class="nohighlight 
 
     # Pre-allocate solution vectors, etc.
     n_dofs = ndofs(dh)  # total number of dofs
-    u = zeros(n_dofs)  # solution vector
+    u = zeros(n_dofs)   # solution vector
     Δu = zeros(n_dofs)  # displacement correction
     r = zeros(n_dofs)   # residual
-    K = allocate_matrix(dh)  # tangent stiffness matrix
+    K = allocate_matrix(dh) # tangent stiffness matrix
 
     # Create material states. One array for each cell, where each element is an array of material-
     # states - one for each integration point
@@ -217,7 +215,6 @@ end</code></pre><pre class="documenter-example-output"><code class="nohighlight 
 
         while true
             newton_itr += 1
-
             if newton_itr &gt; 8
                 error(&quot;Reached maximum Newton iterations, aborting&quot;)
                 break
@@ -349,7 +346,7 @@ plot(
     markershape = :auto
 )
 ylabel!(&quot;Traction [Pa]&quot;)
-xlabel!(&quot;Maximum deflection [m]&quot;)</code></pre><img src="5f1a4585.svg" alt="Example block output"/><p><em>Figure 2.</em> Load-displacement-curve for the beam, showing a clear decrease in stiffness as more material starts to yield.</p><h2 id="plasticity-plain-program"><a class="docs-heading-anchor" href="#plasticity-plain-program">Plain program</a><a id="plasticity-plain-program-1"></a><a class="docs-heading-anchor-permalink" href="#plasticity-plain-program" title="Permalink"></a></h2><p>Here follows a version of the program without any comments. The file is also available here: <a href="../plasticity.jl"><code>plasticity.jl</code></a>.</p><pre><code class="language-julia hljs">using Ferrite, Tensors, SparseArrays, LinearAlgebra, Printf
+xlabel!(&quot;Maximum deflection [m]&quot;)</code></pre><img src="d92a5fb5.svg" alt="Example block output"/><p><em>Figure 2.</em> Load-displacement-curve for the beam, showing a clear decrease in stiffness as more material starts to yield.</p><h2 id="plasticity-plain-program"><a class="docs-heading-anchor" href="#plasticity-plain-program">Plain program</a><a id="plasticity-plain-program-1"></a><a class="docs-heading-anchor-permalink" href="#plasticity-plain-program" title="Permalink"></a></h2><p>Here follows a version of the program without any comments. The file is also available here: <a href="../plasticity.jl"><code>plasticity.jl</code></a>.</p><pre><code class="language-julia hljs">using Ferrite, Tensors, SparseArrays, LinearAlgebra, Printf
 
 struct J2Plasticity{T, S &lt;: SymmetricTensor{4, 3, T}}
     G::T  # Shear modulus
@@ -399,7 +396,7 @@ function compute_stress_tangent(ϵ::SymmetricTensor{2, 3}, material::J2Plasticit
     σᵗ = material.Dᵉ ⊡ (ϵ - state.ϵᵖ) # trial-stress
     sᵗ = dev(σᵗ)         # deviatoric part of trial-stress
     J₂ = 0.5 * sᵗ ⊡ sᵗ   # second invariant of sᵗ
-    σᵗₑ = sqrt(3.0 * J₂)   # effective trial-stress (von Mises stress)
+    σᵗₑ = sqrt(3.0 * J₂) # effective trial-stress (von Mises stress)
     σʸ = material.σ₀ + H * state.k # Previous yield limit
 
     φᵗ = σᵗₑ - σʸ # Trial-value of the yield surface
@@ -408,7 +405,7 @@ function compute_stress_tangent(ϵ::SymmetricTensor{2, 3}, material::J2Plasticit
         return σᵗ, material.Dᵉ, MaterialState(state.ϵᵖ, σᵗ, state.k)
     else # plastic loading
         h = H + 3G
-        μ = φᵗ / h   # plastic multiplier
+        μ = φᵗ / h # plastic multiplier
 
         c1 = 1 - 3G * μ / σᵗₑ
         s = c1 * sᵗ           # updated deviatoric stress
@@ -428,8 +425,8 @@ function compute_stress_tangent(ϵ::SymmetricTensor{2, 3}, material::J2Plasticit
 
         # Return new state
         Δϵᵖ = 3 / 2 * μ / σₑ * s # plastic strain
-        ϵᵖ = state.ϵᵖ + Δϵᵖ    # plastic strain
-        k = state.k + μ        # hardening variable
+        ϵᵖ = state.ϵᵖ + Δϵᵖ      # plastic strain
+        k = state.k + μ          # hardening variable
         return σ, D, MaterialState(ϵᵖ, σ, k)
     end
 end
@@ -485,10 +482,7 @@ function doassemble!(
     return K, r
 end
 
-function assemble_cell!(
-        Ke, re, cell, cellvalues, material,
-        ue, state, state_old
-    )
+function assemble_cell!(Ke, re, cell, cellvalues, material, ue, state, state_old)
     n_basefuncs = getnbasefunctions(cellvalues)
     reinit!(cellvalues, cell)
 
@@ -507,7 +501,8 @@ function assemble_cell!(
             end
         end
     end
-    return symmetrize_lower!(Ke)
+    symmetrize_lower!(Ke)
+    return
 end
 
 function symmetrize_lower!(K)
@@ -540,10 +535,10 @@ end
 
 function solve()
     # Define material parameters
-    E = 200.0e9 # [Pa]
+    E = 200.0e9  # [Pa]
     H = E / 20   # [Pa]
-    ν = 0.3     # [-]
-    σ₀ = 200.0e6  # [Pa]
+    ν = 0.3      # [-]
+    σ₀ = 200.0e6 # [Pa]
     material = J2Plasticity(E, ν, σ₀, H)
 
     L = 10.0 # beam length [m]
@@ -568,10 +563,10 @@ function solve()
 
     # Pre-allocate solution vectors, etc.
     n_dofs = ndofs(dh)  # total number of dofs
-    u = zeros(n_dofs)  # solution vector
+    u = zeros(n_dofs)   # solution vector
     Δu = zeros(n_dofs)  # displacement correction
     r = zeros(n_dofs)   # residual
-    K = allocate_matrix(dh)  # tangent stiffness matrix
+    K = allocate_matrix(dh) # tangent stiffness matrix
 
     # Create material states. One array for each cell, where each element is an array of material-
     # states - one for each integration point
@@ -593,7 +588,6 @@ function solve()
 
         while true
             newton_itr += 1
-
             if newton_itr &gt; 8
                 error(&quot;Reached maximum Newton iterations, aborting&quot;)
                 break
@@ -655,4 +649,4 @@ plot(
     markershape = :auto
 )
 ylabel!(&quot;Traction [Pa]&quot;)
-xlabel!(&quot;Maximum deflection [m]&quot;)</code></pre><hr/><p><em>This page was generated using <a href="https://github.com/fredrikekre/Literate.jl">Literate.jl</a>.</em></p></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../hyperelasticity/">« Hyperelasticity</a><a class="docs-footer-nextpage" href="../transient_heat_equation/">Transient heat equation »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option><option value="catppuccin-latte">catppuccin-latte</option><option value="catppuccin-frappe">catppuccin-frappe</option><option value="catppuccin-macchiato">catppuccin-macchiato</option><option value="catppuccin-mocha">catppuccin-mocha</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.7.0 on <span class="colophon-date" title="Tuesday 29 October 2024 12:10">Tuesday 29 October 2024</span>. Using Julia version 1.11.1.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
+xlabel!(&quot;Maximum deflection [m]&quot;)</code></pre><hr/><p><em>This page was generated using <a href="https://github.com/fredrikekre/Literate.jl">Literate.jl</a>.</em></p></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../hyperelasticity/">« Hyperelasticity</a><a class="docs-footer-nextpage" href="../transient_heat_equation/">Transient heat equation »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option><option value="catppuccin-latte">catppuccin-latte</option><option value="catppuccin-frappe">catppuccin-frappe</option><option value="catppuccin-macchiato">catppuccin-macchiato</option><option value="catppuccin-mocha">catppuccin-mocha</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.7.0 on <span class="colophon-date" title="Thursday 31 October 2024 12:08">Thursday 31 October 2024</span>. Using Julia version 1.11.1.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>

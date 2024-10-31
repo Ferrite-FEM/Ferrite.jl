@@ -48,7 +48,7 @@ function compute_stress_tangent(ϵ::SymmetricTensor{2, 3}, material::J2Plasticit
     σᵗ = material.Dᵉ ⊡ (ϵ - state.ϵᵖ) # trial-stress
     sᵗ = dev(σᵗ)         # deviatoric part of trial-stress
     J₂ = 0.5 * sᵗ ⊡ sᵗ   # second invariant of sᵗ
-    σᵗₑ = sqrt(3.0 * J₂)   # effective trial-stress (von Mises stress)
+    σᵗₑ = sqrt(3.0 * J₂) # effective trial-stress (von Mises stress)
     σʸ = material.σ₀ + H * state.k # Previous yield limit
 
     φᵗ = σᵗₑ - σʸ # Trial-value of the yield surface
@@ -57,7 +57,7 @@ function compute_stress_tangent(ϵ::SymmetricTensor{2, 3}, material::J2Plasticit
         return σᵗ, material.Dᵉ, MaterialState(state.ϵᵖ, σᵗ, state.k)
     else # plastic loading
         h = H + 3G
-        μ = φᵗ / h   # plastic multiplier
+        μ = φᵗ / h # plastic multiplier
 
         c1 = 1 - 3G * μ / σᵗₑ
         s = c1 * sᵗ           # updated deviatoric stress
@@ -77,8 +77,8 @@ function compute_stress_tangent(ϵ::SymmetricTensor{2, 3}, material::J2Plasticit
 
         # Return new state
         Δϵᵖ = 3 / 2 * μ / σₑ * s # plastic strain
-        ϵᵖ = state.ϵᵖ + Δϵᵖ    # plastic strain
-        k = state.k + μ        # hardening variable
+        ϵᵖ = state.ϵᵖ + Δϵᵖ      # plastic strain
+        k = state.k + μ          # hardening variable
         return σ, D, MaterialState(ϵᵖ, σ, k)
     end
 end
@@ -134,10 +134,7 @@ function doassemble!(
     return K, r
 end
 
-function assemble_cell!(
-        Ke, re, cell, cellvalues, material,
-        ue, state, state_old
-    )
+function assemble_cell!(Ke, re, cell, cellvalues, material, ue, state, state_old)
     n_basefuncs = getnbasefunctions(cellvalues)
     reinit!(cellvalues, cell)
 
@@ -156,7 +153,8 @@ function assemble_cell!(
             end
         end
     end
-    return symmetrize_lower!(Ke)
+    symmetrize_lower!(Ke)
+    return
 end
 
 function symmetrize_lower!(K)
@@ -189,10 +187,10 @@ end
 
 function solve()
     # Define material parameters
-    E = 200.0e9 # [Pa]
+    E = 200.0e9  # [Pa]
     H = E / 20   # [Pa]
-    ν = 0.3     # [-]
-    σ₀ = 200.0e6  # [Pa]
+    ν = 0.3      # [-]
+    σ₀ = 200.0e6 # [Pa]
     material = J2Plasticity(E, ν, σ₀, H)
 
     L = 10.0 # beam length [m]
@@ -217,10 +215,10 @@ function solve()
 
     # Pre-allocate solution vectors, etc.
     n_dofs = ndofs(dh)  # total number of dofs
-    u = zeros(n_dofs)  # solution vector
+    u = zeros(n_dofs)   # solution vector
     Δu = zeros(n_dofs)  # displacement correction
     r = zeros(n_dofs)   # residual
-    K = allocate_matrix(dh)  # tangent stiffness matrix
+    K = allocate_matrix(dh) # tangent stiffness matrix
 
     # Create material states. One array for each cell, where each element is an array of material-
     # states - one for each integration point
@@ -242,7 +240,6 @@ function solve()
 
         while true
             newton_itr += 1
-
             if newton_itr > 8
                 error("Reached maximum Newton iterations, aborting")
                 break

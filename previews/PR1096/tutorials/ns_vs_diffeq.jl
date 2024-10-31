@@ -24,7 +24,7 @@ if !IS_CI                                                                       
     circle_surf_tag = gmsh.model.occ.add_plane_surface([circle_curve_tag])
     gmsh.model.occ.cut([(dim, rect_tag)], [(dim, circle_surf_tag)])
 else                                                                                                #hide
-    rect_tag = gmsh.model.occ.add_rectangle(0, 0, 0, 0.55, 0.41)                                        #hide
+    rect_tag = gmsh.model.occ.add_rectangle(0, 0, 0, 0.55, 0.41)                                    #hide
 end                                                                                                 #hide
 nothing                                                                                             #hide
 
@@ -37,19 +37,19 @@ if !IS_CI                                                                       
     toptag = gmsh.model.model.add_physical_group(dim - 1, [9], -1, "top")
     holetag = gmsh.model.model.add_physical_group(dim - 1, [5], -1, "hole")
 else                                                                                                #hide
-    gmsh.model.model.add_physical_group(dim - 1, [4], 7, "left")                                             #hide
-    gmsh.model.model.add_physical_group(dim - 1, [3], 8, "top")                                              #hide
-    gmsh.model.model.add_physical_group(dim - 1, [2], 9, "right")                                            #hide
-    gmsh.model.model.add_physical_group(dim - 1, [1], 10, "bottom")                                          #hide
-end #hide
+    gmsh.model.model.add_physical_group(dim - 1, [4], 7, "left")                                    #hide
+    gmsh.model.model.add_physical_group(dim - 1, [3], 8, "top")                                     #hide
+    gmsh.model.model.add_physical_group(dim - 1, [2], 9, "right")                                   #hide
+    gmsh.model.model.add_physical_group(dim - 1, [1], 10, "bottom")                                 #hide
+end                                                                                                 #hide
 nothing                                                                                             #hide
 
 gmsh.option.setNumber("Mesh.Algorithm", 11)
 gmsh.option.setNumber("Mesh.MeshSizeFromCurvature", 20)
 gmsh.option.setNumber("Mesh.MeshSizeMax", 0.05)
 if IS_CI                                                                                            #hide
-    gmsh.option.setNumber("Mesh.MeshSizeFromCurvature", 20)                                              #hide
-    gmsh.option.setNumber("Mesh.MeshSizeMax", 0.15)                                                      #hide
+    gmsh.option.setNumber("Mesh.MeshSizeFromCurvature", 20)                                         #hide
+    gmsh.option.setNumber("Mesh.MeshSizeMax", 0.15)                                                 #hide
 end                                                                                                 #hide
 
 gmsh.model.mesh.generate(dim)
@@ -72,7 +72,7 @@ ch = ConstraintHandler(dh);
 
 nosplip_facet_names = ["top", "bottom", "hole"];
 if IS_CI                                                                #hide
-    nosplip_facet_names = ["top", "bottom"]                                 #hide
+    nosplip_facet_names = ["top", "bottom"]                             #hide
 end                                                                     #hide
 ∂Ω_noslip = union(getfacetset.((grid,), nosplip_facet_names)...);
 noslip_bc = Dirichlet(:v, ∂Ω_noslip, (x, t) -> Vec((0.0, 0.0)), [1, 2])
@@ -343,7 +343,7 @@ if IS_CI                                                                        
     let                                                                         #hide
         u = copy(integrator.u)                                                  #hide
         Δdivv = abs(compute_divergence(dh, u, cellvalues_v))                    #hide
-        @test isapprox(Δdivv, 0.0, atol = 1.0e-12)                                  #hide
+        @test isapprox(Δdivv, 0.0, atol = 1.0e-12)                              #hide
         #hide
         Δv = 0.0                                                                #hide
         for cell in CellIterator(dh)                                            #hide
@@ -356,10 +356,10 @@ if IS_CI                                                                        
                 dΩ = getdetJdV(cellvalues_v, q_point)                           #hide
                 coords_qp = spatial_coordinate(cellvalues_v, q_point, coords)   #hide
                 v = function_value(cellvalues_v, q_point, v_cell)               #hide
-                Δv += norm(v - parabolic_inflow_profile(coords_qp, T))^2 * dΩ     #hide
+                Δv += norm(v - parabolic_inflow_profile(coords_qp, T))^2 * dΩ   #hide
             end                                                                 #hide
         end                                                                     #hide
-        @test isapprox(sqrt(Δv), 0.0, atol = 1.0e-3)                                #hide
+        @test isapprox(sqrt(Δv), 0.0, atol = 1.0e-3)                            #hide
     end                                                                         #hide
     nothing                                                                     #hide
 end                                                                             #hide

@@ -42,8 +42,7 @@ update!(dbcs, 0.0)
 K = allocate_matrix(dh);
 
 function doassemble(
-        cellvalues::CellValues, facetvalues::FacetValues,
-        K::SparseMatrixCSC, dh::DofHandler
+        cellvalues::CellValues, facetvalues::FacetValues, K::SparseMatrixCSC, dh::DofHandler
     )
     b = 1.0
     f = zeros(ndofs(dh))

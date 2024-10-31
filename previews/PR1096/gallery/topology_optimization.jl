@@ -107,7 +107,7 @@ function cache_neighborhood(dh, topology)
         i = cellid(element)
         for j in 1:_nfacets
             nbg_cellid = getneighborhood(topology, dh.grid, FacetIndex(i, j))
-            if (!isempty(nbg_cellid))
+            if !isempty(nbg_cellid)
                 nbg[j] = first(nbg_cellid)[1] # assuming only one facet neighbor per cell
             else # boundary facet
                 nbg[j] = first(getneighborhood(topology, dh.grid, FacetIndex(i, opp[j])))[1]
@@ -140,7 +140,7 @@ function compute_χn1(χn, Δχ, ρ, ηs, χ_min)
     λ_upper = maximum(Δχ) + ηs
     λ_trial = 0.0
 
-    while (abs(ρ - ρ_trial) > 1.0e-7)
+    while abs(ρ - ρ_trial) > 1.0e-7
         for i in 1:n_el
             Δχt = 1 / ηs * (Δχ[i] - λ_trial)
             χ_trial[i] = max(χ_min, min(1.0, χn[i] + Δχt))
@@ -151,9 +151,9 @@ function compute_χn1(χn, Δχ, ρ, ηs, χ_min)
             ρ_trial += χ_trial[i] / n_el
         end
 
-        if (ρ_trial > ρ)
+        if ρ_trial > ρ
             λ_lower = λ_trial
-        elseif (ρ_trial < ρ)
+        elseif ρ_trial < ρ
             λ_upper = λ_trial
         end
         λ_trial = 1 / 2 * (λ_upper + λ_lower)
@@ -189,7 +189,7 @@ function update_density(dh, states, mp, ρ, neighboorhoods, Δh)
 
         χn1 = compute_χn1(χn, Δχ, ρ, mp.η, mp.χ_min)
 
-        if (j < n_j)
+        if j < n_j
             χn[:] = χn1[:]
         end
     end
@@ -241,7 +241,7 @@ function elmt!(Ke, re, element, cellvalues, facetvalues, grid, mp, ue, state)
 
     symmetrize_lower!(Ke)
 
-    return @inbounds for facet in 1:nfacets(getcells(grid, cellid(element)))
+    @inbounds for facet in 1:nfacets(getcells(grid, cellid(element)))
         if (cellid(element), facet) ∈ getfacetset(grid, "traction")
             reinit!(facetvalues, element, facet)
             t = Vec((0.0, -1.0)) # force pointing downwards
@@ -254,7 +254,7 @@ function elmt!(Ke, re, element, cellvalues, facetvalues, grid, mp, ue, state)
             end
         end
     end
-
+    return
 end
 
 function symmetrize_lower!(K)
@@ -340,13 +340,13 @@ function topopt(ra, ρ, n, filename; output = :false)
         # calculate compliance
         compliance = 1 / 2 * u' * K * u
 
-        if (it == 1)
+        if it == 1
             compliance_0 = compliance
         end
 
         # check convergence criterium (twice!)
-        if (abs(compliance - compliance_n) / compliance < tol)
-            if (conv)
+        if abs(compliance - compliance_n) / compliance < tol
+            if conv
                 println("Converged at iteration number: ", it)
                 break
             else
@@ -366,7 +366,7 @@ function topopt(ra, ρ, n, filename; output = :false)
         compliance_n = compliance
 
         # output during calculation
-        if (output)
+        if output
             i = @sprintf("%3.3i", it)
             filename_it = string(filename, "_", i)
 
@@ -377,7 +377,7 @@ function topopt(ra, ρ, n, filename; output = :false)
     end
 
     # export converged results
-    if (!output)
+    if !output
         VTKGridFile(filename, grid) do vtk
             write_cell_data(vtk, χ, "density")
         end

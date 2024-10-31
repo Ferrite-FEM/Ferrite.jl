@@ -359,7 +359,8 @@ function solve(dh, ch, domains; Δt = 0.025, t_total = 1.0)
             pvd[t] = vtk
         end
     end
-    return vtk_save(pvd)
+    vtk_save(pvd)
+    return
 end;
 
 # Finally we call the functions to actually run the code

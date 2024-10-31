@@ -96,7 +96,7 @@ end</code></pre><p>For the Laplacian we need some neighboorhood information whic
         i = cellid(element)
         for j in 1:_nfacets
             nbg_cellid = getneighborhood(topology, dh.grid, FacetIndex(i, j))
-            if (!isempty(nbg_cellid))
+            if !isempty(nbg_cellid)
                 nbg[j] = first(nbg_cellid)[1] # assuming only one facet neighbor per cell
             else # boundary facet
                 nbg[j] = first(getneighborhood(topology, dh.grid, FacetIndex(i, opp[j])))[1]
@@ -125,7 +125,7 @@ end</code></pre><p>For the iterative computation of the solution, a function is 
     λ_upper = maximum(Δχ) + ηs
     λ_trial = 0.0
 
-    while (abs(ρ - ρ_trial) &gt; 1.0e-7)
+    while abs(ρ - ρ_trial) &gt; 1.0e-7
         for i in 1:n_el
             Δχt = 1 / ηs * (Δχ[i] - λ_trial)
             χ_trial[i] = max(χ_min, min(1.0, χn[i] + Δχt))
@@ -136,9 +136,9 @@ end</code></pre><p>For the iterative computation of the solution, a function is 
             ρ_trial += χ_trial[i] / n_el
         end
 
-        if (ρ_trial &gt; ρ)
+        if ρ_trial &gt; ρ
             λ_lower = λ_trial
-        elseif (ρ_trial &lt; ρ)
+        elseif ρ_trial &lt; ρ
             λ_upper = λ_trial
         end
         λ_trial = 1 / 2 * (λ_upper + λ_lower)
@@ -170,7 +170,7 @@ end</code></pre><p>Finally, we put everything together to update the density. Th
 
         χn1 = compute_χn1(χn, Δχ, ρ, mp.η, mp.χ_min)
 
-        if (j &lt; n_j)
+        if j &lt; n_j
             χn[:] = χn1[:]
         end
     end
@@ -218,7 +218,7 @@ end</code></pre><p>The element routine is used to calculate the elementwise stif
 
     symmetrize_lower!(Ke)
 
-    return @inbounds for facet in 1:nfacets(getcells(grid, cellid(element)))
+    @inbounds for facet in 1:nfacets(getcells(grid, cellid(element)))
         if (cellid(element), facet) ∈ getfacetset(grid, &quot;traction&quot;)
             reinit!(facetvalues, element, facet)
             t = Vec((0.0, -1.0)) # force pointing downwards
@@ -231,7 +231,7 @@ end</code></pre><p>The element routine is used to calculate the elementwise stif
             end
         end
     end
-
+    return
 end
 
 function symmetrize_lower!(K)
@@ -315,13 +315,13 @@ end</code></pre><p>We put everything together in the main function. Here the use
         # calculate compliance
         compliance = 1 / 2 * u&#39; * K * u
 
-        if (it == 1)
+        if it == 1
             compliance_0 = compliance
         end
 
         # check convergence criterium (twice!)
-        if (abs(compliance - compliance_n) / compliance &lt; tol)
-            if (conv)
+        if abs(compliance - compliance_n) / compliance &lt; tol
+            if conv
                 println(&quot;Converged at iteration number: &quot;, it)
                 break
             else
@@ -341,7 +341,7 @@ end</code></pre><p>We put everything together in the main function. Here the use
         compliance_n = compliance
 
         # output during calculation
-        if (output)
+        if output
             i = @sprintf(&quot;%3.3i&quot;, it)
             filename_it = string(filename, &quot;_&quot;, i)
 
@@ -352,7 +352,7 @@ end</code></pre><p>We put everything together in the main function. Here the use
     end
 
     # export converged results
-    if (!output)
+    if !output
         VTKGridFile(filename, grid) do vtk
             write_cell_data(vtk, χ, &quot;density&quot;)
         end
@@ -365,7 +365,7 @@ end</code></pre><p>Lastly, we call our main function and compare the results. To
  Starting Newton iterations
 Converged at iteration number: 65
 Rel. stiffness: 4.8466
-  4.473742 seconds (2.24 M allocations: 2.005 GiB, 1.88% gc time, 1.85% compilation time)</code></pre><p>We observe, that the stiffness for the lower value of <span>$ra$</span> is higher, but also requires more iterations until convergence and finer structures to be manufactured, as can be seen in Figure 2:</p><p><img src="../bending.png" alt/></p><p><em>Figure 2</em>: Optimization results of the bending beam for smaller (left) and larger (right) value of the regularization parameter <span>$\beta$</span>.</p><p>To prove mesh independence, the user could vary the mesh resolution and compare the results.</p><h2 id="References"><a class="docs-heading-anchor" href="#References">References</a><a id="References-1"></a><a class="docs-heading-anchor-permalink" href="#References" title="Permalink"></a></h2><div class="citation noncanonical"><dl><dt>[14]</dt><dd><div>D. R. Jantos, K. Hackl and P. Junker. <a href="https://doi.org/10.1002/nme.5988"><em>An accurate and fast regularization approach to thermodynamic topology optimization</em></a>. <a href="https://doi.org/10.1002/nme.5988">International Journal for Numerical Methods in Engineering <strong>117</strong>, 991–1017</a> (2019).</div></dd><dt>[15]</dt><dd><div>M. Blaszczyk, D. R. Jantos and P. Junker. <a href="https://doi.org/10.1016/j.cma.2022.114698"><em>Application of Taylor series combined with the weighted least square method to thermodynamic topology optimization</em></a>. <a href="https://doi.org/10.1016/j.cma.2022.114698">Computer Methods in Applied Mechanics and Engineering <strong>393</strong>, 114698</a> (2022).</div></dd></dl></div><h2 id="topology_optimization-plain-program"><a class="docs-heading-anchor" href="#topology_optimization-plain-program">Plain program</a><a id="topology_optimization-plain-program-1"></a><a class="docs-heading-anchor-permalink" href="#topology_optimization-plain-program" title="Permalink"></a></h2><p>Here follows a version of the program without any comments. The file is also available here: <a href="../topology_optimization.jl"><code>topology_optimization.jl</code></a>.</p><pre><code class="language-julia hljs">using Ferrite, SparseArrays, LinearAlgebra, Tensors, Printf
+  4.402401 seconds (2.24 M allocations: 2.005 GiB, 2.26% gc time, 1.99% compilation time)</code></pre><p>We observe, that the stiffness for the lower value of <span>$ra$</span> is higher, but also requires more iterations until convergence and finer structures to be manufactured, as can be seen in Figure 2:</p><p><img src="../bending.png" alt/></p><p><em>Figure 2</em>: Optimization results of the bending beam for smaller (left) and larger (right) value of the regularization parameter <span>$\beta$</span>.</p><p>To prove mesh independence, the user could vary the mesh resolution and compare the results.</p><h2 id="References"><a class="docs-heading-anchor" href="#References">References</a><a id="References-1"></a><a class="docs-heading-anchor-permalink" href="#References" title="Permalink"></a></h2><div class="citation noncanonical"><dl><dt>[14]</dt><dd><div>D. R. Jantos, K. Hackl and P. Junker. <a href="https://doi.org/10.1002/nme.5988"><em>An accurate and fast regularization approach to thermodynamic topology optimization</em></a>. <a href="https://doi.org/10.1002/nme.5988">International Journal for Numerical Methods in Engineering <strong>117</strong>, 991–1017</a> (2019).</div></dd><dt>[15]</dt><dd><div>M. Blaszczyk, D. R. Jantos and P. Junker. <a href="https://doi.org/10.1016/j.cma.2022.114698"><em>Application of Taylor series combined with the weighted least square method to thermodynamic topology optimization</em></a>. <a href="https://doi.org/10.1016/j.cma.2022.114698">Computer Methods in Applied Mechanics and Engineering <strong>393</strong>, 114698</a> (2022).</div></dd></dl></div><h2 id="topology_optimization-plain-program"><a class="docs-heading-anchor" href="#topology_optimization-plain-program">Plain program</a><a id="topology_optimization-plain-program-1"></a><a class="docs-heading-anchor-permalink" href="#topology_optimization-plain-program" title="Permalink"></a></h2><p>Here follows a version of the program without any comments. The file is also available here: <a href="../topology_optimization.jl"><code>topology_optimization.jl</code></a>.</p><pre><code class="language-julia hljs">using Ferrite, SparseArrays, LinearAlgebra, Tensors, Printf
 
 function create_grid(n)
     corners = [
@@ -474,7 +474,7 @@ function cache_neighborhood(dh, topology)
         i = cellid(element)
         for j in 1:_nfacets
             nbg_cellid = getneighborhood(topology, dh.grid, FacetIndex(i, j))
-            if (!isempty(nbg_cellid))
+            if !isempty(nbg_cellid)
                 nbg[j] = first(nbg_cellid)[1] # assuming only one facet neighbor per cell
             else # boundary facet
                 nbg[j] = first(getneighborhood(topology, dh.grid, FacetIndex(i, opp[j])))[1]
@@ -507,7 +507,7 @@ function compute_χn1(χn, Δχ, ρ, ηs, χ_min)
     λ_upper = maximum(Δχ) + ηs
     λ_trial = 0.0
 
-    while (abs(ρ - ρ_trial) &gt; 1.0e-7)
+    while abs(ρ - ρ_trial) &gt; 1.0e-7
         for i in 1:n_el
             Δχt = 1 / ηs * (Δχ[i] - λ_trial)
             χ_trial[i] = max(χ_min, min(1.0, χn[i] + Δχt))
@@ -518,9 +518,9 @@ function compute_χn1(χn, Δχ, ρ, ηs, χ_min)
             ρ_trial += χ_trial[i] / n_el
         end
 
-        if (ρ_trial &gt; ρ)
+        if ρ_trial &gt; ρ
             λ_lower = λ_trial
-        elseif (ρ_trial &lt; ρ)
+        elseif ρ_trial &lt; ρ
             λ_upper = λ_trial
         end
         λ_trial = 1 / 2 * (λ_upper + λ_lower)
@@ -556,7 +556,7 @@ function update_density(dh, states, mp, ρ, neighboorhoods, Δh)
 
         χn1 = compute_χn1(χn, Δχ, ρ, mp.η, mp.χ_min)
 
-        if (j &lt; n_j)
+        if j &lt; n_j
             χn[:] = χn1[:]
         end
     end
@@ -608,7 +608,7 @@ function elmt!(Ke, re, element, cellvalues, facetvalues, grid, mp, ue, state)
 
     symmetrize_lower!(Ke)
 
-    return @inbounds for facet in 1:nfacets(getcells(grid, cellid(element)))
+    @inbounds for facet in 1:nfacets(getcells(grid, cellid(element)))
         if (cellid(element), facet) ∈ getfacetset(grid, &quot;traction&quot;)
             reinit!(facetvalues, element, facet)
             t = Vec((0.0, -1.0)) # force pointing downwards
@@ -621,7 +621,7 @@ function elmt!(Ke, re, element, cellvalues, facetvalues, grid, mp, ue, state)
             end
         end
     end
-
+    return
 end
 
 function symmetrize_lower!(K)
@@ -707,13 +707,13 @@ function topopt(ra, ρ, n, filename; output = :false)
         # calculate compliance
         compliance = 1 / 2 * u&#39; * K * u
 
-        if (it == 1)
+        if it == 1
             compliance_0 = compliance
         end
 
         # check convergence criterium (twice!)
-        if (abs(compliance - compliance_n) / compliance &lt; tol)
-            if (conv)
+        if abs(compliance - compliance_n) / compliance &lt; tol
+            if conv
                 println(&quot;Converged at iteration number: &quot;, it)
                 break
             else
@@ -733,7 +733,7 @@ function topopt(ra, ρ, n, filename; output = :false)
         compliance_n = compliance
 
         # output during calculation
-        if (output)
+        if output
             i = @sprintf(&quot;%3.3i&quot;, it)
             filename_it = string(filename, &quot;_&quot;, i)
 
@@ -744,7 +744,7 @@ function topopt(ra, ρ, n, filename; output = :false)
     end
 
     # export converged results
-    if (!output)
+    if !output
         VTKGridFile(filename, grid) do vtk
             write_cell_data(vtk, χ, &quot;density&quot;)
         end
@@ -755,4 +755,4 @@ function topopt(ra, ρ, n, filename; output = :false)
 end
 
 @time topopt(0.03, 0.5, 60, &quot;large_radius&quot;; output = :false);
-#topopt(0.02, 0.5, 60, &quot;topopt_animation&quot;; output=:true); # can be used to create animations</code></pre><hr/><p><em>This page was generated using <a href="https://github.com/fredrikekre/Literate.jl">Literate.jl</a>.</em></p></article><nav class="docs-footer"><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option><option value="catppuccin-latte">catppuccin-latte</option><option value="catppuccin-frappe">catppuccin-frappe</option><option value="catppuccin-macchiato">catppuccin-macchiato</option><option value="catppuccin-mocha">catppuccin-mocha</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.7.0 on <span class="colophon-date" title="Tuesday 29 October 2024 12:10">Tuesday 29 October 2024</span>. Using Julia version 1.11.1.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
+#topopt(0.02, 0.5, 60, &quot;topopt_animation&quot;; output=:true); # can be used to create animations</code></pre><hr/><p><em>This page was generated using <a href="https://github.com/fredrikekre/Literate.jl">Literate.jl</a>.</em></p></article><nav class="docs-footer"><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option><option value="catppuccin-latte">catppuccin-latte</option><option value="catppuccin-frappe">catppuccin-frappe</option><option value="catppuccin-macchiato">catppuccin-macchiato</option><option value="catppuccin-mocha">catppuccin-mocha</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.7.0 on <span class="colophon-date" title="Thursday 31 October 2024 12:08">Thursday 31 October 2024</span>. Using Julia version 1.11.1.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
