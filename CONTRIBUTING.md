@@ -70,6 +70,38 @@ issues][open-issues].
 Remember to always include (when applicable): i) unit tests which exercises the new code,
 ii) documentation, iii) a note in the [CHANGELOG.md](CHANGELOG.md) file.
 
+### Code formatting
+
+Ferrite uses [Runic.jl][runic] for code formatting. You can install Runic with the following
+command:
+
+```shell
+julia --project=@runic -e 'using Pkg; Pkg.add(url = "https://github.com/fredrikekre/Runic.jl")'
+```
+
+and you can then run the formatter from the root of the repository with:
+
+```shell
+julia --project=@runic -e 'using Runic; exit(Runic.main(ARGS))' -- --inplace .
+```
+
+Refer to the Runic.jl [README][runic-readme] for more details (such as editor integration).
+
+
+### pre-commit hooks
+
+Ferrite uses [pre-commit] to run various checks (including Runic formatting). After
+installing pre-commit (refer to the [pre-commit installation
+instructions][pre-commit-install]) run the following from the root of the repository to
+configure pre-commit to run before each commit:
+
+```shell
+pre-commit install
+```
+
+Note that this currently requires Runic.jl to be installed in the shared `@runic`
+environment according to the instructions above.
+
 
 [documenter]: https://juliadocs.github.io/Documenter.jl/
 [first-contributions]: https://github.com/firstcontributions/first-contributions
@@ -80,6 +112,10 @@ ii) documentation, iii) a note in the [CHANGELOG.md](CHANGELOG.md) file.
 [new-discussion]: https://github.com/Ferrite-FEM/Ferrite.jl/discussions/new
 [new-issue]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/new
 [open-issues]: https://github.com/Ferrite-FEM/Ferrite.jl/issues
+[pre-commit-install]: https://pre-commit.com/#install
+[pre-commit]: https://pre-commit.com/
+[runic-readme]: https://github.com/fredrikekre/Runic.jl/blob/master/README.md
+[runic]: https://github.com/fredrikekre/Runic.jl
 [so-mre]: https://stackoverflow.com/help/minimal-reproducible-example
 [tim-doc]: https://youtu.be/ZpH1ry8qqfw
 [tim-git]: https://youtu.be/cquJ9kPkwR8
