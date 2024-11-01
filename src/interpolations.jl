@@ -1856,12 +1856,63 @@ function get_direction(::RaviartThomas{2, RefTriangle, 2}, j, cell)
 end
 
 #####################################
+# Brezzi-Douglas–Marini, H(div)     #
+#####################################
+struct BrezziDouglasMarini{vdim, shape, order} <: VectorInterpolation{vdim, shape, order} end
+mapping_type(::BrezziDouglasMarini) = ContravariantPiolaMapping()
+reference_coordinates(ip::BrezziDouglasMarini{vdim}) where vdim = fill(NaN*zero(Vec{vdim}), getnbasefunctions(ip))
+dirichlet_facedof_indices(ip::BrezziDouglasMarini) = facetdof_interior_indices(ip)
+n_dbc_components(::BrezziDouglasMarini) = 1
+#=
+----------------+--------------------
+Vertex numbers: | Vertex coordinates:
+    2           |
+    | \         | v1: 𝛏 = (1.0, 0.0)
+    |   \       | v2: 𝛏 = (0.0, 1.0)
+ξ₂^ |     \     | v3: 𝛏 = (0.0, 0.0)
+  | 3-------1   |
+  +--> ξ₁       |
+----------------+--------------------
+Edge numbers:   | Edge identifiers:
+    +           |
+    | \         | e1: (v1, v2)
+    2   1       | e2: (v2, v3)
+    |     \     | e3: (v3, v1)
+    +---3---+   |
+----------------+--------------------
+=#
+
+# RefTriangle, 1st order Lagrange
+function reference_shape_value(ip::BrezziDouglasMarini{2, RefTriangle, 1}, ξ::Vec{2}, i::Int)
+    x, y = ξ
+    # Edge 1
+    i == 1 && return Vec(4x, -2y) # Changed sign to make positive outwards
+    i == 2 && return Vec(-2x, 4y) # Changed sign to make positive outwards
+    # Edge 2 (reverse order to follow Ferrite convention)
+    i == 3 && return Vec(-2x - 6y + 2, 4y)
+    i == 4 && return Vec(4x + 6y - 4, -2y)
+    # Edge 3
+    i == 5 && return Vec(-2x, 6x + 4y - 4) # Changed sign to make positive outwards
+    i == 6 && return Vec(4x, -6x - 2y + 2) # Changed sign to make positive outwards
+    throw(ArgumentError("no shape function $i for interpolation $ip"))
+end
+
+getnbasefunctions(::BrezziDouglasMarini{2, RefTriangle, 1}) = 6
+edgedof_interior_indices(::BrezziDouglasMarini{2, RefTriangle, 1}) = ((1, 2), (3, 4), (5, 6))
+adjust_dofs_during_distribution(::BrezziDouglasMarini{2, RefTriangle, 1}) = false
+
+function get_direction(::BrezziDouglasMarini{2, RefTriangle, 1}, j, cell)
+    edge = edges(cell)[(j + 1) ÷ 2]
+    return ifelse(edge[2] > edge[1], 1, -1)
+end
+
+#####################################
 # Nedelec (1st kind), H(curl)       #
 #####################################
 struct Nedelec{vdim, shape, order} <: VectorInterpolation{vdim, shape, order} end
 mapping_type(::Nedelec) = CovariantPiolaMapping()
 reference_coordinates(ip::Nedelec{vdim}) where vdim = fill(NaN*zero(Vec{vdim}), getnbasefunctions(ip))
-dirichlet_facedof_indices(ip::Nedelec) = facedof_interior_indices(ip)
+dirichlet_facedof_indices(ip::Nedelec) = facetdof_interior_indices(ip)
 n_dbc_components(::Nedelec) = 1
 # RefTriangle, 1st order Lagrange
 # https://defelement.com/elements/examples/triangle-nedelec1-lagrange-1.html

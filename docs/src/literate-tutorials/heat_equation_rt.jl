@@ -1,5 +1,6 @@
 # # [Heat equation (Mixed, RaviartThomas)](@id tutorial-heat-equation-rt)
-# Note, there are a lot to consider here it seems like. Good ref,
+# Note, there are a lot to consider here it seems like. Good refs,
+# ```
 # @book{Gatica2014,
 # title = {A Simple Introduction to the Mixed Finite Element Method: Theory and Applications},
 # ISBN = {9783319036953},
@@ -24,54 +25,63 @@
 #   year = {2013}
 # }
 # for a(n even) more comprehensive book.
-#
-# ## Strong form
-# ```math
-# \nabla \cdot \boldsymbol{q} = h \in \Omega \\
-# \boldsymbol{q} = - k\ \nabla u \in \Omega \\
-# \boldsymbol{q}\cdot \boldsymbol{n} = q_n \in \Gamma_\mathrm{N}\\
-# u = u_\mathrm{D} \in \Gamma_\mathrm{D}
 # ```
 #
-# ## Weak form
-# ### Part 1
-# ```math
-# \int_{\Omega} \delta u \nabla \cdot \boldsymbol{q}\ \mathrm{d}\Omega = \int_{\Omega} \delta u\ h\ \mathrm{d}\Omega \\
-# \int_{\Gamma} \delta u \boldsymbol{n} \cdot \boldsymbol{q}\ \mathrm{d}\Gamma -
-# \int_{\Omega} \nabla (\delta u) \cdot \boldsymbol{q}\ \mathrm{d}\Omega = \int_{\Omega} \delta u\ h\ \mathrm{d}\Omega \\
-# ```
-#
-# ### Part 2
-# ```math
-# \int_{\Omega} \boldsymbol{\delta q} \cdot \boldsymbol{q}\ \mathrm{d}\Omega = - \int_{\Omega} \boldsymbol{\delta q} \cdot \left[k\ \nabla u\right]\ \mathrm{d}\Omega
-# ```
-# where no Green-Gauss theorem is applied.
-#
-# ### Summary
-# The weak form becomes, find $u\in H^1$ and $\boldsymbol{q} \in H\mathrm{(div)}$, such that
+# ## Theory
+# We start with the strong form of the heat equation: Find the temperature, $u(\boldsymbol{x})$, and heat flux, $\boldsymbol{q}(x)$,
+# such that
 # ```math
 # \begin{align*}
-# -\int_{\Omega} \nabla (\delta u) \cdot \boldsymbol{q}\ \mathrm{d}\Omega &= \int_{\Omega} \delta u\ h\ \mathrm{d}\Omega -
-# \int_{\Gamma} \delta u\ q_\mathrm{n}\ \mathrm{d}\Gamma
-# \quad
-# \forall\ \delta u \in \delta H^1 \\
-# \int_{\Omega} \boldsymbol{\delta q} \cdot \boldsymbol{q}\ \mathrm{d}\Omega &= - \int_{\Omega} \boldsymbol{\delta q} \cdot \left[k\ \nabla u\right]\ \mathrm{d}\Omega
-#  \quad \forall\ \boldsymbol{\delta q} \in \delta H\mathrm{(div)}
+# \boldsymbol{\nabla}\cdot \boldsymbol{q} &= h(\boldsymbol{x}), \quad \forall \boldsymbol{x} \in \Omega \\
+# \boldsymbol{q}(\boldsymbol{x}) &= - k\ \boldsymbol{\nabla} u(\boldsymbol{x}), \quad \forall \boldsymbol{x} \in \Omega \\
+# \boldsymbol{q}(\boldsymbol{x})\cdot \boldsymbol{n}(\boldsymbol{x}) &= q_n, \quad \forall \boldsymbol{x} \in \Gamma_\mathrm{N}\\
+# u(\boldsymbol{x}) &= u_\mathrm{D}, \quad \forall \boldsymbol{x} \in \Gamma_\mathrm{D}
 # \end{align*}
 # ```
+#
+# From this strong form, we can formulate the weak form as a mixed formulation.
+# Find $u \in \mathbb{U}$ and $\boldsymbol{q}\in\mathbb{Q}$ such that
+# ```math
+# \begin{align*}
+# \int_{\Omega} \delta u [\boldsymbol{\nabla} \cdot \boldsymbol{q}]\ \mathrm{d}\Omega &= - \int_\Omega \delta u h\ \mathrm{d}\Omega, \quad \forall\ \delta u \in \delta\mathbb{U} \\
+# %\int_{\Omega} \boldsymbol{\delta q} \cdot \boldsymbol{q}\ \mathrm{d}\Omega &= \int_\Omega \boldsymbol{\delta q} \cdot [k\ \boldsymbol{\nabla} u]\ \mathrm{d}\Omega \\
+# \int_{\Omega} \boldsymbol{\delta q} \cdot \boldsymbol{q}\ \mathrm{d}\Omega + \int_{\Omega} [\boldsymbol{\nabla} \cdot \boldsymbol{\delta q}] k u \ \mathrm{d}\Omega &=
+# \int_\Gamma \boldsymbol{\delta q} \cdot \boldsymbol{n} k\ u\ \mathrm{d}\Omega, \quad \forall\ \boldsymbol{\delta q} \in \delta\mathbb{Q}
+# \end{align*}
+# ```
+# where we have the function spaces
+# * $\mathbb{U} = \delta\mathbb{U} = L^2$
+# * $\mathbb{Q} = \lbrace \boldsymbol{q} \in H(\mathrm{div}) \text{such that} \boldsymbol{q}\cdot\boldsymbol{n} = q_\mathrm{n} \text{ on } \Gamma_\mathrm{D}\rbrace$
+# * $\mathbb{Q} = \lbrace \boldsymbol{q} \in H(\mathrm{div}) \text{such that} \boldsymbol{q}\cdot\boldsymbol{n} = 0 \text{ on } \Gamma_\mathrm{D}\rbrace$
+#
+# A stable choice of finite element spaces for this problem on grid with triangles is using
+# * `DiscontinuousLagrange{RefTriangle, k-1}` for approximating $L^2$
+# * `BrezziDouglasMarini{RefTriangle, k}` for approximating $H(\mathrm{div})$
+# following [fenics](https://fenicsproject.org/olddocs/dolfin/1.4.0/python/demo/documented/mixed-poisson/python/documentation.html).
+# For further details, see Boffi2013.
+# We will also see what happens if we instead use `Lagrange` elements which are a subspace of $H^1$ instead of $H(\mathrm{div})$ elements.
 #
 # ## Commented Program
 #
 # Now we solve the problem in Ferrite. What follows is a program spliced with comments.
-#md # The full program, without comments, can be found in the next [section](@ref heat_equation-plain-program).
 #
-# First we load Ferrite, and some other packages we need
-using Ferrite, SparseArrays
-# We start by generating a simple grid with 20x20 quadrilateral elements
-# using `generate_grid`. The generator defaults to the unit square,
-# so we don't need to specify the corners of the domain.
-#grid = generate_grid(QuadraticTriangle, (20, 20));
-grid = generate_grid(Triangle, (20, 20));
+# First we load Ferrite,
+using Ferrite
+# And define our grid, representing a channel with a central part having a lower
+# conductivity, $k$, than the surrounding.
+function create_grid(ny::Int)
+    width = 10.0
+    length = 40.0
+    center_width = 5.0
+    center_length = 20.0
+    upper_right = Vec((length / 2, width / 2))
+    grid = generate_grid(Triangle, (round(Int, ny * length / width), ny), -upper_right, upper_right);
+    addcellset!(grid, "center", x -> abs(x[1]) < center_width/2 && abs(x[2]) < center_length / 2)
+    addcellset!(grid, "around", setdiff(1:getncells(grid), getcellset(grid, "center")))
+    return grid
+end
+
+grid = create_grid(10)
 
 # ### Trial and test functions
 # A `CellValues` facilitates the process of evaluating values and gradients of
@@ -82,7 +92,7 @@ grid = generate_grid(Triangle, (20, 20));
 # the same reference element. We combine the interpolation and the quadrature rule
 # to a `CellValues` object.
 ip_geo = geometric_interpolation(getcelltype(grid))
-ipu = Lagrange{RefTriangle, 1}() # Why does it "explode" for 2nd order ipu?
+ipu = DiscontinuousLagrange{RefTriangle, 1}() # Why does it "explode" for 2nd order ipu?
 ipq = RaviartThomas{2,RefTriangle, 1}()
 qr = QuadratureRule{RefTriangle}(2)
 cellvalues = (u=CellValues(qr, ipu, ip_geo), q=CellValues(qr, ipq, ip_geo))

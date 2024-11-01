@@ -32,7 +32,6 @@
 # ## Commented Program
 #
 # Now we solve the problem in Ferrite. What follows is a program spliced with comments.
-#md # The full program, without comments, can be found in the next [section](@ref heat_equation-plain-program).
 #
 # First we load Ferrite, and some other packages we need
 using Ferrite, SparseArrays

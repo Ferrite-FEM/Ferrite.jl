@@ -14,7 +14,7 @@ push!(ARGS, "liveserver")
 # Run LiveServer.servedocs(...)
 import LiveServer
 LiveServer.servedocs(;
-    host = "0.0.0.0",
+    # host = "0.0.0.0",
     # Documentation root where make.jl and src/ are located
     foldername = joinpath(repo_root, "docs"),
     # Extra source folder to watch for changes

@@ -270,7 +270,7 @@ end
 #    Where f(s) = 1 for linear interpolation and f(s)=1-s and f(s)=s for 2nd order interpolation (first and second shape function)
 #    And s is the path parameter ∈[0,1] along the positive direction of the path.
 # 2) Zero along other edges: Nⱼ ⋅ v = 0 if j∉𝔇
-@testset "Nedelec" begin
+@testset "H(curl) on RefCell" begin
     lineqr = QuadratureRule{RefLine}(20)
     for ip in (Nedelec{2,RefTriangle,1}(), Nedelec{2,RefTriangle,2}(), Nedelec{3,RefTetrahedron,1}(), Nedelec{3,RefHexahedron,1}())
         cell = reference_cell(getrefshape(ip))
@@ -294,6 +294,46 @@ end
                     for shape_nr in shape_nrs
                         for ξ in (x[i1] + r*Δx for r in [0.0, rand(3)..., 1.0])
                             @test abs(reference_shape_value(ip, ξ, shape_nr) ⋅ v) < eps()*100
+                        end
+                    end
+                end
+            end
+        end
+    end
+end
+
+# Required properties of shape value Nⱼ of an edge-elements (Hdiv) on an edge with normal n, length L, and dofs ∈ 𝔇
+# 1) Unit property: ∫(Nⱼ ⋅ n f(s) dS) = 1
+#    Where f(s) = 1 for single shape function on edge, and f(s)=1-s and f(s)=s for two shape functions on edge
+#    s is the path parameter ∈[0,1] along the positive direction of the path.
+# 2) Zero normal component on other edges: Nⱼ ⋅ n = 0 if j∉𝔇
+@testset "H(div) on RefCell" begin
+    lineqr = QuadratureRule{RefLine}(20)
+    for ip in (RaviartThomas{2, RefTriangle, 1}(), Ferrite.BrezziDouglasMarini{2, RefTriangle, 1}(), )
+        cell = reference_cell(getrefshape(ip))
+        cell_facets = Ferrite.facets(cell)
+        dofs = Ferrite.facetdof_interior_indices(ip)
+        x = Ferrite.reference_coordinates(geometric_interpolation(typeof(cell)))
+        normals = reference_normals(geometric_interpolation(typeof(cell)))
+        @testset "$ip" begin
+            for (facet_nr, (i1, i2)) in enumerate(cell_facets)
+                @testset "Facet $facet_nr" begin
+                    Δx = x[i2]-x[i1]
+                    x0 = (x[i1]+x[i2])/2
+                    L = norm(Δx)
+                    n = normals[facet_nr]
+                    for (idof, shape_nr) in enumerate(dofs[facet_nr])
+                        nfacetdofs = length(dofs[facet_nr])
+                        f(x) = nfacetdofs == 1 ? 1.0 : (idof == 1 ? 1-x : x)
+                        s = line_integral(lineqr, ip, shape_nr, x0, Δx, L, n, f)
+                        @test s ≈ one(s)
+                    end
+                    for (j_facet, shape_nrs) in enumerate(dofs)
+                        j_facet == facet_nr && continue
+                        for shape_nr in shape_nrs
+                            for ξ in (x[i1] + r*Δx for r in [0.0, rand(3)..., 1.0])
+                                @test abs(reference_shape_value(ip, ξ, shape_nr) ⋅ n) < eps()*100
+                            end
                         end
                     end
                 end
@@ -336,9 +376,10 @@ end
     include(joinpath(@__DIR__, "InterpolationTestUtils.jl"))
     import .InterpolationTestUtils as ITU
     nel = 3
-    transformation_functions = Dict(
-        Nedelec=>(v,n)-> v - n*(v⋅n),   # Hcurl (tangent continuity)
-        RaviartThomas=>(v,n) -> v ⋅ n)  # Hdiv (normal continuity)
+    hdiv_check(v, n) = v ⋅ n        # Hdiv (normal continuity)
+    hcurl_check(v, n) = v - n*(v⋅n) # Hcurl (tangent continuity)
+    transformation_functions = ((Nedelec, hcurl_check), (RaviartThomas, hdiv_check), (Ferrite.BrezziDouglasMarini, hdiv_check))
+
     for CT in (Triangle, QuadraticTriangle, Tetrahedron, Hexahedron)
         dim = Ferrite.getrefdim(CT) # dim = sdim = rdim
         p1, p2 = (rand(Vec{dim}), ones(Vec{dim})+rand(Vec{dim}))
@@ -352,11 +393,11 @@ end
         basecell = getcells(grid, cellnr)
         RefShape = Ferrite.getrefshape(basecell)
         for order in (1, 2)
-            for IPT in (Nedelec, RaviartThomas)
+            for (IPT, transformation_function) in transformation_functions
                 dim == 3 && order > 1 && continue
                 IPT == RaviartThomas && (dim == 3 || order > 1) && continue
                 IPT == RaviartThomas && (RefShape == RefHexahedron) && continue
-                transformation_function=transformation_functions[IPT]
+                IPT == Ferrite.BrezziDouglasMarini && !(RefShape == RefTriangle && order == 1) && continue
                 ip = IPT{dim, RefShape, order}()
                 @testset "$CT, $ip" begin
                     for testcell in cell_permutations(basecell)
