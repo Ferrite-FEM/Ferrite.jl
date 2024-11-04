@@ -57,6 +57,11 @@ n_components(::VectorInterpolation{vdim}) where {vdim} = vdim
 # Number of components that are allowed to prescribe in e.g. Dirichlet BC
 n_dbc_components(ip::Interpolation) = n_components(ip)
 
+"""
+    shape_value_type(ip::Iterpolation, ::Type{T}) where T<:Number
+
+Return the type of `shape_value(ip::Interpolation, ξ::Vec, ib::Int)`
+"""
 shape_value_type(::ScalarInterpolation, ::Type{T}) where {T <: Number} = T
 shape_value_type(::VectorInterpolation{vdim}, ::Type{T}) where {vdim, T <: Number} = Vec{vdim, T}
 #shape_value_type(::MatrixInterpolation, T::Type) = Tensor  #958
