@@ -957,7 +957,7 @@ function _evaluate_at_grid_nodes(dh::DofHandler{sdim}, u::AbstractVector{T}, fie
         ip_geo = geometric_interpolation(CT)
         local_node_coords = reference_coordinates(ip_geo)
         qr = QuadratureRule{getrefshape(ip)}(zeros(length(local_node_coords)), local_node_coords)
-        cv = CellValues(qr, ip, ip_geo^sdim; update_gradients = Val(false), update_hessians = Val(false), update_detJdV = Val(false))
+        cv = CellValues(qr, ip, ip_geo^sdim; update_gradients = false, update_hessians = false, update_detJdV = false)
         drange = dof_range(sdh, field_idx)
         # Function barrier
         _evaluate_at_grid_nodes!(data, sdh, u, cv, drange)
