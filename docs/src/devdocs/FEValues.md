@@ -23,7 +23,6 @@ Ferrite.BCValues
 ```@docs
 Ferrite.embedding_det
 Ferrite.shape_value_type(::Ferrite.AbstractValues)
-Ferrite.shape_value_type(::Ferrite.FunctionValues)
 Ferrite.shape_gradient_type
 Ferrite.ValuesUpdateFlags
 ```
