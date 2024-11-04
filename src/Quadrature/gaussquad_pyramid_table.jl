@@ -1,3 +1,4 @@
+# runic: off
 # Symmetric quadrature rules takes from
 #   Witherden, Freddie D., and Peter E. Vincent. "On the identification of
 #   symmetric quadrature rules for finite element methods." Computers &

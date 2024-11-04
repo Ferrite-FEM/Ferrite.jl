@@ -16,6 +16,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
    ```
    ([#1083])
 
+### Other
+ - Ferrite now uses [Runic.jl](https://github.com/fredrikekre/Runic.jl) for code formatting.
+   ([#1096])
+
 ## [v1.0.0] - 2024-09-30
 
 Ferrite version 1.0 is a relatively large release, with a lot of new features, improvements,
@@ -1027,3 +1031,4 @@ poking into Ferrite internals:
 [#1058]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1058
 [#1059]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1059
 [#1083]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1083
+[#1096]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1096

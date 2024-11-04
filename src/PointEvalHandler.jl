@@ -1,7 +1,7 @@
 Base.@kwdef struct NewtonLineSearchPointFinder{T}
     max_iters::Int = 10
     max_line_searches::Int = 5
-    residual_tolerance::T = 1e-10
+    residual_tolerance::T = 1.0e-10
 end
 
 """
@@ -29,10 +29,10 @@ There are two ways to use the `PointEvalHandler` to evaluate functions:
 """
 PointEvalHandler
 
-struct PointEvalHandler{G,T<:Real}
+struct PointEvalHandler{G, T <: Real}
     grid::G
     cells::Vector{Union{Nothing, Int}}
-    local_coords::Vector{Union{Nothing, Vec{1,T},Vec{2,T},Vec{3,T}}}
+    local_coords::Vector{Union{Nothing, Vec{1, T}, Vec{2, T}, Vec{3, T}}}
 end
 
 function Base.show(io::IO, ::MIME"text/plain", ph::PointEvalHandler)
@@ -44,6 +44,7 @@ function Base.show(io::IO, ::MIME"text/plain", ph::PointEvalHandler)
     else
         print(io, "  Could not find corresponding cell for ", n_missing, " points.")
     end
+    return
 end
 
 # Internals:
@@ -54,19 +55,19 @@ end
 #  - `newton_max_iters::Int`: Maximum number of inner Newton iterations. Default value: `10`.
 #  - `newton_residual_tolerance`: Tolerance for the residual norm to indicate convergence in the
 #    inner Newton solver. Default value: `1e-10`.
-function PointEvalHandler(grid::AbstractGrid{dim}, points::AbstractVector{Vec{dim,T}}; search_nneighbors=3, warn::Bool=true, strategy = NewtonLineSearchPointFinder()) where {dim, T}
+function PointEvalHandler(grid::AbstractGrid{dim}, points::AbstractVector{Vec{dim, T}}; search_nneighbors = 3, warn::Bool = true, strategy = NewtonLineSearchPointFinder()) where {dim, T}
     node_cell_dicts = _get_node_cell_map(grid)
     cells, local_coords = _get_cellcoords(points, grid, node_cell_dicts, search_nneighbors, warn, strategy)
     return PointEvalHandler(grid, cells, local_coords)
 end
 
-function _get_cellcoords(points::AbstractVector{Vec{dim,T}}, grid::AbstractGrid, node_cell_dicts::Dict{C,Dict{Int, Vector{Int}}}, search_nneighbors, warn, strategy::NewtonLineSearchPointFinder) where {dim, T<:Real, C}
+function _get_cellcoords(points::AbstractVector{Vec{dim, T}}, grid::AbstractGrid, node_cell_dicts::Dict{C, Dict{Int, Vector{Int}}}, search_nneighbors, warn, strategy::NewtonLineSearchPointFinder) where {dim, T <: Real, C}
     # set up tree structure for finding nearest nodes to points
-    kdtree = KDTree(reinterpret(Vec{dim,T}, getnodes(grid)))
+    kdtree = KDTree(reinterpret(Vec{dim, T}, getnodes(grid)))
     nearest_nodes, _ = knn(kdtree, points, search_nneighbors, true)
 
     cells = Vector{Union{Nothing, Int}}(nothing, length(points))
-    local_coords = Vector{Union{Nothing, Vec{1, T},Vec{2, T},Vec{3, T}}}(nothing, length(points))
+    local_coords = Vector{Union{Nothing, Vec{1, T}, Vec{2, T}, Vec{3, T}}}(nothing, length(points))
 
     for point_idx in 1:length(points)
         cell_found = false
@@ -110,10 +111,10 @@ function check_isoparametric_boundaries(::Type{RefSimplex{dim}}, x_local::Vec{di
 end
 
 cellcenter(::Type{<:RefHypercube{dim}}, _::Type{T}) where {dim, T} = zero(Vec{dim, T})
-cellcenter(::Type{<:RefSimplex{dim}}, _::Type{T}) where {dim, T} = Vec{dim, T}((ntuple(d->1/3, dim)))
+cellcenter(::Type{<:RefSimplex{dim}}, _::Type{T}) where {dim, T} = Vec{dim, T}((ntuple(d -> 1 / 3, dim)))
 
-_solve_helper(A::Tensor{2,dim}, b::Vec{dim}) where {dim} = inv(A) ⋅ b
-_solve_helper(A::SMatrix{idim, odim}, b::Vec{idim,T}) where {odim, idim, T} = Vec{odim,T}(pinv(A) * b)
+_solve_helper(A::Tensor{2, dim}, b::Vec{dim}) where {dim} = inv(A) ⋅ b
+_solve_helper(A::SMatrix{idim, odim}, b::Vec{idim, T}) where {odim, idim, T} = Vec{odim, T}(pinv(A) * b)
 
 # See https://discourse.julialang.org/t/finding-the-value-of-a-field-at-a-spatial-location-in-juafem/38975/2
 function find_local_coordinate(interpolation::Interpolation{refshape}, cell_coordinates::Vector{<:Vec{sdim}}, global_coordinate::Vec{sdim}, strategy::NewtonLineSearchPointFinder; warn::Bool = false) where {sdim, refshape}
@@ -154,8 +155,8 @@ function find_local_coordinate(interpolation::Interpolation{refshape}, cell_coor
         best_residual_norm = norm(global_guess - global_coordinate)
         if !check_isoparametric_boundaries(refshape, new_local_guess, boundary_tolerance)
             # Search for the residual minimizer, which is still inside the element
-            for next_index ∈ 2:strategy.max_line_searches
-                new_local_guess = local_guess - Δξ/2^(next_index-1)
+            for next_index in 2:strategy.max_line_searches
+                new_local_guess = local_guess - Δξ / 2^(next_index - 1)
                 global_guess = spatial_coordinate(interpolation, new_local_guess, cell_coordinates)
                 residual_norm = norm(global_guess - global_coordinate)
                 if residual_norm < best_residual_norm && check_isoparametric_boundaries(refshape, new_local_guess, boundary_tolerance)
@@ -164,7 +165,7 @@ function find_local_coordinate(interpolation::Interpolation{refshape}, cell_coor
                 end
             end
         end
-        local_guess -= Δξ / 2^(best_index-1)
+        local_guess -= Δξ / 2^(best_index - 1)
         # Late convergence check
         if best_residual_norm ≤ strategy.residual_tolerance
             converged = check_isoparametric_boundaries(refshape, local_guess, boundary_tolerance)
@@ -189,7 +190,7 @@ function _get_node_cell_map(grid::AbstractGrid)
     cell_dicts = Dict{Type{<:C}, Dict{Int, Vector{Int}}}()
     ctypes = Set{Type{<:C}}(typeof(c) for c in cells)
     for ctype in ctypes
-        cell_dict = cell_dicts[ctype] = Dict{Int,Vector{Int}}()
+        cell_dict = cell_dicts[ctype] = Dict{Int, Vector{Int}}()
         for (cellidx, cell) in enumerate(cells)
             cell isa ctype || continue
             for node in cell.nodes
@@ -218,11 +219,13 @@ have `NaN`s for the corresponding entries in the output vector.
 evaluate_at_points
 
 function evaluate_at_points(ph::PointEvalHandler, proj::L2Projector, dof_vals::AbstractVector)
-    evaluate_at_points(ph, proj.dh, dof_vals)
+    return evaluate_at_points(ph, proj.dh, dof_vals)
 end
 
-function evaluate_at_points(ph::PointEvalHandler{<:Any, T1}, dh::AbstractDofHandler, dof_vals::AbstractVector{T2},
-                           fname::Symbol=find_single_field(dh)) where {T1, T2}
+function evaluate_at_points(
+        ph::PointEvalHandler{<:Any, T1}, dh::AbstractDofHandler, dof_vals::AbstractVector{T2},
+        fname::Symbol = find_single_field(dh)
+    ) where {T1, T2}
     npoints = length(ph.cells)
     # Figure out the value type by creating a dummy PointValues
     ip = getfieldinterpolation(dh, find_field(dh, fname))
@@ -244,12 +247,13 @@ function find_single_field(dh)
 end
 
 # values in dof-order. They must be obtained from the same DofHandler that was used for constructing the PointEvalHandler
-function evaluate_at_points!(out_vals::Vector{T2},
-    ph::PointEvalHandler{<:Any, T_ph},
-    dh::DofHandler,
-    dof_vals::Vector{T},
-    fname::Symbol,
-    func_interpolations
+function evaluate_at_points!(
+        out_vals::Vector{T2},
+        ph::PointEvalHandler{<:Any, T_ph},
+        dh::DofHandler,
+        dof_vals::Vector{T},
+        fname::Symbol,
+        func_interpolations
     ) where {T2, T_ph, T}
 
     # TODO: I don't think this is correct??
@@ -271,14 +275,14 @@ end
 
 # function barrier with concrete type of PointValues
 function _evaluate_at_points!(
-    out_vals::Vector{T2},
-    dof_vals::Vector{T},
-    ph::PointEvalHandler,
-    dh::AbstractDofHandler,
-    pv::PointValues,
-    cellset::Union{Nothing, AbstractSet{Int}},
-    dofrange::AbstractRange{Int},
-    ) where {T2,T}
+        out_vals::Vector{T2},
+        dof_vals::Vector{T},
+        ph::PointEvalHandler,
+        dh::AbstractDofHandler,
+        pv::PointValues,
+        cellset::Union{Nothing, AbstractSet{Int}},
+        dofrange::AbstractRange{Int},
+    ) where {T2, T}
 
     # extract variables
     local_coords = ph.local_coords
@@ -310,7 +314,7 @@ function _evaluate_at_points!(
 end
 
 function get_func_interpolations(dh::DofHandler, fieldname)
-    func_interpolations = Union{Interpolation,Nothing}[]
+    func_interpolations = Union{Interpolation, Nothing}[]
     for sdh in dh.subdofhandlers
         j = _find_field(sdh, fieldname)
         if j === nothing
@@ -346,14 +350,14 @@ end
 """
 PointIterator
 
-struct PointIterator{PH<:PointEvalHandler, V <: Vec}
+struct PointIterator{PH <: PointEvalHandler, V <: Vec}
     ph::PH
     coords::Vector{V}
 end
 
-function PointIterator(ph::PointEvalHandler{G}) where {D,C,T,G<:Grid{D,C,T}}
+function PointIterator(ph::PointEvalHandler{G}) where {D, C, T, G <: Grid{D, C, T}}
     n = nnodes_per_cell(ph.grid)
-    coords = zeros(Vec{D,T}, n) # resize!d later if needed
+    coords = zeros(Vec{D, T}, n) # resize!d later if needed
     return PointIterator(ph, coords)
 end
 

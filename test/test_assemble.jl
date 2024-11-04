@@ -44,13 +44,13 @@
     @test length(f) == 10
 
     # assemble with different row and col dofs
-    rdofs = [1,4,6]
-    cdofs = [1,7]
+    rdofs = [1, 4, 6]
+    cdofs = [1, 7]
     a = Ferrite.COOAssembler()
     Ke = rand(length(rdofs), length(cdofs))
     assemble!(a, rdofs, cdofs, Ke)
     K, _ = finish_assemble(a)
-    @test (K[rdofs,cdofs] .== Ke) |> all
+    @test (K[rdofs, cdofs] .== Ke) |> all
 
     # SparseMatrix assembler
     K = spzeros(10, 10)
@@ -83,7 +83,7 @@
     @test fc ≈ f
 
     # No zero filling
-    assembler = start_assemble(Kc, fc; fillzero=false)
+    assembler = start_assemble(Kc, fc; fillzero = false)
     @test Kc ≈ K
     @test fc ≈ f
     for i in 1:2
@@ -132,17 +132,17 @@ function Base.:+(y::Float64, x::IgnoreMeIfZero)
 end
 
 @testset "assemble! ignoring zeros" begin
-    store_dofs    = [1, 5, 2, 8]
+    store_dofs = [1, 5, 2, 8]
     assemble_dofs = [1, 5, 4, 8]
-    I = repeat(store_dofs; outer=4)
-    J = repeat(store_dofs; inner=4)
+    I = repeat(store_dofs; outer = 4)
+    J = repeat(store_dofs; inner = 4)
     V = zeros(length(I))
     K = sparse(I, J, V)
     D = zeros(size(K))
 
     # Standard assembler
     a = start_assemble(K)
-    ke = rand(4,4); ke[3, :] .= 0; ke[:, 3] .= 0; ke[2,2] = 0
+    ke = rand(4, 4); ke[3, :] .= 0; ke[:, 3] .= 0; ke[2, 2] = 0
     assemble!(a, assemble_dofs, IgnoreMeIfZero.(ke))
     D[assemble_dofs, assemble_dofs] += ke
     @test K == D
@@ -161,13 +161,17 @@ end
     K = spdiagm(0 => zeros(2))
     a = start_assemble(K)
     as = start_assemble(Symmetric(K))
-    errr(i,j) = try Ferrite._missing_sparsity_pattern_error(i, j) catch e e end
+    errr(i, j) = try
+        Ferrite._missing_sparsity_pattern_error(i, j)
+    catch e
+        e
+    end
     ## Errors below diagonal
-    @test_throws errr(2,1) assemble!(a, [1, 2], [1.0 0.0; 3.0 4.0])
-    @test_throws errr(2,1) assemble!(a, [2, 1], [1.0 2.0; 0.0 4.0])
+    @test_throws errr(2, 1) assemble!(a, [1, 2], [1.0 0.0; 3.0 4.0])
+    @test_throws errr(2, 1) assemble!(a, [2, 1], [1.0 2.0; 0.0 4.0])
     ## Errors above diagonal
-    @test_throws errr(2,2) assemble!(a, [1, 2], [1.0 2.0; 0.0 4.0])
-    @test_throws errr(2,2) assemble!(as, [1, 2], [1.0 2.0; 0.0 4.0])
-    @test_throws errr(2,2) assemble!(a, [2, 1], [1.0 0.0; 3.0 4.0])
-    @test_throws errr(2,2) assemble!(as, [2, 1], [1.0 0.0; 3.0 4.0])
+    @test_throws errr(2, 2) assemble!(a, [1, 2], [1.0 2.0; 0.0 4.0])
+    @test_throws errr(2, 2) assemble!(as, [1, 2], [1.0 2.0; 0.0 4.0])
+    @test_throws errr(2, 2) assemble!(a, [2, 1], [1.0 0.0; 3.0 4.0])
+    @test_throws errr(2, 2) assemble!(as, [2, 1], [1.0 0.0; 3.0 4.0])
 end

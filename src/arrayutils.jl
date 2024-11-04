@@ -24,19 +24,19 @@ Fallback: `A[i, j] += v`.
 """
 addindex!
 
-function addindex!(A::AbstractMatrix{T}, v, i::Integer, j::Integer) where T
+function addindex!(A::AbstractMatrix{T}, v, i::Integer, j::Integer) where {T}
     return addindex!(A, T(v), Int(i), Int(j))
 end
-function addindex!(A::AbstractMatrix{T}, v::T, i::Int, j::Int) where T
+function addindex!(A::AbstractMatrix{T}, v::T, i::Int, j::Int) where {T}
     iszero(v) && return A
     A[i, j] += v
     return A
 end
 
-function addindex!(b::AbstractVector{T}, v, i::Integer) where T
+function addindex!(b::AbstractVector{T}, v, i::Integer) where {T}
     return addindex!(b, T(v), Int(i))
 end
-function addindex!(b::AbstractVector{T}, v::T, i::Int) where T
+function addindex!(b::AbstractVector{T}, v::T, i::Int) where {T}
     iszero(v) && return b
     b[i] += v
     return b
@@ -51,7 +51,7 @@ Fallback: `fill!(A, zero(T))`.
 """
 fillzero!(A)
 
-function fillzero!(A::AbstractVecOrMat{T}) where T
+function fillzero!(A::AbstractVecOrMat{T}) where {T}
     return fill!(A, zero(T))
 end
 
@@ -59,13 +59,13 @@ end
 ## SparseArrays.SparseMatrixCSC ##
 ##################################
 
-function addindex!(A::SparseMatrixCSC{Tv}, v::Tv, i::Int, j::Int) where Tv
+function addindex!(A::SparseMatrixCSC{Tv}, v::Tv, i::Int, j::Int) where {Tv}
     @boundscheck checkbounds(A, i, j)
     # Return early if v is 0
     iszero(v) && return A
     # Search column j for row i
     coljfirstk = Int(SparseArrays.getcolptr(A)[j])
-    coljlastk = Int(SparseArrays.getcolptr(A)[j+1] - 1)
+    coljlastk = Int(SparseArrays.getcolptr(A)[j + 1] - 1)
     searchk = searchsortedfirst(rowvals(A), i, coljfirstk, coljlastk, Base.Order.Forward)
     if searchk <= coljlastk && rowvals(A)[searchk] == i
         # Column j contains entry A[i,j]. Update and return.
@@ -77,11 +77,11 @@ function addindex!(A::SparseMatrixCSC{Tv}, v::Tv, i::Int, j::Int) where Tv
     end
 end
 
-function fillzero!(A::SparseMatrixCSC{T}) where T
+function fillzero!(A::SparseMatrixCSC{T}) where {T}
     fill!(nonzeros(A), zero(T))
     return A
 end
-function fillzero!(A::Symmetric{T,<:SparseMatrixCSC}) where T
+function fillzero!(A::Symmetric{T, <:SparseMatrixCSC}) where {T}
     fillzero!(A.data)
     return A
 end

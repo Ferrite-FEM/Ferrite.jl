@@ -69,20 +69,19 @@ module GaussQuadrature
 #       Hall, Englewood Cliffs, N.J., 1966.
 
 
-
 """
 Enumeration type used to specify which endpoints of the integration
 interval should be included amongst the quadrature points: neither,
 left, right or both.
 """
 struct EndPt
-    label :: Char
+    label::Char
 end
 
 const neither = EndPt('N')
-const left    = EndPt('L')
-const right   = EndPt('R')
-const both    = EndPt('B')
+const left = EndPt('L')
+const right = EndPt('R')
+const both = EndPt('B')
 
 # Maximum number of QL iterations used by steig!.
 # You might need to increase this.
@@ -95,7 +94,7 @@ for the interval -1 < x < 1 with weight function w(x) = 1.
 Use endpt=left, right, both for the left Radau, right Radau, Lobatto
 rules.
 """
-function legendre(::Type{T}, n::Integer, endpt::EndPt=neither) where {T<:AbstractFloat}
+function legendre(::Type{T}, n::Integer, endpt::EndPt = neither) where {T <: AbstractFloat}
     a, b, muzero = legendre_coeff(T, n, endpt)
     return custom_gauss_rule(-one(T), one(T), a, b, muzero, endpt)
 end
@@ -104,14 +103,14 @@ end
 x, w = legendre(n, endpt=neither)
 Convenience function with type T = Float64.
 """
-legendre(n, endpt=neither) = legendre(Float64, n, endpt)
+legendre(n, endpt = neither) = legendre(Float64, n, endpt)
 
-function legendre_coeff(::Type{T}, n::Integer, endpt::EndPt) where {T<:AbstractFloat}
+function legendre_coeff(::Type{T}, n::Integer, endpt::EndPt) where {T <: AbstractFloat}
     muzero = convert(T, 2.0)
     a = zeros(T, n)
     b = zeros(T, n)
-    for i = 1:n
-        b[i] = i / sqrt(convert(T, 4*i^2-1))
+    for i in 1:n
+        b[i] = i / sqrt(convert(T, 4 * i^2 - 1))
     end
     return a, b, muzero
 end
@@ -125,7 +124,7 @@ for the interval -1 < x < 1 with weight function
 Use endpt=left, right, both for the left Radau, right Radau, Lobatto
 rules.
 """
-function chebyshev(::Type{T}, n::Integer, kind::Integer=1, endpt::EndPt=neither) where {T<:AbstractFloat}
+function chebyshev(::Type{T}, n::Integer, kind::Integer = 1, endpt::EndPt = neither) where {T <: AbstractFloat}
     a, b, muzero = chebyshev_coeff(T, n, kind, endpt)
     return custom_gauss_rule(-one(T), one(T), a, b, muzero, endpt)
 end
@@ -134,9 +133,9 @@ end
 x, w = chebyshev(n, kind=1, endpt=neither)
 Convenience function with type T = Float64.
 """
-chebyshev(n, kind=1, endpt=neither) = chebyshev(Float64, n, kind, endpt)
+chebyshev(n, kind = 1, endpt = neither) = chebyshev(Float64, n, kind, endpt)
 
-function chebyshev_coeff(::Type{T}, n::Integer, kind::Integer, endpt::EndPt) where {T<:AbstractFloat}
+function chebyshev_coeff(::Type{T}, n::Integer, kind::Integer, endpt::EndPt) where {T <: AbstractFloat}
     muzero = convert(T, pi)
     half = convert(T, 0.5)
     a = zeros(T, n)
@@ -152,9 +151,11 @@ function chebyshev_coeff(::Type{T}, n::Integer, kind::Integer, endpt::EndPt) whe
 end
 
 
-function custom_gauss_rule(lo::T, hi::T,
-         a::Array{T,1}, b::Array{T,1}, muzero::T, endpt::EndPt,
-         maxits::Integer=maxiterations[T]) where {T<:AbstractFloat}
+function custom_gauss_rule(
+        lo::T, hi::T,
+        a::Array{T, 1}, b::Array{T, 1}, muzero::T, endpt::EndPt,
+        maxits::Integer = maxiterations[T]
+    ) where {T <: AbstractFloat}
     #
     # On entry:
     #
@@ -183,33 +184,33 @@ function custom_gauss_rule(lo::T, hi::T,
         if n == 1
             a[1] = lo
         else
-            a[n] = solve(n, lo, a, b) * b[n-1]^2 + lo
+            a[n] = solve(n, lo, a, b) * b[n - 1]^2 + lo
         end
     elseif endpt == right
         if n == 1
             a[1] = hi
         else
-            a[n] = solve(n, hi, a, b) * b[n-1]^2 + hi
+            a[n] = solve(n, hi, a, b) * b[n - 1]^2 + hi
         end
     elseif endpt == both
         if n == 1
             error("Must have at least two points for both ends.")
         end
         g = solve(n, lo, a, b)
-        t1 = ( hi - lo ) / ( g - solve(n, hi, a, b) )
-        b[n-1] = sqrt(t1)
+        t1 = (hi - lo) / (g - solve(n, hi, a, b))
+        b[n - 1] = sqrt(t1)
         a[n] = lo + g * t1
     end
     w = zero(a)
     steig!(a, b, w, maxits)
-    for i = 1:n
+    for i in 1:n
         w[i] = muzero * w[i]^2
     end
     idx = sortperm(a)
     return a[idx], w[idx]
 end
 
-function solve(n::Integer, shift::T, a::Array{T,1}, b::Array{T,1}) where {T<:AbstractFloat}
+function solve(n::Integer, shift::T, a::Array{T, 1}, b::Array{T, 1}) where {T <: AbstractFloat}
     #
     # Perform elimination to find the nth component s = delta[n]
     # of the solution to the nxn linear system
@@ -221,13 +222,13 @@ function solve(n::Integer, shift::T, a::Array{T,1}, b::Array{T,1}) where {T<:Abs
     # standard basis vector.
     #
     t = a[1] - shift
-    for i = 2:n-1
-        t = a[i] - shift - b[i-1]^2 / t
+    for i in 2:(n - 1)
+        t = a[i] - shift - b[i - 1]^2 / t
     end
     return one(t) / t
 end
 
-function steig!(d::Array{T,1}, e::Array{T,1}, z::Array{T,1}, maxits::Integer) where {T<:AbstractFloat}
+function steig!(d::Array{T, 1}, e::Array{T, 1}, z::Array{T, 1}, maxits::Integer) where {T <: AbstractFloat}
     #
     # Finds the eigenvalues and first components of the normalised
     # eigenvectors of a symmetric tridiagonal matrix by the implicit
@@ -260,12 +261,12 @@ function steig!(d::Array{T,1}, e::Array{T,1}, z::Array{T,1}, maxits::Integer) wh
     if n == 1 # Nothing to do for a 1x1 matrix.
         return
     end
-    for l = 1:n
-        for j = 1:maxits
+    for l in 1:n
+        for j in 1:maxits
             # Look for small off-diagonal elements.
             m = n
-            for i = l:n-1
-                if abs(e[i]) <= eps(T) * ( abs(d[i]) + abs(d[i+1]) )
+            for i in l:(n - 1)
+                if abs(e[i]) <= eps(T) * (abs(d[i]) + abs(d[i + 1]))
                     m = i
                     break
                 end
@@ -280,63 +281,68 @@ function steig!(d::Array{T,1}, e::Array{T,1}, z::Array{T,1}, maxits::Integer) wh
                 error(msg)
             end
             # Form shift
-            g = ( d[l+1] - p ) / ( 2 * e[l] )
+            g = (d[l + 1] - p) / (2 * e[l])
             r = hypot(g, one(T))
-            g = d[m] - p + e[l] / ( g + copysign(r, g) )
+            g = d[m] - p + e[l] / (g + copysign(r, g))
             s = one(T)
             c = one(T)
             p = zero(T)
-            for i = m-1:-1:l
+            for i in (m - 1):-1:l
                 f = s * e[i]
                 b = c * e[i]
-                if abs(f) <  abs(g)
+                if abs(f) < abs(g)
                     s = f / g
                     r = hypot(s, one(T))
-                    e[i+1] = g * r
+                    e[i + 1] = g * r
                     c = one(T) / r
                     s *= c
                 else
                     c = g / f
                     r = hypot(c, one(T))
-                    e[i+1] = f * r
+                    e[i + 1] = f * r
                     s = one(T) / r
                     c *= s
                 end
-                g = d[i+1] - p
-                r = ( d[i] - g ) * s + 2 * c * b
+                g = d[i + 1] - p
+                r = (d[i] - g) * s + 2 * c * b
                 p = s * r
-                d[i+1] = g + p
+                d[i + 1] = g + p
                 g = c * r - b
                 # Form first component of vector.
-                f = z[i+1]
-                z[i+1] = s * z[i] + c * f
-                z[i]   = c * z[i] - s * f
+                f = z[i + 1]
+                z[i + 1] = s * z[i] + c * f
+                z[i] = c * z[i] - s * f
             end # loop over i
             d[l] -= p
             e[l] = g
             e[m] = zero(T)
         end # loop over j
     end # loop over l
+    return
 end
 
-function orthonormal_poly(x::Array{T,1},
-                         a::Array{T,1}, b::Array{T,1}, muzero::T) where {T<:AbstractFloat}
+function orthonormal_poly(
+        x::Array{T, 1},
+        a::Array{T, 1}, b::Array{T, 1}, muzero::T
+    ) where {T <: AbstractFloat}
     # p[i,j] = value at x[i] of orthonormal polynomial of degree j-1.
     m = length(x)
     n = length(a)
-    p = zeros(T, m, n+1)
+    p = zeros(T, m, n + 1)
     c = one(T) / sqrt(muzero)
     rb = one(T) / b[1]
-    for i = 1:m
-        p[i,1] = c
-        p[i,2] = rb * ( x[i] - a[1] ) * c
+    for i in 1:m
+        p[i, 1] = c
+        p[i, 2] = rb * (x[i] - a[1]) * c
     end
-    for j = 2:n
-       rb = one(T) / b[j]
-       for i = 1:m
-           p[i,j+1] = rb * ( (x[i]-a[j]) * p[i,j]
-                                - b[j-1] * p[i,j-1] )
-       end
+    for j in 2:n
+        rb = one(T) / b[j]
+        for i in 1:m
+            p[i, j + 1] = rb * (
+                (x[i] - a[j]) * p[i, j]
+                    - b[j - 1] * p[i, j - 1]
+            )
+        end
     end
     return p
 end

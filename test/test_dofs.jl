@@ -1,5 +1,5 @@
 @testset "DofHandler construction" begin
-    grid = generate_grid(Quadrilateral, (2,1))
+    grid = generate_grid(Quadrilateral, (2, 1))
     dh = DofHandler(grid)
     # incompatible refshape (#638)
     @test_throws ErrorException add!(dh, :u, Lagrange{RefTriangle, 1}())
@@ -10,7 +10,7 @@
 
     # Invalid SubDofHandler construction
     dh = DofHandler(grid)
-    sdh1 = Ferrite.SubDofHandler(dh, Set(1,))
+    sdh1 = Ferrite.SubDofHandler(dh, Set(1))
     # Subdomains not disjoint
     @test_throws ErrorException Ferrite.SubDofHandler(dh, Set(1:getncells(grid)))
     # add field to DofHandler that has subdomains
@@ -18,8 +18,8 @@
 
     # inconsistent field across several SubDofHandlers
     dh = DofHandler(grid)
-    sdh1 = Ferrite.SubDofHandler(dh, Set(1,))
-    sdh2 = Ferrite.SubDofHandler(dh, Set(2,))
+    sdh1 = Ferrite.SubDofHandler(dh, Set(1))
+    sdh2 = Ferrite.SubDofHandler(dh, Set(2))
     add!(sdh1, :u, Lagrange{RefQuadrilateral, 1}())
     # different number of components in different sdh
     @test_throws ErrorException add!(sdh2, :u, Lagrange{RefQuadrilateral, 1}()^2)
@@ -31,111 +31,117 @@ end
 # misc dofhandler unit tests
 @testset "dofs" begin
 
-# set up a test DofHandler
-grid = generate_grid(Triangle, (10, 10))
-dh = DofHandler(grid)
-add!(dh, :u, Lagrange{RefTriangle,2}()^2)
-add!(dh, :p, Lagrange{RefTriangle,1}())
-close!(dh)
+    # set up a test DofHandler
+    grid = generate_grid(Triangle, (10, 10))
+    dh = DofHandler(grid)
+    add!(dh, :u, Lagrange{RefTriangle, 2}()^2)
+    add!(dh, :p, Lagrange{RefTriangle, 1}())
+    close!(dh)
 
-# dof_range
-@test (@inferred dof_range(dh, :u)) == 1:12
-@test (@inferred dof_range(dh, :p)) == 13:15
-# dof_range for SubDofHandler
-ip = Lagrange{RefTriangle, 1}()
-dh = DofHandler(grid)
-sdh = SubDofHandler(dh, Set(1:getncells(grid)))
-add!(sdh, :u, ip^2)
-add!(sdh, :c, ip)
+    # dof_range
+    @test (@inferred dof_range(dh, :u)) == 1:12
+    @test (@inferred dof_range(dh, :p)) == 13:15
+    # dof_range for SubDofHandler
+    ip = Lagrange{RefTriangle, 1}()
+    dh = DofHandler(grid)
+    sdh = SubDofHandler(dh, Set(1:getncells(grid)))
+    add!(sdh, :u, ip^2)
+    add!(sdh, :c, ip)
 
-@test dof_range(sdh, Ferrite.find_field(sdh, :u)) == 1:6
-@test dof_range(sdh, Ferrite.find_field(sdh, :c)) == 7:9
+    @test dof_range(sdh, Ferrite.find_field(sdh, :u)) == 1:6
+    @test dof_range(sdh, Ferrite.find_field(sdh, :c)) == 7:9
 end # testset
 
 @testset "Dofs for Line2" begin
 
-nodes = [Node{2,Float64}(Vec(0.0,0.0)), Node{2,Float64}(Vec(1.0,1.0)), Node{2,Float64}(Vec(2.0,0.0))]
-cells = [Line((1,2)), Line((2,3))]
-grid = Grid(cells,nodes)
+    nodes = [Node{2, Float64}(Vec(0.0, 0.0)), Node{2, Float64}(Vec(1.0, 1.0)), Node{2, Float64}(Vec(2.0, 0.0))]
+    cells = [Line((1, 2)), Line((2, 3))]
+    grid = Grid(cells, nodes)
 
-#2d line with 1st order 1d interpolation
-dh = DofHandler(grid)
-add!(dh, :x, Lagrange{RefLine,1}()^2)
-close!(dh)
+    #2d line with 1st order 1d interpolation
+    dh = DofHandler(grid)
+    add!(dh, :x, Lagrange{RefLine, 1}()^2)
+    close!(dh)
 
-@test celldofs(dh,1) == [1,2,3,4]
-@test celldofs(dh,2) == [3,4,5,6]
+    @test celldofs(dh, 1) == [1, 2, 3, 4]
+    @test celldofs(dh, 2) == [3, 4, 5, 6]
 
-#2d line with 2nd order 1d interpolation
-dh = DofHandler(grid)
-add!(dh, :x, Lagrange{RefLine,2}()^2)
-close!(dh)
+    #2d line with 2nd order 1d interpolation
+    dh = DofHandler(grid)
+    add!(dh, :x, Lagrange{RefLine, 2}()^2)
+    close!(dh)
 
-@test celldofs(dh,1) == [1,2,3,4,5,6]
-@test celldofs(dh,2) == [3,4,7,8,9,10]
+    @test celldofs(dh, 1) == [1, 2, 3, 4, 5, 6]
+    @test celldofs(dh, 2) == [3, 4, 7, 8, 9, 10]
 
-#3d line with 2nd order 1d interpolation
-dh = DofHandler(grid)
-add!(dh, :u, Lagrange{RefLine,2}()^3)
-add!(dh, :θ, Lagrange{RefLine,2}()^3)
-close!(dh)
+    #3d line with 2nd order 1d interpolation
+    dh = DofHandler(grid)
+    add!(dh, :u, Lagrange{RefLine, 2}()^3)
+    add!(dh, :θ, Lagrange{RefLine, 2}()^3)
+    close!(dh)
 
-@test celldofs(dh,1) == collect(1:18)
-@test celldofs(dh,2) == [4,5,6,19,20,21,22,23,24,    # u
-                         13,14,15,25,26,27,28,29,30] # θ
+    @test celldofs(dh, 1) == collect(1:18)
+    @test celldofs(dh, 2) == [
+        4, 5, 6, 19, 20, 21, 22, 23, 24,    # u
+        13, 14, 15, 25, 26, 27, 28, 29, 30, # θ
+    ]
 end
 
 @testset "Dofs for quad in 3d (shell)" begin
 
-nodes = [Node{3,Float64}(Vec(0.0,0.0,0.0)), Node{3,Float64}(Vec(1.0,0.0,0.0)),
-            Node{3,Float64}(Vec(1.0,1.0,0.0)), Node{3,Float64}(Vec(0.0,1.0,0.0)),
-            Node{3,Float64}(Vec(2.0,0.0,0.0)), Node{3,Float64}(Vec(2.0,2.0,0.0))]
+    nodes = [
+        Node{3, Float64}(Vec(0.0, 0.0, 0.0)), Node{3, Float64}(Vec(1.0, 0.0, 0.0)),
+        Node{3, Float64}(Vec(1.0, 1.0, 0.0)), Node{3, Float64}(Vec(0.0, 1.0, 0.0)),
+        Node{3, Float64}(Vec(2.0, 0.0, 0.0)), Node{3, Float64}(Vec(2.0, 2.0, 0.0)),
+    ]
 
-cells = [Quadrilateral((1,2,3,4)), Quadrilateral((2,5,6,3))]
-grid = Grid(cells,nodes)
+    cells = [Quadrilateral((1, 2, 3, 4)), Quadrilateral((2, 5, 6, 3))]
+    grid = Grid(cells, nodes)
 
-#3d quad with 1st order 2d interpolation
-dh = DofHandler(grid)
-add!(dh, :u, Lagrange{RefQuadrilateral,1}()^3)
-add!(dh, :θ, Lagrange{RefQuadrilateral,1}()^3)
-close!(dh)
+    #3d quad with 1st order 2d interpolation
+    dh = DofHandler(grid)
+    add!(dh, :u, Lagrange{RefQuadrilateral, 1}()^3)
+    add!(dh, :θ, Lagrange{RefQuadrilateral, 1}()^3)
+    close!(dh)
 
-@test celldofs(dh,1) == collect(1:24)
-@test celldofs(dh,2) == [4,5,6,25,26,27,28,29,30,7,8,9, # u
-                         16,17,18,31,32,33,34,35,36,19,20,21]# θ
+    @test celldofs(dh, 1) == collect(1:24)
+    @test celldofs(dh, 2) == [
+        4, 5, 6, 25, 26, 27, 28, 29, 30, 7, 8, 9,       # u
+        16, 17, 18, 31, 32, 33, 34, 35, 36, 19, 20, 21, # θ
+    ]
 
-#3d quads with two quadratic interpolations fields
-#Only 1 dim per field for simplicity...
-dh = DofHandler(grid)
-add!(dh, :u, Lagrange{RefQuadrilateral,2}())
-add!(dh, :θ, Lagrange{RefQuadrilateral,2}())
-close!(dh)
+    #3d quads with two quadratic interpolations fields
+    #Only 1 dim per field for simplicity...
+    dh = DofHandler(grid)
+    add!(dh, :u, Lagrange{RefQuadrilateral, 2}())
+    add!(dh, :θ, Lagrange{RefQuadrilateral, 2}())
+    close!(dh)
 
-@test celldofs(dh,1) == collect(1:18)
-@test celldofs(dh,2) == [2, 19, 20, 3, 21, 22, 23, 6, 24, 11, 25, 26, 12, 27, 28, 29, 15, 30]
+    @test celldofs(dh, 1) == collect(1:18)
+    @test celldofs(dh, 2) == [2, 19, 20, 3, 21, 22, 23, 6, 24, 11, 25, 26, 12, 27, 28, 29, 15, 30]
 
-# test evaluate_at_grid_nodes
-## DofHandler
-mesh = generate_grid(Quadrilateral, (1,1))
-dh = DofHandler(mesh)
-add!(dh, :v, Lagrange{RefQuadrilateral,1}()^2)
-add!(dh, :s, Lagrange{RefQuadrilateral,1}())
-close!(dh)
+    # test evaluate_at_grid_nodes
+    ## DofHandler
+    mesh = generate_grid(Quadrilateral, (1, 1))
+    dh = DofHandler(mesh)
+    add!(dh, :v, Lagrange{RefQuadrilateral, 1}()^2)
+    add!(dh, :s, Lagrange{RefQuadrilateral, 1}())
+    close!(dh)
 
-u  = [1.1, 1.2, 2.1, 2.2, 4.1, 4.2, 3.1, 3.2, 1.3, 2.3, 4.3, 3.3]
-uv = @view u[1:end]
-# :s on solution
-s_nodes = evaluate_at_grid_nodes(dh, u, :s)
-@test s_nodes ≈ [i+0.3 for i=1:4]
-# :s on a view into solution
-sv_nodes = evaluate_at_grid_nodes(dh, uv, :s)
-@test sv_nodes ≈ [i+0.3 for i=1:4]
-# :v on solution
-v_nodes = evaluate_at_grid_nodes(dh, u, :v)
-@test v_nodes ≈ [Vec{2,Float64}(i -> j+i/10) for j = 1:4]
-# :v on a view into solution
-vv_nodes = evaluate_at_grid_nodes(dh, uv, :v)
-@test vv_nodes ≈ [Vec{2,Float64}(i -> j+i/10) for j = 1:4]
+    u = [1.1, 1.2, 2.1, 2.2, 4.1, 4.2, 3.1, 3.2, 1.3, 2.3, 4.3, 3.3]
+    uv = @view u[1:end]
+    # :s on solution
+    s_nodes = evaluate_at_grid_nodes(dh, u, :s)
+    @test s_nodes ≈ [i + 0.3 for i in 1:4]
+    # :s on a view into solution
+    sv_nodes = evaluate_at_grid_nodes(dh, uv, :s)
+    @test sv_nodes ≈ [i + 0.3 for i in 1:4]
+    # :v on solution
+    v_nodes = evaluate_at_grid_nodes(dh, u, :v)
+    @test v_nodes ≈ [Vec{2, Float64}(i -> j + i / 10) for j in 1:4]
+    # :v on a view into solution
+    vv_nodes = evaluate_at_grid_nodes(dh, uv, :v)
+    @test vv_nodes ≈ [Vec{2, Float64}(i -> j + i / 10) for j in 1:4]
 
 end
 
@@ -144,14 +150,14 @@ end
         local dh, mdh, ch
         grid = generate_grid(Triangle, (10, 10))
         dh = DofHandler(grid)
-        add!(dh, :u, Lagrange{RefTriangle,1}())
+        add!(dh, :u, Lagrange{RefTriangle, 1}())
         close!(dh)
         # subdomains
         mdh = DofHandler(grid)
-        sdh1 = SubDofHandler(mdh, Set(1:getncells(grid)÷2))
-        add!(sdh1, :u, Lagrange{RefTriangle,1}())
-        sdh2 = SubDofHandler(mdh, Set((getncells(grid)÷2+1):getncells(grid)))
-        add!(sdh2, :u, Lagrange{RefTriangle,1}())
+        sdh1 = SubDofHandler(mdh, Set(1:(getncells(grid) ÷ 2)))
+        add!(sdh1, :u, Lagrange{RefTriangle, 1}())
+        sdh2 = SubDofHandler(mdh, Set((getncells(grid) ÷ 2 + 1):getncells(grid)))
+        add!(sdh2, :u, Lagrange{RefTriangle, 1}())
         close!(mdh)
         ch = ConstraintHandler(dh)
         add!(ch, Dirichlet(:u, getfacetset(grid, "left"), (x, t) -> 0))
@@ -220,8 +226,8 @@ end
         local grid, dh, ch
         grid = generate_grid(Quadrilateral, (2, 1))
         dh = DofHandler(grid)
-        add!(dh, :v, Lagrange{RefQuadrilateral,1}()^2)
-        add!(dh, :s, Lagrange{RefQuadrilateral,1}())
+        add!(dh, :v, Lagrange{RefQuadrilateral, 1}()^2)
+        add!(dh, :s, Lagrange{RefQuadrilateral, 1}())
         close!(dh)
         ch = ConstraintHandler(dh)
         add!(ch, Dirichlet(:v, getfacetset(grid, "left"), (x, t) -> 0, [2]))
@@ -305,7 +311,7 @@ end
     function test_dhch_subdomain()
         local grid, dh, ch
         grid = generate_grid(Quadrilateral, (2, 1))
-        ip = Lagrange{RefQuadrilateral,1}()
+        ip = Lagrange{RefQuadrilateral, 1}()
         dh = DofHandler(grid)
         sdh1 = SubDofHandler(dh, Set(1))
         add!(sdh1, :v, ip^2)
@@ -394,7 +400,7 @@ end
     #   │  1  │  2  │     │  1  │  2  │
     # 11,1──12,2──15,5    7─────8────
     @test celldofs(dh, 1) == [11, 1, 12, 2, 13, 3, 14, 4, 7, 8, 9, 10]
-    @test celldofs(dh, 2) == [12, 2, 15, 5, 16, 6, 13, 3, ]
+    @test celldofs(dh, 2) == [12, 2, 15, 5, 16, 6, 13, 3]
     @test ch.prescribed_dofs == sort!([1, 4, 7, 10, 15])
     dof_range_v1 = dof_range(dh.subdofhandlers[1], :v)
     dof_range_s1 = dof_range(dh.subdofhandlers[1], :s)
@@ -412,15 +418,15 @@ end
     dh, ch = testdhch()
     renumber!(dh, DofOrder.Ext{Metis}())
     @test_throws ErrorException renumber!(dh, ch, DofOrder.Ext{Metis}())
-    renumber!(dh, DofOrder.Ext{Metis}(coupling=[true true; true false]))
-    @test_throws ErrorException renumber!(dh, ch, DofOrder.Ext{Metis}(coupling=[true true; true false]))
+    renumber!(dh, DofOrder.Ext{Metis}(coupling = [true true; true false]))
+    @test_throws ErrorException renumber!(dh, ch, DofOrder.Ext{Metis}(coupling = [true true; true false]))
 end
 
 @testset "dof coupling" begin
     grid = generate_grid(Quadrilateral, (1, 1))
     dh = DofHandler(grid)
-    add!(dh, :u, Lagrange{RefQuadrilateral,1}()^2)
-    add!(dh, :p, Lagrange{RefQuadrilateral,1}())
+    add!(dh, :u, Lagrange{RefQuadrilateral, 1}()^2)
+    add!(dh, :p, Lagrange{RefQuadrilateral, 1}())
     close!(dh)
     ch = ConstraintHandler(dh)
     close!(ch)
@@ -452,12 +458,12 @@ end
 
     # Field coupling
     coupling = [
-    #   u    p
+        # u    p
         true true  # v
         true false # q
     ]
     sparsity_pattern = init_sparsity_pattern(dh)
-    add_sparsity_entries!(sparsity_pattern, dh; coupling=coupling)
+    add_sparsity_entries!(sparsity_pattern, dh; coupling = coupling)
     K = allocate_matrix(sparsity_pattern)
     # Kch = allocate_matrix(dh, ch; coupling=coupling)
     # @test K.rowval == Kch.rowval
@@ -484,13 +490,13 @@ end
 
     # Component coupling
     coupling = [
-    #   u1    u2    p
+        # u1   u2    p
         true  true  false # v1
         true  false true  # v2
         false true  true  # q
     ]
     sparsity_pattern = init_sparsity_pattern(dh)
-    add_sparsity_entries!(sparsity_pattern, dh; coupling=coupling)
+    add_sparsity_entries!(sparsity_pattern, dh; coupling = coupling)
     K = allocate_matrix(sparsity_pattern)
     # KS = create_symmetric_sparsity_pattern(dh; coupling=coupling)
     for j in u1dofs, i in vdofs
@@ -525,7 +531,7 @@ end
     end
 
     # Error paths
-    @test_throws ErrorException("coupling not square") allocate_matrix(dh; coupling=[true true])
+    @test_throws ErrorException("coupling not square") allocate_matrix(dh; coupling = [true true])
     # @test_throws ErrorException("coupling not symmetric") create_symmetric_sparsity_pattern(dh; coupling=[true true; false true])
     # @test_throws ErrorException("could not create coupling") create_symmetric_sparsity_pattern(dh; coupling=falses(100, 100))
 
@@ -533,10 +539,10 @@ end
     grid = generate_grid(Quadrilateral, (1, 2))
     dh = DofHandler(grid)
     sdh1 = SubDofHandler(dh, Set(1))
-    add!(sdh1, :u, Lagrange{RefQuadrilateral,1}()^2)
-    add!(sdh1, :p, Lagrange{RefQuadrilateral,1}())
+    add!(sdh1, :u, Lagrange{RefQuadrilateral, 1}()^2)
+    add!(sdh1, :p, Lagrange{RefQuadrilateral, 1}())
     sdh2 = SubDofHandler(dh, Set(2))
-    add!(sdh2, :u, Lagrange{RefQuadrilateral,1}()^2)
+    add!(sdh2, :u, Lagrange{RefQuadrilateral, 1}()^2)
     close!(dh)
 
     sparsity_pattern = init_sparsity_pattern(dh)
@@ -635,9 +641,9 @@ end
                             i_dofs_v = i_dofs[dim1:vdim[1]:end]
                             j_dofs_v = j_dofs[dim2:vdim[2]:end]
                             for i_idx in i_dofs_v, j_idx in j_dofs_v
-                                i = celldofs(dh,cell_idx)[i_idx]
-                                j = celldofs(dh,cell2_idx)[j_idx]
-                                is_cross_element && (i ∈ celldofs(dh,cell2_idx) || j ∈ celldofs(dh,cell_idx)) && continue
+                                i = celldofs(dh, cell_idx)[i_idx]
+                                j = celldofs(dh, cell2_idx)[j_idx]
+                                is_cross_element && (i ∈ celldofs(dh, cell2_idx) || j ∈ celldofs(dh, cell_idx)) && continue
                                 @test is_stored(K, i, j) == coupling[coupling_idx...]
                             end
                             coupling_idx[2] += 1
@@ -651,34 +657,34 @@ end
     function check_coupling(dh, topology, K, coupling, interface_coupling)
         for cell_idx in eachindex(getcells(dh.grid))
             sdh = dh.subdofhandlers[dh.cell_to_subdofhandler[cell_idx]]
-            coupling_idx = [1,1]
-            interface_coupling_idx = [1,1]
-            vdim = [1,1]
+            coupling_idx = [1, 1]
+            interface_coupling_idx = [1, 1]
+            vdim = [1, 1]
             # test inner coupling
             _check_dofs(K, dh, sdh, cell_idx, coupling, coupling_idx, vdim, [cell_idx], false)
             # test cross-element coupling
             neighborhood = Ferrite.get_facet_facet_neighborhood(topology, grid)
             neighbors = [neighborhood[cell_idx, i] for i in 1:size(neighborhood, 2)]
-            _check_dofs(K, dh, sdh, cell_idx, interface_coupling, interface_coupling_idx, vdim, [i[1][1] for i in  neighbors[.!isempty.(neighbors)]], true)
+            _check_dofs(K, dh, sdh, cell_idx, interface_coupling, interface_coupling_idx, vdim, [i[1][1] for i in neighbors[.!isempty.(neighbors)]], true)
         end
     end
     grid = generate_grid(Quadrilateral, (2, 2))
     topology = ExclusiveTopology(grid)
     dh = DofHandler(grid)
-    add!(dh, :u, DiscontinuousLagrange{RefQuadrilateral,1}()^2)
-    add!(dh, :p, DiscontinuousLagrange{RefQuadrilateral,1}())
-    add!(dh, :w, Lagrange{RefQuadrilateral,1}())
+    add!(dh, :u, DiscontinuousLagrange{RefQuadrilateral, 1}()^2)
+    add!(dh, :p, DiscontinuousLagrange{RefQuadrilateral, 1}())
+    add!(dh, :w, Lagrange{RefQuadrilateral, 1}())
     close!(dh)
     for coupling in couplings, interface_coupling in couplings
-        K = allocate_matrix(dh; coupling=coupling, topology = topology, interface_coupling = interface_coupling)
+        K = allocate_matrix(dh; coupling = coupling, topology = topology, interface_coupling = interface_coupling)
         all(coupling) && @test K == allocate_matrix(dh, topology = topology, interface_coupling = interface_coupling)
         check_coupling(dh, topology, K, coupling, interface_coupling)
     end
 
     # Error paths
-    @test_throws ErrorException("coupling not square") allocate_matrix(dh; coupling=[true true])
+    @test_throws ErrorException("coupling not square") allocate_matrix(dh; coupling = [true true])
     # @test_throws ErrorException("coupling not symmetric") allocate_matrix(dh; coupling=[true true; false true])
-    @test_throws ErrorException("could not create coupling") allocate_matrix(dh; coupling=falses(100, 100))
+    @test_throws ErrorException("could not create coupling") allocate_matrix(dh; coupling = falses(100, 100))
 
     # Test coupling with subdomains
     # Note: `check_coupling` works for this case only because the second domain has dofs from the first domain in order. Otherwise tests like in continuous ip are required.
@@ -687,15 +693,15 @@ end
 
     dh = DofHandler(grid)
     sdh1 = SubDofHandler(dh, Set(1))
-    add!(sdh1, :u, DiscontinuousLagrange{RefQuadrilateral,1}()^2)
-    add!(sdh1, :y, DiscontinuousLagrange{RefQuadrilateral,1}())
-    add!(sdh1, :p, Lagrange{RefQuadrilateral,1}())
+    add!(sdh1, :u, DiscontinuousLagrange{RefQuadrilateral, 1}()^2)
+    add!(sdh1, :y, DiscontinuousLagrange{RefQuadrilateral, 1}())
+    add!(sdh1, :p, Lagrange{RefQuadrilateral, 1}())
     sdh2 = SubDofHandler(dh, Set(2))
-    add!(sdh2, :u, DiscontinuousLagrange{RefQuadrilateral,1}()^2)
+    add!(sdh2, :u, DiscontinuousLagrange{RefQuadrilateral, 1}()^2)
     close!(dh)
 
     for coupling in couplings, interface_coupling in couplings
-        K = allocate_matrix(dh; coupling=coupling, topology = topology, interface_coupling = interface_coupling)
+        K = allocate_matrix(dh; coupling = coupling, topology = topology, interface_coupling = interface_coupling)
         all(coupling) && @test K == allocate_matrix(dh, topology = topology, interface_coupling = interface_coupling)
         check_coupling(dh, topology, K, coupling, interface_coupling)
     end
@@ -704,11 +710,11 @@ end
     grid = generate_grid(Triangle, (2, 1))
     topology = ExclusiveTopology(grid)
     dh = DofHandler(grid)
-    add!(dh, :u, CrouzeixRaviart{RefTriangle,1}())
+    add!(dh, :u, CrouzeixRaviart{RefTriangle, 1}())
     close!(dh)
-    coupling = trues(3,3)
-    K = allocate_matrix(dh; coupling=coupling, topology = topology, interface_coupling = coupling)
-    K_cont = allocate_matrix(dh; coupling=coupling, topology = topology, interface_coupling = falses(3,3))
+    coupling = trues(3, 3)
+    K = allocate_matrix(dh; coupling = coupling, topology = topology, interface_coupling = coupling)
+    K_cont = allocate_matrix(dh; coupling = coupling, topology = topology, interface_coupling = falses(3, 3))
     K_default = allocate_matrix(dh)
     @test K == K_cont == K_default
 end
@@ -723,12 +729,12 @@ end
     # 1 ____ 2  2
 
     dim = 2
-    grid = generate_grid(Quadrilateral, (1,1))
-    line1 = Line((2,4))
+    grid = generate_grid(Quadrilateral, (1, 1))
+    line1 = Line((2, 4))
     grid = Grid([grid.cells[1], line1], grid.nodes)
 
     order = 2
-    ip_solid = Lagrange{RefQuadrilateral, order}()#^dim
+    ip_solid = Lagrange{RefQuadrilateral, order}() #^dim
     ip_shell = Lagrange{RefLine, order}()
 
     dh = DofHandler(grid)
@@ -756,12 +762,12 @@ end
     #         2--------4
 
     dim = 2
-    grid = generate_grid(Hexahedron, (1,1,1))
-    shell = Quadrilateral((4,3,7,8))
+    grid = generate_grid(Hexahedron, (1, 1, 1))
+    shell = Quadrilateral((4, 3, 7, 8))
     grid = Grid([grid.cells[1], shell], grid.nodes)
 
     order = 2
-    ip_solid = Lagrange{RefHexahedron, order}()#^dim
+    ip_solid = Lagrange{RefHexahedron, order}() #^dim
     ip_shell = Lagrange{RefQuadrilateral, order}()
 
     dh = DofHandler(grid)
@@ -781,9 +787,9 @@ end
     #facedofs!(dofs, dh, FaceIndex(1,4))
 
     #Shared node dofs
-    @test dofsshell[1:4] == [3,4,8,7]
+    @test dofsshell[1:4] == [3, 4, 8, 7]
     #Shared edge dofs
-    @test dofsshell[5:8] == [11,20,15,19]
+    @test dofsshell[5:8] == [11, 20, 15, 19]
     #Shared face dof
     @test dofsshell[9] == 24
 end
