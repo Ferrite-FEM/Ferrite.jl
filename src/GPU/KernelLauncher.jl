@@ -5,8 +5,8 @@ and backends, serving as a foundation for GPU-accelerated computations.
 =#
 
 ### Abstract Types ###
-abstract type AbstractGPUKernel end
-abstract type AbstractGPUBackend end
+abstract type AbstractKernel end
+abstract type AbstractBackend end
 
 
 ### Functions ###
@@ -28,7 +28,7 @@ kernel function, and additional arguments.
 This function needs to be implemented for each specific backend. Calling this function
 without a concrete implementation will raise an error.
 """
-function init_gpu_kernel(backend::AbstractGPUBackend, n_cells::Ti, n_basefuncs::Ti, kernel::Function, args::Tuple) where {Ti <: Integer}
+function init_kernel(backend::AbstractBackend, n_cells::Ti, n_basefuncs::Ti, kernel::Function, args::Tuple) where {Ti <: Integer}
     throw(ErrorException("A concrete implementation of init_gpu_kernel is required"))
 end
 
@@ -45,7 +45,7 @@ mechanism for running GPU-accelerated computations across different GPU backends
 This function must be implemented for specific GPU kernels. If not implemented,
 an error will be thrown.
 """
-function launch!(kernel::AbstractGPUKernel)
+function launch!(kernel::AbstractKernel)
     throw(ErrorException("A concrete implementation of launch! is required"))
 end
 
@@ -53,7 +53,7 @@ end
 ### Concrete Types ###
 
 """
-    GPUKernel{Ti}(n_cells::Ti, n_basefuncs::Ti, kernel::Function, args::Tuple, backend::Type{<:AbstractGPUBackend})
+    LazyKernel{Ti}(n_cells::Ti, n_basefuncs::Ti, kernel::Function, args::Tuple, backend::Type{<:AbstractGPUBackend})
 
 Represents a high-level interface to a GPU backend for configuring and launching GPU kernels.
 It stores the necessary parameters for kernel execution, such as the number of cells,
@@ -69,13 +69,15 @@ number of base functions, the kernel function, and any additional arguments.
 # Type Parameters
 - `Ti`: An integer type representing the number type used for `n_cells` and `n_basefuncs`.
 """
-struct GPUKernel{Ti} <: AbstractGPUKernel
+struct LazyKernel{Ti,BKD<:AbstractBackend} <: AbstractKernel
     n_cells::Ti               # Number of cells
     n_basefuncs::Ti           # Number of base functions
     kernel::Function          # Kernel function to execute
     args::Tuple               # Arguments for the kernel function
-    backend::Type{<:AbstractGPUBackend} # GPU backend
+    backend::Type{BKD} # GPU backend
 end
+ 
+(ker::LazyKernel)() = launch!(ker)
 
 """
     getbackend(kernel::GPUKernel) -> Type{<:AbstractGPUBackend}
@@ -88,7 +90,7 @@ Returns the backend associated with the given `GPUKernel`.
 # Returns
 The backend type associated with the kernel.
 """
-getbackend(kernel::GPUKernel) = kernel.backend
+getbackend(kernel::LazyKernel) = kernel.backend
 
 
 ### GPU Backend ###
@@ -99,4 +101,5 @@ getbackend(kernel::GPUKernel) = kernel.backend
 Represents the CUDA backend for GPU acceleration. This type serves as a concrete
 implementation of `AbstractGPUBackend` for executing GPU computations using CUDA.
 """
-struct BackendCUDA <: AbstractGPUBackend end
+struct BackendCUDA <: AbstractBackend end
+struct BackendCPU <: AbstractBackend end

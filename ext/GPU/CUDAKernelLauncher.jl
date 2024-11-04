@@ -1,8 +1,8 @@
 
 
-function Ferrite.init_gpu_kernel(::Type{BackendCUDA}, n_cells::Ti, n_basefuncs::Ti, kernel::Function, args::Tuple) where {Ti<: Integer}
+function Ferrite.init_kernel(::Type{BackendCUDA}, n_cells::Ti, n_basefuncs::Ti, kernel::Function, args::Tuple) where {Ti<: Integer}
     if CUDA.functional()
-        return GPUKernel(n_cells, n_basefuncs, kernel, args, BackendCUDA)
+        return LazyKernel(n_cells, n_basefuncs, kernel, args, BackendCUDA)
     else
         throw(ArgumentError("CUDA is not functional, please check your GPU driver and CUDA installation"))
     end
@@ -17,13 +17,7 @@ Launch a CUDA kernel with the given configuration.
 Arguments:
 - `kernel_config`: The `CUDAKernelLauncher` object containing a higher level fields for kernel configuration.
 """
-function Ferrite.launch!(kernel::GPUKernel{Ti}) where Ti
-    backend  = kernel |> getbackend
-    _launch_kernel!(backend, kernel)
-end
-
-
-function _launch_kernel!(::Type{BackendCUDA}, kernel::GPUKernel{Ti}) where Ti
+function Ferrite.launch!(kernel::LazyKernel{Ti,BackendCUDA}) where Ti
     n_cells = kernel.n_cells
     n_basefuncs = kernel.n_basefuncs
     ker = kernel.kernel
@@ -35,6 +29,7 @@ function _launch_kernel!(::Type{BackendCUDA}, kernel::GPUKernel{Ti}) where Ti
     blocks = _calculate_nblocks(threads, n_cells)
     kernel(args...; threads, blocks, shmem=shared_mem)
 end
+
 
 function _calculate_shared_memory(threads::Integer, n_basefuncs::Integer)
     return sizeof(Float32) * (threads) * ( n_basefuncs) * n_basefuncs + sizeof(Float32) * (threads) * n_basefuncs

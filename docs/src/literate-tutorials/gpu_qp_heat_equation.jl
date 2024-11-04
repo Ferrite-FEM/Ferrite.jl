@@ -10,15 +10,15 @@ using CUDA
 
 left = Tensor{1,2,Float32}((0,-0)) # define the left bottom corner of the grid.
 
-right = Tensor{1,2,Float32}((100.0,100.0)) # define the right top corner of the grid.
+right = Tensor{1,2,Float32}((10.0,10.0)) # define the right top corner of the grid.
 
 
-grid = generate_grid(Quadrilateral, (100, 100),left,right)
-
+grid = generate_grid(Quadrilateral, (5, 5),left,right)
 
 
 ip = Lagrange{RefQuadrilateral, 1}() # define the interpolation function (i.e. Bilinear lagrange)
 
+colors = create_coloring(grid)
 
 
 qr = QuadratureRule{RefQuadrilateral}(Float32,2)
@@ -34,7 +34,7 @@ add!(dh, :u, ip)
 
 close!(dh);
 
-
+dh |> get_grid
 
 # Standard assembly of the element.
 function assemble_element_std!(Ke::Matrix, fe::Vector, cellvalues::CellValues)
@@ -138,8 +138,10 @@ end
 
 n_basefuncs = getnbasefunctions(cellvalues)
 
-# Allocate CPU matrix
-K = allocate_matrix(SparseMatrixCSC{Float32, Int32},dh);
+## Allocate CPU matrix
+## K = allocate_matrix(SparseMatrixCSC{Float32, Int32},dh);
+K = allocate_matrix(SparseMatrixCSC{Float64, Int64},dh);
+f = zeros(ndofs(dh));
 
 # Allocate GPU matrix
 ## commented to pass the test
@@ -150,13 +152,22 @@ n_cells = dh |> get_grid |> getncells
 
 # Kernel configuration
 ## commented to pass the test
-## init_gpu_kernel(BackendCUDA,n_cells,n_basefuncs,assemble_gpu!, (Kgpu,fgpu, cellvalues, dh)) |> launch!
-
+##init_kernel(BackendCUDA,n_cells,n_basefuncs,assemble_gpu!, (Kgpu,fgpu, cellvalues, dh)) |> launch!
+cpu_kernel = init_kernel(BackendCPU,n_cells,n_basefuncs,assemble_gpu!, (K,f, cellvalues, dh));
+cpu_kernel()
 
 stassy(cv,dh) = assemble_global!(cv,dh,Val(false))
 
-
+norm(K)
 ## commented to pass the test
 ## norm(Kgpu)
 Kstd , Fstd = stassy(cellvalues,dh);
 norm(Kstd)
+
+
+
+for i in 1:10 
+    Threads.@threads for j in 1:4
+        @show i,j
+    end
+end

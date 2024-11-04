@@ -169,10 +169,12 @@ include("deprecations.jl")
 include("docs.jl")
 
 # GPU support
-include("GPU/GPUKernelLauncher.jl")
+include("GPU/coloring_dof.jl")
+include("GPU/KernelLauncher.jl")
+include("GPU/CPUKernelLauncher.jl")
 include("GPU/gpu_grid.jl")
 include("GPU/GPUDofHandler.jl")
-include("GPU/gpu_iterator.jl")
+include("GPU/parallel_iterator.jl")
 
 
 end # module

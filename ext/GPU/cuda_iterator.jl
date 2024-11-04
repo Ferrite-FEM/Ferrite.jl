@@ -7,7 +7,7 @@ Create `CUDACellIterator` object for each thread with local id `thread_id` in or
 on the GPU and these elements are associated with the thread based on a stride = `blockDim().x * gridDim().x`.
 The elements of the iterator are `GPUCellCache` objects.
 """
-struct CUDACellIterator{DH<:Ferrite.AbstractGPUDofHandler,GRID<: Ferrite.AbstractGPUGrid,KDynamicSharedMem,FDynamicSharedMem} <: Ferrite.AbstractGPUCellIterator
+struct CUDACellIterator{DH<:Ferrite.AbstractGPUDofHandler,GRID<: Ferrite.AbstractGPUGrid,KDynamicSharedMem,FDynamicSharedMem} <: Ferrite.AbstractKernelCellIterator
     dh::DH # TODO: subdofhandlers are not supported yet.
     grid::GRID
     n_cells::Int32
@@ -85,7 +85,7 @@ Arguments:
 - `ke`: View into shared memory for the cell's stiffness matrix.
 - `fe`: View into shared memory for the cell's force vector.
 """
-struct GPUCellCache{DOFS <: AbstractVector{Int32},NN,NODES <: SVector{NN,Int32},X, COORDS<: SVector{X},KDynamicSharedMem,FDynamicSharedMem} <: Ferrite.AbstractGPUCellCache
+struct GPUCellCache{DOFS <: AbstractVector{Int32},NN,NODES <: SVector{NN,Int32},X, COORDS<: SVector{X},KDynamicSharedMem,FDynamicSharedMem} <: Ferrite.AbstractKernelCellCache
     coords::COORDS
     dofs::DOFS
     cellid::Int32

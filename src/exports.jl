@@ -189,10 +189,10 @@ export
     PointValues,
 
 # GPU
-    GPUKernel,
+    LazyKernel,
     StaticQuadratureView,
     StaticInterpolationValues,
-    init_gpu_kernel,
+    init_kernel,
     launch!,
     cellke,
     cellfe,
@@ -200,4 +200,5 @@ export
     GPUGrid,
     getweights,
     getbackend,
-    BackendCUDA
+    BackendCUDA,
+    BackendCPU
