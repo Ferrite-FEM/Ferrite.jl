@@ -13,14 +13,14 @@ cellvalues = CellValues(qr, ip);
 facetvalues = FacetValues(facet_qr, ip);
 interfacevalues = InterfaceValues(facet_qr, ip);
 
-getdistance(p1::Vec{N, T},p2::Vec{N, T}) where {N, T} = norm(p1-p2);
-getdiameter(cell_coords::Vector{Vec{N, T}}) where {N, T} = maximum(getdistance.(cell_coords, reshape(cell_coords, (1,:))));
+getdistance(p1::Vec{N, T}, p2::Vec{N, T}) where {N, T} = norm(p1 - p2);
+getdiameter(cell_coords::Vector{Vec{N, T}}) where {N, T} = maximum(getdistance.(cell_coords, reshape(cell_coords, (1, :))));
 
 dh = DofHandler(grid)
 add!(dh, :u, ip)
 close!(dh);
 
-K = allocate_matrix(dh, topology = topology, interface_coupling = trues(1,1));
+K = allocate_matrix(dh, topology = topology, interface_coupling = trues(1, 1));
 
 ch = ConstraintHandler(dh)
 add!(ch, Dirichlet(:u, getfacetset(grid, "right"), (x, t) -> 1.0))
@@ -43,7 +43,7 @@ function assemble_element!(Ke::Matrix, fe::Vector, cellvalues::CellValues)
         dΩ = getdetJdV(cellvalues, q_point)
         # Loop over test shape functions
         for i in 1:n_basefuncs
-            δu  = shape_value(cellvalues, q_point, i)
+            δu = shape_value(cellvalues, q_point, i)
             ∇δu = shape_gradient(cellvalues, q_point, i)
             # Add contribution to fe
             fe[i] += δu * dΩ
@@ -78,7 +78,7 @@ function assemble_interface!(Ki::Matrix, iv::InterfaceValues, μ::Float64)
                 u_jump = shape_value_jump(iv, q_point, j) * (-normal)
                 ∇u_avg = shape_gradient_average(iv, q_point, j)
                 # Add contribution to Ki
-                Ki[i, j] += -(δu_jump ⋅ ∇u_avg + ∇δu_avg ⋅ u_jump)*dΓ +  μ * (δu_jump ⋅ u_jump) * dΓ
+                Ki[i, j] += -(δu_jump ⋅ ∇u_avg + ∇δu_avg ⋅ u_jump) * dΓ + μ * (δu_jump ⋅ u_jump) * dΓ
             end
         end
     end
@@ -128,7 +128,7 @@ function assemble_global(cellvalues::CellValues, facetvalues::FacetValues, inter
         # Reinitialize interfacevalues for this interface
         reinit!(interfacevalues, ic)
         # Calculate the characteristic size hₑ as the face diameter
-        interfacecoords =  ∩(getcoordinates(ic)...)
+        interfacecoords = ∩(getcoordinates(ic)...)
         hₑ = getdiameter(interfacecoords)
         # Calculate μ
         μ = (1 + order)^dim / hₑ

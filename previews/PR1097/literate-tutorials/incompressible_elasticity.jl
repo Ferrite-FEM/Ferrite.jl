@@ -27,10 +27,12 @@ using BlockArrays, SparseArrays, LinearAlgebra
 
 # First we generate a simple grid, specifying the 4 corners of Cooks membrane.
 function create_cook_grid(nx, ny)
-    corners = [Vec{2}(( 0.0,  0.0)),
-               Vec{2}((48.0, 44.0)),
-               Vec{2}((48.0, 60.0)),
-               Vec{2}(( 0.0, 44.0))]
+    corners = [
+        Vec{2}((0.0, 0.0)),
+        Vec{2}((48.0, 44.0)),
+        Vec{2}((48.0, 60.0)),
+        Vec{2}((0.0, 44.0)),
+    ]
     grid = generate_grid(Triangle, (nx, ny), corners)
     ## facesets for boundary conditions
     addfacetset!(grid, "clamped", x -> norm(x[1]) ≈ 0.0)
@@ -41,7 +43,7 @@ end;
 # Next we define a function to set up our cell- and FacetValues.
 function create_values(interpolation_u, interpolation_p)
     ## quadrature rules
-    qr      = QuadratureRule{RefTriangle}(3)
+    qr = QuadratureRule{RefTriangle}(3)
     facet_qr = FacetQuadratureRule{RefTriangle}(3)
 
     ## cell and FacetValues for u
@@ -85,11 +87,11 @@ end
 # use a `BlockedArray` from `BlockArrays.jl`.
 
 function doassemble(
-    cellvalues_u::CellValues,
-    cellvalues_p::CellValues,
-    facetvalues_u::FacetValues,
-    K::SparseMatrixCSC, grid::Grid, dh::DofHandler, mp::LinearElasticity
-)
+        cellvalues_u::CellValues,
+        cellvalues_p::CellValues,
+        facetvalues_u::FacetValues,
+        K::SparseMatrixCSC, grid::Grid, dh::DofHandler, mp::LinearElasticity
+    )
     f = zeros(ndofs(dh))
     assembler = start_assemble(K, f)
     nu = getnbasefunctions(cellvalues_u)
@@ -169,14 +171,16 @@ function assemble_up!(Ke, fe, cell, cellvalues_u, cellvalues_p, facetvalues_u, g
             end
         end
     end
+    return
 end
 
 function symmetrize_lower!(Ke)
     for i in 1:size(Ke, 1)
-        for j in i+1:size(Ke, 1)
+        for j in (i + 1):size(Ke, 1)
             Ke[i, j] = Ke[j, i]
         end
     end
+    return
 end;
 
 # To evaluate the stresses after solving the problem we once again loop over the cells in
@@ -201,8 +205,10 @@ end;
 # this formulation. Therefore we expand the strain to a 3D tensor, and then compute the (3D)
 # stress tensor.
 
-function compute_stresses(cellvalues_u::CellValues, cellvalues_p::CellValues,
-                          dh::DofHandler, mp::LinearElasticity, a::Vector)
+function compute_stresses(
+        cellvalues_u::CellValues, cellvalues_p::CellValues,
+        dh::DofHandler, mp::LinearElasticity, a::Vector
+    )
     ae = zeros(ndofs_per_cell(dh)) # local solution vector
     u_range = dof_range(dh, :u)    # local range of dofs corresponding to u
     p_range = dof_range(dh, :p)    # local range of dofs corresponding to p
@@ -228,9 +234,9 @@ function compute_stresses(cellvalues_u::CellValues, cellvalues_p::CellValues,
             ## Expand strain to 3D
             ε3D = SymmetricTensor{2, 3}((i, j) -> i < 3 && j < 3 ? ε[i, j] : 0.0)
             ## Compute the stress in this quadrature point
-            σqp  = 2 * mp.G * dev(ε3D) - one(ε3D) * p
+            σqp = 2 * mp.G * dev(ε3D) - one(ε3D) * p
             σΩi += σqp * dΩ
-            Ωi  += dΩ
+            Ωi += dΩ
         end
         ## Store the value
         σ[cellid(cc)] = σΩi / Ωi
@@ -265,11 +271,12 @@ function solve(ν, interpolation_u, interpolation_p)
 
     ## Compute the stress
     σ = compute_stresses(cellvalues_u, cellvalues_p, dh, mp, u)
-    σvM = map(x -> √(3/2 * dev(x) ⊡ dev(x)), σ) # von Mise effective stress
+    σvM = map(x -> √(3 / 2 * dev(x) ⊡ dev(x)), σ) # von Mise effective stress
 
     ## Export the solution and the stress
-    filename = "cook_" * (interpolation_u == Lagrange{RefTriangle, 1}()^2 ? "linear" : "quadratic") *
-                         "_linear"
+    filename = "cook_" *
+        (interpolation_u == Lagrange{RefTriangle, 1}()^2 ? "linear" : "quadratic") *
+        "_linear"
 
     VTKGridFile(filename, grid) do vtk
         write_solution(vtk, dh, u)
@@ -288,9 +295,9 @@ end
 # vectorize it to 2 dimensions such that we obtain vector shape functions (and 2nd order
 # tensors for the gradients).
 
-linear_p    = Lagrange{RefTriangle,1}()
-linear_u    = Lagrange{RefTriangle,1}()^2
-quadratic_u = Lagrange{RefTriangle,2}()^2
+linear_p = Lagrange{RefTriangle, 1}()
+linear_u = Lagrange{RefTriangle, 1}()^2
+quadratic_u = Lagrange{RefTriangle, 2}()^2
 #md nothing # hide
 
 # All that is left is to solve the problem. We choose a value of Poissons
@@ -298,7 +305,7 @@ quadratic_u = Lagrange{RefTriangle,2}()^2
 # linear/linear approximation to return garbage, and the quadratic/linear
 # approximation to be stable.
 
-u1 = solve(0.5, linear_u,    linear_p);
+u1 = solve(0.5, linear_u, linear_p);
 u2 = solve(0.5, quadratic_u, linear_p);
 
 ## test the result                 #src

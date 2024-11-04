@@ -18,7 +18,7 @@ ch_dirichlet = ConstraintHandler(dh)
 dirichlet = Dirichlet(
     :u,
     union(getfacetset.(Ref(grid), ["left", "right", "top", "bottom"])...),
-    (x, t) ->  [0, 0],
+    (x, t) -> [0, 0],
     [1, 2]
 )
 add!(ch_dirichlet, dirichlet)
@@ -39,20 +39,20 @@ ch = (dirichlet = ch_dirichlet, periodic = ch_periodic);
 
 K = (
     dirichlet = allocate_matrix(dh),
-    periodic  = allocate_matrix(dh, ch.periodic),
+    periodic = allocate_matrix(dh, ch.periodic),
 );
 
-λ, μ = 1e10, 7e9 # Lamé parameters
-δ(i,j) = i == j ? 1.0 : 0.0
+λ, μ = 1.0e10, 7.0e9 # Lamé parameters
+δ(i, j) = i == j ? 1.0 : 0.0
 Em = SymmetricTensor{4, 2}(
-    (i,j,k,l) -> λ * δ(i,j) * δ(k,l) + μ * (δ(i,k) * δ(j,l) + δ(i,l) * δ(j,k))
+    (i, j, k, l) -> λ * δ(i, j) * δ(k, l) + μ * (δ(i, k) * δ(j, l) + δ(i, l) * δ(j, k))
 )
 Ei = 10 * Em;
 
 εᴹ = [
-      SymmetricTensor{2,2}([1.0 0.0; 0.0 0.0]), # ε_11 loading
-      SymmetricTensor{2,2}([0.0 0.0; 0.0 1.0]), # ε_22 loading
-      SymmetricTensor{2,2}([0.0 0.5; 0.5 0.0]), # ε_12/ε_21 loading
+    SymmetricTensor{2, 2}([1.0 0.0; 0.0 0.0]), # ε_11 loading
+    SymmetricTensor{2, 2}([0.0 0.0; 0.0 1.0]), # ε_22 loading
+    SymmetricTensor{2, 2}([0.0 0.5; 0.5 0.0]), # ε_12/ε_21 loading
 ];
 
 function doassemble!(cellvalues::CellValues, K::SparseMatrixCSC, dh::DofHandler, εᴹ)
@@ -81,8 +81,8 @@ function doassemble!(cellvalues::CellValues, K::SparseMatrixCSC, dh::DofHandler,
                 end
                 for (rhs, ε) in enumerate(εᴹ)
                     σᴹ = E ⊡ ε
-                    fe[i, rhs] += ( - δεi ⊡ σᴹ) * dΩ
-               end
+                    fe[i, rhs] += (- δεi ⊡ σᴹ) * dΩ
+                end
             end
         end
 
@@ -95,20 +95,20 @@ end;
 
 rhs = (
     dirichlet = doassemble!(cellvalues, K.dirichlet, dh, εᴹ),
-    periodic  = doassemble!(cellvalues, K.periodic,  dh, εᴹ),
+    periodic = doassemble!(cellvalues, K.periodic, dh, εᴹ),
 );
 
 rhsdata = (
     dirichlet = get_rhs_data(ch.dirichlet, K.dirichlet),
-    periodic  = get_rhs_data(ch.periodic,  K.periodic),
+    periodic = get_rhs_data(ch.periodic, K.periodic),
 )
 
 apply!(K.dirichlet, ch.dirichlet)
-apply!(K.periodic,  ch.periodic)
+apply!(K.periodic, ch.periodic)
 
 u = (
     dirichlet = Vector{Float64}[],
-    periodic  = Vector{Float64}[],
+    periodic = Vector{Float64}[],
 )
 
 for i in 1:size(rhs.dirichlet, 2)
@@ -129,7 +129,7 @@ end
 
 function compute_stress(cellvalues::CellValues, dh::DofHandler, u, εᴹ)
     σvM_qpdata = zeros(getnquadpoints(cellvalues), getncells(dh.grid))
-    σ̄Ω = zero(SymmetricTensor{2,2})
+    σ̄Ω = zero(SymmetricTensor{2, 2})
     Ω = 0.0 # Total volume
     for cell in CellIterator(dh)
         E = cellid(cell) in getcellset(dh.grid, "inclusions") ? Ei : Em
@@ -138,7 +138,7 @@ function compute_stress(cellvalues::CellValues, dh::DofHandler, u, εᴹ)
             dΩ = getdetJdV(cellvalues, q_point)
             εμ = function_symmetric_gradient(cellvalues, q_point, u[celldofs(cell)])
             σ = E ⊡ (εᴹ + εμ)
-            σvM_qpdata[q_point, cellid(cell)] = sqrt(3/2 * dev(σ) ⊡ dev(σ))
+            σvM_qpdata[q_point, cellid(cell)] = sqrt(3 / 2 * dev(σ) ⊡ dev(σ))
             Ω += dΩ # Update total volume
             σ̄Ω += σ * dΩ # Update integrated stress
         end
@@ -148,12 +148,12 @@ function compute_stress(cellvalues::CellValues, dh::DofHandler, u, εᴹ)
 end;
 
 σ̄ = (
-    dirichlet = SymmetricTensor{2,2}[],
-    periodic  = SymmetricTensor{2,2}[],
+    dirichlet = SymmetricTensor{2, 2}[],
+    periodic = SymmetricTensor{2, 2}[],
 )
 σ = (
-     dirichlet = Vector{Float64}[],
-     periodic  = Vector{Float64}[],
+    dirichlet = Vector{Float64}[],
+    periodic = Vector{Float64}[],
 )
 
 projector = L2Projector(ip, grid)
@@ -172,7 +172,7 @@ for i in 1:3
     push!(σ̄.periodic, σ̄_i)
 end
 
-E_dirichlet = SymmetricTensor{4,2}((i, j, k, l) -> begin
+E_dirichlet = SymmetricTensor{4, 2}() do i, j, k, l
     if k == l == 1
         σ̄.dirichlet[1][i, j] # ∂σ∂ε_**11
     elseif k == l == 2
@@ -180,9 +180,9 @@ E_dirichlet = SymmetricTensor{4,2}((i, j, k, l) -> begin
     else
         σ̄.dirichlet[3][i, j] # ∂σ∂ε_**12 and ∂σ∂ε_**21
     end
-end)
+end
 
-E_periodic = SymmetricTensor{4,2}((i, j, k, l) -> begin
+E_periodic = SymmetricTensor{4, 2}() do i, j, k, l
     if k == l == 1
         σ̄.periodic[1][i, j]
     elseif k == l == 2
@@ -190,10 +190,10 @@ E_periodic = SymmetricTensor{4,2}((i, j, k, l) -> begin
     else
         σ̄.periodic[3][i, j]
     end
-end);
+end
 
 function matrix_volume_fraction(grid, cellvalues)
-    V  = 0.0 # Total volume
+    V = 0.0 # Total volume
     Vm = 0.0 # Volume of the matrix
     for c in CellIterator(grid)
         reinit!(cellvalues, c)
@@ -211,11 +211,11 @@ end
 
 vm = matrix_volume_fraction(grid, cellvalues)
 
-E_voigt = vm * Em + (1-vm) * Ei
-E_reuss = inv(vm * inv(Em) + (1-vm) * inv(Ei));
+E_voigt = vm * Em + (1 - vm) * Ei
+E_reuss = inv(vm * inv(Em) + (1 - vm) * inv(Ei));
 
 ev = (first ∘ eigvals).((E_reuss, E_periodic, E_dirichlet, E_voigt))
-round.(ev; digits=-8)
+round.(ev; digits = -8)
 
 uM = zeros(ndofs(dh))
 

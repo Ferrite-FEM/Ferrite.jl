@@ -46,7 +46,7 @@ u_y(0,\nu) &amp;= u_x(\nu, 0) \quad &amp; \nu\ \in\ [0.5, 1],
 \underline{f}_{u} \\
 \underline{0} \\
 \underline{0}
-\end{bmatrix}.\]</p></div></div><h2 id="Commented-program"><a class="docs-heading-anchor" href="#Commented-program">Commented program</a><a id="Commented-program-1"></a><a class="docs-heading-anchor-permalink" href="#Commented-program" title="Permalink"></a></h2><p>What follows is a program spliced with comments. The full program, without comments, can be found in the next <a href="#stokes-flow-plain-program">section</a>.</p><pre><code class="language-julia hljs">using Ferrite, FerriteGmsh, Gmsh, Tensors, LinearAlgebra, SparseArrays</code></pre><h3 id="Geometry-and-mesh-generation-with-Gmsh.jl"><a class="docs-heading-anchor" href="#Geometry-and-mesh-generation-with-Gmsh.jl">Geometry and mesh generation with <code>Gmsh.jl</code></a><a id="Geometry-and-mesh-generation-with-Gmsh.jl-1"></a><a class="docs-heading-anchor-permalink" href="#Geometry-and-mesh-generation-with-Gmsh.jl" title="Permalink"></a></h3><p>In the <code>setup_grid</code> function below we use the <a href="https://github.com/JuliaFEM/Gmsh.jl"><code>Gmsh.jl</code></a> package for setting up the geometry and performing the meshing. We will not discuss this part in much detail but refer to the <a href="https://gmsh.info/doc/texinfo/gmsh.html#Gmsh-API">Gmsh API documentation</a> instead. The most important thing to note is the mesh periodicity constraint that is applied between the &quot;inlet&quot; and &quot;outlet&quot; parts using <code>gmsh.model.set_periodic</code>. This is necessary to later on apply a periodicity constraint for the approximated velocity field.</p><pre><code class="language-julia hljs">function setup_grid(h=0.05)
+\end{bmatrix}.\]</p></div></div><h2 id="Commented-program"><a class="docs-heading-anchor" href="#Commented-program">Commented program</a><a id="Commented-program-1"></a><a class="docs-heading-anchor-permalink" href="#Commented-program" title="Permalink"></a></h2><p>What follows is a program spliced with comments. The full program, without comments, can be found in the next <a href="#stokes-flow-plain-program">section</a>.</p><pre><code class="language-julia hljs">using Ferrite, FerriteGmsh, Gmsh, Tensors, LinearAlgebra, SparseArrays</code></pre><h3 id="Geometry-and-mesh-generation-with-Gmsh.jl"><a class="docs-heading-anchor" href="#Geometry-and-mesh-generation-with-Gmsh.jl">Geometry and mesh generation with <code>Gmsh.jl</code></a><a id="Geometry-and-mesh-generation-with-Gmsh.jl-1"></a><a class="docs-heading-anchor-permalink" href="#Geometry-and-mesh-generation-with-Gmsh.jl" title="Permalink"></a></h3><p>In the <code>setup_grid</code> function below we use the <a href="https://github.com/JuliaFEM/Gmsh.jl"><code>Gmsh.jl</code></a> package for setting up the geometry and performing the meshing. We will not discuss this part in much detail but refer to the <a href="https://gmsh.info/doc/texinfo/gmsh.html#Gmsh-API">Gmsh API documentation</a> instead. The most important thing to note is the mesh periodicity constraint that is applied between the &quot;inlet&quot; and &quot;outlet&quot; parts using <code>gmsh.model.set_periodic</code>. This is necessary to later on apply a periodicity constraint for the approximated velocity field.</p><pre><code class="language-julia hljs">function setup_grid(h = 0.05)
     # Initialize gmsh
     Gmsh.initialize()
     gmsh.option.set_number(&quot;General.Verbosity&quot;, 2)
@@ -153,7 +153,7 @@ end</code></pre><h3 id="Boundary-conditions-and-constraints"><a class="docs-head
     V ./= V[constrained_dof_idx]
     mean_value_constraint = AffineConstraint(
         constrained_dof,
-        Pair{Int,Float64}[J[i] =&gt; -V[i] for i in 1:length(J) if J[i] != constrained_dof],
+        Pair{Int, Float64}[J[i] =&gt; -V[i] for i in 1:length(J) if J[i] != constrained_dof],
         0.0,
     )
     return mean_value_constraint
@@ -183,8 +183,8 @@ end</code></pre><h3 id="Global-and-local-assembly"><a class="docs-heading-anchor
     ndofs_u = length(range_u)
     range_p = dof_range(dh, :p)
     ndofs_p = length(range_p)
-    ϕᵤ = Vector{Vec{2,Float64}}(undef, ndofs_u)
-    ∇ϕᵤ = Vector{Tensor{2,2,Float64,4}}(undef, ndofs_u)
+    ϕᵤ = Vector{Vec{2, Float64}}(undef, ndofs_u)
+    ∇ϕᵤ = Vector{Tensor{2, 2, Float64, 4}}(undef, ndofs_u)
     divϕᵤ = Vector{Float64}(undef, ndofs_u)
     ϕₚ = Vector{Float64}(undef, ndofs_p)
     for cell in CellIterator(dh)
@@ -204,15 +204,15 @@ end</code></pre><h3 id="Global-and-local-assembly"><a class="docs-heading-anchor
             end
             # u-u
             for (i, I) in pairs(range_u), (j, J) in pairs(range_u)
-                ke[I, J] += ( ∇ϕᵤ[i] ⊡ ∇ϕᵤ[j] ) * dΩ
+                ke[I, J] += (∇ϕᵤ[i] ⊡ ∇ϕᵤ[j]) * dΩ
             end
             # u-p
             for (i, I) in pairs(range_u), (j, J) in pairs(range_p)
-                ke[I, J] += ( -divϕᵤ[i] * ϕₚ[j] ) * dΩ
+                ke[I, J] += (-divϕᵤ[i] * ϕₚ[j]) * dΩ
             end
             # p-u
             for (i, I) in pairs(range_p), (j, J) in pairs(range_u)
-                ke[I, J] += ( -divϕᵤ[j] * ϕₚ[i] ) * dΩ
+                ke[I, J] += (-divϕᵤ[j] * ϕₚ[i]) * dΩ
             end
             # rhs
             for (i, I) in pairs(range_u)
@@ -230,18 +230,18 @@ end</code></pre><h3 id="Running-the-simulation"><a class="docs-heading-anchor" h
     h = 0.05 # approximate element size
     grid = setup_grid(h)
     # Interpolations
-    ipu = Lagrange{RefTriangle,2}() ^ 2 # quadratic
-    ipp = Lagrange{RefTriangle,1}()     # linear
+    ipu = Lagrange{RefTriangle, 2}()^2 # quadratic
+    ipp = Lagrange{RefTriangle, 1}()   # linear
     # Dofs
     dh = setup_dofs(grid, ipu, ipp)
     # FE values
-    ipg = Lagrange{RefTriangle,1}() # linear geometric interpolation
+    ipg = Lagrange{RefTriangle, 1}() # linear geometric interpolation
     cvu, cvp, fvp = setup_fevalues(ipu, ipp, ipg)
     # Boundary conditions
     ch = setup_constraints(dh, fvp)
     # Global tangent matrix and rhs
     coupling = [true true; true false] # no coupling between pressure test/trial functions
-    K = allocate_matrix(dh, ch; coupling=coupling)
+    K = allocate_matrix(dh, ch; coupling = coupling)
     f = zeros(ndofs(dh))
     # Assemble system
     assemble_system!(K, f, dh, cvu, cvp)
@@ -258,7 +258,7 @@ end</code></pre><h3 id="Running-the-simulation"><a class="docs-heading-anchor" h
     return
 end</code></pre><p>Run it!</p><pre><code class="language-julia hljs">main()</code></pre><p>The resulting magnitude of the velocity field is visualized in <em>Figure 1</em>.</p><h2 id="stokes-flow-plain-program"><a class="docs-heading-anchor" href="#stokes-flow-plain-program">Plain program</a><a id="stokes-flow-plain-program-1"></a><a class="docs-heading-anchor-permalink" href="#stokes-flow-plain-program" title="Permalink"></a></h2><p>Here follows a version of the program without any comments. The file is also available here: <a href="../stokes-flow.jl"><code>stokes-flow.jl</code></a>.</p><pre><code class="language-julia hljs">using Ferrite, FerriteGmsh, Gmsh, Tensors, LinearAlgebra, SparseArrays
 
-function setup_grid(h=0.05)
+function setup_grid(h = 0.05)
     # Initialize gmsh
     Gmsh.initialize()
     gmsh.option.set_number(&quot;General.Verbosity&quot;, 2)
@@ -371,7 +371,7 @@ function setup_mean_constraint(dh, fvp)
     V ./= V[constrained_dof_idx]
     mean_value_constraint = AffineConstraint(
         constrained_dof,
-        Pair{Int,Float64}[J[i] =&gt; -V[i] for i in 1:length(J) if J[i] != constrained_dof],
+        Pair{Int, Float64}[J[i] =&gt; -V[i] for i in 1:length(J) if J[i] != constrained_dof],
         0.0,
     )
     return mean_value_constraint
@@ -405,8 +405,8 @@ function assemble_system!(K, f, dh, cvu, cvp)
     ndofs_u = length(range_u)
     range_p = dof_range(dh, :p)
     ndofs_p = length(range_p)
-    ϕᵤ = Vector{Vec{2,Float64}}(undef, ndofs_u)
-    ∇ϕᵤ = Vector{Tensor{2,2,Float64,4}}(undef, ndofs_u)
+    ϕᵤ = Vector{Vec{2, Float64}}(undef, ndofs_u)
+    ∇ϕᵤ = Vector{Tensor{2, 2, Float64, 4}}(undef, ndofs_u)
     divϕᵤ = Vector{Float64}(undef, ndofs_u)
     ϕₚ = Vector{Float64}(undef, ndofs_p)
     for cell in CellIterator(dh)
@@ -426,15 +426,15 @@ function assemble_system!(K, f, dh, cvu, cvp)
             end
             # u-u
             for (i, I) in pairs(range_u), (j, J) in pairs(range_u)
-                ke[I, J] += ( ∇ϕᵤ[i] ⊡ ∇ϕᵤ[j] ) * dΩ
+                ke[I, J] += (∇ϕᵤ[i] ⊡ ∇ϕᵤ[j]) * dΩ
             end
             # u-p
             for (i, I) in pairs(range_u), (j, J) in pairs(range_p)
-                ke[I, J] += ( -divϕᵤ[i] * ϕₚ[j] ) * dΩ
+                ke[I, J] += (-divϕᵤ[i] * ϕₚ[j]) * dΩ
             end
             # p-u
             for (i, I) in pairs(range_p), (j, J) in pairs(range_u)
-                ke[I, J] += ( -divϕᵤ[j] * ϕₚ[i] ) * dΩ
+                ke[I, J] += (-divϕᵤ[j] * ϕₚ[i]) * dΩ
             end
             # rhs
             for (i, I) in pairs(range_u)
@@ -454,18 +454,18 @@ function main()
     h = 0.05 # approximate element size
     grid = setup_grid(h)
     # Interpolations
-    ipu = Lagrange{RefTriangle,2}() ^ 2 # quadratic
-    ipp = Lagrange{RefTriangle,1}()     # linear
+    ipu = Lagrange{RefTriangle, 2}()^2 # quadratic
+    ipp = Lagrange{RefTriangle, 1}()   # linear
     # Dofs
     dh = setup_dofs(grid, ipu, ipp)
     # FE values
-    ipg = Lagrange{RefTriangle,1}() # linear geometric interpolation
+    ipg = Lagrange{RefTriangle, 1}() # linear geometric interpolation
     cvu, cvp, fvp = setup_fevalues(ipu, ipp, ipg)
     # Boundary conditions
     ch = setup_constraints(dh, fvp)
     # Global tangent matrix and rhs
     coupling = [true true; true false] # no coupling between pressure test/trial functions
-    K = allocate_matrix(dh, ch; coupling=coupling)
+    K = allocate_matrix(dh, ch; coupling = coupling)
     f = zeros(ndofs(dh))
     # Assemble system
     assemble_system!(K, f, dh, cvu, cvp)
@@ -482,4 +482,4 @@ function main()
     return
 end
 
-main()</code></pre><hr/><p><em>This page was generated using <a href="https://github.com/fredrikekre/Literate.jl">Literate.jl</a>.</em></p></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../computational_homogenization/">« Computational homogenization</a><a class="docs-footer-nextpage" href="../porous_media/">Porous media »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option><option value="catppuccin-latte">catppuccin-latte</option><option value="catppuccin-frappe">catppuccin-frappe</option><option value="catppuccin-macchiato">catppuccin-macchiato</option><option value="catppuccin-mocha">catppuccin-mocha</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.7.0 on <span class="colophon-date" title="Tuesday 29 October 2024 14:55">Tuesday 29 October 2024</span>. Using Julia version 1.11.1.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
+main()</code></pre><hr/><p><em>This page was generated using <a href="https://github.com/fredrikekre/Literate.jl">Literate.jl</a>.</em></p></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../computational_homogenization/">« Computational homogenization</a><a class="docs-footer-nextpage" href="../porous_media/">Porous media »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option><option value="catppuccin-latte">catppuccin-latte</option><option value="catppuccin-frappe">catppuccin-frappe</option><option value="catppuccin-macchiato">catppuccin-macchiato</option><option value="catppuccin-mocha">catppuccin-mocha</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.7.0 on <span class="colophon-date" title="Monday 4 November 2024 14:08">Monday 4 November 2024</span>. Using Julia version 1.11.1.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>

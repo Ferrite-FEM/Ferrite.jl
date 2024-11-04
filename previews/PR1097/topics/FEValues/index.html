@@ -49,17 +49,24 @@
     - J^{-T}_{mn} \mathcal{H}_{mnl} J^{-1}_{lj} \frac{J_{ik} \hat{N}_k}{\det(\boldsymbol{J})}
     + \frac{J_{ik}}{\det(\boldsymbol{J})}  \frac{\mathrm{d} \hat{N}_k}{\mathrm{d} \xi_l} J_{lj}^{-1}
 \end{align*}\]</p></div></details><h2 id="SimpleCellValues"><a class="docs-heading-anchor" href="#SimpleCellValues">Walkthrough: Creating <code>SimpleCellValues</code></a><a id="SimpleCellValues-1"></a><a class="docs-heading-anchor-permalink" href="#SimpleCellValues" title="Permalink"></a></h2><p>In the following, we walk through how to create a <code>SimpleCellValues</code> type which works similar to Ferrite&#39;s <code>CellValues</code>, but is not performance optimized and not as general. The main purpose is to explain how the <code>CellValues</code> works for the standard case of <code>IdentityMapping</code> described above. Please note that several internal functions are used, and these may change without a major version increment. Please see the <a href="../../devdocs/#Developer-documentation">Developer documentation</a> for their documentation.</p><p>We start by including Ferrite and Test (to check our implementation).</p><pre><code class="language-julia hljs">using Ferrite, Test</code></pre><p>Then, we define a simple version of the cell values object, which only supports</p><ul><li>Scalar interpolations</li><li>Identity mapping from reference to physical cell.</li><li>The cell shape has the same dimension as the physical space (excludes so-called embedded cells).</li></ul><pre><code class="language-julia hljs">struct SimpleCellValues{T, dim} &lt;: Ferrite.AbstractCellValues
-    N::Matrix{T}             # Precalculated shape values, N[i, q_point] where i is the
-                             # shape function number and q_point the integration point
-    dNdξ::Matrix{Vec{dim,T}} # Precalculated shape gradients in the reference domain, dNdξ[i, q_point]
-    dNdx::Matrix{Vec{dim,T}} # Cache for shape gradients in the physical domain, dNdx[i, q_point]
-    M::Matrix{T}             # Precalculated geometric shape values, M[j, q_point] where j is the
-                             # geometric shape function number
-    dMdξ::Matrix{Vec{dim,T}} # Precalculated geometric shape gradients, dMdξ[j, q_point]
-    weights::Vector{T}       # Given quadrature weights in the reference domain, weights[q_point]
-    detJdV::Vector{T}        # Cache for quadrature weights in the physical domain, detJdV[q_point], i.e.
-                             # det(J)*weight[q_point], where J is the jacobian of the geometric mapping
-                             # at the quadrature point, q_point.
+    # Precalculated shape values, N[i, q_point] where i is the
+    # shape function number and q_point the integration point
+    N::Matrix{T}
+    # Precalculated shape gradients in the reference domain, dNdξ[i, q_point]
+    dNdξ::Matrix{Vec{dim, T}}
+    # Cache for shape gradients in the physical domain, dNdx[i, q_point]
+    dNdx::Matrix{Vec{dim, T}}
+    # Precalculated geometric shape values, M[j, q_point] where j is the
+    # geometric shape function number
+    M::Matrix{T}
+    # Precalculated geometric shape gradients, dMdξ[j, q_point]
+    dMdξ::Matrix{Vec{dim, T}}
+    # Given quadrature weights in the reference domain, weights[q_point]
+    weights::Vector{T}
+    # Cache for quadrature weights in the physical domain, detJdV[q_point], i.e.
+    # det(J)*weight[q_point], where J is the jacobian of the geometric mapping
+    # at the quadrature point, q_point.
+    detJdV::Vector{T}
 end;</code></pre><p>Next, we create a constructor with the same input as <code>CellValues</code></p><pre><code class="language-julia hljs">function SimpleCellValues(qr::QuadratureRule, ip_fun::Interpolation, ip_geo::Interpolation)
     dim = Ferrite.getrefdim(ip_fun)
     # Quadrature weights and coordinates (in reference cell)
@@ -69,14 +76,14 @@ end;</code></pre><p>Next, we create a constructor with the same input as <code>C
 
     # Function interpolation
     n_func_basefuncs = getnbasefunctions(ip_fun)
-    N    = zeros(T,          n_func_basefuncs, n_qpoints)
-    dNdx = zeros(Vec{dim,T}, n_func_basefuncs, n_qpoints)
-    dNdξ = zeros(Vec{dim,T}, n_func_basefuncs, n_qpoints)
+    N = zeros(T, n_func_basefuncs, n_qpoints)
+    dNdx = zeros(Vec{dim, T}, n_func_basefuncs, n_qpoints)
+    dNdξ = zeros(Vec{dim, T}, n_func_basefuncs, n_qpoints)
 
     # Geometry interpolation
     n_geom_basefuncs = getnbasefunctions(ip_geo)
-    M    = zeros(T,          n_geom_basefuncs, n_qpoints)
-    dMdξ = zeros(Vec{dim,T}, n_geom_basefuncs, n_qpoints)
+    M = zeros(T, n_geom_basefuncs, n_qpoints)
+    dMdξ = zeros(Vec{dim, T}, n_geom_basefuncs, n_qpoints)
 
     # Precalculate function and geometric shape values and gradients
     for (qp, ξ) in pairs(Ferrite.getpoints(qr))
@@ -89,32 +96,33 @@ end;</code></pre><p>Next, we create a constructor with the same input as <code>C
     end
 
     detJdV = zeros(T, n_qpoints)
-    SimpleCellValues(N, dNdξ, dNdx, M, dMdξ, weights, detJdV)
+    return SimpleCellValues(N, dNdξ, dNdx, M, dMdξ, weights, detJdV)
 end;</code></pre><p>To make our <code>SimpleCellValues</code> work in standard Ferrite code, we need to dispatch some access functions:</p><pre><code class="language-julia hljs">Ferrite.getnbasefunctions(cv::SimpleCellValues) = size(cv.N, 1)
 Ferrite.getnquadpoints(cv::SimpleCellValues) = size(cv.N, 2)
 Ferrite.shape_value(cv::SimpleCellValues, q_point::Int, i::Int) = cv.N[i, q_point]
-Ferrite.shape_gradient(cv::SimpleCellValues, q_point::Int, i::Int) = cv.dNdx[i, q_point];</code></pre><p>The last step is then to dispatch <code>reinit!</code> for our <code>SimpleCellValues</code> to calculate the cached values <code>dNdx</code> and <code>detJdV</code> for the current cell according to the theory for <code>IdentityMapping</code> above.</p><pre><code class="language-julia hljs">function Ferrite.reinit!(cv::SimpleCellValues, x::Vector{Vec{dim,T}}) where {dim,T}
+Ferrite.shape_gradient(cv::SimpleCellValues, q_point::Int, i::Int) = cv.dNdx[i, q_point];</code></pre><p>The last step is then to dispatch <code>reinit!</code> for our <code>SimpleCellValues</code> to calculate the cached values <code>dNdx</code> and <code>detJdV</code> for the current cell according to the theory for <code>IdentityMapping</code> above.</p><pre><code class="language-julia hljs">function Ferrite.reinit!(cv::SimpleCellValues, x::Vector{Vec{dim, T}}) where {dim, T}
     for (q_point, w) in pairs(cv.weights) # Loop over each quadrature point
         # Calculate the jacobian, J
-        J = zero(Tensor{2,dim,T})
+        J = zero(Tensor{2, dim, T})
         for i in eachindex(x)
             J += x[i] ⊗ cv.dMdξ[i, q_point]
         end
         # Calculate the correct integration weight for the current q_point
-        cv.detJdV[q_point] = det(J)*w
+        cv.detJdV[q_point] = det(J) * w
         # map the shape gradients to the current geometry
         Jinv = inv(J)
         for i in 1:getnbasefunctions(cv)
             cv.dNdx[i, q_point] = cv.dNdξ[i, q_point] ⋅ Jinv
         end
     end
+    return
 end;</code></pre><p>To test our implementation, we create instances of our <code>SimpleCellValues</code> and the standard <code>CellValues</code>:</p><pre><code class="language-julia hljs">qr = QuadratureRule{RefQuadrilateral}(2)
-ip = Lagrange{RefQuadrilateral,1}()
+ip = Lagrange{RefQuadrilateral, 1}()
 simple_cv = SimpleCellValues(qr, ip, ip)
-cv = CellValues(qr, ip, ip);</code></pre><p>The first thing to try is to reinitialize the cell values to a given cell, in this case cell nr. 2</p><pre><code class="language-julia hljs">grid = generate_grid(Quadrilateral, (2,2))
+cv = CellValues(qr, ip, ip);</code></pre><p>The first thing to try is to reinitialize the cell values to a given cell, in this case cell nr. 2</p><pre><code class="language-julia hljs">grid = generate_grid(Quadrilateral, (2, 2))
 x = getcoordinates(grid, 2)
 reinit!(simple_cv, x)
 reinit!(cv, x);</code></pre><p>If we now pretend we are inside an element routine and have a vector of element degree of freedom values, <code>ue</code>. Then, we can check that our function values and gradients match Ferrite&#39;s builtin <code>CellValues</code>:</p><pre><code class="language-julia hljs">ue = rand(getnbasefunctions(simple_cv))
 q_point = 2
 @test function_value(cv, q_point, ue) ≈ function_value(simple_cv, q_point, ue)
-@test function_gradient(cv, q_point, ue) ≈ function_gradient(simple_cv, q_point, ue)</code></pre><pre><code class="nohighlight hljs">Test Passed</code></pre><h2 id="Further-reading"><a class="docs-heading-anchor" href="#Further-reading">Further reading</a><a id="Further-reading-1"></a><a class="docs-heading-anchor-permalink" href="#Further-reading" title="Permalink"></a></h2><ul><li><a href="https://defelement.com/ciarlet.html#Mapping+finite+elements">defelement.com</a></li><li>Kirby (2017) [<a href="../../cited-literature/#Kirby2017">5</a>]</li></ul></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../reference_shapes/">« Reference shapes</a><a class="docs-footer-nextpage" href="../degrees_of_freedom/">Degrees of Freedom »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option><option value="catppuccin-latte">catppuccin-latte</option><option value="catppuccin-frappe">catppuccin-frappe</option><option value="catppuccin-macchiato">catppuccin-macchiato</option><option value="catppuccin-mocha">catppuccin-mocha</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.7.0 on <span class="colophon-date" title="Tuesday 29 October 2024 14:55">Tuesday 29 October 2024</span>. Using Julia version 1.11.1.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
+@test function_gradient(cv, q_point, ue) ≈ function_gradient(simple_cv, q_point, ue)</code></pre><pre><code class="nohighlight hljs">Test Passed</code></pre><h2 id="Further-reading"><a class="docs-heading-anchor" href="#Further-reading">Further reading</a><a id="Further-reading-1"></a><a class="docs-heading-anchor-permalink" href="#Further-reading" title="Permalink"></a></h2><ul><li><a href="https://defelement.com/ciarlet.html#Mapping+finite+elements">defelement.com</a></li><li>Kirby (2017) [<a href="../../cited-literature/#Kirby2017">5</a>]</li></ul></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../reference_shapes/">« Reference shapes</a><a class="docs-footer-nextpage" href="../degrees_of_freedom/">Degrees of Freedom »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option><option value="catppuccin-latte">catppuccin-latte</option><option value="catppuccin-frappe">catppuccin-frappe</option><option value="catppuccin-macchiato">catppuccin-macchiato</option><option value="catppuccin-mocha">catppuccin-mocha</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.7.0 on <span class="colophon-date" title="Monday 4 November 2024 14:08">Monday 4 November 2024</span>. Using Julia version 1.11.1.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>

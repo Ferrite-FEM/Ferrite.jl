@@ -48,14 +48,14 @@ include("../tutorials/heat_equation.jl");
 # Next we define a function that computes the heat flux for each integration point in the domain.
 # Fourier's law is adopted, where the conductivity tensor is assumed to be isotropic with unit
 # conductivity ``\lambda = 1 ⇒ q = - \nabla u``, where ``u`` is the temperature.
-function compute_heat_fluxes(cellvalues::CellValues, dh::DofHandler, a::AbstractVector{T}) where T
+function compute_heat_fluxes(cellvalues::CellValues, dh::DofHandler, a::AbstractVector{T}) where {T}
 
     n = getnbasefunctions(cellvalues)
     cell_dofs = zeros(Int, n)
     nqp = getnquadpoints(cellvalues)
 
     ## Allocate storage for the fluxes to store
-    q = [Vec{2,T}[] for _ in 1:getncells(dh.grid)]
+    q = [Vec{2, T}[] for _ in 1:getncells(dh.grid)]
 
     for (cell_num, cell) in enumerate(CellIterator(dh))
         q_cell = q[cell_num]
@@ -101,7 +101,7 @@ end;
 
 # Consider a cut-line through the domain like the black line in *Figure 2* above.
 # We will evaluate the temperature and the heat flux distribution along a horizontal line.
-points = [Vec((x, 0.75)) for x in range(-1.0, 1.0, length=101)];
+points = [Vec((x, 0.75)) for x in range(-1.0, 1.0, length = 101)];
 
 # First, we need to generate a `PointEvalHandler`. This will find and store the cells
 # containing the input points.
@@ -124,11 +124,11 @@ u_points = evaluate_at_points(ph, dh, u, :u);
 import Plots
 
 # Firstly, we are going to plot the temperature values along the given line.
-Plots.plot(getindex.(points,1), u_points, xlabel="x (coordinate)", ylabel="u (temperature)", label=nothing)
+Plots.plot(getindex.(points, 1), u_points, xlabel = "x (coordinate)", ylabel = "u (temperature)", label = nothing)
 # *Figure 3*: Temperature along the cut line from *Figure 2*.
 
 # Secondly, the horizontal heat flux (i.e. the first component of the heat flux vector) is plotted.
-Plots.plot(getindex.(points,1), getindex.(q_points,1), xlabel="x (coordinate)", ylabel="q_x (flux in x-direction)", label=nothing)
+Plots.plot(getindex.(points, 1), getindex.(q_points, 1), xlabel = "x (coordinate)", ylabel = "q_x (flux in x-direction)", label = nothing)
 # *Figure 4*: ``x``-component of the flux along the cut line from *Figure 2*.
 
 #md # ## [Plain program](@id postprocessing-plain-program)
