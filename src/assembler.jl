@@ -183,7 +183,7 @@ end
 """
 Assembler for sparse matrix with CSR storage type.
 """
-struct CSRAssembler{Tv,Ti,MT<:AbstractSparseMatrix{Tv,Ti}} <: AbstractCSRAssembler #AbstractSparseMatrixCSR does not exist
+struct CSRAssembler{Tv, Ti, MT <: AbstractSparseMatrix{Tv, Ti}} <: AbstractCSRAssembler #AbstractSparseMatrixCSR does not exist
     K::MT
     f::Vector{Tv}
     permutation::Vector{Int}
@@ -211,9 +211,9 @@ function Base.show(io::IO, ::MIME"text/plain", a::Union{CSCAssembler, CSRAssembl
     return
 end
 
-matrix_handle(a::Union{AbstractCSCAssembler,AbstractCSRAssembler}) = a.K
+matrix_handle(a::Union{AbstractCSCAssembler, AbstractCSRAssembler}) = a.K
 matrix_handle(a::SymmetricCSCAssembler) = a.K.data
-vector_handle(a::Union{AbstractCSCAssembler,AbstractCSRAssembler}) = a.f
+vector_handle(a::Union{AbstractCSCAssembler, AbstractCSRAssembler}) = a.f
 
 """
     start_assemble(K::AbstractSparseMatrixCSC;            fillzero::Bool=true) -> CSCAssembler
@@ -283,7 +283,7 @@ Sorts the dofs into a separate buffer and returns it together with a permutation
     return sorteddofs, permutation
 end
 
-@propagate_inbounds function _assemble!(A::Union{AbstractCSCAssembler,AbstractCSRAssembler}, dofs::AbstractVector{<:Integer}, Ke::AbstractMatrix, fe::Union{AbstractVector, Nothing}, sym::Bool)
+@propagate_inbounds function _assemble!(A::Union{AbstractCSCAssembler, AbstractCSRAssembler}, dofs::AbstractVector{<:Integer}, Ke::AbstractMatrix, fe::Union{AbstractVector, Nothing}, sym::Bool)
     ld = length(dofs)
     @boundscheck checkbounds(Ke, keys(dofs), keys(dofs))
     if fe !== nothing
@@ -300,7 +300,7 @@ end
     # Note that we are not allowed to mutate `dofs` in the process.
     sorteddofs, permutation = _sortdofs_for_assembly!(A.permutation, A.sorteddofs, dofs)
 
-    _assemble_inner!(K, Ke, dofs, sorteddofs, permutation, sym)
+    return _assemble_inner!(K, Ke, dofs, sorteddofs, permutation, sym)
 end
 
 @propagate_inbounds function _assemble_inner!(K::SparseMatrixCSC, Ke::AbstractMatrix, dofs::AbstractVector, sorteddofs::AbstractVector, permutation::AbstractVector, sym::Bool)

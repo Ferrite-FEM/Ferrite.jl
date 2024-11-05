@@ -81,7 +81,7 @@ function fillzero!(A::AbstractSparseMatrix{T}) where {T}
     fill!(nonzeros(A), zero(T))
     return A
 end
-function fillzero!(A::Symmetric{T,<:AbstractSparseMatrix}) where {T}
+function fillzero!(A::Symmetric{T, <:AbstractSparseMatrix}) where {T}
     fillzero!(A.data)
     return A
 end

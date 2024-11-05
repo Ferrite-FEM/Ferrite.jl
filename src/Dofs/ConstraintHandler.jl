@@ -599,14 +599,14 @@ function _apply_v(v::AbstractVector, ch::ConstraintHandler, apply_zero::Bool)
 end
 
 function apply!(K::Union{AbstractSparseMatrix, Symmetric}, ch::ConstraintHandler)
-    apply!(K, eltype(K)[], ch, true)
+    return apply!(K, eltype(K)[], ch, true)
 end
 
 function apply_zero!(K::Union{AbstractSparseMatrix, Symmetric}, f::AbstractVector, ch::ConstraintHandler)
-    apply!(K, f, ch, true)
+    return apply!(K, f, ch, true)
 end
 
-function apply!(KK::Union{AbstractSparseMatrix, Symmetric{<:Any, <:AbstractSparseMatrix}}, f::AbstractVector, ch::ConstraintHandler, applyzero::Bool=false)
+function apply!(KK::Union{AbstractSparseMatrix, Symmetric{<:Any, <:AbstractSparseMatrix}}, f::AbstractVector, ch::ConstraintHandler, applyzero::Bool = false)
     @assert isclosed(ch)
     sym = isa(KK, Symmetric)
     K = sym ? KK.data : KK
@@ -645,12 +645,12 @@ Compute "f -= K*inhomogeneities".
 By default this is a generic version via SpMSpV kernel.
 """
 function add_inhomogeneities!(K, f::AbstractVector, inhomogeneities::AbstractVector, prescribed_dofs::AbstractVector{<:Integer}, dofmapping)
-    f .-= K*sparsevec(prescribed_dofs, inhomogeneities, size(K,2))
+    return f .-= K * sparsevec(prescribed_dofs, inhomogeneities, size(K, 2))
 end
 
 # Optimized version for SparseMatrixCSC
 add_inhomogeneities!(K::SparseMatrixCSC, f::AbstractVector, inhomogeneities::AbstractVector, prescribed_dofs::AbstractVector{<:Integer}, dofmapping) = add_inhomogeneities_csc!(K, f, inhomogeneities, prescribed_dofs, dofmapping, false)
-add_inhomogeneities!(K::Symmetric{<:Any,<:SparseMatrixCSC}, f::AbstractVector, inhomogeneities::AbstractVector, prescribed_dofs::AbstractVector{<:Integer}, dofmapping) = add_inhomogeneities_csc!(K.data, f, inhomogeneities, prescribed_dofs, dofmapping, true)
+add_inhomogeneities!(K::Symmetric{<:Any, <:SparseMatrixCSC}, f::AbstractVector, inhomogeneities::AbstractVector, prescribed_dofs::AbstractVector{<:Integer}, dofmapping) = add_inhomogeneities_csc!(K.data, f, inhomogeneities, prescribed_dofs, dofmapping, true)
 function add_inhomogeneities_csc!(K::SparseMatrixCSC, f::AbstractVector, inhomogeneities::AbstractVector, prescribed_dofs::AbstractVector{<:Integer}, dofmapping, sym::Bool)
     @inbounds for i in 1:length(inhomogeneities)
         d = prescribed_dofs[i]
@@ -663,7 +663,7 @@ function add_inhomogeneities_csc!(K::SparseMatrixCSC, f::AbstractVector, inhomog
             end
         end
     end
-    if sym
+    return if sym
         # In the symmetric case, for a constrained dof `d`, we handle the contribution
         # from `K[1:d, d]` in the loop above, but we are still missing the contribution
         # from `K[(d+1):size(K,1), d]`. These values are not stored, but since the
@@ -691,7 +691,7 @@ end
 end
 
 
-function _condense!(K::AbstractSparseMatrix, f::AbstractVector, dofcoefficients::Vector{Union{Nothing, DofCoefficients{T}}}, dofmapping::Dict{Int,Int}, sym::Bool=false) where T
+function _condense!(K::AbstractSparseMatrix, f::AbstractVector, dofcoefficients::Vector{Union{Nothing, DofCoefficients{T}}}, dofmapping::Dict{Int, Int}, sym::Bool = false) where {T}
     # Return early if there are no non-trivial affine constraints
     any(i -> !(i === nothing || isempty(i)), dofcoefficients) || return
     error("condensation of ::$(typeof(K)) matrix not supported")

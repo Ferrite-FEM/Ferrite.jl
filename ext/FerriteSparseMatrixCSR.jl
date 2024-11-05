@@ -5,15 +5,15 @@ import Ferrite: AbstractSparsityPattern, CSRAssembler
 import Base: @propagate_inbounds
 
 #FIXME https://github.com/JuliaSparse/SparseArrays.jl/pull/546
-function Ferrite.start_assemble(K::SparseMatrixCSR{<:Any,T}, f::Vector=T[]; fillzero::Bool=true, maxcelldofs_hint::Int=0) where {T}
+function Ferrite.start_assemble(K::SparseMatrixCSR{<:Any, T}, f::Vector = T[]; fillzero::Bool = true, maxcelldofs_hint::Int = 0) where {T}
     fillzero && (Ferrite.fillzero!(K); Ferrite.fillzero!(f))
-    return CSRAssembler(K, f, zeros(Int,maxcelldofs_hint), zeros(Int,maxcelldofs_hint))
+    return CSRAssembler(K, f, zeros(Int, maxcelldofs_hint), zeros(Int, maxcelldofs_hint))
 end
 
 @propagate_inbounds function Ferrite._assemble_inner!(K::SparseMatrixCSR, Ke::AbstractMatrix, dofs::AbstractVector, sorteddofs::AbstractVector, permutation::AbstractVector, sym::Bool)
     current_row = 1
     ld = length(dofs)
-    @inbounds for Krow in sorteddofs
+    return @inbounds for Krow in sorteddofs
         maxlookups = sym ? current_row : ld
         Kerow = permutation[current_row]
         ci = 1 # col index pointer for the local matrix
@@ -58,12 +58,13 @@ function Ferrite.zero_out_rows!(K::SparseMatrixCSR, ch::ConstraintHandler) # can
         r = nzrange(K, row)
         K.nzval[r] .= 0.0
     end
+    return
 end
 
 function Ferrite.zero_out_columns!(K::SparseMatrixCSR, ch::ConstraintHandler)
     colval = K.colval
     nzval = K.nzval
-    @inbounds for i in eachindex(colval, nzval)
+    return @inbounds for i in eachindex(colval, nzval)
         if haskey(ch.dofmapping, colval[i])
             nzval[i] = 0
         end
@@ -71,11 +72,11 @@ function Ferrite.zero_out_columns!(K::SparseMatrixCSR, ch::ConstraintHandler)
 end
 
 function Ferrite.allocate_matrix(::Type{SparseMatrixCSR}, sp::AbstractSparsityPattern)
-    _allocate_matrix(SparseMatrixCSR{1, Float64, Int64}, sp, false)
+    return _allocate_matrix(SparseMatrixCSR{1, Float64, Int64}, sp, false)
 end
 
 function Ferrite.allocate_matrix(::Type{SparseMatrixCSR{1, Tv, Ti}}, sp::AbstractSparsityPattern) where {Tv, Ti}
-    _allocate_matrix(SparseMatrixCSR{1, Tv, Ti}, sp, false)
+    return _allocate_matrix(SparseMatrixCSR{1, Tv, Ti}, sp, false)
 end
 
 function _allocate_matrix(::Type{SparseMatrixCSR{1, Tv, Ti}}, sp::AbstractSparsityPattern, sym::Bool) where {Tv, Ti}
@@ -85,7 +86,7 @@ function _allocate_matrix(::Type{SparseMatrixCSR{1, Tv, Ti}}, sp::AbstractSparsi
     for (row, colidxs) in enumerate(Ferrite.eachrow(sp))
         for col in colidxs
             sym && row > col && continue
-            rowptr[row+1] += 1
+            rowptr[row + 1] += 1
         end
     end
     cumsum!(rowptr, rowptr)
