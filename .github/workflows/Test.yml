@@ -1,20 +1,18 @@
-name: CI
-
+name: Test
 on:
   pull_request:
   push:
-    branches: master
-    tags: '*'
-
+    branches: ['master']
+    tags: ['*']
 jobs:
   test:
-    name: Julia ${{ matrix.julia-version }} - ${{ matrix.os }} - ${{ github.event_name }}
+    name: Julia ${{ matrix.julia-version }} - ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
     timeout-minutes: 40
     continue-on-error: ${{ matrix.julia-version == 'nightly' }}
     strategy:
       matrix:
-        julia-version: ['1.9', '1', 'nightly']
+        julia-version: ['1.10', '1', 'nightly']
         os: ['ubuntu-latest']
         include:
           - os: windows-latest
@@ -29,6 +27,14 @@ jobs:
       - uses: julia-actions/cache@v2
       - uses: julia-actions/julia-buildpkg@v1
       - uses: julia-actions/julia-runtest@v1
+      - name: JET tests
+        shell: julia --color=yes --project=@jet {0}
+        run: |
+          using Pkg
+          Pkg.add("JET")
+          Pkg.develop(path = pwd())
+          include(joinpath(pwd(), "test/jet.jl"))
+        if: ${{ matrix.os == 'ubuntu-latest' && matrix.julia-version != 'nightly' }}
       - uses: julia-actions/julia-processcoverage@v1
         with:
           directories: 'src,ext'
@@ -37,21 +43,3 @@ jobs:
           file: lcov.info
         env:
           CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
-  docs:
-    name: Documentation
-    runs-on: ubuntu-latest
-    timeout-minutes: 60
-    steps:
-      - uses: actions/checkout@v4
-      - uses: julia-actions/setup-julia@v2
-        with:
-          version: '1'
-      - uses: julia-actions/cache@v2
-      - name: Install dependencies
-        run: julia --project=docs -e 'using Pkg; Pkg.instantiate(); Pkg.precompile()'
-      - name: Build and deploy
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          DOCUMENTER_KEY: ${{ secrets.DOCUMENTER_KEY }}
-          GKSwstype: '100'
-        run: julia --project=docs --color=yes docs/make.jl

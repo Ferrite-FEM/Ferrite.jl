@@ -5,34 +5,34 @@
 # vdim = vector dimension (dimension of the field)              #
 #################################################################
 
-# Scalar, sdim == rdim                                                 sdim                     rdim
-typeof_N(     ::Type{T}, ::ScalarInterpolation, ::VectorizedInterpolation{dim, <: AbstractRefShape{dim}}) where {T, dim} = T
-typeof_dNdx(  ::Type{T}, ::ScalarInterpolation, ::VectorizedInterpolation{dim, <: AbstractRefShape{dim}}) where {T, dim} = Vec{dim, T}
-typeof_dNdξ(  ::Type{T}, ::ScalarInterpolation, ::VectorizedInterpolation{dim, <: AbstractRefShape{dim}}) where {T, dim} = Vec{dim, T}
-typeof_d2Ndx2(::Type{T}, ::ScalarInterpolation, ::VectorizedInterpolation{dim, <: AbstractRefShape{dim}}) where {T, dim} = Tensor{2, dim, T}
-typeof_d2Ndξ2(::Type{T}, ::ScalarInterpolation, ::VectorizedInterpolation{dim, <: AbstractRefShape{dim}}) where {T, dim} = Tensor{2, dim, T}
+# Scalar, sdim == rdim                                              sdim                    rdim
+typeof_N(::Type{T}, ::ScalarInterpolation, ::VectorizedInterpolation{dim, <:AbstractRefShape{dim}}) where {T, dim} = T
+typeof_dNdx(::Type{T}, ::ScalarInterpolation, ::VectorizedInterpolation{dim, <:AbstractRefShape{dim}}) where {T, dim} = Vec{dim, T}
+typeof_dNdξ(::Type{T}, ::ScalarInterpolation, ::VectorizedInterpolation{dim, <:AbstractRefShape{dim}}) where {T, dim} = Vec{dim, T}
+typeof_d2Ndx2(::Type{T}, ::ScalarInterpolation, ::VectorizedInterpolation{dim, <:AbstractRefShape{dim}}) where {T, dim} = Tensor{2, dim, T}
+typeof_d2Ndξ2(::Type{T}, ::ScalarInterpolation, ::VectorizedInterpolation{dim, <:AbstractRefShape{dim}}) where {T, dim} = Tensor{2, dim, T}
 
-# Vector, vdim == sdim == rdim              vdim                            sdim                     rdim
-typeof_N(     ::Type{T}, ::VectorInterpolation{dim}, ::VectorizedInterpolation{dim, <: AbstractRefShape{dim}}) where {T, dim} = Vec{dim, T}
-typeof_dNdx(  ::Type{T}, ::VectorInterpolation{dim}, ::VectorizedInterpolation{dim, <: AbstractRefShape{dim}}) where {T, dim} = Tensor{2, dim, T}
-typeof_dNdξ(  ::Type{T}, ::VectorInterpolation{dim}, ::VectorizedInterpolation{dim, <: AbstractRefShape{dim}}) where {T, dim} = Tensor{2, dim, T}
-typeof_d2Ndx2(::Type{T}, ::VectorInterpolation{dim}, ::VectorizedInterpolation{dim, <: AbstractRefShape{dim}}) where {T, dim} = Tensor{3, dim, T}
-typeof_d2Ndξ2(::Type{T}, ::VectorInterpolation{dim}, ::VectorizedInterpolation{dim, <: AbstractRefShape{dim}}) where {T, dim} = Tensor{3, dim, T}
+# Vector, vdim == sdim == rdim           vdim                            sdim                    rdim
+typeof_N(::Type{T}, ::VectorInterpolation{dim}, ::VectorizedInterpolation{dim, <:AbstractRefShape{dim}}) where {T, dim} = Vec{dim, T}
+typeof_dNdx(::Type{T}, ::VectorInterpolation{dim}, ::VectorizedInterpolation{dim, <:AbstractRefShape{dim}}) where {T, dim} = Tensor{2, dim, T}
+typeof_dNdξ(::Type{T}, ::VectorInterpolation{dim}, ::VectorizedInterpolation{dim, <:AbstractRefShape{dim}}) where {T, dim} = Tensor{2, dim, T}
+typeof_d2Ndx2(::Type{T}, ::VectorInterpolation{dim}, ::VectorizedInterpolation{dim, <:AbstractRefShape{dim}}) where {T, dim} = Tensor{3, dim, T}
+typeof_d2Ndξ2(::Type{T}, ::VectorInterpolation{dim}, ::VectorizedInterpolation{dim, <:AbstractRefShape{dim}}) where {T, dim} = Tensor{3, dim, T}
 
 # Scalar, sdim != rdim (TODO: Use Vec if (s|r)dim <= 3?)
-typeof_N(   ::Type{T}, ::ScalarInterpolation, ::VectorizedInterpolation{sdim, <: AbstractRefShape{rdim}}) where {T, sdim, rdim} = T
-typeof_dNdx(::Type{T}, ::ScalarInterpolation, ::VectorizedInterpolation{sdim, <: AbstractRefShape{rdim}}) where {T, sdim, rdim} = SVector{sdim, T}
-typeof_dNdξ(::Type{T}, ::ScalarInterpolation, ::VectorizedInterpolation{sdim, <: AbstractRefShape{rdim}}) where {T, sdim, rdim} = SVector{rdim, T}
-typeof_d2Ndx2(::Type{T}, ::ScalarInterpolation, ::VectorizedInterpolation{sdim, <: AbstractRefShape{rdim}}) where {T, sdim, rdim} = SMatrix{sdim, sdim, T, sdim*sdim}
-typeof_d2Ndξ2(::Type{T}, ::ScalarInterpolation, ::VectorizedInterpolation{sdim, <: AbstractRefShape{rdim}}) where {T, sdim, rdim} = SMatrix{rdim, rdim, T, rdim*rdim}
+typeof_N(::Type{T}, ::ScalarInterpolation, ::VectorizedInterpolation{sdim, <:AbstractRefShape{rdim}}) where {T, sdim, rdim} = T
+typeof_dNdx(::Type{T}, ::ScalarInterpolation, ::VectorizedInterpolation{sdim, <:AbstractRefShape{rdim}}) where {T, sdim, rdim} = SVector{sdim, T}
+typeof_dNdξ(::Type{T}, ::ScalarInterpolation, ::VectorizedInterpolation{sdim, <:AbstractRefShape{rdim}}) where {T, sdim, rdim} = SVector{rdim, T}
+typeof_d2Ndx2(::Type{T}, ::ScalarInterpolation, ::VectorizedInterpolation{sdim, <:AbstractRefShape{rdim}}) where {T, sdim, rdim} = SMatrix{sdim, sdim, T, sdim * sdim}
+typeof_d2Ndξ2(::Type{T}, ::ScalarInterpolation, ::VectorizedInterpolation{sdim, <:AbstractRefShape{rdim}}) where {T, sdim, rdim} = SMatrix{rdim, rdim, T, rdim * rdim}
 
 
 # Vector, vdim != sdim != rdim (TODO: Use Vec/Tensor if (s|r)dim <= 3?)
-typeof_N(   ::Type{T}, ::VectorInterpolation{vdim}, ::VectorizedInterpolation{sdim, <: AbstractRefShape{rdim}}) where {T, vdim, sdim, rdim} = SVector{vdim, T}
-typeof_dNdx(::Type{T}, ::VectorInterpolation{vdim}, ::VectorizedInterpolation{sdim, <: AbstractRefShape{rdim}}) where {T, vdim, sdim, rdim} = SMatrix{vdim, sdim, T, vdim*sdim}
-typeof_dNdξ(::Type{T}, ::VectorInterpolation{vdim}, ::VectorizedInterpolation{sdim, <: AbstractRefShape{rdim}}) where {T, vdim, sdim, rdim} = SMatrix{vdim, rdim, T, vdim*rdim}
-typeof_d2Ndx2(::Type{T}, ::VectorInterpolation{vdim}, ::VectorizedInterpolation{sdim, <: AbstractRefShape{rdim}}) where {T, vdim, sdim, rdim} = SArray{Tuple{vdim, sdim, sdim}, T, 3, vdim*sdim*sdim}
-typeof_d2Ndξ2(::Type{T}, ::VectorInterpolation{vdim}, ::VectorizedInterpolation{sdim, <: AbstractRefShape{rdim}}) where {T, vdim, sdim, rdim} = SArray{Tuple{vdim, rdim, rdim}, T, 3, vdim*rdim*rdim}
+typeof_N(::Type{T}, ::VectorInterpolation{vdim}, ::VectorizedInterpolation{sdim, <:AbstractRefShape{rdim}}) where {T, vdim, sdim, rdim} = SVector{vdim, T}
+typeof_dNdx(::Type{T}, ::VectorInterpolation{vdim}, ::VectorizedInterpolation{sdim, <:AbstractRefShape{rdim}}) where {T, vdim, sdim, rdim} = SMatrix{vdim, sdim, T, vdim * sdim}
+typeof_dNdξ(::Type{T}, ::VectorInterpolation{vdim}, ::VectorizedInterpolation{sdim, <:AbstractRefShape{rdim}}) where {T, vdim, sdim, rdim} = SMatrix{vdim, rdim, T, vdim * rdim}
+typeof_d2Ndx2(::Type{T}, ::VectorInterpolation{vdim}, ::VectorizedInterpolation{sdim, <:AbstractRefShape{rdim}}) where {T, vdim, sdim, rdim} = SArray{Tuple{vdim, sdim, sdim}, T, 3, vdim * sdim * sdim}
+typeof_d2Ndξ2(::Type{T}, ::VectorInterpolation{vdim}, ::VectorizedInterpolation{sdim, <:AbstractRefShape{rdim}}) where {T, vdim, sdim, rdim} = SArray{Tuple{vdim, rdim, rdim}, T, 3, vdim * rdim * rdim}
 
 
 """
@@ -51,13 +51,13 @@ struct FunctionValues{DiffOrder, IP, N_t, dNdx_t, dNdξ_t, d2Ndx2_t, d2Ndξ2_t}
     dNdξ::dNdξ_t    # ::AbstractMatrix{Union{<:Tensor,<:StaticArray}} or Nothing
     d2Ndx2::d2Ndx2_t   # ::AbstractMatrix{<:Tensor{2}}  Hessians of geometric shape functions in ref-domain
     d2Ndξ2::d2Ndξ2_t   # ::AbstractMatrix{<:Tensor{2}}  Hessians of geometric shape functions in ref-domain
-    function FunctionValues(ip::Interpolation, Nx::N_t, Nξ::N_t, ::Nothing, ::Nothing, ::Nothing, ::Nothing) where {N_t<:AbstractMatrix}
+    function FunctionValues(ip::Interpolation, Nx::N_t, Nξ::N_t, ::Nothing, ::Nothing, ::Nothing, ::Nothing) where {N_t <: AbstractMatrix}
         return new{0, typeof(ip), N_t, Nothing, Nothing, Nothing, Nothing}(ip, Nx, Nξ, nothing, nothing, nothing, nothing)
     end
-    function FunctionValues(ip::Interpolation, Nx::N_t, Nξ::N_t, dNdx::AbstractMatrix, dNdξ::AbstractMatrix, ::Nothing, ::Nothing) where {N_t<:AbstractMatrix}
+    function FunctionValues(ip::Interpolation, Nx::N_t, Nξ::N_t, dNdx::AbstractMatrix, dNdξ::AbstractMatrix, ::Nothing, ::Nothing) where {N_t <: AbstractMatrix}
         return new{1, typeof(ip), N_t, typeof(dNdx), typeof(dNdξ), Nothing, Nothing}(ip, Nx, Nξ, dNdx, dNdξ, nothing, nothing)
     end
-    function FunctionValues(ip::Interpolation, Nx::N_t, Nξ::N_t, dNdx::AbstractMatrix, dNdξ::AbstractMatrix, d2Ndx2::AbstractMatrix, d2Ndξ2::AbstractMatrix) where {N_t<:AbstractMatrix}
+    function FunctionValues(ip::Interpolation, Nx::N_t, Nξ::N_t, dNdx::AbstractMatrix, dNdξ::AbstractMatrix, d2Ndx2::AbstractMatrix, d2Ndξ2::AbstractMatrix) where {N_t <: AbstractMatrix}
         return new{2, typeof(ip), N_t, typeof(dNdx), typeof(dNdξ), typeof(d2Ndx2), typeof(d2Ndξ2)}(ip, Nx, Nξ, dNdx, dNdξ, d2Ndx2, d2Ndξ2)
     end
 end
@@ -70,12 +70,12 @@ function FunctionValues{DiffOrder}(::Type{T}, ip::Interpolation, qr::QuadratureR
     dNdξ = dNdx = d2Ndξ2 = d2Ndx2 = nothing
 
     if DiffOrder >= 1
-        dNdξ = zeros(typeof_dNdξ(T, ip, ip_geo),               n_shape, n_qpoints)
+        dNdξ = zeros(typeof_dNdξ(T, ip, ip_geo), n_shape, n_qpoints)
         dNdx = fill(zero(typeof_dNdx(T, ip, ip_geo)) * T(NaN), n_shape, n_qpoints)
     end
 
     if DiffOrder >= 2
-        d2Ndξ2 = zeros(typeof_d2Ndξ2(T, ip, ip_geo),               n_shape, n_qpoints)
+        d2Ndξ2 = zeros(typeof_d2Ndξ2(T, ip, ip_geo), n_shape, n_qpoints)
         d2Ndx2 = fill(zero(typeof_d2Ndx2(T, ip, ip_geo)) * T(NaN), n_shape, n_qpoints)
     end
 
@@ -89,13 +89,13 @@ function FunctionValues{DiffOrder}(::Type{T}, ip::Interpolation, qr::QuadratureR
 end
 
 function precompute_values!(fv::FunctionValues{0}, qr_points::AbstractVector{<:Vec})
-    reference_shape_values!(fv.Nξ, fv.ip, qr_points)
+    return reference_shape_values!(fv.Nξ, fv.ip, qr_points)
 end
 function precompute_values!(fv::FunctionValues{1}, qr_points::AbstractVector{<:Vec})
-    reference_shape_gradients_and_values!(fv.dNdξ, fv.Nξ, fv.ip, qr_points)
+    return reference_shape_gradients_and_values!(fv.dNdξ, fv.Nξ, fv.ip, qr_points)
 end
 function precompute_values!(fv::FunctionValues{2}, qr_points::AbstractVector{<:Vec})
-    reference_shape_hessians_gradients_and_values!(fv.d2Ndξ2, fv.dNdξ, fv.Nξ, fv.ip, qr_points)
+    return reference_shape_hessians_gradients_and_values!(fv.d2Ndξ2, fv.dNdξ, fv.Nξ, fv.ip, qr_points)
 end
 
 function Base.copy(v::FunctionValues)
@@ -115,7 +115,7 @@ getnbasefunctions(funvals::FunctionValues) = size(funvals.Nx, 1)
 @propagate_inbounds shape_symmetric_gradient(funvals::FunctionValues, q_point::Int, base_func::Int) = symmetric(shape_gradient(funvals, q_point, base_func))
 
 function_interpolation(funvals::FunctionValues) = funvals.ip
-function_difforder(::FunctionValues{DiffOrder}) where DiffOrder = DiffOrder
+function_difforder(::FunctionValues{DiffOrder}) where {DiffOrder} = DiffOrder
 shape_value_type(funvals::FunctionValues) = eltype(funvals.Nx)
 shape_gradient_type(funvals::FunctionValues) = eltype(funvals.dNdx)
 shape_gradient_type(::FunctionValues{0}) = nothing
@@ -125,17 +125,18 @@ shape_hessian_type(::FunctionValues{1}) = nothing
 
 
 # Checks that the user provides the right dimension of coordinates to reinit! methods to ensure good error messages if not
-sdim_from_gradtype(::Type{<:AbstractTensor{<:Any,sdim}}) where sdim = sdim
-sdim_from_gradtype(::Type{<:SVector{sdim}}) where sdim = sdim
-sdim_from_gradtype(::Type{<:SMatrix{<:Any,sdim}}) where sdim = sdim
+sdim_from_gradtype(::Type{<:AbstractTensor{<:Any, sdim}}) where {sdim} = sdim
+sdim_from_gradtype(::Type{<:SVector{sdim}}) where {sdim} = sdim
+sdim_from_gradtype(::Type{<:SMatrix{<:Any, sdim}}) where {sdim} = sdim
 
 # For performance, these must be fully inferable for the compiler.
 # args: valname (:CellValues or :FacetValues), shape_gradient_type, eltype(x)
 function check_reinit_sdim_consistency(valname, gradtype::Type, ::Type{<:Vec{sdim}}) where {sdim}
     check_reinit_sdim_consistency(valname, Val(sdim_from_gradtype(gradtype)), Val(sdim))
+    return
 end
 check_reinit_sdim_consistency(_, ::Nothing, ::Type{<:Vec}) = nothing # gradient not stored, cannot check
-check_reinit_sdim_consistency(_, ::Val{sdim}, ::Val{sdim}) where sdim = nothing
+check_reinit_sdim_consistency(_, ::Val{sdim}, ::Val{sdim}) where {sdim} = nothing
 function check_reinit_sdim_consistency(valname, ::Val{sdim_val}, ::Val{sdim_x}) where {sdim_val, sdim_x}
     throw(ArgumentError("The $valname (sdim=$sdim_val) and coordinates (sdim=$sdim_x) have different spatial dimensions."))
 end
@@ -157,7 +158,7 @@ Return the required order of geometric derivatives to map
 the function values and gradients from the reference cell
 to the physical cell geometry.
 """
-required_geo_diff_order(::IdentityMapping,           fun_diff_order::Int) = fun_diff_order
+required_geo_diff_order(::IdentityMapping, fun_diff_order::Int) = fun_diff_order
 #required_geo_diff_order(::ContravariantPiolaMapping, fun_diff_order::Int) = 1 + fun_diff_order # PR798
 #required_geo_diff_order(::CovariantPiolaMapping,     fun_diff_order::Int) = 1 + fun_diff_order # PR798
 
@@ -209,12 +210,12 @@ end
     @inbounds for j in 1:getnbasefunctions(funvals)
         dNdx = dothelper(funvals.dNdξ[j, q_point], Jinv)
         if is_vector_valued
-            d2Ndx2 = (funvals.d2Ndξ2[j, q_point] - dNdx⋅H) ⊡ Jinv_otimesu_Jinv
+            d2Ndx2 = (funvals.d2Ndξ2[j, q_point] - dNdx ⋅ H) ⊡ Jinv_otimesu_Jinv
         else
-            d2Ndx2 = Jinv'⋅(funvals.d2Ndξ2[j, q_point] - dNdx⋅H)⋅Jinv
+            d2Ndx2 = Jinv' ⋅ (funvals.d2Ndξ2[j, q_point] - dNdx ⋅ H) ⋅ Jinv
         end
 
-        funvals.dNdx[j, q_point]   = dNdx
+        funvals.dNdx[j, q_point] = dNdx
         funvals.d2Ndx2[j, q_point] = d2Ndx2
     end
     return nothing

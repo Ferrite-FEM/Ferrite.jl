@@ -106,8 +106,8 @@ function assemble!(a::COOAssembler{T}, rowdofs::AbstractVector{Int}, coldofs::Ab
     nrows = length(rowdofs)
     ncols = length(coldofs)
 
-    @assert(size(Ke,1) == nrows)
-    @assert(size(Ke,2) == ncols)
+    @assert(size(Ke, 1) == nrows)
+    @assert(size(Ke, 2) == ncols)
 
     append!(a.V, Ke)
     @inbounds for i in 1:ncols
@@ -116,6 +116,7 @@ function assemble!(a::COOAssembler{T}, rowdofs::AbstractVector{Int}, coldofs::Ab
             push!(a.J, coldofs[i])
         end
     end
+    return
 end
 
 """
@@ -129,7 +130,7 @@ function finish_assemble(a::COOAssembler)
     # Create the matrix
     nrows = a.nrows == -1 ? maximum(a.I) : a.nrows
     ncols = a.ncols == -1 ? maximum(a.J) : a.ncols
-    K = sparse!!(a.I, a.J, a.V, nrows, ncols)
+    K = SparseArrays.sparse!(a.I, a.J, a.V, nrows, ncols)
     # Finalize the vector
     f = a.f
     if !isempty(f)
@@ -157,6 +158,7 @@ Assembles the element residual `ge` into the global residual vector `g`.
     @inbounds for (i, dof) in pairs(dofs)
         addindex!(g, ge[i], dof)
     end
+    return
 end
 
 """
@@ -171,7 +173,7 @@ matrix_handle, vector_handle
 """
 Assembler for sparse matrix with CSC storage type.
 """
-struct CSCAssembler{Tv,Ti,MT<:AbstractSparseMatrixCSC{Tv,Ti}} <: AbstractCSCAssembler
+struct CSCAssembler{Tv, Ti, MT <: AbstractSparseMatrixCSC{Tv, Ti}} <: AbstractCSCAssembler
     K::MT
     f::Vector{Tv}
     permutation::Vector{Int}
@@ -191,7 +193,7 @@ end
 """
 Assembler for symmetric sparse matrix with CSC storage type.
 """
-struct SymmetricCSCAssembler{Tv,Ti, MT <: Symmetric{Tv,<:AbstractSparseMatrixCSC{Tv,Ti}}} <: AbstractCSCAssembler
+struct SymmetricCSCAssembler{Tv, Ti, MT <: Symmetric{Tv, <:AbstractSparseMatrixCSC{Tv, Ti}}} <: AbstractCSCAssembler
     K::MT
     f::Vector{Tv}
     permutation::Vector{Int}
@@ -206,6 +208,7 @@ function Base.show(io::IO, ::MIME"text/plain", a::Union{CSCAssembler, CSRAssembl
         print(io, "\n - ")
         summary(io, f)
     end
+    return
 end
 
 matrix_handle(a::Union{AbstractCSCAssembler,AbstractCSRAssembler}) = a.K
@@ -232,15 +235,15 @@ out, but instead keep their current values.
 
 Depending on the loaded extensions more assembly formats become available through this interface.
 """
-start_assemble(K::Union{AbstractSparseMatrixCSC, Symmetric{<:Any,<:AbstractSparseMatrixCSC}}, f::Vector; fillzero::Bool)
+start_assemble(K::Union{AbstractSparseMatrixCSC, Symmetric{<:Any, <:AbstractSparseMatrixCSC}}, f::Vector; fillzero::Bool)
 
-function start_assemble(K::AbstractSparseMatrixCSC{T}, f::Vector=T[]; fillzero::Bool=true, maxcelldofs_hint::Int=0) where {T}
+function start_assemble(K::AbstractSparseMatrixCSC{T}, f::Vector = T[]; fillzero::Bool = true, maxcelldofs_hint::Int = 0) where {T}
     fillzero && (fillzero!(K); fillzero!(f))
-    return CSCAssembler(K, f, zeros(Int,maxcelldofs_hint), zeros(Int,maxcelldofs_hint))
+    return CSCAssembler(K, f, zeros(Int, maxcelldofs_hint), zeros(Int, maxcelldofs_hint))
 end
-function start_assemble(K::Symmetric{T,<:SparseMatrixCSC}, f::Vector=T[]; fillzero::Bool=true, maxcelldofs_hint::Int=0) where T
+function start_assemble(K::Symmetric{T, <:SparseMatrixCSC}, f::Vector = T[]; fillzero::Bool = true, maxcelldofs_hint::Int = 0) where {T}
     fillzero && (fillzero!(K); fillzero!(f))
-    return SymmetricCSCAssembler(K, f, zeros(Int,maxcelldofs_hint), zeros(Int,maxcelldofs_hint))
+    return SymmetricCSCAssembler(K, f, zeros(Int, maxcelldofs_hint), zeros(Int, maxcelldofs_hint))
 end
 
 function finish_assemble(a::Union{CSCAssembler, CSRAssembler, SymmetricCSCAssembler})
@@ -260,10 +263,10 @@ stiffness matrix and `f` the global force/residual vector, but more efficient.
 assemble!(::AbstractAssembler, ::AbstractVector{<:Integer}, ::AbstractMatrix, ::AbstractVector)
 
 @propagate_inbounds function assemble!(A::AbstractAssembler, dofs::AbstractVector{<:Integer}, Ke::AbstractMatrix, fe::Union{AbstractVector, Nothing} = nothing)
-    _assemble!(A, dofs, Ke, fe, false)
+    return _assemble!(A, dofs, Ke, fe, false)
 end
 @propagate_inbounds function assemble!(A::SymmetricCSCAssembler, dofs::AbstractVector{<:Integer}, Ke::AbstractMatrix, fe::Union{AbstractVector, Nothing} = nothing)
-    _assemble!(A, dofs, Ke, fe, true)
+    return _assemble!(A, dofs, Ke, fe, true)
 end
 
 """
@@ -342,17 +345,17 @@ end
         end
         current_col += 1
     end
+    return
 end
 
 function _missing_sparsity_pattern_error(Krow::Int, Kcol::Int)
-    throw(ErrorException(
-        "You are trying to assemble values in to K[$(Krow), $(Kcol)], but K[$(Krow), " *
+    msg = "You are trying to assemble values in to K[$(Krow), $(Kcol)], but K[$(Krow), " *
         "$(Kcol)] is missing in the sparsity pattern. Make sure you have called `K = " *
         "allocate_matrix(dh)` or `K = allocate_matrix(dh, ch)` if you " *
         "have affine constraints. This error might also happen if you are using " *
         "the assembler in a threaded assembly loop (you need to create one " *
         "`assembler` for each task)."
-    ))
+    throw(ErrorException(msg))
 end
 
 ## assemble! with local condensation ##
@@ -400,22 +403,22 @@ end
 Sort the input vector inplace and compute the corresponding permutation.
 """
 function sortperm2!(B, ii)
-   @inbounds for i = 1:length(B)
-      ii[i] = i
-   end
-   quicksort!(B, ii)
-   return
+    @inbounds for i in 1:length(B)
+        ii[i] = i
+    end
+    quicksort!(B, ii)
+    return
 end
 
-function quicksort!(A, order, i=1,j=length(A))
+function quicksort!(A, order, i = 1, j = length(A))
     @inbounds if j > i
-        if  j - i <= 12
-           # Insertion sort for small groups is faster than Quicksort
-           InsertionSort!(A, order, i, j)
-           return A
+        if j - i <= 12
+            # Insertion sort for small groups is faster than Quicksort
+            InsertionSort!(A, order, i, j)
+            return A
         end
 
-        pivot = A[div(i+j,2)]
+        pivot = A[div(i + j, 2)]
         left, right = i, j
         while left <= right
             while A[left] < pivot
@@ -433,33 +436,33 @@ function quicksort!(A, order, i=1,j=length(A))
             end
         end  # left <= right
 
-        quicksort!(A,order, i,   right)
-        quicksort!(A,order, left,j)
+        quicksort!(A, order, i, right)
+        quicksort!(A, order, left, j)
     end  # j > i
 
     return A
 end
 
-function InsertionSort!(A, order, ii=1, jj=length(A))
-    @inbounds for i = ii+1 : jj
+function InsertionSort!(A, order, ii = 1, jj = length(A))
+    @inbounds for i in (ii + 1):jj
         j = i - 1
-        temp  = A[i]
+        temp = A[i]
         itemp = order[i]
 
         while true
-            if j == ii-1
+            if j == ii - 1
                 break
             end
             if A[j] <= temp
                 break
             end
-            A[j+1] = A[j]
-            order[j+1] = order[j]
+            A[j + 1] = A[j]
+            order[j + 1] = order[j]
             j -= 1
         end
 
-        A[j+1] = temp
-        order[j+1] = itemp
+        A[j + 1] = temp
+        order[j + 1] = itemp
     end  # i
     return
 end

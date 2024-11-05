@@ -1,3 +1,4 @@
+# runic: off
 # # [Linear shell](@id tutorial-linear-shell)
 #
 # ![](linear_shell.png)

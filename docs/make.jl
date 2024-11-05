@@ -31,7 +31,7 @@ Changelog.generate(
 
 bibtex_plugin = CitationBibliography(
     joinpath(@__DIR__, "src", "assets", "references.bib"),
-    style=:numeric
+    style = :numeric
 )
 
 # Build documentation.
@@ -40,7 +40,7 @@ bibtex_plugin = CitationBibliography(
         assets = [
             "assets/custom.css",
             "assets/citations.css",
-            "assets/favicon.ico"
+            "assets/favicon.ico",
         ],
         canonical = "https://ferrite-fem.github.io/Ferrite.jl/stable",
         collapselevel = 1,
@@ -79,7 +79,7 @@ bibtex_plugin = CitationBibliography(
             "topics/boundary_conditions.md",
             "topics/constraints.md",
             "topics/grid.md",
-            "topics/export.md"
+            "topics/export.md",
         ],
         "API reference" => [
             "Reference overview" => "reference/index.md",
@@ -109,7 +109,7 @@ bibtex_plugin = CitationBibliography(
         # ],
         "devdocs/index.md",
         "cited-literature.md",
-        ],
+    ],
     plugins = [
         bibtex_plugin,
     ]
@@ -134,7 +134,7 @@ end
 if !liveserver
     @timeit dto "deploydocs" deploydocs(
         repo = "github.com/Ferrite-FEM/Ferrite.jl.git",
-        push_preview=true,
+        push_preview = true,
         versions = [
             "stable" => "v^",
             "v#.#",
@@ -147,7 +147,7 @@ if !liveserver
             "v0.3.7",
             "v0.3.6",
             "v0.3.5",
-            "dev" => "dev"
+            "dev" => "dev",
         ]
     )
 end

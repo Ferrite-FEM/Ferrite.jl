@@ -5,6 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Removed
+ - The deprecated third type parameter for interpolations have been removed. Old code which
+   tries to use three parameters will now throw the somewhat cryptic error:
+   ```
+   julia> Lagrange{2, RefCube, 1}()
+   ERROR: too many parameters for type
+   ```
+   ([#1083])
+
+### Other
+ - Ferrite now uses [Runic.jl](https://github.com/fredrikekre/Runic.jl) for code formatting.
+   ([#1096])
+
 ## [v1.0.0] - 2024-09-30
 
 Ferrite version 1.0 is a relatively large release, with a lot of new features, improvements,
@@ -1015,3 +1030,5 @@ poking into Ferrite internals:
 [#974]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/974
 [#1058]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1058
 [#1059]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1059
+[#1083]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1083
+[#1096]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1096

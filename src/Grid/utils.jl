@@ -19,11 +19,11 @@ addcellset!(grid, "right", x -> norm(x[1]) < 2.0 ) #add cell to cellset right, i
 ```
 """
 function addcellset!(grid::AbstractGrid, name::String, cellid::AbstractVecOrSet{Int})
-    _addset!(grid, name, cellid, getcellsets(grid))
+    return _addset!(grid, name, cellid, getcellsets(grid))
 end
 
-function addcellset!(grid::AbstractGrid, name::String, f::Function; all::Bool=true)
-    _addset!(grid, name, create_cellset(grid, f; all), getcellsets(grid))
+function addcellset!(grid::AbstractGrid, name::String, f::Function; all::Bool = true)
+    return _addset!(grid, name, create_cellset(grid, f; all), getcellsets(grid))
 end
 
 """
@@ -57,8 +57,8 @@ addfacetset!(grid, "clamped", x -> norm(x[1]) ≈ 0.0) #see incompressible elast
 addfacetset!(grid::AbstractGrid, name::String, set::AbstractVecOrSet{FacetIndex}) =
     _addset!(grid, name, set, getfacetsets(grid))
 
-addfacetset!(grid::AbstractGrid, name::String, f::Function; all::Bool=true) =
-    _addset!(grid, name, create_facetset(grid, f; all=all), getfacetsets(grid))
+addfacetset!(grid::AbstractGrid, name::String, f::Function; all::Bool = true) =
+    _addset!(grid, name, create_facetset(grid, f; all = all), getfacetsets(grid))
 
 """
     addvertexset!(grid::AbstractGrid, name::String, faceid::AbstractVecOrSet{FaceIndex})
@@ -77,14 +77,14 @@ addvertexset!(grid::AbstractGrid, name::String, set::AbstractVecOrSet{VertexInde
     _addset!(grid, name, set, getvertexsets(grid))
 
 addvertexset!(grid::AbstractGrid, name::String, f::Function) =
-    _addset!(grid, name, create_vertexset(grid, f; all=true), getvertexsets(grid))
+    _addset!(grid, name, create_vertexset(grid, f; all = true), getvertexsets(grid))
 
 function _addset!(grid::AbstractGrid, name::String, _set::AbstractVecOrSet, dict::Dict)
     _check_setname(dict, name)
     set = convert_to_orderedset(_set)
     _warn_emptyset(set, name)
     dict[name] = set
-    grid
+    return grid
 end
 
 """
@@ -116,7 +116,7 @@ function addboundaryfacetset!(grid::AbstractGrid, top::ExclusiveTopology, name::
     return _addset!(grid, name, set, getfacetsets(grid))
 end
 
-function _create_set(f::Function, grid::AbstractGrid, ::Type{BI}; all=true) where {BI <: BoundaryIndex}
+function _create_set(f::Function, grid::AbstractGrid, ::Type{BI}; all = true) where {BI <: BoundaryIndex}
     set = OrderedSet{BI}()
     # Since we loop over the cells in order the resulting set will be sorted
     # lexicographically based on the (cell_idx, entity_idx) tuple
@@ -139,7 +139,7 @@ function push_entity_instances!(set::OrderedSet{BI}, grid::AbstractGrid, top::Ex
     push!(set, entity) # Add the given entity
     cell = getcells(grid, entity[1])
     verts = boundaryfunction(BI)(cell)[entity[2]]
-    for cell_idx in top.vertex_to_cell[verts[1]]# Since all vertices should be shared, the first one can be used here
+    for cell_idx in top.vertex_to_cell[verts[1]] # Since all vertices should be shared, the first one can be used here
         cell_entities = boundaryfunction(BI)(getcells(grid, cell_idx))
         for (entity_idx, cell_entity) in pairs(cell_entities)
             if all(x -> x in verts, cell_entity)
@@ -162,7 +162,7 @@ function _create_boundaryset(f::Function, grid::AbstractGrid, top::ExclusiveTopo
         for (ff_nh_idx, neighborhood) in pairs(ff_nh)
             # ff_nh_idx::CartesianIndex into AbstractMatrix{AbstractVector{BI}}
             isempty(neighborhood) || continue # Skip any facets with neighbors (not on boundary)
-            cell_idx  = ff_nh_idx[1]
+            cell_idx = ff_nh_idx[1]
             facet_nr = ff_nh_idx[2]
             cell = getcells(grid, cell_idx)
             facet_nodes = facets(cell)[facet_nr]
@@ -182,7 +182,7 @@ function _create_boundaryset(f::Function, grid::AbstractGrid, top::ExclusiveTopo
     return _makeset(get_facet_facet_neighborhood(top, grid))::OrderedSet{BI}
 end
 
-function create_cellset(grid::AbstractGrid, f::Function; all::Bool=true)
+function create_cellset(grid::AbstractGrid, f::Function; all::Bool = true)
     cells = OrderedSet{Int}()
     # Since we loop over the cells in order the resulting set will be sorted
     for (i, cell) in enumerate(getcells(grid))
@@ -203,14 +203,14 @@ function create_nodeset(grid::AbstractGrid, f::Function)
     return nodes
 end
 create_vertexset(grid::AbstractGrid, f::Function; kwargs...) = _create_set(f, grid, VertexIndex; kwargs...)
-create_edgeset(  grid::AbstractGrid, f::Function; kwargs...) = _create_set(f, grid, EdgeIndex;   kwargs...)
-create_faceset(  grid::AbstractGrid, f::Function; kwargs...) = _create_set(f, grid, FaceIndex;   kwargs...)
-create_facetset( grid::AbstractGrid, f::Function; kwargs...) = _create_set(f, grid, FacetIndex;  kwargs...)
+create_edgeset(grid::AbstractGrid, f::Function; kwargs...) = _create_set(f, grid, EdgeIndex; kwargs...)
+create_faceset(grid::AbstractGrid, f::Function; kwargs...) = _create_set(f, grid, FaceIndex; kwargs...)
+create_facetset(grid::AbstractGrid, f::Function; kwargs...) = _create_set(f, grid, FacetIndex; kwargs...)
 
 create_boundaryvertexset(grid::AbstractGrid, top::ExclusiveTopology, f::Function; kwargs...) = _create_boundaryset(f, grid, top, VertexIndex; kwargs...)
-create_boundaryedgeset(  grid::AbstractGrid, top::ExclusiveTopology, f::Function; kwargs...) = _create_boundaryset(f, grid, top, EdgeIndex;   kwargs...)
-create_boundaryfaceset(  grid::AbstractGrid, top::ExclusiveTopology, f::Function; kwargs...) = _create_boundaryset(f, grid, top, FaceIndex;   kwargs...)
-create_boundaryfacetset( grid::AbstractGrid, top::ExclusiveTopology, f::Function; kwargs...) = _create_boundaryset(f, grid, top, FacetIndex;  kwargs...)
+create_boundaryedgeset(grid::AbstractGrid, top::ExclusiveTopology, f::Function; kwargs...) = _create_boundaryset(f, grid, top, EdgeIndex; kwargs...)
+create_boundaryfaceset(grid::AbstractGrid, top::ExclusiveTopology, f::Function; kwargs...) = _create_boundaryset(f, grid, top, FaceIndex; kwargs...)
+create_boundaryfacetset(grid::AbstractGrid, top::ExclusiveTopology, f::Function; kwargs...) = _create_boundaryset(f, grid, top, FacetIndex; kwargs...)
 
 """
     bounding_box(grid::AbstractGrid)
@@ -220,8 +220,8 @@ Returns the minimum and maximum vertex coordinates of the bounding box.
 """
 function bounding_box(grid::AbstractGrid{dim}) where {dim}
     T = get_coordinate_eltype(grid)
-    min_vertex = Vec{dim}(i->typemax(T))
-    max_vertex = Vec{dim}(i->typemin(T))
+    min_vertex = Vec{dim}(i -> typemax(T))
+    max_vertex = Vec{dim}(i -> typemin(T))
     for node in getnodes(grid)
         x = get_node_coordinate(node)
         _max_tmp = max_vertex # avoid type instability

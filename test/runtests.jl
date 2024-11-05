@@ -10,28 +10,7 @@ using SparseArrays
 using StaticArrays
 using OrderedCollections
 using WriteVTK
-
-const HAS_EXTENSIONS = isdefined(Base, :get_extension)
-
-# https://github.com/JuliaLang/julia/pull/47749
-const MODULE_CAN_BE_TYPE_PARAMETER = VERSION >= v"1.10.0-DEV.90"
-
-if HAS_EXTENSIONS && MODULE_CAN_BE_TYPE_PARAMETER
-    import Metis
-end
-
-const RUN_JET_TESTS = VERSION >= v"1.9" && isempty(VERSION.prerelease)
-
-if RUN_JET_TESTS
-    using Pkg: Pkg
-    Pkg.add("JET")
-    using JET: @test_call
-else
-    # Just eat the macro on incompatible versions
-    macro test_call(args...)
-        nothing
-    end
-end
+import Metis
 
 include("test_utils.jl")
 
@@ -59,8 +38,8 @@ include("test_apply_rhs.jl")
 include("test_apply_analytical.jl")
 include("PoolAllocator.jl")
 include("test_deprecations.jl")
-HAS_EXTENSIONS && include("blockarrays.jl")
-HAS_EXTENSIONS && include("test_assembler_extensions.jl")
+include("blockarrays.jl")
+include("test_assembler_extensions.jl")
 include("test_examples.jl")
 
 @test all(x -> isdefined(Ferrite, x), names(Ferrite))  # Test that all exported symbols are defined
