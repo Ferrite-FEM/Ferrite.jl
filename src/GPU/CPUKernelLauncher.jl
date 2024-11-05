@@ -17,8 +17,7 @@ function launch!(kernel::LazyKernel{Ti,BackendCPU}) where Ti
     nthreads = Threads.nthreads()
     for i in 1:no_colors
         current_color!(color_dh, i)
-        @show "color" i, current_color(color_dh)
-        Threads.@threads for j in 1:nthreads
+        Threads.@threads :static for j in 1:nthreads
             ker(args...)
         end
     end

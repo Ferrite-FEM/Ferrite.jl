@@ -13,12 +13,11 @@ left = Tensor{1,2,Float32}((0,-0)) # define the left bottom corner of the grid.
 right = Tensor{1,2,Float32}((10.0,10.0)) # define the right top corner of the grid.
 
 
-grid = generate_grid(Quadrilateral, (5, 5),left,right)
+grid = generate_grid(Quadrilateral, (2, 2),left,right)
 
 
 ip = Lagrange{RefQuadrilateral, 1}() # define the interpolation function (i.e. Bilinear lagrange)
 
-colors = create_coloring(grid)
 
 
 qr = QuadratureRule{RefQuadrilateral}(Float32,2)
@@ -99,6 +98,8 @@ end
 
 
 ## gpu version of element assembly
+
+
 function assemble_element!(Ke,fe,cv,cell)
     n_basefuncs = getnbasefunctions(cv)
     for qv in Ferrite.QuadratureValuesIterator(cv,getcoordinates(cell))
@@ -125,7 +126,7 @@ end
 # gpu version of global assembly
 function assemble_gpu!(Kgpu,fgpu, cv, dh)
     n_basefuncs = getnbasefunctions(cv)
-    assembler = start_assemble(Kgpu, fgpu)
+    assembler = start_assemble(Kgpu, fgpu;fillzero=false)
     for cell in CellIterator(dh, convert(Int32,n_basefuncs))
         Ke = cellke(cell)
         fe = cellfe(cell)
@@ -140,6 +141,7 @@ n_basefuncs = getnbasefunctions(cellvalues)
 
 ## Allocate CPU matrix
 ## K = allocate_matrix(SparseMatrixCSC{Float32, Int32},dh);
+
 K = allocate_matrix(SparseMatrixCSC{Float64, Int64},dh);
 f = zeros(ndofs(dh));
 
@@ -163,11 +165,3 @@ norm(K)
 ## norm(Kgpu)
 Kstd , Fstd = stassy(cellvalues,dh);
 norm(Kstd)
-
-
-
-for i in 1:10 
-    Threads.@threads for j in 1:4
-        @show i,j
-    end
-end

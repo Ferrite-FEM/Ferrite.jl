@@ -57,6 +57,7 @@ function Base.iterate(iterator::CPUKernelCellIterator)
     eles_color = eles_in_color(iterator.dh, curr_color) # elements in the current color
     ncells = length(eles_color)
     i <= ncells || return nothing
+    @show i, eles_color[i]
     return (_makecache(iterator, eles_color[i]), i)
 end
 
@@ -68,6 +69,7 @@ function Base.iterate(iterator::CPUKernelCellIterator, state)
     eles_color = eles_in_color(iterator.dh, curr_color) # elements in the current color
     ncells = length(eles_color)
     i <= ncells || return nothing
+    @show i, eles_color[i]
     return (_makecache(iterator, eles_color[i]), i)
 end
 
@@ -88,7 +90,6 @@ function _makecache(iterator::CPUKernelCellIterator, e::Ti) where {Ti<:Integer}
     dh = iterator.dh |> dofhandler
     grid = iterator.grid
     cellid = e
-    @show cellid
     cell = getcells(grid, e)
 
     # Extract the node IDs of the cell.
@@ -96,7 +97,7 @@ function _makecache(iterator::CPUKernelCellIterator, e::Ti) where {Ti<:Integer}
 
     # Extract the degrees of freedom for the cell.
     dofs = celldofs(dh, e)
-
+    @show dofs
     # Get the coordinates of the nodes of the cell.
     CT = get_coordinate_type(grid)
     N = nnodes(cell)
