@@ -72,7 +72,7 @@ function Ferrite.zero_out_columns!(K::SparseMatrixCSR, ch::ConstraintHandler)
 end
 
 function Ferrite.allocate_matrix(::Type{SparseMatrixCSR}, sp::AbstractSparsityPattern)
-    return _allocate_matrix(SparseMatrixCSR{1, Float64, Int64}, sp)
+    return Ferrite.allocate_matrix(SparseMatrixCSR{1, Float64, Int64}, sp)
 end
 
 function Ferrite.allocate_matrix(::Type{SparseMatrixCSR{1, Tv, Ti}}, sp::AbstractSparsityPattern) where {Tv, Ti}
