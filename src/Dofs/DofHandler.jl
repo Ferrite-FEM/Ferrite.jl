@@ -930,7 +930,7 @@ function evaluate_at_grid_nodes(dh::DofHandler, u::AbstractVector, fieldname::Sy
 end
 
 # Internal method that have the vtk option to allocate the output differently
-function _evaluate_at_grid_nodes(dh::DofHandler{sdim}, u::AbstractVector{T}, fieldname::Symbol, ::Val{vtk}=Val(false)) where {T, vtk, sdim}
+function _evaluate_at_grid_nodes(dh::DofHandler{sdim}, u::AbstractVector{T}, fieldname::Symbol, ::Val{vtk} = Val(false)) where {T, vtk, sdim}
     # Make sure the field exists
     fieldname ∈ getfieldnames(dh) || error("Field $fieldname not found.")
     # Figure out the return type (scalar or vector)
@@ -966,8 +966,10 @@ function _evaluate_at_grid_nodes(dh::DofHandler{sdim}, u::AbstractVector{T}, fie
 end
 
 # Loop over the cells and use shape functions to compute the value
-function _evaluate_at_grid_nodes!(data::Union{Vector,Matrix}, sdh::SubDofHandler,
-        u::AbstractVector{T}, cv::CellValues, drange::UnitRange) where {T}
+function _evaluate_at_grid_nodes!(
+        data::Union{Vector, Matrix}, sdh::SubDofHandler,
+        u::AbstractVector{T}, cv::CellValues, drange::UnitRange
+    ) where {T}
     ue = zeros(T, length(drange))
     for cell in CellIterator(sdh)
         # Note: We are only using the shape functions: no reinit!(cv, cell) necessary
