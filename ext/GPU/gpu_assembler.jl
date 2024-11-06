@@ -13,7 +13,8 @@ struct GPUAssemblerSparsityPattern{Tv, Ti, VEC_FLOAT <: AbstractVector{Tv}, SPAR
     f::VEC_FLOAT
 end
 
-function Ferrite.start_assemble(K::CUSPARSE.CuSparseDeviceMatrixCSC{Tv, Ti}, f::CuDeviceVector{Tv}) where {Tv, Ti}
+function Ferrite.start_assemble(K::CUSPARSE.CuSparseDeviceMatrixCSC{Tv, Ti}, f::CuDeviceVector{Tv}; fillzero = false) where {Tv, Ti}
+    ##fillzero && (fillzero!(K); fillzero!(f))
     return GPUAssemblerSparsityPattern(K, f)
 end
 
