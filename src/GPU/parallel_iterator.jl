@@ -107,24 +107,24 @@ function _makecache(iterator::CPUKernelCellIterator, e::Ti) where {Ti <: Integer
 end
 
 
-Ferrite.getnodes(cc::CPUKernelCellCache) = cc.nodes
+getnodes(cc::CPUKernelCellCache) = cc.nodes
 
 
-Ferrite.getcoordinates(cc::CPUKernelCellCache) = cc.coords
+getcoordinates(cc::CPUKernelCellCache) = cc.coords
 
 
-Ferrite.celldofs(cc::CPUKernelCellCache) = cc.dofs
+celldofs(cc::CPUKernelCellCache) = cc.dofs
 
 
-Ferrite.cellid(cc::CPUKernelCellCache) = cc.cellid
+cellid(cc::CPUKernelCellCache) = cc.cellid
 
 
-@inline function Ferrite.cellke(cc::CPUKernelCellCache)
+@inline function cellke(cc::CPUKernelCellCache)
     ke = cc.ke
     return fill!(ke, zero(eltype(ke)))
 end
 
-@inline function Ferrite.cellfe(cc::CPUKernelCellCache)
+@inline function cellfe(cc::CPUKernelCellCache)
     fe = cc.fe
     return fill!(fe, zero(eltype(fe)))
 end

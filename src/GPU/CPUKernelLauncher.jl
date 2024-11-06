@@ -47,5 +47,5 @@ function _to_static_cellvalues(cv::CellValues)
     fv = StaticInterpolationValues(cv.fun_values)
     gm = StaticInterpolationValues(cv.geo_mapping)
     weights = ntuple(i -> getweights(cv.qr)[i], getnquadpoints(cv))
-    return Ferrite.StaticCellValues(fv, gm, weights)
+    return StaticCellValues(fv, gm, weights)
 end
