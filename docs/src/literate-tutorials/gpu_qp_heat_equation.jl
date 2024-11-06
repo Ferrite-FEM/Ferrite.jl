@@ -1,7 +1,6 @@
 using Ferrite
 using StaticArrays
 using SparseArrays
-using CUDA
 
 
 
