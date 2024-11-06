@@ -3,22 +3,21 @@
 
 abstract type AbstractGPUGrid{dim} <: AbstractGrid{dim} end
 
-struct GPUGrid{dim,CELLVEC<:AbstractArray,NODEVEC<:AbstractArray}<: AbstractGPUGrid{dim}
+struct GPUGrid{dim, CELLVEC <: AbstractArray, NODEVEC <: AbstractArray} <: AbstractGPUGrid{dim}
     cells::CELLVEC
     nodes::NODEVEC
 end
 
-function GPUGrid(cells::CELLVEC,
-                 nodes::NODEVEC) where {C<:AbstractCell,CELLVEC<:AbstractArray{C,1},NODEVEC<:AbstractArray{Node{dim,T}}} where {dim,T}
-    GPUGrid{dim,CELLVEC,NODEVEC}(cells,nodes)
+function GPUGrid(
+        cells::CELLVEC,
+        nodes::NODEVEC
+    ) where {C <: AbstractCell, CELLVEC <: AbstractArray{C, 1}, NODEVEC <: AbstractArray{Node{dim, T}}} where {dim, T}
+    return GPUGrid{dim, CELLVEC, NODEVEC}(cells, nodes)
 end
 
-get_coordinate_type(::GPUGrid{dim,CELLVEC,NODEVEC}) where
-    {C<:AbstractCell,CELLVEC<:AbstractArray{C,1},NODEVEC<:AbstractArray{Node{dim,T}}} where
-    {dim,T} = Vec{dim,T} # Node is baked into the mesh type.
-
-
-
+get_coordinate_type(::GPUGrid{dim, CELLVEC, NODEVEC}) where
+{C <: AbstractCell, CELLVEC <: AbstractArray{C, 1}, NODEVEC <: AbstractArray{Node{dim, T}}} where
+{dim, T} = Vec{dim, T} # Node is baked into the mesh type.
 
 
 # Note: For functions that takes blockIdx as an argument, we need to use Int32 explicitly,
@@ -31,7 +30,7 @@ get_coordinate_type(::GPUGrid{dim,CELLVEC,NODEVEC}) where
 
 Return the coordinates of the nodes of the element `e` in the `GPUGrid` `grid`.
 """
-function getcoordinates(grid::GPUGrid,e::Int32)
+function getcoordinates(grid::GPUGrid, e::Int32)
     # e is the element index.
     CT = get_coordinate_type(grid)
     cell = getcells(grid, e)

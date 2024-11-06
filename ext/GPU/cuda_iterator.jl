@@ -7,7 +7,7 @@ Create `CUDACellIterator` object for each thread with local id `thread_id` in or
 on the GPU and these elements are associated with the thread based on a stride = `blockDim().x * gridDim().x`.
 The elements of the iterator are `GPUCellCache` objects.
 """
-struct CUDACellIterator{DH<:Ferrite.AbstractGPUDofHandler,GRID<: Ferrite.AbstractGPUGrid,KDynamicSharedMem,FDynamicSharedMem} <: Ferrite.AbstractKernelCellIterator
+struct CUDACellIterator{DH <: Ferrite.AbstractGPUDofHandler, GRID <: Ferrite.AbstractGPUGrid, KDynamicSharedMem, FDynamicSharedMem} <: Ferrite.AbstractKernelCellIterator
     dh::DH # TODO: subdofhandlers are not supported yet.
     grid::GRID
     n_cells::Int32
@@ -33,10 +33,10 @@ function Ferrite.CellIterator(dh::Ferrite.AbstractGPUDofHandler, n_basefuncs::In
     grid = get_grid(dh)
     n_cells = grid |> getncells |> Int32
     bd = blockDim().x
-    ke_shared =@cuDynamicSharedMem(Float32, (bd, n_basefuncs, n_basefuncs))
+    ke_shared = @cuDynamicSharedMem(Float32, (bd, n_basefuncs, n_basefuncs))
     fe_shared = @cuDynamicSharedMem(Float32, (bd, n_basefuncs), sizeof(Float32) * bd * n_basefuncs * n_basefuncs)
     local_thread_id = threadIdx().x
-    CUDACellIterator(dh, grid, n_cells, ke_shared, fe_shared, local_thread_id)
+    return CUDACellIterator(dh, grid, n_cells, ke_shared, fe_shared, local_thread_id)
 end
 
 """
@@ -85,7 +85,7 @@ Arguments:
 - `ke`: View into shared memory for the cell's stiffness matrix.
 - `fe`: View into shared memory for the cell's force vector.
 """
-struct GPUCellCache{DOFS <: AbstractVector{Int32},NN,NODES <: SVector{NN,Int32},X, COORDS<: SVector{X},KDynamicSharedMem,FDynamicSharedMem} <: Ferrite.AbstractKernelCellCache
+struct GPUCellCache{DOFS <: AbstractVector{Int32}, NN, NODES <: SVector{NN, Int32}, X, COORDS <: SVector{X}, KDynamicSharedMem, FDynamicSharedMem} <: Ferrite.AbstractKernelCellCache
     coords::COORDS
     dofs::DOFS
     cellid::Int32
@@ -117,7 +117,7 @@ function _makecache(iterator::CUDACellIterator, e::Int32)
     coords = SVector(x...)
 
     # Return the GPUCellCache containing the cell's data.
-    return  GPUCellCache(coords, dofs, cellid, nodes, (@view iterator.block_ke[iterator.thread_id, :, :]), (@view iterator.block_fe[iterator.thread_id, :, :]))
+    return GPUCellCache(coords, dofs, cellid, nodes, (@view iterator.block_ke[iterator.thread_id, :, :]), (@view iterator.block_fe[iterator.thread_id, :, :]))
 end
 
 """
@@ -185,7 +185,7 @@ Returns:
 """
 @inline function Ferrite.cellke(cc::GPUCellCache)
     ke = cc.ke
-    fill!(ke, 0.0f0)
+    return fill!(ke, 0.0f0)
 end
 
 """
@@ -201,5 +201,5 @@ Returns:
 """
 @inline function Ferrite.cellfe(cc::GPUCellCache)
     fe = cc.fe
-    fill!(fe, 0.0f0)
+    return fill!(fe, 0.0f0)
 end

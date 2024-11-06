@@ -16,7 +16,7 @@ end
 function assemble_kernel!(K, f, dofs, Ke, fe)
     # kernel that only assembles local into global.
     A = start_assemble(K, f)
-    assemble!(A, dofs, Ke, fe)
+    return assemble!(A, dofs, Ke, fe)
 end
 
 # Test for assembling global stiffness matrix and force vector

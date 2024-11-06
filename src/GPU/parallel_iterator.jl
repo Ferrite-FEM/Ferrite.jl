@@ -9,7 +9,7 @@ abstract type AbstractKernelCellCache <: AbstractCellCache end
 abstract type AbstractKernelCellIterator <: AbstractIterator end
 
 
-function _makecache(iterator::AbstractKernelCellIterator, i::Ti) where {Ti<:Integer}
+function _makecache(iterator::AbstractKernelCellIterator, i::Ti) where {Ti <: Integer}
     throw(ArgumentError("makecache should be implemented in the derived type"))
 end
 
@@ -22,11 +22,10 @@ end
 end
 
 
-
 ## Concrete Implementation for CPU Multithreading ##
 
 ##### CPUKernelCellIterator #####
-struct CPUKernelCellIterator{DH<:ColoringDofHandler,GRID<: AbstractGrid,Tv} <: AbstractKernelCellIterator
+struct CPUKernelCellIterator{DH <: ColoringDofHandler, GRID <: AbstractGrid, Tv} <: AbstractKernelCellIterator
     dh::DH
     grid::GRID
     n_cells::Int
@@ -36,15 +35,14 @@ struct CPUKernelCellIterator{DH<:ColoringDofHandler,GRID<: AbstractGrid,Tv} <: A
 end
 
 
-
-function CellIterator(dh::ColoringDofHandler, n_basefuncs::Ti) where {Ti<:Integer}
-    grid = dh |> dofhandler |>  get_grid
+function CellIterator(dh::ColoringDofHandler, n_basefuncs::Ti) where {Ti <: Integer}
+    grid = dh |> dofhandler |> get_grid
     n_cells = grid |> getncells
     ## TODO: Float64 needs to be dependant of the eltype of the matrix
     ke = zeros(Float64, n_basefuncs, n_basefuncs)
     fe = zeros(Float64, n_basefuncs)
     local_thread_id = Threads.threadid()
-    CPUKernelCellIterator(dh, grid, n_cells, ke, fe, local_thread_id)
+    return CPUKernelCellIterator(dh, grid, n_cells, ke, fe, local_thread_id)
 end
 
 
@@ -74,7 +72,7 @@ end
 
 ##### CPUKernelCellCache #####
 ## Future IDEA: we can make this cache mutable, since we are using it on CPU.
-struct CPUKernelCellCache{Ti <: Integer,DOFS <: AbstractVector{Ti},NN,NODES <: SVector{NN,Ti},X, COORDS<: SVector{X},Tv<:Real} <: AbstractKernelCellCache
+struct CPUKernelCellCache{Ti <: Integer, DOFS <: AbstractVector{Ti}, NN, NODES <: SVector{NN, Ti}, X, COORDS <: SVector{X}, Tv <: Real} <: AbstractKernelCellCache
     coords::COORDS
     dofs::DOFS
     cellid::Ti
@@ -84,7 +82,7 @@ struct CPUKernelCellCache{Ti <: Integer,DOFS <: AbstractVector{Ti},NN,NODES <: S
 end
 
 
-function _makecache(iterator::CPUKernelCellIterator, e::Ti) where {Ti<:Integer}
+function _makecache(iterator::CPUKernelCellIterator, e::Ti) where {Ti <: Integer}
     dh = iterator.dh |> dofhandler
     grid = iterator.grid
     cellid = e
@@ -105,7 +103,7 @@ function _makecache(iterator::CPUKernelCellIterator, e::Ti) where {Ti<:Integer}
     coords = SVector(x...)
 
     # Return the GPUCellCache containing the cell's data.
-    return  CPUKernelCellCache(coords, dofs, cellid, nodes,  iterator.ke, iterator.fe)
+    return CPUKernelCellCache(coords, dofs, cellid, nodes, iterator.ke, iterator.fe)
 end
 
 
@@ -123,10 +121,10 @@ Ferrite.cellid(cc::CPUKernelCellCache) = cc.cellid
 
 @inline function Ferrite.cellke(cc::CPUKernelCellCache)
     ke = cc.ke
-    fill!(ke, zero(eltype(ke)))
+    return fill!(ke, zero(eltype(ke)))
 end
 
 @inline function Ferrite.cellfe(cc::CPUKernelCellCache)
     fe = cc.fe
-    fill!(fe, zero(eltype(fe)))
+    return fill!(fe, zero(eltype(fe)))
 end

@@ -9,7 +9,7 @@ function assemble_element_std!(Ke::Matrix, fe::Vector, cellvalues::CellValues)
         dΩ = getdetJdV(cellvalues, q_point)
         ## Loop over test shape functions
         for i in 1:n_basefuncs
-            δu  = shape_value(cellvalues, q_point, i)
+            δu = shape_value(cellvalues, q_point, i)
             ∇δu = shape_gradient(cellvalues, q_point, i)
             ## Add contribution to fe
             fe[i] += δu * dΩ
@@ -33,7 +33,7 @@ function assemble_element_qpiter!(Ke::Matrix, fe::Vector, cellvalues)
         dΩ = getdetJdV(qv)
         ## Loop over test shape functions
         for i in 1:n_basefuncs
-            δu  = shape_value(qv, i)
+            δu = shape_value(qv, i)
             ∇δu = shape_gradient(qv, i)
             ## Add contribution to fe
             fe[i] += δu * dΩ
@@ -56,7 +56,7 @@ function assemble_element_qpiter!(Ke::Matrix, fe::Vector, cellvalues, cell_coord
         dΩ = getdetJdV(qv)
         ## Loop over test shape functions
         for i in 1:n_basefuncs
-            δu  = shape_value(qv, i)
+            δu = shape_value(qv, i)
             ∇δu = shape_gradient(qv, i)
             ## Add contribution to fe
             fe[i] += δu * dΩ
@@ -72,11 +72,11 @@ function assemble_element_qpiter!(Ke::Matrix, fe::Vector, cellvalues, cell_coord
 end
 
 function assemble_global(cellvalues, dh; kwargs...)
-    assemble_global!(create_buffers(cellvalues, dh), cellvalues, dh; kwargs...)
+    return assemble_global!(create_buffers(cellvalues, dh), cellvalues, dh; kwargs...)
 end
 
 function assemble_global!(buffer, cellvalues, dh::DofHandler; qp_iter::Val{QPiter}, reinit::Val{ReInit}) where {QPiter, ReInit}
-    (;f, K, assembler, Ke, fe) = buffer
+    (; f, K, assembler, Ke, fe) = buffer
     for cell in CellIterator(dh)
         fill!(Ke, 0)
         fill!(fe, 0)
@@ -104,7 +104,7 @@ function create_buffers(cellvalues, dh)
     n_basefuncs = getnbasefunctions(cellvalues)
     Ke = zeros(n_basefuncs, n_basefuncs)
     fe = zeros(n_basefuncs)
-    return (;f, K, assembler, Ke, fe)
+    return (; f, K, assembler, Ke, fe)
 end
 
 n = 50
@@ -121,9 +121,9 @@ cellvalues = CellValues(qr, ip);
 
 static_cellvalues = Ferrite.StaticCellValues(cellvalues)
 
-stdassy(buffer, cv, dh) = assemble_global!(buffer, cv, dh; qp_iter=Val(false), reinit=Val(false))
-qp_outside(buffer, cv, dh) = assemble_global!(buffer, cv, dh; qp_iter=Val(true), reinit=Val(true))
-qp_inside(buffer, cv, dh) = assemble_global!(buffer, cv, dh; qp_iter=Val(true), reinit=Val(false))
+stdassy(buffer, cv, dh) = assemble_global!(buffer, cv, dh; qp_iter = Val(false), reinit = Val(false))
+qp_outside(buffer, cv, dh) = assemble_global!(buffer, cv, dh; qp_iter = Val(true), reinit = Val(true))
+qp_inside(buffer, cv, dh) = assemble_global!(buffer, cv, dh; qp_iter = Val(true), reinit = Val(false))
 
 Kstd, fstd = stdassy(create_buffers(cellvalues, dh), cellvalues, dh);
 using LinearAlgebra
@@ -142,8 +142,8 @@ using Test
 @testset "check outputs" begin
     for (k, K, f) in (("qpo", K_qp_o, f_qp_o), ("qpi", K_qp_i, f_qp_i), ("so", Ks_o, fs_o), ("si", Ks_i, fs_i))
         @testset "$k" begin
-          @test K ≈ Kstd
-          @test f ≈ fstd
+            @test K ≈ Kstd
+            @test f ≈ fstd
         end
     end
 end
@@ -152,15 +152,15 @@ end
 using BenchmarkTools
 if n ≤ 100
     print("Standard: ")
-    @btime stdassy(buffer, $cellvalues, $dh) setup=(buffer=create_buffers(cellvalues, dh));
+    @btime stdassy(buffer, $cellvalues, $dh) setup = (buffer = create_buffers(cellvalues, dh))
     print("Std qpoint outside: ")
-    @btime qp_outside(buffer, $cellvalues, $dh) setup=(buffer=create_buffers(cellvalues, dh));
+    @btime qp_outside(buffer, $cellvalues, $dh) setup = (buffer = create_buffers(cellvalues, dh))
     print("Std qpoint inside: ")
-    @btime qp_inside(buffer, $cellvalues, $dh) setup=(buffer=create_buffers(cellvalues, dh));
+    @btime qp_inside(buffer, $cellvalues, $dh) setup = (buffer = create_buffers(cellvalues, dh))
     print("Static outside: ")
-    @btime qp_outside(buffer, $cvs_o, $dh) setup=(buffer=create_buffers(cvs_o, dh));
+    @btime qp_outside(buffer, $cvs_o, $dh) setup = (buffer = create_buffers(cvs_o, dh))
     print("Static inside: ")
-    @btime qp_inside(buffer, $cvs_i, $dh) setup=(buffer=create_buffers(cvs_i, dh));
+    @btime qp_inside(buffer, $cvs_i, $dh) setup = (buffer = create_buffers(cvs_i, dh))
 else
     buffer = create_buffers(cellvalues, dh)
     print("Standard: ")

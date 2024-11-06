@@ -69,7 +69,7 @@ number of base functions, the kernel function, and any additional arguments.
 # Type Parameters
 - `Ti`: An integer type representing the number type used for `n_cells` and `n_basefuncs`.
 """
-struct LazyKernel{Ti,BKD<:AbstractBackend} <: AbstractKernel
+struct LazyKernel{Ti, BKD <: AbstractBackend} <: AbstractKernel
     n_cells::Ti               # Number of cells
     n_basefuncs::Ti           # Number of base functions
     kernel::Function          # Kernel function to execute

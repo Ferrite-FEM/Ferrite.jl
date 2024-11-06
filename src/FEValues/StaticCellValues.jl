@@ -14,8 +14,8 @@ getdetJdV(qv::StaticQuadratureValues) = qv.detJdV
 # Accessors for function values
 getnbasefunctions(qv::StaticQuadratureValues) = length(qv.N)
 # function_interpolation(qv::StaticQuadratureValues) = function_interpolation(qv.v) # Not included
-shape_value_type(::StaticQuadratureValues{<:Any, N_t}) where N_t = N_t
-shape_gradient_type(::StaticQuadratureValues{<:Any, <:Any, dNdx_t}) where dNdx_t = dNdx_t
+shape_value_type(::StaticQuadratureValues{<:Any, N_t}) where {N_t} = N_t
+shape_gradient_type(::StaticQuadratureValues{<:Any, <:Any, dNdx_t}) where {dNdx_t} = dNdx_t
 
 @propagate_inbounds shape_value(qv::StaticQuadratureValues, i::Int) = qv.N[i]
 @propagate_inbounds shape_gradient(qv::StaticQuadratureValues, i::Int) = qv.dNdx[i]
@@ -55,7 +55,7 @@ getnbasefunctions(siv::StaticInterpolationValues) = getnbasefunctions(siv.ip)
 # Dispatch on DiffOrder parameter?
 # Reuse functions for GeometryMapping - same signature but need access functions
 # Or merge GeometryMapping and StaticInterpolationValues => InterpolationValues
-@propagate_inbounds @inline function calculate_mapping(ip_values::StaticInterpolationValues{<:Any, N}, q_point, x) where N
+@propagate_inbounds @inline function calculate_mapping(ip_values::StaticInterpolationValues{<:Any, N}, q_point, x) where {N}
     fecv_J = zero(otimes_returntype(eltype(x), eltype(ip_values.dNdξ)))
     @inbounds for j in 1:N
         #fecv_J += x[j] ⊗ geo_mapping.dMdξ[j, q_point]
@@ -95,32 +95,32 @@ getnbasefunctions(cv::StaticCellValues) = getnbasefunctions(cv.fv)
 getngeobasefunctions(cv::StaticCellValues) = getnbasefunctions(cv.gm)
 
 @inline function reinit!(cv::StaticCellValues{<:Any, <:Any, <:AbstractVector}, cell_coords::AbstractVector)
-    copyto!(cv.x, cell_coords)
+    return copyto!(cv.x, cell_coords)
     #TODO: Also allow the cell::AbstracCell to be given and updated
 end
 @inline function reinit!(::StaticCellValues{<:Any, <:Any, Nothing}, ::AbstractVector)
-    nothing # Nothing to do on reinit if x is not saved.
+    return nothing # Nothing to do on reinit if x is not saved.
 end
 
 @inline function quadrature_point_values(fe_v::StaticCellValues{<:Any, <:Any, <:AbstractVector}, q_point::Int)
-    return _quadrature_point_values(fe_v, q_point, fe_v.x,detJ->throw_detJ_not_pos(detJ))
+    return _quadrature_point_values(fe_v, q_point, fe_v.x, detJ -> throw_detJ_not_pos(detJ))
 end
 
 @inline function quadrature_point_values(fe_v::StaticCellValues{<:Any, <:Any}, q_point::Int, cell_coords::AbstractVector)
-    return _quadrature_point_values(fe_v, q_point, cell_coords,detJ->throw_detJ_not_pos(detJ))
+    return _quadrature_point_values(fe_v, q_point, cell_coords, detJ -> throw_detJ_not_pos(detJ))
 end
 
 @inline function quadrature_point_values(fe_v::StaticCellValues{<:Any, <:Any}, q_point::Int, cell_coords::StaticVector)
-    return _quadrature_point_values(fe_v, q_point, cell_coords,detJ->-1)
+    return _quadrature_point_values(fe_v, q_point, cell_coords, detJ -> -1)
 end
 
 
-function _quadrature_point_values(fe_v::StaticCellValues, q_point::Int, cell_coords::AbstractVector,neg_detJ_err_fun::Function)
+function _quadrature_point_values(fe_v::StaticCellValues, q_point::Int, cell_coords::AbstractVector, neg_detJ_err_fun::Function)
     #q_point bounds checked, ok to use @inbounds
     @inbounds begin
-         mapping = calculate_mapping(fe_v.gm, q_point, cell_coords)
+        mapping = calculate_mapping(fe_v.gm, q_point, cell_coords)
 
-         detJ = calculate_detJ(getjacobian(mapping))
+        detJ = calculate_detJ(getjacobian(mapping))
         detJ > 0.0f0 || neg_detJ_err_fun(detJ) # Cannot throw error on GPU, TODO: return error code instead
         detJdV = detJ * fe_v.weights[q_point]
 
@@ -132,7 +132,7 @@ end
 
 
 ## New Implementation for StaticQuadratureValues to suit the GPU code
-struct StaticQuadratureView{JT,HT,  N_Nodes,NODEVEC} <: AbstractQuadratureValues
+struct StaticQuadratureView{JT, HT, N_Nodes, NODEVEC} <: AbstractQuadratureValues
     mapping::MappingValues{JT, HT}
     cell_coords::SVector{N_Nodes, NODEVEC}
     q_point::Int32
@@ -143,14 +143,14 @@ end
 @inline function quadrature_point_values(fe_v::StaticCellValues{<:Any, <:Any}, q_point::Int32, cell_coords::SVector)
     @inbounds begin
         mapping = calculate_mapping(fe_v.gm, q_point, cell_coords)
-   end
+    end
     return StaticQuadratureView(mapping, cell_coords, q_point, fe_v)
 end
 
 
 @inline function getdetJdV(qv::StaticQuadratureView)
     detJ = Float32(calculate_detJ(getjacobian(qv.mapping)))
-    detJ > 0.0f0 || -1.f0 # Cannot throw error on GPU, TODO: return error code instead
+    detJ > 0.0f0 || -1.0f0 # Cannot throw error on GPU, TODO: return error code instead
     detJdV = detJ * qv.cv.weights[qv.q_point]
     return detJdV
 end
@@ -159,7 +159,7 @@ end
     @inbounds begin
         Jinv = calculate_Jinv(getjacobian(qv.mapping))
         #Nx = qv.cv.fv.Nξ[i, q_point]
-        dNdx =  dothelper(qv.cv.fv.dNdξ[i, qv.q_point], Jinv)
-        return  dNdx
+        dNdx = dothelper(qv.cv.fv.dNdξ[i, qv.q_point], Jinv)
+        return dNdx
     end
 end

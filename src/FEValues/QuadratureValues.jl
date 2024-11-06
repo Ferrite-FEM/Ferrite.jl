@@ -1,8 +1,8 @@
 # QuadratureValuesIterator
-struct QuadratureValuesIterator{VT,XT}
+struct QuadratureValuesIterator{VT, XT}
     v::VT
     cell_coords::XT # Union{AbstractArray{<:Vec}, Nothing}
-    function QuadratureValuesIterator(v::V) where V
+    function QuadratureValuesIterator(v::V) where {V}
         return new{V, Nothing}(v, nothing)
     end
     function QuadratureValuesIterator(v::V, cell_coords::VT) where {V, VT <: AbstractArray}
@@ -11,17 +11,17 @@ struct QuadratureValuesIterator{VT,XT}
     end
 end
 
-function Base.iterate(iterator::QuadratureValuesIterator{<:Any, Nothing}, q_point=1)
+function Base.iterate(iterator::QuadratureValuesIterator{<:Any, Nothing}, q_point = 1)
     checkbounds(Bool, 1:getnquadpoints(iterator.v), q_point) || return nothing
     qp_v = @inbounds quadrature_point_values(iterator.v, q_point)
-    return (qp_v, q_point+1)
+    return (qp_v, q_point + 1)
 end
 
-function Base.iterate(iterator::QuadratureValuesIterator{<:Any, <:StaticVector}, q_point=1)
+function Base.iterate(iterator::QuadratureValuesIterator{<:Any, <:StaticVector}, q_point = 1)
     checkbounds(Bool, 1:getnquadpoints(iterator.v), q_point) || return nothing
     #q_point < 5 || return nothing
     qp_v = @inbounds quadrature_point_values(iterator.v, q_point, iterator.cell_coords)
-    return (qp_v, q_point+1)
+    return (qp_v, q_point + 1)
     #return (1, q_point+1)
 end
 Base.IteratorEltype(::Type{<:QuadratureValuesIterator}) = Base.EltypeUnknown()
@@ -82,7 +82,7 @@ end
 
 # Specific design for QuadratureValues <: AbstractQuadratureValues
 # which contains standard AbstractValues
-struct QuadratureValues{VT<:AbstractValues} <: AbstractQuadratureValues
+struct QuadratureValues{VT <: AbstractValues} <: AbstractQuadratureValues
     v::VT
     q_point::Int
     Base.@propagate_inbounds function QuadratureValues(v::AbstractValues, q_point::Int)
@@ -109,7 +109,6 @@ shape_gradient_type(qv::QuadratureValues) = shape_gradient_type(qv.v)
 @propagate_inbounds shape_value(qv::QuadratureValues, i::Int) = shape_value(qv.v, qv.q_point, i)
 @propagate_inbounds shape_gradient(qv::QuadratureValues, i::Int) = shape_gradient(qv.v, qv.q_point, i)
 @propagate_inbounds shape_symmetric_gradient(qv::QuadratureValues, i::Int) = shape_symmetric_gradient(qv.v, qv.q_point, i)
-
 
 
 #= Proposed syntax, for heatflow in general

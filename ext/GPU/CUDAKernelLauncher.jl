@@ -1,6 +1,4 @@
-
-
-function Ferrite.init_kernel(::Type{BackendCUDA}, n_cells::Ti, n_basefuncs::Ti, kernel::Function, args::Tuple) where {Ti<: Integer}
+function Ferrite.init_kernel(::Type{BackendCUDA}, n_cells::Ti, n_basefuncs::Ti, kernel::Function, args::Tuple) where {Ti <: Integer}
     if CUDA.functional()
         return LazyKernel(n_cells, n_basefuncs, kernel, args, BackendCUDA)
     else
@@ -17,22 +15,22 @@ Launch a CUDA kernel with the given configuration.
 Arguments:
 - `kernel_config`: The `CUDAKernelLauncher` object containing a higher level fields for kernel configuration.
 """
-function Ferrite.launch!(kernel::LazyKernel{Ti,BackendCUDA}) where Ti
+function Ferrite.launch!(kernel::LazyKernel{Ti, BackendCUDA}) where {Ti}
     n_cells = kernel.n_cells
     n_basefuncs = kernel.n_basefuncs
     ker = kernel.kernel
     args = kernel.args
-    kernel = @cuda launch=false ker(args...)
+    kernel = @cuda launch = false ker(args...)
     config = launch_configuration(kernel.fun)
-    threads = convert(Ti,min(n_cells, config.threads,256))
-    shared_mem = _calculate_shared_memory(threads ,n_basefuncs)
+    threads = convert(Ti, min(n_cells, config.threads, 256))
+    shared_mem = _calculate_shared_memory(threads, n_basefuncs)
     blocks = _calculate_nblocks(threads, n_cells)
-    kernel(args...; threads, blocks, shmem=shared_mem)
+    return kernel(args...; threads, blocks, shmem = shared_mem)
 end
 
 
 function _calculate_shared_memory(threads::Integer, n_basefuncs::Integer)
-    return sizeof(Float32) * (threads) * ( n_basefuncs) * n_basefuncs + sizeof(Float32) * (threads) * n_basefuncs
+    return sizeof(Float32) * (threads) * (n_basefuncs) * n_basefuncs + sizeof(Float32) * (threads) * n_basefuncs
 end
 
 
