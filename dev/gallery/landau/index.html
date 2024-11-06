@@ -190,29 +190,29 @@ save_landau(&quot;landauorig&quot;, model)
 @time minimize!(model)
 save_landau(&quot;landaufinal&quot;, model)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">Iter     Function value   Gradient norm
      0     2.127588e+06     3.597094e+02
- * time: 8.893013000488281e-5
+ * time: 9.608268737792969e-5
      1     3.786155e+05     1.047687e+02
- * time: 3.408262014389038
+ * time: 3.1862170696258545
      2     5.306125e+04     2.978953e+01
- * time: 6.387434005737305
+ * time: 6.3575170040130615
      3    -2.642320e+03     7.943136e+00
- * time: 9.38116979598999
+ * time: 9.530497074127197
      4    -1.027484e+04     1.752693e+00
- * time: 12.332655906677246
+ * time: 12.673146963119507
      5    -1.084925e+04     2.157295e-01
- * time: 15.293574810028076
+ * time: 16.274462938308716
      6    -1.085880e+04     5.288877e-03
- * time: 18.23457980155945
+ * time: 19.439736127853394
      7    -1.085881e+04     3.478176e-06
- * time: 21.181691884994507
+ * time: 22.607845067977905
      8    -1.085881e+04     1.596091e-12
- * time: 24.147727012634277
+ * time: 25.774194955825806
      9    -1.085881e+04     1.444882e-12
- * time: 27.144327878952026
+ * time: 28.97071409225464
     10    -1.085881e+04     1.548831e-13
- * time: 30.10275888442993
+ * time: 32.13159108161926
     11    -1.085881e+04     1.548831e-13
- * time: 33.1748628616333
+ * time: 35.37090802192688
     12    -1.085881e+04     1.508030e-13
- * time: 33.61965799331665
- 40.071869 seconds (11.20 M allocations: 3.880 GiB, 1.50% gc time, 8.97% compilation time)</code></pre><p>as we can see this runs very quickly even for relatively large gridsizes. The key to get high performance like this is to minimize the allocations inside the threaded loops, ideally to 0.</p><hr/><p><em>This page was generated using <a href="https://github.com/fredrikekre/Literate.jl">Literate.jl</a>.</em></p></article><nav class="docs-footer"><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option><option value="catppuccin-latte">catppuccin-latte</option><option value="catppuccin-frappe">catppuccin-frappe</option><option value="catppuccin-macchiato">catppuccin-macchiato</option><option value="catppuccin-mocha">catppuccin-mocha</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.7.0 on <span class="colophon-date" title="Thursday 31 October 2024 22:26">Thursday 31 October 2024</span>. Using Julia version 1.11.1.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
+ * time: 35.8068950176239
+ 42.087405 seconds (11.20 M allocations: 3.880 GiB, 1.39% gc time, 7.79% compilation time)</code></pre><p>as we can see this runs very quickly even for relatively large gridsizes. The key to get high performance like this is to minimize the allocations inside the threaded loops, ideally to 0.</p><hr/><p><em>This page was generated using <a href="https://github.com/fredrikekre/Literate.jl">Literate.jl</a>.</em></p></article><nav class="docs-footer"><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option><option value="catppuccin-latte">catppuccin-latte</option><option value="catppuccin-frappe">catppuccin-frappe</option><option value="catppuccin-macchiato">catppuccin-macchiato</option><option value="catppuccin-mocha">catppuccin-mocha</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.7.0 on <span class="colophon-date" title="Wednesday 6 November 2024 07:56">Wednesday 6 November 2024</span>. Using Julia version 1.11.1.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
