@@ -13,8 +13,11 @@ struct GPUAssemblerSparsityPattern{Tv, Ti, VEC_FLOAT <: AbstractVector{Tv}, SPAR
     f::VEC_FLOAT
 end
 
-function Ferrite.start_assemble(K::CUSPARSE.CuSparseDeviceMatrixCSC{Tv, Ti}, f::CuDeviceVector{Tv}; fillzero = false) where {Tv, Ti}
-    ##fillzero && (fillzero!(K); fillzero!(f))
+function Ferrite.start_assemble(K::CUSPARSE.CuSparseDeviceMatrixCSC{Tv, Ti}, f::CuDeviceVector{Tv}; fillzero::Bool = false) where {Tv, Ti}
+    ## `fillzero` is not required in GPU version and should be always set to false, because different threads will
+    ## instantiate their own instance of assembler, so it it's set to true, the results will be wrong.
+    ## However, the interface is kept the same for consistency with the CPU version (in CPU multithreading we use the standard assembler).
+    fillzero && (fillzero!(K); fillzero!(f))
     return GPUAssemblerSparsityPattern(K, f)
 end
 
@@ -59,4 +62,16 @@ end
         end
     end
     return
+end
+
+
+### Array utils ###
+function fillzero!(A::CuDeviceVector{Tv}) where {Tv}
+    CUDA.fill!(A, zero(Tv))
+    return A
+end
+
+function fillzero!(A::CUSPARSE.CuSparseDeviceMatrixCSC{Tv, Ti}) where {Tv, Ti}
+    CUDA.fill!(A.nzVal, zero(Tv))
+    return A
 end

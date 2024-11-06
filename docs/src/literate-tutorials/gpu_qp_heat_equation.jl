@@ -1,6 +1,7 @@
 using Ferrite
 using StaticArrays
 using SparseArrays
+using CUDA
 
 
 left = Tensor{1, 2, Float32}((0, -0)) # define the left bottom corner of the grid.
@@ -25,6 +26,7 @@ dh = DofHandler(grid)
 add!(dh, :u, ip)
 
 close!(dh);
+
 
 dh |> get_grid
 
@@ -133,9 +135,7 @@ end
 n_basefuncs = getnbasefunctions(cellvalues)
 
 ## Allocate CPU matrix
-## K = allocate_matrix(SparseMatrixCSC{Float32, Int32},dh);
-
-K = allocate_matrix(SparseMatrixCSC{Float64, Int64}, dh);
+K = allocate_matrix(SparseMatrixCSC{Float32, Int32}, dh);
 f = zeros(ndofs(dh));
 
 # Allocate GPU matrix
@@ -146,8 +146,14 @@ f = zeros(ndofs(dh));
 n_cells = dh |> get_grid |> getncells
 
 # Kernel configuration
+## GPU kernel ##
 ## commented to pass the test
-##init_kernel(BackendCUDA,n_cells,n_basefuncs,assemble_gpu!, (Kgpu,fgpu, cellvalues, dh)) |> launch!
+## First init the kernel with the required config.
+## gpu_kernel = init_kernel(BackendCUDA,n_cells,n_basefuncs,assemble_gpu!, (Kgpu,fgpu, cellvalues, dh))
+## Then launch the kernel
+## gpu_kernel |> launch! or gpu_kernel()
+
+## CPU kernel ##
 cpu_kernel = init_kernel(BackendCPU, n_cells, n_basefuncs, assemble_gpu!, (K, f, cellvalues, dh));
 cpu_kernel()
 

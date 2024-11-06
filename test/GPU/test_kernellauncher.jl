@@ -9,7 +9,7 @@ end
 
 # Helper function to launch the kernel with CUDAKernelLauncher
 function test_launch_kernel!(n_cells::Integer, n_basefuncs::Integer, args...)
-    return init_gpu_kernel(BackendCUDA, n_cells, n_basefuncs, kernel_add, args) |> launch!
+    return init_kernel(BackendCUDA, n_cells, n_basefuncs, kernel_add, args) |> launch!
 end
 
 # Testing for different integer types

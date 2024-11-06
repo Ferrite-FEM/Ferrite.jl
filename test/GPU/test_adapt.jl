@@ -49,7 +49,7 @@ end
     ncells = dh |> get_grid |> getncells
     nbasefunctions = cv |> getnbasefunctions
     gpudofs = zeros(Int32, nbasefunctions, ncells) |> cu
-    init_gpu_kernel(BackendCUDA, ncells, nbasefunctions, dofs_gpu_kernel, (gpudofs, dh, cv)) |> launch!
+    init_kernel(BackendCUDA, ncells, nbasefunctions, dofs_gpu_kernel, (gpudofs, dh, cv)) |> launch!
     ## Test that dofs are correctly transfered to the GPU
     @test all(cpudofs .== gpudofs)
     ## Test that weights are correctly transfered to the GPU
@@ -61,6 +61,6 @@ end
     cpunodes = nodes_cpu(dh |> get_grid) |> cu
     n_nodes = length(cpunodes)
     gpu_cellnodes = CUDA.zeros(Int32, nbasefunctions, ncells)
-    init_gpu_kernel(BackendCUDA, ncells, nbasefunctions, nodes_gpu_kernel, (gpu_cellnodes, dh, cv)) |> launch!
+    init_kernel(BackendCUDA, ncells, nbasefunctions, nodes_gpu_kernel, (gpu_cellnodes, dh, cv)) |> launch!
     @test all(cpunodes .== gpu_cellnodes)
 end
