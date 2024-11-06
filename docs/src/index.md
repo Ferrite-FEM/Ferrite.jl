@@ -78,7 +78,6 @@ flowchart TD
     sptype(SparsityPattern)
     mattype[[System matrix]]
     vectype[[System vector]]
-    assemblertype(Assembler)
     assemblycode{{User assembly code}}
     gridtype-->dhtype
     iptype-->dhtype
@@ -94,11 +93,10 @@ flowchart TD
     sptype-->mattype
     chtype-->vectype
     dhtype-->vectype
-    vectype-->assemblertype
-    mattype-->assemblertype
     cvtype-->assemblycode
     fvtype-->assemblycode
-    assemblertype-->assemblycode
+    assemblycode-->vectype
+    assemblycode-->mattype
 ```
 
 ### Getting help
