@@ -10,7 +10,7 @@ if liveserver
     @timeit dto "Revise.revise()" Revise.revise()
 end
 
-using Documenter, DocumenterCitations, Ferrite, FerriteGmsh, FerriteMeshParser,
+using Documenter, DocumenterCitations, DocumenterMermaid, Ferrite, FerriteGmsh, FerriteMeshParser,
     SparseArrays, LinearAlgebra, Changelog
 
 using BlockArrays
