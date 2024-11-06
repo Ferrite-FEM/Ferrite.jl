@@ -341,10 +341,10 @@ end
     `InterfaceIterator` is stateful and should not be used for things other than `for`-looping
     (e.g. broadcasting over, or collecting the iterator may yield unexpected results).
 """
-struct InterfaceIterator{IC <: InterfaceCache, G <: AbstractGrid, Topology <: AbstractTopology}
+struct InterfaceIterator{IC <: InterfaceCache, G <: AbstractGrid, TopologyType <: AbstractTopology}
     cache::IC
     grid::G
-    topology::Topology
+    topology::TopologyType
 end
 
 function InterfaceIterator(

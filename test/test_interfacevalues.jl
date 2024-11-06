@@ -200,23 +200,78 @@
     #     DiscontinuousLagrange{RefTriangle, 1}(), FacetQuadratureRule{RefTriangle}(2))
     # end
     @testset "Unordered nodes 3D" begin
-        dim = 2
-        nodes = [
-            Node((-1.0, 0.0, 0.0)), Node((0.0, 0.0, 0.0)), Node((1.0, 0.0, 0.0)),
-            Node((-1.0, 1.0, 0.0)), Node((0.0, 1.0, 0.0)), Node((1.0, 1.0, 0.0)),
-            Node((-1.0, 0.0, 1.0)), Node((0.0, 0.0, 1.0)), Node((1.0, 0.0, 1.0)),
-            Node((-1.0, 1.0, 1.0)), Node((0.0, 1.0, 1.0)), Node((1.0, 1.0, 1.0)),
-        ]
-        cells = [
-            Hexahedron((1, 2, 5, 4, 7, 8, 11, 10)),
-            Hexahedron((5, 6, 12, 11, 2, 3, 9, 8)),
-        ]
-
-        grid = Grid(cells, nodes)
-        test_interfacevalues(
-            grid,
-            InterfaceValues(FacetQuadratureRule{RefHexahedron}(2), DiscontinuousLagrange{RefHexahedron, 1}())
-        )
+        @testset "Hexahedron" begin
+            nodes = [
+                Node((-1.0, 0.0, 0.0)), Node((0.0, 0.0, 0.0)), Node((1.0, 0.0, 0.0)),
+                Node((-1.0, 1.0, 0.0)), Node((0.0, 1.0, 0.0)), Node((1.0, 1.0, 0.0)),
+                Node((-1.0, 0.0, 1.0)), Node((0.0, 0.0, 1.0)), Node((1.0, 0.0, 1.0)),
+                Node((-1.0, 1.0, 1.0)), Node((0.0, 1.0, 1.0)), Node((1.0, 1.0, 1.0)),
+            ]
+            cells = [
+                Hexahedron((1, 2, 5, 4, 7, 8, 11, 10)),
+                Hexahedron((5, 6, 12, 11, 2, 3, 9, 8)),
+            ]
+            grid = Grid(cells, nodes)
+            test_interfacevalues(
+                grid,
+                InterfaceValues(FacetQuadratureRule{RefHexahedron}(2), DiscontinuousLagrange{RefHexahedron, 1}())
+            )
+            orientation_info = Ferrite.InterfaceOrientationInfo(getcells(grid, 1), getcells(grid, 2), 3, 5)
+            @testset "Interface Orientation" begin
+                @test orientation_info.flipped == true
+                @test Ferrite.get_transformation_matrix(orientation_info) isa Tensor{2, 3}
+            end
+            @testset "Flipped normal Interface Orientation" begin
+                nodes = [
+                    Node((-1.0, 0.0, 0.0)), Node((0.0, 0.0, 0.0)), Node((1.0, 0.0, 0.0)),
+                    Node((-1.0, 1.0, 0.0)), Node((0.0, 1.0, 0.0)), Node((1.0, 1.0, 0.0)),
+                    Node((-1.0, 0.0, 1.0)), Node((0.0, 0.0, 1.0)), Node((1.0, 0.0, 1.0)),
+                    Node((-1.0, 1.0, 1.0)), Node((0.0, 1.0, 1.0)), Node((1.0, 1.0, 1.0)),
+                ]
+                cells = [
+                    Hexahedron((1, 4, 5, 2, 7, 10, 11, 8)),
+                    Hexahedron((5, 6, 12, 11, 2, 3, 9, 8)),
+                ]
+                grid = Grid(cells, nodes)
+                orientation_info = Ferrite.InterfaceOrientationInfo(getcells(grid, 1), getcells(grid, 2), 4, 5)
+                @test orientation_info.flipped == false
+                @test Ferrite.get_transformation_matrix(orientation_info) isa Tensor{2, 3}
+            end
+        end
+        @testset "Tetrahedron" begin
+            nodes = [
+                Node((0.0, 0.0, 0.0)), Node((1.0, 0.0, 0.0)), Node((0.0, 1.0, 0.0)),
+                Node((0.0, 0.0, 1.0)), Node((-1.0, 0.0, 0.0)),
+            ]
+            cells = [
+                Tetrahedron((1, 2, 3, 4)),
+                Tetrahedron((1, 3, 5, 4)),
+            ]
+            grid = Grid(cells, nodes)
+            test_interfacevalues(
+                grid,
+                InterfaceValues(FacetQuadratureRule{RefTetrahedron}(2), DiscontinuousLagrange{RefTetrahedron, 1}())
+            )
+            orientation_info = Ferrite.InterfaceOrientationInfo(getcells(grid, 1), getcells(grid, 2), 4, 2)
+            @testset "Interface Orientation" begin
+                @test orientation_info.flipped == true
+                @test Ferrite.get_transformation_matrix(orientation_info) isa Tensor{2, 3}
+            end
+            @testset "Flipped normal Interface Orientation" begin
+                nodes = [
+                    Node((0.0, 0.0, 0.0)), Node((1.0, 0.0, 0.0)), Node((0.0, 1.0, 0.0)),
+                    Node((0.0, 0.0, 1.0)), Node((-1.0, 0.0, 0.0)),
+                ]
+                cells = [
+                    Tetrahedron((1, 2, 4, 3)),
+                    Tetrahedron((1, 3, 5, 4)),
+                ]
+                grid = Grid(cells, nodes)
+                orientation_info = Ferrite.InterfaceOrientationInfo(getcells(grid, 1), getcells(grid, 2), 4, 2)
+                @test orientation_info.flipped == false
+                @test Ferrite.get_transformation_matrix(orientation_info) isa Tensor{2, 3}
+            end
+        end
     end
     @testset "Interface dof_range" begin
         grid = generate_grid(Quadrilateral, (3, 3))
