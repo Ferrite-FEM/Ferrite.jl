@@ -121,7 +121,7 @@ end
 # gpu version of global assembly
 function assemble_gpu!(Kgpu, fgpu, cv, dh)
     n_basefuncs = getnbasefunctions(cv)
-    assembler = start_assemble(Kgpu, fgpu; fillzero = false)
+    assembler = start_assemble(Kgpu, fgpu; fillzero = false) ## has to be always false
     for cell in CellIterator(dh, convert(Int32, n_basefuncs))
         Ke = cellke(cell)
         fe = cellfe(cell)
@@ -135,7 +135,9 @@ end
 n_basefuncs = getnbasefunctions(cellvalues)
 
 ## Allocate CPU matrix
-K = allocate_matrix(SparseMatrixCSC{Float32, Int32}, dh);
+## K = allocate_matrix(SparseMatrixCSC{Float32, Int32}, dh);
+
+K = allocate_matrix(SparseMatrixCSC{Float64, Int64}, dh);
 f = zeros(ndofs(dh));
 
 # Allocate GPU matrix
