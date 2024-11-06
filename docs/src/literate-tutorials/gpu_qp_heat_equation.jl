@@ -10,10 +10,10 @@ using CUDA
 
 left = Tensor{1,2,Float32}((0,-0)) # define the left bottom corner of the grid.
 
-right = Tensor{1,2,Float32}((10.0,10.0)) # define the right top corner of the grid.
+right = Tensor{1,2,Float32}((100.0,100.0)) # define the right top corner of the grid.
 
 
-grid = generate_grid(Quadrilateral, (2, 2),left,right)
+grid = generate_grid(Quadrilateral, (100, 100),left,right)
 
 
 ip = Lagrange{RefQuadrilateral, 1}() # define the interpolation function (i.e. Bilinear lagrange)
@@ -74,6 +74,7 @@ end
 
 
 # Standard global assembly
+
 function assemble_global!(cellvalues, dh::DofHandler,qp_iter::Val{QPiter}) where {QPiter}
     (;f, K, assembler, Ke, fe) = create_buffers(cellvalues,dh)
     ## Loop over all cels

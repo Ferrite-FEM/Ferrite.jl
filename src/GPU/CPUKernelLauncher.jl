@@ -27,7 +27,7 @@ end
 function _to_colordh(args::Tuple)
     dh_index = findfirst(x -> x isa AbstractDofHandler, args)
     dh_index !== nothing || throw(ErrorException("No subtype of AbstractDofHandler found in the arguments"))
-    arr  = args |> collect 
+    arr  = args |> collect
     color_dh = init_colordh(arr[dh_index])
     arr[dh_index] = color_dh
     return Tuple(arr), color_dh
@@ -36,7 +36,7 @@ end
 function _update_cell_args(args::Tuple,index::Int)
     ## since tuples are immutable we need to convert it to an array to update the values
     ## then convert it back to a tuple
-    arr  = args |> collect 
+    arr  = args |> collect
     arr[index] = _to_static_cellvalues(arr[index])
     return Tuple(arr)
 end

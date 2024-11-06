@@ -76,7 +76,7 @@ struct LazyKernel{Ti,BKD<:AbstractBackend} <: AbstractKernel
     args::Tuple               # Arguments for the kernel function
     backend::Type{BKD} # GPU backend
 end
- 
+
 (ker::LazyKernel)() = launch!(ker)
 
 """

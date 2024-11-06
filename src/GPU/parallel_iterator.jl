@@ -27,7 +27,7 @@ end
 
 ##### CPUKernelCellIterator #####
 struct CPUKernelCellIterator{DH<:ColoringDofHandler,GRID<: AbstractGrid,Tv} <: AbstractKernelCellIterator
-    dh::DH 
+    dh::DH
     grid::GRID
     n_cells::Int
     ke::Matrix{Tv} # 2d local stiffness matrix that is shared among the same thread
@@ -57,7 +57,6 @@ function Base.iterate(iterator::CPUKernelCellIterator)
     eles_color = eles_in_color(iterator.dh, curr_color) # elements in the current color
     ncells = length(eles_color)
     i <= ncells || return nothing
-    @show i, eles_color[i]
     return (_makecache(iterator, eles_color[i]), i)
 end
 
@@ -69,7 +68,6 @@ function Base.iterate(iterator::CPUKernelCellIterator, state)
     eles_color = eles_in_color(iterator.dh, curr_color) # elements in the current color
     ncells = length(eles_color)
     i <= ncells || return nothing
-    @show i, eles_color[i]
     return (_makecache(iterator, eles_color[i]), i)
 end
 
@@ -81,8 +79,8 @@ struct CPUKernelCellCache{Ti <: Integer,DOFS <: AbstractVector{Ti},NN,NODES <: S
     dofs::DOFS
     cellid::Ti
     nodes::NODES
-    ke::Matrix{Tv} 
-    fe::Vector{Tv} 
+    ke::Matrix{Tv}
+    fe::Vector{Tv}
 end
 
 
@@ -97,7 +95,6 @@ function _makecache(iterator::CPUKernelCellIterator, e::Ti) where {Ti<:Integer}
 
     # Extract the degrees of freedom for the cell.
     dofs = celldofs(dh, e)
-    @show dofs
     # Get the coordinates of the nodes of the cell.
     CT = get_coordinate_type(grid)
     N = nnodes(cell)
