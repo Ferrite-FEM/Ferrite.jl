@@ -19,6 +19,7 @@ Ferrite.reference_shape_values!
 Ferrite.reference_shape_gradients!
 Ferrite.reference_shape_gradients_and_values!
 Ferrite.reference_shape_hessians_gradients_and_values!
+Ferrite.shape_value_type(ip::Interpolation, ::Type{T}) where T<:Number
 ```
 
 ### Required methods to implement for all subtypes of `Interpolation` to define a new finite element
