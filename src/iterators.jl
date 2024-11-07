@@ -384,7 +384,10 @@ function InterfaceIterator(
     ninterfaces = count(facet -> !isempty(neighborhood[facet[1], facet[2]]), fs)
     set = OrderedSet{InterfaceIndex}()
     sizehint!(set, ninterfaces)
-    map!(facet -> InterfaceIndex((facet[1], facet[2], neighborhood[facet[1], facet[2]][1][1], neighborhood[facet[1], facet[2]][1][2])), set, filter(facet -> !isempty(neighborhood[facet[1], facet[2]]), fs))
+    for facet in fs
+        isempty(neighborhood[facet[1], facet[2]]) && continue
+        push!(set, InterfaceIndex((facet[1], facet[2], neighborhood[facet[1], facet[2]][][1], neighborhood[facet[1], facet[2]][][2])))
+    end
     return InterfaceIterator(InterfaceCache(gridordh), set)
 end
 
