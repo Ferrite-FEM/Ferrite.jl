@@ -107,6 +107,10 @@ struct FacetIndex <: BoundaryIndex
     idx::Tuple{Int, Int} # cell and side
 end
 
+struct InterfaceIndex <: BoundaryIndex
+    idx::Tuple{Int, Int, Int, Int}
+end
+
 const AbstractVecOrSet{T} = Union{AbstractSet{T}, AbstractVector{T}}
 const IntegerCollection = AbstractVecOrSet{<:Integer}
 

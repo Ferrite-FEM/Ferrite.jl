@@ -176,9 +176,9 @@ function InterfaceCache(gridordh::Union{AbstractGrid, AbstractDofHandler})
     return InterfaceCache(fc_a, fc_b, Int[])
 end
 
-function reinit!(cache::InterfaceCache, facet_a::BoundaryIndex, facet_b::BoundaryIndex)
-    reinit!(cache.a, facet_a)
-    reinit!(cache.b, facet_b)
+function reinit!(cache::InterfaceCache, interface::InterfaceIndex)
+    reinit!(cache.a, FacetIndex(interface.idx[1], interface.idx[2]))
+    reinit!(cache.b, FacetIndex(interface.idx[3], interface.idx[4]))
     resize!(cache.dofs, length(celldofs(cache.a)) + length(celldofs(cache.b)))
     for (i, d) in pairs(cache.a.dofs)
         cache.dofs[i] = d
@@ -341,10 +341,33 @@ end
     `InterfaceIterator` is stateful and should not be used for things other than `for`-looping
     (e.g. broadcasting over, or collecting the iterator may yield unexpected results).
 """
-struct InterfaceIterator{IC <: InterfaceCache, G <: Grid}
+struct InterfaceIterator{IC <: InterfaceCache}
     cache::IC
-    grid::G
-    topology::ExclusiveTopology
+    set::OrderedSet{InterfaceIndex}
+end
+
+@inline _getcache(ii::InterfaceIterator) = ii.cache
+@inline _getset(ii::InterfaceIterator) = ii.set
+
+function InterfaceIterator(
+        gridordh::Union{Grid, AbstractDofHandler},
+        set_here::AbstractVecOrSet{FacetIndex},
+        topology::ExclusiveTopology = ExclusiveTopology(gridordh isa Grid ? gridordh : get_grid(gridordh))
+    )
+    grid = gridordh isa Grid ? gridordh : get_grid(gridordh)
+    if gridordh isa DofHandler
+        # Keep here to maintain same settings as for CellIterator
+        _check_same_celltype(grid, set_here)
+    end
+    neighborhood = get_facet_facet_neighborhood(topology, grid)
+    @assert all(facet -> !isempty(neighborhood[facet[1], facet[2]]), set) "Facets in the set must have neighbors"
+    set = OrderedSet{InterfaceIndex}()
+    sizehint!(set, ninterfaces)
+    for facet in set_here
+        neighbor = neighborhood[facet[1], facet[2]][]
+        push!(set, InterfaceIndex(facet[1], facet[2], neighbor[1], neighbor[2]))
+    end
+    return InterfaceIterator(InterfaceCache(gridordh), set)
 end
 
 function InterfaceIterator(
@@ -352,28 +375,18 @@ function InterfaceIterator(
         topology::ExclusiveTopology = ExclusiveTopology(gridordh isa Grid ? gridordh : get_grid(gridordh))
     )
     grid = gridordh isa Grid ? gridordh : get_grid(gridordh)
-    return InterfaceIterator(InterfaceCache(gridordh), grid, topology)
-end
-
-# Iterator interface
-function Base.iterate(ii::InterfaceIterator{<:Any, <:Grid{sdim}}, state...) where {sdim}
-    neighborhood = get_facet_facet_neighborhood(ii.topology, ii.grid) # TODO: This could be moved to InterfaceIterator constructor (potentially type-instable for non-union or mixed grids)
-    while true
-        it = iterate(facetskeleton(ii.topology, ii.grid), state...)
-        it === nothing && return nothing
-        facet_a, state = it
-        if isempty(neighborhood[facet_a[1], facet_a[2]])
-            continue
-        end
-        neighbors = neighborhood[facet_a[1], facet_a[2]]
-        length(neighbors) > 1 && error("multiple neighboring faces not supported yet")
-        facet_b = neighbors[1]
-        reinit!(ii.cache, facet_a, facet_b)
-        return (ii.cache, state)
+    if gridordh isa DofHandler
+        # Keep here to maintain same settings as for CellIterator
+        _check_same_celltype(grid, 1:getncells(grid))
     end
-    return
+    neighborhood = get_facet_facet_neighborhood(topology, grid)
+    fs = facetskeleton(topology, grid)
+    ninterfaces = count(facet -> !isempty(neighborhood[facet[1], facet[2]]), fs)
+    set = OrderedSet{InterfaceIndex}()
+    sizehint!(set, ninterfaces)
+    map!(facet -> InterfaceIndex((facet[1], facet[2], neighborhood[facet[1], facet[2]][1][1], neighborhood[facet[1], facet[2]][1][2])), set, filter(facet -> !isempty(neighborhood[facet[1], facet[2]]), fs))
+    return InterfaceIterator(InterfaceCache(gridordh), set)
 end
-
 
 # Iterator interface for CellIterator/FacetIterator
 const GridIterators{C} = Union{CellIterator{C}, FacetIterator{C}, InterfaceIterator{C}}
