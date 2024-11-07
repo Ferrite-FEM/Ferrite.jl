@@ -2,7 +2,7 @@
 using Ferrite
 ```
 
-# Degrees of Freedom
+# Degrees of freedom
 
 The distribution and numbering of degrees of freedom (dofs) are handled by the `DofHandler`.
 The DofHandler will be used to query information about the dofs. For example we can obtain
