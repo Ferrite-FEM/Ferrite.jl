@@ -172,13 +172,12 @@ end
 # purpose. Finally, for the assembler we call `start_assemble` to create a new assembler but
 # note that we set `fillzero = false` because we don't want to risk that a task that starts
 # a bit later will zero out data that another task have already assembled.
-function ScratchData(dh::DofHandler, K::SparseMatrixCSC, f::Vector, cellvalues::CellValues)
-    cell_cache = CellCache(dh)
-    n = ndofs_per_cell(dh)
-    Ke = zeros(n, n)
-    fe = zeros(n)
-    asm = start_assemble(K, f; fillzero = false)
-    return ScratchData(cell_cache, copy(cellvalues), Ke, fe, asm)
+function create_scratch(scratch::ScratchData)
+    return ScratchData(
+        task_local(scratch.cell_cache), task_local(scratch.cellvalues),
+        task_local(scratch.Ke), task_local(scratch.fe),
+        task_local(scratch.assembler)
+    )
 end
 nothing # hide
 
@@ -220,13 +219,17 @@ using OhMyThreads, TaskLocalValues
 
 function assemble_global!(
         K::SparseMatrixCSC, f::Vector, dh::DofHandler, colors,
-        cellvalues_template::CellValues; ntasks = Threads.nthreads()
+        cellvalues::CellValues; ntasks = Threads.nthreads()
     )
-    ## Zero-out existing data in K and f
-    _ = start_assemble(K, f)
     ## Body force and material stiffness
     b = Vec{3}((0.0, 0.0, -1.0))
     C = create_material_stiffness()
+    ## Scratch data
+    scratch = ScratchData(
+        CellCache(dh), cellvalues,
+        zeros(ndofs_per_cell(dh), ndofs_per_cell(dh)), zeros(ndofs_per_cell(dh)),
+        start_assemble(K, f)
+    )
     ## Loop over the colors
     for color in colors
         ## Dynamic scheduler spawning `ntasks` tasks where each task will process a chunk of
@@ -237,8 +240,8 @@ function assemble_global!(
             ## Tell the @tasks loop to use the scheduler defined above
             @set scheduler = scheduler
             ## Obtain a task local scratch and unpack it
-            @local scratch = ScratchData(dh, K, f, cellvalues_template)
-            (; cell_cache, cellvalues, Ke, fe, assembler) = scratch
+            @local scratch = create_scratch(scratch)
+            local (; cell_cache, cellvalues, Ke, fe, assembler) = scratch
             ## Reinitialize the cell cache and then the cellvalues
             reinit!(cell_cache, cellidx)
             reinit!(cellvalues, cell_cache)
@@ -259,7 +262,7 @@ nothing # hide
 #     ```julia
 #     # using TaskLocalValues
 #     scratches = TaskLocalValue() do
-#         ScratchData(dh, K, f, cellvalues)
+#         create_scratch(scratch)
 #     end
 #     OhMyThreads.tforeach(color; scheduler) do cellidx
 #         # Obtain a task local scratch and unpack it

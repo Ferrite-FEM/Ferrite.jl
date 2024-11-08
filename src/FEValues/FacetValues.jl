@@ -68,10 +68,12 @@ function FacetValues(::Type{T}, qr::FacetQuadratureRule, ip::Interpolation, ip_g
     return FacetValues(T, qr, ip, ip_geo, ValuesUpdateFlags(ip; kwargs...))
 end
 
-function Base.copy(fv::FacetValues)
-    fun_values = map(copy, fv.fun_values)
-    geo_mapping = map(copy, fv.geo_mapping)
-    return FacetValues(fun_values, geo_mapping, copy(fv.fqr), copy(fv.detJdV), copy(fv.normals), fv.current_facet)
+function task_local(fv::FacetValues)
+    return FacetValues(
+        map(task_local, fv.fun_values), map(task_local, fv.geo_mapping),
+        task_local(fv.fqr), task_local(fv.detJdV), task_local(fv.normals),
+        task_local(fv.current_facet)
+    )
 end
 
 getngeobasefunctions(fv::FacetValues) = getngeobasefunctions(get_geo_mapping(fv))

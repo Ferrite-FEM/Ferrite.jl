@@ -31,6 +31,8 @@ using .CollectionsOfViews:
 
 include("exports.jl")
 
+# Task based multithreading support
+include("multithreading.jl")
 
 """
     AbstractRefShape{refdim}
