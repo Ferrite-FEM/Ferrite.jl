@@ -373,7 +373,7 @@ jac_sparsity = sparse(K);
 
 # To apply the nonlinear portion of the Navier-Stokes problem we simply hand
 # over the dof handler and cell values to the right-hand-side (RHS) as a parameter.
-# Furthermore the pre-assembled linear part, our Stokes opeartor (which is time independent)
+# Furthermore the pre-assembled linear part, our Stokes operator (which is time independent)
 # is passed to save some additional runtime. To apply the time-dependent Dirichlet BCs, we
 # also need to hand over the constraint handler.
 # The basic idea to apply the Dirichlet BCs consistently is that we copy the
