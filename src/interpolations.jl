@@ -1683,7 +1683,7 @@ end
 get_n_copies(::VectorizedInterpolation{vdim}) where {vdim} = vdim
 InterpolationInfo(ip::VectorizedInterpolation) = InterpolationInfo(ip.ip, get_n_copies(ip))
 
-# Error when trying to get dof indicies from vectorized interpolations.
+# Error when trying to get dof indices from vectorized interpolations.
 # Currently, this should only be done for the scalar interpolation.
 function _entitydof_indices_vectorized_ip_error(f::Symbol)
     throw(ArgumentError(string(f, " is not implemented for VectorizedInterpolations and should be called on the scalar base interpolation")))

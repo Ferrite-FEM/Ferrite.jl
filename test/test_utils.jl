@@ -278,8 +278,8 @@ getfacerefshape(::Tetrahedron, ::Int) = RefTriangle
 getfacerefshape(::Pyramid, face::Int) = face == 1 ? RefQuadrilateral : RefTriangle
 getfacerefshape(::Wedge, face::Int) = face ∈ (1, 5) ? RefTriangle : RefQuadrilateral
 
-function perturbate_standard_grid!(grid::Ferrite.AbstractGrid{dim}, strength) where {dim}
-    function perturbate(x::Vec{dim}) where {dim}
+function perturb_standard_grid!(grid::Ferrite.AbstractGrid{dim}, strength) where {dim}
+    function perturb(x::Vec{dim}) where {dim}
         for d in 1:dim
             if x[d] ≈ 1.0 || x[d] ≈ -1.0
                 return x
@@ -287,7 +287,7 @@ function perturbate_standard_grid!(grid::Ferrite.AbstractGrid{dim}, strength) wh
         end
         return x + Vec{dim}(0.5 * strength .* (2 .* rand(Vec{dim}) .- 1.0))
     end
-    return transform_coordinates!(grid, perturbate)
+    return transform_coordinates!(grid, perturb)
 end
 
 ######################################################

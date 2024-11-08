@@ -26,7 +26,7 @@ end
 """
     ValuesUpdateFlags(ip_fun::Interpolation; update_gradients = Val(true), update_hessians = Val(false), update_detJdV = Val(true))
 
-Creates a singelton type for specifying what parts of the AbstractValues should be updated. Note that this is internal
+Creates a singleton type for specifying what parts of the AbstractValues should be updated. Note that this is internal
 API used to get type-stable construction. Keyword arguments in `AbstractValues` constructors are forwarded, and the public API
 is passing these as `Bool`, while the `ValuesUpdateFlags` method supports both boolean and `Val(::Bool)` keyword args.
 """
