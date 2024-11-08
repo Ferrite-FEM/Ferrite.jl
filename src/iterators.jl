@@ -176,6 +176,12 @@ function InterfaceCache(gridordh::Union{AbstractGrid, AbstractDofHandler})
     return InterfaceCache(fc_a, fc_b, Int[])
 end
 
+function InterfaceCache(sdh_here::SubDofHandler, sdh_there::SubDofHandler)
+    fc_a = FacetCache(sdh_here)
+    fc_b = FacetCache(sdh_there)
+    return InterfaceCache(fc_a, fc_b, Int[])
+end
+
 function reinit!(cache::InterfaceCache, interface::InterfaceIndex)
     reinit!(cache.a, FacetIndex(interface.idx[1], interface.idx[2]))
     reinit!(cache.b, FacetIndex(interface.idx[3], interface.idx[4]))
@@ -350,7 +356,7 @@ end
 @inline _getset(ii::InterfaceIterator) = ii.set
 
 function InterfaceIterator(
-        gridordh::Union{Grid, AbstractDofHandler},
+        gridordh::Union{Grid, DofHandler},
         set_here::AbstractVecOrSet{FacetIndex},
         topology::ExclusiveTopology = ExclusiveTopology(gridordh isa Grid ? gridordh : get_grid(gridordh))
     )
@@ -371,7 +377,7 @@ function InterfaceIterator(
 end
 
 function InterfaceIterator(
-        gridordh::Union{Grid, AbstractDofHandler},
+        gridordh::Union{Grid, DofHandler},
         topology::ExclusiveTopology = ExclusiveTopology(gridordh isa Grid ? gridordh : get_grid(gridordh))
     )
     grid = gridordh isa Grid ? gridordh : get_grid(gridordh)
@@ -389,6 +395,34 @@ function InterfaceIterator(
         push!(set, InterfaceIndex(facet[1], facet[2], neighborhood[facet[1], facet[2]][][1], neighborhood[facet[1], facet[2]][][2]))
     end
     return InterfaceIterator(InterfaceCache(gridordh), set)
+end
+
+function InterfaceIterator(
+        sdh_here::SubDofHandler,
+        sdh_there::SubDofHandler,
+        topology::ExclusiveTopology = ExclusiveTopology(get_grid(sdh_here.dh))
+    )
+    grid = get_grid(sdh_here.dh)
+    neighborhood = get_facet_facet_neighborhood(topology, grid)
+    fs = facetskeleton(topology, grid)
+    ninterfaces = 0
+    for facet in fs
+        facet[1] ∈ sdh_here.cellset || continue
+        neighbors = neighborhood[facet[1], facet[2]]
+        isempty(neighbors) && continue
+        neighbors[][1] ∈ sdh_there.cellset || continue
+        ninterfaces += 1
+    end
+    set = Set{InterfaceIndex}()
+    sizehint!(set, ninterfaces)
+    for facet in fs
+        facet[1] ∈ sdh_here.cellset || continue
+        neighbors = neighborhood[facet[1], facet[2]]
+        isempty(neighbors) && continue
+        neighbors[][1] ∈ sdh_there.cellset || continue
+        push!(set, InterfaceIndex(facet[1], facet[2], neighborhood[facet[1], facet[2]][][1], neighborhood[facet[1], facet[2]][][2]))
+    end
+    return InterfaceIterator(InterfaceCache(sdh_here, sdh_there), set)
 end
 
 # Iterator interface for CellIterator/FacetIterator
