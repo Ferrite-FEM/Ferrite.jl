@@ -341,9 +341,9 @@ end
     `InterfaceIterator` is stateful and should not be used for things other than `for`-looping
     (e.g. broadcasting over, or collecting the iterator may yield unexpected results).
 """
-struct InterfaceIterator{IC <: InterfaceCache}
+struct InterfaceIterator{IC <: InterfaceCache, SetType <: AbstractSet{InterfaceIndex}}
     cache::IC
-    set::OrderedSet{InterfaceIndex}
+    set::SetType
 end
 
 @inline _getcache(ii::InterfaceIterator) = ii.cache
@@ -360,12 +360,12 @@ function InterfaceIterator(
         _check_same_celltype(grid, set_here)
     end
     neighborhood = get_facet_facet_neighborhood(topology, grid)
-    @assert all(facet -> !isempty(neighborhood[facet[1], facet[2]]), set) "Facets in the set must have neighbors"
-    set = OrderedSet{InterfaceIndex}()
-    sizehint!(set, ninterfaces)
+    @assert all(facet -> !isempty(neighborhood[facet[1], facet[2]]), set_here) "Facets in the set must have neighbors"
+    set = Set{InterfaceIndex}()
+    sizehint!(set, length(set_here))
     for facet in set_here
         neighbor = neighborhood[facet[1], facet[2]][]
-        push!(set, InterfaceIndex(facet[1], facet[2], neighbor[1], neighbor[2]))
+        push!(set, InterfaceIndex((facet[1], facet[2], neighbor[1], neighbor[2])))
     end
     return InterfaceIterator(InterfaceCache(gridordh), set)
 end
@@ -382,7 +382,7 @@ function InterfaceIterator(
     neighborhood = get_facet_facet_neighborhood(topology, grid)
     fs = facetskeleton(topology, grid)
     ninterfaces = count(facet -> !isempty(neighborhood[facet[1], facet[2]]), fs)
-    set = OrderedSet{InterfaceIndex}()
+    set = Set{InterfaceIndex}()
     sizehint!(set, ninterfaces)
     for facet in fs
         isempty(neighborhood[facet[1], facet[2]]) && continue
