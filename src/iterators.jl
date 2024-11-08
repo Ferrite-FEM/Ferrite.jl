@@ -365,7 +365,7 @@ function InterfaceIterator(
     sizehint!(set, length(set_here))
     for facet in set_here
         neighbor = neighborhood[facet[1], facet[2]][]
-        push!(set, InterfaceIndex((facet[1], facet[2], neighbor[1], neighbor[2])))
+        push!(set, InterfaceIndex(facet[1], facet[2], neighbor[1], neighbor[2]))
     end
     return InterfaceIterator(InterfaceCache(gridordh), set)
 end
@@ -386,7 +386,7 @@ function InterfaceIterator(
     sizehint!(set, ninterfaces)
     for facet in fs
         isempty(neighborhood[facet[1], facet[2]]) && continue
-        push!(set, InterfaceIndex((facet[1], facet[2], neighborhood[facet[1], facet[2]][][1], neighborhood[facet[1], facet[2]][][2])))
+        push!(set, InterfaceIndex(facet[1], facet[2], neighborhood[facet[1], facet[2]][][1], neighborhood[facet[1], facet[2]][][2]))
     end
     return InterfaceIterator(InterfaceCache(gridordh), set)
 end

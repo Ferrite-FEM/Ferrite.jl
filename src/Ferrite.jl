@@ -107,8 +107,11 @@ struct FacetIndex <: BoundaryIndex
     idx::Tuple{Int, Int} # cell and side
 end
 
+"""
+An `InterfaceIndex` wraps an (Int, Int, Int, Int) and defines an interface by pointing to a (cell_here, facet_here, cell_there, facet_there).
+"""
 struct InterfaceIndex <: BoundaryIndex
-    idx::Tuple{Int, Int, Int, Int}
+    idx::Tuple{Int, Int, Int, Int} # cell - side - cell - side
 end
 
 const AbstractVecOrSet{T} = Union{AbstractSet{T}, AbstractVector{T}}

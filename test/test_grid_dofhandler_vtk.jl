@@ -232,12 +232,12 @@ end
     # InterfaceCache
     grid = generate_grid(Quadrilateral, (2, 1))
     ic = InterfaceCache(grid)
-    reinit!(ic, FaceIndex(1, 2), FaceIndex(2, 4))
+    reinit!(ic, InterfaceIndex(1, 2, 2, 4))
     @test interfacedofs(ic) == Int[] # Empty because no DofHandler given
     ip = DiscontinuousLagrange{RefQuadrilateral, 1}()
     dh = DofHandler(grid); add!(dh, :u, ip); close!(dh)
     ic = InterfaceCache(dh)
-    reinit!(ic, FaceIndex(1, 2), FaceIndex(2, 4))
+    reinit!(ic, InterfaceIndex(1, 2, 2, 4))
     @test interfacedofs(ic) == collect(1:8)
     # Mixed Elements
     dim = 2
@@ -254,7 +254,7 @@ end
     sdh2 = SubDofHandler(dh, Set([2])); add!(sdh2, :u, ip2)
     close!(dh)
     ic = InterfaceCache(dh)
-    reinit!(ic, FaceIndex(1, 2), FaceIndex(2, 3))
+    reinit!(ic, InterfaceIndex(1, 2, 2, 3))
     @test interfacedofs(ic) == collect(1:7)
     # Unit test of some utilities
     mixed_grid = Grid(
