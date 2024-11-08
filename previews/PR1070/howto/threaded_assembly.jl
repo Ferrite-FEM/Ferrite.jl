@@ -105,7 +105,7 @@ function assemble_global!(
             # Tell the @tasks loop to use the scheduler defined above
             @set scheduler = scheduler
             # Obtain a task local scratch and unpack it
-            @local scratch = make_scratch(scratch)
+            @local scratch = create_scratch(scratch)
             local (; cell_cache, cellvalues, Ke, fe, assembler) = scratch
             # Reinitialize the cell cache and then the cellvalues
             reinit!(cell_cache, cellidx)

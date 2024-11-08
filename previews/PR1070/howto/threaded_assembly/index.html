@@ -96,7 +96,7 @@ function assemble_global!(
             # Tell the @tasks loop to use the scheduler defined above
             @set scheduler = scheduler
             # Obtain a task local scratch and unpack it
-            @local scratch = make_scratch(scratch)
+            @local scratch = create_scratch(scratch)
             local (; cell_cache, cellvalues, Ke, fe, assembler) = scratch
             # Reinitialize the cell cache and then the cellvalues
             reinit!(cell_cache, cellidx)
@@ -110,7 +110,7 @@ function assemble_global!(
     return K, f
 end</code></pre><details class="admonition is-details"><summary class="admonition-header">OhMyThreads functional API: OhMyThreads.tforeach</summary><div class="admonition-body"><p>The <code>OhMyThreads.@tasks</code> block above corresponds to a call to <code>OhMyThreads.tforeach</code>. Using the functional API directly would look like below. The main difference is that we need to manually create a <code>TaskLocalValue</code> for the scratch data.</p><pre><code class="language-julia hljs"># using TaskLocalValues
 scratches = TaskLocalValue() do
-    make_scratch(scratch)
+    create_scratch(scratch)
 end
 OhMyThreads.tforeach(color; scheduler) do cellidx
     # Obtain a task local scratch and unpack it
@@ -249,7 +249,7 @@ function assemble_global!(
             # Tell the @tasks loop to use the scheduler defined above
             @set scheduler = scheduler
             # Obtain a task local scratch and unpack it
-            @local scratch = make_scratch(scratch)
+            @local scratch = create_scratch(scratch)
             local (; cell_cache, cellvalues, Ke, fe, assembler) = scratch
             # Reinitialize the cell cache and then the cellvalues
             reinit!(cell_cache, cellidx)
@@ -281,4 +281,4 @@ function main(; n = 20, ntasks = Threads.nthreads())
     @time assemble_global!(K, f, dh, colors, cellvalues; ntasks = ntasks)
     return
 end
-nothing # hide</code></pre><hr/><p><em>This page was generated using <a href="https://github.com/fredrikekre/Literate.jl">Literate.jl</a>.</em></p></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../postprocessing/">« Post processing and visualization</a><a class="docs-footer-nextpage" href="../../gallery/">Code gallery »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option><option value="catppuccin-latte">catppuccin-latte</option><option value="catppuccin-frappe">catppuccin-frappe</option><option value="catppuccin-macchiato">catppuccin-macchiato</option><option value="catppuccin-mocha">catppuccin-mocha</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.7.0 on <span class="colophon-date" title="Friday 8 November 2024 01:17">Friday 8 November 2024</span>. Using Julia version 1.11.1.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
+nothing # hide</code></pre><hr/><p><em>This page was generated using <a href="https://github.com/fredrikekre/Literate.jl">Literate.jl</a>.</em></p></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../postprocessing/">« Post processing and visualization</a><a class="docs-footer-nextpage" href="../../gallery/">Code gallery »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option><option value="catppuccin-latte">catppuccin-latte</option><option value="catppuccin-frappe">catppuccin-frappe</option><option value="catppuccin-macchiato">catppuccin-macchiato</option><option value="catppuccin-mocha">catppuccin-mocha</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.7.0 on <span class="colophon-date" title="Friday 8 November 2024 02:10">Friday 8 November 2024</span>. Using Julia version 1.11.1.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
