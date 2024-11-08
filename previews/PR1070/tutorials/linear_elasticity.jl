@@ -10,9 +10,9 @@ FerriteGmsh.Gmsh.gmsh.option.set_number("General.Verbosity", 2) #hide
 grid = togrid(logo_mesh);
 FerriteGmsh.Gmsh.finalize(); #hide
 
-addfacetset!(grid, "top",    x -> x[2] ≈ 1.0) # facets for which x[2] ≈ 1.0 for all nodes
-addfacetset!(grid, "left",   x -> abs(x[1]) < 1e-6)
-addfacetset!(grid, "bottom", x -> abs(x[2]) < 1e-6);
+addfacetset!(grid, "top", x -> x[2] ≈ 1.0) # facets for which x[2] ≈ 1.0 for all nodes
+addfacetset!(grid, "left", x -> abs(x[1]) < 1.0e-6)
+addfacetset!(grid, "bottom", x -> abs(x[2]) < 1.0e-6);
 
 dim = 2
 order = 1 # linear interpolation
@@ -30,10 +30,10 @@ close!(dh);
 
 ch = ConstraintHandler(dh)
 add!(ch, Dirichlet(:u, getfacetset(grid, "bottom"), (x, t) -> 0.0, 2))
-add!(ch, Dirichlet(:u, getfacetset(grid, "left"),   (x, t) -> 0.0, 1))
+add!(ch, Dirichlet(:u, getfacetset(grid, "left"), (x, t) -> 0.0, 1))
 close!(ch);
 
-traction(x) = Vec(0.0, 20e3 * x[1]);
+traction(x) = Vec(0.0, 20.0e3 * x[1]);
 
 function assemble_external_forces!(f_ext, dh, facetset, facetvalues, prescribed_traction)
     # Create a temporary array for the facet's local contributions to the external force vector
@@ -62,13 +62,13 @@ function assemble_external_forces!(f_ext, dh, facetset, facetvalues, prescribed_
     return f_ext
 end
 
-Emod = 200e3 # Young's modulus [MPa]
-ν = 0.3      # Poisson's ratio [-]
+Emod = 200.0e3 # Young's modulus [MPa]
+ν = 0.3        # Poisson's ratio [-]
 
 Gmod = Emod / (2(1 + ν))  # Shear modulus
 Kmod = Emod / (3(1 - 2ν)) # Bulk modulus
 
-C = gradient(ϵ -> 2 * Gmod * dev(ϵ) + 3 * Kmod * vol(ϵ), zero(SymmetricTensor{2,2}));
+C = gradient(ϵ -> 2 * Gmod * dev(ϵ) + 3 * Kmod * vol(ϵ), zero(SymmetricTensor{2, 2}));
 
 function assemble_cell!(ke, cellvalues, C)
     for q_point in 1:getnquadpoints(cellvalues)
@@ -118,8 +118,9 @@ u = K \ f_ext;
 
 function calculate_stresses(grid, dh, cv, u, C)
     qp_stresses = [
-        [zero(SymmetricTensor{2,2}) for _ in 1:getnquadpoints(cv)]
-        for _ in 1:getncells(grid)]
+        [zero(SymmetricTensor{2, 2}) for _ in 1:getnquadpoints(cv)]
+            for _ in 1:getncells(grid)
+    ]
     avg_cell_stresses = tuple((zeros(getncells(grid)) for _ in 1:3)...)
     for cell in CellIterator(dh)
         reinit!(cv, cell)
@@ -146,8 +147,8 @@ colors = [                                       #hide
     "1" => 1, "5" => 1, # purple                 #hide
     "2" => 2, "3" => 2, # red                    #hide
     "4" => 3,           # blue                   #hide
-    "6" => 4            # green                  #hide
-    ]                                            #hide
+    "6" => 4,           # green                  #hide
+]                                                #hide
 for (key, color) in colors                       #hide
     for i in getcellset(grid, key)               #hide
         color_data[i] = color                    #hide

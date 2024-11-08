@@ -1,17 +1,17 @@
 <!DOCTYPE html>
-<html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/><title>Von Mises plasticity · Ferrite.jl</title><meta name="title" content="Von Mises plasticity · Ferrite.jl"/><meta property="og:title" content="Von Mises plasticity · Ferrite.jl"/><meta property="twitter:title" content="Von Mises plasticity · Ferrite.jl"/><meta name="description" content="Documentation for Ferrite.jl."/><meta property="og:description" content="Documentation for Ferrite.jl."/><meta property="twitter:description" content="Documentation for Ferrite.jl."/><meta property="og:url" content="https://ferrite-fem.github.io/Ferrite.jl/stable/tutorials/plasticity/"/><meta property="twitter:url" content="https://ferrite-fem.github.io/Ferrite.jl/stable/tutorials/plasticity/"/><link rel="canonical" href="https://ferrite-fem.github.io/Ferrite.jl/stable/tutorials/plasticity/"/><script data-outdated-warner src="../../assets/warner.js"></script><link href="https://cdnjs.cloudflare.com/ajax/libs/lato-font/3.0.0/css/lato-font.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/juliamono/0.050/juliamono.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/fontawesome.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/solid.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/brands.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.8/katex.min.css" rel="stylesheet" type="text/css"/><script>documenterBaseURL="../.."</script><script src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.6/require.min.js" data-main="../../assets/documenter.js"></script><script src="../../search_index.js"></script><script src="../../siteinfo.js"></script><script src="../../../versions.js"></script><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/catppuccin-mocha.css" data-theme-name="catppuccin-mocha"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/catppuccin-macchiato.css" data-theme-name="catppuccin-macchiato"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/catppuccin-frappe.css" data-theme-name="catppuccin-frappe"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/catppuccin-latte.css" data-theme-name="catppuccin-latte"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/documenter-dark.css" data-theme-name="documenter-dark" data-theme-primary-dark/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/documenter-light.css" data-theme-name="documenter-light" data-theme-primary/><script src="../../assets/themeswap.js"></script><link href="../../assets/custom.css" rel="stylesheet" type="text/css"/><link href="../../assets/citations.css" rel="stylesheet" type="text/css"/><link href="../../assets/favicon.ico" rel="icon" type="image/x-icon"/></head><body><div id="documenter"><nav class="docs-sidebar"><a class="docs-logo" href="../../"><img src="../../assets/logo.svg" alt="Ferrite.jl logo"/></a><div class="docs-package-name"><span class="docs-autofit"><a href="../../">Ferrite.jl</a></span></div><button class="docs-search-query input is-rounded is-small is-clickable my-2 mx-auto py-1 px-2" id="documenter-search-query">Search docs (Ctrl + /)</button><ul class="docs-menu"><li><a class="tocitem" href="../../">Home</a></li><li><input class="collapse-toggle" id="menuitem-3" type="checkbox" checked/><label class="tocitem" for="menuitem-3"><span class="docs-label">Tutorials</span><i class="docs-chevron"></i></label><ul class="collapsed"><li><a class="tocitem" href="../">Tutorials overview</a></li><li><a class="tocitem" href="../heat_equation/">Heat equation</a></li><li><a class="tocitem" href="../linear_elasticity/">Linear elasticity</a></li><li><a class="tocitem" href="../incompressible_elasticity/">Incompressible elasticity</a></li><li><a class="tocitem" href="../hyperelasticity/">Hyperelasticity</a></li><li class="is-active"><a class="tocitem" href>Von Mises plasticity</a><ul class="internal"><li><a class="tocitem" href="#Introduction"><span>Introduction</span></a></li><li><a class="tocitem" href="#Material-modeling"><span>Material modeling</span></a></li><li><a class="tocitem" href="#Constitutive-driver"><span>Constitutive driver</span></a></li><li><a class="tocitem" href="#FE-problem"><span>FE-problem</span></a></li><li><a class="tocitem" href="#plasticity-plain-program"><span>Plain program</span></a></li></ul></li><li><a class="tocitem" href="../transient_heat_equation/">Transient heat equation</a></li><li><a class="tocitem" href="../computational_homogenization/">Computational homogenization</a></li><li><a class="tocitem" href="../stokes-flow/">Stokes flow</a></li><li><a class="tocitem" href="../porous_media/">Porous media</a></li><li><a class="tocitem" href="../ns_vs_diffeq/">Incompressible Navier-Stokes equations via DifferentialEquations.jl</a></li><li><a class="tocitem" href="../reactive_surface/">Reactive surface</a></li><li><a class="tocitem" href="../linear_shell/">Linear shell</a></li><li><a class="tocitem" href="../dg_heat_equation/">Discontinuous Galerkin heat equation</a></li></ul></li><li><input class="collapse-toggle" id="menuitem-4" type="checkbox"/><label class="tocitem" for="menuitem-4"><span class="docs-label">Topic guides</span><i class="docs-chevron"></i></label><ul class="collapsed"><li><a class="tocitem" href="../../topics/">Topic guide overview</a></li><li><a class="tocitem" href="../../topics/fe_intro/">Introduction to FEM</a></li><li><a class="tocitem" href="../../topics/reference_shapes/">Reference shapes</a></li><li><a class="tocitem" href="../../topics/FEValues/">FEValues</a></li><li><a class="tocitem" href="../../topics/degrees_of_freedom/">Degrees of Freedom</a></li><li><a class="tocitem" href="../../topics/sparse_matrix/">Sparsity pattern and sparse matrices</a></li><li><a class="tocitem" href="../../topics/assembly/">Assembly</a></li><li><a class="tocitem" href="../../topics/boundary_conditions/">Initial and Boundary Conditions</a></li><li><a class="tocitem" href="../../topics/constraints/">Constraints</a></li><li><a class="tocitem" href="../../topics/grid/">Grid</a></li><li><a class="tocitem" href="../../topics/export/">Export</a></li></ul></li><li><input class="collapse-toggle" id="menuitem-5" type="checkbox"/><label class="tocitem" for="menuitem-5"><span class="docs-label">API reference</span><i class="docs-chevron"></i></label><ul class="collapsed"><li><a class="tocitem" href="../../reference/">Reference overview</a></li><li><a class="tocitem" href="../../reference/quadrature/">Quadrature</a></li><li><a class="tocitem" href="../../reference/interpolations/">Interpolation</a></li><li><a class="tocitem" href="../../reference/fevalues/">FEValues</a></li><li><a class="tocitem" href="../../reference/dofhandler/">Degrees of Freedom</a></li><li><a class="tocitem" href="../../reference/sparsity_pattern/">Sparsity pattern and sparse matrices</a></li><li><a class="tocitem" href="../../reference/assembly/">Assembly</a></li><li><a class="tocitem" href="../../reference/boundary_conditions/">Boundary Conditions</a></li><li><a class="tocitem" href="../../reference/grid/">Grid &amp; AbstractGrid</a></li><li><a class="tocitem" href="../../reference/export/">Postprocessing</a></li><li><a class="tocitem" href="../../reference/utils/">Development utility functions</a></li></ul></li><li><input class="collapse-toggle" id="menuitem-6" type="checkbox"/><label class="tocitem" for="menuitem-6"><span class="docs-label">How-to guides</span><i class="docs-chevron"></i></label><ul class="collapsed"><li><a class="tocitem" href="../../howto/">How-to guide overview</a></li><li><a class="tocitem" href="../../howto/postprocessing/">Post processing and visualization</a></li><li><a class="tocitem" href="../../howto/threaded_assembly/">Multi-threaded assembly</a></li></ul></li><br><li><a class="tocitem" href="../../gallery/">Code gallery</a></li><li><a class="tocitem" href="../../devdocs/">Developer documentation</a></li><li><a class="tocitem" href="../../cited-literature/">Cited literature</a></li></ul><div class="docs-version-selector field has-addons"><div class="control"><span class="docs-label button is-static is-size-7">Version</span></div><div class="docs-selector control is-expanded"><div class="select is-fullwidth is-size-7"><select id="documenter-version-selector"></select></div></div></div></nav><div class="docs-main"><header class="docs-navbar"><a class="docs-sidebar-button docs-navbar-link fa-solid fa-bars is-hidden-desktop" id="documenter-sidebar-button" href="#"></a><nav class="breadcrumb"><ul class="is-hidden-mobile"><li><a class="is-disabled">Tutorials</a></li><li class="is-active"><a href>Von Mises plasticity</a></li></ul><ul class="is-hidden-tablet"><li class="is-active"><a href>Von Mises plasticity</a></li></ul></nav><div class="docs-right"><a class="docs-navbar-link" href="https://github.com/Ferrite-FEM/Ferrite.jl" title="View the repository on GitHub"><span class="docs-icon fa-brands"></span><span class="docs-label is-hidden-touch">GitHub</span></a><a class="docs-navbar-link" href="https://github.com/Ferrite-FEM/Ferrite.jl/blob/master/docs/src/literate-tutorials/plasticity.jl" title="Edit source on GitHub"><span class="docs-icon fa-solid"></span></a><a class="docs-settings-button docs-navbar-link fa-solid fa-gear" id="documenter-settings-button" href="#" title="Settings"></a><a class="docs-article-toggle-button fa-solid fa-chevron-up" id="documenter-article-toggle-button" href="javascript:;" title="Collapse all docstrings"></a></div></header><article class="content" id="documenter-page"><h1 id="tutorial-plasticity"><a class="docs-heading-anchor" href="#tutorial-plasticity">Von Mises plasticity</a><a id="tutorial-plasticity-1"></a><a class="docs-heading-anchor-permalink" href="#tutorial-plasticity" title="Permalink"></a></h1><p><img src="../plasticity.png" alt="Shows the von Mises stress distribution in a cantilever beam."/></p><p><em>Figure 1.</em> A coarse mesh solution of a cantilever beam subjected to a load causing plastic deformations. The initial yield limit is 200 MPa but due to hardening it increases up to approximately 240 MPa.</p><div class="admonition is-success"><header class="admonition-header">Tip</header><div class="admonition-body"><p>This example is also available as a Jupyter notebook: <a href="https://nbviewer.jupyter.org/github/Ferrite-FEM/Ferrite.jl/blob/gh-pages/previews/PR1070/tutorials/plasticity.ipynb"><code>plasticity.ipynb</code></a>.</p></div></div><h2 id="Introduction"><a class="docs-heading-anchor" href="#Introduction">Introduction</a><a id="Introduction-1"></a><a class="docs-heading-anchor-permalink" href="#Introduction" title="Permalink"></a></h2><p>This example illustrates the use of a nonlinear material model in Ferrite. The particular model is von Mises plasticity (also know as J₂-plasticity) with isotropic hardening. The model is fully 3D, meaning that no assumptions like <em>plane stress</em> or <em>plane strain</em> are introduced.</p><p>Also note that the theory of the model is not described here, instead one is referred to standard textbooks on material modeling.</p><p>To illustrate the use of the plasticity model, we setup and solve a FE-problem consisting of a cantilever beam loaded at its free end. But first, we shortly describe the parts of the implementation dealing with the material modeling.</p><h2 id="Material-modeling"><a class="docs-heading-anchor" href="#Material-modeling">Material modeling</a><a id="Material-modeling-1"></a><a class="docs-heading-anchor-permalink" href="#Material-modeling" title="Permalink"></a></h2><p>This section describes the <code>struct</code>s and methods used to implement the material model</p><h3 id="Material-parameters-and-state-variables"><a class="docs-heading-anchor" href="#Material-parameters-and-state-variables">Material parameters and state variables</a><a id="Material-parameters-and-state-variables-1"></a><a class="docs-heading-anchor-permalink" href="#Material-parameters-and-state-variables" title="Permalink"></a></h3><p>Start by loading some necessary packages</p><pre><code class="language-julia hljs">using Ferrite, Tensors, SparseArrays, LinearAlgebra, Printf</code></pre><p>We define a J₂-plasticity-material, containing material parameters and the elastic stiffness Dᵉ (since it is constant)</p><pre><code class="language-julia hljs">struct J2Plasticity{T, S &lt;: SymmetricTensor{4, 3, T}}
+<html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/><title>Von Mises plasticity · Ferrite.jl</title><meta name="title" content="Von Mises plasticity · Ferrite.jl"/><meta property="og:title" content="Von Mises plasticity · Ferrite.jl"/><meta property="twitter:title" content="Von Mises plasticity · Ferrite.jl"/><meta name="description" content="Documentation for Ferrite.jl."/><meta property="og:description" content="Documentation for Ferrite.jl."/><meta property="twitter:description" content="Documentation for Ferrite.jl."/><meta property="og:url" content="https://ferrite-fem.github.io/Ferrite.jl/stable/tutorials/plasticity/"/><meta property="twitter:url" content="https://ferrite-fem.github.io/Ferrite.jl/stable/tutorials/plasticity/"/><link rel="canonical" href="https://ferrite-fem.github.io/Ferrite.jl/stable/tutorials/plasticity/"/><script data-outdated-warner src="../../assets/warner.js"></script><link href="https://cdnjs.cloudflare.com/ajax/libs/lato-font/3.0.0/css/lato-font.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/juliamono/0.050/juliamono.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/fontawesome.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/solid.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/brands.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.8/katex.min.css" rel="stylesheet" type="text/css"/><script>documenterBaseURL="../.."</script><script src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.6/require.min.js" data-main="../../assets/documenter.js"></script><script src="../../search_index.js"></script><script src="../../siteinfo.js"></script><script src="../../../versions.js"></script><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/catppuccin-mocha.css" data-theme-name="catppuccin-mocha"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/catppuccin-macchiato.css" data-theme-name="catppuccin-macchiato"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/catppuccin-frappe.css" data-theme-name="catppuccin-frappe"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/catppuccin-latte.css" data-theme-name="catppuccin-latte"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/documenter-dark.css" data-theme-name="documenter-dark" data-theme-primary-dark/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/documenter-light.css" data-theme-name="documenter-light" data-theme-primary/><script src="../../assets/themeswap.js"></script><link href="../../assets/custom.css" rel="stylesheet" type="text/css"/><link href="../../assets/citations.css" rel="stylesheet" type="text/css"/><link href="../../assets/favicon.ico" rel="icon" type="image/x-icon"/></head><body><div id="documenter"><nav class="docs-sidebar"><a class="docs-logo" href="../../"><img src="../../assets/logo.svg" alt="Ferrite.jl logo"/></a><div class="docs-package-name"><span class="docs-autofit"><a href="../../">Ferrite.jl</a></span></div><button class="docs-search-query input is-rounded is-small is-clickable my-2 mx-auto py-1 px-2" id="documenter-search-query">Search docs (Ctrl + /)</button><ul class="docs-menu"><li><a class="tocitem" href="../../">Home</a></li><li><input class="collapse-toggle" id="menuitem-3" type="checkbox" checked/><label class="tocitem" for="menuitem-3"><span class="docs-label">Tutorials</span><i class="docs-chevron"></i></label><ul class="collapsed"><li><a class="tocitem" href="../">Tutorials overview</a></li><li><a class="tocitem" href="../heat_equation/">Heat equation</a></li><li><a class="tocitem" href="../linear_elasticity/">Linear elasticity</a></li><li><a class="tocitem" href="../incompressible_elasticity/">Incompressible elasticity</a></li><li><a class="tocitem" href="../hyperelasticity/">Hyperelasticity</a></li><li class="is-active"><a class="tocitem" href>Von Mises plasticity</a><ul class="internal"><li><a class="tocitem" href="#Introduction"><span>Introduction</span></a></li><li><a class="tocitem" href="#Material-modeling"><span>Material modeling</span></a></li><li><a class="tocitem" href="#Constitutive-driver"><span>Constitutive driver</span></a></li><li><a class="tocitem" href="#FE-problem"><span>FE-problem</span></a></li><li><a class="tocitem" href="#plasticity-plain-program"><span>Plain program</span></a></li></ul></li><li><a class="tocitem" href="../transient_heat_equation/">Transient heat equation</a></li><li><a class="tocitem" href="../computational_homogenization/">Computational homogenization</a></li><li><a class="tocitem" href="../stokes-flow/">Stokes flow</a></li><li><a class="tocitem" href="../porous_media/">Porous media</a></li><li><a class="tocitem" href="../ns_vs_diffeq/">Incompressible Navier-Stokes equations via DifferentialEquations.jl</a></li><li><a class="tocitem" href="../reactive_surface/">Reactive surface</a></li><li><a class="tocitem" href="../linear_shell/">Linear shell</a></li><li><a class="tocitem" href="../dg_heat_equation/">Discontinuous Galerkin heat equation</a></li></ul></li><li><input class="collapse-toggle" id="menuitem-4" type="checkbox"/><label class="tocitem" for="menuitem-4"><span class="docs-label">Topic guides</span><i class="docs-chevron"></i></label><ul class="collapsed"><li><a class="tocitem" href="../../topics/">Topic guide overview</a></li><li><a class="tocitem" href="../../topics/fe_intro/">Introduction to FEM</a></li><li><a class="tocitem" href="../../topics/reference_shapes/">Reference shapes</a></li><li><a class="tocitem" href="../../topics/FEValues/">FEValues</a></li><li><a class="tocitem" href="../../topics/degrees_of_freedom/">Degrees of Freedom</a></li><li><a class="tocitem" href="../../topics/sparse_matrix/">Sparsity pattern and sparse matrices</a></li><li><a class="tocitem" href="../../topics/assembly/">Assembly</a></li><li><a class="tocitem" href="../../topics/boundary_conditions/">Boundary and initial conditions</a></li><li><a class="tocitem" href="../../topics/constraints/">Constraints</a></li><li><a class="tocitem" href="../../topics/grid/">Grid</a></li><li><a class="tocitem" href="../../topics/export/">Export</a></li></ul></li><li><input class="collapse-toggle" id="menuitem-5" type="checkbox"/><label class="tocitem" for="menuitem-5"><span class="docs-label">API reference</span><i class="docs-chevron"></i></label><ul class="collapsed"><li><a class="tocitem" href="../../reference/">Reference overview</a></li><li><a class="tocitem" href="../../reference/quadrature/">Quadrature</a></li><li><a class="tocitem" href="../../reference/interpolations/">Interpolation</a></li><li><a class="tocitem" href="../../reference/fevalues/">FEValues</a></li><li><a class="tocitem" href="../../reference/dofhandler/">Degrees of Freedom</a></li><li><a class="tocitem" href="../../reference/sparsity_pattern/">Sparsity pattern and sparse matrices</a></li><li><a class="tocitem" href="../../reference/assembly/">Assembly</a></li><li><a class="tocitem" href="../../reference/boundary_conditions/">Boundary conditions</a></li><li><a class="tocitem" href="../../reference/grid/">Grid &amp; AbstractGrid</a></li><li><a class="tocitem" href="../../reference/export/">Postprocessing</a></li><li><a class="tocitem" href="../../reference/utils/">Development utility functions</a></li></ul></li><li><input class="collapse-toggle" id="menuitem-6" type="checkbox"/><label class="tocitem" for="menuitem-6"><span class="docs-label">How-to guides</span><i class="docs-chevron"></i></label><ul class="collapsed"><li><a class="tocitem" href="../../howto/">How-to guide overview</a></li><li><a class="tocitem" href="../../howto/postprocessing/">Post processing and visualization</a></li><li><a class="tocitem" href="../../howto/threaded_assembly/">Multi-threaded assembly</a></li></ul></li><br><li><a class="tocitem" href="../../gallery/">Code gallery</a></li><li><a class="tocitem" href="../../devdocs/">Developer documentation</a></li><li><a class="tocitem" href="../../cited-literature/">Cited literature</a></li></ul><div class="docs-version-selector field has-addons"><div class="control"><span class="docs-label button is-static is-size-7">Version</span></div><div class="docs-selector control is-expanded"><div class="select is-fullwidth is-size-7"><select id="documenter-version-selector"></select></div></div></div></nav><div class="docs-main"><header class="docs-navbar"><a class="docs-sidebar-button docs-navbar-link fa-solid fa-bars is-hidden-desktop" id="documenter-sidebar-button" href="#"></a><nav class="breadcrumb"><ul class="is-hidden-mobile"><li><a class="is-disabled">Tutorials</a></li><li class="is-active"><a href>Von Mises plasticity</a></li></ul><ul class="is-hidden-tablet"><li class="is-active"><a href>Von Mises plasticity</a></li></ul></nav><div class="docs-right"><a class="docs-navbar-link" href="https://github.com/Ferrite-FEM/Ferrite.jl" title="View the repository on GitHub"><span class="docs-icon fa-brands"></span><span class="docs-label is-hidden-touch">GitHub</span></a><a class="docs-navbar-link" href="https://github.com/Ferrite-FEM/Ferrite.jl/blob/master/docs/src/literate-tutorials/plasticity.jl" title="Edit source on GitHub"><span class="docs-icon fa-solid"></span></a><a class="docs-settings-button docs-navbar-link fa-solid fa-gear" id="documenter-settings-button" href="#" title="Settings"></a><a class="docs-article-toggle-button fa-solid fa-chevron-up" id="documenter-article-toggle-button" href="javascript:;" title="Collapse all docstrings"></a></div></header><article class="content" id="documenter-page"><h1 id="tutorial-plasticity"><a class="docs-heading-anchor" href="#tutorial-plasticity">Von Mises plasticity</a><a id="tutorial-plasticity-1"></a><a class="docs-heading-anchor-permalink" href="#tutorial-plasticity" title="Permalink"></a></h1><p><img src="../plasticity.png" alt="Shows the von Mises stress distribution in a cantilever beam."/></p><p><em>Figure 1.</em> A coarse mesh solution of a cantilever beam subjected to a load causing plastic deformations. The initial yield limit is 200 MPa but due to hardening it increases up to approximately 240 MPa.</p><div class="admonition is-success"><header class="admonition-header">Tip</header><div class="admonition-body"><p>This example is also available as a Jupyter notebook: <a href="https://nbviewer.jupyter.org/github/Ferrite-FEM/Ferrite.jl/blob/gh-pages/previews/PR1070/tutorials/plasticity.ipynb"><code>plasticity.ipynb</code></a>.</p></div></div><h2 id="Introduction"><a class="docs-heading-anchor" href="#Introduction">Introduction</a><a id="Introduction-1"></a><a class="docs-heading-anchor-permalink" href="#Introduction" title="Permalink"></a></h2><p>This example illustrates the use of a nonlinear material model in Ferrite. The particular model is von Mises plasticity (also know as J₂-plasticity) with isotropic hardening. The model is fully 3D, meaning that no assumptions like <em>plane stress</em> or <em>plane strain</em> are introduced.</p><p>Also note that the theory of the model is not described here, instead one is referred to standard textbooks on material modeling.</p><p>To illustrate the use of the plasticity model, we setup and solve a FE-problem consisting of a cantilever beam loaded at its free end. But first, we shortly describe the parts of the implementation dealing with the material modeling.</p><h2 id="Material-modeling"><a class="docs-heading-anchor" href="#Material-modeling">Material modeling</a><a id="Material-modeling-1"></a><a class="docs-heading-anchor-permalink" href="#Material-modeling" title="Permalink"></a></h2><p>This section describes the <code>struct</code>s and methods used to implement the material model</p><h3 id="Material-parameters-and-state-variables"><a class="docs-heading-anchor" href="#Material-parameters-and-state-variables">Material parameters and state variables</a><a id="Material-parameters-and-state-variables-1"></a><a class="docs-heading-anchor-permalink" href="#Material-parameters-and-state-variables" title="Permalink"></a></h3><p>Start by loading some necessary packages</p><pre><code class="language-julia hljs">using Ferrite, Tensors, SparseArrays, LinearAlgebra, Printf</code></pre><p>We define a J₂-plasticity-material, containing material parameters and the elastic stiffness Dᵉ (since it is constant)</p><pre><code class="language-julia hljs">struct J2Plasticity{T, S &lt;: SymmetricTensor{4, 3, T}}
     G::T  # Shear modulus
     K::T  # Bulk modulus
     σ₀::T # Initial yield limit
     H::T  # Hardening modulus
     Dᵉ::S # Elastic stiffness tensor
 end;</code></pre><p>Next, we define a constructor for the material instance.</p><pre><code class="language-julia hljs">function J2Plasticity(E, ν, σ₀, H)
-    δ(i,j) = i == j ? 1.0 : 0.0 # helper function
+    δ(i, j) = i == j ? 1.0 : 0.0 # helper function
     G = E / 2(1 + ν)
     K = E / 3(1 - 2ν)
 
-    Isymdev(i,j,k,l) = 0.5*(δ(i,k)*δ(j,l) + δ(i,l)*δ(j,k)) - 1.0/3.0*δ(i,j)*δ(k,l)
-    temp(i,j,k,l) = 2.0G *( 0.5*(δ(i,k)*δ(j,l) + δ(i,l)*δ(j,k)) + ν/(1.0-2.0ν)*δ(i,j)*δ(k,l))
+    Isymdev(i, j, k, l) = 0.5 * (δ(i, k) * δ(j, l) + δ(i, l) * δ(j, k)) - 1.0 / 3.0 * δ(i, j) * δ(k, l)
+    temp(i, j, k, l) = 2.0G * (0.5 * (δ(i, k) * δ(j, l) + δ(i, l) * δ(j, k)) + ν / (1.0 - 2.0ν) * δ(i, j) * δ(k, l))
     Dᵉ = SymmetricTensor{4, 3}(temp)
     return J2Plasticity(G, K, σ₀, H, Dᵉ)
 end;</code></pre><div class="admonition is-info"><header class="admonition-header">Note</header><div class="admonition-body"><p>Above, we defined a constructor <code>J2Plasticity(E, ν, σ₀, H)</code> in terms of the more common material parameters <span>$E$</span> and <span>$ν$</span> - simply as a convenience for the user.</p></div></div><p>Define a <code>struct</code> to store the material state for a Gauss point.</p><pre><code class="language-julia hljs">struct MaterialState{T, S &lt;: SecondOrderTensor{3, T}}
@@ -21,12 +21,13 @@ end;</code></pre><div class="admonition is-info"><header class="admonition-heade
     k::T # hardening variable
 end</code></pre><p>Constructor for initializing a material state. Every quantity is set to zero.</p><pre><code class="language-julia hljs">function MaterialState()
     return MaterialState(
-                zero(SymmetricTensor{2, 3}),
-                zero(SymmetricTensor{2, 3}),
-                0.0)
+        zero(SymmetricTensor{2, 3}),
+        zero(SymmetricTensor{2, 3}),
+        0.0
+    )
 end</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">Main.MaterialState</code></pre><p>For later use, during the post-processing step, we define a function to compute the von Mises effective stress.</p><pre><code class="language-julia hljs">function vonMises(σ)
     s = dev(σ)
-    return sqrt(3.0/2.0 * s ⊡ s)
+    return sqrt(3.0 / 2.0 * s ⊡ s)
 end;</code></pre><h2 id="Constitutive-driver"><a class="docs-heading-anchor" href="#Constitutive-driver">Constitutive driver</a><a id="Constitutive-driver-1"></a><a class="docs-heading-anchor-permalink" href="#Constitutive-driver" title="Permalink"></a></h2><p>This is the actual method which computes the stress and material tangent stiffness in a given integration point. Input is the current strain and the material state from the previous timestep.</p><pre><code class="language-julia hljs">function compute_stress_tangent(ϵ::SymmetricTensor{2, 3}, material::J2Plasticity, state::MaterialState)
     # unpack some material parameters
     G = material.G
@@ -36,16 +37,16 @@ end;</code></pre><h2 id="Constitutive-driver"><a class="docs-heading-anchor" hre
     σᵗ = material.Dᵉ ⊡ (ϵ - state.ϵᵖ) # trial-stress
     sᵗ = dev(σᵗ)         # deviatoric part of trial-stress
     J₂ = 0.5 * sᵗ ⊡ sᵗ   # second invariant of sᵗ
-    σᵗₑ = sqrt(3.0*J₂)   # effective trial-stress (von Mises stress)
+    σᵗₑ = sqrt(3.0 * J₂) # effective trial-stress (von Mises stress)
     σʸ = material.σ₀ + H * state.k # Previous yield limit
 
-    φᵗ  = σᵗₑ - σʸ # Trial-value of the yield surface
+    φᵗ = σᵗₑ - σʸ # Trial-value of the yield surface
 
     if φᵗ &lt; 0.0 # elastic loading
         return σᵗ, material.Dᵉ, MaterialState(state.ϵᵖ, σᵗ, state.k)
     else # plastic loading
         h = H + 3G
-        μ =  φᵗ / h   # plastic multiplier
+        μ = φᵗ / h # plastic multiplier
 
         c1 = 1 - 3G * μ / σᵗₑ
         s = c1 * sᵗ           # updated deviatoric stress
@@ -55,23 +56,23 @@ end;</code></pre><h2 id="Constitutive-driver"><a class="docs-heading-anchor" hre
         κ = H * (state.k + μ) # drag stress
         σₑ = material.σ₀ + κ  # updated yield surface
 
-        δ(i,j) = i == j ? 1.0 : 0.0
-        Isymdev(i,j,k,l)  = 0.5*(δ(i,k)*δ(j,l) + δ(i,l)*δ(j,k)) - 1.0/3.0*δ(i,j)*δ(k,l)
-        Q(i,j,k,l) = Isymdev(i,j,k,l) - 3.0 / (2.0*σₑ^2) * s[i,j]*s[k,l]
-        b = (3G*μ/σₑ) / (1.0 + 3G*μ/σₑ)
+        δ(i, j) = i == j ? 1.0 : 0.0
+        Isymdev(i, j, k, l) = 0.5 * (δ(i, k) * δ(j, l) + δ(i, l) * δ(j, k)) - 1.0 / 3.0 * δ(i, j) * δ(k, l)
+        Q(i, j, k, l) = Isymdev(i, j, k, l) - 3.0 / (2.0 * σₑ^2) * s[i, j] * s[k, l]
+        b = (3G * μ / σₑ) / (1.0 + 3G * μ / σₑ)
 
-        Dtemp(i,j,k,l) = -2G*b * Q(i,j,k,l) - 9G^2 / (h*σₑ^2) * s[i,j]*s[k,l]
+        Dtemp(i, j, k, l) = -2G * b * Q(i, j, k, l) - 9G^2 / (h * σₑ^2) * s[i, j] * s[k, l]
         D = material.Dᵉ + SymmetricTensor{4, 3}(Dtemp)
 
         # Return new state
-        Δϵᵖ = 3/2 * μ / σₑ * s # plastic strain
-        ϵᵖ = state.ϵᵖ + Δϵᵖ    # plastic strain
-        k = state.k + μ        # hardening variable
+        Δϵᵖ = 3 / 2 * μ / σₑ * s # plastic strain
+        ϵᵖ = state.ϵᵖ + Δϵᵖ      # plastic strain
+        k = state.k + μ          # hardening variable
         return σ, D, MaterialState(ϵᵖ, σ, k)
     end
 end</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">compute_stress_tangent (generic function with 1 method)</code></pre><h2 id="FE-problem"><a class="docs-heading-anchor" href="#FE-problem">FE-problem</a><a id="FE-problem-1"></a><a class="docs-heading-anchor-permalink" href="#FE-problem" title="Permalink"></a></h2><p>What follows are methods for assembling and and solving the FE-problem.</p><pre><code class="language-julia hljs">function create_values(interpolation)
     # setup quadrature rules
-    qr      = QuadratureRule{RefTetrahedron}(2)
+    qr = QuadratureRule{RefTetrahedron}(2)
     facet_qr = FacetQuadratureRule{RefTetrahedron}(3)
 
     # cell and facetvalues for u
@@ -88,12 +89,14 @@ end</code></pre><pre class="documenter-example-output"><code class="nohighlight 
     dbcs = ConstraintHandler(dh)
     # Clamped on the left side
     dofs = [1, 2, 3]
-    dbc = Dirichlet(:u, getfacetset(grid, &quot;left&quot;), (x,t) -&gt; [0.0, 0.0, 0.0], dofs)
+    dbc = Dirichlet(:u, getfacetset(grid, &quot;left&quot;), (x, t) -&gt; [0.0, 0.0, 0.0], dofs)
     add!(dbcs, dbc)
     close!(dbcs)
     return dbcs
-end;</code></pre><h3 id="Assembling-of-element-contributions"><a class="docs-heading-anchor" href="#Assembling-of-element-contributions">Assembling of element contributions</a><a id="Assembling-of-element-contributions-1"></a><a class="docs-heading-anchor-permalink" href="#Assembling-of-element-contributions" title="Permalink"></a></h3><ul><li>Residual vector <code>r</code></li><li>Tangent stiffness <code>K</code></li></ul><pre><code class="language-julia hljs">function doassemble!(K::SparseMatrixCSC, r::Vector, cellvalues::CellValues, dh::DofHandler,
-                     material::J2Plasticity, u, states, states_old)
+end;</code></pre><h3 id="Assembling-of-element-contributions"><a class="docs-heading-anchor" href="#Assembling-of-element-contributions">Assembling of element contributions</a><a id="Assembling-of-element-contributions-1"></a><a class="docs-heading-anchor-permalink" href="#Assembling-of-element-contributions" title="Permalink"></a></h3><ul><li>Residual vector <code>r</code></li><li>Tangent stiffness <code>K</code></li></ul><pre><code class="language-julia hljs">function doassemble!(
+        K::SparseMatrixCSC, r::Vector, cellvalues::CellValues, dh::DofHandler,
+        material::J2Plasticity, u, states, states_old
+    )
     assembler = start_assemble(K, r)
     nu = getnbasefunctions(cellvalues)
     re = zeros(nu)     # element residual vector
@@ -110,8 +113,7 @@ end;</code></pre><h3 id="Assembling-of-element-contributions"><a class="docs-hea
         assemble!(assembler, eldofs, ke, re)
     end
     return K, r
-end</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">doassemble! (generic function with 1 method)</code></pre><p>Compute element contribution to the residual and the tangent.</p><div class="admonition is-info"><header class="admonition-header">Note</header><div class="admonition-body"><p>Due to symmetry, we only compute the lower half of the tangent and then symmetrize it.</p></div></div><pre><code class="language-julia hljs">function assemble_cell!(Ke, re, cell, cellvalues, material,
-                        ue, state, state_old)
+end</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">doassemble! (generic function with 1 method)</code></pre><p>Compute element contribution to the residual and the tangent.</p><div class="admonition is-info"><header class="admonition-header">Note</header><div class="admonition-body"><p>Due to symmetry, we only compute the lower half of the tangent and then symmetrize it.</p></div></div><pre><code class="language-julia hljs">function assemble_cell!(Ke, re, cell, cellvalues, material, ue, state, state_old)
     n_basefuncs = getnbasefunctions(cellvalues)
     reinit!(cellvalues, cell)
 
@@ -131,12 +133,14 @@ end</code></pre><pre class="documenter-example-output"><code class="nohighlight 
         end
     end
     symmetrize_lower!(Ke)
+    return
 end</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">assemble_cell! (generic function with 1 method)</code></pre><p>Helper function to symmetrize the material tangent</p><pre><code class="language-julia hljs">function symmetrize_lower!(K)
-    for i in 1:size(K,1)
-        for j in i+1:size(K,1)
-            K[i,j] = K[j,i]
+    for i in 1:size(K, 1)
+        for j in (i + 1):size(K, 1)
+            K[i, j] = K[j, i]
         end
     end
+    return
 end;
 
 function doassemble_neumann!(r, dh, facetset, facetvalues, t)
@@ -158,10 +162,10 @@ function doassemble_neumann!(r, dh, facetset, facetvalues, t)
     return r
 end</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">doassemble_neumann! (generic function with 1 method)</code></pre><p>Define a function which solves the FE-problem.</p><pre><code class="language-julia hljs">function solve()
     # Define material parameters
-    E = 200.0e9 # [Pa]
-    H = E/20   # [Pa]
-    ν = 0.3     # [-]
-    σ₀ = 200e6  # [Pa]
+    E = 200.0e9  # [Pa]
+    H = E / 20   # [Pa]
+    ν = 0.3      # [-]
+    σ₀ = 200.0e6 # [Pa]
     material = J2Plasticity(E, ν, σ₀, H)
 
     L = 10.0 # beam length [m]
@@ -169,7 +173,7 @@ end</code></pre><pre class="documenter-example-output"><code class="nohighlight 
     h = 1.0  # beam height[m]
     n_timesteps = 10
     u_max = zeros(n_timesteps)
-    traction_magnitude = 1.e7 * range(0.5, 1.0, length=n_timesteps)
+    traction_magnitude = 1.0e7 * range(0.5, 1.0, length = n_timesteps)
 
     # Create geometry, dofs and boundary conditions
     n = 2
@@ -186,10 +190,10 @@ end</code></pre><pre class="documenter-example-output"><code class="nohighlight 
 
     # Pre-allocate solution vectors, etc.
     n_dofs = ndofs(dh)  # total number of dofs
-    u  = zeros(n_dofs)  # solution vector
+    u = zeros(n_dofs)   # solution vector
     Δu = zeros(n_dofs)  # displacement correction
     r = zeros(n_dofs)   # residual
-    K = allocate_matrix(dh); # tangent stiffness matrix
+    K = allocate_matrix(dh) # tangent stiffness matrix
 
     # Create material states. One array for each cell, where each element is an array of material-
     # states - one for each integration point
@@ -209,14 +213,14 @@ end</code></pre><pre class="documenter-example-output"><code class="nohighlight 
         update!(dbcs, t) # evaluates the D-bndc at time t
         apply!(u, dbcs)  # set the prescribed values in the solution vector
 
-        while true; newton_itr += 1
-
+        while true
+            newton_itr += 1
             if newton_itr &gt; 8
                 error(&quot;Reached maximum Newton iterations, aborting&quot;)
                 break
             end
             # Tangent and residual contribution from the cells (volume integral)
-            doassemble!(K, r, cellvalues, dh, material, u, states, states_old);
+            doassemble!(K, r, cellvalues, dh, material, u, states, states_old)
             # Residual contribution from the Neumann boundary (surface integral)
             doassemble_neumann!(r, dh, getfacetset(grid, &quot;right&quot;), facetvalues, traction)
             norm_r = norm(r[Ferrite.free_dofs(dbcs)])
@@ -246,7 +250,7 @@ end</code></pre><pre class="documenter-example-output"><code class="nohighlight 
     for (el, cell_states) in enumerate(eachcol(states))
         for state in cell_states
             mises_values[el] += vonMises(state.σ)
-            κ_values[el] += state.k*material.H
+            κ_values[el] += state.k * material.H
         end
         mises_values[el] /= length(cell_states) # average von Mises stress
         κ_values[el] /= length(cell_states)     # average drag stress
@@ -263,86 +267,86 @@ end</code></pre><pre class="documenter-example-output"><code class="nohighlight 
 
  Time step @time = 1:
 Iteration: 0 	residual: 1435838.41167605
-Iteration: 1 	residual: 118655.22428967
-Iteration: 2 	residual: 59.50456060
-Iteration: 3 	residual: 0.00002737
+Iteration: 1 	residual: 118655.22430368
+Iteration: 2 	residual: 59.50456058
+Iteration: 3 	residual: 0.00002560
 
  Time step @time = 2:
-Iteration: 0 	residual: 159537.60129707
-Iteration: 1 	residual: 1694313.86969940
-Iteration: 2 	residual: 61777.44063548
-Iteration: 3 	residual: 14.34471355
-Iteration: 4 	residual: 0.00001388
+Iteration: 0 	residual: 159537.60129725
+Iteration: 1 	residual: 1706974.26597926
+Iteration: 2 	residual: 97346.48157049
+Iteration: 3 	residual: 37.17532011
+Iteration: 4 	residual: 0.00001524
 
  Time step @time = 3:
-Iteration: 0 	residual: 159537.60129719
-Iteration: 1 	residual: 3227708.04749207
-Iteration: 2 	residual: 99013.81852850
-Iteration: 3 	residual: 49.55853290
-Iteration: 4 	residual: 0.00002494
+Iteration: 0 	residual: 159537.60129701
+Iteration: 1 	residual: 3033614.51718249
+Iteration: 2 	residual: 183762.82986491
+Iteration: 3 	residual: 187.23777242
+Iteration: 4 	residual: 0.00023135
 
  Time step @time = 4:
-Iteration: 0 	residual: 159537.60129708
-Iteration: 1 	residual: 3863537.91331718
-Iteration: 2 	residual: 100396.49934950
-Iteration: 3 	residual: 66.62450946
-Iteration: 4 	residual: 0.00005686
+Iteration: 0 	residual: 159537.60129742
+Iteration: 1 	residual: 3668226.41190261
+Iteration: 2 	residual: 85645.15221552
+Iteration: 3 	residual: 33.39133787
+Iteration: 4 	residual: 0.00002312
 
  Time step @time = 5:
-Iteration: 0 	residual: 159537.60129741
-Iteration: 1 	residual: 5168267.49859617
-Iteration: 2 	residual: 678560.06498321
-Iteration: 3 	residual: 2453.49117670
-Iteration: 4 	residual: 0.03620823
+Iteration: 0 	residual: 159537.60129764
+Iteration: 1 	residual: 4942707.09611024
+Iteration: 2 	residual: 822244.81049667
+Iteration: 3 	residual: 2806.49948363
+Iteration: 4 	residual: 0.04196782
 
  Time step @time = 6:
 Iteration: 0 	residual: 159537.60129723
-Iteration: 1 	residual: 6078737.05245668
-Iteration: 2 	residual: 995497.43247340
-Iteration: 3 	residual: 4327.75689389
-Iteration: 4 	residual: 0.09292498
+Iteration: 1 	residual: 6350622.82330476
+Iteration: 2 	residual: 1433617.64531907
+Iteration: 3 	residual: 11917.22662334
+Iteration: 4 	residual: 0.96519065
 
  Time step @time = 7:
-Iteration: 0 	residual: 159537.60129751
-Iteration: 1 	residual: 7348905.45427386
-Iteration: 2 	residual: 2139806.24814421
-Iteration: 3 	residual: 23924.58823291
-Iteration: 4 	residual: 3.93116782
-Iteration: 5 	residual: 0.00002315
+Iteration: 0 	residual: 159537.60130042
+Iteration: 1 	residual: 7442093.81842929
+Iteration: 2 	residual: 2293366.32653456
+Iteration: 3 	residual: 27806.00144416
+Iteration: 4 	residual: 4.78936691
+Iteration: 5 	residual: 0.00002337
 
  Time step @time = 8:
-Iteration: 0 	residual: 159537.60129715
-Iteration: 1 	residual: 8120087.06631968
-Iteration: 2 	residual: 2134764.28729250
-Iteration: 3 	residual: 19864.02465890
-Iteration: 4 	residual: 2.60819630
-Iteration: 5 	residual: 0.00004042
+Iteration: 0 	residual: 159537.60129787
+Iteration: 1 	residual: 7898429.46749798
+Iteration: 2 	residual: 2166408.36902476
+Iteration: 3 	residual: 19078.14976325
+Iteration: 4 	residual: 2.12913739
+Iteration: 5 	residual: 0.00003700
 
  Time step @time = 9:
-Iteration: 0 	residual: 159537.60129806
-Iteration: 1 	residual: 9159629.12187718
-Iteration: 2 	residual: 2209816.36317459
-Iteration: 3 	residual: 52799.10929751
-Iteration: 4 	residual: 14.75467017
-Iteration: 5 	residual: 0.00003575
+Iteration: 0 	residual: 159537.60129718
+Iteration: 1 	residual: 9113096.78354406
+Iteration: 2 	residual: 1942261.17847130
+Iteration: 3 	residual: 14972.09948485
+Iteration: 4 	residual: 1.53213288
+Iteration: 5 	residual: 0.00003588
 
  Time step @time = 10:
-Iteration: 0 	residual: 159537.60129712
-Iteration: 1 	residual: 9273064.62817820
-Iteration: 2 	residual: 1917040.83138600
-Iteration: 3 	residual: 34418.60586839
-Iteration: 4 	residual: 4.39319877
-Iteration: 5 	residual: 0.00004478</code></pre><p>Finally we plot the load-displacement curve.</p><pre><code class="language-julia hljs">using Plots
+Iteration: 0 	residual: 159537.60129681
+Iteration: 1 	residual: 9810716.23843057
+Iteration: 2 	residual: 1947382.98912119
+Iteration: 3 	residual: 34190.85171497
+Iteration: 4 	residual: 4.44141634
+Iteration: 5 	residual: 0.00005322</code></pre><p>Finally we plot the load-displacement curve.</p><pre><code class="language-julia hljs">using Plots
 plot(
     vcat(0.0, u_max),                # add the origin as a point
     vcat(0.0, traction_magnitude),
-    linewidth=2,
-    title=&quot;Traction-displacement&quot;,
-    label=nothing,
-    markershape=:auto
-    )
+    linewidth = 2,
+    title = &quot;Traction-displacement&quot;,
+    label = nothing,
+    markershape = :auto
+)
 ylabel!(&quot;Traction [Pa]&quot;)
-xlabel!(&quot;Maximum deflection [m]&quot;)</code></pre><img src="79f3b26a.svg" alt="Example block output"/><p><em>Figure 2.</em> Load-displacement-curve for the beam, showing a clear decrease in stiffness as more material starts to yield.</p><h2 id="plasticity-plain-program"><a class="docs-heading-anchor" href="#plasticity-plain-program">Plain program</a><a id="plasticity-plain-program-1"></a><a class="docs-heading-anchor-permalink" href="#plasticity-plain-program" title="Permalink"></a></h2><p>Here follows a version of the program without any comments. The file is also available here: <a href="../plasticity.jl"><code>plasticity.jl</code></a>.</p><pre><code class="language-julia hljs">using Ferrite, Tensors, SparseArrays, LinearAlgebra, Printf
+xlabel!(&quot;Maximum deflection [m]&quot;)</code></pre><img src="b085dcfc.svg" alt="Example block output"/><p><em>Figure 2.</em> Load-displacement-curve for the beam, showing a clear decrease in stiffness as more material starts to yield.</p><h2 id="plasticity-plain-program"><a class="docs-heading-anchor" href="#plasticity-plain-program">Plain program</a><a id="plasticity-plain-program-1"></a><a class="docs-heading-anchor-permalink" href="#plasticity-plain-program" title="Permalink"></a></h2><p>Here follows a version of the program without any comments. The file is also available here: <a href="../plasticity.jl"><code>plasticity.jl</code></a>.</p><pre><code class="language-julia hljs">using Ferrite, Tensors, SparseArrays, LinearAlgebra, Printf
 
 struct J2Plasticity{T, S &lt;: SymmetricTensor{4, 3, T}}
     G::T  # Shear modulus
@@ -353,12 +357,12 @@ struct J2Plasticity{T, S &lt;: SymmetricTensor{4, 3, T}}
 end;
 
 function J2Plasticity(E, ν, σ₀, H)
-    δ(i,j) = i == j ? 1.0 : 0.0 # helper function
+    δ(i, j) = i == j ? 1.0 : 0.0 # helper function
     G = E / 2(1 + ν)
     K = E / 3(1 - 2ν)
 
-    Isymdev(i,j,k,l) = 0.5*(δ(i,k)*δ(j,l) + δ(i,l)*δ(j,k)) - 1.0/3.0*δ(i,j)*δ(k,l)
-    temp(i,j,k,l) = 2.0G *( 0.5*(δ(i,k)*δ(j,l) + δ(i,l)*δ(j,k)) + ν/(1.0-2.0ν)*δ(i,j)*δ(k,l))
+    Isymdev(i, j, k, l) = 0.5 * (δ(i, k) * δ(j, l) + δ(i, l) * δ(j, k)) - 1.0 / 3.0 * δ(i, j) * δ(k, l)
+    temp(i, j, k, l) = 2.0G * (0.5 * (δ(i, k) * δ(j, l) + δ(i, l) * δ(j, k)) + ν / (1.0 - 2.0ν) * δ(i, j) * δ(k, l))
     Dᵉ = SymmetricTensor{4, 3}(temp)
     return J2Plasticity(G, K, σ₀, H, Dᵉ)
 end;
@@ -372,14 +376,15 @@ end
 
 function MaterialState()
     return MaterialState(
-                zero(SymmetricTensor{2, 3}),
-                zero(SymmetricTensor{2, 3}),
-                0.0)
+        zero(SymmetricTensor{2, 3}),
+        zero(SymmetricTensor{2, 3}),
+        0.0
+    )
 end
 
 function vonMises(σ)
     s = dev(σ)
-    return sqrt(3.0/2.0 * s ⊡ s)
+    return sqrt(3.0 / 2.0 * s ⊡ s)
 end;
 
 function compute_stress_tangent(ϵ::SymmetricTensor{2, 3}, material::J2Plasticity, state::MaterialState)
@@ -391,16 +396,16 @@ function compute_stress_tangent(ϵ::SymmetricTensor{2, 3}, material::J2Plasticit
     σᵗ = material.Dᵉ ⊡ (ϵ - state.ϵᵖ) # trial-stress
     sᵗ = dev(σᵗ)         # deviatoric part of trial-stress
     J₂ = 0.5 * sᵗ ⊡ sᵗ   # second invariant of sᵗ
-    σᵗₑ = sqrt(3.0*J₂)   # effective trial-stress (von Mises stress)
+    σᵗₑ = sqrt(3.0 * J₂) # effective trial-stress (von Mises stress)
     σʸ = material.σ₀ + H * state.k # Previous yield limit
 
-    φᵗ  = σᵗₑ - σʸ # Trial-value of the yield surface
+    φᵗ = σᵗₑ - σʸ # Trial-value of the yield surface
 
     if φᵗ &lt; 0.0 # elastic loading
         return σᵗ, material.Dᵉ, MaterialState(state.ϵᵖ, σᵗ, state.k)
     else # plastic loading
         h = H + 3G
-        μ =  φᵗ / h   # plastic multiplier
+        μ = φᵗ / h # plastic multiplier
 
         c1 = 1 - 3G * μ / σᵗₑ
         s = c1 * sᵗ           # updated deviatoric stress
@@ -410,25 +415,25 @@ function compute_stress_tangent(ϵ::SymmetricTensor{2, 3}, material::J2Plasticit
         κ = H * (state.k + μ) # drag stress
         σₑ = material.σ₀ + κ  # updated yield surface
 
-        δ(i,j) = i == j ? 1.0 : 0.0
-        Isymdev(i,j,k,l)  = 0.5*(δ(i,k)*δ(j,l) + δ(i,l)*δ(j,k)) - 1.0/3.0*δ(i,j)*δ(k,l)
-        Q(i,j,k,l) = Isymdev(i,j,k,l) - 3.0 / (2.0*σₑ^2) * s[i,j]*s[k,l]
-        b = (3G*μ/σₑ) / (1.0 + 3G*μ/σₑ)
+        δ(i, j) = i == j ? 1.0 : 0.0
+        Isymdev(i, j, k, l) = 0.5 * (δ(i, k) * δ(j, l) + δ(i, l) * δ(j, k)) - 1.0 / 3.0 * δ(i, j) * δ(k, l)
+        Q(i, j, k, l) = Isymdev(i, j, k, l) - 3.0 / (2.0 * σₑ^2) * s[i, j] * s[k, l]
+        b = (3G * μ / σₑ) / (1.0 + 3G * μ / σₑ)
 
-        Dtemp(i,j,k,l) = -2G*b * Q(i,j,k,l) - 9G^2 / (h*σₑ^2) * s[i,j]*s[k,l]
+        Dtemp(i, j, k, l) = -2G * b * Q(i, j, k, l) - 9G^2 / (h * σₑ^2) * s[i, j] * s[k, l]
         D = material.Dᵉ + SymmetricTensor{4, 3}(Dtemp)
 
         # Return new state
-        Δϵᵖ = 3/2 * μ / σₑ * s # plastic strain
-        ϵᵖ = state.ϵᵖ + Δϵᵖ    # plastic strain
-        k = state.k + μ        # hardening variable
+        Δϵᵖ = 3 / 2 * μ / σₑ * s # plastic strain
+        ϵᵖ = state.ϵᵖ + Δϵᵖ      # plastic strain
+        k = state.k + μ          # hardening variable
         return σ, D, MaterialState(ϵᵖ, σ, k)
     end
 end
 
 function create_values(interpolation)
     # setup quadrature rules
-    qr      = QuadratureRule{RefTetrahedron}(2)
+    qr = QuadratureRule{RefTetrahedron}(2)
     facet_qr = FacetQuadratureRule{RefTetrahedron}(3)
 
     # cell and facetvalues for u
@@ -449,14 +454,16 @@ function create_bc(dh, grid)
     dbcs = ConstraintHandler(dh)
     # Clamped on the left side
     dofs = [1, 2, 3]
-    dbc = Dirichlet(:u, getfacetset(grid, &quot;left&quot;), (x,t) -&gt; [0.0, 0.0, 0.0], dofs)
+    dbc = Dirichlet(:u, getfacetset(grid, &quot;left&quot;), (x, t) -&gt; [0.0, 0.0, 0.0], dofs)
     add!(dbcs, dbc)
     close!(dbcs)
     return dbcs
 end;
 
-function doassemble!(K::SparseMatrixCSC, r::Vector, cellvalues::CellValues, dh::DofHandler,
-                     material::J2Plasticity, u, states, states_old)
+function doassemble!(
+        K::SparseMatrixCSC, r::Vector, cellvalues::CellValues, dh::DofHandler,
+        material::J2Plasticity, u, states, states_old
+    )
     assembler = start_assemble(K, r)
     nu = getnbasefunctions(cellvalues)
     re = zeros(nu)     # element residual vector
@@ -475,8 +482,7 @@ function doassemble!(K::SparseMatrixCSC, r::Vector, cellvalues::CellValues, dh::
     return K, r
 end
 
-function assemble_cell!(Ke, re, cell, cellvalues, material,
-                        ue, state, state_old)
+function assemble_cell!(Ke, re, cell, cellvalues, material, ue, state, state_old)
     n_basefuncs = getnbasefunctions(cellvalues)
     reinit!(cellvalues, cell)
 
@@ -496,14 +502,16 @@ function assemble_cell!(Ke, re, cell, cellvalues, material,
         end
     end
     symmetrize_lower!(Ke)
+    return
 end
 
 function symmetrize_lower!(K)
-    for i in 1:size(K,1)
-        for j in i+1:size(K,1)
-            K[i,j] = K[j,i]
+    for i in 1:size(K, 1)
+        for j in (i + 1):size(K, 1)
+            K[i, j] = K[j, i]
         end
     end
+    return
 end;
 
 function doassemble_neumann!(r, dh, facetset, facetvalues, t)
@@ -527,10 +535,10 @@ end
 
 function solve()
     # Define material parameters
-    E = 200.0e9 # [Pa]
-    H = E/20   # [Pa]
-    ν = 0.3     # [-]
-    σ₀ = 200e6  # [Pa]
+    E = 200.0e9  # [Pa]
+    H = E / 20   # [Pa]
+    ν = 0.3      # [-]
+    σ₀ = 200.0e6 # [Pa]
     material = J2Plasticity(E, ν, σ₀, H)
 
     L = 10.0 # beam length [m]
@@ -538,7 +546,7 @@ function solve()
     h = 1.0  # beam height[m]
     n_timesteps = 10
     u_max = zeros(n_timesteps)
-    traction_magnitude = 1.e7 * range(0.5, 1.0, length=n_timesteps)
+    traction_magnitude = 1.0e7 * range(0.5, 1.0, length = n_timesteps)
 
     # Create geometry, dofs and boundary conditions
     n = 2
@@ -555,10 +563,10 @@ function solve()
 
     # Pre-allocate solution vectors, etc.
     n_dofs = ndofs(dh)  # total number of dofs
-    u  = zeros(n_dofs)  # solution vector
+    u = zeros(n_dofs)   # solution vector
     Δu = zeros(n_dofs)  # displacement correction
     r = zeros(n_dofs)   # residual
-    K = allocate_matrix(dh); # tangent stiffness matrix
+    K = allocate_matrix(dh) # tangent stiffness matrix
 
     # Create material states. One array for each cell, where each element is an array of material-
     # states - one for each integration point
@@ -578,14 +586,14 @@ function solve()
         update!(dbcs, t) # evaluates the D-bndc at time t
         apply!(u, dbcs)  # set the prescribed values in the solution vector
 
-        while true; newton_itr += 1
-
+        while true
+            newton_itr += 1
             if newton_itr &gt; 8
                 error(&quot;Reached maximum Newton iterations, aborting&quot;)
                 break
             end
             # Tangent and residual contribution from the cells (volume integral)
-            doassemble!(K, r, cellvalues, dh, material, u, states, states_old);
+            doassemble!(K, r, cellvalues, dh, material, u, states, states_old)
             # Residual contribution from the Neumann boundary (surface integral)
             doassemble_neumann!(r, dh, getfacetset(grid, &quot;right&quot;), facetvalues, traction)
             norm_r = norm(r[Ferrite.free_dofs(dbcs)])
@@ -615,7 +623,7 @@ function solve()
     for (el, cell_states) in enumerate(eachcol(states))
         for state in cell_states
             mises_values[el] += vonMises(state.σ)
-            κ_values[el] += state.k*material.H
+            κ_values[el] += state.k * material.H
         end
         mises_values[el] /= length(cell_states) # average von Mises stress
         κ_values[el] /= length(cell_states)     # average drag stress
@@ -635,10 +643,10 @@ using Plots
 plot(
     vcat(0.0, u_max),                # add the origin as a point
     vcat(0.0, traction_magnitude),
-    linewidth=2,
-    title=&quot;Traction-displacement&quot;,
-    label=nothing,
-    markershape=:auto
-    )
+    linewidth = 2,
+    title = &quot;Traction-displacement&quot;,
+    label = nothing,
+    markershape = :auto
+)
 ylabel!(&quot;Traction [Pa]&quot;)
-xlabel!(&quot;Maximum deflection [m]&quot;)</code></pre><hr/><p><em>This page was generated using <a href="https://github.com/fredrikekre/Literate.jl">Literate.jl</a>.</em></p></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../hyperelasticity/">« Hyperelasticity</a><a class="docs-footer-nextpage" href="../transient_heat_equation/">Transient heat equation »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option><option value="catppuccin-latte">catppuccin-latte</option><option value="catppuccin-frappe">catppuccin-frappe</option><option value="catppuccin-macchiato">catppuccin-macchiato</option><option value="catppuccin-mocha">catppuccin-mocha</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.7.0 on <span class="colophon-date" title="Friday 27 September 2024 00:01">Friday 27 September 2024</span>. Using Julia version 1.10.5.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
+xlabel!(&quot;Maximum deflection [m]&quot;)</code></pre><hr/><p><em>This page was generated using <a href="https://github.com/fredrikekre/Literate.jl">Literate.jl</a>.</em></p></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../hyperelasticity/">« Hyperelasticity</a><a class="docs-footer-nextpage" href="../transient_heat_equation/">Transient heat equation »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option><option value="catppuccin-latte">catppuccin-latte</option><option value="catppuccin-frappe">catppuccin-frappe</option><option value="catppuccin-macchiato">catppuccin-macchiato</option><option value="catppuccin-mocha">catppuccin-mocha</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.7.0 on <span class="colophon-date" title="Friday 8 November 2024 01:02">Friday 8 November 2024</span>. Using Julia version 1.11.1.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>

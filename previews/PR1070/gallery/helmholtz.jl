@@ -19,34 +19,36 @@ add!(dh, :u, ip)
 close!(dh)
 
 function u_ana(x::Vec{2, T}) where {T}
-    xs = (Vec{2}((-0.5,  0.5)),
-          Vec{2}((-0.5, -0.5)),
-          Vec{2}(( 0.5,  -0.5)))
-    σ = 1/8
+    xs = (
+        Vec{2}((-0.5, 0.5)),
+        Vec{2}((-0.5, -0.5)),
+        Vec{2}((0.5, -0.5)),
+    )
+    σ = 1 / 8
     s = zero(eltype(x))
     for i in 1:3
         s += exp(- norm(x - xs[i])^2 / σ^2)
     end
-    return max(1e-15 * one(T), s) # Denormals, be gone
+    return max(1.0e-15 * one(T), s) # Denormals, be gone
 end;
 
 dbcs = ConstraintHandler(dh)
 
-dbc = Dirichlet(:u, union(getfacetset(grid, "top"), getfacetset(grid, "right")), (x,t) -> u_ana(x))
+dbc = Dirichlet(:u, union(getfacetset(grid, "top"), getfacetset(grid, "right")), (x, t) -> u_ana(x))
 add!(dbcs, dbc)
 close!(dbcs)
 update!(dbcs, 0.0)
 
 K = allocate_matrix(dh);
 
-function doassemble(cellvalues::CellValues, facetvalues::FacetValues,
-                         K::SparseMatrixCSC, dh::DofHandler)
+function doassemble(
+        cellvalues::CellValues, facetvalues::FacetValues, K::SparseMatrixCSC, dh::DofHandler
+    )
     b = 1.0
     f = zeros(ndofs(dh))
     assembler = start_assemble(K, f)
 
     n_basefuncs = getnbasefunctions(cellvalues)
-    global_dofs = zeros(Int, ndofs_per_cell(dh))
 
     fe = zeros(n_basefuncs) # Local force vector
     Ke = zeros(n_basefuncs, n_basefuncs) # Local stiffness mastrix
@@ -76,7 +78,7 @@ function doassemble(cellvalues::CellValues, facetvalues::FacetValues,
 
         for facet in 1:nfacets(cell)
             if (cellcount, facet) ∈ getfacetset(grid, "left") ||
-               (cellcount, facet) ∈ getfacetset(grid, "bottom")
+                    (cellcount, facet) ∈ getfacetset(grid, "bottom")
                 reinit!(facetvalues, cell, facet)
                 for q_point in 1:getnquadpoints(facetvalues)
                     coords_qp = spatial_coordinate(facetvalues, q_point, coords)
@@ -91,8 +93,7 @@ function doassemble(cellvalues::CellValues, facetvalues::FacetValues,
             end
         end
 
-        celldofs!(global_dofs, cell)
-        assemble!(assembler, global_dofs, Ke, fe)
+        assemble!(assembler, celldofs(cell), Ke, fe)
     end
     return K, f
 end;

@@ -72,6 +72,7 @@ function create_example_2d_grid()
         Ferrite.write_cell_colors(vtk, grid, colors_workstream, "workstream-coloring")
         Ferrite.write_cell_colors(vtk, grid, colors_greedy, "greedy-coloring")
     end
+    return
 end
 
 create_example_2d_grid()
@@ -171,8 +172,8 @@ end
 # purpose. Finally, for the assembler we call `start_assemble` to create a new assembler but
 # note that we set `fillzero = false` because we don't want to risk that a task that starts
 # a bit later will zero out data that another task have already assembled.
-function Ferrite.task_local(scratch::ScratchData)
-    ScratchData(
+function create_scratch(scratch::ScratchData)
+    return ScratchData(
         task_local(scratch.cell_cache), task_local(scratch.cellvalues),
         task_local(scratch.Ke), task_local(scratch.fe),
         task_local(scratch.assembler)
@@ -239,7 +240,7 @@ function assemble_global!(
             ## Tell the @tasks loop to use the scheduler defined above
             @set scheduler = scheduler
             ## Obtain a task local scratch and unpack it
-            @local scratch = task_local(scratch)
+            @local scratch = make_scratch(scratch)
             local (; cell_cache, cellvalues, Ke, fe, assembler) = scratch
             ## Reinitialize the cell cache and then the cellvalues
             reinit!(cell_cache, cellidx)
@@ -261,7 +262,7 @@ nothing # hide
 #     ```julia
 #     # using TaskLocalValues
 #     scratches = TaskLocalValue() do
-#         task_local(scratch_template)
+#         make_scratch(scratch)
 #     end
 #     OhMyThreads.tforeach(color; scheduler) do cellidx
 #         # Obtain a task local scratch and unpack it

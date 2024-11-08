@@ -8,6 +8,7 @@ function create_example_2d_grid()
         Ferrite.write_cell_colors(vtk, grid, colors_workstream, "workstream-coloring")
         Ferrite.write_cell_colors(vtk, grid, colors_greedy, "greedy-coloring")
     end
+    return
 end
 
 create_example_2d_grid()
@@ -70,8 +71,8 @@ struct ScratchData{CC, CV, T, A}
     assembler::A
 end
 
-function Ferrite.task_local(scratch::ScratchData)
-    ScratchData(
+function create_scratch(scratch::ScratchData)
+    return ScratchData(
         task_local(scratch.cell_cache), task_local(scratch.cellvalues),
         task_local(scratch.Ke), task_local(scratch.fe),
         task_local(scratch.assembler)
@@ -104,7 +105,7 @@ function assemble_global!(
             # Tell the @tasks loop to use the scheduler defined above
             @set scheduler = scheduler
             # Obtain a task local scratch and unpack it
-            @local scratch = task_local(scratch)
+            @local scratch = make_scratch(scratch)
             local (; cell_cache, cellvalues, Ke, fe, assembler) = scratch
             # Reinitialize the cell cache and then the cellvalues
             reinit!(cell_cache, cellidx)

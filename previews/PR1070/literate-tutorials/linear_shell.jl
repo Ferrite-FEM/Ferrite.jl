@@ -1,10 +1,11 @@
+# runic: off
 # # [Linear shell](@id tutorial-linear-shell)
 #
 # ![](linear_shell.png)
 #-
 # ## Introduction
 #
-# In this example we show how shell elements can be analyzed in Ferrite.jl. The shell implemented here comes from the book
+# In this example we show how shell elements can be analyzed with Ferrite. The shell implemented here comes from the book
 # "The finite element method - Linear static and dynamic finite element analysis" by Hughes (1987), and a brief description of it is
 # given at the end of this tutorial.  The first part of the tutorial explains how to set up the problem.
 

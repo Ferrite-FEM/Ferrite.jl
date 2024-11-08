@@ -19,8 +19,8 @@ function assemble_element_mass!(Me::Matrix, cellvalues::CellValues)
     n_basefuncs = getnbasefunctions(cellvalues)
     # The mass matrices between the reactions are not coupled, so we get a blocked-strided matrix.
     num_reactants = 2
-    r₁range = 1:num_reactants:num_reactants*n_basefuncs
-    r₂range = 2:num_reactants:num_reactants*n_basefuncs
+    r₁range = 1:num_reactants:(num_reactants * n_basefuncs)
+    r₂range = 2:num_reactants:(num_reactants * n_basefuncs)
     Me₁ = @view Me[r₁range, r₁range]
     Me₂ = @view Me[r₂range, r₂range]
     # Reset to 0
@@ -36,8 +36,8 @@ function assemble_element_mass!(Me::Matrix, cellvalues::CellValues)
             for j in 1:n_basefuncs
                 δuⱼ = shape_value(cellvalues, q_point, j)
                 # Add contribution to Ke
-                Me₁[i,j] += (δuᵢ * δuⱼ) * dΩ
-                Me₂[i,j] += (δuᵢ * δuⱼ) * dΩ
+                Me₁[i, j] += (δuᵢ * δuⱼ) * dΩ
+                Me₂[i, j] += (δuᵢ * δuⱼ) * dΩ
             end
         end
     end
@@ -50,8 +50,8 @@ function assemble_element_diffusion!(De::Matrix, cellvalues::CellValues, materia
     D₂ = material.D₂
     # The diffusion between the reactions is not coupled, so we get a blocked-strided matrix.
     num_reactants = 2
-    r₁range = 1:num_reactants:num_reactants*n_basefuncs
-    r₂range = 2:num_reactants:num_reactants*n_basefuncs
+    r₁range = 1:num_reactants:(num_reactants * n_basefuncs)
+    r₂range = 2:num_reactants:(num_reactants * n_basefuncs)
     De₁ = @view De[r₁range, r₁range]
     De₂ = @view De[r₂range, r₂range]
     # Reset to 0
@@ -67,8 +67,8 @@ function assemble_element_diffusion!(De::Matrix, cellvalues::CellValues, materia
             for j in 1:n_basefuncs
                 ∇δuⱼ = shape_gradient(cellvalues, q_point, j)
                 # Add contribution to Ke
-                De₁[i,j] += D₁ * (∇δuᵢ ⋅ ∇δuⱼ) * dΩ
-                De₂[i,j] += D₂ * (∇δuᵢ ⋅ ∇δuⱼ) * dΩ
+                De₁[i, j] += D₁ * (∇δuᵢ ⋅ ∇δuⱼ) * dΩ
+                De₂[i, j] += D₂ * (∇δuᵢ ⋅ ∇δuⱼ) * dΩ
             end
         end
     end
@@ -79,8 +79,8 @@ function assemble_matrices!(M::SparseMatrixCSC, D::SparseMatrixCSC, cellvalues::
     n_basefuncs = getnbasefunctions(cellvalues)
 
     # Allocate the element stiffness matrix and element force vector
-    Me = zeros(2*n_basefuncs, 2*n_basefuncs)
-    De = zeros(2*n_basefuncs, 2*n_basefuncs)
+    Me = zeros(2 * n_basefuncs, 2 * n_basefuncs)
+    De = zeros(2 * n_basefuncs, 2 * n_basefuncs)
 
     # Create an assembler
     M_assembler = start_assemble(M)
@@ -121,14 +121,15 @@ function setup_initial_conditions!(u₀::Vector, cellvalues::CellValues, dh::Dof
         end
     end
 
-    u₀ .+= 0.01*rand(ndofs(dh))
+    u₀ .+= 0.01 * rand(ndofs(dh))
+    return
 end;
 
 function create_embedded_sphere(refinements)
     gmsh.initialize()
 
     # Add a unit sphere in 3D space
-    gmsh.model.occ.addSphere(0.0,0.0,0.0,1.0)
+    gmsh.model.occ.addSphere(0.0, 0.0, 0.0, 1.0)
     gmsh.model.occ.synchronize()
 
     # Generate nodes and surface elements only, hence we need to pass 2 into generate
@@ -144,7 +145,7 @@ function create_embedded_sphere(refinements)
     nodes = tonodes()
     elements, _ = toelements(2)
     gmsh.finalize()
-    grid = Grid(elements, nodes);
+    return Grid(elements, nodes)
 end
 
 function gray_scott_on_sphere(material::GrayScottMaterial, Δt::Real, T::Real, refinements::Integer)
@@ -157,7 +158,7 @@ function gray_scott_on_sphere(material::GrayScottMaterial, Δt::Real, T::Real, r
     # elements are embedded into, which is in this example 3.
     ip = Lagrange{RefTriangle, 1}()
     qr = QuadratureRule{RefTriangle}(2)
-    cellvalues = CellValues(qr, ip, ip^3);
+    cellvalues = CellValues(qr, ip, ip^3)
 
     # We have two options to add the reactants to the dof handler, which will give us slightly
     # different resulting dof distributions:
@@ -170,22 +171,22 @@ function gray_scott_on_sphere(material::GrayScottMaterial, Δt::Real, T::Real, r
     # we can create simply reshape the solution vector u to a matrix where the inner index
     # corresponds to the index of the reactant. Note that we will still use the scalar
     # interpolation for the assembly procedure.
-    dh = DofHandler(grid);
-    add!(dh, :reactants, ip^2);
-    close!(dh);
+    dh = DofHandler(grid)
+    add!(dh, :reactants, ip^2)
+    close!(dh)
 
     # We can save some memory by telling the sparsity pattern that the matrices are not coupled.
-    M = allocate_matrix(dh; coupling=[true false; false true])
-    D = allocate_matrix(dh; coupling=[true false; false true])
+    M = allocate_matrix(dh; coupling = [true false; false true])
+    D = allocate_matrix(dh; coupling = [true false; false true])
 
     # Since the heat problem is linear and has no time dependent parameters, we precompute the
     # decomposition of the system matrix to speed up the linear system solver.
-    assemble_matrices!(M, D, cellvalues, dh, material);
+    assemble_matrices!(M, D, cellvalues, dh, material)
     A = M + Δt .* D
     cholA = cholesky(A)
 
     # Now we setup buffers for the time dependent solution and fill the initial condition.
-    uₜ   = zeros(ndofs(dh))
+    uₜ = zeros(ndofs(dh))
     uₜ₋₁ = ones(ndofs(dh))
     setup_initial_conditions!(uₜ₋₁, cellvalues, dh)
 
@@ -199,7 +200,7 @@ function gray_scott_on_sphere(material::GrayScottMaterial, Δt::Real, T::Real, r
     # This is now the main solve loop.
     F = material.F
     k = material.k
-    for (iₜ, t) ∈ enumerate(Δt:Δt:T)
+    for (iₜ, t) in enumerate(Δt:Δt:T)
         # First we solve the heat problem
         uₜ .= cholA \ (M * uₜ₋₁)
 
@@ -207,11 +208,11 @@ function gray_scott_on_sphere(material::GrayScottMaterial, Δt::Real, T::Real, r
         # the heat problem as initial guess. 2 is the number of reactants.
         num_individual_reaction_dofs = ndofs(dh) ÷ 2
         rvₜ = reshape(uₜ, (2, num_individual_reaction_dofs))
-        for i ∈ 1:num_individual_reaction_dofs
+        for i in 1:num_individual_reaction_dofs
             r₁ = rvₜ[1, i]
             r₂ = rvₜ[2, i]
-            rvₜ[1, i] += Δt*( -r₁*r₂^2 + F *(1 - r₁) )
-            rvₜ[2, i] += Δt*(  r₁*r₂^2 - r₂*(F + k ) )
+            rvₜ[1, i] += Δt * (-r₁ * r₂^2 + F * (1 - r₁))
+            rvₜ[2, i] += Δt * (r₁ * r₂^2 - r₂ * (F + k))
         end
 
         # The solution is then stored every 10th step to vtk files for
@@ -226,12 +227,12 @@ function gray_scott_on_sphere(material::GrayScottMaterial, Δt::Real, T::Real, r
         # Finally we totate the solution to initialize the next timestep.
         uₜ₋₁ .= uₜ
     end
-
-    vtk_save(pvd);
+    vtk_save(pvd)
+    return
 end
 
 # This parametrization gives the spot pattern shown in the gif above.
 material = GrayScottMaterial(0.00016, 0.00008, 0.06, 0.062)
-gray_scott_on_sphere(material, 10.0, 32000.0, 3)
+    gray_scott_on_sphere(material, 10.0, 32000.0, 3)
 
 # This file was generated using Literate.jl, https://github.com/fredrikekre/Literate.jl
