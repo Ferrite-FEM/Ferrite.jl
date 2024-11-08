@@ -653,8 +653,8 @@ for INDEX in (:VertexIndex, :EdgeIndex, :FaceIndex, :FacetIndex, :InterfaceIndex
 
         # Necessary to check if, e.g. `(cellid, faceidx) in faceset`
         Base.isequal(x::$INDEX, y::$INDEX) = x.idx == y.idx
-        Base.isequal(x::NTuple{N, Int}, y::$INDEX) where N = all(i -> x[i] == y.idx[i], 1:N)
-        Base.isequal(y::$INDEX, x::NTuple{N, Int}) where N = all(i -> x[i] == y.idx[i], 1:N)
+        Base.isequal(x::NTuple{N, Int}, y::$INDEX) where {N} = all(i -> x[i] == y.idx[i], 1:N)
+        Base.isequal(y::$INDEX, x::NTuple{N, Int}) where {N} = all(i -> x[i] == y.idx[i], 1:N)
         Base.hash(x::$INDEX, h::UInt) = hash(x.idx, h)
     end
 end
