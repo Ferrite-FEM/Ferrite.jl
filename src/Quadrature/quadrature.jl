@@ -323,5 +323,5 @@ function task_local(qr::QR) where {refshape, QR <: QuadratureRule{refshape}}
     return QuadratureRule{refshape}(task_local(qr.weights), task_local(qr.points))::QR
 end
 function task_local(qr::QR) where {refshape, QR <: FacetQuadratureRule{refshape}}
-    return FacetQuadratureRule{refshape}(map(task_local, qr.face_rules))::QR
+    return FacetQuadratureRule{refshape}(task_local(qr.face_rules))::QR
 end

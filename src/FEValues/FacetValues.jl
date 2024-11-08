@@ -70,7 +70,7 @@ end
 
 function task_local(fv::FacetValues)
     return FacetValues(
-        map(task_local, fv.fun_values), map(task_local, fv.geo_mapping),
+        task_local(fv.fun_values), task_local(fv.geo_mapping),
         task_local(fv.fqr), task_local(fv.detJdV), task_local(fv.normals),
         task_local(fv.current_facet)
     )
