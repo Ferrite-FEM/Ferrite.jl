@@ -30,7 +30,7 @@ end
 
 Initiate an `L2Projector` for projecting quadrature data onto
 a function space. To define the function space, add interpolations for
-differents cell sets with `add!` before `close!`ing the projector,
+different cell sets with `add!` before `close!`ing the projector,
 see the example below.
 
 The `L2Projector` acts as the integrated left hand side of the projection equation:

@@ -3,7 +3,7 @@ using Ferrite, Test
 function test_pe_scalar_field()
     # isoparametric approximation
     mesh = generate_grid(QuadraticQuadrilateral, (3, 3))
-    perturbate_standard_grid!(mesh, 1 / 10)
+    perturb_standard_grid!(mesh, 1 / 10)
 
     f(x) = x[1] + x[2]
 
@@ -47,7 +47,7 @@ end
 
 function test_pe_embedded()
     mesh = generate_grid(QuadraticQuadrilateral, (3, 3))
-    perturbate_standard_grid!(mesh, 1 / 10)
+    perturb_standard_grid!(mesh, 1 / 10)
     mesh = Grid(mesh.cells, map(x -> Node(Vec((x.x[1], x.x[2], x.x[1] + x.x[2]))), mesh.nodes))
 
     f(x) = x[1] + x[2]
@@ -91,7 +91,7 @@ function test_pe_vector_field()
     ## vector field
     # isoparametric approximation
     mesh = generate_grid(QuadraticQuadrilateral, (3, 3))
-    perturbate_standard_grid!(mesh, 1 / 10)
+    perturb_standard_grid!(mesh, 1 / 10)
     f(x) = Vec((x[1], x[2]))
     nodal_vals = [f(p.x) for p in mesh.nodes]
 
@@ -134,7 +134,7 @@ end
 function test_pe_superparametric()
     # superparametric approximation
     mesh = generate_grid(Quadrilateral, (3, 3))
-    perturbate_standard_grid!(mesh, 1 / 10)
+    perturb_standard_grid!(mesh, 1 / 10)
     f(x) = x
     ip_f = Lagrange{RefQuadrilateral, 2}() # function interpolation
 
@@ -170,7 +170,7 @@ end
 
 function test_pe_dofhandler()
     mesh = generate_grid(Quadrilateral, (2, 2))
-    perturbate_standard_grid!(mesh, 1 / 10)
+    perturb_standard_grid!(mesh, 1 / 10)
     dof_vals = [1.0, 2.0, 5.0, 4.0, 3.0, 6.0, 8.0, 7.0, 9.0]
     points = [node.x for node in mesh.nodes] # same as nodes
 
@@ -235,7 +235,7 @@ function test_pe_dofhandler2(; three_dimensional = true)
     # but not using L2Projector since we want the DofHandler dofs
     if (three_dimensional)
         mesh = generate_grid(Hexahedron, (3, 3, 3))
-        perturbate_standard_grid!(mesh, 1 / 10)
+        perturb_standard_grid!(mesh, 1 / 10)
         f_s = x -> 1.0 + x[1] + x[2] + x[1] * x[2] + x[2] * x[3]
         f_v = x -> Vec{3}((1.0 + x[1] + x[2] + x[1] * x[2], 2.0 - x[1] - x[2] - x[1] * x[2], 4.0 + x[1] - x[2] + x[3] - x[1] * x[3] - x[2] * x[3]))
         points = [Vec((x, x, x)) for x in range(0; stop = 1, length = 100)]
@@ -244,7 +244,7 @@ function test_pe_dofhandler2(; three_dimensional = true)
         qr = QuadratureRule{RefHexahedron}(3)
     else
         mesh = generate_grid(Quadrilateral, (3, 3))
-        perturbate_standard_grid!(mesh, 1 / 10)
+        perturb_standard_grid!(mesh, 1 / 10)
         f_s = x -> 1.0 + x[1] + x[2] + x[1] * x[2]
         f_v = x -> Vec{2}((1.0 + x[1] + x[2] + x[1] * x[2], 2.0 - x[1] - x[2] - x[1] * x[2]))
         points = [Vec((x, x)) for x in range(0; stop = 1, length = 100)]
@@ -377,7 +377,7 @@ end
 function test_pe_oneD()
     # isoparametric approximation
     mesh = generate_grid(Line, (2,))
-    perturbate_standard_grid!(mesh, 1 / 10)
+    perturb_standard_grid!(mesh, 1 / 10)
     f(x) = x[1]
     nodal_vals = [f(p.x) for p in mesh.nodes]
 
