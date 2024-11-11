@@ -407,20 +407,35 @@ function InterfaceIterator(
     fs = facetskeleton(topology, grid)
     ninterfaces = 0
     for facet in fs
-        facet[1] ∈ sdh_here.cellset || continue
-        neighbors = neighborhood[facet[1], facet[2]]
-        isempty(neighbors) && continue
-        neighbors[][1] ∈ sdh_there.cellset || continue
+        if facet[1] ∈ sdh_here.cellset
+            neighbors = neighborhood[facet[1], facet[2]]
+            isempty(neighbors) && continue
+            neighbors[][1] ∈ sdh_there.cellset || continue
+        elseif facet[1] ∈ sdh_there.cellset
+            neighbors = neighborhood[facet[1], facet[2]]
+            isempty(neighbors) && continue
+            neighbors[][1] ∈ sdh_here.cellset || continue
+        else
+            continue
+        end
         ninterfaces += 1
     end
     set = Set{InterfaceIndex}()
     sizehint!(set, ninterfaces)
     for facet in fs
-        facet[1] ∈ sdh_here.cellset || continue
-        neighbors = neighborhood[facet[1], facet[2]]
-        isempty(neighbors) && continue
-        neighbors[][1] ∈ sdh_there.cellset || continue
-        push!(set, InterfaceIndex(facet[1], facet[2], neighborhood[facet[1], facet[2]][][1], neighborhood[facet[1], facet[2]][][2]))
+        if facet[1] ∈ sdh_here.cellset
+            neighbors = neighborhood[facet[1], facet[2]]
+            isempty(neighbors) && continue
+            neighbors[][1] ∈ sdh_there.cellset || continue
+            push!(set, InterfaceIndex(facet[1], facet[2], neighborhood[facet[1], facet[2]][][1], neighborhood[facet[1], facet[2]][][2]))
+        elseif facet[1] ∈ sdh_there.cellset
+            neighbors = neighborhood[facet[1], facet[2]]
+            isempty(neighbors) && continue
+            neighbors[][1] ∈ sdh_here.cellset || continue
+            push!(set, InterfaceIndex(neighborhood[facet[1], facet[2]][][1], neighborhood[facet[1], facet[2]][][2], facet[1], facet[2]))
+        else
+            continue
+        end
     end
     return InterfaceIterator(InterfaceCache(sdh_here, sdh_there), set)
 end
