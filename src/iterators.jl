@@ -357,25 +357,24 @@ end
 
 function InterfaceIterator(
         gridordh::Union{Grid, DofHandler},
-        set_here::AbstractVecOrSet{FacetIndex},
-        topology::ExclusiveTopology = ExclusiveTopology(gridordh isa Grid ? gridordh : get_grid(gridordh))
+        set::AbstractVecOrSet{InterfaceIndex}
     )
     grid = gridordh isa Grid ? gridordh : get_grid(gridordh)
     if gridordh isa DofHandler
         # Keep here to maintain same settings as for CellIterator
-        _check_same_celltype(grid, set_here)
-    end
-    neighborhood = get_facet_facet_neighborhood(topology, grid)
-    @assert all(facet -> !isempty(neighborhood[facet[1], facet[2]]), set_here) "Facets in the set must have neighbors"
-    set = Set{InterfaceIndex}()
-    sizehint!(set, length(set_here))
-    for facet in set_here
-        neighbor = neighborhood[facet[1], facet[2]][]
-        push!(set, InterfaceIndex(facet[1], facet[2], neighbor[1], neighbor[2]))
+        _check_same_celltype(grid, set)
     end
     return InterfaceIterator(InterfaceCache(gridordh), set)
 end
-
+function InterfaceIterator(
+        sdh_here::SubDofHandler,
+        sdh_there::SubDofHandler,
+        set::AbstractVecOrSet{InterfaceIndex}
+    )
+    grid = get_grid(sdh_here.dh)
+    _check_same_celltype(grid, set)
+    return InterfaceIterator(InterfaceCache(sdh_here, sdh_there), set)
+end
 function InterfaceIterator(
         gridordh::Union{Grid, DofHandler},
         topology::ExclusiveTopology = ExclusiveTopology(gridordh isa Grid ? gridordh : get_grid(gridordh))
@@ -394,7 +393,7 @@ function InterfaceIterator(
         isempty(neighborhood[facet[1], facet[2]]) && continue
         push!(set, InterfaceIndex(facet[1], facet[2], neighborhood[facet[1], facet[2]][][1], neighborhood[facet[1], facet[2]][][2]))
     end
-    return InterfaceIterator(InterfaceCache(gridordh), set)
+    return InterfaceIterator(gridordh, set)
 end
 
 function InterfaceIterator(
@@ -437,7 +436,7 @@ function InterfaceIterator(
             continue
         end
     end
-    return InterfaceIterator(InterfaceCache(sdh_here, sdh_there), set)
+    return InterfaceIterator(sdh_here, sdh_there, set)
 end
 
 # Iterator interface for CellIterator/FacetIterator
@@ -470,6 +469,16 @@ function _check_same_celltype(grid::AbstractGrid, facetset::AbstractVecOrSet{<:B
     celltype = getcelltype(grid, first(facetset)[1])
     if !all(getcelltype(grid, facet[1]) == celltype for facet in facetset)
         error("The cells in the set (set of $(eltype(facetset))) are not all of the same celltype.")
+    end
+    return
+end
+
+function _check_same_celltype(grid::AbstractGrid, interfaceset::AbstractVecOrSet{InterfaceIndex})
+    isconcretetype(getcelltype(grid)) && return nothing # Short circuit check
+    celltype_here = getcelltype(grid, first(interfaceset)[1])
+    celltype_there = getcelltype(grid, first(interfaceset)[3])
+    if !all(getcelltype(grid, interface[1]) == celltype_here && getcelltype(grid, interface[3]) == celltype_there for interface in interfaceset)
+        error("The cells in the set (set of InterfaceIndex) are not all of the same celltype on each side.")
     end
     return
 end
