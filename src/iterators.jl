@@ -372,7 +372,7 @@ function InterfaceIterator(
         set::AbstractVecOrSet{InterfaceIndex}
     )
     grid = get_grid(sdh_here.dh)
-    _check_same_celltype(grid, set)
+    _check_same_celltype(grid, set, getcelltype(grid, first(sdh_here.cellset)), getcelltype(grid, first(sdh_there.cellset)))
     return InterfaceIterator(InterfaceCache(sdh_here, sdh_there), set)
 end
 function InterfaceIterator(
@@ -473,10 +473,10 @@ function _check_same_celltype(grid::AbstractGrid, facetset::AbstractVecOrSet{<:B
     return
 end
 
-function _check_same_celltype(grid::AbstractGrid, interfaceset::AbstractVecOrSet{InterfaceIndex})
+function _check_same_celltype(grid::AbstractGrid, interfaceset::AbstractVecOrSet{InterfaceIndex},
+        celltype_here::Type{<:AbstractCell} = getcelltype(grid, first(interfaceset)[1]),
+        celltype_there::Type{<:AbstractCell} = getcelltype(grid, first(interfaceset)[3]))
     isconcretetype(getcelltype(grid)) && return nothing # Short circuit check
-    celltype_here = getcelltype(grid, first(interfaceset)[1])
-    celltype_there = getcelltype(grid, first(interfaceset)[3])
     if !all(getcelltype(grid, interface[1]) == celltype_here && getcelltype(grid, interface[3]) == celltype_there for interface in interfaceset)
         error("The cells in the set (set of InterfaceIndex) are not all of the same celltype on each side.")
     end

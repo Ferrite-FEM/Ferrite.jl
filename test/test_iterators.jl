@@ -1,4 +1,8 @@
 @testset "InterfaceIterator" begin
+    @check_allocs function testallocs_iterate(iterator)
+        for _ in iterator end
+        return nothing
+    end
     function _iterate(iterator)
         for _ in iterator end
         return nothing
@@ -23,10 +27,10 @@
         _iterate(ii_dh)
         _iterate(ii_grid)
         # Test for allocations
-        @test (@allocations _iterate(ii_dh)) == 1 # Should be zero??
-        @test (@allocations _iterate(ii_dh_top)) == 2 # Should be zero?? this one is 2???
-        @test (@allocations _iterate(ii_grid)) == 1 # Should be zero??
-        @test (@allocations _iterate(ii_grid_top)) == 1 # Should be zero??
+        @test (@allocated _iterate(ii_dh)) == 0
+        @test (@allocated _iterate(ii_dh_top)) == 144 # Why???
+        @test (@allocated _iterate(ii_grid)) == 0
+        @test (@allocated _iterate(ii_grid_top)) == 0
     end
 
     @testset "subdomains" begin
@@ -114,8 +118,6 @@
         add!(sdh_quad, :u, ip_quad)
         add!(sdh_tri, :u, ip_tri)
         close!(dh)
-
-        # @test_throws ErrorException InterfaceIterator(sdh_quad, sdh_tri, Set([InterfaceIndex(2, 2, 1, 2)]))
-
+        @test_throws ErrorException("The cells in the set (set of InterfaceIndex) are not all of the same celltype on each side.") InterfaceIterator(sdh_quad, sdh_tri, Set([InterfaceIndex(2, 2, 1, 2)]))
     end
 end

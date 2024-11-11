@@ -11,6 +11,7 @@ using StaticArrays
 using OrderedCollections
 using WriteVTK
 import Metis
+using AllocCheck
 
 include("test_utils.jl")
 
