@@ -649,7 +649,7 @@ for INDEX in (:VertexIndex, :EdgeIndex, :FaceIndex, :FacetIndex, :InterfaceIndex
         Base.getindex(I::($INDEX), i::Int) = I.idx[i]
 
         #To be able to do a,b = faceidx
-        Base.iterate(I::($INDEX), state::Int = 1) = (state == 3) ? nothing : (I[state], state + 1)
+        Base.iterate(I::($INDEX), state::Int = 1) = (state == length(I.idx) + 1) ? nothing : (I[state], state + 1)
 
         # Necessary to check if, e.g. `(cellid, faceidx) in faceset`
         Base.isequal(x::$INDEX, y::$INDEX) = x.idx == y.idx
