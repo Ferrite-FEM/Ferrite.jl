@@ -446,34 +446,39 @@ function _coupling_to_local_dof_coupling(dh::DofHandler, coupling::AbstractMatri
     sz == size(coupling, 2) || error("coupling not square")
 
     # Return one matrix per (potential) sub-domain
-    outs = Matrix{Bool}[]
+    nsdh = length(dh.subdofhandlers)
+    outs = Matrix{Matrix{Bool}}(undef, nsdh, nsdh)
     field_dims = map(fieldname -> n_components(dh, fieldname), dh.field_names)
 
-    for sdh in dh.subdofhandlers
-        out = zeros(Bool, ndofs_per_cell(sdh), ndofs_per_cell(sdh))
-        push!(outs, out)
+    for (sdh1_idx, sdh1) in enumerate(dh.subdofhandlers)
+        for (sdh2_idx, sdh2) in enumerate(dh.subdofhandlers)
+            out = zeros(Bool, ndofs_per_cell(sdh1), ndofs_per_cell(sdh2))
+            outs[sdh1_idx, sdh2_idx] = out
 
-        dof_ranges = [dof_range(sdh, f) for f in sdh.field_names]
-        global_idxs = [findfirst(x -> x === f, dh.field_names) for f in sdh.field_names]
+            dof_ranges_here = [dof_range(sdh1, f) for f in sdh1.field_names]
+            dof_ranges_there = [dof_range(sdh2, f) for f in sdh2.field_names]
+            global_idxs_here = [findfirst(x -> x === f, dh.field_names) for f in sdh1.field_names]
+            global_idxs_there = [findfirst(x -> x === f, dh.field_names) for f in sdh2.field_names]
 
-        if sz == length(dh.field_names) # Coupling given by fields
-            for (j, jrange) in pairs(dof_ranges), (i, irange) in pairs(dof_ranges)
-                out[irange, jrange] .= coupling[global_idxs[i], global_idxs[j]]
-            end
-        elseif sz == sum(field_dims) # Coupling given by components
-            component_offsets = pushfirst!(cumsum(field_dims), 0)
-            for (jf, jrange) in pairs(dof_ranges), (j, J) in pairs(jrange)
-                jc = mod1(j, field_dims[global_idxs[jf]]) + component_offsets[global_idxs[jf]]
-                for (i_f, irange) in pairs(dof_ranges), (i, I) in pairs(irange)
-                    ic = mod1(i, field_dims[global_idxs[i_f]]) + component_offsets[global_idxs[i_f]]
-                    out[I, J] = coupling[ic, jc]
+            if sz == length(dh.field_names) # Coupling given by fields
+                for (j, jrange) in pairs(dof_ranges_there), (i, irange) in pairs(dof_ranges_here)
+                    out[irange, jrange] .= coupling[global_idxs_here[i], global_idxs_there[j]]
                 end
+            elseif sz == sum(field_dims) # Coupling given by components
+                component_offsets = pushfirst!(cumsum(field_dims), 0)
+                for (jf, jrange) in pairs(dof_ranges_there), (j, J) in pairs(jrange)
+                    jc = mod1(j, field_dims[global_idxs_there[jf]]) + component_offsets[global_idxs_there[jf]]
+                    for (i_f, irange) in pairs(dof_ranges_here), (i, I) in pairs(irange)
+                        ic = mod1(i, field_dims[global_idxs_here[i_f]]) + component_offsets[global_idxs_here[i_f]]
+                        out[I, J] = coupling[ic, jc]
+                    end
+                end
+            elseif sz == ndofs_per_cell(sdh1) # Coupling given by template local matrix
+                # TODO: coupling[fieldhandler_idx] if different template per subddomain
+                out .= coupling
+            else
+                error("could not create coupling")
             end
-        elseif sz == ndofs_per_cell(sdh) # Coupling given by template local matrix
-            # TODO: coupling[fieldhandler_idx] if different template per subddomain
-            out .= coupling
-        else
-            error("could not create coupling")
         end
     end
     return outs
@@ -481,16 +486,13 @@ end
 
 function _add_cell_entries!(
         sp::AbstractSparsityPattern, dh::DofHandler, ch::Union{ConstraintHandler, Nothing},
-        keep_constrained::Bool, coupling::Union{Vector{<:AbstractMatrix{Bool}}, Nothing},
+        keep_constrained::Bool, coupling::Union{<:AbstractMatrix{<:AbstractMatrix{Bool}}, Nothing},
     )
     # Add all connections between dofs for every cell while filtering based
     # on a) constraints, and b) field/dof coupling.
-    cc = CellCache(dh)
     for (sdhi, sdh) in pairs(dh.subdofhandlers)
-        set = BitSet(sdh.cellset)
         coupling === nothing || (coupling_sdh = coupling[sdhi])
-        for cell_id in set
-            reinit!(cc, cell_id)
+        for cc in CellIterator(sdh)
             for (i, row) in pairs(cc.dofs)
                 # a) check constraint for row
                 !keep_constrained && haskey(ch.dofmapping, row) && continue
@@ -606,41 +608,39 @@ function _add_interface_entries!(
         interface_coupling::AbstractMatrix{Bool},
     )
     couplings = _coupling_to_local_dof_coupling(dh, interface_coupling)
-    for ic in InterfaceIterator(dh, topology)
-        # TODO: This looks like it can be optimized for the common case where
-        #       the cells are in the same subdofhandler
-        sdhs_idx = dh.cell_to_subdofhandler[cellid.([ic.a, ic.b])]
-        sdhs = dh.subdofhandlers[sdhs_idx]
-        to_check = Dict{Int, Vector{Int}}()
-        for (i, sdh) in pairs(sdhs)
-            sdh_idx = sdhs_idx[i]
-            coupling_sdh = couplings[sdh_idx]
-            for cell_field in sdh.field_names
-                dofrange1 = dof_range(sdh, cell_field)
-                cell_dofs = celldofs(sdh_idx == 1 ? ic.a : ic.b)
-                cell_field_dofs = @view cell_dofs[dofrange1]
-                for neighbor_field in sdh.field_names
-                    sdh2 = sdhs[i == 1 ? 2 : 1]
-                    neighbor_field ∈ sdh2.field_names || continue
-                    dofrange2 = dof_range(sdh2, neighbor_field)
-                    neighbor_dofs = celldofs(sdh_idx == 2 ? ic.a : ic.b)
-                    neighbor_field_dofs = @view neighbor_dofs[dofrange2]
+    for (_i, sdh1) in enumerate(dh.subdofhandlers)
+        for (_j, sdh2) in enumerate(dh.subdofhandlers)
+            for ic in InterfaceIterator(sdh1, sdh2, topology)
+                # TODO: This looks like it can be optimized for the common case where
+                #       the cells are in the same subdofhandler
+                to_check = Dict{Int, Vector{Int}}()
+                coupling_sdh = couplings[_i, _j]
+                for cell_field in sdh1.field_names
+                    dofrange1 = dof_range(sdh1, cell_field)
+                    cell_dofs = celldofs(ic.a)
+                    cell_field_dofs = @view cell_dofs[dofrange1]
+                    for neighbor_field in sdh1.field_names
+                        neighbor_field ∈ sdh2.field_names || continue
+                        dofrange2 = dof_range(sdh2, neighbor_field)
+                        neighbor_dofs = celldofs(ic.b)
+                        neighbor_field_dofs = @view neighbor_dofs[dofrange2]
 
-                    empty!(to_check)
-                    for (j, dof_j) in enumerate(dofrange2)
-                        for (i, dof_i) in enumerate(dofrange1)
-                            coupling_sdh[dof_i, dof_j] || continue
-                            push!(get!(Vector{Int}, to_check, j), i)
+                        empty!(to_check)
+                        for (j, dof_j) in enumerate(dofrange2)
+                            for (i, dof_i) in enumerate(dofrange1)
+                                coupling_sdh[dof_i, dof_j] || continue
+                                push!(get!(Vector{Int}, to_check, j), i)
+                            end
                         end
-                    end
 
-                    for (j, is) in to_check
-                        # Avoid coupling the shared dof in continuous interpolations as cross-element. They're coupled in the local coupling matrix.
-                        neighbor_field_dofs[j] ∈ cell_dofs && continue
-                        for i in is
-                            cell_field_dofs[i] ∈ neighbor_dofs && continue
-                            _add_interface_entry(sp, cell_field_dofs, neighbor_field_dofs, i, j, keep_constrained, ch)
-                            _add_interface_entry(sp, neighbor_field_dofs, cell_field_dofs, j, i, keep_constrained, ch)
+                        for (j, is) in to_check
+                            # Avoid coupling the shared dof in continuous interpolations as cross-element. They're coupled in the local coupling matrix.
+                            neighbor_field_dofs[j] ∈ cell_dofs && continue
+                            for i in is
+                                cell_field_dofs[i] ∈ neighbor_dofs && continue
+                                _add_interface_entry(sp, cell_field_dofs, neighbor_field_dofs, i, j, keep_constrained, ch)
+                                _add_interface_entry(sp, neighbor_field_dofs, cell_field_dofs, j, i, keep_constrained, ch)
+                            end
                         end
                     end
                 end

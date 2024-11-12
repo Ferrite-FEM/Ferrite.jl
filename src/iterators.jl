@@ -402,6 +402,7 @@ function InterfaceIterator(
     if gridordh isa DofHandler
         # Keep here to maintain same settings as for CellIterator
         _check_same_celltype(grid, 1:getncells(grid))
+        @assert length(gridordh.subdofhandlers) == 1 "Use InterfaceIterator(::SubDofHandler, ::SubDofHandler) for subdomain support"
     end
     neighborhood = get_facet_facet_neighborhood(topology, grid)
     fs = facetskeleton(topology, grid)

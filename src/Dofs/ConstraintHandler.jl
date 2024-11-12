@@ -356,16 +356,18 @@ function _add!(ch::ConstraintHandler, dbc::Dirichlet, bcnodes::AbstractVecOrSet{
     interpol_points = getnbasefunctions(interpolation)
     node_dofs = zeros(Int, ncomps, nnodes)
     visited = falses(nnodes)
-    for cell in CellIterator(ch.dh, cellset) # only go over cells that belong to current SubDofHandler
-        for idx in 1:min(interpol_points, length(cell.nodes))
-            node = cell.nodes[idx]
-            if !visited[node]
-                noderange = (offset + (idx - 1) * field_dim + 1):(offset + idx * field_dim) # the dofs in this node
-                for (i, c) in enumerate(dbc.components)
-                    node_dofs[i, node] = cell.dofs[noderange[c]]
-                    @debug println("adding dof $(cell.dofs[noderange[c]]) to node_dofs")
+    for sdh in ch.dh.subdofhandlers
+        for cell in CellIterator(sdh, cellset) # only go over cells that belong to current SubDofHandler
+            for idx in 1:min(interpol_points, length(cell.nodes))
+                node = cell.nodes[idx]
+                if !visited[node]
+                    noderange = (offset + (idx - 1) * field_dim + 1):(offset + idx * field_dim) # the dofs in this node
+                    for (i, c) in enumerate(dbc.components)
+                        node_dofs[i, node] = cell.dofs[noderange[c]]
+                        @debug println("adding dof $(cell.dofs[noderange[c]]) to node_dofs")
+                    end
+                    visited[node] = true
                 end
-                visited[node] = true
             end
         end
     end
