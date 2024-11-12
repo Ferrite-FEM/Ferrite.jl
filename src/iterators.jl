@@ -70,7 +70,8 @@ function CellCache(sdh::SubDofHandler{<:DofHandler{dim}}, flags::UpdateFlags = U
     return CellCache(flags, sdh.dh.grid, -1, nodes, coords, sdh.dh, celldofs)
 end
 
-function reinit!(cc::CellCache, i::Int)
+# TODO: Find a better way to make AllocCheck.jl happy
+function reinit!(cc::CellCache{<:Any, <:Any, <:Nothing}, i::Int)
     cc.cellid = i
     if cc.flags.nodes
         resize!(cc.nodes, nnodes_per_cell(cc.grid, i))
@@ -82,6 +83,21 @@ function reinit!(cc::CellCache, i::Int)
     end
     if cc.dh !== nothing && cc.flags.dofs
         resize!(cc.dofs, ndofs_per_cell(cc.dh, i))
+        celldofs!(cc.dofs, cc.dh, i)
+    end
+    return cc
+end
+
+function reinit!(cc::CellCache{<:Any, <:Any, <:AbstractDofHandler}, i::Int)
+    # If we have a DofHandler the cells must be of the same type -> no need to resize
+    cc.cellid = i
+    if cc.flags.nodes
+        cellnodes!(cc.nodes, cc.grid, i)
+    end
+    if cc.flags.coords
+        getcoordinates!(cc.coords, cc.grid, i)
+    end
+    if cc.dh !== nothing && cc.flags.dofs
         celldofs!(cc.dofs, cc.dh, i)
     end
     return cc
@@ -168,9 +184,9 @@ interface. The cache is updated for a new cell by calling `reinit!(cache, facet_
 
 See also [`InterfaceIterator`](@ref).
 """
-struct InterfaceCache{FC <: FacetCache}
-    a::FC
-    b::FC
+struct InterfaceCache{FC_HERE <: FacetCache, FC_THERE <: FacetCache}
+    a::FC_HERE
+    b::FC_THERE
     dofs::Vector{Int}
 end
 
@@ -183,13 +199,12 @@ end
 function InterfaceCache(sdh_here::SubDofHandler, sdh_there::SubDofHandler)
     fc_a = FacetCache(sdh_here)
     fc_b = FacetCache(sdh_there)
-    return InterfaceCache(fc_a, fc_b, Int[])
+    return InterfaceCache(fc_a, fc_b, zeros(Int, length(celldofs(fc_a)) + length(celldofs(fc_b))))
 end
 
 function reinit!(cache::InterfaceCache, interface::InterfaceIndex)
     reinit!(cache.a, FacetIndex(interface.idx[1], interface.idx[2]))
     reinit!(cache.b, FacetIndex(interface.idx[3], interface.idx[4]))
-    resize!(cache.dofs, length(celldofs(cache.a)) + length(celldofs(cache.b)))
     for (i, d) in pairs(cache.a.dofs)
         cache.dofs[i] = d
     end

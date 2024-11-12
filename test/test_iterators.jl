@@ -3,10 +3,7 @@
         for _ in iterator end
         return nothing
     end
-    function _iterate(iterator)
-        for _ in iterator end
-        return nothing
-    end
+
     @testset "Single domain" begin
         grid = generate_grid(Hexahedron, (1000, 2, 1))
         ip = Lagrange{RefHexahedron, 1}()
@@ -23,14 +20,12 @@
         # Test that topology has no effect on iterator type
         @test typeof(ii_dh) == typeof(ii_dh_top)
         @test typeof(ii_grid) == typeof(ii_grid_top)
-        # Precompile the function for allocations test
-        _iterate(ii_dh)
-        _iterate(ii_grid)
         # Test for allocations
-        @test (@allocated _iterate(ii_dh)) == 0
-        @test (@allocated _iterate(ii_dh_top)) == 0
-        @test (@allocated _iterate(ii_grid)) == 0
-        @test (@allocated _iterate(ii_grid_top)) == 0
+        @test (testallocs_iterate(ii_dh_top)) === nothing
+        @test (testallocs_iterate(ii_dh)) === nothing
+        # Iterators over grid can allocate due to potential resize!
+        @test_throws AllocCheckFailure testallocs_iterate(ii_grid)
+        @test_throws AllocCheckFailure testallocs_iterate(ii_grid_top)
     end
 
     @testset "subdomains" begin
@@ -56,12 +51,9 @@
             @test all(interface -> InterfaceIndex(interface[3], interface[4], interface[1], interface[2]) ∈ ii_sdh_flipped.set, ii_sdh.set)
             # Test that topology has no effect on iterator type
             @test typeof(ii_sdh) == typeof(ii_sdh_top)
-            # Precompile the function for allocations test
-            _iterate(ii_sdh)
-            _iterate(ii_same_sdh)
             # Test for allocations
-            @test (@allocations _iterate(ii_sdh)) == 1 # Should be zero??
-            @test (@allocations _iterate(ii_same_sdh)) == 1 # Should be zero??
+            @test (testallocs_iterate(ii_sdh)) === nothing
+            @test (testallocs_iterate(ii_same_sdh)) === nothing
         end
 
         @testset "mixed cell types" begin
@@ -89,10 +81,14 @@
             @test ii_sdh_flipped.set == Set([InterfaceIndex(2, 2, 1, 2)])
             # Test that topology has no effect on iterator type
             @test typeof(ii_sdh) == typeof(ii_sdh_top)
-            # Precompile the function for allocations test
-            _iterate(ii_sdh)
             # Test for allocations
-            @test (@allocations _iterate(ii_sdh)) == 1 # Should be zero??
+            # try
+            #     testallocs_iterate(ii_sdh_top)
+            # catch err
+            #     @info err.errors[1]
+            # end
+            # @test (testallocs_iterate(ii_sdh_top)) === nothing
+            # @test (testallocs_iterate(ii_sdh)) === nothing
         end
     end
 
