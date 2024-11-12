@@ -8,11 +8,6 @@ abstract type AbstractCellCache end
 abstract type AbstractKernelCellCache <: AbstractCellCache end
 abstract type AbstractKernelCellIterator <: AbstractIterator end
 
-
-function _makecache(iterator::AbstractKernelCellIterator, i::Ti) where {Ti <: Integer}
-    throw(ArgumentError("makecache should be implemented in the derived type"))
-end
-
 @inline function cellke(::AbstractKernelCellCache)
     throw(ArgumentError("cellke should be implemented in the derived type"))
 end
@@ -24,86 +19,72 @@ end
 
 ## Concrete Implementation for CPU Multithreading ##
 
-##### CPUKernelCellIterator #####
-struct CPUKernelCellIterator{DH <: ColoringDofHandler, GRID <: AbstractGrid, Tv} <: AbstractKernelCellIterator
-    dh::DH
-    grid::GRID
-    n_cells::Int
-    ke::Matrix{Tv} # 2d local stiffness matrix that is shared among the same thread
-    fe::Vector{Tv} # 1d local force vector that is shared among the same thread
-    thread_id::Int # thread id that the iterator is working on
-end
-
-
-function CellIterator(dh::ColoringDofHandler, n_basefuncs::Ti) where {Ti <: Integer}
-    grid = dh |> dofhandler |> get_grid
-    n_cells = grid |> getncells
-    ## TODO: Float64 needs to be dependant of the eltype of the matrix
-    ke = zeros(Float64, n_basefuncs, n_basefuncs)
-    fe = zeros(Float64, n_basefuncs)
-    local_thread_id = Threads.threadid()
-    return CPUKernelCellIterator(dh, grid, n_cells, ke, fe, local_thread_id)
-end
-
-
-ncells(iterator::CPUKernelCellIterator) = iterator.n_cells
-
-
-function Base.iterate(iterator::CPUKernelCellIterator)
-    i = iterator.thread_id
-    curr_color = iterator.dh |> current_color # current color that's being processed
-    eles_color = eles_in_color(iterator.dh, curr_color) # elements in the current color
-    ncells = length(eles_color)
-    i <= ncells || return nothing
-    return (_makecache(iterator, eles_color[i]), i)
-end
-
-
-function Base.iterate(iterator::CPUKernelCellIterator, state)
-    stride = Threads.nthreads()
-    i = state + stride # next strided element id
-    curr_color = iterator.dh |> current_color # current color that's being processed
-    eles_color = eles_in_color(iterator.dh, curr_color) # elements in the current color
-    ncells = length(eles_color)
-    i <= ncells || return nothing
-    return (_makecache(iterator, eles_color[i]), i)
-end
-
 
 ##### CPUKernelCellCache #####
-## Future IDEA: we can make this cache mutable, since we are using it on CPU.
-struct CPUKernelCellCache{Ti <: Integer, DOFS <: AbstractVector{Ti}, NN, NODES <: SVector{NN, Ti}, X, COORDS <: SVector{X}, Tv <: Real} <: AbstractKernelCellCache
-    coords::COORDS
-    dofs::DOFS
+mutable struct CPUKernelCellCache{G <: AbstractGrid, Ti <: Integer, X, Tv <: Real} <: AbstractKernelCellCache
+    const flags::UpdateFlags
+    const grid::G
+    const dh::AbstractDofHandler
+    const coords::Vector{X}
+    const dofs::Vector{Ti}
     cellid::Ti
-    nodes::NODES
-    ke::Matrix{Tv}
-    fe::Vector{Tv}
+    const nodes::Vector{Ti}
+    const ke::Matrix{Tv}
+    const fe::Vector{Tv}
 end
 
 
-function _makecache(iterator::CPUKernelCellIterator, e::Ti) where {Ti <: Integer}
-    dh = iterator.dh |> dofhandler
-    grid = iterator.grid
-    cellid = e
-    cell = getcells(grid, e)
+function CellCache(dh::AbstractDofHandler, grid::Grid{dim, C, T}, n_basefuncs::Ti, flags::UpdateFlags = UpdateFlags()) where {Ti <: Integer, dim, C, T}
+    ke = zeros(T, n_basefuncs, n_basefuncs)
+    fe = zeros(T, n_basefuncs)
+    N = nnodes_per_cell(grid, 1) # nodes and coords will be resized in `reinit!`
+    nodes = zeros(Ti, N)
+    coords = zeros(Vec{dim, T}, N)
+    return CPUKernelCellCache(flags, grid, dh, coords, Ti[], convert(Ti, -1), nodes, ke, fe)
+end
 
-    # Extract the node IDs of the cell.
-    nodes = SVector(get_node_ids(cell)...)
+# function _makecache(iterator::CPUKernelCellIterator, e::Ti) where {Ti <: Integer}
+#     dh = iterator.dh |> dofhandler
+#     grid = iterator.grid
+#     cellid = e
+#     cell = getcells(grid, e)
 
-    # Extract the degrees of freedom for the cell.
-    dofs = celldofs(dh, e)
-    # Get the coordinates of the nodes of the cell.
-    CT = get_coordinate_type(grid)
-    N = nnodes(cell)
-    x = MVector{N, CT}(undef)
-    for i in eachindex(x)
-        x[i] = get_node_coordinate(grid, nodes[i])
+#     # Extract the node IDs of the cell.
+#     nodes = SVector(get_node_ids(cell)...)
+
+#     # Extract the degrees of freedom for the cell.
+#     dofs = celldofs(dh, e)
+#     # Get the coordinates of the nodes of the cell.
+#     CT = get_coordinate_type(grid)
+#     N = nnodes(cell)
+#     x = MVector{N, CT}(undef)
+#     for i in eachindex(x)
+#         x[i] = get_node_coordinate(grid, nodes[i])
+#     end
+#     coords = SVector(x...)
+
+#     # Return the GPUCellCache containing the cell's data.
+#     return CPUKernelCellCache(coords, dofs, cellid, nodes, iterator.ke, iterator.fe)
+# end
+
+
+function _reinit!(cc::CPUKernelCellCache, i::Ti) where {Ti <: Integer}
+    cc.cellid = i
+    fill!(cc.ke, zero(eltype(cc.ke)))
+    fill!(cc.fe, zero(eltype(cc.fe)))
+    if cc.flags.nodes
+        resize!(cc.nodes, nnodes_per_cell(cc.grid, i))
+        cellnodes!(cc.nodes, cc.grid, i)
     end
-    coords = SVector(x...)
-
-    # Return the GPUCellCache containing the cell's data.
-    return CPUKernelCellCache(coords, dofs, cellid, nodes, iterator.ke, iterator.fe)
+    if cc.flags.coords
+        resize!(cc.coords, nnodes_per_cell(cc.grid, i))
+        getcoordinates!(cc.coords, cc.grid, i)
+    end
+    if cc.flags.dofs
+        resize!(cc.dofs, ndofs_per_cell(cc.dh, i))
+        celldofs!(cc.dofs, cc.dh, i)
+    end
+    return cc
 end
 
 
@@ -119,12 +100,57 @@ celldofs(cc::CPUKernelCellCache) = cc.dofs
 cellid(cc::CPUKernelCellCache) = cc.cellid
 
 
-@inline function cellke(cc::CPUKernelCellCache)
-    ke = cc.ke
-    return fill!(ke, zero(eltype(ke)))
+cellke(cc::CPUKernelCellCache) = cc.ke
+
+cellfe(cc::CPUKernelCellCache) = cc.fe
+
+
+##### CPUKernelCellIterator #####
+struct CPUKernelCellIterator{CC <: CPUKernelCellCache, DH <: ColoringDofHandler} <: AbstractKernelCellIterator
+    cache::CC
+    dh::DH
+    n_cells::Int
+    # ke::Matrix{Tv} # 2d local stiffness matrix that is shared among the same thread
+    # fe::Vector{Tv} # 1d local force vector that is shared among the same thread
+    thread_id::Int # thread id that the iterator is working on
 end
 
-@inline function cellfe(cc::CPUKernelCellCache)
-    fe = cc.fe
-    return fill!(fe, zero(eltype(fe)))
+
+function CellIterator(dh::ColoringDofHandler, n_basefuncs::Ti) where {Ti <: Integer}
+    grid = dh |> dofhandler |> get_grid
+    n_cells = grid |> getncells
+    # ## TODO: Float64 needs to be dependant of the eltype of the matrix
+    # ke = zeros(Float64, n_basefuncs, n_basefuncs)
+    # fe = zeros(Float64, n_basefuncs)
+    cache = CellCache(dh |> dofhandler, grid, n_basefuncs)
+    local_thread_id = Threads.threadid()
+    return CPUKernelCellIterator(cache, dh, n_cells, local_thread_id)
+end
+
+
+ncells(iterator::CPUKernelCellIterator) = iterator.n_cells
+_cache(iterator::CPUKernelCellIterator) = iterator.cache
+
+function Base.iterate(iterator::CPUKernelCellIterator)
+    i = iterator.thread_id
+    curr_color = iterator.dh |> current_color # current color that's being processed
+    eles_color = eles_in_color(iterator.dh, curr_color) # elements in the current color
+    ncells = length(eles_color)
+    i <= ncells || return nothing
+    cache = _cache(iterator)
+    _reinit!(cache, eles_color[i])
+    return (cache, i)
+end
+
+
+function Base.iterate(iterator::CPUKernelCellIterator, state)
+    stride = Threads.nthreads()
+    i = state + stride # next strided element id
+    curr_color = iterator.dh |> current_color # current color that's being processed
+    eles_color = eles_in_color(iterator.dh, curr_color) # elements in the current color
+    ncells = length(eles_color)
+    i <= ncells || return nothing
+    cache = _cache(iterator)
+    _reinit!(cache, eles_color[i])
+    return (cache, i)
 end

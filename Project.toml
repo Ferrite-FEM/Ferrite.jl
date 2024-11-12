@@ -3,7 +3,6 @@ uuid = "c061ca5d-56c9-439f-9c0e-210fe06d3992"
 version = "1.0.0"
 
 [deps]
-
 EnumX = "4e289a0a-7415-4d19-859d-a7e5c4648b56"
 ForwardDiff = "f6369f11-7733-5829-9624-2563aa707210"
 LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
@@ -17,15 +16,15 @@ Tensors = "48a634ad-e948-5137-8d70-aa71f2a747f4"
 WriteVTK = "64499a7a-5c06-52f2-abe2-ccb03c286192"
 
 [weakdeps]
-BlockArrays = "8e7c35d0-a365-5155-bbbb-fb81a777f24e"
-Metis = "2679e427-3c69-5b7f-982b-ece356f1e94b"
 Adapt = "79e6a3ab-5dfb-504d-930d-738a2a938a0e"
+BlockArrays = "8e7c35d0-a365-5155-bbbb-fb81a777f24e"
 CUDA = "052768ef-5323-5732-b1bb-66c8b64840ba"
+Metis = "2679e427-3c69-5b7f-982b-ece356f1e94b"
 
 [extensions]
 FerriteBlockArrays = "BlockArrays"
+FerriteGPU = ["CUDA", "Adapt"]
 FerriteMetis = "Metis"
-FerriteGPU = ["CUDA" , "Adapt"]
 
 [compat]
 BlockArrays = "0.16, 1"
@@ -57,7 +56,6 @@ Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
 SHA = "ea8e919c-243c-51af-8825-aaa63cd721ce"
 TaskLocalValues = "ed4db957-447d-4319-bfb6-7fa9ae7ecf34"
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
-TimerOutputs = "a759f4b9-e2f1-59dc-863e-4aeb61b1ea8f"
 
 [targets]
 test = ["BlockArrays", "Downloads", "FerriteGmsh", "ForwardDiff", "Gmsh", "IterativeSolvers", "Metis", "NBInclude", "OhMyThreads", "ProgressMeter", "Random", "SHA", "TaskLocalValues", "Test", "TimerOutputs", "Logging"]

@@ -10,6 +10,7 @@ mutable struct ColoringDofHandler{Ti <: Integer, VECS <: Vector{Vector{Ti}}, DH 
     current_color::Ti
 end
 
+
 function init_colordh(dh::AbstractDofHandler)
     grid = get_grid(dh)
     colors = create_coloring(grid)
