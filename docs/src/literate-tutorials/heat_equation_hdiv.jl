@@ -220,7 +220,7 @@ end
 
 println("Outward flux: ", calculate_flux(dh, Γ, ipq, u))
 
-# Note that this is not the case for the standard [Heat equation](@id tutorial-heat-equation),
+# Note that this is not the case for the standard [Heat equation](@ref tutorial-heat-equation),
 # as the flux terms are less accurately approximated. A fine mesh is required to converge in that case.
 # However, the present example gives a worse approximation of the temperature field.
 
