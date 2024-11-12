@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/><title>Heat equation - Mixed H(div) conforming formulation) · Ferrite.jl</title><meta name="title" content="Heat equation - Mixed H(div) conforming formulation) · Ferrite.jl"/><meta property="og:title" content="Heat equation - Mixed H(div) conforming formulation) · Ferrite.jl"/><meta property="twitter:title" content="Heat equation - Mixed H(div) conforming formulation) · Ferrite.jl"/><meta name="description" content="Documentation for Ferrite.jl."/><meta property="og:description" content="Documentation for Ferrite.jl."/><meta property="twitter:description" content="Documentation for Ferrite.jl."/><meta property="og:url" content="https://ferrite-fem.github.io/Ferrite.jl/stable/tutorials/heat_equation_hdiv/"/><meta property="twitter:url" content="https://ferrite-fem.github.io/Ferrite.jl/stable/tutorials/heat_equation_hdiv/"/><link rel="canonical" href="https://ferrite-fem.github.io/Ferrite.jl/stable/tutorials/heat_equation_hdiv/"/><script data-outdated-warner src="../../assets/warner.js"></script><link href="https://cdnjs.cloudflare.com/ajax/libs/lato-font/3.0.0/css/lato-font.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/juliamono/0.050/juliamono.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/fontawesome.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/solid.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/brands.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.8/katex.min.css" rel="stylesheet" type="text/css"/><script>documenterBaseURL="../.."</script><script src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.6/require.min.js" data-main="../../assets/documenter.js"></script><script src="../../search_index.js"></script><script src="../../siteinfo.js"></script><script src="../../../versions.js"></script><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/catppuccin-mocha.css" data-theme-name="catppuccin-mocha"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/catppuccin-macchiato.css" data-theme-name="catppuccin-macchiato"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/catppuccin-frappe.css" data-theme-name="catppuccin-frappe"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/catppuccin-latte.css" data-theme-name="catppuccin-latte"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/documenter-dark.css" data-theme-name="documenter-dark" data-theme-primary-dark/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/documenter-light.css" data-theme-name="documenter-light" data-theme-primary/><script src="../../assets/themeswap.js"></script><link href="../../assets/custom.css" rel="stylesheet" type="text/css"/><link href="../../assets/citations.css" rel="stylesheet" type="text/css"/><link href="../../assets/favicon.ico" rel="icon" type="image/x-icon"/></head><body><div id="documenter"><nav class="docs-sidebar"><a class="docs-logo" href="../../"><img src="../../assets/logo.svg" alt="Ferrite.jl logo"/></a><div class="docs-package-name"><span class="docs-autofit"><a href="../../">Ferrite.jl</a></span></div><button class="docs-search-query input is-rounded is-small is-clickable my-2 mx-auto py-1 px-2" id="documenter-search-query">Search docs (Ctrl + /)</button><ul class="docs-menu"><li><a class="tocitem" href="../../">Home</a></li><li><input class="collapse-toggle" id="menuitem-3" type="checkbox" checked/><label class="tocitem" for="menuitem-3"><span class="docs-label">Tutorials</span><i class="docs-chevron"></i></label><ul class="collapsed"><li><a class="tocitem" href="../">Tutorials overview</a></li><li><a class="tocitem" href="../heat_equation/">Heat equation</a></li><li class="is-active"><a class="tocitem" href>Heat equation - Mixed H(div) conforming formulation)</a><ul class="internal"><li><a class="tocitem" href="#Theory"><span>Theory</span></a></li><li><a class="tocitem" href="#Commented-Program"><span>Commented Program</span></a></li><li><a class="tocitem" href="#Postprocess-the-total-flux"><span>Postprocess the total flux</span></a></li><li><a class="tocitem" href="#tutorial-heat-equation-hdiv-plain"><span>Plain program</span></a></li></ul></li><li><a class="tocitem" href="../linear_elasticity/">Linear elasticity</a></li><li><a class="tocitem" href="../incompressible_elasticity/">Incompressible elasticity</a></li><li><a class="tocitem" href="../hyperelasticity/">Hyperelasticity</a></li><li><a class="tocitem" href="../plasticity/">Von Mises plasticity</a></li><li><a class="tocitem" href="../transient_heat_equation/">Transient heat equation</a></li><li><a class="tocitem" href="../computational_homogenization/">Computational homogenization</a></li><li><a class="tocitem" href="../stokes-flow/">Stokes flow</a></li><li><a class="tocitem" href="../porous_media/">Porous media</a></li><li><a class="tocitem" href="../ns_vs_diffeq/">Incompressible Navier-Stokes equations via DifferentialEquations.jl</a></li><li><a class="tocitem" href="../reactive_surface/">Reactive surface</a></li><li><a class="tocitem" href="../linear_shell/">Linear shell</a></li><li><a class="tocitem" href="../dg_heat_equation/">Discontinuous Galerkin heat equation</a></li></ul></li><li><input class="collapse-toggle" id="menuitem-4" type="checkbox"/><label class="tocitem" for="menuitem-4"><span class="docs-label">Topic guides</span><i class="docs-chevron"></i></label><ul class="collapsed"><li><a class="tocitem" href="../../topics/">Topic guide overview</a></li><li><a class="tocitem" href="../../topics/fe_intro/">Introduction to FEM</a></li><li><a class="tocitem" href="../../topics/reference_shapes/">Reference shapes</a></li><li><a class="tocitem" href="../../topics/FEValues/">FEValues</a></li><li><a class="tocitem" href="../../topics/degrees_of_freedom/">Degrees of Freedom</a></li><li><a class="tocitem" href="../../topics/sparse_matrix/">Sparsity pattern and sparse matrices</a></li><li><a class="tocitem" href="../../topics/assembly/">Assembly</a></li><li><a class="tocitem" href="../../topics/boundary_conditions/">Boundary and initial conditions</a></li><li><a class="tocitem" href="../../topics/constraints/">Constraints</a></li><li><a class="tocitem" href="../../topics/grid/">Grid</a></li><li><a class="tocitem" href="../../topics/export/">Export</a></li></ul></li><li><input class="collapse-toggle" id="menuitem-5" type="checkbox"/><label class="tocitem" for="menuitem-5"><span class="docs-label">API reference</span><i class="docs-chevron"></i></label><ul class="collapsed"><li><a class="tocitem" href="../../reference/">Reference overview</a></li><li><a class="tocitem" href="../../reference/quadrature/">Quadrature</a></li><li><a class="tocitem" href="../../reference/interpolations/">Interpolation</a></li><li><a class="tocitem" href="../../reference/fevalues/">FEValues</a></li><li><a class="tocitem" href="../../reference/dofhandler/">Degrees of Freedom</a></li><li><a class="tocitem" href="../../reference/sparsity_pattern/">Sparsity pattern and sparse matrices</a></li><li><a class="tocitem" href="../../reference/assembly/">Assembly</a></li><li><a class="tocitem" href="../../reference/boundary_conditions/">Boundary conditions</a></li><li><a class="tocitem" href="../../reference/grid/">Grid &amp; AbstractGrid</a></li><li><a class="tocitem" href="../../reference/export/">Postprocessing</a></li><li><a class="tocitem" href="../../reference/utils/">Development utility functions</a></li></ul></li><li><input class="collapse-toggle" id="menuitem-6" type="checkbox"/><label class="tocitem" for="menuitem-6"><span class="docs-label">How-to guides</span><i class="docs-chevron"></i></label><ul class="collapsed"><li><a class="tocitem" href="../../howto/">How-to guide overview</a></li><li><a class="tocitem" href="../../howto/postprocessing/">Post processing and visualization</a></li><li><a class="tocitem" href="../../howto/threaded_assembly/">Multi-threaded assembly</a></li></ul></li><br><li><a class="tocitem" href="../../gallery/">Code gallery</a></li><li><a class="tocitem" href="../../devdocs/">Developer documentation</a></li><li><a class="tocitem" href="../../cited-literature/">Cited literature</a></li></ul><div class="docs-version-selector field has-addons"><div class="control"><span class="docs-label button is-static is-size-7">Version</span></div><div class="docs-selector control is-expanded"><div class="select is-fullwidth is-size-7"><select id="documenter-version-selector"></select></div></div></div></nav><div class="docs-main"><header class="docs-navbar"><a class="docs-sidebar-button docs-navbar-link fa-solid fa-bars is-hidden-desktop" id="documenter-sidebar-button" href="#"></a><nav class="breadcrumb"><ul class="is-hidden-mobile"><li><a class="is-disabled">Tutorials</a></li><li class="is-active"><a href>Heat equation - Mixed H(div) conforming formulation)</a></li></ul><ul class="is-hidden-tablet"><li class="is-active"><a href>Heat equation - Mixed H(div) conforming formulation)</a></li></ul></nav><div class="docs-right"><a class="docs-navbar-link" href="https://github.com/Ferrite-FEM/Ferrite.jl" title="View the repository on GitHub"><span class="docs-icon fa-brands"></span><span class="docs-label is-hidden-touch">GitHub</span></a><a class="docs-navbar-link" href="https://github.com/Ferrite-FEM/Ferrite.jl/blob/master/docs/src/literate-tutorials/heat_equation_hdiv.jl" title="Edit source on GitHub"><span class="docs-icon fa-solid"></span></a><a class="docs-settings-button docs-navbar-link fa-solid fa-gear" id="documenter-settings-button" href="#" title="Settings"></a><a class="docs-article-toggle-button fa-solid fa-chevron-up" id="documenter-article-toggle-button" href="javascript:;" title="Collapse all docstrings"></a></div></header><article class="content" id="documenter-page"><h1 id="tutorial-heat-equation-hdiv"><a class="docs-heading-anchor" href="#tutorial-heat-equation-hdiv">Heat equation - Mixed H(div) conforming formulation)</a><a id="tutorial-heat-equation-hdiv-1"></a><a class="docs-heading-anchor-permalink" href="#tutorial-heat-equation-hdiv" title="Permalink"></a></h1><p>As an alternative to the standard formulation for solving the heat equation used in the <a href="../heat_equation/#tutorial-heat-equation">heat equation tutorial</a>, we can used a mixed formulation where both the temperature, <span>$u(\mathbf{x})$</span>, and the heat flux, <span>$\boldsymbol{q}(\boldsymbol{x})$</span>, are primary variables. From a theoretical standpoint, there are many details on e.g. which combinations of interpolations that are stable. See e.g. [<a href="../../cited-literature/#Gatica2014">1</a>] and [<a href="../../cited-literature/#Boffi2013">2</a>] for further reading. This tutorial is based on the theory in <a href="https://fenicsproject.org/olddocs/dolfin/1.4.0/python/demo/documented/mixed-poisson/python/documentation.html">Fenics&#39; mixed poisson example</a>.</p><p><img src="https://raw.githubusercontent.com/Ferrite-FEM/Ferrite.jl/refs/heads/gh-pages/assets/heat_equation_hdiv.png" alt="Temperature solution"/> <strong>Figure:</strong> Temperature distribution considering a central part with lower heat conductivity.</p><p>The advantage with the mixed formulation is that the heat flux is approximated better. However, the temperature becomes discontinuous where the conductivity is discontinuous.</p><h2 id="Theory"><a class="docs-heading-anchor" href="#Theory">Theory</a><a id="Theory-1"></a><a class="docs-heading-anchor-permalink" href="#Theory" title="Permalink"></a></h2><p>We start with the strong form of the heat equation: Find the temperature, <span>$u(\boldsymbol{x})$</span>, and heat flux, <span>$\boldsymbol{q}(x)$</span>, such that</p><p class="math-container">\[\begin{align*}
+\boldsymbol{\nabla}\cdot \boldsymbol{q} &amp;= h(\boldsymbol{x}), \quad \forall \boldsymbol{x} \in \Omega \\
+\boldsymbol{q}(\boldsymbol{x}) &amp;= - k\ \boldsymbol{\nabla} u(\boldsymbol{x}), \quad \forall \boldsymbol{x} \in \Omega \\
+\boldsymbol{q}(\boldsymbol{x})\cdot \boldsymbol{n}(\boldsymbol{x}) &amp;= q_n, \quad \forall \boldsymbol{x} \in \Gamma_\mathrm{N}\\
+u(\boldsymbol{x}) &amp;= u_\mathrm{D}, \quad \forall \boldsymbol{x} \in \Gamma_\mathrm{D}
+\end{align*}\]</p><p>From this strong form, we can formulate the weak form as a mixed formulation. Find <span>$u \in \mathbb{U}$</span> and <span>$\boldsymbol{q}\in\mathbb{Q}$</span> such that</p><p class="math-container">\[\begin{align*}
+\int_{\Omega} \delta u [\boldsymbol{\nabla} \cdot \boldsymbol{q}]\ \mathrm{d}\Omega &amp;= \int_\Omega \delta u h\ \mathrm{d}\Omega, \quad \forall\ \delta u \in \delta\mathbb{U} \\
+\int_{\Omega} \boldsymbol{\delta q} \cdot \boldsymbol{q}\ \mathrm{d}\Omega &amp;= -\int_\Omega \boldsymbol{\delta q} \cdot [k\ \boldsymbol{\nabla} u]\ \mathrm{d}\Omega \\
+\int_{\Omega} \boldsymbol{\delta q} \cdot \boldsymbol{q}\ \mathrm{d}\Omega - \int_{\Omega} [\boldsymbol{\nabla} \cdot \boldsymbol{\delta q}] k u \ \mathrm{d}\Omega &amp;=
+-\int_\Gamma \boldsymbol{\delta q} \cdot \boldsymbol{n} k\ u\ \mathrm{d}\Omega, \quad \forall\ \boldsymbol{\delta q} \in \delta\mathbb{Q}
+\end{align*}\]</p><p>where we have the function spaces,</p><p class="math-container">\[\begin{align*}
+\mathbb{U} &amp;= \delta\mathbb{U} = L^2 \\
+\mathbb{Q} &amp;= \lbrace \boldsymbol{q} \in H(\mathrm{div}) \text{ such that } \boldsymbol{q}\cdot\boldsymbol{n} = q_\mathrm{n} \text{ on } \Gamma_\mathrm{D}\rbrace \\
+\delta\mathbb{Q} &amp;= \lbrace \boldsymbol{q} \in H(\mathrm{div}) \text{ such that } \boldsymbol{q}\cdot\boldsymbol{n} = 0 \text{ on } \Gamma_\mathrm{D}\rbrace
+\end{align*}\]</p><p>A stable choice of finite element spaces for this problem on grid with triangles is using</p><ul><li><code>DiscontinuousLagrange{RefTriangle, k-1}</code> for approximating <span>$L^2$</span></li><li><code>BrezziDouglasMarini{RefTriangle, k}</code> for approximating <span>$H(\mathrm{div})$</span></li></ul><p>We will also investigate the consequences of using <span>$H^1$</span> <code>Lagrange</code> instead of <span>$H(\mathrm{div})$</span> interpolations.</p><h2 id="Commented-Program"><a class="docs-heading-anchor" href="#Commented-Program">Commented Program</a><a id="Commented-Program-1"></a><a class="docs-heading-anchor-permalink" href="#Commented-Program" title="Permalink"></a></h2><p>Now we solve the problem in Ferrite. What follows is a program spliced with comments.</p><p>First we load Ferrite,</p><pre><code class="language-julia hljs">using Ferrite</code></pre><p>And define our grid, representing a channel with a central part having a lower conductivity, <span>$k$</span>, than the surrounding.</p><pre><code class="language-julia hljs">function create_grid(ny::Int)
+    width = 10.0
+    length = 40.0
+    center_width = 5.0
+    center_length = 20.0
+    upper_right = Vec((length / 2, width / 2))
+    grid = generate_grid(Triangle, (round(Int, ny * length / width), ny), -upper_right, upper_right)
+    addcellset!(grid, &quot;center&quot;, x -&gt; abs(x[1]) &lt; center_length / 2 &amp;&amp; abs(x[2]) &lt; center_width / 2)
+    addcellset!(grid, &quot;around&quot;, setdiff(1:getncells(grid), getcellset(grid, &quot;center&quot;)))
+    return grid
+end
+
+grid = create_grid(100)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">Grid{2, Triangle, Float64} with 80000 Triangle cells and 40501 nodes</code></pre><h3 id="Setup"><a class="docs-heading-anchor" href="#Setup">Setup</a><a id="Setup-1"></a><a class="docs-heading-anchor-permalink" href="#Setup" title="Permalink"></a></h3><p>We define one <code>CellValues</code> for each field which share the same quadrature rule.</p><pre><code class="language-julia hljs">ip_geo = geometric_interpolation(getcelltype(grid))
+ipu = DiscontinuousLagrange{RefTriangle, 0}()
+ipq = Ferrite.BrezziDouglasMarini{2, RefTriangle, 1}()
+qr = QuadratureRule{RefTriangle}(2)
+cellvalues = (u = CellValues(qr, ipu, ip_geo), q = CellValues(qr, ipq, ip_geo))</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">(u = CellValues{Ferrite.FunctionValues{1, DiscontinuousLagrange{RefTriangle, 0}, Matrix{Float64}, Matrix{Vec{2, Float64}}, Matrix{Vec{2, Float64}}, Nothing, Nothing}, Ferrite.GeometryMapping{1, Lagrange{RefTriangle, 1}, Matrix{Float64}, Matrix{Vec{2, Float64}}, Nothing}, QuadratureRule{RefTriangle, Vector{Float64}, Vector{Vec{2, Float64}}}, Vector{Float64}}(Ferrite.FunctionValues{1, DiscontinuousLagrange{RefTriangle, 0}, Matrix{Float64}, Matrix{Vec{2, Float64}}, Matrix{Vec{2, Float64}}, Nothing, Nothing}(DiscontinuousLagrange{RefTriangle, 0}(), [1.0 1.0 1.0], [1.0 1.0 1.0], Vec{2, Float64}[[NaN, NaN] [NaN, NaN] [NaN, NaN]], Vec{2, Float64}[[0.0, 0.0] [0.0, 0.0] [0.0, 0.0]], nothing, nothing), Ferrite.GeometryMapping{1, Lagrange{RefTriangle, 1}, Matrix{Float64}, Matrix{Vec{2, Float64}}, Nothing}(Lagrange{RefTriangle, 1}(), [0.16666666666667 0.16666666666667 0.66666666666667; 0.16666666666667 0.66666666666667 0.16666666666667; 0.6666666666666601 0.16666666666666008 0.16666666666666005], Vec{2, Float64}[[1.0, 0.0] [1.0, 0.0] [1.0, 0.0]; [0.0, 1.0] [0.0, 1.0] [0.0, 1.0]; [-1.0, -1.0] [-1.0, -1.0] [-1.0, -1.0]], nothing), QuadratureRule{RefTriangle, Vector{Float64}, Vector{Vec{2, Float64}}}([0.166666666666665, 0.166666666666665, 0.166666666666665], Vec{2, Float64}[[0.16666666666667, 0.16666666666667], [0.16666666666667, 0.66666666666667], [0.66666666666667, 0.16666666666667]]), [NaN, NaN, NaN]), q = CellValues{Ferrite.FunctionValues{1, Ferrite.BrezziDouglasMarini{2, RefTriangle, 1}, Matrix{Vec{2, Float64}}, Matrix{Tensor{2, 2, Float64, 4}}, Matrix{Tensor{2, 2, Float64, 4}}, Nothing, Nothing}, Ferrite.GeometryMapping{2, Lagrange{RefTriangle, 1}, Matrix{Float64}, Matrix{Vec{2, Float64}}, Matrix{Tensor{2, 2, Float64, 4}}}, QuadratureRule{RefTriangle, Vector{Float64}, Vector{Vec{2, Float64}}}, Vector{Float64}}(Ferrite.FunctionValues{1, Ferrite.BrezziDouglasMarini{2, RefTriangle, 1}, Matrix{Vec{2, Float64}}, Matrix{Tensor{2, 2, Float64, 4}}, Matrix{Tensor{2, 2, Float64, 4}}, Nothing, Nothing}(Ferrite.BrezziDouglasMarini{2, RefTriangle, 1}(), Vec{2, Float64}[[6.02e-321, 1.265e-321] [6.304e-321, 1.265e-321] [6.39e-321, 1.265e-321]; [6.047e-321, 1.265e-321] [6.334e-321, 1.265e-321] [6.393e-321, 1.265e-321]; … ; [6.265e-321, 1.265e-321] [6.354e-321, 1.265e-321] [6.423e-321, 1.265e-321]; [6.27e-321, 1.265e-321] [6.383e-321, 1.265e-321] [6.43e-321, 1.265e-321]], Vec{2, Float64}[[0.66666666666668, -0.33333333333334] [0.66666666666668, -1.33333333333334] [2.66666666666668, -0.33333333333334]; [-0.33333333333334, 0.66666666666668] [-0.33333333333334, 2.66666666666668] [-1.33333333333334, 0.66666666666668]; … ; [-0.33333333333334, -2.3333333333333] [-0.33333333333334, -0.3333333333333002] [-1.33333333333334, 0.6666666666666998]; [0.66666666666668, 0.6666666666666401] [0.66666666666668, -0.3333333333333597] [2.66666666666668, -2.3333333333333597]], Tensor{2, 2, Float64, 4}[[NaN NaN; NaN NaN] [NaN NaN; NaN NaN] [NaN NaN; NaN NaN]; [NaN NaN; NaN NaN] [NaN NaN; NaN NaN] [NaN NaN; NaN NaN]; … ; [NaN NaN; NaN NaN] [NaN NaN; NaN NaN] [NaN NaN; NaN NaN]; [NaN NaN; NaN NaN] [NaN NaN; NaN NaN] [NaN NaN; NaN NaN]], Tensor{2, 2, Float64, 4}[[4.0 0.0; -0.0 -2.0] [4.0 0.0; -0.0 -2.0] [4.0 0.0; -0.0 -2.0]; [-2.0 -0.0; 0.0 4.0] [-2.0 -0.0; 0.0 4.0] [-2.0 -0.0; 0.0 4.0]; … ; [-2.0 -0.0; 6.0 4.0] [-2.0 -0.0; 6.0 4.0] [-2.0 -0.0; 6.0 4.0]; [4.0 0.0; -6.0 -2.0] [4.0 0.0; -6.0 -2.0] [4.0 0.0; -6.0 -2.0]], nothing, nothing), Ferrite.GeometryMapping{2, Lagrange{RefTriangle, 1}, Matrix{Float64}, Matrix{Vec{2, Float64}}, Matrix{Tensor{2, 2, Float64, 4}}}(Lagrange{RefTriangle, 1}(), [0.16666666666667 0.16666666666667 0.66666666666667; 0.16666666666667 0.66666666666667 0.16666666666667; 0.6666666666666601 0.16666666666666008 0.16666666666666005], Vec{2, Float64}[[1.0, 0.0] [1.0, 0.0] [1.0, 0.0]; [0.0, 1.0] [0.0, 1.0] [0.0, 1.0]; [-1.0, -1.0] [-1.0, -1.0] [-1.0, -1.0]], Tensor{2, 2, Float64, 4}[[0.0 0.0; 0.0 0.0] [0.0 0.0; 0.0 0.0] [0.0 0.0; 0.0 0.0]; [0.0 0.0; 0.0 0.0] [0.0 0.0; 0.0 0.0] [0.0 0.0; 0.0 0.0]; [-0.0 -0.0; -0.0 -0.0] [-0.0 -0.0; -0.0 -0.0] [-0.0 -0.0; -0.0 -0.0]]), QuadratureRule{RefTriangle, Vector{Float64}, Vector{Vec{2, Float64}}}([0.166666666666665, 0.166666666666665, 0.166666666666665], Vec{2, Float64}[[0.16666666666667, 0.16666666666667], [0.16666666666667, 0.66666666666667], [0.66666666666667, 0.16666666666667]]), [NaN, NaN, NaN]))</code></pre><p>Distribute the degrees of freedom</p><pre><code class="language-julia hljs">dh = DofHandler(grid)
+add!(dh, :u, ipu)
+add!(dh, :q, ipq)
+close!(dh);</code></pre><p>In this problem, we have a zero temperature on the boundary, Γ, which is enforced via zero Neumann boundary conditions. Hence, we don&#39;t need a <code>Constrainthandler</code>.</p><pre><code class="language-julia hljs">Γ = union((getfacetset(grid, name) for name in (&quot;left&quot;, &quot;right&quot;, &quot;bottom&quot;, &quot;top&quot;))...)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">OrderedCollections.OrderedSet{FacetIndex} with 1000 elements:
+  FacetIndex((1, 3))
+  FacetIndex((801, 3))
+  FacetIndex((1601, 3))
+  FacetIndex((2401, 3))
+  FacetIndex((3201, 3))
+  FacetIndex((4001, 3))
+  FacetIndex((4801, 3))
+  FacetIndex((5601, 3))
+  FacetIndex((6401, 3))
+  FacetIndex((7201, 3))
+  FacetIndex((8001, 3))
+  FacetIndex((8801, 3))
+  FacetIndex((9601, 3))
+  FacetIndex((10401, 3))
+  FacetIndex((11201, 3))
+  FacetIndex((12001, 3))
+  FacetIndex((12801, 3))
+  FacetIndex((13601, 3))
+  FacetIndex((14401, 3))
+  ⋮ </code></pre><h3 id="Element-implementation"><a class="docs-heading-anchor" href="#Element-implementation">Element implementation</a><a id="Element-implementation-1"></a><a class="docs-heading-anchor-permalink" href="#Element-implementation" title="Permalink"></a></h3><pre><code class="language-julia hljs">function assemble_element!(Ke::Matrix, fe::Vector, cv::NamedTuple, dr::NamedTuple, k::Number)
+    cvu = cv[:u]
+    cvq = cv[:q]
+    dru = dr[:u]
+    drq = dr[:q]
+    h = 1.0 # Heat source
+    # Loop over quadrature points
+    for q_point in 1:getnquadpoints(cvu)
+        # Get the quadrature weight
+        dΩ = getdetJdV(cvu, q_point)
+        # Loop over test shape functions
+        for (iu, Iu) in pairs(dru)
+            δNu = shape_value(cvu, q_point, iu)
+            # Add contribution to fe
+            fe[Iu] += δNu * h * dΩ
+            # Loop over trial shape functions
+            for (jq, Jq) in pairs(drq)
+                div_Nq = shape_divergence(cvq, q_point, jq)
+                # Add contribution to Ke
+                Ke[Iu, Jq] += (δNu * div_Nq) * dΩ
+            end
+        end
+        for (iq, Iq) in pairs(drq)
+            δNq = shape_value(cvq, q_point, iq)
+            div_δNq = shape_divergence(cvq, q_point, iq)
+            for (ju, Ju) in pairs(dru)
+                Nu = shape_value(cvu, q_point, ju)
+                Ke[Iq, Ju] -= div_δNq * k * Nu * dΩ
+            end
+            for (jq, Jq) in pairs(drq)
+                Nq = shape_value(cvq, q_point, jq)
+                Ke[Iq, Jq] += (δNq ⋅ Nq) * dΩ
+            end
+        end
+    end
+    return Ke, fe
+end</code></pre><h3 id="Global-assembly"><a class="docs-heading-anchor" href="#Global-assembly">Global assembly</a><a id="Global-assembly-1"></a><a class="docs-heading-anchor-permalink" href="#Global-assembly" title="Permalink"></a></h3><pre><code class="language-julia hljs">function assemble_global(cellvalues, dh::DofHandler)
+    grid = dh.grid
+    # Allocate the element stiffness matrix and element force vector
+    dofranges = (u = dof_range(dh, :u), q = dof_range(dh, :q))
+    ncelldofs = ndofs_per_cell(dh)
+    Ke = zeros(ncelldofs, ncelldofs)
+    fe = zeros(ncelldofs)
+    # Allocate global system matrix and vector
+    K = allocate_matrix(dh)
+    f = zeros(ndofs(dh))
+    # Create an assembler
+    assembler = start_assemble(K, f)
+    x = copy(getcoordinates(grid, 1))
+    dofs = copy(celldofs(dh, 1))
+    # Loop over all cells
+    for (cells, k) in (
+            (getcellset(grid, &quot;center&quot;), 0.1),
+            (getcellset(grid, &quot;around&quot;), 1.0),
+        )
+        for cellnr in cells
+            # Reinitialize cellvalues for this cell
+            cell = getcells(grid, cellnr)
+            getcoordinates!(x, grid, cell)
+            celldofs!(dofs, dh, cellnr)
+            reinit!(cellvalues[:u], cell, x)
+            reinit!(cellvalues[:q], cell, x)
+            # Reset to 0
+            fill!(Ke, 0)
+            fill!(fe, 0)
+            # Compute element contribution
+            assemble_element!(Ke, fe, cellvalues, dofranges, k)
+            # Assemble Ke and fe into K and f
+            assemble!(assembler, dofs, Ke, fe)
+        end
+    end
+    return K, f
+end</code></pre><h3 id="Solution-of-the-system"><a class="docs-heading-anchor" href="#Solution-of-the-system">Solution of the system</a><a id="Solution-of-the-system-1"></a><a class="docs-heading-anchor-permalink" href="#Solution-of-the-system" title="Permalink"></a></h3><pre><code class="language-julia hljs">K, f = assemble_global(cellvalues, dh);
+u = K \ f;</code></pre><h3 id="Exporting-to-VTK"><a class="docs-heading-anchor" href="#Exporting-to-VTK">Exporting to VTK</a><a id="Exporting-to-VTK-1"></a><a class="docs-heading-anchor-permalink" href="#Exporting-to-VTK" title="Permalink"></a></h3><p>Currently, exporting discontinuous interpolations is not supported. Since in this case, we have a single temperature degree of freedom per cell, we work around this by calculating the per-cell temperature.</p><pre><code class="language-julia hljs">temperature_dof = first(dof_range(dh, :u))
+u_cells = map(1:getncells(grid)) do i
+    u[celldofs(dh, i)[temperature_dof]]
+end
+VTKGridFile(&quot;heat_equation_hdiv&quot;, dh) do vtk
+    write_cell_data(vtk, u_cells, &quot;temperature&quot;)
+end</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">VTKGridFile for the closed file &quot;heat_equation_hdiv.vtu&quot;.</code></pre><h2 id="Postprocess-the-total-flux"><a class="docs-heading-anchor" href="#Postprocess-the-total-flux">Postprocess the total flux</a><a id="Postprocess-the-total-flux-1"></a><a class="docs-heading-anchor-permalink" href="#Postprocess-the-total-flux" title="Permalink"></a></h2><p>We applied a constant unit heat source to the body, and the total heat flux exiting across the boundary should therefore match the area for the considered stationary case.</p><pre><code class="language-julia hljs">function calculate_flux(dh, boundary_facets, ip, a)
+    grid = dh.grid
+    qr = FacetQuadratureRule{RefTriangle}(4)
+    ip_geo = geometric_interpolation(getcelltype(grid))
+    fv = FacetValues(qr, ip, ip_geo)
+
+    dofrange = dof_range(dh, :q)
+    flux = 0.0
+    dofs = celldofs(dh, 1)
+    ae = zeros(length(dofs))
+    x = getcoordinates(grid, 1)
+    for (cellnr, facetnr) in boundary_facets
+        getcoordinates!(x, grid, cellnr)
+        cell = getcells(grid, cellnr)
+        celldofs!(dofs, dh, cellnr)
+        map!(i -&gt; a[i], ae, dofs)
+        reinit!(fv, cell, x, facetnr)
+        for q_point in 1:getnquadpoints(fv)
+            dΓ = getdetJdV(fv, q_point)
+            n = getnormal(fv, q_point)
+            q = function_value(fv, q_point, ae, dofrange)
+            flux += (q ⋅ n) * dΓ
+        end
+    end
+    return flux
+end
+
+println(&quot;Outward flux: &quot;, calculate_flux(dh, Γ, ipq, u))</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">Outward flux: 399.9999999999993</code></pre><p>Note that this is not the case for the standard <a href="../heat_equation/#tutorial-heat-equation">Heat equation</a>, as the flux terms are less accurately approximated. A fine mesh is required to converge in that case. However, the present example gives a worse approximation of the temperature field.</p><h2 id="tutorial-heat-equation-hdiv-plain"><a class="docs-heading-anchor" href="#tutorial-heat-equation-hdiv-plain">Plain program</a><a id="tutorial-heat-equation-hdiv-plain-1"></a><a class="docs-heading-anchor-permalink" href="#tutorial-heat-equation-hdiv-plain" title="Permalink"></a></h2><p>Here follows a version of the program without any comments. The file is also available here: <a href="../heat_equation_hdiv.jl"><code>heat_equation_hdiv.jl</code></a>.</p><pre><code class="language-julia hljs">using Ferrite
+
+function create_grid(ny::Int)
+    width = 10.0
+    length = 40.0
+    center_width = 5.0
+    center_length = 20.0
+    upper_right = Vec((length / 2, width / 2))
+    grid = generate_grid(Triangle, (round(Int, ny * length / width), ny), -upper_right, upper_right)
+    addcellset!(grid, &quot;center&quot;, x -&gt; abs(x[1]) &lt; center_length / 2 &amp;&amp; abs(x[2]) &lt; center_width / 2)
+    addcellset!(grid, &quot;around&quot;, setdiff(1:getncells(grid), getcellset(grid, &quot;center&quot;)))
+    return grid
+end
+
+grid = create_grid(100)
+
+ip_geo = geometric_interpolation(getcelltype(grid))
+ipu = DiscontinuousLagrange{RefTriangle, 0}()
+ipq = Ferrite.BrezziDouglasMarini{2, RefTriangle, 1}()
+qr = QuadratureRule{RefTriangle}(2)
+cellvalues = (u = CellValues(qr, ipu, ip_geo), q = CellValues(qr, ipq, ip_geo))
+
+dh = DofHandler(grid)
+add!(dh, :u, ipu)
+add!(dh, :q, ipq)
+close!(dh);
+
+Γ = union((getfacetset(grid, name) for name in (&quot;left&quot;, &quot;right&quot;, &quot;bottom&quot;, &quot;top&quot;))...)
+
+function assemble_element!(Ke::Matrix, fe::Vector, cv::NamedTuple, dr::NamedTuple, k::Number)
+    cvu = cv[:u]
+    cvq = cv[:q]
+    dru = dr[:u]
+    drq = dr[:q]
+    h = 1.0 # Heat source
+    # Loop over quadrature points
+    for q_point in 1:getnquadpoints(cvu)
+        # Get the quadrature weight
+        dΩ = getdetJdV(cvu, q_point)
+        # Loop over test shape functions
+        for (iu, Iu) in pairs(dru)
+            δNu = shape_value(cvu, q_point, iu)
+            # Add contribution to fe
+            fe[Iu] += δNu * h * dΩ
+            # Loop over trial shape functions
+            for (jq, Jq) in pairs(drq)
+                div_Nq = shape_divergence(cvq, q_point, jq)
+                # Add contribution to Ke
+                Ke[Iu, Jq] += (δNu * div_Nq) * dΩ
+            end
+        end
+        for (iq, Iq) in pairs(drq)
+            δNq = shape_value(cvq, q_point, iq)
+            div_δNq = shape_divergence(cvq, q_point, iq)
+            for (ju, Ju) in pairs(dru)
+                Nu = shape_value(cvu, q_point, ju)
+                Ke[Iq, Ju] -= div_δNq * k * Nu * dΩ
+            end
+            for (jq, Jq) in pairs(drq)
+                Nq = shape_value(cvq, q_point, jq)
+                Ke[Iq, Jq] += (δNq ⋅ Nq) * dΩ
+            end
+        end
+    end
+    return Ke, fe
+end
+
+function assemble_global(cellvalues, dh::DofHandler)
+    grid = dh.grid
+    # Allocate the element stiffness matrix and element force vector
+    dofranges = (u = dof_range(dh, :u), q = dof_range(dh, :q))
+    ncelldofs = ndofs_per_cell(dh)
+    Ke = zeros(ncelldofs, ncelldofs)
+    fe = zeros(ncelldofs)
+    # Allocate global system matrix and vector
+    K = allocate_matrix(dh)
+    f = zeros(ndofs(dh))
+    # Create an assembler
+    assembler = start_assemble(K, f)
+    x = copy(getcoordinates(grid, 1))
+    dofs = copy(celldofs(dh, 1))
+    # Loop over all cells
+    for (cells, k) in (
+            (getcellset(grid, &quot;center&quot;), 0.1),
+            (getcellset(grid, &quot;around&quot;), 1.0),
+        )
+        for cellnr in cells
+            # Reinitialize cellvalues for this cell
+            cell = getcells(grid, cellnr)
+            getcoordinates!(x, grid, cell)
+            celldofs!(dofs, dh, cellnr)
+            reinit!(cellvalues[:u], cell, x)
+            reinit!(cellvalues[:q], cell, x)
+            # Reset to 0
+            fill!(Ke, 0)
+            fill!(fe, 0)
+            # Compute element contribution
+            assemble_element!(Ke, fe, cellvalues, dofranges, k)
+            # Assemble Ke and fe into K and f
+            assemble!(assembler, dofs, Ke, fe)
+        end
+    end
+    return K, f
+end
+
+K, f = assemble_global(cellvalues, dh);
+u = K \ f;
+
+temperature_dof = first(dof_range(dh, :u))
+u_cells = map(1:getncells(grid)) do i
+    u[celldofs(dh, i)[temperature_dof]]
+end
+VTKGridFile(&quot;heat_equation_hdiv&quot;, dh) do vtk
+    write_cell_data(vtk, u_cells, &quot;temperature&quot;)
+end
+
+function calculate_flux(dh, boundary_facets, ip, a)
+    grid = dh.grid
+    qr = FacetQuadratureRule{RefTriangle}(4)
+    ip_geo = geometric_interpolation(getcelltype(grid))
+    fv = FacetValues(qr, ip, ip_geo)
+
+    dofrange = dof_range(dh, :q)
+    flux = 0.0
+    dofs = celldofs(dh, 1)
+    ae = zeros(length(dofs))
+    x = getcoordinates(grid, 1)
+    for (cellnr, facetnr) in boundary_facets
+        getcoordinates!(x, grid, cellnr)
+        cell = getcells(grid, cellnr)
+        celldofs!(dofs, dh, cellnr)
+        map!(i -&gt; a[i], ae, dofs)
+        reinit!(fv, cell, x, facetnr)
+        for q_point in 1:getnquadpoints(fv)
+            dΓ = getdetJdV(fv, q_point)
+            n = getnormal(fv, q_point)
+            q = function_value(fv, q_point, ae, dofrange)
+            flux += (q ⋅ n) * dΓ
+        end
+    end
+    return flux
+end
+
+println(&quot;Outward flux: &quot;, calculate_flux(dh, Γ, ipq, u))</code></pre><hr/><p><em>This page was generated using <a href="https://github.com/fredrikekre/Literate.jl">Literate.jl</a>.</em></p></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../heat_equation/">« Heat equation</a><a class="docs-footer-nextpage" href="../linear_elasticity/">Linear elasticity »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option><option value="catppuccin-latte">catppuccin-latte</option><option value="catppuccin-frappe">catppuccin-frappe</option><option value="catppuccin-macchiato">catppuccin-macchiato</option><option value="catppuccin-mocha">catppuccin-mocha</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.7.0 on <span class="colophon-date" title="Tuesday 12 November 2024 15:38">Tuesday 12 November 2024</span>. Using Julia version 1.11.1.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
