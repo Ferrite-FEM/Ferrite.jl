@@ -1800,7 +1800,7 @@ n_dbc_components(::RaviartThomas) = 1
 function reference_shape_value(ip::RaviartThomas{2, RefTriangle, 1}, ξ::Vec{2}, i::Int)
     x, y = ξ
     i == 1 && return ξ                  # Flip sign
-    i == 2 && return Vec(x-1, y)        # Keep sign
+    i == 2 && return Vec(x - 1, y)        # Keep sign
     i == 3 && return Vec(x, y - 1)      # Flip sign
     throw(ArgumentError("no shape function $i for interpolation $ip"))
 end
@@ -1809,7 +1809,7 @@ getnbasefunctions(::RaviartThomas{2, RefTriangle, 1}) = 3
 edgedof_interior_indices(::RaviartThomas{2, RefTriangle, 1}) = ((1,), (2,), (3,))
 adjust_dofs_during_distribution(::RaviartThomas) = false
 
-function get_direction(::RaviartThomas{2,RefTriangle,1}, j, cell)
+function get_direction(::RaviartThomas{2, RefTriangle, 1}, j, cell)
     edge = edges(cell)[j]
     return ifelse(edge[2] > edge[1], 1, -1)
 end
@@ -1841,24 +1841,24 @@ RefTriangle
 function reference_shape_value(ip::RaviartThomas{2, RefTriangle, 2}, ξ::Vec{2}, i::Int)
     x, y = ξ
     # Face 1 (keep ordering, flip sign)
-    i == 1 && return Vec(4x*(2x-1), 2y*(4x-1))
-    i == 2 && return Vec(2x*(4y-1), 4y*(2y-1))
+    i == 1 && return Vec(4x * (2x - 1), 2y * (4x - 1))
+    i == 2 && return Vec(2x * (4y - 1), 4y * (2y - 1))
     # Face 2 (flip ordering, keep signs)
-    i == 3 && return Vec( 8x*y - 2x - 6y + 2, 4y*(2y - 1))
-    i == 4 && return Vec(-8x^2 - 8x*y + 12x + 6y - 4, 2y*(-4x - 4y + 3))
+    i == 3 && return Vec(8x * y - 2x - 6y + 2, 4y * (2y - 1))
+    i == 4 && return Vec(-8x^2 - 8x * y + 12x + 6y - 4, 2y * (-4x - 4y + 3))
     # Face 3 (keep ordering, flip sign)
-    i == 5 && return Vec(2x*(3 - 4x - 4y), -8x*y + 6x - 8y^2 + 12y - 4)
-    i == 6 && return Vec(4x*(2x-1), 8x*y - 6x - 2y + 2)
+    i == 5 && return Vec(2x * (3 - 4x - 4y), -8x * y + 6x - 8y^2 + 12y - 4)
+    i == 6 && return Vec(4x * (2x - 1), 8x * y - 6x - 2y + 2)
     # Cell
-    i == 7 && return Vec(8x*(-2x - y + 2), 8y*(-2x - y + 1))
-    i == 8 && return Vec(8x*(-2y - x + 1), 8y*(-2y - x + 2))
+    i == 7 && return Vec(8x * (-2x - y + 2), 8y * (-2x - y + 1))
+    i == 8 && return Vec(8x * (-2y - x + 1), 8y * (-2y - x + 2))
     throw(ArgumentError("no shape function $i for interpolation $ip"))
 end
 
-getnbasefunctions(::RaviartThomas{2,RefTriangle,2}) = 8
-edgedof_interior_indices(::RaviartThomas{2,RefTriangle,2}) = ((1, 2), (3, 4), (5, 6))
-volumedof_interior_indices(::RaviartThomas{2,RefTriangle,2}) = (7,8)
-adjust_dofs_during_distribution(::RaviartThomas{2,RefTriangle,2}) = true
+getnbasefunctions(::RaviartThomas{2, RefTriangle, 2}) = 8
+edgedof_interior_indices(::RaviartThomas{2, RefTriangle, 2}) = ((1, 2), (3, 4), (5, 6))
+volumedof_interior_indices(::RaviartThomas{2, RefTriangle, 2}) = (7, 8)
+adjust_dofs_during_distribution(::RaviartThomas{2, RefTriangle, 2}) = true
 
 function get_direction(::RaviartThomas{2, RefTriangle, 2}, j, cell)
     j > 6 && return 1
@@ -1871,7 +1871,7 @@ end
 #####################################
 struct BrezziDouglasMarini{vdim, shape, order} <: VectorInterpolation{vdim, shape, order} end
 mapping_type(::BrezziDouglasMarini) = ContravariantPiolaMapping()
-reference_coordinates(ip::BrezziDouglasMarini{vdim}) where vdim = fill(NaN*zero(Vec{vdim}), getnbasefunctions(ip))
+reference_coordinates(ip::BrezziDouglasMarini{vdim}) where {vdim} = fill(NaN * zero(Vec{vdim}), getnbasefunctions(ip))
 #dirichlet_facedof_indices(ip::BrezziDouglasMarini) = facetdof_interior_indices(ip)
 n_dbc_components(::BrezziDouglasMarini) = 1
 #=
@@ -1922,16 +1922,16 @@ end
 #####################################
 struct Nedelec{vdim, shape, order} <: VectorInterpolation{vdim, shape, order} end
 mapping_type(::Nedelec) = CovariantPiolaMapping()
-reference_coordinates(ip::Nedelec{vdim}) where vdim = fill(NaN*zero(Vec{vdim}), getnbasefunctions(ip))
+reference_coordinates(ip::Nedelec{vdim}) where {vdim} = fill(NaN * zero(Vec{vdim}), getnbasefunctions(ip))
 dirichlet_facedof_indices(ip::Nedelec) = facetdof_interior_indices(ip)
 n_dbc_components(::Nedelec) = 1
 # RefTriangle, 1st order Lagrange
 # https://defelement.com/elements/examples/triangle-nedelec1-lagrange-1.html
-function reference_shape_value(ip::Nedelec{2,RefTriangle,1}, ξ::Vec{2}, i::Int)
+function reference_shape_value(ip::Nedelec{2, RefTriangle, 1}, ξ::Vec{2}, i::Int)
     x, y = ξ
-    i == 1 && return Vec(  - y,     x)
-    i == 2 && return Vec(  - y, x - 1) # Changed signed, follow Ferrite's sign convention
-    i == 3 && return Vec(1 - y,     x)
+    i == 1 && return Vec(- y, x)
+    i == 2 && return Vec(- y, x - 1) # Changed signed, follow Ferrite's sign convention
+    i == 3 && return Vec(1 - y, x)
     throw(ArgumentError("no shape function $i for interpolation $ip"))
 end
 
@@ -1946,34 +1946,50 @@ end
 
 # RefTriangle, 2nd order Lagrange
 # https://defelement.com/elements/examples/triangle-nedelec1-lagrange-2.html
-function reference_shape_value(ip::Nedelec{2,RefTriangle,2}, ξ::Vec{2}, i::Int)
+function reference_shape_value(ip::Nedelec{2, RefTriangle, 2}, ξ::Vec{2}, i::Int)
     x, y = ξ
     # Face 1
-    i == 1 && return Vec( 2*y*(1 - 4*x),
-                          4*x*(2*x - 1))
-    i == 2 && return Vec( 4*y*(1 - 2*y),
-                          2*x*(4*y - 1))
+    i == 1 && return Vec(
+        2 * y * (1 - 4 * x),
+        4 * x * (2 * x - 1)
+    )
+    i == 2 && return Vec(
+        4 * y * (1 - 2 * y),
+        2 * x * (4 * y - 1)
+    )
     # Face 2 (flip order and sign compared to defelement)
-    i == 3 && return Vec( 4*y*(1 - 2*y),
-                          8*x*y - 2*x - 6*y + 2)
-    i == 4 && return Vec( 2*y*(4*x + 4*y - 3),
-                         -8*x^2 - 8*x*y + 12*x + 6*y - 4)
+    i == 3 && return Vec(
+        4 * y * (1 - 2 * y),
+        8 * x * y - 2 * x - 6 * y + 2
+    )
+    i == 4 && return Vec(
+        2 * y * (4 * x + 4 * y - 3),
+        -8 * x^2 - 8 * x * y + 12 * x + 6 * y - 4
+    )
     # Face 3
-    i == 5 && return Vec( 8*x*y - 6*x + 8*y^2 - 12*y + 4,
-                          2*x*(-4*x - 4*y + 3))
-    i == 6 && return Vec(-8*x*y + 6*x + 2*y - 2,
-                          4*x*(2*x - 1))
+    i == 5 && return Vec(
+        8 * x * y - 6 * x + 8 * y^2 - 12 * y + 4,
+        2 * x * (-4 * x - 4 * y + 3)
+    )
+    i == 6 && return Vec(
+        -8 * x * y + 6 * x + 2 * y - 2,
+        4 * x * (2 * x - 1)
+    )
     # Cell
-    i == 7 && return Vec( 8*y*(-x - 2*y + 2),
-                          8*x*( x + 2*y - 1))
-    i == 8 && return Vec( 8*y*( 2*x + y - 1),
-                          8*x*(-2*x - y + 2))
+    i == 7 && return Vec(
+        8 * y * (-x - 2 * y + 2),
+        8 * x * (x + 2 * y - 1)
+    )
+    i == 8 && return Vec(
+        8 * y * (2 * x + y - 1),
+        8 * x * (-2 * x - y + 2)
+    )
     throw(ArgumentError("no shape function $i for interpolation $ip"))
 end
 
 getnbasefunctions(::Nedelec{2, RefTriangle, 2}) = 8
-edgedof_interior_indices(::Nedelec{2, RefTriangle, 2}) = ((1,2), (3,4), (5,6))
-volumedof_interior_indices(::Nedelec{2, RefTriangle, 2}) = (7,8)
+edgedof_interior_indices(::Nedelec{2, RefTriangle, 2}) = ((1, 2), (3, 4), (5, 6))
+volumedof_interior_indices(::Nedelec{2, RefTriangle, 2}) = (7, 8)
 adjust_dofs_during_distribution(::Nedelec{2, RefTriangle, 2}) = true
 
 function get_direction(::Nedelec{2, RefTriangle, 2}, j, cell)
@@ -1983,7 +1999,7 @@ function get_direction(::Nedelec{2, RefTriangle, 2}, j, cell)
 end
 
 # https://defelement.com/elements/examples/tetrahedron-nedelec1-lagrange-1.html
-function reference_shape_value(ip::Nedelec{3, RefTetrahedron, 1}, ξ::Vec{3, T}, i::Int) where T
+function reference_shape_value(ip::Nedelec{3, RefTetrahedron, 1}, ξ::Vec{3, T}, i::Int) where {T}
     x, y, z = ξ
     # Edge 1 (defelement 5, positive)
     i == 1 && return Vec(- y - z + 1, x, x)
@@ -2002,7 +2018,7 @@ function reference_shape_value(ip::Nedelec{3, RefTetrahedron, 1}, ξ::Vec{3, T},
 end
 
 getnbasefunctions(::Nedelec{3, RefTetrahedron, 1}) = 6
-edgedof_interior_indices(::Nedelec{3, RefTetrahedron, 1}) = ntuple(i->(i,), 6)
+edgedof_interior_indices(::Nedelec{3, RefTetrahedron, 1}) = ntuple(i -> (i,), 6)
 adjust_dofs_during_distribution(::Nedelec{3, RefTetrahedron, 1}) = false
 
 function get_direction(::Nedelec{3, RefTetrahedron, 1}, j, cell)
@@ -2022,38 +2038,38 @@ No point in implementing guesses that cannot be verified...
 
 # https://defelement.com/elements/examples/hexahedron-nedelec1-lagrange-1.html
 # Note: Divide by 2 since J=2I compared to DefElement's reference shape, and mapping is N ⋅ J^-T
-function reference_shape_value(ip::Nedelec{3, RefHexahedron, 1}, ξ::Vec{3, T}, i::Int) where T
-    x, y, z = (ξ + ones(ξ))/2
+function reference_shape_value(ip::Nedelec{3, RefHexahedron, 1}, ξ::Vec{3, T}, i::Int) where {T}
+    x, y, z = (ξ + ones(ξ)) / 2
     # Edge 1 (defelement 0, positive)
-    i ==  1 && return Vec(y*z - y - z + 1, zero(T), zero(T))/2
+    i == 1 && return Vec(y * z - y - z + 1, zero(T), zero(T)) / 2
     # Edge 2 (defelement 3, positive)
-    i ==  2 && return Vec(zero(T), x * (1 - z), zero(T))/2
+    i == 2 && return Vec(zero(T), x * (1 - z), zero(T)) / 2
     # Edge 3 (defelement 5, negative)
-    i ==  3 && return Vec(-y*(1-z), zero(T), zero(T))/2
+    i == 3 && return Vec(-y * (1 - z), zero(T), zero(T)) / 2
     # Edge 4 (defelement 1, negative)
-    i ==  4 && return Vec(zero(T), - x*z + x + z - 1, zero(T))/2
+    i == 4 && return Vec(zero(T), - x * z + x + z - 1, zero(T)) / 2
     # Edge 5 (defelement 8, positive)
-    i ==  5 && return Vec(z*(1-y), zero(T), zero(T))/2
+    i == 5 && return Vec(z * (1 - y), zero(T), zero(T)) / 2
     # Edge 6 (defelement 10, positive)
-    i ==  6 && return Vec(zero(T), x * z, zero(T))/2
+    i == 6 && return Vec(zero(T), x * z, zero(T)) / 2
     # Edge 7 (defelement 11, negative)
-    i ==  7 && return Vec(- y*z, zero(T), zero(T))/2
+    i == 7 && return Vec(- y * z, zero(T), zero(T)) / 2
     # Edge 8 (defelement 9, negative)
-    i ==  8 && return Vec(zero(T), - z * (1 - x), zero(T))/2
+    i == 8 && return Vec(zero(T), - z * (1 - x), zero(T)) / 2
     # Edge 9 (defelement 2, positive)
-    i ==  9 && return Vec(zero(T), zero(T), x*y - x - y + 1)/2
+    i == 9 && return Vec(zero(T), zero(T), x * y - x - y + 1) / 2
     # Edge 10 (defelement 4, positive)
-    i == 10 && return Vec(zero(T), zero(T), x * (1 - y))/2
+    i == 10 && return Vec(zero(T), zero(T), x * (1 - y)) / 2
     # Edge 11 (defelement 7, positive)
-    i == 11 && return Vec(zero(T), zero(T), x * y)/2
+    i == 11 && return Vec(zero(T), zero(T), x * y) / 2
     # Edge 12 (defelement 6, positive)
-    i == 12 && return Vec(zero(T), zero(T), y * (1 - x))/2
+    i == 12 && return Vec(zero(T), zero(T), y * (1 - x)) / 2
 
     throw(ArgumentError("no shape function $i for interpolation $ip"))
 end
 
 getnbasefunctions(::Nedelec{3, RefHexahedron, 1}) = 12
-edgedof_interior_indices(::Nedelec{3, RefHexahedron, 1}) = ntuple(i->(i,), 12)
+edgedof_interior_indices(::Nedelec{3, RefHexahedron, 1}) = ntuple(i -> (i,), 12)
 adjust_dofs_during_distribution(::Nedelec{3, RefHexahedron, 1}) = false
 
 function get_direction(::Nedelec{3, RefHexahedron, 1}, j, cell)

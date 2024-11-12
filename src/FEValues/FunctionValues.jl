@@ -226,7 +226,7 @@ end
     @inbounds for j in 1:getnbasefunctions(funvals)
         d = get_direction(funvals.ip, j, cell)
         Nξ = funvals.Nξ[j, q_point]
-        funvals.Nx[j, q_point] = d*(Nξ ⋅ Jinv)
+        funvals.Nx[j, q_point] = d * (Nξ ⋅ Jinv)
     end
     return nothing
 end
@@ -238,8 +238,8 @@ end
         d = get_direction(funvals.ip, j, cell)
         dNdξ = funvals.dNdξ[j, q_point]
         Nξ = funvals.Nξ[j, q_point]
-        funvals.Nx[j, q_point] = d*(Nξ ⋅ Jinv)
-        funvals.dNdx[j, q_point] = d*(Jinv' ⋅ dNdξ ⋅ Jinv - Jinv' ⋅ (Nξ ⋅ Jinv ⋅ H ⋅ Jinv))
+        funvals.Nx[j, q_point] = d * (Nξ ⋅ Jinv)
+        funvals.dNdx[j, q_point] = d * (Jinv' ⋅ dNdξ ⋅ Jinv - Jinv' ⋅ (Nξ ⋅ Jinv ⋅ H ⋅ Jinv))
     end
     return nothing
 end
@@ -251,7 +251,7 @@ end
     @inbounds for j in 1:getnbasefunctions(funvals)
         d = get_direction(funvals.ip, j, cell)
         Nξ = funvals.Nξ[j, q_point]
-        funvals.Nx[j, q_point] = d*(J ⋅ Nξ)/detJ
+        funvals.Nx[j, q_point] = d * (J ⋅ Nξ) / detJ
     end
     return nothing
 end
@@ -262,15 +262,15 @@ end
     Jinv = inv(J)
     detJ = det(J)
     I2 = one(J)
-    H_Jinv = H⋅Jinv
-    A1 = (H_Jinv ⊡ (otimesl(I2,I2))) / detJ
+    H_Jinv = H ⋅ Jinv
+    A1 = (H_Jinv ⊡ (otimesl(I2, I2))) / detJ
     A2 = (Jinv' ⊡ H_Jinv) / detJ
     @inbounds for j in 1:getnbasefunctions(funvals)
         d = get_direction(funvals.ip, j, cell)
         dNdξ = funvals.dNdξ[j, q_point]
         Nξ = funvals.Nξ[j, q_point]
-        funvals.Nx[j, q_point] = d*(J ⋅ Nξ)/detJ
-        funvals.dNdx[j, q_point] = d*(J ⋅ dNdξ ⋅ Jinv/detJ + A1 ⋅ Nξ - (J ⋅ Nξ) ⊗ A2)
+        funvals.Nx[j, q_point] = d * (J ⋅ Nξ) / detJ
+        funvals.dNdx[j, q_point] = d * (J ⋅ dNdξ ⋅ Jinv / detJ + A1 ⋅ Nξ - (J ⋅ Nξ) ⊗ A2)
     end
     return nothing
 end

@@ -225,8 +225,8 @@ using Ferrite: reference_shape_value, reference_shape_gradient
     end
 
     @testset "Correctness of AD of embedded interpolations" begin
-        ip = Lagrange{RefHexahedron,2}()^3
-        ξ = rand(Vec{3,Float64})
+        ip = Lagrange{RefHexahedron, 2}()^3
+        ξ = rand(Vec{3, Float64})
         for I in 1:getnbasefunctions(ip)
             #Call StaticArray-version
             H_sa, G_sa, V_sa = Ferrite._reference_shape_hessian_gradient_and_value_static_array(ip, ξ, I)
@@ -251,92 +251,49 @@ using Ferrite: reference_shape_value, reference_shape_gradient
         end
     end
 
-reference_cell(::Type{RefTriangle}) = Triangle((1,2,3))
-reference_cell(::Type{RefQuadrilateral}) = Quadrilateral((1,2,3,4))
-reference_cell(::Type{RefTetrahedron}) = Tetrahedron((1,2,3,4))
-reference_cell(::Type{RefHexahedron}) = Hexahedron((ntuple(identity, 8)))
+    reference_cell(::Type{RefTriangle}) = Triangle((1, 2, 3))
+    reference_cell(::Type{RefQuadrilateral}) = Quadrilateral((1, 2, 3, 4))
+    reference_cell(::Type{RefTetrahedron}) = Tetrahedron((1, 2, 3, 4))
+    reference_cell(::Type{RefHexahedron}) = Hexahedron((ntuple(identity, 8)))
 
-function line_integral(qr::QuadratureRule{RefLine}, ip, shape_nr, x0, Δx, L, v, f)
-    s = 0.0
-    for (ξ1d, w) in zip(Ferrite.getpoints(qr), Ferrite.getweights(qr))
-        ξ = x0 + (ξ1d[1]/2) * Δx
-        s += (reference_shape_value(ip, ξ, shape_nr) ⋅ v) * (w*L/2) * f((ξ1d[1]+1)/2)
-    end
-    return s
-end
-
-# Required properties of shape value Nⱼ of an edge-elements (Hcurl) on an edge with direction v, length L, and dofs ∈ 𝔇
-# 1) Unit property: ∫(Nⱼ ⋅ v f(s) dS) = 1 ∀ ∈ 𝔇
-#    Where f(s) = 1 for linear interpolation and f(s)=1-s and f(s)=s for 2nd order interpolation (first and second shape function)
-#    And s is the path parameter ∈[0,1] along the positive direction of the path.
-# 2) Zero along other edges: Nⱼ ⋅ v = 0 if j∉𝔇
-@testset "H(curl) on RefCell" begin
-    lineqr = QuadratureRule{RefLine}(20)
-    for ip in (Nedelec{2,RefTriangle,1}(), Nedelec{2,RefTriangle,2}(), Nedelec{3,RefTetrahedron,1}(), Nedelec{3,RefHexahedron,1}())
-        cell = reference_cell(getrefshape(ip))
-        edges = Ferrite.edges(cell)
-        dofs = Ferrite.edgedof_interior_indices(ip)
-        x = Ferrite.reference_coordinates(geometric_interpolation(typeof(cell)))
-        @testset "$(getrefshape(ip)), order=$(Ferrite.getorder(ip))" begin
-            for (edge_nr, (i1, i2)) in enumerate(edges)
-                Δx = x[i2]-x[i1]
-                x0 = (x[i1]+x[i2])/2
-                L = norm(Δx)
-                v = Δx/L
-                for (idof, shape_nr) in enumerate(dofs[edge_nr])
-                    nedgedofs = length(dofs[edge_nr])
-                    f(x) = nedgedofs == 1 ? 1.0 : (idof == 1 ? 1-x : x)
-                    s = line_integral(lineqr, ip, shape_nr, x0, Δx, L, v, f)
-                    @test s ≈ one(s)
-                end
-                for (j_edge, shape_nrs) in enumerate(dofs)
-                    j_edge == edge_nr && continue
-                    for shape_nr in shape_nrs
-                        for ξ in (x[i1] + r*Δx for r in [0.0, rand(3)..., 1.0])
-                            @test abs(reference_shape_value(ip, ξ, shape_nr) ⋅ v) < eps()*100
-                        end
-                    end
-                end
-            end
+    function line_integral(qr::QuadratureRule{RefLine}, ip, shape_nr, x0, Δx, L, v, f)
+        s = 0.0
+        for (ξ1d, w) in zip(Ferrite.getpoints(qr), Ferrite.getweights(qr))
+            ξ = x0 + (ξ1d[1] / 2) * Δx
+            s += (reference_shape_value(ip, ξ, shape_nr) ⋅ v) * (w * L / 2) * f((ξ1d[1] + 1) / 2)
         end
+        return s
     end
-end
 
-# Required properties of shape value Nⱼ of an edge-elements (Hdiv) on an edge with normal n, length L, and dofs ∈ 𝔇
-# 1) Unit property: ∫(Nⱼ ⋅ n f(s) dS) = 1 ∀ ∈ 𝔇
-#    Where f(s) = 1 for single shape function on edge, and f(s)=1-s and f(s)=s for two shape functions on edge
-#    s is the path parameter ∈[0,1] along the positive direction of the path.
-# 2) Zero normal component on other edges: Nⱼ ⋅ n = 0 if j∉𝔇
-@testset "H(div) on RefCell" begin
-    lineqr = QuadratureRule{RefLine}(20)
-    for ip in (
-            RaviartThomas{2, RefTriangle, 1}(),
-            RaviartThomas{2, RefTriangle, 2}(),
-            Ferrite.BrezziDouglasMarini{2, RefTriangle, 1}(),
-            )
-        cell = reference_cell(getrefshape(ip))
-        cell_facets = Ferrite.facets(cell)
-        dofs = Ferrite.facetdof_interior_indices(ip)
-        x = Ferrite.reference_coordinates(geometric_interpolation(typeof(cell)))
-        normals = reference_normals(geometric_interpolation(typeof(cell)))
-        @testset "$ip" begin
-            for (facet_nr, (i1, i2)) in enumerate(cell_facets)
-                @testset "Facet $facet_nr" begin
-                    Δx = x[i2]-x[i1]
-                    x0 = (x[i1]+x[i2])/2
+    # Required properties of shape value Nⱼ of an edge-elements (Hcurl) on an edge with direction v, length L, and dofs ∈ 𝔇
+    # 1) Unit property: ∫(Nⱼ ⋅ v f(s) dS) = 1 ∀ ∈ 𝔇
+    #    Where f(s) = 1 for linear interpolation and f(s)=1-s and f(s)=s for 2nd order interpolation (first and second shape function)
+    #    And s is the path parameter ∈[0,1] along the positive direction of the path.
+    # 2) Zero along other edges: Nⱼ ⋅ v = 0 if j∉𝔇
+    @testset "H(curl) on RefCell" begin
+        lineqr = QuadratureRule{RefLine}(20)
+        for ip in (Nedelec{2, RefTriangle, 1}(), Nedelec{2, RefTriangle, 2}(), Nedelec{3, RefTetrahedron, 1}(), Nedelec{3, RefHexahedron, 1}())
+            cell = reference_cell(getrefshape(ip))
+            edges = Ferrite.edges(cell)
+            dofs = Ferrite.edgedof_interior_indices(ip)
+            x = Ferrite.reference_coordinates(geometric_interpolation(typeof(cell)))
+            @testset "$(getrefshape(ip)), order=$(Ferrite.getorder(ip))" begin
+                for (edge_nr, (i1, i2)) in enumerate(edges)
+                    Δx = x[i2] - x[i1]
+                    x0 = (x[i1] + x[i2]) / 2
                     L = norm(Δx)
-                    n = normals[facet_nr]
-                    for (idof, shape_nr) in enumerate(dofs[facet_nr])
-                        nfacetdofs = length(dofs[facet_nr])
-                        f(x) = nfacetdofs == 1 ? 1.0 : (idof == 1 ? 1-x : x)
-                        s = line_integral(lineqr, ip, shape_nr, x0, Δx, L, n, f)
+                    v = Δx / L
+                    for (idof, shape_nr) in enumerate(dofs[edge_nr])
+                        nedgedofs = length(dofs[edge_nr])
+                        f(x) = nedgedofs == 1 ? 1.0 : (idof == 1 ? 1 - x : x)
+                        s = line_integral(lineqr, ip, shape_nr, x0, Δx, L, v, f)
                         @test s ≈ one(s)
                     end
-                    for (j_facet, shape_nrs) in enumerate(dofs)
-                        j_facet == facet_nr && continue
+                    for (j_edge, shape_nrs) in enumerate(dofs)
+                        j_edge == edge_nr && continue
                         for shape_nr in shape_nrs
-                            for ξ in (x[i1] + r*Δx for r in [0.0, rand(3)..., 1.0])
-                                @test abs(reference_shape_value(ip, ξ, shape_nr) ⋅ n) < eps()*100
+                            for ξ in (x[i1] + r * Δx for r in [0.0, rand(3)..., 1.0])
+                                @test abs(reference_shape_value(ip, ξ, shape_nr) ⋅ v) < eps() * 100
                             end
                         end
                     end
@@ -344,98 +301,143 @@ end
             end
         end
     end
-end
 
-tupleshift(t::NTuple{N}, shift::Int) where N = ntuple(i -> t[mod(i - 1 - shift, N) + 1], N)
-#tupleshift(t::NTuple, shift::Int) = tuple(circshift(SVector(t), shift)...)
-cell_permutations(cell::Quadrilateral)      = (Quadrilateral(tupleshift(cell.nodes, shift)) for shift in 0:3)
-cell_permutations(cell::Triangle)           = (     Triangle(tupleshift(cell.nodes, shift)) for shift in 0:2)
-cell_permutations(cell::QuadraticTriangle)  = (QuadraticTriangle((tupleshift(cell.nodes[1:3], shift)..., tupleshift(cell.nodes[4:6], shift)...)) for shift in 0:3)
-
-function cell_permutations(cell::Hexahedron)
-    idx = ( #Logic on refshape: Select 1st and 2nd vertex (must be neighbours)
-    # The next follows to create inward vector with RHR, and then 4th is in same plane.
-    # The last four must be the neighbours on the other plane to the first four (same order)
-        (1,2,3,4,5,6,7,8), (1,4,8,5,2,3,7,6), (1,5,6,2,4,8,7,3),
-        (2,1,5,6,3,4,8,7), (2,3,4,1,6,7,8,5), (2,6,7,3,1,5,8,4),
-        (3,2,6,7,4,1,5,8), (3,4,1,2,7,8,5,6), (3,7,8,4,2,6,5,1),
-        (4,1,2,3,8,5,6,7), (4,3,7,8,1,2,6,5), (4,8,5,1,3,7,6,1),
-        (5,1,4,8,6,2,3,7), (5,6,2,1,8,7,3,4), (5,8,7,6,1,4,3,2),
-        (6,2,1,5,7,3,4,8), (6,5,8,7,2,1,4,3), (6,7,3,2,5,8,4,1),
-        (7,3,2,6,8,4,1,5), (7,6,5,8,3,2,1,4), (7,8,4,3,6,5,1,2),
-        (8,4,3,7,5,1,2,6), (8,5,1,4,7,6,2,3), (8,7,6,5,4,3,2,1),
-    )
-    return (Hexahedron(ntuple(i -> cell.nodes[perm[i]], 8)) for perm in idx)
-end
-
-function cell_permutations(cell::Tetrahedron)
-    idx = ( (1,2,3,4), (1,3,4,2), (1,4,2,3),
-            (2,1,4,3), (2,3,1,4), (2,4,3,1),
-            (3,1,2,4), (3,2,4,1), (3,4,1,2),
-            (4,1,3,2), (4,3,2,1), (4,2,1,3))
-    return (Tetrahedron(ntuple(i -> cell.nodes[perm[i]], 4)) for perm in idx)
-end
-
-@testset "Hcurl and Hdiv" begin
-    include(joinpath(@__DIR__, "InterpolationTestUtils.jl"))
-    import .InterpolationTestUtils as ITU
-    nel = 3
-    hdiv_check(v, n) = v ⋅ n        # Hdiv (normal continuity)
-    hcurl_check(v, n) = v - n*(v⋅n) # Hcurl (tangent continuity)
-    transformation_functions = ((Nedelec, hcurl_check), (RaviartThomas, hdiv_check), (Ferrite.BrezziDouglasMarini, hdiv_check))
-
-    for CT in (Triangle, QuadraticTriangle, Tetrahedron, Hexahedron)
-        dim = Ferrite.getrefdim(CT) # dim = sdim = rdim
-        p1, p2 = (rand(Vec{dim}), ones(Vec{dim})+rand(Vec{dim}))
-        grid = generate_grid(CT, ntuple(_->nel, dim), p1, p2)
-        # Smoothly distort grid (to avoid spuriously badly deformed elements).
-        # A distorted grid is important to properly test the geometry mapping
-        # for 2nd order elements.
-        transfun(x) = typeof(x)(i->sinpi(x[mod(i, length(x))+1]+i/3))/10
-        transform_coordinates!(grid, x->(x + transfun(x)))
-        cellnr = getncells(grid)÷2 + 1 # Should be a cell in the center
-        basecell = getcells(grid, cellnr)
-        RefShape = Ferrite.getrefshape(basecell)
-        for order in (1, 2)
-            for (IPT, transformation_function) in transformation_functions
-                dim == 3 && order > 1 && continue
-                IPT == RaviartThomas && (dim == 3 || order > 1) && continue
-                IPT == RaviartThomas && (RefShape == RefHexahedron) && continue
-                IPT == Ferrite.BrezziDouglasMarini && !(RefShape == RefTriangle && order == 1) && continue
-                ip = IPT{dim, RefShape, order}()
-                @testset "$CT, $ip" begin
-                    for testcell in cell_permutations(basecell)
-                        grid.cells[cellnr] = testcell
-                        dh = DofHandler(grid)
-                        add!(dh, :u, ip)
-                        close!(dh)
-                        for facetnr in 1:nfacets(RefShape)
-                            fi = FacetIndex(cellnr, facetnr)
-                            # Check continuity of tangential function value
-                            ITU.test_continuity(dh, fi; transformation_function)
+    # Required properties of shape value Nⱼ of an edge-elements (Hdiv) on an edge with normal n, length L, and dofs ∈ 𝔇
+    # 1) Unit property: ∫(Nⱼ ⋅ n f(s) dS) = 1 ∀ ∈ 𝔇
+    #    Where f(s) = 1 for single shape function on edge, and f(s)=1-s and f(s)=s for two shape functions on edge
+    #    s is the path parameter ∈[0,1] along the positive direction of the path.
+    # 2) Zero normal component on other edges: Nⱼ ⋅ n = 0 if j∉𝔇
+    @testset "H(div) on RefCell" begin
+        lineqr = QuadratureRule{RefLine}(20)
+        for ip in (
+                RaviartThomas{2, RefTriangle, 1}(),
+                RaviartThomas{2, RefTriangle, 2}(),
+                Ferrite.BrezziDouglasMarini{2, RefTriangle, 1}(),
+            )
+            cell = reference_cell(getrefshape(ip))
+            cell_facets = Ferrite.facets(cell)
+            dofs = Ferrite.facetdof_interior_indices(ip)
+            x = Ferrite.reference_coordinates(geometric_interpolation(typeof(cell)))
+            normals = reference_normals(geometric_interpolation(typeof(cell)))
+            @testset "$ip" begin
+                for (facet_nr, (i1, i2)) in enumerate(cell_facets)
+                    @testset "Facet $facet_nr" begin
+                        Δx = x[i2] - x[i1]
+                        x0 = (x[i1] + x[i2]) / 2
+                        L = norm(Δx)
+                        n = normals[facet_nr]
+                        for (idof, shape_nr) in enumerate(dofs[facet_nr])
+                            nfacetdofs = length(dofs[facet_nr])
+                            f(x) = nfacetdofs == 1 ? 1.0 : (idof == 1 ? 1 - x : x)
+                            s = line_integral(lineqr, ip, shape_nr, x0, Δx, L, n, f)
+                            @test s ≈ one(s)
                         end
-                        # Check gradient calculation
-                        ITU.test_gradient(dh, cellnr)
+                        for (j_facet, shape_nrs) in enumerate(dofs)
+                            j_facet == facet_nr && continue
+                            for shape_nr in shape_nrs
+                                for ξ in (x[i1] + r * Δx for r in [0.0, rand(3)..., 1.0])
+                                    @test abs(reference_shape_value(ip, ξ, shape_nr) ⋅ n) < eps() * 100
+                                end
+                            end
+                        end
                     end
                 end
             end
         end
     end
-end
+
+    tupleshift(t::NTuple{N}, shift::Int) where {N} = ntuple(i -> t[mod(i - 1 - shift, N) + 1], N)
+    #tupleshift(t::NTuple, shift::Int) = tuple(circshift(SVector(t), shift)...)
+    cell_permutations(cell::Quadrilateral) = (Quadrilateral(tupleshift(cell.nodes, shift)) for shift in 0:3)
+    cell_permutations(cell::Triangle) = (Triangle(tupleshift(cell.nodes, shift)) for shift in 0:2)
+    cell_permutations(cell::QuadraticTriangle) = (QuadraticTriangle((tupleshift(cell.nodes[1:3], shift)..., tupleshift(cell.nodes[4:6], shift)...)) for shift in 0:3)
+
+    function cell_permutations(cell::Hexahedron)
+        idx = ( #Logic on refshape: Select 1st and 2nd vertex (must be neighbours)
+            # The next follows to create inward vector with RHR, and then 4th is in same plane.
+            # The last four must be the neighbours on the other plane to the first four (same order)
+            (1, 2, 3, 4, 5, 6, 7, 8), (1, 4, 8, 5, 2, 3, 7, 6), (1, 5, 6, 2, 4, 8, 7, 3),
+            (2, 1, 5, 6, 3, 4, 8, 7), (2, 3, 4, 1, 6, 7, 8, 5), (2, 6, 7, 3, 1, 5, 8, 4),
+            (3, 2, 6, 7, 4, 1, 5, 8), (3, 4, 1, 2, 7, 8, 5, 6), (3, 7, 8, 4, 2, 6, 5, 1),
+            (4, 1, 2, 3, 8, 5, 6, 7), (4, 3, 7, 8, 1, 2, 6, 5), (4, 8, 5, 1, 3, 7, 6, 1),
+            (5, 1, 4, 8, 6, 2, 3, 7), (5, 6, 2, 1, 8, 7, 3, 4), (5, 8, 7, 6, 1, 4, 3, 2),
+            (6, 2, 1, 5, 7, 3, 4, 8), (6, 5, 8, 7, 2, 1, 4, 3), (6, 7, 3, 2, 5, 8, 4, 1),
+            (7, 3, 2, 6, 8, 4, 1, 5), (7, 6, 5, 8, 3, 2, 1, 4), (7, 8, 4, 3, 6, 5, 1, 2),
+            (8, 4, 3, 7, 5, 1, 2, 6), (8, 5, 1, 4, 7, 6, 2, 3), (8, 7, 6, 5, 4, 3, 2, 1),
+        )
+        return (Hexahedron(ntuple(i -> cell.nodes[perm[i]], 8)) for perm in idx)
+    end
+
+    function cell_permutations(cell::Tetrahedron)
+        idx = (
+            (1, 2, 3, 4), (1, 3, 4, 2), (1, 4, 2, 3),
+            (2, 1, 4, 3), (2, 3, 1, 4), (2, 4, 3, 1),
+            (3, 1, 2, 4), (3, 2, 4, 1), (3, 4, 1, 2),
+            (4, 1, 3, 2), (4, 3, 2, 1), (4, 2, 1, 3),
+        )
+        return (Tetrahedron(ntuple(i -> cell.nodes[perm[i]], 4)) for perm in idx)
+    end
+
+    @testset "Hcurl and Hdiv" begin
+        include(joinpath(@__DIR__, "InterpolationTestUtils.jl"))
+        import .InterpolationTestUtils as ITU
+        nel = 3
+        hdiv_check(v, n) = v ⋅ n        # Hdiv (normal continuity)
+        hcurl_check(v, n) = v - n * (v ⋅ n) # Hcurl (tangent continuity)
+        transformation_functions = ((Nedelec, hcurl_check), (RaviartThomas, hdiv_check), (Ferrite.BrezziDouglasMarini, hdiv_check))
+
+        for CT in (Triangle, QuadraticTriangle, Tetrahedron, Hexahedron)
+            dim = Ferrite.getrefdim(CT) # dim = sdim = rdim
+            p1, p2 = (rand(Vec{dim}), ones(Vec{dim}) + rand(Vec{dim}))
+            grid = generate_grid(CT, ntuple(_ -> nel, dim), p1, p2)
+            # Smoothly distort grid (to avoid spuriously badly deformed elements).
+            # A distorted grid is important to properly test the geometry mapping
+            # for 2nd order elements.
+            transfun(x) = typeof(x)(i -> sinpi(x[mod(i, length(x)) + 1] + i / 3)) / 10
+            transform_coordinates!(grid, x -> (x + transfun(x)))
+            cellnr = getncells(grid) ÷ 2 + 1 # Should be a cell in the center
+            basecell = getcells(grid, cellnr)
+            RefShape = Ferrite.getrefshape(basecell)
+            for order in (1, 2)
+                for (IPT, transformation_function) in transformation_functions
+                    dim == 3 && order > 1 && continue
+                    IPT == RaviartThomas && (dim == 3 || order > 1) && continue
+                    IPT == RaviartThomas && (RefShape == RefHexahedron) && continue
+                    IPT == Ferrite.BrezziDouglasMarini && !(RefShape == RefTriangle && order == 1) && continue
+                    ip = IPT{dim, RefShape, order}()
+                    @testset "$CT, $ip" begin
+                        for testcell in cell_permutations(basecell)
+                            grid.cells[cellnr] = testcell
+                            dh = DofHandler(grid)
+                            add!(dh, :u, ip)
+                            close!(dh)
+                            for facetnr in 1:nfacets(RefShape)
+                                fi = FacetIndex(cellnr, facetnr)
+                                # Check continuity of tangential function value
+                                ITU.test_continuity(dh, fi; transformation_function)
+                            end
+                            # Check gradient calculation
+                            ITU.test_gradient(dh, cellnr)
+                        end
+                    end
+                end
+            end
+        end
+    end
 
 
-@testset "Errors for entitydof_indices on VectorizedInterpolations" begin
-    ip = Lagrange{RefQuadrilateral, 2}()^2
-    @test_throws ArgumentError Ferrite.vertexdof_indices(ip)
-    @test_throws ArgumentError Ferrite.edgedof_indices(ip)
-    @test_throws ArgumentError Ferrite.facedof_indices(ip)
-    @test_throws ArgumentError Ferrite.facetdof_indices(ip)
+    @testset "Errors for entitydof_indices on VectorizedInterpolations" begin
+        ip = Lagrange{RefQuadrilateral, 2}()^2
+        @test_throws ArgumentError Ferrite.vertexdof_indices(ip)
+        @test_throws ArgumentError Ferrite.edgedof_indices(ip)
+        @test_throws ArgumentError Ferrite.facedof_indices(ip)
+        @test_throws ArgumentError Ferrite.facetdof_indices(ip)
 
-    @test_throws ArgumentError Ferrite.edgedof_interior_indices(ip)
-    @test_throws ArgumentError Ferrite.facedof_interior_indices(ip)
-    @test_throws ArgumentError Ferrite.volumedof_interior_indices(ip)
-    @test_throws ArgumentError Ferrite.facetdof_interior_indices(ip)
-end
+        @test_throws ArgumentError Ferrite.edgedof_interior_indices(ip)
+        @test_throws ArgumentError Ferrite.facedof_interior_indices(ip)
+        @test_throws ArgumentError Ferrite.volumedof_interior_indices(ip)
+        @test_throws ArgumentError Ferrite.facetdof_interior_indices(ip)
+    end
 
 
 end # testset

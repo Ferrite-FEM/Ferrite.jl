@@ -63,8 +63,8 @@ function create_grid(ny::Int)
     center_width = 5.0
     center_length = 20.0
     upper_right = Vec((length / 2, width / 2))
-    grid = generate_grid(Triangle, (round(Int, ny * length / width), ny), -upper_right, upper_right);
-    addcellset!(grid, "center", x -> abs(x[1]) < center_length/2 && abs(x[2]) <  center_width / 2)
+    grid = generate_grid(Triangle, (round(Int, ny * length / width), ny), -upper_right, upper_right)
+    addcellset!(grid, "center", x -> abs(x[1]) < center_length / 2 && abs(x[2]) < center_width / 2)
     addcellset!(grid, "around", setdiff(1:getncells(grid), getcellset(grid, "center")))
     return grid
 end
@@ -77,7 +77,7 @@ ip_geo = geometric_interpolation(getcelltype(grid))
 ipu = DiscontinuousLagrange{RefTriangle, 0}()
 ipq = Ferrite.BrezziDouglasMarini{2, RefTriangle, 1}()
 qr = QuadratureRule{RefTriangle}(2)
-cellvalues = (u=CellValues(qr, ipu, ip_geo), q=CellValues(qr, ipq, ip_geo))
+cellvalues = (u = CellValues(qr, ipu, ip_geo), q = CellValues(qr, ipq, ip_geo))
 
 # Distribute the degrees of freedom
 dh = DofHandler(grid)
@@ -103,7 +103,7 @@ function assemble_element!(Ke::Matrix, fe::Vector, cv::NamedTuple, dr::NamedTupl
         dΩ = getdetJdV(cvu, q_point)
         ## Loop over test shape functions
         for (iu, Iu) in pairs(dru)
-            δNu  = shape_value(cvu, q_point, iu)
+            δNu = shape_value(cvu, q_point, iu)
             ## Add contribution to fe
             fe[Iu] += δNu * h * dΩ
             ## Loop over trial shape functions
@@ -148,8 +148,9 @@ function assemble_global(cellvalues, dh::DofHandler)
     dofs = copy(celldofs(dh, 1))
     ## Loop over all cells
     for (cells, k) in (
-        (getcellset(grid, "center"), 0.1),
-        (getcellset(grid, "around"), 1.00))
+            (getcellset(grid, "center"), 0.1),
+            (getcellset(grid, "around"), 1.0),
+        )
         for cellnr in cells
             ## Reinitialize cellvalues for this cell
             cell = getcells(grid, cellnr)
@@ -205,13 +206,13 @@ function calculate_flux(dh, boundary_facets, ip, a)
         getcoordinates!(x, grid, cellnr)
         cell = getcells(grid, cellnr)
         celldofs!(dofs, dh, cellnr)
-        map!(i->a[i], ae, dofs)
+        map!(i -> a[i], ae, dofs)
         reinit!(fv, cell, x, facetnr)
         for q_point in 1:getnquadpoints(fv)
             dΓ = getdetJdV(fv, q_point)
             n = getnormal(fv, q_point)
             q = function_value(fv, q_point, ae, dofrange)
-            flux += (q ⋅ n)*dΓ
+            flux += (q ⋅ n) * dΓ
         end
     end
     return flux
