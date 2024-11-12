@@ -70,7 +70,7 @@ function CellCache(sdh::SubDofHandler{<:DofHandler{dim}}, flags::UpdateFlags = U
     return CellCache(flags, sdh.dh.grid, -1, nodes, coords, sdh.dh, celldofs)
 end
 
-function reinit!(cc::CellCache{<:Any, <:Grid{<:Any, AbstractCell}}, i::Int)
+function reinit!(cc::CellCache, i::Int)
     cc.cellid = i
     if cc.flags.nodes
         resize!(cc.nodes, nnodes_per_cell(cc.grid, i))
@@ -87,19 +87,6 @@ function reinit!(cc::CellCache{<:Any, <:Grid{<:Any, AbstractCell}}, i::Int)
     return cc
 end
 
-function reinit!(cc::CellCache, i::Int)
-    cc.cellid = i
-    if cc.flags.nodes
-        cellnodes!(cc.nodes, cc.grid, i)
-    end
-    if cc.flags.coords
-        getcoordinates!(cc.coords, cc.grid, i)
-    end
-    if cc.dh !== nothing && cc.flags.dofs
-        celldofs!(cc.dofs, cc.dh, i)
-    end
-    return cc
-end
 # reinit! FEValues with CellCache
 reinit!(cv::CellValues, cc::CellCache) = reinit!(cv, cc.coords)
 reinit!(fv::FacetValues, cc::CellCache, f::Int) = reinit!(fv, cc.coords, f)
