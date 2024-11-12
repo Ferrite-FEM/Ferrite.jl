@@ -309,7 +309,11 @@ end
 # 2) Zero normal component on other edges: Nⱼ ⋅ n = 0 if j∉𝔇
 @testset "H(div) on RefCell" begin
     lineqr = QuadratureRule{RefLine}(20)
-    for ip in (RaviartThomas{2, RefTriangle, 1}(), Ferrite.BrezziDouglasMarini{2, RefTriangle, 1}(), )
+    for ip in (
+            RaviartThomas{2, RefTriangle, 1}(),
+            RaviartThomas{2, RefTriangle, 2}(),
+            Ferrite.BrezziDouglasMarini{2, RefTriangle, 1}(),
+            )
         cell = reference_cell(getrefshape(ip))
         cell_facets = Ferrite.facets(cell)
         dofs = Ferrite.facetdof_interior_indices(ip)

@@ -1861,7 +1861,7 @@ end
 struct BrezziDouglasMarini{vdim, shape, order} <: VectorInterpolation{vdim, shape, order} end
 mapping_type(::BrezziDouglasMarini) = ContravariantPiolaMapping()
 reference_coordinates(ip::BrezziDouglasMarini{vdim}) where vdim = fill(NaN*zero(Vec{vdim}), getnbasefunctions(ip))
-dirichlet_facedof_indices(ip::BrezziDouglasMarini) = facetdof_interior_indices(ip)
+#dirichlet_facedof_indices(ip::BrezziDouglasMarini) = facetdof_interior_indices(ip)
 n_dbc_components(::BrezziDouglasMarini) = 1
 #=
 ----------------+--------------------
@@ -1886,11 +1886,11 @@ Edge numbers:   | Edge identifiers:
 function reference_shape_value(ip::BrezziDouglasMarini{2, RefTriangle, 1}, ξ::Vec{2}, i::Int)
     x, y = ξ
     # Edge 1
-    i == 1 && return Vec(4x, -2y) # Changed sign to make positive outwards
+    i == 1 && return Vec(4x, -2y) # Changed sign to integrated value positive outwards
     i == 2 && return Vec(-2x, 4y) # Changed sign to make positive outwards
     # Edge 2 (reverse order to follow Ferrite convention)
-    i == 3 && return Vec(-2x - 6y + 2, 4y)
-    i == 4 && return Vec(4x + 6y - 4, -2y)
+    i == 3 && return Vec(-2x - 6y + 2, 4y) # N ⋅ n = (6y - 2)
+    i == 4 && return Vec(4x + 6y - 4, -2y) # N ⋅ n = (4 - 6y)
     # Edge 3
     i == 5 && return Vec(-2x, 6x + 4y - 4) # Changed sign to make positive outwards
     i == 6 && return Vec(4x, -6x - 2y + 2) # Changed sign to make positive outwards
@@ -1899,7 +1899,7 @@ end
 
 getnbasefunctions(::BrezziDouglasMarini{2, RefTriangle, 1}) = 6
 edgedof_interior_indices(::BrezziDouglasMarini{2, RefTriangle, 1}) = ((1, 2), (3, 4), (5, 6))
-adjust_dofs_during_distribution(::BrezziDouglasMarini{2, RefTriangle, 1}) = false
+adjust_dofs_during_distribution(::BrezziDouglasMarini{2, RefTriangle, 1}) = true
 
 function get_direction(::BrezziDouglasMarini{2, RefTriangle, 1}, j, cell)
     edge = edges(cell)[(j + 1) ÷ 2]
