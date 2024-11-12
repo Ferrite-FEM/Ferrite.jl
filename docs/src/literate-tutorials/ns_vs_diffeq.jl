@@ -139,11 +139,13 @@ dim = 2;
 # We specify first the rectangle, the cylinder, the surface spanned by the cylinder
 # and the boolean difference of rectangle and cylinder.
 if !IS_CI                                                                                           #hide
-    rect_tag = gmsh.model.occ.add_rectangle(0, 0, 0, 1.1, 0.41)
-    circle_tag = gmsh.model.occ.add_circle(0.2, 0.2, 0, 0.05)
-    circle_curve_tag = gmsh.model.occ.add_curve_loop([circle_tag])
-    circle_surf_tag = gmsh.model.occ.add_plane_surface([circle_curve_tag])
-    gmsh.model.occ.cut([(dim, rect_tag)], [(dim, circle_surf_tag)])
+    # runic: off                                                                                    #src
+rect_tag = gmsh.model.occ.add_rectangle(0, 0, 0, 1.1, 0.41)
+circle_tag = gmsh.model.occ.add_circle(0.2, 0.2, 0, 0.05)
+circle_curve_tag = gmsh.model.occ.add_curve_loop([circle_tag])
+circle_surf_tag = gmsh.model.occ.add_plane_surface([circle_curve_tag])
+gmsh.model.occ.cut([(dim, rect_tag)], [(dim, circle_surf_tag)])
+    # runic: on                                                                                     #src
 else                                                                                                #hide
     rect_tag = gmsh.model.occ.add_rectangle(0, 0, 0, 0.55, 0.41)                                    #hide
 end                                                                                                 #hide
@@ -153,11 +155,13 @@ nothing                                                                         
 gmsh.model.occ.synchronize()
 # In the next lines, we add the physical groups needed to define boundary conditions.
 if !IS_CI                                                                                           #hide
-    bottomtag = gmsh.model.model.add_physical_group(dim - 1, [6], -1, "bottom")
-    lefttag = gmsh.model.model.add_physical_group(dim - 1, [7], -1, "left")
-    righttag = gmsh.model.model.add_physical_group(dim - 1, [8], -1, "right")
-    toptag = gmsh.model.model.add_physical_group(dim - 1, [9], -1, "top")
-    holetag = gmsh.model.model.add_physical_group(dim - 1, [5], -1, "hole")
+    # runic: off                                                                                    #src
+bottomtag = gmsh.model.model.add_physical_group(dim - 1, [6], -1, "bottom")
+lefttag = gmsh.model.model.add_physical_group(dim - 1, [7], -1, "left")
+righttag = gmsh.model.model.add_physical_group(dim - 1, [8], -1, "right")
+toptag = gmsh.model.model.add_physical_group(dim - 1, [9], -1, "top")
+holetag = gmsh.model.model.add_physical_group(dim - 1, [5], -1, "hole")
+    # runic: on                                                                                     #src
 else                                                                                                #hide
     gmsh.model.model.add_physical_group(dim - 1, [4], 7, "left")                                    #hide
     gmsh.model.model.add_physical_group(dim - 1, [3], 8, "top")                                     #hide
@@ -369,7 +373,7 @@ jac_sparsity = sparse(K);
 
 # To apply the nonlinear portion of the Navier-Stokes problem we simply hand
 # over the dof handler and cell values to the right-hand-side (RHS) as a parameter.
-# Furthermore the pre-assembled linear part, our Stokes opeartor (which is time independent)
+# Furthermore the pre-assembled linear part, our Stokes operator (which is time independent)
 # is passed to save some additional runtime. To apply the time-dependent Dirichlet BCs, we
 # also need to hand over the constraint handler.
 # The basic idea to apply the Dirichlet BCs consistently is that we copy the
