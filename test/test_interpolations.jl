@@ -266,7 +266,7 @@ function line_integral(qr::QuadratureRule{RefLine}, ip, shape_nr, x0, Δx, L, v,
 end
 
 # Required properties of shape value Nⱼ of an edge-elements (Hcurl) on an edge with direction v, length L, and dofs ∈ 𝔇
-# 1) Unit property: ∑_{j∈𝔇} ∫(Nⱼ ⋅ v f(s) dS) = 1
+# 1) Unit property: ∫(Nⱼ ⋅ v f(s) dS) = 1 ∀ ∈ 𝔇
 #    Where f(s) = 1 for linear interpolation and f(s)=1-s and f(s)=s for 2nd order interpolation (first and second shape function)
 #    And s is the path parameter ∈[0,1] along the positive direction of the path.
 # 2) Zero along other edges: Nⱼ ⋅ v = 0 if j∉𝔇
@@ -303,7 +303,7 @@ end
 end
 
 # Required properties of shape value Nⱼ of an edge-elements (Hdiv) on an edge with normal n, length L, and dofs ∈ 𝔇
-# 1) Unit property: ∫(Nⱼ ⋅ n f(s) dS) = 1
+# 1) Unit property: ∫(Nⱼ ⋅ n f(s) dS) = 1 ∀ ∈ 𝔇
 #    Where f(s) = 1 for single shape function on edge, and f(s)=1-s and f(s)=s for two shape functions on edge
 #    s is the path parameter ∈[0,1] along the positive direction of the path.
 # 2) Zero normal component on other edges: Nⱼ ⋅ n = 0 if j∉𝔇
