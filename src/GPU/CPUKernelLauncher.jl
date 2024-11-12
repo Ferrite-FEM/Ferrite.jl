@@ -1,8 +1,23 @@
-function init_kernel(::Type{BackendCPU}, n_cells::Ti, n_basefuncs::Ti, kernel::Function, args::Tuple) where {Ti <: Integer}
-    return LazyKernel(n_cells, n_basefuncs, kernel, args, BackendCPU)
+struct CPULazyKernel{Ti, BKD <: AbstractBackend} <: AbstractKernel
+    n_cells::Ti               # Number of cells
+    n_basefuncs::Ti           # Number of base functions
+    kernel::Function          # Kernel function to execute
+    args::Tuple               # Arguments for the kernel function
+    n_colors::Ti
+    dh::ColoringDofHandler
+    backend::Type{BKD} # GPU backend
 end
 
-function launch!(kernel::LazyKernel{Ti, BackendCPU}) where {Ti}
+(ker::CPULazyKernel)() = launch!(ker)
+
+
+function init_kernel(::Type{BackendCPU}, n_cells::Ti, n_basefuncs::Ti, kernel::Function, args::Tuple) where {Ti <: Integer}
+    args, color_dh = _to_colordh(args) # convert the dofhandler to color colordofhandler
+    no_colors = ncolors(color_dh)
+    return CPULazyKernel(n_cells, n_basefuncs, kernel, args, no_colors, color_dh, BackendCPU)
+end
+
+function launch!(kernel::CPULazyKernel{Ti, BackendCPU}) where {Ti}
     ker = kernel.kernel
     args = kernel.args
     ## Naive implementation to circumvent the issue with cellvalues
@@ -12,8 +27,8 @@ function launch!(kernel::LazyKernel{Ti, BackendCPU}) where {Ti}
     ## convert it to the static version
     cell_index = findfirst(x -> x isa CellValues, args)
     (cell_index === nothing) || (args = _update_cell_args(args, cell_index))
-    args, color_dh = _to_colordh(args) # convert the dofhandler to color dofhandler
-    no_colors = ncolors(color_dh)
+    color_dh = kernel.dh
+    no_colors = kernel.n_colors
     nthreads = Threads.nthreads()
     for i in 1:no_colors
         current_color!(color_dh, i)

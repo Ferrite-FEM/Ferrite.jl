@@ -6,10 +6,10 @@ using CUDA
 
 left = Tensor{1, 2, Float64}((0, -0)) # define the left bottom corner of the grid.
 
-right = Tensor{1, 2, Float64}((2.0, 1.0)) # define the right top corner of the grid.
+right = Tensor{1, 2, Float64}((100.0, 100.0)) # define the right top corner of the grid.
 
 
-grid = generate_grid(Quadrilateral, (2, 1), left, right)
+grid = generate_grid(Quadrilateral, (100, 100), left, right)
 
 
 ip = Lagrange{RefQuadrilateral, 1}() # define the interpolation function (i.e. Bilinear lagrange)
