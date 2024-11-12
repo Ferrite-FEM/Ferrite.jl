@@ -28,7 +28,7 @@
         _iterate(ii_grid)
         # Test for allocations
         @test (@allocated _iterate(ii_dh)) == 0
-        @test (@allocated _iterate(ii_dh_top)) == 144 # Why???
+        @test (@allocated _iterate(ii_dh_top)) == 0
         @test (@allocated _iterate(ii_grid)) == 0
         @test (@allocated _iterate(ii_grid_top)) == 0
     end

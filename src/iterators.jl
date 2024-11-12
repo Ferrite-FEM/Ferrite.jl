@@ -61,12 +61,16 @@ function CellCache(dh::DofHandler{dim}, flags::UpdateFlags = UpdateFlags()) wher
     return CellCache(flags, get_grid(dh), -1, nodes, coords, dh, celldofs)
 end
 
-function CellCache(sdh::SubDofHandler, flags::UpdateFlags = UpdateFlags())
-    Tv = get_coordinate_type(sdh.dh.grid)
-    return CellCache(flags, sdh.dh.grid, -1, Int[], Tv[], sdh, Int[])
+function CellCache(sdh::SubDofHandler{<:DofHandler{dim}}, flags::UpdateFlags = UpdateFlags()) where {dim}
+    n = ndofs_per_cell(sdh) # dofs and coords will be resized in `reinit!`
+    N = nnodes_per_cell(get_grid(sdh.dh), sdh.cellset[1])
+    nodes = zeros(Int, N)
+    coords = zeros(Vec{dim, get_coordinate_eltype(get_grid(sdh.dh))}, N)
+    celldofs = zeros(Int, n)
+    return CellCache(flags, sdh.dh.grid, -1, nodes, coords, sdh.dh, celldofs)
 end
 
-function reinit!(cc::CellCache, i::Int)
+function reinit!(cc::CellCache{<:Any, <:Grid{<:Any, AbstractCell}}, i::Int)
     cc.cellid = i
     if cc.flags.nodes
         resize!(cc.nodes, nnodes_per_cell(cc.grid, i))
@@ -83,6 +87,19 @@ function reinit!(cc::CellCache, i::Int)
     return cc
 end
 
+function reinit!(cc::CellCache, i::Int)
+    cc.cellid = i
+    if cc.flags.nodes
+        cellnodes!(cc.nodes, cc.grid, i)
+    end
+    if cc.flags.coords
+        getcoordinates!(cc.coords, cc.grid, i)
+    end
+    if cc.dh !== nothing && cc.flags.dofs
+        celldofs!(cc.dofs, cc.dh, i)
+    end
+    return cc
+end
 # reinit! FEValues with CellCache
 reinit!(cv::CellValues, cc::CellCache) = reinit!(cv, cc.coords)
 reinit!(fv::FacetValues, cc::CellCache, f::Int) = reinit!(fv, cc.coords, f)
@@ -173,7 +190,7 @@ end
 function InterfaceCache(gridordh::Union{AbstractGrid, AbstractDofHandler})
     fc_a = FacetCache(gridordh)
     fc_b = FacetCache(gridordh)
-    return InterfaceCache(fc_a, fc_b, Int[])
+    return InterfaceCache(fc_a, fc_b, zeros(Int, length(celldofs(fc_a)) + length(celldofs(fc_b))))
 end
 
 function InterfaceCache(sdh_here::SubDofHandler, sdh_there::SubDofHandler)
