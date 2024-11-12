@@ -34,13 +34,14 @@ mutable struct CPUKernelCellCache{G <: AbstractGrid, Ti <: Integer, X, Tv <: Rea
 end
 
 
-function CellCache(dh::AbstractDofHandler, grid::Grid{dim, C, T}, n_basefuncs::Ti, flags::UpdateFlags = UpdateFlags()) where {Ti <: Integer, dim, C, T}
-    ke = zeros(T, n_basefuncs, n_basefuncs)
-    fe = zeros(T, n_basefuncs)
+function CellCache(dh::DofHandler{dim}, n_basefuncs::Int, flags::UpdateFlags = UpdateFlags()) where {dim}
+    ke = zeros(Float64, n_basefuncs, n_basefuncs)
+    fe = zeros(Float64, n_basefuncs)
+    grid = dh |> get_grid
     N = nnodes_per_cell(grid, 1) # nodes and coords will be resized in `reinit!`
-    nodes = zeros(Ti, N)
-    coords = zeros(Vec{dim, T}, N)
-    return CPUKernelCellCache(flags, grid, dh, coords, Ti[], convert(Ti, -1), nodes, ke, fe)
+    nodes = zeros(Int, N)
+    coords = zeros(Vec{dim, Float64}, N)
+    return CPUKernelCellCache(flags, grid, dh, coords, Int[], -1, nodes, ke, fe)
 end
 
 # function _makecache(iterator::CPUKernelCellIterator, e::Ti) where {Ti <: Integer}
@@ -66,7 +67,6 @@ end
 #     # Return the GPUCellCache containing the cell's data.
 #     return CPUKernelCellCache(coords, dofs, cellid, nodes, iterator.ke, iterator.fe)
 # end
-
 
 function _reinit!(cc::CPUKernelCellCache, i::Ti) where {Ti <: Integer}
     cc.cellid = i
@@ -110,8 +110,6 @@ struct CPUKernelCellIterator{CC <: CPUKernelCellCache, DH <: ColoringDofHandler}
     cache::CC
     dh::DH
     n_cells::Int
-    # ke::Matrix{Tv} # 2d local stiffness matrix that is shared among the same thread
-    # fe::Vector{Tv} # 1d local force vector that is shared among the same thread
     thread_id::Int # thread id that the iterator is working on
 end
 
@@ -119,10 +117,7 @@ end
 function CellIterator(dh::ColoringDofHandler, n_basefuncs::Ti) where {Ti <: Integer}
     grid = dh |> dofhandler |> get_grid
     n_cells = grid |> getncells
-    # ## TODO: Float64 needs to be dependant of the eltype of the matrix
-    # ke = zeros(Float64, n_basefuncs, n_basefuncs)
-    # fe = zeros(Float64, n_basefuncs)
-    cache = CellCache(dh |> dofhandler, grid, n_basefuncs)
+    cache = CellCache(dh |> dofhandler, n_basefuncs)
     local_thread_id = Threads.threadid()
     return CPUKernelCellIterator(cache, dh, n_cells, local_thread_id)
 end
