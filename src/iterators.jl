@@ -323,9 +323,9 @@ for faceindex in facetset
     # ...
 end
 """
-struct FacetIterator{FC <: FacetCache}
+struct FacetIterator{FC <: FacetCache, SetType <: AbstractVecOrSet{FacetIndex}}
     fc::FC
-    set::OrderedSet{FacetIndex}
+    set::SetType
 end
 
 function FacetIterator(
@@ -337,6 +337,25 @@ function FacetIterator(
         _check_same_celltype(get_grid(gridordh), set)
     end
     return FacetIterator(FacetCache(gridordh, flags), set)
+end
+
+function FacetIterator(
+        gridordh::Union{<:AbstractGrid, <:DofHandler}, topology::ExclusiveTopology,
+        flags::UpdateFlags = UpdateFlags()
+    )
+    grid = gridordh isa DofHandler ? get_grid(gridordh) : gridordh
+    set = Set(create_boundaryfacetset(grid, topology, _ -> true))
+    return FacetIterator(gridordh, set, flags)
+end
+
+function FacetIterator(
+        sdh::SubDofHandler, topology::ExclusiveTopology,
+        flags::UpdateFlags = UpdateFlags()
+    )
+    grid = get_grid(sdh.dh)
+    set_unfiltered = create_boundaryfacetset(grid, topology, _ -> true)
+    set = Set(filter!(facet -> facet[1] ∈ sdh.cellset, set_unfiltered))
+    return FacetIterator(sdh, set, flags)
 end
 
 @inline _getcache(fi::FacetIterator) = fi.fc
