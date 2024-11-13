@@ -311,15 +311,12 @@ function _add!(ch::ConstraintHandler, dbc::Dirichlet, bcfacets::AbstractVecOrSet
 
     # loop over all the faces in the set and add the global dofs to `constrained_dofs`
     constrained_dofs = Int[]
-    for sdh in ch.dh.subdofhandlers
-        facets_sdh_ = filter(x -> x[1] ∈ sdh.cellset, bcfacets)
-        facets_sdh = OrderedSet{FacetIndex}(FacetIndex(x[1], x[2]) for x in facets_sdh_)
-        for cc in FacetIterator(sdh, facets_sdh, UpdateFlags(; nodes = false, coords = false, dofs = true))
-            facetidx = cc.current_facet_id
-            r = local_facet_dofs_offset[facetidx]:(local_facet_dofs_offset[facetidx + 1] - 1)
-            append!(constrained_dofs, cc.dofs[local_facet_dofs[r]]) # TODO: for-loop over r and simply push! to ch.prescribed_dofs
-            @debug println("adding dofs $(cc.dofs[local_facet_dofs[r]]) to dbc")
-        end
+    cc = CellCache(ch.dh, UpdateFlags(; nodes = false, coords = false, dofs = true))
+    for (cellidx, facetidx) in bcfacets
+        reinit!(cc, cellidx)
+        r = local_facet_dofs_offset[facetidx]:(local_facet_dofs_offset[facetidx + 1] - 1)
+        append!(constrained_dofs, cc.dofs[local_facet_dofs[r]]) # TODO: for-loop over r and simply push! to ch.prescribed_dofs
+        @debug println("adding dofs $(cc.dofs[local_facet_dofs[r]]) to dbc")
     end
 
     # save it to the ConstraintHandler
@@ -359,19 +356,16 @@ function _add!(ch::ConstraintHandler, dbc::Dirichlet, bcnodes::AbstractVecOrSet{
     interpol_points = getnbasefunctions(interpolation)
     node_dofs = zeros(Int, ncomps, nnodes)
     visited = falses(nnodes)
-    for sdh in ch.dh.subdofhandlers
-        for cell in CellIterator(sdh) # only go over cells that belong to current SubDofHandler
-            cellid(cell) ∈ cellset || continue
-            for idx in 1:min(interpol_points, length(cell.nodes))
-                node = cell.nodes[idx]
-                if !visited[node]
-                    noderange = (offset + (idx - 1) * field_dim + 1):(offset + idx * field_dim) # the dofs in this node
-                    for (i, c) in enumerate(dbc.components)
-                        node_dofs[i, node] = cell.dofs[noderange[c]]
-                        @debug println("adding dof $(cell.dofs[noderange[c]]) to node_dofs")
-                    end
-                    visited[node] = true
+    for cell in CellIterator(ch.dh, cellset) # only go over cells that belong to current SubDofHandler
+        for idx in 1:min(interpol_points, length(cell.nodes))
+            node = cell.nodes[idx]
+            if !visited[node]
+                noderange = (offset + (idx - 1) * field_dim + 1):(offset + idx * field_dim) # the dofs in this node
+                for (i, c) in enumerate(dbc.components)
+                    node_dofs[i, node] = cell.dofs[noderange[c]]
+                    @debug println("adding dof $(cell.dofs[noderange[c]]) to node_dofs")
                 end
+                visited[node] = true
             end
         end
     end
@@ -451,34 +445,32 @@ function _update!(
         dofmapping::Dict{Int, Int}, dofcoefficients::Vector{Union{Nothing, DofCoefficients{T}}}, time::Real
     ) where {T}
 
-    for sdh in dh.subdofhandlers
-        facets_sdh_ = filter(x -> x[1] ∈ sdh.cellset, boundary_entities)
-        facets_sdh = OrderedSet{FacetIndex}(FacetIndex(x[1], x[2]) for x in facets_sdh_)
-        for fc in FacetIterator(sdh, facets_sdh, UpdateFlags(; nodes = false, coords = true, dofs = true))
-            entityidx = fc.current_facet_id
-            cc = fc.cc
-            # no need to reinit!, enough to update current_entity since we only need geometric shape functions M
-            boundaryvalues.current_entity = entityidx
-            # local dof-range for this facet
-            r = local_facet_dofs_offset[entityidx]:(local_facet_dofs_offset[entityidx + 1] - 1)
-            counter = 1
-            for location in 1:getnquadpoints(boundaryvalues)
-                x = spatial_coordinate(boundaryvalues, location, cc.coords)
-                bc_value = f(x, time)
-                @assert length(bc_value) == length(components)
+    cc = CellCache(dh, UpdateFlags(; nodes = false, coords = true, dofs = true))
+    for (cellidx, entityidx) in boundary_entities
+        reinit!(cc, cellidx)
 
-                for i in 1:length(components)
-                    # find the global dof
-                    globaldof = cc.dofs[local_facet_dofs[r[counter]]]
-                    counter += 1
+        # no need to reinit!, enough to update current_entity since we only need geometric shape functions M
+        boundaryvalues.current_entity = entityidx
 
-                    dbc_index = dofmapping[globaldof]
-                    # Only DBC dofs are currently update!-able so don't modify inhomogeneities
-                    # for affine constraints
-                    if dofcoefficients[dbc_index] === nothing
-                        inhomogeneities[dbc_index] = bc_value[i]
-                        @debug println("prescribing value $(bc_value[i]) on global dof $(globaldof)")
-                    end
+        # local dof-range for this facet
+        r = local_facet_dofs_offset[entityidx]:(local_facet_dofs_offset[entityidx + 1] - 1)
+        counter = 1
+        for location in 1:getnquadpoints(boundaryvalues)
+            x = spatial_coordinate(boundaryvalues, location, cc.coords)
+            bc_value = f(x, time)
+            @assert length(bc_value) == length(components)
+
+            for i in 1:length(components)
+                # find the global dof
+                globaldof = cc.dofs[local_facet_dofs[r[counter]]]
+                counter += 1
+
+                dbc_index = dofmapping[globaldof]
+                # Only DBC dofs are currently update!-able so don't modify inhomogeneities
+                # for affine constraints
+                if dofcoefficients[dbc_index] === nothing
+                    inhomogeneities[dbc_index] = bc_value[i]
+                    @debug println("prescribing value $(bc_value[i]) on global dof $(globaldof)")
                 end
             end
         end
