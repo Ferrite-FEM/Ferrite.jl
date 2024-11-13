@@ -714,13 +714,19 @@ function test_celliterator_on_true_subdomain_smoketest()
 
     for cell in CellIterator(dh, [1, 2, 3])
     end
-
-    for cell in CellIterator(dh)
-        if cellid(cell) <= 3
-            @test length(celldofs(cell)) == getnbasefunctions(ip)
-        else
-            @test length(celldofs(cell)) == 0
-        end
+    # I smell smoke here
+    # for cell in CellIterator(dh)
+    #     if cellid(cell) <= 3
+    #         @test length(celldofs(cell)) == getnbasefunctions(ip)
+    #     else
+    #         @test length(celldofs(cell)) == 0
+    #     end
+    # end
+    for cell in CellIterator(sdh)
+        @test length(celldofs(cell)) == getnbasefunctions(ip)
+    end
+    for cell in CellIterator(grid)
+        @test length(celldofs(cell)) == 0
     end
     return
 end

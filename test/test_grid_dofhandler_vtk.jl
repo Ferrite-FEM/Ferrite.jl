@@ -253,7 +253,7 @@ end
     sdh1 = SubDofHandler(dh, Set([1])); add!(sdh1, :u, ip1)
     sdh2 = SubDofHandler(dh, Set([2])); add!(sdh2, :u, ip2)
     close!(dh)
-    ic = InterfaceCache(dh)
+    ic = InterfaceCache(sdh1, sdh2)
     reinit!(ic, InterfaceIndex(1, 2, 2, 3))
     @test interfacedofs(ic) == collect(1:7)
     # Unit test of some utilities
