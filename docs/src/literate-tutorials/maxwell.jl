@@ -87,5 +87,5 @@ ip = Nedelec{2, RefTriangle, 1}()
 
 A, B, dh = setup_and_assemble(ip)
 
-vals, vecs, info = geneigsolve((A, B), 1, EigSorter(x -> abs(x - 5.0)); maxiter = 1000);
+# vals, vecs, info = geneigsolve((A, B), 1, EigSorter(x -> abs(x - 5.0)); maxiter = 1000);
 # λ, ϕ = Arpack.eigs(A, B, nev = 2, sigma=5.5);
