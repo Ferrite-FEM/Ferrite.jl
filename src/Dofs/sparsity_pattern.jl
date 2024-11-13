@@ -610,7 +610,7 @@ function _add_interface_entries!(
     couplings = _coupling_to_local_dof_coupling(dh, interface_coupling)
     for (_i, sdh1) in enumerate(dh.subdofhandlers)
         for (_j, sdh2) in enumerate(dh.subdofhandlers)
-            for ic in InterfaceIterator(sdh1, sdh2, topology)
+            for ic in InterfaceIterator(sdh1, sdh2, topology, false)
                 # TODO: This looks like it can be optimized for the common case where
                 #       the cells are in the same subdofhandler
                 to_check = Dict{Int, Vector{Int}}()

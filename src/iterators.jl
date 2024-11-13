@@ -443,7 +443,9 @@ end
 function InterfaceIterator(
         sdh_here::SubDofHandler,
         sdh_there::SubDofHandler,
-        topology::ExclusiveTopology = ExclusiveTopology(get_grid(sdh_here.dh))
+        topology::ExclusiveTopology = ExclusiveTopology(get_grid(sdh_here.dh)),
+        # TODO: better name?
+        allow_all::Bool = true # allow interfaces that belong to the other cell according to the cell numbering to be iterated over as if they were "here" not "there"
     )
     grid = get_grid(sdh_here.dh)
     neighborhood = get_facet_facet_neighborhood(topology, grid)
@@ -454,7 +456,7 @@ function InterfaceIterator(
             neighbors = neighborhood[facet[1], facet[2]]
             isempty(neighbors) && continue
             neighbors[][1] ∈ sdh_there.cellset || continue
-        elseif facet[1] ∈ sdh_there.cellset
+        elseif allow_all && facet[1] ∈ sdh_there.cellset
             neighbors = neighborhood[facet[1], facet[2]]
             isempty(neighbors) && continue
             neighbors[][1] ∈ sdh_here.cellset || continue
@@ -471,7 +473,7 @@ function InterfaceIterator(
             isempty(neighbors) && continue
             neighbors[][1] ∈ sdh_there.cellset || continue
             push!(set, InterfaceIndex(facet[1], facet[2], neighborhood[facet[1], facet[2]][][1], neighborhood[facet[1], facet[2]][][2]))
-        elseif facet[1] ∈ sdh_there.cellset
+        elseif allow_all && facet[1] ∈ sdh_there.cellset
             neighbors = neighborhood[facet[1], facet[2]]
             isempty(neighbors) && continue
             neighbors[][1] ∈ sdh_here.cellset || continue
