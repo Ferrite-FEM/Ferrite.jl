@@ -288,9 +288,12 @@ function CellIterator(gridordh::Union{Grid, DofHandler}, flags::UpdateFlags)
     return CellIterator(gridordh, nothing, flags)
 end
 function CellIterator(sdh::SubDofHandler, flags::UpdateFlags = UpdateFlags())
-    return CellIterator(CellCache(sdh, flags), sdh.cellset)
+    return CellIterator(sdh, sdh.cellset, flags)
 end
 
+function CellIterator(sdh::SubDofHandler, set::IntegerCollection, flags::UpdateFlags = UpdateFlags())
+    return CellIterator(CellCache(sdh, flags), set)
+end
 @inline _getset(ci::CellIterator) = ci.set
 @inline _getcache(ci::CellIterator) = ci.cc
 

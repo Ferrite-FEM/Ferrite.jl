@@ -353,3 +353,11 @@ function function_value_from_physical_coord(interpolation::Interpolation, cell_c
     end
     return u
 end
+
+###############################################################################
+# Function to test for possible allocations/dynamic dispatch when iterating   #
+###############################################################################
+@check_allocs function testallocs_iterate(iterator)
+    for _ in iterator end
+    return nothing
+end
