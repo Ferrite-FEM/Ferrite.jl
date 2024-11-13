@@ -67,11 +67,11 @@ function CellCache(sdh::SubDofHandler{<:DofHandler{dim}}, flags::UpdateFlags = U
     nodes = zeros(Int, N)
     coords = zeros(Vec{dim, get_coordinate_eltype(get_grid(sdh.dh))}, N)
     celldofs = zeros(Int, n)
-    return CellCache(flags, sdh.dh.grid, -1, nodes, coords, sdh.dh, celldofs)
+    return CellCache(flags, sdh.dh.grid, -1, nodes, coords, sdh, celldofs)
 end
 
 # TODO: Find a better way to make AllocCheck.jl happy
-function reinit!(cc::CellCache{<:Any, <:Any, <:Nothing}, i::Int)
+function reinit!(cc::CellCache, i::Int)
     cc.cellid = i
     if cc.flags.nodes
         resize!(cc.nodes, nnodes_per_cell(cc.grid, i))
@@ -88,14 +88,16 @@ function reinit!(cc::CellCache{<:Any, <:Any, <:Nothing}, i::Int)
     return cc
 end
 
-function reinit!(cc::CellCache{<:Any, <:Any, <:AbstractDofHandler}, i::Int)
+function reinit!(cc::CellCache{<:Any, <:AbstractGrid, <:SubDofHandler{<:Any, CT}}, i::Int) where {CT}
     # If we have a DofHandler the cells must be of the same type -> no need to resize
     cc.cellid = i
     if cc.flags.nodes
-        cellnodes!(cc.nodes, cc.grid, i)
+        cell = getcells(cc.grid, i)::CT
+        _cellnodes!(cc.nodes, cell)
     end
     if cc.flags.coords
-        getcoordinates!(cc.coords, cc.grid, i)
+        cell = getcells(cc.grid, i)::CT
+        getcoordinates!(cc.coords, cc.grid, cell)
     end
     if cc.dh !== nothing && cc.flags.dofs
         celldofs!(cc.dofs, cc.dh, i)
