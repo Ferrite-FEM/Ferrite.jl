@@ -12,7 +12,7 @@ Access some grid representation for the dof handler.
 """
 get_grid(dh::AbstractDofHandler)
 
-mutable struct SubDofHandler{DH} <: AbstractDofHandler
+mutable struct SubDofHandler{DH, CT} <: AbstractDofHandler
     # From constructor
     const dh::DH
     const cellset::OrderedSet{Int}
@@ -68,7 +68,7 @@ function SubDofHandler(dh::DH, cellset::AbstractVecOrSet{Int}) where {DH <: Abst
         end
     end
     # Construct and insert into the parent dh
-    sdh = SubDofHandler{typeof(dh)}(dh, convert_to_orderedset(cellset), Symbol[], Interpolation[], Int[], -1)
+    sdh = SubDofHandler{typeof(dh), CT}(dh, convert_to_orderedset(cellset), Symbol[], Interpolation[], Int[], -1)
     push!(dh.subdofhandlers, sdh)
     return sdh
 end
