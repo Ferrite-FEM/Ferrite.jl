@@ -69,7 +69,7 @@ function create_grid(ny::Int)
     return grid
 end
 
-grid = create_grid(100)
+grid = create_grid(10)
 
 # ### Setup
 # We define one `CellValues` for each field which share the same quadrature rule.

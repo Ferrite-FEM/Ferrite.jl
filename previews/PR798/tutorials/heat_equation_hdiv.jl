@@ -12,7 +12,7 @@ function create_grid(ny::Int)
     return grid
 end
 
-grid = create_grid(100)
+grid = create_grid(10)
 
 ip_geo = geometric_interpolation(getcelltype(grid))
 ipu = DiscontinuousLagrange{RefTriangle, 0}()
