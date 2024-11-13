@@ -1,3 +1,11 @@
+###############################################################################
+# Function to test for possible allocations/dynamic dispatch when iterating   #
+###############################################################################
+@check_allocs function testallocs_iterate(iterator)
+    for _ in iterator end
+    return nothing
+end
+
 @testset "InterfaceValues" begin
     function test_interfacevalues(grid::Ferrite.AbstractGrid, iv::InterfaceValues; tol = 0)
         ip_here = Ferrite.function_interpolation(iv.here)
@@ -185,20 +193,22 @@
             test_interfacevalues(grid, iv; tol = 5 * eps(Float64))
         end
     end
-    # @testset "Mixed elements 2D grids" begin # TODO: this shouldn't work because it should change the FacetValues object
-    #     dim = 2
-    #     nodes = [Node((-1.0, 0.0)), Node((0.0, 0.0)), Node((1.0, 0.0)), Node((-1.0, 1.0)), Node((0.0, 1.0))]
-    #     cells = [
-    #                 Quadrilateral((1,2,5,4)),
-    #                 Triangle((3,5,2)),
-    #             ]
+    @testset "Mixed elements 2D grids" begin
+        dim = 2
+        nodes = [Node((-1.0, 0.0)), Node((0.0, 0.0)), Node((1.0, 0.0)), Node((-1.0, 1.0)), Node((0.0, 1.0))]
+        cells = [
+            Quadrilateral((1, 2, 5, 4)),
+            Triangle((3, 5, 2)),
+        ]
 
-    #     grid = Grid(cells, nodes)
-    #     topology = ExclusiveTopology(grid)
-    #     test_interfacevalues(grid,
-    #     DiscontinuousLagrange{RefQuadrilateral, 1}(), FacetQuadratureRule{RefQuadrilateral}(2),
-    #     DiscontinuousLagrange{RefTriangle, 1}(), FacetQuadratureRule{RefTriangle}(2))
-    # end
+        grid = Grid(cells, nodes)
+        topology = ExclusiveTopology(grid)
+        test_interfacevalues(
+            grid,
+            DiscontinuousLagrange{RefQuadrilateral, 1}(), FacetQuadratureRule{RefQuadrilateral}(2),
+            DiscontinuousLagrange{RefTriangle, 1}(), FacetQuadratureRule{RefTriangle}(2)
+        )
+    end
     @testset "Unordered nodes 3D" begin
         dim = 2
         nodes = [
