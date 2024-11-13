@@ -87,7 +87,7 @@ function _reinit!(cc::CPUKernelCellCache, i::Int)
     return cc
 end
 
-
+## Accessors ##
 getnodes(cc::CPUKernelCellCache) = cc.nodes
 
 
@@ -125,7 +125,8 @@ end
 
 ncells(iterator::CPUKernelCellIterator) = iterator.n_cells
 _cache(iterator::CPUKernelCellIterator) = iterator.cache
-using TimerOutputs
+
+
 function Base.iterate(iterator::CPUKernelCellIterator)
     i = iterator.thread_id
     curr_color = iterator.dh |> current_color # current color that's being processed
@@ -133,10 +134,7 @@ function Base.iterate(iterator::CPUKernelCellIterator)
     ncells = length(eles_color)
     i <= ncells || return nothing
     cache = _cache(iterator)
-    ## Benchmarking Code ##
-    thread_timer = get_timer("thread_$(Threads.threadid())")
-    @timeit thread_timer "cache! $(Threads.threadid())" _reinit!(cache, eles_color[i])
-    ## End Benchmarking ##
+    _reinit!(cache, eles_color[i])
     return (cache, i)
 end
 
@@ -149,9 +147,6 @@ function Base.iterate(iterator::CPUKernelCellIterator, state)
     ncells = length(eles_color)
     i <= ncells || return nothing
     cache = _cache(iterator)
-    ## Benchmarking Code ##
-    thread_timer = get_timer("thread_$(Threads.threadid())")
-    @timeit thread_timer "cache! $(Threads.threadid())" _reinit!(cache, eles_color[i])
-    ## End Benchmarking ##
+    _reinit!(cache, eles_color[i])
     return (cache, i)
 end

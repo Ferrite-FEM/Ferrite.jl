@@ -8,10 +8,8 @@ struct CPULazyKernel{Ti, BKD <: AbstractBackend} <: AbstractKernel
     backend::Type{BKD} # GPU backend
 end
 
-using TimerOutputs
-
 function init_kernel(::Type{BackendCPU}, n_cells::Ti, n_basefuncs::Ti, kernel::Function, args::Tuple) where {Ti <: Integer}
-    args, color_dh = @timeit "create colors" _to_colordh(args) # convert the dofhandler to color colordofhandler
+    args, color_dh = _to_colordh(args) # convert the dofhandler to color colordofhandler
     no_colors = ncolors(color_dh)
     return CPULazyKernel(n_cells, n_basefuncs, kernel, args, no_colors, color_dh, BackendCPU)
 end
@@ -32,12 +30,6 @@ function launch!(kernel::CPULazyKernel{Ti, BackendCPU}) where {Ti}
     for i in 1:no_colors
         current_color!(color_dh, i)
         Threads.@threads :static for j in 1:nthreads
-            ## Benchmark Code: to be removed ##
-            ## create local timer to measure the time of each thread
-            thread_timer = get_timer("thread_$(Threads.threadid())")
-            if (i == 1)
-                reset_timer!(thread_timer)
-            end
             ker(args...)
         end
     end

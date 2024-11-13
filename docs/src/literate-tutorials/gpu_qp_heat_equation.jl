@@ -127,11 +127,8 @@ function assemble_gpu!(Kgpu, fgpu, cv, dh)
     for cell in CellIterator(dh, convert(Int, n_basefuncs))
         Ke = cellke(cell)
         fe = cellfe(cell)
-        ## Benchmark Code: to be removed ##
-        thread_timer = get_timer("thread_$(Threads.threadid())")
-        @timeit thread_timer "assemble element $(Threads.threadid())" assemble_element!(Ke, fe, cv, cell)
-        @timeit thread_timer "global assembly $(Threads.threadid())" assemble!(assembler, celldofs(cell), Ke, fe)
-        ## End of Benchmark Code ##
+        assemble_element!(Ke, fe, cv, cell)
+        assemble!(assembler, celldofs(cell), Ke, fe)
     end
     return nothing
 end
@@ -171,25 +168,3 @@ norm(K)
 ## norm(Kgpu)
 Kstd, Fstd = stassy(cellvalues, dh);
 norm(Kstd)
-
-
-function cpu_benchmark()
-    reset_timer!()
-    Kstd, Fstd = @timeit "CPU sequential assembly" stassy(cellvalues, dh)
-    fill!(K, 0.0)
-    fill!(f, 0.0)
-    cpu_ker = @timeit "init CPU parallel assembly" init_kernel(BackendCPU, n_cells, n_basefuncs, assemble_gpu!, (K, f, cellvalues, dh))
-    return @timeit "CPU Parallel assembly w $(Threads.nthreads()) threads" cpu_ker()
-end
-cpu_benchmark()
-
-
-to = TimerOutputs.DEFAULT_TIMER;
-
-for t in 1:Threads.nthreads()
-    timer_name = "thread_$(t)"
-    thread_timer = get_timer(timer_name)
-    merge!(to, thread_timer, tree_point = ["CPU Parallel assembly w $(Threads.nthreads()) threads"])
-end
-
-print_timer(title = "CPU Multithreading w Biquadratic Lagrane Interpolation and 9 point quadrature rule")
