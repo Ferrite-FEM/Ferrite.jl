@@ -2,23 +2,24 @@ using Ferrite
 using StaticArrays
 using SparseArrays
 using CUDA
+using TimerOutputs
 
 
 left = Tensor{1, 2, Float64}((0, -0)) # define the left bottom corner of the grid.
 
-right = Tensor{1, 2, Float64}((100.0, 100.0)) # define the right top corner of the grid.
+right = Tensor{1, 2, Float64}((1000.0, 1000.0)) # define the right top corner of the grid.
 
 
-grid = generate_grid(Quadrilateral, (100, 100), left, right)
+grid = generate_grid(Quadrilateral, (1000, 1000), left, right)
 
 
-ip = Lagrange{RefQuadrilateral, 1}() # define the interpolation function (i.e. Bilinear lagrange)
+ip = Lagrange{RefQuadrilateral, 2}() # define the interpolation function (i.e. Bilinear lagrange)
 
 
-qr = QuadratureRule{RefQuadrilateral}(Float32, 2)
+qr = QuadratureRule{RefQuadrilateral}(Float64, 3)
 
 
-cellvalues = CellValues(Float32, qr, ip)
+cellvalues = CellValues(Float64, qr, ip)
 
 
 dh = DofHandler(grid)
@@ -126,8 +127,11 @@ function assemble_gpu!(Kgpu, fgpu, cv, dh)
     for cell in CellIterator(dh, convert(Int, n_basefuncs))
         Ke = cellke(cell)
         fe = cellfe(cell)
-        assemble_element!(Ke, fe, cv, cell)
-        assemble!(assembler, celldofs(cell), Ke, fe)
+        ## Benchmark Code: to be removed ##
+        thread_timer = get_timer("thread_$(Threads.threadid())")
+        @timeit thread_timer "assemble element $(Threads.threadid())" assemble_element!(Ke, fe, cv, cell)
+        @timeit thread_timer "global assembly $(Threads.threadid())" assemble!(assembler, celldofs(cell), Ke, fe)
+        ## End of Benchmark Code ##
     end
     return nothing
 end
@@ -167,3 +171,25 @@ norm(K)
 ## norm(Kgpu)
 Kstd, Fstd = stassy(cellvalues, dh);
 norm(Kstd)
+
+
+function cpu_benchmark()
+    reset_timer!()
+    Kstd, Fstd = @timeit "CPU sequential assembly" stassy(cellvalues, dh)
+    fill!(K, 0.0)
+    fill!(f, 0.0)
+    cpu_ker = @timeit "init CPU parallel assembly" init_kernel(BackendCPU, n_cells, n_basefuncs, assemble_gpu!, (K, f, cellvalues, dh))
+    return @timeit "CPU Parallel assembly w $(Threads.nthreads()) threads" cpu_ker()
+end
+cpu_benchmark()
+
+
+to = TimerOutputs.DEFAULT_TIMER;
+
+for t in 1:Threads.nthreads()
+    timer_name = "thread_$(t)"
+    thread_timer = get_timer(timer_name)
+    merge!(to, thread_timer, tree_point = ["CPU Parallel assembly w $(Threads.nthreads()) threads"])
+end
+
+print_timer(title = "CPU Multithreading w Biquadratic Lagrane Interpolation and 9 point quadrature rule")

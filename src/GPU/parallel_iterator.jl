@@ -21,14 +21,14 @@ end
 
 
 ##### CPUKernelCellCache #####
-mutable struct CPUKernelCellCache{G <: AbstractGrid, Ti <: Integer, X, Tv <: Real} <: AbstractKernelCellCache
+mutable struct CPUKernelCellCache{G <: AbstractGrid, X, Tv <: Real} <: AbstractKernelCellCache
     const flags::UpdateFlags
     const grid::G
     const dh::AbstractDofHandler
     const coords::Vector{X}
-    const dofs::Vector{Ti}
-    cellid::Ti
-    const nodes::Vector{Ti}
+    const dofs::Vector{Int}
+    cellid::Int
+    const nodes::Vector{Int}
     const ke::Matrix{Tv}
     const fe::Vector{Tv}
 end
@@ -68,7 +68,7 @@ end
 #     return CPUKernelCellCache(coords, dofs, cellid, nodes, iterator.ke, iterator.fe)
 # end
 
-function _reinit!(cc::CPUKernelCellCache, i::Ti) where {Ti <: Integer}
+function _reinit!(cc::CPUKernelCellCache, i::Int)
     cc.cellid = i
     fill!(cc.ke, zero(eltype(cc.ke)))
     fill!(cc.fe, zero(eltype(cc.fe)))
@@ -114,7 +114,7 @@ struct CPUKernelCellIterator{CC <: CPUKernelCellCache, DH <: ColoringDofHandler}
 end
 
 
-function CellIterator(dh::ColoringDofHandler, n_basefuncs::Ti) where {Ti <: Integer}
+function CellIterator(dh::ColoringDofHandler, n_basefuncs::Int)
     grid = dh |> dofhandler |> get_grid
     n_cells = grid |> getncells
     cache = CellCache(dh |> dofhandler, n_basefuncs)
@@ -125,7 +125,7 @@ end
 
 ncells(iterator::CPUKernelCellIterator) = iterator.n_cells
 _cache(iterator::CPUKernelCellIterator) = iterator.cache
-
+using TimerOutputs
 function Base.iterate(iterator::CPUKernelCellIterator)
     i = iterator.thread_id
     curr_color = iterator.dh |> current_color # current color that's being processed
@@ -133,7 +133,10 @@ function Base.iterate(iterator::CPUKernelCellIterator)
     ncells = length(eles_color)
     i <= ncells || return nothing
     cache = _cache(iterator)
-    _reinit!(cache, eles_color[i])
+    ## Benchmarking Code ##
+    thread_timer = get_timer("thread_$(Threads.threadid())")
+    @timeit thread_timer "cache! $(Threads.threadid())" _reinit!(cache, eles_color[i])
+    ## End Benchmarking ##
     return (cache, i)
 end
 
@@ -146,6 +149,9 @@ function Base.iterate(iterator::CPUKernelCellIterator, state)
     ncells = length(eles_color)
     i <= ncells || return nothing
     cache = _cache(iterator)
-    _reinit!(cache, eles_color[i])
+    ## Benchmarking Code ##
+    thread_timer = get_timer("thread_$(Threads.threadid())")
+    @timeit thread_timer "cache! $(Threads.threadid())" _reinit!(cache, eles_color[i])
+    ## End Benchmarking ##
     return (cache, i)
 end
