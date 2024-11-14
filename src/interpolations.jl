@@ -1793,6 +1793,7 @@ mapping_type(::VectorizedInterpolation) = IdentityMapping()
 struct RaviartThomas{vdim, shape, order} <: VectorInterpolation{vdim, shape, order} end
 mapping_type(::RaviartThomas) = ContravariantPiolaMapping()
 n_dbc_components(::RaviartThomas) = 1
+reference_coordinates(ip::RaviartThomas{vdim}) where {vdim} = fill(NaN * zero(Vec{vdim}), getnbasefunctions(ip))
 dirichlet_edgedof_indices(ip::RaviartThomas{2}) = edgedof_interior_indices(ip)
 dirichlet_facedof_indices(ip::RaviartThomas{3}) = facedof_interior_indices(ip)
 
@@ -1809,7 +1810,6 @@ end
 
 getnbasefunctions(::RaviartThomas{2, RefTriangle, 1}) = 3
 edgedof_interior_indices(::RaviartThomas{2, RefTriangle, 1}) = ((1,), (2,), (3,))
-
 adjust_dofs_during_distribution(::RaviartThomas) = false
 
 function get_direction(::RaviartThomas{2, RefTriangle, 1}, j, cell)
