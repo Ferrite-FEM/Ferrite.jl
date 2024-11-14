@@ -1,7 +1,6 @@
 using Ferrite: reference_shape_value, reference_shape_gradient
 
 @testset "interpolations" begin
-    #=
     @testset "Value Type $value_type" for value_type in (Float32, Float64)
         @testset "Correctness of $interpolation" for interpolation in (
                 Lagrange{RefLine, 1}(),
@@ -223,7 +222,6 @@ using Ferrite: reference_shape_value, reference_shape_gradient
         @test Ferrite.is_discontinuous(d_ip) == true
         @test Ferrite.is_discontinuous(d_ip_t) == true
     end
-    =#
     @testset "Correctness of AD of embedded interpolations" begin
         ip = Lagrange{RefHexahedron, 2}()^3
         ξ = rand(Vec{3, Float64})
