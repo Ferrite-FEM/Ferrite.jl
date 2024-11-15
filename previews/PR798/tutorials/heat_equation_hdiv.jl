@@ -23,7 +23,7 @@ cellvalues = (u = CellValues(qr, ipu, ip_geo), q = CellValues(qr, ipq, ip_geo))
 dh = DofHandler(grid)
 add!(dh, :u, ipu)
 add!(dh, :q, ipq)
-close!(dh);
+close!(dh)
 
 Γ = union((getfacetset(grid, name) for name in ("left", "right", "bottom", "top"))...)
 
@@ -104,7 +104,7 @@ function assemble_global(cellvalues, dh::DofHandler)
 end
 
 K, f = assemble_global(cellvalues, dh);
-u = K \ f;
+u = K \ f
 
 temperature_dof = first(dof_range(dh, :u))
 u_cells = map(1:getncells(grid)) do i
