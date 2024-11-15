@@ -18,10 +18,10 @@
 # such that
 # ```math
 # \begin{align*}
-# \boldsymbol{\nabla}\cdot \boldsymbol{q} &= h(\boldsymbol{x}), \quad \forall \boldsymbol{x} \in \Omega \\
-# \boldsymbol{q}(\boldsymbol{x}) &= - k\ \boldsymbol{\nabla} u(\boldsymbol{x}), \quad \forall \boldsymbol{x} \in \Omega \\
-# \boldsymbol{q}(\boldsymbol{x})\cdot \boldsymbol{n}(\boldsymbol{x}) &= q_n, \quad \forall \boldsymbol{x} \in \Gamma_\mathrm{N}\\
-# u(\boldsymbol{x}) &= u_\mathrm{D}, \quad \forall \boldsymbol{x} \in \Gamma_\mathrm{D}
+# \boldsymbol{\nabla}\cdot \boldsymbol{q} &= h(\boldsymbol{x}), \quad \text{in } \Omega \\
+# \boldsymbol{q}(\boldsymbol{x}) &= - k\ \boldsymbol{\nabla} u(\boldsymbol{x}), \quad \text{in } \Omega \\
+# \boldsymbol{q}(\boldsymbol{x})\cdot \boldsymbol{n}(\boldsymbol{x}) &= q_n, \quad \text{on } \Gamma_\mathrm{N}\\
+# u(\boldsymbol{x}) &= u_\mathrm{D}, \quad \text{on } \Gamma_\mathrm{D}
 # \end{align*}
 # ```
 #
@@ -30,9 +30,9 @@
 # ```math
 # \begin{align*}
 # \int_{\Omega} \delta u [\boldsymbol{\nabla} \cdot \boldsymbol{q}]\ \mathrm{d}\Omega &= \int_\Omega \delta u h\ \mathrm{d}\Omega, \quad \forall\ \delta u \in \delta\mathbb{U} \\
-# \int_{\Omega} \boldsymbol{\delta q} \cdot \boldsymbol{q}\ \mathrm{d}\Omega &= -\int_\Omega \boldsymbol{\delta q} \cdot [k\ \boldsymbol{\nabla} u]\ \mathrm{d}\Omega \\
+# % \int_{\Omega} \boldsymbol{\delta q} \cdot \boldsymbol{q}\ \mathrm{d}\Omega &= -\int_\Omega \boldsymbol{\delta q} \cdot [k\ \boldsymbol{\nabla} u]\ \mathrm{d}\Omega \\
 # \int_{\Omega} \boldsymbol{\delta q} \cdot \boldsymbol{q}\ \mathrm{d}\Omega - \int_{\Omega} [\boldsymbol{\nabla} \cdot \boldsymbol{\delta q}] k u \ \mathrm{d}\Omega &=
-# -\int_\Gamma \boldsymbol{\delta q} \cdot \boldsymbol{n} k\ u\ \mathrm{d}\Omega, \quad \forall\ \boldsymbol{\delta q} \in \delta\mathbb{Q}
+# -\int_\Gamma \boldsymbol{\delta q} \cdot \boldsymbol{n} k\ u\ \mathrm{d}\Gamma, \quad \forall\ \boldsymbol{\delta q} \in \delta\mathbb{Q}
 # \end{align*}
 # ```
 # where we have the function spaces,
@@ -46,8 +46,6 @@
 # A stable choice of finite element spaces for this problem on grid with triangles is using
 # * `DiscontinuousLagrange{RefTriangle, k-1}` for approximating $L^2$
 # * `BrezziDouglasMarini{RefTriangle, k}` for approximating $H(\mathrm{div})$
-#
-# We will also investigate the consequences of using $H^1$ `Lagrange` instead of $H(\mathrm{div})$ interpolations.
 #
 # ## Commented Program
 #
@@ -70,6 +68,7 @@ function create_grid(ny::Int)
 end
 
 grid = create_grid(10)
+#md nothing # hide
 
 # ### Setup
 # We define one `CellValues` for each field which share the same quadrature rule.
@@ -78,16 +77,19 @@ ipu = DiscontinuousLagrange{RefTriangle, 0}()
 ipq = Ferrite.BrezziDouglasMarini{2, RefTriangle, 1}()
 qr = QuadratureRule{RefTriangle}(2)
 cellvalues = (u = CellValues(qr, ipu, ip_geo), q = CellValues(qr, ipq, ip_geo))
+#md nothing # hide
 
 # Distribute the degrees of freedom
 dh = DofHandler(grid)
 add!(dh, :u, ipu)
 add!(dh, :q, ipq)
-close!(dh);
+close!(dh)
+#md nothing # hide
 
 # In this problem, we have a zero temperature on the boundary, Γ, which is enforced
 # via zero Neumann boundary conditions. Hence, we don't need a `Constrainthandler`.
 Γ = union((getfacetset(grid, name) for name in ("left", "right", "bottom", "top"))...)
+#md nothing # hide
 
 # ### Element implementation
 
@@ -131,7 +133,6 @@ end
 #md nothing # hide
 
 # ### Global assembly
-
 function assemble_global(cellvalues, dh::DofHandler)
     grid = dh.grid
     ## Allocate the element stiffness matrix and element force vector
@@ -173,7 +174,8 @@ end
 
 # ### Solution of the system
 K, f = assemble_global(cellvalues, dh);
-u = K \ f;
+u = K \ f
+#md nothing # hide
 
 # ### Exporting to VTK
 # Currently, exporting discontinuous interpolations is not supported.
@@ -186,6 +188,7 @@ end
 VTKGridFile("heat_equation_hdiv", dh) do vtk
     write_cell_data(vtk, u_cells, "temperature")
 end
+#md nothing # hide
 
 # ## Postprocess the total flux
 # We applied a constant unit heat source to the body, and the
@@ -219,6 +222,7 @@ function calculate_flux(dh, boundary_facets, ip, a)
 end
 
 println("Outward flux: ", calculate_flux(dh, Γ, ipq, u))
+#md nothing # hide
 
 # Note that this is not the case for the standard [Heat equation](@ref tutorial-heat-equation),
 # as the flux terms are less accurately approximated. A fine mesh is required to converge in that case.
