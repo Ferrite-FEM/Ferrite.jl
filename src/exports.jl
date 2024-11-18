@@ -201,4 +201,8 @@ export
     getweights,
     getbackend,
     BackendCUDA,
-    BackendCPU
+    BackendCPU,
+    LocalsGPUDofHandler,
+    dofhandler,
+    localfes,
+    localkes

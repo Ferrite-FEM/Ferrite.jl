@@ -30,18 +30,17 @@ function Ferrite.launch!(kernel::LazyKernel{Ti, BackendCUDA}) where {Ti}
     _can_use_dynshmem(shared_mem) && return kernel(args...; threads, blocks, shmem = shared_mem)
 
     ## otherwise use global memory
-    device = device()
-    warp_size = CUDA.attribute(device, CUDA.CU_DEVICE_ATTRIBUTE_WARP_SIZE)
-    nes = blocks * warp_size # Allocate only based on the number of active threads
-    kes = CUDA.zeros(Float32, nes * n_basefuncs * n_basefuncs)
-    fes = CUDA.zeros(Float32, nes * n_basefuncs)
+    nes = blocks * threads
+    kes = CUDA.zeros(Float32, nes, n_basefuncs, n_basefuncs)
+    fes = CUDA.zeros(Float32, nes, n_basefuncs)
     args = _to_localdh(args, kes, fes)
-    return kernel(args...; threads, blocks)
+    @cuda blocks = blocks threads = threads ker(args...)
+    return nothing
 end
 
 
 function _to_localdh(args::Tuple, kes::AbstractArray, fes::AbstractArray)
-    dh_index = findfirst(x -> x isa AbstractDofHandler, args)
+    dh_index = findfirst(x -> x isa Ferrite.AbstractDofHandler, args)
     dh_index !== nothing || throw(ErrorException("No subtype of AbstractDofHandler found in the arguments"))
     arr = args |> collect
     local_dh = LocalsGPUDofHandler(arr[dh_index], kes, fes)
@@ -54,9 +53,9 @@ function _calculate_shared_memory(threads::Integer, n_basefuncs::Integer)
 end
 
 
-function _can_use_dynshmem(required_shmem::Int32)
+function _can_use_dynshmem(required_shmem::Integer)
     dev = device()
-    MAX_DYN_SHMEM = CUDA.attribute(dev, CUDA.CU_DEVICE_ATTRIBUTE_MAX_SHARED_MEMORY_PER_BLOCK_OPTIN) #size of dynamic shared memory
+    MAX_DYN_SHMEM = CUDA.attribute(dev, CUDA.CU_DEVICE_ATTRIBUTE_MAX_SHARED_MEMORY_PER_BLOCK) #size of dynamic shared memory
     return required_shmem < MAX_DYN_SHMEM
 end
 

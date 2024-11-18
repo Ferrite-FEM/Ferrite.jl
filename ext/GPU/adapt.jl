@@ -70,6 +70,14 @@ function Adapt.adapt_structure(to, dh::DofHandler)
 end
 
 
+function Adapt.adapt_structure(to, dh::LocalsGPUDofHandler)
+    dh_ = Adapt.adapt_structure(to, dh |> dofhandler)
+    Kes = Adapt.adapt_structure(to, dh |> localkes)
+    fes = Adapt.adapt_structure(to, dh |> localfes)
+    return LocalsGPUDofHandler(dh_, Kes, fes)
+end
+
+
 function Adapt.adapt_structure(to, assembler::GPUAssemblerSparsityPattern)
     K = Adapt.adapt_structure(to, assembler.K)
     f = Adapt.adapt_structure(to, assembler.f)
