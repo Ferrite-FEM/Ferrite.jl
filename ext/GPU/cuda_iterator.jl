@@ -1,39 +1,70 @@
 ##### GPUCellIterator #####
 
+"""
+    AbstractCUDACellIterator <: Ferrite.AbstractKernelCellIterator
 
+Abstract type representing CUDA cell iterators for finite element computations
+on the GPU. It provides the base for implementing multiple cell iteration strategies (e.g. with shared memory, with global memory).
+"""
 abstract type AbstractCUDACellIterator <: Ferrite.AbstractKernelCellIterator end
 
 """
-    CUDACellIterator{DH<:Ferrite.AbstractGPUDofHandler,GRID<: Ferrite.AbstractGPUGrid,KDynamicSharedMem,FDynamicSharedMem}
+    ncells(iterator::AbstractCUDACellIterator)
 
-Create `CUDACellIterator` object for each thread with local id `thread_id` in order to iterate over some elements in the grid
-on the GPU and these elements are associated with the thread based on a stride = `blockDim().x * gridDim().x`.
-The elements of the iterator are `GPUCellCache` objects.
+Get the total number of cells the iterator will process.
+
+# Arguments
+- `iterator`: A subtype of `AbstractCUDACellIterator`.
+
+# Returns
+The number of cells as an `Int32`.
+"""
+ncells(iterator::AbstractCUDACellIterator) = iterator.n_cells ## any subtype has to have `n_cells` field
+
+
+"""
+    CUDACellIterator{DH, GRID, KDynamicSharedMem, FDynamicSharedMem}
+
+A CUDA-specific cell iterator used for iterating over elements of a finite element
+grid on the GPU. This iterator is designed to work with shared memory for local stiffness matrices and force vectors.
+
+# Type Parameters
+- `DH<:Ferrite.AbstractGPUDofHandler`: Degree-of-freedom handler for GPU data.
+- `GRID<:Ferrite.AbstractGPUGrid`: GPU-based grid structure.
+- `KDynamicSharedMem`: Dynamic shared memory type for stiffness matrices.
+- `FDynamicSharedMem`: Dynamic shared memory type for force vectors.
+
+# Fields
+- `dh`: The degree-of-freedom handler.
+- `grid`: The GPU grid being processed.
+- `n_cells`: Total number of cells in the grid.
+- `block_ke`: Block local stifness matrices (i.e. 3rd order tensor (e,i,j)).
+- `block_fe`: Block local force vectors (i.e. 2nd order tensor (e,i)).
+- `thread_id`: Local thread ID in the CUDA block.
 """
 struct CUDACellIterator{DH <: Ferrite.GPUDofHandler, GRID <: Ferrite.AbstractGPUGrid, KDynamicSharedMem, FDynamicSharedMem} <: AbstractCUDACellIterator
-    dh::DH # TODO: subdofhandlers are not supported yet.
+    dh::DH
     grid::GRID
     n_cells::Int32
-    block_ke::KDynamicSharedMem # dynamic shared memory for the block (3rd order tensor (e,i,j))
-    block_fe::FDynamicSharedMem # dynamic shared memory for the block (2nd order tensor (e,i))
-    thread_id::Int32 # local thread id (maps to the index of the element in block_ke and block_fe)
+    block_ke::KDynamicSharedMem
+    block_fe::FDynamicSharedMem
+    thread_id::Int32
 end
 
 """
-    Ferrite.CellIterator(dh::Ferrite.AbstractGPUDofHandler, n_basefuncs::Int32)
+    Ferrite.CellIterator(dh::Ferrite.GPUDofHandler, n_basefuncs::Int32)
 
-Create a `CUDACellIterator` object which is used to iterate over the cells of the grid on the GPU.
-This function also initializes the dynamic shared memory (`block_ke` and `block_fe`) to store the stiffness matrix and force vector
-per element for the base functions (`n_basefuncs`) being used.
-Arguments:
-- `dh`: The degree of freedom handler for the GPU.
-- `n_basefuncs`: Number of base functions (shape functions) for each element.
+Create a `CUDACellIterator` for iterating over grid cells on the GPU.
 
-Returns:
-- A `CUDACellIterator` object.
+# Arguments
+- `dh`: Degree-of-freedom handler for the GPU.
+- `n_basefuncs`: Number of shape functions per cell.
+
+# Returns
+A `CUDACellIterator` configured with dynamic shared memory for stiffness matrices
+and force vectors.
 """
 function Ferrite.CellIterator(dh::Ferrite.GPUDofHandler, n_basefuncs::Int32)
-    ## cell iterator that uses dynamic shared memory
     grid = get_grid(dh)
     n_cells = grid |> getncells |> Int32
     bd = blockDim().x
@@ -44,22 +75,8 @@ function Ferrite.CellIterator(dh::Ferrite.GPUDofHandler, n_basefuncs::Int32)
 end
 
 
-"""
-    ncells(iterator::AbstractCUDACellIterator)
-
-Return the total number of cells in the grid that the iterator is iterating over.
-
-Arguments:
-- `iterator`: The subtype of `AbstractCUDACellIterator` type.
-
-Returns:
-- The total number of cells as `Int32`.
-"""
-ncells(iterator::AbstractCUDACellIterator) = iterator.n_cells
-
-
 function Base.iterate(iterator::AbstractCUDACellIterator)
-    i = (blockIdx().x - Int32(1)) * blockDim().x + threadIdx().x # global thread id
+    i = (blockIdx().x - Int32(1)) * blockDim().x + threadIdx().x
     i <= iterator.n_cells || return nothing
     return (_makecache(iterator, i), i)
 end
@@ -67,25 +84,52 @@ end
 
 function Base.iterate(iterator::AbstractCUDACellIterator, state)
     stride = blockDim().x * gridDim().x
-    i = state + stride # next strided element id
+    i = state + stride
     i <= iterator.n_cells || return nothing
     return (_makecache(iterator, i), i)
 end
 
+"""
+    CUDAGlobalCellIterator{DH, GRID, MAT, VEC}
 
-## Cell iterator that uses global memory ##
+A CUDA-specific cell iterator that uses global memory instead of shared memory.
 
+# Type Parameters
+- `DH<:Ferrite.GPUDofHandler`: Degree-of-freedom handler.
+- `GRID<:Ferrite.AbstractGPUGrid`: GPU-based grid structure.
+- `MAT`: Type of the global memory for stiffness matrices.
+- `VEC`: Type of the global memory for force vectors.
+
+# Fields
+- `dh`: The degree-of-freedom handler.
+- `grid`: The GPU grid being processed.
+- `n_cells`: Total number of cells in the grid.
+- `ke`: Reference to global memory for cell stiffness matrix.
+- `fe`: Reference to global memory for cell force vector.
+- `thread_id`: Local thread ID in the CUDA block.
+"""
 struct CUDAGlobalCellIterator{DH <: Ferrite.GPUDofHandler, GRID <: Ferrite.AbstractGPUGrid, MAT, VEC} <: AbstractCUDACellIterator
-    dh::DH # TODO: subdofhandlers are not supported yet.
+    dh::DH
     grid::GRID
     n_cells::Int32
-    ke::MAT # reference to the global memory for the stiffness matrix
-    fe::VEC  # reference to the global memory for the force vector
-    thread_id::Int32 # local thread id
+    ke::MAT
+    fe::VEC
+    thread_id::Int32
 end
 
-function Ferrite.CellIterator(dh_::Ferrite.LocalsGPUDofHandler, n_basefuncs::Int32)
-    ## cell iterator that uses global memory
+"""
+    Ferrite.CellIterator(dh_::Ferrite.LocalsGPUDofHandler, ::Int32)
+
+Create a `CUDAGlobalCellIterator` for iterating over grid cells using global memory.
+
+# Arguments
+- `dh_`: A `LocalsGPUDofHandler` instance containing GPU-local degrees of freedom.
+- `::Int32`: Unused placeholder argument.
+
+# Returns
+A `CUDAGlobalCellIterator` configured for processing grid cells using global memory.
+"""
+function Ferrite.CellIterator(dh_::Ferrite.LocalsGPUDofHandler, ::Int32)
     dh = dh_ |> dofhandler
     grid = get_grid(dh)
     n_cells = grid |> getncells |> Int32
@@ -97,31 +141,29 @@ function Ferrite.CellIterator(dh_::Ferrite.LocalsGPUDofHandler, n_basefuncs::Int
     return CUDAGlobalCellIterator(dh, grid, n_cells, ke, fe, local_thread_id)
 end
 
-
-##### GPUCellCache #####
-
 """
-    GPUCellCache{DOFS,NN,NODES,COORDS,KDynamicSharedMem,FDynamicSharedMem}
+    GPUCellCache{DOFS, NN, NODES, COORDS, KDynamicSharedMem, FDynamicSharedMem}
 
-This structure holds the data needed for each finite element cell during GPU computations.
-It includes the coordinates of the cell's nodes, the degrees of freedom (DoFs), the cell ID,
-and views into dynamic shared memory for the stiffness matrix (`ke`) and force vector (`fe`).
+Structure to store data for a single finite element cell during GPU computations.
 
-Arguments:
-- `coords`: Coordinates of the nodes of the cell.
+# Fields
+- `coords`: Node coordinates of the cell.
 - `dofs`: Degrees of freedom associated with the cell.
-- `cellid`: ID of the current cell.
-- `nodes`: Node IDs of the cell (as a static vector for performance).
-- `ke`: View into shared memory for the cell's stiffness matrix.
-- `fe`: View into shared memory for the cell's force vector.
+- `cellid`: ID of the cell.
+- `nodes`: Node IDs as a static vector.
+- `ke`: View of shared memory for the stiffness matrix.
+- `fe`: View of shared memory for the force vector.
+
+# Returns
+A `GPUCellCache` object holding cell-specific data for computations.
 """
 struct GPUCellCache{DOFS <: AbstractVector{Int32}, NN, NODES <: SVector{NN, Int32}, X, COORDS <: SVector{X}, KDynamicSharedMem, FDynamicSharedMem} <: Ferrite.AbstractKernelCellCache
     coords::COORDS
     dofs::DOFS
     cellid::Int32
     nodes::NODES
-    ke::KDynamicSharedMem # view of the dynamic shared memory for the cell (i.e. element local stiffness matrix).
-    fe::FDynamicSharedMem # view of the dynamic shared memory for the cell (i.e. element local force vector).
+    ke::KDynamicSharedMem
+    fe::FDynamicSharedMem
 end
 
 
@@ -131,11 +173,13 @@ function _makecache(iterator::CUDACellIterator, e::Int32)
     return _makecache(iterator, e, ke_fun, fe_fun)
 end
 
+
 function _makecache(iterator::CUDAGlobalCellIterator, e::Int32)
     ke_fun = () -> iterator.ke
     fe_fun = () -> iterator.fe
     return _makecache(iterator, e, ke_fun, fe_fun)
 end
+
 
 function _makecache(iterator::AbstractCUDACellIterator, e::Int32, ke_func::Function, fe_func::Function)
     dh = iterator.dh
@@ -167,11 +211,11 @@ end
 
 Return the node IDs associated with the current cell in the cache.
 
-Arguments:
+# Arguments
 - `cc`: The `GPUCellCache` object.
 
-Returns:
-- The node IDs of the current cell.
+# Returns
+The node IDs of the current cell.
 """
 Ferrite.getnodes(cc::GPUCellCache) = cc.nodes
 
@@ -180,11 +224,11 @@ Ferrite.getnodes(cc::GPUCellCache) = cc.nodes
 
 Return the coordinates of the current cell's nodes.
 
-Arguments:
+# Arguments
 - `cc`: The `GPUCellCache` object.
 
-Returns:
-- The coordinates of the nodes of the current cell.
+# Returns
+The coordinates of the nodes of the current cell.
 """
 Ferrite.getcoordinates(cc::GPUCellCache) = cc.coords
 
@@ -193,11 +237,11 @@ Ferrite.getcoordinates(cc::GPUCellCache) = cc.coords
 
 Return the degrees of freedom (DoFs) for the current cell from the cache.
 
-Arguments:
+# Arguments
 - `cc`: The `GPUCellCache` object.
 
-Returns:
-- The degrees of freedom (DoFs) associated with the current cell.
+# Returns
+The degrees of freedom (DoFs) associated with the current cell.
 """
 Ferrite.celldofs(cc::GPUCellCache) = cc.dofs
 
@@ -206,11 +250,11 @@ Ferrite.celldofs(cc::GPUCellCache) = cc.dofs
 
 Return the ID of the current cell stored in the cache.
 
-Arguments:
+# Arguments
 - `cc`: The `GPUCellCache` object.
 
-Returns:
-- The ID of the current cell.
+# Returns
+The ID of the current cell.
 """
 Ferrite.cellid(cc::GPUCellCache) = cc.cellid
 
@@ -219,11 +263,11 @@ Ferrite.cellid(cc::GPUCellCache) = cc.cellid
 
 Access the stiffness matrix (`ke`) of the current cell from shared memory and reset it to zero.
 
-Arguments:
+# Arguments
 - `cc`: The `GPUCellCache` object.
 
-Returns:
-- The stiffness matrix filled with zeros.
+# Returns
+The stiffness matrix filled with zeros.
 """
 @inline function Ferrite.cellke(cc::GPUCellCache)
     ke = cc.ke
@@ -235,11 +279,11 @@ end
 
 Access the force vector (`fe`) of the current cell from shared memory and reset it to zero.
 
-Arguments:
+# Arguments
 - `cc`: The `GPUCellCache` object.
 
-Returns:
-- The force vector filled with zeros.
+# Returns
+The force vector filled with zeros.
 """
 @inline function Ferrite.cellfe(cc::GPUCellCache)
     fe = cc.fe
