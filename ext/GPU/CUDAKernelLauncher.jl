@@ -25,36 +25,41 @@ function Ferrite.launch!(kernel::LazyKernel{Ti, BackendCUDA}) where {Ti}
     threads = convert(Ti, min(n_cells, config.threads, 256))
     shared_mem = _calculate_shared_memory(threads, n_basefuncs)
     blocks = _calculate_nblocks(threads, n_cells)
-    return kernel(args...; threads, blocks, shmem = shared_mem)
+
+    ## use dynamic shared memory if possible
+    _can_use_dynshmem(shared_mem) && return kernel(args...; threads, blocks, shmem = shared_mem)
+
+    ## otherwise use global memory
+    device = device()
+    warp_size = CUDA.attribute(device, CUDA.CU_DEVICE_ATTRIBUTE_WARP_SIZE)
+    nes = blocks * warp_size # Allocate only based on the number of active threads
+    kes = CUDA.zeros(Float32, nes * n_basefuncs * n_basefuncs)
+    fes = CUDA.zeros(Float32, nes * n_basefuncs)
+    args = _to_localdh(args, kes, fes)
+    return kernel(args...; threads, blocks)
 end
 
+
+function _to_localdh(args::Tuple, kes::AbstractArray, fes::AbstractArray)
+    dh_index = findfirst(x -> x isa AbstractDofHandler, args)
+    dh_index !== nothing || throw(ErrorException("No subtype of AbstractDofHandler found in the arguments"))
+    arr = args |> collect
+    local_dh = LocalsGPUDofHandler(arr[dh_index], kes, fes)
+    arr[dh_index] = local_dh
+    return Tuple(arr)
+end
 
 function _calculate_shared_memory(threads::Integer, n_basefuncs::Integer)
     return sizeof(Float32) * (threads) * (n_basefuncs) * n_basefuncs + sizeof(Float32) * (threads) * n_basefuncs
 end
 
 
-# function optimize_nthreads_for_dynshmem(max_threads::Int32, n_basefuncs::Int32)
-#     dev = device()
-#     MAX_DYN_SHMEM = CUDA.attribute(dev, CUDA.CU_DEVICE_ATTRIBUTE_MAX_SHARED_MEMORY_PER_BLOCK_OPTIN) #size of dynamic shared memory
-#     shmem_needed = sizeof(Float32) * (max_threads) * ( n_basefuncs) * n_basefuncs + sizeof(Float32) * (max_threads) * n_basefuncs
-#     if(shmem_needed < MAX_DYN_SHMEM)
-#         return max_threads, shmem_needed
-#     else
-#         # solve for threads
-#         max_possible = Int32(MAX_DYN_SHMEM ÷ (sizeof(Float32) * ( n_basefuncs) * n_basefuncs + sizeof(Float32) * n_basefuncs))
-#         warp_size = CUDA.attribute(dev, CUDA.CU_DEVICE_ATTRIBUTE_WARP_SIZE)
-#         # approximate the number of threads to be a multiple of warp size (mostly 32)
-#         nearest_no_warps = max_possible ÷ warp_size
-#         if(nearest_no_warps < 4)
-#             throw(ArgumentError("Bad implementation (less than 4 warps per block, wasted resources)"))
-#         else
-#             possiple_threads = nearest_no_warps * warp_size
-#             shmem_needed = sizeof(Float32) * (possiple_threads) * ( n_basefuncs) * n_basefuncs + sizeof(Float32) * (possiple_threads) * n_basefuncs
-#             return possiple_threads, shmem_needed
-#         end
-#     end
-# end
+function _can_use_dynshmem(required_shmem::Int32)
+    dev = device()
+    MAX_DYN_SHMEM = CUDA.attribute(dev, CUDA.CU_DEVICE_ATTRIBUTE_MAX_SHARED_MEMORY_PER_BLOCK_OPTIN) #size of dynamic shared memory
+    return required_shmem < MAX_DYN_SHMEM
+end
+
 
 """
     _calculate_nblocks(threads::Int, n_cells::Int)

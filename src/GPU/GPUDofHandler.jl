@@ -10,9 +10,9 @@ struct GPUDofHandler{CDOFS <: AbstractArray{<:Number, 1}, VEC_INT <: AbstractArr
     ndofs_cell::VEC_INT
 end
 
-@inline ndofs_per_cell(dh::GPUDofHandler, i::Int32) = dh.ndofs_cell[i]
-@inline cell_dof_offset(dh::GPUDofHandler, i::Int32) = dh.cell_dofs_offset[i]
-@inline get_grid(dh::GPUDofHandler) = dh.grid
+ndofs_per_cell(dh::GPUDofHandler, i::Int32) = dh.ndofs_cell[i]
+cell_dof_offset(dh::GPUDofHandler, i::Int32) = dh.cell_dofs_offset[i]
+get_grid(dh::GPUDofHandler) = dh.grid
 
 """
     celldofs(dh::GPUDofHandler, i::Int32)
@@ -25,3 +25,15 @@ function celldofs(dh::GPUDofHandler, i::Int32)
     view = @view dh.cell_dofs[offset:(offset + ndofs - Int32(1))]
     return view
 end
+
+
+struct LocalsGPUDofHandler{DH <: AbstractDofHandler, LOCAL_MATRICES, LOCAL_VECTORS} <: AbstractGPUDofHandler
+    dh::DH
+    Kes::LOCAL_MATRICES # local stiffness matrices for each running cell (3rd order tensor (e,i,j))
+    fes::LOCAL_VECTORS # local force vectors for each running cell (2nd order tensor (e,i))
+end
+
+## Accessors ##
+dofhandler(dh::LocalsGPUDofHandler) = dh.dh
+cellke(dh::LocalsGPUDofHandler, e::Int32) = @view dh.Kes[e, :, :]
+cellfe(dh::LocalsGPUDofHandler, e::Int32) = @view dh.fes[e, :]

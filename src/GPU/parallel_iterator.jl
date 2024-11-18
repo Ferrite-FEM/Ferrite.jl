@@ -44,6 +44,7 @@ function CellCache(dh::DofHandler{dim}, n_basefuncs::Int, flags::UpdateFlags = U
     return CPUKernelCellCache(flags, grid, dh, coords, Int[], -1, nodes, ke, fe)
 end
 
+## TODO: to be removed (kept for reference)
 # function _makecache(iterator::CPUKernelCellIterator, e::Ti) where {Ti <: Integer}
 #     dh = iterator.dh |> dofhandler
 #     grid = iterator.grid
