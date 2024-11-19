@@ -143,8 +143,8 @@ f = zeros(ndofs(dh));
 
 # Allocate GPU matrix
 ## commented to pass the test
-Kgpu = CUSPARSE.CuSparseMatrixCSC(K);
-fgpu = CUDA.zeros(ndofs(dh));
+## Kgpu = CUSPARSE.CuSparseMatrixCSC(K);
+## fgpu = CUDA.zeros(ndofs(dh));
 
 n_cells = dh |> get_grid |> getncells
 
@@ -152,10 +152,10 @@ n_cells = dh |> get_grid |> getncells
 ## GPU kernel ##
 ## commented to pass the test
 ## First init the kernel with the required config.
-gpu_kernel = init_kernel(BackendCUDA, n_cells, n_basefuncs, assemble_gpu!, (Kgpu, fgpu, cellvalues, dh))
+## gpu_kernel = init_kernel(BackendCUDA, n_cells, n_basefuncs, assemble_gpu!, (Kgpu, fgpu, cellvalues, dh))
 ## Then launch the kernel
 ## gpu_kernel |> launch! or gpu_kernel()
-gpu_kernel()
+## gpu_kernel()
 
 ## CPU kernel ##
 ## cpu_kernel = init_kernel(BackendCPU, n_cells, n_basefuncs, assemble_gpu!, (K, f, cellvalues, dh));
@@ -171,5 +171,12 @@ norm(Kstd)
 
 
 ## GPU Benchmarking, remove when not needed ##
-## CUDA.@time gpu_kernel()
-## CUDA.@profile trace = true gpu_kernel()
+## function bench_gpu(n_cells, n_basefuncs, cellvalues, dh)
+##     Kgpu = CUSPARSE.CuSparseMatrixCSC(K);
+##     fgpu = CUDA.zeros(ndofs(dh));
+##     gpu_kernel = init_kernel(BackendCUDA, n_cells, n_basefuncs, assemble_gpu!, (Kgpu, fgpu, cellvalues, dh))
+##     gpu_kernel()
+## end
+
+## CUDA.@time bench_gpu(n_cells, n_basefuncs, cellvalues, dh)
+## CUDA.@profile trace = true bench_gpu(n_cells, n_basefuncs, cellvalues, dh)
