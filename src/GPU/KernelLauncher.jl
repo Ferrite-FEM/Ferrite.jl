@@ -39,13 +39,13 @@ Launches a GPU kernel using the specified backend. This interface provides a gen
 mechanism for running GPU-accelerated computations across different GPU backends.
 
 # Arguments
-- `kernel::AbstractGPUKernel`: The GPU kernel to be launched.
+- `::AbstractGPUKernel`: The GPU kernel to be launched.
 
 # Notes
 This function must be implemented for specific GPU kernels. If not implemented,
 an error will be thrown.
 """
-function launch!(kernel::AbstractKernel)
+function launch!(::AbstractKernel)
     throw(ErrorException("A concrete implementation of launch! is required"))
 end
 
@@ -94,12 +94,5 @@ getbackend(kernel::LazyKernel) = kernel.backend
 
 
 ### GPU Backend ###
-
-"""
-    BackendCUDA <: AbstractGPUBackend
-
-Represents the CUDA backend for GPU acceleration. This type serves as a concrete
-implementation of `AbstractGPUBackend` for executing GPU computations using CUDA.
-"""
 struct BackendCUDA <: AbstractBackend end
 struct BackendCPU <: AbstractBackend end

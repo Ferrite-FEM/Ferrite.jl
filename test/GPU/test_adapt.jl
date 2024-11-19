@@ -44,7 +44,7 @@ function nodes_gpu_kernel(nodes, dh, cv)
 end
 
 @testset "Adapt" begin
-    dh, cv = generate_problem()
+    dh, cv = generate_Bilinear_problem()
     cpudofs = dofs_cpu(dh, cv) |> cu
     ncells = dh |> get_grid |> getncells
     nbasefunctions = cv |> getnbasefunctions

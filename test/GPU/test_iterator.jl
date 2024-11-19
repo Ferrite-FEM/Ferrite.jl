@@ -91,10 +91,10 @@ function get_cpu_kefe(dh, cellvalues)
     return kes |> cu, fes |> cu
 end
 
-@testset "Test iterators" begin
-    dh, cellvalues = generate_problem()
+@testset "Test shared memory iterators" begin
+    dh, cellvalues = generate_Bilinear_problem()
     n_basefuncs = getnbasefunctions(cellvalues)
-    # 1. Test that dofs for each cell in the grid are correctly computed
+    # 1 Test that dofs for each cell in the grid are correctly computed
     ncells = dh |> get_grid |> getncells
     dofs = CUDA.fill(Int32(0), n_basefuncs, ncells)
     correct_dofs = getalldofs(dh)
@@ -107,5 +107,25 @@ end
     init_kernel(BackendCUDA, ncells, n_basefuncs, localkefe_kernel!, (kes_gpu, fes_gpu, cellvalues, dh)) |> launch!
     kes_cpu, fes_cpu = get_cpu_kefe(dh, cellvalues)
     @test all(abs.(kes_gpu .- kes_cpu) .< 1.0e-3) #TODO: This needs further investigation
+    @test all(fes_gpu .≈ fes_cpu)
+end
+
+
+@testset "Test global memory iterators" begin
+    dh, cellvalues = generate_Biquadratic_problem()
+    n_basefuncs = getnbasefunctions(cellvalues)
+    # 1 Test that dofs for each cell in the grid are correctly computed
+    ncells = dh |> get_grid |> getncells
+    dofs = CUDA.fill(Int32(0), n_basefuncs, ncells)
+    correct_dofs = getalldofs(dh)
+    init_kernel(BackendCUDA, ncells, n_basefuncs, dof_kernel_kernel!, (dofs, dh, n_basefuncs)) |> launch!
+    @test all(dofs .≈ correct_dofs)
+
+    # 2. Test that local ke and fe are correctly computed
+    kes_gpu = CUDA.fill(0.0f0, ncells, n_basefuncs, n_basefuncs)
+    fes_gpu = CUDA.fill(0.0f0, ncells, n_basefuncs)
+    init_kernel(BackendCUDA, ncells, n_basefuncs, localkefe_kernel!, (kes_gpu, fes_gpu, cellvalues, dh)) |> launch!
+    kes_cpu, fes_cpu = get_cpu_kefe(dh, cellvalues)
+    @test all(abs.(kes_gpu .- kes_cpu) .< 1.0e-1) #TODO: This needs further investigation
     @test all(fes_gpu .≈ fes_cpu)
 end
