@@ -8,7 +8,7 @@ Abstract type representing degree-of-freedom (DoF) handlers for GPU-based
 finite element computations. This serves as the base type for GPU-specific
 DoF handler implementations.
 """
-abstract type AbstractGPUDofHandler <: Ferrite.AbstractDofHandler end
+abstract type AbstractGPUDofHandler <: AbstractDofHandler end
 
 
 struct GPUDofHandler{CDOFS <: AbstractArray{<:Number, 1}, VEC_INT <: AbstractArray{Int32, 1}, GRID <: AbstractGrid} <: AbstractGPUDofHandler
