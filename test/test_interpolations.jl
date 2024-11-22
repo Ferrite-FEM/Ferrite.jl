@@ -255,18 +255,25 @@ using Ferrite: reference_shape_value, reference_shape_gradient
     reference_cell(::Type{RefHexahedron}) = Hexahedron((ntuple(identity, 8)))
 
     function line_integral(qr::QuadratureRule{RefLine}, ip, shape_nr, x0, Δx, L, v, f)
-        s = 0.0
+        val = 0.0
         for (ξ1d, w) in zip(Ferrite.getpoints(qr), Ferrite.getweights(qr))
-            ξ = x0 + (ξ1d[1] / 2) * Δx
-            s += (reference_shape_value(ip, ξ, shape_nr) ⋅ v) * (w * L / 2) * f((ξ1d[1] + 1) / 2)
+            ξ = x0 + (ξ1d[1] / 2) * Δx  # ::Vec
+            s = (ξ1d[1] + 1) / 2        # ∈ [0, 1]
+            Nξ = reference_shape_value(ip, ξ, shape_nr)
+            dΩ = (w * L / 2)
+            val += (Nξ ⋅ v) * f(s) * dΩ
         end
-        return s
+        return val
     end
 
     # Required properties of shape value Nⱼ of an edge-elements (Hcurl) on an edge with direction v, length L, and dofs ∈ 𝔇
-    # 1) Unit property: ∫(Nⱼ ⋅ v f(s) dS) = 1 ∀ ∈ 𝔇
-    #    Where f(s) = 1 for linear interpolation and f(s)=1-s and f(s)=s for 2nd order interpolation (first and second shape function)
-    #    And s is the path parameter ∈[0,1] along the positive direction of the path.
+    # 1) Unit property: ∫(Nⱼ ⋅ v f(s) dS) = 1/length(𝔇) ∀ ∈ 𝔇
+    #    Must hold for
+    #    length(𝔇) ≥ 1: f(s) = 1
+    #    length(𝔇) = 2: f(s) = 1 - s or f(s) = s for 1st and 2nd dof, respectively.
+    #    Additionally, should be zero for
+    #    length(𝔇) = 2: f(s) = s or f(s) = 1 - s for 1st and 2nd dof, respectively.
+    #    s is the path parameter ∈[0,1] along the positive direction of the path.
     # 2) Zero along other edges: Nⱼ ⋅ v = 0 if j∉𝔇
     @testset "H(curl) on RefCell" begin
         lineqr = QuadratureRule{RefLine}(20)
@@ -285,7 +292,11 @@ using Ferrite: reference_shape_value, reference_shape_gradient
                         nedgedofs = length(dofs[edge_nr])
                         f(x) = nedgedofs == 1 ? 1.0 : (idof == 1 ? 1 - x : x)
                         s = line_integral(lineqr, ip, shape_nr, x0, Δx, L, v, f)
-                        @test s ≈ one(s)
+                        @test s ≈ one(s) / nedgedofs
+                        if nedgedofs == 2
+                            g(x) = idof == 1 ? x : 1 - x
+                            @test 1 ≈ 1 + line_integral(lineqr, ip, shape_nr, x0, Δx, L, v, g)
+                        end
                     end
                     for (j_edge, shape_nrs) in enumerate(dofs)
                         j_edge == edge_nr && continue
@@ -301,10 +312,12 @@ using Ferrite: reference_shape_value, reference_shape_gradient
     end
 
     # Required properties of shape value Nⱼ of an edge-elements (Hdiv) on an edge with normal n, length L, and dofs ∈ 𝔇
-    # 1) Unit property: ∫(Nⱼ ⋅ n f(s) dS) = 1 ∀ ∈ 𝔇
-    #    Where f(s) = 1 for single shape function on edge, and f(s)=1-s and f(s)=s for two shape functions on edge
-    #    It also seems like unit property should hold for multiple shape functions per edge, and that
-    #    it should be zero for the "reverse" (e.g. shape fun 1 unit for f(s)=1-s but zero for f(s)=s)
+    # 1) Unit property: ∫(Nⱼ ⋅ n f(s) dS) = 1/length(𝔇) ∀ j ∈ 𝔇
+    #    Must hold for
+    #    length(𝔇) ≥ 1: f(s) = 1
+    #    length(𝔇) = 2: f(s) = 1 - s or f(s) = s for 1st and 2nd dof, respectively.
+    #    Additionally, should be zero for
+    #    length(𝔇) = 2: f(s) = s or f(s) = 1 - s for 1st and 2nd dof, respectively.
     #    s is the path parameter ∈[0,1] along the positive direction of the path.
     # 2) Zero normal component on other edges: Nⱼ ⋅ n = 0 if j∉𝔇
     @testset "H(div) on RefCell" begin
@@ -330,7 +343,11 @@ using Ferrite: reference_shape_value, reference_shape_gradient
                             nfacetdofs = length(dofs[facet_nr])
                             f(x) = nfacetdofs == 1 ? 1.0 : (idof == 1 ? 1 - x : x)
                             s = line_integral(lineqr, ip, shape_nr, x0, Δx, L, n, f)
-                            @test s ≈ one(s)
+                            @test s ≈ one(s) / nfacetdofs
+                            if nfacetdofs == 2
+                                g(x) = idof == 1 ? x : 1 - x
+                                @test 1 ≈ 1 + line_integral(lineqr, ip, shape_nr, x0, Δx, L, n, g)
+                            end
                         end
                         for (j_facet, shape_nrs) in enumerate(dofs)
                             j_facet == facet_nr && continue
@@ -428,15 +445,14 @@ using Ferrite: reference_shape_value, reference_shape_gradient
     @testset "Hcurl and Hdiv BC" begin
         hdiv_ips = (
             RaviartThomas{2, RefTriangle, 1}(),
-            # More than 1 per edge doesn't work.
-            #RaviartThomas{2, RefTriangle, 2}(),
-            #Ferrite.BrezziDouglasMarini{2, RefTriangle, 1}(),
+            RaviartThomas{2, RefTriangle, 2}(),
+            Ferrite.BrezziDouglasMarini{2, RefTriangle, 1}(),
         )
         hdiv_check(v, n) = v ⋅ n
 
         hcurl_ips = (
-            # Nedelec{2, RefTriangle, 1}(),
-            # Nedelec{2, RefTriangle, 2}(),
+            Nedelec{2, RefTriangle, 1}(),
+            Nedelec{2, RefTriangle, 2}(),
         )
         function hcurl_check(v, n::Vec{2}) # 3d not supported yet
             t = rotate(n, π / 2)
@@ -452,8 +468,8 @@ using Ferrite: reference_shape_value, reference_shape_gradient
                     qr = FacetQuadratureRule{RefShape}(4)
                     fv = FacetValues(qr, ip, geometric_interpolation(CT))
                     dh = close!(add!(DofHandler(grid), :u, ip))
-                    for bval in (#=0.0,=# 1.0,)
-                        for side in ("left",) # "right", "top", "bottom")
+                    for bval in (0.0, 1.0)
+                        for side in ("left", "right", "top", "bottom")
                             a = zeros(ndofs(dh))
                             ch = ConstraintHandler(dh)
                             add!(ch, Dirichlet(:u, getfacetset(grid, side), Returns(bval)))
@@ -464,7 +480,6 @@ using Ferrite: reference_shape_value, reference_shape_gradient
                                 reinit!(fv, getcells(grid, cellidx), getcoordinates(grid, cellidx), facetidx)
                                 ae = a[celldofs(dh, cellidx)]
                                 val = 0.0
-                                @show ae
                                 for q_point in 1:getnquadpoints(fv)
                                     dΓ = getdetJdV(fv, q_point)
                                     val += f(function_value(fv, q_point, ae), getnormal(fv, q_point)) * dΓ
