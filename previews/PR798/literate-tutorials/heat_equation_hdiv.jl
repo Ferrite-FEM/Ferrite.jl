@@ -5,7 +5,7 @@
 # are primary variables. From a theoretical standpoint, there are many details on e.g. which combinations
 # of interpolations that are stable. See e.g. [Gatica2014](@cite) and [Boffi2013](@cite) for further reading.
 # This tutorial is based on the theory in
-# [Fenics' mixed poisson example](https://fenicsproject.org/olddocs/dolfin/1.4.0/python/demo/documented/mixed-poisson/python/documentation.html).
+# [FEniCSx' mixed poisson example](https://docs.fenicsproject.org/dolfinx/v0.9.0/python/demos/demo_mixed-poisson.html).
 #
 # ![Temperature solution](https://raw.githubusercontent.com/Ferrite-FEM/Ferrite.jl/refs/heads/gh-pages/assets/heat_equation_hdiv.png)
 # **Figure:** Temperature distribution considering a central part with lower heat conductivity.
@@ -46,6 +46,25 @@
 # A stable choice of finite element spaces for this problem on grid with triangles is using
 # * `DiscontinuousLagrange{RefTriangle, k-1}` for approximating $L^2$
 # * `BrezziDouglasMarini{RefTriangle, k}` for approximating $H(\mathrm{div})$
+#=
+# Dirichlet BC theory for hdiv interpolations.
+For a field representing a flux, we in general set the boundary condition on the normal component of this
+flux. Consider the field $\boldsymbol{q}(\boldsymbol{x})$, then we want to prescribe
+$q_\mathrm{n}(\boldsymbol{x}) = \boldsymbol{q}(\boldsymbol{x}) \cdot \boldsymbol{n}$, which we can calculate as
+```math
+q_\mathrm{n}(\boldsymbol{x}) = [\boldsymbol{N}_i(\boldsymbol{x}) \cdot \boldsymbol{n}] a_i
+```
+However, for $H(\mathrm{div})$ interpolations, we don't have distinct algebraic nodal coordinates,
+$\boldsymbol{x}_j$, fulfilling $\vert\boldsymbol{N}_i(\boldsymbol{x}_j)\vert = \delta_{ij}$. Instead,
+we have
+```math
+\begin{align*}
+\int_0^1 s (4-6s) \mathrm{d}s = [2s^2 - 2 s^3] = 0\\
+\int_0^1 (1-s) (4-6s) \mathrm{d}s = \int_0^1 4 - 10s + 6s^2  \mathrm{d}s = [4s - 5s^2 + 2s^3] = 1
+\end{align*}
+```
+=#
+#
 #
 # ## Commented Program
 #
