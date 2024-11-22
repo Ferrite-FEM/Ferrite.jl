@@ -463,7 +463,8 @@ function _update!(
                 1
             else
                 cell = getcells(cc.grid, cellidx)
-                get_direction(ip, location, cell)
+                shape_number = local_facet_dofs[r[counter]]
+                get_direction(ip, shape_number, cell)
             end
             x = spatial_coordinate(boundaryvalues, location, cc.coords)
             bc_value = f(x, time)

@@ -303,6 +303,8 @@ using Ferrite: reference_shape_value, reference_shape_gradient
     # Required properties of shape value Nⱼ of an edge-elements (Hdiv) on an edge with normal n, length L, and dofs ∈ 𝔇
     # 1) Unit property: ∫(Nⱼ ⋅ n f(s) dS) = 1 ∀ ∈ 𝔇
     #    Where f(s) = 1 for single shape function on edge, and f(s)=1-s and f(s)=s for two shape functions on edge
+    #    It also seems like unit property should hold for multiple shape functions per edge, and that
+    #    it should be zero for the "reverse" (e.g. shape fun 1 unit for f(s)=1-s but zero for f(s)=s)
     #    s is the path parameter ∈[0,1] along the positive direction of the path.
     # 2) Zero normal component on other edges: Nⱼ ⋅ n = 0 if j∉𝔇
     @testset "H(div) on RefCell" begin
@@ -426,6 +428,7 @@ using Ferrite: reference_shape_value, reference_shape_gradient
     @testset "Hcurl and Hdiv BC" begin
         hdiv_ips = (
             RaviartThomas{2, RefTriangle, 1}(),
+            # More than 1 per edge doesn't work.
             #RaviartThomas{2, RefTriangle, 2}(),
             #Ferrite.BrezziDouglasMarini{2, RefTriangle, 1}(),
         )
@@ -433,7 +436,7 @@ using Ferrite: reference_shape_value, reference_shape_gradient
 
         hcurl_ips = (
             # Nedelec{2, RefTriangle, 1}(),
-            #Nedelec{2, RefTriangle, 2}(),
+            # Nedelec{2, RefTriangle, 2}(),
         )
         function hcurl_check(v, n::Vec{2}) # 3d not supported yet
             t = rotate(n, π / 2)
@@ -449,26 +452,26 @@ using Ferrite: reference_shape_value, reference_shape_gradient
                     qr = FacetQuadratureRule{RefShape}(4)
                     fv = FacetValues(qr, ip, geometric_interpolation(CT))
                     dh = close!(add!(DofHandler(grid), :u, ip))
-                    for bval in (#=0.0,=# 1.0,) # Need to add mapping in _update! for this to work correctly
-                        for side in ("left", "right", "top", "bottom")
+                    for bval in (#=0.0,=# 1.0,)
+                        for side in ("left",) # "right", "top", "bottom")
                             a = zeros(ndofs(dh))
                             ch = ConstraintHandler(dh)
-                            add!(ch, Dirichlet(:u, getfacetset(grid, "left"), Returns(bval)))
+                            add!(ch, Dirichlet(:u, getfacetset(grid, side), Returns(bval)))
                             close!(ch)
                             apply!(a, ch)
                             test_val = 0.0
-                            for (cellidx, facetidx) in getfacetset(grid, "left")
+                            for (cellidx, facetidx) in getfacetset(grid, side)
                                 reinit!(fv, getcells(grid, cellidx), getcoordinates(grid, cellidx), facetidx)
                                 ae = a[celldofs(dh, cellidx)]
                                 val = 0.0
+                                @show ae
                                 for q_point in 1:getnquadpoints(fv)
                                     dΓ = getdetJdV(fv, q_point)
                                     val += f(function_value(fv, q_point, ae), getnormal(fv, q_point)) * dΓ
                                 end
                                 test_val += f === hdiv_check ? val : abs(val)
                             end
-                            println(typeof(ip), " ($side): ", test_val)
-                            #@test abs(test_val - 2 * bval) < 1.0e-6
+                            @test abs(test_val - 2 * bval) < 1.0e-6
                         end
                     end
                 end
