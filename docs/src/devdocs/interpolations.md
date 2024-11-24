@@ -67,5 +67,6 @@ facet and the reference shape of the facet (`RefLine`, `RefTriangle`, or `RefQua
 
 These integral quantities apply to arbitrarily sized cell facets, and hence the actual value of the base functions
 will scale depending on the size (smaller facet ``\rightarrow`` higher values). Consequently, when applying BCs,
-we need to consider the actual facet size to be able to prescribe the average flux. Therefore, we include the
-`GeometryMapping` values in the `BCValues` object.
+we need to consider the actual facet size to be able to prescribe the average flux.
+Consider making a new generalized `BCValues`: `BoundaryDofValues` object that stores the required info.
+Develop as separate first, could possible replace the current `BCValues`...
