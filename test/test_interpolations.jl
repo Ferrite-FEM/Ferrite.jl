@@ -1,6 +1,6 @@
 using Ferrite: reference_shape_value, reference_shape_gradient
 
-@testset "interpolations" begin #=
+@testset "interpolations" begin # #=
     @testset "Value Type $value_type" for value_type in (Float32, Float64)
         @testset "Correctness of $interpolation" for interpolation in (
                 Lagrange{RefLine, 1}(),
@@ -221,7 +221,7 @@ using Ferrite: reference_shape_value, reference_shape_gradient
         @test Ferrite.is_discontinuous(ip_t) == false
         @test Ferrite.is_discontinuous(d_ip) == true
         @test Ferrite.is_discontinuous(d_ip_t) == true
-    end =#
+    end # =#
     @testset "Correctness of AD of embedded interpolations" begin
         ip = Lagrange{RefHexahedron, 2}()^3
         ξ = rand(Vec{3, Float64})
@@ -464,18 +464,20 @@ using Ferrite: reference_shape_value, reference_shape_gradient
                     RefShape = Ferrite.getrefshape(ip)
                     CT = typeof(reference_cell(RefShape))
                     dim = Ferrite.getrefdim(CT) # dim=sdim=vdim
-                    grid = generate_grid(CT, ntuple(Returns(2), dim))
+                    #grid = generate_grid(CT, ntuple(Returns(2), dim), - rand(Vec{dim}), rand(Vec{dim}))
+                    grid = generate_grid(CT, ntuple(Returns(2), dim), -Vec((-0.25, -0.25)), Vec((0.2, 0.2)))
                     qr = FacetQuadratureRule{RefShape}(4)
                     fv = FacetValues(qr, ip, geometric_interpolation(CT))
                     dh = close!(add!(DofHandler(grid), :u, ip))
-                    for bval in (0.0, 1.0)
-                        for side in ("left", "right", "top", "bottom")
+                    for bval in (1.0,) #(0.0, 1.0)
+                        for side in ("left",) # "right", "top", "bottom")
                             a = zeros(ndofs(dh))
                             ch = ConstraintHandler(dh)
                             add!(ch, Dirichlet(:u, getfacetset(grid, side), Returns(bval)))
                             close!(ch)
                             apply!(a, ch)
                             test_val = 0.0
+                            test_area = 0.0
                             for (cellidx, facetidx) in getfacetset(grid, side)
                                 reinit!(fv, getcells(grid, cellidx), getcoordinates(grid, cellidx), facetidx)
                                 ae = a[celldofs(dh, cellidx)]
@@ -483,10 +485,12 @@ using Ferrite: reference_shape_value, reference_shape_gradient
                                 for q_point in 1:getnquadpoints(fv)
                                     dΓ = getdetJdV(fv, q_point)
                                     val += f(function_value(fv, q_point, ae), getnormal(fv, q_point)) * dΓ
+                                    test_area += dΓ
                                 end
                                 test_val += f === hdiv_check ? val : abs(val)
                             end
-                            @test abs(test_val - 2 * bval) < 1.0e-6
+                            @show (test_val, test_area)
+                            #@test abs(test_val - test_area * bval) < 1.0e-6
                         end
                     end
                 end

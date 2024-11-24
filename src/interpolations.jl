@@ -1899,15 +1899,15 @@ Edge numbers:   | Edge identifiers:
 # RefTriangle, 1st order Lagrange
 function reference_shape_value(ip::BrezziDouglasMarini{2, RefTriangle, 1}, ξ::Vec{2}, i::Int)
     x, y = ξ
-    # Edge 1
-    i == 1 && return Vec(4x, -2y) / 2 # Changed sign to integrated value positive outwards
-    i == 2 && return Vec(-2x, 4y) / 2 # Changed sign to make positive outwards
-    # Edge 2 (reverse order to follow Ferrite convention)
+    # Edge 1: y=1-x, n = [1, 1]/√2 (Flip sign, pos. integration outwards)
+    i == 1 && return Vec(4x, -2y) / 2 # N ⋅ n = (2√2 x - √2 (1-x)) = 3√2 x - √2
+    i == 2 && return Vec(-2x, 4y) / 2 # N ⋅ n = (-√2x + 2√2 (1-x)) = 2√2 - 3√2x
+    # Edge 2: x=0, n = [-1, 0] (reverse order to follow Ferrite convention)
     i == 3 && return Vec(-2x - 6y + 2, 4y) / 2 # N ⋅ n = (6y - 2)
     i == 4 && return Vec(4x + 6y - 4, -2y) / 2 # N ⋅ n = (4 - 6y)
-    # Edge 3
-    i == 5 && return Vec(-2x, 6x + 4y - 4) / 2 # Changed sign to make positive outwards
-    i == 6 && return Vec(4x, -6x - 2y + 2) / 2 # Changed sign to make positive outwards
+    # Edge 3: y=0, n = [0, -1] (Flip sign, post. integration outwards)
+    i == 5 && return Vec(-2x, 6x + 4y - 4) / 2 # N ⋅ n = (4 - 6x)
+    i == 6 && return Vec(4x, -6x - 2y + 2) / 2 # N ⋅ n = (6x - 2)
     throw(ArgumentError("no shape function $i for interpolation $ip"))
 end
 
