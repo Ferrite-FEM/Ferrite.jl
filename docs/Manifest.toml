@@ -667,7 +667,7 @@ version = "1.0.0"
 
     [deps.Ferrite.extensions]
     FerriteBlockArrays = "BlockArrays"
-    FerriteGPU = ["CUDA", "Adapt"]
+    FerriteCuda = ["CUDA", "Adapt"]
     FerriteMetis = "Metis"
 
     [deps.Ferrite.weakdeps]

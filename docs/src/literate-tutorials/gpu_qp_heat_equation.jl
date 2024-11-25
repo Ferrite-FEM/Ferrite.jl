@@ -6,7 +6,7 @@ using CUDA
 
 left = Tensor{1, 2, Float32}((0, -0)) # define the left bottom corner of the grid.
 right = Tensor{1, 2, Float32}((1.0, 1.0)) # define the right top corner of the grid.
-grid = generate_grid(Quadrilateral, (1000, 1000), left, right)
+grid = generate_grid(Quadrilateral, (100, 100), left, right)
 
 
 ip = Lagrange{RefQuadrilateral, 2}() # define the interpolation function (i.e. Bilinear lagrange)
@@ -14,9 +14,9 @@ qr = QuadratureRule{RefQuadrilateral}(Float32, 3)
 cellvalues = CellValues(Float32, qr, ip)
 
 
-dh = DofHandler(grid)  
-add!(dh, :u, ip)  
-close!(dh); 
+dh = DofHandler(grid)
+add!(dh, :u, ip)
+close!(dh);
 
 
 # Standard assembly of the element.
@@ -52,7 +52,7 @@ function assemble_element_qpiter!(Ke::Matrix, fe::Vector, cellvalues, cell_coord
         dΩ = getdetJdV(qv)
         ## Loop over test shape functions
         for i in 1:n_basefuncs
-            δu  = shape_value(qv, i)
+            δu = shape_value(qv, i)
             ∇δu = shape_gradient(qv, i)
             ## Add contribution to fe
             fe[i] += δu * dΩ
@@ -189,5 +189,12 @@ norm(Kstd)
 ##     gpu_kernel()
 ## end
 
-## CUDA.@time bench_gpu(n_cells, n_basefuncs, cellvalues, dh)
-## CUDA.@profile trace = true bench_gpu(n_cells, n_basefuncs, cellvalues, dh)
+# function setup_bench_gpu(n_cells, n_basefuncs, cellvalues, dh)
+#     Kgpu = CUSPARSE.CuSparseMatrixCSC(K);
+#     fgpu = CUDA.zeros(ndofs(dh));
+#     gpu_kernel = init_kernel(BackendCUDA, n_cells, n_basefuncs, assemble_gpu!, (Kgpu, fgpu, cellvalues, dh))
+# end
+
+# gpu_kernel = setup_bench_gpu(n_cells, n_basefuncs, cellvalues, dh);
+# CUDA.@time gpu_kernel()
+# CUDA.@profile trace = true gpu_kernel()

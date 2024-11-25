@@ -23,7 +23,7 @@ Metis = "2679e427-3c69-5b7f-982b-ece356f1e94b"
 
 [extensions]
 FerriteBlockArrays = "BlockArrays"
-FerriteGPU = ["CUDA", "Adapt"]
+FerriteCuda = ["CUDA", "Adapt"]
 FerriteMetis = "Metis"
 
 [compat]
