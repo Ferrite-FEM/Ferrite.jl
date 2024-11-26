@@ -6,7 +6,7 @@ using CUDA
 
 left = Tensor{1, 2, Float32}((0, -0)) # define the left bottom corner of the grid.
 right = Tensor{1, 2, Float32}((1.0, 1.0)) # define the right top corner of the grid.
-grid = generate_grid(Quadrilateral, (100, 100), left, right)
+grid = generate_grid(Quadrilateral, (1000, 1000), left, right)
 
 
 ip = Lagrange{RefQuadrilateral, 2}() # define the interpolation function (i.e. Bilinear lagrange)
@@ -147,14 +147,13 @@ end
 n_basefuncs = getnbasefunctions(cellvalues)
 
 ## Allocate CPU matrix
-K = allocate_matrix(SparseMatrixCSC{Float32, Int32}, dh);
 #K = allocate_matrix(SparseMatrixCSC{Float64, Int64}, dh);
 #f = zeros(eltype(K), ndofs(dh));
 
 
 # Allocate GPU matrix
 ## commented to pass the test
-## Kgpu = CUSPARSE.CuSparseMatrixCSC(K);
+## Kgpu = allocate_matrix(CUSPARSE.CuSparseMatrixCSC{Float32, Int32}, dh)
 ## fgpu = CUDA.zeros(Float32, ndofs(dh));
 
 n_cells = dh |> get_grid |> getncells
@@ -172,29 +171,34 @@ n_cells = dh |> get_grid |> getncells
 ## cpu_kernel = init_kernel(BackendCPU, n_cells, n_basefuncs, assemble_gpu!, (K, f, cellvalues, dh));
 ## cpu_kernel()
 
-stassy(cv, dh) = assemble_global!(cv, dh, Val(false))
 
-norm(K)
 ## commented to pass the test
 ## norm(Kgpu)
-Kstd, Fstd = stassy(cellvalues, dh);
-norm(Kstd)
 
 
 ## GPU Benchmarking, remove when not needed ##
-## function bench_gpu(n_cells, n_basefuncs, cellvalues, dh)
-##     Kgpu = CUSPARSE.CuSparseMatrixCSC(K);
-##     fgpu = CUDA.zeros(ndofs(dh));
-##     gpu_kernel = init_kernel(BackendCUDA, n_cells, n_basefuncs, assemble_gpu!, (Kgpu, fgpu, cellvalues, dh))
-##     gpu_kernel()
-## end
-
 # function setup_bench_gpu(n_cells, n_basefuncs, cellvalues, dh)
-#     Kgpu = CUSPARSE.CuSparseMatrixCSC(K);
-#     fgpu = CUDA.zeros(ndofs(dh));
+#     Kgpu = allocate_matrix(CUSPARSE.CuSparseMatrixCSC{Float32, Int32}, dh)
+#     fgpu = CUDA.zeros(eltype(Kgpu), ndofs(dh));
 #     gpu_kernel = init_kernel(BackendCUDA, n_cells, n_basefuncs, assemble_gpu!, (Kgpu, fgpu, cellvalues, dh))
 # end
 
-# gpu_kernel = setup_bench_gpu(n_cells, n_basefuncs, cellvalues, dh);
+# CUDA.@time setup_bench_gpu(n_cells, n_basefuncs, cellvalues, dh)
+# CUDA.@profile trace = true setup_bench_gpu(n_cells, n_basefuncs, cellvalues, dh)
+# gpu_kernel = setup_bench_gpu(n_cells, n_basefuncs, cellvalues, dh)
 # CUDA.@time gpu_kernel()
 # CUDA.@profile trace = true gpu_kernel()
+
+
+## CPU Benchmarking, remove when not needed ##
+# function setup_bench_cpu( dh)
+#     K = allocate_matrix(SparseMatrixCSC{Float64, Int}, dh)
+#     f = zeros(eltype(K), ndofs(dh));
+#     return K,f
+# end
+
+# using BenchmarkTools
+# @benchmark setup_bench_cpu($dh)
+# K,f = setup_bench_cpu(dh)
+# @benchmark assemble_global_std!($cellvalues, $dh, $K, $f)
+# @benchmark assemble_global_qp!($cellvalues, $dh, $K, $f)

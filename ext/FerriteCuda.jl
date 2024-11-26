@@ -7,7 +7,7 @@ using Adapt
 using Base:
     @propagate_inbounds
 using SparseArrays:
-    AbstractSparseArray
+    AbstractSparseArray, SparseMatrixCSC
 using StaticArrays:
     SVector, MVector
 
@@ -16,5 +16,6 @@ include("GPU/gpu_assembler.jl")
 include("GPU/CUDAKernelLauncher.jl")
 include("GPU/cuda_iterator.jl")
 include("GPU/adapt.jl")
+include("GPU/cuda_sparsity_pattern.jl")
 
 end
