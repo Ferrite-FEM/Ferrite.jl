@@ -454,16 +454,16 @@ end
     θ = 2 * shift_index / 3
     θpre = 2 * lowest_node_shift_index / 3
 
-    flipping = SMatrix{3, 3}(1.0, 0.0, 0.0, 0.0, -1.0, 0.0, 0.0, 0.0, 1.0)
+    flipping = Tensor{2, 3}((1.0, 0.0, 0.0, 0.0, -1.0, 0.0, 0.0, 0.0, 1.0))
 
-    translate_1 = SMatrix{3, 3}(1.0, 0.0, 0.0, 0.0, 1.0, 0.0, -sinpi(2 / 3) / 3, -0.5, 1.0)
-    stretch_1 = SMatrix{3, 3}(sinpi(2 / 3), 0.5, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0)
+    translate_1 = Tensor{2, 3}((1.0, 0.0, 0.0, 0.0, 1.0, 0.0, -sinpi(2 / 3) / 3, -0.5, 1.0))
+    stretch_1 = Tensor{2, 3}((sinpi(2 / 3), 0.5, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0))
 
-    translate_2 = SMatrix{3, 3}(1.0, 0.0, 0.0, 0.0, 1.0, 0.0, sinpi(2 / 3) / 3, 0.5, 1.0)
-    stretch_2 = SMatrix{3, 3}(1 / sinpi(2 / 3), -1 / 2 / sinpi(2 / 3), 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0)
+    translate_2 = Tensor{2, 3}((1.0, 0.0, 0.0, 0.0, 1.0, 0.0, sinpi(2 / 3) / 3, 0.5, 1.0))
+    stretch_2 = Tensor{2, 3}((1 / sinpi(2 / 3), -1 / 2 / sinpi(2 / 3), 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0))
 
-    return flipped ? stretch_2 * translate_2 * rotation_tensor(0, 0, θpre * pi) * flipping * rotation_tensor(0, 0, (θ - θpre) * pi) * translate_1 * stretch_1 :
-        stretch_2 * translate_2 * rotation_tensor(0, 0, θ * pi) * translate_1 * stretch_1
+    return flipped ? stretch_2 ⋅ translate_2 ⋅ rotation_tensor(0, 0, θpre * pi) ⋅ flipping ⋅ rotation_tensor(0, 0, (θ - θpre) * pi) ⋅ translate_1 ⋅ stretch_1 :
+        stretch_2 ⋅ translate_2 ⋅ rotation_tensor(0, 0, θ * pi) ⋅ translate_1 ⋅ stretch_1
 end
 
 @inline function _get_transformation_matrix(::NTuple{4, Int}, interface_transformation::InterfaceOrientationInfo)
@@ -474,8 +474,8 @@ end
     θ = 2 * shift_index / 4
     θpre = 2 * lowest_node_shift_index / 4
 
-    flipping = SMatrix{3, 3}(0.0, 1.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0)
-    return flipped ? rotation_tensor(0, 0, θpre * pi) * flipping * rotation_tensor(0, 0, (θ - θpre) * pi) : rotation_tensor(0, 0, θ * pi)
+    flipping = Tensor{2, 3}((0.0, 1.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0))
+    return flipped ? rotation_tensor(0, 0, θpre * pi) ⋅ flipping ⋅ rotation_tensor(0, 0, (θ - θpre) * pi) : rotation_tensor(0, 0, θ * pi)
 end
 
 @inline function _get_transformation_matrix(::NTuple{N, Int}, ::InterfaceOrientationInfo) where {N}
@@ -553,7 +553,7 @@ function transform_interface_points!(dst::AbstractVector{Vec{3, Float64}}, point
     M = get_transformation_matrix(interface_transformation)
     for (idx, point) in pairs(points)
         face_point = element_to_facet_transformation(point, RefShapeA, facet_a)
-        result = M * Vec(face_point[1], face_point[2], 1.0)
+        result = M ⋅ Vec(face_point[1], face_point[2], 1.0)
         dst[idx] = facet_to_element_transformation(Vec(result[1], result[2]), RefShapeB, facet_b)
     end
     return nothing
