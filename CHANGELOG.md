@@ -153,7 +153,7 @@ more discussion).
   - ip_function = Lagrange{2, RefTetrahedron, 2}()
   - ip_geometry = Lagrange{2, RefTetrahedron, 1}()
   - cv = CellScalarValues(qr, ip_function, ip_geometry)
-  + ip_function = Lagrange{2, RefTetrahedron, 2}()
+  + ip_function = Lagrange{RefTriangle, 2}()
   + cv = CellValues(qr, ip_function)
   ```
   and if you have quadratic (or higher order) elements in the grid you must now pass the
@@ -162,8 +162,8 @@ more discussion).
   qr = QuadratureRule(...)
   - ip_function = Lagrange{2, RefTetrahedron, 2}()
   - cv = CellScalarValues(qr, ip_function)
-  + ip_function = Lagrange{2, RefTetrahedron, 2}()
-  + ip_geometry = Lagrange{2, RefTetrahedron, 1}()
+  + ip_function = Lagrange{RefTriangle, 2}()
+  + ip_geometry = Lagrange{RefTriangle, 1}()
   + cv = CellValues(qr, ip_function, ip_geometry)
   ```
 
