@@ -11,6 +11,7 @@ using StaticArrays
 using OrderedCollections
 using WriteVTK
 import Metis
+using AllocCheck
 
 include("test_utils.jl")
 
@@ -20,6 +21,7 @@ include("test_interpolations.jl")
 include("test_cellvalues.jl")
 include("test_facevalues.jl")
 include("test_interfacevalues.jl")
+include("test_iterators.jl")
 include("test_quadrules.jl")
 include("test_assemble.jl")
 include("test_dofs.jl")

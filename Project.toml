@@ -54,6 +54,7 @@ SHA = "ea8e919c-243c-51af-8825-aaa63cd721ce"
 TaskLocalValues = "ed4db957-447d-4319-bfb6-7fa9ae7ecf34"
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 TimerOutputs = "a759f4b9-e2f1-59dc-863e-4aeb61b1ea8f"
+AllocCheck = "9b6a8646-10ed-4001-bbdc-1d2f46dfbb1a"
 
 [targets]
-test = ["BlockArrays", "Downloads", "FerriteGmsh", "ForwardDiff", "Gmsh", "IterativeSolvers", "Metis", "NBInclude", "OhMyThreads", "ProgressMeter", "Random", "SHA", "TaskLocalValues", "Test", "TimerOutputs", "Logging"]
+test = ["BlockArrays", "Downloads", "FerriteGmsh", "ForwardDiff", "Gmsh", "IterativeSolvers", "Metis", "NBInclude", "OhMyThreads", "ProgressMeter", "Random", "SHA", "TaskLocalValues", "Test", "TimerOutputs", "Logging", "AllocCheck"]

@@ -641,20 +641,20 @@ boundaryfunction(::Type{EdgeIndex}) = edges
 boundaryfunction(::Type{VertexIndex}) = vertices
 boundaryfunction(::Type{FacetIndex}) = facets
 
-for INDEX in (:VertexIndex, :EdgeIndex, :FaceIndex, :FacetIndex)
+for INDEX in (:VertexIndex, :EdgeIndex, :FaceIndex, :FacetIndex, :InterfaceIndex)
     @eval begin
         #Constructor
-        ($INDEX)(a::Int, b::Int) = ($INDEX)((a, b))
+        ($INDEX)(args...) = ($INDEX)((args...,))
 
         Base.getindex(I::($INDEX), i::Int) = I.idx[i]
 
         #To be able to do a,b = faceidx
-        Base.iterate(I::($INDEX), state::Int = 1) = (state == 3) ? nothing : (I[state], state + 1)
+        Base.iterate(I::($INDEX), state::Int = 1) = (state == length(I.idx) + 1) ? nothing : (I[state], state + 1)
 
         # Necessary to check if, e.g. `(cellid, faceidx) in faceset`
         Base.isequal(x::$INDEX, y::$INDEX) = x.idx == y.idx
-        Base.isequal(x::Tuple{Int, Int}, y::$INDEX) = x[1] == y.idx[1] && x[2] == y.idx[2]
-        Base.isequal(y::$INDEX, x::Tuple{Int, Int}) = x[1] == y.idx[1] && x[2] == y.idx[2]
+        Base.isequal(x::NTuple{N, Int}, y::$INDEX) where {N} = all(i -> x[i] == y.idx[i], 1:N)
+        Base.isequal(y::$INDEX, x::NTuple{N, Int}) where {N} = all(i -> x[i] == y.idx[i], 1:N)
         Base.hash(x::$INDEX, h::UInt) = hash(x.idx, h)
     end
 end

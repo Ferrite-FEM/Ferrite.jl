@@ -1,13 +1,12 @@
 @testset "InterfaceValues" begin
-    function test_interfacevalues(grid::Ferrite.AbstractGrid, iv::InterfaceValues; tol = 0)
+    function test_interfacevalues(iv::InterfaceValues, args...; tol = 0)
         ip_here = Ferrite.function_interpolation(iv.here)
         ip_there = Ferrite.function_interpolation(iv.there)
         rdim = Ferrite.getrefdim(ip_here)
         n_basefuncs = getnbasefunctions(ip_here) + getnbasefunctions(ip_there)
 
         @test getnbasefunctions(iv) == n_basefuncs
-
-        for ic in InterfaceIterator(grid)
+        for ic in InterfaceIterator(args...)
             reinit!(iv, ic)
             coords_here, coords_there = getcoordinates(ic)
             nqp = getnquadpoints(iv)
@@ -152,7 +151,7 @@
         for func_interpol in (scalar_interpol, VectorizedInterpolation(scalar_interpol))
             iv = cell_shape ∈ (QuadraticLine, QuadraticQuadrilateral, QuadraticTriangle, QuadraticTetrahedron) ?
                 InterfaceValues(quad_rule, func_interpol, ip) : InterfaceValues(quad_rule, func_interpol)
-            test_interfacevalues(grid, iv)
+            test_interfacevalues(iv, grid)
         end
     end
     # Custom quadrature
@@ -182,23 +181,45 @@
         end
         for func_interpol in (scalar_interpol, VectorizedInterpolation(scalar_interpol))
             iv = InterfaceValues(quad_rule, func_interpol)
-            test_interfacevalues(grid, iv; tol = 5 * eps(Float64))
+            test_interfacevalues(iv, grid; tol = 5 * eps(Float64))
         end
     end
-    # @testset "Mixed elements 2D grids" begin # TODO: this shouldn't work because it should change the FacetValues object
-    #     dim = 2
-    #     nodes = [Node((-1.0, 0.0)), Node((0.0, 0.0)), Node((1.0, 0.0)), Node((-1.0, 1.0)), Node((0.0, 1.0))]
-    #     cells = [
-    #                 Quadrilateral((1,2,5,4)),
-    #                 Triangle((3,5,2)),
-    #             ]
+    @testset "Mixed elements 2D grids" begin
+        dim = 2
+        nodes = [Node((-1.0, 0.0)), Node((0.0, 0.0)), Node((1.0, 0.0)), Node((-1.0, 1.0)), Node((0.0, 1.0))]
+        cells = [
+            Quadrilateral((1, 2, 5, 4)),
+            Triangle((3, 5, 2)),
+        ]
 
-    #     grid = Grid(cells, nodes)
-    #     topology = ExclusiveTopology(grid)
-    #     test_interfacevalues(grid,
-    #     DiscontinuousLagrange{RefQuadrilateral, 1}(), FacetQuadratureRule{RefQuadrilateral}(2),
-    #     DiscontinuousLagrange{RefTriangle, 1}(), FacetQuadratureRule{RefTriangle}(2))
-    # end
+        grid = Grid(cells, nodes)
+        topology = ExclusiveTopology(grid)
+        qr_facet_quad = FacetQuadratureRule{RefQuadrilateral}(2)
+        qr_facet_tri = FacetQuadratureRule{RefTriangle}(2)
+        ip_quad = DiscontinuousLagrange{RefQuadrilateral, 1}()
+        ip_tri = DiscontinuousLagrange{RefTriangle, 1}()
+        dh = DofHandler(grid)
+        sdh_quad = SubDofHandler(dh, Set([1]))
+        sdh_tri = SubDofHandler(dh, Set([2]))
+        add!(sdh_quad, :u, ip_quad)
+        add!(sdh_tri, :u, ip_tri)
+        qr_collection = (qr_facet_quad, qr_facet_tri)
+        ip_collection = (ip_quad, ip_tri)
+        close!(dh)
+        for (sdh_here_idx, sdh_here) in enumerate(dh.subdofhandlers)
+            for (sdh_there_idx, sdh_there) in enumerate(dh.subdofhandlers)
+                sdh_there_idx < sdh_here_idx && continue
+                iv = InterfaceValues(
+                    qr_collection[sdh_here_idx], ip_collection[sdh_here_idx],
+                    qr_collection[sdh_there_idx], ip_collection[sdh_there_idx]
+                )
+                test_interfacevalues(
+                    iv, sdh_here, sdh_there
+                )
+            end
+        end
+
+    end
     @testset "Unordered nodes 3D" begin
         dim = 2
         nodes = [
@@ -214,8 +235,8 @@
 
         grid = Grid(cells, nodes)
         test_interfacevalues(
-            grid,
-            InterfaceValues(FacetQuadratureRule{RefHexahedron}(2), DiscontinuousLagrange{RefHexahedron, 1}())
+            InterfaceValues(FacetQuadratureRule{RefHexahedron}(2), DiscontinuousLagrange{RefHexahedron, 1}()),
+            grid
         )
     end
     @testset "Interface dof_range" begin

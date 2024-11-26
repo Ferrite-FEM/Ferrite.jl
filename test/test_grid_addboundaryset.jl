@@ -200,4 +200,21 @@
         addboundaryfacetset!(grid, topology, "test_boundary_facetset", filter_function)
         @test getfacetset(grid, "test_boundary_facetset") == Ferrite.create_boundaryfacetset(grid, topology, filter_function)
     end
+
+    @testset "addboundaryset Mixed grid" begin
+        nodes = [Node((-1.0, 0.0)), Node((0.0, 0.0)), Node((1.0, 0.0)), Node((-1.0, 1.0)), Node((0.0, 1.0))]
+        cells = [
+            Quadrilateral((1, 2, 5, 4)),
+            Triangle((3, 5, 2)),
+        ]
+        grid = Grid(cells, nodes)
+        topology = ExclusiveTopology(grid)
+        @test extractboundary(grid, topology) == extractboundarycheck(grid)
+
+        filter_function(x) = x[1] > 0
+        addboundaryvertexset!(grid, topology, "test_boundary_vertexset", filter_function)
+        @test getvertexset(grid, "test_boundary_vertexset") == Ferrite.create_boundaryvertexset(grid, topology, filter_function)
+        addboundaryfacetset!(grid, topology, "test_boundary_facetset", filter_function)
+        @test getfacetset(grid, "test_boundary_facetset") == Ferrite.create_boundaryfacetset(grid, topology, filter_function)
+    end
 end

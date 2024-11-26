@@ -77,6 +77,7 @@ export
     EdgeIndex,
     VertexIndex,
     FacetIndex,
+    InterfaceIndex,
     geometric_interpolation,
     ExclusiveTopology,
     getneighborhood,
