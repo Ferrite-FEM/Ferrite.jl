@@ -1,26 +1,36 @@
 ## This file manifsts the launch of GPU kernel on CUDA backend ##
+abstract type AbstractCudaKernel <: Ferrite.AbstractKernel{BackendCUDA} end
 
-"""
-    Ferrite.init_kernel(::Type{BackendCUDA}, n_cells::Ti, n_basefuncs::Ti, kernel::Function, args::Tuple) where {Ti <: Integer}
 
-Initialize a CUDA kernel for the Ferrite framework.
+struct CudaKernel{MemAlloc <: AbstractCudaMemAlloc, Ti <: Integer} <: AbstractCudaKernel
+    n_cells::Ti
+    n_basefuncs::Ti
+    kernel::Function
+    args::Tuple
+    mem_alloc::MemAlloc
+    threads::Ti
+    blocks::Ti
+end
 
-# Arguments
-- `::Type{BackendCUDA}`: Specifies the CUDA backend.
-- `n_cells::Ti`: Number of cells in the problem.
-- `n_basefuncs::Ti`: Number of shape functions per cell.
-- `kernel::Function`: The CUDA kernel function to execute.
-- `args::Tuple`: Tuple of arguments for the kernel.
 
-# Returns
-- A `LazyKernel` object encapsulating the kernel and its execution configuration.
-
-# Errors
-Throws an `ArgumentError` if CUDA is not functional (e.g., due to missing drivers or improper installation).
-"""
 function Ferrite.init_kernel(::Type{BackendCUDA}, n_cells::Ti, n_basefuncs::Ti, kernel::Function, args::Tuple) where {Ti <: Integer}
-    if CUDA.functional()
-        return LazyKernel(n_cells, n_basefuncs, kernel, args, BackendCUDA)
+    return if CUDA.functional()
+        threads = convert(Ti, min(n_cells, 256))
+        shared_mem = _calculate_shared_memory(threads, n_basefuncs)
+        blocks = _calculate_nblocks(threads, n_cells)
+        shared_mem = _calculate_shared_memory(threads, n_basefuncs)
+        is_shared = _can_use_dynshmem(shared_mem)
+        if (is_shared)
+            Ke = DynamicSharedMemFunction{Ti}(Float32, (threads, n_basefuncs, n_basefuncs))
+            fe = DynamicSharedMemFunction{Ti}(Float32, (threads, n_basefuncs), sizeof(Float32) * bd * n_basefuncs * n_basefuncs)
+            mem_alloc = SharedMemAlloc(Ke, fe, shared_mem)
+            return CudaKernel(n_cells, n_basefuncs, kernel, args, mem_alloc, threads, blocks)
+        else
+            Kes = CUDA.zeros(Float32, n_cells, n_basefuncs, n_basefuncs)
+            fes = CUDA.zeros(Float32, n_cells, n_basefuncs)
+            mem_alloc = GlobalMemAlloc(Kes, fes)
+            return CudaKernel(n_cells, n_basefuncs, kernel, args, mem_alloc, threads, blocks)
+        end
     else
         throw(ArgumentError("CUDA is not functional, please check your GPU driver and CUDA installation"))
     end
@@ -37,53 +47,35 @@ Launch a CUDA kernel encapsulated in a `LazyKernel` object.
 # Returns
 - `nothing`: Indicates that the kernel was launched and synchronized successfully.
 """
-function Ferrite.launch!(kernel::LazyKernel{Ti, BackendCUDA}) where {Ti}
-    n_cells = kernel.n_cells
-    n_basefuncs = kernel.n_basefuncs
+function Ferrite.launch!(kernel::CudaKernel{SharedMemAlloc})
     ker = kernel.kernel
     args = kernel.args
-    kernel = @cuda launch = false ker(args...)
-    config = launch_configuration(kernel.fun)
-    threads = convert(Ti, min(n_cells, config.threads, 256))
-    shared_mem = _calculate_shared_memory(threads, n_basefuncs)
-    blocks = _calculate_nblocks(threads, n_cells)
+    blocks = kernel.blocks
+    threads = kernel.threads
+    shmem_size = mem_size(kernel.mem_alloc)
+
+    kwargs = (mem_alloc = kernel.mem_alloc)
 
     ## use dynamic shared memory if possible
-    _can_use_dynshmem(shared_mem) && return CUDA.@sync kernel(args...; threads, blocks, shmem = shared_mem)
+    return CUDA.@sync @cuda blocks = blocks threads = threads shmem = shmem_size ker(args...; kwargs...)
 
-    ## otherwise use global memory
-    nes = blocks * threads
-    kes = CUDA.zeros(Float32, nes, n_basefuncs, n_basefuncs)
-    fes = CUDA.zeros(Float32, nes, n_basefuncs)
-    args = _to_localdh(args, kes, fes)
-    CUDA.@sync @cuda blocks = blocks threads = threads ker(args...)
     return nothing
 end
 
-"""
-    _to_localdh(args::Tuple, kes::AbstractArray, fes::AbstractArray)
 
-Convert a global degree-of-freedom handler to a local handler for use on the GPU.
+function Ferrite.launch!(kernel::CudaKernel{GlobalMemAlloc})
+    ker = kernel.kernel
+    args = kernel.args
+    blocks = kernel.blocks
+    threads = kernel.threads
 
-# Arguments
-- `args::Tuple`: Kernel arguments.
-- `kes::AbstractArray`: GPU storage for element stiffness matrices.
-- `fes::AbstractArray`: GPU storage for element force vectors.
+    kwargs = (mem_alloc = kernel.mem_alloc)
 
-# Returns
-- `Tuple`: Updated arguments tuple with the degree-of-freedom handler replaced by a local GPU handler.
+    return CUDA.@sync @cuda blocks = blocks threads = threads ker(args...; kwargs...)
 
-# Errors
-Throws an `ErrorException` if no `AbstractDofHandler` is found in `args`.
-"""
-function _to_localdh(args::Tuple, kes::AbstractArray, fes::AbstractArray)
-    dh_index = findfirst(x -> x isa Ferrite.AbstractDofHandler, args)
-    dh_index !== nothing || throw(ErrorException("No subtype of AbstractDofHandler found in the arguments"))
-    arr = args |> collect
-    local_dh = LocalsGPUDofHandler(arr[dh_index], kes, fes)
-    arr[dh_index] = local_dh
-    return Tuple(arr)
+    return nothing
 end
+
 
 """
     _calculate_shared_memory(threads::Integer, n_basefuncs::Integer)

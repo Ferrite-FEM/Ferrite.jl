@@ -131,10 +131,9 @@ end
 
 
 # gpu version of global assembly
-function assemble_gpu!(Kgpu, fgpu, cv, dh; test = false)
-    n_basefuncs = getnbasefunctions(cv)
+function assemble_gpu!(Kgpu, fgpu, cv, dh; mem_alloc::AbstractMemAlloc)
     assembler = start_assemble(Kgpu, fgpu; fillzero = false) ## has to be always false
-    for cell in CellIterator(dh, convert(Int32, n_basefuncs))
+    for cell in CellIterator(dh, mem_alloc)
         Ke = cellke(cell)
         fe = cellfe(cell)
         assemble_element!(Ke, fe, cv, cell)
