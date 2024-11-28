@@ -131,7 +131,7 @@ end
 
 
 # gpu version of global assembly
-function assemble_gpu!(Kgpu, fgpu, cv, dh)
+function assemble_gpu!(Kgpu, fgpu, cv, dh; test = false)
     n_basefuncs = getnbasefunctions(cv)
     assembler = start_assemble(Kgpu, fgpu; fillzero = false) ## has to be always false
     for cell in CellIterator(dh, convert(Int32, n_basefuncs))

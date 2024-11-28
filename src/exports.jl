@@ -205,4 +205,5 @@ export
     LocalsGPUDofHandler,
     dofhandler,
     localfes,
-    localkes
+    localkes,
+    AbstractMemAlloc

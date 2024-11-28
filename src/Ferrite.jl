@@ -175,6 +175,7 @@ include("GPU/CPUKernelLauncher.jl")
 include("GPU/gpu_grid.jl")
 include("GPU/GPUDofHandler.jl")
 include("GPU/parallel_iterator.jl")
+include("GPU/mem_alloc.jl")
 
 
 end # module
