@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/><title>Discontinuous Galerkin heat equation · Ferrite.jl</title><meta name="title" content="Discontinuous Galerkin heat equation · Ferrite.jl"/><meta property="og:title" content="Discontinuous Galerkin heat equation · Ferrite.jl"/><meta property="twitter:title" content="Discontinuous Galerkin heat equation · Ferrite.jl"/><meta name="description" content="Documentation for Ferrite.jl."/><meta property="og:description" content="Documentation for Ferrite.jl."/><meta property="twitter:description" content="Documentation for Ferrite.jl."/><meta property="og:url" content="https://ferrite-fem.github.io/Ferrite.jl/stable/tutorials/dg_heat_equation/"/><meta property="twitter:url" content="https://ferrite-fem.github.io/Ferrite.jl/stable/tutorials/dg_heat_equation/"/><link rel="canonical" href="https://ferrite-fem.github.io/Ferrite.jl/stable/tutorials/dg_heat_equation/"/><script data-outdated-warner src="../../assets/warner.js"></script><link href="https://cdnjs.cloudflare.com/ajax/libs/lato-font/3.0.0/css/lato-font.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/juliamono/0.050/juliamono.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/fontawesome.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/solid.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/brands.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.8/katex.min.css" rel="stylesheet" type="text/css"/><script>documenterBaseURL="../.."</script><script src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.6/require.min.js" data-main="../../assets/documenter.js"></script><script src="../../search_index.js"></script><script src="../../siteinfo.js"></script><script src="../../../versions.js"></script><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/catppuccin-mocha.css" data-theme-name="catppuccin-mocha"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/catppuccin-macchiato.css" data-theme-name="catppuccin-macchiato"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/catppuccin-frappe.css" data-theme-name="catppuccin-frappe"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/catppuccin-latte.css" data-theme-name="catppuccin-latte"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/documenter-dark.css" data-theme-name="documenter-dark" data-theme-primary-dark/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/documenter-light.css" data-theme-name="documenter-light" data-theme-primary/><script src="../../assets/themeswap.js"></script><link href="../../assets/custom.css" rel="stylesheet" type="text/css"/><link href="../../assets/citations.css" rel="stylesheet" type="text/css"/><link href="../../assets/favicon.ico" rel="icon" type="image/x-icon"/></head><body><div id="documenter"><nav class="docs-sidebar"><a class="docs-logo" href="../../"><img src="../../assets/logo.svg" alt="Ferrite.jl logo"/></a><div class="docs-package-name"><span class="docs-autofit"><a href="../../">Ferrite.jl</a></span></div><button class="docs-search-query input is-rounded is-small is-clickable my-2 mx-auto py-1 px-2" id="documenter-search-query">Search docs (Ctrl + /)</button><ul class="docs-menu"><li><a class="tocitem" href="../../">Home</a></li><li><input class="collapse-toggle" id="menuitem-3" type="checkbox" checked/><label class="tocitem" for="menuitem-3"><span class="docs-label">Tutorials</span><i class="docs-chevron"></i></label><ul class="collapsed"><li><a class="tocitem" href="../">Tutorials overview</a></li><li><a class="tocitem" href="../heat_equation/">Heat equation</a></li><li><a class="tocitem" href="../linear_elasticity/">Linear elasticity</a></li><li><a class="tocitem" href="../incompressible_elasticity/">Incompressible elasticity</a></li><li><a class="tocitem" href="../hyperelasticity/">Hyperelasticity</a></li><li><a class="tocitem" href="../plasticity/">Von Mises plasticity</a></li><li><a class="tocitem" href="../transient_heat_equation/">Transient heat equation</a></li><li><a class="tocitem" href="../computational_homogenization/">Computational homogenization</a></li><li><a class="tocitem" href="../stokes-flow/">Stokes flow</a></li><li><a class="tocitem" href="../porous_media/">Porous media</a></li><li><a class="tocitem" href="../ns_vs_diffeq/">Incompressible Navier-Stokes equations via DifferentialEquations.jl</a></li><li><a class="tocitem" href="../reactive_surface/">Reactive surface</a></li><li><a class="tocitem" href="../linear_shell/">Linear shell</a></li><li class="is-active"><a class="tocitem" href>Discontinuous Galerkin heat equation</a><ul class="internal"><li><a class="tocitem" href="#Introduction"><span>Introduction</span></a></li><li><a class="tocitem" href="#Commented-Program"><span>Commented Program</span></a></li><li><a class="tocitem" href="#References"><span>References</span></a></li><li><a class="tocitem" href="#heat_equation-DG-plain-program"><span>Plain program</span></a></li></ul></li></ul></li><li><input class="collapse-toggle" id="menuitem-4" type="checkbox"/><label class="tocitem" for="menuitem-4"><span class="docs-label">Topic guides</span><i class="docs-chevron"></i></label><ul class="collapsed"><li><a class="tocitem" href="../../topics/">Topic guide overview</a></li><li><a class="tocitem" href="../../topics/fe_intro/">Introduction to FEM</a></li><li><a class="tocitem" href="../../topics/reference_shapes/">Reference shapes</a></li><li><a class="tocitem" href="../../topics/FEValues/">FEValues</a></li><li><a class="tocitem" href="../../topics/degrees_of_freedom/">Degrees of Freedom</a></li><li><a class="tocitem" href="../../topics/sparse_matrix/">Sparsity pattern and sparse matrices</a></li><li><a class="tocitem" href="../../topics/assembly/">Assembly</a></li><li><a class="tocitem" href="../../topics/boundary_conditions/">Boundary and initial conditions</a></li><li><a class="tocitem" href="../../topics/constraints/">Constraints</a></li><li><a class="tocitem" href="../../topics/grid/">Grid</a></li><li><a class="tocitem" href="../../topics/export/">Export</a></li></ul></li><li><input class="collapse-toggle" id="menuitem-5" type="checkbox"/><label class="tocitem" for="menuitem-5"><span class="docs-label">API reference</span><i class="docs-chevron"></i></label><ul class="collapsed"><li><a class="tocitem" href="../../reference/">Reference overview</a></li><li><a class="tocitem" href="../../reference/quadrature/">Quadrature</a></li><li><a class="tocitem" href="../../reference/interpolations/">Interpolation</a></li><li><a class="tocitem" href="../../reference/fevalues/">FEValues</a></li><li><a class="tocitem" href="../../reference/dofhandler/">Degrees of Freedom</a></li><li><a class="tocitem" href="../../reference/sparsity_pattern/">Sparsity pattern and sparse matrices</a></li><li><a class="tocitem" href="../../reference/assembly/">Assembly</a></li><li><a class="tocitem" href="../../reference/boundary_conditions/">Boundary conditions</a></li><li><a class="tocitem" href="../../reference/grid/">Grid &amp; AbstractGrid</a></li><li><a class="tocitem" href="../../reference/export/">Postprocessing</a></li><li><a class="tocitem" href="../../reference/utils/">Development utility functions</a></li></ul></li><li><input class="collapse-toggle" id="menuitem-6" type="checkbox"/><label class="tocitem" for="menuitem-6"><span class="docs-label">How-to guides</span><i class="docs-chevron"></i></label><ul class="collapsed"><li><a class="tocitem" href="../../howto/">How-to guide overview</a></li><li><a class="tocitem" href="../../howto/postprocessing/">Post processing and visualization</a></li><li><a class="tocitem" href="../../howto/threaded_assembly/">Multi-threaded assembly</a></li></ul></li><br><li><a class="tocitem" href="../../gallery/">Code gallery</a></li><li><a class="tocitem" href="../../devdocs/">Developer documentation</a></li><li><a class="tocitem" href="../../cited-literature/">Cited literature</a></li></ul><div class="docs-version-selector field has-addons"><div class="control"><span class="docs-label button is-static is-size-7">Version</span></div><div class="docs-selector control is-expanded"><div class="select is-fullwidth is-size-7"><select id="documenter-version-selector"></select></div></div></div></nav><div class="docs-main"><header class="docs-navbar"><a class="docs-sidebar-button docs-navbar-link fa-solid fa-bars is-hidden-desktop" id="documenter-sidebar-button" href="#"></a><nav class="breadcrumb"><ul class="is-hidden-mobile"><li><a class="is-disabled">Tutorials</a></li><li class="is-active"><a href>Discontinuous Galerkin heat equation</a></li></ul><ul class="is-hidden-tablet"><li class="is-active"><a href>Discontinuous Galerkin heat equation</a></li></ul></nav><div class="docs-right"><a class="docs-navbar-link" href="https://github.com/Ferrite-FEM/Ferrite.jl" title="View the repository on GitHub"><span class="docs-icon fa-brands"></span><span class="docs-label is-hidden-touch">GitHub</span></a><a class="docs-navbar-link" href="https://github.com/Ferrite-FEM/Ferrite.jl/blob/master/docs/src/literate-tutorials/dg_heat_equation.jl" title="Edit source on GitHub"><span class="docs-icon fa-solid"></span></a><a class="docs-settings-button docs-navbar-link fa-solid fa-gear" id="documenter-settings-button" href="#" title="Settings"></a><a class="docs-article-toggle-button fa-solid fa-chevron-up" id="documenter-article-toggle-button" href="javascript:;" title="Collapse all docstrings"></a></div></header><article class="content" id="documenter-page"><h1 id="tutorial-dg-heat-equation"><a class="docs-heading-anchor" href="#tutorial-dg-heat-equation">Discontinuous Galerkin heat equation</a><a id="tutorial-dg-heat-equation-1"></a><a class="docs-heading-anchor-permalink" href="#tutorial-dg-heat-equation" title="Permalink"></a></h1><p><img src="../dg_heat_equation.png" alt/></p><p><em>Figure 1</em>: Temperature field on the unit square with an internal uniform heat source solved with inhomogeneous Dirichlet boundary conditions on the left and right boundaries and flux on the top and bottom boundaries.</p><div class="admonition is-success"><header class="admonition-header">Tip</header><div class="admonition-body"><p>This example is also available as a Jupyter notebook: <a href="https://nbviewer.jupyter.org/github/Ferrite-FEM/Ferrite.jl/blob/gh-pages/previews/PR1114/tutorials/dg_heat_equation.ipynb"><code>dg_heat_equation.ipynb</code></a>.</p></div></div><p>This example was developed as part of the Google summer of code funded project <a href="https://summerofcode.withgoogle.com/programs/2023/projects/SLGbRNI5">&quot;Discontinuous Galerkin Infrastructure For the finite element toolbox Ferrite.jl&quot;</a></p><h2 id="Introduction"><a class="docs-heading-anchor" href="#Introduction">Introduction</a><a id="Introduction-1"></a><a class="docs-heading-anchor-permalink" href="#Introduction" title="Permalink"></a></h2><p>This tutorial extends <a href="../heat_equation/">Tutorial 1: Heat equation</a> by using the discontinuous Galerkin method. The reader is expected to have gone through <a href="../heat_equation/">Tutorial 1: Heat equation</a> before proceeding with this tutorial. The main differences between the two tutorials are the interface integral terms in the weak form, the boundary conditions, and some implementation differences explained in the commented program below.</p><p>The strong form considered in this tutorial is given as follows</p><p class="math-container">\[ -\boldsymbol{\nabla} \cdot [\boldsymbol{\nabla}(u)] = 1  \quad \textbf{x} \in \Omega,\]</p><p>with the inhomogeneous Dirichlet boundary conditions</p><p class="math-container">\[u(\textbf{x}) = 1 \quad \textbf{x} \in \partial \Omega_D^+ = \lbrace\textbf{x} : x_1 = 1.0\rbrace, \\
+u(\textbf{x}) = -1 \quad \textbf{x} \in \partial \Omega_D^- = \lbrace\textbf{x} : x_1 = -1.0\rbrace,\]</p><p>and Neumann boundary conditions</p><p class="math-container">\[[\boldsymbol{\nabla} (u(\textbf{x}))] \cdot \boldsymbol{n} = 1 \quad \textbf{x} \in \partial \Omega_N^+ = \lbrace\textbf{x} : x_2 = 1.0\rbrace, \\
+[\boldsymbol{\nabla} (u(\textbf{x}))] \cdot \boldsymbol{n} = -1 \quad \textbf{x} \in \partial \Omega_N^- = \lbrace\textbf{x} : x_2 = -1.0\rbrace,\]</p><p>The following definitions of average and jump on interfaces between elements are adopted in this tutorial:</p><p class="math-container">\[ \{u\} = \frac{1}{2}(u^+ + u^-),\quad \llbracket u\rrbracket  = u^+ \boldsymbol{n}^+ + u^- \boldsymbol{n}^-\\\]</p><p>where <span>$u^+$</span> and <span>$u^-$</span> are the temperature on the two sides of the interface.</p><details class="admonition is-details"><summary class="admonition-header">Derivation of the weak form for homogeneous Dirichlet boundary condition</summary><div class="admonition-body"><p>Defining <span>$\boldsymbol{\sigma}$</span> as the gradient of the temperature field the equation can be expressed as</p><p class="math-container">\[ \boldsymbol{\sigma} = \boldsymbol{\nabla} (u),\\
+ -\boldsymbol{\nabla} \cdot \boldsymbol{\sigma} = 1,\]</p><p>Multiplying by test functions $ \boldsymbol{\tau} $ and $ \delta u $ respectively and integrating over the domain,</p><p class="math-container">\[ \int_\Omega \boldsymbol{\sigma} \cdot \boldsymbol{\tau} \,\mathrm{d}\Omega = \int_\Omega [\boldsymbol{\nabla} (u)] \cdot \boldsymbol{\tau} \,\mathrm{d}\Omega,\\
+ -\int_\Omega \boldsymbol{\nabla} \cdot \boldsymbol{\sigma} \delta u \,\mathrm{d}\Omega = \int_\Omega \delta u \,\mathrm{d}\Omega,\]</p><p>Integrating by parts and applying divergence theorem,</p><p class="math-container">\[ \int_\Omega \boldsymbol{\sigma} \cdot \boldsymbol{\tau} \,\mathrm{d}\Omega = -\int_\Omega u (\boldsymbol{\nabla} \cdot \boldsymbol{\tau}) \,\mathrm{d}\Omega + \int_\Gamma \hat{u} \boldsymbol{\tau} \cdot \boldsymbol{n} \,\mathrm{d}\Gamma,\\
+ \int_\Omega \boldsymbol{\sigma} \cdot [\boldsymbol{\nabla} (\delta u)] \,\mathrm{d}\Omega = \int_\Omega \delta u \,\mathrm{d}\Omega + \int_\Gamma \delta u \boldsymbol{\hat{\sigma}} \cdot \boldsymbol{n} \,\mathrm{d}\Gamma,\]</p><p>Where <span>$\boldsymbol{n}$</span> is the outwards pointing normal, <span>$\Gamma$</span> is the union of the elements&#39; boundaries, and <span>$\hat{u}, \, \hat{\sigma}$</span> are the numerical fluxes. Substituting the integrals of form</p><p class="math-container">\[ \int_\Gamma q \boldsymbol{\phi} \cdot \boldsymbol{n} \,\mathrm{d}\Gamma = \int_\Gamma \llbracket q\rrbracket  \cdot \{\boldsymbol{\phi}\} \,\mathrm{d}\Gamma + \int_{\Gamma^0} \{q\} \llbracket \boldsymbol{\phi}\rrbracket  \,\mathrm{d}\Gamma^0,\]</p><p>where <span>$\Gamma^0 : \Gamma \setminus \partial \Omega$</span>, and the jump of the vector-valued field <span>$\boldsymbol{\phi}$</span> is defined as</p><p class="math-container">\[ \llbracket \boldsymbol{\phi}\rrbracket  = \boldsymbol{\phi}^+ \cdot \boldsymbol{n}^+ + \boldsymbol{\phi}^- \cdot \boldsymbol{n}^-\\\]</p><p>with the jumps and averages results in</p><p class="math-container">\[ \int_\Omega \boldsymbol{\sigma} \cdot \boldsymbol{\tau} \,\mathrm{d}\Omega = -\int_\Omega u (\boldsymbol{\nabla} \cdot \boldsymbol{\tau}) \,\mathrm{d}\Omega + \int_\Gamma \llbracket \hat{u}\rrbracket  \cdot \{\boldsymbol{\tau}\} \,\mathrm{d}\Gamma + \int_{\Gamma^0} \{\hat{u}\} \llbracket \boldsymbol{\tau}\rrbracket  \,\mathrm{d}\Gamma^0,\\
+ \int_\Omega \boldsymbol{\sigma} \cdot [\boldsymbol{\nabla} (\delta u)] \,\mathrm{d}\Omega = \int_\Omega \delta u \,\mathrm{d}\Omega + \int_\Gamma \llbracket \delta u\rrbracket  \cdot \{\hat{\boldsymbol{\sigma}}\} \,\mathrm{d}\Gamma + \int_{\Gamma^0} \{\delta u\} \llbracket \hat{\boldsymbol{\sigma}}\rrbracket  \,\mathrm{d}\Gamma^0,\]</p><p>Integrating $ \int_\Omega [\boldsymbol{\nabla} (u)] \cdot \boldsymbol{\tau} \,\mathrm{d}\Omega $ by parts and applying divergence theorem without using numerical flux, then substitute in the equation to obtain a weak form.</p><p class="math-container">\[ \int_\Omega \boldsymbol{\sigma} \cdot \boldsymbol{\tau} \,\mathrm{d}\Omega = \int_\Omega [\boldsymbol{\nabla} (u)] \cdot \boldsymbol{\tau} \,\mathrm{d}\Omega + \int_\Gamma \llbracket \hat{u} - u\rrbracket  \cdot \{\boldsymbol{\tau}\} \,\mathrm{d}\Gamma + \int_{\Gamma^0} \{\hat{u} - u\} \llbracket \boldsymbol{\tau}\rrbracket  \,\mathrm{d}\Gamma^0,\\
+ \int_\Omega \boldsymbol{\sigma} \cdot [\boldsymbol{\nabla} (\delta u)] \,\mathrm{d}\Omega = \int_\Omega \delta u \,\mathrm{d}\Omega + \int_\Gamma \llbracket \delta u\rrbracket  \cdot \{\hat{\boldsymbol{\sigma}}\} \,\mathrm{d}\Gamma + \int_{\Gamma^0} \{\delta u\} \llbracket \hat{\boldsymbol{\sigma}}\rrbracket  \,\mathrm{d}\Gamma^0,\]</p><p>Substituting</p><p class="math-container">\[ \boldsymbol{\tau} = \boldsymbol{\nabla} (\delta u),\\\]</p><p>results in</p><p class="math-container">\[ \int_\Omega \boldsymbol{\sigma} \cdot [\boldsymbol{\nabla} (\delta u)] \,\mathrm{d}\Omega = \int_\Omega [\boldsymbol{\nabla} (u)] \cdot [\boldsymbol{\nabla} (\delta u)] \,\mathrm{d}\Omega + \int_\Gamma \llbracket \hat{u} - u\rrbracket  \cdot \{\boldsymbol{\nabla} (\delta u)\} \,\mathrm{d}\Gamma + \int_{\Gamma^0} \{\hat{u} - u\} \llbracket \boldsymbol{\nabla} (\delta u)\rrbracket  \,\mathrm{d}\Gamma^0,\\
+ \int_\Omega \boldsymbol{\sigma} \cdot [\boldsymbol{\nabla} (\delta u)] \,\mathrm{d}\Omega = \int_\Omega \delta u \,\mathrm{d}\Omega + \int_\Gamma \llbracket \delta u\rrbracket  \cdot \{\hat{\boldsymbol{\sigma}}\} \,\mathrm{d}\Gamma + \int_{\Gamma^0} \{\delta u\} \llbracket \hat{\boldsymbol{\sigma}}\rrbracket  \,\mathrm{d}\Gamma^0,\]</p><p>Combining the two equations,</p><p class="math-container">\[ \int_\Omega [\boldsymbol{\nabla} (u)] \cdot [\boldsymbol{\nabla} (\delta u)] \,\mathrm{d}\Omega + \int_\Gamma \llbracket \hat{u} - u\rrbracket  \cdot \{\boldsymbol{\nabla} (\delta u)\} \,\mathrm{d}\Gamma + \int_{\Gamma^0} \{\hat{u} - u\} \llbracket \boldsymbol{\nabla} (\delta u)\rrbracket  \,\mathrm{d}\Gamma^0 - \int_\Gamma \llbracket \delta u\rrbracket  \cdot \{\hat{\boldsymbol{\sigma}}\} \,\mathrm{d}\Gamma - \int_{\Gamma^0} \{\delta u\} \llbracket \hat{\boldsymbol{\sigma}}\rrbracket  \,\mathrm{d}\Gamma^0 = \int_\Omega \delta u \,\mathrm{d}\Omega,\\\]</p><p>The numerical fluxes chosen for the interior penalty method are <span>$\boldsymbol{\hat{\sigma}} = \{\boldsymbol{\nabla} (u)\} - \alpha(\llbracket u\rrbracket)$</span> on <span>$\Gamma$</span>, <span>$\hat{u} = \{u\}$</span> on the interfaces between elements <span>$\Gamma^0 : \Gamma \setminus \partial \Omega$</span>, and <span>$\hat{u} = 0$</span> on <span>$\partial \Omega$</span>. Such choice results in <span>$\{\hat{\boldsymbol{\sigma}}\} = \{\boldsymbol{\nabla} (u)\} - \alpha(\llbracket u\rrbracket)$</span>, <span>$\llbracket \hat{u}\rrbracket  = 0$</span>, <span>$\{\hat{u}\} = \{u\}$</span>, <span>$\llbracket \hat{\boldsymbol{\sigma}}\rrbracket  = 0$</span> and the equation becomes</p><p class="math-container">\[ \int_\Omega [\boldsymbol{\nabla} (u)] \cdot [\boldsymbol{\nabla} (\delta u)] \,\mathrm{d}\Omega - \int_\Gamma \llbracket u\rrbracket  \cdot \{\boldsymbol{\nabla} (\delta u)\}  \,\mathrm{d}\Gamma - \int_\Gamma \llbracket \delta u\rrbracket  \cdot \{\boldsymbol{\nabla} (u)\} - \llbracket \delta u\rrbracket  \cdot \alpha(\llbracket u\rrbracket)  \,\mathrm{d}\Gamma = \int_\Omega \delta u \,\mathrm{d}\Omega,\\\]</p><p>Where</p><p class="math-container">\[ \alpha(\llbracket u\rrbracket) = \mu \llbracket u\rrbracket\]</p><p>Where <span>$\mu = \eta h_e^{-1}$</span>, the weak form becomes</p><p class="math-container">\[ \int_\Omega [\boldsymbol{\nabla} (u)] \cdot [\boldsymbol{\nabla}] (\delta u) \,\mathrm{d}\Omega - \int_\Gamma \llbracket u \rrbracket \cdot \{\boldsymbol{\nabla} (\delta u)\} + \llbracket \delta u \rrbracket  \cdot \{\boldsymbol{\nabla} (u)\}  \,\mathrm{d}\Gamma + \int_\Gamma \frac{\eta}{h_e} \llbracket u\rrbracket  \cdot \llbracket \delta u\rrbracket   \,\mathrm{d}\Gamma = \int_\Omega \delta u \,\mathrm{d}\Omega,\\\]</p></div></details><p>Since <span>$\partial \Omega$</span> is constrained with both Dirichlet and Neumann boundary conditions the term <span>$\int_{\partial \Omega} [\boldsymbol{\nabla} (u)] \cdot \boldsymbol{n} \delta u \,\mathrm{d} \Omega$</span> can be expressed as an integral over <span>$\partial \Omega_N$</span>, where <span>$\partial \Omega_N$</span> is the boundaries with only prescribed Neumann boundary condition, The resulting weak form is given given as follows: Find <span>$u \in \mathbb{U}$</span> such that</p><p class="math-container">\[ \int_\Omega [\boldsymbol{\nabla} (u)] \cdot [\boldsymbol{\nabla} (\delta u)] \,\mathrm{d}\Omega - \int_{\Gamma^0} \llbracket u\rrbracket \cdot \{\boldsymbol{\nabla} (\delta u)\} + \llbracket \delta u\rrbracket  \cdot \{\boldsymbol{\nabla} (u)\}  \,\mathrm{d}\Gamma^0 + \int_{\Gamma^0} \frac{\eta}{h_e} \llbracket u\rrbracket \cdot \llbracket \delta u\rrbracket   \,\mathrm{d}\Gamma^0 = \int_\Omega \delta u \,\mathrm{d}\Omega + \int_{\partial \Omega_N} ([\boldsymbol{\nabla} (u)] \cdot \boldsymbol{n}) \delta u \,\mathrm{d} \partial \Omega_N,\\\]</p><p>where <span>$h_e$</span> is the characteristic size (the diameter of the interface), and <span>$\eta$</span> is a large enough positive number independent of <span>$h_e$</span> [<a href="../../cited-literature/#Mu:2014:IP">3</a>], <span>$\delta u \in \mathbb{T}$</span> is a test function, and where <span>$\mathbb{U}$</span> and <span>$\mathbb{T}$</span> are suitable trial and test function sets, respectively. We use the value <span>$\eta = (1 + O)^{D}$</span>, where <span>$O$</span> is the polynomial order and <span>$D$</span> the dimension, in this tutorial.</p><p>More details on DG formulations for elliptic problems can be found in [<a href="../../cited-literature/#Cockburn:2002:unifiedanalysis">4</a>].</p><h2 id="Commented-Program"><a class="docs-heading-anchor" href="#Commented-Program">Commented Program</a><a id="Commented-Program-1"></a><a class="docs-heading-anchor-permalink" href="#Commented-Program" title="Permalink"></a></h2><p>Now we solve the problem in Ferrite. What follows is a program spliced with comments. The full program, without comments, can be found in the next <a href="#heat_equation-DG-plain-program">section</a>.</p><p>First we load Ferrite and other packages, and generate grid just like the <a href="../heat_equation/">heat equation tutorial</a></p><pre><code class="language-julia hljs">using Ferrite, SparseArrays
+dim = 2;
+grid = generate_grid(Quadrilateral, ntuple(_ -&gt; 20, dim));</code></pre><p>We construct the topology information which is used later for generating the sparsity pattern for stiffness matrix.</p><pre><code class="language-julia hljs">topology = ExclusiveTopology(grid);</code></pre><h3 id="Trial-and-test-functions"><a class="docs-heading-anchor" href="#Trial-and-test-functions">Trial and test functions</a><a id="Trial-and-test-functions-1"></a><a class="docs-heading-anchor-permalink" href="#Trial-and-test-functions" title="Permalink"></a></h3><p><code>CellValues</code>, <code>FacetValues</code>, and <code>InterfaceValues</code> facilitate the process of evaluating values and gradients of test and trial functions (among other things). To define these we need to specify an interpolation space for the shape functions. We use <code>DiscontinuousLagrange</code> functions based on the two-dimensional reference quadrilateral. We also define a quadrature rule based on the same reference element. We combine the interpolation and the quadrature rule to <code>CellValues</code> and <code>InterfaceValues</code> object. Note that <code>InterfaceValues</code> object contains two <code>FacetValues</code> objects which can be used individually.</p><pre><code class="language-julia hljs">order = 1;
+ip = DiscontinuousLagrange{RefQuadrilateral, order}();
+qr = QuadratureRule{RefQuadrilateral}(2);</code></pre><p>For <code>FacetValues</code> and <code>InterfaceValues</code> we use <code>FacetQuadratureRule</code></p><pre><code class="language-julia hljs">facet_qr = FacetQuadratureRule{RefQuadrilateral}(2);
+cellvalues = CellValues(qr, ip);
+facetvalues = FacetValues(facet_qr, ip);
+interfacevalues = InterfaceValues(facet_qr, ip);</code></pre><h3 id="Penalty-term-parameters"><a class="docs-heading-anchor" href="#Penalty-term-parameters">Penalty term parameters</a><a id="Penalty-term-parameters-1"></a><a class="docs-heading-anchor-permalink" href="#Penalty-term-parameters" title="Permalink"></a></h3><p>We define functions to calculate the diameter of a set of points, used to calculate the characteristic size <span>$h_e$</span> in the assembly routine.</p><pre><code class="language-julia hljs">getdistance(p1::Vec{N, T}, p2::Vec{N, T}) where {N, T} = norm(p1 - p2);
+getdiameter(cell_coords::Vector{Vec{N, T}}) where {N, T} = maximum(getdistance.(cell_coords, reshape(cell_coords, (1, :))));</code></pre><h3 id="Degrees-of-freedom"><a class="docs-heading-anchor" href="#Degrees-of-freedom">Degrees of freedom</a><a id="Degrees-of-freedom-1"></a><a class="docs-heading-anchor-permalink" href="#Degrees-of-freedom" title="Permalink"></a></h3><p>Degrees of freedom distribution is handled using <code>DofHandler</code> as usual</p><pre><code class="language-julia hljs">dh = DofHandler(grid)
+add!(dh, :u, ip)
+close!(dh);</code></pre><p>However, when generating the sparsity pattern we need to pass the topology and the cross-element coupling matrix when we&#39;re using discontinuous interpolations. The cross-element coupling matrix is of size [1,1] in this case as we have only one field and one DofHandler.</p><pre><code class="language-julia hljs">K = allocate_matrix(dh, topology = topology, interface_coupling = trues(1, 1));</code></pre><h3 id="Boundary-conditions"><a class="docs-heading-anchor" href="#Boundary-conditions">Boundary conditions</a><a id="Boundary-conditions-1"></a><a class="docs-heading-anchor-permalink" href="#Boundary-conditions" title="Permalink"></a></h3><p>The Dirichlet boundary conditions are treated as usual by a <code>ConstraintHandler</code>.</p><pre><code class="language-julia hljs">ch = ConstraintHandler(dh)
+add!(ch, Dirichlet(:u, getfacetset(grid, &quot;right&quot;), (x, t) -&gt; 1.0))
+add!(ch, Dirichlet(:u, getfacetset(grid, &quot;left&quot;), (x, t) -&gt; -1.0))
+close!(ch);</code></pre><p>Furthermore, we define <span>$\partial \Omega_N$</span> as the <code>union</code> of the facet sets with Neumann boundary conditions for later use</p><pre><code class="language-julia hljs">∂Ωₙ = union(
+    getfacetset(grid, &quot;top&quot;),
+    getfacetset(grid, &quot;bottom&quot;),
+);</code></pre><h3 id="Assembling-the-linear-system"><a class="docs-heading-anchor" href="#Assembling-the-linear-system">Assembling the linear system</a><a id="Assembling-the-linear-system-1"></a><a class="docs-heading-anchor-permalink" href="#Assembling-the-linear-system" title="Permalink"></a></h3><p>Now we have all the pieces needed to assemble the linear system, <span>$K u = f$</span>. Assembling of the global system is done by looping over i) all the elements in order to compute the element contributions <span>$K_e$</span> and <span>$f_e$</span>, ii) all the interfaces to compute their contributions <span>$K_i$</span>, and iii) all the Neumann boundary facets to compute their contributions <span>$f_e$</span>. All these local contributions are then assembled into the appropriate place in the global <span>$K$</span> and <span>$f$</span>.</p><h4 id="Local-assembly"><a class="docs-heading-anchor" href="#Local-assembly">Local assembly</a><a id="Local-assembly-1"></a><a class="docs-heading-anchor-permalink" href="#Local-assembly" title="Permalink"></a></h4><p>We define the functions</p><ul><li><code>assemble_element!</code> to compute the contributions <span>$K_e$</span> and <span>$f_e$</span> of volume integrals over an element using <code>cellvalues</code>.</li><li><code>assemble_interface!</code> to compute the contribution <span>$K_i$</span> of surface integrals over an interface using <code>interfacevalues</code>.</li><li><code>assemble_boundary!</code> to compute the contribution <span>$f_e$</span> of surface integrals over a boundary facet using <code>FacetValues</code>.</li></ul><pre><code class="language-julia hljs">function assemble_element!(Ke::Matrix, fe::Vector, cellvalues::CellValues)
+    n_basefuncs = getnbasefunctions(cellvalues)
+    # Reset to 0
+    fill!(Ke, 0)
+    fill!(fe, 0)
+    # Loop over quadrature points
+    for q_point in 1:getnquadpoints(cellvalues)
+        # Quadrature weight
+        dΩ = getdetJdV(cellvalues, q_point)
+        # Loop over test shape functions
+        for i in 1:n_basefuncs
+            δu = shape_value(cellvalues, q_point, i)
+            ∇δu = shape_gradient(cellvalues, q_point, i)
+            # Add contribution to fe
+            fe[i] += δu * dΩ
+            # Loop over trial shape functions
+            for j in 1:n_basefuncs
+                ∇u = shape_gradient(cellvalues, q_point, j)
+                # Add contribution to Ke
+                Ke[i, j] += (∇δu ⋅ ∇u) * dΩ
+            end
+        end
+    end
+    return Ke, fe
+end
+
+function assemble_interface!(Ki::Matrix, iv::InterfaceValues, μ::Float64)
+    # Reset to 0
+    fill!(Ki, 0)
+    # Loop over quadrature points
+    for q_point in 1:getnquadpoints(iv)
+        # Get the normal to facet A
+        normal = getnormal(iv, q_point)
+        # Get the quadrature weight
+        dΓ = getdetJdV(iv, q_point)
+        # Loop over test shape functions
+        for i in 1:getnbasefunctions(iv)
+            # Multiply the jump by the negative normal to get the definition from the theory section.
+            δu_jump = shape_value_jump(iv, q_point, i) * (-normal)
+            ∇δu_avg = shape_gradient_average(iv, q_point, i)
+            # Loop over trial shape functions
+            for j in 1:getnbasefunctions(iv)
+                # Multiply the jump by the negative normal to get the definition from the theory section.
+                u_jump = shape_value_jump(iv, q_point, j) * (-normal)
+                ∇u_avg = shape_gradient_average(iv, q_point, j)
+                # Add contribution to Ki
+                Ki[i, j] += -(δu_jump ⋅ ∇u_avg + ∇δu_avg ⋅ u_jump) * dΓ + μ * (δu_jump ⋅ u_jump) * dΓ
+            end
+        end
+    end
+    return Ki
+end
+
+function assemble_boundary!(fe::Vector, fv::FacetValues)
+    # Reset to 0
+    fill!(fe, 0)
+    # Loop over quadrature points
+    for q_point in 1:getnquadpoints(fv)
+        # Get the normal to facet A
+        normal = getnormal(fv, q_point)
+        # Get the quadrature weight
+        ∂Ω = getdetJdV(fv, q_point)
+        # Loop over test shape functions
+        for i in 1:getnbasefunctions(fv)
+            δu = shape_value(fv, q_point, i)
+            boundary_flux = normal[2]
+            fe[i] = boundary_flux * δu * ∂Ω
+        end
+    end
+    return fe
+end</code></pre><h4 id="Global-assembly"><a class="docs-heading-anchor" href="#Global-assembly">Global assembly</a><a id="Global-assembly-1"></a><a class="docs-heading-anchor-permalink" href="#Global-assembly" title="Permalink"></a></h4><p>We define the function <code>assemble_global</code> to loop over all elements and internal facets (interfaces), as well as the external facets involved in Neumann boundary conditions.</p><pre><code class="language-julia hljs">function assemble_global(cellvalues::CellValues, facetvalues::FacetValues, interfacevalues::InterfaceValues, K::SparseMatrixCSC, dh::DofHandler, order::Int, dim::Int)
+    # Allocate the element stiffness matrix and element force vector
+    n_basefuncs = getnbasefunctions(cellvalues)
+    Ke = zeros(n_basefuncs, n_basefuncs)
+    fe = zeros(n_basefuncs)
+    Ki = zeros(n_basefuncs * 2, n_basefuncs * 2)
+    # Allocate global force vector f
+    f = zeros(ndofs(dh))
+    # Create an assembler
+    assembler = start_assemble(K, f)
+    # Loop over all cells
+    for cell in CellIterator(dh)
+        # Reinitialize cellvalues for this cell
+        reinit!(cellvalues, cell)
+        # Compute volume integral contribution
+        assemble_element!(Ke, fe, cellvalues)
+        # Assemble Ke and fe into K and f
+        assemble!(assembler, celldofs(cell), Ke, fe)
+    end
+    # Loop over all interfaces
+    for ic in InterfaceIterator(dh)
+        # Reinitialize interfacevalues for this interface
+        reinit!(interfacevalues, ic)
+        # Calculate the characteristic size hₑ as the face diameter
+        interfacecoords = ∩(getcoordinates(ic)...)
+        hₑ = getdiameter(interfacecoords)
+        # Calculate μ
+        μ = (1 + order)^dim / hₑ
+        # Compute interface surface integrals contribution
+        assemble_interface!(Ki, interfacevalues, μ)
+        # Assemble Ki into K
+        assemble!(assembler, interfacedofs(ic), Ki)
+    end
+    # Loop over domain boundaries with Neumann boundary conditions
+    for fc in FacetIterator(dh, ∂Ωₙ)
+        # Reinitialize facetvalues for this boundary facet
+        reinit!(facetvalues, fc)
+        # Compute boundary facet surface integrals contribution
+        assemble_boundary!(fe, facetvalues)
+        # Assemble fe into f
+        assemble!(f, celldofs(fc), fe)
+    end
+    return K, f
+end
+K, f = assemble_global(cellvalues, facetvalues, interfacevalues, K, dh, order, dim);</code></pre><h3 id="Solution-of-the-system"><a class="docs-heading-anchor" href="#Solution-of-the-system">Solution of the system</a><a id="Solution-of-the-system-1"></a><a class="docs-heading-anchor-permalink" href="#Solution-of-the-system" title="Permalink"></a></h3><p>The solution of the system is independent of the discontinuous discretization and the application of constraints, linear solve, and exporting is done as usual.</p><pre><code class="language-julia hljs">apply!(K, f, ch)
+u = K \ f;
+VTKGridFile(&quot;dg_heat_equation&quot;, dh) do vtk
+    write_solution(vtk, dh, u)
+end;</code></pre><h2 id="References"><a class="docs-heading-anchor" href="#References">References</a><a id="References-1"></a><a class="docs-heading-anchor-permalink" href="#References" title="Permalink"></a></h2><div class="citation noncanonical"><dl><dt>[3]</dt><dd><div>L. Mu, J. Wang, Y. Wang and X. Ye. <a href="https://www.sciencedirect.com/science/article/pii/S0377042713002999"><em>Interior penalty discontinuous Galerkin method on very general polygonal and polyhedral meshes</em></a>. <a href="https://doi.org/10.1016/j.cam.2013.06.003">Journal of Computational and Applied Mathematics <strong>255</strong>, 432–440</a> (2014).</div></dd><dt>[4]</dt><dd><div>D. N. Arnold, F. Brezzi, B. Cockburn and L. D. Marini. <a href="http://www.jstor.org/stable/4101034"><em>Unified Analysis of Discontinuous Galerkin Methods for Elliptic Problems</em></a>. SIAM Journal on Numerical Analysis <strong>39</strong>, 1749–1779 (2002). Accessed on Dec 20, 2023.</div></dd></dl></div><h2 id="heat_equation-DG-plain-program"><a class="docs-heading-anchor" href="#heat_equation-DG-plain-program">Plain program</a><a id="heat_equation-DG-plain-program-1"></a><a class="docs-heading-anchor-permalink" href="#heat_equation-DG-plain-program" title="Permalink"></a></h2><p>Here follows a version of the program without any comments. The file is also available here: <a href="../dg_heat_equation.jl"><code>dg_heat_equation.jl</code></a>.</p><pre><code class="language-julia hljs">using Ferrite, SparseArrays
+dim = 2;
+grid = generate_grid(Quadrilateral, ntuple(_ -&gt; 20, dim));
+
+topology = ExclusiveTopology(grid);
+
+order = 1;
+ip = DiscontinuousLagrange{RefQuadrilateral, order}();
+qr = QuadratureRule{RefQuadrilateral}(2);
+
+facet_qr = FacetQuadratureRule{RefQuadrilateral}(2);
+cellvalues = CellValues(qr, ip);
+facetvalues = FacetValues(facet_qr, ip);
+interfacevalues = InterfaceValues(facet_qr, ip);
+
+getdistance(p1::Vec{N, T}, p2::Vec{N, T}) where {N, T} = norm(p1 - p2);
+getdiameter(cell_coords::Vector{Vec{N, T}}) where {N, T} = maximum(getdistance.(cell_coords, reshape(cell_coords, (1, :))));
+
+dh = DofHandler(grid)
+add!(dh, :u, ip)
+close!(dh);
+
+K = allocate_matrix(dh, topology = topology, interface_coupling = trues(1, 1));
+
+ch = ConstraintHandler(dh)
+add!(ch, Dirichlet(:u, getfacetset(grid, &quot;right&quot;), (x, t) -&gt; 1.0))
+add!(ch, Dirichlet(:u, getfacetset(grid, &quot;left&quot;), (x, t) -&gt; -1.0))
+close!(ch);
+
+∂Ωₙ = union(
+    getfacetset(grid, &quot;top&quot;),
+    getfacetset(grid, &quot;bottom&quot;),
+);
+
+function assemble_element!(Ke::Matrix, fe::Vector, cellvalues::CellValues)
+    n_basefuncs = getnbasefunctions(cellvalues)
+    # Reset to 0
+    fill!(Ke, 0)
+    fill!(fe, 0)
+    # Loop over quadrature points
+    for q_point in 1:getnquadpoints(cellvalues)
+        # Quadrature weight
+        dΩ = getdetJdV(cellvalues, q_point)
+        # Loop over test shape functions
+        for i in 1:n_basefuncs
+            δu = shape_value(cellvalues, q_point, i)
+            ∇δu = shape_gradient(cellvalues, q_point, i)
+            # Add contribution to fe
+            fe[i] += δu * dΩ
+            # Loop over trial shape functions
+            for j in 1:n_basefuncs
+                ∇u = shape_gradient(cellvalues, q_point, j)
+                # Add contribution to Ke
+                Ke[i, j] += (∇δu ⋅ ∇u) * dΩ
+            end
+        end
+    end
+    return Ke, fe
+end
+
+function assemble_interface!(Ki::Matrix, iv::InterfaceValues, μ::Float64)
+    # Reset to 0
+    fill!(Ki, 0)
+    # Loop over quadrature points
+    for q_point in 1:getnquadpoints(iv)
+        # Get the normal to facet A
+        normal = getnormal(iv, q_point)
+        # Get the quadrature weight
+        dΓ = getdetJdV(iv, q_point)
+        # Loop over test shape functions
+        for i in 1:getnbasefunctions(iv)
+            # Multiply the jump by the negative normal to get the definition from the theory section.
+            δu_jump = shape_value_jump(iv, q_point, i) * (-normal)
+            ∇δu_avg = shape_gradient_average(iv, q_point, i)
+            # Loop over trial shape functions
+            for j in 1:getnbasefunctions(iv)
+                # Multiply the jump by the negative normal to get the definition from the theory section.
+                u_jump = shape_value_jump(iv, q_point, j) * (-normal)
+                ∇u_avg = shape_gradient_average(iv, q_point, j)
+                # Add contribution to Ki
+                Ki[i, j] += -(δu_jump ⋅ ∇u_avg + ∇δu_avg ⋅ u_jump) * dΓ + μ * (δu_jump ⋅ u_jump) * dΓ
+            end
+        end
+    end
+    return Ki
+end
+
+function assemble_boundary!(fe::Vector, fv::FacetValues)
+    # Reset to 0
+    fill!(fe, 0)
+    # Loop over quadrature points
+    for q_point in 1:getnquadpoints(fv)
+        # Get the normal to facet A
+        normal = getnormal(fv, q_point)
+        # Get the quadrature weight
+        ∂Ω = getdetJdV(fv, q_point)
+        # Loop over test shape functions
+        for i in 1:getnbasefunctions(fv)
+            δu = shape_value(fv, q_point, i)
+            boundary_flux = normal[2]
+            fe[i] = boundary_flux * δu * ∂Ω
+        end
+    end
+    return fe
+end
+
+function assemble_global(cellvalues::CellValues, facetvalues::FacetValues, interfacevalues::InterfaceValues, K::SparseMatrixCSC, dh::DofHandler, order::Int, dim::Int)
+    # Allocate the element stiffness matrix and element force vector
+    n_basefuncs = getnbasefunctions(cellvalues)
+    Ke = zeros(n_basefuncs, n_basefuncs)
+    fe = zeros(n_basefuncs)
+    Ki = zeros(n_basefuncs * 2, n_basefuncs * 2)
+    # Allocate global force vector f
+    f = zeros(ndofs(dh))
+    # Create an assembler
+    assembler = start_assemble(K, f)
+    # Loop over all cells
+    for cell in CellIterator(dh)
+        # Reinitialize cellvalues for this cell
+        reinit!(cellvalues, cell)
+        # Compute volume integral contribution
+        assemble_element!(Ke, fe, cellvalues)
+        # Assemble Ke and fe into K and f
+        assemble!(assembler, celldofs(cell), Ke, fe)
+    end
+    # Loop over all interfaces
+    for ic in InterfaceIterator(dh)
+        # Reinitialize interfacevalues for this interface
+        reinit!(interfacevalues, ic)
+        # Calculate the characteristic size hₑ as the face diameter
+        interfacecoords = ∩(getcoordinates(ic)...)
+        hₑ = getdiameter(interfacecoords)
+        # Calculate μ
+        μ = (1 + order)^dim / hₑ
+        # Compute interface surface integrals contribution
+        assemble_interface!(Ki, interfacevalues, μ)
+        # Assemble Ki into K
+        assemble!(assembler, interfacedofs(ic), Ki)
+    end
+    # Loop over domain boundaries with Neumann boundary conditions
+    for fc in FacetIterator(dh, ∂Ωₙ)
+        # Reinitialize facetvalues for this boundary facet
+        reinit!(facetvalues, fc)
+        # Compute boundary facet surface integrals contribution
+        assemble_boundary!(fe, facetvalues)
+        # Assemble fe into f
+        assemble!(f, celldofs(fc), fe)
+    end
+    return K, f
+end
+K, f = assemble_global(cellvalues, facetvalues, interfacevalues, K, dh, order, dim);
+
+apply!(K, f, ch)
+u = K \ f;
+VTKGridFile(&quot;dg_heat_equation&quot;, dh) do vtk
+    write_solution(vtk, dh, u)
+end;</code></pre><hr/><p><em>This page was generated using <a href="https://github.com/fredrikekre/Literate.jl">Literate.jl</a>.</em></p></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../linear_shell/">« Linear shell</a><a class="docs-footer-nextpage" href="../../topics/">Topic guide overview »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option><option value="catppuccin-latte">catppuccin-latte</option><option value="catppuccin-frappe">catppuccin-frappe</option><option value="catppuccin-macchiato">catppuccin-macchiato</option><option value="catppuccin-mocha">catppuccin-mocha</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.7.0 on <span class="colophon-date" title="Sunday 1 December 2024 21:32">Sunday 1 December 2024</span>. Using Julia version 1.11.1.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
