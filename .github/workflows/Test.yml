@@ -40,7 +40,7 @@ jobs:
           directories: 'src,ext'
       - uses: codecov/codecov-action@v5
         with:
-          file: lcov.info
+          files: lcov.info
           plugins: noop
           disable_search: true
         env:
