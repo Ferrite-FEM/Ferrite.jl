@@ -23,6 +23,7 @@ struct SharedMemAlloc{Ti <: Integer} <: AbstractCudaMemAlloc
     tot_mem_size::Ti
 end
 
+mem_size(alloc::SharedMemAlloc) = alloc.tot_mem_size
 
 struct GlobalMemAlloc{LOCAL_MATRICES, LOCAL_VECTORS} <: AbstractCudaMemAlloc
     Kes::LOCAL_MATRICES ## global level allocation (i.e. memory for all blocks)

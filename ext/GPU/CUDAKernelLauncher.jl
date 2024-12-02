@@ -18,7 +18,6 @@ function Ferrite.init_kernel(::Type{BackendCUDA}, n_cells::Ti, n_basefuncs::Ti, 
         threads = convert(Ti, min(n_cells, 256))
         shared_mem = _calculate_shared_memory(threads, n_basefuncs)
         blocks = _calculate_nblocks(threads, n_cells)
-        shared_mem = _calculate_shared_memory(threads, n_basefuncs)
         is_shared = _can_use_dynshmem(shared_mem)
         if (is_shared)
             Ke = DynamicSharedMemFunction{Ti}(Float32, (threads, n_basefuncs, n_basefuncs))
