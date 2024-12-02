@@ -16,7 +16,7 @@ grid = create_grid(10)
 
 ip_geo = geometric_interpolation(getcelltype(grid))
 ipu = DiscontinuousLagrange{RefTriangle, 0}()
-ipq = Ferrite.BrezziDouglasMarini{2, RefTriangle, 1}()
+ipq = BrezziDouglasMarini{2, RefTriangle, 1}()
 qr = QuadratureRule{RefTriangle}(2)
 cellvalues = (u = CellValues(qr, ipu, ip_geo), q = CellValues(qr, ipq, ip_geo))
 
