@@ -19,6 +19,7 @@ export
     Serendipity,
     Nedelec,
     RaviartThomas,
+    BrezziDouglasMarini,
     getnbasefunctions,
     getrefshape,
 

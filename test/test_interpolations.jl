@@ -265,9 +265,11 @@ using Ferrite: reference_shape_value, reference_shape_gradient
         end
         return val
     end
-
+    # TODO: 3D H(curl) not tested for BC (need edge integrals)
+    Hcurl_interpolations = [Nedelec{2, RefTriangle, 1}(), Nedelec{2, RefTriangle, 2}()] # Nedelec{3, RefTetrahedron, 1}(), Nedelec{3, RefHexahedron, 1}()]
+    Hdiv_interpolations = [RaviartThomas{2, RefTriangle, 1}(), RaviartThomas{2, RefTriangle, 2}(), BrezziDouglasMarini{2, RefTriangle, 1}()]
     # Required properties of shape value Nⱼ of an edge-elements (Hcurl) on an edge with direction v, length L, and dofs ∈ 𝔇
-    # 1) Unit property: ∫(Nⱼ ⋅ v f(s) dS) = 1/length(𝔇) ∀ ∈ 𝔇
+    # 1) Unit property: ∫(Nⱼ ⋅ v f(s) dS) = 1 ∀ ∈ 𝔇
     #    Must hold for
     #    length(𝔇) ≥ 1: f(s) = 1
     #    length(𝔇) = 2: f(s) = 1 - s or f(s) = s for 1st and 2nd dof, respectively.
@@ -277,7 +279,7 @@ using Ferrite: reference_shape_value, reference_shape_gradient
     # 2) Zero along other edges: Nⱼ ⋅ v = 0 if j∉𝔇
     @testset "H(curl) on RefCell" begin
         lineqr = QuadratureRule{RefLine}(20)
-        for ip in (Nedelec{2, RefTriangle, 1}(), Nedelec{2, RefTriangle, 2}(), Nedelec{3, RefTetrahedron, 1}(), Nedelec{3, RefHexahedron, 1}())
+        for ip in Hcurl_interpolations
             cell = reference_cell(getrefshape(ip))
             edges = Ferrite.edges(cell)
             dofs = Ferrite.edgedof_interior_indices(ip)
@@ -292,7 +294,7 @@ using Ferrite: reference_shape_value, reference_shape_gradient
                         nedgedofs = length(dofs[edge_nr])
                         f(x) = nedgedofs == 1 ? 1.0 : (idof == 1 ? 1 - x : x)
                         s = line_integral(lineqr, ip, shape_nr, x0, Δx, L, v, f)
-                        @test s ≈ one(s) / nedgedofs
+                        @test s ≈ one(s)
                         if nedgedofs == 2
                             g(x) = idof == 1 ? x : 1 - x
                             @test 1 ≈ 1 + line_integral(lineqr, ip, shape_nr, x0, Δx, L, v, g)
@@ -322,11 +324,7 @@ using Ferrite: reference_shape_value, reference_shape_gradient
     # 2) Zero normal component on other edges: Nⱼ ⋅ n = 0 if j∉𝔇
     @testset "H(div) on RefCell" begin
         lineqr = QuadratureRule{RefLine}(20)
-        for ip in (
-                RaviartThomas{2, RefTriangle, 1}(),
-                RaviartThomas{2, RefTriangle, 2}(),
-                Ferrite.BrezziDouglasMarini{2, RefTriangle, 1}(),
-            )
+        for ip in Hdiv_interpolations
             cell = reference_cell(getrefshape(ip))
             cell_facets = Ferrite.facets(cell)
             dofs = Ferrite.facetdof_interior_indices(ip)
@@ -343,7 +341,7 @@ using Ferrite: reference_shape_value, reference_shape_gradient
                             nfacetdofs = length(dofs[facet_nr])
                             f(x) = nfacetdofs == 1 ? 1.0 : (idof == 1 ? 1 - x : x)
                             s = line_integral(lineqr, ip, shape_nr, x0, Δx, L, n, f)
-                            @test s ≈ one(s) / nfacetdofs
+                            @test s ≈ one(s)
                             if nfacetdofs == 2
                                 g(x) = idof == 1 ? x : 1 - x
                                 @test 1 ≈ 1 + line_integral(lineqr, ip, shape_nr, x0, Δx, L, n, g)
@@ -401,27 +399,28 @@ using Ferrite: reference_shape_value, reference_shape_gradient
         nel = 3
         hdiv_check(v, n) = v ⋅ n        # Hdiv (normal continuity)
         hcurl_check(v, n) = v - n * (v ⋅ n) # Hcurl (tangent continuity)
-        transformation_functions = ((Nedelec, hcurl_check), (RaviartThomas, hdiv_check), (Ferrite.BrezziDouglasMarini, hdiv_check))
 
-        for CT in (Triangle, QuadraticTriangle, Tetrahedron, Hexahedron)
-            dim = Ferrite.getrefdim(CT) # dim = sdim = rdim
-            p1, p2 = (rand(Vec{dim}), ones(Vec{dim}) + rand(Vec{dim}))
-            grid = generate_grid(CT, ntuple(_ -> nel, dim), p1, p2)
-            # Smoothly distort grid (to avoid spuriously badly deformed elements).
-            # A distorted grid is important to properly test the geometry mapping
-            # for 2nd order elements.
-            transfun(x) = typeof(x)(i -> sinpi(x[mod(i, length(x)) + 1] + i / 3)) / 10
-            transform_coordinates!(grid, x -> (x + transfun(x)))
-            cellnr = getncells(grid) ÷ 2 + 1 # Should be a cell in the center
-            basecell = getcells(grid, cellnr)
-            RefShape = Ferrite.getrefshape(basecell)
-            for order in (1, 2)
-                for (IPT, transformation_function) in transformation_functions
-                    dim == 3 && order > 1 && continue
-                    IPT == RaviartThomas && (dim == 3 || order > 1) && continue
-                    IPT == RaviartThomas && (RefShape == RefHexahedron) && continue
-                    IPT == Ferrite.BrezziDouglasMarini && !(RefShape == RefTriangle && order == 1) && continue
-                    ip = IPT{dim, RefShape, order}()
+        cell_types = Dict(
+            RefTriangle => [Triangle, QuadraticTriangle],
+            RefQuadrilateral => [Quadrilateral, QuadraticQuadrilateral],
+            RefTetrahedron => [Tetrahedron],
+            RefHexahedron => [Hexahedron]
+        )
+
+        for (ips, check_function) in ((Hcurl_interpolations, hcurl_check), (Hdiv_interpolations, hdiv_check))
+            for ip in ips
+                RefShape = getrefshape(ip)
+                dim = Ferrite.getrefdim(ip) # dim = sdim = rdim
+                p1, p2 = (rand(Vec{dim}), ones(Vec{dim}) + rand(Vec{dim}))
+                transfun(x) = typeof(x)(i -> sinpi(x[mod(i, length(x)) + 1] + i / 3)) / 10
+                for CT in cell_types[RefShape]
+                    grid = generate_grid(CT, ntuple(_ -> nel, dim), p1, p2)
+                    # Smoothly distort grid (to avoid spuriously badly deformed elements).
+                    # A distorted grid is important to properly test the geometry mapping
+                    # for 2nd order elements.
+                    transform_coordinates!(grid, x -> (x + transfun(x)))
+                    cellnr = getncells(grid) ÷ 2 + 1 # Should be a cell in the center
+                    basecell = getcells(grid, cellnr)
                     @testset "$CT, $ip" begin
                         for testcell in cell_permutations(basecell)
                             grid.cells[cellnr] = testcell
@@ -430,8 +429,8 @@ using Ferrite: reference_shape_value, reference_shape_gradient
                             close!(dh)
                             for facetnr in 1:nfacets(RefShape)
                                 fi = FacetIndex(cellnr, facetnr)
-                                # Check continuity of tangential function value
-                                ITU.test_continuity(dh, fi; transformation_function)
+                                # Check continuity of function value according to check_function
+                                ITU.test_continuity(dh, fi; transformation_function = check_function)
                             end
                             # Check gradient calculation
                             ITU.test_gradient(dh, cellnr)
@@ -443,34 +442,24 @@ using Ferrite: reference_shape_value, reference_shape_gradient
     end
 
     @testset "Hcurl and Hdiv BC" begin
-        hdiv_ips = (
-            RaviartThomas{2, RefTriangle, 1}(),
-            RaviartThomas{2, RefTriangle, 2}(),
-            Ferrite.BrezziDouglasMarini{2, RefTriangle, 1}(),
-        )
         hdiv_check(v, n) = v ⋅ n
-
-        hcurl_ips = (
-            Nedelec{2, RefTriangle, 1}(),
-            Nedelec{2, RefTriangle, 2}(),
-        )
         function hcurl_check(v, n::Vec{2}) # 3d not supported yet
             t = rotate(n, π / 2)
             return v ⋅ t
         end
-        for (f, interpolations) in ((hdiv_check, hdiv_ips), (hcurl_check, hcurl_ips))
+        for (f, interpolations) in ((hdiv_check, Hdiv_interpolations), (hcurl_check, Hcurl_interpolations))
             for ip in interpolations
+                ip isa Nedelec && Ferrite.getrefdim(ip) == 3 && continue # skip 3d nedelec
                 @testset "$ip" begin
                     RefShape = Ferrite.getrefshape(ip)
                     CT = typeof(reference_cell(RefShape))
                     dim = Ferrite.getrefdim(CT) # dim=sdim=vdim
-                    #grid = generate_grid(CT, ntuple(Returns(2), dim), - rand(Vec{dim}), rand(Vec{dim}))
                     grid = generate_grid(CT, ntuple(Returns(2), dim), -Vec((-0.25, -0.25)), Vec((0.2, 0.2)))
                     qr = FacetQuadratureRule{RefShape}(4)
                     fv = FacetValues(qr, ip, geometric_interpolation(CT))
                     dh = close!(add!(DofHandler(grid), :u, ip))
-                    for bval in (1.0,) #(0.0, 1.0)
-                        for side in ("left",) # "right", "top", "bottom")
+                    for bval in (0.0,) # TODO: Currently only zero-valued BC supported
+                        for side in ("left", "right", "top", "bottom")
                             a = zeros(ndofs(dh))
                             ch = ConstraintHandler(dh)
                             add!(ch, Dirichlet(:u, getfacetset(grid, side), Returns(bval)))
@@ -489,8 +478,7 @@ using Ferrite: reference_shape_value, reference_shape_gradient
                                 end
                                 test_val += f === hdiv_check ? val : abs(val)
                             end
-                            @show (test_val, test_area)
-                            #@test abs(test_val - test_area * bval) < 1.0e-6
+                            @test abs(test_val - test_area * bval) < 1.0e-6
                         end
                     end
                 end

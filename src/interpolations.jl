@@ -1803,7 +1803,7 @@ dirichlet_facedof_indices(ip::RaviartThomas{3}) = facedof_interior_indices(ip)
 function reference_shape_value(ip::RaviartThomas{2, RefTriangle, 1}, ξ::Vec{2}, i::Int)
     x, y = ξ
     i == 1 && return ξ                  # Flip sign
-    i == 2 && return Vec(x - 1, y)        # Keep sign
+    i == 2 && return Vec(x - 1, y)      # Keep sign
     i == 3 && return Vec(x, y - 1)      # Flip sign
     throw(ArgumentError("no shape function $i for interpolation $ip"))
 end
@@ -1844,17 +1844,17 @@ RefTriangle
 function reference_shape_value(ip::RaviartThomas{2, RefTriangle, 2}, ξ::Vec{2}, i::Int)
     x, y = ξ
     # Face 1 (keep ordering, flip sign)
-    i == 1 && return Vec(4x * (2x - 1), 2y * (4x - 1)) / 2
-    i == 2 && return Vec(2x * (4y - 1), 4y * (2y - 1)) / 2
+    i == 1 && return Vec(4x * (2x - 1), 2y * (4x - 1))
+    i == 2 && return Vec(2x * (4y - 1), 4y * (2y - 1))
     # Face 2 (flip ordering, keep signs)
-    i == 3 && return Vec(8x * y - 2x - 6y + 2, 4y * (2y - 1)) / 2
-    i == 4 && return Vec(-8x^2 - 8x * y + 12x + 6y - 4, 2y * (-4x - 4y + 3)) / 2
+    i == 3 && return Vec(8x * y - 2x - 6y + 2, 4y * (2y - 1))
+    i == 4 && return Vec(-8x^2 - 8x * y + 12x + 6y - 4, 2y * (-4x - 4y + 3))
     # Face 3 (keep ordering, flip sign)
-    i == 5 && return Vec(2x * (3 - 4x - 4y), -8x * y + 6x - 8y^2 + 12y - 4) / 2
-    i == 6 && return Vec(4x * (2x - 1), 8x * y - 6x - 2y + 2) / 2
+    i == 5 && return Vec(2x * (3 - 4x - 4y), -8x * y + 6x - 8y^2 + 12y - 4)
+    i == 6 && return Vec(4x * (2x - 1), 8x * y - 6x - 2y + 2)
     # Cell
-    i == 7 && return Vec(8x * (-2x - y + 2), 8y * (-2x - y + 1)) / 2
-    i == 8 && return Vec(8x * (-2y - x + 1), 8y * (-2y - x + 2)) / 2
+    i == 7 && return Vec(8x * (-2x - y + 2), 8y * (-2x - y + 1))
+    i == 8 && return Vec(8x * (-2y - x + 1), 8y * (-2y - x + 2))
     throw(ArgumentError("no shape function $i for interpolation $ip"))
 end
 
@@ -1900,14 +1900,14 @@ Edge numbers:   | Edge identifiers:
 function reference_shape_value(ip::BrezziDouglasMarini{2, RefTriangle, 1}, ξ::Vec{2}, i::Int)
     x, y = ξ
     # Edge 1: y=1-x, n = [1, 1]/√2 (Flip sign, pos. integration outwards)
-    i == 1 && return Vec(4x, -2y) / 2 # N ⋅ n = (2√2 x - √2 (1-x)) = 3√2 x - √2
-    i == 2 && return Vec(-2x, 4y) / 2 # N ⋅ n = (-√2x + 2√2 (1-x)) = 2√2 - 3√2x
+    i == 1 && return Vec(4x, -2y) # N ⋅ n = (2√2 x - √2 (1-x)) = 3√2 x - √2
+    i == 2 && return Vec(-2x, 4y) # N ⋅ n = (-√2x + 2√2 (1-x)) = 2√2 - 3√2x
     # Edge 2: x=0, n = [-1, 0] (reverse order to follow Ferrite convention)
-    i == 3 && return Vec(-2x - 6y + 2, 4y) / 2 # N ⋅ n = (6y - 2)
-    i == 4 && return Vec(4x + 6y - 4, -2y) / 2 # N ⋅ n = (4 - 6y)
-    # Edge 3: y=0, n = [0, -1] (Flip sign, post. integration outwards)
-    i == 5 && return Vec(-2x, 6x + 4y - 4) / 2 # N ⋅ n = (4 - 6x)
-    i == 6 && return Vec(4x, -6x - 2y + 2) / 2 # N ⋅ n = (6x - 2)
+    i == 3 && return Vec(-2x - 6y + 2, 4y) # N ⋅ n = (6y - 2)
+    i == 4 && return Vec(4x + 6y - 4, -2y) # N ⋅ n = (4 - 6y)
+    # Edge 3: y=0, n = [0, -1] (Flip sign, pos. integration outwards)
+    i == 5 && return Vec(-2x, 6x + 4y - 4) # N ⋅ n = (4 - 6x)
+    i == 6 && return Vec(4x, -6x - 2y + 2) # N ⋅ n = (6x - 2)
     throw(ArgumentError("no shape function $i for interpolation $ip"))
 end
 
@@ -1955,38 +1955,38 @@ function reference_shape_value(ip::Nedelec{2, RefTriangle, 2}, ξ::Vec{2}, i::In
     i == 1 && return Vec(
         2 * y * (1 - 4 * x),
         4 * x * (2 * x - 1)
-    ) / 2
+    )
     i == 2 && return Vec(
         4 * y * (1 - 2 * y),
         2 * x * (4 * y - 1)
-    ) / 2
+    )
     # Face 2 (flip order and sign compared to defelement)
     i == 3 && return Vec(
         4 * y * (1 - 2 * y),
         8 * x * y - 2 * x - 6 * y + 2
-    ) / 2
+    )
     i == 4 && return Vec(
         2 * y * (4 * x + 4 * y - 3),
         -8 * x^2 - 8 * x * y + 12 * x + 6 * y - 4
-    ) / 2
+    )
     # Face 3
     i == 5 && return Vec(
         8 * x * y - 6 * x + 8 * y^2 - 12 * y + 4,
         2 * x * (-4 * x - 4 * y + 3)
-    ) / 2
+    )
     i == 6 && return Vec(
         -8 * x * y + 6 * x + 2 * y - 2,
         4 * x * (2 * x - 1)
-    ) / 2
+    )
     # Cell
     i == 7 && return Vec(
         8 * y * (-x - 2 * y + 2),
         8 * x * (x + 2 * y - 1)
-    ) / 2
+    )
     i == 8 && return Vec(
         8 * y * (2 * x + y - 1),
         8 * x * (-2 * x - y + 2)
-    ) / 2
+    )
     throw(ArgumentError("no shape function $i for interpolation $ip"))
 end
 
