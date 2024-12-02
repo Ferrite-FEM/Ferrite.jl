@@ -65,8 +65,11 @@ function CellValues(::Type{T}, qr::QuadratureRule, ip::Interpolation, ip_geo::Ve
     return CellValues(T, qr, ip, ip_geo, ValuesUpdateFlags(ip; kwargs...))
 end
 
-function Base.copy(cv::CellValues)
-    return CellValues(copy(cv.fun_values), copy(cv.geo_mapping), copy(cv.qr), _copy_or_nothing(cv.detJdV))
+function task_local(cv::CellValues)
+    return CellValues(
+        task_local(cv.fun_values), task_local(cv.geo_mapping), task_local(cv.qr),
+        task_local(cv.detJdV)
+    )
 end
 
 # Access geometry values

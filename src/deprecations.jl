@@ -425,3 +425,14 @@ end
 function celldofs!(::Vector, ::FacetCache)
     throw(DeprecationError("celldofs!(v::Vector, fs::FacetCache)" => "celldofs!(v, celldofs(fc))"))
 end
+
+## Deprecations introduced in Ferrite@1.x (keep until 2.0) ##
+
+# Base.copy -> task_local, https://github.com/Ferrite-FEM/Ferrite.jl/pull/1070
+import Base: copy
+for T in (
+        CellValues, FacetValues, FunctionValues, GeometryMapping, InterfaceValues,
+        Interpolation, QuadratureRule, FacetQuadratureRule,
+    )
+    @eval @deprecate copy(x::$T) task_local(x)
+end
