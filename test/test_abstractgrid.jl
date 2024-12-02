@@ -92,4 +92,19 @@
     colors1 = Ferrite.create_coloring(subtype_grid, alg = ColoringAlgorithm.Greedy)
     colors2 = Ferrite.create_coloring(reference_grid, alg = ColoringAlgorithm.Greedy)
     @test all(colors1 .== colors2)
+
+    @testset "IO interface" begin
+        # Generate files
+        gridfilename = "smallgrid"
+        refgridfilename = "refgrid"
+        VTKGridFile(gridfilename, subtype_grid) do vtk::VTKGridFile
+        end
+        VTKGridFile(refgridfilename, reference_grid) do vtk::VTKGridFile
+        end
+        # Check if the output is the same
+        @test bytes2hex(open(SHA.sha1, gridfilename * ".vtu")) == bytes2hex(open(SHA.sha1, refgridfilename * ".vtu"))
+        # Cleanup
+        rm(gridfilename * ".vtu")
+        rm(refgridfilename * ".vtu")
+    end
 end
