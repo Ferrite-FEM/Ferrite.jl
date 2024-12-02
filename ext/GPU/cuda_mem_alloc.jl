@@ -26,8 +26,8 @@ end
 mem_size(alloc::SharedMemAlloc) = alloc.tot_mem_size
 
 struct GlobalMemAlloc{LOCAL_MATRICES, LOCAL_VECTORS} <: AbstractCudaMemAlloc
-    Kes::LOCAL_MATRICES ## global level allocation (i.e. memory for all blocks)
-    fes::LOCAL_VECTORS  ## global level allocation (i.e. memory for all blocks)
+    Kes::LOCAL_MATRICES ## global level allocation (i.e. memory for all blocks -> 3rd order tensor)
+    fes::LOCAL_VECTORS  ## global level allocation (i.e. memory for all blocks -> 2nd order tensor)
 end
 
 cellke(alloc::GlobalMemAlloc, e::Ti) where {Ti <: Integer} = @view alloc.Kes[e, :, :]

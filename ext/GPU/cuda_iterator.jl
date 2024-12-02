@@ -12,14 +12,16 @@ abstract type AbstractCUDACellIterator <: Ferrite.AbstractKernelCellIterator end
 ncells(iterator::AbstractCUDACellIterator) = iterator.n_cells ## any subtype has to have `n_cells` field
 
 
-struct CUDACellIterator{DH <: Ferrite.GPUDofHandler, GRID <: Ferrite.AbstractGPUGrid, Ti <: Integer, MatrixType, VectorType, AllocType::Type{<:AbstractCudaMemAlloc}} <: AbstractCUDACellIterator
+struct CUDACellIterator{DH <: Ferrite.GPUDofHandler, GRID <: Ferrite.AbstractGPUGrid, Ti <: Integer, MatrixType, VectorType} <: AbstractCUDACellIterator
     dh::DH
     grid::GRID
     n_cells::Ti
     cell_ke::MatrixType
     cell_fe::VectorType
-    alloc_type::AllocType
+    #alloc_type::AllocType
 end
+
+struct CudaOutOfBoundCellIterator <: AbstractCUDACellIterator end  # used to handle the case for out of bound threads
 
 
 function Ferrite.CellIterator(dh::Ferrite.GPUDofHandler, buffer_alloc::GlobalMemAlloc)
@@ -28,9 +30,10 @@ function Ferrite.CellIterator(dh::Ferrite.GPUDofHandler, buffer_alloc::GlobalMem
     bd = blockDim().x
     local_thread_id = threadIdx().x
     global_thread_id = (blockIdx().x - Int32(1)) * bd + local_thread_id
+    global_thread_id <= n_cells || return CudaOutOfBoundCellIterator()
     cell_ke = cellke(buffer_alloc, global_thread_id)
     cell_fe = cellfe(buffer_alloc, global_thread_id)
-    return CUDACellIterator(dh, grid, n_cells, cell_ke, cell_fe, GlobalMemAlloc)
+    return CUDACellIterator(dh, grid, n_cells, cell_ke, cell_fe)
 end
 
 
@@ -42,18 +45,19 @@ function Ferrite.CellIterator(dh::Ferrite.GPUDofHandler, buffer_alloc::SharedMem
     local_thread_id = threadIdx().x
     cell_ke = block_ke[local_thread_id, :, :]
     cell_fe = block_fe[local_thread_id, :]
-    return CUDACellIterator(dh, grid, n_cells, cell_ke, cell_fe, SharedMemAlloc)
+    #return CUDACellIterator(dh, grid, n_cells, cell_ke, cell_fe, SharedMemAlloc)
+    return CUDACellIterator(dh, grid, n_cells, cell_ke, cell_fe)
 end
 
 
-function Base.iterate(iterator::AbstractCUDACellIterator)
+function Base.iterate(iterator::CUDACellIterator)
     i = (blockIdx().x - Int32(1)) * blockDim().x + threadIdx().x
     i <= ncells(iterator)  || return nothing
     return (_makecache(iterator, i), i)
 end
 
 
-function Base.iterate(iterator::AbstractCUDACellIterator, state)
+function Base.iterate(iterator::CUDACellIterator, state)
     stride = blockDim().x * gridDim().x
     i = state + stride
     i <= ncells(iterator) || return nothing
@@ -61,7 +65,12 @@ function Base.iterate(iterator::AbstractCUDACellIterator, state)
 end
 
 
-struct GPUCellCache{DOFS <: AbstractVector{Ti}, NN, NODES <: SVector{NN, Ti}, Ti <: Integer, X, COORDS <: SVector{X}, KDynamicSharedMem, FDynamicSharedMem} <: Ferrite.AbstractKernelCellCache
+Base.iterate(::CudaOutOfBoundCellIterator) = nothing
+
+Base.iterate(::CudaOutOfBoundCellIterator, state) = nothing # I believe this is not necessary
+
+
+struct GPUCellCache{Ti <: Integer, DOFS <: AbstractVector{Ti}, NN, NODES <: SVector{NN, Ti}, X, COORDS <: SVector{X}, MatrixType, VectorType} <: Ferrite.AbstractKernelCellCache
     coords::COORDS
     dofs::DOFS
     cellid::Ti
@@ -71,7 +80,7 @@ struct GPUCellCache{DOFS <: AbstractVector{Ti}, NN, NODES <: SVector{NN, Ti}, Ti
 end
 
 
-function _makecache(iterator::AbstractCUDACellIterator, e::Ti) where {Ti <: Integer}
+function _makecache(iterator::AbstractCUDACellIterator, e::Integer)
     dh = iterator.dh
     grid = iterator.grid
     cellid = e
@@ -161,7 +170,7 @@ The stiffness matrix filled with zeros.
 """
 @inline function Ferrite.cellke(cc::GPUCellCache)
     ke = cc.ke
-    return fill!(ke, 0.0f0)
+    return CUDA.fill!(ke, 0.0f0)
 end
 
 """
@@ -177,5 +186,5 @@ The force vector filled with zeros.
 """
 @inline function Ferrite.cellfe(cc::GPUCellCache)
     fe = cc.fe
-    return fill!(fe, 0.0f0)
+    return CUDA.fill!(fe, 0.0f0)
 end

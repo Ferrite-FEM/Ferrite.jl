@@ -1,20 +1,22 @@
-struct CPULazyKernel{Ti, BKD <: AbstractBackend} <: AbstractKernel
+abstract type AbstractCPUKernel <: AbstractKernel{BackendCPU} end
+
+
+struct CPUKernel{Ti} <: AbstractCPUKernel
     n_cells::Ti               # Number of cells
     n_basefuncs::Ti           # Number of base functions
     kernel::Function          # Kernel function to execute
     args::Tuple               # Arguments for the kernel function
     n_colors::Ti
     dh::ColoringDofHandler
-    backend::Type{BKD} # GPU backend
 end
 
 function init_kernel(::Type{BackendCPU}, n_cells::Ti, n_basefuncs::Ti, kernel::Function, args::Tuple) where {Ti <: Integer}
     args, color_dh = _to_colordh(args) # convert the dofhandler to color colordofhandler
     no_colors = ncolors(color_dh)
-    return CPULazyKernel(n_cells, n_basefuncs, kernel, args, no_colors, color_dh, BackendCPU)
+    return CPUKernel(n_cells, n_basefuncs, kernel, args, no_colors, color_dh)
 end
 
-function launch!(kernel::CPULazyKernel{Ti, BackendCPU}) where {Ti}
+function launch!(kernel::CPUKernel{Ti}) where {Ti}
     ker = kernel.kernel
     args = kernel.args
     ## Naive implementation to circumvent the issue with cellvalues
@@ -36,7 +38,7 @@ function launch!(kernel::CPULazyKernel{Ti, BackendCPU}) where {Ti}
     return
 end
 
-(ker::CPULazyKernel)() = launch!(ker)
+(ker::CPUKernel)() = launch!(ker)
 
 function _to_colordh(args::Tuple)
     dh_index = findfirst(x -> x isa AbstractDofHandler, args)

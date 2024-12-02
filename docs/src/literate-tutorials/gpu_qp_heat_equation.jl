@@ -6,7 +6,7 @@ using CUDA
 
 left = Tensor{1, 2, Float32}((0, -0)) # define the left bottom corner of the grid.
 right = Tensor{1, 2, Float32}((1.0, 1.0)) # define the right top corner of the grid.
-grid = generate_grid(Quadrilateral, (1000, 1000), left, right)
+grid = generate_grid(Quadrilateral, (100, 100), left, right)
 
 
 ip = Lagrange{RefQuadrilateral, 2}() # define the interpolation function (i.e. Bilinear lagrange)
@@ -131,7 +131,7 @@ end
 
 
 # gpu version of global assembly
-function assemble_gpu!(Kgpu, fgpu, cv, dh; mem_alloc::AbstractMemAlloc)
+function assemble_gpu!(Kgpu, fgpu, cv, dh, mem_alloc::AbstractMemAlloc)
     assembler = start_assemble(Kgpu, fgpu; fillzero = false) ## has to be always false
     for cell in CellIterator(dh, mem_alloc)
         Ke = cellke(cell)
@@ -143,7 +143,7 @@ function assemble_gpu!(Kgpu, fgpu, cv, dh; mem_alloc::AbstractMemAlloc)
 end
 
 
-n_basefuncs = getnbasefunctions(cellvalues)
+n_basefuncs = getnbasefunctions(cellvalues) |> Int32
 
 ## Allocate CPU matrix
 #K = allocate_matrix(SparseMatrixCSC{Float64, Int64}, dh);
@@ -152,19 +152,19 @@ n_basefuncs = getnbasefunctions(cellvalues)
 
 # Allocate GPU matrix
 ## commented to pass the test
-## Kgpu = allocate_matrix(CUSPARSE.CuSparseMatrixCSC{Float32, Int32}, dh)
-## fgpu = CUDA.zeros(Float32, ndofs(dh));
+Kgpu = allocate_matrix(CUSPARSE.CuSparseMatrixCSC{Float32, Int32}, dh)
+fgpu = CUDA.zeros(Float32, ndofs(dh));
 
-n_cells = dh |> get_grid |> getncells
+n_cells = dh |> get_grid |> getncells |> Int32
 
 # Kernel configuration
 ## GPU kernel ##
 ## commented to pass the test
 ## First init the kernel with the required config.
-## gpu_kernel = init_kernel(BackendCUDA, n_cells, n_basefuncs, assemble_gpu!, (Kgpu, fgpu, cellvalues, dh))
+gpu_kernel = init_kernel(BackendCUDA, n_cells, n_basefuncs, assemble_gpu!, (Kgpu, fgpu, cellvalues, dh));
 ## Then launch the kernel
 ## gpu_kernel |> launch! or gpu_kernel()
-## gpu_kernel()
+gpu_kernel()
 
 ## CPU kernel ##
 ## cpu_kernel = init_kernel(BackendCPU, n_cells, n_basefuncs, assemble_gpu!, (K, f, cellvalues, dh));

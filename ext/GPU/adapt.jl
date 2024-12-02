@@ -1,5 +1,20 @@
 # This file defines the adapt_structure function, which is used to adapt custom structures to be used on the GPU.
 
+
+## Adapt GlobalMemAlloc
+function Adapt.adapt_structure(to, mem_alloc::GlobalMemAlloc)
+    kes = Adapt.adapt_structure(to, mem_alloc.Kes |> cu)
+    fe = Adapt.adapt_structure(to, mem_alloc.fes |> cu)
+    return GlobalMemAlloc(kes, fe)
+end
+
+## Adapt SharedMemAlloc
+function Adapt.adapt_structure(to, mem_alloc::SharedMemAlloc)
+    Ke = Adapt.adapt_structure(to, mem_alloc.Ke)
+    fe = Adapt.adapt_structure(to, mem_alloc.fe)
+    return SharedMemAlloc(Ke, fe, mem_alloc.tot_mem_size)
+end
+
 function Adapt.adapt_structure(to, cv::CellValues)
     fv = Adapt.adapt(to, StaticInterpolationValues(cv.fun_values))
     gm = Adapt.adapt(to, StaticInterpolationValues(cv.geo_mapping))

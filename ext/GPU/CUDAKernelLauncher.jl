@@ -46,31 +46,26 @@ Launch a CUDA kernel encapsulated in a `LazyKernel` object.
 # Returns
 - `nothing`: Indicates that the kernel was launched and synchronized successfully.
 """
-function Ferrite.launch!(kernel::CudaKernel{SharedMemAlloc})
+function Ferrite.launch!(kernel::CudaKernel{SharedMemAlloc{Ti}, Ti}) where {Ti}
     ker = kernel.kernel
     args = kernel.args
     blocks = kernel.blocks
     threads = kernel.threads
     shmem_size = mem_size(kernel.mem_alloc)
 
-    kwargs = (mem_alloc = kernel.mem_alloc)
-
-    ## use dynamic shared memory if possible
-    return CUDA.@sync @cuda blocks = blocks threads = threads shmem = shmem_size ker(args...; kwargs...)
+    CUDA.@sync @cuda blocks = blocks threads = threads shmem = shmem_size ker(args..., kernel.mem_alloc)
 
     return nothing
 end
 
 
-function Ferrite.launch!(kernel::CudaKernel{GlobalMemAlloc})
+function Ferrite.launch!(kernel::CudaKernel{GlobalMemAlloc{LOCAL_MATRICES, LOCAL_VECTORS}, Ti}) where {LOCAL_MATRICES, LOCAL_VECTORS, Ti}
     ker = kernel.kernel
     args = kernel.args
     blocks = kernel.blocks
     threads = kernel.threads
 
-    kwargs = (mem_alloc = kernel.mem_alloc)
-
-    return CUDA.@sync @cuda blocks = blocks threads = threads ker(args...; kwargs...)
+    CUDA.@sync @cuda blocks = blocks threads = threads ker(args..., kernel.mem_alloc)
 
     return nothing
 end
@@ -121,10 +116,10 @@ Calculate the number of blocks required for kernel execution.
 # Returns
 - `Integer`: Number of blocks to launch.
 """
-function _calculate_nblocks(threads::Integer, n_cells::Integer)
+function _calculate_nblocks(threads::Ti, n_cells::Ti) where {Ti <: Integer}
     dev = device()
     no_sms = CUDA.attribute(dev, CUDA.CU_DEVICE_ATTRIBUTE_MULTIPROCESSOR_COUNT)
     required_blocks = cld(n_cells, threads)
-    required_blocks < 2 * no_sms || return 2 * no_sms
-    return required_blocks
+    required_blocks < 2 * no_sms || return convert(Ti, 2 * no_sms)
+    return convert(Ti, required_blocks)
 end

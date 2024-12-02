@@ -13,9 +13,9 @@ using StaticArrays:
 
 
 include("GPU/gpu_assembler.jl")
+include("GPU/cuda_mem_alloc.jl")
 include("GPU/CUDAKernelLauncher.jl")
 include("GPU/cuda_iterator.jl")
 include("GPU/adapt.jl")
 include("GPU/cuda_sparsity_pattern.jl")
-include("GPU/cuda_mem_alloc.jl")
 end

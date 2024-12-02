@@ -49,6 +49,7 @@ function launch!(::AbstractKernel)
     throw(ErrorException("A concrete implementation of launch! is required"))
 end
 
+(ker::AbstractKernel)() = launch!(ker)
 
 ### GPU Backend ###
 struct BackendCUDA <: AbstractBackend end
