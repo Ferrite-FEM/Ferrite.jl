@@ -95,7 +95,7 @@
 
     @testset "IO interface" begin
         # Generate files
-        gridfilename    = "smallgrid"
+        gridfilename = "smallgrid"
         refgridfilename = "refgrid"
         VTKGridFile(gridfilename, subtype_grid) do vtk::VTKGridFile
         end
