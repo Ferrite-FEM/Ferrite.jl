@@ -20,8 +20,8 @@ function Ferrite.init_kernel(::Type{BackendCUDA}, n_cells::Ti, n_basefuncs::Ti, 
         blocks = _calculate_nblocks(threads, n_cells)
         is_shared = _can_use_dynshmem(shared_mem)
         if (is_shared)
-            Ke = DynamicSharedMemFunction{Ti}(Float32, (threads, n_basefuncs, n_basefuncs))
-            fe = DynamicSharedMemFunction{Ti}(Float32, (threads, n_basefuncs), sizeof(Float32) * bd * n_basefuncs * n_basefuncs)
+            Ke = DynamicSharedMemFunction{3, Float32, Int32}((threads, n_basefuncs, n_basefuncs), Int32(0))
+            fe = DynamicSharedMemFunction{2, Float32, Int32}((threads, n_basefuncs), sizeof(Float32) * threads * n_basefuncs * n_basefuncs |> Int32)
             mem_alloc = SharedMemAlloc(Ke, fe, shared_mem)
             return CudaKernel(n_cells, n_basefuncs, kernel, args, mem_alloc, threads, blocks)
         else
@@ -46,7 +46,7 @@ Launch a CUDA kernel encapsulated in a `LazyKernel` object.
 # Returns
 - `nothing`: Indicates that the kernel was launched and synchronized successfully.
 """
-function Ferrite.launch!(kernel::CudaKernel{SharedMemAlloc{Ti}, Ti}) where {Ti}
+function Ferrite.launch!(kernel::CudaKernel{SharedMemAlloc{N, M, Tv, Ti}, Ti}) where {N, M, Tv, Ti}
     ker = kernel.kernel
     args = kernel.args
     blocks = kernel.blocks
@@ -83,8 +83,8 @@ Calculate the shared memory required for kernel execution.
 # Returns
 - `Integer`: Amount of shared memory in bytes.
 """
-function _calculate_shared_memory(threads::Integer, n_basefuncs::Integer)
-    return sizeof(Float32) * (threads) * (n_basefuncs) * n_basefuncs + sizeof(Float32) * (threads) * n_basefuncs
+function _calculate_shared_memory(threads::Ti, n_basefuncs::Ti) where {Ti <: Integer}
+    return convert(Ti, sizeof(Float32) * (threads) * (n_basefuncs) * n_basefuncs + sizeof(Float32) * (threads) * n_basefuncs)
 end
 
 """

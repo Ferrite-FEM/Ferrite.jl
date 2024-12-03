@@ -18,10 +18,9 @@ struct CUDACellIterator{DH <: Ferrite.GPUDofHandler, GRID <: Ferrite.AbstractGPU
     n_cells::Ti
     cell_ke::MatrixType
     cell_fe::VectorType
-    #alloc_type::AllocType
 end
 
-struct CudaOutOfBoundCellIterator <: AbstractCUDACellIterator end  # used to handle the case for out of bound threads
+struct CudaOutOfBoundCellIterator <: AbstractCUDACellIterator end  # used to handle the case for out of bound threads (global memory only)
 
 
 function Ferrite.CellIterator(dh::Ferrite.GPUDofHandler, buffer_alloc::GlobalMemAlloc)
@@ -43,9 +42,8 @@ function Ferrite.CellIterator(dh::Ferrite.GPUDofHandler, buffer_alloc::SharedMem
     block_ke = buffer_alloc.Ke()
     block_fe = buffer_alloc.fe()
     local_thread_id = threadIdx().x
-    cell_ke = block_ke[local_thread_id, :, :]
-    cell_fe = block_fe[local_thread_id, :]
-    #return CUDACellIterator(dh, grid, n_cells, cell_ke, cell_fe, SharedMemAlloc)
+    cell_ke = @view block_ke[local_thread_id, :, :]
+    cell_fe = @view block_fe[local_thread_id, :]
     return CUDACellIterator(dh, grid, n_cells, cell_ke, cell_fe)
 end
 

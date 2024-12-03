@@ -9,11 +9,20 @@ function Adapt.adapt_structure(to, mem_alloc::GlobalMemAlloc)
 end
 
 ## Adapt SharedMemAlloc
-function Adapt.adapt_structure(to, mem_alloc::SharedMemAlloc)
-    Ke = Adapt.adapt_structure(to, mem_alloc.Ke)
-    fe = Adapt.adapt_structure(to, mem_alloc.fe)
-    return SharedMemAlloc(Ke, fe, mem_alloc.tot_mem_size)
-end
+# function Adapt.adapt_structure(to, mem_alloc::SharedMemAlloc)
+#     @show "Hi1"
+#     Ke = Adapt.adapt_structure(to, mem_alloc.Ke)
+#     fe = Adapt.adapt_structure(to, mem_alloc.fe)
+#     return SharedMemAlloc(Ke, fe, mem_alloc.tot_mem_size)
+# end
+
+# function Adapt.adapt_structure(to,fun::DynamicSharedMemFunction)
+#     @show "Hi2"
+#     Tv = Adapt.adapt_structure(to, fun.Tv)
+#     mem_size = Adapt.adapt_structure(to, fun.mem_size)
+#     offset = Adapt.adapt_structure(to, fun.offset)
+#     return DynamicSharedMemFunction( Tv, mem_size, offset)
+# end
 
 function Adapt.adapt_structure(to, cv::CellValues)
     fv = Adapt.adapt(to, StaticInterpolationValues(cv.fun_values))

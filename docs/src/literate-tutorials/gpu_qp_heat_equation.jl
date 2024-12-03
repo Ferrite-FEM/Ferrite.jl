@@ -6,11 +6,11 @@ using CUDA
 
 left = Tensor{1, 2, Float32}((0, -0)) # define the left bottom corner of the grid.
 right = Tensor{1, 2, Float32}((1.0, 1.0)) # define the right top corner of the grid.
-grid = generate_grid(Quadrilateral, (100, 100), left, right)
+grid = generate_grid(Quadrilateral, (10, 10), left, right)
 
 
-ip = Lagrange{RefQuadrilateral, 2}() # define the interpolation function (i.e. Bilinear lagrange)
-qr = QuadratureRule{RefQuadrilateral}(Float32, 3)
+ip = Lagrange{RefQuadrilateral, 1}() # define the interpolation function (i.e. Bilinear lagrange)
+qr = QuadratureRule{RefQuadrilateral}(Float32, 2)
 cellvalues = CellValues(Float32, qr, ip)
 
 
@@ -201,3 +201,24 @@ gpu_kernel()
 # K,f = setup_bench_cpu(dh)
 # @benchmark assemble_global_std!($cellvalues, $dh, $K, $f)
 # @benchmark assemble_global_qp!($cellvalues, $dh, $K, $f)
+
+
+using CUDA
+using Adapt
+
+struct DynamicSharedMemFunction{N, Tv <: Real, Ti <: Integer}
+    mem_size::NTuple{N, Ti}
+    offset::Ti
+end
+
+
+function test_tuple(tup::DynamicSharedMemFunction)
+    @cushow tup.offset
+    return nothing
+end
+
+
+fun = DynamicSharedMemFunction{3, Float32, Int32}((1, 2, 3), 4)
+Adapt.@adapt_structure DynamicSharedMemFunction
+fun_gpu = Adapt.adapt_structure(CUDA.KernelAdaptor(), fun)
+@cuda test_tuple(fun)
