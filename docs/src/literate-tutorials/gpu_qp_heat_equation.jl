@@ -131,7 +131,7 @@ end
 
 
 # gpu version of global assembly
-function assemble_gpu!(Kgpu, fgpu, cv, dh, mem_alloc::AbstractMemAlloc)
+function assemble_gpu!(Kgpu, fgpu, cv, dh; mem_alloc::AbstractMemAlloc)
     assembler = start_assemble(Kgpu, fgpu; fillzero = false) ## has to be always false
     for cell in CellIterator(dh, mem_alloc)
         Ke = cellke(cell)
@@ -201,24 +201,3 @@ gpu_kernel()
 # K,f = setup_bench_cpu(dh)
 # @benchmark assemble_global_std!($cellvalues, $dh, $K, $f)
 # @benchmark assemble_global_qp!($cellvalues, $dh, $K, $f)
-
-
-using CUDA
-using Adapt
-
-struct DynamicSharedMemFunction{N, Tv <: Real, Ti <: Integer}
-    mem_size::NTuple{N, Ti}
-    offset::Ti
-end
-
-
-function test_tuple(tup::DynamicSharedMemFunction)
-    @cushow tup.offset
-    return nothing
-end
-
-
-fun = DynamicSharedMemFunction{3, Float32, Int32}((1, 2, 3), 4)
-Adapt.@adapt_structure DynamicSharedMemFunction
-fun_gpu = Adapt.adapt_structure(CUDA.KernelAdaptor(), fun)
-@cuda test_tuple(fun)

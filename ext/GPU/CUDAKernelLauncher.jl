@@ -52,8 +52,9 @@ function Ferrite.launch!(kernel::CudaKernel{SharedMemAlloc{N, M, Tv, Ti}, Ti}) w
     blocks = kernel.blocks
     threads = kernel.threads
     shmem_size = mem_size(kernel.mem_alloc)
-
-    CUDA.@sync @cuda blocks = blocks threads = threads shmem = shmem_size ker(args..., kernel.mem_alloc)
+    kwargs = (mem_alloc = kernel.mem_alloc,)
+    kernel_fun = () -> ker(args...; kwargs...)
+    CUDA.@sync @cuda blocks = blocks threads = threads shmem = shmem_size kernel_fun()
 
     return nothing
 end
@@ -64,8 +65,9 @@ function Ferrite.launch!(kernel::CudaKernel{GlobalMemAlloc{LOCAL_MATRICES, LOCAL
     args = kernel.args
     blocks = kernel.blocks
     threads = kernel.threads
-
-    CUDA.@sync @cuda blocks = blocks threads = threads ker(args..., kernel.mem_alloc)
+    kwargs = (mem_alloc = kernel.mem_alloc,)
+    kernel_fun = () -> ker(args...; kwargs...)
+    CUDA.@sync @cuda blocks = blocks threads = threads kernel_fun()
 
     return nothing
 end
