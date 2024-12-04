@@ -18,17 +18,18 @@ function Ferrite.init_kernel(::Type{BackendCUDA}, n_cells::Ti, n_basefuncs::Ti, 
         threads = convert(Ti, min(n_cells, 256))
         shared_mem = _calculate_shared_memory(threads, n_basefuncs)
         blocks = _calculate_nblocks(threads, n_cells)
-        is_shared = _can_use_dynshmem(shared_mem)
-        if (is_shared)
+        _adapted_args = _adapt_args(CuArray, args)
+
+        if (_can_use_dynshmem(shared_mem) && false)
             Ke = DynamicSharedMemFunction{3, Float32, Int32}((threads, n_basefuncs, n_basefuncs), Int32(0))
             fe = DynamicSharedMemFunction{2, Float32, Int32}((threads, n_basefuncs), sizeof(Float32) * threads * n_basefuncs * n_basefuncs |> Int32)
             mem_alloc = SharedMemAlloc(Ke, fe, shared_mem)
-            return CudaKernel(n_cells, n_basefuncs, kernel, args, mem_alloc, threads, blocks)
+            return CudaKernel(n_cells, n_basefuncs, kernel, _adapted_args, mem_alloc, threads, blocks)
         else
             Kes = CUDA.zeros(Float32, n_cells, n_basefuncs, n_basefuncs)
             fes = CUDA.zeros(Float32, n_cells, n_basefuncs)
             mem_alloc = GlobalMemAlloc(Kes, fes)
-            return CudaKernel(n_cells, n_basefuncs, kernel, args, mem_alloc, threads, blocks)
+            return CudaKernel(n_cells, n_basefuncs, kernel, _adapted_args, mem_alloc, threads, blocks)
         end
     else
         throw(ArgumentError("CUDA is not functional, please check your GPU driver and CUDA installation"))
@@ -68,7 +69,6 @@ function Ferrite.launch!(kernel::CudaKernel{GlobalMemAlloc{LOCAL_MATRICES, LOCAL
     kwargs = (mem_alloc = kernel.mem_alloc,)
     kernel_fun = () -> ker(args...; kwargs...)
     CUDA.@sync @cuda blocks = blocks threads = threads kernel_fun()
-
     return nothing
 end
 

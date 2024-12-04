@@ -6,11 +6,11 @@ using CUDA
 
 left = Tensor{1, 2, Float32}((0, -0)) # define the left bottom corner of the grid.
 right = Tensor{1, 2, Float32}((1.0, 1.0)) # define the right top corner of the grid.
-grid = generate_grid(Quadrilateral, (10, 10), left, right)
+grid = generate_grid(Quadrilateral, (5, 5), left, right)
 
 
-ip = Lagrange{RefQuadrilateral, 1}() # define the interpolation function (i.e. Bilinear lagrange)
-qr = QuadratureRule{RefQuadrilateral}(Float32, 2)
+ip = Lagrange{RefQuadrilateral, 2}() # define the interpolation function (i.e. Bilinear lagrange)
+qr = QuadratureRule{RefQuadrilateral}(Float32, 3)
 cellvalues = CellValues(Float32, qr, ip)
 
 
@@ -66,7 +66,6 @@ function assemble_element_qpiter!(Ke::Matrix, fe::Vector, cellvalues, cell_coord
     end
     return Ke, fe
 end
-
 
 # Standard global assembly
 function assemble_global_qp!(cellvalues, dh::DofHandler, K, f)
@@ -131,7 +130,7 @@ end
 
 
 # gpu version of global assembly
-function assemble_gpu!(Kgpu, fgpu, cv, dh; mem_alloc::AbstractMemAlloc)
+function assemble_gpu!(Kgpu, fgpu, dh, cv; mem_alloc::AbstractMemAlloc)
     assembler = start_assemble(Kgpu, fgpu; fillzero = false) ## has to be always false
     for cell in CellIterator(dh, mem_alloc)
         Ke = cellke(cell)
@@ -157,11 +156,12 @@ fgpu = CUDA.zeros(Float32, ndofs(dh));
 
 n_cells = dh |> get_grid |> getncells |> Int32
 
+
 # Kernel configuration
 ## GPU kernel ##
 ## commented to pass the test
 ## First init the kernel with the required config.
-gpu_kernel = init_kernel(BackendCUDA, n_cells, n_basefuncs, assemble_gpu!, (Kgpu, fgpu, cellvalues, dh));
+gpu_kernel = init_kernel(BackendCUDA, n_cells, n_basefuncs, assemble_gpu!, (Kgpu, fgpu, dh, cellvalues));
 ## Then launch the kernel
 ## gpu_kernel |> launch! or gpu_kernel()
 gpu_kernel()
@@ -170,6 +170,8 @@ gpu_kernel()
 ## cpu_kernel = init_kernel(BackendCPU, n_cells, n_basefuncs, assemble_gpu!, (K, f, cellvalues, dh));
 ## cpu_kernel()
 
+
+Adapt.adapt_structure(CUSPARSE.CuSparseDeviceMatrixCSC, Kgpu)
 
 ## commented to pass the test
 ## norm(Kgpu)
