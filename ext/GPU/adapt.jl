@@ -3,8 +3,7 @@
 Adapt.@adapt_structure GPUGrid
 Adapt.@adapt_structure GPUDofHandler
 
-function _adapt_args(to, args)
-    @show "Hi do you see me?"
+function _adapt_args(args)
     return tuple(((_adapt(arg) for arg in args) |> collect)...)
 end
 

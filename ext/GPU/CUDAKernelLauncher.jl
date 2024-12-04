@@ -18,9 +18,9 @@ function Ferrite.init_kernel(::Type{BackendCUDA}, n_cells::Ti, n_basefuncs::Ti, 
         threads = convert(Ti, min(n_cells, 256))
         shared_mem = _calculate_shared_memory(threads, n_basefuncs)
         blocks = _calculate_nblocks(threads, n_cells)
-        _adapted_args = _adapt_args(CuArray, args)
+        _adapted_args = _adapt_args(args)
 
-        if (_can_use_dynshmem(shared_mem) && false)
+        if (_can_use_dynshmem(shared_mem))
             Ke = DynamicSharedMemFunction{3, Float32, Int32}((threads, n_basefuncs, n_basefuncs), Int32(0))
             fe = DynamicSharedMemFunction{2, Float32, Int32}((threads, n_basefuncs), sizeof(Float32) * threads * n_basefuncs * n_basefuncs |> Int32)
             mem_alloc = SharedMemAlloc(Ke, fe, shared_mem)

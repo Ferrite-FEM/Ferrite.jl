@@ -171,8 +171,6 @@ gpu_kernel()
 ## cpu_kernel()
 
 
-Adapt.adapt_structure(CUSPARSE.CuSparseDeviceMatrixCSC, Kgpu)
-
 ## commented to pass the test
 ## norm(Kgpu)
 
