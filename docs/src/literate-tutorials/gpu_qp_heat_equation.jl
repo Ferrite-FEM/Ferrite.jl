@@ -6,7 +6,7 @@ using CUDA
 
 left = Tensor{1, 2, Float32}((0, -0)) # define the left bottom corner of the grid.
 right = Tensor{1, 2, Float32}((1.0, 1.0)) # define the right top corner of the grid.
-grid = generate_grid(Quadrilateral, (5, 5), left, right)
+grid = generate_grid(Quadrilateral, (1000, 1000), left, right)
 
 
 ip = Lagrange{RefQuadrilateral, 2}() # define the interpolation function (i.e. Bilinear lagrange)
@@ -184,12 +184,11 @@ gpu_kernel()
 
 # CUDA.@time setup_bench_gpu(n_cells, n_basefuncs, cellvalues, dh)
 # CUDA.@profile trace = true setup_bench_gpu(n_cells, n_basefuncs, cellvalues, dh)
-# gpu_kernel = setup_bench_gpu(n_cells, n_basefuncs, cellvalues, dh)
 # CUDA.@time gpu_kernel()
 # CUDA.@profile trace = true gpu_kernel()
 
 
-## CPU Benchmarking, remove when not needed ##
+# ## CPU Benchmarking, remove when not needed ##
 # function setup_bench_cpu( dh)
 #     K = allocate_matrix(SparseMatrixCSC{Float64, Int}, dh)
 #     f = zeros(eltype(K), ndofs(dh));
