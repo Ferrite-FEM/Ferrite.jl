@@ -2,6 +2,7 @@
 
 Adapt.@adapt_structure GPUGrid
 Adapt.@adapt_structure GPUDofHandler
+Adapt.@adapt_structure GlobalMemAlloc
 
 function _adapt_args(args)
     return tuple(((_adapt(arg) for arg in args) |> collect)...)
@@ -13,6 +14,7 @@ function _adapt(kgpu::CUSPARSE.CuSparseMatrixCSC)
     return Adapt.adapt_structure(CUSPARSE.CuSparseDeviceMatrixCSC, kgpu)
 end
 
+
 function _adapt(obj::Any)
     # fallback to the default implementation
     return Adapt.adapt_structure(CuArray, obj)
@@ -21,8 +23,8 @@ end
 ## Adapt GlobalMemAlloc
 function Adapt.adapt_structure(to, mem_alloc::GlobalMemAlloc)
     @show "Adapting GlobalMemAlloc"
-    kes = Adapt.adapt_structure(to, mem_alloc.Kes |> cu)
-    fes = Adapt.adapt_structure(to, mem_alloc.fes |> cu)
+    kes = Adapt.adapt_structure(to, mem_alloc.Kes)
+    fes = Adapt.adapt_structure(to, mem_alloc.fes)
     return GlobalMemAlloc(kes, fes)
 end
 

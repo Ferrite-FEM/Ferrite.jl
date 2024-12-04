@@ -14,23 +14,17 @@ end
 
 
 function Ferrite.init_kernel(::Type{BackendCUDA}, n_cells::Ti, n_basefuncs::Ti, kernel::Function, args::Tuple) where {Ti <: Integer}
-    return if CUDA.functional()
+    if CUDA.functional()
         threads = convert(Ti, min(n_cells, 256))
-        shared_mem = _calculate_shared_memory(threads, n_basefuncs)
         blocks = _calculate_nblocks(threads, n_cells)
-        _adapted_args = _adapt_args(args)
+        adapted_args = _adapt_args(args)
 
-        if (_can_use_dynshmem(shared_mem))
-            Ke = DynamicSharedMemFunction{3, Float32, Int32}((threads, n_basefuncs, n_basefuncs), Int32(0))
-            fe = DynamicSharedMemFunction{2, Float32, Int32}((threads, n_basefuncs), sizeof(Float32) * threads * n_basefuncs * n_basefuncs |> Int32)
-            mem_alloc = SharedMemAlloc(Ke, fe, shared_mem)
-            return CudaKernel(n_cells, n_basefuncs, kernel, _adapted_args, mem_alloc, threads, blocks)
-        else
-            Kes = CUDA.zeros(Float32, n_cells, n_basefuncs, n_basefuncs)
-            fes = CUDA.zeros(Float32, n_cells, n_basefuncs)
-            mem_alloc = GlobalMemAlloc(Kes, fes)
-            return CudaKernel(n_cells, n_basefuncs, kernel, _adapted_args, mem_alloc, threads, blocks)
-        end
+        mem_alloc = try_allocate_shared_mem(Float32, threads, n_basefuncs)
+        mem_alloc isa Nothing || return CudaKernel(n_cells, n_basefuncs, kernel, adapted_args, mem_alloc, threads, blocks)
+
+        # FIXME: mem_alloc adapted twice here and in launch!
+        mem_alloc = allocate_global_mem(Float32, n_cells, n_basefuncs) |> _adapt
+        return CudaKernel(n_cells, n_basefuncs, kernel, adapted_args, mem_alloc, threads, blocks)
     else
         throw(ArgumentError("CUDA is not functional, please check your GPU driver and CUDA installation"))
     end
@@ -70,40 +64,6 @@ function Ferrite.launch!(kernel::CudaKernel{GlobalMemAlloc{LOCAL_MATRICES, LOCAL
     kernel_fun = () -> ker(args...; kwargs...)
     CUDA.@sync @cuda blocks = blocks threads = threads kernel_fun()
     return nothing
-end
-
-
-"""
-    _calculate_shared_memory(threads::Integer, n_basefuncs::Integer)
-
-Calculate the shared memory required for kernel execution.
-
-# Arguments
-- `threads::Integer`: Number of threads per block.
-- `n_basefuncs::Integer`: Number of basis functions per cell.
-
-# Returns
-- `Integer`: Amount of shared memory in bytes.
-"""
-function _calculate_shared_memory(threads::Ti, n_basefuncs::Ti) where {Ti <: Integer}
-    return convert(Ti, sizeof(Float32) * (threads) * (n_basefuncs) * n_basefuncs + sizeof(Float32) * (threads) * n_basefuncs)
-end
-
-"""
-    _can_use_dynshmem(required_shmem::Integer)
-
-Check if the GPU supports the required amount of dynamic shared memory.
-
-# Arguments
-- `required_shmem::Integer`: Required shared memory size in bytes.
-
-# Returns
-- `Bool`: `true` if the GPU can provide the required shared memory; `false` otherwise.
-"""
-function _can_use_dynshmem(required_shmem::Integer)
-    dev = device()
-    MAX_DYN_SHMEM = CUDA.attribute(dev, CUDA.CU_DEVICE_ATTRIBUTE_MAX_SHARED_MEMORY_PER_BLOCK)
-    return required_shmem < MAX_DYN_SHMEM
 end
 
 """
