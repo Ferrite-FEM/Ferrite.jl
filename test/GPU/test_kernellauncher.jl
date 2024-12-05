@@ -1,5 +1,5 @@
 # Sample CUDA Kernel (adding two vectors)
-function kernel_add(A, B, C, n)
+function kernel_add(A, B, C, n; mem_alloc)
     i = threadIdx().x + (blockIdx().x - 1) * blockDim().x
     if i <= n
         C[i] = A[i] + B[i]

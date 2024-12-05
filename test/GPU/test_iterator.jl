@@ -4,10 +4,10 @@ function getalldofs(dh)
 end
 
 
-function dof_kernel_kernel!(dofs, dh, n_basefuncs)
+function dof_kernel_kernel!(dofs, dh, n_basefuncs; mem_alloc)
     # this kernel is used to get all the dofs of the grid, which then
     # can be validated against the correct dofs (i.e. CPU version).
-    for cell in CellIterator(dh, convert(Int32, n_basefuncs))
+    for cell in CellIterator(dh, mem_alloc)
         cid = cellid(cell)
         cdofs = celldofs(cell)
         for i in 1:n_basefuncs
@@ -65,9 +65,9 @@ function assemble_element_cpu!(Ke, fe, cellvalues)
     return Ke, fe
 end
 
-function localkefe_kernel!(kes, fes, cv, dh)
+function localkefe_kernel!(kes, fes, cv, dh; mem_alloc)
     nbasefuncs = getnbasefunctions(cv)
-    for cell in CellIterator(dh, convert(Int32, nbasefuncs))
+    for cell in CellIterator(dh, mem_alloc)
         Ke = cellke(cell)
         fe = cellfe(cell)
         assemble_element_gpu!(Ke, fe, cv, cell)

@@ -10,9 +10,9 @@ function dofs_cpu(dh, cv)
 end
 
 
-function dofs_gpu_kernel(dofs, dh, cv)
+function dofs_gpu_kernel(dofs, dh, cv; mem_alloc)
     nbasefuncs = cv |> getnbasefunctions
-    for cell in CellIterator(dh, convert(Int32, nbasefuncs))
+    for cell in CellIterator(dh, mem_alloc)
         cdofs = celldofs(cell)
         dofs[:, cellid(cell)] .= cdofs
     end
@@ -34,9 +34,9 @@ function nodes_cpu(grid)
     return hcat(nodes...)
 end
 
-function nodes_gpu_kernel(nodes, dh, cv)
+function nodes_gpu_kernel(nodes, dh, cv; mem_alloc)
     nbasefuncs = cv |> getnbasefunctions
-    for cell in CellIterator(dh, convert(Int32, nbasefuncs))
+    for cell in CellIterator(dh, mem_alloc)
         cnodes = getnodes(cell)
         nodes[:, cellid(cell)] .= cnodes
     end
