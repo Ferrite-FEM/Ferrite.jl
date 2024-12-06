@@ -36,14 +36,14 @@ for spatial_dim in [3] # 1:3
 
                     LAGRANGE_SUITE["DofHandler"] = BenchmarkGroup()
 
-                    close_helper = function(grid, ip)
+                    close_helper = function (grid, ip)
                         dh = DofHandler(grid)
                         push!(dh, :u, field_dim, ip)
                         return close!(dh)
                     end
                     LAGRANGE_SUITE["DofHandler"]["one-field"] = @benchmarkable $close_helper($grid, $ip)
 
-                    close_helper = function(grid, ip, ip2)
+                    close_helper = function (grid, ip, ip2)
                         dh = DofHandler(grid)
                         push!(dh, :u, field_dim, ip)
                         push!(dh, :p, 1, ip2)
@@ -51,7 +51,7 @@ for spatial_dim in [3] # 1:3
                     end
                     LAGRANGE_SUITE["DofHandler"]["two-fields"] = @benchmarkable $close_helper($grid, $ip, $ip2)
 
-                    close_helper = function(grid)
+                    close_helper = function (grid)
                         dh = DofHandler(grid)
                         sdh = SubDofHandler(dh, Set(1:Int(round(getncells(grid) / 2))))
                         add!(sdh, :u, ip^field_dim)
@@ -59,7 +59,7 @@ for spatial_dim in [3] # 1:3
                     end
                     LAGRANGE_SUITE["DofHandler"]["one-field-subdomain"] = @benchmarkable $close_helper($grid)
 
-                    close_helper = function(grid)
+                    close_helper = function (grid)
                         dh = DofHandler(grid)
                         sdh = SubDofHandler(dh, Set(1:Int(round(getncells(grid) / 2))))
                         add!(sdh, :u, ip^field_dim)
