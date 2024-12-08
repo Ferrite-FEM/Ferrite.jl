@@ -1308,6 +1308,19 @@ function reference_shape_value(ip::Lagrange{RefPyramid, 2}, ξ::Vec{3, T}, i::In
     throw(ArgumentError("no shape function $i for interpolation $ip"))
 end
 
+#####################################
+# Lagrange dim 0 RefPoint order 0   #
+#####################################
+getnbasefunctions(::Lagrange{RefPoint}) = 1
+vertexdof_indices(::Lagrange{RefPoint}) = ((1,),)
+function reference_coordinates(::Lagrange{RefPoint})
+    return [Tensor{1, 0, Float64, 0}(())] # zero dim Vec{0}
+end
+function reference_shape_value(ip::Lagrange{RefPoint}, ξ::Vec{0}, i::Int)
+    return i == 1 && 1.0
+    throw(ArgumentError("no shape function $i for interpolation $ip"))
+end
+
 ###################
 # Bubble elements #
 ###################
