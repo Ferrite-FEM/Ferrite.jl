@@ -82,7 +82,7 @@ A collection of constraints associated with the dof handler `dh`.
 `T` is the numeric type for stored values.
 """
 mutable struct ConstraintHandler{DH <: AbstractDofHandler, T}
-    const dbcs::Vector{Dirichlet}
+    const dbcs::Vector{Dirichlet} #TODO: Vector{Constraint}
     const prescribed_dofs::Vector{Int}
     const free_dofs::Vector{Int}
     const inhomogeneities::Vector{T}
@@ -1760,5 +1760,84 @@ function _condense_local!(
             local_vector[local_col] = 0
         end
     end
+    return
+end
+
+
+##### New constraint
+
+struct RigidConnector # <: Constraint
+    rigidbody_cellid::Int #Cell id
+    rigidbody_field::Symbol
+    facets::Vector{FacetIndex}
+    field_name::Symbol
+end
+
+function RigidConnector(;
+        rigidbody_cellid,
+        rigidbody_field = :rb,
+        facets,
+        field_name = :u
+    )
+    return RigidConnector(rigidbody_cellid, rigidbody_field, collect(facets), field_name)
+end
+
+function add!(ch::ConstraintHandler, c::RigidConnector)
+    (; dh) = ch
+    grid = get_grid(dh)
+
+    xdof, ydof, θdof = celldofs(dh, c.rigidbody_cellid)
+
+    _check_same_celltype(grid, c.facets)
+    @assert getcells(grid, c.rigidbody_cellid) isa Point
+    r = getcoordinates(grid, c.rigidbody_cellid)[1]
+
+    cellid = first(c.facets)[1]
+    sdh_index = dh.cell_to_subdofhandler[cellid]
+    sdh = dh.subdofhandlers[sdh_index]
+
+    field_idx = find_field(sdh, :u) #Hardcoded
+    CT = getcelltype(sdh)
+    ip = getfieldinterpolation(sdh, field_idx)
+    ip_geo = geometric_interpolation(CT)
+    offset = field_offset(sdh, field_idx)
+    n_comp = n_dbc_components(ip)
+
+    local_facet_dofs, local_facet_dofs_offset =
+        _local_facet_dofs_for_bc(ip.ip, n_comp, 1:n_comp, offset)
+
+    dofsadded = Set{Int}()
+    fv = BCValues(ip.ip, ip_geo)
+
+    cc = CellCache(dh, UpdateFlags(; nodes = false, coords = true, dofs = true))
+    for (cellidx, entityidx) in c.facets
+        reinit!(cc, cellidx)
+
+        # no need to reinit!, enough to update current_entity since we only need geometric shape functions M
+        fv.current_entity = entityidx
+
+        # local dof-range for this facet
+        erange = local_facet_dofs_offset[entityidx]:(local_facet_dofs_offset[entityidx + 1] - 1)
+        dofs = cc.dofs
+        #dofs[1] in dofsadded && continue
+
+        c = 0
+        for ipoint in getnquadpoints(fv)
+            x = spatial_coordinate(fv, ipoint, cc.coords)
+
+            # r + A*ū == x
+            ū = x - r
+            uperp = rotate(ū, pi / 2)
+
+            for d in 1:2
+                c += 1
+                globaldof = cc.dofs[local_facet_dofs[erange[c]]]
+                a1 = AffineConstraint(globaldof, [xdof => d == 1 ? 1.0 : 0.0, ydof => d == 2 ? 1.0 : 0.0, θdof => uperp[d]], 0.0)
+                add!(ch, a1)
+                push!(dofsadded, globaldof)
+            end
+        end
+    end
+
     return
 end
