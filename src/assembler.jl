@@ -204,6 +204,14 @@ matrix_handle(a::AbstractCSCAssembler) = a.K
 matrix_handle(a::SymmetricCSCAssembler) = a.K.data
 vector_handle(a::AbstractCSCAssembler) = a.f
 
+function task_local(asm::CSCAssembler)
+    return CSCAssembler(asm.K, asm.f, task_local(asm.permutation), task_local(asm.sorteddofs))
+end
+function task_local(asm::SymmetricCSCAssembler)
+    return SymmetricCSCAssembler(asm.K, asm.f, task_local(asm.permutation), task_local(asm.sorteddofs))
+end
+
+
 """
     start_assemble(K::AbstractSparseMatrixCSC;            fillzero::Bool=true) -> CSCAssembler
     start_assemble(K::AbstractSparseMatrixCSC, f::Vector; fillzero::Bool=true) -> CSCAssembler

@@ -145,35 +145,6 @@
                 # end
 
             end
-
-            @testset "copy(::FacetValues)" begin
-                fvc = copy(fv)
-                @test typeof(fv) == typeof(fvc)
-
-                # Test that all mutable types in FunctionValues and GeometryMapping have been copied
-                for key in (:fun_values, :geo_mapping)
-                    for i in eachindex(getfield(fv, key))
-                        val = getfield(fv, key)[i]
-                        valc = getfield(fvc, key)[i]
-                        for fname in fieldnames(typeof(val))
-                            v = getfield(val, fname)
-                            vc = getfield(valc, fname)
-                            isbits(v) || @test v !== vc
-                            @test v == vc
-                        end
-                    end
-                end
-                # Test that fqr, detJdV, and normals, are copied as expected.
-                # Note that qr remain aliased, as defined by `copy(qr)=qr`, see quadrature.jl.
-                for fname in (:fqr, :detJdV, :normals)
-                    v = getfield(fv, fname)
-                    vc = getfield(fvc, fname)
-                    if fname !== :fqr # Test unaliased
-                        @test v !== vc
-                    end
-                    @test v == vc
-                end
-            end
         end
     end
 

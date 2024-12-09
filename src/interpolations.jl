@@ -116,8 +116,6 @@ nvertices(::Interpolation{RefShape}) where {RefShape} = nvertices(RefShape)
 nedges(::Interpolation{RefShape}) where {RefShape} = nedges(RefShape)
 nfaces(::Interpolation{RefShape}) where {RefShape} = nfaces(RefShape)
 
-Base.copy(ip::Interpolation) = ip
-
 """
     Ferrite.getrefdim(::Interpolation)
 

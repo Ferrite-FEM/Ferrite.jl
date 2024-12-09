@@ -138,31 +138,6 @@
             for (i, qp_x) in pairs(Ferrite.getpoints(quad_rule))
                 @test spatial_coordinate(cv, i, coords) ≈ qp_x
             end
-
-            @testset "copy(::CellValues)" begin
-                cvc = copy(cv)
-                @test typeof(cv) == typeof(cvc)
-
-                # Test that all mutable types in FunctionValues and GeometryMapping have been copied
-                for key in (:fun_values, :geo_mapping)
-                    val = getfield(cv, key)
-                    valc = getfield(cvc, key)
-                    for fname in fieldnames(typeof(val))
-                        v = getfield(val, fname)
-                        vc = getfield(valc, fname)
-                        isbits(v) || @test v !== vc
-                        @test v == vc
-                    end
-                end
-                # Test that qr and detJdV is copied as expected.
-                # Note that qr remain aliased, as defined by `copy(qr)=qr`, see quadrature.jl.
-                for fname in (:qr, :detJdV)
-                    v = getfield(cv, fname)
-                    vc = getfield(cvc, fname)
-                    fname === :qr || @test v !== vc
-                    @test v == vc
-                end
-            end
         end
     end
 
