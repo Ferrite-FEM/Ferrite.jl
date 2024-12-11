@@ -70,7 +70,7 @@ function doassemble!(A, B, dh, cv)
 end
 
 function setup_and_assemble(ip::VectorInterpolation{2, RefTriangle})
-    grid = generate_grid(Triangle, (10, 10))
+    grid = generate_grid(Triangle, (40, 40), zero(Vec{2}), π * ones(Vec{2}))
     cv = CellValues(QuadratureRule{RefTriangle}(2), ip, geometric_interpolation(Triangle))
     dh = close!(add!(DofHandler(grid), :u, ip))
     ∂Ω = union((getfacetset(grid, k) for k in ("left", "top", "right", "bottom"))...)
@@ -81,14 +81,17 @@ function setup_and_assemble(ip::VectorInterpolation{2, RefTriangle})
     A = allocate_matrix(sp)
     B = allocate_matrix(sp)
     doassemble!(A, B, dh, cv)
-    Ferrite.zero_out_rows!(B, ch.dofmapping)
-    Ferrite.zero_out_columns!(B, ch.prescribed_dofs)
-    return A, B, dh
+    #Ferrite.zero_out_rows!(B, ch.dofmapping)
+    #Ferrite.zero_out_columns!(B, ch.prescribed_dofs)
+    fdofs = ch.free_dofs
+    return A, B, dh, fdofs
 end
 
 ip = Nedelec{2, RefTriangle, 1}()
+#ip = Lagrange{RefTriangle, 1}()^2
 
-A, B, dh = setup_and_assemble(ip)
-
-# vals, vecs, info = geneigsolve((A, B), 1, EigSorter(x -> abs(x - 5.0)); maxiter = 1000);
-# λ, ϕ = Arpack.eigs(A, B, nev = 2, sigma=5.5);
+A, B, dh, fdofs = setup_and_assemble(ip)
+Aff = A[fdofs, fdofs]
+Bff = B[fdofs, fdofs]
+# vals, vecs, info = geneigsolve((Aff, Bff), 10, EigSorter(x -> abs(x - 5.0)); maxiter = 1000);
+# λ, ϕ = Arpack.eigs(Aff, Bff, nev = 2, sigma=5.5);

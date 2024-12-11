@@ -34,7 +34,7 @@ function doassemble!(A, B, dh, cv)
 end
 
 function setup_and_assemble(ip::VectorInterpolation{2, RefTriangle})
-    grid = generate_grid(Triangle, (10, 10))
+    grid = generate_grid(Triangle, (40, 40), zero(Vec{2}), π * ones(Vec{2}))
     cv = CellValues(QuadratureRule{RefTriangle}(2), ip, geometric_interpolation(Triangle))
     dh = close!(add!(DofHandler(grid), :u, ip))
     ∂Ω = union((getfacetset(grid, k) for k in ("left", "top", "right", "bottom"))...)
@@ -45,13 +45,17 @@ function setup_and_assemble(ip::VectorInterpolation{2, RefTriangle})
     A = allocate_matrix(sp)
     B = allocate_matrix(sp)
     doassemble!(A, B, dh, cv)
-    Ferrite.zero_out_rows!(B, ch.dofmapping)
-    Ferrite.zero_out_columns!(B, ch.prescribed_dofs)
-    return A, B, dh
+    #Ferrite.zero_out_rows!(B, ch.dofmapping)
+    #Ferrite.zero_out_columns!(B, ch.prescribed_dofs)
+    fdofs = ch.free_dofs
+    return A, B, dh, fdofs
 end
 
 ip = Nedelec{2, RefTriangle, 1}()
+#ip = Lagrange{RefTriangle, 1}()^2
 
-A, B, dh = setup_and_assemble(ip)
+A, B, dh, fdofs = setup_and_assemble(ip)
+Aff = A[fdofs, fdofs]
+Bff = B[fdofs, fdofs]
 
 # This file was generated using Literate.jl, https://github.com/fredrikekre/Literate.jl
