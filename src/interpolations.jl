@@ -1797,6 +1797,10 @@ reference_coordinates(ip::RaviartThomas{vdim}) where {vdim} = fill(NaN * zero(Ve
 dirichlet_edgedof_indices(ip::RaviartThomas{2}) = edgedof_interior_indices(ip)
 dirichlet_facedof_indices(ip::RaviartThomas{3}) = facedof_interior_indices(ip)
 
+# RefTriangle
+edgedof_indices(ip::RaviartThomas{2, RefTriangle}) = edgedof_interior_indices(ip)
+facedof_indices(ip::RaviartThomas{2, RefTriangle}) = (ntuple(i -> i, getnbasefunctions(ip)),)
+
 # RefTriangle, 1st order Lagrange
 # https://defelement.com/elements/examples/triangle-raviart-thomas-lagrange-1.html
 # Signs changed when needed to make positive direction outwards
@@ -1810,6 +1814,7 @@ end
 
 getnbasefunctions(::RaviartThomas{2, RefTriangle, 1}) = 3
 edgedof_interior_indices(::RaviartThomas{2, RefTriangle, 1}) = ((1,), (2,), (3,))
+facedof_interior_indices(::RaviartThomas{2, RefTriangle, 1}) = ((),)
 adjust_dofs_during_distribution(::RaviartThomas) = false
 
 function get_direction(::RaviartThomas{2, RefTriangle, 1}, j, cell)
@@ -1860,7 +1865,7 @@ end
 
 getnbasefunctions(::RaviartThomas{2, RefTriangle, 2}) = 8
 edgedof_interior_indices(::RaviartThomas{2, RefTriangle, 2}) = ((1, 2), (3, 4), (5, 6))
-volumedof_interior_indices(::RaviartThomas{2, RefTriangle, 2}) = (7, 8)
+facedof_interior_indices(::RaviartThomas{2, RefTriangle, 2}) = ((7, 8),)
 adjust_dofs_during_distribution(::RaviartThomas{2, RefTriangle, 2}) = true
 
 function get_direction(::RaviartThomas{2, RefTriangle, 2}, j, cell)
@@ -1877,6 +1882,11 @@ mapping_type(::BrezziDouglasMarini) = ContravariantPiolaMapping()
 reference_coordinates(ip::BrezziDouglasMarini{vdim}) where {vdim} = fill(NaN * zero(Vec{vdim}), getnbasefunctions(ip))
 dirichlet_edgedof_indices(ip::BrezziDouglasMarini{2}) = edgedof_interior_indices(ip)
 n_dbc_components(::BrezziDouglasMarini) = 1
+
+# RefTriangle
+edgedof_indices(ip::BrezziDouglasMarini{2, RefTriangle}) = edgedof_interior_indices(ip)
+facedof_indices(ip::BrezziDouglasMarini{2, RefTriangle}) = (ntuple(i -> i, getnbasefunctions(ip)),)
+
 #=
 ----------------+--------------------
 Vertex numbers: | Vertex coordinates:
@@ -1928,6 +1938,11 @@ mapping_type(::Nedelec) = CovariantPiolaMapping()
 reference_coordinates(ip::Nedelec{vdim}) where {vdim} = fill(NaN * zero(Vec{vdim}), getnbasefunctions(ip))
 dirichlet_edgedof_indices(ip::Nedelec) = edgedof_interior_indices(ip)
 n_dbc_components(::Nedelec) = 1
+edgedof_indices(ip::Nedelec) = edgedof_interior_indices(ip)
+
+# 2D refshape (rdim == vdim for Nedelec)
+facedof_indices(ip::Nedelec{2, <:AbstractRefShape{2}}) = (ntuple(i -> i, getnbasefunctions(ip)),)
+
 # RefTriangle, 1st order Lagrange
 # https://defelement.com/elements/examples/triangle-nedelec1-lagrange-1.html
 function reference_shape_value(ip::Nedelec{2, RefTriangle, 1}, ξ::Vec{2}, i::Int)
@@ -1992,7 +2007,7 @@ end
 
 getnbasefunctions(::Nedelec{2, RefTriangle, 2}) = 8
 edgedof_interior_indices(::Nedelec{2, RefTriangle, 2}) = ((1, 2), (3, 4), (5, 6))
-volumedof_interior_indices(::Nedelec{2, RefTriangle, 2}) = (7, 8)
+facedof_interior_indices(::Nedelec{2, RefTriangle, 2}) = ((7, 8),)
 adjust_dofs_during_distribution(::Nedelec{2, RefTriangle, 2}) = true
 
 function get_direction(::Nedelec{2, RefTriangle, 2}, j, cell)
@@ -2023,6 +2038,8 @@ end
 getnbasefunctions(::Nedelec{3, RefTetrahedron, 1}) = 6
 edgedof_interior_indices(::Nedelec{3, RefTetrahedron, 1}) = ntuple(i -> (i,), 6)
 adjust_dofs_during_distribution(::Nedelec{3, RefTetrahedron, 1}) = false
+
+#TODO: facedof_indices
 
 function get_direction(::Nedelec{3, RefTetrahedron, 1}, j, cell)
     edge = edges(cell)[j]
@@ -2074,6 +2091,8 @@ end
 getnbasefunctions(::Nedelec{3, RefHexahedron, 1}) = 12
 edgedof_interior_indices(::Nedelec{3, RefHexahedron, 1}) = ntuple(i -> (i,), 12)
 adjust_dofs_during_distribution(::Nedelec{3, RefHexahedron, 1}) = false
+
+#TODO: facedof_indices
 
 function get_direction(::Nedelec{3, RefHexahedron, 1}, j, cell)
     edge = edges(cell)[j]

@@ -1,6 +1,6 @@
 using Ferrite: reference_shape_value, reference_shape_gradient
 
-@testset "interpolations" begin # #=
+@testset "interpolations" begin #=
     @testset "Value Type $value_type" for value_type in (Float32, Float64)
         @testset "Correctness of $interpolation" for interpolation in (
                 Lagrange{RefLine, 1}(),
@@ -186,7 +186,7 @@ using Ferrite: reference_shape_value, reference_shape_gradient
                 end
             end
         end
-    end=#
+    end
 
             # VectorizedInterpolation
             v_interpolation_1 = interpolation^2
@@ -203,7 +203,7 @@ using Ferrite: reference_shape_value, reference_shape_gradient
                 @test @inferred(reference_shape_value(v_interpolation_1, x, dof)) isa Vec{2, value_type}
                 @test @inferred(reference_shape_gradient(v_interpolation_3, x, dof)) isa Tensor{2, ref_dim, value_type}
             end
-        end # correctness testset
+        end # correctness testset =#
 
         @test Ferrite.reference_coordinates(DiscontinuousLagrange{RefTriangle, 0}()) ≈ [Vec{2, Float64}((1 / 3, 1 / 3))]
         @test Ferrite.reference_coordinates(DiscontinuousLagrange{RefQuadrilateral, 0}()) ≈ [Vec{2, Float64}((0, 0))]
@@ -265,9 +265,91 @@ using Ferrite: reference_shape_value, reference_shape_gradient
         end
         return val
     end
-    # TODO: 3D H(curl) not tested for BC (need edge integrals)
+
+    # There is some overlap with tests above, this tests some properties more carefully,
+    # and does not assume nodal base functions.
+    function test_interpolation_numbering(ip::Interpolation)
+        RefShape = getrefshape(ip)
+        collect_all_dofs(t::Tuple) = vcat(Int[], collect.(t)...)
+        vdofs = collect_all_dofs(Ferrite.vertexdof_indices(ip))
+        edofs = collect_all_dofs(Ferrite.edgedof_indices(ip))
+        fdofs = collect_all_dofs(Ferrite.facedof_indices(ip))
+        edofs_i = collect_all_dofs(Ferrite.edgedof_interior_indices(ip))
+        fdofs_i = collect_all_dofs(Ferrite.facedof_interior_indices(ip))
+        voldofs_i = Ferrite.volumedof_interior_indices(ip)
+
+        # Check match to reference shape
+        @test length(Ferrite.vertexdof_indices(ip)) == Ferrite.nvertices(RefShape)
+        @test length(Ferrite.edgedof_indices(ip)) == Ferrite.nedges(RefShape)
+        @test length(Ferrite.edgedof_interior_indices(ip)) == Ferrite.nedges(RefShape)
+        @test length(Ferrite.facedof_indices(ip)) == Ferrite.nfaces(RefShape)
+        @test length(Ferrite.facedof_interior_indices(ip)) == Ferrite.nfaces(RefShape)
+
+        # Check numbering convention
+        # Vertices numbered first
+        @test all(vdofs .== 1:length(vdofs))
+        # Edges numbered next, no gaps or missing numbers. Sorted by edge number.
+        all_edofs_i = vcat(collect.(edofs_i)...)
+        @test all(all_edofs_i .== length(vdofs) .+ (1:length(all_edofs_i)))
+        # - all edge dofs include both vertexdofs and interior edegdofs, and nothing more.
+        all_edofs = vcat(collect.(edofs)...)
+        @test all(all_edofs .== 1:length(all_edofs))
+        @test length(all_edofs) == length(vdofs) + length(all_edofs_i)
+        # - test each edge invidividually
+        for i in 1:Ferrite.nedges(RefShape)
+            vdofs_e = Int[]
+            for j in Ferrite.reference_edges(RefShape)[i]
+                vdof_indices = Ferrite.vertexdof_indices(ip)[j]
+                isempty(vdof_indices) || append!(vdofs_e, collect(vdof_indices))
+            end
+            edofs_e = collect(Ferrite.edgedof_interior_indices(ip)[i])
+            @test Set(Ferrite.edgedof_indices(ip)[i]) == Set(vcat(vdofs_e, edofs_e))
+        end
+
+        # Face numbered next, no gaps or missing numbers. Sorted by face number.
+        all_fdofs_i = vcat(collect.(fdofs_i)...)
+        @test all(all_fdofs_i .== length(all_edofs) .+ (1:length(all_fdofs_i)))
+        # - all face dofs include edgedofs and interior facedofs, and nothing more.
+        all_fdofs = vcat(collect.(fdofs)...)
+        @test all(all_fdofs .== 1:length(all_fdofs))
+        # - test each face individually
+        for i in 1:Ferrite.nfaces(RefShape)
+            face_verts = Ferrite.reference_faces(RefShape)[i]
+            vdofs_f = Int[]
+            for j in face_verts
+                vdof_indices = Ferrite.vertexdof_indices(ip)[j]
+                isempty(vdof_indices) || append!(vdofs_f, collect(vdof_indices))
+            end
+            edofs_f = Int[]
+            for (edgenr, edge) in enumerate(Ferrite.reference_edges(RefShape))
+                (edge[1] ∈ face_verts && edge[2] ∈ face_verts) || continue
+                append!(edofs_f, collect(Ferrite.edgedof_interior_indices(ip)[edgenr]))
+            end
+            fdofs_f = collect(Ferrite.facedof_interior_indices(ip)[i])
+            @test Set(Ferrite.facedof_indices(ip)[i]) == Set(vcat(vdofs_f, edofs_f, fdofs_f))
+        end
+
+        # Volumedofs numbered last
+        voldofs = vcat(all_fdofs, collect(voldofs_i))
+        @test length(voldofs) == getnbasefunctions(ip)  # Correct total number of dofs
+        @test all(voldofs .== 1:length(voldofs))        # Numbering convention
+
+        # All base functions implemented. Argument errors for 0th and n+1 indices.
+        ξ = zero(Vec{Ferrite.getrefdim(ip)})
+        @test_throws ArgumentError Ferrite.reference_shape_value(ip, ξ, 0)
+        for i in 1:getnbasefunctions(ip)
+            @test Ferrite.reference_shape_value(ip, ξ, i) isa Ferrite.shape_value_type(ip, Float64)
+        end
+        @test_throws ArgumentError Ferrite.reference_shape_value(ip, ξ, getnbasefunctions(ip) + 1)
+
+    end
+
     Hcurl_interpolations = [Nedelec{2, RefTriangle, 1}(), Nedelec{2, RefTriangle, 2}()] # Nedelec{3, RefTetrahedron, 1}(), Nedelec{3, RefHexahedron, 1}()]
     Hdiv_interpolations = [RaviartThomas{2, RefTriangle, 1}(), RaviartThomas{2, RefTriangle, 2}(), BrezziDouglasMarini{2, RefTriangle, 1}()]
+
+    test_interpolation_numbering.(Hcurl_interpolations)
+    test_interpolation_numbering.(Hdiv_interpolations)
+
     # Required properties of shape value Nⱼ of an edge-elements (Hcurl) on an edge with direction v, length L, and dofs ∈ 𝔇
     # 1) Unit property: ∫(Nⱼ ⋅ v f(s) dS) = 1 ∀ ∈ 𝔇
     #    Must hold for
@@ -313,8 +395,56 @@ using Ferrite: reference_shape_value, reference_shape_gradient
         end
     end
 
+    function facet_parameterization(::Type{RefShape}, ξ, facet_id) where {RefShape <: Ferrite.AbstractRefShape{2}}
+        # facet = edge
+        return edge_parameterization(RefShape, ξ, facet_id)
+    end
+    """
+        edge_parameterization(::Type{<:AbstractRefShape}, ξ, edge_id)
+
+    An edge is parameterized by the normalized curve coordinate `s [0, 1]`,
+    increasing in the positive edge direction.
+    """
+    function edge_parameterization(::Type{RefShape}, ξ, edge_id) where {RefShape <: Ferrite.AbstractRefShape}
+        ipg = Lagrange{RefShape, 1}() # Reference shape always described by 1st order Lagrange ip.
+        refcoords = Ferrite.reference_coordinates(ipg)
+        i1, i2 = Ferrite.edgedof_indices(ipg)[edge_id]
+        ξ1, ξ2 = (refcoords[i1], refcoords[i2])
+        Δξ = ξ2 - ξ1
+        L = norm(Δξ)
+        s = (ξ - ξ1) ⋅ normalize(Δξ) / L
+        @assert norm(ξ - ξ1) ≈ L * s # Ensure ξ is on the line ξ1 - ξ2
+        @assert -eps(L) ≤ s ≤ (1 + eps(L)) # Ensure ξ is between ξ1 and ξ2
+        return s
+    end
+
+    function facet_parameterization(::Type{<:Ferrite.AbstractRefShape{3}}, ξ, facet_id)
+        # Not implemented (not yet defined in Ferrite what this should be),
+        # but to support testing interpolations with a single facedof interior index,
+        # we return `nothing` just to allow running the code as long as the output isn't used.
+        return nothing
+    end
+
+    function integrate_facet(fv::FacetValues, f::Function, shapenr::Int, cell::Ferrite.AbstractCell{RefShape}) where {RefShape}
+        facet_id = Ferrite.getcurrentfacet(fv)
+        function qpoint_contribution(q_point)
+            ξ = Ferrite.getpoints(fv.fqr, facet_id)[q_point]
+            # facet parameterization: 1D [0, 1], 2D ([0, 1], [0, 1])
+            s = facet_parameterization(RefShape, ξ, facet_id)
+            n = getnormal(fv, q_point)
+            facet_sign = Ferrite.get_direction(Ferrite.function_interpolation(fv), shapenr, cell)
+            N = shape_value(fv, q_point, shapenr) * facet_sign # Ensure no reorientation.
+            return f(s, N, n) * getdetJdV(fv, q_point)
+        end
+        val = qpoint_contribution(1)
+        for q_point in 2:getnquadpoints(fv)
+            val += qpoint_contribution(q_point)
+        end
+        return val
+    end
+
     # Required properties of shape value Nⱼ of an edge-elements (Hdiv) on an edge with normal n, length L, and dofs ∈ 𝔇
-    # 1) Unit property: ∫(Nⱼ ⋅ n f(s) dS) = 1/length(𝔇) ∀ j ∈ 𝔇
+    # 1) Unit property: ∫(Nⱼ ⋅ n f(s) dS) = 1 ∀ j ∈ 𝔇
     #    Must hold for
     #    length(𝔇) ≥ 1: f(s) = 1
     #    length(𝔇) = 2: f(s) = 1 - s or f(s) = s for 1st and 2nd dof, respectively.
@@ -323,28 +453,32 @@ using Ferrite: reference_shape_value, reference_shape_gradient
     #    s is the path parameter ∈[0,1] along the positive direction of the path.
     # 2) Zero normal component on other edges: Nⱼ ⋅ n = 0 if j∉𝔇
     @testset "H(div) on RefCell" begin
-        lineqr = QuadratureRule{RefLine}(20)
+        reference_moment_functions(::RaviartThomas{2, RefTriangle, 1}) = (Returns(1.0),)
+        reference_moment_functions(::RaviartThomas{2, RefTriangle, 2}) = (s -> 1 - s, s -> s)
+        reference_moment_functions(::BrezziDouglasMarini{2, RefTriangle, 1}) = (s -> 1 - s, s -> s)
+
         for ip in Hdiv_interpolations
             cell = reference_cell(getrefshape(ip))
+            fqr = FacetQuadratureRule{getrefshape(ip)}(4)
+            fv = FacetValues(fqr, ip, Lagrange{getrefshape(ip), 1}())
             cell_facets = Ferrite.facets(cell)
             dofs = Ferrite.facetdof_interior_indices(ip)
             x = Ferrite.reference_coordinates(geometric_interpolation(typeof(cell)))
             normals = reference_normals(geometric_interpolation(typeof(cell)))
             @testset "$ip" begin
                 for (facet_nr, (i1, i2)) in enumerate(cell_facets)
+                    reinit!(fv, reference_cell(getrefshape(ip)), x, facet_nr)
                     @testset "Facet $facet_nr" begin
-                        Δx = x[i2] - x[i1]
-                        x0 = (x[i1] + x[i2]) / 2
-                        L = norm(Δx)
                         n = normals[facet_nr]
-                        for (idof, shape_nr) in enumerate(dofs[facet_nr])
-                            nfacetdofs = length(dofs[facet_nr])
-                            f(x) = nfacetdofs == 1 ? 1.0 : (idof == 1 ? 1 - x : x)
-                            s = line_integral(lineqr, ip, shape_nr, x0, Δx, L, n, f)
-                            @test s ≈ one(s)
-                            if nfacetdofs == 2
-                                g(x) = idof == 1 ? x : 1 - x
-                                @test 1 ≈ 1 + line_integral(lineqr, ip, shape_nr, x0, Δx, L, n, g)
+                        Δx = x[i2] - x[i1]
+                        for (rmf_idx, rm_fun) in enumerate(reference_moment_functions(ip))
+                            f(s, N, nq) = rm_fun(s) * (N ⋅ nq)
+                            for (idof, shape_nr) in enumerate(dofs[facet_nr])
+                                if idof == rmf_idx
+                                    @test 1 ≈ integrate_facet(fv, f, shape_nr, cell)
+                                else
+                                    @test 1 ≈ 1 + integrate_facet(fv, f, shape_nr, cell)
+                                end
                             end
                         end
                         for (j_facet, shape_nrs) in enumerate(dofs)
@@ -497,7 +631,7 @@ using Ferrite: reference_shape_value, reference_shape_gradient
         @test_throws ArgumentError Ferrite.facedof_interior_indices(ip)
         @test_throws ArgumentError Ferrite.volumedof_interior_indices(ip)
         @test_throws ArgumentError Ferrite.facetdof_interior_indices(ip)
-    end
+    end # =#
 
 
 end # testset
