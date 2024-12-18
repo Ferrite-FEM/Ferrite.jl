@@ -129,6 +129,9 @@ add!(dh, :u, ip_u)
 add!(dh, :p, ip_p)
 close!(dh)
 ```
+
+!!! note
+    The dof numbering does not follow the node numbering of the associated grid.
 """
 function DofHandler(grid::G) where {dim, G <: AbstractGrid{dim}}
     ncells = getncells(grid)
