@@ -12,7 +12,7 @@
 
 #=
 **Not working:** Maybe try the standard laplace eigenvalue problem
-https://www.cambridge.org/core/services/aop-cambridge-core/content/view/4BD87CC520C7E11CF402981AA58D77E2/S0962492910000012a.pdf/finite-element-approximation-of-eigenvalue-problems.pdf
+[https://www.cambridge.org/core/services/aop-cambridge-core/content/view/4BD87CC520C7E11CF402981AA58D77E2/S0962492910000012a.pdf/finite-element-approximation-of-eigenvalue-problems.pdf](https://www.cambridge.org/core/services/aop-cambridge-core/content/view/4BD87CC520C7E11CF402981AA58D77E2/S0962492910000012a.pdf/finite-element-approximation-of-eigenvalue-problems.pdf)
 
 # Maxwell eigenvalue problem
 Strong form
