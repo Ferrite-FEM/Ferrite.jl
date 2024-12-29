@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/><title>Linear elasticity · Ferrite.jl</title><meta name="title" content="Linear elasticity · Ferrite.jl"/><meta property="og:title" content="Linear elasticity · Ferrite.jl"/><meta property="twitter:title" content="Linear elasticity · Ferrite.jl"/><meta name="description" content="Documentation for Ferrite.jl."/><meta property="og:description" content="Documentation for Ferrite.jl."/><meta property="twitter:description" content="Documentation for Ferrite.jl."/><meta property="og:url" content="https://ferrite-fem.github.io/Ferrite.jl/stable/tutorials/linear_elasticity/"/><meta property="twitter:url" content="https://ferrite-fem.github.io/Ferrite.jl/stable/tutorials/linear_elasticity/"/><link rel="canonical" href="https://ferrite-fem.github.io/Ferrite.jl/stable/tutorials/linear_elasticity/"/><script data-outdated-warner src="../../assets/warner.js"></script><link href="https://cdnjs.cloudflare.com/ajax/libs/lato-font/3.0.0/css/lato-font.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/juliamono/0.050/juliamono.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/fontawesome.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/solid.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/brands.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.8/katex.min.css" rel="stylesheet" type="text/css"/><script>documenterBaseURL="../.."</script><script src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.6/require.min.js" data-main="../../assets/documenter.js"></script><script src="../../search_index.js"></script><script src="../../siteinfo.js"></script><script src="../../../versions.js"></script><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/catppuccin-mocha.css" data-theme-name="catppuccin-mocha"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/catppuccin-macchiato.css" data-theme-name="catppuccin-macchiato"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/catppuccin-frappe.css" data-theme-name="catppuccin-frappe"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/catppuccin-latte.css" data-theme-name="catppuccin-latte"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/documenter-dark.css" data-theme-name="documenter-dark" data-theme-primary-dark/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/documenter-light.css" data-theme-name="documenter-light" data-theme-primary/><script src="../../assets/themeswap.js"></script><link href="../../assets/custom.css" rel="stylesheet" type="text/css"/><link href="../../assets/citations.css" rel="stylesheet" type="text/css"/><link href="../../assets/favicon.ico" rel="icon" type="image/x-icon"/></head><body><div id="documenter"><nav class="docs-sidebar"><a class="docs-logo" href="../../"><img src="../../assets/logo.svg" alt="Ferrite.jl logo"/></a><div class="docs-package-name"><span class="docs-autofit"><a href="../../">Ferrite.jl</a></span></div><button class="docs-search-query input is-rounded is-small is-clickable my-2 mx-auto py-1 px-2" id="documenter-search-query">Search docs (Ctrl + /)</button><ul class="docs-menu"><li><a class="tocitem" href="../../">Home</a></li><li><input class="collapse-toggle" id="menuitem-3" type="checkbox" checked/><label class="tocitem" for="menuitem-3"><span class="docs-label">Tutorials</span><i class="docs-chevron"></i></label><ul class="collapsed"><li><a class="tocitem" href="../">Tutorials overview</a></li><li><a class="tocitem" href="../heat_equation/">Heat equation</a></li><li class="is-active"><a class="tocitem" href>Linear elasticity</a><ul class="internal"><li><a class="tocitem" href="#Introduction"><span>Introduction</span></a></li><li><a class="tocitem" href="#Implementation"><span>Implementation</span></a></li><li><a class="tocitem" href="#linear_elasticity-plain-program"><span>Plain program</span></a></li></ul></li><li><a class="tocitem" href="../incompressible_elasticity/">Incompressible elasticity</a></li><li><a class="tocitem" href="../hyperelasticity/">Hyperelasticity</a></li><li><a class="tocitem" href="../plasticity/">Von Mises plasticity</a></li><li><a class="tocitem" href="../transient_heat_equation/">Transient heat equation</a></li><li><a class="tocitem" href="../computational_homogenization/">Computational homogenization</a></li><li><a class="tocitem" href="../stokes-flow/">Stokes flow</a></li><li><a class="tocitem" href="../porous_media/">Porous media</a></li><li><a class="tocitem" href="../ns_vs_diffeq/">Incompressible Navier-Stokes equations via DifferentialEquations.jl</a></li><li><a class="tocitem" href="../reactive_surface/">Reactive surface</a></li><li><a class="tocitem" href="../linear_shell/">Linear shell</a></li><li><a class="tocitem" href="../dg_heat_equation/">Discontinuous Galerkin heat equation</a></li></ul></li><li><input class="collapse-toggle" id="menuitem-4" type="checkbox"/><label class="tocitem" for="menuitem-4"><span class="docs-label">Topic guides</span><i class="docs-chevron"></i></label><ul class="collapsed"><li><a class="tocitem" href="../../topics/">Topic guide overview</a></li><li><a class="tocitem" href="../../topics/fe_intro/">Introduction to FEM</a></li><li><a class="tocitem" href="../../topics/reference_shapes/">Reference shapes</a></li><li><a class="tocitem" href="../../topics/FEValues/">FEValues</a></li><li><a class="tocitem" href="../../topics/degrees_of_freedom/">Degrees of Freedom</a></li><li><a class="tocitem" href="../../topics/sparse_matrix/">Sparsity pattern and sparse matrices</a></li><li><a class="tocitem" href="../../topics/assembly/">Assembly</a></li><li><a class="tocitem" href="../../topics/boundary_conditions/">Boundary and initial conditions</a></li><li><a class="tocitem" href="../../topics/constraints/">Constraints</a></li><li><a class="tocitem" href="../../topics/grid/">Grid</a></li><li><a class="tocitem" href="../../topics/export/">Export</a></li></ul></li><li><input class="collapse-toggle" id="menuitem-5" type="checkbox"/><label class="tocitem" for="menuitem-5"><span class="docs-label">API reference</span><i class="docs-chevron"></i></label><ul class="collapsed"><li><a class="tocitem" href="../../reference/">Reference overview</a></li><li><a class="tocitem" href="../../reference/quadrature/">Quadrature</a></li><li><a class="tocitem" href="../../reference/interpolations/">Interpolation</a></li><li><a class="tocitem" href="../../reference/fevalues/">FEValues</a></li><li><a class="tocitem" href="../../reference/dofhandler/">Degrees of Freedom</a></li><li><a class="tocitem" href="../../reference/sparsity_pattern/">Sparsity pattern and sparse matrices</a></li><li><a class="tocitem" href="../../reference/assembly/">Assembly</a></li><li><a class="tocitem" href="../../reference/boundary_conditions/">Boundary conditions</a></li><li><a class="tocitem" href="../../reference/grid/">Grid &amp; AbstractGrid</a></li><li><a class="tocitem" href="../../reference/export/">Postprocessing</a></li><li><a class="tocitem" href="../../reference/utils/">Development utility functions</a></li></ul></li><li><input class="collapse-toggle" id="menuitem-6" type="checkbox"/><label class="tocitem" for="menuitem-6"><span class="docs-label">How-to guides</span><i class="docs-chevron"></i></label><ul class="collapsed"><li><a class="tocitem" href="../../howto/">How-to guide overview</a></li><li><a class="tocitem" href="../../howto/postprocessing/">Post processing and visualization</a></li><li><a class="tocitem" href="../../howto/threaded_assembly/">Multi-threaded assembly</a></li></ul></li><br><li><a class="tocitem" href="../../gallery/">Code gallery</a></li><li><a class="tocitem" href="../../devdocs/">Developer documentation</a></li><li><a class="tocitem" href="../../cited-literature/">Cited literature</a></li></ul><div class="docs-version-selector field has-addons"><div class="control"><span class="docs-label button is-static is-size-7">Version</span></div><div class="docs-selector control is-expanded"><div class="select is-fullwidth is-size-7"><select id="documenter-version-selector"></select></div></div></div></nav><div class="docs-main"><header class="docs-navbar"><a class="docs-sidebar-button docs-navbar-link fa-solid fa-bars is-hidden-desktop" id="documenter-sidebar-button" href="#"></a><nav class="breadcrumb"><ul class="is-hidden-mobile"><li><a class="is-disabled">Tutorials</a></li><li class="is-active"><a href>Linear elasticity</a></li></ul><ul class="is-hidden-tablet"><li class="is-active"><a href>Linear elasticity</a></li></ul></nav><div class="docs-right"><a class="docs-navbar-link" href="https://github.com/Ferrite-FEM/Ferrite.jl" title="View the repository on GitHub"><span class="docs-icon fa-brands"></span><span class="docs-label is-hidden-touch">GitHub</span></a><a class="docs-navbar-link" href="https://github.com/Ferrite-FEM/Ferrite.jl/blob/master/docs/src/literate-tutorials/linear_elasticity.jl" title="Edit source on GitHub"><span class="docs-icon fa-solid"></span></a><a class="docs-settings-button docs-navbar-link fa-solid fa-gear" id="documenter-settings-button" href="#" title="Settings"></a><a class="docs-article-toggle-button fa-solid fa-chevron-up" id="documenter-article-toggle-button" href="javascript:;" title="Collapse all docstrings"></a></div></header><article class="content" id="documenter-page"><h1 id="tutorial-linear-elasticity"><a class="docs-heading-anchor" href="#tutorial-linear-elasticity">Linear elasticity</a><a id="tutorial-linear-elasticity-1"></a><a class="docs-heading-anchor-permalink" href="#tutorial-linear-elasticity" title="Permalink"></a></h1><p><img src="../linear_elasticity.svg" alt/></p><p><em>Figure 1</em>: Linear elastically deformed 1mm <span>$\times$</span> 1mm Ferrite logo.</p><div class="admonition is-success"><header class="admonition-header">Tip</header><div class="admonition-body"><p>This tutorial is also available as a Jupyter notebook: <a href="https://nbviewer.jupyter.org/github/Ferrite-FEM/Ferrite.jl/blob/gh-pages/previews/PR1121/tutorials/linear_elasticity.ipynb"><code>linear_elasticity.ipynb</code></a>.</p></div></div><h2 id="Introduction"><a class="docs-heading-anchor" href="#Introduction">Introduction</a><a id="Introduction-1"></a><a class="docs-heading-anchor-permalink" href="#Introduction" title="Permalink"></a></h2><p>The classical first finite element problem to solve in solid mechanics is a linear balance of momentum problem. We will use this to introduce a vector valued field, the displacements <span>$\boldsymbol{u}(\boldsymbol{x})$</span>. In addition, some features of the <a href="https://github.com/Ferrite-FEM/Tensors.jl"><code>Tensors.jl</code></a> toolbox are demonstrated.</p><h3 id="Strong-form"><a class="docs-heading-anchor" href="#Strong-form">Strong form</a><a id="Strong-form-1"></a><a class="docs-heading-anchor-permalink" href="#Strong-form" title="Permalink"></a></h3><p>The strong form of the balance of momentum for quasi-static loading is given by</p><p class="math-container">\[\begin{alignat*}{2}
+  \mathrm{div}(\boldsymbol{\sigma}) + \boldsymbol{b} &amp;= 0 \quad &amp;&amp;\boldsymbol{x} \in \Omega \\
+  \boldsymbol{u} &amp;= \boldsymbol{u}_\mathrm{D} \quad &amp;&amp;\boldsymbol{x} \in \Gamma_\mathrm{D} \\
+  \boldsymbol{n} \cdot \boldsymbol{\sigma} &amp;= \boldsymbol{t}_\mathrm{N} \quad &amp;&amp;\boldsymbol{x} \in \Gamma_\mathrm{N}
+\end{alignat*}\]</p><p>where <span>$\boldsymbol{\sigma}$</span> is the (Cauchy) stress tensor and <span>$\boldsymbol{b}$</span> the body force. The domain, <span>$\Omega$</span>, has the boundary <span>$\Gamma$</span>, consisting of a Dirichlet part, <span>$\Gamma_\mathrm{D}$</span>, and a Neumann part, <span>$\Gamma_\mathrm{N}$</span>, with outward pointing normal vector <span>$\boldsymbol{n}$</span>. <span>$\boldsymbol{u}_\mathrm{D}$</span> denotes prescribed displacements on <span>$\Gamma_\mathrm{D}$</span>, while <span>$\boldsymbol{t}_\mathrm{N}$</span> the known tractions on <span>$\Gamma_\mathrm{N}$</span>.</p><p>In this tutorial, we use linear elasticity, such that</p><p class="math-container">\[\boldsymbol{\sigma} = \mathsf{C} : \boldsymbol{\varepsilon}, \quad
+\boldsymbol{\varepsilon} = \left[\mathrm{grad}(\boldsymbol{u})\right]^\mathrm{sym}\]</p><p>where <span>$\mathsf{C}$</span> is the 4th order elastic stiffness tensor and <span>$\boldsymbol{\varepsilon}$</span> the small strain tensor. The colon, <span>$:$</span>, represents the double contraction, <span>$\sigma_{ij} = \mathsf{C}_{ijkl} \varepsilon_{kl}$</span>, and the superscript <span>$\mathrm{sym}$</span> denotes the symmetric part.</p><h3 id="Weak-form"><a class="docs-heading-anchor" href="#Weak-form">Weak form</a><a id="Weak-form-1"></a><a class="docs-heading-anchor-permalink" href="#Weak-form" title="Permalink"></a></h3><p>The resulting weak form is given given as follows: Find <span>$\boldsymbol{u} \in \mathbb{U}$</span> such that</p><p class="math-container">\[\int_\Omega
+  \mathrm{grad}(\delta \boldsymbol{u}) : \boldsymbol{\sigma}
+\, \mathrm{d}\Omega
+=
+\int_{\Gamma}
+  \delta \boldsymbol{u} \cdot \boldsymbol{t}
+\, \mathrm{d}\Gamma
++
+\int_\Omega
+  \delta \boldsymbol{u} \cdot \boldsymbol{b}
+\, \mathrm{d}\Omega
+\quad \forall \, \delta \boldsymbol{u} \in \mathbb{T},\]</p><p>where <span>$\mathbb{U}$</span> and <span>$\mathbb{T}$</span> denote suitable trial and test function spaces. <span>$\delta \boldsymbol{u}$</span> is a vector valued test function and <span>$\boldsymbol{t} = \boldsymbol{\sigma}\cdot\boldsymbol{n}$</span> is the traction vector on the boundary. In this tutorial, we will neglect body forces (i.e. <span>$\boldsymbol{b} = \boldsymbol{0}$</span>) and the weak form reduces to</p><p class="math-container">\[\int_\Omega
+  \mathrm{grad}(\delta \boldsymbol{u}) : \boldsymbol{\sigma}
+\, \mathrm{d}\Omega
+=
+\int_{\Gamma}
+  \delta \boldsymbol{u} \cdot \boldsymbol{t}
+\, \mathrm{d}\Gamma \,.\]</p><h3 id="Finite-element-form"><a class="docs-heading-anchor" href="#Finite-element-form">Finite element form</a><a id="Finite-element-form-1"></a><a class="docs-heading-anchor-permalink" href="#Finite-element-form" title="Permalink"></a></h3><p>Finally, the finite element form is obtained by introducing the finite element shape functions. Since the displacement field, <span>$\boldsymbol{u}$</span>, is vector valued, we use vector valued shape functions <span>$\delta\boldsymbol{N}_i$</span> and <span>$\boldsymbol{N}_i$</span> to approximate the test and trial functions:</p><p class="math-container">\[\boldsymbol{u} \approx \sum_{i=1}^N \boldsymbol{N}_i (\boldsymbol{x}) \, \hat{u}_i
+\qquad
+\delta \boldsymbol{u} \approx \sum_{i=1}^N \delta\boldsymbol{N}_i (\boldsymbol{x}) \, \delta \hat{u}_i\]</p><p>Here <span>$N$</span> is the number of nodal variables, with <span>$\hat{u}_i$</span> and <span>$\delta\hat{u}_i$</span> representing the <span>$i$</span>-th nodal value. Using the Einstein summation convention, we can write this in short form as <span>$\boldsymbol{u} \approx \boldsymbol{N}_i \, \hat{u}_i$</span> and <span>$\delta\boldsymbol{u} \approx \delta\boldsymbol{N}_i \, \delta\hat{u}_i$</span>.</p><p>Inserting the these into the weak form, and noting that that the equation should hold for all <span>$\delta \hat{u}_i$</span>, we get</p><p class="math-container">\[\underbrace{\int_\Omega \mathrm{grad}(\delta \boldsymbol{N}_i) : \boldsymbol{\sigma}\ \mathrm{d}\Omega}_{f_i^\mathrm{int}} = \underbrace{\int_\Gamma \delta \boldsymbol{N}_i \cdot \boldsymbol{t}\ \mathrm{d}\Gamma}_{f_i^\mathrm{ext}}\]</p><p>Inserting the linear constitutive relationship, <span>$\boldsymbol{\sigma} = \mathsf{C}:\boldsymbol{\varepsilon}$</span>, in the internal force vector, <span>$f_i^\mathrm{int}$</span>, yields the linear equation</p><p class="math-container">\[\underbrace{\left[\int_\Omega \mathrm{grad}(\delta \boldsymbol{N}_i) : \mathsf{C} : \left[\mathrm{grad}(\boldsymbol{N}_j)\right]^\mathrm{sym}\ \mathrm{d}\Omega\right]}_{K_{ij}}\ \hat{u}_j = f_i^\mathrm{ext}\]</p><h2 id="Implementation"><a class="docs-heading-anchor" href="#Implementation">Implementation</a><a id="Implementation-1"></a><a class="docs-heading-anchor-permalink" href="#Implementation" title="Permalink"></a></h2><p>First we load Ferrite, and some other packages we need.</p><pre><code class="language-julia hljs">using Ferrite, FerriteGmsh, SparseArrays</code></pre><p>As in the heat equation tutorial, we will use a unit square - but here we&#39;ll load the grid of the Ferrite logo! This is done by downloading <a href="../logo.geo"><code>logo.geo</code></a> and loading it using <a href="https://github.com/Ferrite-FEM/FerriteGmsh.jl">FerriteGmsh.jl</a>,</p><pre><code class="language-julia hljs">using Downloads: download
+logo_mesh = &quot;logo.geo&quot;
+asset_url = &quot;https://raw.githubusercontent.com/Ferrite-FEM/Ferrite.jl/gh-pages/assets/&quot;
+isfile(logo_mesh) || download(string(asset_url, logo_mesh), logo_mesh)
+
+grid = togrid(logo_mesh);</code></pre><p>The generated grid lacks the facetsets for the boundaries, so we add them by using Ferrite&#39;s <a href="../../reference/grid/#Ferrite.addfacetset!"><code>addfacetset!</code></a>. It allows us to add facetsets to the grid based on coordinates. Note that approximate comparison to 0.0 doesn&#39;t work well, so we use a tolerance instead.</p><pre><code class="language-julia hljs">addfacetset!(grid, &quot;top&quot;, x -&gt; x[2] ≈ 1.0) # facets for which x[2] ≈ 1.0 for all nodes
+addfacetset!(grid, &quot;left&quot;, x -&gt; abs(x[1]) &lt; 1.0e-6)
+addfacetset!(grid, &quot;bottom&quot;, x -&gt; abs(x[2]) &lt; 1.0e-6);</code></pre><h3 id="Trial-and-test-functions"><a class="docs-heading-anchor" href="#Trial-and-test-functions">Trial and test functions</a><a id="Trial-and-test-functions-1"></a><a class="docs-heading-anchor-permalink" href="#Trial-and-test-functions" title="Permalink"></a></h3><p>In this tutorial, we use the same linear Lagrange shape functions to approximate both the test and trial spaces, i.e. <span>$\delta\boldsymbol{N}_i = \boldsymbol{N}_i$</span>. As our grid is composed of triangular elements, we need the Lagrange functions defined on a <code>RefTriangle</code>. All currently available interpolations can be found under <a href="../../reference/interpolations/#reference-interpolation"><code>Interpolation</code></a>.</p><p>Here we use linear triangular elements (also called constant strain triangles). The vector valued shape functions are constructed by raising the interpolation to the power <code>dim</code> (the dimension) since the displacement field has one component in each spatial dimension.</p><pre><code class="language-julia hljs">dim = 2
+order = 1 # linear interpolation
+ip = Lagrange{RefTriangle, order}()^dim; # vector valued interpolation</code></pre><p>In order to evaluate the integrals, we need to specify the quadrature rules to use. Due to the linear interpolation, a single quadrature point suffices, both inside the cell and on the facet. In 2d, a facet is the edge of the element.</p><pre><code class="language-julia hljs">qr = QuadratureRule{RefTriangle}(1) # 1 quadrature point
+qr_face = FacetQuadratureRule{RefTriangle}(1);</code></pre><p>Finally, we collect the interpolations and quadrature rules into the <code>CellValues</code> and <code>FacetValues</code> buffers, which we will later use to evaluate the integrals over the cells and facets.</p><pre><code class="language-julia hljs">cellvalues = CellValues(qr, ip)
+facetvalues = FacetValues(qr_face, ip);</code></pre><h3 id="Degrees-of-freedom"><a class="docs-heading-anchor" href="#Degrees-of-freedom">Degrees of freedom</a><a id="Degrees-of-freedom-1"></a><a class="docs-heading-anchor-permalink" href="#Degrees-of-freedom" title="Permalink"></a></h3><p>For distributing degrees of freedom, we define a <code>DofHandler</code>. The <code>DofHandler</code> knows that <code>u</code> has two degrees of freedom per node because we vectorized the interpolation above.</p><pre><code class="language-julia hljs">dh = DofHandler(grid)
+add!(dh, :u, ip)
+close!(dh);</code></pre><h3 id="Boundary-conditions"><a class="docs-heading-anchor" href="#Boundary-conditions">Boundary conditions</a><a id="Boundary-conditions-1"></a><a class="docs-heading-anchor-permalink" href="#Boundary-conditions" title="Permalink"></a></h3><p>We set Dirichlet boundary conditions by fixing the motion normal to the bottom and left boundaries. The last argument to <code>Dirichlet</code> determines which components of the field should be constrained. If no argument is given, all components are constrained by default.</p><pre><code class="language-julia hljs">ch = ConstraintHandler(dh)
+add!(ch, Dirichlet(:u, getfacetset(grid, &quot;bottom&quot;), (x, t) -&gt; 0.0, 2))
+add!(ch, Dirichlet(:u, getfacetset(grid, &quot;left&quot;), (x, t) -&gt; 0.0, 1))
+close!(ch);</code></pre><p>In addition, we will use Neumann boundary conditions on the top surface, where we add a traction vector of the form</p><p class="math-container">\[\boldsymbol{t}_\mathrm{N}(\boldsymbol{x}) = (20e3) x_1 \boldsymbol{e}_2\ \mathrm{N}/\mathrm{mm}^2\]</p><pre><code class="language-julia hljs">traction(x) = Vec(0.0, 20.0e3 * x[1]);</code></pre><p>On the right boundary, we don&#39;t do anything, resulting in a zero traction Neumann boundary. In order to assemble the external forces, <span>$f_i^\mathrm{ext}$</span>, we need to iterate over all facets in the relevant facetset. We do this by using the <a href="../../reference/dofhandler/#Ferrite.FacetIterator"><code>FacetIterator</code></a>.</p><pre><code class="language-julia hljs">function assemble_external_forces!(f_ext, dh, facetset, facetvalues, prescribed_traction)
+    # Create a temporary array for the facet&#39;s local contributions to the external force vector
+    fe_ext = zeros(getnbasefunctions(facetvalues))
+    for facet in FacetIterator(dh, facetset)
+        # Update the facetvalues to the correct facet number
+        reinit!(facetvalues, facet)
+        # Reset the temporary array for the next facet
+        fill!(fe_ext, 0.0)
+        # Access the cell&#39;s coordinates
+        cell_coordinates = getcoordinates(facet)
+        for qp in 1:getnquadpoints(facetvalues)
+            # Calculate the global coordinate of the quadrature point.
+            x = spatial_coordinate(facetvalues, qp, cell_coordinates)
+            tₚ = prescribed_traction(x)
+            # Get the integration weight for the current quadrature point.
+            dΓ = getdetJdV(facetvalues, qp)
+            for i in 1:getnbasefunctions(facetvalues)
+                Nᵢ = shape_value(facetvalues, qp, i)
+                fe_ext[i] += tₚ ⋅ Nᵢ * dΓ
+            end
+        end
+        # Add the local contributions to the correct indices in the global external force vector
+        assemble!(f_ext, celldofs(facet), fe_ext)
+    end
+    return f_ext
+end</code></pre><h3 id="Material-behavior"><a class="docs-heading-anchor" href="#Material-behavior">Material behavior</a><a id="Material-behavior-1"></a><a class="docs-heading-anchor-permalink" href="#Material-behavior" title="Permalink"></a></h3><p>Next, we need to define the material behavior, specifically the elastic stiffness tensor, <span>$\mathsf{C}$</span>. In this tutorial, we use plane strain linear isotropic elasticity, with Hooke&#39;s law as</p><p class="math-container">\[\boldsymbol{\sigma} = 2G \boldsymbol{\varepsilon}^\mathrm{dev} + 3K \boldsymbol{\varepsilon}^\mathrm{vol}\]</p><p>where <span>$G$</span> is the shear modulus and <span>$K$</span> the bulk modulus. This expression can be written as <span>$\boldsymbol{\sigma} = \mathsf{C}:\boldsymbol{\varepsilon}$</span>, with</p><p class="math-container">\[ \mathsf{C} := \frac{\partial \boldsymbol{\sigma}}{\partial \boldsymbol{\varepsilon}}\]</p><p>The volumetric, <span>$\boldsymbol{\varepsilon}^\mathrm{vol}$</span>, and deviatoric, <span>$\boldsymbol{\varepsilon}^\mathrm{dev}$</span> strains, are defined as</p><p class="math-container">\[\begin{align*}
+\boldsymbol{\varepsilon}^\mathrm{vol} &amp;= \frac{\mathrm{tr}(\boldsymbol{\varepsilon})}{3}\boldsymbol{I}, \quad
+\boldsymbol{\varepsilon}^\mathrm{dev} &amp;= \boldsymbol{\varepsilon} - \boldsymbol{\varepsilon}^\mathrm{vol}
+\end{align*}\]</p><p>Starting from Young&#39;s modulus, <span>$E$</span>, and Poisson&#39;s ratio, <span>$\nu$</span>, the shear and bulk modulus are</p><p class="math-container">\[G = \frac{E}{2(1 + \nu)}, \quad K = \frac{E}{3(1 - 2\nu)}\]</p><pre><code class="language-julia hljs">Emod = 200.0e3 # Young&#39;s modulus [MPa]
+ν = 0.3        # Poisson&#39;s ratio [-]
+
+Gmod = Emod / (2(1 + ν))  # Shear modulus
+Kmod = Emod / (3(1 - 2ν)) # Bulk modulus</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">166666.66666666663</code></pre><p>Finally, we demonstrate <code>Tensors.jl</code>&#39;s automatic differentiation capabilities when calculating the elastic stiffness tensor</p><pre><code class="language-julia hljs">C = gradient(ϵ -&gt; 2 * Gmod * dev(ϵ) + 3 * Kmod * vol(ϵ), zero(SymmetricTensor{2, 2}));</code></pre><details class="admonition is-details"><summary class="admonition-header">Plane stress instead of plane strain?</summary><div class="admonition-body"><p>In order to change this tutorial to consider plane stress instead of plane strain, the elastic stiffness tensor should be changed to reflect this. The plane stress elasticity stiffness matrix in Voigt notation for engineering shear strains, is given as</p><p class="math-container">\[\underline{\underline{\boldsymbol{E}}} = \frac{E}{1 - \nu^2}\begin{bmatrix}
+1 &amp; \nu &amp; 0 \\
+\nu &amp; 1 &amp; 0 \\
+0 &amp; 0 &amp; (1 - \nu)/2
+\end{bmatrix}\]</p><p>This matrix can be converted into the 4th order elastic stiffness tensor as</p><pre><code class="language-julia hljs">C_voigt = Emod * [1.0 ν 0.0; ν 1.0 0.0; 0.0 0.0 (1-ν)/2] / (1 - ν^2)
+C = fromvoigt(SymmetricTensor{4,2}, E_voigt)</code></pre></div></details><h3 id="Element-routine"><a class="docs-heading-anchor" href="#Element-routine">Element routine</a><a id="Element-routine-1"></a><a class="docs-heading-anchor-permalink" href="#Element-routine" title="Permalink"></a></h3><p>To calculate the global stiffness matrix, <span>$K_{ij}$</span>, the element routine computes the local stiffness matrix <code>ke</code> for a single element and assembles it into the global matrix. <code>ke</code> is pre-allocated and reused for all elements.</p><p>Note that the elastic stiffness tensor <span>$\mathsf{C}$</span> is constant. Thus is needs to be computed and once and can then be used for all integration points.</p><pre><code class="language-julia hljs">function assemble_cell!(ke, cellvalues, C)
+    for q_point in 1:getnquadpoints(cellvalues)
+        # Get the integration weight for the quadrature point
+        dΩ = getdetJdV(cellvalues, q_point)
+        for i in 1:getnbasefunctions(cellvalues)
+            # Gradient of the test function
+            ∇Nᵢ = shape_gradient(cellvalues, q_point, i)
+            for j in 1:getnbasefunctions(cellvalues)
+                # Symmetric gradient of the trial function
+                ∇ˢʸᵐNⱼ = shape_symmetric_gradient(cellvalues, q_point, j)
+                ke[i, j] += (∇Nᵢ ⊡ C ⊡ ∇ˢʸᵐNⱼ) * dΩ
+            end
+        end
+    end
+    return ke
+end</code></pre><h3 id="Global-assembly"><a class="docs-heading-anchor" href="#Global-assembly">Global assembly</a><a id="Global-assembly-1"></a><a class="docs-heading-anchor-permalink" href="#Global-assembly" title="Permalink"></a></h3><p>We define the function <code>assemble_global</code> to loop over the elements and do the global assembly. The function takes the preallocated sparse matrix <code>K</code>, our DofHandler <code>dh</code>, our <code>cellvalues</code> and the elastic stiffness tensor <code>C</code> as input arguments and computes the global stiffness matrix <code>K</code>.</p><pre><code class="language-julia hljs">function assemble_global!(K, dh, cellvalues, C)
+    # Allocate the element stiffness matrix
+    n_basefuncs = getnbasefunctions(cellvalues)
+    ke = zeros(n_basefuncs, n_basefuncs)
+    # Create an assembler
+    assembler = start_assemble(K)
+    # Loop over all cells
+    for cell in CellIterator(dh)
+        # Update the shape function gradients based on the cell coordinates
+        reinit!(cellvalues, cell)
+        # Reset the element stiffness matrix
+        fill!(ke, 0.0)
+        # Compute element contribution
+        assemble_cell!(ke, cellvalues, C)
+        # Assemble ke into K
+        assemble!(assembler, celldofs(cell), ke)
+    end
+    return K
+end</code></pre><h3 id="Solution-of-the-system"><a class="docs-heading-anchor" href="#Solution-of-the-system">Solution of the system</a><a id="Solution-of-the-system-1"></a><a class="docs-heading-anchor-permalink" href="#Solution-of-the-system" title="Permalink"></a></h3><p>The last step is to solve the system. First we allocate the global stiffness matrix <code>K</code> and assemble it.</p><pre><code class="language-julia hljs">K = allocate_matrix(dh)
+assemble_global!(K, dh, cellvalues, C);</code></pre><p>Then we allocate and assemble the external force vector.</p><pre><code class="language-julia hljs">f_ext = zeros(ndofs(dh))
+assemble_external_forces!(f_ext, dh, getfacetset(grid, &quot;top&quot;), facetvalues, traction);</code></pre><p>To account for the Dirichlet boundary conditions we use the <code>apply!</code> function. This modifies elements in <code>K</code> and <code>f</code>, such that we can get the correct solution vector <code>u</code> by using solving the linear equation system <span>$K_{ij} \hat{u}_j = f^\mathrm{ext}_i$</span>,</p><pre><code class="language-julia hljs">apply!(K, f_ext, ch)
+u = K \ f_ext;</code></pre><h3 id="Postprocessing"><a class="docs-heading-anchor" href="#Postprocessing">Postprocessing</a><a id="Postprocessing-1"></a><a class="docs-heading-anchor-permalink" href="#Postprocessing" title="Permalink"></a></h3><p>In this case, we want to analyze the displacements, as well as the stress field. We calculate the stress in each quadrature point, and then export it in two different ways:</p><ol><li>Constant in each cell (matching the approximation of constant strains in each element). Note that a current limitation is that cell data for second order tensors must be exported component-wise (see issue #768)</li><li>Interpolated using the linear lagrange ansatz functions via the <a href="../../reference/export/#Ferrite.L2Projector-Tuple{Ferrite.AbstractGrid}"><code>L2Projector</code></a>.</li></ol><pre><code class="language-julia hljs">function calculate_stresses(grid, dh, cv, u, C)
+    qp_stresses = [
+        [zero(SymmetricTensor{2, 2}) for _ in 1:getnquadpoints(cv)]
+            for _ in 1:getncells(grid)
+    ]
+    avg_cell_stresses = tuple((zeros(getncells(grid)) for _ in 1:3)...)
+    for cell in CellIterator(dh)
+        reinit!(cv, cell)
+        cell_stresses = qp_stresses[cellid(cell)]
+        for q_point in 1:getnquadpoints(cv)
+            ε = function_symmetric_gradient(cv, q_point, u, celldofs(cell))
+            cell_stresses[q_point] = C ⊡ ε
+        end
+        σ_avg = sum(cell_stresses) / getnquadpoints(cv)
+        avg_cell_stresses[1][cellid(cell)] = σ_avg[1, 1]
+        avg_cell_stresses[2][cellid(cell)] = σ_avg[2, 2]
+        avg_cell_stresses[3][cellid(cell)] = σ_avg[1, 2]
+    end
+    return qp_stresses, avg_cell_stresses
+end
+
+qp_stresses, avg_cell_stresses = calculate_stresses(grid, dh, cellvalues, u, C);</code></pre><p>We now use the the L2Projector to project the stress-field onto the piecewise linear finite element space that we used to solve the problem.</p><pre><code class="language-julia hljs">proj = L2Projector(Lagrange{RefTriangle, 1}(), grid)
+stress_field = project(proj, qp_stresses, qr);</code></pre><p>To visualize the result we export to a VTK-file. Specifically, an unstructured grid file, <code>.vtu</code>, is created, which can be viewed in e.g. <a href="https://www.paraview.org/">ParaView</a>.</p><pre><code class="language-julia hljs">VTKGridFile(&quot;linear_elasticity&quot;, dh) do vtk
+    write_solution(vtk, dh, u)
+    for (i, key) in enumerate((&quot;11&quot;, &quot;22&quot;, &quot;12&quot;))
+        write_cell_data(vtk, avg_cell_stresses[i], &quot;sigma_&quot; * key)
+    end
+    write_projection(vtk, proj, stress_field, &quot;stress field&quot;)
+    Ferrite.write_cellset(vtk, grid)
+end</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">VTKGridFile for the closed file &quot;linear_elasticity.vtu&quot;.</code></pre><p>We used the displacement field to visualize the deformed logo in <em>Figure 1</em>, and in <em>Figure 2</em>, we demonstrate the difference between the interpolated stress field and the constant stress in each cell.</p><p><img src="../linear_elasticity_stress.png" alt/></p><p><em>Figure 2</em>: Vertical normal stresses (MPa) exported using the <code>L2Projector</code> (left) and constant stress in each cell (right).</p><h2 id="linear_elasticity-plain-program"><a class="docs-heading-anchor" href="#linear_elasticity-plain-program">Plain program</a><a id="linear_elasticity-plain-program-1"></a><a class="docs-heading-anchor-permalink" href="#linear_elasticity-plain-program" title="Permalink"></a></h2><p>Here follows a version of the program without any comments. The file is also available here: <a href="../linear_elasticity.jl"><code>linear_elasticity.jl</code></a>.</p><pre><code class="language-julia hljs">using Ferrite, FerriteGmsh, SparseArrays
+
+using Downloads: download
+logo_mesh = &quot;logo.geo&quot;
+asset_url = &quot;https://raw.githubusercontent.com/Ferrite-FEM/Ferrite.jl/gh-pages/assets/&quot;
+isfile(logo_mesh) || download(string(asset_url, logo_mesh), logo_mesh)
+
+grid = togrid(logo_mesh);
+
+addfacetset!(grid, &quot;top&quot;, x -&gt; x[2] ≈ 1.0) # facets for which x[2] ≈ 1.0 for all nodes
+addfacetset!(grid, &quot;left&quot;, x -&gt; abs(x[1]) &lt; 1.0e-6)
+addfacetset!(grid, &quot;bottom&quot;, x -&gt; abs(x[2]) &lt; 1.0e-6);
+
+dim = 2
+order = 1 # linear interpolation
+ip = Lagrange{RefTriangle, order}()^dim; # vector valued interpolation
+
+qr = QuadratureRule{RefTriangle}(1) # 1 quadrature point
+qr_face = FacetQuadratureRule{RefTriangle}(1);
+
+cellvalues = CellValues(qr, ip)
+facetvalues = FacetValues(qr_face, ip);
+
+dh = DofHandler(grid)
+add!(dh, :u, ip)
+close!(dh);
+
+ch = ConstraintHandler(dh)
+add!(ch, Dirichlet(:u, getfacetset(grid, &quot;bottom&quot;), (x, t) -&gt; 0.0, 2))
+add!(ch, Dirichlet(:u, getfacetset(grid, &quot;left&quot;), (x, t) -&gt; 0.0, 1))
+close!(ch);
+
+traction(x) = Vec(0.0, 20.0e3 * x[1]);
+
+function assemble_external_forces!(f_ext, dh, facetset, facetvalues, prescribed_traction)
+    # Create a temporary array for the facet&#39;s local contributions to the external force vector
+    fe_ext = zeros(getnbasefunctions(facetvalues))
+    for facet in FacetIterator(dh, facetset)
+        # Update the facetvalues to the correct facet number
+        reinit!(facetvalues, facet)
+        # Reset the temporary array for the next facet
+        fill!(fe_ext, 0.0)
+        # Access the cell&#39;s coordinates
+        cell_coordinates = getcoordinates(facet)
+        for qp in 1:getnquadpoints(facetvalues)
+            # Calculate the global coordinate of the quadrature point.
+            x = spatial_coordinate(facetvalues, qp, cell_coordinates)
+            tₚ = prescribed_traction(x)
+            # Get the integration weight for the current quadrature point.
+            dΓ = getdetJdV(facetvalues, qp)
+            for i in 1:getnbasefunctions(facetvalues)
+                Nᵢ = shape_value(facetvalues, qp, i)
+                fe_ext[i] += tₚ ⋅ Nᵢ * dΓ
+            end
+        end
+        # Add the local contributions to the correct indices in the global external force vector
+        assemble!(f_ext, celldofs(facet), fe_ext)
+    end
+    return f_ext
+end
+
+Emod = 200.0e3 # Young&#39;s modulus [MPa]
+ν = 0.3        # Poisson&#39;s ratio [-]
+
+Gmod = Emod / (2(1 + ν))  # Shear modulus
+Kmod = Emod / (3(1 - 2ν)) # Bulk modulus
+
+C = gradient(ϵ -&gt; 2 * Gmod * dev(ϵ) + 3 * Kmod * vol(ϵ), zero(SymmetricTensor{2, 2}));
+
+function assemble_cell!(ke, cellvalues, C)
+    for q_point in 1:getnquadpoints(cellvalues)
+        # Get the integration weight for the quadrature point
+        dΩ = getdetJdV(cellvalues, q_point)
+        for i in 1:getnbasefunctions(cellvalues)
+            # Gradient of the test function
+            ∇Nᵢ = shape_gradient(cellvalues, q_point, i)
+            for j in 1:getnbasefunctions(cellvalues)
+                # Symmetric gradient of the trial function
+                ∇ˢʸᵐNⱼ = shape_symmetric_gradient(cellvalues, q_point, j)
+                ke[i, j] += (∇Nᵢ ⊡ C ⊡ ∇ˢʸᵐNⱼ) * dΩ
+            end
+        end
+    end
+    return ke
+end
+
+function assemble_global!(K, dh, cellvalues, C)
+    # Allocate the element stiffness matrix
+    n_basefuncs = getnbasefunctions(cellvalues)
+    ke = zeros(n_basefuncs, n_basefuncs)
+    # Create an assembler
+    assembler = start_assemble(K)
+    # Loop over all cells
+    for cell in CellIterator(dh)
+        # Update the shape function gradients based on the cell coordinates
+        reinit!(cellvalues, cell)
+        # Reset the element stiffness matrix
+        fill!(ke, 0.0)
+        # Compute element contribution
+        assemble_cell!(ke, cellvalues, C)
+        # Assemble ke into K
+        assemble!(assembler, celldofs(cell), ke)
+    end
+    return K
+end
+
+K = allocate_matrix(dh)
+assemble_global!(K, dh, cellvalues, C);
+
+f_ext = zeros(ndofs(dh))
+assemble_external_forces!(f_ext, dh, getfacetset(grid, &quot;top&quot;), facetvalues, traction);
+
+apply!(K, f_ext, ch)
+u = K \ f_ext;
+
+function calculate_stresses(grid, dh, cv, u, C)
+    qp_stresses = [
+        [zero(SymmetricTensor{2, 2}) for _ in 1:getnquadpoints(cv)]
+            for _ in 1:getncells(grid)
+    ]
+    avg_cell_stresses = tuple((zeros(getncells(grid)) for _ in 1:3)...)
+    for cell in CellIterator(dh)
+        reinit!(cv, cell)
+        cell_stresses = qp_stresses[cellid(cell)]
+        for q_point in 1:getnquadpoints(cv)
+            ε = function_symmetric_gradient(cv, q_point, u, celldofs(cell))
+            cell_stresses[q_point] = C ⊡ ε
+        end
+        σ_avg = sum(cell_stresses) / getnquadpoints(cv)
+        avg_cell_stresses[1][cellid(cell)] = σ_avg[1, 1]
+        avg_cell_stresses[2][cellid(cell)] = σ_avg[2, 2]
+        avg_cell_stresses[3][cellid(cell)] = σ_avg[1, 2]
+    end
+    return qp_stresses, avg_cell_stresses
+end
+
+qp_stresses, avg_cell_stresses = calculate_stresses(grid, dh, cellvalues, u, C);
+
+proj = L2Projector(Lagrange{RefTriangle, 1}(), grid)
+stress_field = project(proj, qp_stresses, qr);
+
+
+VTKGridFile(&quot;linear_elasticity&quot;, dh) do vtk
+    write_solution(vtk, dh, u)
+    for (i, key) in enumerate((&quot;11&quot;, &quot;22&quot;, &quot;12&quot;))
+        write_cell_data(vtk, avg_cell_stresses[i], &quot;sigma_&quot; * key)
+    end
+    write_projection(vtk, proj, stress_field, &quot;stress field&quot;)
+    Ferrite.write_cellset(vtk, grid)
+end</code></pre><hr/><p><em>This page was generated using <a href="https://github.com/fredrikekre/Literate.jl">Literate.jl</a>.</em></p></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../heat_equation/">« Heat equation</a><a class="docs-footer-nextpage" href="../incompressible_elasticity/">Incompressible elasticity »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option><option value="catppuccin-latte">catppuccin-latte</option><option value="catppuccin-frappe">catppuccin-frappe</option><option value="catppuccin-macchiato">catppuccin-macchiato</option><option value="catppuccin-mocha">catppuccin-mocha</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.7.0 on <span class="colophon-date" title="Sunday 29 December 2024 08:12">Sunday 29 December 2024</span>. Using Julia version 1.11.2.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
