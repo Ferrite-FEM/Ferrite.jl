@@ -10,54 +10,30 @@ DoF handler implementations.
 """
 abstract type AbstractGPUDofHandler <: AbstractDofHandler end
 
+struct GPUSubDofHandler{VEC_INT, Ti, VEC_IP} <: AbstractGPUDofHandler
+    cellset::VEC_INT
+    field_names::VEC_INT # cannot use symbols in GPU
+    field_interpolations::VEC_IP
+    ndofs_per_cell::Ti
+end
 
-struct GPUDofHandler{CDOFS <: AbstractArray{<:Number, 1}, VEC_INT <: AbstractArray{Int32, 1}, GRID <: AbstractGrid} <: AbstractGPUDofHandler
+## IDEA: to have multiple interfaces for dofhandlers (e.g. one domain dofhandler, multiple subdomains)
+struct GPUDofHandler{SUB_DOFS <: AbstractArray{<:AbstractGPUDofHandler, 1}, CDOFS <: AbstractArray{<:Number, 1}, VEC_INT <: AbstractArray{Int32, 1}, GRID <: AbstractGrid} <: AbstractGPUDofHandler
+    subdofhandlers::SUB_DOFS
     cell_dofs::CDOFS
     grid::GRID
     cell_dofs_offset::VEC_INT
-    ndofs_cell::VEC_INT
+    cell_to_subdofhandler::VEC_INT
 end
 
-"""
-    ndofs_per_cell(dh::GPUDofHandler, i::Int32)
 
-Return the number of degrees of freedom (DoFs) associated with the cell at
-index `i` in the `GPUDofHandler`.
-
-# Arguments
-- `dh`: A `GPUDofHandler` instance.
-- `i::Int32`: The index of the cell.
-
-# Returns
-The number of DoFs for the specified cell as an `Int32`.
-"""
-ndofs_per_cell(dh::GPUDofHandler, i::Int32) = dh.ndofs_cell[i]
-
-"""
-    cell_dof_offset(dh::GPUDofHandler, i::Int32)
-
-Return the offset into the `cell_dofs` array for the cell at index `i`.
-
-# Arguments
-- `dh`: A `GPUDofHandler` instance.
-- `i::Int32`: The index of the cell.
-
-# Returns
-The offset in the `cell_dofs` array as an `Int32`.
-"""
+function ndofs_per_cell(dh::GPUDofHandler, cell::Ti) where {Ti <: Integer}
+    sdhidx = dh.cell_to_subdofhandler[cell]
+    sdhidx ∉ 1:length(dh.subdofhandlers) && return 0 # Dof handler is just defined on a subdomain
+    return ndofs_per_cell(dh.subdofhandlers[sdhidx])
+end
+ndofs_per_cell(sdh::GPUSubDofHandler) = sdh.ndofs_per_cell
 cell_dof_offset(dh::GPUDofHandler, i::Int32) = dh.cell_dofs_offset[i]
-
-"""
-    get_grid(dh::GPUDofHandler)
-
-Return the computational grid associated with the `GPUDofHandler`.
-
-# Arguments
-- `dh`: A `GPUDofHandler` instance.
-
-# Returns
-The computational grid.
-"""
 get_grid(dh::GPUDofHandler) = dh.grid
 
 """
@@ -80,6 +56,8 @@ function celldofs(dh::GPUDofHandler, i::Int32)
     return view
 end
 
+
+# TODO: Delete all below this line
 """
     LocalsGPUDofHandler{DH, LOCAL_MATRICES, LOCAL_VECTORS} <: AbstractGPUDofHandler
 

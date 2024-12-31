@@ -79,14 +79,25 @@ function _get_ndofs_cell(dh::DofHandler)
     return ndofs_cell
 end
 
+_symbols_to_int32(symbols) = 1:length(symbols) .|> (sym -> convert(Int32, sym))
+
+function Adapt.adapt_structure(to, sdh::SubDofHandler)
+    cellset = Adapt.adapt_structure(to, sdh.cellset |> collect .|> (x -> convert(Int32, x)) |> cu)
+    field_names = Adapt.adapt_structure(to, _symbols_to_int32(sdh.field_names) |> cu)
+    field_interpolations = sdh.field_interpolations .|> (ip -> Adapt.adapt_structure(to, ip)) |> cu
+    ndofs_per_cell = Adapt.adapt_structure(to, sdh.ndofs_per_cell)
+    return GPUSubDofHandler(cellset, field_names, field_interpolations, ndofs_per_cell)
+end
 
 function Adapt.adapt_structure(to, dh::DofHandler)
-    cell_dofs = Adapt.adapt_structure(to, dh.cell_dofs .|> Int32 |> cu)
+    subdofhandlers = dh.subdofhandlers .|> (sdh -> Adapt.adapt_structure(to, sdh)) |> cu
+    cell_dofs = Adapt.adapt_structure(to, dh.cell_dofs .|> (x -> convert(Int32, x)) |> cu)
     cells = Adapt.adapt_structure(to, dh.grid.cells |> cu)
     offsets = Adapt.adapt_structure(to, dh.cell_dofs_offset .|> Int32 |> cu)
     nodes = Adapt.adapt_structure(to, dh.grid.nodes |> cu)
-    ndofs_cell = Adapt.adapt_structure(to, _get_ndofs_cell(dh) |> cu)
-    return GPUDofHandler(cell_dofs, GPUGrid(cells, nodes), offsets, ndofs_cell)
+    #ndofs_cell = Adapt.adapt_structure(to, _get_ndofs_cell(dh) |> cu)
+    cell_to_subdofhandler = Adapt.adapt_structure(to, dh.cell_to_subdofhandler .|> (x -> convert(Int32, x)) |> cu)
+    return GPUDofHandler(subdofhandlers, cell_dofs, GPUGrid(cells, nodes), offsets, cell_to_subdofhandler)
 end
 
 ## TODO: remove this...not needed

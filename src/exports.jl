@@ -196,6 +196,7 @@ export
     launch!,
     cellke,
     cellfe,
+    GPUSubDofHandler,
     GPUDofHandler,
     GPUGrid,
     getweights,
