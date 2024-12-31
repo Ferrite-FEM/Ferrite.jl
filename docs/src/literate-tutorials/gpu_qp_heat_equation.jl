@@ -129,7 +129,7 @@ function assemble_element!(Ke, fe, cv, cell)
 end
 
 
-# gpu version of global assembly
+## gpu version of global assembly
 function assemble_gpu!(Kgpu, fgpu, dh, cv; mem_alloc::AbstractMemAlloc)
     assembler = start_assemble(Kgpu, fgpu; fillzero = false) ## has to be always false
     for cell in CellIterator(dh, mem_alloc)
@@ -145,11 +145,11 @@ end
 n_basefuncs = getnbasefunctions(cellvalues) |> Int32
 
 ## Allocate CPU matrix
-#K = allocate_matrix(SparseMatrixCSC{Float64, Int64}, dh);
+## K = allocate_matrix(SparseMatrixCSC{Float64, Int64}, dh);
 #f = zeros(eltype(K), ndofs(dh));
 
 
-# Allocate GPU matrix
+## Allocate GPU matrix
 ## commented to pass the test
 ## Kgpu = allocate_matrix(CUSPARSE.CuSparseMatrixCSC{Float32, Int32}, dh)
 ## fgpu = CUDA.zeros(Float32, ndofs(dh));
@@ -176,27 +176,27 @@ n_cells = dh |> get_grid |> getncells |> Int32
 
 
 ## GPU Benchmarking, remove when not needed ##
-# function setup_bench_gpu(n_cells, n_basefuncs, cellvalues, dh)
-#     Kgpu = allocate_matrix(CUSPARSE.CuSparseMatrixCSC{Float32, Int32}, dh)
-#     fgpu = CUDA.zeros(eltype(Kgpu), ndofs(dh));
-#     gpu_kernel = init_kernel(BackendCUDA, n_cells, n_basefuncs, assemble_gpu!, (Kgpu, fgpu, cellvalues, dh))
-# end
+## function setup_bench_gpu(n_cells, n_basefuncs, cellvalues, dh)
+##     Kgpu = allocate_matrix(CUSPARSE.CuSparseMatrixCSC{Float32, Int32}, dh)
+##     fgpu = CUDA.zeros(eltype(Kgpu), ndofs(dh));
+##     gpu_kernel = init_kernel(BackendCUDA, n_cells, n_basefuncs, assemble_gpu!, (Kgpu, fgpu, cellvalues, dh))
+## end
 
-# CUDA.@time setup_bench_gpu(n_cells, n_basefuncs, cellvalues, dh)
-# CUDA.@profile trace = true setup_bench_gpu(n_cells, n_basefuncs, cellvalues, dh)
-# CUDA.@time gpu_kernel()
-# CUDA.@profile trace = true gpu_kernel()
+## CUDA.@time setup_bench_gpu(n_cells, n_basefuncs, cellvalues, dh)
+## CUDA.@profile trace = true setup_bench_gpu(n_cells, n_basefuncs, cellvalues, dh)
+## CUDA.@time gpu_kernel()
+## CUDA.@profile trace = true gpu_kernel()
 
 
 # ## CPU Benchmarking, remove when not needed ##
-# function setup_bench_cpu( dh)
-#     K = allocate_matrix(SparseMatrixCSC{Float64, Int}, dh)
-#     f = zeros(eltype(K), ndofs(dh));
-#     return K,f
-# end
+## function setup_bench_cpu( dh)
+##     K = allocate_matrix(SparseMatrixCSC{Float64, Int}, dh)
+##     f = zeros(eltype(K), ndofs(dh));
+##     return K,f
+## end
 
-# using BenchmarkTools
-# @benchmark setup_bench_cpu($dh)
-# K,f = setup_bench_cpu(dh)
-# @benchmark assemble_global_std!($cellvalues, $dh, $K, $f)
-# @benchmark assemble_global_qp!($cellvalues, $dh, $K, $f)
+## using BenchmarkTools
+## @benchmark setup_bench_cpu($dh)
+## K,f = setup_bench_cpu(dh)
+## @benchmark assemble_global_std!($cellvalues, $dh, $K, $f)
+## @benchmark assemble_global_qp!($cellvalues, $dh, $K, $f)
