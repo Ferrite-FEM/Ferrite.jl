@@ -128,10 +128,12 @@ include("FEValues/GeometryMapping.jl")
 include("FEValues/FunctionValues.jl")
 include("FEValues/CellValues.jl")
 include("FEValues/FacetValues.jl")
+include("FEValues/EdgeValues.jl")
 include("FEValues/InterfaceValues.jl")
 include("FEValues/PointValues.jl")
 include("FEValues/common_values.jl")
-include("FEValues/face_integrals.jl")
+#include("FEValues/face_integrals.jl")
+include("FEValues/boundary_integrals.jl")
 
 # Grid
 include("Grid/grid.jl")
