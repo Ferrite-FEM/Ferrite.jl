@@ -163,9 +163,9 @@ function Base.show(io::IO, d::MIME"text/plain", fv::FacetValues)
     print(io, "FacetValues(", vstr, ", rdim=$rdim, sdim=$sdim): ")
     nqp = getnquadpoints.(fv.fqr.facet_rules)
     if all(n == first(nqp) for n in nqp)
-        println(io, first(nqp), " quadrature points per face")
+        println(io, first(nqp), " quadrature points per facet")
     else
-        println(io, tuple(nqp...), " quadrature points on each face")
+        println(io, tuple(nqp...), " quadrature points on each facet")
     end
     print(io, " Function interpolation: "); show(io, d, function_interpolation(fv))
     print(io, "\nGeometric interpolation: ")
@@ -225,9 +225,9 @@ function spatial_coordinate(bcv::BCValues, q_point::Int, xh::AbstractVector{Vec{
     n_base_funcs = size(bcv.M, 1)
     length(xh) == n_base_funcs || throw_incompatible_coord_length(length(xh), n_base_funcs)
     x = zero(Vec{dim, T})
-    face = bcv.current_entity[]
+    facet = bcv.current_entity[]
     @inbounds for i in 1:n_base_funcs
-        x += bcv.M[i, q_point, face] * xh[i] # geometric_value(fe_v, q_point, i) * xh[i]
+        x += bcv.M[i, q_point, facet] * xh[i] # geometric_value(fe_v, q_point, i) * xh[i]
     end
     return x
 end

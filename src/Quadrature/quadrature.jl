@@ -176,7 +176,7 @@ end
     FacetQuadratureRule{shape}(facet_rules::NTuple{<:Any, <:QuadratureRule{shape}})
     FacetQuadratureRule{shape}(facet_rules::AbstractVector{<:QuadratureRule{shape}})
 
-Create a `FacetQuadratureRule` used for integration of the faces of the refshape `shape` (of
+Create a `FacetQuadratureRule` used for integration of the facets of the refshape `shape` (of
 type [`AbstractRefShape`](@ref)). `order` is the order of the quadrature rule.
 If no symbol is provided, the default `quad_rule_type` for each facet's reference shape is used (see [QuadratureRule](@ref)).
 For non-default `quad_rule_type`s on cells with mixed facet types (e.g. `RefPrism` and `RefPyramid`), the
@@ -206,8 +206,8 @@ function FacetQuadratureRule{shape}(quad_type::Symbol, order::Int) where {shape 
     return FacetQuadratureRule{shape}(Float64, quad_type, order)
 end
 
-# For RefShapes with equal face-shapes: generate quad rule for the face shape
-# and expand to each face
+# For RefShapes with equal facet shapes: generate quad rule for the facet shape
+# and expand to each facet
 function FacetQuadratureRule{RefLine}(::Type{T}, ::Int) where {T}
     w, p = T[1], Vec{0, T}[Vec{0, T}(())]
     return create_facet_quad_rule(RefLine, w, p)
@@ -268,15 +268,15 @@ Return the number of quadrature points in `qr`.
 getnquadpoints(qr::QuadratureRule) = length(getweights(qr))
 
 """
-    getnquadpoints(qr::FacetQuadratureRule, face::Int)
+    getnquadpoints(qr::FacetQuadratureRule, facet::Int)
 
-Return the number of quadrature points in `qr` for local face index `face`.
+Return the number of quadrature points in `qr` for local facet index `facet`.
 """
-getnquadpoints(qr::FacetQuadratureRule, face::Int) = getnquadpoints(qr.facet_rules[face])
+getnquadpoints(qr::FacetQuadratureRule, facet::Int) = getnquadpoints(qr.facet_rules[facet])
 
 """
     getweights(qr::QuadratureRule)
-    getweights(qr::FacetQuadratureRule, face::Int)
+    getweights(qr::FacetQuadratureRule, facet::Int)
 
 Return the weights of the quadrature rule.
 
@@ -292,12 +292,12 @@ julia> getweights(qr)
 ```
 """
 getweights(qr::QuadratureRule) = qr.weights
-getweights(qr::FacetQuadratureRule, face::Int) = getweights(qr.facet_rules[face])
+getweights(qr::FacetQuadratureRule, facet::Int) = getweights(qr.facet_rules[facet])
 
 
 """
     getpoints(qr::QuadratureRule)
-    getpoints(qr::FacetQuadratureRule, face::Int)
+    getpoints(qr::FacetQuadratureRule, facet::Int)
 
 Return the points of the quadrature rule.
 
@@ -313,9 +313,9 @@ julia> getpoints(qr)
 ```
 """
 getpoints(qr::QuadratureRule) = qr.points
-getpoints(qr::FacetQuadratureRule, face::Int) = getpoints(qr.facet_rules[face])
+getpoints(qr::FacetQuadratureRule, facet::Int) = getpoints(qr.facet_rules[facet])
 
 getrefshape(::QuadratureRule{RefShape}) where {RefShape} = RefShape
 
-# TODO: This is used in copy(::(Cell|Face)Values), but it it useful to get an actual copy?
+# TODO: This is used in copy(::(Cell|Facet)Values), but it it useful to get an actual copy?
 Base.copy(qr::Union{QuadratureRule, FacetQuadratureRule}) = qr
