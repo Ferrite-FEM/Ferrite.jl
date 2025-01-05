@@ -51,9 +51,9 @@ function FacetValues(
     ) where {T, sdim, FunDiffOrder, GeoDiffOrder}
 
     # max(GeoDiffOrder, 1) ensures that we get the jacobian needed to calculate the normal.
-    geo_mapping = map(qr -> GeometryMapping{max(GeoDiffOrder, 1)}(T, ip_geo.ip, qr), fqr.face_rules)
-    fun_values = map(qr -> FunctionValues{FunDiffOrder}(T, ip_fun, qr, ip_geo), fqr.face_rules)
-    max_nquadpoints = maximum(qr -> length(getweights(qr)), fqr.face_rules)
+    geo_mapping = map(qr -> GeometryMapping{max(GeoDiffOrder, 1)}(T, ip_geo.ip, qr), fqr.facet_rules)
+    fun_values = map(qr -> FunctionValues{FunDiffOrder}(T, ip_fun, qr, ip_geo), fqr.facet_rules)
+    max_nquadpoints = maximum(qr -> length(getweights(qr)), fqr.facet_rules)
     # detJdV always calculated, since we needed to calculate the jacobian anyways for the normal.
     detJdV = fill(T(NaN), max_nquadpoints)
     normals = fill(zero(Vec{sdim, T}) * T(NaN), max_nquadpoints)
@@ -161,7 +161,7 @@ function Base.show(io::IO, d::MIME"text/plain", fv::FacetValues)
     sdim = GradT === nothing ? nothing : sdim_from_gradtype(GradT)
     vstr = vdim == 0 ? "scalar" : "vdim=$vdim"
     print(io, "FacetValues(", vstr, ", rdim=$rdim, sdim=$sdim): ")
-    nqp = getnquadpoints.(fv.fqr.face_rules)
+    nqp = getnquadpoints.(fv.fqr.facet_rules)
     if all(n == first(nqp) for n in nqp)
         println(io, first(nqp), " quadrature points per face")
     else

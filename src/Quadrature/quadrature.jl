@@ -173,29 +173,29 @@ end
 
 """
     FacetQuadratureRule{shape}([::Type{T},] [quad_rule_type::Symbol,] order::Int)
-    FacetQuadratureRule{shape}(face_rules::NTuple{<:Any, <:QuadratureRule{shape}})
-    FacetQuadratureRule{shape}(face_rules::AbstractVector{<:QuadratureRule{shape}})
+    FacetQuadratureRule{shape}(facet_rules::NTuple{<:Any, <:QuadratureRule{shape}})
+    FacetQuadratureRule{shape}(facet_rules::AbstractVector{<:QuadratureRule{shape}})
 
 Create a `FacetQuadratureRule` used for integration of the faces of the refshape `shape` (of
 type [`AbstractRefShape`](@ref)). `order` is the order of the quadrature rule.
 If no symbol is provided, the default `quad_rule_type` for each facet's reference shape is used (see [QuadratureRule](@ref)).
 For non-default `quad_rule_type`s on cells with mixed facet types (e.g. `RefPrism` and `RefPyramid`), the
-`face_rules` must be provided explicitly.
+`facet_rules` must be provided explicitly.
 
 `FacetQuadratureRule` is used as one of the components to create [`FacetValues`](@ref).
 """
 struct FacetQuadratureRule{shape, FacetRulesType}
-    face_rules::FacetRulesType # E.g. Tuple{QuadratureRule{RefLine,...}, QuadratureRule{RefLine,...}}
-    function FacetQuadratureRule{shape}(face_rules::Union{NTuple{<:Any, QRType}, AbstractVector{QRType}}) where {shape, QRType <: QuadratureRule{shape}}
-        if length(face_rules) != nfacets(shape)
-            throw(ArgumentError("number of quadrature rules does not not match number of facets (#rules=$(length(face_rules)) != #facets=$(nfacets(shape)))"))
+    facet_rules::FacetRulesType # E.g. Tuple{QuadratureRule{RefLine,...}, QuadratureRule{RefLine,...}}
+    function FacetQuadratureRule{shape}(facet_rules::Union{NTuple{<:Any, QRType}, AbstractVector{QRType}}) where {shape, QRType <: QuadratureRule{shape}}
+        if length(facet_rules) != nfacets(shape)
+            throw(ArgumentError("number of quadrature rules does not not match number of facets (#rules=$(length(facet_rules)) != #facets=$(nfacets(shape)))"))
         end
-        return new{shape, typeof(face_rules)}(face_rules)
+        return new{shape, typeof(facet_rules)}(facet_rules)
     end
 end
 
-function FacetQuadratureRule(face_rules::Union{NTuple{<:Any, QRType}, AbstractVector{QRType}}) where {shape, QRType <: QuadratureRule{shape}}
-    return FacetQuadratureRule{shape}(face_rules)
+function FacetQuadratureRule(facet_rules::Union{NTuple{<:Any, QRType}, AbstractVector{QRType}}) where {shape, QRType <: QuadratureRule{shape}}
+    return FacetQuadratureRule{shape}(facet_rules)
 end
 
 # Fill in defaults T=Float64
@@ -272,7 +272,7 @@ getnquadpoints(qr::QuadratureRule) = length(getweights(qr))
 
 Return the number of quadrature points in `qr` for local face index `face`.
 """
-getnquadpoints(qr::FacetQuadratureRule, face::Int) = getnquadpoints(qr.face_rules[face])
+getnquadpoints(qr::FacetQuadratureRule, face::Int) = getnquadpoints(qr.facet_rules[face])
 
 """
     getweights(qr::QuadratureRule)
@@ -292,7 +292,7 @@ julia> getweights(qr)
 ```
 """
 getweights(qr::QuadratureRule) = qr.weights
-getweights(qr::FacetQuadratureRule, face::Int) = getweights(qr.face_rules[face])
+getweights(qr::FacetQuadratureRule, face::Int) = getweights(qr.facet_rules[face])
 
 
 """
@@ -313,7 +313,7 @@ julia> getpoints(qr)
 ```
 """
 getpoints(qr::QuadratureRule) = qr.points
-getpoints(qr::FacetQuadratureRule, face::Int) = getpoints(qr.face_rules[face])
+getpoints(qr::FacetQuadratureRule, face::Int) = getpoints(qr.facet_rules[face])
 
 getrefshape(::QuadratureRule{RefShape}) where {RefShape} = RefShape
 
