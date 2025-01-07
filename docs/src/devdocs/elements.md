@@ -37,8 +37,10 @@ Ferrite.sortface
 Ferrite.sortface_fast
 Ferrite.sortedge
 Ferrite.sortedge_fast
-Ferrite.element_to_facet_transformation
-Ferrite.facet_to_element_transformation
+Ferrite.cell_to_edge_transformation
+Ferrite.edge_to_cell_transformation
+Ferrite.cell_to_face_transformation
+Ferrite.face_to_cell_transformation
 Ferrite.InterfaceOrientationInfo
 Ferrite.transform_interface_points!
 Ferrite.get_transformation_matrix

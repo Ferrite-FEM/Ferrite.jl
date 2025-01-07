@@ -7,11 +7,11 @@ from the graduate course MTH 653: Advanced Numerical Analysis (Spring 2019)
 The purpose of the tutorial is to demonstrate how `Nedelec` vector interpolations will converge to the correct
 solution for a Maxwell problem, when vectorized `Lagrange` interpolations converge to an incorrect solution.
 
-# ## Loading packages
+## Loading packages
 We start by adding the required packages for this tutorial
 =#
 import Pkg
-# Pkg.add(;url = ...)
+# `Pkg.add(;url = ...)`
 using Ferrite, Tensors, ForwardDiff
 using Gmsh, FerriteGmsh
 using FerriteTriangulation: Triangulation, SubTriangulation
@@ -43,6 +43,31 @@ Plt.lines!(ax, first.(points), last.(points))
 fig #hide
 
 #=
+## Theoretical background
+We have the following partial integration rules, where ``\boldsymbol{n}`` is the outward pointing normal vector,
+ following Monk (2003) [Monk2003; Eqs. (3.47) and (3.51)](@cite),
+```math
+\begin{align*}
+\int_\Gamma \left[\boldsymbol{n}\times\boldsymbol{u}\right]\cdot\boldsymbol{\phi}\ \mathrm{d}\Gamma &=
+\int_\Omega \left[\nabla \times \boldsymbol{u}\right]\cdot \boldsymbol{\phi}\ \mathrm{d}\Omega -
+\int_\Omega \boldsymbol{u}\cdot\left[ \nabla \times \boldsymbol{\phi} \right]\ \mathrm{d}\Omega, \quad \boldsymbol{u} \in H(\mathrm{curl}),\ \boldsymbol{\phi} \in (\mathcal{C}^1)^3\\
+\int_\Gamma \left[\boldsymbol{n}\times\boldsymbol{u}\right]\cdot\left[\left[\boldsymbol{n}\times\boldsymbol{\phi}\right]\times\boldsymbol{n}\right] \mathrm{d}\Gamma &=
+\int_\Omega \left[\nabla \times \boldsymbol{u}\right]\cdot \boldsymbol{\phi}\ \mathrm{d}\Omega -
+\int_\Omega \boldsymbol{u}\cdot\left[ \nabla \times \boldsymbol{\phi} \right]\ \mathrm{d}\Omega, \quad \boldsymbol{u},\ \boldsymbol{\phi}\in H(\mathrm{curl}),
+\end{align*}
+```
+respectively. Note that [Monk2003; Eq. (3.27)](@cite), requiring that ``\boldsymbol{u} \in (\mathcal{C}^1)^3``,
+is a special case of [Monk2003; Eq. (3.47)](@cite) as ``(\mathcal{C}^1)^3 \subset H(\mathrm{curl})``.
+
+We remark that in 2D for ``\boldsymbol{u}`` pointing out of the plane, ``\boldsymbol{u} = u_3 \boldsymbol{e}_3``,
+and ``\boldsymbol{\phi}`` in the plane, ``\boldsymbol{\phi} \cdot \boldsymbol{e}_3 = 0``, we have
+```math
+\left[\boldsymbol{n}\times\boldsymbol{u}\right]\cdot\left[\left[\boldsymbol{n}\times\boldsymbol{\phi}\right]\times\boldsymbol{n}\right] = -u_3 \boldsymbol{\phi} \cdot \boldsymbol{t}
+```
+where ``\boldsymbol{t} = [-n_2,\ n_1]`` is the counter-clockwise tangent vector.
+
+=#
+#=
 ## Exact solution
 In this example, we choose an exact solution, ``\boldsymbol{E}_\mathrm{exact}(\boldsymbol{x})``,
 that fullfills the differential equations. We then use ``\boldsymbol{E}_\mathrm{exact}`` to
@@ -59,7 +84,8 @@ along the lines, ``\theta = 0`` and ``\theta = 3\pi/2``, ``\sin(2\theta/3) = 0``
 ``\boldsymbol{E}_\mathrm{exact} \cdot \boldsymbol{t} = 0``. Consequently, even if we have a
 singularity at ``\boldsymbol{x} = \boldsymbol{0}``, this doesn't enter the boundary conditions.
 Finally, due to the singularity, the components of ``\boldsymbol{E}_\mathrm{exact}`` are not in
-``H^1(\Omega)``. * **TODO:** Explain why `div(E)`` is fullfilled, use divergence theorem?*
+``H^1(\Omega)``.
+**TODO:** *Explain why ``\mathrm{div}(\boldsymbol{E})=0`` is fullfilled, use divergence theorem?*
 
 ## Lagrange interpolation
 Following the notes in the linked example, the lagrange problem becomes to solve
@@ -72,7 +98,20 @@ Following the notes in the linked example, the lagrange problem becomes to solve
 ```
 
 ## Nedelec interpolation
-To be completed...
+Using a Lagrange multiplier, ``\phi``, to weakly enforce the divergence equation,
+we obtain the following problem:
+Find ``\boldsymbol{E}\in H(\mathrm{div})`` and ``\phi\in H_0^1``, such that
+```math
+\begin{align*}
+\int_\Gamma \left[\left[\boldsymbol{n}\times\delta\boldsymbol{E}\right]\times\boldsymbol{n}\right]\cdot
+\left[\boldsymbol{n}\cdot\mathrm{curl}(\boldsymbol{E})\right]\ \mathrm{d}\Gamma +
+\int_\Omega \mathrm{curl}(\delta\boldsymbol{E})\cdot\mathrm{curl}(\boldsymbol{E})\ \mathrm{d}\Omega +
+\int_\Omega \delta\boldsymbol{E}\cdot\mathrm{grad}(\phi)\ \mathrm{d}\Omega &= 0\\
+\int_\Omega \mathrm{grad}(\delta\phi) \cdot \boldsymbol{E}\ \mathrm{d}\Omega &= 0 \\
+\boldsymbol{E}\cdot \boldsymbol{t} &= g\; \text{on }\Gamma
+\end{align*}
+```
+for all ``\delta\boldsymbol{E}\in H_0(\mathrm{curl})`` and ``\delta\phi\in H_0^1``.
 =#
 
 # We then use `FerriteGmsh.jl` to create the grid
@@ -189,9 +228,12 @@ m = Plt.mesh!(
 )
 Plt.Colorbar(fig[1, 2], m)
 #=
+```julia
 for i in 2:length(tr.tri_edges)
     Plt.lines!(view(nodes, view(tr.edges, tr.tri_edges[i-1]:(tr.tri_edges[i]-1))); color=:black)
-end # =#
+end
+```
+=#
 
 # Error calculator
 mutable struct L2Error{F}
@@ -261,6 +303,7 @@ function lagrange_error(h::Float64)
 end
 
 #=
+```julia
 mesh_sizes = (1/2) .^(3:8)
 lagrange_errors = Float64[]
 for h in mesh_sizes
@@ -268,6 +311,7 @@ for h in mesh_sizes
     e = @time lagrange_error(h)
     push!(lagrange_errors, e)
 end
+```
 =#
 
 tr = Triangulation(dh, 2)
