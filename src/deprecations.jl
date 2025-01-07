@@ -341,10 +341,10 @@ function FacetValues(
 end
 
 function value(ip::Interpolation, ξ::Vec)
-    throw(DeprecationError("value(ip::Interpolation, ξ::Vec)" => "[reference_shape_value(ip, ξ, i) for i in 1:getnbasefunctions(ip)] or reference_shape_values!(N, ip, ξ) with preallocated N"))
+    throw(DeprecationError("value(ip::Interpolation, ξ::Vec) is deprecated, use `[reference_shape_value(ip, ξ, i) for i in 1:getnbasefunctions(ip)]` or `reference_shape_values!(N, ip, ξ)` with preallocated `N` instead"))
 end
 function derivative(ip::Interpolation, ξ::Vec)
-    throw(DeprecationError("derivative(ip::Interpolation, ξ::Vec)" => "[reference_shape_gradient(ip, ξ, i) for i in 1:getnbasefunctions(ip)] or reference_shape_gradients!(dNdξ, ip, ξ) with preallocated dNdξ"))
+    throw(DeprecationError("derivative(ip::Interpolation, ξ::Vec) is deprecated, use `[reference_shape_gradient(ip, ξ, i) for i in 1:getnbasefunctions(ip)]` or `reference_shape_gradients!(dNdξ, ip, ξ)` with preallocated `dNdξ` instead"))
 end
 function value(ip::Interpolation, i::Int, ξ::Vec)
     throw(DeprecationError("value(ip::Interpolation, i::Int, ξ::Vec)" => "reference_shape_value(ip, ξ, i)"))
