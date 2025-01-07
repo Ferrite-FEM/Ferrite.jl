@@ -132,23 +132,23 @@ end
 ##################
 # Special cases since we don't have cell_to_vertex and vertex_to_cell
 # Mapping from to 0D node to 1D line vertex.
-function facet_to_element_transformation(::Union{Vec{0, T}, Vec{1, T}}, ::Type{RefLine}, face::Int) where {T}
-    face == 1 && return Vec{1, T}((-one(T),))
-    face == 2 && return Vec{1, T}((one(T),))
+function facet_to_element_transformation(::Union{Vec{0, T}, Vec{1, T}}, ::Type{RefLine}, facetnr::Int) where {T}
+    facetnr == 1 && return Vec{1, T}((-one(T),))
+    facetnr == 2 && return Vec{1, T}((one(T),))
     throw(ArgumentError("unknown facet number"))
 end
 
 # Mapping from 1D line to point.
-function element_to_facet_transformation(ξ::Vec{1, T}, ::Type{RefLine}, face::Int) where {T}
+function element_to_facet_transformation(ξ::Vec{1, T}, ::Type{RefLine}, facetnr::Int) where {T}
     x = ξ[1]
-    face == 1 && return Vec(-x)
-    face == 2 && return Vec(x)
+    facetnr == 1 && return Vec(-x)
+    facetnr == 2 && return Vec(x)
     throw(ArgumentError("unknown facet number"))
 end
 
-function weighted_normal(::Tensor{2, 1, T}, ::Type{RefLine}, face::Int) where {T}
-    face == 1 && return Vec{1, T}((-one(T),))
-    face == 2 && return Vec{1, T}((one(T),))
+function weighted_normal(::Tensor{2, 1, T}, ::Type{RefLine}, facetnr::Int) where {T}
+    facetnr == 1 && return Vec{1, T}((-one(T),))
+    facetnr == 2 && return Vec{1, T}((one(T),))
     throw(ArgumentError("unknown facet number"))
 end
 
@@ -164,31 +164,31 @@ end
 ###########################
 
 # Mapping from 1D line to 2D face of a quadrilateral.
-function edge_to_cell_transformation(ξ::Vec{1, T}, ::Type{RefQuadrilateral}, edge::Int) where {T}
+function edge_to_cell_transformation(ξ::Vec{1, T}, ::Type{RefQuadrilateral}, edgenr::Int) where {T}
     x = ξ[1]
-    face == 1 && return Vec{2, T}((x, -one(T)))
-    face == 2 && return Vec{2, T}((one(T), x))
-    face == 3 && return Vec{2, T}((-x, one(T)))
-    face == 4 && return Vec{2, T}((-one(T), -x))
+    edgenr == 1 && return Vec{2, T}((x, -one(T)))
+    edgenr == 2 && return Vec{2, T}((one(T), x))
+    edgenr == 3 && return Vec{2, T}((-x, one(T)))
+    edgenr == 4 && return Vec{2, T}((-one(T), -x))
     throw(ArgumentError("unknown edge number"))
 end
 
 # Mapping from 2D face of a quadrilateral to 1D line.
-function cell_to_edge_transformation(ξ::Vec{2, T}, ::Type{RefQuadrilateral}, edge::Int) where {T}
+function cell_to_edge_transformation(ξ::Vec{2, T}, ::Type{RefQuadrilateral}, edgenr::Int) where {T}
     x, y = ξ
-    face == 1 && return Vec(x)
-    face == 2 && return Vec(y)
-    face == 3 && return Vec(-x)
-    face == 4 && return Vec(-y)
+    edgenr == 1 && return Vec(x)
+    edgenr == 2 && return Vec(y)
+    edgenr == 3 && return Vec(-x)
+    edgenr == 4 && return Vec(-y)
     throw(ArgumentError("unknown edge number"))
 end
 
-function weighted_normal(J::Tensor{2, 2}, ::Type{RefQuadrilateral}, face::Int)
+function weighted_normal(J::Tensor{2, 2}, ::Type{RefQuadrilateral}, edgenr::Int)
     @inbounds begin
-        face == 1 && return Vec{2}((J[2, 1], -J[1, 1]))
-        face == 2 && return Vec{2}((J[2, 2], -J[1, 2]))
-        face == 3 && return Vec{2}((-J[2, 1], J[1, 1]))
-        face == 4 && return Vec{2}((-J[2, 2], J[1, 2]))
+        edgenr == 1 && return Vec{2}((J[2, 1], -J[1, 1]))
+        edgenr == 2 && return Vec{2}((J[2, 2], -J[1, 2]))
+        edgenr == 3 && return Vec{2}((-J[2, 1], J[1, 1]))
+        edgenr == 4 && return Vec{2}((-J[2, 2], J[1, 2]))
     end
     throw(ArgumentError("unknown facet number"))
 end
