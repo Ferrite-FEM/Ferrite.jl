@@ -51,9 +51,9 @@ function FacetValues(
     ) where {T, sdim, FunDiffOrder, GeoDiffOrder}
 
     # max(GeoDiffOrder, 1) ensures that we get the jacobian needed to calculate the normal.
-    geo_mapping = map(qr -> GeometryMapping{max(GeoDiffOrder, 1)}(T, ip_geo.ip, qr), fqr.face_rules)
-    fun_values = map(qr -> FunctionValues{FunDiffOrder}(T, ip_fun, qr, ip_geo), fqr.face_rules)
-    max_nquadpoints = maximum(qr -> length(getweights(qr)), fqr.face_rules)
+    geo_mapping = map(qr -> GeometryMapping{max(GeoDiffOrder, 1)}(T, ip_geo.ip, qr), fqr.facet_rules)
+    fun_values = map(qr -> FunctionValues{FunDiffOrder}(T, ip_fun, qr, ip_geo), fqr.facet_rules)
+    max_nquadpoints = maximum(qr -> length(getweights(qr)), fqr.facet_rules)
     # detJdV always calculated, since we needed to calculate the jacobian anyways for the normal.
     detJdV = fill(T(NaN), max_nquadpoints)
     normals = fill(zero(Vec{sdim, T}) * T(NaN), max_nquadpoints)
@@ -112,21 +112,21 @@ getnormal(fv::FacetValues, qp::Int) = fv.normals[qp]
 
 nfacets(fv::FacetValues) = length(fv.geo_mapping)
 
-function set_current_facet!(fv::FacetValues, face_nr::Int)
-    # Checking face_nr before setting current_facet allows us to use @inbounds
+function set_current_facet!(fv::FacetValues, facet_nr::Int)
+    # Checking facet_nr before setting current_facet allows us to use @inbounds
     # when indexing by getcurrentfacet(fv) in other places!
-    checkbounds(Bool, 1:nfacets(fv), face_nr) || throw(ArgumentError("Face index out of range."))
-    fv.current_facet = face_nr
+    checkbounds(Bool, 1:nfacets(fv), facet_nr) || throw(ArgumentError("Facet nr is out of range."))
+    fv.current_facet = facet_nr
     return
 end
 
-@inline function reinit!(fv::FacetValues, x::AbstractVector, face_nr::Int)
-    return reinit!(fv, nothing, x, face_nr)
+@inline function reinit!(fv::FacetValues, x::AbstractVector, facet_nr::Int)
+    return reinit!(fv, nothing, x, facet_nr)
 end
 
-function reinit!(fv::FacetValues, cell::Union{AbstractCell, Nothing}, x::AbstractVector{Vec{dim, T}}, face_nr::Int) where {dim, T}
+function reinit!(fv::FacetValues, cell::Union{AbstractCell, Nothing}, x::AbstractVector{Vec{dim, T}}, facet_nr::Int) where {dim, T}
     check_reinit_sdim_consistency(:FacetValues, shape_gradient_type(fv), eltype(x))
-    set_current_facet!(fv, face_nr)
+    set_current_facet!(fv, facet_nr)
     n_geom_basefuncs = getngeobasefunctions(fv)
     if !checkbounds(Bool, x, 1:n_geom_basefuncs) || length(x) != n_geom_basefuncs
         throw_incompatible_coord_length(length(x), n_geom_basefuncs)
@@ -139,11 +139,11 @@ function reinit!(fv::FacetValues, cell::Union{AbstractCell, Nothing}, x::Abstrac
         throw(ArgumentError("The cell::AbstractCell input is required to reinit! non-identity function mappings"))
     end
 
-    @inbounds for (q_point, w) in pairs(getweights(fv.fqr, face_nr))
+    @inbounds for (q_point, w) in pairs(getweights(fv.fqr, facet_nr))
         mapping = calculate_mapping(geo_mapping, q_point, x)
         J = getjacobian(mapping)
         # See the `Ferrite.embedding_det` docstring for more background
-        weight_norm = weighted_normal(J, getrefshape(geo_mapping.ip), face_nr)
+        weight_norm = weighted_normal(J, getrefshape(geo_mapping.ip), facet_nr)
         detJ = norm(weight_norm)
         detJ > 0.0 || throw_detJ_not_pos(detJ)
         @inbounds fv.detJdV[q_point] = detJ * w
@@ -161,11 +161,11 @@ function Base.show(io::IO, d::MIME"text/plain", fv::FacetValues)
     sdim = GradT === nothing ? nothing : sdim_from_gradtype(GradT)
     vstr = vdim == 0 ? "scalar" : "vdim=$vdim"
     print(io, "FacetValues(", vstr, ", rdim=$rdim, sdim=$sdim): ")
-    nqp = getnquadpoints.(fv.fqr.face_rules)
+    nqp = getnquadpoints.(fv.fqr.facet_rules)
     if all(n == first(nqp) for n in nqp)
-        println(io, first(nqp), " quadrature points per face")
+        println(io, first(nqp), " quadrature points per facet")
     else
-        println(io, tuple(nqp...), " quadrature points on each face")
+        println(io, tuple(nqp...), " quadrature points on each facet")
     end
     print(io, " Function interpolation: "); show(io, d, function_interpolation(fv))
     print(io, "\nGeometric interpolation: ")
@@ -225,9 +225,9 @@ function spatial_coordinate(bcv::BCValues, q_point::Int, xh::AbstractVector{Vec{
     n_base_funcs = size(bcv.M, 1)
     length(xh) == n_base_funcs || throw_incompatible_coord_length(length(xh), n_base_funcs)
     x = zero(Vec{dim, T})
-    face = bcv.current_entity[]
+    facet = bcv.current_entity[]
     @inbounds for i in 1:n_base_funcs
-        x += bcv.M[i, q_point, face] * xh[i] # geometric_value(fe_v, q_point, i) * xh[i]
+        x += bcv.M[i, q_point, facet] * xh[i] # geometric_value(fe_v, q_point, i) * xh[i]
     end
     return x
 end
