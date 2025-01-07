@@ -112,21 +112,21 @@ getnormal(fv::FacetValues, qp::Int) = fv.normals[qp]
 
 nfacets(fv::FacetValues) = length(fv.geo_mapping)
 
-function set_current_facet!(fv::FacetValues, face_nr::Int)
-    # Checking face_nr before setting current_facet allows us to use @inbounds
+function set_current_facet!(fv::FacetValues, facet_nr::Int)
+    # Checking facet_nr before setting current_facet allows us to use @inbounds
     # when indexing by getcurrentfacet(fv) in other places!
-    checkbounds(Bool, 1:nfacets(fv), face_nr) || throw(ArgumentError("Face index out of range."))
-    fv.current_facet = face_nr
+    checkbounds(Bool, 1:nfacets(fv), facet_nr) || throw(ArgumentError("Facet nr is out of range."))
+    fv.current_facet = facet_nr
     return
 end
 
-@inline function reinit!(fv::FacetValues, x::AbstractVector, face_nr::Int)
-    return reinit!(fv, nothing, x, face_nr)
+@inline function reinit!(fv::FacetValues, x::AbstractVector, facet_nr::Int)
+    return reinit!(fv, nothing, x, facet_nr)
 end
 
-function reinit!(fv::FacetValues, cell::Union{AbstractCell, Nothing}, x::AbstractVector{Vec{dim, T}}, face_nr::Int) where {dim, T}
+function reinit!(fv::FacetValues, cell::Union{AbstractCell, Nothing}, x::AbstractVector{Vec{dim, T}}, facet_nr::Int) where {dim, T}
     check_reinit_sdim_consistency(:FacetValues, shape_gradient_type(fv), eltype(x))
-    set_current_facet!(fv, face_nr)
+    set_current_facet!(fv, facet_nr)
     n_geom_basefuncs = getngeobasefunctions(fv)
     if !checkbounds(Bool, x, 1:n_geom_basefuncs) || length(x) != n_geom_basefuncs
         throw_incompatible_coord_length(length(x), n_geom_basefuncs)
@@ -139,11 +139,11 @@ function reinit!(fv::FacetValues, cell::Union{AbstractCell, Nothing}, x::Abstrac
         throw(ArgumentError("The cell::AbstractCell input is required to reinit! non-identity function mappings"))
     end
 
-    @inbounds for (q_point, w) in pairs(getweights(fv.fqr, face_nr))
+    @inbounds for (q_point, w) in pairs(getweights(fv.fqr, facet_nr))
         mapping = calculate_mapping(geo_mapping, q_point, x)
         J = getjacobian(mapping)
         # See the `Ferrite.embedding_det` docstring for more background
-        weight_norm = weighted_normal(J, getrefshape(geo_mapping.ip), face_nr)
+        weight_norm = weighted_normal(J, getrefshape(geo_mapping.ip), facet_nr)
         detJ = norm(weight_norm)
         detJ > 0.0 || throw_detJ_not_pos(detJ)
         @inbounds fv.detJdV[q_point] = detJ * w
