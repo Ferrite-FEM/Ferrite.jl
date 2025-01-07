@@ -528,7 +528,7 @@ Returns all nodesets of the `grid`.
 """
     getfacetset(grid::AbstractGrid, setname::String)
 
-Returns all faces as `FacetIndex` in the set with name `setname`.
+Returns all facets as `FacetIndex` in the set with name `setname`.
 """
 @inline getfacetset(grid::AbstractGrid, setname::String) = grid.facetsets[setname]
 """
@@ -648,10 +648,10 @@ for INDEX in (:VertexIndex, :EdgeIndex, :FaceIndex, :FacetIndex)
 
         Base.getindex(I::($INDEX), i::Int) = I.idx[i]
 
-        #To be able to do a,b = faceidx
+        #To be able to do, e.g., `a,b = facetidx`
         Base.iterate(I::($INDEX), state::Int = 1) = (state == 3) ? nothing : (I[state], state + 1)
 
-        # Necessary to check if, e.g. `(cellid, faceidx) in faceset`
+        # Necessary to check if, e.g. `(cellid, facetnr) in facetset`
         Base.isequal(x::$INDEX, y::$INDEX) = x.idx == y.idx
         Base.isequal(x::Tuple{Int, Int}, y::$INDEX) = x[1] == y.idx[1] && x[2] == y.idx[2]
         Base.isequal(y::$INDEX, x::Tuple{Int, Int}) = x[1] == y.idx[1] && x[2] == y.idx[2]

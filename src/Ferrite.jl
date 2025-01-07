@@ -132,7 +132,7 @@ include("FEValues/EdgeValues.jl")
 include("FEValues/InterfaceValues.jl")
 include("FEValues/PointValues.jl")
 include("FEValues/common_values.jl")
-#include("FEValues/face_integrals.jl")
+#include("FEValues/facet_integrals.jl")
 include("FEValues/boundary_integrals.jl")
 
 # Grid

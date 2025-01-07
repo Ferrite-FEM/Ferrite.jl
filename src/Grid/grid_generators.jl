@@ -27,13 +27,13 @@ function generate_grid(::Type{Line}, nel::NTuple{1, Int}, left::Vec{1, T} = Vec{
     end
 
 
-    # Cell faces
+    # Cell facets
     boundary = [
         FacetIndex(1, 1),
         FacetIndex(nel_x, 2),
     ]
 
-    # Cell face sets
+    # Cell facet sets
     facetsets = Dict(
         "left" => OrderedSet{FacetIndex}([boundary[1]]),
         "right" => OrderedSet{FacetIndex}([boundary[2]])
@@ -60,13 +60,13 @@ function generate_grid(::Type{QuadraticLine}, nel::NTuple{1, Int}, left::Vec{1, 
         push!(cells, QuadraticLine((2 * i - 1, 2 * i + 1, 2 * i)))
     end
 
-    # Cell faces
+    # Cell facets
     boundary = FacetIndex[
         FacetIndex(1, 1),
         FacetIndex(nel_x, 2),
     ]
 
-    # Cell face sets
+    # Cell facet sets
     facetsets = Dict(
         "left" => OrderedSet{FacetIndex}([boundary[1]]),
         "right" => OrderedSet{FacetIndex}([boundary[2]])
@@ -125,7 +125,7 @@ function generate_grid(C::Type{Quadrilateral}, nel::NTuple{2, Int}, LL::Vec{2, T
         push!(cells, Quadrilateral((node_array[i, j], node_array[i + 1, j], node_array[i + 1, j + 1], node_array[i, j + 1])))
     end
 
-    # Cell faces
+    # Cell facets
     cell_array = reshape(collect(1:nel_tot), (nel_x, nel_y))
     boundary = FacetIndex[
         [FacetIndex(cl, 1) for cl in cell_array[:, 1]];
@@ -134,7 +134,7 @@ function generate_grid(C::Type{Quadrilateral}, nel::NTuple{2, Int}, LL::Vec{2, T
         [FacetIndex(cl, 4) for cl in cell_array[1, :]]
     ]
 
-    # Cell face sets
+    # Cell facet sets
     offset = 0
     facetsets = Dict{String, OrderedSet{FacetIndex}}()
     facetsets["bottom"] = OrderedSet{FacetIndex}(boundary[(1:length(cell_array[:, 1])) .+ offset]); offset += length(cell_array[:, 1])
@@ -170,7 +170,7 @@ function generate_grid(::Type{QuadraticQuadrilateral}, nel::NTuple{2, Int}, LL::
         push!(cells, cell)
     end
 
-    # Cell faces
+    # Cell facets
     cell_array = reshape(collect(1:nel_tot), (nel_x, nel_y))
     boundary = FacetIndex[
         [FacetIndex(cl, 1) for cl in cell_array[:, 1]];
@@ -179,7 +179,7 @@ function generate_grid(::Type{QuadraticQuadrilateral}, nel::NTuple{2, Int}, LL::
         [FacetIndex(cl, 4) for cl in cell_array[1, :]]
     ]
 
-    # Cell face sets
+    # Cell facet sets
     offset = 0
     facetsets = Dict{String, OrderedSet{FacetIndex}}()
     facetsets["bottom"] = OrderedSet{FacetIndex}(boundary[(1:length(cell_array[:, 1])) .+ offset]); offset += length(cell_array[:, 1])
@@ -219,7 +219,7 @@ function generate_grid(::Type{Hexahedron}, nel::NTuple{3, Int}, left::Vec{3, T} 
         push!(cells, cell)
     end
 
-    # Cell faces
+    # Cell facets
     cell_array = reshape(collect(1:nel_tot), (nel_x, nel_y, nel_z))
     boundary = FacetIndex[
         [FacetIndex(cl, 1) for cl in cell_array[:, :, 1][:]];
@@ -230,7 +230,7 @@ function generate_grid(::Type{Hexahedron}, nel::NTuple{3, Int}, left::Vec{3, T} 
         [FacetIndex(cl, 6) for cl in cell_array[:, :, end][:]]
     ]
 
-    # Cell face sets
+    # Cell facet sets
     offset = 0
     facetsets = Dict{String, OrderedSet{FacetIndex}}()
     facetsets["bottom"] = OrderedSet{FacetIndex}(boundary[(1:length(cell_array[:, :, 1][:])) .+ offset]); offset += length(cell_array[:, :, 1][:])
@@ -403,7 +403,7 @@ function generate_grid(::Type{SerendipityQuadraticHexahedron}, nel::NTuple{3, In
         push!(cells, cell)
     end
 
-    # Cell faces
+    # Cell facets
     cell_array = reshape(collect(1:nel_tot), (nel_x, nel_y, nel_z))
     boundary = FacetIndex[
         [FacetIndex(cl, 1) for cl in cell_array[:, :, 1][:]];
@@ -414,7 +414,7 @@ function generate_grid(::Type{SerendipityQuadraticHexahedron}, nel::NTuple{3, In
         [FacetIndex(cl, 6) for cl in cell_array[:, :, end][:]]
     ]
 
-    # Cell face sets
+    # Cell facet sets
     offset = 0
     facetsets = Dict{String, OrderedSet{FacetIndex}}()
     facetsets["bottom"] = OrderedSet{FacetIndex}(boundary[(1:length(cell_array[:, :, 1][:])) .+ offset]); offset += length(cell_array[:, :, 1][:])
@@ -446,7 +446,7 @@ function generate_grid(::Type{Triangle}, nel::NTuple{2, Int}, LL::Vec{2, T}, LR:
         push!(cells, Triangle((node_array[i + 1, j], node_array[i + 1, j + 1], node_array[i, j + 1]))) # ◹
     end
 
-    # Cell faces
+    # Cell facets
     cell_array = reshape(collect(1:nel_tot), (2, nel_x, nel_y))
     boundary = FacetIndex[
         [FacetIndex(cl, 1) for cl in cell_array[1, :, 1]];
@@ -455,7 +455,7 @@ function generate_grid(::Type{Triangle}, nel::NTuple{2, Int}, LL::Vec{2, T}, LR:
         [FacetIndex(cl, 3) for cl in cell_array[1, 1, :]]
     ]
 
-    # Cell face sets
+    # Cell facet sets
     offset = 0
     facetsets = Dict{String, OrderedSet{FacetIndex}}()
     facetsets["bottom"] = OrderedSet{FacetIndex}(boundary[(1:length(cell_array[1, :, 1])) .+ offset]); offset += length(cell_array[1, :, 1])
@@ -499,7 +499,7 @@ function generate_grid(::Type{QuadraticTriangle}, nel::NTuple{2, Int}, LL::Vec{2
         push!(cells, triangle2)
     end
 
-    # Cell faces
+    # Cell facets
     cell_array = reshape(collect(1:nel_tot), (2, nel_x, nel_y))
     boundary = FacetIndex[
         [FacetIndex(cl, 1) for cl in cell_array[1, :, 1]];
@@ -508,7 +508,7 @@ function generate_grid(::Type{QuadraticTriangle}, nel::NTuple{2, Int}, LL::Vec{2
         [FacetIndex(cl, 3) for cl in cell_array[1, 1, :]]
     ]
 
-    # Cell face sets
+    # Cell facet sets
     offset = 0
     facetsets = Dict{String, OrderedSet{FacetIndex}}()
     facetsets["bottom"] = OrderedSet{FacetIndex}(boundary[(1:length(cell_array[1, :, 1])) .+ offset]); offset += length(cell_array[1, :, 1])
