@@ -1,0 +1,758 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/><title>Topology optimization · Ferrite.jl</title><meta name="title" content="Topology optimization · Ferrite.jl"/><meta property="og:title" content="Topology optimization · Ferrite.jl"/><meta property="twitter:title" content="Topology optimization · Ferrite.jl"/><meta name="description" content="Documentation for Ferrite.jl."/><meta property="og:description" content="Documentation for Ferrite.jl."/><meta property="twitter:description" content="Documentation for Ferrite.jl."/><meta property="og:url" content="https://ferrite-fem.github.io/Ferrite.jl/stable/gallery/topology_optimization/"/><meta property="twitter:url" content="https://ferrite-fem.github.io/Ferrite.jl/stable/gallery/topology_optimization/"/><link rel="canonical" href="https://ferrite-fem.github.io/Ferrite.jl/stable/gallery/topology_optimization/"/><script data-outdated-warner src="../../assets/warner.js"></script><link href="https://cdnjs.cloudflare.com/ajax/libs/lato-font/3.0.0/css/lato-font.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/juliamono/0.050/juliamono.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/fontawesome.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/solid.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/brands.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.8/katex.min.css" rel="stylesheet" type="text/css"/><script>documenterBaseURL="../.."</script><script src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.6/require.min.js" data-main="../../assets/documenter.js"></script><script src="../../search_index.js"></script><script src="../../siteinfo.js"></script><script src="../../../versions.js"></script><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/catppuccin-mocha.css" data-theme-name="catppuccin-mocha"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/catppuccin-macchiato.css" data-theme-name="catppuccin-macchiato"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/catppuccin-frappe.css" data-theme-name="catppuccin-frappe"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/catppuccin-latte.css" data-theme-name="catppuccin-latte"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/documenter-dark.css" data-theme-name="documenter-dark" data-theme-primary-dark/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/documenter-light.css" data-theme-name="documenter-light" data-theme-primary/><script src="../../assets/themeswap.js"></script><link href="../../assets/custom.css" rel="stylesheet" type="text/css"/><link href="../../assets/citations.css" rel="stylesheet" type="text/css"/><link href="../../assets/favicon.ico" rel="icon" type="image/x-icon"/></head><body><div id="documenter"><nav class="docs-sidebar"><a class="docs-logo" href="../../"><img src="../../assets/logo.svg" alt="Ferrite.jl logo"/></a><div class="docs-package-name"><span class="docs-autofit"><a href="../../">Ferrite.jl</a></span></div><button class="docs-search-query input is-rounded is-small is-clickable my-2 mx-auto py-1 px-2" id="documenter-search-query">Search docs (Ctrl + /)</button><ul class="docs-menu"><li><a class="tocitem" href="../../">Home</a></li><li><input class="collapse-toggle" id="menuitem-3" type="checkbox"/><label class="tocitem" for="menuitem-3"><span class="docs-label">Tutorials</span><i class="docs-chevron"></i></label><ul class="collapsed"><li><a class="tocitem" href="../../tutorials/">Tutorials overview</a></li><li><a class="tocitem" href="../../tutorials/heat_equation/">Heat equation</a></li><li><a class="tocitem" href="../../tutorials/linear_elasticity/">Linear elasticity</a></li><li><a class="tocitem" href="../../tutorials/incompressible_elasticity/">Incompressible elasticity</a></li><li><a class="tocitem" href="../../tutorials/hyperelasticity/">Hyperelasticity</a></li><li><a class="tocitem" href="../../tutorials/plasticity/">Von Mises plasticity</a></li><li><a class="tocitem" href="../../tutorials/transient_heat_equation/">Transient heat equation</a></li><li><a class="tocitem" href="../../tutorials/computational_homogenization/">Computational homogenization</a></li><li><a class="tocitem" href="../../tutorials/stokes-flow/">Stokes flow</a></li><li><a class="tocitem" href="../../tutorials/porous_media/">Porous media</a></li><li><a class="tocitem" href="../../tutorials/ns_vs_diffeq/">Incompressible Navier-Stokes equations via DifferentialEquations.jl</a></li><li><a class="tocitem" href="../../tutorials/reactive_surface/">Reactive surface</a></li><li><a class="tocitem" href="../../tutorials/linear_shell/">Linear shell</a></li><li><a class="tocitem" href="../../tutorials/dg_heat_equation/">Discontinuous Galerkin heat equation</a></li></ul></li><li><input class="collapse-toggle" id="menuitem-4" type="checkbox"/><label class="tocitem" for="menuitem-4"><span class="docs-label">Topic guides</span><i class="docs-chevron"></i></label><ul class="collapsed"><li><a class="tocitem" href="../../topics/">Topic guide overview</a></li><li><a class="tocitem" href="../../topics/fe_intro/">Introduction to FEM</a></li><li><a class="tocitem" href="../../topics/reference_shapes/">Reference shapes</a></li><li><a class="tocitem" href="../../topics/FEValues/">FEValues</a></li><li><a class="tocitem" href="../../topics/degrees_of_freedom/">Degrees of Freedom</a></li><li><a class="tocitem" href="../../topics/sparse_matrix/">Sparsity pattern and sparse matrices</a></li><li><a class="tocitem" href="../../topics/assembly/">Assembly</a></li><li><a class="tocitem" href="../../topics/boundary_conditions/">Boundary and initial conditions</a></li><li><a class="tocitem" href="../../topics/constraints/">Constraints</a></li><li><a class="tocitem" href="../../topics/grid/">Grid</a></li><li><a class="tocitem" href="../../topics/export/">Export</a></li></ul></li><li><input class="collapse-toggle" id="menuitem-5" type="checkbox"/><label class="tocitem" for="menuitem-5"><span class="docs-label">API reference</span><i class="docs-chevron"></i></label><ul class="collapsed"><li><a class="tocitem" href="../../reference/">Reference overview</a></li><li><a class="tocitem" href="../../reference/quadrature/">Quadrature</a></li><li><a class="tocitem" href="../../reference/interpolations/">Interpolation</a></li><li><a class="tocitem" href="../../reference/fevalues/">FEValues</a></li><li><a class="tocitem" href="../../reference/dofhandler/">Degrees of Freedom</a></li><li><a class="tocitem" href="../../reference/sparsity_pattern/">Sparsity pattern and sparse matrices</a></li><li><a class="tocitem" href="../../reference/assembly/">Assembly</a></li><li><a class="tocitem" href="../../reference/boundary_conditions/">Boundary conditions</a></li><li><a class="tocitem" href="../../reference/grid/">Grid &amp; AbstractGrid</a></li><li><a class="tocitem" href="../../reference/export/">Postprocessing</a></li><li><a class="tocitem" href="../../reference/utils/">Development utility functions</a></li></ul></li><li><input class="collapse-toggle" id="menuitem-6" type="checkbox"/><label class="tocitem" for="menuitem-6"><span class="docs-label">How-to guides</span><i class="docs-chevron"></i></label><ul class="collapsed"><li><a class="tocitem" href="../../howto/">How-to guide overview</a></li><li><a class="tocitem" href="../../howto/postprocessing/">Post processing and visualization</a></li><li><a class="tocitem" href="../../howto/threaded_assembly/">Multi-threaded assembly</a></li></ul></li><br><li><a class="tocitem" href="../">Code gallery</a></li><li><a class="tocitem" href="../../devdocs/">Developer documentation</a></li><li><a class="tocitem" href="../../cited-literature/">Cited literature</a></li></ul><div class="docs-version-selector field has-addons"><div class="control"><span class="docs-label button is-static is-size-7">Version</span></div><div class="docs-selector control is-expanded"><div class="select is-fullwidth is-size-7"><select id="documenter-version-selector"></select></div></div></div></nav><div class="docs-main"><header class="docs-navbar"><a class="docs-sidebar-button docs-navbar-link fa-solid fa-bars is-hidden-desktop" id="documenter-sidebar-button" href="#"></a><nav class="breadcrumb"><ul class="is-hidden-mobile"><li class="is-active"><a href>Topology optimization</a></li></ul><ul class="is-hidden-tablet"><li class="is-active"><a href>Topology optimization</a></li></ul></nav><div class="docs-right"><a class="docs-navbar-link" href="https://github.com/Ferrite-FEM/Ferrite.jl" title="View the repository on GitHub"><span class="docs-icon fa-brands"></span><span class="docs-label is-hidden-touch">GitHub</span></a><a class="docs-navbar-link" href="https://github.com/Ferrite-FEM/Ferrite.jl/blob/master/docs/src/literate-gallery/topology_optimization.jl" title="Edit source on GitHub"><span class="docs-icon fa-solid"></span></a><a class="docs-settings-button docs-navbar-link fa-solid fa-gear" id="documenter-settings-button" href="#" title="Settings"></a><a class="docs-article-toggle-button fa-solid fa-chevron-up" id="documenter-article-toggle-button" href="javascript:;" title="Collapse all docstrings"></a></div></header><article class="content" id="documenter-page"><h1 id="tutorial-topology-optimization"><a class="docs-heading-anchor" href="#tutorial-topology-optimization">Topology optimization</a><a id="tutorial-topology-optimization-1"></a><a class="docs-heading-anchor-permalink" href="#tutorial-topology-optimization" title="Permalink"></a></h1><p><strong>Keywords</strong>: <em>Topology optimization</em>, <em>weak and strong form</em>, <em>non-linear problem</em>, <em>Laplacian</em>, <em>grid topology</em></p><p><img src="../bending_animation.gif" alt/></p><p><em>Figure 1</em>: Optimization of the bending beam. Evolution of the density for fixed total mass.</p><div class="admonition is-success"><header class="admonition-header">Tip</header><div class="admonition-body"><p>This example is also available as a Jupyter notebook: <a href="https://nbviewer.jupyter.org/github/Ferrite-FEM/Ferrite.jl/blob/gh-pages/previews/PR1126/gallery/topology_optimization.ipynb"><code>topology_optimization.ipynb</code></a>.</p></div></div><h2 id="Introduction"><a class="docs-heading-anchor" href="#Introduction">Introduction</a><a id="Introduction-1"></a><a class="docs-heading-anchor-permalink" href="#Introduction" title="Permalink"></a></h2><p>Topology optimization is the task of finding structures that are mechanically ideal. In this example we cover the bending beam, where we specify a load, boundary conditions and the total mass. Then, our objective is to find the most suitable geometry within the design space minimizing the compliance (i.e. the inverse stiffness) of the structure. We shortly introduce our simplified model for regular meshes. A detailed derivation of the method and advanced techniques can be found in [<a href="../../cited-literature/#JanHacJun2019regularizedthermotopopt">14</a>] and [<a href="../../cited-literature/#BlaJanJun2022taylorwlsthermotopopt">15</a>].</p><p>We start by introducing the local, elementwise density <span>$\chi \in [\chi_{\text{min}}, 1]$</span> of the material, where we choose <span>$\chi_{\text{min}}$</span> slightly above zero to prevent numerical instabilities. Here, <span>$\chi = \chi_{\text{min}}$</span> means void and <span>$\chi=1$</span> means bulk material. Then, we use a SIMP ansatz (solid isotropic material with penalization) for the stiffness tensor <span>$C(\chi) = \chi^p C_0$</span>, where <span>$C_0$</span> is the stiffness of the bulk material. The SIMP exponent <span>$p&gt;1$</span> ensures that the model prefers the density values void and bulk before the intermediate values. The variational formulation then yields the modified Gibbs energy</p><p class="math-container">\[G = \int_{\Omega} \frac{1}{2} \chi^p \varepsilon : C : \varepsilon \; \text{d}V - \int_{\Omega} \boldsymbol{f} \cdot \boldsymbol{u} \; \text{d}V - \int_{\partial\Omega} \boldsymbol{t} \cdot \boldsymbol{u} \; \text{d}A.\]</p><p>Furthermore, we receive the evolution equation of the density and the additional Neumann boundary condition in the strong form</p><p class="math-container">\[p_\chi + \eta \dot{\chi} + \lambda + \gamma - \beta \nabla^2 \chi \ni 0 \quad \forall \textbf{x} \in \Omega,\]</p><p class="math-container">\[\beta \nabla \chi \cdot \textbf{n} = 0 \quad \forall \textbf{x} \in \partial \Omega,\]</p><p>with the thermodynamic driving force</p><p class="math-container">\[p_\chi = \frac{1}{2} p \chi^{p-1} \varepsilon : C : \varepsilon.\]</p><p>We obtain the mechanical displacement field by applying the Finite Element Method to the weak form of the Gibbs energy using Ferrite. In contrast, we use the evolution equation (i.e. the strong form) to calculate the value of the density field <span>$\chi$</span>. The advantage of this &quot;split&quot; approach is the very high computation speed. The evolution equation consists of the driving force, the damping parameter <span>$\eta$</span>, the regularization parameter <span>$\beta$</span> times the Laplacian, which is necessary to avoid numerical issues like mesh dependence or checkerboarding, and the constraint parameters <span>$\lambda$</span>, to keep the mass constant, and <span>$\gamma$</span>, to avoid leaving the set <span>$[\chi_{\text{min}}, 1]$</span>. By including gradient regularization, it becomes necessary to calculate the Laplacian. The Finite Difference Method for square meshes with the edge length <span>$\Delta h$</span> approximates the Laplacian as follows:</p><p class="math-container">\[\nabla^2 \chi_p = \frac{1}{(\Delta h)^2} (\chi_n + \chi_s + \chi_w + \chi_e - 4 \chi_p)\]</p><p>Here, the indices refer to the different cardinal directions. Boundary element do not have neighbors in each direction. However, we can calculate the central difference to fulfill Neumann boundary condition. For example, if the element is on the left boundary, we have to fulfill</p><p class="math-container">\[\nabla \chi_p \cdot \textbf{n} = \frac{1}{\Delta h} (\chi_w - \chi_e) = 0\]</p><p>from which follows <span>$\chi_w = \chi_e$</span>. Thus for boundary elements we can replace the value for the missing neighbor by the value of the opposite neighbor. In order to find the corresponding neighbor elements, we will make use of Ferrites grid topology funcionalities.</p><h2 id="Commented-Program"><a class="docs-heading-anchor" href="#Commented-Program">Commented Program</a><a id="Commented-Program-1"></a><a class="docs-heading-anchor-permalink" href="#Commented-Program" title="Permalink"></a></h2><p>We now solve the problem in Ferrite. What follows is a program spliced with comments. The full program, without comments, can be found in the next <a href="#topology_optimization-plain-program">section</a>.</p><p>First we load all necessary packages.</p><pre><code class="language-julia hljs">using Ferrite, SparseArrays, LinearAlgebra, Tensors, Printf</code></pre><p>Next, we create a simple square grid of the size 2x1. We apply a fixed Dirichlet boundary condition to the left facet set, called <code>clamped</code>. On the right facet, we create a small set <code>traction</code>, where we will later apply a force in negative y-direction.</p><pre><code class="language-julia hljs">function create_grid(n)
+    corners = [
+        Vec{2}((0.0, 0.0)),
+        Vec{2}((2.0, 0.0)),
+        Vec{2}((2.0, 1.0)),
+        Vec{2}((0.0, 1.0)),
+    ]
+    grid = generate_grid(Quadrilateral, (2 * n, n), corners)
+
+    # node-/facesets for boundary conditions
+    addnodeset!(grid, &quot;clamped&quot;, x -&gt; x[1] ≈ 0.0)
+    addfacetset!(grid, &quot;traction&quot;, x -&gt; x[1] ≈ 2.0 &amp;&amp; norm(x[2] - 0.5) &lt;= 0.05)
+    return grid
+end</code></pre><p>Next, we create the FE values, the DofHandler and the Dirichlet boundary condition.</p><pre><code class="language-julia hljs">function create_values()
+    # quadrature rules
+    qr = QuadratureRule{RefQuadrilateral}(2)
+    facet_qr = FacetQuadratureRule{RefQuadrilateral}(2)
+
+    # cell and facetvalues for u
+    ip = Lagrange{RefQuadrilateral, 1}()^2
+    cellvalues = CellValues(qr, ip)
+    facetvalues = FacetValues(facet_qr, ip)
+
+    return cellvalues, facetvalues
+end
+
+function create_dofhandler(grid)
+    dh = DofHandler(grid)
+    add!(dh, :u, Lagrange{RefQuadrilateral, 1}()^2) # displacement
+    close!(dh)
+    return dh
+end
+
+function create_bc(dh)
+    dbc = ConstraintHandler(dh)
+    add!(dbc, Dirichlet(:u, getnodeset(dh.grid, &quot;clamped&quot;), (x, t) -&gt; zero(Vec{2}), [1, 2]))
+    close!(dbc)
+    t = 0.0
+    update!(dbc, t)
+    return dbc
+end</code></pre><p>Now, we define a struct to store all necessary material parameters (stiffness tensor of the bulk material and the parameters for topology optimization) and add a constructor to the struct to initialize it by using the common material parameters Young&#39;s modulus and Poisson number.</p><pre><code class="language-julia hljs">struct MaterialParameters{T, S &lt;: SymmetricTensor{4, 2, T}}
+    C::S
+    χ_min::T
+    p::T
+    β::T
+    η::T
+end
+
+function MaterialParameters(E, ν, χ_min, p, β, η)
+    δ(i, j) = i == j ? 1.0 : 0.0 # helper function
+
+    G = E / 2(1 + ν) # =μ
+    λ = E * ν / (1 - ν^2) # correction for plane stress included
+
+    C = SymmetricTensor{4, 2}((i, j, k, l) -&gt; λ * δ(i, j) * δ(k, l) + G * (δ(i, k) * δ(j, l) + δ(i, l) * δ(j, k)))
+    return MaterialParameters(C, χ_min, p, β, η)
+end</code></pre><p>To store the density and the strain required to calculate the driving forces, we create the struct <code>MaterialState</code>. We add a constructor to initialize the struct. The function <code>update_material_states!</code> updates the density values once we calculated the new values.</p><pre><code class="language-julia hljs">mutable struct MaterialState{T, S &lt;: AbstractArray{SymmetricTensor{2, 2, T, 3}, 1}}
+    χ::T # density
+    ε::S # strain in each quadrature point
+end
+
+function MaterialState(ρ, n_qp)
+    return MaterialState(ρ, Array{SymmetricTensor{2, 2, Float64, 3}, 1}(undef, n_qp))
+end
+
+function update_material_states!(χn1, states, dh)
+    for (element, state) in zip(CellIterator(dh), states)
+        state.χ = χn1[cellid(element)]
+    end
+    return
+end</code></pre><p>Next, we define a function to calculate the driving forces for all elements. For this purpose, we iterate through all elements and calculate the average strain in each element. Then, we compute the driving force from the formula introduced at the beginning. We create a second function to collect the density in each element.</p><pre><code class="language-julia hljs">function compute_driving_forces(states, mp, dh, χn)
+    pΨ = zeros(length(states))
+    for (element, state) in zip(CellIterator(dh), states)
+        i = cellid(element)
+        ε = sum(state.ε) / length(state.ε) # average element strain
+        pΨ[i] = 1 / 2 * mp.p * χn[i]^(mp.p - 1) * (ε ⊡ mp.C ⊡ ε)
+    end
+    return pΨ
+end
+
+function compute_densities(states, dh)
+    χn = zeros(length(states))
+    for (element, state) in zip(CellIterator(dh), states)
+        i = cellid(element)
+        χn[i] = state.χ
+    end
+    return χn
+end</code></pre><p>For the Laplacian we need some neighboorhood information which is constant throughout the analysis so we compute it once and cache it. We iterate through each facet of each element, obtaining the neighboring element by using the <code>getneighborhood</code> function. For boundary facets, the function call will return an empty object. In that case we use the dictionary to instead find the opposite facet, as discussed in the introduction.</p><pre><code class="language-julia hljs">function cache_neighborhood(dh, topology)
+    nbgs = Vector{Vector{Int}}(undef, getncells(dh.grid))
+    _nfacets = nfacets(dh.grid.cells[1])
+    opp = Dict(1 =&gt; 3, 2 =&gt; 4, 3 =&gt; 1, 4 =&gt; 2)
+
+    for element in CellIterator(dh)
+        nbg = zeros(Int, _nfacets)
+        i = cellid(element)
+        for j in 1:_nfacets
+            nbg_cellid = getneighborhood(topology, dh.grid, FacetIndex(i, j))
+            if !isempty(nbg_cellid)
+                nbg[j] = first(nbg_cellid)[1] # assuming only one facet neighbor per cell
+            else # boundary facet
+                nbg[j] = first(getneighborhood(topology, dh.grid, FacetIndex(i, opp[j])))[1]
+            end
+        end
+
+        nbgs[i] = nbg
+    end
+
+    return nbgs
+end</code></pre><p>Now we calculate the Laplacian using the previously cached neighboorhood information.</p><pre><code class="language-julia hljs">function approximate_laplacian(nbgs, χn, Δh)
+    ∇²χ = zeros(length(nbgs))
+    for i in 1:length(nbgs)
+        nbg = nbgs[i]
+        ∇²χ[i] = (χn[nbg[1]] + χn[nbg[2]] + χn[nbg[3]] + χn[nbg[4]] - 4 * χn[i]) / (Δh^2)
+    end
+
+    return ∇²χ
+end</code></pre><p>For the iterative computation of the solution, a function is needed to update the densities in each element. To ensure that the mass is kept constant, we have to calculate the constraint parameter <span>$\lambda$</span>, which we do via the bisection method. We repeat the calculation until the difference between the average density (calculated from the element-wise trial densities) and the target density nearly vanishes. By using the extremal values of <span>$\Delta \chi$</span> as the starting interval, we guarantee that the method converges eventually.</p><pre><code class="language-julia hljs">function compute_χn1(χn, Δχ, ρ, ηs, χ_min)
+    n_el = length(χn)
+
+    χ_trial = zeros(n_el)
+    ρ_trial = 0.0
+
+    λ_lower = minimum(Δχ) - ηs
+    λ_upper = maximum(Δχ) + ηs
+    λ_trial = 0.0
+
+    while abs(ρ - ρ_trial) &gt; 1.0e-7
+        for i in 1:n_el
+            Δχt = 1 / ηs * (Δχ[i] - λ_trial)
+            χ_trial[i] = max(χ_min, min(1.0, χn[i] + Δχt))
+        end
+
+        ρ_trial = 0.0
+        for i in 1:n_el
+            ρ_trial += χ_trial[i] / n_el
+        end
+
+        if ρ_trial &gt; ρ
+            λ_lower = λ_trial
+        elseif ρ_trial &lt; ρ
+            λ_upper = λ_trial
+        end
+        λ_trial = 1 / 2 * (λ_upper + λ_lower)
+    end
+
+    return χ_trial
+end</code></pre><p>Lastly, we use the following helper function to compute the average driving force, which is later used to normalize the driving forces. This makes the used material parameters and numerical parameters independent of the problem.</p><pre><code class="language-julia hljs">function compute_average_driving_force(mp, pΨ, χn)
+    n = length(pΨ)
+    w = zeros(n)
+
+    for i in 1:n
+        w[i] = (χn[i] - mp.χ_min) * (1 - χn[i])
+    end
+
+    p_Ω = sum(w .* pΨ) / sum(w) # average driving force
+
+    return p_Ω
+end</code></pre><p>Finally, we put everything together to update the density. The loop ensures the stability of the updated solution.</p><pre><code class="language-julia hljs">function update_density(dh, states, mp, ρ, neighboorhoods, Δh)
+    n_j = Int(ceil(6 * mp.β / (mp.η * Δh^2))) # iterations needed for stability
+    χn = compute_densities(states, dh) # old density field
+    χn1 = zeros(length(χn))
+
+    for j in 1:n_j
+        ∇²χ = approximate_laplacian(neighboorhoods, χn, Δh) # Laplacian
+        pΨ = compute_driving_forces(states, mp, dh, χn) # driving forces
+        p_Ω = compute_average_driving_force(mp, pΨ, χn) # average driving force
+
+        Δχ = pΨ / p_Ω + mp.β * ∇²χ
+
+        χn1 = compute_χn1(χn, Δχ, ρ, mp.η, mp.χ_min)
+
+        if j &lt; n_j
+            χn[:] = χn1[:]
+        end
+    end
+
+    return χn1
+end</code></pre><p>Now, we move on to the Finite Element part of the program. We use the following function to assemble our linear system.</p><pre><code class="language-julia hljs">function doassemble!(cellvalues::CellValues, facetvalues::FacetValues, K::SparseMatrixCSC, grid::Grid, dh::DofHandler, mp::MaterialParameters, u, states)
+    r = zeros(ndofs(dh))
+    assembler = start_assemble(K, r)
+    nu = getnbasefunctions(cellvalues)
+
+    re = zeros(nu) # local residual vector
+    Ke = zeros(nu, nu) # local stiffness matrix
+
+    for (element, state) in zip(CellIterator(dh), states)
+        fill!(Ke, 0)
+        fill!(re, 0)
+
+        eldofs = celldofs(element)
+        ue = u[eldofs]
+
+        elmt!(Ke, re, element, cellvalues, facetvalues, grid, mp, ue, state)
+        assemble!(assembler, celldofs(element), Ke, re)
+    end
+
+    return K, r
+end</code></pre><p>The element routine is used to calculate the elementwise stiffness matrix and the residual. In contrast to a purely elastomechanic problem, for topology optimization we additionally use our material state to receive the density value of the element and to store the strain at each quadrature point.</p><pre><code class="language-julia hljs">function elmt!(Ke, re, element, cellvalues, facetvalues, grid, mp, ue, state)
+    n_basefuncs = getnbasefunctions(cellvalues)
+    reinit!(cellvalues, element)
+    χ = state.χ
+
+    # We only assemble lower half triangle of the stiffness matrix and then symmetrize it.
+    @inbounds for q_point in 1:getnquadpoints(cellvalues)
+        dΩ = getdetJdV(cellvalues, q_point)
+        state.ε[q_point] = function_symmetric_gradient(cellvalues, q_point, ue)
+
+        for i in 1:n_basefuncs
+            δεi = shape_symmetric_gradient(cellvalues, q_point, i)
+            for j in 1:i
+                δεj = shape_symmetric_gradient(cellvalues, q_point, j)
+                Ke[i, j] += (χ)^(mp.p) * (δεi ⊡ mp.C ⊡ δεj) * dΩ
+            end
+            re[i] += (-δεi ⊡ ((χ)^(mp.p) * mp.C ⊡ state.ε[q_point])) * dΩ
+        end
+    end
+
+    symmetrize_lower!(Ke)
+
+    @inbounds for facet in 1:nfacets(getcells(grid, cellid(element)))
+        if (cellid(element), facet) ∈ getfacetset(grid, &quot;traction&quot;)
+            reinit!(facetvalues, element, facet)
+            t = Vec((0.0, -1.0)) # force pointing downwards
+            for q_point in 1:getnquadpoints(facetvalues)
+                dΓ = getdetJdV(facetvalues, q_point)
+                for i in 1:n_basefuncs
+                    δu = shape_value(facetvalues, q_point, i)
+                    re[i] += (δu ⋅ t) * dΓ
+                end
+            end
+        end
+    end
+    return
+end
+
+function symmetrize_lower!(K)
+    for i in 1:size(K, 1)
+        for j in (i + 1):size(K, 1)
+            K[i, j] = K[j, i]
+        end
+    end
+    return
+end</code></pre><p>We put everything together in the main function. Here the user may choose the radius parameter, which is related to the regularization parameter as <span>$\beta = ra^2$</span>, the starting density, the number of elements in vertical direction and finally the name of the output. Additionally, the user may choose whether only the final design (default) or every iteration step is saved.</p><p>First, we compute the material parameters and create the grid, DofHandler, boundary condition and FE values. Then we prepare the iterative Newton-Raphson method by pre-allocating all important vectors. Furthermore, we create material states for each element and construct the topology of the grid.</p><p>During each iteration step, first we solve our FE problem in the Newton-Raphson loop. With the solution of the elastomechanic problem, we check for convergence of our topology design. The criteria has to be fulfilled twice in a row to avoid oscillations. If no convergence is reached yet, we update our design and prepare the next iteration step. Finally, we output the results in paraview and calculate the relative stiffness of the final design, i.e. how much how the stiffness increased compared to the starting point.</p><pre><code class="language-julia hljs">function topopt(ra, ρ, n, filename; output = :false)
+    # material
+    mp = MaterialParameters(210.0e3, 0.3, 1.0e-3, 3.0, ra^2, 15.0)
+
+    # grid, dofhandler, boundary condition
+    grid = create_grid(n)
+    dh = create_dofhandler(grid)
+    Δh = 1 / n # element edge length
+    dbc = create_bc(dh)
+
+    # cellvalues
+    cellvalues, facetvalues = create_values()
+
+    # Pre-allocate solution vectors, etc.
+    n_dofs = ndofs(dh) # total number of dofs
+    u = zeros(n_dofs) # solution vector
+    un = zeros(n_dofs) # previous solution vector
+
+    Δu = zeros(n_dofs)  # previous displacement correction
+    ΔΔu = zeros(n_dofs) # new displacement correction
+
+    # create material states
+    states = [MaterialState(ρ, getnquadpoints(cellvalues)) for _ in 1:getncells(dh.grid)]
+
+    χ = zeros(getncells(dh.grid))
+
+    r = zeros(n_dofs) # residual
+    K = allocate_matrix(dh) # stiffness matrix
+
+    i_max = 300 ## maximum number of iteration steps
+    tol = 1.0e-4
+    compliance = 0.0
+    compliance_0 = 0.0
+    compliance_n = 0.0
+    conv = :false
+
+    topology = ExclusiveTopology(grid)
+    neighboorhoods = cache_neighborhood(dh, topology)
+
+    # Newton-Raphson loop
+    NEWTON_TOL = 1.0e-8
+    print(&quot;\n Starting Newton iterations\n&quot;)
+
+    for it in 1:i_max
+        apply_zero!(u, dbc)
+        newton_itr = -1
+
+        while true
+            newton_itr += 1
+
+            if newton_itr &gt; 10
+                error(&quot;Reached maximum Newton iterations, aborting&quot;)
+                break
+            end
+
+            # current guess
+            u .= un .+ Δu
+            K, r = doassemble!(cellvalues, facetvalues, K, grid, dh, mp, u, states)
+            norm_r = norm(r[Ferrite.free_dofs(dbc)])
+
+            if (norm_r) &lt; NEWTON_TOL
+                break
+            end
+
+            apply_zero!(K, r, dbc)
+            ΔΔu = Symmetric(K) \ r
+
+            apply_zero!(ΔΔu, dbc)
+            Δu .+= ΔΔu
+        end # of loop while NR-Iteration
+
+        # calculate compliance
+        compliance = 1 / 2 * u&#39; * K * u
+
+        if it == 1
+            compliance_0 = compliance
+        end
+
+        # check convergence criterium (twice!)
+        if abs(compliance - compliance_n) / compliance &lt; tol
+            if conv
+                println(&quot;Converged at iteration number: &quot;, it)
+                break
+            else
+                conv = :true
+            end
+        else
+            conv = :false
+        end
+
+        # update density
+        χ = update_density(dh, states, mp, ρ, neighboorhoods, Δh)
+
+        # update old displacement, density and compliance
+        un .= u
+        Δu .= 0.0
+        update_material_states!(χ, states, dh)
+        compliance_n = compliance
+
+        # output during calculation
+        if output
+            i = @sprintf(&quot;%3.3i&quot;, it)
+            filename_it = string(filename, &quot;_&quot;, i)
+
+            VTKGridFile(filename_it, grid) do vtk
+                write_cell_data(vtk, χ, &quot;density&quot;)
+            end
+        end
+    end
+
+    # export converged results
+    if !output
+        VTKGridFile(filename, grid) do vtk
+            write_cell_data(vtk, χ, &quot;density&quot;)
+        end
+    end
+    @printf &quot;Rel. stiffness: %.4f \n&quot; compliance^(-1) / compliance_0^(-1)
+
+    return
+end</code></pre><p>Lastly, we call our main function and compare the results. To create the complete output with all iteration steps, it is possible to set the output parameter to <code>true</code>.</p><p>grid, χ =topopt(0.02, 0.5, 60, &quot;small_radius&quot;; output=:false);</p><pre><code class="language-julia hljs">@time topopt(0.03, 0.5, 60, &quot;large_radius&quot;; output = :false);
+#topopt(0.02, 0.5, 60, &quot;topopt_animation&quot;; output=:true); # can be used to create animations</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">
+ Starting Newton iterations
+Converged at iteration number: 65
+Rel. stiffness: 4.8466
+  4.519117 seconds (2.24 M allocations: 2.005 GiB, 2.43% gc time, 1.90% compilation time)</code></pre><p>We observe, that the stiffness for the lower value of <span>$ra$</span> is higher, but also requires more iterations until convergence and finer structures to be manufactured, as can be seen in Figure 2:</p><p><img src="../bending.png" alt/></p><p><em>Figure 2</em>: Optimization results of the bending beam for smaller (left) and larger (right) value of the regularization parameter <span>$\beta$</span>.</p><p>To prove mesh independence, the user could vary the mesh resolution and compare the results.</p><h2 id="References"><a class="docs-heading-anchor" href="#References">References</a><a id="References-1"></a><a class="docs-heading-anchor-permalink" href="#References" title="Permalink"></a></h2><div class="citation noncanonical"><dl><dt>[14]</dt><dd><div>D. R. Jantos, K. Hackl and P. Junker. <a href="https://doi.org/10.1002/nme.5988"><em>An accurate and fast regularization approach to thermodynamic topology optimization</em></a>. <a href="https://doi.org/10.1002/nme.5988">International Journal for Numerical Methods in Engineering <strong>117</strong>, 991–1017</a> (2019).</div></dd><dt>[15]</dt><dd><div>M. Blaszczyk, D. R. Jantos and P. Junker. <a href="https://doi.org/10.1016/j.cma.2022.114698"><em>Application of Taylor series combined with the weighted least square method to thermodynamic topology optimization</em></a>. <a href="https://doi.org/10.1016/j.cma.2022.114698">Computer Methods in Applied Mechanics and Engineering <strong>393</strong>, 114698</a> (2022).</div></dd></dl></div><h2 id="topology_optimization-plain-program"><a class="docs-heading-anchor" href="#topology_optimization-plain-program">Plain program</a><a id="topology_optimization-plain-program-1"></a><a class="docs-heading-anchor-permalink" href="#topology_optimization-plain-program" title="Permalink"></a></h2><p>Here follows a version of the program without any comments. The file is also available here: <a href="../topology_optimization.jl"><code>topology_optimization.jl</code></a>.</p><pre><code class="language-julia hljs">using Ferrite, SparseArrays, LinearAlgebra, Tensors, Printf
+
+function create_grid(n)
+    corners = [
+        Vec{2}((0.0, 0.0)),
+        Vec{2}((2.0, 0.0)),
+        Vec{2}((2.0, 1.0)),
+        Vec{2}((0.0, 1.0)),
+    ]
+    grid = generate_grid(Quadrilateral, (2 * n, n), corners)
+
+    # node-/facesets for boundary conditions
+    addnodeset!(grid, &quot;clamped&quot;, x -&gt; x[1] ≈ 0.0)
+    addfacetset!(grid, &quot;traction&quot;, x -&gt; x[1] ≈ 2.0 &amp;&amp; norm(x[2] - 0.5) &lt;= 0.05)
+    return grid
+end
+
+function create_values()
+    # quadrature rules
+    qr = QuadratureRule{RefQuadrilateral}(2)
+    facet_qr = FacetQuadratureRule{RefQuadrilateral}(2)
+
+    # cell and facetvalues for u
+    ip = Lagrange{RefQuadrilateral, 1}()^2
+    cellvalues = CellValues(qr, ip)
+    facetvalues = FacetValues(facet_qr, ip)
+
+    return cellvalues, facetvalues
+end
+
+function create_dofhandler(grid)
+    dh = DofHandler(grid)
+    add!(dh, :u, Lagrange{RefQuadrilateral, 1}()^2) # displacement
+    close!(dh)
+    return dh
+end
+
+function create_bc(dh)
+    dbc = ConstraintHandler(dh)
+    add!(dbc, Dirichlet(:u, getnodeset(dh.grid, &quot;clamped&quot;), (x, t) -&gt; zero(Vec{2}), [1, 2]))
+    close!(dbc)
+    t = 0.0
+    update!(dbc, t)
+    return dbc
+end
+
+struct MaterialParameters{T, S &lt;: SymmetricTensor{4, 2, T}}
+    C::S
+    χ_min::T
+    p::T
+    β::T
+    η::T
+end
+
+function MaterialParameters(E, ν, χ_min, p, β, η)
+    δ(i, j) = i == j ? 1.0 : 0.0 # helper function
+
+    G = E / 2(1 + ν) # =μ
+    λ = E * ν / (1 - ν^2) # correction for plane stress included
+
+    C = SymmetricTensor{4, 2}((i, j, k, l) -&gt; λ * δ(i, j) * δ(k, l) + G * (δ(i, k) * δ(j, l) + δ(i, l) * δ(j, k)))
+    return MaterialParameters(C, χ_min, p, β, η)
+end
+
+mutable struct MaterialState{T, S &lt;: AbstractArray{SymmetricTensor{2, 2, T, 3}, 1}}
+    χ::T # density
+    ε::S # strain in each quadrature point
+end
+
+function MaterialState(ρ, n_qp)
+    return MaterialState(ρ, Array{SymmetricTensor{2, 2, Float64, 3}, 1}(undef, n_qp))
+end
+
+function update_material_states!(χn1, states, dh)
+    for (element, state) in zip(CellIterator(dh), states)
+        state.χ = χn1[cellid(element)]
+    end
+    return
+end
+
+function compute_driving_forces(states, mp, dh, χn)
+    pΨ = zeros(length(states))
+    for (element, state) in zip(CellIterator(dh), states)
+        i = cellid(element)
+        ε = sum(state.ε) / length(state.ε) # average element strain
+        pΨ[i] = 1 / 2 * mp.p * χn[i]^(mp.p - 1) * (ε ⊡ mp.C ⊡ ε)
+    end
+    return pΨ
+end
+
+function compute_densities(states, dh)
+    χn = zeros(length(states))
+    for (element, state) in zip(CellIterator(dh), states)
+        i = cellid(element)
+        χn[i] = state.χ
+    end
+    return χn
+end
+
+function cache_neighborhood(dh, topology)
+    nbgs = Vector{Vector{Int}}(undef, getncells(dh.grid))
+    _nfacets = nfacets(dh.grid.cells[1])
+    opp = Dict(1 =&gt; 3, 2 =&gt; 4, 3 =&gt; 1, 4 =&gt; 2)
+
+    for element in CellIterator(dh)
+        nbg = zeros(Int, _nfacets)
+        i = cellid(element)
+        for j in 1:_nfacets
+            nbg_cellid = getneighborhood(topology, dh.grid, FacetIndex(i, j))
+            if !isempty(nbg_cellid)
+                nbg[j] = first(nbg_cellid)[1] # assuming only one facet neighbor per cell
+            else # boundary facet
+                nbg[j] = first(getneighborhood(topology, dh.grid, FacetIndex(i, opp[j])))[1]
+            end
+        end
+
+        nbgs[i] = nbg
+    end
+
+    return nbgs
+end
+
+function approximate_laplacian(nbgs, χn, Δh)
+    ∇²χ = zeros(length(nbgs))
+    for i in 1:length(nbgs)
+        nbg = nbgs[i]
+        ∇²χ[i] = (χn[nbg[1]] + χn[nbg[2]] + χn[nbg[3]] + χn[nbg[4]] - 4 * χn[i]) / (Δh^2)
+    end
+
+    return ∇²χ
+end
+
+function compute_χn1(χn, Δχ, ρ, ηs, χ_min)
+    n_el = length(χn)
+
+    χ_trial = zeros(n_el)
+    ρ_trial = 0.0
+
+    λ_lower = minimum(Δχ) - ηs
+    λ_upper = maximum(Δχ) + ηs
+    λ_trial = 0.0
+
+    while abs(ρ - ρ_trial) &gt; 1.0e-7
+        for i in 1:n_el
+            Δχt = 1 / ηs * (Δχ[i] - λ_trial)
+            χ_trial[i] = max(χ_min, min(1.0, χn[i] + Δχt))
+        end
+
+        ρ_trial = 0.0
+        for i in 1:n_el
+            ρ_trial += χ_trial[i] / n_el
+        end
+
+        if ρ_trial &gt; ρ
+            λ_lower = λ_trial
+        elseif ρ_trial &lt; ρ
+            λ_upper = λ_trial
+        end
+        λ_trial = 1 / 2 * (λ_upper + λ_lower)
+    end
+
+    return χ_trial
+end
+
+function compute_average_driving_force(mp, pΨ, χn)
+    n = length(pΨ)
+    w = zeros(n)
+
+    for i in 1:n
+        w[i] = (χn[i] - mp.χ_min) * (1 - χn[i])
+    end
+
+    p_Ω = sum(w .* pΨ) / sum(w) # average driving force
+
+    return p_Ω
+end
+
+function update_density(dh, states, mp, ρ, neighboorhoods, Δh)
+    n_j = Int(ceil(6 * mp.β / (mp.η * Δh^2))) # iterations needed for stability
+    χn = compute_densities(states, dh) # old density field
+    χn1 = zeros(length(χn))
+
+    for j in 1:n_j
+        ∇²χ = approximate_laplacian(neighboorhoods, χn, Δh) # Laplacian
+        pΨ = compute_driving_forces(states, mp, dh, χn) # driving forces
+        p_Ω = compute_average_driving_force(mp, pΨ, χn) # average driving force
+
+        Δχ = pΨ / p_Ω + mp.β * ∇²χ
+
+        χn1 = compute_χn1(χn, Δχ, ρ, mp.η, mp.χ_min)
+
+        if j &lt; n_j
+            χn[:] = χn1[:]
+        end
+    end
+
+    return χn1
+end
+
+function doassemble!(cellvalues::CellValues, facetvalues::FacetValues, K::SparseMatrixCSC, grid::Grid, dh::DofHandler, mp::MaterialParameters, u, states)
+    r = zeros(ndofs(dh))
+    assembler = start_assemble(K, r)
+    nu = getnbasefunctions(cellvalues)
+
+    re = zeros(nu) # local residual vector
+    Ke = zeros(nu, nu) # local stiffness matrix
+
+    for (element, state) in zip(CellIterator(dh), states)
+        fill!(Ke, 0)
+        fill!(re, 0)
+
+        eldofs = celldofs(element)
+        ue = u[eldofs]
+
+        elmt!(Ke, re, element, cellvalues, facetvalues, grid, mp, ue, state)
+        assemble!(assembler, celldofs(element), Ke, re)
+    end
+
+    return K, r
+end
+
+function elmt!(Ke, re, element, cellvalues, facetvalues, grid, mp, ue, state)
+    n_basefuncs = getnbasefunctions(cellvalues)
+    reinit!(cellvalues, element)
+    χ = state.χ
+
+    # We only assemble lower half triangle of the stiffness matrix and then symmetrize it.
+    @inbounds for q_point in 1:getnquadpoints(cellvalues)
+        dΩ = getdetJdV(cellvalues, q_point)
+        state.ε[q_point] = function_symmetric_gradient(cellvalues, q_point, ue)
+
+        for i in 1:n_basefuncs
+            δεi = shape_symmetric_gradient(cellvalues, q_point, i)
+            for j in 1:i
+                δεj = shape_symmetric_gradient(cellvalues, q_point, j)
+                Ke[i, j] += (χ)^(mp.p) * (δεi ⊡ mp.C ⊡ δεj) * dΩ
+            end
+            re[i] += (-δεi ⊡ ((χ)^(mp.p) * mp.C ⊡ state.ε[q_point])) * dΩ
+        end
+    end
+
+    symmetrize_lower!(Ke)
+
+    @inbounds for facet in 1:nfacets(getcells(grid, cellid(element)))
+        if (cellid(element), facet) ∈ getfacetset(grid, &quot;traction&quot;)
+            reinit!(facetvalues, element, facet)
+            t = Vec((0.0, -1.0)) # force pointing downwards
+            for q_point in 1:getnquadpoints(facetvalues)
+                dΓ = getdetJdV(facetvalues, q_point)
+                for i in 1:n_basefuncs
+                    δu = shape_value(facetvalues, q_point, i)
+                    re[i] += (δu ⋅ t) * dΓ
+                end
+            end
+        end
+    end
+    return
+end
+
+function symmetrize_lower!(K)
+    for i in 1:size(K, 1)
+        for j in (i + 1):size(K, 1)
+            K[i, j] = K[j, i]
+        end
+    end
+    return
+end
+
+function topopt(ra, ρ, n, filename; output = :false)
+    # material
+    mp = MaterialParameters(210.0e3, 0.3, 1.0e-3, 3.0, ra^2, 15.0)
+
+    # grid, dofhandler, boundary condition
+    grid = create_grid(n)
+    dh = create_dofhandler(grid)
+    Δh = 1 / n # element edge length
+    dbc = create_bc(dh)
+
+    # cellvalues
+    cellvalues, facetvalues = create_values()
+
+    # Pre-allocate solution vectors, etc.
+    n_dofs = ndofs(dh) # total number of dofs
+    u = zeros(n_dofs) # solution vector
+    un = zeros(n_dofs) # previous solution vector
+
+    Δu = zeros(n_dofs)  # previous displacement correction
+    ΔΔu = zeros(n_dofs) # new displacement correction
+
+    # create material states
+    states = [MaterialState(ρ, getnquadpoints(cellvalues)) for _ in 1:getncells(dh.grid)]
+
+    χ = zeros(getncells(dh.grid))
+
+    r = zeros(n_dofs) # residual
+    K = allocate_matrix(dh) # stiffness matrix
+
+    i_max = 300 ## maximum number of iteration steps
+    tol = 1.0e-4
+    compliance = 0.0
+    compliance_0 = 0.0
+    compliance_n = 0.0
+    conv = :false
+
+    topology = ExclusiveTopology(grid)
+    neighboorhoods = cache_neighborhood(dh, topology)
+
+    # Newton-Raphson loop
+    NEWTON_TOL = 1.0e-8
+    print(&quot;\n Starting Newton iterations\n&quot;)
+
+    for it in 1:i_max
+        apply_zero!(u, dbc)
+        newton_itr = -1
+
+        while true
+            newton_itr += 1
+
+            if newton_itr &gt; 10
+                error(&quot;Reached maximum Newton iterations, aborting&quot;)
+                break
+            end
+
+            # current guess
+            u .= un .+ Δu
+            K, r = doassemble!(cellvalues, facetvalues, K, grid, dh, mp, u, states)
+            norm_r = norm(r[Ferrite.free_dofs(dbc)])
+
+            if (norm_r) &lt; NEWTON_TOL
+                break
+            end
+
+            apply_zero!(K, r, dbc)
+            ΔΔu = Symmetric(K) \ r
+
+            apply_zero!(ΔΔu, dbc)
+            Δu .+= ΔΔu
+        end # of loop while NR-Iteration
+
+        # calculate compliance
+        compliance = 1 / 2 * u&#39; * K * u
+
+        if it == 1
+            compliance_0 = compliance
+        end
+
+        # check convergence criterium (twice!)
+        if abs(compliance - compliance_n) / compliance &lt; tol
+            if conv
+                println(&quot;Converged at iteration number: &quot;, it)
+                break
+            else
+                conv = :true
+            end
+        else
+            conv = :false
+        end
+
+        # update density
+        χ = update_density(dh, states, mp, ρ, neighboorhoods, Δh)
+
+        # update old displacement, density and compliance
+        un .= u
+        Δu .= 0.0
+        update_material_states!(χ, states, dh)
+        compliance_n = compliance
+
+        # output during calculation
+        if output
+            i = @sprintf(&quot;%3.3i&quot;, it)
+            filename_it = string(filename, &quot;_&quot;, i)
+
+            VTKGridFile(filename_it, grid) do vtk
+                write_cell_data(vtk, χ, &quot;density&quot;)
+            end
+        end
+    end
+
+    # export converged results
+    if !output
+        VTKGridFile(filename, grid) do vtk
+            write_cell_data(vtk, χ, &quot;density&quot;)
+        end
+    end
+    @printf &quot;Rel. stiffness: %.4f \n&quot; compliance^(-1) / compliance_0^(-1)
+
+    return
+end
+
+@time topopt(0.03, 0.5, 60, &quot;large_radius&quot;; output = :false);
+#topopt(0.02, 0.5, 60, &quot;topopt_animation&quot;; output=:true); # can be used to create animations</code></pre><hr/><p><em>This page was generated using <a href="https://github.com/fredrikekre/Literate.jl">Literate.jl</a>.</em></p></article><nav class="docs-footer"><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option><option value="catppuccin-latte">catppuccin-latte</option><option value="catppuccin-frappe">catppuccin-frappe</option><option value="catppuccin-macchiato">catppuccin-macchiato</option><option value="catppuccin-mocha">catppuccin-mocha</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.7.0 on <span class="colophon-date" title="Tuesday 7 January 2025 17:51">Tuesday 7 January 2025</span>. Using Julia version 1.11.2.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
