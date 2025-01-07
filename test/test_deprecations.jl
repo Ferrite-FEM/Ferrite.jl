@@ -131,4 +131,20 @@ using Ferrite, Test
         @test_throws Ferrite.DeprecationError celldofs!(v, fc)
     end
 
+    # Ferrite v2
+    @testset "Base.copy -> task_local" begin
+        ip = Lagrange{RefQuadrilateral, 1}()
+        @test_deprecated copy(ip)
+        qr = QuadratureRule{RefQuadrilateral}(2)
+        @test_deprecated copy(qr)
+        cv = CellValues(qr, ip)
+        @test_deprecated copy(cv)
+        fqr = FacetQuadratureRule{RefQuadrilateral}(2)
+        @test_deprecated copy(fqr)
+        fv = FacetValues(fqr, ip)
+        @test_deprecated copy(fv)
+        iv = InterfaceValues(fqr, ip)
+        @test_deprecated copy(iv)
+    end
+
 end # testset deprecations

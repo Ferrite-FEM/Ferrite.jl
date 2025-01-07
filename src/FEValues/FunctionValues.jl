@@ -98,14 +98,13 @@ function precompute_values!(fv::FunctionValues{2}, qr_points::AbstractVector{<:V
     return reference_shape_hessians_gradients_and_values!(fv.d2Ndξ2, fv.dNdξ, fv.Nξ, fv.ip, qr_points)
 end
 
-function Base.copy(v::FunctionValues)
-    Nξ_copy = copy(v.Nξ)
-    Nx_copy = v.Nξ === v.Nx ? Nξ_copy : copy(v.Nx) # Preserve aliasing
-    dNdx_copy = _copy_or_nothing(v.dNdx)
-    dNdξ_copy = _copy_or_nothing(v.dNdξ)
-    d2Ndx2_copy = _copy_or_nothing(v.d2Ndx2)
-    d2Ndξ2_copy = _copy_or_nothing(v.d2Ndξ2)
-    return FunctionValues(copy(v.ip), Nx_copy, Nξ_copy, dNdx_copy, dNdξ_copy, d2Ndx2_copy, d2Ndξ2_copy)
+function task_local(v::FunctionValues)
+    Nξ = task_local(v.Nξ)
+    Nx = v.Nξ === v.Nx ? Nξ : task_local(v.Nx) # Preserve aliasing
+    return FunctionValues(
+        task_local(v.ip), Nx, Nξ, task_local(v.dNdx), task_local(v.dNdξ),
+        task_local(v.d2Ndx2), task_local(v.d2Ndξ2)
+    )
 end
 
 getnbasefunctions(funvals::FunctionValues) = size(funvals.Nx, 1)

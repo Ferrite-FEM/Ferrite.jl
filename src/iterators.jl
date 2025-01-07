@@ -9,7 +9,6 @@ end
 UpdateFlags(; nodes::Bool = true, coords::Bool = true, dofs::Bool = true) =
     UpdateFlags(nodes, coords, dofs)
 
-
 ###############
 ## CellCache ##
 ###############
@@ -81,6 +80,13 @@ function reinit!(cc::CellCache, i::Int)
         celldofs!(cc.dofs, cc.dh, i)
     end
     return cc
+end
+
+function task_local(cc::CellCache)
+    return CellCache(
+        cc.flags, cc.grid, task_local(cc.cellid), task_local(cc.nodes),
+        task_local(cc.coords), cc.dh, task_local(cc.dofs)
+    )
 end
 
 # reinit! FEValues with CellCache
