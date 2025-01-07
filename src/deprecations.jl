@@ -347,9 +347,7 @@ function value(ip::Interpolation, ξ::Vec)
     printstyled(io, "`[reference_shape_value(ip, ξ, i) for i in 1:getnbasefunctions(ip)]`", color = :green)
     print(io, " or ")
     printstyled(io, "`reference_shape_values!(N, ip, ξ)`", color = :green)
-    print(io, " (with preallocated ")
-    printstyled(io, "`N`", color = :green)
-    print(io, ") instead.")
+    print(io, " (with preallocated `N`) instead.")
 
     throw(DeprecationError(takestring(io)))
 end
@@ -360,9 +358,7 @@ function derivative(ip::Interpolation, ξ::Vec)
     printstyled(io, "`[reference_shape_gradient(ip, ξ, i) for i in 1:getnbasefunctions(ip)]`", color = :green)
     print(io, " or ")
     printstyled(io, "`reference_shape_gradients!(dNdξ, ip, ξ)`", color = :green)
-    print(io, " (with preallocated ")
-    printstyled(io, "`dNdξ`", color = :green)
-    print(io, ") instead.")
+    print(io, " (with preallocated `dNdξ`) instead.")
 
     throw(DeprecationError(takestring(io)))
 end
