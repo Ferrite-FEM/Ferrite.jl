@@ -116,11 +116,11 @@ for all ``\delta\boldsymbol{E}\in H_0(\mathrm{curl})`` and ``\delta\phi\in H_0^1
 
 # We then use `FerriteGmsh.jl` to create the grid
 function setup_grid(h = 0.2; origin_refinement = 1)
-    # Initialize gmsh
+    ## Initialize gmsh
     Gmsh.initialize()
     gmsh.option.set_number("General.Verbosity", 2)
 
-    # Add the points, finer grid at the discontinuity
+    ## Add the points, finer grid at the discontinuity
     o = gmsh.model.geo.add_point(0.0, 0.0, 0.0, h / origin_refinement)
     p1 = gmsh.model.geo.add_point(1.0, 0.0, 0.0, h)
     p2 = gmsh.model.geo.add_point(1.0, 1.0, 0.0, h)
@@ -129,30 +129,30 @@ function setup_grid(h = 0.2; origin_refinement = 1)
     p5 = gmsh.model.geo.add_point(0.0, -1.0, 0.0, h)
 
     pts = [o, p1, p2, p3, p4, p5, o]
-    # Add the lines
+    ## Add the lines
     lines = [gmsh.model.geo.add_line(pts[i - 1], pts[i]) for i in 2:length(pts)]
 
-    # Create the closed curve loop and the surface
+    ## Create the closed curve loop and the surface
     loop = gmsh.model.geo.add_curve_loop(lines)
     gmsh.model.geo.add_plane_surface([loop])
 
-    # Synchronize the model
+    ## Synchronize the model
     gmsh.model.geo.synchronize()
 
-    # Generate a 2D mesh
+    ## Generate a 2D mesh
     gmsh.model.mesh.generate(2)
 
-    # Save the mesh, and read back in as a Ferrite Grid
+    ## Save the mesh, and read back in as a Ferrite Grid
     grid = mktempdir() do dir
         path = joinpath(dir, "mesh.msh")
         gmsh.write(path)
         togrid(path)
     end
 
-    # Finalize the Gmsh library
+    ## Finalize the Gmsh library
     Gmsh.finalize()
 
-    # Add boundary parts
+    ## Add boundary parts
     addfacetset!(grid, "vertical_facets", x -> abs((x[1] - 1) * x[1] * (x[1] + 1)) ≤ 1.0e-6)
     addfacetset!(grid, "horizontal_facets", x -> abs((x[2] - 1) * x[2] * (x[2] + 1)) ≤ 1.0e-6)
 
@@ -197,7 +197,6 @@ end
 
 grid = setup_grid(0.00390625; origin_refinement = 1)
 
-#
 ip = DiscontinuousLagrange{RefTriangle, 1}()^2
 dh = close!(add!(DofHandler(grid), :u, ip))
 

@@ -143,6 +143,7 @@ export
     # Constraints
     ConstraintHandler,
     Dirichlet,
+    IntegrateableDirichlet,
     PeriodicDirichlet,
     collect_periodic_facets,
     collect_periodic_facets!,
