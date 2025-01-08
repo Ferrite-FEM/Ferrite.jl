@@ -217,7 +217,7 @@ function edge_to_cell_transformation(ξ::Vec{1, T}, ::Type{RefTriangle}, edgenr:
 end
 
 # Mapping from 2D face of a triangle to 1D line.
-function cell_to_edge_transformation(ξ::Vec{2, T}, ::Type{RefTriangle}, facet::Int) where {T}
+function cell_to_edge_transformation(ξ::Vec{2, T}, ::Type{RefTriangle}, edgenr::Int) where {T}
     x, y = ξ
     edgenr == 1 && return Vec(one(T) - x * 2)
     edgenr == 2 && return Vec(one(T) - y * 2)
@@ -225,13 +225,13 @@ function cell_to_edge_transformation(ξ::Vec{2, T}, ::Type{RefTriangle}, facet::
     throw(ArgumentError("unknown edgenr number"))
 end
 
-function weighted_normal(J::Tensor{2, 2}, ::Type{RefTriangle}, facet::Int)
+function weighted_normal(J::Tensor{2, 2}, ::Type{RefTriangle}, edgenr::Int)
     @inbounds begin
-        facet == 1 && return Vec{2}((-(J[2, 1] - J[2, 2]), J[1, 1] - J[1, 2]))
-        facet == 2 && return Vec{2}((-J[2, 2], J[1, 2]))
-        facet == 3 && return Vec{2}((J[2, 1], -J[1, 1]))
+        edgenr == 1 && return Vec{2}((-(J[2, 1] - J[2, 2]), J[1, 1] - J[1, 2]))
+        edgenr == 2 && return Vec{2}((-J[2, 2], J[1, 2]))
+        edgenr == 3 && return Vec{2}((J[2, 1], -J[1, 1]))
     end
-    throw(ArgumentError("unknown facet number"))
+    throw(ArgumentError("unknown edgenr number"))
 end
 
 function weighted_tangent(J::Tensor{2, 2}, ::Type{RefTriangle}, edgenr::Int)
