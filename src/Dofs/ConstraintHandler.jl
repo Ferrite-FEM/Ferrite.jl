@@ -61,48 +61,7 @@ function __to_components(c)
     return components
 end
 
-@doc raw"""
-    IntegrateableDirichlet(field_name::Symbol, facets, f::Function; qr_order = -1)
-
-An `IntegrateableDirichlet` conditions enforces conditions for `field_name` on the boundary for
-non-nodal interpolations (e.g. ``H(\mathrm{div})`` or ``H(\mathrm{curl})``) in an integral sense.
-
-For ``H(\mathrm{div})`` interpolations, we have conditions on the form
-```math
-\boldsymbol{N}^f_i a^f_i \cdot \boldsymbol{n}^f = q_n = f(\boldsymbol{x}, t)
-```
-These are enforced as
-```math
-\int_{\Gamma^f} \boldsymbol{N}^f_\alpha a^f_\alpha \cdot \boldsymbol{n}^f\ \mathrm{d}\Gamma
-= \int_{\Gamma^f} g_\alpha(\boldsymbol{x}) q_n\ \mathrm{d}\Gamma
-```
-(no sum on ``\alpha``) where the weighting functions, ``g_\alpha(\boldsymbol{x})``, are defined such that
-``\sum_{\alpha} g_\alpha(\boldsymbol{x}) = 1`` at all points on the facet.
-These weighting functions are defined by each interpolation.
-
-For ``H(\mathrm{curl})`` interpolations, the conditions are on the form
-```math
-\boldsymbol{N}^f_i a^f_i \times \boldsymbol{n}^f = \boldsymbol{q}_t = \boldsymbol{f}(\boldsymbol{x}, t)
-```
-These are similarly enforced as
-```math
-\int_{\Gamma^f} \boldsymbol{N}^f_\alpha a^f_\alpha \times \boldsymbol{n}^f\ \mathrm{d}\Gamma
-= \int_{\Gamma^f} g_\alpha(\boldsymbol{x}) \boldsymbol{q}_t\ \mathrm{d}\Gamma
-```
-(no sum on ``\alpha``) with equivalent weighting functions as for ``H(\mathrm{div})`` interpolations.
-"""
-mutable struct IntegrateableDirichlet
-    const f::Function
-    const facets::OrderedSet{FacetIndex}
-    const field_name::Symbol
-    const qr_order::Int
-    # Created during `add!`
-    fv::Union{Nothing, FacetValues}
-    facet_dofs::Union{Nothing, ArrayOfVectorViews{Int, 1}}
-end
-function IntegrateableDirichlet(field_name::Symbol, facets::AbstractVecOrSet, f::Function; qr_order = -1)
-    return IntegrateableDirichlet(f, convert_to_orderedset(facets), field_name, qr_order, nothing, nothing)
-end
+include(joinpath(@__DIR__, "IntegrateableDirichlet.jl"))
 
 const DofCoefficients{T} = Vector{Pair{Int, T}}
 """
@@ -126,6 +85,7 @@ A collection of constraints associated with the dof handler `dh`.
 """
 mutable struct ConstraintHandler{DH <: AbstractDofHandler, T}
     const dbcs::Vector{Dirichlet}
+    const idbcs::Vector{IntegrateableDirichlet}
     const prescribed_dofs::Vector{Int}
     const free_dofs::Vector{Int}
     const inhomogeneities::Vector{T}
@@ -146,8 +106,8 @@ ConstraintHandler(dh::AbstractDofHandler) = ConstraintHandler(Float64, dh)
 function ConstraintHandler(::Type{T}, dh::AbstractDofHandler) where {T <: Number}
     @assert isclosed(dh)
     return ConstraintHandler(
-        Dirichlet[], Int[], Int[], T[], Union{Nothing, T}[], Union{Nothing, DofCoefficients{T}}[],
-        Dict{Int, Int}(), BCValues{T}[], dh, false,
+        Dirichlet[], IntegrateableDirichlet[], Int[], Int[], T[], Union{Nothing, T}[],
+        Union{Nothing, DofCoefficients{T}}[], Dict{Int, Int}(), BCValues{T}[], dh, false,
     )
 end
 
@@ -461,6 +421,9 @@ function update!(ch::ConstraintHandler, time::Real = 0.0)
             ch.inhomogeneities, wrapper_f, dbc.facets, ip, dbc.local_facet_dofs, dbc.local_facet_dofs_offset,
             dbc.components, ch.dh, ch.bcvalues[i], ch.dofmapping, ch.dofcoefficients, time
         )
+    end
+    for (i, dbc) in pairs(ch.idbcs)
+        _update!(ch.inhomogeneities, dbc.f, dbc.facets, dbc.fv, dbc.facet_dofs, ch.dh, ch.dofmapping, ch.dofcoefficients, time)
     end
     # Compute effective inhomogeneity for affine constraints with prescribed dofs in the
     # RHS. For example, in u2 = w3 * u3 + w4 * u4 + b2 we allow e.g. u3 to be prescribed by
