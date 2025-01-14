@@ -28,7 +28,7 @@
 # u(\textbf{x}) = 0 \quad \textbf{x} \in \partial \Omega,
 # ```
 # where $\partial \Omega$ denotes the boundary of $\Omega$.
-# The resulting weak form is given given as follows: Find ``u \in \mathbb{U}`` such that
+# The resulting weak form is given as follows: Find ``u \in \mathbb{U}`` such that
 # ```math
 # \int_{\Omega} \nabla \delta u \cdot \nabla u \ d\Omega = \int_{\Omega} \delta u \ d\Omega \quad \forall \delta u \in \mathbb{T},
 # ```
@@ -118,7 +118,7 @@ close!(ch)
 #
 # #### Element assembly
 # We define the function `assemble_element!` (see below) which computes the contribution for
-# an element. The function takes pre-allocated `ke` and `fe` (they are allocated once and
+# an element. The function takes pre-allocated `Ke` and `fe` (they are allocated once and
 # then reused for all elements) so we first need to make sure that they are all zeroes at
 # the start of the function by using `fill!`. Then we loop over all the quadrature points,
 # and for each quadrature point we loop over all the (local) shape functions. We need the
