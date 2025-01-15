@@ -4,6 +4,7 @@ export
     VectorInterpolation,
     ScalarInterpolation,
     VectorizedInterpolation,
+    #RefPoint,
     RefLine,
     RefQuadrilateral,
     RefHexahedron,
@@ -58,6 +59,7 @@ export
     # Grid
     Grid,
     Node,
+    #Point,
     Line,
     QuadraticLine,
     Triangle,
