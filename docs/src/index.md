@@ -61,6 +61,44 @@ understand how Ferrite works. Already this rather simple program discusses many 
 important concepts. See the [tutorials overview](@ref Tutorials) for suggestion on how to
 progress to more advanced usage.
 
+A high-level graphical overview of Ferrite is given in the following diagram
+
+```mermaid
+flowchart TD
+    gridtype(Grid)
+    dhtype(DofHandler)
+    chtype(ConstraintHandler)
+    dirichlettype(Dirichlet)
+    affinetype(AffineConstraint)
+    iptype(Interpolation)
+    qrtype(QuadratureRule)
+    fqrtype(FacetQuadratureRule)
+    cvtype(CellValues)
+    fvtype(FacetValues)
+    sptype(SparsityPattern)
+    mattype[[System matrix]]
+    vectype[[System vector]]
+    assemblycode{{User assembly code}}
+    gridtype-->dhtype
+    iptype-->dhtype
+    dirichlettype-->chtype
+    affinetype-->chtype
+    dhtype-->chtype
+    iptype-->cvtype
+    qrtype-->cvtype
+    iptype-->fvtype
+    fqrtype-->fvtype
+    dhtype-->sptype
+    chtype-->mattype
+    sptype-->mattype
+    chtype-->vectype
+    dhtype-->vectype
+    cvtype-->assemblycode
+    fvtype-->assemblycode
+    assemblycode-->vectype
+    assemblycode-->mattype
+```
+
 ### Getting help
 
 If you have questions about Ferrite it is suggested to use the `#ferrite-fem` channel on the
