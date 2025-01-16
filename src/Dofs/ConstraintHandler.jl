@@ -506,7 +506,7 @@ end
 
 """
 
-    apply!(K::SparseMatrixCSC, rhs::AbstractVector, ch::ConstraintHandler)
+    apply!(K::AbstractSparseMatrix, rhs::AbstractVector, ch::ConstraintHandler)
 
 Adjust the matrix `K` and right hand side `rhs` to account for the Dirichlet boundary
 conditions specified in `ch` such that `K \\ rhs` gives the expected solution.
@@ -598,15 +598,15 @@ function _apply_v(v::AbstractVector, ch::ConstraintHandler, apply_zero::Bool)
     return v
 end
 
-function apply!(K::Union{SparseMatrixCSC, Symmetric}, ch::ConstraintHandler)
+function apply!(K::Union{AbstractSparseMatrix, Symmetric}, ch::ConstraintHandler)
     return apply!(K, eltype(K)[], ch, true)
 end
 
-function apply_zero!(K::Union{SparseMatrixCSC, Symmetric}, f::AbstractVector, ch::ConstraintHandler)
+function apply_zero!(K::Union{AbstractSparseMatrix, Symmetric}, f::AbstractVector, ch::ConstraintHandler)
     return apply!(K, f, ch, true)
 end
 
-function apply!(KK::Union{SparseMatrixCSC, Symmetric}, f::AbstractVector, ch::ConstraintHandler, applyzero::Bool = false)
+function apply!(KK::Union{AbstractSparseMatrix, Symmetric{<:Any, <:AbstractSparseMatrix}}, f::AbstractVector, ch::ConstraintHandler, applyzero::Bool = false)
     @assert isclosed(ch)
     sym = isa(KK, Symmetric)
     K = sym ? KK.data : KK
@@ -617,43 +617,14 @@ function apply!(KK::Union{SparseMatrixCSC, Symmetric}, f::AbstractVector, ch::Co
     m = meandiag(K) # Use the mean of the diagonal here to not ruin things for iterative solver
 
     # Add inhomogeneities to f: (f - K * ch.inhomogeneities)
-    if !applyzero
-        @inbounds for i in 1:length(ch.inhomogeneities)
-            d = ch.prescribed_dofs[i]
-            v = ch.inhomogeneities[i]
-            if v != 0
-                for j in nzrange(K, d)
-                    r = K.rowval[j]
-                    sym && r > d && break # don't look below diagonal
-                    f[r] -= v * K.nzval[j]
-                end
-            end
-        end
-        if sym
-            # In the symmetric case, for a constrained dof `d`, we handle the contribution
-            # from `K[1:d, d]` in the loop above, but we are still missing the contribution
-            # from `K[(d+1):size(K,1), d]`. These values are not stored, but since the
-            # matrix is symmetric we can instead use `K[d, (d+1):size(K,1)]`. Looping over
-            # rows is slow, so loop over all columns again, and check if the row is a
-            # constrained row.
-            @inbounds for col in 1:size(K, 2)
-                for ri in nzrange(K, col)
-                    row = K.rowval[ri]
-                    row >= col && break
-                    if (i = get(ch.dofmapping, row, 0); i != 0)
-                        f[col] -= ch.inhomogeneities[i] * K.nzval[ri]
-                    end
-                end
-            end
-        end
-    end
+    !applyzero && add_inhomogeneities!(KK, f, ch.inhomogeneities, ch.prescribed_dofs, ch.dofmapping)
 
-    # Condense K (C' * K * C) and f (C' * f)
+    # Condense K := (C' * K * C) and f := (C' * f)
     _condense!(K, f, ch.dofcoefficients, ch.dofmapping, sym)
 
     # Remove constrained dofs from the matrix
-    zero_out_columns!(K, ch.prescribed_dofs)
-    zero_out_rows!(K, ch.dofmapping)
+    zero_out_columns!(K, ch)
+    zero_out_rows!(K, ch)
 
     # Add meandiag to constraint dofs
     @inbounds for i in 1:length(ch.inhomogeneities)
@@ -667,12 +638,63 @@ function apply!(KK::Union{SparseMatrixCSC, Symmetric}, f::AbstractVector, ch::Co
     return
 end
 
+"""
+    add_inhomogeneities!(K, f::AbstractVector, inhomogeneities::AbstractVector, prescribed_dofs::AbstractVector{<:Integer}, dofmapping::Dict{Int,Int})
+
+Compute "f -= K*inhomogeneities".
+By default this is a generic version via SpMSpV kernel.
+"""
+function add_inhomogeneities!(K, f::AbstractVector, inhomogeneities::AbstractVector, prescribed_dofs::AbstractVector{<:Integer}, dofmapping)
+    return f .-= K * sparsevec(prescribed_dofs, inhomogeneities, size(K, 2))
+end
+
+# Optimized version for SparseMatrixCSC
+add_inhomogeneities!(K::SparseMatrixCSC, f::AbstractVector, inhomogeneities::AbstractVector, prescribed_dofs::AbstractVector{<:Integer}, dofmapping) = add_inhomogeneities_csc!(K, f, inhomogeneities, prescribed_dofs, dofmapping, false)
+add_inhomogeneities!(K::Symmetric{<:Any, <:SparseMatrixCSC}, f::AbstractVector, inhomogeneities::AbstractVector, prescribed_dofs::AbstractVector{<:Integer}, dofmapping) = add_inhomogeneities_csc!(K.data, f, inhomogeneities, prescribed_dofs, dofmapping, true)
+function add_inhomogeneities_csc!(K::SparseMatrixCSC, f::AbstractVector, inhomogeneities::AbstractVector, prescribed_dofs::AbstractVector{<:Integer}, dofmapping, sym::Bool)
+    @inbounds for i in 1:length(inhomogeneities)
+        d = prescribed_dofs[i]
+        v = inhomogeneities[i]
+        if v != 0
+            for j in nzrange(K, d)
+                r = K.rowval[j]
+                sym && r > d && break # don't look below diagonal
+                f[r] -= v * K.nzval[j]
+            end
+        end
+    end
+    return if sym
+        # In the symmetric case, for a constrained dof `d`, we handle the contribution
+        # from `K[1:d, d]` in the loop above, but we are still missing the contribution
+        # from `K[(d+1):size(K,1), d]`. These values are not stored, but since the
+        # matrix is symmetric we can instead use `K[d, (d+1):size(K,1)]`. Looping over
+        # rows is slow, so loop over all columns again, and check if the row is a
+        # constrained row.
+        @inbounds for col in 1:size(K, 2)
+            for ri in nzrange(K, col)
+                row = K.rowval[ri]
+                row >= col && break
+                if (i = get(dofmapping, row, 0); i != 0)
+                    f[col] -= inhomogeneities[i] * K.nzval[ri]
+                end
+            end
+        end
+    end
+end
+
 # Fetch dof coefficients for a dof prescribed by an affine constraint. Return nothing if the
 # dof is not prescribed, or prescribed by DBC.
 @inline function coefficients_for_dof(dofmapping, dofcoeffs, dof)
     idx = get(dofmapping, dof, 0)
     idx == 0 && return nothing
     return dofcoeffs[idx]
+end
+
+
+function _condense!(K::AbstractSparseMatrix, f::AbstractVector, dofcoefficients::Vector{Union{Nothing, DofCoefficients{T}}}, dofmapping::Dict{Int, Int}, sym::Bool = false) where {T}
+    # Return early if there are no non-trivial affine constraints
+    any(i -> !(i === nothing || isempty(i)), dofcoefficients) || return
+    error("condensation of ::$(typeof(K)) matrix not supported")
 end
 
 # Condenses K and f: C'*K*C, C'*f, in-place assuming the sparsity pattern is correct
@@ -785,22 +807,33 @@ function create_constraint_matrix(ch::ConstraintHandler{dh, T}) where {dh, T}
 
     return C, g
 end
+"""
+    zero_out_columns!(K::AbstractMatrix, ch::ConstraintHandler)
+Set the values of all columns associated with constrained dofs to zero.
+"""
+zero_out_columns!
+
+"""
+    zero_out_rows!(K::AbstractMatrix, ch::ConstraintHandler)
+Set the values of all rows associated with constrained dofs to zero.
+"""
+zero_out_rows!
 
 # columns need to be stored entries, this is not checked
-function zero_out_columns!(K, dofs::Vector{Int}) # can be removed in 0.7 with #24711 merged
-    @debug @assert issorted(dofs)
-    for col in dofs
+function zero_out_columns!(K::SparseArrays.AbstractSparseMatrixCSC, ch::ConstraintHandler) # can be removed in 0.7 with #24711 merged
+    @debug @assert issorted(ch.prescribed_dofs)
+    for col in ch.prescribed_dofs
         r = nzrange(K, col)
         K.nzval[r] .= 0.0
     end
     return
 end
 
-function zero_out_rows!(K, dofmapping)
+function zero_out_rows!(K::SparseArrays.AbstractSparseMatrixCSC, ch::ConstraintHandler)
     rowval = K.rowval
     nzval = K.nzval
     @inbounds for i in eachindex(rowval, nzval)
-        if haskey(dofmapping, rowval[i])
+        if haskey(ch.dofmapping, rowval[i])
             nzval[i] = 0
         end
     end
@@ -1673,9 +1706,16 @@ function _apply_local!(
     return
 end
 
-# Condensation of affine constraints on element level. If possible this function only
-# modifies the local arrays.
 @noinline missing_global() = error("can not condense constraint without the global matrix and vector")
+
+"""
+    _condense_local!(local_matrix::AbstractMatrix, local_vector::AbstractVector,
+                    global_matrix#=::SparseMatrixCSC=#, global_vector#=::Vector=#,
+                    global_dofs::AbstractVector, dofmapping::Dict, dofcoefficients::Vector)
+
+Condensation of affine constraints on element level. If possible this function only
+modifies the local arrays.
+"""
 function _condense_local!(
         local_matrix::AbstractMatrix, local_vector::AbstractVector,
         global_matrix #=::SparseMatrixCSC=#, global_vector #=::Vector=#,
