@@ -61,7 +61,7 @@ function __to_components(c)
     return components
 end
 
-include(joinpath(@__DIR__, "IntegrateableDirichlet.jl"))
+include(joinpath(@__DIR__, "IntegrableDirichlet.jl"))
 
 const DofCoefficients{T} = Vector{Pair{Int, T}}
 """
@@ -85,7 +85,7 @@ A collection of constraints associated with the dof handler `dh`.
 """
 mutable struct ConstraintHandler{DH <: AbstractDofHandler, T}
     const dbcs::Vector{Dirichlet}
-    const idbcs::Vector{IntegrateableDirichlet}
+    const idbcs::Vector{IntegrableDirichlet}
     const prescribed_dofs::Vector{Int}
     const free_dofs::Vector{Int}
     const inhomogeneities::Vector{T}
@@ -106,7 +106,7 @@ ConstraintHandler(dh::AbstractDofHandler) = ConstraintHandler(Float64, dh)
 function ConstraintHandler(::Type{T}, dh::AbstractDofHandler) where {T <: Number}
     @assert isclosed(dh)
     return ConstraintHandler(
-        Dirichlet[], IntegrateableDirichlet[], Int[], Int[], T[], Union{Nothing, T}[],
+        Dirichlet[], IntegrableDirichlet[], Int[], Int[], T[], Union{Nothing, T}[],
         Union{Nothing, DofCoefficients{T}}[], Dict{Int, Int}(), BCValues{T}[], dh, false,
     )
 end
