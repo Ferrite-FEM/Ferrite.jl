@@ -131,7 +131,7 @@ using Ferrite: reference_shape_value
 
         @testset "$ref_cell unknown facet error path" begin
             for face in (-1, 0, 100)
-                err = ArgumentError("unknown facet number")
+                err = ArgumentError # remove string due to generalization ("unknown facet number")
                 @test_throws err Ferrite.weighted_normal(Tensor{2, dim}(zeros(dim^2)), refshape, face)
                 pt = Vec{dim - 1, Float64}(ntuple(i -> 0.0, dim - 1))
                 @test_throws err Ferrite.facet_to_element_transformation(pt, refshape, face)

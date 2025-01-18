@@ -135,7 +135,7 @@ function reinit!(fv::FacetValues, cell::Union{AbstractCell, Nothing}, x::Abstrac
     geo_mapping = get_geo_mapping(fv)
     fun_values = get_fun_values(fv)
 
-    if cell === nothing && !isa(mapping_type(fun_values), IdentityMapping)
+    if cell === nothing && reinit_needs_cell(fv)
         throw(ArgumentError("The cell::AbstractCell input is required to reinit! non-identity function mappings"))
     end
 
