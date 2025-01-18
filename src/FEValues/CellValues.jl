@@ -78,6 +78,7 @@ getdetJdV(cv::CellValues, q_point::Int) = cv.detJdV[q_point]
 getdetJdV(::CellValues{<:Any, <:Any, <:Any, Nothing}, ::Int) = throw(ArgumentError("detJdV is not saved in CellValues"))
 
 # Accessors for function values
+get_fun_values(cv::CellValues) = cv.fun_values
 getnbasefunctions(cv::CellValues) = getnbasefunctions(cv.fun_values)
 function_interpolation(cv::CellValues) = function_interpolation(cv.fun_values)
 function_difforder(cv::CellValues) = function_difforder(cv.fun_values)
