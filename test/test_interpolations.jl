@@ -1,6 +1,6 @@
 using Ferrite: reference_shape_value, reference_shape_gradient
 
-@testset "interpolations" begin #=
+@testset "interpolations" begin
     @testset "Value Type $value_type" for value_type in (Float32, Float64)
         @testset "Correctness of $interpolation" for interpolation in (
                 Lagrange{RefLine, 1}(),
@@ -171,22 +171,22 @@ using Ferrite: reference_shape_value, reference_shape_gradient
             end
 
             # regression for https://github.com/Ferrite-FEM/Ferrite.jl/issues/520
-            #=interpolation_type = typeof(interpolation).name.wrapper
-    if func_order > 1 && interpolation_type != Ferrite.Serendipity
-        first_order = interpolation_type{ref_shape,1}()
-        for (highorderface, firstorderface) in zip(Ferrite.facedof_indices(interpolation), Ferrite.facedof_indices(first_order))
-            for (h_node, f_node) in zip(highorderface, firstorderface)
-                @test h_node == f_node
-            end
-        end
-        if ref_dim > 2
-            for (highorderedge, firstorderedge) in zip(Ferrite.edgedof_indices(interpolation), Ferrite.edgedof_indices(first_order))
-                for (h_node, f_node) in zip(highorderedge, firstorderedge)
-                    @test h_node == f_node
+            interpolation_type = typeof(interpolation).name.wrapper
+            if func_order > 1 && interpolation_type != Ferrite.Serendipity
+                first_order = interpolation_type{ref_shape, 1}()
+                for (highorderface, firstorderface) in zip(Ferrite.facedof_indices(interpolation), Ferrite.facedof_indices(first_order))
+                    for (h_node, f_node) in zip(highorderface, firstorderface)
+                        @test h_node == f_node
+                    end
+                end
+                if ref_dim > 2
+                    for (highorderedge, firstorderedge) in zip(Ferrite.edgedof_indices(interpolation), Ferrite.edgedof_indices(first_order))
+                        for (h_node, f_node) in zip(highorderedge, firstorderedge)
+                            @test h_node == f_node
+                        end
+                    end
                 end
             end
-        end
-    end
 
             # VectorizedInterpolation
             v_interpolation_1 = interpolation^2
@@ -203,7 +203,7 @@ using Ferrite: reference_shape_value, reference_shape_gradient
                 @test @inferred(reference_shape_value(v_interpolation_1, x, dof)) isa Vec{2, value_type}
                 @test @inferred(reference_shape_gradient(v_interpolation_3, x, dof)) isa Tensor{2, ref_dim, value_type}
             end
-        end # correctness testset =#
+        end # correctness testset
 
         @test Ferrite.reference_coordinates(DiscontinuousLagrange{RefTriangle, 0}()) ≈ [Vec{2, Float64}((1 / 3, 1 / 3))]
         @test Ferrite.reference_coordinates(DiscontinuousLagrange{RefQuadrilateral, 0}()) ≈ [Vec{2, Float64}((0, 0))]
@@ -221,7 +221,7 @@ using Ferrite: reference_shape_value, reference_shape_gradient
         @test Ferrite.is_discontinuous(ip_t) == false
         @test Ferrite.is_discontinuous(d_ip) == true
         @test Ferrite.is_discontinuous(d_ip_t) == true
-    end # =#
+    end
     @testset "Correctness of AD of embedded interpolations" begin
         ip = Lagrange{RefHexahedron, 2}()^3
         ξ = rand(Vec{3, Float64})
@@ -247,7 +247,7 @@ using Ferrite: reference_shape_value, reference_shape_gradient
             @test g ≈ G[v_ind, :]
             @test v ≈ V[v_ind]
         end
-    end
+    end #
 
     reference_cell(::Type{RefTriangle}) = Triangle((1, 2, 3))
     reference_cell(::Type{RefQuadrilateral}) = Quadrilateral((1, 2, 3, 4))
@@ -413,7 +413,7 @@ using Ferrite: reference_shape_value, reference_shape_gradient
     #    s is the path parameter ∈[0,1] along the positive direction of the path.
     # 2) Zero along other edges: Nⱼ ⋅ v = 0 if j∉𝔇
     @testset "H(curl) on RefCell" begin
-        for ip in Hcurl_interpolations[1:1]
+        for ip in Hcurl_interpolations
             cell = reference_cell(getrefshape(ip))
             geo_ip = geometric_interpolation(cell)
             ev = EdgeValues(EdgeQuadratureRule{getrefshape(ip)}(20), ip, geo_ip)
@@ -584,76 +584,72 @@ using Ferrite: reference_shape_value, reference_shape_gradient
         end
     end
 
-    @testset "Hdiv BC" begin
+    function _setup_dh_fv(ip; nel = 2, qr_order = 4)
+        RefShape = Ferrite.getrefshape(ip)
+        CT = typeof(reference_cell(RefShape))
+        dim = Ferrite.getrefdim(CT) # dim=sdim=vdim
+        #grid = generate_grid(CT, ntuple(Returns(nel), dim), -0.25 * ones(Vec{dim}), 0.2 * ones(Vec{dim}))
+        grid = generate_grid(CT, ntuple(Returns(nel), dim))
+        qr = FacetQuadratureRule{RefShape}(qr_order)
+        fv = FacetValues(qr, ip, geometric_interpolation(CT))
+        dh = close!(add!(DofHandler(grid), :u, ip))
+        return dh, fv
+    end
+
+    function test_bc_integral(f_bc::Function, check_fun::Function, dh, facetset, fv; tol = 1.0e-6)
+        grid = Ferrite.get_grid(dh)
+        dbc = WeakDirichlet(:u, facetset, f_bc)
+        ch = close!(add!(ConstraintHandler(dh), dbc))
+        a = zeros(ndofs(dh))
+        apply!(a, ch)
+        test_val = zero(f_bc(get_node_coordinate(grid, 1), 0.0, getnormal(fv, 1)))
+        check_val = zero(check_fun(zero(Ferrite.shape_value_type(fv)), getnormal(fv, 1)))
+        @assert typeof(test_val) === typeof(check_val)
+        for (cellidx, facetidx) in facetset
+            cell_coords = getcoordinates(grid, cellidx)
+            reinit!(fv, getcells(grid, cellidx), cell_coords, facetidx)
+            ae = a[celldofs(dh, cellidx)]
+            for q_point in 1:getnquadpoints(fv)
+                dΓ = getdetJdV(fv, q_point)
+                u = function_value(fv, q_point, ae)
+                n = getnormal(fv, q_point)
+                x = spatial_coordinate(fv, q_point, cell_coords)
+                check_val += check_fun(u, n) * dΓ
+                test_val += f_bc(x, 0.0, n) * dΓ
+            end
+        end
+        @test norm(test_val - check_val) < tol
+    end
+
+    @testset "H(div) BC" begin
         for ip in Hdiv_interpolations
             @testset "$ip" begin
-                RefShape = Ferrite.getrefshape(ip)
-                CT = typeof(reference_cell(RefShape))
-                dim = Ferrite.getrefdim(CT) # dim=sdim=vdim
-                grid = generate_grid(CT, ntuple(Returns(2), dim), -0.25 * ones(Vec{dim}), 0.2 * ones(Vec{dim}))
-                qr = FacetQuadratureRule{RefShape}(4)
-                fv = FacetValues(qr, ip, geometric_interpolation(CT))
-                dh = close!(add!(DofHandler(grid), :u, ip))
-                for bval in (0.0,) # TODO: Currently only zero-valued BC supported
-                    for (side, facetset) in grid.facetsets
-                        a = zeros(ndofs(dh))
-                        ch = ConstraintHandler(dh)
-                        add!(ch, Dirichlet(:u, facetset, Returns(bval)))
-                        close!(ch)
-                        apply!(a, ch)
-                        test_val = 0.0
-                        test_area = 0.0
-                        for (cellidx, facetidx) in facetset
-                            reinit!(fv, getcells(grid, cellidx), getcoordinates(grid, cellidx), facetidx)
-                            ae = a[celldofs(dh, cellidx)]
-                            val = 0.0
-                            for q_point in 1:getnquadpoints(fv)
-                                dΓ = getdetJdV(fv, q_point)
-                                val += (function_value(fv, q_point, ae) ⋅ getnormal(fv, q_point)) * dΓ
-                                test_area += dΓ
-                            end
-                            test_val += val
+                dh, fv = _setup_dh_fv(ip)
+                linear_x1(x, _, _) = x[1]
+                for f_bc in (Returns(0.0), Returns(1.0), linear_x1)
+                    @testset "f_bc = $f_bc" begin
+                        for facetset in values(dh.grid.facetsets)
+                            test_bc_integral(f_bc, ⋅, dh, facetset, fv)
                         end
-                        @test abs(test_val - test_area * bval) < 1.0e-6
                     end
                 end
             end
         end
     end
 
-    @testset "Hcurl BC" begin
+    @testset "H(curl) BC" begin
         for ip in Hcurl_interpolations
             @testset "$ip" begin
-                RefShape = Ferrite.getrefshape(ip)
-                CT = typeof(reference_cell(RefShape))
-                dim = Ferrite.getrefdim(CT) # dim=sdim=vdim
-                grid = generate_grid(CT, ntuple(Returns(2), dim), -0.25 * ones(Vec{dim}), 0.2 * ones(Vec{dim}))
-                qr = EdgeQuadratureRule{RefShape}(4)
-                ev = EdgeValues(qr, ip, geometric_interpolation(CT))
-                dh = close!(add!(DofHandler(grid), :u, ip))
-                @assert dim == 2 # Only 2d supported right now...
-                for bval in (0.0,) # TODO: Currently only zero-valued BC supported
-                    for (side, facetset) in grid.facetsets
-                        set = OrderedSet(EdgeIndex(a, b) for (a, b) in facetset)
-                        a = zeros(ndofs(dh))
-                        ch = ConstraintHandler(dh)
-                        add!(ch, Dirichlet(:u, getfacetset(grid, side), Returns(bval)))
-                        close!(ch)
-                        apply!(a, ch)
-                        test_val = 0.0
-                        test_area = 0.0
-                        for (cellidx, facetidx) in getfacetset(grid, side)
-                            reinit!(ev, getcells(grid, cellidx), getcoordinates(grid, cellidx), facetidx)
-                            ae = a[celldofs(dh, cellidx)]
-                            val = 0.0
-                            for q_point in 1:getnquadpoints(ev)
-                                dΓ = getdetJdV(ev, q_point)
-                                val += (function_value(ev, q_point, ae) ⋅ Ferrite.gettangent(ev, q_point)) * dΓ
-                                test_area += dΓ
-                            end
-                            test_val += val
+                dh, fv = _setup_dh_fv(ip)
+                dim = Ferrite.getrefdim(getrefshape(ip))
+                @assert dim == 2 # 3d not supported yet
+                v3 = rand()
+                linear_x1(x, _, _) = x[1] * Vec((0.0, 0.0, v3))
+                for f_bc in (Returns(zero(Vec{3})), Returns(Vec((0.0, 0.0, rand()))), linear_x1)
+                    @testset "f_bc = $f_bc" begin
+                        for facetset in values(dh.grid.facetsets)
+                            test_bc_integral(f_bc, ×, dh, facetset, fv)
                         end
-                        @test abs(test_val - test_area * bval) < 1.0e-6
                     end
                 end
             end
