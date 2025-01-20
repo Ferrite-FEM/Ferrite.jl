@@ -1,4 +1,9 @@
 #=
+
+# TODO
+1) Evaluate triangulation for 2-field problem
+2)
+
 # Maxwell Discretizations: The Good, The Bad, and The Ugly
 This tutorial is based on Jay Gopalakrishnan (Portland State University)
 [Maxwell Discretizations: The Good, The Bad & The Ugly](https://web.pdx.edu/~gjay/pub/MaxwellGoodBadUgly.html)
@@ -153,28 +158,32 @@ function setup_grid(h = 0.2; origin_refinement = 1)
     Gmsh.finalize()
 
     ## Add boundary parts
-    addfacetset!(grid, "vertical_facets", x -> abs((x[1] - 1) * x[1] * (x[1] + 1)) ≤ 1.0e-6)
-    addfacetset!(grid, "horizontal_facets", x -> abs((x[2] - 1) * x[2] * (x[2] + 1)) ≤ 1.0e-6)
-
+    top = ExclusiveTopology(grid)
+    addboundaryfacetset!(grid, top, "vertical_facets", x -> abs((x[1] - 1) * x[1] * (x[1] + 1)) ≤ 1.0e-6)
+    addboundaryfacetset!(grid, top, "horizontal_facets", x -> abs((x[2] - 1) * x[2] * (x[2] + 1)) ≤ 1.0e-6)
+    bfacets = union(getfacetset(grid, "vertical_facets"), getfacetset(grid, "horizontal_facets"))
+    addfacetset!(grid, "boundary_facets", bfacets)
     return grid
 end
 
 # And prepare some functions to process and plot the data on the grid
 # by using `FerriteTriangulation.jl`
-function _create_data!(f, data, grid, a, cvs, subtria::SubTriangulation)
+function _create_data!(f, data, a, cvs, subtria::SubTriangulation, dr::UnitRange)
+    sdh = subtria.sdh
+    grid = sdh.dh.grid
     c1 = first(subtria.faces)[1]
     x = copy(getcoordinates(grid, c1))
-    dofs = copy(celldofs(dh, c1))
+    dofs = copy(celldofs(sdh, c1))
     ae = zeros(eltype(a), length(dofs))
     for (i, (cellnr, facenr)) in enumerate(subtria.faces)
         cv = cvs[facenr]
         getcoordinates!(x, grid, cellnr)
         reinit!(cv, getcells(grid, cellnr), x)
-        celldofs!(dofs, dh, cellnr)
+        celldofs!(dofs, sdh, cellnr)
         copyto!(ae, view(a, dofs))
         node_idxs = subtria.face_nodes[i]:(subtria.face_nodes[i + 1] - 1)
         for q_point in 1:getnquadpoints(cv)
-            data[node_idxs[q_point]] = f(function_value(cv, q_point, ae))
+            data[node_idxs[q_point]] = f(function_value(cv, q_point, ae, dr))
         end
     end
     return
@@ -186,19 +195,28 @@ end
 
 Create scalar data by evaluating `f(function_value(...))` at each triangulation node in the `grid`.
 """
-function create_data(tr::Triangulation, grid, a, ips; f = identity)
+function create_data(tr::Triangulation, fieldname::Symbol, a; f = identity)
     data = zeros(length(tr.nodes))
-    for (ip, subtria) in zip(ips, tr.sub_triangulation)
+    dh = first(tr.sub_triangulation).sdh.dh
+    if length(a) != ndofs(dh)
+        display(dh)
+        println((dh = ndofs(dh), a = length(a)))
+        error("dof vector length not matching number of dofs in triangulation dh")
+    end
+
+    for subtria in tr.sub_triangulation
+        sdh = subtria.sdh
+        ip = Ferrite.getfieldinterpolation(sdh, fieldname)
         cvs = [CellValues(cr, ip, geometric_interpolation(getcelltype(subtria.sdh))) for cr in subtria.rules]
-        _create_data!(f, data, grid, a, cvs, subtria)
+        _create_data!(f, data, a, cvs, subtria, dof_range(sdh, fieldname))
     end
     return data
 end
 
-grid = setup_grid(0.00390625; origin_refinement = 1)
+#grid = setup_grid(0.00390625; origin_refinement = 1)
+grid = setup_grid(0.01; origin_refinement = 1)
 
-ip = DiscontinuousLagrange{RefTriangle, 1}()^2
-dh = close!(add!(DofHandler(grid), :u, ip))
+dh_ana = close!(add!(DofHandler(grid), :u, DiscontinuousLagrange{RefTriangle, 1}()^2))
 
 function analytical_potential(x::Vec{2}) # Analytical potential to be differentiated
     Δθ = -3π / 4 # Rotate discontinuous line to 4th quadrant
@@ -207,25 +225,12 @@ function analytical_potential(x::Vec{2}) # Analytical potential to be differenti
     θ = r ≤ 1.0e-6 ? zero(eltype(x)) : (atan(xp[2], xp[1]) - Δθ)
     return r^(2 // 3) * sin(2θ / 3)
 end
+analytical_solution(x::Vec{2}) = gradient(analytical_potential, x)
 
-a = zeros(ndofs(dh))
+a_ana = zeros(ndofs(dh_ana))
 
-apply_analytical!(a, dh, :u, x -> gradient(analytical_potential, x))
+apply_analytical!(a_ana, dh_ana, :u, analytical_solution)
 
-tr = Triangulation(dh, 2)
-data = create_data(tr, grid, a, (ip,); f = first)
-
-fig = Plt.Figure()
-ax = Plt.Axis(fig[1, 1]; aspect = Plt.DataAspect())
-
-nodes = [GB.Point(x.data) for x in tr.nodes]
-m = Plt.mesh!(
-    ax, nodes, reshape(tr.triangles, :); color = data,
-    colormap = Plt.Makie.wong_colors(),
-    interpolate = true,
-    colorrange = (-2.0, 0.0),
-)
-Plt.Colorbar(fig[1, 2], m)
 #=
 ```julia
 for i in 2:length(tr.tri_edges)
@@ -241,11 +246,21 @@ mutable struct L2Error{F}
     const exact_fun::F
 end
 
-function FerriteAssembly.integrate_cell!(vals::L2Error{F}, state, ae, material, cv, cellbuffer) where {F}
+function FerriteAssembly.integrate_cell!(vals::L2Error{F}, state, ae, material, cv::CellValues, cellbuffer) where {F}
     for q_point in 1:getnquadpoints(cv)
         Eh = function_value(cv, q_point, ae)
         x = spatial_coordinate(cv, q_point, getcoordinates(cellbuffer))
         dΩ = getdetJdV(cv, q_point)
+        vals.l2error += norm(Eh - vals.exact_fun(x))^2 * dΩ
+        vals.volume += dΩ
+    end
+    return
+end
+function FerriteAssembly.integrate_cell!(vals::L2Error{F}, state, ae, material, cv::NamedTuple, cellbuffer) where {F}
+    for q_point in 1:getnquadpoints(cv.E)
+        Eh = function_value(cv.E, q_point, ae, dof_range(cellbuffer, :E))
+        x = spatial_coordinate(cv.E, q_point, getcoordinates(cellbuffer))
+        dΩ = getdetJdV(cv.E, q_point)
         vals.l2error += norm(Eh - vals.exact_fun(x))^2 * dΩ
         vals.volume += dΩ
     end
@@ -270,11 +285,15 @@ function FerriteAssembly.element_routine!(Ke, re, s, ae, ::LagrangeMaterial, cv,
     return
 end
 
-function solve_lagrange(dh, ip)
+function solve_lagrange(dh)
+    ip = Ferrite.getfieldinterpolation(dh, Ferrite.find_field(dh, :E))
     ch = ConstraintHandler(dh)
     add!(ch, Dirichlet(:E, getfacetset(grid, "horizontal_facets"), (x, _) -> gradient(analytical_potential, x)[2], [2]))
     add!(ch, Dirichlet(:E, getfacetset(grid, "vertical_facets"), (x, _) -> gradient(analytical_potential, x)[1], [1]))
     close!(ch)
+    VTKGridFile("dbc", dh) do vtk
+        Ferrite.write_constraints(vtk, ch)
+    end
 
     cv = CellValues(QuadratureRule{RefTriangle}(1), ip)
     K = allocate_matrix(dh)
@@ -284,46 +303,137 @@ function solve_lagrange(dh, ip)
     work!(as, db)
     apply!(K, f, ch)
     a = K \ f
-    l2_vals = L2Error(0.0, 0.0, x -> gradient(analytical_potential, x))
+    l2_vals = L2Error(0.0, 0.0, analytical_solution)
     work!(Integrator(l2_vals), db; a)
     return a, sqrt(l2_vals.l2error) / l2_vals.volume
 end
 
-ip = Lagrange{RefTriangle, 1}()^2
-dh = close!(add!(DofHandler(grid), :E, ip))
-a_lagrange, e_lagrange = solve_lagrange(dh, ip)
+dh_lagrange = close!(add!(DofHandler(grid), :E, Lagrange{RefTriangle, 1}()^2))
+a_lagrange, e_lagrange = solve_lagrange(dh_lagrange)
 
 function lagrange_error(h::Float64)
     grid = setup_grid(h; origin_refinement = 1)
     ip = Lagrange{RefTriangle, 1}()^2
     dh = close!(add!(DofHandler(grid), :E, ip))
-    _, e = solve_lagrange(dh, ip)
+    _, e = solve_lagrange(dh)
     return e
 end
 
-#=
-```julia
-mesh_sizes = (1/2) .^(3:8)
-lagrange_errors = Float64[]
-for h in mesh_sizes
-    println("h = $h")
-    e = @time lagrange_error(h)
-    push!(lagrange_errors, e)
+# ## Nedelec solution
+struct NedelecMaterial end
+function FerriteAssembly.element_residual!(re, s, ae, ::NedelecMaterial, cv, cellbuffer)
+    for q_point in 1:getnquadpoints(cv.E)
+        dΩ = getdetJdV(cv.E, q_point)
+        E = function_value(cv.E, q_point, ae, dof_range(cellbuffer, :E))
+        curlE = function_curl(cv.E, q_point, ae, dof_range(cellbuffer, :E))
+        ∇ϕ = function_gradient(cv.ϕ, q_point, ae, dof_range(cellbuffer, :ϕ))
+        for (i, I) in pairs(dof_range(cellbuffer, :E))
+            δNE = shape_value(cv.E, q_point, i)
+            curl_δNE = shape_curl(cv.E, q_point, i)
+            re[I] += (curl_δNE ⋅ curlE + δNE ⋅ ∇ϕ) * dΩ
+        end
+        for (i, I) in pairs(dof_range(cellbuffer, :ϕ))
+            gradδNϕ = shape_gradient(cv.ϕ, q_point, i)
+            re[I] += (gradδNϕ ⋅ E) * dΩ
+        end
+    end
+    return
 end
-```
-=#
 
-tr = Triangulation(dh, 2)
-data = create_data(tr, grid, a_lagrange, (ip,); f = first)
+function solve_nedelec(dh)
+    ipE = Ferrite.getfieldinterpolation(dh, Ferrite.find_field(dh, :E))
+    ipϕ = Ferrite.getfieldinterpolation(dh, Ferrite.find_field(dh, :ϕ))
+    CT = getcelltype(dh.grid)
 
-ax = Plt.Axis(fig[2, 1]; aspect = Plt.DataAspect())
+    ch = ConstraintHandler(dh)
+    add!(ch, WeakDirichlet(:E, getfacetset(grid, "boundary_facets"), (x, _, n) -> analytical_solution(x) × n))
+    add!(ch, Dirichlet(:ϕ, getfacetset(grid, "boundary_facets"), Returns(0.0)))
+    close!(ch)
 
-nodes = [GB.Point(x.data) for x in tr.nodes]
-m = Plt.mesh!(
-    ax, nodes, reshape(tr.triangles, :); color = data,
-    colormap = Plt.Makie.wong_colors(),
-    interpolate = true,
-    colorrange = (-2.0, 0.0),
-)
-Plt.Colorbar(fig[2, 2], m)
+    qr = QuadratureRule{RefTriangle}(1)
+    ipg = geometric_interpolation(CT)
+    cv = (E = CellValues(qr, ipE, ipg), ϕ = CellValues(qr, ipϕ, ipg))
+    K = allocate_matrix(dh)
+    f = zeros(ndofs(dh))
+    db = setup_domainbuffer(DomainSpec(dh, NedelecMaterial(), cv))
+    as = start_assemble(K, f)
+    a = zeros(ndofs(dh))
+    work!(as, db; a)
+    apply!(K, f, ch)
+    a .= K \ f
+    l2_vals = L2Error(0.0, 0.0, analytical_solution)
+    work!(Integrator(l2_vals), db; a)
+    return a, sqrt(l2_vals.l2error) / l2_vals.volume
+end
+
+ipE = Nedelec{2, RefTriangle, 1}()
+ipϕ = Lagrange{RefTriangle, 1}()
+dh_nedelec = DofHandler(grid)
+add!(dh_nedelec, :E, ipE)
+add!(dh_nedelec, :ϕ, ipϕ)
+close!(dh_nedelec)
+
+a_nedelec, e_nedelec = solve_nedelec(dh_nedelec)
+
+function nedelec_error(h::Float64)
+    grid = setup_grid(h; origin_refinement = 1)
+    ipE = Nedelec{2, RefTriangle, 1}()
+    ipϕ = Lagrange{RefTriangle, 1}()
+    dh = DofHandler(grid)
+    add!(dh, :E, ipE)
+    add!(dh, :ϕ, ipϕ)
+    close!(dh)
+    _, e = solve_nedelec(dh)
+    return e
+end
+
+function calculate_errors(mesh_sizes)
+    lagrange_errors = zeros(length(mesh_sizes))
+    nedelec_errors = similar(lagrange_errors)
+    for (i, h) in enumerate(mesh_sizes)
+        println("h = $h")
+        lagrange_errors[i] = @time lagrange_error(h)
+        nedelec_errors[i] = @time nedelec_error(h)
+    end
+    return lagrange_errors, nedelec_error
+end
+
+
+mesh_sizes = (1 / 2) .^ (3:3)
+lagrange_errors, nedelec_errors = calculate_errors(mesh_sizes)
+
+
+function plot_field(fig_part, dh, fieldname, dofvec; plot_edges = false, meshkwargs...)
+    tr = Triangulation(dh, 2)
+    data = create_data(tr, fieldname, dofvec; f = (x -> x[1]))
+
+    ax = Plt.Axis(fig_part; aspect = Plt.DataAspect())
+
+    nodes = [GB.Point(x.data) for x in tr.nodes]
+    m = Plt.mesh!(
+        ax, nodes, reshape(tr.triangles, :); color = data,
+        colormap = Plt.Makie.wong_colors(),
+        interpolate = true,
+        meshkwargs...
+    )
+    if plot_edges
+        for i in 2:length(tr.tri_edges)
+            Plt.lines!(ax, view(nodes, view(tr.edges, tr.tri_edges[i - 1]:(tr.tri_edges[i] - 1))); color = :black)
+        end
+    end
+    return m
+end
+
+fig = Plt.Figure(size = (1600, 500))
+m_ana = plot_field(fig[1, 1], dh_ana, :u, a_ana; plot_edges = false, colorrange = (-2, 0))
+Plt.Colorbar(fig[1, 2], m_ana)
+m_lag = plot_field(fig[1, 3], dh_lagrange, :E, a_lagrange; plot_edges = false, colorrange = (-2, 0))
+Plt.Colorbar(fig[1, 4], m_lag)
+m_ned = plot_field(fig[1, 5], dh_nedelec, :E, a_nedelec; plot_edges = false, colorrange = (-2, 0))
+Plt.Colorbar(fig[1, 6], m_ned)
+
+ax = Plt.Axis(fig[2, 1])
+Plt.lines!(ax, mesh_sizes, lagrange_errors; label = "Lagrange")
+Plt.lines!(ax, mesh_sizes, nedelec_errors; label = "Nedelec")
+
 fig
