@@ -1,9 +1,4 @@
 #=
-
-# TODO
-1) Evaluate triangulation for 2-field problem
-2)
-
 # Maxwell Discretizations: The Good, The Bad, and The Ugly
 This tutorial is based on Jay Gopalakrishnan (Portland State University)
 [Maxwell Discretizations: The Good, The Bad & The Ugly](https://web.pdx.edu/~gjay/pub/MaxwellGoodBadUgly.html)
@@ -11,6 +6,12 @@ from the graduate course MTH 653: Advanced Numerical Analysis (Spring 2019)
 
 The purpose of the tutorial is to demonstrate how `Nedelec` vector interpolations will converge to the correct
 solution for a Maxwell problem, when vectorized `Lagrange` interpolations converge to an incorrect solution.
+
+![Results for different discretizations](maxwell.png)
+
+**Figure 1**: The results of this tutorial, showing how the analytical solution is not found when discretizing
+the problem using `Lagrange` interpolations, but when using a `Nedelec` interpolation, we converge to the
+analytical solution as the mesh size, ``h``, decreases.
 
 ## Loading packages
 We start by adding the required packages for this tutorial
@@ -91,6 +92,13 @@ singularity at ``\boldsymbol{x} = \boldsymbol{0}``, this doesn't enter the bound
 Finally, due to the singularity, the components of ``\boldsymbol{E}_\mathrm{exact}`` are not in
 ``H^1(\Omega)``.
 **TODO:** *Explain why ``\mathrm{div}(\boldsymbol{E})=0`` is fullfilled, use divergence theorem?*
+
+To evaluate the accuracy of the different discretizations, we will use the analytical solution to
+evaluate the boundary condition,
+``g = \boldsymbol{E}_\mathrm{exact}\cdot \boldsymbol{t} \quad \text{on }\Gamma``. A correct
+discretization should then reproduce
+``\boldsymbol{E}_\mathrm{exact}(\boldsymbol{x})\text{ in }\Omega``,
+as ``\boldsymbol{E}_\mathrm{exact}`` fulfills the PDE exactly, as well as its boundary conditions.
 
 ## Lagrange interpolation
 Following the notes in the linked example, the lagrange problem becomes to solve
@@ -213,8 +221,9 @@ function create_data(tr::Triangulation, fieldname::Symbol, a; f = identity)
     return data
 end
 
-#grid = setup_grid(0.00390625; origin_refinement = 1)
-grid = setup_grid(0.01; origin_refinement = 1)
+# ## Analytical implementation
+mesh_size = 0.01
+grid = setup_grid(mesh_size; origin_refinement = 1)
 
 dh_ana = close!(add!(DofHandler(grid), :u, DiscontinuousLagrange{RefTriangle, 1}()^2))
 
@@ -230,16 +239,17 @@ analytical_solution(x::Vec{2}) = gradient(analytical_potential, x)
 a_ana = zeros(ndofs(dh_ana))
 
 apply_analytical!(a_ana, dh_ana, :u, analytical_solution)
-
 #=
-```julia
-for i in 2:length(tr.tri_edges)
-    Plt.lines!(view(nodes, view(tr.edges, tr.tri_edges[i-1]:(tr.tri_edges[i]-1))); color=:black)
-end
+## Error calculation
+We will calculate the error, ``e(h)``, between the analytical,
+``\boldsymbol{E}_\mathrm{exact}``, and numerical,
+``\boldsymbol{E}_\mathrm{h}(h)``, solutions as integral norm,
+```math
+e(h) = \frac{1}{V}\int_\Omega ||\boldsymbol{E}_\mathrm{h}(h) - \boldsymbol{E}_\mathrm{exact}||^2\ \mathrm{d}\Omega,
+\quad V = \int_\Omega \mathrm{d}\Omega
 ```
+where ``h`` is a measure of the element size.
 =#
-
-# Error calculator
 mutable struct L2Error{F}
     l2error::Float64
     volume::Float64
@@ -288,12 +298,9 @@ end
 function solve_lagrange(dh)
     ip = Ferrite.getfieldinterpolation(dh, Ferrite.find_field(dh, :E))
     ch = ConstraintHandler(dh)
-    add!(ch, Dirichlet(:E, getfacetset(grid, "horizontal_facets"), (x, _) -> gradient(analytical_potential, x)[2], [2]))
-    add!(ch, Dirichlet(:E, getfacetset(grid, "vertical_facets"), (x, _) -> gradient(analytical_potential, x)[1], [1]))
+    add!(ch, Dirichlet(:E, getfacetset(dh.grid, "horizontal_facets"), (x, _) -> gradient(analytical_potential, x)[2], [2]))
+    add!(ch, Dirichlet(:E, getfacetset(dh.grid, "vertical_facets"), (x, _) -> gradient(analytical_potential, x)[1], [1]))
     close!(ch)
-    VTKGridFile("dbc", dh) do vtk
-        Ferrite.write_constraints(vtk, ch)
-    end
 
     cv = CellValues(QuadratureRule{RefTriangle}(1), ip)
     K = allocate_matrix(dh)
@@ -311,8 +318,7 @@ end
 dh_lagrange = close!(add!(DofHandler(grid), :E, Lagrange{RefTriangle, 1}()^2))
 a_lagrange, e_lagrange = solve_lagrange(dh_lagrange)
 
-function lagrange_error(h::Float64)
-    grid = setup_grid(h; origin_refinement = 1)
+function lagrange_error(grid)
     ip = Lagrange{RefTriangle, 1}()^2
     dh = close!(add!(DofHandler(grid), :E, ip))
     _, e = solve_lagrange(dh)
@@ -346,8 +352,8 @@ function solve_nedelec(dh)
     CT = getcelltype(dh.grid)
 
     ch = ConstraintHandler(dh)
-    add!(ch, WeakDirichlet(:E, getfacetset(grid, "boundary_facets"), (x, _, n) -> analytical_solution(x) × n))
-    add!(ch, Dirichlet(:ϕ, getfacetset(grid, "boundary_facets"), Returns(0.0)))
+    add!(ch, WeakDirichlet(:E, getfacetset(dh.grid, "boundary_facets"), (x, _, n) -> analytical_solution(x) × n))
+    add!(ch, Dirichlet(:ϕ, getfacetset(dh.grid, "boundary_facets"), Returns(0.0)))
     close!(ch)
 
     qr = QuadratureRule{RefTriangle}(1)
@@ -355,7 +361,7 @@ function solve_nedelec(dh)
     cv = (E = CellValues(qr, ipE, ipg), ϕ = CellValues(qr, ipϕ, ipg))
     K = allocate_matrix(dh)
     f = zeros(ndofs(dh))
-    db = setup_domainbuffer(DomainSpec(dh, NedelecMaterial(), cv))
+    db = setup_domainbuffer(DomainSpec(dh, NedelecMaterial(), cv); autodiffbuffer = true)
     as = start_assemble(K, f)
     a = zeros(ndofs(dh))
     work!(as, db; a)
@@ -375,8 +381,7 @@ close!(dh_nedelec)
 
 a_nedelec, e_nedelec = solve_nedelec(dh_nedelec)
 
-function nedelec_error(h::Float64)
-    grid = setup_grid(h; origin_refinement = 1)
+function nedelec_error(grid)
     ipE = Nedelec{2, RefTriangle, 1}()
     ipϕ = Lagrange{RefTriangle, 1}()
     dh = DofHandler(grid)
@@ -391,23 +396,31 @@ function calculate_errors(mesh_sizes)
     lagrange_errors = zeros(length(mesh_sizes))
     nedelec_errors = similar(lagrange_errors)
     for (i, h) in enumerate(mesh_sizes)
-        println("h = $h")
-        lagrange_errors[i] = @time lagrange_error(h)
-        nedelec_errors[i] = @time nedelec_error(h)
+        grid = setup_grid(h; origin_refinement = 1)
+        lagrange_errors[i] = lagrange_error(grid)
+        nedelec_errors[i] = nedelec_error(grid)
     end
-    return lagrange_errors, nedelec_error
+    return lagrange_errors, nedelec_errors
 end
 
-
-mesh_sizes = (1 / 2) .^ (3:3)
+mesh_sizes = 0.1 * ((1 / 2) .^ (0:5))
+lagrange_errors = [0.10849541129807588, 0.09262531863237256, 0.08372918040381809, 0.07939314534131932, 0.07639600032795617, 0.07579072269391056] #hide
+nedelec_errors = [0.02246208564658041, 0.014303181582571767, 0.00906062850047998, 0.0057408487615066535, 0.003616459776120822, 0.0022876386764458592] #hide
+#=
+```julia
 lagrange_errors, nedelec_errors = calculate_errors(mesh_sizes)
+```
+=#
+using Test #src
+for i in 1:2 #src
+    @test [lagrange_errors[i], nedelec_errors[i]] ≈ collect(map(first, calculate_errors(mesh_sizes[i]))) #src
+end #src
 
-
-function plot_field(fig_part, dh, fieldname, dofvec; plot_edges = false, meshkwargs...)
+function plot_field(fig_part, dh, fieldname, dofvec, name::String; plot_edges = false, meshkwargs...)
     tr = Triangulation(dh, 2)
     data = create_data(tr, fieldname, dofvec; f = (x -> x[1]))
 
-    ax = Plt.Axis(fig_part; aspect = Plt.DataAspect())
+    ax = Plt.Axis(fig_part; aspect = Plt.DataAspect(), xlabel = "x₁", ylabel = "x₂", title = name)
 
     nodes = [GB.Point(x.data) for x in tr.nodes]
     m = Plt.mesh!(
@@ -424,16 +437,21 @@ function plot_field(fig_part, dh, fieldname, dofvec; plot_edges = false, meshkwa
     return m
 end
 
-fig = Plt.Figure(size = (1600, 500))
-m_ana = plot_field(fig[1, 1], dh_ana, :u, a_ana; plot_edges = false, colorrange = (-2, 0))
-Plt.Colorbar(fig[1, 2], m_ana)
-m_lag = plot_field(fig[1, 3], dh_lagrange, :E, a_lagrange; plot_edges = false, colorrange = (-2, 0))
-Plt.Colorbar(fig[1, 4], m_lag)
-m_ned = plot_field(fig[1, 5], dh_nedelec, :E, a_nedelec; plot_edges = false, colorrange = (-2, 0))
-Plt.Colorbar(fig[1, 6], m_ned)
+fig = let
+    fig = Plt.Figure(size = (1000, 600))
+    m_ana = plot_field(fig[1, 1], dh_ana, :u, a_ana, "Analytical"; plot_edges = false, colorrange = (-2, 0))
+    m_lag = plot_field(fig[1, 2], dh_lagrange, :E, a_lagrange, "Lagrange (h = $mesh_size)"; plot_edges = false, colorrange = (-2, 0))
+    m_ned = plot_field(fig[1, 3], dh_nedelec, :E, a_nedelec, "Nedelec (h = $mesh_size)"; plot_edges = false, colorrange = (-2, 0))
+    Plt.Colorbar(fig[1, 4], m_ned; label = "E₁")
 
-ax = Plt.Axis(fig[2, 1])
-Plt.lines!(ax, mesh_sizes, lagrange_errors; label = "Lagrange")
-Plt.lines!(ax, mesh_sizes, nedelec_errors; label = "Nedelec")
+    ax = Plt.Axis(
+        fig[2, 1:2];
+        xscale = log10, yscale = log10,
+        xlabel = "mesh size, h", ylabel = "error"
+    )
+    Plt.lines!(ax, mesh_sizes, lagrange_errors; label = "Lagrange")
+    Plt.lines!(ax, mesh_sizes, nedelec_errors; label = "Nedelec")
+    Plt.axislegend(ax; position = :rb)
 
-fig
+    fig
+end

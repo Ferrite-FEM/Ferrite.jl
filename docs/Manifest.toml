@@ -779,8 +779,7 @@ version = "1.0.0"
 
 [[deps.FerriteAssembly]]
 deps = ["Ferrite", "ForwardDiff", "MaterialModelsBase"]
-git-tree-sha1 = "98055718e3b739e6a1307bb1fe1854f1bf74c475"
-repo-url = "https://github.com/KnutAM/FerriteAssembly.jl"
+path = "/Users/knutan/.julia/dev/FerriteAssembly"
 uuid = "fd21fc07-c509-4fe1-9468-19963fd5935d"
 version = "0.3.4"
 
