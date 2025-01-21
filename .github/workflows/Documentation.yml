@@ -16,7 +16,18 @@ jobs:
           version: '1.11'
       - uses: julia-actions/cache@v2
       - name: Install dependencies
-        run: julia --project=docs -e 'using Pkg; Pkg.develop(;url = "https://github.com/KnutAM/FerriteAssembly.jl"); Pkg.instantiate(); Pkg.precompile()'
+        run: |
+            julia --color=yes --project=docs -e '
+            using Pkg
+            packages = [
+                PackageSpec(;url="https://github.com/KnutAM/MaterialModelsBase.jl.git"),
+                PackageSpec(;url="https://github.com/KnutAM/FerriteAssembly.jl.git"),
+                PackageSpec(;url="https://github.com/KnutAM/FerriteTriangulation.jl.git"),
+                PackageSpec(path=pwd())
+                ]
+            Pkg.develop(packages)
+            Pkg.instantiate()'
+        shell: bash
       - name: Build and deploy
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

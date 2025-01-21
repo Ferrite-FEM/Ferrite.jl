@@ -16,8 +16,6 @@ analytical solution as the mesh size, ``h``, decreases.
 ## Loading packages
 We start by adding the required packages for this tutorial
 =#
-import Pkg
-# `Pkg.add(;url = ...)`
 using Ferrite, Tensors, ForwardDiff
 using Gmsh, FerriteGmsh
 using FerriteTriangulation: Triangulation, SubTriangulation
@@ -238,7 +236,8 @@ analytical_solution(x::Vec{2}) = gradient(analytical_potential, x)
 
 a_ana = zeros(ndofs(dh_ana))
 
-apply_analytical!(a_ana, dh_ana, :u, analytical_solution)
+apply_analytical!(a_ana, dh_ana, :u, analytical_solution);
+
 #=
 ## Error calculation
 We will calculate the error, ``e(h)``, between the analytical,
@@ -275,7 +274,7 @@ function FerriteAssembly.integrate_cell!(vals::L2Error{F}, state, ae, material, 
         vals.volume += dΩ
     end
     return
-end
+end;
 
 # ## Lagrange solution
 struct LagrangeMaterial end
@@ -323,7 +322,7 @@ function lagrange_error(grid)
     dh = close!(add!(DofHandler(grid), :E, ip))
     _, e = solve_lagrange(dh)
     return e
-end
+end;
 
 # ## Nedelec solution
 struct NedelecMaterial end
@@ -403,9 +402,9 @@ function calculate_errors(mesh_sizes)
     return lagrange_errors, nedelec_errors
 end
 
-mesh_sizes = 0.1 * ((1 / 2) .^ (0:5))
-lagrange_errors = [0.10849541129807588, 0.09262531863237256, 0.08372918040381809, 0.07939314534131932, 0.07639600032795617, 0.07579072269391056] #hide
-nedelec_errors = [0.02246208564658041, 0.014303181582571767, 0.00906062850047998, 0.0057408487615066535, 0.003616459776120822, 0.0022876386764458592] #hide
+mesh_sizes = 0.1 * ((1 / 2) .^ (0:5));
+lagrange_errors = [0.10849541129807588, 0.09262531863237256, 0.08372918040381809, 0.07939314534131932, 0.07639600032795617, 0.07579072269391056]; #hide
+nedelec_errors = [0.02246208564658041, 0.014303181582571767, 0.00906062850047998, 0.0057408487615066535, 0.003616459776120822, 0.0022876386764458592]; #hide
 #=
 ```julia
 lagrange_errors, nedelec_errors = calculate_errors(mesh_sizes)
@@ -454,4 +453,4 @@ fig = let
     Plt.axislegend(ax; position = :rb)
 
     fig
-end
+end;

@@ -797,8 +797,7 @@ version = "0.2.0"
 
 [[deps.FerriteTriangulation]]
 deps = ["Ferrite", "Tensors"]
-git-tree-sha1 = "3b7f694d319bdbe4a98d7028a3758444a24eb868"
-repo-url = "https://github.com/KnutAM/FerriteTriangulation.jl"
+path = "/Users/knutan/.julia/dev/FerriteTriangulation"
 uuid = "b200c708-61b9-46d9-917a-515144ac7aac"
 version = "0.1.0"
 
@@ -1674,8 +1673,7 @@ version = "0.1.2"
 
 [[deps.MaterialModelsBase]]
 deps = ["StaticArrays", "Tensors"]
-git-tree-sha1 = "1a3591c7472ec7690b5a6d3ced4504f4a7a314d3"
-repo-url = "https://github.com/KnutAM/MaterialModelsBase.jl"
+path = "/Users/knutan/.julia/dev/MaterialModelsBase"
 uuid = "af893363-701d-44dc-8b1e-d9a2c129bfc9"
 version = "0.2.2"
 
