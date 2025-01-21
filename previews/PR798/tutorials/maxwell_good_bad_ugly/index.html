@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/><title>Maxwell Discretizations: The Good, The Bad, and The Ugly · Ferrite.jl</title><meta name="title" content="Maxwell Discretizations: The Good, The Bad, and The Ugly · Ferrite.jl"/><meta property="og:title" content="Maxwell Discretizations: The Good, The Bad, and The Ugly · Ferrite.jl"/><meta property="twitter:title" content="Maxwell Discretizations: The Good, The Bad, and The Ugly · Ferrite.jl"/><meta name="description" content="Documentation for Ferrite.jl."/><meta property="og:description" content="Documentation for Ferrite.jl."/><meta property="twitter:description" content="Documentation for Ferrite.jl."/><meta property="og:url" content="https://ferrite-fem.github.io/Ferrite.jl/stable/tutorials/maxwell_good_bad_ugly/"/><meta property="twitter:url" content="https://ferrite-fem.github.io/Ferrite.jl/stable/tutorials/maxwell_good_bad_ugly/"/><link rel="canonical" href="https://ferrite-fem.github.io/Ferrite.jl/stable/tutorials/maxwell_good_bad_ugly/"/><script data-outdated-warner src="../../assets/warner.js"></script><link href="https://cdnjs.cloudflare.com/ajax/libs/lato-font/3.0.0/css/lato-font.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/juliamono/0.050/juliamono.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/fontawesome.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/solid.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/brands.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.8/katex.min.css" rel="stylesheet" type="text/css"/><script>documenterBaseURL="../.."</script><script src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.6/require.min.js" data-main="../../assets/documenter.js"></script><script src="../../search_index.js"></script><script src="../../siteinfo.js"></script><script src="../../../versions.js"></script><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/catppuccin-mocha.css" data-theme-name="catppuccin-mocha"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/catppuccin-macchiato.css" data-theme-name="catppuccin-macchiato"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/catppuccin-frappe.css" data-theme-name="catppuccin-frappe"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/catppuccin-latte.css" data-theme-name="catppuccin-latte"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/documenter-dark.css" data-theme-name="documenter-dark" data-theme-primary-dark/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/documenter-light.css" data-theme-name="documenter-light" data-theme-primary/><script src="../../assets/themeswap.js"></script><link href="../../assets/custom.css" rel="stylesheet" type="text/css"/><link href="../../assets/citations.css" rel="stylesheet" type="text/css"/><link href="../../assets/favicon.ico" rel="icon" type="image/x-icon"/></head><body><div id="documenter"><nav class="docs-sidebar"><a class="docs-logo" href="../../"><img src="../../assets/logo.svg" alt="Ferrite.jl logo"/></a><div class="docs-package-name"><span class="docs-autofit"><a href="../../">Ferrite.jl</a></span></div><button class="docs-search-query input is-rounded is-small is-clickable my-2 mx-auto py-1 px-2" id="documenter-search-query">Search docs (Ctrl + /)</button><ul class="docs-menu"><li><a class="tocitem" href="../../">Home</a></li><li><input class="collapse-toggle" id="menuitem-3" type="checkbox" checked/><label class="tocitem" for="menuitem-3"><span class="docs-label">Tutorials</span><i class="docs-chevron"></i></label><ul class="collapsed"><li><a class="tocitem" href="../">Tutorials overview</a></li><li><a class="tocitem" href="../heat_equation/">Heat equation</a></li><li><a class="tocitem" href="../heat_equation_hdiv/">Heat equation - Mixed H(div) conforming formulation)</a></li><li><a class="tocitem" href="../linear_elasticity/">Linear elasticity</a></li><li><a class="tocitem" href="../incompressible_elasticity/">Incompressible elasticity</a></li><li><a class="tocitem" href="../hyperelasticity/">Hyperelasticity</a></li><li><a class="tocitem" href="../plasticity/">Von Mises plasticity</a></li><li><a class="tocitem" href="../transient_heat_equation/">Transient heat equation</a></li><li><a class="tocitem" href="../computational_homogenization/">Computational homogenization</a></li><li><a class="tocitem" href="../stokes-flow/">Stokes flow</a></li><li><a class="tocitem" href="../porous_media/">Porous media</a></li><li><a class="tocitem" href="../ns_vs_diffeq/">Incompressible Navier-Stokes equations via DifferentialEquations.jl</a></li><li><a class="tocitem" href="../reactive_surface/">Reactive surface</a></li><li><a class="tocitem" href="../linear_shell/">Linear shell</a></li><li><a class="tocitem" href="../dg_heat_equation/">Discontinuous Galerkin heat equation</a></li><li class="is-active"><a class="tocitem" href>Maxwell Discretizations: The Good, The Bad, and The Ugly</a><ul class="internal"><li><a class="tocitem" href="#Loading-packages"><span>Loading packages</span></a></li><li><a class="tocitem" href="#Introduction"><span>Introduction</span></a></li><li><a class="tocitem" href="#Theoretical-background"><span>Theoretical background</span></a></li><li><a class="tocitem" href="#Exact-solution"><span>Exact solution</span></a></li><li><a class="tocitem" href="#Lagrange-interpolation"><span>Lagrange interpolation</span></a></li><li><a class="tocitem" href="#Nedelec-interpolation"><span>Nedelec interpolation</span></a></li><li><a class="tocitem" href="#Analytical-implementation"><span>Analytical implementation</span></a></li><li><a class="tocitem" href="#Error-calculation"><span>Error calculation</span></a></li><li><a class="tocitem" href="#Lagrange-solution"><span>Lagrange solution</span></a></li><li><a class="tocitem" href="#Nedelec-solution"><span>Nedelec solution</span></a></li></ul></li></ul></li><li><input class="collapse-toggle" id="menuitem-4" type="checkbox"/><label class="tocitem" for="menuitem-4"><span class="docs-label">Topic guides</span><i class="docs-chevron"></i></label><ul class="collapsed"><li><a class="tocitem" href="../../topics/">Topic guide overview</a></li><li><a class="tocitem" href="../../topics/fe_intro/">Introduction to FEM</a></li><li><a class="tocitem" href="../../topics/reference_shapes/">Reference shapes</a></li><li><a class="tocitem" href="../../topics/FEValues/">FEValues</a></li><li><a class="tocitem" href="../../topics/degrees_of_freedom/">Degrees of Freedom</a></li><li><a class="tocitem" href="../../topics/sparse_matrix/">Sparsity pattern and sparse matrices</a></li><li><a class="tocitem" href="../../topics/assembly/">Assembly</a></li><li><a class="tocitem" href="../../topics/boundary_conditions/">Boundary and initial conditions</a></li><li><a class="tocitem" href="../../topics/constraints/">Constraints</a></li><li><a class="tocitem" href="../../topics/grid/">Grid</a></li><li><a class="tocitem" href="../../topics/export/">Export</a></li></ul></li><li><input class="collapse-toggle" id="menuitem-5" type="checkbox"/><label class="tocitem" for="menuitem-5"><span class="docs-label">API reference</span><i class="docs-chevron"></i></label><ul class="collapsed"><li><a class="tocitem" href="../../reference/">Reference overview</a></li><li><a class="tocitem" href="../../reference/quadrature/">Quadrature</a></li><li><a class="tocitem" href="../../reference/interpolations/">Interpolation</a></li><li><a class="tocitem" href="../../reference/fevalues/">FEValues</a></li><li><a class="tocitem" href="../../reference/dofhandler/">Degrees of Freedom</a></li><li><a class="tocitem" href="../../reference/sparsity_pattern/">Sparsity pattern and sparse matrices</a></li><li><a class="tocitem" href="../../reference/assembly/">Assembly</a></li><li><a class="tocitem" href="../../reference/boundary_conditions/">Boundary conditions</a></li><li><a class="tocitem" href="../../reference/grid/">Grid &amp; AbstractGrid</a></li><li><a class="tocitem" href="../../reference/export/">Postprocessing</a></li><li><a class="tocitem" href="../../reference/utils/">Development utility functions</a></li></ul></li><li><input class="collapse-toggle" id="menuitem-6" type="checkbox"/><label class="tocitem" for="menuitem-6"><span class="docs-label">How-to guides</span><i class="docs-chevron"></i></label><ul class="collapsed"><li><a class="tocitem" href="../../howto/">How-to guide overview</a></li><li><a class="tocitem" href="../../howto/postprocessing/">Post processing and visualization</a></li><li><a class="tocitem" href="../../howto/threaded_assembly/">Multi-threaded assembly</a></li></ul></li><br><li><a class="tocitem" href="../../gallery/">Code gallery</a></li><li><a class="tocitem" href="../../devdocs/">Developer documentation</a></li><li><a class="tocitem" href="../../cited-literature/">Cited literature</a></li></ul><div class="docs-version-selector field has-addons"><div class="control"><span class="docs-label button is-static is-size-7">Version</span></div><div class="docs-selector control is-expanded"><div class="select is-fullwidth is-size-7"><select id="documenter-version-selector"></select></div></div></div></nav><div class="docs-main"><header class="docs-navbar"><a class="docs-sidebar-button docs-navbar-link fa-solid fa-bars is-hidden-desktop" id="documenter-sidebar-button" href="#"></a><nav class="breadcrumb"><ul class="is-hidden-mobile"><li><a class="is-disabled">Tutorials</a></li><li class="is-active"><a href>Maxwell Discretizations: The Good, The Bad, and The Ugly</a></li></ul><ul class="is-hidden-tablet"><li class="is-active"><a href>Maxwell Discretizations: The Good, The Bad, and The Ugly</a></li></ul></nav><div class="docs-right"><a class="docs-navbar-link" href="https://github.com/Ferrite-FEM/Ferrite.jl" title="View the repository on GitHub"><span class="docs-icon fa-brands"></span><span class="docs-label is-hidden-touch">GitHub</span></a><a class="docs-navbar-link" href="https://github.com/Ferrite-FEM/Ferrite.jl/blob/master/docs/src/literate-tutorials/maxwell_good_bad_ugly.jl" title="Edit source on GitHub"><span class="docs-icon fa-solid"></span></a><a class="docs-settings-button docs-navbar-link fa-solid fa-gear" id="documenter-settings-button" href="#" title="Settings"></a><a class="docs-article-toggle-button fa-solid fa-chevron-up" id="documenter-article-toggle-button" href="javascript:;" title="Collapse all docstrings"></a></div></header><article class="content" id="documenter-page"><h1 id="Maxwell-Discretizations:-The-Good,-The-Bad,-and-The-Ugly"><a class="docs-heading-anchor" href="#Maxwell-Discretizations:-The-Good,-The-Bad,-and-The-Ugly">Maxwell Discretizations: The Good, The Bad, and The Ugly</a><a id="Maxwell-Discretizations:-The-Good,-The-Bad,-and-The-Ugly-1"></a><a class="docs-heading-anchor-permalink" href="#Maxwell-Discretizations:-The-Good,-The-Bad,-and-The-Ugly" title="Permalink"></a></h1><p>This tutorial is based on Jay Gopalakrishnan (Portland State University) <a href="https://web.pdx.edu/~gjay/pub/MaxwellGoodBadUgly.html">Maxwell Discretizations: The Good, The Bad &amp; The Ugly</a> from the graduate course MTH 653: Advanced Numerical Analysis (Spring 2019)</p><p>The purpose of the tutorial is to demonstrate how <code>Nedelec</code> vector interpolations will converge to the correct solution for a Maxwell problem, when vectorized <code>Lagrange</code> interpolations converge to an incorrect solution.</p><p><img src="../maxwell.png" alt="Results for different discretizations"/></p><p><strong>Figure 1</strong>: The results of this tutorial, showing how the analytical solution is not found when discretizing the problem using <code>Lagrange</code> interpolations, but when using a <code>Nedelec</code> interpolation, we converge to the analytical solution as the mesh size, <span>$h$</span>, decreases.</p><h2 id="Loading-packages"><a class="docs-heading-anchor" href="#Loading-packages">Loading packages</a><a id="Loading-packages-1"></a><a class="docs-heading-anchor-permalink" href="#Loading-packages" title="Permalink"></a></h2><p>We start by adding the required packages for this tutorial</p><pre><code class="language-julia hljs">using Ferrite, Tensors, ForwardDiff
+using Gmsh, FerriteGmsh
+using FerriteTriangulation: Triangulation, SubTriangulation
+import CairoMakie as Plt
+import GeometryBasics as GB
+
+using FerriteAssembly</code></pre><h2 id="Introduction"><a class="docs-heading-anchor" href="#Introduction">Introduction</a><a id="Introduction-1"></a><a class="docs-heading-anchor-permalink" href="#Introduction" title="Permalink"></a></h2><p>Specifically, we will consider the problem to determine the vector-valued field <span>$\boldsymbol{E}$</span>, such that</p><p class="math-container">\[\begin{align*}
+\mathrm{curl}(\mathrm{curl}(\boldsymbol{E})) &amp;= 0\quad \text{in }\Omega \\
+\mathrm{div}(\boldsymbol{E}) &amp;= 0\quad \text{in }\Omega \\
+\boldsymbol{E}\cdot \boldsymbol{t} &amp;= g\quad \text{on }\Gamma
+\end{align*}\]</p><p>where <span>$\boldsymbol{t}$</span> is the normalized tangential vector along the boundary, <span>$\Gamma$</span>, of the domain, <span>$\Omega$</span>. The rotated L-shaped domain is located such that the sharp internal corner is at the origin.</p><pre><code class="language-julia hljs">fig = Plt.Figure()
+ax = Plt.Axis(fig[1, 1]; xlabel = &quot;x&quot;, ylabel = &quot;y&quot;)
+points = [(0, 0), (1, 0), (1, 1), (-1, 1), (-1, -1), (0, -1), (0, 0)]
+Plt.lines!(ax, first.(points), last.(points))</code></pre><img src="208662e2.png" alt="Example block output"/><h2 id="Theoretical-background"><a class="docs-heading-anchor" href="#Theoretical-background">Theoretical background</a><a id="Theoretical-background-1"></a><a class="docs-heading-anchor-permalink" href="#Theoretical-background" title="Permalink"></a></h2><p>We have the following partial integration rules, where <span>$\boldsymbol{n}$</span> is the outward pointing normal vector,  following Monk (2003) [<a href="../../cited-literature/#Monk2003">7</a>, Eqs. (3.47) and (3.51)],</p><p class="math-container">\[\begin{align*}
+\int_\Gamma \left[\boldsymbol{n}\times\boldsymbol{u}\right]\cdot\boldsymbol{\phi}\ \mathrm{d}\Gamma &amp;=
+\int_\Omega \left[\nabla \times \boldsymbol{u}\right]\cdot \boldsymbol{\phi}\ \mathrm{d}\Omega -
+\int_\Omega \boldsymbol{u}\cdot\left[ \nabla \times \boldsymbol{\phi} \right]\ \mathrm{d}\Omega, \quad \boldsymbol{u} \in H(\mathrm{curl}),\ \boldsymbol{\phi} \in (\mathcal{C}^1)^3\\
+\int_\Gamma \left[\boldsymbol{n}\times\boldsymbol{u}\right]\cdot\left[\left[\boldsymbol{n}\times\boldsymbol{\phi}\right]\times\boldsymbol{n}\right] \mathrm{d}\Gamma &amp;=
+\int_\Omega \left[\nabla \times \boldsymbol{u}\right]\cdot \boldsymbol{\phi}\ \mathrm{d}\Omega -
+\int_\Omega \boldsymbol{u}\cdot\left[ \nabla \times \boldsymbol{\phi} \right]\ \mathrm{d}\Omega, \quad \boldsymbol{u},\ \boldsymbol{\phi}\in H(\mathrm{curl}),
+\end{align*}\]</p><p>respectively. Note that [<a href="../../cited-literature/#Monk2003">7</a>, Eq. (3.27)], requiring that <span>$\boldsymbol{u} \in (\mathcal{C}^1)^3$</span>, is a special case of [<a href="../../cited-literature/#Monk2003">7</a>, Eq. (3.47)] as <span>$(\mathcal{C}^1)^3 \subset H(\mathrm{curl})$</span>.</p><p>We remark that in 2D for <span>$\boldsymbol{u}$</span> pointing out of the plane, <span>$\boldsymbol{u} = u_3 \boldsymbol{e}_3$</span>, and <span>$\boldsymbol{\phi}$</span> in the plane, <span>$\boldsymbol{\phi} \cdot \boldsymbol{e}_3 = 0$</span>, we have</p><p class="math-container">\[\left[\boldsymbol{n}\times\boldsymbol{u}\right]\cdot\left[\left[\boldsymbol{n}\times\boldsymbol{\phi}\right]\times\boldsymbol{n}\right] = -u_3 \boldsymbol{\phi} \cdot \boldsymbol{t}\]</p><p>where <span>$\boldsymbol{t} = [-n_2,\ n_1]$</span> is the counter-clockwise tangent vector.</p><h2 id="Exact-solution"><a class="docs-heading-anchor" href="#Exact-solution">Exact solution</a><a id="Exact-solution-1"></a><a class="docs-heading-anchor-permalink" href="#Exact-solution" title="Permalink"></a></h2><p>In this example, we choose an exact solution, <span>$\boldsymbol{E}_\mathrm{exact}(\boldsymbol{x})$</span>, that fullfills the differential equations. We then use <span>$\boldsymbol{E}_\mathrm{exact}$</span> to find <span>$g$</span> to insert into the Dirichlet boundary conditions. Specifically, we choose</p><p class="math-container">\[\boldsymbol{E}_\mathrm{exact}(\boldsymbol{x}) = \mathrm{grad}(r^{2/3}\sin(2\theta/3))\]</p><p>where <span>$r$</span> and <span>$\theta$</span> are the polar coordinates. Where <span>$\theta$</span> is defined as the positive angle measured from the <span>$x$</span>-axis.</p><p>The first PDE is directly satisfied by using the gradient to define the vector-valued solution, since <span>$\mathrm{curl}(\mathrm{grad}(u)) = 0$</span> holds for any field <span>$u$</span>. Furthermore, along the lines, <span>$\theta = 0$</span> and <span>$\theta = 3\pi/2$</span>, <span>$\sin(2\theta/3) = 0$</span>, such that the <span>$\boldsymbol{E}_\mathrm{exact} \cdot \boldsymbol{t} = 0$</span>. Consequently, even if we have a singularity at <span>$\boldsymbol{x} = \boldsymbol{0}$</span>, this doesn&#39;t enter the boundary conditions. Finally, due to the singularity, the components of <span>$\boldsymbol{E}_\mathrm{exact}$</span> are not in <span>$H^1(\Omega)$</span>. <strong>TODO:</strong> <em>Explain why <span>$\mathrm{div}(\boldsymbol{E})=0$</span> is fullfilled, use divergence theorem?</em></p><p>To evaluate the accuracy of the different discretizations, we will use the analytical solution to evaluate the boundary condition, <span>$g = \boldsymbol{E}_\mathrm{exact}\cdot \boldsymbol{t} \quad \text{on }\Gamma$</span>. A correct discretization should then reproduce <span>$\boldsymbol{E}_\mathrm{exact}(\boldsymbol{x})\text{ in }\Omega$</span>, as <span>$\boldsymbol{E}_\mathrm{exact}$</span> fulfills the PDE exactly, as well as its boundary conditions.</p><h2 id="Lagrange-interpolation"><a class="docs-heading-anchor" href="#Lagrange-interpolation">Lagrange interpolation</a><a id="Lagrange-interpolation-1"></a><a class="docs-heading-anchor-permalink" href="#Lagrange-interpolation" title="Permalink"></a></h2><p>Following the notes in the linked example, the lagrange problem becomes to solve</p><p class="math-container">\[\begin{align*}
+\int_\Omega \mathrm{curl}(\delta \boldsymbol{E}) \cdot \mathrm{curl}(\boldsymbol{E})\ \mathrm{d}\Omega
++ \int_\Omega \mathrm{div}(\delta \boldsymbol{E}) \mathrm{div}(\boldsymbol{E})\ \mathrm{d}\Omega &amp;= 0 \quad \forall\ \delta\boldsymbol{E} \in H^1 \\
+\boldsymbol{E}\cdot\boldsymbol{t} &amp;= g\quad \text{on }\Gamma
+\end{align*}\]</p><h2 id="Nedelec-interpolation"><a class="docs-heading-anchor" href="#Nedelec-interpolation">Nedelec interpolation</a><a id="Nedelec-interpolation-1"></a><a class="docs-heading-anchor-permalink" href="#Nedelec-interpolation" title="Permalink"></a></h2><p>Using a Lagrange multiplier, <span>$\phi$</span>, to weakly enforce the divergence equation, we obtain the following problem: Find <span>$\boldsymbol{E}\in H(\mathrm{div})$</span> and <span>$\phi\in H_0^1$</span>, such that</p><p class="math-container">\[\begin{align*}
+\int_\Gamma \left[\left[\boldsymbol{n}\times\delta\boldsymbol{E}\right]\times\boldsymbol{n}\right]\cdot
+\left[\boldsymbol{n}\cdot\mathrm{curl}(\boldsymbol{E})\right]\ \mathrm{d}\Gamma +
+\int_\Omega \mathrm{curl}(\delta\boldsymbol{E})\cdot\mathrm{curl}(\boldsymbol{E})\ \mathrm{d}\Omega +
+\int_\Omega \delta\boldsymbol{E}\cdot\mathrm{grad}(\phi)\ \mathrm{d}\Omega &amp;= 0\\
+\int_\Omega \mathrm{grad}(\delta\phi) \cdot \boldsymbol{E}\ \mathrm{d}\Omega &amp;= 0 \\
+\boldsymbol{E}\cdot \boldsymbol{t} &amp;= g\; \text{on }\Gamma
+\end{align*}\]</p><p>for all <span>$\delta\boldsymbol{E}\in H_0(\mathrm{curl})$</span> and <span>$\delta\phi\in H_0^1$</span>.</p><p>We then use <code>FerriteGmsh.jl</code> to create the grid</p><pre><code class="language-julia hljs">function setup_grid(h = 0.2; origin_refinement = 1)
+    # Initialize gmsh
+    Gmsh.initialize()
+    gmsh.option.set_number(&quot;General.Verbosity&quot;, 2)
+
+    # Add the points, finer grid at the discontinuity
+    o = gmsh.model.geo.add_point(0.0, 0.0, 0.0, h / origin_refinement)
+    p1 = gmsh.model.geo.add_point(1.0, 0.0, 0.0, h)
+    p2 = gmsh.model.geo.add_point(1.0, 1.0, 0.0, h)
+    p3 = gmsh.model.geo.add_point(-1.0, 1.0, 0.0, h)
+    p4 = gmsh.model.geo.add_point(-1.0, -1.0, 0.0, h)
+    p5 = gmsh.model.geo.add_point(0.0, -1.0, 0.0, h)
+
+    pts = [o, p1, p2, p3, p4, p5, o]
+    # Add the lines
+    lines = [gmsh.model.geo.add_line(pts[i - 1], pts[i]) for i in 2:length(pts)]
+
+    # Create the closed curve loop and the surface
+    loop = gmsh.model.geo.add_curve_loop(lines)
+    gmsh.model.geo.add_plane_surface([loop])
+
+    # Synchronize the model
+    gmsh.model.geo.synchronize()
+
+    # Generate a 2D mesh
+    gmsh.model.mesh.generate(2)
+
+    # Save the mesh, and read back in as a Ferrite Grid
+    grid = mktempdir() do dir
+        path = joinpath(dir, &quot;mesh.msh&quot;)
+        gmsh.write(path)
+        togrid(path)
+    end
+
+    # Finalize the Gmsh library
+    Gmsh.finalize()
+
+    # Add boundary parts
+    top = ExclusiveTopology(grid)
+    addboundaryfacetset!(grid, top, &quot;vertical_facets&quot;, x -&gt; abs((x[1] - 1) * x[1] * (x[1] + 1)) ≤ 1.0e-6)
+    addboundaryfacetset!(grid, top, &quot;horizontal_facets&quot;, x -&gt; abs((x[2] - 1) * x[2] * (x[2] + 1)) ≤ 1.0e-6)
+    bfacets = union(getfacetset(grid, &quot;vertical_facets&quot;), getfacetset(grid, &quot;horizontal_facets&quot;))
+    addfacetset!(grid, &quot;boundary_facets&quot;, bfacets)
+    return grid
+end</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">setup_grid (generic function with 2 methods)</code></pre><p>And prepare some functions to process and plot the data on the grid by using <code>FerriteTriangulation.jl</code></p><pre><code class="language-julia hljs">function _create_data!(f, data, a, cvs, subtria::SubTriangulation, dr::UnitRange)
+    sdh = subtria.sdh
+    grid = sdh.dh.grid
+    c1 = first(subtria.faces)[1]
+    x = copy(getcoordinates(grid, c1))
+    dofs = copy(celldofs(sdh, c1))
+    ae = zeros(eltype(a), length(dofs))
+    for (i, (cellnr, facenr)) in enumerate(subtria.faces)
+        cv = cvs[facenr]
+        getcoordinates!(x, grid, cellnr)
+        reinit!(cv, getcells(grid, cellnr), x)
+        celldofs!(dofs, sdh, cellnr)
+        copyto!(ae, view(a, dofs))
+        node_idxs = subtria.face_nodes[i]:(subtria.face_nodes[i + 1] - 1)
+        for q_point in 1:getnquadpoints(cv)
+            data[node_idxs[q_point]] = f(function_value(cv, q_point, ae, dr))
+        end
+    end
+    return
+end
+
+&quot;&quot;&quot;
+    create_data(tr::Triangulation, grid::AbstractGrid, a::Vector{&lt;:Number}, ::NTuple{N, &lt;:Interpolation};
+        f = identity)
+
+Create scalar data by evaluating `f(function_value(...))` at each triangulation node in the `grid`.
+&quot;&quot;&quot;
+function create_data(tr::Triangulation, fieldname::Symbol, a; f = identity)
+    data = zeros(length(tr.nodes))
+    dh = first(tr.sub_triangulation).sdh.dh
+    if length(a) != ndofs(dh)
+        display(dh)
+        println((dh = ndofs(dh), a = length(a)))
+        error(&quot;dof vector length not matching number of dofs in triangulation dh&quot;)
+    end
+
+    for subtria in tr.sub_triangulation
+        sdh = subtria.sdh
+        ip = Ferrite.getfieldinterpolation(sdh, fieldname)
+        cvs = [CellValues(cr, ip, geometric_interpolation(getcelltype(subtria.sdh))) for cr in subtria.rules]
+        _create_data!(f, data, a, cvs, subtria, dof_range(sdh, fieldname))
+    end
+    return data
+end</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">Main.create_data</code></pre><h2 id="Analytical-implementation"><a class="docs-heading-anchor" href="#Analytical-implementation">Analytical implementation</a><a id="Analytical-implementation-1"></a><a class="docs-heading-anchor-permalink" href="#Analytical-implementation" title="Permalink"></a></h2><pre><code class="language-julia hljs">mesh_size = 0.01
+grid = setup_grid(mesh_size; origin_refinement = 1)
+
+dh_ana = close!(add!(DofHandler(grid), :u, DiscontinuousLagrange{RefTriangle, 1}()^2))
+
+function analytical_potential(x::Vec{2}) # Analytical potential to be differentiated
+    Δθ = -3π / 4 # Rotate discontinuous line to 4th quadrant
+    xp = rotate(x, Δθ)
+    r = sqrt(x ⋅ x + eps())
+    θ = r ≤ 1.0e-6 ? zero(eltype(x)) : (atan(xp[2], xp[1]) - Δθ)
+    return r^(2 // 3) * sin(2θ / 3)
+end
+analytical_solution(x::Vec{2}) = gradient(analytical_potential, x)
+
+a_ana = zeros(ndofs(dh_ana))
+
+apply_analytical!(a_ana, dh_ana, :u, analytical_solution);</code></pre><h2 id="Error-calculation"><a class="docs-heading-anchor" href="#Error-calculation">Error calculation</a><a id="Error-calculation-1"></a><a class="docs-heading-anchor-permalink" href="#Error-calculation" title="Permalink"></a></h2><p>We will calculate the error, <span>$e(h)$</span>, between the analytical, <span>$\boldsymbol{E}_\mathrm{exact}$</span>, and numerical, <span>$\boldsymbol{E}_\mathrm{h}(h)$</span>, solutions as integral norm,</p><p class="math-container">\[e(h) = \frac{1}{V}\int_\Omega ||\boldsymbol{E}_\mathrm{h}(h) - \boldsymbol{E}_\mathrm{exact}||^2\ \mathrm{d}\Omega,
+\quad V = \int_\Omega \mathrm{d}\Omega\]</p><p>where <span>$h$</span> is a measure of the element size.</p><pre><code class="language-julia hljs">mutable struct L2Error{F}
+    l2error::Float64
+    volume::Float64
+    const exact_fun::F
+end
+
+function FerriteAssembly.integrate_cell!(vals::L2Error{F}, state, ae, material, cv::CellValues, cellbuffer) where {F}
+    for q_point in 1:getnquadpoints(cv)
+        Eh = function_value(cv, q_point, ae)
+        x = spatial_coordinate(cv, q_point, getcoordinates(cellbuffer))
+        dΩ = getdetJdV(cv, q_point)
+        vals.l2error += norm(Eh - vals.exact_fun(x))^2 * dΩ
+        vals.volume += dΩ
+    end
+    return
+end
+function FerriteAssembly.integrate_cell!(vals::L2Error{F}, state, ae, material, cv::NamedTuple, cellbuffer) where {F}
+    for q_point in 1:getnquadpoints(cv.E)
+        Eh = function_value(cv.E, q_point, ae, dof_range(cellbuffer, :E))
+        x = spatial_coordinate(cv.E, q_point, getcoordinates(cellbuffer))
+        dΩ = getdetJdV(cv.E, q_point)
+        vals.l2error += norm(Eh - vals.exact_fun(x))^2 * dΩ
+        vals.volume += dΩ
+    end
+    return
+end;</code></pre><h2 id="Lagrange-solution"><a class="docs-heading-anchor" href="#Lagrange-solution">Lagrange solution</a><a id="Lagrange-solution-1"></a><a class="docs-heading-anchor-permalink" href="#Lagrange-solution" title="Permalink"></a></h2><pre><code class="language-julia hljs">struct LagrangeMaterial end
+function FerriteAssembly.element_routine!(Ke, re, s, ae, ::LagrangeMaterial, cv, cellbuffer)
+    for q_point in 1:getnquadpoints(cv)
+        dΩ = getdetJdV(cv, q_point)
+        for i in 1:getnbasefunctions(cv)
+            div_δNi = shape_divergence(cv, q_point, i)
+            curl_δNi = shape_curl(cv, q_point, i)
+            for j in 1:getnbasefunctions(cv)
+                div_Nj = shape_divergence(cv, q_point, j)
+                curl_Nj = shape_curl(cv, q_point, j)
+                Ke[i, j] += (curl_δNi ⋅ curl_Nj + div_δNi * div_Nj) * dΩ
+            end
+        end
+    end
+    return
+end
+
+function solve_lagrange(dh)
+    ip = Ferrite.getfieldinterpolation(dh, Ferrite.find_field(dh, :E))
+    ch = ConstraintHandler(dh)
+    add!(ch, Dirichlet(:E, getfacetset(dh.grid, &quot;horizontal_facets&quot;), (x, _) -&gt; gradient(analytical_potential, x)[2], [2]))
+    add!(ch, Dirichlet(:E, getfacetset(dh.grid, &quot;vertical_facets&quot;), (x, _) -&gt; gradient(analytical_potential, x)[1], [1]))
+    close!(ch)
+
+    cv = CellValues(QuadratureRule{RefTriangle}(1), ip)
+    K = allocate_matrix(dh)
+    f = zeros(ndofs(dh))
+    db = setup_domainbuffer(DomainSpec(dh, LagrangeMaterial(), cv))
+    as = start_assemble(K, f)
+    work!(as, db)
+    apply!(K, f, ch)
+    a = K \ f
+    l2_vals = L2Error(0.0, 0.0, analytical_solution)
+    work!(Integrator(l2_vals), db; a)
+    return a, sqrt(l2_vals.l2error) / l2_vals.volume
+end
+
+dh_lagrange = close!(add!(DofHandler(grid), :E, Lagrange{RefTriangle, 1}()^2))
+a_lagrange, e_lagrange = solve_lagrange(dh_lagrange)
+
+function lagrange_error(grid)
+    ip = Lagrange{RefTriangle, 1}()^2
+    dh = close!(add!(DofHandler(grid), :E, ip))
+    _, e = solve_lagrange(dh)
+    return e
+end;</code></pre><h2 id="Nedelec-solution"><a class="docs-heading-anchor" href="#Nedelec-solution">Nedelec solution</a><a id="Nedelec-solution-1"></a><a class="docs-heading-anchor-permalink" href="#Nedelec-solution" title="Permalink"></a></h2><pre><code class="language-julia hljs">struct NedelecMaterial end
+function FerriteAssembly.element_residual!(re, s, ae, ::NedelecMaterial, cv, cellbuffer)
+    for q_point in 1:getnquadpoints(cv.E)
+        dΩ = getdetJdV(cv.E, q_point)
+        E = function_value(cv.E, q_point, ae, dof_range(cellbuffer, :E))
+        curlE = function_curl(cv.E, q_point, ae, dof_range(cellbuffer, :E))
+        ∇ϕ = function_gradient(cv.ϕ, q_point, ae, dof_range(cellbuffer, :ϕ))
+        for (i, I) in pairs(dof_range(cellbuffer, :E))
+            δNE = shape_value(cv.E, q_point, i)
+            curl_δNE = shape_curl(cv.E, q_point, i)
+            re[I] += (curl_δNE ⋅ curlE + δNE ⋅ ∇ϕ) * dΩ
+        end
+        for (i, I) in pairs(dof_range(cellbuffer, :ϕ))
+            gradδNϕ = shape_gradient(cv.ϕ, q_point, i)
+            re[I] += (gradδNϕ ⋅ E) * dΩ
+        end
+    end
+    return
+end
+
+function solve_nedelec(dh)
+    ipE = Ferrite.getfieldinterpolation(dh, Ferrite.find_field(dh, :E))
+    ipϕ = Ferrite.getfieldinterpolation(dh, Ferrite.find_field(dh, :ϕ))
+    CT = getcelltype(dh.grid)
+
+    ch = ConstraintHandler(dh)
+    add!(ch, WeakDirichlet(:E, getfacetset(dh.grid, &quot;boundary_facets&quot;), (x, _, n) -&gt; analytical_solution(x) × n))
+    add!(ch, Dirichlet(:ϕ, getfacetset(dh.grid, &quot;boundary_facets&quot;), Returns(0.0)))
+    close!(ch)
+
+    qr = QuadratureRule{RefTriangle}(1)
+    ipg = geometric_interpolation(CT)
+    cv = (E = CellValues(qr, ipE, ipg), ϕ = CellValues(qr, ipϕ, ipg))
+    K = allocate_matrix(dh)
+    f = zeros(ndofs(dh))
+    db = setup_domainbuffer(DomainSpec(dh, NedelecMaterial(), cv); autodiffbuffer = true)
+    as = start_assemble(K, f)
+    a = zeros(ndofs(dh))
+    work!(as, db; a)
+    apply!(K, f, ch)
+    a .= K \ f
+    l2_vals = L2Error(0.0, 0.0, analytical_solution)
+    work!(Integrator(l2_vals), db; a)
+    return a, sqrt(l2_vals.l2error) / l2_vals.volume
+end
+
+ipE = Nedelec{2, RefTriangle, 1}()
+ipϕ = Lagrange{RefTriangle, 1}()
+dh_nedelec = DofHandler(grid)
+add!(dh_nedelec, :E, ipE)
+add!(dh_nedelec, :ϕ, ipϕ)
+close!(dh_nedelec)
+
+a_nedelec, e_nedelec = solve_nedelec(dh_nedelec)
+
+function nedelec_error(grid)
+    ipE = Nedelec{2, RefTriangle, 1}()
+    ipϕ = Lagrange{RefTriangle, 1}()
+    dh = DofHandler(grid)
+    add!(dh, :E, ipE)
+    add!(dh, :ϕ, ipϕ)
+    close!(dh)
+    _, e = solve_nedelec(dh)
+    return e
+end
+
+function calculate_errors(mesh_sizes)
+    lagrange_errors = zeros(length(mesh_sizes))
+    nedelec_errors = similar(lagrange_errors)
+    for (i, h) in enumerate(mesh_sizes)
+        grid = setup_grid(h; origin_refinement = 1)
+        lagrange_errors[i] = lagrange_error(grid)
+        nedelec_errors[i] = nedelec_error(grid)
+    end
+    return lagrange_errors, nedelec_errors
+end
+
+mesh_sizes = 0.1 * ((1 / 2) .^ (0:5));</code></pre><pre><code class="language-julia hljs">lagrange_errors, nedelec_errors = calculate_errors(mesh_sizes)</code></pre><pre><code class="language-julia hljs">function plot_field(fig_part, dh, fieldname, dofvec, name::String; plot_edges = false, meshkwargs...)
+    tr = Triangulation(dh, 2)
+    data = create_data(tr, fieldname, dofvec; f = (x -&gt; x[1]))
+
+    ax = Plt.Axis(fig_part; aspect = Plt.DataAspect(), xlabel = &quot;x₁&quot;, ylabel = &quot;x₂&quot;, title = name)
+
+    nodes = [GB.Point(x.data) for x in tr.nodes]
+    m = Plt.mesh!(
+        ax, nodes, reshape(tr.triangles, :); color = data,
+        colormap = Plt.Makie.wong_colors(),
+        interpolate = true,
+        meshkwargs...
+    )
+    if plot_edges
+        for i in 2:length(tr.tri_edges)
+            Plt.lines!(ax, view(nodes, view(tr.edges, tr.tri_edges[i - 1]:(tr.tri_edges[i] - 1))); color = :black)
+        end
+    end
+    return m
+end
+
+fig = let
+    fig = Plt.Figure(size = (1000, 600))
+    m_ana = plot_field(fig[1, 1], dh_ana, :u, a_ana, &quot;Analytical&quot;; plot_edges = false, colorrange = (-2, 0))
+    m_lag = plot_field(fig[1, 2], dh_lagrange, :E, a_lagrange, &quot;Lagrange (h = $mesh_size)&quot;; plot_edges = false, colorrange = (-2, 0))
+    m_ned = plot_field(fig[1, 3], dh_nedelec, :E, a_nedelec, &quot;Nedelec (h = $mesh_size)&quot;; plot_edges = false, colorrange = (-2, 0))
+    Plt.Colorbar(fig[1, 4], m_ned; label = &quot;E₁&quot;)
+
+    ax = Plt.Axis(
+        fig[2, 1:2];
+        xscale = log10, yscale = log10,
+        xlabel = &quot;mesh size, h&quot;, ylabel = &quot;error&quot;
+    )
+    Plt.lines!(ax, mesh_sizes, lagrange_errors; label = &quot;Lagrange&quot;)
+    Plt.lines!(ax, mesh_sizes, nedelec_errors; label = &quot;Nedelec&quot;)
+    Plt.axislegend(ax; position = :rb)
+
+    fig
+end;</code></pre><hr/><p><em>This page was generated using <a href="https://github.com/fredrikekre/Literate.jl">Literate.jl</a>.</em></p></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../dg_heat_equation/">« Discontinuous Galerkin heat equation</a><a class="docs-footer-nextpage" href="../../topics/">Topic guide overview »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option><option value="catppuccin-latte">catppuccin-latte</option><option value="catppuccin-frappe">catppuccin-frappe</option><option value="catppuccin-macchiato">catppuccin-macchiato</option><option value="catppuccin-mocha">catppuccin-mocha</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.8.0 on <span class="colophon-date" title="Tuesday 21 January 2025 21:26">Tuesday 21 January 2025</span>. Using Julia version 1.11.2.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
