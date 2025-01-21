@@ -256,6 +256,44 @@ function _FacetQuadratureRulePyramid(::Type{T}, quad_types::Tuple{Symbol, Symbol
     )
 end
 
+struct EdgeQuadratureRule{RefShape, EdgeRulesType}
+    edge_rules::EdgeRulesType # E.g. Tuple{QuadratureRule{RefLine,...}, QuadratureRule{RefLine,...}}
+    function EdgeQuadratureRule{RefShape}(edge_rules::Union{NTuple{<:Any, QRType}, AbstractVector{QRType}}) where {RefShape, QRType <: QuadratureRule{RefShape}}
+        if length(edge_rules) != nedges(RefShape)
+            throw(ArgumentError("number of quadrature rules does not not match number of edges (#rules=$(length(edge_rules)) != #edges=$(nedges(RefShape)))"))
+        end
+        return new{RefShape, typeof(edge_rules)}(edge_rules)
+    end
+end
+
+function EdgeQuadratureRule(edge_rules::Union{NTuple{<:Any, QRType}, AbstractVector{QRType}}) where {RefShape, QRType <: QuadratureRule{RefShape}}
+    return EdgeQuadratureRule{RefShape}(edge_rules)
+end
+
+# Fill in defaults T=Float64
+function EdgeQuadratureRule{RefShape}(order::Int) where {RefShape <: AbstractRefShape}
+    return EdgeQuadratureRule{RefShape}(Float64, order)
+end
+function EdgeQuadratureRule{RefShape}(quad_type::Symbol, order::Int) where {RefShape <: AbstractRefShape}
+    return EdgeQuadratureRule{RefShape}(Float64, quad_type, order)
+end
+function EdgeQuadratureRule{RefShape}(::Type{T}, order::Int) where {T, RefShape <: AbstractRefShape}
+    return EdgeQuadratureRule{RefShape}(T, _default_quadrature_rule(RefLine), order)
+end
+function EdgeQuadratureRule{RefShape}(::Type{T}, quad_type::Symbol, order::Int) where {T, RefShape <: AbstractRefShape}
+    qr = QuadratureRule{RefLine}(quad_type, order)
+    #TODO: The following scaling should be fixed in `create_edge_quad_rule`,
+    #      but the way below mirrors `create_facet_quad_rule`.
+    weights = if RefShape === RefTriangle
+        getweights(qr) / 2 # (-1, 1) -> (0, 1)
+    elseif RefShape === RefTetrahedron || RefShape === RefPrism || RefShape === RefPyramid
+        getweights(qr) / 4 # (-1, 1)² -> (0, 1)²
+    else
+        getweights(qr)
+    end
+    return create_edge_quad_rule(RefShape, weights, getpoints(qr))
+end
+
 ##################
 # Common methods #
 ##################
@@ -273,6 +311,7 @@ getnquadpoints(qr::QuadratureRule) = length(getweights(qr))
 Return the number of quadrature points in `qr` for local facet index `facet`.
 """
 getnquadpoints(qr::FacetQuadratureRule, facet::Int) = getnquadpoints(qr.facet_rules[facet])
+getnquadpoints(qr::EdgeQuadratureRule, edge::Int) = getnquadpoints(qr.edge_rules[edge])
 
 """
     getweights(qr::QuadratureRule)
@@ -293,7 +332,7 @@ julia> getweights(qr)
 """
 getweights(qr::QuadratureRule) = qr.weights
 getweights(qr::FacetQuadratureRule, facet::Int) = getweights(qr.facet_rules[facet])
-
+getweights(qr::EdgeQuadratureRule, edge::Int) = getweights(qr.edge_rules[edge])
 
 """
     getpoints(qr::QuadratureRule)
@@ -314,8 +353,9 @@ julia> getpoints(qr)
 """
 getpoints(qr::QuadratureRule) = qr.points
 getpoints(qr::FacetQuadratureRule, facet::Int) = getpoints(qr.facet_rules[facet])
+getpoints(qr::EdgeQuadratureRule, edge::Int) = getpoints(qr.edge_rules[edge])
 
 getrefshape(::QuadratureRule{RefShape}) where {RefShape} = RefShape
 
 # TODO: This is used in copy(::(Cell|Facet)Values), but it it useful to get an actual copy?
-Base.copy(qr::Union{QuadratureRule, FacetQuadratureRule}) = qr
+Base.copy(qr::Union{QuadratureRule, FacetQuadratureRule, EdgeQuadratureRule}) = qr
