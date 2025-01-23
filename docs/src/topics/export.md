@@ -61,7 +61,7 @@ vtk_save(pvd);
 See [Transient heat equation](@ref tutorial-transient-heat-equation) for an example
 
 # Evaluating the Solution at a list of Points for Plotting using Plots.jl
-The solution can also be evaluated at a list of points and plotted using `Plots.jl`. For the heat equation example it can be done like this:
+The solution can also be evaluated at a list of points and plotted using `Plots.jl`. For the [heat equation](@ref tutorial-heat-equation) example it can be done like this:
 ```
 using Plots
 # The domain extends from -1 to 1 by default
