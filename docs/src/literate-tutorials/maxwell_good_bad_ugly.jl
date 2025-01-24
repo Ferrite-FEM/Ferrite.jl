@@ -9,9 +9,9 @@ solution for a Maxwell problem, when vectorized `Lagrange` interpolations conver
 
 ![Results for different discretizations](maxwell.png)
 
-**Figure 1**: The results of this tutorial, showing how the analytical solution is not found when discretizing
+**Figure 1**: The results of this tutorial, showing how the exact solution is not found when discretizing
 the problem using `Lagrange` interpolations, but when using a `Nedelec` interpolation, we converge to the
-analytical solution as the mesh size, ``h``, decreases.
+exact solution as the mesh size, ``h``, decreases.
 
 ## Loading packages
 We start by adding the required packages for this tutorial
@@ -38,15 +38,8 @@ Specifically, we will consider the problem to determine the vector-valued field
 where ``\boldsymbol{t}`` is the normalized tangential vector along
 the boundary, ``\Gamma``, of the domain, ``\Omega``.
 The rotated L-shaped domain is located such that the sharp internal corner
-is at the origin.
-=#
-fig = Plt.Figure()
-ax = Plt.Axis(fig[1, 1]; xlabel = "x", ylabel = "y")
-points = [(0, 0), (1, 0), (1, 1), (-1, 1), (-1, -1), (0, -1), (0, 0)]
-Plt.lines!(ax, first.(points), last.(points))
-fig #hide
+is at the origin, see Figure 1.
 
-#=
 ## Theoretical background
 We have the following partial integration rules, where ``\boldsymbol{n}`` is the outward pointing normal vector,
  following Monk (2003) [Monk2003; Eqs. (3.47) and (3.51)](@cite),
@@ -89,9 +82,10 @@ along the lines, ``\theta = 0`` and ``\theta = 3\pi/2``, ``\sin(2\theta/3) = 0``
 singularity at ``\boldsymbol{x} = \boldsymbol{0}``, this doesn't enter the boundary conditions.
 Finally, due to the singularity, the components of ``\boldsymbol{E}_\mathrm{exact}`` are not in
 ``H^1(\Omega)``.
-**TODO:** *Explain why ``\mathrm{div}(\boldsymbol{E})=0`` is fullfilled, use divergence theorem?*
 
-To evaluate the accuracy of the different discretizations, we will use the analytical solution to
+**TODO:** Explain why ``\mathrm{div}(\boldsymbol{E})=0`` is fullfilled, use divergence theorem?
+
+To evaluate the accuracy of the different discretizations, we will use the exact solution to
 evaluate the boundary condition,
 ``g = \boldsymbol{E}_\mathrm{exact}\cdot \boldsymbol{t} \quad \text{on }\Gamma``. A correct
 discretization should then reproduce
@@ -219,28 +213,28 @@ function create_data(tr::Triangulation, fieldname::Symbol, a; f = identity)
     return data
 end
 
-# ## Analytical implementation
+# ## Exact implementation
 mesh_size = 0.01
 grid = setup_grid(mesh_size; origin_refinement = 1)
 
 dh_ana = close!(add!(DofHandler(grid), :u, DiscontinuousLagrange{RefTriangle, 1}()^2))
 
-function analytical_potential(x::Vec{2}) # Analytical potential to be differentiated
+function exact_potential(x::Vec{2}) # Exact potential to be differentiated
     Δθ = -3π / 4 # Rotate discontinuous line to 4th quadrant
     xp = rotate(x, Δθ)
     r = sqrt(x ⋅ x + eps())
     θ = r ≤ 1.0e-6 ? zero(eltype(x)) : (atan(xp[2], xp[1]) - Δθ)
     return r^(2 // 3) * sin(2θ / 3)
 end
-analytical_solution(x::Vec{2}) = gradient(analytical_potential, x)
+exact_solution(x::Vec{2}) = gradient(exact_potential, x)
 
 a_ana = zeros(ndofs(dh_ana))
 
-apply_analytical!(a_ana, dh_ana, :u, analytical_solution);
+apply_analytical!(a_ana, dh_ana, :u, exact_solution);
 
 #=
 ## Error calculation
-We will calculate the error, ``e(h)``, between the analytical,
+We will calculate the error, ``e(h)``, between the exact,
 ``\boldsymbol{E}_\mathrm{exact}``, and numerical,
 ``\boldsymbol{E}_\mathrm{h}(h)``, solutions as integral norm,
 ```math
@@ -297,8 +291,8 @@ end
 function solve_lagrange(dh)
     ip = Ferrite.getfieldinterpolation(dh, Ferrite.find_field(dh, :E))
     ch = ConstraintHandler(dh)
-    add!(ch, Dirichlet(:E, getfacetset(dh.grid, "horizontal_facets"), (x, _) -> gradient(analytical_potential, x)[2], [2]))
-    add!(ch, Dirichlet(:E, getfacetset(dh.grid, "vertical_facets"), (x, _) -> gradient(analytical_potential, x)[1], [1]))
+    add!(ch, Dirichlet(:E, getfacetset(dh.grid, "horizontal_facets"), (x, _) -> gradient(exact_potential, x)[2], [2]))
+    add!(ch, Dirichlet(:E, getfacetset(dh.grid, "vertical_facets"), (x, _) -> gradient(exact_potential, x)[1], [1]))
     close!(ch)
 
     cv = CellValues(QuadratureRule{RefTriangle}(1), ip)
@@ -309,7 +303,7 @@ function solve_lagrange(dh)
     work!(as, db)
     apply!(K, f, ch)
     a = K \ f
-    l2_vals = L2Error(0.0, 0.0, analytical_solution)
+    l2_vals = L2Error(0.0, 0.0, exact_solution)
     work!(Integrator(l2_vals), db; a)
     return a, sqrt(l2_vals.l2error) / l2_vals.volume
 end
@@ -351,7 +345,7 @@ function solve_nedelec(dh)
     CT = getcelltype(dh.grid)
 
     ch = ConstraintHandler(dh)
-    add!(ch, WeakDirichlet(:E, getfacetset(dh.grid, "boundary_facets"), (x, _, n) -> analytical_solution(x) × n))
+    add!(ch, WeakDirichlet(:E, getfacetset(dh.grid, "boundary_facets"), (x, _, n) -> exact_solution(x) × n))
     add!(ch, Dirichlet(:ϕ, getfacetset(dh.grid, "boundary_facets"), Returns(0.0)))
     close!(ch)
 
@@ -366,7 +360,7 @@ function solve_nedelec(dh)
     work!(as, db; a)
     apply!(K, f, ch)
     a .= K \ f
-    l2_vals = L2Error(0.0, 0.0, analytical_solution)
+    l2_vals = L2Error(0.0, 0.0, exact_solution)
     work!(Integrator(l2_vals), db; a)
     return a, sqrt(l2_vals.l2error) / l2_vals.volume
 end
@@ -438,7 +432,7 @@ end
 
 fig = let
     fig = Plt.Figure(size = (1000, 600))
-    m_ana = plot_field(fig[1, 1], dh_ana, :u, a_ana, "Analytical"; plot_edges = false, colorrange = (-2, 0))
+    m_ana = plot_field(fig[1, 1], dh_ana, :u, a_ana, "Exact"; plot_edges = false, colorrange = (-2, 0))
     m_lag = plot_field(fig[1, 2], dh_lagrange, :E, a_lagrange, "Lagrange (h = $mesh_size)"; plot_edges = false, colorrange = (-2, 0))
     m_ned = plot_field(fig[1, 3], dh_nedelec, :E, a_nedelec, "Nedelec (h = $mesh_size)"; plot_edges = false, colorrange = (-2, 0))
     Plt.Colorbar(fig[1, 4], m_ned; label = "E₁")
