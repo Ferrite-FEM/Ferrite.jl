@@ -20,7 +20,6 @@ C) Lower-dimensional entities' dof indices + current interior dof indices
 D) The dof indices values matches `1:N` without duplication (follows from B, but also checked separately)
 E) All `N` base functions are implemented + `ArgumentError` if `i=0` or `i=N+1`
 F) Interpolation accessor functions versus type parameters (e.g. same refshape)
-
 """
 function test_interpolation_properties(ip::Interpolation{RefShape, FunOrder}) where {RefShape, FunOrder}
     return @testset "Interpolation properties: $ip" begin
@@ -30,80 +29,28 @@ function test_interpolation_properties(ip::Interpolation{RefShape, FunOrder}) wh
         @test Ferrite.getorder(ip) == FunOrder
 
         rdim = Ferrite.getrefdim(ip)
-        collect_all_dofs(t::Tuple) = vcat(Int[], collect.(t)...)
-        vdofs = Ferrite.vertexdof_indices(ip)
-        edofs = Ferrite.edgedof_indices(ip)
-        fdofs = Ferrite.facedof_indices(ip)
-        edofs_i = Ferrite.edgedof_interior_indices(ip)
-        fdofs_i = Ferrite.facedof_interior_indices(ip)
-        voldofs_i = Ferrite.volumedof_interior_indices(ip)
 
-        # Check match to reference shape (A)
-        @test length(vdofs) == Ferrite.nvertices(RefShape)
-        @test length(edofs) == Ferrite.nedges(RefShape)
-        @test length(edofs_i) == Ferrite.nedges(RefShape)
-        @test length(fdofs) == Ferrite.nfaces(RefShape)
-        @test length(fdofs_i) == Ferrite.nfaces(RefShape)
+        as_vector(t::Tuple) = collect(as_vector.(t))
+        as_vector(i::Int) = i
+        dof_data = (
+            vert = as_vector(Ferrite.vertexdof_indices(ip)),
+            edge = as_vector(Ferrite.edgedof_indices(ip)),
+            face = as_vector(Ferrite.facedof_indices(ip)),
+            edge_i = as_vector(Ferrite.edgedof_interior_indices(ip)),
+            face_i = as_vector(Ferrite.facedof_interior_indices(ip)),
+            vol_i = as_vector(Ferrite.volumedof_interior_indices(ip)),
+            n = getnbasefunctions(ip),
+        )
 
-        # Check numbering convention (B) and entity matching
-        all_dofs = Int[]
-        # Vertices numbered first
-        append!(all_dofs, collect_all_dofs(vdofs))
-        @test all(all_dofs .== 1:length(all_dofs))
-        if rdim ≥ 1 # Test edges
-            # Edges numbered next, no gaps or missing numbers. Sorted by edge number.
-            all_edofs_i = collect_all_dofs(edofs_i)
-            @test all(all_edofs_i .== length(all_dofs) .+ (1:length(all_edofs_i)))
-            # - all edge dofs include both vertexdofs and interior edegdofs, and nothing more.
-            append!(all_dofs, all_edofs_i)
-            @test all(all_dofs .== 1:length(all_dofs))
-            @test length(all_dofs) == length(collect_all_dofs(vdofs)) + length(all_edofs_i)
-            # Coarse check for C
-            @test Set(collect_all_dofs(edofs)) == Set(1:length(all_dofs))
-            # - test each edge individually (Detailed check for C)
-            for i in 1:Ferrite.nedges(RefShape)
-                vdofs_e = Int[] # vdofs for vertices belonging to the current edge
-                for j in Ferrite.reference_edges(RefShape)[i] # vertices in edge i
-                    isempty(vdofs[j]) || append!(vdofs_e, collect(vdofs[j]))
-                end
-                @test Set(edofs[i]) == Set(vcat(vdofs_e, collect(edofs_i[i])))
-            end
-        end
-        if rdim ≥ 2 # Test faces
-            # Face numbered next, no gaps or missing numbers. Sorted by face number.
-            all_fdofs_i = collect_all_dofs(fdofs_i)
-            @test all(all_fdofs_i .== length(all_dofs) .+ (1:length(all_fdofs_i)))
-            # - all dofs now include vertex dofs, edge dofs and face dofs, but not volume dofs.
-            append!(all_dofs, all_fdofs_i)
-            @test all(all_dofs .== 1:length(all_dofs))
-            # Coarse check for C
-            @test Set(collect_all_dofs(fdofs)) == Set(1:length(all_dofs))
-            # - test each face individually (Detailed check for C)
-            for i in 1:Ferrite.nfaces(RefShape)
-                face_verts = Ferrite.reference_faces(RefShape)[i]
-                vdofs_f = Int[]
-                for j in face_verts # vertices in face i
-                    vdof_indices = Ferrite.vertexdof_indices(ip)[j]
-                    isempty(vdof_indices) || append!(vdofs_f, collect(vdof_indices))
-                end
-                edofs_f = Int[] # Interior edgedofs for edges belong to current face
-                for (edgenr, edge) in enumerate(Ferrite.reference_edges(RefShape)) # All edges
-                    # Both edge vertices belong to face => edge belongs to face
-                    (edge[1] ∈ face_verts && edge[2] ∈ face_verts) || continue
-                    append!(edofs_f, collect(edofs_i[edgenr]))
-                end
-                @test Set(fdofs[i]) == Set(vcat(vdofs_f, edofs_f, collect(fdofs_i[i])))
-            end
-        end
-        # Test volume
-        # We always test this, since volumedofs are also used by lower-dimensional
-        # discontinuous inteprolations to make them internal to the cell, e.g. DiscontinuousLagrange
-        # Volumedofs numbered last
-        append!(all_dofs, collect(voldofs_i))
-        @test all(all_dofs .== 1:length(all_dofs))        # Numbering convention
+        refshape_data = (
+            nvertices = as_vector(Ferrite.nvertices(RefShape)),
+            edges = as_vector(Ferrite.reference_edges(RefShape)),
+            faces = as_vector(Ferrite.reference_faces(RefShape)),
+            rdim = rdim,
+        )
 
-        # Test D: getnbasefunctions matching number of dof indices
-        @test length(all_dofs) == getnbasefunctions(ip)
+        # Test A-D
+        _test_interpolation_properties(dof_data, refshape_data)
 
         # Test E: All base functions implemented.
         # Argument errors for 0th and n+1 indices.
@@ -116,6 +63,75 @@ function test_interpolation_properties(ip::Interpolation{RefShape, FunOrder}) wh
     end
 end
 
+# Brake out to avoid compiling new function for each interpolation
+function _test_interpolation_properties(dofs::NamedTuple, rs::NamedTuple)
+    collect_all_dofs(t::Union{Tuple, Vector}) = vcat(Int[], collect.(t)...)
+    # Check match to reference shape (A)
+    @test length(dofs.vert) == rs.nvertices
+    @test length(dofs.edge) == length(rs.edges)
+    @test length(dofs.edge_i) == length(rs.edges)
+    @test length(dofs.face) == length(rs.faces)
+    @test length(dofs.face_i) == length(rs.faces)
+
+    # Check numbering convention (B) and entity matching
+    all_dofs = Int[]
+    # Vertices numbered first
+    append!(all_dofs, collect_all_dofs(dofs.vert))
+    @test all(all_dofs .== 1:length(all_dofs))
+    if rs.rdim ≥ 1 # Test edges
+        # Edges numbered next, no gaps or missing numbers. Sorted by edge number.
+        all_edofs_i = collect_all_dofs(dofs.edge_i)
+        @test all(all_edofs_i .== length(all_dofs) .+ (1:length(all_edofs_i)))
+        # - all edge dofs include both vertexdofs and interior edegdofs, and nothing more.
+        append!(all_dofs, all_edofs_i)
+        @test all(all_dofs .== 1:length(all_dofs))
+        @test length(all_dofs) == length(collect_all_dofs(dofs.vert)) + length(all_edofs_i)
+        # Coarse check for C
+        @test Set(collect_all_dofs(dofs.edge)) == Set(1:length(all_dofs))
+        # - test each edge individually (Detailed check for C)
+        for (edge_nr, edge_vertices) in enumerate(rs.edges)
+            vdofs_e = Int[] # dofs.vert for vertices belonging to the current edge
+            for j in edge_vertices # vertices in edge i
+                isempty(dofs.vert[j]) || append!(vdofs_e, collect(dofs.vert[j]))
+            end
+            @test Set(dofs.edge[edge_nr]) == Set(vcat(vdofs_e, collect(dofs.edge_i[edge_nr])))
+        end
+    end
+    if rs.rdim ≥ 2 # Test faces
+        # Face numbered next, no gaps or missing numbers. Sorted by face number.
+        all_fdofs_i = collect_all_dofs(dofs.face_i)
+        @test all(all_fdofs_i .== length(all_dofs) .+ (1:length(all_fdofs_i)))
+        # - all dofs now include vertex dofs, edge dofs and face dofs, but not volume dofs.
+        append!(all_dofs, all_fdofs_i)
+        @test all(all_dofs .== 1:length(all_dofs))
+        # Coarse check for C
+        @test Set(collect_all_dofs(dofs.face)) == Set(1:length(all_dofs))
+        # - test each face individually (Detailed check for C)
+        for (facenr, face_verts) in enumerate(rs.faces)
+            vdofs_f = Int[]
+            for j in face_verts # vertices in face i
+                vdof_indices = dofs.vert[j]
+                isempty(vdof_indices) || append!(vdofs_f, collect(vdof_indices))
+            end
+            edofs_f = Int[] # Interior edgedofs for edges belong to current face
+            for (edgenr, edge_verts) in enumerate(rs.edges)
+                # Both edge vertices belong to face => edge belongs to face
+                (edge_verts[1] ∈ face_verts && edge_verts[2] ∈ face_verts) || continue
+                append!(edofs_f, collect(dofs.edge_i[edgenr]))
+            end
+            @test Set(dofs.face[facenr]) == Set(vcat(vdofs_f, edofs_f, collect(dofs.face_i[facenr])))
+        end
+    end
+    # Test volume
+    # We always test this, since volumedofs are also used by lower-dimensional
+    # discontinuous inteprolations to make them internal to the cell, e.g. DiscontinuousLagrange
+    # Volumedofs numbered last
+    append!(all_dofs, collect(dofs.vol_i))
+    @test all(all_dofs .== 1:length(all_dofs))        # Numbering convention
+
+    # Test D: getnbasefunctions matching number of dof indices
+    return @test length(all_dofs) == dofs.n
+end
 @testset "interpolations" begin
     @testset "Correctness of $interpolation" for interpolation in (
             Lagrange{RefLine, 1}(),
@@ -333,5 +349,4 @@ end
         @test_throws ArgumentError Ferrite.volumedof_interior_indices(ip)
         @test_throws ArgumentError Ferrite.facetdof_interior_indices(ip)
     end
-
 end # testset
