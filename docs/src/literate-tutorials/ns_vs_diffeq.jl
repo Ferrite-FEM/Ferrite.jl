@@ -364,11 +364,61 @@ u₀ = zeros(ndofs(dh))
 apply!(u₀, ch);
 
 # DifferentialEquations assumes dense matrices by default, which is not
-# feasible for semi-discretization of finite element models. We communicate
-# that a sparse matrix with specified pattern should be utilized through the
-# `jac_prototyp` argument. It is simple to see that the Jacobian and the
-# stiffness matrix share the same sparsity pattern, since they share the
-# same relation between trial and test functions.
+# feasible for the semi-discretization of finite element models. Since we use 
+# an implicit method to solve the ODEs, it is more efficient to provide 
+# information to the solver about the sparsity pattern and values of the Jacobian.
+# We communicate that a sparse matrix with specified pattern should be utilized 
+# through the `jac_prototype` argument. The sparsity pattern and values for the
+# Jacobian can be shown by taking the directional gradient (see also [deal.ii: step 57](https://www.dealii.org/current/doxygen/deal.II/step_57.html)) of
+# $F(\bold{x})$ along $\delta \bold{x}$ where $F(\bold{x}) = F(v, p)$ is the 
+# semi-discrete weak form of the incompressible Navier-Stokes equations such that
+# ```math
+# F(v, p) = \begin{pmatrix}
+# F_1 \\
+# F_2
+# \end{pmatrix} = \begin{pmatrix}
+# - \int_\Omega \nu \nabla v : \nabla \varphi - \int_\Omega (v \cdot \nabla) v \cdot \varphi + \int_\Omega p (\nabla \cdot \varphi) \\
+# \int_{\Omega} (\nabla \cdot v) \psi
+# \end{pmatrix}.
+# ```
+# The variable $t$ is omitted as it is not relevant to the directional gradient. 
+# The directional gradient is thus given by
+# ```math
+# \begin{aligned}
+#   \nabla F(v, p) \cdot (\delta v, \delta p) &= \lim_{\epsilon \to 0 } \frac{1}{\epsilon} (F(v + \delta v, p + \delta p ) - F(v, p)) \\
+#   &= \lim_{\epsilon \to 0}  \frac{1}{\epsilon} \begin{pmatrix}
+#   F_1(v + \epsilon \delta v, p + \epsilon \delta p) - F_1(v,p) \\
+#   F_2(v + \epsilon \delta v) - F_2(v)
+#   \end{pmatrix} \\
+#   &= \lim_{\epsilon \to 0}  \frac{1}{\epsilon} \begin{pmatrix}
+# - \int_\Omega \nu \nabla (v + \epsilon \delta v) : \nabla \varphi - \int_\Omega ((v + \epsilon \delta v) \cdot \nabla) (v + \epsilon \delta v) \cdot \varphi + \int_\Omega (p + \epsilon \delta p)(\nabla \cdot \varphi)  - F_1 \\
+# \int_{\Omega} (\nabla \cdot (v + \epsilon \delta v)) \psi - F_2 
+#   \end{pmatrix} \\
+#   &= \lim_{\epsilon \to 0} \frac{1}{\epsilon} \begin{pmatrix}
+#   - \int_{\Omega} \nu \epsilon \nabla \delta v : \nabla \varphi - \int_{\Omega} (\epsilon \delta v \cdot \nabla v + v \cdot \epsilon \nabla \delta v + \epsilon^2 \delta v \cdot \nabla \delta v) \cdot \varphi + \int_{\Omega} \epsilon \delta p (\nabla \cdot \varphi) \\ 
+#   - \int_{\Omega} (\nabla \cdot \epsilon \delta v) \psi
+#   \end{pmatrix} \\
+#   &=  \begin{pmatrix}
+#   - \int_{\Omega} \nu \nabla \delta v : \nabla \varphi - \int_{\Omega} (\delta v \cdot \nabla v + v \cdot \nabla \delta v) \cdot \varphi + \int_{\Omega} \delta p (\nabla \cdot \varphi) \\ 
+#   - \int_{\Omega} (\nabla \cdot \delta v) \psi
+#   \end{pmatrix}.
+# \end{aligned}
+# ```
+# The directional gradient of the nonlinear advection term is the only term that 
+# does not match the pattern described by the stiffness matrix. This implies 
+# that local contributions from the nonlinear elements 
+# ```math
+#  - \int_{\Omega} (\delta v \cdot \nabla v + v \cdot \nabla \delta v) \cdot \varphi 
+# ```
+# must be added to the Jacobian explicitly, and $v$ must be a function value
+# while $\nabla v$ must be a function gradient.
+# Conversely,
+# $\delta v$ and $\delta p$ are approximated by $\varphi$ and $\psi$, 
+# respectively, so the nonzero values of $K$ *are* the local contributions of the 
+# linear terms and can be used to populate the Jacobian directly.
+# It is therefore simple to see that the Jacobian and the stiffness matrix share 
+# the same sparsity pattern, since they share the same relation between trial 
+# and test functions.
 jac_sparsity = sparse(K);
 
 # To apply the nonlinear portion of the Navier-Stokes problem we simply hand
