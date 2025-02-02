@@ -25,6 +25,7 @@ Ferrite.adjust_dofs_during_distribution(::Interpolation)
 ```
 
 ### For special interpolations
+#### Discontinuous interpolations
 For discontinuous interpolations, the following methods should
 be implemented.
 ```@docs
@@ -34,6 +35,7 @@ Ferrite.dirichlet_facedof_indices(::Interpolation)
 Ferrite.dirichlet_edgedof_indices(::Interpolation)
 ```
 
+#### Non-identity mapping
 For interpolations that have a non-identity mapping (see
 [Mapping of finite elements](@ref mapping_theory)), the
 mapping type must be specified.
@@ -41,7 +43,7 @@ mapping type must be specified.
 Ferrite.mapping_type
 ```
 
-### Default should always work
+### The defaults should always work
 The following functions are defined such that they should work for
 any interpolations that defines the required functions specified above.
 ```@docs
