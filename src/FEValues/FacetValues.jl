@@ -120,7 +120,7 @@ function set_current_facet!(fv::FacetValues, facet_nr::Int)
     return
 end
 
-@inline function reinit!(fv::FacetValues, x::AbstractVector, facet_nr::Int)
+@inline function reinit!(fv::AbstractFacetValues, x::AbstractVector, facet_nr::Int)
     return reinit!(fv, nothing, x, facet_nr)
 end
 
