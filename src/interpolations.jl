@@ -498,8 +498,8 @@ function reference_coordinates(ip::DiscontinuousLagrange{RefTetrahedron, 0})
 end
 
 function reference_shape_value(ip::DiscontinuousLagrange{shape, 0}, ::Vec{dim, T}, i::Int) where {dim, shape <: AbstractRefShape{dim}, T}
-    i > 1 && throw(ArgumentError("no shape function $i for interpolation $ip"))
-    return one(T)
+    i == 1 && return one(T)
+    throw(ArgumentError("no shape function $i for interpolation $ip"))
 end
 
 is_discontinuous(::Type{<:DiscontinuousLagrange}) = true
