@@ -6,12 +6,6 @@ import GeometryBasics as GB
 
 using FerriteAssembly
 
-fig = Plt.Figure()
-ax = Plt.Axis(fig[1, 1]; xlabel = "x", ylabel = "y")
-points = [(0, 0), (1, 0), (1, 1), (-1, 1), (-1, -1), (0, -1), (0, 0)]
-Plt.lines!(ax, first.(points), last.(points))
-fig #hide
-
 function setup_grid(h = 0.2; origin_refinement = 1)
     # Initialize gmsh
     Gmsh.initialize()
@@ -108,18 +102,18 @@ grid = setup_grid(mesh_size; origin_refinement = 1)
 
 dh_ana = close!(add!(DofHandler(grid), :u, DiscontinuousLagrange{RefTriangle, 1}()^2))
 
-function analytical_potential(x::Vec{2}) # Analytical potential to be differentiated
+function exact_potential(x::Vec{2}) # Exact potential to be differentiated
     Δθ = -3π / 4 # Rotate discontinuous line to 4th quadrant
     xp = rotate(x, Δθ)
     r = sqrt(x ⋅ x + eps())
     θ = r ≤ 1.0e-6 ? zero(eltype(x)) : (atan(xp[2], xp[1]) - Δθ)
     return r^(2 // 3) * sin(2θ / 3)
 end
-analytical_solution(x::Vec{2}) = gradient(analytical_potential, x)
+exact_solution(x::Vec{2}) = gradient(exact_potential, x)
 
 a_ana = zeros(ndofs(dh_ana))
 
-apply_analytical!(a_ana, dh_ana, :u, analytical_solution);
+apply_analytical!(a_ana, dh_ana, :u, exact_solution);
 
 mutable struct L2Error{F}
     l2error::Float64
@@ -168,8 +162,8 @@ end
 function solve_lagrange(dh)
     ip = Ferrite.getfieldinterpolation(dh, Ferrite.find_field(dh, :E))
     ch = ConstraintHandler(dh)
-    add!(ch, Dirichlet(:E, getfacetset(dh.grid, "horizontal_facets"), (x, _) -> gradient(analytical_potential, x)[2], [2]))
-    add!(ch, Dirichlet(:E, getfacetset(dh.grid, "vertical_facets"), (x, _) -> gradient(analytical_potential, x)[1], [1]))
+    add!(ch, Dirichlet(:E, getfacetset(dh.grid, "horizontal_facets"), (x, _) -> gradient(exact_potential, x)[2], [2]))
+    add!(ch, Dirichlet(:E, getfacetset(dh.grid, "vertical_facets"), (x, _) -> gradient(exact_potential, x)[1], [1]))
     close!(ch)
 
     cv = CellValues(QuadratureRule{RefTriangle}(1), ip)
@@ -180,7 +174,7 @@ function solve_lagrange(dh)
     work!(as, db)
     apply!(K, f, ch)
     a = K \ f
-    l2_vals = L2Error(0.0, 0.0, analytical_solution)
+    l2_vals = L2Error(0.0, 0.0, exact_solution)
     work!(Integrator(l2_vals), db; a)
     return a, sqrt(l2_vals.l2error) / l2_vals.volume
 end
@@ -221,7 +215,7 @@ function solve_nedelec(dh)
     CT = getcelltype(dh.grid)
 
     ch = ConstraintHandler(dh)
-    add!(ch, WeakDirichlet(:E, getfacetset(dh.grid, "boundary_facets"), (x, _, n) -> analytical_solution(x) × n))
+    add!(ch, WeakDirichlet(:E, getfacetset(dh.grid, "boundary_facets"), (x, _, n) -> exact_solution(x) × n))
     add!(ch, Dirichlet(:ϕ, getfacetset(dh.grid, "boundary_facets"), Returns(0.0)))
     close!(ch)
 
@@ -236,7 +230,7 @@ function solve_nedelec(dh)
     work!(as, db; a)
     apply!(K, f, ch)
     a .= K \ f
-    l2_vals = L2Error(0.0, 0.0, analytical_solution)
+    l2_vals = L2Error(0.0, 0.0, exact_solution)
     work!(Integrator(l2_vals), db; a)
     return a, sqrt(l2_vals.l2error) / l2_vals.volume
 end
@@ -299,7 +293,7 @@ end
 
 fig = let
     fig = Plt.Figure(size = (1000, 600))
-    m_ana = plot_field(fig[1, 1], dh_ana, :u, a_ana, "Analytical"; plot_edges = false, colorrange = (-2, 0))
+    m_ana = plot_field(fig[1, 1], dh_ana, :u, a_ana, "Exact"; plot_edges = false, colorrange = (-2, 0))
     m_lag = plot_field(fig[1, 2], dh_lagrange, :E, a_lagrange, "Lagrange (h = $mesh_size)"; plot_edges = false, colorrange = (-2, 0))
     m_ned = plot_field(fig[1, 3], dh_nedelec, :E, a_nedelec, "Nedelec (h = $mesh_size)"; plot_edges = false, colorrange = (-2, 0))
     Plt.Colorbar(fig[1, 4], m_ned; label = "E₁")
