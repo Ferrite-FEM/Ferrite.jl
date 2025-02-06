@@ -265,5 +265,81 @@ using Ferrite: reference_shape_value, reference_shape_gradient
         @test_throws ArgumentError Ferrite.facetdof_interior_indices(ip)
     end
 
+    @testset "H(curl) and H(div)" begin
+        Hcurl_interpolations = [Nedelec{2, RefTriangle, 1}(), Nedelec{2, RefTriangle, 2}()] # Nedelec{3, RefTetrahedron, 1}(), Nedelec{3, RefHexahedron, 1}()]
+        Hdiv_interpolations = [RaviartThomas{2, RefTriangle, 1}(), RaviartThomas{2, RefTriangle, 2}(), BrezziDouglasMarini{2, RefTriangle, 1}()]
+        # test_interpolation_properties.(Hcurl_interpolations)  # Requires PR1136
+        # test_interpolation_properties.(Hdiv_interpolations)   # Requires PR1136
+
+        # These reference moments define the functionals that an interpolation should fulfill
+        reference_moment(::RaviartThomas{2, RefTriangle, 1}, s, facet_shape_nr) = 1
+        reference_moment(::RaviartThomas{2, RefTriangle, 2}, s, facet_shape_nr) = facet_shape_nr == 1 ? (1 - s) : s
+        reference_moment(::BrezziDouglasMarini{2, RefTriangle, 1}, s, facet_shape_nr) = facet_shape_nr == 1 ? (1 - s) : s
+        reference_moment(::Nedelec{2, RefTriangle, 1}, s, edge_shape_nr) = 1
+        reference_moment(::Nedelec{2, RefTriangle, 2}, s, edge_shape_nr) = edge_shape_nr == 1 ? (1 - s) : s
+
+        function_space(::RaviartThomas) = Val(:Hdiv)
+        function_space(::BrezziDouglasMarini) = Val(:Hdiv)
+        function_space(::Nedelec) = Val(:Hcurl)
+        # function_space(::Lagrange) = Val(:H1)
+        # function_space(::DiscontinuousLagrange) = Val(:L2)
+
+        function test_interpolation_functionals(ip::Interpolation)
+            return test_interpolation_functionals(function_space(ip), Val(Ferrite.getrefdim(ip)), ip)
+        end
+
+        # 2D, H(div) -> facet
+        function test_interpolation_functionals(::Val{:Hdiv}, ::Val{2}, ip::Interpolation)
+            RefShape = getrefshape(ip)
+            ipg = Lagrange{RefShape, 1}()
+            for facetnr in 1:nfacets(RefShape)
+                facet_coords = getindex.((Ferrite.reference_coordinates(ipg),), Ferrite.reference_facets(RefShape)[facetnr])
+                dof_inds = Ferrite.facetdof_interior_indices(ip)[facetnr]
+                ξ(s) = facet_coords[1] + (facet_coords[2] - facet_coords[1]) * s
+                weighted_normal = norm(facet_coords[2] - facet_coords[1]) * reference_normals(ipg)[facetnr]
+                for (facet_shape_nr, shape_nr) in pairs(dof_inds)
+                    moment_fun(s) = reference_moment(ip, s, facet_shape_nr)
+                    f(s) = moment_fun(s) * (reference_shape_value(ip, ξ(s), shape_nr) ⋅ weighted_normal)
+                    val, _ = quadgk(f, 0, 1; atol = 1.0e-8)
+                    @test val ≈ 1
+                end
+
+                for shape_nr in 1:getnbasefunctions(ip)
+                    shape_nr in dof_inds && continue # Already tested
+                    for s in range(0, 1, 5)
+                        @test abs(reference_shape_value(ip, ξ(s), shape_nr) ⋅ weighted_normal) < 1.0e-10
+                    end
+                end
+            end
+        end
+
+        function test_interpolation_functionals(::Val{:Hcurl}, ::Val{2}, ip::Interpolation)
+            RefShape = getrefshape(ip)
+            ipg = Lagrange{RefShape, 1}()
+            for edgenr in 1:Ferrite.nedges(RefShape)
+                edge_coords = getindex.((Ferrite.reference_coordinates(ipg),), Ferrite.reference_edges(RefShape)[edgenr])
+                edge_vector = edge_coords[2] - edge_coords[1] # Weighted direction vector
+                dof_inds = Ferrite.edgedof_interior_indices(ip)[edgenr]
+                ξ(s) = edge_coords[1] + edge_vector * s
+                for (edge_shape_nr, shape_nr) in pairs(dof_inds)
+                    moment_fun(s) = reference_moment(ip, s, edge_shape_nr)
+                    f(s) = moment_fun(s) * (reference_shape_value(ip, ξ(s), shape_nr) ⋅ edge_vector)
+                    val, _ = quadgk(f, 0, 1; atol = 1.0e-8)
+                    @test val ≈ 1
+                end
+
+                for shape_nr in 1:getnbasefunctions(ip)
+                    shape_nr in dof_inds && continue # Already tested
+                    for s in range(0, 1, 5)
+                        @test abs(reference_shape_value(ip, ξ(s), shape_nr) ⋅ edge_vector) < 1.0e-10
+                    end
+                end
+            end
+        end
+
+        test_interpolation_functionals.(Hdiv_interpolations)
+        test_interpolation_functionals.(Hcurl_interpolations)
+    end
+
 
 end # testset

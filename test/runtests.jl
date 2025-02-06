@@ -11,6 +11,7 @@ using StaticArrays
 using OrderedCollections
 using WriteVTK
 import Metis
+using QuadGK: quadgk
 
 include("test_utils.jl")
 
@@ -39,6 +40,7 @@ include("test_apply_analytical.jl")
 include("PoolAllocator.jl")
 include("test_deprecations.jl")
 include("blockarrays.jl")
+include("test_continuity.jl")
 include("test_examples.jl")
 
 @test all(x -> isdefined(Ferrite, x), names(Ferrite))  # Test that all exported symbols are defined
