@@ -1780,10 +1780,6 @@ mapping_type(::VectorizedInterpolation) = IdentityMapping()
 #####################################
 struct RaviartThomas{vdim, shape, order} <: VectorInterpolation{vdim, shape, order} end
 mapping_type(::RaviartThomas) = ContravariantPiolaMapping()
-n_dbc_components(::RaviartThomas) = 1
-reference_coordinates(ip::RaviartThomas{vdim}) where {vdim} = fill(NaN * zero(Vec{vdim}), getnbasefunctions(ip))
-dirichlet_edgedof_indices(ip::RaviartThomas{2}) = edgedof_interior_indices(ip)
-dirichlet_facedof_indices(ip::RaviartThomas{3}) = facedof_interior_indices(ip)
 
 # RefTriangle
 edgedof_indices(ip::RaviartThomas{2, RefTriangle}) = edgedof_interior_indices(ip)
@@ -1844,9 +1840,6 @@ end
 #####################################
 struct BrezziDouglasMarini{vdim, shape, order} <: VectorInterpolation{vdim, shape, order} end
 mapping_type(::BrezziDouglasMarini) = ContravariantPiolaMapping()
-reference_coordinates(ip::BrezziDouglasMarini{vdim}) where {vdim} = fill(NaN * zero(Vec{vdim}), getnbasefunctions(ip))
-dirichlet_edgedof_indices(ip::BrezziDouglasMarini{2}) = edgedof_interior_indices(ip)
-n_dbc_components(::BrezziDouglasMarini) = 1
 
 # RefTriangle
 edgedof_indices(ip::BrezziDouglasMarini{2, RefTriangle}) = edgedof_interior_indices(ip)
@@ -1882,9 +1875,6 @@ end
 #####################################
 struct Nedelec{vdim, shape, order} <: VectorInterpolation{vdim, shape, order} end
 mapping_type(::Nedelec) = CovariantPiolaMapping()
-reference_coordinates(ip::Nedelec{vdim}) where {vdim} = fill(NaN * zero(Vec{vdim}), getnbasefunctions(ip))
-dirichlet_edgedof_indices(ip::Nedelec) = edgedof_interior_indices(ip)
-n_dbc_components(::Nedelec) = 1
 edgedof_indices(ip::Nedelec) = edgedof_interior_indices(ip)
 
 # 2D refshape (rdim == vdim for Nedelec)
