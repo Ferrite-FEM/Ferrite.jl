@@ -1323,7 +1323,7 @@ end
 #######################################
 # Lagrange-Bubble RefTriangle order 1 #
 #######################################
-# Taken from https://web.archive.org/web/20240519081038/https://defelement.com/elements/bubble-enriched-lagrange.html
+# Taken from https://web.archive.org/web/20230328191012/https://defelement.com/elements/examples/triangle-bubble-enriched-vector-Lagrange-1.html
 getnbasefunctions(::BubbleEnrichedLagrange{RefTriangle, 1}) = 4
 adjust_dofs_during_distribution(::BubbleEnrichedLagrange{RefTriangle, 1}) = false
 
