@@ -113,6 +113,14 @@ nothing                    #hide
 # in the implementation and only stated for clarity in this section.
 #
 #
+# ### Derivation of the Jacobian
+# * The solution of nonlinear problems with newton-like methods (deal.ii, bueller)
+# * The Jacobian's relevance, provide the newton update equation (deal.ii, bueller, heath)
+# * The derivation of the jacobian (deal.ii)
+# * Relevance to the discrete form (Whitely discrete, Bubnov-Galerkin approach and so $K^{ele}$ same for $J^{ele}$ for linear elements)
+# * Add references section
+# * Further reading
+#
 # ## Commented implementation
 #
 # Now we solve the problem with Ferrite and [DifferentialEquations.jl](https://github.com/SciML/DifferentialEquations.jl). What follows is a program spliced with comments.
