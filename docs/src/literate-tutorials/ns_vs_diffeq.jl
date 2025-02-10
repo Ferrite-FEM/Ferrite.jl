@@ -377,7 +377,7 @@ apply!(u₀, ch);
 # information to the solver about the sparsity pattern and values of the Jacobian.
 # We communicate that a sparse matrix with specified pattern should be utilized 
 # through the `jac_prototype` argument. The sparsity pattern and values for the
-# Jacobian can be shown by taking the directional gradient (see also [deal.ii: step 57](https://www.dealii.org/current/doxygen/deal.II/step_57.html)) of
+# Jacobian can be shown by taking the directional gradient of
 # $F(\bold{x})$ along $\delta \bold{x}$ where $F(\bold{x}) = F(v, p)$ is the 
 # semi-discrete weak form of the incompressible Navier-Stokes equations such that
 # ```math
@@ -701,3 +701,8 @@ end                                                                             
 #md # ```julia
 #md # @__CODE__
 #md # ```
+
+# ## Further Reading
+# * [deal.ii: step 57](https://www.dealii.org/current/doxygen/deal.II/step_57.html)
+# * Chapter 4: Nonlinear Equations by Newton's Method in Bueler (2021) [Bueler2021_Ch4NonlinearEquationsByNewtonsMethod](@cite)
+# * Nonlinear Boundary Value Problems in Whiteley (2017) [Whiteley2017_Ch5NonlinearBoundaryValueProblems](@cite)
