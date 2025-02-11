@@ -3,8 +3,8 @@ using Ferrite: reference_shape_value, reference_shape_gradient
 """
     test_interpolation_properties(ip::Interpolation)
 
-This function tests the following implementation details for an
-interpolation. All base interpolations should pass this test, but
+This function tests the following
+interpolation properties. All base interpolations should pass this test, but
 `VectorizedInterpolation`s do not which is ok as these are
 special-cased in the code base.
 
