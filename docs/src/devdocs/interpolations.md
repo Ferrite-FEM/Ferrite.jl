@@ -1,12 +1,8 @@
-```@meta
-Draft = false
-```
-
 # [Interpolations](@id devdocs-interpolations)
 
 All `Interpolation`s should subtype `Interpolation{shape, order}`,
 where `shape <: AbstractRefShape` is the reference shape for which
-the interpolation is defined and `order` is the characteristic interpolation
+the interpolation is defined and [`order`](@doc Ferrite.getorder) is the characteristic interpolation
 order. The [how-to at bottom of this page](@ref devdocs-howto_new-interpolation) describes how to implement a new interpolation.
 
 ## Methods to be implemented for a new interpolation
@@ -84,8 +80,8 @@ RefTriangle
 
 For this particular interpolation, we have one degree of freedom associated
 with each vertex, and one degree of freedom associated with each edge.
-Following the Ferrite numbering rules, we start by enumerating the
-vertices first, followed by the edges.
+Following the [Ferrite numbering rules](@ref "Ordering-of-Dofs"), we start by enumerating the
+vertices first, followed by the edges. The numbering is based on the `RefTriangle` shown above, and the actual shape functions are taken from [defelement.org](https://defelement.org/elements/examples/triangle-lagrange-equispaced-2.html).
 ```@example InterpolationExample
 function Ferrite.reference_shape_value(ip::QTI, ξ::Vec{2}, shape_number::Int)
     ξ₁ = ξ[1]
