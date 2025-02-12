@@ -22,8 +22,7 @@ Ferrite.adjust_dofs_during_distribution(::Interpolation)
 
 ### For special interpolations
 #### Discontinuous interpolations
-For discontinuous interpolations, the following methods should
-be implemented.
+For discontinuous interpolations, implementing the following methods might be required.
 ```@docs
 Ferrite.is_discontinuous(::Interpolation)
 Ferrite.dirichlet_vertexdof_indices(::Interpolation)
