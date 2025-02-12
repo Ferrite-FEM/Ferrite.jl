@@ -43,7 +43,7 @@
 # denotes the symmetric part.
 #
 # ### Weak form
-# The resulting weak form is given given as follows: Find ``\boldsymbol{u} \in \mathbb{U}`` such that
+# The resulting weak form is given as follows: Find ``\boldsymbol{u} \in \mathbb{U}`` such that
 # ```math
 # \int_\Omega
 #   \mathrm{grad}(\delta \boldsymbol{u}) : \boldsymbol{\sigma}
