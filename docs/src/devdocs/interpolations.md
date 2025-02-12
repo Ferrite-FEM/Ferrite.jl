@@ -2,7 +2,7 @@
 
 All `Interpolation`s should subtype `Interpolation{shape, order}`,
 where `shape <: AbstractRefShape` is the reference shape for which
-the interpolation is defined and [`order`](@doc Ferrite.getorder) is the characteristic interpolation
+the interpolation is defined and [`order`](@ref Ferrite.getorder) is the characteristic interpolation
 order. The [how-to at bottom of this page](@ref devdocs-howto_new-interpolation) describes how to implement a new interpolation.
 
 ## Methods to be implemented for a new interpolation
