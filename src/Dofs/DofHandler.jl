@@ -130,7 +130,7 @@ add!(dh, :p, ip_p)
 close!(dh)
 ```
 
-!!! note
+!!! note "Dof numbering"
     The dof numbering does not follow the node numbering of the associated grid.
 """
 function DofHandler(grid::G) where {dim, G <: AbstractGrid{dim}}

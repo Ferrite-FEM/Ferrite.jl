@@ -208,7 +208,7 @@ K, f = assemble_global(cellvalues, K, dh);
 # To account for the boundary conditions we use the `apply!` function.
 # This modifies elements in `K` and `f` respectively, such that
 # we can get the correct solution vector `u` by using `\`.
-# Please note that the dof numbering does not follow the node numbering of the grid.
+# Please note that the dof numbering does not follow the node numbering of the grid, i.e. `u[i]` is not the temperature of node `i`. Use `evaluate_at_grid_nodes` to get the temperatures ordered by node numbers instead.
 apply!(K, f, ch)
 u = K \ f;
 

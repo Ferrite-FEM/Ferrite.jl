@@ -72,12 +72,12 @@ set of *elements* or *cells*. We call this geometric discretization *grid* (or *
 and denote it with $\Omega_h$. In this example the corners of the triangles are called
 *nodes*.
 
-Next we introduce the finite element approximation $u_\mathrm{h} \approx u$ as a sum of (nodal)
-*shape functions*, where we denote each of these function by $\phi_i$ and the corresponding
-*degree of freedom* (dof) $\hat{u}_i$. These are sometimes also called *weights* or *nodal values*.
-In general, the indices for the dofs do **not** coincide with the indices of the nodes of a grid,
-as we can use different shape functions for either. Hence, in Ferrite grid nodes are numbered
-differently than degrees of freedom by default.
+Next we introduce the finite element approximation $u_\mathrm{h} \approx u$ as linear combination of
+*shape functions*, $\phi_i$, weighted by the corresponding *degree of freedoms* (dof) $\hat{u}_i$.
+These are sometimes also called *weights* or *nodal values*, but the numbering of these do not correspond
+to the node numbers in the grid in Ferrite. While such numbering is common in basic finite element codes,
+Ferrite supports different approximations of the finite element fields and the geometry, prohibiting
+such basic numbering. For more details, see the [Ferrite numbering rules](@ref "Ordering-of-Dofs").
 
 Note that *shape functions* are sometimes referred to as *basis functions* or *trial functions*,
 and instead of $\phi_i$ they are sometimes denoted $N_i$. In this example we choose to approximate
