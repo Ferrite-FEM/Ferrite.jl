@@ -146,6 +146,7 @@ facetvalues = FacetValues(qr_face, ip);
 # ### Degrees of freedom
 # For distributing degrees of freedom, we define a `DofHandler`. The `DofHandler` knows that
 # `u` has two degrees of freedom per node because we vectorized the interpolation above.
+# Please note that the dof numbering does not follow the node numbering of the grid.
 dh = DofHandler(grid)
 add!(dh, :u, ip)
 close!(dh);
@@ -312,6 +313,7 @@ assemble_external_forces!(f_ext, dh, getfacetset(grid, "top"), facetvalues, trac
 # To account for the Dirichlet boundary conditions we use the `apply!` function.
 # This modifies elements in `K` and `f`, such that we can get the
 # correct solution vector `u` by using solving the linear equation system $K_{ij} \hat{u}_j = f^\mathrm{ext}_i$,
+# Please note that the dof numbering does not follow the node numbering of the grid.
 apply!(K, f_ext, ch)
 u = K \ f_ext;
 

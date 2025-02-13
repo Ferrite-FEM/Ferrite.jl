@@ -208,6 +208,7 @@ K, f = assemble_global(cellvalues, K, dh);
 # To account for the boundary conditions we use the `apply!` function.
 # This modifies elements in `K` and `f` respectively, such that
 # we can get the correct solution vector `u` by using `\`.
+# Please note that the dof numbering does not follow the node numbering of the grid.
 apply!(K, f, ch)
 u = K \ f;
 
