@@ -84,8 +84,14 @@ function reinit!(cc::CellCache, i::Int)
 end
 
 # reinit! FEValues with CellCache
-reinit!(cv::CellValues, cc::CellCache) = reinit!(cv, cc.coords)
-reinit!(fv::FacetValues, cc::CellCache, f::Int) = reinit!(fv, cc.coords, f)
+function reinit!(cv::CellValues, cc::CellCache)
+    cell = reinit_needs_cell(cv) ? getcells(cc.grid, cellid(cc)) : nothing
+    return reinit!(cv, cell, cc.coords)
+end
+function reinit!(fv::FacetValues, cc::CellCache, f::Int)
+    cell = reinit_needs_cell(fv) ? getcells(cc.grid, cellid(cc)) : nothing
+    return reinit!(fv, cell, cc.coords, f)
+end
 
 # Accessor functions
 getnodes(cc::CellCache) = cc.nodes
