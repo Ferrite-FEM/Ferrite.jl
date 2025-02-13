@@ -235,8 +235,8 @@
         end
         test_ips = [
             Lagrange{RefTriangle, 2}(), Lagrange{RefQuadrilateral, 2}(), Lagrange{RefHexahedron, 2}()^3, # Test should also work for identity mapping
-            Nedelec{2, RefTriangle, 1}(), Nedelec{2, RefTriangle, 2}(),
-            RaviartThomas{2, RefTriangle, 1}(), RaviartThomas{2, RefTriangle, 2}(), BrezziDouglasMarini{2, RefTriangle, 1}(),
+            Nedelec{RefTriangle, 1}(), Nedelec{RefTriangle, 2}(),
+            RaviartThomas{RefTriangle, 1}(), RaviartThomas{RefTriangle, 2}(), BrezziDouglasMarini{RefTriangle, 1}(),
         ]
         # Makes most sense to test for nonlinear geometries, so we use such cells for testing only
         cell_from_refshape(::Type{RefTriangle}) = QuadraticTriangle((ntuple(identity, 6)))
