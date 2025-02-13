@@ -341,10 +341,26 @@ function FacetValues(
 end
 
 function value(ip::Interpolation, ξ::Vec)
-    throw(DeprecationError("value(ip::Interpolation, ξ::Vec)" => "[reference_shape_value(ip, ξ, i) for i in 1:getnbasefunctions(ip)]"))
+    io = _iobuffer()
+    printstyled(io, "`value(ip::Interpolation, ξ::Vec)`", color = :red)
+    print(io, " is deprecated, use ")
+    printstyled(io, "`[reference_shape_value(ip, ξ, i) for i in 1:getnbasefunctions(ip)]`", color = :green)
+    print(io, " or ")
+    printstyled(io, "`reference_shape_values!(N, ip, ξ)`", color = :green)
+    print(io, " (with preallocated `N`) instead.")
+
+    throw(DeprecationError(takestring(io)))
 end
 function derivative(ip::Interpolation, ξ::Vec)
-    throw(DeprecationError("derivative(ip::Interpolation, ξ::Vec)" => "[reference_shape_gradient(ip, ξ, i) for i in 1:getnbasefunctions(ip)]"))
+    io = _iobuffer()
+    printstyled(io, "`derivative(ip::Interpolation, ξ::Vec)`", color = :red)
+    print(io, " is deprecated, use ")
+    printstyled(io, "`[reference_shape_gradient(ip, ξ, i) for i in 1:getnbasefunctions(ip)]`", color = :green)
+    print(io, " or ")
+    printstyled(io, "`reference_shape_gradients!(dNdξ, ip, ξ)`", color = :green)
+    print(io, " (with preallocated `dNdξ`) instead.")
+
+    throw(DeprecationError(takestring(io)))
 end
 function value(ip::Interpolation, i::Int, ξ::Vec)
     throw(DeprecationError("value(ip::Interpolation, i::Int, ξ::Vec)" => "reference_shape_value(ip, ξ, i)"))
