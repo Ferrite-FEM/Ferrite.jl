@@ -313,7 +313,7 @@ assemble_external_forces!(f_ext, dh, getfacetset(grid, "top"), facetvalues, trac
 # To account for the Dirichlet boundary conditions we use the `apply!` function.
 # This modifies elements in `K` and `f`, such that we can get the
 # correct solution vector `u` by using solving the linear equation system $K_{ij} \hat{u}_j = f^\mathrm{ext}_i$,
-# Please note that the dof numbering does not follow the node numbering of the grid.
+# Please note that the dof numbering does not follow the node numbering of the grid, i.e. `(u[2 * i - 1], u[2 * i])` are not the displacements of node `i`. Use `evaluate_at_grid_nodes` to get the displacements ordered by node numbers instead.
 apply!(K, f_ext, ch)
 u = K \ f_ext;
 
