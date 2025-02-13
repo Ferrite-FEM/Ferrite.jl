@@ -72,13 +72,18 @@ set of *elements* or *cells*. We call this geometric discretization *grid* (or *
 and denote it with $\Omega_h$. In this example the corners of the triangles are called
 *nodes*.
 
-Next we introduce the finite element approximation $u_\mathrm{h} \approx u$ as a sum of N nodal
+Next we introduce the finite element approximation $u_\mathrm{h} \approx u$ as a sum of (nodal)
 *shape functions*, where we denote each of these function by $\phi_i$ and the corresponding
-*nodal values* $\hat{u}_i$. Note that *shape functions* are sometimes referred to as
-*basis functions* or *trial functions*, and instead of $\phi_i$ they are sometimes denoted $N_i$.
-In this example we choose to approximate the test function in the same way. This approach is known
-as the *Galerkin finite element method*. Formally we write the evaluation of our approximations
-at a specific point $\mathbf{x}$ in our domain $\Omega$ as:
+*degree of freedom* (dof) $\hat{u}_i$. These are sometimes also called *weights* or *nodal values*.
+In general, the indices for the dofs do **not** coincide with the indices of the nodes of a grid,
+as we can use different shape functions for either. Hence, in Ferrite grid nodes are numbered
+differently than degrees of freedom by default.
+
+Note that *shape functions* are sometimes referred to as *basis functions* or *trial functions*,
+and instead of $\phi_i$ they are sometimes denoted $N_i$. In this example we choose to approximate
+the test function in the same way. This approach is known as the *(Bubnov-)Galerkin finite element
+method*. Formally we write the evaluation of our approximations at a specific point $\mathbf{x}$
+in our domain $\Omega$ as:
 
 ```math
 u_\mathrm{h}(\mathbf{x}) = \sum_{i=1}^{\mathrm{N}} \phi_i(\mathbf{x}) \, \hat{u}_i,\qquad
