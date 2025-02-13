@@ -488,8 +488,8 @@ function reference_coordinates(ip::DiscontinuousLagrange{RefTetrahedron, 0})
 end
 
 function reference_shape_value(ip::DiscontinuousLagrange{shape, 0}, ::Vec{dim, T}, i::Int) where {dim, shape <: AbstractRefShape{dim}, T}
-    i > 1 && throw(ArgumentError("no shape function $i for interpolation $ip"))
-    return one(T)
+    i == 1 && return one(T)
+    throw(ArgumentError("no shape function $i for interpolation $ip"))
 end
 
 is_discontinuous(::Type{<:DiscontinuousLagrange}) = true
@@ -667,7 +667,7 @@ function reference_coordinates(::Lagrange{RefQuadrilateral, 3})
 end
 
 function reference_shape_value(ip::Lagrange{RefQuadrilateral, 3}, ξ::Vec{2}, i::Int)
-    # See https://defelement.com/elements/examples/quadrilateral-Q-3.html
+    # See https://web.archive.org/web/20220817132305/https://defelement.com/elements/examples/quadrilateral-Q-3.html
     # Transform domain from [-1, 1] × [-1, 1] to [0, 1] × [0, 1]
     ξ_x = (ξ[1] + 1) / 2
     ξ_y = (ξ[2] + 1) / 2
@@ -1070,7 +1070,7 @@ end
 #############################
 # Lagrange RefPrism order 1 #
 #############################
-# Build on https://defelement.com/elements/examples/prism-Lagrange-1.html
+# Build on https://web.archive.org/web/20220817123819/https://defelement.com/elements/examples/prism-Lagrange-1.html
 getnbasefunctions(::Lagrange{RefPrism, 1}) = 6
 
 facedof_indices(::Lagrange{RefPrism, 1}) = ((1, 3, 2), (1, 2, 5, 4), (3, 1, 4, 6), (2, 3, 6, 5), (4, 5, 6))
@@ -1101,7 +1101,7 @@ end
 #############################
 # Lagrange RefPrism order 2 #
 #############################
-# Build on https://defelement.com/elements/examples/prism-Lagrange-2.html .
+# Build on https://web.archive.org/web/20220817125403/https://defelement.com/elements/examples/prism-Lagrange-2.html
 # This is simply the tensor-product of a quadratic triangle with a quadratic line.
 getnbasefunctions(::Lagrange{RefPrism, 2}) = 18
 
@@ -1323,7 +1323,7 @@ end
 #######################################
 # Lagrange-Bubble RefTriangle order 1 #
 #######################################
-# Taken from https://defelement.com/elements/bubble-enriched-lagrange.html
+# Taken from https://web.archive.org/web/20230328191012/https://defelement.com/elements/examples/triangle-bubble-enriched-vector-Lagrange-1.html
 getnbasefunctions(::BubbleEnrichedLagrange{RefTriangle, 1}) = 4
 adjust_dofs_during_distribution(::BubbleEnrichedLagrange{RefTriangle, 1}) = false
 
