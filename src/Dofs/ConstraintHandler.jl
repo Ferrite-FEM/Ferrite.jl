@@ -99,38 +99,6 @@ and integrate over the facet, ``\Gamma^f``, resulting in,
 \underbrace{\int_{\Gamma^f} \left[\delta\boldsymbol{N}^f_i \times \boldsymbol{n}^f\right]\cdot\left[\boldsymbol{N}^f_j \times \boldsymbol{n}^f\right]\ \mathrm{d}\Gamma}_{K^f_{ij}}\ a_j^f
 = \underbrace{\int_{\Gamma^f} \left[\delta\boldsymbol{N}^f_i \times \boldsymbol{n}^f\right]\cdot \boldsymbol{q}_t\ \mathrm{d}\Gamma}_{f^f_i}
 ```
-
-## Old notes
-For ``H(\mathrm{div})`` interpolations, we have conditions on the form
-```math
-\boldsymbol{N}^f_i a^f_i \cdot \boldsymbol{n}^f = q_n = f(\boldsymbol{x}, t, \boldsymbol{n})
-```
-where ``\boldsymbol{x}`` is the spatial coordinate, ``t`` the current time, and ``\boldsymbol{n}``
-the facet normal. These conditions are enforced as an integral over the facet ``\Gamma^f``.
-```math
-\int_{\Gamma^f} \boldsymbol{N}^f_\alpha a^f_\alpha \cdot \boldsymbol{n}^f\ \mathrm{d}\Gamma
-= \int_{\Gamma^f} g_\alpha(\boldsymbol{x}) q_n\ \mathrm{d}\Gamma
-```
-(no sum on ``\alpha``) where the weighting functions, ``g_\alpha(\boldsymbol{x})``, are defined such that
-``\sum_{\alpha} g_\alpha(\boldsymbol{x}) = 1`` at all points on the facet.
-These weighting functions are defined by each interpolation.
-
-For ``H(\mathrm{curl})`` interpolations, the conditions are on the form
-```math
-\boldsymbol{N}^f_i a^f_i \times \boldsymbol{n}^f = \boldsymbol{q}_t =
-\left[\boldsymbol{I} - \boldsymbol{n}\otimes\boldsymbol{n}\right] \cdot \boldsymbol{f}(\boldsymbol{x}, t, \boldsymbol{n})
-```
-where the multiplication with ``\boldsymbol{I} - \boldsymbol{n}\otimes\boldsymbol{n}`` projects
-``\boldsymbol{f}(\boldsymbol{x}, t, \boldsymbol{n})`` onto the plane normal to ``\boldsymbol{n}``.
-
-Currently, these constraints are not implemented for 3d cases. But the current implementation
-enforces this condition by considering the projection along ``\boldsymbol{q}_t``, i.e.
-```math
-a^f_\alpha =
-\frac{\int_{\Gamma^f} g_\alpha(\boldsymbol{x}) \boldsymbol{q}_t \cdot \boldsymbol{q}_t\ \mathrm{d}\Gamma}{
-\int_{\Gamma^f} \left[\boldsymbol{N}^f_\alpha \times \boldsymbol{n}^f\right]\cdot \boldsymbol{q}_t\ \mathrm{d}\Gamma}
-```
-(no sum on ``\alpha``) with equivalent weighting functions as for ``H(\mathrm{div})`` interpolations.
 """
 mutable struct WeakDirichlet
     const f::Function
