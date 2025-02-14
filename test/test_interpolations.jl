@@ -20,6 +20,7 @@ C) Lower-dimensional entities' dof indices + current interior dof indices
 D) The dof indices values matches `1:N` without duplication (follows from B, but also checked separately)
 E) All `N` base functions are implemented + `ArgumentError` if `i=0` or `i=N+1`
 F) Interpolation accessor functions versus type parameters (e.g. same refshape)
+G) `function_space` and `mapping_type` is defined
 """
 function test_interpolation_properties(ip::Interpolation{RefShape, FunOrder}) where {RefShape, FunOrder}
     return @testset "Interpolation properties: $ip" begin
@@ -60,6 +61,10 @@ function test_interpolation_properties(ip::Interpolation{RefShape, FunOrder}) wh
             @test Ferrite.reference_shape_value(ip, ξ, i) isa Ferrite.shape_value_type(ip, Float64)
         end
         @test_throws ArgumentError Ferrite.reference_shape_value(ip, ξ, getnbasefunctions(ip) + 1)
+
+        # Test that property functions are defined, runs, and, if possible, give expected type
+        Ferrite.mapping_type(ip) # Dry-run just to catch if it isn't defined
+        @test Ferrite.function_space(ip) isa Val
     end
 end
 
@@ -493,6 +498,16 @@ end
                         end
                     end
                 end
+            end
+        end
+
+        @testset "WeakDirichlet error path" begin
+            dh_H1, _ = _setup_dh_fv_for_bc_test(Lagrange{RefTriangle, 1}()^2; nel = 1, qr_order = 1)
+            dh_L2, _ = _setup_dh_fv_for_bc_test(DiscontinuousLagrange{RefTriangle, 1}()^2; nel = 1, qr_order = 1)
+            for dh in (dh_H1, dh_L2)
+                dbc = WeakDirichlet(:u, Set([FacetIndex(1, 1)]), Returns(zero(Vec{2})))
+                ch = add!(ConstraintHandler(dh), dbc)
+                @test_throws ArgumentError close!(ch)
             end
         end
 

@@ -1848,7 +1848,7 @@ function add!(ch::ConstraintHandler, dbc::WeakDirichlet)
         fqr = FacetQuadratureRule{getrefshape(interpolation)}(qr_order)
         fv = FacetValues(fqr, interpolation, geometric_interpolation(CT))
         local_facet_dofs, local_facet_dofs_offset =
-            _local_facet_dofs_for_bc(interpolation, 1, 1, field_offset(sdh, field_idx), dirichlet_facetdof_indices)
+            _local_facet_dofs_for_bc(get_base_interpolation(interpolation), 1, 1, field_offset(sdh, field_idx), dirichlet_facetdof_indices)
         facet_dofs = ArrayOfVectorViews(local_facet_dofs_offset, local_facet_dofs, LinearIndices(1:(length(local_facet_dofs_offset) - 1)))
 
         filtered_dbc = WeakDirichlet(dbc.f, filtered_set, dbc.field_name, qr_order, fv, facet_dofs)
@@ -1960,7 +1960,7 @@ function integrate_weak_dbc!(::Val{:Hcurl}, Kᶠ, fᶠ, bc_fun, fv, shape_nrs, c
     return
 end
 
-function integrate_weak_dbc!(::Val{:H1}, Kᶠ, fᶠ, bc_fun, fv, shape_nrs, cell_coords, time)
+function integrate_weak_dbc!(::Union{Val{:H1}, Val{:L2}}, Kᶠ, fᶠ, bc_fun, fv, shape_nrs, cell_coords, time)
     ip_str = sprint(show, function_interpolation(fv))
-    throw(ArgumentError("WeakDirichlet is not defined for H¹ function spaces ($ip_str)"))
+    throw(ArgumentError("WeakDirichlet is not defined for H¹ and L2 function spaces ($ip_str)"))
 end
