@@ -468,12 +468,12 @@ function update!(ch::ConstraintHandler, time::Real = 0.0)
         ip = getfieldinterpolation(ch.dh, field_idx)
         # Function barrier
         _update!(
-            ch.inhomogeneities, wrapper_f, dbc.facets, ip, dbc.local_facet_dofs, dbc.local_facet_dofs_offset,
+            ch.inhomogeneities, wrapper_f, dbc.facets, dbc.local_facet_dofs, dbc.local_facet_dofs_offset,
             dbc.components, ch.dh, ch.bcvalues[i], ch.dofmapping, ch.dofcoefficients, time
         )
     end
     for (i, dbc) in pairs(ch.idbcs)
-        _update!(ch.inhomogeneities, dbc.f, dbc.facets, dbc.fv, dbc.facet_dofs, ch.dh, ch.dofmapping, ch.dofcoefficients, time)
+        _update_weak_dbc!(ch.inhomogeneities, dbc.f, dbc.facets, dbc.fv, dbc.facet_dofs, ch.dh, ch.dofmapping, ch.dofcoefficients, time)
     end
     # Compute effective inhomogeneity for affine constraints with prescribed dofs in the
     # RHS. For example, in u2 = w3 * u3 + w4 * u4 + b2 we allow e.g. u3 to be prescribed by
@@ -499,7 +499,7 @@ end
 
 # for facets, vertices, faces and edges
 function _update!(
-        inhomogeneities::Vector{T}, f::Function, boundary_entities::AbstractVecOrSet{<:BoundaryIndex}, ip::Interpolation, local_facet_dofs::Vector{Int}, local_facet_dofs_offset::Vector{Int},
+        inhomogeneities::Vector{T}, f::Function, boundary_entities::AbstractVecOrSet{<:BoundaryIndex}, local_facet_dofs::Vector{Int}, local_facet_dofs_offset::Vector{Int},
         components::Vector{Int}, dh::AbstractDofHandler, boundaryvalues::BCValues,
         dofmapping::Dict{Int, Int}, dofcoefficients::Vector{Union{Nothing, DofCoefficients{T}}}, time::Real
     ) where {T}
@@ -515,13 +515,6 @@ function _update!(
         r = local_facet_dofs_offset[entityidx]:(local_facet_dofs_offset[entityidx + 1] - 1)
         counter = 1
         for location in 1:getnquadpoints(boundaryvalues)
-            sign = if mapping_type(ip) isa IdentityMapping
-                1
-            else
-                cell = getcells(cc.grid, cellidx)
-                shape_number = local_facet_dofs[r[counter]]
-                get_direction(ip, shape_number, cell)
-            end
             x = spatial_coordinate(boundaryvalues, location, cc.coords)
             bc_value = f(x, time)
             @assert length(bc_value) == length(components)
@@ -535,7 +528,7 @@ function _update!(
                 # Only DBC dofs are currently update!-able so don't modify inhomogeneities
                 # for affine constraints
                 if dofcoefficients[dbc_index] === nothing
-                    inhomogeneities[dbc_index] = sign * bc_value[i]
+                    inhomogeneities[dbc_index] = bc_value[i]
                     @debug println("prescribing value $(bc_value[i]) on global dof $(globaldof)")
                 end
             end
@@ -546,7 +539,7 @@ end
 
 # for nodes
 function _update!(
-        inhomogeneities::Vector{T}, f::Function, ::AbstractVecOrSet{Int}, _::Interpolation, nodeidxs::Vector{Int}, globaldofs::Vector{Int},
+        inhomogeneities::Vector{T}, f::Function, ::AbstractVecOrSet{Int}, nodeidxs::Vector{Int}, globaldofs::Vector{Int},
         components::Vector{Int}, dh::AbstractDofHandler, facetvalues::BCValues,
         dofmapping::Dict{Int, Int}, dofcoefficients::Vector{Union{Nothing, DofCoefficients{T}}}, time::Real
     ) where {T}
@@ -1889,7 +1882,7 @@ function _add!(ch::ConstraintHandler, dbc::WeakDirichlet, facet_dofs)
 end
 
 
-function _update!(
+function _update_weak_dbc!(
         inhomogeneities::Vector{T}, f::Function, facets::AbstractVecOrSet{FacetIndex}, fv::FacetValues, facet_dofs::ArrayOfVectorViews,
         dh::AbstractDofHandler, dofmapping::Dict{Int, Int}, dofcoefficients::Vector{Union{Nothing, DofCoefficients{T}}}, time::Real
     ) where {T}
