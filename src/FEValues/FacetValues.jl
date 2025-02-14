@@ -231,3 +231,62 @@ function spatial_coordinate(bcv::BCValues, q_point::Int, xh::AbstractVector{Vec{
     end
     return x
 end
+
+"""
+    BCValues2(func_interpol::Interpolation, geom_interpol::Interpolation, boundary_type::Union{Type{<:BoundaryIndex}})
+
+`BCValues2` stores the shape values at all facet/faces/edges/vertices (depending on `boundary_type`) for the geometric interpolation (`geom_interpol`),
+for each dof-position determined by the `func_interpol`. Used mainly by the `ConstraintHandler`.
+"""
+mutable struct BCValues2{T, sdim}
+    const M::Vector{Matrix{T}}
+    const dofs::ArrayOfVectorViews{Int, 1}
+    current_entity::Int
+end
+
+BCValues2(func_interpol::Interpolation, geom_interpol::Interpolation, boundary_type::Type{<:BoundaryIndex}) =
+    BCValues2(Float64, func_interpol, geom_interpol, boundary_type)
+
+function BCValues2(
+        ::Type{T}, func_interpol::Interpolation{refshape}, geom_interpol::Interpolation{refshape},
+        boundary_type::Type{<:BoundaryIndex}, field_offset
+    ) where {T, dim, refshape <: AbstractRefShape{dim}}
+
+    dof_coords = reference_coordinates(func_interpol)
+    n_geom_basefuncs = getnbasefunctions(geom_interpol)
+    n_dbc_comp = n_dbc_components(func_interpolation)
+
+    M = Matrix{T}[]
+    local_facet_dofs = Int[]
+    local_facet_dofs_offset = Int[1]
+
+    for boundarydofs in dirichlet_boundarydof_indices(boundary_type)(func_interpol)
+        ξ = [dof_coords[i] for i in boundarydofs]
+        M_current = zeros(n_geom_basefuncs, length(boundarydofs))
+        for (i, boundarydof) in boundarydofs
+            ξ = dof_coords[boundarydof]
+            reference_shape_values!(view(M_current, :, i), geom_interpol, ξ)
+            push!(local_facet_dofs, (boundarydof - 1) * n_dbc_comp + field_offset)
+        end
+        push!(M, M_current)
+        push!(local_facet_dofs_offset, length(local_facet_dofs) + 1)
+    end
+    dofs = ArrayOfVectorViews(local_facet_dofs, local_facet_dofs_offset, 1:(length(local_facet_dofs_offset) - 1))
+
+    return BCValues2{T}(M, x, dofs, 1)
+end
+
+get_dof_locations(bcv::BCValues2) = 1:size(bcv.M[bcv.current_entity], 2)
+
+function spatial_coordinate(bcv::BCValues2, dof_location_nr::Int, xh::AbstractVector{Vec{dim, T}}) where {dim, T}
+    n_base_funcs = size(bcv.M, 1)
+    (checkbounds(xh, 1:n_base_funcs) && length(xh) == n_base_funcs) || throw_incompatible_coord_length(length(xh), n_base_funcs)
+    x = zero(Vec{dim, T})
+    M = bcv.M[bcv.current_entity]
+    @inbounds for i in 1:n_base_funcs
+        x += M[i, dof_location_nr] * xh[i]
+    end
+    return x
+end
+
+get_local_dof(bcv::BCValues2, location::Int, component) = bcv.dofs[bcv.current_entity][location] + component - 1
