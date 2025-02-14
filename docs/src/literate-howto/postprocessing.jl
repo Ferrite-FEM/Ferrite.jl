@@ -13,12 +13,28 @@
 #
 # ## Introduction
 #
-# After running a simulation, we usually want to visualize the results in different ways.
-# The `L2Projector` and the `PointEvalHandler` build a pipeline for doing so. With the `L2Projector`,
-# integration point quantities can be projected to the nodes. The `PointEvalHandler` enables evaluation of
-# the finite element approximated function in any coordinate in the domain. Thus with the combination of both functionalities,
-# both nodal quantities and integration point quantities can be evaluated in any coordinate, allowing for example
-# cut-planes through 3D structures or cut-lines through 2D-structures.
+# After running a simulation, we usually want to postprocess and visualize the results in
+# different ways. Ferrite provides several tools to facilitate these tasks:
+#
+#  - L2 projection of (discrete) data onto FE interpolations using the `L2Projector`
+#  - Evalutation of fields (solutions, projections, etc) at arbitrary, user-defined, points
+#    using the `PointEvalHandler`
+#  - Builtin functionality for exporting data (solutions, cell data, projections, etc) to
+#    the VTK format
+#  - [Makie.jl](https://docs.makie.org/) based plotting using
+#    [FerriteViz.jl](https://ferrite-fem.github.io/FerriteViz.jl/)
+#
+# This how-to demonstrates the VTK export, the `L2Projector` for projecting discrete
+# quadrature point data onto a continuous FE interpolation, and the `PointEvalHandler` for
+# evaluating the FE solution, and the projection, along a user-defined cut line through the
+# domain.
+
+# !!! warning "Custom visualization"
+#     A common assumption is that the numbering of degrees of freedom matche the numbering
+#     of the nodes in the grid. This is *NOT* the case in Ferrite. If the available tools
+#     don't suit your needs and you decide to "roll your own" visualization you need to be
+#     aware of this and take it into account. For the specific case of evaluating the
+#     solution at the grid nodes you can use [`evaluate_at_grid_nodes`](@ref).
 #
 # This example continues from the Heat equation example, where the temperature field was
 # determined on a square domain. In this example, we first compute the heat flux in each
@@ -130,12 +146,6 @@ Plots.plot(getindex.(points, 1), u_points, xlabel = "x (coordinate)", ylabel = "
 # Secondly, the horizontal heat flux (i.e. the first component of the heat flux vector) is plotted.
 Plots.plot(getindex.(points, 1), getindex.(q_points, 1), xlabel = "x (coordinate)", ylabel = "q_x (flux in x-direction)", label = nothing)
 # *Figure 4*: ``x``-component of the flux along the cut line from *Figure 2*.
-
-#md # ## What next?
-#md # For more complicated visualization workflows we recommend either using our visualization tool [FerriteViz.jl](https://github.com/Ferrite-FEM/FerriteViz.jl)
-#md # or users should export the solution into vtk files and use e.g. [ParaView](https://www.paraview.org/), [Mayavi](https://docs.enthought.com/mayavi/mayavi/), ... .
-#md # It should be noted that the ordering of the DofHandler and the numbering of the nodes does not match, hence we cannot directly use solution
-#md # vectors to assign colors to discretizations.
 
 #md # ## [Plain program](@id postprocessing-plain-program)
 #md #
