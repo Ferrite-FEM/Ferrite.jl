@@ -363,14 +363,8 @@ end
         reference_moment(::Nedelec{RefTriangle, 1}, s, edge_shape_nr) = 1
         reference_moment(::Nedelec{RefTriangle, 2}, s, edge_shape_nr) = edge_shape_nr == 1 ? (1 - s) : s
 
-        function_space(::RaviartThomas) = Val(:Hdiv)
-        function_space(::BrezziDouglasMarini) = Val(:Hdiv)
-        function_space(::Nedelec) = Val(:Hcurl)
-        # function_space(::Lagrange) = Val(:H1)
-        # function_space(::DiscontinuousLagrange) = Val(:L2)
-
         function test_interpolation_functionals(ip::Interpolation)
-            return test_interpolation_functionals(function_space(ip), Val(Ferrite.getrefdim(ip)), ip)
+            return test_interpolation_functionals(Ferrite.function_space(ip), Val(Ferrite.getrefdim(ip)), ip)
         end
 
         # 2D, H(div) -> facet
@@ -424,6 +418,84 @@ end
 
         test_interpolation_functionals.(Hdiv_interpolations)
         test_interpolation_functionals.(Hcurl_interpolations)
+
+        # Test boundary conditions (WeakDirichlet)
+        cell_type(::Type{RefLine}) = Line
+        cell_type(::Type{RefTriangle}) = Triangle
+        cell_type(::Type{RefQuadrilateral}) = Quadrilateral
+        cell_type(::Type{RefTetrahedron}) = Tetrahedron
+        cell_type(::Type{RefHexahedron}) = Hexahedron
+        function _setup_dh_fv_for_bc_test(ip; nel = 2, qr_order = 4)
+            RefShape = Ferrite.getrefshape(ip)
+            CT = cell_type(RefShape)
+            dim = Ferrite.getrefdim(CT) # dim=sdim=vdim
+            grid = generate_grid(CT, ntuple(Returns(nel), dim), -0.25 * ones(Vec{dim}), 0.2 * ones(Vec{dim}))
+            qr = FacetQuadratureRule{RefShape}(qr_order)
+            fv = FacetValues(qr, ip, geometric_interpolation(CT))
+            dh = close!(add!(DofHandler(grid), :u, ip))
+            return dh, fv
+        end
+
+        function test_bc_integral(f_bc::Function, check_fun::Function, dh, facetset, fv; tol = 1.0e-6)
+            grid = Ferrite.get_grid(dh)
+            dbc = WeakDirichlet(:u, facetset, f_bc)
+            ch = close!(add!(ConstraintHandler(dh), dbc))
+            a = zeros(ndofs(dh))
+            apply!(a, ch)
+            test_val = zero(f_bc(get_node_coordinate(grid, 1), 0.0, getnormal(fv, 1)))
+            check_val = zero(check_fun(zero(Ferrite.shape_value_type(fv)), getnormal(fv, 1)))
+            @assert typeof(test_val) === typeof(check_val)
+            for (cellidx, facetidx) in facetset
+                cell_coords = getcoordinates(grid, cellidx)
+                reinit!(fv, getcells(grid, cellidx), cell_coords, facetidx)
+                ae = a[celldofs(dh, cellidx)]
+                for q_point in 1:getnquadpoints(fv)
+                    dΓ = getdetJdV(fv, q_point)
+                    u = function_value(fv, q_point, ae)
+                    n = getnormal(fv, q_point)
+                    x = spatial_coordinate(fv, q_point, cell_coords)
+                    check_val += check_fun(u, n) * dΓ
+                    test_val += f_bc(x, 0.0, n) * dΓ
+                end
+            end
+            @test norm(test_val - check_val) < tol
+        end
+
+        @testset "H(div) BC" begin
+            for ip in Hdiv_interpolations
+                @testset "$ip" begin
+                    dh, fv = _setup_dh_fv_for_bc_test(ip)
+                    linear_x1(x, _, _) = x[1]
+                    for f_bc in (Returns(0.0), Returns(1.0), linear_x1)
+                        @testset "f_bc = $f_bc" begin
+                            for facetset in values(dh.grid.facetsets)
+                                test_bc_integral(f_bc, ⋅, dh, facetset, fv)
+                            end
+                        end
+                    end
+                end
+            end
+        end
+
+        @testset "H(curl) BC" begin
+            for ip in Hcurl_interpolations
+                @testset "$ip" begin
+                    dh, fv = _setup_dh_fv_for_bc_test(ip)
+                    dim = Ferrite.getrefdim(getrefshape(ip))
+                    @assert dim == 2 # 3d not supported yet
+                    v3 = rand()
+                    linear_x1(x, _, _) = x[1] * Vec((0.0, 0.0, v3))
+                    for f_bc in (Returns(zero(Vec{3})), Returns(Vec((0.0, 0.0, rand()))), linear_x1)
+                        @testset "f_bc = $f_bc" begin
+                            for facetset in values(dh.grid.facetsets)
+                                test_bc_integral(f_bc, ×, dh, facetset, fv)
+                            end
+                        end
+                    end
+                end
+            end
+        end
+
     end
 
 end # testset

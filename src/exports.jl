@@ -140,6 +140,7 @@ export
     # Constraints
     ConstraintHandler,
     Dirichlet,
+    WeakDirichlet,
     PeriodicDirichlet,
     collect_periodic_facets,
     collect_periodic_facets!,
