@@ -68,7 +68,6 @@
         qr = QuadratureRule{RefShape}(zeros(length(ξs)), ξs)
         cv = CellValues(qr, ip_fun, ip_geo)
         reinit!(cv, cell2, cell_coords2)
-        # fun_vals2 = similar(fun_vals)
         ue2 = u[celldofs(dh, facet2[1])]
         for q_point in 1:getnquadpoints(cv)
             @assert spatial_coordinate(cv, q_point, cell_coords2) ≈ point_coords[q_point]
@@ -76,14 +75,8 @@
             n = point_normal[q_point]
             v1 = fun_vals[q_point]
             v2 = value_function(cv, q_point, ue2)
-            @test isapprox(transformation_function(v1, n), transformation_function(v2, n); rtol = 1.0e-6)
+            @test isapprox(transformation_function(v1, n), transformation_function(v2, n); atol = 1.0e-6)
         end
-
-        #d1 = map((v, n) -> transformation_function(v, n), fun_vals, point_normal)
-        #d2 = map((v, n) -> transformation_function(v, n), fun_vals2, point_normal)
-        # d1 = transformation_function.(fun_vals, point_normal)
-        # d1 = transformation_function.(fun_vals2, point_normal)
-        # @test all(isapprox.(d1, d2; rtol = 1.0e-6))
         return true
     end
 
@@ -125,7 +118,6 @@
     continuity_function(::Nedelec) = ((v, n) -> v - n * (v ⋅ n)) # Tangent continuity (H(curl))
     continuity_function(::RaviartThomas) = ((v, n) -> v ⋅ n) # Normal continuity (H(div))
     continuity_function(::BrezziDouglasMarini) = ((v, n) -> v ⋅ n) # Normal continuity (H(div))
-
 
     nel = 3
 
