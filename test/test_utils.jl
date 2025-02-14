@@ -120,7 +120,7 @@ end
 
 function valid_coordinates_and_normals(fs::Interpolation{shape, order}) where {dim, shape <: Ferrite.AbstractRefShape{dim}, order}
     x = Ferrite.reference_coordinates(fs)
-    n = reference_normals(fs)
+    n = reference_normals(shape)
     R = rotmat(dim)
     return [2.0 * (R ⋅ x[i]) for i in 1:length(x)], [(R ⋅ n[i]) / norm((R ⋅ n[i])) for i in 1:length(n)]
 end

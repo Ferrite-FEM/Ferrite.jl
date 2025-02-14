@@ -102,7 +102,7 @@ getnquadpoints(cv::CellValues) = getnquadpoints(cv.qr)
 end
 @inline _update_detJdV!(::Nothing, q_point, w, mapping) = nothing
 
-@inline function reinit!(cv::CellValues, x::AbstractVector)
+@inline function reinit!(cv::AbstractCellValues, x::AbstractVector)
     return reinit!(cv, nothing, x)
 end
 

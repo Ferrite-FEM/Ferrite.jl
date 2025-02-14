@@ -145,9 +145,6 @@ end
 struct IdentityMapping end
 struct CovariantPiolaMapping end
 struct ContravariantPiolaMapping end
-# Not yet implemented:
-# struct DoubleCovariantPiolaMapping end
-# struct DoubleContravariantPiolaMapping end
 
 mapping_type(fv::FunctionValues) = mapping_type(fv.ip)
 

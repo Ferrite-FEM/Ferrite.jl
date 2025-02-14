@@ -129,6 +129,10 @@ add!(dh, :u, ip_u)
 add!(dh, :p, ip_p)
 close!(dh)
 ```
+
+!!! note "Numbering of degree of freedom"
+    Note that the numbering of degrees of freedom do *NOT* follow the global numbering of
+    nodes in the associated grid.
 """
 function DofHandler(grid::G) where {dim, G <: AbstractGrid{dim}}
     ncells = getncells(grid)

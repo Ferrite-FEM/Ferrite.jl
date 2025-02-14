@@ -120,7 +120,7 @@ function set_current_facet!(fv::FacetValues, facet_nr::Int)
     return
 end
 
-@inline function reinit!(fv::FacetValues, x::AbstractVector, facet_nr::Int)
+@inline function reinit!(fv::AbstractFacetValues, x::AbstractVector, facet_nr::Int)
     return reinit!(fv, nothing, x, facet_nr)
 end
 
@@ -186,10 +186,10 @@ mutable struct BCValues{T}
     current_entity::Int
 end
 
-BCValues(func_interpol::Interpolation, geom_interpol::Interpolation, boundary_type::Type{<:BoundaryIndex} = FaceIndex) =
+BCValues(func_interpol::Interpolation, geom_interpol::Interpolation, boundary_type::Type{<:BoundaryIndex}) =
     BCValues(Float64, func_interpol, geom_interpol, boundary_type)
 
-function BCValues(::Type{T}, func_interpol::Interpolation{refshape}, geom_interpol::Interpolation{refshape}, boundary_type::Type{<:BoundaryIndex} = FaceIndex) where {T, dim, refshape <: AbstractRefShape{dim}}
+function BCValues(::Type{T}, func_interpol::Interpolation{refshape}, geom_interpol::Interpolation{refshape}, boundary_type::Type{<:BoundaryIndex}) where {T, dim, refshape <: AbstractRefShape{dim}}
     # set up quadrature rules for each boundary entity with dof-positions
     # (determined by func_interpol) as the quadrature points
     interpolation_coords = reference_coordinates(func_interpol)
