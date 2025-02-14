@@ -66,10 +66,14 @@ cellvalues = CellValues(qr, ip);
 # our interpolation `ip` defined above.
 # Lastly we `close!` the `DofHandler`, it is now that the dofs are distributed
 # for all the elements.
-# Please note that the dof numbering does not follow the node numbering of the grid.
 dh = DofHandler(grid)
 add!(dh, :u, ip)
 close!(dh);
+
+# !!! warning "Numbering of degrees of freedom"
+#     A common assumption is that the numbering of degrees of freedom follows the global
+#     numbering of the nodes in the grid. This is *NOT* the case in Ferrite. For more
+#     details, see the [Ferrite numbering rules](@ref "Ordering-of-Dofs").
 
 # Now that we have distributed all our dofs we can create our tangent matrix,
 # using `allocate_matrix`. This function returns a sparse matrix
@@ -208,9 +212,13 @@ K, f = assemble_global(cellvalues, K, dh);
 # To account for the boundary conditions we use the `apply!` function.
 # This modifies elements in `K` and `f` respectively, such that
 # we can get the correct solution vector `u` by using `\`.
-# Please note that the dof numbering does not follow the node numbering of the grid, i.e. `u[i]` is not the temperature of node `i`. Use `evaluate_at_grid_nodes` to get the temperatures ordered by node numbers instead.
 apply!(K, f, ch)
 u = K \ f;
+
+# !!! warning "Numbering of degrees of freedom"
+#     Once again, recall that numbering of degrees of freedom does *NOT* follow the global
+#     numbering of the nodes in the grid. Specifically, `u[i]` is *NOT* the temperature at
+#     node `i`.
 
 # ### Exporting to VTK
 # To visualize the result we export the grid and our field `u`
