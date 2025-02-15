@@ -331,6 +331,24 @@ function _add!(ch::ConstraintHandler, dbc::Dirichlet, bcfacets::AbstractVecOrSet
     return ch
 end
 
+# TODO: _local_facet_dofs_for_bc included in BCValues, but not used by periodic bc
+# Calculate which local dof index live on each facet:
+# facet `i` have dofs `local_facet_dofs[local_facet_dofs_offset[i]:local_facet_dofs_offset[i+1]-1]
+function _local_facet_dofs_for_bc(interpolation, field_dim, components, offset, boundaryfunc::F = dirichlet_facetdof_indices) where {F}
+    @assert issorted(components)
+    local_facet_dofs = Int[]
+    local_facet_dofs_offset = Int[1]
+    for (_, facet) in enumerate(boundaryfunc(interpolation))
+        for fdof in facet, d in 1:field_dim
+            if d in components
+                push!(local_facet_dofs, (fdof - 1) * field_dim + d + offset)
+            end
+        end
+        push!(local_facet_dofs_offset, length(local_facet_dofs) + 1)
+    end
+    return local_facet_dofs, local_facet_dofs_offset
+end
+
 function _add!(ch::ConstraintHandler, dbc::Dirichlet, bcnodes::AbstractVecOrSet{Int}, interpolation::Interpolation, field_dim::Int, offset::Int, bcvalue::BCValues, cellset::AbstractVecOrSet{Int} = OrderedSet{Int}(1:getncells(get_grid(ch.dh))))
     grid = get_grid(ch.dh)
     if interpolation !== geometric_interpolation(getcelltype(grid, first(cellset)))
@@ -1153,23 +1171,6 @@ function construct_cornerish(min_x::V, max_x::V) where {T, V <: Vec{3, T}}
         Vec{3, T}((max_x[1], min_x[2], max_x[3])),
         Vec{3, T}((min_x[1], max_x[2], max_x[3])),
     ]
-end
-
-# Calculate which local dof index live on each facet:
-# facet `i` have dofs `local_facet_dofs[local_facet_dofs_offset[i]:local_facet_dofs_offset[i+1]-1]
-function _local_facet_dofs_for_bc(interpolation, field_dim, components, offset, boundaryfunc::F = dirichlet_facetdof_indices) where {F}
-    @assert issorted(components)
-    local_facet_dofs = Int[]
-    local_facet_dofs_offset = Int[1]
-    for (_, facet) in enumerate(boundaryfunc(interpolation))
-        for fdof in facet, d in 1:field_dim
-            if d in components
-                push!(local_facet_dofs, (fdof - 1) * field_dim + d + offset)
-            end
-        end
-        push!(local_facet_dofs_offset, length(local_facet_dofs) + 1)
-    end
-    return local_facet_dofs, local_facet_dofs_offset
 end
 
 function mirror_local_dofs(_, _, ::Lagrange{RefLine}, ::Int)
