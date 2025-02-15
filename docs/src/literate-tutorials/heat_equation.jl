@@ -70,6 +70,11 @@ dh = DofHandler(grid)
 add!(dh, :u, ip)
 close!(dh);
 
+# !!! warning "Numbering of degrees of freedom"
+#     A common assumption is that the numbering of degrees of freedom follows the global
+#     numbering of the nodes in the grid. This is *NOT* the case in Ferrite. For more
+#     details, see the [Ferrite numbering rules](@ref "Ordering-of-Dofs").
+
 # Now that we have distributed all our dofs we can create our tangent matrix,
 # using `allocate_matrix`. This function returns a sparse matrix
 # with the correct entries stored.
@@ -209,6 +214,11 @@ K, f = assemble_global(cellvalues, K, dh);
 # we can get the correct solution vector `u` by using `\`.
 apply!(K, f, ch)
 u = K \ f;
+
+# !!! warning "Numbering of degrees of freedom"
+#     Once again, recall that numbering of degrees of freedom does *NOT* follow the global
+#     numbering of the nodes in the grid. Specifically, `u[i]` is *NOT* the temperature at
+#     node `i`.
 
 # ### Exporting to VTK
 # To visualize the result we export the grid and our field `u`
