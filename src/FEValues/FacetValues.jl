@@ -175,118 +175,68 @@ function Base.show(io::IO, d::MIME"text/plain", fv::FacetValues)
 end
 
 """
-    BCValues(func_interpol::Interpolation, geom_interpol::Interpolation, boundary_type::Union{Type{<:BoundaryIndex}})
+    BCValues(func_interpol::Interpolation, geom_interpol::Interpolation, boundary_type::Union{Type{<:BoundaryIndex}}, field_offset)
 
 `BCValues` stores the shape values at all facet/faces/edges/vertices (depending on `boundary_type`) for the geometric interpolation (`geom_interpol`),
 for each dof-position determined by the `func_interpol`. Used mainly by the `ConstraintHandler`.
 """
 mutable struct BCValues{T}
-    const M::Array{T, 3}
-    const nqp::Array{Int}
-    current_entity::Int
-end
-
-BCValues(func_interpol::Interpolation, geom_interpol::Interpolation, boundary_type::Type{<:BoundaryIndex}) =
-    BCValues(Float64, func_interpol, geom_interpol, boundary_type)
-
-function BCValues(::Type{T}, func_interpol::Interpolation{refshape}, geom_interpol::Interpolation{refshape}, boundary_type::Type{<:BoundaryIndex}) where {T, dim, refshape <: AbstractRefShape{dim}}
-    # set up quadrature rules for each boundary entity with dof-positions
-    # (determined by func_interpol) as the quadrature points
-    interpolation_coords = reference_coordinates(func_interpol)
-
-    qrs = QuadratureRule{refshape, Vector{T}, Vector{Vec{dim, T}}}[]
-    for boundarydofs in dirichlet_boundarydof_indices(boundary_type)(func_interpol)
-        dofcoords = Vec{dim, T}[]
-        for boundarydof in boundarydofs
-            push!(dofcoords, interpolation_coords[boundarydof])
-        end
-        qrf = QuadratureRule{refshape}(fill(T(NaN), length(dofcoords)), dofcoords) # weights will not be used
-        push!(qrs, qrf)
-    end
-
-    n_boundary_entities = length(qrs)
-    n_qpoints = n_boundary_entities == 0 ? 0 : maximum(qr -> length(getweights(qr)), qrs) # Bound number of qps correctly.
-    n_geom_basefuncs = getnbasefunctions(geom_interpol)
-    M = fill(zero(T) * T(NaN), n_geom_basefuncs, n_qpoints, n_boundary_entities)
-    nqp = zeros(Int, n_boundary_entities)
-
-    for n_boundary_entity in 1:n_boundary_entities
-        for (qp, ξ) in pairs(qrs[n_boundary_entity].points)
-            reference_shape_values!(@view(M[:, qp, n_boundary_entity]), geom_interpol, ξ)
-        end
-        nqp[n_boundary_entity] = length(qrs[n_boundary_entity].points)
-    end
-
-    return BCValues{T}(M, nqp, 0)
-end
-
-getnquadpoints(bcv::BCValues) = bcv.nqp[bcv.current_entity]
-function spatial_coordinate(bcv::BCValues, q_point::Int, xh::AbstractVector{Vec{dim, T}}) where {dim, T}
-    n_base_funcs = size(bcv.M, 1)
-    length(xh) == n_base_funcs || throw_incompatible_coord_length(length(xh), n_base_funcs)
-    x = zero(Vec{dim, T})
-    facet = bcv.current_entity[]
-    @inbounds for i in 1:n_base_funcs
-        x += bcv.M[i, q_point, facet] * xh[i] # geometric_value(fe_v, q_point, i) * xh[i]
-    end
-    return x
-end
-
-"""
-    BCValues2(func_interpol::Interpolation, geom_interpol::Interpolation, boundary_type::Union{Type{<:BoundaryIndex}})
-
-`BCValues2` stores the shape values at all facet/faces/edges/vertices (depending on `boundary_type`) for the geometric interpolation (`geom_interpol`),
-for each dof-position determined by the `func_interpol`. Used mainly by the `ConstraintHandler`.
-"""
-mutable struct BCValues2{T, sdim}
     const M::Vector{Matrix{T}}
     const dofs::ArrayOfVectorViews{Int, 1}
+    const field_offset::Int # Only needed for nodal dbc, could be removed if a `NodalDirichlet` is introduced.
     current_entity::Int
 end
 
-BCValues2(func_interpol::Interpolation, geom_interpol::Interpolation, boundary_type::Type{<:BoundaryIndex}) =
-    BCValues2(Float64, func_interpol, geom_interpol, boundary_type)
+function BCValues(func_interpol::Interpolation, geom_interpol::Interpolation, boundary_type::Type{<:BoundaryIndex}, field_offset)
+    return BCValues(Float64, func_interpol, geom_interpol, boundary_type, field_offset)
+end
 
-function BCValues2(
+function reinit!(bcv::BCValues, current_entity::Int)
+    return bcv.current_entity = current_entity
+end
+
+function BCValues(
         ::Type{T}, func_interpol::Interpolation{refshape}, geom_interpol::Interpolation{refshape},
         boundary_type::Type{<:BoundaryIndex}, field_offset
     ) where {T, dim, refshape <: AbstractRefShape{dim}}
 
     dof_coords = reference_coordinates(func_interpol)
     n_geom_basefuncs = getnbasefunctions(geom_interpol)
-    n_dbc_comp = n_dbc_components(func_interpolation)
+    n_dbc_comp = n_dbc_components(func_interpol)
+    ipf_base = get_base_interpolation(func_interpol)
 
     M = Matrix{T}[]
     local_facet_dofs = Int[]
     local_facet_dofs_offset = Int[1]
 
-    for boundarydofs in dirichlet_boundarydof_indices(boundary_type)(func_interpol)
+    for boundarydofs in dirichlet_boundarydof_indices(boundary_type)(ipf_base)
         ξ = [dof_coords[i] for i in boundarydofs]
         M_current = zeros(n_geom_basefuncs, length(boundarydofs))
-        for (i, boundarydof) in boundarydofs
+        for (i, boundarydof) in pairs(boundarydofs)
             ξ = dof_coords[boundarydof]
             reference_shape_values!(view(M_current, :, i), geom_interpol, ξ)
-            push!(local_facet_dofs, (boundarydof - 1) * n_dbc_comp + field_offset)
+            push!(local_facet_dofs, 1 + (boundarydof - 1) * n_dbc_comp + field_offset)
         end
         push!(M, M_current)
         push!(local_facet_dofs_offset, length(local_facet_dofs) + 1)
     end
-    dofs = ArrayOfVectorViews(local_facet_dofs, local_facet_dofs_offset, 1:(length(local_facet_dofs_offset) - 1))
+    dofs = ArrayOfVectorViews(local_facet_dofs_offset, local_facet_dofs, LinearIndices(1:(length(local_facet_dofs_offset) - 1)))
 
-    return BCValues2{T}(M, x, dofs, 1)
+    return BCValues{T}(M, dofs, field_offset, 1)
 end
 
-get_dof_locations(bcv::BCValues2) = 1:size(bcv.M[bcv.current_entity], 2)
+get_dof_locations(bcv::BCValues) = 1:size(bcv.M[bcv.current_entity], 2)
 
-function spatial_coordinate(bcv::BCValues2, dof_location_nr::Int, xh::AbstractVector{Vec{dim, T}}) where {dim, T}
-    n_base_funcs = size(bcv.M, 1)
-    (checkbounds(xh, 1:n_base_funcs) && length(xh) == n_base_funcs) || throw_incompatible_coord_length(length(xh), n_base_funcs)
-    x = zero(Vec{dim, T})
+function spatial_coordinate(bcv::BCValues, dof_location_nr::Int, xh::AbstractVector{Vec{dim, T}}) where {dim, T}
     M = bcv.M[bcv.current_entity]
+    n_base_funcs = size(M, 1)
+    (checkbounds(Bool, xh, 1:n_base_funcs) && length(xh) == n_base_funcs) || throw_incompatible_coord_length(length(xh), n_base_funcs)
+
+    x = zero(Vec{dim, T})
     @inbounds for i in 1:n_base_funcs
         x += M[i, dof_location_nr] * xh[i]
     end
     return x
 end
 
-get_local_dof(bcv::BCValues2, location::Int, component) = bcv.dofs[bcv.current_entity][location] + component - 1
+get_local_dof(bcv::BCValues, location::Int, component) = bcv.dofs[bcv.current_entity][location] + component - 1
