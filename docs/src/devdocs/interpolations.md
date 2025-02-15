@@ -59,7 +59,8 @@ Ferrite.shape_value_type(ip::Interpolation, ::Type{T}) where T<:Number
 ## [How to implement a new interpolation, `QTI`](@id devdocs-howto_new-interpolation)
 As an example, we will implement a `Q`uadratic `T`riangle `I`nterpolation
 (`QTI`), corresponding to `Lagrange{RefTriangle, 2}()`. This is described
-in the devdocs as the API is not considered fully stable yet.
+in the devdocs as the API is not considered fully stable yet. Since this interpolation
+gives scalar-valued shape functions, it is a subtype of `ScalarInterpolation`,
 
 ```@example InterpolationExample
 using Ferrite # hide
@@ -169,6 +170,10 @@ dof per edge, we don't need to adjust these, hence,
 ```@example InterpolationExample
 Ferrite.adjust_dofs_during_distribution(::QTI) = false
 ```
+
+!!! tip
+    The function `test_interpolation_properties` in `test/test_interpolations.jl`
+    can be used when implementation to check that some basic properties are fullfilled.
 
 ```@example InterpolationExample
 grid = generate_grid(Triangle, (2,2))                       # hide
