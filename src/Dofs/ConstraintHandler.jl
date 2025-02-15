@@ -1924,7 +1924,7 @@ function integrate_weak_dbc!(Kᶠ, fᶠ, bc_fun, fv, shape_nrs, cell_coords, tim
     return integrate_weak_dbc!(function_space(fv), Kᶠ, fᶠ, bc_fun, fv, shape_nrs, cell_coords, time)
 end
 
-function integrate_weak_dbc!(::Val{:Hdiv}, Kᶠ, fᶠ, bc_fun, fv, shape_nrs, cell_coords, time)
+function integrate_weak_dbc!(::FunctionSpace{:Hdiv}, Kᶠ, fᶠ, bc_fun, fv, shape_nrs, cell_coords, time)
     for q_point in 1:getnquadpoints(fv)
         dΓ = getdetJdV(fv, q_point)
         n = getnormal(fv, q_point)
@@ -1942,7 +1942,7 @@ function integrate_weak_dbc!(::Val{:Hdiv}, Kᶠ, fᶠ, bc_fun, fv, shape_nrs, ce
     return
 end
 
-function integrate_weak_dbc!(::Val{:Hcurl}, Kᶠ, fᶠ, bc_fun, fv, shape_nrs, cell_coords, time)
+function integrate_weak_dbc!(::FunctionSpace{:Hcurl}, Kᶠ, fᶠ, bc_fun, fv, shape_nrs, cell_coords, time)
     for q_point in 1:getnquadpoints(fv)
         dΓ = getdetJdV(fv, q_point)
         n = getnormal(fv, q_point)
@@ -1960,7 +1960,7 @@ function integrate_weak_dbc!(::Val{:Hcurl}, Kᶠ, fᶠ, bc_fun, fv, shape_nrs, c
     return
 end
 
-function integrate_weak_dbc!(::Union{Val{:H1}, Val{:L2}}, Kᶠ, fᶠ, bc_fun, fv, shape_nrs, cell_coords, time)
+function integrate_weak_dbc!(::Union{FunctionSpace{:H1}, FunctionSpace{:L2}}, args...)
     ip_str = sprint(show, function_interpolation(fv))
     throw(ArgumentError("WeakDirichlet is not defined for H¹ and L2 function spaces ($ip_str)"))
 end
