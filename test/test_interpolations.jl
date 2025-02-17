@@ -64,7 +64,7 @@ function test_interpolation_properties(ip::Interpolation{RefShape, FunOrder}) wh
 
         # Test that property functions are defined, runs, and, if possible, give expected type
         Ferrite.mapping_type(ip) # Dry-run just to catch if it isn't defined
-        @test Ferrite.function_space(ip) isa Ferrite.FunctionSpace
+        @test Ferrite.function_space(ip) isa Ferrite.Conformity
     end
 end
 
@@ -373,7 +373,7 @@ end
         end
 
         # 2D, H(div) -> facet
-        function test_interpolation_functionals(::Ferrite.FunctionSpace{:Hdiv}, ::Val{2}, ip::Interpolation)
+        function test_interpolation_functionals(::Ferrite.Conformity{:Hdiv}, ::Val{2}, ip::Interpolation)
             RefShape = getrefshape(ip)
             ipg = Lagrange{RefShape, 1}()
             for facetnr in 1:nfacets(RefShape)
@@ -397,7 +397,7 @@ end
             end
         end
 
-        function test_interpolation_functionals(::Ferrite.FunctionSpace{:Hcurl}, ::Val{2}, ip::Interpolation)
+        function test_interpolation_functionals(::Ferrite.Conformity{:Hcurl}, ::Val{2}, ip::Interpolation)
             RefShape = getrefshape(ip)
             ipg = Lagrange{RefShape, 1}()
             for edgenr in 1:Ferrite.nedges(RefShape)
