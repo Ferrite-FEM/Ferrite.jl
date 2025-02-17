@@ -430,7 +430,7 @@ end
         cell_type(::Type{RefQuadrilateral}) = Quadrilateral
         cell_type(::Type{RefTetrahedron}) = Tetrahedron
         cell_type(::Type{RefHexahedron}) = Hexahedron
-        function _setup_dh_fv_for_bc_test(ip; nel = 2, qr_order = 4)
+        function _setup_dh_fv_for_bc_test(ip; nel = 2, qr_order = 6)
             RefShape = Ferrite.getrefshape(ip)
             CT = cell_type(RefShape)
             dim = Ferrite.getrefdim(CT) # dim=sdim=vdim
@@ -470,8 +470,11 @@ end
             for ip in Hdiv_interpolations
                 @testset "$ip" begin
                     dh, fv = _setup_dh_fv_for_bc_test(ip)
+                    nexp = 4 * Ferrite.getorder(ip) - 1
                     linear_x1(x, _, _) = x[1]
-                    for f_bc in (Returns(0.0), Returns(1.0), linear_x1)
+                    nonlinear(x, _, _) = 100 * (x[1] - 0.3)^nexp
+                    funs = [Returns(0.0), Returns(1.0), linear_x1, nonlinear]
+                    for f_bc in funs
                         @testset "f_bc = $f_bc" begin
                             for facetset in values(dh.grid.facetsets)
                                 test_bc_integral(f_bc, ⋅, dh, facetset, fv)
@@ -490,7 +493,11 @@ end
                     @assert dim == 2 # 3d not supported yet
                     v3 = rand()
                     linear_x1(x, _, _) = x[1] * Vec((0.0, 0.0, v3))
-                    for f_bc in (Returns(zero(Vec{3})), Returns(Vec((0.0, 0.0, rand()))), linear_x1)
+                    quadratic_x1(x, _, _) = Vec((0.0, 0.0, v3)) * (10000 * (x[1] - 0.3)^3)
+                    nexp = 4 * Ferrite.getorder(ip) - 1
+                    nonlinear(x, _, _) = Vec((0.0, 0.0, v3)) * (1.0e8 * (x[1] - 0.3)^nexp)
+                    funs = [Returns(zero(Vec{3})), Returns(Vec((0.0, 0.0, rand()))), linear_x1, nonlinear]
+                    for f_bc in funs
                         @testset "f_bc = $f_bc" begin
                             for facetset in values(dh.grid.facetsets)
                                 test_bc_integral(f_bc, ×, dh, facetset, fv)
