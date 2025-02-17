@@ -64,7 +64,7 @@ end
 @doc raw"""
     WeakDirichlet(field_name::Symbol, facets, f::Function; qr_order = -1)
 
-An `WeakDirichlet` conditions enforces conditions for `field_name` on the boundary for
+A `WeakDirichlet` condition enforces conditions for `field_name` on the boundary for
 non-nodal interpolations (e.g. ``H(\mathrm{div})`` or ``H(\mathrm{curl})``) in an weak sense.
 
 # ``H(\mathrm{div})`` interpolations
@@ -135,7 +135,7 @@ A collection of constraints associated with the dof handler `dh`.
 """
 mutable struct ConstraintHandler{DH <: AbstractDofHandler, T}
     const dbcs::Vector{Dirichlet}
-    const idbcs::Vector{WeakDirichlet}
+    const wdbcs::Vector{WeakDirichlet}
     const prescribed_dofs::Vector{Int}
     const free_dofs::Vector{Int}
     const inhomogeneities::Vector{T}
@@ -1857,7 +1857,7 @@ function add!(ch::ConstraintHandler, dbc::WeakDirichlet)
 
         dbc_added = true
     end
-    dbc_added || error("No overlap between dbc::Dirichlet and fields in the ConstraintHandler's DofHandler")
+    dbc_added || error("No overlap between dbc::WeakDirichlet and fields in the ConstraintHandler's DofHandler")
     return ch
 end
 
