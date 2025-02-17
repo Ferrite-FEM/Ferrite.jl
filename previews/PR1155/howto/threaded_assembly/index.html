@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/><title>Multi-threaded assembly · Ferrite.jl</title><meta name="title" content="Multi-threaded assembly · Ferrite.jl"/><meta property="og:title" content="Multi-threaded assembly · Ferrite.jl"/><meta property="twitter:title" content="Multi-threaded assembly · Ferrite.jl"/><meta name="description" content="Documentation for Ferrite.jl."/><meta property="og:description" content="Documentation for Ferrite.jl."/><meta property="twitter:description" content="Documentation for Ferrite.jl."/><meta property="og:url" content="https://ferrite-fem.github.io/Ferrite.jl/stable/howto/threaded_assembly/"/><meta property="twitter:url" content="https://ferrite-fem.github.io/Ferrite.jl/stable/howto/threaded_assembly/"/><link rel="canonical" href="https://ferrite-fem.github.io/Ferrite.jl/stable/howto/threaded_assembly/"/><script data-outdated-warner src="../../assets/warner.js"></script><link href="https://cdnjs.cloudflare.com/ajax/libs/lato-font/3.0.0/css/lato-font.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/juliamono/0.050/juliamono.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/fontawesome.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/solid.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/brands.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.8/katex.min.css" rel="stylesheet" type="text/css"/><script>documenterBaseURL="../.."</script><script src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.6/require.min.js" data-main="../../assets/documenter.js"></script><script src="../../search_index.js"></script><script src="../../siteinfo.js"></script><script src="../../../versions.js"></script><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/catppuccin-mocha.css" data-theme-name="catppuccin-mocha"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/catppuccin-macchiato.css" data-theme-name="catppuccin-macchiato"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/catppuccin-frappe.css" data-theme-name="catppuccin-frappe"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/catppuccin-latte.css" data-theme-name="catppuccin-latte"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/documenter-dark.css" data-theme-name="documenter-dark" data-theme-primary-dark/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/documenter-light.css" data-theme-name="documenter-light" data-theme-primary/><script src="../../assets/themeswap.js"></script><link href="../../assets/custom.css" rel="stylesheet" type="text/css"/><link href="../../assets/citations.css" rel="stylesheet" type="text/css"/><link href="../../assets/favicon.ico" rel="icon" type="image/x-icon"/></head><body><div id="documenter"><nav class="docs-sidebar"><a class="docs-logo" href="../../"><img src="../../assets/logo.svg" alt="Ferrite.jl logo"/></a><div class="docs-package-name"><span class="docs-autofit"><a href="../../">Ferrite.jl</a></span></div><button class="docs-search-query input is-rounded is-small is-clickable my-2 mx-auto py-1 px-2" id="documenter-search-query">Search docs (Ctrl + /)</button><ul class="docs-menu"><li><a class="tocitem" href="../../">Home</a></li><li><input class="collapse-toggle" id="menuitem-3" type="checkbox"/><label class="tocitem" for="menuitem-3"><span class="docs-label">Tutorials</span><i class="docs-chevron"></i></label><ul class="collapsed"><li><a class="tocitem" href="../../tutorials/">Tutorials overview</a></li><li><a class="tocitem" href="../../tutorials/heat_equation/">Heat equation</a></li><li><a class="tocitem" href="../../tutorials/linear_elasticity/">Linear elasticity</a></li><li><a class="tocitem" href="../../tutorials/incompressible_elasticity/">Incompressible elasticity</a></li><li><a class="tocitem" href="../../tutorials/hyperelasticity/">Hyperelasticity</a></li><li><a class="tocitem" href="../../tutorials/plasticity/">Von Mises plasticity</a></li><li><a class="tocitem" href="../../tutorials/transient_heat_equation/">Transient heat equation</a></li><li><a class="tocitem" href="../../tutorials/computational_homogenization/">Computational homogenization</a></li><li><a class="tocitem" href="../../tutorials/stokes-flow/">Stokes flow</a></li><li><a class="tocitem" href="../../tutorials/porous_media/">Porous media</a></li><li><a class="tocitem" href="../../tutorials/ns_vs_diffeq/">Incompressible Navier-Stokes equations via DifferentialEquations.jl</a></li><li><a class="tocitem" href="../../tutorials/reactive_surface/">Reactive surface</a></li><li><a class="tocitem" href="../../tutorials/linear_shell/">Linear shell</a></li><li><a class="tocitem" href="../../tutorials/dg_heat_equation/">Discontinuous Galerkin heat equation</a></li></ul></li><li><input class="collapse-toggle" id="menuitem-4" type="checkbox"/><label class="tocitem" for="menuitem-4"><span class="docs-label">Topic guides</span><i class="docs-chevron"></i></label><ul class="collapsed"><li><a class="tocitem" href="../../topics/">Topic guide overview</a></li><li><a class="tocitem" href="../../topics/fe_intro/">Introduction to FEM</a></li><li><a class="tocitem" href="../../topics/reference_shapes/">Reference shapes</a></li><li><a class="tocitem" href="../../topics/FEValues/">FEValues</a></li><li><a class="tocitem" href="../../topics/degrees_of_freedom/">Degrees of Freedom</a></li><li><a class="tocitem" href="../../topics/sparse_matrix/">Sparsity pattern and sparse matrices</a></li><li><a class="tocitem" href="../../topics/assembly/">Assembly</a></li><li><a class="tocitem" href="../../topics/boundary_conditions/">Boundary and initial conditions</a></li><li><a class="tocitem" href="../../topics/constraints/">Affine constraints</a></li><li><a class="tocitem" href="../../topics/grid/">Grid</a></li><li><a class="tocitem" href="../../topics/export/">Export</a></li></ul></li><li><input class="collapse-toggle" id="menuitem-5" type="checkbox"/><label class="tocitem" for="menuitem-5"><span class="docs-label">API reference</span><i class="docs-chevron"></i></label><ul class="collapsed"><li><a class="tocitem" href="../../reference/">Reference overview</a></li><li><a class="tocitem" href="../../reference/quadrature/">Quadrature</a></li><li><a class="tocitem" href="../../reference/interpolations/">Interpolation</a></li><li><a class="tocitem" href="../../reference/fevalues/">FEValues</a></li><li><a class="tocitem" href="../../reference/dofhandler/">Degrees of Freedom</a></li><li><a class="tocitem" href="../../reference/sparsity_pattern/">Sparsity pattern and sparse matrices</a></li><li><a class="tocitem" href="../../reference/assembly/">Assembly</a></li><li><a class="tocitem" href="../../reference/boundary_conditions/">Boundary conditions</a></li><li><a class="tocitem" href="../../reference/grid/">Grid &amp; AbstractGrid</a></li><li><a class="tocitem" href="../../reference/export/">Postprocessing</a></li><li><a class="tocitem" href="../../reference/utils/">Development utility functions</a></li></ul></li><li><input class="collapse-toggle" id="menuitem-6" type="checkbox" checked/><label class="tocitem" for="menuitem-6"><span class="docs-label">How-to guides</span><i class="docs-chevron"></i></label><ul class="collapsed"><li><a class="tocitem" href="../">How-to guide overview</a></li><li><a class="tocitem" href="../postprocessing/">Post processing and visualization</a></li><li class="is-active"><a class="tocitem" href>Multi-threaded assembly</a><ul class="internal"><li><a class="tocitem" href="#Introduction"><span>Introduction</span></a></li><li><a class="tocitem" href="#Grid-coloring"><span>Grid coloring</span></a></li><li><a class="tocitem" href="#Multithreaded-assembly-of-a-cantilever-beam-in-3D"><span>Multithreaded assembly of a cantilever beam in 3D</span></a></li><li><a class="tocitem" href="#threaded_assembly-plain-program"><span>Plain program</span></a></li></ul></li></ul></li><br><li><a class="tocitem" href="../../gallery/">Code gallery</a></li><li><a class="tocitem" href="../../devdocs/">Developer documentation</a></li><li><a class="tocitem" href="../../cited-literature/">Cited literature</a></li></ul><div class="docs-version-selector field has-addons"><div class="control"><span class="docs-label button is-static is-size-7">Version</span></div><div class="docs-selector control is-expanded"><div class="select is-fullwidth is-size-7"><select id="documenter-version-selector"></select></div></div></div></nav><div class="docs-main"><header class="docs-navbar"><a class="docs-sidebar-button docs-navbar-link fa-solid fa-bars is-hidden-desktop" id="documenter-sidebar-button" href="#"></a><nav class="breadcrumb"><ul class="is-hidden-mobile"><li><a class="is-disabled">How-to guides</a></li><li class="is-active"><a href>Multi-threaded assembly</a></li></ul><ul class="is-hidden-tablet"><li class="is-active"><a href>Multi-threaded assembly</a></li></ul></nav><div class="docs-right"><a class="docs-navbar-link" href="https://github.com/Ferrite-FEM/Ferrite.jl" title="View the repository on GitHub"><span class="docs-icon fa-brands"></span><span class="docs-label is-hidden-touch">GitHub</span></a><a class="docs-navbar-link" href="https://github.com/Ferrite-FEM/Ferrite.jl/blob/master/docs/src/literate-howto/threaded_assembly.jl" title="Edit source on GitHub"><span class="docs-icon fa-solid"></span></a><a class="docs-settings-button docs-navbar-link fa-solid fa-gear" id="documenter-settings-button" href="#" title="Settings"></a><a class="docs-article-toggle-button fa-solid fa-chevron-up" id="documenter-article-toggle-button" href="javascript:;" title="Collapse all docstrings"></a></div></header><article class="content" id="documenter-page"><h1 id="tutorial-threaded-assembly"><a class="docs-heading-anchor" href="#tutorial-threaded-assembly">Multi-threaded assembly</a><a id="tutorial-threaded-assembly-1"></a><a class="docs-heading-anchor-permalink" href="#tutorial-threaded-assembly" title="Permalink"></a></h1><div class="admonition is-success"><header class="admonition-header">Tip</header><div class="admonition-body"><p>This example is also available as a Jupyter notebook: <a href="https://nbviewer.jupyter.org/github/Ferrite-FEM/Ferrite.jl/blob/gh-pages/previews/PR1155/howto/threaded_assembly.ipynb"><code>threaded_assembly.ipynb</code></a>.</p></div></div><h2 id="Introduction"><a class="docs-heading-anchor" href="#Introduction">Introduction</a><a id="Introduction-1"></a><a class="docs-heading-anchor-permalink" href="#Introduction" title="Permalink"></a></h2><p>In this howto we will explore how to use task based multithreading (shared memory parallelism) to speed up the analysis. Some parts of a finite element simulation are trivially parallelizable such as the computation of the local element contributions since each element can be processed independently. However, two things need to be considered in order to parallelize safely:</p><ul><li><strong>Modification of shared data</strong>: Although the contributions from all the elements can be computed independently, eventually they need to be assembled into the global matrix and vector. Letting each task assemble their own contribution would lead to race conditions since elements share degrees of freedom with each other. There are various ways to remedy this, for example:<ul><li><strong>Locking</strong>: By using a lock around the call to <code>assemble!</code> we can ensure that only one task assembles at a time. This is simple to implement but can lead to lock contention and thus poor performance. Another drawback is that the results will not be deterministic since floating point operations are neither associative nor commutative.</li><li><strong>Assembler task</strong>: By using a designated task for the assembling we (obviously) ensure that only a single task assembles. The worker tasks (the tasks computing the element contributions) would then hand off their results to the assemly task. This can be a useful approach if computing the element contributions is much slower than the assembly – otherwise the assembler task can&#39;t keep up with the worker tasks. There might also be some extra overhead because of task switching in the scheduler. The problem with non-deterministic results still remains.</li><li><strong>Grid coloring</strong>: By &quot;coloring&quot; the grid such that, within each color, no two elements share degrees of freedom, we can safely assemble each color in parallel. Even if concurrently running tasks will write to the global matrix and vector they will not write to the same memory locations. Note also that this procedure gives predictable results because for a memory location which, for example, a &quot;red&quot;, a &quot;blue&quot;, and a &quot;green&quot; element will contribute to we will always add the red first, then the blue, and finally the green.</li></ul></li><li><strong>Scratch data</strong>: In order to speed up the computation of the element contributions we typically pre-allocate some data structures that can be reused for every element. Such scratch data include, for example, the local matrix and vector, and the CellValues. Each task need their own copy of the scratch data since they will be modified for each element.</li></ul><h2 id="Grid-coloring"><a class="docs-heading-anchor" href="#Grid-coloring">Grid coloring</a><a id="Grid-coloring-1"></a><a class="docs-heading-anchor-permalink" href="#Grid-coloring" title="Permalink"></a></h2><p>Ferrite include functionality to color the grid with the <a href="../../reference/grid/#Ferrite.create_coloring"><code>create_coloring</code></a> function. Here we create a simple 2D grid, color it, and export the colors to a VTK file to visualize the result (see <em>Figure 1</em>.). Note that no cells with the same color has any shared nodes (dofs). This means that it is safe to assemble in parallel as long as we only assemble one color at a time.</p><p>There are two coloring algorithms implemented: the &quot;workstream&quot; algorithm (from Turcksin et al. [<a href="../../cited-literature/#Turcksin2016">11</a>]) and a &quot;greedy&quot; algorithm. For this structured grid the greedy algorithm uses fewer colors, but both algorithms result in colors that contain roughly the same number of elements. The workstream algorithm is the default one since it in general results in more balanced colors. For unstructured grids the greedy algorithm can result in colors with very few elements, for example.</p><pre><code class="language-julia hljs">using Ferrite, SparseArrays
+
+function create_example_2d_grid()
+    grid = generate_grid(Quadrilateral, (10, 10), Vec{2}((0.0, 0.0)), Vec{2}((10.0, 10.0)))
+    colors_workstream = create_coloring(grid; alg = ColoringAlgorithm.WorkStream)
+    colors_greedy = create_coloring(grid; alg = ColoringAlgorithm.Greedy)
+    VTKGridFile(&quot;colored&quot;, grid) do vtk
+        Ferrite.write_cell_colors(vtk, grid, colors_workstream, &quot;workstream-coloring&quot;)
+        Ferrite.write_cell_colors(vtk, grid, colors_greedy, &quot;greedy-coloring&quot;)
+    end
+    return
+end
+
+create_example_2d_grid()</code></pre><p><img src="../coloring.png" alt/></p><p><em>Figure 1</em>: Element coloring using the &quot;workstream&quot;-algorithm (left) and the &quot;greedy&quot;- algorithm (right).</p><h2 id="Multithreaded-assembly-of-a-cantilever-beam-in-3D"><a class="docs-heading-anchor" href="#Multithreaded-assembly-of-a-cantilever-beam-in-3D">Multithreaded assembly of a cantilever beam in 3D</a><a id="Multithreaded-assembly-of-a-cantilever-beam-in-3D-1"></a><a class="docs-heading-anchor-permalink" href="#Multithreaded-assembly-of-a-cantilever-beam-in-3D" title="Permalink"></a></h2><p>We will now look at an example where we assemble the stiffness matrix and right hand side using multiple threads. The problem setup is a cantilever beam in 3D with a linear elastic material behavior. For this exercise we only focus on the multithreading and are not bothered with boundary conditions. For more details refer to the <a href="../../tutorials/linear_elasticity/">tutorial on linear elasticity</a>.</p><h3 id="Setup"><a class="docs-heading-anchor" href="#Setup">Setup</a><a id="Setup-1"></a><a class="docs-heading-anchor-permalink" href="#Setup" title="Permalink"></a></h3><p>We define the element routine, material stiffness, grid and DofHandler just like in the <a href="../../tutorials/linear_elasticity/">tutorial on linear elasticity</a> without discussing it further here.</p><pre><code class="language-julia hljs"># Element routine
+function assemble_cell!(Ke::Matrix, fe::Vector, cellvalues::CellValues, C::SymmetricTensor, b::Vec)
+    fill!(Ke, 0)
+    fill!(fe, 0)
+    for q_point in 1:getnquadpoints(cellvalues)
+        dΩ = getdetJdV(cellvalues, q_point)
+        for i in 1:getnbasefunctions(cellvalues)
+            δui = shape_value(cellvalues, q_point, i)
+            fe[i] += (δui ⋅ b) * dΩ
+            ∇δui = shape_symmetric_gradient(cellvalues, q_point, i)
+            for j in 1:getnbasefunctions(cellvalues)
+                ∇uj = shape_symmetric_gradient(cellvalues, q_point, j)
+                Ke[i, j] += (∇δui ⊡ C ⊡ ∇uj) * dΩ
+            end
+        end
+    end
+    return Ke, fe
+end
+
+# Material stiffness
+function create_material_stiffness()
+    E = 200.0e9
+    ν = 0.3
+    λ = E * ν / ((1 + ν) * (1 - 2ν))
+    μ = E / (2(1 + ν))
+    δ(i, j) = i == j ? 1.0 : 0.0
+    C = SymmetricTensor{4, 3}() do i, j, k, l
+        return λ * δ(i, j) * δ(k, l) + μ * (δ(i, k) * δ(j, l) + δ(i, l) * δ(j, k))
+    end
+    return C
+end
+
+# Grid and grid coloring
+function create_cantilever_grid(n::Int)
+    xmin = Vec{3}((0.0, 0.0, 0.0))
+    xmax = Vec{3}((10.0, 1.0, 1.0))
+    grid = generate_grid(Hexahedron, (10 * n, n, n), xmin, xmax)
+    colors = create_coloring(grid)
+    return grid, colors
+end
+
+# DofHandler with displacement field u
+function create_dofhandler(grid::Grid, interpolation::VectorInterpolation)
+    dh = DofHandler(grid)
+    add!(dh, :u, interpolation)
+    close!(dh)
+    return dh
+end</code></pre><h3 id="Task-local-scratch-data"><a class="docs-heading-anchor" href="#Task-local-scratch-data">Task local scratch data</a><a id="Task-local-scratch-data-1"></a><a class="docs-heading-anchor-permalink" href="#Task-local-scratch-data" title="Permalink"></a></h3><p>We group everything that needs to be duplicated for each task in the struct <code>ScratchData</code>:</p><ul><li><code>cell_cache::CellCache</code>: contain buffers for coordinates and (global) dofs which will be <code>reinit!</code>ed for each cell.</li><li><code>cellvalues::CellValues</code>: the cell values which will be <code>reinit!</code>ed for each cell using the <code>cell_cache</code></li><li><code>Ke::Matrix</code>: the local matrix</li><li><code>fe::Vector</code>: the local vector</li><li><code>assembler</code>: the assembler (which needs to be duplicated because it contains buffers that are modified during the call to <code>assemble!</code>)</li></ul><pre><code class="language-julia hljs">struct ScratchData{CC, CV, T, A}
+    cell_cache::CC
+    cellvalues::CV
+    Ke::Matrix{T}
+    fe::Vector{T}
+    assembler::A
+end</code></pre><p>This constructor will be called within each task to create a independent <code>ScratchData</code> object. For <code>cell_cache</code>, <code>Ke</code>, and <code>fe</code> we simply call the constructors to allocate independent objects. For <code>cellvalues</code> we use <code>copy</code> which Ferrite defines for this purpose. Finally, for the assembler we call <code>start_assemble</code> to create a new assembler but note that we set <code>fillzero = false</code> because we don&#39;t want to risk that a task that starts a bit later will zero out data that another task have already assembled.</p><pre><code class="language-julia hljs">function ScratchData(dh::DofHandler, K::SparseMatrixCSC, f::Vector, cellvalues::CellValues)
+    cell_cache = CellCache(dh)
+    n = ndofs_per_cell(dh)
+    Ke = zeros(n, n)
+    fe = zeros(n)
+    asm = start_assemble(K, f; fillzero = false)
+    return ScratchData(cell_cache, copy(cellvalues), Ke, fe, asm)
+end</code></pre><h3 id="Global-assembly-routine"><a class="docs-heading-anchor" href="#Global-assembly-routine">Global assembly routine</a><a id="Global-assembly-routine-1"></a><a class="docs-heading-anchor-permalink" href="#Global-assembly-routine" title="Permalink"></a></h3><p>Finally we define the global assemble routine, which is where the parallelization happens. The main difference from all previous <code>assemble_global!</code> functions is that we now have an outer loop over the colors, and then the inner loop over the cells in each color, which can be parallelized.</p><p>For the scheduling of parallel tasks we use the <a href="https://github.com/JuliaFolds2/OhMyThreads.jl">OhMyThreads.jl</a> package. OhMyThreads provides a macro based and a functional API. Here we use the macro based API because it is slightly more convenient when using task local values since they can be defined with the <code>@local</code> macro.</p><div class="admonition is-info"><header class="admonition-header">Schedulers and load balancing</header><div class="admonition-body"><p>OhMyThreads provides a number of different <a href="https://juliafolds2.github.io/OhMyThreads.jl/stable/refs/api/#Schedulers">schedulers</a>. In this example we use the <code>DynamicScheduler</code> (which is the default one). The <code>DynamicScheduler</code> will spawn <code>ntasks</code> tasks where each task will process a chunk of (roughly) equal number of cells (i.e. <code>length(color) ÷ ntasks</code>). This should be a good choice for this example because we expect all cells to take the same time to process and we don&#39;t need any load balancing.</p><p>For a different problem setup where some cells might take longer to process (perhaps they experience plastic deformation and we need to solve a local problem) we might benefit from load balancing. The <code>DynamicScheduler</code> can be used also for load balancing by specifiying <code>nchunks</code> or <code>chunksize</code>. However, the <code>DynamicScheduler</code> will always spawn <code>nchunks</code> tasks which can become costly since we are allocating scratch data for every task. To limit the number of tasks, while allowing for more than <code>ntasks</code> chunks, we can use the <code>GreedyScheduler</code> <em>with chunking</em>. For example, <code>scheduler = OhMyThreads.GreedyScheduler(; ntasks = ntasks, nchunks = 10 * ntasks)</code> will split the work into <code>10 * ntasks</code> chunks and spawn <code>ntasks</code> tasks to process them. Refer to the <a href="https://juliafolds2.github.io/OhMyThreads.jl/stable/">OhMyThreads documentation</a> for details.</p></div></div><pre><code class="language-julia hljs">using OhMyThreads, TaskLocalValues
+
+function assemble_global!(
+        K::SparseMatrixCSC, f::Vector, dh::DofHandler, colors,
+        cellvalues_template::CellValues; ntasks = Threads.nthreads()
+    )
+    # Zero-out existing data in K and f
+    _ = start_assemble(K, f)
+    # Body force and material stiffness
+    b = Vec{3}((0.0, 0.0, -1.0))
+    C = create_material_stiffness()
+    # Loop over the colors
+    for color in colors
+        # Dynamic scheduler spawning `ntasks` tasks where each task will process a chunk of
+        # (roughly) equal number of cells (`length(color) ÷ ntasks`).
+        scheduler = OhMyThreads.DynamicScheduler(; ntasks)
+        # Parallelize the loop over the cells in this color
+        OhMyThreads.@tasks for cellidx in color
+            # Tell the @tasks loop to use the scheduler defined above
+            @set scheduler = scheduler
+            # Obtain a task local scratch and unpack it
+            @local scratch = ScratchData(dh, K, f, cellvalues_template)
+            (; cell_cache, cellvalues, Ke, fe, assembler) = scratch
+            # Reinitialize the cell cache and then the cellvalues
+            reinit!(cell_cache, cellidx)
+            reinit!(cellvalues, cell_cache)
+            # Compute the local contribution of the cell
+            assemble_cell!(Ke, fe, cellvalues, C, b)
+            # Assemble local contribution
+            assemble!(assembler, celldofs(cell_cache), Ke, fe)
+        end
+    end
+    return K, f
+end</code></pre><details class="admonition is-details"><summary class="admonition-header">OhMyThreads functional API: OhMyThreads.tforeach</summary><div class="admonition-body"><p>The <code>OhMyThreads.@tasks</code> block above corresponds to a call to <code>OhMyThreads.tforeach</code>. Using the functional API directly would look like below. The main difference is that we need to manually create a <code>TaskLocalValue</code> for the scratch data.</p><pre><code class="language-julia hljs"># using TaskLocalValues
+scratches = TaskLocalValue() do
+    ScratchData(dh, K, f, cellvalues)
+end
+OhMyThreads.tforeach(color; scheduler) do cellidx
+    # Obtain a task local scratch and unpack it
+    scratch = scratches[]
+    (; cell_cache, cellvalues, Ke, fe, assembler) = scratch
+    # Reinitialize the cell cache and then the cellvalues
+    reinit!(cell_cache, cellidx)
+    reinit!(cellvalues, cell_cache)
+    # Compute the local contribution of the cell
+    assemble_cell!(Ke, fe, cellvalues, C, b)
+    # Assemble local contribution
+    assemble!(assembler, celldofs(cell_cache), Ke, fe)
+end</code></pre></div></details><p>We define the main function to setup everything and then time the call to <code>assemble_global!</code>.</p><pre><code class="language-julia hljs">function main(; n = 20, ntasks = Threads.nthreads())
+    # Interpolation, quadrature and cellvalues
+    interpolation = Lagrange{RefHexahedron, 1}()^3
+    quadrature = QuadratureRule{RefHexahedron}(2)
+    cellvalues = CellValues(quadrature, interpolation)
+    # Grid, colors and DofHandler
+    grid, colors = create_cantilever_grid(n)
+    dh = create_dofhandler(grid, interpolation)
+    # Global matrix and vector
+    K = allocate_matrix(dh)
+    f = zeros(ndofs(dh))
+    # Compile it
+    assemble_global!(K, f, dh, colors, cellvalues; ntasks = ntasks)
+    # Time it
+    @time assemble_global!(K, f, dh, colors, cellvalues; ntasks = ntasks)
+    return
+end</code></pre><p>On a machine with 4 cores, starting julia with <code>--threads=auto</code>, we obtain the following timings:</p><pre><code class="language-julia hljs">main(; ntasks = 1) # 1.970784 seconds (902 allocations: 816.172 KiB)
+main(; ntasks = 2) # 1.025065 seconds (1.64 k allocations: 1.564 MiB)
+main(; ntasks = 3) # 0.700423 seconds (2.38 k allocations: 2.332 MiB)
+main(; ntasks = 4) # 0.548356 seconds (3.12 k allocations: 3.099 MiB)</code></pre><h2 id="threaded_assembly-plain-program"><a class="docs-heading-anchor" href="#threaded_assembly-plain-program">Plain program</a><a id="threaded_assembly-plain-program-1"></a><a class="docs-heading-anchor-permalink" href="#threaded_assembly-plain-program" title="Permalink"></a></h2><p>Here follows a version of the program without any comments. The file is also available here: <a href="../threaded_assembly.jl"><code>threaded_assembly.jl</code></a>.</p><pre><code class="language-julia hljs">using Ferrite, SparseArrays
+
+function create_example_2d_grid()
+    grid = generate_grid(Quadrilateral, (10, 10), Vec{2}((0.0, 0.0)), Vec{2}((10.0, 10.0)))
+    colors_workstream = create_coloring(grid; alg = ColoringAlgorithm.WorkStream)
+    colors_greedy = create_coloring(grid; alg = ColoringAlgorithm.Greedy)
+    VTKGridFile(&quot;colored&quot;, grid) do vtk
+        Ferrite.write_cell_colors(vtk, grid, colors_workstream, &quot;workstream-coloring&quot;)
+        Ferrite.write_cell_colors(vtk, grid, colors_greedy, &quot;greedy-coloring&quot;)
+    end
+    return
+end
+
+create_example_2d_grid()
+
+# Element routine
+function assemble_cell!(Ke::Matrix, fe::Vector, cellvalues::CellValues, C::SymmetricTensor, b::Vec)
+    fill!(Ke, 0)
+    fill!(fe, 0)
+    for q_point in 1:getnquadpoints(cellvalues)
+        dΩ = getdetJdV(cellvalues, q_point)
+        for i in 1:getnbasefunctions(cellvalues)
+            δui = shape_value(cellvalues, q_point, i)
+            fe[i] += (δui ⋅ b) * dΩ
+            ∇δui = shape_symmetric_gradient(cellvalues, q_point, i)
+            for j in 1:getnbasefunctions(cellvalues)
+                ∇uj = shape_symmetric_gradient(cellvalues, q_point, j)
+                Ke[i, j] += (∇δui ⊡ C ⊡ ∇uj) * dΩ
+            end
+        end
+    end
+    return Ke, fe
+end
+
+# Material stiffness
+function create_material_stiffness()
+    E = 200.0e9
+    ν = 0.3
+    λ = E * ν / ((1 + ν) * (1 - 2ν))
+    μ = E / (2(1 + ν))
+    δ(i, j) = i == j ? 1.0 : 0.0
+    C = SymmetricTensor{4, 3}() do i, j, k, l
+        return λ * δ(i, j) * δ(k, l) + μ * (δ(i, k) * δ(j, l) + δ(i, l) * δ(j, k))
+    end
+    return C
+end
+
+# Grid and grid coloring
+function create_cantilever_grid(n::Int)
+    xmin = Vec{3}((0.0, 0.0, 0.0))
+    xmax = Vec{3}((10.0, 1.0, 1.0))
+    grid = generate_grid(Hexahedron, (10 * n, n, n), xmin, xmax)
+    colors = create_coloring(grid)
+    return grid, colors
+end
+
+# DofHandler with displacement field u
+function create_dofhandler(grid::Grid, interpolation::VectorInterpolation)
+    dh = DofHandler(grid)
+    add!(dh, :u, interpolation)
+    close!(dh)
+    return dh
+end
+nothing # hide
+
+struct ScratchData{CC, CV, T, A}
+    cell_cache::CC
+    cellvalues::CV
+    Ke::Matrix{T}
+    fe::Vector{T}
+    assembler::A
+end
+
+function ScratchData(dh::DofHandler, K::SparseMatrixCSC, f::Vector, cellvalues::CellValues)
+    cell_cache = CellCache(dh)
+    n = ndofs_per_cell(dh)
+    Ke = zeros(n, n)
+    fe = zeros(n)
+    asm = start_assemble(K, f; fillzero = false)
+    return ScratchData(cell_cache, copy(cellvalues), Ke, fe, asm)
+end
+nothing # hide
+
+using OhMyThreads, TaskLocalValues
+
+function assemble_global!(
+        K::SparseMatrixCSC, f::Vector, dh::DofHandler, colors,
+        cellvalues_template::CellValues; ntasks = Threads.nthreads()
+    )
+    # Zero-out existing data in K and f
+    _ = start_assemble(K, f)
+    # Body force and material stiffness
+    b = Vec{3}((0.0, 0.0, -1.0))
+    C = create_material_stiffness()
+    # Loop over the colors
+    for color in colors
+        # Dynamic scheduler spawning `ntasks` tasks where each task will process a chunk of
+        # (roughly) equal number of cells (`length(color) ÷ ntasks`).
+        scheduler = OhMyThreads.DynamicScheduler(; ntasks)
+        # Parallelize the loop over the cells in this color
+        OhMyThreads.@tasks for cellidx in color
+            # Tell the @tasks loop to use the scheduler defined above
+            @set scheduler = scheduler
+            # Obtain a task local scratch and unpack it
+            @local scratch = ScratchData(dh, K, f, cellvalues_template)
+            (; cell_cache, cellvalues, Ke, fe, assembler) = scratch
+            # Reinitialize the cell cache and then the cellvalues
+            reinit!(cell_cache, cellidx)
+            reinit!(cellvalues, cell_cache)
+            # Compute the local contribution of the cell
+            assemble_cell!(Ke, fe, cellvalues, C, b)
+            # Assemble local contribution
+            assemble!(assembler, celldofs(cell_cache), Ke, fe)
+        end
+    end
+    return K, f
+end
+nothing # hide
+
+function main(; n = 20, ntasks = Threads.nthreads())
+    # Interpolation, quadrature and cellvalues
+    interpolation = Lagrange{RefHexahedron, 1}()^3
+    quadrature = QuadratureRule{RefHexahedron}(2)
+    cellvalues = CellValues(quadrature, interpolation)
+    # Grid, colors and DofHandler
+    grid, colors = create_cantilever_grid(n)
+    dh = create_dofhandler(grid, interpolation)
+    # Global matrix and vector
+    K = allocate_matrix(dh)
+    f = zeros(ndofs(dh))
+    # Compile it
+    assemble_global!(K, f, dh, colors, cellvalues; ntasks = ntasks)
+    # Time it
+    @time assemble_global!(K, f, dh, colors, cellvalues; ntasks = ntasks)
+    return
+end
+nothing # hide</code></pre><hr/><p><em>This page was generated using <a href="https://github.com/fredrikekre/Literate.jl">Literate.jl</a>.</em></p></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../postprocessing/">« Post processing and visualization</a><a class="docs-footer-nextpage" href="../../gallery/">Code gallery »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option><option value="catppuccin-latte">catppuccin-latte</option><option value="catppuccin-frappe">catppuccin-frappe</option><option value="catppuccin-macchiato">catppuccin-macchiato</option><option value="catppuccin-mocha">catppuccin-mocha</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.7.0 on <span class="colophon-date" title="Monday 17 February 2025 08:19">Monday 17 February 2025</span>. Using Julia version 1.11.3.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
