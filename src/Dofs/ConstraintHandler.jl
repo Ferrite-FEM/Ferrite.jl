@@ -1887,10 +1887,10 @@ function _update_weak_dbc!(
         dh::AbstractDofHandler, dofmapping::Dict{Int, Int}, dofcoefficients::Vector{Union{Nothing, DofCoefficients{T}}}, time::Real
     ) where {T}
     ip = function_interpolation(fv)
-    n = maximum(length, dirichlet_facetdof_indices(ip))
-    Kᶠ = zeros(n, n)
-    aᶠ = zeros(n)
-    fᶠ = zeros(n)
+    max_dofs_per_facet = maximum(length, dirichlet_facetdof_indices(ip))
+    Kᶠ = zeros(max_dofs_per_facet, max_dofs_per_facet)
+    aᶠ = zeros(max_dofs_per_facet)
+    fᶠ = zeros(max_dofs_per_facet)
     for fc in FacetIterator(dh, facets)
         reinit!(fv, fc)
         shape_nrs = dirichlet_facetdof_indices(ip)[getcurrentfacet(fv)]
