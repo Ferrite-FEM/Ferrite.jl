@@ -79,14 +79,14 @@ be used to calculate the dependent DoFs. Ferrite has functionaliy for setting up
 ``\hat{\boldsymbol{K}}`` and ``\hat{\boldsymbol{f}}`` in an efficient way.
 
 !!! note "Limitations"
-    Ferrite currently cannot untangle constraints where a DoF is both *master* and *slave*
+    Ferrite currently cannot untangle constraints where a DoF is both a *main* and a *constrained*
     DoF. For example, if we have two affine constraints such as:
     ```math
     a_1 = 2a_2 + 4 \\
     a_2 = 3a_3 + 1
     ```
-    Ferrite will not be able to resolve this situation because `` a_2 `` is both a master
-    and a slave DoF in different constraints.
+    Ferrite will not be able to resolve this situation because `` a_2 `` is both a main
+    and a constrained DoF in different constraints.
 
 ### Affine Constraints in Ferrite
 
