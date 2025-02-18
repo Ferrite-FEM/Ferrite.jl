@@ -20,7 +20,7 @@ C) Lower-dimensional entities' dof indices + current interior dof indices
 D) The dof indices values matches `1:N` without duplication (follows from B, but also checked separately)
 E) All `N` base functions are implemented + `ArgumentError` if `i=0` or `i=N+1`
 F) Interpolation accessor functions versus type parameters (e.g. same refshape)
-G) `function_space` and `mapping_type` is defined
+G) `conformity` and `mapping_type` is defined
 """
 function test_interpolation_properties(ip::Interpolation{RefShape, FunOrder}) where {RefShape, FunOrder}
     return @testset "Interpolation properties: $ip" begin
@@ -64,7 +64,7 @@ function test_interpolation_properties(ip::Interpolation{RefShape, FunOrder}) wh
 
         # Test that property functions are defined, runs, and, if possible, give expected type
         Ferrite.mapping_type(ip) # Dry-run just to catch if it isn't defined
-        @test Ferrite.function_space(ip) isa Ferrite.Conformity
+        @test Ferrite.conformity(ip) isa Ferrite.Conformity
     end
 end
 
@@ -369,7 +369,7 @@ end
         reference_moment(::Nedelec{RefTriangle, 2}, s, edge_shape_nr) = edge_shape_nr == 1 ? (1 - s) : s
 
         function test_interpolation_functionals(ip::Interpolation)
-            return test_interpolation_functionals(Ferrite.function_space(ip), Val(Ferrite.getrefdim(ip)), ip)
+            return test_interpolation_functionals(Ferrite.conformity(ip), Val(Ferrite.getrefdim(ip)), ip)
         end
 
         # 2D, H(div) -> facet

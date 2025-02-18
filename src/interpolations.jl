@@ -455,7 +455,7 @@ struct DiscontinuousLagrange{shape, order} <: ScalarInterpolation{shape, order}
         return new{shape, order}()
     end
 end
-function_space(::DiscontinuousLagrange) = Conformity(:L2)
+conformity(::DiscontinuousLagrange) = Conformity(:L2)
 
 adjust_dofs_during_distribution(::DiscontinuousLagrange) = false
 
@@ -513,7 +513,7 @@ struct Lagrange{shape, order} <: ScalarInterpolation{shape, order}
         return new{shape, order}()
     end
 end
-function_space(::Lagrange) = Conformity(:H1)
+conformity(::Lagrange) = Conformity(:H1)
 
 adjust_dofs_during_distribution(::Lagrange) = true
 adjust_dofs_during_distribution(::Lagrange{<:Any, 2}) = false
@@ -1326,7 +1326,7 @@ struct BubbleEnrichedLagrange{shape, order} <: ScalarInterpolation{shape, order}
         return new{shape, order}()
     end
 end
-function_space(::BubbleEnrichedLagrange) = Conformity(:H1)
+conformity(::BubbleEnrichedLagrange) = Conformity(:H1)
 
 #######################################
 # Lagrange-Bubble RefTriangle order 1 #
@@ -1372,7 +1372,7 @@ struct Serendipity{shape, order} <: ScalarInterpolation{shape, order}
         return new{shape, order}()
     end
 end
-function_space(::Serendipity) = Conformity(:H1)
+conformity(::Serendipity) = Conformity(:H1)
 
 # Note that the edgedofs for high order serendipity elements are defined in terms of integral moments,
 # so no permutation exists in general. See e.g. Scroggs et al. [2022] for an example.
@@ -1523,7 +1523,7 @@ struct CrouzeixRaviart{shape, order} <: ScalarInterpolation{shape, order}
     CrouzeixRaviart{RefTriangle, 1}() = new{RefTriangle, 1}()
     CrouzeixRaviart{RefTetrahedron, 1}() = new{RefTetrahedron, 1}()
 end
-function_space(::CrouzeixRaviart) = Conformity(:L2)
+conformity(::CrouzeixRaviart) = Conformity(:L2)
 
 # CR elements are characterized by not having vertex dofs
 vertexdof_indices(ip::CrouzeixRaviart) = ntuple(i -> (), nvertices(ip))
@@ -1592,7 +1592,7 @@ This element is basically the idea from Crouzeix and Raviart applied to
 hypercubes. For details see the original paper [RanTur:1992:snq](@cite).
 """
 struct RannacherTurek{shape, order} <: ScalarInterpolation{shape, order} end
-function_space(::RannacherTurek) = Conformity(:L2)
+conformity(::RannacherTurek) = Conformity(:L2)
 
 # CR-type elements are characterized by not having vertex dofs
 vertexdof_indices(ip::RannacherTurek) = ntuple(i -> (), nvertices(ip))
@@ -1671,7 +1671,7 @@ struct VectorizedInterpolation{vdim, refshape, order, SI <: ScalarInterpolation{
         return new{vdim, refshape, order, SI}(ip)
     end
 end
-function_space(ip::VectorizedInterpolation) = function_space(ip.ip)
+conformity(ip::VectorizedInterpolation) = conformity(ip.ip)
 
 adjust_dofs_during_distribution(ip::VectorizedInterpolation) = adjust_dofs_during_distribution(ip.ip)
 
@@ -1796,7 +1796,7 @@ struct RaviartThomas{shape, order, vdim} <: VectorInterpolation{vdim, shape, ord
     end
 end
 mapping_type(::RaviartThomas) = ContravariantPiolaMapping()
-function_space(::RaviartThomas) = Conformity(:Hdiv)
+conformity(::RaviartThomas) = Conformity(:Hdiv)
 
 # RefTriangle
 edgedof_indices(ip::RaviartThomas{RefTriangle}) = edgedof_interior_indices(ip)
@@ -1861,7 +1861,7 @@ struct BrezziDouglasMarini{shape, order, vdim} <: VectorInterpolation{vdim, shap
     end
 end
 mapping_type(::BrezziDouglasMarini) = ContravariantPiolaMapping()
-function_space(::BrezziDouglasMarini) = Conformity(:Hdiv)
+conformity(::BrezziDouglasMarini) = Conformity(:Hdiv)
 
 # RefTriangle
 edgedof_indices(ip::BrezziDouglasMarini{RefTriangle}) = edgedof_interior_indices(ip)
@@ -1901,7 +1901,7 @@ struct Nedelec{shape, order, vdim} <: VectorInterpolation{vdim, shape, order}
     end
 end
 mapping_type(::Nedelec) = CovariantPiolaMapping()
-function_space(::Nedelec) = Conformity(:Hcurl)
+conformity(::Nedelec) = Conformity(:Hcurl)
 edgedof_indices(ip::Nedelec) = edgedof_interior_indices(ip)
 
 # 2D refshape (rdim == vdim for Nedelec)

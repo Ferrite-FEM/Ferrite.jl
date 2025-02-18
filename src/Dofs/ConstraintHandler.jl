@@ -1921,7 +1921,7 @@ function solve_weak_dbc!(aᶠ, Kᶠ, fᶠ, bc_fun, fv, shape_nrs, cell_coords, t
 end
 
 function integrate_weak_dbc!(Kᶠ, fᶠ, bc_fun, fv, shape_nrs, cell_coords, time)
-    return integrate_weak_dbc!(function_space(fv), Kᶠ, fᶠ, bc_fun, fv, shape_nrs, cell_coords, time)
+    return integrate_weak_dbc!(conformity(fv), Kᶠ, fᶠ, bc_fun, fv, shape_nrs, cell_coords, time)
 end
 
 function integrate_weak_dbc!(::Conformity{:Hdiv}, Kᶠ, fᶠ, bc_fun, fv, shape_nrs, cell_coords, time)

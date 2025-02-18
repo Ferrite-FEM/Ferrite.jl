@@ -30,7 +30,7 @@ end
     throw(ArgumentError(msg))
 end
 
-function_space(fe_values::AbstractValues) = function_space(function_interpolation(fe_values))
+conformity(fe_values::AbstractValues) = conformity(function_interpolation(fe_values))
 
 """
     ValuesUpdateFlags(ip_fun::Interpolation; update_gradients = Val(true), update_hessians = Val(false), update_detJdV = Val(true))
