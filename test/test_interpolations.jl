@@ -425,23 +425,40 @@ end
         test_interpolation_functionals.(Hcurl_interpolations)
 
         # Test boundary conditions (WeakDirichlet)
+        # Depending on the interpolation, we have different polynomials orders on the facets
+        _facet_poly_order(ip::Nedelec) = Ferrite.getorder(ip) - 1
+        _facet_poly_order(ip::RaviartThomas) = Ferrite.getorder(ip) - 1
+        _facet_poly_order(ip::BrezziDouglasMarini) = Ferrite.getorder(ip)
+        # Based on this order, p_facet, we expect that we should fullfill different criteria.
+        # * If we prescribe a polynomial function to WeakDirichlet with a lower or equal order
+        #   than p_facet, we expect that the interpolation should match the provided function pointwise.
+        # * If we prescribe a polynomial function with higher order, but lower order than what the quadrature
+        #   rule in WeakDirichlet can integrate exactly, we expect that the integral over the boundary are equal.
+        # * If we prescribe a polynomial one order lower than we can integrate exactly, and p_facet ≥ 1,
+        #   we expect that the integrated linear moment equation, ∫ x f(x) dx, is integrated exactly
+        # The following tests check those properties for the H(div) and H(curl) interpolations.
+
         cell_type(::Type{RefLine}) = Line
         cell_type(::Type{RefTriangle}) = Triangle
         cell_type(::Type{RefQuadrilateral}) = Quadrilateral
         cell_type(::Type{RefTetrahedron}) = Tetrahedron
         cell_type(::Type{RefHexahedron}) = Hexahedron
-        function _setup_dh_fv_for_bc_test(ip; nel = 2, qr_order = 6)
+        function _setup_dh_fv_for_bc_test(ip; nel = 3, qr_order = 6)
             RefShape = Ferrite.getrefshape(ip)
             CT = cell_type(RefShape)
             dim = Ferrite.getrefdim(CT) # dim=sdim=vdim
             grid = generate_grid(CT, ntuple(Returns(nel), dim), -0.25 * ones(Vec{dim}), 0.2 * ones(Vec{dim}))
+            transform_coordinates!(grid, x -> x + 0.5 * Vec(ntuple(i -> abs(x[dim - i + 1])^(1 + i / dim), dim)))
             qr = FacetQuadratureRule{RefShape}(qr_order)
             fv = FacetValues(qr, ip, geometric_interpolation(CT))
             dh = close!(add!(DofHandler(grid), :u, ip))
             return dh, fv
         end
 
-        function test_bc_integral(f_bc::Function, check_fun::Function, dh, facetset, fv; tol = 1.0e-6)
+        function test_bc_integral(
+                f_bc::Function, check_fun::Function, moment_fun::Function, dh, facetset, fv;
+                tol = 1.0e-6, pointwise_check
+            )
             grid = Ferrite.get_grid(dh)
             dbc = WeakDirichlet(:u, facetset, f_bc)
             ch = close!(add!(ConstraintHandler(dh), dbc))
@@ -459,25 +476,48 @@ end
                     u = function_value(fv, q_point, ae)
                     n = getnormal(fv, q_point)
                     x = spatial_coordinate(fv, q_point, cell_coords)
-                    check_val += check_fun(u, n) * dΓ
-                    test_val += f_bc(x, 0.0, n) * dΓ
+                    check_fun_val = check_fun(u, n)
+                    bc_fun_val = f_bc(x, 0.0, n)
+                    check_val += moment_fun(x) * check_fun_val * dΓ
+                    test_val += moment_fun(x) * bc_fun_val * dΓ
+                    if pointwise_check
+                        @test check_fun_val ≈ bc_fun_val
+                    end
                 end
             end
             @test norm(test_val - check_val) < tol
+        end
+
+        function test_bc_integrals(f_bc, check_fun, order::Int, args...; pointwise_check, kwargs...)
+            test_bc_integral(f_bc, ⋅, Returns(1), args...; pointwise_check, kwargs...)
+            if order > 1
+                test_bc_integral(f_bc, ⋅, x -> x[1], args...; pointwise_check = false, kwargs...)
+            end
         end
 
         @testset "H(div) BC" begin
             for ip in Hdiv_interpolations
                 @testset "$ip" begin
                     dh, fv = _setup_dh_fv_for_bc_test(ip)
-                    nexp = 4 * Ferrite.getorder(ip) - 1
+                    qr_order = Ferrite._default_bc_qr_order(ip) # Default for WeakDirichlet
+                    nexp = 2 * qr_order - 1 # Exact gauss integration for polynomial of order nexp.
                     linear_x1(x, _, _) = x[1]
+                    quadratic_x1(x, _, _) = (x[1] - 0.3)^2
                     nonlinear(x, _, _) = 100 * (x[1] - 0.3)^nexp
-                    funs = [Returns(0.0), Returns(1.0), linear_x1, nonlinear]
-                    for f_bc in funs
+                    funs = [
+                        (Returns(0.0), true),
+                        (Returns(rand()), true),
+                        (linear_x1, _facet_poly_order(ip) ≥ 1),
+                        (quadratic_x1, _facet_poly_order(ip) ≥ 2),
+                        (nonlinear, false), # Only test integral quantities
+                    ]
+                    for (f_bc, pointwise_check) in funs
                         @testset "f_bc = $f_bc" begin
                             for facetset in values(dh.grid.facetsets)
-                                test_bc_integral(f_bc, ⋅, dh, facetset, fv)
+                                test_bc_integral(f_bc, ⋅, Returns(1), dh, facetset, fv; pointwise_check)
+                                if _facet_poly_order(ip) ≥ 1 && f_bc !== nonlinear # Linear facet polynomial should pass moment test.
+                                    test_bc_integral(f_bc, ⋅, x -> x[1], dh, facetset, fv; pointwise_check = false)
+                                end
                             end
                         end
                     end
@@ -491,16 +531,26 @@ end
                     dh, fv = _setup_dh_fv_for_bc_test(ip)
                     dim = Ferrite.getrefdim(getrefshape(ip))
                     @assert dim == 2 # 3d not supported yet
+                    qr_order = Ferrite._default_bc_qr_order(ip) # Default for WeakDirichlet
+                    nexp = 2 * qr_order - 1 # Exact gauss integration for polynomial of order nexp.
                     v3 = rand()
                     linear_x1(x, _, _) = x[1] * Vec((0.0, 0.0, v3))
-                    quadratic_x1(x, _, _) = Vec((0.0, 0.0, v3)) * (10000 * (x[1] - 0.3)^3)
-                    nexp = 4 * Ferrite.getorder(ip) - 1
-                    nonlinear(x, _, _) = Vec((0.0, 0.0, v3)) * (1.0e8 * (x[1] - 0.3)^nexp)
-                    funs = [Returns(zero(Vec{3})), Returns(Vec((0.0, 0.0, rand()))), linear_x1, nonlinear]
-                    for f_bc in funs
+                    quadratic_x1(x, _, _) = (x[1] - 0.3)^2 * Vec((0.0, 0.0, v3))
+                    nonlinear(x, _, _) = Vec((0.0, 0.0, v3)) * (100 * (x[1] + 0.3)^nexp)
+                    funs = [
+                        (Returns(zero(Vec{3})), true),
+                        (Returns(Vec((0.0, 0.0, rand()))), true),
+                        (linear_x1, _facet_poly_order(ip) ≥ 1),
+                        (quadratic_x1, _facet_poly_order(ip) ≥ 2),
+                        (nonlinear, false),
+                    ]
+                    for (f_bc, pointwise_check) in funs
                         @testset "f_bc = $f_bc" begin
                             for facetset in values(dh.grid.facetsets)
-                                test_bc_integral(f_bc, ×, dh, facetset, fv)
+                                test_bc_integral(f_bc, ×, Returns(1.0), dh, facetset, fv; pointwise_check)
+                                if _facet_poly_order(ip) ≥ 1  && f_bc !== nonlinear
+                                    test_bc_integral(f_bc, ×, x -> x[1], dh, facetset, fv; pointwise_check = false)
+                                end
                             end
                         end
                     end
