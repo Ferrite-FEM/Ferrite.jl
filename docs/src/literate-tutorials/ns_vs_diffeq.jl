@@ -116,7 +116,7 @@ nothing                    #hide
 # To enable the use of a wide range of solvers, it is more efficient to provide 
 # information to the solver about the sparsity pattern and values of the Jacobian
 # of $f(u, t)$. The sparsity pattern and values for the Jacobian can be shown by 
-# taking the [directional gradient](https://en.wikipedia.org/wiki/Directional_derivative) of
+# taking the [directional derivative](https://en.wikipedia.org/wiki/Directional_derivative) of
 # $f(u, t) \equiv f(v, p, t)$ along $\delta u \equiv (\delta v, \delta p)$. It is useful
 # to frame the Jacobian of $f(u, t)$ in the context of the weak form described in 
 # the previous [section](@ref weak-form-derivation). The motivation for this
@@ -164,7 +164,7 @@ nothing                    #hide
 # We now show that the finite element contributions for *part* of the Jacobian 
 # exactly match the contributions for the Stokes operator $K$. When substituting 
 # the finite element approximation for the viscosity term and comparing this 
-# with the analagous term in the directional gradient,
+# with the analagous term in the directional derivative,
 # ```math
 # \begin{aligned}
 # - \int_\Omega \nu \nabla \delta v : \nabla \varphi  & \xrightarrow{\delta v_h} - \sum_{i}^{N} (\int_{\Omega} \nu \nabla \varphi_i : \nabla \varphi_j) \delta \hat{v}_i \\ 
@@ -183,12 +183,12 @@ nothing                    #hide
 # However, the Jacobian cannot be assembled using the values and pattern from $K$ 
 # alone since the nonlinear advection term is not accounted for by $K$. 
 # Substituting the finite element approximation into the term resulting from the 
-# directional gradient of the nonlinear advection term, we have
+# directional derivative of the nonlinear advection term, we have
 # ```math
 #  - \int_{\Omega} (\delta v \cdot \nabla v + v \cdot \nabla \delta v) \cdot \varphi \xrightarrow{\delta v_h} - \sum_{i}^{N} (\int_{\Omega} (\varphi_i \cdot \nabla v + v \cdot \nabla \varphi_i) \cdot \varphi_j) \delta \hat{v}_i.
 # ```
 # Since it is clear that the values of the Jacobian corresponding to the 
-# directional gradient of the nonlinear advection term rely on the velocity
+# directional derivative of the nonlinear advection term rely on the velocity
 # values $v$ and velocity gradient $\nabla v$ that change during the solving 
 # phase, the finite element contributions to the Jacobian for this term are 
 # calculated separately.
