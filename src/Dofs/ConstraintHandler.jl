@@ -43,13 +43,11 @@ struct Dirichlet # <: Constraint
     facets::OrderedSet{T} where {T <: Union{Int, FacetIndex, FaceIndex, EdgeIndex, VertexIndex}}
     field_name::Symbol
     components::Vector{Int} # components of the field
-    local_facet_dofs::Vector{Int} # TODO: Remove, only used as buffer in periodic bc construction
-    local_facet_dofs_offset::Vector{Int} # TODO: Remove, only used as buffer in periodic bc construction
-    global_dofs_nodal_dbc::Vector{Int}
+    global_dofs_nodal_dbc::Vector{Int} # Only for nodal BCs
     constrained_nodes::Vector{Int}
 end
 function Dirichlet(field_name::Symbol, facets::AbstractVecOrSet, f::Function, components = nothing)
-    return Dirichlet(f, convert_to_orderedset(facets), field_name, __to_components(components), Int[], Int[], Int[], Int[])
+    return Dirichlet(f, convert_to_orderedset(facets), field_name, __to_components(components), Int[], Int[])
 end
 
 # components=nothing is default and means that all components should be constrained
@@ -374,25 +372,23 @@ function _add!(ch::ConstraintHandler, dbc::Dirichlet, bcnodes::AbstractVecOrSet{
         end
     end
 
-    constrained_dofs = Int[]
-    sizehint!(constrained_dofs, ncomps * length(bcnodes))
-    sizehint!(dbc.local_facet_dofs, length(bcnodes))
+    sizehint!(dbc.global_dofs_nodal_dbc, ncomps * length(bcnodes))
+    sizehint!(dbc.constrained_nodes, length(bcnodes))
     for node in bcnodes
         if !visited[node]
             # either the node belongs to another field handler or it does not have dofs in the constrained field
             continue
         end
         for i in 1:ncomps
-            push!(constrained_dofs, node_dofs[i, node])
+            push!(dbc.global_dofs_nodal_dbc, node_dofs[i, node])
         end
         push!(dbc.constrained_nodes, node)
     end
 
     # save it to the ConstraintHandler
-    copy!(dbc.global_dofs_nodal_dbc, constrained_dofs)
     push!(ch.dbcs, dbc)
     push!(ch.bcvalues, bcvalue)
-    for d in constrained_dofs
+    for d in dbc.global_dofs_nodal_dbc
         add_prescribed_dof!(ch, d, NaN, nothing)
     end
     return ch
@@ -1089,10 +1085,6 @@ function _add!(
         # No need to update!(chtmp, t) here since we only care about the dofs
         # TODO: Right? maybe if the user passed f we need to...
         foreach(x -> delete!(dof_map, x), chtmp.prescribed_dofs)
-
-        # Need to reset the internal of this DBC in order to add! it again...
-        resize!(dbc.local_facet_dofs, 0)
-        resize!(dbc.local_facet_dofs_offset, 0)
 
         # Add the Dirichlet for the corners
         add!(ch, dbc)

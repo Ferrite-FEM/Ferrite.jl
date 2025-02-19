@@ -175,7 +175,7 @@ function Base.show(io::IO, d::MIME"text/plain", fv::FacetValues)
 end
 
 """
-    BCValues(func_interpol::Interpolation, geom_interpol::Interpolation, boundary_type::Union{Type{<:BoundaryIndex}}, field_offset)
+    BCValues(func_interpol::Interpolation, geom_interpol::Interpolation, boundary_type::Union{Type{<:BoundaryIndex}}, field_dof_offset)
 
 `BCValues` stores the shape values at all facet/faces/edges/vertices (depending on `boundary_type`) for the geometric interpolation (`geom_interpol`),
 for each dof-position determined by the `func_interpol`. Used mainly by the `ConstraintHandler`.
@@ -183,12 +183,11 @@ for each dof-position determined by the `func_interpol`. Used mainly by the `Con
 mutable struct BCValues{T}
     const M::Vector{Matrix{T}}
     const dofs::ArrayOfVectorViews{Int, 1}
-    const field_offset::Int # Only needed for nodal dbc, could be removed if a `NodalDirichlet` is introduced.
     current_entity::Int
 end
 
-function BCValues(func_interpol::Interpolation, geom_interpol::Interpolation, boundary_type::Type{<:BoundaryIndex}, field_offset)
-    return BCValues(Float64, func_interpol, geom_interpol, boundary_type, field_offset)
+function BCValues(func_interpol::Interpolation, geom_interpol::Interpolation, boundary_type::Type{<:BoundaryIndex}, field_dof_offset)
+    return BCValues(Float64, func_interpol, geom_interpol, boundary_type, field_dof_offset)
 end
 
 function reinit!(bcv::BCValues, current_entity::Int)
@@ -197,7 +196,7 @@ end
 
 function BCValues(
         ::Type{T}, func_interpol::Interpolation{refshape}, geom_interpol::Interpolation{refshape},
-        boundary_type::Type{<:BoundaryIndex}, field_offset
+        boundary_type::Type{<:BoundaryIndex}, field_dof_offset
     ) where {T, dim, refshape <: AbstractRefShape{dim}}
 
     dof_coords = reference_coordinates(func_interpol)
@@ -215,14 +214,14 @@ function BCValues(
         for (i, boundarydof) in pairs(boundarydofs)
             ξ = dof_coords[boundarydof]
             reference_shape_values!(view(M_current, :, i), geom_interpol, ξ)
-            push!(local_facet_dofs, 1 + (boundarydof - 1) * n_dbc_comp + field_offset)
+            push!(local_facet_dofs, 1 + (boundarydof - 1) * n_dbc_comp + field_dof_offset)
         end
         push!(M, M_current)
         push!(local_facet_dofs_offset, length(local_facet_dofs) + 1)
     end
     dofs = ArrayOfVectorViews(local_facet_dofs_offset, local_facet_dofs, LinearIndices(1:(length(local_facet_dofs_offset) - 1)))
 
-    return BCValues{T}(M, dofs, field_offset, 1)
+    return BCValues{T}(M, dofs, 1)
 end
 
 get_dof_locations(bcv::BCValues) = 1:size(bcv.M[bcv.current_entity], 2)
