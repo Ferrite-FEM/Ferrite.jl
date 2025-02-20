@@ -882,6 +882,8 @@ struct PeriodicFacetPair
     mirrored::Bool  # mirrored => opposite normal vectors
 end
 
+include(joinpath(@__DIR__, "periodicity_utils.jl"))
+
 """
     PeriodicDirichlet(u::Symbol, facet_mapping, components=nothing)
     PeriodicDirichlet(u::Symbol, facet_mapping, R::AbstractMatrix, components=nothing)
@@ -941,9 +943,6 @@ function add!(ch::ConstraintHandler, pdbc::PeriodicDirichlet)
     field_idx = find_field(ch.dh, pdbc.field_name)
     interpolation = getfieldinterpolation(ch.dh, field_idx)
     n_comp = n_dbc_components(interpolation)
-    if interpolation isa VectorizedInterpolation
-        interpolation = interpolation.ip
-    end
 
     if !all(c -> 0 < c <= n_comp, pdbc.components)
         error("components $(pdbc.components) not within range of field :$(pdbc.field_name) ($(n_comp) dimension(s))")
@@ -952,10 +951,7 @@ function add!(ch::ConstraintHandler, pdbc::PeriodicDirichlet)
     # Empty components means constrain them all
     isempty(pdbc.components) && append!(pdbc.components, 1:n_comp)
 
-    if pdbc.rotation_matrix === nothing
-        dof_map_t = Int
-        iterator_f = identity
-    else
+    if pdbc.rotation_matrix !== nothing
         @assert pdbc.func === nothing # Verified in constructor
         if is_legacy
             error("legacy mode not supported with rotations")
@@ -967,29 +963,26 @@ function add!(ch::ConstraintHandler, pdbc::PeriodicDirichlet)
         if nc !== n_comp
             error("rotations currently only supported when all components are periodic")
         end
-        dof_map_t = Vector{Int}
-        iterator_f = x -> Iterators.partition(x, nc)
     end
-    _add!(ch, pdbc, interpolation, n_comp, field_offset(ch.dh.subdofhandlers[field_idx[1]], field_idx[2]), is_legacy, pdbc.rotation_matrix, dof_map_t, iterator_f)
+    _add!(ch, pdbc, interpolation, field_offset(ch.dh.subdofhandlers[field_idx[1]], field_idx[2]), is_legacy, pdbc.rotation_matrix)
     return ch
 end
 
 function _add!(
         ch::ConstraintHandler, pdbc::PeriodicDirichlet, interpolation::Interpolation,
-        field_dim::Int, offset::Int, is_legacy::Bool, rotation_matrix::Union{Matrix{T}, Nothing}, ::Type{dof_map_t}, iterator_f::F
-    ) where {T, dof_map_t, F <: Function}
+        offset::Int, is_legacy::Bool, rotation_matrix::Union{Matrix, Nothing}
+    )
+
     grid = get_grid(ch.dh)
     facet_map = pdbc.facet_map
 
-    # Indices of the local dofs for the facets
-    local_facet_dofs, local_facet_dofs_offset =
-        _local_facet_dofs_for_bc(interpolation, field_dim, pdbc.components, offset)
-    mirrored_indices =
-        mirror_local_dofs(local_facet_dofs, local_facet_dofs_offset, interpolation, length(pdbc.components))
-    rotated_indices = rotate_local_dofs(local_facet_dofs, local_facet_dofs_offset, interpolation, length(pdbc.components))
+    dofmap = PeriodicDofPosMapping(interpolation, offset)
 
-    # Dof map for mirror dof => image dof
-    dof_map = Dict{dof_map_t, dof_map_t}()
+    # Dof map for mirror dof (constrained) => image dof (master dof)
+    # However, here we only add the first component, as the rest can be calculated when needed
+    dof_map = Dict{Int, Int}()
+    first_component_offset = first(pdbc.components) - 1
+    component_incr_offsets = pdbc.components .- first(pdbc.components) # Increments from the first component (incl. 0 for first)
 
     n = ndofs_per_cell(ch.dh, first(facet_map).mirror[1])
     mirror_dofs = zeros(Int, n)
@@ -1000,30 +993,25 @@ function _add!(
         celldofs!(mirror_dofs, ch.dh, m[1])
         celldofs!(image_dofs, ch.dh, i[1])
 
-        mdof_range = local_facet_dofs_offset[m[2]]:(local_facet_dofs_offset[m[2] + 1] - 1)
-        idof_range = local_facet_dofs_offset[i[2]]:(local_facet_dofs_offset[i[2] + 1] - 1)
+        for dof_location in get_dof_locations(dofmap, facet_pair)
+            local_mdof, local_idof = get_local_dof_pair(dofmap, facet_pair, dof_location)
 
-        for (md, id) in zip(iterator_f(mdof_range), iterator_f(idof_range))
-            mdof = image_dofs[local_facet_dofs[id]]
-            # Rotate the mirror index
-            rotated_md = rotated_indices[md, facet_pair.rotation + 1]
-            # Mirror the mirror index (maybe) :)
-            mirrored_md = facet_pair.mirrored ? mirrored_indices[rotated_md] : rotated_md
-            cdof = mirror_dofs[local_facet_dofs[mirrored_md]]
-            if haskey(dof_map, mdof)
-                mdof′ = dof_map[mdof]
-                # @info "$cdof => $mdof, but $mdof => $mdof′, remapping $cdof => $mdof′."
+            idof = image_dofs[local_idof] + first_component_offset
+            mdof = mirror_dofs[local_mdof] + first_component_offset
+            if haskey(dof_map, idof)
+                idof′ = dof_map[idof]
+                # @info "$mdof => $idof, but $idof => $idof′, remapping $mdof => $idof′."
                 # TODO: Is this needed now when untangling below?
-                push!(dof_map, cdof => mdof′)
-                # elseif haskey(dof_map, cdof) && dof_map[cdof] == mdof
-                # @info "$cdof => $mdof already in the set, skipping."
-            elseif haskey(dof_map, cdof)
-                # @info "$cdof => $mdof, but $cdof => $(dof_map[cdof]) already, skipping."
-            elseif cdof == mdof
-                # @info "Skipping self-constraint $cdof => $mdof."
+                push!(dof_map, mdof => idof′)
+                # elseif haskey(dof_map, mdof) && dof_map[mdof] == mdof
+                # @info "$mdof => $idof already in the set, skipping."
+            elseif haskey(dof_map, mdof)
+                # @info "$mdof => $idof, but $mdof => $(dof_map[mdof]) already, skipping."
+            elseif mdof == idof
+                # @info "Skipping self-constraint $mdof => $idof."
             else
-                # @info "$cdof => $mdof."
-                push!(dof_map, cdof => mdof)
+                # @info "$mdof => $idof."
+                push!(dof_map, mdof => idof)
             end
         end
     end
@@ -1031,7 +1019,7 @@ function _add!(
     # Need to untangle in case we have 1 => 2 and 2 => 3 into 1 => 3 and 2 => 3.
     # Note that a single pass is enough (no need to iterate) since all constraints are
     # between just one mirror dof and one image dof.
-    remaps = Dict{dof_map_t, dof_map_t}()
+    remaps = Dict{Int, Int}()
     for (k, v) in dof_map
         if haskey(dof_map, v)
             remaps[k] = get(remaps, v, dof_map[v])
@@ -1105,25 +1093,28 @@ function _add!(
         inhomogeneity_map = Dict{Int, Float64}()
         for (k, v) in dof_map
             g = chtmp2.inhomogeneities
-            push!(
-                inhomogeneity_map,
-                k => - g[chtmp2.dofmapping[v]] + g[chtmp2.dofmapping[k]]
-            )
+            for Δn in component_incr_offsets
+                push!(
+                    inhomogeneity_map,
+                    (k + Δn) => - g[chtmp2.dofmapping[v + Δn]] + g[chtmp2.dofmapping[k + Δn]]
+                )
+            end
         end
     end
 
     # Any remaining mappings are added as homogeneous AffineConstraints
     for (k, v) in dof_map
-        if dof_map_t === Int
-            ac = AffineConstraint(k, [v => 1.0], inhomogeneity_map === nothing ? 0.0 : inhomogeneity_map[k])
-            add!(ch, ac)
+        if rotation_matrix === nothing
+            for Δn in component_incr_offsets
+                ac = AffineConstraint(k + Δn, [(v + Δn) => 1.0], inhomogeneity_map === nothing ? 0.0 : inhomogeneity_map[k + Δn])
+                add!(ch, ac)
+            end
         else
             @assert inhomogeneity_map === nothing
-            @assert rotation_matrix !== nothing
-            for (i, ki) in pairs(k)
+            for (i, Δn_mirror) in pairs(component_incr_offsets)
                 # u_mirror = R ⋅ u_image
-                vs = Pair{Int, eltype(T)}[v[j] => rotation_matrix[i, j] for j in 1:length(v)]
-                ac = AffineConstraint(ki, vs, 0.0)
+                vs = Pair{Int, eltype(rotation_matrix)}[(v + Δn_image) => rotation_matrix[i, j] for (j, Δn_image) in pairs(component_incr_offsets)]
+                ac = AffineConstraint(k + Δn_mirror, vs, 0.0)
                 add!(ch, ac)
             end
         end
@@ -1131,6 +1122,7 @@ function _add!(
 
     return ch
 end
+
 
 function construct_cornerish(min_x::V, max_x::V) where {T, V <: Vec{1, T}}
     lx = max_x - min_x
@@ -1163,81 +1155,6 @@ function construct_cornerish(min_x::V, max_x::V) where {T, V <: Vec{3, T}}
         Vec{3, T}((max_x[1], min_x[2], max_x[3])),
         Vec{3, T}((min_x[1], max_x[2], max_x[3])),
     ]
-end
-
-function mirror_local_dofs(_, _, ::Lagrange{RefLine}, ::Int)
-    # For 1D there is nothing to do
-end
-function mirror_local_dofs(local_facet_dofs, local_facet_dofs_offset, ip::Lagrange{<:Union{RefQuadrilateral, RefTriangle}}, n::Int)
-    # For 2D we always permute since Ferrite defines dofs counter-clockwise
-    ret = collect(1:length(local_facet_dofs))
-    for (i, f) in enumerate(dirichlet_facetdof_indices(ip))
-        this_offset = local_facet_dofs_offset[i]
-        other_offset = this_offset + n
-        for d in 1:n
-            idx1 = this_offset + (d - 1)
-            idx2 = other_offset + (d - 1)
-            tmp = ret[idx1]
-            ret[idx1] = ret[idx2]
-            ret[idx2] = tmp
-        end
-    end
-    return ret
-end
-
-# TODO: Can probably be combined with the method above.
-function mirror_local_dofs(local_facet_dofs, local_facet_dofs_offset, ip::Lagrange{<:Union{RefHexahedron, RefTetrahedron}, O}, n::Int) where {O}
-    @assert 1 <= O <= 2
-    N = ip isa Lagrange{RefHexahedron} ? 4 : 3
-    ret = collect(1:length(local_facet_dofs))
-
-    # Mirror by changing from counter-clockwise to clockwise
-    for (i, f) in enumerate(dirichlet_facetdof_indices(ip))
-        r = local_facet_dofs_offset[i]:(local_facet_dofs_offset[i + 1] - 1)
-        # 1. Rotate the corners
-        vertex_range = r[1:(N * n)]
-        vlr = @view ret[vertex_range]
-        for i in 1:N
-            reverse!(vlr, (i - 1) * n + 1, i * n)
-        end
-        reverse!(vlr)
-        circshift!(vlr, n)
-        # 2. Rotate the edge dofs for quadratic interpolation
-        if O > 1
-            edge_range = r[(N * n + 1):(2N * n)]
-            elr = @view ret[edge_range]
-            for i in 1:N
-                reverse!(elr, (i - 1) * n + 1, i * n)
-            end
-            reverse!(elr)
-            # circshift!(elr, n) # !!! Note: no shift here
-        end
-    end
-    return ret
-end
-
-function rotate_local_dofs(local_facet_dofs, local_facet_dofs_offset, ip::Lagrange{<:Union{RefQuadrilateral, RefTriangle}}, ncomponents)
-    return collect(1:length(local_facet_dofs)) # TODO: Return range?
-end
-function rotate_local_dofs(local_facet_dofs, local_facet_dofs_offset, ip::Lagrange{<:Union{RefHexahedron, RefTetrahedron}, O}, ncomponents) where {O}
-    @assert 1 <= O <= 2
-    N = ip isa Lagrange{RefHexahedron} ? 4 : 3
-    ret = similar(local_facet_dofs, length(local_facet_dofs), N)
-    ret[:, :] .= 1:length(local_facet_dofs)
-    for f in 1:(length(local_facet_dofs_offset) - 1)
-        facet_range = local_facet_dofs_offset[f]:(local_facet_dofs_offset[f + 1] - 1)
-        for i in 1:(N - 1)
-            # 1. Rotate the vertex dofs
-            vertex_range = facet_range[1:(N * ncomponents)]
-            circshift!(@view(ret[vertex_range, i + 1]), @view(ret[vertex_range, i]), -ncomponents)
-            # 2. Rotate the edge dofs
-            if O > 1
-                edge_range = facet_range[(N * ncomponents + 1):(2N * ncomponents)]
-                circshift!(@view(ret[edge_range, i + 1]), @view(ret[edge_range, i]), -ncomponents)
-            end
-        end
-    end
-    return ret
 end
 
 """
