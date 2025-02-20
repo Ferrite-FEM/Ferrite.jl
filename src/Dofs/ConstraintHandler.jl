@@ -978,6 +978,18 @@ function _add!(
 
     dofmap = PeriodicDofPosMapping(interpolation, offset)
 
+
+    # Temporary test code
+    ipg = default_geometric_interpolation(interpolation) # dummy
+    bcvalues = BCValues(interpolation, ipg, FacetIndex, offset)
+    pdl = PeriodicDofLocations(interpolation)
+    function _getdofnr(bv::BCValues, facet_nr, dof_location)
+        reinit!(bv, facet_nr)
+        return get_local_dof(bv, dof_location, 1)
+    end
+    # End: Temporary test code
+
+
     # Dof map for mirror dof (constrained) => image dof (master dof)
     # However, here we only add the first component, as the rest can be calculated when needed
     dof_map = Dict{Int, Int}()
@@ -995,6 +1007,14 @@ function _add!(
 
         for dof_location in get_dof_locations(dofmap, facet_pair)
             local_mdof, local_idof = get_local_dof_pair(dofmap, facet_pair, dof_location)
+
+
+            # Temporary test code
+            mirror_dof_location = get_mirror_dof_location(pdl, facet_pair, dof_location)
+            @assert local_idof == _getdofnr(bcvalues, i[2], dof_location)
+            @assert local_mdof == _getdofnr(bcvalues, m[2], mirror_dof_location)
+            # End: Temporary test code
+
 
             idof = image_dofs[local_idof] + first_component_offset
             mdof = mirror_dofs[local_mdof] + first_component_offset

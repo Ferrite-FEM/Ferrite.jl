@@ -195,10 +195,11 @@ function reinit!(bcv::BCValues, current_entity::Int)
 end
 
 function BCValues(
-        ::Type{T}, func_interpol::Interpolation{refshape}, geom_interpol::Interpolation{refshape},
+        ::Type{T}, func_interpol::Interpolation{refshape}, ipg::Interpolation{refshape},
         boundary_type::Type{<:BoundaryIndex}, field_dof_offset
     ) where {T, dim, refshape <: AbstractRefShape{dim}}
 
+    geom_interpol = get_base_interpolation(ipg)
     dof_coords = reference_coordinates(func_interpol)
     n_geom_basefuncs = getnbasefunctions(geom_interpol)
     n_dbc_comp = n_dbc_components(func_interpol)
