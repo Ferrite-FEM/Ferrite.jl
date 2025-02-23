@@ -132,12 +132,12 @@ function doassemble_K!(K::SparseMatrixCSC, f::Vector, cellvalues::CellValues, dh
                 fe[i] += 0.1 * v * dΩ
                 for j in 1:n_basefuncs
                     ∇u = shape_gradient(cellvalues, q_point, j)
-                    Ke[i, j] += 1e-3 * (∇v ⋅ ∇u) * dΩ
+                    Ke[i, j] += 1.0e-3 * (∇v ⋅ ∇u) * dΩ
                 end
             end
         end
 
-        assemble!(assembler, celldofs(cell), fe, Ke)
+        assemble!(assembler, celldofs(cell), Ke, fe)
     end
     return K, f
 end
@@ -217,7 +217,7 @@ for (step, t) in enumerate(Δt:Δt:T)
     uₙ .= u
 end
 # In order to use the .pvd file we need to store it to the disk, which is done by:
-close(pvd);
+vtk_save(pvd);
 
 #md # ## [Plain program](@id transient_heat_equation-plain-program)
 #md #

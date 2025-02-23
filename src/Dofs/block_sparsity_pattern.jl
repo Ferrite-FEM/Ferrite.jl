@@ -121,7 +121,7 @@ function Base.iterate(it::BSPRowIterator, state = (1, 1))
     else
         # Compute global col idx and advance idx
         col_local = colidxs[idx]
-        offset = sum((bsp.block_sizes[i] for i in 1:col_block-1); init = 0)
+        offset = sum((bsp.block_sizes[i] for i in 1:(col_block - 1)); init = 0)
         return offset + col_local, (col_block, idx + 1)
     end
 end

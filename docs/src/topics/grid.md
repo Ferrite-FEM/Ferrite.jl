@@ -4,21 +4,21 @@ DocTestSetup = :(using Ferrite)
 
 # Grid
 
-## Mesh Reading
+## Mesh reading
 
 A Ferrite `Grid` can be generated with the [`generate_grid`](@ref) function.
 More advanced meshes can be imported with the
-[`FerriteMeshParser.jl`](https://github.com/Ferrite-FEM/FerriteMeshParser.jl) (from Abaqus input files),
-or even created and translated with the [`Gmsh.jl`](https://github.com/JuliaFEM/Gmsh.jl) and [`FerriteGmsh.jl`](https://github.com/Ferrite-FEM/FerriteGmsh.jl) package, respectively.
+[FerriteMeshParser.jl](https://github.com/Ferrite-FEM/FerriteMeshParser.jl) (from Abaqus input files),
+or even created and translated with the [`Gmsh.jl`](https://github.com/JuliaFEM/Gmsh.jl) and [FerriteGmsh.jl](https://github.com/Ferrite-FEM/FerriteGmsh.jl) package, respectively.
 
-### FerriteGmsh
+### FerriteGmsh.jl
 
-`FerriteGmsh.jl` supports all defined cells with an alias in [`Ferrite.jl`](https://github.com/Ferrite-FEM/Ferrite.jl/blob/master/src/Grid/grid.jl#L39-L54) as well as the 3D Serendipity `Cell{3,20,6}`.
+FerriteGmsh.jl supports all defined cells with an alias in [Ferrite.jl](https://github.com/Ferrite-FEM/Ferrite.jl/blob/master/src/Grid/grid.jl#L39-L54) as well as the 3D Serendipity `Cell{3,20,6}`.
 Either, a mesh is created on the fly with the gmsh API or a mesh in `.msh` or `.geo` format can be read and translated with the `FerriteGmsh.togrid` function.
 ```@docs
 FerriteGmsh.togrid
 ```
-`FerriteGmsh.jl` supports currently the translation of `cellsets` and `facetsets`.
+FerriteGmsh supports currently the translation of `cellsets` and `facetsets`.
 Such sets are defined in Gmsh as `PhysicalGroups` of dimension `dim` and `dim-1`, respectively.
 In case only a part of the mesh is the domain, the domain can be specified by providing the keyword argument `domain` the name of the `PhysicalGroups` in the [`FerriteGmsh.togrid`](@ref) function.
 
@@ -28,14 +28,14 @@ In case only a part of the mesh is the domain, the domain can be specified by pr
     which doesn't harm the FE computation, but maybe distort your sophisticated grid operations (if present).
     For more information, see [this issue](https://github.com/Ferrite-FEM/FerriteGmsh.jl/issues/20).
 
-If you want to read another, not yet supported cell from gmsh, consider to open a PR at `FerriteGmsh` that extends the [`gmshtoferritecell` dict](https://github.com/Ferrite-FEM/FerriteGmsh.jl/blob/c9de4f64b3ad3c73fcb36758855a6e517c6d0d95/src/FerriteGmsh.jl#L6-L15)
+If you want to read another, not yet supported cell from gmsh, consider to open a PR at FerriteGmsh that extends the [`gmshtoferritecell` dict](https://github.com/Ferrite-FEM/FerriteGmsh.jl/blob/c9de4f64b3ad3c73fcb36758855a6e517c6d0d95/src/FerriteGmsh.jl#L6-L15)
 and if needed, reorder the element nodes by dispatching [`FerriteGmsh.translate_elements`](https://github.com/Ferrite-FEM/FerriteGmsh.jl/blob/c9de4f64b3ad3c73fcb36758855a6e517c6d0d95/src/FerriteGmsh.jl#L17-L63).
 The reordering of nodes is necessary if the Gmsh ordering doesn't match the one from Ferrite. Gmsh ordering is documented [here](https://gmsh.info/doc/texinfo/gmsh.html#Node-ordering).
-For an exemplary usage of `Gmsh.jl` and `FerriteGmsh.jl`, consider the [Stokes flow](@ref tutorial-stokes-flow) and [Incompressible Navier-Stokes Equations via DifferentialEquations.jl](@ref tutorial-ins-ordinarydiffeq) example.
+For an exemplary usage of Gmsh.jl and FerriteGmsh.jl, consider the [Stokes flow](@ref tutorial-stokes-flow) and [Incompressible Navier-Stokes Equations via DifferentialEquations.jl](@ref tutorial-ins-ordinarydiffeq) example.
 
-### FerriteMeshParser
+### FerriteMeshParser.jl
 
-`FerriteMeshParser.jl` converts the mesh in an Abaqus input file (`.inp`) to a `Ferrite.Grid` with its function `get_ferrite_grid`.
+FerriteMeshParser.jl converts the mesh in an Abaqus input file (`.inp`) to a `Ferrite.Grid` with its function `get_ferrite_grid`.
 The translations for most of Abaqus' standard 2d and 3d continuum elements to a `Ferrite.AbstractCell` are defined.
 Custom translations can be given as input, which can be used to import other (custom) elements or to override the default translation.
 ```@docs
@@ -45,7 +45,7 @@ FerriteMeshParser.get_ferrite_grid
 If you are missing the translation of an Abaqus element that is equivalent to a `Ferrite.AbstractCell`,
 consider to open an [issue](https://github.com/Ferrite-FEM/FerriteMeshParser.jl/issues/new) or a pull request.
 
-## `Grid` Datastructure
+## `Grid` datastructure
 
 In Ferrite a Grid is a collection of `Node`s and `Cell`s and is parameterized in its physical dimensionality and cell type.
 `Node`s are points in the physical space and can be initialized by a N-Tuple, where N corresponds to the dimensions.
@@ -135,7 +135,7 @@ Ferrite.get_coordinate_type(::SmallGrid{dim}) where dim = Vec{dim,Float64}
 Ferrite.nnodes_per_cell(grid::SmallGrid, i::Int=1) = Ferrite.nnodes(grid.cells_test[i])
 ```
 
-These definitions make many of `Ferrite`s functions work out of the box, e.g. you can now call
+These definitions make many of Ferrite functions work out of the box, e.g. you can now call
 `getcoordinates(grid, cellid)` on the `SmallGrid`.
 
 Now, you would be able to assemble the heat equation example over the new custom `SmallGrid` type.

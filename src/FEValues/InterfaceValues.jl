@@ -17,10 +17,10 @@ The first element of the interface is denoted "here" and the second element "the
   geometric interpolation.
 * `InterfaceValues(qr_here::FacetQuadratureRule, ip_here::Interpolation, ip_geo_here::Interpolation, qr_there::FacetQuadratureRule, ip_there::Interpolation, ip_geo_there::Interpolation)`:
   same as above but with given geometric interpolation.
-* `InterfaceValues(fv::FacetValues)`: quadrature rule and interpolations from face values
+* `InterfaceValues(fv::FacetValues)`: quadrature rule and interpolations from facet values
   (same on both sides).
 * `InterfaceValues(fv_here::FacetValues, fv_there::FacetValues)`: quadrature rule and
-  interpolations from the face values.
+  interpolations from the facet values.
 
 **Associated methods:**
 * [`shape_value_average`](@ref)
@@ -59,7 +59,7 @@ end
 function InterfaceValues(
         qr_here::FacetQuadratureRule, ip_here::Interpolation, ipg_here::Interpolation,
         qr_there::FacetQuadratureRule, ip_there::Interpolation, ipg_there::Interpolation
-        )
+    )
     # FacetValues constructor enforces that refshape matches for all arguments
     here = FacetValues(qr_here, ip_here, ipg_here)
     there = FacetValues(qr_there, ip_there, ipg_there)
@@ -84,7 +84,7 @@ function InterfaceValues(
 end
 # From FacetValue(s)
 InterfaceValues(facetvalues_here::FVA, facetvalues_there::FVB = deepcopy(FacetValues_here)) where {FVA <: FacetValues, FVB <: FacetValues} =
-    InterfaceValues{FVA,FVB}(facetvalues_here, facetvalues_there)
+    InterfaceValues{FVA, FVB}(facetvalues_here, facetvalues_there)
 
 function Base.copy(iv::InterfaceValues)
     return InterfaceValues(copy(iv.here), copy(iv.there))
@@ -136,7 +136,7 @@ function reinit!(
     @assert length(quad_points_a) <= length(quad_points_b)
 
     # Re-evaluate shape functions in the transformed quadrature points
-    precompute_values!(get_fun_values(iv.there),  quad_points_b)
+    precompute_values!(get_fun_values(iv.there), quad_points_b)
     precompute_values!(get_geo_mapping(iv.there), quad_points_b)
 
     # reinit! the "there" side
@@ -151,7 +151,7 @@ Return the normal vector in the quadrature point `qp` on the interface. If `here
 (default) the outward normal to the "here" element is returned, otherwise the outward normal
 to the "there" element.
 """
-function getnormal(iv::InterfaceValues, qp::Int; here::Bool=true)
+function getnormal(iv::InterfaceValues, qp::Int; here::Bool = true)
     # TODO: Remove the `here` kwarg and let user use `- getnormal(iv, qp)` instead?
     return getnormal(here ? iv.here : iv.there, qp)
 end
@@ -238,10 +238,10 @@ multiply by minus the outward facing normal to the first element's side of the i
 """
 function shape_gradient_jump end
 
-for (func,                      f_,              f_type) in (
-    (:shape_value,              :shape_value,    :shape_value_type),
-    (:shape_gradient,           :shape_gradient, :shape_gradient_type),
-)
+for (func, f_, f_type) in (
+        (:shape_value, :shape_value, :shape_value_type),
+        (:shape_gradient, :shape_gradient, :shape_gradient_type),
+    )
     @eval begin
         function $(func)(iv::InterfaceValues, qp::Int, i::Int; here::Bool)
             nbf = getnbasefunctions(iv)
@@ -262,12 +262,12 @@ for (func,                      f_,              f_type) in (
     end
 end
 
-for (func,                      f_,               is_avg) in (
-    (:shape_value_average,      :shape_value,     true),
-    (:shape_gradient_average,   :shape_gradient,  true),
-    (:shape_value_jump,         :shape_value,     false),
-    (:shape_gradient_jump,      :shape_gradient,  false),
-)
+for (func, f_, is_avg) in (
+        (:shape_value_average, :shape_value, true),
+        (:shape_gradient_average, :shape_gradient, true),
+        (:shape_value_jump, :shape_value, false),
+        (:shape_gradient_jump, :shape_gradient, false),
+    )
     @eval begin
         function $(func)(iv::InterfaceValues, qp::Int, i::Int)
             f_here = $(f_)(iv, qp, i; here = true)
@@ -317,10 +317,7 @@ multiply by minus the outward facing normal to the first element's side of the i
 """
 function function_gradient_jump end
 
-for (func,                          ) in (
-    (:function_value,               ),
-    (:function_gradient,            ),
-)
+for func in (:function_value, :function_gradient)
     @eval begin
         function $(func)(
                 iv::InterfaceValues, q_point::Int, u::AbstractVector;
@@ -352,12 +349,12 @@ for (func,                          ) in (
     end
 end
 
-for (func,                          f_,                     is_avg) in (
-    (:function_value_average,       :function_value,        true ),
-    (:function_gradient_average,    :function_gradient,     true ),
-    (:function_value_jump,          :function_value,        false),
-    (:function_gradient_jump,       :function_gradient,     false),
-)
+for (func, f_, is_avg) in (
+        (:function_value_average, :function_value, true),
+        (:function_gradient_average, :function_gradient, true),
+        (:function_value_jump, :function_value, false),
+        (:function_gradient_jump, :function_gradient, false),
+    )
     @eval begin
         function $(func)(iv::InterfaceValues, qp::Int, u::AbstractVector)
             @boundscheck checkbounds(u, getnbasefunctions(iv))
@@ -399,12 +396,12 @@ end
 Relative orientation information for 1D and 2D interfaces in 2D and 3D elements respectively.
 This information is used to construct the transformation matrix to
 transform the quadrature points from facet_a to facet_b achieving synced
-spatial coordinates. Face B's orientation relative to Face A's can
+spatial coordinates. Facet B's orientation relative to Facet A's can
 possibly be flipped (i.e. the vertices indices order is reversed)
 and the vertices can be rotated against each other.
-The reference orientation of face B is such that the first node
+The reference orientation of facet B is such that the first node
 has the lowest vertex index. Thus, this structure also stores the
-shift of the lowest vertex index which is used to reorient the face in
+shift of the lowest vertex index which is used to reorient the facet in
 case of flipping [`transform_interface_points!`](@ref).
 """
 struct InterfaceOrientationInfo{RefShapeA, RefShapeB}
@@ -418,7 +415,7 @@ end
 """
     InterfaceOrientationInfo(cell_a::AbstractCell, cell_b::AbstractCell, facet_a::Int, facet_b::Int)
 
-Return the relative orientation info for face B with regards to face A.
+Return the relative orientation info for facet B with regards to facet A.
 Relative orientation is computed using a [`OrientationInfo`](@ref) for each side of the interface.
 """
 function InterfaceOrientationInfo(cell_a::AbstractCell{RefShapeA}, cell_b::AbstractCell{RefShapeB}, facet_a::Int, facet_b::Int) where {RefShapeA <: AbstractRefShape, RefShapeB <: AbstractRefShape}
@@ -430,7 +427,7 @@ function InterfaceOrientationInfo(cell_a::AbstractCell{RefShapeA}, cell_b::Abstr
 end
 
 function InterfaceOrientationInfo(_::AbstractCell{RefShapeA}, _::AbstractCell{RefShapeB}, _::Int, _::Int) where {RefShapeA <: AbstractRefShape{1}, RefShapeB <: AbstractRefShape{1}}
-    (error("1D elements don't use transformations for interfaces."))
+    error("1D elements don't use transformations for interfaces.")
 end
 
 """
@@ -438,59 +435,59 @@ end
 
 Returns the transformation matrix corresponding to the interface orientation information stored in `InterfaceOrientationInfo`.
 The transformation matrix is constructed using a combination of affine transformations defined for each interface reference shape.
-The transformation for a flipped face is a function of both relative orientation and the orientation of the second face.
-If the face is not flipped then the transformation is a function of relative orientation only.
+The transformation for a flipped facet is a function of both relative orientation and the orientation of the second facet.
+If the facet is not flipped then the transformation is a function of relative orientation only.
 """
 get_transformation_matrix
 
-function get_transformation_matrix(interface_transformation::InterfaceOrientationInfo{RefShapeA}) where RefShapeA <: AbstractRefShape{3}
+function get_transformation_matrix(interface_transformation::InterfaceOrientationInfo{RefShapeA}) where {RefShapeA <: AbstractRefShape{3}}
     facet_a = interface_transformation.facet_a
     facenodes = reference_facets(RefShapeA)[facet_a]
-    _get_transformation_matrix(facenodes, interface_transformation)
+    return _get_transformation_matrix(facenodes, interface_transformation)
 end
 
-@inline function _get_transformation_matrix(::NTuple{3,Int}, interface_transformation::InterfaceOrientationInfo)
+@inline function _get_transformation_matrix(::NTuple{3, Int}, interface_transformation::InterfaceOrientationInfo)
     flipped = interface_transformation.flipped
     shift_index = interface_transformation.shift_index
     lowest_node_shift_index = interface_transformation.lowest_node_shift_index
 
-    θ = 2*shift_index/3
-    θpre = 2*lowest_node_shift_index/3
+    θ = 2 * shift_index / 3
+    θpre = 2 * lowest_node_shift_index / 3
 
-    flipping = SMatrix{3,3}(1.0, 0.0, 0.0, 0.0, -1.0, 0.0, 0.0, 0.0, 1.0)
+    flipping = Tensor{2, 3}((1.0, 0.0, 0.0, 0.0, -1.0, 0.0, 0.0, 0.0, 1.0))
 
-    translate_1 = SMatrix{3,3}(1.0, 0.0, 0.0, 0.0, 1.0, 0.0, -sinpi(2/3)/3, -0.5, 1.0)
-    stretch_1 = SMatrix{3,3}(sinpi(2/3), 0.5, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0)
+    translate_1 = Tensor{2, 3}((1.0, 0.0, 0.0, 0.0, 1.0, 0.0, -sinpi(2 / 3) / 3, -0.5, 1.0))
+    stretch_1 = Tensor{2, 3}((sinpi(2 / 3), 0.5, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0))
 
-    translate_2 = SMatrix{3,3}(1.0, 0.0, 0.0, 0.0, 1.0, 0.0, sinpi(2/3)/3, 0.5, 1.0)
-    stretch_2 = SMatrix{3,3}(1/sinpi(2/3), -1/2/sinpi(2/3), 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0)
+    translate_2 = Tensor{2, 3}((1.0, 0.0, 0.0, 0.0, 1.0, 0.0, sinpi(2 / 3) / 3, 0.5, 1.0))
+    stretch_2 = Tensor{2, 3}((1 / sinpi(2 / 3), -1 / 2 / sinpi(2 / 3), 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0))
 
-    return flipped ? stretch_2 * translate_2 * rotation_tensor(0,0,θpre*pi) * flipping * rotation_tensor(0,0,(θ - θpre)*pi) * translate_1 * stretch_1 :
-        stretch_2 * translate_2 * rotation_tensor(0,0,θ*pi) * translate_1 * stretch_1
+    return flipped ? stretch_2 ⋅ translate_2 ⋅ rotation_tensor(0, 0, θpre * pi) ⋅ flipping ⋅ rotation_tensor(0, 0, (θ - θpre) * pi) ⋅ translate_1 ⋅ stretch_1 :
+        stretch_2 ⋅ translate_2 ⋅ rotation_tensor(0, 0, θ * pi) ⋅ translate_1 ⋅ stretch_1
 end
 
-@inline function _get_transformation_matrix(::NTuple{4,Int}, interface_transformation::InterfaceOrientationInfo)
+@inline function _get_transformation_matrix(::NTuple{4, Int}, interface_transformation::InterfaceOrientationInfo)
     flipped = interface_transformation.flipped
     shift_index = interface_transformation.shift_index
     lowest_node_shift_index = interface_transformation.lowest_node_shift_index
 
-    θ = 2*shift_index/4
-    θpre = 2*lowest_node_shift_index/4
+    θ = 2 * shift_index / 4
+    θpre = 2 * lowest_node_shift_index / 4
 
-    flipping = SMatrix{3,3}(0.0, 1.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0)
-    return flipped ? rotation_tensor(0,0,θpre*pi) * flipping * rotation_tensor(0,0,(θ - θpre)*pi) :  rotation_tensor(0,0,θ*pi)
+    flipping = Tensor{2, 3}((0.0, 1.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0))
+    return flipped ? rotation_tensor(0, 0, θpre * pi) ⋅ flipping ⋅ rotation_tensor(0, 0, (θ - θpre) * pi) : rotation_tensor(0, 0, θ * pi)
 end
 
-@inline function _get_transformation_matrix(::NTuple{N,Int}, ::InterfaceOrientationInfo) where N
+@inline function _get_transformation_matrix(::NTuple{N, Int}, ::InterfaceOrientationInfo) where {N}
     throw(ArgumentError("transformation is not implemented"))
 end
 
 @doc raw"""
     transform_interface_points!(dst::AbstractVector{Vec{3, Float64}}, points::AbstractVector{Vec{3, Float64}}, interface_transformation::InterfaceOrientationInfo)
 
-Transform the points from face A to face B using the orientation information of the interface and store it in the vector dst.
-For 3D, the faces are transformed into regular polygons such that the rotation angle is the shift in reference node index × 2π ÷ number of edges in face.
-If the face is flipped then the flipping is about the axis that preserves the position of the first node (which is the reference node after being rotated to be in the first position,
+Transform the points from facet A to facet B using the orientation information of the interface and store it in the vector dst.
+For 3D, the facets are transformed into regular polygons such that the rotation angle is the shift in reference node index × 2π ÷ number of edges in facet.
+If the facet is flipped then the flipping is about the axis that preserves the position of the first node (which is the reference node after being rotated to be in the first position,
 it's rotated back in the opposite direction after flipping).
 Take for example the interface
 ```
@@ -556,8 +553,8 @@ function transform_interface_points!(dst::AbstractVector{Vec{3, Float64}}, point
     M = get_transformation_matrix(interface_transformation)
     for (idx, point) in pairs(points)
         face_point = element_to_facet_transformation(point, RefShapeA, facet_a)
-        result = M * Vec(face_point[1],face_point[2], 1.0)
-        dst[idx] = facet_to_element_transformation(Vec(result[1],result[2]), RefShapeB, facet_b)
+        result = M ⋅ Vec(face_point[1], face_point[2], 1.0)
+        dst[idx] = facet_to_element_transformation(Vec(result[1], result[2]), RefShapeB, facet_b)
     end
     return nothing
 end
@@ -578,8 +575,9 @@ end
 function Base.show(io::IO, m::MIME"text/plain", iv::InterfaceValues)
     println(io, "InterfaceValues with")
     print(io, "{Here} ")
-    show(io,m,iv.here)
+    show(io, m, iv.here)
     println(io)
     print(io, "{There} ")
-    show(io,m,iv.there)
+    show(io, m, iv.there)
+    return
 end

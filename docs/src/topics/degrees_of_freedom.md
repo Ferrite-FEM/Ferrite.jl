@@ -42,5 +42,7 @@ close!(dh)
 
 ## Ordering of Dofs
 
-ordered in the same order as we add to dofhandler
-vertices -> edges -> faces -> volumes
+!!! todo
+    Describe dof ordering within elements (vertices -> edges -> faces ->
+    volumes) and `dof_range`.
+    Describe (global) dof renumbering
