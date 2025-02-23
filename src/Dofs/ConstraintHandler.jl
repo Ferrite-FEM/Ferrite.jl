@@ -310,9 +310,8 @@ function _add!(ch::ConstraintHandler, dbc::Dirichlet, bcfacets::AbstractVecOrSet
     cc = CellCache(ch.dh, UpdateFlags(; nodes = false, coords = false, dofs = true))
     for (cellidx, facetidx) in bcfacets
         reinit!(cc, cellidx)
-        reinit!(bcvalue, facetidx)
         @debug i0 = length(constrained_dofs) + 1
-        for location in get_dof_locations(bcvalue)
+        for location in get_dof_locations(bcvalue, facetidx)
             for component in dbc.components
                 push!(constrained_dofs, cc.dofs[get_local_dof(bcvalue, location, component)])
             end
@@ -327,24 +326,6 @@ function _add!(ch::ConstraintHandler, dbc::Dirichlet, bcfacets::AbstractVecOrSet
         add_prescribed_dof!(ch, d, NaN, nothing)
     end
     return ch
-end
-
-# TODO: _local_facet_dofs_for_bc included in BCValues, but not used by periodic bc
-# Calculate which local dof index live on each facet:
-# facet `i` have dofs `local_facet_dofs[local_facet_dofs_offset[i]:local_facet_dofs_offset[i+1]-1]
-function _local_facet_dofs_for_bc(interpolation, field_dim, components, offset, boundaryfunc::F = dirichlet_facetdof_indices) where {F}
-    @assert issorted(components)
-    local_facet_dofs = Int[]
-    local_facet_dofs_offset = Int[1]
-    for (_, facet) in enumerate(boundaryfunc(interpolation))
-        for fdof in facet, d in 1:field_dim
-            if d in components
-                push!(local_facet_dofs, (fdof - 1) * field_dim + d + offset)
-            end
-        end
-        push!(local_facet_dofs_offset, length(local_facet_dofs) + 1)
-    end
-    return local_facet_dofs, local_facet_dofs_offset
 end
 
 function _add!(ch::ConstraintHandler, dbc::Dirichlet, bcnodes::AbstractVecOrSet{Int}, interpolation::Interpolation, field_dim::Int, offset::Int, bcvalue::BCValues, cellset::AbstractVecOrSet{Int} = OrderedSet{Int}(1:getncells(get_grid(ch.dh))))
@@ -448,8 +429,7 @@ function _update!(
     cc = CellCache(dh, UpdateFlags(; nodes = false, coords = true, dofs = true))
     for (cellidx, entityidx) in boundary_entities
         reinit!(cc, cellidx)
-        reinit!(boundaryvalues, entityidx)
-        for location in get_dof_locations(boundaryvalues)
+        for location in get_dof_locations(boundaryvalues, entityidx)
             x = spatial_coordinate(boundaryvalues, location, cc.coords)
             bc_value = f(x, time)
             @assert length(bc_value) == length(components)
@@ -976,48 +956,32 @@ function _add!(
     grid = get_grid(ch.dh)
     facet_map = pdbc.facet_map
 
-    dofmap = PeriodicDofPosMapping(interpolation, offset)
-
-
-    # Temporary test code
-    ipg = default_geometric_interpolation(interpolation) # dummy
+    ipg = default_geometric_interpolation(interpolation) # dummy, TODO: Support BCValues without spatial coord
     bcvalues = BCValues(interpolation, ipg, FacetIndex, offset)
     pdl = PeriodicDofLocations(interpolation)
-    function _getdofnr(bv::BCValues, facet_nr, dof_location)
-        reinit!(bv, facet_nr)
-        return get_local_dof(bv, dof_location, 1)
-    end
-    # End: Temporary test code
-
 
     # Dof map for mirror dof (constrained) => image dof (master dof)
     # However, here we only add the first component, as the rest can be calculated when needed
     dof_map = Dict{Int, Int}()
-    first_component_offset = first(pdbc.components) - 1
     component_incr_offsets = pdbc.components .- first(pdbc.components) # Increments from the first component (incl. 0 for first)
 
     n = ndofs_per_cell(ch.dh, first(facet_map).mirror[1])
     mirror_dofs = zeros(Int, n)
     image_dofs = zeros(Int, n)
     for facet_pair in facet_map
-        m = facet_pair.mirror
-        i = facet_pair.image
-        celldofs!(mirror_dofs, ch.dh, m[1])
-        celldofs!(image_dofs, ch.dh, i[1])
+        image_facet = facet_pair.image
+        mirror_facet = facet_pair.mirror
+        celldofs!(mirror_dofs, ch.dh, mirror_facet[1])
+        celldofs!(image_dofs, ch.dh, image_facet[1])
 
-        for dof_location in get_dof_locations(dofmap, facet_pair)
-            local_mdof, local_idof = get_local_dof_pair(dofmap, facet_pair, dof_location)
+        for image_dof_location in get_dof_locations(bcvalues, image_facet)
+            local_idof = get_local_dof(bcvalues, image_dof_location, first(pdbc.components))
+            mirror_dof_location = get_mirror_dof_location(pdl, facet_pair, image_dof_location)
+            local_mdof = get_local_dof(bcvalues, mirror_dof_location, first(pdbc.components))
 
+            idof = image_dofs[local_idof]
+            mdof = mirror_dofs[local_mdof]
 
-            # Temporary test code
-            mirror_dof_location = get_mirror_dof_location(pdl, facet_pair, dof_location)
-            @assert local_idof == _getdofnr(bcvalues, i[2], dof_location)
-            @assert local_mdof == _getdofnr(bcvalues, m[2], mirror_dof_location)
-            # End: Temporary test code
-
-
-            idof = image_dofs[local_idof] + first_component_offset
-            mdof = mirror_dofs[local_mdof] + first_component_offset
             if haskey(dof_map, idof)
                 idof′ = dof_map[idof]
                 # @info "$mdof => $idof, but $idof => $idof′, remapping $mdof => $idof′."

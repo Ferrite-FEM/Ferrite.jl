@@ -183,15 +183,10 @@ for each dof-position determined by the `func_interpol`. Used mainly by the `Con
 mutable struct BCValues{T}
     const M::Vector{Matrix{T}}
     const dofs::ArrayOfVectorViews{Int, 1}
-    current_entity::Int
 end
 
 function BCValues(func_interpol::Interpolation, geom_interpol::Interpolation, boundary_type::Type{<:BoundaryIndex}, field_dof_offset)
     return BCValues(Float64, func_interpol, geom_interpol, boundary_type, field_dof_offset)
-end
-
-function reinit!(bcv::BCValues, current_entity::Int)
-    return bcv.current_entity = current_entity
 end
 
 function BCValues(
@@ -222,21 +217,27 @@ function BCValues(
     end
     dofs = ArrayOfVectorViews(local_facet_dofs_offset, local_facet_dofs, LinearIndices(1:(length(local_facet_dofs_offset) - 1)))
 
-    return BCValues{T}(M, dofs, 1)
+    return BCValues{T}(M, dofs)
 end
 
-get_dof_locations(bcv::BCValues) = 1:size(bcv.M[bcv.current_entity], 2)
+struct DofLocation
+    entitynr::Int
+    location_nr::Int
+end
 
-function spatial_coordinate(bcv::BCValues, dof_location_nr::Int, xh::AbstractVector{Vec{dim, T}}) where {dim, T}
-    M = bcv.M[bcv.current_entity]
+get_dof_locations(bcv::BCValues, idx::BoundaryIndex) = get_dof_locations(bcv, idx[2])
+get_dof_locations(bcv::BCValues, entitynr) = (DofLocation(entitynr, i) for i in 1:size(bcv.M[entitynr], 2))
+
+function spatial_coordinate(bcv::BCValues, loc::DofLocation, xh::AbstractVector{Vec{dim, T}}) where {dim, T}
+    M = bcv.M[loc.entitynr]
     n_base_funcs = size(M, 1)
     (checkbounds(Bool, xh, 1:n_base_funcs) && length(xh) == n_base_funcs) || throw_incompatible_coord_length(length(xh), n_base_funcs)
 
     x = zero(Vec{dim, T})
     @inbounds for i in 1:n_base_funcs
-        x += M[i, dof_location_nr] * xh[i]
+        x += M[i, loc.location_nr] * xh[i]
     end
     return x
 end
 
-get_local_dof(bcv::BCValues, location::Int, component) = bcv.dofs[bcv.current_entity][location] + component - 1
+get_local_dof(bcv::BCValues, loc::DofLocation, component) = bcv.dofs[loc.entitynr][loc.location_nr] + component - 1
