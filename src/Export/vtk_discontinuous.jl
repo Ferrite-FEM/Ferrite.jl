@@ -6,11 +6,11 @@ function create_discontinuous_vtk_griddata(grid::Grid{dim, C, T}) where {dim, C,
     icoord = 0
     for cell in CellIterator(grid)
         CT = getcelltype(grid, cellid(cell))
-        vtk_celltype = Ferrite.cell_to_vtkcell(CT)
+        vtk_celltype = cell_to_vtkcell(CT)
         cell_coords = getcoordinates(cell)
         n = length(cell_coords)
         cellnodes[cellid(cell)] = (1:n) .+ icoord
-        vtk_cellnodes = nodes_to_vtkorder(CT((ntuple(i->i+icoord, n))))
+        vtk_cellnodes = nodes_to_vtkorder(CT((ntuple(i -> i + icoord, n))))
         cls[cellid(cell)] = WriteVTK.MeshCell(vtk_celltype, vtk_cellnodes)
         for x in cell_coords
             icoord += 1
@@ -20,13 +20,13 @@ function create_discontinuous_vtk_griddata(grid::Grid{dim, C, T}) where {dim, C,
     return coords, cls, cellnodes
 end
 
-function evaluate_at_discontinuous_vtkgrid_nodes(dh::DofHandler, u::Vector{T}, fieldname::Symbol, cellnodes) where T
+function evaluate_at_discontinuous_vtkgrid_nodes(dh::DofHandler, u::Vector{T}, fieldname::Symbol, cellnodes) where {T}
     # Make sure the field exists
     fieldname ∈ getfieldnames(dh) || error("Field $fieldname not found.")
     # Figure out the return type (scalar or vector)
     field_idx = find_field(dh, fieldname)
     ip = getfieldinterpolation(dh, field_idx)
-    RT = ip isa ScalarInterpolation ? T : Vec{n_components(ip),T}
+    RT = ip isa ScalarInterpolation ? T : Vec{n_components(ip), T}
     n_c = n_components(ip)
     vtk_dim = n_c == 2 ? 3 : n_c # VTK wants vectors padded to 3D
     n_vtk_nodes = maximum(maximum, cellnodes)
@@ -56,8 +56,10 @@ function evaluate_at_discontinuous_vtkgrid_nodes(dh::DofHandler, u::Vector{T}, f
     return data
 end
 
-function _evaluate_at_discontinuous_vtkgrid_nodes!(data::Matrix, sdh::SubDofHandler,
-    u::Vector{T}, cv::CellValues, drange::UnitRange, ::Type{RT}, cellnodes) where {T, RT}
+function _evaluate_at_discontinuous_vtkgrid_nodes!(
+        data::Matrix, sdh::SubDofHandler,
+        u::Vector{T}, cv::CellValues, drange::UnitRange, ::Type{RT}, cellnodes
+    ) where {T, RT}
     ue = zeros(T, length(drange))
     # TODO: Remove this hack when embedding works...
     if RT <: Vec && function_interpolation(cv) isa ScalarInterpolation
@@ -74,7 +76,7 @@ function _evaluate_at_discontinuous_vtkgrid_nodes!(data::Matrix, sdh::SubDofHand
         for (qp, nodeid) in pairs(cellnodes[cellid(cell)])
             val = function_value(cv, qp, uer)
             data[1:length(val), nodeid] .= val
-            data[(length(val)+1):end, nodeid] .= 0 # purge the NaN
+            data[(length(val) + 1):end, nodeid] .= 0 # purge the NaN
         end
     end
     return data
