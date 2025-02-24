@@ -1942,3 +1942,38 @@ function get_direction(::Nedelec{RefTriangle, 2}, j, cell)
     edge = edges(cell)[(j + 1) ÷ 2]
     return ifelse(edge[2] > edge[1], 1, -1)
 end
+
+# RefTetrahedron, 1st order Lagrange
+# https://defelement.org/elements/examples/tetrahedron-nedelec1-lagrange-1.html
+#
+# Edges map from RefTetrahedron to their DefElement basis functions as follows
+#  1 -> φ5
+#  2 -> φ2
+#  3 -> -φ4
+#  4 -> φ3
+#  5 -> φ1
+#  6 -> φ0
+function reference_shape_value(ip::Nedelec{RefTetrahedron, 1}, ξ::Vec{3}, i::Int)
+    x, y, z = ξ
+    i == 1 && return Vec(1 - y - z, x, x)
+    i == 2 && return Vec(-y, x, 0.0) # DefElement φ2
+    i == 3 && return Vec(-y, x + z - 1, -y) # DefElement -φ4
+    i == 4 && return Vec(z, z, 1 - x - y) # DefElement φ3
+    i == 5 && return Vec(-z, 0.0, x) # DefElement φ1
+    i == 6 && return Vec(0.0, -z, y) # DefElement φ0
+    throw(ArgumentError("no shape function $i for interpolation $ip"))
+end
+
+getnbasefunctions(::Nedelec{RefTetrahedron, 1}) = 6
+edgedof_interior_indices(::Nedelec{RefTetrahedron, 1}) = ((1,), (2,), (3,), (4,), (5,), (6,))
+facedof_indices(::Nedelec{RefTetrahedron, 1}) = ((1, 2, 3), (1, 4, 5), (2, 5, 6), (3, 4, 6))
+adjust_dofs_during_distribution(::Nedelec{RefTetrahedron, 1}) = false
+
+function get_direction(::Nedelec{RefTetrahedron, 1}, j, cell)
+    edge = edges(cell)[j]
+    if(j == 3) # Edge 3 (v3, v1) is reversed compared to the "normal" definition, which has e[2] > e[1]
+        return ifelse(edge[1] > edge[2], 1, -1)
+    else
+        return ifelse(edge[2] > edge[1], 1, -1)
+    end
+end
