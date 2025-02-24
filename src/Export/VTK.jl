@@ -224,7 +224,7 @@ Project `vals` to the grid nodes with `proj` and save to `vtk`.
 """
 function write_projection(vtk::VTKGridFile, proj::L2Projector, vals, name)
     if write_discontinuous(vtk)
-        @assert first(vals) isa Number
+        # @assert first(vals) isa Number
         data = evaluate_at_discontinuous_vtkgrid_nodes(proj.dh, vals, only(getfieldnames(proj.dh)), vtk.cellnodes)
         comp_names = ["x", "y", "z"][1:size(data, 1)]
     else

@@ -20,13 +20,13 @@ function create_discontinuous_vtk_griddata(grid::Grid{dim, C, T}) where {dim, C,
     return coords, cls, cellnodes
 end
 
-function evaluate_at_discontinuous_vtkgrid_nodes(dh::DofHandler, u::Vector{T}, fieldname::Symbol, cellnodes) where {T}
+function evaluate_at_discontinuous_vtkgrid_nodes(dh::DofHandler{sdim}, u::Vector{T}, fieldname::Symbol, cellnodes) where {sdim, T}
     # Make sure the field exists
     fieldname ∈ getfieldnames(dh) || error("Field $fieldname not found.")
     # Figure out the return type (scalar or vector)
     field_idx = find_field(dh, fieldname)
     ip = getfieldinterpolation(dh, field_idx)
-    RT = ip isa ScalarInterpolation ? T : Vec{n_components(ip), T}
+    RT = shape_value_type(ip, T)
     n_c = n_components(ip)
     vtk_dim = n_c == 2 ? 3 : n_c # VTK wants vectors padded to 3D
     n_vtk_nodes = maximum(maximum, cellnodes)
@@ -43,12 +43,8 @@ function evaluate_at_discontinuous_vtkgrid_nodes(dh::DofHandler, u::Vector{T}, f
         ip_geo = geometric_interpolation(CT)
         local_node_coords = reference_coordinates(ip_geo)
         qr = QuadratureRule{getrefshape(ip)}(zeros(length(local_node_coords)), local_node_coords)
-        if ip isa VectorizedInterpolation
-            # TODO: Remove this hack when embedding works...
-            cv = CellValues(qr, ip.ip, ip_geo)
-        else
-            cv = CellValues(qr, ip, ip_geo)
-        end
+        cv = CellValues(qr, ip, ip_geo)
+        cv = CellValues(qr, ip, ip_geo^sdim; update_gradients = false, update_hessians = false, update_detJdV = false)
         drange = dof_range(sdh, field_idx)
         # Function barrier
         _evaluate_at_discontinuous_vtkgrid_nodes!(data, sdh, u, cv, drange, RT, cellnodes)

@@ -155,6 +155,7 @@ end
 _mass_qr(::RaviartThomas{shape, order}) where {shape, order} = QuadratureRule{shape}(order + 2)
 
 _mass_qr(ip::VectorizedInterpolation) = _mass_qr(ip.ip)
+_mass_qr(::DiscontinuousLagrange{shape, order}) where {shape, order} = _mass_qr(Lagrange{shape, order}())
 
 function _assemble_L2_matrix(dh::DofHandler, qrs_lhs::Vector{<:QuadratureRule})
     M = Symmetric(allocate_matrix(dh))
