@@ -943,7 +943,7 @@ function _evaluate_at_grid_nodes(dh::DofHandler{sdim}, u::AbstractVector{T}, fie
     # Figure out the return type (scalar or vector)
     field_idx = find_field(dh, fieldname)
     ip = getfieldinterpolation(dh, field_idx)
-    RT = _function_value_type(ip, typeof(u))
+    RT = _function_value_type(ip, u)
     if vtk
         # VTK output of solution field (or L2 projected scalar data)
         n_c = n_components(ip)
