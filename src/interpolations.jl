@@ -1784,6 +1784,7 @@ struct RaviartThomas{shape, order, vdim} <: VectorInterpolation{vdim, shape, ord
     end
 end
 mapping_type(::RaviartThomas) = ContravariantPiolaMapping()
+is_discontinuous(::RaviartThomas) = true
 
 # RefTriangle
 edgedof_indices(ip::RaviartThomas{RefTriangle}) = edgedof_interior_indices(ip)
@@ -1848,6 +1849,7 @@ struct BrezziDouglasMarini{shape, order, vdim} <: VectorInterpolation{vdim, shap
     end
 end
 mapping_type(::BrezziDouglasMarini) = ContravariantPiolaMapping()
+is_discontinuous(::BrezziDouglasMarini) = true
 
 # RefTriangle
 edgedof_indices(ip::BrezziDouglasMarini{RefTriangle}) = edgedof_interior_indices(ip)
@@ -1887,6 +1889,7 @@ struct Nedelec{shape, order, vdim} <: VectorInterpolation{vdim, shape, order}
     end
 end
 mapping_type(::Nedelec) = CovariantPiolaMapping()
+is_discontinuous(::Nedelec) = true
 edgedof_indices(ip::Nedelec) = edgedof_interior_indices(ip)
 
 # 2D refshape (rdim == vdim for Nedelec)

@@ -153,7 +153,7 @@ function _mass_qr(::Lagrange{shape, 2}) where {shape <: RefSimplex}
     return QuadratureRule{shape}(4)
 end
 _mass_qr(::RaviartThomas{shape, order}) where {shape, order} = QuadratureRule{shape}(order + 2)
-
+_mass_qr(::BrezziDouglasMarini{shape, order}) where {shape, order} = QuadratureRule{shape}(order + 2)
 _mass_qr(ip::VectorizedInterpolation) = _mass_qr(ip.ip)
 _mass_qr(::DiscontinuousLagrange{shape, order}) where {shape, order} = _mass_qr(Lagrange{shape, order}())
 

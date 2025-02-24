@@ -30,6 +30,7 @@ addcellset!(grid, "low_k", x -> x[2] < -1.0e-3 || x[1] > 1.0e-3)
 #=
 
 ![Mesh](l2flux_mesh.png)
+
 **Figure 1:** Mesh and domains for prototype problem
 
 Next, we solve the described FE problem, following the [heat equation tutorial](@ref tutorial-heat-equation),
@@ -38,11 +39,10 @@ conditions,
 =#
 
 ipu = Lagrange{RefTriangle, 2}()
-dh = close!(add!(DofHandler(grid), :u, ipu))
+dh = close!(add!(DofHandler(grid), :T, ipu))
 qr = QuadratureRule{RefTriangle}(2)
 cv = CellValues(qr, ipu, Lagrange{RefTriangle, 1}())
 
-# Next, we assign a given temperature solution.
 function solve_fe(dh, cv, low_k_set)
     K = allocate_matrix(dh)
     f = zeros(ndofs(dh))
@@ -67,8 +67,8 @@ function solve_fe(dh, cv, low_k_set)
     end
 
     ch = ConstraintHandler(dh)
-    add!(ch, Dirichlet(:u, getfacetset(dh.grid, "left"), Returns(-1.0)))
-    add!(ch, Dirichlet(:u, getfacetset(dh.grid, "right"), Returns(+1.0)))
+    add!(ch, Dirichlet(:T, getfacetset(dh.grid, "left"), Returns(-1.0)))
+    add!(ch, Dirichlet(:T, getfacetset(dh.grid, "right"), Returns(+1.0)))
     close!(ch)
     apply!(K, f, ch)
     return K \ f
@@ -78,7 +78,9 @@ a = solve_fe(dh, cv, getcellset(grid, "low_k"));
 
 #=
 This gives the continuous temperature field,
+
 ![Temperature field](L2flux_temperature.png)
+
 **Figure 2:** Continuous temperature solution
 
 Even though the temperature is continuous, the flux, $\boldsymbol{q}$, becomes discontinuous
@@ -104,13 +106,14 @@ end
 qp_data = [calculate_qp_flux(cv, a, cell, getcellset(grid, "low_k")) for cell in CellIterator(dh)];
 
 #=
-Next, we project the solution and export it for each case
+Next, we project the solution and export it for interpolation. Note that 2nd order `RaviartThomas` has
+8 base functions per triangle cell compared to 6 for vectorized linear `DiscontinuousLagrange` and `Lagrange`.
 =#
 function project_and_export(name, dofhandler, sol, grid, qr_rhs, ip, type, data)
     proj = L2Projector{type}(grid)
     add!(proj, 1:getncells(grid), ip; qr_rhs)
     close!(proj)
-    return VTKGridFile(name, dofhandler; write_discontinuous = !isa(ip, Lagrange)) do vtk
+    return VTKGridFile(name, dofhandler; write_discontinuous = Ferrite.is_discontinuous(ip)) do vtk
         write_solution(vtk, dofhandler, sol)
         Ferrite.write_cellset(vtk, grid, "low_k")
         write_projection(vtk, proj, project(proj, data), "q")
@@ -123,5 +126,17 @@ project_and_export("proj_Hdiv", dh, a, grid, qr, RaviartThomas{RefTriangle, 2}()
 
 #=
 ![Different projections for H1 and H(div)](L2flux.png)
-**Figure 3:** Differences between fluxes for projection onto different function spaces
+**Figure 3:** $q_1$ flux projected onto different function spaces,
+with increasing continuity requirements from left to right,
+$L_2$, $H(\mathrm{div})$, and $H^1$.
+
+From these results, we observe that both the discontinuous interpolations,
+`DiscontinuousLagrange` and `RaviartThomas`, correctly gives a sharp jump in
+the flux from the bottom to the top side. When forcing the discontinuous solution
+onto a continuous field for the `Lagrange` interpolation, we get some non-physical
+artifacts. Comparing the discontinuous interpolations, we note that neither gives
+a perfectly continuous flux within each domain. $H(\mathrm{div})$ interpolations only
+guarantee continuous normal fluxes across element boundaries, so this is expected on
+the slanted element edges. Finally, we note that there is less sharp non-physical jumps
+for the $H(\mathrm{div})$ projection compared to the $L_2$ projection in the x-direction.
 =#

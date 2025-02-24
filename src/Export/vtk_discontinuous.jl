@@ -26,11 +26,14 @@ function evaluate_at_discontinuous_vtkgrid_nodes(dh::DofHandler{sdim}, u::Vector
     # Figure out the return type (scalar or vector)
     field_idx = find_field(dh, fieldname)
     ip = getfieldinterpolation(dh, field_idx)
-    RT = shape_value_type(ip, T)
-    n_c = n_components(ip)
-    vtk_dim = n_c == 2 ? 3 : n_c # VTK wants vectors padded to 3D
+
+    get_vtk_dim(::ScalarInterpolation, ::AbstractVector{<:Number}) = 1
+    get_vtk_dim(::ScalarInterpolation, ::AbstractVector{<:Vec{dim}}) where {dim} = dim == 2 ? 3 : dim
+    get_vtk_dim(::VectorInterpolation{vdim}, ::AbstractVector{<:Number}) where {vdim} = vdim == 2 ? 3 : vdim
+
+    vtk_dim = get_vtk_dim(ip, u)
     n_vtk_nodes = maximum(maximum, cellnodes)
-    data = fill(NaN * zero(T), vtk_dim, n_vtk_nodes)
+    data = fill(NaN * zero(eltype(T)), vtk_dim, n_vtk_nodes)
     # Loop over the subdofhandlers
     for sdh in dh.subdofhandlers
         # Check if this sdh contains this field, otherwise continue to the next
@@ -43,26 +46,19 @@ function evaluate_at_discontinuous_vtkgrid_nodes(dh::DofHandler{sdim}, u::Vector
         ip_geo = geometric_interpolation(CT)
         local_node_coords = reference_coordinates(ip_geo)
         qr = QuadratureRule{getrefshape(ip)}(zeros(length(local_node_coords)), local_node_coords)
-        cv = CellValues(qr, ip, ip_geo)
         cv = CellValues(qr, ip, ip_geo^sdim; update_gradients = false, update_hessians = false, update_detJdV = false)
         drange = dof_range(sdh, field_idx)
         # Function barrier
-        _evaluate_at_discontinuous_vtkgrid_nodes!(data, sdh, u, cv, drange, RT, cellnodes)
+        _evaluate_at_discontinuous_vtkgrid_nodes!(data, sdh, u, cv, drange, cellnodes)
     end
     return data
 end
 
 function _evaluate_at_discontinuous_vtkgrid_nodes!(
         data::Matrix, sdh::SubDofHandler,
-        u::Vector{T}, cv::CellValues, drange::UnitRange, ::Type{RT}, cellnodes
-    ) where {T, RT}
+        u::Vector{T}, cv::CellValues, drange::UnitRange, cellnodes
+    ) where {T}
     ue = zeros(T, length(drange))
-    # TODO: Remove this hack when embedding works...
-    if RT <: Vec && function_interpolation(cv) isa ScalarInterpolation
-        uer = reinterpret(RT, ue)
-    else
-        uer = ue
-    end
     for cell in CellIterator(sdh)
         reinit!(cv, cell)
         @assert getnquadpoints(cv) == length(cell.nodes)
@@ -70,7 +66,7 @@ function _evaluate_at_discontinuous_vtkgrid_nodes!(
             ue[i] = u[cell.dofs[I]]
         end
         for (qp, nodeid) in pairs(cellnodes[cellid(cell)])
-            val = function_value(cv, qp, uer)
+            val = function_value(cv, qp, ue)
             data[1:length(val), nodeid] .= val
             data[(length(val) + 1):end, nodeid] .= 0 # purge the NaN
         end
