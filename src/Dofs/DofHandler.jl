@@ -79,6 +79,7 @@ function Base.show(io::IO, mime::MIME"text/plain", sdh::SubDofHandler)
     println(io, typeof(sdh))
     println(io, "  Cell type: ", getcelltype(sdh))
     _print_field_information(io, mime, sdh)
+    return
 end
 
 function _print_field_information(io::IO, mime::MIME"text/plain", sdh::SubDofHandler)
@@ -91,9 +92,10 @@ function _print_field_information(io::IO, mime::MIME"text/plain", sdh::SubDofHan
     else
         println(io, "  Dofs per cell: ", ndofs_per_cell(sdh))
     end
+    return
 end
 
-mutable struct DofHandler{dim,G<:AbstractGrid{dim}} <: AbstractDofHandler
+mutable struct DofHandler{dim, G <: AbstractGrid{dim}} <: AbstractDofHandler
     const subdofhandlers::Vector{SubDofHandler{DofHandler{dim, G}}}
     const field_names::Vector{Symbol}
     # Dofs for cell i are stored in cell_dofs at the range:
@@ -127,11 +129,15 @@ add!(dh, :u, ip_u)
 add!(dh, :p, ip_p)
 close!(dh)
 ```
+
+!!! note "Numbering of degree of freedom"
+    Note that the numbering of degrees of freedom do *NOT* follow the global numbering of
+    nodes in the associated grid.
 """
 function DofHandler(grid::G) where {dim, G <: AbstractGrid{dim}}
     ncells = getncells(grid)
     sdhs = SubDofHandler{DofHandler{dim, G}}[]
-    DofHandler{dim, G}(sdhs, Symbol[], Int[], zeros(Int, ncells), zeros(Int, ncells), false, grid, -1)
+    return DofHandler{dim, G}(sdhs, Symbol[], Int[], zeros(Int, ncells), zeros(Int, ncells), false, grid, -1)
 end
 
 function Base.show(io::IO, mime::MIME"text/plain", dh::DofHandler)
@@ -145,7 +151,7 @@ function Base.show(io::IO, mime::MIME"text/plain", dh::DofHandler)
             if ip isa ScalarInterpolation
                 field_type = "scalar"
             elseif ip isa VectorInterpolation
-                _getvdim(::VectorInterpolation{vdim}) where vdim = vdim
+                _getvdim(::VectorInterpolation{vdim}) where {vdim} = vdim
                 field_type = "Vec{$(_getvdim(ip))}"
             end
             println(io, "    ", repr(fieldname), ", ", field_type)
@@ -156,6 +162,7 @@ function Base.show(io::IO, mime::MIME"text/plain", dh::DofHandler)
     else
         print(io, "  Total dofs: ", ndofs(dh))
     end
+    return
 end
 
 isclosed(dh::AbstractDofHandler) = dh.closed
@@ -220,7 +227,7 @@ function celldofs(dh::AbstractDofHandler, i::Int)
 end
 
 function cellnodes!(global_nodes::Vector{Int}, dh::DofHandler, i::Union{Int, <:AbstractCell})
-    cellnodes!(global_nodes, get_grid(dh), i)
+    return cellnodes!(global_nodes, get_grid(dh), i)
 end
 
 """
@@ -388,7 +395,7 @@ function __close!(dh::DofHandler{dim}) where {dim}
             facedicts,
         )
     end
-    dh.ndofs = maximum(dh.cell_dofs; init=0)
+    dh.ndofs = maximum(dh.cell_dofs; init = 0)
     dh.closed = true
 
     return dh, vertexdicts, edgedicts, facedicts
@@ -407,25 +414,25 @@ function _close_subdofhandler!(dh::DofHandler{sdim}, sdh::SubDofHandler, sdh_ind
         base_ip = get_base_interpolation(interpolation)
         begin
             next_dof_index = 1
-            for vdofs ∈ vertexdof_indices(base_ip)
-                for dof_index ∈ vdofs
+            for vdofs in vertexdof_indices(base_ip)
+                for dof_index in vdofs
                     @assert dof_index == next_dof_index "Vertex dof ordering not supported. Please consult the dev docs."
                     next_dof_index += 1
                 end
             end
-            for vdofs ∈ edgedof_interior_indices(base_ip)
-                for dof_index ∈ vdofs
+            for vdofs in edgedof_interior_indices(base_ip)
+                for dof_index in vdofs
                     @assert dof_index == next_dof_index "Edge dof ordering not supported. Please consult the dev docs."
                     next_dof_index += 1
                 end
             end
-            for vdofs ∈ facedof_interior_indices(base_ip)
-                for dof_index ∈ vdofs
+            for vdofs in facedof_interior_indices(base_ip)
+                for dof_index in vdofs
                     @assert dof_index == next_dof_index "Face dof ordering not supported. Please consult the dev docs."
                     next_dof_index += 1
                 end
             end
-            for dof_index ∈ volumedof_interior_indices(base_ip)
+            for dof_index in volumedof_interior_indices(base_ip)
                 @assert next_dof_index <= dof_index <= getnbasefunctions(base_ip) "Cell dof ordering not supported. Please consult the dev docs."
             end
         end
@@ -479,7 +486,7 @@ function _close_subdofhandler!(dh::DofHandler{sdim}, sdh::SubDofHandler, sdh_ind
         else
             @assert ndofs_per_cell == length(dh.cell_dofs) - len_cell_dofs_start
         end
-        @debug println("\tDofs for cell #$ci:\t$(dh.cell_dofs[(end-ndofs_per_cell+1):end])")
+        @debug println("\tDofs for cell #$ci:\t$(dh.cell_dofs[(end - ndofs_per_cell + 1):end])")
     end # cell loop
     return nextdof
 end
@@ -529,7 +536,7 @@ function add_vertex_dofs(cell_dofs::Vector{Int}, cell::AbstractCell, vertexdict,
                 # (Re)compute the next dof from first_dof by adding n_copies dofs from the
                 # (lvi-1) previous vertex dofs and the (d-1) dofs already distributed for
                 # the current vertex dof
-                dof = first_dof + (lvi-1)*n_copies + (d-1)
+                dof = first_dof + (lvi - 1) * n_copies + (d - 1)
                 push!(cell_dofs, dof)
             end
         else # create dofs
@@ -539,7 +546,7 @@ function add_vertex_dofs(cell_dofs::Vector{Int}, cell::AbstractCell, vertexdict,
                 nextdof += 1
             end
         end
-        @debug println("\t\t\tdofs: $(cell_dofs[(end-nvertexdofs[vi]*n_copies+1):end])")
+        @debug println("\t\t\tdofs: $(cell_dofs[(end - nvertexdofs[vi] * n_copies + 1):end])")
     end
     return nextdof
 end
@@ -554,25 +561,25 @@ for the object (vertex, face) then simply return those, otherwise create new dof
     token = Base.ht_keyindex2!(dict, key)
     if token > 0  # vertex, face etc. visited before
         first_dof = dict.vals[token]
-        dofs = first_dof : n_copies : (first_dof + n_copies * ndofs - 1)
+        dofs = first_dof:n_copies:(first_dof + n_copies * ndofs - 1)
         @debug println("\t\t\tkey: $key dofs: $(dofs)  (reused dofs)")
     else  # create new dofs
-        dofs = nextdof : n_copies : (nextdof + n_copies*ndofs-1)
+        dofs = nextdof:n_copies:(nextdof + n_copies * ndofs - 1)
         @debug println("\t\t\tkey: $key dofs: $dofs")
         Base._setindex!(dict, nextdof, key, -token)
-        nextdof += ndofs*n_copies
+        nextdof += ndofs * n_copies
     end
     return nextdof, dofs
 end
 
 function add_face_dofs(cell_dofs::Vector{Int}, cell::AbstractCell, facedict::Dict, nfacedofs::Vector{Int}, nextdof::Int, adjust_during_distribution::Bool, n_copies::Int)
-    for (fi,face) in pairs(faces(cell))
+    for (fi, face) in pairs(faces(cell))
         nfacedofs[fi] > 0 || continue # skip if no dof on this vertex
         sface, orientation = sortface(face)
         @debug println("\t\tface #$sface, $orientation")
         nextdof, dofs = get_or_create_dofs!(nextdof, nfacedofs[fi], n_copies, facedict, sface)
         permute_and_push!(cell_dofs, dofs, orientation, adjust_during_distribution, getrefdim(cell)) # TODO: passing rdim of cell is temporary, simply to check if facedofs are internal to cell
-        @debug println("\t\t\tadjusted dofs: $(cell_dofs[(end - nfacedofs[fi]*n_copies + 1):end])")
+        @debug println("\t\t\tadjusted dofs: $(cell_dofs[(end - nfacedofs[fi] * n_copies + 1):end])")
     end
     return nextdof
 end
@@ -584,14 +591,14 @@ function add_edge_dofs(cell_dofs::Vector{Int}, cell::AbstractCell, edgedict::Dic
             @debug println("\t\tedge #$sedge, $orientation")
             nextdof, dofs = get_or_create_dofs!(nextdof, nedgedofs[ei], n_copies, edgedict, sedge)
             permute_and_push!(cell_dofs, dofs, orientation, adjust_during_distribution)
-            @debug println("\t\t\tadjusted dofs: $(cell_dofs[(end - nedgedofs[ei]*n_copies + 1):end])")
+            @debug println("\t\t\tadjusted dofs: $(cell_dofs[(end - nedgedofs[ei] * n_copies + 1):end])")
         end
     end
     return nextdof
 end
 
 function add_volume_dofs(cell_dofs::CD, nvolumedofs::Int, nextdof::Int, n_copies::Int) where {CD}
-    @debug println("\t\tvolumedofs #$nextdof:$(nvolumedofs*n_copies-1)")
+    @debug println("\t\tvolumedofs #$nextdof:$(nvolumedofs * n_copies - 1)")
     for _ in 1:nvolumedofs, _ in 1:n_copies
         push!(cell_dofs, nextdof)
         nextdof += 1
@@ -632,7 +639,7 @@ described therein.
 # References
  - [Scroggs2022](@cite) Scroggs et al. ACM Trans. Math. Softw. 48 (2022).
 """
-@inline function permute_and_push!(cell_dofs::Vector{Int}, dofs::StepRange{Int,Int}, orientation::PathOrientationInfo, adjust_during_distribution::Bool)
+@inline function permute_and_push!(cell_dofs::Vector{Int}, dofs::StepRange{Int, Int}, orientation::PathOrientationInfo, adjust_during_distribution::Bool)
     # TODO Investigate if we can somehow pass the interpolation into this function in a
     # typestable way.
     n_copies = step(dofs)
@@ -643,7 +650,7 @@ described therein.
     end
     for dof in dofs
         for i in 1:n_copies
-            push!(cell_dofs, dof+(i-1))
+            push!(cell_dofs, dof + (i - 1))
         end
     end
     return nothing
@@ -657,9 +664,9 @@ Here the unique representation is the sorted node index tuple. The
 orientation is `true` if the edge is not flipped, where it is `false`
 if the edge is flipped.
 """
-function sortedge(edge::Tuple{Int,Int})
+function sortedge(edge::Tuple{Int, Int})
     a, b = edge
-    a < b ? (return (edge, PathOrientationInfo(true))) : (return ((b, a), PathOrientationInfo(false)))
+    return a < b ? (edge, PathOrientationInfo(true)) : ((b, a), PathOrientationInfo(false))
 end
 
 """
@@ -668,9 +675,9 @@ sortedge_fast(edge::Tuple{Int,Int})
 Returns the unique representation of an edge.
 Here the unique representation is the sorted node index tuple.
 """
-function sortedge_fast(edge::Tuple{Int,Int})
+function sortedge_fast(edge::Tuple{Int, Int})
     a, b = edge
-    a < b ? (return edge) : (return (b, a))
+    return a < b ? edge : (b, a)
 end
 
 """
@@ -713,21 +720,21 @@ For more details we refer to [1] as we follow the methodology described therein.
 
     !!!TODO Investigate if we can somehow pass the interpolation into this function in a typestable way.
 """
-@inline function permute_and_push!(cell_dofs::Vector{Int}, dofs::StepRange{Int,Int}, ::SurfaceOrientationInfo, adjust_during_distribution::Bool, rdim::Int)
-    if rdim==3 && adjust_during_distribution && length(dofs) > 1
+@inline function permute_and_push!(cell_dofs::Vector{Int}, dofs::StepRange{Int, Int}, ::SurfaceOrientationInfo, adjust_during_distribution::Bool, rdim::Int)
+    if rdim == 3 && adjust_during_distribution && length(dofs) > 1
         error("Dof distribution for interpolations with multiple dofs per face not implemented yet.")
     end
     n_copies = step(dofs)
     @assert n_copies > 0
     for dof in dofs
         for i in 1:n_copies
-            push!(cell_dofs, dof+(i-1))
+            push!(cell_dofs, dof + (i - 1))
         end
     end
     return nothing
 end
 
-function sortface(face::Tuple{Int,Int,Int})
+function sortface(face::Tuple{Int, Int, Int})
     a, b, c = face
     b, c = minmax(b, c)
     a, c = minmax(a, c)
@@ -736,7 +743,7 @@ function sortface(face::Tuple{Int,Int,Int})
 end
 
 
-function sortface_fast(face::Tuple{Int,Int,Int})
+function sortface_fast(face::Tuple{Int, Int, Int})
     a, b, c = face
     b, c = minmax(b, c)
     a, c = minmax(a, c)
@@ -745,7 +752,7 @@ function sortface_fast(face::Tuple{Int,Int,Int})
 end
 
 
-function sortface(face::Tuple{Int,Int,Int,Int})
+function sortface(face::Tuple{Int, Int, Int, Int})
     a, b, c, d = face
     c, d = minmax(c, d)
     b, d = minmax(b, d)
@@ -757,7 +764,7 @@ function sortface(face::Tuple{Int,Int,Int,Int})
 end
 
 
-function sortface_fast(face::Tuple{Int,Int,Int,Int})
+function sortface_fast(face::Tuple{Int, Int, Int, Int})
     a, b, c, d = face
     c, d = minmax(c, d)
     b, d = minmax(b, d)
@@ -838,7 +845,7 @@ end
 # Calculate the offset to the first local dof of a field
 function field_offset(sdh::SubDofHandler, field_idx::Int)
     offset = 0
-    for i in 1:(field_idx-1)
+    for i in 1:(field_idx - 1)
         offset += getnbasefunctions(sdh.field_interpolations[i])::Int
     end
     return offset
@@ -884,7 +891,7 @@ function dof_range(sdh::SubDofHandler, field_idx::Int)
     offset = field_offset(sdh, field_idx)
     field_interpolation = sdh.field_interpolations[field_idx]
     n_field_dofs = getnbasefunctions(field_interpolation)::Int
-    return (offset+1):(offset+n_field_dofs)
+    return (offset + 1):(offset + n_field_dofs)
 end
 dof_range(sdh::SubDofHandler, field_name::Symbol) = dof_range(sdh, find_field(sdh, field_name))
 
@@ -904,7 +911,7 @@ end
 Return the interpolation of a given field. The field can be specified by its index (see
 [`find_field`](@ref) or its name.
 """
-function getfieldinterpolation(dh::DofHandler, field_idxs::NTuple{2,Int})
+function getfieldinterpolation(dh::DofHandler, field_idxs::NTuple{2, Int})
     sdh_idx, field_idx = field_idxs
     ip = dh.subdofhandlers[sdh_idx].field_interpolations[field_idx]
     return ip
@@ -927,13 +934,13 @@ function evaluate_at_grid_nodes(dh::DofHandler, u::AbstractVector, fieldname::Sy
 end
 
 # Internal method that have the vtk option to allocate the output differently
-function _evaluate_at_grid_nodes(dh::DofHandler, u::AbstractVector{T}, fieldname::Symbol, ::Val{vtk}=Val(false)) where {T, vtk}
+function _evaluate_at_grid_nodes(dh::DofHandler{sdim}, u::AbstractVector{T}, fieldname::Symbol, ::Val{vtk} = Val(false)) where {T, vtk, sdim}
     # Make sure the field exists
     fieldname ∈ getfieldnames(dh) || error("Field $fieldname not found.")
     # Figure out the return type (scalar or vector)
     field_idx = find_field(dh, fieldname)
     ip = getfieldinterpolation(dh, field_idx)
-    RT = ip isa ScalarInterpolation ? T : Vec{n_components(ip),T}
+    RT = shape_value_type(ip, T)
     if vtk
         # VTK output of solution field (or L2 projected scalar data)
         n_c = n_components(ip)
@@ -954,29 +961,20 @@ function _evaluate_at_grid_nodes(dh::DofHandler, u::AbstractVector{T}, fieldname
         ip_geo = geometric_interpolation(CT)
         local_node_coords = reference_coordinates(ip_geo)
         qr = QuadratureRule{getrefshape(ip)}(zeros(length(local_node_coords)), local_node_coords)
-        if ip isa VectorizedInterpolation
-            # TODO: Remove this hack when embedding works...
-            cv = CellValues(qr, ip.ip, ip_geo)
-        else
-            cv = CellValues(qr, ip, ip_geo)
-        end
+        cv = CellValues(qr, ip, ip_geo^sdim; update_gradients = false, update_hessians = false, update_detJdV = false)
         drange = dof_range(sdh, field_idx)
         # Function barrier
-        _evaluate_at_grid_nodes!(data, sdh, u, cv, drange, RT)
+        _evaluate_at_grid_nodes!(data, sdh, u, cv, drange)
     end
     return data
 end
 
 # Loop over the cells and use shape functions to compute the value
-function _evaluate_at_grid_nodes!(data::Union{Vector,Matrix}, sdh::SubDofHandler,
-        u::AbstractVector{T}, cv::CellValues, drange::UnitRange, ::Type{RT}) where {T, RT}
+function _evaluate_at_grid_nodes!(
+        data::Union{Vector, Matrix}, sdh::SubDofHandler,
+        u::AbstractVector{T}, cv::CellValues, drange::UnitRange
+    ) where {T}
     ue = zeros(T, length(drange))
-    # TODO: Remove this hack when embedding works...
-    if RT <: Vec && function_interpolation(cv) isa ScalarInterpolation
-        uer = reinterpret(RT, ue)
-    else
-        uer = ue
-    end
     for cell in CellIterator(sdh)
         # Note: We are only using the shape functions: no reinit!(cv, cell) necessary
         @assert getnquadpoints(cv) == length(cell.nodes)
@@ -984,10 +982,10 @@ function _evaluate_at_grid_nodes!(data::Union{Vector,Matrix}, sdh::SubDofHandler
             ue[i] = u[cell.dofs[I]]
         end
         for (qp, nodeid) in pairs(cell.nodes)
-            val = function_value(cv, qp, uer)
+            val = function_value(cv, qp, ue)
             if data isa Matrix # VTK
                 data[1:length(val), nodeid] .= val
-                data[(length(val)+1):end, nodeid] .= 0 # purge the NaN
+                data[(length(val) + 1):end, nodeid] .= 0 # purge the NaN
             else
                 data[nodeid] = val
             end

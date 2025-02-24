@@ -44,8 +44,9 @@ module TestComputationalHomogenization
     include(joinpath(@__DIR__, "../docs/download_resources.jl"))
     mktempdir() do dir
         cd(dir) do
-            cp(joinpath(@__DIR__, "../docs/src/tutorials/periodic-rve.msh"),
-               joinpath(dir, "periodic-rve.msh")
+            cp(
+                joinpath(@__DIR__, "../docs/src/tutorials/periodic-rve.msh"),
+                joinpath(dir, "periodic-rve.msh")
             )
             include(joinpath(@__DIR__, "../docs/src/literate-tutorials/computational_homogenization.jl"))
         end
@@ -53,11 +54,22 @@ module TestComputationalHomogenization
 end
 
 module TestStokesFlow
-if !Sys.iswindows()
-    mktempdir() do dir
-        cd(dir) do
-            include(joinpath(@__DIR__, "../docs/src/literate-tutorials/stokes-flow.jl"))
+    if !Sys.iswindows()
+        mktempdir() do dir
+            cd(dir) do
+                include(joinpath(@__DIR__, "../docs/src/literate-tutorials/stokes-flow.jl"))
+            end
         end
     end
 end
+
+module TestMultiThreading
+    mktempdir() do dir
+        cd(dir) do
+            # Silence the @time output
+            redirect_stdout(devnull) do
+                include(joinpath(@__DIR__, "../docs/src/literate-howto/threaded_assembly.jl"))
+            end
+        end
+    end
 end

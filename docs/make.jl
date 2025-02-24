@@ -10,7 +10,8 @@ if liveserver
     @timeit dto "Revise.revise()" Revise.revise()
 end
 
-using Documenter, DocumenterCitations, Ferrite, FerriteGmsh, FerriteMeshParser, SparseArrays, LinearAlgebra
+using Documenter, DocumenterCitations, Ferrite, FerriteGmsh, FerriteMeshParser,
+    SparseArrays, LinearAlgebra, Changelog
 
 using BlockArrays
 const FerriteBlockArrays = Base.get_extension(Ferrite, :FerriteBlockArrays)
@@ -21,12 +22,16 @@ const is_ci = haskey(ENV, "GITHUB_ACTIONS")
 include("generate.jl")
 
 # Changelog
-include("changelog.jl")
-create_documenter_changelog()
+Changelog.generate(
+    Changelog.Documenter(),
+    joinpath(@__DIR__, "..", "CHANGELOG.md"),
+    joinpath(@__DIR__, "src", "changelog.md");
+    repo = "Ferrite-FEM/Ferrite.jl",
+)
 
 bibtex_plugin = CitationBibliography(
     joinpath(@__DIR__, "src", "assets", "references.bib"),
-    style=:numeric
+    style = :numeric
 )
 
 # Build documentation.
@@ -35,7 +40,7 @@ bibtex_plugin = CitationBibliography(
         assets = [
             "assets/custom.css",
             "assets/citations.css",
-            "assets/favicon.ico"
+            "assets/favicon.ico",
         ],
         canonical = "https://ferrite-fem.github.io/Ferrite.jl/stable",
         collapselevel = 1,
@@ -46,7 +51,7 @@ bibtex_plugin = CitationBibliography(
     draft = liveserver,
     pages = Any[
         "Home" => "index.md",
-        # hide("Changelog" => "changelog.md"),
+        hide("Changelog" => "changelog.md"),
         "Tutorials" => [
             "Tutorials overview" => "tutorials/index.md",
             "tutorials/heat_equation.md",
@@ -74,7 +79,7 @@ bibtex_plugin = CitationBibliography(
             "topics/boundary_conditions.md",
             "topics/constraints.md",
             "topics/grid.md",
-            "topics/export.md"
+            "topics/export.md",
         ],
         "API reference" => [
             "Reference overview" => "reference/index.md",
@@ -105,7 +110,7 @@ bibtex_plugin = CitationBibliography(
         # ],
         "devdocs/index.md",
         "cited-literature.md",
-        ],
+    ],
     plugins = [
         bibtex_plugin,
     ]
@@ -130,7 +135,7 @@ end
 if !liveserver
     @timeit dto "deploydocs" deploydocs(
         repo = "github.com/Ferrite-FEM/Ferrite.jl.git",
-        push_preview=true,
+        push_preview = true,
         versions = [
             "stable" => "v^",
             "v#.#",
@@ -143,7 +148,7 @@ if !liveserver
             "v0.3.7",
             "v0.3.6",
             "v0.3.5",
-            "dev" => "dev"
+            "dev" => "dev",
         ]
     )
 end
