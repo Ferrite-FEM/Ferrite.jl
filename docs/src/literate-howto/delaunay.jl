@@ -171,7 +171,7 @@ apply_analytical!(a, dh, :u, norm)
 # The solution can be visualised as in previous tutorials. Alternatively, we can use `tricontourf` which 
 # knows how to use DelaunayTriangulation.jl's `Triangulation`.
 tricontourf(tri, a)
-# *Figure 2*: Solution to the heat equation on the annulus $\Omega = \{\textbf{x} \in \mathbb{R}^2 : 1 < \|\textbf{x}\| < 2\}$.
+# *Figure 2*: Solution on the domain $\Omega = \{\textbf{x} \in \mathbb{R}^2 : 1 < \|\textbf{x}\| < 2\}$.
 
 #md # ## [Plain program](@id delaunay-plain-program)
 #md #
