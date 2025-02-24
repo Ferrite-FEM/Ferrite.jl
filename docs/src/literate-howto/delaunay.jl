@@ -142,13 +142,13 @@ end
 # The `nc == 1` and `nc == ns == 1` checks are not used for the mesh we have generated, but they are needed 
 # for simpler meshes. The `g` variable is used to keep track of the associated ghost vertex. We now 
 # have all that we need to generate our `Grid`.
-function Ferrite.Grid(tri::Triangulation)
+function create_ferrite_grid(tri::Triangulation)
     cells, cell_map = get_cells(tri)
     nodes = get_nodes(tri)
     facetsets = get_facetsets(tri, cell_map)
-    return Ferrite.Grid(cells, nodes; facetsets)
+    return Grid(cells, nodes; facetsets)
 end
-grid = Grid(tri)
+grid = create_ferrite_grid(tri)
 
 # The `facetsets` in this case have the ghost vertices as the keys:
 Ferrite.getfacetsets(grid)
@@ -157,79 +157,20 @@ Ferrite.getfacetsets(grid)
 # The ordering of these ghost vertices comes from the ordering of sections in the `boundary_nodes` variable.
 
 # ### Solving the problem
-# Solving the problem is now straightforward, and we simply mimic the implementation from the 
-# [heat equation tutorial](@ref tutorial-heat-equation). The only modifications are the use of triangles 
-# for defining the interpolation and quadrature rule, and the new boundary conditions. 
-ip = Lagrange{RefTriangle,1}()
-qr = QuadratureRule{RefTriangle}(2)
-cellvalues = CellValues(qr, ip)
-dh = DofHandler(grid)
-add!(dh, :u, ip)
-close!(dh)
-K = allocate_matrix(dh)
+# By transforming the Delaunay triangulation into a Ferrtie `Grid`, we are now in a position to solve 
+# finite element problems using the standard Ferrite workflow; see e.g. the [heat flow](@ref tutorial-heat-equation) and [linear elasticity](@ref tutorial-linear-elasticity) tutorials.
+# The main difference is the need to use triangles for defining the interpolation and quadrature rules. For illustration,
+# here we define a scalar field interpolation describing an analytic solution that is simply the $\sqrt{x^2 + y^2}$.
+dh = DofHandler(grid)  
+add!(dh, :u, Lagrange{RefTriangle,1}())  
+close!(dh)  
+a = zeros(DelaunayTriangulation.num_points(tri))
+apply_analytical!(a, dh, :u, norm)  
 
-#-
-ch = ConstraintHandler(dh)
-dbc = Dirichlet(:u, getfacetset(grid, "-1"), (x, t) -> x[1]^2 * x[2]^2)
-add!(ch, dbc)
-nbc = Dirichlet(:u, getfacetset(grid, "-2"), (x, t) -> 0.0)
-add!(ch, nbc)
-close!(ch)
-function assemble_element!(Ke::Matrix, fe::Vector, cellvalues::CellValues) # Copied exactly from the heat equation tutorial
-    n_basefuncs = getnbasefunctions(cellvalues)
-    ## Reset to 0
-    fill!(Ke, 0)
-    fill!(fe, 0)
-    ## Loop over quadrature points
-    for q_point in 1:getnquadpoints(cellvalues)
-        ## Get the quadrature weight
-        dΩ = getdetJdV(cellvalues, q_point)
-        ## Loop over test shape functions
-        for i in 1:n_basefuncs
-            δu = shape_value(cellvalues, q_point, i)
-            ∇δu = shape_gradient(cellvalues, q_point, i)
-            ## Add contribution to fe
-            fe[i] += δu * dΩ
-            ## Loop over trial shape functions
-            for j in 1:n_basefuncs
-                ∇u = shape_gradient(cellvalues, q_point, j)
-                ## Add contribution to Ke
-                Ke[i, j] += (∇δu ⋅ ∇u) * dΩ
-            end
-        end
-    end
-    return Ke, fe
-end
-function assemble_global(cellvalues::CellValues, K::SparseMatrixCSC, dh::DofHandler)
-    ## Allocate the element stiffness matrix and element force vector
-    n_basefuncs = getnbasefunctions(cellvalues)
-    Ke = zeros(n_basefuncs, n_basefuncs)
-    fe = zeros(n_basefuncs)
-    ## Allocate global force vector f
-    f = zeros(ndofs(dh))
-    ## Create an assembler
-    assembler = start_assemble(K, f)
-    ## Loop over all cels
-    for cell in CellIterator(dh)
-        ## Reinitialize cellvalues for this cell
-        reinit!(cellvalues, cell)
-        ## Compute element contribution
-        assemble_element!(Ke, fe, cellvalues)
-        ## Assemble Ke and fe into K and f
-        assemble!(assembler, celldofs(cell), Ke, fe)
-    end
-    return K, f
-end
-#md nothing # hide
-
-K, f = assemble_global(cellvalues, K, dh)
-apply!(K, f, ch)
-u = K \ f;
-
+# ### Plotting
 # The solution can be visualised as in previous tutorials. Alternatively, we can use `tricontourf` which 
 # knows how to use DelaunayTriangulation.jl's `Triangulation`.
-sol =  evaluate_at_grid_nodes(dh, u, :u)
-tricontourf(tri, sol)
+tricontourf(tri, a)
 # *Figure 2*: Solution to the heat equation on the annulus $\Omega = \{\textbf{x} \in \mathbb{R}^2 : 1 < \|\textbf{x}\| < 2\}$.
 
 #md # ## [Plain program](@id delaunay-plain-program)
