@@ -351,7 +351,7 @@ end
     end
 
     @testset "H(curl) and H(div)" begin
-        Hcurl_interpolations = [Nedelec{RefTriangle, 1}(), Nedelec{RefTriangle, 2}(), Nedelec{RefTetrahedron, 1}()] # Nedelec{RefHexahedron, 1}()]
+        Hcurl_interpolations = [Nedelec{RefTriangle, 1}(), Nedelec{RefTriangle, 2}(), Nedelec{RefTetrahedron, 1}(), Nedelec{RefHexahedron, 1}()]
         Hdiv_interpolations = [RaviartThomas{RefTriangle, 1}(), RaviartThomas{RefTriangle, 2}(), BrezziDouglasMarini{RefTriangle, 1}()]
         test_interpolation_properties.(Hcurl_interpolations)  # Requires PR1136
         test_interpolation_properties.(Hdiv_interpolations)   # Requires PR1136
@@ -363,6 +363,7 @@ end
         reference_moment(::Nedelec{RefTriangle, 1}, s, edge_shape_nr) = 1
         reference_moment(::Nedelec{RefTriangle, 2}, s, edge_shape_nr) = edge_shape_nr == 1 ? (1 - s) : s
         reference_moment(::Nedelec{RefTetrahedron, 1}, s, edge_shape_nr) = 1
+        reference_moment(::Nedelec{RefHexahedron, 1}, s, edge_shape_nr) = 1
 
         function_space(::RaviartThomas) = Val(:Hdiv)
         function_space(::BrezziDouglasMarini) = Val(:Hdiv)
