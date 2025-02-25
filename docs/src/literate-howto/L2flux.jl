@@ -29,7 +29,7 @@ grid = generate_grid(Triangle, (10, 10))
 addcellset!(grid, "low_k", x -> x[2] < -1.0e-3 || x[1] > 1.0e-3)
 #=
 
-![Mesh](l2flux_mesh.png)
+![Mesh](L2flux_mesh.png)
 
 **Figure 1:** Mesh and domains for prototype problem
 
