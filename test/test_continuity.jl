@@ -130,7 +130,7 @@
 
     test_ips = [
         Lagrange{RefTriangle, 2}(), Lagrange{RefQuadrilateral, 2}(), Lagrange{RefHexahedron, 2}()^3, # Test should also work for identity mapping
-        Nedelec{RefTriangle, 1}(), Nedelec{RefTriangle, 2}(),
+        Nedelec{RefTriangle, 1}(), Nedelec{RefTriangle, 2}(), Nedelec{RefTetrahedron, 1}(),
         RaviartThomas{RefTriangle, 1}(), RaviartThomas{RefTriangle, 2}(), BrezziDouglasMarini{RefTriangle, 1}(),
     ]
 
