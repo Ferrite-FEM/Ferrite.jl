@@ -52,7 +52,7 @@ function test_interpolation_properties(ip::Interpolation{RefShape, FunOrder}) wh
         # Test A-D
         _test_interpolation_properties(dof_data, refshape_data)
 
-        # Test E: All base functions implemented and infers correct types
+        # Test E: All base functions implemented and infers correct types.
         # Argument errors for 0th and n+1 indices.
         for T in (Float64, Float32)
             ξ = zero(Vec{Ferrite.getrefdim(ip), T})
