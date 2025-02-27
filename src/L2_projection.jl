@@ -7,7 +7,7 @@ mutable struct L2Projector{type} <: AbstractProjector
     qrs_rhs::Vector{<:QuadratureRule}
 end
 isclosed(proj::L2Projector) = isclosed(proj.dh)
-L2Projector(args...) = L2Projector{:scalar}(args...) # Default behavior to use only scalar interpolations
+L2Projector(args...; kwargs...) = L2Projector{:scalar}(args...; kwargs...) # Default behavior to use only scalar interpolations
 
 function Base.show(io::IO, ::MIME"text/plain", proj::L2Projector)
     dh = proj.dh

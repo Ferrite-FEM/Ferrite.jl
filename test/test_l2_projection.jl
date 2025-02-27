@@ -365,7 +365,7 @@ function test_export(; subset::Bool)
     nindex = isnan.(fnodes)
     findex = (!isnan).(fnodes)
     let r = evaluate_at_grid_nodes(p, p_scalar),
-            rv = Ferrite._evaluate_at_grid_nodes(p, p_scalar, Val(true))
+        rv = Ferrite._evaluate_at_grid_nodes(p, p_scalar, Val(true))
         @test size(r) == (6,)
         @test all(isnan, r[nindex])
         @test all(isnan, rv[nindex])
@@ -375,7 +375,7 @@ function test_export(; subset::Bool)
         @test r[findex] == vec(rv)[findex]
     end
     let r = evaluate_at_grid_nodes(p, p_vec),
-            rv = Ferrite._evaluate_at_grid_nodes(p, p_vec, Val(true))
+        rv = Ferrite._evaluate_at_grid_nodes(p, p_vec, Val(true))
         @test size(r) == (6,)
         @test getindex.(r[findex], 1) ≈ fnodes[findex]
         @test getindex.(r[findex], 2) ≈ 2fnodes[findex]
@@ -385,7 +385,7 @@ function test_export(; subset::Bool)
         @test all(isnan, rv[:, nindex])
     end
     let r = evaluate_at_grid_nodes(p, p_tens),
-            rv = Ferrite._evaluate_at_grid_nodes(p, p_tens, Val(true))
+        rv = Ferrite._evaluate_at_grid_nodes(p, p_tens, Val(true))
         @test size(r) == (6,)
         @test getindex.(r[findex], 1) ≈ fnodes[findex] # 11-components
         @test getindex.(r[findex], 2) ≈ 2fnodes[findex] # 12-components
@@ -397,7 +397,7 @@ function test_export(; subset::Bool)
         @test all(isnan, rv[:, nindex])
     end
     let r = evaluate_at_grid_nodes(p, p_stens),
-            rv = Ferrite._evaluate_at_grid_nodes(p, p_stens, Val(true))
+        rv = Ferrite._evaluate_at_grid_nodes(p, p_stens, Val(true))
         @test size(r) == (6,)
         @test getindex.(r[findex], 1) ≈ fnodes[findex] # 11-components
         @test getindex.(r[findex], 2) ≈ 2fnodes[findex] # 21-components
@@ -438,7 +438,7 @@ function test_show_l2()
 
     # Multi-domain setup
     proj2 = L2Projector(grid)
-    @test sprint(show, MIME"text/plain"(), proj2) == "L2Projector (not closed)"
+    @test sprint(show, MIME"text/plain"(), proj2) == repr(typeof(proj)) * " (not closed)"
     qr_rhs = QuadratureRule{RefTriangle}(2)
     add!(proj2, Set(1:2), ip; qr_rhs)
     add!(proj2, Set(3:4), ip; qr_rhs)
