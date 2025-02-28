@@ -11,16 +11,8 @@
 # In this example, we will demonstrate how to generate a mesh using the 
 # [DelaunayTriangulation.jl](https://github.com/JuliaGeometry/DelaunayTriangulation.jl).
 # This package allows for the generation of a Delaunay triangulation of a set of points, boundaries,
-# and constrained edges using `triangulate`, and mesh refinement is done using `refine!`.
-#
-# For this example, we consider solving the heat equation
-# ```math 
-# -\nabla \cdot (\nabla u) = 1 \quad \text{in} \quad \Omega,
-# ```
-# Our domain $\Omega$ will be the annulus $\Omega = \{\textbf{x} \in \mathbb{R}^2 : R_1 < \|\textbf{x}\| < R_2\}$, 
-# where $R_1 = 1$ and $R_2 = 2$. For the boundary conditions, we let $u(\textbf{x}) = 0$ on 
-# $\|\textbf{x}\| = R_1$ and $u(\textbf{x}) = x_1^2x_2^2$ on $\|\textbf{x}\| = R_2$. This equation can be 
-# converted to weak form as demonstrated in the [heat equation tutorial](@ref tutorial-heat-equation).
+# and constrained edges using `triangulate`, and mesh refinement is done using `refine!`. We then
+# show how to convert this mesh into a Ferrite grid.
 
 # ## Implementation 
 # We first load the packages we will need.
