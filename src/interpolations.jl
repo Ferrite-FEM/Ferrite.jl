@@ -1839,6 +1839,64 @@ function get_direction(::RaviartThomas{RefTriangle, 2}, j, cell)
     return ifelse(edge[2] > edge[1], 1, -1)
 end
 
+# RefTetrahedron, 1st order Lagrange
+# https://defelement.com/elements/examples/tetrahedron-raviart-thomas-lagrange-1.html
+function reference_shape_value(ip::RaviartThomas{RefTetrahedron, 1}, ξ::Vec{3}, i::Int)
+    x, y, z = ξ
+    i == 1 && return Vec(2 * x, 2 * y, 2 * (z - 1)) # Changed sign, follow Ferrite's sign convention
+    i == 2 && return Vec(2 * x, 2 * (y - 1), 2 * z)
+    i == 3 && return Vec(2 * x, 2 * y, 2 * z)
+    i == 4 && return Vec(2 * (x - 1), 2 * y, 2 * z) # Changed sign, follow Ferrite's sign convention
+    throw(ArgumentError("no shape function $i for interpolation $ip"))
+end
+
+getnbasefunctions(::RaviartThomas{RefTetrahedron, 1}) = 4
+edgedof_indices(ip::RaviartThomas{RefTetrahedron, 1}) = edgedof_interior_indices(ip)
+facedof_indices(ip::RaviartThomas{RefTetrahedron, 1}) = facedof_interior_indices(ip)
+edgedof_interior_indices(::RaviartThomas{RefTetrahedron, 1}) = ((), (), (), (), (), ())
+facedof_interior_indices(::RaviartThomas{RefTetrahedron, 1}) = ((1), (2), (3), (4))
+adjust_dofs_during_distribution(::RaviartThomas{RefTetrahedron, 1}) = false
+
+function get_direction(::RaviartThomas{RefTetrahedron, 1}, j, cell)
+    face = faces(cell)[j]
+    _, idx_min = findmin(face)
+
+    idx_next = mod(idx_min, length(face)) + 1
+    idx_prev = mod(idx_min - 2, length(face)) + 1
+    return face[idx_next] < face[idx_prev] ? 1 : -1
+end
+
+# RefHexahedron, 1st order Lagrange
+# https://defelement.com/elements/examples/hexahedron-raviart-thomas-lagrange-1.html
+function reference_shape_value(ip::RaviartThomas{RefHexahedron, 1}, ξ::Vec{3,T}, i::Int) where {T}
+    x, y, z = ξ
+    nil = zero(T)
+
+    i == 1 && return Vec(nil, nil, (z - 1) / 2) # Changed sign, follow Ferrite's sign convention
+    i == 2 && return Vec(nil, (y - 1) / 2, nil)
+    i == 3 && return Vec((x + 1) / 2, nil, nil)
+    i == 4 && return Vec(nil, (y + 1) / 2, nil) # Changed sign, follow Ferrite's sign convention
+    i == 5 && return Vec((x - 1) / 2, nil, nil) # Changed sign, follow Ferrite's sign convention
+    i == 6 && return Vec(nil, nil, (z + 1) / 2)
+    throw(ArgumentError("no shape function $i for interpolation $ip"))
+end
+
+getnbasefunctions(::RaviartThomas{RefHexahedron, 1}) = 6
+edgedof_indices(ip::RaviartThomas{RefHexahedron, 1}) = edgedof_interior_indices(ip)
+facedof_indices(ip::RaviartThomas{RefHexahedron, 1}) = facedof_interior_indices(ip)
+edgedof_interior_indices(::RaviartThomas{RefHexahedron, 1}) = ((), (), (), (), (), (), (), (), (), (), (), ())
+facedof_interior_indices(::RaviartThomas{RefHexahedron, 1}) = ((1), (2), (3), (4), (5), (6))
+adjust_dofs_during_distribution(::RaviartThomas{RefHexahedron, 1}) = false
+
+function get_direction(::RaviartThomas{RefHexahedron, 1}, j, cell)
+    face = faces(cell)[j]
+    _, idx_min = findmin(face)
+
+    idx_next = mod(idx_min, length(face)) + 1
+    idx_prev = mod(idx_min - 2, length(face)) + 1
+    return face[idx_next] < face[idx_prev] ? 1 : -1
+end
+
 #####################################
 # Brezzi-Douglas–Marini, H(div)     #
 #####################################
