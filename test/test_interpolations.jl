@@ -132,225 +132,225 @@ function _test_interpolation_properties(dofs::NamedTuple, rs::NamedTuple)
     # Test D: getnbasefunctions matching number of dof indices
     return @test length(all_dofs) == dofs.n
 end
-# @testset "interpolations" begin
-#     @testset "Correctness of $interpolation" for interpolation in (
-#             Lagrange{RefLine, 1}(),
-#             Lagrange{RefLine, 2}(),
-#             Lagrange{RefQuadrilateral, 1}(),
-#             Lagrange{RefQuadrilateral, 2}(),
-#             Lagrange{RefQuadrilateral, 3}(),
-#             Lagrange{RefTriangle, 1}(),
-#             Lagrange{RefTriangle, 2}(),
-#             Lagrange{RefTriangle, 3}(),
-#             Lagrange{RefTriangle, 4}(),
-#             Lagrange{RefTriangle, 5}(),
-#             Lagrange{RefHexahedron, 1}(),
-#             Lagrange{RefHexahedron, 2}(),
-#             Serendipity{RefQuadrilateral, 2}(),
-#             Serendipity{RefHexahedron, 2}(),
-#             Lagrange{RefTetrahedron, 1}(),
-#             Lagrange{RefTetrahedron, 2}(),
-#             Lagrange{RefPrism, 1}(),
-#             Lagrange{RefPrism, 2}(),
-#             Lagrange{RefPyramid, 1}(),
-#             Lagrange{RefPyramid, 2}(),
-#             #
-#             DiscontinuousLagrange{RefLine, 0}(),
-#             DiscontinuousLagrange{RefQuadrilateral, 0}(),
-#             DiscontinuousLagrange{RefHexahedron, 0}(),
-#             DiscontinuousLagrange{RefTriangle, 0}(),
-#             DiscontinuousLagrange{RefTetrahedron, 0}(),
-#             DiscontinuousLagrange{RefLine, 1}(),
-#             DiscontinuousLagrange{RefQuadrilateral, 1}(),
-#             DiscontinuousLagrange{RefHexahedron, 1}(),
-#             DiscontinuousLagrange{RefTriangle, 1}(),
-#             DiscontinuousLagrange{RefTetrahedron, 1}(),
-#             DiscontinuousLagrange{RefPrism, 1}(),
-#             DiscontinuousLagrange{RefPyramid, 1}(),
-#             #
-#             BubbleEnrichedLagrange{RefTriangle, 1}(),
-#             #
-#             CrouzeixRaviart{RefTriangle, 1}(),
-#             CrouzeixRaviart{RefTetrahedron, 1}(),
-#             RannacherTurek{RefQuadrilateral, 1}(),
-#             RannacherTurek{RefHexahedron, 1}(),
-#         )
-#         # Standard test all base interpolations must fullfill
-#         test_interpolation_properties(interpolation)
+@testset "interpolations" begin
+    @testset "Correctness of $interpolation" for interpolation in (
+            Lagrange{RefLine, 1}(),
+            Lagrange{RefLine, 2}(),
+            Lagrange{RefQuadrilateral, 1}(),
+            Lagrange{RefQuadrilateral, 2}(),
+            Lagrange{RefQuadrilateral, 3}(),
+            Lagrange{RefTriangle, 1}(),
+            Lagrange{RefTriangle, 2}(),
+            Lagrange{RefTriangle, 3}(),
+            Lagrange{RefTriangle, 4}(),
+            Lagrange{RefTriangle, 5}(),
+            Lagrange{RefHexahedron, 1}(),
+            Lagrange{RefHexahedron, 2}(),
+            Serendipity{RefQuadrilateral, 2}(),
+            Serendipity{RefHexahedron, 2}(),
+            Lagrange{RefTetrahedron, 1}(),
+            Lagrange{RefTetrahedron, 2}(),
+            Lagrange{RefPrism, 1}(),
+            Lagrange{RefPrism, 2}(),
+            Lagrange{RefPyramid, 1}(),
+            Lagrange{RefPyramid, 2}(),
+            #
+            DiscontinuousLagrange{RefLine, 0}(),
+            DiscontinuousLagrange{RefQuadrilateral, 0}(),
+            DiscontinuousLagrange{RefHexahedron, 0}(),
+            DiscontinuousLagrange{RefTriangle, 0}(),
+            DiscontinuousLagrange{RefTetrahedron, 0}(),
+            DiscontinuousLagrange{RefLine, 1}(),
+            DiscontinuousLagrange{RefQuadrilateral, 1}(),
+            DiscontinuousLagrange{RefHexahedron, 1}(),
+            DiscontinuousLagrange{RefTriangle, 1}(),
+            DiscontinuousLagrange{RefTetrahedron, 1}(),
+            DiscontinuousLagrange{RefPrism, 1}(),
+            DiscontinuousLagrange{RefPyramid, 1}(),
+            #
+            BubbleEnrichedLagrange{RefTriangle, 1}(),
+            #
+            CrouzeixRaviart{RefTriangle, 1}(),
+            CrouzeixRaviart{RefTetrahedron, 1}(),
+            RannacherTurek{RefQuadrilateral, 1}(),
+            RannacherTurek{RefHexahedron, 1}(),
+        )
+        # Standard test all base interpolations must fullfill
+        test_interpolation_properties(interpolation)
 
-#         ref_dim = Ferrite.getrefdim(interpolation)
-#         ref_shape = Ferrite.getrefshape(interpolation)
-#         func_order = Ferrite.getorder(interpolation)
+        ref_dim = Ferrite.getrefdim(interpolation)
+        ref_shape = Ferrite.getrefshape(interpolation)
+        func_order = Ferrite.getorder(interpolation)
 
-#         # Note that not every element formulation exists for every order and dimension.
-#         if applicable(Ferrite.getlowerorder, interpolation)
-#             @test isa(Ferrite.getlowerorder(interpolation), Interpolation{ref_shape, func_order - 1})
-#         end
+        # Note that not every element formulation exists for every order and dimension.
+        if applicable(Ferrite.getlowerorder, interpolation)
+            @test isa(Ferrite.getlowerorder(interpolation), Interpolation{ref_shape, func_order - 1})
+        end
 
-#         n_basefuncs = getnbasefunctions(interpolation)
-#         coords = Ferrite.reference_coordinates(interpolation)
-#         @test length(coords) == n_basefuncs
+        n_basefuncs = getnbasefunctions(interpolation)
+        coords = Ferrite.reference_coordinates(interpolation)
+        @test length(coords) == n_basefuncs
 
-#         @testset "Value Type $value_type" for value_type in (Float32, Float64)
-#             @testset let x = Vec{ref_dim, value_type}(sample_random_point(ref_shape))
-#                 # Check gradient evaluation
-#                 f(ξ) = [reference_shape_value(interpolation, Vec{ref_dim}(ξ), i) for i in 1:n_basefuncs]
-#                 @test vec(ForwardDiff.jacobian(f, Array(x))') ≈
-#                     reinterpret(value_type, [reference_shape_gradient(interpolation, x, i) for i in 1:n_basefuncs])
-#                 # Check partition of unity at random point.
-#                 @test sum([reference_shape_value(interpolation, x, i) for i in 1:n_basefuncs]) ≈ 1.0
-#                 # Check if the important functions are consistent
-#                 @test_throws ArgumentError reference_shape_value(interpolation, x, n_basefuncs + 1)
-#                 # Idempotency test
-#                 @test reference_shape_value(interpolation, x, n_basefuncs) == reference_shape_value(interpolation, x, n_basefuncs)
+        @testset "Value Type $value_type" for value_type in (Float32, Float64)
+            @testset let x = Vec{ref_dim, value_type}(sample_random_point(ref_shape))
+                # Check gradient evaluation
+                f(ξ) = [reference_shape_value(interpolation, Vec{ref_dim}(ξ), i) for i in 1:n_basefuncs]
+                @test vec(ForwardDiff.jacobian(f, Array(x))') ≈
+                    reinterpret(value_type, [reference_shape_gradient(interpolation, x, i) for i in 1:n_basefuncs])
+                # Check partition of unity at random point.
+                @test sum([reference_shape_value(interpolation, x, i) for i in 1:n_basefuncs]) ≈ 1.0
+                # Check if the important functions are consistent
+                @test_throws ArgumentError reference_shape_value(interpolation, x, n_basefuncs + 1)
+                # Idempotency test
+                @test reference_shape_value(interpolation, x, n_basefuncs) == reference_shape_value(interpolation, x, n_basefuncs)
 
-#                 # Check for evaluation type correctness of interpolation
-#                 for dof in 1:n_basefuncs
-#                     @test (@inferred reference_shape_value(interpolation, x, dof)) isa value_type
-#                     @test (@inferred reference_shape_gradient(interpolation, x, dof)) isa Vec{ref_dim, value_type}
-#                 end
-#             end
-#         end
+                # Check for evaluation type correctness of interpolation
+                for dof in 1:n_basefuncs
+                    @test (@inferred reference_shape_value(interpolation, x, dof)) isa value_type
+                    @test (@inferred reference_shape_gradient(interpolation, x, dof)) isa Vec{ref_dim, value_type}
+                end
+            end
+        end
 
-#         # Check for dirac delta property of interpolation
-#         @testset "dirac delta property of dof $dof" for dof in 1:n_basefuncs
-#             for k in 1:n_basefuncs
-#                 N_dof = reference_shape_value(interpolation, coords[dof], k)
-#                 if k == dof
-#                     @test N_dof ≈ 1.0
-#                 else
-#                     factor = interpolation isa Lagrange{RefQuadrilateral, 3} ? 200 : 4
-#                     @test N_dof ≈ 0.0 atol = factor * eps(typeof(N_dof))
-#                 end
-#             end
-#         end
+        # Check for dirac delta property of interpolation
+        @testset "dirac delta property of dof $dof" for dof in 1:n_basefuncs
+            for k in 1:n_basefuncs
+                N_dof = reference_shape_value(interpolation, coords[dof], k)
+                if k == dof
+                    @test N_dof ≈ 1.0
+                else
+                    factor = interpolation isa Lagrange{RefQuadrilateral, 3} ? 200 : 4
+                    @test N_dof ≈ 0.0 atol = factor * eps(typeof(N_dof))
+                end
+            end
+        end
 
-#         # Test that facedof_indices(...) return in counter clockwise order (viewing from the outside)
-#         if interpolation isa Lagrange
-#             function __outward_normal(coords::Vector{<:Vec{1}}, nodes)
-#                 n = coords[nodes[1]]
-#                 return n / norm(n)
-#             end
-#             function __outward_normal(coords::Vector{<:Vec{2}}, nodes)
-#                 p1 = coords[nodes[1]]
-#                 p2 = coords[nodes[2]]
-#                 n = Vec{2}((p2[2] - p1[2], - p2[1] + p1[1]))
-#                 return n / norm(n)
-#             end
-#             function __outward_normal(coords::Vector{<:Vec{3}}, nodes)
-#                 p1 = coords[nodes[1]]
-#                 p2 = coords[nodes[2]]
-#                 p3 = coords[nodes[3]]
-#                 n = (p3 - p2) × (p1 - p2)
-#                 return n / norm(n)
-#             end
-#             normals = reference_normals(getrefshape(interpolation))
-#             for (facetnodes, normal) in zip(Ferrite.facetdof_indices(interpolation), normals)
-#                 @test __outward_normal(coords, facetnodes) ≈ normal
-#             end
-#         end
+        # Test that facedof_indices(...) return in counter clockwise order (viewing from the outside)
+        if interpolation isa Lagrange
+            function __outward_normal(coords::Vector{<:Vec{1}}, nodes)
+                n = coords[nodes[1]]
+                return n / norm(n)
+            end
+            function __outward_normal(coords::Vector{<:Vec{2}}, nodes)
+                p1 = coords[nodes[1]]
+                p2 = coords[nodes[2]]
+                n = Vec{2}((p2[2] - p1[2], - p2[1] + p1[1]))
+                return n / norm(n)
+            end
+            function __outward_normal(coords::Vector{<:Vec{3}}, nodes)
+                p1 = coords[nodes[1]]
+                p2 = coords[nodes[2]]
+                p3 = coords[nodes[3]]
+                n = (p3 - p2) × (p1 - p2)
+                return n / norm(n)
+            end
+            normals = reference_normals(getrefshape(interpolation))
+            for (facetnodes, normal) in zip(Ferrite.facetdof_indices(interpolation), normals)
+                @test __outward_normal(coords, facetnodes) ≈ normal
+            end
+        end
 
-#         # regression for https://github.com/Ferrite-FEM/Ferrite.jl/issues/520
-#         interpolation_type = typeof(interpolation).name.wrapper
-#         if func_order > 1 && interpolation_type != Ferrite.Serendipity
-#             first_order = interpolation_type{ref_shape, 1}()
-#             for (highorderface, firstorderface) in zip(Ferrite.facedof_indices(interpolation), Ferrite.facedof_indices(first_order))
-#                 for (h_node, f_node) in zip(highorderface, firstorderface)
-#                     @test h_node == f_node
-#                 end
-#             end
-#             if ref_dim > 2
-#                 for (highorderedge, firstorderedge) in zip(Ferrite.edgedof_indices(interpolation), Ferrite.edgedof_indices(first_order))
-#                     for (h_node, f_node) in zip(highorderedge, firstorderedge)
-#                         @test h_node == f_node
-#                     end
-#                 end
-#             end
-#         end
+        # regression for https://github.com/Ferrite-FEM/Ferrite.jl/issues/520
+        interpolation_type = typeof(interpolation).name.wrapper
+        if func_order > 1 && interpolation_type != Ferrite.Serendipity
+            first_order = interpolation_type{ref_shape, 1}()
+            for (highorderface, firstorderface) in zip(Ferrite.facedof_indices(interpolation), Ferrite.facedof_indices(first_order))
+                for (h_node, f_node) in zip(highorderface, firstorderface)
+                    @test h_node == f_node
+                end
+            end
+            if ref_dim > 2
+                for (highorderedge, firstorderedge) in zip(Ferrite.edgedof_indices(interpolation), Ferrite.edgedof_indices(first_order))
+                    for (h_node, f_node) in zip(highorderedge, firstorderedge)
+                        @test h_node == f_node
+                    end
+                end
+            end
+        end
 
-#         @testset "VectorizedInterpolation" begin
-#             v_interpolation_1 = interpolation^2
-#             v_interpolation_2 = (d = 2; interpolation^d)
-#             @test getnbasefunctions(v_interpolation_1) ==
-#                 getnbasefunctions(v_interpolation_2) ==
-#                 getnbasefunctions(interpolation) * 2
-#             # pretty printing
-#             @test repr("text/plain", v_interpolation_1) == repr(v_interpolation_1.ip) * "^2"
+        @testset "VectorizedInterpolation" begin
+            v_interpolation_1 = interpolation^2
+            v_interpolation_2 = (d = 2; interpolation^d)
+            @test getnbasefunctions(v_interpolation_1) ==
+                getnbasefunctions(v_interpolation_2) ==
+                getnbasefunctions(interpolation) * 2
+            # pretty printing
+            @test repr("text/plain", v_interpolation_1) == repr(v_interpolation_1.ip) * "^2"
 
-#             # Check for evaluation type correctness of vectorized interpolation
-#             v_interpolation_3 = interpolation^ref_dim
+            # Check for evaluation type correctness of vectorized interpolation
+            v_interpolation_3 = interpolation^ref_dim
 
-#             @testset "Value Type $value_type" for value_type in (Float32, Float64)
-#                 x = Vec{ref_dim, value_type}(sample_random_point(getrefshape(v_interpolation_1)))
-#                 @testset "vectorized case of return type correctness of dof $dof" for dof in 1:n_basefuncs
-#                     @test @inferred(reference_shape_value(v_interpolation_1, x, dof)) isa Vec{2, value_type}
-#                     @test @inferred(reference_shape_gradient(v_interpolation_3, x, dof)) isa Tensor{2, ref_dim, value_type}
-#                 end
-#             end
-#         end
-#     end
+            @testset "Value Type $value_type" for value_type in (Float32, Float64)
+                x = Vec{ref_dim, value_type}(sample_random_point(getrefshape(v_interpolation_1)))
+                @testset "vectorized case of return type correctness of dof $dof" for dof in 1:n_basefuncs
+                    @test @inferred(reference_shape_value(v_interpolation_1, x, dof)) isa Vec{2, value_type}
+                    @test @inferred(reference_shape_gradient(v_interpolation_3, x, dof)) isa Tensor{2, ref_dim, value_type}
+                end
+            end
+        end
+    end
 
-#     @testset "Discontinuous interpolations" begin
-#         @test Ferrite.reference_coordinates(DiscontinuousLagrange{RefTriangle, 0}()) ≈ [Vec{2, Float64}((1 / 3, 1 / 3))]
-#         @test Ferrite.reference_coordinates(DiscontinuousLagrange{RefQuadrilateral, 0}()) ≈ [Vec{2, Float64}((0, 0))]
-#         @test Ferrite.reference_coordinates(DiscontinuousLagrange{RefTetrahedron, 0}()) ≈ [Vec{3, Float64}((1 / 4, 1 / 4, 1 / 4))]
-#         @test Ferrite.reference_coordinates(DiscontinuousLagrange{RefHexahedron, 0}()) ≈ [Vec{3, Float64}((0, 0, 0))]
+    @testset "Discontinuous interpolations" begin
+        @test Ferrite.reference_coordinates(DiscontinuousLagrange{RefTriangle, 0}()) ≈ [Vec{2, Float64}((1 / 3, 1 / 3))]
+        @test Ferrite.reference_coordinates(DiscontinuousLagrange{RefQuadrilateral, 0}()) ≈ [Vec{2, Float64}((0, 0))]
+        @test Ferrite.reference_coordinates(DiscontinuousLagrange{RefTetrahedron, 0}()) ≈ [Vec{3, Float64}((1 / 4, 1 / 4, 1 / 4))]
+        @test Ferrite.reference_coordinates(DiscontinuousLagrange{RefHexahedron, 0}()) ≈ [Vec{3, Float64}((0, 0, 0))]
 
-#         # Test discontinuous interpolations related functions
-#         d_ip = DiscontinuousLagrange{RefQuadrilateral, 1}()
-#         d_ip_t = DiscontinuousLagrange{RefQuadrilateral, 1}
+        # Test discontinuous interpolations related functions
+        d_ip = DiscontinuousLagrange{RefQuadrilateral, 1}()
+        d_ip_t = DiscontinuousLagrange{RefQuadrilateral, 1}
 
-#         ip = Lagrange{RefQuadrilateral, 1}()
-#         ip_t = Lagrange{RefQuadrilateral, 1}
+        ip = Lagrange{RefQuadrilateral, 1}()
+        ip_t = Lagrange{RefQuadrilateral, 1}
 
-#         @test Ferrite.is_discontinuous(ip) == false
-#         @test Ferrite.is_discontinuous(ip_t) == false
-#         @test Ferrite.is_discontinuous(d_ip) == true
-#         @test Ferrite.is_discontinuous(d_ip_t) == true
-#     end
+        @test Ferrite.is_discontinuous(ip) == false
+        @test Ferrite.is_discontinuous(ip_t) == false
+        @test Ferrite.is_discontinuous(d_ip) == true
+        @test Ferrite.is_discontinuous(d_ip_t) == true
+    end
 
-#     @testset "Correctness of AD of embedded interpolations" begin
-#         ip = Lagrange{RefHexahedron, 2}()^3
-#         ξ = rand(Vec{3, Float64})
-#         for I in 1:getnbasefunctions(ip)
-#             #Call StaticArray-version
-#             H_sa, G_sa, V_sa = Ferrite._reference_shape_hessian_gradient_and_value_static_array(ip, ξ, I)
-#             #Call tensor AD version
-#             H, G, V = Ferrite.reference_shape_hessian_gradient_and_value(ip, ξ, I)
+    @testset "Correctness of AD of embedded interpolations" begin
+        ip = Lagrange{RefHexahedron, 2}()^3
+        ξ = rand(Vec{3, Float64})
+        for I in 1:getnbasefunctions(ip)
+            #Call StaticArray-version
+            H_sa, G_sa, V_sa = Ferrite._reference_shape_hessian_gradient_and_value_static_array(ip, ξ, I)
+            #Call tensor AD version
+            H, G, V = Ferrite.reference_shape_hessian_gradient_and_value(ip, ξ, I)
 
-#             @test V ≈ V_sa
-#             @test G ≈ G_sa
-#             @test H ≈ H_sa
-#         end
+            @test V ≈ V_sa
+            @test G ≈ G_sa
+            @test H ≈ H_sa
+        end
 
-#         ips = Lagrange{RefQuadrilateral, 2}()
-#         vdim = 3
-#         ipv = ips^vdim
-#         ξ = rand(Vec{2, Float64})
-#         for ipv_ind in 1:getnbasefunctions(ipv)
-#             ips_ind, v_ind = fldmod1(ipv_ind, vdim)
-#             H, G, V = Ferrite.reference_shape_hessian_gradient_and_value(ipv, ξ, ipv_ind)
-#             h, g, v = Ferrite.reference_shape_hessian_gradient_and_value(ips, ξ, ips_ind)
-#             @test h ≈ H[v_ind, :, :]
-#             @test g ≈ G[v_ind, :]
-#             @test v ≈ V[v_ind]
-#         end
-#     end
+        ips = Lagrange{RefQuadrilateral, 2}()
+        vdim = 3
+        ipv = ips^vdim
+        ξ = rand(Vec{2, Float64})
+        for ipv_ind in 1:getnbasefunctions(ipv)
+            ips_ind, v_ind = fldmod1(ipv_ind, vdim)
+            H, G, V = Ferrite.reference_shape_hessian_gradient_and_value(ipv, ξ, ipv_ind)
+            h, g, v = Ferrite.reference_shape_hessian_gradient_and_value(ips, ξ, ips_ind)
+            @test h ≈ H[v_ind, :, :]
+            @test g ≈ G[v_ind, :]
+            @test v ≈ V[v_ind]
+        end
+    end
 
-#     @testset "Errors for entitydof_indices on VectorizedInterpolations" begin
-#         ip = Lagrange{RefQuadrilateral, 2}()^2
-#         @test_throws ArgumentError Ferrite.vertexdof_indices(ip)
-#         @test_throws ArgumentError Ferrite.edgedof_indices(ip)
-#         @test_throws ArgumentError Ferrite.facedof_indices(ip)
-#         @test_throws ArgumentError Ferrite.facetdof_indices(ip)
+    @testset "Errors for entitydof_indices on VectorizedInterpolations" begin
+        ip = Lagrange{RefQuadrilateral, 2}()^2
+        @test_throws ArgumentError Ferrite.vertexdof_indices(ip)
+        @test_throws ArgumentError Ferrite.edgedof_indices(ip)
+        @test_throws ArgumentError Ferrite.facedof_indices(ip)
+        @test_throws ArgumentError Ferrite.facetdof_indices(ip)
 
-#         @test_throws ArgumentError Ferrite.edgedof_interior_indices(ip)
-#         @test_throws ArgumentError Ferrite.facedof_interior_indices(ip)
-#         @test_throws ArgumentError Ferrite.volumedof_interior_indices(ip)
-#         @test_throws ArgumentError Ferrite.facetdof_interior_indices(ip)
-#     end
+        @test_throws ArgumentError Ferrite.edgedof_interior_indices(ip)
+        @test_throws ArgumentError Ferrite.facedof_interior_indices(ip)
+        @test_throws ArgumentError Ferrite.volumedof_interior_indices(ip)
+        @test_throws ArgumentError Ferrite.facetdof_interior_indices(ip)
+    end
 
-#     @testset "H(curl) and H(div)" begin
+    @testset "H(curl) and H(div)" begin
         Hcurl_interpolations = [
             Nedelec{RefTriangle, 1}(), Nedelec{RefTriangle, 2}(), 
             Nedelec{RefTetrahedron, 1}(), Nedelec{RefHexahedron, 1}()
@@ -462,6 +462,6 @@ end
 
         test_interpolation_functionals.(Hdiv_interpolations)
         test_interpolation_functionals.(Hcurl_interpolations)
-#     end
+    end
 
-# end # testset
+end # testset
