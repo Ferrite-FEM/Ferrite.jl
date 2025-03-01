@@ -351,17 +351,28 @@ end
     end
 
     @testset "H(curl) and H(div)" begin
-        Hcurl_interpolations = [Nedelec{RefTriangle, 1}(), Nedelec{RefTriangle, 2}()] # Nedelec{3, RefTetrahedron, 1}(), Nedelec{3, RefHexahedron, 1}()]
-        Hdiv_interpolations = [RaviartThomas{RefTriangle, 1}(), RaviartThomas{RefTriangle, 2}(), BrezziDouglasMarini{RefTriangle, 1}()]
+        Hcurl_interpolations = [
+            Nedelec{RefTriangle, 1}(), Nedelec{RefTriangle, 2}(), 
+            Nedelec{RefTetrahedron, 1}(), Nedelec{RefHexahedron, 1}()
+        ]
+        Hdiv_interpolations = [
+            RaviartThomas{RefTriangle, 1}(), RaviartThomas{RefTriangle, 2}(), 
+            RaviartThomas{RefTetrahedron, 1}(), RaviartThomas{RefHexahedron, 1}(),
+            BrezziDouglasMarini{RefTriangle, 1}()
+        ]
         test_interpolation_properties.(Hcurl_interpolations)  # Requires PR1136
         test_interpolation_properties.(Hdiv_interpolations)   # Requires PR1136
 
         # These reference moments define the functionals that an interpolation should fulfill
         reference_moment(::RaviartThomas{RefTriangle, 1}, s, facet_shape_nr) = 1
         reference_moment(::RaviartThomas{RefTriangle, 2}, s, facet_shape_nr) = facet_shape_nr == 1 ? (1 - s) : s
+        reference_moment(::RaviartThomas{RefTetrahedron, 1}, s0, s1, facet_shape_nr) = 1
+        reference_moment(::RaviartThomas{RefHexahedron, 1}, s0, s1, facet_shape_nr) = 1
         reference_moment(::BrezziDouglasMarini{RefTriangle, 1}, s, facet_shape_nr) = facet_shape_nr == 1 ? (1 - s) : s
         reference_moment(::Nedelec{RefTriangle, 1}, s, edge_shape_nr) = 1
         reference_moment(::Nedelec{RefTriangle, 2}, s, edge_shape_nr) = edge_shape_nr == 1 ? (1 - s) : s
+        reference_moment(::Nedelec{RefTetrahedron, 1}, s, edge_shape_nr) = 1
+        reference_moment(::Nedelec{RefHexahedron, 1}, s, edge_shape_nr) = 1
 
         function_space(::RaviartThomas) = Val(:Hdiv)
         function_space(::BrezziDouglasMarini) = Val(:Hdiv)
@@ -373,7 +384,7 @@ end
             return test_interpolation_functionals(function_space(ip), Val(Ferrite.getrefdim(ip)), ip)
         end
 
-        # 2D, H(div) -> facet
+        # 2D, H(div)
         function test_interpolation_functionals(::Val{:Hdiv}, ::Val{2}, ip::Interpolation)
             RefShape = getrefshape(ip)
             ipg = Lagrange{RefShape, 1}()
@@ -398,7 +409,34 @@ end
             end
         end
 
-        function test_interpolation_functionals(::Val{:Hcurl}, ::Val{2}, ip::Interpolation)
+        # 3D, H(div)
+        function test_interpolation_functionals(::Val{:Hdiv}, ::Val{3}, ip::Interpolation)
+            RefShape = getrefshape(ip)
+            ipg = Lagrange{RefShape, 1}()
+            for facetnr in 1:nfacets(RefShape)
+                facet_coords = getindex.((Ferrite.reference_coordinates(ipg),), Ferrite.reference_facets(RefShape)[facetnr])
+                dof_inds = Ferrite.facetdof_interior_indices(ip)[facetnr]
+                ξ(s0, s1) = facet_coords[1] + (facet_coords[2] - facet_coords[1]) * s0 + (facet_coords[3] - facet_coords[1]) * s1
+                weighted_normal = reference_normals(RefShape)[facetnr] * reference_face_area(ip, facetnr)
+                for (facet_shape_nr, shape_nr) in pairs(dof_inds)
+                    moment_fun(s0, s1) = reference_moment(ip, s0, s1, facet_shape_nr)
+                    f(s0, s1) = moment_fun(s0, s1) * (reference_shape_value(ip, ξ(s0, s1), shape_nr) ⋅ weighted_normal)
+
+                    if(length(facet_coords) == 3)
+                        val, _ = quadgk(s0 -> quadgk(s1 -> f(s0, s1), 0, 1 - s0; atol = 1.0e-8)[1], 0, 1; atol = 1.0e-8) # TODO Replace quadgk by more suitable 2D cubature
+                        @test val ≈ 0.5
+                    elseif(length(facet_coords) == 4)
+                        val, _ = quadgk(s0 -> quadgk(s1 -> f(s0, s1), 0, 1; atol = 1.0e-8)[1], 0, 1; atol = 1.0e-8) # TODO Replace quadgk by more suitable 2D cubature
+                        @test val ≈ 4
+                    else
+                        error("Cubature not defined for facets that are not triangles or quadrilaterals")
+                    end             
+                end
+            end
+        end
+
+        # 2D and 3D, H(curl)
+        function test_interpolation_functionals(::Val{:Hcurl}, ::Union{Val{2}, Val{3}}, ip::Interpolation)
             RefShape = getrefshape(ip)
             ipg = Lagrange{RefShape, 1}()
             for edgenr in 1:Ferrite.nedges(RefShape)
