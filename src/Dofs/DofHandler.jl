@@ -976,7 +976,7 @@ function _evaluate_at_grid_nodes!(
     ) where {T}
     ue = zeros(T, length(drange))
     for cell in CellIterator(sdh)
-        # Note: We are only using the shape functions: no reinit!(cv, cell) necessary
+        reinit!(cv, cell)
         @assert getnquadpoints(cv) == length(cell.nodes)
         for (i, I) in pairs(drange)
             ue[i] = u[cell.dofs[I]]
