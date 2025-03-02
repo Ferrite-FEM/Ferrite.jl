@@ -70,38 +70,20 @@ issues][open-issues].
 Remember to always include (when applicable): i) unit tests which exercises the new code,
 ii) documentation, iii) a note in the [CHANGELOG.md](CHANGELOG.md) file.
 
-### Code formatting
+### Code formatting and pre-commit hooks
 
-Ferrite uses [Runic.jl][runic] for code formatting. You can install Runic with the following
-command:
+Ferrite uses [Runic.jl][runic] for code formatting, see the [README][runic-readme] for 
+details on how to install and run manually. Alternatively, you can use Ferrite's 
+[pre-commit] setup to run the same formatting checks as the github actions, 
+including Runic formatting.
 
-```shell
-julia --project=@runic -e 'using Pkg; Pkg.add(url = "https://github.com/fredrikekre/Runic.jl")'
-```
-
-and you can then run the formatter from the root of the repository with:
-
-```shell
-julia --project=@runic -e 'using Runic; exit(Runic.main(ARGS))' -- --inplace .
-```
-
-Refer to the Runic.jl [README][runic-readme] for more details (such as editor integration).
-
-
-### pre-commit hooks
-
-Ferrite uses [pre-commit] to run various checks (including Runic formatting). After
-installing pre-commit (refer to the [pre-commit installation
-instructions][pre-commit-install]) run the following from the root of the repository to
+After installing pre-commit (refer to the [pre-commit installation
+instructions][pre-commit-install]), run the following from the root of the repository to
 configure pre-commit to run before each commit:
 
 ```shell
 pre-commit install
 ```
-
-Note that this currently requires Runic.jl to be installed in the shared `@runic`
-environment according to the instructions above.
-
 
 [documenter]: https://juliadocs.github.io/Documenter.jl/
 [first-contributions]: https://github.com/firstcontributions/first-contributions
