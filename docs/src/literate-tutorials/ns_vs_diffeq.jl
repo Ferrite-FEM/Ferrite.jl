@@ -115,32 +115,56 @@ nothing                    #hide
 # ### [Derivation of the Jacobian](@id jacobian-derivation)
 # To enable the use of a wide range of solvers, it is more efficient to provide 
 # information to the solver about the sparsity pattern and values of the Jacobian
-# of $f(u, t)$. The sparsity pattern and values for the Jacobian can be shown by 
-# taking the [directional derivative](https://en.wikipedia.org/wiki/Directional_derivative) of
-# $f(u, t) \equiv f(v, p, t)$ along $\delta u \equiv (\delta v, \delta p)$. It is useful
-# to frame the Jacobian of $f(u, t)$ in the context of the weak form described in 
-# the previous [section](@ref weak-form-derivation). The motivation for this
-# framing will later become clear when determining the values and sparsity
-# pattern of the Jacobian. By definition, and omitting $t$, the directional 
-# gradient is given by 
-# 
+# $J$ of $f(u, t) \equiv f(v, p, t)$. By definition, 
 # ```math
-# \begin{aligned}
-#   \nabla f(v, p) \cdot (\delta v, \delta p) &= \lim_{\epsilon \to 0 } \frac{1}{\epsilon} (f(v + \epsilon \delta v, p + \epsilon \delta p ) - f(v, p)) \\
-#   &= \lim_{\epsilon \to 0}  \frac{1}{\epsilon} \begin{bmatrix}
-# - \int_\Omega \nu \nabla (v + \epsilon \delta v) : \nabla \varphi - \int_\Omega ((v + \epsilon \delta v) \cdot \nabla) (v + \epsilon \delta v) \cdot \varphi + \int_\Omega (p + \epsilon \delta p)(\nabla \cdot \varphi) \\
-# \int_{\Omega} (\nabla \cdot (v + \epsilon \delta v)) \psi
-#   \end{bmatrix} - f(v, p) \\
-#   &= \lim_{\epsilon \to 0} \frac{1}{\epsilon} \begin{bmatrix}
-#   - \int_{\Omega} \nu \epsilon \nabla \delta v : \nabla \varphi - \int_{\Omega} (\epsilon \delta v \cdot \nabla v + v \cdot \epsilon \nabla \delta v + \epsilon^2 \delta v \cdot \nabla \delta v) \cdot \varphi + \int_{\Omega} \epsilon \delta p (\nabla \cdot \varphi) \\ 
-#   - \int_{\Omega} (\nabla \cdot \epsilon \delta v) \psi
-#   \end{bmatrix} \\
-#   &=  \begin{bmatrix}
-#   - \int_{\Omega} \nu \nabla \delta v : \nabla \varphi - \int_{\Omega} (\delta v \cdot \nabla v + v \cdot \nabla \delta v) \cdot \varphi + \int_{\Omega} \delta p (\nabla \cdot \varphi) \\ 
-#   - \int_{\Omega} (\nabla \cdot \delta v) \psi
-#   \end{bmatrix}.
-# \end{aligned}
-# ```
+# J = \frac{\partial f}{\partial u} = \frac{\partial}{\partial u}(K u + N(u)) = K + \frac{\partial N}{\partial u}.
+# ``` 
+# It is simple to see that the Jacobian and the discretized Stokes operator $K$ 
+# share the same sparsity pattern since they share the same relation between 
+# trial and test functions.
+#
+# TODO: Add $u$ to semi-discrete weak form as vector of unknowns syntax
+#
+# !!! details "Extra details on the Jacobian" 
+#     Since the [directional derivative](https://en.wikipedia.org/wiki/Directional_derivative) 
+#     is [equivalent to the Jacobian](https://math.stackexchange.com/questions/3191003/directional-derivative-and-jacobian-matrix), 
+#     we take the directional derivative of $f(u, t) \equiv f(v, p, t)$ along 
+#     $\delta u \equiv (\delta v, \delta p)$ (similar to [deal.ii: step 57](https://www.dealii.org/current/doxygen/deal.II/step_57.html)) 
+#     to determine the sparsity pattern 
+#     and values for the Jacobian. Note that $f$ is a vector function with 
+#     components $f_1$ and $f_2$ corresponding to
+#     the right handside of the first and second equations, respectively, of the 
+#     weak form defined in the previous [section](@ref weak-form-derivation).
+#     By definition, and omitting $t$, the directional derivative is given by 
+#     
+#     ```math
+#     \begin{aligned}
+#       J &= \nabla f(v, p) \cdot (\delta v, \delta p) \\
+#       &= \lim_{\epsilon \to 0 } \frac{1}{\epsilon}(f(v + \epsilon \delta v, p + \epsilon \delta p ) - f(v, p)) \\
+#       &= \lim_{\epsilon \to 0}  \frac{1}{\epsilon} \left( \begin{bmatrix}
+#     - \int_\Omega \nu \nabla (v + \epsilon \delta v) : \nabla \varphi - \int_\Omega ((v + \epsilon \delta v) \cdot \nabla) (v + \epsilon \delta v) \cdot \varphi + \int_\Omega (p + \epsilon \delta p)(\nabla \cdot \varphi) \\
+#     \int_{\Omega} (\nabla \cdot (v + \epsilon \delta v)) \psi 
+#       \end{bmatrix} - \begin{bmatrix}
+#       f_1(v,p) \\
+#       f_2(v,p)
+#       \end{bmatrix} \right) \\ 
+#       &= \lim_{\epsilon \to 0} \frac{1}{\epsilon} \left( \begin{bmatrix}
+#       - \int_{\Omega} \cancel{\nu \nabla v : \nabla \varphi} + \nu \epsilon \nabla \delta v : \nabla \varphi - \int_{\Omega} (\cancel{(v \cdot \nabla) v} + \epsilon \delta v \cdot \nabla v + v \cdot \nabla \epsilon \delta v + \epsilon \delta v \cdot \nabla \epsilon \delta v) \cdot \varphi + \int_{\Omega} \cancel{p (\nabla \cdot \varphi)} + \epsilon \delta p (\nabla \cdot \varphi) \\
+#       \int_{\Omega} (\nabla \cdot v)\psi + (\nabla \cdot \epsilon \delta v)\psi
+#       \end{bmatrix} - \begin{bmatrix}
+#       \cancel{f_1(v,p)} \\
+#       \cancel{f_2(v,p)}
+#       \end{bmatrix} \right)\\
+#       &= \lim_{\epsilon \to 0} \frac{1}{\cancel{\epsilon}} \begin{bmatrix}
+#       - \int_{\Omega} \nu \cancel{\epsilon} \nabla \delta v : \nabla \varphi - \int_{\Omega} (\cancel{\epsilon} \delta v \cdot \nabla v + v \cdot \nabla \cancel{\epsilon} \delta v + \cancel{\epsilon^2 \delta v \cdot \nabla \delta v}) \cdot \varphi + \int_{\Omega} \cancel{\epsilon} \delta p (\nabla \cdot \varphi) \\ 
+#       \int_{\Omega} (\nabla \cdot \cancel{\epsilon} \delta v) \psi
+#       \end{bmatrix} \\
+#       &=  \begin{bmatrix}
+#       - \int_{\Omega} \nu \nabla \delta v : \nabla \varphi - \int_{\Omega} (\delta v \cdot \nabla v + v \cdot \nabla \delta v) \cdot \varphi + \int_{\Omega} \delta p (\nabla \cdot \varphi) \\ 
+#       \int_{\Omega} (\nabla \cdot \delta v) \psi
+#       \end{bmatrix}.
+#     \end{aligned}
+#     ```
 #
 # To determine the values and sparsity pattern of the Jacobian given 
 # $\nabla f(v, p) \cdot (\delta v, \delta p)$, we now consider the 
@@ -151,7 +175,7 @@ nothing                    #hide
 # \delta p_h(\mathbf{x}) &= \sum_{i}^{N} \psi_i(\mathbf{x}) \delta \hat{p}_i.
 # \end{aligned}
 # ```
-# on a mesh with element size $h$ and $N$ trial (aka nodal shape) functions 
+# on a mesh with characteristic element size $h$ and $N$ trial (aka nodal shape) functions 
 # $\varphi$ and $\psi$. An important note here is that the trial functions 
 # are the same as in the previous [section](@ref weak-form-derivation) where
 # the finite element approximation of $v$ and $p$ is given by
@@ -164,7 +188,7 @@ nothing                    #hide
 # We now show that the finite element contributions for *part* of the Jacobian 
 # exactly match the contributions for the Stokes operator $K$. When substituting 
 # the finite element approximation for the viscosity term and comparing this 
-# with the analagous term in the directional derivative,
+# with the analogous term in the directional derivative,
 # ```math
 # \begin{aligned}
 # - \int_\Omega \nu \nabla \delta v : \nabla \varphi  & \xrightarrow{\delta v_h} - \sum_{i}^{N} (\int_{\Omega} \nu \nabla \varphi_i : \nabla \varphi_j) \delta \hat{v}_i \\ 
@@ -176,9 +200,6 @@ nothing                    #hide
 # are the same. The same can be shown for the pressure term and the
 # incompressibility terms. This implies that once $K$ is assembled, its 
 # sparsity values and pattern can be used to initialize the Jacobian. 
-# In other words, it is simple to see that the Jacobian and the discretized
-# Stokes operator share the same sparsity pattern since they share the same 
-# relation between trial and test functions.
 #
 # However, the Jacobian cannot be assembled using the values and pattern from $K$ 
 # alone since the nonlinear advection term is not accounted for by $K$. 
@@ -727,5 +748,6 @@ end                                                                             
 #md # ```
 
 # ## Further reading
-# * [deal.ii: step 57](https://www.dealii.org/current/doxygen/deal.II/step_57.html)
+# TODO: Move refs (also odeset ref) to details 
+# * [deal.ii: step 57](
 # * Nonlinear Boundary Value Problems in Whiteley (2017) [Whiteley2017_Ch5NonlinearBoundaryValueProblems](@cite)
