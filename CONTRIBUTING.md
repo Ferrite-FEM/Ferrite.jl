@@ -72,9 +72,9 @@ ii) documentation, iii) a note in the [CHANGELOG.md](CHANGELOG.md) file.
 
 ### Code formatting and pre-commit hooks
 
-Ferrite uses [Runic.jl][runic] for code formatting, see the [README][runic-readme] for 
-details on how to install and run manually. Alternatively, you can use Ferrite's 
-[pre-commit] setup to run the same formatting checks as the github actions, 
+Ferrite uses [Runic.jl][runic] for code formatting, see the [README][runic-readme] for
+details on how to install and run manually. Alternatively, you can use Ferrite's
+[pre-commit] setup to run the same formatting checks as the github actions,
 including Runic formatting.
 
 After installing pre-commit (refer to the [pre-commit installation
