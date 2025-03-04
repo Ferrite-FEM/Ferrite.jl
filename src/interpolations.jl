@@ -451,7 +451,7 @@ function get_face_direction(facenodes::Tuple)
     min_idx = argmin(facenodes)
     if min_idx == 1
         positive = facenodes[2] < facenodes[end]
-    elseif min_idx == length(surface)
+    elseif min_idx == length(facenodes)
         positive = facenodes[1] < facenodes[end - 1]
     else
         positive = facenodes[min_idx + 1] < facenodes[min_idx - 1]
