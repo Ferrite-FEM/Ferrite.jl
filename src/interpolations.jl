@@ -438,6 +438,28 @@ dirichlet_boundarydof_indices(::Type{EdgeIndex}) = dirichlet_edgedof_indices
 dirichlet_boundarydof_indices(::Type{VertexIndex}) = dirichlet_vertexdof_indices
 dirichlet_boundarydof_indices(::Type{FacetIndex}) = dirichlet_facetdof_indices
 
+
+get_edge_direction(cell, edgenr) = get_edge_direction(edges(cell)[edgenr])
+get_face_direction(cell, facenr) = get_face_direction(faces(cell)[facenr])
+
+function get_edge_direction(edgenodes::Tuple)
+    positive = edgenodes[2] > edgenodes[1]
+    return ifelse(positive, 1, -1)
+end
+
+function get_face_direction(facenodes::Tuple)
+    min_idx = argmin(facenodes)
+    if min_idx == 1
+        positive = facenodes[2] < facenodes[end]
+    elseif min_idx == length(surface)
+        positive = facenodes[1] < facenodes[end - 1]
+    else
+        positive = facenodes[min_idx + 1] < facenodes[min_idx - 1]
+    end
+    return ifelse(positive, 1, -1)
+end
+
+
 #########################
 # DiscontinuousLagrange #
 #########################
@@ -1805,8 +1827,7 @@ facedof_interior_indices(::RaviartThomas{RefTriangle, 1}) = ((),)
 adjust_dofs_during_distribution(::RaviartThomas) = false
 
 function get_direction(::RaviartThomas{RefTriangle, 1}, j, cell)
-    edge = edges(cell)[j]
-    return ifelse(edge[2] > edge[1], 1, -1)
+    return get_edge_direction(cell, j)
 end
 
 # RefTriangle, 2st order Lagrange
@@ -1835,8 +1856,7 @@ adjust_dofs_during_distribution(::RaviartThomas{RefTriangle, 2}) = true
 
 function get_direction(::RaviartThomas{RefTriangle, 2}, j, cell)
     j > 6 && return 1
-    edge = edges(cell)[(j + 1) ÷ 2]
-    return ifelse(edge[2] > edge[1], 1, -1)
+    return get_edge_direction(cell, (j + 1) ÷ 2)
 end
 
 # RefTetrahedron, 1st order Lagrange
@@ -1858,17 +1878,12 @@ facedof_interior_indices(::RaviartThomas{RefTetrahedron, 1}) = ((1), (2), (3), (
 adjust_dofs_during_distribution(::RaviartThomas{RefTetrahedron, 1}) = false
 
 function get_direction(::RaviartThomas{RefTetrahedron, 1}, j, cell)
-    face = faces(cell)[j]
-    _, idx_min = findmin(face)
-
-    idx_next = mod(idx_min, length(face)) + 1
-    idx_prev = mod(idx_min - 2, length(face)) + 1
-    return face[idx_next] < face[idx_prev] ? 1 : -1
+    return get_face_direction(cell, j)
 end
 
 # RefHexahedron, 1st order Lagrange
 # https://defelement.com/elements/examples/hexahedron-raviart-thomas-lagrange-1.html
-function reference_shape_value(ip::RaviartThomas{RefHexahedron, 1}, ξ::Vec{3,T}, i::Int) where {T}
+function reference_shape_value(ip::RaviartThomas{RefHexahedron, 1}, ξ::Vec{3, T}, i::Int) where {T}
     x, y, z = ξ
     nil = zero(T)
 
@@ -1889,12 +1904,7 @@ facedof_interior_indices(::RaviartThomas{RefHexahedron, 1}) = ((1), (2), (3), (4
 adjust_dofs_during_distribution(::RaviartThomas{RefHexahedron, 1}) = false
 
 function get_direction(::RaviartThomas{RefHexahedron, 1}, j, cell)
-    face = faces(cell)[j]
-    _, idx_min = findmin(face)
-
-    idx_next = mod(idx_min, length(face)) + 1
-    idx_prev = mod(idx_min - 2, length(face)) + 1
-    return face[idx_next] < face[idx_prev] ? 1 : -1
+    return get_face_direction(cell, j)
 end
 
 #####################################
@@ -1932,8 +1942,7 @@ edgedof_interior_indices(::BrezziDouglasMarini{RefTriangle, 1}) = ((1, 2), (3, 4
 adjust_dofs_during_distribution(::BrezziDouglasMarini{RefTriangle, 1}) = true
 
 function get_direction(::BrezziDouglasMarini{RefTriangle, 1}, j, cell)
-    edge = edges(cell)[(j + 1) ÷ 2]
-    return ifelse(edge[2] > edge[1], 1, -1)
+    return get_edge_direction(cell, (j + 1) ÷ 2)
 end
 
 #####################################
@@ -1965,8 +1974,7 @@ edgedof_interior_indices(::Nedelec{RefTriangle, 1}) = ((1,), (2,), (3,))
 adjust_dofs_during_distribution(::Nedelec{RefTriangle, 1}) = false
 
 function get_direction(::Nedelec{RefTriangle, 1}, j, cell)
-    edge = edges(cell)[j]
-    return ifelse(edge[2] > edge[1], 1, -1)
+    return get_edge_direction(cell, j)
 end
 
 # RefTriangle, 2nd order Lagrange
@@ -1997,13 +2005,12 @@ adjust_dofs_during_distribution(::Nedelec{RefTriangle, 2}) = true
 
 function get_direction(::Nedelec{RefTriangle, 2}, j, cell)
     j > 6 && return 1
-    edge = edges(cell)[(j + 1) ÷ 2]
-    return ifelse(edge[2] > edge[1], 1, -1)
+    return get_edge_direction(cell, (j + 1) ÷ 2)
 end
 
 # RefTetrahedron, 1st order Lagrange
 # https://defelement.org/elements/examples/tetrahedron-nedelec1-lagrange-1.html
-function reference_shape_value(ip::Nedelec{RefTetrahedron, 1}, ξ::Vec{3,T}, i::Int) where {T}
+function reference_shape_value(ip::Nedelec{RefTetrahedron, 1}, ξ::Vec{3, T}, i::Int) where {T}
     x, y, z = ξ
     nil = zero(T)
 
@@ -2022,13 +2029,12 @@ facedof_indices(::Nedelec{RefTetrahedron, 1}) = ((1, 2, 3), (1, 4, 5), (2, 5, 6)
 adjust_dofs_during_distribution(::Nedelec{RefTetrahedron, 1}) = false
 
 function get_direction(::Nedelec{RefTetrahedron, 1}, j, cell)
-    edge = edges(cell)[j]
-    return ifelse(edge[2] > edge[1], 1, -1)
+    return get_edge_direction(cell, j)
 end
 
 # RefHexahedron, 1st order Lagrange
 # https://defelement.org/elements/examples/hexahedron-nedelec1-lagrange-1.html
-function reference_shape_value(ip::Nedelec{RefHexahedron, 1}, ξ::Vec{3,T}, i::Int) where {T}
+function reference_shape_value(ip::Nedelec{RefHexahedron, 1}, ξ::Vec{3, T}, i::Int) where {T}
     x, y, z = ξ
     nil = zero(T)
 
@@ -2043,7 +2049,7 @@ function reference_shape_value(ip::Nedelec{RefHexahedron, 1}, ξ::Vec{3,T}, i::I
     i == 9 && return Vec(nil, nil, (x * y - x - y + 1) / 8)
     i == 10 && return Vec(nil, nil, -(x * y - x + y - 1) / 8)
     i == 11 && return Vec(nil, nil, (x * y + x + y + 1) / 8)
-    i == 12 && return Vec(nil, nil, -(y * x - y + x - 1) / 8) 
+    i == 12 && return Vec(nil, nil, -(y * x - y + x - 1) / 8)
     throw(ArgumentError("no shape function $i for interpolation $ip"))
 end
 
@@ -2053,6 +2059,5 @@ facedof_indices(::Nedelec{RefHexahedron, 1}) = ((1, 2, 3, 4), (1, 5, 9, 10), (2,
 adjust_dofs_during_distribution(::Nedelec{RefHexahedron, 1}) = false
 
 function get_direction(::Nedelec{RefHexahedron, 1}, j, cell)
-    edge = edges(cell)[j]
-    return ifelse(edge[2] > edge[1], 1, -1)
+    return get_edge_direction(cell, j)
 end

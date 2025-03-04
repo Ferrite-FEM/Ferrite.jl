@@ -352,13 +352,13 @@ end
 
     @testset "H(curl) and H(div)" begin
         Hcurl_interpolations = [
-            Nedelec{RefTriangle, 1}(), Nedelec{RefTriangle, 2}(), 
-            Nedelec{RefTetrahedron, 1}(), Nedelec{RefHexahedron, 1}()
+            Nedelec{RefTriangle, 1}(), Nedelec{RefTriangle, 2}(),
+            Nedelec{RefTetrahedron, 1}(), Nedelec{RefHexahedron, 1}(),
         ]
         Hdiv_interpolations = [
-            RaviartThomas{RefTriangle, 1}(), RaviartThomas{RefTriangle, 2}(), 
+            RaviartThomas{RefTriangle, 1}(), RaviartThomas{RefTriangle, 2}(),
             RaviartThomas{RefTetrahedron, 1}(), RaviartThomas{RefHexahedron, 1}(),
-            BrezziDouglasMarini{RefTriangle, 1}()
+            BrezziDouglasMarini{RefTriangle, 1}(),
         ]
         test_interpolation_properties.(Hcurl_interpolations)  # Requires PR1136
         test_interpolation_properties.(Hdiv_interpolations)   # Requires PR1136
@@ -422,15 +422,15 @@ end
                     moment_fun(s0, s1) = reference_moment(ip, s0, s1, facet_shape_nr)
                     f(s0, s1) = moment_fun(s0, s1) * (reference_shape_value(ip, ξ(s0, s1), shape_nr) ⋅ weighted_normal)
 
-                    if(length(facet_coords) == 3)
+                    if (length(facet_coords) == 3)
                         val, _ = quadgk(s0 -> quadgk(s1 -> f(s0, s1), 0, 1 - s0; atol = 1.0e-8)[1], 0, 1; atol = 1.0e-8) # TODO Replace quadgk by more suitable 2D cubature
                         @test val ≈ 0.5
-                    elseif(length(facet_coords) == 4)
+                    elseif (length(facet_coords) == 4)
                         val, _ = quadgk(s0 -> quadgk(s1 -> f(s0, s1), 0, 1; atol = 1.0e-8)[1], 0, 1; atol = 1.0e-8) # TODO Replace quadgk by more suitable 2D cubature
                         @test val ≈ 4
                     else
                         error("Cubature not defined for facets that are not triangles or quadrilaterals")
-                    end             
+                    end
                 end
             end
         end
