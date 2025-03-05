@@ -63,4 +63,19 @@
             @test bytes2hex(open(SHA.sha1, manual * ".vtu")) == bytes2hex(open(SHA.sha1, auto * ".vtu"))
         end
     end
+    @testset "type promotion" begin
+        grid = generate_grid(Triangle, (2, 2))
+        dh = DofHandler(grid)
+        add!(dh, :u, Lagrange{RefTriangle, 1}()^2)
+        add!(dh, :p, Lagrange{RefTriangle, 1}())
+        close!(dh)
+        for T in (Int, Float32, Float64)
+            u = collect(T, 1:ndofs(dh))
+            for n in (:u, :p)
+                data = Ferrite._evaluate_at_grid_nodes(dh, u, n, Val(true))
+                @test data isa Matrix{promote_type(T, Float32)}
+                @test size(data) == (n === :u ? 3 : 1, getnnodes(grid))
+            end
+        end
+    end
 end
