@@ -17,10 +17,9 @@ Equivalent to `A[i, j] += v` but more efficient.
 memory location for index `(i, j)` -- one time for the read, and one time for the write.
 This method avoids the double lookup.
 
-Zeros are ignored (i.e. if `iszero(v)`) by returning early. If the index `(i, j)` is not
-existing in the sparsity pattern of `A` this method throws a `SparsityError`.
-
-Fallback: `A[i, j] += v`.
+Zeros are ignored (i.e. if `iszero(v)`) by returning early.
+If the index `(i, j)` is not in the sparsity pattern of `A`, the entry must be zero and will be set to `v`.
+If `A` is not a `SparseMatrixCSC`, this method falls back to `A[i, j] += v`.
 """
 addindex!
 
@@ -71,10 +70,10 @@ function addindex!(A::SparseMatrixCSC{Tv}, v::Tv, i::Int, j::Int) where {Tv}
         # Column j contains entry A[i,j]. Update and return.
         nonzeros(A)[searchk] += v
         return A
-    else
-        # (i, j) not stored. Throw.
-        throw(SparsityError())
     end
+    # If [i, j] is not in A's sparsity pattern, the entry must be zero, so assign the new value.
+    A[i, j] = v
+    return A
 end
 
 function fillzero!(A::SparseMatrixCSC{T}) where {T}
