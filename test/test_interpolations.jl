@@ -385,7 +385,7 @@ end
 
         ## Nedelec on RefTetrahedron
         reference_moment(::Nedelec{RefTetrahedron, 1}, s::Vec{1}, edge_shape_nr) = 1
-        
+
         ## Nedelec on RefHexahedron
         reference_moment(::Nedelec{RefHexahedron, 1}, s::Vec{1}, edge_shape_nr) = 1
 
@@ -401,17 +401,17 @@ end
 
         """
             integrate_edge(f)
-
+        
         Integrate f(s) on the domain s ∈ [0, 1]
         """
         function integrate_edge(f)
-            val, _ = hquadrature(s -> f(Vec(s)), 0, 1; atol = 1.0e-8) 
+            val, _ = hquadrature(s -> f(Vec(s)), 0, 1; atol = 1.0e-8)
             return val
         end
 
         """
             integrate_face_tri(f)
-
+        
         Integrate f(s) on a triangular domain using the Duffy transform; 
         The transformed function is integrated on the square domain s ∈ [0, 1] × [0, 1]
         """
@@ -426,7 +426,7 @@ end
 
         """
             integrate_face_tri(f)
-
+        
         Integrate f(s) on the square domain s ∈ [0, 1] × [0, 1]
         """
         function integrate_face_quad(f)
@@ -508,10 +508,10 @@ end
                     end
                 end
             end
-            
+
             # Test functionals associated with the volume
-            # begin 
-                
+            # begin
+
             # end
         end
 
@@ -608,9 +608,9 @@ end
 
             # Test functionals associated with the volumes
             # begin
-            #     volume_coords = 
+            #     volume_coords =
             #     dof_inds = Ferrite.volumedof_interior_indices(ip)
-                
+
             #     ξ(s::Vec{3}) = parameterize_volume(volume_coords, s)
             #     for (volume_shape_nr, shape_nr) in pairs(dof_inds)
             #         f(s) = reference_moment(ip, s, volume_shape_nr) ⋅ reference_shape_value(ip, ξ(s), shape_nr)
