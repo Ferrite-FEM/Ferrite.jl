@@ -1859,6 +1859,31 @@ function get_direction(::RaviartThomas{RefTriangle, 2}, j, cell)
     return get_edge_direction(cell, (j + 1) ÷ 2)
 end
 
+# RefQuadrilateral, 1st order Lagrange
+edgedof_indices(ip::RaviartThomas{RefQuadrilateral}) = edgedof_interior_indices(ip)
+facedof_indices(ip::RaviartThomas{RefQuadrilateral}) = (ntuple(i -> i, getnbasefunctions(ip)),)
+
+# https://defelement.org/elements/examples/quadrilateral-raviart-thomas-lagrange-1.html
+function reference_shape_value(ip::RaviartThomas{RefQuadrilateral, 1}, ξ::Vec{2, T}, i::Int) where {T}
+    x, y = ξ
+    nil = zero(T)
+
+    i == 1 && return Vec(nil, -(1 - y) / 2) # Changed sign, follow Ferrite's sign convention
+    i == 2 && return Vec((1 + x) / 2, nil)  # Changed sign, follow Ferrite's sign convention
+    i == 3 && return Vec(nil, (1 + y) / 2)
+    i == 4 && return Vec((x - 1) / 2, nil)
+    throw(ArgumentError("no shape function $i for interpolation $ip"))
+end
+
+getnbasefunctions(::RaviartThomas{RefQuadrilateral, 1}) = 4
+edgedof_interior_indices(::RaviartThomas{RefQuadrilateral, 1}) = ((1,), (2,), (3,), (4,))
+facedof_interior_indices(::RaviartThomas{RefQuadrilateral, 1}) = ((),)
+adjust_dofs_during_distribution(::RaviartThomas{RefQuadrilateral, 1}) = false
+
+function get_direction(::RaviartThomas{RefQuadrilateral, 1}, j, cell)
+    return get_edge_direction(cell, j)
+end
+
 # RefTetrahedron, 1st order Lagrange
 # https://defelement.com/elements/examples/tetrahedron-raviart-thomas-lagrange-1.html
 function reference_shape_value(ip::RaviartThomas{RefTetrahedron, 1}, ξ::Vec{3}, i::Int)
@@ -1964,7 +1989,7 @@ facedof_indices(ip::Nedelec{<:AbstractRefShape{2}}) = (ntuple(i -> i, getnbasefu
 function reference_shape_value(ip::Nedelec{RefTriangle, 1}, ξ::Vec{2}, i::Int)
     x, y = ξ
     i == 1 && return Vec(- y, x)
-    i == 2 && return Vec(- y, x - 1) # Changed signed, follow Ferrite's sign convention
+    i == 2 && return Vec(- y, x - 1) # Changed sign, follow Ferrite's sign convention
     i == 3 && return Vec(1 - y, x)
     throw(ArgumentError("no shape function $i for interpolation $ip"))
 end
@@ -2006,6 +2031,27 @@ adjust_dofs_during_distribution(::Nedelec{RefTriangle, 2}) = true
 function get_direction(::Nedelec{RefTriangle, 2}, j, cell)
     j > 6 && return 1
     return get_edge_direction(cell, (j + 1) ÷ 2)
+end
+
+# RefQuadrilateral, 1st order Lagrange
+# https://defelement.org/elements/examples/quadrilateral-nedelec1-lagrange-1.html
+function reference_shape_value(ip::Nedelec{RefQuadrilateral, 1}, ξ::Vec{2, T}, i::Int) where {T}
+    x, y = ξ
+    nil = zero(T)
+
+    i == 1 && return Vec((1 - y) / 2, nil)
+    i == 2 && return Vec(nil, (1 + x) / 2)
+    i == 3 && return Vec(-(1 + y) / 2, nil) # Changed sign, follow Ferrite's sign convention
+    i == 4 && return Vec(nil, -(1 - x) / 2) # Changed sign, follow Ferrite's sign convention
+    throw(ArgumentError("no shape function $i for interpolation $ip"))
+end
+
+getnbasefunctions(::Nedelec{RefQuadrilateral, 1}) = 4
+edgedof_interior_indices(::Nedelec{RefQuadrilateral, 1}) = ((1,), (2,), (3,), (4,))
+adjust_dofs_during_distribution(::Nedelec{RefQuadrilateral, 1}) = false
+
+function get_direction(::Nedelec{RefQuadrilateral, 1}, j, cell)
+    return get_edge_direction(cell, j)
 end
 
 # RefTetrahedron, 1st order Lagrange
