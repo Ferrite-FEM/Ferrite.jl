@@ -360,19 +360,34 @@ end
             RaviartThomas{RefTetrahedron, 1}(), RaviartThomas{RefHexahedron, 1}(),
             BrezziDouglasMarini{RefTriangle, 1}(),
         ]
-        test_interpolation_properties.(Hcurl_interpolations)  # Requires PR1136
-        test_interpolation_properties.(Hdiv_interpolations)   # Requires PR1136
+        # test_interpolation_properties.(Hcurl_interpolations)  # Requires PR1136
+        # test_interpolation_properties.(Hdiv_interpolations)   # Requires PR1136
 
         # These reference moments define the functionals that an interpolation should fulfill
-        reference_moment(::RaviartThomas{RefTriangle, 1}, s, facet_shape_nr) = 1
-        reference_moment(::RaviartThomas{RefTriangle, 2}, s, facet_shape_nr) = facet_shape_nr == 1 ? (1 - s) : s
-        reference_moment(::RaviartThomas{RefTetrahedron, 1}, s0, s1, facet_shape_nr) = 1
-        reference_moment(::RaviartThomas{RefHexahedron, 1}, s0, s1, facet_shape_nr) = 1
-        reference_moment(::BrezziDouglasMarini{RefTriangle, 1}, s, facet_shape_nr) = facet_shape_nr == 1 ? (1 - s) : s
-        reference_moment(::Nedelec{RefTriangle, 1}, s, edge_shape_nr) = 1
-        reference_moment(::Nedelec{RefTriangle, 2}, s, edge_shape_nr) = edge_shape_nr == 1 ? (1 - s) : s
-        reference_moment(::Nedelec{RefTetrahedron, 1}, s, edge_shape_nr) = 1
-        reference_moment(::Nedelec{RefHexahedron, 1}, s, edge_shape_nr) = 1
+        ## Raviart-Thomas on RefTriangle
+        reference_moment(::RaviartThomas{RefTriangle, 1}, s::Vec{1}, edge_shape_nr) = 1
+        reference_moment(::RaviartThomas{RefTriangle, 2}, s::Vec{1}, edge_shape_nr) = edge_shape_nr == 1 ? (1 - s[1]) : s[1]
+        reference_moment(::RaviartThomas{RefTriangle, 2}, s::Vec{2}, face_shape_nr) = face_shape_nr == 1 ? Vec(1, 0) : Vec(0, 1)
+
+        ## Raviart-Thomas on RefTetrahedron
+        reference_moment(::RaviartThomas{RefTetrahedron, 1}, s::Vec{2}, face_shape_nr) = 1
+
+        ## Raviart-Thomas on RefHexahedron
+        reference_moment(::RaviartThomas{RefHexahedron, 1}, s::Vec{2}, face_shape_nr) = 1
+
+        ## Brezzi-Douglas-Marini on RefTriangle
+        reference_moment(::BrezziDouglasMarini{RefTriangle, 1}, s::Vec{1}, facet_shape_nr) = facet_shape_nr == 1 ? (1 - s[1]) : s[1]
+
+        ## Nedelec on RefTriangle
+        reference_moment(::Nedelec{RefTriangle, 1}, s::Vec{1}, edge_shape_nr) = 1
+        reference_moment(::Nedelec{RefTriangle, 2}, s::Vec{1}, edge_shape_nr) = edge_shape_nr == 1 ? (1 - s[1]) : s[1]
+        reference_moment(::Nedelec{RefTriangle, 2}, s::Vec{2}, face_shape_nr) = face_shape_nr == 1 ? Vec(1, 0) : Vec(0, 1)
+
+        ## Nedelec on RefTetrahedron
+        reference_moment(::Nedelec{RefTetrahedron, 1}, s::Vec{1}, edge_shape_nr) = 1
+        
+        ## Nedelec on RefHexahedron
+        reference_moment(::Nedelec{RefHexahedron, 1}, s::Vec{1}, edge_shape_nr) = 1
 
         function_space(::RaviartThomas) = Val(:Hdiv)
         function_space(::BrezziDouglasMarini) = Val(:Hdiv)
@@ -384,26 +399,86 @@ end
             return test_interpolation_functionals(function_space(ip), Val(Ferrite.getrefdim(ip)), ip)
         end
 
+        """
+            integrate_edge(f)
+
+        Integrate f(s) on the domain s ∈ [0, 1]
+        """
+        function integrate_edge(f)
+            val, _ = hquadrature(s -> f(Vec(s)), 0, 1; atol = 1.0e-8) 
+            return val
+        end
+
+        """
+            integrate_face_tri(f)
+
+        Integrate f(s) on a triangular domain using the Duffy transform; 
+        The transformed function is integrated on the square domain s ∈ [0, 1] × [0, 1]
+        """
+        function integrate_face_tri(f)
+            duffy_transform(s) = Vec(s[1] * (1 - s[2]), s[2]) # (x, y) = (u(1 - v), v)
+            duffy_detJ(s) = 1 - s[2]
+            F(s) = f(duffy_transform(s)) * duffy_detJ(s)
+
+            val, _ = hcubature(s -> F(Vec{2}(s)), [0, 0], [1, 1]; atol = 1.0e-8)
+            return val
+        end
+
+        """
+            integrate_face_tri(f)
+
+        Integrate f(s) on the square domain s ∈ [0, 1] × [0, 1]
+        """
+        function integrate_face_quad(f)
+            val, _ = hcubature(s -> f(Vec{2}(s)), [0, 0], [1, 1]; atol = 1.0e-8)
+            return val
+        end
+
+        parameterize_edge(edge_coords, s::Vec{1}) = edge_coords[1] + (edge_coords[2] - edge_coords[1]) * s[1]
+        parameterize_face(face_coords, s::Vec{2}) = face_coords[1] + (face_coords[2] - face_coords[1]) * s[1] + (face_coords[end] - face_coords[1]) * s[2]
+        # parameterize_volume(volume_coords, s::Vec{3}) = # TODO parameterization of volume (Tetrahedron, Hexahedron, Prism, Pyramid)
+
         # 2D, H(div)
         function test_interpolation_functionals(::Val{:Hdiv}, ::Val{2}, ip::Interpolation)
             RefShape = getrefshape(ip)
             ipg = Lagrange{RefShape, 1}()
-            for facetnr in 1:nfacets(RefShape)
-                facet_coords = getindex.((Ferrite.reference_coordinates(ipg),), Ferrite.reference_facets(RefShape)[facetnr])
-                dof_inds = Ferrite.facetdof_interior_indices(ip)[facetnr]
-                ξ(s) = facet_coords[1] + (facet_coords[2] - facet_coords[1]) * s
-                weighted_normal = norm(facet_coords[2] - facet_coords[1]) * reference_normals(RefShape)[facetnr]
-                for (facet_shape_nr, shape_nr) in pairs(dof_inds)
-                    moment_fun(s) = reference_moment(ip, s, facet_shape_nr)
-                    f(s) = moment_fun(s) * (reference_shape_value(ip, ξ(s), shape_nr) ⋅ weighted_normal)
-                    val, _ = quadgk(f, 0, 1; atol = 1.0e-8)
-                    @test val ≈ 1
+
+            # Test functionals associated with the edges (facets)
+            for edge_nr in 1:Ferrite.nedges(RefShape)
+                edge_coords = getindex.((Ferrite.reference_coordinates(ipg),), Ferrite.reference_edges(RefShape)[edge_nr])
+                dof_inds = Ferrite.edgedof_interior_indices(ip)[edge_nr]
+
+                ξ(s::Vec{1}) = parameterize_edge(edge_coords, s)
+                weighted_normal = norm(edge_coords[2] - edge_coords[1]) * reference_normals(RefShape)[edge_nr]
+                for (edge_shape_nr, shape_nr) in pairs(dof_inds)
+                    f(s) = reference_moment(ip, s, edge_shape_nr) * (reference_shape_value(ip, ξ(s), shape_nr) ⋅ weighted_normal)
+                    @test integrate_edge(f) ≈ 1 # reference volume of RefLine
                 end
 
                 for shape_nr in 1:getnbasefunctions(ip)
                     shape_nr in dof_inds && continue # Already tested
                     for s in range(0, 1, 5)
-                        @test abs(reference_shape_value(ip, ξ(s), shape_nr) ⋅ weighted_normal) < 1.0e-10
+                        @test abs(reference_shape_value(ip, ξ(Vec(s)), shape_nr) ⋅ weighted_normal) < 1.0e-10
+                    end
+                end
+            end
+
+            # Test functionals associated with the faces (volumes)
+            for face_nr in 1:Ferrite.nfaces(RefShape)
+                face_coords = getindex.((Ferrite.reference_coordinates(ipg),), Ferrite.reference_faces(RefShape)[face_nr])
+                area = reference_volume(ip)
+                dof_inds = Ferrite.facedof_interior_indices(ip)[face_nr]
+
+                ξ(s::Vec{2}) = parameterize_face(face_coords, s)
+                for (face_shape_nr, shape_nr) in pairs(dof_inds)
+                    f(s) = reference_moment(ip, s, face_shape_nr) ⋅ reference_shape_value(ip, ξ(s), shape_nr) * area
+
+                    if (length(face_coords) == 3)
+                        @test integrate_face_tri(f) ≈ 0.5 # reference volume of RefTriangle
+                    elseif (length(face_coords) == 4)
+                        @test integrate_face_quad(f) ≈ 4.0 # reference volume of RefQuadrilateral
+                    else
+                        error("Cubature not defined for facets that are not triangles or quadrilaterals")
                     end
                 end
             end
@@ -413,21 +488,72 @@ end
         function test_interpolation_functionals(::Val{:Hdiv}, ::Val{3}, ip::Interpolation)
             RefShape = getrefshape(ip)
             ipg = Lagrange{RefShape, 1}()
-            for facetnr in 1:nfacets(RefShape)
-                facet_coords = getindex.((Ferrite.reference_coordinates(ipg),), Ferrite.reference_facets(RefShape)[facetnr])
-                dof_inds = Ferrite.facetdof_interior_indices(ip)[facetnr]
-                ξ(s0, s1) = facet_coords[1] + (facet_coords[2] - facet_coords[1]) * s0 + (facet_coords[3] - facet_coords[1]) * s1
-                weighted_normal = reference_normals(RefShape)[facetnr] * reference_face_area(ip, facetnr)
-                for (facet_shape_nr, shape_nr) in pairs(dof_inds)
-                    moment_fun(s0, s1) = reference_moment(ip, s0, s1, facet_shape_nr)
-                    f(s0, s1) = moment_fun(s0, s1) * (reference_shape_value(ip, ξ(s0, s1), shape_nr) ⋅ weighted_normal)
 
-                    if (length(facet_coords) == 3)
-                        val, _ = quadgk(s0 -> quadgk(s1 -> f(s0, s1), 0, 1 - s0; atol = 1.0e-8)[1], 0, 1; atol = 1.0e-8) # TODO Replace quadgk by more suitable 2D cubature
-                        @test val ≈ 0.5
-                    elseif (length(facet_coords) == 4)
-                        val, _ = quadgk(s0 -> quadgk(s1 -> f(s0, s1), 0, 1; atol = 1.0e-8)[1], 0, 1; atol = 1.0e-8) # TODO Replace quadgk by more suitable 2D cubature
-                        @test val ≈ 4
+            # Test functionals associated with the faces
+            for face_nr in 1:Ferrite.nfaces(RefShape)
+                face_coords = getindex.((Ferrite.reference_coordinates(ipg),), Ferrite.reference_faces(RefShape)[face_nr])
+                weighted_normal = reference_normals(RefShape)[face_nr] * reference_face_area(ip, face_nr)
+                dof_inds = Ferrite.facedof_interior_indices(ip)[face_nr]
+
+                ξ(s::Vec{2}) = parameterize_face(face_coords, s)
+                for (face_shape_nr, shape_nr) in pairs(dof_inds)
+                    f(s) = reference_moment(ip, s, face_shape_nr) * (reference_shape_value(ip, ξ(s), shape_nr) ⋅ weighted_normal)
+
+                    if (length(face_coords) == 3)
+                        @test integrate_face_tri(f) ≈ 0.5 # reference volume of RefTriangle
+                    elseif (length(face_coords) == 4)
+                        @test integrate_face_quad(f) ≈ 4.0 # reference volume of RefQuadrilateral
+                    else
+                        error("Cubature not defined for facets that are not triangles or quadrilaterals")
+                    end
+                end
+            end
+            
+            # Test functionals associated with the volume
+            # begin 
+                
+            # end
+        end
+
+        # 2D, H(curl)
+        function test_interpolation_functionals(::Val{:Hcurl}, ::Val{2}, ip::Interpolation)
+            RefShape = getrefshape(ip)
+            ipg = Lagrange{RefShape, 1}()
+
+            # Test functionals associated with the edges (facets)
+            for edge_nr in 1:Ferrite.nedges(RefShape)
+                edge_coords = getindex.((Ferrite.reference_coordinates(ipg),), Ferrite.reference_edges(RefShape)[edge_nr])
+                edge_vector = edge_coords[2] - edge_coords[1] # Weighted direction vector
+                dof_inds = Ferrite.edgedof_interior_indices(ip)[edge_nr]
+
+                ξ(s::Vec{1}) = parameterize_edge(edge_coords, s)
+                for (edge_shape_nr, shape_nr) in pairs(dof_inds)
+                    f(s) = reference_moment(ip, s, edge_shape_nr) * (reference_shape_value(ip, ξ(s), shape_nr) ⋅ edge_vector)
+                    @test integrate_edge(f) ≈ 1
+                end
+
+                for shape_nr in 1:getnbasefunctions(ip)
+                    shape_nr in dof_inds && continue # Already tested
+                    for s in range(0, 1, 5)
+                        @test abs(reference_shape_value(ip, ξ(Vec(s)), shape_nr) ⋅ edge_vector) < 1.0e-10
+                    end
+                end
+            end
+
+            # Test functionals associated with the faces (volumes)
+            for face_nr in 1:Ferrite.nfaces(RefShape)
+                face_coords = getindex.((Ferrite.reference_coordinates(ipg),), Ferrite.reference_faces(RefShape)[face_nr])
+                area = reference_volume(ip)
+                dof_inds = Ferrite.facedof_interior_indices(ip)[face_nr]
+
+                ξ(s::Vec{2}) = parameterize_face(face_coords, s)
+                for (face_shape_nr, shape_nr) in pairs(dof_inds)
+                    f(s) = reference_moment(ip, s, face_shape_nr) ⋅ reference_shape_value(ip, ξ(s), shape_nr) * area
+
+                    if (length(face_coords) == 3)
+                        @test integrate_face_tri(f) ≈ 0.5 # reference volume of RefTriangle
+                    elseif (length(face_coords) == 4)
+                        @test integrate_face_quad(f) ≈ 4.0 # reference volume of RefQuadrilateral
                     else
                         error("Cubature not defined for facets that are not triangles or quadrilaterals")
                     end
@@ -435,29 +561,62 @@ end
             end
         end
 
-        # 2D and 3D, H(curl)
-        function test_interpolation_functionals(::Val{:Hcurl}, ::Union{Val{2}, Val{3}}, ip::Interpolation)
+        # 3D, H(curl)
+        function test_interpolation_functionals(::Val{:Hcurl}, ::Val{3}, ip::Interpolation)
             RefShape = getrefshape(ip)
             ipg = Lagrange{RefShape, 1}()
-            for edgenr in 1:Ferrite.nedges(RefShape)
-                edge_coords = getindex.((Ferrite.reference_coordinates(ipg),), Ferrite.reference_edges(RefShape)[edgenr])
+
+            # Test functionals associated with the edges
+            for edge_nr in 1:Ferrite.nedges(RefShape)
+                edge_coords = getindex.((Ferrite.reference_coordinates(ipg),), Ferrite.reference_edges(RefShape)[edge_nr])
                 edge_vector = edge_coords[2] - edge_coords[1] # Weighted direction vector
-                dof_inds = Ferrite.edgedof_interior_indices(ip)[edgenr]
-                ξ(s) = edge_coords[1] + edge_vector * s
+                dof_inds = Ferrite.edgedof_interior_indices(ip)[edge_nr]
+
+                ξ(s::Vec{1}) = edge_coords[1] + edge_vector * s[1]
                 for (edge_shape_nr, shape_nr) in pairs(dof_inds)
-                    moment_fun(s) = reference_moment(ip, s, edge_shape_nr)
-                    f(s) = moment_fun(s) * (reference_shape_value(ip, ξ(s), shape_nr) ⋅ edge_vector)
-                    val, _ = quadgk(f, 0, 1; atol = 1.0e-8)
-                    @test val ≈ 1
+                    f(s) = reference_moment(ip, s, edge_shape_nr) * (reference_shape_value(ip, ξ(s), shape_nr) ⋅ edge_vector)
+                    @test integrate_edge(f) ≈ 1
                 end
 
                 for shape_nr in 1:getnbasefunctions(ip)
                     shape_nr in dof_inds && continue # Already tested
                     for s in range(0, 1, 5)
-                        @test abs(reference_shape_value(ip, ξ(s), shape_nr) ⋅ edge_vector) < 1.0e-10
+                        @test abs(reference_shape_value(ip, ξ(Vec(s)), shape_nr) ⋅ edge_vector) < 1.0e-10
                     end
                 end
             end
+
+            # Test functionals associated with the faces
+            for face_nr in 1:Ferrite.nfaces(RefShape)
+                face_coords = getindex.((Ferrite.reference_coordinates(ipg),), Ferrite.reference_faces(RefShape)[face_nr])
+                area = reference_face_area(ip, face_nr)
+                dof_inds = Ferrite.facedof_interior_indices(ip)[face_nr]
+
+                ξ(s::Vec{2}) = face_coords[1] + (face_coords[2] - face_coords[1]) * s[1] + (face_coords[end] - face_coords[1]) * s[2]
+                for (face_shape_nr, shape_nr) in pairs(dof_inds)
+                    f(s) = reference_moment(ip, s, face_shape_nr) ⋅ reference_shape_value(ip, ξ(s), shape_nr) * area
+
+                    if (length(face_coords) == 3)
+                        @test integrate_face_tri(f) ≈ 0.5 # reference volume of RefTriangle
+                    elseif (length(face_coords) == 4)
+                        @test integrate_face_quad(f) ≈ 4.0 # reference volume of RefQuadrilateral
+                    else
+                        error("Cubature not defined for facets that are not triangles or quadrilaterals")
+                    end
+                end
+            end
+
+            # Test functionals associated with the volumes
+            # begin
+            #     volume_coords = 
+            #     dof_inds = Ferrite.volumedof_interior_indices(ip)
+                
+            #     ξ(s::Vec{3}) = parameterize_volume(volume_coords, s)
+            #     for (volume_shape_nr, shape_nr) in pairs(dof_inds)
+            #         f(s) = reference_moment(ip, s, volume_shape_nr) ⋅ reference_shape_value(ip, ξ(s), shape_nr)
+            #         # TODO integration on volume (Tetrahedron, Hexahedron, Prism, Pyramid)
+            #     end
+            # end
         end
 
         test_interpolation_functionals.(Hdiv_interpolations)

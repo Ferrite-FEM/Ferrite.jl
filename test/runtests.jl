@@ -11,7 +11,7 @@ using StaticArrays
 using OrderedCollections
 using WriteVTK
 import Metis
-using QuadGK: quadgk
+using HCubature: hcubature, hquadrature
 
 include("test_utils.jl")
 
