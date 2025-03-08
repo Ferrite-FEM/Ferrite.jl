@@ -360,8 +360,6 @@ end
             RaviartThomas{RefTetrahedron, 1}(), RaviartThomas{RefHexahedron, 1}(),
             BrezziDouglasMarini{RefTriangle, 1}(),
         ]
-        # test_interpolation_properties.(Hcurl_interpolations)  # Requires PR1136
-        # test_interpolation_properties.(Hdiv_interpolations)   # Requires PR1136
 
         # These reference moments define the functionals that an interpolation should fulfill
         ## Raviart-Thomas on RefTriangle
@@ -619,8 +617,11 @@ end
             # end
         end
 
-        test_interpolation_functionals.(Hdiv_interpolations)
+        test_interpolation_properties.(Hcurl_interpolations)  # Requires PR1136
+        test_interpolation_properties.(Hdiv_interpolations)   # Requires PR1136
+
         test_interpolation_functionals.(Hcurl_interpolations)
+        test_interpolation_functionals.(Hdiv_interpolations)
     end
 
 end # testset
