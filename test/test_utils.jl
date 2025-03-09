@@ -5,36 +5,30 @@ using Ferrite: reference_shape_value
 #####################################
 # Volume for the reference elements #
 #####################################
-reference_volume(::Interpolation{Ferrite.RefHypercube{dim}}) where {dim} = 2^dim
-reference_volume(::Interpolation{Ferrite.RefSimplex{dim}}) where {dim} = 1 / factorial(dim)
-reference_volume(::Interpolation{RefPrism}) = 1 / 2
-reference_volume(::Interpolation{RefPyramid}) = 1 / 3
-# For faces
-reference_face_area(fs::VectorizedInterpolation, f::Int) = reference_face_area(fs.ip, f)
-reference_face_area(fs::Interpolation{Ferrite.RefHypercube{dim}}, face::Int) where {dim} = 2^(dim - 1)
-reference_face_area(fs::Interpolation{RefTriangle}, face::Int) = face == 1 ? sqrt(2) : 1.0
-reference_face_area(fs::Interpolation{RefTetrahedron}, face::Int) = face == 3 ? sqrt(2 * 1.5) / 2.0 : 0.5
-function reference_face_area(fs::Interpolation{RefPrism}, face::Int)
-    face == 4 && return √2
-    face ∈ [1, 5] && return 0.5
-    face ∈ [2, 3] && return 1.0
-    error("Invalid face index")
+reference_volume(::Type{Ferrite.RefHypercube{dim}}) where {dim} = 2^dim
+reference_volume(::Type{Ferrite.RefSimplex{dim}}) where {dim} = 1 / factorial(dim)
+reference_volume(::Type{RefPrism}) = 1 / 2
+reference_volume(::Type{RefPyramid}) = 1 / 3
+# For facets
+reference_facet_area(::Type{Ferrite.RefHypercube{dim}}, ::Int) where {dim} = 2^(dim - 1)
+reference_facet_area(::Type{RefTriangle}, facet::Int) = facet == 1 ? sqrt(2) : 1.0
+reference_facet_area(::Type{RefTetrahedron}, facet::Int) = facet == 3 ? sqrt(2 * 1.5) / 2.0 : 0.5
+function reference_facet_area(::Type{RefPrism}, facet::Int)
+    facet == 4 && return √2
+    facet ∈ [1, 5] && return 0.5
+    facet ∈ [2, 3] && return 1.0
+    error("Invalid facet index")
 end
-function reference_face_area(fs::Interpolation{RefPyramid}, face::Int)
-    face == 1 && return 1.0
-    face ∈ [2, 3] && return 0.5
-    face ∈ [4, 5] && return sqrt(2) / 2
-    error("Invalid face index")
+function reference_facet_area(::Type{RefPyramid}, facet::Int)
+    facet == 1 && return 1.0
+    facet ∈ [2, 3] && return 0.5
+    facet ∈ [4, 5] && return sqrt(2) / 2
+    error("Invalid facet index")
 end
 
 ######################################################
 # Coordinates and normals for the reference shapes #
 ######################################################
-
-function reference_normals(::Interpolation{RefShape}) where {RefShape}
-    @warn "Using reference normals of Interpolation, use of RefShape directly instead"
-    return reference_normals(RefShape)
-end
 
 function reference_normals(::Type{RefLine})
     return [
@@ -261,14 +255,14 @@ coords_on_faces(x, ::Serendipity{RefHexahedron, 2}) =
 check_equal_or_nan(a::Any, b::Any) = a == b || (isnan(a) && isnan(b))
 check_equal_or_nan(a::Union{Tensor, Array}, b::Union{Tensor, Array}) = all(check_equal_or_nan.(a, b))
 
-######################################################
+#######################################################
 # Helpers for testing facet_to_element_transformation #
-######################################################
-getfacerefshape(::Union{Quadrilateral, Triangle}, ::Int) = RefLine
-getfacerefshape(::Hexahedron, ::Int) = RefQuadrilateral
-getfacerefshape(::Tetrahedron, ::Int) = RefTriangle
-getfacerefshape(::Pyramid, face::Int) = face == 1 ? RefQuadrilateral : RefTriangle
-getfacerefshape(::Wedge, face::Int) = face ∈ (1, 5) ? RefTriangle : RefQuadrilateral
+#######################################################
+getfacetrefshape(::Type{<:Ferrite.AbstractRefShape{2}}, ::Int) = RefLine
+getfacetrefshape(::Type{<:RefHexahedron}, ::Int) = RefQuadrilateral
+getfacetrefshape(::Type{RefTetrahedron}, ::Int) = RefTriangle
+getfacetrefshape(::Type{RefPyramid}, facet::Int) = facet == 1 ? RefQuadrilateral : RefTriangle
+getfacetrefshape(::Type{RefPrism}, facet::Int) = facet ∈ (1, 5) ? RefTriangle : RefQuadrilateral
 
 function perturb_standard_grid!(grid::Ferrite.AbstractGrid{dim}, strength) where {dim}
     function perturb(x::Vec{dim}) where {dim}
