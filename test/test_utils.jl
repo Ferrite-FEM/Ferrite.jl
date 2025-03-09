@@ -5,19 +5,11 @@ using Ferrite: reference_shape_value
 #####################################
 # Volume for the reference elements #
 #####################################
-function reference_volume(::Interpolation{RefShape}) where {RefShape}
-    @warn "Using reference_volume of Interpolation, use RefShape directly instead"
-    return reference_volume(RefShape)
-end
 reference_volume(::Type{Ferrite.RefHypercube{dim}}) where {dim} = 2^dim
 reference_volume(::Type{Ferrite.RefSimplex{dim}}) where {dim} = 1 / factorial(dim)
 reference_volume(::Type{RefPrism}) = 1 / 2
 reference_volume(::Type{RefPyramid}) = 1 / 3
 # For facets
-function reference_facet_area(::Interpolation{RefShape}, facetnr::Int) where {RefShape}
-    @warn "Using reference_facet_area of Interpolation, use RefShape directly instead"
-    return reference_facet_area(RefShape, facetnr)
-end
 reference_facet_area(::Type{Ferrite.RefHypercube{dim}}, ::Int) where {dim} = 2^(dim - 1)
 reference_facet_area(::Type{RefTriangle}, facet::Int) = facet == 1 ? sqrt(2) : 1.0
 reference_facet_area(::Type{RefTetrahedron}, facet::Int) = facet == 3 ? sqrt(2 * 1.5) / 2.0 : 0.5
@@ -37,11 +29,6 @@ end
 ######################################################
 # Coordinates and normals for the reference shapes #
 ######################################################
-
-function reference_normals(::Interpolation{RefShape}) where {RefShape}
-    @warn "Using reference normals of Interpolation, use RefShape directly instead"
-    return reference_normals(RefShape)
-end
 
 function reference_normals(::Type{RefLine})
     return [
