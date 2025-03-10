@@ -353,8 +353,8 @@ end
     end
 
     @testset "H(curl) and H(div)" begin
-        Hcurl_interpolations = [Nedelec{RefTriangle, 1}(), Nedelec{RefTriangle, 2}()] # Nedelec{3, RefTetrahedron, 1}(), Nedelec{3, RefHexahedron, 1}()]
-        Hdiv_interpolations = [RaviartThomas{RefTriangle, 1}(), RaviartThomas{RefTriangle, 2}(), Nedelec{RefQuadrilateral, 1}(), BrezziDouglasMarini{RefTriangle, 1}()]
+        Hcurl_interpolations = [Nedelec{RefTriangle, 1}(), Nedelec{RefTriangle, 2}(), Nedelec{RefQuadrilateral, 1}()] # Nedelec{3, RefTetrahedron, 1}(), Nedelec{3, RefHexahedron, 1}()]
+        Hdiv_interpolations = [RaviartThomas{RefTriangle, 1}(), RaviartThomas{RefTriangle, 2}(), BrezziDouglasMarini{RefTriangle, 1}()]
         test_interpolation_properties.(Hcurl_interpolations)
         test_interpolation_properties.(Hdiv_interpolations)
 
