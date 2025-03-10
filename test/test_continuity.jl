@@ -17,17 +17,14 @@
     function test_continuity(
             dh::DofHandler, facet::FacetIndex;
             transformation_function::Function,
-            value_function::Function = function_value
+            value_function::Function = function_value,
+            fieldname = :u
         )
         # transformation_function: (v,n) -> z
         # Examples
         # * Tangential continuity: fun(v, n) = v - (v ⋅ n)*n
         # * Normal continuity: fun(v, n) = v ⋅ n
         # value_function: (fe_v, q_point, ue) -> z
-
-        # Check validity of input
-        @assert length(dh.subdofhandlers) == 1
-        @assert length(Ferrite.getfieldnames(dh)) == 1
 
         # Find the matching FaceIndex
         cellnr, facetnr = facet
@@ -36,11 +33,11 @@
 
         # Pick "random" points on the facet
         cell = getcells(dh.grid, cellnr)
-        RefShape = Ferrite.getrefshape(getcells(dh.grid, cellnr))
-        ip_geo = geometric_interpolation(typeof(cell))
-        ip_fun = Ferrite.getfieldinterpolation(dh, (1, 1))
-        fqr = FacetQuadratureRule{RefShape}(8)
-        fv = FacetValues(fqr, ip_fun, ip_geo)
+        sdh1 = dh.subdofhandlers[dh.cell_to_subdofhandler[cellnr]]
+        ipg1 = geometric_interpolation(typeof(cell))
+        ipf1 = Ferrite.getfieldinterpolation(sdh1, fieldname)
+        fqr = FacetQuadratureRule{Ferrite.getrefshape(ipg1)}(8)
+        fv = FacetValues(fqr, ipf1, ipg1)
         cell_coords = getcoordinates(dh.grid, cellnr)
         inds = randperm(getnquadpoints(fv))[1:min(4, getnquadpoints(fv))]
 
@@ -62,11 +59,14 @@
         # Calculate function values on the other cell
         cell2 = getcells(dh.grid, facet2[1])
         cell_coords2 = getcoordinates(dh.grid, facet2[1])
-        local_coords = map(x -> Ferrite.find_local_coordinate(ip_geo, cell_coords2, x, Ferrite.NewtonLineSearchPointFinder()), point_coords)
+        ipg2 = geometric_interpolation(typeof(cell2))
+        sdh2 = dh.subdofhandlers[dh.cell_to_subdofhandler[facet2[1]]]
+        ipf2 = Ferrite.getfieldinterpolation(sdh2, fieldname)
+        local_coords = map(x -> Ferrite.find_local_coordinate(ipg2, cell_coords2, x, Ferrite.NewtonLineSearchPointFinder()), point_coords)
         @assert all(first.(local_coords)) # check that find_local_coordinate converged
         ξs = collect(last.(local_coords)) # Extract the local coordinates
-        qr = QuadratureRule{RefShape}(zeros(length(ξs)), ξs)
-        cv = CellValues(qr, ip_fun, ip_geo)
+        qr = QuadratureRule{Ferrite.getrefshape(ipg2)}(zeros(length(ξs)), ξs)
+        cv = CellValues(qr, ipf2, ipg2)
         reinit!(cv, cell2, cell_coords2)
         ue2 = u[celldofs(dh, facet2[1])]
         for q_point in 1:getnquadpoints(cv)
@@ -133,37 +133,67 @@
         Nedelec{RefTriangle, 1}(), Nedelec{RefTriangle, 2}(),
         RaviartThomas{RefTriangle, 1}(), RaviartThomas{RefTriangle, 2}(), BrezziDouglasMarini{RefTriangle, 1}(),
     ]
+    @testset "Non-mixed grid" begin
+        for ip in test_ips
+            RefShape = getrefshape(ip)
+            dim = Ferrite.getrefdim(ip) # dim = sdim = rdim
+            p1, p2 = (rand(Vec{dim}), ones(Vec{dim}) + rand(Vec{dim}))
+            transfun(x) = typeof(x)(i -> sinpi(x[mod(i, length(x)) + 1] + i / 3)) / 10
 
-    for ip in test_ips
-        RefShape = getrefshape(ip)
-        dim = Ferrite.getrefdim(ip) # dim = sdim = rdim
-        p1, p2 = (rand(Vec{dim}), ones(Vec{dim}) + rand(Vec{dim}))
-        transfun(x) = typeof(x)(i -> sinpi(x[mod(i, length(x)) + 1] + i / 3)) / 10
-
-        for CT in cell_types[RefShape]
-            grid = generate_grid(CT, ntuple(_ -> nel, dim), p1, p2)
-            # Smoothly distort grid (to avoid spuriously badly deformed elements).
-            # A distorted grid is important to properly test the geometry mapping
-            # for 2nd order elements.
-            transform_coordinates!(grid, x -> (x + transfun(x)))
-            cellnr = getncells(grid) ÷ 2 + 1 # Should be a cell in the center
-            basecell = getcells(grid, cellnr)
-            @testset "$CT, $ip" begin
-                for testcell in cell_permutations(basecell)
-                    grid.cells[cellnr] = testcell
-                    dh = DofHandler(grid)
-                    add!(dh, :u, ip)
-                    close!(dh)
-                    cnt = 0
-                    for facetnr in 1:nfacets(RefShape)
-                        fi = FacetIndex(cellnr, facetnr)
-                        # Check continuity of function value according to continuity_function
-                        found_matching = test_continuity(dh, fi; transformation_function = continuity_function(ip))
-                        cnt += found_matching
+            for CT in cell_types[RefShape]
+                grid = generate_grid(CT, ntuple(_ -> nel, dim), p1, p2)
+                # Smoothly distort grid (to avoid spuriously badly deformed elements).
+                # A distorted grid is important to properly test the geometry mapping
+                # for 2nd order elements.
+                transform_coordinates!(grid, x -> (x + transfun(x)))
+                cellnr = getncells(grid) ÷ 2 + 1 # Should be a cell in the center
+                basecell = getcells(grid, cellnr)
+                @testset "$CT, $ip" begin
+                    for testcell in cell_permutations(basecell)
+                        grid.cells[cellnr] = testcell
+                        dh = DofHandler(grid)
+                        add!(dh, :u, ip)
+                        close!(dh)
+                        cnt = 0
+                        for facetnr in 1:nfacets(RefShape)
+                            fi = FacetIndex(cellnr, facetnr)
+                            # Check continuity of function value according to continuity_function
+                            found_matching = test_continuity(dh, fi; transformation_function = continuity_function(ip))
+                            cnt += found_matching
+                        end
+                        @assert cnt > 0
                     end
-                    @assert cnt > 0
                 end
             end
+        end
+    end
+
+    # Test continuity for mixed grid, Quadrilaterals and Triangles
+    trigrid = generate_grid(Triangle, (3, 3))
+    mixgrid, cellnr = grid_with_inserted_quad(trigrid, (9, 10); update_sets = false)
+    dim = 2
+    p1, p2 = (rand(Vec{dim}), ones(Vec{dim}) + rand(Vec{dim}))
+    transfun(x) = typeof(x)(i -> sinpi(x[mod(i, length(x)) + 1] + i / 3)) / 10
+    basecell = getcells(mixgrid, cellnr)
+    ip1 = Nedelec{RefTriangle, 1}(); set1 = setdiff(1:getncells(mixgrid), cellnr)
+    ip2 = Nedelec{RefQuadrilateral, 1}(); set2 = Set(cellnr)
+    @testset "Quad in Tri-grid, 1st order Nedelec" begin
+        for testcell in (basecell,) #cell_permutations(basecell)
+            mixgrid.cells[cellnr] = testcell
+            dh = DofHandler(mixgrid)
+            sdh1 = SubDofHandler(dh, set1)
+            add!(sdh1, :u, ip1)
+            sdh2 = SubDofHandler(dh, set2)
+            add!(sdh2, :u, ip2)
+            close!(dh)
+            cnt = 0
+            for facetnr in 1:1 #:nfacets(testcell)
+                fi = FacetIndex(cellnr, facetnr)
+                # Check continuity of function value according to continuity_function
+                found_matching = test_continuity(dh, fi; transformation_function = continuity_function(ip1))
+                cnt += found_matching
+            end
+            @assert cnt > 0
         end
     end
 end
