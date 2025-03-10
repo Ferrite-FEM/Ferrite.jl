@@ -67,7 +67,7 @@ nothing                    #hide
 # $\nu \partial_{\textrm{n}} v - p n = 0$ to model outflow. With these boundary conditions we can choose the zero solution as a
 # feasible initial condition.
 #
-# ### Derivation of Semi-Discrete Weak Form
+# ### [Derivation of semi-discrete weak form](@id weak-form-derivation)
 #
 # By multiplying test functions $\varphi$ and $\psi$ from a suitable test function space on the strong form,
 # followed by integrating over the domain and applying partial integration to the pressure and viscosity terms
@@ -112,6 +112,87 @@ nothing                    #hide
 # of $v$ and $p$ respectively, while $\hat{\varphi}$ is the choice for the test function in the discretization. The hats are dropped
 # in the implementation and only stated for clarity in this section.
 #
+# ### [Derivation of the Jacobian](@id jacobian-derivation)
+# To enable the use of a wide range of solvers, it is more efficient to provide 
+# information to the solver about the sparsity pattern and values of the Jacobian
+# of $f(u, t)$. The sparsity pattern and values for the Jacobian can be shown by 
+# taking the [directional derivative](https://en.wikipedia.org/wiki/Directional_derivative) of
+# $f(u, t) \equiv f(v, p, t)$ along $\delta u \equiv (\delta v, \delta p)$. It is useful
+# to frame the Jacobian of $f(u, t)$ in the context of the weak form described in 
+# the previous [section](@ref weak-form-derivation). The motivation for this
+# framing will later become clear when determining the values and sparsity
+# pattern of the Jacobian. By definition, and omitting $t$, the directional 
+# gradient is given by 
+# 
+# ```math
+# \begin{aligned}
+#   \nabla f(v, p) \cdot (\delta v, \delta p) &= \lim_{\epsilon \to 0 } \frac{1}{\epsilon} (f(v + \epsilon \delta v, p + \epsilon \delta p ) - f(v, p)) \\
+#   &= \lim_{\epsilon \to 0}  \frac{1}{\epsilon} \begin{bmatrix}
+# - \int_\Omega \nu \nabla (v + \epsilon \delta v) : \nabla \varphi - \int_\Omega ((v + \epsilon \delta v) \cdot \nabla) (v + \epsilon \delta v) \cdot \varphi + \int_\Omega (p + \epsilon \delta p)(\nabla \cdot \varphi) \\
+# \int_{\Omega} (\nabla \cdot (v + \epsilon \delta v)) \psi
+#   \end{bmatrix} - f(v, p) \\
+#   &= \lim_{\epsilon \to 0} \frac{1}{\epsilon} \begin{bmatrix}
+#   - \int_{\Omega} \nu \epsilon \nabla \delta v : \nabla \varphi - \int_{\Omega} (\epsilon \delta v \cdot \nabla v + v \cdot \epsilon \nabla \delta v + \epsilon^2 \delta v \cdot \nabla \delta v) \cdot \varphi + \int_{\Omega} \epsilon \delta p (\nabla \cdot \varphi) \\ 
+#   - \int_{\Omega} (\nabla \cdot \epsilon \delta v) \psi
+#   \end{bmatrix} \\
+#   &=  \begin{bmatrix}
+#   - \int_{\Omega} \nu \nabla \delta v : \nabla \varphi - \int_{\Omega} (\delta v \cdot \nabla v + v \cdot \nabla \delta v) \cdot \varphi + \int_{\Omega} \delta p (\nabla \cdot \varphi) \\ 
+#   - \int_{\Omega} (\nabla \cdot \delta v) \psi
+#   \end{bmatrix}.
+# \end{aligned}
+# ```
+#
+# To determine the values and sparsity pattern of the Jacobian given 
+# $\nabla f(v, p) \cdot (\delta v, \delta p)$, we now consider the 
+# finite element approximation of $\delta v$ and $\delta p$
+# ```math
+# \begin{aligned}
+# \delta v_h(\mathbf{x}) &= \sum_{i}^{N} \varphi_i(\mathbf{x}) \delta \hat{v}_i \\
+# \delta p_h(\mathbf{x}) &= \sum_{i}^{N} \psi_i(\mathbf{x}) \delta \hat{p}_i.
+# \end{aligned}
+# ```
+# on a mesh with element size $h$ and $N$ trial (aka nodal shape) functions 
+# $\varphi$ and $\psi$. An important note here is that the trial functions 
+# are the same as in the previous [section](@ref weak-form-derivation) where
+# the finite element approximation of $v$ and $p$ is given by
+# ```math
+# \begin{aligned}
+# v_h(\mathbf{x}) &= \sum_{i}^{N} \varphi_i(\mathbf{x}) \hat{v}_i \\
+# p_h(\mathbf{x}) &= \sum_{i}^{N} \psi_i(\mathbf{x}) \hat{p}_i.
+# \end{aligned}
+# ```
+# We now show that the finite element contributions for *part* of the Jacobian 
+# exactly match the contributions for the Stokes operator $K$. When substituting 
+# the finite element approximation for the viscosity term and comparing this 
+# with the analagous term in the directional derivative,
+# ```math
+# \begin{aligned}
+# - \int_\Omega \nu \nabla \delta v : \nabla \varphi  & \xrightarrow{\delta v_h} - \sum_{i}^{N} (\int_{\Omega} \nu \nabla \varphi_i : \nabla \varphi_j) \delta \hat{v}_i \\ 
+# - \int_\Omega \nu \nabla v : \nabla \varphi  & \xrightarrow{v_h}  - \sum_{i}^{N} (\int_{\Omega} \nu \nabla \varphi_i : \nabla \varphi_j) \hat{v}_i \\
+# \end{aligned} 
+# ```
+# we see that the coefficients (i.e., the terms in the integrand on the right 
+# hand side of the arrow) for the nodal unknowns $\delta \hat{v}_i$ and $\hat{v}_i$
+# are the same. The same can be shown for the pressure term and the
+# incompressibility terms. This implies that once $K$ is assembled, its 
+# sparsity values and pattern can be used to initialize the Jacobian. 
+# In other words, it is simple to see that the Jacobian and the discretized
+# Stokes operator share the same sparsity pattern since they share the same 
+# relation between trial and test functions.
+#
+# However, the Jacobian cannot be assembled using the values and pattern from $K$ 
+# alone since the nonlinear advection term is not accounted for by $K$. 
+# Substituting the finite element approximation into the term resulting from the 
+# directional derivative of the nonlinear advection term, we have
+# ```math
+#  - \int_{\Omega} (\delta v \cdot \nabla v + v \cdot \nabla \delta v) \cdot \varphi \xrightarrow{\delta v_h} - \sum_{i}^{N} (\int_{\Omega} (\varphi_i \cdot \nabla v + v \cdot \nabla \varphi_i) \cdot \varphi_j) \delta \hat{v}_i.
+# ```
+# Since it is clear that the values of the Jacobian corresponding to the 
+# directional derivative of the nonlinear advection term rely on the velocity
+# values $v$ and velocity gradient $\nabla v$ that change during the solving 
+# phase, the finite element contributions to the Jacobian for this term are 
+# calculated separately.
+
 #
 # ## Commented implementation
 #
@@ -183,7 +264,7 @@ gmsh.model.mesh.generate(dim)
 grid = togrid()
 Gmsh.finalize();
 
-#  ### Function Space
+#  ### Function space
 #  To ensure stability we utilize the Taylor-Hood element pair Q2-Q1.
 #  We have to utilize the same quadrature rule for the pressure as for the velocity, because in the weak form the
 #  linear pressure term is tested against a quadratic function.
@@ -239,7 +320,7 @@ add!(ch, inflow_bc);
 close!(ch)
 update!(ch, 0.0);
 
-# ### Linear System Assembly
+# ### Linear system assembly
 # Next we describe how the block mass matrix and the Stokes matrix are assembled.
 #
 # For the block mass matrix $M$ we remember that only the first equation had a time derivative
@@ -363,12 +444,13 @@ K = assemble_stokes_matrix(cellvalues_v, cellvalues_p, ν, K, dh);
 u₀ = zeros(ndofs(dh))
 apply!(u₀, ch);
 
-# DifferentialEquations assumes dense matrices by default, which is not
-# feasible for semi-discretization of finite element models. We communicate
-# that a sparse matrix with specified pattern should be utilized through the
-# `jac_prototyp` argument. It is simple to see that the Jacobian and the
-# stiffness matrix share the same sparsity pattern, since they share the
-# same relation between trial and test functions.
+# When using ODE solvers from DifferentialEquations for stiff problems, the 
+# solvers assume the Jacobian is a dense matrix by default. This is not 
+# feasible for the semi-discretization of finite element models, and it is much
+# more efficient to provide the sparsity pattern and construction of the Jacobian. 
+# From the derivation of the jacobian [section](@ref jacobian-derivation),
+# we communicate that a sparse matrix with a specified pattern should be utilized 
+# through the `jac_prototype` argument. 
 jac_sparsity = sparse(K);
 
 # To apply the nonlinear portion of the Navier-Stokes problem we simply hand
@@ -377,9 +459,9 @@ jac_sparsity = sparse(K);
 # is passed to save some additional runtime. To apply the time-dependent Dirichlet BCs, we
 # also need to hand over the constraint handler.
 # The basic idea to apply the Dirichlet BCs consistently is that we copy the
-# current solution `u`, apply the Dirichlet BCs on the copy, evaluate the
+# current solution `u`, apply the Dirichlet BCs on the copy, and evaluate the
 # discretized RHS of the Navier-Stokes equations with this vector.
-# Furthermore we pass down the Jacobian assembly manually. For the Jacobian we eliminate all
+# Furthermore, we pass down the Jacobian assembly manually. For the Jacobian we eliminate all
 # rows and columns associated with constrained dofs. Also note that we eliminate the mass
 # matrix beforehand in a similar fashion. This decouples the time evolution of the constrained
 # dofs from the true unknowns. The correct solution is enforced by utilizing step and
@@ -643,3 +725,7 @@ end                                                                             
 #md # ```julia
 #md # @__CODE__
 #md # ```
+
+# ## Further reading
+# * [deal.ii: step 57](https://www.dealii.org/current/doxygen/deal.II/step_57.html)
+# * Nonlinear Boundary Value Problems in Whiteley (2017) [Whiteley2017_Ch5NonlinearBoundaryValueProblems](@cite)
