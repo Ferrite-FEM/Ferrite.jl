@@ -63,7 +63,7 @@ where $\mathbb{U}, \mathbb{T}$ are suitable function spaces with sufficiently re
 functions. Under very general assumptions it can be shown that the solution to the weak
 form is identical to the solution to the strong form.
 
-## Finite Element approximation
+## Finite element approximation
 
 
 Using the finite element method to solve partial differential equations is usually
