@@ -69,7 +69,7 @@ nothing                    #hide
 #     for the theory behind operator splitting and can only refer to the original papers for each method.
 #
 #-
-# ## Commented Program
+# ## Commented program
 #
 # Now we solve the problem in Ferrite. What follows is a program spliced with comments.
 #md # The full program, without comments, can be found in the next [section](@ref reactive_surface-plain-program).

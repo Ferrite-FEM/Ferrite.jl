@@ -125,7 +125,7 @@
 #
 # More details on DG formulations for elliptic problems can be found in [Cockburn:2002:unifiedanalysis](@cite).
 #-
-# ## Commented Program
+# ## Commented program
 #
 # Now we solve the problem in Ferrite. What follows is a program spliced with comments.
 #md # The full program, without comments, can be found in the next [section](@ref heat_equation-DG-plain-program).
