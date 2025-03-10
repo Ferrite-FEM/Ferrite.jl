@@ -176,5 +176,5 @@ Markdown.parse(content)
 ```
 
 ## Further reading
-* [defelement.com](https://defelement.org/ciarlet.html#Mapping+finite+elements)
+* [defelement.org](https://defelement.org/ciarlet.html#Mapping+finite+elements)
 * Kirby (2017) [Kirby2017](@cite)
