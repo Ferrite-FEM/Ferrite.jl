@@ -73,7 +73,7 @@ close!(dh);
 # !!! warning "Numbering of degrees of freedom"
 #     A common assumption is that the numbering of degrees of freedom follows the global
 #     numbering of the nodes in the grid. This is *NOT* the case in Ferrite. For more
-#     details, see the [Ferrite numbering rules](@ref "Ordering-of-Dofs").
+#     details, see the [Ferrite numbering rules](@ref "Ordering-of-dofs").
 
 # Now that we have distributed all our dofs we can create our tangent matrix,
 # using `allocate_matrix`. This function returns a sparse matrix
