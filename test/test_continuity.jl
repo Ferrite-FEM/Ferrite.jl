@@ -178,7 +178,7 @@
     ip1 = Nedelec{RefTriangle, 1}(); set1 = setdiff(1:getncells(mixgrid), cellnr)
     ip2 = Nedelec{RefQuadrilateral, 1}(); set2 = Set(cellnr)
     @testset "Quad in Tri-grid, 1st order Nedelec" begin
-        for testcell in (basecell,) #cell_permutations(basecell)
+        for testcell in cell_permutations(basecell)
             mixgrid.cells[cellnr] = testcell
             dh = DofHandler(mixgrid)
             sdh1 = SubDofHandler(dh, set1)
@@ -187,7 +187,7 @@
             add!(sdh2, :u, ip2)
             close!(dh)
             cnt = 0
-            for facetnr in 1:1 #:nfacets(testcell)
+            for facetnr in 1:nfacets(testcell)
                 fi = FacetIndex(cellnr, facetnr)
                 # Check continuity of function value according to continuity_function
                 found_matching = test_continuity(dh, fi; transformation_function = continuity_function(ip1))
