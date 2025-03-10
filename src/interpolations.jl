@@ -442,12 +442,13 @@ dirichlet_boundarydof_indices(::Type{FacetIndex}) = dirichlet_facetdof_indices
 get_edge_direction(cell, edgenr) = get_edge_direction(edges(cell)[edgenr])
 get_face_direction(cell, facenr) = get_face_direction(faces(cell)[facenr])
 
-function get_edge_direction(edgenodes::Tuple)
+function get_edge_direction(edgenodes::NTuple{2, Int})
     positive = edgenodes[2] > edgenodes[1]
     return ifelse(positive, 1, -1)
 end
 
-function get_face_direction(facenodes::Tuple)
+function get_face_direction(facenodes::NTuple{N, Int}) where {N}
+    @assert N > 2
     min_idx = argmin(facenodes)
     if min_idx == 1
         positive = facenodes[2] < facenodes[end]
@@ -1826,8 +1827,8 @@ edgedof_interior_indices(::RaviartThomas{RefTriangle, 1}) = ((1,), (2,), (3,))
 facedof_interior_indices(::RaviartThomas{RefTriangle, 1}) = ((),)
 adjust_dofs_during_distribution(::RaviartThomas) = false
 
-function get_direction(::RaviartThomas{RefTriangle, 1}, j, cell)
-    return get_edge_direction(cell, j)
+function get_direction(::RaviartThomas{RefTriangle, 1}, shape_nr, cell)
+    return get_edge_direction(cell, shape_nr) # shape_nr = edge_nr
 end
 
 # RefTriangle, 2st order Lagrange
@@ -1854,9 +1855,10 @@ edgedof_interior_indices(::RaviartThomas{RefTriangle, 2}) = ((1, 2), (3, 4), (5,
 facedof_interior_indices(::RaviartThomas{RefTriangle, 2}) = ((7, 8),)
 adjust_dofs_during_distribution(::RaviartThomas{RefTriangle, 2}) = true
 
-function get_direction(::RaviartThomas{RefTriangle, 2}, j, cell)
-    j > 6 && return 1
-    return get_edge_direction(cell, (j + 1) ÷ 2)
+function get_direction(::RaviartThomas{RefTriangle, 2}, shape_nr, cell)
+    shape_nr > 6 && return 1
+    edge_nr = (shape_nr + 1) ÷ 2
+    return get_edge_direction(cell, edge_nr)
 end
 
 # RefQuadrilateral, 1st order Lagrange
@@ -1880,8 +1882,8 @@ edgedof_interior_indices(::RaviartThomas{RefQuadrilateral, 1}) = ((1,), (2,), (3
 facedof_interior_indices(::RaviartThomas{RefQuadrilateral, 1}) = ((),)
 adjust_dofs_during_distribution(::RaviartThomas{RefQuadrilateral, 1}) = false
 
-function get_direction(::RaviartThomas{RefQuadrilateral, 1}, j, cell)
-    return get_edge_direction(cell, j)
+function get_direction(::RaviartThomas{RefQuadrilateral, 1}, shape_nr, cell)
+    return get_edge_direction(cell, shape_nr) # shape_nr = edge_nr
 end
 
 # RefTetrahedron, 1st order Lagrange
@@ -1896,14 +1898,14 @@ function reference_shape_value(ip::RaviartThomas{RefTetrahedron, 1}, ξ::Vec{3},
 end
 
 getnbasefunctions(::RaviartThomas{RefTetrahedron, 1}) = 4
+edgedof_interior_indices(::RaviartThomas{RefTetrahedron, 1}) = ntuple(_ -> (), 6)
 edgedof_indices(ip::RaviartThomas{RefTetrahedron, 1}) = edgedof_interior_indices(ip)
-facedof_indices(ip::RaviartThomas{RefTetrahedron, 1}) = facedof_interior_indices(ip)
-edgedof_interior_indices(::RaviartThomas{RefTetrahedron, 1}) = ((), (), (), (), (), ())
 facedof_interior_indices(::RaviartThomas{RefTetrahedron, 1}) = ((1), (2), (3), (4))
+facedof_indices(ip::RaviartThomas{RefTetrahedron, 1}) = facedof_interior_indices(ip)
 adjust_dofs_during_distribution(::RaviartThomas{RefTetrahedron, 1}) = false
 
-function get_direction(::RaviartThomas{RefTetrahedron, 1}, j, cell)
-    return get_face_direction(cell, j)
+function get_direction(::RaviartThomas{RefTetrahedron, 1}, shape_nr, cell)
+    return get_face_direction(cell, shape_nr) # shape_nr = face_nr
 end
 
 # RefHexahedron, 1st order Lagrange
@@ -1922,14 +1924,14 @@ function reference_shape_value(ip::RaviartThomas{RefHexahedron, 1}, ξ::Vec{3, T
 end
 
 getnbasefunctions(::RaviartThomas{RefHexahedron, 1}) = 6
+edgedof_interior_indices(::RaviartThomas{RefHexahedron, 1}) = ntuple(_ -> (), 12)
 edgedof_indices(ip::RaviartThomas{RefHexahedron, 1}) = edgedof_interior_indices(ip)
-facedof_indices(ip::RaviartThomas{RefHexahedron, 1}) = facedof_interior_indices(ip)
-edgedof_interior_indices(::RaviartThomas{RefHexahedron, 1}) = ((), (), (), (), (), (), (), (), (), (), (), ())
 facedof_interior_indices(::RaviartThomas{RefHexahedron, 1}) = ((1), (2), (3), (4), (5), (6))
+facedof_indices(ip::RaviartThomas{RefHexahedron, 1}) = facedof_interior_indices(ip)
 adjust_dofs_during_distribution(::RaviartThomas{RefHexahedron, 1}) = false
 
-function get_direction(::RaviartThomas{RefHexahedron, 1}, j, cell)
-    return get_face_direction(cell, j)
+function get_direction(::RaviartThomas{RefHexahedron, 1}, shape_nr, cell)
+    return get_face_direction(cell, shape_nr) # shape_nr = face_nr
 end
 
 #####################################
@@ -1966,8 +1968,9 @@ getnbasefunctions(::BrezziDouglasMarini{RefTriangle, 1}) = 6
 edgedof_interior_indices(::BrezziDouglasMarini{RefTriangle, 1}) = ((1, 2), (3, 4), (5, 6))
 adjust_dofs_during_distribution(::BrezziDouglasMarini{RefTriangle, 1}) = true
 
-function get_direction(::BrezziDouglasMarini{RefTriangle, 1}, j, cell)
-    return get_edge_direction(cell, (j + 1) ÷ 2)
+function get_direction(::BrezziDouglasMarini{RefTriangle, 1}, shape_nr, cell)
+    edge_nr = (shape_nr + 1) ÷ 2
+    return get_edge_direction(cell, edge_nr)
 end
 
 #####################################
@@ -1998,8 +2001,8 @@ getnbasefunctions(::Nedelec{RefTriangle, 1}) = 3
 edgedof_interior_indices(::Nedelec{RefTriangle, 1}) = ((1,), (2,), (3,))
 adjust_dofs_during_distribution(::Nedelec{RefTriangle, 1}) = false
 
-function get_direction(::Nedelec{RefTriangle, 1}, j, cell)
-    return get_edge_direction(cell, j)
+function get_direction(::Nedelec{RefTriangle, 1}, shape_nr, cell)
+    return get_edge_direction(cell, shape_nr) # shape_nr = edge_nr
 end
 
 # RefTriangle, 2nd order Lagrange
@@ -2028,9 +2031,10 @@ edgedof_interior_indices(::Nedelec{RefTriangle, 2}) = ((1, 2), (3, 4), (5, 6))
 facedof_interior_indices(::Nedelec{RefTriangle, 2}) = ((7, 8),)
 adjust_dofs_during_distribution(::Nedelec{RefTriangle, 2}) = true
 
-function get_direction(::Nedelec{RefTriangle, 2}, j, cell)
-    j > 6 && return 1
-    return get_edge_direction(cell, (j + 1) ÷ 2)
+function get_direction(::Nedelec{RefTriangle, 2}, shape_nr, cell)
+    shape_nr > 6 && return 1
+    edge_nr = (shape_nr + 1) ÷ 2
+    return get_edge_direction(cell, edge_nr)
 end
 
 # RefQuadrilateral, 1st order Lagrange
@@ -2050,8 +2054,8 @@ getnbasefunctions(::Nedelec{RefQuadrilateral, 1}) = 4
 edgedof_interior_indices(::Nedelec{RefQuadrilateral, 1}) = ((1,), (2,), (3,), (4,))
 adjust_dofs_during_distribution(::Nedelec{RefQuadrilateral, 1}) = false
 
-function get_direction(::Nedelec{RefQuadrilateral, 1}, j, cell)
-    return get_edge_direction(cell, j)
+function get_direction(::Nedelec{RefQuadrilateral, 1}, shape_nr, cell)
+    return get_edge_direction(cell, shape_nr) # shape_nr = edge_nr
 end
 
 # RefTetrahedron, 1st order Lagrange
@@ -2074,8 +2078,8 @@ edgedof_interior_indices(::Nedelec{RefTetrahedron, 1}) = ((1,), (2,), (3,), (4,)
 facedof_indices(::Nedelec{RefTetrahedron, 1}) = ((1, 2, 3), (1, 4, 5), (2, 5, 6), (3, 4, 6))
 adjust_dofs_during_distribution(::Nedelec{RefTetrahedron, 1}) = false
 
-function get_direction(::Nedelec{RefTetrahedron, 1}, j, cell)
-    return get_edge_direction(cell, j)
+function get_direction(::Nedelec{RefTetrahedron, 1}, shape_nr, cell)
+    return get_edge_direction(cell, shape_nr) # shape_nr = edge_nr
 end
 
 # RefHexahedron, 1st order Lagrange
@@ -2104,6 +2108,6 @@ edgedof_interior_indices(::Nedelec{RefHexahedron, 1}) = ((1,), (2,), (3,), (4,),
 facedof_indices(::Nedelec{RefHexahedron, 1}) = ((1, 2, 3, 4), (1, 5, 9, 10), (2, 6, 10, 11), (3, 7, 11, 12), (4, 8, 9, 12), (5, 6, 7, 8))
 adjust_dofs_during_distribution(::Nedelec{RefHexahedron, 1}) = false
 
-function get_direction(::Nedelec{RefHexahedron, 1}, j, cell)
-    return get_edge_direction(cell, j)
+function get_direction(::Nedelec{RefHexahedron, 1}, shape_nr, cell)
+    return get_edge_direction(cell, shape_nr) # shape_nr = edge_nr
 end
