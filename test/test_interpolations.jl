@@ -363,35 +363,35 @@ end
 
         # These reference moments define the functionals that an interpolation should fulfill
         ## Raviart-Thomas on RefTriangle
-        reference_moment(::RaviartThomas{RefTriangle, 1}, s::Vec{1}, edge_shape_nr) = 1
-        reference_moment(::RaviartThomas{RefTriangle, 2}, s::Vec{1}, edge_shape_nr) = edge_shape_nr == 1 ? (1 - s[1]) : s[1]
-        reference_moment(::RaviartThomas{RefTriangle, 2}, s::Vec{2}, face_shape_nr) = face_shape_nr == 1 ? Vec(1, 0) : Vec(0, 1)
+        reference_edge_moment(::RaviartThomas{RefTriangle, 1}, s::SVector{1}, edge_shape_nr) = 1
+        reference_edge_moment(::RaviartThomas{RefTriangle, 2}, s::SVector{1}, edge_shape_nr) = edge_shape_nr == 1 ? (1 - s[1]) : s[1]
+        reference_face_moment(::RaviartThomas{RefTriangle, 2}, s::SVector{2}, face_shape_nr) = face_shape_nr == 1 ? Vec(1, 0) : Vec(0, 1)
 
         ## Raviart-Thomas on RefQuadrilateral
-        reference_moment(::RaviartThomas{RefQuadrilateral, 1}, s::Vec{1}, edge_shape_nr) = 1
+        reference_edge_moment(::RaviartThomas{RefQuadrilateral, 1}, s::SVector{1}, edge_shape_nr) = 1
 
         ## Raviart-Thomas on RefTetrahedron
-        reference_moment(::RaviartThomas{RefTetrahedron, 1}, s::Vec{2}, face_shape_nr) = 1
+        reference_face_moment(::RaviartThomas{RefTetrahedron, 1}, s::SVector{2}, face_shape_nr) = 1
 
         ## Raviart-Thomas on RefHexahedron
-        reference_moment(::RaviartThomas{RefHexahedron, 1}, s::Vec{2}, face_shape_nr) = 1
+        reference_face_moment(::RaviartThomas{RefHexahedron, 1}, s::SVector{2}, face_shape_nr) = 1
 
         ## Brezzi-Douglas-Marini on RefTriangle
-        reference_moment(::BrezziDouglasMarini{RefTriangle, 1}, s::Vec{1}, facet_shape_nr) = facet_shape_nr == 1 ? (1 - s[1]) : s[1]
+        reference_edge_moment(::BrezziDouglasMarini{RefTriangle, 1}, s::SVector{1}, edge_shape_nr) = edge_shape_nr == 1 ? (1 - s[1]) : s[1]
 
         ## Nedelec on RefTriangle
-        reference_moment(::Nedelec{RefTriangle, 1}, s::Vec{1}, edge_shape_nr) = 1
-        reference_moment(::Nedelec{RefTriangle, 2}, s::Vec{1}, edge_shape_nr) = edge_shape_nr == 1 ? (1 - s[1]) : s[1]
-        reference_moment(::Nedelec{RefTriangle, 2}, s::Vec{2}, face_shape_nr) = face_shape_nr == 1 ? Vec(1, 0) : Vec(0, 1)
+        reference_edge_moment(::Nedelec{RefTriangle, 1}, s::SVector{1}, edge_shape_nr) = 1
+        reference_edge_moment(::Nedelec{RefTriangle, 2}, s::SVector{1}, edge_shape_nr) = edge_shape_nr == 1 ? (1 - s[1]) : s[1]
+        reference_face_moment(::Nedelec{RefTriangle, 2}, s::SVector{2}, face_shape_nr) = face_shape_nr == 1 ? Vec(1, 0) : Vec(0, 1)
 
         ## Nedelec on RefQuadrilateral
-        reference_moment(::Nedelec{RefQuadrilateral, 1}, s::Vec{1}, edge_shape_nr) = 1
+        reference_edge_moment(::Nedelec{RefQuadrilateral, 1}, s::SVector{1}, edge_shape_nr) = 1
 
         ## Nedelec on RefTetrahedron
-        reference_moment(::Nedelec{RefTetrahedron, 1}, s::Vec{1}, edge_shape_nr) = 1
+        reference_edge_moment(::Nedelec{RefTetrahedron, 1}, s::SVector{1}, edge_shape_nr) = 1
 
         ## Nedelec on RefHexahedron
-        reference_moment(::Nedelec{RefHexahedron, 1}, s::Vec{1}, edge_shape_nr) = 1
+        reference_edge_moment(::Nedelec{RefHexahedron, 1}, s::SVector{1}, edge_shape_nr) = 1
 
         function_space(::RaviartThomas) = Val(:Hdiv)
         function_space(::BrezziDouglasMarini) = Val(:Hdiv)
@@ -409,7 +409,7 @@ end
         Integrate f(s) on the domain s ∈ [0, 1]
         """
         function integrate_edge(f)
-            val, _ = hquadrature(s -> f(Vec(s)), 0, 1; atol = 1.0e-8)
+            val, _ = hquadrature(s -> f(SVector(s)), 0, 1; atol = 1.0e-8)
             return val
         end
 
@@ -420,11 +420,11 @@ end
         The transformed function is integrated on the square domain s ∈ [0, 1] × [0, 1]
         """
         function integrate_face(::Type{RefTriangle}, f)
-            duffy_transform(s) = Vec(s[1] * (1 - s[2]), s[2]) # (x, y) = (u(1 - v), v)
+            duffy_transform(s) = SVector(s[1] * (1 - s[2]), s[2]) # (x, y) = (u(1 - v), v)
             duffy_detJ(s) = 1 - s[2]
             F(s) = f(duffy_transform(s)) * duffy_detJ(s)
 
-            val, _ = hcubature(s -> F(Vec{2}(s)), [0, 0], [1, 1]; atol = 1.0e-8)
+            val, _ = hcubature(F, (0, 0), (1, 1); atol = 1.0e-8)
             return val
         end
 
@@ -434,13 +434,13 @@ end
         Integrate f(s) on the square domain s ∈ [0, 1] × [0, 1]
         """
         function integrate_face(::Type{RefQuadrilateral}, f)
-            val, _ = hcubature(s -> f(Vec{2}(s)), [0, 0], [1, 1]; atol = 1.0e-8)
+            val, _ = hcubature(f, (0, 0), (1, 1); atol = 1.0e-8)
             return val
         end
 
-        parameterize_edge(edge_coords, s::Vec{1}) = edge_coords[1] + (edge_coords[2] - edge_coords[1]) * s[1]
-        parameterize_face(face_coords, s::Vec{2}) = face_coords[1] + (face_coords[2] - face_coords[1]) * s[1] + (face_coords[end] - face_coords[1]) * s[2]
-        # parameterize_volume(volume_coords, s::Vec{3}) = # TODO parameterization of volume (Tetrahedron, Hexahedron, Prism, Pyramid)
+        parameterize_edge(edge_coords, s::SVector{1}) = edge_coords[1] + (edge_coords[2] - edge_coords[1]) * s[1]
+        parameterize_face(face_coords, s::SVector{2}) = face_coords[1] + (face_coords[2] - face_coords[1]) * s[1] + (face_coords[end] - face_coords[1]) * s[2]
+        # parameterize_volume(volume_coords, s::SVector{3}) = # TODO parameterization of volume (Tetrahedron, Hexahedron, Prism, Pyramid)
 
         face_refshape(::Type{RefTetrahedron}, ::Int) = RefTriangle
         face_refshape(::Type{RefHexahedron}, ::Int) = RefQuadrilateral
@@ -460,17 +460,17 @@ end
                 edge_coords = getindex.((Ferrite.reference_coordinates(ipg),), Ferrite.reference_edges(RefShape)[edge_nr])
                 dof_inds = Ferrite.edgedof_interior_indices(ip)[edge_nr]
 
-                ξ(s::Vec{1}) = parameterize_edge(edge_coords, s)
+                ξ(s::SVector{1}) = parameterize_edge(edge_coords, s)
                 weighted_normal = reference_normals(RefShape)[edge_nr] * reference_face_area(ip, edge_nr) * reference_edge_weight(RefShape)
                 for (edge_shape_nr, shape_nr) in pairs(dof_inds)
-                    f(s) = reference_moment(ip, s, edge_shape_nr) * (reference_shape_value(ip, ξ(s), shape_nr) ⋅ weighted_normal)
+                    f(s) = reference_edge_moment(ip, s, edge_shape_nr) * (reference_shape_value(ip, ξ(s), shape_nr) ⋅ weighted_normal)
                     @test integrate_edge(f) ≈ 1
                 end
 
                 for shape_nr in 1:getnbasefunctions(ip)
                     shape_nr in dof_inds && continue # Already tested
                     for s in range(0, 1, 5)
-                        @test abs(reference_shape_value(ip, ξ(Vec(s)), shape_nr) ⋅ weighted_normal) < 1.0e-10
+                        @test abs(reference_shape_value(ip, ξ(SVector(s)), shape_nr) ⋅ weighted_normal) < 1.0e-10
                     end
                 end
             end
@@ -481,9 +481,9 @@ end
                 weighted_area = reference_volume(ip) * reference_face_weight(RefShape)
                 dof_inds = Ferrite.facedof_interior_indices(ip)[face_nr]
 
-                ξ(s::Vec{2}) = parameterize_face(face_coords, s)
+                ξ(s::SVector{2}) = parameterize_face(face_coords, s)
                 for (face_shape_nr, shape_nr) in pairs(dof_inds)
-                    f(s) = reference_moment(ip, s, face_shape_nr) ⋅ reference_shape_value(ip, ξ(s), shape_nr) * weighted_area
+                    f(s) = reference_face_moment(ip, s, face_shape_nr) ⋅ reference_shape_value(ip, ξ(s), shape_nr) * weighted_area
                     @test integrate_face(RefShape, f) ≈ 1
                 end
             end
@@ -501,9 +501,9 @@ end
                 weighted_normal = reference_normals(RefShape)[face_nr] * reference_face_area(ip, face_nr) * reference_face_weight(face_shape)
                 dof_inds = Ferrite.facedof_interior_indices(ip)[face_nr]
 
-                ξ(s::Vec{2}) = parameterize_face(face_coords, s)
+                ξ(s::SVector{2}) = parameterize_face(face_coords, s)
                 for (face_shape_nr, shape_nr) in pairs(dof_inds)
-                    f(s) = reference_moment(ip, s, face_shape_nr) * (reference_shape_value(ip, ξ(s), shape_nr) ⋅ weighted_normal)
+                    f(s) = reference_face_moment(ip, s, face_shape_nr) * (reference_shape_value(ip, ξ(s), shape_nr) ⋅ weighted_normal)
                     @test integrate_face(face_shape, f) ≈ 1
                 end
             end
@@ -526,16 +526,16 @@ end
                 edge_vector = reference_edge_weight(RefShape) * reference_face_area(ip, edge_nr) * edge_vector / norm(edge_vector) # Weighted direction vector
                 dof_inds = Ferrite.edgedof_interior_indices(ip)[edge_nr]
 
-                ξ(s::Vec{1}) = parameterize_edge(edge_coords, s)
+                ξ(s::SVector{1}) = parameterize_edge(edge_coords, s)
                 for (edge_shape_nr, shape_nr) in pairs(dof_inds)
-                    f(s) = reference_moment(ip, s, edge_shape_nr) * (reference_shape_value(ip, ξ(s), shape_nr) ⋅ edge_vector)
+                    f(s) = reference_edge_moment(ip, s, edge_shape_nr) * (reference_shape_value(ip, ξ(s), shape_nr) ⋅ edge_vector)
                     @test integrate_edge(f) ≈ 1
                 end
 
                 for shape_nr in 1:getnbasefunctions(ip)
                     shape_nr in dof_inds && continue # Already tested
                     for s in range(0, 1, 5)
-                        @test abs(reference_shape_value(ip, ξ(Vec(s)), shape_nr) ⋅ edge_vector) < 1.0e-10
+                        @test abs(reference_shape_value(ip, ξ(SVector(s)), shape_nr) ⋅ edge_vector) < 1.0e-10
                     end
                 end
             end
@@ -546,9 +546,9 @@ end
                 area = reference_volume(ip) * reference_face_weight(RefShape)
                 dof_inds = Ferrite.facedof_interior_indices(ip)[face_nr]
 
-                ξ(s::Vec{2}) = parameterize_face(face_coords, s)
+                ξ(s::SVector{2}) = parameterize_face(face_coords, s)
                 for (face_shape_nr, shape_nr) in pairs(dof_inds)
-                    f(s) = reference_moment(ip, s, face_shape_nr) ⋅ reference_shape_value(ip, ξ(s), shape_nr) * area
+                    f(s) = reference_face_moment(ip, s, face_shape_nr) ⋅ reference_shape_value(ip, ξ(s), shape_nr) * area
                     @test integrate_face(RefShape, f) ≈ 1
                 end
             end
@@ -565,16 +565,16 @@ end
                 edge_vector = edge_coords[2] - edge_coords[1] # Weighted direction vector
                 dof_inds = Ferrite.edgedof_interior_indices(ip)[edge_nr]
 
-                ξ(s::Vec{1}) = edge_coords[1] + edge_vector * s[1]
+                ξ(s::SVector{1}) = edge_coords[1] + edge_vector * s[1]
                 for (edge_shape_nr, shape_nr) in pairs(dof_inds)
-                    f(s) = reference_moment(ip, s, edge_shape_nr) * (reference_shape_value(ip, ξ(s), shape_nr) ⋅ edge_vector)
+                    f(s) = reference_edge_moment(ip, s, edge_shape_nr) * (reference_shape_value(ip, ξ(s), shape_nr) ⋅ edge_vector)
                     @test integrate_edge(f) ≈ 1
                 end
 
                 for shape_nr in 1:getnbasefunctions(ip)
                     shape_nr in dof_inds && continue # Already tested
                     for s in range(0, 1, 5)
-                        @test abs(reference_shape_value(ip, ξ(Vec(s)), shape_nr) ⋅ edge_vector) < 1.0e-10
+                        @test abs(reference_shape_value(ip, ξ(SVector(s)), shape_nr) ⋅ edge_vector) < 1.0e-10
                     end
                 end
             end
@@ -586,9 +586,9 @@ end
                 area = reference_face_area(ip, face_nr) * reference_face_weight(face_shape)
                 dof_inds = Ferrite.facedof_interior_indices(ip)[face_nr]
 
-                ξ(s::Vec{2}) = face_coords[1] + (face_coords[2] - face_coords[1]) * s[1] + (face_coords[end] - face_coords[1]) * s[2]
+                ξ(s::SVector{2}) = face_coords[1] + (face_coords[2] - face_coords[1]) * s[1] + (face_coords[end] - face_coords[1]) * s[2]
                 for (face_shape_nr, shape_nr) in pairs(dof_inds)
-                    f(s) = reference_moment(ip, s, face_shape_nr) ⋅ reference_shape_value(ip, ξ(s), shape_nr) * area
+                    f(s) = reference_face_moment(ip, s, face_shape_nr) ⋅ reference_shape_value(ip, ξ(s), shape_nr) * area
                     @test integrate_face(face_shape, f) ≈ 1
                 end
             end
