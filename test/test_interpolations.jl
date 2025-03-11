@@ -416,7 +416,7 @@ end
         """
             integrate_face(::Type{RefTriangle}, f)
 
-        Integrate f(s) on a triangular domain using the Duffy transform; 
+        Integrate f(s) on a triangular domain using the Duffy transform;
         The transformed function is integrated on the square domain s ∈ [0, 1] × [0, 1]
         """
         function integrate_face(::Type{RefTriangle}, f)
@@ -442,13 +442,9 @@ end
         parameterize_face(face_coords, s::SVector{2}) = face_coords[1] + (face_coords[2] - face_coords[1]) * s[1] + (face_coords[end] - face_coords[1]) * s[2]
         # parameterize_volume(volume_coords, s::SVector{3}) = # TODO parameterization of volume (Tetrahedron, Hexahedron, Prism, Pyramid)
 
-        face_refshape(::Type{RefTetrahedron}, ::Int) = RefTriangle
-        face_refshape(::Type{RefHexahedron}, ::Int) = RefQuadrilateral
-
-        reference_edge_weight(::Type{RefTriangle}) = 1.0
-        reference_edge_weight(::Type{RefQuadrilateral}) = 0.5
-        reference_face_weight(::Type{RefTriangle}) = 2.0
-        reference_face_weight(::Type{RefQuadrilateral}) = 0.25
+        # TODO why is this necessary
+        reference_face_weight(RefShape::Type{RefTriangle}) = 1 / reference_volume(RefShape)
+        reference_face_weight(RefShape::Type{RefQuadrilateral}) = 1 / reference_volume(RefShape)
 
         # 2D, H(div)
         function test_interpolation_functionals(::Val{:Hdiv}, ::Val{2}, ip::Interpolation)
@@ -461,7 +457,7 @@ end
                 dof_inds = Ferrite.edgedof_interior_indices(ip)[edge_nr]
 
                 ξ(s::SVector{1}) = parameterize_edge(edge_coords, s)
-                weighted_normal = reference_normals(RefShape)[edge_nr] * reference_face_area(ip, edge_nr) * reference_edge_weight(RefShape)
+                weighted_normal = reference_normals(RefShape)[edge_nr] * reference_facet_area(RefShape, edge_nr)
                 for (edge_shape_nr, shape_nr) in pairs(dof_inds)
                     f(s) = reference_edge_moment(ip, s, edge_shape_nr) * (reference_shape_value(ip, ξ(s), shape_nr) ⋅ weighted_normal)
                     @test integrate_edge(f) ≈ 1
@@ -478,7 +474,7 @@ end
             # Test functionals associated with the faces (volumes)
             for face_nr in 1:Ferrite.nfaces(RefShape)
                 face_coords = getindex.((Ferrite.reference_coordinates(ipg),), Ferrite.reference_faces(RefShape)[face_nr])
-                weighted_area = reference_volume(ip) * reference_face_weight(RefShape)
+                weighted_area = reference_volume(RefShape) * reference_face_weight(RefShape)
                 dof_inds = Ferrite.facedof_interior_indices(ip)[face_nr]
 
                 ξ(s::SVector{2}) = parameterize_face(face_coords, s)
@@ -496,9 +492,9 @@ end
 
             # Test functionals associated with the faces
             for face_nr in 1:Ferrite.nfaces(RefShape)
-                face_shape = face_refshape(RefShape, face_nr)
+                face_shape = getfacetrefshape(RefShape, face_nr)
                 face_coords = getindex.((Ferrite.reference_coordinates(ipg),), Ferrite.reference_faces(RefShape)[face_nr])
-                weighted_normal = reference_normals(RefShape)[face_nr] * reference_face_area(ip, face_nr) * reference_face_weight(face_shape)
+                weighted_normal = reference_normals(RefShape)[face_nr] * reference_facet_area(RefShape, face_nr) * reference_face_weight(face_shape)
                 dof_inds = Ferrite.facedof_interior_indices(ip)[face_nr]
 
                 ξ(s::SVector{2}) = parameterize_face(face_coords, s)
@@ -523,7 +519,7 @@ end
             for edge_nr in 1:Ferrite.nedges(RefShape)
                 edge_coords = getindex.((Ferrite.reference_coordinates(ipg),), Ferrite.reference_edges(RefShape)[edge_nr])
                 edge_vector = edge_coords[2] - edge_coords[1]
-                edge_vector = reference_edge_weight(RefShape) * reference_face_area(ip, edge_nr) * edge_vector / norm(edge_vector) # Weighted direction vector
+                edge_vector = reference_facet_area(RefShape, edge_nr) * edge_vector / norm(edge_vector) # Weighted direction vector
                 dof_inds = Ferrite.edgedof_interior_indices(ip)[edge_nr]
 
                 ξ(s::SVector{1}) = parameterize_edge(edge_coords, s)
@@ -543,7 +539,7 @@ end
             # Test functionals associated with the faces (volumes)
             for face_nr in 1:Ferrite.nfaces(RefShape)
                 face_coords = getindex.((Ferrite.reference_coordinates(ipg),), Ferrite.reference_faces(RefShape)[face_nr])
-                area = reference_volume(ip) * reference_face_weight(RefShape)
+                area = reference_volume(RefShape) * reference_face_weight(RefShape)
                 dof_inds = Ferrite.facedof_interior_indices(ip)[face_nr]
 
                 ξ(s::SVector{2}) = parameterize_face(face_coords, s)
@@ -581,9 +577,9 @@ end
 
             # Test functionals associated with the faces
             for face_nr in 1:Ferrite.nfaces(RefShape)
-                face_shape = face_refshape(RefShape, face_nr)
+                face_shape = getfacetrefshape(RefShape, face_nr)
                 face_coords = getindex.((Ferrite.reference_coordinates(ipg),), Ferrite.reference_faces(RefShape)[face_nr])
-                area = reference_face_area(ip, face_nr) * reference_face_weight(face_shape)
+                area = reference_facet_area(RefShape, face_nr) * reference_face_weight(face_shape)
                 dof_inds = Ferrite.facedof_interior_indices(ip)[face_nr]
 
                 ξ(s::SVector{2}) = face_coords[1] + (face_coords[2] - face_coords[1]) * s[1] + (face_coords[end] - face_coords[1]) * s[2]

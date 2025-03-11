@@ -29,6 +29,7 @@
                 @inferred CellValues(quad_rule, func_interpol, geom_interpol; update_gradients = Val(false), update_detJdV = Val(false))
             end
             rdim = Ferrite.getrefdim(func_interpol)
+            RefShape = Ferrite.getrefshape(func_interpol)
             n_basefuncs = getnbasefunctions(func_interpol)
 
             @test getnbasefunctions(cv) == n_basefuncs
@@ -132,7 +133,7 @@
             for i in 1:getnquadpoints(cv)
                 vol += getdetJdV(cv, i)
             end
-            @test vol ≈ reference_volume(func_interpol)
+            @test vol ≈ reference_volume(RefShape)
 
             # Test spatial coordinate (after reinit with ref.coords we should get back the quad_points)
             for (i, qp_x) in pairs(Ferrite.getpoints(quad_rule))

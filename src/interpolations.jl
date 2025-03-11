@@ -1870,10 +1870,10 @@ function reference_shape_value(ip::RaviartThomas{RefQuadrilateral, 1}, ξ::Vec{2
     x, y = ξ
     nil = zero(T)
 
-    i == 1 && return Vec(nil, -(1 - y) / 2) # Changed sign, follow Ferrite's sign convention
-    i == 2 && return Vec((1 + x) / 2, nil)  # Changed sign, follow Ferrite's sign convention
-    i == 3 && return Vec(nil, (1 + y) / 2)
-    i == 4 && return Vec((x - 1) / 2, nil)
+    i == 1 && return Vec(nil, -(1 - y) / 4) # Changed sign, follow Ferrite's sign convention
+    i == 2 && return Vec((1 + x) / 4, nil)  # Changed sign, follow Ferrite's sign convention
+    i == 3 && return Vec(nil, (1 + y) / 4)
+    i == 4 && return Vec((x - 1) / 4, nil)
     throw(ArgumentError("no shape function $i for interpolation $ip"))
 end
 
@@ -2043,10 +2043,10 @@ function reference_shape_value(ip::Nedelec{RefQuadrilateral, 1}, ξ::Vec{2, T}, 
     x, y = ξ
     nil = zero(T)
 
-    i == 1 && return Vec((1 - y) / 2, nil)
-    i == 2 && return Vec(nil, (1 + x) / 2)
-    i == 3 && return Vec(-(1 + y) / 2, nil) # Changed sign, follow Ferrite's sign convention
-    i == 4 && return Vec(nil, -(1 - x) / 2) # Changed sign, follow Ferrite's sign convention
+    i == 1 && return Vec((1 - y) / 4, nil)
+    i == 2 && return Vec(nil, (1 + x) / 4)
+    i == 3 && return Vec(-(1 + y) / 4, nil) # Changed sign, follow Ferrite's sign convention
+    i == 4 && return Vec(nil, -(1 - x) / 4) # Changed sign, follow Ferrite's sign convention
     throw(ArgumentError("no shape function $i for interpolation $ip"))
 end
 
@@ -2088,18 +2088,18 @@ function reference_shape_value(ip::Nedelec{RefHexahedron, 1}, ξ::Vec{3, T}, i::
     x, y, z = ξ
     nil = zero(T)
 
-    i == 1 && return Vec((y * z - y - z + 1) / 8, nil, nil)
-    i == 2 && return Vec(nil, -(x * z - x + z - 1) / 8, nil)
-    i == 3 && return Vec((y * z - y + z - 1) / 8, nil, nil) # Changed sign, follow Ferrite's sign convention
-    i == 4 && return Vec(nil, -(x * z - x - z + 1) / 8, nil)  # Changed sign, follow Ferrite's sign convention
-    i == 5 && return Vec(-(z * y - z + y - 1) / 8, nil, nil)
-    i == 6 && return Vec(nil, (x * z + x + z + 1) / 8, nil)
-    i == 7 && return Vec(-(y * z + y + z + 1) / 8, nil, nil)  # Changed sign, follow Ferrite's sign convention
-    i == 8 && return Vec(nil, (z * x - z + x - 1) / 8, nil) # Changed sign, follow Ferrite's sign convention
-    i == 9 && return Vec(nil, nil, (x * y - x - y + 1) / 8)
-    i == 10 && return Vec(nil, nil, -(x * y - x + y - 1) / 8)
-    i == 11 && return Vec(nil, nil, (x * y + x + y + 1) / 8)
-    i == 12 && return Vec(nil, nil, -(y * x - y + x - 1) / 8)
+    i == 1 && return Vec((1 - y) * (1 - z) / 8, nil, nil)
+    i == 2 && return Vec(nil, (1 + x) * (1 - z) / 8, nil)
+    i == 3 && return Vec(-(1 + y) * (1 - z) / 8, nil, nil) # Changed sign, follow Ferrite's sign convention
+    i == 4 && return Vec(nil, -(1 - x) * (1 - z) / 8, nil)  # Changed sign, follow Ferrite's sign convention
+    i == 5 && return Vec((1 - y) * (1 + z) / 8, nil, nil)
+    i == 6 && return Vec(nil, (1 + x) * (1 + z) / 8, nil)
+    i == 7 && return Vec(-(1 + y) * (1 + z) / 8, nil, nil)  # Changed sign, follow Ferrite's sign convention
+    i == 8 && return Vec(nil, -(1 - x) * (1 + z) / 8, nil) # Changed sign, follow Ferrite's sign convention
+    i == 9 && return Vec(nil, nil, (1 - x) * (1 - y) / 8)
+    i == 10 && return Vec(nil, nil, (1 + x) * (1 - y) / 8)
+    i == 11 && return Vec(nil, nil, (1 + x) * (1 + y) / 8)
+    i == 12 && return Vec(nil, nil, (1 - x) * (1 + y) / 8)
     throw(ArgumentError("no shape function $i for interpolation $ip"))
 end
 
