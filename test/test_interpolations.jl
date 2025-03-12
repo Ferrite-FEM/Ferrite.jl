@@ -366,7 +366,6 @@ end
         reference_moment(::Nedelec{RefTriangle, 2}, s, edge_shape_nr) = edge_shape_nr == 1 ? (1 - s) : s
         reference_moment(::Nedelec{RefQuadrilateral, 1}, s, edge_shape_nr) = 1
 
-
         function_space(::RaviartThomas) = Val(:Hdiv)
         function_space(::BrezziDouglasMarini) = Val(:Hdiv)
         function_space(::Nedelec) = Val(:Hcurl)
