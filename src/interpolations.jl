@@ -1910,16 +1910,17 @@ end
 
 # RefHexahedron, 1st order Lagrange
 # https://defelement.com/elements/examples/hexahedron-raviart-thomas-lagrange-1.html
+# Scale with factor 1/4 as Ferrite has 4 times defelement's face area.
 function reference_shape_value(ip::RaviartThomas{RefHexahedron, 1}, ξ::Vec{3, T}, i::Int) where {T}
     x, y, z = ξ
     nil = zero(T)
 
-    i == 1 && return Vec(nil, nil, (z - 1) / 2) # Changed sign, follow Ferrite's sign convention
-    i == 2 && return Vec(nil, (y - 1) / 2, nil)
-    i == 3 && return Vec((x + 1) / 2, nil, nil)
-    i == 4 && return Vec(nil, (y + 1) / 2, nil) # Changed sign, follow Ferrite's sign convention
-    i == 5 && return Vec((x - 1) / 2, nil, nil) # Changed sign, follow Ferrite's sign convention
-    i == 6 && return Vec(nil, nil, (z + 1) / 2)
+    i == 1 && return Vec(nil, nil, (z - 1) / 8) # Changed sign, follow Ferrite's sign convention
+    i == 2 && return Vec(nil, (y - 1) / 8, nil)
+    i == 3 && return Vec((x + 1) / 8, nil, nil)
+    i == 4 && return Vec(nil, (y + 1) / 8, nil) # Changed sign, follow Ferrite's sign convention
+    i == 5 && return Vec((x - 1) / 8, nil, nil) # Changed sign, follow Ferrite's sign convention
+    i == 6 && return Vec(nil, nil, (z + 1) / 8)
     throw(ArgumentError("no shape function $i for interpolation $ip"))
 end
 
