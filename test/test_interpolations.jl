@@ -404,7 +404,7 @@ end
 
         Integrate f(s) on the unit line, s ∈ [0, 1]
         """
-        function integrate_edge(f)
+        function integrate_edge(f::Function)
             val, _ = hquadrature(f, 0, 1; atol = 1.0e-8)
             return val
         end
@@ -487,6 +487,7 @@ end
                 for (face_shape_nr, shape_nr) in pairs(dof_inds)
                     f(s1, s2) = reference_face_moment(ip, face_shape_nr, s1, s2) ⋅ reference_shape_value(ip, ξ(s1, s2), shape_nr) * face_weight(ξ, s1, s2)
                     @test integrate_face(f) ≈ 1
+
                     # Test that the functional is zero for the other shape functions
                     for other_shape_nr in 1:getnbasefunctions(ip)
                         other_shape_nr == shape_nr && continue
@@ -512,6 +513,7 @@ end
                 for (face_shape_nr, shape_nr) in pairs(dof_inds)
                     f(s1, s2) = reference_face_moment(ip, face_shape_nr, s1, s2) * (reference_shape_value(ip, ξ(s1, s2), shape_nr) ⋅ normal) * face_weight(ξ, s1, s2)
                     @test integrate_face(f) ≈ 1
+
                     # Test that the functional is zero for the other shape functions
                     for other_shape_nr in 1:getnbasefunctions(ip)
                         other_shape_nr == shape_nr && continue
@@ -519,6 +521,7 @@ end
                         @test integrate_face(g) + 1 ≈ 1 # integrate_edge(g) ≈ 0
                     end
                 end
+                
                 # Test that normal components of other shape functions are zero on this edge
                 # Stronger requirement than functionals being zero.
                 for shape_nr in 1:getnbasefunctions(ip)
