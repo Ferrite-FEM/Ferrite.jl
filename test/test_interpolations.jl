@@ -401,7 +401,7 @@ end
 
         """
             integrate_edge(f)
-        
+
         Integrate f(s) on the unit line, s ∈ [0, 1]
         """
         function integrate_edge(f::Function)
@@ -411,7 +411,7 @@ end
 
         """
             integrate_face(f)
-        
+
         Integrate f(s1, s2) on the unit square, (s1,s2) ∈ [0, 1] × [0, 1]
         """
         function integrate_face(f::Function)
