@@ -93,7 +93,6 @@ function reinit!(fv::FacetValues, cc::CellCache, f::Int)
     return reinit!(fv, cell, cc.coords, f)
 end
 
-# Accessor functions
 getnodes(cc::CellCache) = cc.nodes
 getcoordinates(cc::CellCache) = cc.coords
 celldofs(cc::CellCache) = cc.dofs

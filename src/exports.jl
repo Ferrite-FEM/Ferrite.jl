@@ -26,6 +26,7 @@ export
     # Quadrature
     QuadratureRule,
     FacetQuadratureRule,
+    EdgeQuadratureRule,
     getnquadpoints,
 
     # FEValues
@@ -33,6 +34,7 @@ export
     AbstractFacetValues,
     CellValues,
     FacetValues,
+    EdgeValues,
     InterfaceValues,
     reinit!,
     shape_value,
@@ -48,6 +50,7 @@ export
     function_curl,
     spatial_coordinate,
     getnormal,
+    gettangent,
     getdetJdV,
     shape_value_average,
     shape_value_jump,
@@ -140,6 +143,7 @@ export
     # Constraints
     ConstraintHandler,
     Dirichlet,
+    WeakDirichlet,
     PeriodicDirichlet,
     collect_periodic_facets,
     collect_periodic_facets!,

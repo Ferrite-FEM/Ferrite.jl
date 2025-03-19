@@ -263,6 +263,16 @@ end
 
 
 """
+    shape_hessian_gradient_and_value(ip::Interpolation, ξ::Vec, i::Int)
+
+Optimized version combining the evaluation [`Ferrite.shape_value(::Interpolation)`](@ref),
+[`Ferrite.shape_gradient(::Interpolation)`](@ref), and the gradient of the latter.
+"""
+function shape_hessian_gradient_and_value(ip::Interpolation, ξ::Vec, i::Int)
+    return hessian(x -> reference_shape_value(ip, x, i), ξ, :all)
+end
+
+"""
     reference_coordinates(ip::Interpolation)
 
 Returns a vector of coordinates with length [`getnbasefunctions(::Interpolation)`](@ref)
@@ -1759,7 +1769,6 @@ function _reference_shape_hessian_gradient_and_value_static_array(ipv::Vectorize
 end
 
 reference_coordinates(ip::VectorizedInterpolation) = reference_coordinates(ip.ip)
-
 is_discontinuous(::Type{<:VectorizedInterpolation{<:Any, <:Any, <:Any, ip}}) where {ip} = is_discontinuous(ip)
 
 """
