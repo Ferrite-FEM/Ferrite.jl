@@ -27,6 +27,7 @@
             end
 
             rdim = Ferrite.getrefdim(func_interpol)
+            RefShape = Ferrite.getrefshape(func_interpol)
             n_basefuncs = getnbasefunctions(func_interpol)
 
             @test getnbasefunctions(fv) == n_basefuncs
@@ -136,7 +137,7 @@
                 for i in 1:getnquadpoints(fv)
                     vol += getdetJdV(fv, i)
                 end
-                @test vol ≈ reference_face_area(func_interpol, face)
+                @test vol ≈ reference_facet_area(RefShape, face)
 
                 # Test spatial coordinate (after reinit with ref.coords we should get back the quad_points)
                 # # TODO: Renable somehow after quad rule is no longer stored in FacetValues
