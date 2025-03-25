@@ -236,7 +236,7 @@
         @test getfacetset(grid, "test_boundary_facetset") == Ferrite.create_boundaryfacetset(grid, topology, filter_function)
     end
 
-    @testset "mixed grid" begin
+    @testset "mixed grid 3D" begin
         nodes = reshape([Node(Vec(x, y, z)) for x in -1:1, y in -1:1, z in 0:1], :)
         for (shape1, shape2) in ((Hexahedron, Wedge), (Wedge, Hexahedron))
             grid = Grid([generate_cell1(shape1), generate_cell2(shape2)], nodes)
@@ -244,5 +244,16 @@
             addboundaryfacetset!(grid, topology, "boundary", _ -> true)
             @test getfacetset(grid, "boundary") == boundary_facets(shape1, shape2)
         end
+    end
+    @testset "mixed grid 2D" begin
+        nodes = [Node((-1.0, 0.0)), Node((0.0, 0.0)), Node((1.0, 0.0)), Node((-1.0, 1.0)), Node((0.0, 1.0))]
+        cells = [
+            Quadrilateral((1, 2, 5, 4)),
+            Triangle((3, 5, 2)),
+        ]
+        grid = Grid(cells, nodes)
+        topology = ExclusiveTopology(grid)
+        addboundaryfacetset!(grid, topology, "boundary", _ -> true)
+        @test getfacetset(grid, "boundary") == Set([FacetIndex(1, 1), FacetIndex(1, 3), FacetIndex(1, 4), FacetIndex(2, 1), FacetIndex(2, 3)])
     end
 end
