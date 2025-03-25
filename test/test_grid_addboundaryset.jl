@@ -200,4 +200,52 @@
         addboundaryfacetset!(grid, topology, "test_boundary_facetset", filter_function)
         @test getfacetset(grid, "test_boundary_facetset") == Ferrite.create_boundaryfacetset(grid, topology, filter_function)
     end
+    ref_shapes = [
+        Hexahedron,
+        Wedge,
+    ]
+
+    function generate_cell1(::Type{Hexahedron})
+        return Hexahedron((1, 2, 5, 4, 7, 8, 11, 10))
+    end
+
+    function generate_cell1(::Type{Wedge})
+        return Wedge((2, 1, 5, 8, 7, 11))
+    end
+
+    function generate_cell2(::Type{Hexahedron})
+        return Hexahedron((2, 3, 6, 5, 8, 9, 12, 11))
+    end
+
+    function generate_cell2(::Type{Wedge})
+        return Wedge((2, 3, 5, 8, 9, 11))
+    end
+
+    function boundary_facets(::Type{Hexahedron}, ::Type{Wedge})
+        return Set(
+            [
+                FacetIndex(1, 1), FacetIndex(1, 2), FacetIndex(1, 4), FacetIndex(1, 5), FacetIndex(1, 6),
+                FacetIndex(2, 1), FacetIndex(2, 2), FacetIndex(2, 4), FacetIndex(2, 5),
+            ]
+        )
+    end
+
+    function boundary_facets(::Type{Wedge}, ::Type{Hexahedron})
+        return Set(
+            [
+                FacetIndex(1, 1), FacetIndex(1, 2), FacetIndex(1, 4), FacetIndex(1, 5),
+                FacetIndex(2, 1), FacetIndex(2, 2), FacetIndex(2, 3), FacetIndex(2, 4), FacetIndex(2, 6),
+            ]
+        )
+    end
+
+    @testset "mixed grid" begin
+        nodes = reshape([Node(Vec(x, y, z)) for x in -1:1, y in -1:1, z in 0:1], :)
+        for (shape1, shape2) in ((Hexahedron, Wedge), (Wedge, Hexahedron))
+            grid = Grid([generate_cell1(shape1), generate_cell2(shape2)], nodes)
+            topology = ExclusiveTopology(grid)
+            addboundaryfacetset!(grid, topology, "boundary", _ -> true)
+            @test getfacetset(grid, "boundary") == boundary_facets(shape1, shape2)
+        end
+    end
 end
