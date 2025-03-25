@@ -163,6 +163,32 @@ close(csio)
     close(csio)
 end
 
+@testset "vtk export view" begin
+    grid = generate_grid(Hexahedron, (5, 5, 5))
+    dofhandler = DofHandler(grid)
+    ip = geometric_interpolation(Hexahedron)
+    add!(dofhandler, :temperature, ip)
+    add!(dofhandler, :displacement, ip^3)
+    close!(dofhandler)
+    u = zeros(ndofs(dofhandler))
+    dofhandlerfilename = "dofhandler-no-views"
+    VTKGridFile(dofhandlerfilename, grid) do vtk::VTKGridFile
+        @test write_solution(vtk, dofhandler, u) === vtk
+    end
+    dofhandler_views_filename = "dofhandler-views"
+    VTKGridFile(dofhandler_views_filename, grid) do vtk::VTKGridFile
+        @test write_solution(vtk, dofhandler, (@view u[1:end])) === vtk
+    end
+
+    # test the sha of the file
+    sha = bytes2hex(open(SHA.sha1, dofhandlerfilename * ".vtu"))
+    sha_views = bytes2hex(open(SHA.sha1, dofhandler_views_filename * ".vtu"))
+
+    @test sha == sha_views
+    rm(dofhandlerfilename * ".vtu")
+    rm(dofhandler_views_filename * ".vtu")
+end
+
 @testset "Grid utils" begin
 
     grid = Ferrite.generate_grid(QuadraticQuadrilateral, (1, 1), Vec((0.0, 0.0)), Vec((1.0, 1.0)))
@@ -212,7 +238,9 @@ end
         ip = Lagrange{Ferrite.RefHypercube{dim}, 1}()^dim
         fqr = FacetQuadratureRule{Ferrite.RefHypercube{dim}}(2)
         fv = FacetValues(fqr, ip)
-        dh = DofHandler(grid); add!(dh, :u, ip); close!(dh)
+        dh = DofHandler(grid)
+        add!(dh, :u, ip)
+        close!(dh)
         facetset = getfacetset(grid, "right")
         for dh_or_grid in (grid, dh)
             @test first(FacetIterator(dh_or_grid, facetset)) isa FacetCache
@@ -235,7 +263,9 @@ end
     reinit!(ic, FaceIndex(1, 2), FaceIndex(2, 4))
     @test interfacedofs(ic) == Int[] # Empty because no DofHandler given
     ip = DiscontinuousLagrange{RefQuadrilateral, 1}()
-    dh = DofHandler(grid); add!(dh, :u, ip); close!(dh)
+    dh = DofHandler(grid)
+    add!(dh, :u, ip)
+    close!(dh)
     ic = InterfaceCache(dh)
     reinit!(ic, FaceIndex(1, 2), FaceIndex(2, 4))
     @test interfacedofs(ic) == collect(1:8)
@@ -250,8 +280,10 @@ end
     ip1 = DiscontinuousLagrange{RefQuadrilateral, 1}()
     ip2 = DiscontinuousLagrange{RefTriangle, 1}()
     dh = DofHandler(grid)
-    sdh1 = SubDofHandler(dh, Set([1])); add!(sdh1, :u, ip1)
-    sdh2 = SubDofHandler(dh, Set([2])); add!(sdh2, :u, ip2)
+    sdh1 = SubDofHandler(dh, Set([1]))
+    add!(sdh1, :u, ip1)
+    sdh2 = SubDofHandler(dh, Set([2]))
+    add!(sdh2, :u, ip2)
     close!(dh)
     ic = InterfaceCache(dh)
     reinit!(ic, FaceIndex(1, 2), FaceIndex(2, 3))
