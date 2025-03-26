@@ -170,7 +170,7 @@ end
     add!(dofhandler, :temperature, ip)
     add!(dofhandler, :displacement, ip^3)
     close!(dofhandler)
-    u = zeros(ndofs(dofhandler))
+    u = rand(ndofs(dofhandler))
     dofhandlerfilename = "dofhandler-no-views"
     VTKGridFile(dofhandlerfilename, grid) do vtk::VTKGridFile
         @test write_solution(vtk, dofhandler, u) === vtk
