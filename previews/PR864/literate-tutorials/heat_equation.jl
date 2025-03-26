@@ -28,14 +28,14 @@
 # u(\textbf{x}) = 0 \quad \textbf{x} \in \partial \Omega,
 # ```
 # where $\partial \Omega$ denotes the boundary of $\Omega$.
-# The resulting weak form is given given as follows: Find ``u \in \mathbb{U}`` such that
+# The resulting weak form is given as follows: Find ``u \in \mathbb{U}`` such that
 # ```math
 # \int_{\Omega} \nabla \delta u \cdot \nabla u \ d\Omega = \int_{\Omega} \delta u \ d\Omega \quad \forall \delta u \in \mathbb{T},
 # ```
 # where $\delta u$ is a test function, and where $\mathbb{U}$ and $\mathbb{T}$ are suitable
 # trial and test function sets, respectively.
 #-
-# ## Commented Program
+# ## Commented program
 #
 # Now we solve the problem in Ferrite. What follows is a program spliced with comments.
 #md # The full program, without comments, can be found in the next [section](@ref heat_equation-plain-program).
@@ -69,6 +69,11 @@ cellvalues = CellValues(qr, ip);
 dh = DofHandler(grid)
 add!(dh, :u, ip)
 close!(dh);
+
+# !!! warning "Numbering of degrees of freedom"
+#     A common assumption is that the numbering of degrees of freedom follows the global
+#     numbering of the nodes in the grid. This is *NOT* the case in Ferrite. For more
+#     details, see the [Ferrite numbering rules](@ref "Ordering-of-dofs").
 
 # Now that we have distributed all our dofs we can create our tangent matrix,
 # using `allocate_matrix`. This function returns a sparse matrix
@@ -118,7 +123,7 @@ close!(ch)
 #
 # #### Element assembly
 # We define the function `assemble_element!` (see below) which computes the contribution for
-# an element. The function takes pre-allocated `ke` and `fe` (they are allocated once and
+# an element. The function takes pre-allocated `Ke` and `fe` (they are allocated once and
 # then reused for all elements) so we first need to make sure that they are all zeroes at
 # the start of the function by using `fill!`. Then we loop over all the quadrature points,
 # and for each quadrature point we loop over all the (local) shape functions. We need the
@@ -209,6 +214,11 @@ K, f = assemble_global(cellvalues, K, dh);
 # we can get the correct solution vector `u` by using `\`.
 apply!(K, f, ch)
 u = K \ f;
+
+# !!! warning "Numbering of degrees of freedom"
+#     Once again, recall that numbering of degrees of freedom does *NOT* follow the global
+#     numbering of the nodes in the grid. Specifically, `u[i]` is *NOT* the temperature at
+#     node `i`.
 
 # ### Exporting to VTK
 # To visualize the result we export the grid and our field `u`

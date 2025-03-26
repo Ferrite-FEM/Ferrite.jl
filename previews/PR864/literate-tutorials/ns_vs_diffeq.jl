@@ -67,7 +67,7 @@ nothing                    #hide
 # $\nu \partial_{\textrm{n}} v - p n = 0$ to model outflow. With these boundary conditions we can choose the zero solution as a
 # feasible initial condition.
 #
-# ### Derivation of Semi-Discrete Weak Form
+# ### Derivation of semi-discrete weak form
 #
 # By multiplying test functions $\varphi$ and $\psi$ from a suitable test function space on the strong form,
 # followed by integrating over the domain and applying partial integration to the pressure and viscosity terms
@@ -183,7 +183,7 @@ gmsh.model.mesh.generate(dim)
 grid = togrid()
 Gmsh.finalize();
 
-#  ### Function Space
+#  ### Function space
 #  To ensure stability we utilize the Taylor-Hood element pair Q2-Q1.
 #  We have to utilize the same quadrature rule for the pressure as for the velocity, because in the weak form the
 #  linear pressure term is tested against a quadratic function.
@@ -239,7 +239,7 @@ add!(ch, inflow_bc);
 close!(ch)
 update!(ch, 0.0);
 
-# ### Linear System Assembly
+# ### Linear system assembly
 # Next we describe how the block mass matrix and the Stokes matrix are assembled.
 #
 # For the block mass matrix $M$ we remember that only the first equation had a time derivative
@@ -373,7 +373,7 @@ jac_sparsity = sparse(K);
 
 # To apply the nonlinear portion of the Navier-Stokes problem we simply hand
 # over the dof handler and cell values to the right-hand-side (RHS) as a parameter.
-# Furthermore the pre-assembled linear part, our Stokes opeartor (which is time independent)
+# Furthermore the pre-assembled linear part, our Stokes operator (which is time independent)
 # is passed to save some additional runtime. To apply the time-dependent Dirichlet BCs, we
 # also need to hand over the constraint handler.
 # The basic idea to apply the Dirichlet BCs consistently is that we copy the
