@@ -63,7 +63,7 @@ where $\mathbb{U}, \mathbb{T}$ are suitable function spaces with sufficiently re
 functions. Under very general assumptions it can be shown that the solution to the weak
 form is identical to the solution to the strong form.
 
-## Finite Element approximation
+## Finite element approximation
 
 
 Using the finite element method to solve partial differential equations is usually
@@ -72,13 +72,18 @@ set of *elements* or *cells*. We call this geometric discretization *grid* (or *
 and denote it with $\Omega_h$. In this example the corners of the triangles are called
 *nodes*.
 
-Next we introduce the finite element approximation $u_\mathrm{h} \approx u$ as a sum of N nodal
-*shape functions*, where we denote each of these function by $\phi_i$ and the corresponding
-*nodal values* $\hat{u}_i$. Note that *shape functions* are sometimes referred to as
-*basis functions* or *trial functions*, and instead of $\phi_i$ they are sometimes denoted $N_i$.
-In this example we choose to approximate the test function in the same way. This approach is known
-as the *Galerkin finite element method*. Formally we write the evaluation of our approximations
-at a specific point $\mathbf{x}$ in our domain $\Omega$ as:
+Next, we introduce the finite element approximation $u_\mathrm{h} \approx u$ as linear combination of
+*shape functions*, $\phi_i$. The corresponding weights are usually called *degree of freedoms* (dofs), $\hat{u}_i$.
+Sometimes, the dofs are called *weights* or *nodal values*. In Ferrite, the numbering of the dofs does not correspond
+to the node numbers in the grid. While such numbering is common in basic finite element codes,
+Ferrite supports different approximations of the finite element fields and the geometry, prohibiting
+such basic numbering. For more details, see the [Ferrite numbering rules](@ref "Ordering-of-dofs").
+
+Note that *shape functions* are sometimes referred to as *basis functions* or *trial functions*,
+and instead of $\phi_i$ they are sometimes denoted $N_i$. In this example we choose to approximate
+the test function in the same way. This approach is known as the *Bubnov-Galerkin finite element
+method*. Formally we write the evaluation of our approximations at a specific point $\mathbf{x}$
+in our domain $\Omega$ as:
 
 ```math
 u_\mathrm{h}(\mathbf{x}) = \sum_{i=1}^{\mathrm{N}} \phi_i(\mathbf{x}) \, \hat{u}_i,\qquad

@@ -4,8 +4,9 @@
   <img alt="Ferrite.jl logo." src="https://github.com/Ferrite-FEM/Ferrite.jl/blob/master/docs/src/assets/logo-horizontal.svg">
 </picture>
 
-![Build Status](https://github.com/Ferrite-FEM/Ferrite.jl/workflows/CI/badge.svg?event=push)
+[![Test Status](https://github.com/Ferrite-FEM/Ferrite.jl/actions/workflows/Test.yml/badge.svg?branch=master&event=push)](https://github.com/Ferrite-FEM/Ferrite.jl/actions/workflows/Test.yml)
 [![codecov.io](https://codecov.io/github/Ferrite-FEM/Ferrite.jl/coverage.svg?branch=master)](https://codecov.io/github/Ferrite-FEM/Ferrite.jl?branch=master)
+[![code style: runic](https://img.shields.io/badge/code_style-%E1%9A%B1%E1%9A%A2%E1%9A%BE%E1%9B%81%E1%9A%B2-black)](https://github.com/fredrikekre/Runic.jl)
 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.13862652.svg)](https://doi.org/10.5281/zenodo.13862652)
 
 A finite element toolbox written in Julia.

@@ -22,7 +22,7 @@ using WriteVTK:
     WriteVTK, VTKCellTypes
 using Tensors:
     Tensors, AbstractTensor, SecondOrderTensor, SymmetricTensor, Tensor, Vec, gradient,
-    rotation_tensor, symmetric, tovoigt!, hessian, otimesu
+    rotation_tensor, symmetric, tovoigt!, hessian, otimesu, otimesl
 using ForwardDiff:
     ForwardDiff
 
@@ -132,7 +132,7 @@ include("FEValues/FacetValues.jl")
 include("FEValues/InterfaceValues.jl")
 include("FEValues/PointValues.jl")
 include("FEValues/common_values.jl")
-include("FEValues/face_integrals.jl")
+include("FEValues/facet_integrals.jl")
 
 # Grid
 include("Grid/grid.jl")

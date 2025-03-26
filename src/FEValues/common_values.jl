@@ -9,6 +9,13 @@ function checkquadpoint(fe_v::AbstractValues, qp::Int)
     return nothing
 end
 
+@inline function reinit_needs_cell(fe_values::AbstractValues)
+    # TODO: Might need better logic for this, but for current implementations this
+    # is ok. If someone implements a non-identity mapping that doesn't require the cell
+    # as input, this is only a slight performance issue in some cases.
+    return !isa(mapping_type(get_fun_values(fe_values)), IdentityMapping)
+end
+
 @noinline function throw_incompatible_dof_length(length_ue, n_base_funcs)
     msg = "the number of base functions ($(n_base_funcs)) does not match the length " *
         "of the vector ($(length_ue)). Perhaps you passed the global vector, " *
@@ -26,7 +33,7 @@ end
 """
     ValuesUpdateFlags(ip_fun::Interpolation; update_gradients = Val(true), update_hessians = Val(false), update_detJdV = Val(true))
 
-Creates a singelton type for specifying what parts of the AbstractValues should be updated. Note that this is internal
+Creates a singleton type for specifying what parts of the AbstractValues should be updated. Note that this is internal
 API used to get type-stable construction. Keyword arguments in `AbstractValues` constructors are forwarded, and the public API
 is passing these as `Bool`, while the `ValuesUpdateFlags` method supports both boolean and `Val(::Bool)` keyword args.
 """

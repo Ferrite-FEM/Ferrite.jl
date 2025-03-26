@@ -17,6 +17,9 @@ export
     Lagrange,
     DiscontinuousLagrange,
     Serendipity,
+    Nedelec,
+    RaviartThomas,
+    BrezziDouglasMarini,
     getnbasefunctions,
     getrefshape,
 

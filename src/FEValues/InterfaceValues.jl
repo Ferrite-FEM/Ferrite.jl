@@ -17,10 +17,10 @@ The first element of the interface is denoted "here" and the second element "the
   geometric interpolation.
 * `InterfaceValues(qr_here::FacetQuadratureRule, ip_here::Interpolation, ip_geo_here::Interpolation, qr_there::FacetQuadratureRule, ip_there::Interpolation, ip_geo_there::Interpolation)`:
   same as above but with given geometric interpolation.
-* `InterfaceValues(fv::FacetValues)`: quadrature rule and interpolations from face values
+* `InterfaceValues(fv::FacetValues)`: quadrature rule and interpolations from facet values
   (same on both sides).
 * `InterfaceValues(fv_here::FacetValues, fv_there::FacetValues)`: quadrature rule and
-  interpolations from the face values.
+  interpolations from the facet values.
 
 **Associated methods:**
 * [`shape_value_average`](@ref)
@@ -396,12 +396,12 @@ end
 Relative orientation information for 1D and 2D interfaces in 2D and 3D elements respectively.
 This information is used to construct the transformation matrix to
 transform the quadrature points from facet_a to facet_b achieving synced
-spatial coordinates. Face B's orientation relative to Face A's can
+spatial coordinates. Facet B's orientation relative to Facet A's can
 possibly be flipped (i.e. the vertices indices order is reversed)
 and the vertices can be rotated against each other.
-The reference orientation of face B is such that the first node
+The reference orientation of facet B is such that the first node
 has the lowest vertex index. Thus, this structure also stores the
-shift of the lowest vertex index which is used to reorient the face in
+shift of the lowest vertex index which is used to reorient the facet in
 case of flipping [`transform_interface_points!`](@ref).
 """
 struct InterfaceOrientationInfo{RefShapeA, RefShapeB}
@@ -415,7 +415,7 @@ end
 """
     InterfaceOrientationInfo(cell_a::AbstractCell, cell_b::AbstractCell, facet_a::Int, facet_b::Int)
 
-Return the relative orientation info for face B with regards to face A.
+Return the relative orientation info for facet B with regards to facet A.
 Relative orientation is computed using a [`OrientationInfo`](@ref) for each side of the interface.
 """
 function InterfaceOrientationInfo(cell_a::AbstractCell{RefShapeA}, cell_b::AbstractCell{RefShapeB}, facet_a::Int, facet_b::Int) where {RefShapeA <: AbstractRefShape, RefShapeB <: AbstractRefShape}
@@ -435,8 +435,8 @@ end
 
 Returns the transformation matrix corresponding to the interface orientation information stored in `InterfaceOrientationInfo`.
 The transformation matrix is constructed using a combination of affine transformations defined for each interface reference shape.
-The transformation for a flipped face is a function of both relative orientation and the orientation of the second face.
-If the face is not flipped then the transformation is a function of relative orientation only.
+The transformation for a flipped facet is a function of both relative orientation and the orientation of the second facet.
+If the facet is not flipped then the transformation is a function of relative orientation only.
 """
 get_transformation_matrix
 
@@ -454,16 +454,16 @@ end
     θ = 2 * shift_index / 3
     θpre = 2 * lowest_node_shift_index / 3
 
-    flipping = SMatrix{3, 3}(1.0, 0.0, 0.0, 0.0, -1.0, 0.0, 0.0, 0.0, 1.0)
+    flipping = Tensor{2, 3}((1.0, 0.0, 0.0, 0.0, -1.0, 0.0, 0.0, 0.0, 1.0))
 
-    translate_1 = SMatrix{3, 3}(1.0, 0.0, 0.0, 0.0, 1.0, 0.0, -sinpi(2 / 3) / 3, -0.5, 1.0)
-    stretch_1 = SMatrix{3, 3}(sinpi(2 / 3), 0.5, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0)
+    translate_1 = Tensor{2, 3}((1.0, 0.0, 0.0, 0.0, 1.0, 0.0, -sinpi(2 / 3) / 3, -0.5, 1.0))
+    stretch_1 = Tensor{2, 3}((sinpi(2 / 3), 0.5, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0))
 
-    translate_2 = SMatrix{3, 3}(1.0, 0.0, 0.0, 0.0, 1.0, 0.0, sinpi(2 / 3) / 3, 0.5, 1.0)
-    stretch_2 = SMatrix{3, 3}(1 / sinpi(2 / 3), -1 / 2 / sinpi(2 / 3), 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0)
+    translate_2 = Tensor{2, 3}((1.0, 0.0, 0.0, 0.0, 1.0, 0.0, sinpi(2 / 3) / 3, 0.5, 1.0))
+    stretch_2 = Tensor{2, 3}((1 / sinpi(2 / 3), -1 / 2 / sinpi(2 / 3), 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0))
 
-    return flipped ? stretch_2 * translate_2 * rotation_tensor(0, 0, θpre * pi) * flipping * rotation_tensor(0, 0, (θ - θpre) * pi) * translate_1 * stretch_1 :
-        stretch_2 * translate_2 * rotation_tensor(0, 0, θ * pi) * translate_1 * stretch_1
+    return flipped ? stretch_2 ⋅ translate_2 ⋅ rotation_tensor(0, 0, θpre * pi) ⋅ flipping ⋅ rotation_tensor(0, 0, (θ - θpre) * pi) ⋅ translate_1 ⋅ stretch_1 :
+        stretch_2 ⋅ translate_2 ⋅ rotation_tensor(0, 0, θ * pi) ⋅ translate_1 ⋅ stretch_1
 end
 
 @inline function _get_transformation_matrix(::NTuple{4, Int}, interface_transformation::InterfaceOrientationInfo)
@@ -474,8 +474,8 @@ end
     θ = 2 * shift_index / 4
     θpre = 2 * lowest_node_shift_index / 4
 
-    flipping = SMatrix{3, 3}(0.0, 1.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0)
-    return flipped ? rotation_tensor(0, 0, θpre * pi) * flipping * rotation_tensor(0, 0, (θ - θpre) * pi) : rotation_tensor(0, 0, θ * pi)
+    flipping = Tensor{2, 3}((0.0, 1.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0))
+    return flipped ? rotation_tensor(0, 0, θpre * pi) ⋅ flipping ⋅ rotation_tensor(0, 0, (θ - θpre) * pi) : rotation_tensor(0, 0, θ * pi)
 end
 
 @inline function _get_transformation_matrix(::NTuple{N, Int}, ::InterfaceOrientationInfo) where {N}
@@ -485,9 +485,9 @@ end
 @doc raw"""
     transform_interface_points!(dst::AbstractVector{Vec{3, Float64}}, points::AbstractVector{Vec{3, Float64}}, interface_transformation::InterfaceOrientationInfo)
 
-Transform the points from face A to face B using the orientation information of the interface and store it in the vector dst.
-For 3D, the faces are transformed into regular polygons such that the rotation angle is the shift in reference node index × 2π ÷ number of edges in face.
-If the face is flipped then the flipping is about the axis that preserves the position of the first node (which is the reference node after being rotated to be in the first position,
+Transform the points from facet A to facet B using the orientation information of the interface and store it in the vector dst.
+For 3D, the facets are transformed into regular polygons such that the rotation angle is the shift in reference node index × 2π ÷ number of edges in facet.
+If the facet is flipped then the flipping is about the axis that preserves the position of the first node (which is the reference node after being rotated to be in the first position,
 it's rotated back in the opposite direction after flipping).
 Take for example the interface
 ```
@@ -553,7 +553,7 @@ function transform_interface_points!(dst::AbstractVector{Vec{3, Float64}}, point
     M = get_transformation_matrix(interface_transformation)
     for (idx, point) in pairs(points)
         face_point = element_to_facet_transformation(point, RefShapeA, facet_a)
-        result = M * Vec(face_point[1], face_point[2], 1.0)
+        result = M ⋅ Vec(face_point[1], face_point[2], 1.0)
         dst[idx] = facet_to_element_transformation(Vec(result[1], result[2]), RefShapeB, facet_b)
     end
     return nothing

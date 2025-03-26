@@ -78,6 +78,7 @@ getdetJdV(cv::CellValues, q_point::Int) = cv.detJdV[q_point]
 getdetJdV(::CellValues{<:Any, <:Any, <:Any, Nothing}, ::Int) = throw(ArgumentError("detJdV is not saved in CellValues"))
 
 # Accessors for function values
+get_fun_values(cv::CellValues) = cv.fun_values
 getnbasefunctions(cv::CellValues) = getnbasefunctions(cv.fun_values)
 function_interpolation(cv::CellValues) = function_interpolation(cv.fun_values)
 function_difforder(cv::CellValues) = function_difforder(cv.fun_values)
@@ -101,7 +102,7 @@ getnquadpoints(cv::CellValues) = getnquadpoints(cv.qr)
 end
 @inline _update_detJdV!(::Nothing, q_point, w, mapping) = nothing
 
-@inline function reinit!(cv::CellValues, x::AbstractVector)
+@inline function reinit!(cv::AbstractCellValues, x::AbstractVector)
     return reinit!(cv, nothing, x)
 end
 
@@ -111,7 +112,7 @@ function reinit!(cv::CellValues, cell::Union{AbstractCell, Nothing}, x::Abstract
     n_geom_basefuncs = getngeobasefunctions(geo_mapping)
 
     check_reinit_sdim_consistency(:CellValues, shape_gradient_type(cv), eltype(x))
-    if cell === nothing && !isa(mapping_type(fun_values), IdentityMapping)
+    if cell === nothing && reinit_needs_cell(cv)
         throw(ArgumentError("The cell::AbstractCell input is required to reinit! non-identity function mappings"))
     end
     if !checkbounds(Bool, x, 1:n_geom_basefuncs) || length(x) != n_geom_basefuncs

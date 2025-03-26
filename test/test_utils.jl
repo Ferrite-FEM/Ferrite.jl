@@ -28,21 +28,21 @@ function reference_face_area(fs::Interpolation{RefPyramid}, face::Int)
 end
 
 ######################################################
-# Coordinates and normals for the reference elements #
+# Coordinates and normals for the reference shapes #
 ######################################################
 
-reference_normals(ip::VectorizedInterpolation) = reference_normals(ip.ip)
+function reference_normals(::Interpolation{RefShape}) where {RefShape}
+    @warn "Using reference normals of Interpolation, use of RefShape directly instead"
+    return reference_normals(RefShape)
+end
 
-# Lagrange{1, RefLine}
-function reference_normals(::Lagrange{RefLine})
+function reference_normals(::Type{RefLine})
     return [
         Vec{1, Float64}((-1.0,)),
         Vec{1, Float64}((1.0,)),
     ]
 end
-
-# Lagrange{2, RefQuadrilateral}
-function reference_normals(::Lagrange{RefQuadrilateral})
+function reference_normals(::Type{RefQuadrilateral})
     return [
         Vec{2, Float64}((0.0, -1.0)),
         Vec{2, Float64}((1.0, 0.0)),
@@ -51,8 +51,7 @@ function reference_normals(::Lagrange{RefQuadrilateral})
     ]
 end
 
-# Lagrange{2, RefTriangle}
-function reference_normals(::Lagrange{RefTriangle})
+function reference_normals(::Type{RefTriangle})
     return [
         Vec{2, Float64}((1 / √2, 1 / √2)),
         Vec{2, Float64}((-1.0, 0.0)),
@@ -60,8 +59,7 @@ function reference_normals(::Lagrange{RefTriangle})
     ]
 end
 
-# Lagrange{3, RefTetrahedron}
-function reference_normals(::Lagrange{RefTetrahedron})
+function reference_normals(::Type{RefTetrahedron})
     return [
         Vec{3, Float64}((0.0, 0.0, -1.0)),
         Vec{3, Float64}((0.0, -1.0, 0.0)),
@@ -70,8 +68,7 @@ function reference_normals(::Lagrange{RefTetrahedron})
     ]
 end
 
-# Lagrange{3, Cube}
-function reference_normals(::Lagrange{RefHexahedron})
+function reference_normals(::Type{RefHexahedron})
     return [
         Vec{3, Float64}((0.0, 0.0, -1.0)),
         Vec{3, Float64}((0.0, -1.0, 0.0)),
@@ -82,8 +79,7 @@ function reference_normals(::Lagrange{RefHexahedron})
     ]
 end
 
-# Lagrange{3, Wedge}
-function reference_normals(::Lagrange{RefPrism})
+function reference_normals(::Type{RefPrism})
     return [
         Vec{3, Float64}((0.0, 0.0, -1.0)),
         Vec{3, Float64}((0.0, -1.0, 0.0)),
@@ -93,8 +89,7 @@ function reference_normals(::Lagrange{RefPrism})
     ]
 end
 
-# Lagrange{3, RefPyramid}
-function reference_normals(::Lagrange{RefPyramid})
+function reference_normals(::Type{RefPyramid})
     return [
         Vec{3, Float64}((0.0, 0.0, -1.0)),
         Vec{3, Float64}((0.0, -1.0, 0.0)),
@@ -103,9 +98,6 @@ function reference_normals(::Lagrange{RefPyramid})
         Vec{3, Float64}((0.0, 1 / √2, 1 / √2)),
     ]
 end
-
-# Serendipity{2, RefQuadrilateral}
-reference_normals(::Serendipity{RefQuadrilateral, 2}) = reference_normals(Lagrange{RefQuadrilateral, 1}())
 
 ##################################
 # Valid coordinates by expanding #
@@ -128,7 +120,7 @@ end
 
 function valid_coordinates_and_normals(fs::Interpolation{shape, order}) where {dim, shape <: Ferrite.AbstractRefShape{dim}, order}
     x = Ferrite.reference_coordinates(fs)
-    n = reference_normals(fs)
+    n = reference_normals(shape)
     R = rotmat(dim)
     return [2.0 * (R ⋅ x[i]) for i in 1:length(x)], [(R ⋅ n[i]) / norm((R ⋅ n[i])) for i in 1:length(n)]
 end
@@ -278,8 +270,8 @@ getfacerefshape(::Tetrahedron, ::Int) = RefTriangle
 getfacerefshape(::Pyramid, face::Int) = face == 1 ? RefQuadrilateral : RefTriangle
 getfacerefshape(::Wedge, face::Int) = face ∈ (1, 5) ? RefTriangle : RefQuadrilateral
 
-function perturbate_standard_grid!(grid::Ferrite.AbstractGrid{dim}, strength) where {dim}
-    function perturbate(x::Vec{dim}) where {dim}
+function perturb_standard_grid!(grid::Ferrite.AbstractGrid{dim}, strength) where {dim}
+    function perturb(x::Vec{dim}) where {dim}
         for d in 1:dim
             if x[d] ≈ 1.0 || x[d] ≈ -1.0
                 return x
@@ -287,7 +279,7 @@ function perturbate_standard_grid!(grid::Ferrite.AbstractGrid{dim}, strength) wh
         end
         return x + Vec{dim}(0.5 * strength .* (2 .* rand(Vec{dim}) .- 1.0))
     end
-    return transform_coordinates!(grid, perturbate)
+    return transform_coordinates!(grid, perturb)
 end
 
 ######################################################

@@ -84,8 +84,14 @@ function reinit!(cc::CellCache, i::Int)
 end
 
 # reinit! FEValues with CellCache
-reinit!(cv::CellValues, cc::CellCache) = reinit!(cv, cc.coords)
-reinit!(fv::FacetValues, cc::CellCache, f::Int) = reinit!(fv, cc.coords, f)
+function reinit!(cv::CellValues, cc::CellCache)
+    cell = reinit_needs_cell(cv) ? getcells(cc.grid, cellid(cc)) : nothing
+    return reinit!(cv, cell, cc.coords)
+end
+function reinit!(fv::FacetValues, cc::CellCache, f::Int)
+    cell = reinit_needs_cell(fv) ? getcells(cc.grid, cellid(cc)) : nothing
+    return reinit!(fv, cell, cc.coords, f)
+end
 
 # Accessor functions
 getnodes(cc::CellCache) = cc.nodes
@@ -102,11 +108,11 @@ nfacets(cc::CellCache) = nfacets(getcells(cc.grid, cc.cellid))
     FacetCache(dh::AbstractDofHandler)
 
 Create a cache object with pre-allocated memory for the nodes, coordinates, and dofs of a
-cell suitable for looping over *faces* in a grid. The cache is updated for a new face by
+cell suitable for looping over *facets* in a grid. The cache is updated for a new facet by
 calling `reinit!(cache, fi::FacetIndex)`.
 
 **Methods with `fc::FacetCache`**
- - `reinit!(fc, fi)`: reinitialize the cache for face `fi::FacetIndex`
+ - `reinit!(fc, fi)`: reinitialize the cache for facet `fi::FacetIndex`
  - `cellid(fc)`: get the current cellid
  - `getnodes(fc)`: get the global node ids of the *cell*
  - `getcoordinates(fc)`: get the coordinates of the *cell*
@@ -151,11 +157,11 @@ end
 
 Create a cache object with pre-allocated memory for the nodes, coordinates, and dofs of an
 interface. The cache is updated for a new cell by calling `reinit!(cache, facet_a, facet_b)` where
-`facet_a::FacetIndex` and `facet_b::FacetIndex` are the two interface faces.
+`facet_a::FacetIndex` and `facet_b::FacetIndex` are the two interface facets.
 
 **Struct fields of `InterfaceCache`**
- - `ic.a :: FacetCache`: face cache for the first face of the interface
- - `ic.b :: FacetCache`: face cache for the second face of the interface
+ - `ic.a :: FacetCache`: facet cache for the first facet of the interface
+ - `ic.b :: FacetCache`: facet cache for the second facet of the interface
  - `ic.dofs :: Vector{Int}`: global dof ids for the interface (union of `ic.a.dofs` and `ic.b.dofs`)
 
 **Methods with `InterfaceCache`**
@@ -328,12 +334,13 @@ end
 ```
 is thus simply convenience for the following equivalent snippet for grids of dimensions > 1:
 ```julia
-ic = InterfaceCache(grid, topology)
-for face in topology.face_skeleton
-    neighborhood = topology.face_face_neighbor[face[1], face[2]]
-    isempty(neighborhood) && continue
-    neighbor_face = neighborhood[1]
-    reinit!(ic, face, neighbor_face)
+ic = InterfaceCache(grid)
+neighborhood = Ferrite.get_facet_facet_neighborhood(topology, grid)
+for facet in facetskeleton(topology, grid)
+    neighbors = neighborhood[facet[1], facet[2]]
+    isempty(neighbors) && continue
+    neighbor_facet = neighbors[1]
+    reinit!(ic, facet, neighbor_facet)
     # ...
 end
 ```
@@ -341,10 +348,10 @@ end
     `InterfaceIterator` is stateful and should not be used for things other than `for`-looping
     (e.g. broadcasting over, or collecting the iterator may yield unexpected results).
 """
-struct InterfaceIterator{IC <: InterfaceCache, G <: Grid}
+struct InterfaceIterator{IC <: InterfaceCache, G <: AbstractGrid, TopologyType <: AbstractTopology}
     cache::IC
     grid::G
-    topology::ExclusiveTopology
+    topology::TopologyType
 end
 
 function InterfaceIterator(

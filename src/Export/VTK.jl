@@ -114,17 +114,19 @@ nodes_to_vtkorder(cell::QuadraticHexahedron) = [
     cell.nodes[27], # interior
 ]
 
-function create_vtk_griddata(grid::Grid{dim, C, T}) where {dim, C, T}
+function create_vtk_griddata(grid::AbstractGrid{sdim}) where {sdim}
     cls = WriteVTK.MeshCell[]
     for cell in getcells(grid)
         celltype = cell_to_vtkcell(typeof(cell))
         push!(cls, WriteVTK.MeshCell(celltype, nodes_to_vtkorder(cell)))
     end
-    coords = reshape(reinterpret(T, getnodes(grid)), (dim, getnnodes(grid)))
+    T = get_coordinate_eltype(grid)
+    nodes_flat = reinterpret(T, getnodes(grid))
+    coords = reshape(nodes_flat, (sdim, getnnodes(grid)))
     return coords, cls
 end
 
-function create_vtk_grid(filename::AbstractString, grid::Grid{dim, C, T}; kwargs...) where {dim, C, T}
+function create_vtk_grid(filename::AbstractString, grid::AbstractGrid; kwargs...)
     coords, cls = create_vtk_griddata(grid)
     return WriteVTK.vtk_grid(filename, coords, cls; kwargs...)
 end
@@ -173,7 +175,7 @@ function component_names(::Type{S}) where {S}
 end
 
 """
-    write_solution(vtk::VTKGridFile, dh::AbstractDofHandler, u::Vector, suffix="")
+    write_solution(vtk::VTKGridFile, dh::AbstractDofHandler, u::AbstractVector, suffix="")
 
 Save the values at the nodes in the degree of freedom vector `u` to `vtk`.
 Each field in `dh` will be saved separately, and `suffix` can be used to append
@@ -184,7 +186,7 @@ degree of freedom in `dh`, see [`write_node_data`](@ref write_node_data) for det
 Use `write_node_data` directly when exporting values that are already
 sorted by the nodes in the grid.
 """
-function write_solution(vtk::VTKGridFile, dh::AbstractDofHandler, u::Vector, suffix = "")
+function write_solution(vtk::VTKGridFile, dh::AbstractDofHandler, u::AbstractVector, suffix = "")
     fieldnames = getfieldnames(dh)  # all primary fields
     for name in fieldnames
         data = _evaluate_at_grid_nodes(dh, u, name, #=vtk=# Val(true))

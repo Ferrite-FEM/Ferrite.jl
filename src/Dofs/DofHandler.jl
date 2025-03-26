@@ -129,6 +129,10 @@ add!(dh, :u, ip_u)
 add!(dh, :p, ip_p)
 close!(dh)
 ```
+
+!!! note "Numbering of degree of freedom"
+    Note that the numbering of degrees of freedom do *NOT* follow the global numbering of
+    nodes in the associated grid.
 """
 function DofHandler(grid::G) where {dim, G <: AbstractGrid{dim}}
     ncells = getncells(grid)
@@ -929,22 +933,27 @@ function evaluate_at_grid_nodes(dh::DofHandler, u::AbstractVector, fieldname::Sy
     return _evaluate_at_grid_nodes(dh, u, fieldname)
 end
 
+function_value_init(::ScalarInterpolation, ::AbstractVector{T}) where {T} = zero(T)
+function_value_init(::VectorInterpolation{vdim}, ::AbstractVector{T}) where {vdim, T <: Number} = zero(Vec{vdim, T})
+
 # Internal method that have the vtk option to allocate the output differently
-function _evaluate_at_grid_nodes(dh::DofHandler, u::AbstractVector{T}, fieldname::Symbol, ::Val{vtk} = Val(false)) where {T, vtk}
+function _evaluate_at_grid_nodes(dh::DofHandler{sdim}, u::AbstractVector{T}, fieldname::Symbol, ::Val{vtk} = Val(false)) where {T, vtk, sdim}
     # Make sure the field exists
     fieldname ∈ getfieldnames(dh) || error("Field $fieldname not found.")
     # Figure out the return type (scalar or vector)
     field_idx = find_field(dh, fieldname)
     ip = getfieldinterpolation(dh, field_idx)
-    RT = ip isa ScalarInterpolation ? T : Vec{n_components(ip), T}
     if vtk
         # VTK output of solution field (or L2 projected scalar data)
         n_c = n_components(ip)
         vtk_dim = n_c == 2 ? 3 : n_c # VTK wants vectors padded to 3D
-        data = fill(NaN * zero(T), vtk_dim, getnnodes(get_grid(dh)))
+        # Float32 is the smallest float type supported by VTK
+        TT = promote_type(T, Float32)
+        data = fill!(Matrix{TT}(undef, vtk_dim, getnnodes(get_grid(dh))), NaN)
     else
         # Just evaluation at grid nodes
-        data = fill(NaN * zero(RT), getnnodes(get_grid(dh)))
+        RT = typeof(function_value_init(ip, u))
+        data = fill(T(NaN) * zero(RT), getnnodes(get_grid(dh)))
     end
     # Loop over the subdofhandlers
     for sdh in dh.subdofhandlers
@@ -957,15 +966,10 @@ function _evaluate_at_grid_nodes(dh::DofHandler, u::AbstractVector{T}, fieldname
         ip_geo = geometric_interpolation(CT)
         local_node_coords = reference_coordinates(ip_geo)
         qr = QuadratureRule{getrefshape(ip)}(zeros(length(local_node_coords)), local_node_coords)
-        if ip isa VectorizedInterpolation
-            # TODO: Remove this hack when embedding works...
-            cv = CellValues(qr, ip.ip, ip_geo)
-        else
-            cv = CellValues(qr, ip, ip_geo)
-        end
+        cv = CellValues(qr, ip, ip_geo^sdim; update_gradients = false, update_hessians = false, update_detJdV = false)
         drange = dof_range(sdh, field_idx)
         # Function barrier
-        _evaluate_at_grid_nodes!(data, sdh, u, cv, drange, RT)
+        _evaluate_at_grid_nodes!(data, sdh, u, cv, drange)
     end
     return data
 end
@@ -973,15 +977,9 @@ end
 # Loop over the cells and use shape functions to compute the value
 function _evaluate_at_grid_nodes!(
         data::Union{Vector, Matrix}, sdh::SubDofHandler,
-        u::AbstractVector{T}, cv::CellValues, drange::UnitRange, ::Type{RT}
-    ) where {T, RT}
+        u::AbstractVector{T}, cv::CellValues, drange::UnitRange
+    ) where {T}
     ue = zeros(T, length(drange))
-    # TODO: Remove this hack when embedding works...
-    if RT <: Vec && function_interpolation(cv) isa ScalarInterpolation
-        uer = reinterpret(RT, ue)
-    else
-        uer = ue
-    end
     for cell in CellIterator(sdh)
         # Note: We are only using the shape functions: no reinit!(cv, cell) necessary
         @assert getnquadpoints(cv) == length(cell.nodes)
@@ -989,7 +987,7 @@ function _evaluate_at_grid_nodes!(
             ue[i] = u[cell.dofs[I]]
         end
         for (qp, nodeid) in pairs(cell.nodes)
-            val = function_value(cv, qp, uer)
+            val = function_value(cv, qp, ue)
             if data isa Matrix # VTK
                 data[1:length(val), nodeid] .= val
                 data[(length(val) + 1):end, nodeid] .= 0 # purge the NaN

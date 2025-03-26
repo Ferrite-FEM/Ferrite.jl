@@ -27,7 +27,7 @@ jobs:
       - uses: julia-actions/cache@v2
       - uses: fredrikekre/runic-action@v1
         with:
-          version: "d9a27b9d6279a103fedc7202258207a7b7afe18c"
+          version: "1.4" # Keep version in sync with .pre-commit-config.yaml
 
   explicit-imports:
     runs-on: ubuntu-latest
