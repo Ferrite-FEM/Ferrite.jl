@@ -78,4 +78,29 @@
             end
         end
     end
+    @testset "write_solution view" begin
+        grid = generate_grid(Hexahedron, (5, 5, 5))
+        dofhandler = DofHandler(grid)
+        ip = geometric_interpolation(Hexahedron)
+        add!(dofhandler, :temperature, ip)
+        add!(dofhandler, :displacement, ip^3)
+        close!(dofhandler)
+        u = rand(ndofs(dofhandler))
+        dofhandlerfilename = "dofhandler-no-views"
+        VTKGridFile(dofhandlerfilename, grid) do vtk::VTKGridFile
+            @test write_solution(vtk, dofhandler, u) === vtk
+        end
+        dofhandler_views_filename = "dofhandler-views"
+        VTKGridFile(dofhandler_views_filename, grid) do vtk::VTKGridFile
+            @test write_solution(vtk, dofhandler, (@view u[1:end])) === vtk
+        end
+
+        # test the sha of the file
+        sha = bytes2hex(open(SHA.sha1, dofhandlerfilename * ".vtu"))
+        sha_views = bytes2hex(open(SHA.sha1, dofhandler_views_filename * ".vtu"))
+
+        @test sha == sha_views
+        rm(dofhandlerfilename * ".vtu")
+        rm(dofhandler_views_filename * ".vtu")
+    end
 end
