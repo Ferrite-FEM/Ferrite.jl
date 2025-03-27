@@ -45,6 +45,7 @@ abstract type AbstractRefShape{refdim} end
 # See src/docs.jl for detailed documentation
 struct RefHypercube{refdim} <: AbstractRefShape{refdim} end
 struct RefSimplex{refdim} <: AbstractRefShape{refdim} end
+const RefPoint = RefHypercube{0}
 const RefLine = RefHypercube{1}
 const RefQuadrilateral = RefHypercube{2}
 const RefHexahedron = RefHypercube{3}

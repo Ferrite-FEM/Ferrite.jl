@@ -193,6 +193,11 @@ function faces(c::AbstractCell{RefShape}) where {RefShape}
     end
 end
 
+# RefPoint (refdim = 0)
+reference_vertices(::Type{RefPoint}) = (1,)
+reference_edges(::Type{RefPoint}) = () # -
+reference_faces(::Type{RefPoint}) = () # -
+
 # RefLine (refdim = 1)
 reference_vertices(::Type{RefLine}) = (1, 2)
 reference_edges(::Type{RefLine}) = ((1, 2),) # e1
@@ -263,6 +268,9 @@ end
 ######################################################
 
 # Lagrange interpolation based cells
+struct Point <: AbstractCell{RefPoint}
+    nodes::NTuple{1, Int}
+end
 struct Line <: AbstractCell{RefLine}
     nodes::NTuple{2, Int}
 end
@@ -300,6 +308,7 @@ struct Pyramid <: AbstractCell{RefPyramid}
     nodes::NTuple{5, Int}
 end
 
+geometric_interpolation(::Type{Point}) = Lagrange{RefPoint, 1}()
 geometric_interpolation(::Type{Line}) = Lagrange{RefLine, 1}()
 geometric_interpolation(::Type{QuadraticLine}) = Lagrange{RefLine, 2}()
 geometric_interpolation(::Type{Triangle}) = Lagrange{RefTriangle, 1}()
