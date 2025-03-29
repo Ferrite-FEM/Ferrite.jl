@@ -27,7 +27,7 @@ nothing                    #hide
 # discretization technique - in our case FEM. The mass matrix form of ODEs and DAEs
 # is given as:
 # ```math
-#   M(t) \mathrm{d}_t u = f(u,t)
+#   M(t) \mathrm{d}_t u = f(u,t),
 # ```
 # where $M$ is a possibly time-dependent and not necessarily invertible mass matrix,
 # $u$ the vector of unknowns and $f$ the right-hand-side (RHS). For us $f$ can be interpreted as
@@ -41,8 +41,8 @@ nothing                    #hide
 # The incompressible Navier-Stokes equations can be stated as the system
 # ```math
 #  \begin{aligned}
-#    \partial_t v &= \underbrace{\nu \Delta v}_{\text{viscosity}} - \underbrace{(v \cdot \nabla) v}_{\text{advection}} - \underbrace{\nabla p}_{\text{pressure}} \\
-#               0 &= \underbrace{\nabla \cdot v}_{\text{incompressibility}}
+#    \partial_t v &= \underbrace{\nu \Delta v}_{\text{viscosity}} - \underbrace{(v \cdot \nabla) v}_{\text{advection}} - \underbrace{\nabla p,}_{\text{pressure}} \\
+#               0 &= \underbrace{\nabla \cdot v,}_{\text{incompressibility}}
 #  \end{aligned}
 # ```
 # where $v$ is the unknown velocity field, $p$ the unknown pressure field,
@@ -59,7 +59,7 @@ nothing                    #hide
 #  \begin{bmatrix}
 #      4 v_{in}(t) y (0.41-y)/0.41^2 \\
 #      0
-#  \end{bmatrix}
+#  \end{bmatrix},
 # ```
 # where $v_{in}(t) = \text{clamp}(t, 0.0, 1.5)$. With a dynamic viscosity of $\nu = 0.001$
 # this is enough to induce turbulence behind the cylinder which leads to vortex shedding. The top and bottom of our
@@ -74,8 +74,8 @@ nothing                    #hide
 # we can obtain the following weak form
 # ```math
 #  \begin{aligned}
-#    \int_\Omega \partial_t v \cdot \varphi &= - \int_\Omega \nu \nabla v : \nabla \varphi - \int_\Omega (v \cdot \nabla) v \cdot \varphi + \int_\Omega p (\nabla \cdot \varphi) + \int_{\partial \Omega_{N}} \underbrace{(\nu \partial_n v - p n )}_{=0} \cdot \varphi \\
-#                                  0 &= \int_\Omega (\nabla \cdot v) \psi
+#    \int_\Omega \partial_t v \cdot \varphi &= - \int_\Omega \nu \nabla v : \nabla \varphi - \int_\Omega (v \cdot \nabla) v \cdot \varphi + \int_\Omega p (\nabla \cdot \varphi) + \int_{\partial \Omega_{N}} \underbrace{(\nu \partial_n v - p n )}_{=0} \cdot \varphi, \\
+#                                  0 &= \int_\Omega (\nabla \cdot v) \psi,
 #  \end{aligned}
 # ```
 # for all possible test functions from the suitable space.
@@ -105,7 +105,7 @@ nothing                    #hide
 #  \begin{bmatrix}
 #      N(\hat{v}, \hat{v}, \hat{\varphi}) \\
 #      0
-#  \end{bmatrix}
+#  \end{bmatrix}.
 # ```
 # Here $M$ is the singular block mass matrix, $K$ is the discretized Stokes operator and $N$ the nonlinear advection term, which
 # is also called trilinear form. $\hat{v}$ and $\hat{p}$ represent the time-dependent vectors of nodal values of the discretizations
@@ -115,7 +115,7 @@ nothing                    #hide
 # ### [Derivation of the Jacobian](@id jacobian-derivation)
 # To enable the use of a wide range of solvers, it is more efficient to provide
 # information to the solver about the [sparsity pattern and values of the Jacobian](https://docs.sciml.ai/DiffEqDocs/stable/tutorials/advanced_ode_example/#stiff)
-# $J$ of $f(u, t) \equiv f(v, p, t)$ where $f(u, t)$ is just the right hand side of the
+# $J$ of $f(u, t) \equiv f(v, p, t)$ where $f(u, t)$ is just the RHS of the
 # mass matrix form given by $f(u, t) = Ku + N(u)$. By [definition](https://nl.mathworks.com/help/matlab/ref/odeset.html#d126e1203285),
 # ```math
 # J = \frac{\partial f}{\partial u} = \frac{\partial}{\partial u}(K u + N(u)) = K + \frac{\partial N}{\partial u}.
@@ -125,8 +125,20 @@ nothing                    #hide
 # trial and test functions. This implies that once $K$ is assembled, its
 # sparsity values and pattern can be used to initialize the Jacobian.
 #
-# TODO: Some brief summary here about how dN/du is computed, then go into extra
-# details...
+# To define $\frac{\partial N}{\partial u}$, we take the directional derivative
+# of $f$ along the vector $(\delta v, \delta p)$ and
+# define finite element approximations of $\delta v$ and $\delta p$ with trial
+# functions $\varphi$ and $\psi$, respectively. The discrete form of
+# $\frac{\delta N}{\delta u}$ is therefore given by
+#
+# ```math
+# - \sum_{i=1}^{N} (\int_{\Omega} (\varphi_i \cdot \nabla v + v \cdot \nabla \varphi_i) \cdot \varphi_j) \delta \hat{v}_i,
+# ```
+# on a mesh with characteristic element size $h$ and $N$ trial functions.
+#
+# With the Jacobian accounting for both the linear and nonlinear contributions
+# of the semi-discrete weak form, we can easily use
+# [ODE solvers from DifferentialEquations.jl](https://docs.sciml.ai/DiffEqDocs/stable/solvers/ode_solve/).
 #
 # !!! details "Extra details on the Jacobian"
 #     Since the [directional derivative](https://en.wikipedia.org/wiki/Directional_derivative)
@@ -136,7 +148,7 @@ nothing                    #hide
 #     to explicitly determine the sparsity pattern
 #     and values for the Jacobian. Note that $f$ is a vector function with
 #     components $f_1$ and $f_2$ corresponding to
-#     the right handside of the first and second equations, respectively, of the
+#     the RHS of the first and second equations, respectively, of the
 #     weak form defined in the previous [section](@ref weak-form-derivation).
 #     By definition, and omitting $t$, the directional derivative is given by
 #
@@ -153,7 +165,7 @@ nothing                    #hide
 #       \end{bmatrix} \right) \\
 #       &= \lim_{\epsilon \to 0} \frac{1}{\epsilon} \left( \begin{bmatrix}
 #       - \int_{\Omega} \cancel{\nu \nabla v : \nabla \varphi} + \nu \epsilon \nabla \delta v : \nabla \varphi - \int_{\Omega} (\cancel{(v \cdot \nabla) v} + \epsilon \delta v \cdot \nabla v + v \cdot \nabla \epsilon \delta v + \epsilon \delta v \cdot \nabla \epsilon \delta v) \cdot \varphi + \int_{\Omega} \cancel{p (\nabla \cdot \varphi)} + \epsilon \delta p (\nabla \cdot \varphi) \\
-#       \int_{\Omega} (\nabla \cdot v)\psi + (\nabla \cdot \epsilon \delta v)\psi
+#       \int_{\Omega} \cancel{(\nabla \cdot v)\psi} + (\nabla \cdot \epsilon \delta v)\psi
 #       \end{bmatrix} - \begin{bmatrix}
 #       \cancel{f_1(v,p)} \\
 #       \cancel{f_2(v,p)}
@@ -180,59 +192,22 @@ nothing                    #hide
 #     cannot be formulated as constant coefficients.
 #     To make this explicit, we construct a finite element approximation of
 #     $\delta v$ and $\delta p$ on a mesh with characteristic element size $h$
-#     and $N$ trial functions $\varphi$ and $\psi$. An important note here is
-#     that the trial functions are the same as in the previous [section](@ref weak-form-derivation).
+#     and $N$ trial functions $\varphi$. An important note here is
+#     that the trial functions are the same as in the previous [section](@ref weak-form-derivation). The finite element approximation for $\delta v$ is thus given by
 #
-#     TODO: Brief insert here about finite element discretization since this
-#     will show how dN/du is implemented in the code...
+#     ```math
+#     \delta v_h(\mathbf{x}) = \sum_{i}^{N} \varphi_i(\mathbf{x}) \delta \hat{v}_i,
+#     ```
+#     for a specific point $\mathbf{x}$ and nodal trial functions $\varphi_i$
+#     with unknown nodal values $\delta \hat{v}_i$. Substituting $\delta v_h$
+#     into the corresponding nonlinear advection term above, we have
 #
-# To determine the values and sparsity pattern of the Jacobian given
-# $\nabla f(v, p) \cdot (\delta v, \delta p)$, we now consider the
-# finite element approximation of $\delta v$ and $\delta p$
-# ```math
-# \begin{aligned}
-# \delta v_h(\mathbf{x}) &= \sum_{i}^{N} \varphi_i(\mathbf{x}) \delta \hat{v}_i \\
-# \delta p_h(\mathbf{x}) &= \sum_{i}^{N} \psi_i(\mathbf{x}) \delta \hat{p}_i.
-# \end{aligned}
-# ```
-# on a mesh with characteristic element size $h$ and $N$ trial (aka nodal shape) functions
-# $\varphi$ and $\psi$. An important note here is that the trial functions
-# are the same as in the previous [section](@ref weak-form-derivation) where
-# the finite element approximation of $v$ and $p$ is given by
-# ```math
-# \begin{aligned}
-# v_h(\mathbf{x}) &= \sum_{i}^{N} \varphi_i(\mathbf{x}) \hat{v}_i \\
-# p_h(\mathbf{x}) &= \sum_{i}^{N} \psi_i(\mathbf{x}) \hat{p}_i.
-# \end{aligned}
-# ```
-# We now show that the finite element contributions for *part* of the Jacobian
-# exactly match the contributions for the Stokes operator $K$. When substituting
-# the finite element approximation for the viscosity term and comparing this
-# with the analogous term in the directional derivative,
-# ```math
-# \begin{aligned}
-# - \int_\Omega \nu \nabla \delta v : \nabla \varphi  & \xrightarrow{\delta v_h} - \sum_{i}^{N} (\int_{\Omega} \nu \nabla \varphi_i : \nabla \varphi_j) \delta \hat{v}_i \\
-# - \int_\Omega \nu \nabla v : \nabla \varphi  & \xrightarrow{v_h}  - \sum_{i}^{N} (\int_{\Omega} \nu \nabla \varphi_i : \nabla \varphi_j) \hat{v}_i \\
-# \end{aligned}
-# ```
-# we see that the coefficients (i.e., the terms in the integrand on the right
-# hand side of the arrow) for the nodal unknowns $\delta \hat{v}_i$ and $\hat{v}_i$
-# are the same. The same can be shown for the pressure term and the
-# incompressibility terms.
-#
-# However, the Jacobian cannot be assembled using the values and pattern from $K$
-# alone since the nonlinear advection term is not accounted for by $K$.
-# Substituting the finite element approximation into the term resulting from the
-# directional derivative of the nonlinear advection term, we have
-# ```math
-#  - \int_{\Omega} (\delta v \cdot \nabla v + v \cdot \nabla \delta v) \cdot \varphi \xrightarrow{\delta v_h} - \sum_{i}^{N} (\int_{\Omega} (\varphi_i \cdot \nabla v + v \cdot \nabla \varphi_i) \cdot \varphi_j) \delta \hat{v}_i.
-# ```
-# Since it is clear that the values of the Jacobian corresponding to the
-# directional derivative of the nonlinear advection term rely on the velocity
-# values $v$ and velocity gradient $\nabla v$ that change during the solving
-# phase, the finite element contributions to the Jacobian for this term are
-# calculated separately.
-
+#     ```math
+#     \sum_{i}^{N} (\int_{\Omega} (\varphi_i \cdot \nabla v + v \cdot \nabla \varphi_i) \cdot \varphi_j) \delta \hat{v}_i,
+#     ```
+#     and we implement a function for the terms in the integrand. With this
+#     function and $K$, we can fully describe the Jacobian in the manner required
+#     by the [ODEFunction](https://docs.sciml.ai/DiffEqDocs/stable/types/ode_types/#SciMLBase.ODEFunction) used by the solver.
 #
 # ## Commented implementation
 #
@@ -494,7 +469,7 @@ apply!(u₀, ch);
 jac_sparsity = sparse(K);
 
 # To apply the nonlinear portion of the Navier-Stokes problem we simply hand
-# over the dof handler and cell values to the right-hand-side (RHS) as a parameter.
+# over the dof handler and cell values to the RHS as a parameter.
 # Furthermore the pre-assembled linear part, our Stokes operator (which is time independent)
 # is passed to save some additional runtime. To apply the time-dependent Dirichlet BCs, we
 # also need to hand over the constraint handler.
