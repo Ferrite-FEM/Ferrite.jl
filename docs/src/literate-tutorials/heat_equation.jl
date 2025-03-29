@@ -35,7 +35,7 @@
 # where $\delta u$ is a test function, and where $\mathbb{U}$ and $\mathbb{T}$ are suitable
 # trial and test function sets, respectively.
 #-
-# ## Commented Program
+# ## Commented program
 #
 # Now we solve the problem in Ferrite. What follows is a program spliced with comments.
 #md # The full program, without comments, can be found in the next [section](@ref heat_equation-plain-program).
@@ -69,6 +69,11 @@ cellvalues = CellValues(qr, ip);
 dh = DofHandler(grid)
 add!(dh, :u, ip)
 close!(dh);
+
+# !!! warning "Numbering of degrees of freedom"
+#     A common assumption is that the numbering of degrees of freedom follows the global
+#     numbering of the nodes in the grid. This is *NOT* the case in Ferrite. For more
+#     details, see the [Ferrite numbering rules](@ref "Ordering-of-dofs").
 
 # Now that we have distributed all our dofs we can create our tangent matrix,
 # using `allocate_matrix`. This function returns a sparse matrix
@@ -209,6 +214,11 @@ K, f = assemble_global(cellvalues, K, dh);
 # we can get the correct solution vector `u` by using `\`.
 apply!(K, f, ch)
 u = K \ f;
+
+# !!! warning "Numbering of degrees of freedom"
+#     Once again, recall that numbering of degrees of freedom does *NOT* follow the global
+#     numbering of the nodes in the grid. Specifically, `u[i]` is *NOT* the temperature at
+#     node `i`.
 
 # ### Exporting to VTK
 # To visualize the result we export the grid and our field `u`

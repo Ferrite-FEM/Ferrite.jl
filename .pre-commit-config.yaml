@@ -10,6 +10,8 @@ repos:
       - id: mixed-line-ending
       - id: trailing-whitespace
   - repo: 'https://github.com/fredrikekre/runic-pre-commit'
-    rev: v1.0.0
+    rev: v2.0.1
     hooks:
       - id: runic
+        additional_dependencies:
+          - 'Runic@1.4' # Keep version in sync with .github/workflows/Check.yml

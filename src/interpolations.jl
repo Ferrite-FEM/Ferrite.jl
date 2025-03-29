@@ -488,8 +488,8 @@ function reference_coordinates(ip::DiscontinuousLagrange{RefTetrahedron, 0})
 end
 
 function reference_shape_value(ip::DiscontinuousLagrange{shape, 0}, ::Vec{dim, T}, i::Int) where {dim, shape <: AbstractRefShape{dim}, T}
-    i > 1 && throw(ArgumentError("no shape function $i for interpolation $ip"))
-    return one(T)
+    i == 1 && return one(T)
+    throw(ArgumentError("no shape function $i for interpolation $ip"))
 end
 
 is_discontinuous(::Type{<:DiscontinuousLagrange}) = true
@@ -667,7 +667,7 @@ function reference_coordinates(::Lagrange{RefQuadrilateral, 3})
 end
 
 function reference_shape_value(ip::Lagrange{RefQuadrilateral, 3}, ξ::Vec{2}, i::Int)
-    # See https://defelement.com/elements/examples/quadrilateral-Q-3.html
+    # See https://defelement.org/elements/examples/quadrilateral-lagrange-equispaced-3.html
     # Transform domain from [-1, 1] × [-1, 1] to [0, 1] × [0, 1]
     ξ_x = (ξ[1] + 1) / 2
     ξ_y = (ξ[2] + 1) / 2
@@ -1070,7 +1070,7 @@ end
 #############################
 # Lagrange RefPrism order 1 #
 #############################
-# Build on https://defelement.com/elements/examples/prism-Lagrange-1.html
+# Build on https://defelement.org/elements/examples/prism-lagrange-equispaced-1.html
 getnbasefunctions(::Lagrange{RefPrism, 1}) = 6
 
 facedof_indices(::Lagrange{RefPrism, 1}) = ((1, 3, 2), (1, 2, 5, 4), (3, 1, 4, 6), (2, 3, 6, 5), (4, 5, 6))
@@ -1101,7 +1101,7 @@ end
 #############################
 # Lagrange RefPrism order 2 #
 #############################
-# Build on https://defelement.com/elements/examples/prism-Lagrange-2.html .
+# Build on https://defelement.org/elements/examples/prism-lagrange-equispaced-2.html
 # This is simply the tensor-product of a quadratic triangle with a quadratic line.
 getnbasefunctions(::Lagrange{RefPrism, 2}) = 18
 
@@ -1323,7 +1323,7 @@ end
 #######################################
 # Lagrange-Bubble RefTriangle order 1 #
 #######################################
-# Taken from https://defelement.com/elements/bubble-enriched-lagrange.html
+# Taken from https://defelement.org/elements/examples/triangle-bubble-enriched-lagrange-1.html
 getnbasefunctions(::BubbleEnrichedLagrange{RefTriangle, 1}) = 4
 adjust_dofs_during_distribution(::BubbleEnrichedLagrange{RefTriangle, 1}) = false
 
@@ -1774,3 +1774,171 @@ function mapping_type end
 
 mapping_type(::ScalarInterpolation) = IdentityMapping()
 mapping_type(::VectorizedInterpolation) = IdentityMapping()
+
+#####################################
+# RaviartThomas (1st kind), H(div)  #
+#####################################
+struct RaviartThomas{shape, order, vdim} <: VectorInterpolation{vdim, shape, order}
+    function RaviartThomas{shape, order}() where {rdim, shape <: AbstractRefShape{rdim}, order}
+        return new{shape, order, rdim}()
+    end
+end
+mapping_type(::RaviartThomas) = ContravariantPiolaMapping()
+
+# RefTriangle
+edgedof_indices(ip::RaviartThomas{RefTriangle}) = edgedof_interior_indices(ip)
+facedof_indices(ip::RaviartThomas{RefTriangle}) = (ntuple(i -> i, getnbasefunctions(ip)),)
+
+# RefTriangle, 1st order Lagrange
+# https://defelement.org/elements/examples/triangle-raviart-thomas-lagrange-1.html
+function reference_shape_value(ip::RaviartThomas{RefTriangle, 1}, ξ::Vec{2}, i::Int)
+    x, y = ξ
+    i == 1 && return ξ                  # Flip sign
+    i == 2 && return Vec(x - 1, y)      # Keep sign
+    i == 3 && return Vec(x, y - 1)      # Flip sign
+    throw(ArgumentError("no shape function $i for interpolation $ip"))
+end
+
+getnbasefunctions(::RaviartThomas{RefTriangle, 1}) = 3
+edgedof_interior_indices(::RaviartThomas{RefTriangle, 1}) = ((1,), (2,), (3,))
+facedof_interior_indices(::RaviartThomas{RefTriangle, 1}) = ((),)
+adjust_dofs_during_distribution(::RaviartThomas) = false
+
+function get_direction(::RaviartThomas{RefTriangle, 1}, j, cell)
+    edge = edges(cell)[j]
+    return ifelse(edge[2] > edge[1], 1, -1)
+end
+
+# RefTriangle, 2st order Lagrange
+# https://defelement.org/elements/examples/triangle-raviart-thomas-lagrange-2.html
+function reference_shape_value(ip::RaviartThomas{RefTriangle, 2}, ξ::Vec{2}, i::Int)
+    x, y = ξ
+    # Face 1 (keep ordering, flip sign)
+    i == 1 && return Vec(4x * (2x - 1), 2y * (4x - 1))
+    i == 2 && return Vec(2x * (4y - 1), 4y * (2y - 1))
+    # Face 2 (flip ordering, keep signs)
+    i == 3 && return Vec(8x * y - 2x - 6y + 2, 4y * (2y - 1))
+    i == 4 && return Vec(-8x^2 - 8x * y + 12x + 6y - 4, 2y * (-4x - 4y + 3))
+    # Face 3 (keep ordering, flip sign)
+    i == 5 && return Vec(2x * (3 - 4x - 4y), -8x * y + 6x - 8y^2 + 12y - 4)
+    i == 6 && return Vec(4x * (2x - 1), 8x * y - 6x - 2y + 2)
+    # Cell
+    i == 7 && return Vec(8x * (-2x - y + 2), 8y * (-2x - y + 1))
+    i == 8 && return Vec(8x * (-2y - x + 1), 8y * (-2y - x + 2))
+    throw(ArgumentError("no shape function $i for interpolation $ip"))
+end
+
+getnbasefunctions(::RaviartThomas{RefTriangle, 2}) = 8
+edgedof_interior_indices(::RaviartThomas{RefTriangle, 2}) = ((1, 2), (3, 4), (5, 6))
+facedof_interior_indices(::RaviartThomas{RefTriangle, 2}) = ((7, 8),)
+adjust_dofs_during_distribution(::RaviartThomas{RefTriangle, 2}) = true
+
+function get_direction(::RaviartThomas{RefTriangle, 2}, j, cell)
+    j > 6 && return 1
+    edge = edges(cell)[(j + 1) ÷ 2]
+    return ifelse(edge[2] > edge[1], 1, -1)
+end
+
+#####################################
+# Brezzi-Douglas–Marini, H(div)     #
+#####################################
+struct BrezziDouglasMarini{shape, order, vdim} <: VectorInterpolation{vdim, shape, order}
+    function BrezziDouglasMarini{shape, order}() where {rdim, shape <: AbstractRefShape{rdim}, order}
+        return new{shape, order, rdim}()
+    end
+end
+mapping_type(::BrezziDouglasMarini) = ContravariantPiolaMapping()
+
+# RefTriangle
+edgedof_indices(ip::BrezziDouglasMarini{RefTriangle}) = edgedof_interior_indices(ip)
+facedof_indices(ip::BrezziDouglasMarini{RefTriangle}) = (ntuple(i -> i, getnbasefunctions(ip)),)
+
+# RefTriangle, 1st order Lagrange
+# https://defelement.org/elements/examples/triangle-brezzi-douglas-marini-lagrange-1.html
+function reference_shape_value(ip::BrezziDouglasMarini{RefTriangle, 1}, ξ::Vec{2}, i::Int)
+    x, y = ξ
+    # Edge 1: y=1-x, n = [1, 1]/√2 (Flip sign, pos. integration outwards)
+    i == 1 && return Vec(4x, -2y) # N ⋅ n = (2√2 x - √2 (1-x)) = 3√2 x - √2
+    i == 2 && return Vec(-2x, 4y) # N ⋅ n = (-√2x + 2√2 (1-x)) = 2√2 - 3√2x
+    # Edge 2: x=0, n = [-1, 0] (reverse order to follow Ferrite convention)
+    i == 3 && return Vec(-2x - 6y + 2, 4y) # N ⋅ n = (6y - 2)
+    i == 4 && return Vec(4x + 6y - 4, -2y) # N ⋅ n = (4 - 6y)
+    # Edge 3: y=0, n = [0, -1] (Flip sign, pos. integration outwards)
+    i == 5 && return Vec(-2x, 6x + 4y - 4) # N ⋅ n = (4 - 6x)
+    i == 6 && return Vec(4x, -6x - 2y + 2) # N ⋅ n = (6x - 2)
+    throw(ArgumentError("no shape function $i for interpolation $ip"))
+end
+
+getnbasefunctions(::BrezziDouglasMarini{RefTriangle, 1}) = 6
+edgedof_interior_indices(::BrezziDouglasMarini{RefTriangle, 1}) = ((1, 2), (3, 4), (5, 6))
+adjust_dofs_during_distribution(::BrezziDouglasMarini{RefTriangle, 1}) = true
+
+function get_direction(::BrezziDouglasMarini{RefTriangle, 1}, j, cell)
+    edge = edges(cell)[(j + 1) ÷ 2]
+    return ifelse(edge[2] > edge[1], 1, -1)
+end
+
+#####################################
+# Nedelec (1st kind), H(curl)       #
+#####################################
+struct Nedelec{shape, order, vdim} <: VectorInterpolation{vdim, shape, order}
+    function Nedelec{shape, order}() where {rdim, shape <: AbstractRefShape{rdim}, order}
+        return new{shape, order, rdim}()
+    end
+end
+mapping_type(::Nedelec) = CovariantPiolaMapping()
+edgedof_indices(ip::Nedelec) = edgedof_interior_indices(ip)
+
+# 2D refshape (rdim == vdim for Nedelec)
+facedof_indices(ip::Nedelec{<:AbstractRefShape{2}}) = (ntuple(i -> i, getnbasefunctions(ip)),)
+
+# RefTriangle, 1st order Lagrange
+# https://defelement.org/elements/examples/triangle-nedelec1-lagrange-1.html
+function reference_shape_value(ip::Nedelec{RefTriangle, 1}, ξ::Vec{2}, i::Int)
+    x, y = ξ
+    i == 1 && return Vec(- y, x)
+    i == 2 && return Vec(- y, x - 1) # Changed signed, follow Ferrite's sign convention
+    i == 3 && return Vec(1 - y, x)
+    throw(ArgumentError("no shape function $i for interpolation $ip"))
+end
+
+getnbasefunctions(::Nedelec{RefTriangle, 1}) = 3
+edgedof_interior_indices(::Nedelec{RefTriangle, 1}) = ((1,), (2,), (3,))
+adjust_dofs_during_distribution(::Nedelec{RefTriangle, 1}) = false
+
+function get_direction(::Nedelec{RefTriangle, 1}, j, cell)
+    edge = edges(cell)[j]
+    return ifelse(edge[2] > edge[1], 1, -1)
+end
+
+# RefTriangle, 2nd order Lagrange
+# https://defelement.org/elements/examples/triangle-nedelec1-lagrange-2.html
+function reference_shape_value(ip::Nedelec{RefTriangle, 2}, ξ::Vec{2}, i::Int)
+    x, y = ξ
+    # Edge 1
+    i == 1 && return Vec(2 * y * (1 - 4 * x), 4 * x * (2 * x - 1))
+    i == 2 && return Vec(4 * y * (1 - 2 * y), 2 * x * (4 * y - 1))
+    # Edge 2 (flip order and sign compared to defelement)
+    i == 3 && return Vec(4 * y * (1 - 2 * y), 8 * x * y - 2 * x - 6 * y + 2)
+    i == 4 && return Vec(2 * y * (4 * x + 4 * y - 3), -8 * x^2 - 8 * x * y + 12 * x + 6 * y - 4)
+    # Edge 3
+    i == 5 && return Vec(8 * x * y - 6 * x + 8 * y^2 - 12 * y + 4, 2 * x * (-4 * x - 4 * y + 3))
+    i == 6 && return Vec(
+        -8 * x * y + 6 * x + 2 * y - 2, 4 * x * (2 * x - 1)
+    )
+    # Face
+    i == 7 && return Vec(8 * y * (-x - 2 * y + 2), 8 * x * (x + 2 * y - 1))
+    i == 8 && return Vec(8 * y * (2 * x + y - 1), 8 * x * (-2 * x - y + 2))
+    throw(ArgumentError("no shape function $i for interpolation $ip"))
+end
+
+getnbasefunctions(::Nedelec{RefTriangle, 2}) = 8
+edgedof_interior_indices(::Nedelec{RefTriangle, 2}) = ((1, 2), (3, 4), (5, 6))
+facedof_interior_indices(::Nedelec{RefTriangle, 2}) = ((7, 8),)
+adjust_dofs_during_distribution(::Nedelec{RefTriangle, 2}) = true
+
+function get_direction(::Nedelec{RefTriangle, 2}, j, cell)
+    j > 6 && return 1
+    edge = edges(cell)[(j + 1) ÷ 2]
+    return ifelse(edge[2] > edge[1], 1, -1)
+end

@@ -150,6 +150,11 @@ dh = DofHandler(grid)
 add!(dh, :u, ip)
 close!(dh);
 
+# !!! warning "Numbering of degrees of freedom"
+#     A common assumption is that the numbering of degrees of freedom follows the global
+#     numbering of the nodes in the grid. This is *NOT* the case in Ferrite. For more
+#     details, see the [Ferrite numbering rules](@ref "Ordering-of-dofs").
+
 # ### Boundary conditions
 # We set Dirichlet boundary conditions by fixing the motion normal to the bottom and left
 # boundaries. The last argument to `Dirichlet` determines which components of the field should be
@@ -314,6 +319,11 @@ assemble_external_forces!(f_ext, dh, getfacetset(grid, "top"), facetvalues, trac
 # correct solution vector `u` by using solving the linear equation system $K_{ij} \hat{u}_j = f^\mathrm{ext}_i$,
 apply!(K, f_ext, ch)
 u = K \ f_ext;
+
+# !!! warning "Numbering of degrees of freedom"
+#     Once again, recall that numbering of degrees of freedom does *NOT* follow the global
+#     numbering of the nodes in the grid. Specifically, `u[2 * i - 1]` and `u[2 * i]` are
+#     *NOT* the displacements at node `i`.
 
 # ### Postprocessing
 # In this case, we want to analyze the displacements, as well as the stress field.

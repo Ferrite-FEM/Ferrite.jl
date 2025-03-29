@@ -688,7 +688,7 @@ function test_vtk_export()
     sdh_tri = SubDofHandler(dh, Set(2))
     add!(sdh_tri, :u, ip_tri)
     close!(dh)
-    u = collect(1:ndofs(dh))
+    u = collect(Float64, 1:ndofs(dh))
     filename = "mixed_2d_grid"
     VTKGridFile(filename, dh) do vtk
         write_solution(vtk, dh, u)

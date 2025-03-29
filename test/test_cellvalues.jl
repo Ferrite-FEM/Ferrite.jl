@@ -187,6 +187,69 @@
         @test Ferrite.calculate_mapping(cv2.geo_mapping, 1, cc.coords) == Ferrite.calculate_mapping(ip, ξ, cc.coords, Val(2))
     end
 
+    @testset "Non-identity mapping gradients" begin
+        function test_gradient(ip_fun, cell::CT) where {CT <: Ferrite.AbstractCell}
+            ip_geo = geometric_interpolation(CT)
+            RefShape = Ferrite.getrefshape(ip_fun)
+            x_ref = Ferrite.reference_coordinates(ip_geo)
+            # Random cell coordinates, but small pertubation to ensure 1-1 mapping.
+            cell_coords = (1 .+ rand(length(x_ref)) / 10) .* x_ref
+
+            function calculate_value_differentiable(ξ::Vec; i = 1)
+                T = eltype(ξ)
+                qr = QuadratureRule{RefShape}([zero(T)], [ξ])
+                gm = Ferrite.GeometryMapping{1}(T, ip_geo, qr)
+                mv = Ferrite.calculate_mapping(gm, 1, cell_coords)
+                fv0 = Ferrite.FunctionValues{0}(eltype(T), ip_fun, qr, ip_geo^length(ξ))
+                Ferrite.apply_mapping!(fv0, 1, mv, cell)
+                return shape_value(fv0, 1, i)
+            end
+
+            function spatial_coordinate_differentiable(ξ)
+                x = zero(ξ)
+                for i in 1:getnbasefunctions(ip_geo)
+                    x += cell_coords[i] * Ferrite.reference_shape_value(ip_geo, ξ, i)
+                end
+                return x
+            end
+
+            ξ_rand = sample_random_point(RefShape)
+            qr = QuadratureRule{RefShape}([NaN], [ξ_rand])
+            cv = CellValues(qr, ip_fun, ip_geo)
+            reinit!(cv, cell, cell_coords)
+
+            # Test jacobian calculation
+            dxdξ = gradient(spatial_coordinate_differentiable, ξ_rand) # Jacobian
+            J = Ferrite.getjacobian(Ferrite.calculate_mapping(cv.geo_mapping, 1, cell_coords))
+            @test dxdξ ≈ J
+            for i in 1:getnbasefunctions(ip_fun)
+                dNdξ, N = gradient(z -> calculate_value_differentiable(z; i), ξ_rand, :all)
+                # Test that using FunctionValues{0} and FunctionValues{1} gives same mapped value
+                @test shape_value(cv, 1, i) ≈ N
+                # Test gradient. Hard to differentiate wrt. x, easier to differentiate with ξ,
+                # and use the chain-rule to test.
+                # Note that N̂(ξ) = reference_shape_value != N(ξ) = shape_value in general.
+                #                         dNdx ⋅ dxdξ = dNdξ
+                @test shape_gradient(cv, 1, i) ⋅ dxdξ ≈ dNdξ
+            end
+        end
+        test_ips = [
+            Lagrange{RefTriangle, 2}(), Lagrange{RefQuadrilateral, 2}(), Lagrange{RefHexahedron, 2}()^3, # Test should also work for identity mapping
+            Nedelec{RefTriangle, 1}(), Nedelec{RefTriangle, 2}(),
+            RaviartThomas{RefTriangle, 1}(), RaviartThomas{RefTriangle, 2}(), BrezziDouglasMarini{RefTriangle, 1}(),
+        ]
+        # Makes most sense to test for nonlinear geometries, so we use such cells for testing only
+        cell_from_refshape(::Type{RefTriangle}) = QuadraticTriangle((ntuple(identity, 6)))
+        cell_from_refshape(::Type{RefQuadrilateral}) = QuadraticQuadrilateral((ntuple(identity, 9)))
+        cell_from_refshape(::Type{RefHexahedron}) = QuadraticHexahedron((ntuple(identity, 27)))
+        for ip in test_ips
+            cell = cell_from_refshape(getrefshape(ip))
+            @testset "$ip" begin
+                test_gradient(ip, cell)
+            end
+        end
+    end
+
     @testset "#265: error message for incompatible geometric interpolation" begin
         dim = 1
         deg = 1

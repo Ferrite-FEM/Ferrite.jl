@@ -29,7 +29,7 @@ of the other tutorials. The remaining tutorials discuss more advanced topics.
 
 ---
 
-##### [Tutorial 1: Heat equation](heat_equation.md)
+#### [Tutorial 1: Heat equation](heat_equation.md)
 
 This tutorial guides you through the process of solving the linear stationary heat equation
 (i.e. Poisson's equation) on a unit square with homogeneous Dirichlet boundary conditions.
@@ -42,7 +42,7 @@ complex tutorials.*
 
 ---
 
-##### [Tutorial 2: Linear elasticity](linear_elasticity.md)
+#### [Tutorial 2: Linear elasticity](linear_elasticity.md)
 
 TBW.
 
@@ -50,7 +50,7 @@ TBW.
 
 ---
 
-##### [Tutorial 3: Incompressible elasticity](incompressible_elasticity.md)
+#### [Tutorial 3: Incompressible elasticity](incompressible_elasticity.md)
 
 This tutorial focuses on a mixed formulation of linear elasticity, with (vector)
 displacement and (scalar) pressure as the two unknowns, suitable for incompressibility.
