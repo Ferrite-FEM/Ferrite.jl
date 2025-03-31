@@ -1790,7 +1790,7 @@ edgedof_indices(ip::RaviartThomas{RefTriangle}) = edgedof_interior_indices(ip)
 facedof_indices(ip::RaviartThomas{RefTriangle}) = (ntuple(i -> i, getnbasefunctions(ip)),)
 
 # RefTriangle, 1st order Lagrange
-# https://defelement.org/elements/examples/triangle-raviart-thomas-lagrange-1.html
+# https://defelement.org/elements/examples/triangle-raviart-thomas-lagrange-0.html
 function reference_shape_value(ip::RaviartThomas{RefTriangle, 1}, ξ::Vec{2}, i::Int)
     x, y = ξ
     i == 1 && return ξ                  # Flip sign
@@ -1810,7 +1810,7 @@ function get_direction(::RaviartThomas{RefTriangle, 1}, j, cell)
 end
 
 # RefTriangle, 2st order Lagrange
-# https://defelement.org/elements/examples/triangle-raviart-thomas-lagrange-2.html
+# https://defelement.org/elements/examples/triangle-raviart-thomas-lagrange-1.html
 function reference_shape_value(ip::RaviartThomas{RefTriangle, 2}, ξ::Vec{2}, i::Int)
     x, y = ξ
     # Face 1 (keep ordering, flip sign)
@@ -1893,7 +1893,7 @@ edgedof_indices(ip::Nedelec) = edgedof_interior_indices(ip)
 facedof_indices(ip::Nedelec{<:AbstractRefShape{2}}) = (ntuple(i -> i, getnbasefunctions(ip)),)
 
 # RefTriangle, 1st order Lagrange
-# https://defelement.org/elements/examples/triangle-nedelec1-lagrange-1.html
+# https://defelement.org/elements/examples/triangle-nedelec1-lagrange-0.html
 function reference_shape_value(ip::Nedelec{RefTriangle, 1}, ξ::Vec{2}, i::Int)
     x, y = ξ
     i == 1 && return Vec(- y, x)
@@ -1912,7 +1912,7 @@ function get_direction(::Nedelec{RefTriangle, 1}, j, cell)
 end
 
 # RefTriangle, 2nd order Lagrange
-# https://defelement.org/elements/examples/triangle-nedelec1-lagrange-2.html
+# https://defelement.org/elements/examples/triangle-nedelec1-lagrange-1.html
 function reference_shape_value(ip::Nedelec{RefTriangle, 2}, ξ::Vec{2}, i::Int)
     x, y = ξ
     # Edge 1
