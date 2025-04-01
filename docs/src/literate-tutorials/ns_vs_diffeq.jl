@@ -184,7 +184,7 @@ nothing                    #hide
 #     The term in the Jacobian
 #
 #     ```math
-#     \int_{\Omega} (\delta v \cdot \nabla v + v \cdot \nabla \delta v) \cdot \varphi,
+#     - \int_{\Omega} (\delta v \cdot \nabla v + v \cdot \nabla \delta v) \cdot \varphi,
 #     ```
 #
 #     corresponding to the nonlinear advection term is of particular interest since
@@ -203,7 +203,7 @@ nothing                    #hide
 #     into the corresponding nonlinear advection term above, we have
 #
 #     ```math
-#     \sum_{i}^{N} (\int_{\Omega} (\varphi_i \cdot \nabla v + v \cdot \nabla \varphi_i) \cdot \varphi_j) \delta \hat{v}_i,
+#     - \sum_{i}^{N} (\int_{\Omega} (\varphi_i \cdot \nabla v + v \cdot \nabla \varphi_i) \cdot \varphi_j) \delta \hat{v}_i,
 #     ```
 #     and we implement a function for the terms in the integrand. With this
 #     function and $K$, we can fully describe the Jacobian in the manner required
