@@ -5,7 +5,7 @@ Base.@kwdef struct NewtonLineSearchPointFinder{T}
 end
 
 """
-    PointEvalHandler(grid::Grid, points::AbstractVector{Vec{dim,T}}; kwargs...) where {dim, T}
+    PointEvalHandler(grid::Grid, points::AbstractVector{Vec{dim,T}} [, set = subdomains::Vector{OrderedSet{Int}}] ; kwargs...) where {dim, T}
 
 The `PointEvalHandler` can be used for function evaluation in *arbitrary points* in the
 domain -- not just in quadrature points or nodes.
@@ -33,6 +33,7 @@ struct PointEvalHandler{G, T <: Real}
     grid::G
     cells::Vector{Union{Nothing, Int}}
     local_coords::Vector{Union{Nothing, Vec{1, T}, Vec{2, T}, Vec{3, T}}}
+    constructed_on_subdomain::Bool
 end
 
 function Base.show(io::IO, ::MIME"text/plain", ph::PointEvalHandler)
@@ -58,7 +59,13 @@ end
 function PointEvalHandler(grid::AbstractGrid{dim}, points::AbstractVector{Vec{dim, T}}; search_nneighbors = 3, warn::Bool = true, strategy = NewtonLineSearchPointFinder()) where {dim, T}
     node_cell_dicts = _get_node_cell_map(grid)
     cells, local_coords = _get_cellcoords(points, grid, node_cell_dicts, search_nneighbors, warn, strategy)
-    return PointEvalHandler(grid, cells, local_coords)
+    return PointEvalHandler(grid, cells, local_coords, false)
+end
+
+function PointEvalHandler(grid::AbstractGrid{dim}, points::AbstractVector{Vec{dim, T}}, subdomains::Vector{OrderedSet{Int}}; search_nneighbors = 3, warn::Bool = true, strategy = NewtonLineSearchPointFinder()) where {dim, T}
+    node_cell_dicts = _get_node_cell_map(grid, subdomains)
+    cells, local_coords = _get_cellcoords(points, grid, node_cell_dicts, search_nneighbors, warn, strategy)
+    return PointEvalHandler(grid, cells, local_coords, true)
 end
 
 function _get_cellcoords(points::AbstractVector{Vec{dim, T}}, grid::AbstractGrid, node_cell_dicts::Dict{C, Dict{Int, Vector{Int}}}, search_nneighbors, warn, strategy::NewtonLineSearchPointFinder) where {dim, T <: Real, C}
@@ -202,6 +209,31 @@ function _get_node_cell_map(grid::AbstractGrid)
     return cell_dicts
 end
 
+function _get_node_cell_map(grid::AbstractGrid, subdomains::Vector{OrderedSet{Int}})
+    @inline function _check_contained_subdomain(i, subdomains)
+        for subdomain in subdomains
+            i ∈ subdomain && return true
+        end
+        return false
+    end
+    cells = getcells(grid)
+    C = eltype(cells) # possibly abstract
+    cell_dicts = Dict{Type{<:C}, Dict{Int, Vector{Int}}}()
+    ctypes = Set{Type{<:C}}(typeof(c) for c in cells)
+    for ctype in ctypes
+        cell_dict = cell_dicts[ctype] = Dict{Int, Vector{Int}}()
+        for (cellidx, cell) in enumerate(cells)
+            cell isa ctype || continue
+            _check_contained_subdomain(cellidx, subdomains) || continue
+            for node in cell.nodes
+                v = get!(Vector{Int}, cell_dict, node)
+                push!(v, cellidx)
+            end
+        end
+    end
+    return cell_dicts
+end
+
 """
     evaluate_at_points(ph::PointEvalHandler, dh::AbstractDofHandler, dof_values::Vector{T}, [fieldname::Symbol]) where T
     evaluate_at_points(ph::PointEvalHandler, proj::L2Projector, dof_values::Vector{T}) where T
@@ -226,6 +258,10 @@ function evaluate_at_points(
         ph::PointEvalHandler{<:Any, T1}, dh::AbstractDofHandler, dof_vals::AbstractVector{T2},
         fname::Symbol = find_single_field(dh)
     ) where {T1, T2}
+    if !is_defined_on_full_domain(dh) && !ph.constructed_on_subdomain
+        # @warn "DofHandler is defined on a true subdomain only, but the PointEvalHandler serached cells on the full grid. The evaluation assignment might be broken!" maxlog=1
+        error("!!!")
+    end
     npoints = length(ph.cells)
     # Figure out the value type by creating a dummy PointValues
     ip = getfieldinterpolation(dh, find_field(dh, fname))

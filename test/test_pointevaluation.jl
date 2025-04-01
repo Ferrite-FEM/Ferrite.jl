@@ -1,4 +1,4 @@
-using Ferrite, Test
+using Ferrite, Test, Logging, OrderedCollections
 
 function test_pe_scalar_field()
     # isoparametric approximation
@@ -345,16 +345,15 @@ function test_pe_mixed_grid()
     # construct projector
     projector = L2Projector(ip_quad, mesh; set = getcellset(mesh, "quads"))
 
-    points = [Vec((x, 2x)) for x in range(0.0; stop = 1.0, length = 10)]
+    points = [Vec((x, 2x)) for x in range(0.0; stop = 0.5, length = 5)]
 
     # first alternative: L2Projection to dofs
     projector_values = project(projector, qp_vals_quads, qr)
     @test_logs min_level = Logging.Warn PointEvalHandler(mesh, points)
-    ph = PointEvalHandler(mesh, points)
+    ph = PointEvalHandler(mesh, points, [getcellset(mesh, "quads")])
     @test all(x -> x !== nothing, ph.cells)
     vals = evaluate_at_points(ph, projector, projector_values)
     @test vals[1:5] ≈ f.(points[1:5])
-    @test all(isnan, vals[6:end])
 
     # second alternative: assume a vector field :v
     dh = DofHandler(mesh)
@@ -427,6 +426,25 @@ function test_pe_first_point_missing()
     return
 end
 
+function test_pe_true_subdomain()
+    # Generate a subdofhandler on two elements
+    grid = generate_grid(Triangle, (4, 4), Vec((-2.0, -2.0)), Vec((2.0, 2.0)))
+    addcellset!(grid, "hole", x -> norm(x) ≤ 1.0)
+    subdomain = getcellset(grid, "hole")
+    dh = DofHandler(grid)
+    sdh = SubDofHandler(dh, subdomain)
+    add!(sdh, :v, Lagrange{RefTriangle, 1}())
+    close!(dh)
+
+    # Evaluate at all nodes of all triangles in "hole"
+    nodes = Vec{2, Float64}.([[0.0, -1.0], [0.0, 0.0], [-1.0, 0.0], [1.0, 0.0], [0.0, 1.0]])
+    ph = PointEvalHandler(grid, nodes, [subdomain]; warn = true)
+    result = Ferrite.evaluate_at_points(ph, dh, zeros(ndofs(dh)))
+
+    @test !any(isnan.(result))
+    return
+end
+
 @testset "PointEvalHandler" begin
     @testset "scalar field" begin
         test_pe_scalar_field()
@@ -457,6 +475,10 @@ end
 
     @testset "failure cases" begin
         test_pe_first_point_missing()
+    end
+
+    @testset "True Subdomain (issue #1181)" begin
+        test_pe_true_subdomain()
     end
 end
 
