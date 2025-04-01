@@ -165,6 +165,8 @@ function _create_boundaryset(f::Function, grid::AbstractGrid, top::ExclusiveTopo
             cell_idx = ff_nh_idx[1]
             facet_nr = ff_nh_idx[2]
             cell = getcells(grid, cell_idx)
+            # `ff_nh::AbstractMatrix`, indexed by (cell_idx, facet_nr). For mixed grids,
+            # `facet_nr` can then become too large and should be skipped as the facet doesn't exist.
             facet_nr > length(facets(cell)) && continue
             facet_nodes = facets(cell)[facet_nr]
             for (subentity_idx, subentity_nodes) in pairs(boundaryfunction(BI)(cell))
