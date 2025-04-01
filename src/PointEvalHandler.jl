@@ -259,8 +259,7 @@ function evaluate_at_points(
         fname::Symbol = find_single_field(dh)
     ) where {T1, T2}
     if !is_defined_on_full_domain(dh) && !ph.constructed_on_subdomain
-        # @warn "DofHandler is defined on a true subdomain only, but the PointEvalHandler serached cells on the full grid. The evaluation assignment might be broken!" maxlog=1
-        error("!!!")
+        @warn "DofHandler is defined on a true subdomain only, but the PointEvalHandler serached cells on the full grid. The evaluation assignment might be broken!" maxlog=1
     end
     npoints = length(ph.cells)
     # Figure out the value type by creating a dummy PointValues
