@@ -270,7 +270,7 @@ function evaluate_at_points!(
             _evaluate_at_points!(out_vals, dof_vals, ph, dh, pv, cellset, dofrange)
         end
     end
-    return nothing
+    return out_vals
 end
 
 # function barrier with concrete type of PointValues
@@ -310,7 +310,7 @@ function _evaluate_at_points!(
         reinit!(pv, x, local_coords[pointid])
         out_vals[pointid] = function_value(pv, 1, u_e, dofrange)
     end
-    return nothing
+    return out_vals
 end
 
 function get_func_interpolations(dh::DofHandler, fieldname)
