@@ -61,7 +61,6 @@
         vertices = _extractboundarycheck(grid, Ferrite.create_vertexset)
         return union(facets, edges, vertices)
     end
-
     #=
     @testset "getentities" begin
     #                            (8)
