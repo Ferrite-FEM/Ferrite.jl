@@ -21,3 +21,17 @@ for (file, url) in [
         Downloads.download(url, afile)
     end
 end
+
+const howto_directory = joinpath(@__DIR__, "src", "howto")
+mkpath(howto_directory)
+
+for (file, url) in [
+        "L2flux_mesh.png" => "https://raw.githubusercontent.com/Ferrite-FEM/Ferrite.jl/refs/heads/gh-pages/assets/L2flux_mesh.png",
+        "L2flux_temperature.png" => "https://raw.githubusercontent.com/Ferrite-FEM/Ferrite.jl/refs/heads/gh-pages/assets/L2flux_temperature.png",
+        "L2flux.png" => "https://raw.githubusercontent.com/Ferrite-FEM/Ferrite.jl/refs/heads/gh-pages/assets/L2flux.png",
+    ]
+    afile = joinpath(howto_directory, file)
+    if !isfile(afile)
+        Downloads.download(url, afile)
+    end
+end
