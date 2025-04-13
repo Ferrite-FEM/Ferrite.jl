@@ -53,14 +53,16 @@ function test_interpolation_properties(ip::Interpolation{RefShape, FunOrder}) wh
         # Test A-D
         _test_interpolation_properties(dof_data, refshape_data)
 
-        # Test E: All base functions implemented.
+        # Test E: All base functions implemented and infers correct types.
         # Argument errors for 0th and n+1 indices.
-        ξ = zero(Vec{Ferrite.getrefdim(ip)})
-        @test_throws ArgumentError Ferrite.reference_shape_value(ip, ξ, 0)
-        for i in 1:getnbasefunctions(ip)
-            @test Ferrite.reference_shape_value(ip, ξ, i) isa Ferrite.shape_value_type(ip, Float64)
+        for T in (Float64, Float32)
+            ξ = zero(Vec{Ferrite.getrefdim(ip), T})
+            @test_throws ArgumentError Ferrite.reference_shape_value(ip, ξ, 0)
+            for i in 1:getnbasefunctions(ip)
+                @test (@inferred Ferrite.reference_shape_value(ip, ξ, i)) isa Ferrite.shape_value_type(ip, T)
+            end
+            @test_throws ArgumentError Ferrite.reference_shape_value(ip, ξ, getnbasefunctions(ip) + 1)
         end
-        @test_throws ArgumentError Ferrite.reference_shape_value(ip, ξ, getnbasefunctions(ip) + 1)
 
         # Test that property functions are defined, runs, and, if possible, give expected type
         Ferrite.mapping_type(ip) # Dry-run just to catch if it isn't defined
