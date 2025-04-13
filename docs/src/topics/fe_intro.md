@@ -63,7 +63,7 @@ where $\mathbb{U}, \mathbb{T}$ are suitable function spaces with sufficiently re
 functions. Under very general assumptions it can be shown that the solution to the weak
 form is identical to the solution to the strong form.
 
-## Finite Element approximation
+## Finite element approximation
 
 
 Using the finite element method to solve partial differential equations is usually
@@ -77,7 +77,7 @@ Next, we introduce the finite element approximation $u_\mathrm{h} \approx u$ as 
 Sometimes, the dofs are called *weights* or *nodal values*. In Ferrite, the numbering of the dofs does not correspond
 to the node numbers in the grid. While such numbering is common in basic finite element codes,
 Ferrite supports different approximations of the finite element fields and the geometry, prohibiting
-such basic numbering. For more details, see the [Ferrite numbering rules](@ref "Ordering-of-Dofs").
+such basic numbering. For more details, see the [Ferrite numbering rules](@ref "Ordering-of-dofs").
 
 Note that *shape functions* are sometimes referred to as *basis functions* or *trial functions*,
 and instead of $\phi_i$ they are sometimes denoted $N_i$. In this example we choose to approximate
