@@ -36,6 +36,7 @@ For interpolations that have a non-identity mapping (see
 mapping type must be specified.
 ```@docs
 Ferrite.mapping_type
+Ferrite.get_direction
 ```
 
 ### The defaults should always work
