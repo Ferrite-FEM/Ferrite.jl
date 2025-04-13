@@ -132,8 +132,9 @@ nothing                    #hide
 # $\frac{\delta N}{\delta u}$ is therefore given by
 #
 # ```math
-# - \sum_{i=1}^{N} (\int_{\Omega} (\varphi_i \cdot \nabla v + v \cdot \nabla \varphi_i) \cdot \varphi_j) \delta \hat{v}_i,
+#     - \sum_{i}^{N} (\int_{\Omega} ((\varphi_i \cdot \nabla) v + (v \cdot \nabla) \varphi_i) \cdot \varphi_j) \delta \hat{v}_i,
 # ```
+#
 # on a mesh with characteristic element size $h$ and $N$ trial functions.
 #
 # With the Jacobian accounting for both the linear and nonlinear contributions
@@ -164,18 +165,18 @@ nothing                    #hide
 #       f_2(v,p)
 #       \end{bmatrix} \right) \\
 #       &= \lim_{\epsilon \to 0} \frac{1}{\epsilon} \left( \begin{bmatrix}
-#       - \int_{\Omega} \cancel{\nu \nabla v : \nabla \varphi} + \nu \epsilon \nabla \delta v : \nabla \varphi - \int_{\Omega} (\cancel{(v \cdot \nabla) v} + \epsilon \delta v \cdot \nabla v + v \cdot \nabla \epsilon \delta v + \epsilon \delta v \cdot \nabla \epsilon \delta v) \cdot \varphi + \int_{\Omega} \cancel{p (\nabla \cdot \varphi)} + \epsilon \delta p (\nabla \cdot \varphi) \\
+#       - \int_{\Omega} \cancel{\nu \nabla v : \nabla \varphi} + \nu \epsilon \nabla \delta v : \nabla \varphi - \int_{\Omega} (\cancel{(v \cdot \nabla) v} + (\epsilon \delta v \cdot \nabla) v + (v \cdot \nabla) \epsilon \delta v + (\epsilon \delta v \cdot \nabla) \epsilon \delta v) \cdot \varphi + \int_{\Omega} \cancel{p (\nabla \cdot \varphi)} + \epsilon \delta p (\nabla \cdot \varphi) \\
 #       \int_{\Omega} \cancel{(\nabla \cdot v)\psi} + (\nabla \cdot \epsilon \delta v)\psi
 #       \end{bmatrix} - \begin{bmatrix}
 #       \cancel{f_1(v,p)} \\
 #       \cancel{f_2(v,p)}
 #       \end{bmatrix} \right)\\
 #       &= \lim_{\epsilon \to 0} \frac{1}{\cancel{\epsilon}} \begin{bmatrix}
-#       - \int_{\Omega} \nu \cancel{\epsilon} \nabla \delta v : \nabla \varphi - \int_{\Omega} (\cancel{\epsilon} \delta v \cdot \nabla v + v \cdot \nabla \cancel{\epsilon} \delta v + \cancel{\epsilon^2 \delta v \cdot \nabla \delta v}) \cdot \varphi + \int_{\Omega} \cancel{\epsilon} \delta p (\nabla \cdot \varphi) \\
+#       - \int_{\Omega} \nu \cancel{\epsilon} \nabla \delta v : \nabla \varphi - \int_{\Omega} ((\cancel{\epsilon} \delta v \cdot \nabla) v + (v \cdot \nabla) \cancel{\epsilon} \delta v + \cancel{\epsilon^2 (\delta v \cdot \nabla) \delta v}) \cdot \varphi + \int_{\Omega} \cancel{\epsilon} \delta p (\nabla \cdot \varphi) \\
 #       \int_{\Omega} (\nabla \cdot \cancel{\epsilon} \delta v) \psi
 #       \end{bmatrix} \\
 #       &=  \begin{bmatrix}
-#       - \int_{\Omega} \nu \nabla \delta v : \nabla \varphi - \int_{\Omega} (\delta v \cdot \nabla v + v \cdot \nabla \delta v) \cdot \varphi + \int_{\Omega} \delta p (\nabla \cdot \varphi) \\
+#       - \int_{\Omega} \nu \nabla \delta v : \nabla \varphi - \int_{\Omega} ((\delta v \cdot \nabla) v + (v \cdot \nabla) \delta v) \cdot \varphi + \int_{\Omega} \delta p (\nabla \cdot \varphi) \\
 #       \int_{\Omega} (\nabla \cdot \delta v) \psi
 #       \end{bmatrix}.
 #     \end{aligned}
@@ -184,7 +185,7 @@ nothing                    #hide
 #     The term in the Jacobian
 #
 #     ```math
-#     - \int_{\Omega} (\delta v \cdot \nabla v + v \cdot \nabla \delta v) \cdot \varphi,
+#     - \int_{\Omega} ((\delta v \cdot \nabla) v + (v \cdot \nabla) \delta v) \cdot \varphi,
 #     ```
 #
 #     corresponding to the nonlinear advection term is of particular interest since
@@ -203,11 +204,29 @@ nothing                    #hide
 #     into the corresponding nonlinear advection term above, we have
 #
 #     ```math
-#     - \sum_{i}^{N} (\int_{\Omega} (\varphi_i \cdot \nabla v + v \cdot \nabla \varphi_i) \cdot \varphi_j) \delta \hat{v}_i,
+#     - \sum_{i}^{N} (\int_{\Omega} ((\varphi_i \cdot \nabla) v + (v \cdot \nabla) \varphi_i) \cdot \varphi_j) \delta \hat{v}_i,
 #     ```
-#     and we implement a function for the terms in the integrand. With this
-#     function and $K$, we can fully describe the Jacobian in the manner required
+#     and we implement a function for the terms in this integrand.
+#     With this function for the nonlinear term and $K$, we can fully describe the
+#     Jacobian in the manner required
 #     by the [ODEFunction](https://docs.sciml.ai/DiffEqDocs/stable/types/ode_types/#SciMLBase.ODEFunction) used by the solver.
+#
+#     Note that the operation
+#
+#     ```math
+#     g(\xi, \theta) := (\xi \cdot \nabla) \theta
+#     ```
+#
+#     for vectors $\xi$ and $\theta$ can be implemented as either
+#
+#     ```math
+#     g(\xi, \theta) := \begin{cases}
+#       \xi \cdot (\nabla \theta)^{\text{T}},\ \text{or} \\
+#       \nabla \theta \cdot \xi.
+#     \end{cases}
+#     ```
+#
+#     We use the first of these two definitions in the implementation.
 #
 # ## Commented implementation
 #
