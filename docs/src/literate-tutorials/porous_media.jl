@@ -253,12 +253,9 @@ end;
 # `get_ferrite_grid` function. We then create one cellset for each phase (solid and porous)
 # for each element type. These 4 sets will later be used in their own `SubDofHandler`
 function get_grid()
-    ## Try downloading the grid if not available already
+    ## Download the grid if not available already
     gridfile = "porous_media_0p25.inp"
-    isfile(gridfile) || Downloads.download(
-        string("https://raw.githubusercontent.com/Ferrite-FEM/Ferrite.jl/gh-pages/assets/", gridfile),
-        gridfile
-    )
+    isfile(gridfile) || Downloads.download(Ferrite.asset_url(gridfile), gridfile)
 
     ## Import grid from abaqus mesh
     grid = get_ferrite_grid(gridfile)

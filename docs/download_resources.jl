@@ -4,17 +4,15 @@ import Downloads
 const directory = joinpath(@__DIR__, "src", "tutorials")
 mkpath(directory)
 
-for (file, url) in [
-        "transient_heat.gif" => "https://raw.githubusercontent.com/Ferrite-FEM/Ferrite.jl/gh-pages/assets/transient_heat.gif",
-        "transient_heat_colorbar.svg" => "https://raw.githubusercontent.com/Ferrite-FEM/Ferrite.jl/gh-pages/assets/transient_heat_colorbar.svg",
-        "porous_media.gif" => "https://raw.githubusercontent.com/Ferrite-FEM/Ferrite.jl/gh-pages/assets/porous_media.gif",
-        "reactive_surface.gif" => "https://raw.githubusercontent.com/Ferrite-FEM/Ferrite.jl/gh-pages/assets/reactive_surface.gif",
-        "nsdiffeq.gif" => "https://raw.githubusercontent.com/Ferrite-FEM/Ferrite.jl/gh-pages/assets/nsdiffeq.gif",
-        "linear_elasticity.svg" => "https://raw.githubusercontent.com/Ferrite-FEM/Ferrite.jl/gh-pages/assets/linear_elasticity.svg",
-        "linear_elasticity_stress.png" => "https://raw.githubusercontent.com/Ferrite-FEM/Ferrite.jl/gh-pages/assets/linear_elasticity_stress.png",
+for file in [
+        "transient_heat.gif", "transient_heat_colorbar.svg",
+        "porous_media.gif",
+        "reactive_surface.gif",
+        "nsdiffeq.gif",
+        "linear_elasticity.svg", "linear_elasticity_stress.png",
     ]
     afile = joinpath(directory, file)
     if !isfile(afile)
-        Downloads.download(url, afile)
+        Downloads.download(Ferrite.asset_url(file), afile)
     end
 end
