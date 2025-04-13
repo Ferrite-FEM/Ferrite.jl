@@ -46,8 +46,10 @@ struct CellValues{FV, GM, QR, detT} <: AbstractCellValues
     qr::QR         # QuadratureRule
     detJdV::detT   # AbstractVector{<:Number} or Nothing
 end
-function CellValues(::Type{T}, qr::QuadratureRule, ip_fun::Interpolation, ip_geo::VectorizedInterpolation,
-        ::ValuesUpdateFlags{FunDiffOrder, GeoDiffOrder, DetJdV}) where {T, FunDiffOrder, GeoDiffOrder, DetJdV}
+function CellValues(
+        ::Type{T}, qr::QuadratureRule, ip_fun::Interpolation, ip_geo::VectorizedInterpolation,
+        ::ValuesUpdateFlags{FunDiffOrder, GeoDiffOrder, DetJdV}
+    ) where {T, FunDiffOrder, GeoDiffOrder, DetJdV}
 
     geo_mapping = GeometryMapping{GeoDiffOrder}(T, ip_geo.ip, qr)
     fun_values = FunctionValues{FunDiffOrder}(T, ip_fun, qr, ip_geo)
@@ -56,10 +58,10 @@ function CellValues(::Type{T}, qr::QuadratureRule, ip_fun::Interpolation, ip_geo
 end
 
 CellValues(qr::QuadratureRule, ip::Interpolation, args...; kwargs...) = CellValues(Float64, qr, ip, args...; kwargs...)
-function CellValues(::Type{T}, qr, ip::Interpolation, ip_geo::ScalarInterpolation; kwargs...) where T
+function CellValues(::Type{T}, qr, ip::Interpolation, ip_geo::ScalarInterpolation; kwargs...) where {T}
     return CellValues(T, qr, ip, VectorizedInterpolation(ip_geo); kwargs...)
 end
-function CellValues(::Type{T}, qr::QuadratureRule, ip::Interpolation, ip_geo::VectorizedInterpolation = default_geometric_interpolation(ip); kwargs...) where T
+function CellValues(::Type{T}, qr::QuadratureRule, ip::Interpolation, ip_geo::VectorizedInterpolation = default_geometric_interpolation(ip); kwargs...) where {T}
     return CellValues(T, qr, ip, ip_geo, ValuesUpdateFlags(ip; kwargs...))
 end
 
@@ -76,6 +78,7 @@ getdetJdV(cv::CellValues, q_point::Int) = cv.detJdV[q_point]
 getdetJdV(::CellValues{<:Any, <:Any, <:Any, Nothing}, ::Int) = throw(ArgumentError("detJdV is not saved in CellValues"))
 
 # Accessors for function values
+get_fun_values(cv::CellValues) = cv.fun_values
 getnbasefunctions(cv::CellValues) = getnbasefunctions(cv.fun_values)
 function_interpolation(cv::CellValues) = function_interpolation(cv.fun_values)
 function_difforder(cv::CellValues) = function_difforder(cv.fun_values)
@@ -95,10 +98,11 @@ getnquadpoints(cv::CellValues) = getnquadpoints(cv.qr)
     detJ = calculate_detJ(getjacobian(mapping))
     detJ > 0.0 || throw_detJ_not_pos(detJ)
     @inbounds detJvec[q_point] = detJ * w
+    return
 end
 @inline _update_detJdV!(::Nothing, q_point, w, mapping) = nothing
 
-@inline function reinit!(cv::CellValues, x::AbstractVector)
+@inline function reinit!(cv::AbstractCellValues, x::AbstractVector)
     return reinit!(cv, nothing, x)
 end
 
@@ -108,7 +112,7 @@ function reinit!(cv::CellValues, cell::Union{AbstractCell, Nothing}, x::Abstract
     n_geom_basefuncs = getngeobasefunctions(geo_mapping)
 
     check_reinit_sdim_consistency(:CellValues, shape_gradient_type(cv), eltype(x))
-    if cell === nothing && !isa(mapping_type(fun_values), IdentityMapping)
+    if cell === nothing && reinit_needs_cell(cv)
         throw(ArgumentError("The cell::AbstractCell input is required to reinit! non-identity function mappings"))
     end
     if !checkbounds(Bool, x, 1:n_geom_basefuncs) || length(x) != n_geom_basefuncs
@@ -129,10 +133,11 @@ function Base.show(io::IO, d::MIME"text/plain", cv::CellValues)
     vdim = isa(shape_value(cv, 1, 1), Vec) ? length(shape_value(cv, 1, 1)) : 0
     GradT = shape_gradient_type(cv)
     sdim = GradT === nothing ? nothing : sdim_from_gradtype(GradT)
-    vstr = vdim==0 ? "scalar" : "vdim=$vdim"
+    vstr = vdim == 0 ? "scalar" : "vdim=$vdim"
     print(io, "CellValues(", vstr, ", rdim=$rdim, and sdim=$sdim): ")
     print(io, getnquadpoints(cv), " quadrature points")
     print(io, "\n Function interpolation: "); show(io, d, ip_fun)
-    print(io, "\nGeometric interpolation: ");
+    print(io, "\nGeometric interpolation: ")
     sdim === nothing ? show(io, d, ip_geo) : show(io, d, ip_geo^sdim)
+    return
 end

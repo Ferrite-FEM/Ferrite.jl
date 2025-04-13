@@ -1,57 +1,63 @@
 @testset "grid boundary" begin
     function _extractboundary(grid::Ferrite.AbstractGrid{3}, topology::ExclusiveTopology, _ftype::Function)
-        return union((  _ftype(grid, topology, x -> x[3] ≈ -1.0),
-                        _ftype(grid, topology, x -> x[3] ≈  1.0),
-                        _ftype(grid, topology, x -> x[1] ≈  1.0),
-                        _ftype(grid, topology, x -> x[1] ≈ -1.0),
-                        _ftype(grid, topology, x -> x[2] ≈  1.0),
-                        _ftype(grid, topology, x -> x[2] ≈ -1.0))...)
+        return union(
+            _ftype(grid, topology, x -> x[3] ≈ -1.0),
+            _ftype(grid, topology, x -> x[3] ≈ 1.0),
+            _ftype(grid, topology, x -> x[1] ≈ 1.0),
+            _ftype(grid, topology, x -> x[1] ≈ -1.0),
+            _ftype(grid, topology, x -> x[2] ≈ 1.0),
+            _ftype(grid, topology, x -> x[2] ≈ -1.0),
+        )
     end
     function _extractboundary(grid::Ferrite.AbstractGrid{2}, topology::ExclusiveTopology, _ftype::Function)
-        return union((  _ftype(grid, topology, x -> x[1] ≈  1.0),
-                        _ftype(grid, topology, x -> x[1] ≈ -1.0),
-                        _ftype(grid, topology, x -> x[2] ≈  1.0),
-                        _ftype(grid, topology, x -> x[2] ≈ -1.0))...)
+        return union(
+            _ftype(grid, topology, x -> x[1] ≈ 1.0),
+            _ftype(grid, topology, x -> x[1] ≈ -1.0),
+            _ftype(grid, topology, x -> x[2] ≈ 1.0),
+            _ftype(grid, topology, x -> x[2] ≈ -1.0),
+        )
     end
     function extractboundary(grid::Ferrite.AbstractGrid{3}, topology::ExclusiveTopology)
-        facets   = _extractboundary(grid, topology, Ferrite.create_boundaryfacetset)
-        faces    = _extractboundary(grid, topology, Ferrite.create_boundaryfaceset)
-        edges    = _extractboundary(grid, topology, Ferrite.create_boundaryedgeset)
+        facets = _extractboundary(grid, topology, Ferrite.create_boundaryfacetset)
+        faces = _extractboundary(grid, topology, Ferrite.create_boundaryfaceset)
+        edges = _extractboundary(grid, topology, Ferrite.create_boundaryedgeset)
         vertices = _extractboundary(grid, topology, Ferrite.create_boundaryvertexset)
         return union(facets, faces, edges, vertices)
     end
     function extractboundary(grid::Ferrite.AbstractGrid{2}, topology::ExclusiveTopology)
-        facets   = _extractboundary(grid, topology, Ferrite.create_boundaryfacetset)
-        edges    = _extractboundary(grid, topology, Ferrite.create_boundaryedgeset)
+        facets = _extractboundary(grid, topology, Ferrite.create_boundaryfacetset)
+        edges = _extractboundary(grid, topology, Ferrite.create_boundaryedgeset)
         vertices = _extractboundary(grid, topology, Ferrite.create_boundaryvertexset)
         return union(facets, edges, vertices)
     end
     function _extractboundarycheck(grid::Ferrite.AbstractGrid{3}, _ftype::Function)
-        return union((
-        _ftype(grid, x -> x[3] ≈ -1.0),
-        _ftype(grid, x -> x[3] ≈  1.0),
-        _ftype(grid, x -> x[1] ≈  1.0),
-        _ftype(grid, x -> x[1] ≈ -1.0),
-        _ftype(grid, x -> x[2] ≈  1.0),
-        _ftype(grid, x -> x[2] ≈ -1.0))...)
+        return union(
+            _ftype(grid, x -> x[3] ≈ -1.0),
+            _ftype(grid, x -> x[3] ≈ 1.0),
+            _ftype(grid, x -> x[1] ≈ 1.0),
+            _ftype(grid, x -> x[1] ≈ -1.0),
+            _ftype(grid, x -> x[2] ≈ 1.0),
+            _ftype(grid, x -> x[2] ≈ -1.0),
+        )
     end
     function _extractboundarycheck(grid::Ferrite.AbstractGrid{2}, _ftype::Function)
-        return union((
-        _ftype(grid, x -> x[1] ≈  1.0),
-        _ftype(grid, x -> x[1] ≈ -1.0),
-        _ftype(grid, x -> x[2] ≈  1.0),
-        _ftype(grid, x -> x[2] ≈ -1.0))...)
+        return union(
+            _ftype(grid, x -> x[1] ≈ 1.0),
+            _ftype(grid, x -> x[1] ≈ -1.0),
+            _ftype(grid, x -> x[2] ≈ 1.0),
+            _ftype(grid, x -> x[2] ≈ -1.0),
+        )
     end
     function extractboundarycheck(grid::Ferrite.AbstractGrid{3})
-        faces    = _extractboundarycheck(grid, Ferrite.create_faceset)
-        facets   = _extractboundarycheck(grid, Ferrite.create_facetset)
-        edges    = _extractboundarycheck(grid, Ferrite.create_edgeset)
+        faces = _extractboundarycheck(grid, Ferrite.create_faceset)
+        facets = _extractboundarycheck(grid, Ferrite.create_facetset)
+        edges = _extractboundarycheck(grid, Ferrite.create_edgeset)
         vertices = _extractboundarycheck(grid, Ferrite.create_vertexset)
         return union(facets, faces, edges, vertices)
     end
     function extractboundarycheck(grid::Ferrite.AbstractGrid{2})
-        facets   = _extractboundarycheck(grid, Ferrite.create_facetset)
-        edges    = _extractboundarycheck(grid, Ferrite.create_edgeset)
+        facets = _extractboundarycheck(grid, Ferrite.create_facetset)
+        edges = _extractboundarycheck(grid, Ferrite.create_edgeset)
         vertices = _extractboundarycheck(grid, Ferrite.create_vertexset)
         return union(facets, edges, vertices)
     end
@@ -164,34 +170,54 @@
     end
     =#
     @testset "addboundaryset ($cell_type)" for cell_type in [
-        # Line, # topology construction error
-        # QuadraticLine, # topology construction error
+            # Line, # topology construction error
+            # QuadraticLine, # topology construction error
 
-        Triangle,
-        QuadraticTriangle,
+            Triangle,
+            QuadraticTriangle,
 
-        Quadrilateral,
-        QuadraticQuadrilateral,
+            Quadrilateral,
+            QuadraticQuadrilateral,
 
-        Tetrahedron,
-        # QuadraticTetrahedron, # grid construction error
+            Tetrahedron,
+            # QuadraticTetrahedron, # grid construction error
 
-        Hexahedron,
-        # QuadraticHexahedron, # grid construction error
-        # Wedge, # grid construction error (nfacepoints)
+            Hexahedron,
+            # QuadraticHexahedron, # grid construction error
+            # Wedge, # grid construction error (nfacepoints)
 
-        # SerendipityQuadraticQuadrilateral, # grid construction error
-        SerendipityQuadraticHexahedron
-    ]
+            # SerendipityQuadraticQuadrilateral, # grid construction error
+            SerendipityQuadraticHexahedron,
+        ]
         # Grid tests - Regression test for https://github.com/Ferrite-FEM/Ferrite.jl/discussions/565
-        grid = generate_grid(cell_type, ntuple(i->3, Ferrite.getrefdim(cell_type)))
+        grid = generate_grid(cell_type, ntuple(i -> 3, Ferrite.getrefdim(cell_type)))
         topology = ExclusiveTopology(grid)
         @test extractboundary(grid, topology) == extractboundarycheck(grid)
 
         filter_function(x) = x[1] > 0
+        # Test that the sets are actually addeed to the grid's dict
         addboundaryvertexset!(grid, topology, "test_boundary_vertexset", filter_function)
         @test getvertexset(grid, "test_boundary_vertexset") == Ferrite.create_boundaryvertexset(grid, topology, filter_function)
         addboundaryfacetset!(grid, topology, "test_boundary_facetset", filter_function)
         @test getfacetset(grid, "test_boundary_facetset") == Ferrite.create_boundaryfacetset(grid, topology, filter_function)
+    end
+
+    @testset "mixed grid 3D" begin
+        nodes = reshape([Node(Vec(x, y, z)) for x in -1:1, y in -1:1, z in 0:1], :)
+        grid = Grid([Hexahedron((1, 2, 5, 4, 7, 8, 11, 10)), Wedge((2, 3, 5, 8, 9, 11))], nodes)
+        topology = ExclusiveTopology(grid)
+        addboundaryfacetset!(grid, topology, "boundary", _ -> true)
+        @test getfacetset(grid, "boundary") == Set([FacetIndex(1, 1), FacetIndex(1, 2), FacetIndex(1, 4), FacetIndex(1, 5), FacetIndex(1, 6), FacetIndex(2, 1), FacetIndex(2, 2), FacetIndex(2, 4), FacetIndex(2, 5)])
+    end
+    @testset "mixed grid 2D" begin
+        nodes = [Node((-1.0, 0.0)), Node((0.0, 0.0)), Node((1.0, 0.0)), Node((-1.0, 1.0)), Node((0.0, 1.0))]
+        cells = [
+            Quadrilateral((1, 2, 5, 4)),
+            Triangle((3, 5, 2)),
+        ]
+        grid = Grid(cells, nodes)
+        topology = ExclusiveTopology(grid)
+        addboundaryfacetset!(grid, topology, "boundary", _ -> true)
+        @test getfacetset(grid, "boundary") == Set([FacetIndex(1, 1), FacetIndex(1, 3), FacetIndex(1, 4), FacetIndex(2, 1), FacetIndex(2, 3)])
     end
 end

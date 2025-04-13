@@ -2,7 +2,7 @@
 using Ferrite
 ```
 
-# Degrees of Freedom
+# Degrees of freedom
 
 The distribution and numbering of degrees of freedom (dofs) are handled by the `DofHandler`.
 The DofHandler will be used to query information about the dofs. For example we can obtain
@@ -40,7 +40,9 @@ dofs for the fields we added.
 close!(dh)
 ```
 
-## Ordering of Dofs
+## Ordering of dofs
 
-ordered in the same order as we add to dofhandler
-vertices -> edges -> faces -> volumes
+!!! todo
+    Describe dof ordering within elements (vertices -> edges -> faces ->
+    volumes) and `dof_range`.
+    Describe (global) dof renumbering

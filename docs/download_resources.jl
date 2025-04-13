@@ -10,6 +10,8 @@ for (file, url) in [
         "porous_media.gif" => "https://raw.githubusercontent.com/Ferrite-FEM/Ferrite.jl/gh-pages/assets/porous_media.gif",
         "reactive_surface.gif" => "https://raw.githubusercontent.com/Ferrite-FEM/Ferrite.jl/gh-pages/assets/reactive_surface.gif",
         "nsdiffeq.gif" => "https://raw.githubusercontent.com/Ferrite-FEM/Ferrite.jl/gh-pages/assets/nsdiffeq.gif",
+        "linear_elasticity.svg" => "https://raw.githubusercontent.com/Ferrite-FEM/Ferrite.jl/gh-pages/assets/linear_elasticity.svg",
+        "linear_elasticity_stress.png" => "https://raw.githubusercontent.com/Ferrite-FEM/Ferrite.jl/gh-pages/assets/linear_elasticity_stress.png",
     ]
     afile = joinpath(directory, file)
     if !isfile(afile)

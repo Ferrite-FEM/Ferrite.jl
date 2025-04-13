@@ -1,10 +1,10 @@
 # We check for a divergence free velocity field in the CI                      #src
- if isdefined(Main, :is_ci) #hide
-     IS_CI = Main.is_ci     #hide
- else                       #hide
-     IS_CI = false          #hide
- end                        #hide
- nothing                    #hide
+if isdefined(Main, :is_ci) #hide
+    IS_CI = Main.is_ci     #hide
+else                       #hide
+    IS_CI = false          #hide
+end                        #hide
+nothing                    #hide
 # # [Incompressible Navier-Stokes equations via DifferentialEquations.jl](@id tutorial-ins-ordinarydiffeq)
 #
 # ![nsdiffeq](nsdiffeq.gif)
@@ -13,7 +13,7 @@
 # In this example we focus on a simple but visually appealing problem from
 # fluid dynamics, namely vortex shedding. This problem is also known as
 # [von-Karman vortex streets](https://en.wikipedia.org/wiki/K%C3%A1rm%C3%A1n_vortex_street). Within this example, we show how to utilize [DifferentialEquations.jl](https://github.com/SciML/DifferentialEquations.jl)
-# in tandem with Ferrite.jl to solve this space-time problem. To keep things simple we use a naive approach
+# in tandem with Ferrite to solve this space-time problem. To keep things simple we use a naive approach
 # to discretize the system.
 #
 # ## Remarks on DifferentialEquations.jl
@@ -67,7 +67,7 @@
 # $\nu \partial_{\textrm{n}} v - p n = 0$ to model outflow. With these boundary conditions we can choose the zero solution as a
 # feasible initial condition.
 #
-# ### Derivation of Semi-Discrete Weak Form
+# ### Derivation of semi-discrete weak form
 #
 # By multiplying test functions $\varphi$ and $\psi$ from a suitable test function space on the strong form,
 # followed by integrating over the domain and applying partial integration to the pressure and viscosity terms
@@ -119,16 +119,16 @@
 # The full program, without comments, can be found in the next [section](@ref ns_vs_diffeq-plain-program).
 #
 # First we load Ferrite and some other packages we need
-using Ferrite, SparseArrays, BlockArrays, LinearAlgebra, UnPack, LinearSolve
+using Ferrite, SparseArrays, BlockArrays, LinearAlgebra, UnPack, LinearSolve, WriteVTK
 # Since we do not need the complete DifferentialEquations suite, we just load the required ODE infrastructure, which can also handle
 # DAEs in mass matrix form.
 using OrdinaryDiffEq
 
 # We start off by defining our only material parameter.
-ν = 1.0/1000.0; #dynamic viscosity
+ν = 1.0 / 1000.0; #dynamic viscosity
 
 # Next a rectangular grid with a cylinder in it has to be generated.
-# We use `Gmsh` for the creation of the mesh and `FerriteGmsh` to translate it to a `Ferrite.Grid`.
+# We use Gmsh.jl for the creation of the mesh and FerriteGmsh.jl to translate it to a `Ferrite.Grid`.
 # Note that the mesh is pretty fine, leading to a high memory consumption when
 # feeding the equation system to direct solvers.
 using FerriteGmsh
@@ -139,13 +139,15 @@ dim = 2;
 # We specify first the rectangle, the cylinder, the surface spanned by the cylinder
 # and the boolean difference of rectangle and cylinder.
 if !IS_CI                                                                                           #hide
+    # runic: off                                                                                    #src
 rect_tag = gmsh.model.occ.add_rectangle(0, 0, 0, 1.1, 0.41)
 circle_tag = gmsh.model.occ.add_circle(0.2, 0.2, 0, 0.05)
 circle_curve_tag = gmsh.model.occ.add_curve_loop([circle_tag])
 circle_surf_tag = gmsh.model.occ.add_plane_surface([circle_curve_tag])
-gmsh.model.occ.cut([(dim,rect_tag)],[(dim,circle_surf_tag)]);
+gmsh.model.occ.cut([(dim, rect_tag)], [(dim, circle_surf_tag)])
+    # runic: on                                                                                     #src
 else                                                                                                #hide
-rect_tag = gmsh.model.occ.add_rectangle(0, 0, 0, 0.55, 0.41);                                       #hide
+    rect_tag = gmsh.model.occ.add_rectangle(0, 0, 0, 0.55, 0.41)                                    #hide
 end                                                                                                 #hide
 nothing                                                                                             #hide
 # Now, the geometrical entities need to be synchronized in order to be available outside
@@ -153,33 +155,35 @@ nothing                                                                         
 gmsh.model.occ.synchronize()
 # In the next lines, we add the physical groups needed to define boundary conditions.
 if !IS_CI                                                                                           #hide
-bottomtag = gmsh.model.model.add_physical_group(dim-1,[6],-1,"bottom")
-lefttag = gmsh.model.model.add_physical_group(dim-1,[7],-1,"left")
-righttag = gmsh.model.model.add_physical_group(dim-1,[8],-1,"right")
-toptag = gmsh.model.model.add_physical_group(dim-1,[9],-1,"top")
-holetag = gmsh.model.model.add_physical_group(dim-1,[5],-1,"hole");
+    # runic: off                                                                                    #src
+bottomtag = gmsh.model.model.add_physical_group(dim - 1, [6], -1, "bottom")
+lefttag = gmsh.model.model.add_physical_group(dim - 1, [7], -1, "left")
+righttag = gmsh.model.model.add_physical_group(dim - 1, [8], -1, "right")
+toptag = gmsh.model.model.add_physical_group(dim - 1, [9], -1, "top")
+holetag = gmsh.model.model.add_physical_group(dim - 1, [5], -1, "hole")
+    # runic: on                                                                                     #src
 else                                                                                                #hide
-gmsh.model.model.add_physical_group(dim-1,[4],7,"left")                                             #hide
-gmsh.model.model.add_physical_group(dim-1,[3],8,"top")                                              #hide
-gmsh.model.model.add_physical_group(dim-1,[2],9,"right")                                            #hide
-gmsh.model.model.add_physical_group(dim-1,[1],10,"bottom");                                         #hide
-end #hide
+    gmsh.model.model.add_physical_group(dim - 1, [4], 7, "left")                                    #hide
+    gmsh.model.model.add_physical_group(dim - 1, [3], 8, "top")                                     #hide
+    gmsh.model.model.add_physical_group(dim - 1, [2], 9, "right")                                   #hide
+    gmsh.model.model.add_physical_group(dim - 1, [1], 10, "bottom")                                 #hide
+end                                                                                                 #hide
 nothing                                                                                             #hide
 # Since we want a quad mesh, we specify the meshing algorithm to the quasi structured quad one.
 # For a complete list, [see the Gmsh docs](https://gmsh.info/doc/texinfo/gmsh.html#Mesh-options-list).
-gmsh.option.setNumber("Mesh.Algorithm",11)
-gmsh.option.setNumber("Mesh.MeshSizeFromCurvature",20)
-gmsh.option.setNumber("Mesh.MeshSizeMax",0.05)
+gmsh.option.setNumber("Mesh.Algorithm", 11)
+gmsh.option.setNumber("Mesh.MeshSizeFromCurvature", 20)
+gmsh.option.setNumber("Mesh.MeshSizeMax", 0.05)
 if IS_CI                                                                                            #hide
-gmsh.option.setNumber("Mesh.MeshSizeFromCurvature",20)                                              #hide
-gmsh.option.setNumber("Mesh.MeshSizeMax",0.15)                                                      #hide
+    gmsh.option.setNumber("Mesh.MeshSizeFromCurvature", 20)                                         #hide
+    gmsh.option.setNumber("Mesh.MeshSizeMax", 0.15)                                                 #hide
 end                                                                                                 #hide
 # In the next step, the mesh is generated and finally translated.
 gmsh.model.mesh.generate(dim)
 grid = togrid()
 Gmsh.finalize();
 
-#  ### Function Space
+#  ### Function space
 #  To ensure stability we utilize the Taylor-Hood element pair Q2-Q1.
 #  We have to utilize the same quadrature rule for the pressure as for the velocity, because in the weak form the
 #  linear pressure term is tested against a quadratic function.
@@ -195,7 +199,7 @@ add!(dh, :v, ip_v)
 add!(dh, :p, ip_p)
 close!(dh);
 
-# ### Boundary Conditions
+# ### Boundary conditions
 # As in the DFG benchmark we apply no-slip conditions to the top, bottom and
 # cylinder boundary. The no-slip condition states that the velocity of the
 # fluid on this portion of the boundary is fixed to be zero.
@@ -204,10 +208,10 @@ ch = ConstraintHandler(dh);
 nosplip_facet_names = ["top", "bottom", "hole"];
 # No hole for the test present                                          #src
 if IS_CI                                                                #hide
-nosplip_facet_names = ["top", "bottom"]                                 #hide
+    nosplip_facet_names = ["top", "bottom"]                             #hide
 end                                                                     #hide
-∂Ω_noslip = union(getfacetset.((grid, ), nosplip_facet_names)...);
-noslip_bc = Dirichlet(:v, ∂Ω_noslip, (x, t) -> Vec((0.0,0.0)), [1,2])
+∂Ω_noslip = union(getfacetset.((grid,), nosplip_facet_names)...);
+noslip_bc = Dirichlet(:v, ∂Ω_noslip, (x, t) -> Vec((0.0, 0.0)), [1, 2])
 add!(ch, noslip_bc);
 
 # The left boundary has a parabolic inflow with peak velocity of 1.5. This
@@ -220,10 +224,10 @@ add!(ch, noslip_bc);
 # !!! note
 #     The kink in the velocity profile will lead to a discontinuity in the pressure at $t=1$.
 #     This needs to be considered in the DiffEq `init` by providing the keyword argument `d_discontinuities=[1.0]`.
-vᵢₙ(t) = min(t*1.5, 1.5) #inflow velocity
+vᵢₙ(t) = min(t * 1.5, 1.5) #inflow velocity
 
-parabolic_inflow_profile(x,t) = Vec((4*vᵢₙ(t)*x[2]*(0.41-x[2])/0.41^2, 0.0))
-inflow_bc = Dirichlet(:v, ∂Ω_inflow, parabolic_inflow_profile, [1,2])
+parabolic_inflow_profile(x, t) = Vec((4 * vᵢₙ(t) * x[2] * (0.41 - x[2]) / 0.41^2, 0.0))
+inflow_bc = Dirichlet(:v, ∂Ω_inflow, parabolic_inflow_profile, [1, 2])
 add!(ch, inflow_bc);
 
 # The outflow boundary condition has been applied on the right side of the
@@ -235,7 +239,7 @@ add!(ch, inflow_bc);
 close!(ch)
 update!(ch, 0.0);
 
-# ### Linear System Assembly
+# ### Linear system assembly
 # Next we describe how the block mass matrix and the Stokes matrix are assembled.
 #
 # For the block mass matrix $M$ we remember that only the first equation had a time derivative
@@ -369,7 +373,7 @@ jac_sparsity = sparse(K);
 
 # To apply the nonlinear portion of the Navier-Stokes problem we simply hand
 # over the dof handler and cell values to the right-hand-side (RHS) as a parameter.
-# Furthermore the pre-assembled linear part, our Stokes opeartor (which is time independent)
+# Furthermore the pre-assembled linear part, our Stokes operator (which is time independent)
 # is passed to save some additional runtime. To apply the time-dependent Dirichlet BCs, we
 # also need to hand over the constraint handler.
 # The basic idea to apply the Dirichlet BCs consistently is that we copy the
@@ -399,7 +403,7 @@ p = RHSparams(K, ch, dh, cellvalues_v, copy(u₀))
 
 function ferrite_limiter!(u, _, p, t)
     update!(p.ch, t)
-    apply!(u, p.ch)
+    return apply!(u, p.ch)
 end
 
 function navierstokes_rhs_element!(dvₑ, vₑ, cellvalues_v)
@@ -420,12 +424,13 @@ function navierstokes_rhs_element!(dvₑ, vₑ, cellvalues_v)
             dvₑ[j] -= v ⋅ ∇v' ⋅ φⱼ * dΩ
         end
     end
+    return
 end
 
-function navierstokes!(du,u_uc,p::RHSparams,t)
+function navierstokes!(du, u_uc, p::RHSparams, t)
     # Unpack the struct to save some allocations.
     #+
-    @unpack K,ch,dh,cellvalues_v,u = p
+    @unpack K, ch, dh, cellvalues_v, u = p
 
     # We start by applying the time-dependent Dirichlet BCs. Note that we are
     # not allowed to mutate `u_uc`! Furthermore not that we also can not pre-
@@ -455,6 +460,7 @@ function navierstokes!(du,u_uc,p::RHSparams,t)
         navierstokes_rhs_element!(duₑ, vₑ, cellvalues_v)
         assemble!(du, v_celldofs, duₑ)
     end
+    return
 end;
 
 function navierstokes_jac_element!(Jₑ, vₑ, cellvalues_v)
@@ -479,9 +485,10 @@ function navierstokes_jac_element!(Jₑ, vₑ, cellvalues_v)
             end
         end
     end
+    return
 end
 
-function navierstokes_jac!(J,u_uc,p,t)
+function navierstokes_jac!(J, u_uc, p, t)
     # Unpack the struct to save some allocations.
     #+
     @unpack K, ch, dh, cellvalues_v, u = p
@@ -499,7 +506,7 @@ function navierstokes_jac!(J,u_uc,p,t)
     ## Here we assume that J has exactly the same structure as K by construction
     nonzeros(J) .= nonzeros(K)
 
-    assembler = start_assemble(J; fillzero=false)
+    assembler = start_assemble(J; fillzero = false)
 
     ## Assemble variation of the nonlinear term
     n_basefuncs = getnbasefunctions(cellvalues_v)
@@ -519,13 +526,13 @@ function navierstokes_jac!(J,u_uc,p,t)
     # Finally we eliminate the constrained dofs from the Jacobian to
     # decouple them in the nonlinear solver from the remaining system.
     #+
-    apply!(J, ch)
+    return apply!(J, ch)
 end;
 
 # Finally, together with our pre-assembled mass matrix, we are now able to
 # define our problem in mass matrix form.
-rhs = ODEFunction(navierstokes!, mass_matrix=M; jac=navierstokes_jac!, jac_prototype=jac_sparsity)
-problem = ODEProblem(rhs, u₀, (0.0,T), p);
+rhs = ODEFunction(navierstokes!, mass_matrix = M; jac = navierstokes_jac!, jac_prototype = jac_sparsity)
+problem = ODEProblem(rhs, u₀, (0.0, T), p);
 
 # All norms must not depend on constrained dofs. A problem with the presented implementation
 # is that we are currently unable to strictly enforce constraint everywhere in the internal
@@ -550,7 +557,7 @@ end
 # To visualize the result we export the grid and our fields
 # to VTK-files, which can be viewed in [ParaView](https://www.paraview.org/)
 # by utilizing the corresponding pvd file.
-timestepper = Rodas5P(autodiff=false, step_limiter! = ferrite_limiter!);
+timestepper = Rodas5P(autodiff = false, step_limiter! = ferrite_limiter!);
 # timestepper = ImplicitEuler(nlsolve=NonlinearSolveAlg(OrdinaryDiffEq.NonlinearSolve.NewtonRaphson(autodiff=OrdinaryDiffEq.AutoFiniteDiff()); max_iter=50), step_limiter! = ferrite_limiter!) #src
 #NOTE!   This is left for future reference                                #src
 # function algebraicmultigrid(W,du,u,p,t,newW,Plprev,Prprev,solverdata)   #src
@@ -566,23 +573,24 @@ timestepper = Rodas5P(autodiff=false, step_limiter! = ferrite_limiter!);
 # !!! info "Debugging convergence issues"
 #     We can obtain some debug information from OrdinaryDiffEq by wrapping the following section into a [debug logger](https://docs.julialang.org/en/v1/stdlib/Logging/#Example:-Enable-debug-level-messages).
 integrator = init(
-    problem, timestepper; initializealg=NoInit(), dt=Δt₀,
-    adaptive=true, abstol=1e-4, reltol=1e-5,
-    progress=true, progress_steps=1,
-    verbose=true, internalnorm=FreeDofErrorNorm(ch), d_discontinuities=[1.0]
+    problem, timestepper; initializealg = NoInit(), dt = Δt₀,
+    adaptive = true, abstol = 1.0e-4, reltol = 1.0e-5,
+    progress = true, progress_steps = 1,
+    verbose = true, internalnorm = FreeDofErrorNorm(ch), d_discontinuities = [1.0]
 );
 
 
 # !!! note "Export of solution"
 #     Exporting interpolated solutions of problems containing mass matrices is currently broken.
 #     Thus, the `intervals` iterator is used. Note that `solve` holds all solutions in the memory.
-pvd = VTKFileCollection("vortex-street", grid);
-for (u,t) in intervals(integrator)
-    addstep!(pvd, t) do io
-        write_solution(io, dh, u)
+pvd = paraview_collection("vortex-street")
+for (step, (u, t)) in enumerate(intervals(integrator))
+    VTKGridFile("vortex-street-$step", dh) do vtk
+        write_solution(vtk, dh, u)
+        pvd[t] = vtk
     end
 end
-close(pvd);
+vtk_save(pvd);
 
 
 using Test                                                                      #hide
@@ -593,11 +601,11 @@ if IS_CI                                                                        
             Ferrite.reinit!(cellvalues_v, cell)                                 #hide
             for q_point in 1:getnquadpoints(cellvalues_v)                       #hide
                 dΩ = getdetJdV(cellvalues_v, q_point)                           #hide
-                                                                                #hide
+                #hide
                 all_celldofs = celldofs(cell)                                   #hide
                 v_celldofs = all_celldofs[dof_range(dh, :v)]                    #hide
                 v_cell = u[v_celldofs]                                          #hide
-                                                                                #hide
+                #hide
                 divv += function_divergence(cellvalues_v, q_point, v_cell) * dΩ #hide
             end                                                                 #hide
         end                                                                     #hide
@@ -606,8 +614,8 @@ if IS_CI                                                                        
     let                                                                         #hide
         u = copy(integrator.u)                                                  #hide
         Δdivv = abs(compute_divergence(dh, u, cellvalues_v))                    #hide
-        @test isapprox(Δdivv, 0.0, atol=1e-12)                                  #hide
-                                                                                #hide
+        @test isapprox(Δdivv, 0.0, atol = 1.0e-12)                              #hide
+        #hide
         Δv = 0.0                                                                #hide
         for cell in CellIterator(dh)                                            #hide
             Ferrite.reinit!(cellvalues_v, cell)                                 #hide
@@ -619,11 +627,11 @@ if IS_CI                                                                        
                 dΩ = getdetJdV(cellvalues_v, q_point)                           #hide
                 coords_qp = spatial_coordinate(cellvalues_v, q_point, coords)   #hide
                 v = function_value(cellvalues_v, q_point, v_cell)               #hide
-                Δv += norm(v - parabolic_inflow_profile(coords_qp, T))^2*dΩ     #hide
+                Δv += norm(v - parabolic_inflow_profile(coords_qp, T))^2 * dΩ   #hide
             end                                                                 #hide
         end                                                                     #hide
-        @test isapprox(sqrt(Δv), 0.0, atol=1e-3)                                #hide
-    end;                                                                        #hide
+        @test isapprox(sqrt(Δv), 0.0, atol = 1.0e-3)                            #hide
+    end                                                                         #hide
     nothing                                                                     #hide
 end                                                                             #hide
 

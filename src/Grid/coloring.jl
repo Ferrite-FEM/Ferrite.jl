@@ -1,5 +1,5 @@
 # Incidence matrix for element connections in the grid
-function create_incidence_matrix(g::AbstractGrid, cellset=1:getncells(g))
+function create_incidence_matrix(g::AbstractGrid, cellset = 1:getncells(g))
     cell_containing_node = Dict{Int, Set{Int}}()
     for cellid in cellset
         cell = getcells(g, cellid)
@@ -9,7 +9,7 @@ function create_incidence_matrix(g::AbstractGrid, cellset=1:getncells(g))
         end
     end
 
-    I, J, V = Int[], Int[], Bool[]
+    I, J = Int[], Int[]
     for (_, cells) in cell_containing_node
         for cell1 in cells # All these cells have a neighboring node
             for cell2 in cells
@@ -17,20 +17,20 @@ function create_incidence_matrix(g::AbstractGrid, cellset=1:getncells(g))
                 if cell1 != cell2
                     push!(I, cell1)
                     push!(J, cell2)
-                    push!(V, true)
                 end
             end
         end
     end
 
-    incidence_matrix = sparse(I, J, V, getncells(g), getncells(g))
+    incidence_matrix = SparseArrays.spzeros!(Bool, I, J, getncells(g), getncells(g))
+    fill!(incidence_matrix.nzval, true)
     return incidence_matrix
 end
 
 # Greedy algorithm for coloring a grid such that no two cells with the same node
 # have the same color
-function greedy_coloring(incidence_matrix, cells=1:size(incidence_matrix, 1))
-    cell_colors = Dict{Int,Int}(i => 0 for i in cells) # Zero represents no color set yet
+function greedy_coloring(incidence_matrix, cells = 1:size(incidence_matrix, 1))
+    cell_colors = Dict{Int, Int}(i => 0 for i in cells) # Zero represents no color set yet
     occupied_colors = Set{Int}()
     final_colors = Vector{Int}[]
     total_colors = 0
@@ -96,11 +96,11 @@ function workstream_coloring(incidence_matrix, cellset)
             # Loop over all elements in previous zone and add their neighbouring elements
             # unless they are in any of the previous 2 zones.
             empty_zone = true
-            for c in get(zones, Z-1, Z0)
+            for c in get(zones, Z - 1, Z0)
                 c ∈ cellset || continue # technically not needed as long as incidence matrix is created with cellset
                 for r in nzrange(incidence_matrix, c)
                     cell_neighbour = incidence_matrix.rowval[r]
-                    if !(cell_neighbour in get(zones, Z-2, Z0) || cell_neighbour in get(zones, Z-1, Z0))
+                    if !(cell_neighbour in get(zones, Z - 2, Z0) || cell_neighbour in get(zones, Z - 1, Z0))
                         push!(s, cell_neighbour)
                         empty_zone = false
                     end
@@ -124,7 +124,7 @@ function workstream_coloring(incidence_matrix, cellset)
     ################
     # 3. Gathering #
     ################
-    Nodd,  Zodd  = findmax(x -> isodd(x)  ? length(zone_colors[x]) : typemin(Int), 1:length(zone_colors))
+    Nodd, Zodd = findmax(x -> isodd(x) ? length(zone_colors[x]) : typemin(Int), 1:length(zone_colors))
     Neven, Zeven = findmax(x -> iseven(x) ? length(zone_colors[x]) : typemin(Int), 1:length(zone_colors))
     N = Nodd + Neven
     final_colors = append!(zone_colors[Zodd], zone_colors[Zeven]) # Reuse these for output
@@ -137,7 +137,7 @@ function workstream_coloring(incidence_matrix, cellset)
 
         empty!(used_for_zone)
 
-        for local_color in sortperm(zone_color_vectors; by=length, rev=true)
+        for local_color in sortperm(zone_color_vectors; by = length, rev = true)
             cond = odd ? (x -> x <= Nodd) : (x -> x > Nodd)
             _, global_color = findmin(x -> (cond(x) && x ∉ used_for_zone) ? color_sizes[x] : typemax(Int), 1:N)
             push!(used_for_zone, global_color)
@@ -179,7 +179,7 @@ Two different algorithms are available, specified with the `alg` keyword argumen
  - `alg = ColoringAlgorithm.Greedy`: greedy algorithm that works well for structured quadrilateral grids such as
    e.g. quadrilateral grids from `generate_grid`.
 
-The resulting colors can be visualized using [`vtk_cell_data_colors`](@ref).
+The resulting colors can be visualized using [`Ferrite.write_cell_colors`](@ref).
 
 !!! note "Cell to color mapping"
     In a previous version of Ferrite this function returned a dictionary mapping
@@ -195,7 +195,7 @@ The resulting colors can be visualized using [`vtk_cell_data_colors`](@ref).
 # References
  - [Turcksin2016](@cite) Turcksin et al. ACM Trans. Math. Softw. 43 (2016).
 """
-function create_coloring(g::AbstractGrid, cellset=1:getncells(g); alg::ColoringAlgorithm.T=ColoringAlgorithm.WorkStream)
+function create_coloring(g::AbstractGrid, cellset = 1:getncells(g); alg::ColoringAlgorithm.T = ColoringAlgorithm.WorkStream)
     incidence_matrix = create_incidence_matrix(g, cellset)
     if alg === ColoringAlgorithm.WorkStream
         return workstream_coloring(incidence_matrix, cellset)

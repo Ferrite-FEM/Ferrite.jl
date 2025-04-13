@@ -22,7 +22,7 @@ Ferrite.BCValues
 ## Internal utilities
 ```@docs
 Ferrite.embedding_det
-Ferrite.shape_value_type
+Ferrite.shape_value_type(::Ferrite.AbstractValues)
 Ferrite.shape_gradient_type
 Ferrite.ValuesUpdateFlags
 ```
@@ -39,7 +39,7 @@ Custom FEValues, `fe_v::AbstractValues`, should normally implement the [`reinit!
   * [`getnquadpoints`](@ref)
   * [`getnbasefunctions`](@ref)
 * [`spatial_coordinate`](@ref), requires
-  * [`geometric_value`](@ref)
+  * [`geometric_value`](@ref Ferrite.geometric_value)
   * `getngeobasefunctions`
   * [`getnquadpoints`](@ref)
 

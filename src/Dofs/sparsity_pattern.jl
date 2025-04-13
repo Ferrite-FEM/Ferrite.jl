@@ -147,9 +147,9 @@ function Base.show(io::IO, ::MIME"text/plain", sp::SparsityPattern)
     println(iob, " - Entries per row (min, max, avg): $(min_entries), $(max_entries), $(avg_entries)")
     # Compute memory estimate
     @assert getnrows(sp) * sizeof(eltype(sp.rows)) == sizeof(sp.rows)
-    bytes_used      = sizeof(sp.rows) + stored_entries * sizeof(Int)
+    bytes_used = sizeof(sp.rows) + stored_entries * sizeof(Int)
     bytes_allocated = sizeof(sp.rows) + PoolAllocator.mempool_stats(sp.mempool)[2]
-    print(iob,   " - Memory estimate: $(Base.format_bytes(bytes_used)) used, $(Base.format_bytes(bytes_allocated)) allocated")
+    print(iob, " - Memory estimate: $(Base.format_bytes(bytes_used)) used, $(Base.format_bytes(bytes_allocated)) allocated")
     write(io, seekstart(iob))
     return
 end
@@ -173,7 +173,7 @@ end
     return x
 end
 
-eachrow(sp::SparsityPattern)           = sp.rows
+eachrow(sp::SparsityPattern) = sp.rows
 eachrow(sp::SparsityPattern, row::Int) = sp.rows[row]
 
 
@@ -329,7 +329,7 @@ function must be called as the *last* step when creating the sparsity pattern.
 function add_constraint_entries!(
         sp::AbstractSparsityPattern, ch::ConstraintHandler;
         keep_constrained::Bool = true,
-)
+    )
     return _add_constraint_entries!(sp, ch.dofcoefficients, ch.dofmapping, keep_constrained)
 end
 
@@ -391,7 +391,7 @@ allocate_matrix(MatrixType, sp)
 ````
 
 Refer to [`allocate_matrix`](@ref allocate_matrix(::Type{<:Any}, ::SparsityPattern)) for
-supported matrix types, and to [`create_sparsity_pattern`](@ref) for details about supported
+supported matrix types, and to [`init_sparsity_pattern`](@ref) for details about supported
 arguments `args` and keyword arguments `kwargs`.
 
 !!! note
@@ -512,7 +512,7 @@ end
 
 function _add_constraint_entries!(
         sp::AbstractSparsityPattern, dofcoefficients::Vector{Union{DofCoefficients{T}, Nothing}},
-        dofmapping::Dict{Int,Int}, keep_constrained::Bool,
+        dofmapping::Dict{Int, Int}, keep_constrained::Bool,
     ) where {T}
 
     # Return early if there are no non-trivial affine constraints
@@ -587,9 +587,11 @@ function _add_constraint_entries!(
     return sp
 end
 
-function _add_interface_entry(sp::SparsityPattern,
+function _add_interface_entry(
+        sp::SparsityPattern,
         cell_field_dofs::Union{Vector{Int}, SubArray}, neighbor_field_dofs::Union{Vector{Int}, SubArray},
-        i::Int, j::Int, keep_constrained::Bool, ch::Union{ConstraintHandler, Nothing})
+        i::Int, j::Int, keep_constrained::Bool, ch::Union{ConstraintHandler, Nothing}
+    )
     dofi = cell_field_dofs[i]
     dofj = neighbor_field_dofs[j]
     # sym && (dofj > dofi && return cnt)
@@ -656,7 +658,7 @@ function _allocate_matrix(::Type{SparseMatrixCSC{Tv, Ti}}, sp::AbstractSparsityP
     for (row, colidxs) in enumerate(eachrow(sp))
         for col in colidxs
             sym && row > col && continue
-            colptr[col+1] += 1
+            colptr[col + 1] += 1
         end
     end
     cumsum!(colptr, colptr)

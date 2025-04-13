@@ -67,34 +67,36 @@ close!(dh)
 # This is a good testing strategy for PDE codes and known as the method of manufactured solutions.
 
 function u_ana(x::Vec{2, T}) where {T}
-    xs = (Vec{2}((-0.5,  0.5)),
-          Vec{2}((-0.5, -0.5)),
-          Vec{2}(( 0.5,  -0.5)))
-    σ = 1/8
+    xs = (
+        Vec{2}((-0.5, 0.5)),
+        Vec{2}((-0.5, -0.5)),
+        Vec{2}((0.5, -0.5)),
+    )
+    σ = 1 / 8
     s = zero(eltype(x))
     for i in 1:3
         s += exp(- norm(x - xs[i])^2 / σ^2)
     end
-    return max(1e-15 * one(T), s) # Denormals, be gone
+    return max(1.0e-15 * one(T), s) # Denormals, be gone
 end;
 
 dbcs = ConstraintHandler(dh)
 # The (strong) Dirichlet boundary condition can be handled automatically by the Ferrite library.
-dbc = Dirichlet(:u, union(getfacetset(grid, "top"), getfacetset(grid, "right")), (x,t) -> u_ana(x))
+dbc = Dirichlet(:u, union(getfacetset(grid, "top"), getfacetset(grid, "right")), (x, t) -> u_ana(x))
 add!(dbcs, dbc)
 close!(dbcs)
 update!(dbcs, 0.0)
 
 K = allocate_matrix(dh);
 
-function doassemble(cellvalues::CellValues, facetvalues::FacetValues,
-                         K::SparseMatrixCSC, dh::DofHandler)
+function doassemble(
+        cellvalues::CellValues, facetvalues::FacetValues, K::SparseMatrixCSC, dh::DofHandler
+    )
     b = 1.0
     f = zeros(ndofs(dh))
     assembler = start_assemble(K, f)
 
     n_basefuncs = getnbasefunctions(cellvalues)
-    global_dofs = zeros(Int, ndofs_per_cell(dh))
 
     fe = zeros(n_basefuncs) # Local force vector
     Ke = zeros(n_basefuncs, n_basefuncs) # Local stiffness mastrix
@@ -136,7 +138,7 @@ function doassemble(cellvalues::CellValues, facetvalues::FacetValues,
         #+
         for facet in 1:nfacets(cell)
             if (cellcount, facet) ∈ getfacetset(grid, "left") ||
-               (cellcount, facet) ∈ getfacetset(grid, "bottom")
+                    (cellcount, facet) ∈ getfacetset(grid, "bottom")
                 reinit!(facetvalues, cell, facet)
                 for q_point in 1:getnquadpoints(facetvalues)
                     coords_qp = spatial_coordinate(facetvalues, q_point, coords)
@@ -151,8 +153,7 @@ function doassemble(cellvalues::CellValues, facetvalues::FacetValues,
             end
         end
 
-        celldofs!(global_dofs, cell)
-        assemble!(assembler, global_dofs, fe, Ke)
+        assemble!(assembler, celldofs(cell), Ke, fe)
     end
     return K, f
 end;
@@ -161,7 +162,7 @@ K, f = doassemble(cellvalues, facetvalues, K, dh);
 apply!(K, f, dbcs)
 u = Symmetric(K) \ f;
 
-vtk = VTKFile("helmholtz", dh)
+vtk = VTKGridFile("helmholtz", dh)
 write_solution(vtk, dh, u)
 close(vtk)
 using Test #src
@@ -169,6 +170,6 @@ using Test #src
 #src the true maximum is slightly bigger then 1.0
 @test maximum(u) ≈ 0.9952772469054607 #src
 @test u_ana(Vec{2}((-0.5, -0.5))) ≈ 1 #src
-@test u_ana(Vec{2}((0.5, -0.5)))  ≈ 1 #src
-@test u_ana(Vec{2}((-0.5, 0.5)))  ≈ 1 #src
+@test u_ana(Vec{2}((0.5, -0.5))) ≈ 1  #src
+@test u_ana(Vec{2}((-0.5, 0.5))) ≈ 1  #src
 println("Helmholtz successful")

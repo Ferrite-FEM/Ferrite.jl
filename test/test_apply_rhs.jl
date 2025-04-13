@@ -1,6 +1,6 @@
 function test_apply_rhs()
     grid = generate_grid(Quadrilateral, (20, 20))
-    ip = Lagrange{RefQuadrilateral,1}()
+    ip = Lagrange{RefQuadrilateral, 1}()
     qr = QuadratureRule{RefQuadrilateral}(2)
     cellvalues = CellValues(qr, ip)
 
@@ -14,20 +14,20 @@ function test_apply_rhs()
 
     ∂Ω = union(getfacetset.((grid,), ["left", "right"])...)
     dbc = Dirichlet(:u, ∂Ω, (x, t) -> 0)
-    add!(ch, dbc);
+    add!(ch, dbc)
 
     ∂Ω = union(getfacetset.((grid,), ["top", "bottom"])...)
     dbc = Dirichlet(:u, ∂Ω, (x, t) -> 2)
-    add!(ch, dbc);
+    add!(ch, dbc)
 
     close!(ch)
-    update!(ch, 0.0);
+    update!(ch, 0.0)
 
     function doassemble!(
-        cellvalues::CellValues,
-        K::SparseMatrixCSC,
-        dh::DofHandler,
-    )
+            cellvalues::CellValues,
+            K::SparseMatrixCSC,
+            dh::DofHandler,
+        )
 
         n_basefuncs = getnbasefunctions(cellvalues)
         Ke = zeros(n_basefuncs, n_basefuncs)
@@ -42,21 +42,21 @@ function test_apply_rhs()
 
             reinit!(cellvalues, cell)
 
-            for q_point = 1:getnquadpoints(cellvalues)
+            for q_point in 1:getnquadpoints(cellvalues)
                 dΩ = getdetJdV(cellvalues, q_point)
 
-                for i = 1:n_basefuncs
+                for i in 1:n_basefuncs
                     v = shape_value(cellvalues, q_point, i)
                     ∇v = shape_gradient(cellvalues, q_point, i)
                     fe[i] += v * dΩ
-                    for j = 1:n_basefuncs
+                    for j in 1:n_basefuncs
                         ∇u = shape_gradient(cellvalues, q_point, j)
                         Ke[i, j] += (∇v ⋅ ∇u) * dΩ
                     end
                 end
             end
 
-            assemble!(assembler, celldofs(cell), fe, Ke)
+            assemble!(assembler, celldofs(cell), Ke, fe)
         end
         return K, f
     end

@@ -33,17 +33,17 @@ precision (`Float64`, 8 bytes) it would require 8 TB of memory. If instead the s
 99.9973% (which is the case when solving the heat equation on a three dimensional hypercube
 with linear Lagrange interpolation) this would be reduced to 216 MB.
 
-[1]: Structurally nonzero means that there is a possibility of a nonzero value even though
+[^1]: Structurally nonzero means that there is a possibility of a nonzero value even though
      the computed value might become zero in the end for various reasons.
 
-[2]: At least for most practical problems using low order interpolations.
+[^2]: At least for most practical problems using low order interpolations.
 
 
 !!! details "Sparsity pattern example"
 
     To give an example, in this one-dimensional heat problem (see the [Heat
     equation](../tutorials/heat_equation.md) tutorial for the weak form) we have 4 nodes
-    with 3 elements in between. For simplicitly DoF numbers and node numbers are the same
+    with 3 elements in between. For simplicity DoF numbers and node numbers are the same
     but this is not true in general since nodes and DoFs can be numbered independently (and
     in fact are numbered independently in Ferrite).
 

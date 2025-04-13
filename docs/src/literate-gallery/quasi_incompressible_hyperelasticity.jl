@@ -4,13 +4,13 @@
 #-
 #md # !!! tip
 #md #     This example is also available as a Jupyter notebook:
-#md #     [`quasi_incompressible_hyperelasticity.ipynb`](@__NBVIEWER_ROOT_URL__/examples/quasi_incompressible_hyperelasticity.ipynb)
+#md #     [`quasi_incompressible_hyperelasticity.ipynb`](@__NBVIEWER_ROOT_URL__/gallery/quasi_incompressible_hyperelasticity.ipynb)
 #-
 # ## Introduction
 #
 # In this example we study quasi- or nearly-incompressible hyperelasticity using the stable Taylor-Hood approximation. In spirit, this example is the nonlinear analogue of
-# [`incompressible_elasticity`](@__NBVIEWER_ROOT_URL__/examples/incompressible_elasticity.ipynb) and the incompressible analogue of
-# [`hyperelasticity`](@__NBVIEWER_ROOT_URL__/examples/hyperelasticity.ipynb). Much of the code therefore follows from the above two examples.
+# [`incompressible_elasticity`](@__NBVIEWER_ROOT_URL__/tutorials/incompressible_elasticity.ipynb) and the incompressible analogue of
+# [`hyperelasticity`](@__NBVIEWER_ROOT_URL__/tutorials/hyperelasticity.ipynb). Much of the code therefore follows from the above two examples.
 # The problem is formulated in the undeformed or reference configuration with the displacement $\mathbf{u}$ and pressure $p$ being the unknown fields. We now briefly outline
 # the formulation. Consider the standard hyperelasticity problem
 #
@@ -72,7 +72,7 @@
 # ## Implementation
 # We now get to the actual code. First, we import the respective packages
 
-using Ferrite, Tensors, ProgressMeter
+using Ferrite, Tensors, ProgressMeter, WriteVTK
 using BlockArrays, SparseArrays, LinearAlgebra
 
 # and the corresponding `struct` to store our material properties.
@@ -85,11 +85,11 @@ end
 # We then create a function to generate a simple test mesh on which to compute FE solution. We also mark the boundaries
 # to later assign Dirichlet boundary conditions
 function importTestGrid()
-    grid = generate_grid(Tetrahedron, (5, 5, 5), zero(Vec{3}), ones(Vec{3}));
-    addfacetset!(grid, "myBottom", x -> norm(x[2]) ≈ 0.0);
-    addfacetset!(grid, "myBack", x -> norm(x[3]) ≈ 0.0);
-    addfacetset!(grid, "myRight", x -> norm(x[1]) ≈ 1.0);
-    addfacetset!(grid, "myLeft", x -> norm(x[1]) ≈ 0.0);
+    grid = generate_grid(Tetrahedron, (5, 5, 5), zero(Vec{3}), ones(Vec{3}))
+    addfacetset!(grid, "myBottom", x -> norm(x[2]) ≈ 0.0)
+    addfacetset!(grid, "myBack", x -> norm(x[3]) ≈ 0.0)
+    addfacetset!(grid, "myRight", x -> norm(x[1]) ≈ 1.0)
+    addfacetset!(grid, "myLeft", x -> norm(x[1]) ≈ 0.0)
     return grid
 end;
 
@@ -97,7 +97,7 @@ end;
 # follows in a similar fashion from the `incompressible_elasticity` example
 function create_values(interpolation_u, interpolation_p)
     ## quadrature rules
-    qr      = QuadratureRule{RefTetrahedron}(4)
+    qr = QuadratureRule{RefTetrahedron}(4)
     facet_qr = FacetQuadratureRule{RefTetrahedron}(4)
 
     ## cell and facetvalues for u
@@ -116,7 +116,7 @@ function Ψ(F, p, mp::NeoHooke)
     λ = mp.λ
     Ic = tr(tdot(F))
     J = det(F)
-    Js = (λ + p + sqrt((λ + p)^2. + 4. * λ * μ ))/(2. * λ)
+    Js = (λ + p + sqrt((λ + p)^2.0 + 4.0 * λ * μ)) / (2.0 * λ)
     return p * (Js - J) + μ / 2 * (Ic - 3) - μ * log(Js) + λ / 2 * (Js - 1)^2
 end;
 
@@ -141,14 +141,14 @@ function create_dofhandler(grid, ipu, ipp)
 end;
 
 # We are simulating a uniaxial tensile loading of a unit cube. Hence we apply a displacement field (`:u`) in `x` direction on the right face.
-# The left, bottom and back faces are fixed in the `x`, `y` and `z` components of the displacement so as to emulate the uniaxial nature
+# The left, bottom and back facets are fixed in the `x`, `y` and `z` components of the displacement so as to emulate the uniaxial nature
 # of the loading.
 function create_bc(dh)
     dbc = ConstraintHandler(dh)
-    add!(dbc, Dirichlet(:u, getfacetset(dh.grid, "myLeft"), (x,t) -> zero(Vec{1}), [1]))
-    add!(dbc, Dirichlet(:u, getfacetset(dh.grid, "myBottom"), (x,t) -> zero(Vec{1}), [2]))
-    add!(dbc, Dirichlet(:u, getfacetset(dh.grid, "myBack"), (x,t) -> zero(Vec{1}), [3]))
-    add!(dbc, Dirichlet(:u, getfacetset(dh.grid, "myRight"), (x,t) -> t*ones(Vec{1}), [1]))
+    add!(dbc, Dirichlet(:u, getfacetset(dh.grid, "myLeft"), (x, t) -> zero(Vec{1}), [1]))
+    add!(dbc, Dirichlet(:u, getfacetset(dh.grid, "myBottom"), (x, t) -> zero(Vec{1}), [2]))
+    add!(dbc, Dirichlet(:u, getfacetset(dh.grid, "myBack"), (x, t) -> zero(Vec{1}), [3]))
+    add!(dbc, Dirichlet(:u, getfacetset(dh.grid, "myRight"), (x, t) -> t * ones(Vec{1}), [1]))
     close!(dbc)
     Ferrite.update!(dbc, 0.0)
     return dbc
@@ -158,7 +158,7 @@ end;
 # It is easy to show that this is equal to ∫J*dΩ where J=det(F). This can be done at the level of each element (cell)
 function calculate_element_volume(cell, cellvalues_u, ue)
     reinit!(cellvalues_u, cell)
-    evol::Float64=0.0;
+    evol::Float64 = 0.0
     for qp in 1:getnquadpoints(cellvalues_u)
         dΩ = getdetJdV(cellvalues_u, qp)
         ∇u = function_gradient(cellvalues_u, qp, ue)
@@ -171,14 +171,14 @@ end;
 
 # and then assembled over all the cells (elements)
 function calculate_volume_deformed_mesh(w, dh::DofHandler, cellvalues_u)
-    evol::Float64 = 0.0;
+    evol::Float64 = 0.0
     for cell in CellIterator(dh)
         global_dofs = celldofs(cell)
         nu = getnbasefunctions(cellvalues_u)
         global_dofs_u = global_dofs[1:nu]
         ue = w[global_dofs_u]
         δevol = calculate_element_volume(cell, cellvalues_u, ue)
-        evol += δevol;
+        evol += δevol
     end
     return evol
 end;
@@ -211,26 +211,26 @@ function assemble_element!(Ke, fe, cell, cellvalues_u, cellvalues_p, mp, ue, pe)
             ## gradient of the test function
             ∇δui = shape_gradient(cellvalues_u, qp, i)
             ## Add contribution to the residual from this test function
-            fe[BlockIndex((ublock), (i))] += ( ∇δui ⊡ ∂Ψ∂F) * dΩ
+            fe[BlockIndex((ublock), (i))] += (∇δui ⊡ ∂Ψ∂F) * dΩ
 
             ∇δui∂S∂F = ∇δui ⊡ ∂²Ψ∂F²
             for j in 1:n_basefuncs_u
                 ∇δuj = shape_gradient(cellvalues_u, qp, j)
 
                 ## Add contribution to the tangent
-                Ke[BlockIndex((ublock, ublock), (i, j))] += ( ∇δui∂S∂F ⊡ ∇δuj ) * dΩ
+                Ke[BlockIndex((ublock, ublock), (i, j))] += (∇δui∂S∂F ⊡ ∇δuj) * dΩ
             end
             ## Loop over the `p`-test functions
             for j in 1:n_basefuncs_p
                 δp = shape_value(cellvalues_p, qp, j)
                 ## Add contribution to the tangent
-                Ke[BlockIndex((ublock, pblock), (i, j))] += ( ∂²Ψ∂F∂p ⊡ ∇δui ) * δp * dΩ
+                Ke[BlockIndex((ublock, pblock), (i, j))] += (∂²Ψ∂F∂p ⊡ ∇δui) * δp * dΩ
             end
         end
         ## Loop over the `p`-test functions to calculate the `p-`u` and `p`-`p` blocks
         for i in 1:n_basefuncs_p
             δp = shape_value(cellvalues_p, qp, i)
-            fe[BlockIndex((pblock), (i))] += ( δp * ∂Ψ∂p) * dΩ
+            fe[BlockIndex((pblock), (i))] += (δp * ∂Ψ∂p) * dΩ
 
             for j in 1:n_basefuncs_u
                 ∇δuj = shape_gradient(cellvalues_u, qp, j)
@@ -242,12 +242,15 @@ function assemble_element!(Ke, fe, cell, cellvalues_u, cellvalues_p, mp, ue, pe)
             end
         end
     end
+    return
 end;
 
 # The only thing that changes in the assembly of the global stiffness matrix is slicing the corresponding element
 # dofs for the displacement (see `global_dofsu`) and pressure (`global_dofsp`).
-function assemble_global!(K::SparseMatrixCSC, f, cellvalues_u::CellValues,
-                         cellvalues_p::CellValues, dh::DofHandler, mp::NeoHooke, w)
+function assemble_global!(
+        K::SparseMatrixCSC, f, cellvalues_u::CellValues,
+        cellvalues_p::CellValues, dh::DofHandler, mp::NeoHooke, w
+    )
     nu = getnbasefunctions(cellvalues_u)
     np = getnbasefunctions(cellvalues_p)
 
@@ -259,14 +262,15 @@ function assemble_global!(K::SparseMatrixCSC, f, cellvalues_u::CellValues,
     ## Loop over all cells in the grid
     for cell in CellIterator(dh)
         global_dofs = celldofs(cell)
-        global_dofsu = global_dofs[1:nu]; # first nu dofs are displacement
-        global_dofsp = global_dofs[nu + 1:end]; # last np dofs are pressure
+        global_dofsu = global_dofs[1:nu] # first nu dofs are displacement
+        global_dofsp = global_dofs[(nu + 1):end] # last np dofs are pressure
         @assert size(global_dofs, 1) == nu + np # sanity check
         ue = w[global_dofsu] # displacement dofs for the current cell
         pe = w[global_dofsp] # pressure dofs for the current cell
         assemble_element!(ke, fe, cell, cellvalues_u, cellvalues_p, mp, ue, pe)
-        assemble!(assembler, global_dofs, fe, ke)
+        assemble!(assembler, global_dofs, ke, fe)
     end
+    return
 end;
 
 # We now define a main function `solve`. For nonlinear quasistatic problems we often like to parameterize the
@@ -278,8 +282,8 @@ function solve(interpolation_u, interpolation_p)
     grid = importTestGrid()
 
     ## Material parameters
-    μ = 1.
-    λ = 1.E4 * μ
+    μ = 1.0
+    λ = 1.0e4 * μ
     mp = NeoHooke(μ, λ)
 
     ## Create the DofHandler and CellValues
@@ -291,7 +295,7 @@ function solve(interpolation_u, interpolation_p)
 
     ## Pre-allocation of vectors for the solution and Newton increments
     _ndofs = ndofs(dh)
-    w  = zeros(_ndofs)
+    w = zeros(_ndofs)
     ΔΔw = zeros(_ndofs)
     apply!(w, dbc)
 
@@ -301,24 +305,25 @@ function solve(interpolation_u, interpolation_p)
 
     ## We run the simulation parameterized by a time like parameter. `Tf` denotes the final value
     ## of this parameter, and Δt denotes its increment in each step
-    Tf = 2.0;
-    Δt = 0.1;
-    NEWTON_TOL = 1e-8
+    Tf = 2.0
+    Δt = 0.1
+    NEWTON_TOL = 1.0e-8
 
-    pvd = VTKFileCollection("hyperelasticity_incomp_mixed", grid);
-    for t ∈ 0.0:Δt:Tf
+    pvd = paraview_collection("hyperelasticity_incomp_mixed")
+    for (step, t) in enumerate(0.0:Δt:Tf)
         ## Perform Newton iterations
         Ferrite.update!(dbc, t)
         apply!(w, dbc)
         newton_itr = -1
-        prog = ProgressMeter.ProgressThresh(NEWTON_TOL, "Solving @ time $t of $Tf;")
-        fill!(ΔΔw, 0.0);
-        while true; newton_itr += 1
+        prog = ProgressMeter.ProgressThresh(NEWTON_TOL; desc = "Solving @ time $t of $Tf;")
+        fill!(ΔΔw, 0.0)
+        while true
+            newton_itr += 1
             assemble_global!(K, f, cellvalues_u, cellvalues_p, dh, mp, w)
             norm_res = norm(f[Ferrite.free_dofs(dbc)])
             apply_zero!(K, f, dbc)
             ## Only display output at specific load steps
-            if t%(5*Δt) == 0
+            if t % (5 * Δt) == 0
                 ProgressMeter.update!(prog, norm_res; showvalues = [(:iter, newton_itr)])
             end
             if norm_res < NEWTON_TOL
@@ -327,21 +332,22 @@ function solve(interpolation_u, interpolation_p)
                 error("Reached maximum Newton iterations, aborting")
             end
             ## Compute the incremental `dof`-vector (both displacement and pressure)
-            ΔΔw .= K\f;
+            ΔΔw .= K \ f
 
             apply_zero!(ΔΔw, dbc)
             w .-= ΔΔw
-        end;
+        end
 
         ## Save the solution fields
-        addstep!(pvd, t) do io
-            write_solution(io, dh, w)
+        VTKGridFile("hyperelasticity_incomp_mixed_$step", grid) do vtk
+            write_solution(vtk, dh, w)
+            pvd[t] = vtk
         end
-    end;
-    close(pvd);
-    vol_def = calculate_volume_deformed_mesh(w, dh, cellvalues_u);
+    end
+    vtk_save(pvd)
+    vol_def = calculate_volume_deformed_mesh(w, dh, cellvalues_u)
     print("Deformed volume is $vol_def")
-    return vol_def;
+    return vol_def
 end;
 
 # We can now test the solution using the Taylor-Hood approximation
@@ -352,7 +358,7 @@ vol_def = solve(quadratic_u, linear_p)
 # The deformed volume is indeed close to 1 (as should be for a nearly incompressible material).
 
 using Test                #src
-@test isapprox(vol_def, 1.0, atol=1E-3) #src
+@test isapprox(vol_def, 1.0, atol = 1.0e-3) #src
 
 #md # ## Plain program
 #md #
