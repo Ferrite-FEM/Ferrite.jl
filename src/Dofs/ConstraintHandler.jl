@@ -62,43 +62,63 @@ function __to_components(c)
 end
 
 @doc raw"""
-    WeakDirichlet(field_name::Symbol, facets, f::Function; qr_order = -1)
+    WeakDirichlet(field_name::Symbol, facets::AbstractSet{FacetIndex}, f::Function; qr_order = -1)
 
-A `WeakDirichlet` condition enforces conditions for `field_name` on the boundary for
-non-nodal interpolations (e.g. ``H(\mathrm{div})`` or ``H(\mathrm{curl})``) in an weak sense.
+A `WeakDirichlet` condition enforces conditions for `field_name` on the boundary, `facets`, for
+non-nodal interpolations (e.g. ``H(\mathrm{div})`` or ``H(\mathrm{curl})``) in an weak sense,
+i.e. minimizing the L2 error between the function `f(x, t, n)` and the values described
+by the FE approximation on the facet, ``\Gamma^\mathrm{f}``. The arguments to the function are
+the coordinate, ``\boldsymbol{x}``, the time, ``t``, and the facet normal, ``\boldsymbol{n}``.
+The quadrature rule is automatically created, but the default order, `qr_order = 2 * ip_order`
+(may be refined in future releases),
+where `ip_order` is the order of the interpolation, can be overrided if desired.
 
-# ``H(\mathrm{div})`` interpolations
-
-For ``H(\mathrm{div})`` interpolations, we have conditions on the form
+# H(div) interpolations
+For H(div), we want to prescribe the normal flux, ``q_\mathrm{n} = f(\boldsymbol{x}, t, \boldsymbol{n})``.
+To that end, we want to find the degree of freedom values, ``a_j``, associated
+with the the facet that minimizes
 ```math
-\boldsymbol{N}^f_i a^f_i \cdot \boldsymbol{n}^f = q_n = f(\boldsymbol{x}, t, \boldsymbol{n})
+U(\boldsymbol{q}(\boldsymbol{x})) = \int_{\Gamma^\mathrm{f}}
+\left[\boldsymbol{q}(\boldsymbol{x}) \cdot \boldsymbol{n} - f(\boldsymbol{x}, t, \boldsymbol{n}) \right]^2 \mathrm{d}\Gamma
 ```
-
-To satisfy this condition in a weak sense, we multiply with the (arbitrary) test
-function ``\delta q_n \approx \delta\boldsymbol{N}^f_j c^f_j \cdot \boldsymbol{n}^f``,
-and integrate over the facet, ``\Gamma^f``, resulting in
+with ``\boldsymbol{q}(\boldsymbol{x}) = \boldsymbol{N}^\mathrm{f}_j(\boldsymbol{x}) a_j``.
+Finding the stationary point by taking the directional derivative in all possible directions,
+``\delta\boldsymbol{q}(\boldsymbol{x})``, yields,
+```math
+0 = \lim_{\epsilon\rightarrow 0}\frac{\partial}{\partial \epsilon}
+U\big(\boldsymbol{q}(\boldsymbol{x}) + \epsilon \delta\boldsymbol{q}(\boldsymbol{x})\big)
+ = \int_{\Gamma^\mathrm{f}} \left[\boldsymbol{q}(\boldsymbol{x}) \cdot \boldsymbol{n} - f(\boldsymbol{x}, t, \boldsymbol{n})\right]
+    \delta\boldsymbol{q}(\boldsymbol{x}) \cdot \boldsymbol{n}\ \mathrm{d}\Gamma
+```
+Inserting the FE-approximations,
+``\boldsymbol{q}(\boldsymbol{x}) = \boldsymbol{N}^\mathrm{f}_j(\boldsymbol{x}) a_j`` and
+``\delta\boldsymbol{q}(\boldsymbol{x}) = \boldsymbol{N}^\mathrm{f}_i(\boldsymbol{x}) c_i``,
+and using the arbitrariness of ``c_i``, yields the linear equation system,
 ```math
 \underbrace{\int_{\Gamma^f} \left[\delta\boldsymbol{N}^f_i \cdot \boldsymbol{n}^f\right]\left[\boldsymbol{N}^f_j \cdot \boldsymbol{n}^f\right]\ \mathrm{d}\Gamma}_{K^f_{ij}}\ a_j^f
-= \underbrace{\int_{\Gamma^f} \left[\delta\boldsymbol{N}^f_i \cdot \boldsymbol{n}^f\right] q_n\ \mathrm{d}\Gamma}_{f^f_i}
+= \underbrace{\int_{\Gamma^f} \left[\delta\boldsymbol{N}^f_i \cdot \boldsymbol{n}^f\right] f(\boldsymbol{x}, t, \boldsymbol{n})\ \mathrm{d}\Gamma}_{f^f_i}
 ```
+to find the coefficients to be prescribed, ``a_j^f``.
 
-By solving the equation ``\underbar{\underbar K}^f \underbar{a}^f = \underbar{f}^f``, we can
-determine the coefficients ``\underbar{a}^f`` for the current facet.
-
-# ``H(\mathrm{curl})`` interpolations
-
-For ``H(\mathrm{curl})`` interpolations, the conditions are on the form
+# H(curl) interpolations
+For H(curl), we want to prescribe the tangential flux, ``\boldsymbol{q}_\mathrm{t} = \boldsymbol{f}(\boldsymbol{x}, t, \boldsymbol{n})``.
+To that end, we want to find the degree of freedom values, ``a_j``, associated
+with the the facet that minimizes
 ```math
-\boldsymbol{N}^f_j a^f_j \times \boldsymbol{n}^f = \boldsymbol{q}_t = \boldsymbol{f}(\boldsymbol{x}, t, \boldsymbol{n})
+U(\boldsymbol{q}(\boldsymbol{x})) = \int_{\Gamma^\mathrm{f}}
+\left\vert\left\vert
+    \boldsymbol{q}(\boldsymbol{x}) \times \boldsymbol{n} - \boldsymbol{f}(\boldsymbol{x}, t, \boldsymbol{n})
+\right\vert\right\vert^2
+\mathrm{d}\Gamma
 ```
-To satisfy this condition in a weak sense, we take the single contraction
-with the (arbitrary) test function
-``\delta \boldsymbol{q}_t \approx \delta\boldsymbol{N}^f_i c^f_i \times \boldsymbol{n}^f``,
-and integrate over the facet, ``\Gamma^f``, resulting in,
+with ``\boldsymbol{q}(\boldsymbol{x}) = \boldsymbol{N}^\mathrm{f}_j(\boldsymbol{x}) a_j``.
+Similar to for ``H(\mathrm{div})``, we find the minimum by considering the directional derivative,
+and thereafter inserting the FE-approximations yields the linear equation system,
 ```math
 \underbrace{\int_{\Gamma^f} \left[\delta\boldsymbol{N}^f_i \times \boldsymbol{n}^f\right]\cdot\left[\boldsymbol{N}^f_j \times \boldsymbol{n}^f\right]\ \mathrm{d}\Gamma}_{K^f_{ij}}\ a_j^f
-= \underbrace{\int_{\Gamma^f} \left[\delta\boldsymbol{N}^f_i \times \boldsymbol{n}^f\right]\cdot \boldsymbol{q}_t\ \mathrm{d}\Gamma}_{f^f_i}
+= \underbrace{\int_{\Gamma^f} \left[\delta\boldsymbol{N}^f_i \times \boldsymbol{n}^f\right]\cdot \boldsymbol{f}(\boldsymbol{x}, t, \boldsymbol{n})\ \mathrm{d}\Gamma}_{f^f_i}
 ```
+to find the coefficients to be prescribed, ``a_j^f``
 """
 mutable struct WeakDirichlet
     const f::Function
