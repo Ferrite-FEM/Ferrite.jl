@@ -1944,7 +1944,7 @@ function integrate_weak_dbc!(Kᶠ, fᶠ, bc_fun, fv, shape_nrs, cell_coords, tim
     return integrate_weak_dbc!(conformity(fv), Kᶠ, fᶠ, bc_fun, fv, shape_nrs, cell_coords, time)
 end
 
-function integrate_weak_dbc!(::Conformity{:Hdiv}, Kᶠ, fᶠ, bc_fun, fv, shape_nrs, cell_coords, time)
+function integrate_weak_dbc!(::HdivConformity, Kᶠ, fᶠ, bc_fun, fv, shape_nrs, cell_coords, time)
     for q_point in 1:getnquadpoints(fv)
         dΓ = getdetJdV(fv, q_point)
         n = getnormal(fv, q_point)
@@ -1962,7 +1962,7 @@ function integrate_weak_dbc!(::Conformity{:Hdiv}, Kᶠ, fᶠ, bc_fun, fv, shape_
     return
 end
 
-function integrate_weak_dbc!(::Conformity{:Hcurl}, Kᶠ, fᶠ, bc_fun, fv, shape_nrs, cell_coords, time)
+function integrate_weak_dbc!(::HcurlConformity, Kᶠ, fᶠ, bc_fun, fv, shape_nrs, cell_coords, time)
     for q_point in 1:getnquadpoints(fv)
         dΓ = getdetJdV(fv, q_point)
         n = getnormal(fv, q_point)
@@ -1980,7 +1980,7 @@ function integrate_weak_dbc!(::Conformity{:Hcurl}, Kᶠ, fᶠ, bc_fun, fv, shape
     return
 end
 
-function integrate_weak_dbc!(::Union{Conformity{:H1}, Conformity{:L2}}, args...)
+function integrate_weak_dbc!(::Union{H1Conformity, L2Conformity}, args...)
     ip_str = sprint(show, function_interpolation(fv))
     throw(ArgumentError("WeakDirichlet is not defined for H¹ and L2 function spaces ($ip_str)"))
 end
