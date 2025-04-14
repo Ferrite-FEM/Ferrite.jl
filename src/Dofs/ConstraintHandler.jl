@@ -155,7 +155,7 @@ A collection of constraints associated with the dof handler `dh`.
 """
 mutable struct ConstraintHandler{DH <: AbstractDofHandler, T}
     const dbcs::Vector{Dirichlet}
-    const wdbcs::Vector{L2ProjectedDirichlet}
+    const pdbcs::Vector{L2ProjectedDirichlet}
     const prescribed_dofs::Vector{Int}
     const free_dofs::Vector{Int}
     const inhomogeneities::Vector{T}
@@ -489,8 +489,8 @@ function update!(ch::ConstraintHandler, time::Real = 0.0)
             dbc.components, ch.dh, ch.bcvalues[i], ch.dofmapping, ch.dofcoefficients, time
         )
     end
-    for wdbc in ch.wdbcs
-        _update_weak_dbc!(ch.inhomogeneities, wdbc.f, wdbc.facets, wdbc.fv, wdbc.facet_dofs, ch.dh, ch.dofmapping, ch.dofcoefficients, time)
+    for pdbc in ch.pdbcs
+        _update_weak_dbc!(ch.inhomogeneities, pdbc.f, pdbc.facets, pdbc.fv, pdbc.facet_dofs, ch.dh, ch.dofmapping, ch.dofcoefficients, time)
     end
     # Compute effective inhomogeneity for affine constraints with prescribed dofs in the
     # RHS. For example, in u2 = w3 * u3 + w4 * u4 + b2 we allow e.g. u3 to be prescribed by
@@ -1878,11 +1878,11 @@ function add!(ch::ConstraintHandler, dbc::L2ProjectedDirichlet)
     return ch
 end
 
-function _add!(ch::ConstraintHandler, wdbc::L2ProjectedDirichlet, facet_dofs)
+function _add!(ch::ConstraintHandler, pdbc::L2ProjectedDirichlet, facet_dofs)
     # loop over all the faces in the set and add the global dofs to `constrained_dofs`
     constrained_dofs = Int[]
     cc = CellCache(ch.dh, UpdateFlags(; nodes = false, coords = false, dofs = true))
-    for (cellidx, facetidx) in wdbc.facets
+    for (cellidx, facetidx) in pdbc.facets
         reinit!(cc, cellidx)
         local_dofs = facet_dofs[facetidx]
         for d in local_dofs
@@ -1891,7 +1891,7 @@ function _add!(ch::ConstraintHandler, wdbc::L2ProjectedDirichlet, facet_dofs)
     end
 
     # save it to the ConstraintHandler
-    push!(ch.wdbcs, wdbc)
+    push!(ch.pdbcs, pdbc)
     for d in constrained_dofs
         add_prescribed_dof!(ch, d, NaN, nothing)
     end
