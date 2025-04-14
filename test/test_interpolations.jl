@@ -426,16 +426,16 @@ end
         test_interpolation_functionals.(Hdiv_interpolations)
         test_interpolation_functionals.(Hcurl_interpolations)
 
-        # Test boundary conditions (WeakDirichlet)
+        # Test boundary conditions (L2ProjectedDirichlet)
         # Depending on the interpolation, we have different polynomials orders on the facets
         _facet_poly_order(ip::Nedelec) = Ferrite.getorder(ip) - 1
         _facet_poly_order(ip::RaviartThomas) = Ferrite.getorder(ip) - 1
         _facet_poly_order(ip::BrezziDouglasMarini) = Ferrite.getorder(ip)
         # Based on this order, p_facet, we expect that we should fullfill different criteria.
-        # * If we prescribe a polynomial function to WeakDirichlet with a lower or equal order
+        # * If we prescribe a polynomial function to L2ProjectedDirichlet with a lower or equal order
         #   than p_facet, we expect that the interpolation should match the provided function pointwise.
         # * If we prescribe a polynomial function with higher order, but lower order than what the quadrature
-        #   rule in WeakDirichlet can integrate exactly, we expect that the integral over the boundary are equal.
+        #   rule in L2ProjectedDirichlet can integrate exactly, we expect that the integral over the boundary are equal.
         # * If we prescribe a polynomial one order lower than we can integrate exactly, and p_facet ≥ 1,
         #   we expect that the integrated linear moment equation, ∫ x f(x) dx, is integrated exactly
         # The following tests check those properties for the H(div) and H(curl) interpolations.
@@ -462,7 +462,7 @@ end
                 tol = 1.0e-6, pointwise_check
             )
             grid = Ferrite.get_grid(dh)
-            dbc = WeakDirichlet(:u, facetset, f_bc)
+            dbc = L2ProjectedDirichlet(:u, facetset, f_bc)
             ch = close!(add!(ConstraintHandler(dh), dbc))
             a = zeros(ndofs(dh))
             apply!(a, ch)
@@ -501,7 +501,7 @@ end
             for ip in Hdiv_interpolations
                 @testset "$ip" begin
                     dh, fv = _setup_dh_fv_for_bc_test(ip)
-                    qr_order = Ferrite._default_bc_qr_order(ip) # Default for WeakDirichlet
+                    qr_order = Ferrite._default_bc_qr_order(ip) # Default for L2ProjectedDirichlet
                     nexp = 2 * qr_order - 1 # Exact gauss integration for polynomial of order nexp.
                     linear_x1(x, _, _) = x[1]
                     quadratic_x1(x, _, _) = (x[1] - 0.3)^2
@@ -533,7 +533,7 @@ end
                     dh, fv = _setup_dh_fv_for_bc_test(ip)
                     dim = Ferrite.getrefdim(getrefshape(ip))
                     @assert dim == 2 # 3d not supported yet
-                    qr_order = Ferrite._default_bc_qr_order(ip) # Default for WeakDirichlet
+                    qr_order = Ferrite._default_bc_qr_order(ip) # Default for L2ProjectedDirichlet
                     nexp = 2 * qr_order - 1 # Exact gauss integration for polynomial of order nexp.
                     v3 = rand()
                     linear_x1(x, _, _) = x[1] * Vec((0.0, 0.0, v3))
@@ -560,11 +560,11 @@ end
             end
         end
 
-        @testset "WeakDirichlet error path" begin
+        @testset "L2ProjectedDirichlet error path" begin
             dh_H1, _ = _setup_dh_fv_for_bc_test(Lagrange{RefTriangle, 1}()^2; nel = 1, qr_order = 1)
             dh_L2, _ = _setup_dh_fv_for_bc_test(DiscontinuousLagrange{RefTriangle, 1}()^2; nel = 1, qr_order = 1)
             for dh in (dh_H1, dh_L2)
-                dbc = WeakDirichlet(:u, Set([FacetIndex(1, 1)]), Returns(zero(Vec{2})))
+                dbc = L2ProjectedDirichlet(:u, Set([FacetIndex(1, 1)]), Returns(zero(Vec{2})))
                 ch = add!(ConstraintHandler(dh), dbc)
                 @test_throws ArgumentError close!(ch)
             end

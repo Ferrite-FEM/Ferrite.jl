@@ -62,9 +62,9 @@ function __to_components(c)
 end
 
 @doc raw"""
-    WeakDirichlet(field_name::Symbol, facets::AbstractSet{FacetIndex}, f::Function; qr_order = -1)
+    L2ProjectedDirichlet(field_name::Symbol, facets::AbstractSet{FacetIndex}, f::Function; qr_order = -1)
 
-A `WeakDirichlet` condition enforces conditions for `field_name` on the boundary, `facets`, for
+A `L2ProjectedDirichlet` condition enforces conditions for `field_name` on the boundary, `facets`, for
 non-nodal interpolations (e.g. ``H(\mathrm{div})`` or ``H(\mathrm{curl})``) in an weak sense,
 i.e. minimizing the L2 error between the function `f(x, t, n)` and the values described
 by the FE approximation on the facet, ``\Gamma^f``. The arguments to the function are
@@ -120,7 +120,7 @@ which after inserting the FE-approximations yields the linear equation system,
 ```
 determining the coefficients to be prescribed, ``a_j^f``
 """
-mutable struct WeakDirichlet
+mutable struct L2ProjectedDirichlet
     const f::Function
     const facets::OrderedSet{FacetIndex}
     const field_name::Symbol
@@ -129,8 +129,8 @@ mutable struct WeakDirichlet
     fv::Union{Nothing, FacetValues}
     facet_dofs::Union{Nothing, ArrayOfVectorViews{Int, 1}}
 end
-function WeakDirichlet(field_name::Symbol, facets::AbstractVecOrSet, f::Function; qr_order = -1)
-    return WeakDirichlet(f, convert_to_orderedset(facets), field_name, qr_order, nothing, nothing)
+function L2ProjectedDirichlet(field_name::Symbol, facets::AbstractVecOrSet, f::Function; qr_order = -1)
+    return L2ProjectedDirichlet(f, convert_to_orderedset(facets), field_name, qr_order, nothing, nothing)
 end
 
 const DofCoefficients{T} = Vector{Pair{Int, T}}
@@ -155,7 +155,7 @@ A collection of constraints associated with the dof handler `dh`.
 """
 mutable struct ConstraintHandler{DH <: AbstractDofHandler, T}
     const dbcs::Vector{Dirichlet}
-    const wdbcs::Vector{WeakDirichlet}
+    const wdbcs::Vector{L2ProjectedDirichlet}
     const prescribed_dofs::Vector{Int}
     const free_dofs::Vector{Int}
     const inhomogeneities::Vector{T}
@@ -176,7 +176,7 @@ ConstraintHandler(dh::AbstractDofHandler) = ConstraintHandler(Float64, dh)
 function ConstraintHandler(::Type{T}, dh::AbstractDofHandler) where {T <: Number}
     @assert isclosed(dh)
     return ConstraintHandler(
-        Dirichlet[], WeakDirichlet[], Int[], Int[], T[], Union{Nothing, T}[],
+        Dirichlet[], L2ProjectedDirichlet[], Int[], Int[], T[], Union{Nothing, T}[],
         Union{Nothing, DofCoefficients{T}}[], Dict{Int, Int}(), BCValues{T}[], dh, false,
     )
 end
@@ -1850,7 +1850,7 @@ end
 # Q&D default, should be more elaborated
 _default_bc_qr_order(::Interpolation{<:Any, order}) where {order} = 2 * order
 
-function add!(ch::ConstraintHandler, dbc::WeakDirichlet)
+function add!(ch::ConstraintHandler, dbc::L2ProjectedDirichlet)
     # Duplicate the Dirichlet constraint for every SubDofHandler
     dbc_added = false
     for sdh in ch.dh.subdofhandlers
@@ -1871,17 +1871,17 @@ function add!(ch::ConstraintHandler, dbc::WeakDirichlet)
             _local_facet_dofs_for_bc(get_base_interpolation(interpolation), 1, 1, field_offset(sdh, field_idx), dirichlet_facetdof_indices)
         facet_dofs = ArrayOfVectorViews(local_facet_dofs_offset, local_facet_dofs, LinearIndices(1:(length(local_facet_dofs_offset) - 1)))
 
-        filtered_dbc = WeakDirichlet(dbc.f, filtered_set, dbc.field_name, qr_order, fv, facet_dofs)
+        filtered_dbc = L2ProjectedDirichlet(dbc.f, filtered_set, dbc.field_name, qr_order, fv, facet_dofs)
 
         _add!(ch, filtered_dbc, facet_dofs)
 
         dbc_added = true
     end
-    dbc_added || error("No overlap between dbc::WeakDirichlet and fields in the ConstraintHandler's DofHandler")
+    dbc_added || error("No overlap between dbc::L2ProjectedDirichlet and fields in the ConstraintHandler's DofHandler")
     return ch
 end
 
-function _add!(ch::ConstraintHandler, wdbc::WeakDirichlet, facet_dofs)
+function _add!(ch::ConstraintHandler, wdbc::L2ProjectedDirichlet, facet_dofs)
     # loop over all the faces in the set and add the global dofs to `constrained_dofs`
     constrained_dofs = Int[]
     cc = CellCache(ch.dh, UpdateFlags(; nodes = false, coords = false, dofs = true))
@@ -1982,5 +1982,5 @@ end
 
 function integrate_weak_dbc!(::Union{H1Conformity, L2Conformity}, args...)
     ip_str = sprint(show, function_interpolation(fv))
-    throw(ArgumentError("WeakDirichlet is not defined for H¹ and L2 function spaces ($ip_str)"))
+    throw(ArgumentError("L2ProjectedDirichlet is not defined for H¹ and L2 function spaces ($ip_str)"))
 end
