@@ -122,17 +122,17 @@ nothing                    #hide
 # ```
 # It is simple to see that the Jacobian and the discretized Stokes operator $K$
 # share the same sparsity pattern since they share the same relation between
-# trial and test functions. This implies that once $K$ is assembled, its
+# trial and test functions, ignoring the zero values in the form. This implies that once $K$ is assembled, its
 # sparsity values and pattern can be used to initialize the Jacobian.
 #
-# To define $\frac{\partial N}{\partial u}$, we take the directional derivative
+# To derive $\frac{\partial N}{\partial u}$, we take the directional derivative
 # of $f$ along the vector $(\delta v, \delta p)$ and
 # define finite element approximations of $\delta v$ and $\delta p$ with trial
 # functions $\varphi$ and $\psi$, respectively. The discrete form of
-# $\frac{\delta N}{\delta u}$ is therefore given by
+# $\frac{\partial N}{\partial u}$ is therefore given by
 #
 # ```math
-#     - \sum_{i}^{N} (\int_{\Omega} ((\varphi_i \cdot \nabla) v + (v \cdot \nabla) \varphi_i) \cdot \varphi_j) \delta \hat{v}_i,
+#     \frac{\partial N}{\partial u} = - \sum_{i}^{N} (\int_{\Omega} ((\varphi_i \cdot \nabla) v + (v \cdot \nabla) \varphi_i) \cdot \varphi_j) \cdot \delta \hat{v}_i,
 # ```
 #
 # on a mesh with characteristic element size $h$ and $N$ trial functions.
