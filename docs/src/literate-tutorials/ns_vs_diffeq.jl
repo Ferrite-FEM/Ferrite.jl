@@ -132,10 +132,10 @@ nothing                    #hide
 # $\frac{\partial N}{\partial u}$ is therefore given by
 #
 # ```math
-#     \frac{\partial N}{\partial u} = - \sum_{i}^{N} (\int_{\Omega} ((\varphi_i \cdot \nabla) v + (v \cdot \nabla) \varphi_i) \cdot \varphi_j) \cdot \delta \hat{v}_i,
+#     \frac{\partial N}{\partial u} = - \sum_{i}^{n} (\int_{\Omega} ((\varphi_i \cdot \nabla) v + (v \cdot \nabla) \varphi_i) \cdot \varphi_j) \cdot \delta \hat{v}_i,
 # ```
 #
-# on a mesh with characteristic element size $h$ and $N$ trial functions.
+# for $n$ trial functions.
 #
 # With the Jacobian accounting for both the linear and nonlinear contributions
 # of the semi-discrete weak form, we can easily use
@@ -193,18 +193,19 @@ nothing                    #hide
 #     cannot be formulated as constant coefficients.
 #     To make this explicit, we construct a finite element approximation of
 #     $\delta v$ and $\delta p$ on a mesh with characteristic element size $h$
-#     and $N$ trial functions $\varphi$. An important note here is
-#     that the trial functions are the same as in the previous [section](@ref weak-form-derivation). The finite element approximation for $\delta v$ is thus given by
+#     and $n$ trial functions $\varphi$. An important note here is
+#     that the trial functions are the same as in the previous [section](@ref weak-form-derivation).
+#     The finite element approximation for $\delta v$ is thus given by
 #
 #     ```math
-#     \delta v_h(\mathbf{x}) = \sum_{i}^{N} \varphi_i(\mathbf{x}) \delta \hat{v}_i,
+#     \delta v_h(\mathbf{x}) = \sum_{i}^{n} \varphi_i(\mathbf{x}) \delta \hat{v}_i,
 #     ```
 #     for a specific point $\mathbf{x}$ and nodal trial functions $\varphi_i$
 #     with unknown nodal values $\delta \hat{v}_i$. Substituting $\delta v_h$
 #     into the corresponding nonlinear advection term above, we have
 #
 #     ```math
-#     - \sum_{i}^{N} (\int_{\Omega} ((\varphi_i \cdot \nabla) v + (v \cdot \nabla) \varphi_i) \cdot \varphi_j) \delta \hat{v}_i,
+#     - \sum_{i}^{n} (\int_{\Omega} ((\varphi_i \cdot \nabla) v + (v \cdot \nabla) \varphi_i) \cdot \varphi_j) \delta \hat{v}_i,
 #     ```
 #     and we implement a function for the terms in this integrand.
 #     With this function for the nonlinear term and $K$, we can fully describe the
