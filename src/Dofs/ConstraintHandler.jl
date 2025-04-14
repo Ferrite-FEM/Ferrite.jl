@@ -483,9 +483,6 @@ function update!(ch::ConstraintHandler, time::Real = 0.0)
         # g(x, t) = f(x) that discards the second parameter so that _update! can always call
         # the function with two arguments internally.
         wrapper_f = hasmethod(dbc.f, Tuple{get_coordinate_type(get_grid(ch.dh)), typeof(time)}) ? dbc.f : (x, _) -> dbc.f(x)
-        #TODO: Temporary way to get the ip, not safe as it just get the first sdh with field_name in it.
-        field_idx = find_field(ch.dh, dbc.field_name)
-        ip = getfieldinterpolation(ch.dh, field_idx)
         # Function barrier
         _update!(
             ch.inhomogeneities, wrapper_f, dbc.facets, dbc.local_facet_dofs, dbc.local_facet_dofs_offset,
@@ -1931,10 +1928,11 @@ end
 function solve_weak_dbc!(aᶠ, Kᶠ, fᶠ, bc_fun, fv, shape_nrs, cell_coords, time)
     fill!(Kᶠ, 0)
     fill!(fᶠ, 0)
-    # Support varying number of facetdofs (for ref shapes with different facet types)
-    for i in (length(shape_nrs) + 1):size(Kᶠ, 1)
-        Kᶠ[i, i] = 1
-    end
+    # Supporting varying number of facetdofs (for ref shapes with different facet types) requires
+    # for i in (length(shape_nrs) + 1):size(Kᶠ, 1)
+    #     Kᶠ[i, i] = 1
+    # end
+    @assert length(shape_nrs) == size(Kᶠ, 1)
     integrate_weak_dbc!(Kᶠ, fᶠ, bc_fun, fv, shape_nrs, cell_coords, time)
     aᶠ .= Kᶠ \ fᶠ # Could be done non-allocating if required, using e.g. SMatrix
     return aᶠ
