@@ -1957,3 +1957,25 @@ function get_direction(::Nedelec{RefTriangle, 2}, j, cell)
     edge = edges(cell)[(j + 1) ÷ 2]
     return ifelse(edge[2] > edge[1], 1, -1)
 end
+
+# RefQuadrilateral, 1st order Lagrange
+# https://defelement.org/elements/examples/quadrilateral-nedelec1-lagrange-1.html
+# Scaled by 1/2 as the reference edge length in Ferrite is length 2, but 1 in DefElement.
+function reference_shape_value(ip::Nedelec{RefQuadrilateral, 1}, ξ::Vec{2, T}, i::Int) where {T}
+    x, y = ξ
+    nil = zero(T)
+
+    i == 1 && return Vec((1 - y) / 4, nil)
+    i == 2 && return Vec(nil, (1 + x) / 4)
+    i == 3 && return Vec(-(1 + y) / 4, nil) # Changed sign, follow Ferrite's sign convention
+    i == 4 && return Vec(nil, -(1 - x) / 4) # Changed sign, follow Ferrite's sign convention
+    throw(ArgumentError("no shape function $i for interpolation $ip"))
+end
+
+getnbasefunctions(::Nedelec{RefQuadrilateral, 1}) = 4
+edgedof_interior_indices(::Nedelec{RefQuadrilateral, 1}) = ((1,), (2,), (3,), (4,))
+adjust_dofs_during_distribution(::Nedelec{RefQuadrilateral, 1}) = false
+function get_direction(::Nedelec{RefQuadrilateral, 1}, j, cell)
+    edge = edges(cell)[j]
+    return ifelse(edge[2] > edge[1], 1, -1)
+end
