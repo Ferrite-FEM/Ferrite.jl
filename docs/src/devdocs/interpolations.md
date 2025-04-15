@@ -49,3 +49,24 @@ dofs defined on a specific entity. Hence, not overloading of the dof functions w
 element with zero dofs. Also, it should always be double checked that everything is consistent as
 specified in the docstring of the corresponding function, as inconsistent implementations can
 lead to bugs which are really difficult to track down.
+
+## Vector interpolation properties
+### Hdiv interpolations
+
+On a facet, ``\Gamma``, with normal, ``\boldsymbol{n}``,
+the set of ``H(\mathrm{div})`` interpolation functions,
+``\boldsymbol{N}_i(\boldsymbol{\xi})``, should fullfill
+```math
+\begin{align*}
+\sum_{i = 1}^N \int_\Gamma \boldsymbol{N}_i(\boldsymbol{\xi}) \cdot \boldsymbol{n} &= 1 \\
+\sum_{i = 1}^N \int_\Gamma f_i(\boldsymbol{\xi}) \boldsymbol{N}_i(\boldsymbol{\xi}) \cdot \boldsymbol{n} &= 1 \\
+\int_\Gamma f_i(\boldsymbol{\xi}) \boldsymbol{N}_j(\boldsymbol{\xi}) \cdot \boldsymbol{n} &= 0, \quad i \neq j
+```
+The moment-weighting functions ``f_i(\boldsymbol{\xi})`` depend on how many base functions there are per
+facet and the reference shape of the facet (`RefLine`, `RefTriangle`, or `RefQuadrilateral`).
+
+These integral quantities apply to arbitrarily sized cell facets, and hence the actual value of the base functions
+will scale depending on the size (smaller facet ``\rightarrow`` higher values). Consequently, when applying BCs,
+we need to consider the actual facet size to be able to prescribe the average flux.
+Consider making a new generalized `BCValues`: `BoundaryDofValues` object that stores the required info.
+Develop as separate first, could possible replace the current `BCValues`...

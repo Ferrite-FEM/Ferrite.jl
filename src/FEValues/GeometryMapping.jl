@@ -12,10 +12,8 @@ struct MappingValues{JT, HT}
     J::JT # dx/dξ # Jacobian
     H::HT # dJ/dξ # Hessian
 end
-
 @inline getjacobian(mv::MappingValues{<:Union{AbstractTensor, SMatrix}}) = mv.J
 @inline gethessian(mv::MappingValues{<:Any, <:AbstractTensor}) = mv.H
-
 
 """
     GeometryMapping{DiffOrder}(::Type{T}, ip_geo, qr::QuadratureRule)

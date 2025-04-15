@@ -185,6 +185,7 @@
         cv2 = CellValues(Float64, qr, ip, ip^2; update_detJdV = false, update_gradients = false, update_hessians = true)
         reinit!(cv2, cc)
         @test Ferrite.calculate_mapping(cv2.geo_mapping, 1, cc.coords) == Ferrite.calculate_mapping(ip, ξ, cc.coords, Val(2))
+
     end
 
     @testset "Non-identity mapping gradients" begin

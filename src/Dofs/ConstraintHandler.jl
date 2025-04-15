@@ -61,6 +61,90 @@ function __to_components(c)
     return components
 end
 
+@doc raw"""
+    WeakDirichlet(field_name::Symbol, facets, f::Function; qr_order = -1)
+
+An `WeakDirichlet` conditions enforces conditions for `field_name` on the boundary for
+non-nodal interpolations (e.g. ``H(\mathrm{div})`` or ``H(\mathrm{curl})``) in an weak sense.
+
+# ``H(\mathrm{div})`` interpolations
+
+For ``H(\mathrm{div})`` interpolations, we have conditions on the form
+```math
+\boldsymbol{N}^f_i a^f_i \cdot \boldsymbol{n}^f = q_n = f(\boldsymbol{x}, t, \boldsymbol{n})
+```
+
+To satisfy this condition in a weak sense, we multiply with the (arbitrary) test
+function ``\delta q_n \approx \delta\boldsymbol{N}^f_j c^f_j \cdot \boldsymbol{n}^f``,
+and integrate over the facet, ``\Gamma^f``, resulting in
+```math
+\underbrace{\int_{\Gamma^f} \left[\delta\boldsymbol{N}^f_i \cdot \boldsymbol{n}^f\right]\left[\boldsymbol{N}^f_j \cdot \boldsymbol{n}^f\right]\ \mathrm{d}\Gamma}_{K^f_{ij}}\ a_j^f
+= \underbrace{\int_{\Gamma^f} \left[\delta\boldsymbol{N}^f_i \cdot \boldsymbol{n}^f\right] q_n\ \mathrm{d}\Gamma}_{f^f_i}
+```
+
+By solving the equation ``\underbar{\underbar K}^f \underbar{a}^f = \underbar{f}^f``, we can
+determine the coefficients ``\underbar{a}^f`` for the current facet.
+
+# ``H(\mathrm{curl})`` interpolations
+
+For ``H(\mathrm{curl})`` interpolations, the conditions are on the form
+```math
+\boldsymbol{N}^f_j a^f_j \times \boldsymbol{n}^f = \boldsymbol{q}_t = \boldsymbol{f}(\boldsymbol{x}, t, \boldsymbol{n})
+```
+To satisfy this condition in a weak sense, we take the single contraction
+with the (arbitrary) test function
+``\delta \boldsymbol{q}_t \approx \delta\boldsymbol{N}^f_i c^f_i \times \boldsymbol{n}^f``,
+and integrate over the facet, ``\Gamma^f``, resulting in,
+```math
+\underbrace{\int_{\Gamma^f} \left[\delta\boldsymbol{N}^f_i \times \boldsymbol{n}^f\right]\cdot\left[\boldsymbol{N}^f_j \times \boldsymbol{n}^f\right]\ \mathrm{d}\Gamma}_{K^f_{ij}}\ a_j^f
+= \underbrace{\int_{\Gamma^f} \left[\delta\boldsymbol{N}^f_i \times \boldsymbol{n}^f\right]\cdot \boldsymbol{q}_t\ \mathrm{d}\Gamma}_{f^f_i}
+```
+
+## Old notes
+For ``H(\mathrm{div})`` interpolations, we have conditions on the form
+```math
+\boldsymbol{N}^f_i a^f_i \cdot \boldsymbol{n}^f = q_n = f(\boldsymbol{x}, t, \boldsymbol{n})
+```
+where ``\boldsymbol{x}`` is the spatial coordinate, ``t`` the current time, and ``\boldsymbol{n}``
+the facet normal. These conditions are enforced as an integral over the facet ``\Gamma^f``.
+```math
+\int_{\Gamma^f} \boldsymbol{N}^f_\alpha a^f_\alpha \cdot \boldsymbol{n}^f\ \mathrm{d}\Gamma
+= \int_{\Gamma^f} g_\alpha(\boldsymbol{x}) q_n\ \mathrm{d}\Gamma
+```
+(no sum on ``\alpha``) where the weighting functions, ``g_\alpha(\boldsymbol{x})``, are defined such that
+``\sum_{\alpha} g_\alpha(\boldsymbol{x}) = 1`` at all points on the facet.
+These weighting functions are defined by each interpolation.
+
+For ``H(\mathrm{curl})`` interpolations, the conditions are on the form
+```math
+\boldsymbol{N}^f_i a^f_i \times \boldsymbol{n}^f = \boldsymbol{q}_t =
+\left[\boldsymbol{I} - \boldsymbol{n}\otimes\boldsymbol{n}\right] \cdot \boldsymbol{f}(\boldsymbol{x}, t, \boldsymbol{n})
+```
+where the multiplication with ``\boldsymbol{I} - \boldsymbol{n}\otimes\boldsymbol{n}`` projects
+``\boldsymbol{f}(\boldsymbol{x}, t, \boldsymbol{n})`` onto the plane normal to ``\boldsymbol{n}``.
+
+Currently, these constraints are not implemented for 3d cases. But the current implementation
+enforces this condition by considering the projection along ``\boldsymbol{q}_t``, i.e.
+```math
+a^f_\alpha =
+\frac{\int_{\Gamma^f} g_\alpha(\boldsymbol{x}) \boldsymbol{q}_t \cdot \boldsymbol{q}_t\ \mathrm{d}\Gamma}{
+\int_{\Gamma^f} \left[\boldsymbol{N}^f_\alpha \times \boldsymbol{n}^f\right]\cdot \boldsymbol{q}_t\ \mathrm{d}\Gamma}
+```
+(no sum on ``\alpha``) with equivalent weighting functions as for ``H(\mathrm{div})`` interpolations.
+"""
+mutable struct WeakDirichlet
+    const f::Function
+    const facets::OrderedSet{FacetIndex}
+    const field_name::Symbol
+    const qr_order::Int
+    # Created during `add!`
+    fv::Union{Nothing, FacetValues}
+    facet_dofs::Union{Nothing, ArrayOfVectorViews{Int, 1}}
+end
+function WeakDirichlet(field_name::Symbol, facets::AbstractVecOrSet, f::Function; qr_order = -1)
+    return WeakDirichlet(f, convert_to_orderedset(facets), field_name, qr_order, nothing, nothing)
+end
+
 const DofCoefficients{T} = Vector{Pair{Int, T}}
 """
     AffineConstraint(constrained_dof::Int, entries::Vector{Pair{Int,T}}, b::T) where T
@@ -83,6 +167,7 @@ A collection of constraints associated with the dof handler `dh`.
 """
 mutable struct ConstraintHandler{DH <: AbstractDofHandler, T}
     const dbcs::Vector{Dirichlet}
+    const idbcs::Vector{WeakDirichlet}
     const prescribed_dofs::Vector{Int}
     const free_dofs::Vector{Int}
     const inhomogeneities::Vector{T}
@@ -103,8 +188,8 @@ ConstraintHandler(dh::AbstractDofHandler) = ConstraintHandler(Float64, dh)
 function ConstraintHandler(::Type{T}, dh::AbstractDofHandler) where {T <: Number}
     @assert isclosed(dh)
     return ConstraintHandler(
-        Dirichlet[], Int[], Int[], T[], Union{Nothing, T}[], Union{Nothing, DofCoefficients{T}}[],
-        Dict{Int, Int}(), BCValues{T}[], dh, false,
+        Dirichlet[], WeakDirichlet[], Int[], Int[], T[], Union{Nothing, T}[],
+        Union{Nothing, DofCoefficients{T}}[], Dict{Int, Int}(), BCValues{T}[], dh, false,
     )
 end
 
@@ -410,11 +495,17 @@ function update!(ch::ConstraintHandler, time::Real = 0.0)
         # g(x, t) = f(x) that discards the second parameter so that _update! can always call
         # the function with two arguments internally.
         wrapper_f = hasmethod(dbc.f, Tuple{get_coordinate_type(get_grid(ch.dh)), typeof(time)}) ? dbc.f : (x, _) -> dbc.f(x)
+        #TODO: Temporary way to get the ip, not safe as it just get the first sdh with field_name in it.
+        field_idx = find_field(ch.dh, dbc.field_name)
+        ip = getfieldinterpolation(ch.dh, field_idx)
         # Function barrier
         _update!(
-            ch.inhomogeneities, wrapper_f, dbc.facets, dbc.field_name, dbc.local_facet_dofs, dbc.local_facet_dofs_offset,
+            ch.inhomogeneities, wrapper_f, dbc.facets, ip, dbc.local_facet_dofs, dbc.local_facet_dofs_offset,
             dbc.components, ch.dh, ch.bcvalues[i], ch.dofmapping, ch.dofcoefficients, time
         )
+    end
+    for (i, dbc) in pairs(ch.idbcs)
+        _update!(ch.inhomogeneities, dbc.f, dbc.facets, dbc.fv, dbc.facet_dofs, ch.dh, ch.dofmapping, ch.dofcoefficients, time)
     end
     # Compute effective inhomogeneity for affine constraints with prescribed dofs in the
     # RHS. For example, in u2 = w3 * u3 + w4 * u4 + b2 we allow e.g. u3 to be prescribed by
@@ -440,7 +531,7 @@ end
 
 # for facets, vertices, faces and edges
 function _update!(
-        inhomogeneities::Vector{T}, f::Function, boundary_entities::AbstractVecOrSet{<:BoundaryIndex}, field::Symbol, local_facet_dofs::Vector{Int}, local_facet_dofs_offset::Vector{Int},
+        inhomogeneities::Vector{T}, f::Function, boundary_entities::AbstractVecOrSet{<:BoundaryIndex}, ip::Interpolation, local_facet_dofs::Vector{Int}, local_facet_dofs_offset::Vector{Int},
         components::Vector{Int}, dh::AbstractDofHandler, boundaryvalues::BCValues,
         dofmapping::Dict{Int, Int}, dofcoefficients::Vector{Union{Nothing, DofCoefficients{T}}}, time::Real
     ) where {T}
@@ -456,6 +547,13 @@ function _update!(
         r = local_facet_dofs_offset[entityidx]:(local_facet_dofs_offset[entityidx + 1] - 1)
         counter = 1
         for location in 1:getnquadpoints(boundaryvalues)
+            sign = if mapping_type(ip) isa IdentityMapping
+                1
+            else
+                cell = getcells(cc.grid, cellidx)
+                shape_number = local_facet_dofs[r[counter]]
+                get_direction(ip, shape_number, cell)
+            end
             x = spatial_coordinate(boundaryvalues, location, cc.coords)
             bc_value = f(x, time)
             @assert length(bc_value) == length(components)
@@ -469,7 +567,7 @@ function _update!(
                 # Only DBC dofs are currently update!-able so don't modify inhomogeneities
                 # for affine constraints
                 if dofcoefficients[dbc_index] === nothing
-                    inhomogeneities[dbc_index] = bc_value[i]
+                    inhomogeneities[dbc_index] = sign * bc_value[i]
                     @debug println("prescribing value $(bc_value[i]) on global dof $(globaldof)")
                 end
             end
@@ -480,7 +578,7 @@ end
 
 # for nodes
 function _update!(
-        inhomogeneities::Vector{T}, f::Function, ::AbstractVecOrSet{Int}, field::Symbol, nodeidxs::Vector{Int}, globaldofs::Vector{Int},
+        inhomogeneities::Vector{T}, f::Function, ::AbstractVecOrSet{Int}, _::Interpolation, nodeidxs::Vector{Int}, globaldofs::Vector{Int},
         components::Vector{Int}, dh::AbstractDofHandler, facetvalues::BCValues,
         dofmapping::Dict{Int, Int}, dofcoefficients::Vector{Union{Nothing, DofCoefficients{T}}}, time::Real
     ) where {T}
@@ -1762,3 +1860,155 @@ function _condense_local!(
     end
     return
 end
+
+
+function _default_bc_qr_order(user_provided::Int, ip::Interpolation)
+    user_provided > 0 && return user_provided
+    return _default_bc_qr_order(ip)
+end
+# Q&D default, should be more elaborated
+_default_bc_qr_order(::Interpolation{<:Any, order}) where {order} = 2 * order
+
+function add!(ch::ConstraintHandler, dbc::WeakDirichlet)
+    # Duplicate the Dirichlet constraint for every SubDofHandler
+    dbc_added = false
+    for sdh in ch.dh.subdofhandlers
+        # Skip if the constrained field does not live on this sub domain
+        dbc.field_name in sdh.field_names || continue
+        # Compute the intersection between dbc.set and the cellset of this
+        # SubDofHandler and skip if the set is empty
+        filtered_set = filter_dbc_set(get_grid(ch.dh), sdh.cellset, dbc.facets)
+        isempty(filtered_set) && continue
+        # Fetch information about the field on this SubDofHandler
+        field_idx = find_field(sdh, dbc.field_name)
+        interpolation = getfieldinterpolation(sdh, field_idx)
+        CT = getcelltype(sdh) # Same celltype enforced in SubDofHandler constructor
+        qr_order = _default_bc_qr_order(dbc.qr_order, interpolation)
+        fqr = FacetQuadratureRule{getrefshape(interpolation)}(qr_order)
+        fv = FacetValues(fqr, interpolation, geometric_interpolation(CT))
+        local_facet_dofs, local_facet_dofs_offset =
+            _local_facet_dofs_for_bc(interpolation, 1, 1, field_offset(sdh, field_idx), dirichlet_facetdof_indices)
+        facet_dofs = ArrayOfVectorViews(local_facet_dofs_offset, local_facet_dofs, LinearIndices(1:(length(local_facet_dofs_offset) - 1)))
+
+        filtered_dbc = WeakDirichlet(dbc.f, filtered_set, dbc.field_name, qr_order, fv, facet_dofs)
+
+        _add!(ch, filtered_dbc, facet_dofs)
+
+        dbc_added = true
+    end
+    dbc_added || error("No overlap between dbc::Dirichlet and fields in the ConstraintHandler's DofHandler")
+    return ch
+end
+
+function _add!(ch::ConstraintHandler, dbc::WeakDirichlet, facet_dofs)
+    # loop over all the faces in the set and add the global dofs to `constrained_dofs`
+    constrained_dofs = Int[]
+    cc = CellCache(ch.dh, UpdateFlags(; nodes = false, coords = false, dofs = true))
+    for (cellidx, facetidx) in dbc.facets
+        reinit!(cc, cellidx)
+        local_dofs = facet_dofs[facetidx]
+        for d in local_dofs
+            push!(constrained_dofs, cc.dofs[d])
+        end
+    end
+
+    # save it to the ConstraintHandler
+    push!(ch.idbcs, dbc)
+    for d in constrained_dofs
+        add_prescribed_dof!(ch, d, NaN, nothing)
+    end
+    return ch
+end
+
+
+function _update!(
+        inhomogeneities::Vector{T}, f::Function, facets::AbstractVecOrSet{FacetIndex}, fv::FacetValues, facet_dofs::ArrayOfVectorViews,
+        dh::AbstractDofHandler, dofmapping::Dict{Int, Int}, dofcoefficients::Vector{Union{Nothing, DofCoefficients{T}}}, time::Real
+    ) where {T}
+    ip = function_interpolation(fv)
+    n = maximum(length, dirichlet_facetdof_indices(ip))
+    Kᶠ = zeros(n, n)
+    aᶠ = zeros(n)
+    fᶠ = zeros(n)
+    for fc in FacetIterator(dh, facets)
+        reinit!(fv, fc)
+        shape_nrs = dirichlet_facetdof_indices(ip)[getcurrentfacet(fv)]
+        solve_weak_dbc!(aᶠ, Kᶠ, fᶠ, f, fv, shape_nrs, getcoordinates(fc), time)
+        for (idof, shape_nr) in enumerate(shape_nrs)
+            globaldof = celldofs(fc)[shape_nr]
+            dbc_index = dofmapping[globaldof]
+            # Only DBC dofs are currently update!-able so don't modify inhomogeneities
+            # for affine constraints
+            if dofcoefficients[dbc_index] === nothing
+                inhomogeneities[dbc_index] = aᶠ[idof]
+            end
+        end
+    end
+    return nothing
+end
+
+function solve_weak_dbc!(aᶠ, Kᶠ, fᶠ, bc_fun, fv, shape_nrs, cell_coords, time)
+    fill!(Kᶠ, 0)
+    fill!(fᶠ, 0)
+    # Support varying number of facetdofs (for ref shapes with different facet types)
+    for i in (length(shape_nrs) + 1):size(Kᶠ, 1)
+        Kᶠ[i, i] = 1
+    end
+    integrate_weak_dbc!(Kᶠ, fᶠ, bc_fun, fv, shape_nrs, cell_coords, time)
+    aᶠ .= Kᶠ \ fᶠ # Could be done non-allocating if required, using e.g. SMatrix
+    return aᶠ
+end
+
+function integrate_weak_dbc!(Kᶠ, fᶠ, bc_fun, fv, shape_nrs, cell_coords, time)
+    return integrate_weak_dbc!(function_space(fv), Kᶠ, fᶠ, bc_fun, fv, shape_nrs, cell_coords, time)
+end
+
+function integrate_weak_dbc!(::Val{:Hdiv}, Kᶠ, fᶠ, bc_fun, fv, shape_nrs, cell_coords, time)
+    for q_point in 1:getnquadpoints(fv)
+        dΓ = getdetJdV(fv, q_point)
+        n = getnormal(fv, q_point)
+        x = spatial_coordinate(fv, q_point, cell_coords)
+        qn = bc_fun(x, time, n)
+        for (i, I) in enumerate(shape_nrs)
+            δN_dot_n = shape_value(fv, q_point, I) ⋅ n
+            fᶠ[i] += qn * δN_dot_n * dΓ
+            for (j, J) in enumerate(shape_nrs)
+                N_dot_n = shape_value(fv, q_point, J) ⋅ n
+                Kᶠ[i, j] += (δN_dot_n * N_dot_n) * dΓ
+            end
+        end
+    end
+    return
+end
+
+function integrate_weak_dbc!(::Val{:Hcurl}, Kᶠ, fᶠ, bc_fun, fv, shape_nrs, cell_coords, time)
+    for q_point in 1:getnquadpoints(fv)
+        dΓ = getdetJdV(fv, q_point)
+        n = getnormal(fv, q_point)
+        x = spatial_coordinate(fv, q_point, cell_coords)
+        qt = bc_fun(x, time, n)
+        for (i, I) in enumerate(shape_nrs)
+            δN_cross_n = shape_value(fv, q_point, I) × n
+            fᶠ[i] += (δN_cross_n ⋅ qt) * dΓ
+            for (j, J) in enumerate(shape_nrs)
+                N_cross_n = shape_value(fv, q_point, J) × n
+                Kᶠ[i, j] += (δN_cross_n ⋅ N_cross_n) * dΓ
+            end
+        end
+    end
+    return
+end
+
+function integrate_weak_dbc!(::Val{:H1}, Kᶠ, fᶠ, bc_fun, fv, shape_nrs, cell_coords, time)
+    ip_str = sprint(show, function_interpolation(fv))
+    throw(ArgumentError("WeakDirichlet is not defined for H¹ function spaces ($ip_str)"))
+end
+
+# Temp, put in interpolations.jl
+function_space(::Interpolation) = Val(:H1) # Default fallback, should perhaps be explicit, but ok for now...
+function_space(::RaviartThomas) = Val(:Hdiv)
+function_space(::BrezziDouglasMarini) = Val(:Hdiv)
+function_space(::Nedelec) = Val(:Hcurl)
+# End of temp that should go in interpolations.jl
+# Shortcut for fe values
+function_space(fe_values::AbstractValues) = function_space(function_interpolation(fe_values))

@@ -55,6 +55,7 @@ bibtex_plugin = CitationBibliography(
         "Tutorials" => [
             "Tutorials overview" => "tutorials/index.md",
             "tutorials/heat_equation.md",
+            "tutorials/heat_equation_hdiv.md",
             "tutorials/linear_elasticity.md",
             "tutorials/incompressible_elasticity.md",
             "tutorials/hyperelasticity.md",
@@ -67,6 +68,7 @@ bibtex_plugin = CitationBibliography(
             "tutorials/reactive_surface.md",
             "tutorials/linear_shell.md",
             "tutorials/dg_heat_equation.md",
+            "tutorials/maxwell_good_bad_ugly.md",
         ],
         "Topic guides" => [
             "Topic guide overview" => "topics/index.md",
