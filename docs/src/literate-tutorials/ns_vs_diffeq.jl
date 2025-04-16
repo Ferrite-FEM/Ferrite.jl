@@ -97,42 +97,48 @@ nothing                    #hide
 #       A & B^{\textrm{T}} \\
 #       B & 0
 #  \end{bmatrix}}_{:=K}
-#  \begin{bmatrix}
+#  \underbrace{\begin{bmatrix}
 #      \hat{v} \\
 #      \hat{p}
-#  \end{bmatrix}
+#  \end{bmatrix}}_{:=\hat{u}}
 #  +
 #  \begin{bmatrix}
 #      N(\hat{v}, \hat{v}, \hat{\varphi}) \\
 #      0
 #  \end{bmatrix}.
 # ```
-# Here $M$ is the singular block mass matrix, $K$ is the discretized Stokes operator and $N$ the nonlinear advection term, which
-# is also called trilinear form. $\hat{v}$ and $\hat{p}$ represent the time-dependent vectors of nodal values of the discretizations
-# of $v$ and $p$ respectively, while $\hat{\varphi}$ is the choice for the test function in the discretization. The hats are dropped
-# in the implementation and only stated for clarity in this section.
+# Here $M$ is the singular block mass matrix, $K$ is the discretized Stokes
+# operator and $N$ the nonlinear advection term, which is also called the trilinear
+# form. The solution vector $\hat{u}$ has components $\hat{v}$ and $\hat{p}$
+# that represent the time-dependent vectors of nodal values of the
+# discretizations of $v$ and $p$, respectively. The discrete form of the
+# test function $\varphi$ is denoted by $\hat{\varphi}$.
+# The hats are dropped in the implementation and only stated for clarity in
+# this section.
 #
 # ### [Derivation of the Jacobian](@id jacobian-derivation)
 # To enable the use of a wide range of solvers, it is more efficient to provide
 # information to the solver about the [sparsity pattern and values of the Jacobian](https://docs.sciml.ai/DiffEqDocs/stable/tutorials/advanced_ode_example/#stiff)
-# $J$ of $f(u, t) \equiv f(v, p, t)$ where $f(u, t)$ is just the RHS of the
-# mass matrix form given by $f(u, t) = Ku + N(u)$. By [definition](https://nl.mathworks.com/help/matlab/ref/odeset.html#d126e1203285),
+# $J$ of $f(\hat{u}, t) \equiv f(\hat{v}, \hat{p}, t)$ where $f(\hat{u}, t)$ is
+# just the discrete form of the RHS of the mass matrix form given by $f(\hat{u}, t) = K\hat{u} + N(\hat{u})$. By [definition](https://nl.mathworks.com/help/matlab/ref/odeset.html#d126e1203285),
 # ```math
-# J = \frac{\partial f}{\partial u} = \frac{\partial}{\partial u}(K u + N(u)) = K + \frac{\partial N}{\partial u}.
+# J = \frac{\partial f}{\partial \hat{u}} = \frac{\partial}{\partial \hat{u}}(K \hat{u} + N(\hat{u})) = K + \frac{\partial N}{\partial \hat{u}}.
 # ```
 # It is simple to see that the Jacobian and the discretized Stokes operator $K$
 # share the same sparsity pattern since they share the same relation between
 # trial and test functions, ignoring the zero values in the form. This implies that once $K$ is assembled, its
 # sparsity values and pattern can be used to initialize the Jacobian.
 #
-# To derive $\frac{\partial N}{\partial u}$, we take the directional derivative
-# of $f$ along the vector $(\delta v, \delta p)$ and
-# define finite element approximations of $\delta v$ and $\delta p$ with trial
-# functions $\varphi$ and $\psi$, respectively. The discrete form of
-# $\frac{\partial N}{\partial u}$ is therefore given by
+# To derive $\frac{\partial N}{\partial \hat{u}}$, we take the directional derivative
+# of $f$ along the vector $(\delta \hat{v}, \delta \hat{p})$ where
+# $\delta \hat{v}$ and $\delta \hat{p}$ belong to finite dimensional subspaces
+# of the corresponding function spaces for $\delta v$ and $\delta p$. Naturally,
+# the trial functions $\hat{\varphi}$ and $\hat{\psi}$ are used for
+# $\delta \hat{v}$ and $\delta \hat{p}$, respectively. The discrete form of
+# $\frac{\partial N}{\partial \hat{u}}$ is therefore given by
 #
 # ```math
-#     \frac{\partial N}{\partial u} = - \sum_{i}^{n} (\int_{\Omega} ((\varphi_i \cdot \nabla) v + (v \cdot \nabla) \varphi_i) \cdot \varphi_j) \cdot \delta \hat{v}_i,
+#     \frac{\partial N}{\partial \hat{u}} = - \sum_{i}^{n} \left(\int_{\Omega} ((\hat{\varphi_i} \cdot \nabla) \hat{v} + (\hat{v} \cdot \nabla) \hat{\varphi_i}) \cdot \hat{\varphi_j} \cdot \delta \hat{v}_i\right),
 # ```
 #
 # for $n$ trial functions.
@@ -144,8 +150,9 @@ nothing                    #hide
 # !!! details "Extra details on the Jacobian"
 #     Since the [directional derivative](https://en.wikipedia.org/wiki/Directional_derivative)
 #     is [equivalent to the Jacobian](https://math.stackexchange.com/questions/3191003/directional-derivative-and-jacobian-matrix),
-#     we take the directional derivative of $f(u, t) \equiv f(v, p, t)$ along
-#     $\delta u \equiv (\delta v, \delta p)$ (similar to [deal.ii: step 57](https://www.dealii.org/current/doxygen/deal.II/step_57.html))
+#     we take the directional derivative of
+#     $f(\hat{u}, t) \equiv f(\hat{v}, \hat{p}, t)$ along
+#     $\delta \hat{u} \equiv (\delta \hat{v}, \delta \hat{p})$ (similar to [deal.ii: step 57](https://www.dealii.org/current/doxygen/deal.II/step_57.html))
 #     to explicitly determine the sparsity pattern
 #     and values for the Jacobian. Note that $f$ is a vector function with
 #     components $f_1$ and $f_2$ corresponding to
@@ -155,29 +162,29 @@ nothing                    #hide
 #
 #     ```math
 #     \begin{aligned}
-#       J &= \nabla f(v, p) \cdot (\delta v, \delta p) \\
-#       &= \lim_{\epsilon \to 0 } \frac{1}{\epsilon}(f(v + \epsilon \delta v, p + \epsilon \delta p ) - f(v, p)) \\
+#       J &= \nabla f(\hat{v}, \hat{p}) \cdot (\delta \hat{v}, \delta \hat{p}) \\
+#       &= \lim_{\epsilon \to 0 } \frac{1}{\epsilon}(f(\hat{v} + \epsilon \delta \hat{v}, \hat{p} + \epsilon \delta \hat{p} ) - f(\hat{v}, \hat{p})) \\
 #       &= \lim_{\epsilon \to 0}  \frac{1}{\epsilon} \left( \begin{bmatrix}
-#     - \int_\Omega \nu \nabla (v + \epsilon \delta v) : \nabla \varphi - \int_\Omega ((v + \epsilon \delta v) \cdot \nabla) (v + \epsilon \delta v) \cdot \varphi + \int_\Omega (p + \epsilon \delta p)(\nabla \cdot \varphi) \\
-#     \int_{\Omega} (\nabla \cdot (v + \epsilon \delta v)) \psi
+#     - \int_\Omega \nu \nabla (\hat{v} + \epsilon \delta \hat{v}) : \nabla \hat{\varphi} - \int_\Omega ((\hat{v} + \epsilon \delta \hat{v}) \cdot \nabla) (\hat{v} + \epsilon \delta \hat{v}) \cdot \hat{\varphi} + \int_\Omega (\hat{p} + \epsilon \delta \hat{p})(\nabla \cdot \hat{\varphi}) \\
+#     \int_{\Omega} (\nabla \cdot (\hat{v} + \epsilon \delta \hat{v})) \hat{\psi}
 #       \end{bmatrix} - \begin{bmatrix}
-#       f_1(v,p) \\
-#       f_2(v,p)
+#       f_1(\hat{v},\hat{p}) \\
+#       f_2(\hat{v},\hat{p})
 #       \end{bmatrix} \right) \\
 #       &= \lim_{\epsilon \to 0} \frac{1}{\epsilon} \left( \begin{bmatrix}
-#       - \int_{\Omega} \cancel{\nu \nabla v : \nabla \varphi} + \nu \epsilon \nabla \delta v : \nabla \varphi - \int_{\Omega} (\cancel{(v \cdot \nabla) v} + (\epsilon \delta v \cdot \nabla) v + (v \cdot \nabla) \epsilon \delta v + (\epsilon \delta v \cdot \nabla) \epsilon \delta v) \cdot \varphi + \int_{\Omega} \cancel{p (\nabla \cdot \varphi)} + \epsilon \delta p (\nabla \cdot \varphi) \\
-#       \int_{\Omega} \cancel{(\nabla \cdot v)\psi} + (\nabla \cdot \epsilon \delta v)\psi
+#       - \int_{\Omega} \cancel{\nu \nabla \hat{v} : \nabla \hat{\varphi}} + \nu \epsilon \nabla \delta \hat{v} : \nabla \hat{\varphi} - \int_{\Omega} (\cancel{(\hat{v} \cdot \nabla) \hat{v}} + (\epsilon \delta \hat{v} \cdot \nabla) \hat{v} + (\hat{v} \cdot \nabla) \epsilon \delta \hat{v} + (\epsilon \delta \hat{v} \cdot \nabla) \epsilon \delta \hat{v}) \cdot \hat{\varphi} + \int_{\Omega} \cancel{\hat{p} (\nabla \cdot \hat{\varphi})} + \epsilon \delta \hat{p} (\nabla \cdot \hat{\varphi}) \\
+#       \int_{\Omega} \cancel{(\nabla \cdot \hat{v})\hat{\psi}} + (\nabla \cdot \epsilon \delta \hat{v})\hat{\psi}
 #       \end{bmatrix} - \begin{bmatrix}
-#       \cancel{f_1(v,p)} \\
-#       \cancel{f_2(v,p)}
+#       \cancel{f_1(\hat{v},\hat{p})} \\
+#       \cancel{f_2(\hat{v},\hat{p})}
 #       \end{bmatrix} \right)\\
 #       &= \lim_{\epsilon \to 0} \frac{1}{\cancel{\epsilon}} \begin{bmatrix}
-#       - \int_{\Omega} \nu \cancel{\epsilon} \nabla \delta v : \nabla \varphi - \int_{\Omega} ((\cancel{\epsilon} \delta v \cdot \nabla) v + (v \cdot \nabla) \cancel{\epsilon} \delta v + \cancel{\epsilon^2 (\delta v \cdot \nabla) \delta v}) \cdot \varphi + \int_{\Omega} \cancel{\epsilon} \delta p (\nabla \cdot \varphi) \\
-#       \int_{\Omega} (\nabla \cdot \cancel{\epsilon} \delta v) \psi
+#       - \int_{\Omega} \nu \cancel{\epsilon} \nabla \delta \hat{v} : \nabla \hat{\varphi} - \int_{\Omega} ((\cancel{\epsilon} \delta \hat{v} \cdot \nabla) \hat{v} + (\hat{v} \cdot \nabla) \cancel{\epsilon} \delta \hat{v} + \cancel{\epsilon^2 (\delta \hat{v} \cdot \nabla) \delta \hat{v}}) \cdot \hat{\varphi} + \int_{\Omega} \cancel{\epsilon} \delta \hat{p} (\nabla \cdot \hat{\varphi}) \\
+#       \int_{\Omega} (\nabla \cdot \cancel{\epsilon} \delta \hat{v}) \hat{\psi}
 #       \end{bmatrix} \\
 #       &=  \begin{bmatrix}
-#       - \int_{\Omega} \nu \nabla \delta v : \nabla \varphi - \int_{\Omega} ((\delta v \cdot \nabla) v + (v \cdot \nabla) \delta v) \cdot \varphi + \int_{\Omega} \delta p (\nabla \cdot \varphi) \\
-#       \int_{\Omega} (\nabla \cdot \delta v) \psi
+#       - \int_{\Omega} \nu \nabla \delta \hat{v} : \nabla \hat{\varphi} - \int_{\Omega} ((\delta \hat{v} \cdot \nabla) \hat{v} + (\hat{v} \cdot \nabla) \delta \hat{v}) \cdot \hat{\varphi} + \int_{\Omega} \delta \hat{p} (\nabla \cdot \hat{\varphi}) \\
+#       \int_{\Omega} (\nabla \cdot \delta \hat{v}) \hat{\psi}
 #       \end{bmatrix}.
 #     \end{aligned}
 #     ```
@@ -185,8 +192,10 @@ nothing                    #hide
 #     The term in the Jacobian
 #
 #     ```math
-#     - \int_{\Omega} ((\delta v \cdot \nabla) v + (v \cdot \nabla) \delta v) \cdot \varphi,
+#     - \int_{\Omega} ((\delta \hat{v} \cdot \nabla) \hat{v} + (\hat{v} \cdot \nabla) \delta \hat{v}) \cdot \hat{\varphi}
 #     ```
+#
+#     BEGIN TODO: Use discrete notation for finite element stuff in the next section...
 #
 #     corresponding to the nonlinear advection term is of particular interest since
 #     this integrand contains terms that evolve over time and thus these terms
@@ -211,6 +220,8 @@ nothing                    #hide
 #     With this function for the nonlinear term and $K$, we can fully describe the
 #     Jacobian in the manner required
 #     by the [ODEFunction](https://docs.sciml.ai/DiffEqDocs/stable/types/ode_types/#SciMLBase.ODEFunction) used by the solver.
+#
+#     END TODO
 #
 #     Note that the operation
 #
