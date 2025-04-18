@@ -667,7 +667,7 @@ function reference_coordinates(::Lagrange{RefQuadrilateral, 3})
 end
 
 function reference_shape_value(ip::Lagrange{RefQuadrilateral, 3}, ξ::Vec{2}, i::Int)
-    # See https://web.archive.org/web/20220817132305/https://defelement.com/elements/examples/quadrilateral-Q-3.html
+    # See https://defelement.org/elements/examples/quadrilateral-lagrange-equispaced-3.html
     # Transform domain from [-1, 1] × [-1, 1] to [0, 1] × [0, 1]
     ξ_x = (ξ[1] + 1) / 2
     ξ_y = (ξ[2] + 1) / 2
@@ -1070,7 +1070,7 @@ end
 #############################
 # Lagrange RefPrism order 1 #
 #############################
-# Build on https://web.archive.org/web/20220817123819/https://defelement.com/elements/examples/prism-Lagrange-1.html
+# Build on https://defelement.org/elements/examples/prism-lagrange-equispaced-1.html
 getnbasefunctions(::Lagrange{RefPrism, 1}) = 6
 
 facedof_indices(::Lagrange{RefPrism, 1}) = ((1, 3, 2), (1, 2, 5, 4), (3, 1, 4, 6), (2, 3, 6, 5), (4, 5, 6))
@@ -1101,7 +1101,7 @@ end
 #############################
 # Lagrange RefPrism order 2 #
 #############################
-# Build on https://web.archive.org/web/20220817125403/https://defelement.com/elements/examples/prism-Lagrange-2.html
+# Build on https://defelement.org/elements/examples/prism-lagrange-equispaced-2.html
 # This is simply the tensor-product of a quadratic triangle with a quadratic line.
 getnbasefunctions(::Lagrange{RefPrism, 2}) = 18
 
@@ -1323,7 +1323,7 @@ end
 #######################################
 # Lagrange-Bubble RefTriangle order 1 #
 #######################################
-# Taken from https://web.archive.org/web/20230328191012/https://defelement.com/elements/examples/triangle-bubble-enriched-vector-Lagrange-1.html
+# Taken from https://defelement.org/elements/examples/triangle-bubble-enriched-lagrange-1.html
 getnbasefunctions(::BubbleEnrichedLagrange{RefTriangle, 1}) = 4
 adjust_dofs_during_distribution(::BubbleEnrichedLagrange{RefTriangle, 1}) = false
 
@@ -1790,7 +1790,7 @@ edgedof_indices(ip::RaviartThomas{RefTriangle}) = edgedof_interior_indices(ip)
 facedof_indices(ip::RaviartThomas{RefTriangle}) = (ntuple(i -> i, getnbasefunctions(ip)),)
 
 # RefTriangle, 1st order Lagrange
-# https://defelement.com/elements/examples/triangle-raviart-thomas-lagrange-1.html
+# https://defelement.org/elements/examples/triangle-raviart-thomas-lagrange-0.html
 function reference_shape_value(ip::RaviartThomas{RefTriangle, 1}, ξ::Vec{2}, i::Int)
     x, y = ξ
     i == 1 && return ξ                  # Flip sign
@@ -1810,7 +1810,7 @@ function get_direction(::RaviartThomas{RefTriangle, 1}, j, cell)
 end
 
 # RefTriangle, 2st order Lagrange
-# https://defelement.org/elements/examples/triangle-raviart-thomas-lagrange-2.html
+# https://defelement.org/elements/examples/triangle-raviart-thomas-lagrange-1.html
 function reference_shape_value(ip::RaviartThomas{RefTriangle, 2}, ξ::Vec{2}, i::Int)
     x, y = ξ
     # Face 1 (keep ordering, flip sign)
@@ -1893,7 +1893,7 @@ edgedof_indices(ip::Nedelec) = edgedof_interior_indices(ip)
 facedof_indices(ip::Nedelec{<:AbstractRefShape{2}}) = (ntuple(i -> i, getnbasefunctions(ip)),)
 
 # RefTriangle, 1st order Lagrange
-# https://defelement.org/elements/examples/triangle-nedelec1-lagrange-1.html
+# https://defelement.org/elements/examples/triangle-nedelec1-lagrange-0.html
 function reference_shape_value(ip::Nedelec{RefTriangle, 1}, ξ::Vec{2}, i::Int)
     x, y = ξ
     i == 1 && return Vec(- y, x)
@@ -1912,7 +1912,7 @@ function get_direction(::Nedelec{RefTriangle, 1}, j, cell)
 end
 
 # RefTriangle, 2nd order Lagrange
-# https://defelement.org/elements/examples/triangle-nedelec1-lagrange-2.html
+# https://defelement.org/elements/examples/triangle-nedelec1-lagrange-1.html
 function reference_shape_value(ip::Nedelec{RefTriangle, 2}, ξ::Vec{2}, i::Int)
     x, y = ξ
     # Edge 1
@@ -1940,5 +1940,27 @@ adjust_dofs_during_distribution(::Nedelec{RefTriangle, 2}) = true
 function get_direction(::Nedelec{RefTriangle, 2}, j, cell)
     j > 6 && return 1
     edge = edges(cell)[(j + 1) ÷ 2]
+    return ifelse(edge[2] > edge[1], 1, -1)
+end
+
+# RefQuadrilateral, 1st order Lagrange
+# https://defelement.org/elements/examples/quadrilateral-nedelec1-lagrange-1.html
+# Scaled by 1/2 as the reference edge length in Ferrite is length 2, but 1 in DefElement.
+function reference_shape_value(ip::Nedelec{RefQuadrilateral, 1}, ξ::Vec{2, T}, i::Int) where {T}
+    x, y = ξ
+    nil = zero(T)
+
+    i == 1 && return Vec((1 - y) / 4, nil)
+    i == 2 && return Vec(nil, (1 + x) / 4)
+    i == 3 && return Vec(-(1 + y) / 4, nil) # Changed sign, follow Ferrite's sign convention
+    i == 4 && return Vec(nil, -(1 - x) / 4) # Changed sign, follow Ferrite's sign convention
+    throw(ArgumentError("no shape function $i for interpolation $ip"))
+end
+
+getnbasefunctions(::Nedelec{RefQuadrilateral, 1}) = 4
+edgedof_interior_indices(::Nedelec{RefQuadrilateral, 1}) = ((1,), (2,), (3,), (4,))
+adjust_dofs_during_distribution(::Nedelec{RefQuadrilateral, 1}) = false
+function get_direction(::Nedelec{RefQuadrilateral, 1}, j, cell)
+    edge = edges(cell)[j]
     return ifelse(edge[2] > edge[1], 1, -1)
 end
