@@ -1,5 +1,3 @@
-include("vtk_discontinuous.jl")
-
 """
     VTKGridFile(filename::AbstractString, grid::AbstractGrid; kwargs...)
     VTKGridFile(filename::AbstractString, dh::DofHandler; kwargs...)
