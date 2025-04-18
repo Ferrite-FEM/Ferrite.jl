@@ -155,7 +155,7 @@ A collection of constraints associated with the dof handler `dh`.
 """
 mutable struct ConstraintHandler{DH <: AbstractDofHandler, T}
     const dbcs::Vector{Dirichlet}
-    const pdbcs::Vector{L2ProjectedDirichlet}
+    const l2bcs::Vector{L2ProjectedDirichlet}
     const prescribed_dofs::Vector{Int}
     const free_dofs::Vector{Int}
     const inhomogeneities::Vector{T}
@@ -489,8 +489,8 @@ function update!(ch::ConstraintHandler, time::Real = 0.0)
             dbc.components, ch.dh, ch.bcvalues[i], ch.dofmapping, ch.dofcoefficients, time
         )
     end
-    for pdbc in ch.pdbcs
-        _update_weak_dbc!(ch.inhomogeneities, pdbc.f, pdbc.facets, pdbc.fv, pdbc.facet_dofs, ch.dh, ch.dofmapping, ch.dofcoefficients, time)
+    for bc in ch.l2bcs
+        _update_weak_dbc!(ch.inhomogeneities, bc.f, bc.facets, bc.fv, bc.facet_dofs, ch.dh, ch.dofmapping, ch.dofcoefficients, time)
     end
     # Compute effective inhomogeneity for affine constraints with prescribed dofs in the
     # RHS. For example, in u2 = w3 * u3 + w4 * u4 + b2 we allow e.g. u3 to be prescribed by
@@ -1847,42 +1847,42 @@ end
 # Q&D default, should be more elaborated
 _default_bc_qr_order(::Interpolation{<:Any, order}) where {order} = 2 * order
 
-function add!(ch::ConstraintHandler, dbc::L2ProjectedDirichlet)
+function add!(ch::ConstraintHandler, bc::L2ProjectedDirichlet)
     # Duplicate the Dirichlet constraint for every SubDofHandler
     dbc_added = false
     for sdh in ch.dh.subdofhandlers
         # Skip if the constrained field does not live on this sub domain
-        dbc.field_name in sdh.field_names || continue
-        # Compute the intersection between dbc.set and the cellset of this
+        bc.field_name in sdh.field_names || continue
+        # Compute the intersection between bc.set and the cellset of this
         # SubDofHandler and skip if the set is empty
-        filtered_set = filter_dbc_set(get_grid(ch.dh), sdh.cellset, dbc.facets)
+        filtered_set = filter_dbc_set(get_grid(ch.dh), sdh.cellset, bc.facets)
         isempty(filtered_set) && continue
         # Fetch information about the field on this SubDofHandler
-        field_idx = find_field(sdh, dbc.field_name)
+        field_idx = find_field(sdh, bc.field_name)
         interpolation = getfieldinterpolation(sdh, field_idx)
         CT = getcelltype(sdh) # Same celltype enforced in SubDofHandler constructor
-        qr_order = _default_bc_qr_order(dbc.qr_order, interpolation)
+        qr_order = _default_bc_qr_order(bc.qr_order, interpolation)
         fqr = FacetQuadratureRule{getrefshape(interpolation)}(qr_order)
         fv = FacetValues(fqr, interpolation, geometric_interpolation(CT))
         local_facet_dofs, local_facet_dofs_offset =
             _local_facet_dofs_for_bc(get_base_interpolation(interpolation), 1, 1, field_offset(sdh, field_idx), dirichlet_facetdof_indices)
         facet_dofs = ArrayOfVectorViews(local_facet_dofs_offset, local_facet_dofs, LinearIndices(1:(length(local_facet_dofs_offset) - 1)))
 
-        filtered_dbc = L2ProjectedDirichlet(dbc.f, filtered_set, dbc.field_name, qr_order, fv, facet_dofs)
+        filtered_dbc = L2ProjectedDirichlet(bc.f, filtered_set, bc.field_name, qr_order, fv, facet_dofs)
 
         _add!(ch, filtered_dbc, facet_dofs)
 
         dbc_added = true
     end
-    dbc_added || error("No overlap between dbc::L2ProjectedDirichlet and fields in the ConstraintHandler's DofHandler")
+    dbc_added || error("No overlap between bc::L2ProjectedDirichlet and fields in the ConstraintHandler's DofHandler")
     return ch
 end
 
-function _add!(ch::ConstraintHandler, pdbc::L2ProjectedDirichlet, facet_dofs)
+function _add!(ch::ConstraintHandler, bc::L2ProjectedDirichlet, facet_dofs)
     # loop over all the faces in the set and add the global dofs to `constrained_dofs`
     constrained_dofs = Int[]
     cc = CellCache(ch.dh, UpdateFlags(; nodes = false, coords = false, dofs = true))
-    for (cellidx, facetidx) in pdbc.facets
+    for (cellidx, facetidx) in bc.facets
         reinit!(cc, cellidx)
         local_dofs = facet_dofs[facetidx]
         for d in local_dofs
@@ -1891,7 +1891,7 @@ function _add!(ch::ConstraintHandler, pdbc::L2ProjectedDirichlet, facet_dofs)
     end
 
     # save it to the ConstraintHandler
-    push!(ch.pdbcs, pdbc)
+    push!(ch.l2bcs, bc)
     for d in constrained_dofs
         add_prescribed_dof!(ch, d, NaN, nothing)
     end
