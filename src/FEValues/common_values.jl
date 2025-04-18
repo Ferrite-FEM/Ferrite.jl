@@ -394,3 +394,16 @@ function reference_shape_hessians_gradients_and_values!(hessians::AbstractMatrix
     end
     return
 end
+
+assert_same_refshapes(::Union{QuadratureRule{RS}, FacetQuadratureRule{RS}}, ::Interpolation{RS}, ::Interpolation{RS}) where {RS} = nothing
+function assert_same_refshapes(qr::Union{QuadratureRule, FacetQuadratureRule}, ipf::Interpolation, ipg::Interpolation)
+    throw(
+        ArgumentError(
+            """
+            The reference shapes of the quadrature rule ($(getrefshape(qr))),
+            function interpolation ($(getrefshape(ipf))), and geometric interpolation ($(getrefshape(ipg))),
+            must be equal.
+            """
+        )
+    )
+end

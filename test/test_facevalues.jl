@@ -177,6 +177,13 @@
         end
     end
 
+    @testset "construction errors" begin
+        @test_throws ArgumentError FacetValues(FacetQuadratureRule{RefTriangle}(1), Lagrange{RefQuadrilateral, 1}())
+        @test_throws ArgumentError FacetValues(FacetQuadratureRule{RefTriangle}(1), Lagrange{RefTriangle, 1}(), Lagrange{RefQuadrilateral, 1}())
+        @test_throws ArgumentError FacetValues(FacetQuadratureRule{RefTriangle}(1), Lagrange{RefQuadrilateral, 1}(), Lagrange{RefQuadrilateral, 1}())
+        @test_throws ArgumentError FacetValues(FacetQuadratureRule{RefTriangle}(1), Lagrange{RefQuadrilateral, 1}(), Lagrange{RefTriangle, 1}())
+    end
+
     @testset "show" begin
         # Just smoke test to make sure show doesn't error.
         fv = FacetValues(FacetQuadratureRule{RefQuadrilateral}(2), Lagrange{RefQuadrilateral, 2}())
