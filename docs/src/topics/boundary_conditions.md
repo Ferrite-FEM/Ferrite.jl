@@ -104,7 +104,7 @@ and the finite element interpolation space. Although standard interpolations are
 the figure below illustrates well the difference between applying a standard `Dirichlet` condition and an
 `L2ProjectedDirichlet` condition when the prescribed function cannot be described by the chosen FE-interpolation.
 
-![L2ProjectedDirichlet illustration](https://raw.githubusercontent.com/Ferrite-FEM/Ferrite.jl/gh-pages/assets/L2ProjectedDirichlet.svg)
+![L2ProjectedDirichlet illustration](downloaded_assets/L2ProjectedDirichlet.svg)
 
 Here, we note that while the `Dirichlet` condition gives the correct value at the nodes, the `L2ProjectedDirichlet` gives
 a more accurate average boundary value (specifically the L2 projection of `f(x)` onto the finite element space).

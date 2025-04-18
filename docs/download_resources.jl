@@ -1,6 +1,7 @@
 # Download some assets necessary for docs/testing not stored in the repo
 import Downloads
 
+# Tutorials
 const directory = joinpath(@__DIR__, "src", "tutorials")
 mkpath(directory)
 
@@ -20,4 +21,15 @@ for (file, url) in [
     if !isfile(afile)
         Downloads.download(url, afile)
     end
+end
+
+# Topics
+const topics_directory = joinpath(@__DIR__, "src", "topics", "downloaded_assets")
+mkpath(topics_directory)
+
+for (file, url) in [
+        "L2ProjectedDirichlet.svg" => "https://raw.githubusercontent.com/Ferrite-FEM/Ferrite.jl/gh-pages/assets/L2ProjectedDirichlet.svg",
+    ]
+    afile = joinpath(topics_directory, file)
+    isfile(afile) || Downloads.download(url, afile)
 end
