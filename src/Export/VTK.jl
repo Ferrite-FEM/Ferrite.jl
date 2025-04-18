@@ -258,6 +258,11 @@ When `nodedata` contains second order tensors, the index order,
 `[11, 22, 33, 23, 13, 12, 32, 31, 21]`, follows the default Voigt order in Tensors.jl.
 """
 function write_node_data(vtk::VTKGridFile, nodedata, name)
+    if write_discontinuous(vtk)
+        # Note: Can be implemented, requires creating a larger nodedata vector indexed by
+        # the vtk node representation, but then the Ferrite grid must be available in `vtk`
+        throw(ArgumentError("Writing of node data to a discontinuous vtk grid is not supported"))
+    end
     _vtk_write_node_data(vtk.vtk, nodedata, name)
     return vtk
 end
