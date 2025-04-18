@@ -11,6 +11,7 @@ Pages = ["boundary_conditions.md"]
 ```@docs
 ConstraintHandler
 Dirichlet
+L2ProjectedDirichlet
 PeriodicDirichlet
 collect_periodic_facets
 collect_periodic_facets!
