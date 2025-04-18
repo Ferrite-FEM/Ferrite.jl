@@ -52,14 +52,16 @@ function test_interpolation_properties(ip::Interpolation{RefShape, FunOrder}) wh
         # Test A-D
         _test_interpolation_properties(dof_data, refshape_data)
 
-        # Test E: All base functions implemented.
+        # Test E: All base functions implemented and infers correct types.
         # Argument errors for 0th and n+1 indices.
-        ξ = zero(Vec{Ferrite.getrefdim(ip)})
-        @test_throws ArgumentError Ferrite.reference_shape_value(ip, ξ, 0)
-        for i in 1:getnbasefunctions(ip)
-            @test Ferrite.reference_shape_value(ip, ξ, i) isa Ferrite.shape_value_type(ip, Float64)
+        for T in (Float64, Float32)
+            ξ = zero(Vec{Ferrite.getrefdim(ip), T})
+            @test_throws ArgumentError Ferrite.reference_shape_value(ip, ξ, 0)
+            for i in 1:getnbasefunctions(ip)
+                @test (@inferred Ferrite.reference_shape_value(ip, ξ, i)) isa Ferrite.shape_value_type(ip, T)
+            end
+            @test_throws ArgumentError Ferrite.reference_shape_value(ip, ξ, getnbasefunctions(ip) + 1)
         end
-        @test_throws ArgumentError Ferrite.reference_shape_value(ip, ξ, getnbasefunctions(ip) + 1)
     end
 end
 
@@ -351,10 +353,10 @@ end
     end
 
     @testset "H(curl) and H(div)" begin
-        Hcurl_interpolations = [Nedelec{RefTriangle, 1}(), Nedelec{RefTriangle, 2}()] # Nedelec{3, RefTetrahedron, 1}(), Nedelec{3, RefHexahedron, 1}()]
+        Hcurl_interpolations = [Nedelec{RefTriangle, 1}(), Nedelec{RefTriangle, 2}(), Nedelec{RefQuadrilateral, 1}()] # Nedelec{3, RefTetrahedron, 1}(), Nedelec{3, RefHexahedron, 1}()]
         Hdiv_interpolations = [RaviartThomas{RefTriangle, 1}(), RaviartThomas{RefTriangle, 2}(), BrezziDouglasMarini{RefTriangle, 1}()]
-        test_interpolation_properties.(Hcurl_interpolations)  # Requires PR1136
-        test_interpolation_properties.(Hdiv_interpolations)   # Requires PR1136
+        test_interpolation_properties.(Hcurl_interpolations)
+        test_interpolation_properties.(Hdiv_interpolations)
 
         # These reference moments define the functionals that an interpolation should fulfill
         reference_moment(::RaviartThomas{RefTriangle, 1}, s, facet_shape_nr) = 1
@@ -362,6 +364,7 @@ end
         reference_moment(::BrezziDouglasMarini{RefTriangle, 1}, s, facet_shape_nr) = facet_shape_nr == 1 ? (1 - s) : s
         reference_moment(::Nedelec{RefTriangle, 1}, s, edge_shape_nr) = 1
         reference_moment(::Nedelec{RefTriangle, 2}, s, edge_shape_nr) = edge_shape_nr == 1 ? (1 - s) : s
+        reference_moment(::Nedelec{RefQuadrilateral, 1}, s, edge_shape_nr) = 1
 
         function_space(::RaviartThomas) = Val(:Hdiv)
         function_space(::BrezziDouglasMarini) = Val(:Hdiv)
