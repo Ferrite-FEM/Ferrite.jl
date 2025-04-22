@@ -55,6 +55,7 @@ struct GeometryMapping{DiffOrder, IP, M_t, dMdξ_t, d2Mdξ2_t}
     end
 end
 function GeometryMapping{0}(::Type{T}, ip::ScalarInterpolation, qr::QuadratureRule) where {T}
+    assert_same_refshapes(qr, ip, ip)
     n_shape = getnbasefunctions(ip)
     n_qpoints = getnquadpoints(qr)
     gm = GeometryMapping(ip, zeros(T, n_shape, n_qpoints), nothing, nothing)
@@ -62,6 +63,7 @@ function GeometryMapping{0}(::Type{T}, ip::ScalarInterpolation, qr::QuadratureRu
     return gm
 end
 function GeometryMapping{1}(::Type{T}, ip::ScalarInterpolation, qr::QuadratureRule) where {T}
+    assert_same_refshapes(qr, ip, ip)
     n_shape = getnbasefunctions(ip)
     n_qpoints = getnquadpoints(qr)
 
@@ -73,6 +75,7 @@ function GeometryMapping{1}(::Type{T}, ip::ScalarInterpolation, qr::QuadratureRu
     return gm
 end
 function GeometryMapping{2}(::Type{T}, ip::ScalarInterpolation, qr::QuadratureRule) where {T}
+    assert_same_refshapes(qr, ip, ip)
     n_shape = getnbasefunctions(ip)
     n_qpoints = getnquadpoints(qr)
 

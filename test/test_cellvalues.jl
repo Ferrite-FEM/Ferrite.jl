@@ -479,6 +479,13 @@
         end
     end
 
+    @testset "construction errors" begin
+        @test_throws ArgumentError CellValues(QuadratureRule{RefTriangle}(1), Lagrange{RefQuadrilateral, 1}())
+        @test_throws ArgumentError CellValues(QuadratureRule{RefTriangle}(1), Lagrange{RefTriangle, 1}(), Lagrange{RefQuadrilateral, 1}())
+        @test_throws ArgumentError CellValues(QuadratureRule{RefTriangle}(1), Lagrange{RefQuadrilateral, 1}(), Lagrange{RefQuadrilateral, 1}())
+        @test_throws ArgumentError CellValues(QuadratureRule{RefTriangle}(1), Lagrange{RefQuadrilateral, 1}(), Lagrange{RefTriangle, 1}())
+    end
+
     @testset "show" begin
         cv_quad = CellValues(QuadratureRule{RefQuadrilateral}(2), Lagrange{RefQuadrilateral, 2}()^2)
         showstring = sprint(show, MIME"text/plain"(), cv_quad)
