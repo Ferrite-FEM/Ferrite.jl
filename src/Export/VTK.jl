@@ -27,7 +27,7 @@ end
 """
 struct VTKGridFile{VTK <: WriteVTK.DatasetFile}
     vtk::VTK
-    cellnodes::Vector{UnitRange{Int}}
+    cellnodes::Union{Vector{UnitRange{Int}}, Nothing}
 end
 function VTKGridFile(filename::String, dh::DofHandler; kwargs...)
     for sdh in dh.subdofhandlers
@@ -54,7 +54,7 @@ function VTKGridFile(f::Function, args...; kwargs...)
     return vtk
 end
 
-write_discontinuous(vtk::VTKGridFile) = length(vtk.cellnodes) > 0
+write_discontinuous(vtk::VTKGridFile) = vtk.cellnodes !== nothing
 
 function Base.close(vtk::VTKGridFile)
     WriteVTK.vtk_save(vtk.vtk)
@@ -142,7 +142,7 @@ function create_vtk_grid(filename::AbstractString, grid::AbstractGrid, write_dis
         coords, cls, cellnodes = create_discontinuous_vtk_griddata(grid)
     else
         coords, cls = create_vtk_griddata(grid)
-        cellnodes = Vector{UnitRange{Int}}(undef, 0)
+        cellnodes = nothing
     end
     return WriteVTK.vtk_grid(filename, coords, cls; kwargs...), cellnodes
 end
