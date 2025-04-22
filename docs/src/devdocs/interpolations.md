@@ -57,10 +57,12 @@ Ferrite.reference_shape_hessians_gradients_and_values!
 Ferrite.shape_value_type(ip::Interpolation, ::Type{T}) where T<:Number
 ```
 
-## [How to implement a new interpolation, `QTI`](@id devdocs-howto_new-interpolation)
+## [How to implement a new interpolation](@id devdocs-howto_new-interpolation)
+!!! warning
+    The API for implementing a new interpolation is not fully stable yet.
+
 As an example, we will implement a `Q`uadratic `T`riangle `I`nterpolation
-(`QTI`), corresponding to `Lagrange{RefTriangle, 2}()`. This is described
-in the devdocs as the API is not considered fully stable yet. Since this interpolation
+(`QTI`), corresponding to `Lagrange{RefTriangle, 2}()`. Since this interpolation
 gives scalar-valued shape functions, it is a subtype of `ScalarInterpolation`,
 
 ```@example InterpolationExample
