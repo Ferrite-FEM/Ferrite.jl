@@ -1775,6 +1775,25 @@ function mapping_type end
 mapping_type(::ScalarInterpolation) = IdentityMapping()
 mapping_type(::VectorizedInterpolation) = IdentityMapping()
 
+"""
+    get_direction(interpolation::Interpolation, shape_nr::Int, cell::AbstractCell)
+
+Return the direction, `±1`, of the cell entity (e.g. facet or edge) associated with
+the `interpolation`'s shape function nr. `shape_nr`. This is only required for interpolations
+with non-identity mappings, where the direction is required during the mapping of the shape values.
+
+**TODO:** Move the following description to `get_edge_direction` and `get_face_direction`
+following #1162
+
+The direction of entities are defined as following the node numbers of the entity's
+vertices, `vnodes`. For an edge, `vnodes[2] > vnodes[1]` implies positive direction.
+
+For a face, we first find index, `i`, of the smallest value in `vnodes`. Considering
+circular indexing, then a positive face has `vnodes[i-1] > vnodes[i+1]`.
+"""
+function get_direction end
+
+
 #####################################
 # RaviartThomas (1st kind), H(div)  #
 #####################################
