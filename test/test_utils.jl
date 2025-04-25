@@ -8,20 +8,20 @@ Ferrite.getnbasefunctions(::TensorProductQ9TestInterpolation) = 9
 Ferrite.vertexdof_indices(::TensorProductQ9TestInterpolation) = ((1,), (3,), (9,), (7,))
 Ferrite.edgedof_indices(::TensorProductQ9TestInterpolation) = ((1, 3, 2), (3, 9, 6), (9, 7, 8), (7, 1, 4))
 Ferrite.edgedof_interior_indices(::TensorProductQ9TestInterpolation) = ((2,), (6,), (8,), (4,))
-Ferrite.facedof_indices(ip::TensorProductQ9TestInterpolation) = ((1,3,9,7,2,6,8,4,5),)
+Ferrite.facedof_indices(ip::TensorProductQ9TestInterpolation) = ((1, 3, 9, 7, 2, 6, 8, 4, 5),)
 Ferrite.facedof_interior_indices(::TensorProductQ9TestInterpolation) = ((5,))
 
 function Ferrite.reference_coordinates(::TensorProductQ9TestInterpolation)
     return [
         Vec{2, Float64}((-1.0, -1.0)),
-        Vec{2, Float64}(( 0.0, -1.0)),
-        Vec{2, Float64}(( 1.0, -1.0)),
-        Vec{2, Float64}((-1.0,  0.0)),
-        Vec{2, Float64}(( 0.0,  0.0)),
-        Vec{2, Float64}(( 1.0,  0.0)),
-        Vec{2, Float64}((-1.0,  1.0)),
-        Vec{2, Float64}(( 0.0,  1.0)),
-        Vec{2, Float64}(( 1.0,  1.0)),
+        Vec{2, Float64}((0.0, -1.0)),
+        Vec{2, Float64}((1.0, -1.0)),
+        Vec{2, Float64}((-1.0, 0.0)),
+        Vec{2, Float64}((0.0, 0.0)),
+        Vec{2, Float64}((1.0, 0.0)),
+        Vec{2, Float64}((-1.0, 1.0)),
+        Vec{2, Float64}((0.0, 1.0)),
+        Vec{2, Float64}((1.0, 1.0)),
     ]
 end
 

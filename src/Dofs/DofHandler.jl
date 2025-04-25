@@ -435,10 +435,10 @@ Main entry point to distribute dofs for a single [`SubDofHandler`](@ref) on its 
 """
 function _close_subdofhandler!(dh::DofHandler{sdim}, sdh::SubDofHandler, sdh_index::Int, nextdof::Int, vertexdicts, edgedicts, facedicts) where {sdim}
     # First we allocate space to store the indices.
-    sdh.ndofs_per_cell = sum([getnbasefunctions(ip) for ip in sdh.field_interpolations]; init=0)::Int
+    sdh.ndofs_per_cell = sum([getnbasefunctions(ip) for ip in sdh.field_interpolations]; init = 0)::Int
     field_offsets_cell = cumsum([1; [getnbasefunctions(ip) for ip in sdh.field_interpolations]])::Vector{Int}
 
-    subdomain_cell_dofs = zeros(Int, sdh.ndofs_per_cell*length(sdh.cellset))
+    subdomain_cell_dofs = zeros(Int, sdh.ndofs_per_cell * length(sdh.cellset))
 
     ip_infos = InterpolationInfo[]
     for interpolation in sdh.field_interpolations
@@ -453,7 +453,7 @@ function _close_subdofhandler!(dh::DofHandler{sdim}, sdh::SubDofHandler, sdh_ind
         # TODO: More than one face dof per face in 3D are not implemented yet. This requires
         #       keeping track of the relative rotation between the faces, not just the
         #       direction as for faces (i.e. edges) in 2D.
-        sdim == 3 && @assert !any(x -> x > 1, ip_info.lfacedofoffsets[2:end] .- ip_info.lfacedofoffsets[1:(end-1)])
+        sdim == 3 && @assert !any(x -> x > 1, ip_info.lfacedofoffsets[2:end] .- ip_info.lfacedofoffsets[1:(end - 1)])
     end
 
     # Mapping between the local field index and the global field index
@@ -484,21 +484,21 @@ function _close_subdofhandler!(dh::DofHandler{sdim}, sdh::SubDofHandler, sdh_ind
 end
 
 function _distribute_dofs_on_subdomain!(
-    grid::AbstractGrid,
-    sdh::SubDofHandler,
-    sdh_index::Int,
-    subdomain_celldofs_offset::Int,
-    field_offsets_cell,
-    subdomain_cell_dofs,
-    cell_to_subdofhandler,
-    cell_dofs_offsets,
-    ip_infos::Vector{InterpolationInfo},
-    nextdof::Int,
-    global_fidxs,
-    vertexdicts,
-    edgedicts,
-    facedicts,
-)
+        grid::AbstractGrid,
+        sdh::SubDofHandler,
+        sdh_index::Int,
+        subdomain_celldofs_offset::Int,
+        field_offsets_cell,
+        subdomain_cell_dofs,
+        cell_to_subdofhandler,
+        cell_dofs_offsets,
+        ip_infos::Vector{InterpolationInfo},
+        nextdof::Int,
+        global_fidxs,
+        vertexdicts,
+        edgedicts,
+        facedicts,
+    )
     current_celldofs_offset = 1
     # loop over all the cells, and distribute dofs for all the fields
     for ci in sdh.cellset
@@ -514,13 +514,13 @@ function _distribute_dofs_on_subdomain!(
 
         cell = getcells(grid, ci)
 
-        cell_dof_local_view = @view subdomain_cell_dofs[current_celldofs_offset:(current_celldofs_offset+sdh.ndofs_per_cell-1)]
+        cell_dof_local_view = @view subdomain_cell_dofs[current_celldofs_offset:(current_celldofs_offset + sdh.ndofs_per_cell - 1)]
 
         for (local_field_idx, ip_info) in pairs(ip_infos)
             global_fidx = global_fidxs[local_field_idx]
             @debug println("\tfield: $(sdh.field_names[local_field_idx])")
 
-            local_range         = field_offsets_cell[local_field_idx]:(field_offsets_cell[local_field_idx+1]-1)
+            local_range = field_offsets_cell[local_field_idx]:(field_offsets_cell[local_field_idx + 1] - 1)
             cell_dof_field_view = @view cell_dof_local_view[local_range]
 
             nextdof = _distribute_field_dofs_for_cell!(
@@ -580,7 +580,7 @@ end
 
 function add_vertex_dofs(cell_dofs, cell::AbstractCell, vertexdict, allvdofs::Vector{Int}, offsets::Vector{Int}, nextdof::Int, n_copies::Int)
     for (vi, vertex) in pairs(vertices(cell))
-        vdofs = @view allvdofs[offsets[vi]:offsets[vi+1]-1]
+        vdofs = @view allvdofs[offsets[vi]:(offsets[vi + 1] - 1)]
         length(vdofs) > 0 || continue # skip if no dof on this vertex
         @debug println("\t\tvertex #$vertex")
         first_dof = vertexdict[vertex]
@@ -590,12 +590,12 @@ function add_vertex_dofs(cell_dofs, cell::AbstractCell, vertexdict, allvdofs::Ve
                 # (lvi-1) previous vertex dofs and the (d-1) dofs already distributed for
                 # the current vertex dof
                 dof = first_dof + (lvi - 1) * n_copies + (d - 1)
-                cell_dofs[n_copies*(vdofs[lvi]-1) + d] = dof
+                cell_dofs[n_copies * (vdofs[lvi] - 1) + d] = dof
             end
         else # create dofs
             vertexdict[vertex] = nextdof
             for lvi in 1:length(vdofs), d in 1:n_copies
-                cell_dofs[n_copies*(vdofs[lvi]-1) + d] = nextdof
+                cell_dofs[n_copies * (vdofs[lvi] - 1) + d] = nextdof
                 nextdof += 1
             end
         end
@@ -628,8 +628,8 @@ end
 function add_face_dofs(cell_dofs, cell::AbstractCell, facedict::Dict, allfdofs::Vector{Int}, offsets::Vector{Int}, nextdof::Int, adjust_during_distribution::Bool, n_copies::Int)
     length(allfdofs) == 0 && return nextdof
     for (fi, face) in pairs(faces(cell))
-        fdofids = @view allfdofs[offsets[fi]:offsets[fi+1]-1]
-        nfacedofs =  length(fdofids)
+        fdofids = @view allfdofs[offsets[fi]:(offsets[fi + 1] - 1)]
+        nfacedofs = length(fdofids)
         nfacedofs > 0 || continue # skip if no dof on this face
         sface, orientation = sortface(face)
         @debug println("\t\tface #$sface, $orientation")
@@ -643,8 +643,8 @@ end
 function add_edge_dofs(cell_dofs, cell::AbstractCell, edgedict::Dict, alledofs::Vector{Int}, offsets::Vector{Int}, nextdof::Int, adjust_during_distribution::Bool, n_copies::Int)
     length(alledofs) == 0 && return nextdof
     for (ei, edge) in pairs(edges(cell))
-        edofids = @view alledofs[offsets[ei]:offsets[ei+1]-1]
-        nedgedofs =  length(edofids)
+        edofids = @view alledofs[offsets[ei]:(offsets[ei + 1] - 1)]
+        nedgedofs = length(edofids)
         nedgedofs > 0 || continue # skip if no dof on this edge
         sedge, orientation = sortedge(edge)
         @debug println("\t\tedge #$sedge, $orientation")
@@ -658,7 +658,7 @@ end
 function add_volume_dofs(cell_dofs, volumedofs::Vector{Int}, nextdof::Int, n_copies::Int)
     # @debug println("\t\tvolumedofs #$nextdof:$(nvolumedofs * n_copies - 1)")
     for vdof in volumedofs, d in 1:n_copies
-        cell_dofs[n_copies*(vdof-1) + d] = nextdof
+        cell_dofs[n_copies * (vdof - 1) + d] = nextdof
         nextdof += 1
     end
     return nextdof
@@ -706,9 +706,9 @@ described therein.
         # Reverse the dofs for the path
         dofs = reverse(dofs)
     end
-    for (i,dof) in enumerate(dofs)
+    for (i, dof) in enumerate(dofs)
         for d in 1:n_copies
-            j = n_copies*(local_range[i]-1) + d
+            j = n_copies * (local_range[i] - 1) + d
             cell_dofs[j] = dof + (d - 1)
         end
     end
@@ -785,10 +785,10 @@ For more details we refer to [1] as we follow the methodology described therein.
     end
     n_copies = step(dofs)
     @assert n_copies > 0
-    for (i,dof) in enumerate(dofs)
+    for (i, dof) in enumerate(dofs)
         for d in 1:n_copies
-            j = n_copies*(local_dof_table[i]-1) + d
-            cell_dofs[j] = n_copies*(dof-1) + d
+            j = n_copies * (local_dof_table[i] - 1) + d
+            cell_dofs[j] = n_copies * (dof - 1) + d
         end
     end
     return nothing
