@@ -155,6 +155,13 @@
             test_interfacevalues(grid, iv)
         end
     end
+    @testset "construction errors" begin
+        @test_throws ArgumentError InterfaceValues(FacetQuadratureRule{RefTriangle}(1), Lagrange{RefQuadrilateral, 1}())
+        @test_throws ArgumentError InterfaceValues(FacetQuadratureRule{RefTriangle}(1), Lagrange{RefTriangle, 1}(), Lagrange{RefQuadrilateral, 1}())
+        @test_throws ArgumentError InterfaceValues(FacetQuadratureRule{RefTriangle}(1), Lagrange{RefQuadrilateral, 1}(), Lagrange{RefQuadrilateral, 1}())
+        @test_throws ArgumentError InterfaceValues(FacetQuadratureRule{RefTriangle}(1), Lagrange{RefQuadrilateral, 1}(), Lagrange{RefTriangle, 1}())
+        @test_throws ArgumentError InterfaceValues(FacetQuadratureRule{RefTriangle}(1), Lagrange{RefTriangle, 1}(), FacetQuadratureRule{RefTriangle}(1), Lagrange{RefQuadrilateral, 1}())
+    end
     # Custom quadrature
     @testset "Custom quadrature interface values" begin
         cell_shape = Tetrahedron
