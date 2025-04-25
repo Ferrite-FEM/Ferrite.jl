@@ -587,16 +587,16 @@ end
             test_interpolation_functionals.(Hdiv_interpolations)
         end
 
-        # Test boundary conditions (L2ProjectedDirichlet)
+        # Test boundary conditions (ProjectedDirichlet)
         # Depending on the interpolation, we have different polynomials orders on the facets
         _facet_poly_order(ip::Nedelec) = Ferrite.getorder(ip) - 1
         _facet_poly_order(ip::RaviartThomas) = Ferrite.getorder(ip) - 1
         _facet_poly_order(ip::BrezziDouglasMarini) = Ferrite.getorder(ip)
         # Based on this order, p_facet, we expect that we should fullfill different criteria.
-        # * If we prescribe a polynomial function to L2ProjectedDirichlet with a lower or equal order
+        # * If we prescribe a polynomial function to ProjectedDirichlet with a lower or equal order
         #   than p_facet, we expect that the interpolation should match the provided function pointwise.
         # * If we prescribe a polynomial function with higher order, but lower order than what the quadrature
-        #   rule in L2ProjectedDirichlet can integrate exactly, we expect that the integral over the boundary are equal.
+        #   rule in ProjectedDirichlet can integrate exactly, we expect that the integral over the boundary are equal.
         # * If we prescribe a polynomial one order lower than we can integrate exactly, and p_facet ≥ 1,
         #   we expect that the integrated linear moment equation, ∫ x f(x) dx, is integrated exactly
         # The following tests check those properties for the H(div) and H(curl) interpolations.
@@ -644,9 +644,9 @@ end
             )
             grid = Ferrite.get_grid(dh)
             dbc = if custom_qr_order === nothing
-                L2ProjectedDirichlet(:u, facetset, f_bc)
+                ProjectedDirichlet(:u, facetset, f_bc)
             else
-                L2ProjectedDirichlet(:u, facetset, f_bc; qr_order = custom_qr_order)
+                ProjectedDirichlet(:u, facetset, f_bc; qr_order = custom_qr_order)
             end
             ch = close!(add!(ConstraintHandler(dh), dbc))
             a = zeros(ndofs(dh))
@@ -760,11 +760,11 @@ end
             end
         end
 
-        @testset "L2ProjectedDirichlet error path" begin
+        @testset "ProjectedDirichlet error path" begin
             dh_H1, _ = _setup_dh_fv_for_bc_test(Lagrange{RefTriangle, 1}()^2; nel = 1, qr_order = 1)
             dh_L2, _ = _setup_dh_fv_for_bc_test(DiscontinuousLagrange{RefTriangle, 1}()^2; nel = 1, qr_order = 1)
             for dh in (dh_H1, dh_L2)
-                dbc = L2ProjectedDirichlet(:u, Set([FacetIndex(1, 1)]), Returns(zero(Vec{2})))
+                dbc = ProjectedDirichlet(:u, Set([FacetIndex(1, 1)]), Returns(zero(Vec{2})))
                 ch = add!(ConstraintHandler(dh), dbc)
                 @test_throws ArgumentError close!(ch)
             end

@@ -28,7 +28,7 @@ const topics_directory = joinpath(@__DIR__, "src", "topics", "downloaded_assets"
 mkpath(topics_directory)
 
 for (file, url) in [
-        "L2ProjectedDirichlet.svg" => "https://raw.githubusercontent.com/Ferrite-FEM/Ferrite.jl/gh-pages/assets/L2ProjectedDirichlet.svg",
+        "ProjectedDirichlet.svg" => "https://raw.githubusercontent.com/Ferrite-FEM/Ferrite.jl/gh-pages/assets/ProjectedDirichlet.svg",
     ]
     afile = joinpath(topics_directory, file)
     isfile(afile) || Downloads.download(url, afile)

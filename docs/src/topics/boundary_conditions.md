@@ -93,20 +93,20 @@ end
     Most examples make use of Dirichlet boundary conditions, for example [Heat
     Equation](@ref tutorial-heat-equation).
 
-## L2ProjectedDirichlet
+## ProjectedDirichlet
 Some interpolations don't have nodal support points:
 ``H(\mathrm{curl})`` interpolations, e.g., `Nedelec`, are associated to edges
 and ``H(\mathrm{div})`` interpolations, e.g. `RaviartThomas`, are associated to facets.
 While normal `Dirichlet` boundary conditions assume the existence of such nodal support points,
-Ferrite provides the `L2ProjectedDirichlet`, which instead finds the degree of freedom values that
+Ferrite provides the `ProjectedDirichlet`, which instead finds the degree of freedom values that
 minimizes the L2-distance between the prescribed function, ``f(\boldsymbol{x},t,\boldsymbol{n})``,
 and the finite element interpolation space. Although standard interpolations are not currently supported,
 the figure below illustrates well the difference between applying a standard `Dirichlet` condition and an
-`L2ProjectedDirichlet` condition when the prescribed function cannot be described by the chosen FE-interpolation.
+`ProjectedDirichlet` condition when the prescribed function cannot be described by the chosen FE-interpolation.
 
-![L2ProjectedDirichlet illustration](downloaded_assets/L2ProjectedDirichlet.svg)
+![ProjectedDirichlet illustration](downloaded_assets/ProjectedDirichlet.svg)
 
-Here, we note that while the `Dirichlet` condition gives the correct value at the nodes, the `L2ProjectedDirichlet` gives
+Here, we note that while the `Dirichlet` condition gives the correct value at the nodes, the `ProjectedDirichlet` gives
 a more accurate average boundary value (specifically the L2 projection of `f(x)` onto the finite element space).
 
 ## Neumann boundary conditions
