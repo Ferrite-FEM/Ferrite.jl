@@ -423,6 +423,7 @@ function __close!(dh::DofHandler, alg::CompatibleLocalizedOrderDofDistributionAl
         )
     end
     dh.ndofs = maximum(dh.cell_dofs; init = 0)
+    dh.ndofs > 0 && @assert minimum(dh.cell_dofs; init = dh.ndofs) == 1
     dh.closed = true
 
     return dh, vertexdicts, edgedicts, facedicts
@@ -459,24 +460,22 @@ function _close_subdofhandler!(dh::DofHandler{sdim}, sdh::SubDofHandler, sdh_ind
     # Mapping between the local field index and the global field index
     global_fidxs = Int[findfirst(gname -> gname === lname, dh.field_names) for lname in sdh.field_names]
 
-    for (local_field_idx, field_interpolation) in pairs(sdh.field_interpolations)
-        nextdof = _distribute_dofs_on_subdomain!(
-            get_grid(dh),
-            sdh,
-            sdh_index,
-            length(dh.cell_dofs),
-            field_offsets_cell,
-            subdomain_cell_dofs,
-            dh.cell_to_subdofhandler,
-            dh.cell_dofs_offset,
-            ip_infos,
-            nextdof,
-            global_fidxs,
-            vertexdicts,
-            edgedicts,
-            facedicts,
-        )
-    end
+    nextdof = _distribute_dofs_on_subdomain!(
+        get_grid(dh),
+        sdh,
+        sdh_index,
+        length(dh.cell_dofs),
+        field_offsets_cell,
+        subdomain_cell_dofs,
+        dh.cell_to_subdofhandler,
+        dh.cell_dofs_offset,
+        ip_infos,
+        nextdof,
+        global_fidxs,
+        vertexdicts,
+        edgedicts,
+        facedicts,
+    )
 
     append!(dh.cell_dofs, subdomain_cell_dofs)
 
@@ -697,7 +696,7 @@ described therein.
 # References
  - [Scroggs2022](@cite) Scroggs et al. ACM Trans. Math. Softw. 48 (2022).
 """
-@inline function permute_and_set!(cell_dofs, local_range, dofs::StepRange{Int, Int}, orientation::PathOrientationInfo, adjust_during_distribution::Bool)
+@inline function permute_and_set!(cell_dofs, local_dof_table, dofs::StepRange{Int, Int}, orientation::PathOrientationInfo, adjust_during_distribution::Bool)
     # TODO Investigate if we can somehow pass the interpolation into this function in a
     # typestable way.
     n_copies = step(dofs)
@@ -708,8 +707,8 @@ described therein.
     end
     for (i, dof) in enumerate(dofs)
         for d in 1:n_copies
-            j = n_copies * (local_range[i] - 1) + d
-            cell_dofs[j] = dof + (d - 1)
+            j = n_copies * (local_dof_table[i] - 1) + d
+            cell_dofs[j] = (dof - 1) + d
         end
     end
     return nothing
@@ -788,7 +787,7 @@ For more details we refer to [1] as we follow the methodology described therein.
     for (i, dof) in enumerate(dofs)
         for d in 1:n_copies
             j = n_copies * (local_dof_table[i] - 1) + d
-            cell_dofs[j] = n_copies * (dof - 1) + d
+            cell_dofs[j] = (dof - 1) + d
         end
     end
     return nothing
