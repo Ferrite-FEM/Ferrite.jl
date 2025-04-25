@@ -129,7 +129,7 @@ vertex. In this case, we only have a single dof per vertex,
 Ferrite.vertexdof_indices(::QTI) = ((1,), (2,), (3,))
 compare_test(Ferrite.vertexdof_indices) # hide
 ```
-Note that the dofs are assigned in order of increasing codimension, followed by the 
+Note that the dofs are assigned in order of increasing codimension, followed by the
 index of the local geometry, consistent with its local orientation. E.g. first all
 dofs of the first vertex, then all dofs of the second vertex, and so on. The dof index
 can be arbitrarily assigned, as long as they are assigned consistently and between 1 and
