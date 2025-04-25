@@ -24,6 +24,6 @@ Ferrite.get_grid
 Ferrite.find_field
 Ferrite._find_field
 Ferrite._close_subdofhandler!
-Ferrite._distribute_dofs_for_cell!
-Ferrite.permute_and_push!
+Ferrite._distribute_field_dofs_for_cell!!
+Ferrite.permute_and_set!
 ```

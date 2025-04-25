@@ -129,13 +129,16 @@ vertex. In this case, we only have a single dof per vertex,
 Ferrite.vertexdof_indices(::QTI) = ((1,), (2,), (3,))
 compare_test(Ferrite.vertexdof_indices) # hide
 ```
-Note that the dof index numbering must be in order, first all in the first
-vertex, then all in the next vertex, and so on. (If we had two indices per
-vertex, we would have `((1,2), (3,4), (5,6))`). Next, we number the edge dofs,
-following the same convention, matching how we defined it above,
+Note that the dofs are assigned in order of increasing codimension, followed by the 
+index of the local geometry, consistent with its local orientation. E.g. first all
+dofs of the first vertex, then all dofs of the second vertex, and so on. The dof index
+can be arbitrarily assigned, as long as they are assigned consistently and between 1 and
+the number of basis functions (here 6).
 ```@example InterpolationExample
+#                                           e1    e2    e3
 Ferrite.edgedof_interior_indices(::QTI) = ((4,), (5,), (6,))
 compare_test(Ferrite.edgedof_interior_indices) # hide
+#                                  v1 v2 e1    v2 v3 e2    v3 v1 e3
 Ferrite.edgedof_indices(::QTI) = ((1, 2, 4,), (2, 3, 5,), (3, 1, 6,))
 compare_test(Ferrite.edgedof_indices) # hide
 ```
