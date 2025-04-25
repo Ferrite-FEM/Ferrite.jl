@@ -100,7 +100,8 @@ and ``H(\mathrm{div})`` interpolations, e.g. `RaviartThomas`, are associated to 
 While normal `Dirichlet` boundary conditions assume the existence of such nodal support points,
 Ferrite provides the `ProjectedDirichlet`, which instead finds the degree of freedom values that
 minimizes the L2-distance between the prescribed function, ``f(\boldsymbol{x},t,\boldsymbol{n})``,
-and the finite element interpolation space. Although standard interpolations are not currently supported,
+and the finite element interpolation space, cf. [Bartels2004:ProjectedDirichlet](@cite).
+Although standard interpolations are not currently supported,
 the figure below illustrates well the difference between applying a standard `Dirichlet` condition and an
 `ProjectedDirichlet` condition when the prescribed function cannot be described by the chosen FE-interpolation.
 
