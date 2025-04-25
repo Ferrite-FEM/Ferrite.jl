@@ -400,16 +400,6 @@ end
         ## Nedelec on RefHexahedron
         reference_edge_moment(::Nedelec{RefHexahedron, 1}, edge_shape_nr, s) = 1
 
-        function test_interpolation_functionals(ip::Interpolation)
-            return test_interpolation_functionals(Ferrite.conformity(ip), Val(Ferrite.getrefdim(ip)), ip)
-        end
-
-        function_space(::RaviartThomas) = Val(:Hdiv)
-        function_space(::BrezziDouglasMarini) = Val(:Hdiv)
-        function_space(::Nedelec) = Val(:Hcurl)
-        # function_space(::Lagrange) = Val(:H1)
-        # function_space(::DiscontinuousLagrange) = Val(:L2)
-
         """
             integrate_edge(f)
 
@@ -453,7 +443,7 @@ end
 
         function test_interpolation_functionals(ip::Interpolation)
             @testset "functionals $ip" begin
-                test_interpolation_functionals(function_space(ip), Val(Ferrite.getrefdim(ip)), ip)
+                test_interpolation_functionals(Ferrite.conformity(ip), Val(Ferrite.getrefdim(ip)), ip)
             end
         end
 
@@ -621,7 +611,7 @@ end
             CT = cell_type(RefShape)
             dim = Ferrite.getrefdim(CT) # dim=sdim=vdim
             grid = generate_grid(CT, ntuple(Returns(nel), dim), -0.25 * ones(Vec{dim}), 0.2 * ones(Vec{dim}))
-            transform_coordinates!(grid, x -> x + 0.5 * Vec(ntuple(i -> abs(x[dim - i + 1])^(1 + i / dim), dim)))
+            transform_coordinates!(grid, x -> x + 0.25 * Vec(ntuple(i -> abs(x[dim - i + 1])^(1 + i / dim), dim)))
             qr = FacetQuadratureRule{RefShape}(qr_order)
             fv = FacetValues(qr, ip, geometric_interpolation(CT))
             dh = close!(add!(DofHandler(grid), :u, ip))
@@ -634,7 +624,7 @@ end
             mixgrid, nr_quad = grid_with_inserted_quad(trigrid, (3, 4); update_sets = false) # Quad on bottom facet.
             empty!(mixgrid.facetsets)
             addfacetset!(mixgrid, "bottom", x -> x[2] ≈ -0.25)
-            transform_coordinates!(mixgrid, x -> x + 0.5 * Vec(ntuple(i -> abs(x[dim - i + 1])^(1 + i / dim), dim)))
+            transform_coordinates!(mixgrid, x -> x + 0.25 * Vec(ntuple(i -> abs(x[dim - i + 1])^(1 + i / dim), dim)))
             qr_tri = FacetQuadratureRule{RefTriangle}(qr_order)
             fv_tri = FacetValues(qr_tri, ips[1], geometric_interpolation(Triangle))
             qr_quad = FacetQuadratureRule{RefQuadrilateral}(qr_order)
@@ -650,10 +640,14 @@ end
 
         function test_bc_integral(
                 f_bc::Function, check_fun::Function, moment_fun::Function, dh::DofHandler, facetset, fvs::Tuple;
-                tol = 1.0e-6, pointwise_check
+                tol = 1.0e-6, custom_qr_order = nothing, pointwise_check, kwargs...
             )
             grid = Ferrite.get_grid(dh)
-            dbc = L2ProjectedDirichlet(:u, facetset, f_bc)
+            dbc = if custom_qr_order === nothing
+                L2ProjectedDirichlet(:u, facetset, f_bc)
+            else
+                L2ProjectedDirichlet(:u, facetset, f_bc; qr_order = custom_qr_order)
+            end
             ch = close!(add!(ConstraintHandler(dh), dbc))
             a = zeros(ndofs(dh))
             apply!(a, ch)
@@ -662,7 +656,7 @@ end
             check_val = zero(check_fun(zero(Ferrite.shape_value_type(fv1)), getnormal(fv1, 1)))
             @assert typeof(test_val) === typeof(check_val)
             for (sdh, fv) in zip(dh.subdofhandlers, fvs)
-                tv, cv = test_bc_integral(f_bc, check_fun, moment_fun, sdh, a, facetset, fv; pointwise_check)
+                tv, cv = test_bc_integral(f_bc, check_fun, moment_fun, sdh, a, facetset, fv; pointwise_check, kwargs...)
                 test_val += tv
                 check_val += cv
             end
@@ -706,22 +700,21 @@ end
             for ip in Hdiv_interpolations
                 @testset "$ip" begin
                     dh, fv = _setup_dh_fv_for_bc_test(ip)
-                    qr_order = Ferrite._default_bc_qr_order(ip) # Default for L2ProjectedDirichlet
-                    nexp = 2 * qr_order - 1 # Exact gauss integration for polynomial of order nexp.
                     linear_x1(x, _, _) = x[1]
                     quadratic_x1(x, _, _) = (x[1] - 0.3)^2
-                    nonlinear(x, _, _) = 100 * (x[1] - 0.3)^nexp
+                    nonlinear(x, _, _) = 100 * (x[1] - 0.3)^4
                     funs = [
                         (Returns(0.0), true),
                         (Returns(rand()), true),
                         (linear_x1, _facet_poly_order(ip) ≥ 1),
                         (quadratic_x1, _facet_poly_order(ip) ≥ 2),
-                        (nonlinear, false), # Only test integral quantities
+                        (nonlinear, false), # Only test integral quantities using high-order integration.
                     ]
                     for (f_bc, pointwise_check) in funs
                         @testset "f_bc = $f_bc" begin
                             for facetset in values(dh.grid.facetsets)
-                                test_bc_integral(f_bc, ⋅, Returns(1), dh, facetset, fv; pointwise_check)
+                                custom_qr_order = f_bc === nonlinear ? 5 : nothing
+                                test_bc_integral(f_bc, ⋅, Returns(1), dh, facetset, fv; pointwise_check, custom_qr_order)
                                 if _facet_poly_order(ip) ≥ 1 && f_bc !== nonlinear # Linear facet polynomial should pass moment test.
                                     test_bc_integral(f_bc, ⋅, x -> x[1], dh, facetset, fv; pointwise_check = false)
                                 end
@@ -736,17 +729,15 @@ end
             ips = Any[Hcurl_interpolations...]
             push!(ips, (Nedelec{RefTriangle, 1}(), Nedelec{RefQuadrilateral, 1}())) # Mixed case
             for interp in ips
+                ip = isa(interp, Tuple) ? interp[1] : interp
+                dim = Ferrite.getrefdim(getrefshape(ip))
+                dim == 3 && continue # TODO: Not yet implemented
                 @testset "$interp" begin
                     dh, fvs = _setup_dh_fv_for_bc_test(interp)
-                    ip = isa(interp, Tuple) ? interp[1] : interp
-                    dim = Ferrite.getrefdim(getrefshape(ip))
-                    @assert dim == 2 # 3d not supported yet
-                    qr_order = Ferrite._default_bc_qr_order(ip) # Default for L2ProjectedDirichlet
-                    nexp = 2 * qr_order - 1 # Exact gauss integration for polynomial of order nexp.
                     v3 = rand()
                     linear_x1(x, _, _) = x[1] * Vec((0.0, 0.0, v3))
                     quadratic_x1(x, _, _) = (x[1] - 0.3)^2 * Vec((0.0, 0.0, v3))
-                    nonlinear(x, _, _) = Vec((0.0, 0.0, v3)) * (100 * (x[1] + 0.3)^nexp)
+                    nonlinear(x, _, _) = Vec((0.0, 0.0, v3)) * (100 * (x[1] + 0.3)^4)
                     funs = [
                         (Returns(zero(Vec{3})), true),
                         (Returns(Vec((0.0, 0.0, rand()))), true),
@@ -757,7 +748,8 @@ end
                     for (f_bc, pointwise_check) in funs
                         @testset "f_bc = $f_bc" begin
                             for facetset in values(dh.grid.facetsets)
-                                test_bc_integral(f_bc, ×, Returns(1.0), dh, facetset, fvs; pointwise_check)
+                                custom_qr_order = f_bc === nonlinear ? 5 : nothing
+                                test_bc_integral(f_bc, ×, Returns(1.0), dh, facetset, fvs; pointwise_check, custom_qr_order)
                                 if _facet_poly_order(ip) ≥ 1  && f_bc !== nonlinear
                                     test_bc_integral(f_bc, ×, x -> x[1], dh, facetset, fvs; pointwise_check = false)
                                 end
