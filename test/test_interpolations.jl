@@ -79,17 +79,15 @@ function _test_interpolation_properties(dofs::NamedTuple, rs::NamedTuple)
     all_dofs = Int[]
     # Vertices numbered first
     append!(all_dofs, collect_all_dofs(dofs.vert))
-    @test all(all_dofs .== 1:length(all_dofs))
+    @test all(1 .≤ all_dofs .≤ dofs.n)
+    @test length(all_dofs) == length(Set(all_dofs))
+
     if rs.rdim ≥ 1 # Test edges
-        # Edges numbered next, no gaps or missing numbers. Sorted by edge number.
+        # Edges have no numbers. Sorted by edge number.
         all_edofs_i = collect_all_dofs(dofs.edge_i)
-        @test all(all_edofs_i .== length(all_dofs) .+ (1:length(all_edofs_i)))
         # - all edge dofs include both vertexdofs and interior edegdofs, and nothing more.
         append!(all_dofs, all_edofs_i)
-        @test all(all_dofs .== 1:length(all_dofs))
         @test length(all_dofs) == length(collect_all_dofs(dofs.vert)) + length(all_edofs_i)
-        # Coarse check for C
-        @test Set(collect_all_dofs(dofs.edge)) == Set(1:length(all_dofs))
         # - test each edge individually (Detailed check for C)
         for (edge_nr, edge_vertices) in enumerate(rs.edges)
             vdofs_e = Int[] # dofs.vert for vertices belonging to the current edge
@@ -99,15 +97,14 @@ function _test_interpolation_properties(dofs::NamedTuple, rs::NamedTuple)
             @test Set(dofs.edge[edge_nr]) == Set(vcat(vdofs_e, collect(dofs.edge_i[edge_nr])))
         end
     end
+    @test all(1 .≤ all_dofs .≤ dofs.n)
+    @test length(all_dofs) == length(Set(all_dofs))
+
     if rs.rdim ≥ 2 # Test faces
         # Face numbered next, no gaps or missing numbers. Sorted by face number.
         all_fdofs_i = collect_all_dofs(dofs.face_i)
-        @test all(all_fdofs_i .== length(all_dofs) .+ (1:length(all_fdofs_i)))
         # - all dofs now include vertex dofs, edge dofs and face dofs, but not volume dofs.
         append!(all_dofs, all_fdofs_i)
-        @test all(all_dofs .== 1:length(all_dofs))
-        # Coarse check for C
-        @test Set(collect_all_dofs(dofs.face)) == Set(1:length(all_dofs))
         # - test each face individually (Detailed check for C)
         for (facenr, face_verts) in enumerate(rs.faces)
             vdofs_f = Int[]
@@ -124,12 +121,15 @@ function _test_interpolation_properties(dofs::NamedTuple, rs::NamedTuple)
             @test Set(dofs.face[facenr]) == Set(vcat(vdofs_f, edofs_f, collect(dofs.face_i[facenr])))
         end
     end
+    @test all(1 .≤ all_dofs .≤ dofs.n)
+    @test length(all_dofs) == length(Set(all_dofs))
+
     # Test volume
     # We always test this, since volumedofs are also used by lower-dimensional
     # discontinuous inteprolations to make them internal to the cell, e.g. DiscontinuousLagrange
     # Volumedofs numbered last
     append!(all_dofs, collect(dofs.vol_i))
-    @test all(all_dofs .== 1:length(all_dofs))        # Numbering convention
+    @test all(1 .≤ all_dofs .≤ dofs.n)
 
     # Test D: getnbasefunctions matching number of dof indices
     return @test length(all_dofs) == dofs.n
@@ -140,6 +140,7 @@ end
             Lagrange{RefLine, 2}(),
             Lagrange{RefQuadrilateral, 1}(),
             Lagrange{RefQuadrilateral, 2}(),
+            TensorProductQ9TestInterpolation(),
             Lagrange{RefQuadrilateral, 3}(),
             Lagrange{RefTriangle, 1}(),
             Lagrange{RefTriangle, 2}(),
@@ -254,7 +255,7 @@ end
 
         # regression for https://github.com/Ferrite-FEM/Ferrite.jl/issues/520
         interpolation_type = typeof(interpolation).name.wrapper
-        if func_order > 1 && interpolation_type != Ferrite.Serendipity
+        if func_order > 1 && interpolation_type ∉ (Ferrite.Serendipity, TensorProductQ9TestInterpolation)
             first_order = interpolation_type{ref_shape, 1}()
             for (highorderface, firstorderface) in zip(Ferrite.facedof_indices(interpolation), Ferrite.facedof_indices(first_order))
                 for (h_node, f_node) in zip(highorderface, firstorderface)
@@ -546,7 +547,7 @@ end
             # Test functionals associated with the edges
             for edge_nr in 1:Ferrite.nedges(RefShape)
                 edge_coords = getindex.((Ferrite.reference_coordinates(ipg),), Ferrite.reference_edges(RefShape)[edge_nr])
-                tangent = normalize(edge_coords[2] - edge_coords[1])
+                tangent = Tensors.normalize(edge_coords[2] - edge_coords[1])
                 dof_inds = Ferrite.edgedof_interior_indices(ip)[edge_nr]
 
                 ξ(s) = parameterize_edge(edge_coords, s)

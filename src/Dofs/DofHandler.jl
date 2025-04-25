@@ -330,19 +330,34 @@ function add!(dh::DofHandler, name::Symbol, ip::Interpolation)
 end
 
 """
-    close!(dh::AbstractDofHandler)
+    close!(dh::AbstractDofHandler, [alg])
 
-Closes `dh` and creates degrees of freedom for each cell.
+Closes `dh` and creates degrees of freedom for each cell with some given algorithm.
 """
-function close!(dh::DofHandler)
-    dh, _, _, _ = __close!(dh)
+function close!(dh::DofHandler, alg = CompatibleLocalizedOrderDofDistributionAlgorithm()) # Changing the dof distribution algorithm is considered a breakin change, so we keep the standard algo one for now instead of automatically choosing one.
+    dh, _, _, _ = __close!(dh, alg)
     return dh
 end
 
 """
-    __close!(dh::DofHandler)
+    DefaultDofDistributionAlgorithm
 
-Internal entry point for dof distribution.
+Automatically chooses a suitable dof distribution algorithm.
+"""
+struct DefaultDofDistributionAlgorithm
+end
+
+"""
+    NodalDofDistributionAlgorithm
+
+Construct a dof ordering compatible with the node order of the mesh.
+Requires a compatible interpolation, i.e. the nodes of the geometric ansatz function **must** match the field interpolations nodes.
+"""
+struct NodalDofDistributionAlgorithm
+end
+
+"""
+    CompatibleLocalizedOrderDofDistributionAlgorithm
 
 Dofs are distributed as follows:
 For the `DofHandler` each `SubDofHandler` is visited in the order they were added.
@@ -352,8 +367,20 @@ so first the dofs for field 1 are distributed, then field 2, etc.
 For each cell dofs are first distributed on its vertices, then on the interior of edges (if applicable), then on the
 interior of faces (if applicable), and finally on the cell interior.
 The entity ordering follows the geometrical ordering found in [`vertices`](@ref), [`faces`](@ref) and [`edges`](@ref).
+
+Here it is assumed that all interpolations are of compatible characteristic order.
 """
-function __close!(dh::DofHandler{dim}) where {dim}
+struct CompatibleLocalizedOrderDofDistributionAlgorithm
+end
+
+__close!(dh::DofHandler, alg::NodalDofDistributionAlgorithm) = error("Nodal dof distribution is not implemented.")
+
+"""
+    __close!(dh::DofHandler, alg)
+
+Internal entry point for dof distribution.
+"""
+function __close!(dh::DofHandler, alg::CompatibleLocalizedOrderDofDistributionAlgorithm)
     @assert !isclosed(dh)
 
     # Collect the global field names
@@ -399,154 +426,180 @@ function __close!(dh::DofHandler{dim}) where {dim}
     dh.closed = true
 
     return dh, vertexdicts, edgedicts, facedicts
-
 end
 
 """
     _close_subdofhandler!(dh::DofHandler{sdim}, sdh::SubDofHandler, sdh_index::Int, nextdof::Int, vertexdicts, edgedicts, facedicts) where {sdim}
 
-Main entry point to distribute dofs for a single [`SubDofHandler`](@ref) on its subdomain.
+Main entry point to distribute dofs for a single [`SubDofHandler`](@ref) on its subdomain with the same interpolation kind per cell.
 """
 function _close_subdofhandler!(dh::DofHandler{sdim}, sdh::SubDofHandler, sdh_index::Int, nextdof::Int, vertexdicts, edgedicts, facedicts) where {sdim}
+    # First we allocate space to store the indices.
+    sdh.ndofs_per_cell = sum([getnbasefunctions(ip) for ip in sdh.field_interpolations]; init=0)::Int
+    field_offsets_cell = cumsum([1; [getnbasefunctions(ip) for ip in sdh.field_interpolations]])::Vector{Int}
+
+    subdomain_cell_dofs = zeros(Int, sdh.ndofs_per_cell*length(sdh.cellset))
+
     ip_infos = InterpolationInfo[]
     for interpolation in sdh.field_interpolations
         ip_info = InterpolationInfo(interpolation)
         base_ip = get_base_interpolation(interpolation)
         begin
-            next_dof_index = 1
-            for vdofs in vertexdof_indices(base_ip)
-                for dof_index in vdofs
-                    @assert dof_index == next_dof_index "Vertex dof ordering not supported. Please consult the dev docs."
-                    next_dof_index += 1
-                end
-            end
-            for vdofs in edgedof_interior_indices(base_ip)
-                for dof_index in vdofs
-                    @assert dof_index == next_dof_index "Edge dof ordering not supported. Please consult the dev docs."
-                    next_dof_index += 1
-                end
-            end
-            for vdofs in facedof_interior_indices(base_ip)
-                for dof_index in vdofs
-                    @assert dof_index == next_dof_index "Face dof ordering not supported. Please consult the dev docs."
-                    next_dof_index += 1
-                end
-            end
-            for dof_index in volumedof_interior_indices(base_ip)
-                @assert next_dof_index <= dof_index <= getnbasefunctions(base_ip) "Cell dof ordering not supported. Please consult the dev docs."
-            end
+            alldofs = [ip_info.lvertexdofs; ip_info.ledgedofs; ip_info.lfacedofs; ip_info.lvolumedofs]
+            @assert length(alldofs) == length(Set(alldofs)) "Interpolation has non-unqiue dof assignment."
+            @assert maximum(alldofs) == length(alldofs) && minimum(alldofs) == 1 "Interpolation is not continously numbered."
         end
         push!(ip_infos, ip_info)
         # TODO: More than one face dof per face in 3D are not implemented yet. This requires
         #       keeping track of the relative rotation between the faces, not just the
         #       direction as for faces (i.e. edges) in 2D.
-        sdim == 3 && @assert !any(x -> x > 1, ip_info.nfacedofs)
+        sdim == 3 && @assert !any(x -> x > 1, ip_info.lfacedofoffsets[2:end] .- ip_info.lfacedofoffsets[1:(end-1)])
     end
-
-    # TODO: Given the InterpolationInfo it should be possible to compute ndofs_per_cell, but
-    # doesn't quite work for embedded elements right now (they don't distribute all dofs
-    # "promised" by InterpolationInfo). Instead we compute it based on the number of dofs
-    # added for the first cell in the set.
-    first_cell = true
-    ndofs_per_cell = -1
 
     # Mapping between the local field index and the global field index
     global_fidxs = Int[findfirst(gname -> gname === lname, dh.field_names) for lname in sdh.field_names]
 
+    for (local_field_idx, field_interpolation) in pairs(sdh.field_interpolations)
+        nextdof = _distribute_dofs_on_subdomain!(
+            get_grid(dh),
+            sdh,
+            sdh_index,
+            length(dh.cell_dofs),
+            field_offsets_cell,
+            subdomain_cell_dofs,
+            dh.cell_to_subdofhandler,
+            dh.cell_dofs_offset,
+            ip_infos,
+            nextdof,
+            global_fidxs,
+            vertexdicts,
+            edgedicts,
+            facedicts,
+        )
+    end
+
+    append!(dh.cell_dofs, subdomain_cell_dofs)
+
+    return nextdof
+end
+
+function _distribute_dofs_on_subdomain!(
+    grid::AbstractGrid,
+    sdh::SubDofHandler,
+    sdh_index::Int,
+    subdomain_celldofs_offset::Int,
+    field_offsets_cell,
+    subdomain_cell_dofs,
+    cell_to_subdofhandler,
+    cell_dofs_offsets,
+    ip_infos::Vector{InterpolationInfo},
+    nextdof::Int,
+    global_fidxs,
+    vertexdicts,
+    edgedicts,
+    facedicts,
+)
+    current_celldofs_offset = 1
     # loop over all the cells, and distribute dofs for all the fields
     for ci in sdh.cellset
         @debug println("Creating dofs for cell #$ci")
 
+        # We do set this information in this function to prevent looping a second time over the cellsets.
+        # Technically we could also fully eliminate this array and just store the subdomain offsets in the subdofhandlers.
+        cell_dofs_offsets[ci] = subdomain_celldofs_offset + current_celldofs_offset
+
         # TODO: _check_cellset_intersections can be removed in favor of this assertion
-        @assert dh.cell_to_subdofhandler[ci] == 0
-        dh.cell_to_subdofhandler[ci] = sdh_index
+        @assert cell_to_subdofhandler[ci] == 0 || cell_to_subdofhandler[ci] == sdh_index
+        cell_to_subdofhandler[ci] = sdh_index
 
-        cell = getcells(get_grid(dh), ci)
-        len_cell_dofs_start = length(dh.cell_dofs)
-        dh.cell_dofs_offset[ci] = len_cell_dofs_start + 1
+        cell = getcells(grid, ci)
 
-        # Distribute dofs per field
-        for (lidx, gidx) in pairs(global_fidxs)
-            @debug println("\tfield: $(sdh.field_names[lidx])")
-            nextdof = _distribute_dofs_for_cell!(
-                dh,
+        cell_dof_local_view = @view subdomain_cell_dofs[current_celldofs_offset:(current_celldofs_offset+sdh.ndofs_per_cell-1)]
+
+        for (local_field_idx, ip_info) in pairs(ip_infos)
+            global_fidx = global_fidxs[local_field_idx]
+            @debug println("\tfield: $(sdh.field_names[local_field_idx])")
+
+            local_range         = field_offsets_cell[local_field_idx]:(field_offsets_cell[local_field_idx+1]-1)
+            cell_dof_field_view = @view cell_dof_local_view[local_range]
+
+            nextdof = _distribute_field_dofs_for_cell!(
+                cell_dof_field_view,
                 cell,
-                ip_infos[lidx],
+                ip_info,
                 nextdof,
-                vertexdicts[gidx],
-                edgedicts[gidx],
-                facedicts[gidx]
+                vertexdicts[global_fidx],
+                edgedicts[global_fidx],
+                facedicts[global_fidx],
             )
+
+            @debug println("\tDofs for field on cell #$ci:\t$(cell_dof_field_view)")
         end
 
-        if first_cell
-            ndofs_per_cell = length(dh.cell_dofs) - len_cell_dofs_start
-            sdh.ndofs_per_cell = ndofs_per_cell
-            first_cell = false
-        else
-            @assert ndofs_per_cell == length(dh.cell_dofs) - len_cell_dofs_start
-        end
-        @debug println("\tDofs for cell #$ci:\t$(dh.cell_dofs[(end - ndofs_per_cell + 1):end])")
+        current_celldofs_offset += sdh.ndofs_per_cell
     end # cell loop
+
     return nextdof
 end
 
 """
-    _distribute_dofs_for_cell!(dh::DofHandler{sdim}, cell::AbstractCell, ip_info::InterpolationInfo, nextdof::Int, vertexdict, edgedict, facedict) where {sdim}
+    _distribute_field_dofs_for_cell!(dh::DofHandler{sdim}, cell::AbstractCell, ip_info::InterpolationInfo, nextdof::Int, vertexdict, edgedict, facedict) where {sdim}
 
-Main entry point to distribute dofs for a single cell.
+Main entry point to distribute dofs for a single cell for a given interpolation.
 """
-function _distribute_dofs_for_cell!(dh::DofHandler{sdim}, cell::AbstractCell, ip_info::InterpolationInfo, nextdof::Int, vertexdict, edgedict, facedict) where {sdim}
-
+function _distribute_field_dofs_for_cell!(cell_field_dofs, cell::AbstractCell, ip_info, nextdof::Int, vertexdict, edgedict, facedict)
     # Distribute dofs for vertices
     nextdof = add_vertex_dofs(
-        dh.cell_dofs, cell, vertexdict,
-        ip_info.nvertexdofs, nextdof, ip_info.n_copies,
+        cell_field_dofs, cell, vertexdict,
+        ip_info.lvertexdofs, ip_info.lvertexdofoffsets, nextdof,
+        ip_info.n_copies,
     )
 
     # Distribute dofs for edges
     nextdof = add_edge_dofs(
-        dh.cell_dofs, cell, edgedict,
-        ip_info.nedgedofs, nextdof,
-        ip_info.adjust_during_distribution, ip_info.n_copies,
+        cell_field_dofs, cell, edgedict,
+        ip_info.ledgedofs, ip_info.ledgedofoffsets, nextdof,
+        ip_info.adjust_during_distribution,
+        ip_info.n_copies,
     )
 
     # Distribute dofs for faces.
     nextdof = add_face_dofs(
-        dh.cell_dofs, cell, facedict,
-        ip_info.nfacedofs, nextdof,
+        cell_field_dofs, cell, facedict,
+        ip_info.lfacedofs, ip_info.lfacedofoffsets, nextdof,
         ip_info.adjust_during_distribution, ip_info.n_copies,
     )
 
     # Distribute internal dofs for cells
     nextdof = add_volume_dofs(
-        dh.cell_dofs, ip_info.nvolumedofs, nextdof, ip_info.n_copies,
+        cell_field_dofs, ip_info.lvolumedofs, nextdof, ip_info.n_copies,
     )
 
     return nextdof
 end
 
-function add_vertex_dofs(cell_dofs::Vector{Int}, cell::AbstractCell, vertexdict, nvertexdofs::Vector{Int}, nextdof::Int, n_copies::Int)
+function add_vertex_dofs(cell_dofs, cell::AbstractCell, vertexdict, allvdofs::Vector{Int}, offsets::Vector{Int}, nextdof::Int, n_copies::Int)
     for (vi, vertex) in pairs(vertices(cell))
-        nvertexdofs[vi] > 0 || continue # skip if no dof on this vertex
+        vdofs = @view allvdofs[offsets[vi]:offsets[vi+1]-1]
+        length(vdofs) > 0 || continue # skip if no dof on this vertex
         @debug println("\t\tvertex #$vertex")
         first_dof = vertexdict[vertex]
         if first_dof > 0 # reuse dof
-            for lvi in 1:nvertexdofs[vi], d in 1:n_copies
+            for lvi in 1:length(vdofs), d in 1:n_copies
                 # (Re)compute the next dof from first_dof by adding n_copies dofs from the
                 # (lvi-1) previous vertex dofs and the (d-1) dofs already distributed for
                 # the current vertex dof
                 dof = first_dof + (lvi - 1) * n_copies + (d - 1)
-                push!(cell_dofs, dof)
+                cell_dofs[n_copies*(vdofs[lvi]-1) + d] = dof
             end
         else # create dofs
             vertexdict[vertex] = nextdof
-            for _ in 1:nvertexdofs[vi], _ in 1:n_copies
-                push!(cell_dofs, nextdof)
+            for lvi in 1:length(vdofs), d in 1:n_copies
+                cell_dofs[n_copies*(vdofs[lvi]-1) + d] = nextdof
                 nextdof += 1
             end
         end
-        @debug println("\t\t\tdofs: $(cell_dofs[(end - nvertexdofs[vi] * n_copies + 1):end])")
+        @debug println("\t\t\tdofs: $(cell_dofs)")
     end
     return nextdof
 end
@@ -572,42 +625,47 @@ for the object (vertex, face) then simply return those, otherwise create new dof
     return nextdof, dofs
 end
 
-function add_face_dofs(cell_dofs::Vector{Int}, cell::AbstractCell, facedict::Dict, nfacedofs::Vector{Int}, nextdof::Int, adjust_during_distribution::Bool, n_copies::Int)
+function add_face_dofs(cell_dofs, cell::AbstractCell, facedict::Dict, allfdofs::Vector{Int}, offsets::Vector{Int}, nextdof::Int, adjust_during_distribution::Bool, n_copies::Int)
+    length(allfdofs) == 0 && return nextdof
     for (fi, face) in pairs(faces(cell))
-        nfacedofs[fi] > 0 || continue # skip if no dof on this vertex
+        fdofids = @view allfdofs[offsets[fi]:offsets[fi+1]-1]
+        nfacedofs =  length(fdofids)
+        nfacedofs > 0 || continue # skip if no dof on this face
         sface, orientation = sortface(face)
         @debug println("\t\tface #$sface, $orientation")
-        nextdof, dofs = get_or_create_dofs!(nextdof, nfacedofs[fi], n_copies, facedict, sface)
-        permute_and_push!(cell_dofs, dofs, orientation, adjust_during_distribution, getrefdim(cell)) # TODO: passing rdim of cell is temporary, simply to check if facedofs are internal to cell
-        @debug println("\t\t\tadjusted dofs: $(cell_dofs[(end - nfacedofs[fi] * n_copies + 1):end])")
+        nextdof, dofs = get_or_create_dofs!(nextdof, nfacedofs, n_copies, facedict, sface)
+        permute_and_set!(cell_dofs, fdofids, dofs, orientation, adjust_during_distribution, getrefdim(cell)) # TODO: passing rdim of cell is temporary, simply to check if facedofs are internal to cell
+        @debug println("\t\t\tadjusted dofs: $(cell_dofs)")
     end
     return nextdof
 end
 
-function add_edge_dofs(cell_dofs::Vector{Int}, cell::AbstractCell, edgedict::Dict, nedgedofs::Vector{Int}, nextdof::Int, adjust_during_distribution::Bool, n_copies::Int)
+function add_edge_dofs(cell_dofs, cell::AbstractCell, edgedict::Dict, alledofs::Vector{Int}, offsets::Vector{Int}, nextdof::Int, adjust_during_distribution::Bool, n_copies::Int)
+    length(alledofs) == 0 && return nextdof
     for (ei, edge) in pairs(edges(cell))
-        if nedgedofs[ei] > 0
-            sedge, orientation = sortedge(edge)
-            @debug println("\t\tedge #$sedge, $orientation")
-            nextdof, dofs = get_or_create_dofs!(nextdof, nedgedofs[ei], n_copies, edgedict, sedge)
-            permute_and_push!(cell_dofs, dofs, orientation, adjust_during_distribution)
-            @debug println("\t\t\tadjusted dofs: $(cell_dofs[(end - nedgedofs[ei] * n_copies + 1):end])")
-        end
+        edofids = @view alledofs[offsets[ei]:offsets[ei+1]-1]
+        nedgedofs =  length(edofids)
+        nedgedofs > 0 || continue # skip if no dof on this edge
+        sedge, orientation = sortedge(edge)
+        @debug println("\t\tedge #$sedge, $orientation")
+        nextdof, dofs = get_or_create_dofs!(nextdof, nedgedofs, n_copies, edgedict, sedge)
+        permute_and_set!(cell_dofs, edofids, dofs, orientation, adjust_during_distribution)
+        @debug println("\t\t\tadjusted dofs: $(cell_dofs)")
     end
     return nextdof
 end
 
-function add_volume_dofs(cell_dofs::CD, nvolumedofs::Int, nextdof::Int, n_copies::Int) where {CD}
-    @debug println("\t\tvolumedofs #$nextdof:$(nvolumedofs * n_copies - 1)")
-    for _ in 1:nvolumedofs, _ in 1:n_copies
-        push!(cell_dofs, nextdof)
+function add_volume_dofs(cell_dofs, volumedofs::Vector{Int}, nextdof::Int, n_copies::Int)
+    # @debug println("\t\tvolumedofs #$nextdof:$(nvolumedofs * n_copies - 1)")
+    for vdof in volumedofs, d in 1:n_copies
+        cell_dofs[n_copies*(vdof-1) + d] = nextdof
         nextdof += 1
     end
     return nextdof
 end
 
 """
-    permute_and_push!
+    permute_and_set!
 
 For interpolations with more than one interior dof per edge it may be necessary to adjust
 the dofs. Since dofs are (initially) enumerated according to the local edge direction there
@@ -639,7 +697,7 @@ described therein.
 # References
  - [Scroggs2022](@cite) Scroggs et al. ACM Trans. Math. Softw. 48 (2022).
 """
-@inline function permute_and_push!(cell_dofs::Vector{Int}, dofs::StepRange{Int, Int}, orientation::PathOrientationInfo, adjust_during_distribution::Bool)
+@inline function permute_and_set!(cell_dofs, local_range, dofs::StepRange{Int, Int}, orientation::PathOrientationInfo, adjust_during_distribution::Bool)
     # TODO Investigate if we can somehow pass the interpolation into this function in a
     # typestable way.
     n_copies = step(dofs)
@@ -648,9 +706,10 @@ described therein.
         # Reverse the dofs for the path
         dofs = reverse(dofs)
     end
-    for dof in dofs
-        for i in 1:n_copies
-            push!(cell_dofs, dof + (i - 1))
+    for (i,dof) in enumerate(dofs)
+        for d in 1:n_copies
+            j = n_copies*(local_range[i]-1) + d
+            cell_dofs[j] = dof + (d - 1)
         end
     end
     return nothing
@@ -720,15 +779,16 @@ For more details we refer to [1] as we follow the methodology described therein.
 
     !!!TODO Investigate if we can somehow pass the interpolation into this function in a typestable way.
 """
-@inline function permute_and_push!(cell_dofs::Vector{Int}, dofs::StepRange{Int, Int}, ::SurfaceOrientationInfo, adjust_during_distribution::Bool, rdim::Int)
+@inline function permute_and_set!(cell_dofs, local_dof_table, dofs::StepRange{Int, Int}, ::SurfaceOrientationInfo, adjust_during_distribution::Bool, rdim::Int)
     if rdim == 3 && adjust_during_distribution && length(dofs) > 1
         error("Dof distribution for interpolations with multiple dofs per face not implemented yet.")
     end
     n_copies = step(dofs)
     @assert n_copies > 0
-    for dof in dofs
-        for i in 1:n_copies
-            push!(cell_dofs, dof + (i - 1))
+    for (i,dof) in enumerate(dofs)
+        for d in 1:n_copies
+            j = n_copies*(local_dof_table[i]-1) + d
+            cell_dofs[j] = n_copies*(dof-1) + d
         end
     end
     return nothing
