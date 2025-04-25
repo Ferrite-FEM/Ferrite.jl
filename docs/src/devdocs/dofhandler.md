@@ -1,4 +1,4 @@
-# [Dof Handler](@id dofhandler-interpolations)
+# [Dof handler](@id dofhandler-interpolations)
 
 ## Type definitions
 
