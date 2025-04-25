@@ -75,6 +75,7 @@ function Base.setindex!(pvd::WriteVTK.CollectionFile, datfile::VTKGridFile, time
     return WriteVTK.collection_add_timestep(pvd, datfile, time)
 end
 
+cell_to_vtkcell(::Type{Point}) = VTKCellTypes.VTK_VERTEX
 cell_to_vtkcell(::Type{Line}) = VTKCellTypes.VTK_LINE
 cell_to_vtkcell(::Type{QuadraticLine}) = VTKCellTypes.VTK_QUADRATIC_EDGE
 
