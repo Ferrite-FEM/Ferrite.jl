@@ -448,7 +448,7 @@ function get_edge_direction(edgenodes::NTuple{2, Int})
 end
 
 function get_face_direction(facenodes::NTuple{N, Int}) where {N}
-    @assert N > 2
+    N > 2 || throw(ArgumentError("A face must have at least 3 nodes"))
     min_idx = argmin(facenodes)
     if min_idx == 1
         positive = facenodes[2] < facenodes[end]
@@ -1880,10 +1880,11 @@ function get_direction(::RaviartThomas{RefTriangle, 2}, shape_nr, cell)
     return get_edge_direction(cell, edge_nr)
 end
 
-# RefQuadrilateral, 1st order Lagrange
+# RefQuadrilateral
 edgedof_indices(ip::RaviartThomas{RefQuadrilateral}) = edgedof_interior_indices(ip)
 facedof_indices(ip::RaviartThomas{RefQuadrilateral}) = (ntuple(i -> i, getnbasefunctions(ip)),)
 
+# RefQuadrilateral, 1st order Lagrange
 # https://defelement.org/elements/examples/quadrilateral-raviart-thomas-lagrange-1.html
 function reference_shape_value(ip::RaviartThomas{RefQuadrilateral, 1}, ξ::Vec{2, T}, i::Int) where {T}
     x, y = ξ
@@ -1919,7 +1920,7 @@ end
 getnbasefunctions(::RaviartThomas{RefTetrahedron, 1}) = 4
 edgedof_interior_indices(::RaviartThomas{RefTetrahedron, 1}) = ntuple(_ -> (), 6)
 edgedof_indices(ip::RaviartThomas{RefTetrahedron, 1}) = edgedof_interior_indices(ip)
-facedof_interior_indices(::RaviartThomas{RefTetrahedron, 1}) = ((1), (2), (3), (4))
+facedof_interior_indices(::RaviartThomas{RefTetrahedron, 1}) = ((1,), (2,), (3,), (4,))
 facedof_indices(ip::RaviartThomas{RefTetrahedron, 1}) = facedof_interior_indices(ip)
 adjust_dofs_during_distribution(::RaviartThomas{RefTetrahedron, 1}) = false
 
@@ -1946,7 +1947,7 @@ end
 getnbasefunctions(::RaviartThomas{RefHexahedron, 1}) = 6
 edgedof_interior_indices(::RaviartThomas{RefHexahedron, 1}) = ntuple(_ -> (), 12)
 edgedof_indices(ip::RaviartThomas{RefHexahedron, 1}) = edgedof_interior_indices(ip)
-facedof_interior_indices(::RaviartThomas{RefHexahedron, 1}) = ((1), (2), (3), (4), (5), (6))
+facedof_interior_indices(::RaviartThomas{RefHexahedron, 1}) = ((1,), (2,), (3,), (4,), (5,), (6,))
 facedof_indices(ip::RaviartThomas{RefHexahedron, 1}) = facedof_interior_indices(ip)
 adjust_dofs_during_distribution(::RaviartThomas{RefHexahedron, 1}) = false
 
