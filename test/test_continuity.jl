@@ -169,32 +169,43 @@
         end
     end
 
-    # Test continuity for mixed grid, Quadrilaterals and Triangles
-    trigrid = generate_grid(Triangle, (3, 3))
-    mixgrid, cellnr = grid_with_inserted_quad(trigrid, (9, 10); update_sets = false)
-    dim = 2
-    p1, p2 = (rand(Vec{dim}), ones(Vec{dim}) + rand(Vec{dim}))
-    transfun(x) = typeof(x)(i -> sinpi(x[mod(i, length(x)) + 1] + i / 3)) / 10
-    basecell = getcells(mixgrid, cellnr)
-    ip1 = Nedelec{RefTriangle, 1}(); set1 = setdiff(1:getncells(mixgrid), cellnr)
-    ip2 = Nedelec{RefQuadrilateral, 1}(); set2 = Set(cellnr)
-    @testset "Quad in Tri-grid, 1st order Nedelec" begin
-        for testcell in cell_permutations(basecell)
-            mixgrid.cells[cellnr] = testcell
-            dh = DofHandler(mixgrid)
-            sdh1 = SubDofHandler(dh, set1)
-            add!(sdh1, :u, ip1)
-            sdh2 = SubDofHandler(dh, set2)
-            add!(sdh2, :u, ip2)
-            close!(dh)
-            cnt = 0
-            for facetnr in 1:nfacets(testcell)
-                fi = FacetIndex(cellnr, facetnr)
-                # Check continuity of function value according to continuity_function
-                found_matching = test_continuity(dh, fi; transformation_function = continuity_function(ip1))
-                cnt += found_matching
+    # Test continuity for 2D mixed grid, Quadrilaterals and Triangles
+    test_ips = [
+        (Nedelec, 1), #(Nedelec, 2), # 2nd order Nedelec on Quadrilaterals not yet implemented
+        (RaviartThomas, 1), #(RaviartThomas, 2) # 2nd order RT on Quadrilaterals not yet implemented
+    ]
+
+    @testset "Quad in Tri-grid" begin
+        trigrid = generate_grid(Triangle, (3, 3))
+        mixgrid, cellnr = grid_with_inserted_quad(trigrid, (9, 10); update_sets = false)
+        dim = 2
+        p1, p2 = (rand(Vec{dim}), ones(Vec{dim}) + rand(Vec{dim}))
+        transfun(x) = typeof(x)(i -> sinpi(x[mod(i, length(x)) + 1] + i / 3)) / 10
+        basecell = getcells(mixgrid, cellnr)
+
+        for (ip, order) in test_ips
+            ip1 = ip{RefTriangle, order}(); set1 = setdiff(1:getncells(mixgrid), cellnr)
+            ip2 = ip{RefQuadrilateral, order}(); set2 = Set(cellnr)
+
+            @testset "$ip, order = $order" begin
+                for testcell in cell_permutations(basecell)
+                    mixgrid.cells[cellnr] = testcell
+                    dh = DofHandler(mixgrid)
+                    sdh1 = SubDofHandler(dh, set1)
+                    add!(sdh1, :u, ip1)
+                    sdh2 = SubDofHandler(dh, set2)
+                    add!(sdh2, :u, ip2)
+                    close!(dh)
+                    cnt = 0
+                    for facetnr in 1:nfacets(testcell)
+                        fi = FacetIndex(cellnr, facetnr)
+                        # Check continuity of function value according to continuity_function
+                        found_matching = test_continuity(dh, fi; transformation_function = continuity_function(ip1))
+                        cnt += found_matching
+                    end
+                    @assert cnt > 0
+                end
             end
-            @assert cnt > 0
         end
     end
 end
