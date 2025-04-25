@@ -330,7 +330,7 @@ function add!(dh::DofHandler, name::Symbol, ip::Interpolation)
 end
 
 """
-    close!(dh::AbstractDofHandler, [alg])
+    close!(dh::AbstractDofHandler [, alg])
 
 Closes `dh` and creates degrees of freedom for each cell with some given algorithm.
 """
