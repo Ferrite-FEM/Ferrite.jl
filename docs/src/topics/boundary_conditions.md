@@ -95,8 +95,8 @@ end
 
 ## ProjectedDirichlet
 Some interpolations don't have nodal support points:
-``H(\mathrm{curl})`` interpolations, e.g., `Nedelec`, are associated to edges
-and ``H(\mathrm{div})`` interpolations, e.g. `RaviartThomas`, are associated to facets.
+``H(\mathrm{curl})`` interpolations, e.g., `Nedelec`, are associated to edges and faces,
+while ``H(\mathrm{div})`` interpolations, e.g. `RaviartThomas`, are associated to facets.
 While normal `Dirichlet` boundary conditions assume the existence of such nodal support points,
 Ferrite provides the `ProjectedDirichlet`, which instead finds the degree of freedom values that
 minimizes the L2-distance between the prescribed function, ``f(\boldsymbol{x},t,\boldsymbol{n})``,
