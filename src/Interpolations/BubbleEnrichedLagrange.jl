@@ -1,6 +1,6 @@
 """
     BubbleEnrichedLagrange{refshape, order} <: ScalarInterpolation
-    
+
 Lagrange element with bubble stabilization.
 The following interpolations are implemented:
 

@@ -1,7 +1,7 @@
 """
     Serendipity{refshape, order} <: ScalarInterpolation
 
-Serendipity element on hypercubes. 
+Serendipity element on hypercubes.
 The following interpolations are implemented:
 
 * `Serendipity{RefQuadrilateral,2}`

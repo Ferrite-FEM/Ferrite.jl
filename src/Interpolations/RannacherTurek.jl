@@ -3,7 +3,7 @@
 
 Classical non-conforming Rannacher-Turek element.
 
-This element is basically the idea from Crouzeix and Raviart applied to hypercubes. 
+This element is basically the idea from Crouzeix and Raviart applied to hypercubes.
 The following interpolations are implemented:
 
 * `RannacherTurek{RefQuadrilateral, 1}`

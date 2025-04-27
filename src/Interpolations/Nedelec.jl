@@ -3,7 +3,7 @@
 
 H(curl)-conforming Nedelec elements of the 1st kind.
 The following interpolations are implemented:
- 
+
 * Nedelec{RefTriangle, 1}
 * Nedelec{RefTriangle, 2}
 * Nedelec{RefQuadrilateral, 1}

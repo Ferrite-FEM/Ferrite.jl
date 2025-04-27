@@ -117,7 +117,7 @@ include("PoolAllocator.jl")
 include("arrayutils.jl")
 
 # Interpolations
-include("interpolations.jl")
+include("Interpolations/Interpolations.jl")
 
 # Quadrature
 include("Quadrature/quadrature.jl")

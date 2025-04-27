@@ -3,7 +3,7 @@
 
 H(div)-conforming Brezzi-Douglas-Marini elements.
 The following interpolations are implemented:
- 
+
 * BrezziDouglasMarini{RefTriangle, 1}
 """
 struct BrezziDouglasMarini{shape, order, vdim} <: VectorInterpolation{vdim, shape, order}

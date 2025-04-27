@@ -7,8 +7,6 @@ Abstract type for interpolations defined on `ref_shape`
 The interpolation is used to define shape functions to interpolate
 a function between nodes.
 
-The following interpolations are implemented:
-
 # Examples
 ```jldoctest
 julia> ip = Lagrange{RefTriangle, 2}()
@@ -578,19 +576,19 @@ function get_direction end
 
 
 # Scalar interpolations
-include("Interpolations/Lagrange.jl")
-include("Interpolations/BubbleLagrange.jl")
-include("Interpolations/DiscontinuousLagrange.jl")
+include("Lagrange.jl")
+include("BubbleEnrichedLagrange.jl")
+include("DiscontinuousLagrange.jl")
 
-include("Interpolations/Serendipity.jl")
+include("Serendipity.jl")
 
-include("Interpolations/CrouzeixRaviart.jl")
-include("Interpolations/RannacherTurek.jl")
+include("CrouzeixRaviart.jl")
+include("RannacherTurek.jl")
 
 # Vector interpolations
 ## H(div) conforming
-include("Interpolations/RaviartThomas.jl")
-include("Interpolations/BrezziDouglasMarini.jl")
+include("RaviartThomas.jl")
+include("BrezziDouglasMarini.jl")
 
 ## H(curl) conforming
-include("Interpolations/Nedelec1.jl")
+include("Nedelec.jl")
