@@ -43,8 +43,8 @@ struct Dirichlet # <: Constraint
     facets::OrderedSet{T} where {T <: Union{Int, FacetIndex, FaceIndex, EdgeIndex, VertexIndex}}
     field_name::Symbol
     components::Vector{Int} # components of the field
-    local_facet_dofs::Vector{Int}
-    local_facet_dofs_offset::Vector{Int}
+    global_dofs_nodal_dbc::Vector{Int} # Only for nodal BCs
+    constrained_nodes::Vector{Int}
 end
 function Dirichlet(field_name::Symbol, facets::AbstractVecOrSet, f::Function, components = nothing)
     return Dirichlet(f, convert_to_orderedset(facets), field_name, __to_components(components), Int[], Int[])
@@ -304,19 +304,19 @@ end
 
 # Dirichlet on (facet|face|edge|vertex)set
 function _add!(ch::ConstraintHandler, dbc::Dirichlet, bcfacets::AbstractVecOrSet{Index}, interpolation::Interpolation, field_dim::Int, offset::Int, bcvalue::BCValues, _) where {Index <: BoundaryIndex}
-    local_facet_dofs, local_facet_dofs_offset =
-        _local_facet_dofs_for_bc(interpolation, field_dim, dbc.components, offset, dirichlet_boundarydof_indices(eltype(bcfacets)))
-    copy!(dbc.local_facet_dofs, local_facet_dofs)
-    copy!(dbc.local_facet_dofs_offset, local_facet_dofs_offset)
 
     # loop over all the faces in the set and add the global dofs to `constrained_dofs`
     constrained_dofs = Int[]
     cc = CellCache(ch.dh, UpdateFlags(; nodes = false, coords = false, dofs = true))
     for (cellidx, facetidx) in bcfacets
         reinit!(cc, cellidx)
-        r = local_facet_dofs_offset[facetidx]:(local_facet_dofs_offset[facetidx + 1] - 1)
-        append!(constrained_dofs, cc.dofs[local_facet_dofs[r]]) # TODO: for-loop over r and simply push! to ch.prescribed_dofs
-        @debug println("adding dofs $(cc.dofs[local_facet_dofs[r]]) to dbc")
+        @debug i0 = length(constrained_dofs) + 1
+        for location in get_dof_locations(bcvalue, facetidx)
+            for component in dbc.components
+                push!(constrained_dofs, cc.dofs[get_local_dof(bcvalue, location, component)])
+            end
+        end
+        @debug println("adding dofs $(constrained_dofs[i0:end]) to dbc")
     end
 
     # save it to the ConstraintHandler
@@ -326,23 +326,6 @@ function _add!(ch::ConstraintHandler, dbc::Dirichlet, bcfacets::AbstractVecOrSet
         add_prescribed_dof!(ch, d, NaN, nothing)
     end
     return ch
-end
-
-# Calculate which local dof index live on each facet:
-# facet `i` have dofs `local_facet_dofs[local_facet_dofs_offset[i]:local_facet_dofs_offset[i+1]-1]
-function _local_facet_dofs_for_bc(interpolation, field_dim, components, offset, boundaryfunc::F = dirichlet_facetdof_indices) where {F}
-    @assert issorted(components)
-    local_facet_dofs = Int[]
-    local_facet_dofs_offset = Int[1]
-    for (_, facet) in enumerate(boundaryfunc(interpolation))
-        for fdof in facet, d in 1:field_dim
-            if d in components
-                push!(local_facet_dofs, (fdof - 1) * field_dim + d + offset)
-            end
-        end
-        push!(local_facet_dofs_offset, length(local_facet_dofs) + 1)
-    end
-    return local_facet_dofs, local_facet_dofs_offset
 end
 
 function _add!(ch::ConstraintHandler, dbc::Dirichlet, bcnodes::AbstractVecOrSet{Int}, interpolation::Interpolation, field_dim::Int, offset::Int, bcvalue::BCValues, cellset::AbstractVecOrSet{Int} = OrderedSet{Int}(1:getncells(get_grid(ch.dh))))
@@ -370,25 +353,23 @@ function _add!(ch::ConstraintHandler, dbc::Dirichlet, bcnodes::AbstractVecOrSet{
         end
     end
 
-    constrained_dofs = Int[]
-    sizehint!(constrained_dofs, ncomps * length(bcnodes))
-    sizehint!(dbc.local_facet_dofs, length(bcnodes))
+    sizehint!(dbc.global_dofs_nodal_dbc, ncomps * length(bcnodes))
+    sizehint!(dbc.constrained_nodes, length(bcnodes))
     for node in bcnodes
         if !visited[node]
             # either the node belongs to another field handler or it does not have dofs in the constrained field
             continue
         end
         for i in 1:ncomps
-            push!(constrained_dofs, node_dofs[i, node])
+            push!(dbc.global_dofs_nodal_dbc, node_dofs[i, node])
         end
-        push!(dbc.local_facet_dofs, node) # use this field to store the node idx for each node
+        push!(dbc.constrained_nodes, node)
     end
 
     # save it to the ConstraintHandler
-    copy!(dbc.local_facet_dofs_offset, constrained_dofs) # use this field to store the global dofs
     push!(ch.dbcs, dbc)
     push!(ch.bcvalues, bcvalue)
-    for d in constrained_dofs
+    for d in dbc.global_dofs_nodal_dbc
         add_prescribed_dof!(ch, d, NaN, nothing)
     end
     return ch
@@ -412,7 +393,7 @@ function update!(ch::ConstraintHandler, time::Real = 0.0)
         wrapper_f = hasmethod(dbc.f, Tuple{get_coordinate_type(get_grid(ch.dh)), typeof(time)}) ? dbc.f : (x, _) -> dbc.f(x)
         # Function barrier
         _update!(
-            ch.inhomogeneities, wrapper_f, dbc.facets, dbc.field_name, dbc.local_facet_dofs, dbc.local_facet_dofs_offset,
+            ch.inhomogeneities, wrapper_f, dbc.facets, dbc.constrained_nodes, dbc.global_dofs_nodal_dbc,
             dbc.components, ch.dh, ch.bcvalues[i], ch.dofmapping, ch.dofcoefficients, time
         )
     end
@@ -440,7 +421,7 @@ end
 
 # for facets, vertices, faces and edges
 function _update!(
-        inhomogeneities::Vector{T}, f::Function, boundary_entities::AbstractVecOrSet{<:BoundaryIndex}, field::Symbol, local_facet_dofs::Vector{Int}, local_facet_dofs_offset::Vector{Int},
+        inhomogeneities::Vector{T}, f::Function, boundary_entities::AbstractVecOrSet{<:BoundaryIndex}, _, _,
         components::Vector{Int}, dh::AbstractDofHandler, boundaryvalues::BCValues,
         dofmapping::Dict{Int, Int}, dofcoefficients::Vector{Union{Nothing, DofCoefficients{T}}}, time::Real
     ) where {T}
@@ -448,23 +429,13 @@ function _update!(
     cc = CellCache(dh, UpdateFlags(; nodes = false, coords = true, dofs = true))
     for (cellidx, entityidx) in boundary_entities
         reinit!(cc, cellidx)
-
-        # no need to reinit!, enough to update current_entity since we only need geometric shape functions M
-        boundaryvalues.current_entity = entityidx
-
-        # local dof-range for this facet
-        r = local_facet_dofs_offset[entityidx]:(local_facet_dofs_offset[entityidx + 1] - 1)
-        counter = 1
-        for location in 1:getnquadpoints(boundaryvalues)
+        for location in get_dof_locations(boundaryvalues, entityidx)
             x = spatial_coordinate(boundaryvalues, location, cc.coords)
             bc_value = f(x, time)
             @assert length(bc_value) == length(components)
 
-            for i in 1:length(components)
-                # find the global dof
-                globaldof = cc.dofs[local_facet_dofs[r[counter]]]
-                counter += 1
-
+            for (i, component) in pairs(components)
+                globaldof = cc.dofs[get_local_dof(boundaryvalues, location, component)]
                 dbc_index = dofmapping[globaldof]
                 # Only DBC dofs are currently update!-able so don't modify inhomogeneities
                 # for affine constraints
@@ -480,7 +451,7 @@ end
 
 # for nodes
 function _update!(
-        inhomogeneities::Vector{T}, f::Function, ::AbstractVecOrSet{Int}, field::Symbol, nodeidxs::Vector{Int}, globaldofs::Vector{Int},
+        inhomogeneities::Vector{T}, f::Function, ::AbstractVecOrSet{Int}, nodeidxs::Vector{Int}, globaldofs::Vector{Int},
         components::Vector{Int}, dh::AbstractDofHandler, facetvalues::BCValues,
         dofmapping::Dict{Int, Int}, dofcoefficients::Vector{Union{Nothing, DofCoefficients{T}}}, time::Real
     ) where {T}
@@ -833,11 +804,9 @@ function add!(ch::ConstraintHandler, dbc::Dirichlet)
         # Fetch information about the field on this SubDofHandler
         field_idx = find_field(sdh, dbc.field_name)
         interpolation = getfieldinterpolation(sdh, field_idx)
-        # Internally we use the devectorized version
+
         n_comp = n_dbc_components(interpolation)
-        if interpolation isa VectorizedInterpolation
-            interpolation = interpolation.ip
-        end
+
         getorder(interpolation) == 0 && error("No dof prescribed for order 0 interpolations")
         # Set up components to prescribe (empty input means prescribe all components)
         components = isempty(dbc.components) ? collect(Int, 1:n_comp) : dbc.components
@@ -851,11 +820,11 @@ function add!(ch::ConstraintHandler, dbc::Dirichlet)
             EntityType = FacetIndex
         end
         CT = getcelltype(sdh) # Same celltype enforced in SubDofHandler constructor
-        bcvalues = BCValues(interpolation, geometric_interpolation(CT), EntityType)
+        bcvalues = BCValues(interpolation, geometric_interpolation(CT), EntityType, field_offset(sdh, field_idx))
         # Recreate the Dirichlet(...) struct with the filtered set and call internal add!
         filtered_dbc = Dirichlet(dbc.field_name, filtered_set, dbc.f, components)
         _add!(
-            ch, filtered_dbc, filtered_dbc.facets, interpolation, n_comp,
+            ch, filtered_dbc, filtered_dbc.facets, get_base_interpolation(interpolation), n_comp,
             field_offset(sdh, field_idx), bcvalues, sdh.cellset,
         )
         dbc_added = true
@@ -892,6 +861,8 @@ struct PeriodicFacetPair
     rotation::UInt8 # relative rotation of the mirror facet counter-clockwise the *image* normal (only relevant in 3D)
     mirrored::Bool  # mirrored => opposite normal vectors
 end
+
+include(joinpath(@__DIR__, "periodicity_utils.jl"))
 
 """
     PeriodicDirichlet(u::Symbol, facet_mapping, components=nothing)
@@ -952,9 +923,6 @@ function add!(ch::ConstraintHandler, pdbc::PeriodicDirichlet)
     field_idx = find_field(ch.dh, pdbc.field_name)
     interpolation = getfieldinterpolation(ch.dh, field_idx)
     n_comp = n_dbc_components(interpolation)
-    if interpolation isa VectorizedInterpolation
-        interpolation = interpolation.ip
-    end
 
     if !all(c -> 0 < c <= n_comp, pdbc.components)
         error("components $(pdbc.components) not within range of field :$(pdbc.field_name) ($(n_comp) dimension(s))")
@@ -963,10 +931,7 @@ function add!(ch::ConstraintHandler, pdbc::PeriodicDirichlet)
     # Empty components means constrain them all
     isempty(pdbc.components) && append!(pdbc.components, 1:n_comp)
 
-    if pdbc.rotation_matrix === nothing
-        dof_map_t = Int
-        iterator_f = identity
-    else
+    if pdbc.rotation_matrix !== nothing
         @assert pdbc.func === nothing # Verified in constructor
         if is_legacy
             error("legacy mode not supported with rotations")
@@ -978,63 +943,59 @@ function add!(ch::ConstraintHandler, pdbc::PeriodicDirichlet)
         if nc !== n_comp
             error("rotations currently only supported when all components are periodic")
         end
-        dof_map_t = Vector{Int}
-        iterator_f = x -> Iterators.partition(x, nc)
     end
-    _add!(ch, pdbc, interpolation, n_comp, field_offset(ch.dh.subdofhandlers[field_idx[1]], field_idx[2]), is_legacy, pdbc.rotation_matrix, dof_map_t, iterator_f)
+    _add!(ch, pdbc, interpolation, field_offset(ch.dh.subdofhandlers[field_idx[1]], field_idx[2]), is_legacy, pdbc.rotation_matrix)
     return ch
 end
 
 function _add!(
         ch::ConstraintHandler, pdbc::PeriodicDirichlet, interpolation::Interpolation,
-        field_dim::Int, offset::Int, is_legacy::Bool, rotation_matrix::Union{Matrix{T}, Nothing}, ::Type{dof_map_t}, iterator_f::F
-    ) where {T, dof_map_t, F <: Function}
+        offset::Int, is_legacy::Bool, rotation_matrix::Union{Matrix, Nothing}
+    )
+
     grid = get_grid(ch.dh)
     facet_map = pdbc.facet_map
 
-    # Indices of the local dofs for the facets
-    local_facet_dofs, local_facet_dofs_offset =
-        _local_facet_dofs_for_bc(interpolation, field_dim, pdbc.components, offset)
-    mirrored_indices =
-        mirror_local_dofs(local_facet_dofs, local_facet_dofs_offset, interpolation, length(pdbc.components))
-    rotated_indices = rotate_local_dofs(local_facet_dofs, local_facet_dofs_offset, interpolation, length(pdbc.components))
+    ipg = default_geometric_interpolation(interpolation) # dummy, TODO: Support BCValues without spatial coord
+    bcvalues = BCValues(interpolation, ipg, FacetIndex, offset)
+    pdl = PeriodicDofLocations(interpolation)
 
-    # Dof map for mirror dof => image dof
-    dof_map = Dict{dof_map_t, dof_map_t}()
+    # Dof map for mirror dof (constrained) => image dof (master dof)
+    # However, here we only add the first component, as the rest can be calculated when needed
+    dof_map = Dict{Int, Int}()
+    component_incr_offsets = pdbc.components .- first(pdbc.components) # Increments from the first component (incl. 0 for first)
 
     n = ndofs_per_cell(ch.dh, first(facet_map).mirror[1])
     mirror_dofs = zeros(Int, n)
     image_dofs = zeros(Int, n)
     for facet_pair in facet_map
-        m = facet_pair.mirror
-        i = facet_pair.image
-        celldofs!(mirror_dofs, ch.dh, m[1])
-        celldofs!(image_dofs, ch.dh, i[1])
+        image_facet = facet_pair.image
+        mirror_facet = facet_pair.mirror
+        celldofs!(mirror_dofs, ch.dh, mirror_facet[1])
+        celldofs!(image_dofs, ch.dh, image_facet[1])
 
-        mdof_range = local_facet_dofs_offset[m[2]]:(local_facet_dofs_offset[m[2] + 1] - 1)
-        idof_range = local_facet_dofs_offset[i[2]]:(local_facet_dofs_offset[i[2] + 1] - 1)
+        for image_dof_location in get_dof_locations(bcvalues, image_facet)
+            local_idof = get_local_dof(bcvalues, image_dof_location, first(pdbc.components))
+            mirror_dof_location = get_mirror_dof_location(pdl, facet_pair, image_dof_location)
+            local_mdof = get_local_dof(bcvalues, mirror_dof_location, first(pdbc.components))
 
-        for (md, id) in zip(iterator_f(mdof_range), iterator_f(idof_range))
-            mdof = image_dofs[local_facet_dofs[id]]
-            # Rotate the mirror index
-            rotated_md = rotated_indices[md, facet_pair.rotation + 1]
-            # Mirror the mirror index (maybe) :)
-            mirrored_md = facet_pair.mirrored ? mirrored_indices[rotated_md] : rotated_md
-            cdof = mirror_dofs[local_facet_dofs[mirrored_md]]
-            if haskey(dof_map, mdof)
-                mdof′ = dof_map[mdof]
-                # @info "$cdof => $mdof, but $mdof => $mdof′, remapping $cdof => $mdof′."
+            idof = image_dofs[local_idof]
+            mdof = mirror_dofs[local_mdof]
+
+            if haskey(dof_map, idof)
+                idof′ = dof_map[idof]
+                # @info "$mdof => $idof, but $idof => $idof′, remapping $mdof => $idof′."
                 # TODO: Is this needed now when untangling below?
-                push!(dof_map, cdof => mdof′)
-                # elseif haskey(dof_map, cdof) && dof_map[cdof] == mdof
-                # @info "$cdof => $mdof already in the set, skipping."
-            elseif haskey(dof_map, cdof)
-                # @info "$cdof => $mdof, but $cdof => $(dof_map[cdof]) already, skipping."
-            elseif cdof == mdof
-                # @info "Skipping self-constraint $cdof => $mdof."
+                push!(dof_map, mdof => idof′)
+                # elseif haskey(dof_map, mdof) && dof_map[mdof] == mdof
+                # @info "$mdof => $idof already in the set, skipping."
+            elseif haskey(dof_map, mdof)
+                # @info "$mdof => $idof, but $mdof => $(dof_map[mdof]) already, skipping."
+            elseif mdof == idof
+                # @info "Skipping self-constraint $mdof => $idof."
             else
-                # @info "$cdof => $mdof."
-                push!(dof_map, cdof => mdof)
+                # @info "$mdof => $idof."
+                push!(dof_map, mdof => idof)
             end
         end
     end
@@ -1042,7 +1003,7 @@ function _add!(
     # Need to untangle in case we have 1 => 2 and 2 => 3 into 1 => 3 and 2 => 3.
     # Note that a single pass is enough (no need to iterate) since all constraints are
     # between just one mirror dof and one image dof.
-    remaps = Dict{dof_map_t, dof_map_t}()
+    remaps = Dict{Int, Int}()
     for (k, v) in dof_map
         if haskey(dof_map, v)
             remaps[k] = get(remaps, v, dof_map[v])
@@ -1097,10 +1058,6 @@ function _add!(
         # TODO: Right? maybe if the user passed f we need to...
         foreach(x -> delete!(dof_map, x), chtmp.prescribed_dofs)
 
-        # Need to reset the internal of this DBC in order to add! it again...
-        resize!(dbc.local_facet_dofs, 0)
-        resize!(dbc.local_facet_dofs_offset, 0)
-
         # Add the Dirichlet for the corners
         add!(ch, dbc)
     end
@@ -1120,25 +1077,28 @@ function _add!(
         inhomogeneity_map = Dict{Int, Float64}()
         for (k, v) in dof_map
             g = chtmp2.inhomogeneities
-            push!(
-                inhomogeneity_map,
-                k => - g[chtmp2.dofmapping[v]] + g[chtmp2.dofmapping[k]]
-            )
+            for Δn in component_incr_offsets
+                push!(
+                    inhomogeneity_map,
+                    (k + Δn) => - g[chtmp2.dofmapping[v + Δn]] + g[chtmp2.dofmapping[k + Δn]]
+                )
+            end
         end
     end
 
     # Any remaining mappings are added as homogeneous AffineConstraints
     for (k, v) in dof_map
-        if dof_map_t === Int
-            ac = AffineConstraint(k, [v => 1.0], inhomogeneity_map === nothing ? 0.0 : inhomogeneity_map[k])
-            add!(ch, ac)
+        if rotation_matrix === nothing
+            for Δn in component_incr_offsets
+                ac = AffineConstraint(k + Δn, [(v + Δn) => 1.0], inhomogeneity_map === nothing ? 0.0 : inhomogeneity_map[k + Δn])
+                add!(ch, ac)
+            end
         else
             @assert inhomogeneity_map === nothing
-            @assert rotation_matrix !== nothing
-            for (i, ki) in pairs(k)
+            for (i, Δn_mirror) in pairs(component_incr_offsets)
                 # u_mirror = R ⋅ u_image
-                vs = Pair{Int, eltype(T)}[v[j] => rotation_matrix[i, j] for j in 1:length(v)]
-                ac = AffineConstraint(ki, vs, 0.0)
+                vs = Pair{Int, eltype(rotation_matrix)}[(v + Δn_image) => rotation_matrix[i, j] for (j, Δn_image) in pairs(component_incr_offsets)]
+                ac = AffineConstraint(k + Δn_mirror, vs, 0.0)
                 add!(ch, ac)
             end
         end
@@ -1146,6 +1106,7 @@ function _add!(
 
     return ch
 end
+
 
 function construct_cornerish(min_x::V, max_x::V) where {T, V <: Vec{1, T}}
     lx = max_x - min_x
@@ -1178,81 +1139,6 @@ function construct_cornerish(min_x::V, max_x::V) where {T, V <: Vec{3, T}}
         Vec{3, T}((max_x[1], min_x[2], max_x[3])),
         Vec{3, T}((min_x[1], max_x[2], max_x[3])),
     ]
-end
-
-function mirror_local_dofs(_, _, ::Lagrange{RefLine}, ::Int)
-    # For 1D there is nothing to do
-end
-function mirror_local_dofs(local_facet_dofs, local_facet_dofs_offset, ip::Lagrange{<:Union{RefQuadrilateral, RefTriangle}}, n::Int)
-    # For 2D we always permute since Ferrite defines dofs counter-clockwise
-    ret = collect(1:length(local_facet_dofs))
-    for (i, f) in enumerate(dirichlet_facetdof_indices(ip))
-        this_offset = local_facet_dofs_offset[i]
-        other_offset = this_offset + n
-        for d in 1:n
-            idx1 = this_offset + (d - 1)
-            idx2 = other_offset + (d - 1)
-            tmp = ret[idx1]
-            ret[idx1] = ret[idx2]
-            ret[idx2] = tmp
-        end
-    end
-    return ret
-end
-
-# TODO: Can probably be combined with the method above.
-function mirror_local_dofs(local_facet_dofs, local_facet_dofs_offset, ip::Lagrange{<:Union{RefHexahedron, RefTetrahedron}, O}, n::Int) where {O}
-    @assert 1 <= O <= 2
-    N = ip isa Lagrange{RefHexahedron} ? 4 : 3
-    ret = collect(1:length(local_facet_dofs))
-
-    # Mirror by changing from counter-clockwise to clockwise
-    for (i, f) in enumerate(dirichlet_facetdof_indices(ip))
-        r = local_facet_dofs_offset[i]:(local_facet_dofs_offset[i + 1] - 1)
-        # 1. Rotate the corners
-        vertex_range = r[1:(N * n)]
-        vlr = @view ret[vertex_range]
-        for i in 1:N
-            reverse!(vlr, (i - 1) * n + 1, i * n)
-        end
-        reverse!(vlr)
-        circshift!(vlr, n)
-        # 2. Rotate the edge dofs for quadratic interpolation
-        if O > 1
-            edge_range = r[(N * n + 1):(2N * n)]
-            elr = @view ret[edge_range]
-            for i in 1:N
-                reverse!(elr, (i - 1) * n + 1, i * n)
-            end
-            reverse!(elr)
-            # circshift!(elr, n) # !!! Note: no shift here
-        end
-    end
-    return ret
-end
-
-function rotate_local_dofs(local_facet_dofs, local_facet_dofs_offset, ip::Lagrange{<:Union{RefQuadrilateral, RefTriangle}}, ncomponents)
-    return collect(1:length(local_facet_dofs)) # TODO: Return range?
-end
-function rotate_local_dofs(local_facet_dofs, local_facet_dofs_offset, ip::Lagrange{<:Union{RefHexahedron, RefTetrahedron}, O}, ncomponents) where {O}
-    @assert 1 <= O <= 2
-    N = ip isa Lagrange{RefHexahedron} ? 4 : 3
-    ret = similar(local_facet_dofs, length(local_facet_dofs), N)
-    ret[:, :] .= 1:length(local_facet_dofs)
-    for f in 1:(length(local_facet_dofs_offset) - 1)
-        facet_range = local_facet_dofs_offset[f]:(local_facet_dofs_offset[f + 1] - 1)
-        for i in 1:(N - 1)
-            # 1. Rotate the vertex dofs
-            vertex_range = facet_range[1:(N * ncomponents)]
-            circshift!(@view(ret[vertex_range, i + 1]), @view(ret[vertex_range, i]), -ncomponents)
-            # 2. Rotate the edge dofs
-            if O > 1
-                edge_range = facet_range[(N * ncomponents + 1):(2N * ncomponents)]
-                circshift!(@view(ret[edge_range, i + 1]), @view(ret[edge_range, i]), -ncomponents)
-            end
-        end
-    end
-    return ret
 end
 
 """
