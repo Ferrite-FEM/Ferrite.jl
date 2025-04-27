@@ -767,7 +767,7 @@ end
             for dh in (dh_H1, dh_L2, dh_Hcurl_3d)
                 dbc = ProjectedDirichlet(:u, Set([FacetIndex(1, 1)]), Returns(zero(Vec{2})))
                 ch = add!(ConstraintHandler(dh), dbc)
-                @test_throws ArgumentError close!(ch)
+                @test_throws "ProjectedDirichlet is not implemented for" close!(ch)
             end
         end
 

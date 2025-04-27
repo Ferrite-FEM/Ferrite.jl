@@ -1903,7 +1903,7 @@ function _update_projected_dbc!(
         inhomogeneities::Vector{T}, f::Function, facets::AbstractVecOrSet{FacetIndex}, fv::FacetValues, facet_dofs::ArrayOfVectorViews,
         dh::AbstractDofHandler, dofmapping::Dict{Int, Int}, dofcoefficients::Vector{Union{Nothing, DofCoefficients{T}}}, time::Real
     ) where {T}
-    ip = function_interpolation(fv)
+    ip = get_base_interpolation(function_interpolation(fv)) # Ensures getting error message from `integrate_projected_dbc!`
     max_dofs_per_facet = maximum(length, dirichlet_facetdof_indices(ip))
     Kᶠ = zeros(max_dofs_per_facet, max_dofs_per_facet)
     aᶠ = zeros(max_dofs_per_facet)
@@ -1981,7 +1981,7 @@ function integrate_projected_dbc!(::HcurlConformity, Kᶠ, fᶠ, bc_fun, fv, sha
     return
 end
 
-function integrate_projected_dbc!(::Union{H1Conformity, L2Conformity}, args...)
+function integrate_projected_dbc!(::Union{H1Conformity, L2Conformity}, _, _, _, fv, args...)
     ip_str = sprint(show, function_interpolation(fv))
     throw(ArgumentError("ProjectedDirichlet is not implemented for H¹ and L2 conformities ($ip_str)"))
 end
