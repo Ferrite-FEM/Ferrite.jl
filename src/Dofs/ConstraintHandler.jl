@@ -490,7 +490,7 @@ function update!(ch::ConstraintHandler, time::Real = 0.0)
         )
     end
     for bc in ch.projbcs
-        _update_l2_dbc!(ch.inhomogeneities, bc.f, bc.facets, bc.fv, bc.facet_dofs, ch.dh, ch.dofmapping, ch.dofcoefficients, time)
+        _update_projected_dbc!(ch.inhomogeneities, bc.f, bc.facets, bc.fv, bc.facet_dofs, ch.dh, ch.dofmapping, ch.dofcoefficients, time)
     end
     # Compute effective inhomogeneity for affine constraints with prescribed dofs in the
     # RHS. For example, in u2 = w3 * u3 + w4 * u4 + b2 we allow e.g. u3 to be prescribed by
@@ -1899,7 +1899,7 @@ function _add!(ch::ConstraintHandler, bc::ProjectedDirichlet, facet_dofs)
 end
 
 
-function _update_l2_dbc!(
+function _update_projected_dbc!(
         inhomogeneities::Vector{T}, f::Function, facets::AbstractVecOrSet{FacetIndex}, fv::FacetValues, facet_dofs::ArrayOfVectorViews,
         dh::AbstractDofHandler, dofmapping::Dict{Int, Int}, dofcoefficients::Vector{Union{Nothing, DofCoefficients{T}}}, time::Real
     ) where {T}
@@ -1911,7 +1911,7 @@ function _update_l2_dbc!(
     for fc in FacetIterator(dh, facets)
         reinit!(fv, fc)
         shape_nrs = dirichlet_facetdof_indices(ip)[getcurrentfacet(fv)]
-        solve_l2_dbc!(aᶠ, Kᶠ, fᶠ, f, fv, shape_nrs, getcoordinates(fc), time)
+        solve_projected_dbc!(aᶠ, Kᶠ, fᶠ, f, fv, shape_nrs, getcoordinates(fc), time)
         for (idof, shape_nr) in enumerate(shape_nrs)
             globaldof = celldofs(fc)[shape_nr]
             dbc_index = dofmapping[globaldof]
@@ -1925,7 +1925,7 @@ function _update_l2_dbc!(
     return nothing
 end
 
-function solve_l2_dbc!(aᶠ, Kᶠ, fᶠ, bc_fun, fv, shape_nrs, cell_coords, time)
+function solve_projected_dbc!(aᶠ, Kᶠ, fᶠ, bc_fun, fv, shape_nrs, cell_coords, time)
     fill!(Kᶠ, 0)
     fill!(fᶠ, 0)
     # Supporting varying number of facetdofs (for ref shapes with different facet types) requires
@@ -1933,16 +1933,16 @@ function solve_l2_dbc!(aᶠ, Kᶠ, fᶠ, bc_fun, fv, shape_nrs, cell_coords, tim
     #     Kᶠ[i, i] = 1
     # end
     @assert length(shape_nrs) == size(Kᶠ, 1)
-    integrate_l2_dbc!(Kᶠ, fᶠ, bc_fun, fv, shape_nrs, cell_coords, time)
+    integrate_projected_dbc!(Kᶠ, fᶠ, bc_fun, fv, shape_nrs, cell_coords, time)
     aᶠ .= Kᶠ \ fᶠ # Could be done non-allocating if required, using e.g. SMatrix
     return aᶠ
 end
 
-function integrate_l2_dbc!(Kᶠ, fᶠ, bc_fun, fv, shape_nrs, cell_coords, time)
-    return integrate_l2_dbc!(conformity(fv), Kᶠ, fᶠ, bc_fun, fv, shape_nrs, cell_coords, time)
+function integrate_projected_dbc!(Kᶠ, fᶠ, bc_fun, fv, shape_nrs, cell_coords, time)
+    return integrate_projected_dbc!(conformity(fv), Kᶠ, fᶠ, bc_fun, fv, shape_nrs, cell_coords, time)
 end
 
-function integrate_l2_dbc!(::HdivConformity, Kᶠ, fᶠ, bc_fun, fv, shape_nrs, cell_coords, time)
+function integrate_projected_dbc!(::HdivConformity, Kᶠ, fᶠ, bc_fun, fv, shape_nrs, cell_coords, time)
     for q_point in 1:getnquadpoints(fv)
         dΓ = getdetJdV(fv, q_point)
         n = getnormal(fv, q_point)
@@ -1960,7 +1960,10 @@ function integrate_l2_dbc!(::HdivConformity, Kᶠ, fᶠ, bc_fun, fv, shape_nrs, 
     return
 end
 
-function integrate_l2_dbc!(::HcurlConformity, Kᶠ, fᶠ, bc_fun, fv, shape_nrs, cell_coords, time)
+function integrate_projected_dbc!(::HcurlConformity, Kᶠ, fᶠ, bc_fun, fv, shape_nrs, cell_coords, time)
+    if getrefdim(function_interpolation(fv)) == 3
+        throw(ArgumentError("ProjectedDirichlet is not implemented for 3D H(curl) conformity"))
+    end
     for q_point in 1:getnquadpoints(fv)
         dΓ = getdetJdV(fv, q_point)
         n = getnormal(fv, q_point)
@@ -1978,7 +1981,7 @@ function integrate_l2_dbc!(::HcurlConformity, Kᶠ, fᶠ, bc_fun, fv, shape_nrs,
     return
 end
 
-function integrate_l2_dbc!(::Union{H1Conformity, L2Conformity}, args...)
+function integrate_projected_dbc!(::Union{H1Conformity, L2Conformity}, args...)
     ip_str = sprint(show, function_interpolation(fv))
-    throw(ArgumentError("ProjectedDirichlet is not defined for H¹ and L2 function spaces ($ip_str)"))
+    throw(ArgumentError("ProjectedDirichlet is not implemented for H¹ and L2 conformities ($ip_str)"))
 end
