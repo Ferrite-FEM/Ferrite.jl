@@ -3,7 +3,7 @@
 
 H(div)-conforming Raviart-Thomas elements.
 The following interpolations are implemented:
- 
+
 * RaviartThomas{RefTriangle, 1}
 * RaviartThomas{RefTriangle, 2}
 * RaviartThomas{RefQuadrilateral, 1}
