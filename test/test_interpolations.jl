@@ -139,7 +139,7 @@ function _test_interpolation_properties(dofs::NamedTuple, rs::NamedTuple)
     # Test D: getnbasefunctions matching number of dof indices
     return @test length(all_dofs) == dofs.n
 end
-@testset "interpolations" begin #=
+@testset "interpolations" begin
     @testset "Correctness of $interpolation" for interpolation in (
             Lagrange{RefLine, 1}(),
             Lagrange{RefLine, 2}(),
@@ -356,7 +356,7 @@ end
         @test_throws ArgumentError Ferrite.volumedof_interior_indices(ip)
         @test_throws ArgumentError Ferrite.facetdof_interior_indices(ip)
     end
-    =#
+
     @testset "H(curl) and H(div)" begin
         Hcurl_interpolations = [
             Nedelec{RefTriangle, 1}(), Nedelec{RefTriangle, 2}(), Nedelec{RefQuadrilateral, 1}(),
