@@ -16,11 +16,14 @@ Tensors = "48a634ad-e948-5137-8d70-aa71f2a747f4"
 WriteVTK = "64499a7a-5c06-52f2-abe2-ccb03c286192"
 
 [weakdeps]
+Adapt = "79e6a3ab-5dfb-504d-930d-738a2a938a0e"
 BlockArrays = "8e7c35d0-a365-5155-bbbb-fb81a777f24e"
+CUDA = "052768ef-5323-5732-b1bb-66c8b64840ba"
 Metis = "2679e427-3c69-5b7f-982b-ece356f1e94b"
 
 [extensions]
 FerriteBlockArrays = "BlockArrays"
+FerriteCuda = ["CUDA", "Adapt"]
 FerriteMetis = "Metis"
 
 [compat]
@@ -35,6 +38,7 @@ Preferences = "1"
 Reexport = "1"
 StaticArrays = "1"
 Tensors = "1.14"
+TimerOutputs = "0.5.25"
 WriteVTK = "1.13"
 julia = "1.10"
 

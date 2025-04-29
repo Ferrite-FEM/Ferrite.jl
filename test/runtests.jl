@@ -45,7 +45,7 @@ include("test_continuity.jl")
 include("test_examples.jl")
 
 @test all(x -> isdefined(Ferrite, x), names(Ferrite))  # Test that all exported symbols are defined
-# # See which is not defined if fails
+# See which is not defined if fails
 # for name in names(Ferrite)
 #     isdefined(Ferrite, name) || @warn "Ferrite.$name is not defined but $name is exported"
 # end
