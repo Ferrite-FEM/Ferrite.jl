@@ -51,6 +51,11 @@ const InterpolationByDim{dim} = Interpolation{<:AbstractRefShape{dim}}
 abstract type ScalarInterpolation{refshape, order} <: Interpolation{refshape, order} end
 abstract type VectorInterpolation{vdim, refshape, order} <: Interpolation{refshape, order} end
 
+struct L2Conformity end     # Discontinuous across cell boundaries
+struct HdivConformity end   # Normal continuity across cell boundaries
+struct HcurlConformity end  # Tangent continuity across cell boundaries
+struct H1Conformity end     # Function continuity across cell boundaries
+
 # Number of components for the interpolation.
 n_components(::ScalarInterpolation) = 1
 n_components(::VectorInterpolation{vdim}) where {vdim} = vdim
@@ -473,6 +478,7 @@ struct DiscontinuousLagrange{shape, order} <: ScalarInterpolation{shape, order}
         return new{shape, order}()
     end
 end
+conformity(::DiscontinuousLagrange) = L2Conformity()
 
 adjust_dofs_during_distribution(::DiscontinuousLagrange) = false
 
@@ -530,6 +536,7 @@ struct Lagrange{shape, order} <: ScalarInterpolation{shape, order}
         return new{shape, order}()
     end
 end
+conformity(::Lagrange) = H1Conformity()
 
 adjust_dofs_during_distribution(::Lagrange) = true
 adjust_dofs_during_distribution(::Lagrange{<:Any, 2}) = false
@@ -1342,6 +1349,7 @@ struct BubbleEnrichedLagrange{shape, order} <: ScalarInterpolation{shape, order}
         return new{shape, order}()
     end
 end
+conformity(::BubbleEnrichedLagrange) = H1Conformity()
 
 #######################################
 # Lagrange-Bubble RefTriangle order 1 #
@@ -1387,6 +1395,7 @@ struct Serendipity{shape, order} <: ScalarInterpolation{shape, order}
         return new{shape, order}()
     end
 end
+conformity(::Serendipity) = H1Conformity()
 
 # Note that the edgedofs for high order serendipity elements are defined in terms of integral moments,
 # so no permutation exists in general. See e.g. Scroggs et al. [2022] for an example.
@@ -1537,6 +1546,7 @@ struct CrouzeixRaviart{shape, order} <: ScalarInterpolation{shape, order}
     CrouzeixRaviart{RefTriangle, 1}() = new{RefTriangle, 1}()
     CrouzeixRaviart{RefTetrahedron, 1}() = new{RefTetrahedron, 1}()
 end
+conformity(::CrouzeixRaviart) = L2Conformity()
 
 # CR elements are characterized by not having vertex dofs
 vertexdof_indices(ip::CrouzeixRaviart) = ntuple(i -> (), nvertices(ip))
@@ -1605,6 +1615,7 @@ This element is basically the idea from Crouzeix and Raviart applied to
 hypercubes. For details see the original paper [RanTur:1992:snq](@cite).
 """
 struct RannacherTurek{shape, order} <: ScalarInterpolation{shape, order} end
+conformity(::RannacherTurek) = L2Conformity()
 
 # CR-type elements are characterized by not having vertex dofs
 vertexdof_indices(ip::RannacherTurek) = ntuple(i -> (), nvertices(ip))
@@ -1683,6 +1694,7 @@ struct VectorizedInterpolation{vdim, refshape, order, SI <: ScalarInterpolation{
         return new{vdim, refshape, order, SI}(ip)
     end
 end
+conformity(ip::VectorizedInterpolation) = conformity(ip.ip)
 
 adjust_dofs_during_distribution(ip::VectorizedInterpolation) = adjust_dofs_during_distribution(ip.ip)
 
@@ -1826,6 +1838,7 @@ struct RaviartThomas{shape, order, vdim} <: VectorInterpolation{vdim, shape, ord
     end
 end
 mapping_type(::RaviartThomas) = ContravariantPiolaMapping()
+conformity(::RaviartThomas) = HdivConformity()
 
 # RefTriangle
 edgedof_indices(ip::RaviartThomas{RefTriangle}) = edgedof_interior_indices(ip)
@@ -1964,6 +1977,7 @@ struct BrezziDouglasMarini{shape, order, vdim} <: VectorInterpolation{vdim, shap
     end
 end
 mapping_type(::BrezziDouglasMarini) = ContravariantPiolaMapping()
+conformity(::BrezziDouglasMarini) = HdivConformity()
 
 # RefTriangle
 edgedof_indices(ip::BrezziDouglasMarini{RefTriangle}) = edgedof_interior_indices(ip)
@@ -2003,6 +2017,7 @@ struct Nedelec{shape, order, vdim} <: VectorInterpolation{vdim, shape, order}
     end
 end
 mapping_type(::Nedelec) = CovariantPiolaMapping()
+conformity(::Nedelec) = HcurlConformity()
 edgedof_indices(ip::Nedelec) = edgedof_interior_indices(ip)
 
 # 2D refshape (rdim == vdim for Nedelec)
