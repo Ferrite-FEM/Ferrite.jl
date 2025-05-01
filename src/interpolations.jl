@@ -46,8 +46,8 @@ The following interpolations are implemented:
 * `RaviartThomas{RefHexahedron, 1}`
 * `BrezziDouglasMarini{RefTriangle, 1}`
 
-including `DiscontinuousLagrange` for the same reference shapes and orders as `Lagrange`,
-in addition to `order = 0` for any reference shape.
+Additionally, `DiscontinuousLagrange` is implemented for the same reference shapes
+and orders as `Lagrange`, as well as for `order = 0` on any reference shape.
 
 # Examples
 ```jldoctest
