@@ -8,9 +8,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [v1.1.0] - 2025-05-01
 
 ### Added
- - New vector interpolations for H(div) and H(curl) spaces (Nedelec, RaviartThomas,
-   BrezziDouglasMarini). ([#1045],[#1162])
- - `ProjectedDirichlet` boundary conditions for H(div) and H(curl) interpolations. ([#1151])
+ - New vector interpolations for H(div) and H(curl) spaces (`Nedelec`, `RaviartThomas`,
+   `BrezziDouglasMarini`). ([#1045],[#1162])
+ - New boundary condition type, `ProjectedDirichlet`, for H(div) and H(curl) interpolations. ([#1151])
    It can be added to a constraint handler the same way as for a regular `Dirichlet`.
  - Support for exporting discontinuous fields to VTK. ([#867])
    This happens automatically when a DofHandler with a discontinuous field is used
