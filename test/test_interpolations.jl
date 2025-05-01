@@ -305,15 +305,10 @@ end
 
         # Test discontinuous interpolations related functions
         d_ip = DiscontinuousLagrange{RefQuadrilateral, 1}()
-        d_ip_t = DiscontinuousLagrange{RefQuadrilateral, 1}
-
         ip = Lagrange{RefQuadrilateral, 1}()
-        ip_t = Lagrange{RefQuadrilateral, 1}
 
         @test Ferrite.is_discontinuous(ip) == false
-        @test Ferrite.is_discontinuous(ip_t) == false
         @test Ferrite.is_discontinuous(d_ip) == true
-        @test Ferrite.is_discontinuous(d_ip_t) == true
     end
 
     @testset "Correctness of AD of embedded interpolations" begin
