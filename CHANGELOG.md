@@ -22,7 +22,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
  -  `evaluate_at_grid_nodes` now respects the precision of the input dof vector. ([#1044])
 
 ### Removed
- - The deprecated third type parameter for interpolations has been removed. ([#1083]) 
+ - The deprecated third type parameter for interpolations has been removed. ([#1083])
    Old code which tries to use three parameters will now throw the somewhat cryptic error:
    ```
    julia> Lagrange{2, RefCube, 1}()
