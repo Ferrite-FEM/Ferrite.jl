@@ -461,25 +461,6 @@ dirichlet_boundarydof_indices(::Type{FacetIndex}) = dirichlet_facetdof_indices
 get_edge_direction(cell, edgenr) = get_edge_direction(edges(cell)[edgenr])
 get_face_direction(cell, facenr) = get_face_direction(faces(cell)[facenr])
 
-function get_edge_direction(edgenodes::NTuple{2, Int})
-    positive = edgenodes[2] > edgenodes[1]
-    return ifelse(positive, 1, -1)
-end
-
-function get_face_direction(facenodes::NTuple{N, Int}) where {N}
-    N > 2 || throw(ArgumentError("A face must have at least 3 nodes"))
-    min_idx = argmin(facenodes)
-    if min_idx == 1
-        positive = facenodes[2] < facenodes[end]
-    elseif min_idx == length(facenodes)
-        positive = facenodes[1] < facenodes[end - 1]
-    else
-        positive = facenodes[min_idx + 1] < facenodes[min_idx - 1]
-    end
-    return ifelse(positive, 1, -1)
-end
-
-
 #########################
 # DiscontinuousLagrange #
 #########################
