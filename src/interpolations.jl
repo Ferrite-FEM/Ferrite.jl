@@ -595,7 +595,7 @@ end
 getnbasefunctions(::Lagrange{RefLine, 2}) = 3
 
 edgedof_indices(::Lagrange{RefLine, 2}) = ((1, 2, 3),)
-edgedof_interior_indices(::Lagrange{RefLine, 2}) = (3,)
+edgedof_interior_indices(::Lagrange{RefLine, 2}) = ((3,),)
 
 function reference_coordinates(::Lagrange{RefLine, 2})
     return [
@@ -648,7 +648,7 @@ getnbasefunctions(::Lagrange{RefQuadrilateral, 2}) = 9
 edgedof_indices(::Lagrange{RefQuadrilateral, 2}) = ((1, 2, 5), (2, 3, 6), (3, 4, 7), (4, 1, 8))
 edgedof_interior_indices(::Lagrange{RefQuadrilateral, 2}) = ((5,), (6,), (7,), (8,))
 facedof_indices(ip::Lagrange{RefQuadrilateral, 2}) = (ntuple(i -> i, getnbasefunctions(ip)),)
-facedof_interior_indices(::Lagrange{RefQuadrilateral, 2}) = ((9,))
+facedof_interior_indices(::Lagrange{RefQuadrilateral, 2}) = ((9,),)
 
 function reference_coordinates(::Lagrange{RefQuadrilateral, 2})
     return [
@@ -1030,7 +1030,7 @@ edgedof_indices(::Lagrange{RefHexahedron, 2}) = (
     (4, 8, 20),
 )
 edgedof_interior_indices(::Lagrange{RefHexahedron, 2}) = (
-    (9,), (10,), (11,), (12,), (13,), (14,), (15,), (16,), (17), (18,), (19,), (20,),
+    (9,), (10,), (11,), (12,), (13,), (14,), (15,), (16,), (17,), (18,), (19,), (20,),
 )
 
 volumedof_interior_indices(::Lagrange{RefHexahedron, 2}) = (27,)
@@ -1489,7 +1489,7 @@ edgedof_indices(::Serendipity{RefHexahedron, 2}) = (
 )
 
 edgedof_interior_indices(::Serendipity{RefHexahedron, 2}) = (
-    (9,), (10,), (11,), (12,), (13,), (14,), (15,), (16,), (17), (18,), (19,), (20,),
+    (9,), (10,), (11,), (12,), (13,), (14,), (15,), (16,), (17,), (18,), (19,), (20,),
 )
 
 function reference_coordinates(::Serendipity{RefHexahedron, 2})

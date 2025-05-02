@@ -34,13 +34,13 @@ function test_interpolation_properties(ip::Interpolation{RefShape, FunOrder}) wh
         as_vector(t::Tuple) = collect(as_vector.(t))
         as_vector(i::Int) = i
         dof_data = (
-            vert = as_vector(Ferrite.vertexdof_indices(ip)),
-            edge = as_vector(Ferrite.edgedof_indices(ip)),
-            face = as_vector(Ferrite.facedof_indices(ip)),
-            edge_i = as_vector(Ferrite.edgedof_interior_indices(ip)),
-            face_i = as_vector(Ferrite.facedof_interior_indices(ip)),
-            vol_i = as_vector(Ferrite.volumedof_interior_indices(ip)),
-            n = getnbasefunctions(ip),
+            vert = as_vector(Ferrite.vertexdof_indices(ip)::NTuple{<:Any, NTuple{<:Any, Int}}),
+            edge = as_vector(Ferrite.edgedof_indices(ip)::NTuple{<:Any, NTuple{<:Any, Int}}),
+            face = as_vector(Ferrite.facedof_indices(ip)::NTuple{<:Any, NTuple{<:Any, Int}}),
+            edge_i = as_vector(Ferrite.edgedof_interior_indices(ip)::NTuple{<:Any, NTuple{<:Any, Int}}),
+            face_i = as_vector(Ferrite.facedof_interior_indices(ip)::NTuple{<:Any, NTuple{<:Any, Int}}),
+            vol_i = as_vector(Ferrite.volumedof_interior_indices(ip)::NTuple{<:Any, Int}),
+            n = getnbasefunctions(ip)::Int,
         )
 
         refshape_data = (
