@@ -109,7 +109,7 @@ using Ferrite: reference_shape_value
                         fcoords[i] = x
                     end
                     ipcell = Lagrange{refshape, 1}()
-                    ipface = Lagrange{getfacerefshape(cell, lfaceid), 1}()
+                    ipface = Lagrange{getfacetrefshape(refshape, lfaceid), 1}()
 
                     ξface = rand(Vec_face_t) / 4
                     ξcell = Ferrite.facet_to_element_transformation(ξface, refshape, lfaceid)

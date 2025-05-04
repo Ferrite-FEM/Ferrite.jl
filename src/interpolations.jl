@@ -9,31 +9,45 @@ a function between nodes.
 
 The following interpolations are implemented:
 
-* `Lagrange{RefLine,1}`
-* `Lagrange{RefLine,2}`
-* `Lagrange{RefQuadrilateral,1}`
-* `Lagrange{RefQuadrilateral,2}`
-* `Lagrange{RefQuadrilateral,3}`
-* `Lagrange{RefTriangle,1}`
-* `Lagrange{RefTriangle,2}`
-* `Lagrange{RefTriangle,3}`
-* `Lagrange{RefTriangle,4}`
-* `Lagrange{RefTriangle,5}`
-* `BubbleEnrichedLagrange{RefTriangle,1}`
+* `Lagrange{RefLine, 1}`
+* `Lagrange{RefLine, 2}`
+* `Lagrange{RefQuadrilateral, 1}`
+* `Lagrange{RefQuadrilateral, 2}`
+* `Lagrange{RefQuadrilateral, 3}`
+* `Lagrange{RefTriangle, 1}`
+* `Lagrange{RefTriangle, 2}`
+* `Lagrange{RefTriangle, 3}`
+* `Lagrange{RefTriangle, 4}`
+* `Lagrange{RefTriangle, 5}`
+* `BubbleEnrichedLagrange{RefTriangle, 1}`
 * `CrouzeixRaviart{RefTriangle, 1}`
 * `CrouzeixRaviart{RefTetrahedron, 1}`
 * `RannacherTurek{RefQuadrilateral, 1}`
 * `RannacherTurek{RefHexahedron, 1}`
-* `Lagrange{RefHexahedron,1}`
-* `Lagrange{RefHexahedron,2}`
-* `Lagrange{RefTetrahedron,1}`
-* `Lagrange{RefTetrahedron,2}`
-* `Lagrange{RefPrism,1}`
-* `Lagrange{RefPrism,2}`
-* `Lagrange{RefPyramid,1}`
-* `Lagrange{RefPyramid,2}`
-* `Serendipity{RefQuadrilateral,2}`
-* `Serendipity{RefHexahedron,2}`
+* `Lagrange{RefHexahedron, 1}`
+* `Lagrange{RefHexahedron, 2}`
+* `Lagrange{RefTetrahedron, 1}`
+* `Lagrange{RefTetrahedron, 2}`
+* `Lagrange{RefPrism, 1}`
+* `Lagrange{RefPrism, 2}`
+* `Lagrange{RefPyramid, 1}`
+* `Lagrange{RefPyramid, 2}`
+* `Serendipity{RefQuadrilateral, 2}`
+* `Serendipity{RefHexahedron, 2}`
+* `Nedelec{RefTriangle, 1}`
+* `Nedelec{RefTriangle, 2}`
+* `Nedelec{RefQuadrilateral, 1}`
+* `Nedelec{RefTetrahedron, 1}`
+* `Nedelec{RefHexahedron, 1}`
+* `RaviartThomas{RefTriangle, 1}`
+* `RaviartThomas{RefTriangle, 2}`
+* `RaviartThomas{RefQuadrilateral, 1}`
+* `RaviartThomas{RefTetrahedron, 1}`
+* `RaviartThomas{RefHexahedron, 1}`
+* `BrezziDouglasMarini{RefTriangle, 1}`
+
+Additionally, `DiscontinuousLagrange` is implemented for the same reference shapes
+and orders as `Lagrange`, as well as for `order = 0` on any reference shape.
 
 # Examples
 ```jldoctest
@@ -50,6 +64,11 @@ const InterpolationByDim{dim} = Interpolation{<:AbstractRefShape{dim}}
 
 abstract type ScalarInterpolation{refshape, order} <: Interpolation{refshape, order} end
 abstract type VectorInterpolation{vdim, refshape, order} <: Interpolation{refshape, order} end
+
+struct L2Conformity end     # Discontinuous across cell boundaries
+struct HdivConformity end   # Normal continuity across cell boundaries
+struct HcurlConformity end  # Tangent continuity across cell boundaries
+struct H1Conformity end     # Function continuity across cell boundaries
 
 # Number of components for the interpolation.
 n_components(::ScalarInterpolation) = 1
@@ -438,6 +457,29 @@ dirichlet_boundarydof_indices(::Type{EdgeIndex}) = dirichlet_edgedof_indices
 dirichlet_boundarydof_indices(::Type{VertexIndex}) = dirichlet_vertexdof_indices
 dirichlet_boundarydof_indices(::Type{FacetIndex}) = dirichlet_facetdof_indices
 
+
+get_edge_direction(cell, edgenr) = get_edge_direction(edges(cell)[edgenr])
+get_face_direction(cell, facenr) = get_face_direction(faces(cell)[facenr])
+
+function get_edge_direction(edgenodes::NTuple{2, Int})
+    positive = edgenodes[2] > edgenodes[1]
+    return ifelse(positive, 1, -1)
+end
+
+function get_face_direction(facenodes::NTuple{N, Int}) where {N}
+    N > 2 || throw(ArgumentError("A face must have at least 3 nodes"))
+    min_idx = argmin(facenodes)
+    if min_idx == 1
+        positive = facenodes[2] < facenodes[end]
+    elseif min_idx == length(facenodes)
+        positive = facenodes[1] < facenodes[end - 1]
+    else
+        positive = facenodes[min_idx + 1] < facenodes[min_idx - 1]
+    end
+    return ifelse(positive, 1, -1)
+end
+
+
 #########################
 # DiscontinuousLagrange #
 #########################
@@ -450,6 +492,7 @@ struct DiscontinuousLagrange{shape, order} <: ScalarInterpolation{shape, order}
         return new{shape, order}()
     end
 end
+conformity(::DiscontinuousLagrange) = L2Conformity()
 
 adjust_dofs_during_distribution(::DiscontinuousLagrange) = false
 
@@ -507,6 +550,7 @@ struct Lagrange{shape, order} <: ScalarInterpolation{shape, order}
         return new{shape, order}()
     end
 end
+conformity(::Lagrange) = H1Conformity()
 
 adjust_dofs_during_distribution(::Lagrange) = true
 adjust_dofs_during_distribution(::Lagrange{<:Any, 2}) = false
@@ -551,7 +595,7 @@ end
 getnbasefunctions(::Lagrange{RefLine, 2}) = 3
 
 edgedof_indices(::Lagrange{RefLine, 2}) = ((1, 2, 3),)
-edgedof_interior_indices(::Lagrange{RefLine, 2}) = (3,)
+edgedof_interior_indices(::Lagrange{RefLine, 2}) = ((3,),)
 
 function reference_coordinates(::Lagrange{RefLine, 2})
     return [
@@ -604,7 +648,7 @@ getnbasefunctions(::Lagrange{RefQuadrilateral, 2}) = 9
 edgedof_indices(::Lagrange{RefQuadrilateral, 2}) = ((1, 2, 5), (2, 3, 6), (3, 4, 7), (4, 1, 8))
 edgedof_interior_indices(::Lagrange{RefQuadrilateral, 2}) = ((5,), (6,), (7,), (8,))
 facedof_indices(ip::Lagrange{RefQuadrilateral, 2}) = (ntuple(i -> i, getnbasefunctions(ip)),)
-facedof_interior_indices(::Lagrange{RefQuadrilateral, 2}) = ((9,))
+facedof_interior_indices(::Lagrange{RefQuadrilateral, 2}) = ((9,),)
 
 function reference_coordinates(::Lagrange{RefQuadrilateral, 2})
     return [
@@ -986,7 +1030,7 @@ edgedof_indices(::Lagrange{RefHexahedron, 2}) = (
     (4, 8, 20),
 )
 edgedof_interior_indices(::Lagrange{RefHexahedron, 2}) = (
-    (9,), (10,), (11,), (12,), (13,), (14,), (15,), (16,), (17), (18,), (19,), (20,),
+    (9,), (10,), (11,), (12,), (13,), (14,), (15,), (16,), (17,), (18,), (19,), (20,),
 )
 
 volumedof_interior_indices(::Lagrange{RefHexahedron, 2}) = (27,)
@@ -1319,6 +1363,7 @@ struct BubbleEnrichedLagrange{shape, order} <: ScalarInterpolation{shape, order}
         return new{shape, order}()
     end
 end
+conformity(::BubbleEnrichedLagrange) = H1Conformity()
 
 #######################################
 # Lagrange-Bubble RefTriangle order 1 #
@@ -1364,6 +1409,7 @@ struct Serendipity{shape, order} <: ScalarInterpolation{shape, order}
         return new{shape, order}()
     end
 end
+conformity(::Serendipity) = H1Conformity()
 
 # Note that the edgedofs for high order serendipity elements are defined in terms of integral moments,
 # so no permutation exists in general. See e.g. Scroggs et al. [2022] for an example.
@@ -1443,7 +1489,7 @@ edgedof_indices(::Serendipity{RefHexahedron, 2}) = (
 )
 
 edgedof_interior_indices(::Serendipity{RefHexahedron, 2}) = (
-    (9,), (10,), (11,), (12,), (13,), (14,), (15,), (16,), (17), (18,), (19,), (20,),
+    (9,), (10,), (11,), (12,), (13,), (14,), (15,), (16,), (17,), (18,), (19,), (20,),
 )
 
 function reference_coordinates(::Serendipity{RefHexahedron, 2})
@@ -1514,6 +1560,7 @@ struct CrouzeixRaviart{shape, order} <: ScalarInterpolation{shape, order}
     CrouzeixRaviart{RefTriangle, 1}() = new{RefTriangle, 1}()
     CrouzeixRaviart{RefTetrahedron, 1}() = new{RefTetrahedron, 1}()
 end
+conformity(::CrouzeixRaviart) = L2Conformity()
 
 # CR elements are characterized by not having vertex dofs
 vertexdof_indices(ip::CrouzeixRaviart) = ntuple(i -> (), nvertices(ip))
@@ -1582,6 +1629,7 @@ This element is basically the idea from Crouzeix and Raviart applied to
 hypercubes. For details see the original paper [RanTur:1992:snq](@cite).
 """
 struct RannacherTurek{shape, order} <: ScalarInterpolation{shape, order} end
+conformity(::RannacherTurek) = L2Conformity()
 
 # CR-type elements are characterized by not having vertex dofs
 vertexdof_indices(ip::RannacherTurek) = ntuple(i -> (), nvertices(ip))
@@ -1660,6 +1708,7 @@ struct VectorizedInterpolation{vdim, refshape, order, SI <: ScalarInterpolation{
         return new{vdim, refshape, order, SI}(ip)
     end
 end
+conformity(ip::VectorizedInterpolation) = conformity(ip.ip)
 
 adjust_dofs_during_distribution(ip::VectorizedInterpolation) = adjust_dofs_during_distribution(ip.ip)
 
@@ -1804,6 +1853,7 @@ struct RaviartThomas{shape, order, vdim} <: VectorInterpolation{vdim, shape, ord
 end
 mapping_type(::RaviartThomas) = ContravariantPiolaMapping()
 is_discontinuous(::RaviartThomas) = true
+conformity(::RaviartThomas) = HdivConformity()
 
 # RefTriangle
 edgedof_indices(ip::RaviartThomas{RefTriangle}) = edgedof_interior_indices(ip)
@@ -1824,9 +1874,8 @@ edgedof_interior_indices(::RaviartThomas{RefTriangle, 1}) = ((1,), (2,), (3,))
 facedof_interior_indices(::RaviartThomas{RefTriangle, 1}) = ((),)
 adjust_dofs_during_distribution(::RaviartThomas) = false
 
-function get_direction(::RaviartThomas{RefTriangle, 1}, j, cell)
-    edge = edges(cell)[j]
-    return ifelse(edge[2] > edge[1], 1, -1)
+function get_direction(::RaviartThomas{RefTriangle, 1}, shape_nr, cell)
+    return get_edge_direction(cell, shape_nr) # shape_nr = edge_nr
 end
 
 # RefTriangle, 2st order Lagrange
@@ -1853,10 +1902,85 @@ edgedof_interior_indices(::RaviartThomas{RefTriangle, 2}) = ((1, 2), (3, 4), (5,
 facedof_interior_indices(::RaviartThomas{RefTriangle, 2}) = ((7, 8),)
 adjust_dofs_during_distribution(::RaviartThomas{RefTriangle, 2}) = true
 
-function get_direction(::RaviartThomas{RefTriangle, 2}, j, cell)
-    j > 6 && return 1
-    edge = edges(cell)[(j + 1) ÷ 2]
-    return ifelse(edge[2] > edge[1], 1, -1)
+function get_direction(::RaviartThomas{RefTriangle, 2}, shape_nr, cell)
+    shape_nr > 6 && return 1
+    edge_nr = (shape_nr + 1) ÷ 2
+    return get_edge_direction(cell, edge_nr)
+end
+
+# RefQuadrilateral
+edgedof_indices(ip::RaviartThomas{RefQuadrilateral}) = edgedof_interior_indices(ip)
+facedof_indices(ip::RaviartThomas{RefQuadrilateral}) = (ntuple(i -> i, getnbasefunctions(ip)),)
+
+# RefQuadrilateral, 1st order Lagrange
+# https://defelement.org/elements/examples/quadrilateral-raviart-thomas-lagrange-1.html
+function reference_shape_value(ip::RaviartThomas{RefQuadrilateral, 1}, ξ::Vec{2, T}, i::Int) where {T}
+    x, y = ξ
+    nil = zero(T)
+
+    i == 1 && return Vec(nil, -(1 - y) / 4) # Changed sign, follow Ferrite's sign convention
+    i == 2 && return Vec((1 + x) / 4, nil)  # Changed sign, follow Ferrite's sign convention
+    i == 3 && return Vec(nil, (1 + y) / 4)
+    i == 4 && return Vec((x - 1) / 4, nil)
+    throw(ArgumentError("no shape function $i for interpolation $ip"))
+end
+
+getnbasefunctions(::RaviartThomas{RefQuadrilateral, 1}) = 4
+edgedof_interior_indices(::RaviartThomas{RefQuadrilateral, 1}) = ((1,), (2,), (3,), (4,))
+facedof_interior_indices(::RaviartThomas{RefQuadrilateral, 1}) = ((),)
+adjust_dofs_during_distribution(::RaviartThomas{RefQuadrilateral, 1}) = false
+
+function get_direction(::RaviartThomas{RefQuadrilateral, 1}, shape_nr, cell)
+    return get_edge_direction(cell, shape_nr) # shape_nr = edge_nr
+end
+
+# RefTetrahedron, 1st order Lagrange
+# https://defelement.com/elements/examples/tetrahedron-raviart-thomas-lagrange-1.html
+function reference_shape_value(ip::RaviartThomas{RefTetrahedron, 1}, ξ::Vec{3}, i::Int)
+    x, y, z = ξ
+    i == 1 && return Vec(2 * x, 2 * y, 2 * (z - 1)) # Changed sign, follow Ferrite's sign convention
+    i == 2 && return Vec(2 * x, 2 * (y - 1), 2 * z)
+    i == 3 && return Vec(2 * x, 2 * y, 2 * z)
+    i == 4 && return Vec(2 * (x - 1), 2 * y, 2 * z) # Changed sign, follow Ferrite's sign convention
+    throw(ArgumentError("no shape function $i for interpolation $ip"))
+end
+
+getnbasefunctions(::RaviartThomas{RefTetrahedron, 1}) = 4
+edgedof_interior_indices(::RaviartThomas{RefTetrahedron, 1}) = ntuple(_ -> (), 6)
+edgedof_indices(ip::RaviartThomas{RefTetrahedron, 1}) = edgedof_interior_indices(ip)
+facedof_interior_indices(::RaviartThomas{RefTetrahedron, 1}) = ((1,), (2,), (3,), (4,))
+facedof_indices(ip::RaviartThomas{RefTetrahedron, 1}) = facedof_interior_indices(ip)
+adjust_dofs_during_distribution(::RaviartThomas{RefTetrahedron, 1}) = false
+
+function get_direction(::RaviartThomas{RefTetrahedron, 1}, shape_nr, cell)
+    return get_face_direction(cell, shape_nr) # shape_nr = face_nr
+end
+
+# RefHexahedron, 1st order Lagrange
+# https://defelement.com/elements/examples/hexahedron-raviart-thomas-lagrange-1.html
+# Scale with factor 1/4 as Ferrite has 4 times defelement's face area.
+function reference_shape_value(ip::RaviartThomas{RefHexahedron, 1}, ξ::Vec{3, T}, i::Int) where {T}
+    x, y, z = ξ
+    nil = zero(T)
+
+    i == 1 && return Vec(nil, nil, (z - 1) / 8) # Changed sign, follow Ferrite's sign convention
+    i == 2 && return Vec(nil, (y - 1) / 8, nil)
+    i == 3 && return Vec((x + 1) / 8, nil, nil)
+    i == 4 && return Vec(nil, (y + 1) / 8, nil) # Changed sign, follow Ferrite's sign convention
+    i == 5 && return Vec((x - 1) / 8, nil, nil) # Changed sign, follow Ferrite's sign convention
+    i == 6 && return Vec(nil, nil, (z + 1) / 8)
+    throw(ArgumentError("no shape function $i for interpolation $ip"))
+end
+
+getnbasefunctions(::RaviartThomas{RefHexahedron, 1}) = 6
+edgedof_interior_indices(::RaviartThomas{RefHexahedron, 1}) = ntuple(_ -> (), 12)
+edgedof_indices(ip::RaviartThomas{RefHexahedron, 1}) = edgedof_interior_indices(ip)
+facedof_interior_indices(::RaviartThomas{RefHexahedron, 1}) = ((1,), (2,), (3,), (4,), (5,), (6,))
+facedof_indices(ip::RaviartThomas{RefHexahedron, 1}) = facedof_interior_indices(ip)
+adjust_dofs_during_distribution(::RaviartThomas{RefHexahedron, 1}) = false
+
+function get_direction(::RaviartThomas{RefHexahedron, 1}, shape_nr, cell)
+    return get_face_direction(cell, shape_nr) # shape_nr = face_nr
 end
 
 #####################################
@@ -1869,6 +1993,7 @@ struct BrezziDouglasMarini{shape, order, vdim} <: VectorInterpolation{vdim, shap
 end
 mapping_type(::BrezziDouglasMarini) = ContravariantPiolaMapping()
 is_discontinuous(::BrezziDouglasMarini) = true
+conformity(::BrezziDouglasMarini) = HdivConformity()
 
 # RefTriangle
 edgedof_indices(ip::BrezziDouglasMarini{RefTriangle}) = edgedof_interior_indices(ip)
@@ -1894,9 +2019,9 @@ getnbasefunctions(::BrezziDouglasMarini{RefTriangle, 1}) = 6
 edgedof_interior_indices(::BrezziDouglasMarini{RefTriangle, 1}) = ((1, 2), (3, 4), (5, 6))
 adjust_dofs_during_distribution(::BrezziDouglasMarini{RefTriangle, 1}) = true
 
-function get_direction(::BrezziDouglasMarini{RefTriangle, 1}, j, cell)
-    edge = edges(cell)[(j + 1) ÷ 2]
-    return ifelse(edge[2] > edge[1], 1, -1)
+function get_direction(::BrezziDouglasMarini{RefTriangle, 1}, shape_nr, cell)
+    edge_nr = (shape_nr + 1) ÷ 2
+    return get_edge_direction(cell, edge_nr)
 end
 
 #####################################
@@ -1909,6 +2034,7 @@ struct Nedelec{shape, order, vdim} <: VectorInterpolation{vdim, shape, order}
 end
 mapping_type(::Nedelec) = CovariantPiolaMapping()
 is_discontinuous(::Nedelec) = true
+conformity(::Nedelec) = HcurlConformity()
 edgedof_indices(ip::Nedelec) = edgedof_interior_indices(ip)
 
 # 2D refshape (rdim == vdim for Nedelec)
@@ -1919,7 +2045,7 @@ facedof_indices(ip::Nedelec{<:AbstractRefShape{2}}) = (ntuple(i -> i, getnbasefu
 function reference_shape_value(ip::Nedelec{RefTriangle, 1}, ξ::Vec{2}, i::Int)
     x, y = ξ
     i == 1 && return Vec(- y, x)
-    i == 2 && return Vec(- y, x - 1) # Changed signed, follow Ferrite's sign convention
+    i == 2 && return Vec(- y, x - 1) # Changed sign, follow Ferrite's sign convention
     i == 3 && return Vec(1 - y, x)
     throw(ArgumentError("no shape function $i for interpolation $ip"))
 end
@@ -1928,9 +2054,8 @@ getnbasefunctions(::Nedelec{RefTriangle, 1}) = 3
 edgedof_interior_indices(::Nedelec{RefTriangle, 1}) = ((1,), (2,), (3,))
 adjust_dofs_during_distribution(::Nedelec{RefTriangle, 1}) = false
 
-function get_direction(::Nedelec{RefTriangle, 1}, j, cell)
-    edge = edges(cell)[j]
-    return ifelse(edge[2] > edge[1], 1, -1)
+function get_direction(::Nedelec{RefTriangle, 1}, shape_nr, cell)
+    return get_edge_direction(cell, shape_nr) # shape_nr = edge_nr
 end
 
 # RefTriangle, 2nd order Lagrange
@@ -1959,10 +2084,10 @@ edgedof_interior_indices(::Nedelec{RefTriangle, 2}) = ((1, 2), (3, 4), (5, 6))
 facedof_interior_indices(::Nedelec{RefTriangle, 2}) = ((7, 8),)
 adjust_dofs_during_distribution(::Nedelec{RefTriangle, 2}) = true
 
-function get_direction(::Nedelec{RefTriangle, 2}, j, cell)
-    j > 6 && return 1
-    edge = edges(cell)[(j + 1) ÷ 2]
-    return ifelse(edge[2] > edge[1], 1, -1)
+function get_direction(::Nedelec{RefTriangle, 2}, shape_nr, cell)
+    shape_nr > 6 && return 1
+    edge_nr = (shape_nr + 1) ÷ 2
+    return get_edge_direction(cell, edge_nr)
 end
 
 # RefQuadrilateral, 1st order Lagrange
@@ -1982,7 +2107,61 @@ end
 getnbasefunctions(::Nedelec{RefQuadrilateral, 1}) = 4
 edgedof_interior_indices(::Nedelec{RefQuadrilateral, 1}) = ((1,), (2,), (3,), (4,))
 adjust_dofs_during_distribution(::Nedelec{RefQuadrilateral, 1}) = false
-function get_direction(::Nedelec{RefQuadrilateral, 1}, j, cell)
-    edge = edges(cell)[j]
-    return ifelse(edge[2] > edge[1], 1, -1)
+
+function get_direction(::Nedelec{RefQuadrilateral, 1}, shape_nr, cell)
+    return get_edge_direction(cell, shape_nr) # shape_nr = edge_nr
+end
+
+# RefTetrahedron, 1st order Lagrange
+# https://defelement.org/elements/examples/tetrahedron-nedelec1-lagrange-1.html
+function reference_shape_value(ip::Nedelec{RefTetrahedron, 1}, ξ::Vec{3, T}, i::Int) where {T}
+    x, y, z = ξ
+    nil = zero(T)
+
+    i == 1 && return Vec(1 - y - z, x, x)
+    i == 2 && return Vec(-y, x, nil)
+    i == 3 && return Vec(-y, x + z - 1, -y) # Changed sign, follow Ferrite's sign convention
+    i == 4 && return Vec(z, z, 1 - x - y)
+    i == 5 && return Vec(-z, nil, x)
+    i == 6 && return Vec(nil, -z, y)
+    throw(ArgumentError("no shape function $i for interpolation $ip"))
+end
+
+getnbasefunctions(::Nedelec{RefTetrahedron, 1}) = 6
+edgedof_interior_indices(::Nedelec{RefTetrahedron, 1}) = ((1,), (2,), (3,), (4,), (5,), (6,))
+facedof_indices(::Nedelec{RefTetrahedron, 1}) = ((1, 2, 3), (1, 4, 5), (2, 5, 6), (3, 4, 6))
+adjust_dofs_during_distribution(::Nedelec{RefTetrahedron, 1}) = false
+
+function get_direction(::Nedelec{RefTetrahedron, 1}, shape_nr, cell)
+    return get_edge_direction(cell, shape_nr) # shape_nr = edge_nr
+end
+
+# RefHexahedron, 1st order Lagrange
+# https://defelement.org/elements/examples/hexahedron-nedelec1-lagrange-1.html
+function reference_shape_value(ip::Nedelec{RefHexahedron, 1}, ξ::Vec{3, T}, i::Int) where {T}
+    x, y, z = ξ
+    nil = zero(T)
+
+    i == 1 && return Vec((1 - y) * (1 - z) / 8, nil, nil)
+    i == 2 && return Vec(nil, (1 + x) * (1 - z) / 8, nil)
+    i == 3 && return Vec(-(1 + y) * (1 - z) / 8, nil, nil) # Changed sign, follow Ferrite's sign convention
+    i == 4 && return Vec(nil, -(1 - x) * (1 - z) / 8, nil)  # Changed sign, follow Ferrite's sign convention
+    i == 5 && return Vec((1 - y) * (1 + z) / 8, nil, nil)
+    i == 6 && return Vec(nil, (1 + x) * (1 + z) / 8, nil)
+    i == 7 && return Vec(-(1 + y) * (1 + z) / 8, nil, nil)  # Changed sign, follow Ferrite's sign convention
+    i == 8 && return Vec(nil, -(1 - x) * (1 + z) / 8, nil) # Changed sign, follow Ferrite's sign convention
+    i == 9 && return Vec(nil, nil, (1 - x) * (1 - y) / 8)
+    i == 10 && return Vec(nil, nil, (1 + x) * (1 - y) / 8)
+    i == 11 && return Vec(nil, nil, (1 + x) * (1 + y) / 8)
+    i == 12 && return Vec(nil, nil, (1 - x) * (1 + y) / 8)
+    throw(ArgumentError("no shape function $i for interpolation $ip"))
+end
+
+getnbasefunctions(::Nedelec{RefHexahedron, 1}) = 12
+edgedof_interior_indices(::Nedelec{RefHexahedron, 1}) = ((1,), (2,), (3,), (4,), (5,), (6,), (7,), (8,), (9,), (10,), (11,), (12,))
+facedof_indices(::Nedelec{RefHexahedron, 1}) = ((1, 2, 3, 4), (1, 5, 9, 10), (2, 6, 10, 11), (3, 7, 11, 12), (4, 8, 9, 12), (5, 6, 7, 8))
+adjust_dofs_during_distribution(::Nedelec{RefHexahedron, 1}) = false
+
+function get_direction(::Nedelec{RefHexahedron, 1}, shape_nr, cell)
+    return get_edge_direction(cell, shape_nr) # shape_nr = edge_nr
 end

@@ -5,20 +5,38 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [v1.1.0] - 2025-05-01
+
+### Added
+ - New vector interpolations for H(div) and H(curl) spaces (`Nedelec`, `RaviartThomas`,
+   `BrezziDouglasMarini`). ([#1045],[#1162])
+ - New boundary condition type, `ProjectedDirichlet`, for H(div) and H(curl) interpolations. ([#1151])
+   It can be added to a constraint handler the same way as for a regular `Dirichlet`.
+ - Support for exporting discontinuous fields to VTK. ([#867])
+   This happens automatically when a DofHandler with a discontinuous field is used
+   to construct the `VTKGridFile`, but can be requested with the `write_discontinuous`
+   keyword argument.
+
+### Fixes
+ - `addboundaryfacetset` has been fixed for mixed grids. ([#1176])
+ -  `evaluate_at_grid_nodes` now respects the precision of the input dof vector. ([#1044])
 
 ### Removed
- - The deprecated third type parameter for interpolations have been removed. Old code which
-   tries to use three parameters will now throw the somewhat cryptic error:
+ - The deprecated third type parameter for interpolations has been removed. ([#1083])
+   Old code which tries to use three parameters will now throw the somewhat cryptic error:
    ```
    julia> Lagrange{2, RefCube, 1}()
    ERROR: too many parameters for type
    ```
-   ([#1083])
+
+### Documentation updates
+ - A comparison between different assembly strategies have been added to the docs. ([#1063])
+ - The affine constraints docs have been extended. ([#1146])
 
 ### Other
  - Ferrite now uses [Runic.jl](https://github.com/fredrikekre/Runic.jl) for code formatting.
    ([#1096])
+ - Ferrite now supports `ForwardDiff` v1. ([#1178])
 
 ## [v1.0.0] - 2024-09-30
 

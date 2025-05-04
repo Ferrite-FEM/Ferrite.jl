@@ -113,11 +113,10 @@
         return (Tetrahedron(ntuple(i -> cell.nodes[perm[i]], 4)) for perm in idx)
     end
 
-    continuity_function(ip::VectorizedInterpolation) = continuity_function(ip.ip)
-    continuity_function(::Lagrange) = ((v, _) -> v)
-    continuity_function(::Nedelec) = ((v, n) -> v - n * (v ⋅ n)) # Tangent continuity (H(curl))
-    continuity_function(::RaviartThomas) = ((v, n) -> v ⋅ n) # Normal continuity (H(div))
-    continuity_function(::BrezziDouglasMarini) = ((v, n) -> v ⋅ n) # Normal continuity (H(div))
+    continuity_function(ip::Interpolation) = continuity_function(Ferrite.conformity(ip))
+    continuity_function(::Ferrite.H1Conformity) = ((v, _) -> v)
+    continuity_function(::Ferrite.HcurlConformity) = ((v, n) -> v - n * (v ⋅ n)) # Tangent continuity
+    continuity_function(::Ferrite.HdivConformity) = ((v, n) -> v ⋅ n) # Normal continuity
 
     nel = 3
 
@@ -130,8 +129,9 @@
 
     test_ips = [
         Lagrange{RefTriangle, 2}(), Lagrange{RefQuadrilateral, 2}(), Lagrange{RefHexahedron, 2}()^3, # Test should also work for identity mapping
-        Nedelec{RefTriangle, 1}(), Nedelec{RefTriangle, 2}(),
-        RaviartThomas{RefTriangle, 1}(), RaviartThomas{RefTriangle, 2}(), BrezziDouglasMarini{RefTriangle, 1}(),
+        Nedelec{RefTriangle, 1}(), Nedelec{RefTriangle, 2}(), Nedelec{RefQuadrilateral, 1}(), Nedelec{RefTetrahedron, 1}(), Nedelec{RefHexahedron, 1}(),
+        RaviartThomas{RefTriangle, 1}(), RaviartThomas{RefTriangle, 2}(), RaviartThomas{RefQuadrilateral, 1}(), RaviartThomas{RefTetrahedron, 1}(), RaviartThomas{RefHexahedron, 1}(),
+        BrezziDouglasMarini{RefTriangle, 1}(),
     ]
     @testset "Non-mixed grid" begin
         for ip in test_ips
@@ -168,32 +168,43 @@
         end
     end
 
-    # Test continuity for mixed grid, Quadrilaterals and Triangles
-    trigrid = generate_grid(Triangle, (3, 3))
-    mixgrid, cellnr = grid_with_inserted_quad(trigrid, (9, 10); update_sets = false)
-    dim = 2
-    p1, p2 = (rand(Vec{dim}), ones(Vec{dim}) + rand(Vec{dim}))
-    transfun(x) = typeof(x)(i -> sinpi(x[mod(i, length(x)) + 1] + i / 3)) / 10
-    basecell = getcells(mixgrid, cellnr)
-    ip1 = Nedelec{RefTriangle, 1}(); set1 = setdiff(1:getncells(mixgrid), cellnr)
-    ip2 = Nedelec{RefQuadrilateral, 1}(); set2 = Set(cellnr)
-    @testset "Quad in Tri-grid, 1st order Nedelec" begin
-        for testcell in cell_permutations(basecell)
-            mixgrid.cells[cellnr] = testcell
-            dh = DofHandler(mixgrid)
-            sdh1 = SubDofHandler(dh, set1)
-            add!(sdh1, :u, ip1)
-            sdh2 = SubDofHandler(dh, set2)
-            add!(sdh2, :u, ip2)
-            close!(dh)
-            cnt = 0
-            for facetnr in 1:nfacets(testcell)
-                fi = FacetIndex(cellnr, facetnr)
-                # Check continuity of function value according to continuity_function
-                found_matching = test_continuity(dh, fi; transformation_function = continuity_function(ip1))
-                cnt += found_matching
+    # Test continuity for 2D mixed grid, Quadrilaterals and Triangles
+    test_ips = [
+        (Nedelec, 1), #(Nedelec, 2), # 2nd order Nedelec on Quadrilaterals not yet implemented
+        (RaviartThomas, 1), #(RaviartThomas, 2) # 2nd order RT on Quadrilaterals not yet implemented
+    ]
+
+    @testset "Quad in Tri-grid" begin
+        trigrid = generate_grid(Triangle, (3, 3))
+        mixgrid, cellnr = grid_with_inserted_quad(trigrid, (9, 10); update_sets = false)
+        dim = 2
+        p1, p2 = (rand(Vec{dim}), ones(Vec{dim}) + rand(Vec{dim}))
+        transfun(x) = typeof(x)(i -> sinpi(x[mod(i, length(x)) + 1] + i / 3)) / 10
+        basecell = getcells(mixgrid, cellnr)
+
+        for (ip, order) in test_ips
+            ip1 = ip{RefTriangle, order}(); set1 = setdiff(1:getncells(mixgrid), cellnr)
+            ip2 = ip{RefQuadrilateral, order}(); set2 = Set(cellnr)
+
+            @testset "$ip, order = $order" begin
+                for testcell in cell_permutations(basecell)
+                    mixgrid.cells[cellnr] = testcell
+                    dh = DofHandler(mixgrid)
+                    sdh1 = SubDofHandler(dh, set1)
+                    add!(sdh1, :u, ip1)
+                    sdh2 = SubDofHandler(dh, set2)
+                    add!(sdh2, :u, ip2)
+                    close!(dh)
+                    cnt = 0
+                    for facetnr in 1:nfacets(testcell)
+                        fi = FacetIndex(cellnr, facetnr)
+                        # Check continuity of function value according to continuity_function
+                        found_matching = test_continuity(dh, fi; transformation_function = continuity_function(ip1))
+                        cnt += found_matching
+                    end
+                    @assert cnt > 0
+                end
             end
-            @assert cnt > 0
         end
     end
 end
