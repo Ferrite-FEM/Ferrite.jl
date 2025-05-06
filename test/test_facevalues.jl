@@ -27,14 +27,15 @@
             end
 
             rdim = Ferrite.getrefdim(func_interpol)
+            RefShape = Ferrite.getrefshape(func_interpol)
             n_basefuncs = getnbasefunctions(func_interpol)
 
             @test getnbasefunctions(fv) == n_basefuncs
 
             coords, n = valid_coordinates_and_normals(func_interpol)
-            for face in 1:Ferrite.nfacets(func_interpol)
-                reinit!(fv, coords, face)
-                @test Ferrite.getcurrentfacet(fv) == face
+            for facet in 1:Ferrite.nfacets(func_interpol)
+                reinit!(fv, coords, facet)
+                @test Ferrite.getcurrentfacet(fv) == facet
 
                 # We test this by applying a given deformation gradient on all the nodes.
                 # Since this is a linear deformation we should get back the exact values
@@ -101,7 +102,7 @@
                 # Only do this for one interpolation becuase it relise on AD on "iterative function"
                 if scalar_interpol === Lagrange{RefQuadrilateral, 2}()
                     coords_nl = [x + rand(x) * 0.01 for x in coords] # add some displacement to nodes
-                    reinit!(fv, coords_nl, face)
+                    reinit!(fv, coords_nl, facet)
 
                     _ue_nl = [u_funk(coords_nl[i], V, G, H) for i in 1:n_basefunc_base]
                     ue_nl = reinterpret(Float64, _ue_nl)
@@ -115,7 +116,7 @@
                             @test Ferrite.function_hessian(fv, i, ue_nl) ≈ Hqp
                         end
                     end
-                    reinit!(fv, coords, face) # reinit back to old coords
+                    reinit!(fv, coords, facet) # reinit back to old coords
                 end
 
 
@@ -125,18 +126,18 @@
                     vol += getdetJdV(fv, i)
                 end
                 let ip_base = func_interpol isa VectorizedInterpolation ? func_interpol.ip : func_interpol
-                    x_face = coords[[Ferrite.facetdof_indices(ip_base)[face]...]]
-                    @test vol ≈ calculate_facet_area(ip_base, x_face, face)
+                    x_face = coords[[Ferrite.facetdof_indices(ip_base)[facet]...]]
+                    @test vol ≈ calculate_facet_area(ip_base, x_face, facet)
                 end
 
                 # Test quadrature rule after reinit! with ref. coords
                 x = Ferrite.reference_coordinates(func_interpol)
-                reinit!(fv, x, face)
+                reinit!(fv, x, facet)
                 vol = 0.0
                 for i in 1:getnquadpoints(fv)
                     vol += getdetJdV(fv, i)
                 end
-                @test vol ≈ reference_face_area(func_interpol, face)
+                @test vol ≈ reference_facet_area(RefShape, facet)
 
                 # Test spatial coordinate (after reinit with ref.coords we should get back the quad_points)
                 # # TODO: Renable somehow after quad rule is no longer stored in FacetValues
@@ -175,6 +176,13 @@
                 end
             end
         end
+    end
+
+    @testset "construction errors" begin
+        @test_throws ArgumentError FacetValues(FacetQuadratureRule{RefTriangle}(1), Lagrange{RefQuadrilateral, 1}())
+        @test_throws ArgumentError FacetValues(FacetQuadratureRule{RefTriangle}(1), Lagrange{RefTriangle, 1}(), Lagrange{RefQuadrilateral, 1}())
+        @test_throws ArgumentError FacetValues(FacetQuadratureRule{RefTriangle}(1), Lagrange{RefQuadrilateral, 1}(), Lagrange{RefQuadrilateral, 1}())
+        @test_throws ArgumentError FacetValues(FacetQuadratureRule{RefTriangle}(1), Lagrange{RefQuadrilateral, 1}(), Lagrange{RefTriangle, 1}())
     end
 
     @testset "show" begin

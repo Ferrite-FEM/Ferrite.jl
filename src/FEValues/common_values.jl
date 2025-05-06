@@ -30,6 +30,8 @@ end
     throw(ArgumentError(msg))
 end
 
+conformity(fe_values::AbstractValues) = conformity(function_interpolation(fe_values))
+
 """
     ValuesUpdateFlags(ip_fun::Interpolation; update_gradients = Val(true), update_hessians = Val(false), update_detJdV = Val(true))
 
@@ -393,4 +395,17 @@ function reference_shape_hessians_gradients_and_values!(hessians::AbstractMatrix
         reference_shape_hessians_gradients_and_values!(@view(hessians[:, qp]), @view(gradients[:, qp]), @view(values[:, qp]), ip, ξ)
     end
     return
+end
+
+assert_same_refshapes(::Union{QuadratureRule{RS}, FacetQuadratureRule{RS}}, ::Interpolation{RS}, ::Interpolation{RS}) where {RS} = nothing
+function assert_same_refshapes(qr::Union{QuadratureRule, FacetQuadratureRule}, ipf::Interpolation, ipg::Interpolation)
+    throw(
+        ArgumentError(
+            """
+            The reference shapes of the quadrature rule ($(getrefshape(qr))),
+            function interpolation ($(getrefshape(ipf))), and geometric interpolation ($(getrefshape(ipg))),
+            must be equal.
+            """
+        )
+    )
 end
