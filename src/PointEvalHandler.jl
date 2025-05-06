@@ -203,8 +203,8 @@ function _get_node_cell_map(grid::AbstractGrid)
 end
 
 """
-    evaluate_at_points(ph::PointEvalHandler, dh::AbstractDofHandler, dof_values::Vector{T}, [fieldname::Symbol]) where T
-    evaluate_at_points(ph::PointEvalHandler, proj::L2Projector, dof_values::Vector{T}) where T
+    evaluate_at_points(ph::PointEvalHandler, dh::AbstractDofHandler, dof_values::AbstractVector{T}, [fieldname::Symbol]) where T
+    evaluate_at_points(ph::PointEvalHandler, proj::L2Projector, dof_values::AbstractVector{T}) where T
 
 Return a `Vector{T}` (for a 1-dimensional field) or a `Vector{Vec{fielddim, T}}` (for a
 vector field) with the field values of field `fieldname` in the points of the
@@ -248,10 +248,10 @@ end
 
 # values in dof-order. They must be obtained from the same DofHandler that was used for constructing the PointEvalHandler
 function evaluate_at_points!(
-        out_vals::Vector{T2},
+        out_vals::AbstractVector{T2},
         ph::PointEvalHandler{<:Any, T_ph},
         dh::DofHandler,
-        dof_vals::Vector{T},
+        dof_vals::AbstractVector{T},
         fname::Symbol,
         func_interpolations
     ) where {T2, T_ph, T}
@@ -275,8 +275,8 @@ end
 
 # function barrier with concrete type of PointValues
 function _evaluate_at_points!(
-        out_vals::Vector{T2},
-        dof_vals::Vector{T},
+        out_vals::AbstractVector{T2},
+        dof_vals::AbstractVector{T},
         ph::PointEvalHandler,
         dh::AbstractDofHandler,
         pv::PointValues,
