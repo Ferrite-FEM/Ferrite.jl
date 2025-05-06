@@ -10,6 +10,7 @@ the internal interface
 ```@docs
 Ferrite.zero_out_rows!
 Ferrite.zero_out_columns!
+Ferrite._condense!
 ```
 
 and the `AbstractSparseMatrix` interface for their custom matrix type. Optional dispatches to speed up operations might be

@@ -766,7 +766,11 @@ end
     return dofcoeffs[idx]
 end
 
+"""
+    _condense!(K::AbstractSparseMatrix, f::AbstractVector, dofcoefficients::Vector{Union{Nothing, DofCoefficients{T}}}, dofmapping::Dict{Int, Int}, sym::Bool = false)
 
+Condenses affine constraints K := C'*K*C and f := C'*f in-place, assuming the sparsity pattern is correct.
+"""
 function _condense!(K::AbstractSparseMatrix, f::AbstractVector, dofcoefficients::Vector{Union{Nothing, DofCoefficients{T}}}, dofmapping::Dict{Int, Int}, sym::Bool = false) where {T}
     # Return early if there are no non-trivial affine constraints
     any(i -> !(i === nothing || isempty(i)), dofcoefficients) || return
