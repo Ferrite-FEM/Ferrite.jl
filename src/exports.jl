@@ -171,6 +171,7 @@ export
     start_assemble,
     assemble!,
     finish_assemble,
+    finish_assemble!,
 
     # exporting data
     VTKGridFile,
