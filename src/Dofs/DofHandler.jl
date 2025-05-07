@@ -739,7 +739,7 @@ function sortface(face::Tuple{Int, Int, Int})
     b, c = minmax(b, c)
     a, c = minmax(a, c)
     a, b = minmax(a, b)
-    return (a, b, c), SurfaceOrientationInfo(false, 0)
+    return (a, b, c), SurfaceOrientationInfo(face)
 end
 
 
@@ -760,7 +760,7 @@ function sortface(face::Tuple{Int, Int, Int, Int})
     b, c = minmax(b, c)
     a, c = minmax(a, c)
     a, b = minmax(a, b)
-    return (a, b, c), SurfaceOrientationInfo(false, 0)
+    return (a, b, c), SurfaceOrientationInfo(face)
 end
 
 
