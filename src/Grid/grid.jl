@@ -664,8 +664,28 @@ end
 #################################
 # @TODO merge this code with into the logic in `ConstraintHandler`.
 
+function get_edge_direction(edgenodes::NTuple{2, Int})
+    positive = edgenodes[2] > edgenodes[1]
+    return ifelse(positive, 1, -1)
+end
+
+function get_face_direction(facenodes::NTuple{N, Int}) where {N}
+    N > 2 || throw(ArgumentError("A face must have at least 3 nodes"))
+    min_idx = argmin(facenodes)
+    if min_idx == 1
+        positive = facenodes[2] < facenodes[end]
+    elseif min_idx == length(facenodes)
+        positive = facenodes[1] < facenodes[end - 1]
+    else
+        positive = facenodes[min_idx + 1] < facenodes[min_idx - 1]
+    end
+    return ifelse(positive, 1, -1)
+end
+
 """
     PathOrientationInfo
+    PathOrientationInfo(flipped:Bool)
+    PathOrientationInfo(edgenodes::NTuple{2, Int})
 
 Orientation information for 1D entities.
 
@@ -674,18 +694,29 @@ associated to the vertices. To give an example, the oriented path
 ```
 1 ---> 2
 ```
-is called *regular*, indicated by `regular=true`, while the oriented path
+is called *regular*, indicated by `flipped=true`, while the oriented path
 ```
 2 ---> 1
 ```
-is called *inverted*, indicated by `regular=false`.
+is called *inverted*, indicated by `flipped=false`.
 """
 struct PathOrientationInfo
-    regular::Bool # Indicator whether the orientation is regular or inverted.
+    flipped::Bool # Indicator whether the orientation is regular or inverted.
+    shift_index::Int
+
+    function PathOrientationInfo(flipped::Bool)
+        new(flipped, 0)
+    end
+end
+
+function PathOrientationInfo(edgenodes::NTuple{2, Int})
+    return PathOrientationInfo(get_edge_direction(edgenodes) < 0)
 end
 
 """
     SurfaceOrientationInfo
+    SurfaceOrientationInfo(flipped:Bool, shift_index::Int)
+    SurfaceOrientationInfo(facenodes::NTuple{N, Int})
 
 Orientation information for 2D entities. Such an entity can be
 possibly flipped (i.e. the defining vertex order is reverse to the
@@ -706,85 +737,30 @@ which are flipped against each other. Any combination of these can happen.
 The combination to map this local face to the defining face is encoded with
 this data structure via ``rotate \\circ flip`` where the rotation is indiced by
 the shift index.
-    !!!NOTE TODO implement me.
 """
 struct SurfaceOrientationInfo
-    #flipped::Bool
-    #shift_index::Int
-end
-
-
-@doc raw"""
-    InterfaceOrientationInfo
-
-Orientation information for 1D and 2D entities.
-The orientation is defined by the indices of the grid nodes
-associated to the vertices. To give an example, the oriented path
-```
-1 ---> 2
-```
-is called *regular*, indicated by `flipped=false`, while the oriented path
-```
-2 ---> 1
-```
-is called *inverted*, indicated by `flipped=true`.
-
-2D entities can be flipped (i.e. the defining vertex order is reverse to the
-spanning vertex order) and the vertices can be rotated against each other.
-
-The reference entity is a one with it's first node is the lowest index vertex
-and its vertices span counter-clock-wise.
-Take for example the faces
-```
-1           2
-| \         | \
-|  \        |  \
-| A \       | B \
-|    \      |    \
-2-----3     3-----1
-```
-which are rotated against each other by 240° after tranfroming to an
-equilateral triangle (shift index is 2). Or the faces
-```
-3           2
-| \         | \
-|  \        |  \
-| A \       | B \
-|    \      |    \
-2-----1     3-----1
-```
-which are flipped against each other.
-"""
-struct OrientationInfo
     flipped::Bool
     shift_index::Int
 end
 
-function OrientationInfo(edgenodes::NTuple{2, Int})
-    return OrientationInfo(get_edge_direction(edgenodes) < 0, 0)
-end
-
-function OrientationInfo(facenodes::NTuple{N, Int}) where {N}
+function SurfaceOrientationInfo(facenodes::NTuple{N, Int}) where {N}
     min_idx = argmin(facenodes)
     shift_index = min_idx - 1
     flipped = get_face_direction(facenodes) < 0
-    return OrientationInfo(flipped, shift_index)
+    return SurfaceOrientationInfo(flipped, shift_index)
 end
 
-function get_edge_direction(edgenodes::NTuple{2, Int})
-    positive = edgenodes[2] > edgenodes[1]
-    return ifelse(positive, 1, -1)
+
+"""
+    OrientationInfo(edgenodes::NTuple{2, Int})
+    OrientationInfo(facenodes::NTuple{N, Int})
+
+Helper function that returns a `PathOrientationInfo` or `SurfaceOrientationInfo` as appropriate for the size of the node tuple.
+"""
+function OrientationInfo(edgenodes::NTuple{2, Int})
+    return PathOrientationInfo(edgenodes)
 end
 
-function get_face_direction(facenodes::NTuple{N, Int}) where {N}
-    N > 2 || throw(ArgumentError("A face must have at least 3 nodes"))
-    min_idx = argmin(facenodes)
-    if min_idx == 1
-        positive = facenodes[2] < facenodes[end]
-    elseif min_idx == length(facenodes)
-        positive = facenodes[1] < facenodes[end - 1]
-    else
-        positive = facenodes[min_idx + 1] < facenodes[min_idx - 1]
-    end
-    return ifelse(positive, 1, -1)
+function OrientationInfo(facenodes::NTuple{N, Int}) where {N}
+    return SurfaceOrientationInfo(facenodes)
 end
