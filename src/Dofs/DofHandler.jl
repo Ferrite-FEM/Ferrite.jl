@@ -639,12 +639,12 @@ described therein.
 # References
  - [Scroggs2022](@cite) Scroggs et al. ACM Trans. Math. Softw. 48 (2022).
 """
-@inline function permute_and_push!(cell_dofs::Vector{Int}, dofs::StepRange{Int, Int}, orientation::PathOrientationInfo, adjust_during_distribution::Bool)
+@inline function permute_and_push!(cell_dofs::Vector{Int}, dofs::StepRange{Int, Int}, orientation::OrientationInfo, adjust_during_distribution::Bool)
     # TODO Investigate if we can somehow pass the interpolation into this function in a
     # typestable way.
     n_copies = step(dofs)
     @assert n_copies > 0
-    if adjust_during_distribution && !orientation.regular
+    if adjust_during_distribution && orientation.flipped
         # Reverse the dofs for the path
         dofs = reverse(dofs)
     end
@@ -666,7 +666,7 @@ if the edge is flipped.
 """
 function sortedge(edge::Tuple{Int, Int})
     a, b = edge
-    return a < b ? (edge, PathOrientationInfo(true)) : ((b, a), PathOrientationInfo(false))
+    return a < b ? (edge, OrientationInfo(false, 0)) : ((b, a), OrientationInfo(true, 0))
 end
 
 """
@@ -720,7 +720,7 @@ For more details we refer to [1] as we follow the methodology described therein.
 
     !!!TODO Investigate if we can somehow pass the interpolation into this function in a typestable way.
 """
-@inline function permute_and_push!(cell_dofs::Vector{Int}, dofs::StepRange{Int, Int}, ::SurfaceOrientationInfo, adjust_during_distribution::Bool, rdim::Int)
+@inline function permute_and_push!(cell_dofs::Vector{Int}, dofs::StepRange{Int, Int}, ::OrientationInfo, adjust_during_distribution::Bool, rdim::Int)
     if rdim == 3 && adjust_during_distribution && length(dofs) > 1
         error("Dof distribution for interpolations with multiple dofs per face not implemented yet.")
     end
@@ -739,7 +739,7 @@ function sortface(face::Tuple{Int, Int, Int})
     b, c = minmax(b, c)
     a, c = minmax(a, c)
     a, b = minmax(a, b)
-    return (a, b, c), SurfaceOrientationInfo() # TODO fill struct
+    return (a, b, c), OrientationInfo(false, 0)
 end
 
 
@@ -760,7 +760,7 @@ function sortface(face::Tuple{Int, Int, Int, Int})
     b, c = minmax(b, c)
     a, c = minmax(a, c)
     a, b = minmax(a, b)
-    return (a, b, c), SurfaceOrientationInfo() # TODO fill struct
+    return (a, b, c), OrientationInfo(false, 0)
 end
 
 
