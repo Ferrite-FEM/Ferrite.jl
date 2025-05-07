@@ -9,8 +9,7 @@ during dof distribution, because the interpolations are not available as concret
 
 ```@docs
 Ferrite.InterpolationInfo
-Ferrite.PathOrientationInfo
-Ferrite.SurfaceOrientationInfo
+Ferrite.OrientationInfo
 ```
 
 
