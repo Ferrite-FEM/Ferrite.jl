@@ -705,7 +705,7 @@ struct PathOrientationInfo
     shift_index::Int
 
     function PathOrientationInfo(flipped::Bool)
-        new(flipped, 0)
+        return new(flipped, 0)
     end
 end
 
