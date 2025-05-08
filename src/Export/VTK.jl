@@ -32,7 +32,7 @@ end
 function VTKGridFile(filename::String, dh::DofHandler; kwargs...)
     for sdh in dh.subdofhandlers
         for ip in sdh.field_interpolations
-            if is_discontinuous(ip)
+            if !isa(conformity(ip), H1Conformity)
                 return VTKGridFile(filename, get_grid(dh); write_discontinuous = true, kwargs...)
             end
         end
