@@ -302,10 +302,6 @@ end
         @test Ferrite.reference_coordinates(DiscontinuousLagrange{RefQuadrilateral, 0}()) ≈ [Vec{2, Float64}((0, 0))]
         @test Ferrite.reference_coordinates(DiscontinuousLagrange{RefTetrahedron, 0}()) ≈ [Vec{3, Float64}((1 / 4, 1 / 4, 1 / 4))]
         @test Ferrite.reference_coordinates(DiscontinuousLagrange{RefHexahedron, 0}()) ≈ [Vec{3, Float64}((0, 0, 0))]
-
-        # Test discontinuous interpolations related functions
-        d_ip = DiscontinuousLagrange{RefQuadrilateral, 1}()
-        ip = Lagrange{RefQuadrilateral, 1}()
     end
 
     @testset "Correctness of AD of embedded interpolations" begin
