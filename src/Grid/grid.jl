@@ -723,15 +723,15 @@ possibly flipped (i.e. the defining vertex order is reverse to the
 spanning vertex order) and the vertices can be rotated against each other.
 Take for example the faces
 ```
-1---2 2---3
+4---3 3---2
 | A | | B |
-4---3 1---4
+1---2 4---1
 ```
 which are rotated against each other by 90° (shift index is 1) or the faces
 ```
-1---2 2---1
+4---3 2---3
 | A | | B |
-4---3 3---4
+1---2 1---4
 ```
 which are flipped against each other. Any combination of these can happen.
 The combination to map this local face to the defining face is encoded with
