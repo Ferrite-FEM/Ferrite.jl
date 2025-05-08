@@ -693,7 +693,7 @@ function apply!(KK::Union{AbstractSparseMatrix, Symmetric{<:Any, <:AbstractSpars
     m = meandiag(K) # Use the mean of the diagonal here to not ruin things for iterative solver
 
     # Add inhomogeneities to f: (f - K * ch.inhomogeneities)
-    !applyzero && add_inhomogeneities!(KK, f, ch.inhomogeneities, ch.prescribed_dofs, ch.dofmapping)
+    !applyzero && add_inhomogeneities!(f, KK, ch.inhomogeneities, ch.prescribed_dofs, ch.dofmapping)
 
     # Condense K := (C' * K * C) and f := (C' * f)
     _condense!(K, f, ch.dofcoefficients, ch.dofmapping, sym)
@@ -715,19 +715,19 @@ function apply!(KK::Union{AbstractSparseMatrix, Symmetric{<:Any, <:AbstractSpars
 end
 
 """
-    add_inhomogeneities!(K, f::AbstractVector, inhomogeneities::AbstractVector, prescribed_dofs::AbstractVector{<:Integer}, dofmapping::Dict{Int,Int})
+    add_inhomogeneities!(f::AbstractVector, K::AbstractMatrix, inhomogeneities::AbstractVector, prescribed_dofs::AbstractVector{<:Integer}, dofmapping::Dict{Int,Int})
 
 Compute "f -= K*inhomogeneities".
 By default this is a generic version via SpMSpV kernel.
 """
-function add_inhomogeneities!(K, f::AbstractVector, inhomogeneities::AbstractVector, prescribed_dofs::AbstractVector{<:Integer}, dofmapping)
+function add_inhomogeneities!(f::AbstractVector, K::AbstractMatrix, inhomogeneities::AbstractVector, prescribed_dofs::AbstractVector{<:Integer}, dofmapping)
     return f .-= K * sparsevec(prescribed_dofs, inhomogeneities, size(K, 2))
 end
 
 # Optimized version for SparseMatrixCSC
-add_inhomogeneities!(K::SparseMatrixCSC, f::AbstractVector, inhomogeneities::AbstractVector, prescribed_dofs::AbstractVector{<:Integer}, dofmapping) = add_inhomogeneities_csc!(K, f, inhomogeneities, prescribed_dofs, dofmapping, false)
-add_inhomogeneities!(K::Symmetric{<:Any, <:SparseMatrixCSC}, f::AbstractVector, inhomogeneities::AbstractVector, prescribed_dofs::AbstractVector{<:Integer}, dofmapping) = add_inhomogeneities_csc!(K.data, f, inhomogeneities, prescribed_dofs, dofmapping, true)
-function add_inhomogeneities_csc!(K::SparseMatrixCSC, f::AbstractVector, inhomogeneities::AbstractVector, prescribed_dofs::AbstractVector{<:Integer}, dofmapping, sym::Bool)
+add_inhomogeneities!(f::AbstractVector, K::SparseMatrixCSC, inhomogeneities::AbstractVector, prescribed_dofs::AbstractVector{<:Integer}, dofmapping) = add_inhomogeneities_csc!(f, K, inhomogeneities, prescribed_dofs, dofmapping, false)
+add_inhomogeneities!(f::AbstractVector, K::Symmetric{<:Any, <:SparseMatrixCSC},inhomogeneities::AbstractVector, prescribed_dofs::AbstractVector{<:Integer}, dofmapping) = add_inhomogeneities_csc!(f, K.data, inhomogeneities, prescribed_dofs, dofmapping, true)
+function add_inhomogeneities_csc!(f::AbstractVector, K::SparseMatrixCSC, inhomogeneities::AbstractVector, prescribed_dofs::AbstractVector{<:Integer}, dofmapping, sym::Bool)
     @inbounds for i in 1:length(inhomogeneities)
         d = prescribed_dofs[i]
         v = inhomogeneities[i]
@@ -739,7 +739,7 @@ function add_inhomogeneities_csc!(K::SparseMatrixCSC, f::AbstractVector, inhomog
             end
         end
     end
-    return if sym
+    if sym
         # In the symmetric case, for a constrained dof `d`, we handle the contribution
         # from `K[1:d, d]` in the loop above, but we are still missing the contribution
         # from `K[(d+1):size(K,1), d]`. These values are not stored, but since the
@@ -756,6 +756,7 @@ function add_inhomogeneities_csc!(K::SparseMatrixCSC, f::AbstractVector, inhomog
             end
         end
     end
+    return f
 end
 
 # Fetch dof coefficients for a dof prescribed by an affine constraint. Return nothing if the
@@ -900,7 +901,7 @@ Set the values of all rows associated with constrained dofs to zero.
 zero_out_rows!
 
 # columns need to be stored entries, this is not checked
-function zero_out_columns!(K::SparseArrays.AbstractSparseMatrixCSC, ch::ConstraintHandler) # can be removed in 0.7 with #24711 merged
+function zero_out_columns!(K::AbstractSparseMatrixCSC, ch::ConstraintHandler) # can be removed in 0.7 with #24711 merged
     @debug @assert issorted(ch.prescribed_dofs)
     for col in ch.prescribed_dofs
         r = nzrange(K, col)
@@ -909,7 +910,7 @@ function zero_out_columns!(K::SparseArrays.AbstractSparseMatrixCSC, ch::Constrai
     return
 end
 
-function zero_out_rows!(K::SparseArrays.AbstractSparseMatrixCSC, ch::ConstraintHandler)
+function zero_out_rows!(K::AbstractSparseMatrixCSC, ch::ConstraintHandler)
     rowval = K.rowval
     nzval = K.nzval
     @inbounds for i in eachindex(rowval, nzval)
