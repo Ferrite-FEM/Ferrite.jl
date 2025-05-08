@@ -45,7 +45,6 @@ any interpolations that defines the required functions specified above.
 ```@docs
 Ferrite.getrefshape(::Interpolation)
 Ferrite.getorder(::Interpolation)
-Ferrite.is_discontinuous(::Interpolation)
 Ferrite.reference_shape_gradient(::Interpolation, ::Vec, ::Int)
 Ferrite.reference_shape_gradient_and_value(::Interpolation, ::Vec, ::Int)
 Ferrite.reference_shape_hessian_gradient_and_value(::Interpolation, ::Vec, ::Int)

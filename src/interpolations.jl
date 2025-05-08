@@ -78,9 +78,6 @@ or `H1Conformity()`, for the interpolation.
 """
 function conformity end
 
-is_discontinuous(::H1Conformity) = false
-is_discontinuous(::Union{L2Conformity, HdivConformity, HcurlConformity}) = true
-
 # Number of components for the interpolation.
 n_components(::ScalarInterpolation) = 1
 n_components(::VectorInterpolation{vdim}) where {vdim} = vdim
@@ -443,14 +440,6 @@ dirichlet_facetdof_indices(ip::InterpolationByDim{1}) = dirichlet_vertexdof_indi
 nfacets(ip::InterpolationByDim{3}) = nfaces(ip)
 nfacets(ip::InterpolationByDim{2}) = nedges(ip)
 nfacets(ip::InterpolationByDim{1}) = nvertices(ip)
-
-"""
-    is_discontinuous(ip::Interpolation)
-
-Checks whether the interpolation is discontinuous (i.e. `DiscontinuousLagrange`),
-automatically implemented based on `conformity(ip)`.
-"""
-is_discontinuous(ip::Interpolation) = is_discontinuous(conformity(ip))
 
 """
     dirichlet_boundarydof_indices(::Type{<:BoundaryIndex})
