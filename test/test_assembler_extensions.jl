@@ -55,11 +55,14 @@ using SparseArrays, LinearAlgebra
         @test K.colval == K_manual.colval
         f = zeros(3)
 
-        # Check that incuding the ch doesnot mess up the pattern
+        # Check that including the ch doesnot mess up the pattern
         ch = ConstraintHandler(dh)
         add!(ch, Dirichlet(:u, getfacetset(grid, "left"), (x, t) -> 1))
         close!(ch)
-        @test K == allocate_matrix(SparseMatrixCSR, dh, ch)
+        K_ch = allocate_matrix(SparseMatrixCSR, dh, ch)
+        @test K == K_ch
+        @test K.rowptr == K_ch.rowptr
+        @test K.colval == K_ch.colval
 
         # Check if assembly works
         assembler = start_assemble(K, f)
