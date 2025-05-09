@@ -644,7 +644,7 @@ described therein.
     # typestable way.
     n_copies = step(dofs)
     @assert n_copies > 0
-    if adjust_during_distribution && !orientation.regular
+    if adjust_during_distribution && orientation.flipped
         # Reverse the dofs for the path
         dofs = reverse(dofs)
     end
@@ -661,12 +661,12 @@ end
 
 Returns the unique representation of an edge and its orientation.
 Here the unique representation is the sorted node index tuple. The
-orientation is `true` if the edge is not flipped, where it is `false`
+orientation is `false` if the edge is not flipped, where it is `true`
 if the edge is flipped.
 """
 function sortedge(edge::Tuple{Int, Int})
     a, b = edge
-    return a < b ? (edge, PathOrientationInfo(true)) : ((b, a), PathOrientationInfo(false))
+    return a < b ? (edge, PathOrientationInfo(false)) : ((b, a), PathOrientationInfo(true))
 end
 
 """
@@ -739,7 +739,7 @@ function sortface(face::Tuple{Int, Int, Int})
     b, c = minmax(b, c)
     a, c = minmax(a, c)
     a, b = minmax(a, b)
-    return (a, b, c), SurfaceOrientationInfo() # TODO fill struct
+    return (a, b, c), SurfaceOrientationInfo(face)
 end
 
 
@@ -760,7 +760,7 @@ function sortface(face::Tuple{Int, Int, Int, Int})
     b, c = minmax(b, c)
     a, c = minmax(a, c)
     a, b = minmax(a, b)
-    return (a, b, c), SurfaceOrientationInfo() # TODO fill struct
+    return (a, b, c), SurfaceOrientationInfo(face)
 end
 
 

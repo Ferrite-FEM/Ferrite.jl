@@ -664,113 +664,6 @@ end
 #################################
 # @TODO merge this code with into the logic in `ConstraintHandler`.
 
-"""
-    PathOrientationInfo
-
-Orientation information for 1D entities.
-
-The orientation for 1D entities is defined by the indices of the grid nodes
-associated to the vertices. To give an example, the oriented path
-```
-1 ---> 2
-```
-is called *regular*, indicated by `regular=true`, while the oriented path
-```
-2 ---> 1
-```
-is called *inverted*, indicated by `regular=false`.
-"""
-struct PathOrientationInfo
-    regular::Bool # Indicator whether the orientation is regular or inverted.
-end
-
-"""
-    SurfaceOrientationInfo
-
-Orientation information for 2D entities. Such an entity can be
-possibly flipped (i.e. the defining vertex order is reverse to the
-spanning vertex order) and the vertices can be rotated against each other.
-Take for example the faces
-```
-1---2 2---3
-| A | | B |
-4---3 1---4
-```
-which are rotated against each other by 90° (shift index is 1) or the faces
-```
-1---2 2---1
-| A | | B |
-4---3 3---4
-```
-which are flipped against each other. Any combination of these can happen.
-The combination to map this local face to the defining face is encoded with
-this data structure via ``rotate \\circ flip`` where the rotation is indiced by
-the shift index.
-    !!!NOTE TODO implement me.
-"""
-struct SurfaceOrientationInfo
-    #flipped::Bool
-    #shift_index::Int
-end
-
-
-@doc raw"""
-    InterfaceOrientationInfo
-
-Orientation information for 1D and 2D entities.
-The orientation is defined by the indices of the grid nodes
-associated to the vertices. To give an example, the oriented path
-```
-1 ---> 2
-```
-is called *regular*, indicated by `flipped=false`, while the oriented path
-```
-2 ---> 1
-```
-is called *inverted*, indicated by `flipped=true`.
-
-2D entities can be flipped (i.e. the defining vertex order is reverse to the
-spanning vertex order) and the vertices can be rotated against each other.
-
-The reference entity is a one with it's first node is the lowest index vertex
-and its vertices span counter-clock-wise.
-Take for example the faces
-```
-1           2
-| \         | \
-|  \        |  \
-| A \       | B \
-|    \      |    \
-2-----3     3-----1
-```
-which are rotated against each other by 240° after tranfroming to an
-equilateral triangle (shift index is 2). Or the faces
-```
-3           2
-| \         | \
-|  \        |  \
-| A \       | B \
-|    \      |    \
-2-----1     3-----1
-```
-which are flipped against each other.
-"""
-struct OrientationInfo
-    flipped::Bool
-    shift_index::Int
-end
-
-function OrientationInfo(edgenodes::NTuple{2, Int})
-    return OrientationInfo(get_edge_direction(edgenodes) < 0, 0)
-end
-
-function OrientationInfo(facenodes::NTuple{N, Int}) where {N}
-    min_idx = argmin(facenodes)
-    shift_index = min_idx - 1
-    flipped = get_face_direction(facenodes) < 0
-    return OrientationInfo(flipped, shift_index)
-end
-
 function get_edge_direction(edgenodes::NTuple{2, Int})
     positive = edgenodes[2] > edgenodes[1]
     return ifelse(positive, 1, -1)
@@ -787,4 +680,87 @@ function get_face_direction(facenodes::NTuple{N, Int}) where {N}
         positive = facenodes[min_idx + 1] < facenodes[min_idx - 1]
     end
     return ifelse(positive, 1, -1)
+end
+
+"""
+    PathOrientationInfo
+    PathOrientationInfo(flipped:Bool)
+    PathOrientationInfo(edgenodes::NTuple{2, Int})
+
+Orientation information for 1D entities.
+
+The orientation for 1D entities is defined by the indices of the grid nodes
+associated to the vertices. To give an example, the oriented path
+```
+1 ---> 2
+```
+is called *regular*, indicated by `flipped=false`, while the oriented path
+```
+2 ---> 1
+```
+is called *inverted*, indicated by `flipped=true`.
+"""
+struct PathOrientationInfo
+    flipped::Bool # Indicator whether the orientation is regular or inverted.
+    shift_index::Int
+
+    function PathOrientationInfo(flipped::Bool)
+        return new(flipped, 0)
+    end
+end
+
+function PathOrientationInfo(edgenodes::NTuple{2, Int})
+    return PathOrientationInfo(get_edge_direction(edgenodes) < 0)
+end
+
+"""
+    SurfaceOrientationInfo
+    SurfaceOrientationInfo(flipped:Bool, shift_index::Int)
+    SurfaceOrientationInfo(facenodes::NTuple{N, Int})
+
+Orientation information for 2D entities. Such an entity can be
+possibly flipped (i.e. the defining vertex order is reverse to the
+spanning vertex order) and the vertices can be rotated against each other.
+Take for example the faces
+```
+4---3 3---2
+| A | | B |
+1---2 4---1
+```
+which are rotated against each other by 90° (shift index is 1) or the faces
+```
+4---3 2---3
+| A | | B |
+1---2 1---4
+```
+which are flipped against each other. Any combination of these can happen.
+The combination to map this local face to the defining face is encoded with
+this data structure via ``rotate \\circ flip`` where the rotation is indiced by
+the shift index.
+"""
+struct SurfaceOrientationInfo
+    flipped::Bool
+    shift_index::Int
+end
+
+function SurfaceOrientationInfo(facenodes::NTuple{N, Int}) where {N}
+    min_idx = argmin(facenodes)
+    shift_index = min_idx - 1
+    flipped = get_face_direction(facenodes) < 0
+    return SurfaceOrientationInfo(flipped, shift_index)
+end
+
+
+"""
+    orientation_info(edgenodes::NTuple{2, Int})
+    orientation_info(facenodes::NTuple{N, Int})
+
+Helper function that returns a `PathOrientationInfo` or `SurfaceOrientationInfo` as appropriate for the size of the node tuple.
+"""
+function orientation_info(edgenodes::NTuple{2, Int})
+    return PathOrientationInfo(edgenodes)
+end
+
+function orientation_info(facenodes::NTuple{N, Int}) where {N}
+    return SurfaceOrientationInfo(facenodes)
 end
