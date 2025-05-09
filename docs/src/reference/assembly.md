@@ -8,5 +8,4 @@ DocTestSetup = :(using Ferrite)
 allocate_matrix
 start_assemble
 assemble!
-finish_assemble!
 ```

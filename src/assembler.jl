@@ -120,14 +120,6 @@ function assemble!(a::COOAssembler{T}, rowdofs::AbstractVector{Int}, coldofs::Ab
 end
 
 """
-    finish_assemble!(a::AbstractAssembler)
-
-Finalize the assembly. This step is e.g. necessary for some parallel matrix formats
-where a synchronization step is necessary.
-"""
-finish_assemble!(a::AbstractAssembler) = nothing
-
-"""
     finish_assemble(a::COOAssembler) -> K, f
 
 Finalize the assembly and return the sparse matrix `K::SparseMatrixCSC` and vector

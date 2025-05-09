@@ -26,7 +26,6 @@ In case the default assembler is insufficient, users can implement a custom asse
 ```@docs; canonical=false
 start_assemble
 assemble!
-finish_assemble!
 ```
 
 For local elimination support the following functions might also need custom dispatches

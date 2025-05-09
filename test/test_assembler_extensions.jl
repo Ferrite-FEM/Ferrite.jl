@@ -73,7 +73,6 @@ using SparseArrays, LinearAlgebra
         I = [1, 1, 2, 2, 2, 3, 3]
         J = [1, 2, 1, 2, 3, 2, 3]
         V = [-1.0, 1.0, 2.0, -2.0, 2.0, 1.0, -1.0]
-        finish_assemble!(assembler) # Make codecov happy
         @test K ≈ sparsecsr(I, J, V)
         @test f ≈ [1.0, 4.0, 1.0]
 
@@ -102,7 +101,6 @@ using SparseArrays, LinearAlgebra
             K = allocate_matrix(SparseMatrixCSR, dh; coupling)
             a = start_assemble(K)
             assemble!(a, dofs, Ke_zeros)
-            finish_assemble!(a) # Make codecov happy
             if all(coupling)
                 assemble!(a, dofs, Ke_rand)
                 @test Ke_rand ≈ K[dofs, dofs]
