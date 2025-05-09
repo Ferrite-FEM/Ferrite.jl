@@ -693,7 +693,7 @@ function apply!(KK::Union{AbstractSparseMatrix, Symmetric{<:Any, <:AbstractSpars
     m = meandiag(K) # Use the mean of the diagonal here to not ruin things for iterative solver
 
     # Add inhomogeneities to f: (f - K * ch.inhomogeneities)
-    !applyzero && add_inhomogeneities!(f, KK, ch.inhomogeneities, ch.prescribed_dofs, ch.dofmapping)
+    !applyzero && add_inhomogeneities!(f, KK, ch)
 
     # Condense K := (C' * K * C) and f := (C' * f)
     _condense!(K, f, ch.dofcoefficients, ch.dofmapping, sym)
@@ -715,7 +715,7 @@ function apply!(KK::Union{AbstractSparseMatrix, Symmetric{<:Any, <:AbstractSpars
 end
 
 """
-    add_inhomogeneities!(f::AbstractVector, K::AbstractMatrix, inhomogeneities::AbstractVector, prescribed_dofs::AbstractVector{<:Integer}, dofmapping::Dict{Int,Int})
+    add_inhomogeneities!(f::AbstractVector, K::AbstractMatrix, ch::ConstraintHandler)
 
 Compute "f -= K*inhomogeneities".
 By default this is a generic version via SpMSpV kernel.
@@ -725,9 +725,11 @@ function add_inhomogeneities!(f::AbstractVector, K::AbstractMatrix, inhomogeneit
 end
 
 # Optimized version for SparseMatrixCSC
-add_inhomogeneities!(f::AbstractVector, K::SparseMatrixCSC, inhomogeneities::AbstractVector, prescribed_dofs::AbstractVector{<:Integer}, dofmapping) = add_inhomogeneities_csc!(f, K, inhomogeneities, prescribed_dofs, dofmapping, false)
-add_inhomogeneities!(f::AbstractVector, K::Symmetric{<:Any, <:SparseMatrixCSC}, inhomogeneities::AbstractVector, prescribed_dofs::AbstractVector{<:Integer}, dofmapping) = add_inhomogeneities_csc!(f, K.data, inhomogeneities, prescribed_dofs, dofmapping, true)
-function add_inhomogeneities_csc!(f::AbstractVector, K::SparseMatrixCSC, inhomogeneities::AbstractVector, prescribed_dofs::AbstractVector{<:Integer}, dofmapping, sym::Bool)
+add_inhomogeneities!(f::AbstractVector, K::SparseMatrixCSC, ch::ConstraintHandler) = add_inhomogeneities_csc!(f, K, ch, false)
+add_inhomogeneities!(f::AbstractVector, K::Symmetric{<:Any, <:SparseMatrixCSC}, ch::ConstraintHandler) = add_inhomogeneities_csc!(f, K.data, ch, true)
+function add_inhomogeneities_csc!(f::AbstractVector, K::SparseMatrixCSC, ch::ConstraintHandler, sym::Bool)
+    (; inhomogeneities, prescribed_dofs, dofmapping) = ch
+
     @inbounds for i in 1:length(inhomogeneities)
         d = prescribed_dofs[i]
         v = inhomogeneities[i]
