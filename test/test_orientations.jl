@@ -68,4 +68,8 @@
             @test orientation.shift_index == shift_index
         end
     end
+
+    @assert typeof(Ferrite.orientation_info((1, 2))) <: Ferrite.PathOrientationInfo
+    @assert typeof(Ferrite.orientation_info((1, 2, 3))) <: Ferrite.SurfaceOrientationInfo
+    @assert typeof(Ferrite.orientation_info((1, 2, 3, 4))) <: Ferrite.SurfaceOrientationInfo
 end

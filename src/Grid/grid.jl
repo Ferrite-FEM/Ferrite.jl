@@ -694,11 +694,11 @@ associated to the vertices. To give an example, the oriented path
 ```
 1 ---> 2
 ```
-is called *regular*, indicated by `flipped=true`, while the oriented path
+is called *regular*, indicated by `flipped=false`, while the oriented path
 ```
 2 ---> 1
 ```
-is called *inverted*, indicated by `flipped=false`.
+is called *inverted*, indicated by `flipped=true`.
 """
 struct PathOrientationInfo
     flipped::Bool # Indicator whether the orientation is regular or inverted.
@@ -752,15 +752,15 @@ end
 
 
 """
-    OrientationInfo(edgenodes::NTuple{2, Int})
-    OrientationInfo(facenodes::NTuple{N, Int})
+    orientation_info(edgenodes::NTuple{2, Int})
+    orientation_info(facenodes::NTuple{N, Int})
 
 Helper function that returns a `PathOrientationInfo` or `SurfaceOrientationInfo` as appropriate for the size of the node tuple.
 """
-function OrientationInfo(edgenodes::NTuple{2, Int})
+function orientation_info(edgenodes::NTuple{2, Int})
     return PathOrientationInfo(edgenodes)
 end
 
-function OrientationInfo(facenodes::NTuple{N, Int}) where {N}
+function orientation_info(facenodes::NTuple{N, Int}) where {N}
     return SurfaceOrientationInfo(facenodes)
 end
