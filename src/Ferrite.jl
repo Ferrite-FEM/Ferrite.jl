@@ -8,7 +8,7 @@ using Base:
 using EnumX:
     EnumX, @enumx
 using LinearAlgebra:
-    LinearAlgebra, Symmetric, cholesky, det, norm, pinv, tr
+    LinearAlgebra, Symmetric, cholesky, det, norm, pinv, tr, mul!
 using NearestNeighbors:
     NearestNeighbors, KDTree, knn
 using OrderedCollections:
