@@ -720,8 +720,8 @@ end
 Compute "f -= K*inhomogeneities".
 By default this is a generic version via SpMSpV kernel.
 """
-function add_inhomogeneities!(f::AbstractVector, K::AbstractMatrix, inhomogeneities::AbstractVector, prescribed_dofs::AbstractVector{<:Integer}, dofmapping)
-    return f .-= K * sparsevec(prescribed_dofs, inhomogeneities, size(K, 2))
+function add_inhomogeneities!(f::AbstractVector, K::AbstractMatrix, ch::ConstraintHandler)
+    return mul!(f, K, sparsevec(ch.prescribed_dofs, ch.inhomogeneities, size(K, 2)), -1, 1)
 end
 
 # Optimized version for SparseMatrixCSC

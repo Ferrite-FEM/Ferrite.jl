@@ -4,7 +4,7 @@ using Ferrite, SparseArrays, SparseMatricesCSR
 import Ferrite: AbstractSparsityPattern, CSRAssembler
 import Base: @propagate_inbounds
 
-#FIXME https://github.com/JuliaSparse/SparseArrays.jl/pull/546
+# Could be generalized if https://github.com/JuliaSparse/SparseArrays.jl/pull/546 is merged
 function Ferrite.start_assemble(K::SparseMatrixCSR{<:Any, T}, f::Vector = T[]; fillzero::Bool = true, maxcelldofs_hint::Int = 0) where {T}
     fillzero && (Ferrite.fillzero!(K); Ferrite.fillzero!(f))
     return CSRAssembler(K, f, zeros(Int, maxcelldofs_hint), zeros(Int, maxcelldofs_hint))
@@ -52,7 +52,7 @@ end
     end
 end
 
-function Ferrite.zero_out_rows!(K::SparseMatrixCSR, ch::ConstraintHandler) # can be removed in 0.7 with #24711 merged
+function Ferrite.zero_out_rows!(K::SparseMatrixCSR, ch::ConstraintHandler)
     @debug @assert issorted(ch.prescribed_dofs)
     for row in ch.prescribed_dofs
         r = nzrange(K, row)
