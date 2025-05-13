@@ -99,6 +99,9 @@ interpolations, generally).
 """
 adjust_dofs_during_distribution(::Interpolation)
 
+
+transform_facedofs_during_mapping(::Interpolation) = false
+
 """
     InterpolationInfo
 
@@ -2068,10 +2071,6 @@ function get_direction(::Nedelec{RefTriangle, 2}, shape_nr, cell)
     return get_edge_direction(cell, edge_nr)
 end
 
-function transform_dofs(::Nedelec{RefTriangle, 2}, flipped::Bool, shift_index::Int, facenr::Int, Nξ, dNdξ)
-    return Nξ, dNdξ
-end
-
 # RefQuadrilateral, 1st order Lagrange
 # https://defelement.org/elements/examples/quadrilateral-nedelec1-lagrange-1.html
 # Scaled by 1/2 as the reference edge length in Ferrite is length 2, but 1 in DefElement.
@@ -2142,7 +2141,7 @@ function reference_shape_value(ip::Nedelec{RefTetrahedron, 2}, ξ::Vec{3, T}, i:
     # Edge 6
     i == 11 && return Vec(nil, 2z * (1 - 4y), 4y * (2y - 1))
     i == 12 && return Vec(nil, 4z * (1 - 2z), 2y * (4z - 1))
-    
+
     # Face 1 (flip order compared to defelement)
     i == 13 && return Vec(8y * (2x + y + z - 1), -8x * (2x + y + 2z - 2), 8x * y)
     i == 14 && return Vec(-8y * (x + 2y + 2z - 2), 8x * (x + 2y + z - 1), 8x * y)
@@ -2163,9 +2162,10 @@ edgedof_interior_indices(::Nedelec{RefTetrahedron, 2}) = ((1, 2), (3, 4), (5, 6)
 facedof_indices(::Nedelec{RefTetrahedron, 2}) = ((1, 2, 3, 4, 5, 6, 13, 14), (1, 2, 7, 8, 9, 10, 15, 16), (3, 4, 9, 10, 11, 12, 17, 18), (5, 6, 7, 8, 11, 12, 19, 20))
 facedof_interior_indices(::Nedelec{RefTetrahedron, 2}) = ((13, 14), (15, 16), (17, 18), (19, 20))
 adjust_dofs_during_distribution(::Nedelec{RefTetrahedron, 2}) = true
+transform_facedofs_during_mapping(::Nedelec{RefTetrahedron, 2}) = true
 
 function get_direction(::Nedelec{RefTetrahedron, 2}, shape_nr, cell)
-    if(shape_nr < 13)
+    if (shape_nr < 13)
         edge_nr = (shape_nr + 1) ÷ 2
         return get_edge_direction(cell, edge_nr)
     else
@@ -2174,15 +2174,14 @@ function get_direction(::Nedelec{RefTetrahedron, 2}, shape_nr, cell)
     end
 end
 
-# TODO cannot directly pass SurfaceOrientationInfo due to order of include's
 # TODO transformation for Nξ is tested in test_continuity, but dNdξ is not. Need to do anything extra here?
 # TODO settle on a good way to define transformations with two indices (flipped & orientation)
-function transform_dofs(::Nedelec{RefTetrahedron, 2}, flipped::Bool, shift_index::Int, facenr::Int, Nξ, dNdξ)
+function transform_dofs(::Nedelec{RefTetrahedron, 2}, orientation::SurfaceOrientationInfo, facenr::Int, Nξ, dNdξ)
     # indexed by shift_index
     transformations = [[1 0; 0 1], [0 1; -1 -1], [-1 -1; 1 0]]
-    
-    T = transformations[shift_index + 1]
-    if(flipped)
+
+    T = transformations[orientation.shift_index + 1]
+    if (orientation.flipped)
         T = [0 1; 1 0] * T
     end
 

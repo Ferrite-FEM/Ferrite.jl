@@ -232,6 +232,7 @@ end
 # TODO ensure facedof mapping is always applied before geometric transformation
 # Currently only implemented for FunctionValues{1}, CovariantPiolaMapping (used for test case 2nd order Nedelec)
 @inline function apply_mapping!(funvals::FunctionValues{1}, ::CovariantPiolaMapping, q_point::Int, mapping_values, cell)
+    ip = funvals.ip
     H = gethessian(mapping_values)
     Jinv = inv(getjacobian(mapping_values))
 
@@ -252,13 +253,18 @@ end
         isempty(local_facedofs) && continue
 
         orientation = SurfaceOrientationInfo(faces(cell)[face])
-        
+
         i = collect(local_facedofs)
         dNdξ = funvals.dNdξ[i, q_point]
         Nξ = funvals.Nξ[i, q_point]
-        Nξ, dNdξ = transform_dofs(funvals.ip, orientation.flipped, orientation.shift_index, face, Nξ, dNdξ)
 
-        for (j, dof) in enumerate(i)
+        # Face DOF transformation on elements that need it
+        if (transform_facedofs_during_mapping(ip))
+            Nξ, dNdξ = transform_dofs(ip, orientation, face, Nξ, dNdξ)
+        end
+
+        # Actual geometrical mapping
+        @inbounds for (j, dof) in enumerate(i)
             funvals.Nx[dof, q_point] = Nξ[j] ⋅ Jinv
             funvals.dNdx[dof, q_point] = Jinv' ⋅ dNdξ[j] ⋅ Jinv - Jinv' ⋅ (Nξ[j] ⋅ Jinv ⋅ H ⋅ Jinv)
         end

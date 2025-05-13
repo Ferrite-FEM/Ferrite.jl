@@ -437,11 +437,14 @@ function _close_subdofhandler!(dh::DofHandler{sdim}, sdh::SubDofHandler, sdh_ind
             end
         end
         push!(ip_infos, ip_info)
-        # TODO test if facedof transformation/permutation is implemented
         # TODO: More than one face dof per face in 3D are not implemented yet. This requires
         #       keeping track of the relative rotation between the faces, not just the
         #       direction as for faces (i.e. edges) in 2D.
-        # sdim == 3 && @assert !any(x -> x > 1, ip_info.nfacedofs)
+        #
+        # PR #1199:
+        #   Either the facedofs must be permuted during dof distribution (if possible), or they must be transformed during mapping.
+        #   For now, if multiple facedofs are defined, the interpolation must have transform_facedofs_during_mapping = true.
+        sdim == 3 && any(x -> x > 1, ip_info.nfacedofs) && @assert Ferrite.transform_facedofs_during_mapping(interpolation)
     end
 
     # TODO: Given the InterpolationInfo it should be possible to compute ndofs_per_cell, but
