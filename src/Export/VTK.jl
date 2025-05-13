@@ -208,7 +208,7 @@ function write_solution(vtk::VTKGridFile, dh::AbstractDofHandler, u::AbstractVec
         if write_discontinuous(vtk)
             data = evaluate_at_discontinuous_vtkgrid_nodes(dh, u, name, vtk.cellnodes)
         else
-            data = _evaluate_at_grid_nodes(dh, u, name, Val(true)) #=vtk=#
+            data = _evaluate_at_grid_nodes(dh, u, name, #=vtk=# Val(true))
         end
         _vtk_write_node_data(vtk.vtk, data, string(name, suffix))
     end
@@ -226,7 +226,7 @@ function write_projection(vtk::VTKGridFile, proj::L2Projector, vals, name)
         data = evaluate_at_discontinuous_vtkgrid_nodes(proj.dh, vals, only(getfieldnames(proj.dh)), vtk.cellnodes)
         comp_names = ["x", "y", "z"][1:size(data, 1)]
     else
-        data = _evaluate_at_grid_nodes(proj, vals, Val(true))::Matrix #=vtk=#
+        data = _evaluate_at_grid_nodes(proj, vals, #=vtk=# Val(true))::Matrix
         @assert size(data, 2) == getnnodes(get_grid(proj.dh))
         comp_names = component_names(eltype(vals))
     end
@@ -423,7 +423,7 @@ function _evaluate_at_discontinuous_vtkgrid_nodes!(
         data::Matrix, sdh::SubDofHandler,
         u::Vector{T}, cv::CellValues, drange::UnitRange, cellnodes
     ) where {T}
-    ue = zeros(T, getnbasefunctions(cv))
+    ue = zeros(T, length(drange))
     for cell in CellIterator(sdh)
         reinit!(cv, cell)
         @assert getnquadpoints(cv) == length(cell.nodes)
