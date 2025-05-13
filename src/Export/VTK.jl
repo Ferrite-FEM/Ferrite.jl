@@ -151,6 +151,7 @@ function toparaview!(v, x::Vec{D}) where {D}
     v[1:D] .= x
     return v
 end
+
 function toparaview!(v, x::SecondOrderTensor)
     tovoigt!(v, x)
     return v
@@ -432,38 +433,9 @@ function _evaluate_at_discontinuous_vtkgrid_nodes!(
         end
         for (qp, nodeid) in pairs(cellnodes[cellid(cell)])
             val = function_value(cv, qp, ue)
-            data[1:length(val), nodeid] .= val
-            data[(length(val) + 1):end, nodeid] .= 0 # purge the NaN
-        end
-    end
-    return data
-end
-
-function _evaluate_at_discontinuous_vtkgrid_nodes!(
-        data::Matrix, sdh::SubDofHandler,
-        u::Vector{S}, cv::CellValues, drange::UnitRange, cellnodes
-    ) where {order, dim, T, M, S <: Union{Tensor{order, dim, T, M}, SymmetricTensor{order, dim, T, M}}}
-    ue = zeros(S, getnbasefunctions(cv))
-    for cell in CellIterator(sdh)
-        reinit!(cv, cell)
-        @assert getnquadpoints(cv) == length(cell.nodes)
-        for (i, I) in pairs(drange)
-            ue[i] = u[cell.dofs[I]]
-        end
-        for (qp, nodeid) in pairs(cellnodes[cellid(cell)])
-            # Loop manually over the shape functions since function_value
-            # doesn't like scalar base functions with tensor dofs
-            val = zero(S)
-            for i in 1:getnbasefunctions(cv)
-                val += shape_value(cv, qp, i) * ue[i]
-            end
-            if data isa Matrix # VTK
-                dataview = @view data[:, nodeid]
-                fill!(dataview, 0) # purge the NaN
-                toparaview!(dataview, val)
-            else
-                data[nodeid] = val
-            end
+            dataview = @view data[:, nodeid]
+            fill!(dataview, 0) # purge the NaN
+            toparaview!(dataview, val)
         end
     end
     return data
