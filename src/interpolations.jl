@@ -2068,6 +2068,10 @@ function get_direction(::Nedelec{RefTriangle, 2}, shape_nr, cell)
     return get_edge_direction(cell, edge_nr)
 end
 
+function transform_dofs(::Nedelec{RefTriangle, 2}, flipped::Bool, shift_index::Int, facenr::Int, Nξ, dNdξ)
+    return Nξ, dNdξ
+end
+
 # RefQuadrilateral, 1st order Lagrange
 # https://defelement.org/elements/examples/quadrilateral-nedelec1-lagrange-1.html
 # Scaled by 1/2 as the reference edge length in Ferrite is length 2, but 1 in DefElement.
@@ -2112,6 +2116,80 @@ adjust_dofs_during_distribution(::Nedelec{RefTetrahedron, 1}) = false
 
 function get_direction(::Nedelec{RefTetrahedron, 1}, shape_nr, cell)
     return get_edge_direction(cell, shape_nr) # shape_nr = edge_nr
+end
+
+# RefTetrahedron, 2nd order Lagrange
+# https://defelement.org/elements/examples/tetrahedron-nedelec1-lagrange-1.html
+function reference_shape_value(ip::Nedelec{RefTetrahedron, 2}, ξ::Vec{3, T}, i::Int) where {T}
+    x, y, z = ξ
+    nil = zero(T)
+
+    # Edge 1
+    i == 1 && return Vec(8(y^2 + z^2 + x * y + x * z + 2y * z) - 6(x + 2y + 2z) + 4, -2x * (4x + 4y + 4z - 3), -2x * (4x + 4y + 4z - 3))
+    i == 2 && return Vec(-8x * (y + z) + 2(3x + y + z - 1), 4x * (2x - 1), 4x * (2x - 1))
+    # Edge 2
+    i == 3 && return Vec(2y * (1 - 4x), 4x * (2x - 1), nil)
+    i == 4 && return Vec(4y * (1 - 2y), 2x * (4y - 1), nil)
+    # Edge 3 (flip order and sign compared to defelement)
+    i == 5 && return Vec(-4y * (2y - 1), 8y * (x + z) - 2(x + 3y + z - 1), -4y * (2y - 1))
+    i == 6 && return Vec(2y * (4x + 4y + 4z - 3), -(8(x^2 + z^2 + x * y + 2x * z + y * z) - 6(2x + y + 2z) + 4), 2y * (4x + 4y + 4z - 3))
+    # Edge 4
+    i == 7 && return Vec(-2z * (4x + 4y + 4z - 3), -2z * (4x + 4y + 4z - 3), 8(x^2 + y^2 + 2x * y + x * z + y * z) - 6(2x + 2y + z) + 4)
+    i == 8 && return Vec(4z * (2z - 1), 4z * (2z - 1), -8z * (x + y) + 2(x + y + 3z - 1))
+    # Edge 5
+    i == 9 && return Vec(2z * (1 - 4x), nil, 4x * (2x - 1))
+    i == 10 && return Vec(4z * (1 - 2z), nil, 2x * (4z - 1))
+    # Edge 6
+    i == 11 && return Vec(nil, 2z * (1 - 4y), 4y * (2y - 1))
+    i == 12 && return Vec(nil, 4z * (1 - 2z), 2y * (4z - 1))
+    
+    # Face 1 (flip order compared to defelement)
+    i == 13 && return Vec(8y * (2x + y + z - 1), -8x * (2x + y + 2z - 2), 8x * y)
+    i == 14 && return Vec(-8y * (x + 2y + 2z - 2), 8x * (x + 2y + z - 1), 8x * y)
+    # Face 2
+    i == 15 && return Vec(-8z * (x + 2y + 2z - 2), 8x * z, 8x * (x + y + 2z - 1))
+    i == 16 && return Vec(8z * (2x + y + z - 1), 8x * z, -8x * (2x + 2y + z - 2))
+    # Face 3
+    i == 17 && return Vec(-8y * z, 16x * z, -8x * y)
+    i == 18 && return Vec(-8y * z, -8x * z, 16x * y)
+    # Face 4 (flip order compared to defelement)
+    i == 19 && return Vec(8y * z, 8z * (x + 2y + z - 1), -8y * (2x + 2y + z - 2))
+    i == 20 && return Vec(8y * z, -8z * (2x + y + 2z - 2), 8y * (x + y + 2z - 1))
+    throw(ArgumentError("no shape function $i for interpolation $ip"))
+end
+
+getnbasefunctions(::Nedelec{RefTetrahedron, 2}) = 20
+edgedof_interior_indices(::Nedelec{RefTetrahedron, 2}) = ((1, 2), (3, 4), (5, 6), (7, 8), (9, 10), (11, 12))
+facedof_indices(::Nedelec{RefTetrahedron, 2}) = ((1, 2, 3, 4, 5, 6, 13, 14), (1, 2, 7, 8, 9, 10, 15, 16), (3, 4, 9, 10, 11, 12, 17, 18), (5, 6, 7, 8, 11, 12, 19, 20))
+facedof_interior_indices(::Nedelec{RefTetrahedron, 2}) = ((13, 14), (15, 16), (17, 18), (19, 20))
+adjust_dofs_during_distribution(::Nedelec{RefTetrahedron, 2}) = true
+
+function get_direction(::Nedelec{RefTetrahedron, 2}, shape_nr, cell)
+    if(shape_nr < 13)
+        edge_nr = (shape_nr + 1) ÷ 2
+        return get_edge_direction(cell, edge_nr)
+    else
+        face_nr = (shape_nr - 11) ÷ 2
+        return get_face_direction(cell, face_nr)
+    end
+end
+
+# TODO cannot directly pass SurfaceOrientationInfo due to order of include's
+# TODO transformation for Nξ is tested in test_continuity, but dNdξ is not. Need to do anything extra here?
+# TODO settle on a good way to define transformations with two indices (flipped & orientation)
+function transform_dofs(::Nedelec{RefTetrahedron, 2}, flipped::Bool, shift_index::Int, facenr::Int, Nξ, dNdξ)
+    # indexed by shift_index
+    transformations = [[1 0; 0 1], [0 1; -1 -1], [-1 -1; 1 0]]
+    
+    T = transformations[shift_index + 1]
+    if(flipped)
+        T = [0 1; 1 0] * T
+    end
+
+    Nξ = T * Nξ
+    dNdξ = T * dNdξ
+
+    return Nξ, dNdξ
 end
 
 # RefHexahedron, 1st order Lagrange

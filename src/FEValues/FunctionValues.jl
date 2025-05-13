@@ -229,16 +229,41 @@ end
     return nothing
 end
 
+# TODO ensure facedof mapping is always applied before geometric transformation
+# Currently only implemented for FunctionValues{1}, CovariantPiolaMapping (used for test case 2nd order Nedelec)
 @inline function apply_mapping!(funvals::FunctionValues{1}, ::CovariantPiolaMapping, q_point::Int, mapping_values, cell)
     H = gethessian(mapping_values)
     Jinv = inv(getjacobian(mapping_values))
+
+    facedof_indices = facedof_interior_indices(funvals.ip)
+    facedofs = Iterators.flatten(facedof_indices)
+
     @inbounds for j in 1:getnbasefunctions(funvals)
-        d = get_direction(funvals.ip, j, cell)
-        dNdξ = funvals.dNdξ[j, q_point]
-        Nξ = funvals.Nξ[j, q_point]
-        funvals.Nx[j, q_point] = d * (Nξ ⋅ Jinv)
-        funvals.dNdx[j, q_point] = d * (Jinv' ⋅ dNdξ ⋅ Jinv - Jinv' ⋅ (Nξ ⋅ Jinv ⋅ H ⋅ Jinv))
+        if (!(j in facedofs))
+            d = get_direction(funvals.ip, j, cell)
+            dNdξ = funvals.dNdξ[j, q_point]
+            Nξ = funvals.Nξ[j, q_point]
+            funvals.Nx[j, q_point] = d * (Nξ ⋅ Jinv)
+            funvals.dNdx[j, q_point] = d * (Jinv' ⋅ dNdξ ⋅ Jinv - Jinv' ⋅ (Nξ ⋅ Jinv ⋅ H ⋅ Jinv))
+        end
     end
+
+    @inbounds for (face, local_facedofs) in enumerate(facedof_indices)
+        isempty(local_facedofs) && continue
+
+        orientation = SurfaceOrientationInfo(faces(cell)[face])
+        
+        i = collect(local_facedofs)
+        dNdξ = funvals.dNdξ[i, q_point]
+        Nξ = funvals.Nξ[i, q_point]
+        Nξ, dNdξ = transform_dofs(funvals.ip, orientation.flipped, orientation.shift_index, face, Nξ, dNdξ)
+
+        for (j, dof) in enumerate(i)
+            funvals.Nx[dof, q_point] = Nξ[j] ⋅ Jinv
+            funvals.dNdx[dof, q_point] = Jinv' ⋅ dNdξ[j] ⋅ Jinv - Jinv' ⋅ (Nξ[j] ⋅ Jinv ⋅ H ⋅ Jinv)
+        end
+    end
+
     return nothing
 end
 

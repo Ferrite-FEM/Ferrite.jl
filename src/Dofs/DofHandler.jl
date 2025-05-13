@@ -437,10 +437,11 @@ function _close_subdofhandler!(dh::DofHandler{sdim}, sdh::SubDofHandler, sdh_ind
             end
         end
         push!(ip_infos, ip_info)
+        # TODO test if facedof transformation/permutation is implemented
         # TODO: More than one face dof per face in 3D are not implemented yet. This requires
         #       keeping track of the relative rotation between the faces, not just the
         #       direction as for faces (i.e. edges) in 2D.
-        sdim == 3 && @assert !any(x -> x > 1, ip_info.nfacedofs)
+        # sdim == 3 && @assert !any(x -> x > 1, ip_info.nfacedofs)
     end
 
     # TODO: Given the InterpolationInfo it should be possible to compute ndofs_per_cell, but
@@ -721,9 +722,10 @@ For more details we refer to [1] as we follow the methodology described therein.
     !!!TODO Investigate if we can somehow pass the interpolation into this function in a typestable way.
 """
 @inline function permute_and_push!(cell_dofs::Vector{Int}, dofs::StepRange{Int, Int}, ::SurfaceOrientationInfo, adjust_during_distribution::Bool, rdim::Int)
-    if rdim == 3 && adjust_during_distribution && length(dofs) > 1
-        error("Dof distribution for interpolations with multiple dofs per face not implemented yet.")
-    end
+    # TODO test if facedof transformation/permutation is implemented
+    #if rdim == 3 && adjust_during_distribution && length(dofs) > 1
+    #    error("Dof distribution for interpolations with multiple dofs per face not implemented yet.")
+    #end
     n_copies = step(dofs)
     @assert n_copies > 0
     for dof in dofs
