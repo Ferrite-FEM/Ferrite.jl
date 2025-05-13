@@ -25,21 +25,21 @@ VTKGridFile(filename, grid) do vtk
 end
 ```
 """
-struct VTKGridFile{VTK<:WriteVTK.DatasetFile}
+struct VTKGridFile{VTK <: WriteVTK.DatasetFile}
     vtk::VTK
-    cellnodes::Union{Vector{UnitRange{Int}},Nothing}
+    cellnodes::Union{Vector{UnitRange{Int}}, Nothing}
 end
 function VTKGridFile(filename::String, dh::DofHandler; kwargs...)
     for sdh in dh.subdofhandlers
         for ip in sdh.field_interpolations
             if is_discontinuous(ip)
-                return VTKGridFile(filename, get_grid(dh); write_discontinuous=true, kwargs...)
+                return VTKGridFile(filename, get_grid(dh); write_discontinuous = true, kwargs...)
             end
         end
     end
     return VTKGridFile(filename, get_grid(dh); kwargs...)
 end
-function VTKGridFile(filename::String, grid::AbstractGrid; write_discontinuous=false, kwargs...)
+function VTKGridFile(filename::String, grid::AbstractGrid; write_discontinuous = false, kwargs...)
     vtk, cellnodes = create_vtk_grid(filename, grid, write_discontinuous; kwargs...)
     return VTKGridFile(vtk, cellnodes)
 end
@@ -157,35 +157,35 @@ function toparaview!(v, x::SecondOrderTensor)
 end
 
 function _vtk_write_node_data(
-    vtk::WriteVTK.DatasetFile,
-    nodedata::Vector{S},
-    name::AbstractString
-) where {O,D,T,M,S<:Union{Tensor{O,D,T,M},SymmetricTensor{O,D,T,M}}}
+        vtk::WriteVTK.DatasetFile,
+        nodedata::Vector{S},
+        name::AbstractString
+    ) where {O, D, T, M, S <: Union{Tensor{O, D, T, M}, SymmetricTensor{O, D, T, M}}}
     noutputs = S <: Vec{2} ? 3 : M # Pad 2D Vec to 3D
     npoints = length(nodedata)
     out = zeros(T, noutputs, npoints)
     for i in 1:npoints
         toparaview!(@view(out[:, i]), nodedata[i])
     end
-    return WriteVTK.vtk_point_data(vtk, out, name; component_names=component_names(S))
+    return WriteVTK.vtk_point_data(vtk, out, name; component_names = component_names(S))
 end
 function _vtk_write_node_data(vtk::WriteVTK.DatasetFile, nodedata::Vector{<:Real}, name::AbstractString)
     return WriteVTK.vtk_point_data(vtk, nodedata, name)
 end
-function _vtk_write_node_data(vtk::WriteVTK.DatasetFile, nodedata::Matrix{<:Real}, name::AbstractString; component_names=nothing)
-    return WriteVTK.vtk_point_data(vtk, nodedata, name; component_names=component_names)
+function _vtk_write_node_data(vtk::WriteVTK.DatasetFile, nodedata::Matrix{<:Real}, name::AbstractString; component_names = nothing)
+    return WriteVTK.vtk_point_data(vtk, nodedata, name; component_names = component_names)
 end
 
 function component_names(::Type{S}) where {S}
     names =
         S <: Vec{1} ? ["x"] :
         S <: Vec ? ["x", "y", "z"] : # Pad 2D Vec to 3D
-        S <: Tensor{2,1} ? ["xx"] :
-        S <: SymmetricTensor{2,1} ? ["xx"] :
-        S <: Tensor{2,2} ? ["xx", "yy", "xy", "yx"] :
-        S <: SymmetricTensor{2,2} ? ["xx", "yy", "xy"] :
-        S <: Tensor{2,3} ? ["xx", "yy", "zz", "yz", "xz", "xy", "zy", "zx", "yx"] :
-        S <: SymmetricTensor{2,3} ? ["xx", "yy", "zz", "yz", "xz", "xy"] :
+        S <: Tensor{2, 1} ? ["xx"] :
+        S <: SymmetricTensor{2, 1} ? ["xx"] :
+        S <: Tensor{2, 2} ? ["xx", "yy", "xy", "yx"] :
+        S <: SymmetricTensor{2, 2} ? ["xx", "yy", "xy"] :
+        S <: Tensor{2, 3} ? ["xx", "yy", "zz", "yz", "xz", "xy", "zy", "zx", "yx"] :
+        S <: SymmetricTensor{2, 3} ? ["xx", "yy", "zz", "yz", "xz", "xy"] :
         nothing
     return names
 end
@@ -202,7 +202,7 @@ degree of freedom in `dh`, see [`write_node_data`](@ref write_node_data) for det
 Use `write_node_data` directly when exporting values that are already
 sorted by the nodes in the grid.
 """
-function write_solution(vtk::VTKGridFile, dh::AbstractDofHandler, u::AbstractVector, suffix="")
+function write_solution(vtk::VTKGridFile, dh::AbstractDofHandler, u::AbstractVector, suffix = "")
     fieldnames = getfieldnames(dh)  # all primary fields
     for name in fieldnames
         if write_discontinuous(vtk)
@@ -231,7 +231,7 @@ function write_projection(vtk::VTKGridFile, proj::L2Projector, vals, name)
         comp_names = component_names(eltype(vals))
     end
 
-    _vtk_write_node_data(vtk.vtk, data, name; component_names=comp_names)
+    _vtk_write_node_data(vtk.vtk, data, name; component_names = comp_names)
     return vtk
 end
 
@@ -289,7 +289,7 @@ Write all cell sets in the grid with name according to their keys and
 celldata 1 if the cell is in the set, and 0 otherwise. It is also possible to
 only export a single `cellset`, or multiple `cellsets`.
 """
-function write_cellset(vtk, grid::AbstractGrid, cellsets=keys(getcellsets(grid)))
+function write_cellset(vtk, grid::AbstractGrid, cellsets = keys(getcellsets(grid)))
     z = zeros(getncells(grid))
     for cellset in cellsets
         fill!(z, 0)
@@ -347,7 +347,7 @@ Write cell colors (see [`create_coloring`](@ref)) to a VTK file for visualizatio
 
 In case of coloring a subset, the cells which are not part of the subset are represented as color 0.
 """
-function write_cell_colors(vtk, grid::AbstractGrid, cell_colors::AbstractVector{<:AbstractVector{<:Integer}}, name="coloring")
+function write_cell_colors(vtk, grid::AbstractGrid, cell_colors::AbstractVector{<:AbstractVector{<:Integer}}, name = "coloring")
     color_vector = zeros(Int, getncells(grid))
     for (i, cells_color) in enumerate(cell_colors)
         for cell in cells_color
@@ -360,7 +360,7 @@ end
 
 # A discontinuous vtk grid data duplicates nodes such that each vtk node only belongs to
 # a single cell. `cellnodes[i]` give the indices of these nodes for cell `i`.
-function create_discontinuous_vtk_griddata(grid::Grid{dim,C,T}) where {dim,C,T}
+function create_discontinuous_vtk_griddata(grid::Grid{dim, C, T}) where {dim, C, T}
     cls = Vector{WriteVTK.MeshCell}(undef, getncells(grid))
     cellnodes = Vector{UnitRange{Int}}(undef, getncells(grid))
     ncoords = sum(nnodes, getcells(grid))
@@ -382,7 +382,7 @@ function create_discontinuous_vtk_griddata(grid::Grid{dim,C,T}) where {dim,C,T}
     return coords, cls, cellnodes
 end
 
-function evaluate_at_discontinuous_vtkgrid_nodes(dh::DofHandler{sdim}, u::Vector{T}, fieldname::Symbol, cellnodes) where {sdim,T}
+function evaluate_at_discontinuous_vtkgrid_nodes(dh::DofHandler{sdim}, u::Vector{T}, fieldname::Symbol, cellnodes) where {sdim, T}
     # Make sure the field exists
     fieldname ∈ getfieldnames(dh) || error("Field $fieldname not found.")
     # Figure out the return type (scalar or vector)
@@ -393,8 +393,8 @@ function evaluate_at_discontinuous_vtkgrid_nodes(dh::DofHandler{sdim}, u::Vector
     get_vtk_dim(::ScalarInterpolation, ::AbstractVector{<:Vec{dim}}) where {dim} = dim == 2 ? 3 : dim
     get_vtk_dim(::VectorInterpolation{vdim}, ::AbstractVector{<:Number}) where {vdim} = vdim == 2 ? 3 : vdim
 
-    get_vtk_dim(::ScalarInterpolation, ::AbstractVector{<:SymmetricTensor{order,dim, T, M}}) where {order,dim, T, M} = M
-    get_vtk_dim(::ScalarInterpolation, ::AbstractVector{<:Tensor{order,dim, T, M}}) where {order,dim, T, M} = M
+    get_vtk_dim(::ScalarInterpolation, ::AbstractVector{<:SymmetricTensor{order, dim, T, M}}) where {order, dim, T, M} = M
+    get_vtk_dim(::ScalarInterpolation, ::AbstractVector{<:Tensor{order, dim, T, M}}) where {order, dim, T, M} = M
 
     vtk_dim = get_vtk_dim(ip, u)
     n_vtk_nodes = maximum(maximum, cellnodes)
@@ -411,7 +411,7 @@ function evaluate_at_discontinuous_vtkgrid_nodes(dh::DofHandler{sdim}, u::Vector
         ip_geo = geometric_interpolation(CT)
         local_node_coords = reference_coordinates(ip_geo)
         qr = QuadratureRule{getrefshape(ip)}(zeros(length(local_node_coords)), local_node_coords)
-        cv = CellValues(qr, ip, ip_geo^sdim; update_gradients=false, update_hessians=false, update_detJdV=false)
+        cv = CellValues(qr, ip, ip_geo^sdim; update_gradients = false, update_hessians = false, update_detJdV = false)
         drange = dof_range(sdh, field_idx)
         # Function barrier
         _evaluate_at_discontinuous_vtkgrid_nodes!(data, sdh, u, cv, drange, cellnodes)
@@ -420,9 +420,9 @@ function evaluate_at_discontinuous_vtkgrid_nodes(dh::DofHandler{sdim}, u::Vector
 end
 
 function _evaluate_at_discontinuous_vtkgrid_nodes!(
-    data::Matrix, sdh::SubDofHandler,
-    u::Vector{T}, cv::CellValues, drange::UnitRange, cellnodes
-) where {T}
+        data::Matrix, sdh::SubDofHandler,
+        u::Vector{T}, cv::CellValues, drange::UnitRange, cellnodes
+    ) where {T}
     ue = zeros(T, getnbasefunctions(cv))
     for cell in CellIterator(sdh)
         reinit!(cv, cell)
@@ -433,16 +433,16 @@ function _evaluate_at_discontinuous_vtkgrid_nodes!(
         for (qp, nodeid) in pairs(cellnodes[cellid(cell)])
             val = function_value(cv, qp, ue)
             data[1:length(val), nodeid] .= val
-            data[(length(val)+1):end, nodeid] .= 0 # purge the NaN
+            data[(length(val) + 1):end, nodeid] .= 0 # purge the NaN
         end
     end
     return data
 end
 
 function _evaluate_at_discontinuous_vtkgrid_nodes!(
-    data::Matrix, sdh::SubDofHandler,
-    u::Vector{S}, cv::CellValues, drange::UnitRange, cellnodes
-) where {order,dim,T,M,S<:Union{Tensor{order,dim,T,M},SymmetricTensor{order,dim,T,M}}}
+        data::Matrix, sdh::SubDofHandler,
+        u::Vector{S}, cv::CellValues, drange::UnitRange, cellnodes
+    ) where {order, dim, T, M, S <: Union{Tensor{order, dim, T, M}, SymmetricTensor{order, dim, T, M}}}
     ue = zeros(S, getnbasefunctions(cv))
     for cell in CellIterator(sdh)
         reinit!(cv, cell)
