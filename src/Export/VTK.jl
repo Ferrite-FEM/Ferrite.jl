@@ -151,7 +151,6 @@ function toparaview!(v, x::Vec{D}) where {D}
     v[1:D] .= x
     return v
 end
-
 function toparaview!(v, x::SecondOrderTensor)
     tovoigt!(v, x)
     return v
