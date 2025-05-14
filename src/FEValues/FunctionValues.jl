@@ -222,10 +222,10 @@ end
 @inline function apply_mapping!(funvals::FunctionValues{0}, ::CovariantPiolaMapping, q_point::Int, mapping_values, cell)
     Jinv = inv(getjacobian(mapping_values))
 
-    Nξ = funvals.Nξ[:, q_point]
+    Nξ = @view funvals.Nξ[:, q_point]
     ip = funvals.ip
 
-    Mξ, _ = transform_dofs(ip, Nξ, Nξ, cell)
+    Mξ, _ = transform_dofs(ip, cell, Nξ, Nξ)
 
     @inbounds for j in 1:getnbasefunctions(funvals)
         mξ = Mξ[j]
@@ -238,11 +238,11 @@ end
     H = gethessian(mapping_values)
     Jinv = inv(getjacobian(mapping_values))
 
-    Nξ = funvals.Nξ[:, q_point]
-    dNdξ = funvals.dNdξ[:, q_point]
+    Nξ = @view funvals.Nξ[:, q_point]
+    dNdξ = @view funvals.dNdξ[:, q_point]
     ip = funvals.ip
 
-    Mξ, dMdξ = transform_dofs(ip, Nξ, dNdξ, cell)
+    Mξ, dMdξ = transform_dofs(ip, cell, Nξ, dNdξ)
 
     @inbounds for j in 1:getnbasefunctions(funvals)
         mξ = Mξ[j]
@@ -259,10 +259,10 @@ end
     J = getjacobian(mapping_values)
     detJ = det(J)
 
-    Nξ = funvals.Nξ[:, q_point]
+    Nξ = @view funvals.Nξ[:, q_point]
     ip = funvals.ip
 
-    Mξ, _ = transform_dofs(ip, Nξ, Nξ, cell)
+    Mξ, _ = transform_dofs(ip, cell, Nξ, Nξ)
 
     @inbounds for j in 1:getnbasefunctions(funvals)
         mξ = Mξ[j]
@@ -281,11 +281,11 @@ end
     A1 = (H_Jinv ⊡ (otimesl(I2, I2))) / detJ
     A2 = (Jinv' ⊡ H_Jinv) / detJ
 
-    Nξ = funvals.Nξ[:, q_point]
-    dNdξ = funvals.dNdξ[:, q_point]
+    Nξ = @view funvals.Nξ[:, q_point]
+    dNdξ = @view funvals.dNdξ[:, q_point]
     ip = funvals.ip
 
-    Mξ, dMdξ = transform_dofs(ip, Nξ, dNdξ, cell)
+    Mξ, dMdξ = transform_dofs(ip, cell, Nξ, dNdξ)
 
     @inbounds for j in 1:getnbasefunctions(funvals)
         mξ = Mξ[j]
@@ -299,11 +299,11 @@ end
 # ==============
 # Transform dofs
 # ==============
-function transform_dofs(ip::Interpolation, Nξ::Vector{<:Vec{sdim}}, args...) where {sdim}
-    return transform_dofs(ip, conformity(ip), Nξ, args...)
+function transform_dofs(ip::Interpolation, cell::AbstractCell, args...)
+    return transform_dofs(ip, conformity(ip), cell, args...)
 end
 
-function transform_dofs(ip::Interpolation, ::HcurlConformity, Nξ, dNdξ, cell)
+function transform_dofs(ip::Interpolation, ::HcurlConformity, cell::AbstractCell, Nξ, dNdξ)
     Mξ = similar(Nξ)
     dMdξ = similar(dNdξ)
 
@@ -341,7 +341,7 @@ function transform_dofs(ip::Interpolation, ::HcurlConformity, Nξ, dNdξ, cell)
     return Mξ, dMdξ
 end
 
-function transform_dofs(ip::Interpolation, ::HdivConformity, Nξ, dNdξ, cell)
+function transform_dofs(ip::Interpolation, ::HdivConformity, cell::AbstractCell, Nξ, dNdξ)
     Mξ = similar(Nξ)
     dMdξ = similar(dNdξ)
 
