@@ -299,8 +299,8 @@ end
 # ==============
 # Transform dofs
 # ==============
-function transform_dofs(ip::Interpolation, args...)
-    return transform_dofs(ip, conformity(ip), args...)
+function transform_dofs(ip::Interpolation, Nξ::Vector{<:Vec{sdim}}, args...) where {sdim}
+    return transform_dofs(ip, conformity(ip), Nξ, args...)
 end
 
 function transform_dofs(ip::Interpolation, ::HcurlConformity, Nξ, dNdξ, cell)
@@ -327,7 +327,9 @@ function transform_dofs(ip::Interpolation, ::HcurlConformity, Nξ, dNdξ, cell)
         # Face DOF transformation on elements that need it
         # TODO it appears that the required mapping is different for each interpolation. Possible to generalize somehow?
         if (transform_facedofs_during_mapping(ip))
-            nξ, dndξ = transform_dofs(ip, orientation, face, nξ, dndξ)
+            T = dof_transformation_matrix(ip, orientation, face)
+            nξ = T * nξ
+            dndξ = T * dndξ
         end
 
         @inbounds for (j, dof) in enumerate(facedofs)

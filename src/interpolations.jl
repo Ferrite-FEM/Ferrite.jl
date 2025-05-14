@@ -2174,21 +2174,18 @@ function get_direction(::Nedelec{RefTetrahedron, 2}, shape_nr, cell)
     end
 end
 
-# TODO transformation for Nξ is tested in test_continuity, but dNdξ is not. Need to do anything extra here?
-# TODO settle on a good way to define transformations with two indices (flipped & orientation)
-function transform_dofs(::Nedelec{RefTetrahedron, 2}, orientation::SurfaceOrientationInfo, facenr::Int, Nξ, dNdξ)
-    # indexed by shift_index
-    transformations = [[1 0; 0 1], [0 1; -1 -1], [-1 -1; 1 0]]
-
-    T = transformations[orientation.shift_index + 1]
-    if (orientation.flipped)
-        T = [0 1; 1 0] * T
+function dof_transformation_matrix(ip::Nedelec{RefTetrahedron, 2}, orientation::SurfaceOrientationInfo, facenr::Int)
+    shift_index = orientation.shift_index
+    if (!orientation.flipped)
+        shift_index == 0 && return Tensor{2, 2}((1, 0, 0, 1))
+        shift_index == 1 && return Tensor{2, 2}((0, -1, 1, -1))
+        shift_index == 2 && return Tensor{2, 2}((-1, 1, -1, 0))
+    else
+        shift_index == 0 && return Tensor{2, 2}((0, 1, 1, 0))
+        shift_index == 1 && return Tensor{2, 2}((-1, 0, -1, 1))
+        shift_index == 2 && return Tensor{2, 2}((1, -1, 0, -1))
     end
-
-    Nξ = T * Nξ
-    dNdξ = T * dNdξ
-
-    return Nξ, dNdξ
+    throw(ArgumentError("no dof transformation matrix defined for $orientation for interpolation $ip"))
 end
 
 # RefHexahedron, 1st order Lagrange
