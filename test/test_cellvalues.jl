@@ -236,12 +236,14 @@
         end
         test_ips = [
             Lagrange{RefTriangle, 2}(), Lagrange{RefQuadrilateral, 2}(), Lagrange{RefHexahedron, 2}()^3, # Test should also work for identity mapping
-            Nedelec{RefTriangle, 1}(), Nedelec{RefTriangle, 2}(),
-            RaviartThomas{RefTriangle, 1}(), RaviartThomas{RefTriangle, 2}(), BrezziDouglasMarini{RefTriangle, 1}(),
+            Nedelec{RefTriangle, 1}(), Nedelec{RefTriangle, 2}(), Nedelec{RefQuadrilateral, 1}(), Nedelec{RefTetrahedron, 1}(), Nedelec{RefTetrahedron, 2}(), Nedelec{RefHexahedron, 1}(),
+            RaviartThomas{RefTriangle, 1}(), RaviartThomas{RefTriangle, 2}(), RaviartThomas{RefQuadrilateral, 1}(), RaviartThomas{RefTetrahedron, 1}(), RaviartThomas{RefHexahedron, 1}(),
+            BrezziDouglasMarini{RefTriangle, 1}(),
         ]
         # Makes most sense to test for nonlinear geometries, so we use such cells for testing only
         cell_from_refshape(::Type{RefTriangle}) = QuadraticTriangle((ntuple(identity, 6)))
         cell_from_refshape(::Type{RefQuadrilateral}) = QuadraticQuadrilateral((ntuple(identity, 9)))
+        cell_from_refshape(::Type{RefTetrahedron}) = QuadraticTetrahedron((ntuple(identity, 10)))
         cell_from_refshape(::Type{RefHexahedron}) = QuadraticHexahedron((ntuple(identity, 27)))
         for ip in test_ips
             cell = cell_from_refshape(getrefshape(ip))
