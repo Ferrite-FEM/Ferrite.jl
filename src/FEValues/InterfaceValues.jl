@@ -419,8 +419,8 @@ Return the relative orientation info for facet B with regards to facet A.
 Relative orientation is computed using a [`OrientationInfo`](@ref) for each side of the interface.
 """
 function InterfaceOrientationInfo(cell_a::AbstractCell{RefShapeA}, cell_b::AbstractCell{RefShapeB}, facet_a::Int, facet_b::Int) where {RefShapeA <: AbstractRefShape, RefShapeB <: AbstractRefShape}
-    OI_a = OrientationInfo(facets(cell_a)[facet_a])
-    OI_b = OrientationInfo(facets(cell_b)[facet_b])
+    OI_a = orientation_info(facets(cell_a)[facet_a])
+    OI_b = orientation_info(facets(cell_b)[facet_b])
     flipped = OI_a.flipped != OI_b.flipped
     shift_index = OI_b.shift_index - OI_a.shift_index
     return InterfaceOrientationInfo{RefShapeA, RefShapeB}(flipped, shift_index, OI_b.shift_index, facet_a, facet_b)

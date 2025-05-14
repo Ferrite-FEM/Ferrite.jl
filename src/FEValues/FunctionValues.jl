@@ -221,10 +221,15 @@ end
 # Covariant Piola Mapping
 @inline function apply_mapping!(funvals::FunctionValues{0}, ::CovariantPiolaMapping, q_point::Int, mapping_values, cell)
     Jinv = inv(getjacobian(mapping_values))
+
+    Nξ = @view funvals.Nξ[:, q_point]
+    ip = funvals.ip
+
+    Mξ, _ = transform_dofs(ip, cell, Nξ, Nξ)
+
     @inbounds for j in 1:getnbasefunctions(funvals)
-        d = get_direction(funvals.ip, j, cell)
-        Nξ = funvals.Nξ[j, q_point]
-        funvals.Nx[j, q_point] = d * (Nξ ⋅ Jinv)
+        mξ = Mξ[j]
+        funvals.Nx[j, q_point] = mξ ⋅ Jinv
     end
     return nothing
 end
@@ -232,13 +237,20 @@ end
 @inline function apply_mapping!(funvals::FunctionValues{1}, ::CovariantPiolaMapping, q_point::Int, mapping_values, cell)
     H = gethessian(mapping_values)
     Jinv = inv(getjacobian(mapping_values))
+
+    Nξ = @view funvals.Nξ[:, q_point]
+    dNdξ = @view funvals.dNdξ[:, q_point]
+    ip = funvals.ip
+
+    Mξ, dMdξ = transform_dofs(ip, cell, Nξ, dNdξ)
+
     @inbounds for j in 1:getnbasefunctions(funvals)
-        d = get_direction(funvals.ip, j, cell)
-        dNdξ = funvals.dNdξ[j, q_point]
-        Nξ = funvals.Nξ[j, q_point]
-        funvals.Nx[j, q_point] = d * (Nξ ⋅ Jinv)
-        funvals.dNdx[j, q_point] = d * (Jinv' ⋅ dNdξ ⋅ Jinv - Jinv' ⋅ (Nξ ⋅ Jinv ⋅ H ⋅ Jinv))
+        mξ = Mξ[j]
+        dmdξ = dMdξ[j]
+        funvals.Nx[j, q_point] = mξ ⋅ Jinv
+        funvals.dNdx[j, q_point] = Jinv' ⋅ dmdξ ⋅ Jinv - Jinv' ⋅ (mξ ⋅ Jinv ⋅ H ⋅ Jinv)
     end
+
     return nothing
 end
 
@@ -246,10 +258,15 @@ end
 @inline function apply_mapping!(funvals::FunctionValues{0}, ::ContravariantPiolaMapping, q_point::Int, mapping_values, cell)
     J = getjacobian(mapping_values)
     detJ = det(J)
+
+    Nξ = @view funvals.Nξ[:, q_point]
+    ip = funvals.ip
+
+    Mξ, _ = transform_dofs(ip, cell, Nξ, Nξ)
+
     @inbounds for j in 1:getnbasefunctions(funvals)
-        d = get_direction(funvals.ip, j, cell)
-        Nξ = funvals.Nξ[j, q_point]
-        funvals.Nx[j, q_point] = d * (J ⋅ Nξ) / detJ
+        mξ = Mξ[j]
+        funvals.Nx[j, q_point] = J ⋅ mξ / detJ
     end
     return nothing
 end
@@ -263,12 +280,81 @@ end
     H_Jinv = H ⋅ Jinv
     A1 = (H_Jinv ⊡ (otimesl(I2, I2))) / detJ
     A2 = (Jinv' ⊡ H_Jinv) / detJ
+
+    Nξ = @view funvals.Nξ[:, q_point]
+    dNdξ = @view funvals.dNdξ[:, q_point]
+    ip = funvals.ip
+
+    Mξ, dMdξ = transform_dofs(ip, cell, Nξ, dNdξ)
+
     @inbounds for j in 1:getnbasefunctions(funvals)
-        d = get_direction(funvals.ip, j, cell)
-        dNdξ = funvals.dNdξ[j, q_point]
-        Nξ = funvals.Nξ[j, q_point]
-        funvals.Nx[j, q_point] = d * (J ⋅ Nξ) / detJ
-        funvals.dNdx[j, q_point] = d * (J ⋅ dNdξ ⋅ Jinv / detJ + A1 ⋅ Nξ - (J ⋅ Nξ) ⊗ A2)
+        mξ = Mξ[j]
+        dmdξ = dMdξ[j]
+        funvals.Nx[j, q_point] = J ⋅ mξ / detJ
+        funvals.dNdx[j, q_point] = J ⋅ dmdξ ⋅ Jinv / detJ + A1 ⋅ mξ - (J ⋅ mξ) ⊗ A2
     end
     return nothing
+end
+
+# ==============
+# Transform dofs
+# ==============
+function transform_dofs(ip::Interpolation, cell::AbstractCell, args...)
+    return transform_dofs(ip, conformity(ip), cell, args...)
+end
+
+function transform_dofs(ip::Interpolation, ::HcurlConformity, cell::AbstractCell, Nξ, dNdξ)
+    Mξ = similar(Nξ)
+    dMdξ = similar(dNdξ)
+
+    @inbounds for (edge, edgedofs) in enumerate(edgedof_interior_indices(ip))
+        @inbounds for dof in edgedofs
+            d = get_direction(ip, dof, cell)
+            Mξ[dof] = d * Nξ[dof]
+            dMdξ[dof] = d * dNdξ[dof]
+        end
+    end
+
+    @inbounds for (face, facedofs) in enumerate(facedof_interior_indices(ip))
+        isempty(facedofs) && continue
+
+        orientation = SurfaceOrientationInfo(faces(cell)[face])
+
+        dof_idx = collect(facedofs)
+        nξ = Nξ[dof_idx]
+        dndξ = dNdξ[dof_idx]
+
+        # Face DOF transformation on elements that need it
+        # TODO it appears that the required mapping is different for each interpolation. Possible to generalize somehow?
+        if (transform_facedofs_during_mapping(ip))
+            T = dof_transformation_matrix(ip, orientation, face)
+            nξ = T * nξ
+            dndξ = T * dndξ
+        end
+
+        @inbounds for (j, dof) in enumerate(facedofs)
+            Mξ[dof] = nξ[j]
+            dMdξ[dof] = dndξ[j]
+        end
+    end
+
+    return Mξ, dMdξ
+end
+
+function transform_dofs(ip::Interpolation, ::HdivConformity, cell::AbstractCell, Nξ, dNdξ)
+    Mξ = similar(Nξ)
+    dMdξ = similar(dNdξ)
+
+    @inbounds for j in 1:getnbasefunctions(ip)
+        d = get_direction(ip, j, cell)
+        Mξ[j] = d * Nξ[j]
+        dMdξ[j] = d * dNdξ[j]
+    end
+
+    @inbounds for (face, facedofs) in enumerate(facedof_interior_indices(ip))
+        isempty(facedofs) && continue
+        getrefdim(ip) == 3 && length(facedofs) > 1 && error("Multiple facedofs not supported for 3D H(div) interpolations: $ip")
+    end
+
+    return Mξ, dMdξ
 end

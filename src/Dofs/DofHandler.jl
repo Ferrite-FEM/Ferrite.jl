@@ -440,7 +440,11 @@ function _close_subdofhandler!(dh::DofHandler{sdim}, sdh::SubDofHandler, sdh_ind
         # TODO: More than one face dof per face in 3D are not implemented yet. This requires
         #       keeping track of the relative rotation between the faces, not just the
         #       direction as for faces (i.e. edges) in 2D.
-        sdim == 3 && @assert !any(x -> x > 1, ip_info.nfacedofs)
+        #
+        # PR #1199:
+        #   Either the facedofs must be permuted during dof distribution (if possible), or they must be transformed during mapping.
+        #   For now, if multiple facedofs are defined, the interpolation must have transform_facedofs_during_mapping = true.
+        sdim == 3 && any(x -> x > 1, ip_info.nfacedofs) && @assert transform_facedofs_during_mapping(interpolation)
     end
 
     # TODO: Given the InterpolationInfo it should be possible to compute ndofs_per_cell, but
@@ -644,7 +648,7 @@ described therein.
     # typestable way.
     n_copies = step(dofs)
     @assert n_copies > 0
-    if adjust_during_distribution && !orientation.regular
+    if adjust_during_distribution && orientation.flipped
         # Reverse the dofs for the path
         dofs = reverse(dofs)
     end
@@ -661,12 +665,12 @@ end
 
 Returns the unique representation of an edge and its orientation.
 Here the unique representation is the sorted node index tuple. The
-orientation is `true` if the edge is not flipped, where it is `false`
+orientation is `false` if the edge is not flipped, where it is `true`
 if the edge is flipped.
 """
 function sortedge(edge::Tuple{Int, Int})
     a, b = edge
-    return a < b ? (edge, PathOrientationInfo(true)) : ((b, a), PathOrientationInfo(false))
+    return a < b ? (edge, PathOrientationInfo(false)) : ((b, a), PathOrientationInfo(true))
 end
 
 """
@@ -721,9 +725,10 @@ For more details we refer to [1] as we follow the methodology described therein.
     !!!TODO Investigate if we can somehow pass the interpolation into this function in a typestable way.
 """
 @inline function permute_and_push!(cell_dofs::Vector{Int}, dofs::StepRange{Int, Int}, ::SurfaceOrientationInfo, adjust_during_distribution::Bool, rdim::Int)
-    if rdim == 3 && adjust_during_distribution && length(dofs) > 1
-        error("Dof distribution for interpolations with multiple dofs per face not implemented yet.")
-    end
+    # TODO test if facedof transformation/permutation is implemented
+    #if rdim == 3 && adjust_during_distribution && length(dofs) > 1
+    #    error("Dof distribution for interpolations with multiple dofs per face not implemented yet.")
+    #end
     n_copies = step(dofs)
     @assert n_copies > 0
     for dof in dofs
@@ -739,7 +744,7 @@ function sortface(face::Tuple{Int, Int, Int})
     b, c = minmax(b, c)
     a, c = minmax(a, c)
     a, b = minmax(a, b)
-    return (a, b, c), SurfaceOrientationInfo() # TODO fill struct
+    return (a, b, c), SurfaceOrientationInfo(face)
 end
 
 
@@ -760,7 +765,7 @@ function sortface(face::Tuple{Int, Int, Int, Int})
     b, c = minmax(b, c)
     a, c = minmax(a, c)
     a, b = minmax(a, b)
-    return (a, b, c), SurfaceOrientationInfo() # TODO fill struct
+    return (a, b, c), SurfaceOrientationInfo(face)
 end
 
 
