@@ -493,6 +493,64 @@ function test_l2proj_errorpaths()
     return
 end
 
+function test_mass_qr()
+    function _ips(shape)
+        if shape <: RefCube
+            return (
+                Lagrange{shape, 1}(), Lagrange{shape, 2}(),
+                Lagrange{shape, 3}(), DiscontinuousLagrange{shape, 0}(),
+                DiscontinuousLagrange{shape, 1}(), DiscontinuousLagrange{shape, 2}(), Serendipity{
+                    shape, 2,
+                }(),
+            )
+        else
+            return (
+                Lagrange{shape, 1}(), Lagrange{shape, 2}(),
+                Lagrange{shape, 3}(), DiscontinuousLagrange{shape, 0}(),
+                DiscontinuousLagrange{shape, 1}(), DiscontinuousLagrange{shape, 2}(),
+            )
+        end
+    end
+
+    function _mass_qr_test(ip::Interpolation{RefShape}) where {RefShape}
+        return QuadratureRule{RefShape}(Ferrite._mass_qr_order(ip) + 1)
+    end
+
+    function _calculate_local_me(grid, ip::Interpolation, qr::QuadratureRule)
+        cv = CellValues(qr, ip)
+        cc = CellCache(grid)
+        Ferrite.reinit!(cc, 1)
+        Ferrite.reinit!(cv, cc)
+
+        nbasef = getnbasefunctions(cv)
+        Me = zeros(nbasef, nbasef)
+        for q_point in 1:getnquadpoints(cv)
+            dV = getdetJdV(cv, q_point)
+            for i in 1:nbasef
+                Ni = shape_value(cv, q_point, i)
+                for j in 1:nbasef
+                    Nj = shape_value(cv, q_point, j)
+                    Me[i, j] += (Ni ⋅ Nj) * dV
+                end
+            end
+        end
+        return Me
+    end
+
+    for (shape, refshape) in ((Quadrilateral, RefQuadrilateral), (Triangle, RefTriangle))
+        grid = generate_grid(shape, (2, 2), Vec{2}((0.0, 0.0)), Vec{2}((1.0, 1.0)))
+        for ip in _ips(refshape)
+            me_1 = _calculate_local_me(grid, ip, Ferrite._mass_qr(ip))
+            me_2 = _calculate_local_me(grid, ip, _mass_qr_test(ip))
+            @test me_1 ≈ me_2
+            if !(me_1 ≈ me_2)
+                println("The mass matrix calculated with order+1 is not identical to the mass matrix calculated with order for $ip")
+            end
+        end
+    end
+    return
+end
+
 @testset "Test L2-Projection" begin
     test_projection(1, RefQuadrilateral)
     test_projection(1, RefTriangle)
@@ -505,4 +563,5 @@ end
     test_export(subset = true)
     test_show_l2()
     test_l2proj_errorpaths()
+    test_mass_qr()
 end
