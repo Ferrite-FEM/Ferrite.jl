@@ -495,21 +495,15 @@ end
 
 function test_mass_qr()
     function _ips(shape)
+        ips = (
+            Lagrange{shape, 1}(), Lagrange{shape, 2}(),
+            Lagrange{shape, 3}(), DiscontinuousLagrange{shape, 0}(),
+            DiscontinuousLagrange{shape, 1}(), DiscontinuousLagrange{shape, 2}(), DiscontinuousLagrange{shape, 3}(),
+        )
         if shape <: RefCube
-            return (
-                Lagrange{shape, 1}(), Lagrange{shape, 2}(),
-                Lagrange{shape, 3}(), DiscontinuousLagrange{shape, 0}(),
-                DiscontinuousLagrange{shape, 1}(), DiscontinuousLagrange{shape, 2}(), Serendipity{
-                    shape, 2,
-                }(),
-            )
-        else
-            return (
-                Lagrange{shape, 1}(), Lagrange{shape, 2}(),
-                Lagrange{shape, 3}(), DiscontinuousLagrange{shape, 0}(),
-                DiscontinuousLagrange{shape, 1}(), DiscontinuousLagrange{shape, 2}(),
-            )
+            ips = (ips..., Serendipity{shape, 2}())
         end
+        return ips
     end
 
     function _mass_qr_test(ip::Interpolation{RefShape}) where {RefShape}
