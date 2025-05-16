@@ -18,13 +18,13 @@ Ferrite.edgedof_interior_indices(::Interpolation)
 Ferrite.volumedof_interior_indices(::Interpolation)
 Ferrite.getnbasefunctions(::Interpolation)
 Ferrite.adjust_dofs_during_distribution(::Interpolation)
+Ferrite.conformity
 ```
 
 ### For special interpolations
 #### Discontinuous interpolations
 For discontinuous interpolations, implementing the following methods might be required to apply Dirichlet boundary conditions.
 ```@docs
-Ferrite.is_discontinuous(::Interpolation)
 Ferrite.dirichlet_vertexdof_indices(::Interpolation)
 Ferrite.dirichlet_facedof_indices(::Interpolation)
 Ferrite.dirichlet_edgedof_indices(::Interpolation)
@@ -172,6 +172,13 @@ we consider the same ordering. Since we only have a single interior
 dof per edge, we don't need to adjust these, hence,
 ```@example InterpolationExample
 Ferrite.adjust_dofs_during_distribution(::QTI) = false
+```
+
+Finally, our interpolation results in continuous function values across
+cell borders, but the derivatives are discontinous. Hence, it describes
+a $H_1$ conformity,
+```@example InterpolationExample
+Ferrite.conformity(::QTI) = Ferrite.H1Conformity()
 ```
 
 !!! tip

@@ -70,6 +70,14 @@ struct HdivConformity end   # Normal continuity across cell boundaries
 struct HcurlConformity end  # Tangent continuity across cell boundaries
 struct H1Conformity end     # Function continuity across cell boundaries
 
+"""
+    conformity(ip::Interpolation)
+
+Return the conformity, i.e. `L2Conformity()`, `HdivConformity()`, `HcurlConformity()`,
+or `H1Conformity()`, for the interpolation.
+"""
+function conformity end
+
 # Number of components for the interpolation.
 n_components(::ScalarInterpolation) = 1
 n_components(::VectorInterpolation{vdim}) where {vdim} = vdim
@@ -114,7 +122,6 @@ struct InterpolationInfo
     reference_dim::Int
     adjust_during_distribution::Bool
     n_copies::Int
-    is_discontinuous::Bool
 end
 function InterpolationInfo(interpolation::Interpolation{shape}, n_copies) where {rdim, shape <: AbstractRefShape{rdim}}
     info = InterpolationInfo(
@@ -124,8 +131,7 @@ function InterpolationInfo(interpolation::Interpolation{shape}, n_copies) where 
         length(volumedof_interior_indices(interpolation)),
         rdim,
         adjust_dofs_during_distribution(interpolation),
-        n_copies,
-        is_discontinuous(interpolation)
+        n_copies
     )
     return info
 end
@@ -436,15 +442,6 @@ nfacets(ip::InterpolationByDim{2}) = nedges(ip)
 nfacets(ip::InterpolationByDim{1}) = nvertices(ip)
 
 """
-    is_discontinuous(::Interpolation)
-    is_discontinuous(::Type{<:Interpolation})
-
-Checks whether the interpolation is discontinuous (i.e. `DiscontinuousLagrange`)
-"""
-is_discontinuous(ip::Interpolation) = is_discontinuous(typeof(ip))
-is_discontinuous(::Type{<:Interpolation}) = false
-
-"""
     dirichlet_boundarydof_indices(::Type{<:BoundaryIndex})
 
 Helper function to generically dispatch on the correct dof sets of a boundary entity.
@@ -515,8 +512,6 @@ function reference_shape_value(ip::DiscontinuousLagrange{shape, 0}, ::Vec{dim, T
     i == 1 && return one(T)
     throw(ArgumentError("no shape function $i for interpolation $ip"))
 end
-
-is_discontinuous(::Type{<:DiscontinuousLagrange}) = true
 
 ############
 # Lagrange #
@@ -1789,8 +1784,6 @@ function _reference_shape_hessian_gradient_and_value_static_array(ipv::Vectorize
 end
 
 reference_coordinates(ip::VectorizedInterpolation) = reference_coordinates(ip.ip)
-
-is_discontinuous(::Type{<:VectorizedInterpolation{<:Any, <:Any, <:Any, ip}}) where {ip} = is_discontinuous(ip)
 
 """
     mapping_type(ip::Interpolation)
