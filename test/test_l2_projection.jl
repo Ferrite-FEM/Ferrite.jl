@@ -500,7 +500,7 @@ function test_mass_qr()
             Lagrange{shape, 3}(), DiscontinuousLagrange{shape, 0}(),
             DiscontinuousLagrange{shape, 1}(), DiscontinuousLagrange{shape, 2}(), DiscontinuousLagrange{shape, 3}(),
         )
-        if shape <: RefCube
+        if shape <: Ferrite.RefHypercube
             ips = (ips..., Serendipity{shape, 2}())
         end
         return ips

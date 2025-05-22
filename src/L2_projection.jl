@@ -140,7 +140,7 @@ end
 _mass_qr(ip::Interpolation{RefShape}) where {RefShape} = QuadratureRule{RefShape}(_mass_qr_order(ip))
 _mass_qr_order(::Lagrange{<:AbstractRefShape, order}) where {order} = order + 1
 _mass_qr_order(::DiscontinuousLagrange{RefShape, order}) where {RefShape, order} = _mass_qr_order(Lagrange{RefShape, order}())
-_mass_qr_order(::Serendipity{<:AbstractRefShape, order}) where {order} = _mass_qr_order(Lagrange{RefShape, order}())
+_mass_qr_order(::Serendipity{RefShape, order}) where {RefShape, order} = _mass_qr_order(Lagrange{RefShape, order}())
 _mass_qr_order(::Lagrange{RefSimplex{refdim}, order}) where {order, refdim} = max(1, refdim * order)
 _mass_qr_order(ip::VectorizedInterpolation) = _mass_qr_order(ip.ip)
 
