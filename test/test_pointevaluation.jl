@@ -193,19 +193,19 @@ end
 function test_pe_views()
     mesh = generate_grid(Quadrilateral, (3, 3))
     perturb_standard_grid!(mesh, 1 / 10)
-    dof_vals = 1.0 * [0, 0, 1, 2, 6, 5, 3, 7, 4, 8, 10, 9, 11, 12, 14, 13, 15, 16, 0, 0]
+    dof_vals = Float64[0, 0, 1, 2, 6, 5, 3, 7, 4, 8, 10, 9, 11, 12, 14, 13, 15, 16, 0, 0]
     points = [node.x for node in mesh.nodes[[6, 7, 11, 10]]] # same as nodes
     vals_to = zeros(length(points) + 4)
 
     dh = DofHandler(mesh)
-    add!(dh, :s, Lagrange{RefQuadrilateral, 1}()) # a scalar field
+    ip = Lagrange{RefQuadrilateral, 1}()
+    add!(dh, :s, ip) # a scalar field
     close!(dh)
 
     ph = PointEvalHandler(mesh, points)
 
-    ip = Ferrite.get_func_interpolations(dh, :s)
     Ferrite.evaluate_at_points!((@view vals_to[3:(end - 2)]), ph, dh, (@view dof_vals[3:(end - 2)]), :s, ip)
-    @test vals_to ≈ 1.0 * [0, 0, 6, 7, 11, 10, 0, 0]
+    @test vals_to ≈ Float64[0, 0, 6, 7, 11, 10, 0, 0]
 
     return nothing
 end
