@@ -205,7 +205,8 @@ function test_pe_views()
     ph = PointEvalHandler(mesh, points)
 
     Ferrite.evaluate_at_points!((@view vals_to[3:(end - 2)]), ph, dh, (@view dof_vals[3:(end - 2)]), :s, Ferrite.get_func_interpolations(dh, :s))
-    @test vals_to ≈ Float64[0, 0, 6, 7, 11, 10, 0, 0]
+    vals_new = Ferrite.evaluate_at_points(ph, dh, (@view dof_vals[3:(end - 2)]))
+    @test vals_to ≈ Float64[0, 0, 6, 7, 11, 10, 0, 0] ≈ [0.0, 0.0, vals_new..., 0.0, 0.0]
 
     return nothing
 end
