@@ -348,7 +348,7 @@ end
     @testset "H(curl) and H(div)" begin
         Hcurl_interpolations = [
             Nedelec{RefTriangle, 1}(), Nedelec{RefTriangle, 2}(), Nedelec{RefQuadrilateral, 1}(),
-            Nedelec{RefTetrahedron, 1}(), Nedelec{RefHexahedron, 1}(),
+            Nedelec{RefTetrahedron, 1}(), Nedelec{RefTetrahedron, 2}(), Nedelec{RefHexahedron, 1}(),
         ]
         Hdiv_interpolations = [
             RaviartThomas{RefTriangle, 1}(), RaviartThomas{RefTriangle, 2}(), RaviartThomas{RefQuadrilateral, 1}(),
@@ -360,16 +360,16 @@ end
         ## Raviart-Thomas on RefTriangle
         reference_edge_moment(::RaviartThomas{RefTriangle, 1}, edge_shape_nr, s) = 1
         reference_edge_moment(::RaviartThomas{RefTriangle, 2}, edge_shape_nr, s) = edge_shape_nr == 1 ? (1 - s) : s
-        reference_face_moment(::RaviartThomas{RefTriangle, 2}, face_shape_nr, s1, s2) = face_shape_nr == 1 ? Vec(1, 0) : Vec(0, 1)
+        reference_face_moment(::RaviartThomas{RefTriangle, 2}, face_shape_nr, shape_nr, s1, s2) = face_shape_nr == 1 ? Vec(1, 0) : Vec(0, 1)
 
         ## Raviart-Thomas on RefQuadrilateral
         reference_edge_moment(::RaviartThomas{RefQuadrilateral, 1}, edge_shape_nr, s) = 1
 
         ## Raviart-Thomas on RefTetrahedron
-        reference_face_moment(::RaviartThomas{RefTetrahedron, 1}, face_shape_nr, s1, s2) = 1
+        reference_face_moment(::RaviartThomas{RefTetrahedron, 1}, face_shape_nr, shape_nr, s1, s2) = 1
 
         ## Raviart-Thomas on RefHexahedron
-        reference_face_moment(::RaviartThomas{RefHexahedron, 1}, face_shape_nr, s1, s2) = 1
+        reference_face_moment(::RaviartThomas{RefHexahedron, 1}, face_shape_nr, shape_nr, s1, s2) = 1
 
         ## Brezzi-Douglas-Marini on RefTriangle
         reference_edge_moment(::BrezziDouglasMarini{RefTriangle, 1}, edge_shape_nr, s) = edge_shape_nr == 1 ? (1 - s) : s
@@ -377,13 +377,25 @@ end
         ## Nedelec on RefTriangle
         reference_edge_moment(::Nedelec{RefTriangle, 1}, edge_shape_nr, s) = 1
         reference_edge_moment(::Nedelec{RefTriangle, 2}, edge_shape_nr, s) = edge_shape_nr == 1 ? (1 - s) : s
-        reference_face_moment(::Nedelec{RefTriangle, 2}, face_shape_nr, s1, s2) = face_shape_nr == 1 ? Vec(1, 0) : Vec(0, 1)
+        reference_face_moment(::Nedelec{RefTriangle, 2}, face_shape_nr, shape_nr, s1, s2) = face_shape_nr == 1 ? Vec(1, 0) : Vec(0, 1)
 
         ## Nedelec on RefQuadrilateral
         reference_edge_moment(::Nedelec{RefQuadrilateral, 1}, edge_shape_nr, s) = 1
 
         ## Nedelec on RefTetrahedron
         reference_edge_moment(::Nedelec{RefTetrahedron, 1}, edge_shape_nr, s) = 1
+        reference_edge_moment(::Nedelec{RefTetrahedron, 2}, edge_shape_nr, s) = edge_shape_nr == 1 ? (1 - s) : s
+        function reference_face_moment(::Nedelec{RefTetrahedron, 2}, face_shape_nr, shape_nr, s1, s2)
+            shape_nr == 13 && return Vec(0, 1, 0)
+            shape_nr == 14 && return Vec(1, 0, 0)
+            shape_nr == 15 && return Vec(1, 0, 0)
+            shape_nr == 16 && return Vec(0, 0, 1)
+            shape_nr == 17 && return Vec(-1 / √3, 1 / √3, 0.0)
+            shape_nr == 18 && return Vec(-1 / √3, 0.0, 1 / √3)
+            shape_nr == 19 && return Vec(0, 0, 1)
+            shape_nr == 20 && return Vec(0, 1, 0)
+            throw(ArgumentError("no reference edge face moment for shape_nr $shape_nr in Nedelec{RefTetrahedron, 2}"))
+        end
 
         ## Nedelec on RefHexahedron
         reference_edge_moment(::Nedelec{RefHexahedron, 1}, edge_shape_nr, s) = 1
@@ -474,13 +486,13 @@ end
 
                 ξ(s1, s2) = parameterize_face(face_coords, s1, s2)
                 for (face_shape_nr, shape_nr) in pairs(dof_inds)
-                    f(s1, s2) = reference_face_moment(ip, face_shape_nr, s1, s2) ⋅ reference_shape_value(ip, ξ(s1, s2), shape_nr) * face_weight(ξ, s1, s2)
+                    f(s1, s2) = reference_face_moment(ip, face_shape_nr, shape_nr, s1, s2) ⋅ reference_shape_value(ip, ξ(s1, s2), shape_nr) * face_weight(ξ, s1, s2)
                     @test integrate_face(f) ≈ 1
 
                     # Test that the functional is zero for the other shape functions
                     for other_shape_nr in 1:getnbasefunctions(ip)
                         other_shape_nr == shape_nr && continue
-                        g(s1, s2) = reference_face_moment(ip, face_shape_nr, s1, s2) ⋅ reference_shape_value(ip, ξ(s1, s2), other_shape_nr) * face_weight(ξ, s1, s2)
+                        g(s1, s2) = reference_face_moment(ip, face_shape_nr, shape_nr, s1, s2) ⋅ reference_shape_value(ip, ξ(s1, s2), other_shape_nr) * face_weight(ξ, s1, s2)
                         @test integrate_face(g) + 1 ≈ 1 # integrate_edge(g) ≈ 0
                     end
                 end
@@ -500,13 +512,13 @@ end
 
                 ξ(s1, s2) = parameterize_face(face_coords, s1, s2)
                 for (face_shape_nr, shape_nr) in pairs(dof_inds)
-                    f(s1, s2) = reference_face_moment(ip, face_shape_nr, s1, s2) * (reference_shape_value(ip, ξ(s1, s2), shape_nr) ⋅ normal) * face_weight(ξ, s1, s2)
+                    f(s1, s2) = reference_face_moment(ip, face_shape_nr, shape_nr, s1, s2) * (reference_shape_value(ip, ξ(s1, s2), shape_nr) ⋅ normal) * face_weight(ξ, s1, s2)
                     @test integrate_face(f) ≈ 1
 
                     # Test that the functional is zero for the other shape functions
                     for other_shape_nr in 1:getnbasefunctions(ip)
                         other_shape_nr == shape_nr && continue
-                        g(s1, s2) = reference_face_moment(ip, face_shape_nr, s1, s2) * (reference_shape_value(ip, ξ(s1, s2), other_shape_nr) ⋅ normal) * face_weight(ξ, s1, s2)
+                        g(s1, s2) = reference_face_moment(ip, face_shape_nr, shape_nr, s1, s2) * (reference_shape_value(ip, ξ(s1, s2), other_shape_nr) ⋅ normal) * face_weight(ξ, s1, s2)
                         @test integrate_face(g) + 1 ≈ 1 # integrate_edge(g) ≈ 0
                     end
                 end
@@ -557,7 +569,7 @@ end
 
                 ξ(s1, s2) = parameterize_face(face_coords, s1, s2)
                 for (face_shape_nr, shape_nr) in pairs(dof_inds)
-                    f(s1, s2) = reference_face_moment(ip, face_shape_nr, s1, s2) ⋅ reference_shape_value(ip, ξ(s1, s2), shape_nr) * face_weight(ξ, s1, s2)
+                    f(s1, s2) = reference_face_moment(ip, face_shape_nr, shape_nr, s1, s2) ⋅ reference_shape_value(ip, ξ(s1, s2), shape_nr) * face_weight(ξ, s1, s2)
                     @test integrate_face(f) ≈ 1
                 end
             end

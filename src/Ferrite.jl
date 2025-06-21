@@ -117,6 +117,13 @@ include("PoolAllocator.jl")
 # Matrix/Vector utilities
 include("arrayutils.jl")
 
+# Grid
+include("Grid/grid.jl")
+include("Grid/topology.jl")
+include("Grid/utils.jl")
+include("Grid/grid_generators.jl")
+include("Grid/coloring.jl")
+
 # Interpolations
 include("interpolations.jl")
 
@@ -133,13 +140,6 @@ include("FEValues/InterfaceValues.jl")
 include("FEValues/PointValues.jl")
 include("FEValues/common_values.jl")
 include("FEValues/facet_integrals.jl")
-
-# Grid
-include("Grid/grid.jl")
-include("Grid/topology.jl")
-include("Grid/utils.jl")
-include("Grid/grid_generators.jl")
-include("Grid/coloring.jl")
 
 # Dofs
 include("Dofs/DofHandler.jl")
