@@ -313,7 +313,7 @@ _getneighborhood(::Val{1}, top, grid, facetindex::FacetIndex, include_self) = ge
 _getneighborhood(::Val{2}, top, grid, facetindex::FacetIndex, include_self) = getneighborhood(top, grid, EdgeIndex(facetindex...), include_self)
 _getneighborhood(::Val{3}, top, grid, facetindex::FacetIndex, include_self) = getneighborhood(top, grid, FaceIndex(facetindex...), include_self)
 function _getneighborhood(::Val{:mixed}, args...)
-    throw(ArgumentError("getneighborhood with FacetIndex is is only supported for grids containing cells with a common reference dimension.
+    throw(ArgumentError("getneighborhood with FacetIndex is only supported for grids containing cells with a common reference dimension.
     For mixed-dimensionality grid, use `VertexIndex`, `EdgeIndex`, and `FaceIndex` explicitly"))
 end
 

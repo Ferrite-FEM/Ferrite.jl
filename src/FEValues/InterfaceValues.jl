@@ -488,7 +488,7 @@ end
 Transform the points from facet A to facet B using the orientation information of the interface and store it in the vector dst.
 For 3D, the facets are transformed into regular polygons such that the rotation angle is the shift in reference node index × 2π ÷ number of edges in facet.
 If the facet is flipped then the flipping is about the axis that preserves the position of the first node (which is the reference node after being rotated to be in the first position,
-it's rotated back in the opposite direction after flipping).
+it is rotated back in the opposite direction after flipping).
 Take for example the interface
 ```
         2           3
