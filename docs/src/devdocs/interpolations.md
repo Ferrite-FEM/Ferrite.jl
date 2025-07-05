@@ -183,7 +183,7 @@ Ferrite.conformity(::QTI) = Ferrite.H1Conformity()
 
 !!! tip
     The function `test_interpolation_properties` in `test/test_interpolations.jl`
-    can be used when implementation to check that some basic properties are fullfilled.
+    can be used when implementation to check that some basic properties are fulfilled.
 
 ```@example InterpolationExample
 grid = generate_grid(Triangle, (2,2))                       # hide
