@@ -44,7 +44,7 @@ complex tutorials.*
 
 #### [Tutorial 2: Linear elasticity](linear_elasticity.md)
 
-This tutorial guides you through the process of solving the linear elasticity problem on a cantilever beam. The tutorial builds on the concepts from Tutorial 1 and introduces vector-valued solutions and Neumann boundary conditions.
+This tutorial guides you through the process of solving the linear elasticity problem. The tutorial builds on the concepts from Tutorial 1 and introduces vector-valued solutions and Neumann boundary conditions.
 
 **Keywords**: vector-valued solution, Dirichlet and Neumann boundary conditions.
 
