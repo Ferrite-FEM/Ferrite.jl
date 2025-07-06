@@ -103,7 +103,7 @@ determining the coefficients to be prescribed, ``a_j^f``.
 # H(curl) interpolations
 For H(curl), we want to prescribe the tangential flux, ``\boldsymbol{q}_\mathrm{t} = \boldsymbol{f}(\boldsymbol{x}, t, \boldsymbol{n})``.
 To that end, we want to find the degree of freedom values, ``a_j^f``, associated
-with the the facet that minimizes
+with the facet that minimizes
 ```math
 U(\boldsymbol{q}(\boldsymbol{x})) = \int_{\Gamma^f}
 \left\vert\left\vert
