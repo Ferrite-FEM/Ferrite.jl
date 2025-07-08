@@ -32,7 +32,7 @@ end
 function VTKGridFile(filename::String, dh::DofHandler; kwargs...)
     for sdh in dh.subdofhandlers
         for ip in sdh.field_interpolations
-            if is_discontinuous(ip)
+            if !isa(conformity(ip), H1Conformity)
                 return VTKGridFile(filename, get_grid(dh); write_discontinuous = true, kwargs...)
             end
         end
@@ -156,6 +156,8 @@ function toparaview!(v, x::SecondOrderTensor)
     return v
 end
 
+toparaview!(data::AbstractVector, val::Number) = (data[1] = val)
+
 function _vtk_write_node_data(
         vtk::WriteVTK.DatasetFile,
         nodedata::Vector{S},
@@ -222,16 +224,13 @@ Project `vals` to the grid nodes with `proj` and save to `vtk`.
 """
 function write_projection(vtk::VTKGridFile, proj::L2Projector, vals, name)
     if write_discontinuous(vtk)
-        # @assert first(vals) isa Number
         data = evaluate_at_discontinuous_vtkgrid_nodes(proj.dh, vals, only(getfieldnames(proj.dh)), vtk.cellnodes)
-        comp_names = ["x", "y", "z"][1:size(data, 1)]
     else
         data = _evaluate_at_grid_nodes(proj, vals, #=vtk=# Val(true))::Matrix
         @assert size(data, 2) == getnnodes(get_grid(proj.dh))
-        comp_names = component_names(eltype(vals))
     end
 
-    _vtk_write_node_data(vtk.vtk, data, name; component_names = comp_names)
+    _vtk_write_node_data(vtk.vtk, data, name; component_names = component_names(eltype(vals)))
     return vtk
 end
 
@@ -393,6 +392,9 @@ function evaluate_at_discontinuous_vtkgrid_nodes(dh::DofHandler{sdim}, u::Vector
     get_vtk_dim(::ScalarInterpolation, ::AbstractVector{<:Vec{dim}}) where {dim} = dim == 2 ? 3 : dim
     get_vtk_dim(::VectorInterpolation{vdim}, ::AbstractVector{<:Number}) where {vdim} = vdim == 2 ? 3 : vdim
 
+    get_vtk_dim(::ScalarInterpolation, ::AbstractVector{<:SymmetricTensor{order, dim, T, M}}) where {order, dim, T, M} = M
+    get_vtk_dim(::ScalarInterpolation, ::AbstractVector{<:Tensor{order, dim, T, M}}) where {order, dim, T, M} = M
+
     vtk_dim = get_vtk_dim(ip, u)
     n_vtk_nodes = maximum(maximum, cellnodes)
     data = fill(NaN * zero(eltype(T)), vtk_dim, n_vtk_nodes)
@@ -429,8 +431,9 @@ function _evaluate_at_discontinuous_vtkgrid_nodes!(
         end
         for (qp, nodeid) in pairs(cellnodes[cellid(cell)])
             val = function_value(cv, qp, ue)
-            data[1:length(val), nodeid] .= val
-            data[(length(val) + 1):end, nodeid] .= 0 # purge the NaN
+            dataview = @view data[:, nodeid]
+            fill!(dataview, 0) # purge the NaN
+            toparaview!(dataview, val)
         end
     end
     return data

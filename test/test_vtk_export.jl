@@ -181,4 +181,29 @@
         rm(dofhandlerfilename * ".vtu")
         rm(dofhandler_views_filename * ".vtu")
     end
+    @testset "discontinous_projection" begin
+        mktempdir() do tmp
+            grid = generate_grid(Quadrilateral, (2, 2), Vec{2}((0.0, 0.0)), Vec{2}((1.0, 1.0)))
+            qr = QuadratureRule{RefQuadrilateral}(2)
+            ip = Lagrange{RefQuadrilateral, 1}()^2
+            dh = DofHandler(grid)
+            add!(dh, :u, ip)
+            close!(dh)
+            nQP = getnquadpoints(qr)
+            proj = L2Projector(ip, grid)
+            for T in (SymmetricTensor{2, 2}, Tensor{2, 2})
+                qp_quantities = [[zero(T) for _ in 1:nQP] for _ in 1:getncells(grid)]
+                for cell in CellIterator(dh)
+                    cell_quantities = qp_quantities[cellid(cell)]
+                    for qp in 1:nQP
+                        cell_quantities[qp] = rand(T)
+                    end
+                end
+                field = project(proj, qp_quantities, qr)
+                VTKGridFile(joinpath(tmp, "output"), dh, write_discontinuous = true) do vtk
+                    write_projection(vtk, proj, field, "cellid")
+                end
+            end
+        end
+    end
 end

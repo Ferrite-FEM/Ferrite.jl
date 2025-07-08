@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Next] - xxxx-xx-xx
+
+### Added
+- Support for directly assembling to `SparseMatrixCSR` (from `SparseMatricesCSR.jl`). ([#864])
+
+### Documentation updates
+- Extended assembly docs with information on how to support direct assembly into new matrix types. ([#864])
+
 ## [v1.1.0] - 2025-05-01
 
 ### Added
