@@ -1,13 +1,12 @@
 abstract type AbstractProjector end
 
-mutable struct L2Projector{type} <: AbstractProjector
+mutable struct L2Projector <: AbstractProjector
     M_cholesky #::SuiteSparse.CHOLMOD.Factor{Float64}
     dh::DofHandler
     qrs_lhs::Vector{<:QuadratureRule}
     qrs_rhs::Vector{<:QuadratureRule}
 end
 isclosed(proj::L2Projector) = isclosed(proj.dh)
-L2Projector(args...; kwargs...) = L2Projector{:scalar}(args...; kwargs...) # Default behavior to use only scalar interpolations
 
 function Base.show(io::IO, ::MIME"text/plain", proj::L2Projector)
     dh = proj.dh
@@ -65,9 +64,9 @@ projected = project(proj, vals)
 where `projected` can be used in e.g. `evaluate_at_points` with the [`PointEvalHandler`](@ref),
 or with [`evaluate_at_grid_nodes`](@ref).
 """
-function L2Projector{type}(grid::AbstractGrid) where {type}
+function L2Projector(grid::AbstractGrid) where {type}
     dh = DofHandler(grid)
-    return L2Projector{type}(nothing, dh, QuadratureRule[], QuadratureRule[])
+    return L2Projector(nothing, dh, QuadratureRule[], QuadratureRule[])
 end
 
 """
@@ -78,15 +77,15 @@ it, and then `close!` it so that it can be used to `project`. The optional
 keyword argument `set` defaults to all cells in the `grid`, while `qr_lhs` defaults
 to a quadrature rule that integrates the mass matrix exactly for the interpolation `ip`.
 """
-function L2Projector{type}(
+function L2Projector(
         ip::Interpolation,
         grid::AbstractGrid;
         qr_lhs::QuadratureRule = _mass_qr(ip),
         set = OrderedSet(1:getncells(grid)),
         geom_ip = nothing,
-    ) where {type}
+    )
     geom_ip === nothing || @warn("Providing geom_ip is deprecated, the geometric interpolation of the cells with always be used")
-    proj = L2Projector{type}(grid)
+    proj = L2Projector(grid)
     add!(proj, set, ip; qr_lhs, qr_rhs = nothing)
     close!(proj)
     return proj
@@ -106,7 +105,7 @@ Add an interpolation `ip` on the cells in `set` to the `L2Projector` `proj`.
 
 """
 function add!(
-        proj::L2Projector{type}, set::AbstractVecOrSet{Int}, ip::Interpolation;
+        proj::L2Projector, set::AbstractVecOrSet{Int}, ip::Interpolation;
         qr_rhs::Union{QuadratureRule, Nothing}, qr_lhs::QuadratureRule = _mass_qr(ip)
     ) where {type}
     # Validate user input
@@ -288,7 +287,8 @@ function _project(proj::L2Projector, vars::Union{AbstractVector{TC}, AbstractDic
     return _project(proj, qrs_rhs, vars, M, T)
 end
 
-function _project(proj::L2Projector{:scalar}, qrs_rhs::Vector{<:QuadratureRule}, vars::Union{AbstractVector, AbstractDict}, M::Integer, ::Type{T}) where {T}
+# Scalar
+function _project(proj::L2Projector, qrs_rhs::Vector{<:QuadratureRule}, vars::Union{AbstractVector, AbstractDict}, M::Integer, ::Type{T}) where {T}
     f = zeros(ndofs(proj.dh), M)
     for (sdh, qr_rhs) in zip(proj.dh.subdofhandlers, qrs_rhs)
         ip_fun = only(sdh.field_interpolations)
@@ -342,43 +342,7 @@ function assemble_scalar_proj_rhs!(f::Matrix, cellvalues::CellValues, sdh::SubDo
     return
 end
 
-function _project(proj::L2Projector{:tensor}, qrs_rhs::Vector{<:QuadratureRule}, vars::Union{AbstractVector, AbstractDict}, M::Integer, ::Type{T}) where {T}
-    f = zeros(ndofs(proj.dh))
-    for (sdh, qr_rhs) in zip(proj.dh.subdofhandlers, qrs_rhs)
-        ip_fun = only(sdh.field_interpolations)
-        ip_geo = geometric_interpolation(getcelltype(sdh))
-        cv = CellValues(qr_rhs, ip_fun, ip_geo; update_gradients = false)
-        assemble_tensor_proj_rhs!(f, cv, sdh, vars)
-    end
-
-    return proj.M_cholesky \ f
-end
-
-function assemble_tensor_proj_rhs!(f::Vector, cellvalues::CellValues, sdh::SubDofHandler, vars::Union{AbstractVector, AbstractDict})
-    # Assemble the multi-column rhs, f = ∭( v ⋅ x̂ )dΩ
-    n = getnbasefunctions(cellvalues)
-    fe = zeros(n)
-    nqp = getnquadpoints(cellvalues)
-
-    ## Assemble contributions from each cell
-    for cell in CellIterator(sdh)
-        fill!(fe, 0)
-        cell_vars = vars[cellid(cell)]
-        length(cell_vars) == nqp || error("The number of variables per cell doesn't match the number of quadrature points")
-        reinit!(cellvalues, cell)
-
-        for q_point in 1:nqp
-            dΩ = getdetJdV(cellvalues, q_point)
-            qp_vars = cell_vars[q_point]
-            for i in 1:n
-                v = shape_value(cellvalues, q_point, i)
-                fe[i] += (v ⋅ qp_vars) * dΩ
-            end
-        end
-        assemble!(f, celldofs(cell), fe)
-    end
-    return
-end
+include("L2_tensor_projection.jl")
 
 evaluate_at_grid_nodes(proj::L2Projector, vals::AbstractVector) =
     _evaluate_at_grid_nodes(proj, vals, Val(false))
