@@ -110,8 +110,20 @@ function check_isoparametric_boundaries(::Type{RefSimplex{dim}}, x_local::Vec{di
     return all(x -> x > -tol, x_local) && sum(x_local) - 1 < tol
 end
 
+function check_isoparametric_boundaries(::Type{RefPrism}, x_local::Vec{dim, T}, tol) where {dim, T}
+    # Positive and below the plane 1 - ξx - ξy
+    return all(x -> x > -tol, x_local) && x_local[1] + x_local[2] - 1 < tol
+end
+
+function check_isoparametric_boundaries(::Type{RefPyramid}, x_local::Vec{dim, T}, tol) where {dim, T}
+    # Positive and below the planes 1 - ξy - ξz and 1 - ξx - ξz
+    return all(x -> x > -tol, x_local) && x_local[1] + x_local[3] - 1 < tol && x_local[2] + x_local[3] - 1 < tol
+end
+
 cellcenter(::Type{<:RefHypercube{dim}}, _::Type{T}) where {dim, T} = zero(Vec{dim, T})
 cellcenter(::Type{<:RefSimplex{dim}}, _::Type{T}) where {dim, T} = Vec{dim, T}((ntuple(d -> 1 / 3, dim)))
+cellcenter(::Type{RefPrism}, _::Type{T}) where {T} = Vec{3, T}((1 / 3, 1 / 3, 0.5))
+cellcenter(::Type{RefPyramid}, _::Type{T}) where {T} = Vec{3, T}((0.4, 0.4, 0.2))
 
 _solve_helper(A::Tensor{2, dim}, b::Vec{dim}) where {dim} = inv(A) ⋅ b
 _solve_helper(A::SMatrix{idim, odim}, b::Vec{idim, T}) where {odim, idim, T} = Vec{odim, T}(pinv(A) * b)

@@ -377,3 +377,9 @@ function grid_with_inserted_quad(grid::Grid{2, Triangle}, nrs::NTuple{2, Int}; u
     end
     # TODO: Update sets (not needed for current usage)
 end
+
+function single_element_grid(::Type{CellType}) where {RefShape, CellType <: Ferrite.AbstractCell{RefShape}}
+    nodes = Node.(Ferrite.reference_coordinates(Lagrange{RefShape, 1}()))
+    cells = [CellType(ntuple(i -> i, length(nodes)))]
+    return Grid(cells, nodes)
+end
