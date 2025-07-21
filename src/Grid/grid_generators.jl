@@ -8,50 +8,48 @@ e.g. `Triangle` or `Hexahedron`. `nel` is a tuple of the number of elements in e
 generate_grid
 
 # Line
-function generate_grid(::Type{Line}, nel::NTuple{1, Int}, left::Vec{1, T} = Vec{1}((-1.0,)), right::Vec{1, T} = Vec{1}((1.0,))) where {T}
+function generate_grid(::Type{Line}, nel::NTuple{1, Int}, left::Vec{dim, T} = -ones(Vec{dim, T}), right::Vec{dim, T} = ones(Vec{dim, T})) where {T, dim}
     nel_x = nel[1]
     n_nodes = nel_x + 1
 
     # Generate nodes
-    coords_x = collect(range(left[1], stop = right[1], length = n_nodes))
-    nodes = Node{1, T}[]
+    coords = [collect(range(left[i]; stop = right[i], length = n_nodes)) for i in 1:dim]
+    nodes = Node{dim, T}[]
     for i in 1:n_nodes
-        push!(nodes, Node((coords_x[i],)))
+        push!(nodes, Node(Tuple(coords[j][i] for j in 1:dim)))
     end
 
     # Generate cells
-
     cells = Line[]
     for i in 1:nel_x
         push!(cells, Line((i, i + 1)))
     end
 
-
-    # Cell facets
+    # Cell faces
     boundary = [
         FacetIndex(1, 1),
         FacetIndex(nel_x, 2),
     ]
 
-    # Cell facet sets
+    # Cell face sets
     facetsets = Dict(
         "left" => OrderedSet{FacetIndex}([boundary[1]]),
         "right" => OrderedSet{FacetIndex}([boundary[2]])
     )
-    foreach(s -> sort!(s, by = x -> x.idx), values(facetsets))
-    return Grid(cells, nodes, facetsets = facetsets)
+    foreach(s -> sort!(s; by = x -> x.idx), values(facetsets))
+    return Grid(cells, nodes; facetsets = facetsets)
 end
 
 # QuadraticLine
-function generate_grid(::Type{QuadraticLine}, nel::NTuple{1, Int}, left::Vec{1, T} = Vec{1}((-1.0,)), right::Vec{1, T} = Vec{1}((1.0,))) where {T}
+function generate_grid(::Type{QuadraticLine}, nel::NTuple{1, Int}, left::Vec{dim, T} = -ones(Vec{dim, T}), right::Vec{dim, T} = ones(Vec{dim, T})) where {T, dim}
     nel_x = nel[1]
     n_nodes = 2 * nel_x + 1
 
     # Generate nodes
-    coords_x = collect(range(left[1], stop = right[1], length = n_nodes))
-    nodes = Node{1, T}[]
+    coords = [collect(range(left[i]; stop = right[i], length = n_nodes)) for i in 1:dim]
+    nodes = Node{dim, T}[]
     for i in 1:n_nodes
-        push!(nodes, Node((coords_x[i],)))
+        push!(nodes, Node(Tuple(coords[j][i] for j in 1:dim)))
     end
 
     # Generate cells

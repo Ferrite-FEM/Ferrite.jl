@@ -19,8 +19,25 @@ function test_generate_grid(T::Type)
     return
 end
 
+function test_line_grid(T::Type)
+    dims = [1, 2, 3]
+    cell_types = [Line, QuadraticLine]
+
+    for CT in cell_types
+        for dim in dims
+            left = - ones(Vec{dim, T})
+            right = ones(Vec{dim, T})
+            grid = generate_grid(CT, (1,), left, right)
+            @test isa(grid, Grid{dim, CT, T})
+        end
+    end
+    return
+end
+
 # Run tests for different floating-point types
 @testset "Generate Grid Tests" begin
     test_generate_grid(Float64)
     test_generate_grid(Float32)
+    test_line_grid(Float64)
+    test_line_grid(Float32)
 end
