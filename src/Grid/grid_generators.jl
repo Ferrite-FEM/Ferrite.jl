@@ -8,7 +8,7 @@ e.g. `Triangle` or `Hexahedron`. `nel` is a tuple of the number of elements in e
 generate_grid
 
 # Line
-function generate_grid(::Type{Line}, nel::NTuple{1, Int}, left::Vec{dim, T} = -ones(Vec{dim, T}), right::Vec{dim, T} = ones(Vec{dim, T})) where {T, dim}
+function generate_grid(::Type{Line}, nel::NTuple{1, Int}, left::Vec{dim, T} = Vec{1}((-1.0,)), right::Vec{dim, T} = Vec{1}((1.0,))) where {T, dim}
     nel_x = nel[1]
     n_nodes = nel_x + 1
 
@@ -41,7 +41,7 @@ function generate_grid(::Type{Line}, nel::NTuple{1, Int}, left::Vec{dim, T} = -o
 end
 
 # QuadraticLine
-function generate_grid(::Type{QuadraticLine}, nel::NTuple{1, Int}, left::Vec{dim, T} = -ones(Vec{dim, T}), right::Vec{dim, T} = ones(Vec{dim, T})) where {T, dim}
+function generate_grid(::Type{QuadraticLine}, nel::NTuple{1, Int}, left::Vec{dim, T} = Vec{1}((-1.0,)), right::Vec{dim, T} = Vec{1}((1.0,))) where {T, dim}
     nel_x = nel[1]
     n_nodes = 2 * nel_x + 1
 

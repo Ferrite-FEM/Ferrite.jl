@@ -31,6 +31,11 @@ function test_line_grid(T::Type)
             @test isa(grid, Grid{dim, CT, T})
         end
     end
+
+    # fallback case
+    @test isa(generate_grid(Line, (1,)), Grid{1, Line, Float64})
+    @test isa(generate_grid(QuadraticLine, (1,)), Grid{1, QuadraticLine, Float64})
+
     return
 end
 
