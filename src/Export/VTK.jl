@@ -155,6 +155,10 @@ function toparaview!(v, x::SecondOrderTensor)
     tovoigt!(v, x)
     return v
 end
+function toparaview!(v, x::SVector{D}) where {D}
+    v[1:D] .= x
+    return v
+end
 
 toparaview!(data::AbstractVector, val::Number) = (data[1] = val)
 
