@@ -1,10 +1,13 @@
 abstract type AbstractProjector end
 
-mutable struct L2Projector <: AbstractProjector
-    M_cholesky #::SuiteSparse.CHOLMOD.Factor{Float64}
-    dh::DofHandler
-    qrs_lhs::Vector{<:QuadratureRule}
-    qrs_rhs::Vector{<:QuadratureRule}
+mutable struct L2Projector{type, F} <: AbstractProjector
+    M_cholesky::F #::SuiteSparse.CHOLMOD.Factor{Float64}
+    const dh::DofHandler
+    const qrs_lhs::Vector{<:QuadratureRule}
+    const qrs_rhs::Vector{<:QuadratureRule}
+    function L2Projector{type}(M_cholesky::F, dh, qrs_lhs, qrs_rhs) where {type, F}
+        return L2Projector{type, F}(M_cholesky, dh, qrs_lhs, qrs_rhs)
+    end
 end
 isclosed(proj::L2Projector) = isclosed(proj.dh)
 
@@ -63,11 +66,20 @@ projected = project(proj, vals)
 ```
 where `projected` can be used in e.g. `evaluate_at_points` with the [`PointEvalHandler`](@ref),
 or with [`evaluate_at_grid_nodes`](@ref).
+
+    L2Projector{:tensor}(grid::AbstractGrid)
+
+For tensor-valued interpolations, it is only possible to project data of the same type,
+and it is required to specify this upon constructing the L2Projector as shown above.
 """
-function L2Projector(grid::AbstractGrid) where {type}
+function L2Projector{type}(grid::AbstractGrid) where {type}
+    # To get the right type, will be overwritten in close!
+    M_cholesky = cholesky(Symmetric(sparse([1], [1], 1.0)))
     dh = DofHandler(grid)
-    return L2Projector(nothing, dh, QuadratureRule[], QuadratureRule[])
+    return L2Projector{type}(M_cholesky, dh, QuadratureRule[], QuadratureRule[])
 end
+
+L2Projector(grid::AbstractGrid) = L2Projector{:scalar}(grid)
 
 """
     L2Projector(ip::Interpolation, grid::AbstractGrid; [qr_lhs], [set])
@@ -107,7 +119,7 @@ Add an interpolation `ip` on the cells in `set` to the `L2Projector` `proj`.
 function add!(
         proj::L2Projector, set::AbstractVecOrSet{Int}, ip::Interpolation;
         qr_rhs::Union{QuadratureRule, Nothing}, qr_lhs::QuadratureRule = _mass_qr(ip)
-    ) where {type}
+    )
     # Validate user input
     isclosed(proj) && error("The L2Projector is already closed")
     if qr_rhs !== nothing
@@ -116,16 +128,8 @@ function add!(
     end
     getrefshape(ip) == getrefshape(qr_lhs) || error("The reference shape of the interpolation and the qr_lhs must be the same")
 
-    if type === :scalar && !isa(ip, ScalarInterpolation)
-        if ip isa VectorizedInterpolation
-            ip = ip.ip
-        else
-            throw(ArgumentError("Cannot add a non-scalar interpolation to a scalar L2Projector"))
-        end
-    end
-
     sdh = SubDofHandler(proj.dh, set)
-    add!(sdh, :_, ip)
+    add!(sdh, :_, get_base_interpolation(ip))
     push!(proj.qrs_lhs, qr_lhs)
 
     return proj
@@ -264,11 +268,8 @@ function project(p::L2Projector, vars::AbstractMatrix, args...)
     return project(p, collect(eachcol(vars)), args...)
 end
 
-function _project(proj::L2Projector, vars::Union{AbstractVector{TC}, AbstractDict{Int, TC}}, qrs_rhs::Vector{<:QuadratureRule}) where {
-        T <: Union{Number, AbstractTensor}, TC <: AbstractVector{T},
-    }
+function check_project_inputs(proj, vars, qrs_rhs)
 
-    # Sanity checks for user input
     isclosed(proj) || error("The L2Projector is not closed")
     length(qrs_rhs) == 0 && error("The right-hand-side quadrature rule must be provided, unless already given to the L2Projector")
     length(qrs_rhs) == length(proj.dh.subdofhandlers) || error("Number of qrs_rhs must match the number of `add!`ed sets")
@@ -278,23 +279,22 @@ function _project(proj::L2Projector, vars::Union{AbstractVector{TC}, AbstractDic
         end
     end
     # Catch if old input-style giving vars indexed by the set index, instead of the cell id
-    if isa(vars, AbstractVector) && length(vars) != getncells(get_grid(proj.dh))
+    return if isa(vars, AbstractVector) && length(vars) != getncells(get_grid(proj.dh))
         error("vars is indexed by the cellid, not the index in the set: length(vars) != number of cells")
     end
-
-    M = T <: AbstractTensor ? Tensors.n_components(Tensors.get_base(T)) : 1
-
-    return _project(proj, qrs_rhs, vars, M, T)
 end
 
-# Scalar
-function _project(proj::L2Projector, qrs_rhs::Vector{<:QuadratureRule}, vars::Union{AbstractVector, AbstractDict}, M::Integer, ::Type{T}) where {T}
+function _project(proj::L2Projector{:scalar}, vars::Union{AbstractVector{<:AbstractVector}, AbstractDict{Int, <:AbstractVector}}, qrs_rhs::Vector{<:QuadratureRule})
+    check_project_inputs(proj, vars, qrs_rhs)
+    T = eltype(values(vars))
+    M = T <: AbstractTensor ? Tensors.n_components(Tensors.get_base(T)) : 1
     f = zeros(ndofs(proj.dh), M)
     for (sdh, qr_rhs) in zip(proj.dh.subdofhandlers, qrs_rhs)
         ip_fun = only(sdh.field_interpolations)
         ip_geo = geometric_interpolation(getcelltype(sdh))
         cv = CellValues(qr_rhs, ip_fun, ip_geo; update_gradients = false)
-        assemble_scalar_proj_rhs!(f, cv, sdh, vars)
+        fe = zeros(getnbasefunctions(cv), M)
+        assemble_proj_rhs!(f, cv, sdh, vars, fe)
     end
 
     # solve for the projected nodal values
@@ -305,12 +305,42 @@ function _project(proj::L2Projector, qrs_rhs::Vector{<:QuadratureRule}, vars::Un
     return T[make_T(x) for x in Base.eachrow(projected_vals)]
 end
 
-function assemble_scalar_proj_rhs!(f::Matrix, cellvalues::CellValues, sdh::SubDofHandler, vars::Union{AbstractVector, AbstractDict})
+function _project(proj::L2Projector{:tensor}, vars::Union{AbstractVector{<:AbstractVector}, AbstractDict{Int, <:AbstractVector}}, qrs_rhs::Vector{<:QuadratureRule})
+    check_project_inputs(proj, vars, qrs_rhs)
+    f = zeros(ndofs(proj.dh))
+    for (sdh, qr_rhs) in zip(proj.dh.subdofhandlers, qrs_rhs)
+        ip_fun = only(sdh.field_interpolations)
+        ip_geo = geometric_interpolation(getcelltype(sdh))
+        cv = CellValues(qr_rhs, ip_fun, ip_geo; update_gradients = false)
+        fe = zeros(getnbasefunctions(cv), M)
+        assemble_proj_rhs!(f, cv, sdh, vars, fe)
+    end
+    return proj.M_cholesky \ f
+end
+
+function assemble_proj_fe!(fe::Matrix, i::Int, v::Number, qp_vars, dΩ::Number)
+    for j in 1:size(fe, 2)
+        fe[i, j] += v * get_data(qp_vars, j) * dΩ
+    end
+    return
+end
+
+function assemble_proj_fe!(fe::Vector, i::Int, v, qp_vars, dΩ::Number)
+    return fe[i] += (v ⋅ qp_vars) * dΩ
+end
+
+function assemble_proj_f!(f::Matrix, dofs::AbstractVector{Int}, fe::Matrix)
+    for (num, dof) in enumerate(dofs)
+        f[dof, :] += fe[num, :]
+    end
+    return
+end
+assemble_proj_f!(f::Vector, dofs::AbstractVector{Int}, fe::Vector) = assemble!(f, dofs, fe)
+
+function assemble_proj_rhs!(f::AbstractArray, cellvalues::CellValues, sdh::SubDofHandler, vars::Union{AbstractVector, AbstractDict}, fe::AbstractArray)
     # Assemble the multi-column rhs, f = ∭( v ⋅ x̂ )dΩ
     # The number of columns corresponds to the length of the data-tuple in the tensor x̂.
-    M = size(f, 2)
     n = getnbasefunctions(cellvalues)
-    fe = zeros(n, M)
     nqp = getnquadpoints(cellvalues)
 
     get_data(x::AbstractTensor, i) = x.data[i]
@@ -328,21 +358,13 @@ function assemble_scalar_proj_rhs!(f::Matrix, cellvalues::CellValues, sdh::SubDo
             qp_vars = cell_vars[q_point]
             for i in 1:n
                 v = shape_value(cellvalues, q_point, i)
-                for j in 1:M
-                    fe[i, j] += v * get_data(qp_vars, j) * dΩ
-                end
+                assemble_proj_fe!(fe, i, v, qp_vars, dΩ)
             end
         end
-
-        # Assemble cell contribution
-        for (num, dof) in enumerate(celldofs(cell))
-            f[dof, :] += fe[num, :]
-        end
+        assemble_proj_f!(f, celldofs(cell), fe)
     end
     return
 end
-
-include("L2_tensor_projection.jl")
 
 evaluate_at_grid_nodes(proj::L2Projector, vals::AbstractVector) =
     _evaluate_at_grid_nodes(proj, vals, Val(false))
@@ -351,7 +373,7 @@ evaluate_at_grid_nodes(proj::L2Projector, vals::AbstractVector) =
 _evaluate_at_grid_nodes(proj::L2Projector, vals::AbstractVector{<:Number}, vtk) =
     _evaluate_at_grid_nodes(proj.dh, vals, only(getfieldnames(proj.dh)), vtk)
 
-# Deal with projected tensors
+# Deal with projected tensors with scalar L2Projector
 function _evaluate_at_grid_nodes(
         proj::L2Projector{:scalar}, vals::AbstractVector{S}, ::Val{vtk}
     ) where {order, dim, T, M, S <: Union{Tensor{order, dim, T, M}, SymmetricTensor{order, dim, T, M}}, vtk}

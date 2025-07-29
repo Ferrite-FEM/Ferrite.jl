@@ -15,7 +15,7 @@ using OrderedCollections:
     OrderedSet
 using SparseArrays:
     SparseArrays, SparseMatrixCSC, nonzeros, nzrange, rowvals,
-    AbstractSparseMatrix, AbstractSparseMatrixCSC, sparsevec
+    AbstractSparseMatrix, AbstractSparseMatrixCSC, sparsevec, sparse
 using StaticArrays:
     StaticArrays, MArray, MMatrix, SArray, SMatrix, SVector
 using WriteVTK:
