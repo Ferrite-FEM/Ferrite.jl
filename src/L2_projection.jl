@@ -5,9 +5,6 @@ mutable struct L2Projector{type, F} <: AbstractProjector
     const dh::DofHandler
     const qrs_lhs::Vector{<:QuadratureRule}
     const qrs_rhs::Vector{<:QuadratureRule}
-    function L2Projector{type}(M_cholesky::F, dh, qrs_lhs, qrs_rhs) where {type, F}
-        return L2Projector{type, F}(M_cholesky, dh, qrs_lhs, qrs_rhs)
-    end
 end
 isclosed(proj::L2Projector) = isclosed(proj.dh)
 
@@ -76,7 +73,7 @@ function L2Projector{type}(grid::AbstractGrid) where {type}
     # To get the right type, will be overwritten in close!
     M_cholesky = cholesky(Symmetric(sparse([1], [1], 1.0)))
     dh = DofHandler(grid)
-    return L2Projector{type}(M_cholesky, dh, QuadratureRule[], QuadratureRule[])
+    return L2Projector{type, typeof(M_cholesky)}(M_cholesky, dh, QuadratureRule[], QuadratureRule[])
 end
 
 L2Projector(grid::AbstractGrid) = L2Projector{:scalar}(grid)
@@ -286,7 +283,7 @@ end
 
 function _project(proj::L2Projector{:scalar}, vars::Union{AbstractVector{<:AbstractVector}, AbstractDict{Int, <:AbstractVector}}, qrs_rhs::Vector{<:QuadratureRule})
     check_project_inputs(proj, vars, qrs_rhs)
-    T = eltype(values(vars))
+    T = eltype(eltype(values(vars)))
     M = T <: AbstractTensor ? Tensors.n_components(Tensors.get_base(T)) : 1
     f = zeros(ndofs(proj.dh), M)
     for (sdh, qr_rhs) in zip(proj.dh.subdofhandlers, qrs_rhs)
@@ -312,17 +309,19 @@ function _project(proj::L2Projector{:tensor}, vars::Union{AbstractVector{<:Abstr
         ip_fun = only(sdh.field_interpolations)
         ip_geo = geometric_interpolation(getcelltype(sdh))
         cv = CellValues(qr_rhs, ip_fun, ip_geo; update_gradients = false)
-        fe = zeros(getnbasefunctions(cv), M)
+        fe = zeros(getnbasefunctions(cv))
         assemble_proj_rhs!(f, cv, sdh, vars, fe)
     end
     return proj.M_cholesky \ f
 end
 
 function assemble_proj_fe!(fe::Matrix, i::Int, v::Number, qp_vars, dΩ::Number)
+    get_data(x::AbstractTensor, i) = x.data[i]
+    get_data(x::Number, _) = x
     for j in 1:size(fe, 2)
         fe[i, j] += v * get_data(qp_vars, j) * dΩ
     end
-    return
+    return fe
 end
 
 function assemble_proj_fe!(fe::Vector, i::Int, v, qp_vars, dΩ::Number)
@@ -333,7 +332,7 @@ function assemble_proj_f!(f::Matrix, dofs::AbstractVector{Int}, fe::Matrix)
     for (num, dof) in enumerate(dofs)
         f[dof, :] += fe[num, :]
     end
-    return
+    return f
 end
 assemble_proj_f!(f::Vector, dofs::AbstractVector{Int}, fe::Vector) = assemble!(f, dofs, fe)
 
@@ -342,9 +341,6 @@ function assemble_proj_rhs!(f::AbstractArray, cellvalues::CellValues, sdh::SubDo
     # The number of columns corresponds to the length of the data-tuple in the tensor x̂.
     n = getnbasefunctions(cellvalues)
     nqp = getnquadpoints(cellvalues)
-
-    get_data(x::AbstractTensor, i) = x.data[i]
-    get_data(x::Number, _) = x
 
     ## Assemble contributions from each cell
     for cell in CellIterator(sdh)
