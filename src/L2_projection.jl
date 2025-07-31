@@ -315,30 +315,38 @@ function _project(proj::L2Projector{:tensor}, vars::Union{AbstractVector{<:Abstr
     return proj.M_cholesky \ f
 end
 
-function assemble_proj_fe!(fe::Matrix, i::Int, v::Number, qp_vars, dΩ::Number)
-    get_data(x::AbstractTensor, i) = x.data[i]
-    get_data(x::Number, _) = x
-    for j in 1:size(fe, 2)
-        fe[i, j] += v * get_data(qp_vars, j) * dΩ
+# Scalar L2Projector (scalar data)
+function assemble_proj_fe!(fe::AbstractMatrix, i::Int, v::Number, qp_vars::Number, dΩ::Number)
+    return (fe[i, begin] += v * qp_vars * dΩ)
+end
+
+# Scalar L2Projector (tensor data)
+function assemble_proj_fe!(fe::AbstractMatrix, i::Int, v::Number, qp_vars::AbstractTensor, dΩ::Number)
+    for (j, c) in enumerate(eachcol(fe))
+        c[i] += v * qp_vars.data[j] * dΩ
     end
     return fe
 end
 
-function assemble_proj_fe!(fe::Vector, i::Int, v, qp_vars, dΩ::Number)
+# Tensor L2Projector (single rhs)
+function assemble_proj_fe!(fe::AbstractVector, i::Int, v, qp_vars, dΩ::Number)
     return fe[i] += (v ⋅ qp_vars) * dΩ
 end
 
-function assemble_proj_f!(f::Matrix, dofs::AbstractVector{Int}, fe::Matrix)
+# Assemble fe into f, supporting multicolumn f
+function assemble_proj_f!(f::AbstractMatrix, dofs::AbstractVector{Int}, fe::AbstractMatrix)
     for (num, dof) in enumerate(dofs)
         f[dof, :] += fe[num, :]
     end
     return f
 end
-assemble_proj_f!(f::Vector, dofs::AbstractVector{Int}, fe::Vector) = assemble!(f, dofs, fe)
+assemble_proj_f!(f::AbstractVector, dofs::AbstractVector{Int}, fe::AbstractVector) = assemble!(f, dofs, fe)
 
 function assemble_proj_rhs!(f::AbstractArray, cellvalues::CellValues, sdh::SubDofHandler, vars::Union{AbstractVector, AbstractDict}, fe::AbstractArray)
-    # Assemble the multi-column rhs, f = ∭( v ⋅ x̂ )dΩ
-    # The number of columns corresponds to the length of the data-tuple in the tensor x̂.
+    # Assemble the, possibly multi-column, rhs, fᵢ = ∭( Nᵢ ⋅ x̂ )dΩ
+    # For scalar (or vectorized) interpolations, Nᵢ is scalar and the number of columns
+    # corresponds to the length of the data-tuple in the tensor x̂ (f::AbstractMatrix).
+    # For true tensor interpolations, Nᵢ and x̂ have the same shape, giving a single rhs (f::AbstractVector)
     n = getnbasefunctions(cellvalues)
     nqp = getnquadpoints(cellvalues)
 
@@ -369,7 +377,7 @@ evaluate_at_grid_nodes(proj::L2Projector, vals::AbstractVector) =
 _evaluate_at_grid_nodes(proj::L2Projector, vals::AbstractVector{<:Number}, vtk) =
     _evaluate_at_grid_nodes(proj.dh, vals, only(getfieldnames(proj.dh)), vtk)
 
-# Deal with projected tensors with scalar L2Projector
+# Deal with projected tensors for scalar L2Projector
 function _evaluate_at_grid_nodes(
         proj::L2Projector{:scalar}, vals::AbstractVector{S}, ::Val{vtk}
     ) where {order, dim, T, M, S <: Union{Tensor{order, dim, T, M}, SymmetricTensor{order, dim, T, M}}, vtk}
