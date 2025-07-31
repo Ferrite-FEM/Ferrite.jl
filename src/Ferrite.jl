@@ -69,7 +69,7 @@ abstract type AbstractCellValues <: AbstractValues end
 abstract type AbstractFacetValues <: AbstractValues end
 
 """
-Abstract type which is used as identifier for faces, edges and verices
+Abstract type which is used as identifier for faces, edges and vertices
 """
 abstract type BoundaryIndex end
 

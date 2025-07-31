@@ -24,7 +24,7 @@ get_node_coordinate(n::Node) = n.x
 """
     get_coordinate_type(::Node)
 
-Get the data type of the the node coordinate.
+Get the data type of the node coordinate.
 """
 get_coordinate_type(::Node{dim, T}) where {dim, T} = Vec{dim, T}
 
@@ -732,7 +732,7 @@ is called *inverted*, indicated by `flipped=true`.
 2D entities can be flipped (i.e. the defining vertex order is reverse to the
 spanning vertex order) and the vertices can be rotated against each other.
 
-The reference entity is a one with it's first node is the lowest index vertex
+The reference entity is one where its first node is the lowest index vertex
 and its vertices span counter-clock-wise.
 Take for example the faces
 ```
