@@ -1,12 +1,12 @@
 using Ferrite
-
-grid = generate_grid(Triangle, (10, 10))
+RefShape = RefQuadrilateral
+grid = generate_grid(Quadrilateral, 1 .* (10, 10))
 addcellset!(grid, "low_k", x -> x[2] < -1.0e-3 || x[1] > 1.0e-3)
 
-ipu = Lagrange{RefTriangle, 2}()
+ipu = Lagrange{RefShape, 2}()
 dh = close!(add!(DofHandler(grid), :T, ipu))
-qr = QuadratureRule{RefTriangle}(2)
-cv = CellValues(qr, ipu, Lagrange{RefTriangle, 1}())
+qr = QuadratureRule{RefShape}(2)
+cv = CellValues(qr, ipu, Lagrange{RefShape, 1}())
 
 function solve_fe(dh, cv, low_k_set)
     K = allocate_matrix(dh)
@@ -54,15 +54,15 @@ function project_and_export(name, dofhandler, sol, grid, qr_rhs, ip, type, data)
     proj = L2Projector{type}(grid)
     add!(proj, 1:getncells(grid), ip; qr_rhs)
     close!(proj)
-    return VTKGridFile(name, dofhandler; write_discontinuous = Ferrite.is_discontinuous(ip)) do vtk
+    return VTKGridFile(name, dofhandler; write_discontinuous = true) do vtk
         write_solution(vtk, dofhandler, sol)
         Ferrite.write_cellset(vtk, grid, "low_k")
         write_projection(vtk, proj, project(proj, data), "q")
     end
 end
 
-project_and_export("proj_L2", dh, a, grid, qr, DiscontinuousLagrange{RefTriangle, 1}(), :scalar, qp_data)
-project_and_export("proj_H1", dh, a, grid, qr, Lagrange{RefTriangle, 1}(), :scalar, qp_data)
-project_and_export("proj_Hdiv", dh, a, grid, qr, RaviartThomas{RefTriangle, 2}(), :tensor, qp_data)
+project_and_export("proj_L2", dh, a, grid, qr, DiscontinuousLagrange{RefShape, 1}(), :scalar, qp_data)
+project_and_export("proj_H1", dh, a, grid, qr, Lagrange{RefShape, 1}(), :scalar, qp_data)
+project_and_export("proj_Hdiv", dh, a, grid, qr, RaviartThomas{RefShape, 1}(), :tensor, qp_data)
 
 # This file was generated using Literate.jl, https://github.com/fredrikekre/Literate.jl
