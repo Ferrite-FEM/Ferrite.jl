@@ -281,9 +281,10 @@ function check_project_inputs(proj, vars, qrs_rhs)
     end
 end
 
-function _project(proj::L2Projector{:scalar}, vars::Union{AbstractVector{<:AbstractVector}, AbstractDict{Int, <:AbstractVector}}, qrs_rhs::Vector{<:QuadratureRule})
+function _project(proj::L2Projector{:scalar}, vars::Union{AbstractVector{TC}, AbstractDict{Int, TC}}, qrs_rhs::Vector{<:QuadratureRule}) where {
+        T <: Union{Number, AbstractTensor}, TC <: AbstractVector{T},
+    }
     check_project_inputs(proj, vars, qrs_rhs)
-    T = eltype(eltype(values(vars)))
     M = T <: AbstractTensor ? Tensors.n_components(Tensors.get_base(T)) : 1
     f = zeros(ndofs(proj.dh), M)
     for (sdh, qr_rhs) in zip(proj.dh.subdofhandlers, qrs_rhs)
@@ -297,8 +298,8 @@ function _project(proj::L2Projector{:scalar}, vars::Union{AbstractVector{<:Abstr
     # solve for the projected nodal values
     projected_vals = proj.M_cholesky \ f
 
-    # Recast to original input type
-    make_T(vals) = T <: AbstractTensor ? T(Tuple(vals)) : vals[1]
+    # Recast to original input type (need ntuple + n_components to ensure type-stability)
+    make_T(vals) = T <: AbstractTensor ? T(ntuple(i -> vals[i], Tensors.n_components(Tensors.get_base(T)))) : vals[1]
     return T[make_T(x) for x in Base.eachrow(projected_vals)]
 end
 
