@@ -1826,7 +1826,6 @@ struct RaviartThomas{shape, order, vdim} <: VectorInterpolation{vdim, shape, ord
     end
 end
 mapping_type(::RaviartThomas) = ContravariantPiolaMapping()
-is_discontinuous(::RaviartThomas) = true
 conformity(::RaviartThomas) = HdivConformity()
 
 # RefTriangle
@@ -1966,7 +1965,6 @@ struct BrezziDouglasMarini{shape, order, vdim} <: VectorInterpolation{vdim, shap
     end
 end
 mapping_type(::BrezziDouglasMarini) = ContravariantPiolaMapping()
-is_discontinuous(::BrezziDouglasMarini) = true
 conformity(::BrezziDouglasMarini) = HdivConformity()
 
 # RefTriangle
@@ -2007,7 +2005,6 @@ struct Nedelec{shape, order, vdim} <: VectorInterpolation{vdim, shape, order}
     end
 end
 mapping_type(::Nedelec) = CovariantPiolaMapping()
-is_discontinuous(::Nedelec) = true
 conformity(::Nedelec) = HcurlConformity()
 edgedof_indices(ip::Nedelec) = edgedof_interior_indices(ip)
 
