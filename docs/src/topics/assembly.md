@@ -201,7 +201,7 @@ K[I, J] = tmp2
 
 The key difference here is that we index using integers (`I`, `J`, `i`, and `j`) which means
 that `tmp1` and `tmp2` are scalars which don't need to be allocated on the heap. This
-stragety thus eliminates all allocations that were present in the first strategy. However,
+strategy thus eliminates all allocations that were present in the first strategy. However,
 we still lookup the same location in `K` twice, and we still have a random access pattern.
 
 #### Strategy 3: scalar indexing with single lookup

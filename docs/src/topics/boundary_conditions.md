@@ -208,8 +208,8 @@ Sometimes this is written as
 ```
 
 where ``\llbracket \bullet \rrbracket := \bullet(\boldsymbol{x}^+) -
-\bullet(\boldsymbol{x}^-)`` is the "jump operator". Thus, this condition ensure that the
-jump, or difference, in the solution between the image and mirror boundary is the zero --
+\bullet(\boldsymbol{x}^-)`` is the "jump operator". Thus, this condition ensures that the
+jump, or difference, in the solution between the image and mirror boundary is zero --
 the solution becomes periodic. For a vector valued problem the periodicity constraint can in
 general be written as
 
