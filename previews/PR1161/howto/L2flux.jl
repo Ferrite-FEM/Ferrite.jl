@@ -1,12 +1,14 @@
 using Ferrite
-RefShape = RefQuadrilateral
-grid = generate_grid(Quadrilateral, 1 .* (10, 10))
-addcellset!(grid, "low_k", x -> x[2] < -1.0e-3 || x[1] > 1.0e-3)
+grid = generate_grid(QuadraticQuadrilateral, (20, 20))
+addcellset!(grid, "low_k", x -> x[2] < 1.0e-10 || x[1] > -1.0e-10)
+nothing #hide
 
-ipu = Lagrange{RefShape, 2}()
-dh = close!(add!(DofHandler(grid), :T, ipu))
-qr = QuadratureRule{RefShape}(2)
-cv = CellValues(qr, ipu, Lagrange{RefShape, 1}())
+qr = QuadratureRule{RefQuadrilateral}(2)
+ip = Lagrange{RefQuadrilateral, 2}()
+ipg = geometric_interpolation(getcelltype(grid))
+cv = CellValues(qr, ip, ipg)
+
+dh = close!(add!(DofHandler(grid), :T, ip))
 
 function solve_fe(dh, cv, low_k_set)
     K = allocate_matrix(dh)
@@ -39,7 +41,8 @@ function solve_fe(dh, cv, low_k_set)
     return K \ f
 end
 
-a = solve_fe(dh, cv, getcellset(grid, "low_k"));
+a = solve_fe(dh, cv, getcellset(grid, "low_k"))
+nothing #hide
 
 function calculate_qp_flux(cv, a, cell, low_k_set)
     k = cellid(cell) in low_k_set ? 0.1 : 1.0
@@ -61,8 +64,9 @@ function project_and_export(name, dofhandler, sol, grid, qr_rhs, ip, type, data)
     end
 end
 
-project_and_export("proj_L2", dh, a, grid, qr, DiscontinuousLagrange{RefShape, 1}(), :scalar, qp_data)
-project_and_export("proj_H1", dh, a, grid, qr, Lagrange{RefShape, 1}(), :scalar, qp_data)
-project_and_export("proj_Hdiv", dh, a, grid, qr, RaviartThomas{RefShape, 1}(), :tensor, qp_data)
+project_and_export("proj_H1", dh, a, grid, qr, Lagrange{RefQuadrilateral, 1}(), :scalar, qp_data)
+project_and_export("proj_L2", dh, a, grid, qr, DiscontinuousLagrange{RefQuadrilateral, 1}(), :scalar, qp_data)
+project_and_export("proj_Hdiv", dh, a, grid, qr, RaviartThomas{RefQuadrilateral, 1}(), :tensor, qp_data)
+nothing #hide
 
 # This file was generated using Literate.jl, https://github.com/fredrikekre/Literate.jl
