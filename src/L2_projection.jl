@@ -66,8 +66,10 @@ or with [`evaluate_at_grid_nodes`](@ref).
 
     L2Projector{:tensor}(grid::AbstractGrid)
 
-For tensor-valued interpolations, it is only possible to project data of the same type,
-and it is required to specify this upon constructing the L2Projector as shown above.
+For tensor-valued interpolations, it is only possible to project data of the same type as the
+interpolation's shape function, and it is required to specify this upon constructing the L2Projector
+by using `L2Projector{:tensor}`.
+(The default is scalar projection, and is specified with `L2Projector{:scalar}`)
 """
 function L2Projector{type}(grid::AbstractGrid) where {type}
     # To get the right type, will be overwritten in close!
