@@ -353,7 +353,7 @@ function getstencil(top::ArrayOfVectorViews{VertexIndex, 1}, grid::Grid, vertex_
 end
 
 """
-    _create_facet_skeleton(neighborhood::AbstractMatrix{AbstractVector{BI}}) where BI <: Union{FaceIndex, EdgeIndex, VertexIndex}
+    _create_facet_skeleton(neighborhood::AbstractMatrix{AbstractVector{BI}}, grid::AbstractGrid) where BI <: Union{FaceIndex, EdgeIndex, VertexIndex}
 
 Materializes the skeleton from the `neighborhood` information by returning a `Vector{FacetIndex}` describing the
 unique facets in the grid.
@@ -361,15 +361,25 @@ unique facets in the grid.
 *Example:* With `BI=EdgeIndex`, and an edge between cells and 1 and 2, with vertices 2 and 5, could be described by either
 `EdgeIndex(1, 2)` or `EdgeIndex(2, 4)`, but only one of these will be in the vector returned by this function.
 """
-function _create_facet_skeleton(neighborhood::ArrayOfVectorViews{BI, 2}) where {BI <: Union{FaceIndex, EdgeIndex, VertexIndex}}
+function _create_facet_skeleton(neighborhood::ArrayOfVectorViews{BI, 2}, grid) where {BI <: Union{FaceIndex, EdgeIndex, VertexIndex}}
     i = 1
     skeleton = Vector{FacetIndex}(undef, length(neighborhood) - count(neighbors -> !isempty(neighbors), values(neighborhood)) ÷ 2)
     for (idx, entity) in pairs(neighborhood)
-        isempty(entity) || entity[][1] > idx[1] || continue
-        skeleton[i] = FacetIndex(idx[1], idx[2])
-        i += 1
+        cell_nr = idx[1]
+        facet_nr = idx[2]
+        if !isconcretetype(getcelltype(grid)) # Mixed grid
+            # `neighborhood`, indexed by (cell_idx, facet_nr). For mixed grids,
+            # `facet_nr` will sometimes be too large.
+            # facet_nr > nfacets(getcells(grid, cell_nr)) && continue
+            facet_nr > nfacets(getcells(grid, cell_nr)) && continue
+        end
+        on_boundary = isempty(entity)
+        if on_boundary || entity[][1] > cell_nr # Pick the cell with the lowest nr
+            skeleton[i] = FacetIndex(cell_nr, facet_nr)
+            i += 1
+        end
     end
-    return skeleton
+    return resize!(skeleton, i - 1)
 end
 
 """
@@ -382,11 +392,11 @@ function facetskeleton(top::ExclusiveTopology, grid::AbstractGrid)
     if top.facet_skeleton === nothing
         rdim = get_reference_dimension(grid)
         top.facet_skeleton = if rdim == 1
-            _create_facet_skeleton(top.vertex_vertex_neighbor)
+            _create_facet_skeleton(top.vertex_vertex_neighbor, grid)
         elseif rdim == 2
-            _create_facet_skeleton(top.edge_edge_neighbor)
+            _create_facet_skeleton(top.edge_edge_neighbor, grid)
         elseif rdim == 3
-            _create_facet_skeleton(top.face_face_neighbor)
+            _create_facet_skeleton(top.face_face_neighbor, grid)
         else
             throw(ArgumentError("facetskeleton not supported for refdim = $rdim"))
         end
