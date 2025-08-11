@@ -1,0 +1,487 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/><title>Reactive surface · Ferrite.jl</title><meta name="title" content="Reactive surface · Ferrite.jl"/><meta property="og:title" content="Reactive surface · Ferrite.jl"/><meta property="twitter:title" content="Reactive surface · Ferrite.jl"/><meta name="description" content="Documentation for Ferrite.jl."/><meta property="og:description" content="Documentation for Ferrite.jl."/><meta property="twitter:description" content="Documentation for Ferrite.jl."/><meta property="og:url" content="https://ferrite-fem.github.io/Ferrite.jl/stable/tutorials/reactive_surface/"/><meta property="twitter:url" content="https://ferrite-fem.github.io/Ferrite.jl/stable/tutorials/reactive_surface/"/><link rel="canonical" href="https://ferrite-fem.github.io/Ferrite.jl/stable/tutorials/reactive_surface/"/><script data-outdated-warner src="../../assets/warner.js"></script><link href="https://cdnjs.cloudflare.com/ajax/libs/lato-font/3.0.0/css/lato-font.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/juliamono/0.050/juliamono.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/fontawesome.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/solid.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/brands.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.8/katex.min.css" rel="stylesheet" type="text/css"/><script>documenterBaseURL="../.."</script><script src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.6/require.min.js" data-main="../../assets/documenter.js"></script><script src="../../search_index.js"></script><script src="../../siteinfo.js"></script><script src="../../../versions.js"></script><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/catppuccin-mocha.css" data-theme-name="catppuccin-mocha"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/catppuccin-macchiato.css" data-theme-name="catppuccin-macchiato"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/catppuccin-frappe.css" data-theme-name="catppuccin-frappe"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/catppuccin-latte.css" data-theme-name="catppuccin-latte"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/documenter-dark.css" data-theme-name="documenter-dark" data-theme-primary-dark/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/documenter-light.css" data-theme-name="documenter-light" data-theme-primary/><script src="../../assets/themeswap.js"></script><link href="../../assets/custom.css" rel="stylesheet" type="text/css"/><link href="../../assets/citations.css" rel="stylesheet" type="text/css"/><link href="../../assets/favicon.ico" rel="icon" type="image/x-icon"/></head><body><div id="documenter"><nav class="docs-sidebar"><a class="docs-logo" href="../../"><img src="../../assets/logo.svg" alt="Ferrite.jl logo"/></a><div class="docs-package-name"><span class="docs-autofit"><a href="../../">Ferrite.jl</a></span></div><button class="docs-search-query input is-rounded is-small is-clickable my-2 mx-auto py-1 px-2" id="documenter-search-query">Search docs (Ctrl + /)</button><ul class="docs-menu"><li><a class="tocitem" href="../../">Home</a></li><li><input class="collapse-toggle" id="menuitem-3" type="checkbox" checked/><label class="tocitem" for="menuitem-3"><span class="docs-label">Tutorials</span><i class="docs-chevron"></i></label><ul class="collapsed"><li><a class="tocitem" href="../">Tutorials overview</a></li><li><a class="tocitem" href="../heat_equation/">Heat equation</a></li><li><a class="tocitem" href="../linear_elasticity/">Linear elasticity</a></li><li><a class="tocitem" href="../incompressible_elasticity/">Incompressible elasticity</a></li><li><a class="tocitem" href="../hyperelasticity/">Hyperelasticity</a></li><li><a class="tocitem" href="../plasticity/">Von Mises plasticity</a></li><li><a class="tocitem" href="../transient_heat_equation/">Transient heat equation</a></li><li><a class="tocitem" href="../computational_homogenization/">Computational homogenization</a></li><li><a class="tocitem" href="../stokes-flow/">Stokes flow</a></li><li><a class="tocitem" href="../porous_media/">Porous media</a></li><li><a class="tocitem" href="../ns_vs_diffeq/">Incompressible Navier-Stokes equations via DifferentialEquations.jl</a></li><li class="is-active"><a class="tocitem" href>Reactive surface</a><ul class="internal"><li><a class="tocitem" href="#Introduction"><span>Introduction</span></a></li><li><a class="tocitem" href="#Solver-details"><span>Solver details</span></a></li><li><a class="tocitem" href="#Commented-program"><span>Commented program</span></a></li><li><a class="tocitem" href="#reactive_surface-plain-program"><span>Plain program</span></a></li></ul></li><li><a class="tocitem" href="../linear_shell/">Linear shell</a></li><li><a class="tocitem" href="../dg_heat_equation/">Discontinuous Galerkin heat equation</a></li></ul></li><li><input class="collapse-toggle" id="menuitem-4" type="checkbox"/><label class="tocitem" for="menuitem-4"><span class="docs-label">Topic guides</span><i class="docs-chevron"></i></label><ul class="collapsed"><li><a class="tocitem" href="../../topics/">Topic guide overview</a></li><li><a class="tocitem" href="../../topics/fe_intro/">Introduction to FEM</a></li><li><a class="tocitem" href="../../topics/reference_shapes/">Reference shapes</a></li><li><a class="tocitem" href="../../topics/FEValues/">FEValues</a></li><li><a class="tocitem" href="../../topics/degrees_of_freedom/">Degrees of freedom</a></li><li><a class="tocitem" href="../../topics/sparse_matrix/">Sparsity pattern and sparse matrices</a></li><li><a class="tocitem" href="../../topics/assembly/">Assembly</a></li><li><a class="tocitem" href="../../topics/boundary_conditions/">Boundary and initial conditions</a></li><li><a class="tocitem" href="../../topics/constraints/">Affine constraints</a></li><li><a class="tocitem" href="../../topics/grid/">Grid</a></li><li><a class="tocitem" href="../../topics/export/">Export</a></li></ul></li><li><input class="collapse-toggle" id="menuitem-5" type="checkbox"/><label class="tocitem" for="menuitem-5"><span class="docs-label">API reference</span><i class="docs-chevron"></i></label><ul class="collapsed"><li><a class="tocitem" href="../../reference/">Reference overview</a></li><li><a class="tocitem" href="../../reference/quadrature/">Quadrature</a></li><li><a class="tocitem" href="../../reference/interpolations/">Interpolation</a></li><li><a class="tocitem" href="../../reference/fevalues/">FEValues</a></li><li><a class="tocitem" href="../../reference/dofhandler/">Degrees of freedom</a></li><li><a class="tocitem" href="../../reference/sparsity_pattern/">Sparsity pattern and sparse matrices</a></li><li><a class="tocitem" href="../../reference/assembly/">Assembly</a></li><li><a class="tocitem" href="../../reference/boundary_conditions/">Boundary conditions</a></li><li><a class="tocitem" href="../../reference/grid/">Grid &amp; AbstractGrid</a></li><li><a class="tocitem" href="../../reference/export/">Postprocessing</a></li><li><a class="tocitem" href="../../reference/utils/">Development utility functions</a></li></ul></li><li><input class="collapse-toggle" id="menuitem-6" type="checkbox"/><label class="tocitem" for="menuitem-6"><span class="docs-label">How-to guides</span><i class="docs-chevron"></i></label><ul class="collapsed"><li><a class="tocitem" href="../../howto/">How-to guide overview</a></li><li><a class="tocitem" href="../../howto/postprocessing/">Post processing and visualization</a></li><li><a class="tocitem" href="../../howto/threaded_assembly/">Multi-threaded assembly</a></li></ul></li><br><li><a class="tocitem" href="../../gallery/">Code gallery</a></li><li><a class="tocitem" href="../../devdocs/">Developer documentation</a></li><li><a class="tocitem" href="../../cited-literature/">Cited literature</a></li></ul><div class="docs-version-selector field has-addons"><div class="control"><span class="docs-label button is-static is-size-7">Version</span></div><div class="docs-selector control is-expanded"><div class="select is-fullwidth is-size-7"><select id="documenter-version-selector"></select></div></div></div></nav><div class="docs-main"><header class="docs-navbar"><a class="docs-sidebar-button docs-navbar-link fa-solid fa-bars is-hidden-desktop" id="documenter-sidebar-button" href="#"></a><nav class="breadcrumb"><ul class="is-hidden-mobile"><li><a class="is-disabled">Tutorials</a></li><li class="is-active"><a href>Reactive surface</a></li></ul><ul class="is-hidden-tablet"><li class="is-active"><a href>Reactive surface</a></li></ul></nav><div class="docs-right"><a class="docs-navbar-link" href="https://github.com/Ferrite-FEM/Ferrite.jl" title="View the repository on GitHub"><span class="docs-icon fa-brands"></span><span class="docs-label is-hidden-touch">GitHub</span></a><a class="docs-navbar-link" href="https://github.com/Ferrite-FEM/Ferrite.jl/blob/master/docs/src/literate-tutorials/reactive_surface.jl" title="Edit source on GitHub"><span class="docs-icon fa-solid"></span></a><a class="docs-settings-button docs-navbar-link fa-solid fa-gear" id="documenter-settings-button" href="#" title="Settings"></a><a class="docs-article-toggle-button fa-solid fa-chevron-up" id="documenter-article-toggle-button" href="javascript:;" title="Collapse all docstrings"></a></div></header><article class="content" id="documenter-page"><h1 id="tutorial-reactive-surface"><a class="docs-heading-anchor" href="#tutorial-reactive-surface">Reactive surface</a><a id="tutorial-reactive-surface-1"></a><a class="docs-heading-anchor-permalink" href="#tutorial-reactive-surface" title="Permalink"></a></h1><p><img src="../reactive_surface.gif" alt/></p><p><em>Figure 1</em>: Reactant concentration field of the Gray-Scott model on the unit sphere.</p><div class="admonition is-success"><header class="admonition-header">Tip</header><div class="admonition-body"><p>This example is also available as a Jupyter notebook: <a href="https://nbviewer.jupyter.org/github/Ferrite-FEM/Ferrite.jl/blob/gh-pages/previews/PR1223/tutorials/reactive_surface.ipynb"><code>reactive_surface.ipynb</code></a>.</p></div></div><h2 id="Introduction"><a class="docs-heading-anchor" href="#Introduction">Introduction</a><a id="Introduction-1"></a><a class="docs-heading-anchor-permalink" href="#Introduction" title="Permalink"></a></h2><p>This tutorial gives a quick tutorial on how to assemble and solve time-dependent problems on embedded surfaces.</p><p>For this showcase we use the well known Gray-Scott model, which is a well-known reaction-diffusion system to study pattern formation. The strong form is given by</p><p class="math-container">\[ \begin{aligned}
+   \partial_t r_1 &amp;= \nabla \cdot (D_1 \nabla r_1) - r_1*r_2^2 + F *(1 - r_1) \quad \textbf{x} \in \Omega, \\
+   \partial_t r_2 &amp;= \nabla \cdot (D_2 \nabla r_2) + r_1*r_2^2 - r_2*(F + k ) \quad \textbf{x} \in \Omega,
+ \end{aligned}\]</p><p>where <span>$r_1$</span> and <span>$r_2$</span> are the reaction fields, <span>$D_1$</span> and <span>$D_2$</span> the diffusion tensors, <span>$k$</span> is the conversion rate, <span>$F$</span> is the feed rate and <span>$\Omega$</span> the domain. Depending on the choice of parameters a different pattern can be observed. Please also note that the domain does not have a boundary. The corresponding weak form can be derived as usual.</p><p>For simplicity we will solve the problem with the Lie-Troter-Godunov operator splitting technique with the classical reaction-diffusion split. In this method we split our problem in two problems, i.e. a heat problem and a pointwise reaction problem, and solve them alternatingly to advance in time.</p><h2 id="Solver-details"><a class="docs-heading-anchor" href="#Solver-details">Solver details</a><a id="Solver-details-1"></a><a class="docs-heading-anchor-permalink" href="#Solver-details" title="Permalink"></a></h2><p>The main idea for the Lie-Trotter-Godunov scheme is simple. We can write down the reaction diffusion problem in an abstract way as</p><p class="math-container">\[  \partial_t \mathbf{r} = \mathcal{D}\mathbf{r} + R(\mathbf{r}) \quad \textbf{x} \in \Omega\]</p><p>where <span>$\mathcal{D}$</span> is the diffusion operator and <span>$R$</span> is the reaction operator. Notice that the right hand side is just the sum of two operators. Now with our operator splitting scheme we can advance a solution <span>$\mathbf{r}(t_1)$</span> to <span>$\mathbf{r}(t_2)$</span> by first solving a heat problem</p><p class="math-container">\[  \partial_t \mathbf{r}^{\mathrm{\mathrm{A}}} = \mathcal{D}\mathbf{r}^{\mathrm{A}} \quad \textbf{x} \in \Omega\]</p><p>with <span>$\mathbf{r}^{\mathrm{A}}(t_1) = \mathbf{r}(t_1)$</span> on the time interval <span>$t_1$</span> to <span>$t_2$</span> and use the solution as the initial condition to solve the reaction problem</p><p class="math-container">\[  \partial_t \mathbf{r}^{\mathrm{B}} = R(\mathbf{r}^{\mathrm{B}}) \quad \textbf{x} \in \Omega\]</p><p>with <span>$\mathbf{r}^{\mathrm{B}}(t_1) = \mathbf{r}^{\mathrm{A}}(t_2)$</span>. This way we obtain a solution approximation <span>$\mathbf{r}(t_2) \approx \mathbf{r}^{\mathrm{B}}(t_2)$</span>.</p><div class="admonition is-info"><header class="admonition-header">Note</header><div class="admonition-body"><p>The operator splitting itself is an approximation, so even if we solve the subproblems analytically we end up with having only a solution approximation. We also do not have a beginner friendly reference for the theory behind operator splitting and can only refer to the original papers for each method.</p></div></div><h2 id="Commented-program"><a class="docs-heading-anchor" href="#Commented-program">Commented program</a><a id="Commented-program-1"></a><a class="docs-heading-anchor-permalink" href="#Commented-program" title="Permalink"></a></h2><p>Now we solve the problem in Ferrite. What follows is a program spliced with comments. The full program, without comments, can be found in the next <a href="#reactive_surface-plain-program">section</a>.</p><p>First we load Ferrite, and some other packages we need</p><pre><code class="language-julia hljs">using Ferrite, FerriteGmsh
+using BlockArrays, SparseArrays, LinearAlgebra, WriteVTK</code></pre><h3 id="Assembly-routines"><a class="docs-heading-anchor" href="#Assembly-routines">Assembly routines</a><a id="Assembly-routines-1"></a><a class="docs-heading-anchor-permalink" href="#Assembly-routines" title="Permalink"></a></h3><p>Before we head into the assembly, we define a helper struct to control the dispatches.</p><pre><code class="language-julia hljs">struct GrayScottMaterial{T}
+    D₁::T
+    D₂::T
+    F::T
+    k::T
+end;</code></pre><p>The following assembly routines are written analogue to these found in previous tutorials.</p><pre><code class="language-julia hljs">function assemble_element_mass!(Me::Matrix, cellvalues::CellValues)
+    n_basefuncs = getnbasefunctions(cellvalues)
+    # The mass matrices between the reactions are not coupled, so we get a blocked-strided matrix.
+    num_reactants = 2
+    r₁range = 1:num_reactants:(num_reactants * n_basefuncs)
+    r₂range = 2:num_reactants:(num_reactants * n_basefuncs)
+    Me₁ = @view Me[r₁range, r₁range]
+    Me₂ = @view Me[r₂range, r₂range]
+    # Reset to 0
+    fill!(Me, 0)
+    # Loop over quadrature points
+    for q_point in 1:getnquadpoints(cellvalues)
+        # Get the quadrature weight
+        dΩ = getdetJdV(cellvalues, q_point)
+        # Loop over test shape functions
+        for i in 1:n_basefuncs
+            δuᵢ = shape_value(cellvalues, q_point, i)
+            # Loop over trial shape functions
+            for j in 1:n_basefuncs
+                δuⱼ = shape_value(cellvalues, q_point, j)
+                # Add contribution to Ke
+                Me₁[i, j] += (δuᵢ * δuⱼ) * dΩ
+                Me₂[i, j] += (δuᵢ * δuⱼ) * dΩ
+            end
+        end
+    end
+    return nothing
+end
+
+function assemble_element_diffusion!(De::Matrix, cellvalues::CellValues, material::GrayScottMaterial)
+    n_basefuncs = getnbasefunctions(cellvalues)
+    D₁ = material.D₁
+    D₂ = material.D₂
+    # The diffusion between the reactions is not coupled, so we get a blocked-strided matrix.
+    num_reactants = 2
+    r₁range = 1:num_reactants:(num_reactants * n_basefuncs)
+    r₂range = 2:num_reactants:(num_reactants * n_basefuncs)
+    De₁ = @view De[r₁range, r₁range]
+    De₂ = @view De[r₂range, r₂range]
+    # Reset to 0
+    fill!(De, 0)
+    # Loop over quadrature points
+    for q_point in 1:getnquadpoints(cellvalues)
+        # Get the quadrature weight
+        dΩ = getdetJdV(cellvalues, q_point)
+        # Loop over test shape functions
+        for i in 1:n_basefuncs
+            ∇δuᵢ = shape_gradient(cellvalues, q_point, i)
+            # Loop over trial shape functions
+            for j in 1:n_basefuncs
+                ∇δuⱼ = shape_gradient(cellvalues, q_point, j)
+                # Add contribution to Ke
+                De₁[i, j] += D₁ * (∇δuᵢ ⋅ ∇δuⱼ) * dΩ
+                De₂[i, j] += D₂ * (∇δuᵢ ⋅ ∇δuⱼ) * dΩ
+            end
+        end
+    end
+    return nothing
+end
+
+function assemble_matrices!(M::SparseMatrixCSC, D::SparseMatrixCSC, cellvalues::CellValues, dh::DofHandler, material::GrayScottMaterial)
+    n_basefuncs = getnbasefunctions(cellvalues)
+
+    # Allocate the element stiffness matrix and element force vector
+    Me = zeros(2 * n_basefuncs, 2 * n_basefuncs)
+    De = zeros(2 * n_basefuncs, 2 * n_basefuncs)
+
+    # Create an assembler
+    M_assembler = start_assemble(M)
+    D_assembler = start_assemble(D)
+    # Loop over all cels
+    for cell in CellIterator(dh)
+        # Reinitialize cellvalues for this cell
+        reinit!(cellvalues, cell)
+        # Compute element contribution
+        assemble_element_mass!(Me, cellvalues)
+        assemble!(M_assembler, celldofs(cell), Me)
+
+        assemble_element_diffusion!(De, cellvalues, material)
+        assemble!(D_assembler, celldofs(cell), De)
+    end
+    return nothing
+end;</code></pre><h3 id="Initial-condition-setup"><a class="docs-heading-anchor" href="#Initial-condition-setup">Initial condition setup</a><a id="Initial-condition-setup-1"></a><a class="docs-heading-anchor-permalink" href="#Initial-condition-setup" title="Permalink"></a></h3><p>Time-dependent problems always need an initial condition from which the time evolution starts. In this tutorial we set the concentration of reactant 1 to <span>$1$</span> and the concentration of reactant 2 to <span>$0$</span> for all nodal dof with associated coordinate <span>$z \leq 0.9$</span> on the sphere. Since the simulation would be pretty boring with a steady-state initial condition, we introduce some heterogeneity by setting the dofs associated to top part of the sphere (i.e. dofs with <span>$z &gt; 0.9$</span> to store the reactant concentrations of <span>$0.5$</span> and <span>$0.25$</span> for the reactants 1 and 2 respectively.</p><pre><code class="language-julia hljs">function setup_initial_conditions!(u₀::Vector, cellvalues::CellValues, dh::DofHandler)
+    u₀ .= ones(ndofs(dh))
+    u₀[2:2:end] .= 0.0
+
+    n_basefuncs = getnbasefunctions(cellvalues)
+
+    for cell in CellIterator(dh)
+        reinit!(cellvalues, cell)
+
+        coords = getcoordinates(cell)
+        dofs = celldofs(cell)
+        uₑ = @view u₀[dofs]
+        rv₀ₑ = reshape(uₑ, (2, n_basefuncs))
+
+        for i in 1:n_basefuncs
+            if coords[i][3] &gt; 0.9
+                rv₀ₑ[1, i] = 0.5
+                rv₀ₑ[2, i] = 0.25
+            end
+        end
+    end
+
+    u₀ .+= 0.01 * rand(ndofs(dh))
+    return
+end;</code></pre><h3 id="Mesh-generation"><a class="docs-heading-anchor" href="#Mesh-generation">Mesh generation</a><a id="Mesh-generation-1"></a><a class="docs-heading-anchor-permalink" href="#Mesh-generation" title="Permalink"></a></h3><p>In this section we define a routine to create a surface mesh with the help of FerriteGmsh.jl.</p><pre><code class="language-julia hljs">function create_embedded_sphere(refinements)
+    gmsh.initialize()
+
+    # Add a unit sphere in 3D space
+    gmsh.model.occ.addSphere(0.0, 0.0, 0.0, 1.0)
+    gmsh.model.occ.synchronize()
+
+    # Generate nodes and surface elements only, hence we need to pass 2 into generate
+    gmsh.model.mesh.generate(2)
+
+    # To get good solution quality refine the elements several times
+    for _ in 1:refinements
+        gmsh.model.mesh.refine()
+    end
+
+    # Now we create a Ferrite grid out of it. Note that we also call toelements
+    # with our surface element dimension to obtain these.
+    nodes = tonodes()
+    elements, _ = toelements(2)
+    gmsh.finalize()
+    return Grid(elements, nodes)
+end</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">create_embedded_sphere (generic function with 1 method)</code></pre><h3 id="Simulation-routines"><a class="docs-heading-anchor" href="#Simulation-routines">Simulation routines</a><a id="Simulation-routines-1"></a><a class="docs-heading-anchor-permalink" href="#Simulation-routines" title="Permalink"></a></h3><p>Now we define a function to setup and solve the problem with given feed and conversion rates <span>$F$</span> and <span>$k$</span>, as well as the time step length and for how long we want to solve the model.</p><pre><code class="language-julia hljs">function gray_scott_on_sphere(material::GrayScottMaterial, Δt::Real, T::Real, refinements::Integer)
+    # We start by setting up grid, dof handler and the matrices for the heat problem.
+    grid = create_embedded_sphere(refinements)
+
+    # Next we are creating our element assembly helper for surface elements.
+    # The only change which we need to introduce here is to pass in a geometrical
+    # interpolation with the same dimension as the physical space into which our
+    # elements are embedded into, which is in this example 3.
+    ip = Lagrange{RefTriangle, 1}()
+    qr = QuadratureRule{RefTriangle}(2)
+    cellvalues = CellValues(qr, ip, ip^3)
+
+    # We have two options to add the reactants to the dof handler, which will give us slightly
+    # different resulting dof distributions:
+    # A) We can add a scalar-valued interpolation for each reactant.
+    # B) We can add one vectorized interpolation whose dimension is the number of reactants
+    #    number of reactants.
+    # In this tutorial we opt for B, because the dofs are distributed per cell entity -- or
+    # to be specific for this tutorial, we use an isoparametric concept such that the nodes
+    # of our grid and the nodes of our solution approximation coincide. This way a reaction
+    # we can create simply reshape the solution vector u to a matrix where the inner index
+    # corresponds to the index of the reactant. Note that we will still use the scalar
+    # interpolation for the assembly procedure.
+    dh = DofHandler(grid)
+    add!(dh, :reactants, ip^2)
+    close!(dh)
+
+    # We can save some memory by telling the sparsity pattern that the matrices are not coupled.
+    M = allocate_matrix(dh; coupling = [true false; false true])
+    D = allocate_matrix(dh; coupling = [true false; false true])
+
+    # Since the heat problem is linear and has no time dependent parameters, we precompute the
+    # decomposition of the system matrix to speed up the linear system solver.
+    assemble_matrices!(M, D, cellvalues, dh, material)
+    A = M + Δt .* D
+    cholA = cholesky(A)
+
+    # Now we setup buffers for the time dependent solution and fill the initial condition.
+    uₜ = zeros(ndofs(dh))
+    uₜ₋₁ = ones(ndofs(dh))
+    setup_initial_conditions!(uₜ₋₁, cellvalues, dh)
+
+    # And prepare output for visualization.
+    pvd = paraview_collection(&quot;reactive-surface&quot;)
+    VTKGridFile(&quot;reactive-surface-0&quot;, dh) do vtk
+        write_solution(vtk, dh, uₜ₋₁)
+        pvd[0.0] = vtk
+    end
+
+    # This is now the main solve loop.
+    F = material.F
+    k = material.k
+    for (iₜ, t) in enumerate(Δt:Δt:T)
+        # First we solve the heat problem
+        uₜ .= cholA \ (M * uₜ₋₁)
+
+        # Then we solve the point-wise reaction problem with the solution of
+        # the heat problem as initial guess. 2 is the number of reactants.
+        num_individual_reaction_dofs = ndofs(dh) ÷ 2
+        rvₜ = reshape(uₜ, (2, num_individual_reaction_dofs))
+        for i in 1:num_individual_reaction_dofs
+            r₁ = rvₜ[1, i]
+            r₂ = rvₜ[2, i]
+            rvₜ[1, i] += Δt * (-r₁ * r₂^2 + F * (1 - r₁))
+            rvₜ[2, i] += Δt * (r₁ * r₂^2 - r₂ * (F + k))
+        end
+
+        # The solution is then stored every 10th step to vtk files for
+        # later visualization purposes.
+        if (iₜ % 10) == 0
+            VTKGridFile(&quot;reactive-surface-$(iₜ)&quot;, dh) do vtk
+                write_solution(vtk, dh, uₜ₋₁)
+                pvd[t] = vtk
+            end
+        end
+
+        # Finally we totate the solution to initialize the next timestep.
+        uₜ₋₁ .= uₜ
+    end
+    vtk_save(pvd)
+    return
+end
+
+# This parametrization gives the spot pattern shown in the gif above.
+material = GrayScottMaterial(0.00016, 0.00008, 0.06, 0.062)
+    gray_scott_on_sphere(material, 10.0, 32000.0, 3)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">Info    : Meshing 1D...
+Info    : [ 40%] Meshing curve 2 (Circle)
+Info    : Done meshing 1D (Wall 0.000115846s, CPU 0.000115s)
+Info    : Meshing 2D...
+Info    : Meshing surface 1 (Sphere, Frontal-Delaunay)
+Info    : Done meshing 2D (Wall 0.0116277s, CPU 0.011626s)
+Info    : 162 nodes 332 elements
+Info    : Refining mesh...
+Info    : Meshing order 2 (curvilinear on)...
+Info    : [  0%] Meshing curve 1 order 2
+Info    : [ 30%] Meshing curve 2 order 2
+Info    : [ 50%] Meshing curve 3 order 2
+Info    : [ 70%] Meshing surface 1 order 2
+Info    : [ 90%] Meshing volume 1 order 2
+Info    : Surface mesh: worst distortion = 0.968739 (0 elements in ]0, 0.2]); worst gamma = 0.533321
+Info    : Done meshing order 2 (Wall 0.00121501s, CPU 0.001214s)
+Info    : Done refining mesh (Wall 0.00158777s, CPU 0.001588s)
+Info    : Refining mesh...
+Info    : Meshing order 2 (curvilinear on)...
+Info    : [  0%] Meshing curve 1 order 2
+Info    : [ 30%] Meshing curve 2 order 2
+Info    : [ 50%] Meshing curve 3 order 2
+Info    : [ 70%] Meshing surface 1 order 2
+Info    : [ 90%] Meshing volume 1 order 2
+Info    : Surface mesh: worst distortion = 0.991679 (0 elements in ]0, 0.2]); worst gamma = 0.514495
+Info    : Done meshing order 2 (Wall 0.00478342s, CPU 0.003793s)
+Info    : Done refining mesh (Wall 0.00620057s, CPU 0.005206s)
+Info    : Refining mesh...
+Info    : Meshing order 2 (curvilinear on)...
+Info    : [  0%] Meshing curve 1 order 2
+Info    : [ 30%] Meshing curve 2 order 2
+Info    : [ 50%] Meshing curve 3 order 2
+Info    : [ 70%] Meshing surface 1 order 2
+Info    : [ 90%] Meshing volume 1 order 2
+Info    : Surface mesh: worst distortion = 0.997887 (0 elements in ]0, 0.2]); worst gamma = 0.509717
+Info    : Done meshing order 2 (Wall 0.0185447s, CPU 0.018543s)
+Info    : Done refining mesh (Wall 0.024898s, CPU 0.024898s)</code></pre><h2 id="reactive_surface-plain-program"><a class="docs-heading-anchor" href="#reactive_surface-plain-program">Plain program</a><a id="reactive_surface-plain-program-1"></a><a class="docs-heading-anchor-permalink" href="#reactive_surface-plain-program" title="Permalink"></a></h2><p>Here follows a version of the program without any comments. The file is also available here: <a href="../reactive_surface.jl"><code>reactive_surface.jl</code></a>.</p><pre><code class="language-julia hljs">using Ferrite, FerriteGmsh
+using BlockArrays, SparseArrays, LinearAlgebra, WriteVTK
+
+struct GrayScottMaterial{T}
+    D₁::T
+    D₂::T
+    F::T
+    k::T
+end;
+
+function assemble_element_mass!(Me::Matrix, cellvalues::CellValues)
+    n_basefuncs = getnbasefunctions(cellvalues)
+    # The mass matrices between the reactions are not coupled, so we get a blocked-strided matrix.
+    num_reactants = 2
+    r₁range = 1:num_reactants:(num_reactants * n_basefuncs)
+    r₂range = 2:num_reactants:(num_reactants * n_basefuncs)
+    Me₁ = @view Me[r₁range, r₁range]
+    Me₂ = @view Me[r₂range, r₂range]
+    # Reset to 0
+    fill!(Me, 0)
+    # Loop over quadrature points
+    for q_point in 1:getnquadpoints(cellvalues)
+        # Get the quadrature weight
+        dΩ = getdetJdV(cellvalues, q_point)
+        # Loop over test shape functions
+        for i in 1:n_basefuncs
+            δuᵢ = shape_value(cellvalues, q_point, i)
+            # Loop over trial shape functions
+            for j in 1:n_basefuncs
+                δuⱼ = shape_value(cellvalues, q_point, j)
+                # Add contribution to Ke
+                Me₁[i, j] += (δuᵢ * δuⱼ) * dΩ
+                Me₂[i, j] += (δuᵢ * δuⱼ) * dΩ
+            end
+        end
+    end
+    return nothing
+end
+
+function assemble_element_diffusion!(De::Matrix, cellvalues::CellValues, material::GrayScottMaterial)
+    n_basefuncs = getnbasefunctions(cellvalues)
+    D₁ = material.D₁
+    D₂ = material.D₂
+    # The diffusion between the reactions is not coupled, so we get a blocked-strided matrix.
+    num_reactants = 2
+    r₁range = 1:num_reactants:(num_reactants * n_basefuncs)
+    r₂range = 2:num_reactants:(num_reactants * n_basefuncs)
+    De₁ = @view De[r₁range, r₁range]
+    De₂ = @view De[r₂range, r₂range]
+    # Reset to 0
+    fill!(De, 0)
+    # Loop over quadrature points
+    for q_point in 1:getnquadpoints(cellvalues)
+        # Get the quadrature weight
+        dΩ = getdetJdV(cellvalues, q_point)
+        # Loop over test shape functions
+        for i in 1:n_basefuncs
+            ∇δuᵢ = shape_gradient(cellvalues, q_point, i)
+            # Loop over trial shape functions
+            for j in 1:n_basefuncs
+                ∇δuⱼ = shape_gradient(cellvalues, q_point, j)
+                # Add contribution to Ke
+                De₁[i, j] += D₁ * (∇δuᵢ ⋅ ∇δuⱼ) * dΩ
+                De₂[i, j] += D₂ * (∇δuᵢ ⋅ ∇δuⱼ) * dΩ
+            end
+        end
+    end
+    return nothing
+end
+
+function assemble_matrices!(M::SparseMatrixCSC, D::SparseMatrixCSC, cellvalues::CellValues, dh::DofHandler, material::GrayScottMaterial)
+    n_basefuncs = getnbasefunctions(cellvalues)
+
+    # Allocate the element stiffness matrix and element force vector
+    Me = zeros(2 * n_basefuncs, 2 * n_basefuncs)
+    De = zeros(2 * n_basefuncs, 2 * n_basefuncs)
+
+    # Create an assembler
+    M_assembler = start_assemble(M)
+    D_assembler = start_assemble(D)
+    # Loop over all cels
+    for cell in CellIterator(dh)
+        # Reinitialize cellvalues for this cell
+        reinit!(cellvalues, cell)
+        # Compute element contribution
+        assemble_element_mass!(Me, cellvalues)
+        assemble!(M_assembler, celldofs(cell), Me)
+
+        assemble_element_diffusion!(De, cellvalues, material)
+        assemble!(D_assembler, celldofs(cell), De)
+    end
+    return nothing
+end;
+
+function setup_initial_conditions!(u₀::Vector, cellvalues::CellValues, dh::DofHandler)
+    u₀ .= ones(ndofs(dh))
+    u₀[2:2:end] .= 0.0
+
+    n_basefuncs = getnbasefunctions(cellvalues)
+
+    for cell in CellIterator(dh)
+        reinit!(cellvalues, cell)
+
+        coords = getcoordinates(cell)
+        dofs = celldofs(cell)
+        uₑ = @view u₀[dofs]
+        rv₀ₑ = reshape(uₑ, (2, n_basefuncs))
+
+        for i in 1:n_basefuncs
+            if coords[i][3] &gt; 0.9
+                rv₀ₑ[1, i] = 0.5
+                rv₀ₑ[2, i] = 0.25
+            end
+        end
+    end
+
+    u₀ .+= 0.01 * rand(ndofs(dh))
+    return
+end;
+
+function create_embedded_sphere(refinements)
+    gmsh.initialize()
+
+    # Add a unit sphere in 3D space
+    gmsh.model.occ.addSphere(0.0, 0.0, 0.0, 1.0)
+    gmsh.model.occ.synchronize()
+
+    # Generate nodes and surface elements only, hence we need to pass 2 into generate
+    gmsh.model.mesh.generate(2)
+
+    # To get good solution quality refine the elements several times
+    for _ in 1:refinements
+        gmsh.model.mesh.refine()
+    end
+
+    # Now we create a Ferrite grid out of it. Note that we also call toelements
+    # with our surface element dimension to obtain these.
+    nodes = tonodes()
+    elements, _ = toelements(2)
+    gmsh.finalize()
+    return Grid(elements, nodes)
+end
+
+function gray_scott_on_sphere(material::GrayScottMaterial, Δt::Real, T::Real, refinements::Integer)
+    # We start by setting up grid, dof handler and the matrices for the heat problem.
+    grid = create_embedded_sphere(refinements)
+
+    # Next we are creating our element assembly helper for surface elements.
+    # The only change which we need to introduce here is to pass in a geometrical
+    # interpolation with the same dimension as the physical space into which our
+    # elements are embedded into, which is in this example 3.
+    ip = Lagrange{RefTriangle, 1}()
+    qr = QuadratureRule{RefTriangle}(2)
+    cellvalues = CellValues(qr, ip, ip^3)
+
+    # We have two options to add the reactants to the dof handler, which will give us slightly
+    # different resulting dof distributions:
+    # A) We can add a scalar-valued interpolation for each reactant.
+    # B) We can add one vectorized interpolation whose dimension is the number of reactants
+    #    number of reactants.
+    # In this tutorial we opt for B, because the dofs are distributed per cell entity -- or
+    # to be specific for this tutorial, we use an isoparametric concept such that the nodes
+    # of our grid and the nodes of our solution approximation coincide. This way a reaction
+    # we can create simply reshape the solution vector u to a matrix where the inner index
+    # corresponds to the index of the reactant. Note that we will still use the scalar
+    # interpolation for the assembly procedure.
+    dh = DofHandler(grid)
+    add!(dh, :reactants, ip^2)
+    close!(dh)
+
+    # We can save some memory by telling the sparsity pattern that the matrices are not coupled.
+    M = allocate_matrix(dh; coupling = [true false; false true])
+    D = allocate_matrix(dh; coupling = [true false; false true])
+
+    # Since the heat problem is linear and has no time dependent parameters, we precompute the
+    # decomposition of the system matrix to speed up the linear system solver.
+    assemble_matrices!(M, D, cellvalues, dh, material)
+    A = M + Δt .* D
+    cholA = cholesky(A)
+
+    # Now we setup buffers for the time dependent solution and fill the initial condition.
+    uₜ = zeros(ndofs(dh))
+    uₜ₋₁ = ones(ndofs(dh))
+    setup_initial_conditions!(uₜ₋₁, cellvalues, dh)
+
+    # And prepare output for visualization.
+    pvd = paraview_collection(&quot;reactive-surface&quot;)
+    VTKGridFile(&quot;reactive-surface-0&quot;, dh) do vtk
+        write_solution(vtk, dh, uₜ₋₁)
+        pvd[0.0] = vtk
+    end
+
+    # This is now the main solve loop.
+    F = material.F
+    k = material.k
+    for (iₜ, t) in enumerate(Δt:Δt:T)
+        # First we solve the heat problem
+        uₜ .= cholA \ (M * uₜ₋₁)
+
+        # Then we solve the point-wise reaction problem with the solution of
+        # the heat problem as initial guess. 2 is the number of reactants.
+        num_individual_reaction_dofs = ndofs(dh) ÷ 2
+        rvₜ = reshape(uₜ, (2, num_individual_reaction_dofs))
+        for i in 1:num_individual_reaction_dofs
+            r₁ = rvₜ[1, i]
+            r₂ = rvₜ[2, i]
+            rvₜ[1, i] += Δt * (-r₁ * r₂^2 + F * (1 - r₁))
+            rvₜ[2, i] += Δt * (r₁ * r₂^2 - r₂ * (F + k))
+        end
+
+        # The solution is then stored every 10th step to vtk files for
+        # later visualization purposes.
+        if (iₜ % 10) == 0
+            VTKGridFile(&quot;reactive-surface-$(iₜ)&quot;, dh) do vtk
+                write_solution(vtk, dh, uₜ₋₁)
+                pvd[t] = vtk
+            end
+        end
+
+        # Finally we totate the solution to initialize the next timestep.
+        uₜ₋₁ .= uₜ
+    end
+    vtk_save(pvd)
+    return
+end
+
+# This parametrization gives the spot pattern shown in the gif above.
+material = GrayScottMaterial(0.00016, 0.00008, 0.06, 0.062)
+    gray_scott_on_sphere(material, 10.0, 32000.0, 3)</code></pre><hr/><p><em>This page was generated using <a href="https://github.com/fredrikekre/Literate.jl">Literate.jl</a>.</em></p></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../ns_vs_diffeq/">« Incompressible Navier-Stokes equations via DifferentialEquations.jl</a><a class="docs-footer-nextpage" href="../linear_shell/">Linear shell »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option><option value="catppuccin-latte">catppuccin-latte</option><option value="catppuccin-frappe">catppuccin-frappe</option><option value="catppuccin-macchiato">catppuccin-macchiato</option><option value="catppuccin-mocha">catppuccin-mocha</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.10.2 on <span class="colophon-date" title="Monday 11 August 2025 07:54">Monday 11 August 2025</span>. Using Julia version 1.11.6.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
