@@ -1,8 +1,8 @@
 # This file is machine-generated - editing it directly is not advised
 
-julia_version = "1.11.5"
+julia_version = "1.11.6"
 manifest_format = "2.0"
-project_hash = "4e52f4aa4cee9f66ec4f633f0ae538fbd227ac5e"
+project_hash = "f218bbc3ae896b5538d5c03e3a7ea37a5ec08f36"
 
 [[deps.ADTypes]]
 git-tree-sha1 = "e2478490447631aedba0823d4d7a80b2cc8cdb32"
@@ -647,10 +647,12 @@ version = "1.1.0"
     [deps.Ferrite.extensions]
     FerriteBlockArrays = "BlockArrays"
     FerriteMetis = "Metis"
+    FerriteSparseMatrixCSR = "SparseMatricesCSR"
 
     [deps.Ferrite.weakdeps]
     BlockArrays = "8e7c35d0-a365-5155-bbbb-fb81a777f24e"
     Metis = "2679e427-3c69-5b7f-982b-ece356f1e94b"
+    SparseMatricesCSR = "a0a7dd2c-ebf4-11e9-1f05-cf50bc540ca1"
 
 [[deps.FerriteGmsh]]
 deps = ["Ferrite", "Gmsh"]
