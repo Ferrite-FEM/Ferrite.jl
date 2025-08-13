@@ -244,7 +244,7 @@ update!(ch_dirichlet, 0.0)
 # which is very similar to the `Dirichlet` type, but instead of a passing a facetset we pass
 # a vector with "facet pairs", i.e. the mapping between mirror and image parts of the
 # boundary. In this example the `"left"` and `"bottom"` boundaries are mirrors, and the
-# `"right"` and `"top"` boundaries are the mirrors.
+# `"right"` and `"top"` boundaries are the images.
 
 ch_periodic = ConstraintHandler(dh);
 periodic = PeriodicDirichlet(
