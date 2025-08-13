@@ -12,10 +12,14 @@ using Base.Cartesian: @nloops, @ntuple, @nexprs
 
 """
     QuadratureRule{shape}([::Type{T},] [quad_rule_type::Symbol,] order::Int)
+    QuadratureRule{shape}([::Type{T},] [quad_rule_type::Symbol,]; polyorder::Int)
     QuadratureRule{shape}(weights::AbstractVector{T}, points::AbstractVector{Vec{rdim, T}})
 
 Create a `QuadratureRule` used for integration on the refshape `shape` (of type [`AbstractRefShape`](@ref)).
-`order` is the order of the quadrature rule.
+`order` is the order of the quadrature rule, which for hypercubes corresponds to the number of quadrature points
+in each direction, and for simplices, prisms, and pyramids to the polynomial order that is fully integrated.
+To control the order of the polynomial that is exactly integrated for all reference shapes, the keyword argument
+`polyorder` can be passed instead of the `order` argument.
 `quad_rule_type` is an optional argument determining the type of quadrature rule,
 currently the `:legendre` and `:lobatto` rules are implemented for hypercubes.
 For triangles up to order 8 the default rule is the one by `:dunavant` (see [Dun:1985:hde](@cite)) and for
@@ -66,16 +70,39 @@ end
 @inline _default_quadrature_rule(::Type{RefTetrahedron}) = :keast_minimal
 
 # Fill in defaults with T=Float64
-function QuadratureRule{shape}(order::Int) where {shape <: AbstractRefShape}
-    return QuadratureRule{shape}(Float64, order)
+function QuadratureRule{shape}(args...; kwargs...) where {shape <: AbstractRefShape}
+    return QuadratureRule{shape}(Float64, args...; kwargs...)
 end
-function QuadratureRule{shape}(::Type{T}, order::Int) where {shape <: AbstractRefShape, T}
+function QuadratureRule{shape}(::Type{T}, args...; kwargs...) where {shape <: AbstractRefShape, T}
     quad_type = _default_quadrature_rule(shape)
+    return QuadratureRule{shape}(T, quad_type, args...)
+end
+function QuadratureRule{shape}(quad_type::Symbol, args...; kwargs...) where {shape <: AbstractRefShape}
+    return QuadratureRule{shape}(Float64, quad_type, args...; kwargs...)
+end
+
+# Passing polyorder kwarg:
+QuadratureRule{shape}(; kwargs...) where {shape <: AbstractRefShape} = QuadratureRule{shape}(Float64; kwargs...)
+function QuadratureRule{shape}(::Type{T}, quad_type::Symbol; polyorder::Int) where {shape <: AbstractRefShape, T}
+    order = _get_quadrature_order(shape, quad_type, polyorder)
     return QuadratureRule{shape}(T, quad_type, order)
 end
-function QuadratureRule{shape}(quad_type::Symbol, order::Int) where {shape <: AbstractRefShape}
-    return QuadratureRule{shape}(Float64, quad_type, order)
+
+function _get_quadrature_order(::Type{shape}, quad_type, polyorder) where {shape <: RefHypercube}
+    # Source: Pages pages 430 - 432 in
+    # Quarteroni, A., Sacco, R., Saleri, F. (2006). Orthogonal Polynomials in Approximation Theory.
+    # In: Numerical Mathematics. Texts in Applied Mathematics, vol 37. Springer, Berlin, Heidelberg.
+    # https://doi.org/10.1007/978-3-540-49809-4_10
+    if quad_type === :legendre
+        return ceil(Int, (polyorder + 1) / 2)
+    elseif quad_type === :lobatto
+        return ceil(Int, (polyorder + 3) / 2)
+    else
+        throw(ArgumentError("unsupported quadrature rule for $shape: $quad_type"))
+    end
 end
+
+_get_quadrature_order(::Type{shape}, quad_type, polyorder) where {shape <: Union{RefSimplex, RefPrism, RefPyramid}} = polyorder
 
 # Generate Gauss quadrature rules on hypercubes by doing an outer product
 # over all dimensions
