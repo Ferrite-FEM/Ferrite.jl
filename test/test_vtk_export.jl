@@ -206,4 +206,22 @@
             end
         end
     end
+    @testset "discontinous_embedded" begin
+        mktempdir() do tmp
+            _grid = generate_grid(Line, (2,), Vec((0.0,)), Vec((1.0,)))
+            nodes = [(n.x[1], 0.0) |> Vec{2} |> Node for n in _grid.nodes]
+            grid = Grid(_grid.cells, nodes)
+
+            qr = QuadratureRule{RefLine}(2)
+            ip = Lagrange{RefLine, 1}()^2
+            dh = DofHandler(grid)
+            add!(dh, :u, ip)
+            close!(dh)
+
+            u = rand(ndofs(dh))
+            VTKGridFile(joinpath(tmp, "output"), dh, write_discontinuous = true) do vtk
+                write_solution(vtk, dh, u)
+            end
+        end
+    end
 end
