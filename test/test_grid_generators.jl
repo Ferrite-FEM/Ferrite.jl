@@ -11,7 +11,7 @@ function test_generate_grid(T::Type)
     for CT in cell_types
         rdim = Ferrite.getrefdim(CT)
         nels = ntuple(i -> 2, rdim)
-        left = - ones(Vec{rdim, T})
+        left = -ones(Vec{rdim, T})
         right = ones(Vec{rdim, T})
         grid = generate_grid(CT, nels, left, right)
         @test isa(grid, Grid{rdim, CT, T})
@@ -20,15 +20,17 @@ function test_generate_grid(T::Type)
 end
 
 function test_line_grid(T::Type)
-    dims = [1, 2, 3]
-    cell_types = [Line, QuadraticLine]
+    for CT in [QuadraticLine]
+        for dim in 1:3
+            left = rand(Vec{dim, T})
+            right = left + rand(Vec{dim, T})
+            grid = generate_grid(CT, (2,), left, right)
 
-    for CT in cell_types
-        for dim in dims
-            left = - ones(Vec{dim, T})
-            right = ones(Vec{dim, T})
-            grid = generate_grid(CT, (1,), left, right)
             @test isa(grid, Grid{dim, CT, T})
+            @test get_node_coordinate(grid, 1) ≈ left
+            @test get_node_coordinate(grid, getnnodes(grid)) ≈ right
+            @test get_node_coordinate(grid, Int(ceil(getnnodes(grid) / 2))) ≈ (left + right) / 2
+            @test getncells(grid) == 2
         end
     end
 

@@ -8,16 +8,13 @@ e.g. `Triangle` or `Hexahedron`. `nel` is a tuple of the number of elements in e
 generate_grid
 
 # Line
-function generate_grid(::Type{Line}, nel::NTuple{1, Int}, left::Vec{dim, T} = Vec{1}((-1.0,)), right::Vec{dim, T} = Vec{1}((1.0,))) where {T, dim}
+function generate_grid(::Type{Line}, nel::NTuple{1, Int}, left::Vec = Vec{1}((-1.0,)), right::Vec = Vec{1}((1.0,)))
     nel_x = nel[1]
     n_nodes = nel_x + 1
 
     # Generate nodes
-    coords = [collect(range(left[i]; stop = right[i], length = n_nodes)) for i in 1:dim]
-    nodes = Node{dim, T}[]
-    for i in 1:n_nodes
-        push!(nodes, Node(Tuple(coords[j][i] for j in 1:dim)))
-    end
+    dx = (right - left) / nel_x
+    nodes = [Node(left + i * dx) for i in 0:(n_nodes - 1)]
 
     # Generate cells
     cells = Line[]
@@ -31,7 +28,7 @@ function generate_grid(::Type{Line}, nel::NTuple{1, Int}, left::Vec{dim, T} = Ve
         FacetIndex(nel_x, 2),
     ]
 
-    # Cell face sets
+    # Cell facet sets
     facetsets = Dict(
         "left" => OrderedSet{FacetIndex}([boundary[1]]),
         "right" => OrderedSet{FacetIndex}([boundary[2]])
@@ -41,16 +38,13 @@ function generate_grid(::Type{Line}, nel::NTuple{1, Int}, left::Vec{dim, T} = Ve
 end
 
 # QuadraticLine
-function generate_grid(::Type{QuadraticLine}, nel::NTuple{1, Int}, left::Vec{dim, T} = Vec{1}((-1.0,)), right::Vec{dim, T} = Vec{1}((1.0,))) where {T, dim}
+function generate_grid(::Type{QuadraticLine}, nel::NTuple{1, Int}, left::Vec = Vec{1}((-1.0,)), right::Vec = Vec{1}((1.0,)))
     nel_x = nel[1]
     n_nodes = 2 * nel_x + 1
 
     # Generate nodes
-    coords = [collect(range(left[i]; stop = right[i], length = n_nodes)) for i in 1:dim]
-    nodes = Node{dim, T}[]
-    for i in 1:n_nodes
-        push!(nodes, Node(Tuple(coords[j][i] for j in 1:dim)))
-    end
+    dx = (right - left) / 2nel_x
+    nodes = [Node(left + i * dx) for i in 0:(n_nodes - 1)]
 
     # Generate cells
     cells = QuadraticLine[]
