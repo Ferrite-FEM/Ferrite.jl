@@ -248,7 +248,7 @@ using Ferrite: reference_shape_value
         (f::PolyFunction{dim})(x::Vec{dim}) where {dim} = sum(w * sum(tuple(x...) .^ e) for (w, e) in zip(f.weights, f.exponents))
 
         function PolyFunction{1}(order::Int)
-            return PolyFunction{1}(rand(order + 1), [(i,) for i in 0:order])
+            return PolyFunction{1}(collect(range(0, 1, order + 1)), [(i,) for i in 0:order])
         end
         function PolyFunction{2}(order::Int)
             exponents = NTuple{2, Int}[]
@@ -257,7 +257,7 @@ using Ferrite: reference_shape_value
                     push!(exponents, (i, j))
                 end
             end
-            return PolyFunction{2}(rand(length(exponents)), exponents)
+            return PolyFunction{2}(collect(range(0, 1, length(exponents))), exponents)
         end
         function PolyFunction{3}(order::Int)
             exponents = NTuple{3, Int}[]
@@ -268,7 +268,7 @@ using Ferrite: reference_shape_value
                     end
                 end
             end
-            return PolyFunction{3}(rand(length(exponents)), exponents)
+            return PolyFunction{3}(collect(range(0, 1, length(exponents))), exponents)
         end
 
         # Define functions to integrate over the difference reference shapes with hcubature.
