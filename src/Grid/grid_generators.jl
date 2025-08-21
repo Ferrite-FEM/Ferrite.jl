@@ -22,7 +22,7 @@ function generate_grid(::Type{Line}, nel::NTuple{1, Int}, left::Vec = Vec{1}((-1
         push!(cells, Line((i, i + 1)))
     end
 
-    # Cell faces
+    # Cell facets
     boundary = [
         FacetIndex(1, 1),
         FacetIndex(nel_x, 2),

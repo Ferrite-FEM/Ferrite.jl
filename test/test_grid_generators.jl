@@ -20,7 +20,7 @@ function test_generate_grid(T::Type)
 end
 
 function test_line_grid(T::Type)
-    for CT in [QuadraticLine]
+    for CT in [Line, QuadraticLine]
         for dim in 1:3
             left = rand(Vec{dim, T})
             right = left + rand(Vec{dim, T})
