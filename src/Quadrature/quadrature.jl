@@ -75,14 +75,13 @@ function QuadratureRule{shape}(args...; kwargs...) where {shape <: AbstractRefSh
 end
 function QuadratureRule{shape}(::Type{T}, args...; kwargs...) where {shape <: AbstractRefShape, T}
     quad_type = _default_quadrature_rule(shape)
-    return QuadratureRule{shape}(T, quad_type, args...)
+    return QuadratureRule{shape}(T, quad_type, args...; kwargs...)
 end
 function QuadratureRule{shape}(quad_type::Symbol, args...; kwargs...) where {shape <: AbstractRefShape}
     return QuadratureRule{shape}(Float64, quad_type, args...; kwargs...)
 end
 
 # Passing polyorder kwarg:
-QuadratureRule{shape}(; kwargs...) where {shape <: AbstractRefShape} = QuadratureRule{shape}(Float64; kwargs...)
 function QuadratureRule{shape}(::Type{T}, quad_type::Symbol; polyorder::Int) where {shape <: AbstractRefShape, T}
     order = _get_quadrature_order(shape, quad_type, polyorder)
     return QuadratureRule{shape}(T, quad_type, order)

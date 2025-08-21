@@ -322,5 +322,18 @@ using Ferrite: reference_shape_value
                 end
             end
         end
+        qr_spec = QuadratureRule{RefQuadrilateral}(Float32; polyorder = 2)
+        qr_def = QuadratureRule{RefQuadrilateral}(Float32, :legendre; polyorder = 2)
+        @test eltype(Ferrite.getweights(qr_spec)) == Float32
+        @test eltype(Ferrite.getpoints(qr_spec)) == Vec{2, Float32}
+        @test Ferrite.getweights(qr_spec) == Ferrite.getweights(qr_def)
+        @test Ferrite.getpoints(qr_spec) == Ferrite.getpoints(qr_def)
+
+        qr_spec = QuadratureRule{RefQuadrilateral}(polyorder = 2)
+        qr_def = QuadratureRule{RefQuadrilateral}(:legendre; polyorder = 2)
+        @test eltype(Ferrite.getweights(qr_spec)) == Float64
+        @test eltype(Ferrite.getpoints(qr_spec)) == Vec{2, Float64}
+        @test Ferrite.getweights(qr_spec) == Ferrite.getweights(qr_def)
+        @test Ferrite.getpoints(qr_spec) == Ferrite.getpoints(qr_def)
     end
 end
