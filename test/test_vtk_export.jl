@@ -206,4 +206,23 @@
             end
         end
     end
+    @testset "discontinous_embedded" begin
+        mktempdir() do tmp
+            grid = generate_grid(Line, (2,), Vec((0.0, 0.0)), Vec((1.0, 0.5)))
+
+            qr = QuadratureRule{RefLine}(2)
+            ip = Lagrange{RefLine, 1}()^2
+            dh = DofHandler(grid)
+            add!(dh, :u, ip)
+            close!(dh)
+
+            u = collect(range(0, 1, ndofs(dh)))
+            VTKGridFile(joinpath(tmp, "output"), dh, write_discontinuous = true) do vtk
+                write_solution(vtk, dh, u)
+            end
+
+            sha = bytes2hex(open(SHA.sha1, joinpath(tmp, "output") * ".vtu"))
+            @test sha == "571c8a348d8e34bb0a1e0b9a2d9343e973d7c1f9"
+        end
+    end
 end
