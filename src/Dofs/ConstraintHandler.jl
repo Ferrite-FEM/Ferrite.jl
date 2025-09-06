@@ -2008,8 +2008,9 @@ function integrate_projected_dbc!(::HdivConformity, Kᶠ, fᶠ, bc_fun, fv, shap
 end
 
 function integrate_projected_dbc!(::HcurlConformity, Kᶠ, fᶠ, bc_fun, fv, shape_nrs, cell_coords, time)
-    if getrefdim(function_interpolation(fv)) == 3
-        throw(ArgumentError("ProjectedDirichlet is not implemented for 3D H(curl) conformity"))
+	if (getrefdim(function_interpolation(fv)) == 3) && !(bc_fun isa Returns && norm(bc_fun()) == 0)
+		@warn "ProjectedDirichlet for zero-dirichlet will work with bc_fun=Returns(zero(Vec{D}))."
+		throw(ArgumentError("ProjectedDirichlet is not implemented for 3D H(curl) conformity"))
     end
     for q_point in 1:getnquadpoints(fv)
         dΓ = getdetJdV(fv, q_point)
