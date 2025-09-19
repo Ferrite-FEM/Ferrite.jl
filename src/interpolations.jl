@@ -184,12 +184,12 @@ getnbasefunctions(::Interpolation)
 #   celldof: dof that is local to the element
 
 """
-    reference_shape_values!(values::AbstractArray{T}, ip::Interpolation, ξ::Vec)
+    reference_shape_values!(values::AbstractVector, ip::Interpolation, ξ::Vec)
 
 Evaluate all shape functions of `ip` at once at the reference point `ξ` and store them in
 `values`.
 """
-@propagate_inbounds function reference_shape_values!(values::AT, ip::IP, ξ::Vec) where {IP <: Interpolation, AT <: AbstractArray}
+@propagate_inbounds function reference_shape_values!(values::AbstractVector, ip::Interpolation, ξ::Vec)
     @boundscheck checkbounds(values, 1:getnbasefunctions(ip))
     @inbounds for i in 1:getnbasefunctions(ip)
         values[i] = reference_shape_value(ip, ξ, i)
@@ -198,12 +198,12 @@ Evaluate all shape functions of `ip` at once at the reference point `ξ` and sto
 end
 
 """
-    reference_shape_gradients!(gradients::AbstractArray, ip::Interpolation, ξ::Vec)
+    reference_shape_gradients!(gradients::AbstractVector, ip::Interpolation, ξ::Vec)
 
 Evaluate all shape function gradients of `ip` at once at the reference point `ξ` and store
 them in `gradients`.
 """
-function reference_shape_gradients!(gradients::AT, ip::IP, ξ::Vec) where {IP <: Interpolation, AT <: AbstractArray}
+function reference_shape_gradients!(gradients::AbstractVector, ip::Interpolation, ξ::Vec)
     @boundscheck checkbounds(gradients, 1:getnbasefunctions(ip))
     @inbounds for i in 1:getnbasefunctions(ip)
         gradients[i] = reference_shape_gradient(ip, ξ, i)
@@ -212,12 +212,12 @@ function reference_shape_gradients!(gradients::AT, ip::IP, ξ::Vec) where {IP <:
 end
 
 """
-    reference_shape_gradients_and_values!(gradients::AbstractArray, values::AbstractArray, ip::Interpolation, ξ::Vec)
+    reference_shape_gradients_and_values!(gradients::AbstractVector, values::AbstractVector, ip::Interpolation, ξ::Vec)
 
 Evaluate all shape function gradients and values of `ip` at once at the reference point `ξ`
 and store them in `values`.
 """
-function reference_shape_gradients_and_values!(gradients::GAT, values::SAT, ip::IP, ξ::Vec) where {IP <: Interpolation, SAT <: AbstractArray, GAT <: AbstractArray}
+function reference_shape_gradients_and_values!(gradients::AbstractVector, values::AbstractVector, ip::Interpolation, ξ::Vec)
     @boundscheck checkbounds(gradients, 1:getnbasefunctions(ip))
     @boundscheck checkbounds(values, 1:getnbasefunctions(ip))
     @inbounds for i in 1:getnbasefunctions(ip)
@@ -263,7 +263,7 @@ Evaluate the gradient of the `i`th shape function of the interpolation `ip` in
 reference coordinate `ξ`.
 """
 function reference_shape_gradient(ip::Interpolation, ξ::Vec, i::Int)
-    return Tensors.gradient(x -> reference_shape_value(ip, x, i), ξ)
+    return gradient(x -> reference_shape_value(ip, x, i), ξ)
 end
 
 """
@@ -292,11 +292,7 @@ end
 
 Returns a vector of coordinates with length [`getnbasefunctions(::Interpolation)`](@ref)
 and indices corresponding to the indices of a dof in [`vertices`](@ref), [`faces`](@ref) and
-[`edges`](@ref).
-
-    Only required for nodal interpolations.
-
-    TODO: Separate nodal and non-nodal interpolations.
+[`edges`](@ref). Only applicable to nodal interpolations.
 """
 reference_coordinates(::Interpolation)
 
