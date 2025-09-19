@@ -88,6 +88,13 @@ function weighted_normal(::Tensor{2, 1, T}, ::Type{RefLine}, facet::Int) where {
     throw(ArgumentError("unknown facet number"))
 end
 
+# Embedded lines in 2D space
+function weighted_normal(J::SMatrix{2, 1, T}, ::Type{RefLine}, facet::Int) where {T}
+    facet == 1 && return Vec{2, T}((J[2], -J[1]))
+    facet == 2 && return Vec{2, T}((-J[2], J[1]))
+    throw(ArgumentError("unknown facet number"))
+end
+
 ###########################
 # All 2D RefQuadrilateral #
 ###########################
