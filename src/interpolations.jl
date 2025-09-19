@@ -232,7 +232,7 @@ end
 Evaluate all shape function hessians, gradients and values of `ip` at once at the reference point `ξ`
 and store them in `hessians`, `gradients`, and `values`.
 """
-@propagate_inbounds function reference_shape_hessians_gradients_and_values!(hessians::AbstractVector, gradients::AbstractVector, values::AbstractVector, ip::Interpolation, ξ::Vec)
+@propagate_inbounds function reference_shape_hessians_gradients_and_values!(hessians::HAT, gradients::GAT, values::SAT, ip::IP, ξ::Vec) where {IP <: Interpolation, SAT <: AbstractArray, GAT <: AbstractArray, HAT <: AbstractArray}
     @boundscheck checkbounds(hessians, 1:getnbasefunctions(ip))
     @boundscheck checkbounds(gradients, 1:getnbasefunctions(ip))
     @boundscheck checkbounds(values, 1:getnbasefunctions(ip))
