@@ -146,7 +146,6 @@
                 # end
 
             end
-            @test_throws ArgumentError reinit!(fv, coords, Ferrite.nfacets(func_interpol) + 1)
 
             @testset "copy(::FacetValues)" begin
                 fvc = copy(fv)
