@@ -199,3 +199,24 @@
     end
 
 end # of testset
+
+@testset "EmbeddedLineFacetValues" begin
+    lₕ = 4.0
+    lᵥ = 3.0
+    l = sqrt(lₕ^2 + lᵥ^2)
+
+    grid = generate_grid(Line, (1,), Vec((0.0, 0.0)), Vec((lₕ, lᵥ)))
+    ip = Lagrange{RefLine, 1}()
+    ipGeo = Lagrange{RefLine, 1}()^2
+
+    fqr = FacetQuadratureRule{RefLine}(1)
+    fv = FacetValues(fqr, ip, ipGeo)
+    fc = FacetCache(grid)
+
+    # The normals are orthogonal to the line
+    for (i, expected) in zip(1:2, (Vec((lᵥ / l, -lₕ / l)), Vec((-lᵥ / l, lₕ / l))))
+        Ferrite.reinit!(fc, FaceIndex((1, i)))
+        Ferrite.reinit!(fv, fc)
+        @test first(fv.normals) == expected
+    end
+end
