@@ -146,6 +146,7 @@
                 # end
 
             end
+            @test_throws ArgumentError reinit!(fv, coords, Ferrite.nfacets(func_interpol) + 1)
 
             @testset "copy(::FacetValues)" begin
                 fvc = copy(fv)
@@ -219,4 +220,8 @@ end # of testset
         Ferrite.reinit!(fv, fc)
         @test first(fv.normals) == expected
     end
+
+    # Test unknown facet error path as its not yet tested in "test_quadrules.jl"
+    err = ArgumentError("unknown facet number")
+    @test_throws err Ferrite.weighted_normal(zero(Ferrite.SMatrix{2, 1}), RefLine, 3)
 end
