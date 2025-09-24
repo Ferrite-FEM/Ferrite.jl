@@ -201,24 +201,32 @@
 end # of testset
 
 @testset "EmbeddedLineFacetValues" begin
-    lₕ = 4.0
-    lᵥ = 3.0
-    l = sqrt(lₕ^2 + lᵥ^2)
 
-    for (order, ct) in zip((1, 2), (Line, QuadraticLine))
-        grid = generate_grid(ct, (1,), Vec((0.0, 0.0)), Vec((lₕ, lᵥ)))
-        ip = Lagrange{RefLine, order}()
-        ipGeo = Lagrange{RefLine, order}()^2
+    for dim in (2, 3)
+        for (order, ct) in zip((1, 2), (Line, QuadraticLine))
+            grid = generate_grid(ct, (1,), ones(Vec{dim}), dim == 2 ? Vec((4.0, 3.0)) : Vec((4.0, 3.0, 5.0)))
+            ip = Lagrange{RefLine, order}()
+            ipGeo = Lagrange{RefLine, order}()^dim
 
-        fqr = FacetQuadratureRule{RefLine}(1)
-        fv = FacetValues(fqr, ip, ipGeo)
-        fc = FacetCache(grid)
+            qr = QuadratureRule{RefLine}(2)
+            cv = CellValues(qr, ip, ipGeo)
+            cc = CellCache(grid)
+            Ferrite.reinit!(cc, 1)
+            Ferrite.reinit!(cv, cc)
 
-        # The normals are orthogonal to the line
-        for (i, expected) in zip(1:2, (Vec((lᵥ / l, -lₕ / l)), Vec((-lᵥ / l, lₕ / l))))
-            Ferrite.reinit!(fc, FaceIndex((1, i)))
-            Ferrite.reinit!(fv, fc)
-            @test first(fv.normals) == expected
+            fqr = FacetQuadratureRule{RefLine}(1)
+            fv = FacetValues(fqr, ip, ipGeo)
+            fc = FacetCache(grid)
+
+            x = getproperty.(getnodes(grid), :x)
+            dxdξ = Ferrite.calculate_mapping(cv.geo_mapping, 1, x).J
+
+            for i in 1:2
+                s = i == 1 ? -1 : 1
+                Ferrite.reinit!(fc, FaceIndex((1, i)))
+                Ferrite.reinit!(fv, fc)
+                @test first(fv.normals) ≈ Vec{dim}(s * dxdξ / norm(dxdξ))
+            end
         end
     end
 
