@@ -1455,7 +1455,7 @@ function __collect_boundary_facets(grid::Grid)
 end
 
 function __collect_periodic_facets_tree!(facet_map::Vector{PeriodicFacetPair}, grid::Grid, mset::Vector{FacetIndex}, iset::Vector{FacetIndex}, transformation::F, tol::Float64) where {F <: Function}
-    if length(mset) != length(mset)
+    if length(mset) != length(iset)
         error("different number of facets in mirror and image set")
     end
     Tx = get_coordinate_type(grid)
