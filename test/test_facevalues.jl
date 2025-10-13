@@ -204,33 +204,38 @@ end # of testset
 
     for dim in (2, 3)
         for (order, ct) in zip((1, 2), (Line, QuadraticLine))
-            grid = generate_grid(ct, (1,), ones(Vec{dim}), dim == 2 ? Vec((4.0, 3.0)) : Vec((4.0, 3.0, 5.0)))
+            grid = generate_grid(ct, (1,), zero(Vec{dim}), 1.2 * ones(Vec{dim}))
+            transform_coordinates!(grid, x -> x + basevec(x)[1] * norm(x)^2) # Make geometry nonlinear
             ip = Lagrange{RefLine, order}()
-            ipGeo = Lagrange{RefLine, order}()^dim
+            ip_geo = Lagrange{RefLine, order}()^dim
 
-            qr = QuadratureRule{RefLine}(2)
-            cv = CellValues(qr, ip, ipGeo)
-            cc = CellCache(grid)
-            Ferrite.reinit!(cc, 1)
-            Ferrite.reinit!(cv, cc)
+            dξ = 1.0e-6
+            ξ = Vec{1}.([(-1.0,), (-1.0 + dξ,), (1.0 - dξ,), (1.0,)])
+            qr = QuadratureRule{RefLine}(fill(NaN, 4), ξ)
+
+            cv = CellValues(qr, ip, ip_geo)
+            cell_coords = Ferrite.getcoordinates(grid, 1)
+            reinit!(cv, cell_coords)
 
             fqr = FacetQuadratureRule{RefLine}(1)
-            fv = FacetValues(fqr, ip, ipGeo)
-            fc = FacetCache(grid)
+            fv = FacetValues(fqr, ip, ip_geo)
 
-            x = getproperty.(getnodes(grid), :x)
-            dxdξ = Ferrite.calculate_mapping(cv.geo_mapping, 1, x).J
+            # Facet 1
+            reinit!(fv, cell_coords, 1)
+            x1 = spatial_coordinate(cv, 1, cell_coords)
+            x2 = spatial_coordinate(cv, 2, cell_coords)
+            @assert norm(x1 - spatial_coordinate(fv, 1, cell_coords)) < 1.0e-14 # Handle x ≈ 0
+            @test getnormal(fv, 1) ≈ normalize(x1 - x2) atol = 1.0e-6
 
-            for i in 1:2
-                s = i == 1 ? -1 : 1
-                Ferrite.reinit!(fc, FaceIndex((1, i)))
-                Ferrite.reinit!(fv, fc)
-                @test first(fv.normals) ≈ Vec{dim}(s * dxdξ / norm(dxdξ))
-            end
+            # Facet 2
+            reinit!(fv, cell_coords, 2)
+            x3 = spatial_coordinate(cv, 3, cell_coords)
+            x4 = spatial_coordinate(cv, 4, cell_coords)
+            @assert x4 ≈ spatial_coordinate(fv, 1, cell_coords)
+            @test getnormal(fv, 1) ≈ normalize(x4 - x3) atol = 1.0e-6
         end
     end
 
     # Test unknown facet error path as its not yet tested in "test_quadrules.jl"
-    err = ArgumentError("unknown facet number")
-    @test_throws err Ferrite.weighted_normal(zero(Ferrite.SMatrix{2, 1}), RefLine, 3)
+    @test_throws ArgumentError Ferrite.weighted_normal(zero(SMatrix{2, 1}), RefLine, 3)
 end
