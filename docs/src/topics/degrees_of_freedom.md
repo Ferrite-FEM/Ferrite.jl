@@ -45,7 +45,7 @@ close!(dh)
 
 ## Local DoF indices
 
-Locally on each element the DoFs are ordered by field, in the same order they are were added
+Locally on each element the DoFs are ordered by field, in the same order they were added
 to the DofHandler. Within each field the DoFs follow the order of the interpolation.
 Concretely this means that the local matrix is a block matrix (and the local vector a block
 vector).
@@ -88,7 +88,7 @@ u_range, v_range
 i.e. the local indices for the `:u` field are `1:3` and for the `:v` field `4:9`. This
 matches directly with the number of dofs for each field: 3 for `:u` and 6 for `:v`. The
 ranges are used when assembling the blocks of the matrix, i.e. if `Ke` is the local matrix,
-then `Ke[u_range, u_range]` corresponds to the``K_{uu}``, `Ke[u_range, v_range]` to
+then `Ke[u_range, u_range]` corresponds to the ``K_{uu}``, `Ke[u_range, v_range]` to
 ``K_{uv}``, etc. See for example [Tutorial 8: Stokes flow](../tutorials/stokes-flow.md) for
 how the ranges are used.
 
@@ -101,7 +101,7 @@ the global system is not. For all intents and purposes, the default global dof o
 should be considered an implementation detail.
 
 !!! warning "DoF numbering is decoupled from the node numbering"
-    A common pitfall for new Ferrite is to assume that the numbering of DoFs follows the
+    A common pitfall for new Ferrite users is to assume that the numbering of DoFs follows the
     numbering of the nodes in the grid. This is *not* the case. While it would be possible
     to align these two numberings in some special cases (single isoparametric scalar field)
     it is not possible in general.
@@ -191,7 +191,7 @@ nothing # hide
     ```
 
 Similarly, global blocking can be done by components, and fields and/or component can be
-permuted in the global system. See[`DofOrder.FieldWise`](@ref) and
+permuted in the global system. See [`DofOrder.FieldWise`](@ref) and
 [`DofOrder.ComponentWise`](@ref) for more details.
 
 ### Renumbering to reduce fill-in
@@ -216,7 +216,6 @@ internal ordering within the fields/components so they can be combined with Meti
 fill-in for the individual blocks, for example:
 
 ```@example dofs
-using Metis
 renumber!(dh, DofOrder.Ext{Metis}())
 renumber!(dh, DofOrder.FieldWise())
 allocate_matrix(dh)
