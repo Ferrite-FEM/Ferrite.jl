@@ -12,7 +12,7 @@ jobs:
     continue-on-error: ${{ matrix.julia-version == 'nightly' }}
     strategy:
       matrix:
-        julia-version: ['1.10', '1', 'nightly']
+        julia-version: ['lts', '1', 'pre']
         os: ['ubuntu-latest']
         include:
           - os: windows-latest
