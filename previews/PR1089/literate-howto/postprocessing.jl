@@ -13,12 +13,28 @@
 #
 # ## Introduction
 #
-# After running a simulation, we usually want to visualize the results in different ways.
-# The `L2Projector` and the `PointEvalHandler` build a pipeline for doing so. With the `L2Projector`,
-# integration point quantities can be projected to the nodes. The `PointEvalHandler` enables evaluation of
-# the finite element approximated function in any coordinate in the domain. Thus with the combination of both functionalities,
-# both nodal quantities and integration point quantities can be evaluated in any coordinate, allowing for example
-# cut-planes through 3D structures or cut-lines through 2D-structures.
+# After running a simulation, we usually want to postprocess and visualize the results in
+# different ways. Ferrite provides several tools to facilitate these tasks:
+#
+#  - L2 projection of (discrete) data onto FE interpolations using the `L2Projector`
+#  - Evalutation of fields (solutions, projections, etc) at arbitrary, user-defined, points
+#    using the `PointEvalHandler`
+#  - Builtin functionality for exporting data (solutions, cell data, projections, etc) to
+#    the VTK format
+#  - [Makie.jl](https://docs.makie.org/) based plotting using
+#    [FerriteViz.jl](https://ferrite-fem.github.io/FerriteViz.jl/)
+#
+# This how-to demonstrates the VTK export, the `L2Projector` for projecting discrete
+# quadrature point data onto a continuous FE interpolation, and the `PointEvalHandler` for
+# evaluating the FE solution, and the projection, along a user-defined cut line through the
+# domain.
+
+# !!! warning "Custom visualization"
+#     A common assumption is that the numbering of degrees of freedom matche the numbering
+#     of the nodes in the grid. This is *NOT* the case in Ferrite. If the available tools
+#     don't suit your needs and you decide to "roll your own" visualization you need to be
+#     aware of this and take it into account. For the specific case of evaluating the
+#     solution at the grid nodes you can use [`evaluate_at_grid_nodes`](@ref).
 #
 # This example continues from the Heat equation example, where the temperature field was
 # determined on a square domain. In this example, we first compute the heat flux in each
@@ -48,14 +64,14 @@ include("../tutorials/heat_equation.jl");
 # Next we define a function that computes the heat flux for each integration point in the domain.
 # Fourier's law is adopted, where the conductivity tensor is assumed to be isotropic with unit
 # conductivity ``\lambda = 1 ⇒ q = - \nabla u``, where ``u`` is the temperature.
-function compute_heat_fluxes(cellvalues::CellValues, dh::DofHandler, a::AbstractVector{T}) where T
+function compute_heat_fluxes(cellvalues::CellValues, dh::DofHandler, a::AbstractVector{T}) where {T}
 
     n = getnbasefunctions(cellvalues)
     cell_dofs = zeros(Int, n)
     nqp = getnquadpoints(cellvalues)
 
     ## Allocate storage for the fluxes to store
-    q = [Vec{2,T}[] for _ in 1:getncells(dh.grid)]
+    q = [Vec{2, T}[] for _ in 1:getncells(dh.grid)]
 
     for (cell_num, cell) in enumerate(CellIterator(dh))
         q_cell = q[cell_num]
@@ -101,7 +117,7 @@ end;
 
 # Consider a cut-line through the domain like the black line in *Figure 2* above.
 # We will evaluate the temperature and the heat flux distribution along a horizontal line.
-points = [Vec((x, 0.75)) for x in range(-1.0, 1.0, length=101)];
+points = [Vec((x, 0.75)) for x in range(-1.0, 1.0, length = 101)];
 
 # First, we need to generate a `PointEvalHandler`. This will find and store the cells
 # containing the input points.
@@ -124,11 +140,11 @@ u_points = evaluate_at_points(ph, dh, u, :u);
 import Plots
 
 # Firstly, we are going to plot the temperature values along the given line.
-Plots.plot(getindex.(points,1), u_points, xlabel="x (coordinate)", ylabel="u (temperature)", label=nothing)
+Plots.plot(getindex.(points, 1), u_points, xlabel = "x (coordinate)", ylabel = "u (temperature)", label = nothing)
 # *Figure 3*: Temperature along the cut line from *Figure 2*.
 
 # Secondly, the horizontal heat flux (i.e. the first component of the heat flux vector) is plotted.
-Plots.plot(getindex.(points,1), getindex.(q_points,1), xlabel="x (coordinate)", ylabel="q_x (flux in x-direction)", label=nothing)
+Plots.plot(getindex.(points, 1), getindex.(q_points, 1), xlabel = "x (coordinate)", ylabel = "q_x (flux in x-direction)", label = nothing)
 # *Figure 4*: ``x``-component of the flux along the cut line from *Figure 2*.
 
 #md # ## [Plain program](@id postprocessing-plain-program)

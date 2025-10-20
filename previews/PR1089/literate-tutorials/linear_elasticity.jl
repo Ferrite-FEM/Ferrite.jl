@@ -43,7 +43,7 @@
 # denotes the symmetric part.
 #
 # ### Weak form
-# The resulting weak form is given given as follows: Find ``\boldsymbol{u} \in \mathbb{U}`` such that
+# The resulting weak form is given as follows: Find ``\boldsymbol{u} \in \mathbb{U}`` such that
 # ```math
 # \int_\Omega
 #   \mathrm{grad}(\delta \boldsymbol{u}) : \boldsymbol{\sigma}
@@ -113,9 +113,9 @@ FerriteGmsh.Gmsh.finalize(); #hide
 # The generated grid lacks the facetsets for the boundaries, so we add them by using Ferrite's
 # [`addfacetset!`](@ref). It allows us to add facetsets to the grid based on coordinates.
 # Note that approximate comparison to 0.0 doesn't work well, so we use a tolerance instead.
-addfacetset!(grid, "top",    x -> x[2] ≈ 1.0) # facets for which x[2] ≈ 1.0 for all nodes
-addfacetset!(grid, "left",   x -> abs(x[1]) < 1e-6)
-addfacetset!(grid, "bottom", x -> abs(x[2]) < 1e-6);
+addfacetset!(grid, "top", x -> x[2] ≈ 1.0) # facets for which x[2] ≈ 1.0 for all nodes
+addfacetset!(grid, "left", x -> abs(x[1]) < 1.0e-6)
+addfacetset!(grid, "bottom", x -> abs(x[2]) < 1.0e-6);
 
 # ### Trial and test functions
 # In this tutorial, we use the same linear Lagrange shape functions to approximate both the
@@ -150,13 +150,18 @@ dh = DofHandler(grid)
 add!(dh, :u, ip)
 close!(dh);
 
+# !!! warning "Numbering of degrees of freedom"
+#     A common assumption is that the numbering of degrees of freedom follows the global
+#     numbering of the nodes in the grid. This is *NOT* the case in Ferrite. For more
+#     details, see the [Ferrite numbering rules](@ref "Global-DoF-indices").
+
 # ### Boundary conditions
 # We set Dirichlet boundary conditions by fixing the motion normal to the bottom and left
 # boundaries. The last argument to `Dirichlet` determines which components of the field should be
 # constrained. If no argument is given, all components are constrained by default.
 ch = ConstraintHandler(dh)
 add!(ch, Dirichlet(:u, getfacetset(grid, "bottom"), (x, t) -> 0.0, 2))
-add!(ch, Dirichlet(:u, getfacetset(grid, "left"),   (x, t) -> 0.0, 1))
+add!(ch, Dirichlet(:u, getfacetset(grid, "left"), (x, t) -> 0.0, 1))
 close!(ch);
 
 # In addition, we will use Neumann boundary conditions on the top surface, where
@@ -164,7 +169,7 @@ close!(ch);
 # ```math
 # \boldsymbol{t}_\mathrm{N}(\boldsymbol{x}) = (20e3) x_1 \boldsymbol{e}_2\ \mathrm{N}/\mathrm{mm}^2
 # ```
-traction(x) = Vec(0.0, 20e3 * x[1]);
+traction(x) = Vec(0.0, 20.0e3 * x[1]);
 
 # On the right boundary, we don't do anything, resulting in a zero traction Neumann boundary.
 # In order to assemble the external forces, $f_i^\mathrm{ext}$, we need to iterate over all
@@ -222,15 +227,15 @@ end
 # ```math
 # G = \frac{E}{2(1 + \nu)}, \quad K = \frac{E}{3(1 - 2\nu)}
 # ```
-Emod = 200e3 # Young's modulus [MPa]
-ν = 0.3      # Poisson's ratio [-]
+Emod = 200.0e3 # Young's modulus [MPa]
+ν = 0.3        # Poisson's ratio [-]
 
 Gmod = Emod / (2(1 + ν))  # Shear modulus
 Kmod = Emod / (3(1 - 2ν)) # Bulk modulus
 
 # Finally, we demonstrate `Tensors.jl`'s automatic differentiation capabilities when
 # calculating the elastic stiffness tensor
-C = gradient(ϵ -> 2 * Gmod * dev(ϵ) + 3 * Kmod * vol(ϵ), zero(SymmetricTensor{2,2}));
+C = gradient(ϵ -> 2 * Gmod * dev(ϵ) + 3 * Kmod * vol(ϵ), zero(SymmetricTensor{2, 2}));
 
 #md # !!! details "Plane stress instead of plane strain?"
 #md #     In order to change this tutorial to consider plane stress instead of plane strain,
@@ -315,6 +320,11 @@ assemble_external_forces!(f_ext, dh, getfacetset(grid, "top"), facetvalues, trac
 apply!(K, f_ext, ch)
 u = K \ f_ext;
 
+# !!! warning "Numbering of degrees of freedom"
+#     Once again, recall that numbering of degrees of freedom does *NOT* follow the global
+#     numbering of the nodes in the grid. Specifically, `u[2 * i - 1]` and `u[2 * i]` are
+#     *NOT* the displacements at node `i`.
+
 # ### Postprocessing
 # In this case, we want to analyze the displacements, as well as the stress field.
 # We calculate the stress in each quadrature point, and then export it in two different
@@ -326,8 +336,9 @@ u = K \ f_ext;
 
 function calculate_stresses(grid, dh, cv, u, C)
     qp_stresses = [
-        [zero(SymmetricTensor{2,2}) for _ in 1:getnquadpoints(cv)]
-        for _ in 1:getncells(grid)]
+        [zero(SymmetricTensor{2, 2}) for _ in 1:getnquadpoints(cv)]
+            for _ in 1:getncells(grid)
+    ]
     avg_cell_stresses = tuple((zeros(getncells(grid)) for _ in 1:3)...)
     for cell in CellIterator(dh)
         reinit!(cv, cell)
@@ -357,8 +368,8 @@ colors = [                                       #hide
     "1" => 1, "5" => 1, # purple                 #hide
     "2" => 2, "3" => 2, # red                    #hide
     "4" => 3,           # blue                   #hide
-    "6" => 4            # green                  #hide
-    ]                                            #hide
+    "6" => 4,           # green                  #hide
+]                                                #hide
 for (key, color) in colors                       #hide
     for i in getcellset(grid, key)               #hide
         color_data[i] = color                    #hide
