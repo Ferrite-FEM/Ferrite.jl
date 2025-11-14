@@ -1,10 +1,8 @@
-using ForwardDiff
-import ForwardDiff: GradientConfig, HessianConfig, Chunk
+using ForwardDiff: ForwardDiff, GradientConfig, HessianConfig, Chunk
 using Ferrite
 using Optim, LineSearches
 using SparseArrays
 using Tensors
-using Base.Threads
 
 function Fl(P::Vec{3, T}, α::Vec{3}) where {T}
     P2 = Vec{3, T}((P[1]^2, P[2]^2, P[3]^2))
@@ -76,10 +74,9 @@ function LandauModel(α, G, gridsize, left::Vec{DIM, T}, right::Vec{DIM, T}, elp
 
     apply!(dofvector, boundaryconds)
 
-    hessian = allocate_matrix(dofhandler)
     dpc = ndofs_per_cell(dofhandler)
     cpc = length(grid.cells[1].nodes)
-    caches = [ThreadCache(dpc, cpc, copy(cvP), ModelParams(α, G), elpotential) for t in 1:nthreads()]
+    caches = [ThreadCache(dpc, cpc, copy(cvP), ModelParams(α, G), elpotential) for t in 1:Threads.maxthreadid()]
     return LandauModel(dofvector, dofhandler, boundaryconds, threadindices, caches)
 end
 
@@ -95,8 +92,8 @@ macro assemble!(innerbody)
         quote
             dofhandler = model.dofhandler
             for indices in model.threadindices
-                @threads for i in indices
-                    cache = model.threadcaches[threadid()]
+                Threads.@threads for i in indices
+                    cache = model.threadcaches[Threads.threadid()]
                     eldofs = cache.element_dofs
                     nodeids = dofhandler.grid.cells[i].nodes
                     for j in 1:length(cache.element_coords)
@@ -116,9 +113,9 @@ macro assemble!(innerbody)
 end
 
 function F(dofvector::Vector{T}, model) where {T}
-    outs = fill(zero(T), nthreads())
+    outs = fill(zero(T), Threads.maxthreadid())
     @assemble! begin
-        outs[threadid()] += cache.element_potential(eldofs)
+        outs[Threads.threadid()] += cache.element_potential(eldofs)
     end
     return sum(outs)
 end
@@ -133,23 +130,23 @@ function ∇F!(∇f::Vector{T}, dofvector::Vector{T}, model::LandauModel{T}) whe
 end
 
 function ∇²F!(∇²f::SparseMatrixCSC, dofvector::Vector{T}, model::LandauModel{T}) where {T}
-    assemblers = [start_assemble(∇²f) for t in 1:nthreads()]
+    assemblers = [start_assemble(∇²f) for t in 1:Threads.maxthreadid()]
     @assemble! begin
         ForwardDiff.hessian!(cache.element_hessian, cache.element_potential, eldofs, cache.hessconf)
-        @inbounds assemble!(assemblers[threadid()], cache.element_indices, cache.element_hessian)
+        @inbounds assemble!(assemblers[Threads.threadid()], cache.element_indices, cache.element_hessian)
     end
     return
 end
 
 function calcall(∇²f::SparseMatrixCSC, ∇f::Vector{T}, dofvector::Vector{T}, model::LandauModel{T}) where {T}
-    outs = fill(zero(T), nthreads())
+    outs = fill(zero(T), Threads.maxthreadid())
     fill!(∇f, zero(T))
-    assemblers = [start_assemble(∇²f, ∇f) for t in 1:nthreads()]
+    assemblers = [start_assemble(∇²f, ∇f) for t in 1:Threads.maxthreadid()]
     @assemble! begin
-        outs[threadid()] += cache.element_potential(eldofs)
+        outs[Threads.threadid()] += cache.element_potential(eldofs)
         ForwardDiff.hessian!(cache.element_hessian, cache.element_potential, eldofs, cache.hessconf)
         ForwardDiff.gradient!(cache.element_gradient, cache.element_potential, eldofs, cache.gradconf)
-        @inbounds assemble!(assemblers[threadid()], cache.element_indices, cache.element_gradient, cache.element_hessian)
+        @inbounds assemble!(assemblers[Threads.threadid()], cache.element_indices, cache.element_gradient, cache.element_hessian)
     end
     return sum(outs)
 end
