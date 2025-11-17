@@ -1,4 +1,4 @@
-using Ferrite, FerriteMeshParser, Tensors, WriteVTK
+using Ferrite, FerriteMeshParser, Tensors, WriteVTK, Downloads
 
 struct Elastic{T}
     C::SymmetricTensor{4, 2, T, 9}
@@ -130,8 +130,12 @@ function doassemble!(assembler, domain::FEDomain, a, a_old, Δt)
 end;
 
 function get_grid()
+    # Download the grid if not available already
+    gridfile = "porous_media_0p25.inp"
+    isfile(gridfile) || Downloads.download(Ferrite.asset_url(gridfile), gridfile)
+
     # Import grid from abaqus mesh
-    grid = get_ferrite_grid(joinpath(@__DIR__, "porous_media_0p25.inp"))
+    grid = get_ferrite_grid(gridfile)
 
     # Create cellsets for each fieldhandler
     addcellset!(grid, "solid3", intersect(getcellset(grid, "solid"), getcellset(grid, "CPS3")))

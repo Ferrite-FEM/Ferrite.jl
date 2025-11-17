@@ -1,9 +1,12 @@
 using Ferrite, SparseArrays, LinearAlgebra
 
 using FerriteGmsh
+using Downloads: Downloads
 
-# grid = togrid("periodic-rve-coarse.msh")
-grid = togrid("periodic-rve.msh")
+meshfile = "periodic-rve.msh"
+isfile(meshfile) || Downloads.download(Ferrite.asset_url(meshfile), meshfile)
+
+grid = togrid(meshfile)
 
 dim = 2
 ip = Lagrange{RefTriangle, 1}()^dim

@@ -24,7 +24,7 @@ K_{ij}^\mathrm{uu} &amp;= \frac{\partial r_i^\mathrm{u}}{\partial u_j} = \int_\O
 K_{ij}^\mathrm{up} &amp;= \frac{\partial r_i^\mathrm{u}}{\partial p_j} = - \int_\Omega [\boldsymbol{\delta N}^\mathrm{u}_i \cdot \boldsymbol{\nabla}] \alpha N_j^\mathrm{p}\ \mathrm{d}\Omega \\
 K_{ij}^\mathrm{pu} &amp;= \frac{\partial r_i^\mathrm{p}}{\partial u_j} = \int_\Omega \delta N_i^\mathrm{p} \frac{\alpha}{\Delta t} [\boldsymbol{N}_j^\mathrm{u} \cdot\boldsymbol{\nabla}]\ \mathrm{d}\Omega\\
 K_{ij}^\mathrm{pp} &amp;= \frac{\partial r_i^\mathrm{p}}{\partial p_j} = \int_\Omega \delta N_i^\mathrm{p} \frac{N_j^\mathrm{p}}{\Delta t} + \boldsymbol{\nabla}(\delta N_i^\mathrm{p}) \cdot [k \boldsymbol{\nabla}(N_j^\mathrm{p})] \mathrm{d}\Omega
-\end{aligned}\]</p><p>We could assemble one stiffness matrix and one mass matrix, which would be constant, but for simplicity we only consider a single system matrix that depends on the time step, and assemble this for each step. The equations are still linear, so no iterations are required.</p><h2 id="Implementation"><a class="docs-heading-anchor" href="#Implementation">Implementation</a><a id="Implementation-1"></a><a class="docs-heading-anchor-permalink" href="#Implementation" title="Permalink"></a></h2><p>We now solve the problem step by step. The full program with fewer comments is found in the final <a href="#porous-media-plain-program">section</a></p><p>Required packages</p><pre><code class="language-julia hljs">using Ferrite, FerriteMeshParser, Tensors, WriteVTK</code></pre><h3 id="Elasticity"><a class="docs-heading-anchor" href="#Elasticity">Elasticity</a><a id="Elasticity-1"></a><a class="docs-heading-anchor-permalink" href="#Elasticity" title="Permalink"></a></h3><p>We start by defining the elastic material type, containing the elastic stiffness, for the linear elastic impermeable solid aggregates.</p><pre><code class="language-julia hljs">struct Elastic{T}
+\end{aligned}\]</p><p>We could assemble one stiffness matrix and one mass matrix, which would be constant, but for simplicity we only consider a single system matrix that depends on the time step, and assemble this for each step. The equations are still linear, so no iterations are required.</p><h2 id="Implementation"><a class="docs-heading-anchor" href="#Implementation">Implementation</a><a id="Implementation-1"></a><a class="docs-heading-anchor-permalink" href="#Implementation" title="Permalink"></a></h2><p>We now solve the problem step by step. The full program with fewer comments is found in the final <a href="#porous-media-plain-program">section</a></p><p>Required packages</p><pre><code class="language-julia hljs">using Ferrite, FerriteMeshParser, Tensors, WriteVTK, Downloads</code></pre><h3 id="Elasticity"><a class="docs-heading-anchor" href="#Elasticity">Elasticity</a><a id="Elasticity-1"></a><a class="docs-heading-anchor-permalink" href="#Elasticity" title="Permalink"></a></h3><p>We start by defining the elastic material type, containing the elastic stiffness, for the linear elastic impermeable solid aggregates.</p><pre><code class="language-julia hljs">struct Elastic{T}
     C::SymmetricTensor{4, 2, T, 9}
 end
 function Elastic(; E = 20.0e3, ν = 0.3)
@@ -140,8 +140,12 @@ end;</code></pre><p>For one domain (corresponding to a specific SubDofHandler), 
     end
     return
 end;</code></pre><h3 id="Mesh-import"><a class="docs-heading-anchor" href="#Mesh-import">Mesh import</a><a id="Mesh-import-1"></a><a class="docs-heading-anchor-permalink" href="#Mesh-import" title="Permalink"></a></h3><p>In this example, we import the mesh from the Abaqus input file, <a href="../porous_media_0p25.inp"><code>porous_media_0p25.inp</code></a> using FerriteMeshParser&#39;s <code>get_ferrite_grid</code> function. We then create one cellset for each phase (solid and porous) for each element type. These 4 sets will later be used in their own <code>SubDofHandler</code></p><pre><code class="language-julia hljs">function get_grid()
+    # Download the grid if not available already
+    gridfile = &quot;porous_media_0p25.inp&quot;
+    isfile(gridfile) || Downloads.download(Ferrite.asset_url(gridfile), gridfile)
+
     # Import grid from abaqus mesh
-    grid = get_ferrite_grid(joinpath(@__DIR__, &quot;porous_media_0p25.inp&quot;))
+    grid = get_ferrite_grid(gridfile)
 
     # Create cellsets for each fieldhandler
     addcellset!(grid, &quot;solid3&quot;, intersect(getcellset(grid, &quot;solid&quot;), getcellset(grid, &quot;CPS3&quot;)))
@@ -240,7 +244,7 @@ end;</code></pre><h3 id="Solving"><a class="docs-heading-anchor" href="#Solving"
     vtk_save(pvd)
     return
 end;</code></pre><p>Finally we call the functions to actually run the code</p><pre><code class="language-julia hljs">dh, ch, domains = setup_problem()
-solve(dh, ch, domains);</code></pre><h2 id="porous-media-plain-program"><a class="docs-heading-anchor" href="#porous-media-plain-program">Plain program</a><a id="porous-media-plain-program-1"></a><a class="docs-heading-anchor-permalink" href="#porous-media-plain-program" title="Permalink"></a></h2><p>Here follows a version of the program without any comments. The file is also available here: <a href="../porous_media.jl"><code>porous_media.jl</code></a>.</p><pre><code class="language-julia hljs">using Ferrite, FerriteMeshParser, Tensors, WriteVTK
+solve(dh, ch, domains);</code></pre><h2 id="porous-media-plain-program"><a class="docs-heading-anchor" href="#porous-media-plain-program">Plain program</a><a id="porous-media-plain-program-1"></a><a class="docs-heading-anchor-permalink" href="#porous-media-plain-program" title="Permalink"></a></h2><p>Here follows a version of the program without any comments. The file is also available here: <a href="../porous_media.jl"><code>porous_media.jl</code></a>.</p><pre><code class="language-julia hljs">using Ferrite, FerriteMeshParser, Tensors, WriteVTK, Downloads
 
 struct Elastic{T}
     C::SymmetricTensor{4, 2, T, 9}
@@ -372,8 +376,12 @@ function doassemble!(assembler, domain::FEDomain, a, a_old, Δt)
 end;
 
 function get_grid()
+    # Download the grid if not available already
+    gridfile = &quot;porous_media_0p25.inp&quot;
+    isfile(gridfile) || Downloads.download(Ferrite.asset_url(gridfile), gridfile)
+
     # Import grid from abaqus mesh
-    grid = get_ferrite_grid(joinpath(@__DIR__, &quot;porous_media_0p25.inp&quot;))
+    grid = get_ferrite_grid(gridfile)
 
     # Create cellsets for each fieldhandler
     addcellset!(grid, &quot;solid3&quot;, intersect(getcellset(grid, &quot;solid&quot;), getcellset(grid, &quot;CPS3&quot;)))
@@ -478,4 +486,4 @@ function solve(dh, ch, domains; Δt = 0.025, t_total = 1.0)
 end;
 
 dh, ch, domains = setup_problem()
-solve(dh, ch, domains);</code></pre><hr/><p><em>This page was generated using <a href="https://github.com/fredrikekre/Literate.jl">Literate.jl</a>.</em></p></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../stokes-flow/">« Stokes flow</a><a class="docs-footer-nextpage" href="../ns_vs_diffeq/">Incompressible Navier-Stokes equations via DifferentialEquations.jl »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option><option value="catppuccin-latte">catppuccin-latte</option><option value="catppuccin-frappe">catppuccin-frappe</option><option value="catppuccin-macchiato">catppuccin-macchiato</option><option value="catppuccin-mocha">catppuccin-mocha</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.15.0 on <span class="colophon-date" title="Friday 14 November 2025 13:57">Friday 14 November 2025</span>. Using Julia version 1.12.1.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
+solve(dh, ch, domains);</code></pre><hr/><p><em>This page was generated using <a href="https://github.com/fredrikekre/Literate.jl">Literate.jl</a>.</em></p></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../stokes-flow/">« Stokes flow</a><a class="docs-footer-nextpage" href="../ns_vs_diffeq/">Incompressible Navier-Stokes equations via DifferentialEquations.jl »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option><option value="catppuccin-latte">catppuccin-latte</option><option value="catppuccin-frappe">catppuccin-frappe</option><option value="catppuccin-macchiato">catppuccin-macchiato</option><option value="catppuccin-mocha">catppuccin-mocha</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.15.0 on <span class="colophon-date" title="Monday 17 November 2025 18:49">Monday 17 November 2025</span>. Using Julia version 1.12.1.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>

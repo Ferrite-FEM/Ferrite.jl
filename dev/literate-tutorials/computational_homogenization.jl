@@ -187,27 +187,23 @@
 using Ferrite, SparseArrays, LinearAlgebra
 using Test #src
 
-# We first load the mesh file [`periodic-rve.msh`](periodic-rve.msh)
-# ([`periodic-rve-coarse.msh`](periodic-rve-coarse.msh) for a coarser mesh). The mesh is
-# generated with [Gmsh](https://gmsh.info/), and we read it in as a Ferrite `Grid` using
+# We first load the mesh file `"periodic-rve.msh"` (or `"periodic-rve-coarse.msh"`
+# for a coarser mesh). The mesh is generated with [Gmsh](https://gmsh.info/),
+# and we read it in as a Ferrite `Grid` using
 # the [FerriteGmsh.jl](https://github.com/Ferrite-FEM/FerriteGmsh.jl) package:
 
 using FerriteGmsh
+using Downloads: Downloads
 
+meshfile = "periodic-rve.msh" #!nb
 #src notebook: use coarse mesh to decrease build time
 #src   script: use the fine mesh
 #src markdown: use the coarse mesh to decrease build time, but make it look like the fine
-#nb ## grid = togrid("periodic-rve.msh")
-#nb grid = togrid("periodic-rve-coarse.msh")
-#jl ## grid = togrid("periodic-rve-coarse.msh")
-#jl grid = togrid("periodic-rve.msh")
-#md grid = togrid("periodic-rve.msh")
-#-
-#md grid = redirect_stdout(devnull) do                #hide
-#md     togrid("periodic-rve-coarse.msh") #hide
-#md end                                               #hide
+#md meshfile = "periodic-rve-coarse.msh" #hide
+#nb meshfile = "periodic-rve-coarse.msh"
+isfile(meshfile) || Downloads.download(Ferrite.asset_url(meshfile), meshfile)
 
-grid = togrid("periodic-rve.msh") #src
+grid = togrid(meshfile)
 
 # Next we construct the interpolation and quadrature rule, and combining them into
 # cellvalues as usual:
