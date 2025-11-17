@@ -117,12 +117,15 @@ nothing                    #hide
 #
 # Now we solve the problem with Ferrite and [DifferentialEquations.jl](https://github.com/SciML/DifferentialEquations.jl). What follows is a program spliced with comments.
 # The full program, without comments, can be found in the next [section](@ref ns_vs_diffeq-plain-program).
-#
+
 # First we load Ferrite and some other packages we need
-using Ferrite, SparseArrays, BlockArrays, LinearAlgebra, UnPack, LinearSolve, WriteVTK
-# Since we do not need the complete DifferentialEquations suite, we just load the required ODE infrastructure, which can also handle
-# DAEs in mass matrix form.
-using OrdinaryDiffEq
+using Ferrite, SparseArrays, BlockArrays, LinearAlgebra, UnPack, WriteVTK
+
+# We do not need the complete SciML/DifferentialEquations suite. We load DiffEqBase, which
+# provides most of the ODE infrastructure (which can also handle DAEs in mass matrix form),
+# and the Rodas5P solver from OrdinaryDiffEqRosenbrock.
+using DiffEqBase
+using OrdinaryDiffEqRosenbrock: Rodas5P
 
 # We start off by defining our only material parameter.
 ν = 1.0 / 1000.0; #dynamic viscosity

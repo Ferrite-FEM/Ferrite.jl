@@ -5,9 +5,10 @@ else                       #hide
 end                        #hide
 nothing                    #hide
 
-using Ferrite, SparseArrays, BlockArrays, LinearAlgebra, UnPack, LinearSolve, WriteVTK
+using Ferrite, SparseArrays, BlockArrays, LinearAlgebra, UnPack, WriteVTK
 
-using OrdinaryDiffEq
+using DiffEqBase
+using OrdinaryDiffEqRosenbrock: Rodas5P
 
 ν = 1.0 / 1000.0; #dynamic viscosity
 
