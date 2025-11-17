@@ -113,13 +113,17 @@ function doassemble(
     return K, f
 end;
 
-function dev_3d(t::SymmetricTensor{2, 2, T}) where {T}
-    return dev(SymmetricTensor{2, 3}((i, j) -> (i ≤ 2 && j ≤ 2) ? t[i, j] : zero(T)))
-end
-
 # The element routine integrates the local stiffness and force vector for all elements.
 # Since the problem results in a symmetric matrix we choose to only assemble the lower part,
 # and then symmetrize it after the loop over the quadrature points.
+
+function dev_3d(t::SymmetricTensor{2, 2, T}) where {T}
+    ## Given 2d and 3d tensors, t2 and t3, where the out-of-plane components for t3 are zero,
+    ## we have t2 ⊡ t2 == t3 ⊡ t3, but dev(t2) ⊡ dev(t2) != dev(t3) ⊡ dev(t3), so we have to
+    ## expand the tensor before calling `dev` to get the correct value in the element routine.
+    return dev(SymmetricTensor{2, 3}((i, j) -> (i ≤ 2 && j ≤ 2) ? t[i, j] : zero(T)))
+end
+
 function assemble_up!(Ke, fe, cell, cellvalues_u, cellvalues_p, facetvalues_u, grid, mp, t)
 
     n_basefuncs_u = getnbasefunctions(cellvalues_u)
