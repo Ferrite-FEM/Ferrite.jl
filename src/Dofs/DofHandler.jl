@@ -108,6 +108,14 @@ mutable struct DofHandler{dim, G <: AbstractGrid{dim}} <: AbstractDofHandler
     ndofs::Int
 end
 
+function is_defined_on_full_domain(dh::DofHandler)
+    num_cells = 0
+    for sdh in dh.subdofhandlers
+        num_cells += length(sdh.cellset)
+    end
+    return getncells(get_grid(dh)) == num_cells
+end
+
 """
     DofHandler(grid::Grid)
 
