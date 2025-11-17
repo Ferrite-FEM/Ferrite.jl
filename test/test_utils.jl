@@ -5,36 +5,30 @@ using Ferrite: reference_shape_value
 #####################################
 # Volume for the reference elements #
 #####################################
-reference_volume(::Interpolation{Ferrite.RefHypercube{dim}}) where {dim} = 2^dim
-reference_volume(::Interpolation{Ferrite.RefSimplex{dim}}) where {dim} = 1 / factorial(dim)
-reference_volume(::Interpolation{RefPrism}) = 1 / 2
-reference_volume(::Interpolation{RefPyramid}) = 1 / 3
-# For faces
-reference_face_area(fs::VectorizedInterpolation, f::Int) = reference_face_area(fs.ip, f)
-reference_face_area(fs::Interpolation{Ferrite.RefHypercube{dim}}, face::Int) where {dim} = 2^(dim - 1)
-reference_face_area(fs::Interpolation{RefTriangle}, face::Int) = face == 1 ? sqrt(2) : 1.0
-reference_face_area(fs::Interpolation{RefTetrahedron}, face::Int) = face == 3 ? sqrt(2 * 1.5) / 2.0 : 0.5
-function reference_face_area(fs::Interpolation{RefPrism}, face::Int)
-    face == 4 && return √2
-    face ∈ [1, 5] && return 0.5
-    face ∈ [2, 3] && return 1.0
-    error("Invalid face index")
+reference_volume(::Type{Ferrite.RefHypercube{dim}}) where {dim} = 2^dim
+reference_volume(::Type{Ferrite.RefSimplex{dim}}) where {dim} = 1 / factorial(dim)
+reference_volume(::Type{RefPrism}) = 1 / 2
+reference_volume(::Type{RefPyramid}) = 1 / 3
+# For facets
+reference_facet_area(::Type{Ferrite.RefHypercube{dim}}, ::Int) where {dim} = 2^(dim - 1)
+reference_facet_area(::Type{RefTriangle}, facet::Int) = facet == 1 ? sqrt(2) : 1.0
+reference_facet_area(::Type{RefTetrahedron}, facet::Int) = facet == 3 ? sqrt(2 * 1.5) / 2.0 : 0.5
+function reference_facet_area(::Type{RefPrism}, facet::Int)
+    facet == 4 && return √2
+    facet ∈ [1, 5] && return 0.5
+    facet ∈ [2, 3] && return 1.0
+    error("Invalid facet index")
 end
-function reference_face_area(fs::Interpolation{RefPyramid}, face::Int)
-    face == 1 && return 1.0
-    face ∈ [2, 3] && return 0.5
-    face ∈ [4, 5] && return sqrt(2) / 2
-    error("Invalid face index")
+function reference_facet_area(::Type{RefPyramid}, facet::Int)
+    facet == 1 && return 1.0
+    facet ∈ [2, 3] && return 0.5
+    facet ∈ [4, 5] && return sqrt(2) / 2
+    error("Invalid facet index")
 end
 
 ######################################################
 # Coordinates and normals for the reference shapes #
 ######################################################
-
-function reference_normals(::Interpolation{RefShape}) where {RefShape}
-    @warn "Using reference normals of Interpolation, use of RefShape directly instead"
-    return reference_normals(RefShape)
-end
 
 function reference_normals(::Type{RefLine})
     return [
@@ -261,14 +255,14 @@ coords_on_faces(x, ::Serendipity{RefHexahedron, 2}) =
 check_equal_or_nan(a::Any, b::Any) = a == b || (isnan(a) && isnan(b))
 check_equal_or_nan(a::Union{Tensor, Array}, b::Union{Tensor, Array}) = all(check_equal_or_nan.(a, b))
 
-######################################################
+#######################################################
 # Helpers for testing facet_to_element_transformation #
-######################################################
-getfacerefshape(::Union{Quadrilateral, Triangle}, ::Int) = RefLine
-getfacerefshape(::Hexahedron, ::Int) = RefQuadrilateral
-getfacerefshape(::Tetrahedron, ::Int) = RefTriangle
-getfacerefshape(::Pyramid, face::Int) = face == 1 ? RefQuadrilateral : RefTriangle
-getfacerefshape(::Wedge, face::Int) = face ∈ (1, 5) ? RefTriangle : RefQuadrilateral
+#######################################################
+getfacetrefshape(::Type{<:Ferrite.AbstractRefShape{2}}, ::Int) = RefLine
+getfacetrefshape(::Type{<:RefHexahedron}, ::Int) = RefQuadrilateral
+getfacetrefshape(::Type{RefTetrahedron}, ::Int) = RefTriangle
+getfacetrefshape(::Type{RefPyramid}, facet::Int) = facet == 1 ? RefQuadrilateral : RefTriangle
+getfacetrefshape(::Type{RefPrism}, facet::Int) = facet ∈ (1, 5) ? RefTriangle : RefQuadrilateral
 
 function perturb_standard_grid!(grid::Ferrite.AbstractGrid{dim}, strength) where {dim}
     function perturb(x::Vec{dim}) where {dim}
@@ -344,4 +338,42 @@ function function_value_from_physical_coord(interpolation::Interpolation, cell_c
         u += N * ue[j]
     end
     return u
+end
+
+# Insert different cell(s) into a grid with a single cell type.
+# This is useful for testing properties on mixed grids.
+
+"""
+grid_with_inserted_quad(
+    grid::Grid{2, <:Union{Triangle, QuadraticTriangle}}, nrs::NTuple{2, Int};
+    update_sets = true)
+
+Replace the two triangles with cell `nrs` by a single Quadrilateral cell, and return
+the new grid along with the cell number of the inserted cell.
+If `updated_sets = true`, the sets should be updated and included in the new grid,
+otherwise there are no sets.
+"""
+function grid_with_inserted_quad(grid::Grid{2, Triangle}, nrs::NTuple{2, Int}; update_sets = true)
+    nrs = nrs[2] > nrs[1] ? nrs : (nrs[2], nrs[1]) # Sort.
+    t1, t2 = getcells.((grid,), nrs)
+    # Find the node numbers of for the new quadrilateral
+    t1v, t2v = Ferrite.vertices.((t1, t2))
+    @assert length(intersect(t1v, t2v)) == 2 # Exactly two overlapping vertices.
+    i1 = findfirst(v -> v ∉ t2v, t1v)
+    v1 = t1v[i1]
+    v2 = t1v[mod1(i1 + 1, 3)]
+    v3 = t2v[findfirst(v -> v ∉ t1v, t2v)]
+    v4 = t1v[mod1(i1 + 2, 3)]
+    quadcell = Quadrilateral((v1, v2, v3, v4))
+    cells = Union{Triangle, Quadrilateral}[]
+    append!(cells, grid.cells[1:(nrs[1] - 1)])
+    push!(cells, quadcell)
+    append!(cells, grid.cells[(nrs[1] + 1):(nrs[2] - 1)])
+    append!(cells, grid.cells[(nrs[2] + 1):end])
+    if !update_sets
+        return Grid(cells, grid.nodes), nrs[1]
+    else
+        throw(ArgumentError("Updating and including sets is not implemented"))
+    end
+    # TODO: Update sets (not needed for current usage)
 end

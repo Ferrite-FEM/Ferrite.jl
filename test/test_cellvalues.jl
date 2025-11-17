@@ -29,6 +29,7 @@
                 @inferred CellValues(quad_rule, func_interpol, geom_interpol; update_gradients = Val(false), update_detJdV = Val(false))
             end
             rdim = Ferrite.getrefdim(func_interpol)
+            RefShape = Ferrite.getrefshape(func_interpol)
             n_basefuncs = getnbasefunctions(func_interpol)
 
             @test getnbasefunctions(cv) == n_basefuncs
@@ -132,7 +133,7 @@
             for i in 1:getnquadpoints(cv)
                 vol += getdetJdV(cv, i)
             end
-            @test vol ≈ reference_volume(func_interpol)
+            @test vol ≈ reference_volume(RefShape)
 
             # Test spatial coordinate (after reinit with ref.coords we should get back the quad_points)
             for (i, qp_x) in pairs(Ferrite.getpoints(quad_rule))
@@ -476,6 +477,13 @@
                 @test Ferrite.geometric_interpolation(cv) == scalar_ip(geo_ip)
             end
         end
+    end
+
+    @testset "construction errors" begin
+        @test_throws ArgumentError CellValues(QuadratureRule{RefTriangle}(1), Lagrange{RefQuadrilateral, 1}())
+        @test_throws ArgumentError CellValues(QuadratureRule{RefTriangle}(1), Lagrange{RefTriangle, 1}(), Lagrange{RefQuadrilateral, 1}())
+        @test_throws ArgumentError CellValues(QuadratureRule{RefTriangle}(1), Lagrange{RefQuadrilateral, 1}(), Lagrange{RefQuadrilateral, 1}())
+        @test_throws ArgumentError CellValues(QuadratureRule{RefTriangle}(1), Lagrange{RefQuadrilateral, 1}(), Lagrange{RefTriangle, 1}())
     end
 
     @testset "show" begin
