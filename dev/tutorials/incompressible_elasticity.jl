@@ -66,20 +66,25 @@ function doassemble(
 
     # traction vector
     t = Vec{2}((0.0, 1 / 16))
-    # cache ɛdev outside the element routine to avoid some unnecessary allocations
-    ɛdev = [zero(SymmetricTensor{2, 2}) for i in 1:getnbasefunctions(cellvalues_u)]
 
     for cell in CellIterator(dh)
         fill!(ke, 0)
         fill!(fe, 0)
-        assemble_up!(ke, fe, cell, cellvalues_u, cellvalues_p, facetvalues_u, grid, mp, ɛdev, t)
+        assemble_up!(ke, fe, cell, cellvalues_u, cellvalues_p, facetvalues_u, grid, mp, t)
         assemble!(assembler, celldofs(cell), ke, fe)
     end
 
     return K, f
 end;
 
-function assemble_up!(Ke, fe, cell, cellvalues_u, cellvalues_p, facetvalues_u, grid, mp, ɛdev, t)
+function dev_3d(t::SymmetricTensor{2, 2, T}) where {T}
+    # Given 2d and 3d tensors, t2 and t3, where the out-of-plane components for t3 are zero,
+    # we have t2 ⊡ t2 == t3 ⊡ t3, but dev(t2) ⊡ dev(t2) != dev(t3) ⊡ dev(t3), so we have to
+    # expand the tensor before calling `dev` to get the correct value in the element routine.
+    return dev(SymmetricTensor{2, 3}((i, j) -> (i ≤ 2 && j ≤ 2) ? t[i, j] : zero(T)))
+end
+
+function assemble_up!(Ke, fe, cell, cellvalues_u, cellvalues_p, facetvalues_u, grid, mp, t)
 
     n_basefuncs_u = getnbasefunctions(cellvalues_u)
     n_basefuncs_p = getnbasefunctions(cellvalues_p)
@@ -89,15 +94,12 @@ function assemble_up!(Ke, fe, cell, cellvalues_u, cellvalues_p, facetvalues_u, g
 
     # We only assemble lower half triangle of the stiffness matrix and then symmetrize it.
     for q_point in 1:getnquadpoints(cellvalues_u)
-        for i in 1:n_basefuncs_u
-            ɛdev[i] = dev(symmetric(shape_gradient(cellvalues_u, q_point, i)))
-        end
         dΩ = getdetJdV(cellvalues_u, q_point)
         for i in 1:n_basefuncs_u
-            divδu = shape_divergence(cellvalues_u, q_point, i)
-            δu = shape_value(cellvalues_u, q_point, i)
+            ɛdev_i = dev_3d(symmetric(shape_gradient(cellvalues_u, q_point, i)))
             for j in 1:i
-                Ke[BlockIndex((u▄, u▄), (i, j))] += 2 * mp.G * ɛdev[i] ⊡ ɛdev[j] * dΩ
+                ɛdev_j = dev_3d(symmetric(shape_gradient(cellvalues_u, q_point, j)))
+                Ke[BlockIndex((u▄, u▄), (i, j))] += 2 * mp.G * ɛdev_i ⊡ ɛdev_j * dΩ
             end
         end
 
@@ -187,7 +189,7 @@ function solve(ν, interpolation_u, interpolation_p)
     # material
     Emod = 1.0
     Gmod = Emod / 2(1 + ν)
-    Kmod = Emod * ν / ((1 + ν) * (1 - 2ν))
+    Kmod = Emod * ν / (3 * (1 - 2ν))
     mp = LinearElasticity(Gmod, Kmod)
 
     # Grid, dofhandler, boundary condition
