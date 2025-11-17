@@ -251,7 +251,7 @@ function solve(ν, interpolation_u, interpolation_p)
     ## material
     Emod = 1.0
     Gmod = Emod / 2(1 + ν)
-    Kmod = Emod * ν / ((1 + ν) * (1 - 2ν))
+    Kmod = Emod * ν / (3 * (1 - 2ν))
     mp = LinearElasticity(Gmod, Kmod)
 
     ## Grid, dofhandler, boundary condition
@@ -310,7 +310,7 @@ u2 = solve(0.5, quadratic_u, linear_p);
 
 ## test the result                 #src
 using Test                         #src
-@test norm(u2) ≈ 919.2121476140703 #src
+@test norm(u2) ≈ 919.2121476140474 #src
 
 #md # ## [Plain program](@id incompressible_elasticity-plain-program)
 #md #
