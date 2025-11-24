@@ -204,13 +204,13 @@ Store the degrees of freedom that belong to cell `i` in `global_dofs`.
 
 See also [`celldofs`](@ref).
 """
-function celldofs!(global_dofs::Vector{Int}, dh::DofHandler, i::Int)
+function celldofs!(global_dofs::AbstractVector{Int}, dh::DofHandler, i::Int)
     @assert isclosed(dh)
     @assert length(global_dofs) == ndofs_per_cell(dh, i)
     unsafe_copyto!(global_dofs, 1, dh.cell_dofs, dh.cell_dofs_offset[i], length(global_dofs))
     return global_dofs
 end
-function celldofs!(global_dofs::Vector{Int}, sdh::SubDofHandler, i::Int)
+function celldofs!(global_dofs::AbstractVector{Int}, sdh::SubDofHandler, i::Int)
     @assert i in sdh.cellset
     return celldofs!(global_dofs, sdh.dh, i)
 end
@@ -226,7 +226,7 @@ function celldofs(dh::AbstractDofHandler, i::Int)
     return celldofs!(zeros(Int, ndofs_per_cell(dh, i)), dh, i)
 end
 
-function cellnodes!(global_nodes::Vector{Int}, dh::DofHandler, i::Union{Int, <:AbstractCell})
+function cellnodes!(global_nodes::AbstractVector{Int}, dh::DofHandler, i::Union{Int, <:AbstractCell})
     return cellnodes!(global_nodes, get_grid(dh), i)
 end
 
