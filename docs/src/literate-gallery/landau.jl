@@ -9,8 +9,8 @@
 # Optimized
 
 # In this example a basic Ginzburg-Landau model is solved.
-# This example gives an idea of how the API together with ForwardDiff can be leveraged to
-# performantly solve non standard problems on a FEM grid.
+# This example demonstrates how DifferentiationInterface.jl can be used to
+# performantly solve non-standard problems on a FEM grid with different AD backends.
 # A large portion of the code is there only for performance reasons,
 # but since this usually really matters and is what takes the most time to optimize,
 # it is included.
@@ -20,8 +20,15 @@
 # gradient and Hessian calculations.
 # This means that they are performed for each cell separately instead of for the
 # grid as a whole.
+#
+# By using DifferentiationInterface.jl, we can easily switch between different AD backends
+# (ForwardDiff, Enzyme, Zygote, etc.) and compare their performance.
+# For this second-order optimization problem, we can test both forward-mode and reverse-mode AD,
+# as well as mixed-mode approaches. Typically, reverse-mode AD is more efficient for gradients
+# when the output dimension is small compared to the input dimension.
 
-using ForwardDiff: ForwardDiff, GradientConfig, HessianConfig, Chunk
+using DifferentiationInterface
+import ForwardDiff, Enzyme, Mooncake, Zygote  # AD backends to compare
 using Ferrite
 using Optim, LineSearches
 using SparseArrays
@@ -48,7 +55,7 @@ end
 
 # ### ThreadCache
 # This holds the values that each thread will use during the assembly.
-struct ThreadCache{CV, T, DIM, F <: Function, GC <: GradientConfig, HC <: HessianConfig}
+struct ThreadCache{CV, T, DIM, F <: Function, GP, HP, B}
     cvP::CV
     element_indices::Vector{Int}
     element_dofs::Vector{T}
@@ -56,19 +63,21 @@ struct ThreadCache{CV, T, DIM, F <: Function, GC <: GradientConfig, HC <: Hessia
     element_hessian::Matrix{T}
     element_coords::Vector{Vec{DIM, T}}
     element_potential::F
-    gradconf::GC
-    hessconf::HC
+    grad_prep::GP
+    hess_prep::HP
+    backend::B
 end
-function ThreadCache(dpc::Int, nodespercell, cvP::CellValues, modelparams, elpotential)
+function ThreadCache(dpc::Int, nodespercell, cvP::CellValues, modelparams, elpotential, backend)
     element_indices = zeros(Int, dpc)
     element_dofs = zeros(dpc)
     element_gradient = zeros(dpc)
     element_hessian = zeros(dpc, dpc)
     element_coords = zeros(Vec{3, Float64}, nodespercell)
     potfunc = x -> elpotential(x, cvP, modelparams)
-    gradconf = GradientConfig(potfunc, zeros(dpc), Chunk{12}())
-    hessconf = HessianConfig(potfunc, zeros(dpc), Chunk{4}())
-    return ThreadCache(cvP, element_indices, element_dofs, element_gradient, element_hessian, element_coords, potfunc, gradconf, hessconf)
+    # Prepare gradient and hessian computations with DifferentiationInterface
+    grad_prep = prepare_gradient(potfunc, backend, zeros(dpc))
+    hess_prep = prepare_hessian(potfunc, backend, zeros(dpc))
+    return ThreadCache(cvP, element_indices, element_dofs, element_gradient, element_hessian, element_coords, potfunc, grad_prep, hess_prep, backend)
 end
 
 # ## The Model
@@ -81,7 +90,7 @@ mutable struct LandauModel{T, DH <: DofHandler, CH <: ConstraintHandler, TC <: T
     threadcaches::Vector{TC}
 end
 
-function LandauModel(α, G, gridsize, left::Vec{DIM, T}, right::Vec{DIM, T}, elpotential) where {DIM, T}
+function LandauModel(α, G, gridsize, left::Vec{DIM, T}, right::Vec{DIM, T}, elpotential, backend) where {DIM, T}
     grid = generate_grid(Tetrahedron, gridsize, left, right)
     threadindices = Ferrite.create_coloring(grid)
 
@@ -106,7 +115,7 @@ function LandauModel(α, G, gridsize, left::Vec{DIM, T}, right::Vec{DIM, T}, elp
 
     dpc = ndofs_per_cell(dofhandler)
     cpc = length(grid.cells[1].nodes)
-    caches = [ThreadCache(dpc, cpc, copy(cvP), ModelParams(α, G), elpotential) for t in 1:Threads.maxthreadid()]
+    caches = [ThreadCache(dpc, cpc, copy(cvP), ModelParams(α, G), elpotential, backend) for t in 1:Threads.maxthreadid()]
     return LandauModel(dofvector, dofhandler, boundaryconds, threadindices, caches)
 end
 
@@ -159,7 +168,7 @@ end
 function ∇F!(∇f::Vector{T}, dofvector::Vector{T}, model::LandauModel{T}) where {T}
     fill!(∇f, zero(T))
     @assemble! begin
-        ForwardDiff.gradient!(cache.element_gradient, cache.element_potential, eldofs, cache.gradconf)
+        gradient!(cache.element_potential, cache.element_gradient, cache.grad_prep, cache.backend, eldofs)
         @inbounds assemble!(∇f, cache.element_indices, cache.element_gradient)
     end
     return
@@ -169,21 +178,21 @@ end
 function ∇²F!(∇²f::SparseMatrixCSC, dofvector::Vector{T}, model::LandauModel{T}) where {T}
     assemblers = [start_assemble(∇²f) for t in 1:Threads.maxthreadid()]
     @assemble! begin
-        ForwardDiff.hessian!(cache.element_hessian, cache.element_potential, eldofs, cache.hessconf)
+        hessian!(cache.element_potential, cache.element_hessian, cache.hess_prep, cache.backend, eldofs)
         @inbounds assemble!(assemblers[Threads.threadid()], cache.element_indices, cache.element_hessian)
     end
     return
 end
 
 # We can also calculate all things in one go!
+# Using value_gradient_and_hessian! is more efficient than computing them separately
 function calcall(∇²f::SparseMatrixCSC, ∇f::Vector{T}, dofvector::Vector{T}, model::LandauModel{T}) where {T}
     outs = fill(zero(T), Threads.maxthreadid())
     fill!(∇f, zero(T))
     assemblers = [start_assemble(∇²f, ∇f) for t in 1:Threads.maxthreadid()]
     @assemble! begin
-        outs[Threads.threadid()] += cache.element_potential(eldofs)
-        ForwardDiff.hessian!(cache.element_hessian, cache.element_potential, eldofs, cache.hessconf)
-        ForwardDiff.gradient!(cache.element_gradient, cache.element_potential, eldofs, cache.gradconf)
+        y, _, _ = value_gradient_and_hessian!(cache.element_potential, cache.element_gradient, cache.element_hessian, cache.hess_prep, cache.backend, eldofs)
+        outs[Threads.threadid()] += y
         @inbounds assemble!(assemblers[Threads.threadid()], cache.element_indices, cache.element_gradient, cache.element_hessian)
     end
     return sum(outs)
@@ -192,7 +201,7 @@ end
 # ## Minimization
 # Now everything can be combined to minimize the energy, and find the equilibrium
 # configuration.
-function minimize!(model; kwargs...)
+function minimize!(model; show_trace::Bool=true)
     dh = model.dofhandler
     dofs = model.dofs
     ∇f = fill(0.0, length(dofs))
@@ -215,7 +224,7 @@ function minimize!(model; kwargs...)
     ## model.dofs .= res.minimizer
     ## to get the final convergence, Newton's method is more ideal since the energy landscape should be almost parabolic
     ##+
-    res = optimize(od, model.dofs, Newton(linesearch = BackTracking()), Optim.Options(show_trace = true, show_every = 1, g_tol = 1.0e-20))
+    res = optimize(od, model.dofs, Newton(linesearch = BackTracking()), Optim.Options(;show_trace, show_every = 1, g_tol = 1.0e-20))
     model.dofs .= res.minimizer
     return res
 end
@@ -255,12 +264,36 @@ G = V2T(1.0e2, 0.0, 1.0e2)
 α = Vec{3}((-1.0, 1.0, 1.0))
 left = Vec{3}((-75.0, -25.0, -2.0))
 right = Vec{3}((75.0, 25.0, 2.0))
-model = LandauModel(α, G, (50, 50, 2), left, right, element_potential)
 
-save_landau("landauorig", model)
-@time minimize!(model)
-save_landau("landaufinal", model)
+# ## Benchmarking different AD backends
+# Now we can easily compare different AD backends using DifferentiationInterface.
 
-# as we can see this runs very quickly even for relatively large gridsizes.
+backends = [
+    ("ForwardDiff", AutoForwardDiff()),
+    #("Enzyme", AutoEnzyme(; function_annotation=Enzyme.Const)),
+    #("Zygote", AutoZygote()),
+    #("Mooncake", AutoMooncake()),
+    #("SecondOrder (ForwardDiff + Zygote)", SecondOrder(AutoForwardDiff(), AutoZygote())),
+]
+
+for (i, (name, backend)) in enumerate(backends)
+    println("Testing backend: $name")
+
+    model_tiny = LandauModel(α, G, (2, 2, 2), left, right, element_potential, backend)
+    model = LandauModel(α, G, (50, 50, 2), left, right, element_potential, backend)
+
+    # Save original state only for the first backend
+    i == 1 &&  save_landau("landauorig", model)
+
+    try
+        minimize!(model_tiny; show_trace=false) # Compilation_time
+        time_taken = @elapsed res = @time minimize!(model)
+
+        save_landau("landaufinal_$(replace(lowercase(name), " " => "_", "(" => "", ")" => "", "+" => ""))", model)
+    catch e
+        @error "Backend $name failed" exception=(e, catch_backtrace())
+    end
+end
+
 # The key to get high performance like this is to minimize the allocations inside the threaded loops,
 # ideally to 0.
