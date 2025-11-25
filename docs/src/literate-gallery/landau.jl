@@ -9,7 +9,7 @@
 # Optimized
 
 # In this example a basic Ginzburg-Landau model is solved.
-# This example gives an idea of how the API together with ForwardDiff can be leveraged to
+# This example gives an idea of how the API together with ForwardDiff (and HyperHessians) can be leveraged to
 # performantly solve non standard problems on a FEM grid.
 # A large portion of the code is there only for performance reasons,
 # but since this usually really matters and is what takes the most time to optimize,
@@ -21,7 +21,8 @@
 # This means that they are performed for each cell separately instead of for the
 # grid as a whole.
 
-using ForwardDiff: ForwardDiff, GradientConfig, HessianConfig, Chunk
+using ForwardDiff: ForwardDiff, GradientConfig, Chunk
+using HyperHessians: HyperHessians
 using Ferrite
 using Optim, LineSearches
 using SparseArrays
@@ -48,7 +49,7 @@ end
 
 # ### ThreadCache
 # This holds the values that each thread will use during the assembly.
-struct ThreadCache{CV, T, DIM, F <: Function, GC <: GradientConfig, HC <: HessianConfig}
+struct ThreadCache{CV, T, DIM, F <: Function, GC <: GradientConfig, HC <: HyperHessians.HessianConfig}
     cvP::CV
     element_indices::Vector{Int}
     element_dofs::Vector{T}
@@ -67,7 +68,7 @@ function ThreadCache(dpc::Int, nodespercell, cvP::CellValues, modelparams, elpot
     element_coords = zeros(Vec{3, Float64}, nodespercell)
     potfunc = x -> elpotential(x, cvP, modelparams)
     gradconf = GradientConfig(potfunc, zeros(dpc), Chunk{12}())
-    hessconf = HessianConfig(potfunc, zeros(dpc), Chunk{4}())
+    hessconf = HyperHessians.HessianConfig(zeros(dpc), HyperHessians.Chunk{4}())
     return ThreadCache(cvP, element_indices, element_dofs, element_gradient, element_hessian, element_coords, potfunc, gradconf, hessconf)
 end
 
@@ -165,25 +166,24 @@ function ∇F!(∇f::Vector{T}, dofvector::Vector{T}, model::LandauModel{T}) whe
     return
 end
 
-# The Hessian calculation for the whole grid
+# The Hessian calculation for the whole grid - using HyperHessians
 function ∇²F!(∇²f::SparseMatrixCSC, dofvector::Vector{T}, model::LandauModel{T}) where {T}
     assemblers = [start_assemble(∇²f) for t in 1:Threads.maxthreadid()]
     @assemble! begin
-        ForwardDiff.hessian!(cache.element_hessian, cache.element_potential, eldofs, cache.hessconf)
+        HyperHessians.hessian!(cache.element_hessian, cache.element_potential, eldofs, cache.hessconf)
         @inbounds assemble!(assemblers[Threads.threadid()], cache.element_indices, cache.element_hessian)
     end
     return
 end
 
-# We can also calculate all things in one go!
+# We can also calculate all things in one go using HyperHessians!
 function calcall(∇²f::SparseMatrixCSC, ∇f::Vector{T}, dofvector::Vector{T}, model::LandauModel{T}) where {T}
     outs = fill(zero(T), Threads.maxthreadid())
     fill!(∇f, zero(T))
     assemblers = [start_assemble(∇²f, ∇f) for t in 1:Threads.maxthreadid()]
     @assemble! begin
-        outs[Threads.threadid()] += cache.element_potential(eldofs)
-        ForwardDiff.hessian!(cache.element_hessian, cache.element_potential, eldofs, cache.hessconf)
-        ForwardDiff.gradient!(cache.element_gradient, cache.element_potential, eldofs, cache.gradconf)
+        value = HyperHessians.hessiangradvalue!(cache.element_hessian, cache.element_gradient, cache.element_potential, eldofs, cache.hessconf)
+        outs[Threads.threadid()] += value
         @inbounds assemble!(assemblers[Threads.threadid()], cache.element_indices, cache.element_gradient, cache.element_hessian)
     end
     return sum(outs)
