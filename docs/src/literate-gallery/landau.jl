@@ -168,7 +168,7 @@ end
 # The Hessian calculation for the whole grid
 function ∇²F!(∇²f::SparseMatrixCSC, dofvector::Vector{T}, model::LandauModel{T}) where {T}
     assemblers = [start_assemble(∇²f) for t in 1:Threads.maxthreadid()]
-    assemble_model!(dofvector, model) do cache, eldofs
+    @time "∇²F!" assemble_model!(dofvector, model) do cache, eldofs
         ForwardDiff.hessian!(cache.element_hessian, cache.element_potential, eldofs, cache.hessconf)
         @inbounds Ferrite.assemble!(assemblers[Threads.threadid()], cache.element_indices, cache.element_hessian)
     end
@@ -178,15 +178,13 @@ end
 # ## Minimization
 # Now everything can be combined to minimize the energy, and find the equilibrium
 # configuration.
-function minimize!(model)
+function minimize!(model; show_trace::Bool=true)
     dh = model.dofhandler
     dofs = model.dofs
     ∇f = fill(0.0, length(dofs))
     ∇²f = allocate_matrix(dh)
     function g!(storage, x)
         ∇F!(storage, x, model)
-        @code_warntype ∇F!(storage, x, model)
-        error()
         return apply_zero!(storage, model.boundaryconds)
     end
     function h!(storage, x)
@@ -203,7 +201,7 @@ function minimize!(model)
     ## model.dofs .= res.minimizer
     ## to get the final convergence, Newton's method is more ideal since the energy landscape should be almost parabolic
     ##+
-    res = optimize(od, model.dofs, Newton(linesearch = BackTracking()), Optim.Options(show_trace = true, show_every = 1, g_tol = 1.0e-20, iterations=5))
+    res = optimize(od, model.dofs, Newton(linesearch = BackTracking()), Optim.Options(;show_trace, show_every = 1, g_tol = 1.0e-20, iterations=5))
     model.dofs .= res.minimizer
     return res
 end
@@ -245,23 +243,59 @@ left = Vec{3}((-75.0, -25.0, -2.0))
 right = Vec{3}((75.0, 25.0, 2.0))
 
 model_small = LandauModel(α, G, (2, 2, 2), left, right, element_potential)
-minimize!(model_small)
+minimize!(model_small; show_trace=false)
 
 model = LandauModel(α, G, (50, 50, 2), left, right, element_potential)
-save_landau("landauorig", model)
+# save_landau("landauorig", model)
 @time minimize!(model)
-save_landau("landaufinal", model)
-
-# as we can see this runs very quickly even for relatively large gridsizes.
-# The key to get high performance like this is to minimize the allocations inside the threaded loops,
-# ideally to 0.
-
-# 5 iterations
-# no thread macro
-# 1 thread: 13.154833 seconds (1.26 M allocations: 1.314 GiB, 0.19% gc time, 0.02% compilation time)
-# 8 threads:  13.371658 seconds (1.26 M allocations: 1.314 GiB, 0.30% gc time, 0.03% compilation time)
+# save_landau("landaufinal", model)
 
 
-# 1 threads  12.984311 seconds (1.27 M allocations: 1.285 GiB, 0.10% gc time)
-# 4 threads   4.725177 seconds (9.38 M allocations: 2.741 GiB, 1.84% gc time, 0.10% compilation time)
-# 8 threads   3.386255 seconds (15.52 M allocations: 4.384 GiB, 3.53% gc time, 0.14% compilation time)
+
+#############
+### 1.12 ####
+#############
+# nthreads 8
+# thread loop commented
+#=
+F: 0.011456 seconds
+∇F!: 0.109305 seconds
+∇²F!: 1.978417 seconds (210.00 k allocations: 50.812 MiB, 0.02% gc time)
+...
+ 13.214244 seconds (1.26 M allocations: 1.312 GiB, 0.27% gc time, 0.01% compilation time)
+=#
+
+# threaded
+#=
+F: 0.017733 seconds (121.30 k allocations: 27.131 MiB)
+∇F!: 0.059531 seconds (121.30 k allocations: 50.020 MiB, 1.08% gc time)
+∇²F!: 0.625460 seconds (11.70 M allocations: 6.324 GiB, 31.33% gc time)
+...
+  4.535544 seconds (71.67 M allocations: 39.401 GiB, 20.64% gc time, 0.02% compilation time)
+=#
+
+
+#############
+### 1.10 ####
+#############
+# nthreads 8
+# thread loop commented
+#=
+F: 0.011798 seconds
+∇F!: 0.068082 seconds
+∇²F!: 1.095828 seconds (90.00 k allocations: 46.692 MiB)
+...
+  7.689195 seconds (541.72 k allocations: 1.257 GiB, 0.16% gc time, 0.01% compilation time)
+=#
+
+# threaded
+#=
+F: 0.016949 seconds (1.76 k allocations: 187.453 KiB)
+∇F!: 0.039521 seconds (1.76 k allocations: 187.453 KiB)
+∇²F!: 0.265877 seconds (91.78 k allocations: 46.877 MiB)
+...
+  2.551576 seconds (573.67 k allocations: 1.260 GiB, 0.84% gc time, 0.04% compilation time)
+=#
+
+
+nothing
