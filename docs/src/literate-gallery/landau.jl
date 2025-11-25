@@ -136,6 +136,7 @@ function assemble_cell!(f, dofvector, dofhandler, cache, i)
     f(cache, eldofs)
 end
 
+if haskey(ENV, "RUN_THREADED")
 function assemble_model!(f::F, dofvector, model) where {F}
     dofhandler = model.dofhandler
     for indices in model.threadindices
@@ -145,7 +146,17 @@ function assemble_model!(f::F, dofvector, model) where {F}
         end
     end
 end
-
+else
+function assemble_model!(f::F, dofvector, model) where {F}
+    dofhandler = model.dofhandler
+    for indices in model.threadindices
+        for i in indices
+            cache = model.threadcaches[Threads.threadid()]
+            assemble_cell!(f, dofvector, dofhandler, cache, i)
+        end
+    end
+end
+end
 # This calculates the total energy calculation of the grid
 function F(dofvector::Vector{T}, model) where {T}
     out = Threads.Atomic{T}(zero(T))
