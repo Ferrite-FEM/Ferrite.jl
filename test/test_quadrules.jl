@@ -22,7 +22,7 @@ using Ferrite: reference_shape_value
             for order in orderrange
                 f = (x, p) -> sum([x[i]^p for i in 1:length(x)])
                 qr = QuadratureRule{shape}(rulename, order)
-                @test integrate(qr, (x) -> f(x, 2 * order - 1)) < 1.0e-14
+                @test abs(integrate(qr, (x) -> f(x, 2 * order - 1))) < 1.0e-14
                 @test sum(qr.weights) ≈ ref_square_vol(dim)
                 @test sum(Ferrite.getweights(qr)) ≈ ref_square_vol(dim)
             end
@@ -40,7 +40,7 @@ using Ferrite: reference_shape_value
         dim = 2
         for order in orderrange
             qr = QuadratureRule{RefTriangle}(rulename, order)
-            @test integrate(qr, g) - 0.4 < 0.01
+            @test abs(integrate(qr, g) - 0.4) < 0.01/order^2
             @test sum(qr.weights) ≈ ref_tet_vol(dim)
         end
     end
@@ -59,7 +59,7 @@ using Ferrite: reference_shape_value
         dim = 3
         for order in orderrange
             qr = QuadratureRule{RefTetrahedron}(rulename, order)
-            @test integrate(qr, g) - 0.14 < 0.01
+            @test abs(integrate(qr, g) - 0.142857142857143) < 0.01/order^2
             @test sum(qr.weights) ≈ ref_tet_vol(dim)
         end
     end
@@ -74,7 +74,7 @@ using Ferrite: reference_shape_value
         g = (x) -> √(x[1] + x[2]) * x[3]^2
         for order in 1:10
             qr = QuadratureRule{RefPrism}(:polyquad, order)
-            @test integrate(qr, g) - 2 / 15 < 0.01
+            @test abs(integrate(qr, g) - 2 / 15) < 0.1/order^2
             @test sum(qr.weights) ≈ ref_prism_vol()
         end
     end
