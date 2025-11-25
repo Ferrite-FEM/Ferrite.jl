@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/><title>Ginzburg-Landau model energy minimization · Ferrite.jl</title><meta name="title" content="Ginzburg-Landau model energy minimization · Ferrite.jl"/><meta property="og:title" content="Ginzburg-Landau model energy minimization · Ferrite.jl"/><meta property="twitter:title" content="Ginzburg-Landau model energy minimization · Ferrite.jl"/><meta name="description" content="Documentation for Ferrite.jl."/><meta property="og:description" content="Documentation for Ferrite.jl."/><meta property="twitter:description" content="Documentation for Ferrite.jl."/><meta property="og:url" content="https://ferrite-fem.github.io/Ferrite.jl/stable/gallery/landau/"/><meta property="twitter:url" content="https://ferrite-fem.github.io/Ferrite.jl/stable/gallery/landau/"/><link rel="canonical" href="https://ferrite-fem.github.io/Ferrite.jl/stable/gallery/landau/"/><script data-outdated-warner src="../../assets/warner.js"></script><link href="https://cdnjs.cloudflare.com/ajax/libs/lato-font/3.0.0/css/lato-font.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/juliamono/0.050/juliamono.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/fontawesome.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/solid.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/brands.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.8/katex.min.css" rel="stylesheet" type="text/css"/><script>documenterBaseURL="../.."</script><script src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.6/require.min.js" data-main="../../assets/documenter.js"></script><script src="../../search_index.js"></script><script src="../../siteinfo.js"></script><script src="../../../versions.js"></script><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/catppuccin-mocha.css" data-theme-name="catppuccin-mocha"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/catppuccin-macchiato.css" data-theme-name="catppuccin-macchiato"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/catppuccin-frappe.css" data-theme-name="catppuccin-frappe"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/catppuccin-latte.css" data-theme-name="catppuccin-latte"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/documenter-dark.css" data-theme-name="documenter-dark" data-theme-primary-dark/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/documenter-light.css" data-theme-name="documenter-light" data-theme-primary/><script src="../../assets/themeswap.js"></script><link href="../../assets/custom.css" rel="stylesheet" type="text/css"/><link href="../../assets/citations.css" rel="stylesheet" type="text/css"/><link href="../../assets/favicon.ico" rel="icon" type="image/x-icon"/></head><body><div id="documenter"><nav class="docs-sidebar"><a class="docs-logo" href="../../"><img src="../../assets/logo.svg" alt="Ferrite.jl logo"/></a><div class="docs-package-name"><span class="docs-autofit"><a href="../../">Ferrite.jl</a></span></div><button class="docs-search-query input is-rounded is-small is-clickable my-2 mx-auto py-1 px-2" id="documenter-search-query">Search docs (Ctrl + /)</button><ul class="docs-menu"><li><a class="tocitem" href="../../">Home</a></li><li><input class="collapse-toggle" id="menuitem-3" type="checkbox"/><label class="tocitem" for="menuitem-3"><span class="docs-label">Tutorials</span><i class="docs-chevron"></i></label><ul class="collapsed"><li><a class="tocitem" href="../../tutorials/">Tutorials overview</a></li><li><a class="tocitem" href="../../tutorials/heat_equation/">Heat equation</a></li><li><a class="tocitem" href="../../tutorials/linear_elasticity/">Linear elasticity</a></li><li><a class="tocitem" href="../../tutorials/incompressible_elasticity/">Incompressible elasticity</a></li><li><a class="tocitem" href="../../tutorials/hyperelasticity/">Hyperelasticity</a></li><li><a class="tocitem" href="../../tutorials/plasticity/">Von Mises plasticity</a></li><li><a class="tocitem" href="../../tutorials/transient_heat_equation/">Transient heat equation</a></li><li><a class="tocitem" href="../../tutorials/computational_homogenization/">Computational homogenization</a></li><li><a class="tocitem" href="../../tutorials/stokes-flow/">Stokes flow</a></li><li><a class="tocitem" href="../../tutorials/porous_media/">Porous media</a></li><li><a class="tocitem" href="../../tutorials/ns_vs_diffeq/">Incompressible Navier-Stokes equations via DifferentialEquations.jl</a></li><li><a class="tocitem" href="../../tutorials/reactive_surface/">Reactive surface</a></li><li><a class="tocitem" href="../../tutorials/linear_shell/">Linear shell</a></li><li><a class="tocitem" href="../../tutorials/dg_heat_equation/">Discontinuous Galerkin heat equation</a></li></ul></li><li><input class="collapse-toggle" id="menuitem-4" type="checkbox"/><label class="tocitem" for="menuitem-4"><span class="docs-label">Topic guides</span><i class="docs-chevron"></i></label><ul class="collapsed"><li><a class="tocitem" href="../../topics/">Topic guide overview</a></li><li><a class="tocitem" href="../../topics/fe_intro/">Introduction to FEM</a></li><li><a class="tocitem" href="../../topics/reference_shapes/">Reference shapes</a></li><li><a class="tocitem" href="../../topics/FEValues/">FEValues</a></li><li><a class="tocitem" href="../../topics/degrees_of_freedom/">Degrees of freedom</a></li><li><a class="tocitem" href="../../topics/sparse_matrix/">Sparsity pattern and sparse matrices</a></li><li><a class="tocitem" href="../../topics/assembly/">Assembly</a></li><li><a class="tocitem" href="../../topics/boundary_conditions/">Boundary and initial conditions</a></li><li><a class="tocitem" href="../../topics/constraints/">Affine constraints</a></li><li><a class="tocitem" href="../../topics/grid/">Grid</a></li><li><a class="tocitem" href="../../topics/export/">Export</a></li></ul></li><li><input class="collapse-toggle" id="menuitem-5" type="checkbox"/><label class="tocitem" for="menuitem-5"><span class="docs-label">API reference</span><i class="docs-chevron"></i></label><ul class="collapsed"><li><a class="tocitem" href="../../reference/">Reference overview</a></li><li><a class="tocitem" href="../../reference/quadrature/">Quadrature</a></li><li><a class="tocitem" href="../../reference/interpolations/">Interpolation</a></li><li><a class="tocitem" href="../../reference/fevalues/">FEValues</a></li><li><a class="tocitem" href="../../reference/dofhandler/">Degrees of freedom</a></li><li><a class="tocitem" href="../../reference/sparsity_pattern/">Sparsity pattern and sparse matrices</a></li><li><a class="tocitem" href="../../reference/assembly/">Assembly</a></li><li><a class="tocitem" href="../../reference/boundary_conditions/">Boundary conditions</a></li><li><a class="tocitem" href="../../reference/grid/">Grid &amp; AbstractGrid</a></li><li><a class="tocitem" href="../../reference/export/">Postprocessing</a></li><li><a class="tocitem" href="../../reference/utils/">Development utility functions</a></li></ul></li><li><input class="collapse-toggle" id="menuitem-6" type="checkbox"/><label class="tocitem" for="menuitem-6"><span class="docs-label">How-to guides</span><i class="docs-chevron"></i></label><ul class="collapsed"><li><a class="tocitem" href="../../howto/">How-to guide overview</a></li><li><a class="tocitem" href="../../howto/postprocessing/">Post processing and visualization</a></li><li><a class="tocitem" href="../../howto/threaded_assembly/">Multi-threaded assembly</a></li></ul></li><br><li><a class="tocitem" href="../">Code gallery</a></li><li><a class="tocitem" href="../../devdocs/">Developer documentation</a></li><li><a class="tocitem" href="../../cited-literature/">Cited literature</a></li><li><a class="tocitem" href="../../ferritepapers/">Papers using Ferrite</a></li></ul><div class="docs-version-selector field has-addons"><div class="control"><span class="docs-label button is-static is-size-7">Version</span></div><div class="docs-selector control is-expanded"><div class="select is-fullwidth is-size-7"><select id="documenter-version-selector"></select></div></div></div></nav><div class="docs-main"><header class="docs-navbar"><a class="docs-sidebar-button docs-navbar-link fa-solid fa-bars is-hidden-desktop" id="documenter-sidebar-button" href="#"></a><nav class="breadcrumb"><ul class="is-hidden-mobile"><li class="is-active"><a href>Ginzburg-Landau model energy minimization</a></li></ul><ul class="is-hidden-tablet"><li class="is-active"><a href>Ginzburg-Landau model energy minimization</a></li></ul></nav><div class="docs-right"><a class="docs-navbar-link" href="https://github.com/Ferrite-FEM/Ferrite.jl" title="View the repository on GitHub"><span class="docs-icon fa-brands"></span><span class="docs-label is-hidden-touch">GitHub</span></a><a class="docs-navbar-link" href="https://github.com/Ferrite-FEM/Ferrite.jl/blob/master/docs/src/literate-gallery/landau.jl" title="Edit source on GitHub"><span class="docs-icon fa-solid"></span></a><a class="docs-settings-button docs-navbar-link fa-solid fa-gear" id="documenter-settings-button" href="#" title="Settings"></a><a class="docs-article-toggle-button fa-solid fa-chevron-up" id="documenter-article-toggle-button" href="javascript:;" title="Collapse all docstrings"></a></div></header><article class="content" id="documenter-page"><h1 id="tutorial-ginzburg-landau-minimizer"><a class="docs-heading-anchor" href="#tutorial-ginzburg-landau-minimizer">Ginzburg-Landau model energy minimization</a><a id="tutorial-ginzburg-landau-minimizer-1"></a><a class="docs-heading-anchor-permalink" href="#tutorial-ginzburg-landau-minimizer" title="Permalink"></a></h1><p><img src="../landau_orig.png" alt="landau_orig.png"/></p><p>Original</p><p><img src="../landau_opt.png" alt="landau_opt.png"/></p><p>Optimized</p><p>In this example a basic Ginzburg-Landau model is solved. This example gives an idea of how the API together with ForwardDiff can be leveraged to performantly solve non standard problems on a FEM grid. A large portion of the code is there only for performance reasons, but since this usually really matters and is what takes the most time to optimize, it is included.</p><p>The key to using a method like this for minimizing a free energy function directly, rather than the weak form, as is usually done with FEM, is to split up the gradient and Hessian calculations. This means that they are performed for each cell separately instead of for the grid as a whole.</p><pre><code class="language-julia hljs">using ForwardDiff: ForwardDiff, GradientConfig, HessianConfig, Chunk
+using Ferrite
+using Optim, LineSearches
+using SparseArrays
+using Tensors</code></pre><h2 id="Energy-terms"><a class="docs-heading-anchor" href="#Energy-terms">Energy terms</a><a id="Energy-terms-1"></a><a class="docs-heading-anchor-permalink" href="#Energy-terms" title="Permalink"></a></h2><h3 id="4th-order-Landau-free-energy"><a class="docs-heading-anchor" href="#4th-order-Landau-free-energy">4th order Landau free energy</a><a id="4th-order-Landau-free-energy-1"></a><a class="docs-heading-anchor-permalink" href="#4th-order-Landau-free-energy" title="Permalink"></a></h3><pre><code class="language-julia hljs">function Fl(P::Vec{3, T}, α::Vec{3}) where {T}
+    P2 = Vec{3, T}((P[1]^2, P[2]^2, P[3]^2))
+    return α[1] * sum(P2) +
+        α[2] * (P[1]^4 + P[2]^4 + P[3]^4) +
+        α[3] * ((P2[1] * P2[2] + P2[2] * P2[3]) + P2[1] * P2[3])
+end</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">Fl (generic function with 1 method)</code></pre><h3 id="Ginzburg-free-energy"><a class="docs-heading-anchor" href="#Ginzburg-free-energy">Ginzburg free energy</a><a id="Ginzburg-free-energy-1"></a><a class="docs-heading-anchor-permalink" href="#Ginzburg-free-energy" title="Permalink"></a></h3><pre><code class="language-julia hljs">@inline Fg(∇P, G) = 0.5(∇P ⊡ G) ⊡ ∇P</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">Fg (generic function with 1 method)</code></pre><h3 id="GL-free-energy"><a class="docs-heading-anchor" href="#GL-free-energy">GL free energy</a><a id="GL-free-energy-1"></a><a class="docs-heading-anchor-permalink" href="#GL-free-energy" title="Permalink"></a></h3><pre><code class="language-julia hljs">F(P, ∇P, params) = Fl(P, params.α) + Fg(∇P, params.G)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">F (generic function with 1 method)</code></pre><h3 id="Parameters-that-characterize-the-model"><a class="docs-heading-anchor" href="#Parameters-that-characterize-the-model">Parameters that characterize the model</a><a id="Parameters-that-characterize-the-model-1"></a><a class="docs-heading-anchor-permalink" href="#Parameters-that-characterize-the-model" title="Permalink"></a></h3><pre><code class="language-julia hljs">struct ModelParams{V, T}
+    α::V
+    G::T
+end</code></pre><h3 id="ThreadCache"><a class="docs-heading-anchor" href="#ThreadCache">ThreadCache</a><a id="ThreadCache-1"></a><a class="docs-heading-anchor-permalink" href="#ThreadCache" title="Permalink"></a></h3><p>This holds the values that each thread will use during the assembly.</p><pre><code class="language-julia hljs">struct ThreadCache{CV, T, DIM, F &lt;: Function, GC &lt;: GradientConfig, HC &lt;: HessianConfig}
+    cvP::CV
+    element_indices::Vector{Int}
+    element_dofs::Vector{T}
+    element_gradient::Vector{T}
+    element_hessian::Matrix{T}
+    element_coords::Vector{Vec{DIM, T}}
+    element_potential::F
+    gradconf::GC
+    hessconf::HC
+end
+function ThreadCache(dpc::Int, nodespercell, cvP::CellValues, modelparams, elpotential)
+    element_indices = zeros(Int, dpc)
+    element_dofs = zeros(dpc)
+    element_gradient = zeros(dpc)
+    element_hessian = zeros(dpc, dpc)
+    element_coords = zeros(Vec{3, Float64}, nodespercell)
+    potfunc = x -&gt; elpotential(x, cvP, modelparams)
+    gradconf = GradientConfig(potfunc, zeros(dpc), Chunk{12}())
+    hessconf = HessianConfig(potfunc, zeros(dpc), Chunk{4}())
+    return ThreadCache(cvP, element_indices, element_dofs, element_gradient, element_hessian, element_coords, potfunc, gradconf, hessconf)
+end</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">Main.ThreadCache</code></pre><h2 id="The-Model"><a class="docs-heading-anchor" href="#The-Model">The Model</a><a id="The-Model-1"></a><a class="docs-heading-anchor-permalink" href="#The-Model" title="Permalink"></a></h2><p>everything is combined into a model.</p><pre><code class="language-julia hljs">mutable struct LandauModel{T, DH &lt;: DofHandler, CH &lt;: ConstraintHandler, TC &lt;: ThreadCache}
+    dofs::Vector{T}
+    dofhandler::DH
+    boundaryconds::CH
+    threadindices::Vector{Vector{Int}}
+    threadcaches::Vector{TC}
+end
+
+function LandauModel(α, G, gridsize, left::Vec{DIM, T}, right::Vec{DIM, T}, elpotential) where {DIM, T}
+    grid = generate_grid(Tetrahedron, gridsize, left, right)
+    threadindices = Ferrite.create_coloring(grid)
+
+    qr = QuadratureRule{RefTetrahedron}(2)
+    ipP = Lagrange{RefTetrahedron, 1}()^3
+    cvP = CellValues(qr, ipP)
+
+    dofhandler = DofHandler(grid)
+    add!(dofhandler, :P, ipP)
+    close!(dofhandler)
+
+    dofvector = zeros(ndofs(dofhandler))
+    startingconditions!(dofvector, dofhandler)
+    boundaryconds = ConstraintHandler(dofhandler)
+    #boundary conditions can be added but aren&#39;t necessary for optimization
+    #add!(boundaryconds, Dirichlet(:P, getfacetset(grid, &quot;left&quot;), (x, t) -&gt; [0.0,0.0,0.53], [1,2,3]))
+    #add!(boundaryconds, Dirichlet(:P, getfacetset(grid, &quot;right&quot;), (x, t) -&gt; [0.0,0.0,-0.53], [1,2,3]))
+    close!(boundaryconds)
+    update!(boundaryconds, 0.0)
+
+    apply!(dofvector, boundaryconds)
+
+    dpc = ndofs_per_cell(dofhandler)
+    cpc = length(grid.cells[1].nodes)
+    caches = [ThreadCache(dpc, cpc, copy(cvP), ModelParams(α, G), elpotential) for t in 1:Threads.maxthreadid()]
+    return LandauModel(dofvector, dofhandler, boundaryconds, threadindices, caches)
+end</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">Main.LandauModel</code></pre><p>utility to quickly save a model</p><pre><code class="language-julia hljs">function save_landau(path, model, dofs = model.dofs)
+    VTKGridFile(path, model.dofhandler) do vtk
+        write_solution(vtk, model.dofhandler, dofs)
+    end
+    return
+end</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">save_landau (generic function with 2 methods)</code></pre><h2 id="Assembly"><a class="docs-heading-anchor" href="#Assembly">Assembly</a><a id="Assembly-1"></a><a class="docs-heading-anchor-permalink" href="#Assembly" title="Permalink"></a></h2><p>This macro defines most of the assembly step, since the structure is the same for the energy, gradient and Hessian calculations.</p><pre><code class="language-julia hljs">macro assemble!(innerbody)
+    return esc(
+        quote
+            dofhandler = model.dofhandler
+            for indices in model.threadindices
+                Threads.@threads for i in indices
+                    cache = model.threadcaches[Threads.threadid()]
+                    eldofs = cache.element_dofs
+                    nodeids = dofhandler.grid.cells[i].nodes
+                    for j in 1:length(cache.element_coords)
+                        cache.element_coords[j] = dofhandler.grid.nodes[nodeids[j]].x
+                    end
+                    reinit!(cache.cvP, cache.element_coords)
+
+                    celldofs!(cache.element_indices, dofhandler, i)
+                    for j in 1:length(cache.element_dofs)
+                        eldofs[j] = dofvector[cache.element_indices[j]]
+                    end
+                    $innerbody
+                end
+            end
+        end
+    )
+end</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">@assemble! (macro with 1 method)</code></pre><p>This calculates the total energy calculation of the grid</p><pre><code class="language-julia hljs">function F(dofvector::Vector{T}, model) where {T}
+    outs = fill(zero(T), Threads.maxthreadid())
+    @assemble! begin
+        outs[Threads.threadid()] += cache.element_potential(eldofs)
+    end
+    return sum(outs)
+end</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">F (generic function with 2 methods)</code></pre><p>The gradient calculation for each dof</p><pre><code class="language-julia hljs">function ∇F!(∇f::Vector{T}, dofvector::Vector{T}, model::LandauModel{T}) where {T}
+    fill!(∇f, zero(T))
+    @assemble! begin
+        ForwardDiff.gradient!(cache.element_gradient, cache.element_potential, eldofs, cache.gradconf)
+        @inbounds assemble!(∇f, cache.element_indices, cache.element_gradient)
+    end
+    return
+end</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">∇F! (generic function with 1 method)</code></pre><p>The Hessian calculation for the whole grid</p><pre><code class="language-julia hljs">function ∇²F!(∇²f::SparseMatrixCSC, dofvector::Vector{T}, model::LandauModel{T}) where {T}
+    assemblers = [start_assemble(∇²f) for t in 1:Threads.maxthreadid()]
+    @assemble! begin
+        ForwardDiff.hessian!(cache.element_hessian, cache.element_potential, eldofs, cache.hessconf)
+        @inbounds assemble!(assemblers[Threads.threadid()], cache.element_indices, cache.element_hessian)
+    end
+    return
+end</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">∇²F! (generic function with 1 method)</code></pre><p>We can also calculate all things in one go!</p><pre><code class="language-julia hljs">function calcall(∇²f::SparseMatrixCSC, ∇f::Vector{T}, dofvector::Vector{T}, model::LandauModel{T}) where {T}
+    outs = fill(zero(T), Threads.maxthreadid())
+    fill!(∇f, zero(T))
+    assemblers = [start_assemble(∇²f, ∇f) for t in 1:Threads.maxthreadid()]
+    @assemble! begin
+        outs[Threads.threadid()] += cache.element_potential(eldofs)
+        ForwardDiff.hessian!(cache.element_hessian, cache.element_potential, eldofs, cache.hessconf)
+        ForwardDiff.gradient!(cache.element_gradient, cache.element_potential, eldofs, cache.gradconf)
+        @inbounds assemble!(assemblers[Threads.threadid()], cache.element_indices, cache.element_gradient, cache.element_hessian)
+    end
+    return sum(outs)
+end</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">calcall (generic function with 1 method)</code></pre><h2 id="Minimization"><a class="docs-heading-anchor" href="#Minimization">Minimization</a><a id="Minimization-1"></a><a class="docs-heading-anchor-permalink" href="#Minimization" title="Permalink"></a></h2><p>Now everything can be combined to minimize the energy, and find the equilibrium configuration.</p><pre><code class="language-julia hljs">function minimize!(model; kwargs...)
+    dh = model.dofhandler
+    dofs = model.dofs
+    ∇f = fill(0.0, length(dofs))
+    ∇²f = allocate_matrix(dh)
+    function g!(storage, x)
+        ∇F!(storage, x, model)
+        return apply_zero!(storage, model.boundaryconds)
+    end
+    function h!(storage, x)
+        return ∇²F!(storage, x, model)
+        # apply!(storage, model.boundaryconds)
+    end
+    f(x) = F(x, model)
+
+    od = TwiceDifferentiable(f, g!, h!, model.dofs, 0.0, ∇f, ∇²f)
+
+    # this way of minimizing is only beneficial when the initial guess is completely off,
+    # then a quick couple of ConjuageGradient steps brings us easily closer to the minimum.
+    # res = optimize(od, model.dofs, ConjugateGradient(linesearch=BackTracking()), Optim.Options(show_trace=true, show_every=1, g_tol=1e-20, iterations=10))
+    # model.dofs .= res.minimizer
+    # to get the final convergence, Newton&#39;s method is more ideal since the energy landscape should be almost parabolic
+    ##+
+    res = optimize(od, model.dofs, Newton(linesearch = BackTracking()), Optim.Options(show_trace = true, show_every = 1, g_tol = 1.0e-20))
+    model.dofs .= res.minimizer
+    return res
+end</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">minimize! (generic function with 1 method)</code></pre><h2 id="Testing-it"><a class="docs-heading-anchor" href="#Testing-it">Testing it</a><a id="Testing-it-1"></a><a class="docs-heading-anchor-permalink" href="#Testing-it" title="Permalink"></a></h2><p>This calculates the contribution of each element to the total energy, it is also the function that will be put through ForwardDiff for the gradient and Hessian.</p><pre><code class="language-julia hljs">function element_potential(eldofs::AbstractVector{T}, cvP, params) where {T}
+    energy = zero(T)
+    for qp in 1:getnquadpoints(cvP)
+        P = function_value(cvP, qp, eldofs)
+        ∇P = function_gradient(cvP, qp, eldofs)
+        energy += F(P, ∇P, params) * getdetJdV(cvP, qp)
+    end
+    return energy
+end</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">element_potential (generic function with 1 method)</code></pre><p>now we define some starting conditions</p><pre><code class="language-julia hljs">function startingconditions!(dofvector, dofhandler)
+    for cell in CellIterator(dofhandler)
+        globaldofs = celldofs(cell)
+        it = 1
+        for i in 1:3:length(globaldofs)
+            dofvector[globaldofs[i]] = -2.0
+            dofvector[globaldofs[i + 1]] = 2.0
+            dofvector[globaldofs[i + 2]] = -2.0tanh(cell.coords[it][1] / 20)
+            it += 1
+        end
+    end
+    return
+end
+
+δ(i, j) = i == j ? one(i) : zero(i)
+V2T(p11, p12, p44) = Tensor{4, 3}((i, j, k, l) -&gt; p11 * δ(i, j) * δ(k, l) * δ(i, k) + p12 * δ(i, j) * δ(k, l) * (1 - δ(i, k)) + p44 * δ(i, k) * δ(j, l) * (1 - δ(i, j)))
+
+G = V2T(1.0e2, 0.0, 1.0e2)
+α = Vec{3}((-1.0, 1.0, 1.0))
+left = Vec{3}((-75.0, -25.0, -2.0))
+right = Vec{3}((75.0, 25.0, 2.0))
+model = LandauModel(α, G, (50, 50, 2), left, right, element_potential)
+
+save_landau(&quot;landauorig&quot;, model)
+@time minimize!(model)
+save_landau(&quot;landaufinal&quot;, model)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">Iter     Function value   Gradient norm
+     0     2.127588e+06     3.597094e+02
+ * time: 0.00010991096496582031
+     1     3.786155e+05     1.047687e+02
+ * time: 2.9714980125427246
+     2     5.306125e+04     2.978953e+01
+ * time: 5.873517990112305
+     3    -2.642320e+03     7.943136e+00
+ * time: 8.77765703201294
+     4    -1.027484e+04     1.752693e+00
+ * time: 11.672312021255493
+     5    -1.084925e+04     2.157295e-01
+ * time: 14.56479811668396
+     6    -1.085880e+04     5.288877e-03
+ * time: 17.453377962112427
+     7    -1.085881e+04     3.478176e-06
+ * time: 20.33835792541504
+     8    -1.085881e+04     1.596091e-12
+ * time: 23.251506090164185
+     9    -1.085881e+04     1.444882e-12
+ * time: 26.196770906448364
+    10    -1.085881e+04     1.548831e-13
+ * time: 29.109750032424927
+    11    -1.085881e+04     1.548831e-13
+ * time: 32.132473945617676
+    12    -1.085881e+04     1.508030e-13
+ * time: 32.58638596534729
+ 38.071931 seconds (8.51 M allocations: 3.147 GiB, 0.30% gc time, 7.24% compilation time)</code></pre><p>as we can see this runs very quickly even for relatively large gridsizes. The key to get high performance like this is to minimize the allocations inside the threaded loops, ideally to 0.</p><hr/><p><em>This page was generated using <a href="https://github.com/fredrikekre/Literate.jl">Literate.jl</a>.</em></p></article><nav class="docs-footer"><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option><option value="catppuccin-latte">catppuccin-latte</option><option value="catppuccin-frappe">catppuccin-frappe</option><option value="catppuccin-macchiato">catppuccin-macchiato</option><option value="catppuccin-mocha">catppuccin-mocha</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.15.0 on <span class="colophon-date" title="Tuesday 25 November 2025 18:12">Tuesday 25 November 2025</span>. Using Julia version 1.12.2.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
