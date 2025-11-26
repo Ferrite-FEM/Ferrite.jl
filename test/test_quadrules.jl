@@ -40,7 +40,7 @@ using Ferrite: reference_shape_value
         dim = 2
         for order in orderrange
             qr = QuadratureRule{RefTriangle}(rulename, order)
-            @test integrate(qr, g) ≈  0.4; atol =  0.01 / order^2
+            @test integrate(qr, g) ≈ 0.4; atol = 0.01 / order^2
             @test sum(qr.weights) ≈ ref_tet_vol(dim)
         end
     end
