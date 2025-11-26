@@ -952,34 +952,34 @@ function reference_coordinates(::Lagrange{RefTetrahedron, 3})
         Vec{3, Float64}((0.0, 0.0, 1.0)),
         # Edges
         #1
-        Vec{3, Float64}((1/3, 0.0, 0.0)),
-        Vec{3, Float64}((2/3, 0.0, 0.0)),
+        Vec{3, Float64}((1 / 3, 0.0, 0.0)),
+        Vec{3, Float64}((2 / 3, 0.0, 0.0)),
         #2
-        Vec{3, Float64}((2/3, 1/3, 0.0)),
-        Vec{3, Float64}((2/3, 2/3, 0.0)),
+        Vec{3, Float64}((2 / 3, 1 / 3, 0.0)),
+        Vec{3, Float64}((2 / 3, 2 / 3, 0.0)),
         #3
-        Vec{3, Float64}((0.0, 2/3, 0.0)),
-        Vec{3, Float64}((0.0, 1/3, 0.0)),
+        Vec{3, Float64}((0.0, 2 / 3, 0.0)),
+        Vec{3, Float64}((0.0, 1 / 3, 0.0)),
         #4
-        Vec{3, Float64}((0.0, 0.0, 1/3)),
-        Vec{3, Float64}((0.0, 0.0, 2/3)),
+        Vec{3, Float64}((0.0, 0.0, 1 / 3)),
+        Vec{3, Float64}((0.0, 0.0, 2 / 3)),
         #5
-        Vec{3, Float64}((2/3, 0.0, 1/3)),
-        Vec{3, Float64}((1/3, 0.0, 2/3)),
+        Vec{3, Float64}((2 / 3, 0.0, 1 / 3)),
+        Vec{3, Float64}((1 / 3, 0.0, 2 / 3)),
         #6
-        Vec{3, Float64}((0.0, 2/3, 1/3)),
-        Vec{3, Float64}((0.0, 1/3, 2/3)),
+        Vec{3, Float64}((0.0, 2 / 3, 1 / 3)),
+        Vec{3, Float64}((0.0, 1 / 3, 2 / 3)),
         # Faces
-        Vec{3, Float64}((1/3, 1/3, 0.0)),
-        Vec{3, Float64}((1/3, 0.0, 1/3)),
-        Vec{3, Float64}((0.0, 1/3, 1/3)),
-        Vec{3, Float64}((1/3, 1/3, 1/3)),
+        Vec{3, Float64}((1 / 3, 1 / 3, 0.0)),
+        Vec{3, Float64}((1 / 3, 0.0, 1 / 3)),
+        Vec{3, Float64}((0.0, 1 / 3, 1 / 3)),
+        Vec{3, Float64}((1 / 3, 1 / 3, 1 / 3)),
     ]
 end
 
 # http://www.colorado.edu/engineering/CAS/courses.d/AFEM.d/AFEM.Ch09.d/AFEM.Ch09.pdf
 # http://www.colorado.edu/engineering/CAS/courses.d/AFEM.d/AFEM.Ch10.d/AFEM.Ch10.pdf
-function reference_shape_value(ip::Lagrange{RefTetrahedron, 3}, ξ::Vec{3, T}, i::Int) where T
+function reference_shape_value(ip::Lagrange{RefTetrahedron, 3}, ξ::Vec{3, T}, i::Int) where {T}
     ξ_x = ξ[1]
     ξ_y = ξ[2]
     ξ_z = ξ[3]
@@ -991,7 +991,7 @@ function reference_shape_value(ip::Lagrange{RefTetrahedron, 3}, ξ::Vec{3, T}, i
     i == 5 && return T(9.0) * ξ_x + T(-22.5) * ξ_x^2 + T(13.5) * ξ_x^3 + T(-18.0) * ξ_x * ξ_y + T(27.0) * ξ_x^2 * ξ_y + T(-22.5) * ξ_x * ξ_z + T(27.0) * ξ_x^2 * ξ_z + T(27.0) * ξ_x * ξ_y * ξ_z + T(13.5) * ξ_x * ξ_z^2
     i == 6 && return T(-4.499999999999999) * ξ_x + T(18.0) * ξ_x^2 + T(-13.5) * ξ_x^3 + T(2.25) * ξ_x * ξ_y + T(-13.5) * ξ_x^2 * ξ_y + T(6.75) * ξ_x * ξ_y^2 + T(4.5) * ξ_x * ξ_z + T(-13.5) * ξ_x^2 * ξ_z
     i == 7 && return T(13.5) * ξ_x * ξ_y * (ξ_x - ξ_y)
-    i == 8 && return  T(6.75) * ξ_x * ξ_y * (ξ_y - T(1 / 3)) #T(-2.25) * ξ_x * ξ_y + T(6.75) * ξ_x * ξ_y^2
+    i == 8 && return T(6.75) * ξ_x * ξ_y * (ξ_y - T(1 / 3)) #T(-2.25) * ξ_x * ξ_y + T(6.75) * ξ_x * ξ_y^2
     i == 9 && return T(-4.499999999999998) * ξ_y + T(2.2500000000000053) * ξ_x * ξ_y + T(17.999999999999996) * ξ_y^2 + T(-6.75) * ξ_x * ξ_y^2 + T(-13.5) * ξ_y^3 + T(4.5) * ξ_y * ξ_z + T(-13.5) * ξ_y^2 * ξ_z
     i == 10 && return T(8.999999999999998) * ξ_y + T(-18.000000000000007) * ξ_x * ξ_y + T(13.500000000000012) * ξ_x^2 * ξ_y + T(-22.499999999999996) * ξ_y^2 + T(13.5) * ξ_x * ξ_y^2 + T(13.5) * ξ_y^3 + T(-22.5) * ξ_y * ξ_z + T(27.0) * ξ_x * ξ_y * ξ_z + T(27.0) * ξ_y^2 * ξ_z + T(13.5) * ξ_y * ξ_z^2
     i == 11 && return T(9.0) * ξ_z + T(-22.5) * ξ_x * ξ_z + T(13.5) * ξ_x^2 * ξ_z + T(-22.5) * ξ_y * ξ_z + T(27.0) * ξ_x * ξ_y * ξ_z + T(13.5) * ξ_y^2 * ξ_z + T(-22.5) * ξ_z^2 + T(27.0) * ξ_x * ξ_z^2 + T(27.0) * ξ_y * ξ_z^2 + T(13.5) * ξ_z^3
@@ -1003,7 +1003,7 @@ function reference_shape_value(ip::Lagrange{RefTetrahedron, 3}, ξ::Vec{3, T}, i
     i == 17 && return T(18.0) * ξ_x * ξ_y + T(-27.0) * ξ_x^2 * ξ_y + T(-27.0) * ξ_x * ξ_y * ξ_z
     i == 18 && return T(27.0) * ξ_x * ξ_z + T(-27.0) * ξ_x^2 * ξ_z + T(-27.0) * ξ_x * ξ_y * ξ_z + T(-27.0) * ξ_x * ξ_z^2
     i == 19 && return T(27.0) * ξ_y * ξ_z + T(-27.0) * ξ_x * ξ_y * ξ_z + T(-27.0) * ξ_y^2 * ξ_z + T(-27.0) * ξ_y * ξ_z^2
-    i == 20 && return T(27.0) * ξ_x * ξ_y * ξ_z    
+    i == 20 && return T(27.0) * ξ_x * ξ_y * ξ_z
     throw(ArgumentError("no shape function $i for interpolation $ip"))
 end
 
@@ -2209,11 +2209,11 @@ function get_direction(::Nedelec{RefHexahedron, 1}, shape_nr, cell)
 end
 
 # TODO where to put this? I am a lazy man and I won't compute this by hand.
-function tabulate_lagrange(interpolation::Lagrange{RefTetrahedron, order}; tol=1e-8, with_T = false) where order
+function tabulate_lagrange(interpolation::Lagrange{RefTetrahedron, order}; tol = 1.0e-8, with_T = false) where {order}
     N = 0
-    for p₃ ∈ 0:order
-        for p₂ ∈ 0:(order-p₃)
-            for p₁ ∈ 0:(order-p₃-p₂)
+    for p₃ in 0:order
+        for p₂ in 0:(order - p₃)
+            for p₁ in 0:(order - p₃ - p₂)
                 N += 1
             end
         end
@@ -2223,13 +2223,13 @@ function tabulate_lagrange(interpolation::Lagrange{RefTetrahedron, order}; tol=1
     xs = reference_coordinates(interpolation)
     V = zeros(N, N)
     j = 0
-    for p₃ ∈ 0:order
-        for p₂ ∈ 0:(order-p₃)
-            for p₁ ∈ 0:(order-p₃-p₂)
+    for p₃ in 0:order
+        for p₂ in 0:(order - p₃)
+            for p₁ in 0:(order - p₃ - p₂)
                 j += 1
                 for i in 1:N
                     x = xs[i]
-                    V[i,j] = x[1]^p₁ * x[2]^p₂ * x[3]^p₃
+                    V[i, j] = x[1]^p₁ * x[2]^p₂ * x[3]^p₃
                 end
             end
         end
@@ -2240,11 +2240,11 @@ function tabulate_lagrange(interpolation::Lagrange{RefTetrahedron, order}; tol=1
         j = 0
         x = xs[i]
         isfirst = true
-        for p₃ ∈ 0:order
-            for p₂ ∈ 0:(order-p₃)
-                for p₁ ∈ 0:(order-p₃-p₂)
+        for p₃ in 0:order
+            for p₂ in 0:(order - p₃)
+                for p₁ in 0:(order - p₃ - p₂)
                     j += 1
-                    (abs(C[i,j]) < tol) && continue
+                    (abs(C[i, j]) < tol) && continue
                     if isfirst
                         print("i == $i && return")
                     else
@@ -2252,17 +2252,17 @@ function tabulate_lagrange(interpolation::Lagrange{RefTetrahedron, order}; tol=1
                     end
                     isfirst = false
                     if with_T
-                        print(" T($(C[i,j]))")
+                        print(" T($(C[i, j]))")
                     else
-                        print(" $(C[i,j])")
+                        print(" $(C[i, j])")
                     end
-                    if p₁ > 0 
+                    if p₁ > 0
                         p₁ > 1 ? print(" * ξ_x^$p₁") : print(" * ξ_x")
                     end
-                    if p₂ > 0 
+                    if p₂ > 0
                         p₂ > 1 ? print(" * ξ_y^$p₂") : print(" * ξ_y")
                     end
-                    if p₃ > 0 
+                    if p₃ > 0
                         p₃ > 1 ? print(" * ξ_z^$p₃") : print(" * ξ_z")
                     end
                 end
