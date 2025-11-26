@@ -28,7 +28,10 @@
 # when the output dimension is small compared to the input dimension.
 
 using DifferentiationInterface
-import ForwardDiff, Enzyme, Mooncake, Zygote  # AD backends to compare
+import ForwardDiff
+# import Enzyme
+import Mooncake
+# import Zygote
 using Ferrite
 using Optim, LineSearches
 using SparseArrays
@@ -272,24 +275,22 @@ backends = [
     ("ForwardDiff", AutoForwardDiff()),
     #("Enzyme", AutoEnzyme(; function_annotation=Enzyme.Const)),
     #("Zygote", AutoZygote()),
-    #("Mooncake", AutoMooncake()),
+    ("Mooncake", AutoMooncake()),
     #("SecondOrder (ForwardDiff + Zygote)", SecondOrder(AutoForwardDiff(), AutoZygote())),
 ]
 
 for (i, (name, backend)) in enumerate(backends)
     println("Testing backend: $name")
 
-    model_tiny = LandauModel(α, G, (2, 2, 2), left, right, element_potential, backend)
-    model = LandauModel(α, G, (50, 50, 2), left, right, element_potential, backend)
+    model = LandauModel(α, G, (5, 5, 2), left, right, element_potential, backend)
 
     # Save original state only for the first backend
-    i == 1 &&  save_landau("landauorig", model)
+    # i == 1 &&  save_landau("landauorig", model)
 
     try
-        minimize!(model_tiny; show_trace=false) # Compilation_time
-        time_taken = @elapsed res = @time minimize!(model)
+        res = @time minimize!(model)
 
-        save_landau("landaufinal_$(replace(lowercase(name), " " => "_", "(" => "", ")" => "", "+" => ""))", model)
+        # save_landau("landaufinal_$(replace(lowercase(name), " " => "_", "(" => "", ")" => "", "+" => ""))", model)
     catch e
         @error "Backend $name failed" exception=(e, catch_backtrace())
     end
