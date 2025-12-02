@@ -45,7 +45,7 @@ jobs:
           # Add ExplicitImports.jl and packages that Ferrite has extensions for
           using Pkg
           Pkg.add([
-            PackageSpec(name = "ExplicitImports", version = "1.6"),
+            PackageSpec(name = "ExplicitImports", version = "1.12"),
             PackageSpec(name = "Metis"),
             PackageSpec(name = "BlockArrays"),
           ])
