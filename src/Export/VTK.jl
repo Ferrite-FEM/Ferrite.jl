@@ -14,6 +14,7 @@ This file handler can be used to to write data with
 * [`write_node_data`](@ref).
 * [`Ferrite.write_cellset`](@ref)
 * [`Ferrite.write_nodeset`](@ref)
+* [`Ferrite.write_facetset`](@ref)
 * [`Ferrite.write_constraints`](@ref)
 
 It is necessary to call `close(::VTKGridFile)` to save the data after writing
