@@ -1,6 +1,0 @@
-{
-    "[julia]": {
-        "editor.defaultFormatter": "jkillian.custom-local-formatters"
-    },
-    "julia.environmentPath": "/home/USADR/ac136110/.julia/dev/Ferrite",
-}
