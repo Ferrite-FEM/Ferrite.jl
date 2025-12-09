@@ -284,6 +284,23 @@ function write_nodeset(vtk, grid::AbstractGrid, nodeset::String)
 end
 
 """
+    write_facetset(vtk::VTKGridFile, grid::AbstractGrid, facetset::String)
+
+Write nodal values of 1 for nodes of the faces in `facetset`, and 0 otherwise
+"""
+function write_facetset(vtk, grid::AbstractGrid, facetset::String)
+    z = zeros(getnnodes(grid))
+    for fi in getfacetset(grid, facetset)
+        for i in Ferrite.faces(getcells(grid, fi[1]))[fi[2]]
+            z[i] = 1.0
+        end
+    end
+    write_node_data(vtk, z, facetset)
+    return vtk
+end
+
+
+"""
     write_cellset(vtk, grid::AbstractGrid)
     write_cellset(vtk, grid::AbstractGrid, cellset::String)
     write_cellset(vtk, grid::AbstractGrid, cellsets::Union{AbstractVector{String},AbstractSet{String})
