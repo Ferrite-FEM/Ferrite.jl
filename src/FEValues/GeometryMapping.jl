@@ -151,8 +151,6 @@ end
 
 @inline function calculate_mapping(geo_mapping::GeometryMapping{2}, q_point::Int, x::AbstractVector{<:Vec})
     J = zero(otimes_returntype(eltype(x), eltype(geo_mapping.dMdξ)))
-    sdim, rdim = size(J)
-    # (rdim != sdim) && error("hessian for embedded elements not implemented (rdim=$rdim, sdim=$sdim)")
     H = zero(otimes_returntype(eltype(x), eltype(geo_mapping.d2Mdξ2)))
     @inbounds for j in 1:getngeobasefunctions(geo_mapping)
         J += otimes_helper(x[j], geo_mapping.dMdξ[j, q_point])

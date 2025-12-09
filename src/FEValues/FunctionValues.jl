@@ -174,33 +174,37 @@ required_geo_diff_order(::CovariantPiolaMapping, fun_diff_order::Int) = 1 + fun_
 # Vector interpolations with sdim > rdim
 @inline dothelper(B::SMatrix{vdim, rdim}, A::SMatrix{rdim, sdim}) where {vdim, rdim, sdim} = B * A
 
-# Result: aᵢBᵢⱼₖ = Cⱼₖ (?)
-function dothelper(A::SVector{sdim}, B::SArray{Tuple{sdim, rdim, rdim}}) where {rdim, sdim}
+# aᵢBᵢⱼₖ = Cⱼₖ
+@inline function dothelper(A::SVector{sdim}, B::SArray{Tuple{sdim, rdim, rdim}}) where {rdim, sdim}
     return SMatrix{rdim, rdim}((dot(A, B[:, j, k])  for j in 1:rdim, k in 1:rdim))
 end
 
 # For Vector Valued
-function dothelper(A::SMatrix{vdim, sdim}, B::SArray{Tuple{sdim, rdim, rdim}}) where {vdim, rdim, sdim}
+@inline function dothelper(A::SMatrix{vdim, sdim}, B::SArray{Tuple{sdim, rdim, rdim}}) where {vdim, rdim, sdim}
     return SArray{Tuple{vdim, rdim, rdim}}(
         (dothelper(A[i, :], B)[j, k] for i in 1:vdim, j in 1:rdim, k in 1:rdim)
     )
 end
 
-dothelper(A::SMatrix{sdim, rdim}, B::SMatrix{rdim, rdim}) where {rdim, sdim} = A * B
-dothelper(A::SMatrix{sdim, rdim}, B::SMatrix{rdim, sdim}) where {rdim, sdim} = A * B
+@inline dothelper(A::SMatrix{sdim, rdim}, B::SMatrix{rdim, rdim}) where {rdim, sdim} = A * B
+@inline dothelper(A::SMatrix{sdim, rdim}, B::SMatrix{rdim, sdim}) where {rdim, sdim} = A * B
 
-@inline dothelper2(A, B) = A ⋅ B
+@inline otimesu_helper(A, B) = otimesu(A, B)
 
-# dothelper2 helps in disambiguating calls to dothelper
-function dothelper2(A::SMatrix{sdim, rdim}, B::SArray{Tuple{vdim, rdim, rdim}}) where {vdim, rdim, sdim}
-    return SArray{Tuple{vdim, sdim, rdim}}(
-        ((A * B[i, :, :])[j, k] for  i in 1:vdim, j in 1:sdim, k in 1:rdim)
+# Cᵢⱼₖₗ = AᵢₖBⱼₗ
+@inline function otimesu_helper(A::SMatrix{rdim, sdim}, B::SMatrix{rdim, sdim}) where {rdim, sdim}
+    return SArray{Tuple{rdim, rdim, sdim, sdim}}(
+        (A[i, k] * B[j, l] for i in 1:rdim, j in 1:rdim, k in 1:sdim, l in 1:sdim)
     )
 end
 
-function dothelper2(A::SArray{Tuple{vdim, sdim, rdim}}, B::SMatrix{rdim, sdim}) where {vdim, rdim, sdim}
+@inline dcontract_helper(A, B) = A ⊡ B
+@inline dcontract_helper(A::SMatrix{rdim, rdim}, B::SMatrix{rdim, rdim}) where {rdim} = Tensor{2, rdim}(A) ⊡ Tensor{2, rdim}(B)
+
+# Cᵢₗₘ = AᵢⱼₖBⱼₖₗₘ
+@inline function dcontract_helper(A::SArray{Tuple{vdim, rdim, rdim}}, B::SArray{Tuple{rdim, rdim, sdim, sdim}}) where {vdim, sdim, rdim}
     return SArray{Tuple{vdim, sdim, sdim}}(
-        ((A[i, :, :] * B)[j, k] for i in 1:vdim, j in 1:sdim, k in 1:sdim)
+        (dcontract_helper(A[i, :, :], B[:, :, l, m]) for i in 1:vdim, l in 1:sdim, m in 1:sdim)
     )
 end
 
@@ -228,16 +232,14 @@ end
 @inline function apply_mapping!(funvals::FunctionValues{2}, ::IdentityMapping, q_point::Int, mapping_values, args...)
     Jinv = calculate_Jinv(getjacobian(mapping_values))
 
-    sdim, rdim = size(Jinv)
-    # (rdim != sdim) && error("apply_mapping! for second order gradients and embedded elements not implemented")
-
     H = gethessian(mapping_values)
     is_vector_valued = first(funvals.Nx) isa Union{<:Vec, <:SVector}
     @inbounds for j in 1:getnbasefunctions(funvals)
         dNdx = dothelper(funvals.dNdξ[j, q_point], Jinv)
         if is_vector_valued
-            t = dothelper2(Jinv', (funvals.d2Ndξ2[j, q_point] - dothelper(dNdx, H)))
-            d2Ndx2 = dothelper2(t, Jinv)
+            t = (funvals.d2Ndξ2[j, q_point] - dothelper(dNdx, H))
+            Jinv_otimesu_Jinv = otimesu_helper(Jinv, Jinv)
+            d2Ndx2 = dcontract_helper(t, Jinv_otimesu_Jinv)
 
             # d2Ndx2 = (funvals.d2Ndξ2[j, q_point] - dNdx ⋅ H) ⊡ Jinv_otimesu_Jinv
         else
