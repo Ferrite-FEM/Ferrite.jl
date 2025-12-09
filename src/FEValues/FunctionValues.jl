@@ -176,15 +176,33 @@ required_geo_diff_order(::CovariantPiolaMapping, fun_diff_order::Int) = 1 + fun_
 
 # Result: aᵢBᵢⱼₖ = Cⱼₖ (?)
 function dothelper(A::SVector{sdim}, B::SArray{Tuple{sdim, rdim, rdim}}) where {rdim, sdim}
-    C = zeros(rdim, rdim)
-    for i in 1:sdim, j in 1:rdim, k in 1:rdim
-        C[j, k] += A[i] * B[i, j, k]
-    end
-    return SMatrix{rdim, rdim}(C)
+    return SMatrix{rdim, rdim}((dot(A, B[:, j, k])  for j in 1:rdim, k in 1:rdim))
+end
+
+# For Vector Valued
+function dothelper(A::SMatrix{vdim, sdim}, B::SArray{Tuple{sdim, rdim, rdim}}) where {vdim, rdim, sdim}
+    return SArray{Tuple{vdim, rdim, rdim}}(
+        (dothelper(A[i, :], B)[j, k] for i in 1:vdim, j in 1:rdim, k in 1:rdim)
+    )
 end
 
 dothelper(A::SMatrix{sdim, rdim}, B::SMatrix{rdim, rdim}) where {rdim, sdim} = A * B
 dothelper(A::SMatrix{sdim, rdim}, B::SMatrix{rdim, sdim}) where {rdim, sdim} = A * B
+
+@inline dothelper2(A, B) = A ⋅ B
+
+# dothelper2 helps in disambiguating calls to dothelper
+function dothelper2(A::SMatrix{sdim, rdim}, B::SArray{Tuple{vdim, rdim, rdim}}) where {vdim, rdim, sdim}
+    return SArray{Tuple{vdim, sdim, rdim}}(
+        ((A * B[i, :, :])[j, k] for  i in 1:vdim, j in 1:sdim, k in 1:rdim)
+    )
+end
+
+function dothelper2(A::SArray{Tuple{vdim, sdim, rdim}}, B::SMatrix{rdim, sdim}) where {vdim, rdim, sdim}
+    return SArray{Tuple{vdim, sdim, sdim}}(
+        ((A[i, :, :] * B)[j, k] for i in 1:vdim, j in 1:sdim, k in 1:sdim)
+    )
+end
 
 # =============
 # Apply mapping
@@ -214,12 +232,14 @@ end
     # (rdim != sdim) && error("apply_mapping! for second order gradients and embedded elements not implemented")
 
     H = gethessian(mapping_values)
-    is_vector_valued = first(funvals.Nx) isa Vec
-    Jinv_otimesu_Jinv = is_vector_valued ? otimesu(Jinv, Jinv) : nothing
+    is_vector_valued = first(funvals.Nx) isa Union{<:Vec, <:SVector}
     @inbounds for j in 1:getnbasefunctions(funvals)
         dNdx = dothelper(funvals.dNdξ[j, q_point], Jinv)
         if is_vector_valued
-            d2Ndx2 = (funvals.d2Ndξ2[j, q_point] - dNdx ⋅ H) ⊡ Jinv_otimesu_Jinv
+            t = dothelper2(Jinv', (funvals.d2Ndξ2[j, q_point] - dothelper(dNdx, H)))
+            d2Ndx2 = dothelper2(t, Jinv)
+
+            # d2Ndx2 = (funvals.d2Ndξ2[j, q_point] - dNdx ⋅ H) ⊡ Jinv_otimesu_Jinv
         else
             t = dothelper(Jinv', (funvals.d2Ndξ2[j, q_point] - dothelper(dNdx, H)))
             d2Ndx2 = dothelper(t, Jinv)

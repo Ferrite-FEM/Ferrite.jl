@@ -442,8 +442,6 @@
             cv_scalar = CellValues(qr, ip, ip^3; update_hessians = true)
 
             coords = [Vec{3}((2x[1], 0.5x[2], rand())) for x in Ferrite.reference_coordinates(ip)]
-            # TODO
-            # @test_throws ErrorException reinit!(cv_vector, coords) # Not implemented for embedded elements
 
             # Test Scalar H
             reinit!(cv_scalar, coords)
@@ -457,12 +455,30 @@
             ∂A₁∂₂ = Vec{3}(i -> getindex.(d2Ndξ2[:, qp], 1, 2) ⋅ getindex.(coords, i)) # = ∂A₂∂₁
             ∂A₂∂₁ = Vec{3}(i -> getindex.(d2Ndξ2[:, qp], 2, 1) ⋅ getindex.(coords, i))
 
-            @test ∂A₁∂₁ ≈ H[:, 1, 1]
+            @test H[:, 1, 1] ≈ ∂A₁∂₁
             @test H[:, 2, 2] ≈ ∂A₂∂₂
             @test H[:, 1, 2] ≈ ∂A₁∂₂
             @test H[:, 2, 1] ≈ ∂A₂∂₁
 
-            # Test Mapping
+
+            # Test Vector H
+            reinit!(cv_vector, coords)
+
+            H = Ferrite.calculate_mapping(cv_vector.geo_mapping, qp, coords).H
+
+            d2Ndξ2 = cv_vector.fun_values.d2Ndξ2
+            ∂A₁∂₁ = Vec{3}(i -> getindex.(d2Ndξ2[1:2:18, qp], 1, 1, 1) ⋅ getindex.(coords, i))
+            ∂A₂∂₂ = Vec{3}(i -> getindex.(d2Ndξ2[1:2:18, qp], 1, 2, 2) ⋅ getindex.(coords, i))
+            ∂A₁∂₂ = Vec{3}(i -> getindex.(d2Ndξ2[1:2:18, qp], 1, 1, 2) ⋅ getindex.(coords, i)) # = ∂A₂∂₁
+            ∂A₂∂₁ = Vec{3}(i -> getindex.(d2Ndξ2[1:2:18, qp], 1, 2, 1) ⋅ getindex.(coords, i))
+
+
+            @test H[:, 1, 1] ≈ ∂A₁∂₁
+            @test H[:, 2, 2] ≈ ∂A₂∂₂
+            @test H[:, 1, 2] ≈ ∂A₁∂₂
+            @test H[:, 2, 1] ≈ ∂A₂∂₁
+
+            # Test Mapping Scalar
             coords_scaled = [Vec{3}((2x[1], 0.5x[2], 0.0)) for x in Ferrite.reference_coordinates(ip)]
             reinit!(cv_scalar, coords_scaled)
 
@@ -473,12 +489,35 @@
             cv_ref = CellValues(qr, ip, ip^3; update_hessians = true)
             reinit!(cv_ref, coords_ref)
 
+            # Test scaling embedded vs embedded
             @test shape_hessian(cv_scalar, qp, 1)[1, 1] * scale_x^2 ≈ shape_hessian(cv_ref, qp, 1)[1, 1]
             @test shape_hessian(cv_scalar, qp, 1)[2, 2] * scale_y^2 ≈ shape_hessian(cv_ref, qp, 1)[2, 2]
             @test shape_hessian(cv_scalar, qp, 1)[3, 3] ≈ shape_hessian(cv_ref, qp, 1)[3, 3]
             @test shape_hessian(cv_scalar, qp, 1)[1, 2] * scale_x * scale_y ≈ shape_hessian(cv_ref, qp, 1)[1, 2]
             @test shape_hessian(cv_scalar, qp, 1)[2, 1] * scale_x * scale_y ≈ shape_hessian(cv_ref, qp, 1)[2, 1]
 
+            # Test Mapping Vector
+            cv_ref2 = CellValues(qr, ip^2, ip^3; update_hessians = true)
+            reinit!(cv_vector, coords_scaled)
+            reinit!(cv_ref2, coords_ref)
+
+            # Test scaling embedded vs embedded
+            @test shape_hessian(cv_vector, qp, 1)[1, 1, 1] * scale_x^2 ≈ shape_hessian(cv_ref2, qp, 1)[1, 1, 1]
+            @test shape_hessian(cv_vector, qp, 1)[1, 2, 2] * scale_y^2 ≈ shape_hessian(cv_ref2, qp, 1)[1, 2, 2]
+            @test shape_hessian(cv_vector, qp, 1)[1, 3, 3] ≈ shape_hessian(cv_ref2, qp, 1)[1, 3, 3]
+            @test shape_hessian(cv_vector, qp, 1)[1, 1, 2] * scale_x * scale_y ≈ shape_hessian(cv_ref2, qp, 1)[1, 1, 2]
+            @test shape_hessian(cv_vector, qp, 1)[1, 2, 1] * scale_x * scale_y ≈ shape_hessian(cv_ref2, qp, 1)[1, 2, 1]
+
+
+            # Test embedded vs non-embedded
+            cv_ref2n = CellValues(qr, ip^2, ip^2; update_hessians = true)
+            coords_refn = [Vec{2}((x[1], x[2])) for x in Ferrite.reference_coordinates(ip)]
+            reinit!(cv_ref2n, coords_refn)
+
+            @test shape_hessian(cv_ref2, qp, 1)[1, 1, 1] ≈ shape_hessian(cv_ref2n, qp, 1)[1, 1, 1]
+            @test shape_hessian(cv_ref2, qp, 1)[1, 2, 1] ≈ shape_hessian(cv_ref2n, qp, 1)[1, 2, 1]
+            @test shape_hessian(cv_ref2, qp, 1)[2, 1, 1] ≈ shape_hessian(cv_ref2n, qp, 1)[2, 1, 1]
+            @test shape_hessian(cv_ref2, qp, 1)[2, 2, 1] ≈ shape_hessian(cv_ref2n, qp, 1)[2, 2, 1]
         end
     end
 
