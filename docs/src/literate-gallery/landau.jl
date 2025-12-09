@@ -9,8 +9,9 @@
 # Optimized
 
 # In this example a basic Ginzburg-Landau model is solved.
-# This example gives an idea of how the API together with ForwardDiff can be leveraged to
-# performantly solve non standard problems on a FEM grid.
+# This example gives an idea of how the API together with DifferentiationInterface.jl
+# (using ForwardDiff as backend) can be leveraged to performantly solve non standard
+# problems on a FEM grid.
 # A large portion of the code is there only for performance reasons,
 # but since this usually really matters and is what takes the most time to optimize,
 # it is included.
@@ -21,7 +22,8 @@
 # This means that they are performed for each cell separately instead of for the
 # grid as a whole.
 
-using ForwardDiff: ForwardDiff, GradientConfig, HessianConfig, Chunk
+using DifferentiationInterface
+using ForwardDiff: ForwardDiff
 using Ferrite
 using Optim, LineSearches
 using SparseArrays
@@ -48,7 +50,7 @@ end
 
 # ### ThreadCache
 # This holds the values that each thread will use during the assembly.
-struct ThreadCache{CV, T, DIM, F <: Function, GC <: GradientConfig, HC <: HessianConfig}
+struct ThreadCache{CV, T, DIM, F <: Function, GP, HP, GB, HB}
     cvP::CV
     element_indices::Vector{Int}
     element_dofs::Vector{T}
@@ -56,19 +58,21 @@ struct ThreadCache{CV, T, DIM, F <: Function, GC <: GradientConfig, HC <: Hessia
     element_hessian::Matrix{T}
     element_coords::Vector{Vec{DIM, T}}
     element_potential::F
-    gradconf::GC
-    hessconf::HC
+    grad_prep::GP
+    hess_prep::HP
+    grad_backend::GB
+    hess_backend::HB
 end
-function ThreadCache(dpc::Int, nodespercell, cvP::CellValues, modelparams, elpotential)
+function ThreadCache(dpc::Int, nodespercell, cvP::CellValues, modelparams, elpotential, grad_backend, hess_backend)
     element_indices = zeros(Int, dpc)
     element_dofs = zeros(dpc)
     element_gradient = zeros(dpc)
     element_hessian = zeros(dpc, dpc)
     element_coords = zeros(Vec{3, Float64}, nodespercell)
     potfunc = x -> elpotential(x, cvP, modelparams)
-    gradconf = GradientConfig(potfunc, zeros(dpc), Chunk{12}())
-    hessconf = HessianConfig(potfunc, zeros(dpc), Chunk{4}())
-    return ThreadCache(cvP, element_indices, element_dofs, element_gradient, element_hessian, element_coords, potfunc, gradconf, hessconf)
+    grad_prep = prepare_gradient(potfunc, grad_backend, zeros(dpc))
+    hess_prep = prepare_hessian(potfunc, hess_backend, zeros(dpc))
+    return ThreadCache(cvP, element_indices, element_dofs, element_gradient, element_hessian, element_coords, potfunc, grad_prep, hess_prep, grad_backend, hess_backend)
 end
 
 # ## The Model
@@ -81,7 +85,7 @@ mutable struct LandauModel{T, DH <: DofHandler, CH <: ConstraintHandler, TC <: T
     threadcaches::Vector{TC}
 end
 
-function LandauModel(α, G, gridsize, left::Vec{DIM, T}, right::Vec{DIM, T}, elpotential) where {DIM, T}
+function LandauModel(α, G, gridsize, left::Vec{DIM, T}, right::Vec{DIM, T}, elpotential, grad_backend, hess_backend) where {DIM, T}
     grid = generate_grid(Tetrahedron, gridsize, left, right)
     threadindices = Ferrite.create_coloring(grid)
 
@@ -106,7 +110,7 @@ function LandauModel(α, G, gridsize, left::Vec{DIM, T}, right::Vec{DIM, T}, elp
 
     dpc = ndofs_per_cell(dofhandler)
     cpc = length(grid.cells[1].nodes)
-    caches = [ThreadCache(dpc, cpc, copy(cvP), ModelParams(α, G), elpotential) for t in 1:Threads.maxthreadid()]
+    caches = [ThreadCache(dpc, cpc, copy(cvP), ModelParams(α, G), elpotential, grad_backend, hess_backend) for t in 1:Threads.maxthreadid()]
     return LandauModel(dofvector, dofhandler, boundaryconds, threadindices, caches)
 end
 
@@ -159,7 +163,7 @@ end
 function ∇F!(∇f::Vector{T}, dofvector::Vector{T}, model::LandauModel{T}) where {T}
     fill!(∇f, zero(T))
     @assemble! begin
-        ForwardDiff.gradient!(cache.element_gradient, cache.element_potential, eldofs, cache.gradconf)
+        gradient!(cache.element_potential, cache.element_gradient, cache.grad_prep, cache.grad_backend, eldofs)
         @inbounds assemble!(∇f, cache.element_indices, cache.element_gradient)
     end
     return
@@ -169,7 +173,7 @@ end
 function ∇²F!(∇²f::SparseMatrixCSC, dofvector::Vector{T}, model::LandauModel{T}) where {T}
     assemblers = [start_assemble(∇²f) for t in 1:Threads.maxthreadid()]
     @assemble! begin
-        ForwardDiff.hessian!(cache.element_hessian, cache.element_potential, eldofs, cache.hessconf)
+        hessian!(cache.element_potential, cache.element_hessian, cache.hess_prep, cache.hess_backend, eldofs)
         @inbounds assemble!(assemblers[Threads.threadid()], cache.element_indices, cache.element_hessian)
     end
     return
@@ -182,8 +186,7 @@ function calcall(∇²f::SparseMatrixCSC, ∇f::Vector{T}, dofvector::Vector{T},
     assemblers = [start_assemble(∇²f, ∇f) for t in 1:Threads.maxthreadid()]
     @assemble! begin
         outs[Threads.threadid()] += cache.element_potential(eldofs)
-        ForwardDiff.hessian!(cache.element_hessian, cache.element_potential, eldofs, cache.hessconf)
-        ForwardDiff.gradient!(cache.element_gradient, cache.element_potential, eldofs, cache.gradconf)
+        value_gradient_and_hessian!(cache.element_potential, cache.element_gradient, cache.element_hessian, cache.hess_prep, cache.hess_backend, eldofs)
         @inbounds assemble!(assemblers[Threads.threadid()], cache.element_indices, cache.element_gradient, cache.element_hessian)
     end
     return sum(outs)
@@ -222,7 +225,7 @@ end
 
 # ## Testing it
 # This calculates the contribution of each element to the total energy,
-# it is also the function that will be put through ForwardDiff for the gradient and Hessian.
+# it is also the function that will be differentiated for the gradient and Hessian.
 function element_potential(eldofs::AbstractVector{T}, cvP, params) where {T}
     energy = zero(T)
     for qp in 1:getnquadpoints(cvP)
@@ -255,7 +258,9 @@ G = V2T(1.0e2, 0.0, 1.0e2)
 α = Vec{3}((-1.0, 1.0, 1.0))
 left = Vec{3}((-75.0, -25.0, -2.0))
 right = Vec{3}((75.0, 25.0, 2.0))
-model = LandauModel(α, G, (50, 50, 2), left, right, element_potential)
+grad_backend = AutoForwardDiff(; chunksize = 12)
+hess_backend = AutoForwardDiff(; chunksize = 4)
+model = LandauModel(α, G, (50, 50, 2), left, right, element_potential, grad_backend, hess_backend)
 
 save_landau("landauorig", model)
 @time minimize!(model)
