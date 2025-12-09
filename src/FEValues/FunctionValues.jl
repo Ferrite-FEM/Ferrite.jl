@@ -174,6 +174,18 @@ required_geo_diff_order(::CovariantPiolaMapping, fun_diff_order::Int) = 1 + fun_
 # Vector interpolations with sdim > rdim
 @inline dothelper(B::SMatrix{vdim, rdim}, A::SMatrix{rdim, sdim}) where {vdim, rdim, sdim} = B * A
 
+# Result: aᵢBᵢⱼₖ = Cⱼₖ (?)
+function dothelper(A::SVector{sdim}, B::SArray{Tuple{sdim, rdim, rdim}}) where {rdim, sdim}
+    C = zeros(rdim, rdim)
+    for i in 1:sdim, j in 1:rdim, k in 1:rdim
+        C[j, k] += A[i] * B[i, j, k]
+    end
+    return SMatrix{rdim, rdim}(C)
+end
+
+dothelper(A::SMatrix{sdim, rdim}, B::SMatrix{rdim, rdim}) where {rdim, sdim} = A * B
+dothelper(A::SMatrix{sdim, rdim}, B::SMatrix{rdim, sdim}) where {rdim, sdim} = A * B
+
 # =============
 # Apply mapping
 # =============
@@ -199,7 +211,7 @@ end
     Jinv = calculate_Jinv(getjacobian(mapping_values))
 
     sdim, rdim = size(Jinv)
-    (rdim != sdim) && error("apply_mapping! for second order gradients and embedded elements not implemented")
+    # (rdim != sdim) && error("apply_mapping! for second order gradients and embedded elements not implemented")
 
     H = gethessian(mapping_values)
     is_vector_valued = first(funvals.Nx) isa Vec
@@ -209,7 +221,10 @@ end
         if is_vector_valued
             d2Ndx2 = (funvals.d2Ndξ2[j, q_point] - dNdx ⋅ H) ⊡ Jinv_otimesu_Jinv
         else
-            d2Ndx2 = Jinv' ⋅ (funvals.d2Ndξ2[j, q_point] - dNdx ⋅ H) ⋅ Jinv
+            t = dothelper(Jinv', (funvals.d2Ndξ2[j, q_point] - dothelper(dNdx, H)))
+            d2Ndx2 = dothelper(t, Jinv)
+
+            # d2Ndx2 = Jinv' ⋅ (funvals.d2Ndξ2[j, q_point] - dothelper(dNdx, H)) ⋅ Jinv
         end
 
         funvals.dNdx[j, q_point] = dNdx
