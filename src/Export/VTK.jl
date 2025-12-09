@@ -292,7 +292,7 @@ Write nodal values of 1 for nodes of the faces in `facetset`, and 0 otherwise
 function write_facetset(vtk, grid::AbstractGrid, facetset::String)
     z = zeros(getnnodes(grid))
     for fi in getfacetset(grid, facetset)
-        for i in Ferrite.faces(getcells(grid, fi[1]))[fi[2]]
+        for i in faces(getcells(grid, fi[1]))[fi[2]]
             z[i] = 1.0
         end
     end
