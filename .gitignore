@@ -24,3 +24,4 @@ docs/src/changelog.md
 LocalPreferences.toml
 docs/LocalPreferences.toml
 benchmark/tune.json
+.vscode/

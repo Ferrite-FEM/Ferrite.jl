@@ -179,7 +179,6 @@ required_geo_diff_order(::CovariantPiolaMapping, fun_diff_order::Int) = 1 + fun_
     return SMatrix{rdim, rdim}((dot(A, B[:, j, k])  for j in 1:rdim, k in 1:rdim))
 end
 
-# For Vector Valued
 @inline function dothelper(A::SMatrix{vdim, sdim}, B::SArray{Tuple{sdim, rdim, rdim}}) where {vdim, rdim, sdim}
     return SArray{Tuple{vdim, rdim, rdim}}(
         (dothelper(A[i, :], B)[j, k] for i in 1:vdim, j in 1:rdim, k in 1:rdim)
