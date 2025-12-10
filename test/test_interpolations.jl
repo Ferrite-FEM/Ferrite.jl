@@ -157,6 +157,7 @@ end
             Serendipity{RefHexahedron, 2}(),
             Lagrange{RefTetrahedron, 1}(),
             Lagrange{RefTetrahedron, 2}(),
+            Lagrange{RefTetrahedron, 3}(),
             Lagrange{RefPrism, 1}(),
             Lagrange{RefPrism, 2}(),
             Lagrange{RefPyramid, 1}(),
@@ -219,14 +220,15 @@ end
             end
         end
 
-        # Check for dirac delta property of interpolation
+        # Check for dirac delta property of interpolatio
         @testset "dirac delta property of dof $dof" for dof in 1:n_basefuncs
             for k in 1:n_basefuncs
                 N_dof = reference_shape_value(interpolation, coords[dof], k)
                 if k == dof
                     @test N_dof ≈ 1.0
                 else
-                    factor = interpolation isa Lagrange{RefQuadrilateral, 3} ? 200 : 4
+                    # High order elements are right now not implemented in factorized form, so there is some small numerical noise in the evaluation.
+                    factor = Ferrite.getorder(interpolation) > 2 ? 200 : 4
                     @test N_dof ≈ 0.0 atol = factor * eps(typeof(N_dof))
                 end
             end
