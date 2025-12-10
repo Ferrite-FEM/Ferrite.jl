@@ -14,6 +14,7 @@ This file handler can be used to to write data with
 * [`write_node_data`](@ref).
 * [`Ferrite.write_cellset`](@ref)
 * [`Ferrite.write_nodeset`](@ref)
+* [`Ferrite.write_facetset`](@ref)
 * [`Ferrite.write_constraints`](@ref)
 
 It is necessary to call `close(::VTKGridFile)` to save the data after writing
@@ -282,6 +283,23 @@ function write_nodeset(vtk, grid::AbstractGrid, nodeset::String)
     write_node_data(vtk, z, nodeset)
     return vtk
 end
+
+"""
+    write_facetset(vtk::VTKGridFile, grid::AbstractGrid, facetset::String)
+
+Write nodal values of 1 for nodes of the faces in `facetset`, and 0 otherwise
+"""
+function write_facetset(vtk, grid::AbstractGrid, facetset::String)
+    z = zeros(getnnodes(grid))
+    for fi in getfacetset(grid, facetset)
+        for i in facets(getcells(grid, fi[1]))[fi[2]]
+            z[i] = 1.0
+        end
+    end
+    write_node_data(vtk, z, facetset)
+    return vtk
+end
+
 
 """
     write_cellset(vtk, grid::AbstractGrid)
