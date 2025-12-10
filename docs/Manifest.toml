@@ -2,7 +2,7 @@
 
 julia_version = "1.12.1"
 manifest_format = "2.0"
-project_hash = "d27b93eebadb7b949d59f30f43496bc5d02daae3"
+project_hash = "64dc13edb9a2a968fc0a528b9d65cf73c0da2c87"
 
 [[deps.ADTypes]]
 git-tree-sha1 = "27cecae79e5cc9935255f90c53bb831cc3c870d7"
@@ -864,6 +864,14 @@ deps = ["Artifacts", "JLLWrappers", "Libdl"]
 git-tree-sha1 = "92f65c4d78ce8cdbb6b68daf88889950b0a99d11"
 uuid = "e33a78d0-f292-5ffc-b300-72abe9b543c8"
 version = "2.12.1+0"
+
+[[deps.HyperHessians]]
+deps = ["CommonSubexpressions", "SIMD"]
+git-tree-sha1 = "9e3682cf414a5f59cb793fd89c58621e87dacb14"
+repo-rev = "master"
+repo-url = "https://github.com/KristofferC/HyperHessians.jl"
+uuid = "06b494a0-c8e0-40cc-ad32-d99506a00a6c"
+version = "0.1.0"
 
 [[deps.IOCapture]]
 deps = ["Logging", "Random"]
