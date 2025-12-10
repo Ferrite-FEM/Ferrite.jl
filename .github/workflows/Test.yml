@@ -9,7 +9,7 @@ jobs:
     name: Julia ${{ matrix.julia-version }} - ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
     timeout-minutes: 40
-    continue-on-error: ${{ matrix.julia-version == 'nightly' }}
+    continue-on-error: ${{ matrix.julia-version == 'pre' }}
     strategy:
       matrix:
         julia-version: ['lts', '1', 'pre']
