@@ -425,7 +425,7 @@ get_coordinate_type(::Grid{dim, C, T}) where {dim, C, T} = Vec{dim, T} # Node is
 This function takes the local vertex representation (a `VertexIndex`) and looks up the unique global id (an `Int`).
 """
 toglobal(grid::AbstractGrid, vertexidx::VertexIndex) = vertices(getcells(grid, vertexidx[1]))[vertexidx[2]]
-toglobal(grid::AbstractGrid, vertexidx::Vector{VertexIndex}) = unique(toglobal.((grid,), vertexidx))
+toglobal(grid::AbstractGrid, vertexidx::AbstractVector{VertexIndex}) = unique(toglobal.((grid,), vertexidx))
 
 """
     Ferrite.getspatialdim(grid::AbstractGrid)
@@ -465,7 +465,7 @@ Returns either all `cells::Collection{C<:AbstractCell}` of a `<:AbstractGrid` or
 Whereas the last option tries to call a `cellset` of the `grid`. `Collection` can be any indexable type, for `Grid` it is `Vector{C<:AbstractCell}`.
 """
 @inline getcells(grid::AbstractGrid) = grid.cells
-@inline getcells(grid::AbstractGrid, v::Union{Int, Vector{Int}}) = grid.cells[v]
+@inline getcells(grid::AbstractGrid, v::Union{Int, AbstractVector{Int}}) = grid.cells[v]
 @inline getcells(grid::AbstractGrid, setname::String) = grid.cells[collect(getcellset(grid, setname))]
 "Returns the number of cells in the `<:AbstractGrid`."
 @inline getncells(grid::AbstractGrid) = length(grid.cells)
@@ -483,7 +483,7 @@ The last option tries to call a `nodeset` of the `<:AbstractGrid`. `Collection{N
 to a Node.
 """
 @inline getnodes(grid::AbstractGrid) = grid.nodes
-@inline getnodes(grid::AbstractGrid, v::Union{Int, Vector{Int}}) = grid.nodes[v]
+@inline getnodes(grid::AbstractGrid, v::Union{Int, AbstractVector{Int}}) = grid.nodes[v]
 @inline getnodes(grid::AbstractGrid, setname::String) = grid.nodes[collect(getnodeset(grid, setname))]
 "Returns the number of nodes in the grid."
 @inline getnnodes(grid::AbstractGrid) = length(grid.nodes)
@@ -584,14 +584,14 @@ end
 
 Mutate `x` to the coordinates of the cell corresponding to `idx` or `cell`.
 """
-@inline function getcoordinates!(x::Vector{Vec{dim, T}}, grid::AbstractGrid, cell::AbstractCell) where {dim, T}
+@inline function getcoordinates!(x::AbstractVector{Vec{dim, T}}, grid::AbstractGrid, cell::AbstractCell) where {dim, T}
     node_ids = get_node_ids(cell)
     @inbounds for i in 1:length(x)
         x[i] = get_node_coordinate(grid, node_ids[i])
     end
     return x
 end
-@inline function getcoordinates!(x::Vector{Vec{dim, T}}, grid::AbstractGrid, cellid::Int) where {dim, T}
+@inline function getcoordinates!(x::AbstractVector{Vec{dim, T}}, grid::AbstractGrid, cellid::Int) where {dim, T}
     cell = getcells(grid, cellid)
     return getcoordinates!(x, grid, cell)
 end
@@ -604,12 +604,12 @@ Return the coordinate of the `n`th node in `grid`
 """
 get_node_coordinate(grid, n) = get_node_coordinate(getnodes(grid, n))
 
-function cellnodes!(global_nodes::Vector{Int}, grid::AbstractGrid, i::Int)
+function cellnodes!(global_nodes::AbstractVector{Int}, grid::AbstractGrid, i::Int)
     cell = getcells(grid, i)
     _cellnodes!(global_nodes, cell)
     return global_nodes
 end
-function _cellnodes!(global_nodes::Vector{Int}, cell::AbstractCell)
+function _cellnodes!(global_nodes::AbstractVector{Int}, cell::AbstractCell)
     @assert length(global_nodes) == nnodes(cell)
     @inbounds for i in 1:length(global_nodes)
         global_nodes[i] = cell.nodes[i]
