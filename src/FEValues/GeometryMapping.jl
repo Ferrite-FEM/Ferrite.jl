@@ -182,13 +182,13 @@ end
 @inline function calculate_mapping(gip::ScalarInterpolation, ξ::Vec{rdim, T}, x::AbstractVector{<:Vec{sdim}}, ::Val{2}) where {T, rdim, sdim}
     n_basefuncs = getnbasefunctions(gip)
     @boundscheck checkbounds(x, Base.OneTo(n_basefuncs))
-    # (rdim != sdim) && error("hessian for embedded elements not implemented (rdim=$rdim, sdim=$sdim)")
     J = zero(otimes_returntype(Vec{sdim, T}, Vec{rdim, T}))
     H = zero(otimes_returntype(eltype(x), typeof(J)))
     @inbounds for j in 1:n_basefuncs
         d2Mdξ2, dMdξ, _ = reference_shape_hessian_gradient_and_value(gip, ξ, j)
 
         J += otimes_helper(x[j], dMdξ)
+        H += otimes_helper(x[j], d2Mdξ2)
 
         # J += x[j] ⊗ dMdξ
         # H += x[j] ⊗ d2Mdξ2
