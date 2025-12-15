@@ -203,7 +203,7 @@ end
 # Cᵢₗₘ = AᵢⱼₖBⱼₖₗₘ
 @inline function dcontract_helper(A::SArray{Tuple{vdim,rdim,rdim}}, B::SArray{Tuple{rdim,rdim,sdim,sdim}}) where {vdim,sdim,rdim}
     return SArray{Tuple{vdim,sdim,sdim}}(
-        (sum(A[i, j, k] * B[j, k, l, m] for a in j:rdim, k in k:rdim) for i in 1:vdim, l in 1:sdim, m in 1:sdim)
+        (sum(A[i, j, k] * B[j, k, l, m] for j in 1:rdim, k in 1:rdim) for i in 1:vdim, l in 1:sdim, m in 1:sdim)
     )
 end
 
