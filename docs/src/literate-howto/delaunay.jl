@@ -157,12 +157,13 @@ dh = DofHandler(grid)
 add!(dh, :u, Lagrange{RefTriangle,1}())  
 close!(dh)  
 a = zeros(DelaunayTriangulation.num_points(tri))
-apply_analytical!(a, dh, :u, norm)  
+apply_analytical!(a, dh, :u, norm)
+u_nodes = evaluate_at_grid_nodes(dh, a, :u)
 
 # ### Plotting
 # The solution can be visualised as in previous tutorials. Alternatively, we can use `tricontourf` which 
 # knows how to use DelaunayTriangulation.jl's `Triangulation`.
-tricontourf(tri, a)
+tricontourf(tri, u_nodes)
 # *Figure 2*: Solution on the domain $\Omega = \{\textbf{x} \in \mathbb{R}^2 : 1 < \|\textbf{x}\| < 2\}$.
 
 #md # ## [Plain program](@id delaunay-plain-program)
