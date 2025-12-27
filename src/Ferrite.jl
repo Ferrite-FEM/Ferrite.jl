@@ -25,6 +25,7 @@ using Tensors:
     rotation_tensor, symmetric, tovoigt!, hessian, otimesu, otimesl
 using ForwardDiff:
     ForwardDiff
+using Tullio: @tullio
 
 include("CollectionsOfViews.jl")
 using .CollectionsOfViews:
