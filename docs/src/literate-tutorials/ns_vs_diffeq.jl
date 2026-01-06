@@ -119,7 +119,7 @@ nothing                    #hide
 # The full program, without comments, can be found in the next [section](@ref ns_vs_diffeq-plain-program).
 
 # First we load Ferrite and some other packages we need
-using Ferrite, SparseArrays, BlockArrays, LinearAlgebra, UnPack, WriteVTK
+using Ferrite, SparseArrays, BlockArrays, LinearAlgebra, WriteVTK
 
 # We do not need the complete SciML/DifferentialEquations suite. We load DiffEqBase, which
 # provides most of the ODE infrastructure (which can also handle DAEs in mass matrix form),
@@ -433,7 +433,7 @@ end
 function navierstokes!(du, u_uc, p::RHSparams, t)
     # Unpack the struct to save some allocations.
     #+
-    @unpack K, ch, dh, cellvalues_v, u = p
+    (; K, ch, dh, cellvalues_v, u) = p
 
     # We start by applying the time-dependent Dirichlet BCs. Note that we are
     # not allowed to mutate `u_uc`! Furthermore not that we also can not pre-
@@ -494,7 +494,7 @@ end
 function navierstokes_jac!(J, u_uc, p, t)
     # Unpack the struct to save some allocations.
     #+
-    @unpack K, ch, dh, cellvalues_v, u = p
+    (; K, ch, dh, cellvalues_v, u) = p
 
     # We start by applying the time-dependent Dirichlet BCs. Note that we are
     # not allowed to mutate `u_uc`, so we use our buffer again.
