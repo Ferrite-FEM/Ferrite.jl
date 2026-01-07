@@ -285,21 +285,25 @@ function write_nodeset(vtk, grid::AbstractGrid, nodeset::String)
 end
 
 """
-    write_facetset(vtk::VTKGridFile, grid::AbstractGrid, facetset::String)
+    write_facetset(vtk::VTKGridFile, grid::AbstractGrid, facetsetname::String [, facetset::AbstractVecOrSet{FacetIndex}])
 
 Write nodal values of 1 for nodes of the faces in `facetset`, and 0 otherwise
 """
-function write_facetset(vtk, grid::AbstractGrid, facetset::String)
+function write_facetset(vtk, grid::AbstractGrid, facetsetname, facetset::AbstractVecOrSet{FacetIndex})
     z = zeros(getnnodes(grid))
-    for fi in getfacetset(grid, facetset)
-        for i in facets(getcells(grid, fi[1]))[fi[2]]
+    for (cellid, lfi) in facetset
+        cell = getcells(grid, cellid)
+        gip  = geometric_interpolation(cell)
+        facetnodes = facetdof_indices(gip)[lfi]
+        for facetnode in facetnodes
+            i = get_node_ids(cell)[facetnode]
             z[i] = 1.0
         end
     end
-    write_node_data(vtk, z, facetset)
+    write_node_data(vtk, z, facetsetname)
     return vtk
 end
-
+write_facetset(vtk, grid::AbstractGrid, facetset::String) = write_facetset(vtk, grid, facetset, getfacetset(grid, facetset))
 
 """
     write_cellset(vtk, grid::AbstractGrid)
