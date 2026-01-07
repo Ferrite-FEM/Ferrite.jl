@@ -153,7 +153,7 @@ close!(dh);
 # !!! warning "Numbering of degrees of freedom"
 #     A common assumption is that the numbering of degrees of freedom follows the global
 #     numbering of the nodes in the grid. This is *NOT* the case in Ferrite. For more
-#     details, see the [Ferrite numbering rules](@ref "Ordering-of-dofs").
+#     details, see the [Ferrite numbering rules](@ref "Global-DoF-indices").
 
 # ### Boundary conditions
 # We set Dirichlet boundary conditions by fixing the motion normal to the bottom and left
