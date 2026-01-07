@@ -293,7 +293,7 @@ function write_facetset(vtk, grid::AbstractGrid, facetsetname, facetset::Abstrac
     z = zeros(getnnodes(grid))
     for (cellid, lfi) in facetset
         cell = getcells(grid, cellid)
-        gip  = geometric_interpolation(cell)
+        gip = geometric_interpolation(cell)
         facetnodes = facetdof_indices(gip)[lfi]
         for facetnode in facetnodes
             i = get_node_ids(cell)[facetnode]
