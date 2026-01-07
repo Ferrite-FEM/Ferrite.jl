@@ -977,8 +977,8 @@ function reference_coordinates(::Lagrange{RefTetrahedron, 3})
     ]
 end
 
-# http://www.colorado.edu/engineering/CAS/courses.d/AFEM.d/AFEM.Ch09.d/AFEM.Ch09.pdf
-# http://www.colorado.edu/engineering/CAS/courses.d/AFEM.d/AFEM.Ch10.d/AFEM.Ch10.pdf
+# Generated with the function descibed in the snippet below.
+# https://gist.github.com/termi-official/2d7f0c5e3cc8ea94921fab08395ab292
 function reference_shape_value(ip::Lagrange{RefTetrahedron, 3}, ξ::Vec{3, T}, i::Int) where {T}
     ξ_x = ξ[1]
     ξ_y = ξ[2]
@@ -2206,70 +2206,4 @@ adjust_dofs_during_distribution(::Nedelec{RefHexahedron, 1}) = false
 
 function get_direction(::Nedelec{RefHexahedron, 1}, shape_nr, cell)
     return get_edge_direction(cell, shape_nr) # shape_nr = edge_nr
-end
-
-# TODO where to put this? I am a lazy man and I won't compute this by hand.
-function tabulate_lagrange(interpolation::Lagrange{RefTetrahedron, order}; tol = 1.0e-8, with_T = false) where {order}
-    N = 0
-    for p₃ in 0:order
-        for p₂ in 0:(order - p₃)
-            for p₁ in 0:(order - p₃ - p₂)
-                N += 1
-            end
-        end
-    end
-
-    @assert N == getnbasefunctions(interpolation)
-    xs = reference_coordinates(interpolation)
-    V = zeros(N, N)
-    j = 0
-    for p₃ in 0:order
-        for p₂ in 0:(order - p₃)
-            for p₁ in 0:(order - p₃ - p₂)
-                j += 1
-                for i in 1:N
-                    x = xs[i]
-                    V[i, j] = x[1]^p₁ * x[2]^p₂ * x[3]^p₃
-                end
-            end
-        end
-    end
-    C = inv(V)' # These are our coefficients
-
-    for i in 1:N
-        j = 0
-        x = xs[i]
-        isfirst = true
-        for p₃ in 0:order
-            for p₂ in 0:(order - p₃)
-                for p₁ in 0:(order - p₃ - p₂)
-                    j += 1
-                    (abs(C[i, j]) < tol) && continue
-                    if isfirst
-                        print("i == $i && return")
-                    else
-                        print(" +")
-                    end
-                    isfirst = false
-                    if with_T
-                        print(" T($(C[i, j]))")
-                    else
-                        print(" $(C[i, j])")
-                    end
-                    if p₁ > 0
-                        p₁ > 1 ? print(" * ξ_x^$p₁") : print(" * ξ_x")
-                    end
-                    if p₂ > 0
-                        p₂ > 1 ? print(" * ξ_y^$p₂") : print(" * ξ_y")
-                    end
-                    if p₃ > 0
-                        p₃ > 1 ? print(" * ξ_z^$p₃") : print(" * ξ_z")
-                    end
-                end
-            end
-        end
-        println()
-    end
-
-    return C
 end
