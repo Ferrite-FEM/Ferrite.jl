@@ -9,7 +9,8 @@ Ferrite.vertexdof_indices(::TensorProductQ9TestInterpolation) = ((1,), (3,), (9,
 Ferrite.edgedof_indices(::TensorProductQ9TestInterpolation) = ((1, 3, 2), (3, 9, 6), (9, 7, 8), (7, 1, 4))
 Ferrite.edgedof_interior_indices(::TensorProductQ9TestInterpolation) = ((2,), (6,), (8,), (4,))
 Ferrite.facedof_indices(ip::TensorProductQ9TestInterpolation) = ((1, 3, 9, 7, 2, 6, 8, 4, 5),)
-Ferrite.facedof_interior_indices(::TensorProductQ9TestInterpolation) = ((5,))
+Ferrite.facedof_interior_indices(::TensorProductQ9TestInterpolation) = ((5,),)
+Ferrite.conformity(::TensorProductQ9TestInterpolation) = Ferrite.H1Conformity()
 
 function Ferrite.reference_coordinates(::TensorProductQ9TestInterpolation)
     return [
