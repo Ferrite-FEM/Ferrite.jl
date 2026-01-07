@@ -38,7 +38,7 @@ After construction any number of discrete fields can be added to the SubDofHandl
 
 # Examples
 We assume we have a `grid` containing "Triangle" and "Quadrilateral" cells,
-including the cellsets "triangles" and "quadilaterals" for to these cells.
+including the cellsets "triangles" and "quadrilaterals" for these cells.
 ```julia
 dh = DofHandler(grid)
 

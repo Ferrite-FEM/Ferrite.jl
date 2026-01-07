@@ -5,20 +5,65 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [Next] - xxxx-xx-xx
+
+## [v1.2.0] - 2025-11-14
+
+### Added
+ - Support for directly assembling to `SparseMatrixCSR` (from `SparseMatricesCSR.jl`). ([#864])
+ - Enhance `generate_grid` to support outputting line meshes embedded in two and three
+   spatial dimentions. ([#1122], [#1214])
+
+### Fixes
+ - Fix L2 projection of tensor fields on discontinuous interpolations. ([#1197], [#1198])
+ - Fix VTK output of tensor data in embedded domains. ([#1212], [#1213])
+ - Fix VTK nodal output for discontinuous output. ([#1194])
+ - Fix `facetskeleton` for mixed grids. ([#1223])
+ - Fix normal vector computation for boundary integration in embedded domains. ([#1226],
+   [#1235])
+ - Relax vector input type from `Vector` to `AbstractVector` in `evaluate_at_points!`.
+   ([#1183])
+
+### Documentation updates
+ - Extended assembly docs with information on how to support direct assembly into new matrix
+   types. ([#864])
+ - Add a list of reserach papers where Ferrite was used for numbeir simulations. Please add
+   your paper! ([#1221])
+ - Add section on global and local DoF numbering. ([#1089])
+ - Fix some typos and grammar ([#1210], [#1224], [#1228])
+
+## [v1.1.0] - 2025-05-01
+
+### Added
+ - New vector interpolations for H(div) and H(curl) spaces (`Nedelec`, `RaviartThomas`,
+   `BrezziDouglasMarini`). ([#1045],[#1162])
+ - New boundary condition type, `ProjectedDirichlet`, for H(div) and H(curl) interpolations. ([#1151])
+   It can be added to a constraint handler the same way as for a regular `Dirichlet`.
+ - Support for exporting discontinuous fields to VTK. ([#867])
+   This happens automatically when a DofHandler with a discontinuous field is used
+   to construct the `VTKGridFile`, but can be requested with the `write_discontinuous`
+   keyword argument.
+
+### Fixes
+ - `addboundaryfacetset` has been fixed for mixed grids. ([#1176])
+ -  `evaluate_at_grid_nodes` now respects the precision of the input dof vector. ([#1044])
 
 ### Removed
- - The deprecated third type parameter for interpolations have been removed. Old code which
-   tries to use three parameters will now throw the somewhat cryptic error:
+ - The deprecated third type parameter for interpolations has been removed. ([#1083])
+   Old code which tries to use three parameters will now throw the somewhat cryptic error:
    ```
    julia> Lagrange{2, RefCube, 1}()
    ERROR: too many parameters for type
    ```
-   ([#1083])
+
+### Documentation updates
+ - A comparison between different assembly strategies have been added to the docs. ([#1063])
+ - The affine constraints docs have been extended. ([#1146])
 
 ### Other
  - Ferrite now uses [Runic.jl](https://github.com/fredrikekre/Runic.jl) for code formatting.
    ([#1096])
+ - Ferrite now supports `ForwardDiff` v1. ([#1178])
 
 ## [v1.0.0] - 2024-09-30
 
@@ -847,6 +892,8 @@ poking into Ferrite internals:
 [v0.3.13]: https://github.com/Ferrite-FEM/Ferrite.jl/releases/tag/v0.3.13
 [v0.3.14]: https://github.com/Ferrite-FEM/Ferrite.jl/releases/tag/v0.3.14
 [v1.0.0]: https://github.com/Ferrite-FEM/Ferrite.jl/releases/tag/v1.0.0
+[v1.1.0]: https://github.com/Ferrite-FEM/Ferrite.jl/releases/tag/v1.1.0
+[v1.2.0]: https://github.com/Ferrite-FEM/Ferrite.jl/releases/tag/v1.2.0
 [#352]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/352
 [#363]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/363
 [#378]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/378
@@ -1019,6 +1066,8 @@ poking into Ferrite internals:
 [#779]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/779
 [#835]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/835
 [#855]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/855
+[#864]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/864
+[#867]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/867
 [#880]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/880
 [#888]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/888
 [#914]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/914
@@ -1028,7 +1077,31 @@ poking into Ferrite internals:
 [#949]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/949
 [#953]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/953
 [#974]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/974
+[#1044]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1044
+[#1045]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1045
 [#1058]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1058
 [#1059]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1059
+[#1063]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1063
 [#1083]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1083
+[#1089]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1089
 [#1096]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1096
+[#1122]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1122
+[#1146]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1146
+[#1151]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1151
+[#1162]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1162
+[#1176]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1176
+[#1178]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1178
+[#1183]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1183
+[#1194]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1194
+[#1197]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1197
+[#1198]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1198
+[#1210]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1210
+[#1212]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1212
+[#1213]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1213
+[#1214]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1214
+[#1221]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1221
+[#1223]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1223
+[#1224]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1224
+[#1226]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1226
+[#1228]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1228
+[#1235]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1235

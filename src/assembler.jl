@@ -1,5 +1,6 @@
 abstract type AbstractAssembler end
 abstract type AbstractCSCAssembler <: AbstractAssembler end
+abstract type AbstractCSRAssembler <: AbstractAssembler end
 
 """
     struct COOAssembler{Tv, Ti}
@@ -122,7 +123,7 @@ end
     finish_assemble(a::COOAssembler) -> K, f
 
 Finalize the assembly and return the sparse matrix `K::SparseMatrixCSC` and vector
-`f::Vector`. If the assembler have not been used for vector assembly, `f` is an empty
+`f::Vector`. If the assembler has not been used for vector assembly, `f` is an empty
 vector.
 """
 function finish_assemble(a::COOAssembler)
@@ -180,6 +181,16 @@ struct CSCAssembler{Tv, Ti, MT <: AbstractSparseMatrixCSC{Tv, Ti}} <: AbstractCS
 end
 
 """
+Assembler for sparse matrix with CSR storage type.
+"""
+struct CSRAssembler{Tv, Ti, MT <: AbstractSparseMatrix{Tv, Ti}} <: AbstractCSRAssembler #AbstractSparseMatrixCSR does not exist
+    K::MT
+    f::Vector{Tv}
+    permutation::Vector{Int}
+    sorteddofs::Vector{Int}
+end
+
+"""
 Assembler for symmetric sparse matrix with CSC storage type.
 """
 struct SymmetricCSCAssembler{Tv, Ti, MT <: Symmetric{Tv, <:AbstractSparseMatrixCSC{Tv, Ti}}} <: AbstractCSCAssembler
@@ -189,7 +200,7 @@ struct SymmetricCSCAssembler{Tv, Ti, MT <: Symmetric{Tv, <:AbstractSparseMatrixC
     sorteddofs::Vector{Int}
 end
 
-function Base.show(io::IO, ::MIME"text/plain", a::Union{CSCAssembler, SymmetricCSCAssembler})
+function Base.show(io::IO, ::MIME"text/plain", a::Union{CSCAssembler, CSRAssembler, SymmetricCSCAssembler})
     print(io, typeof(a), " for assembling into:\n - ")
     summary(io, a.K)
     f = a.f
@@ -200,9 +211,9 @@ function Base.show(io::IO, ::MIME"text/plain", a::Union{CSCAssembler, SymmetricC
     return
 end
 
-matrix_handle(a::AbstractCSCAssembler) = a.K
+matrix_handle(a::Union{AbstractCSCAssembler, AbstractCSRAssembler}) = a.K
 matrix_handle(a::SymmetricCSCAssembler) = a.K.data
-vector_handle(a::AbstractCSCAssembler) = a.f
+vector_handle(a::Union{AbstractCSCAssembler, AbstractCSRAssembler}) = a.f
 
 """
     start_assemble(K::AbstractSparseMatrixCSC;            fillzero::Bool=true) -> CSCAssembler
@@ -221,6 +232,8 @@ necessary for efficient matrix assembly. To assemble the contribution from an el
 
 The keyword argument `fillzero` can be set to `false` if `K` and `f` should not be zeroed
 out, but instead keep their current values.
+
+Depending on the loaded extensions more assembly formats become available through this interface.
 """
 start_assemble(K::Union{AbstractSparseMatrixCSC, Symmetric{<:Any, <:AbstractSparseMatrixCSC}}, f::Vector; fillzero::Bool)
 
@@ -233,7 +246,7 @@ function start_assemble(K::Symmetric{T, <:SparseMatrixCSC}, f::Vector = T[]; fil
     return SymmetricCSCAssembler(K, f, zeros(Int, maxcelldofs_hint), zeros(Int, maxcelldofs_hint))
 end
 
-function finish_assemble(a::Union{CSCAssembler, SymmetricCSCAssembler})
+function finish_assemble(a::Union{CSCAssembler, CSRAssembler, SymmetricCSCAssembler})
     return a.K, a.f
 end
 
@@ -270,7 +283,7 @@ Sorts the dofs into a separate buffer and returns it together with a permutation
     return sorteddofs, permutation
 end
 
-@propagate_inbounds function _assemble!(A::AbstractCSCAssembler, dofs::AbstractVector{<:Integer}, Ke::AbstractMatrix, fe::Union{AbstractVector, Nothing}, sym::Bool)
+@propagate_inbounds function _assemble!(A::Union{AbstractCSCAssembler, AbstractCSRAssembler}, dofs::AbstractVector{<:Integer}, Ke::AbstractMatrix, fe::Union{AbstractVector, Nothing}, sym::Bool)
     ld = length(dofs)
     @boundscheck checkbounds(Ke, keys(dofs), keys(dofs))
     if fe !== nothing
@@ -281,15 +294,20 @@ end
 
     K = matrix_handle(A)
     @boundscheck checkbounds(K, dofs, dofs)
-    Krows = rowvals(K)
-    Kvals = nonzeros(K)
 
     # We assume that the input dofs are not sorted, because the cells need the dofs in
     # a specific order, which might not be the sorted order. Hence we sort them.
     # Note that we are not allowed to mutate `dofs` in the process.
     sorteddofs, permutation = _sortdofs_for_assembly!(A.permutation, A.sorteddofs, dofs)
 
+    return _assemble_inner!(K, Ke, dofs, sorteddofs, permutation, sym)
+end
+
+@propagate_inbounds function _assemble_inner!(K::SparseMatrixCSC, Ke::AbstractMatrix, dofs::AbstractVector, sorteddofs::AbstractVector, permutation::AbstractVector, sym::Bool)
     current_col = 1
+    Krows = rowvals(K)
+    Kvals = nonzeros(K)
+    ld = length(dofs)
     @inbounds for Kcol in sorteddofs
         maxlookups = sym ? current_col : ld
         Kecol = permutation[current_col]

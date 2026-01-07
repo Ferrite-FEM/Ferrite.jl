@@ -8,7 +8,7 @@ values of nodal functions, gradients and divergences of nodal functions etc. in 
 * `T`: an optional argument (default to `Float64`) to determine the type the internal data is stored as.
 * `quad_rule`: an instance of a [`QuadratureRule`](@ref)
 * `func_interpol`: an instance of an [`Interpolation`](@ref) used to interpolate the approximated function
-* `geom_interpol`: an optional instance of a [`Interpolation`](@ref) which is used to interpolate the geometry.
+* `geom_interpol`: an optional instance of an [`Interpolation`](@ref) which is used to interpolate the geometry.
   By default linear Lagrange interpolation is used. For embedded elements the geometric interpolations should
   be vectorized to the spatial dimension.
 

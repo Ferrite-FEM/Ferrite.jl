@@ -16,7 +16,7 @@ module ConvergenceTestHelper
 
     get_quadrature_order(::Main.TensorProductQ9TestInterpolation) = 3
     get_quadrature_order(::Lagrange{shape, order}) where {shape, order} = max(2 * order - 1, 2)
-    get_quadrature_order(::Lagrange{RefTriangle, 5}) where {shape, order} = 8
+    get_quadrature_order(::Lagrange{RefTriangle, 5}) = 8
     get_quadrature_order(::Lagrange{RefPrism, order}) where {order} = 2 * order # Don't know why
     get_quadrature_order(::Serendipity{shape, order}) where {shape, order} = max(2 * order - 1, 2)
     get_quadrature_order(::CrouzeixRaviart{shape, order}) where {shape, order} = max(2 * order - 1, 2)

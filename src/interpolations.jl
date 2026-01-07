@@ -9,31 +9,45 @@ a function between nodes.
 
 The following interpolations are implemented:
 
-* `Lagrange{RefLine,1}`
-* `Lagrange{RefLine,2}`
-* `Lagrange{RefQuadrilateral,1}`
-* `Lagrange{RefQuadrilateral,2}`
-* `Lagrange{RefQuadrilateral,3}`
-* `Lagrange{RefTriangle,1}`
-* `Lagrange{RefTriangle,2}`
-* `Lagrange{RefTriangle,3}`
-* `Lagrange{RefTriangle,4}`
-* `Lagrange{RefTriangle,5}`
-* `BubbleEnrichedLagrange{RefTriangle,1}`
+* `Lagrange{RefLine, 1}`
+* `Lagrange{RefLine, 2}`
+* `Lagrange{RefQuadrilateral, 1}`
+* `Lagrange{RefQuadrilateral, 2}`
+* `Lagrange{RefQuadrilateral, 3}`
+* `Lagrange{RefTriangle, 1}`
+* `Lagrange{RefTriangle, 2}`
+* `Lagrange{RefTriangle, 3}`
+* `Lagrange{RefTriangle, 4}`
+* `Lagrange{RefTriangle, 5}`
+* `BubbleEnrichedLagrange{RefTriangle, 1}`
 * `CrouzeixRaviart{RefTriangle, 1}`
 * `CrouzeixRaviart{RefTetrahedron, 1}`
 * `RannacherTurek{RefQuadrilateral, 1}`
 * `RannacherTurek{RefHexahedron, 1}`
-* `Lagrange{RefHexahedron,1}`
-* `Lagrange{RefHexahedron,2}`
-* `Lagrange{RefTetrahedron,1}`
-* `Lagrange{RefTetrahedron,2}`
-* `Lagrange{RefPrism,1}`
-* `Lagrange{RefPrism,2}`
-* `Lagrange{RefPyramid,1}`
-* `Lagrange{RefPyramid,2}`
-* `Serendipity{RefQuadrilateral,2}`
-* `Serendipity{RefHexahedron,2}`
+* `Lagrange{RefHexahedron, 1}`
+* `Lagrange{RefHexahedron, 2}`
+* `Lagrange{RefTetrahedron, 1}`
+* `Lagrange{RefTetrahedron, 2}`
+* `Lagrange{RefPrism, 1}`
+* `Lagrange{RefPrism, 2}`
+* `Lagrange{RefPyramid, 1}`
+* `Lagrange{RefPyramid, 2}`
+* `Serendipity{RefQuadrilateral, 2}`
+* `Serendipity{RefHexahedron, 2}`
+* `Nedelec{RefTriangle, 1}`
+* `Nedelec{RefTriangle, 2}`
+* `Nedelec{RefQuadrilateral, 1}`
+* `Nedelec{RefTetrahedron, 1}`
+* `Nedelec{RefHexahedron, 1}`
+* `RaviartThomas{RefTriangle, 1}`
+* `RaviartThomas{RefTriangle, 2}`
+* `RaviartThomas{RefQuadrilateral, 1}`
+* `RaviartThomas{RefTetrahedron, 1}`
+* `RaviartThomas{RefHexahedron, 1}`
+* `BrezziDouglasMarini{RefTriangle, 1}`
+
+Additionally, `DiscontinuousLagrange` is implemented for the same reference shapes
+and orders as `Lagrange`, as well as for `order = 0` on any reference shape.
 
 # Examples
 ```jldoctest
@@ -50,6 +64,19 @@ const InterpolationByDim{dim} = Interpolation{<:AbstractRefShape{dim}}
 
 abstract type ScalarInterpolation{refshape, order} <: Interpolation{refshape, order} end
 abstract type VectorInterpolation{vdim, refshape, order} <: Interpolation{refshape, order} end
+
+struct L2Conformity end     # Discontinuous across cell boundaries
+struct HdivConformity end   # Normal continuity across cell boundaries
+struct HcurlConformity end  # Tangent continuity across cell boundaries
+struct H1Conformity end     # Function continuity across cell boundaries
+
+"""
+    conformity(ip::Interpolation)
+
+Return the conformity, i.e. `L2Conformity()`, `HdivConformity()`, `HcurlConformity()`,
+or `H1Conformity()`, for the interpolation.
+"""
+function conformity end
 
 # Number of components for the interpolation.
 n_components(::ScalarInterpolation) = 1
@@ -98,7 +125,6 @@ struct InterpolationInfo
     reference_dim::Int
     adjust_during_distribution::Bool
     n_copies::Int
-    is_discontinuous::Bool
 end
 function InterpolationInfo(interpolation::Interpolation{shape}, n_copies) where {rdim, shape <: AbstractRefShape{rdim}}
     lvertexdofs = Int[]
@@ -123,8 +149,7 @@ function InterpolationInfo(interpolation::Interpolation{shape}, n_copies) where 
         [volumedof_interior_indices(interpolation)...],
         rdim,
         adjust_dofs_during_distribution(interpolation),
-        n_copies,
-        is_discontinuous(interpolation)
+        n_copies
     )
     return info
 end
@@ -177,12 +202,12 @@ getnbasefunctions(::Interpolation)
 #   celldof: dof that is local to the element
 
 """
-    reference_shape_values!(values::AbstractArray{T}, ip::Interpolation, ξ::Vec)
+    reference_shape_values!(values::AbstractVector, ip::Interpolation, ξ::Vec)
 
 Evaluate all shape functions of `ip` at once at the reference point `ξ` and store them in
 `values`.
 """
-@propagate_inbounds function reference_shape_values!(values::AT, ip::IP, ξ::Vec) where {IP <: Interpolation, AT <: AbstractArray}
+@propagate_inbounds function reference_shape_values!(values::AbstractVector, ip::Interpolation, ξ::Vec)
     @boundscheck checkbounds(values, 1:getnbasefunctions(ip))
     @inbounds for i in 1:getnbasefunctions(ip)
         values[i] = reference_shape_value(ip, ξ, i)
@@ -191,12 +216,12 @@ Evaluate all shape functions of `ip` at once at the reference point `ξ` and sto
 end
 
 """
-    reference_shape_gradients!(gradients::AbstractArray, ip::Interpolation, ξ::Vec)
+    reference_shape_gradients!(gradients::AbstractVector, ip::Interpolation, ξ::Vec)
 
 Evaluate all shape function gradients of `ip` at once at the reference point `ξ` and store
 them in `gradients`.
 """
-function reference_shape_gradients!(gradients::AT, ip::IP, ξ::Vec) where {IP <: Interpolation, AT <: AbstractArray}
+function reference_shape_gradients!(gradients::AbstractVector, ip::Interpolation, ξ::Vec)
     @boundscheck checkbounds(gradients, 1:getnbasefunctions(ip))
     @inbounds for i in 1:getnbasefunctions(ip)
         gradients[i] = reference_shape_gradient(ip, ξ, i)
@@ -205,12 +230,12 @@ function reference_shape_gradients!(gradients::AT, ip::IP, ξ::Vec) where {IP <:
 end
 
 """
-    reference_shape_gradients_and_values!(gradients::AbstractArray, values::AbstractArray, ip::Interpolation, ξ::Vec)
+    reference_shape_gradients_and_values!(gradients::AbstractVector, values::AbstractVector, ip::Interpolation, ξ::Vec)
 
 Evaluate all shape function gradients and values of `ip` at once at the reference point `ξ`
 and store them in `values`.
 """
-function reference_shape_gradients_and_values!(gradients::GAT, values::SAT, ip::IP, ξ::Vec) where {IP <: Interpolation, SAT <: AbstractArray, GAT <: AbstractArray}
+function reference_shape_gradients_and_values!(gradients::AbstractVector, values::AbstractVector, ip::Interpolation, ξ::Vec)
     @boundscheck checkbounds(gradients, 1:getnbasefunctions(ip))
     @boundscheck checkbounds(values, 1:getnbasefunctions(ip))
     @inbounds for i in 1:getnbasefunctions(ip)
@@ -256,7 +281,7 @@ Evaluate the gradient of the `i`th shape function of the interpolation `ip` in
 reference coordinate `ξ`.
 """
 function reference_shape_gradient(ip::Interpolation, ξ::Vec, i::Int)
-    return Tensors.gradient(x -> reference_shape_value(ip, x, i), ξ)
+    return gradient(x -> reference_shape_value(ip, x, i), ξ)
 end
 
 """
@@ -285,11 +310,7 @@ end
 
 Returns a vector of coordinates with length [`getnbasefunctions(::Interpolation)`](@ref)
 and indices corresponding to the indices of a dof in [`vertices`](@ref), [`faces`](@ref) and
-[`edges`](@ref).
-
-    Only required for nodal interpolations.
-
-    TODO: Separate nodal and non-nodal interpolations.
+[`edges`](@ref). Only applicable to nodal interpolations.
 """
 reference_coordinates(::Interpolation)
 
@@ -435,15 +456,6 @@ nfacets(ip::InterpolationByDim{2}) = nedges(ip)
 nfacets(ip::InterpolationByDim{1}) = nvertices(ip)
 
 """
-    is_discontinuous(::Interpolation)
-    is_discontinuous(::Type{<:Interpolation})
-
-Checks whether the interpolation is discontinuous (i.e. `DiscontinuousLagrange`)
-"""
-is_discontinuous(ip::Interpolation) = is_discontinuous(typeof(ip))
-is_discontinuous(::Type{<:Interpolation}) = false
-
-"""
     dirichlet_boundarydof_indices(::Type{<:BoundaryIndex})
 
 Helper function to generically dispatch on the correct dof sets of a boundary entity.
@@ -460,25 +472,6 @@ dirichlet_boundarydof_indices(::Type{FacetIndex}) = dirichlet_facetdof_indices
 get_edge_direction(cell, edgenr) = get_edge_direction(edges(cell)[edgenr])
 get_face_direction(cell, facenr) = get_face_direction(faces(cell)[facenr])
 
-function get_edge_direction(edgenodes::NTuple{2, Int})
-    positive = edgenodes[2] > edgenodes[1]
-    return ifelse(positive, 1, -1)
-end
-
-function get_face_direction(facenodes::NTuple{N, Int}) where {N}
-    N > 2 || throw(ArgumentError("A face must have at least 3 nodes"))
-    min_idx = argmin(facenodes)
-    if min_idx == 1
-        positive = facenodes[2] < facenodes[end]
-    elseif min_idx == length(facenodes)
-        positive = facenodes[1] < facenodes[end - 1]
-    else
-        positive = facenodes[min_idx + 1] < facenodes[min_idx - 1]
-    end
-    return ifelse(positive, 1, -1)
-end
-
-
 #########################
 # DiscontinuousLagrange #
 #########################
@@ -491,6 +484,7 @@ struct DiscontinuousLagrange{shape, order} <: ScalarInterpolation{shape, order}
         return new{shape, order}()
     end
 end
+conformity(::DiscontinuousLagrange) = L2Conformity()
 
 adjust_dofs_during_distribution(::DiscontinuousLagrange) = false
 
@@ -533,8 +527,6 @@ function reference_shape_value(ip::DiscontinuousLagrange{shape, 0}, ::Vec{dim, T
     throw(ArgumentError("no shape function $i for interpolation $ip"))
 end
 
-is_discontinuous(::Type{<:DiscontinuousLagrange}) = true
-
 ############
 # Lagrange #
 ############
@@ -548,6 +540,7 @@ struct Lagrange{shape, order} <: ScalarInterpolation{shape, order}
         return new{shape, order}()
     end
 end
+conformity(::Lagrange) = H1Conformity()
 
 adjust_dofs_during_distribution(::Lagrange) = true
 adjust_dofs_during_distribution(::Lagrange{<:Any, 2}) = false
@@ -592,7 +585,7 @@ end
 getnbasefunctions(::Lagrange{RefLine, 2}) = 3
 
 edgedof_indices(::Lagrange{RefLine, 2}) = ((1, 2, 3),)
-edgedof_interior_indices(::Lagrange{RefLine, 2}) = (3,)
+edgedof_interior_indices(::Lagrange{RefLine, 2}) = ((3,),)
 
 function reference_coordinates(::Lagrange{RefLine, 2})
     return [
@@ -645,7 +638,7 @@ getnbasefunctions(::Lagrange{RefQuadrilateral, 2}) = 9
 edgedof_indices(::Lagrange{RefQuadrilateral, 2}) = ((1, 2, 5), (2, 3, 6), (3, 4, 7), (4, 1, 8))
 edgedof_interior_indices(::Lagrange{RefQuadrilateral, 2}) = ((5,), (6,), (7,), (8,))
 facedof_indices(ip::Lagrange{RefQuadrilateral, 2}) = (ntuple(i -> i, getnbasefunctions(ip)),)
-facedof_interior_indices(::Lagrange{RefQuadrilateral, 2}) = ((9,))
+facedof_interior_indices(::Lagrange{RefQuadrilateral, 2}) = ((9,),)
 
 function reference_coordinates(::Lagrange{RefQuadrilateral, 2})
     return [
@@ -1027,7 +1020,7 @@ edgedof_indices(::Lagrange{RefHexahedron, 2}) = (
     (4, 8, 20),
 )
 edgedof_interior_indices(::Lagrange{RefHexahedron, 2}) = (
-    (9,), (10,), (11,), (12,), (13,), (14,), (15,), (16,), (17), (18,), (19,), (20,),
+    (9,), (10,), (11,), (12,), (13,), (14,), (15,), (16,), (17,), (18,), (19,), (20,),
 )
 
 volumedof_interior_indices(::Lagrange{RefHexahedron, 2}) = (27,)
@@ -1360,6 +1353,7 @@ struct BubbleEnrichedLagrange{shape, order} <: ScalarInterpolation{shape, order}
         return new{shape, order}()
     end
 end
+conformity(::BubbleEnrichedLagrange) = H1Conformity()
 
 #######################################
 # Lagrange-Bubble RefTriangle order 1 #
@@ -1405,6 +1399,7 @@ struct Serendipity{shape, order} <: ScalarInterpolation{shape, order}
         return new{shape, order}()
     end
 end
+conformity(::Serendipity) = H1Conformity()
 
 # Note that the edgedofs for high order serendipity elements are defined in terms of integral moments,
 # so no permutation exists in general. See e.g. Scroggs et al. [2022] for an example.
@@ -1484,7 +1479,7 @@ edgedof_indices(::Serendipity{RefHexahedron, 2}) = (
 )
 
 edgedof_interior_indices(::Serendipity{RefHexahedron, 2}) = (
-    (9,), (10,), (11,), (12,), (13,), (14,), (15,), (16,), (17), (18,), (19,), (20,),
+    (9,), (10,), (11,), (12,), (13,), (14,), (15,), (16,), (17,), (18,), (19,), (20,),
 )
 
 function reference_coordinates(::Serendipity{RefHexahedron, 2})
@@ -1555,6 +1550,7 @@ struct CrouzeixRaviart{shape, order} <: ScalarInterpolation{shape, order}
     CrouzeixRaviart{RefTriangle, 1}() = new{RefTriangle, 1}()
     CrouzeixRaviart{RefTetrahedron, 1}() = new{RefTetrahedron, 1}()
 end
+conformity(::CrouzeixRaviart) = L2Conformity()
 
 # CR elements are characterized by not having vertex dofs
 vertexdof_indices(ip::CrouzeixRaviart) = ntuple(i -> (), nvertices(ip))
@@ -1623,6 +1619,7 @@ This element is basically the idea from Crouzeix and Raviart applied to
 hypercubes. For details see the original paper [RanTur:1992:snq](@cite).
 """
 struct RannacherTurek{shape, order} <: ScalarInterpolation{shape, order} end
+conformity(::RannacherTurek) = L2Conformity()
 
 # CR-type elements are characterized by not having vertex dofs
 vertexdof_indices(ip::RannacherTurek) = ntuple(i -> (), nvertices(ip))
@@ -1701,6 +1698,7 @@ struct VectorizedInterpolation{vdim, refshape, order, SI <: ScalarInterpolation{
         return new{vdim, refshape, order, SI}(ip)
     end
 end
+conformity(ip::VectorizedInterpolation) = conformity(ip.ip)
 
 adjust_dofs_during_distribution(ip::VectorizedInterpolation) = adjust_dofs_during_distribution(ip.ip)
 
@@ -1801,8 +1799,6 @@ end
 
 reference_coordinates(ip::VectorizedInterpolation) = reference_coordinates(ip.ip)
 
-is_discontinuous(::Type{<:VectorizedInterpolation{<:Any, <:Any, <:Any, ip}}) where {ip} = is_discontinuous(ip)
-
 """
     mapping_type(ip::Interpolation)
 
@@ -1844,6 +1840,7 @@ struct RaviartThomas{shape, order, vdim} <: VectorInterpolation{vdim, shape, ord
     end
 end
 mapping_type(::RaviartThomas) = ContravariantPiolaMapping()
+conformity(::RaviartThomas) = HdivConformity()
 
 # RefTriangle
 edgedof_indices(ip::RaviartThomas{RefTriangle}) = edgedof_interior_indices(ip)
@@ -1982,6 +1979,7 @@ struct BrezziDouglasMarini{shape, order, vdim} <: VectorInterpolation{vdim, shap
     end
 end
 mapping_type(::BrezziDouglasMarini) = ContravariantPiolaMapping()
+conformity(::BrezziDouglasMarini) = HdivConformity()
 
 # RefTriangle
 edgedof_indices(ip::BrezziDouglasMarini{RefTriangle}) = edgedof_interior_indices(ip)
@@ -2021,6 +2019,7 @@ struct Nedelec{shape, order, vdim} <: VectorInterpolation{vdim, shape, order}
     end
 end
 mapping_type(::Nedelec) = CovariantPiolaMapping()
+conformity(::Nedelec) = HcurlConformity()
 edgedof_indices(ip::Nedelec) = edgedof_interior_indices(ip)
 
 # 2D refshape (rdim == vdim for Nedelec)

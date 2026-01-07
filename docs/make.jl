@@ -109,6 +109,7 @@ bibtex_plugin = CitationBibliography(
         # ],
         "devdocs/index.md",
         "cited-literature.md",
+        "ferritepapers.md",
     ],
     plugins = [
         bibtex_plugin,

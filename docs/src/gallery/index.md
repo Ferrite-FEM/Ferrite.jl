@@ -24,7 +24,7 @@ Neumann boundary conditions and the method of manufactured solutions.
 
 This program combines the ideas from [Tutorial 3: Incompressible
 elasticity](../tutorials/incompressible_elasticity.md) and [Tutorial 4:
-Hyperelasticity](../tutorials/incompressible_elasticity.md) to construct a mixed element
+Hyperelasticity](../tutorials/hyperelasticity.md) to construct a mixed element
 solving three-dimensional displacement-pressure equations.
 
 *Contributed by*: Bhavesh Shrimali ([@bhaveshshrimali](https://github.com/bhaveshshrimali)).

@@ -96,7 +96,7 @@
 #md # the final [section](@ref porous-media-plain-program)
 #
 # Required packages
-using Ferrite, FerriteMeshParser, Tensors, WriteVTK
+using Ferrite, FerriteMeshParser, Tensors, WriteVTK, Downloads
 
 # ### Elasticity
 # We start by defining the elastic material type, containing the elastic stiffness,
@@ -253,8 +253,12 @@ end;
 # `get_ferrite_grid` function. We then create one cellset for each phase (solid and porous)
 # for each element type. These 4 sets will later be used in their own `SubDofHandler`
 function get_grid()
+    ## Download the grid if not available already
+    gridfile = "porous_media_0p25.inp"
+    isfile(gridfile) || Downloads.download(Ferrite.asset_url(gridfile), gridfile)
+
     ## Import grid from abaqus mesh
-    grid = get_ferrite_grid(joinpath(@__DIR__, "porous_media_0p25.inp"))
+    grid = get_ferrite_grid(gridfile)
 
     ## Create cellsets for each fieldhandler
     addcellset!(grid, "solid3", intersect(getcellset(grid, "solid"), getcellset(grid, "CPS3")))

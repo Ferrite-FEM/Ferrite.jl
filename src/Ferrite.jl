@@ -8,13 +8,14 @@ using Base:
 using EnumX:
     EnumX, @enumx
 using LinearAlgebra:
-    LinearAlgebra, Symmetric, cholesky, det, norm, pinv, tr
+    LinearAlgebra, Symmetric, cholesky, det, norm, pinv, tr, mul!
 using NearestNeighbors:
     NearestNeighbors, KDTree, knn
 using OrderedCollections:
     OrderedSet
 using SparseArrays:
-    SparseArrays, SparseMatrixCSC, nonzeros, nzrange, rowvals, AbstractSparseMatrixCSC
+    SparseArrays, SparseMatrixCSC, nonzeros, nzrange, rowvals,
+    AbstractSparseMatrix, AbstractSparseMatrixCSC, sparsevec
 using StaticArrays:
     StaticArrays, MArray, MMatrix, SArray, SMatrix, SVector
 using WriteVTK:
@@ -68,7 +69,7 @@ abstract type AbstractCellValues <: AbstractValues end
 abstract type AbstractFacetValues <: AbstractValues end
 
 """
-Abstract type which is used as identifier for faces, edges and verices
+Abstract type which is used as identifier for faces, edges and vertices
 """
 abstract type BoundaryIndex end
 

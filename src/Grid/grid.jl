@@ -24,7 +24,7 @@ get_node_coordinate(n::Node) = n.x
 """
     get_coordinate_type(::Node)
 
-Get the data type of the the node coordinate.
+Get the data type of the node coordinate.
 """
 get_coordinate_type(::Node{dim, T}) where {dim, T} = Vec{dim, T}
 
@@ -732,7 +732,7 @@ is called *inverted*, indicated by `flipped=true`.
 2D entities can be flipped (i.e. the defining vertex order is reverse to the
 spanning vertex order) and the vertices can be rotated against each other.
 
-The reference entity is a one with it's first node is the lowest index vertex
+The reference entity is one where its first node is the lowest index vertex
 and its vertices span counter-clock-wise.
 Take for example the faces
 ```
@@ -760,20 +760,31 @@ struct OrientationInfo
     shift_index::Int
 end
 
-function OrientationInfo(path::NTuple{2, Int})
-    flipped = first(path) < last(path)
-    return OrientationInfo(flipped, 0)
+function OrientationInfo(edgenodes::NTuple{2, Int})
+    return OrientationInfo(get_edge_direction(edgenodes) < 0, 0)
 end
 
-function OrientationInfo(surface::NTuple{N, Int}) where {N}
-    min_idx = argmin(surface)
+function OrientationInfo(facenodes::NTuple{N, Int}) where {N}
+    min_idx = argmin(facenodes)
     shift_index = min_idx - 1
-    if min_idx == 1
-        flipped = surface[2] < surface[end]
-    elseif min_idx == length(surface)
-        flipped = surface[1] < surface[end - 1]
-    else
-        flipped = surface[min_idx + 1] < surface[min_idx - 1]
-    end
+    flipped = get_face_direction(facenodes) < 0
     return OrientationInfo(flipped, shift_index)
+end
+
+function get_edge_direction(edgenodes::NTuple{2, Int})
+    positive = edgenodes[2] > edgenodes[1]
+    return ifelse(positive, 1, -1)
+end
+
+function get_face_direction(facenodes::NTuple{N, Int}) where {N}
+    N > 2 || throw(ArgumentError("A face must have at least 3 nodes"))
+    min_idx = argmin(facenodes)
+    if min_idx == 1
+        positive = facenodes[2] < facenodes[end]
+    elseif min_idx == length(facenodes)
+        positive = facenodes[1] < facenodes[end - 1]
+    else
+        positive = facenodes[min_idx + 1] < facenodes[min_idx - 1]
+    end
+    return ifelse(positive, 1, -1)
 end

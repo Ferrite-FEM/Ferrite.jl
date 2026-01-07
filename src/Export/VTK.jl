@@ -28,11 +28,12 @@ end
 struct VTKGridFile{VTK <: WriteVTK.DatasetFile}
     vtk::VTK
     cellnodes::Union{Vector{UnitRange{Int}}, Nothing}
+    node_mapping::Union{Vector{Int}, Nothing}
 end
 function VTKGridFile(filename::String, dh::DofHandler; kwargs...)
     for sdh in dh.subdofhandlers
         for ip in sdh.field_interpolations
-            if is_discontinuous(ip)
+            if !isa(conformity(ip), H1Conformity)
                 return VTKGridFile(filename, get_grid(dh); write_discontinuous = true, kwargs...)
             end
         end
@@ -40,8 +41,8 @@ function VTKGridFile(filename::String, dh::DofHandler; kwargs...)
     return VTKGridFile(filename, get_grid(dh); kwargs...)
 end
 function VTKGridFile(filename::String, grid::AbstractGrid; write_discontinuous = false, kwargs...)
-    vtk, cellnodes = create_vtk_grid(filename, grid, write_discontinuous; kwargs...)
-    return VTKGridFile(vtk, cellnodes)
+    vtk, cellnodes, node_mapping = create_vtk_grid(filename, grid, write_discontinuous; kwargs...)
+    return VTKGridFile(vtk, cellnodes, node_mapping)
 end
 # Makes it possible to use the `do`-block syntax
 function VTKGridFile(f::Function, args...; kwargs...)
@@ -139,12 +140,12 @@ end
 
 function create_vtk_grid(filename::AbstractString, grid::AbstractGrid, write_discontinuous; kwargs...)
     if write_discontinuous
-        coords, cls, cellnodes = create_discontinuous_vtk_griddata(grid)
+        coords, cls, cellnodes, node_mapping = create_discontinuous_vtk_griddata(grid)
     else
         coords, cls = create_vtk_griddata(grid)
-        cellnodes = nothing
+        cellnodes = node_mapping = nothing
     end
-    return WriteVTK.vtk_grid(filename, coords, cls; kwargs...), cellnodes
+    return WriteVTK.vtk_grid(filename, coords, cls; kwargs...), cellnodes, node_mapping
 end
 
 function toparaview!(v, x::Vec{D}) where {D}
@@ -155,6 +156,12 @@ function toparaview!(v, x::SecondOrderTensor)
     tovoigt!(v, x)
     return v
 end
+function toparaview!(v::AbstractVector, x::SVector{D}) where {D}
+    v[1:D] .= x
+    return v
+end
+
+toparaview!(data::AbstractVector, val::Number) = (data[1] = val)
 
 function _vtk_write_node_data(
         vtk::WriteVTK.DatasetFile,
@@ -222,16 +229,13 @@ Project `vals` to the grid nodes with `proj` and save to `vtk`.
 """
 function write_projection(vtk::VTKGridFile, proj::L2Projector, vals, name)
     if write_discontinuous(vtk)
-        # @assert first(vals) isa Number
         data = evaluate_at_discontinuous_vtkgrid_nodes(proj.dh, vals, only(getfieldnames(proj.dh)), vtk.cellnodes)
-        comp_names = ["x", "y", "z"][1:size(data, 1)]
     else
         data = _evaluate_at_grid_nodes(proj, vals, #=vtk=# Val(true))::Matrix
         @assert size(data, 2) == getnnodes(get_grid(proj.dh))
-        comp_names = component_names(eltype(vals))
     end
 
-    _vtk_write_node_data(vtk.vtk, data, name; component_names = comp_names)
+    _vtk_write_node_data(vtk.vtk, data, name; component_names = component_names(eltype(vals)))
     return vtk
 end
 
@@ -259,14 +263,13 @@ When `nodedata` contains second order tensors, the index order,
 """
 function write_node_data(vtk::VTKGridFile, nodedata, name)
     if write_discontinuous(vtk)
-        # Note: Can be implemented, requires creating a larger nodedata vector indexed by
-        # the vtk node representation, but then the Ferrite grid must be available in `vtk`
-        throw(ArgumentError("Writing of node data to a discontinuous vtk grid is not supported"))
+        data = _map_to_discontinuous_nodes(vtk.node_mapping, nodedata)
+        _vtk_write_node_data(vtk.vtk, data, name)
+    else
+        _vtk_write_node_data(vtk.vtk, nodedata, name)
     end
-    _vtk_write_node_data(vtk.vtk, nodedata, name)
     return vtk
 end
-
 
 """
     write_nodeset(vtk::VTKGridFile, grid::AbstractGrid, nodeset::String)
@@ -365,6 +368,7 @@ function create_discontinuous_vtk_griddata(grid::Grid{dim, C, T}) where {dim, C,
     cellnodes = Vector{UnitRange{Int}}(undef, getncells(grid))
     ncoords = sum(nnodes, getcells(grid))
     coords = zeros(T, dim, ncoords)
+    node_mapping = zeros(Int, ncoords)
     icoord = 0
     for cell in CellIterator(grid)
         CT = getcelltype(grid, cellid(cell))
@@ -374,12 +378,13 @@ function create_discontinuous_vtk_griddata(grid::Grid{dim, C, T}) where {dim, C,
         cellnodes[cellid(cell)] = (1:n) .+ icoord
         vtk_cellnodes = nodes_to_vtkorder(CT((ntuple(i -> i + icoord, n))))
         cls[cellid(cell)] = WriteVTK.MeshCell(vtk_celltype, vtk_cellnodes)
-        for x in cell_coords
+        for (x, node_idx) in zip(cell_coords, getnodes(cell))
             icoord += 1
             coords[:, icoord] = x
+            node_mapping[icoord] = node_idx
         end
     end
-    return coords, cls, cellnodes
+    return coords, cls, cellnodes, node_mapping
 end
 
 function evaluate_at_discontinuous_vtkgrid_nodes(dh::DofHandler{sdim}, u::Vector{T}, fieldname::Symbol, cellnodes) where {sdim, T}
@@ -392,6 +397,9 @@ function evaluate_at_discontinuous_vtkgrid_nodes(dh::DofHandler{sdim}, u::Vector
     get_vtk_dim(::ScalarInterpolation, ::AbstractVector{<:Number}) = 1
     get_vtk_dim(::ScalarInterpolation, ::AbstractVector{<:Vec{dim}}) where {dim} = dim == 2 ? 3 : dim
     get_vtk_dim(::VectorInterpolation{vdim}, ::AbstractVector{<:Number}) where {vdim} = vdim == 2 ? 3 : vdim
+
+    get_vtk_dim(::ScalarInterpolation, ::AbstractVector{<:SymmetricTensor{order, dim, T, M}}) where {order, dim, T, M} = M
+    get_vtk_dim(::ScalarInterpolation, ::AbstractVector{<:Tensor{order, dim, T, M}}) where {order, dim, T, M} = M
 
     vtk_dim = get_vtk_dim(ip, u)
     n_vtk_nodes = maximum(maximum, cellnodes)
@@ -429,8 +437,22 @@ function _evaluate_at_discontinuous_vtkgrid_nodes!(
         end
         for (qp, nodeid) in pairs(cellnodes[cellid(cell)])
             val = function_value(cv, qp, ue)
-            data[1:length(val), nodeid] .= val
-            data[(length(val) + 1):end, nodeid] .= 0 # purge the NaN
+            dataview = @view data[:, nodeid]
+            fill!(dataview, 0) # purge the NaN
+            toparaview!(dataview, val)
+        end
+    end
+    return data
+end
+
+function _map_to_discontinuous_nodes(node_mapping::Vector{Int}, nodedata::AbstractVector)
+    return map(i -> nodedata[i], node_mapping)
+end
+function _map_to_discontinuous_nodes(node_mapping::Vector{Int}, nodedata::AbstractMatrix)
+    data = similar(nodedata, size(nodedata, 1), length(node_mapping))
+    for (i, n) in enumerate(node_mapping)
+        for j in 1:size(data, 1)
+            data[j, i] = nodedata[j, n]
         end
     end
     return data

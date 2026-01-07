@@ -18,13 +18,13 @@ Ferrite.edgedof_interior_indices(::Interpolation)
 Ferrite.volumedof_interior_indices(::Interpolation)
 Ferrite.getnbasefunctions(::Interpolation)
 Ferrite.adjust_dofs_during_distribution(::Interpolation)
+Ferrite.conformity
 ```
 
 ### For special interpolations
 #### Discontinuous interpolations
 For discontinuous interpolations, implementing the following methods might be required to apply Dirichlet boundary conditions.
 ```@docs
-Ferrite.is_discontinuous(::Interpolation)
 Ferrite.dirichlet_vertexdof_indices(::Interpolation)
 Ferrite.dirichlet_facedof_indices(::Interpolation)
 Ferrite.dirichlet_edgedof_indices(::Interpolation)
@@ -83,7 +83,7 @@ RefTriangle
 
 For this particular interpolation, we have one degree of freedom associated
 with each vertex, and one degree of freedom associated with each edge.
-Following the [Ferrite numbering rules](@ref "Ordering-of-dofs"), we start by enumerating the
+Following the [Ferrite numbering rules](@ref "Local-DoF-indices"), we start by enumerating the
 vertices first, followed by the edges. The numbering is based on the `RefTriangle` shown above, and the actual shape functions are taken from [defelement.org](https://defelement.org/elements/examples/triangle-lagrange-equispaced-2.html).
 ```@example InterpolationExample
 function Ferrite.reference_shape_value(ip::QTI, ξ::Vec{2}, shape_number::Int)
@@ -177,9 +177,16 @@ dof per edge, we don't need to adjust these, hence,
 Ferrite.adjust_dofs_during_distribution(::QTI) = false
 ```
 
+Finally, our interpolation results in continuous function values across
+cell borders, but the derivatives are discontinous. Hence, it describes
+a $H_1$ conformity,
+```@example InterpolationExample
+Ferrite.conformity(::QTI) = Ferrite.H1Conformity()
+```
+
 !!! tip
     The function `test_interpolation_properties` in `test/test_interpolations.jl`
-    can be used when implementation to check that some basic properties are fullfilled.
+    can be used when implementation to check that some basic properties are fulfilled.
 
 ```@example InterpolationExample
 grid = generate_grid(Triangle, (2,2))                       # hide

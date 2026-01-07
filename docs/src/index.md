@@ -44,11 +44,11 @@ for. The document is organized as follows[^1]:
 The four sections above form the main user-facing parts of the documentation. In addition,
 the document also contain the following sections:
 
- - [**Code gallery**](gallery/index.md) contain user contributed example programs showcasing
+ - [**Code gallery**](gallery/index.md) contains user contributed example programs showcasing
    what can be done with Ferrite.
- - [**Changelog**](changelog.md) contain release notes and information about how to upgrade
+ - [**Changelog**](changelog.md) contains release notes and information about how to upgrade
    between releases.
- - [**Developer documentation**](devdocs/index.md) contain documentation of Ferrite internal
+ - [**Developer documentation**](devdocs/index.md) contains documentation of Ferrite internal
    code and is mainly targeted at developers of Ferrite.
 
 ## Getting started
@@ -71,7 +71,7 @@ forum](https://github.com/Ferrite-FEM/Ferrite.jl/discussions) on the GitHub repo
 ### Installation
 
 To use Ferrite you first need to install Julia, see <https://julialang.org/> for details.
-Installing Ferrite can then be done from the Pkg REPL; press `]` at the `julia>` promp to
+Installing Ferrite can then be done from the Pkg REPL; press `]` at the `julia>` prompt to
 enter `pkg>` mode:
 
 ```
