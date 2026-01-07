@@ -330,34 +330,19 @@ function add!(dh::DofHandler, name::Symbol, ip::Interpolation)
 end
 
 """
-    close!(dh::AbstractDofHandler [, alg])
+    close!(dh::AbstractDofHandler)
 
 Closes `dh` and creates degrees of freedom for each cell with some given algorithm.
 """
-function close!(dh::DofHandler, alg = CompatibleLocalizedOrderDofDistributionAlgorithm()) # Changing the dof distribution algorithm is considered a breakin change, so we keep the standard algo one for now instead of automatically choosing one.
-    dh, _, _, _ = __close!(dh, alg)
+function close!(dh::DofHandler)
+    dh, _, _, _ = __close!(dh)
     return dh
 end
 
 """
-    DefaultDofDistributionAlgorithm
+    __close!(dh::DofHandler)
 
-Automatically chooses a suitable dof distribution algorithm.
-"""
-struct DefaultDofDistributionAlgorithm
-end
-
-"""
-    NodalDofDistributionAlgorithm
-
-Construct a dof ordering compatible with the node order of the mesh.
-Requires a compatible interpolation, i.e. the nodes of the geometric ansatz function **must** match the field interpolations nodes.
-"""
-struct NodalDofDistributionAlgorithm
-end
-
-"""
-    CompatibleLocalizedOrderDofDistributionAlgorithm
+Internal entry point for dof distribution.
 
 Dofs are distributed as follows:
 For the `DofHandler` each `SubDofHandler` is visited in the order they were added.
@@ -370,17 +355,7 @@ The entity ordering follows the geometrical ordering found in [`vertices`](@ref)
 
 Here it is assumed that all interpolations are of compatible characteristic order.
 """
-struct CompatibleLocalizedOrderDofDistributionAlgorithm
-end
-
-__close!(dh::DofHandler, alg::NodalDofDistributionAlgorithm) = error("Nodal dof distribution is not implemented.")
-
-"""
-    __close!(dh::DofHandler, alg)
-
-Internal entry point for dof distribution.
-"""
-function __close!(dh::DofHandler, alg::CompatibleLocalizedOrderDofDistributionAlgorithm)
+function __close!(dh::DofHandler)
     @assert !isclosed(dh)
 
     # Collect the global field names
