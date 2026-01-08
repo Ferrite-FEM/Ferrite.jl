@@ -5,7 +5,7 @@ else                       #hide
 end                        #hide
 nothing                    #hide
 
-using Ferrite, SparseArrays, BlockArrays, LinearAlgebra, UnPack, WriteVTK
+using Ferrite, SparseArrays, BlockArrays, LinearAlgebra, WriteVTK
 
 using DiffEqBase
 using OrdinaryDiffEqRosenbrock: Rodas5P
@@ -219,7 +219,7 @@ end
 
 function navierstokes!(du, u_uc, p::RHSparams, t)
 
-    @unpack K, ch, dh, cellvalues_v, u = p
+    (; K, ch, dh, cellvalues_v, u) = p
 
     u .= u_uc
     update!(ch, t)
@@ -265,7 +265,7 @@ end
 
 function navierstokes_jac!(J, u_uc, p, t)
 
-    @unpack K, ch, dh, cellvalues_v, u = p
+    (; K, ch, dh, cellvalues_v, u) = p
 
     u .= u_uc
     update!(ch, t)
