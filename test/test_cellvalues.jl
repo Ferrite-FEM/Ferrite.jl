@@ -99,7 +99,7 @@
             end
 
             # Check if the non-linear mapping is correct
-            # Only do this for one interpolation becuase it relise on AD on "iterative function"
+            # Only do this for one interpolation because it relies on AD on "iterative function"
             if scalar_interpol === Lagrange{RefQuadrilateral, 2}()
                 coords_nl = [x + rand(x) * 0.01 for x in coords] # add some displacement to nodes
                 reinit!(cv, coords_nl)
