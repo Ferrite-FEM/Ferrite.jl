@@ -31,7 +31,7 @@
  \begin{bmatrix}
      N(\hat{v}, \hat{v}, \hat{\varphi}) \\
      0
- \end{bmatrix}\]</p><p>Here <span>$M$</span> is the singular block mass matrix, <span>$K$</span> is the discretized Stokes operator and <span>$N$</span> the nonlinear advection term, which is also called trilinear form. <span>$\hat{v}$</span> and <span>$\hat{p}$</span> represent the time-dependent vectors of nodal values of the discretizations of <span>$v$</span> and <span>$p$</span> respectively, while <span>$\hat{\varphi}$</span> is the choice for the test function in the discretization. The hats are dropped in the implementation and only stated for clarity in this section.</p><h2 id="Commented-implementation"><a class="docs-heading-anchor" href="#Commented-implementation">Commented implementation</a><a id="Commented-implementation-1"></a><a class="docs-heading-anchor-permalink" href="#Commented-implementation" title="Permalink"></a></h2><p>Now we solve the problem with Ferrite and <a href="https://github.com/SciML/DifferentialEquations.jl">DifferentialEquations.jl</a>. What follows is a program spliced with comments. The full program, without comments, can be found in the next <a href="#ns_vs_diffeq-plain-program">section</a>.</p><p>First we load Ferrite and some other packages we need</p><pre><code class="language-julia hljs">using Ferrite, SparseArrays, BlockArrays, LinearAlgebra, UnPack, WriteVTK</code></pre><p>We do not need the complete SciML/DifferentialEquations suite. We load DiffEqBase, which provides most of the ODE infrastructure (which can also handle DAEs in mass matrix form), and the Rodas5P solver from OrdinaryDiffEqRosenbrock.</p><pre><code class="language-julia hljs">using DiffEqBase
+ \end{bmatrix}\]</p><p>Here <span>$M$</span> is the singular block mass matrix, <span>$K$</span> is the discretized Stokes operator and <span>$N$</span> the nonlinear advection term, which is also called trilinear form. <span>$\hat{v}$</span> and <span>$\hat{p}$</span> represent the time-dependent vectors of nodal values of the discretizations of <span>$v$</span> and <span>$p$</span> respectively, while <span>$\hat{\varphi}$</span> is the choice for the test function in the discretization. The hats are dropped in the implementation and only stated for clarity in this section.</p><h2 id="Commented-implementation"><a class="docs-heading-anchor" href="#Commented-implementation">Commented implementation</a><a id="Commented-implementation-1"></a><a class="docs-heading-anchor-permalink" href="#Commented-implementation" title="Permalink"></a></h2><p>Now we solve the problem with Ferrite and <a href="https://github.com/SciML/DifferentialEquations.jl">DifferentialEquations.jl</a>. What follows is a program spliced with comments. The full program, without comments, can be found in the next <a href="#ns_vs_diffeq-plain-program">section</a>.</p><p>First we load Ferrite and some other packages we need</p><pre><code class="language-julia hljs">using Ferrite, SparseArrays, BlockArrays, LinearAlgebra, WriteVTK</code></pre><p>We do not need the complete SciML/DifferentialEquations suite. We load DiffEqBase, which provides most of the ODE infrastructure (which can also handle DAEs in mass matrix form), and the Rodas5P solver from OrdinaryDiffEqRosenbrock.</p><pre><code class="language-julia hljs">using DiffEqBase
 using OrdinaryDiffEqRosenbrock: Rodas5P</code></pre><p>We start off by defining our only material parameter.</p><pre><code class="language-julia hljs">ν = 1.0 / 1000.0; #dynamic viscosity</code></pre><p>Next a rectangular grid with a cylinder in it has to be generated. We use Gmsh.jl for the creation of the mesh and FerriteGmsh.jl to translate it to a <code>Ferrite.Grid</code>. Note that the mesh is pretty fine, leading to a high memory consumption when feeding the equation system to direct solvers.</p><pre><code class="language-julia hljs">using FerriteGmsh
 using FerriteGmsh: Gmsh
 Gmsh.initialize()
@@ -179,7 +179,7 @@ function navierstokes_rhs_element!(dvₑ, vₑ, cellvalues_v)
     return
 end
 
-function navierstokes!(du, u_uc, p::RHSparams, t)</code></pre><p>Unpack the struct to save some allocations.</p><pre><code class="language-julia hljs">    @unpack K, ch, dh, cellvalues_v, u = p</code></pre><p>We start by applying the time-dependent Dirichlet BCs. Note that we are not allowed to mutate <code>u_uc</code>! Furthermore not that we also can not pre- allocate a buffer for this variable variable if we want to use AD to derive the Jacobian matrix, which appears in stiff solvers. Therefore, for efficiency reasons, we simply pass down the jacobian analytically.</p><pre><code class="language-julia hljs">    u .= u_uc
+function navierstokes!(du, u_uc, p::RHSparams, t)</code></pre><p>Unpack the struct to save some allocations.</p><pre><code class="language-julia hljs">    (; K, ch, dh, cellvalues_v, u) = p</code></pre><p>We start by applying the time-dependent Dirichlet BCs. Note that we are not allowed to mutate <code>u_uc</code>! Furthermore not that we also can not pre- allocate a buffer for this variable variable if we want to use AD to derive the Jacobian matrix, which appears in stiff solvers. Therefore, for efficiency reasons, we simply pass down the jacobian analytically.</p><pre><code class="language-julia hljs">    u .= u_uc
     update!(ch, t)
     apply!(u, ch)</code></pre><p>Now we apply the rhs of the Navier-Stokes equations</p><pre><code class="language-julia hljs">    # Linear contribution (Stokes operator)
     mul!(du, K, u) # du .= K * u
@@ -217,7 +217,7 @@ function navierstokes_jac_element!(Jₑ, vₑ, cellvalues_v)
     return
 end
 
-function navierstokes_jac!(J, u_uc, p, t)</code></pre><p>Unpack the struct to save some allocations.</p><pre><code class="language-julia hljs">    @unpack K, ch, dh, cellvalues_v, u = p</code></pre><p>We start by applying the time-dependent Dirichlet BCs. Note that we are not allowed to mutate <code>u_uc</code>, so we use our buffer again.</p><pre><code class="language-julia hljs">    u .= u_uc
+function navierstokes_jac!(J, u_uc, p, t)</code></pre><p>Unpack the struct to save some allocations.</p><pre><code class="language-julia hljs">    (; K, ch, dh, cellvalues_v, u) = p</code></pre><p>We start by applying the time-dependent Dirichlet BCs. Note that we are not allowed to mutate <code>u_uc</code>, so we use our buffer again.</p><pre><code class="language-julia hljs">    u .= u_uc
     update!(ch, t)
     apply!(u, ch)</code></pre><p>Now we apply the Jacobian of the Navier-Stokes equations.</p><pre><code class="language-julia hljs">    # Linear contribution (Stokes operator)
     # Here we assume that J has exactly the same structure as K by construction
@@ -256,7 +256,7 @@ for (step, (u, t)) in enumerate(intervals(integrator))
         pvd[t] = vtk
     end
 end
-vtk_save(pvd);</code></pre><h2 id="ns_vs_diffeq-plain-program"><a class="docs-heading-anchor" href="#ns_vs_diffeq-plain-program">Plain program</a><a id="ns_vs_diffeq-plain-program-1"></a><a class="docs-heading-anchor-permalink" href="#ns_vs_diffeq-plain-program" title="Permalink"></a></h2><p>Here follows a version of the program without any comments. The file is also available here: <a href="../ns_vs_diffeq.jl"><code>ns_vs_diffeq.jl</code></a>.</p><pre><code class="language-julia hljs">using Ferrite, SparseArrays, BlockArrays, LinearAlgebra, UnPack, WriteVTK
+vtk_save(pvd);</code></pre><h2 id="ns_vs_diffeq-plain-program"><a class="docs-heading-anchor" href="#ns_vs_diffeq-plain-program">Plain program</a><a id="ns_vs_diffeq-plain-program-1"></a><a class="docs-heading-anchor-permalink" href="#ns_vs_diffeq-plain-program" title="Permalink"></a></h2><p>Here follows a version of the program without any comments. The file is also available here: <a href="../ns_vs_diffeq.jl"><code>ns_vs_diffeq.jl</code></a>.</p><pre><code class="language-julia hljs">using Ferrite, SparseArrays, BlockArrays, LinearAlgebra, WriteVTK
 
 using DiffEqBase
 using OrdinaryDiffEqRosenbrock: Rodas5P
@@ -447,7 +447,7 @@ end
 
 function navierstokes!(du, u_uc, p::RHSparams, t)
 
-    @unpack K, ch, dh, cellvalues_v, u = p
+    (; K, ch, dh, cellvalues_v, u) = p
 
     u .= u_uc
     update!(ch, t)
@@ -493,7 +493,7 @@ end
 
 function navierstokes_jac!(J, u_uc, p, t)
 
-    @unpack K, ch, dh, cellvalues_v, u = p
+    (; K, ch, dh, cellvalues_v, u) = p
 
     u .= u_uc
     update!(ch, t)
@@ -548,4 +548,4 @@ for (step, (u, t)) in enumerate(intervals(integrator))
         pvd[t] = vtk
     end
 end
-vtk_save(pvd);</code></pre><hr/><p><em>This page was generated using <a href="https://github.com/fredrikekre/Literate.jl">Literate.jl</a>.</em></p></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../porous_media/">« Porous media</a><a class="docs-footer-nextpage" href="../reactive_surface/">Reactive surface »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option><option value="catppuccin-latte">catppuccin-latte</option><option value="catppuccin-frappe">catppuccin-frappe</option><option value="catppuccin-macchiato">catppuccin-macchiato</option><option value="catppuccin-mocha">catppuccin-mocha</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.15.0 on <span class="colophon-date" title="Wednesday 10 December 2025 12:29">Wednesday 10 December 2025</span>. Using Julia version 1.12.2.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
+vtk_save(pvd);</code></pre><hr/><p><em>This page was generated using <a href="https://github.com/fredrikekre/Literate.jl">Literate.jl</a>.</em></p></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../porous_media/">« Porous media</a><a class="docs-footer-nextpage" href="../reactive_surface/">Reactive surface »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option><option value="catppuccin-latte">catppuccin-latte</option><option value="catppuccin-frappe">catppuccin-frappe</option><option value="catppuccin-macchiato">catppuccin-macchiato</option><option value="catppuccin-mocha">catppuccin-mocha</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.15.0 on <span class="colophon-date" title="Thursday 8 January 2026 08:49">Thursday 8 January 2026</span>. Using Julia version 1.12.4.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
