@@ -8,7 +8,7 @@ else
 end
 
 @testset "Grid, DofHandler, vtk" begin
-    for (celltype, dim) in (
+    @testset "$celltype" for (celltype, dim) in (
             (Line, 1),
             (QuadraticLine, 1),
             (Quadrilateral, 2),
@@ -44,6 +44,7 @@ end
             @test Ferrite.write_cellset(vtk, grid, "cell-1") === vtk
             @test Ferrite.write_cellset(vtk, grid, "middle-cells") === vtk
             @test Ferrite.write_nodeset(vtk, grid, "middle-nodes") === vtk
+            @test Ferrite.write_facetset(vtk, grid, "right") === vtk
         end
 
         # test the sha of the file
