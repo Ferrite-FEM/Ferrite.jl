@@ -1,4 +1,5 @@
 using Ferrite: reference_shape_value, reference_shape_gradient
+using LinearAlgebra: normalize
 
 """
     test_interpolation_properties(ip::Interpolation)
@@ -534,7 +535,7 @@ end
             # Test functionals associated with the edges
             for edge_nr in 1:Ferrite.nedges(RefShape)
                 edge_coords = getindex.((Ferrite.reference_coordinates(ipg),), Ferrite.reference_edges(RefShape)[edge_nr])
-                tangent = Tensors.normalize(edge_coords[2] - edge_coords[1])
+                tangent = normalize(edge_coords[2] - edge_coords[1])
                 dof_inds = Ferrite.edgedof_interior_indices(ip)[edge_nr]
 
                 ξ(s) = parameterize_edge(edge_coords, s)
