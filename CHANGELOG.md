@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Next] - xxxx-xx-xx
 
+## [v1.3.0] - 2026-01-09
+
+### Added
+ - New function `Ferrite.write_facetset` for exporting facet sets to VTK. ([#1132], [#1259])
+
+### Documentation
+ - Fix errors in incompressible elasticity tutorial. ([#1251])
+ - Add utility for downloading meshes (and other assets) for tutorials. ([#1037])
+
 ## [v1.2.0] - 2025-11-14
 
 ### Added
