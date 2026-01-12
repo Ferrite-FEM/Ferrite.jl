@@ -51,7 +51,7 @@
 # \boldsymbol{\mathsf{C}}:\boldsymbol{\epsilon} - \boldsymbol{\delta u} \cdot \boldsymbol{\nabla} \alpha p\right] \mathrm{d}\Omega
 # &= \int_\Gamma \boldsymbol{\delta u} \cdot \boldsymbol{t} \mathrm{d} \Gamma \\
 # \int_\Omega \left[\delta p \left[\alpha \dot{\boldsymbol{u}} \cdot \boldsymbol{\nabla} + \beta \dot{p}\right] +
-# \boldsymbol{\nabla}(\delta p) \cdot [k \boldsymbol{\nabla}]\right] \mathrm{d}\Omega
+# \boldsymbol{\nabla}(\delta p) \cdot [k \boldsymbol{\nabla}(p)]\right] \mathrm{d}\Omega
 # &= \int_\Gamma \delta p w_\mathrm{n} \mathrm{d} \Gamma
 # \end{aligned}
 # ```
