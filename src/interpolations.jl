@@ -115,20 +115,38 @@ this cache is of the same type no matter the interpolation: the purpose is to ma
 dof-distribution type-stable.
 """
 struct InterpolationInfo
-    nvertexdofs::Vector{Int}
-    nedgedofs::Vector{Int}
-    nfacedofs::Vector{Int}
-    nvolumedofs::Int
+    lvertexdofs::Vector{Int}
+    lvertexdofoffsets::Vector{Int}
+    ledgedofs::Vector{Int}
+    ledgedofoffsets::Vector{Int}
+    lfacedofs::Vector{Int}
+    lfacedofoffsets::Vector{Int}
+    lvolumedofs::Vector{Int}
     reference_dim::Int
     adjust_during_distribution::Bool
     n_copies::Int
 end
 function InterpolationInfo(interpolation::Interpolation{shape}, n_copies) where {rdim, shape <: AbstractRefShape{rdim}}
+    lvertexdofs = Int[]
+    for ii in vertexdof_indices(interpolation)
+        append!(lvertexdofs, ii)
+    end
+    ledgedofs = Int[]
+    for ii in edgedof_interior_indices(interpolation)
+        append!(ledgedofs, ii)
+    end
+    lfacedofs = Int[]
+    for ii in facedof_interior_indices(interpolation)
+        append!(lfacedofs, ii)
+    end
     info = InterpolationInfo(
-        [length(i) for i in vertexdof_indices(interpolation)],
-        [length(i) for i in edgedof_interior_indices(interpolation)],
-        [length(i) for i in facedof_interior_indices(interpolation)],
-        length(volumedof_interior_indices(interpolation)),
+        lvertexdofs,
+        cumsum([1; [length(i) for i in vertexdof_indices(interpolation)]]),
+        ledgedofs,
+        cumsum([1; [length(i) for i in edgedof_interior_indices(interpolation)]]),
+        lfacedofs,
+        cumsum([1; [length(i) for i in facedof_interior_indices(interpolation)]]),
+        [volumedof_interior_indices(interpolation)...],
         rdim,
         adjust_dofs_during_distribution(interpolation),
         n_copies
