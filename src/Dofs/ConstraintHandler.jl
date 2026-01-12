@@ -1189,8 +1189,8 @@ function _add!(
             union!(all_node_idxs, nodes)
             for n in nodes
                 x = get_node_coordinate(grid, n)
-                min_x = Tx(i -> min(min_x[i], x[i]))
-                max_x = Tx(i -> max(max_x[i], x[i]))
+                min_x = Tx(min.(min_x.data, x.data))
+                max_x = Tx(max.(max_x.data, x.data))
             end
         end
         all_node_idxs_v = collect(all_node_idxs)
