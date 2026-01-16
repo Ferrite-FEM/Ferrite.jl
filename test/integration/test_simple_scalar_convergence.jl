@@ -195,6 +195,7 @@ end
             Lagrange{RefTriangle, 2}(),
             Lagrange{RefHexahedron, 2}(),
             Lagrange{RefTetrahedron, 2}(),
+            Lagrange{RefTetrahedron, 3}(),
             Lagrange{RefPrism, 2}(),
             CrouzeixRaviart{RefTriangle, 1}(),
             CrouzeixRaviart{RefTetrahedron, 1}(),

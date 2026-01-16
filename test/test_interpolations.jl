@@ -157,6 +157,7 @@ end
             Serendipity{RefHexahedron, 2}(),
             Lagrange{RefTetrahedron, 1}(),
             Lagrange{RefTetrahedron, 2}(),
+            Lagrange{RefTetrahedron, 3}(),
             Lagrange{RefPrism, 1}(),
             Lagrange{RefPrism, 2}(),
             Lagrange{RefPyramid, 1}(),
@@ -226,7 +227,8 @@ end
                 if k == dof
                     @test N_dof ≈ 1.0
                 else
-                    factor = interpolation isa Lagrange{RefQuadrilateral, 3} ? 200 : 4
+                    # High order elements are right now not implemented in factorized form, so there is some small numerical noise in the evaluation.
+                    factor = Ferrite.getorder(interpolation) > 2 ? 200 : 4
                     @test N_dof ≈ 0.0 atol = factor * eps(typeof(N_dof))
                 end
             end
