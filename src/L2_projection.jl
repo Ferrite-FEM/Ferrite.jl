@@ -101,7 +101,7 @@ Add an interpolation `ip` on the cells in `set` to the `L2Projector` `proj`.
   projection equation, when calling [`project`](@ref). It should match the quadrature points used when
   creating the quadrature-point variables to project.
 * The *optional* `qr_lhs` sets the quadrature rule used to integrate the left-hand-side of the projection equation,
-  and defaults to a quadrature rule that integrates the mass-matrix exactly for the given interpolation `ip`.
+  and defaults to a quadrature rule that integrates the mass-matrix accurately for the given interpolation `ip`.
 
 """
 function add!(
@@ -137,13 +137,12 @@ function close!(proj::L2Projector)
 end
 
 # Quadrature sufficient for integrating a mass matrix
-function _mass_qr(::Lagrange{shape, order}) where {shape <: AbstractRefShape, order}
-    return QuadratureRule{shape}(order + 1)
-end
-function _mass_qr(::Lagrange{shape, 2}) where {shape <: RefSimplex}
-    return QuadratureRule{shape}(4)
-end
-_mass_qr(ip::VectorizedInterpolation) = _mass_qr(ip.ip)
+_mass_qr(ip::Interpolation{RefShape}) where {RefShape} = QuadratureRule{RefShape}(_mass_qr_order(ip))
+_mass_qr_order(::Lagrange{<:AbstractRefShape, order}) where {order} = order + 1
+_mass_qr_order(::DiscontinuousLagrange{RefShape, order}) where {RefShape, order} = _mass_qr_order(Lagrange{RefShape, order}())
+_mass_qr_order(::Serendipity{RefShape, order}) where {RefShape, order} = _mass_qr_order(Lagrange{RefShape, order}())
+_mass_qr_order(::Lagrange{RefSimplex{refdim}, order}) where {order, refdim} = max(1, refdim * order)
+_mass_qr_order(ip::VectorizedInterpolation) = _mass_qr_order(ip.ip)
 
 function _assemble_L2_matrix(dh::DofHandler, qrs_lhs::Vector{<:QuadratureRule})
     M = Symmetric(allocate_matrix(dh))
