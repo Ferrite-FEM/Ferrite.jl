@@ -237,4 +237,103 @@ using Ferrite: reference_shape_value
             end
         end
     end
+
+    @testset "polyorder" begin
+        # Define a struct that returns a complete polynomial function with random weights.
+        struct PolyFunction{dim}
+            weights::Vector{Float64}
+            exponents::Vector{NTuple{dim, Int}}
+        end
+
+        (f::PolyFunction{dim})(x::Vec{dim}) where {dim} = sum(w * sum(tuple(x...) .^ e) for (w, e) in zip(f.weights, f.exponents))
+
+        function PolyFunction{1}(order::Int)
+            return PolyFunction{1}(collect(range(0, 1, order + 1)), [(i,) for i in 0:order])
+        end
+        function PolyFunction{2}(order::Int)
+            exponents = NTuple{2, Int}[]
+            for i in 0:order
+                for j in 0:(order - i)
+                    push!(exponents, (i, j))
+                end
+            end
+            return PolyFunction{2}(collect(range(0, 1, length(exponents))), exponents)
+        end
+        function PolyFunction{3}(order::Int)
+            exponents = NTuple{3, Int}[]
+            for i in 0:order
+                for j in 0:(order - i)
+                    for k in 0:(order - i - j)
+                        push!(exponents, (i, j, k))
+                    end
+                end
+            end
+            return PolyFunction{3}(collect(range(0, 1, length(exponents))), exponents)
+        end
+
+        # Define functions to integrate over the difference reference shapes with hcubature.
+        function integration_reference(::Type{Ferrite.RefHypercube{dim}}, f::F; kwargs...) where {dim, F}
+            return hcubature(s -> f(Vec(s...)), -ones(Vec{dim}), ones(Vec{dim}); kwargs...)[1]
+        end
+        function integration_reference(::Type{RefTriangle}, f::F; kwargs...) where {F}
+            duffy_transform(s) = Vec((s[1] * (1 - s[2]), s[2]))
+            duffy_detJ(s) = 1 - s[2]
+            return hcubature(s -> f(duffy_transform(s)) * duffy_detJ(s), zero(Vec{2}), ones(Vec{2}); kwargs...)[1]
+        end
+        function integration_reference(::Type{RefPrism}, f::F; kwargs...) where {F}
+            duffy_transform(s) = Vec((s[1] * (1 - s[2]), s[2], s[3]))
+            duffy_detJ(s) = 1 - s[2]
+            return hcubature(s -> f(duffy_transform(s)) * duffy_detJ(s), zero(Vec{3}), ones(Vec{3}); kwargs...)[1]
+        end
+        function integration_reference(::Type{RefTetrahedron}, f::F; kwargs...) where {F}
+            duffy_transform(s) = Vec((s[1], (1 - s[1]) * s[2], (1 - s[1]) * (1 - s[2]) * s[3]))
+            duffy_detJ(s) = (1 - s[1])^2 * (1 - s[2])
+            return hcubature(s -> f(duffy_transform(s)) * duffy_detJ(s), zero(Vec{3}), ones(Vec{3}); kwargs...)[1]
+        end
+        function integration_reference(::Type{RefPyramid}, f::F; kwargs...) where {F}
+            duffy_transform(s) = Vec(s[1] * (1 - s[3]), s[2] * (1 - s[3]), s[3])
+            duffy_detJ(s) = (1 - s[3])^2
+            return hcubature(s -> f(duffy_transform(s)) * duffy_detJ(s), zero(Vec{3}), ones(Vec{3}); kwargs...)[1]
+        end
+
+        # Define function to integrate using the quadrature rule
+        function integration_check(f::F, qr::QuadratureRule) where {F}
+            s = zero(f(first(Ferrite.getpoints(qr))))
+            for (ξ, w) in zip(Ferrite.getpoints(qr), Ferrite.getweights(qr))
+                s += f(ξ) * w
+            end
+            return s
+        end
+
+        # Check that the polyorder kwarg gives the correct value
+        for ((shape, type), polyorders) in [
+                (RefLine, :legendre) => 1:10, (RefQuadrilateral, :legendre) => 1:3, (RefHexahedron, :legendre) => 1:3,
+                (RefLine, :lobatto) => 1:10, (RefQuadrilateral, :lobatto) => 1:3, (RefHexahedron, :lobatto) => 1:3,
+                (RefTriangle, :dunavant) => 1:8, (RefTriangle, :gaussjacobi) => 9:15,
+                (RefTetrahedron, :jinyun) => 1:3, (RefTetrahedron, :keast_minimal) => 4:5, (RefTetrahedron, :keast_positive) => 4,
+                (RefPrism, :polyquad) => 1:10, (RefPyramid, :polyquad) => 1:6,
+            ]
+            for polyorder in polyorders
+                @testset "QuadratureRule{$shape}($type; polyorder = $polyorder)" begin
+                    qr = QuadratureRule{shape}(type; polyorder)
+                    f = PolyFunction{Ferrite.getrefdim(shape)}(polyorder)
+                    solution = integration_reference(shape, f)
+                    @test solution ≈ integration_check(f, qr)
+                end
+            end
+        end
+        qr_spec = QuadratureRule{RefQuadrilateral}(Float32; polyorder = 2)
+        qr_def = QuadratureRule{RefQuadrilateral}(Float32, :legendre; polyorder = 2)
+        @test eltype(Ferrite.getweights(qr_spec)) == Float32
+        @test eltype(Ferrite.getpoints(qr_spec)) == Vec{2, Float32}
+        @test Ferrite.getweights(qr_spec) == Ferrite.getweights(qr_def)
+        @test Ferrite.getpoints(qr_spec) == Ferrite.getpoints(qr_def)
+
+        qr_spec = QuadratureRule{RefQuadrilateral}(polyorder = 2)
+        qr_def = QuadratureRule{RefQuadrilateral}(:legendre; polyorder = 2)
+        @test eltype(Ferrite.getweights(qr_spec)) == Float64
+        @test eltype(Ferrite.getpoints(qr_spec)) == Vec{2, Float64}
+        @test Ferrite.getweights(qr_spec) == Ferrite.getweights(qr_def)
+        @test Ferrite.getpoints(qr_spec) == Ferrite.getpoints(qr_def)
+    end
 end
