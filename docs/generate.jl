@@ -180,6 +180,7 @@ write_overview(
     joinpath(@__DIR__, "gallery_index_body.md"),
     [
         ("helmholtz", "Helmholtz equation", ["helmholtz-light.png", "helmholtz-dark.png"]),
+        ("plate_equation", "Kirchhoff-Love plate equation", ["plate_equation-light.png", "plate_equation-dark.png"]),
         ("quasi_incompressible_hyperelasticity", "Nearly incompressible hyperelasticity", ["quasi_incompressible_hyperelasticity-light.webp", "quasi_incompressible_hyperelasticity-dark.webp"]),
         ("landau", "Ginzburg–Landau minimization", ["landau_opt-light.png", "landau_opt-dark.png"]),
         ("topology_optimization", "Topology optimization", ["topology_optimization-light.webp", "topology_optimization-dark.webp"]),

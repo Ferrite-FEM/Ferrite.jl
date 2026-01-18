@@ -54,7 +54,7 @@ fetch_assets(
 fetch_assets(
     joinpath(@__DIR__, "src", "gallery"),
     vcat(
-        variants(["helmholtz", "landau_orig", "landau_opt", "topology_optimization_result"], ".png"),
+        variants(["helmholtz", "landau_orig", "landau_opt", "plate_equation", "topology_optimization_result"], ".png"),
         variants(["quasi_incompressible_hyperelasticity", "topology_optimization", "elasticity_adaptivity"], ".webp"),
     ),
 )

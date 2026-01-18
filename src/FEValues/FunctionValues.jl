@@ -38,34 +38,39 @@ when indexing e.g. `cmv::MultiFieldCellValues` (e.g. `fv = cmv.u`), as `fv` supp
 """
 FunctionValues
 
-struct FunctionValues{DiffOrder, IP, Nx_t, Nξ_t, dNdx_t, dNdξ_t, d2Ndx2_t, d2Ndξ2_t} <: AbstractValues
+struct FunctionValues{DiffOrder, IP, N_t, dNdx_t, dNdξ_t, d2Ndx2_t, d2Ndξ2_t, transformation_t} <: AbstractValues
     ip::IP          # ::Interpolation
-    # FunctionValues are only functional for the types in the comments for the fields below.
-    # However, e.g. for GPU support, we allow arrays of one order higher to be passed, allowing this type to be used as a struct-of-arrays (SoA) type.
-    # See `soa_utils.jl` for the SoA transformation infrastructure.
-    Nx::Nx_t         # ::AbstractMatrix{Union{<:Tensor,<:Number}}
-    Nξ::Nξ_t         # ::AbstractMatrix{Union{<:Tensor,<:Number}}
+    Nx::N_t         # ::AbstractMatrix{Union{<:Tensor,<:Number}}
+    Nξ::N_t         # ::AbstractMatrix{Union{<:Tensor,<:Number}}
     dNdx::dNdx_t    # ::AbstractMatrix{Union{<:Tensor,<:StaticArray}} or Nothing
     dNdξ::dNdξ_t    # ::AbstractMatrix{Union{<:Tensor,<:StaticArray}} or Nothing
     d2Ndx2::d2Ndx2_t   # ::AbstractMatrix{<:Tensor{2}}  Hessians of geometric shape functions in ref-domain
     d2Ndξ2::d2Ndξ2_t   # ::AbstractMatrix{<:Tensor{2}}  Hessians of geometric shape functions in ref-domain
-    function FunctionValues(ip::Interpolation, Nx::Nx_t, Nξ::Nξ_t, ::Nothing, ::Nothing, ::Nothing, ::Nothing) where {Nx_t <: AbstractArray, Nξ_t <: AbstractArray}
-        return new{0, typeof(ip), Nx_t, Nξ_t, Nothing, Nothing, Nothing, Nothing}(ip, Nx, Nξ, nothing, nothing, nothing, nothing)
-    end
-    function FunctionValues(ip::Interpolation, Nx::Nx_t, Nξ::Nξ_t, dNdx::AbstractArray, dNdξ::AbstractArray, ::Nothing, ::Nothing) where {Nx_t <: AbstractArray, Nξ_t <: AbstractArray}
-        return new{1, typeof(ip), Nx_t, Nξ_t, typeof(dNdx), typeof(dNdξ), Nothing, Nothing}(ip, Nx, Nξ, dNdx, dNdξ, nothing, nothing)
-    end
-    function FunctionValues(ip::Interpolation, Nx::Nx_t, Nξ::Nξ_t, dNdx::AbstractArray, dNdξ::AbstractArray, d2Ndx2::AbstractArray, d2Ndξ2::AbstractArray) where {Nx_t <: AbstractArray, Nξ_t <: AbstractArray}
-        return new{2, typeof(ip), Nx_t, Nξ_t, typeof(dNdx), typeof(dNdξ), typeof(d2Ndx2), typeof(d2Ndξ2)}(ip, Nx, Nξ, dNdx, dNdξ, d2Ndx2, d2Ndξ2)
+    transformation::transformation_t # ::BasisTransformation
+    function FunctionValues(
+            ip::Interpolation,
+            Nx::N_t,
+            Nξ::N_t,
+            dNdx::dNdx_t,
+            dNdξ::dNdξ_t,
+            d2Ndx2::d2Ndx2_t,
+            d2Ndξ2::d2Ndξ2_t,
+            transformation::transformation_t
+        ) where {N_t, dNdx_t, dNdξ_t, d2Ndx2_t, d2Ndξ2_t, transformation_t}
+
+        difforder = !isnothing(d2Ndx2) ? 2 : (!isnothing(dNdx) ? 1 : 0)
+        return new{difforder, typeof(ip), N_t, dNdx_t, dNdξ_t, d2Ndx2_t, d2Ndξ2_t, transformation_t}(ip, Nx, Nξ, dNdx, dNdξ, d2Ndx2, d2Ndξ2, transformation)
     end
 end
+
 function FunctionValues{DiffOrder}(::Type{T}, ip::Interpolation, qr::QuadratureRule, ip_geo::VectorizedInterpolation) where {DiffOrder, T}
     assert_same_refshapes(qr, ip, ip_geo)
     n_shape = getnbasefunctions(ip)
     n_qpoints = getnquadpoints(qr)
 
     Nξ = zeros(typeof_N(T, ip, ip_geo), n_shape, n_qpoints)
-    Nx = isa(mapping_type(ip), IdentityMapping) ? Nξ : similar(Nξ)
+    Nx = reinit_needs_cell(ip) ? similar(Nξ) : Nξ
+
     dNdξ = dNdx = d2Ndξ2 = d2Ndx2 = nothing
 
     if DiffOrder >= 1
@@ -82,7 +87,12 @@ function FunctionValues{DiffOrder}(::Type{T}, ip::Interpolation, qr::QuadratureR
         throw(ArgumentError("Currently only values, gradients, and hessians can be updated in FunctionValues"))
     end
 
-    fv = FunctionValues(ip, Nx, Nξ, dNdx, dNdξ, d2Ndx2, d2Ndξ2)
+    transformation = nothing
+    if requires_basis_transformation(ip)
+        transformation = BasisTransformation(ip)
+    end
+
+    fv = FunctionValues(ip, Nx, Nξ, dNdx, dNdξ, d2Ndx2, d2Ndξ2, transformation)
     precompute_values!(fv, getpoints(qr)) # Separate function for qr point update in PointValues
     return fv
 end
@@ -104,7 +114,8 @@ function Base.copy(v::FunctionValues)
     dNdξ_copy = _copy_or_nothing(v.dNdξ)
     d2Ndx2_copy = _copy_or_nothing(v.d2Ndx2)
     d2Ndξ2_copy = _copy_or_nothing(v.d2Ndξ2)
-    return FunctionValues(copy(v.ip), Nx_copy, Nξ_copy, dNdx_copy, dNdξ_copy, d2Ndx2_copy, d2Ndξ2_copy)
+    transformation_copy = _copy_or_nothing(v.transformation)
+    return FunctionValues(copy(v.ip), Nx_copy, Nξ_copy, dNdx_copy, dNdξ_copy, d2Ndx2_copy, d2Ndξ2_copy, transformation_copy)
 end
 
 getnbasefunctions(funvals::FunctionValues) = size(funvals.Nx, 1)
@@ -121,7 +132,7 @@ shape_gradient_type(::FunctionValues{0}) = nothing
 shape_hessian_type(funvals::FunctionValues) = eltype(funvals.d2Ndx2)
 shape_hessian_type(::FunctionValues{0}) = nothing
 shape_hessian_type(::FunctionValues{1}) = nothing
-
+reinit_needs_cell(funvals::FunctionValues) = reinit_needs_cell(funvals.ip)
 
 # Checks that the user provides the right dimension of coordinates to reinit! methods to ensure good error messages if not
 sdim_from_gradtype(::Type{<:TT}) where {TT <: AbstractTensor} = last(size(TT))
@@ -171,6 +182,11 @@ required_geo_diff_order(::CovariantPiolaMapping, fun_diff_order::Int) = 1 + fun_
     return inv(tdot(J)) ⋅ (J)'
 end
 
+# If we have transformed the basis (e.g. in Argyris element), then the transformed basis
+# is stored in funvals.dNdx. If no transformation is been made, we return the funvals.dNdξ as normal.
+get_dNdξ(funvals::FunctionValues) = funvals.transformation === nothing ? (funvals.dNdξ) : (funvals.dNdx)
+get_dNdξ_and_d2Ndξ(funvals::FunctionValues) = funvals.transformation === nothing ? (funvals.dNdξ, funvals.d2Ndξ2) : (funvals.dNdx, funvals.d2Ndx2)
+
 # =============
 # Apply mapping
 # =============
@@ -179,19 +195,28 @@ end
 end
 
 # Identity mapping
-@inline function apply_mapping!(::FunctionValues{0}, ::IdentityMapping, ::Int, mapping_values, args...)
-    return nothing
-end
-
-@inline function apply_mapping!(funvals::FunctionValues{1}, ::IdentityMapping, q_point::Int, mapping_values, args...)
-    Jinv = calculate_Jinv(getjacobian(mapping_values))
+@inline function apply_mapping!(funvals::FunctionValues{0}, ::IdentityMapping, q_point::Int, mapping_values, cell)
+    #Some elements also need to flip the direction of the dof, e.g. if they have normal gradient dofs.
     @inbounds for j in 1:getnbasefunctions(funvals)
-        funvals.dNdx[j, q_point] = funvals.dNdξ[j, q_point] ⋅ Jinv
+        d = get_direction(funvals.ip, j, cell)
+        funvals.Nx[j, q_point] *= d
     end
     return nothing
 end
 
-@inline function apply_mapping!(funvals::FunctionValues{2}, ::IdentityMapping, q_point::Int, mapping_values, args...)
+@inline function apply_mapping!(funvals::FunctionValues{1}, ::IdentityMapping, q_point::Int, mapping_values, cell)
+    dNdξ = get_dNdξ(funvals)
+    Jinv = calculate_Jinv(getjacobian(mapping_values))
+    @inbounds for j in 1:getnbasefunctions(funvals)
+        d = get_direction(funvals.ip, j, cell)
+        funvals.dNdx[j, q_point] = d * (dNdξ[j, q_point] ⋅ Jinv)
+        funvals.Nx[j, q_point] *= d
+    end
+    return nothing
+end
+
+@inline function apply_mapping!(funvals::FunctionValues{2}, ::IdentityMapping, q_point::Int, mapping_values, cell)
+    dNdξ, dN2dξ2 = get_dNdξ_and_d2Ndξ(funvals)
     Jinv = calculate_Jinv(getjacobian(mapping_values))
 
     sdim, rdim = size(Jinv)
@@ -201,15 +226,17 @@ end
     is_vector_valued = first(funvals.Nx) isa Vec
     Jinv_otimesu_Jinv = is_vector_valued ? otimesu(Jinv, Jinv) : nothing
     @inbounds for j in 1:getnbasefunctions(funvals)
-        dNdx = funvals.dNdξ[j, q_point] ⋅ Jinv
+        dNdx = dNdξ[j, q_point] ⋅ Jinv
         if is_vector_valued
-            d2Ndx2 = (funvals.d2Ndξ2[j, q_point] - dNdx ⋅ H) ⊡ Jinv_otimesu_Jinv
+            d2Ndx2 = (dN2dξ2[j, q_point] - dNdx ⋅ H) ⊡ Jinv_otimesu_Jinv
         else
-            d2Ndx2 = Jinv' ⋅ (funvals.d2Ndξ2[j, q_point] - dNdx ⋅ H) ⋅ Jinv
+            d2Ndx2 = Jinv' ⋅ (dN2dξ2[j, q_point] - dNdx ⋅ H) ⋅ Jinv
         end
 
-        funvals.dNdx[j, q_point] = dNdx
-        funvals.d2Ndx2[j, q_point] = d2Ndx2
+        d = get_direction(funvals.ip, j, cell)
+        funvals.Nx[j, q_point] *= d
+        funvals.dNdx[j, q_point] = dNdx * d
+        funvals.d2Ndx2[j, q_point] = d2Ndx2 * d
     end
     return nothing
 end
@@ -267,4 +294,164 @@ end
         funvals.dNdx[j, q_point] = d * (J ⋅ dNdξ ⋅ Jinv / detJ + A1 ⋅ Nξ - (J ⋅ Nξ) ⊗ A2)
     end
     return nothing
+end
+
+struct BasisTransformation{matrix_t <: AbstractMatrix}
+    M::matrix_t
+    stride::Int #Used for VectorizedInterpolations
+end
+Base.copy(bt::BasisTransformation) = BasisTransformation(copy(bt.M), bt.stride)
+
+"""
+    BasisTransformation(ip::Interpolation)
+
+Creates a transformation matrix `M` for the interpolation `ip`. The
+transformation is used to transform the basis (values, gradients, etc.) via
+`Nx = M * Nξ` for elements/interpolations that are not equivalently mapped,
+where the basis functions must be transformed as linear combinations of
+one another.
+"""
+function BasisTransformation(ip::Interpolation)
+
+    ip, stride = if ip isa VectorizedInterpolation
+        ip.ip
+    else
+        ip, 1
+    end
+
+    M0 = init_basis_transformation_matrix(Float64, ip)
+    return BasisTransformation(M0, stride)
+end
+
+"""
+    basistransformation!(out::AbstractVecOrMat{T}, transform::BasisTransformation, in::AbstractVecOrMat) where T
+
+Performs the basis transformation M * Nξ and stores the result in Nx, where M is stored in `transform`.
+"""
+function basistransformation!(Nx::AbstractVecOrMat{T}, transform::BasisTransformation, Nξ::AbstractVecOrMat) where {T}
+    stride = transform.stride
+    M = transform.M
+    for i in axes(Nx, 2)
+        for d in 1:stride
+            Nx[d:stride:end, i] = M * Nξ[d:stride:end, i]
+        end
+    end
+    return Nx
+end
+
+"""
+    init_basis_transformation_matrix(T, ip::Interpolation)
+
+Create the basis-transformation matrix for `ip`, with entries of type `T`.
+The matrix can be of any ::AbstractMatrix type.
+
+"""
+function init_basis_transformation_matrix(T, ip::Interpolation) end
+
+"""
+    calculate_basis_transformation!(funvals::FunctionValues{DiffOrder}, ip_geo, coords::Vector{<:Vec}) where {DiffOrder}
+
+Computes the basis transformation matrix `M` for the physical cell defined by `ip_geo` and the cell coorindates `coords`.
+It then uses this transformation matrix to transform the 
+"""
+function calculate_basis_transformation!(funvals::FunctionValues{DiffOrder}, ip_geo, coords::Vector{<:Vec}) where {DiffOrder}
+    funvals.transformation === nothing && return nothing
+
+    calculate_basis_transformation_matrix!(funvals, ip_geo, coords) #Update M-matrix
+    #Perform the basis transformation (Nx = M*Nξ):
+    # NOTE: we store the results *temporarily* in Nx, dNdx and d2Ndx2
+    basistransformation!(funvals.Nx, funvals.transformation, funvals.Nξ)
+    DiffOrder >= 1 && basistransformation!(funvals.dNdx, funvals.transformation, funvals.dNdξ)
+    DiffOrder >= 2 && basistransformation!(funvals.d2Ndx2, funvals.transformation, funvals.d2Ndξ2)
+    return nothing
+end
+
+######################################
+# Transformation for Argyris element #
+######################################
+function init_basis_transformation_matrix(T, ip::Argyris)
+    return zeros(T, 21, 21)
+end
+
+function calculate_basis_transformation_matrix!(funvals::FunctionValues{DiffOrder, IP}, ip_geo, coords::Vector{Vec{dim, T}}) where {DiffOrder, IP <: Argyris, dim, T}
+    @assert ip_geo isa Lagrange{RefTriangle, 1} "Only linear geometries allowed for Argyris interpolation"
+    #Compute data required for the argyris basis transformation matrix
+    (t, l, B, J) = compute_argyris_data(ip_geo, coords)
+
+    τ = [Vec{3}((t[i][1]^2, 2 * t[i][1] * t[i][2], t[i][2]^2)) for i in 1:3] #Todo allocation free
+    Θ = Tensor{2, 3}(
+        [
+            J[1, 1]^2 J[1, 2] * J[1, 1] J[1, 2]^2;
+            2 * J[1, 1] * J[2, 1] J[1, 2] * J[2, 1] + J[1, 1] * J[2, 2] 2 * J[2, 2] * J[1, 2];
+            J[2, 1]^2 J[2, 1] * J[2, 2] J[2, 2]^2
+        ]
+    )
+
+    M = funvals.transformation.M
+    fill!(M, zero(eltype(M)))
+
+    edgeindeces = ((1, 3), (1, 2), (2, 3))
+    edge_to_basefunc = (19, 20, 21)
+    _signs = ((1, -1), (-1, 1), (-1, 1))
+
+    for i in 1:3 #Node loop
+        e1, e2 = edgeindeces[i]
+        b1_scalar, b2_scalar = edge_to_basefunc[e1], edge_to_basefunc[e2]
+
+        m1 = 15 * B[e1][1, 2] / 8l[e1] * _signs[i][1]
+        m2 = 15 * B[e2][1, 2] / 8l[e2] * _signs[i][2]
+        row = (i - 1) * 6
+        M[1 + row, 1 + row] = 1.0
+        M[1 + row, b1_scalar] = m1
+        M[1 + row, b2_scalar] = m2
+
+        m3 = -(7 / 16) * B[e1][1, 2] * t[e1]
+        m4 = -(7 / 16) * B[e2][1, 2] * t[e2]
+        M[(2:3) .+ row, (2:3) .+ row] = J
+        M[(2:3) .+ row, b1_scalar] = m3
+        M[(2:3) .+ row, b2_scalar] = m4
+
+        m5 = (1 / 32) * B[e1][1, 2] * τ[e1] * l[e1] * _signs[i][1]
+        m6 = (1 / 32) * B[e2][1, 2] * τ[e2] * l[e2] * _signs[i][2]
+        M[(4:6) .+ row, (4:6) .+ row] = Θ
+        M[(4:6) .+ row, b1_scalar] = m5
+        M[(4:6) .+ row, b2_scalar] = m6
+    end
+
+    for i in 1:3
+        b1 = edge_to_basefunc[i]
+        M[b1, b1] = B[i][1, 1]
+    end
+
+    return
+end
+
+function _compute_B(t, n̂, t̂, J)
+    n = Vec(-t[2], t[1]) # Rotate 90 deg
+    Ĝ = Tensor{2, 2}((n̂[1], t̂[1], n̂[2], t̂[2]))
+    G = Tensor{2, 2}((n[1], t[1], n[2], t[2]))
+    return Ĝ ⋅ J' ⋅ G'
+end
+
+function compute_argyris_data(ip::Lagrange{RefTriangle, 1}, coords)
+    t1 = coords[1] - coords[2]
+    t2 = coords[2] - coords[3]
+    t3 = coords[3] - coords[1]
+    l1, l2, l3 = l = (norm(t1), norm(t2), norm(t3))
+
+    #TODO: For non-linear geometries, we need to compute three jacobian at each corner.
+    #Current implementation only works for linear geometries.
+    ξ = zero(Vec{2, Float64})
+    J, _ = calculate_jacobian_and_spatial_coordinate(ip, ξ, coords)
+
+    t = (t1 / l1, t2 / l2, t3 / l3)
+
+    ts = (t1 / l1, t2 / l2, t3 / l3)
+    n̂s = (Vec((1 / √2, 1 / √2)), Vec((-1.0, 0.0)), Vec((0.0, -1.0)))
+    t̂s = (Vec((1 / √2, -1 / √2)), Vec((0.0, 1.0)), Vec((-1.0, 0.0)))
+    B = map(ts, n̂s, t̂s) do t, n̂, t̂
+        _compute_B(t, n̂, t̂, J)
+    end
+
+    return (t, l, B, J)
 end

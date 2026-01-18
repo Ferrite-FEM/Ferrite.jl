@@ -131,6 +131,7 @@ function reinit!(cv::AbstractCellValues, cell::Union{AbstractCell, Nothing}, x::
     if !checkbounds(Bool, x, 1:n_geom_basefuncs) || length(x) != n_geom_basefuncs
         throw_incompatible_coord_length(length(x), n_geom_basefuncs)
     end
+    calculate_basis_transformation!(get_fun_values(cv), geometric_interpolation(geo_mapping), x)
     @inbounds for (q_point, w) in enumerate(getweights(get_quadrature_rule(cv)))
         mapping = calculate_mapping(geo_mapping, q_point, x)
         _update_detJdV!(getdetJdVs(cv), q_point, w, mapping)
@@ -277,7 +278,7 @@ get_quadrature_rule(cv::MultiFieldCellValues) = getfield(cv, :qr)
 end
 
 @inline function reinit_needs_cell(cv::MultiFieldCellValues)
-    return any(map(fv -> !isa(mapping_type(fv), IdentityMapping), get_fun_values(cv)))
+    return any(map(fv -> reinit_needs_cell(fv), get_fun_values(cv)))
 end
 
 function check_reinit_sdim_consistency(cmv::MultiFieldCellValues, ::AbstractVector{VT}) where {VT}
@@ -290,6 +291,17 @@ end
     expr = Expr(:block)
     for i in 1:N
         push!(expr.args, :(apply_mapping!(fun_values[$i], q_point, mapping, cell)))
+    end
+    return quote
+        $(Expr(:meta, :inline))
+        @inbounds return $expr
+    end
+end
+
+@generated function calculate_basis_transformation!(fun_values::Tuple{Vararg{FunctionValues, N}}, ip_geo, coords) where {N}
+    expr = Expr(:block)
+    for i in 1:N
+        push!(expr.args, :(calculate_basis_transformation!(fun_values[$i], ip_geo, coords)))
     end
     return quote
         $(Expr(:meta, :inline))

@@ -340,6 +340,16 @@ def scene_heat_equation():
     finish(view, "heat_equation", twod=True, zoom=0.95)
 
 
+# --- plate_equation: deflection of a simply supported plate
+@scene("plate_equation")
+def scene_plate_equation():
+    view = new_view()
+    r = OpenDataFile(datadir + "/plate_equation.vtu")
+    d = surface(r, view)
+    colorbar(d, view, ("POINTS", "w"), title="w", horizontal=False)
+    finish(view, "plate_equation", twod=True, zoom=0.95)
+
+
 # --- plasticity: von Mises stress on a deformed cantilever beam
 @scene("plasticity")
 def scene_plasticity():
