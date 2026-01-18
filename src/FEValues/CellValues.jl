@@ -132,7 +132,7 @@ function reinit!(cv::AbstractCellValues, cell::Union{AbstractCell, Nothing}, x::
     @inbounds for (q_point, w) in enumerate(getweights(get_quadrature_rule(cv)))
         mapping = calculate_mapping(geo_mapping, q_point, x)
         _update_detJdV!(getdetJdVs(cv), q_point, w, mapping)
-        apply_mapping!(fun_values, q_point, mapping, cell)
+        apply_mapping!(fun_values, q_point, mapping, cell, x)
     end
     return nothing
 end
