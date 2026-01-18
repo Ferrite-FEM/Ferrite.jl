@@ -148,7 +148,7 @@ function reinit!(fv::FacetValues, cell::Union{AbstractCell, Nothing}, x::Abstrac
         detJ > 0.0 || throw_detJ_not_pos(detJ)
         @inbounds fv.detJdV[q_point] = detJ * w
         @inbounds fv.normals[q_point] = weight_norm / norm(weight_norm)
-        apply_mapping!(fun_values, q_point, mapping, cell)
+        apply_mapping!(fun_values, q_point, mapping, cell, x)
     end
     return
 end
