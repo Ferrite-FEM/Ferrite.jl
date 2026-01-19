@@ -2136,6 +2136,11 @@ end
 ############################
 # Argyris triangle order 5 #
 ############################
+# Dof order:
+# Nodes 1: δ, ∇x, ∇y, ∇∇xx, ∇∇xy, ∇∇yy
+# Nodes 2: δ, ∇x, ∇y, ∇∇xx, ∇∇xy, ∇∇yy
+# Nodes 3: δ, ∇x, ∇y, ∇∇xx, ∇∇xy, ∇∇yy
+# Edges 1-3: ∇_n (normal derivative, normal pointing outward)
 struct Argyris{refshape, order} <: ScalarInterpolation{refshape, order}
 end
 
