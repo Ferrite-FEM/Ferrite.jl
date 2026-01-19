@@ -221,7 +221,7 @@ end
 end
 
 # Covariant Piola Mapping
-@inline function apply_mapping!(funvals::FunctionValues{0}, ::CovariantPiolaMapping, q_point::Int, mapping_values, cell)
+@inline function apply_mapping!(funvals::FunctionValues{0}, ::CovariantPiolaMapping, q_point::Int, mapping_values, cell, args...)
     Jinv = inv(getjacobian(mapping_values))
     @inbounds for j in 1:getnbasefunctions(funvals)
         d = get_direction(funvals.ip, j, cell)
@@ -231,7 +231,7 @@ end
     return nothing
 end
 
-@inline function apply_mapping!(funvals::FunctionValues{1}, ::CovariantPiolaMapping, q_point::Int, mapping_values, cell)
+@inline function apply_mapping!(funvals::FunctionValues{1}, ::CovariantPiolaMapping, q_point::Int, mapping_values, cell, args...)
     H = gethessian(mapping_values)
     Jinv = inv(getjacobian(mapping_values))
     @inbounds for j in 1:getnbasefunctions(funvals)
@@ -245,7 +245,7 @@ end
 end
 
 # Contravariant Piola Mapping
-@inline function apply_mapping!(funvals::FunctionValues{0}, ::ContravariantPiolaMapping, q_point::Int, mapping_values, cell)
+@inline function apply_mapping!(funvals::FunctionValues{0}, ::ContravariantPiolaMapping, q_point::Int, mapping_values, cell, args...)
     J = getjacobian(mapping_values)
     detJ = det(J)
     @inbounds for j in 1:getnbasefunctions(funvals)
@@ -256,7 +256,7 @@ end
     return nothing
 end
 
-@inline function apply_mapping!(funvals::FunctionValues{1}, ::ContravariantPiolaMapping, q_point::Int, mapping_values, cell)
+@inline function apply_mapping!(funvals::FunctionValues{1}, ::ContravariantPiolaMapping, q_point::Int, mapping_values, cell, args...)
     H = gethessian(mapping_values)
     J = getjacobian(mapping_values)
     Jinv = inv(J)
@@ -318,6 +318,8 @@ function apply_mapping!(funvals::Ferrite.FunctionValues{DO}, ::ArgyrisMapping, q
     ip_geo = Ferrite.geometric_interpolation(cell)
     @assert ip_geo isa Lagrange{RefTriangle, 1} "Only linear geometries allowed for Argyris interpolation"
     @assert DO < 3
+
+    @show DO
     
     #Compute data required for the argyris mapping
     #TODO: This can be done once per element, but we have to recompute for each quadrature point with the current setup

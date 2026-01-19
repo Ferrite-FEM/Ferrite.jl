@@ -980,15 +980,13 @@ function _evaluate_at_grid_nodes!(
         u::AbstractVector{T}, cv::CellValues, drange::UnitRange
     ) where {T}
     ue = zeros(T, length(drange))
-    for celldata in CellIterator(sdh)
-        cell = getcells(get_grid(sdh.dh), celldata.cellid)
-        reinit!(cv, cell, celldata.coords)
-        # Note: We are only using the shape functions: no reinit!(cv, cell) necessary
-        @assert getnquadpoints(cv) == length(celldata.nodes)
+    for cell in CellIterator(sdh)
+        reinit!(cv, cell)
+        @assert getnquadpoints(cv) == length(cell.nodes)
         for (i, I) in pairs(drange)
-            ue[i] = u[celldata.dofs[I]]
+            ue[i] = u[cell.dofs[I]]
         end
-        for (qp, nodeid) in pairs(celldata.nodes)
+        for (qp, nodeid) in pairs(cell.nodes)
             val = function_value(cv, qp, ue)
             if data isa Matrix # VTK
                 data[1:length(val), nodeid] .= val
