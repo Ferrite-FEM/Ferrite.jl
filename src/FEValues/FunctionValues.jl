@@ -309,6 +309,11 @@ function ArgyrisData(ip::Lagrange{RefTriangle,1}, coords)
     return ArgyrisData(t, l, Tuple(B), J)
 end
 
+#Apply mapping for the Argyris element.
+#The shape functions on the physical element are related to the shape functions on reference element Nξ via a sparse matrix M: Nx = M*Nξ
+#Since M is sparse, we avoid creating the M-matrix and compute Nx directly.
+#For more information see: 
+# Robert C. Kirby. A general approach to transforming finite elements. The SMAI Journal of computational mathematics (2018)
 function apply_mapping!(funvals::Ferrite.FunctionValues{DO}, ::ArgyrisMapping, q_point::Int, mapping_values, cell, coords) where DO 
     ip_geo = Ferrite.geometric_interpolation(cell)
     @assert ip_geo isa Lagrange{RefTriangle, 1} "Only linear geometries allowed for Argyris interpolation"
@@ -348,6 +353,7 @@ end
 
 _hessian_helper(d2Ndξ2::Tensor{2,2}, dNdx, H, Jinv) = Jinv' ⋅ (d2Ndξ2 - dNdx ⋅ H) ⋅ Jinv
 _hessian_helper(d2Ndξ2::Tensor{3,2}, dNdx, H, Jinv_otimesu_Jinv) = (d2Ndξ2 - dNdx ⋅ H) ⊡ Jinv_otimesu_Jinv
+#Computes Nx = M*Nξ without allocating the M-matrix
 function _argyris_mapping!(argyris_data::ArgyrisData, Nx, Nξ, dNdx, dNdξ, d²Ndx², d²Ndξ², mapping_values, ::Val{DO}, ::Val{vdim}) where {DO, vdim}
     
     (; l, B, t) = argyris_data
@@ -368,7 +374,7 @@ function _argyris_mapping!(argyris_data::ArgyrisData, Nx, Nξ, dNdx, dNdξ, d²N
     edge_to_basefunc = (19, 20, 21)
     _signs = ((1,-1), (-1, 1), (-1, 1))
 
-    #_M = zeros(Float64, 21, 21)
+    #_M = zeros(Float64, 21, 21) 
     for i in 1:3 #Node loop
         e1,e2 = edgeindeces[i]
         b1_scalar,b2_scalar = edge_to_basefunc[e1], edge_to_basefunc[e2]
