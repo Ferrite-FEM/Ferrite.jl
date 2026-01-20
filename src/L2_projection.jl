@@ -330,6 +330,13 @@ function assemble_proj_rhs!(f::Matrix, cellvalues::CellValues, sdh::SubDofHandle
     return
 end
 
+"""
+    evaluate_at_grid_nodes(proj::L2Projector, vals::AbstractVector)
+Return a vector of length `getnnodes(grid)` where the order corresponds with the node order 
+in the `grid` used to create `proj`.
+
+`vals` must have length `getnnodes(grid)`.
+"""
 evaluate_at_grid_nodes(proj::L2Projector, vals::AbstractVector) =
     _evaluate_at_grid_nodes(proj, vals, Val(false))
 
