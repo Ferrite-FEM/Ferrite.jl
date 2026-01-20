@@ -242,7 +242,7 @@ C = gradient(ϵ -> 2 * Gmod * dev(ϵ) + 3 * Kmod * vol(ϵ), zero(SymmetricTensor
 #md #     the elastic stiffness tensor should be changed to reflect this. The plane stress elasticity
 #md #     stiffness matrix in Voigt notation for engineering shear strains, is given as
 #md #     ```math
-#md #     \underline{\underline{\boldsymbol{E}}} = \frac{E}{1 - \nu^2}\begin{bmatrix}
+#md #     \underline{\underline{\boldsymbol{C}}} = \frac{E}{1 - \nu^2}\begin{bmatrix}
 #md #     1 & \nu & 0 \\
 #md #     \nu & 1 & 0 \\
 #md #     0 & 0 & (1 - \nu)/2
