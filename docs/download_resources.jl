@@ -18,6 +18,19 @@ for file in [
     end
 end
 
+const howto_directory = joinpath(@__DIR__, "src", "howto")
+mkpath(howto_directory)
+
+for (file, url) in [
+        "proj_tutorial_setup.png" => "https://raw.githubusercontent.com/Ferrite-FEM/Ferrite.jl/refs/heads/gh-pages/assets/proj_tutorial_setup.png",
+        "proj_tutorial_results.png" => "https://raw.githubusercontent.com/Ferrite-FEM/Ferrite.jl/refs/heads/gh-pages/assets/proj_tutorial_results.png",
+    ]
+    afile = joinpath(howto_directory, file)
+    if !isfile(afile)
+        Downloads.download(url, afile)
+    end
+end
+
 # Topics
 const topics_directory = joinpath(@__DIR__, "src", "topics", "downloaded_assets")
 mkpath(topics_directory)

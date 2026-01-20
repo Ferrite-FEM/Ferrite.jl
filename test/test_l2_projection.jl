@@ -438,7 +438,7 @@ function test_show_l2()
 
     # Multi-domain setup
     proj2 = L2Projector(grid)
-    @test sprint(show, MIME"text/plain"(), proj2) == "L2Projector (not closed)"
+    @test sprint(show, MIME"text/plain"(), proj2) == repr(typeof(proj)) * " (not closed)"
     qr_rhs = QuadratureRule{RefTriangle}(2)
     add!(proj2, Set(1:2), ip; qr_rhs)
     add!(proj2, Set(3:4), ip; qr_rhs)
