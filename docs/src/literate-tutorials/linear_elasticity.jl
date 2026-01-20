@@ -250,8 +250,8 @@ C = gradient(ϵ -> 2 * Gmod * dev(ϵ) + 3 * Kmod * vol(ϵ), zero(SymmetricTensor
 #md #     ```
 #md #     This matrix can be converted into the 4th order elastic stiffness tensor as
 #md #     ```julia
-#md #     E_voigt = Emod * [1.0 ν 0.0; ν 1.0 0.0; 0.0 0.0 (1-ν)/2] / (1 - ν^2)
-#md #     C = fromvoigt(SymmetricTensor{4,2}, E_voigt)
+#md #     C_voigt = Emod * [1.0 ν 0.0; ν 1.0 0.0; 0.0 0.0 (1-ν)/2] / (1 - ν^2)
+#md #     C = fromvoigt(SymmetricTensor{4,2}, C_voigt)
 #md #     ```
 #md #
 # ### Element routine
