@@ -1,16 +1,14 @@
 module FerriteMetis
 
-# This extension requires modules as type parameters
-# https://github.com/JuliaLang/julia/pull/47749
-if VERSION >= v"1.10.0-DEV.90"
-
-using Ferrite
+using Ferrite:
+    Ferrite, CellIterator, ConstraintHandler, DofHandler, DofOrder, celldofs, ndofs,
+    ndofs_per_cell
+using SparseArrays: SparseArrays
 using Metis.LibMetis: idx_t
 using Metis: Metis
-using SparseArrays: sparse
 
 struct MetisOrder <: DofOrder.Ext{Metis}
-    coupling::Union{Matrix{Bool},Nothing}
+    coupling::Union{Matrix{Bool}, Nothing}
 end
 
 """
@@ -19,27 +17,27 @@ end
 Fill-reducing permutation order from [Metis.jl](https://github.com/JuliaSparse/Metis.jl).
 
 Since computing the permutation involves constructing the structural couplings between all
-DoFs the field/component coupling can be provided; see [`create_sparsity_pattern`](@ref) for
+DoFs the field/component coupling can be provided; see [`allocate_matrix`](@ref) for
 details.
 """
 function DofOrder.Ext{Metis}(;
-    coupling::Union{AbstractMatrix{Bool},Nothing}=nothing,
-)
+        coupling::Union{AbstractMatrix{Bool}, Nothing} = nothing,
+    )
     return MetisOrder(coupling)
 end
 
 function Ferrite.compute_renumber_permutation(
-    dh::DofHandler,
-    ch::Union{ConstraintHandler,Nothing},
-    order::DofOrder.Ext{Metis}
-)
+        dh::DofHandler,
+        ch::Union{ConstraintHandler, Nothing},
+        order::DofOrder.Ext{Metis}
+    )
 
     # Expand the coupling matrix to size ndofs_per_cell × ndofs_per_cell
     coupling = order.coupling
     if coupling !== nothing
         # Set sym = true since Metis.permutation requires a symmetric graph.
         # TODO: Perhaps just symmetrize it: coupling = coupling' .| coupling
-        couplings = Ferrite._coupling_to_local_dof_coupling(dh, coupling, #= sym =# true)
+        couplings = Ferrite._coupling_to_local_dof_coupling(dh, coupling)
     end
 
     # Create the CSR (CSC, but pattern is symmetric so equivalent) using
@@ -73,8 +71,7 @@ function Ferrite.compute_renumber_permutation(
     end
     @assert length(I) == length(J) == idx
     N = ndofs(dh)
-    # TODO: Use spzeros! in Julia 1.10.
-    S = sparse(I, J, zeros(Float32, length(I)), N, N)
+    S = SparseArrays.spzeros!(Float32, I, J, N, N)
 
     # Add entries from affine constraints
     if ch !== nothing
@@ -85,11 +82,13 @@ function Ferrite.compute_renumber_permutation(
     G = Metis.Graph(idx_t(N), S.colptr, S.rowval)
 
     # Compute the permutation
-    _, perm = Metis.permutation(G)
-
-    return perm
+    # The permutation returned by Metis is defined such that `A[perm, perm]`, for the
+    # eventual matrix `A`, minimizes fill in. This means that the new dof `i` can be
+    # determined by `perm[i]`. However, to renumber efficiently, we want the reverse
+    # mapping, i.e. `iperm`, so that we can easily lookup the new number for a given dof:
+    # dof `i`s new number is `iperm[i]`.
+    perm, iperm = Metis.permutation(G)
+    return iperm
 end
-
-end # VERSION check
 
 end # module FerriteMetis

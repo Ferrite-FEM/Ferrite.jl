@@ -9,7 +9,7 @@
 #-
 #md # !!! tip
 #md #     This example is also available as a Jupyter notebook:
-#md #     [`computational_homogenization.ipynb`](@__NBVIEWER_ROOT_URL__/examples/computational_homogenization.ipynb).
+#md #     [`computational_homogenization.ipynb`](@__NBVIEWER_ROOT_URL__/tutorials/computational_homogenization.ipynb).
 #-
 #
 # ## Introduction
@@ -179,7 +179,7 @@
 
 # ## Commented program
 #
-# Now we will see how this can be implemented in `Ferrite`. What follows is a program
+# Now we will see how this can be implemented in Ferrite. What follows is a program
 # with comments in between which describe the different steps.
 #md # You can also find the same program without comments at the end of the page,
 #md # see [Plain program](@ref homogenization-plain-program).
@@ -187,26 +187,23 @@
 using Ferrite, SparseArrays, LinearAlgebra
 using Test #src
 
-# We first load the mesh file [`periodic-rve.msh`](periodic-rve.msh)
-# ([`periodic-rve-coarse.msh`](periodic-rve-coarse.msh) for a coarser mesh). The mesh is
-# generated with [`gmsh`](https://gmsh.info/), and we read it in as a `Ferrite` grid using
-# the [`FerriteGmsh`](https://github.com/Ferrite-FEM/FerriteGmsh.jl) package:
+# We first load the mesh file `"periodic-rve.msh"` (or `"periodic-rve-coarse.msh"`
+# for a coarser mesh). The mesh is generated with [Gmsh](https://gmsh.info/),
+# and we read it in as a Ferrite `Grid` using
+# the [FerriteGmsh.jl](https://github.com/Ferrite-FEM/FerriteGmsh.jl) package:
 
 using FerriteGmsh
+using Downloads: Downloads
+
+meshfile = "periodic-rve.msh" #!nb
 #src notebook: use coarse mesh to decrease build time
 #src   script: use the fine mesh
 #src markdown: use the coarse mesh to decrease build time, but make it look like the fine
-#nb ## grid = togrid("periodic-rve.msh")
-#nb grid = togrid("periodic-rve-coarse.msh")
-#jl ## grid = togrid("periodic-rve-coarse.msh")
-#jl grid = togrid("periodic-rve.msh")
-#md grid = togrid("periodic-rve.msh")
-#-
-#md grid = redirect_stdout(devnull) do                #hide
-#md     togrid("periodic-rve-coarse.msh") #hide
-#md end                                               #hide
+#md meshfile = "periodic-rve-coarse.msh" #hide
+#nb meshfile = "periodic-rve-coarse.msh"
+isfile(meshfile) || Downloads.download(Ferrite.asset_url(meshfile), meshfile)
 
-grid = togrid("periodic-rve.msh") #src
+grid = togrid(meshfile)
 
 # Next we construct the interpolation and quadrature rule, and combining them into
 # cellvalues as usual:
@@ -231,8 +228,8 @@ close!(dh);
 ch_dirichlet = ConstraintHandler(dh)
 dirichlet = Dirichlet(
     :u,
-    union(getfaceset.(Ref(grid), ["left", "right", "top", "bottom"])...),
-    (x, t) ->  [0, 0],
+    union(getfacetset.(Ref(grid), ["left", "right", "top", "bottom"])...),
+    (x, t) -> [0, 0],
     [1, 2]
 )
 add!(ch_dirichlet, dirichlet)
@@ -240,10 +237,10 @@ close!(ch_dirichlet)
 update!(ch_dirichlet, 0.0)
 
 # For periodic boundary conditions we use the [`PeriodicDirichlet`](@ref) constraint type,
-# which is very similar to the `Dirichlet` type, but instead of a passing a faceset we pass
-# a vector with "face pairs", i.e. the mapping between mirror and image parts of the
+# which is very similar to the `Dirichlet` type, but instead of a passing a facetset we pass
+# a vector with "facet pairs", i.e. the mapping between mirror and image parts of the
 # boundary. In this example the `"left"` and `"bottom"` boundaries are mirrors, and the
-# `"right"` and `"top"` boundaries are the mirrors.
+# `"right"` and `"top"` boundaries are the images.
 
 ch_periodic = ConstraintHandler(dh);
 periodic = PeriodicDirichlet(
@@ -276,17 +273,17 @@ ch = (dirichlet = ch_dirichlet, periodic = ch_periodic);
 # and the constraint handler.
 
 K = (
-    dirichlet = create_sparsity_pattern(dh),
-    periodic  = create_sparsity_pattern(dh, ch.periodic),
+    dirichlet = allocate_matrix(dh),
+    periodic = allocate_matrix(dh, ch.periodic),
 );
 
 # We define the fourth order elasticity tensor for the matrix material, and define the
 # inclusions to have 10 times higher stiffness
 
-λ, μ = 1e10, 7e9 # Lamé parameters
-δ(i,j) = i == j ? 1.0 : 0.0
+λ, μ = 1.0e10, 7.0e9 # Lamé parameters
+δ(i, j) = i == j ? 1.0 : 0.0
 Em = SymmetricTensor{4, 2}(
-    (i,j,k,l) -> λ * δ(i,j) * δ(k,l) + μ * (δ(i,k) * δ(j,l) + δ(i,l) * δ(j,k))
+    (i, j, k, l) -> λ * δ(i, j) * δ(k, l) + μ * (δ(i, k) * δ(j, l) + δ(i, l) * δ(j, k))
 )
 Ei = 10 * Em;
 
@@ -297,9 +294,9 @@ Ei = 10 * Em;
 # and will result in three different right-hand-sides:
 
 εᴹ = [
-      SymmetricTensor{2,2}([1.0 0.0; 0.0 0.0]), # ε_11 loading
-      SymmetricTensor{2,2}([0.0 0.0; 0.0 1.0]), # ε_22 loading
-      SymmetricTensor{2,2}([0.0 0.5; 0.5 0.0]), # ε_12/ε_21 loading
+    SymmetricTensor{2, 2}([1.0 0.0; 0.0 0.0]), # ε_11 loading
+    SymmetricTensor{2, 2}([0.0 0.0; 0.0 1.0]), # ε_22 loading
+    SymmetricTensor{2, 2}([0.0 0.5; 0.5 0.0]), # ε_12/ε_21 loading
 ];
 
 # The assembly function is nothing strange, and in particular there is no impact from the
@@ -333,8 +330,8 @@ function doassemble!(cellvalues::CellValues, K::SparseMatrixCSC, dh::DofHandler,
                 end
                 for (rhs, ε) in enumerate(εᴹ)
                     σᴹ = E ⊡ ε
-                    fe[i, rhs] += ( - δεi ⊡ σᴹ) * dΩ
-               end
+                    fe[i, rhs] += (- δεi ⊡ σᴹ) * dΩ
+                end
             end
         end
 
@@ -350,7 +347,7 @@ end;
 
 rhs = (
     dirichlet = doassemble!(cellvalues, K.dirichlet, dh, εᴹ),
-    periodic  = doassemble!(cellvalues, K.periodic,  dh, εᴹ),
+    periodic = doassemble!(cellvalues, K.periodic, dh, εᴹ),
 );
 
 # The next step is to solve the systems. Since application of boundary conditions, using
@@ -364,11 +361,11 @@ rhs = (
 
 rhsdata = (
     dirichlet = get_rhs_data(ch.dirichlet, K.dirichlet),
-    periodic  = get_rhs_data(ch.periodic,  K.periodic),
+    periodic = get_rhs_data(ch.periodic, K.periodic),
 )
 
 apply!(K.dirichlet, ch.dirichlet)
-apply!(K.periodic,  ch.periodic)
+apply!(K.periodic, ch.periodic)
 
 # We can now solve the problem(s). Note that we only use `apply_rhs!` in the loops below.
 # The boundary conditions are already applied to the matrix above, so we only need to
@@ -376,7 +373,7 @@ apply!(K.periodic,  ch.periodic)
 
 u = (
     dirichlet = Vector{Float64}[],
-    periodic  = Vector{Float64}[],
+    periodic = Vector{Float64}[],
 )
 
 for i in 1:size(rhs.dirichlet, 2)
@@ -401,7 +398,7 @@ end
 
 function compute_stress(cellvalues::CellValues, dh::DofHandler, u, εᴹ)
     σvM_qpdata = zeros(getnquadpoints(cellvalues), getncells(dh.grid))
-    σ̄Ω = zero(SymmetricTensor{2,2})
+    σ̄Ω = zero(SymmetricTensor{2, 2})
     Ω = 0.0 # Total volume
     for cell in CellIterator(dh)
         E = cellid(cell) in getcellset(dh.grid, "inclusions") ? Ei : Em
@@ -410,7 +407,7 @@ function compute_stress(cellvalues::CellValues, dh::DofHandler, u, εᴹ)
             dΩ = getdetJdV(cellvalues, q_point)
             εμ = function_symmetric_gradient(cellvalues, q_point, u[celldofs(cell)])
             σ = E ⊡ (εᴹ + εμ)
-            σvM_qpdata[q_point, cellid(cell)] = sqrt(3/2 * dev(σ) ⊡ dev(σ))
+            σvM_qpdata[q_point, cellid(cell)] = sqrt(3 / 2 * dev(σ) ⊡ dev(σ))
             Ω += dΩ # Update total volume
             σ̄Ω += σ * dΩ # Update integrated stress
         end
@@ -422,12 +419,12 @@ end;
 # We now compute the homogenized stress and von Mise stress for all cases
 
 σ̄ = (
-    dirichlet = SymmetricTensor{2,2}[],
-    periodic  = SymmetricTensor{2,2}[],
+    dirichlet = SymmetricTensor{2, 2}[],
+    periodic = SymmetricTensor{2, 2}[],
 )
 σ = (
-     dirichlet = Vector{Float64}[],
-     periodic  = Vector{Float64}[],
+    dirichlet = Vector{Float64}[],
+    periodic = Vector{Float64}[],
 )
 
 projector = L2Projector(ip, grid)
@@ -457,7 +454,7 @@ end
 # So we have now already computed all the components, and just need to gather the data in
 # a fourth order tensor:
 
-E_dirichlet = SymmetricTensor{4,2}((i, j, k, l) -> begin
+E_dirichlet = SymmetricTensor{4, 2}() do i, j, k, l
     if k == l == 1
         σ̄.dirichlet[1][i, j] # ∂σ∂ε_**11
     elseif k == l == 2
@@ -465,9 +462,9 @@ E_dirichlet = SymmetricTensor{4,2}((i, j, k, l) -> begin
     else
         σ̄.dirichlet[3][i, j] # ∂σ∂ε_**12 and ∂σ∂ε_**21
     end
-end)
+end
 
-E_periodic = SymmetricTensor{4,2}((i, j, k, l) -> begin
+E_periodic = SymmetricTensor{4, 2}() do i, j, k, l
     if k == l == 1
         σ̄.periodic[1][i, j]
     elseif k == l == 2
@@ -475,7 +472,7 @@ E_periodic = SymmetricTensor{4,2}((i, j, k, l) -> begin
     else
         σ̄.periodic[3][i, j]
     end
-end);
+end
 
 # We can check that the result are what we expect, namely that the stiffness with Dirichlet
 # boundary conditions is higher than when using periodic boundary conditions, and that
@@ -483,7 +480,7 @@ end);
 # compute the volume fraction of the matrix, and then the Voigt and Reuss bounds:
 
 function matrix_volume_fraction(grid, cellvalues)
-    V  = 0.0 # Total volume
+    V = 0.0 # Total volume
     Vm = 0.0 # Volume of the matrix
     for c in CellIterator(grid)
         reinit!(cellvalues, c)
@@ -501,8 +498,8 @@ end
 
 vm = matrix_volume_fraction(grid, cellvalues)
 #-
-E_voigt = vm * Em + (1-vm) * Ei
-E_reuss = inv(vm * inv(Em) + (1-vm) * inv(Ei));
+E_voigt = vm * Em + (1 - vm) * Ei
+E_reuss = inv(vm * inv(Em) + (1 - vm) * inv(Ei));
 
 # We can now compare the different computed stiffness tensors. We expect
 # ``E_\mathrm{Reuss} \leq E_\mathrm{PeriodicBC} \leq E_\mathrm{DirichletBC} \leq
@@ -511,29 +508,29 @@ E_reuss = inv(vm * inv(Em) + (1-vm) * inv(Ei));
 
 ev = (first ∘ eigvals).((E_reuss, E_periodic, E_dirichlet, E_voigt))
 @test issorted(ev) #src
-round.(ev; digits=-8)
+round.(ev; digits = -8)
 
 # Finally, we export the solution and the stress field to a VTK file. For the export we
 # also compute the macroscopic part of the displacement.
 
 uM = zeros(ndofs(dh))
 
-vtk_grid("homogenization", dh) do vtk
+VTKGridFile("homogenization", dh) do vtk
     for i in 1:3
         ## Compute macroscopic solution
         apply_analytical!(uM, dh, :u, x -> εᴹ[i] ⋅ x)
         ## Dirichlet
-        vtk_point_data(vtk, dh, uM + u.dirichlet[i], "_dirichlet_$i")
-        vtk_point_data(vtk, projector, σ.dirichlet[i], "σvM_dirichlet_$i")
+        write_solution(vtk, dh, uM + u.dirichlet[i], "_dirichlet_$i")
+        write_projection(vtk, projector, σ.dirichlet[i], "σvM_dirichlet_$i")
         ## Periodic
-        vtk_point_data(vtk, dh, uM + u.periodic[i], "_periodic_$i")
-        vtk_point_data(vtk, projector, σ.periodic[i], "σvM_periodic_$i")
+        write_solution(vtk, dh, uM + u.periodic[i], "_periodic_$i")
+        write_projection(vtk, projector, σ.periodic[i], "σvM_periodic_$i")
     end
 end;
 
 # Just another way to compute the stiffness for testing purposes               #src
 function homogenize_test(u::Matrix, dh, cv, E_incl, E_mat)                     #src
-    ĒΩ = zero(SymmetricTensor{4,2})                                            #src
+    ĒΩ = zero(SymmetricTensor{4, 2})                                           #src
     Ω = 0.0                                                                    #src
     ue = zeros(ndofs_per_cell(dh), 3)                                          #src
     for cell in CellIterator(dh)                                               #src
@@ -548,15 +545,15 @@ function homogenize_test(u::Matrix, dh, cv, E_incl, E_mat)                     #
             dΩ = getdetJdV(cv, qp)                                             #src
             Ω += dΩ                                                            #src
             ## compute u^ij and u^kl                                           #src
-            Ē′ = SymmetricTensor{4,2}((i, j, k, l) -> begin                    #src
+            Ē′ = SymmetricTensor{4, 2}() do i, j, k, l                         #src
                 ij = i == j == 1 ? 1 : i == j == 2 ? 2 : 3                     #src
                 kl = k == l == 1 ? 1 : k == l == 2 ? 2 : 3                     #src
                 εij = function_symmetric_gradient(cv, qp, view(ue, :, ij)) +   #src
-                          symmetric((basevec(Vec{2}, i) ⊗ basevec(Vec{2}, j))) #src
+                    symmetric((basevec(Vec{2}, i) ⊗ basevec(Vec{2}, j)))       #src
                 εkl = function_symmetric_gradient(cv, qp, view(ue, :, kl)) +   #src
-                          symmetric((basevec(Vec{2}, k) ⊗ basevec(Vec{2}, l))) #src
+                    symmetric((basevec(Vec{2}, k) ⊗ basevec(Vec{2}, l)))       #src
                 return (εij ⊡ E ⊡ εkl) * dΩ                                    #src
-            end)                                                               #src
+            end                                                                #src
             ĒΩ += Ē′                                                           #src
         end                                                                    #src
     end                                                                        #src

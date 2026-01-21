@@ -2,7 +2,7 @@
 DocTestSetup = :(using Ferrite)
 ```
 
-# Boundary Conditions
+# Boundary conditions
 
 ```@index
 Pages = ["boundary_conditions.md"]
@@ -11,9 +11,10 @@ Pages = ["boundary_conditions.md"]
 ```@docs
 ConstraintHandler
 Dirichlet
+ProjectedDirichlet
 PeriodicDirichlet
-collect_periodic_faces
-collect_periodic_faces!
+collect_periodic_facets
+collect_periodic_facets!
 add!
 close!
 update!

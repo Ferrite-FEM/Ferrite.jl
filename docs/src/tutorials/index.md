@@ -21,7 +21,7 @@ focus on different aspects, and solve different problems, it is suggested to hav
 the brief descriptions below to get an idea about what you will learn from each tutorial.
 
 If you are new to Ferrite then Tutorial 1 - Tutorial 6 is the best place to start. These
-tutorials introduces and teaches most of the basic finite element techniques (e.g. linear
+tutorials introduce and teach most of the basic finite element techniques (e.g. linear
 and non-linear problems, scalar- and vector-valued problems, Dirichlet and Neumann boundary
 conditions, mixed finite elements, time integration, direct and iterative linear solvers,
 etc). In particular the very first tutorial is essential in order to be able to follow any
@@ -29,28 +29,28 @@ of the other tutorials. The remaining tutorials discuss more advanced topics.
 
 ---
 
-##### [Tutorial 1: Heat equation](heat_equation.md)
+#### [Tutorial 1: Heat equation](heat_equation.md)
 
 This tutorial guides you through the process of solving the linear stationary heat equation
 (i.e. Poisson's equation) on a unit square with homogeneous Dirichlet boundary conditions.
 This tutorial introduces and teaches many important parts of Ferrite: problem setup, degree
 of freedom management, assembly procedure, boundary conditions, solving the linear system,
-visualization of the result). *Understanding this tutorial is essential to follow more
+visualization of the result. *Understanding this tutorial is essential to follow more
 complex tutorials.*
 
 **Keywords**: scalar-valued solution, Dirichlet boundary conditions.
 
 ---
 
-##### [Tutorial 2: Linear elasticity](linear_elasticity.md)
+#### [Tutorial 2: Linear elasticity](linear_elasticity.md)
 
-TBW.
+This tutorial guides you through the process of solving the linear elasticity problem. The tutorial builds on the concepts from Tutorial 1 and introduces vector-valued solutions and Neumann boundary conditions.
 
 **Keywords**: vector-valued solution, Dirichlet and Neumann boundary conditions.
 
 ---
 
-##### [Tutorial 3: Incompressible elasticity](incompressible_elasticity.md)
+#### [Tutorial 3: Incompressible elasticity](incompressible_elasticity.md)
 
 This tutorial focuses on a mixed formulation of linear elasticity, with (vector)
 displacement and (scalar) pressure as the two unknowns, suitable for incompressibility.
@@ -66,7 +66,7 @@ incompressible limit.
 
 In this tutorial you will learn how to solve a non-linear finite element problem. In
 particular, a hyperelastic material model, in a finite strain setting, is used to solve the
-rotation of a cube. Automatic differentiatio (AD) is used for the consitutive relations.
+rotation of a cube. Automatic differentiation (AD) is used for the constitutive relations.
 Newton's method is used for the non-linear iteration, and a conjugate gradient (CG) solver
 is used for the linear solution of the increment.
 
@@ -103,7 +103,7 @@ integration.
 
 #### [Tutorial 7: Computational homogenization](computational_homogenization.md)
 
-This tutorial guides you through computational homogenization of an representative volume
+This tutorial guides you through computational homogenization of a representative volume
 element (RVE) consisting of a soft matrix material with stiff inclusions. The computational
 mesh is read from an external mesh file generated with Gmsh. Dirichlet and periodic boundary
 conditions are used.
@@ -126,9 +126,9 @@ Gmsh.
 
 #### [Tutorial 9: Porous media (SubDofHandler)](porous_media.md)
 
-This tutorial introduces how to solve a complex linear problem, where there are different 
+This tutorial introduces how to solve a complex linear problem, where there are different
 fields on different subdomains, and different cell types in the grid. This requires using
-the `SubDofHandler` interface. 
+the `SubDofHandler` interface.
 
 **Keywords**: Mixed grids, multiple fields, porous media, `SubDofHandler`
 
@@ -137,7 +137,7 @@ the `SubDofHandler` interface.
 #### [Tutorial 10: Incompressible Navier-Stokes equations](ns_vs_diffeq.md)
 
 In this tutorial the incompressible Navier-Stokes equations are solved. The domain is
-discretized in space with Ferrite as usual, and then forumalated in a way to be compatible
+discretized in space with Ferrite as usual, and then formulated in a way to be compatible
 with the [OrdinaryDiffEq.jl](https://docs.sciml.ai/OrdinaryDiffEq/) package, which is used
 for the time-integration.
 
@@ -145,18 +145,28 @@ for the time-integration.
 
 ---
 
-#### [Tutorial 11: Linear shell](@ref tutorial-linear-shell)
+#### [Tutorial 11: Reactive surface](@ref tutorial-reactive-surface)
+
+In this tutorial a reaction diffusion system on a sphere surface embedded in 3D is solved.
+Ferrite is used to assemble the diffusion operators and the mass matrices. The problem is
+solved by using the usual first order reaction diffusion operator splitting.
+
+**Keywords**: embedded elements, operator splitting, gmsh
+
+---
+
+#### [Tutorial 12: Linear shell](@ref tutorial-linear-shell)
 
 In this tutorial a linear shell element formulation is set up as a two-dimensional domain
 embedded in three-dimensional space. This will teach, and perhaps inspire, you on how
 Ferrite can be used for non-standard things and how to add "hacks" that build on top of
 Ferrite.
 
-**Keywords**: embedding, automatic differentiation
+**Keywords**: shell elements, automatic differentiation
 
 ---
 
-#### [Tutorial 11: Discontinuous Galerkin heat equation](@ref tutorial-dg-heat-equation)
+#### [Tutorial 13: Discontinuous Galerkin heat equation](@ref tutorial-dg-heat-equation)
 
 This tutorial guides you through the process of solving the linear stationary heat equation
 (i.e. Poisson's equation) on a unit square with inhomogeneous Dirichlet and Neumann boundary
@@ -167,4 +177,4 @@ example was developed as part of the *Google Summer of Code* funded project ["Di
 Galerkin Infrastructure For the finite element toolbox
 Ferrite.jl"](https://summerofcode.withgoogle.com/programs/2023/projects/SLGbRNI5).
 
-**Keywords**: scalar-valued solution, Dirichlet boundary conditions, Discontinuous Galerkin, Interior penalty.
+**Keywords**: scalar-valued solution, Dirichlet boundary conditions, Discontinuous Galerkin, Interior penalty

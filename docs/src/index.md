@@ -9,6 +9,11 @@ provides functionalities to implement finite element analysis in
 [Julia](https://github.com/JuliaLang/julia). The aim is to be i) general, ii) performant,
 and iii) to keep mathematical abstractions.
 
+!!! note "Upgrading code from version 0.3.x to version 1.0"
+    Ferrite version 1.0 contains a number of breaking changes compared to version 0.3.x. The
+    [Changelog](changelog.md) documents all changes and there is also a section specifically
+    for [Upgrading code from Ferrite 0.3 to 1.0](@ref).
+
 !!! note
     Please help improve this documentation -- if something confuses you, chances are you're
     not alone. It's easy to do as you read along: just click on the "Edit on GitHub" link at
@@ -36,9 +41,15 @@ for. The document is organized as follows[^1]:
 
 [^1]: The organization of the document follows the [Diátaxis Framework](https://diataxis.fr).
 
-In addition there is a [**Code gallery**](gallery/index.md), with user contributed example
-programs, and the [**Developer documentation**](devdocs/index.md), for documentation of
-Ferrite internal code.
+The four sections above form the main user-facing parts of the documentation. In addition,
+the document also contain the following sections:
+
+ - [**Code gallery**](gallery/index.md) contains user contributed example programs showcasing
+   what can be done with Ferrite.
+ - [**Changelog**](changelog.md) contains release notes and information about how to upgrade
+   between releases.
+ - [**Developer documentation**](devdocs/index.md) contains documentation of Ferrite internal
+   code and is mainly targeted at developers of Ferrite.
 
 ## Getting started
 
@@ -60,7 +71,7 @@ forum](https://github.com/Ferrite-FEM/Ferrite.jl/discussions) on the GitHub repo
 ### Installation
 
 To use Ferrite you first need to install Julia, see <https://julialang.org/> for details.
-Installing Ferrite can then be done from the Pkg REPL; press `]` at the `julia>` promp to
+Installing Ferrite can then be done from the Pkg REPL; press `]` at the `julia>` prompt to
 enter `pkg>` mode:
 
 ```
@@ -86,4 +97,4 @@ Ferrite is still under active development. If you find a bug, or have ideas for
 improvements, you are encouraged to interact with the developers on the [Ferrite GitHub
 repository](https://github.com/Ferrite-FEM/Ferrite.jl). There is also a thorough contributor
 guide which can be found in
-[`CONTRIBUTING.md`](https://github.com/Ferrite-FEM/Ferrite.jl/blob/master/CONTRIBUTING.md).
+[CONTRIBUTING.md](https://github.com/Ferrite-FEM/Ferrite.jl/blob/master/CONTRIBUTING.md).

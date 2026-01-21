@@ -9,39 +9,67 @@ function checkquadpoint(fe_v::AbstractValues, qp::Int)
     return nothing
 end
 
+@inline function reinit_needs_cell(fe_values::AbstractValues)
+    # TODO: Might need better logic for this, but for current implementations this
+    # is ok. If someone implements a non-identity mapping that doesn't require the cell
+    # as input, this is only a slight performance issue in some cases.
+    return !isa(mapping_type(get_fun_values(fe_values)), IdentityMapping)
+end
+
 @noinline function throw_incompatible_dof_length(length_ue, n_base_funcs)
-    throw(ArgumentError(
-        "the number of base functions ($(n_base_funcs)) does not match the length " *
+    msg = "the number of base functions ($(n_base_funcs)) does not match the length " *
         "of the vector ($(length_ue)). Perhaps you passed the global vector, " *
         "or forgot to pass a dof_range?"
-    ))
+    throw(ArgumentError(msg))
 end
 @noinline function throw_incompatible_coord_length(length_x, n_base_funcs)
-    throw(ArgumentError(
-        "the number of (geometric) base functions ($(n_base_funcs)) does not match " *
+    msg = "the number of (geometric) base functions ($(n_base_funcs)) does not match " *
         "the number of coordinates in the vector ($(length_x)). Perhaps you forgot to " *
         "use an appropriate geometric interpolation when creating FE values? See " *
         "https://github.com/Ferrite-FEM/Ferrite.jl/issues/265 for more details."
-    ))
+    throw(ArgumentError(msg))
+end
+
+conformity(fe_values::AbstractValues) = conformity(function_interpolation(fe_values))
+
+"""
+    ValuesUpdateFlags(ip_fun::Interpolation; update_gradients = Val(true), update_hessians = Val(false), update_detJdV = Val(true))
+
+Creates a singleton type for specifying what parts of the AbstractValues should be updated. Note that this is internal
+API used to get type-stable construction. Keyword arguments in `AbstractValues` constructors are forwarded, and the public API
+is passing these as `Bool`, while the `ValuesUpdateFlags` method supports both boolean and `Val(::Bool)` keyword args.
+"""
+function ValuesUpdateFlags(ip_fun::Interpolation; update_gradients = Val(true), update_hessians = Val(false), update_detJdV = Val(true))
+    toval(v::Bool) = Val(v)
+    toval(V::Val) = V
+    return ValuesUpdateFlags(ip_fun, toval(update_gradients), toval(update_hessians), toval(update_detJdV))
+end
+function ValuesUpdateFlags(
+        ip_fun::Interpolation, ::Val{update_gradients}, ::Val{update_hessians}, ::Val{update_detJdV}
+    ) where {update_gradients, update_hessians, update_detJdV}
+    FunDiffOrder = update_hessians ? 2 : (update_gradients ? 1 : 0)
+    GeoDiffOrder = max(required_geo_diff_order(mapping_type(ip_fun), FunDiffOrder), update_detJdV)
+    return ValuesUpdateFlags{FunDiffOrder, GeoDiffOrder, update_detJdV}()
 end
 
 """
     reinit!(cv::Union{CellValues, CellMultiValues}, cell::AbstractCell, x::Vector)
     reinit!(cv::Union{CellValues, CellMultiValues}, x::Vector)
-    reinit!(fv::FaceValues, cell::AbstractCell, x::Vector, face::Int)
-    reinit!(fv::FaceValues, x::Vector, face::Int)
+    reinit!(fv::FacetValues, cell::AbstractCell, x::AbstractVector, facet::Int)
+    reinit!(fv::FacetValues, x::AbstractVector, facet::Int)
 
-Update the `CellValues`/`FaceValues` object for a cell or face with coordinates `x`.
+Update the `CellValues`, `CellMultiValues`, or `FacetValues` object for a cell or
+facet with cell coordinates `x`.
 The derivatives of the shape functions, and the new integration weights are computed.
-For interpolations with non-identity mappings, the current `cell` is also required. 
+For interpolations with non-identity mappings, the current `cell` is also required.
 """
 reinit!
 
 """
     getnquadpoints(fe_v::AbstractValues)
 
-Return the number of quadrature points. For `FaceValues`, 
-this is the number for the current face.
+Return the number of quadrature points. For `FacetValues`,
+this is the number for the current facet.
 """
 function getnquadpoints end
 
@@ -52,7 +80,7 @@ Return the product between the determinant of the Jacobian and the quadrature
 point weight for the given quadrature point: ``\\det(J(\\mathbf{x})) w_q``.
 
 This value is typically used when one integrates a function on a
-finite element cell or face as
+finite element cell or facet as
 
 ``\\int\\limits_\\Omega f(\\mathbf{x}) d \\Omega \\approx \\sum\\limits_{q = 1}^{n_q} f(\\mathbf{x}_q) \\det(J(\\mathbf{x})) w_q``
 ``\\int\\limits_\\Gamma f(\\mathbf{x}) d \\Gamma \\approx \\sum\\limits_{q = 1}^{n_q} f(\\mathbf{x}_q) \\det(J(\\mathbf{x})) w_q``
@@ -71,7 +99,7 @@ shape_value(fe_v::AbstractValues, q_point::Int, base_function::Int)
 """
     geometric_value(fe_v::AbstractValues, q_point, base_function::Int)
 
-Return the value of the geometric shape function `base_function` evaluated in 
+Return the value of the geometric shape function `base_function` evaluated in
 quadrature point `q_point`.
 """
 geometric_value(fe_v::AbstractValues, q_point::Int, base_function::Int)
@@ -114,8 +142,8 @@ quadrature point `q_point`.
 function shape_curl(cv::AbstractValues, q_point::Int, base_func::Int)
     return curl_from_gradient(shape_gradient(cv, q_point, base_func))
 end
-curl_from_gradient(∇v::SecondOrderTensor{3}) = Vec{3}((∇v[3,2] - ∇v[2,3], ∇v[1,3] - ∇v[3,1], ∇v[2,1] - ∇v[1,2]))
-curl_from_gradient(∇v::SecondOrderTensor{2}) = Vec{1}((∇v[2,1] - ∇v[1,2],)) # Alternatively define as Vec{3}((0,0,v))
+curl_from_gradient(∇v::SecondOrderTensor{3}) = Vec{3}((∇v[3, 2] - ∇v[2, 3], ∇v[1, 3] - ∇v[3, 1], ∇v[2, 1] - ∇v[1, 2]))
+curl_from_gradient(∇v::SecondOrderTensor{2}) = Vec{1}((∇v[2, 1] - ∇v[1, 2],)) # Alternatively define as Vec{3}((0, 0, v))
 
 """
     function_value(fe_v::AbstractValues, q_point::Int, u::AbstractVector, [dof_range])
@@ -212,6 +240,38 @@ function function_gradient_init(cv::AbstractValues, ::AbstractVector{T}) where {
 end
 
 """
+    function_hessian(fe_v::AbstractValues{dim}, q_point::Int, u::AbstractVector{<:AbstractFloat}, [dof_range])
+
+    Compute the hessian of the function in a quadrature point. `u` is a vector with values
+    for the degrees of freedom.
+"""
+function function_hessian(fe_v::AbstractValues, q_point::Int, u::AbstractVector, dof_range = eachindex(u))
+    n_base_funcs = getnbasefunctions(fe_v)
+    length(dof_range) == n_base_funcs || throw_incompatible_dof_length(length(dof_range), n_base_funcs)
+    @boundscheck checkbounds(u, dof_range)
+    @boundscheck checkquadpoint(fe_v, q_point)
+    hess = function_hessian_init(fe_v, u)
+    @inbounds for (i, j) in pairs(dof_range)
+        hess += shape_hessian(fe_v, q_point, i) * u[j]
+    end
+    return hess
+end
+
+"""
+    shape_hessian_type(fe_v::AbstractValues)
+
+Return the type of `shape_hessian(fe_v, q_point, base_function)`
+"""
+function shape_hessian_type(fe_v::AbstractValues)
+    # Default fallback
+    return typeof(shape_hessian(fe_v, 1, 1))
+end
+
+function function_hessian_init(cv::AbstractValues, ::AbstractVector{T}) where {T}
+    return zero(shape_hessian_type(cv)) * zero(T)
+end
+
+"""
     function_symmetric_gradient(fe_v::AbstractValues, q_point::Int, u::AbstractVector, [dof_range])
 
 Compute the symmetric gradient of the function, see [`function_gradient`](@ref).
@@ -278,7 +338,10 @@ Compute the spatial coordinate in a quadrature point. `x` contains the nodal
 coordinates of the cell.
 
 The coordinate is computed, using the geometric interpolation, as
-``\\mathbf{x} = \\sum\\limits_{i = 1}^n M_i (\\mathbf{x}) \\mathbf{\\hat{x}}_i``
+``\\mathbf{x} = \\sum\\limits_{i = 1}^n M_i (\\mathbf{\\xi}) \\mathbf{\\hat{x}}_i``.
+
+where ``\\xi``is the coordinate of the given quadrature point `q_point` of the associated
+quadrature rule.
 """
 function spatial_coordinate(fe_v::AbstractValues, q_point::Int, x::AbstractVector{<:Vec})
     n_base_funcs = getngeobasefunctions(fe_v)
@@ -291,28 +354,59 @@ function spatial_coordinate(fe_v::AbstractValues, q_point::Int, x::AbstractVecto
     return vec
 end
 
+"""
+    spatial_coordinate(ip::ScalarInterpolation, ξ::Vec, x::AbstractVector{<:Vec{sdim, T}})
 
-# Utility functions used by GeometryMapping, FunctionValues 
+Compute the spatial coordinate in a given quadrature point. `x` contains the nodal coordinates of the cell.
+
+The coordinate is computed, using the geometric interpolation, as
+``\\mathbf{x} = \\sum\\limits_{i = 1}^n M_i (\\mathbf{\\xi}) \\mathbf{\\hat{x}}_i``
+"""
+function spatial_coordinate(interpolation::ScalarInterpolation, ξ::Vec, x::AbstractVector{<:Vec})
+    n_basefuncs = getnbasefunctions(interpolation)
+    @boundscheck checkbounds(x, Base.OneTo(n_basefuncs))
+    vec = zero(eltype(x))
+    @inbounds for j in 1:n_basefuncs
+        M = reference_shape_value(interpolation, ξ, j)
+        vec += M * x[j]
+    end
+    return vec
+end
+
+# Utility functions used by GeometryMapping, FunctionValues
 _copy_or_nothing(x) = copy(x)
 _copy_or_nothing(::Nothing) = nothing
 
-function shape_values!(values::AbstractMatrix, ip, qr_points::Vector{<:Vec})
+function reference_shape_values!(values::AbstractMatrix, ip, qr_points::AbstractVector{<:Vec})
     for (qp, ξ) in pairs(qr_points)
-        shape_values!(@view(values[:, qp]), ip, ξ)
+        reference_shape_values!(@view(values[:, qp]), ip, ξ)
     end
+    return
 end
 
-function shape_gradients_and_values!(gradients::AbstractMatrix, values::AbstractMatrix, ip, qr_points::Vector{<:Vec})
+function reference_shape_gradients_and_values!(gradients::AbstractMatrix, values::AbstractMatrix, ip, qr_points::AbstractVector{<:Vec})
     for (qp, ξ) in pairs(qr_points)
-        shape_gradients_and_values!(@view(gradients[:, qp]), @view(values[:, qp]), ip, ξ)
+        reference_shape_gradients_and_values!(@view(gradients[:, qp]), @view(values[:, qp]), ip, ξ)
     end
+    return
 end
 
-#= PR798
-function shape_hessians_gradients_and_values!(hessians::AbstractMatrix, gradients::AbstractMatrix, values::AbstractMatrix, ip, qr_points::Vector{<:Vec})
+function reference_shape_hessians_gradients_and_values!(hessians::AbstractMatrix, gradients::AbstractMatrix, values::AbstractMatrix, ip, qr_points::AbstractVector{<:Vec})
     for (qp, ξ) in pairs(qr_points)
-        shape_hessians_gradients_and_values!(@view(hessians[:, qp]), @view(gradients[:, qp]), @view(values[:, qp]), ip, ξ)
+        reference_shape_hessians_gradients_and_values!(@view(hessians[:, qp]), @view(gradients[:, qp]), @view(values[:, qp]), ip, ξ)
     end
+    return
 end
-=#
 
+assert_same_refshapes(::Union{QuadratureRule{RS}, FacetQuadratureRule{RS}}, ::Interpolation{RS}, ::Interpolation{RS}) where {RS} = nothing
+function assert_same_refshapes(qr::Union{QuadratureRule, FacetQuadratureRule}, ipf::Interpolation, ipg::Interpolation)
+    throw(
+        ArgumentError(
+            """
+            The reference shapes of the quadrature rule ($(getrefshape(qr))),
+            function interpolation ($(getrefshape(ipf))), and geometric interpolation ($(getrefshape(ipg))),
+            must be equal.
+            """
+        )
+    )
+end

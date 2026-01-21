@@ -8,7 +8,7 @@
 #-
 #md # !!! tip
 #md #     This example is also available as a Jupyter notebook:
-#md #     [`heat_equation.ipynb`](@__NBVIEWER_ROOT_URL__/examples/heat_equation.ipynb).
+#md #     [`heat_equation.ipynb`](@__NBVIEWER_ROOT_URL__/tutorials/heat_equation.ipynb).
 #-
 #
 # ## Introduction
@@ -28,14 +28,14 @@
 # u(\textbf{x}) = 0 \quad \textbf{x} \in \partial \Omega,
 # ```
 # where $\partial \Omega$ denotes the boundary of $\Omega$.
-# The resulting weak form is given given as follows: Find ``u \in \mathbb{U}`` such that
+# The resulting weak form is given as follows: Find ``u \in \mathbb{U}`` such that
 # ```math
 # \int_{\Omega} \nabla \delta u \cdot \nabla u \ d\Omega = \int_{\Omega} \delta u \ d\Omega \quad \forall \delta u \in \mathbb{T},
 # ```
 # where $\delta u$ is a test function, and where $\mathbb{U}$ and $\mathbb{T}$ are suitable
 # trial and test function sets, respectively.
 #-
-# ## Commented Program
+# ## Commented program
 #
 # Now we solve the problem in Ferrite. What follows is a program spliced with comments.
 #md # The full program, without comments, can be found in the next [section](@ref heat_equation-plain-program).
@@ -70,10 +70,15 @@ dh = DofHandler(grid)
 add!(dh, :u, ip)
 close!(dh);
 
+# !!! warning "Numbering of degrees of freedom"
+#     A common assumption is that the numbering of degrees of freedom follows the global
+#     numbering of the nodes in the grid. This is *NOT* the case in Ferrite. For more
+#     details, see the [Ferrite numbering rules](@ref "Global-DoF-indices").
+
 # Now that we have distributed all our dofs we can create our tangent matrix,
-# using `create_sparsity_pattern`. This function returns a sparse matrix
+# using `allocate_matrix`. This function returns a sparse matrix
 # with the correct entries stored.
-K = create_sparsity_pattern(dh)
+K = allocate_matrix(dh)
 
 # ### Boundary conditions
 # In Ferrite constraints like Dirichlet boundary conditions
@@ -82,16 +87,16 @@ ch = ConstraintHandler(dh);
 
 # Next we need to add constraints to `ch`. For this problem we define
 # homogeneous Dirichlet boundary conditions on the whole boundary, i.e.
-# the `union` of all the face sets on the boundary.
+# the `union` of all the facet sets on the boundary.
 ∂Ω = union(
-    getfaceset(grid, "left"),
-    getfaceset(grid, "right"),
-    getfaceset(grid, "top"),
-    getfaceset(grid, "bottom"),
+    getfacetset(grid, "left"),
+    getfacetset(grid, "right"),
+    getfacetset(grid, "top"),
+    getfacetset(grid, "bottom"),
 );
 
 # Now we are set up to define our constraint. We specify which field
-# the condition is for, and our combined face set `∂Ω`. The last
+# the condition is for, and our combined facet set `∂Ω`. The last
 # argument is a function of the form $f(\textbf{x})$ or $f(\textbf{x}, t)$,
 # where $\textbf{x}$ is the spatial coordinate and
 # $t$ the current time, and returns the prescribed value. Since the boundary condition in
@@ -118,7 +123,7 @@ close!(ch)
 #
 # #### Element assembly
 # We define the function `assemble_element!` (see below) which computes the contribution for
-# an element. The function takes pre-allocated `ke` and `fe` (they are allocated once and
+# an element. The function takes pre-allocated `Ke` and `fe` (they are allocated once and
 # then reused for all elements) so we first need to make sure that they are all zeroes at
 # the start of the function by using `fill!`. Then we loop over all the quadrature points,
 # and for each quadrature point we loop over all the (local) shape functions. We need the
@@ -144,7 +149,7 @@ function assemble_element!(Ke::Matrix, fe::Vector, cellvalues::CellValues)
         dΩ = getdetJdV(cellvalues, q_point)
         ## Loop over test shape functions
         for i in 1:n_basefuncs
-            δu  = shape_value(cellvalues, q_point, i)
+            δu = shape_value(cellvalues, q_point, i)
             ∇δu = shape_gradient(cellvalues, q_point, i)
             ## Add contribution to fe
             fe[i] += δu * dΩ
@@ -210,11 +215,16 @@ K, f = assemble_global(cellvalues, K, dh);
 apply!(K, f, ch)
 u = K \ f;
 
+# !!! warning "Numbering of degrees of freedom"
+#     Once again, recall that numbering of degrees of freedom does *NOT* follow the global
+#     numbering of the nodes in the grid. Specifically, `u[i]` is *NOT* the temperature at
+#     node `i`.
+
 # ### Exporting to VTK
 # To visualize the result we export the grid and our field `u`
 # to a VTK-file, which can be viewed in e.g. [ParaView](https://www.paraview.org/).
-vtk_grid("heat_equation", dh) do vtk
-    vtk_point_data(vtk, dh, u)
+VTKGridFile("heat_equation", dh) do vtk
+    write_solution(vtk, dh, u)
 end
 
 ## test the result                #src

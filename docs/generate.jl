@@ -20,7 +20,7 @@ mkpath(GALLERY_OUT)
 include("download_resources.jl")
 
 # Run Literate on all examples
-@timeit dto "Literate." for (IN, OUT) in [(TUTORIALS_IN, TUTORIALS_OUT), (HOWTO_IN, HOWTO_OUT), (GALLERY_IN, GALLERY_OUT)], program in readdir(IN; join=true)
+@timeit dto "Literate." for (IN, OUT) in [(TUTORIALS_IN, TUTORIALS_OUT), (HOWTO_IN, HOWTO_OUT), (GALLERY_IN, GALLERY_OUT)], program in readdir(IN; join = true)
     name = basename(program)
     if endswith(program, ".jl")
         if !liveserver
@@ -32,7 +32,7 @@ include("download_resources.jl")
 
         # remove "hidden" lines which are not shown in the markdown
         line_ending_symbol = occursin(code, "\r\n") ? "\r\n" : "\n"
-        code_clean = join(filter(x->!endswith(x,"#hide"),split(code, r"\n|\r\n")), line_ending_symbol)
+        code_clean = join(filter(x -> !endswith(x, "#hide"), split(code, r"\n|\r\n")), line_ending_symbol)
         code_clean = replace(code_clean, r"^# This file was generated .*$"m => "")
         code_clean = strip(code_clean)
 
@@ -52,7 +52,7 @@ include("download_resources.jl")
             end
         end
     elseif any(endswith.(program, [".png", ".jpg", ".gif"]))
-        cp(program, joinpath(OUT, name); force=true)
+        cp(program, joinpath(OUT, name); force = true)
     else
         @warn "ignoring $program"
     end

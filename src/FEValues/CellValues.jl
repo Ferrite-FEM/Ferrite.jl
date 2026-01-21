@@ -8,9 +8,14 @@ values of nodal functions, gradients and divergences of nodal functions etc. in 
 * `T`: an optional argument (default to `Float64`) to determine the type the internal data is stored as.
 * `quad_rule`: an instance of a [`QuadratureRule`](@ref)
 * `func_interpol`: an instance of an [`Interpolation`](@ref) used to interpolate the approximated function
-* `geom_interpol`: an optional instance of a [`Interpolation`](@ref) which is used to interpolate the geometry.
+* `geom_interpol`: an optional instance of an [`Interpolation`](@ref) which is used to interpolate the geometry.
   By default linear Lagrange interpolation is used. For embedded elements the geometric interpolations should
   be vectorized to the spatial dimension.
+
+**Keyword arguments:** The following keyword arguments are experimental and may change in future minor releases
+* `update_gradients`: Specifies if the gradients of the shape functions should be updated (default true)
+* `update_hessians`: Specifies if the hessians of the shape functions should be updated (default false)
+* `update_detJdV`: Specifies if the volume associated with each quadrature point should be updated (default true)
 
 **Common methods:**
 
@@ -41,21 +46,23 @@ struct CellValues{FV, GM, QR, detT} <: AbstractCellValues
     qr::QR         # QuadratureRule
     detJdV::detT   # AbstractVector{<:Number} or Nothing
 end
-function CellValues(::Type{T}, qr::QuadratureRule, ip_fun::Interpolation, ip_geo::VectorizedInterpolation; 
-        update_gradients::Union{Bool,Nothing} = nothing, update_detJdV::Union{Bool,Nothing} = nothing) where T 
-    
-    _update_detJdV = update_detJdV === nothing ? true : update_detJdV
-    FunDiffOrder = update_gradients === nothing ? 1 : convert(Int, update_gradients) # Logic must change when supporting update_hessian kwargs
-    GeoDiffOrder = max(required_geo_diff_order(mapping_type(ip_fun), FunDiffOrder), _update_detJdV)
+function CellValues(
+        ::Type{T}, qr::QuadratureRule, ip_fun::Interpolation, ip_geo::VectorizedInterpolation,
+        ::ValuesUpdateFlags{FunDiffOrder, GeoDiffOrder, DetJdV}
+    ) where {T, FunDiffOrder, GeoDiffOrder, DetJdV}
+
     geo_mapping = GeometryMapping{GeoDiffOrder}(T, ip_geo.ip, qr)
     fun_values = FunctionValues{FunDiffOrder}(T, ip_fun, qr, ip_geo)
-    detJdV = _update_detJdV ? fill(T(NaN), length(getweights(qr))) : nothing
+    detJdV = DetJdV ? fill(T(NaN), length(getweights(qr))) : nothing
     return CellValues(fun_values, geo_mapping, qr, detJdV)
 end
 
 CellValues(qr::QuadratureRule, ip::Interpolation, args...; kwargs...) = CellValues(Float64, qr, ip, args...; kwargs...)
-function CellValues(::Type{T}, qr, ip::Interpolation, ip_geo::ScalarInterpolation=default_geometric_interpolation(ip); kwargs...) where T
+function CellValues(::Type{T}, qr, ip::Interpolation, ip_geo::ScalarInterpolation; kwargs...) where {T}
     return CellValues(T, qr, ip, VectorizedInterpolation(ip_geo); kwargs...)
+end
+function CellValues(::Type{T}, qr::QuadratureRule, ip::Interpolation, ip_geo::VectorizedInterpolation = default_geometric_interpolation(ip); kwargs...) where {T}
+    return CellValues(T, qr, ip, ip_geo, ValuesUpdateFlags(ip; kwargs...))
 end
 
 function Base.copy(cv::CellValues)
@@ -70,28 +77,32 @@ geometric_interpolation(cv::CellValues) = geometric_interpolation(cv.geo_mapping
 getdetJdV(cv::CellValues, q_point::Int) = cv.detJdV[q_point]
 getdetJdV(::CellValues{<:Any, <:Any, <:Any, Nothing}, ::Int) = throw(ArgumentError("detJdV is not saved in CellValues"))
 
-# Accessors for function values 
+# Accessors for function values
+get_fun_values(cv::CellValues) = cv.fun_values
 getnbasefunctions(cv::CellValues) = getnbasefunctions(cv.fun_values)
 function_interpolation(cv::CellValues) = function_interpolation(cv.fun_values)
 function_difforder(cv::CellValues) = function_difforder(cv.fun_values)
 shape_value_type(cv::CellValues) = shape_value_type(cv.fun_values)
 shape_gradient_type(cv::CellValues) = shape_gradient_type(cv.fun_values)
+shape_hessian_type(cv::CellValues) = shape_hessian_type(cv.fun_values)
 
 @propagate_inbounds shape_value(cv::CellValues, q_point::Int, i::Int) = shape_value(cv.fun_values, q_point, i)
 @propagate_inbounds shape_gradient(cv::CellValues, q_point::Int, i::Int) = shape_gradient(cv.fun_values, q_point, i)
+@propagate_inbounds shape_hessian(cv::CellValues, q_point::Int, i::Int) = shape_hessian(cv.fun_values, q_point, i)
 @propagate_inbounds shape_symmetric_gradient(cv::CellValues, q_point::Int, i::Int) = shape_symmetric_gradient(cv.fun_values, q_point, i)
 
-# Access quadrature rule values 
+# Access quadrature rule values
 getnquadpoints(cv::CellValues) = getnquadpoints(cv.qr)
 
 @inline function _update_detJdV!(detJvec::AbstractVector, q_point::Int, w, mapping)
     detJ = calculate_detJ(getjacobian(mapping))
     detJ > 0.0 || throw_detJ_not_pos(detJ)
     @inbounds detJvec[q_point] = detJ * w
+    return
 end
 @inline _update_detJdV!(::Nothing, q_point, w, mapping) = nothing
 
-@inline function reinit!(cv::CellValues, x::AbstractVector)
+@inline function reinit!(cv::AbstractCellValues, x::AbstractVector)
     return reinit!(cv, nothing, x)
 end
 
@@ -99,9 +110,9 @@ function reinit!(cv::CellValues, cell::Union{AbstractCell, Nothing}, x::Abstract
     geo_mapping = cv.geo_mapping
     fun_values = cv.fun_values
     n_geom_basefuncs = getngeobasefunctions(geo_mapping)
-    
+
     check_reinit_sdim_consistency(:CellValues, shape_gradient_type(cv), eltype(x))
-    if cell === nothing && !isa(mapping_type(fun_values), IdentityMapping)
+    if cell === nothing && reinit_needs_cell(cv)
         throw(ArgumentError("The cell::AbstractCell input is required to reinit! non-identity function mappings"))
     end
     if !checkbounds(Bool, x, 1:n_geom_basefuncs) || length(x) != n_geom_basefuncs
@@ -118,27 +129,28 @@ end
 function Base.show(io::IO, d::MIME"text/plain", cv::CellValues)
     ip_geo = geometric_interpolation(cv)
     ip_fun = function_interpolation(cv)
-    rdim = getdim(ip_geo)
+    rdim = getrefdim(ip_geo)
     vdim = isa(shape_value(cv, 1, 1), Vec) ? length(shape_value(cv, 1, 1)) : 0
     GradT = shape_gradient_type(cv)
     sdim = GradT === nothing ? nothing : sdim_from_gradtype(GradT)
-    vstr = vdim==0 ? "scalar" : "vdim=$vdim"
+    vstr = vdim == 0 ? "scalar" : "vdim=$vdim"
     print(io, "CellValues(", vstr, ", rdim=$rdim, and sdim=$sdim): ")
     print(io, getnquadpoints(cv), " quadrature points")
     print(io, "\n Function interpolation: "); show(io, d, ip_fun)
-    print(io, "\nGeometric interpolation: "); 
+    print(io, "\nGeometric interpolation: ")
     sdim === nothing ? show(io, d, ip_geo) : show(io, d, ip_geo^sdim)
+    return
 end
 
 """
     CellMultiValues([::Type{T},] quad_rule::QuadratureRule, func_interpols::NamedTuple, [geom_interpol::Interpolation])
 
-A `cmv::CellMultiValues` is similar to a `CellValues` object, but includes values associated with multiple 
+A `cmv::CellMultiValues` is similar to a `CellValues` object, but includes values associated with multiple
 interpolations while sharing the same quadrature points and geometrical interpolation.
 
-In general, functions applicable to a `CellValues` associated with the function interpolation 
-in `func_interpols` with `key::Symbol` can be called on `cmv[key]`, as `cmv[key] isa FunctionValues`. 
-Other functions relating to geometric properties and quadrature rules are called directly on `cmv`. 
+In general, functions applicable to a `CellValues` associated with the function interpolation
+in `func_interpols` with `key::Symbol` can be called on `cmv[key]`, as `cmv[key] isa FunctionValues`.
+Other functions relating to geometric properties and quadrature rules are called directly on `cmv`.
 
 **Arguments:**
 * `T`: an optional argument (default to `Float64`) to determine the type the internal data is stored as.
@@ -148,7 +160,7 @@ Other functions relating to geometric properties and quadrature rules are called
   By default linear Lagrange interpolation is used. For embedded elements the geometric interpolations should
   be vectorized to the spatial dimension.
 
-In general, no performance penalty for using two equal function interpolations compared to a 
+In general, no performance penalty for using two equal function interpolations compared to a
 single function interpolation should be expected as their `FunctionValues` are aliased.
 
 **Examples**
@@ -163,7 +175,7 @@ ipp = Lagrange{RefQuadrilateral,1}()
 ipT = Lagrange{RefQuadrilaterla,1}()
 cmv = CellMultiValues(qr, (u = ipu, p = ipp, T = ipT), ip_geo)
 ```
-After reinitialization, the `cmv` can be used as, e.g. 
+After reinitialization, the `cmv` can be used as, e.g.
 ```
 dΩ = getdetJdV(cmv, q_point)
 Nu = shape_value(cmv[:u], q_point, base_function_nr)
@@ -188,7 +200,7 @@ E.g. applicable to `cmv[:u]` above
   * [`shape_gradient`](@ref)
   * [`shape_symmetric_gradient`](@ref)
   * [`shape_divergence`](@ref)
-  
+
   * [`function_value`](@ref)
   * [`function_gradient`](@ref)
   * [`function_symmetric_gradient`](@ref)
@@ -204,8 +216,10 @@ struct CellMultiValues{FVS, GM, QR, detT, FVT} <: AbstractCellValues
     detJdV::detT            # AbstractVector{<:Number} or Nothing
 end
 
-function CellMultiValues(::Type{T}, qr::QuadratureRule, ip_funs::NamedTuple, ip_geo::VectorizedInterpolation;
-    update_gradients::Bool = true, update_detJdV::Bool = true) where T 
+function CellMultiValues(
+        ::Type{T}, qr::QuadratureRule, ip_funs::NamedTuple, ip_geo::VectorizedInterpolation;
+        update_gradients::Bool = true, update_detJdV::Bool = true
+    ) where {T}
 
     FunDiffOrder = convert(Int, update_gradients) # Logic must change when supporting update_hessian kwargs
     GeoDiffOrder = max(maximum(ip_fun -> required_geo_diff_order(mapping_type(ip_fun), FunDiffOrder), values(ip_funs)), update_detJdV)
@@ -218,7 +232,7 @@ function CellMultiValues(::Type{T}, qr::QuadratureRule, ip_funs::NamedTuple, ip_
 end
 
 CellMultiValues(qr::QuadratureRule, ip_funs::NamedTuple, args...; kwargs...) = CellMultiValues(Float64, qr, ip_funs, args...; kwargs...)
-function CellMultiValues(::Type{T}, qr, ip_funs::NamedTuple, ip_geo::ScalarInterpolation=default_geometric_interpolation(first(ip_funs)); kwargs...) where T
+function CellMultiValues(::Type{T}, qr, ip_funs::NamedTuple, ip_geo::ScalarInterpolation = default_geometric_interpolation(first(ip_funs)); kwargs...) where {T}
     return CellMultiValues(T, qr, ip_funs, VectorizedInterpolation(ip_geo); kwargs...)
 end
 
@@ -238,29 +252,33 @@ function getdetJdV(cv::CellMultiValues, q_point::Int)
     return cv.detJdV[q_point]
 end
 
-# No accessors for function values, just ability to get the stored `FunctionValues` which can be called directly. 
+# No accessors for function values, just ability to get the stored `FunctionValues` which can be called directly.
 @inline Base.getindex(cv::CellMultiValues, key::Symbol) = cv.fun_values[key]
 
-# Access quadrature rule values 
+# Access quadrature rule values
 getnquadpoints(cv::CellMultiValues) = getnquadpoints(cv.qr)
 
 @inline function reinit!(cv::CellMultiValues, x::AbstractVector)
     return reinit!(cv, nothing, x)
 end
 
+@inline function reinit_needs_cell(cv::CellMultiValues)
+    return any(map(fv -> !isa(mapping_type(fv), IdentityMapping), cv.fun_values_tuple))
+end
+
 function reinit!(cv::CellMultiValues, cell::Union{AbstractCell, Nothing}, x::AbstractVector{<:Vec})
     geo_mapping = cv.geo_mapping
     fun_values = cv.fun_values_tuple
     n_geom_basefuncs = getngeobasefunctions(geo_mapping)
-    
+
     map(fv -> check_reinit_sdim_consistency(:CellMultiValues, shape_gradient_type(fv), eltype(x)), fun_values)
-    if cell === nothing && !all(map(fv -> isa(mapping_type(fv), IdentityMapping), fun_values))
+    if cell === nothing && reinit_needs_cell(cv)
         throw(ArgumentError("The cell::AbstractCell input is required to reinit! non-identity function mappings"))
     end
     if !checkbounds(Bool, x, 1:n_geom_basefuncs) || length(x) != n_geom_basefuncs
         throw_incompatible_coord_length(length(x), n_geom_basefuncs)
     end
-    
+
     @inbounds for (q_point, w) in enumerate(getweights(cv.qr))
         mapping = calculate_mapping(geo_mapping, q_point, x)
         _update_detJdV!(cv.detJdV, q_point, w, mapping)
@@ -270,16 +288,16 @@ function reinit!(cv::CellMultiValues, cell::Union{AbstractCell, Nothing}, x::Abs
 end
 
 @inline function _apply_mappings!(fun_values::Tuple, q_point, mapping, cell)
-    map(fv -> (@inbounds apply_mapping!(fv, q_point, mapping, cell)), fun_values)
+    return map(fv -> (@inbounds apply_mapping!(fv, q_point, mapping, cell)), fun_values)
 end
 
-# Slightly faster for unknown reason to write out each call, only worth it for a few unique function values. 
+# Slightly faster for unknown reason to write out each call, only worth it for a few unique function values.
 @inline function _apply_mappings!(fun_values::Tuple{<:FunctionValues}, q_point, mapping, cell)
-    @inbounds apply_mapping!(fun_values[1], q_point, mapping, cell)
+    return @inbounds apply_mapping!(fun_values[1], q_point, mapping, cell)
 end
 
 @inline function _apply_mappings!(fun_values::Tuple{<:FunctionValues, <:FunctionValues}, q_point, mapping, cell)
-    @inbounds begin
+    return @inbounds begin
         apply_mapping!(fun_values[1], q_point, mapping, cell)
         apply_mapping!(fun_values[2], q_point, mapping, cell)
     end

@@ -9,7 +9,7 @@
 #-
 #md # !!! tip
 #md #     This example is also available as a Jupyter notebook:
-#md #     [`dg_heat_equation.ipynb`](@__NBVIEWER_ROOT_URL__/examples/dg_heat_equation.ipynb).
+#md #     [`dg_heat_equation.ipynb`](@__NBVIEWER_ROOT_URL__/tutorials/dg_heat_equation.ipynb).
 #-
 #
 # This example was developed
@@ -71,7 +71,7 @@
 #     ```math
 #      \int_\Gamma q \boldsymbol{\phi} \cdot \boldsymbol{n} \,\mathrm{d}\Gamma = \int_\Gamma \llbracket q\rrbracket  \cdot \{\boldsymbol{\phi}\} \,\mathrm{d}\Gamma + \int_{\Gamma^0} \{q\} \llbracket \boldsymbol{\phi}\rrbracket  \,\mathrm{d}\Gamma^0,
 #     ```
-#     where $\Gamma^0 : \Gamma \setminus \partial \Omega$, and the jump of the vector-valued field $\boldsymbol{\phi}$ is defined as 
+#     where $\Gamma^0 : \Gamma \setminus \partial \Omega$, and the jump of the vector-valued field $\boldsymbol{\phi}$ is defined as
 #     ```math
 #      \llbracket \boldsymbol{\phi}\rrbracket  = \boldsymbol{\phi}^+ \cdot \boldsymbol{n}^+ + \boldsymbol{\phi}^- \cdot \boldsymbol{n}^-\\
 #     ```
@@ -99,7 +99,7 @@
 #     ```math
 #      \int_\Omega [\boldsymbol{\nabla} (u)] \cdot [\boldsymbol{\nabla} (\delta u)] \,\mathrm{d}\Omega + \int_\Gamma \llbracket \hat{u} - u\rrbracket  \cdot \{\boldsymbol{\nabla} (\delta u)\} \,\mathrm{d}\Gamma + \int_{\Gamma^0} \{\hat{u} - u\} \llbracket \boldsymbol{\nabla} (\delta u)\rrbracket  \,\mathrm{d}\Gamma^0 - \int_\Gamma \llbracket \delta u\rrbracket  \cdot \{\hat{\boldsymbol{\sigma}}\} \,\mathrm{d}\Gamma - \int_{\Gamma^0} \{\delta u\} \llbracket \hat{\boldsymbol{\sigma}}\rrbracket  \,\mathrm{d}\Gamma^0 = \int_\Omega \delta u \,\mathrm{d}\Omega,\\
 #     ```
-#     The numerical fluxes chosen for the interior penalty method are $\boldsymbol{\hat{\sigma}} = \{\boldsymbol{\nabla} (u)\} - \alpha(\llbracket u\rrbracket)$ on $\Gamma$, $\hat{u} = \{u\}$ on the interfaces between elements $\Gamma^0 : \Gamma \setminus \partial \Omega$, 
+#     The numerical fluxes chosen for the interior penalty method are $\boldsymbol{\hat{\sigma}} = \{\boldsymbol{\nabla} (u)\} - \alpha(\llbracket u\rrbracket)$ on $\Gamma$, $\hat{u} = \{u\}$ on the interfaces between elements $\Gamma^0 : \Gamma \setminus \partial \Omega$,
 #     and $\hat{u} = 0$ on $\partial \Omega$. Such choice results in $\{\hat{\boldsymbol{\sigma}}\} = \{\boldsymbol{\nabla} (u)\} - \alpha(\llbracket u\rrbracket)$, $\llbracket \hat{u}\rrbracket  = 0$, $\{\hat{u}\} = \{u\}$, $\llbracket \hat{\boldsymbol{\sigma}}\rrbracket  = 0$ and the equation becomes
 #     ```math
 #      \int_\Omega [\boldsymbol{\nabla} (u)] \cdot [\boldsymbol{\nabla} (\delta u)] \,\mathrm{d}\Omega - \int_\Gamma \llbracket u\rrbracket  \cdot \{\boldsymbol{\nabla} (\delta u)\}  \,\mathrm{d}\Gamma - \int_\Gamma \llbracket \delta u\rrbracket  \cdot \{\boldsymbol{\nabla} (u)\} - \llbracket \delta u\rrbracket  \cdot \alpha(\llbracket u\rrbracket)  \,\mathrm{d}\Gamma = \int_\Omega \delta u \,\mathrm{d}\Omega,\\
@@ -113,7 +113,7 @@
 #      \int_\Omega [\boldsymbol{\nabla} (u)] \cdot [\boldsymbol{\nabla}] (\delta u) \,\mathrm{d}\Omega - \int_\Gamma \llbracket u \rrbracket \cdot \{\boldsymbol{\nabla} (\delta u)\} + \llbracket \delta u \rrbracket  \cdot \{\boldsymbol{\nabla} (u)\}  \,\mathrm{d}\Gamma + \int_\Gamma \frac{\eta}{h_e} \llbracket u\rrbracket  \cdot \llbracket \delta u\rrbracket   \,\mathrm{d}\Gamma = \int_\Omega \delta u \,\mathrm{d}\Omega,\\
 #     ```
 # Since $\partial \Omega$ is constrained with both Dirichlet and Neumann boundary conditions the term $\int_{\partial \Omega} [\boldsymbol{\nabla} (u)] \cdot \boldsymbol{n} \delta u \,\mathrm{d} \Omega$ can be expressed as an integral over $\partial \Omega_N$, where $\partial \Omega_N$ is the boundaries with only prescribed Neumann boundary condition,
-# The resulting weak form is given given as follows: Find $u \in \mathbb{U}$ such that
+# The resulting weak form is given as follows: Find $u \in \mathbb{U}$ such that
 # ```math
 #  \int_\Omega [\boldsymbol{\nabla} (u)] \cdot [\boldsymbol{\nabla} (\delta u)] \,\mathrm{d}\Omega - \int_{\Gamma^0} \llbracket u\rrbracket \cdot \{\boldsymbol{\nabla} (\delta u)\} + \llbracket \delta u\rrbracket  \cdot \{\boldsymbol{\nabla} (u)\}  \,\mathrm{d}\Gamma^0 + \int_{\Gamma^0} \frac{\eta}{h_e} \llbracket u\rrbracket \cdot \llbracket \delta u\rrbracket   \,\mathrm{d}\Gamma^0 = \int_\Omega \delta u \,\mathrm{d}\Omega + \int_{\partial \Omega_N} ([\boldsymbol{\nabla} (u)] \cdot \boldsymbol{n}) \delta u \,\mathrm{d} \partial \Omega_N,\\
 # ```
@@ -125,7 +125,7 @@
 #
 # More details on DG formulations for elliptic problems can be found in [Cockburn:2002:unifiedanalysis](@cite).
 #-
-# ## Commented Program
+# ## Commented program
 #
 # Now we solve the problem in Ferrite. What follows is a program spliced with comments.
 #md # The full program, without comments, can be found in the next [section](@ref heat_equation-DG-plain-program).
@@ -138,25 +138,25 @@ grid = generate_grid(Quadrilateral, ntuple(_ -> 20, dim));
 topology = ExclusiveTopology(grid);
 
 # ### Trial and test functions
-# `CellValues`, `FaceValues`, and `InterfaceValues` facilitate the process of evaluating values and gradients of
+# `CellValues`, `FacetValues`, and `InterfaceValues` facilitate the process of evaluating values and gradients of
 # test and trial functions (among other things). To define
 # these we need to specify an interpolation space for the shape functions.
 # We use `DiscontinuousLagrange` functions
 # based on the two-dimensional reference quadrilateral. We also define a quadrature rule based on
 # the same reference element. We combine the interpolation and the quadrature rule
-# to `CellValues` and `InterfaceValues` object. Note that `InterfaceValues` object contains two `FaceValues` objects which can be used individually.
+# to `CellValues` and `InterfaceValues` object. Note that `InterfaceValues` object contains two `FacetValues` objects which can be used individually.
 order = 1;
 ip = DiscontinuousLagrange{RefQuadrilateral, order}();
 qr = QuadratureRule{RefQuadrilateral}(2);
-# For `FaceValues` and `InterfaceValues` we use `FaceQuadratureRule`
-face_qr = FaceQuadratureRule{RefQuadrilateral}(2);
+# For `FacetValues` and `InterfaceValues` we use `FacetQuadratureRule`
+facet_qr = FacetQuadratureRule{RefQuadrilateral}(2);
 cellvalues = CellValues(qr, ip);
-facevalues = FaceValues(face_qr, ip);
-interfacevalues = InterfaceValues(face_qr, ip);
+facetvalues = FacetValues(facet_qr, ip);
+interfacevalues = InterfaceValues(facet_qr, ip);
 # ### Penalty term parameters
 # We define functions to calculate the diameter of a set of points, used to calculate the characteristic size $h_e$ in the assembly routine.
-getdistance(p1::Vec{N, T},p2::Vec{N, T}) where {N, T} = norm(p1-p2);
-getdiameter(cell_coords::Vector{Vec{N, T}}) where {N, T} = maximum(getdistance.(cell_coords, reshape(cell_coords, (1,:))));
+getdistance(p1::Vec{N, T}, p2::Vec{N, T}) where {N, T} = norm(p1 - p2);
+getdiameter(cell_coords::Vector{Vec{N, T}}) where {N, T} = maximum(getdistance.(cell_coords, reshape(cell_coords, (1, :))));
 
 # ### Degrees of freedom
 # Degrees of freedom distribution is handled using `DofHandler` as usual
@@ -167,20 +167,20 @@ close!(dh);
 # However, when generating the sparsity pattern we need to pass the topology and the cross-element coupling matrix when we're using
 # discontinuous interpolations. The cross-element coupling matrix is of size [1,1] in this case as
 # we have only one field and one DofHandler.
-K = create_sparsity_pattern(dh, topology = topology, cross_coupling = trues(1,1));
+K = allocate_matrix(dh, topology = topology, interface_coupling = trues(1, 1));
 
 # ### Boundary conditions
-# The Dirichlet boundary conditions are treated 
+# The Dirichlet boundary conditions are treated
 # as usual by a `ConstraintHandler`.
 ch = ConstraintHandler(dh)
-add!(ch, Dirichlet(:u, getfaceset(grid, "right"), (x, t) -> 1.0))
-add!(ch, Dirichlet(:u, getfaceset(grid, "left"), (x, t) -> -1.0))
+add!(ch, Dirichlet(:u, getfacetset(grid, "right"), (x, t) -> 1.0))
+add!(ch, Dirichlet(:u, getfacetset(grid, "left"), (x, t) -> -1.0))
 close!(ch);
 
-# Furthermore, we define $\partial \Omega_N$ as the `union` of the face sets with Neumann boundary conditions for later use
+# Furthermore, we define $\partial \Omega_N$ as the `union` of the facet sets with Neumann boundary conditions for later use
 ∂Ωₙ = union(
-    getfaceset(grid, "top"),
-    getfaceset(grid, "bottom"),
+    getfacetset(grid, "top"),
+    getfacetset(grid, "bottom"),
 );
 
 
@@ -189,7 +189,7 @@ close!(ch);
 # Now we have all the pieces needed to assemble the linear system, $K u = f$. Assembling of
 # the global system is done by looping over i) all the elements in order to compute the
 # element contributions ``K_e`` and ``f_e``, ii) all the interfaces to compute their
-# contributions ``K_i``, and iii) all the Neumann boundary faces to compute their
+# contributions ``K_i``, and iii) all the Neumann boundary facets to compute their
 # contributions ``f_e``. All these local contributions are then assembled into the
 # appropriate place in the global ``K`` and ``f``.
 #
@@ -200,7 +200,7 @@ close!(ch);
 # * `assemble_interface!` to compute the contribution ``K_i`` of surface integrals over an
 #   interface using `interfacevalues`.
 # * `assemble_boundary!` to compute the contribution ``f_e`` of surface integrals over a
-#   boundary face using `facevalues`.
+#   boundary facet using `FacetValues`.
 
 function assemble_element!(Ke::Matrix, fe::Vector, cellvalues::CellValues)
     n_basefuncs = getnbasefunctions(cellvalues)
@@ -213,7 +213,7 @@ function assemble_element!(Ke::Matrix, fe::Vector, cellvalues::CellValues)
         dΩ = getdetJdV(cellvalues, q_point)
         ## Loop over test shape functions
         for i in 1:n_basefuncs
-            δu  = shape_value(cellvalues, q_point, i)
+            δu = shape_value(cellvalues, q_point, i)
             ∇δu = shape_gradient(cellvalues, q_point, i)
             ## Add contribution to fe
             fe[i] += δu * dΩ
@@ -233,34 +233,34 @@ function assemble_interface!(Ki::Matrix, iv::InterfaceValues, μ::Float64)
     fill!(Ki, 0)
     ## Loop over quadrature points
     for q_point in 1:getnquadpoints(iv)
-        ## Get the normal to face A
+        ## Get the normal to facet A
         normal = getnormal(iv, q_point)
         ## Get the quadrature weight
         dΓ = getdetJdV(iv, q_point)
         ## Loop over test shape functions
         for i in 1:getnbasefunctions(iv)
-            ## Multiply the jump by the normal, as the definition used in Ferrite doesn't include the normals.
-            δu_jump = shape_value_jump(iv, q_point, i) * normal
+            ## Multiply the jump by the negative normal to get the definition from the theory section.
+            δu_jump = shape_value_jump(iv, q_point, i) * (-normal)
             ∇δu_avg = shape_gradient_average(iv, q_point, i)
             ## Loop over trial shape functions
             for j in 1:getnbasefunctions(iv)
-                ## Multiply the jump by the normal, as the definition used in Ferrite doesn't include the normals.
-                u_jump = shape_value_jump(iv, q_point, j) * normal
+                ## Multiply the jump by the negative normal to get the definition from the theory section.
+                u_jump = shape_value_jump(iv, q_point, j) * (-normal)
                 ∇u_avg = shape_gradient_average(iv, q_point, j)
                 ## Add contribution to Ki
-                Ki[i, j] += -(δu_jump ⋅ ∇u_avg + ∇δu_avg ⋅ u_jump)*dΓ +  μ * (δu_jump ⋅ u_jump) * dΓ
+                Ki[i, j] += -(δu_jump ⋅ ∇u_avg + ∇δu_avg ⋅ u_jump) * dΓ + μ * (δu_jump ⋅ u_jump) * dΓ
             end
         end
     end
     return Ki
 end
 
-function assemble_boundary!(fe::Vector, fv::FaceValues)
+function assemble_boundary!(fe::Vector, fv::FacetValues)
     ## Reset to 0
     fill!(fe, 0)
     ## Loop over quadrature points
     for q_point in 1:getnquadpoints(fv)
-        ## Get the normal to face A
+        ## Get the normal to facet A
         normal = getnormal(fv, q_point)
         ## Get the quadrature weight
         ∂Ω = getdetJdV(fv, q_point)
@@ -277,10 +277,10 @@ end
 
 # #### Global assembly
 #
-# We define the function `assemble_global` to loop over all elements and internal faces
-# (interfaces), as well as the external faces involved in Neumann boundary conditions.
+# We define the function `assemble_global` to loop over all elements and internal facets
+# (interfaces), as well as the external facets involved in Neumann boundary conditions.
 
-function assemble_global(cellvalues::CellValues, facevalues::FaceValues, interfacevalues::InterfaceValues, K::SparseMatrixCSC, dh::DofHandler, order::Int, dim::Int)
+function assemble_global(cellvalues::CellValues, facetvalues::FacetValues, interfacevalues::InterfaceValues, K::SparseMatrixCSC, dh::DofHandler, order::Int, dim::Int)
     ## Allocate the element stiffness matrix and element force vector
     n_basefuncs = getnbasefunctions(cellvalues)
     Ke = zeros(n_basefuncs, n_basefuncs)
@@ -304,7 +304,7 @@ function assemble_global(cellvalues::CellValues, facevalues::FaceValues, interfa
         ## Reinitialize interfacevalues for this interface
         reinit!(interfacevalues, ic)
         ## Calculate the characteristic size hₑ as the face diameter
-        interfacecoords =  ∩(getcoordinates(ic)...)
+        interfacecoords = ∩(getcoordinates(ic)...)
         hₑ = getdiameter(interfacecoords)
         ## Calculate μ
         μ = (1 + order)^dim / hₑ
@@ -314,17 +314,17 @@ function assemble_global(cellvalues::CellValues, facevalues::FaceValues, interfa
         assemble!(assembler, interfacedofs(ic), Ki)
     end
     ## Loop over domain boundaries with Neumann boundary conditions
-    for fc in FaceIterator(dh, ∂Ωₙ)
-        ## Reinitialize face_values_a for this boundary face
-        reinit!(facevalues, fc)
-        ## Compute boundary face surface integrals contribution
-        assemble_boundary!(fe, facevalues)
+    for fc in FacetIterator(dh, ∂Ωₙ)
+        ## Reinitialize facetvalues for this boundary facet
+        reinit!(facetvalues, fc)
+        ## Compute boundary facet surface integrals contribution
+        assemble_boundary!(fe, facetvalues)
         ## Assemble fe into f
         assemble!(f, celldofs(fc), fe)
     end
     return K, f
 end
-K, f = assemble_global(cellvalues, facevalues, interfacevalues, K, dh, order, dim);
+K, f = assemble_global(cellvalues, facetvalues, interfacevalues, K, dh, order, dim);
 #md nothing # hide
 
 # ### Solution of the system
@@ -334,8 +334,8 @@ K, f = assemble_global(cellvalues, facevalues, interfacevalues, K, dh, order, di
 
 apply!(K, f, ch)
 u = K \ f;
-vtk_grid("dg_heat_equation", dh) do vtk
-    vtk_point_data(vtk, dh, u)
+VTKGridFile("dg_heat_equation", dh) do vtk
+    write_solution(vtk, dh, u)
 end;
 
 ## test the result                #src
@@ -344,7 +344,7 @@ using Test                        #src
 
 #md # ## References
 #md # ```@bibliography
-#md # Pages = ["tutorials/dg_heat_equation.md"]
+#md # Pages = ["dg_heat_equation.md"]
 #md # Canonical = false
 #md # ```
 

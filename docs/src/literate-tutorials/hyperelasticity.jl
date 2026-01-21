@@ -11,7 +11,7 @@
 #-
 #md # !!! tip
 #md #     This example is also available as a Jupyter notebook:
-#md #     [`hyperelasticity.ipynb`](@__NBVIEWER_ROOT_URL__/examples/hyperelasticity.ipynb).
+#md #     [`hyperelasticity.ipynb`](@__NBVIEWER_ROOT_URL__/tutorials/hyperelasticity.ipynb).
 #-
 # ## Introduction
 #
@@ -51,7 +51,7 @@
 # and print a summary at the end,
 # [ProgressMeter.jl](https://github.com/timholy/ProgressMeter.jl) for showing a simple
 # progress bar, and
-# [IterativeSolvers](https://github.com/JuliaLinearAlgebra/IterativeSolvers.jl) for solving
+# [IterativeSolvers.jl](https://github.com/JuliaLinearAlgebra/IterativeSolvers.jl) for solving
 # the linear system using conjugate gradients.
 
 using Ferrite, Tensors, TimerOutputs, ProgressMeter, IterativeSolvers
@@ -69,6 +69,7 @@ using Ferrite, Tensors, TimerOutputs, ProgressMeter, IterativeSolvers
 #
 # where ``I_1 = \mathrm{tr}(\mathbf{C})`` is the first invariant, ``J = \sqrt{\det(\mathbf{C})}``
 # and ``\mu`` and ``\lambda`` material parameters.
+
 # !!! details "Extra details on compressible neo-Hookean formulations"
 #     The Neo-Hooke model is only a well defined terminology in the incompressible case.
 #     Thus, only $W(\mathbf{C})$ specifies the neo-Hookean behavior, the volume penalty $U(J)$ can vary in different formulations.
@@ -80,6 +81,7 @@ using Ferrite, Tensors, TimerOutputs, ProgressMeter, IterativeSolvers
 #     where [SimMie:1992:act; Eq. (2.37)](@cite) published a non-generalized version with $\beta=-2$.
 #     This shows the possible variety of $U(J)$ while all of them refer to compressible neo-Hookean models.
 #     Sometimes the modified first invariant $\overline{I}_1=\frac{I_1}{I_3^{1/3}}$ is used in $W(\mathbf{C})$ instead of $I_1$.
+
 # From the potential we obtain the second Piola-Kirchoff stress ``\mathbf{S}`` as
 #
 # ```math
@@ -99,60 +101,53 @@ using Ferrite, Tensors, TimerOutputs, ProgressMeter, IterativeSolvers
 # ```math
 # \begin{align*}
 # \mathbf{P} &= \mathbf{F} \cdot \mathbf{S},\\
-# \frac{\partial \mathbf{P}}{\partial \mathbf{F}} &= \mathbf{I} \bar{\otimes} \mathbf{S} + 2\, \mathbf{F} \bar{\otimes} \mathbf{I} :
+# \frac{\partial \mathbf{P}}{\partial \mathbf{F}} &= \mathbf{I} \bar{\otimes} \mathbf{S} + 2\, \mathbf{F} \cdot
 # \frac{\partial \mathbf{S}}{\partial \mathbf{C}} : \mathbf{F}^\mathrm{T} \bar{\otimes} \mathbf{I}.
 # \end{align*}
 # ```
 
-#md # ```@raw html
-#md # <details class="admonition collapsible">
-#md # <summary class="admonition-header">
-#md # Derivation of <span>$\partial \mathbf{P} / \partial \mathbf{F}$</span>
-#md # </summary>
-#md # <div class="admonition-body">
-#md # ```
-#nb # ### Derivation of ``\partial \mathbf{P} / \partial \mathbf{F}``
-# Using the product rule, the chain rule, and the relations ``\mathbf{P} = \mathbf{F} \cdot
-# \mathbf{S}`` and ``\mathbf{C} = \mathbf{F}^\mathrm{T} \cdot \mathbf{F}``, we obtain the
-# following:
-# ```math
-# \begin{aligned}
-# \frac{\partial \mathbf{P}}{\partial \mathbf{F}} &=
-# \frac{\partial P_{ij}}{\partial F_{kl}} \\ &=
-# \frac{\partial (F_{im}S_{mj})}{\partial F_{kl}} \\ &=
-# \frac{\partial F_{im}}{\partial F_{kl}}S_{mj} +
-# F_{im}\frac{\partial S_{mj}}{\partial F_{kl}} \\ &=
-# \delta_{ik}\delta_{ml} S_{mj} +
-# F_{im}\frac{\partial S_{mj}}{\partial C_{no}}\frac{\partial C_{no}}{\partial F_{kl}} \\ &=
-# \delta_{ik}S_{lj} +
-# F_{im}\frac{\partial S_{mj}}{\partial C_{no}}
-# \frac{\partial (F^\mathrm{T}_{np}F_{po})}{\partial F_{kl}} \\ &=
-# \delta_{ik}S^\mathrm{T}_{jl} +
-# F_{im}\delta_{jq}\frac{\partial S_{mq}}{\partial C_{no}}
-# \left(
-# \frac{\partial F^\mathrm{T}_{np}}{\partial F_{kl}}F_{po} +
-# F^\mathrm{T}_{np}\frac{\partial F_{po}}{\partial F_{kl}}
-# \right) \\ &=
-# \delta_{ik}S_{jl} +
-# F_{im}\delta_{jq}\frac{\partial S_{mq}}{\partial C_{no}}
-# (\delta_{nl} \delta_{pk} F_{po} + F^\mathrm{T}_{np}\delta_{pk} \delta_{ol}) \\ &=
-# \delta_{ik}S_{lj} +
-# F_{im}\delta_{jq}\frac{\partial S_{mq}}{\partial C_{no}}
-# (F^\mathrm{T}_{ok} \delta_{nl} + F^\mathrm{T}_{nk} \delta_{ol}) \\ &=
-# \delta_{ik}S_{jl} +
-# 2\, F_{im}\delta_{jq} \frac{\partial S_{mq}}{\partial C_{no}}
-# F^\mathrm{T}_{nk} \delta_{ol} \\ &=
-# \mathbf{I}\bar{\otimes}\mathbf{S} +
-# 2\, \mathbf{F}\bar{\otimes}\mathbf{I} : \frac{\partial \mathbf{S}}{\partial \mathbf{C}}
-# : \mathbf{F}^\mathrm{T} \bar{\otimes} \mathbf{I},
-# \end{aligned}
-# ```
-# where we used the fact that ``\mathbf{S}`` is symmetric (``S_{lj} = S_{jl}``) and that
-# ``\frac{\partial \mathbf{S}}{\partial \mathbf{C}}`` is *minor* symmetric (``\frac{\partial
-# S_{mq}}{\partial C_{no}} = \frac{\partial S_{mq}}{\partial C_{on}}``).
-#md # ```@raw html
-#md # </div></details>
-#md # ```
+# !!! details "Derivation of $\partial \mathbf{P} / \partial \mathbf{F}$"
+#     *Tip:* See [knutam.github.io/tensors](https://knutam.github.io/tensors/Theory/IndexNotation/) for
+#     an explanation of the index notation used in this derivation.
+#md #
+#     Using the product rule, the chain rule, and the relations ``\mathbf{P} = \mathbf{F} \cdot
+#     \mathbf{S}`` and ``\mathbf{C} = \mathbf{F}^\mathrm{T} \cdot \mathbf{F}``, we obtain the
+#     following:
+#     ```math
+#     \begin{aligned}
+#     \frac{\partial P_{ij}}{\partial F_{kl}} &=
+#     \frac{\partial (F_{im}S_{mj})}{\partial F_{kl}} \\ &=
+#     \frac{\partial F_{im}}{\partial F_{kl}}S_{mj} +
+#     F_{im}\frac{\partial S_{mj}}{\partial F_{kl}} \\ &=
+#     \delta_{ik}\delta_{ml} S_{mj} +
+#     F_{im}\frac{\partial S_{mj}}{\partial C_{no}}\frac{\partial C_{no}}{\partial F_{kl}} \\ &=
+#     \delta_{ik}S_{lj} +
+#     F_{im}\frac{\partial S_{mj}}{\partial C_{no}}
+#     \frac{\partial (F^\mathrm{T}_{np}F_{po})}{\partial F_{kl}} \\ &=
+#     \delta_{ik}S^\mathrm{T}_{jl} +
+#     F_{im}\frac{\partial S_{mj}}{\partial C_{no}}
+#     \left(
+#     \frac{\partial F^\mathrm{T}_{np}}{\partial F_{kl}}F_{po} +
+#     F^\mathrm{T}_{np}\frac{\partial F_{po}}{\partial F_{kl}}
+#     \right) \\ &=
+#     \delta_{ik}S_{jl} +
+#     F_{im}\frac{\partial S_{mj}}{\partial C_{no}}
+#     (\delta_{nl} \delta_{pk} F_{po} + F^\mathrm{T}_{np}\delta_{pk} \delta_{ol}) \\ &=
+#     \delta_{ik}S_{lj} +
+#     F_{im}\frac{\partial S_{mj}}{\partial C_{no}}
+#     (F^\mathrm{T}_{ok} \delta_{nl} + F^\mathrm{T}_{nk} \delta_{ol}) \\ &=
+#     \delta_{ik}S_{jl} +
+#     2\, F_{im} \frac{\partial S_{mj}}{\partial C_{no}}
+#     F^\mathrm{T}_{nk} \delta_{ol} \\
+#     \frac{\partial \mathbf{P}}{\partial \mathbf{F}} &=
+#     \mathbf{I}\bar{\otimes}\mathbf{S} +
+#     2\, \mathbf{F} \cdot \frac{\partial \mathbf{S}}{\partial \mathbf{C}}
+#     : \mathbf{F}^\mathrm{T} \bar{\otimes} \mathbf{I},
+#     \end{aligned}
+#     ```
+#     where we used the fact that ``\mathbf{S}`` is symmetric (``S_{lj} = S_{jl}``) and that
+#     ``\frac{\partial \mathbf{S}}{\partial \mathbf{C}}`` is *minor* symmetric (``\frac{\partial
+#     S_{mj}}{\partial C_{no}} = \frac{\partial S_{mj}}{\partial C_{on}}``).
 
 # ### Implementation of material model using automatic differentiation
 # We can implement the material model as follows, where we utilize automatic differentiation
@@ -178,6 +173,19 @@ function constitutive_driver(C, mp::NeoHooke)
     ∂S∂C = 2.0 * ∂²Ψ∂C²
     return S, ∂S∂C
 end;
+
+## Test the derivation                                        #src
+using Test                                                    #src
+F = rand(Tensor{2, 3})                                         #src
+mp = NeoHooke(rand(2)...)                                     #src
+S, ∂S∂C = constitutive_driver(tdot(F), mp)                    #src
+P = F ⋅ S                                                      #src
+I = one(S)                                                    #src
+∂P∂F = otimesu(I, S) + 2 * F ⋅ ∂S∂C ⊡ otimesu(F', I)         #src
+∂P∂F_ad, P_ad = Tensors.hessian(x -> Ψ(tdot(x), mp), F, :all) #src
+@test P ≈ P_ad                                                #src
+@test ∂P∂F ≈ ∂P∂F_ad                                          #src
+nothing                                                       #src
 
 # ## Newton's method
 #
@@ -249,7 +257,7 @@ function assemble_element!(ke, ge, cell, cv, fv, mp, ue, ΓN)
         S, ∂S∂C = constitutive_driver(C, mp)
         P = F ⋅ S
         I = one(S)
-        ∂P∂F =  otimesu(I, S) + 2 * otimesu(F, I) ⊡ ∂S∂C ⊡ otimesu(F', I)
+        ∂P∂F = otimesu(I, S) + 2 * F ⋅ ∂S∂C ⊡ otimesu(F', I)
 
         ## Loop over test functions
         for i in 1:ndofs
@@ -257,21 +265,21 @@ function assemble_element!(ke, ge, cell, cv, fv, mp, ue, ΓN)
             δui = shape_value(cv, qp, i)
             ∇δui = shape_gradient(cv, qp, i)
             ## Add contribution to the residual from this test function
-            ge[i] += ( ∇δui ⊡ P - δui ⋅ b ) * dΩ
+            ge[i] += (∇δui ⊡ P - δui ⋅ b) * dΩ
 
             ∇δui∂P∂F = ∇δui ⊡ ∂P∂F # Hoisted computation
             for j in 1:ndofs
                 ∇δuj = shape_gradient(cv, qp, j)
                 ## Add contribution to the tangent
-                ke[i, j] += ( ∇δui∂P∂F ⊡ ∇δuj ) * dΩ
+                ke[i, j] += (∇δui∂P∂F ⊡ ∇δuj) * dΩ
             end
         end
     end
 
     ## Surface integral for the traction
-    for face in 1:nfaces(cell)
-        if (cellid(cell), face) in ΓN
-            reinit!(fv, cell, face)
+    for facet in 1:nfacets(cell)
+        if (cellid(cell), facet) in ΓN
+            reinit!(fv, cell, facet)
             for q_point in 1:getnquadpoints(fv)
                 t = tn * getnormal(fv, q_point)
                 dΓ = getdetJdV(fv, q_point)
@@ -282,6 +290,7 @@ function assemble_element!(ke, ge, cell, cv, fv, mp, ue, ΓN)
             end
         end
     end
+    return
 end;
 
 # Assembling global residual and tangent is also done in the usual way, just looping over
@@ -301,8 +310,9 @@ function assemble_global!(K, g, dh, cv, fv, mp, u, ΓN)
         global_dofs = celldofs(cell)
         ue = u[global_dofs] # element dofs
         @timeit "element assemble" assemble_element!(ke, ge, cell, cv, fv, mp, ue, ΓN)
-        assemble!(assembler, global_dofs, ge, ke)
+        assemble!(assembler, global_dofs, ke, ge)
     end
+    return
 end;
 
 # Finally, we define a main function which sets up everything and then performs Newton
@@ -328,9 +338,9 @@ function solve()
     ## Finite element base
     ip = Lagrange{RefTetrahedron, 1}()^3
     qr = QuadratureRule{RefTetrahedron}(1)
-    qr_face = FaceQuadratureRule{RefTetrahedron}(1)
+    qr_facet = FacetQuadratureRule{RefTetrahedron}(1)
     cv = CellValues(qr, ip)
-    fv = FaceValues(qr_face, ip)
+    fv = FacetValues(qr_facet, ip)
 
     ## DofHandler
     dh = DofHandler(grid)
@@ -340,18 +350,20 @@ function solve()
     function rotation(X, t)
         θ = pi / 3 # 60°
         x, y, z = X
-        return t * Vec{3}((
-            0.0,
-            L/2 - y + (y-L/2)*cos(θ) - (z-L/2)*sin(θ),
-            L/2 - z + (y-L/2)*sin(θ) + (z-L/2)*cos(θ)
-        ))
+        return t * Vec{3}(
+            (
+                0.0,
+                L / 2 - y + (y - L / 2) * cos(θ) - (z - L / 2) * sin(θ),
+                L / 2 - z + (y - L / 2) * sin(θ) + (z - L / 2) * cos(θ),
+            )
+        )
     end
 
     dbcs = ConstraintHandler(dh)
     ## Add a homogeneous boundary condition on the "clamped" edge
-    dbc = Dirichlet(:u, getfaceset(grid, "right"), (x,t) -> [0.0, 0.0, 0.0], [1, 2, 3])
+    dbc = Dirichlet(:u, getfacetset(grid, "right"), (x, t) -> [0.0, 0.0, 0.0], [1, 2, 3])
     add!(dbcs, dbc)
-    dbc = Dirichlet(:u, getfaceset(grid, "left"), (x,t) -> rotation(x, t), [1, 2, 3])
+    dbc = Dirichlet(:u, getfacetset(grid, "left"), (x, t) -> rotation(x, t), [1, 2, 3])
     add!(dbcs, dbc)
     close!(dbcs)
     t = 0.5
@@ -359,31 +371,32 @@ function solve()
 
     ## Neumann part of the boundary
     ΓN = union(
-        getfaceset(grid, "top"),
-        getfaceset(grid, "bottom"),
-        getfaceset(grid, "front"),
-        getfaceset(grid, "back"),
+        getfacetset(grid, "top"),
+        getfacetset(grid, "bottom"),
+        getfacetset(grid, "front"),
+        getfacetset(grid, "back"),
     )
 
     ## Pre-allocation of vectors for the solution and Newton increments
     _ndofs = ndofs(dh)
     un = zeros(_ndofs) # previous solution vector
-    u  = zeros(_ndofs)
+    u = zeros(_ndofs)
     Δu = zeros(_ndofs)
     ΔΔu = zeros(_ndofs)
     apply!(un, dbcs)
 
     ## Create sparse matrix and residual vector
-    K = create_sparsity_pattern(dh)
+    K = allocate_matrix(dh)
     g = zeros(_ndofs)
 
     ## Perform Newton iterations
     newton_itr = -1
-    NEWTON_TOL = 1e-8
+    NEWTON_TOL = 1.0e-8
     NEWTON_MAXITER = 30
-    prog = ProgressMeter.ProgressThresh(NEWTON_TOL, "Solving:")
+    prog = ProgressMeter.ProgressThresh(NEWTON_TOL; desc = "Solving:")
 
-    while true; newton_itr += 1
+    while true
+        newton_itr += 1
         ## Construct the current guess
         u .= un .+ Δu
         ## Compute residual and tangent for current guess
@@ -400,7 +413,7 @@ function solve()
         end
 
         ## Compute increment using conjugate gradients
-        @timeit "linear solve" IterativeSolvers.cg!(ΔΔu, K, g; maxiter=1000)
+        @timeit "linear solve" IterativeSolvers.cg!(ΔΔu, K, g; maxiter = 1000)
 
         apply_zero!(ΔΔu, dbcs)
         Δu .-= ΔΔu
@@ -408,8 +421,8 @@ function solve()
 
     ## Save the solution
     @timeit "export" begin
-        vtk_grid("hyperelasticity", dh) do vtkfile
-            vtk_point_data(vtkfile, dh, u)
+        VTKGridFile("hyperelasticity", dh) do vtk
+            write_solution(vtk, dh, u)
         end
     end
 

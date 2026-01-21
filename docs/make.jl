@@ -10,7 +10,11 @@ if liveserver
     @timeit dto "Revise.revise()" Revise.revise()
 end
 
-using Documenter, DocumenterCitations, Ferrite, FerriteGmsh, FerriteMeshParser
+using Documenter, DocumenterCitations, Ferrite, FerriteGmsh, FerriteMeshParser,
+    SparseArrays, LinearAlgebra, Changelog
+
+using BlockArrays
+const FerriteBlockArrays = Base.get_extension(Ferrite, :FerriteBlockArrays)
 
 const is_ci = haskey(ENV, "GITHUB_ACTIONS")
 
@@ -18,12 +22,16 @@ const is_ci = haskey(ENV, "GITHUB_ACTIONS")
 include("generate.jl")
 
 # Changelog
-include("changelog.jl")
-create_documenter_changelog()
+Changelog.generate(
+    Changelog.Documenter(),
+    joinpath(@__DIR__, "..", "CHANGELOG.md"),
+    joinpath(@__DIR__, "src", "changelog.md");
+    repo = "Ferrite-FEM/Ferrite.jl",
+)
 
 bibtex_plugin = CitationBibliography(
     joinpath(@__DIR__, "src", "assets", "references.bib"),
-    style=:numeric
+    style = :numeric
 )
 
 # Build documentation.
@@ -32,18 +40,18 @@ bibtex_plugin = CitationBibliography(
         assets = [
             "assets/custom.css",
             "assets/citations.css",
-            "assets/favicon.ico"
+            "assets/favicon.ico",
         ],
         canonical = "https://ferrite-fem.github.io/Ferrite.jl/stable",
         collapselevel = 1,
     ),
     sitename = "Ferrite.jl",
     doctest = false,
-    warnonly = true,
+    warnonly = is_ci ? false : [:cross_references], # Local build exception required for Literate's `@__NBVIEWER_ROOT_URL__`
     draft = liveserver,
     pages = Any[
         "Home" => "index.md",
-        # hide("Changelog" => "changelog.md"),
+        hide("Changelog" => "changelog.md"),
         "Tutorials" => [
             "Tutorials overview" => "tutorials/index.md",
             "tutorials/heat_equation.md",
@@ -56,26 +64,30 @@ bibtex_plugin = CitationBibliography(
             "tutorials/stokes-flow.md",
             "tutorials/porous_media.md",
             "tutorials/ns_vs_diffeq.md",
+            "tutorials/reactive_surface.md",
             "tutorials/linear_shell.md",
             "tutorials/dg_heat_equation.md",
         ],
         "Topic guides" => [
             "Topic guide overview" => "topics/index.md",
             "topics/fe_intro.md",
+            "topics/reference_shapes.md",
             "topics/FEValues.md",
             "topics/degrees_of_freedom.md",
+            "topics/sparse_matrix.md",
             "topics/assembly.md",
             "topics/boundary_conditions.md",
             "topics/constraints.md",
             "topics/grid.md",
-            "topics/export.md"
+            "topics/export.md",
         ],
-        "Reference" => [
+        "API reference" => [
             "Reference overview" => "reference/index.md",
             "reference/quadrature.md",
             "reference/interpolations.md",
             "reference/fevalues.md",
             "reference/dofhandler.md",
+            "reference/sparsity_pattern.md",
             "reference/assembly.md",
             "reference/boundary_conditions.md",
             "reference/grid.md",
@@ -96,8 +108,9 @@ bibtex_plugin = CitationBibliography(
         #     "gallery/topology_optimization.md",
         # ],
         "devdocs/index.md",
-        "references.md",
-        ],
+        "cited-literature.md",
+        "ferritepapers.md",
+    ],
     plugins = [
         bibtex_plugin,
     ]
@@ -122,7 +135,7 @@ end
 if !liveserver
     @timeit dto "deploydocs" deploydocs(
         repo = "github.com/Ferrite-FEM/Ferrite.jl.git",
-        push_preview=true,
+        push_preview = true,
         versions = [
             "stable" => "v^",
             "v#.#",
@@ -135,7 +148,7 @@ if !liveserver
             "v0.3.7",
             "v0.3.6",
             "v0.3.5",
-            "dev" => "dev"
+            "dev" => "dev",
         ]
     )
 end
