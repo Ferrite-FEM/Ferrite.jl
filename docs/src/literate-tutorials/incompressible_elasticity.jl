@@ -102,8 +102,6 @@ function doassemble(
 
     ## traction vector
     t = Vec{2}((0.0, 1 / 16))
-    ## cache ɛdev outside the element routine to avoid some unnecessary allocations
-    ɛdev = [zero(SymmetricTensor{2, 2}) for i in 1:getnbasefunctions(cellvalues[:u])]
 
     ## local dof ranges for each field
     dofrange_u = dof_range(dh, :u)
@@ -112,8 +110,8 @@ function doassemble(
     for cell in CellIterator(dh)
         fill!(ke, 0)
         fill!(fe, 0)
-        assemble_up!(ke, fe, cell, cellvalues, facetvalues_u, grid, mp, ɛdev, t, dofrange_u, dofrange_p)
-        assemble!(assembler, celldofs(cell), fe, ke)
+        assemble_up!(ke, fe, cell, cellvalues, facetvalues_u, grid, mp, t, dofrange_u, dofrange_p)
+        assemble!(assembler, celldofs(cell), ke, fe)
     end
 
     return K, f
@@ -129,17 +127,16 @@ function dev_3d(t::SymmetricTensor{2, 2, T}) where {T}
     return dev(SymmetricTensor{2, 3}((i, j) -> (i ≤ 2 && j ≤ 2) ? t[i, j] : zero(T)))
 end
 
-function assemble_up!(Ke, fe, cell, cellvalues, facetvalues_u, grid, mp, ɛdev, t, dofrange_u, dofrange_p)
+function assemble_up!(Ke, fe, cell, cellvalues, facetvalues_u, grid, mp, t, dofrange_u, dofrange_p)
     reinit!(cellvalues, cell)
     ## We only assemble lower half triangle of the stiffness matrix and then symmetrize it.
     for q_point in 1:getnquadpoints(cellvalues)
-        for i in keys(dofrange_u)
-            ɛdev[i] = dev_3d(symmetric(shape_gradient(cellvalues[:u], q_point, i)))
-        end
         dΩ = getdetJdV(cellvalues, q_point)
         for (iᵤ, Iᵤ) in pairs(dofrange_u)
+            ɛdev_i = dev_3d(symmetric(shape_gradient(cellvalues[:u], q_point, iᵤ)))
             for (jᵤ, Jᵤ) in pairs(dofrange_u[1:iᵤ])
-                Ke[Iᵤ, Jᵤ] += 2 * mp.G * ɛdev[iᵤ] ⊡ ɛdev[jᵤ] * dΩ
+                ɛdev_j = dev_3d(symmetric(shape_gradient(cellvalues[:u], q_point, jᵤ)))
+                Ke[Iᵤ, Jᵤ] += 2 * mp.G * ɛdev_i ⊡ ɛdev_j * dΩ
             end
         end
 
@@ -162,7 +159,7 @@ function assemble_up!(Ke, fe, cell, cellvalues, facetvalues_u, grid, mp, ɛdev, 
     ## We integrate the Neumann boundary using the facevalues.
     ## We loop over all the faces in the cell, then check if the face
     ## is in our `"traction"` faceset.
-    for facet in 1:nfaces(cell)
+    for facet in 1:nfacets(cell)
         if (cellid(cell), facet) ∈ getfacetset(grid, "traction")
             reinit!(facetvalues_u, cell, facet)
             for q_point in 1:getnquadpoints(facetvalues_u)
