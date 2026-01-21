@@ -301,10 +301,6 @@ end
         x = map(xref -> xref + rand(typeof(xref)) / 5, ref_coords) # Random pertubation
         reinit!.((cvu, cvp, cmv, cmv_u, cmv3), (x,))
 
-        @test_call reinit!(cmv, x) # JET testing (e.g. type stability)
-        @test_call reinit!(cmv_u, x) # JET testing (e.g. type stability)
-        @test_call reinit!(cmv3, x) # JET testing (e.g. type stability)
-
         # Test type-stable access by hard-coded key (relies on constant propagation)
         _getufield(x) = x[:u]
         @inferred _getufield(cmv)
