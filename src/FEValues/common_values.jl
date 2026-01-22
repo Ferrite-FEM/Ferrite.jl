@@ -74,6 +74,13 @@ this is the number for the current facet.
 function getnquadpoints end
 
 """
+    getnbasefunctions(fe_v::AbstractValues)
+
+Get the number of base functions for the interpolation in `fe_v`.
+"""
+getnbasefunctions(::AbstractValues)
+
+"""
     getdetJdV(fe_v::AbstractValues, q_point::Int)
 
 Return the product between the determinant of the Jacobian and the quadrature

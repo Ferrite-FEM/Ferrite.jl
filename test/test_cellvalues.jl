@@ -365,6 +365,23 @@ end
             @test cmv_copy.detJdV == cmv.detJdV
 
         end
+        @testset "Error paths specific to CellMultiValues" begin
+            function test_argument_error_call(f::Function, cmv::CellMultiValues, args...)
+                @test_throws ArgumentError f(cmv, args...)
+                @test_throws nameof(f) f(cmv, args...)
+            end
+            qr = QuadratureRule{RefTriangle}(2)
+            ip = Lagrange{RefTriangle, 1}()
+            cmv = CellMultiValues(qr, (u = ip, v = ip^2))
+            test_argument_error_call(getnbasefunctions, cmv)
+            for f in (shape_value, shape_gradient, shape_symmetric_gradient, shape_divergence)
+                test_argument_error_call(f, cmv, 1, 1)
+            end
+            ae = zeros(2)
+            for f in (function_value, function_gradient, function_symmetric_gradient, function_divergence)
+                test_argument_error_call(f, cmv, 1, ae)
+            end
+        end
     end
 
     @testset "error paths in function_* and reinit!" begin

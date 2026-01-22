@@ -42,8 +42,7 @@ shape_gradient(::Ferrite.AbstractValues, ::Int, ::Int)
 shape_symmetric_gradient
 shape_divergence
 shape_curl
-getnbasefunctions
-
+getnbasefunctions(::Ferrite.AbstractValues)
 function_value
 function_gradient
 function_symmetric_gradient
