@@ -304,13 +304,22 @@ end
 end
 
 # Error paths for functions that should be called in individual `FunctionValues`
-for f in (
-        :getnbasefunctions, :shape_value, :shape_gradient, :shape_symmetric_gradient, :shape_divergence,
-        :function_value, :function_gradient, :function_symmetric_gradient, :function_divergence,
-    )
-    @eval function $f(cv::CellMultiValues, args...)
+function getnbasefunctions(cv::CellMultiValues)
+    k = first(keys(cv.fun_values)) # Pick the first function values to use in example
+    throw(ArgumentError("getnbasefunctions isn't applicable to cv::CellMultiValues. Use on `FunctionValues` for the specific field, e.g. getnbasefunctions(cv[:$k], args...)"))
+end
+
+for f in (:shape_value, :shape_gradient, :shape_symmetric_gradient, :shape_divergence)
+    @eval function $f(cv::CellMultiValues, ::Int, ::Int)
         k = first(keys(cv.fun_values)) # Pick the first function values to use in example
         fun = $f                       # Make the function name available to use in the error message
-        throw(ArgumentError("$fun isn't applicable to cv::MultiCellValues. Use on `FunctionValues` for the specific field, e.g. $fun(cv[:$k], args...)"))
+        throw(ArgumentError("$fun isn't applicable to cv::CellMultiValues. Use on `FunctionValues` for the specific field, e.g. $fun(cv[:$k], q_point, shapenr)"))
+    end
+end
+for f in (:function_value, :function_gradient, :function_symmetric_gradient, :function_divergence)
+    @eval function $f(cv::CellMultiValues, ::Int, ::AbstractVector, args...)
+        k = first(keys(cv.fun_values)) # Pick the first function values to use in example
+        fun = $f                       # Make the function name available to use in the error message
+        throw(ArgumentError("$fun isn't applicable to cv::CellMultiValues. Use on `FunctionValues` for the specific field, e.g. $fun(cv[:$k], q_point, ae, [dofrange])"))
     end
 end

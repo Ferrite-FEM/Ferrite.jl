@@ -368,7 +368,7 @@ end
         @testset "Error paths specific to CellMultiValues" begin
             function test_argument_error_call(f::Function, cmv::CellMultiValues, args...)
                 @test_throws ArgumentError f(cmv, args...)
-                @test_throws nameof(f) f(cmv, args...)
+                @test_throws "$(nameof(f))" f(cmv, args...)
             end
             qr = QuadratureRule{RefTriangle}(2)
             ip = Lagrange{RefTriangle, 1}()
