@@ -319,8 +319,6 @@ function apply_mapping!(funvals::Ferrite.FunctionValues{DO}, ::ArgyrisMapping, q
     @assert ip_geo isa Lagrange{RefTriangle, 1} "Only linear geometries allowed for Argyris interpolation"
     @assert DO < 3
 
-    @show DO
-    
     #Compute data required for the argyris mapping
     #TODO: This can be done once per element, but we have to recompute for each quadrature point with the current setup
     argyris_data = ArgyrisData(ip_geo, coords)
@@ -423,10 +421,10 @@ function _argyris_mapping!(argyris_data::ArgyrisData, Nx, Nξ, dNdx, dNdξ, d²N
                 dNdx[3+o2] = dN23dx[2] ⋅ Jinv
                 if DO > 1 # -- Shape hessian
                     d²N23dξ² = @SVector [d²Ndξ²[2+o1], d²Ndξ²[3+o2]]
-                    d²N23dx² = J*d²N23dξ² + @SVector [m3[1]*d²Ndξ²[b1] + m4[1]*d²Ndξ²[b1],
-                                                      m3[2]*d²Ndξ²[b2] + m4[2]*d²Ndξ²[b2]]
-                    d²Ndx²[2+o1] = _hessian_helper(d²N23dx²[1], dNdx[2+o], H, Jinv2)
-                    d²Ndx²[3+o2] = _hessian_helper(d²N23dx²[2], dNdx[3+o], H, Jinv2) 
+                    d²N23dx² = J*d²N23dξ² + @SVector [m3[1]*d²Ndξ²[b1] + m4[1]*d²Ndξ²[b2],
+                                                      m3[2]*d²Ndξ²[b1] + m4[2]*d²Ndξ²[b2]]
+                    d²Ndx²[2+o1] = _hessian_helper(d²N23dx²[1], dNdx[2+o1], H, Jinv2)
+                    d²Ndx²[3+o2] = _hessian_helper(d²N23dx²[2], dNdx[3+o2], H, Jinv2) 
                 end
             end
         end
@@ -459,9 +457,9 @@ function _argyris_mapping!(argyris_data::ArgyrisData, Nx, Nξ, dNdx, dNdξ, d²N
                     d²N456dx² = Θ*d²N456dx² + @SVector[m5[1]*d²Ndξ²[b1] + m6[1]*d²Ndξ²[b2],
                                                     m5[2]*d²Ndξ²[b1] + m6[2]*d²Ndξ²[b2], 
                                                     m5[3]*d²Ndξ²[b1] + m6[3]*d²Ndξ²[b2]]
-                    d²Ndx²[4+o1] = _hessian_helper(d²N456dx²[1], dNdx[4+o], H, Jinv2)
-                    d²Ndx²[5+o2] = _hessian_helper(d²N456dx²[2], dNdx[5+o], H, Jinv2)
-                    d²Ndx²[6+o3] = _hessian_helper(d²N456dx²[3], dNdx[6+o], H, Jinv2)
+                    d²Ndx²[4+o1] = _hessian_helper(d²N456dx²[1], dNdx[4+o1], H, Jinv2)
+                    d²Ndx²[5+o2] = _hessian_helper(d²N456dx²[2], dNdx[5+o2], H, Jinv2)
+                    d²Ndx²[6+o3] = _hessian_helper(d²N456dx²[3], dNdx[6+o3], H, Jinv2)
                 end
             end
         end
