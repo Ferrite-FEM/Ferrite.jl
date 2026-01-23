@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/><title>Kirchhoff-Love Plate Equation · Ferrite.jl</title><meta name="title" content="Kirchhoff-Love Plate Equation · Ferrite.jl"/><meta property="og:title" content="Kirchhoff-Love Plate Equation · Ferrite.jl"/><meta property="twitter:title" content="Kirchhoff-Love Plate Equation · Ferrite.jl"/><meta name="description" content="Documentation for Ferrite.jl."/><meta property="og:description" content="Documentation for Ferrite.jl."/><meta property="twitter:description" content="Documentation for Ferrite.jl."/><meta property="og:url" content="https://ferrite-fem.github.io/Ferrite.jl/stable/gallery/plate_equation/"/><meta property="twitter:url" content="https://ferrite-fem.github.io/Ferrite.jl/stable/gallery/plate_equation/"/><link rel="canonical" href="https://ferrite-fem.github.io/Ferrite.jl/stable/gallery/plate_equation/"/><script data-outdated-warner src="../../assets/warner.js"></script><link href="https://cdnjs.cloudflare.com/ajax/libs/lato-font/3.0.0/css/lato-font.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/juliamono/0.050/juliamono.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/fontawesome.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/solid.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/brands.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.8/katex.min.css" rel="stylesheet" type="text/css"/><script>documenterBaseURL="../.."</script><script src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.6/require.min.js" data-main="../../assets/documenter.js"></script><script src="../../search_index.js"></script><script src="../../siteinfo.js"></script><script src="../../../versions.js"></script><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/catppuccin-mocha.css" data-theme-name="catppuccin-mocha"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/catppuccin-macchiato.css" data-theme-name="catppuccin-macchiato"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/catppuccin-frappe.css" data-theme-name="catppuccin-frappe"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/catppuccin-latte.css" data-theme-name="catppuccin-latte"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/documenter-dark.css" data-theme-name="documenter-dark" data-theme-primary-dark/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/documenter-light.css" data-theme-name="documenter-light" data-theme-primary/><script src="../../assets/themeswap.js"></script><link href="../../assets/custom.css" rel="stylesheet" type="text/css"/><link href="../../assets/citations.css" rel="stylesheet" type="text/css"/><link href="../../assets/favicon.ico" rel="icon" type="image/x-icon"/></head><body><div id="documenter"><nav class="docs-sidebar"><a class="docs-logo" href="../../"><img src="../../assets/logo.svg" alt="Ferrite.jl logo"/></a><div class="docs-package-name"><span class="docs-autofit"><a href="../../">Ferrite.jl</a></span></div><button class="docs-search-query input is-rounded is-small is-clickable my-2 mx-auto py-1 px-2" id="documenter-search-query">Search docs (Ctrl + /)</button><ul class="docs-menu"><li><a class="tocitem" href="../../">Home</a></li><li><input class="collapse-toggle" id="menuitem-3" type="checkbox"/><label class="tocitem" for="menuitem-3"><span class="docs-label">Tutorials</span><i class="docs-chevron"></i></label><ul class="collapsed"><li><a class="tocitem" href="../../tutorials/">Tutorials overview</a></li><li><a class="tocitem" href="../../tutorials/heat_equation/">Heat equation</a></li><li><a class="tocitem" href="../../tutorials/linear_elasticity/">Linear elasticity</a></li><li><a class="tocitem" href="../../tutorials/incompressible_elasticity/">Incompressible elasticity</a></li><li><a class="tocitem" href="../../tutorials/hyperelasticity/">Hyperelasticity</a></li><li><a class="tocitem" href="../../tutorials/plasticity/">Von Mises plasticity</a></li><li><a class="tocitem" href="../../tutorials/transient_heat_equation/">Transient heat equation</a></li><li><a class="tocitem" href="../../tutorials/computational_homogenization/">Computational homogenization</a></li><li><a class="tocitem" href="../../tutorials/stokes-flow/">Stokes flow</a></li><li><a class="tocitem" href="../../tutorials/porous_media/">Porous media</a></li><li><a class="tocitem" href="../../tutorials/ns_vs_diffeq/">Incompressible Navier-Stokes equations via DifferentialEquations.jl</a></li><li><a class="tocitem" href="../../tutorials/reactive_surface/">Reactive surface</a></li><li><a class="tocitem" href="../../tutorials/linear_shell/">Linear shell</a></li><li><a class="tocitem" href="../../tutorials/dg_heat_equation/">Discontinuous Galerkin heat equation</a></li></ul></li><li><input class="collapse-toggle" id="menuitem-4" type="checkbox"/><label class="tocitem" for="menuitem-4"><span class="docs-label">Topic guides</span><i class="docs-chevron"></i></label><ul class="collapsed"><li><a class="tocitem" href="../../topics/">Topic guide overview</a></li><li><a class="tocitem" href="../../topics/fe_intro/">Introduction to FEM</a></li><li><a class="tocitem" href="../../topics/reference_shapes/">Reference shapes</a></li><li><a class="tocitem" href="../../topics/FEValues/">FEValues</a></li><li><a class="tocitem" href="../../topics/degrees_of_freedom/">Degrees of freedom</a></li><li><a class="tocitem" href="../../topics/sparse_matrix/">Sparsity pattern and sparse matrices</a></li><li><a class="tocitem" href="../../topics/assembly/">Assembly</a></li><li><a class="tocitem" href="../../topics/boundary_conditions/">Boundary and initial conditions</a></li><li><a class="tocitem" href="../../topics/constraints/">Affine constraints</a></li><li><a class="tocitem" href="../../topics/grid/">Grid</a></li><li><a class="tocitem" href="../../topics/export/">Export</a></li></ul></li><li><input class="collapse-toggle" id="menuitem-5" type="checkbox"/><label class="tocitem" for="menuitem-5"><span class="docs-label">API reference</span><i class="docs-chevron"></i></label><ul class="collapsed"><li><a class="tocitem" href="../../reference/">Reference overview</a></li><li><a class="tocitem" href="../../reference/quadrature/">Quadrature</a></li><li><a class="tocitem" href="../../reference/interpolations/">Interpolation</a></li><li><a class="tocitem" href="../../reference/fevalues/">FEValues</a></li><li><a class="tocitem" href="../../reference/dofhandler/">Degrees of freedom</a></li><li><a class="tocitem" href="../../reference/sparsity_pattern/">Sparsity pattern and sparse matrices</a></li><li><a class="tocitem" href="../../reference/assembly/">Assembly</a></li><li><a class="tocitem" href="../../reference/boundary_conditions/">Boundary conditions</a></li><li><a class="tocitem" href="../../reference/grid/">Grid &amp; AbstractGrid</a></li><li><a class="tocitem" href="../../reference/export/">Postprocessing</a></li><li><a class="tocitem" href="../../reference/utils/">Development utility functions</a></li></ul></li><li><input class="collapse-toggle" id="menuitem-6" type="checkbox"/><label class="tocitem" for="menuitem-6"><span class="docs-label">How-to guides</span><i class="docs-chevron"></i></label><ul class="collapsed"><li><a class="tocitem" href="../../howto/">How-to guide overview</a></li><li><a class="tocitem" href="../../howto/postprocessing/">Post processing and visualization</a></li><li><a class="tocitem" href="../../howto/threaded_assembly/">Multi-threaded assembly</a></li></ul></li><br><li><a class="tocitem" href="../">Code gallery</a></li><li><a class="tocitem" href="../../devdocs/">Developer documentation</a></li><li><a class="tocitem" href="../../cited-literature/">Cited literature</a></li><li><a class="tocitem" href="../../ferritepapers/">Papers using Ferrite</a></li></ul><div class="docs-version-selector field has-addons"><div class="control"><span class="docs-label button is-static is-size-7">Version</span></div><div class="docs-selector control is-expanded"><div class="select is-fullwidth is-size-7"><select id="documenter-version-selector"></select></div></div></div></nav><div class="docs-main"><header class="docs-navbar"><a class="docs-sidebar-button docs-navbar-link fa-solid fa-bars is-hidden-desktop" id="documenter-sidebar-button" href="#"></a><nav class="breadcrumb"><ul class="is-hidden-mobile"><li class="is-active"><a href>Kirchhoff-Love Plate Equation</a></li></ul><ul class="is-hidden-tablet"><li class="is-active"><a href>Kirchhoff-Love Plate Equation</a></li></ul></nav><div class="docs-right"><a class="docs-navbar-link" href="https://github.com/Ferrite-FEM/Ferrite.jl" title="View the repository on GitHub"><span class="docs-icon fa-brands"></span><span class="docs-label is-hidden-touch">GitHub</span></a><a class="docs-navbar-link" href="https://github.com/Ferrite-FEM/Ferrite.jl/blob/master/docs/src/literate-gallery/plate_equation.jl" title="Edit source on GitHub"><span class="docs-icon fa-solid"></span></a><a class="docs-settings-button docs-navbar-link fa-solid fa-gear" id="documenter-settings-button" href="#" title="Settings"></a><a class="docs-article-toggle-button fa-solid fa-chevron-up" id="documenter-article-toggle-button" href="javascript:;" title="Collapse all docstrings"></a></div></header><article class="content" id="documenter-page"><h1 id="tutorial-plate"><a class="docs-heading-anchor" href="#tutorial-plate">Kirchhoff-Love Plate Equation</a><a id="tutorial-plate-1"></a><a class="docs-heading-anchor-permalink" href="#tutorial-plate" title="Permalink"></a></h1><p>In this example, we solve the Kirchhoff-Love equation for thin plates. This is a fourth-order partial differential equation used to model the deflection <span>$w$</span> of a plate subject to transverse loading. The governing biharmonic equation is:</p><p class="math-container">\[D \Delta^2 w = q\]</p><p>where <span>$\Delta$</span> is the Laplacian operator, and D is the flexural rigidity defined by the Young&#39;s modulus <span>$E$</span>, thickness <span>$t$</span>, and Poisson&#39;s ratio <span>$\nu$</span>:</p><p class="math-container">\[D = \frac{Et^3}{12(1-\nu^2)}\]</p><p>In this tutorial we will model a simply supported plate, for which the boundary conditions on <span>$\Gamma$</span> are:</p><p class="math-container">\[w = 0\]</p><p>For the weak form, we define the curvature vector <span>$\boldsymbol{\kappa}$</span> and the constitutive matrix <span>$\boldsymbol{C}$</span>:</p><p class="math-container">\[\boldsymbol{\kappa}(w) = \begin{bmatrix} \frac{\partial^2 w}{\partial x^2} \frac{\partial^2 w}{\partial x \partial y} \\ \frac{\partial^2 w}{\partial x \partial y} \ \frac{\partial^2 w}{\partial y^2} \end{bmatrix}, \quad
+\mathbf{C} = D \begin{bmatrix} 1 &amp; \nu &amp; 0 \\ \nu &amp; 1 &amp; 0 \\ 0 &amp; 0 &amp; \frac{1-\nu}{2} \end{bmatrix}\]</p><p>We use the following weak formulation:</p><p class="math-container">\[\int_\Omega \boldsymbol{\kappa}(\delta w):\mathbf{C}:\boldsymbol{\kappa}(w) \, d\Omega - \int_\Omega \delta w \cdot q \, d\Omega = 0 \quad \forall \delta w \in H^2_0(\Omega)\]</p><p>To enforce the simply supported boundary conditions, we use a penalty approach to impose the constraint <span>$w = 0$</span>. The reason for this choice will be made clear later in the tutorial. The penalty term adds the following contribution to the weak form:</p><p class="math-container">\[\rho\int_\Gamma w \delta w \, d\Gamma\]</p><p>with <span>$\rho$</span> being the penalty stiffness.</p><h2 id="Notes-on-FE-approximation-of-the-biharmonic-equation"><a class="docs-heading-anchor" href="#Notes-on-FE-approximation-of-the-biharmonic-equation">Notes on FE-approximation of the biharmonic equation</a><a id="Notes-on-FE-approximation-of-the-biharmonic-equation-1"></a><a class="docs-heading-anchor-permalink" href="#Notes-on-FE-approximation-of-the-biharmonic-equation" title="Permalink"></a></h2><p>Since this weak form involves second-order derivatives (the Hessian) of the shape functions, the standard <span>$C^0$</span> Lagrange elements are not suitable for discretising the finite element space. Instead, one must either use a <span>$C^0$</span> interior penalty (C0IP) approach or employ finite elements that provide <span>$C^1$</span> continuity. Here, we demonstrate the latter approach and use the fifth-order Argyris element. This is a Hermite-type element with additional degrees of freedom at the vertices and along the edges that represent the gradient and Hessian of the deflection field (w).</p><h2 id="Code"><a class="docs-heading-anchor" href="#Code">Code</a><a id="Code-1"></a><a class="docs-heading-anchor-permalink" href="#Code" title="Permalink"></a></h2><p>The following code followes a standard Ferrite solution procedure.</p><pre><code class="language-julia hljs">using Ferrite
+using SparseArrays</code></pre><p>First we define some parameters</p><pre><code class="language-julia hljs">L = 2.0         # Side length
+q0 = 10000.0    # Load
+E = 200.0e9       # Stiffness
+t = 0.01        # Thickness
+ν = 0.3         # Poisson&#39;s radtio
+penalty = 1.0e12  # Penalty stiffness
+D = (E * t^3) / (12 * (1 - ν^2)) # Flexural stiffness
+C_voigt = D * [
+    1.0 ν 0.0;
+    ν 1.0 0.0;
+    0.0 0.0 (1 - ν) / 2
+]
+C = fromvoigt(SymmetricTensor{4, 2}, C_voigt)
+
+grid = generate_grid(Triangle, (20, 20), Vec((0.0, 0.0)), Vec((L, L)))</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">Grid{2, Triangle, Float64} with 800 Triangle cells and 441 nodes</code></pre><p>We use the Argyris interpolation as and FE approximation.</p><pre><code class="language-julia hljs">ip = Argyris{RefTriangle, 5}()
+dh = DofHandler(grid)
+add!(dh, :w, ip)
+close!(dh)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">DofHandler{2, Grid{2, Triangle, Float64}}
+  Fields:
+    :w, Argyris{RefTriangle, 5}()
+  Dofs per cell: 21
+  Total dofs: 3886</code></pre><p>For the CellValues and FacetValues we need to requeest to update the hessians.</p><pre><code class="language-julia hljs">qr = QuadratureRule{RefTriangle}(8)
+cellvalues = CellValues(qr, ip; update_hessians = true);
+
+fqr = FacetQuadratureRule{RefTriangle}(8)
+facetvalues = FacetValues(fqr, ip; update_hessians = true);</code></pre><p>For the current BVP, There is a known analtyical solution (Navier&#39;s solution) that we can compare with. This is a good testing strategy for PDE codes and known as the method of manufactured solutions.</p><pre><code class="language-julia hljs">function w_analytical(pos::Vec{2}, L, q0, D; n_terms = 50)
+    x, y = pos
+    w = 0.0
+    constant_factor = (16 * q0 * L^4) / (D * pi^6)
+
+    for m in 1:2:n_terms
+        for n in 1:2:n_terms
+            denom = m * n * (m^2 + n^2)^2
+            num = sin(m * pi * x / L) * sin(n * pi * y / L)
+            w += num / denom
+        end
+    end
+
+    return constant_factor * w
+end;</code></pre><p>Now we define the element routine.</p><pre><code class="language-julia hljs">function element_routine!(ke, fe, cellvalues, C, q0)
+    for iqp in 1:getnquadpoints(cellvalues)
+        dV = getdetJdV(cellvalues, iqp)
+        for i in 1:getnbasefunctions(cellvalues)
+            v = shape_value(cellvalues, iqp, i)
+            fe[i] += (q0 * v) * dV
+            δκ = shape_hessian(cellvalues, iqp, i)
+            for j in 1:getnbasefunctions(cellvalues)
+                Δκ = shape_hessian(cellvalues, iqp, j)
+                ke[i, j] += (δκ ⊡ C ⊡ Δκ) * dV
+            end
+        end
+    end
+    return
+end</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">element_routine! (generic function with 1 method)</code></pre><p>To enforce the boundary condition, we use the penalty method. Currently the ConstraintHandler does not fully support Dirichlet constraints on Hermitian elements (like Argyris).</p><pre><code class="language-julia hljs">function bc_routine!(ke, facetvalues, penalty)
+    for iqp in 1:getnquadpoints(facetvalues)
+        dV = getdetJdV(facetvalues, iqp)
+        for i in 1:getnbasefunctions(facetvalues)
+            Ni = shape_value(facetvalues, iqp, i)
+            for j in 1:getnbasefunctions(facetvalues)
+                Nj = shape_value(facetvalues, iqp, j)
+                ke[i, j] += penalty * (Ni * Nj) * dV
+            end
+        end
+    end
+    return
+end</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">bc_routine! (generic function with 1 method)</code></pre><p>Here we create a standard assembly routine.</p><pre><code class="language-julia hljs">function doassemble!(
+        cellvalues::CellValues, facetvalues::FacetValues, K::SparseMatrixCSC, f::Vector, dh::DofHandler, C::SymmetricTensor, q0::Float64, penalty::Float64
+    )
+
+    n = getnbasefunctions(cellvalues)
+    ke = zeros(n, n)
+    fe = zeros(n)
+
+    assembler = start_assemble(K, f)
+    for celldata in CellIterator(dh)
+        fill!(ke, 0.0)
+        fill!(fe, 0.0)
+        reinit!(cellvalues, celldata)
+        element_routine!(ke, fe, cellvalues, C, q0)
+        assemble!(assembler, celldofs(celldata), ke, fe)
+    end
+
+    ∂Ω = union(
+        getfacetset(grid, &quot;left&quot;),
+        getfacetset(grid, &quot;right&quot;),
+        getfacetset(grid, &quot;top&quot;),
+        getfacetset(grid, &quot;bottom&quot;),
+    )
+
+    for celldata in FacetIterator(dh, ∂Ω)
+        fill!(ke, 0.0)
+        reinit!(facetvalues, celldata)
+        bc_routine!(ke, facetvalues, penalty)
+        assemble!(assembler, celldofs(celldata), ke)
+    end
+    return
+end</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">doassemble! (generic function with 1 method)</code></pre><p>Create stiffness matrix, assemble and solve:</p><pre><code class="language-julia hljs">K = allocate_matrix(dh);
+f = zeros(ndofs(dh))
+doassemble!(cellvalues, facetvalues, K, f, dh, C, q0, penalty);
+u = K \ f</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">3886-element Vector{Float64}:
+ -3.6627157009442177e-7
+  5.272923075374824e-5
+  5.2729230753807e-5
+ -0.004704719162462571
+  0.09691827174410513
+ -0.004704719162472541
+ -7.187865225369506e-9
+ -1.5349465695606945e-6
+  0.0100268745887488
+  0.0003147238992352744
+  ⋮
+ -0.007086918388095675
+ -3.662715700942211e-7
+ -5.2729230753778115e-5
+ -5.2729230753705866e-5
+ -0.004704719162469942
+  0.09691827174406319
+ -0.00470471916246031
+ -0.005055033542012224
+  0.005055033542012229</code></pre><p>Export solution to VTK/Paraview</p><pre><code class="language-julia hljs">VTKGridFile(&quot;plate_equation&quot;, dh) do vtk
+    write_solution(vtk, dh, u)
+end</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">VTKGridFile for the closed file &quot;plate_equation.vtu&quot;.</code></pre><p>To test the solution, we query the deflection at the center of the plate and compare it with the analtyical solution:</p><pre><code class="language-julia hljs">mid_point = Vec((L / 2, L / 2))
+ph = PointEvalHandler(grid, [mid_point])
+w_fem = evaluate_at_points(ph, dh, u, :w) |&gt; first #0.03548889438239366
+w_ana = w_analytical(mid_point, L, q0, D) #0.035488713207468166
+
+using Test
+@test w_fem ≈ w_ana atol = 1.0e-6</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi"><span class="sgr32"><span class="sgr1">Test Passed</span></span></code></pre><hr/><p><em>This page was generated using <a href="https://github.com/fredrikekre/Literate.jl">Literate.jl</a>.</em></p></article><nav class="docs-footer"><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option><option value="catppuccin-latte">catppuccin-latte</option><option value="catppuccin-frappe">catppuccin-frappe</option><option value="catppuccin-macchiato">catppuccin-macchiato</option><option value="catppuccin-mocha">catppuccin-mocha</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.15.0 on <span class="colophon-date" title="Friday 23 January 2026 12:51">Friday 23 January 2026</span>. Using Julia version 1.12.4.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
