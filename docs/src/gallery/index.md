@@ -20,6 +20,16 @@ Neumann boundary conditions and the method of manufactured solutions.
 
 ---
 
+#### [Plate equation](plate_equation.md)
+
+Solves the biharmonic plate equation using \(C^1\)-continuous Argyris elements.
+The example illustrates the finite element discretisation of fourth-order PDEs and the 
+construction of high-order shape functions.
+
+*Contributed by*: Elias Börjesson ([@lijas](https://github.com/lijas)).
+
+---
+
 #### [Nearly incompressible hyperelasticity](quasi_incompressible_hyperelasticity.md)
 
 This program combines the ideas from [Tutorial 3: Incompressible
