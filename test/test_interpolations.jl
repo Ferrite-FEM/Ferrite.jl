@@ -761,4 +761,52 @@ end
 
     end
 
+    @testset "ArgyrisInterpolation" begin
+        # The argyris interpolation is of "Hermitian" type, so it does not
+        # fit well in the test suit used for the other interpolations.
+        ip_geo = Lagrange{RefTriangle, 1}()
+        ip = Argyris{RefTriangle, 5}()
+        # Standard test all base interpolations must fullfill
+        test_interpolation_properties(ip)
+        #Create CellValues used to test to test Dirac property at dof positions
+        coords = Ferrite.reference_coordinates(ip)
+        qr = QuadratureRule{RefTriangle}(zeros(length(coords)), coords)
+        cv = CellValues(qr, ip, ip_geo^2; update_hessians = true)
+
+        function check_dirac_property(shape_nr, f)
+            for i in 1:getnbasefunctions(ip)
+                val = f(i)
+                expected_val = i == shape_nr ? 1.0 : 0.0
+                @test isapprox(val, expected_val, atol = 1.0e-15)
+            end
+        end
+
+        #Check dirac property on reference cell and general cell
+        for coords in [
+                Ferrite.reference_coordinates(ip_geo),
+                [x + x * rand() * 0.05 for x in Ferrite.reference_coordinates(ip_geo)],
+            ]
+            reinit!(cv, Triangle((1, 2, 3)), coords)
+
+            #Check dofs on nodes
+            e1, e2 = basevec(Vec{2})
+            for i in 1:3 #Loop over 3 nodes
+                o = 6 * (i - 1) #6 dofs per node
+                check_dirac_property(1 + o, ib -> shape_value(cv, 1 + o, ib))
+                check_dirac_property(2 + o, ib -> shape_gradient(cv, 2 + o, ib) ⋅ e1)
+                check_dirac_property(3 + o, ib -> shape_gradient(cv, 3 + o, ib) ⋅ e2)
+                check_dirac_property(4 + o, ib -> e1 ⋅ shape_hessian(cv, 4 + o, ib) ⋅ e1)
+                check_dirac_property(5 + o, ib -> e2 ⋅ shape_hessian(cv, 5 + o, ib) ⋅ e1)
+                check_dirac_property(6 + o, ib -> e2 ⋅ shape_hessian(cv, 6 + o, ib) ⋅ e2)
+            end
+            #Check dofs on edges (normal gradients)
+            tangents = [coords[1] - coords[2], coords[2] - coords[3], coords[3] - coords[1]]
+            tangents = [t / norm(t) for t in tangents]
+            n = [rotate(t, pi / 2) for t in tangents]
+            check_dirac_property(19, ib -> shape_gradient(cv, 19, ib) ⋅ n[1])
+            check_dirac_property(20, ib -> shape_gradient(cv, 20, ib) ⋅ n[2])
+            check_dirac_property(21, ib -> -1 * shape_gradient(cv, 21, ib) ⋅ n[3])
+        end
+    end
+
 end # testset

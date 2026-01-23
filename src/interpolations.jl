@@ -1792,7 +1792,7 @@ mapping types.
 function mapping_type end
 
 mapping_type(::ScalarInterpolation) = IdentityMapping()
-mapping_type(::VectorizedInterpolation) = IdentityMapping()
+mapping_type(ip::VectorizedInterpolation) = mapping_type(ip.ip)
 
 """
     get_direction(interpolation::Interpolation, shape_nr::Int, cell::AbstractCell)
@@ -2131,4 +2131,91 @@ adjust_dofs_during_distribution(::Nedelec{RefHexahedron, 1}) = false
 
 function get_direction(::Nedelec{RefHexahedron, 1}, shape_nr, cell)
     return get_edge_direction(cell, shape_nr) # shape_nr = edge_nr
+end
+
+############################
+# Argyris triangle order 5 #
+############################
+# Dof order:
+# Nodes 1: δ, ∇x, ∇y, ∇∇xx, ∇∇xy, ∇∇yy
+# Nodes 2: δ, ∇x, ∇y, ∇∇xx, ∇∇xy, ∇∇yy
+# Nodes 3: δ, ∇x, ∇y, ∇∇xx, ∇∇xy, ∇∇yy
+# Edges 1-3: ∇_n (normal derivative, normal pointing outward)
+struct Argyris{refshape, order} <: ScalarInterpolation{refshape, order}
+end
+
+getnbasefunctions(::Argyris{RefTriangle, 5}) = 21
+vertexdof_indices(::Argyris{RefTriangle, 5}) = ((1, 2, 3, 4, 5, 6), (7, 8, 9, 10, 11, 12), (13, 14, 15, 16, 17, 18))
+edgedof_interior_indices(::Argyris{RefTriangle, 5}) = ((19,), (20,), (21,))
+edgedof_indices(::Argyris{RefTriangle, 5}) = (
+    (1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 19),
+    (7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 20),
+    (13, 14, 15, 16, 17, 18, 1, 2, 3, 4, 5, 6, 21),
+)
+
+facedof_indices(ip::Argyris{RefTriangle, 5}) = (ntuple(i -> i, getnbasefunctions(ip)),)
+adjust_dofs_during_distribution(::Argyris{RefTriangle, 5}) = false
+
+function reference_shape_value(ip::Argyris{RefTriangle, 5}, ξ::Vec{2, T}, i::Int) where {T}
+    x, y = ξ
+    i == 1 && return 10 * x^3 - 15 * x^4 + 15 * x^2 * y^2 + 6 * x^5 - 15 * x^3 * y^2 - 15 * x^2 * y^3
+    i == 2 && return -4 * x^3 + 7 * x^4 - T(3.5) * x^2 * y^2 - 3 * x^5 + T(3.5) * x^3 * y^2 + T(3.5) * x^2 * y^3
+    i == 3 && return -5 * x^2 * y^1 + 14 * x^3 * y^1 + T(18.5) * x^2 * y^2 - 8 * x^4 * y^1 - T(18.5) * x^3 * y^2 - T(13.5) * x^2 * y^3
+    i == 4 && return T(0.5) * x^3 - 1 * x^4 + T(0.25) * x^2 * y^2 + T(0.5) * x^5 - T(0.25) * x^3 * y^2 - T(0.25) * x^2 * y^3
+    i == 5 && return 1 * x^2 * y^1 - 3 * x^3 * y^1 - T(3.5) * x^2 * y^2 + 2 * x^4 * y^1 + T(3.5) * x^3 * y^2 + T(2.5) * x^2 * y^3
+    i == 6 && return T(1.25) * x^2 * y^2 - T(0.75) * x^3 * y^2 - T(1.25) * x^2 * y^3
+    i == 7 && return 10 * y^3 + 15 * x^2 * y^2 - 15 * y^4 - 15 * x^3 * y^2 - 15 * x^2 * y^3 + 6 * y^5
+    i == 8 && return -5 * x^1 * y^2 + T(18.5) * x^2 * y^2 + 14 * x^1 * y^3 - T(13.5) * x^3 * y^2 - T(18.5) * x^2 * y^3 - 8 * x^1 * y^4
+    i == 9 && return -4 * y^3 - T(3.5) * x^2 * y^2 + 7 * y^4 + T(3.5) * x^3 * y^2 + T(3.5) * x^2 * y^3 - 3 * y^5
+    i == 10 && return T(1.25) * x^2 * y^2 - T(1.25) * x^3 * y^2 - T(0.75) * x^2 * y^3
+    i == 11 && return 1 * x^1 * y^2 - T(3.5) * x^2 * y^2 - 3 * x^1 * y^3 + T(2.5) * x^3 * y^2 + T(3.5) * x^2 * y^3 + 2 * x^1 * y^4
+    i == 12 && return T(0.5) * y^3 + T(0.25) * x^2 * y^2 - 1 * y^4 - T(0.25) * x^3 * y^2 - T(0.25) * x^2 * y^3 + T(0.5) * y^5
+    i == 13 && return 1 - 10 * x^3 - 10 * y^3 + 15 * x^4 - 30 * x^2 * y^2 + 15 * y^4 - 6 * x^5 + 30 * x^3 * y^2 + 30 * x^2 * y^3 - 6 * y^5
+    i == 14 && return 1 * x^1 - 6 * x^3 - 11 * x^1 * y^2 + 8 * x^4 + 10 * x^2 * y^2 + 18 * x^1 * y^3 - 3 * x^5 + 1 * x^3 * y^2 - 10 * x^2 * y^3 - 8 * x^1 * y^4
+    i == 15 && return 1 * y^1 - 11 * x^2 * y^1 - 6 * y^3 + 18 * x^3 * y^1 + 10 * x^2 * y^2 + 8 * y^4 - 8 * x^4 * y^1 - 10 * x^3 * y^2 + 1 * x^2 * y^3 - 3 * y^5
+    i == 16 && return T(0.5) * x^2 - T(1.5) * x^3 + T(1.5) * x^4 - T(1.5) * x^2 * y^2 - T(0.5) * x^5 + T(1.5) * x^3 * y^2 + 1 * x^2 * y^3
+    i == 17 && return 1 * x^1 * y^1 - 4 * x^2 * y^1 - 4 * x^1 * y^2 + 5 * x^3 * y^1 + 10 * x^2 * y^2 + 5 * x^1 * y^3 - 2 * x^4 * y^1 - 6 * x^3 * y^2 - 6 * x^2 * y^3 - 2 * x^1 * y^4
+    i == 18 && return T(0.5) * y^2 - T(1.5) * y^3 - T(1.5) * x^2 * y^2 + T(1.5) * y^4 + 1 * x^3 * y^2 + T(1.5) * x^2 * y^3 - T(0.5) * y^5
+    i == 19 && return T(8 * √(2)) * x^2 * y^2 * (-1 + x + y)
+    i == 20 && return -16 * x^1 * y^2 + 32 * x^2 * y^2 + 32 * x^1 * y^3 - 16 * x^3 * y^2 - 32 * x^2 * y^3 - 16 * x^1 * y^4
+    i == 21 && return -16 * x^2 * y^1 + 32 * x^3 * y^1 + 32 * x^2 * y^2 - 16 * x^4 * y^1 - 32 * x^3 * y^2 - 16 * x^2 * y^3
+    throw(ArgumentError("    no shape function $i for interpolation $ip"))
+end
+
+function reference_coordinates(::Argyris{RefTriangle, 5})
+    return [
+        Vec{2, Float64}((1.0, 0.0)),
+        Vec{2, Float64}((1.0, 0.0)),
+        Vec{2, Float64}((1.0, 0.0)),
+        Vec{2, Float64}((1.0, 0.0)),
+        Vec{2, Float64}((1.0, 0.0)),
+        Vec{2, Float64}((1.0, 0.0)),
+        #
+        Vec{2, Float64}((0.0, 1.0)),
+        Vec{2, Float64}((0.0, 1.0)),
+        Vec{2, Float64}((0.0, 1.0)),
+        Vec{2, Float64}((0.0, 1.0)),
+        Vec{2, Float64}((0.0, 1.0)),
+        Vec{2, Float64}((0.0, 1.0)),
+        #
+        Vec{2, Float64}((0.0, 0.0)),
+        Vec{2, Float64}((0.0, 0.0)),
+        Vec{2, Float64}((0.0, 0.0)),
+        Vec{2, Float64}((0.0, 0.0)),
+        Vec{2, Float64}((0.0, 0.0)),
+        Vec{2, Float64}((0.0, 0.0)),
+        #
+        Vec{2, Float64}((0.5, 0.5)),
+        Vec{2, Float64}((0.0, 0.5)),
+        Vec{2, Float64}((0.5, 0.0)),
+    ]
+end
+
+conformity(::Argyris{RefTriangle, 5}) = H1Conformity() #TODO, change to H2Conformity
+mapping_type(::Argyris{RefTriangle, 5}) = ArgyrisMapping()
+
+function get_direction(::Argyris{RefTriangle, 5}, shape_nr, cell)
+    (0 < shape_nr < 19) && return 1
+    edge_nr = shape_nr - 18
+    return get_edge_direction(cell, edge_nr)
 end

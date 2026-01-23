@@ -302,12 +302,13 @@ function _evaluate_at_points!(
         cellid = ph.cells[pointid]
         cellid === nothing && continue # next point if no cell was found for this one
         cellset !== nothing && (cellid ∈ cellset || continue) # no need to check the cellset for a regular DofHandler
+        cell = dh.grid.cells[cellid]
         celldofs!(cell_dofs, dh, ph.cells[pointid])
         for (i, I) in pairs(cell_dofs)
             u_e[i] = dof_vals[I]
         end
         getcoordinates!(x, grid, cellid)
-        reinit!(pv, x, local_coords[pointid])
+        reinit!(pv, cell, x, local_coords[pointid])
         out_vals[pointid] = function_value(pv, 1, u_e, dofrange)
     end
     return out_vals

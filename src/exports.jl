@@ -20,6 +20,7 @@ export
     Nedelec,
     RaviartThomas,
     BrezziDouglasMarini,
+    Argyris,
     getnbasefunctions,
     getrefshape,
 

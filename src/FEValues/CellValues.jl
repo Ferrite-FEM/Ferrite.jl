@@ -121,7 +121,7 @@ function reinit!(cv::CellValues, cell::Union{AbstractCell, Nothing}, x::Abstract
     @inbounds for (q_point, w) in enumerate(getweights(cv.qr))
         mapping = calculate_mapping(geo_mapping, q_point, x)
         _update_detJdV!(cv.detJdV, q_point, w, mapping)
-        apply_mapping!(fun_values, q_point, mapping, cell)
+        apply_mapping!(fun_values, q_point, mapping, cell, x)
     end
     return nothing
 end
