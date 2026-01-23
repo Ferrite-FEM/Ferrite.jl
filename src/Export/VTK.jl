@@ -399,8 +399,10 @@ function create_discontinuous_vtk_griddata(grid::Grid{dim, C, T}) where {dim, C,
         cell_coords = getcoordinates(cell)
         n = length(cell_coords)
         cellnodes[cellid(cell)] = (1:n) .+ icoord
-        vtk_cellnodes = nodes_to_vtkorder(CT((ntuple(i -> i + icoord, n))))
-        cls[cellid(cell)] = WriteVTK.MeshCell(vtk_celltype, vtk_cellnodes)
+        let icoord = icoord
+            vtk_cellnodes = nodes_to_vtkorder(CT((ntuple(i -> i + icoord, n))))
+            cls[cellid(cell)] = WriteVTK.MeshCell(vtk_celltype, vtk_cellnodes)
+        end
         for (x, node_idx) in zip(cell_coords, getnodes(cell))
             icoord += 1
             coords[:, icoord] = x
