@@ -62,7 +62,7 @@ function_symmetric_gradient(pv::PointValues, u::AbstractVector, args...) =
     function_symmetric_gradient(pv, 1, u, args...)
 
 function reinit!(pv::PointValues, x::AbstractVector{<:Vec{sdim}}, ξ::Vec{rdim}) where {sdim, rdim}
-    reinit!(pv, nothing, x, ξ)
+    return reinit!(pv, nothing, x, ξ)
 end
 # reinit! on PointValues must first update N and dNdξ for the new "quadrature point"
 # and then call the regular reinit! for the wrapped CellValues to update dNdx

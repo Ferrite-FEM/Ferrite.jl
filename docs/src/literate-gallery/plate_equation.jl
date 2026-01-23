@@ -26,10 +26,10 @@
 # \rho\int_\Gamma w \delta w \, d\Gamma
 # ```
 # with $\rho$ being the penalty stiffness.
-# 
+#
 # ## Notes on FE-approximation of the biharmonic equation
 # Since this weak form involves second-order derivatives (the Hessian) of the shape functions, the standard $C^0$ Lagrange elements are not suitable for discretising the finite element space. Instead, one must either use a $C^0$ interior penalty (C0IP) approach or employ finite elements that provide $C^1$ continuity.
-# Here, we demonstrate the latter approach and use the fifth-order Argyris element. This is a Hermite-type element with additional degrees of freedom at the vertices and along the edges that represent the gradient and Hessian of the deflection field \(w\). 
+# Here, we demonstrate the latter approach and use the fifth-order Argyris element. This is a Hermite-type element with additional degrees of freedom at the vertices and along the edges that represent the gradient and Hessian of the deflection field \(w\).
 
 # ## Code
 # The following code followes a standard Ferrite solution procedure.
@@ -38,19 +38,21 @@ using Ferrite
 using SparseArrays
 
 # First we define some parameters
-L = 2.0         # Side length 
+L = 2.0         # Side length
 q0 = 10000.0    # Load
-E = 200e9       # Stiffness
+E = 200.0e9       # Stiffness
 t = 0.01        # Thickness
 ν = 0.3         # Poisson's radtio
-penalty = 1e12  # Penalty stiffness
+penalty = 1.0e12  # Penalty stiffness
 D = (E * t^3) / (12 * (1 - ν^2)) # Flexural stiffness
-C_voigt = D * [1.0 ν 0.0; 
-               ν 1.0 0.0; 
-               0.0 0.0 (1-ν)/2] 
-C = fromvoigt(SymmetricTensor{4,2}, C_voigt)
+C_voigt = D * [
+    1.0 ν 0.0;
+    ν 1.0 0.0;
+    0.0 0.0 (1 - ν) / 2
+]
+C = fromvoigt(SymmetricTensor{4, 2}, C_voigt)
 
-grid = generate_grid(Triangle, (20, 20), Vec((0.0, 0.0)), Vec((L,L)))
+grid = generate_grid(Triangle, (20, 20), Vec((0.0, 0.0)), Vec((L, L)))
 
 # We use the Argyris interpolation as and FE approximation.
 ip = Argyris{RefTriangle, 5}()
@@ -60,18 +62,18 @@ close!(dh)
 
 # For the CellValues and FacetValues we need to requeest to update the hessians.
 qr = QuadratureRule{RefTriangle}(8)
-cellvalues = CellValues(qr, ip; update_hessians=true);
+cellvalues = CellValues(qr, ip; update_hessians = true);
 
 fqr = FacetQuadratureRule{RefTriangle}(8)
-facetvalues = FacetValues(fqr, ip; update_hessians=true);
+facetvalues = FacetValues(fqr, ip; update_hessians = true);
 
 # For the current BVP, There is a known analtyical solution (Navier's solution) that we can compare with.
 # This is a good testing strategy for PDE codes and known as the method of manufactured solutions.
-function w_analytical(pos::Vec{2}, L, q0, D; n_terms=50)
-    x,y = pos
+function w_analytical(pos::Vec{2}, L, q0, D; n_terms = 50)
+    x, y = pos
     w = 0.0
     constant_factor = (16 * q0 * L^4) / (D * pi^6)
-    
+
     for m in 1:2:n_terms
         for n in 1:2:n_terms
             denom = m * n * (m^2 + n^2)^2
@@ -79,7 +81,7 @@ function w_analytical(pos::Vec{2}, L, q0, D; n_terms=50)
             w += num / denom
         end
     end
-    
+
     return constant_factor * w
 end;
 
@@ -89,14 +91,15 @@ function element_routine!(ke, fe, cellvalues, C, q0)
         dV = getdetJdV(cellvalues, iqp)
         for i in 1:getnbasefunctions(cellvalues)
             v = shape_value(cellvalues, iqp, i)
-            fe[i] += (q0*v) *dV
+            fe[i] += (q0 * v) * dV
             δκ = shape_hessian(cellvalues, iqp, i)
             for j in 1:getnbasefunctions(cellvalues)
                 Δκ = shape_hessian(cellvalues, iqp, j)
-                ke[i,j] += (δκ ⊡ C ⊡ Δκ) * dV
+                ke[i, j] += (δκ ⊡ C ⊡ Δκ) * dV
             end
         end
     end
+    return
 end
 
 # To enforce the boundary condition, we use the penalty method. Currently the ConstraintHandler does not fully support Dirichlet constraints on Hermitian elements (like Argyris).
@@ -107,10 +110,11 @@ function bc_routine!(ke, facetvalues, penalty)
             Ni = shape_value(facetvalues, iqp, i)
             for j in 1:getnbasefunctions(facetvalues)
                 Nj = shape_value(facetvalues, iqp, j)
-                ke[i,j] += penalty*(Ni * Nj) * dV
+                ke[i, j] += penalty * (Ni * Nj) * dV
             end
         end
     end
+    return
 end
 
 # Here we create a standard assembly routine.
@@ -136,7 +140,7 @@ function doassemble!(
         getfacetset(grid, "right"),
         getfacetset(grid, "top"),
         getfacetset(grid, "bottom"),
-    );
+    )
 
     for celldata in FacetIterator(dh, ∂Ω)
         fill!(ke, 0.0)
@@ -144,6 +148,7 @@ function doassemble!(
         bc_routine!(ke, facetvalues, penalty)
         assemble!(assembler, celldofs(celldata), ke)
     end
+    return
 end
 
 # Create stiffness matrix, assemble and solve:
@@ -158,12 +163,10 @@ VTKGridFile("plate_equation", dh) do vtk
 end
 
 # To test the solution, we query the deflection at the center of the plate and compare it with the analtyical solution:
-mid_point = Vec((L/2,L/2))
-ph = PointEvalHandler(grid, [mid_point, ])
-w_fem = evaluate_at_points(ph, dh, u, :w) |> first #0.03548889438239366 
+mid_point = Vec((L / 2, L / 2))
+ph = PointEvalHandler(grid, [mid_point])
+w_fem = evaluate_at_points(ph, dh, u, :w) |> first #0.03548889438239366
 w_ana = w_analytical(mid_point, L, q0, D) #0.035488713207468166
 
-using Test 
-@test w_fem ≈ w_ana atol=1e-
-
-
+using Test
+@test w_fem ≈ w_ana atol = 1.0e-6
