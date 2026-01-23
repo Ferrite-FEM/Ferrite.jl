@@ -160,7 +160,7 @@ to the physical cell geometry.
 required_geo_diff_order(::IdentityMapping, fun_diff_order::Int) = fun_diff_order
 required_geo_diff_order(::ContravariantPiolaMapping, fun_diff_order::Int) = 1 + fun_diff_order
 required_geo_diff_order(::CovariantPiolaMapping, fun_diff_order::Int) = 1 + fun_diff_order
-required_geo_diff_order(::ArgyrisMapping, fun_diff_order::Int) = fun_diff_order 
+required_geo_diff_order(::ArgyrisMapping, fun_diff_order::Int) = fun_diff_order
 
 # Support for embedded elements
 @inline calculate_Jinv(J::Tensor{2}) = inv(J)
@@ -277,32 +277,32 @@ end
 
 # Type storing data for the mapping of argyris element
 struct ArgyrisData
-    t::NTuple{3,Vec{2,Float64}} # Tangents on edges
-    l::NTuple{3,Float64} # Edge lengths
-    B::NTuple{3,Tensor{2,2,Float64,4}} # Rotated Jacobians on edges
-    J::Tensor{2,2,Float64,4} # Jacobian
+    t::NTuple{3, Vec{2, Float64}} # Tangents on edges
+    l::NTuple{3, Float64} # Edge lengths
+    B::NTuple{3, Tensor{2, 2, Float64, 4}} # Rotated Jacobians on edges
+    J::Tensor{2, 2, Float64, 4} # Jacobian
 end
 
-function ArgyrisData(ip::Lagrange{RefTriangle,1}, coords)
+function ArgyrisData(ip::Lagrange{RefTriangle, 1}, coords)
     t1 = coords[1] - coords[2]
     t2 = coords[2] - coords[3]
     t3 = coords[3] - coords[1]
-    l1,l2,l3 = l = (norm(t1), norm(t2), norm(t3))
+    l1, l2, l3 = l = (norm(t1), norm(t2), norm(t3))
 
     #TODO: For non-linear geometries, we need to compute three jacobian at each corner.
     #Current implementation only works for non-linear geometries.
-    ξ = zero(Vec{2,Float64})
+    ξ = zero(Vec{2, Float64})
     J, _ = Ferrite.calculate_jacobian_and_spatial_coordinate(ip, ξ, coords)
 
-    t = (t1/l1, t2/l2, t3/l3)
-    n = ntuple(i -> rotate(t[i], pi/2), 3)
+    t = (t1 / l1, t2 / l2, t3 / l3)
+    n = ntuple(i -> rotate(t[i], pi / 2), 3)
 
-    n̂ = (Vec((1/√2, 1/√2)), Vec((-1.0, 0.0)), Vec((0.0, -1.0)))
-    t̂ = (Vec((1/√2, -1/√2)), Vec((0.0, 1.0)), Vec((-1.0, 0.0)))
-    B = zeros(Tensor{2,2}, 3)
+    n̂ = (Vec((1 / √2, 1 / √2)), Vec((-1.0, 0.0)), Vec((0.0, -1.0)))
+    t̂ = (Vec((1 / √2, -1 / √2)), Vec((0.0, 1.0)), Vec((-1.0, 0.0)))
+    B = zeros(Tensor{2, 2}, 3)
     for i in 1:3
-        Ĝ = Tensor{2,2}(hcat(n̂[i], t̂[i])')
-        G = Tensor{2,2}(hcat(n[i], t[i])')
+        Ĝ = Tensor{2, 2}(hcat(n̂[i], t̂[i])')
+        G = Tensor{2, 2}(hcat(n[i], t[i])')
         B[i] = Ĝ ⋅ J' ⋅ G'
     end
 
@@ -312,9 +312,9 @@ end
 #Apply mapping for the Argyris element.
 #The shape functions on the physical element are related to the shape functions on reference element Nξ via a sparse matrix M: Nx = M*Nξ
 #Since M is sparse, we avoid creating the M-matrix and compute Nx directly.
-#For more information see: 
+#For more information see:
 # Robert C. Kirby. A general approach to transforming finite elements. The SMAI Journal of computational mathematics (2018)
-function apply_mapping!(funvals::Ferrite.FunctionValues{DO}, ::ArgyrisMapping, q_point::Int, mapping_values, cell, coords) where DO 
+function apply_mapping!(funvals::Ferrite.FunctionValues{DO}, ::ArgyrisMapping, q_point::Int, mapping_values, cell, coords) where {DO}
     ip_geo = Ferrite.geometric_interpolation(cell)
     @assert ip_geo isa Lagrange{RefTriangle, 1} "Only linear geometries allowed for Argyris interpolation"
     @assert DO < 3
@@ -322,22 +322,22 @@ function apply_mapping!(funvals::Ferrite.FunctionValues{DO}, ::ArgyrisMapping, q
     #Compute data required for the argyris mapping
     #TODO: This can be done once per element, but we have to recompute for each quadrature point with the current setup
     argyris_data = ArgyrisData(ip_geo, coords)
-    
+
     Nx = view(funvals.Nx, :, q_point)
     Nξ = view(funvals.Nξ, :, q_point)
     dNdx = (DO > 0) ? view(funvals.dNdx, :, q_point) : nothing
     dNdξ = (DO > 0) ? view(funvals.dNdξ, :, q_point) : nothing
     d²Ndx² = (DO > 1) ? view(funvals.d2Ndx2, :, q_point) : nothing
     d²Ndξ² = (DO > 1) ? view(funvals.d2Ndξ2, :, q_point) : nothing
-    
+
     vdim = length(first(funvals.Nx))
     _argyris_mapping!(argyris_data, Nx, Nξ, dNdx, dNdξ, d²Ndx², d²Ndξ², mapping_values, Val(DO), Val(vdim))
 
     #Fix directions of normal gradients dofs on edges
     for i in 19:21
-        dir = Ferrite.get_direction(vdim==1 ? funvals.ip : funvals.ip.ip, i, cell)
+        dir = Ferrite.get_direction(vdim == 1 ? funvals.ip : funvals.ip.ip, i, cell)
         for d in 1:vdim
-            j = (i-1)*vdim + d
+            j = (i - 1) * vdim + d
             Nx[j] *= dir
             if DO > 0
                 dNdx[j] *= dir
@@ -351,115 +351,129 @@ function apply_mapping!(funvals::Ferrite.FunctionValues{DO}, ::ArgyrisMapping, q
     return nothing
 end
 
-_hessian_helper(d2Ndξ2::Tensor{2,2}, dNdx, H, Jinv) = Jinv' ⋅ (d2Ndξ2 - dNdx ⋅ H) ⋅ Jinv
-_hessian_helper(d2Ndξ2::Tensor{3,2}, dNdx, H, Jinv_otimesu_Jinv) = (d2Ndξ2 - dNdx ⋅ H) ⊡ Jinv_otimesu_Jinv
+_hessian_helper(d2Ndξ2::Tensor{2, 2}, dNdx, H, Jinv) = Jinv' ⋅ (d2Ndξ2 - dNdx ⋅ H) ⋅ Jinv
+_hessian_helper(d2Ndξ2::Tensor{3, 2}, dNdx, H, Jinv_otimesu_Jinv) = (d2Ndξ2 - dNdx ⋅ H) ⊡ Jinv_otimesu_Jinv
 #Computes Nx = M*Nξ without allocating the M-matrix
 function _argyris_mapping!(argyris_data::ArgyrisData, Nx, Nξ, dNdx, dNdξ, d²Ndx², d²Ndξ², mapping_values, ::Val{DO}, ::Val{vdim}) where {DO, vdim}
-    
+
     (; l, B, t) = argyris_data
     J = argyris_data.J
-    
+
     Jinv = DO > 0 ? inv(mapping_values.J) : nothing
     H = DO > 1 ? mapping_values.H : nothing
-    Jinv2 = vdim==1 ? Jinv : otimesu(Jinv, Jinv)
+    Jinv2 = vdim == 1 ? Jinv : otimesu(Jinv, Jinv)
 
     t = @SVector [SVector{2}(argyris_data.t[i]) for i in 1:3]
-    τ = @SVector [SVector{3}(argyris_data.t[i][1]^2, 2*argyris_data.t[i][1]*argyris_data.t[i][2], argyris_data.t[i][2]^2) for i in 1:3]
-    J = SMatrix{2,2}(argyris_data.J)
-    Θ = @SMatrix [J[1,1]^2 J[1,2]*J[1,1] J[1,2]^2; 
-                  2*J[1,1]*J[2,1] J[1,2]*J[2,1] + J[1,1]*J[2,2] 2*J[2,2]*J[1,2]; 
-                  J[2,1]^2 J[2,1]*J[2,2] J[2,2]^2]
+    τ = @SVector [SVector{3}(argyris_data.t[i][1]^2, 2 * argyris_data.t[i][1] * argyris_data.t[i][2], argyris_data.t[i][2]^2) for i in 1:3]
+    J = SMatrix{2, 2}(argyris_data.J)
+    Θ = @SMatrix [
+        J[1, 1]^2 J[1, 2] * J[1, 1] J[1, 2]^2;
+        2 * J[1, 1] * J[2, 1] J[1, 2] * J[2, 1] + J[1, 1] * J[2, 2] 2 * J[2, 2] * J[1, 2];
+        J[2, 1]^2 J[2, 1] * J[2, 2] J[2, 2]^2
+    ]
 
     edgeindeces = ((1, 3), (1, 2), (2, 3))
     edge_to_basefunc = (19, 20, 21)
-    _signs = ((1,-1), (-1, 1), (-1, 1))
+    _signs = ((1, -1), (-1, 1), (-1, 1))
 
-    #_M = zeros(Float64, 21, 21) 
+    #_M = zeros(Float64, 21, 21)
     for i in 1:3 #Node loop
-        e1,e2 = edgeindeces[i]
-        b1_scalar,b2_scalar = edge_to_basefunc[e1], edge_to_basefunc[e2]
-        offset = 6*(i-1)*vdim #Offset (6 shape functions per node)
-        
+        e1, e2 = edgeindeces[i]
+        b1_scalar, b2_scalar = edge_to_basefunc[e1], edge_to_basefunc[e2]
+        offset = 6 * (i - 1) * vdim #Offset (6 shape functions per node)
+
         #Dofs related to values
-        m1 = 15*B[e1][1, 2] / 8l[e1] * _signs[i][1]
-        m2 = 15*B[e2][1, 2] / 8l[e2] * _signs[i][2]
+        m1 = 15 * B[e1][1, 2] / 8l[e1] * _signs[i][1]
+        m2 = 15 * B[e2][1, 2] / 8l[e2] * _signs[i][2]
         for d in 1:vdim
-            o = offset + (d-1)
-            b1, b2 = ((b1_scalar-1)*vdim + d, (b2_scalar-1)*vdim + d)
+            o = offset + (d - 1)
+            b1, b2 = ((b1_scalar - 1) * vdim + d, (b2_scalar - 1) * vdim + d)
             # -- Shape value
-            N1x = Nξ[1+o] + m1*Nξ[b1] + m2*Nξ[b2]
-            Nx[1+o] = N1x
+            N1x = Nξ[1 + o] + m1 * Nξ[b1] + m2 * Nξ[b2]
+            Nx[1 + o] = N1x
             if DO > 0 # -- Shape gradient
-                dN1dx = dNdξ[1+o] + m1*dNdξ[b1] + m2*dNdξ[b2]
-                dNdx[1+o] = dN1dx ⋅ Jinv
+                dN1dx = dNdξ[1 + o] + m1 * dNdξ[b1] + m2 * dNdξ[b2]
+                dNdx[1 + o] = dN1dx ⋅ Jinv
                 if DO > 1 # -- Shape hessian
-                    d²N1dx² = d²Ndξ²[1+o] + m1*d²Ndξ²[b1] + m2*d²Ndξ²[b2]
-                    d²Ndx²[1+o] = _hessian_helper(d²N1dx², dNdx[1+o], H, Jinv2)
+                    d²N1dx² = d²Ndξ²[1 + o] + m1 * d²Ndξ²[b1] + m2 * d²Ndξ²[b2]
+                    d²Ndx²[1 + o] = _hessian_helper(d²N1dx², dNdx[1 + o], H, Jinv2)
                 end
             end
         end
-        
+
         #Dof related to gradients
-        m3 = -(7/16)*B[e1][1, 2]*t[e1]
-        m4 = -(7/16)*B[e2][1, 2]*t[e2]
+        m3 = -(7 / 16) * B[e1][1, 2] * t[e1]
+        m4 = -(7 / 16) * B[e2][1, 2] * t[e2]
         for d in 1:vdim
-            o = offset + (d-1) + 1*(vdim-1) 
-            o1, o2 = (o, o + (vdim-1))
-            b1, b2 = ((b1_scalar-1)*vdim + d, (b2_scalar-1)*vdim + d)
+            o = offset + (d - 1) + 1 * (vdim - 1)
+            o1, o2 = (o, o + (vdim - 1))
+            b1, b2 = ((b1_scalar - 1) * vdim + d, (b2_scalar - 1) * vdim + d)
 
             # -- Shape value
-            N23 = @SVector [Nξ[2+o1], Nξ[3+o2]]
-            N23x = J*N23 + @SVector [m3[1]*Nξ[b1] + m4[1]*Nξ[b2],
-                                     m3[2]*Nξ[b1] + m4[2]*Nξ[b2]] 
-            Nx[2+o1] = N23x[1]
-            Nx[3+o2] = N23x[2]
+            N23 = @SVector [Nξ[2 + o1], Nξ[3 + o2]]
+            N23x = J * N23 + @SVector [
+                m3[1] * Nξ[b1] + m4[1] * Nξ[b2],
+                m3[2] * Nξ[b1] + m4[2] * Nξ[b2],
+            ]
+            Nx[2 + o1] = N23x[1]
+            Nx[3 + o2] = N23x[2]
             if DO > 0 # -- Shape gradient
-                dN23dξ = @SVector [dNdξ[2+o1], dNdξ[3+o2]]
-                dN23dx = J*dN23dξ + @SVector [m3[1]*dNdξ[b1] + m4[1]*dNdξ[b2],
-                                              m3[2]*dNdξ[b1] + m4[2]*dNdξ[b2]] 
-                dNdx[2+o1] = dN23dx[1] ⋅ Jinv
-                dNdx[3+o2] = dN23dx[2] ⋅ Jinv
+                dN23dξ = @SVector [dNdξ[2 + o1], dNdξ[3 + o2]]
+                dN23dx = J * dN23dξ + @SVector [
+                    m3[1] * dNdξ[b1] + m4[1] * dNdξ[b2],
+                    m3[2] * dNdξ[b1] + m4[2] * dNdξ[b2],
+                ]
+                dNdx[2 + o1] = dN23dx[1] ⋅ Jinv
+                dNdx[3 + o2] = dN23dx[2] ⋅ Jinv
                 if DO > 1 # -- Shape hessian
-                    d²N23dξ² = @SVector [d²Ndξ²[2+o1], d²Ndξ²[3+o2]]
-                    d²N23dx² = J*d²N23dξ² + @SVector [m3[1]*d²Ndξ²[b1] + m4[1]*d²Ndξ²[b2],
-                                                      m3[2]*d²Ndξ²[b1] + m4[2]*d²Ndξ²[b2]]
-                    d²Ndx²[2+o1] = _hessian_helper(d²N23dx²[1], dNdx[2+o1], H, Jinv2)
-                    d²Ndx²[3+o2] = _hessian_helper(d²N23dx²[2], dNdx[3+o2], H, Jinv2) 
+                    d²N23dξ² = @SVector [d²Ndξ²[2 + o1], d²Ndξ²[3 + o2]]
+                    d²N23dx² = J * d²N23dξ² + @SVector [
+                        m3[1] * d²Ndξ²[b1] + m4[1] * d²Ndξ²[b2],
+                        m3[2] * d²Ndξ²[b1] + m4[2] * d²Ndξ²[b2],
+                    ]
+                    d²Ndx²[2 + o1] = _hessian_helper(d²N23dx²[1], dNdx[2 + o1], H, Jinv2)
+                    d²Ndx²[3 + o2] = _hessian_helper(d²N23dx²[2], dNdx[3 + o2], H, Jinv2)
                 end
             end
         end
         #Dof related to hessians
-        m5 = (1/32)*B[e1][1, 2] * τ[e1]*l[e1] * _signs[i][1]
-        m6 = (1/32)*B[e2][1, 2] * τ[e2]*l[e2] * _signs[i][2]
+        m5 = (1 / 32) * B[e1][1, 2] * τ[e1] * l[e1] * _signs[i][1]
+        m6 = (1 / 32) * B[e2][1, 2] * τ[e2] * l[e2] * _signs[i][2]
         for d in 1:vdim
             # -- Shape value
-            o = offset + (d-1) + 3*(vdim-1) 
-            o1, o2, o3 = (o, o + (vdim-1), o + 2*(vdim-1))
-            b1, b2 = ((b1_scalar-1)*vdim + d, (b2_scalar-1)*vdim + d)
+            o = offset + (d - 1) + 3 * (vdim - 1)
+            o1, o2, o3 = (o, o + (vdim - 1), o + 2 * (vdim - 1))
+            b1, b2 = ((b1_scalar - 1) * vdim + d, (b2_scalar - 1) * vdim + d)
 
-            N456 = @SVector [Nξ[4+o1], Nξ[5+o2], Nξ[6+o3]]
-            N456x = Θ*N456 + @SVector[m5[1]*Nξ[b1] + m6[1]*Nξ[b2],
-                                    m5[2]*Nξ[b1] + m6[2]*Nξ[b2], 
-                                    m5[3]*Nξ[b1] + m6[3]*Nξ[b2]]
+            N456 = @SVector [Nξ[4 + o1], Nξ[5 + o2], Nξ[6 + o3]]
+            N456x = Θ * N456 + @SVector[
+                m5[1] * Nξ[b1] + m6[1] * Nξ[b2],
+                m5[2] * Nξ[b1] + m6[2] * Nξ[b2],
+                m5[3] * Nξ[b1] + m6[3] * Nξ[b2],
+            ]
             Nx[4 + o1] = N456x[1]
             Nx[5 + o2] = N456x[2]
             Nx[6 + o3] = N456x[3]
             if DO > 0  # -- Shape gradient
-                dN456dξ = @SVector [dNdξ[4+o1], dNdξ[5+o2], dNdξ[6+o3]]
-                dN456dx = Θ*dN456dξ + @SVector[m5[1]*dNdξ[b1] + m6[1]*dNdξ[b2],
-                                            m5[2]*dNdξ[b1] + m6[2]*dNdξ[b2], 
-                                            m5[3]*dNdξ[b1] + m6[3]*dNdξ[b2]]
-                dNdx[4+o1] = dN456dx[1] ⋅ Jinv
-                dNdx[5+o2] = dN456dx[2] ⋅ Jinv
-                dNdx[6+o3] = dN456dx[3] ⋅ Jinv
+                dN456dξ = @SVector [dNdξ[4 + o1], dNdξ[5 + o2], dNdξ[6 + o3]]
+                dN456dx = Θ * dN456dξ + @SVector[
+                    m5[1] * dNdξ[b1] + m6[1] * dNdξ[b2],
+                    m5[2] * dNdξ[b1] + m6[2] * dNdξ[b2],
+                    m5[3] * dNdξ[b1] + m6[3] * dNdξ[b2],
+                ]
+                dNdx[4 + o1] = dN456dx[1] ⋅ Jinv
+                dNdx[5 + o2] = dN456dx[2] ⋅ Jinv
+                dNdx[6 + o3] = dN456dx[3] ⋅ Jinv
                 if DO > 1 # -- Shape hessian
-                    d²N456dx² = @SVector [d²Ndξ²[4+o1], d²Ndξ²[5+o2], d²Ndξ²[6+o3]]
-                    d²N456dx² = Θ*d²N456dx² + @SVector[m5[1]*d²Ndξ²[b1] + m6[1]*d²Ndξ²[b2],
-                                                    m5[2]*d²Ndξ²[b1] + m6[2]*d²Ndξ²[b2], 
-                                                    m5[3]*d²Ndξ²[b1] + m6[3]*d²Ndξ²[b2]]
-                    d²Ndx²[4+o1] = _hessian_helper(d²N456dx²[1], dNdx[4+o1], H, Jinv2)
-                    d²Ndx²[5+o2] = _hessian_helper(d²N456dx²[2], dNdx[5+o2], H, Jinv2)
-                    d²Ndx²[6+o3] = _hessian_helper(d²N456dx²[3], dNdx[6+o3], H, Jinv2)
+                    d²N456dx² = @SVector [d²Ndξ²[4 + o1], d²Ndξ²[5 + o2], d²Ndξ²[6 + o3]]
+                    d²N456dx² = Θ * d²N456dx² + @SVector[
+                        m5[1] * d²Ndξ²[b1] + m6[1] * d²Ndξ²[b2],
+                        m5[2] * d²Ndξ²[b1] + m6[2] * d²Ndξ²[b2],
+                        m5[3] * d²Ndξ²[b1] + m6[3] * d²Ndξ²[b2],
+                    ]
+                    d²Ndx²[4 + o1] = _hessian_helper(d²N456dx²[1], dNdx[4 + o1], H, Jinv2)
+                    d²Ndx²[5 + o2] = _hessian_helper(d²N456dx²[2], dNdx[5 + o2], H, Jinv2)
+                    d²Ndx²[6 + o3] = _hessian_helper(d²N456dx²[3], dNdx[6 + o3], H, Jinv2)
                 end
             end
         end
@@ -480,19 +494,20 @@ function _argyris_mapping!(argyris_data::ArgyrisData, Nx, Nξ, dNdx, dNdξ, d²N
     for i in 1:3
         b1 = edge_to_basefunc[i]
         for d in 1:vdim
-            j = (b1-1)*vdim + d
-            
-            Njx = Nξ[j] * B[i][1,1]
+            j = (b1 - 1) * vdim + d
+
+            Njx = Nξ[j] * B[i][1, 1]
             Nx[j] = Njx
             if DO > 0
-                dNjdx = dNdξ[j] * B[i][1,1]
+                dNjdx = dNdξ[j] * B[i][1, 1]
                 dNdx[j] = dNjdx ⋅ Jinv
                 if DO > 1
-                    d²Njdx² = d²Ndξ²[j] * B[i][1,1]
+                    d²Njdx² = d²Ndξ²[j] * B[i][1, 1]
                     d²Ndx²[j] = _hessian_helper(d²Njdx², dNdx[j], H, Jinv2)
                 end
             end
         end
         #_M[b1,b1] = B[i][1,1]
     end
+    return
 end
