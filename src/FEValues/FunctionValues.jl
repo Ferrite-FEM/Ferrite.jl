@@ -133,6 +133,9 @@ sdim_from_gradtype(::Type{<:SMatrix{<:Any, sdim}}) where {sdim} = sdim
 
 # For performance, these must be fully inferable for the compiler.
 # args: valname (:CellValues or :FacetValues), shape_gradient_type, eltype(x)
+function check_reinit_sdim_consistency(fe_v::FeV, ::AbstractVector{VT}) where {FeV <: AbstractValues, VT}
+    return check_reinit_sdim_consistency(nameof(FeV), shape_gradient_type(fe_v), VT)
+end
 function check_reinit_sdim_consistency(valname, gradtype::Type, ::Type{<:Vec{sdim}}) where {sdim}
     check_reinit_sdim_consistency(valname, Val(sdim_from_gradtype(gradtype)), Val(sdim))
     return

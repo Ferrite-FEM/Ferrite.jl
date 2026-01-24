@@ -106,26 +106,6 @@ end
     return reinit!(cv, nothing, x)
 end
 
-function reinit!(cv::CellValues, cell::Union{AbstractCell, Nothing}, x::AbstractVector{<:Vec})
-    geo_mapping = cv.geo_mapping
-    fun_values = cv.fun_values
-    n_geom_basefuncs = getngeobasefunctions(geo_mapping)
-
-    check_reinit_sdim_consistency(:CellValues, shape_gradient_type(cv), eltype(x))
-    if cell === nothing && reinit_needs_cell(cv)
-        throw(ArgumentError("The cell::AbstractCell input is required to reinit! non-identity function mappings"))
-    end
-    if !checkbounds(Bool, x, 1:n_geom_basefuncs) || length(x) != n_geom_basefuncs
-        throw_incompatible_coord_length(length(x), n_geom_basefuncs)
-    end
-    @inbounds for (q_point, w) in enumerate(getweights(cv.qr))
-        mapping = calculate_mapping(geo_mapping, q_point, x)
-        _update_detJdV!(cv.detJdV, q_point, w, mapping)
-        apply_mapping!(fun_values, q_point, mapping, cell)
-    end
-    return nothing
-end
-
 function Base.show(io::IO, d::MIME"text/plain", cv::CellValues)
     ip_geo = geometric_interpolation(cv)
     ip_fun = function_interpolation(cv)
@@ -209,8 +189,8 @@ E.g. applicable to `cmv[:u]` above
 CellMultiValues
 
 struct CellMultiValues{FVS, GM, QR, detT, FVT} <: AbstractCellValues
-    fun_values::FVS         # FunctionValues collected in a named tuple (not necessarily unique)
-    fun_values_tuple::FVT   # FunctionValues collected in a tuple (each unique)
+    fun_values_nt::FVS      # FunctionValues collected in a named tuple (not necessarily unique)
+    fun_values::FVT         # FunctionValues collected in a tuple (each unique)
     geo_mapping::GM         # GeometryMapping
     qr::QR                  # QuadratureRule
     detJdV::detT            # AbstractVector{<:Number} or Nothing
@@ -225,10 +205,10 @@ function CellMultiValues(
     GeoDiffOrder = max(maximum(ip_fun -> required_geo_diff_order(mapping_type(ip_fun), FunDiffOrder), values(ip_funs)), update_detJdV)
     geo_mapping = GeometryMapping{GeoDiffOrder}(T, ip_geo.ip, qr)
     unique_ips = unique(values(ip_funs))
-    fun_values_tuple = tuple((FunctionValues{FunDiffOrder}(T, ip_fun, qr, ip_geo) for ip_fun in unique_ips)...)
-    fun_values = NamedTuple((key => fun_values_tuple[findfirst(unique_ip -> ip == unique_ip, unique_ips)] for (key, ip) in pairs(ip_funs)))
+    fun_values = tuple((FunctionValues{FunDiffOrder}(T, ip_fun, qr, ip_geo) for ip_fun in unique_ips)...)
+    fun_values_nt = NamedTuple((key => fun_values[findfirst(unique_ip -> ip == unique_ip, unique_ips)] for (key, ip) in pairs(ip_funs)))
     detJdV = update_detJdV ? fill(T(NaN), length(getweights(qr))) : nothing
-    return CellMultiValues(fun_values, fun_values_tuple, geo_mapping, qr, detJdV)
+    return CellMultiValues(fun_values_nt, fun_values, geo_mapping, qr, detJdV)
 end
 
 CellMultiValues(qr::QuadratureRule, ip_funs::NamedTuple, args...; kwargs...) = CellMultiValues(Float64, qr, ip_funs, args...; kwargs...)
@@ -237,9 +217,9 @@ function CellMultiValues(::Type{T}, qr, ip_funs::NamedTuple, ip_geo::ScalarInter
 end
 
 function Base.copy(cv::CMV) where {CMV <: CellMultiValues}
-    fun_values_tuple = map(copy, cv.fun_values_tuple)
-    fun_values = NamedTuple((key => fun_values_tuple[findfirst(fv -> fv === named_fv, cv.fun_values_tuple)] for (key, named_fv) in pairs(cv.fun_values)))
-    return CMV(fun_values, fun_values_tuple, copy(cv.geo_mapping), copy(cv.qr), _copy_or_nothing(cv.detJdV))
+    fun_values = map(copy, cv.fun_values)
+    fun_values_nt = NamedTuple((key => fun_values[findfirst(fv -> fv === named_fv, cv.fun_values)] for (key, named_fv) in pairs(cv.fun_values_nt)))
+    return CMV(fun_values_nt, fun_values, copy(cv.geo_mapping), copy(cv.qr), _copy_or_nothing(cv.detJdV))
 end
 
 # Access geometry values
@@ -253,7 +233,7 @@ function getdetJdV(cv::CellMultiValues, q_point::Int)
 end
 
 # No accessors for function values, just ability to get the stored `FunctionValues` which can be called directly.
-@inline Base.getindex(cv::CellMultiValues, key::Symbol) = cv.fun_values[key]
+@inline Base.getindex(cv::CellMultiValues, key::Symbol) = cv.fun_values_nt[key]
 
 # Access quadrature rule values
 getnquadpoints(cv::CellMultiValues) = getnquadpoints(cv.qr)
@@ -263,15 +243,57 @@ getnquadpoints(cv::CellMultiValues) = getnquadpoints(cv.qr)
 end
 
 @inline function reinit_needs_cell(cv::CellMultiValues)
-    return any(map(fv -> !isa(mapping_type(fv), IdentityMapping), cv.fun_values_tuple))
+    return any(map(fv -> !isa(mapping_type(fv), IdentityMapping), cv.fun_values))
 end
 
-function reinit!(cv::CellMultiValues, cell::Union{AbstractCell, Nothing}, x::AbstractVector{<:Vec})
+function check_reinit_sdim_consistency(cmv::CellMultiValues, ::AbstractVector{VT}) where {VT}
+    return map(fv -> check_reinit_sdim_consistency(:CellMultiValues, shape_gradient_type(fv), VT), cmv.fun_values)
+end
+
+@inline function apply_mapping!(fun_values::Tuple, q_point, mapping, cell)
+    return map(fv -> (@inbounds apply_mapping!(fv, q_point, mapping, cell)), fun_values)
+end
+
+# Slightly faster for unknown reason to write out each call, only worth it for a few unique function values.
+@inline function apply_mapping!(fun_values::Tuple{<:FunctionValues}, q_point, mapping, cell)
+    return @inbounds apply_mapping!(fun_values[1], q_point, mapping, cell)
+end
+
+@inline function apply_mapping!(fun_values::Tuple{<:FunctionValues, <:FunctionValues}, q_point, mapping, cell)
+    return @inbounds begin
+        apply_mapping!(fun_values[1], q_point, mapping, cell)
+        apply_mapping!(fun_values[2], q_point, mapping, cell)
+    end
+end
+
+# Error paths for functions that should be called in individual `FunctionValues`
+function getnbasefunctions(cv::CellMultiValues)
+    k = first(keys(cv.fun_values_nt)) # Pick the first function values to use in example
+    throw(ArgumentError("getnbasefunctions isn't applicable to cv::CellMultiValues. Use on `FunctionValues` for the specific field, e.g. getnbasefunctions(cv[:$k], args...)"))
+end
+
+for f in (:shape_value, :shape_gradient, :shape_symmetric_gradient, :shape_divergence)
+    @eval function $f(cv::CellMultiValues, ::Int, ::Int)
+        k = first(keys(cv.fun_values_nt)) # Pick the first function values to use in example
+        fun = $f                       # Make the function name available to use in the error message
+        throw(ArgumentError("$fun isn't applicable to cv::CellMultiValues. Use on `FunctionValues` for the specific field, e.g. $fun(cv[:$k], q_point, shapenr)"))
+    end
+end
+for f in (:function_value, :function_gradient, :function_symmetric_gradient, :function_divergence)
+    @eval function $f(cv::CellMultiValues, ::Int, ::AbstractVector, args...)
+        k = first(keys(cv.fun_values_nt)) # Pick the first function values to use in example
+        fun = $f                       # Make the function name available to use in the error message
+        throw(ArgumentError("$fun isn't applicable to cv::CellMultiValues. Use on `FunctionValues` for the specific field, e.g. $fun(cv[:$k], q_point, ae, [dofrange])"))
+    end
+end
+
+
+function reinit!(cv::Union{CellValues, CellMultiValues}, cell::Union{AbstractCell, Nothing}, x::AbstractVector{<:Vec})
     geo_mapping = cv.geo_mapping
-    fun_values = cv.fun_values_tuple
+    fun_values = cv.fun_values
     n_geom_basefuncs = getngeobasefunctions(geo_mapping)
 
-    map(fv -> check_reinit_sdim_consistency(:CellMultiValues, shape_gradient_type(fv), eltype(x)), fun_values)
+    check_reinit_sdim_consistency(cv, x)
     if cell === nothing && reinit_needs_cell(cv)
         throw(ArgumentError("The cell::AbstractCell input is required to reinit! non-identity function mappings"))
     end
@@ -282,44 +304,7 @@ function reinit!(cv::CellMultiValues, cell::Union{AbstractCell, Nothing}, x::Abs
     @inbounds for (q_point, w) in enumerate(getweights(cv.qr))
         mapping = calculate_mapping(geo_mapping, q_point, x)
         _update_detJdV!(cv.detJdV, q_point, w, mapping)
-        _apply_mappings!(fun_values, q_point, mapping, cell)
+        apply_mapping!(fun_values, q_point, mapping, cell)
     end
     return nothing
-end
-
-@inline function _apply_mappings!(fun_values::Tuple, q_point, mapping, cell)
-    return map(fv -> (@inbounds apply_mapping!(fv, q_point, mapping, cell)), fun_values)
-end
-
-# Slightly faster for unknown reason to write out each call, only worth it for a few unique function values.
-@inline function _apply_mappings!(fun_values::Tuple{<:FunctionValues}, q_point, mapping, cell)
-    return @inbounds apply_mapping!(fun_values[1], q_point, mapping, cell)
-end
-
-@inline function _apply_mappings!(fun_values::Tuple{<:FunctionValues, <:FunctionValues}, q_point, mapping, cell)
-    return @inbounds begin
-        apply_mapping!(fun_values[1], q_point, mapping, cell)
-        apply_mapping!(fun_values[2], q_point, mapping, cell)
-    end
-end
-
-# Error paths for functions that should be called in individual `FunctionValues`
-function getnbasefunctions(cv::CellMultiValues)
-    k = first(keys(cv.fun_values)) # Pick the first function values to use in example
-    throw(ArgumentError("getnbasefunctions isn't applicable to cv::CellMultiValues. Use on `FunctionValues` for the specific field, e.g. getnbasefunctions(cv[:$k], args...)"))
-end
-
-for f in (:shape_value, :shape_gradient, :shape_symmetric_gradient, :shape_divergence)
-    @eval function $f(cv::CellMultiValues, ::Int, ::Int)
-        k = first(keys(cv.fun_values)) # Pick the first function values to use in example
-        fun = $f                       # Make the function name available to use in the error message
-        throw(ArgumentError("$fun isn't applicable to cv::CellMultiValues. Use on `FunctionValues` for the specific field, e.g. $fun(cv[:$k], q_point, shapenr)"))
-    end
-end
-for f in (:function_value, :function_gradient, :function_symmetric_gradient, :function_divergence)
-    @eval function $f(cv::CellMultiValues, ::Int, ::AbstractVector, args...)
-        k = first(keys(cv.fun_values)) # Pick the first function values to use in example
-        fun = $f                       # Make the function name available to use in the error message
-        throw(ArgumentError("$fun isn't applicable to cv::CellMultiValues. Use on `FunctionValues` for the specific field, e.g. $fun(cv[:$k], q_point, ae, [dofrange])"))
-    end
 end

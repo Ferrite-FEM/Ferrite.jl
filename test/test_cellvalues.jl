@@ -350,7 +350,7 @@ end
             @test cmv_copy isa typeof(cmv)
 
             # Test that all mutable types in FunctionValues and GeometryMapping have been copied
-            for (fv, fvc) in zip(cmv.fun_values_tuple, cmv_copy.fun_values_tuple)
+            for (fv, fvc) in zip(cmv.fun_values, cmv_copy.fun_values)
                 test_equal_but_unaliased(fv, fvc)
             end
             test_equal_but_unaliased(cmv.geo_mapping, cmv_copy.geo_mapping)
