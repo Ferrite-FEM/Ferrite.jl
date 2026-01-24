@@ -250,23 +250,20 @@ function check_reinit_sdim_consistency(cmv::CellMultiValues, ::AbstractVector{VT
     return map(fv -> check_reinit_sdim_consistency(:CellMultiValues, shape_gradient_type(fv), VT), cmv.fun_values)
 end
 
-@inline function apply_mapping!(fun_values::Tuple, q_point, mapping, cell)
-    return map(fv -> (@inbounds apply_mapping!(fv, q_point, mapping, cell)), fun_values)
-end
-
-# Slightly faster for unknown reason to write out each call, only worth it for a few unique function values.
-@inline function apply_mapping!(fun_values::Tuple{<:FunctionValues}, q_point, mapping, cell)
-    return @inbounds apply_mapping!(fun_values[1], q_point, mapping, cell)
-end
-
-@inline function apply_mapping!(fun_values::Tuple{<:FunctionValues, <:FunctionValues}, q_point, mapping, cell)
-    return @inbounds begin
-        apply_mapping!(fun_values[1], q_point, mapping, cell)
-        apply_mapping!(fun_values[2], q_point, mapping, cell)
+# Need to manually unroll applying to each `fun_values` for maximum performance, equivalent code:
+# `foreach(fv -> apply_mapping!(fv, q_point, mapping, cell), fun_values))`
+@generated function apply_mapping!(fun_values::Tuple{Vararg{<:FunctionValues, N}}, q_point, mapping, cell) where {N}
+    expr = Expr(:block)
+    for i in 1:N
+        push!(expr.args, :(apply_mapping!(fun_values[$i], q_point, mapping, cell)))
+    end
+    return quote
+        $(Expr(:meta, :inline))
+        @inbounds return $expr
     end
 end
 
-# Error paths for functions that should be called in individual `FunctionValues`
+# Error messages for functions that should be called in individual `FunctionValues` to help users
 function getnbasefunctions(cv::CellMultiValues)
     k = first(keys(cv.fun_values_nt)) # Pick the first function values to use in example
     throw(ArgumentError("getnbasefunctions isn't applicable to cv::CellMultiValues. Use on `FunctionValues` for the specific field, e.g. getnbasefunctions(cv[:$k], args...)"))
@@ -287,7 +284,7 @@ for f in (:function_value, :function_gradient, :function_symmetric_gradient, :fu
     end
 end
 
-
+# Combined `reinit!` for both CellValues and CellMultiValues
 function reinit!(cv::Union{CellValues, CellMultiValues}, cell::Union{AbstractCell, Nothing}, x::AbstractVector{<:Vec})
     geo_mapping = cv.geo_mapping
     fun_values = cv.fun_values
