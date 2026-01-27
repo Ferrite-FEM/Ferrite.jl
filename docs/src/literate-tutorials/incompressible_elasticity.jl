@@ -23,7 +23,6 @@
 #md # The full program, without comments, can be found in the next
 #md # [section](@ref incompressible_elasticity-plain-program).
 using Ferrite, Tensors
-using SparseArrays, LinearAlgebra
 
 # First we generate a simple grid, specifying the 4 corners of Cooks membrane.
 function create_cook_grid(nx, ny)
@@ -84,15 +83,12 @@ struct LinearElasticity{T}
     K::T
 end
 
-# Now to the assembling of the stiffness matrix. This mixed formulation leads to a blocked
-# element matrix. Since Ferrite does not force us to use any particular matrix type we will
-# use a `BlockedArray` from `BlockArrays.jl`.
-
+# Next, we assemble the stiffness matrix and load vector.
 function doassemble(
-        cellvalues::CellMultiValues,
-        facetvalues_u::FacetValues,
-        K::SparseMatrixCSC, grid::Grid, dh::DofHandler, mp::LinearElasticity
+        cellvalues::CellMultiValues, facetvalues_u::FacetValues,
+        grid::Grid, dh::DofHandler, mp::LinearElasticity
     )
+    K = allocate_matrix(dh)
     f = zeros(ndofs(dh))
     assembler = start_assemble(K, f)
 
@@ -260,8 +256,7 @@ function solve(ν, interpolation_u, interpolation_p)
     cellvalues, facetvalues_u = create_values(interpolation_u, interpolation_p)
 
     ## Assembly and solve
-    K = allocate_matrix(dh)
-    K, f = doassemble(cellvalues, facetvalues_u, K, grid, dh, mp)
+    K, f = doassemble(cellvalues, facetvalues_u, grid, dh, mp)
     apply!(K, f, dbc)
     u = K \ f
 
