@@ -1,5 +1,4 @@
 using Ferrite, Tensors
-using SparseArrays, LinearAlgebra
 
 function create_cook_grid(nx, ny)
     corners = [
@@ -50,10 +49,10 @@ struct LinearElasticity{T}
 end
 
 function doassemble(
-        cellvalues::CellMultiValues,
-        facetvalues_u::FacetValues,
-        K::SparseMatrixCSC, grid::Grid, dh::DofHandler, mp::LinearElasticity
+        cellvalues::CellMultiValues, facetvalues_u::FacetValues,
+        grid::Grid, dh::DofHandler, mp::LinearElasticity
     )
+    K = allocate_matrix(dh)
     f = zeros(ndofs(dh))
     assembler = start_assemble(K, f)
 
@@ -193,8 +192,7 @@ function solve(ν, interpolation_u, interpolation_p)
     cellvalues, facetvalues_u = create_values(interpolation_u, interpolation_p)
 
     # Assembly and solve
-    K = allocate_matrix(dh)
-    K, f = doassemble(cellvalues, facetvalues_u, K, grid, dh, mp)
+    K, f = doassemble(cellvalues, facetvalues_u, grid, dh, mp)
     apply!(K, f, dbc)
     u = K \ f
 
