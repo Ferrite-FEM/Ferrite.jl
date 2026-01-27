@@ -131,6 +131,8 @@ interpolations while sharing the same quadrature points and geometrical interpol
 In general, functions applicable to a `CellValues` associated with the function interpolation
 in `func_interpols` with `key::Symbol` can be called on `cmv[key]`, as `cmv[key] isa FunctionValues`.
 Other functions relating to geometric properties and quadrature rules are called directly on `cmv`.
+No performance penalty occurs when using two equal function interpolations compared to a
+single function interpolation as their `FunctionValues` are aliased.
 
 **Arguments:**
 * `T`: an optional argument (default to `Float64`) to determine the type the internal data is stored as.
@@ -140,8 +142,10 @@ Other functions relating to geometric properties and quadrature rules are called
   By default linear Lagrange interpolation is used. For embedded elements the geometric interpolations should
   be vectorized to the spatial dimension.
 
-In general, no performance penalty for using two equal function interpolations compared to a
-single function interpolation should be expected as their `FunctionValues` are aliased.
+**Keyword arguments:** The following keyword arguments are experimental and may change in future minor releases
+* `update_gradients`: Specifies if the gradients of the shape functions should be updated (default true)
+* `update_hessians`: Specifies if the hessians of the shape functions should be updated (default false)
+* `update_detJdV`: Specifies if the volume associated with each quadrature point should be updated (default true)
 
 **Examples**
 
@@ -197,23 +201,24 @@ struct CellMultiValues{FVS, GM, QR, detT, FVT} <: AbstractCellValues
 end
 
 function CellMultiValues(
-        ::Type{T}, qr::QuadratureRule, ip_funs::NamedTuple, ip_geo::VectorizedInterpolation;
-        update_gradients::Bool = true, update_detJdV::Bool = true
-    ) where {T}
+        ::Type{T}, qr::QuadratureRule, ip_funs::NamedTuple, ip_geo::VectorizedInterpolation,
+        ::ValuesUpdateFlags{FunDiffOrder, GeoDiffOrder, UpdateDetJdV}
+    ) where {T, FunDiffOrder, GeoDiffOrder, UpdateDetJdV}
 
-    FunDiffOrder = convert(Int, update_gradients) # Logic must change when supporting update_hessian kwargs
-    GeoDiffOrder = max(maximum(ip_fun -> required_geo_diff_order(mapping_type(ip_fun), FunDiffOrder), values(ip_funs)), update_detJdV)
     geo_mapping = GeometryMapping{GeoDiffOrder}(T, ip_geo.ip, qr)
-    unique_ips = unique(values(ip_funs))
+    unique_ips = unique(values(ip_funs)) # Not type-stable, but ok for advanced users this should be constructed outside...
     fun_values = tuple((FunctionValues{FunDiffOrder}(T, ip_fun, qr, ip_geo) for ip_fun in unique_ips)...)
     fun_values_nt = NamedTuple((key => fun_values[findfirst(unique_ip -> ip == unique_ip, unique_ips)] for (key, ip) in pairs(ip_funs)))
-    detJdV = update_detJdV ? fill(T(NaN), length(getweights(qr))) : nothing
+    detJdV = UpdateDetJdV ? fill(T(NaN), length(getweights(qr))) : nothing
     return CellMultiValues(fun_values_nt, fun_values, geo_mapping, qr, detJdV)
 end
 
 CellMultiValues(qr::QuadratureRule, ip_funs::NamedTuple, args...; kwargs...) = CellMultiValues(Float64, qr, ip_funs, args...; kwargs...)
-function CellMultiValues(::Type{T}, qr, ip_funs::NamedTuple, ip_geo::ScalarInterpolation = default_geometric_interpolation(first(ip_funs)); kwargs...) where {T}
+function CellMultiValues(::Type{T}, qr, ip_funs::NamedTuple, ip_geo::ScalarInterpolation; kwargs...) where {T}
     return CellMultiValues(T, qr, ip_funs, VectorizedInterpolation(ip_geo); kwargs...)
+end
+function CellMultiValues(::Type{T}, qr, ip_funs::NamedTuple, ip_geo::VectorizedInterpolation = default_geometric_interpolation(first(ip_funs)); kwargs...) where {T}
+    return CellMultiValues(T, qr, ip_funs, ip_geo, ValuesUpdateFlags(ip_funs; kwargs...))
 end
 
 function Base.copy(cv::CMV) where {CMV <: CellMultiValues}

@@ -277,11 +277,15 @@ end
         ipu = Lagrange{RefQuadrilateral, 2}()^2
         ipp = Lagrange{RefQuadrilateral, 1}()
         ipT = ipp
+        iprt = RaviartThomas{RefQuadrilateral, 1}()
+
         qr = QuadratureRule{RefQuadrilateral}(2)
         cvu = CellValues(qr, ipu)
         cvp = CellValues(qr, ipp)
+        cvrt = CellValues(qr, iprt)
         cmv = CellMultiValues(qr, (u = ipu, p = ipp, T = ipT))
         cmv_u = CellMultiValues(qr, (u = ipu,)) # Case with a single interpolation
+        cmv_rt = CellMultiValues(qr, (u = ipu, r = iprt))
         cmv3 = CellMultiValues(qr, (u = ipu, T = Lagrange{RefQuadrilateral, 2}(), p = ipp)) # Case with 3 unique IPs
 
         @test cmv[:p] === cmv[:T] # Correct aliasing for identical interpolations
@@ -297,9 +301,11 @@ end
         @test getnbasefunctions(cmv[:p]) == getnbasefunctions(cvp)
 
         # Reinitialization
+        cell = Quadrilateral((1, 2, 3, 4))
         ref_coords = Ferrite.reference_coordinates(Ferrite.geometric_interpolation(cmv))
         x = map(xref -> xref + rand(typeof(xref)) / 5, ref_coords) # Random pertubation
         reinit!.((cvu, cvp, cmv, cmv_u, cmv3), (x,))
+        reinit!.((cvrt, cmv_rt), (cell,), (x,))
 
         # Test type-stable access by hard-coded key (relies on constant propagation)
         _getufield(x) = x[:u]
@@ -310,8 +316,9 @@ end
         ue = rand(getnbasefunctions(cmv[:u]) + getnbasefunctions(cmv[:p]))
         dru = 1:getnbasefunctions(cmv[:u])
         drp = (1:getnbasefunctions(cmv[:p])) .+ getnbasefunctions(cmv[:u])
+        drr = (1:getnbasefunctions(cmv_rt[:r])) .+ getnbasefunctions(cmv[:u])
         for q_point in 1:getnquadpoints(cmv)
-            for cmv_test in (cmv, cmv_u, cmv3)
+            for cmv_test in (cmv, cmv_u, cmv3, cmv_rt)
                 @test getdetJdV(cvu, q_point) ≈ getdetJdV(cmv, q_point)
                 @test spatial_coordinate(cvu, q_point, x) ≈ spatial_coordinate(cmv, q_point, x)
             end
@@ -322,6 +329,7 @@ end
                     (cvu, cmv3[:u], dru),
                     (cvp, cmv[:p], drp),
                     (cvp, cmv3[:p], drp),
+                    (cvrt, cmv_rt[:r], drr),
                 )
                 value = function_value(cv, q_point, ue, dr)
                 gradient = function_gradient(cv, q_point, ue, dr)
@@ -330,8 +338,8 @@ end
                 @test function_gradient(fv, q_point, ue[dr]) ≈ gradient
                 @test function_gradient(fv, q_point, ue, dr) ≈ gradient
                 if value isa Vec
-                    @test function_symmetric_gradient(cmv[:u], q_point, ue, dr) ≈ symmetric(gradient)
-                    @test function_divergence(cmv[:u], q_point, ue, dr) ≈ tr(gradient)
+                    @test function_symmetric_gradient(fv, q_point, ue, dr) ≈ symmetric(gradient)
+                    @test function_divergence(fv, q_point, ue, dr) ≈ tr(gradient)
                 end
                 for i in 1:getnbasefunctions(fv)
                     Ni = shape_value(cv, q_point, i)
