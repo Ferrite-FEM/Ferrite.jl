@@ -63,6 +63,19 @@ projected = project(proj, vals)
 ```
 where `projected` can be used in e.g. `evaluate_at_points` with the [`PointEvalHandler`](@ref),
 or with [`evaluate_at_grid_nodes`](@ref).
+
+### Background
+
+The operation done by the L2-projector can be interpreted as the Galerkin-projection of ``f`` onto ``u``:
+```math
+    \\int v (u - f) \\ \\mathrm{d}\\Omega = 0 \\quad \\forall v \\in U_h(\\Omega),
+```
+An alternative interpretation here is that we minimize the difference between ``f`` and ``u`` with the functional (induced by the ``L_2`` norm):
+```math
+    \\min_u \\int \\frac{1}{2} (u - f)^2 \\ \\mathrm{d}\\Omega \\, .
+```
+
+
 """
 function L2Projector(grid::AbstractGrid)
     dh = DofHandler(grid)
