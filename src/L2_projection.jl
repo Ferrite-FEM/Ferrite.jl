@@ -34,11 +34,11 @@ different cell sets with `add!` before `close!`ing the projector,
 see the example below.
 
 The `L2Projector` acts as the integrated left hand side of the projection equation:
-Find projection ``u \\in U_h(\\Omega) \\subset L_2(\\Omega)`` such that
+Find projection ``u \\in U(\\Omega) \\subset L_2(\\Omega)`` such that
 ```math
-\\int v u \\ \\mathrm{d}\\Omega = \\int v f \\ \\mathrm{d}\\Omega \\quad \\forall v \\in U_h(\\Omega),
+\\int v u \\ \\mathrm{d}\\Omega = \\int v f \\ \\mathrm{d}\\Omega \\quad \\forall v \\in U(\\Omega),
 ```
-where ``f \\in L_2(\\Omega)`` is the data to project. The function space ``U_h(\\Omega)``
+where ``f \\in L_2(\\Omega)`` is the data to project. The function space ``U(\\Omega)``
 is the finite element approximation given by the interpolations `add!`ed to the `L2Projector`.
 
 ### Example
@@ -63,6 +63,27 @@ projected = project(proj, vals)
 ```
 where `projected` can be used in e.g. `evaluate_at_points` with the [`PointEvalHandler`](@ref),
 or with [`evaluate_at_grid_nodes`](@ref).
+
+### Background
+
+The operation done by the L2-projector can be interpreted as the Galerkin-projection of ``f`` onto ``u``:
+```math
+    \\int v (u - f) \\ \\mathrm{d}\\Omega = 0 \\quad \\forall v \\in U(\\Omega),
+```
+where ``U`` is the test space on ``\\Omega``.
+An alternative interpretation here is that we minimize the difference between ``f`` and ``u`` with the functional (induced by the ``L_2`` norm):
+```math
+    \\min_u \\int \\frac{1}{2} (u - f)^2 \\ \\mathrm{d}\\Omega \\, .
+```
+Please note that the former projection form is equivalent to the first variation (Frechet derivative) of the minimization problem.
+
+After finite element discretization the resulting problem to solve becomes
+```math
+\\underbrace{\\int N_i N_j \\ \\mathrm{d}\\Omega}_{M_{ij}}\\ u^h_j = \\underbrace{\\int N_i f \\ \\mathrm{d}\\Omega}_{b_i}
+```
+where ``u^h_j`` denotes the unknown dofs of the finite-dimensional discrete space to project onto (e.g. Lagrange polynomials) with ansatz and test functions ``N``.
+``b_i`` denotes the right hand side of the finite-dimensional discrete linear system. For vectorized problems we simply apply the projection component-wise.
+
 """
 function L2Projector(grid::AbstractGrid)
     dh = DofHandler(grid)
