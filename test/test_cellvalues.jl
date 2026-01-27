@@ -380,7 +380,7 @@ end
             end
             qr = QuadratureRule{RefTriangle}(2)
             ip = Lagrange{RefTriangle, 1}()
-            cmv = CellMultiValues(qr, (u = ip, v = ip^2))
+            cmv = CellMultiValues(qr, (u = ip, v = ip^2), Lagrange{RefTriangle, 1}())
             test_argument_error_call(getnbasefunctions, cmv)
             for f in (shape_value, shape_gradient, shape_symmetric_gradient, shape_divergence)
                 test_argument_error_call(f, cmv, 1, 1)
