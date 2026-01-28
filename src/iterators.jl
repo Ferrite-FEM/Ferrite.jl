@@ -84,7 +84,7 @@ function reinit!(cc::CellCache, i::Int)
 end
 
 # reinit! FEValues with CellCache
-function reinit!(cv::Union{CellValues, CellMultiValues}, cc::CellCache)
+function reinit!(cv::AbstractCellValues, cc::CellCache)
     cell = reinit_needs_cell(cv) ? getcells(cc.grid, cellid(cc)) : nothing
     return reinit!(cv, cell, cc.coords)
 end

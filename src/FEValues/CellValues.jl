@@ -118,7 +118,6 @@ function reinit!(cv::AbstractCellValues, cell::Union{AbstractCell, Nothing}, x::
     if !checkbounds(Bool, x, 1:n_geom_basefuncs) || length(x) != n_geom_basefuncs
         throw_incompatible_coord_length(length(x), n_geom_basefuncs)
     end
-
     @inbounds for (q_point, w) in enumerate(getweights(cv.qr))
         mapping = calculate_mapping(geo_mapping, q_point, x)
         _update_detJdV!(cv.detJdV, q_point, w, mapping)
