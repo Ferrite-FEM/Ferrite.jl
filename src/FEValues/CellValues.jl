@@ -295,6 +295,22 @@ end
     end
 end
 
+function Base.show(io::IO, d::MIME"text/plain", cv::CellMultiValues)
+    ip_geo = geometric_interpolation(cv)
+    fv1 = first(get_fun_values(cv))
+    GradT = shape_gradient_type(fv1)
+    sdim = GradT === nothing ? nothing : sdim_from_gradtype(GradT)
+    print(io, "CellMultiValues with ", getnquadpoints(cv), " quadrature points")
+    print(io, "\nGeometric interpolation: ")
+    sdim === nothing ? show(io, d, ip_geo) : show(io, d, ip_geo^sdim)
+    print(io, "\nFunction interpolations")
+    for key in keys(getfield(cv, :fun_values_nt))
+        ip = function_interpolation(getfield(cv, :fun_values_nt)[key])
+        print(io, "\n  ", key, ": "); show(io, d, ip)
+    end
+    return
+end
+
 # Error messages for functions that should be called in individual `FunctionValues` to help users
 function getnbasefunctions(cv::CellMultiValues)
     k = first(propertynames(cv)) # Pick the first function values to use in example

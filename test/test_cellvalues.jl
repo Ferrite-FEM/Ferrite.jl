@@ -631,6 +631,13 @@ end
         pv_showstring = sprint(show, MIME"text/plain"(), pv)
         @test startswith(pv_showstring, "PointValues containing")
         @test contains(pv_showstring, "Function interpolation: Lagrange{RefPrism, 2}()")
+
+        cmv = CellMultiValues(QuadratureRule{RefPrism}(2), (u = Lagrange{RefPrism, 2}(), v = Lagrange{RefPrism, 1}()^3))
+        showstring = sprint(show, MIME"text/plain"(), cmv)
+        @test startswith(showstring, "CellMultiValues with 5 quadrature points")
+        @test contains(showstring, "Geometric interpolation: Lagrange{RefPrism, 1}()")
+        @test contains(showstring, "u: Lagrange{RefPrism, 2}()")
+        @test contains(showstring, "v: Lagrange{RefPrism, 1}()^3")
     end
 
     @testset "CustomCellValues" begin
