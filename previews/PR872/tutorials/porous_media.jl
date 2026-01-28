@@ -7,13 +7,11 @@ function Elastic(; E = 20.0e3, ν = 0.3)
     G = E / 2(1 + ν)
     K = E / 3(1 - 2ν)
     I2 = one(SymmetricTensor{2, 2})
-    I4vol = I2 ⊗ I2
-    I4dev = minorsymmetric(otimesu(I2, I2)) - I4vol / 3
-    return Elastic(2G * I4dev + K * I4vol)
+    I4dev = minorsymmetric(otimesu(I2, I2)) - I2 ⊗ I2 / 3
+    return Elastic(2G * I4dev + K * I2 ⊗ I2)
 end;
 
-function element_routine!(Ke, re, material::Elastic, cv, cell, a, args...)
-    reinit!(cv, cell)
+function element_routine!(Ke, re, material::Elastic, cv::CellValues, a, args...)
     n_basefuncs = getnbasefunctions(cv)
 
     for q_point in 1:getnquadpoints(cv)
@@ -41,52 +39,49 @@ struct PoroElastic{T}
 end
 PoroElastic(; elastic, k, ϕ, α, β) = PoroElastic(elastic, k, ϕ, α, β);
 
-function element_routine!(Ke, re, m::PoroElastic, cvs::Tuple, cell, a, a_old, Δt, sdh)
-    # Setup cellvalues and give easier names
-    reinit!.(cvs, (cell,))
-    cv_u, cv_p = cvs
+function element_routine!(Ke, re, m::PoroElastic, cv::CellMultiValues, a, a_old, Δt, sdh)
     dr_u = dof_range(sdh, :u)
     dr_p = dof_range(sdh, :p)
 
     C = m.elastic.C ## Elastic stiffness
 
     # Assemble stiffness and force vectors
-    for q_point in 1:getnquadpoints(cv_u)
-        dΩ = getdetJdV(cv_u, q_point)
-        p = function_value(cv_p, q_point, a, dr_p)
-        p_old = function_value(cv_p, q_point, a_old, dr_p)
+    for q_point in 1:getnquadpoints(cv)
+        dΩ = getdetJdV(cv, q_point)
+        p = function_value(cv[:p], q_point, a, dr_p)
+        p_old = function_value(cv[:p], q_point, a_old, dr_p)
         pdot = (p - p_old) / Δt
-        ∇p = function_gradient(cv_p, q_point, a, dr_p)
-        ϵ = function_symmetric_gradient(cv_u, q_point, a, dr_u)
-        tr_ϵ_old = function_divergence(cv_u, q_point, a_old, dr_u)
+        ∇p = function_gradient(cv[:p], q_point, a, dr_p)
+        ϵ = function_symmetric_gradient(cv[:u], q_point, a, dr_u)
+        tr_ϵ_old = function_divergence(cv[:u], q_point, a_old, dr_u)
         tr_ϵ_dot = (tr(ϵ) - tr_ϵ_old) / Δt
         σ_eff = C ⊡ ϵ
         # Variation of u_i
         for (iᵤ, Iᵤ) in pairs(dr_u)
-            ∇δNu = shape_symmetric_gradient(cv_u, q_point, iᵤ)
-            div_δNu = shape_divergence(cv_u, q_point, iᵤ)
+            ∇δNu = shape_symmetric_gradient(cv[:u], q_point, iᵤ)
+            div_δNu = shape_divergence(cv[:u], q_point, iᵤ)
             re[Iᵤ] += (∇δNu ⊡ σ_eff - div_δNu * p * m.α) * dΩ
             for (jᵤ, Jᵤ) in pairs(dr_u)
-                ∇Nu = shape_symmetric_gradient(cv_u, q_point, jᵤ)
+                ∇Nu = shape_symmetric_gradient(cv[:u], q_point, jᵤ)
                 Ke[Iᵤ, Jᵤ] += (∇δNu ⊡ C ⊡ ∇Nu) * dΩ
             end
             for (jₚ, Jₚ) in pairs(dr_p)
-                Np = shape_value(cv_p, q_point, jₚ)
+                Np = shape_value(cv[:p], q_point, jₚ)
                 Ke[Iᵤ, Jₚ] -= (div_δNu * m.α * Np) * dΩ
             end
         end
         # Variation of p_i
         for (iₚ, Iₚ) in pairs(dr_p)
-            δNp = shape_value(cv_p, q_point, iₚ)
-            ∇δNp = shape_gradient(cv_p, q_point, iₚ)
+            δNp = shape_value(cv[:p], q_point, iₚ)
+            ∇δNp = shape_gradient(cv[:p], q_point, iₚ)
             re[Iₚ] += (δNp * (m.α * tr_ϵ_dot + m.β * pdot) + m.k * (∇δNp ⋅ ∇p)) * dΩ
             for (jᵤ, Jᵤ) in pairs(dr_u)
-                div_Nu = shape_divergence(cv_u, q_point, jᵤ)
+                div_Nu = shape_divergence(cv[:u], q_point, jᵤ)
                 Ke[Iₚ, Jᵤ] += δNp * (m.α / Δt) * div_Nu * dΩ
             end
             for (jₚ, Jₚ) in pairs(dr_p)
-                ∇Np = shape_gradient(cv_p, q_point, jₚ)
-                Np = shape_value(cv_p, q_point, jₚ)
+                ∇Np = shape_gradient(cv[:p], q_point, jₚ)
+                Np = shape_value(cv[:p], q_point, jₚ)
                 Ke[Iₚ, Jₚ] += (δNp * m.β * Np / Δt + m.k * (∇δNp ⋅ ∇Np)) * dΩ
             end
         end
@@ -123,7 +118,8 @@ function doassemble!(assembler, domain::FEDomain, a, a_old, Δt)
         map!(i -> a_old[i], ae_old, celldofs(cell))
         fill!(Ke, 0)
         fill!(re, 0)
-        element_routine!(Ke, re, material, cv, cell, ae, ae_old, Δt, sdh)
+        reinit!(cv, cell)
+        element_routine!(Ke, re, material, cv, ae, ae_old, Δt, sdh)
         assemble!(assembler, celldofs(cell), Ke, re)
     end
     return
@@ -166,8 +162,8 @@ function setup_problem(; t_rise = 0.1, u_max = -0.1)
     # CellValues
     cvu_quad = CellValues(qr_quad, ipu_quad)
     cvu_tri = CellValues(qr_tri, ipu_tri)
-    cvp_quad = CellValues(qr_quad, ipp_quad)
-    cvp_tri = CellValues(qr_tri, ipp_tri)
+    cmv_quad = CellMultiValues(qr_quad, (u = ipu_quad, p = ipp_quad))
+    cmv_tri = CellMultiValues(qr_tri, (u = ipu_tri, p = ipp_tri))
 
     # Setup the DofHandler
     dh = DofHandler(grid)
@@ -192,8 +188,8 @@ function setup_problem(; t_rise = 0.1, u_max = -0.1)
     domains = [
         FEDomain(m_solid, cvu_quad, sdh_solid_quad),
         FEDomain(m_solid, cvu_tri, sdh_solid_tri),
-        FEDomain(m_porous, (cvu_quad, cvp_quad), sdh_porous_quad),
-        FEDomain(m_porous, (cvu_tri, cvp_tri), sdh_porous_tri),
+        FEDomain(m_porous, cmv_quad, sdh_porous_quad),
+        FEDomain(m_porous, cmv_tri, sdh_porous_tri),
     ]
 
     # Boundary conditions
@@ -236,10 +232,10 @@ function solve(dh, ch, domains; Δt = 0.025, t_total = 1.0)
         end
     end
     vtk_save(pvd)
-    return
+    return a
 end;
 
 dh, ch, domains = setup_problem()
-solve(dh, ch, domains);
+a = solve(dh, ch, domains);
 
 # This file was generated using Literate.jl, https://github.com/fredrikekre/Literate.jl

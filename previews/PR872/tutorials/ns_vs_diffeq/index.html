@@ -50,10 +50,8 @@ gmsh.option.setNumber(&quot;Mesh.MeshSizeMax&quot;, 0.05)</code></pre><p>In the 
 grid = togrid()
 Gmsh.finalize();</code></pre><h3 id="Function-space"><a class="docs-heading-anchor" href="#Function-space">Function space</a><a id="Function-space-1"></a><a class="docs-heading-anchor-permalink" href="#Function-space" title="Permalink"></a></h3><p>To ensure stability we utilize the Taylor-Hood element pair Q2-Q1.  We have to utilize the same quadrature rule for the pressure as for the velocity, because in the weak form the  linear pressure term is tested against a quadratic function.</p><pre><code class="language-julia hljs">ip_v = Lagrange{RefQuadrilateral, 2}()^dim
 qr = QuadratureRule{RefQuadrilateral}(4)
-cellvalues_v = CellValues(qr, ip_v);
-
 ip_p = Lagrange{RefQuadrilateral, 1}()
-cellvalues_p = CellValues(qr, ip_p);
+cellvalues = CellMultiValues(qr, (v = ip_v, p = ip_p))
 
 dh = DofHandler(grid)
 add!(dh, :v, ip_v)
@@ -70,10 +68,10 @@ inflow_bc = Dirichlet(:v, ∂Ω_inflow, parabolic_inflow_profile, [1, 2])
 add!(ch, inflow_bc);</code></pre><p>The outflow boundary condition has been applied on the right side of the cylinder when the weak form has been derived by setting the boundary integral to zero. It is also called the do-nothing condition. Other outflow conditions are also possible.</p><pre><code class="language-julia hljs">∂Ω_free = getfacetset(grid, &quot;right&quot;);
 
 close!(ch)
-update!(ch, 0.0);</code></pre><h3 id="Linear-system-assembly"><a class="docs-heading-anchor" href="#Linear-system-assembly">Linear system assembly</a><a id="Linear-system-assembly-1"></a><a class="docs-heading-anchor-permalink" href="#Linear-system-assembly" title="Permalink"></a></h3><p>Next we describe how the block mass matrix and the Stokes matrix are assembled.</p><p>For the block mass matrix <span>$M$</span> we remember that only the first equation had a time derivative and that the block mass matrix corresponds to the term arising from discretizing the time derivatives. Hence, only the upper left block has non-zero components.</p><pre><code class="language-julia hljs">function assemble_mass_matrix(cellvalues_v::CellValues, cellvalues_p::CellValues, M::SparseMatrixCSC, dh::DofHandler)
+update!(ch, 0.0);</code></pre><h3 id="Linear-system-assembly"><a class="docs-heading-anchor" href="#Linear-system-assembly">Linear system assembly</a><a id="Linear-system-assembly-1"></a><a class="docs-heading-anchor-permalink" href="#Linear-system-assembly" title="Permalink"></a></h3><p>Next we describe how the block mass matrix and the Stokes matrix are assembled.</p><p>For the block mass matrix <span>$M$</span> we remember that only the first equation had a time derivative and that the block mass matrix corresponds to the term arising from discretizing the time derivatives. Hence, only the upper left block has non-zero components.</p><pre><code class="language-julia hljs">function assemble_mass_matrix(cv::CellMultiValues, M::SparseMatrixCSC, dh::DofHandler)
     # Allocate a buffer for the local matrix and some helpers, together with the assembler.
-    n_basefuncs_v = getnbasefunctions(cellvalues_v)
-    n_basefuncs_p = getnbasefunctions(cellvalues_p)
+    n_basefuncs_v = getnbasefunctions(cv[:v])
+    n_basefuncs_p = getnbasefunctions(cv[:p])
     n_basefuncs = n_basefuncs_v + n_basefuncs_p
     v▄, p▄ = 1, 2
     Mₑ = BlockedArray(zeros(n_basefuncs, n_basefuncs), [n_basefuncs_v, n_basefuncs_p], [n_basefuncs_v, n_basefuncs_p])
@@ -82,16 +80,16 @@ update!(ch, 0.0);</code></pre><h3 id="Linear-system-assembly"><a class="docs-hea
     mass_assembler = start_assemble(M)
     for cell in CellIterator(dh)
         fill!(Mₑ, 0)
-        Ferrite.reinit!(cellvalues_v, cell)
+        Ferrite.reinit!(cv, cell)
 
-        for q_point in 1:getnquadpoints(cellvalues_v)
-            dΩ = getdetJdV(cellvalues_v, q_point)
+        for q_point in 1:getnquadpoints(cv)
+            dΩ = getdetJdV(cv, q_point)
             # Remember that we assemble a vector mass term, hence the dot product.
             # There is only one time derivative on the left hand side, so only one mass block is non-zero.
             for i in 1:n_basefuncs_v
-                φᵢ = shape_value(cellvalues_v, q_point, i)
+                φᵢ = shape_value(cv[:v], q_point, i)
                 for j in 1:n_basefuncs_v
-                    φⱼ = shape_value(cellvalues_v, q_point, j)
+                    φⱼ = shape_value(cv[:v], q_point, j)
                     Mₑ[BlockIndex((v▄, v▄), (i, j))] += φᵢ ⋅ φⱼ * dΩ
                 end
             end
@@ -103,10 +101,10 @@ update!(ch, 0.0);</code></pre><h3 id="Linear-system-assembly"><a class="docs-hea
 end;</code></pre><p>Next we discuss the assembly of the Stokes matrix appearing on the right hand side. Remember that we use the same function spaces for trial and test, hence the matrix has the following block form</p><p class="math-container">\[  K = \begin{bmatrix}
       A &amp; B^{\textrm{T}} \\
       B &amp; 0
-  \end{bmatrix}\]</p><p>which is also called saddle point matrix. These problems are known to have a non-trivial kernel, which is a reflection of the strong form as discussed in the theory portion if this example.</p><pre><code class="language-julia hljs">function assemble_stokes_matrix(cellvalues_v::CellValues, cellvalues_p::CellValues, ν, K::SparseMatrixCSC, dh::DofHandler)
+  \end{bmatrix}\]</p><p>which is also called saddle point matrix. These problems are known to have a non-trivial kernel, which is a reflection of the strong form as discussed in the theory portion if this example.</p><pre><code class="language-julia hljs">function assemble_stokes_matrix(cv::CellMultiValues, ν, K::SparseMatrixCSC, dh::DofHandler)
     # Again, some buffers and helpers
-    n_basefuncs_v = getnbasefunctions(cellvalues_v)
-    n_basefuncs_p = getnbasefunctions(cellvalues_p)
+    n_basefuncs_v = getnbasefunctions(cv[:v])
+    n_basefuncs_p = getnbasefunctions(cv[:p])
     n_basefuncs = n_basefuncs_v + n_basefuncs_p
     v▄, p▄ = 1, 2
     Kₑ = BlockedArray(zeros(n_basefuncs, n_basefuncs), [n_basefuncs_v, n_basefuncs_p], [n_basefuncs_v, n_basefuncs_p])
@@ -116,21 +114,18 @@ end;</code></pre><p>Next we discuss the assembly of the Stokes matrix appearing 
     for cell in CellIterator(dh)
         # Don&#39;t forget to initialize everything
         fill!(Kₑ, 0)
-
-        Ferrite.reinit!(cellvalues_v, cell)
-        Ferrite.reinit!(cellvalues_p, cell)
-
-        for q_point in 1:getnquadpoints(cellvalues_v)
-            dΩ = getdetJdV(cellvalues_v, q_point)</code></pre><p>Assemble local viscosity block of <span>$A$</span></p><pre><code class="language-julia hljs">            for i in 1:n_basefuncs_v
-                ∇φᵢ = shape_gradient(cellvalues_v, q_point, i)
+        Ferrite.reinit!(cv, cell)
+        for q_point in 1:getnquadpoints(cv)
+            dΩ = getdetJdV(cv, q_point)</code></pre><p>Assemble local viscosity block of <span>$A$</span></p><pre><code class="language-julia hljs">            for i in 1:n_basefuncs_v
+                ∇φᵢ = shape_gradient(cv[:v], q_point, i)
                 for j in 1:n_basefuncs_v
-                    ∇φⱼ = shape_gradient(cellvalues_v, q_point, j)
+                    ∇φⱼ = shape_gradient(cv[:v], q_point, j)
                     Kₑ[BlockIndex((v▄, v▄), (i, j))] -= ν * ∇φᵢ ⊡ ∇φⱼ * dΩ
                 end
             end</code></pre><p>Assemble local pressure and incompressibility blocks of <span>$B^{\textrm{T}}$</span> and <span>$B$</span>.</p><pre><code class="language-julia hljs">            for j in 1:n_basefuncs_p
-                ψ = shape_value(cellvalues_p, q_point, j)
+                ψ = shape_value(cv[:p], q_point, j)
                 for i in 1:n_basefuncs_v
-                    divφ = shape_divergence(cellvalues_v, q_point, i)
+                    divφ = shape_divergence(cv[:v], q_point, i)
                     Kₑ[BlockIndex((v▄, p▄), (i, j))] += (divφ * ψ) * dΩ
                     Kₑ[BlockIndex((p▄, v▄), (j, i))] += (ψ * divφ) * dΩ
                 end
@@ -146,70 +141,70 @@ end;</code></pre><h3 id="Solution-of-the-semi-discretized-system-via-Differentia
 Δt_save = 0.1
 
 M = allocate_matrix(dh);
-M = assemble_mass_matrix(cellvalues_v, cellvalues_p, M, dh);
+M = assemble_mass_matrix(cellvalues, M, dh);
 
 K = allocate_matrix(dh);
-K = assemble_stokes_matrix(cellvalues_v, cellvalues_p, ν, K, dh);</code></pre><p>These are our initial conditions. We start from the zero solution, because it is trivially admissible if the Dirichlet conditions are zero everywhere on the Dirichlet boundary for <span>$t=0$</span>. Note that the time stepper is also doing fine if the Dirichlet condition is non-zero and not too pathological.</p><pre><code class="language-julia hljs">u₀ = zeros(ndofs(dh))
+K = assemble_stokes_matrix(cellvalues, ν, K, dh);</code></pre><p>These are our initial conditions. We start from the zero solution, because it is trivially admissible if the Dirichlet conditions are zero everywhere on the Dirichlet boundary for <span>$t=0$</span>. Note that the time stepper is also doing fine if the Dirichlet condition is non-zero and not too pathological.</p><pre><code class="language-julia hljs">u₀ = zeros(ndofs(dh))
 apply!(u₀, ch);</code></pre><p>DifferentialEquations assumes dense matrices by default, which is not feasible for semi-discretization of finite element models. We communicate that a sparse matrix with specified pattern should be utilized through the <code>jac_prototyp</code> argument. It is simple to see that the Jacobian and the stiffness matrix share the same sparsity pattern, since they share the same relation between trial and test functions.</p><pre><code class="language-julia hljs">jac_sparsity = sparse(K);</code></pre><p>To apply the nonlinear portion of the Navier-Stokes problem we simply hand over the dof handler and cell values to the right-hand-side (RHS) as a parameter. Furthermore the pre-assembled linear part, our Stokes operator (which is time independent) is passed to save some additional runtime. To apply the time-dependent Dirichlet BCs, we also need to hand over the constraint handler. The basic idea to apply the Dirichlet BCs consistently is that we copy the current solution <code>u</code>, apply the Dirichlet BCs on the copy, evaluate the discretized RHS of the Navier-Stokes equations with this vector. Furthermore we pass down the Jacobian assembly manually. For the Jacobian we eliminate all rows and columns associated with constrained dofs. Also note that we eliminate the mass matrix beforehand in a similar fashion. This decouples the time evolution of the constrained dofs from the true unknowns. The correct solution is enforced by utilizing step and stage limiters. The correct norms are computed by passing down a custom norm which simply ignores all constrained dofs.</p><div class="admonition is-info" id="Note-d6bc9c6e1f2166b"><header class="admonition-header">Note<a class="admonition-anchor" href="#Note-d6bc9c6e1f2166b" title="Permalink"></a></header><div class="admonition-body"><p>An alternative strategy is to hook into the nonlinear and linear solvers and enforce the solution therein. However, this is not possible at the time of writing this tutorial.</p></div></div><pre><code class="language-julia hljs">apply!(M, ch)
 
-struct RHSparams
-    K::SparseMatrixCSC
-    ch::ConstraintHandler
-    dh::DofHandler
-    cellvalues_v::CellValues
-    u::Vector
+struct RHSparams{KT, CH, DH, CV, UT}
+    K::KT  # SparseMatrixCSC
+    ch::CH # ConstraintHandler
+    dh::DH # DofHandler
+    cv::CV # CellMultiValues
+    u::UT  # Vector
 end
-p = RHSparams(K, ch, dh, cellvalues_v, copy(u₀))
+p = RHSparams(K, ch, dh, cellvalues, copy(u₀))
 
 function ferrite_limiter!(u, _, p, t)
     update!(p.ch, t)
     return apply!(u, p.ch)
 end
 
-function navierstokes_rhs_element!(dvₑ, vₑ, cellvalues_v)
-    n_basefuncs = getnbasefunctions(cellvalues_v)
-    for q_point in 1:getnquadpoints(cellvalues_v)
-        dΩ = getdetJdV(cellvalues_v, q_point)
-        ∇v = function_gradient(cellvalues_v, q_point, vₑ)
-        v = function_value(cellvalues_v, q_point, vₑ)
+function navierstokes_rhs_element!(dvₑ, vₑ, cv)
+    n_basefuncs = getnbasefunctions(cv[:v])
+    for q_point in 1:getnquadpoints(cv)
+        dΩ = getdetJdV(cv, q_point)
+        ∇v = function_gradient(cv[:v], q_point, vₑ)
+        v = function_value(cv[:v], q_point, vₑ)
         for j in 1:n_basefuncs
-            φⱼ = shape_value(cellvalues_v, q_point, j)</code></pre><p>Note that in Tensors.jl the definition <span>$\textrm{grad} v = \nabla v$</span> holds. With this information it can be quickly shown in index notation that</p><p class="math-container">\[[(v \cdot \nabla) v]_{\textrm{i}} = v_{\textrm{j}} (\partial_{\textrm{j}} v_{\textrm{i}}) = [v (\nabla v)^{\textrm{T}}]_{\textrm{i}}\]</p><p>where we should pay attentation to the transpose of the gradient.</p><pre><code class="language-julia hljs">            dvₑ[j] -= v ⋅ ∇v&#39; ⋅ φⱼ * dΩ
+            φⱼ = shape_value(cv[:v], q_point, j)</code></pre><p>Note that in Tensors.jl the definition <span>$\textrm{grad} v = \nabla v$</span> holds. With this information it can be quickly shown in index notation that</p><p class="math-container">\[[(v \cdot \nabla) v]_{\textrm{i}} = v_{\textrm{j}} (\partial_{\textrm{j}} v_{\textrm{i}}) = [v (\nabla v)^{\textrm{T}}]_{\textrm{i}}\]</p><p>where we should pay attentation to the transpose of the gradient.</p><pre><code class="language-julia hljs">            dvₑ[j] -= v ⋅ ∇v&#39; ⋅ φⱼ * dΩ
         end
     end
     return
 end
 
-function navierstokes!(du, u_uc, p::RHSparams, t)</code></pre><p>Unpack the struct to save some allocations.</p><pre><code class="language-julia hljs">    (; K, ch, dh, cellvalues_v, u) = p</code></pre><p>We start by applying the time-dependent Dirichlet BCs. Note that we are not allowed to mutate <code>u_uc</code>! Furthermore not that we also can not pre- allocate a buffer for this variable variable if we want to use AD to derive the Jacobian matrix, which appears in stiff solvers. Therefore, for efficiency reasons, we simply pass down the jacobian analytically.</p><pre><code class="language-julia hljs">    u .= u_uc
+function navierstokes!(du, u_uc, p::RHSparams, t)</code></pre><p>Unpack the struct to save some allocations.</p><pre><code class="language-julia hljs">    (; K, ch, dh, cv, u) = p</code></pre><p>We start by applying the time-dependent Dirichlet BCs. Note that we are not allowed to mutate <code>u_uc</code>! Furthermore not that we also can not pre- allocate a buffer for this variable variable if we want to use AD to derive the Jacobian matrix, which appears in stiff solvers. Therefore, for efficiency reasons, we simply pass down the jacobian analytically.</p><pre><code class="language-julia hljs">    u .= u_uc
     update!(ch, t)
     apply!(u, ch)</code></pre><p>Now we apply the rhs of the Navier-Stokes equations</p><pre><code class="language-julia hljs">    # Linear contribution (Stokes operator)
     mul!(du, K, u) # du .= K * u
 
     # nonlinear contribution
     v_range = dof_range(dh, :v)
-    n_basefuncs = getnbasefunctions(cellvalues_v)
+    n_basefuncs = getnbasefunctions(cv[:v])
     vₑ = zeros(n_basefuncs)
     duₑ = zeros(n_basefuncs)
     for cell in CellIterator(dh)
-        Ferrite.reinit!(cellvalues_v, cell)
+        Ferrite.reinit!(cv, cell)
         v_celldofs = @view celldofs(cell)[v_range]
         vₑ .= @views u[v_celldofs]
         fill!(duₑ, 0.0)
-        navierstokes_rhs_element!(duₑ, vₑ, cellvalues_v)
+        navierstokes_rhs_element!(duₑ, vₑ, cv)
         assemble!(du, v_celldofs, duₑ)
     end
     return
 end;
 
-function navierstokes_jac_element!(Jₑ, vₑ, cellvalues_v)
-    n_basefuncs = getnbasefunctions(cellvalues_v)
-    for q_point in 1:getnquadpoints(cellvalues_v)
-        dΩ = getdetJdV(cellvalues_v, q_point)
-        ∇v = function_gradient(cellvalues_v, q_point, vₑ)
-        v = function_value(cellvalues_v, q_point, vₑ)
+function navierstokes_jac_element!(Jₑ, vₑ, cv)
+    n_basefuncs = getnbasefunctions(cv[:v])
+    for q_point in 1:getnquadpoints(cv)
+        dΩ = getdetJdV(cv, q_point)
+        ∇v = function_gradient(cv[:v], q_point, vₑ)
+        v = function_value(cv[:v], q_point, vₑ)
         for j in 1:n_basefuncs
-            φⱼ = shape_value(cellvalues_v, q_point, j)</code></pre><p>Note that in Tensors.jl the definition <span>$\textrm{grad} v = \nabla v$</span> holds. With this information it can be quickly shown in index notation that</p><p class="math-container">\[[(v \cdot \nabla) v]_{\textrm{i}} = v_{\textrm{j}} (\partial_{\textrm{j}} v_{\textrm{i}}) = [v (\nabla v)^{\textrm{T}}]_{\textrm{i}}\]</p><p>where we should pay attentation to the transpose of the gradient.</p><pre><code class="language-julia hljs">            for i in 1:n_basefuncs
-                φᵢ = shape_value(cellvalues_v, q_point, i)
-                ∇φᵢ = shape_gradient(cellvalues_v, q_point, i)
+            φⱼ = shape_value(cv[:v], q_point, j)</code></pre><p>Note that in Tensors.jl the definition <span>$\textrm{grad} v = \nabla v$</span> holds. With this information it can be quickly shown in index notation that</p><p class="math-container">\[[(v \cdot \nabla) v]_{\textrm{i}} = v_{\textrm{j}} (\partial_{\textrm{j}} v_{\textrm{i}}) = [v (\nabla v)^{\textrm{T}}]_{\textrm{i}}\]</p><p>where we should pay attentation to the transpose of the gradient.</p><pre><code class="language-julia hljs">            for i in 1:n_basefuncs
+                φᵢ = shape_value(cv[:v], q_point, i)
+                ∇φᵢ = shape_gradient(cv[:v], q_point, i)
                 Jₑ[j, i] -= (φᵢ ⋅ ∇v&#39; + v ⋅ ∇φᵢ&#39;) ⋅ φⱼ * dΩ
             end
         end
@@ -217,7 +212,7 @@ function navierstokes_jac_element!(Jₑ, vₑ, cellvalues_v)
     return
 end
 
-function navierstokes_jac!(J, u_uc, p, t)</code></pre><p>Unpack the struct to save some allocations.</p><pre><code class="language-julia hljs">    (; K, ch, dh, cellvalues_v, u) = p</code></pre><p>We start by applying the time-dependent Dirichlet BCs. Note that we are not allowed to mutate <code>u_uc</code>, so we use our buffer again.</p><pre><code class="language-julia hljs">    u .= u_uc
+function navierstokes_jac!(J, u_uc, p, t)</code></pre><p>Unpack the struct to save some allocations.</p><pre><code class="language-julia hljs">    (; K, ch, dh, cv, u) = p</code></pre><p>We start by applying the time-dependent Dirichlet BCs. Note that we are not allowed to mutate <code>u_uc</code>, so we use our buffer again.</p><pre><code class="language-julia hljs">    u .= u_uc
     update!(ch, t)
     apply!(u, ch)</code></pre><p>Now we apply the Jacobian of the Navier-Stokes equations.</p><pre><code class="language-julia hljs">    # Linear contribution (Stokes operator)
     # Here we assume that J has exactly the same structure as K by construction
@@ -226,17 +221,17 @@ function navierstokes_jac!(J, u_uc, p, t)</code></pre><p>Unpack the struct to sa
     assembler = start_assemble(J; fillzero = false)
 
     # Assemble variation of the nonlinear term
-    n_basefuncs = getnbasefunctions(cellvalues_v)
+    n_basefuncs = getnbasefunctions(cv[:v])
     Jₑ = zeros(n_basefuncs, n_basefuncs)
     vₑ = zeros(n_basefuncs)
     v_range = dof_range(dh, :v)
     for cell in CellIterator(dh)
-        Ferrite.reinit!(cellvalues_v, cell)
+        Ferrite.reinit!(cv, cell)
         v_celldofs = @view celldofs(cell)[v_range]
 
         vₑ .= @views u[v_celldofs]
         fill!(Jₑ, 0.0)
-        navierstokes_jac_element!(Jₑ, vₑ, cellvalues_v)
+        navierstokes_jac_element!(Jₑ, vₑ, cv)
         assemble!(assembler, v_celldofs, Jₑ)
     end</code></pre><p>Finally we eliminate the constrained dofs from the Jacobian to decouple them in the nonlinear solver from the remaining system.</p><pre><code class="language-julia hljs">    return apply!(J, ch)
 end;</code></pre><p>Finally, together with our pre-assembled mass matrix, we are now able to define our problem in mass matrix form.</p><pre><code class="language-julia hljs">rhs = ODEFunction(navierstokes!, mass_matrix = M; jac = navierstokes_jac!, jac_prototype = jac_sparsity)
@@ -293,10 +288,8 @@ Gmsh.finalize();
 
 ip_v = Lagrange{RefQuadrilateral, 2}()^dim
 qr = QuadratureRule{RefQuadrilateral}(4)
-cellvalues_v = CellValues(qr, ip_v);
-
 ip_p = Lagrange{RefQuadrilateral, 1}()
-cellvalues_p = CellValues(qr, ip_p);
+cellvalues = CellMultiValues(qr, (v = ip_v, p = ip_p))
 
 dh = DofHandler(grid)
 add!(dh, :v, ip_v)
@@ -323,10 +316,10 @@ add!(ch, inflow_bc);
 close!(ch)
 update!(ch, 0.0);
 
-function assemble_mass_matrix(cellvalues_v::CellValues, cellvalues_p::CellValues, M::SparseMatrixCSC, dh::DofHandler)
+function assemble_mass_matrix(cv::CellMultiValues, M::SparseMatrixCSC, dh::DofHandler)
     # Allocate a buffer for the local matrix and some helpers, together with the assembler.
-    n_basefuncs_v = getnbasefunctions(cellvalues_v)
-    n_basefuncs_p = getnbasefunctions(cellvalues_p)
+    n_basefuncs_v = getnbasefunctions(cv[:v])
+    n_basefuncs_p = getnbasefunctions(cv[:p])
     n_basefuncs = n_basefuncs_v + n_basefuncs_p
     v▄, p▄ = 1, 2
     Mₑ = BlockedArray(zeros(n_basefuncs, n_basefuncs), [n_basefuncs_v, n_basefuncs_p], [n_basefuncs_v, n_basefuncs_p])
@@ -335,16 +328,16 @@ function assemble_mass_matrix(cellvalues_v::CellValues, cellvalues_p::CellValues
     mass_assembler = start_assemble(M)
     for cell in CellIterator(dh)
         fill!(Mₑ, 0)
-        Ferrite.reinit!(cellvalues_v, cell)
+        Ferrite.reinit!(cv, cell)
 
-        for q_point in 1:getnquadpoints(cellvalues_v)
-            dΩ = getdetJdV(cellvalues_v, q_point)
+        for q_point in 1:getnquadpoints(cv)
+            dΩ = getdetJdV(cv, q_point)
             # Remember that we assemble a vector mass term, hence the dot product.
             # There is only one time derivative on the left hand side, so only one mass block is non-zero.
             for i in 1:n_basefuncs_v
-                φᵢ = shape_value(cellvalues_v, q_point, i)
+                φᵢ = shape_value(cv[:v], q_point, i)
                 for j in 1:n_basefuncs_v
-                    φⱼ = shape_value(cellvalues_v, q_point, j)
+                    φⱼ = shape_value(cv[:v], q_point, j)
                     Mₑ[BlockIndex((v▄, v▄), (i, j))] += φᵢ ⋅ φⱼ * dΩ
                 end
             end
@@ -355,10 +348,10 @@ function assemble_mass_matrix(cellvalues_v::CellValues, cellvalues_p::CellValues
     return M
 end;
 
-function assemble_stokes_matrix(cellvalues_v::CellValues, cellvalues_p::CellValues, ν, K::SparseMatrixCSC, dh::DofHandler)
+function assemble_stokes_matrix(cv::CellMultiValues, ν, K::SparseMatrixCSC, dh::DofHandler)
     # Again, some buffers and helpers
-    n_basefuncs_v = getnbasefunctions(cellvalues_v)
-    n_basefuncs_p = getnbasefunctions(cellvalues_p)
+    n_basefuncs_v = getnbasefunctions(cv[:v])
+    n_basefuncs_p = getnbasefunctions(cv[:p])
     n_basefuncs = n_basefuncs_v + n_basefuncs_p
     v▄, p▄ = 1, 2
     Kₑ = BlockedArray(zeros(n_basefuncs, n_basefuncs), [n_basefuncs_v, n_basefuncs_p], [n_basefuncs_v, n_basefuncs_p])
@@ -368,25 +361,22 @@ function assemble_stokes_matrix(cellvalues_v::CellValues, cellvalues_p::CellValu
     for cell in CellIterator(dh)
         # Don&#39;t forget to initialize everything
         fill!(Kₑ, 0)
-
-        Ferrite.reinit!(cellvalues_v, cell)
-        Ferrite.reinit!(cellvalues_p, cell)
-
-        for q_point in 1:getnquadpoints(cellvalues_v)
-            dΩ = getdetJdV(cellvalues_v, q_point)
+        Ferrite.reinit!(cv, cell)
+        for q_point in 1:getnquadpoints(cv)
+            dΩ = getdetJdV(cv, q_point)
 
             for i in 1:n_basefuncs_v
-                ∇φᵢ = shape_gradient(cellvalues_v, q_point, i)
+                ∇φᵢ = shape_gradient(cv[:v], q_point, i)
                 for j in 1:n_basefuncs_v
-                    ∇φⱼ = shape_gradient(cellvalues_v, q_point, j)
+                    ∇φⱼ = shape_gradient(cv[:v], q_point, j)
                     Kₑ[BlockIndex((v▄, v▄), (i, j))] -= ν * ∇φᵢ ⊡ ∇φⱼ * dΩ
                 end
             end
 
             for j in 1:n_basefuncs_p
-                ψ = shape_value(cellvalues_p, q_point, j)
+                ψ = shape_value(cv[:p], q_point, j)
                 for i in 1:n_basefuncs_v
-                    divφ = shape_divergence(cellvalues_v, q_point, i)
+                    divφ = shape_divergence(cv[:v], q_point, i)
                     Kₑ[BlockIndex((v▄, p▄), (i, j))] += (divφ * ψ) * dΩ
                     Kₑ[BlockIndex((p▄, v▄), (j, i))] += (ψ * divφ) * dΩ
                 end
@@ -404,10 +394,10 @@ T = 6.0
 Δt_save = 0.1
 
 M = allocate_matrix(dh);
-M = assemble_mass_matrix(cellvalues_v, cellvalues_p, M, dh);
+M = assemble_mass_matrix(cellvalues, M, dh);
 
 K = allocate_matrix(dh);
-K = assemble_stokes_matrix(cellvalues_v, cellvalues_p, ν, K, dh);
+K = assemble_stokes_matrix(cellvalues, ν, K, dh);
 
 u₀ = zeros(ndofs(dh))
 apply!(u₀, ch);
@@ -416,28 +406,28 @@ jac_sparsity = sparse(K);
 
 apply!(M, ch)
 
-struct RHSparams
-    K::SparseMatrixCSC
-    ch::ConstraintHandler
-    dh::DofHandler
-    cellvalues_v::CellValues
-    u::Vector
+struct RHSparams{KT, CH, DH, CV, UT}
+    K::KT  # SparseMatrixCSC
+    ch::CH # ConstraintHandler
+    dh::DH # DofHandler
+    cv::CV # CellMultiValues
+    u::UT  # Vector
 end
-p = RHSparams(K, ch, dh, cellvalues_v, copy(u₀))
+p = RHSparams(K, ch, dh, cellvalues, copy(u₀))
 
 function ferrite_limiter!(u, _, p, t)
     update!(p.ch, t)
     return apply!(u, p.ch)
 end
 
-function navierstokes_rhs_element!(dvₑ, vₑ, cellvalues_v)
-    n_basefuncs = getnbasefunctions(cellvalues_v)
-    for q_point in 1:getnquadpoints(cellvalues_v)
-        dΩ = getdetJdV(cellvalues_v, q_point)
-        ∇v = function_gradient(cellvalues_v, q_point, vₑ)
-        v = function_value(cellvalues_v, q_point, vₑ)
+function navierstokes_rhs_element!(dvₑ, vₑ, cv)
+    n_basefuncs = getnbasefunctions(cv[:v])
+    for q_point in 1:getnquadpoints(cv)
+        dΩ = getdetJdV(cv, q_point)
+        ∇v = function_gradient(cv[:v], q_point, vₑ)
+        v = function_value(cv[:v], q_point, vₑ)
         for j in 1:n_basefuncs
-            φⱼ = shape_value(cellvalues_v, q_point, j)
+            φⱼ = shape_value(cv[:v], q_point, j)
 
             dvₑ[j] -= v ⋅ ∇v&#39; ⋅ φⱼ * dΩ
         end
@@ -447,7 +437,7 @@ end
 
 function navierstokes!(du, u_uc, p::RHSparams, t)
 
-    (; K, ch, dh, cellvalues_v, u) = p
+    (; K, ch, dh, cv, u) = p
 
     u .= u_uc
     update!(ch, t)
@@ -458,32 +448,32 @@ function navierstokes!(du, u_uc, p::RHSparams, t)
 
     # nonlinear contribution
     v_range = dof_range(dh, :v)
-    n_basefuncs = getnbasefunctions(cellvalues_v)
+    n_basefuncs = getnbasefunctions(cv[:v])
     vₑ = zeros(n_basefuncs)
     duₑ = zeros(n_basefuncs)
     for cell in CellIterator(dh)
-        Ferrite.reinit!(cellvalues_v, cell)
+        Ferrite.reinit!(cv, cell)
         v_celldofs = @view celldofs(cell)[v_range]
         vₑ .= @views u[v_celldofs]
         fill!(duₑ, 0.0)
-        navierstokes_rhs_element!(duₑ, vₑ, cellvalues_v)
+        navierstokes_rhs_element!(duₑ, vₑ, cv)
         assemble!(du, v_celldofs, duₑ)
     end
     return
 end;
 
-function navierstokes_jac_element!(Jₑ, vₑ, cellvalues_v)
-    n_basefuncs = getnbasefunctions(cellvalues_v)
-    for q_point in 1:getnquadpoints(cellvalues_v)
-        dΩ = getdetJdV(cellvalues_v, q_point)
-        ∇v = function_gradient(cellvalues_v, q_point, vₑ)
-        v = function_value(cellvalues_v, q_point, vₑ)
+function navierstokes_jac_element!(Jₑ, vₑ, cv)
+    n_basefuncs = getnbasefunctions(cv[:v])
+    for q_point in 1:getnquadpoints(cv)
+        dΩ = getdetJdV(cv, q_point)
+        ∇v = function_gradient(cv[:v], q_point, vₑ)
+        v = function_value(cv[:v], q_point, vₑ)
         for j in 1:n_basefuncs
-            φⱼ = shape_value(cellvalues_v, q_point, j)
+            φⱼ = shape_value(cv[:v], q_point, j)
 
             for i in 1:n_basefuncs
-                φᵢ = shape_value(cellvalues_v, q_point, i)
-                ∇φᵢ = shape_gradient(cellvalues_v, q_point, i)
+                φᵢ = shape_value(cv[:v], q_point, i)
+                ∇φᵢ = shape_gradient(cv[:v], q_point, i)
                 Jₑ[j, i] -= (φᵢ ⋅ ∇v&#39; + v ⋅ ∇φᵢ&#39;) ⋅ φⱼ * dΩ
             end
         end
@@ -493,7 +483,7 @@ end
 
 function navierstokes_jac!(J, u_uc, p, t)
 
-    (; K, ch, dh, cellvalues_v, u) = p
+    (; K, ch, dh, cv, u) = p
 
     u .= u_uc
     update!(ch, t)
@@ -506,17 +496,17 @@ function navierstokes_jac!(J, u_uc, p, t)
     assembler = start_assemble(J; fillzero = false)
 
     # Assemble variation of the nonlinear term
-    n_basefuncs = getnbasefunctions(cellvalues_v)
+    n_basefuncs = getnbasefunctions(cv[:v])
     Jₑ = zeros(n_basefuncs, n_basefuncs)
     vₑ = zeros(n_basefuncs)
     v_range = dof_range(dh, :v)
     for cell in CellIterator(dh)
-        Ferrite.reinit!(cellvalues_v, cell)
+        Ferrite.reinit!(cv, cell)
         v_celldofs = @view celldofs(cell)[v_range]
 
         vₑ .= @views u[v_celldofs]
         fill!(Jₑ, 0.0)
-        navierstokes_jac_element!(Jₑ, vₑ, cellvalues_v)
+        navierstokes_jac_element!(Jₑ, vₑ, cv)
         assemble!(assembler, v_celldofs, Jₑ)
     end
 
@@ -548,4 +538,4 @@ for (step, (u, t)) in enumerate(intervals(integrator))
         pvd[t] = vtk
     end
 end
-vtk_save(pvd);</code></pre><hr/><p><em>This page was generated using <a href="https://github.com/fredrikekre/Literate.jl">Literate.jl</a>.</em></p></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../porous_media/">« Porous media</a><a class="docs-footer-nextpage" href="../reactive_surface/">Reactive surface »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option><option value="catppuccin-latte">catppuccin-latte</option><option value="catppuccin-frappe">catppuccin-frappe</option><option value="catppuccin-macchiato">catppuccin-macchiato</option><option value="catppuccin-mocha">catppuccin-mocha</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.15.0 on <span class="colophon-date" title="Tuesday 27 January 2026 14:48">Tuesday 27 January 2026</span>. Using Julia version 1.12.4.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
+vtk_save(pvd);</code></pre><hr/><p><em>This page was generated using <a href="https://github.com/fredrikekre/Literate.jl">Literate.jl</a>.</em></p></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../porous_media/">« Porous media</a><a class="docs-footer-nextpage" href="../reactive_surface/">Reactive surface »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option><option value="catppuccin-latte">catppuccin-latte</option><option value="catppuccin-frappe">catppuccin-frappe</option><option value="catppuccin-macchiato">catppuccin-macchiato</option><option value="catppuccin-mocha">catppuccin-mocha</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.15.0 on <span class="colophon-date" title="Wednesday 28 January 2026 07:54">Wednesday 28 January 2026</span>. Using Julia version 1.12.4.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>

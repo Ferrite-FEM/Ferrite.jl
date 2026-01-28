@@ -59,10 +59,8 @@ Gmsh.finalize();
 
 ip_v = Lagrange{RefQuadrilateral, 2}()^dim
 qr = QuadratureRule{RefQuadrilateral}(4)
-cellvalues_v = CellValues(qr, ip_v);
-
 ip_p = Lagrange{RefQuadrilateral, 1}()
-cellvalues_p = CellValues(qr, ip_p);
+cellvalues = CellMultiValues(qr, (v = ip_v, p = ip_p))
 
 dh = DofHandler(grid)
 add!(dh, :v, ip_v)
@@ -92,10 +90,10 @@ add!(ch, inflow_bc);
 close!(ch)
 update!(ch, 0.0);
 
-function assemble_mass_matrix(cellvalues_v::CellValues, cellvalues_p::CellValues, M::SparseMatrixCSC, dh::DofHandler)
+function assemble_mass_matrix(cv::CellMultiValues, M::SparseMatrixCSC, dh::DofHandler)
     # Allocate a buffer for the local matrix and some helpers, together with the assembler.
-    n_basefuncs_v = getnbasefunctions(cellvalues_v)
-    n_basefuncs_p = getnbasefunctions(cellvalues_p)
+    n_basefuncs_v = getnbasefunctions(cv[:v])
+    n_basefuncs_p = getnbasefunctions(cv[:p])
     n_basefuncs = n_basefuncs_v + n_basefuncs_p
     v▄, p▄ = 1, 2
     Mₑ = BlockedArray(zeros(n_basefuncs, n_basefuncs), [n_basefuncs_v, n_basefuncs_p], [n_basefuncs_v, n_basefuncs_p])
@@ -104,16 +102,16 @@ function assemble_mass_matrix(cellvalues_v::CellValues, cellvalues_p::CellValues
     mass_assembler = start_assemble(M)
     for cell in CellIterator(dh)
         fill!(Mₑ, 0)
-        Ferrite.reinit!(cellvalues_v, cell)
+        Ferrite.reinit!(cv, cell)
 
-        for q_point in 1:getnquadpoints(cellvalues_v)
-            dΩ = getdetJdV(cellvalues_v, q_point)
+        for q_point in 1:getnquadpoints(cv)
+            dΩ = getdetJdV(cv, q_point)
             # Remember that we assemble a vector mass term, hence the dot product.
             # There is only one time derivative on the left hand side, so only one mass block is non-zero.
             for i in 1:n_basefuncs_v
-                φᵢ = shape_value(cellvalues_v, q_point, i)
+                φᵢ = shape_value(cv[:v], q_point, i)
                 for j in 1:n_basefuncs_v
-                    φⱼ = shape_value(cellvalues_v, q_point, j)
+                    φⱼ = shape_value(cv[:v], q_point, j)
                     Mₑ[BlockIndex((v▄, v▄), (i, j))] += φᵢ ⋅ φⱼ * dΩ
                 end
             end
@@ -124,10 +122,10 @@ function assemble_mass_matrix(cellvalues_v::CellValues, cellvalues_p::CellValues
     return M
 end;
 
-function assemble_stokes_matrix(cellvalues_v::CellValues, cellvalues_p::CellValues, ν, K::SparseMatrixCSC, dh::DofHandler)
+function assemble_stokes_matrix(cv::CellMultiValues, ν, K::SparseMatrixCSC, dh::DofHandler)
     # Again, some buffers and helpers
-    n_basefuncs_v = getnbasefunctions(cellvalues_v)
-    n_basefuncs_p = getnbasefunctions(cellvalues_p)
+    n_basefuncs_v = getnbasefunctions(cv[:v])
+    n_basefuncs_p = getnbasefunctions(cv[:p])
     n_basefuncs = n_basefuncs_v + n_basefuncs_p
     v▄, p▄ = 1, 2
     Kₑ = BlockedArray(zeros(n_basefuncs, n_basefuncs), [n_basefuncs_v, n_basefuncs_p], [n_basefuncs_v, n_basefuncs_p])
@@ -137,25 +135,22 @@ function assemble_stokes_matrix(cellvalues_v::CellValues, cellvalues_p::CellValu
     for cell in CellIterator(dh)
         # Don't forget to initialize everything
         fill!(Kₑ, 0)
-
-        Ferrite.reinit!(cellvalues_v, cell)
-        Ferrite.reinit!(cellvalues_p, cell)
-
-        for q_point in 1:getnquadpoints(cellvalues_v)
-            dΩ = getdetJdV(cellvalues_v, q_point)
+        Ferrite.reinit!(cv, cell)
+        for q_point in 1:getnquadpoints(cv)
+            dΩ = getdetJdV(cv, q_point)
 
             for i in 1:n_basefuncs_v
-                ∇φᵢ = shape_gradient(cellvalues_v, q_point, i)
+                ∇φᵢ = shape_gradient(cv[:v], q_point, i)
                 for j in 1:n_basefuncs_v
-                    ∇φⱼ = shape_gradient(cellvalues_v, q_point, j)
+                    ∇φⱼ = shape_gradient(cv[:v], q_point, j)
                     Kₑ[BlockIndex((v▄, v▄), (i, j))] -= ν * ∇φᵢ ⊡ ∇φⱼ * dΩ
                 end
             end
 
             for j in 1:n_basefuncs_p
-                ψ = shape_value(cellvalues_p, q_point, j)
+                ψ = shape_value(cv[:p], q_point, j)
                 for i in 1:n_basefuncs_v
-                    divφ = shape_divergence(cellvalues_v, q_point, i)
+                    divφ = shape_divergence(cv[:v], q_point, i)
                     Kₑ[BlockIndex((v▄, p▄), (i, j))] += (divφ * ψ) * dΩ
                     Kₑ[BlockIndex((p▄, v▄), (j, i))] += (ψ * divφ) * dΩ
                 end
@@ -176,10 +171,10 @@ end                                                                     #hide
 Δt_save = 0.1
 
 M = allocate_matrix(dh);
-M = assemble_mass_matrix(cellvalues_v, cellvalues_p, M, dh);
+M = assemble_mass_matrix(cellvalues, M, dh);
 
 K = allocate_matrix(dh);
-K = assemble_stokes_matrix(cellvalues_v, cellvalues_p, ν, K, dh);
+K = assemble_stokes_matrix(cellvalues, ν, K, dh);
 
 u₀ = zeros(ndofs(dh))
 apply!(u₀, ch);
@@ -188,28 +183,28 @@ jac_sparsity = sparse(K);
 
 apply!(M, ch)
 
-struct RHSparams
-    K::SparseMatrixCSC
-    ch::ConstraintHandler
-    dh::DofHandler
-    cellvalues_v::CellValues
-    u::Vector
+struct RHSparams{KT, CH, DH, CV, UT}
+    K::KT  # SparseMatrixCSC
+    ch::CH # ConstraintHandler
+    dh::DH # DofHandler
+    cv::CV # CellMultiValues
+    u::UT  # Vector
 end
-p = RHSparams(K, ch, dh, cellvalues_v, copy(u₀))
+p = RHSparams(K, ch, dh, cellvalues, copy(u₀))
 
 function ferrite_limiter!(u, _, p, t)
     update!(p.ch, t)
     return apply!(u, p.ch)
 end
 
-function navierstokes_rhs_element!(dvₑ, vₑ, cellvalues_v)
-    n_basefuncs = getnbasefunctions(cellvalues_v)
-    for q_point in 1:getnquadpoints(cellvalues_v)
-        dΩ = getdetJdV(cellvalues_v, q_point)
-        ∇v = function_gradient(cellvalues_v, q_point, vₑ)
-        v = function_value(cellvalues_v, q_point, vₑ)
+function navierstokes_rhs_element!(dvₑ, vₑ, cv)
+    n_basefuncs = getnbasefunctions(cv[:v])
+    for q_point in 1:getnquadpoints(cv)
+        dΩ = getdetJdV(cv, q_point)
+        ∇v = function_gradient(cv[:v], q_point, vₑ)
+        v = function_value(cv[:v], q_point, vₑ)
         for j in 1:n_basefuncs
-            φⱼ = shape_value(cellvalues_v, q_point, j)
+            φⱼ = shape_value(cv[:v], q_point, j)
 
             dvₑ[j] -= v ⋅ ∇v' ⋅ φⱼ * dΩ
         end
@@ -219,7 +214,7 @@ end
 
 function navierstokes!(du, u_uc, p::RHSparams, t)
 
-    (; K, ch, dh, cellvalues_v, u) = p
+    (; K, ch, dh, cv, u) = p
 
     u .= u_uc
     update!(ch, t)
@@ -230,32 +225,32 @@ function navierstokes!(du, u_uc, p::RHSparams, t)
 
     # nonlinear contribution
     v_range = dof_range(dh, :v)
-    n_basefuncs = getnbasefunctions(cellvalues_v)
+    n_basefuncs = getnbasefunctions(cv[:v])
     vₑ = zeros(n_basefuncs)
     duₑ = zeros(n_basefuncs)
     for cell in CellIterator(dh)
-        Ferrite.reinit!(cellvalues_v, cell)
+        Ferrite.reinit!(cv, cell)
         v_celldofs = @view celldofs(cell)[v_range]
         vₑ .= @views u[v_celldofs]
         fill!(duₑ, 0.0)
-        navierstokes_rhs_element!(duₑ, vₑ, cellvalues_v)
+        navierstokes_rhs_element!(duₑ, vₑ, cv)
         assemble!(du, v_celldofs, duₑ)
     end
     return
 end;
 
-function navierstokes_jac_element!(Jₑ, vₑ, cellvalues_v)
-    n_basefuncs = getnbasefunctions(cellvalues_v)
-    for q_point in 1:getnquadpoints(cellvalues_v)
-        dΩ = getdetJdV(cellvalues_v, q_point)
-        ∇v = function_gradient(cellvalues_v, q_point, vₑ)
-        v = function_value(cellvalues_v, q_point, vₑ)
+function navierstokes_jac_element!(Jₑ, vₑ, cv)
+    n_basefuncs = getnbasefunctions(cv[:v])
+    for q_point in 1:getnquadpoints(cv)
+        dΩ = getdetJdV(cv, q_point)
+        ∇v = function_gradient(cv[:v], q_point, vₑ)
+        v = function_value(cv[:v], q_point, vₑ)
         for j in 1:n_basefuncs
-            φⱼ = shape_value(cellvalues_v, q_point, j)
+            φⱼ = shape_value(cv[:v], q_point, j)
 
             for i in 1:n_basefuncs
-                φᵢ = shape_value(cellvalues_v, q_point, i)
-                ∇φᵢ = shape_gradient(cellvalues_v, q_point, i)
+                φᵢ = shape_value(cv[:v], q_point, i)
+                ∇φᵢ = shape_gradient(cv[:v], q_point, i)
                 Jₑ[j, i] -= (φᵢ ⋅ ∇v' + v ⋅ ∇φᵢ') ⋅ φⱼ * dΩ
             end
         end
@@ -265,7 +260,7 @@ end
 
 function navierstokes_jac!(J, u_uc, p, t)
 
-    (; K, ch, dh, cellvalues_v, u) = p
+    (; K, ch, dh, cv, u) = p
 
     u .= u_uc
     update!(ch, t)
@@ -278,17 +273,17 @@ function navierstokes_jac!(J, u_uc, p, t)
     assembler = start_assemble(J; fillzero = false)
 
     # Assemble variation of the nonlinear term
-    n_basefuncs = getnbasefunctions(cellvalues_v)
+    n_basefuncs = getnbasefunctions(cv[:v])
     Jₑ = zeros(n_basefuncs, n_basefuncs)
     vₑ = zeros(n_basefuncs)
     v_range = dof_range(dh, :v)
     for cell in CellIterator(dh)
-        Ferrite.reinit!(cellvalues_v, cell)
+        Ferrite.reinit!(cv, cell)
         v_celldofs = @view celldofs(cell)[v_range]
 
         vₑ .= @views u[v_celldofs]
         fill!(Jₑ, 0.0)
-        navierstokes_jac_element!(Jₑ, vₑ, cellvalues_v)
+        navierstokes_jac_element!(Jₑ, vₑ, cv)
         assemble!(assembler, v_celldofs, Jₑ)
     end
 
@@ -325,38 +320,38 @@ vtk_save(pvd);
 
 using Test                                                                      #hide
 if IS_CI                                                                        #hide
-    function compute_divergence(dh, u, cellvalues_v)                            #hide
+    function compute_divergence(dh, u, cv)                                      #hide
         divv = 0.0                                                              #hide
         for cell in CellIterator(dh)                                            #hide
-            Ferrite.reinit!(cellvalues_v, cell)                                 #hide
-            for q_point in 1:getnquadpoints(cellvalues_v)                       #hide
-                dΩ = getdetJdV(cellvalues_v, q_point)                           #hide
+            Ferrite.reinit!(cv, cell)                                           #hide
+            for q_point in 1:getnquadpoints(cv)                                 #hide
+                dΩ = getdetJdV(cv, q_point)                                     #hide
                 #hide
                 all_celldofs = celldofs(cell)                                   #hide
                 v_celldofs = all_celldofs[dof_range(dh, :v)]                    #hide
                 v_cell = u[v_celldofs]                                          #hide
                 #hide
-                divv += function_divergence(cellvalues_v, q_point, v_cell) * dΩ #hide
+                divv += function_divergence(cv[:v], q_point, v_cell) * dΩ       #hide
             end                                                                 #hide
         end                                                                     #hide
         return divv                                                             #hide
     end                                                                         #hide
     let                                                                         #hide
         u = copy(integrator.u)                                                  #hide
-        Δdivv = abs(compute_divergence(dh, u, cellvalues_v))                    #hide
+        Δdivv = abs(compute_divergence(dh, u, cellvalues))                      #hide
         @test isapprox(Δdivv, 0.0, atol = 1.0e-12)                              #hide
         #hide
         Δv = 0.0                                                                #hide
         for cell in CellIterator(dh)                                            #hide
-            Ferrite.reinit!(cellvalues_v, cell)                                 #hide
+            Ferrite.reinit!(cellvalues, cell)                                   #hide
             all_celldofs = celldofs(cell)                                       #hide
             v_celldofs = all_celldofs[dof_range(dh, :v)]                        #hide
             v_cell = u[v_celldofs]                                              #hide
             coords = getcoordinates(cell)                                       #hide
-            for q_point in 1:getnquadpoints(cellvalues_v)                       #hide
-                dΩ = getdetJdV(cellvalues_v, q_point)                           #hide
-                coords_qp = spatial_coordinate(cellvalues_v, q_point, coords)   #hide
-                v = function_value(cellvalues_v, q_point, v_cell)               #hide
+            for q_point in 1:getnquadpoints(cellvalues)                         #hide
+                dΩ = getdetJdV(cellvalues, q_point)                             #hide
+                coords_qp = spatial_coordinate(cellvalues, q_point, coords)     #hide
+                v = function_value(cellvalues[:v], q_point, v_cell)             #hide
                 Δv += norm(v - parabolic_inflow_profile(coords_qp, T))^2 * dΩ   #hide
             end                                                                 #hide
         end                                                                     #hide

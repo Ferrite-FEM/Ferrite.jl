@@ -31,11 +31,9 @@ function Elastic(; E = 20.0e3, ν = 0.3)
     G = E / 2(1 + ν)
     K = E / 3(1 - 2ν)
     I2 = one(SymmetricTensor{2, 2})
-    I4vol = I2 ⊗ I2
-    I4dev = minorsymmetric(otimesu(I2, I2)) - I4vol / 3
-    return Elastic(2G * I4dev + K * I4vol)
-end;</code></pre><p>Next, we define the element routine for the solid aggregates, where we dispatch on the <code>Elastic</code> material struct. Note that the unused inputs here are used for the porous matrix below.</p><pre><code class="language-julia hljs">function element_routine!(Ke, re, material::Elastic, cv, cell, a, args...)
-    reinit!(cv, cell)
+    I4dev = minorsymmetric(otimesu(I2, I2)) - I2 ⊗ I2 / 3
+    return Elastic(2G * I4dev + K * I2 ⊗ I2)
+end;</code></pre><p>Next, we define the element routine for the solid aggregates, where we dispatch on the <code>Elastic</code> material struct. Note that the unused inputs here are used for the porous matrix below.</p><pre><code class="language-julia hljs">function element_routine!(Ke, re, material::Elastic, cv::CellValues, a, args...)
     n_basefuncs = getnbasefunctions(cv)
 
     for q_point in 1:getnquadpoints(cv)
@@ -59,52 +57,49 @@ end;</code></pre><h3 id="PoroElasticity"><a class="docs-heading-anchor" href="#P
     α::T     ## Biot&#39;s coefficient       [-]
     β::T     ## Liquid compressibility   [1/MPa]
 end
-PoroElastic(; elastic, k, ϕ, α, β) = PoroElastic(elastic, k, ϕ, α, β);</code></pre><p>The element routine requires a few more inputs since we have two fields, as well as the dependence on the rates of the displacements and pressure. Again, we dispatch on the material type.</p><pre><code class="language-julia hljs">function element_routine!(Ke, re, m::PoroElastic, cvs::Tuple, cell, a, a_old, Δt, sdh)
-    # Setup cellvalues and give easier names
-    reinit!.(cvs, (cell,))
-    cv_u, cv_p = cvs
+PoroElastic(; elastic, k, ϕ, α, β) = PoroElastic(elastic, k, ϕ, α, β);</code></pre><p>The element routine requires a few more inputs since we have two fields, as well as the dependence on the rates of the displacements and pressure. Again, we dispatch on the material type.</p><pre><code class="language-julia hljs">function element_routine!(Ke, re, m::PoroElastic, cv::CellMultiValues, a, a_old, Δt, sdh)
     dr_u = dof_range(sdh, :u)
     dr_p = dof_range(sdh, :p)
 
     C = m.elastic.C ## Elastic stiffness
 
     # Assemble stiffness and force vectors
-    for q_point in 1:getnquadpoints(cv_u)
-        dΩ = getdetJdV(cv_u, q_point)
-        p = function_value(cv_p, q_point, a, dr_p)
-        p_old = function_value(cv_p, q_point, a_old, dr_p)
+    for q_point in 1:getnquadpoints(cv)
+        dΩ = getdetJdV(cv, q_point)
+        p = function_value(cv[:p], q_point, a, dr_p)
+        p_old = function_value(cv[:p], q_point, a_old, dr_p)
         pdot = (p - p_old) / Δt
-        ∇p = function_gradient(cv_p, q_point, a, dr_p)
-        ϵ = function_symmetric_gradient(cv_u, q_point, a, dr_u)
-        tr_ϵ_old = function_divergence(cv_u, q_point, a_old, dr_u)
+        ∇p = function_gradient(cv[:p], q_point, a, dr_p)
+        ϵ = function_symmetric_gradient(cv[:u], q_point, a, dr_u)
+        tr_ϵ_old = function_divergence(cv[:u], q_point, a_old, dr_u)
         tr_ϵ_dot = (tr(ϵ) - tr_ϵ_old) / Δt
         σ_eff = C ⊡ ϵ
         # Variation of u_i
         for (iᵤ, Iᵤ) in pairs(dr_u)
-            ∇δNu = shape_symmetric_gradient(cv_u, q_point, iᵤ)
-            div_δNu = shape_divergence(cv_u, q_point, iᵤ)
+            ∇δNu = shape_symmetric_gradient(cv[:u], q_point, iᵤ)
+            div_δNu = shape_divergence(cv[:u], q_point, iᵤ)
             re[Iᵤ] += (∇δNu ⊡ σ_eff - div_δNu * p * m.α) * dΩ
             for (jᵤ, Jᵤ) in pairs(dr_u)
-                ∇Nu = shape_symmetric_gradient(cv_u, q_point, jᵤ)
+                ∇Nu = shape_symmetric_gradient(cv[:u], q_point, jᵤ)
                 Ke[Iᵤ, Jᵤ] += (∇δNu ⊡ C ⊡ ∇Nu) * dΩ
             end
             for (jₚ, Jₚ) in pairs(dr_p)
-                Np = shape_value(cv_p, q_point, jₚ)
+                Np = shape_value(cv[:p], q_point, jₚ)
                 Ke[Iᵤ, Jₚ] -= (div_δNu * m.α * Np) * dΩ
             end
         end
         # Variation of p_i
         for (iₚ, Iₚ) in pairs(dr_p)
-            δNp = shape_value(cv_p, q_point, iₚ)
-            ∇δNp = shape_gradient(cv_p, q_point, iₚ)
+            δNp = shape_value(cv[:p], q_point, iₚ)
+            ∇δNp = shape_gradient(cv[:p], q_point, iₚ)
             re[Iₚ] += (δNp * (m.α * tr_ϵ_dot + m.β * pdot) + m.k * (∇δNp ⋅ ∇p)) * dΩ
             for (jᵤ, Jᵤ) in pairs(dr_u)
-                div_Nu = shape_divergence(cv_u, q_point, jᵤ)
+                div_Nu = shape_divergence(cv[:u], q_point, jᵤ)
                 Ke[Iₚ, Jᵤ] += δNp * (m.α / Δt) * div_Nu * dΩ
             end
             for (jₚ, Jₚ) in pairs(dr_p)
-                ∇Np = shape_gradient(cv_p, q_point, jₚ)
-                Np = shape_value(cv_p, q_point, jₚ)
+                ∇Np = shape_gradient(cv[:p], q_point, jₚ)
+                Np = shape_value(cv[:p], q_point, jₚ)
                 Ke[Iₚ, Jₚ] += (δNp * m.β * Np / Δt + m.k * (∇δNp ⋅ ∇Np)) * dΩ
             end
         end
@@ -135,7 +130,8 @@ end;</code></pre><p>For one domain (corresponding to a specific SubDofHandler), 
         map!(i -&gt; a_old[i], ae_old, celldofs(cell))
         fill!(Ke, 0)
         fill!(re, 0)
-        element_routine!(Ke, re, material, cv, cell, ae, ae_old, Δt, sdh)
+        reinit!(cv, cell)
+        element_routine!(Ke, re, material, cv, ae, ae_old, Δt, sdh)
         assemble!(assembler, celldofs(cell), Ke, re)
     end
     return
@@ -174,8 +170,8 @@ end;</code></pre><h3 id="Problem-setup"><a class="docs-heading-anchor" href="#Pr
     # CellValues
     cvu_quad = CellValues(qr_quad, ipu_quad)
     cvu_tri = CellValues(qr_tri, ipu_tri)
-    cvp_quad = CellValues(qr_quad, ipp_quad)
-    cvp_tri = CellValues(qr_tri, ipp_tri)
+    cmv_quad = CellMultiValues(qr_quad, (u = ipu_quad, p = ipp_quad))
+    cmv_tri = CellMultiValues(qr_tri, (u = ipu_tri, p = ipp_tri))
 
     # Setup the DofHandler
     dh = DofHandler(grid)
@@ -200,8 +196,8 @@ end;</code></pre><h3 id="Problem-setup"><a class="docs-heading-anchor" href="#Pr
     domains = [
         FEDomain(m_solid, cvu_quad, sdh_solid_quad),
         FEDomain(m_solid, cvu_tri, sdh_solid_tri),
-        FEDomain(m_porous, (cvu_quad, cvp_quad), sdh_porous_quad),
-        FEDomain(m_porous, (cvu_tri, cvp_tri), sdh_porous_tri),
+        FEDomain(m_porous, cmv_quad, sdh_porous_quad),
+        FEDomain(m_porous, cmv_tri, sdh_porous_tri),
     ]
 
     # Boundary conditions
@@ -242,9 +238,9 @@ end;</code></pre><h3 id="Solving"><a class="docs-heading-anchor" href="#Solving"
         end
     end
     vtk_save(pvd)
-    return
+    return a
 end;</code></pre><p>Finally we call the functions to actually run the code</p><pre><code class="language-julia hljs">dh, ch, domains = setup_problem()
-solve(dh, ch, domains);</code></pre><h2 id="porous-media-plain-program"><a class="docs-heading-anchor" href="#porous-media-plain-program">Plain program</a><a id="porous-media-plain-program-1"></a><a class="docs-heading-anchor-permalink" href="#porous-media-plain-program" title="Permalink"></a></h2><p>Here follows a version of the program without any comments. The file is also available here: <a href="../porous_media.jl"><code>porous_media.jl</code></a>.</p><pre><code class="language-julia hljs">using Ferrite, FerriteMeshParser, Tensors, WriteVTK, Downloads
+a = solve(dh, ch, domains);</code></pre><h2 id="porous-media-plain-program"><a class="docs-heading-anchor" href="#porous-media-plain-program">Plain program</a><a id="porous-media-plain-program-1"></a><a class="docs-heading-anchor-permalink" href="#porous-media-plain-program" title="Permalink"></a></h2><p>Here follows a version of the program without any comments. The file is also available here: <a href="../porous_media.jl"><code>porous_media.jl</code></a>.</p><pre><code class="language-julia hljs">using Ferrite, FerriteMeshParser, Tensors, WriteVTK, Downloads
 
 struct Elastic{T}
     C::SymmetricTensor{4, 2, T, 9}
@@ -253,13 +249,11 @@ function Elastic(; E = 20.0e3, ν = 0.3)
     G = E / 2(1 + ν)
     K = E / 3(1 - 2ν)
     I2 = one(SymmetricTensor{2, 2})
-    I4vol = I2 ⊗ I2
-    I4dev = minorsymmetric(otimesu(I2, I2)) - I4vol / 3
-    return Elastic(2G * I4dev + K * I4vol)
+    I4dev = minorsymmetric(otimesu(I2, I2)) - I2 ⊗ I2 / 3
+    return Elastic(2G * I4dev + K * I2 ⊗ I2)
 end;
 
-function element_routine!(Ke, re, material::Elastic, cv, cell, a, args...)
-    reinit!(cv, cell)
+function element_routine!(Ke, re, material::Elastic, cv::CellValues, a, args...)
     n_basefuncs = getnbasefunctions(cv)
 
     for q_point in 1:getnquadpoints(cv)
@@ -287,52 +281,49 @@ struct PoroElastic{T}
 end
 PoroElastic(; elastic, k, ϕ, α, β) = PoroElastic(elastic, k, ϕ, α, β);
 
-function element_routine!(Ke, re, m::PoroElastic, cvs::Tuple, cell, a, a_old, Δt, sdh)
-    # Setup cellvalues and give easier names
-    reinit!.(cvs, (cell,))
-    cv_u, cv_p = cvs
+function element_routine!(Ke, re, m::PoroElastic, cv::CellMultiValues, a, a_old, Δt, sdh)
     dr_u = dof_range(sdh, :u)
     dr_p = dof_range(sdh, :p)
 
     C = m.elastic.C ## Elastic stiffness
 
     # Assemble stiffness and force vectors
-    for q_point in 1:getnquadpoints(cv_u)
-        dΩ = getdetJdV(cv_u, q_point)
-        p = function_value(cv_p, q_point, a, dr_p)
-        p_old = function_value(cv_p, q_point, a_old, dr_p)
+    for q_point in 1:getnquadpoints(cv)
+        dΩ = getdetJdV(cv, q_point)
+        p = function_value(cv[:p], q_point, a, dr_p)
+        p_old = function_value(cv[:p], q_point, a_old, dr_p)
         pdot = (p - p_old) / Δt
-        ∇p = function_gradient(cv_p, q_point, a, dr_p)
-        ϵ = function_symmetric_gradient(cv_u, q_point, a, dr_u)
-        tr_ϵ_old = function_divergence(cv_u, q_point, a_old, dr_u)
+        ∇p = function_gradient(cv[:p], q_point, a, dr_p)
+        ϵ = function_symmetric_gradient(cv[:u], q_point, a, dr_u)
+        tr_ϵ_old = function_divergence(cv[:u], q_point, a_old, dr_u)
         tr_ϵ_dot = (tr(ϵ) - tr_ϵ_old) / Δt
         σ_eff = C ⊡ ϵ
         # Variation of u_i
         for (iᵤ, Iᵤ) in pairs(dr_u)
-            ∇δNu = shape_symmetric_gradient(cv_u, q_point, iᵤ)
-            div_δNu = shape_divergence(cv_u, q_point, iᵤ)
+            ∇δNu = shape_symmetric_gradient(cv[:u], q_point, iᵤ)
+            div_δNu = shape_divergence(cv[:u], q_point, iᵤ)
             re[Iᵤ] += (∇δNu ⊡ σ_eff - div_δNu * p * m.α) * dΩ
             for (jᵤ, Jᵤ) in pairs(dr_u)
-                ∇Nu = shape_symmetric_gradient(cv_u, q_point, jᵤ)
+                ∇Nu = shape_symmetric_gradient(cv[:u], q_point, jᵤ)
                 Ke[Iᵤ, Jᵤ] += (∇δNu ⊡ C ⊡ ∇Nu) * dΩ
             end
             for (jₚ, Jₚ) in pairs(dr_p)
-                Np = shape_value(cv_p, q_point, jₚ)
+                Np = shape_value(cv[:p], q_point, jₚ)
                 Ke[Iᵤ, Jₚ] -= (div_δNu * m.α * Np) * dΩ
             end
         end
         # Variation of p_i
         for (iₚ, Iₚ) in pairs(dr_p)
-            δNp = shape_value(cv_p, q_point, iₚ)
-            ∇δNp = shape_gradient(cv_p, q_point, iₚ)
+            δNp = shape_value(cv[:p], q_point, iₚ)
+            ∇δNp = shape_gradient(cv[:p], q_point, iₚ)
             re[Iₚ] += (δNp * (m.α * tr_ϵ_dot + m.β * pdot) + m.k * (∇δNp ⋅ ∇p)) * dΩ
             for (jᵤ, Jᵤ) in pairs(dr_u)
-                div_Nu = shape_divergence(cv_u, q_point, jᵤ)
+                div_Nu = shape_divergence(cv[:u], q_point, jᵤ)
                 Ke[Iₚ, Jᵤ] += δNp * (m.α / Δt) * div_Nu * dΩ
             end
             for (jₚ, Jₚ) in pairs(dr_p)
-                ∇Np = shape_gradient(cv_p, q_point, jₚ)
-                Np = shape_value(cv_p, q_point, jₚ)
+                ∇Np = shape_gradient(cv[:p], q_point, jₚ)
+                Np = shape_value(cv[:p], q_point, jₚ)
                 Ke[Iₚ, Jₚ] += (δNp * m.β * Np / Δt + m.k * (∇δNp ⋅ ∇Np)) * dΩ
             end
         end
@@ -369,7 +360,8 @@ function doassemble!(assembler, domain::FEDomain, a, a_old, Δt)
         map!(i -&gt; a_old[i], ae_old, celldofs(cell))
         fill!(Ke, 0)
         fill!(re, 0)
-        element_routine!(Ke, re, material, cv, cell, ae, ae_old, Δt, sdh)
+        reinit!(cv, cell)
+        element_routine!(Ke, re, material, cv, ae, ae_old, Δt, sdh)
         assemble!(assembler, celldofs(cell), Ke, re)
     end
     return
@@ -412,8 +404,8 @@ function setup_problem(; t_rise = 0.1, u_max = -0.1)
     # CellValues
     cvu_quad = CellValues(qr_quad, ipu_quad)
     cvu_tri = CellValues(qr_tri, ipu_tri)
-    cvp_quad = CellValues(qr_quad, ipp_quad)
-    cvp_tri = CellValues(qr_tri, ipp_tri)
+    cmv_quad = CellMultiValues(qr_quad, (u = ipu_quad, p = ipp_quad))
+    cmv_tri = CellMultiValues(qr_tri, (u = ipu_tri, p = ipp_tri))
 
     # Setup the DofHandler
     dh = DofHandler(grid)
@@ -438,8 +430,8 @@ function setup_problem(; t_rise = 0.1, u_max = -0.1)
     domains = [
         FEDomain(m_solid, cvu_quad, sdh_solid_quad),
         FEDomain(m_solid, cvu_tri, sdh_solid_tri),
-        FEDomain(m_porous, (cvu_quad, cvp_quad), sdh_porous_quad),
-        FEDomain(m_porous, (cvu_tri, cvp_tri), sdh_porous_tri),
+        FEDomain(m_porous, cmv_quad, sdh_porous_quad),
+        FEDomain(m_porous, cmv_tri, sdh_porous_tri),
     ]
 
     # Boundary conditions
@@ -482,8 +474,8 @@ function solve(dh, ch, domains; Δt = 0.025, t_total = 1.0)
         end
     end
     vtk_save(pvd)
-    return
+    return a
 end;
 
 dh, ch, domains = setup_problem()
-solve(dh, ch, domains);</code></pre><hr/><p><em>This page was generated using <a href="https://github.com/fredrikekre/Literate.jl">Literate.jl</a>.</em></p></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../stokes-flow/">« Stokes flow</a><a class="docs-footer-nextpage" href="../ns_vs_diffeq/">Incompressible Navier-Stokes equations via DifferentialEquations.jl »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option><option value="catppuccin-latte">catppuccin-latte</option><option value="catppuccin-frappe">catppuccin-frappe</option><option value="catppuccin-macchiato">catppuccin-macchiato</option><option value="catppuccin-mocha">catppuccin-mocha</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.15.0 on <span class="colophon-date" title="Tuesday 27 January 2026 14:48">Tuesday 27 January 2026</span>. Using Julia version 1.12.4.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
+a = solve(dh, ch, domains);</code></pre><hr/><p><em>This page was generated using <a href="https://github.com/fredrikekre/Literate.jl">Literate.jl</a>.</em></p></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../stokes-flow/">« Stokes flow</a><a class="docs-footer-nextpage" href="../ns_vs_diffeq/">Incompressible Navier-Stokes equations via DifferentialEquations.jl »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option><option value="catppuccin-latte">catppuccin-latte</option><option value="catppuccin-frappe">catppuccin-frappe</option><option value="catppuccin-macchiato">catppuccin-macchiato</option><option value="catppuccin-mocha">catppuccin-mocha</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.15.0 on <span class="colophon-date" title="Wednesday 28 January 2026 07:54">Wednesday 28 January 2026</span>. Using Julia version 1.12.4.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
