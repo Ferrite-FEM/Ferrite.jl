@@ -239,21 +239,21 @@ end;</code></pre><p>Finally, we define a main function which sets up everything 
 
     print_timer(title = &quot;Analysis with $(getncells(grid)) elements&quot;, linechars = :ascii)
     return u
-end</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">solve (generic function with 1 method)</code></pre><p>Run the simulation</p><pre><code class="language-julia hljs">u = solve();</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi"><span class="sgr32">Solving: (thresh = 1e-08, value = 0.000259699)</span>
-<span class="sgr34">   iter: 3</span>
+end</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">solve (generic function with 1 method)</code></pre><p>Run the simulation</p><pre><code class="language-julia hljs">u = solve();</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi"><span class="sgr32">Solving: (thresh = 1e-08, value = 0.0130423)</span>
+<span class="sgr34">   iter: 2</span>
 <span class="sgr32">Solving: Time: 0:00:00 (6 iterations)</span>
 <span class="sgr34">   iter: 5</span>
 <span class="sgr1">-------------------------------------------------------------------------------</span>
 <span class="sgr1"> Analysis with 6000 elements </span>         Time                    Allocations
                              -----------------------   ------------------------
-      Tot / % measured:           355ms /  54.4%           30.9MiB /  35.4%
+      Tot / % measured:           390ms /  60.1%           30.9MiB /  35.4%
 
 Section              ncalls     time    %tot     avg     alloc    %tot      avg
 -------------------------------------------------------------------------------
-assemble                  6    104ms   53.9%  17.4ms   5.50MiB   50.3%   938KiB
-  element assemble    36.0k   70.0ms   36.2%  1.94μs     0.00B    0.0%    0.00B
-linear solve              5   74.9ms   38.8%  15.0ms    473KiB    4.2%  94.6KiB
-export                    1   14.1ms    7.3%  14.1ms   4.98MiB   45.5%  4.98MiB
+assemble                  6    136ms   58.2%  22.7ms   5.50MiB   50.3%   938KiB
+  element assemble    36.0k   95.0ms   40.6%  2.64μs     0.00B    0.0%    0.00B
+linear solve              5   84.4ms   36.0%  16.9ms    473KiB    4.2%  94.6KiB
+export                    1   13.5ms    5.7%  13.5ms   4.98MiB   45.5%  4.98MiB
 <span class="sgr1">-------------------------------------------------------------------------------</span></code></pre><h2 id="Plain-program"><a class="docs-heading-anchor" href="#Plain-program">Plain program</a><a id="Plain-program-1"></a><a class="docs-heading-anchor-permalink" href="#Plain-program" title="Permalink"></a></h2><p>Here follows a version of the program without any comments. The file is also available here: <a href="../hyperelasticity.jl"><code>hyperelasticity.jl</code></a>.</p><pre><code class="language-julia hljs">using Ferrite, Tensors, TimerOutputs, ProgressMeter, IterativeSolvers
 
 struct NeoHooke
@@ -463,4 +463,4 @@ function solve()
     return u
 end
 
-u = solve();</code></pre><hr/><p><em>This page was generated using <a href="https://github.com/fredrikekre/Literate.jl">Literate.jl</a>.</em></p></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../incompressible_elasticity/">« Incompressible elasticity</a><a class="docs-footer-nextpage" href="../plasticity/">Von Mises plasticity »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option><option value="catppuccin-latte">catppuccin-latte</option><option value="catppuccin-frappe">catppuccin-frappe</option><option value="catppuccin-macchiato">catppuccin-macchiato</option><option value="catppuccin-mocha">catppuccin-mocha</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.15.0 on <span class="colophon-date" title="Wednesday 21 January 2026 05:26">Wednesday 21 January 2026</span>. Using Julia version 1.12.4.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
+u = solve();</code></pre><hr/><p><em>This page was generated using <a href="https://github.com/fredrikekre/Literate.jl">Literate.jl</a>.</em></p></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../incompressible_elasticity/">« Incompressible elasticity</a><a class="docs-footer-nextpage" href="../plasticity/">Von Mises plasticity »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option><option value="catppuccin-latte">catppuccin-latte</option><option value="catppuccin-frappe">catppuccin-frappe</option><option value="catppuccin-macchiato">catppuccin-macchiato</option><option value="catppuccin-mocha">catppuccin-mocha</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.15.0 on <span class="colophon-date" title="Wednesday 28 January 2026 17:29">Wednesday 28 January 2026</span>. Using Julia version 1.12.4.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
