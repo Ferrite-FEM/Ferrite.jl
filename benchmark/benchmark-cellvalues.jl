@@ -15,9 +15,9 @@ end
 function element_routine(cv::CellMultiValues)
     s = 0.0
     for q_point in 1:getnquadpoints(cv)
-        for i in 1:getnbasefunctions(cv[:s1])
-            for j in 1:getnbasefunctions(cv[:s1])
-                s += norm(shape_value(cv[:s1], q_point, i)) * norm(shape_gradient(cv[:s1], q_point, j))
+        for i in 1:getnbasefunctions(cv.s1)
+            for j in 1:getnbasefunctions(cv.s1)
+                s += norm(shape_value(cv.s1, q_point, i)) * norm(shape_gradient(cv.s1, q_point, j))
             end
         end
     end

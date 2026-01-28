@@ -288,17 +288,17 @@ end
         cmv_rt = CellMultiValues(qr, (u = ipu, r = iprt))
         cmv3 = CellMultiValues(qr, (u = ipu, T = Lagrange{RefQuadrilateral, 2}(), p = ipp)) # Case with 3 unique IPs
 
-        @test cmv[:p] === cmv[:T] # Correct aliasing for identical interpolations
+        @test cmv.p === cmv.T # Correct aliasing for identical interpolations
         # Correctly inferred geometric interpolation:
         @test Ferrite.geometric_interpolation(cmv) == Ferrite.geometric_interpolation(cvu)
         # Expected function interpolation
-        @test Ferrite.function_interpolation(cmv[:u]) == ipu
-        @test Ferrite.function_interpolation(cmv[:p]) == ipp
+        @test Ferrite.function_interpolation(cmv.u) == ipu
+        @test Ferrite.function_interpolation(cmv.p) == ipp
 
         # Correct number outputs
         @test getnquadpoints(cmv) == getnquadpoints(cvu)
-        @test getnbasefunctions(cmv[:u]) == getnbasefunctions(cvu)
-        @test getnbasefunctions(cmv[:p]) == getnbasefunctions(cvp)
+        @test getnbasefunctions(cmv.u) == getnbasefunctions(cvu)
+        @test getnbasefunctions(cmv.p) == getnbasefunctions(cvp)
 
         # Reinitialization
         cell = Quadrilateral((1, 2, 3, 4))
@@ -308,15 +308,15 @@ end
         reinit!.((cvrt, cmv_rt), (cell,), (x,))
 
         # Test type-stable access by hard-coded key (relies on constant propagation)
-        _getufield(x) = x[:u]
+        _getufield(x) = x.u
         @inferred _getufield(cmv)
         @inferred _getufield(cmv3)
 
         # Test output values when used in an element routine
-        ue = rand(getnbasefunctions(cmv[:u]) + getnbasefunctions(cmv[:p]))
-        dru = 1:getnbasefunctions(cmv[:u])
-        drp = (1:getnbasefunctions(cmv[:p])) .+ getnbasefunctions(cmv[:u])
-        drr = (1:getnbasefunctions(cmv_rt[:r])) .+ getnbasefunctions(cmv[:u])
+        ue = rand(getnbasefunctions(cmv.u) + getnbasefunctions(cmv.p))
+        dru = 1:getnbasefunctions(cmv.u)
+        drp = (1:getnbasefunctions(cmv.p)) .+ getnbasefunctions(cmv.u)
+        drr = (1:getnbasefunctions(cmv_rt.r)) .+ getnbasefunctions(cmv.u)
         for q_point in 1:getnquadpoints(cmv)
             for cmv_test in (cmv, cmv_u, cmv3, cmv_rt)
                 @test getdetJdV(cvu, q_point) ≈ getdetJdV(cmv, q_point)
@@ -324,12 +324,12 @@ end
             end
 
             for (cv, fv, dr) in (
-                    (cvu, cmv[:u], dru),
-                    (cvu, cmv_u[:u], dru),
-                    (cvu, cmv3[:u], dru),
-                    (cvp, cmv[:p], drp),
-                    (cvp, cmv3[:p], drp),
-                    (cvrt, cmv_rt[:r], drr),
+                    (cvu, cmv.u, dru),
+                    (cvu, cmv_u.u, dru),
+                    (cvu, cmv3.u, dru),
+                    (cvp, cmv.p, drp),
+                    (cvp, cmv3.p, drp),
+                    (cvrt, cmv_rt.r, drr),
                 )
                 value = function_value(cv, q_point, ue, dr)
                 gradient = function_gradient(cv, q_point, ue, dr)
@@ -358,20 +358,19 @@ end
             @test cmv_copy isa typeof(cmv)
 
             # Test that all mutable types in FunctionValues and GeometryMapping have been copied
-            for (fv, fvc) in zip(cmv.fun_values, cmv_copy.fun_values)
+            for (fv, fvc) in zip(Ferrite.get_fun_values(cmv), Ferrite.get_fun_values(cmv_copy))
                 test_equal_but_unaliased(fv, fvc)
             end
-            test_equal_but_unaliased(cmv.geo_mapping, cmv_copy.geo_mapping)
+            test_equal_but_unaliased(Ferrite.get_geo_mapping(cmv), Ferrite.get_geo_mapping(cmv_copy))
 
             # Test that aliasing is preserved between equal interpolations
-            @test cmv_copy[:p] === cmv_copy[:T]
+            @test cmv_copy.p === cmv_copy.T
 
             # qr remain aliased, as defined by `copy(qr)=qr`, see quadrature.jl.
-            @test cmv_copy.qr === cmv.qr
+            @test Ferrite.get_quadrature_rule(cmv_copy) === Ferrite.get_quadrature_rule(cmv)
             # While detJdV is copied
-            @test cmv_copy.detJdV !== cmv.detJdV
-            @test cmv_copy.detJdV == cmv.detJdV
-
+            @test Ferrite.getdetJdVs(cmv_copy) !== Ferrite.getdetJdVs(cmv)
+            @test Ferrite.getdetJdVs(cmv_copy) == Ferrite.getdetJdVs(cmv)
         end
         @testset "Error paths specific to CellMultiValues" begin
             function test_argument_error_call(f::Function, cmv::CellMultiValues, args...)
@@ -434,7 +433,7 @@ end
         # Scalar values
         ue = rand(getnbasefunctions(csv) + 1)
         ue_vec = [rand(Vec{dim}) for _ in 1:(getnbasefunctions(csv) + 1)]
-        for test_values in (csv, cmv[:s])
+        for test_values in (csv, cmv.s)
             # Scalar dofs
             @test_throws ArgumentError function_value(test_values, qp, ue)
             @test_throws ArgumentError function_gradient(test_values, qp, ue)
@@ -446,7 +445,7 @@ end
 
         # Vector values, scalar dofs
         ue = rand(getnbasefunctions(cvv) + 1)
-        for test_values in (cvv, cmv[:v])
+        for test_values in (cvv, cmv.v)
             @test_throws ArgumentError function_value(test_values, qp, ue)
             @test_throws ArgumentError function_gradient(test_values, qp, ue)
             @test_throws ArgumentError function_divergence(test_values, qp, ue)

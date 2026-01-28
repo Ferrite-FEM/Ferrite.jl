@@ -157,40 +157,40 @@ function element_routine!(Ke, re, m::PoroElastic, cv::CellMultiValues, a, a_old,
     ## Assemble stiffness and force vectors
     for q_point in 1:getnquadpoints(cv)
         dΩ = getdetJdV(cv, q_point)
-        p = function_value(cv[:p], q_point, a, dr_p)
-        p_old = function_value(cv[:p], q_point, a_old, dr_p)
+        p = function_value(cv.p, q_point, a, dr_p)
+        p_old = function_value(cv.p, q_point, a_old, dr_p)
         pdot = (p - p_old) / Δt
-        ∇p = function_gradient(cv[:p], q_point, a, dr_p)
-        ϵ = function_symmetric_gradient(cv[:u], q_point, a, dr_u)
-        tr_ϵ_old = function_divergence(cv[:u], q_point, a_old, dr_u)
+        ∇p = function_gradient(cv.p, q_point, a, dr_p)
+        ϵ = function_symmetric_gradient(cv.u, q_point, a, dr_u)
+        tr_ϵ_old = function_divergence(cv.u, q_point, a_old, dr_u)
         tr_ϵ_dot = (tr(ϵ) - tr_ϵ_old) / Δt
         σ_eff = C ⊡ ϵ
         ## Variation of u_i
         for (iᵤ, Iᵤ) in pairs(dr_u)
-            ∇δNu = shape_symmetric_gradient(cv[:u], q_point, iᵤ)
-            div_δNu = shape_divergence(cv[:u], q_point, iᵤ)
+            ∇δNu = shape_symmetric_gradient(cv.u, q_point, iᵤ)
+            div_δNu = shape_divergence(cv.u, q_point, iᵤ)
             re[Iᵤ] += (∇δNu ⊡ σ_eff - div_δNu * p * m.α) * dΩ
             for (jᵤ, Jᵤ) in pairs(dr_u)
-                ∇Nu = shape_symmetric_gradient(cv[:u], q_point, jᵤ)
+                ∇Nu = shape_symmetric_gradient(cv.u, q_point, jᵤ)
                 Ke[Iᵤ, Jᵤ] += (∇δNu ⊡ C ⊡ ∇Nu) * dΩ
             end
             for (jₚ, Jₚ) in pairs(dr_p)
-                Np = shape_value(cv[:p], q_point, jₚ)
+                Np = shape_value(cv.p, q_point, jₚ)
                 Ke[Iᵤ, Jₚ] -= (div_δNu * m.α * Np) * dΩ
             end
         end
         ## Variation of p_i
         for (iₚ, Iₚ) in pairs(dr_p)
-            δNp = shape_value(cv[:p], q_point, iₚ)
-            ∇δNp = shape_gradient(cv[:p], q_point, iₚ)
+            δNp = shape_value(cv.p, q_point, iₚ)
+            ∇δNp = shape_gradient(cv.p, q_point, iₚ)
             re[Iₚ] += (δNp * (m.α * tr_ϵ_dot + m.β * pdot) + m.k * (∇δNp ⋅ ∇p)) * dΩ
             for (jᵤ, Jᵤ) in pairs(dr_u)
-                div_Nu = shape_divergence(cv[:u], q_point, jᵤ)
+                div_Nu = shape_divergence(cv.u, q_point, jᵤ)
                 Ke[Iₚ, Jᵤ] += δNp * (m.α / Δt) * div_Nu * dΩ
             end
             for (jₚ, Jₚ) in pairs(dr_p)
-                ∇Np = shape_gradient(cv[:p], q_point, jₚ)
-                Np = shape_value(cv[:p], q_point, jₚ)
+                ∇Np = shape_gradient(cv.p, q_point, jₚ)
+                Np = shape_value(cv.p, q_point, jₚ)
                 Ke[Iₚ, Jₚ] += (δNp * m.β * Np / Δt + m.k * (∇δNp ⋅ ∇Np)) * dΩ
             end
         end
