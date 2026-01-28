@@ -19,7 +19,7 @@ function create_values(interpolation_u, interpolation_p)
     qr = QuadratureRule{RefTriangle}(3)
     facet_qr = FacetQuadratureRule{RefTriangle}(3)
 
-    # CellValues, for both fields
+    # CellMultiValues, for both fields
     cellvalues = CellMultiValues(qr, (u = interpolation_u, p = interpolation_p))
 
     # FacetValues (only for the displacement, u)

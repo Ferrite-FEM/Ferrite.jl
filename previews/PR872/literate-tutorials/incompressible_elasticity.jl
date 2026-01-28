@@ -39,8 +39,8 @@ function create_cook_grid(nx, ny)
     return grid
 end;
 
-# Next we define a function to set up our CellMultiValues and FacetValues.
-# For this coupled problem, using CellMultiValues allow us to use the same
+# Next we define a function to set up our `CellMultiValues` and `FacetValues`.
+# For this coupled problem, using `CellMultiValues` allows us to use the same
 # quadrature rule and geometric interpolation for both the `:u` and `:p`
 # fields, which is more efficient and convenient.
 function create_values(interpolation_u, interpolation_p)
@@ -48,7 +48,7 @@ function create_values(interpolation_u, interpolation_p)
     qr = QuadratureRule{RefTriangle}(3)
     facet_qr = FacetQuadratureRule{RefTriangle}(3)
 
-    ## CellValues, for both fields
+    ## CellMultiValues, for both fields
     cellvalues = CellMultiValues(qr, (u = interpolation_u, p = interpolation_p))
 
     ## FacetValues (only for the displacement, u)
