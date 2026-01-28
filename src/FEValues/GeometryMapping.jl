@@ -15,6 +15,7 @@ end
 
 @inline getjacobian(mv::MappingValues{<:Union{AbstractTensor, SMatrix}}) = mv.J
 @inline gethessian(mv::MappingValues{<:Any, <:AbstractTensor}) = mv.H
+@inline gethessian(mv::MappingValues{<:SMatrix, <:SArray}) = mv.H
 
 
 """
@@ -112,6 +113,12 @@ geometric_interpolation(geo_mapping::GeometryMapping) = geo_mapping.ip
 @inline function otimes_helper(x::Vec{sdim}, dMdξ::Vec{rdim}) where {sdim, rdim}
     return SMatrix{sdim, rdim}((x[i] * dMdξ[j] for i in 1:sdim, j in 1:rdim)...)
 end
+
+@inline otimes_helper(x::Vec{dim}, d2Mdξ2::Tensor{2, dim}) where {dim} = x ⊗ d2Mdξ2
+@inline function otimes_helper(x::Vec{sdim}, d2Mdξ2::Tensor{2, rdim}) where {sdim, rdim}
+    return SArray{Tuple{sdim, rdim, rdim}}((x[i] * d2Mdξ2[j, k] for i in 1:sdim, j in 1:rdim, k in 1:rdim)...)
+end
+
 # End of embedded hot-fixes
 
 # For creating initial value
@@ -124,6 +131,10 @@ end
 function otimes_returntype(#=typeof(x)=# ::Type{<:Vec{dim, Tx}}, #=typeof(d2Mdξ2)=# ::Type{<:Tensor{2, dim, TM}}) where {dim, Tx, TM}
     return Tensor{3, dim, promote_type(Tx, TM)}
 end
+function otimes_returntype(::Type{<:Vec{sdim, Tx}}, #=typeof(d2Mdξ2)=# ::Type{<:Tensor{2, rdim, TM}}) where {sdim, rdim, Tx, TM}
+    return typeof(StaticArrays.@SArray zeros(promote_type(Tx, TM), sdim, rdim, rdim))
+end
+
 
 @inline function calculate_mapping(::GeometryMapping{0}, q_point::Int, x::AbstractVector{<:Vec})
     return MappingValues(nothing, nothing)
@@ -140,12 +151,13 @@ end
 
 @inline function calculate_mapping(geo_mapping::GeometryMapping{2}, q_point::Int, x::AbstractVector{<:Vec})
     J = zero(otimes_returntype(eltype(x), eltype(geo_mapping.dMdξ)))
-    sdim, rdim = size(J)
-    (rdim != sdim) && error("hessian for embedded elements not implemented (rdim=$rdim, sdim=$sdim)")
     H = zero(otimes_returntype(eltype(x), eltype(geo_mapping.d2Mdξ2)))
     @inbounds for j in 1:getngeobasefunctions(geo_mapping)
-        J += x[j] ⊗ geo_mapping.dMdξ[j, q_point]
-        H += x[j] ⊗ geo_mapping.d2Mdξ2[j, q_point]
+        J += otimes_helper(x[j], geo_mapping.dMdξ[j, q_point])
+        H += otimes_helper(x[j], geo_mapping.d2Mdξ2[j, q_point])
+
+        # J += x[j] ⊗ geo_mapping.dMdξ[j, q_point]
+        # H += x[j] ⊗ geo_mapping.d2Mdξ2[j, q_point]
     end
     return MappingValues(J, H)
 end
@@ -170,13 +182,16 @@ end
 @inline function calculate_mapping(gip::ScalarInterpolation, ξ::Vec{rdim, T}, x::AbstractVector{<:Vec{sdim}}, ::Val{2}) where {T, rdim, sdim}
     n_basefuncs = getnbasefunctions(gip)
     @boundscheck checkbounds(x, Base.OneTo(n_basefuncs))
-    (rdim != sdim) && error("hessian for embedded elements not implemented (rdim=$rdim, sdim=$sdim)")
     J = zero(otimes_returntype(Vec{sdim, T}, Vec{rdim, T}))
     H = zero(otimes_returntype(eltype(x), typeof(J)))
     @inbounds for j in 1:n_basefuncs
         d2Mdξ2, dMdξ, _ = reference_shape_hessian_gradient_and_value(gip, ξ, j)
-        J += x[j] ⊗ dMdξ
-        H += x[j] ⊗ d2Mdξ2
+
+        J += otimes_helper(x[j], dMdξ)
+        H += otimes_helper(x[j], d2Mdξ2)
+
+        # J += x[j] ⊗ dMdξ
+        # H += x[j] ⊗ d2Mdξ2
     end
     return MappingValues(J, H)
 end
