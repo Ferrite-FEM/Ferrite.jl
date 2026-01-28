@@ -191,7 +191,7 @@ ipp = Lagrange{RefQuadrilateral,1}()
 ipT = Lagrange{RefQuadrilaterla,1}()
 cmv = CellMultiValues(qr, (u = ipu, p = ipp, T = ipT), ip_geo)
 ```
-After calling [`reinit!`](ref) on `cmv`, it can be used as, e.g.
+After calling [`reinit!`](@ref) on `cmv`, it can be used as, e.g.
 ```
 dΩ = getdetJdV(cmv, q_point)
 Nu = shape_value(cmv.u, q_point, base_function_nr)
