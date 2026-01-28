@@ -66,40 +66,40 @@ PoroElastic(; elastic, k, ϕ, α, β) = PoroElastic(elastic, k, ϕ, α, β);</co
     # Assemble stiffness and force vectors
     for q_point in 1:getnquadpoints(cv)
         dΩ = getdetJdV(cv, q_point)
-        p = function_value(cv[:p], q_point, a, dr_p)
-        p_old = function_value(cv[:p], q_point, a_old, dr_p)
+        p = function_value(cv.p, q_point, a, dr_p)
+        p_old = function_value(cv.p, q_point, a_old, dr_p)
         pdot = (p - p_old) / Δt
-        ∇p = function_gradient(cv[:p], q_point, a, dr_p)
-        ϵ = function_symmetric_gradient(cv[:u], q_point, a, dr_u)
-        tr_ϵ_old = function_divergence(cv[:u], q_point, a_old, dr_u)
+        ∇p = function_gradient(cv.p, q_point, a, dr_p)
+        ϵ = function_symmetric_gradient(cv.u, q_point, a, dr_u)
+        tr_ϵ_old = function_divergence(cv.u, q_point, a_old, dr_u)
         tr_ϵ_dot = (tr(ϵ) - tr_ϵ_old) / Δt
         σ_eff = C ⊡ ϵ
         # Variation of u_i
         for (iᵤ, Iᵤ) in pairs(dr_u)
-            ∇δNu = shape_symmetric_gradient(cv[:u], q_point, iᵤ)
-            div_δNu = shape_divergence(cv[:u], q_point, iᵤ)
+            ∇δNu = shape_symmetric_gradient(cv.u, q_point, iᵤ)
+            div_δNu = shape_divergence(cv.u, q_point, iᵤ)
             re[Iᵤ] += (∇δNu ⊡ σ_eff - div_δNu * p * m.α) * dΩ
             for (jᵤ, Jᵤ) in pairs(dr_u)
-                ∇Nu = shape_symmetric_gradient(cv[:u], q_point, jᵤ)
+                ∇Nu = shape_symmetric_gradient(cv.u, q_point, jᵤ)
                 Ke[Iᵤ, Jᵤ] += (∇δNu ⊡ C ⊡ ∇Nu) * dΩ
             end
             for (jₚ, Jₚ) in pairs(dr_p)
-                Np = shape_value(cv[:p], q_point, jₚ)
+                Np = shape_value(cv.p, q_point, jₚ)
                 Ke[Iᵤ, Jₚ] -= (div_δNu * m.α * Np) * dΩ
             end
         end
         # Variation of p_i
         for (iₚ, Iₚ) in pairs(dr_p)
-            δNp = shape_value(cv[:p], q_point, iₚ)
-            ∇δNp = shape_gradient(cv[:p], q_point, iₚ)
+            δNp = shape_value(cv.p, q_point, iₚ)
+            ∇δNp = shape_gradient(cv.p, q_point, iₚ)
             re[Iₚ] += (δNp * (m.α * tr_ϵ_dot + m.β * pdot) + m.k * (∇δNp ⋅ ∇p)) * dΩ
             for (jᵤ, Jᵤ) in pairs(dr_u)
-                div_Nu = shape_divergence(cv[:u], q_point, jᵤ)
+                div_Nu = shape_divergence(cv.u, q_point, jᵤ)
                 Ke[Iₚ, Jᵤ] += δNp * (m.α / Δt) * div_Nu * dΩ
             end
             for (jₚ, Jₚ) in pairs(dr_p)
-                ∇Np = shape_gradient(cv[:p], q_point, jₚ)
-                Np = shape_value(cv[:p], q_point, jₚ)
+                ∇Np = shape_gradient(cv.p, q_point, jₚ)
+                Np = shape_value(cv.p, q_point, jₚ)
                 Ke[Iₚ, Jₚ] += (δNp * m.β * Np / Δt + m.k * (∇δNp ⋅ ∇Np)) * dΩ
             end
         end
@@ -290,40 +290,40 @@ function element_routine!(Ke, re, m::PoroElastic, cv::CellMultiValues, a, a_old,
     # Assemble stiffness and force vectors
     for q_point in 1:getnquadpoints(cv)
         dΩ = getdetJdV(cv, q_point)
-        p = function_value(cv[:p], q_point, a, dr_p)
-        p_old = function_value(cv[:p], q_point, a_old, dr_p)
+        p = function_value(cv.p, q_point, a, dr_p)
+        p_old = function_value(cv.p, q_point, a_old, dr_p)
         pdot = (p - p_old) / Δt
-        ∇p = function_gradient(cv[:p], q_point, a, dr_p)
-        ϵ = function_symmetric_gradient(cv[:u], q_point, a, dr_u)
-        tr_ϵ_old = function_divergence(cv[:u], q_point, a_old, dr_u)
+        ∇p = function_gradient(cv.p, q_point, a, dr_p)
+        ϵ = function_symmetric_gradient(cv.u, q_point, a, dr_u)
+        tr_ϵ_old = function_divergence(cv.u, q_point, a_old, dr_u)
         tr_ϵ_dot = (tr(ϵ) - tr_ϵ_old) / Δt
         σ_eff = C ⊡ ϵ
         # Variation of u_i
         for (iᵤ, Iᵤ) in pairs(dr_u)
-            ∇δNu = shape_symmetric_gradient(cv[:u], q_point, iᵤ)
-            div_δNu = shape_divergence(cv[:u], q_point, iᵤ)
+            ∇δNu = shape_symmetric_gradient(cv.u, q_point, iᵤ)
+            div_δNu = shape_divergence(cv.u, q_point, iᵤ)
             re[Iᵤ] += (∇δNu ⊡ σ_eff - div_δNu * p * m.α) * dΩ
             for (jᵤ, Jᵤ) in pairs(dr_u)
-                ∇Nu = shape_symmetric_gradient(cv[:u], q_point, jᵤ)
+                ∇Nu = shape_symmetric_gradient(cv.u, q_point, jᵤ)
                 Ke[Iᵤ, Jᵤ] += (∇δNu ⊡ C ⊡ ∇Nu) * dΩ
             end
             for (jₚ, Jₚ) in pairs(dr_p)
-                Np = shape_value(cv[:p], q_point, jₚ)
+                Np = shape_value(cv.p, q_point, jₚ)
                 Ke[Iᵤ, Jₚ] -= (div_δNu * m.α * Np) * dΩ
             end
         end
         # Variation of p_i
         for (iₚ, Iₚ) in pairs(dr_p)
-            δNp = shape_value(cv[:p], q_point, iₚ)
-            ∇δNp = shape_gradient(cv[:p], q_point, iₚ)
+            δNp = shape_value(cv.p, q_point, iₚ)
+            ∇δNp = shape_gradient(cv.p, q_point, iₚ)
             re[Iₚ] += (δNp * (m.α * tr_ϵ_dot + m.β * pdot) + m.k * (∇δNp ⋅ ∇p)) * dΩ
             for (jᵤ, Jᵤ) in pairs(dr_u)
-                div_Nu = shape_divergence(cv[:u], q_point, jᵤ)
+                div_Nu = shape_divergence(cv.u, q_point, jᵤ)
                 Ke[Iₚ, Jᵤ] += δNp * (m.α / Δt) * div_Nu * dΩ
             end
             for (jₚ, Jₚ) in pairs(dr_p)
-                ∇Np = shape_gradient(cv[:p], q_point, jₚ)
-                Np = shape_value(cv[:p], q_point, jₚ)
+                ∇Np = shape_gradient(cv.p, q_point, jₚ)
+                Np = shape_value(cv.p, q_point, jₚ)
                 Ke[Iₚ, Jₚ] += (δNp * m.β * Np / Δt + m.k * (∇δNp ⋅ ∇Np)) * dΩ
             end
         end
@@ -478,4 +478,4 @@ function solve(dh, ch, domains; Δt = 0.025, t_total = 1.0)
 end;
 
 dh, ch, domains = setup_problem()
-a = solve(dh, ch, domains);</code></pre><hr/><p><em>This page was generated using <a href="https://github.com/fredrikekre/Literate.jl">Literate.jl</a>.</em></p></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../stokes-flow/">« Stokes flow</a><a class="docs-footer-nextpage" href="../ns_vs_diffeq/">Incompressible Navier-Stokes equations via DifferentialEquations.jl »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option><option value="catppuccin-latte">catppuccin-latte</option><option value="catppuccin-frappe">catppuccin-frappe</option><option value="catppuccin-macchiato">catppuccin-macchiato</option><option value="catppuccin-mocha">catppuccin-mocha</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.15.0 on <span class="colophon-date" title="Wednesday 28 January 2026 09:29">Wednesday 28 January 2026</span>. Using Julia version 1.12.4.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
+a = solve(dh, ch, domains);</code></pre><hr/><p><em>This page was generated using <a href="https://github.com/fredrikekre/Literate.jl">Literate.jl</a>.</em></p></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../stokes-flow/">« Stokes flow</a><a class="docs-footer-nextpage" href="../ns_vs_diffeq/">Incompressible Navier-Stokes equations via DifferentialEquations.jl »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option><option value="catppuccin-latte">catppuccin-latte</option><option value="catppuccin-frappe">catppuccin-frappe</option><option value="catppuccin-macchiato">catppuccin-macchiato</option><option value="catppuccin-mocha">catppuccin-mocha</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.15.0 on <span class="colophon-date" title="Wednesday 28 January 2026 14:53">Wednesday 28 January 2026</span>. Using Julia version 1.12.4.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>

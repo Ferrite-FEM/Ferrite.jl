@@ -90,21 +90,21 @@ function assemble_up!(Ke, fe, cell, cellvalues, facetvalues_u, grid, mp, t, dofr
     for q_point in 1:getnquadpoints(cellvalues)
         dΩ = getdetJdV(cellvalues, q_point)
         for (iᵤ, Iᵤ) in pairs(dofrange_u)
-            ɛdev_i = dev_3d(symmetric(shape_gradient(cellvalues[:u], q_point, iᵤ)))
+            ɛdev_i = dev_3d(symmetric(shape_gradient(cellvalues.u, q_point, iᵤ)))
             for (jᵤ, Jᵤ) in pairs(dofrange_u[1:iᵤ])
-                ɛdev_j = dev_3d(symmetric(shape_gradient(cellvalues[:u], q_point, jᵤ)))
+                ɛdev_j = dev_3d(symmetric(shape_gradient(cellvalues.u, q_point, jᵤ)))
                 Ke[Iᵤ, Jᵤ] += 2 * mp.G * ɛdev_i ⊡ ɛdev_j * dΩ
             end
         end
 
         for (iₚ, Iₚ) in pairs(dofrange_p)
-            δp = shape_value(cellvalues[:p], q_point, iₚ)
+            δp = shape_value(cellvalues.p, q_point, iₚ)
             for (jᵤ, Jᵤ) in pairs(dofrange_u)
-                divδu = shape_divergence(cellvalues[:u], q_point, jᵤ)
+                divδu = shape_divergence(cellvalues.u, q_point, jᵤ)
                 Ke[Iₚ, Jᵤ] += -δp * divδu * dΩ
             end
             for (jₚ, Jₚ) in pairs(dofrange_p[1:iₚ])
-                p = shape_value(cellvalues[:p], q_point, jₚ)
+                p = shape_value(cellvalues.p, q_point, jₚ)
                 Ke[Iₚ, Jₚ] += - 1 / mp.K * δp * p * dΩ
             end
 
@@ -160,8 +160,8 @@ function compute_stresses(cellvalues::CellMultiValues, dh::DofHandler, mp::Linea
         for qp in 1:getnquadpoints(cellvalues)
             dΩ = getdetJdV(cellvalues, qp)
             # Evaluate the strain and the pressure
-            ε = function_symmetric_gradient(cellvalues[:u], qp, ae, u_range)
-            p = function_value(cellvalues[:p], qp, ae, p_range)
+            ε = function_symmetric_gradient(cellvalues.u, qp, ae, u_range)
+            p = function_value(cellvalues.p, qp, ae, p_range)
             # Expand strain to 3D
             εdev_3d = dev_3d(ε)
             # Compute the stress in this quadrature point
