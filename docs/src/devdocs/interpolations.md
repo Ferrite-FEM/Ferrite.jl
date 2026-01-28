@@ -16,9 +16,11 @@ Ferrite.facedof_interior_indices(::Interpolation)
 Ferrite.edgedof_indices(::Interpolation)
 Ferrite.edgedof_interior_indices(::Interpolation)
 Ferrite.volumedof_interior_indices(::Interpolation)
-Ferrite.getnbasefunctions(::Interpolation)
 Ferrite.adjust_dofs_during_distribution(::Interpolation)
 Ferrite.conformity
+```
+```@docs; canonical=false
+getnbasefunctions(::Interpolation)
 ```
 
 ### For special interpolations

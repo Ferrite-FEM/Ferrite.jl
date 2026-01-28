@@ -38,12 +38,25 @@ typeof_d2Ndξ2(::Type{T}, ::VectorInterpolation{vdim}, ::VectorizedInterpolation
 """
     FunctionValues{DiffOrder}(::Type{T}, ip_fun, qr::QuadratureRule, ip_geo::VectorizedInterpolation)
 
-Create a `FunctionValues` object containing the shape values and gradients (up to order `DiffOrder`)
-for both the reference cell (precalculated) and the real cell (updated in `reinit!`).
+Create a `FunctionValues <: AbstractValues` object containing the shape values and gradients (up to order
+`DiffOrder`) for both the reference cell (precalculated) and the real cell (updated in `reinit!`).
+The user should normally not create `FunctionValues`, these are typically only created from the constructors
+of `AbstractCellValues` and `AbstractFacetValues`. However, the user will interact with `fv::FunctionValues`
+when indexing e.g. `cmv::CellMultiValues` (e.g. `fv = cmv.u`), as `fv` supports
+
+* [`getnbasefunctions`](@ref)
+* [`shape_value`](@ref)
+* [`shape_gradient`](@ref)
+* [`shape_symmetric_gradient`](@ref)
+* [`shape_divergence`](@ref)
+* [`function_value`](@ref)
+* [`function_gradient`](@ref)
+* [`function_symmetric_gradient`](@ref)
+* [`function_divergence`](@ref)
 """
 FunctionValues
 
-struct FunctionValues{DiffOrder, IP, N_t, dNdx_t, dNdξ_t, d2Ndx2_t, d2Ndξ2_t}
+struct FunctionValues{DiffOrder, IP, N_t, dNdx_t, dNdξ_t, d2Ndx2_t, d2Ndξ2_t} <: AbstractValues
     ip::IP          # ::Interpolation
     Nx::N_t         # ::AbstractMatrix{Union{<:Tensor,<:Number}}
     Nξ::N_t         # ::AbstractMatrix{Union{<:Tensor,<:Number}}
@@ -110,6 +123,7 @@ function Base.copy(v::FunctionValues)
 end
 
 getnbasefunctions(funvals::FunctionValues) = size(funvals.Nx, 1)
+getnquadpoints(funvals::FunctionValues) = size(funvals.Nx, 2)
 @propagate_inbounds shape_value(funvals::FunctionValues, q_point::Int, base_func::Int) = funvals.Nx[base_func, q_point]
 @propagate_inbounds shape_gradient(funvals::FunctionValues, q_point::Int, base_func::Int) = funvals.dNdx[base_func, q_point]
 @propagate_inbounds shape_hessian(funvals::FunctionValues{2}, q_point::Int, base_func::Int) = funvals.d2Ndx2[base_func, q_point]
@@ -132,6 +146,9 @@ sdim_from_gradtype(::Type{<:SMatrix{<:Any, sdim}}) where {sdim} = sdim
 
 # For performance, these must be fully inferable for the compiler.
 # args: valname (:CellValues or :FacetValues), shape_gradient_type, eltype(x)
+function check_reinit_sdim_consistency(fe_v::FeV, ::AbstractVector{VT}) where {FeV <: AbstractValues, VT}
+    return check_reinit_sdim_consistency(nameof(FeV), shape_gradient_type(fe_v), VT)
+end
 function check_reinit_sdim_consistency(valname, gradtype::Type, ::Type{<:Vec{sdim}}) where {sdim}
     check_reinit_sdim_consistency(valname, Val(sdim_from_gradtype(gradtype)), Val(sdim))
     return

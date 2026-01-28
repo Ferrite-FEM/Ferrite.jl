@@ -34,6 +34,20 @@ include("test_utils.jl")
             # TODO: Also @test_call some methods that use cv?
         end
     end
+    @testset "CellMultiValues" begin
+        ipu = Lagrange{RefQuadrilateral, 2}()^2
+        ipp = Lagrange{RefQuadrilateral, 1}()
+        ipT = ipp
+        qr = QuadratureRule{RefQuadrilateral}(2)
+        cmv = CellMultiValues(qr, (u = ipu, p = ipp, T = ipT))
+        cmv_u = CellMultiValues(qr, (u = ipu,)) # Case with a single interpolation
+        cmv3 = CellMultiValues(qr, (u = ipu, T = Lagrange{RefQuadrilateral, 2}(), p = ipp)) # Case with 3 unique IPs
+
+        coords, _ = valid_coordinates_and_normals(Ferrite.geometric_interpolation(cmv))
+        @test_call reinit!(cmv, coords)
+        @test_call reinit!(cmv_u, coords)
+        @test_call reinit!(cmv3, coords)
+    end
     @testset "Embedded elements" begin
         @testset "Scalar/vector on curves (vdim = $vdim)" for vdim in (0, 1, 2, 3)
             ip_base = Lagrange{RefLine, 1}()

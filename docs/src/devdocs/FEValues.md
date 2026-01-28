@@ -4,11 +4,13 @@
 * `AbstractValues`
   * `AbstractCellValues`
     * [`CellValues`](@ref)
+    * [`CellMultiValues`](@ref)
   * `AbstractFacetValues`
     * [`FacetValues`](@ref)
     * [`BCValues`](@ref Ferrite.BCValues)
   * [`PointValues`](@ref)
   * [`InterfaceValues`](@ref)
+  * [`FunctionValues`](@ref Ferrite.FunctionValues)
 
 
 ## Internal types

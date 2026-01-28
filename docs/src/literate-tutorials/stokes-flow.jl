@@ -225,13 +225,17 @@ end
 # triangles. However, since linear mapping is default this could have been skipped.
 # We also construct facet-values for the pressure since we need to integrate along
 # the boundary when assembling the constraint matrix ``\underline{\underline{C}}``.
+# Here, we choose to use two separate [`CellValues`](@ref) instead of a single
+# [`CellMultiValues`](@ref) to demonstrate that this alternative. Here, we use
+# don't need the shape gradients of the pressure field, so we request that these
+# are not updated.
 
 function setup_fevalues(ipu, ipp, ipg)
     qr = QuadratureRule{RefTriangle}(2)
     cvu = CellValues(qr, ipu, ipg)
-    cvp = CellValues(qr, ipp, ipg)
+    cvp = CellValues(qr, ipp, ipg; update_gradients = false, update_detJdV = false)
     qr_facet = FacetQuadratureRule{RefTriangle}(2)
-    fvp = FacetValues(qr_facet, ipp, ipg)
+    fvp = FacetValues(qr_facet, ipp, ipg; update_gradients = false)
     return cvu, cvp, fvp
 end
 #md nothing #hide

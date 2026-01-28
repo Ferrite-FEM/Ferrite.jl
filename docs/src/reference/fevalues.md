@@ -6,12 +6,13 @@ DocTestSetup = :(using Ferrite)
 # FEValues
 
 ## Main types
-[`CellValues`](@ref) and [`FacetValues`](@ref) are the most common
+[`CellValues`](@ref), [`CellMultiValues`](@ref), and [`FacetValues`](@ref) are the most common
 subtypes of `Ferrite.AbstractValues`. For more details about how
 these work, please see the related [topic guide](@ref fevalues_topicguide).
 
 ```@docs
 CellValues
+CellMultiValues
 FacetValues
 ```
 
@@ -22,27 +23,31 @@ FacetValues
     API for embedded `FEValues` should therefore be considered experimental.
 
 ## Applicable functions
-The following functions are applicable to both `CellValues`
-and `FacetValues`.
+The following functions are applicable
+`CellValues`, `FacetValues`, and `CellMultiValues`
 
 ```@docs
 reinit!
 getnquadpoints
 getdetJdV
+spatial_coordinate
+geometric_value
+```
 
+Furthermore, the following functions are applicable to
+`CellValues`, `FacetValues`, and `FunctionValues` (obtained from [`CellMultiValues`](@ref))
+```@docs
 shape_value(::Ferrite.AbstractValues, ::Int, ::Int)
 shape_gradient(::Ferrite.AbstractValues, ::Int, ::Int)
 shape_symmetric_gradient
 shape_divergence
 shape_curl
-geometric_value
-
+getnbasefunctions(::Ferrite.AbstractValues)
 function_value
 function_gradient
 function_symmetric_gradient
 function_divergence
 function_curl
-spatial_coordinate
 ```
 
 In addition, there are some methods that are unique for `FacetValues`.

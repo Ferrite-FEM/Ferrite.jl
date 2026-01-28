@@ -7,7 +7,7 @@ DocTestSetup = :(using Ferrite)
 
 ```@docs
 Interpolation
-getnbasefunctions
+getnbasefunctions(::Interpolation)
 getrefdim(::Interpolation)
 getrefshape
 getorder

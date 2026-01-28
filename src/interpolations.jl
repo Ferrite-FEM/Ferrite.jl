@@ -171,7 +171,7 @@ Return order of the interpolation.
 #####################
 
 """
-    Ferrite.getnbasefunctions(ip::Interpolation)
+    getnbasefunctions(ip::Interpolation)
 
 Return the number of base functions for the interpolation `ip`.
 """
