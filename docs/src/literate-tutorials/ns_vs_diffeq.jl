@@ -390,14 +390,14 @@ jac_sparsity = sparse(K);
 #
 apply!(M, ch)
 
-struct RHSparams2{KT, CH, DH, CV, UT}
+struct RHSparams{KT, CH, DH, CV, UT}
     K::KT  # SparseMatrixCSC
     ch::CH # ConstraintHandler
     dh::DH # DofHandler
     cv::CV # CellMultiValues
     u::UT  # Vector
 end
-p = RHSparams2(K, ch, dh, cellvalues, copy(u₀))
+p = RHSparams(K, ch, dh, cellvalues, copy(u₀))
 
 function ferrite_limiter!(u, _, p, t)
     update!(p.ch, t)
@@ -425,7 +425,7 @@ function navierstokes_rhs_element!(dvₑ, vₑ, cv)
     return
 end
 
-function navierstokes!(du, u_uc, p::RHSparams2, t)
+function navierstokes!(du, u_uc, p::RHSparams, t)
     # Unpack the struct to save some allocations.
     #+
     (; K, ch, dh, cv, u) = p
