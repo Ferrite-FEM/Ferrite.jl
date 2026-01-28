@@ -106,6 +106,27 @@ end
     return reinit!(cv, nothing, x)
 end
 
+function reinit!(cv::AbstractCellValues, cell::Union{AbstractCell, Nothing}, x::AbstractVector{<:Vec})
+    geo_mapping = cv.geo_mapping
+    fun_values = cv.fun_values
+    n_geom_basefuncs = getngeobasefunctions(geo_mapping)
+
+    check_reinit_sdim_consistency(cv, x)
+    if cell === nothing && reinit_needs_cell(cv)
+        throw(ArgumentError("The cell::AbstractCell input is required to reinit! non-identity function mappings"))
+    end
+    if !checkbounds(Bool, x, 1:n_geom_basefuncs) || length(x) != n_geom_basefuncs
+        throw_incompatible_coord_length(length(x), n_geom_basefuncs)
+    end
+
+    @inbounds for (q_point, w) in enumerate(getweights(cv.qr))
+        mapping = calculate_mapping(geo_mapping, q_point, x)
+        _update_detJdV!(cv.detJdV, q_point, w, mapping)
+        apply_mapping!(fun_values, q_point, mapping, cell)
+    end
+    return nothing
+end
+
 function Base.show(io::IO, d::MIME"text/plain", cv::CellValues)
     ip_geo = geometric_interpolation(cv)
     ip_fun = function_interpolation(cv)
@@ -287,26 +308,4 @@ for f in (:function_value, :function_gradient, :function_symmetric_gradient, :fu
         fun = $f                       # Make the function name available to use in the error message
         throw(ArgumentError("$fun isn't applicable to cv::CellMultiValues. Use on `FunctionValues` for the specific field, e.g. $fun(cv[:$k], q_point, ae, [dofrange])"))
     end
-end
-
-# Combined `reinit!` for both CellValues and CellMultiValues
-function reinit!(cv::Union{CellValues, CellMultiValues}, cell::Union{AbstractCell, Nothing}, x::AbstractVector{<:Vec})
-    geo_mapping = cv.geo_mapping
-    fun_values = cv.fun_values
-    n_geom_basefuncs = getngeobasefunctions(geo_mapping)
-
-    check_reinit_sdim_consistency(cv, x)
-    if cell === nothing && reinit_needs_cell(cv)
-        throw(ArgumentError("The cell::AbstractCell input is required to reinit! non-identity function mappings"))
-    end
-    if !checkbounds(Bool, x, 1:n_geom_basefuncs) || length(x) != n_geom_basefuncs
-        throw_incompatible_coord_length(length(x), n_geom_basefuncs)
-    end
-
-    @inbounds for (q_point, w) in enumerate(getweights(cv.qr))
-        mapping = calculate_mapping(geo_mapping, q_point, x)
-        _update_detJdV!(cv.detJdV, q_point, w, mapping)
-        apply_mapping!(fun_values, q_point, mapping, cell)
-    end
-    return nothing
 end
