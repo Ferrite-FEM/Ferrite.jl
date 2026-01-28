@@ -593,38 +593,38 @@ vtk_save(pvd);
 
 using Test                                                                      #hide
 if IS_CI                                                                        #hide
-    function compute_divergence(dh, u, cv)                            #hide
+    function compute_divergence(dh, u, cv)                                      #hide
         divv = 0.0                                                              #hide
         for cell in CellIterator(dh)                                            #hide
-            Ferrite.reinit!(cv, cell)                                 #hide
-            for q_point in 1:getnquadpoints(cv)                       #hide
-                dΩ = getdetJdV(cv, q_point)                           #hide
+            Ferrite.reinit!(cv, cell)                                           #hide
+            for q_point in 1:getnquadpoints(cv)                                 #hide
+                dΩ = getdetJdV(cv, q_point)                                     #hide
                 #hide
                 all_celldofs = celldofs(cell)                                   #hide
                 v_celldofs = all_celldofs[dof_range(dh, :v)]                    #hide
                 v_cell = u[v_celldofs]                                          #hide
                 #hide
-                divv += function_divergence(cv[:v], q_point, v_cell) * dΩ #hide
+                divv += function_divergence(cv[:v], q_point, v_cell) * dΩ       #hide
             end                                                                 #hide
         end                                                                     #hide
         return divv                                                             #hide
     end                                                                         #hide
     let                                                                         #hide
         u = copy(integrator.u)                                                  #hide
-        Δdivv = abs(compute_divergence(dh, u, cv))                    #hide
+        Δdivv = abs(compute_divergence(dh, u, cellvalues))                      #hide
         @test isapprox(Δdivv, 0.0, atol = 1.0e-12)                              #hide
         #hide
         Δv = 0.0                                                                #hide
         for cell in CellIterator(dh)                                            #hide
-            Ferrite.reinit!(cv, cell)                                 #hide
+            Ferrite.reinit!(cellvalues, cell)                                   #hide
             all_celldofs = celldofs(cell)                                       #hide
             v_celldofs = all_celldofs[dof_range(dh, :v)]                        #hide
             v_cell = u[v_celldofs]                                              #hide
             coords = getcoordinates(cell)                                       #hide
-            for q_point in 1:getnquadpoints(cv)                       #hide
-                dΩ = getdetJdV(cv, q_point)                           #hide
-                coords_qp = spatial_coordinate(cv, q_point, coords)   #hide
-                v = function_value(cv[:v], q_point, v_cell)               #hide
+            for q_point in 1:getnquadpoints(cellvalues)                         #hide
+                dΩ = getdetJdV(cellvalues, q_point)                             #hide
+                coords_qp = spatial_coordinate(cellvalues, q_point, coords)     #hide
+                v = function_value(cellvalues[:v], q_point, v_cell)             #hide
                 Δv += norm(v - parabolic_inflow_profile(coords_qp, T))^2 * dΩ   #hide
             end                                                                 #hide
         end                                                                     #hide
