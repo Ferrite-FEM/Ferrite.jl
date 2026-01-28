@@ -38,8 +38,21 @@ typeof_d2Ndξ2(::Type{T}, ::VectorInterpolation{vdim}, ::VectorizedInterpolation
 """
     FunctionValues{DiffOrder}(::Type{T}, ip_fun, qr::QuadratureRule, ip_geo::VectorizedInterpolation)
 
-Create a `FunctionValues` object containing the shape values and gradients (up to order `DiffOrder`)
-for both the reference cell (precalculated) and the real cell (updated in `reinit!`).
+Create a `FunctionValues <: AbstractValues` object containing the shape values and gradients (up to order
+`DiffOrder`) for both the reference cell (precalculated) and the real cell (updated in `reinit!`).
+The user should normally not create `FunctionValues`, these are typically only created from the constructors
+of `AbstractCellValues` and `AbstractFacetValues`. However, the user will interact with `fv::FunctionValues`
+when indexing e.g. `cmv::CellMultiValues` (e.g. `fv = cmv[:u]`), as `fv` supports
+
+* [`getnbasefunctions`](@ref)
+* [`shape_value`](@ref)
+* [`shape_gradient`](@ref)
+* [`shape_symmetric_gradient`](@ref)
+* [`shape_divergence`](@ref)
+* [`function_value`](@ref)
+* [`function_gradient`](@ref)
+* [`function_symmetric_gradient`](@ref)
+* [`function_divergence`](@ref)
 """
 FunctionValues
 
