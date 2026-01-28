@@ -3,9 +3,10 @@ using Ferrite, BenchmarkTools
 function element_routine(cv::CellValues)
     s = 0.0
     for q_point in 1:getnquadpoints(cv)
+        dΩ = getdetJdV(cv, q_point)
         for i in 1:getnbasefunctions(cv)
             for j in 1:getnbasefunctions(cv)
-                s += norm(shape_value(cv, q_point, i)) * norm(shape_gradient(cv, q_point, j))
+                s += norm(shape_value(cv, q_point, i)) * norm(shape_gradient(cv, q_point, j)) * dΩ
             end
         end
     end
@@ -15,9 +16,10 @@ end
 function element_routine(cv::CellMultiValues)
     s = 0.0
     for q_point in 1:getnquadpoints(cv)
+        dΩ = getdetJdV(cv, q_point)
         for i in 1:getnbasefunctions(cv.s1)
             for j in 1:getnbasefunctions(cv.s1)
-                s += norm(shape_value(cv.s1, q_point, i)) * norm(shape_gradient(cv.s1, q_point, j))
+                s += norm(shape_value(cv.s1, q_point, i)) * norm(shape_gradient(cv.s1, q_point, j)) * dΩ
             end
         end
     end
