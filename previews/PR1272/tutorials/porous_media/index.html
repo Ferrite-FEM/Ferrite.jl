@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/><title>Porous media · Ferrite.jl</title><meta name="title" content="Porous media · Ferrite.jl"/><meta property="og:title" content="Porous media · Ferrite.jl"/><meta property="twitter:title" content="Porous media · Ferrite.jl"/><meta name="description" content="Documentation for Ferrite.jl."/><meta property="og:description" content="Documentation for Ferrite.jl."/><meta property="twitter:description" content="Documentation for Ferrite.jl."/><meta property="og:url" content="https://ferrite-fem.github.io/Ferrite.jl/stable/tutorials/porous_media/"/><meta property="twitter:url" content="https://ferrite-fem.github.io/Ferrite.jl/stable/tutorials/porous_media/"/><link rel="canonical" href="https://ferrite-fem.github.io/Ferrite.jl/stable/tutorials/porous_media/"/><script data-outdated-warner src="../../assets/warner.js"></script><link href="https://cdnjs.cloudflare.com/ajax/libs/lato-font/3.0.0/css/lato-font.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/juliamono/0.050/juliamono.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/fontawesome.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/solid.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/brands.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.8/katex.min.css" rel="stylesheet" type="text/css"/><script>documenterBaseURL="../.."</script><script src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.6/require.min.js" data-main="../../assets/documenter.js"></script><script src="../../search_index.js"></script><script src="../../siteinfo.js"></script><script src="../../../versions.js"></script><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/catppuccin-mocha.css" data-theme-name="catppuccin-mocha"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/catppuccin-macchiato.css" data-theme-name="catppuccin-macchiato"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/catppuccin-frappe.css" data-theme-name="catppuccin-frappe"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/catppuccin-latte.css" data-theme-name="catppuccin-latte"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/documenter-dark.css" data-theme-name="documenter-dark" data-theme-primary-dark/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/documenter-light.css" data-theme-name="documenter-light" data-theme-primary/><script src="../../assets/themeswap.js"></script><link href="../../assets/custom.css" rel="stylesheet" type="text/css"/><link href="../../assets/citations.css" rel="stylesheet" type="text/css"/><link href="../../assets/favicon.ico" rel="icon" type="image/x-icon"/></head><body><div id="documenter"><nav class="docs-sidebar"><a class="docs-logo" href="../../"><img src="../../assets/logo.svg" alt="Ferrite.jl logo"/></a><div class="docs-package-name"><span class="docs-autofit"><a href="../../">Ferrite.jl</a></span></div><button class="docs-search-query input is-rounded is-small is-clickable my-2 mx-auto py-1 px-2" id="documenter-search-query">Search docs (Ctrl + /)</button><ul class="docs-menu"><li><a class="tocitem" href="../../">Home</a></li><li><input class="collapse-toggle" id="menuitem-3" type="checkbox" checked/><label class="tocitem" for="menuitem-3"><span class="docs-label">Tutorials</span><i class="docs-chevron"></i></label><ul class="collapsed"><li><a class="tocitem" href="../">Tutorials overview</a></li><li><a class="tocitem" href="../heat_equation/">Heat equation</a></li><li><a class="tocitem" href="../linear_elasticity/">Linear elasticity</a></li><li><a class="tocitem" href="../incompressible_elasticity/">Incompressible elasticity</a></li><li><a class="tocitem" href="../hyperelasticity/">Hyperelasticity</a></li><li><a class="tocitem" href="../plasticity/">Von Mises plasticity</a></li><li><a class="tocitem" href="../transient_heat_equation/">Transient heat equation</a></li><li><a class="tocitem" href="../computational_homogenization/">Computational homogenization</a></li><li><a class="tocitem" href="../stokes-flow/">Stokes flow</a></li><li class="is-active"><a class="tocitem" href>Porous media</a><ul class="internal"><li><a class="tocitem" href="#Theory-of-porous-media"><span>Theory of porous media</span></a></li><li><a class="tocitem" href="#Implementation"><span>Implementation</span></a></li><li><a class="tocitem" href="#porous-media-plain-program"><span>Plain program</span></a></li></ul></li><li><a class="tocitem" href="../ns_vs_diffeq/">Incompressible Navier-Stokes equations via DifferentialEquations.jl</a></li><li><a class="tocitem" href="../reactive_surface/">Reactive surface</a></li><li><a class="tocitem" href="../linear_shell/">Linear shell</a></li><li><a class="tocitem" href="../dg_heat_equation/">Discontinuous Galerkin heat equation</a></li></ul></li><li><input class="collapse-toggle" id="menuitem-4" type="checkbox"/><label class="tocitem" for="menuitem-4"><span class="docs-label">Topic guides</span><i class="docs-chevron"></i></label><ul class="collapsed"><li><a class="tocitem" href="../../topics/">Topic guide overview</a></li><li><a class="tocitem" href="../../topics/fe_intro/">Introduction to FEM</a></li><li><a class="tocitem" href="../../topics/reference_shapes/">Reference shapes</a></li><li><a class="tocitem" href="../../topics/FEValues/">FEValues</a></li><li><a class="tocitem" href="../../topics/degrees_of_freedom/">Degrees of freedom</a></li><li><a class="tocitem" href="../../topics/sparse_matrix/">Sparsity pattern and sparse matrices</a></li><li><a class="tocitem" href="../../topics/assembly/">Assembly</a></li><li><a class="tocitem" href="../../topics/boundary_conditions/">Boundary and initial conditions</a></li><li><a class="tocitem" href="../../topics/constraints/">Affine constraints</a></li><li><a class="tocitem" href="../../topics/grid/">Grid</a></li><li><a class="tocitem" href="../../topics/export/">Export</a></li></ul></li><li><input class="collapse-toggle" id="menuitem-5" type="checkbox"/><label class="tocitem" for="menuitem-5"><span class="docs-label">API reference</span><i class="docs-chevron"></i></label><ul class="collapsed"><li><a class="tocitem" href="../../reference/">Reference overview</a></li><li><a class="tocitem" href="../../reference/quadrature/">Quadrature</a></li><li><a class="tocitem" href="../../reference/interpolations/">Interpolation</a></li><li><a class="tocitem" href="../../reference/fevalues/">FEValues</a></li><li><a class="tocitem" href="../../reference/dofhandler/">Degrees of freedom</a></li><li><a class="tocitem" href="../../reference/sparsity_pattern/">Sparsity pattern and sparse matrices</a></li><li><a class="tocitem" href="../../reference/assembly/">Assembly</a></li><li><a class="tocitem" href="../../reference/boundary_conditions/">Boundary conditions</a></li><li><a class="tocitem" href="../../reference/grid/">Grid &amp; AbstractGrid</a></li><li><a class="tocitem" href="../../reference/export/">Postprocessing</a></li><li><a class="tocitem" href="../../reference/utils/">Development utility functions</a></li></ul></li><li><input class="collapse-toggle" id="menuitem-6" type="checkbox"/><label class="tocitem" for="menuitem-6"><span class="docs-label">How-to guides</span><i class="docs-chevron"></i></label><ul class="collapsed"><li><a class="tocitem" href="../../howto/">How-to guide overview</a></li><li><a class="tocitem" href="../../howto/postprocessing/">Post processing and visualization</a></li><li><a class="tocitem" href="../../howto/threaded_assembly/">Multi-threaded assembly</a></li></ul></li><br><li><a class="tocitem" href="../../gallery/">Code gallery</a></li><li><a class="tocitem" href="../../devdocs/">Developer documentation</a></li><li><a class="tocitem" href="../../cited-literature/">Cited literature</a></li><li><a class="tocitem" href="../../ferritepapers/">Papers using Ferrite</a></li></ul><div class="docs-version-selector field has-addons"><div class="control"><span class="docs-label button is-static is-size-7">Version</span></div><div class="docs-selector control is-expanded"><div class="select is-fullwidth is-size-7"><select id="documenter-version-selector"></select></div></div></div></nav><div class="docs-main"><header class="docs-navbar"><a class="docs-sidebar-button docs-navbar-link fa-solid fa-bars is-hidden-desktop" id="documenter-sidebar-button" href="#"></a><nav class="breadcrumb"><ul class="is-hidden-mobile"><li><a class="is-disabled">Tutorials</a></li><li class="is-active"><a href>Porous media</a></li></ul><ul class="is-hidden-tablet"><li class="is-active"><a href>Porous media</a></li></ul></nav><div class="docs-right"><a class="docs-navbar-link" href="https://github.com/Ferrite-FEM/Ferrite.jl" title="View the repository on GitHub"><span class="docs-icon fa-brands"></span><span class="docs-label is-hidden-touch">GitHub</span></a><a class="docs-navbar-link" href="https://github.com/Ferrite-FEM/Ferrite.jl/blob/master/docs/src/literate-tutorials/porous_media.jl" title="Edit source on GitHub"><span class="docs-icon fa-solid"></span></a><a class="docs-settings-button docs-navbar-link fa-solid fa-gear" id="documenter-settings-button" href="#" title="Settings"></a><a class="docs-article-toggle-button fa-solid fa-chevron-up" id="documenter-article-toggle-button" href="javascript:;" title="Collapse all docstrings"></a></div></header><article class="content" id="documenter-page"><h1 id="Porous-media"><a class="docs-heading-anchor" href="#Porous-media">Porous media</a><a id="Porous-media-1"></a><a class="docs-heading-anchor-permalink" href="#Porous-media" title="Permalink"></a></h1><p>Porous media is a two-phase material, consisting of solid parts and a liquid occupying the pores inbetween. Using the porous media theory, we can model such a material without explicitly resolving the microstructure, but by considering the interactions between the solid and liquid. In this example, we will additionally consider larger linear elastic solid aggregates that are impermeable. Hence, there is no liquids in these particles and the only unknown variable is the displacement field <code>:u</code>. In the porous media, denoted the matrix, we have both the displacement field, <code>:u</code>, as well as the liquid pressure, <code>:p</code>, as unknown. The simulation result is shown below</p><p><img src="../porous_media.gif" alt="Pressure evolution."/></p><h2 id="Theory-of-porous-media"><a class="docs-heading-anchor" href="#Theory-of-porous-media">Theory of porous media</a><a id="Theory-of-porous-media-1"></a><a class="docs-heading-anchor-permalink" href="#Theory-of-porous-media" title="Permalink"></a></h2><p>The strong forms are given as</p><p class="math-container">\[\begin{aligned}
+<html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/><title>Porous media · Ferrite.jl</title><meta name="title" content="Porous media · Ferrite.jl"/><meta property="og:title" content="Porous media · Ferrite.jl"/><meta property="twitter:title" content="Porous media · Ferrite.jl"/><meta name="description" content="Documentation for Ferrite.jl."/><meta property="og:description" content="Documentation for Ferrite.jl."/><meta property="twitter:description" content="Documentation for Ferrite.jl."/><meta property="og:url" content="https://ferrite-fem.github.io/Ferrite.jl/stable/tutorials/porous_media/"/><meta property="twitter:url" content="https://ferrite-fem.github.io/Ferrite.jl/stable/tutorials/porous_media/"/><link rel="canonical" href="https://ferrite-fem.github.io/Ferrite.jl/stable/tutorials/porous_media/"/><script data-outdated-warner src="../../assets/warner.js"></script><link href="https://cdnjs.cloudflare.com/ajax/libs/lato-font/3.0.0/css/lato-font.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/juliamono/0.050/juliamono.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/fontawesome.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/solid.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/brands.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.8/katex.min.css" rel="stylesheet" type="text/css"/><script>documenterBaseURL="../.."</script><script src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.6/require.min.js" data-main="../../assets/documenter.js"></script><script src="../../search_index.js"></script><script src="../../siteinfo.js"></script><script src="../../../versions.js"></script><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/catppuccin-mocha.css" data-theme-name="catppuccin-mocha"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/catppuccin-macchiato.css" data-theme-name="catppuccin-macchiato"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/catppuccin-frappe.css" data-theme-name="catppuccin-frappe"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/catppuccin-latte.css" data-theme-name="catppuccin-latte"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/documenter-dark.css" data-theme-name="documenter-dark" data-theme-primary-dark/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/documenter-light.css" data-theme-name="documenter-light" data-theme-primary/><script src="../../assets/themeswap.js"></script><link href="../../assets/custom.css" rel="stylesheet" type="text/css"/><link href="../../assets/citations.css" rel="stylesheet" type="text/css"/><link href="../../assets/favicon.ico" rel="icon" type="image/x-icon"/></head><body><div id="documenter"><nav class="docs-sidebar"><a class="docs-logo" href="../../"><img src="../../assets/logo.svg" alt="Ferrite.jl logo"/></a><div class="docs-package-name"><span class="docs-autofit"><a href="../../">Ferrite.jl</a></span></div><button class="docs-search-query input is-rounded is-small is-clickable my-2 mx-auto py-1 px-2" id="documenter-search-query">Search docs (Ctrl + /)</button><ul class="docs-menu"><li><a class="tocitem" href="../../">Home</a></li><li><input class="collapse-toggle" id="menuitem-3" type="checkbox" checked/><label class="tocitem" for="menuitem-3"><span class="docs-label">Tutorials</span><i class="docs-chevron"></i></label><ul class="collapsed"><li><a class="tocitem" href="../">Tutorials overview</a></li><li><a class="tocitem" href="../heat_equation/">Heat equation</a></li><li><a class="tocitem" href="../linear_elasticity/">Linear elasticity</a></li><li><a class="tocitem" href="../incompressible_elasticity/">Incompressible elasticity</a></li><li><a class="tocitem" href="../hyperelasticity/">Hyperelasticity</a></li><li><a class="tocitem" href="../plasticity/">Von Mises plasticity</a></li><li><a class="tocitem" href="../transient_heat_equation/">Transient heat equation</a></li><li><a class="tocitem" href="../computational_homogenization/">Computational homogenization</a></li><li><a class="tocitem" href="../stokes-flow/">Stokes flow</a></li><li class="is-active"><a class="tocitem" href>Porous media</a><ul class="internal"><li><a class="tocitem" href="#Theory-of-porous-media"><span>Theory of porous media</span></a></li><li><a class="tocitem" href="#Implementation"><span>Implementation</span></a></li><li><a class="tocitem" href="#porous-media-plain-program"><span>Plain program</span></a></li></ul></li><li><a class="tocitem" href="../ns_vs_diffeq/">Incompressible Navier-Stokes equations via DifferentialEquations.jl</a></li><li><a class="tocitem" href="../reactive_surface/">Reactive surface</a></li><li><a class="tocitem" href="../linear_shell/">Linear shell</a></li><li><a class="tocitem" href="../dg_heat_equation/">Discontinuous Galerkin heat equation</a></li></ul></li><li><input class="collapse-toggle" id="menuitem-4" type="checkbox"/><label class="tocitem" for="menuitem-4"><span class="docs-label">Topic guides</span><i class="docs-chevron"></i></label><ul class="collapsed"><li><a class="tocitem" href="../../topics/">Topic guide overview</a></li><li><a class="tocitem" href="../../topics/fe_intro/">Introduction to FEM</a></li><li><a class="tocitem" href="../../topics/reference_shapes/">Reference shapes</a></li><li><a class="tocitem" href="../../topics/FEValues/">FEValues</a></li><li><a class="tocitem" href="../../topics/degrees_of_freedom/">Degrees of freedom</a></li><li><a class="tocitem" href="../../topics/sparse_matrix/">Sparsity pattern and sparse matrices</a></li><li><a class="tocitem" href="../../topics/assembly/">Assembly</a></li><li><a class="tocitem" href="../../topics/boundary_conditions/">Boundary and initial conditions</a></li><li><a class="tocitem" href="../../topics/constraints/">Affine constraints</a></li><li><a class="tocitem" href="../../topics/projections/">Projections and Transfer</a></li><li><a class="tocitem" href="../../topics/grid/">Grid</a></li><li><a class="tocitem" href="../../topics/export/">Export</a></li></ul></li><li><input class="collapse-toggle" id="menuitem-5" type="checkbox"/><label class="tocitem" for="menuitem-5"><span class="docs-label">API reference</span><i class="docs-chevron"></i></label><ul class="collapsed"><li><a class="tocitem" href="../../reference/">Reference overview</a></li><li><a class="tocitem" href="../../reference/quadrature/">Quadrature</a></li><li><a class="tocitem" href="../../reference/interpolations/">Interpolation</a></li><li><a class="tocitem" href="../../reference/fevalues/">FEValues</a></li><li><a class="tocitem" href="../../reference/dofhandler/">Degrees of freedom</a></li><li><a class="tocitem" href="../../reference/sparsity_pattern/">Sparsity pattern and sparse matrices</a></li><li><a class="tocitem" href="../../reference/assembly/">Assembly</a></li><li><a class="tocitem" href="../../reference/boundary_conditions/">Boundary conditions</a></li><li><a class="tocitem" href="../../reference/grid/">Grid &amp; AbstractGrid</a></li><li><a class="tocitem" href="../../reference/export/">Postprocessing</a></li><li><a class="tocitem" href="../../reference/utils/">Development utility functions</a></li></ul></li><li><input class="collapse-toggle" id="menuitem-6" type="checkbox"/><label class="tocitem" for="menuitem-6"><span class="docs-label">How-to guides</span><i class="docs-chevron"></i></label><ul class="collapsed"><li><a class="tocitem" href="../../howto/">How-to guide overview</a></li><li><a class="tocitem" href="../../howto/postprocessing/">Post processing and visualization</a></li><li><a class="tocitem" href="../../howto/threaded_assembly/">Multi-threaded assembly</a></li></ul></li><br><li><a class="tocitem" href="../../gallery/">Code gallery</a></li><li><a class="tocitem" href="../../devdocs/">Developer documentation</a></li><li><a class="tocitem" href="../../cited-literature/">Cited literature</a></li><li><a class="tocitem" href="../../ferritepapers/">Papers using Ferrite</a></li></ul><div class="docs-version-selector field has-addons"><div class="control"><span class="docs-label button is-static is-size-7">Version</span></div><div class="docs-selector control is-expanded"><div class="select is-fullwidth is-size-7"><select id="documenter-version-selector"></select></div></div></div></nav><div class="docs-main"><header class="docs-navbar"><a class="docs-sidebar-button docs-navbar-link fa-solid fa-bars is-hidden-desktop" id="documenter-sidebar-button" href="#"></a><nav class="breadcrumb"><ul class="is-hidden-mobile"><li><a class="is-disabled">Tutorials</a></li><li class="is-active"><a href>Porous media</a></li></ul><ul class="is-hidden-tablet"><li class="is-active"><a href>Porous media</a></li></ul></nav><div class="docs-right"><a class="docs-navbar-link" href="https://github.com/Ferrite-FEM/Ferrite.jl" title="View the repository on GitHub"><span class="docs-icon fa-brands"></span><span class="docs-label is-hidden-touch">GitHub</span></a><a class="docs-navbar-link" href="https://github.com/Ferrite-FEM/Ferrite.jl/blob/master/docs/src/literate-tutorials/porous_media.jl" title="Edit source on GitHub"><span class="docs-icon fa-solid"></span></a><a class="docs-settings-button docs-navbar-link fa-solid fa-gear" id="documenter-settings-button" href="#" title="Settings"></a><a class="docs-article-toggle-button fa-solid fa-chevron-up" id="documenter-article-toggle-button" href="javascript:;" title="Collapse all docstrings"></a></div></header><article class="content" id="documenter-page"><h1 id="Porous-media"><a class="docs-heading-anchor" href="#Porous-media">Porous media</a><a id="Porous-media-1"></a><a class="docs-heading-anchor-permalink" href="#Porous-media" title="Permalink"></a></h1><p>Porous media is a two-phase material, consisting of solid parts and a liquid occupying the pores inbetween. Using the porous media theory, we can model such a material without explicitly resolving the microstructure, but by considering the interactions between the solid and liquid. In this example, we will additionally consider larger linear elastic solid aggregates that are impermeable. Hence, there is no liquids in these particles and the only unknown variable is the displacement field <code>:u</code>. In the porous media, denoted the matrix, we have both the displacement field, <code>:u</code>, as well as the liquid pressure, <code>:p</code>, as unknown. The simulation result is shown below</p><p><img src="../porous_media.gif" alt="Pressure evolution."/></p><h2 id="Theory-of-porous-media"><a class="docs-heading-anchor" href="#Theory-of-porous-media">Theory of porous media</a><a id="Theory-of-porous-media-1"></a><a class="docs-heading-anchor-permalink" href="#Theory-of-porous-media" title="Permalink"></a></h2><p>The strong forms are given as</p><p class="math-container">\[\begin{aligned}
 \boldsymbol{\sigma}(\boldsymbol{\epsilon}, p) \cdot \boldsymbol{\nabla} &amp;= \boldsymbol{0} \\
 \dot{\Phi}(\boldsymbol{\epsilon}, p) + \boldsymbol{w}(p) \cdot \boldsymbol{\nabla} &amp;= 0
 \end{aligned}\]</p><p>where <span>$\boldsymbol{\epsilon} = \left[\boldsymbol{u}\otimes\boldsymbol{\nabla}\right]^\mathrm{sym}$</span> The constitutive relationships are</p><p class="math-container">\[\begin{aligned}
@@ -31,11 +31,9 @@ function Elastic(; E = 20.0e3, ν = 0.3)
     G = E / 2(1 + ν)
     K = E / 3(1 - 2ν)
     I2 = one(SymmetricTensor{2, 2})
-    I4vol = I2 ⊗ I2
-    I4dev = minorsymmetric(otimesu(I2, I2)) - I4vol / 3
-    return Elastic(2G * I4dev + K * I4vol)
-end;</code></pre><p>Next, we define the element routine for the solid aggregates, where we dispatch on the <code>Elastic</code> material struct. Note that the unused inputs here are used for the porous matrix below.</p><pre><code class="language-julia hljs">function element_routine!(Ke, re, material::Elastic, cv, cell, a, args...)
-    reinit!(cv, cell)
+    I4dev = minorsymmetric(otimesu(I2, I2)) - I2 ⊗ I2 / 3
+    return Elastic(2G * I4dev + K * I2 ⊗ I2)
+end;</code></pre><p>Next, we define the element routine for the solid aggregates, where we dispatch on the <code>Elastic</code> material struct. Note that the unused inputs here are used for the porous matrix below.</p><pre><code class="language-julia hljs">function element_routine!(Ke, re, material::Elastic, cv::CellValues, a, args...)
     n_basefuncs = getnbasefunctions(cv)
 
     for q_point in 1:getnquadpoints(cv)
@@ -59,52 +57,49 @@ end;</code></pre><h3 id="PoroElasticity"><a class="docs-heading-anchor" href="#P
     α::T     ## Biot&#39;s coefficient       [-]
     β::T     ## Liquid compressibility   [1/MPa]
 end
-PoroElastic(; elastic, k, ϕ, α, β) = PoroElastic(elastic, k, ϕ, α, β);</code></pre><p>The element routine requires a few more inputs since we have two fields, as well as the dependence on the rates of the displacements and pressure. Again, we dispatch on the material type.</p><pre><code class="language-julia hljs">function element_routine!(Ke, re, m::PoroElastic, cvs::Tuple, cell, a, a_old, Δt, sdh)
-    # Setup cellvalues and give easier names
-    reinit!.(cvs, (cell,))
-    cv_u, cv_p = cvs
+PoroElastic(; elastic, k, ϕ, α, β) = PoroElastic(elastic, k, ϕ, α, β);</code></pre><p>The element routine requires a few more inputs since we have two fields, as well as the dependence on the rates of the displacements and pressure. Again, we dispatch on the material type.</p><pre><code class="language-julia hljs">function element_routine!(Ke, re, m::PoroElastic, cv::MultiFieldCellValues, a, a_old, Δt, sdh)
     dr_u = dof_range(sdh, :u)
     dr_p = dof_range(sdh, :p)
 
     C = m.elastic.C ## Elastic stiffness
 
     # Assemble stiffness and force vectors
-    for q_point in 1:getnquadpoints(cv_u)
-        dΩ = getdetJdV(cv_u, q_point)
-        p = function_value(cv_p, q_point, a, dr_p)
-        p_old = function_value(cv_p, q_point, a_old, dr_p)
+    for q_point in 1:getnquadpoints(cv)
+        dΩ = getdetJdV(cv, q_point)
+        p = function_value(cv.p, q_point, a, dr_p)
+        p_old = function_value(cv.p, q_point, a_old, dr_p)
         pdot = (p - p_old) / Δt
-        ∇p = function_gradient(cv_p, q_point, a, dr_p)
-        ϵ = function_symmetric_gradient(cv_u, q_point, a, dr_u)
-        tr_ϵ_old = function_divergence(cv_u, q_point, a_old, dr_u)
+        ∇p = function_gradient(cv.p, q_point, a, dr_p)
+        ϵ = function_symmetric_gradient(cv.u, q_point, a, dr_u)
+        tr_ϵ_old = function_divergence(cv.u, q_point, a_old, dr_u)
         tr_ϵ_dot = (tr(ϵ) - tr_ϵ_old) / Δt
         σ_eff = C ⊡ ϵ
         # Variation of u_i
         for (iᵤ, Iᵤ) in pairs(dr_u)
-            ∇δNu = shape_symmetric_gradient(cv_u, q_point, iᵤ)
-            div_δNu = shape_divergence(cv_u, q_point, iᵤ)
+            ∇δNu = shape_symmetric_gradient(cv.u, q_point, iᵤ)
+            div_δNu = shape_divergence(cv.u, q_point, iᵤ)
             re[Iᵤ] += (∇δNu ⊡ σ_eff - div_δNu * p * m.α) * dΩ
             for (jᵤ, Jᵤ) in pairs(dr_u)
-                ∇Nu = shape_symmetric_gradient(cv_u, q_point, jᵤ)
+                ∇Nu = shape_symmetric_gradient(cv.u, q_point, jᵤ)
                 Ke[Iᵤ, Jᵤ] += (∇δNu ⊡ C ⊡ ∇Nu) * dΩ
             end
             for (jₚ, Jₚ) in pairs(dr_p)
-                Np = shape_value(cv_p, q_point, jₚ)
+                Np = shape_value(cv.p, q_point, jₚ)
                 Ke[Iᵤ, Jₚ] -= (div_δNu * m.α * Np) * dΩ
             end
         end
         # Variation of p_i
         for (iₚ, Iₚ) in pairs(dr_p)
-            δNp = shape_value(cv_p, q_point, iₚ)
-            ∇δNp = shape_gradient(cv_p, q_point, iₚ)
+            δNp = shape_value(cv.p, q_point, iₚ)
+            ∇δNp = shape_gradient(cv.p, q_point, iₚ)
             re[Iₚ] += (δNp * (m.α * tr_ϵ_dot + m.β * pdot) + m.k * (∇δNp ⋅ ∇p)) * dΩ
             for (jᵤ, Jᵤ) in pairs(dr_u)
-                div_Nu = shape_divergence(cv_u, q_point, jᵤ)
+                div_Nu = shape_divergence(cv.u, q_point, jᵤ)
                 Ke[Iₚ, Jᵤ] += δNp * (m.α / Δt) * div_Nu * dΩ
             end
             for (jₚ, Jₚ) in pairs(dr_p)
-                ∇Np = shape_gradient(cv_p, q_point, jₚ)
-                Np = shape_value(cv_p, q_point, jₚ)
+                ∇Np = shape_gradient(cv.p, q_point, jₚ)
+                Np = shape_value(cv.p, q_point, jₚ)
                 Ke[Iₚ, Jₚ] += (δNp * m.β * Np / Δt + m.k * (∇δNp ⋅ ∇Np)) * dΩ
             end
         end
@@ -135,7 +130,8 @@ end;</code></pre><p>For one domain (corresponding to a specific SubDofHandler), 
         map!(i -&gt; a_old[i], ae_old, celldofs(cell))
         fill!(Ke, 0)
         fill!(re, 0)
-        element_routine!(Ke, re, material, cv, cell, ae, ae_old, Δt, sdh)
+        reinit!(cv, cell)
+        element_routine!(Ke, re, material, cv, ae, ae_old, Δt, sdh)
         assemble!(assembler, celldofs(cell), Ke, re)
     end
     return
@@ -174,8 +170,8 @@ end;</code></pre><h3 id="Problem-setup"><a class="docs-heading-anchor" href="#Pr
     # CellValues
     cvu_quad = CellValues(qr_quad, ipu_quad)
     cvu_tri = CellValues(qr_tri, ipu_tri)
-    cvp_quad = CellValues(qr_quad, ipp_quad)
-    cvp_tri = CellValues(qr_tri, ipp_tri)
+    cmv_quad = MultiFieldCellValues(qr_quad, (u = ipu_quad, p = ipp_quad))
+    cmv_tri = MultiFieldCellValues(qr_tri, (u = ipu_tri, p = ipp_tri))
 
     # Setup the DofHandler
     dh = DofHandler(grid)
@@ -200,8 +196,8 @@ end;</code></pre><h3 id="Problem-setup"><a class="docs-heading-anchor" href="#Pr
     domains = [
         FEDomain(m_solid, cvu_quad, sdh_solid_quad),
         FEDomain(m_solid, cvu_tri, sdh_solid_tri),
-        FEDomain(m_porous, (cvu_quad, cvp_quad), sdh_porous_quad),
-        FEDomain(m_porous, (cvu_tri, cvp_tri), sdh_porous_tri),
+        FEDomain(m_porous, cmv_quad, sdh_porous_quad),
+        FEDomain(m_porous, cmv_tri, sdh_porous_tri),
     ]
 
     # Boundary conditions
@@ -242,9 +238,9 @@ end;</code></pre><h3 id="Solving"><a class="docs-heading-anchor" href="#Solving"
         end
     end
     vtk_save(pvd)
-    return
+    return a
 end;</code></pre><p>Finally we call the functions to actually run the code</p><pre><code class="language-julia hljs">dh, ch, domains = setup_problem()
-solve(dh, ch, domains);</code></pre><h2 id="porous-media-plain-program"><a class="docs-heading-anchor" href="#porous-media-plain-program">Plain program</a><a id="porous-media-plain-program-1"></a><a class="docs-heading-anchor-permalink" href="#porous-media-plain-program" title="Permalink"></a></h2><p>Here follows a version of the program without any comments. The file is also available here: <a href="../porous_media.jl"><code>porous_media.jl</code></a>.</p><pre><code class="language-julia hljs">using Ferrite, FerriteMeshParser, Tensors, WriteVTK, Downloads
+a = solve(dh, ch, domains);</code></pre><h2 id="porous-media-plain-program"><a class="docs-heading-anchor" href="#porous-media-plain-program">Plain program</a><a id="porous-media-plain-program-1"></a><a class="docs-heading-anchor-permalink" href="#porous-media-plain-program" title="Permalink"></a></h2><p>Here follows a version of the program without any comments. The file is also available here: <a href="../porous_media.jl"><code>porous_media.jl</code></a>.</p><pre><code class="language-julia hljs">using Ferrite, FerriteMeshParser, Tensors, WriteVTK, Downloads
 
 struct Elastic{T}
     C::SymmetricTensor{4, 2, T, 9}
@@ -253,13 +249,11 @@ function Elastic(; E = 20.0e3, ν = 0.3)
     G = E / 2(1 + ν)
     K = E / 3(1 - 2ν)
     I2 = one(SymmetricTensor{2, 2})
-    I4vol = I2 ⊗ I2
-    I4dev = minorsymmetric(otimesu(I2, I2)) - I4vol / 3
-    return Elastic(2G * I4dev + K * I4vol)
+    I4dev = minorsymmetric(otimesu(I2, I2)) - I2 ⊗ I2 / 3
+    return Elastic(2G * I4dev + K * I2 ⊗ I2)
 end;
 
-function element_routine!(Ke, re, material::Elastic, cv, cell, a, args...)
-    reinit!(cv, cell)
+function element_routine!(Ke, re, material::Elastic, cv::CellValues, a, args...)
     n_basefuncs = getnbasefunctions(cv)
 
     for q_point in 1:getnquadpoints(cv)
@@ -287,52 +281,49 @@ struct PoroElastic{T}
 end
 PoroElastic(; elastic, k, ϕ, α, β) = PoroElastic(elastic, k, ϕ, α, β);
 
-function element_routine!(Ke, re, m::PoroElastic, cvs::Tuple, cell, a, a_old, Δt, sdh)
-    # Setup cellvalues and give easier names
-    reinit!.(cvs, (cell,))
-    cv_u, cv_p = cvs
+function element_routine!(Ke, re, m::PoroElastic, cv::MultiFieldCellValues, a, a_old, Δt, sdh)
     dr_u = dof_range(sdh, :u)
     dr_p = dof_range(sdh, :p)
 
     C = m.elastic.C ## Elastic stiffness
 
     # Assemble stiffness and force vectors
-    for q_point in 1:getnquadpoints(cv_u)
-        dΩ = getdetJdV(cv_u, q_point)
-        p = function_value(cv_p, q_point, a, dr_p)
-        p_old = function_value(cv_p, q_point, a_old, dr_p)
+    for q_point in 1:getnquadpoints(cv)
+        dΩ = getdetJdV(cv, q_point)
+        p = function_value(cv.p, q_point, a, dr_p)
+        p_old = function_value(cv.p, q_point, a_old, dr_p)
         pdot = (p - p_old) / Δt
-        ∇p = function_gradient(cv_p, q_point, a, dr_p)
-        ϵ = function_symmetric_gradient(cv_u, q_point, a, dr_u)
-        tr_ϵ_old = function_divergence(cv_u, q_point, a_old, dr_u)
+        ∇p = function_gradient(cv.p, q_point, a, dr_p)
+        ϵ = function_symmetric_gradient(cv.u, q_point, a, dr_u)
+        tr_ϵ_old = function_divergence(cv.u, q_point, a_old, dr_u)
         tr_ϵ_dot = (tr(ϵ) - tr_ϵ_old) / Δt
         σ_eff = C ⊡ ϵ
         # Variation of u_i
         for (iᵤ, Iᵤ) in pairs(dr_u)
-            ∇δNu = shape_symmetric_gradient(cv_u, q_point, iᵤ)
-            div_δNu = shape_divergence(cv_u, q_point, iᵤ)
+            ∇δNu = shape_symmetric_gradient(cv.u, q_point, iᵤ)
+            div_δNu = shape_divergence(cv.u, q_point, iᵤ)
             re[Iᵤ] += (∇δNu ⊡ σ_eff - div_δNu * p * m.α) * dΩ
             for (jᵤ, Jᵤ) in pairs(dr_u)
-                ∇Nu = shape_symmetric_gradient(cv_u, q_point, jᵤ)
+                ∇Nu = shape_symmetric_gradient(cv.u, q_point, jᵤ)
                 Ke[Iᵤ, Jᵤ] += (∇δNu ⊡ C ⊡ ∇Nu) * dΩ
             end
             for (jₚ, Jₚ) in pairs(dr_p)
-                Np = shape_value(cv_p, q_point, jₚ)
+                Np = shape_value(cv.p, q_point, jₚ)
                 Ke[Iᵤ, Jₚ] -= (div_δNu * m.α * Np) * dΩ
             end
         end
         # Variation of p_i
         for (iₚ, Iₚ) in pairs(dr_p)
-            δNp = shape_value(cv_p, q_point, iₚ)
-            ∇δNp = shape_gradient(cv_p, q_point, iₚ)
+            δNp = shape_value(cv.p, q_point, iₚ)
+            ∇δNp = shape_gradient(cv.p, q_point, iₚ)
             re[Iₚ] += (δNp * (m.α * tr_ϵ_dot + m.β * pdot) + m.k * (∇δNp ⋅ ∇p)) * dΩ
             for (jᵤ, Jᵤ) in pairs(dr_u)
-                div_Nu = shape_divergence(cv_u, q_point, jᵤ)
+                div_Nu = shape_divergence(cv.u, q_point, jᵤ)
                 Ke[Iₚ, Jᵤ] += δNp * (m.α / Δt) * div_Nu * dΩ
             end
             for (jₚ, Jₚ) in pairs(dr_p)
-                ∇Np = shape_gradient(cv_p, q_point, jₚ)
-                Np = shape_value(cv_p, q_point, jₚ)
+                ∇Np = shape_gradient(cv.p, q_point, jₚ)
+                Np = shape_value(cv.p, q_point, jₚ)
                 Ke[Iₚ, Jₚ] += (δNp * m.β * Np / Δt + m.k * (∇δNp ⋅ ∇Np)) * dΩ
             end
         end
@@ -369,7 +360,8 @@ function doassemble!(assembler, domain::FEDomain, a, a_old, Δt)
         map!(i -&gt; a_old[i], ae_old, celldofs(cell))
         fill!(Ke, 0)
         fill!(re, 0)
-        element_routine!(Ke, re, material, cv, cell, ae, ae_old, Δt, sdh)
+        reinit!(cv, cell)
+        element_routine!(Ke, re, material, cv, ae, ae_old, Δt, sdh)
         assemble!(assembler, celldofs(cell), Ke, re)
     end
     return
@@ -412,8 +404,8 @@ function setup_problem(; t_rise = 0.1, u_max = -0.1)
     # CellValues
     cvu_quad = CellValues(qr_quad, ipu_quad)
     cvu_tri = CellValues(qr_tri, ipu_tri)
-    cvp_quad = CellValues(qr_quad, ipp_quad)
-    cvp_tri = CellValues(qr_tri, ipp_tri)
+    cmv_quad = MultiFieldCellValues(qr_quad, (u = ipu_quad, p = ipp_quad))
+    cmv_tri = MultiFieldCellValues(qr_tri, (u = ipu_tri, p = ipp_tri))
 
     # Setup the DofHandler
     dh = DofHandler(grid)
@@ -438,8 +430,8 @@ function setup_problem(; t_rise = 0.1, u_max = -0.1)
     domains = [
         FEDomain(m_solid, cvu_quad, sdh_solid_quad),
         FEDomain(m_solid, cvu_tri, sdh_solid_tri),
-        FEDomain(m_porous, (cvu_quad, cvp_quad), sdh_porous_quad),
-        FEDomain(m_porous, (cvu_tri, cvp_tri), sdh_porous_tri),
+        FEDomain(m_porous, cmv_quad, sdh_porous_quad),
+        FEDomain(m_porous, cmv_tri, sdh_porous_tri),
     ]
 
     # Boundary conditions
@@ -482,8 +474,8 @@ function solve(dh, ch, domains; Δt = 0.025, t_total = 1.0)
         end
     end
     vtk_save(pvd)
-    return
+    return a
 end;
 
 dh, ch, domains = setup_problem()
-solve(dh, ch, domains);</code></pre><hr/><p><em>This page was generated using <a href="https://github.com/fredrikekre/Literate.jl">Literate.jl</a>.</em></p></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../stokes-flow/">« Stokes flow</a><a class="docs-footer-nextpage" href="../ns_vs_diffeq/">Incompressible Navier-Stokes equations via DifferentialEquations.jl »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option><option value="catppuccin-latte">catppuccin-latte</option><option value="catppuccin-frappe">catppuccin-frappe</option><option value="catppuccin-macchiato">catppuccin-macchiato</option><option value="catppuccin-mocha">catppuccin-mocha</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.15.0 on <span class="colophon-date" title="Tuesday 27 January 2026 15:01">Tuesday 27 January 2026</span>. Using Julia version 1.12.4.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
+a = solve(dh, ch, domains);</code></pre><hr/><p><em>This page was generated using <a href="https://github.com/fredrikekre/Literate.jl">Literate.jl</a>.</em></p></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../stokes-flow/">« Stokes flow</a><a class="docs-footer-nextpage" href="../ns_vs_diffeq/">Incompressible Navier-Stokes equations via DifferentialEquations.jl »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option><option value="catppuccin-latte">catppuccin-latte</option><option value="catppuccin-frappe">catppuccin-frappe</option><option value="catppuccin-macchiato">catppuccin-macchiato</option><option value="catppuccin-mocha">catppuccin-mocha</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.15.0 on <span class="colophon-date" title="Thursday 29 January 2026 16:04">Thursday 29 January 2026</span>. Using Julia version 1.12.4.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
