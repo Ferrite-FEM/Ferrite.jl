@@ -60,8 +60,8 @@ function ValuesUpdateFlags( # For MultiFieldCellValues
 end
 
 """
-    reinit!(cv::AbstractCellValues, cell::AbstractCell, x::Vector)
-    reinit!(cv::AbstractCellValues, x::Vector)
+    reinit!(cv::AbstractCellValues, cell::AbstractCell, x::AbstractVector)
+    reinit!(cv::AbstractCellValues, x::AbstractVector)
     reinit!(fv::FacetValues, cell::AbstractCell, x::AbstractVector, facet::Int)
     reinit!(fv::FacetValues, x::AbstractVector, facet::Int)
 
