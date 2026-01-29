@@ -11,13 +11,13 @@
     addfacetset!(grid, &quot;clamped&quot;, x -&gt; norm(x[1]) ≈ 0.0)
     addfacetset!(grid, &quot;traction&quot;, x -&gt; norm(x[1]) ≈ 48.0)
     return grid
-end;</code></pre><p>Next we define a function to set up our <code>CellMultiValues</code> and <code>FacetValues</code>. For this coupled problem, using <code>CellMultiValues</code> allows us to use the same quadrature rule and geometric interpolation for both the <code>:u</code> and <code>:p</code> fields, which is more efficient and convenient.</p><pre><code class="language-julia hljs">function create_values(interpolation_u, interpolation_p)
+end;</code></pre><p>Next we define a function to set up our <code>MultiFieldCellValues</code> and <code>FacetValues</code>. For this coupled problem, using <code>MultiFieldCellValues</code> allows us to use the same quadrature rule and geometric interpolation for both the <code>:u</code> and <code>:p</code> fields, which is more efficient and convenient.</p><pre><code class="language-julia hljs">function create_values(interpolation_u, interpolation_p)
     # Quadrature rules
     qr = QuadratureRule{RefTriangle}(3)
     facet_qr = FacetQuadratureRule{RefTriangle}(3)
 
-    # CellMultiValues, for both fields
-    cellvalues = CellMultiValues(qr, (u = interpolation_u, p = interpolation_p))
+    # MultiFieldCellValues, for both fields
+    cellvalues = MultiFieldCellValues(qr, (u = interpolation_u, p = interpolation_p))
 
     # FacetValues (only for the displacement, u)
     facetvalues_u = FacetValues(facet_qr, interpolation_u)
@@ -38,7 +38,7 @@ end;</code></pre><p>The material is linear elastic, which is here specified by t
     G::T
     K::T
 end</code></pre><p>Next, we assemble the stiffness matrix and load vector.</p><pre><code class="language-julia hljs">function doassemble(
-        cellvalues::CellMultiValues, facetvalues_u::FacetValues,
+        cellvalues::MultiFieldCellValues, facetvalues_u::FacetValues,
         grid::Grid, dh::DofHandler, mp::LinearElasticity
     )
     K = allocate_matrix(dh)
@@ -127,7 +127,7 @@ function symmetrize_lower!(Ke)
     return
 end;</code></pre><p>To evaluate the stresses after solving the problem we once again loop over the cells in the grid. Stresses are evaluated in the quadrature points, however, for export/visualization you typically want values in the nodes of the mesh, or as single data points per cell. For the former you can project the quadrature point data to a finite element space (see the example with the <code>L2Projector</code> in <a href="../../howto/postprocessing/#howto-postprocessing">Post processing and visualization</a>). In this example we choose to compute the mean value of the stress within each cell, and thus end up with one data point per cell. The mean value is computed as</p><p class="math-container">\[\bar{\boldsymbol{\sigma}}_i = \frac{1}{ |\Omega_i|}
 \int_{\Omega_i} \boldsymbol{\sigma}\, \mathrm{d}\Omega, \quad
-|\Omega_i| = \int_{\Omega_i} 1\, \mathrm{d}\Omega\]</p><p>where <span>$\Omega_i$</span> is the domain occupied by cell number <span>$i$</span>, and <span>$|\Omega_i|$</span> the volume (area) of the cell. The integrals are evaluated using numerical quadrature with the help of cellvalues for u and p, just like in the assembly procedure.</p><p>Note that even though all strain components in the out-of-plane direction are zero (plane strain) the stress components are not. Specifically, <span>$\sigma_{33}$</span> will be non-zero in this formulation. Therefore we expand the strain to a 3D tensor, and then compute the (3D) stress tensor.</p><pre><code class="language-julia hljs">function compute_stresses(cellvalues::CellMultiValues, dh::DofHandler, mp::LinearElasticity, a::Vector)
+|\Omega_i| = \int_{\Omega_i} 1\, \mathrm{d}\Omega\]</p><p>where <span>$\Omega_i$</span> is the domain occupied by cell number <span>$i$</span>, and <span>$|\Omega_i|$</span> the volume (area) of the cell. The integrals are evaluated using numerical quadrature with the help of cellvalues for u and p, just like in the assembly procedure.</p><p>Note that even though all strain components in the out-of-plane direction are zero (plane strain) the stress components are not. Specifically, <span>$\sigma_{33}$</span> will be non-zero in this formulation. Therefore we expand the strain to a 3D tensor, and then compute the (3D) stress tensor.</p><pre><code class="language-julia hljs">function compute_stresses(cellvalues::MultiFieldCellValues, dh::DofHandler, mp::LinearElasticity, a::Vector)
     ae = zeros(ndofs_per_cell(dh)) # local solution vector
     u_range = dof_range(dh, :u)    # local range of dofs corresponding to u
     p_range = dof_range(dh, :p)    # local range of dofs corresponding to p
@@ -223,8 +223,8 @@ function create_values(interpolation_u, interpolation_p)
     qr = QuadratureRule{RefTriangle}(3)
     facet_qr = FacetQuadratureRule{RefTriangle}(3)
 
-    # CellMultiValues, for both fields
-    cellvalues = CellMultiValues(qr, (u = interpolation_u, p = interpolation_p))
+    # MultiFieldCellValues, for both fields
+    cellvalues = MultiFieldCellValues(qr, (u = interpolation_u, p = interpolation_p))
 
     # FacetValues (only for the displacement, u)
     facetvalues_u = FacetValues(facet_qr, interpolation_u)
@@ -253,7 +253,7 @@ struct LinearElasticity{T}
 end
 
 function doassemble(
-        cellvalues::CellMultiValues, facetvalues_u::FacetValues,
+        cellvalues::MultiFieldCellValues, facetvalues_u::FacetValues,
         grid::Grid, dh::DofHandler, mp::LinearElasticity
     )
     K = allocate_matrix(dh)
@@ -344,7 +344,7 @@ function symmetrize_lower!(Ke)
     return
 end;
 
-function compute_stresses(cellvalues::CellMultiValues, dh::DofHandler, mp::LinearElasticity, a::Vector)
+function compute_stresses(cellvalues::MultiFieldCellValues, dh::DofHandler, mp::LinearElasticity, a::Vector)
     ae = zeros(ndofs_per_cell(dh)) # local solution vector
     u_range = dof_range(dh, :u)    # local range of dofs corresponding to u
     p_range = dof_range(dh, :p)    # local range of dofs corresponding to p
@@ -425,4 +425,4 @@ linear_u = Lagrange{RefTriangle, 1}()^2
 quadratic_u = Lagrange{RefTriangle, 2}()^2
 
 u1 = solve(0.5, linear_u, linear_p);
-u2 = solve(0.5, quadratic_u, linear_p);</code></pre><hr/><p><em>This page was generated using <a href="https://github.com/fredrikekre/Literate.jl">Literate.jl</a>.</em></p></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../linear_elasticity/">« Linear elasticity</a><a class="docs-footer-nextpage" href="../hyperelasticity/">Hyperelasticity »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option><option value="catppuccin-latte">catppuccin-latte</option><option value="catppuccin-frappe">catppuccin-frappe</option><option value="catppuccin-macchiato">catppuccin-macchiato</option><option value="catppuccin-mocha">catppuccin-mocha</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.15.0 on <span class="colophon-date" title="Thursday 29 January 2026 13:12">Thursday 29 January 2026</span>. Using Julia version 1.12.4.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
+u2 = solve(0.5, quadratic_u, linear_p);</code></pre><hr/><p><em>This page was generated using <a href="https://github.com/fredrikekre/Literate.jl">Literate.jl</a>.</em></p></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../linear_elasticity/">« Linear elasticity</a><a class="docs-footer-nextpage" href="../hyperelasticity/">Hyperelasticity »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option><option value="catppuccin-latte">catppuccin-latte</option><option value="catppuccin-frappe">catppuccin-frappe</option><option value="catppuccin-macchiato">catppuccin-macchiato</option><option value="catppuccin-mocha">catppuccin-mocha</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.15.0 on <span class="colophon-date" title="Thursday 29 January 2026 13:38">Thursday 29 January 2026</span>. Using Julia version 1.12.4.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>

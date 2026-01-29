@@ -51,7 +51,7 @@ grid = togrid()
 Gmsh.finalize();</code></pre><h3 id="Function-space"><a class="docs-heading-anchor" href="#Function-space">Function space</a><a id="Function-space-1"></a><a class="docs-heading-anchor-permalink" href="#Function-space" title="Permalink"></a></h3><p>To ensure stability we utilize the Taylor-Hood element pair Q2-Q1.  We have to utilize the same quadrature rule for the pressure as for the velocity, because in the weak form the  linear pressure term is tested against a quadratic function.</p><pre><code class="language-julia hljs">ip_v = Lagrange{RefQuadrilateral, 2}()^dim
 qr = QuadratureRule{RefQuadrilateral}(4)
 ip_p = Lagrange{RefQuadrilateral, 1}()
-cellvalues = CellMultiValues(qr, (v = ip_v, p = ip_p))
+cellvalues = MultiFieldCellValues(qr, (v = ip_v, p = ip_p))
 
 dh = DofHandler(grid)
 add!(dh, :v, ip_v)
@@ -68,7 +68,7 @@ inflow_bc = Dirichlet(:v, ∂Ω_inflow, parabolic_inflow_profile, [1, 2])
 add!(ch, inflow_bc);</code></pre><p>The outflow boundary condition has been applied on the right side of the cylinder when the weak form has been derived by setting the boundary integral to zero. It is also called the do-nothing condition. Other outflow conditions are also possible.</p><pre><code class="language-julia hljs">∂Ω_free = getfacetset(grid, &quot;right&quot;);
 
 close!(ch)
-update!(ch, 0.0);</code></pre><h3 id="Linear-system-assembly"><a class="docs-heading-anchor" href="#Linear-system-assembly">Linear system assembly</a><a id="Linear-system-assembly-1"></a><a class="docs-heading-anchor-permalink" href="#Linear-system-assembly" title="Permalink"></a></h3><p>Next we describe how the block mass matrix and the Stokes matrix are assembled.</p><p>For the block mass matrix <span>$M$</span> we remember that only the first equation had a time derivative and that the block mass matrix corresponds to the term arising from discretizing the time derivatives. Hence, only the upper left block has non-zero components.</p><pre><code class="language-julia hljs">function assemble_mass_matrix(cv::CellMultiValues, M::SparseMatrixCSC, dh::DofHandler)
+update!(ch, 0.0);</code></pre><h3 id="Linear-system-assembly"><a class="docs-heading-anchor" href="#Linear-system-assembly">Linear system assembly</a><a id="Linear-system-assembly-1"></a><a class="docs-heading-anchor-permalink" href="#Linear-system-assembly" title="Permalink"></a></h3><p>Next we describe how the block mass matrix and the Stokes matrix are assembled.</p><p>For the block mass matrix <span>$M$</span> we remember that only the first equation had a time derivative and that the block mass matrix corresponds to the term arising from discretizing the time derivatives. Hence, only the upper left block has non-zero components.</p><pre><code class="language-julia hljs">function assemble_mass_matrix(cv::MultiFieldCellValues, M::SparseMatrixCSC, dh::DofHandler)
     # Allocate a buffer for the local matrix and some helpers, together with the assembler.
     n_basefuncs_v = getnbasefunctions(cv.v)
     n_basefuncs_p = getnbasefunctions(cv.p)
@@ -101,7 +101,7 @@ update!(ch, 0.0);</code></pre><h3 id="Linear-system-assembly"><a class="docs-hea
 end;</code></pre><p>Next we discuss the assembly of the Stokes matrix appearing on the right hand side. Remember that we use the same function spaces for trial and test, hence the matrix has the following block form</p><p class="math-container">\[  K = \begin{bmatrix}
       A &amp; B^{\textrm{T}} \\
       B &amp; 0
-  \end{bmatrix}\]</p><p>which is also called saddle point matrix. These problems are known to have a non-trivial kernel, which is a reflection of the strong form as discussed in the theory portion if this example.</p><pre><code class="language-julia hljs">function assemble_stokes_matrix(cv::CellMultiValues, ν, K::SparseMatrixCSC, dh::DofHandler)
+  \end{bmatrix}\]</p><p>which is also called saddle point matrix. These problems are known to have a non-trivial kernel, which is a reflection of the strong form as discussed in the theory portion if this example.</p><pre><code class="language-julia hljs">function assemble_stokes_matrix(cv::MultiFieldCellValues, ν, K::SparseMatrixCSC, dh::DofHandler)
     # Again, some buffers and helpers
     n_basefuncs_v = getnbasefunctions(cv.v)
     n_basefuncs_p = getnbasefunctions(cv.p)
@@ -151,7 +151,7 @@ struct RHSparams{KT, CH, DH, CV, UT}
     K::KT  # SparseMatrixCSC
     ch::CH # ConstraintHandler
     dh::DH # DofHandler
-    cv::CV # CellMultiValues
+    cv::CV # MultiFieldCellValues
     u::UT  # Vector
 end
 p = RHSparams(K, ch, dh, cellvalues, copy(u₀))
@@ -289,7 +289,7 @@ Gmsh.finalize();
 ip_v = Lagrange{RefQuadrilateral, 2}()^dim
 qr = QuadratureRule{RefQuadrilateral}(4)
 ip_p = Lagrange{RefQuadrilateral, 1}()
-cellvalues = CellMultiValues(qr, (v = ip_v, p = ip_p))
+cellvalues = MultiFieldCellValues(qr, (v = ip_v, p = ip_p))
 
 dh = DofHandler(grid)
 add!(dh, :v, ip_v)
@@ -316,7 +316,7 @@ add!(ch, inflow_bc);
 close!(ch)
 update!(ch, 0.0);
 
-function assemble_mass_matrix(cv::CellMultiValues, M::SparseMatrixCSC, dh::DofHandler)
+function assemble_mass_matrix(cv::MultiFieldCellValues, M::SparseMatrixCSC, dh::DofHandler)
     # Allocate a buffer for the local matrix and some helpers, together with the assembler.
     n_basefuncs_v = getnbasefunctions(cv.v)
     n_basefuncs_p = getnbasefunctions(cv.p)
@@ -348,7 +348,7 @@ function assemble_mass_matrix(cv::CellMultiValues, M::SparseMatrixCSC, dh::DofHa
     return M
 end;
 
-function assemble_stokes_matrix(cv::CellMultiValues, ν, K::SparseMatrixCSC, dh::DofHandler)
+function assemble_stokes_matrix(cv::MultiFieldCellValues, ν, K::SparseMatrixCSC, dh::DofHandler)
     # Again, some buffers and helpers
     n_basefuncs_v = getnbasefunctions(cv.v)
     n_basefuncs_p = getnbasefunctions(cv.p)
@@ -410,7 +410,7 @@ struct RHSparams{KT, CH, DH, CV, UT}
     K::KT  # SparseMatrixCSC
     ch::CH # ConstraintHandler
     dh::DH # DofHandler
-    cv::CV # CellMultiValues
+    cv::CV # MultiFieldCellValues
     u::UT  # Vector
 end
 p = RHSparams(K, ch, dh, cellvalues, copy(u₀))
@@ -538,4 +538,4 @@ for (step, (u, t)) in enumerate(intervals(integrator))
         pvd[t] = vtk
     end
 end
-vtk_save(pvd);</code></pre><hr/><p><em>This page was generated using <a href="https://github.com/fredrikekre/Literate.jl">Literate.jl</a>.</em></p></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../porous_media/">« Porous media</a><a class="docs-footer-nextpage" href="../reactive_surface/">Reactive surface »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option><option value="catppuccin-latte">catppuccin-latte</option><option value="catppuccin-frappe">catppuccin-frappe</option><option value="catppuccin-macchiato">catppuccin-macchiato</option><option value="catppuccin-mocha">catppuccin-mocha</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.15.0 on <span class="colophon-date" title="Thursday 29 January 2026 13:12">Thursday 29 January 2026</span>. Using Julia version 1.12.4.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
+vtk_save(pvd);</code></pre><hr/><p><em>This page was generated using <a href="https://github.com/fredrikekre/Literate.jl">Literate.jl</a>.</em></p></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../porous_media/">« Porous media</a><a class="docs-footer-nextpage" href="../reactive_surface/">Reactive surface »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option><option value="catppuccin-latte">catppuccin-latte</option><option value="catppuccin-frappe">catppuccin-frappe</option><option value="catppuccin-macchiato">catppuccin-macchiato</option><option value="catppuccin-mocha">catppuccin-mocha</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.15.0 on <span class="colophon-date" title="Thursday 29 January 2026 13:38">Thursday 29 January 2026</span>. Using Julia version 1.12.4.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>

@@ -57,7 +57,7 @@ end;</code></pre><h3 id="PoroElasticity"><a class="docs-heading-anchor" href="#P
     α::T     ## Biot&#39;s coefficient       [-]
     β::T     ## Liquid compressibility   [1/MPa]
 end
-PoroElastic(; elastic, k, ϕ, α, β) = PoroElastic(elastic, k, ϕ, α, β);</code></pre><p>The element routine requires a few more inputs since we have two fields, as well as the dependence on the rates of the displacements and pressure. Again, we dispatch on the material type.</p><pre><code class="language-julia hljs">function element_routine!(Ke, re, m::PoroElastic, cv::CellMultiValues, a, a_old, Δt, sdh)
+PoroElastic(; elastic, k, ϕ, α, β) = PoroElastic(elastic, k, ϕ, α, β);</code></pre><p>The element routine requires a few more inputs since we have two fields, as well as the dependence on the rates of the displacements and pressure. Again, we dispatch on the material type.</p><pre><code class="language-julia hljs">function element_routine!(Ke, re, m::PoroElastic, cv::MultiFieldCellValues, a, a_old, Δt, sdh)
     dr_u = dof_range(sdh, :u)
     dr_p = dof_range(sdh, :p)
 
@@ -170,8 +170,8 @@ end;</code></pre><h3 id="Problem-setup"><a class="docs-heading-anchor" href="#Pr
     # CellValues
     cvu_quad = CellValues(qr_quad, ipu_quad)
     cvu_tri = CellValues(qr_tri, ipu_tri)
-    cmv_quad = CellMultiValues(qr_quad, (u = ipu_quad, p = ipp_quad))
-    cmv_tri = CellMultiValues(qr_tri, (u = ipu_tri, p = ipp_tri))
+    cmv_quad = MultiFieldCellValues(qr_quad, (u = ipu_quad, p = ipp_quad))
+    cmv_tri = MultiFieldCellValues(qr_tri, (u = ipu_tri, p = ipp_tri))
 
     # Setup the DofHandler
     dh = DofHandler(grid)
@@ -281,7 +281,7 @@ struct PoroElastic{T}
 end
 PoroElastic(; elastic, k, ϕ, α, β) = PoroElastic(elastic, k, ϕ, α, β);
 
-function element_routine!(Ke, re, m::PoroElastic, cv::CellMultiValues, a, a_old, Δt, sdh)
+function element_routine!(Ke, re, m::PoroElastic, cv::MultiFieldCellValues, a, a_old, Δt, sdh)
     dr_u = dof_range(sdh, :u)
     dr_p = dof_range(sdh, :p)
 
@@ -404,8 +404,8 @@ function setup_problem(; t_rise = 0.1, u_max = -0.1)
     # CellValues
     cvu_quad = CellValues(qr_quad, ipu_quad)
     cvu_tri = CellValues(qr_tri, ipu_tri)
-    cmv_quad = CellMultiValues(qr_quad, (u = ipu_quad, p = ipp_quad))
-    cmv_tri = CellMultiValues(qr_tri, (u = ipu_tri, p = ipp_tri))
+    cmv_quad = MultiFieldCellValues(qr_quad, (u = ipu_quad, p = ipp_quad))
+    cmv_tri = MultiFieldCellValues(qr_tri, (u = ipu_tri, p = ipp_tri))
 
     # Setup the DofHandler
     dh = DofHandler(grid)
@@ -478,4 +478,4 @@ function solve(dh, ch, domains; Δt = 0.025, t_total = 1.0)
 end;
 
 dh, ch, domains = setup_problem()
-a = solve(dh, ch, domains);</code></pre><hr/><p><em>This page was generated using <a href="https://github.com/fredrikekre/Literate.jl">Literate.jl</a>.</em></p></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../stokes-flow/">« Stokes flow</a><a class="docs-footer-nextpage" href="../ns_vs_diffeq/">Incompressible Navier-Stokes equations via DifferentialEquations.jl »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option><option value="catppuccin-latte">catppuccin-latte</option><option value="catppuccin-frappe">catppuccin-frappe</option><option value="catppuccin-macchiato">catppuccin-macchiato</option><option value="catppuccin-mocha">catppuccin-mocha</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.15.0 on <span class="colophon-date" title="Thursday 29 January 2026 13:12">Thursday 29 January 2026</span>. Using Julia version 1.12.4.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
+a = solve(dh, ch, domains);</code></pre><hr/><p><em>This page was generated using <a href="https://github.com/fredrikekre/Literate.jl">Literate.jl</a>.</em></p></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../stokes-flow/">« Stokes flow</a><a class="docs-footer-nextpage" href="../ns_vs_diffeq/">Incompressible Navier-Stokes equations via DifferentialEquations.jl »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option><option value="catppuccin-latte">catppuccin-latte</option><option value="catppuccin-frappe">catppuccin-frappe</option><option value="catppuccin-macchiato">catppuccin-macchiato</option><option value="catppuccin-mocha">catppuccin-mocha</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.15.0 on <span class="colophon-date" title="Thursday 29 January 2026 13:38">Thursday 29 January 2026</span>. Using Julia version 1.12.4.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>

@@ -60,7 +60,7 @@ Gmsh.finalize();
 ip_v = Lagrange{RefQuadrilateral, 2}()^dim
 qr = QuadratureRule{RefQuadrilateral}(4)
 ip_p = Lagrange{RefQuadrilateral, 1}()
-cellvalues = CellMultiValues(qr, (v = ip_v, p = ip_p))
+cellvalues = MultiFieldCellValues(qr, (v = ip_v, p = ip_p))
 
 dh = DofHandler(grid)
 add!(dh, :v, ip_v)
@@ -90,7 +90,7 @@ add!(ch, inflow_bc);
 close!(ch)
 update!(ch, 0.0);
 
-function assemble_mass_matrix(cv::CellMultiValues, M::SparseMatrixCSC, dh::DofHandler)
+function assemble_mass_matrix(cv::MultiFieldCellValues, M::SparseMatrixCSC, dh::DofHandler)
     # Allocate a buffer for the local matrix and some helpers, together with the assembler.
     n_basefuncs_v = getnbasefunctions(cv.v)
     n_basefuncs_p = getnbasefunctions(cv.p)
@@ -122,7 +122,7 @@ function assemble_mass_matrix(cv::CellMultiValues, M::SparseMatrixCSC, dh::DofHa
     return M
 end;
 
-function assemble_stokes_matrix(cv::CellMultiValues, ν, K::SparseMatrixCSC, dh::DofHandler)
+function assemble_stokes_matrix(cv::MultiFieldCellValues, ν, K::SparseMatrixCSC, dh::DofHandler)
     # Again, some buffers and helpers
     n_basefuncs_v = getnbasefunctions(cv.v)
     n_basefuncs_p = getnbasefunctions(cv.p)
@@ -187,7 +187,7 @@ struct RHSparams{KT, CH, DH, CV, UT}
     K::KT  # SparseMatrixCSC
     ch::CH # ConstraintHandler
     dh::DH # DofHandler
-    cv::CV # CellMultiValues
+    cv::CV # MultiFieldCellValues
     u::UT  # Vector
 end
 p = RHSparams(K, ch, dh, cellvalues, copy(u₀))
