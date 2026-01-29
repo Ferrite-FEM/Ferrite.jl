@@ -83,7 +83,9 @@ function getnquadpoints end
 """
     getnbasefunctions(fe_v::AbstractValues)
 
-Get the number of base functions for the interpolation in `fe_v`.
+Get the number of base functions for the function interpolation in `fe_v`.
+Note that this is not supported for [`CellMultiValues`](@ref) which has
+multiple function interpolations.
 """
 getnbasefunctions(::AbstractValues)
 
