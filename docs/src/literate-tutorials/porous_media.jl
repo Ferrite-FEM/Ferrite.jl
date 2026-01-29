@@ -148,7 +148,7 @@ PoroElastic(; elastic, k, ϕ, α, β) = PoroElastic(elastic, k, ϕ, α, β);
 # The element routine requires a few more inputs since we have two fields, as well
 # as the dependence on the rates of the displacements and pressure.
 # Again, we dispatch on the material type.
-function element_routine!(Ke, re, m::PoroElastic, cv::CellMultiValues, a, a_old, Δt, sdh)
+function element_routine!(Ke, re, m::PoroElastic, cv::MultiFieldCellValues, a, a_old, Δt, sdh)
     dr_u = dof_range(sdh, :u)
     dr_p = dof_range(sdh, :p)
 
@@ -287,8 +287,8 @@ function setup_problem(; t_rise = 0.1, u_max = -0.1)
     ## CellValues
     cvu_quad = CellValues(qr_quad, ipu_quad)
     cvu_tri = CellValues(qr_tri, ipu_tri)
-    cmv_quad = CellMultiValues(qr_quad, (u = ipu_quad, p = ipp_quad))
-    cmv_tri = CellMultiValues(qr_tri, (u = ipu_tri, p = ipp_tri))
+    cmv_quad = MultiFieldCellValues(qr_quad, (u = ipu_quad, p = ipp_quad))
+    cmv_tri = MultiFieldCellValues(qr_tri, (u = ipu_tri, p = ipp_tri))
 
     ## Setup the DofHandler
     dh = DofHandler(grid)

@@ -13,7 +13,7 @@ function element_routine(cv::CellValues)
     return s
 end
 
-function element_routine(cv::CellMultiValues)
+function element_routine(cv::MultiFieldCellValues)
     s = 0.0
     for q_point in 1:getnquadpoints(cv)
         dΩ = getdetJdV(cv, q_point)
@@ -44,11 +44,11 @@ cv_v1 = CellValues(qr, ip1^dim, ip_geo; update_gradients, update_hessians)
 cv_s2 = CellValues(qr, ip2, ip_geo; update_gradients, update_hessians)
 cv_v2 = CellValues(qr, ip2^dim, ip_geo; update_gradients, update_hessians)
 
-cmv_s1 = CellMultiValues(qr, (s1 = ip1,), ip_geo; update_gradients, update_hessians)
-cmv_s1_square = CellMultiValues(qr, (s1 = ip1, s2 = ip1), ip_geo; update_gradients, update_hessians)
-cmv_s1_v1 = CellMultiValues(qr, (s1 = ip1, v1 = ip1^dim), ip_geo; update_gradients, update_hessians)
-cmv_s2_v2 = CellMultiValues(qr, (s2 = ip2, v2 = ip2^dim), ip_geo; update_gradients, update_hessians)
-cmv_s1_v1_s2_v2 = CellMultiValues(qr, (s1 = ip1, v1 = ip1^dim, s2 = ip2, v2 = ip2^dim), ip_geo; update_gradients, update_hessians)
+cmv_s1 = MultiFieldCellValues(qr, (s1 = ip1,), ip_geo; update_gradients, update_hessians)
+cmv_s1_square = MultiFieldCellValues(qr, (s1 = ip1, s2 = ip1), ip_geo; update_gradients, update_hessians)
+cmv_s1_v1 = MultiFieldCellValues(qr, (s1 = ip1, v1 = ip1^dim), ip_geo; update_gradients, update_hessians)
+cmv_s2_v2 = MultiFieldCellValues(qr, (s2 = ip2, v2 = ip2^dim), ip_geo; update_gradients, update_hessians)
+cmv_s1_v1_s2_v2 = MultiFieldCellValues(qr, (s1 = ip1, v1 = ip1^dim, s2 = ip2, v2 = ip2^dim), ip_geo; update_gradients, update_hessians)
 
 for key in (
         :cv_s1, :cv_v1, :cv_s2, :cv_v2,

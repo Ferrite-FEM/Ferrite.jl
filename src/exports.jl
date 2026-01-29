@@ -32,7 +32,7 @@ export
     AbstractCellValues,
     AbstractFacetValues,
     CellValues,
-    CellMultiValues,
+    MultiFieldCellValues,
     FacetValues,
     InterfaceValues,
     reinit!,

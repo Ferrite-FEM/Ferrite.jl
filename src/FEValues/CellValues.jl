@@ -154,9 +154,9 @@ function Base.show(io::IO, d::MIME"text/plain", cv::CellValues)
 end
 
 """
-    CellMultiValues([::Type{T},] quad_rule::QuadratureRule, func_interpols::NamedTuple, [geom_interpol::Interpolation])
+    MultiFieldCellValues([::Type{T},] quad_rule::QuadratureRule, func_interpols::NamedTuple, [geom_interpol::Interpolation])
 
-A `cmv::CellMultiValues` is similar to a `CellValues` object, but includes values associated with multiple
+A `cmv::MultiFieldCellValues` is similar to a `CellValues` object, but includes values associated with multiple
 interpolations while sharing the same quadrature points and geometrical interpolation.
 
 In general, functions applicable to a `CellValues` associated with the function interpolation
@@ -181,7 +181,7 @@ single function interpolation as their `FunctionValues` are aliased.
 
 **Examples**
 
-Constructing a `CellMultiValues` for three fields, 2nd order interpolation for displacements, `u`,
+Constructing a `MultiFieldCellValues` for three fields, 2nd order interpolation for displacements, `u`,
 and 1st order interpolations for the pressure, `p`, and temperature, `T`.
 ```
 qr = QuadratureRule{RefQuadrilateral}(2)
@@ -189,7 +189,7 @@ ip_geo = Lagrange{RefQuadrilateral,1}() # Optional
 ipu = Lagrange{RefQuadrilateral,2}()^2
 ipp = Lagrange{RefQuadrilateral,1}()
 ipT = Lagrange{RefQuadrilaterla,1}()
-cmv = CellMultiValues(qr, (u = ipu, p = ipp, T = ipT), ip_geo)
+cmv = MultiFieldCellValues(qr, (u = ipu, p = ipp, T = ipT), ip_geo)
 ```
 After calling [`reinit!`](@ref) on `cmv`, it can be used as, e.g.
 ```
@@ -198,7 +198,7 @@ Nu = shape_value(cmv.u, q_point, base_function_nr)
 ∇Np = shape_gradient(cmv.p, q_point, base_function_nr)
 ```
 
-**Common methods for `CellMultiValues`**
+**Common methods for `MultiFieldCellValues`**
 
 Applicable to `cmv` above
 
@@ -222,9 +222,9 @@ Applicable to e.g., `cmv.u` above
   * [`function_symmetric_gradient`](@ref)
   * [`function_divergence`](@ref)
 """
-CellMultiValues
+MultiFieldCellValues
 
-struct CellMultiValues{FVS, GM, QR, detT, FVT} <: AbstractCellValues
+struct MultiFieldCellValues{FVS, GM, QR, detT, FVT} <: AbstractCellValues
     fun_values_nt::FVS      # FunctionValues collected in a named tuple (not necessarily unique)
     fun_values::FVT         # FunctionValues collected in a tuple (each unique)
     geo_mapping::GM         # GeometryMapping
@@ -232,7 +232,7 @@ struct CellMultiValues{FVS, GM, QR, detT, FVT} <: AbstractCellValues
     detJdV::detT            # AbstractVector{<:Number} or Nothing
 end
 
-function CellMultiValues(
+function MultiFieldCellValues(
         ::Type{T}, qr::QuadratureRule, ip_funs::NamedTuple, ip_geo::VectorizedInterpolation,
         ::ValuesUpdateFlags{FunDiffOrder, GeoDiffOrder, UpdateDetJdV}
     ) where {T, FunDiffOrder, GeoDiffOrder, UpdateDetJdV}
@@ -242,44 +242,44 @@ function CellMultiValues(
     fun_values = tuple((FunctionValues{FunDiffOrder}(T, ip_fun, qr, ip_geo) for ip_fun in unique_ips)...)
     fun_values_nt = NamedTuple((key => fun_values[findfirst(unique_ip -> ip == unique_ip, unique_ips)] for (key, ip) in pairs(ip_funs)))
     detJdV = UpdateDetJdV ? fill(T(NaN), length(getweights(qr))) : nothing
-    return CellMultiValues(fun_values_nt, fun_values, geo_mapping, qr, detJdV)
+    return MultiFieldCellValues(fun_values_nt, fun_values, geo_mapping, qr, detJdV)
 end
 
-CellMultiValues(qr::QuadratureRule, ip_funs::NamedTuple, args...; kwargs...) = CellMultiValues(Float64, qr, ip_funs, args...; kwargs...)
-function CellMultiValues(::Type{T}, qr, ip_funs::NamedTuple, ip_geo::ScalarInterpolation; kwargs...) where {T}
-    return CellMultiValues(T, qr, ip_funs, VectorizedInterpolation(ip_geo); kwargs...)
+MultiFieldCellValues(qr::QuadratureRule, ip_funs::NamedTuple, args...; kwargs...) = MultiFieldCellValues(Float64, qr, ip_funs, args...; kwargs...)
+function MultiFieldCellValues(::Type{T}, qr, ip_funs::NamedTuple, ip_geo::ScalarInterpolation; kwargs...) where {T}
+    return MultiFieldCellValues(T, qr, ip_funs, VectorizedInterpolation(ip_geo); kwargs...)
 end
-function CellMultiValues(::Type{T}, qr, ip_funs::NamedTuple, ip_geo::VectorizedInterpolation = default_geometric_interpolation(first(ip_funs)); kwargs...) where {T}
-    return CellMultiValues(T, qr, ip_funs, ip_geo, ValuesUpdateFlags(ip_funs; kwargs...))
+function MultiFieldCellValues(::Type{T}, qr, ip_funs::NamedTuple, ip_geo::VectorizedInterpolation = default_geometric_interpolation(first(ip_funs)); kwargs...) where {T}
+    return MultiFieldCellValues(T, qr, ip_funs, ip_geo, ValuesUpdateFlags(ip_funs; kwargs...))
 end
 
-function Base.copy(cv::CMV) where {CMV <: CellMultiValues}
+function Base.copy(cv::CMV) where {CMV <: MultiFieldCellValues}
     fun_values = map(copy, get_fun_values(cv))
     fun_values_nt = NamedTuple((key => fun_values[findfirst(fv -> fv === named_fv, get_fun_values(cv))] for (key, named_fv) in pairs(getfield(cv, :fun_values_nt))))
     return CMV(fun_values_nt, fun_values, copy(get_geo_mapping(cv)), copy(get_quadrature_rule(cv)), _copy_or_nothing(getdetJdVs(cv)))
 end
 
 # Access geometry values
-get_geo_mapping(cv::CellMultiValues) = getfield(cv, :geo_mapping)
-getdetJdVs(cv::CellMultiValues) = getfield(cv, :detJdV)
+get_geo_mapping(cv::MultiFieldCellValues) = getfield(cv, :geo_mapping)
+getdetJdVs(cv::MultiFieldCellValues) = getfield(cv, :detJdV)
 
-get_fun_values(cv::CellMultiValues) = getfield(cv, :fun_values)
-@inline Base.getproperty(cv::CellMultiValues, key::Symbol) = getproperty(getfield(cv, :fun_values_nt), key)
-Base.propertynames(cv::CellMultiValues) = propertynames(getfield(cv, :fun_values_nt))
+get_fun_values(cv::MultiFieldCellValues) = getfield(cv, :fun_values)
+@inline Base.getproperty(cv::MultiFieldCellValues, key::Symbol) = getproperty(getfield(cv, :fun_values_nt), key)
+Base.propertynames(cv::MultiFieldCellValues) = propertynames(getfield(cv, :fun_values_nt))
 
 # Access quadrature rule values
-get_quadrature_rule(cv::CellMultiValues) = getfield(cv, :qr)
+get_quadrature_rule(cv::MultiFieldCellValues) = getfield(cv, :qr)
 
-@inline function reinit!(cv::CellMultiValues, x::AbstractVector)
+@inline function reinit!(cv::MultiFieldCellValues, x::AbstractVector)
     return reinit!(cv, nothing, x)
 end
 
-@inline function reinit_needs_cell(cv::CellMultiValues)
+@inline function reinit_needs_cell(cv::MultiFieldCellValues)
     return any(map(fv -> !isa(mapping_type(fv), IdentityMapping), get_fun_values(cv)))
 end
 
-function check_reinit_sdim_consistency(cmv::CellMultiValues, ::AbstractVector{VT}) where {VT}
-    return map(fv -> check_reinit_sdim_consistency(:CellMultiValues, shape_gradient_type(fv), VT), get_fun_values(cmv))
+function check_reinit_sdim_consistency(cmv::MultiFieldCellValues, ::AbstractVector{VT}) where {VT}
+    return map(fv -> check_reinit_sdim_consistency(:MultiFieldCellValues, shape_gradient_type(fv), VT), get_fun_values(cmv))
 end
 
 # Need to manually unroll applying to each `fun_values` for maximum performance, equivalent code:
@@ -295,12 +295,12 @@ end
     end
 end
 
-function Base.show(io::IO, d::MIME"text/plain", cv::CellMultiValues)
+function Base.show(io::IO, d::MIME"text/plain", cv::MultiFieldCellValues)
     ip_geo = geometric_interpolation(cv)
     fv1 = first(get_fun_values(cv))
     GradT = shape_gradient_type(fv1)
     sdim = GradT === nothing ? nothing : sdim_from_gradtype(GradT)
-    print(io, "CellMultiValues with ", getnquadpoints(cv), " quadrature points")
+    print(io, "MultiFieldCellValues with ", getnquadpoints(cv), " quadrature points")
     print(io, "\nGeometric interpolation: ")
     sdim === nothing ? show(io, d, ip_geo) : show(io, d, ip_geo^sdim)
     print(io, "\nFunction interpolations")
@@ -312,22 +312,22 @@ function Base.show(io::IO, d::MIME"text/plain", cv::CellMultiValues)
 end
 
 # Error messages for functions that should be called in individual `FunctionValues` to help users
-function getnbasefunctions(cv::CellMultiValues)
+function getnbasefunctions(cv::MultiFieldCellValues)
     k = first(propertynames(cv)) # Pick the first function values to use in example
-    throw(ArgumentError("getnbasefunctions isn't applicable to cv::CellMultiValues. Use on `FunctionValues` for the specific field, e.g. getnbasefunctions(cv.$k)"))
+    throw(ArgumentError("getnbasefunctions isn't applicable to cv::MultiFieldCellValues. Use on `FunctionValues` for the specific field, e.g. getnbasefunctions(cv.$k)"))
 end
 
 for f in (:shape_value, :shape_gradient, :shape_symmetric_gradient, :shape_divergence)
-    @eval function $f(cv::CellMultiValues, ::Int, ::Int)
+    @eval function $f(cv::MultiFieldCellValues, ::Int, ::Int)
         k = first(propertynames(cv)) # Pick the first function values to use in example
         fun = $f                       # Make the function name available to use in the error message
-        throw(ArgumentError("$fun isn't applicable to cv::CellMultiValues. Use on `FunctionValues` for the specific field, e.g. $fun(cv.$k, q_point, shapenr)"))
+        throw(ArgumentError("$fun isn't applicable to cv::MultiFieldCellValues. Use on `FunctionValues` for the specific field, e.g. $fun(cv.$k, q_point, shapenr)"))
     end
 end
 for f in (:function_value, :function_gradient, :function_symmetric_gradient, :function_divergence)
-    @eval function $f(cv::CellMultiValues, ::Int, ::AbstractVector, args...)
+    @eval function $f(cv::MultiFieldCellValues, ::Int, ::AbstractVector, args...)
         k = first(propertynames(cv)) # Pick the first function values to use in example
         fun = $f                       # Make the function name available to use in the error message
-        throw(ArgumentError("$fun isn't applicable to cv::CellMultiValues. Use on `FunctionValues` for the specific field, e.g. $fun(cv.$k, q_point, ae, [dofrange])"))
+        throw(ArgumentError("$fun isn't applicable to cv::MultiFieldCellValues. Use on `FunctionValues` for the specific field, e.g. $fun(cv.$k, q_point, ae, [dofrange])"))
     end
 end

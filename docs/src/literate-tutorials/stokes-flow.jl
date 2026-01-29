@@ -226,7 +226,7 @@ end
 # We also construct facet-values for the pressure since we need to integrate along
 # the boundary when assembling the constraint matrix ``\underline{\underline{C}}``.
 # Here, we choose to use two separate [`CellValues`](@ref) instead of a single
-# [`CellMultiValues`](@ref) to demonstrate that this alternative. Here, we use
+# [`MultiFieldCellValues`](@ref) to demonstrate that this alternative. Here, we use
 # don't need the shape gradients of the pressure field, so we request that these
 # are not updated.
 

@@ -51,7 +51,7 @@ function ValuesUpdateFlags(
     GeoDiffOrder = max(required_geo_diff_order(mapping_type(ip_fun), FunDiffOrder), update_detJdV)
     return ValuesUpdateFlags{FunDiffOrder, GeoDiffOrder, update_detJdV}()
 end
-function ValuesUpdateFlags( # For CellMultiValues
+function ValuesUpdateFlags( # For MultiFieldCellValues
         ip_fun::NamedTuple, ::Val{update_gradients}, ::Val{update_hessians}, ::Val{update_detJdV}
     ) where {update_gradients, update_hessians, update_detJdV}
     FunDiffOrder = update_hessians ? 2 : (update_gradients ? 1 : 0)
@@ -65,7 +65,7 @@ end
     reinit!(fv::FacetValues, cell::AbstractCell, x::AbstractVector, facet::Int)
     reinit!(fv::FacetValues, x::AbstractVector, facet::Int)
 
-Update the `CellValues`, `CellMultiValues`, or `FacetValues` object for a cell or
+Update the `CellValues`, `MultiFieldCellValues`, or `FacetValues` object for a cell or
 facet with cell coordinates `x`.
 The derivatives of the shape functions, and the new integration weights are computed.
 For interpolations with non-identity mappings, the current `cell` is also required.
@@ -84,7 +84,7 @@ function getnquadpoints end
     getnbasefunctions(fe_v::AbstractValues)
 
 Get the number of base functions for the function interpolation in `fe_v`.
-Note that this is not supported for [`CellMultiValues`](@ref) which has
+Note that this is not supported for [`MultiFieldCellValues`](@ref) which has
 multiple function interpolations.
 """
 getnbasefunctions(::AbstractValues)

@@ -271,8 +271,8 @@ end
     end
 
 
-    @testset "CellMultiValues" begin
-        # Here we test that CellMultiValues give the same output as CellValues,
+    @testset "MultiFieldCellValues" begin
+        # Here we test that MultiFieldCellValues give the same output as CellValues,
         # as that output is thoroughly tested above
         ipu = Lagrange{RefQuadrilateral, 2}()^2
         ipp = Lagrange{RefQuadrilateral, 1}()
@@ -283,10 +283,10 @@ end
         cvu = CellValues(qr, ipu)
         cvp = CellValues(qr, ipp)
         cvrt = CellValues(qr, iprt)
-        cmv = CellMultiValues(qr, (u = ipu, p = ipp, T = ipT))
-        cmv_u = CellMultiValues(qr, (u = ipu,)) # Case with a single interpolation
-        cmv_rt = CellMultiValues(qr, (u = ipu, r = iprt))
-        cmv3 = CellMultiValues(qr, (u = ipu, T = Lagrange{RefQuadrilateral, 2}(), p = ipp)) # Case with 3 unique IPs
+        cmv = MultiFieldCellValues(qr, (u = ipu, p = ipp, T = ipT))
+        cmv_u = MultiFieldCellValues(qr, (u = ipu,)) # Case with a single interpolation
+        cmv_rt = MultiFieldCellValues(qr, (u = ipu, r = iprt))
+        cmv3 = MultiFieldCellValues(qr, (u = ipu, T = Lagrange{RefQuadrilateral, 2}(), p = ipp)) # Case with 3 unique IPs
 
         @test cmv.p === cmv.T # Correct aliasing for identical interpolations
         # Correctly inferred geometric interpolation:
@@ -353,7 +353,7 @@ end
                 end
             end
         end
-        @testset "copy(::CellMultiValues)" begin
+        @testset "copy(::MultiFieldCellValues)" begin
             cmv_copy = @inferred copy(cmv)
             @test cmv_copy isa typeof(cmv)
 
@@ -372,14 +372,14 @@ end
             @test Ferrite.getdetJdVs(cmv_copy) !== Ferrite.getdetJdVs(cmv)
             @test Ferrite.getdetJdVs(cmv_copy) == Ferrite.getdetJdVs(cmv)
         end
-        @testset "Error paths specific to CellMultiValues" begin
-            function test_argument_error_call(f::Function, cmv::CellMultiValues, args...)
+        @testset "Error paths specific to MultiFieldCellValues" begin
+            function test_argument_error_call(f::Function, cmv::MultiFieldCellValues, args...)
                 @test_throws ArgumentError f(cmv, args...)
                 @test_throws "$(nameof(f))" f(cmv, args...)
             end
             qr = QuadratureRule{RefTriangle}(2)
             ip = Lagrange{RefTriangle, 1}()
-            cmv = CellMultiValues(qr, (u = ip, v = ip^2), Lagrange{RefTriangle, 1}())
+            cmv = MultiFieldCellValues(qr, (u = ip, v = ip^2), Lagrange{RefTriangle, 1}())
             test_argument_error_call(getnbasefunctions, cmv)
             for f in (shape_value, shape_gradient, shape_symmetric_gradient, shape_divergence)
                 test_argument_error_call(f, cmv, 1, 1)
@@ -400,7 +400,7 @@ end
         csv = CellValues(qr, ip)
         cvv = CellValues(qr, VectorizedInterpolation(ip))
         csv_embedded = CellValues(qr, ip, ip^3)
-        cmv = CellMultiValues(qr, (s = ip, v = VectorizedInterpolation(ip)))
+        cmv = MultiFieldCellValues(qr, (s = ip, v = VectorizedInterpolation(ip)))
         fsv = FacetValues(qr_f, ip)
         fvv = FacetValues(qr_f, VectorizedInterpolation(ip))
         fsv_embedded = FacetValues(qr_f, ip, ip^3)
@@ -632,9 +632,9 @@ end
         @test startswith(pv_showstring, "PointValues containing")
         @test contains(pv_showstring, "Function interpolation: Lagrange{RefPrism, 2}()")
 
-        cmv = CellMultiValues(QuadratureRule{RefPrism}(2), (u = Lagrange{RefPrism, 2}(), v = Lagrange{RefPrism, 1}()^3))
+        cmv = MultiFieldCellValues(QuadratureRule{RefPrism}(2), (u = Lagrange{RefPrism, 2}(), v = Lagrange{RefPrism, 1}()^3))
         showstring = sprint(show, MIME"text/plain"(), cmv)
-        @test startswith(showstring, "CellMultiValues with 5 quadrature points")
+        @test startswith(showstring, "MultiFieldCellValues with 5 quadrature points")
         @test contains(showstring, "Geometric interpolation: Lagrange{RefPrism, 1}()")
         @test contains(showstring, "u: Lagrange{RefPrism, 2}()")
         @test contains(showstring, "v: Lagrange{RefPrism, 1}()^3")

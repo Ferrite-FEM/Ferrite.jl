@@ -34,14 +34,14 @@ include("test_utils.jl")
             # TODO: Also @test_call some methods that use cv?
         end
     end
-    @testset "CellMultiValues" begin
+    @testset "MultiFieldCellValues" begin
         ipu = Lagrange{RefQuadrilateral, 2}()^2
         ipp = Lagrange{RefQuadrilateral, 1}()
         ipT = ipp
         qr = QuadratureRule{RefQuadrilateral}(2)
-        cmv = CellMultiValues(qr, (u = ipu, p = ipp, T = ipT))
-        cmv_u = CellMultiValues(qr, (u = ipu,)) # Case with a single interpolation
-        cmv3 = CellMultiValues(qr, (u = ipu, T = Lagrange{RefQuadrilateral, 2}(), p = ipp)) # Case with 3 unique IPs
+        cmv = MultiFieldCellValues(qr, (u = ipu, p = ipp, T = ipT))
+        cmv_u = MultiFieldCellValues(qr, (u = ipu,)) # Case with a single interpolation
+        cmv3 = MultiFieldCellValues(qr, (u = ipu, T = Lagrange{RefQuadrilateral, 2}(), p = ipp)) # Case with 3 unique IPs
 
         coords, _ = valid_coordinates_and_normals(Ferrite.geometric_interpolation(cmv))
         @test_call reinit!(cmv, coords)
