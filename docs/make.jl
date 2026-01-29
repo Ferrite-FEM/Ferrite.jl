@@ -78,6 +78,7 @@ bibtex_plugin = CitationBibliography(
             "topics/assembly.md",
             "topics/boundary_conditions.md",
             "topics/constraints.md",
+            "topics/projections.md",
             "topics/grid.md",
             "topics/export.md",
         ],
