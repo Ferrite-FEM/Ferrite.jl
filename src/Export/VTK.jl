@@ -34,7 +34,7 @@ end
 function VTKGridFile(filename::String, dh::DofHandler; kwargs...)
     for sdh in dh.subdofhandlers
         for ip in sdh.field_interpolations
-            if !isa(conformity(ip), H1Conformity)
+            if !isa(conformity(ip), H1Conformity) && !isa(conformity(ip), H2Conformity)
                 return VTKGridFile(filename, get_grid(dh); write_discontinuous = true, kwargs...)
             end
         end

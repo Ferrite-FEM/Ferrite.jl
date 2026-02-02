@@ -47,9 +47,9 @@
         # Calculate coordinates and function values for these
         point_coords = zeros(eltype(cell_coords), length(inds))
         point_normal = similar(point_coords)
-        fun_vals = zeros(typeof(shape_value(fv, 1, 1)), length(inds))
-        reinit!(fv, cell, cell_coords, facetnr)
         ue = u[celldofs(dh, cellnr)]
+        fun_vals = zeros(typeof(value_function(fv, 1, ue)), length(inds))
+        reinit!(fv, cell, cell_coords, facetnr)
         for (i, q_point) in enumerate(inds)
             point_coords[i] = spatial_coordinate(fv, q_point, cell_coords)
             point_normal[i] = getnormal(fv, q_point)
@@ -115,8 +115,13 @@
 
     continuity_function(ip::Interpolation) = continuity_function(Ferrite.conformity(ip))
     continuity_function(::Ferrite.H1Conformity) = ((v, _) -> v)
+    continuity_function(::Ferrite.H2Conformity) = ((∇v, n) -> ∇v⋅n)
     continuity_function(::Ferrite.HcurlConformity) = ((v, n) -> v - n * (v ⋅ n)) # Tangent continuity
     continuity_function(::Ferrite.HdivConformity) = ((v, n) -> v ⋅ n) # Normal continuity
+
+    continuity_value_function(ip::Interpolation) = continuity_value_function(Ferrite.conformity(ip))
+    continuity_value_function(::Union{Ferrite.H1Conformity, Ferrite.HcurlConformity, Ferrite.HdivConformity}) = function_value
+    continuity_value_function(::Ferrite.H2Conformity) = function_gradient
 
     nel = 3
 
@@ -131,7 +136,7 @@
         Lagrange{RefTriangle, 2}(), Lagrange{RefQuadrilateral, 2}(), Lagrange{RefHexahedron, 2}()^3, # Test should also work for identity mapping
         Nedelec{RefTriangle, 1}(), Nedelec{RefTriangle, 2}(), Nedelec{RefQuadrilateral, 1}(), Nedelec{RefTetrahedron, 1}(), Nedelec{RefHexahedron, 1}(),
         RaviartThomas{RefTriangle, 1}(), RaviartThomas{RefTriangle, 2}(), RaviartThomas{RefQuadrilateral, 1}(), RaviartThomas{RefTetrahedron, 1}(), RaviartThomas{RefHexahedron, 1}(),
-        BrezziDouglasMarini{RefTriangle, 1}(),
+        BrezziDouglasMarini{RefTriangle, 1}(), Argyris{RefTriangle, 5}(),
     ]
     @testset "Non-mixed grid" begin
         for ip in test_ips
@@ -141,6 +146,7 @@
             transfun(x) = typeof(x)(i -> sinpi(x[mod(i, length(x)) + 1] + i / 3)) / 10
 
             for CT in cell_types[RefShape]
+                (isa(ip, Argyris{RefTriangle,5}) && CT==QuadraticTriangle) && continue #Special case Argyris
                 grid = generate_grid(CT, ntuple(_ -> nel, dim), p1, p2)
                 # Smoothly distort grid (to avoid spuriously badly deformed elements).
                 # A distorted grid is important to properly test the geometry mapping
@@ -158,7 +164,7 @@
                         for facetnr in 1:nfacets(RefShape)
                             fi = FacetIndex(cellnr, facetnr)
                             # Check continuity of function value according to continuity_function
-                            found_matching = test_continuity(dh, fi; transformation_function = continuity_function(ip))
+                            found_matching = test_continuity(dh, fi; transformation_function = continuity_function(ip), value_function = continuity_value_function(ip))
                             cnt += found_matching
                         end
                         @assert cnt > 0

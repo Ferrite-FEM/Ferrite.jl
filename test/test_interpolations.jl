@@ -66,7 +66,7 @@ function test_interpolation_properties(ip::Interpolation{RefShape, FunOrder}) wh
 
         # Test that property functions are defined, runs, and, if possible, give expected type
         Ferrite.mapping_type(ip) # Dry-run just to catch if it isn't defined
-        @test Ferrite.conformity(ip) isa Union{Ferrite.L2Conformity, Ferrite.HdivConformity, Ferrite.HcurlConformity, Ferrite.H1Conformity}
+        @test Ferrite.conformity(ip) isa Union{Ferrite.L2Conformity, Ferrite.HdivConformity, Ferrite.HcurlConformity, Ferrite.H1Conformity, Ferrite.H2Conformity}
     end
 end
 

@@ -69,6 +69,7 @@ struct L2Conformity end     # Discontinuous across cell boundaries
 struct HdivConformity end   # Normal continuity across cell boundaries
 struct HcurlConformity end  # Tangent continuity across cell boundaries
 struct H1Conformity end     # Function continuity across cell boundaries
+struct H2Conformity end     # Function and gradient continuity across cell boundaries
 
 """
     conformity(ip::Interpolation)
@@ -2211,7 +2212,7 @@ function reference_coordinates(::Argyris{RefTriangle, 5})
     ]
 end
 
-conformity(::Argyris{RefTriangle, 5}) = H1Conformity() #TODO, change to H2Conformity
+conformity(::Argyris{RefTriangle, 5}) = H2Conformity()
 mapping_type(::Argyris{RefTriangle, 5}) = ArgyrisMapping()
 
 function get_direction(::Argyris{RefTriangle, 5}, shape_nr, cell)

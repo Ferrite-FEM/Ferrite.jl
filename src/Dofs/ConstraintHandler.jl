@@ -2028,7 +2028,7 @@ function integrate_projected_dbc!(::HcurlConformity, Kᶠ, fᶠ, bc_fun, fv, sha
     return
 end
 
-function integrate_projected_dbc!(::Union{H1Conformity, L2Conformity}, _, _, _, fv, args...)
+function integrate_projected_dbc!(::Union{H1Conformity, H2Conformity, L2Conformity}, _, _, _, fv, args...)
     ip_str = sprint(show, function_interpolation(fv))
-    throw(ArgumentError("ProjectedDirichlet is not implemented for H¹ and L2 conformities ($ip_str)"))
+    throw(ArgumentError("ProjectedDirichlet is not implemented for H¹, H² and L2 conformities ($ip_str)"))
 end
