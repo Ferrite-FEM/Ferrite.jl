@@ -84,7 +84,7 @@ function w_analytical(pos::Vec{2}, L, q0, D; n_terms = 50)
 end;
 
 # Now we define the element routine.
-function element_routine!(ke, fe, cellvalues, C, q0)
+function element_routine!(ke, fe, cellvalues, D, q0)
     for iqp in 1:getnquadpoints(cellvalues)
         dV = getdetJdV(cellvalues, iqp)
         for i in 1:getnbasefunctions(cellvalues)
@@ -117,7 +117,7 @@ end
 
 # Here we create a standard assembly routine.
 function doassemble!(
-        cellvalues::CellValues, facetvalues::FacetValues, K::SparseMatrixCSC, f::Vector, dh::DofHandler, C::SymmetricTensor, q0::Float64, penalty::Float64
+        cellvalues::CellValues, facetvalues::FacetValues, K::SparseMatrixCSC, f::Vector, dh::DofHandler, D::Float64, q0::Float64, penalty::Float64
     )
 
     n = getnbasefunctions(cellvalues)
@@ -129,7 +129,7 @@ function doassemble!(
         fill!(ke, 0.0)
         fill!(fe, 0.0)
         reinit!(cellvalues, celldata)
-        element_routine!(ke, fe, cellvalues, C, q0)
+        element_routine!(ke, fe, cellvalues, D, q0)
         assemble!(assembler, celldofs(celldata), ke, fe)
     end
 
@@ -152,7 +152,7 @@ end
 # Create stiffness matrix, assemble and solve:
 K = allocate_matrix(dh);
 f = zeros(ndofs(dh))
-doassemble!(cellvalues, facetvalues, K, f, dh, C, q0, penalty);
+doassemble!(cellvalues, facetvalues, K, f, dh, D, q0, penalty);
 u = K \ f
 
 # Export solution to VTK/Paraview
