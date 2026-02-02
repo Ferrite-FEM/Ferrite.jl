@@ -162,6 +162,16 @@ curl_from_gradient(∇v::SecondOrderTensor{3}) = Vec{3}((∇v[3, 2] - ∇v[2, 3]
 curl_from_gradient(∇v::SecondOrderTensor{2}) = Vec{1}((∇v[2, 1] - ∇v[1, 2],)) # Alternatively define as Vec{3}((0, 0, v))
 
 """
+    shape_laplacian(fe_v::AbstractValues, q_point::Int, base_function::Int)
+
+Return the laplacian of shape function `base_function` evaluated in
+quadrature point `q_point`.
+"""
+function shape_laplacian(cv::AbstractValues, q_point::Int, base_func::Int)
+    return tr(shape_hessian(cv, q_point, base_func))
+end
+
+"""
     function_value(fe_v::AbstractValues, q_point::Int, u::AbstractVector, [dof_range])
 
 Compute the value of the function in a quadrature point. `u` is a vector with values
@@ -258,8 +268,8 @@ end
 """
     function_hessian(fe_v::AbstractValues{dim}, q_point::Int, u::AbstractVector{<:AbstractFloat}, [dof_range])
 
-    Compute the hessian of the function in a quadrature point. `u` is a vector with values
-    for the degrees of freedom.
+Compute the hessian of the function in a quadrature point. `u` is a vector with values
+for the degrees of freedom.
 """
 function function_hessian(fe_v::AbstractValues, q_point::Int, u::AbstractVector, dof_range = eachindex(u))
     n_base_funcs = getnbasefunctions(fe_v)
@@ -346,6 +356,18 @@ function_curl(fe_v::AbstractValues, q_point::Int, u::AbstractVector, dof_range =
 # TODO: Deprecate this, nobody is using this in practice...
 function_curl(fe_v::AbstractValues, q_point::Int, u::AbstractVector{<:Vec}) =
     curl_from_gradient(function_gradient(fe_v, q_point, u))
+
+"""
+    function_laplacian(fe_v::AbstractValues, q_point::Int, u::AbstractVector, [dof_range])
+
+Compute the laplacian of the scalar valued function in a quadrature point.
+
+The laplacian of a scalar valued functions in the quadrature point ``\\mathbf{x}_q`` is computed as
+``\\Delta u(\\mathbf{x_q}) = \\text{tr}(\\sum\\limits_{i = 1}^n \\nabla\\nabla N_i(\\mathbf{x_q}) u_i)``
+where ``u_i`` are the nodal values of the function.
+"""
+function_laplacian(fe_v::AbstractValues, q_point::Int, u::AbstractVector, dof_range = eachindex(u)) =
+    tr(function_hessian(fe_v, q_point, u, dof_range))
 
 """
     spatial_coordinate(fe_v::AbstractValues, q_point::Int, x::AbstractVector)

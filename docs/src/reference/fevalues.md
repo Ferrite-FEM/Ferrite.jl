@@ -46,8 +46,11 @@ getnbasefunctions(::Ferrite.AbstractValues)
 function_value
 function_gradient
 function_symmetric_gradient
+function_hessian
 function_divergence
 function_curl
+function_laplacian
+spatial_coordinate
 ```
 
 In addition, there are some methods that are unique for `FacetValues`.

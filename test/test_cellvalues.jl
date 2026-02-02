@@ -79,6 +79,9 @@ end
                     # Note, the jacobian of the element is constant, which makes the hessian (of the mapping)
                     # zero. So this is not the optimal test
                     @test Ferrite.function_hessian(cv, i, ue) ≈ Hqp
+                    if func_interpol isa Ferrite.ScalarInterpolation
+                        @test Ferrite.function_laplacian(cv, i, ue) ≈ tr(Hqp)
+                    end
                 end
                 if func_interpol isa Ferrite.VectorInterpolation
                     @test function_symmetric_gradient(cv, i, ue) ≈ 0.5(Gqp + Gqp')
