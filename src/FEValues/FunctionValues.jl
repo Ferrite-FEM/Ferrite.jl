@@ -309,7 +309,7 @@ function ArgyrisData(ip::Lagrange{RefTriangle, 1}, coords)
     #TODO: For non-linear geometries, we need to compute three jacobian at each corner.
     #Current implementation only works for non-linear geometries.
     ξ = zero(Vec{2, Float64})
-    J, _ = Ferrite.calculate_jacobian_and_spatial_coordinate(ip, ξ, coords)
+    J, _ = calculate_jacobian_and_spatial_coordinate(ip, ξ, coords)
 
     t = (t1 / l1, t2 / l2, t3 / l3)
     n = ntuple(i -> rotate(t[i], pi / 2), 3)
@@ -331,8 +331,8 @@ end
 #Since M is sparse, we avoid creating the M-matrix and compute Nx directly.
 #For more information see:
 # Robert C. Kirby. A general approach to transforming finite elements. The SMAI Journal of computational mathematics (2018)
-function apply_mapping!(funvals::Ferrite.FunctionValues{DO}, ::ArgyrisMapping, q_point::Int, mapping_values, cell, coords) where {DO}
-    ip_geo = Ferrite.geometric_interpolation(cell)
+function apply_mapping!(funvals::FunctionValues{DO}, ::ArgyrisMapping, q_point::Int, mapping_values, cell, coords) where {DO}
+    ip_geo = geometric_interpolation(cell)
     @assert ip_geo isa Lagrange{RefTriangle, 1} "Only linear geometries allowed for Argyris interpolation"
     @assert DO < 3
 
@@ -352,7 +352,7 @@ function apply_mapping!(funvals::Ferrite.FunctionValues{DO}, ::ArgyrisMapping, q
 
     #Fix directions of normal gradients dofs on edges
     for i in 19:21
-        dir = Ferrite.get_direction(vdim == 1 ? funvals.ip : funvals.ip.ip, i, cell)
+        dir = get_direction(vdim == 1 ? funvals.ip : funvals.ip.ip, i, cell)
         for d in 1:vdim
             j = (i - 1) * vdim + d
             Nx[j] *= dir
