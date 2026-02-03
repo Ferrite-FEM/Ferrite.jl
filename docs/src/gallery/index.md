@@ -20,7 +20,7 @@ Neumann boundary conditions and the method of manufactured solutions.
 
 ---
 
-#### [Plate equation](plate_equation.md)
+#### [Kirchhoff-Love Plate Equation](plate_equation.md)
 
 Solves the biharmonic plate equation using \(C^1\)-continuous Argyris elements.
 The example illustrates the finite element discretisation of fourth-order PDEs and the 

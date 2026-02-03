@@ -115,7 +115,7 @@
 
     continuity_function(ip::Interpolation) = continuity_function(Ferrite.conformity(ip))
     continuity_function(::Ferrite.H1Conformity) = ((v, _) -> v)
-    continuity_function(::Ferrite.H2Conformity) = ((∇v, n) -> ∇v⋅n)
+    continuity_function(::Ferrite.H2Conformity) = ((∇v, n) -> ∇v ⋅ n)
     continuity_function(::Ferrite.HcurlConformity) = ((v, n) -> v - n * (v ⋅ n)) # Tangent continuity
     continuity_function(::Ferrite.HdivConformity) = ((v, n) -> v ⋅ n) # Normal continuity
 
@@ -146,7 +146,7 @@
             transfun(x) = typeof(x)(i -> sinpi(x[mod(i, length(x)) + 1] + i / 3)) / 10
 
             for CT in cell_types[RefShape]
-                (isa(ip, Argyris{RefTriangle,5}) && CT==QuadraticTriangle) && continue #Special case Argyris
+                (isa(ip, Argyris{RefTriangle, 5}) && CT == QuadraticTriangle) && continue #Special case Argyris
                 grid = generate_grid(CT, ntuple(_ -> nel, dim), p1, p2)
                 # Smoothly distort grid (to avoid spuriously badly deformed elements).
                 # A distorted grid is important to properly test the geometry mapping

@@ -17,7 +17,7 @@
 # ```
 # We use the following weak formulation:
 # ```math
-# D\int_\Omega \Delta w \Delta v \, d\Omega - \int_\Omega v q \, d\Omega = 0 
+# D\int_\Omega \Delta w \Delta v \, d\Omega - \int_\Omega v q \, d\Omega = 0
 # \quad \forall v \in V
 # ```
 # where
@@ -93,7 +93,7 @@ function element_routine!(ke, fe, cellvalues, D, q0)
             Δw = shape_laplacian(cellvalues, iqp, i)
             for j in 1:getnbasefunctions(cellvalues)
                 Δv = shape_laplacian(cellvalues, iqp, j)
-                ke[i, j] += D*(Δw * Δv) * dV
+                ke[i, j] += D * (Δw * Δv) * dV
             end
         end
     end
