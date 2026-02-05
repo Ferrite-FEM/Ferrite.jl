@@ -300,6 +300,13 @@ struct ArgyrisData
     J::Tensor{2, 2, Float64, 4} # Jacobian
 end
 
+function _compute_B(t, n̂, t̂, J)
+    n = Vec(-t[2], t[1]) # Rotate 90 deg
+    Ĝ = Tensor{2, 2}((n̂[1], t̂[1], n̂[2], t̂[2]))
+    G = Tensor{2, 2}((n[1], t[1], n[2], t[2]))
+    return Ĝ ⋅ J' ⋅ G'
+end
+
 function ArgyrisData(ip::Lagrange{RefTriangle, 1}, coords)
     t1 = coords[1] - coords[2]
     t2 = coords[2] - coords[3]
@@ -312,18 +319,15 @@ function ArgyrisData(ip::Lagrange{RefTriangle, 1}, coords)
     J, _ = calculate_jacobian_and_spatial_coordinate(ip, ξ, coords)
 
     t = (t1 / l1, t2 / l2, t3 / l3)
-    n = ntuple(i -> rotate(t[i], pi / 2), 3)
 
-    n̂ = (Vec((1 / √2, 1 / √2)), Vec((-1.0, 0.0)), Vec((0.0, -1.0)))
-    t̂ = (Vec((1 / √2, -1 / √2)), Vec((0.0, 1.0)), Vec((-1.0, 0.0)))
-    B = zeros(Tensor{2, 2}, 3)
-    for i in 1:3
-        Ĝ = Tensor{2, 2}(hcat(n̂[i], t̂[i])')
-        G = Tensor{2, 2}(hcat(n[i], t[i])')
-        B[i] = Ĝ ⋅ J' ⋅ G'
+    ts = (t1 / l1, t2 / l2, t3 / l3)
+    n̂s = (Vec((1 / √2, 1 / √2)), Vec((-1.0, 0.0)), Vec((0.0, -1.0)))
+    t̂s = (Vec((1 / √2, -1 / √2)), Vec((0.0, 1.0)), Vec((-1.0, 0.0)))
+    B = map(ts, n̂s, t̂s) do t, n̂, t̂
+        _compute_B(t, n̂, t̂, J)
     end
 
-    return ArgyrisData(t, l, Tuple(B), J)
+    return ArgyrisData(t, l, B, J)
 end
 
 #Apply mapping for the Argyris element.

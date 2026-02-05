@@ -115,7 +115,7 @@
 
     continuity_function(ip::Interpolation) = continuity_function(Ferrite.conformity(ip))
     continuity_function(::Ferrite.H1Conformity) = ((v, _) -> v)
-    continuity_function(::Ferrite.H2Conformity) = ((∇v, n) -> ∇v ⋅ n)
+    continuity_function(::Ferrite.H2Conformity) = ((∇v, _) -> ∇v)
     continuity_function(::Ferrite.HcurlConformity) = ((v, n) -> v - n * (v ⋅ n)) # Tangent continuity
     continuity_function(::Ferrite.HdivConformity) = ((v, n) -> v ⋅ n) # Normal continuity
 

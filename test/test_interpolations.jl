@@ -781,7 +781,7 @@ end
             end
         end
 
-        #Check dirac property on reference cell and general cell
+        #Check Kronecker delta property on reference cell and general cell
         for coords in [
                 Ferrite.reference_coordinates(ip_geo),
                 [x + x * rand() * 0.05 for x in Ferrite.reference_coordinates(ip_geo)],
