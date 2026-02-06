@@ -250,7 +250,7 @@ end
 function start_assemble(K::Symmetric{T, <:SparseMatrixCSC}, f::Vector = T[]; fillzero::Bool = true, maxcelldofs_hint::Int = 0) where {T}
     fillzero && (fillzero!(K); fillzero!(f))
     permutation = zeros(Int, maxcelldofs_hint)
-    sorteddofs  = zeros(Int, maxcelldofs_hint)
+    sorteddofs = zeros(Int, maxcelldofs_hint)
     return SymmetricCSCAssembler(K, f, permutation, permutation, sorteddofs, sorteddofs)
 end
 
@@ -267,7 +267,7 @@ end
 Assemble the element stiffness matrix `Ke` (and optional force vector `fe`) into the global
 stiffness (and force) in `A`, given the element degrees of freedom `dofs`.
 
-This is equivalent to `K[rowdofs, coldofs] += Ke` and `f[rowdofs] += fe` efficiently, or 
+This is equivalent to `K[rowdofs, coldofs] += Ke` and `f[rowdofs] += fe` efficiently, or
 equivalently this is applying `K[dofs, dofs] += Ke` and `f[dofs] += fe` efficiently, where
 `K` is the global stiffness matrix and `f` the global force/residual vector.
 """
@@ -320,10 +320,12 @@ end
     return _assemble_inner!(K, Ke, rowdofs, sortedrowdofs, rowpermutation, coldofs, sortedcoldofs, colpermutation, sym)
 end
 
-@propagate_inbounds function _assemble_inner!(K::SparseMatrixCSC, Ke::AbstractMatrix,
-    rowdofs::AbstractVector, sortedrowdofs::AbstractVector, rowpermutation::AbstractVector,
-    coldofs::AbstractVector, sortedcoldofs::AbstractVector, colpermutation::AbstractVector,
-    sym::Bool)
+@propagate_inbounds function _assemble_inner!(
+        K::SparseMatrixCSC, Ke::AbstractMatrix,
+        rowdofs::AbstractVector, sortedrowdofs::AbstractVector, rowpermutation::AbstractVector,
+        coldofs::AbstractVector, sortedcoldofs::AbstractVector, colpermutation::AbstractVector,
+        sym::Bool
+    )
     current_col = 1
     Krows = rowvals(K)
     Kvals = nonzeros(K)

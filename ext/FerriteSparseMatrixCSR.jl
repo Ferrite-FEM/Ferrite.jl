@@ -10,10 +10,12 @@ function Ferrite.start_assemble(K::SparseMatrixCSR{<:Any, T}, f::Vector = T[]; f
     return CSRAssembler(K, f, zeros(Int, maxcelldofs_hint), zeros(Int, maxcelldofs_hint), zeros(Int, maxcelldofs_hint), zeros(Int, maxcelldofs_hint))
 end
 
-@propagate_inbounds function Ferrite._assemble_inner!(K::SparseMatrixCSR, Ke::AbstractMatrix,
-    rowdofs::AbstractVector, sortedrowdofs::AbstractVector, rowpermutation::AbstractVector,
-    coldofs::AbstractVector, sortedcoldofs::AbstractVector, colpermutation::AbstractVector,
-    sym::Bool)
+@propagate_inbounds function Ferrite._assemble_inner!(
+        K::SparseMatrixCSR, Ke::AbstractMatrix,
+        rowdofs::AbstractVector, sortedrowdofs::AbstractVector, rowpermutation::AbstractVector,
+        coldofs::AbstractVector, sortedcoldofs::AbstractVector, colpermutation::AbstractVector,
+        sym::Bool
+    )
     current_row = 1
     ld = length(coldofs)
     return @inbounds for Krow in sortedrowdofs
