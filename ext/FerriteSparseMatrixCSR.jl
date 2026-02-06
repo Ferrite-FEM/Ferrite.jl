@@ -7,34 +7,37 @@ import Base: @propagate_inbounds
 # Could be generalized if https://github.com/JuliaSparse/SparseArrays.jl/pull/546 is merged
 function Ferrite.start_assemble(K::SparseMatrixCSR{<:Any, T}, f::Vector = T[]; fillzero::Bool = true, maxcelldofs_hint::Int = 0) where {T}
     fillzero && (Ferrite.fillzero!(K); Ferrite.fillzero!(f))
-    return CSRAssembler(K, f, zeros(Int, maxcelldofs_hint), zeros(Int, maxcelldofs_hint))
+    return CSRAssembler(K, f, zeros(Int, maxcelldofs_hint), zeros(Int, maxcelldofs_hint), zeros(Int, maxcelldofs_hint), zeros(Int, maxcelldofs_hint))
 end
 
-@propagate_inbounds function Ferrite._assemble_inner!(K::SparseMatrixCSR, Ke::AbstractMatrix, dofs::AbstractVector, sorteddofs::AbstractVector, permutation::AbstractVector, sym::Bool)
+@propagate_inbounds function Ferrite._assemble_inner!(K::SparseMatrixCSR, Ke::AbstractMatrix,
+    rowdofs::AbstractVector, sortedrowdofs::AbstractVector, rowpermutation::AbstractVector,
+    coldofs::AbstractVector, sortedcoldofs::AbstractVector, colpermutation::AbstractVector,
+    sym::Bool)
     current_row = 1
-    ld = length(dofs)
-    return @inbounds for Krow in sorteddofs
+    ld = length(coldofs)
+    return @inbounds for Krow in sortedrowdofs
         maxlookups = sym ? current_row : ld
-        Kerow = permutation[current_row]
+        Kerow = rowpermutation[current_row]
         ci = 1 # col index pointer for the local matrix
         Ci = 1 # col index pointer for the global matrix
         nzr = nzrange(K, Krow)
         while Ci <= length(nzr) && ci <= maxlookups
             C = nzr[Ci]
             Kcol = K.colval[C]
-            Kecol = permutation[ci]
+            Kecol = colpermutation[ci]
             val = Ke[Kerow, Kecol]
-            if Kcol == dofs[Kecol]
+            if Kcol == coldofs[Kecol]
                 # Match: add the value (if non-zero) and advance the pointers
                 if !iszero(val)
                     K.nzval[C] += val
                 end
                 ci += 1
                 Ci += 1
-            elseif Kcol < dofs[Kecol]
+            elseif Kcol < coldofs[Kecol]
                 # No match yet: advance the global matrix row pointer
                 Ci += 1
-            else # Kcol > dofs[Kecol]
+            else # Kcol > coldofs[Kecol]
                 # No match: no entry exist in the global matrix for this row. This is
                 # allowed as long as the value which would have been inserted is zero.
                 iszero(val) || Ferrite._missing_sparsity_pattern_error(Krow, Kcol)
@@ -44,8 +47,8 @@ end
         end
         # Make sure that remaining entries in this column of the local matrix are all zero
         for i in ci:maxlookups
-            if !iszero(Ke[Kerow, permutation[i]])
-                Ferrite._missing_sparsity_pattern_error(Krow, sorteddofs[i])
+            if !iszero(Ke[Kerow, colpermutation[i]])
+                Ferrite._missing_sparsity_pattern_error(Krow, sortedcoldofs[i])
             end
         end
         current_row += 1

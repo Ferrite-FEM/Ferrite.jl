@@ -1,3 +1,4 @@
+using Ferrite
 import SparseMatricesCSR: SparseMatrixCSR, sparsecsr
 using SparseArrays, LinearAlgebra
 
@@ -83,6 +84,17 @@ using SparseArrays, LinearAlgebra
         V = [4 / 3, 0.0, 0.0, -2.0, 2.0, 1.0, -1.0]
         @test K ≈ sparsecsr(I, J, V)
         @test f ≈ [4 / 3, 2.0, 1.0]
+
+        I = [1, 1, 4, 4, 6, 6]
+        J = [1, 3, 1, 3, 1, 3]
+        V = zeros(length(I))
+        K = sparsecsr(I, J, V)
+        assembler = start_assemble(K)
+        rdofs = [1, 4, 6]
+        cdofs = [1, 3]
+        Ke = rand(length(rdofs), length(cdofs))
+        assemble!(assembler, rdofs, cdofs, Ke)
+        @test (K[rdofs, cdofs] .== Ke) |> all
 
         # Check if coupling works
         grid = generate_grid(Quadrilateral, (2, 2))

@@ -1,3 +1,6 @@
+using Ferrite, SparseArrays
+import LinearAlgebra: Symmetric
+
 @testset "assemble" begin
     dofs = [1, 3, 5, 7]
     maxd = maximum(dofs)
@@ -50,6 +53,17 @@
     Ke = rand(length(rdofs), length(cdofs))
     assemble!(a, rdofs, cdofs, Ke)
     K, _ = finish_assemble(a)
+    @test (K[rdofs, cdofs] .== Ke) |> all
+
+    I = [1, 1, 4, 4, 6, 6]
+    J = [1, 3, 1, 3, 1, 3]
+    V = zeros(length(I))
+    K = sparse(I, J, V)
+    assembler = start_assemble(K)
+    rdofs = [1, 4, 6]
+    cdofs = [1, 3]
+    Ke = rand(length(rdofs), length(cdofs))
+    assemble!(assembler, rdofs, cdofs, Ke)
     @test (K[rdofs, cdofs] .== Ke) |> all
 
     # SparseMatrix assembler
