@@ -7,14 +7,14 @@ E = 200.0e9       # Stiffness
 t = 0.01        # Thickness
 ν = 0.3         # Poisson's radtio
 penalty = 1.0e12  # Penalty stiffness
-D = (E * t^3) / (12 * (1 - ν^2)) # Flexural stiffness
+D = (E * t^3) / (12 * (1 - ν^2)); # Flexural stiffness
 
-grid = generate_grid(Triangle, (20, 20), Vec((0.0, 0.0)), Vec((L, L)))
+grid = generate_grid(Triangle, (20, 20), Vec((0.0, 0.0)), Vec((L, L)));
 
 ip = Argyris{RefTriangle, 5}()
 dh = DofHandler(grid)
 add!(dh, :w, ip)
-close!(dh)
+close!(dh);
 
 qr = QuadratureRule{RefTriangle}(8)
 cellvalues = CellValues(qr, ip; update_hessians = true);
@@ -52,7 +52,7 @@ function element_routine!(ke, fe, cellvalues, D, q0)
         end
     end
     return
-end
+end;
 
 function bc_routine!(ke, facetvalues, penalty)
     for iqp in 1:getnquadpoints(facetvalues)
@@ -66,7 +66,7 @@ function bc_routine!(ke, facetvalues, penalty)
         end
     end
     return
-end
+end;
 
 function doassemble!(
         cellvalues::CellValues, facetvalues::FacetValues, K::SparseMatrixCSC, f::Vector, dh::DofHandler, D::Float64, q0::Float64, penalty::Float64
@@ -103,16 +103,16 @@ function doassemble!(
         assemble!(assembler, celldofs(celldata), ke)
     end
     return
-end
+end;
 
 K = allocate_matrix(dh);
 f = zeros(ndofs(dh))
 doassemble!(cellvalues, facetvalues, K, f, dh, D, q0, penalty);
-u = K \ f
+u = K \ f;
 
 VTKGridFile("plate_equation", dh) do vtk
     write_solution(vtk, dh, u)
-end
+end;
 
 mid_point = Vec((L / 2, L / 2))
 ph = PointEvalHandler(grid, [mid_point])

@@ -10,16 +10,12 @@ E = 200.0e9       # Stiffness
 t = 0.01        # Thickness
 ν = 0.3         # Poisson&#39;s radtio
 penalty = 1.0e12  # Penalty stiffness
-D = (E * t^3) / (12 * (1 - ν^2)) # Flexural stiffness
+D = (E * t^3) / (12 * (1 - ν^2)); # Flexural stiffness
 
-grid = generate_grid(Triangle, (20, 20), Vec((0.0, 0.0)), Vec((L, L)))</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">Grid{2, Triangle, Float64} with 800 Triangle cells and 441 nodes</code></pre><p>We use the Argyris interpolation as and FE approximation.</p><pre><code class="language-julia hljs">ip = Argyris{RefTriangle, 5}()
+grid = generate_grid(Triangle, (20, 20), Vec((0.0, 0.0)), Vec((L, L)));</code></pre><p>We use the Argyris interpolation as and FE approximation.</p><pre><code class="language-julia hljs">ip = Argyris{RefTriangle, 5}()
 dh = DofHandler(grid)
 add!(dh, :w, ip)
-close!(dh)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">DofHandler{2, Grid{2, Triangle, Float64}}
-  Fields:
-    :w, Argyris{RefTriangle, 5}()
-  Dofs per cell: 21
-  Total dofs: 3886</code></pre><p>For the CellValues and FacetValues we need to requeest to update the hessians.</p><pre><code class="language-julia hljs">qr = QuadratureRule{RefTriangle}(8)
+close!(dh);</code></pre><p>For the CellValues and FacetValues we need to requeest to update the hessians.</p><pre><code class="language-julia hljs">qr = QuadratureRule{RefTriangle}(8)
 cellvalues = CellValues(qr, ip; update_hessians = true);
 
 fqr = FacetQuadratureRule{RefTriangle}(8)
@@ -51,7 +47,7 @@ end;</code></pre><p>Now we define the element routine.</p><pre><code class="lang
         end
     end
     return
-end</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">element_routine! (generic function with 1 method)</code></pre><p>To enforce the boundary condition, we use the penalty method. Currently the ConstraintHandler does not fully support Dirichlet constraints on Hermitian elements (like Argyris).</p><pre><code class="language-julia hljs">function bc_routine!(ke, facetvalues, penalty)
+end;</code></pre><p>To enforce the boundary condition, we use the penalty method. Currently the ConstraintHandler does not fully support Dirichlet constraints on Hermitian elements (like Argyris).</p><pre><code class="language-julia hljs">function bc_routine!(ke, facetvalues, penalty)
     for iqp in 1:getnquadpoints(facetvalues)
         dV = getdetJdV(facetvalues, iqp)
         for i in 1:getnbasefunctions(facetvalues)
@@ -63,7 +59,7 @@ end</code></pre><pre class="documenter-example-output"><code class="nohighlight 
         end
     end
     return
-end</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">bc_routine! (generic function with 1 method)</code></pre><p>Next, we assemble the contributions from the element plate stiffnesses and the stiffness arising from the penalty-based boundary constraint.</p><pre><code class="language-julia hljs">function doassemble!(
+end;</code></pre><p>Next, we assemble the contributions from the element plate stiffnesses and the stiffness arising from the penalty-based boundary constraint.</p><pre><code class="language-julia hljs">function doassemble!(
         cellvalues::CellValues, facetvalues::FacetValues, K::SparseMatrixCSC, f::Vector, dh::DofHandler, D::Float64, q0::Float64, penalty::Float64
     )
 
@@ -98,35 +94,15 @@ end</code></pre><pre class="documenter-example-output"><code class="nohighlight 
         assemble!(assembler, celldofs(celldata), ke)
     end
     return
-end</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">doassemble! (generic function with 1 method)</code></pre><p>Create stiffness matrix, assemble and solve:</p><pre><code class="language-julia hljs">K = allocate_matrix(dh);
+end;</code></pre><p>Create stiffness matrix, assemble and solve:</p><pre><code class="language-julia hljs">K = allocate_matrix(dh);
 f = zeros(ndofs(dh))
 doassemble!(cellvalues, facetvalues, K, f, dh, D, q0, penalty);
-u = K \ f</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">3886-element Vector{Float64}:
-  5.763142164684545e-11
-  2.3650131597808443e-8
-  2.36501316584718e-8
-  9.457457762956658e-7
-  0.10132609082765526
-  9.457457661059359e-7
-  2.1394530867907626e-9
-  1.7715054837049484e-8
-  0.010026970604197862
- -8.07441519775196e-8
-  ⋮
- -0.0070860496861372855
-  5.763142170253642e-11
- -2.3650131650888283e-8
- -2.3650131573186334e-8
-  9.457457667610373e-7
-  0.10132609082764647
-  9.457457771508158e-7
- -0.0050513870756967215
-  0.0050513870756967155</code></pre><p>Export solution to VTK/Paraview</p><pre><code class="language-julia hljs">VTKGridFile(&quot;plate_equation&quot;, dh) do vtk
+u = K \ f;</code></pre><p>Export solution to VTK/Paraview</p><pre><code class="language-julia hljs">VTKGridFile(&quot;plate_equation&quot;, dh) do vtk
     write_solution(vtk, dh, u)
-end</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">VTKGridFile for the closed file &quot;plate_equation.vtu&quot;.</code></pre><p>To test the solution, we query the deflection at the center of the plate and compare it with the analtyical solution:</p><pre><code class="language-julia hljs">mid_point = Vec((L / 2, L / 2))
+end;</code></pre><p>To test the solution, we query the deflection at the center of the plate and compare it with the analtyical solution:</p><pre><code class="language-julia hljs">mid_point = Vec((L / 2, L / 2))
 ph = PointEvalHandler(grid, [mid_point])
 w_fem = evaluate_at_points(ph, dh, u, :w) |&gt; first #0.03548889438239366
 w_ana = w_analytical(mid_point, L, q0, D) #0.035488713207468166
 
 using Test
-@test w_fem ≈ w_ana atol = 1.0e-6</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi"><span class="sgr32"><span class="sgr1">Test Passed</span></span></code></pre><hr/><p><em>This page was generated using <a href="https://github.com/fredrikekre/Literate.jl">Literate.jl</a>.</em></p></article><nav class="docs-footer"><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option><option value="catppuccin-latte">catppuccin-latte</option><option value="catppuccin-frappe">catppuccin-frappe</option><option value="catppuccin-macchiato">catppuccin-macchiato</option><option value="catppuccin-mocha">catppuccin-mocha</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.15.0 on <span class="colophon-date" title="Sunday 8 February 2026 12:26">Sunday 8 February 2026</span>. Using Julia version 1.12.4.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
+@test w_fem ≈ w_ana atol = 1.0e-6</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi"><span class="sgr32"><span class="sgr1">Test Passed</span></span></code></pre><hr/><p><em>This page was generated using <a href="https://github.com/fredrikekre/Literate.jl">Literate.jl</a>.</em></p></article><nav class="docs-footer"><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option><option value="catppuccin-latte">catppuccin-latte</option><option value="catppuccin-frappe">catppuccin-frappe</option><option value="catppuccin-macchiato">catppuccin-macchiato</option><option value="catppuccin-mocha">catppuccin-mocha</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.15.0 on <span class="colophon-date" title="Sunday 8 February 2026 12:54">Sunday 8 February 2026</span>. Using Julia version 1.12.4.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
