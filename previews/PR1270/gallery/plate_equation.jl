@@ -8,12 +8,6 @@ t = 0.01        # Thickness
 ν = 0.3         # Poisson's radtio
 penalty = 1.0e12  # Penalty stiffness
 D = (E * t^3) / (12 * (1 - ν^2)) # Flexural stiffness
-C_voigt = D * [
-    1.0 ν 0.0;
-    ν 1.0 0.0;
-    0.0 0.0 (1 - ν) / 2
-]
-C = fromvoigt(SymmetricTensor{4, 2}, C_voigt)
 
 grid = generate_grid(Triangle, (20, 20), Vec((0.0, 0.0)), Vec((L, L)))
 
@@ -44,16 +38,16 @@ function w_analytical(pos::Vec{2}, L, q0, D; n_terms = 50)
     return constant_factor * w
 end;
 
-function element_routine!(ke, fe, cellvalues, C, q0)
+function element_routine!(ke, fe, cellvalues, D, q0)
     for iqp in 1:getnquadpoints(cellvalues)
         dV = getdetJdV(cellvalues, iqp)
         for i in 1:getnbasefunctions(cellvalues)
             v = shape_value(cellvalues, iqp, i)
             fe[i] += (q0 * v) * dV
-            δκ = shape_hessian(cellvalues, iqp, i)
+            Δw = shape_laplacian(cellvalues, iqp, i)
             for j in 1:getnbasefunctions(cellvalues)
-                Δκ = shape_hessian(cellvalues, iqp, j)
-                ke[i, j] += (δκ ⊡ C ⊡ Δκ) * dV
+                Δv = shape_laplacian(cellvalues, iqp, j)
+                ke[i, j] += D * (Δw * Δv) * dV
             end
         end
     end
@@ -64,10 +58,10 @@ function bc_routine!(ke, facetvalues, penalty)
     for iqp in 1:getnquadpoints(facetvalues)
         dV = getdetJdV(facetvalues, iqp)
         for i in 1:getnbasefunctions(facetvalues)
-            Ni = shape_value(facetvalues, iqp, i)
+            w = shape_value(facetvalues, iqp, i)
             for j in 1:getnbasefunctions(facetvalues)
-                Nj = shape_value(facetvalues, iqp, j)
-                ke[i, j] += penalty * (Ni * Nj) * dV
+                v = shape_value(facetvalues, iqp, j)
+                ke[i, j] += penalty * (w * v) * dV
             end
         end
     end
@@ -75,7 +69,7 @@ function bc_routine!(ke, facetvalues, penalty)
 end
 
 function doassemble!(
-        cellvalues::CellValues, facetvalues::FacetValues, K::SparseMatrixCSC, f::Vector, dh::DofHandler, C::SymmetricTensor, q0::Float64, penalty::Float64
+        cellvalues::CellValues, facetvalues::FacetValues, K::SparseMatrixCSC, f::Vector, dh::DofHandler, D::Float64, q0::Float64, penalty::Float64
     )
 
     n = getnbasefunctions(cellvalues)
@@ -83,11 +77,13 @@ function doassemble!(
     fe = zeros(n)
 
     assembler = start_assemble(K, f)
+
+    #Assemble plate element stiffnesses
     for celldata in CellIterator(dh)
         fill!(ke, 0.0)
         fill!(fe, 0.0)
         reinit!(cellvalues, celldata)
-        element_routine!(ke, fe, cellvalues, C, q0)
+        element_routine!(ke, fe, cellvalues, D, q0)
         assemble!(assembler, celldofs(celldata), ke, fe)
     end
 
@@ -98,6 +94,8 @@ function doassemble!(
         getfacetset(grid, "bottom"),
     )
 
+    #Assemble the penalty-based boundary constraint on
+    #the entire boundary ∂Ω
     for celldata in FacetIterator(dh, ∂Ω)
         fill!(ke, 0.0)
         reinit!(facetvalues, celldata)
@@ -109,7 +107,7 @@ end
 
 K = allocate_matrix(dh);
 f = zeros(ndofs(dh))
-doassemble!(cellvalues, facetvalues, K, f, dh, C, q0, penalty);
+doassemble!(cellvalues, facetvalues, K, f, dh, D, q0, penalty);
 u = K \ f
 
 VTKGridFile("plate_equation", dh) do vtk

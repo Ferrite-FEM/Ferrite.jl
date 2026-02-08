@@ -1,34 +1,38 @@
 # # [Kirchhoff-Love Plate Equation](@id tutorial-plate)
-# In this example, we solve the Kirchhoff-Love equation for thin plates. This is a fourth-order partial differential equation used to model the deflection $w$ of a plate subject to transverse loading.
+# In this example, we solve the Kirchhoff-Love equation for thin plates for linear isotropy. This is a fourth-order partial differential equation used to model the deflection $w$ of a plate subject to transverse loading.
 # The governing biharmonic equation is:
 # ```math
 # D \Delta^2 w = q
 # ```
-# where $\Delta$ is the Laplacian operator, and D is the flexural rigidity defined by the Young's modulus $E$, thickness $t$, and Poisson's ratio $\nu$:
+# where $\Delta$ is the Laplacian operator defined as $\Delta = \nabla \cdot \nabla$, and D is the flexural rigidity defined by the Young's modulus $E$, thickness $t$, and Poisson's ratio $\nu$:
 # ```math
 # D = \frac{Et^3}{12(1-\nu^2)}
 # ```
 # In this tutorial we will model a simply supported plate, for which the boundary conditions on $\Gamma$ are:
 # ```math
-# w = 0
-# ```
-# For the weak form, we define the curvature vector $\boldsymbol{\kappa}$ and the constitutive matrix $\boldsymbol{C}$:
-# ```math
-# \boldsymbol{\kappa}(w) = \begin{bmatrix} \frac{\partial^2 w}{\partial x^2} \frac{\partial^2 w}{\partial x \partial y} \\ \frac{\partial^2 w}{\partial x \partial y} \ \frac{\partial^2 w}{\partial y^2} \end{bmatrix}, \quad
-# \mathbf{C} = D \begin{bmatrix} 1 & \nu & 0 \\ \nu & 1 & 0 \\ 0 & 0 & \frac{1-\nu}{2} \end{bmatrix}
+# \begin{aligned}
+# w &= 0 \\
+# \Delta w &= 0 \quad \text{(zero bending moment)}
+# \end{aligned}
 # ```
 # We use the following weak formulation:
 # ```math
-# \int_\Omega \boldsymbol{\kappa}(\delta w):\mathbf{C}:\boldsymbol{\kappa}(w) \, d\Omega - \int_\Omega \delta w \cdot q \, d\Omega = 0 \quad \forall \delta w \in H^2_0(\Omega)
+# D\int_\Omega \Delta w \Delta v \, d\Omega - \int_\Omega v q \, d\Omega = 0
+# \quad \forall v \in V
 # ```
+# where
+# ```math
+# V := \{ v \in H^2(\Omega) \;:\; v = 0 \text{ on } \partial\Omega \}.
+# ```
+# Here, $v$ is a test function belonging to the Sobolev space of functions with square-integrable values, gradients, and Hessians, satisfying the essential boundary condition $v=0$ on $\partial\Omega$. The vanishing bending moment condition is imposed naturally through the weak formulation.
 # To enforce the simply supported boundary conditions, we use a penalty approach to impose the constraint $w = 0$. The reason for this choice will be made clear later in the tutorial. The penalty term adds the following contribution to the weak form:
 # ```math
-# \rho\int_\Gamma w \delta w \, d\Gamma
+# \rho\int_\Gamma w v \, d\Gamma
 # ```
 # with $\rho$ being the penalty stiffness.
 #
 # ## Notes on FE-approximation of the biharmonic equation
-# Since this weak form involves second-order derivatives (the Hessian) of the shape functions, the standard $C^0$ Lagrange elements are not suitable for discretising the finite element space. Instead, one must either use a $C^0$ interior penalty (C0IP) approach or employ finite elements that provide $C^1$ continuity.
+# Since this weak form require the shape functions of the FE approximation to be in $H^2(\Omega)$, the standard $C^0$ Lagrange elements are not suitable for discretising the finite element space. Instead, one must either use a $C^0$ interior penalty (C0IP) approach or employ finite elements that provide $C^1$ continuity.
 # Here, we demonstrate the latter approach and use the fifth-order Argyris element. This is a Hermite-type element with additional degrees of freedom at the vertices and along the edges that represent the gradient and Hessian of the deflection field \(w\).
 
 # ## Code
@@ -45,12 +49,6 @@ t = 0.01        # Thickness
 ν = 0.3         # Poisson's radtio
 penalty = 1.0e12  # Penalty stiffness
 D = (E * t^3) / (12 * (1 - ν^2)) # Flexural stiffness
-C_voigt = D * [
-    1.0 ν 0.0;
-    ν 1.0 0.0;
-    0.0 0.0 (1 - ν) / 2
-]
-C = fromvoigt(SymmetricTensor{4, 2}, C_voigt)
 
 grid = generate_grid(Triangle, (20, 20), Vec((0.0, 0.0)), Vec((L, L)))
 
@@ -67,8 +65,7 @@ cellvalues = CellValues(qr, ip; update_hessians = true);
 fqr = FacetQuadratureRule{RefTriangle}(8)
 facetvalues = FacetValues(fqr, ip; update_hessians = true);
 
-# For the current BVP, There is a known analtyical solution (Navier's solution) that we can compare with.
-# This is a good testing strategy for PDE codes and known as the method of manufactured solutions.
+# For the current BVP, there is a known analytical solution (Navier’s solution) against which we can compare our numerical results.
 function w_analytical(pos::Vec{2}, L, q0, D; n_terms = 50)
     x, y = pos
     w = 0.0
@@ -86,16 +83,16 @@ function w_analytical(pos::Vec{2}, L, q0, D; n_terms = 50)
 end;
 
 # Now we define the element routine.
-function element_routine!(ke, fe, cellvalues, C, q0)
+function element_routine!(ke, fe, cellvalues, D, q0)
     for iqp in 1:getnquadpoints(cellvalues)
         dV = getdetJdV(cellvalues, iqp)
         for i in 1:getnbasefunctions(cellvalues)
             v = shape_value(cellvalues, iqp, i)
             fe[i] += (q0 * v) * dV
-            δκ = shape_hessian(cellvalues, iqp, i)
+            Δw = shape_laplacian(cellvalues, iqp, i)
             for j in 1:getnbasefunctions(cellvalues)
-                Δκ = shape_hessian(cellvalues, iqp, j)
-                ke[i, j] += (δκ ⊡ C ⊡ Δκ) * dV
+                Δv = shape_laplacian(cellvalues, iqp, j)
+                ke[i, j] += D * (Δw * Δv) * dV
             end
         end
     end
@@ -107,19 +104,19 @@ function bc_routine!(ke, facetvalues, penalty)
     for iqp in 1:getnquadpoints(facetvalues)
         dV = getdetJdV(facetvalues, iqp)
         for i in 1:getnbasefunctions(facetvalues)
-            Ni = shape_value(facetvalues, iqp, i)
+            w = shape_value(facetvalues, iqp, i)
             for j in 1:getnbasefunctions(facetvalues)
-                Nj = shape_value(facetvalues, iqp, j)
-                ke[i, j] += penalty * (Ni * Nj) * dV
+                v = shape_value(facetvalues, iqp, j)
+                ke[i, j] += penalty * (w * v) * dV
             end
         end
     end
     return
 end
 
-# Here we create a standard assembly routine.
+# Next, we assemble the contributions from the element plate stiffnesses and the stiffness arising from the penalty-based boundary constraint.
 function doassemble!(
-        cellvalues::CellValues, facetvalues::FacetValues, K::SparseMatrixCSC, f::Vector, dh::DofHandler, C::SymmetricTensor, q0::Float64, penalty::Float64
+        cellvalues::CellValues, facetvalues::FacetValues, K::SparseMatrixCSC, f::Vector, dh::DofHandler, D::Float64, q0::Float64, penalty::Float64
     )
 
     n = getnbasefunctions(cellvalues)
@@ -127,11 +124,13 @@ function doassemble!(
     fe = zeros(n)
 
     assembler = start_assemble(K, f)
+
+    #Assemble plate element stiffnesses
     for celldata in CellIterator(dh)
         fill!(ke, 0.0)
         fill!(fe, 0.0)
         reinit!(cellvalues, celldata)
-        element_routine!(ke, fe, cellvalues, C, q0)
+        element_routine!(ke, fe, cellvalues, D, q0)
         assemble!(assembler, celldofs(celldata), ke, fe)
     end
 
@@ -142,6 +141,8 @@ function doassemble!(
         getfacetset(grid, "bottom"),
     )
 
+    #Assemble the penalty-based boundary constraint on
+    #the entire boundary ∂Ω
     for celldata in FacetIterator(dh, ∂Ω)
         fill!(ke, 0.0)
         reinit!(facetvalues, celldata)
@@ -154,7 +155,7 @@ end
 # Create stiffness matrix, assemble and solve:
 K = allocate_matrix(dh);
 f = zeros(ndofs(dh))
-doassemble!(cellvalues, facetvalues, K, f, dh, C, q0, penalty);
+doassemble!(cellvalues, facetvalues, K, f, dh, D, q0, penalty);
 u = K \ f
 
 # Export solution to VTK/Paraview
