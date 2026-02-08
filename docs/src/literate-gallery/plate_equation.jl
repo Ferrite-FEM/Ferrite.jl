@@ -65,8 +65,7 @@ cellvalues = CellValues(qr, ip; update_hessians = true);
 fqr = FacetQuadratureRule{RefTriangle}(8)
 facetvalues = FacetValues(fqr, ip; update_hessians = true);
 
-# For the current BVP, There is a known analtyical solution (Navier's solution) that we can compare with.
-# This is a good testing strategy for PDE codes and known as the method of manufactured solutions.
+# For the current BVP, there is a known analytical solution (Navier’s solution) against which we can compare our numerical results.
 function w_analytical(pos::Vec{2}, L, q0, D; n_terms = 50)
     x, y = pos
     w = 0.0
@@ -115,7 +114,7 @@ function bc_routine!(ke, facetvalues, penalty)
     return
 end
 
-# Here we create a standard assembly routine.
+# Next, we assemble the contributions from the element plate stiffnesses and the stiffness arising from the penalty-based boundary constraint.
 function doassemble!(
         cellvalues::CellValues, facetvalues::FacetValues, K::SparseMatrixCSC, f::Vector, dh::DofHandler, D::Float64, q0::Float64, penalty::Float64
     )
@@ -125,6 +124,8 @@ function doassemble!(
     fe = zeros(n)
 
     assembler = start_assemble(K, f)
+
+    #Assemble plate element stiffnesses
     for celldata in CellIterator(dh)
         fill!(ke, 0.0)
         fill!(fe, 0.0)
@@ -140,6 +141,8 @@ function doassemble!(
         getfacetset(grid, "bottom"),
     )
 
+    #Assemble the penalty-based boundary constraint on
+    #the entire boundary ∂Ω
     for celldata in FacetIterator(dh, ∂Ω)
         fill!(ke, 0.0)
         reinit!(facetvalues, celldata)

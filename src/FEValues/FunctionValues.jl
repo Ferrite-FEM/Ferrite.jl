@@ -498,17 +498,6 @@ function _argyris_mapping!(argyris_data::ArgyrisData, Nx, Nξ, dNdx, dNdξ, d²N
                 end
             end
         end
-
-        # row = (i-1)*6
-        # _M[1+row, 1+ row] = 1.0
-        # _M[1+row, b1_scalar] = m1
-        # _M[1+row, b2_scalar] = m2
-        # _M[(2:3) .+ row, (2:3) .+ row] = J
-        # _M[(2:3) .+ row, b1_scalar] = m3
-        # _M[(2:3) .+ row, b2_scalar] = m4
-        # _M[(4:6) .+ row, (4:6) .+ row] = Θ
-        # _M[(4:6) .+ row, b1_scalar] = m5
-        # _M[(4:6) .+ row, b2_scalar] = m6
     end
 
     #Transform edge functions
@@ -528,7 +517,6 @@ function _argyris_mapping!(argyris_data::ArgyrisData, Nx, Nξ, dNdx, dNdξ, d²N
                 end
             end
         end
-        #_M[b1,b1] = B[i][1,1]
     end
     return
 end
