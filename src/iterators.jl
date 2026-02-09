@@ -364,7 +364,7 @@ end
 
 # Iterator interface
 @inline function Base.iterate(ii::InterfaceIterator, i::Int)
-    neighbors = get_facet_facet_neighborhood(ii.topology, ii.grid)# TODO: This could be moved to InterfaceIterator constructor (potentially type-instable for non-union or mixed grids)
+    neighbors = get_facet_facet_neighborhood(ii.topology, ii.grid) # TODO: This could be moved to InterfaceIterator constructor (potentially type-instable for non-union or mixed grids)
     skel::Vector{FacetIndex} = facetskeleton(ii.topology, ii.grid)
     while i <= length(skel)
         fa = skel[i]; i += 1
