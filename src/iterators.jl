@@ -364,14 +364,14 @@ end
 
 # Iterator interface
 @inline function Base.iterate(ii::InterfaceIterator{<:Any,<:Grid{sdim}}, i::Int) where {sdim}
-    neighbors = Ferrite.get_facet_facet_neighborhood(ii.topology, ii.grid)# TODO: This could be moved to InterfaceIterator constructor (potentially type-instable for non-union or mixed grids)
-    skel::Vector{Ferrite.FacetIndex} = facetskeleton(ii.topology, ii.grid)
+    neighbors = get_facet_facet_neighborhood(ii.topology, ii.grid)# TODO: This could be moved to InterfaceIterator constructor (potentially type-instable for non-union or mixed grids)
+    skel::Vector{FacetIndex} = facetskeleton(ii.topology, ii.grid)
     while i <= length(skel)
         fa = skel[i]; i += 1
         nbhs = neighbors[fa[1], fa[2]]
         isempty(nbhs) && continue
         length(nbhs) > 1 && error("multiple neighboring faces not supported yet")
-        Ferrite.reinit!(ii.cache, fa, nbhs[1])
+        reinit!(ii.cache, fa, nbhs[1])
         return (ii.cache, i)
     end
     return nothing
