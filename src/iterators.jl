@@ -380,8 +380,6 @@ end
 end
 @inline Base.iterate(ii::InterfaceIterator) = Base.iterate(ii, 1)
 
-
-
 # Iterator interface for CellIterator/FacetIterator
 const GridIterators{C} = Union{CellIterator{C}, FacetIterator{C}, InterfaceIterator{C}}
 
