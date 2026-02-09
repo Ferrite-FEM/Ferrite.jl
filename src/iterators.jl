@@ -369,7 +369,7 @@ end
     IC = ii.cache
     j = i
     while j <= length(skeleton)
-        facet_a = skeleton[i]; j += 1
+        facet_a = skeleton[j]; j += 1
         neighbors = neighborhood[facet_a[1], facet_a[2]]
         isempty(neighbors) && continue
         length(neighbors) > 1 && error("multiple neighboring faces not supported yet")
