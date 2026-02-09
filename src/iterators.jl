@@ -364,14 +364,14 @@ end
 
 # Iterator interface
 @inline function Base.iterate(ii::InterfaceIterator, i::Integer)
-    neighbors = get_facet_facet_neighborhood(ii.topology, ii.grid) # TODO: This could be moved to InterfaceIterator constructor (potentially type-instable for non-union or mixed grids)
+    neighborhood = get_facet_facet_neighborhood(ii.topology, ii.grid) # TODO: This could be moved to InterfaceIterator constructor (potentially type-instable for non-union or mixed grids)
     skeleton::Vector{FacetIndex} = facetskeleton(ii.topology, ii.grid)
     while i <= length(skeleton)
         facet_a = skeleton[i]; i += 1
-        neighbor = neighbors[facet_a[1], facet_a[2]]
-        isempty(neighbor) && continue
-        length(neighbor) > 1 && error("multiple neighboring faces not supported yet")
-        reinit!(ii.cache, facet_a, neighbor[1])
+        neighbors = neighborhood[facet_a[1], facet_a[2]]
+        isempty(neighbors) && continue
+        length(neighbors) > 1 && error("multiple neighboring faces not supported yet")
+        reinit!(ii.cache, facet_a, neighbors[1])
         return (ii.cache, i)
     end
     return nothing
