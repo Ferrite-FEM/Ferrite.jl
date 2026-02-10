@@ -370,13 +370,14 @@ end
         facet_a = skeleton[i]; i += 1
         neighbors = neighborhood[facet_a[1], facet_a[2]]
         isempty(neighbors) && continue
-        length(neighbors) > 1 && error("multiple neighboring faces not supported yet")
-        reinit!( ii.cache, facet_a, neighbors[1])
-        return  ii.cache, i
+        length(neighbors) > 1 && error("multiple neighboring facets not supported yet")
+        facet_b = neighbors[1]
+        reinit!(ii.cache, facet_a, facet_b)
+        return ii.cache, i
     end
     return nothing
 end
-@inline Base.iterate(ii::InterfaceIterator) = Base.iterate(ii, 1)
+@inline Base.iterate(ii::InterfaceIterator) = iterate(ii, 1)
 
 # Iterator interface for CellIterator/FacetIterator
 const GridIterators{C} = Union{CellIterator{C}, FacetIterator{C}, InterfaceIterator{C}}
