@@ -9,7 +9,7 @@ or build on top of, the tutorials and, therefore, some familiarity with Ferrite 
 #### [Post processing and visualization](postprocessing.md)
 
 This guide builds on top of [Tutorial 1: Heat equation](../tutorials/heat_equation.md) and
-discusses various post processsing techniques with the goal of visualizing primary fields
+discusses various post processing techniques with the goal of visualizing primary fields
 (the finite element solution) and secondary quantities (e.g. fluxes, stresses, etc.).
 Concretely, this guide answers:
  - How to visualize data from quadrature points?

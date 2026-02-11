@@ -1,5 +1,5 @@
 export
-# Interpolations
+    # Interpolations
     Interpolation,
     VectorInterpolation,
     ScalarInterpolation,
@@ -13,26 +13,32 @@ export
     RefPyramid,
     BubbleEnrichedLagrange,
     CrouzeixRaviart,
+    RannacherTurek,
     Lagrange,
     DiscontinuousLagrange,
     Serendipity,
+    Nedelec,
+    RaviartThomas,
+    BrezziDouglasMarini,
     getnbasefunctions,
     getrefshape,
 
-# Quadrature
+    # Quadrature
     QuadratureRule,
     FacetQuadratureRule,
     getnquadpoints,
 
-# FEValues
+    # FEValues
     AbstractCellValues,
     AbstractFacetValues,
     CellValues,
+    MultiFieldCellValues,
     FacetValues,
     InterfaceValues,
     reinit!,
     shape_value,
     shape_gradient,
+    shape_hessian,
     shape_symmetric_gradient,
     shape_divergence,
     shape_curl,
@@ -53,7 +59,7 @@ export
     function_gradient_average,
     function_gradient_jump,
 
-# Grid
+    # Grid
     Grid,
     Node,
     Line,
@@ -75,9 +81,10 @@ export
     EdgeIndex,
     VertexIndex,
     FacetIndex,
+    geometric_interpolation,
     ExclusiveTopology,
     getneighborhood,
-    faceskeleton,
+    facetskeleton,
     vertex_star_stencils,
     getstencil,
     getcells,
@@ -101,14 +108,14 @@ export
     addcellset!,
     transform_coordinates!,
     generate_grid,
-# AdaptiveGrid
+    # AdaptiveGrid
     ForestBWG,
 
-# Grid coloring
+    # Grid coloring
     create_coloring,
     ColoringAlgorithm,
 
-# Dofs
+    # Dofs
     DofHandler,
     SubDofHandler,
     close!,
@@ -116,17 +123,27 @@ export
     ndofs_per_cell,
     celldofs!,
     celldofs,
-    create_sparsity_pattern,
-    create_symmetric_sparsity_pattern,
     dof_range,
     renumber!,
     DofOrder,
     evaluate_at_grid_nodes,
     apply_analytical!,
 
-# Constraints
+    # Sparsity pattern
+    # AbstractSparsityPattern,
+    SparsityPattern,
+    BlockSparsityPattern,
+    init_sparsity_pattern,
+    add_sparsity_entries!,
+    add_cell_entries!,
+    add_interface_entries!,
+    add_constraint_entries!,
+    allocate_matrix,
+
+    # Constraints
     ConstraintHandler,
     Dirichlet,
+    ProjectedDirichlet,
     PeriodicDirichlet,
     collect_periodic_facets,
     collect_periodic_facets!,
@@ -142,9 +159,8 @@ export
     apply_assemble!,
     add!,
     free_dofs,
-    ApplyStrategy,
 
-# iterators
+    # iterators
     CellCache,
     CellIterator,
     FacetCache,
@@ -155,25 +171,23 @@ export
     cellid,
     interfacedofs,
 
-# assembly
+    # assembly
     start_assemble,
     assemble!,
     finish_assemble,
 
-# exporting data
-    VTKFile,
+    # exporting data
+    VTKGridFile,
     write_solution,
     write_cell_data,
     write_projection,
     write_node_data,
-    VTKFileCollection,
-    addstep!,
 
-# L2 Projection
+    # L2 Projection
     project,
     L2Projector,
 
-# Point Evaluation
+    # Point Evaluation
     PointEvalHandler,
     evaluate_at_points,
     PointIterator,

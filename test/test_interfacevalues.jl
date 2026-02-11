@@ -15,8 +15,10 @@
             @test nqp == getnquadpoints(iv.here) == getnquadpoints(iv.there)
             for qp in 1:nqp
                 # If correctly synced quadrature points coordinates should match
-                @test isapprox(spatial_coordinate(iv, qp, coords_here, coords_there; here = true),
-                    spatial_coordinate(iv, qp, coords_here, coords_there; here = false); atol = tol)
+                @test isapprox(
+                    spatial_coordinate(iv, qp, coords_here, coords_there; here = true),
+                    spatial_coordinate(iv, qp, coords_here, coords_there; here = false); atol = tol
+                )
                 for i in 1:getnbasefunctions(iv)
                     here = i <= getnbasefunctions(iv.here)
                     shapevalue = shape_value(iv, qp, i; here = here)
@@ -27,21 +29,21 @@
                     shapegrad_avg = shape_gradient_average(iv, qp, i)
                     shapegrad_jump = shape_gradient_jump(iv, qp, i)
 
-                    normal = getnormal(iv, qp; here=false)
+                    normal = getnormal(iv, qp; here = false)
                     # Test values (May be removed as it mirrors implementation)
                     if i > getnbasefunctions(iv.here)
                         @test shapevalue ≈ shape_value(iv.there, qp, i - getnbasefunctions(iv.here))
                         @test shapegrad ≈ shape_gradient(iv.there, qp, i - getnbasefunctions(iv.here))
 
-                        @test shape_jump ≈ -shapevalue
-                        @test shapegrad_jump ≈ -shapegrad
+                        @test shape_jump ≈ shapevalue
+                        @test shapegrad_jump ≈ shapegrad
                     else
                         normal = getnormal(iv, qp)
                         @test shapevalue ≈ shape_value(iv.here, qp, i)
                         @test shapegrad ≈ shape_gradient(iv.here, qp, i)
 
-                        @test shape_jump ≈ shapevalue
-                        @test shapegrad_jump ≈ shapegrad
+                        @test shape_jump ≈ -shapevalue
+                        @test shapegrad_jump ≈ -shapegrad
                     end
 
                     @test shape_avg ≈ 0.5 * shapevalue
@@ -114,20 +116,20 @@
     end
     getcelltypedim(::Type{<:Ferrite.AbstractCell{shape}}) where {dim, shape <: Ferrite.AbstractRefShape{dim}} = dim
     for (cell_shape, scalar_interpol, quad_rule) in (
-                                        #TODO: update interfaces for lines
-                                        (Line, DiscontinuousLagrange{RefLine, 1}(), FacetQuadratureRule{RefLine}(2)),
-                                        (QuadraticLine, DiscontinuousLagrange{RefLine, 2}(), FacetQuadratureRule{RefLine}(2)),
-                                        (Quadrilateral, DiscontinuousLagrange{RefQuadrilateral, 1}(), FacetQuadratureRule{RefQuadrilateral}(2)),
-                                        (QuadraticQuadrilateral, DiscontinuousLagrange{RefQuadrilateral, 2}(), FacetQuadratureRule{RefQuadrilateral}(2)),
-                                        (Triangle, DiscontinuousLagrange{RefTriangle, 1}(), FacetQuadratureRule{RefTriangle}(2)),
-                                        (QuadraticTriangle, DiscontinuousLagrange{RefTriangle, 2}(), FacetQuadratureRule{RefTriangle}(2)),
-                                        (Hexahedron, DiscontinuousLagrange{RefHexahedron, 1}(), FacetQuadratureRule{RefHexahedron}(2)),
-                                        # (QuadraticQuadrilateral, Serendipity{RefQuadrilateral, 2}(), FacetQuadratureRule{RefQuadrilateral}(2)),
-                                        (Tetrahedron, DiscontinuousLagrange{RefTetrahedron, 1}(), FacetQuadratureRule{RefTetrahedron}(2)),
-                                        # (QuadraticTetrahedron, Lagrange{RefTetrahedron, 2}(), FacetQuadratureRule{RefTetrahedron}(2)),
-                                        (Wedge, DiscontinuousLagrange{RefPrism, 1}(), FacetQuadratureRule{RefPrism}(2)),
-                                        (Pyramid, DiscontinuousLagrange{RefPyramid, 1}(), FacetQuadratureRule{RefPyramid}(2)),
-                                       )
+            #TODO: update interfaces for lines
+            (Line, DiscontinuousLagrange{RefLine, 1}(), FacetQuadratureRule{RefLine}(2)),
+            (QuadraticLine, DiscontinuousLagrange{RefLine, 2}(), FacetQuadratureRule{RefLine}(2)),
+            (Quadrilateral, DiscontinuousLagrange{RefQuadrilateral, 1}(), FacetQuadratureRule{RefQuadrilateral}(2)),
+            (QuadraticQuadrilateral, DiscontinuousLagrange{RefQuadrilateral, 2}(), FacetQuadratureRule{RefQuadrilateral}(2)),
+            (Triangle, DiscontinuousLagrange{RefTriangle, 1}(), FacetQuadratureRule{RefTriangle}(2)),
+            (QuadraticTriangle, DiscontinuousLagrange{RefTriangle, 2}(), FacetQuadratureRule{RefTriangle}(2)),
+            (Hexahedron, DiscontinuousLagrange{RefHexahedron, 1}(), FacetQuadratureRule{RefHexahedron}(2)),
+            # (QuadraticQuadrilateral, Serendipity{RefQuadrilateral, 2}(), FacetQuadratureRule{RefQuadrilateral}(2)),
+            (Tetrahedron, DiscontinuousLagrange{RefTetrahedron, 1}(), FacetQuadratureRule{RefTetrahedron}(2)),
+            # (QuadraticTetrahedron, Lagrange{RefTetrahedron, 2}(), FacetQuadratureRule{RefTetrahedron}(2)),
+            (Wedge, DiscontinuousLagrange{RefPrism, 1}(), FacetQuadratureRule{RefPrism}(2)),
+            (Pyramid, DiscontinuousLagrange{RefPyramid, 1}(), FacetQuadratureRule{RefPyramid}(2)),
+        )
         dim = getcelltypedim(cell_shape)
         grid = generate_grid(cell_shape, ntuple(i -> 2, dim))
         ip = scalar_interpol isa DiscontinuousLagrange ? Lagrange{Ferrite.getrefshape(scalar_interpol), Ferrite.getorder(scalar_interpol)}() : scalar_interpol
@@ -135,16 +137,16 @@
             cell = getcells(grid, 1)
             geom_ip_facets_indices = Ferrite.facetdof_indices(ip)
             Ferrite.getrefdim(ip) > 1 && (geom_ip_facets_indices = Tuple([facet[collect(facet .∉ Ref(interior))] for (facet, interior) in [(geom_ip_facets_indices[i], Ferrite.facetdof_interior_indices(ip)[i]) for i in 1:Ferrite.nfacets(ip)]]))
-            facets_indices = Ferrite.reference_facets(Ferrite.getrefshape(Ferrite.default_interpolation(typeof(cell))))
+            facets_indices = Ferrite.reference_facets(Ferrite.getrefshape(Ferrite.geometric_interpolation(typeof(cell))))
             node_ids = Ferrite.get_node_ids(cell)
             cellfacets = Ferrite.facets(cell)
             @test getindex.(Ref(node_ids), collect.(facets_indices)) == cellfacets == getindex.(Ref(node_ids), collect.(geom_ip_facets_indices))
         end
         @testset "error paths" begin
             cell = getcells(grid, 1)
-            dim == 1 && @test_throws ErrorException("1D elements don't use transformations for interfaces.") Ferrite.InterfaceOrientationInfo(cell,cell,1,1)
-            @test_throws ArgumentError("unknown facet number") Ferrite.element_to_facet_transformation(Vec{dim,Float64}(ntuple(_->0.0, dim)), Ferrite.getrefshape(cell), 100)
-            @test_throws ArgumentError("unknown facet number") Ferrite.facet_to_element_transformation(Vec{dim-1,Float64}(ntuple(_->0.0, dim-1)), Ferrite.getrefshape(cell), 100)
+            dim == 1 && @test_throws ErrorException("1D elements don't use transformations for interfaces.") Ferrite.InterfaceOrientationInfo(cell, cell, 1, 1)
+            @test_throws ArgumentError("unknown facet number") Ferrite.element_to_facet_transformation(Vec{dim, Float64}(ntuple(_ -> 0.0, dim)), Ferrite.getrefshape(cell), 100)
+            @test_throws ArgumentError("unknown facet number") Ferrite.facet_to_element_transformation(Vec{dim - 1, Float64}(ntuple(_ -> 0.0, dim - 1)), Ferrite.getrefshape(cell), 100)
         end
         func_interpol = scalar_interpol
         for func_interpol in (scalar_interpol, VectorizedInterpolation(scalar_interpol))
@@ -152,6 +154,13 @@
                 InterfaceValues(quad_rule, func_interpol, ip) : InterfaceValues(quad_rule, func_interpol)
             test_interfacevalues(grid, iv)
         end
+    end
+    @testset "construction errors" begin
+        @test_throws ArgumentError InterfaceValues(FacetQuadratureRule{RefTriangle}(1), Lagrange{RefQuadrilateral, 1}())
+        @test_throws ArgumentError InterfaceValues(FacetQuadratureRule{RefTriangle}(1), Lagrange{RefTriangle, 1}(), Lagrange{RefQuadrilateral, 1}())
+        @test_throws ArgumentError InterfaceValues(FacetQuadratureRule{RefTriangle}(1), Lagrange{RefQuadrilateral, 1}(), Lagrange{RefQuadrilateral, 1}())
+        @test_throws ArgumentError InterfaceValues(FacetQuadratureRule{RefTriangle}(1), Lagrange{RefQuadrilateral, 1}(), Lagrange{RefTriangle, 1}())
+        @test_throws ArgumentError InterfaceValues(FacetQuadratureRule{RefTriangle}(1), Lagrange{RefTriangle, 1}(), FacetQuadratureRule{RefTriangle}(1), Lagrange{RefQuadrilateral, 1}())
     end
     # Custom quadrature
     @testset "Custom quadrature interface values" begin
@@ -169,18 +178,18 @@
             cell = getcells(grid, 1)
             geom_ip_facets_indices = Ferrite.facetdof_indices(ip)
             Ferrite.getrefdim(ip) > 1 && (geom_ip_facets_indices = Tuple([facet[collect(facet .∉ Ref(interior))] for (facet, interior) in [(geom_ip_facets_indices[i], Ferrite.facedof_interior_indices(ip)[i]) for i in 1:Ferrite.nfaces(ip)]]))
-            facets_indices = Ferrite.reference_facets(Ferrite.getrefshape(Ferrite.default_interpolation(typeof(cell))))
+            facets_indices = Ferrite.reference_facets(Ferrite.getrefshape(Ferrite.geometric_interpolation(typeof(cell))))
             node_ids = Ferrite.get_node_ids(cell)
             @test getindex.(Ref(node_ids), collect.(facets_indices)) == Ferrite.faces(cell) == getindex.(Ref(node_ids), collect.(geom_ip_facets_indices))
         end
         @testset "error paths" begin
             cell = getcells(grid, 1)
-            @test_throws ArgumentError("unknown facet number") Ferrite.element_to_facet_transformation(Vec{dim,Float64}(ntuple(_->0.0, dim)), Ferrite.getrefshape(cell), 100)
-            @test_throws ArgumentError("unknown facet number") Ferrite.facet_to_element_transformation(Vec{dim-1,Float64}(ntuple(_->0.0, dim-1)), Ferrite.getrefshape(cell), 100)
+            @test_throws ArgumentError("unknown facet number") Ferrite.element_to_facet_transformation(Vec{dim, Float64}(ntuple(_ -> 0.0, dim)), Ferrite.getrefshape(cell), 100)
+            @test_throws ArgumentError("unknown facet number") Ferrite.facet_to_element_transformation(Vec{dim - 1, Float64}(ntuple(_ -> 0.0, dim - 1)), Ferrite.getrefshape(cell), 100)
         end
         for func_interpol in (scalar_interpol, VectorizedInterpolation(scalar_interpol))
             iv = InterfaceValues(quad_rule, func_interpol)
-            test_interfacevalues(grid, iv; tol = 5*eps(Float64))
+            test_interfacevalues(grid, iv; tol = 5 * eps(Float64))
         end
     end
     # @testset "Mixed elements 2D grids" begin # TODO: this shouldn't work because it should change the FacetValues object
@@ -198,23 +207,81 @@
     #     DiscontinuousLagrange{RefTriangle, 1}(), FacetQuadratureRule{RefTriangle}(2))
     # end
     @testset "Unordered nodes 3D" begin
-        dim = 2
-        nodes = [Node((-1.0, 0.0, 0.0)), Node((0.0, 0.0, 0.0)), Node((1.0, 0.0, 0.0)),
+        @testset "Hexahedron" begin
+            nodes = [
+                Node((-1.0, 0.0, 0.0)), Node((0.0, 0.0, 0.0)), Node((1.0, 0.0, 0.0)),
                 Node((-1.0, 1.0, 0.0)), Node((0.0, 1.0, 0.0)), Node((1.0, 1.0, 0.0)),
                 Node((-1.0, 0.0, 1.0)), Node((0.0, 0.0, 1.0)), Node((1.0, 0.0, 1.0)),
                 Node((-1.0, 1.0, 1.0)), Node((0.0, 1.0, 1.0)), Node((1.0, 1.0, 1.0)),
+            ]
+            cells = [
+                Hexahedron((1, 2, 5, 4, 7, 8, 11, 10)),
+                Hexahedron((5, 6, 12, 11, 2, 3, 9, 8)),
+            ]
+            grid = Grid(cells, nodes)
+            test_interfacevalues(
+                grid,
+                InterfaceValues(FacetQuadratureRule{RefHexahedron}(2), DiscontinuousLagrange{RefHexahedron, 1}())
+            )
+            orientation_info = Ferrite.InterfaceOrientationInfo(getcells(grid, 1), getcells(grid, 2), 3, 5)
+            @testset "Interface Orientation" begin
+                @test orientation_info.flipped == true
+                @test Ferrite.get_transformation_matrix(orientation_info) isa Tensor{2, 3}
+            end
+            @testset "Flipped normal Interface Orientation" begin
+                nodes = [
+                    Node((-1.0, 0.0, 0.0)), Node((0.0, 0.0, 0.0)), Node((1.0, 0.0, 0.0)),
+                    Node((-1.0, 1.0, 0.0)), Node((0.0, 1.0, 0.0)), Node((1.0, 1.0, 0.0)),
+                    Node((-1.0, 0.0, 1.0)), Node((0.0, 0.0, 1.0)), Node((1.0, 0.0, 1.0)),
+                    Node((-1.0, 1.0, 1.0)), Node((0.0, 1.0, 1.0)), Node((1.0, 1.0, 1.0)),
                 ]
-        cells = [
-                    Hexahedron((1,2,5,4,7,8,11,10)),
-                    Hexahedron((5,6,12,11,2,3,9,8)),
+                cells = [
+                    Hexahedron((1, 4, 5, 2, 7, 10, 11, 8)),
+                    Hexahedron((5, 6, 12, 11, 2, 3, 9, 8)),
                 ]
-
-        grid = Grid(cells, nodes)
-        test_interfacevalues(grid,
-            InterfaceValues(FacetQuadratureRule{RefHexahedron}(2), DiscontinuousLagrange{RefHexahedron, 1}()))
+                grid = Grid(cells, nodes)
+                orientation_info = Ferrite.InterfaceOrientationInfo(getcells(grid, 1), getcells(grid, 2), 4, 5)
+                @test orientation_info.flipped == false
+                @test Ferrite.get_transformation_matrix(orientation_info) isa Tensor{2, 3}
+            end
+        end
+        @testset "Tetrahedron" begin
+            nodes = [
+                Node((0.0, 0.0, 0.0)), Node((1.0, 0.0, 0.0)), Node((0.0, 1.0, 0.0)),
+                Node((0.0, 0.0, 1.0)), Node((-1.0, 0.0, 0.0)),
+            ]
+            cells = [
+                Tetrahedron((1, 2, 3, 4)),
+                Tetrahedron((1, 3, 5, 4)),
+            ]
+            grid = Grid(cells, nodes)
+            test_interfacevalues(
+                grid,
+                InterfaceValues(FacetQuadratureRule{RefTetrahedron}(2), DiscontinuousLagrange{RefTetrahedron, 1}())
+            )
+            orientation_info = Ferrite.InterfaceOrientationInfo(getcells(grid, 1), getcells(grid, 2), 4, 2)
+            @testset "Interface Orientation" begin
+                @test orientation_info.flipped == true
+                @test Ferrite.get_transformation_matrix(orientation_info) isa Tensor{2, 3}
+            end
+            @testset "Flipped normal Interface Orientation" begin
+                nodes = [
+                    Node((0.0, 0.0, 0.0)), Node((1.0, 0.0, 0.0)), Node((0.0, 1.0, 0.0)),
+                    Node((0.0, 0.0, 1.0)), Node((-1.0, 0.0, 0.0)),
+                ]
+                cells = [
+                    Tetrahedron((1, 2, 4, 3)),
+                    Tetrahedron((1, 3, 5, 4)),
+                ]
+                grid = Grid(cells, nodes)
+                orientation_info = Ferrite.InterfaceOrientationInfo(getcells(grid, 1), getcells(grid, 2), 4, 2)
+                @test orientation_info.flipped == false
+                @test Ferrite.get_transformation_matrix(orientation_info) isa Tensor{2, 3}
+            end
+        end
     end
     @testset "Interface dof_range" begin
-        grid = generate_grid(Quadrilateral,(3,3))
+        grid = generate_grid(Quadrilateral, (3, 3))
         ip_u = DiscontinuousLagrange{RefQuadrilateral, 1}()^2
         ip_p = DiscontinuousLagrange{RefQuadrilateral, 1}()
         qr_facet = FacetQuadratureRule{RefQuadrilateral}(2)
@@ -234,7 +301,6 @@
     @test typeof(iv) == typeof(ivc)
     for fname in fieldnames(typeof(iv))
         v = getfield(iv, fname)
-        v isa Ferrite.ScalarWrapper && continue
         vc = getfield(ivc, fname)
         if hasmethod(pointer, Tuple{typeof(v)})
             @test pointer(v) != pointer(vc)
@@ -242,7 +308,6 @@
         v isa FacetValues && continue
         for fname in fieldnames(typeof(vc))
             v2 = getfield(v, fname)
-            v2 isa Ferrite.ScalarWrapper && continue
             vc2 = getfield(vc, fname)
             if hasmethod(pointer, Tuple{typeof(v2)})
                 @test pointer(v2) != pointer(vc2)
@@ -255,7 +320,7 @@
         @test_throws ArgumentError("transformation is not implemented") Ferrite.get_transformation_matrix(it)
     end
     @testset "show" begin
-        iv = InterfaceValues(FacetQuadratureRule{RefQuadrilateral}(2), Lagrange{RefQuadrilateral,2}())
+        iv = InterfaceValues(FacetQuadratureRule{RefQuadrilateral}(2), Lagrange{RefQuadrilateral, 2}())
         showstring = sprint(show, MIME"text/plain"(), iv)
         @test contains(showstring, "InterfaceValues with")
     end

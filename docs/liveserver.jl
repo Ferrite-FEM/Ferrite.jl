@@ -14,12 +14,14 @@ push!(ARGS, "liveserver")
 # Run LiveServer.servedocs(...)
 import LiveServer
 LiveServer.servedocs(;
+    host = "0.0.0.0",
     # Documentation root where make.jl and src/ are located
     foldername = joinpath(repo_root, "docs"),
     # Extra source folder to watch for changes
     include_dirs = [
-        # Watch the src folder so docstrings can be Revise'd
+        # Watch the src and ext folder so docstrings can be Revise'd
         joinpath(repo_root, "src"),
+        joinpath(repo_root, "ext"),
     ],
     skip_dirs = [
         # Skip the folder where Literate.jl output is written. This is needed

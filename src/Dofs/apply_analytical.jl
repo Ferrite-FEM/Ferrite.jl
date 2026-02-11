@@ -1,7 +1,7 @@
-function _default_interpolations(dh::DofHandler)
+function _geometric_interpolations(dh::DofHandler)
     sdhs = dh.subdofhandlers
     getcelltype(i) = typeof(getcells(get_grid(dh), first(sdhs[i].cellset)))
-    ntuple(i -> default_interpolation(getcelltype(i)), length(sdhs))
+    return ntuple(i -> geometric_interpolation(getcelltype(i)), length(sdhs))
 end
 
 """
@@ -26,11 +26,12 @@ This function can be used to apply initial conditions for time dependent problem
     sub- and superparametric elements.
 """
 function apply_analytical!(
-    a::AbstractVector, dh::DofHandler, fieldname::Symbol, f::Function,
-    cellset = 1:getncells(get_grid(dh)))
+        a::AbstractVector, dh::DofHandler, fieldname::Symbol, f::Function,
+        cellset = 1:getncells(get_grid(dh))
+    )
 
     fieldname ∉ getfieldnames(dh) && error("The fieldname $fieldname was not found in the dof handler")
-    ip_geos = _default_interpolations(dh)
+    ip_geos = _geometric_interpolations(dh)
 
     for (sdh, ip_geo) in zip(dh.subdofhandlers, ip_geos)
         isnothing(_find_field(sdh, fieldname)) && continue
@@ -43,14 +44,16 @@ function apply_analytical!(
         else
             intersect(BitSet(sdh.cellset), BitSet(cellset))
         end
+        isempty(set_intersection) && continue
         _apply_analytical!(a, dh, celldofinds, field_dim, ip_fun, ip_geo, f, set_intersection)
     end
     return a
 end
 
 function _apply_analytical!(
-    a::AbstractVector, dh::AbstractDofHandler, celldofinds, field_dim,
-    ip_fun::Interpolation{RefShape}, ip_geo::Interpolation, f::Function, cellset) where {dim, RefShape<:AbstractRefShape{dim}}
+        a::AbstractVector, dh::AbstractDofHandler, celldofinds, field_dim,
+        ip_fun::Interpolation{RefShape}, ip_geo::Interpolation, f::Function, cellset
+    ) where {dim, RefShape <: AbstractRefShape{dim}}
 
     coords = getcoordinates(get_grid(dh), first(cellset))
     ref_points = reference_coordinates(ip_fun)
@@ -79,7 +82,7 @@ function _apply_analytical!(a::AbstractVector, dofs::Vector{Int}, coords::Vector
     for i_dof in 1:getnquadpoints(cv)
         x_dof = spatial_coordinate(cv, i_dof, coords)
         for (idim, icval) in enumerate(f(x_dof))
-            a[dofs[field_dim*(i_dof-1)+idim]] = icval
+            a[dofs[field_dim * (i_dof - 1) + idim]] = icval
         end
     end
     return a

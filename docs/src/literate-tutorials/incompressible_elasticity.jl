@@ -3,7 +3,7 @@
 #-
 #md # !!! tip
 #md #     This example is also available as a Jupyter notebook:
-#md #     [`incompressible_elasticity.ipynb`](@__NBVIEWER_ROOT_URL__/examples/incompressible_elasticity.ipynb).
+#md #     [`incompressible_elasticity.ipynb`](@__NBVIEWER_ROOT_URL__/tutorials/incompressible_elasticity.ipynb).
 #-
 #
 # ## Introduction
@@ -23,14 +23,15 @@
 #md # The full program, without comments, can be found in the next
 #md # [section](@ref incompressible_elasticity-plain-program).
 using Ferrite, Tensors
-using BlockArrays, SparseArrays, LinearAlgebra
 
 # First we generate a simple grid, specifying the 4 corners of Cooks membrane.
 function create_cook_grid(nx, ny)
-    corners = [Vec{2}(( 0.0,  0.0)),
-               Vec{2}((48.0, 44.0)),
-               Vec{2}((48.0, 60.0)),
-               Vec{2}(( 0.0, 44.0))]
+    corners = [
+        Vec{2}((0.0, 0.0)),
+        Vec{2}((48.0, 44.0)),
+        Vec{2}((48.0, 60.0)),
+        Vec{2}((0.0, 44.0)),
+    ]
     grid = generate_grid(Triangle, (nx, ny), corners)
     ## facesets for boundary conditions
     addfacetset!(grid, "clamped", x -> norm(x[1]) ≈ 0.0)
@@ -38,20 +39,22 @@ function create_cook_grid(nx, ny)
     return grid
 end;
 
-# Next we define a function to set up our cell- and FacetValues.
+# Next we define a function to set up our `MultiFieldCellValues` and `FacetValues`.
+# For this coupled problem, using `MultiFieldCellValues` allows us to use the same
+# quadrature rule and geometric interpolation for both the `:u` and `:p`
+# fields, which is more efficient and convenient.
 function create_values(interpolation_u, interpolation_p)
-    ## quadrature rules
-    qr      = QuadratureRule{RefTriangle}(3)
+    ## Quadrature rules
+    qr = QuadratureRule{RefTriangle}(3)
     facet_qr = FacetQuadratureRule{RefTriangle}(3)
 
-    ## cell and FacetValues for u
-    cellvalues_u = CellValues(qr, interpolation_u)
+    ## MultiFieldCellValues, for both fields
+    cellvalues = MultiFieldCellValues(qr, (u = interpolation_u, p = interpolation_p))
+
+    ## FacetValues (only for the displacement, u)
     facetvalues_u = FacetValues(facet_qr, interpolation_u)
 
-    ## cellvalues for p
-    cellvalues_p = CellValues(qr, interpolation_p)
-
-    return cellvalues_u, cellvalues_p, facetvalues_u
+    return cellvalues, facetvalues_u
 end;
 
 
@@ -65,7 +68,7 @@ function create_dofhandler(grid, ipu, ipp)
     return dh
 end;
 
-# We also need to add Dirichlet boundary conditions on the `"clamped"` faceset.
+# We also need to add Dirichlet boundary conditions on the `"clamped"` facetset.
 # We specify a homogeneous Dirichlet bc on the displacement field, `:u`.
 function create_bc(dh)
     dbc = ConstraintHandler(dh)
@@ -80,34 +83,31 @@ struct LinearElasticity{T}
     K::T
 end
 
-# Now to the assembling of the stiffness matrix. This mixed formulation leads to a blocked
-# element matrix. Since Ferrite does not force us to use any particular matrix type we will
-# use a `PseudoBlockArray` from `BlockArrays.jl`.
-
+# Next, we assemble the stiffness matrix and load vector.
 function doassemble(
-    cellvalues_u::CellValues,
-    cellvalues_p::CellValues,
-    facetvalues_u::FacetValues,
-    K::SparseMatrixCSC, grid::Grid, dh::DofHandler, mp::LinearElasticity
-)
+        cellvalues::MultiFieldCellValues, facetvalues_u::FacetValues,
+        grid::Grid, dh::DofHandler, mp::LinearElasticity
+    )
+    K = allocate_matrix(dh)
     f = zeros(ndofs(dh))
     assembler = start_assemble(K, f)
-    nu = getnbasefunctions(cellvalues_u)
-    np = getnbasefunctions(cellvalues_p)
 
-    fe = PseudoBlockArray(zeros(nu + np), [nu, np]) # local force vector
-    ke = PseudoBlockArray(zeros(nu + np, nu + np), [nu, np], [nu, np]) # local stiffness matrix
+    n = ndofs_per_cell(dh)
+    fe = zeros(n)    # local force vector
+    ke = zeros(n, n) # local stiffness matrix
 
     ## traction vector
     t = Vec{2}((0.0, 1 / 16))
-    ## cache ɛdev outside the element routine to avoid some unnecessary allocations
-    ɛdev = [zero(SymmetricTensor{2, 2}) for i in 1:getnbasefunctions(cellvalues_u)]
+
+    ## local dof ranges for each field
+    dofrange_u = dof_range(dh, :u)
+    dofrange_p = dof_range(dh, :p)
 
     for cell in CellIterator(dh)
         fill!(ke, 0)
         fill!(fe, 0)
-        assemble_up!(ke, fe, cell, cellvalues_u, cellvalues_p, facetvalues_u, grid, mp, ɛdev, t)
-        assemble!(assembler, celldofs(cell), fe, ke)
+        assemble_up!(ke, fe, cell, cellvalues, facetvalues_u, grid, mp, t, dofrange_u, dofrange_p)
+        assemble!(assembler, celldofs(cell), ke, fe)
     end
 
     return K, f
@@ -116,37 +116,35 @@ end;
 # The element routine integrates the local stiffness and force vector for all elements.
 # Since the problem results in a symmetric matrix we choose to only assemble the lower part,
 # and then symmetrize it after the loop over the quadrature points.
-function assemble_up!(Ke, fe, cell, cellvalues_u, cellvalues_p, facetvalues_u, grid, mp, ɛdev, t)
+function dev_3d(t::SymmetricTensor{2, 2, T}) where {T}
+    ## Given 2d and 3d tensors, t2 and t3, where the out-of-plane components for t3 are zero,
+    ## we have t2 ⊡ t2 == t3 ⊡ t3, but dev(t2) ⊡ dev(t2) != dev(t3) ⊡ dev(t3), so we have to
+    ## expand the tensor before calling `dev` to get the correct value in the element routine.
+    return dev(SymmetricTensor{2, 3}((i, j) -> (i ≤ 2 && j ≤ 2) ? t[i, j] : zero(T)))
+end
 
-    n_basefuncs_u = getnbasefunctions(cellvalues_u)
-    n_basefuncs_p = getnbasefunctions(cellvalues_p)
-    u▄, p▄ = 1, 2
-    reinit!(cellvalues_u, cell)
-    reinit!(cellvalues_p, cell)
-
+function assemble_up!(Ke, fe, cell, cellvalues, facetvalues_u, grid, mp, t, dofrange_u, dofrange_p)
+    reinit!(cellvalues, cell)
     ## We only assemble lower half triangle of the stiffness matrix and then symmetrize it.
-    for q_point in 1:getnquadpoints(cellvalues_u)
-        for i in 1:n_basefuncs_u
-            ɛdev[i] = dev(symmetric(shape_gradient(cellvalues_u, q_point, i)))
-        end
-        dΩ = getdetJdV(cellvalues_u, q_point)
-        for i in 1:n_basefuncs_u
-            divδu = shape_divergence(cellvalues_u, q_point, i)
-            δu = shape_value(cellvalues_u, q_point, i)
-            for j in 1:i
-                Ke[BlockIndex((u▄, u▄), (i, j))] += 2 * mp.G * ɛdev[i] ⊡ ɛdev[j] * dΩ
+    for q_point in 1:getnquadpoints(cellvalues)
+        dΩ = getdetJdV(cellvalues, q_point)
+        for (iᵤ, Iᵤ) in pairs(dofrange_u)
+            ɛdev_i = dev_3d(symmetric(shape_gradient(cellvalues.u, q_point, iᵤ)))
+            for (jᵤ, Jᵤ) in pairs(dofrange_u[1:iᵤ])
+                ɛdev_j = dev_3d(symmetric(shape_gradient(cellvalues.u, q_point, jᵤ)))
+                Ke[Iᵤ, Jᵤ] += 2 * mp.G * ɛdev_i ⊡ ɛdev_j * dΩ
             end
         end
 
-        for i in 1:n_basefuncs_p
-            δp = shape_value(cellvalues_p, q_point, i)
-            for j in 1:n_basefuncs_u
-                divδu = shape_divergence(cellvalues_u, q_point, j)
-                Ke[BlockIndex((p▄, u▄), (i, j))] += -δp * divδu * dΩ
+        for (iₚ, Iₚ) in pairs(dofrange_p)
+            δp = shape_value(cellvalues.p, q_point, iₚ)
+            for (jᵤ, Jᵤ) in pairs(dofrange_u)
+                divδu = shape_divergence(cellvalues.u, q_point, jᵤ)
+                Ke[Iₚ, Jᵤ] += -δp * divδu * dΩ
             end
-            for j in 1:i
-                p = shape_value(cellvalues_p, q_point, j)
-                Ke[BlockIndex((p▄, p▄), (i, j))] += - 1 / mp.K * δp * p * dΩ
+            for (jₚ, Jₚ) in pairs(dofrange_p[1:iₚ])
+                p = shape_value(cellvalues.p, q_point, jₚ)
+                Ke[Iₚ, Jₚ] += - 1 / mp.K * δp * p * dΩ
             end
 
         end
@@ -154,29 +152,31 @@ function assemble_up!(Ke, fe, cell, cellvalues_u, cellvalues_p, facetvalues_u, g
 
     symmetrize_lower!(Ke)
 
-    ## We integrate the Neumann boundary using the FacetValues.
-    ## We loop over all the facets in the cell, then check if the facet
-    ## is in our `"traction"` facetset.
+    ## We integrate the Neumann boundary using the facevalues.
+    ## We loop over all the faces in the cell, then check if the face
+    ## is in our `"traction"` faceset.
     for facet in 1:nfacets(cell)
         if (cellid(cell), facet) ∈ getfacetset(grid, "traction")
             reinit!(facetvalues_u, cell, facet)
             for q_point in 1:getnquadpoints(facetvalues_u)
                 dΓ = getdetJdV(facetvalues_u, q_point)
-                for i in 1:n_basefuncs_u
-                    δu = shape_value(facetvalues_u, q_point, i)
-                    fe[i] += (δu ⋅ t) * dΓ
+                for (iᵤ, Iᵤ) in pairs(dofrange_u)
+                    δu = shape_value(facetvalues_u, q_point, iᵤ)
+                    fe[Iᵤ] += (δu ⋅ t) * dΓ
                 end
             end
         end
     end
+    return
 end
 
 function symmetrize_lower!(Ke)
     for i in 1:size(Ke, 1)
-        for j in i+1:size(Ke, 1)
+        for j in (i + 1):size(Ke, 1)
             Ke[i, j] = Ke[j, i]
         end
     end
+    return
 end;
 
 # To evaluate the stresses after solving the problem we once again loop over the cells in
@@ -201,8 +201,7 @@ end;
 # this formulation. Therefore we expand the strain to a 3D tensor, and then compute the (3D)
 # stress tensor.
 
-function compute_stresses(cellvalues_u::CellValues, cellvalues_p::CellValues,
-                          dh::DofHandler, mp::LinearElasticity, a::Vector)
+function compute_stresses(cellvalues::MultiFieldCellValues, dh::DofHandler, mp::LinearElasticity, a::Vector)
     ae = zeros(ndofs_per_cell(dh)) # local solution vector
     u_range = dof_range(dh, :u)    # local range of dofs corresponding to u
     p_range = dof_range(dh, :p)    # local range of dofs corresponding to p
@@ -211,26 +210,25 @@ function compute_stresses(cellvalues_u::CellValues, cellvalues_p::CellValues,
     ## Loop over the cells and compute the cell-average stress
     for cc in CellIterator(dh)
         ## Update cellvalues
-        reinit!(cellvalues_u, cc)
-        reinit!(cellvalues_p, cc)
+        reinit!(cellvalues, cc)
         ## Extract the cell local part of the solution
-        for (i, I) in pairs(cc.dofs)
+        for (i, I) in pairs(celldofs(cc))
             ae[i] = a[I]
         end
         ## Loop over the quadrature points
         σΩi = zero(SymmetricTensor{2, 3}) # stress integrated over the cell
         Ωi = 0.0                          # cell volume (area)
-        for qp in 1:getnquadpoints(cellvalues_u)
-            dΩ = getdetJdV(cellvalues_u, qp)
+        for qp in 1:getnquadpoints(cellvalues)
+            dΩ = getdetJdV(cellvalues, qp)
             ## Evaluate the strain and the pressure
-            ε = function_symmetric_gradient(cellvalues_u, qp, ae, u_range)
-            p = function_value(cellvalues_p, qp, ae, p_range)
+            ε = function_symmetric_gradient(cellvalues.u, qp, ae, u_range)
+            p = function_value(cellvalues.p, qp, ae, p_range)
             ## Expand strain to 3D
-            ε3D = SymmetricTensor{2, 3}((i, j) -> i < 3 && j < 3 ? ε[i, j] : 0.0)
+            εdev_3d = dev_3d(ε)
             ## Compute the stress in this quadrature point
-            σqp  = 2 * mp.G * dev(ε3D) - one(ε3D) * p
+            σqp = 2 * mp.G * εdev_3d - one(εdev_3d) * p
             σΩi += σqp * dΩ
-            Ωi  += dΩ
+            Ωi += dΩ
         end
         ## Store the value
         σ[cellid(cc)] = σΩi / Ωi
@@ -245,7 +243,7 @@ function solve(ν, interpolation_u, interpolation_p)
     ## material
     Emod = 1.0
     Gmod = Emod / 2(1 + ν)
-    Kmod = Emod * ν / ((1 + ν) * (1 - 2ν))
+    Kmod = Emod * ν / (3 * (1 - 2ν))
     mp = LinearElasticity(Gmod, Kmod)
 
     ## Grid, dofhandler, boundary condition
@@ -255,23 +253,23 @@ function solve(ν, interpolation_u, interpolation_p)
     dbc = create_bc(dh)
 
     ## CellValues
-    cellvalues_u, cellvalues_p, facetvalues_u = create_values(interpolation_u, interpolation_p)
+    cellvalues, facetvalues_u = create_values(interpolation_u, interpolation_p)
 
     ## Assembly and solve
-    K = create_sparsity_pattern(dh)
-    K, f = doassemble(cellvalues_u, cellvalues_p, facetvalues_u, K, grid, dh, mp)
+    K, f = doassemble(cellvalues, facetvalues_u, grid, dh, mp)
     apply!(K, f, dbc)
     u = K \ f
 
     ## Compute the stress
-    σ = compute_stresses(cellvalues_u, cellvalues_p, dh, mp, u)
-    σvM = map(x -> √(3/2 * dev(x) ⊡ dev(x)), σ) # von Mise effective stress
+    σ = compute_stresses(cellvalues, dh, mp, u)
+    σvM = map(x -> √(3 / 2 * dev(x) ⊡ dev(x)), σ) # von Mises effective stress
 
     ## Export the solution and the stress
-    filename = "cook_" * (interpolation_u == Lagrange{RefTriangle, 1}()^2 ? "linear" : "quadratic") *
-                         "_linear"
+    filename = "cook_" *
+        (interpolation_u == Lagrange{RefTriangle, 1}()^2 ? "linear" : "quadratic") *
+        "_linear"
 
-    VTKFile(filename, grid) do vtk
+    VTKGridFile(filename, grid) do vtk
         write_solution(vtk, dh, u)
         for i in 1:3, j in 1:3
             σij = [x[i, j] for x in σ]
@@ -288,9 +286,9 @@ end
 # vectorize it to 2 dimensions such that we obtain vector shape functions (and 2nd order
 # tensors for the gradients).
 
-linear_p    = Lagrange{RefTriangle,1}()
-linear_u    = Lagrange{RefTriangle,1}()^2
-quadratic_u = Lagrange{RefTriangle,2}()^2
+linear_p = Lagrange{RefTriangle, 1}()
+linear_u = Lagrange{RefTriangle, 1}()^2
+quadratic_u = Lagrange{RefTriangle, 2}()^2
 #md nothing # hide
 
 # All that is left is to solve the problem. We choose a value of Poissons
@@ -298,12 +296,12 @@ quadratic_u = Lagrange{RefTriangle,2}()^2
 # linear/linear approximation to return garbage, and the quadratic/linear
 # approximation to be stable.
 
-u1 = solve(0.5, linear_u,    linear_p);
+u1 = solve(0.5, linear_u, linear_p);
 u2 = solve(0.5, quadratic_u, linear_p);
 
 ## test the result                 #src
 using Test                         #src
-@test norm(u2) ≈ 919.2121476140703 #src
+@test norm(u2) ≈ 919.1284143115702 #src
 
 #md # ## [Plain program](@id incompressible_elasticity-plain-program)
 #md #

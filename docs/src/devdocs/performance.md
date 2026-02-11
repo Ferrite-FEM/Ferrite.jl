@@ -1,4 +1,4 @@
-# [Performance Analysis](@id devdocs-performance)
+# [Performance analysis](@id devdocs-performance)
 
 In the benchmark folder we provide basic infrastructure to analyze the performance of
 Ferrite to help tracking down performance regression issues. Two basic tools can be

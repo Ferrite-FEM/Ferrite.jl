@@ -1,4 +1,4 @@
-# References
+# Cited literature
 
 ```@bibliography
 ```
