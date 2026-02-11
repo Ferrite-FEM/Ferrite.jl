@@ -838,12 +838,13 @@ function hangingnodes(forest::ForestBWG{dim}, nodeids, nodeowners) where dim
                                 break
                             end
                         else #interoctree branch
-                            for (ri,rf) in enumerate(rootfaces)
-                                facet_neighbor_ =  facet_neighborhood[k,_perm[ri]]
+                            #for (ri,rf) in enumerate(rootfaces)
+                            #for (pi,pf) in enumerate(parentfaces)
+                                facet_neighbor_ =  facet_neighborhood[k,_perm[pface_i]]
                                 if length(facet_neighbor_) == 0
                                     continue
                                 end
-                                if contains_facet(rf, pface)
+                                if any(x->contains_facet(x, pface),rootfaces)
                                     k′ = facet_neighbor_[1][1]
                                     ri′ = _perminv[facet_neighbor_[1][2]]
                                     interoctree_neighbor = transform_facet(forest, k′, ri′, neighbor_candidate)
@@ -856,7 +857,7 @@ function hangingnodes(forest::ForestBWG{dim}, nodeids, nodeowners) where dim
                                         fnodes = transformed_neighbor_faces[ri′]
                                         vs = vertices(leaf,tree.b)
                                         if dim > 2
-                                            rotated_ξ = ntuple(i->rotation_permutation(ri′,ri,r,i),ncorners_face3D)
+                                            rotated_ξ = ntuple(i->rotation_permutation(ri′,pface_i,r,i),ncorners_face3D)
                                         else
                                             rotated_ξ = ntuple(i->rotation_permutation(r,i),ncorners_face2D)
                                         end
@@ -865,8 +866,10 @@ function hangingnodes(forest::ForestBWG{dim}, nodeids, nodeowners) where dim
                                         if dim > 2
                                             for ξ in rotated_ξ
                                                 c′ = facetable[pface_i, ξ]
-                                                if c′ ∉ (c̃,c)
-                                                    neighbor_candidate_edges = edges(interoctree_neighbor,tree.b)
+                                                if c′ ∉ (c̃,ci)
+                                                    #neighbor_candidate_edges = edges(interoctree_neighbor,tree.b)
+                                                    #ne = findfirst(x->iscenter(vs[c′],x),neighbor_candidate_edges)
+                                                    neighbor_candidate_edges = edges(parent_,tree.b)
                                                     ne = findfirst(x->iscenter(vs[c′],x),neighbor_candidate_edges)
                                                     if ne !== nothing
                                                         hnodes[nodeids[nodeowners[(k,vs[c′])]]] = [nodeids[nodeowners[(k,ne)]] for ne in neighbor_candidate_edges[ne]]
@@ -877,7 +880,7 @@ function hangingnodes(forest::ForestBWG{dim}, nodeids, nodeowners) where dim
                                         break
                                     end
                                 end
-                            end
+                            #end
                         end
                     end
                 end

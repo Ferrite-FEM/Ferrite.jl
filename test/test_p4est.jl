@@ -591,10 +591,9 @@ end
     # +4 refined elements a 6 face nodes, 12 edge nodes and 1 volume nodes
     # -1 shared node between tree 1 and 6
     @test length(transfered_grid.nodes) == 5^3 + 4*(6 + 12 + 1) - 1
-    # 4*(6 + 12)    potential hanging nodes
-    # - 2           shared through common edge
-    # - 2* (2*3)    outer boundary face and edge nodes
-    @test length(transfered_grid.conformity_info) == 4*(6 + 12) - 2 - 2*3 - 2*3
+    # 30 constraints from tree 1 (2*18 - 6 boundary) + 30 from tree 6 (2*18 - 6 boundary)
+    # - 1 shared on common edge
+    @test length(transfered_grid.conformity_info) == 59
 
     # Combined and rotated
     adaptive_grid = ForestBWG(grid,3)
@@ -609,10 +608,8 @@ end
     # +4 refined elements a 6 face nodes, 12 edge nodes and 1 volume nodes
     # -1 shared node between tree 1 and 7
     @test length(transfered_grid.nodes) == 5^3 + 4*(6 + 12 + 1) - 1
-    # 4*(6 + 12)    potential hanging nodes
-    # - 2           shared through common edge
-    # - 2* (2*3)    outer boundary face and edge nodes
-    @test length(transfered_grid.conformity_info) == 4*(6 + 12) - 2 - 2*3 - 2*3
+    # 30 constraints from tree 1 + 30 from rotated tree 7 - 1 shared on common edge
+    @test length(transfered_grid.conformity_info) == 59
 
     # Reproducer test for Fig.3 BWG 11
     grid = generate_grid(Hexahedron,(2,1,1))
