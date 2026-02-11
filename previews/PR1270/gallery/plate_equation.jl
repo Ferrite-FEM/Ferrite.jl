@@ -68,9 +68,7 @@ function bc_routine!(ke, facetvalues, penalty)
     return
 end;
 
-function doassemble!(
-        cellvalues::CellValues, facetvalues::FacetValues, K::SparseMatrixCSC, f::Vector, dh::DofHandler, D::Float64, q0::Float64, penalty::Float64
-    )
+function doassemble!(K, f, cellvalues, facetvalues, dh, D, q0, penalty)
 
     n = getnbasefunctions(cellvalues)
     ke = zeros(n, n)
@@ -107,7 +105,7 @@ end;
 
 K = allocate_matrix(dh);
 f = zeros(ndofs(dh))
-doassemble!(cellvalues, facetvalues, K, f, dh, D, q0, penalty);
+doassemble!(K, f, cellvalues, facetvalues, dh, D, q0, penalty);
 u = K \ f;
 
 VTKGridFile("plate_equation", dh) do vtk

@@ -1,4 +1,8 @@
 # # [Kirchhoff-Love Plate Equation](@id tutorial-plate)
+# ![](plate_equation.png)
+#
+# *Figure 1*: The deflection $w$ for a simply supported plate with uniform load.
+# ## Introduction
 # In this example, we solve the Kirchhoff-Love equation for thin plates for linear isotropy. This is a fourth-order partial differential equation used to model the deflection $w$ of a plate subject to transverse loading.
 # The governing biharmonic equation is:
 # ```math
@@ -115,9 +119,7 @@ function bc_routine!(ke, facetvalues, penalty)
 end;
 
 # Next, we assemble the contributions from the element plate stiffnesses and the stiffness arising from the penalty-based boundary constraint.
-function doassemble!(
-        cellvalues::CellValues, facetvalues::FacetValues, K::SparseMatrixCSC, f::Vector, dh::DofHandler, D::Float64, q0::Float64, penalty::Float64
-    )
+function doassemble!(K, f, cellvalues, facetvalues, dh, D, q0, penalty)
 
     n = getnbasefunctions(cellvalues)
     ke = zeros(n, n)
@@ -155,7 +157,7 @@ end;
 # Create stiffness matrix, assemble and solve:
 K = allocate_matrix(dh);
 f = zeros(ndofs(dh))
-doassemble!(cellvalues, facetvalues, K, f, dh, D, q0, penalty);
+doassemble!(K, f, cellvalues, facetvalues, dh, D, q0, penalty);
 u = K \ f;
 
 # Export solution to VTK/Paraview
