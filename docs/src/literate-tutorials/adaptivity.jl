@@ -13,7 +13,7 @@ using Ferrite, FerriteGmsh, SparseArrays
 #addfacetset!(grid,"pull",x->x[1]≈0 && x[2] <= 0.5 && x[3] <= 0.5)
 grid = generate_grid(Hexahedron,(2,1,1))
 grid  = ForestBWG(grid,20)
-#Ferrite.refine_all!(grid,1)
+Ferrite.refine_all!(grid,1)
 Ferrite.refine!(grid,[1,2])
 Ferrite.balanceforest!(grid)
 
