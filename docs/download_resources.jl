@@ -28,3 +28,14 @@ for (file, url) in [
     afile = joinpath(topics_directory, file)
     isfile(afile) || Downloads.download(url, afile)
 end
+
+# Gallery
+const gallery_directory = joinpath(@__DIR__, "src", "gallery")
+mkpath(gallery_directory)
+
+for (file, url) in [
+        "plate_equation.png" => "https://raw.githubusercontent.com/Ferrite-FEM/Ferrite.jl/gh-pages/assets/plate_equation.png",
+    ]
+    afile = joinpath(gallery_directory, file)
+    isfile(afile) || Downloads.download(url, afile)
+end
