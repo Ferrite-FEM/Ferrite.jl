@@ -51,12 +51,6 @@ Ferrite.AMR.refine_all!(grid, 1)
 # The right-hand side is obtained by applying the negative Laplacian via
 # automatic differentiation (`Tensors.laplace`).
 analytical_solution(x) = exp(-((norm(x) - 0.5) / 0.02)^2)
-function analytical_gradient(x; r = 0.5, ε = 0.02, δ = 1.0e-8)
-    ρ = sqrt(dot(x, x) + δ^2)
-    s = (ρ - r) / ε
-    factor = -2 * s / (ε * ρ) * exp(-s^2)
-    return factor * x
-end
 analytical_rhs(x) = -laplace(analytical_solution, x)
 
 # ### Element assembly
