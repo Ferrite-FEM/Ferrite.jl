@@ -164,7 +164,7 @@ function solve_adaptive(initial_grid)
     pvd = paraview_collection("heat_amr")
     θ = 0.5
 
-    while !finished && i <= 8
+    while !finished && i <= 3
         @show i
         ## Materialize the forest into a NonConformingGrid and solve
         transfered_grid = Ferrite.creategrid(grid)
