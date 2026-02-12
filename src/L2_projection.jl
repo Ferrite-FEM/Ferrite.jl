@@ -139,7 +139,7 @@ function close!(proj::L2Projector)
         close!(ch)
         proj.ch = ch
     end
-    M = _assemble_L2_matrix(proj.dh, proj.qrs_lhs)
+    M = _assemble_L2_matrix(proj.dh, proj.ch, proj.qrs_lhs)
     if proj.ch !== nothing
         apply!(M.data, proj.ch)
     end
@@ -156,8 +156,8 @@ function _mass_qr(::Lagrange{shape, 2}) where {shape <: RefSimplex}
 end
 _mass_qr(ip::VectorizedInterpolation) = _mass_qr(ip.ip)
 
-function _assemble_L2_matrix(dh::DofHandler, qrs_lhs::Vector{<:QuadratureRule})
-    M = Symmetric(allocate_matrix(dh))
+function _assemble_L2_matrix(dh::DofHandler, ch::ConstraintHandler, qrs_lhs::Vector{<:QuadratureRule})
+    M = Symmetric(allocate_matrix(dh, ch))
     assembler = start_assemble(M)
     for (sdh, qr_lhs) in zip(dh.subdofhandlers, qrs_lhs)
         ip_fun = only(sdh.field_interpolations)
