@@ -168,6 +168,18 @@ function _assemble_L2_matrix(dh::DofHandler, ch::ConstraintHandler, qrs_lhs::Vec
     return M
 end
 
+function _assemble_L2_matrix(dh::DofHandler, ch::Nothing, qrs_lhs::Vector{<:QuadratureRule})
+    M = Symmetric(allocate_matrix(dh))
+    assembler = start_assemble(M)
+    for (sdh, qr_lhs) in zip(dh.subdofhandlers, qrs_lhs)
+        ip_fun = only(sdh.field_interpolations)
+        ip_geo = geometric_interpolation(getcelltype(sdh))
+        cv = CellValues(qr_lhs, ip_fun, ip_geo; update_gradients = false)
+        _assemble_L2_matrix!(assembler, cv, sdh)
+    end
+    return M
+end
+
 function _assemble_L2_matrix!(assembler, cellvalues::CellValues, sdh::SubDofHandler)
 
     n = getnbasefunctions(cellvalues)
