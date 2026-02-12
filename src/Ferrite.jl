@@ -17,7 +17,7 @@ using SparseArrays:
     SparseArrays, SparseMatrixCSC, nonzeros, nzrange, rowvals,
     AbstractSparseMatrix, AbstractSparseMatrixCSC, sparsevec
 using StaticArrays:
-    StaticArrays, MArray, MMatrix, SArray, SMatrix, SVector
+    StaticArrays, MArray, MMatrix, SArray, SMatrix, SVector, @SVector, @SMatrix
 using WriteVTK:
     WriteVTK, VTKCellTypes
 using Tensors:

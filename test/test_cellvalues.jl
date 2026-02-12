@@ -79,6 +79,9 @@ end
                     # Note, the jacobian of the element is constant, which makes the hessian (of the mapping)
                     # zero. So this is not the optimal test
                     @test Ferrite.function_hessian(cv, i, ue) ≈ Hqp
+                    if func_interpol isa Ferrite.ScalarInterpolation
+                        @test Ferrite.function_laplacian(cv, i, ue) ≈ tr(Hqp)
+                    end
                 end
                 if func_interpol isa Ferrite.VectorInterpolation
                     @test function_symmetric_gradient(cv, i, ue) ≈ 0.5(Gqp + Gqp')
@@ -674,6 +677,45 @@ end
                 @test fun(cv_custom, q_point, ae) == fun(cv, q_point, ae)
             end
             @test spatial_coordinate(cv_custom, q_point, x) == spatial_coordinate(cv, q_point, x)
+        end
+    end
+
+    @testset "FEValues+Argyris" begin
+
+        grid = generate_grid(Triangle, (3, 3))
+        #Jiggle mesh amd rotate some elements
+        transform_coordinates!(grid, x -> x + rand(Vec{2}) * 0.05)
+        shifts = ([1, 2, 3], [3, 1, 2], [2, 3, 1])
+        for i in 1:getncells(grid)
+            cell = grid.cells[i]
+            nodes = cell.nodes[shifts[rand(1:length(shifts))]]
+            grid.cells[i] = Triangle((nodes))
+        end
+
+        for vdim in 1:2
+            ip_geo = Ferrite.geometric_interpolation(getcelltype(grid))
+            ip = vdim == 1 ? Argyris{RefTriangle, 5}() : Argyris{RefTriangle, 5}()^vdim
+            dh = DofHandler(grid)
+            add!(dh, :u, ip)
+            close!(dh)
+
+            #Loop over all interfaces and chack that jump in gradient and value is zero (C1 continuity)
+            fqr = FacetQuadratureRule{RefTriangle}(3)
+            fv1 = FacetValues(fqr, ip, ip_geo^2; update_hessians = true)
+            fv2 = FacetValues(deepcopy(fqr), ip, ip_geo^2; update_hessians = true)
+            iv = InterfaceValues(fv1, fv2)
+            a = rand(Float64, Ferrite.ndofs(dh)) #Generate random solution vector
+            value_type = typeof(shape_value(iv, 1, 1; here = true))
+            gradient_type = typeof(shape_gradient(iv, 1, 1; here = true))
+            for interface_data in InterfaceIterator(dh)
+                dofs = interfacedofs(interface_data)
+                ue = a[dofs]
+                reinit!(iv, interface_data)
+                for iqp in 1:getnquadpoints(iv)
+                    @test isapprox(function_value_jump(iv, iqp, ue), zero(value_type), atol = 1.0e-13)
+                    @test isapprox(function_gradient_jump(iv, iqp, ue), zero(gradient_type), atol = 1.0e-13)
+                end
+            end
         end
     end
 

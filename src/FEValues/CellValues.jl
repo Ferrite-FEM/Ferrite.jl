@@ -132,7 +132,7 @@ function reinit!(cv::AbstractCellValues, cell::Union{AbstractCell, Nothing}, x::
     @inbounds for (q_point, w) in enumerate(getweights(get_quadrature_rule(cv)))
         mapping = calculate_mapping(geo_mapping, q_point, x)
         _update_detJdV!(getdetJdVs(cv), q_point, w, mapping)
-        apply_mapping!(fun_values, q_point, mapping, cell)
+        apply_mapping!(fun_values, q_point, mapping, cell, x)
     end
     return nothing
 end
@@ -284,10 +284,10 @@ end
 
 # Need to manually unroll applying to each `fun_values` for maximum performance, equivalent code:
 # `foreach(fv -> apply_mapping!(fv, q_point, mapping, cell), fun_values))`
-@generated function apply_mapping!(fun_values::Tuple{Vararg{<:FunctionValues, N}}, q_point, mapping, cell) where {N}
+@generated function apply_mapping!(fun_values::Tuple{Vararg{<:FunctionValues, N}}, q_point, mapping, cell, x) where {N}
     expr = Expr(:block)
     for i in 1:N
-        push!(expr.args, :(apply_mapping!(fun_values[$i], q_point, mapping, cell)))
+        push!(expr.args, :(apply_mapping!(fun_values[$i], q_point, mapping, cell, x)))
     end
     return quote
         $(Expr(:meta, :inline))

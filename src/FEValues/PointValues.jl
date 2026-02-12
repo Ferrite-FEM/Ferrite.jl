@@ -61,9 +61,12 @@ function_gradient(pv::PointValues, u::AbstractVector, args...) =
 function_symmetric_gradient(pv::PointValues, u::AbstractVector, args...) =
     function_symmetric_gradient(pv, 1, u, args...)
 
+function reinit!(pv::PointValues, x::AbstractVector{<:Vec{sdim}}, ξ::Vec{rdim}) where {sdim, rdim}
+    return reinit!(pv, nothing, x, ξ)
+end
 # reinit! on PointValues must first update N and dNdξ for the new "quadrature point"
 # and then call the regular reinit! for the wrapped CellValues to update dNdx
-function reinit!(pv::PointValues, x::AbstractVector{<:Vec{sdim}}, ξ::Vec{rdim}) where {sdim, rdim}
+function reinit!(pv::PointValues, cell, x::AbstractVector{<:Vec{sdim}}, ξ::Vec{rdim}) where {sdim, rdim}
     # Update the quadrature point location
     qr_points = getpoints(pv.cv.qr)
     qr_points[1] = ξ
@@ -71,7 +74,7 @@ function reinit!(pv::PointValues, x::AbstractVector{<:Vec{sdim}}, ξ::Vec{rdim})
     precompute_values!(pv.cv.fun_values, qr_points)
     precompute_values!(pv.cv.geo_mapping, qr_points)
     # Regular reinit
-    reinit!(pv.cv, x)
+    reinit!(pv.cv, cell, x)
     return nothing
 end
 
