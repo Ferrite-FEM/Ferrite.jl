@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/><title>Adaptive Heat Equation · Ferrite.jl</title><meta name="title" content="Adaptive Heat Equation · Ferrite.jl"/><meta property="og:title" content="Adaptive Heat Equation · Ferrite.jl"/><meta property="twitter:title" content="Adaptive Heat Equation · Ferrite.jl"/><meta name="description" content="Documentation for Ferrite.jl."/><meta property="og:description" content="Documentation for Ferrite.jl."/><meta property="twitter:description" content="Documentation for Ferrite.jl."/><meta property="og:url" content="https://ferrite-fem.github.io/Ferrite.jl/stable/tutorials/heat_adaptivity/"/><meta property="twitter:url" content="https://ferrite-fem.github.io/Ferrite.jl/stable/tutorials/heat_adaptivity/"/><link rel="canonical" href="https://ferrite-fem.github.io/Ferrite.jl/stable/tutorials/heat_adaptivity/"/><script data-outdated-warner src="../../assets/warner.js"></script><link href="https://cdnjs.cloudflare.com/ajax/libs/lato-font/3.0.0/css/lato-font.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/juliamono/0.050/juliamono.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/fontawesome.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/solid.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/brands.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.8/katex.min.css" rel="stylesheet" type="text/css"/><script>documenterBaseURL="../.."</script><script src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.6/require.min.js" data-main="../../assets/documenter.js"></script><script src="../../search_index.js"></script><script src="../../siteinfo.js"></script><script src="../../../versions.js"></script><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/catppuccin-mocha.css" data-theme-name="catppuccin-mocha"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/catppuccin-macchiato.css" data-theme-name="catppuccin-macchiato"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/catppuccin-frappe.css" data-theme-name="catppuccin-frappe"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/catppuccin-latte.css" data-theme-name="catppuccin-latte"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/documenter-dark.css" data-theme-name="documenter-dark" data-theme-primary-dark/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/documenter-light.css" data-theme-name="documenter-light" data-theme-primary/><script src="../../assets/themeswap.js"></script><link href="../../assets/custom.css" rel="stylesheet" type="text/css"/><link href="../../assets/citations.css" rel="stylesheet" type="text/css"/><link href="../../assets/favicon.ico" rel="icon" type="image/x-icon"/></head><body><div id="documenter"><nav class="docs-sidebar"><a class="docs-logo" href="../../"><img src="../../assets/logo.svg" alt="Ferrite.jl logo"/></a><div class="docs-package-name"><span class="docs-autofit"><a href="../../">Ferrite.jl</a></span></div><button class="docs-search-query input is-rounded is-small is-clickable my-2 mx-auto py-1 px-2" id="documenter-search-query">Search docs (Ctrl + /)</button><ul class="docs-menu"><li><a class="tocitem" href="../../">Home</a></li><li><input class="collapse-toggle" id="menuitem-3" type="checkbox"/><label class="tocitem" for="menuitem-3"><span class="docs-label">Tutorials</span><i class="docs-chevron"></i></label><ul class="collapsed"><li><a class="tocitem" href="../">Tutorials overview</a></li><li><a class="tocitem" href="../heat_equation/">Heat equation</a></li><li><a class="tocitem" href="../linear_elasticity/">Linear elasticity</a></li><li><a class="tocitem" href="../incompressible_elasticity/">Incompressible elasticity</a></li><li><a class="tocitem" href="../hyperelasticity/">Hyperelasticity</a></li><li><a class="tocitem" href="../plasticity/">Von Mises plasticity</a></li><li><a class="tocitem" href="../transient_heat_equation/">Transient heat equation</a></li><li><a class="tocitem" href="../computational_homogenization/">Computational homogenization</a></li><li><a class="tocitem" href="../stokes-flow/">Stokes flow</a></li><li><a class="tocitem" href="../porous_media/">Porous media</a></li><li><a class="tocitem" href="../ns_vs_diffeq/">Incompressible Navier-Stokes equations via DifferentialEquations.jl</a></li><li><a class="tocitem" href="../reactive_surface/">Reactive surface</a></li><li><a class="tocitem" href="../linear_shell/">Linear shell</a></li><li><a class="tocitem" href="../dg_heat_equation/">Discontinuous Galerkin heat equation</a></li></ul></li><li><input class="collapse-toggle" id="menuitem-4" type="checkbox"/><label class="tocitem" for="menuitem-4"><span class="docs-label">Topic guides</span><i class="docs-chevron"></i></label><ul class="collapsed"><li><a class="tocitem" href="../../topics/">Topic guide overview</a></li><li><a class="tocitem" href="../../topics/fe_intro/">Introduction to FEM</a></li><li><a class="tocitem" href="../../topics/reference_shapes/">Reference shapes</a></li><li><a class="tocitem" href="../../topics/FEValues/">FEValues</a></li><li><a class="tocitem" href="../../topics/degrees_of_freedom/">Degrees of freedom</a></li><li><a class="tocitem" href="../../topics/sparse_matrix/">Sparsity pattern and sparse matrices</a></li><li><a class="tocitem" href="../../topics/assembly/">Assembly</a></li><li><a class="tocitem" href="../../topics/boundary_conditions/">Boundary and initial conditions</a></li><li><a class="tocitem" href="../../topics/constraints/">Affine constraints</a></li><li><a class="tocitem" href="../../topics/grid/">Grid</a></li><li><a class="tocitem" href="../../topics/export/">Export</a></li><li><a class="tocitem" href="../../topics/amr/">Adaptive Mesh Refinement</a></li></ul></li><li><input class="collapse-toggle" id="menuitem-5" type="checkbox"/><label class="tocitem" for="menuitem-5"><span class="docs-label">API reference</span><i class="docs-chevron"></i></label><ul class="collapsed"><li><a class="tocitem" href="../../reference/">Reference overview</a></li><li><a class="tocitem" href="../../reference/quadrature/">Quadrature</a></li><li><a class="tocitem" href="../../reference/interpolations/">Interpolation</a></li><li><a class="tocitem" href="../../reference/fevalues/">FEValues</a></li><li><a class="tocitem" href="../../reference/dofhandler/">Degrees of freedom</a></li><li><a class="tocitem" href="../../reference/sparsity_pattern/">Sparsity pattern and sparse matrices</a></li><li><a class="tocitem" href="../../reference/assembly/">Assembly</a></li><li><a class="tocitem" href="../../reference/boundary_conditions/">Boundary conditions</a></li><li><a class="tocitem" href="../../reference/grid/">Grid &amp; AbstractGrid</a></li><li><a class="tocitem" href="../../reference/export/">Postprocessing</a></li><li><a class="tocitem" href="../../reference/utils/">Development utility functions</a></li></ul></li><li><input class="collapse-toggle" id="menuitem-6" type="checkbox"/><label class="tocitem" for="menuitem-6"><span class="docs-label">How-to guides</span><i class="docs-chevron"></i></label><ul class="collapsed"><li><a class="tocitem" href="../../howto/">How-to guide overview</a></li><li><a class="tocitem" href="../../howto/postprocessing/">Post processing and visualization</a></li><li><a class="tocitem" href="../../howto/threaded_assembly/">Multi-threaded assembly</a></li></ul></li><br><li><a class="tocitem" href="../../gallery/">Code gallery</a></li><li><a class="tocitem" href="../../devdocs/">Developer documentation</a></li><li><a class="tocitem" href="../../cited-literature/">Cited literature</a></li><li><a class="tocitem" href="../../ferritepapers/">Papers using Ferrite</a></li></ul><div class="docs-version-selector field has-addons"><div class="control"><span class="docs-label button is-static is-size-7">Version</span></div><div class="docs-selector control is-expanded"><div class="select is-fullwidth is-size-7"><select id="documenter-version-selector"></select></div></div></div></nav><div class="docs-main"><header class="docs-navbar"><a class="docs-sidebar-button docs-navbar-link fa-solid fa-bars is-hidden-desktop" id="documenter-sidebar-button" href="#"></a><nav class="breadcrumb"><ul class="is-hidden-mobile"><li class="is-active"><a href>Adaptive Heat Equation</a></li></ul><ul class="is-hidden-tablet"><li class="is-active"><a href>Adaptive Heat Equation</a></li></ul></nav><div class="docs-right"><a class="docs-navbar-link" href="https://github.com/Ferrite-FEM/Ferrite.jl" title="View the repository on GitHub"><span class="docs-icon fa-brands"></span><span class="docs-label is-hidden-touch">GitHub</span></a><a class="docs-navbar-link" href="https://github.com/Ferrite-FEM/Ferrite.jl/blob/master/docs/src/literate-tutorials/heat_adaptivity.jl" title="Edit source on GitHub"><span class="docs-icon fa-solid"></span></a><a class="docs-settings-button docs-navbar-link fa-solid fa-gear" id="documenter-settings-button" href="#" title="Settings"></a><a class="docs-article-toggle-button fa-solid fa-chevron-up" id="documenter-article-toggle-button" href="javascript:;" title="Collapse all docstrings"></a></div></header><article class="content" id="documenter-page"><h1 id="tutorial-heat-adaptivity"><a class="docs-heading-anchor" href="#tutorial-heat-adaptivity">Adaptive Heat Equation</a><a id="tutorial-heat-adaptivity-1"></a><a class="docs-heading-anchor-permalink" href="#tutorial-heat-adaptivity" title="Permalink"></a></h1><p><img src="../heat_adaptivity.png" alt="Shows refined mesh for the problem."/></p><h2 id="Introduction"><a class="docs-heading-anchor" href="#Introduction">Introduction</a><a id="Introduction-1"></a><a class="docs-heading-anchor-permalink" href="#Introduction" title="Permalink"></a></h2><p>This tutorial demonstrates adaptive mesh refinement (AMR) for a 3D heat equation using Ferrite&#39;s <code>ForestBWG</code> — a p4est-style forest-of-octrees data structure. We solve a Poisson problem with a manufactured solution that has a sharp spherical feature, driving refinement with a Zienkiewicz-Zhu (ZZ) error estimator and Dörfler marking.</p><p>The strong form of the problem reads</p><p class="math-container">\[ -\Delta u = f \quad \textbf{x} \in \Omega = [-1,1]^3,\]</p><p>with homogeneous Dirichlet boundary conditions <span>$u = 0$</span> on <span>$\partial\Omega$</span>. The right-hand side <span>$f$</span> is chosen via the method of manufactured solutions so that the exact solution is a Gaussian ring</p><p class="math-container">\[ u_{\mathrm{exact}}(\textbf{x}) = \exp\!\Bigl(-\bigl(\tfrac{\|\textbf{x}\|-0.5}{\varepsilon}\bigr)^2\Bigr), \quad \varepsilon = 0.02,\]</p><p>which is essentially zero at the boundary and has a sharp peak on the sphere <span>$\|\textbf{x}\|=0.5$</span>.</p><h2 id="Commented-Program"><a class="docs-heading-anchor" href="#Commented-Program">Commented Program</a><a id="Commented-Program-1"></a><a class="docs-heading-anchor-permalink" href="#Commented-Program" title="Permalink"></a></h2><p>First we load the required packages.</p><pre><code class="language-julia hljs">using Ferrite, SparseArrays, IterativeSolvers, WriteVTK</code></pre><h3 id="Grid-setup"><a class="docs-heading-anchor" href="#Grid-setup">Grid setup</a><a id="Grid-setup-1"></a><a class="docs-heading-anchor-permalink" href="#Grid-setup" title="Permalink"></a></h3><p>We create a structured 4×4×4 hexahedral grid on <span>$[-1,1]^3$</span>, apply a random perturbation to the interior nodes (to test robustness on deformed meshes), and wrap it in a <code>ForestBWG</code> that allows up to 10 levels of refinement. One uniform refinement gives us a reasonable starting mesh of 512 cells.</p><pre><code class="language-julia hljs">grid = generate_grid(Hexahedron, (4, 4, 4));
+function random_deformation_field(x)
+    if any(x .≈ -1.0) || any(x .≈ 1.0)
+        return x
+    else
+        Vec{3}(x .+ (rand(3) .- 0.5) * 0.15)
+    end
+end
+transform_coordinates!(grid, random_deformation_field)
+grid = ForestBWG(grid, 10)
+Ferrite.AMR.refine_all!(grid, 1)</code></pre><h3 id="Manufactured-solution"><a class="docs-heading-anchor" href="#Manufactured-solution">Manufactured solution</a><a id="Manufactured-solution-1"></a><a class="docs-heading-anchor-permalink" href="#Manufactured-solution" title="Permalink"></a></h3><p>The exact solution is a Gaussian ring concentrated on the sphere <span>$\|\textbf{x}\|=0.5$</span> with width <span>$\varepsilon = 0.02$</span>. It is essentially zero at the origin and at the boundary of the cube, so homogeneous Dirichlet conditions are appropriate. The right-hand side is obtained by applying the negative Laplacian via automatic differentiation (<code>Tensors.laplace</code>).</p><pre><code class="language-julia hljs">analytical_solution(x) = exp(-((norm(x) - 0.5) / 0.02)^2)
+analytical_rhs(x) = -laplace(analytical_solution, x)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">analytical_rhs (generic function with 1 method)</code></pre><h3 id="Element-assembly"><a class="docs-heading-anchor" href="#Element-assembly">Element assembly</a><a id="Element-assembly-1"></a><a class="docs-heading-anchor-permalink" href="#Element-assembly" title="Permalink"></a></h3><p>Standard Galerkin assembly for the Poisson equation. For each quadrature point we evaluate the manufactured right-hand side at the physical coordinate.</p><pre><code class="language-julia hljs">function assemble_cell!(ke, fe, cellvalues, ue, coords)
+    fill!(ke, 0.0)
+    fill!(fe, 0.0)
+
+    n_basefuncs = getnbasefunctions(cellvalues)
+    for q_point in 1:getnquadpoints(cellvalues)
+        x = spatial_coordinate(cellvalues, q_point, coords)
+        dΩ = getdetJdV(cellvalues, q_point)
+        for i in 1:n_basefuncs
+            Nᵢ = shape_value(cellvalues, q_point, i)
+            ∇Nᵢ = shape_gradient(cellvalues, q_point, i)
+            fe[i] += analytical_rhs(x) * Nᵢ * dΩ
+            for j in 1:n_basefuncs
+                ∇Nⱼ = shape_gradient(cellvalues, q_point, j)
+                ke[i, j] += ∇Nⱼ ⋅ ∇Nᵢ * dΩ
+            end
+        end
+    end
+    return
+end</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">assemble_cell! (generic function with 1 method)</code></pre><h3 id="Global-assembly"><a class="docs-heading-anchor" href="#Global-assembly">Global assembly</a><a id="Global-assembly-1"></a><a class="docs-heading-anchor-permalink" href="#Global-assembly" title="Permalink"></a></h3><p>Loop over all cells, reinitialize <code>CellValues</code> for the current cell geometry, compute the element contribution and assemble into the global system.</p><pre><code class="language-julia hljs">function assemble_global!(K, f, a, dh, cellvalues)
+    n_basefuncs = getnbasefunctions(cellvalues)
+    ke = zeros(n_basefuncs, n_basefuncs)
+    fe = zeros(n_basefuncs)
+    assembler = start_assemble(K, f)
+    for cell in CellIterator(dh)
+        reinit!(cellvalues, cell)
+        @views ue = a[celldofs(cell)]
+        coords = getcoordinates(cell)
+        assemble_cell!(ke, fe, cellvalues, ue, coords)
+        assemble!(assembler, celldofs(cell), ke, fe)
+    end
+    return K, f
+end</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">assemble_global! (generic function with 1 method)</code></pre><h3 id="Solve-on-a-single-grid"><a class="docs-heading-anchor" href="#Solve-on-a-single-grid">Solve on a single grid</a><a id="Solve-on-a-single-grid-1"></a><a class="docs-heading-anchor-permalink" href="#Solve-on-a-single-grid" title="Permalink"></a></h3><p>Given a (non-conforming) grid, set up the FE problem with trilinear hexahedral elements and solve it. Homogeneous Dirichlet conditions are applied on all six boundary faces. A <code>ConformityConstraint</code> ensures that the solution is continuous across hanging nodes introduced by adaptive refinement. We use a conjugate gradient solver since the system is symmetric positive definite.</p><pre><code class="language-julia hljs">function solve(grid)
+    dim = 3
+    order = 1
+    ip = Lagrange{RefHexahedron, order}()
+    qr = QuadratureRule{RefHexahedron}(2)
+    cellvalues = CellValues(qr, ip)
+
+    dh = DofHandler(grid)
+    add!(dh, :u, ip)
+    close!(dh)
+
+    # Dirichlet BCs on all boundary faces, plus hanging node constraints
+    ch = ConstraintHandler(dh)
+    for face in (&quot;top&quot;, &quot;bottom&quot;, &quot;left&quot;, &quot;right&quot;, &quot;front&quot;, &quot;back&quot;)
+        add!(ch, Dirichlet(:u, getfacetset(grid, face), (x, t) -&gt; 0.0))
+    end
+    add!(ch, ConformityConstraint(:u))
+    close!(ch)
+
+    K = allocate_matrix(dh, ch)
+    f = zeros(ndofs(dh))
+    a = zeros(ndofs(dh))
+    assemble_global!(K, f, a, dh, cellvalues)
+    apply!(K, f, ch)
+    u = cg(K, f; maxiter = 2000)
+    apply!(u, ch)
+    return u, dh, ch, cellvalues
+end</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">solve (generic function with 1 method)</code></pre><h3 id="Adaptive-solve-loop"><a class="docs-heading-anchor" href="#Adaptive-solve-loop">Adaptive solve loop</a><a id="Adaptive-solve-loop-1"></a><a class="docs-heading-anchor-permalink" href="#Adaptive-solve-loop" title="Permalink"></a></h3><p>The adaptive loop repeats: solve, estimate, mark, refine.</p><p><strong>Error estimation (Zienkiewicz-Zhu).</strong> The ZZ error estimator is a recovery-based <em>a posteriori</em> error estimator. The idea is to compare the raw finite element flux <span>$\sigma_h = \nabla u_h$</span> against a <em>recovered</em> (smoothed) flux <span>$\sigma^*$</span> obtained by L2-projecting the element-wise gradients onto a continuous nodal field. Where the smoothed flux differs significantly from the raw flux, the local approximation is poor and refinement is needed:</p><p class="math-container">\[ \eta_K^2 = \int_K \|\sigma_h - \sigma^*\|^2 \, \mathrm{d}\Omega.\]</p><p><strong>Dörfler marking.</strong> Rather than using an absolute error threshold (which requires problem-dependent tuning), we use Dörfler (bulk) marking: sort cells by decreasing error and mark the smallest set whose cumulative error exceeds a fraction <span>$\theta$</span> of the total. This guarantees a fixed fraction of the error is addressed in each step.</p><pre><code class="language-julia hljs">function solve_adaptive(initial_grid)
+    ip = Lagrange{RefHexahedron, 1}()
+    qr = QuadratureRule{RefHexahedron}(2)
+    finished = false
+    i = 1
+    grid = deepcopy(initial_grid)
+    pvd = paraview_collection(&quot;heat_amr&quot;)
+    θ = 0.5
+
+    while !finished &amp;&amp; i &lt;= 3
+        @show i
+        # Materialize the forest into a NonConformingGrid and solve
+        transfered_grid = Ferrite.creategrid(grid)
+        u, dh, ch, cv = solve(transfered_grid)
+
+        # Step 1: Compute the raw FE flux σ_h = ∇u_h at each quadrature point
+        σ_gp = Vector{Vector{Vec{3, Float64}}}()
+        for cell in CellIterator(dh)
+            reinit!(cv, cell)
+            ue = u[celldofs(cell)]
+            σ_cell = Vec{3, Float64}[]
+            for q_point in 1:getnquadpoints(cv)
+                push!(σ_cell, function_gradient(cv, q_point, ue))
+            end
+            push!(σ_gp, σ_cell)
+        end
+
+        # Step 2: Recover a smooth flux field σ* by L2-projecting the raw
+        # quadrature-point fluxes onto a continuous nodal field.
+        projector = L2Projector(ip, transfered_grid)
+        σ_dof = project(projector, σ_gp, qr)
+
+        # Step 3: Evaluate the ZZ error indicator per cell.
+        # For each cell we compare the recovered flux σ* (evaluated from the
+        # projected nodal values) against the raw flux σ_h at each quadrature point.
+        cv_σ = CellValues(qr, ip^3)
+        error_arr = zeros(getncells(transfered_grid))
+        for (cellid, cell) in enumerate(CellIterator(projector.dh))
+            reinit!(cv_σ, cell)
+            @views σe = σ_dof[celldofs(cell)]
+            for q_point in 1:getnquadpoints(cv_σ)
+                σ_star = function_value(cv_σ, q_point, reinterpret(Float64, σe))
+                σ_h = σ_gp[cellid][q_point]
+                error_arr[cellid] += norm(σ_star - σ_h)^2 * getdetJdV(cv_σ, q_point)
+            end
+        end
+
+        # Dörfler marking: sort cells by error and mark the smallest set
+        # whose cumulative error accounts for a fraction θ of the total.
+        total = sum(error_arr)
+        cells_to_refine = Int[]
+        if total &gt; 0
+            perm = sortperm(error_arr; rev = true)
+            target = θ * total
+            acc = 0.0
+            for idx in perm
+                push!(cells_to_refine, idx)
+                acc += error_arr[idx]
+                acc &gt;= target &amp;&amp; break
+            end
+        end
+
+        @info &quot;AMR step $i: $(length(cells_to_refine))/$(getncells(transfered_grid)) cells marked, total error = $total&quot;
+
+        # Export the solution and cell-wise error to VTK for visualization
+        VTKGridFile(&quot;heat_amr-$i&quot;, dh) do vtk
+            write_solution(vtk, dh, u)
+            write_cell_data(vtk, error_arr, &quot;error&quot;)
+            pvd[i] = vtk
+        end
+
+        # Refine marked cells and enforce 2:1 balance across the forest
+        Ferrite.refine!(grid, cells_to_refine)
+        Ferrite.balanceforest!(grid)
+
+        i += 1
+        if isempty(cells_to_refine)
+            finished = true
+        end
+    end
+    return vtk_save(pvd)
+end</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">solve_adaptive (generic function with 1 method)</code></pre><h3 id="Run"><a class="docs-heading-anchor" href="#Run">Run</a><a id="Run-1"></a><a class="docs-heading-anchor-permalink" href="#Run" title="Permalink"></a></h3><p>Finally, we call <code>solve_adaptive</code> with our initial forest grid.</p><pre><code class="language-julia hljs">solve_adaptive(grid)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">4-element Vector{String}:
+ &quot;heat_amr.pvd&quot;
+ &quot;heat_amr-1.vtu&quot;
+ &quot;heat_amr-2.vtu&quot;
+ &quot;heat_amr-3.vtu&quot;</code></pre><hr/><p><em>This page was generated using <a href="https://github.com/fredrikekre/Literate.jl">Literate.jl</a>.</em></p></article><nav class="docs-footer"><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option><option value="catppuccin-latte">catppuccin-latte</option><option value="catppuccin-frappe">catppuccin-frappe</option><option value="catppuccin-macchiato">catppuccin-macchiato</option><option value="catppuccin-mocha">catppuccin-mocha</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.15.0 on <span class="colophon-date" title="Thursday 12 February 2026 12:27">Thursday 12 February 2026</span>. Using Julia version 1.12.5.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>

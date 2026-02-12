@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<VTKFile type="Collection" version="1.0" byte_order="LittleEndian" compressor="vtkZLibDataCompressor">
+  <Collection>
+    <DataSet timestep="1" part="0" file="heat_amr-1.vtu"/>
+    <DataSet timestep="2" part="0" file="heat_amr-2.vtu"/>
+    <DataSet timestep="3" part="0" file="heat_amr-3.vtu"/>
+  </Collection>
+</VTKFile>
