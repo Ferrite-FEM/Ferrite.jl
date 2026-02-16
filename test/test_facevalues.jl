@@ -237,5 +237,5 @@ end # of testset
     end
 
     # Test unknown facet error path as its not yet tested in "test_quadrules.jl"
-    @test_throws ArgumentError Ferrite.weighted_normal(zero(SMatrix{2, 1}), RefLine, 3)
+    @test_throws ArgumentError Ferrite.weighted_normal(zero(MixedTensor{2, (2, 1)}), RefLine, 3)
 end

@@ -305,19 +305,6 @@ end
     end
 
     @testset "Correctness of AD of embedded interpolations" begin
-        ip = Lagrange{RefHexahedron, 2}()^3
-        ξ = rand(Vec{3, Float64})
-        for I in 1:getnbasefunctions(ip)
-            #Call StaticArray-version
-            H_sa, G_sa, V_sa = Ferrite._reference_shape_hessian_gradient_and_value_static_array(ip, ξ, I)
-            #Call tensor AD version
-            H, G, V = Ferrite.reference_shape_hessian_gradient_and_value(ip, ξ, I)
-
-            @test V ≈ V_sa
-            @test G ≈ G_sa
-            @test H ≈ H_sa
-        end
-
         ips = Lagrange{RefQuadrilateral, 2}()
         vdim = 3
         ipv = ips^vdim

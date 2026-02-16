@@ -13,7 +13,7 @@ struct MappingValues{JT, HT}
     H::HT # dJ/dξ # Hessian
 end
 
-@inline getjacobian(mv::MappingValues{<:Union{AbstractTensor, SMatrix}}) = mv.J
+@inline getjacobian(mv::MappingValues{<:AbstractTensor}) = mv.J
 @inline gethessian(mv::MappingValues{<:Any, <:AbstractTensor}) = mv.H
 
 
@@ -106,23 +106,12 @@ getngeobasefunctions(geo_mapping::GeometryMapping) = size(geo_mapping.M, 1)
 @propagate_inbounds geometric_value(geo_mapping::GeometryMapping, q_point::Int, base_func::Int) = geo_mapping.M[base_func, q_point]
 geometric_interpolation(geo_mapping::GeometryMapping) = geo_mapping.ip
 
-# Hot-fixes to support embedded elements before MixedTensors are available
-# See https://github.com/Ferrite-FEM/Tensors.jl/pull/188
-@inline otimes_helper(x::Vec{dim}, dMdξ::Vec{dim}) where {dim} = x ⊗ dMdξ
-@inline function otimes_helper(x::Vec{sdim}, dMdξ::Vec{rdim}) where {sdim, rdim}
-    return SMatrix{sdim, rdim}((x[i] * dMdξ[j] for i in 1:sdim, j in 1:rdim)...)
-end
-# End of embedded hot-fixes
-
 # For creating initial value
 function otimes_returntype(#=typeof(x)=# ::Type{<:Vec{sdim, Tx}}, #=typeof(dMdξ)=# ::Type{<:Vec{rdim, TM}}) where {sdim, rdim, Tx, TM}
-    return SMatrix{sdim, rdim, promote_type(Tx, TM)}
+    return make_type_regular(MixedTensor{2, (sdim, rdim), promote_type(Tx, TM)})
 end
-function otimes_returntype(#=typeof(x)=# ::Type{<:Vec{dim, Tx}}, #=typeof(dMdξ)=# ::Type{<:Vec{dim, TM}}) where {dim, Tx, TM}
-    return Tensor{2, dim, promote_type(Tx, TM)}
-end
-function otimes_returntype(#=typeof(x)=# ::Type{<:Vec{dim, Tx}}, #=typeof(d2Mdξ2)=# ::Type{<:Tensor{2, dim, TM}}) where {dim, Tx, TM}
-    return Tensor{3, dim, promote_type(Tx, TM)}
+function otimes_returntype(#=typeof(x)=# ::Type{<:Vec{sdim, Tx}}, #=typeof(d2Mdξ2)=# ::Type{<:Tensor{2, rdim, TM}}) where {sdim, Tx, rdim, TM}
+    return make_type_regular(MixedTensor{3, (sdim, rdim, rdim), promote_type(Tx, TM)})
 end
 
 @inline function calculate_mapping(::GeometryMapping{0}, q_point::Int, x::AbstractVector{<:Vec})
@@ -132,8 +121,7 @@ end
 @inline function calculate_mapping(geo_mapping::GeometryMapping{1}, q_point::Int, x::AbstractVector{<:Vec})
     J = zero(otimes_returntype(eltype(x), eltype(geo_mapping.dMdξ)))
     @inbounds for j in 1:getngeobasefunctions(geo_mapping)
-        # J += x[j] ⊗ geo_mapping.dMdξ[j, q_point]
-        J += otimes_helper(x[j], geo_mapping.dMdξ[j, q_point])
+        J += x[j] ⊗ geo_mapping.dMdξ[j, q_point]
     end
     return MappingValues(J, nothing)
 end
@@ -161,8 +149,7 @@ end
     J = zero(otimes_returntype(Vec{sdim, T}, Vec{rdim, T}))
     @inbounds for j in 1:n_basefuncs
         dMdξ = reference_shape_gradient(gip, ξ, j)
-        # J += x[j] ⊗ dMdξ # https://github.com/Ferrite-FEM/Tensors.jl/pull/188
-        J += otimes_helper(x[j], dMdξ)
+        J += x[j] ⊗ dMdξ
     end
     return MappingValues(J, nothing)
 end
@@ -182,7 +169,7 @@ end
 end
 
 calculate_detJ(J::Tensor{2}) = det(J)
-calculate_detJ(J::SMatrix) = embedding_det(J)
+calculate_detJ(J::MixedTensor{2}) = embedding_det(J)
 
 function calculate_jacobian_and_spatial_coordinate(gip::ScalarInterpolation, ξ::Vec{rdim, Tξ}, x::AbstractVector{<:Vec{sdim, Tx}}) where {Tξ, Tx, rdim, sdim}
     n_basefuncs = getnbasefunctions(gip)
@@ -193,7 +180,7 @@ function calculate_jacobian_and_spatial_coordinate(gip::ScalarInterpolation, ξ:
     @inbounds for j in 1:n_basefuncs
         dMdξ, M = reference_shape_gradient_and_value(gip, ξ, j)
         sx += M * x[j]
-        fecv_J += otimes_helper(x[j], dMdξ)
+        fecv_J += x[j] ⊗ dMdξ
     end
     return fecv_J, sx
 end
@@ -202,7 +189,7 @@ end
 # Embedded
 
 """
-    embedding_det(J::SMatrix{3, 2})
+    embedding_det(J::MixedTensor{2, (3, 2)})
 
 Embedding determinant for surfaces in 3D.
 
@@ -214,10 +201,10 @@ where ||∂x/∂ξ₁ × ∂x/∂ξ₂||₂ is "detJ" and n is the unit normal.
 See e.g. https://scicomp.stackexchange.com/questions/41741/integration-of-d-1-dimensional-functions-on-finite-element-surfaces for simple explanation.
 For more details see e.g. the doctoral thesis by Mirza Cenanovic **Tangential Calculus** [Cenanovic2017](@cite).
 """
-embedding_det(J::SMatrix{3, 2}) = norm(J[:, 1] × J[:, 2])
+embedding_det((J::MixedTensor{2, (3, 2)})) = norm(J[:, 1] × J[:, 2])
 
 """
-    embedding_det(J::Union{SMatrix{2, 1}, SMatrix{3, 1}})
+    embedding_det(J::Union{MixedTensor{2, (2, 1)}, MixedTensor{2, (3, 1)}})
 
 Embedding determinant for curves in 2D and 3D.
 
@@ -228,4 +215,4 @@ The transformation theorem for some function f on a 1D curve in 2D and 3D space 
 where ||∂x/∂ξ||₂ is "detJ" and t is "the unit tangent".
 See e.g. https://scicomp.stackexchange.com/questions/41741/integration-of-d-1-dimensional-functions-on-finite-element-surfaces for simple explanation.
 """
-embedding_det(J::Union{SMatrix{2, 1}, SMatrix{3, 1}}) = norm(J)
+embedding_det(J::Union{MixedTensor{2, (2, 1)}, MixedTensor{2, (3, 1)}}) = norm(J)

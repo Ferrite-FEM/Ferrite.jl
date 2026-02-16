@@ -17,7 +17,7 @@ using SparseArrays:
     SparseArrays, SparseMatrixCSC, nonzeros, nzrange, rowvals,
     AbstractSparseMatrix, AbstractSparseMatrixCSC, sparsevec
 using StaticArrays:
-    StaticArrays, MArray, MMatrix, SArray, SMatrix, SVector
+    SMatrix
 using WriteVTK:
     WriteVTK, VTKCellTypes
 using Tensors:
@@ -25,6 +25,47 @@ using Tensors:
     rotation_tensor, symmetric, tovoigt!, hessian, otimesu, otimesl
 using ForwardDiff:
     ForwardDiff
+
+# Temporary - move to Tensors.jl
+using Tensors: get_data
+Tensors.isregular(::Type{<:MixedTensor{1}}) = true
+Tensors.isregular(::Type{<:MixedTensor{2, dims}}) where {dims} = dims[1] === dims[2]
+Tensors.isregular(::Type{<:MixedTensor{3, dims}}) where {dims} = dims[1] === dims[2] === dims[3]
+Tensors.isregular(::Type{<:MixedTensor{4, dims}}) where {dims} = dims[1] === dims[2] === dims[3] === dims[4]
+
+@inline @generated function Base.getindex(S::MixedTensor{2, dims}, i::Int, ::Colon) where {dims}
+    idx2(i, j) = i + dims[1] * (j - 1)
+    ex1 = Expr(:tuple, [:(get_data(S)[$(idx2(1, j))]) for j in 1:dims[2]]...)
+    ex2 = Expr(:tuple, [:(get_data(S)[$(idx2(2, j))]) for j in 1:dims[2]]...)
+    ex3 = Expr(:tuple, [:(get_data(S)[$(idx2(3, j))]) for j in 1:dims[2]]...)
+    return quote
+        @boundscheck checkbounds(S, i, Colon())
+        if i == 1
+            return Vec{dims[2]}($ex1)
+        elseif i == 2
+            return Vec{dims[2]}($ex2)
+        else
+            return Vec{dims[2]}($ex3)
+        end
+    end
+end
+@inline @generated function Base.getindex(S::MixedTensor{2, dims}, ::Colon, j::Int) where {dims}
+    idx2(i, j) = i + dims[1] * (j - 1)
+    ex1 = Expr(:tuple, [:(get_data(S)[$(idx2(i, 1))]) for i in 1:dims[1]]...)
+    ex2 = Expr(:tuple, [:(get_data(S)[$(idx2(i, 2))]) for i in 1:dims[1]]...)
+    ex3 = Expr(:tuple, [:(get_data(S)[$(idx2(i, 3))]) for i in 1:dims[1]]...)
+    return quote
+        @boundscheck checkbounds(S, Colon(), j)
+        if j == 1
+            return Vec{dims[1]}($ex1)
+        elseif j == 2
+            return Vec{dims[1]}($ex2)
+        else
+            return Vec{dims[1]}($ex3)
+        end
+    end
+end
+# End temporary
 
 include("CollectionsOfViews.jl")
 using .CollectionsOfViews:
