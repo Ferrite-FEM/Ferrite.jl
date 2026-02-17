@@ -284,7 +284,7 @@ end
 
 # Need to manually unroll applying to each `fun_values` for maximum performance, equivalent code:
 # `foreach(fv -> apply_mapping!(fv, q_point, mapping, cell), fun_values))`
-@generated function apply_mapping!(fun_values::Tuple{Vararg{<:FunctionValues, N}}, q_point, mapping, cell) where {N}
+@generated function apply_mapping!(fun_values::Tuple{Vararg{FunctionValues, N}}, q_point, mapping, cell) where {N}
     expr = Expr(:block)
     for i in 1:N
         push!(expr.args, :(apply_mapping!(fun_values[$i], q_point, mapping, cell)))
