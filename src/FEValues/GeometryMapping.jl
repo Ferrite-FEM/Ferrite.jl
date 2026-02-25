@@ -108,10 +108,10 @@ geometric_interpolation(geo_mapping::GeometryMapping) = geo_mapping.ip
 
 # For creating initial value
 function otimes_returntype(#=typeof(x)=# ::Type{<:Vec{sdim, Tx}}, #=typeof(dMdξ)=# ::Type{<:Vec{rdim, TM}}) where {sdim, rdim, Tx, TM}
-    return Tensors.regular_if_possible(MixedTensor{2, (sdim, rdim), promote_type(Tx, TM)})
+    return Tensors.regular_if_possible(MixedTensor2{sdim, rdim, promote_type(Tx, TM)})
 end
 function otimes_returntype(#=typeof(x)=# ::Type{<:Vec{sdim, Tx}}, #=typeof(d2Mdξ2)=# ::Type{<:Tensor{2, rdim, TM}}) where {sdim, Tx, rdim, TM}
-    return Tensors.regular_if_possible(MixedTensor{3, (sdim, rdim, rdim), promote_type(Tx, TM)})
+    return Tensors.regular_if_possible(MixedTensor3{sdim, rdim, rdim, promote_type(Tx, TM)})
 end
 
 @inline function calculate_mapping(::GeometryMapping{0}, q_point::Int, x::AbstractVector{<:Vec})
@@ -189,7 +189,7 @@ end
 # Embedded
 
 """
-    embedding_det(J::MixedTensor{2, (3, 2)})
+    embedding_det(J::MixedTensor2{3, 2})
 
 Embedding determinant for surfaces in 3D.
 
@@ -201,10 +201,10 @@ where ||∂x/∂ξ₁ × ∂x/∂ξ₂||₂ is "detJ" and n is the unit normal.
 See e.g. https://scicomp.stackexchange.com/questions/41741/integration-of-d-1-dimensional-functions-on-finite-element-surfaces for simple explanation.
 For more details see e.g. the doctoral thesis by Mirza Cenanovic **Tangential Calculus** [Cenanovic2017](@cite).
 """
-embedding_det((J::MixedTensor{2, (3, 2)})) = norm(J[:, 1] × J[:, 2])
+embedding_det((J::MixedTensor2{3, 2})) = norm(J[:, 1] × J[:, 2])
 
 """
-    embedding_det(J::Union{MixedTensor{2, (2, 1)}, MixedTensor{2, (3, 1)}})
+    embedding_det(J::MixedTensor2{<:Any, 1})
 
 Embedding determinant for curves in 2D and 3D.
 
@@ -215,4 +215,4 @@ The transformation theorem for some function f on a 1D curve in 2D and 3D space 
 where ||∂x/∂ξ||₂ is "detJ" and t is "the unit tangent".
 See e.g. https://scicomp.stackexchange.com/questions/41741/integration-of-d-1-dimensional-functions-on-finite-element-surfaces for simple explanation.
 """
-embedding_det(J::Union{MixedTensor{2, (2, 1)}, MixedTensor{2, (3, 1)}}) = norm(J)
+embedding_det(J::MixedTensor2{<:Any, 1}) = norm(J)

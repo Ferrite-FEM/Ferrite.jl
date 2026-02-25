@@ -89,11 +89,10 @@ function weighted_normal(::Tensor{2, 1, T}, ::Type{RefLine}, facet::Int) where {
 end
 
 # Embedded lines
-function weighted_normal(J::MixedTensor{2, dims, T}, ::Type{RefLine}, facet::Int) where {dims, T}
-    dims[2] === 1 || throw(ArgumentError("J's last dimension must match the reference dimension"))
+function weighted_normal(J::MixedTensor2{dim1, 1, T}, ::Type{RefLine}, facet::Int) where {dim1, T}
     (facet < 1 || facet > 2) && throw(ArgumentError("unknown facet number"))
     s = facet == 1 ? -1 : 1
-    return s * Vec{dims[1], T}((J...,))
+    return s * normalize(Vec{dim1, T}((J...,)))
 end
 
 ###########################

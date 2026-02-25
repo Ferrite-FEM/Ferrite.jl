@@ -14,10 +14,10 @@ typeof_d2Ndξ2(::Type{T}, ::ScalarInterpolation, ::VectorizedInterpolation{sdim,
 
 # Vector, vdim != sdim != rdim (TODO: Use Vec/Tensor if (s|r)dim <= 3?)
 typeof_N(::Type{T}, ::VectorInterpolation{vdim}, ::VectorizedInterpolation{sdim, <:AbstractRefShape{rdim}}) where {T, vdim, sdim, rdim} = Vec{vdim, T}
-typeof_dNdx(::Type{T}, ::VectorInterpolation{vdim}, ::VectorizedInterpolation{sdim, <:AbstractRefShape{rdim}}) where {T, vdim, sdim, rdim} = Tensors.regular_if_possible(MixedTensor{2, (vdim, sdim), T})
-typeof_dNdξ(::Type{T}, ::VectorInterpolation{vdim}, ::VectorizedInterpolation{sdim, <:AbstractRefShape{rdim}}) where {T, vdim, sdim, rdim} = Tensors.regular_if_possible(MixedTensor{2, (vdim, rdim), T})
-typeof_d2Ndx2(::Type{T}, ::VectorInterpolation{vdim}, ::VectorizedInterpolation{sdim, <:AbstractRefShape{rdim}}) where {T, vdim, sdim, rdim} = Tensors.regular_if_possible(MixedTensor{3, (vdim, sdim, sdim), T})
-typeof_d2Ndξ2(::Type{T}, ::VectorInterpolation{vdim}, ::VectorizedInterpolation{sdim, <:AbstractRefShape{rdim}}) where {T, vdim, sdim, rdim} = Tensors.regular_if_possible(MixedTensor{3, (vdim, rdim, rdim), T})
+typeof_dNdx(::Type{T}, ::VectorInterpolation{vdim}, ::VectorizedInterpolation{sdim, <:AbstractRefShape{rdim}}) where {T, vdim, sdim, rdim} = Tensors.regular_if_possible(MixedTensor2{vdim, sdim, T})
+typeof_dNdξ(::Type{T}, ::VectorInterpolation{vdim}, ::VectorizedInterpolation{sdim, <:AbstractRefShape{rdim}}) where {T, vdim, sdim, rdim} = Tensors.regular_if_possible(MixedTensor2{vdim, rdim, T})
+typeof_d2Ndx2(::Type{T}, ::VectorInterpolation{vdim}, ::VectorizedInterpolation{sdim, <:AbstractRefShape{rdim}}) where {T, vdim, sdim, rdim} = Tensors.regular_if_possible(MixedTensor3{vdim, sdim, sdim, T})
+typeof_d2Ndξ2(::Type{T}, ::VectorInterpolation{vdim}, ::VectorizedInterpolation{sdim, <:AbstractRefShape{rdim}}) where {T, vdim, sdim, rdim} = Tensors.regular_if_possible(MixedTensor3{vdim, rdim, rdim, T})
 
 """
     FunctionValues{DiffOrder}(::Type{T}, ip_fun, qr::QuadratureRule, ip_geo::VectorizedInterpolation)
@@ -124,8 +124,7 @@ shape_hessian_type(::FunctionValues{1}) = nothing
 
 
 # Checks that the user provides the right dimension of coordinates to reinit! methods to ensure good error messages if not
-sdim_from_gradtype(::Type{<:Tensor{<:Any, sdim}}) where {sdim} = sdim
-sdim_from_gradtype(::Type{<:MixedTensor{2, dims}}) where {dims} = dims[2]
+sdim_from_gradtype(::Type{<:TT}) where {TT <: AbstractTensor} = last(size(TT))
 
 # For performance, these must be fully inferable for the compiler.
 # args: valname (:CellValues or :FacetValues), shape_gradient_type, eltype(x)
@@ -163,9 +162,9 @@ required_geo_diff_order(::CovariantPiolaMapping, fun_diff_order::Int) = 1 + fun_
 # Support for embedded elements
 @inline calculate_Jinv(J::Tensor{2}) = inv(J)
 # TODO: Have Tensors.jl support pinv?
-@inline function calculate_Jinv(J::MixedTensor{2, dims}) where {dims}
-    Js = SMatrix{dims[1], dims[2]}(J.data)
-    return MixedTensor{2, (dims[2], dims[1])}((pinv(Js)...,))
+@inline function calculate_Jinv(J::MixedTensor2{dim1, dim2}) where {dim1, dim2}
+    Js = SMatrix{dim1, dim2}(J.data)
+    return MixedTensor2{dim2, dim1}((pinv(Js)...,))
 end
 
 # =============
