@@ -108,10 +108,10 @@ geometric_interpolation(geo_mapping::GeometryMapping) = geo_mapping.ip
 
 # For creating initial value
 function otimes_returntype(#=typeof(x)=# ::Type{<:Vec{sdim, Tx}}, #=typeof(dMdξ)=# ::Type{<:Vec{rdim, TM}}) where {sdim, rdim, Tx, TM}
-    return make_type_regular(MixedTensor{2, (sdim, rdim), promote_type(Tx, TM)})
+    return Tensors.regular_if_possible(MixedTensor{2, (sdim, rdim), promote_type(Tx, TM)})
 end
 function otimes_returntype(#=typeof(x)=# ::Type{<:Vec{sdim, Tx}}, #=typeof(d2Mdξ2)=# ::Type{<:Tensor{2, rdim, TM}}) where {sdim, Tx, rdim, TM}
-    return make_type_regular(MixedTensor{3, (sdim, rdim, rdim), promote_type(Tx, TM)})
+    return Tensors.regular_if_possible(MixedTensor{3, (sdim, rdim, rdim), promote_type(Tx, TM)})
 end
 
 @inline function calculate_mapping(::GeometryMapping{0}, q_point::Int, x::AbstractVector{<:Vec})
