@@ -21,7 +21,7 @@ using StaticArrays:
 using WriteVTK:
     WriteVTK, VTKCellTypes
 using Tensors:
-    Tensors, AbstractTensor, SecondOrderTensor, SymmetricTensor, Tensor, Vec, MixedTensor,
+    Tensors, AbstractTensor, SecondOrderTensor, SymmetricTensor, Tensor, Vec, MixedTensor2, MixedTensor3,
     gradient, rotation_tensor, symmetric, tovoigt!, hessian, otimesu, otimesl
 using ForwardDiff:
     ForwardDiff

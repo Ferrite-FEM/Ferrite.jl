@@ -169,7 +169,7 @@ end
 end
 
 calculate_detJ(J::Tensor{2}) = det(J)
-calculate_detJ(J::MixedTensor{2}) = embedding_det(J)
+calculate_detJ(J::MixedTensor2) = embedding_det(J)
 
 function calculate_jacobian_and_spatial_coordinate(gip::ScalarInterpolation, ξ::Vec{rdim, Tξ}, x::AbstractVector{<:Vec{sdim, Tx}}) where {Tξ, Tx, rdim, sdim}
     n_basefuncs = getnbasefunctions(gip)
