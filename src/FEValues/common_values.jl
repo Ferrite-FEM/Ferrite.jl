@@ -2,7 +2,7 @@
 
 using Base: @propagate_inbounds
 
-@noinline throw_detJ_not_pos(detJ) = throw(ArgumentError("det(J) is not positive: det(J) = $(detJ)"))
+@noinline throw_detJ_not_pos(detJ) = error() # throw(ArgumentError("det(J) is not positive: det(J) = $(detJ)"))
 
 function checkquadpoint(fe_v::AbstractValues, qp::Int)
     0 < qp <= getnquadpoints(fe_v) || error("quadrature point out of range")
@@ -17,17 +17,19 @@ end
 end
 
 @noinline function throw_incompatible_dof_length(length_ue, n_base_funcs)
-    msg = "the number of base functions ($(n_base_funcs)) does not match the length " *
-        "of the vector ($(length_ue)). Perhaps you passed the global vector, " *
-        "or forgot to pass a dof_range?"
-    throw(ArgumentError(msg))
+    # msg = "the number of base functions ($(n_base_funcs)) does not match the length " *
+    #     "of the vector ($(length_ue)). Perhaps you passed the global vector, " *
+    #     "or forgot to pass a dof_range?"
+    # throw(ArgumentError(msg))
+    error()
 end
 @noinline function throw_incompatible_coord_length(length_x, n_base_funcs)
-    msg = "the number of (geometric) base functions ($(n_base_funcs)) does not match " *
-        "the number of coordinates in the vector ($(length_x)). Perhaps you forgot to " *
-        "use an appropriate geometric interpolation when creating FE values? See " *
-        "https://github.com/Ferrite-FEM/Ferrite.jl/issues/265 for more details."
-    throw(ArgumentError(msg))
+    # msg = "the number of (geometric) base functions ($(n_base_funcs)) does not match " *
+    #     "the number of coordinates in the vector ($(length_x)). Perhaps you forgot to " *
+    #     "use an appropriate geometric interpolation when creating FE values? See " *
+    #     "https://github.com/Ferrite-FEM/Ferrite.jl/issues/265 for more details."
+    # throw(ArgumentError(msg))
+    error()
 end
 
 conformity(fe_values::AbstractValues) = conformity(function_interpolation(fe_values))

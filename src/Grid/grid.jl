@@ -584,18 +584,18 @@ end
 
 Mutate `x` to the coordinates of the cell corresponding to `idx` or `cell`.
 """
-@inline function getcoordinates!(x::Vector{Vec{dim, T}}, grid::AbstractGrid, cell::AbstractCell) where {dim, T}
+@inline function getcoordinates!(x::AbstractVector{Vec{dim, T}}, grid::AbstractGrid, cell::AbstractCell) where {dim, T}
     node_ids = get_node_ids(cell)
     @inbounds for i in 1:length(x)
         x[i] = get_node_coordinate(grid, node_ids[i])
     end
     return x
 end
-@inline function getcoordinates!(x::Vector{Vec{dim, T}}, grid::AbstractGrid, cellid::Int) where {dim, T}
+@inline function getcoordinates!(x::AbstractVector{Vec{dim, T}}, grid::AbstractGrid, cellid::Int) where {dim, T}
     cell = getcells(grid, cellid)
     return getcoordinates!(x, grid, cell)
 end
-@inline getcoordinates!(x::Vector{Vec{dim, T}}, grid::AbstractGrid, cell::CellIndex) where {dim, T} = getcoordinates!(x, grid, cell.idx)
+@inline getcoordinates!(x::AbstractVector{Vec{dim, T}}, grid::AbstractGrid, cell::CellIndex) where {dim, T} = getcoordinates!(x, grid, cell.idx)
 
 """
     get_node_coordinate(grid::AbstractGrid, n::Int)
@@ -604,12 +604,12 @@ Return the coordinate of the `n`th node in `grid`
 """
 get_node_coordinate(grid, n) = get_node_coordinate(getnodes(grid, n))
 
-function cellnodes!(global_nodes::Vector{Int}, grid::AbstractGrid, i::Int)
+function cellnodes!(global_nodes::AbstractVector{Int}, grid::AbstractGrid, i::Int)
     cell = getcells(grid, i)
     _cellnodes!(global_nodes, cell)
     return global_nodes
 end
-function _cellnodes!(global_nodes::Vector{Int}, cell::AbstractCell)
+function _cellnodes!(global_nodes::AbstractVector{Int}, cell::AbstractCell)
     @assert length(global_nodes) == nnodes(cell)
     @inbounds for i in 1:length(global_nodes)
         global_nodes[i] = cell.nodes[i]
