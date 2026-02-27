@@ -36,11 +36,7 @@ function assembly_kernel!(assembler, color, cell_cache, cv, Ke)
     cv_i = get_worker_part(i, cv)
     cc_i = get_worker_part(i, cell_cache, cellid)
 
-    cc_i.flags.nodes  && Ferrite.cellnodes!(cc_i.nodes, cc_i.grid, cellid)
-    cc_i.flags.coords && Ferrite.getcoordinates!(cc_i.coords, cc_i.grid, cellid)
-    cc_i.sdh !== nothing && cc_i.flags.dofs && Ferrite.celldofs!(cc_i.dofs, cc_i.sdh, cellid)
-
-    Ferrite.reinit!(cv_i, nothing, cc_i.coords)
+    reinit!(cc_i, cellid)
 
     assemble_cell!(view(Ke, i, :, :), cc_i, cv_i, assembler)
 

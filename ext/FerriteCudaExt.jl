@@ -207,6 +207,12 @@ function get_worker_part(i, cc::GPUCellCache, cellid)
     )
 end
 
+function Ferrite.reinit!(cc_i::GPUCellCache, cellid::Integer)
+    cc_i.flags.nodes  && Ferrite.cellnodes!(cc_i.nodes, cc_i.grid, cellid)
+    cc_i.flags.coords && Ferrite.getcoordinates!(cc_i.coords, cc_i.grid, cellid)
+    cc_i.sdh !== nothing && cc_i.flags.dofs && Ferrite.celldofs!(cc_i.dofs, cc_i.sdh, cellid)
+    return nothing
+end
 
 # -------------------- assembler ----------------------
 
