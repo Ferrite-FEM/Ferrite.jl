@@ -172,7 +172,7 @@ mutable struct ConstraintHandler{DH <: AbstractDofHandler, Tv, Ti}
 end
 
 ConstraintHandler(dh::AbstractDofHandler) = ConstraintHandler(Float64, Int64, dh)
-ConstraintHandler(::Type{Tv}, dh::AbstractDofHandler) where Tv = ConstraintHandler(Tv, Int64, dh)
+ConstraintHandler(::Type{Tv}, dh::AbstractDofHandler) where {Tv} = ConstraintHandler(Tv, Int64, dh)
 function ConstraintHandler(::Type{Tv}, ::Type{Ti}, dh::AbstractDofHandler) where {Tv <: Number, Ti <: Integer}
     @assert isclosed(dh)
     return ConstraintHandler(
@@ -261,7 +261,7 @@ prescribed_dofs(ch::ConstraintHandler) = ch.prescribed_dofs
 
 # Equivalent to `copy!(out, setdiff(1:n_entries, diff))`, but requires that
 # `issorted(diff)` and that `1 ≤ diff[1] ≤ diff[end] ≤ n_entries`
-function _sorted_setdiff!(out::Vector{Ti}, n_entries::Ti, diff::Vector{Ti}) where Ti
+function _sorted_setdiff!(out::Vector{Ti}, n_entries::Ti, diff::Vector{Ti}) where {Ti}
     n_diff = length(diff)
     resize!(out, n_entries - n_diff)
     diff_ind = out_ind = 1
@@ -281,7 +281,7 @@ end
 
 Close and finalize the `ConstraintHandler`.
 """
-function close!(ch::ConstraintHandler{<:Any,<:Any,Ti}) where Ti
+function close!(ch::ConstraintHandler{<:Any, <:Any, Ti}) where {Ti}
     @assert(!isclosed(ch))
     @assert(allunique(ch.prescribed_dofs))
 
@@ -418,7 +418,7 @@ function _local_facet_dofs_for_bc(interpolation, field_dim, components, offset, 
     return local_facet_dofs, local_facet_dofs_offset
 end
 
-function _add!(ch::ConstraintHandler{<:Any,<:Any,Ti}, dbc::Dirichlet, bcnodes::AbstractVecOrSet{<:Integer}, interpolation::Interpolation, field_dim::Int, offset::Int, bcvalue::BCValues, cellset::AbstractVecOrSet{<:Integer} = OrderedSet{Int}(1:getncells(get_grid(ch.dh)))) where Ti
+function _add!(ch::ConstraintHandler{<:Any, <:Any, Ti}, dbc::Dirichlet, bcnodes::AbstractVecOrSet{<:Integer}, interpolation::Interpolation, field_dim::Int, offset::Int, bcvalue::BCValues, cellset::AbstractVecOrSet{<:Integer} = OrderedSet{Int}(1:getncells(get_grid(ch.dh)))) where {Ti}
     grid = get_grid(ch.dh)
     if interpolation !== geometric_interpolation(getcelltype(grid, first(cellset)))
         @warn("adding constraint to nodeset is not recommended for sub/super-parametric approximations.")
@@ -1102,7 +1102,7 @@ function add!(ch::ConstraintHandler, pdbc::PeriodicDirichlet)
 end
 
 function _add!(
-        ch::ConstraintHandler{<:Any,<:Any,Ti}, pdbc::PeriodicDirichlet, interpolation::Interpolation,
+        ch::ConstraintHandler{<:Any, <:Any, Ti}, pdbc::PeriodicDirichlet, interpolation::Interpolation,
         field_dim::Int, offset::Int, is_legacy::Bool, rotation_matrix::Union{Matrix{T}, Nothing}, ::Type{dof_map_t}, iterator_f::F
     ) where {T, Ti, dof_map_t, F <: Function}
     grid = get_grid(ch.dh)

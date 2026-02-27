@@ -25,7 +25,7 @@ end
 function assemble_cell!(Ke, cell, cv, assembler)
     reinit!(cv, nothing, cell.coords)
     assemble_element!(Ke, cv)
-    assemble!(assembler, celldofs(cell), Ke)
+    return assemble!(assembler, celldofs(cell), Ke)
 end
 
 function assembly_kernel!(assembler, color, cell_cache, cv, Ke)
@@ -33,8 +33,8 @@ function assembly_kernel!(assembler, color, cell_cache, cv, Ke)
     i > length(color) && return
 
     cellid = color[i]
-    cv_i   = get_worker_part(i, cv)
-    cc_i   = get_worker_part(i, cell_cache, cellid)
+    cv_i = get_worker_part(i, cv)
+    cc_i = get_worker_part(i, cell_cache, cellid)
 
     cc_i.flags.nodes  && Ferrite.cellnodes!(cc_i.nodes, cc_i.grid, cellid)
     cc_i.flags.coords && Ferrite.getcoordinates!(cc_i.coords, cc_i.grid, cellid)
@@ -50,7 +50,7 @@ end
 function assemble_global!(cv::CellValues, K::CuSparseMatrixCSC, cell_cache, colors::Vector, Ke)
     assembler = start_assemble(K)
     for color in colors
-        @cuda threads=length(color) assembly_kernel!(assembler, color, cell_cache, cv, Ke)
+        @cuda threads = length(color) assembly_kernel!(assembler, color, cell_cache, cv, Ke)
         CUDA.synchronize()
     end
     return nothing
@@ -68,26 +68,26 @@ end
 
 ### --- Example / Tests ---
 
-grid = generate_grid(Hexahedron, (10, 10, 10), Vec{3}((-1.f0,-1.f0,-1.f0)), Vec{3}((1.f0,1.f0,1.f0)))
-ip   = Lagrange{RefHexahedron, 1}()
-qr   = QuadratureRule{RefHexahedron}(Float32, 2)
-cv   = CellValues(qr, ip)
-dh   = DofHandler(grid)
+grid = generate_grid(Hexahedron, (10, 10, 10), Vec{3}((-1.0f0, -1.0f0, -1.0f0)), Vec{3}((1.0f0, 1.0f0, 1.0f0)))
+ip = Lagrange{RefHexahedron, 1}()
+qr = QuadratureRule{RefHexahedron}(Float32, 2)
+cv = CellValues(qr, ip)
+dh = DofHandler(grid)
 add!(dh, :u, ip)
 close!(dh)
 K = allocate_matrix(SparseMatrixCSC{Float32, Int32}, dh)
 
-colors     = create_coloring(grid, collect(Int32, dh.subdofhandlers[1].cellset))
-backend    = CUDABackend()
+colors = create_coloring(grid, collect(Int32, dh.subdofhandlers[1].cellset))
+backend = CUDABackend()
 colors_gpu = [adapt(backend, c) for c in colors]
-n_workers  = maximum(length.(colors_gpu))
+n_workers = maximum(length.(colors_gpu))
 descriptor = TaskDescriptor(backend, n_workers)
-dh_gpu     = adapt(descriptor, dh)
-sdh        = dh_gpu.subdofhandlers[1]
-K_gpu      = allocate_matrix(CuSparseMatrixCSC{Float32, Int32}, dh)
-cv_gpu     = adapt(descriptor, cv)
+dh_gpu = adapt(descriptor, dh)
+sdh = dh_gpu.subdofhandlers[1]
+K_gpu = allocate_matrix(CuSparseMatrixCSC{Float32, Int32}, dh)
+cv_gpu = adapt(descriptor, cv)
 cell_cache = Ferrite.CellCache(descriptor, sdh)
-Ke         = KernelAbstractions.zeros(backend, Float32, n_workers, getnbasefunctions(cv), getnbasefunctions(cv))
+Ke = KernelAbstractions.zeros(backend, Float32, n_workers, getnbasefunctions(cv), getnbasefunctions(cv))
 
 assemble_global!(cv_gpu, K_gpu, cell_cache, colors_gpu, Ke)
 assemble_global!(cv, K, dh)
@@ -101,8 +101,8 @@ add!(ch, Dirichlet(:u, union(getfacetset(grid, "left"), getfacetset(grid, "right
 close!(ch)
 
 ch_gpu = adapt(backend, ch)
-f      = zeros(Float32, ndofs(dh))
-f_gpu  = KernelAbstractions.zeros(backend, Float32, ndofs(dh))
+f = zeros(Float32, ndofs(dh))
+f_gpu = KernelAbstractions.zeros(backend, Float32, ndofs(dh))
 
 apply!(K, f, ch)
 apply!(K_gpu, f_gpu, ch_gpu)
@@ -112,13 +112,19 @@ apply!(K_gpu, f_gpu, ch_gpu)
 
 # Dirichlet BCs — inhomogeneous (left + right + top + bottom)
 ch2 = ConstraintHandler(Float32, Int32, dh)
-add!(ch2, Dirichlet(:u, union(getfacetset(grid, "left"), getfacetset(grid, "right"),
-                              getfacetset(grid, "top"),  getfacetset(grid, "bottom")), (x, t) -> 1.0))
+add!(
+    ch2, Dirichlet(
+        :u, union(
+            getfacetset(grid, "left"), getfacetset(grid, "right"),
+            getfacetset(grid, "top"), getfacetset(grid, "bottom")
+        ), (x, t) -> 1.0
+    )
+)
 close!(ch2)
 
 ch_gpu2 = adapt(backend, ch2)
-f2      = zeros(Float32, ndofs(dh))
-f_gpu2  = KernelAbstractions.zeros(backend, Float32, ndofs(dh))
+f2 = zeros(Float32, ndofs(dh))
+f_gpu2 = KernelAbstractions.zeros(backend, Float32, ndofs(dh))
 
 apply!(K, f2, ch2)
 apply!(K_gpu, f_gpu2, ch_gpu2)

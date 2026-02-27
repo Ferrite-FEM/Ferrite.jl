@@ -12,25 +12,29 @@ import KernelAbstractions: KernelAbstractions, get_backend
 
 # ----------------- grid --------------------
 
-struct GPUGrid{dim, C <: Ferrite.AbstractCell, T <: Real,
-    CA <: AbstractArray{C,1}, NA <: AbstractArray{Node{dim,T},1}} <: Ferrite.AbstractGrid{dim}
-cells::CA
-nodes::NA
+struct GPUGrid{
+        dim, C <: Ferrite.AbstractCell, T <: Real,
+        CA <: AbstractArray{C, 1}, NA <: AbstractArray{Node{dim, T}, 1},
+    } <: Ferrite.AbstractGrid{dim}
+    cells::CA
+    nodes::NA
 end
 
 function Adapt.adapt_structure(to, grid::GPUGrid)
-return GPUGrid(Adapt.adapt_structure(to, grid.cells), Adapt.adapt_structure(to, grid.nodes))
+    return GPUGrid(Adapt.adapt_structure(to, grid.cells), Adapt.adapt_structure(to, grid.nodes))
 end
 
 function GPUGrid(backend, grid::AbstractGrid)
-return GPUGrid(adapt(backend, getcells(grid)), adapt(backend, getnodes(grid)))
+    return GPUGrid(adapt(backend, getcells(grid)), adapt(backend, getnodes(grid)))
 end
 
 
 # ----------------- dofs --------------------
 
-struct GPUSubDofHandler{CS <: AbstractVector{Int}, CD <: AbstractVector{Int},
-                        CO <: AbstractVector{Int}, FN, DR <: Tuple, G}
+struct GPUSubDofHandler{
+        CS <: AbstractVector{Int}, CD <: AbstractVector{Int},
+        CO <: AbstractVector{Int}, FN, DR <: Tuple, G,
+    }
     cellset::CS
     cell_dofs::CD
     cell_dofs_offset::CO
@@ -81,13 +85,15 @@ struct GPUDofHandler{dim, G <: GPUGrid{dim}, SDH <: GPUSubDofHandler} <: Ferrite
 end
 
 function GPUDofHandler(backend, dh::DofHandler)
-    gpu_grid         = GPUGrid(backend, dh.grid)
-    cell_dofs        = adapt(backend, dh.cell_dofs)
+    gpu_grid = GPUGrid(backend, dh.grid)
+    cell_dofs = adapt(backend, dh.cell_dofs)
     cell_dofs_offset = adapt(backend, dh.cell_dofs_offset)
     subdofhandlers = map(dh.subdofhandlers) do sdh
         dof_ranges = Tuple(Ferrite.dof_range(sdh, i) for i in 1:length(sdh.field_names))
-        GPUSubDofHandler(adapt(backend, collect(Int, sdh.cellset)), cell_dofs, cell_dofs_offset,
-                         sdh.ndofs_per_cell, copy(sdh.field_names), dof_ranges, gpu_grid)
+        GPUSubDofHandler(
+            adapt(backend, collect(Int, sdh.cellset)), cell_dofs, cell_dofs_offset,
+            sdh.ndofs_per_cell, copy(sdh.field_names), dof_ranges, gpu_grid
+        )
     end
     return GPUDofHandler(subdofhandlers, gpu_grid)
 end
@@ -144,16 +150,16 @@ function adapt(to::TaskDescriptor, cv::CellValues)
     )
 end
 
-function adapt(to::TaskDescriptor, qr::QuadratureRule{shape}) where shape
+function adapt(to::TaskDescriptor, qr::QuadratureRule{shape}) where {shape}
     d = to.device
     return QuadratureRule{shape}(adapt(d, collect(qr.weights)), adapt(d, collect(qr.points)))
 end
 
-function adapt(to, qr::QuadratureRule{shape}) where shape
+function adapt(to, qr::QuadratureRule{shape}) where {shape}
     return QuadratureRule{shape}(adapt(to, qr.weights), adapt(to, qr.points))
 end
 
-function adapt_structure(to, qr::QuadratureRule{shape}) where shape
+function adapt_structure(to, qr::QuadratureRule{shape}) where {shape}
     return QuadratureRule{shape}(adapt_structure(to, qr.weights), adapt_structure(to, qr.points))
 end
 
@@ -171,30 +177,34 @@ struct GPUCellCache{G <: AbstractGrid, SDH, IVT, VX}
 end
 Adapt.@adapt_structure GPUCellCache
 
-function GPUCellCache(sdh::GPUSubDofHandler, grid::GPUGrid{dim}, descriptor::TaskDescriptor,
-                      flags::UpdateFlags = UpdateFlags()) where dim
+function GPUCellCache(
+        sdh::GPUSubDofHandler, grid::GPUGrid{dim}, descriptor::TaskDescriptor,
+        flags::UpdateFlags = UpdateFlags()
+    ) where {dim}
     d = descriptor.device
     @allowscalar begin
-        n      = sdh.ndofs_per_cell
-        N      = Ferrite.nnodes_per_cell(grid, 1)
-        W      = descriptor.num_workers
-        nodes  = KernelAbstractions.zeros(d, Int, W, N)
+        n = sdh.ndofs_per_cell
+        N = Ferrite.nnodes_per_cell(grid, 1)
+        W = descriptor.num_workers
+        nodes = KernelAbstractions.zeros(d, Int, W, N)
         coords = KernelAbstractions.zeros(d, Vec{dim, get_coordinate_eltype(grid)}, W, N)
-        dofs   = KernelAbstractions.zeros(d, Int, W, n)
+        dofs = KernelAbstractions.zeros(d, Int, W, n)
     end
     return GPUCellCache(flags, grid, -1, nodes, coords, sdh, dofs)
 end
 
 Ferrite.celldofs(cc::GPUCellCache) = cc.dofs
 
-# TODO I do not like this design. 
+# TODO I do not like this design.
 function Ferrite.CellCache(descriptor::TaskDescriptor, sdh::GPUSubDofHandler, flags::UpdateFlags = UpdateFlags())
     return GPUCellCache(sdh, sdh.grid, descriptor, flags)
 end
 
 function get_worker_part(i, cc::GPUCellCache, cellid)
-    return GPUCellCache(cc.flags, cc.grid, cellid,
-                        view(cc.nodes, i, :), view(cc.coords, i, :), cc.sdh, view(cc.dofs, i, :))
+    return GPUCellCache(
+        cc.flags, cc.grid, cellid,
+        view(cc.nodes, i, :), view(cc.coords, i, :), cc.sdh, view(cc.dofs, i, :)
+    )
 end
 
 
@@ -216,8 +226,8 @@ function Ferrite.assemble!(A::GPUCSCAssembler, dofs::AbstractVector{<:Integer}, 
     ndofs = length(dofs)
     for j in 1:ndofs
         col = dofs[j]
-        r1  = A.colptr[col]
-        r2  = A.colptr[col + 1] - 1
+        r1 = A.colptr[col]
+        r2 = A.colptr[col + 1] - 1
         for i in 1:ndofs
             val = Ke[i, j]
             iszero(val) && continue
@@ -276,13 +286,14 @@ function meandiag_kernel!(diag, colptr, rowval, nzval, n)
     return nothing
 end
 
-function meandiag(K::CuSparseMatrixCSC{T}) where T
+function meandiag(K::CuSparseMatrixCSC{T}) where {T}
     n = size(K, 1)
     backend = get_backend(nonzeros(K))
     diag = KernelAbstractions.zeros(backend, T, n)
     threads = min(256, n)
-    @cuda threads=threads blocks=cld(n, threads) meandiag_kernel!(
-        diag, SparseArrays.getcolptr(K), rowvals(K), nonzeros(K), n)
+    @cuda threads = threads blocks = cld(n, threads) meandiag_kernel!(
+        diag, SparseArrays.getcolptr(K), rowvals(K), nonzeros(K), n
+    )
     return sum(diag) / n
 end
 
@@ -326,35 +337,38 @@ function apply_set_diag_kernel!(colptr, rowval, nzval, f, prescribed_dofs, inhom
     return nothing
 end
 
-function Ferrite.apply!(K::CuSparseMatrixCSC{T}, f::CuVector{T}, ch::GPUConstraintHandler{T}, applyzero::Bool = false) where T
+function Ferrite.apply!(K::CuSparseMatrixCSC{T}, f::CuVector{T}, ch::GPUConstraintHandler{T}, applyzero::Bool = false) where {T}
     n_prescribed = length(ch.prescribed_dofs)
     n_prescribed == 0 && return
 
-    colptr    = SparseArrays.getcolptr(K)
-    rv        = rowvals(K)
-    nz        = nonzeros(K)
-    nnz       = length(nz)
-    m         = meandiag(K)
+    colptr = SparseArrays.getcolptr(K)
+    rv = rowvals(K)
+    nz = nonzeros(K)
+    nnz = length(nz)
+    m = meandiag(K)
     threads_p = min(256, n_prescribed)
-    blocks_p  = cld(n_prescribed, threads_p)
+    blocks_p = cld(n_prescribed, threads_p)
 
     # Step 1+2: f -= K[:,d]*v, then zero prescribed columns
-    @cuda threads=threads_p blocks=blocks_p apply_inhom_zero_cols_kernel!(
-        f, colptr, rv, nz, ch.prescribed_dofs, ch.inhomogeneities, n_prescribed, applyzero)
+    @cuda threads = threads_p blocks = blocks_p apply_inhom_zero_cols_kernel!(
+        f, colptr, rv, nz, ch.prescribed_dofs, ch.inhomogeneities, n_prescribed, applyzero
+    )
 
     # Step 3: zero prescribed rows
     threads_z = min(256, nnz)
-    @cuda threads=threads_z blocks=cld(nnz, threads_z) apply_zero_rows_kernel!(
-        rv, nz, ch.is_prescribed, nnz)
+    @cuda threads = threads_z blocks = cld(nnz, threads_z) apply_zero_rows_kernel!(
+        rv, nz, ch.is_prescribed, nnz
+    )
 
     # Step 4: set diagonal and rhs
-    @cuda threads=threads_p blocks=blocks_p apply_set_diag_kernel!(
-        colptr, rv, nz, f, ch.prescribed_dofs, ch.inhomogeneities, T(m), n_prescribed, applyzero)
+    @cuda threads = threads_p blocks = blocks_p apply_set_diag_kernel!(
+        colptr, rv, nz, f, ch.prescribed_dofs, ch.inhomogeneities, T(m), n_prescribed, applyzero
+    )
 
     return
 end
 
-function Ferrite.apply_zero!(K::CuSparseMatrixCSC{T}, f::CuVector{T}, ch::GPUConstraintHandler{T}) where T
+function Ferrite.apply_zero!(K::CuSparseMatrixCSC{T}, f::CuVector{T}, ch::GPUConstraintHandler{T}) where {T}
     return Ferrite.apply!(K, f, ch, true)
 end
 
