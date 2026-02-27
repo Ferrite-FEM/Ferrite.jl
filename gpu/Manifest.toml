@@ -2,7 +2,7 @@
 
 julia_version = "1.11.8"
 manifest_format = "2.0"
-project_hash = "a1a49511cd14965bf1a0e55053132a32c4c89a76"
+project_hash = "391032c25947f1c06d68acd4220b0e4e3011d882"
 
 [[deps.AbstractFFTs]]
 deps = ["LinearAlgebra"]
@@ -208,11 +208,15 @@ version = "1.3.0"
 
     [deps.Ferrite.extensions]
     FerriteBlockArrays = "BlockArrays"
+    FerriteCudaExt = ["Adapt", "CUDA", "KernelAbstractions"]
     FerriteMetis = "Metis"
     FerriteSparseMatrixCSR = "SparseMatricesCSR"
 
     [deps.Ferrite.weakdeps]
+    Adapt = "79e6a3ab-5dfb-504d-930d-738a2a938a0e"
     BlockArrays = "8e7c35d0-a365-5155-bbbb-fb81a777f24e"
+    CUDA = "052768ef-5323-5732-b1bb-66c8b64840ba"
+    KernelAbstractions = "63c18a36-062a-441e-b654-da1e3ab1ce7c"
     Metis = "2679e427-3c69-5b7f-982b-ece356f1e94b"
     SparseMatricesCSR = "a0a7dd2c-ebf4-11e9-1f05-cf50bc540ca1"
 
