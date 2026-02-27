@@ -1246,15 +1246,15 @@ function _add!(
     # Any remaining mappings are added as homogeneous AffineConstraints
     for (k, v) in dof_map
         if dof_map_t === Int
-            ac = AffineConstraint(k, [v => one(T)], inhomogeneity_map === nothing ? zero(T) : inhomogeneity_map[k])
+            ac = AffineConstraint(k, [v => one(Tv)], inhomogeneity_map === nothing ? zero(Tv) : inhomogeneity_map[k])
             add!(ch, ac)
         else
             @assert inhomogeneity_map === nothing
             @assert rotation_matrix !== nothing
             for (i, ki) in pairs(k)
                 # u_mirror = R ⋅ u_image
-                vs = Pair{Int, eltype(T)}[v[j] => rotation_matrix[i, j] for j in 1:length(v)]
-                ac = AffineConstraint(ki, vs, zero(T))
+                vs = Pair{Int, eltype(Tv)}[v[j] => rotation_matrix[i, j] for j in 1:length(v)]
+                ac = AffineConstraint(ki, vs, zero(Tv))
                 add!(ch, ac)
             end
         end
