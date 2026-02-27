@@ -25,59 +25,82 @@ function GPUGrid(::Type{T}, grid::Grid) where T
     )
 end
 
-struct GPUSubDofHandler
-    ndofs_per_cell::Int
-end
-
-struct GPUDofHandler{sdim, GRID <: GPUGrid{sdim}, CADOFS <: AbstractArray{Int,1}, CAOFFSETS <: AbstractArray{Int,1}, CASDHI <: AbstractArray{Int,1}, SDHS <: Tuple} <: Ferrite.AbstractDofHandler
+struct GPUSubDofHandler{CELLSET <: AbstractVector{Int}, CADOFS <: AbstractVector{Int}, CAOFFSETS <: AbstractVector{Int}, FN, DR <: Tuple}
+    cellset::CELLSET
     cell_dofs::CADOFS
     cell_dofs_offset::CAOFFSETS
-    cell_to_subdofhandler::CASDHI
-    subdofhandlers::SDHS
-    grid::GRID
+    ndofs_per_cell::Int
+    # Vector{Symbol} on CPU, Nothing on GPU — Symbol is not a bitstype and cannot
+    # be stored in GPU memory. Use the integer index overload of dof_range on GPU.
+    field_names::FN
+    dof_ranges::DR
 end
-function GPUDofHandler(dh::DofHandler)
-    sdhs = Tuple(GPUSubDofHandler(sdh.ndofs_per_cell) for sdh in dh.subdofhandlers)
-    GPUDofHandler(
-        CuArray(dh.cell_dofs),
-        CuArray(dh.cell_dofs_offset),
-        CuArray(dh.cell_to_subdofhandler),
-        sdhs,
-        GPUGrid(dh.grid)
+
+function Adapt.adapt_structure(to, sdh::GPUSubDofHandler)
+    GPUSubDofHandler(
+        Adapt.adapt_structure(to, sdh.cellset),
+        Adapt.adapt_structure(to, sdh.cell_dofs),
+        Adapt.adapt_structure(to, sdh.cell_dofs_offset),
+        sdh.ndofs_per_cell,
+        nothing,
+        sdh.dof_ranges,
     )
 end
-function GPUDofHandler(::Type{T}, dh::DofHandler) where T
-    sdhs = Tuple(GPUSubDofHandler(sdh.ndofs_per_cell) for sdh in dh.subdofhandlers)
-    GPUDofHandler(
-        CuArray(dh.cell_dofs),
-        CuArray(dh.cell_dofs_offset),
-        CuArray(dh.cell_to_subdofhandler),
-        sdhs,
-        GPUGrid(T, dh.grid)
-    )
+
+Ferrite.ndofs_per_cell(sdh::GPUSubDofHandler) = sdh.ndofs_per_cell
+
+function Ferrite.dof_range(sdh::GPUSubDofHandler, field_idx::Int)
+    return sdh.dof_ranges[field_idx]
 end
-Ferrite.get_grid(dh::GPUDofHandler) = dh.grid
-function Ferrite.ndofs_per_cell(dh::GPUDofHandler, i::Int)
-    sdhidx = dh.cell_to_subdofhandler[i]
-    return dh.subdofhandlers[sdhidx].ndofs_per_cell
+function Ferrite.dof_range(sdh::GPUSubDofHandler, field_name::Symbol)
+    idx = findfirst(==(field_name), sdh.field_names)
+    idx === nothing && error("Field $field_name not found in GPUSubDofHandler")
+    return sdh.dof_ranges[idx]
 end
-function Ferrite.celldofs(dh::GPUDofHandler, cell_index::Int)
-    n = Ferrite.ndofs_per_cell(dh, cell_index)
-    offset = dh.cell_dofs_offset[cell_index] - 1
-    return @view dh.cell_dofs[offset:(offset + n)]
-end
-function Ferrite.celldofs!(global_dofs::AbstractVector, dh::GPUDofHandler, i::Integer)
-    offset = dh.cell_dofs_offset[i] - 1
-    n = Ferrite.ndofs_per_cell(dh, i)
+
+function Ferrite.celldofs!(global_dofs::AbstractVector, sdh::GPUSubDofHandler, i::Integer)
+    offset = sdh.cell_dofs_offset[i] - 1
+    n = sdh.ndofs_per_cell
     @inbounds for j in 1:n
-        global_dofs[j] = dh.cell_dofs[offset + j]
+        global_dofs[j] = sdh.cell_dofs[offset + j]
     end
     return global_dofs
 end
-Adapt.@adapt_structure GPUDofHandler
+
+# CPU-only container — not sent to the GPU
+struct GPUDofHandler{sdim, GRID <: GPUGrid{sdim}, SDH <: GPUSubDofHandler} <: Ferrite.AbstractDofHandler
+    subdofhandlers::Vector{SDH}
+    grid::GRID
+end
+
+function _build_gpu_subdofhandler(sdh, cell_dofs_cu, cell_dofs_offset_cu)
+    dof_ranges = Tuple(Ferrite.dof_range(sdh, i) for i in 1:length(sdh.field_names))
+    GPUSubDofHandler(
+        CuArray(collect(Int, sdh.cellset)),
+        cell_dofs_cu, cell_dofs_offset_cu,
+        sdh.ndofs_per_cell,
+        copy(sdh.field_names),
+        dof_ranges,
+    )
+end
+
+function GPUDofHandler(dh::DofHandler)
+    cell_dofs_cu = CuArray(dh.cell_dofs)
+    cell_dofs_offset_cu = CuArray(dh.cell_dofs_offset)
+    sdhs = [_build_gpu_subdofhandler(sdh, cell_dofs_cu, cell_dofs_offset_cu) for sdh in dh.subdofhandlers]
+    GPUDofHandler(sdhs, GPUGrid(dh.grid))
+end
+
+function GPUDofHandler(::Type{T}, dh::DofHandler) where T
+    cell_dofs_cu = CuArray(dh.cell_dofs)
+    cell_dofs_offset_cu = CuArray(dh.cell_dofs_offset)
+    sdhs = [_build_gpu_subdofhandler(sdh, cell_dofs_cu, cell_dofs_offset_cu) for sdh in dh.subdofhandlers]
+    GPUDofHandler(sdhs, GPUGrid(T, dh.grid))
+end
+
+Ferrite.get_grid(dh::GPUDofHandler) = dh.grid
 
 grid = generate_grid(Hexahedron, (10, 10, 10), Vec{3}((-1.f0,-1.f0,-1.f0)), Vec{3}((1.f0,1.f0,1.f0)));
-colors = create_coloring(grid)
 
 ip = Lagrange{RefHexahedron, 1}()
 qr = QuadratureRule{RefHexahedron}(Float32, 2)
@@ -219,27 +242,27 @@ Adapt.@adapt_structure CellValues
 Adapt.@adapt_structure Ferrite.GeometryMapping
 Adapt.@adapt_structure Ferrite.FunctionValues
 
-struct GPUCellCache{G <: AbstractGrid, DH <: Union{AbstractDofHandler, Nothing}, IVT, VX}
+struct GPUCellCache{G <: AbstractGrid, SDH, IVT, VX}
     flags::UpdateFlags
     grid::G
     cellid::Int
     nodes::IVT
     coords::VX
-    dh::DH
+    sdh::SDH
     dofs::IVT
 end
 Adapt.@adapt_structure GPUCellCache
 
-function GPUCellCache(dh::GPUDofHandler{dim}, descriptor::CudaTaskDescriptor, flags::UpdateFlags = UpdateFlags()) where {dim}
-    @allowscalar begin 
-        n = Ferrite.ndofs_per_cell(dh, 1) # dofs and coords will be resized in `reinit!`
-        N = Ferrite.nnodes_per_cell(get_grid(dh), 1)
+function GPUCellCache(sdh::GPUSubDofHandler, grid::GPUGrid{dim}, descriptor::CudaTaskDescriptor, flags::UpdateFlags = UpdateFlags()) where {dim}
+    @allowscalar begin
+        n = sdh.ndofs_per_cell
+        N = Ferrite.nnodes_per_cell(grid, 1)
         W = descriptor.num_workers
         nodes = CUDA.zeros(Int, W, N)
-        coords = CUDA.zeros(Vec{dim, get_coordinate_eltype(get_grid(dh))}, W, N)
+        coords = CUDA.zeros(Vec{dim, get_coordinate_eltype(grid)}, W, N)
         celldofs = CUDA.zeros(Int, W, n)
     end
-    return GPUCellCache(flags, get_grid(dh), -1, nodes, coords, dh, celldofs)
+    return GPUCellCache(flags, grid, -1, nodes, coords, sdh, celldofs)
 end
 
 function extract_ith_item(i, cc::GPUCellCache, cellid)
@@ -249,7 +272,7 @@ function extract_ith_item(i, cc::GPUCellCache, cellid)
         cellid,
         view(cc.nodes, i, :),
         view(cc.coords, i, :),
-        cc.dh,
+        cc.sdh,
         view(cc.dofs, i, :),
     )
 end
@@ -419,19 +442,17 @@ function Ferrite.apply_zero!(K::CuSparseMatrixCSC{T}, f::CuVector{T}, ch::GPUCon
     return Ferrite.apply!(K, f, ch, true)
 end
 
-function assemble_global_gpu(cv::CellValues, K::CuSparseMatrixCSC, dh::GPUDofHandler, ccs, colors::Vector, Kes)
-    n_basefuncs = getnbasefunctions(cv)
+function assemble_global_gpu(cv::CellValues, K::CuSparseMatrixCSC, ccs, colors::Vector, Kes)
     num_parallel_workers = maximum(length.(colors))
-    Ke = zeros(n_basefuncs, n_basefuncs)
     assembler = start_assemble(K)
     for color in colors
-        @cuda threads=num_parallel_workers cuda_kernel(assembler, dh, color, ccs, cv, Kes)
+        @cuda threads=num_parallel_workers cuda_kernel(assembler, color, ccs, cv, Kes)
         CUDA.synchronize()
     end
     return nothing
 end
 
-function cuda_kernel(assemblers, dh, color, ccs, allcv, Kes)
+function cuda_kernel(assemblers, color, ccs, allcv, Kes)
     i = threadIdx().x
     if i > length(color) 
         return # do not go out of bounds
@@ -440,15 +461,14 @@ function cuda_kernel(assemblers, dh, color, ccs, allcv, Kes)
     cellid = color[i]
     cv = extract_ith_item(i, allcv)
     cc = extract_ith_item(i, ccs, cellid)
-    # reinit!(cc)
     if cc.flags.nodes
         Ferrite.cellnodes!(cc.nodes, cc.grid, cellid)
     end
     if cc.flags.coords
         Ferrite.getcoordinates!(cc.coords, cc.grid, cellid)
     end
-    if cc.dh !== nothing && cc.flags.dofs
-        Ferrite.celldofs!(cc.dofs, cc.dh, cellid)
+    if cc.sdh !== nothing && cc.flags.dofs
+        Ferrite.celldofs!(cc.dofs, cc.sdh, cellid)
     end
 
     Ferrite.reinit!(cv, nothing, cc.coords)
@@ -461,13 +481,15 @@ function cuda_kernel(assemblers, dh, color, ccs, allcv, Kes)
 end
 
 dhgpu = GPUDofHandler(dh)
+sdh = dhgpu.subdofhandlers[1]
+colors = create_coloring(grid, collect(Int, dh.subdofhandlers[1].cellset))
 Kgpu = CuSparseMatrixCSC(K)
 colorsgpu = CuVector.(colors)
 num_parallel_workers = maximum(length.(colors))
 cvgpu = adapt(CudaTaskDescriptor(num_parallel_workers), cv)
-ccs = GPUCellCache(dhgpu, CudaTaskDescriptor(num_parallel_workers))
+ccs = GPUCellCache(sdh, get_grid(dhgpu), CudaTaskDescriptor(num_parallel_workers))
 Kes = CUDA.zeros(num_parallel_workers, getnbasefunctions(cv), getnbasefunctions(cv))
-assemble_global_gpu(cvgpu, Kgpu, dhgpu, ccs, colorsgpu, Kes)
+assemble_global_gpu(cvgpu, Kgpu, ccs, colorsgpu, Kes)
 assemble_global_cpu(cv, K, dh)
 
 using Test
