@@ -10,12 +10,12 @@ function get_worker_part(i, cv::CellValues)
         cv.qr, view(cv.detJdV, i, :)
     )
 end
-function get_worker_part(i, fv::Ferrite.FunctionValues)
-    return Ferrite.FunctionValues(
+function get_worker_part(i, fv::FunctionValues)
+    return FunctionValues(
         fv.ip, view(fv.Nx, i, :, :), fv.Nξ,
         view(fv.dNdx, i, :, :), fv.dNdξ, nothing, nothing
     )
 end
-function get_worker_part(i, fv::Ferrite.GeometryMapping)
-    return Ferrite.GeometryMapping(fv.ip, view(fv.M, i, :, :), fv.dMdξ, fv.d2Mdξ2)
+function get_worker_part(i, fv::GeometryMapping)
+    return GeometryMapping(fv.ip, view(fv.M, i, :, :), fv.dMdξ, fv.d2Mdξ2)
 end
