@@ -1102,9 +1102,9 @@ function add!(ch::ConstraintHandler, pdbc::PeriodicDirichlet)
 end
 
 function _add!(
-        ch::ConstraintHandler{<:Any, <:Any, Ti}, pdbc::PeriodicDirichlet, interpolation::Interpolation,
-        field_dim::Int, offset::Int, is_legacy::Bool, rotation_matrix::Union{Matrix{T}, Nothing}, ::Type{dof_map_t}, iterator_f::F
-    ) where {T, Ti, dof_map_t, F <: Function}
+        ch::ConstraintHandler{<:Any, Tv, Ti}, pdbc::PeriodicDirichlet, interpolation::Interpolation,
+        field_dim::Int, offset::Int, is_legacy::Bool, rotation_matrix::Union{Matrix{Tv}, Nothing}, ::Type{dof_map_t}, iterator_f::F
+    ) where {Tv, Ti, dof_map_t, F <: Function}
     grid = get_grid(ch.dh)
     facet_map = pdbc.facet_map
 
