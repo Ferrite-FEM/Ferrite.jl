@@ -3,7 +3,7 @@ import CUDA: CUDA.CUSPARSE.CuSparseMatrixCSC, @allowscalar
 import Ferrite: get_grid, AbstractGrid, AbstractDofHandler, get_coordinate_eltype
 import Adapt: Adapt, adapt, adapt_structure
 import KernelAbstractions: KernelAbstractions, get_backend
-using StaticArrays, SparseArrays
+using SparseArrays
 
 import Ferrite: TaskDescriptor, get_worker_part
 
