@@ -296,6 +296,129 @@ function Ferrite.assemble!(A::GPUCSCAssembler, dofs::AbstractVector{<:Integer}, 
     return nothing
 end
 
+# GPU ConstraintHandler - stores constraint data for GPU apply!
+struct GPUConstraintHandler{T, PD <: AbstractVector, IH <: AbstractVector{T}, IP <: AbstractVector{Bool}}
+    prescribed_dofs::PD
+    inhomogeneities::IH
+    is_prescribed::IP
+end
+
+function GPUConstraintHandler(ch::ConstraintHandler{<:Any, T}, ::Type{Tv} = T) where {T, Tv}
+    @assert Ferrite.isclosed(ch)
+    n = Ferrite.ndofs(ch.dh)
+    is_prescribed = zeros(Bool, n)
+    for d in ch.prescribed_dofs
+        is_prescribed[d] = true
+    end
+    return GPUConstraintHandler(
+        CuArray(ch.prescribed_dofs),
+        CuArray(Tv.(ch.inhomogeneities)),
+        CuArray(is_prescribed),
+    )
+end
+
+# --- GPU kernels for apply! ---
+
+function _meandiag_kernel!(diag, colptr, rowval, nzval, n)
+    j = threadIdx().x + (blockIdx().x - 1) * blockDim().x
+    if j <= n
+        for k in colptr[j]:(colptr[j + 1] - 1)
+            if rowval[k] == j
+                diag[j] = abs(nzval[k])
+                break
+            end
+        end
+    end
+    return nothing
+end
+
+function _gpu_meandiag(K::CuSparseMatrixCSC{T}) where T
+    n = size(K, 1)
+    diag = CUDA.zeros(T, n)
+    threads = min(256, n)
+    blocks = cld(n, threads)
+    @cuda threads=threads blocks=blocks _meandiag_kernel!(diag, SparseArrays.getcolptr(K), rowvals(K), nonzeros(K), n)
+    return sum(diag) / n
+end
+
+# Combined: f -= K[:, d] * inhom[i], then zero column d
+function _apply_inhom_zero_cols_kernel!(f, colptr, rowval, nzval, prescribed_dofs, inhomogeneities, n_prescribed, applyzero)
+    idx = threadIdx().x + (blockIdx().x - 1) * blockDim().x
+    if idx <= n_prescribed
+        d = prescribed_dofs[idx]
+        v = inhomogeneities[idx]
+        for k in colptr[d]:(colptr[d + 1] - 1)
+            if !applyzero && !iszero(v)
+                CUDA.@atomic f[rowval[k]] -= v * nzval[k]
+            end
+            nzval[k] = zero(eltype(nzval))
+        end
+    end
+    return nothing
+end
+
+# Zero out prescribed rows
+function _apply_zero_rows_kernel!(rowval, nzval, is_prescribed, nnz)
+    idx = threadIdx().x + (blockIdx().x - 1) * blockDim().x
+    if idx <= nnz
+        if is_prescribed[rowval[idx]]
+            nzval[idx] = zero(eltype(nzval))
+        end
+    end
+    return nothing
+end
+
+# Set K[d,d] = m and f[d] = inhom * m
+function _apply_set_diag_kernel!(colptr, rowval, nzval, f, prescribed_dofs, inhomogeneities, m, n_prescribed, applyzero)
+    idx = threadIdx().x + (blockIdx().x - 1) * blockDim().x
+    if idx <= n_prescribed
+        d = prescribed_dofs[idx]
+        for k in colptr[d]:(colptr[d + 1] - 1)
+            if rowval[k] == d
+                nzval[k] = m
+                break
+            end
+        end
+        vz = applyzero ? zero(eltype(f)) : inhomogeneities[idx]
+        f[d] = vz * m
+    end
+    return nothing
+end
+
+function Ferrite.apply!(K::CuSparseMatrixCSC{T}, f::CuVector{T}, ch::GPUConstraintHandler{T}, applyzero::Bool = false) where T
+    n_prescribed = length(ch.prescribed_dofs)
+    n_prescribed == 0 && return
+
+    colptr = SparseArrays.getcolptr(K)
+    rv = rowvals(K)
+    nz = nonzeros(K)
+    nnz_val = length(nz)
+
+    m = _gpu_meandiag(K)
+
+    # Step 1+2: f -= K[:,d]*v, then zero prescribed columns
+    threads = min(256, n_prescribed)
+    blocks = cld(n_prescribed, threads)
+    @cuda threads=threads blocks=blocks _apply_inhom_zero_cols_kernel!(
+        f, colptr, rv, nz, ch.prescribed_dofs, ch.inhomogeneities, n_prescribed, applyzero)
+
+    # Step 3: zero prescribed rows
+    threads_r = min(256, nnz_val)
+    blocks_r = cld(nnz_val, threads_r)
+    @cuda threads=threads_r blocks=blocks_r _apply_zero_rows_kernel!(
+        rv, nz, ch.is_prescribed, nnz_val)
+
+    # Step 4: set diagonal and f
+    @cuda threads=threads blocks=blocks _apply_set_diag_kernel!(
+        colptr, rv, nz, f, ch.prescribed_dofs, ch.inhomogeneities, T(m), n_prescribed, applyzero)
+
+    return
+end
+
+function Ferrite.apply_zero!(K::CuSparseMatrixCSC{T}, f::CuVector{T}, ch::GPUConstraintHandler{T}) where T
+    return Ferrite.apply!(K, f, ch, true)
+end
+
 function assemble_global_gpu(cv::CellValues, K::CuSparseMatrixCSC, dh::GPUDofHandler, ccs, colors::Vector, Kes)
     n_basefuncs = getnbasefunctions(cv)
     num_parallel_workers = maximum(length.(colors))
@@ -349,3 +472,42 @@ assemble_global_cpu(cv, K, dh)
 
 using Test
 @test CuSparseMatrixCSC(K) ≈ Kgpu
+
+# Test apply! with Dirichlet boundary conditions
+ch = ConstraintHandler(dh)
+∂Ω = union(getfacetset(grid, "left"), getfacetset(grid, "right"))
+add!(ch, Dirichlet(:u, ∂Ω, (x, t) -> 0.0))
+close!(ch)
+
+chgpu = GPUConstraintHandler(ch, Float32)
+
+f = zeros(Float32, ndofs(dh))
+fgpu = CUDA.zeros(Float32, ndofs(dh))
+
+apply!(K, f, ch)
+apply!(Kgpu, fgpu, chgpu)
+
+@test CuSparseMatrixCSC(K) ≈ Kgpu
+@test CuVector(f) ≈ fgpu
+
+
+ch2 = ConstraintHandler(dh)
+∂Ω2 = union(
+    getfacetset(grid, "left"),
+    getfacetset(grid, "right"),
+    getfacetset(grid, "top"),
+    getfacetset(grid, "bottom"),
+);
+add!(ch2, Dirichlet(:u, ∂Ω2, (x, t) -> 1.0))
+close!(ch2)
+
+chgpu2 = GPUConstraintHandler(ch2, Float32)
+
+f2 = zeros(Float32, ndofs(dh))
+fgpu2 = CUDA.zeros(Float32, ndofs(dh))
+
+apply!(K, f2, ch2)
+apply!(Kgpu, fgpu2, chgpu2)
+
+@test CuSparseMatrixCSC(K) ≈ Kgpu
+@test CuVector(f2) ≈ fgpu2
