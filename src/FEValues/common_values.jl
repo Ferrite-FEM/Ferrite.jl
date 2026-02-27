@@ -17,19 +17,12 @@ end
 end
 
 @noinline function throw_incompatible_dof_length(length_ue, n_base_funcs)
-    # msg = "the number of base functions ($(n_base_funcs)) does not match the length " *
-    #     "of the vector ($(length_ue)). Perhaps you passed the global vector, " *
-    #     "or forgot to pass a dof_range?"
-    # throw(ArgumentError(msg))
-    error()
+    msg = "the number of base functions does not match the length of the vector. Perhaps you passed the global vector, or forgot to pass a dof_range?"
+    throw(ArgumentError(msg))
 end
 @noinline function throw_incompatible_coord_length(length_x, n_base_funcs)
-    # msg = "the number of (geometric) base functions ($(n_base_funcs)) does not match " *
-    #     "the number of coordinates in the vector ($(length_x)). Perhaps you forgot to " *
-    #     "use an appropriate geometric interpolation when creating FE values? See " *
-    #     "https://github.com/Ferrite-FEM/Ferrite.jl/issues/265 for more details."
-    # throw(ArgumentError(msg))
-    error()
+    msg = "the number of (geometric) base functions does not match the number of coordinates in the vector. Perhaps you forgot to use an appropriate geometric interpolation when creating FE values? See https://github.com/Ferrite-FEM/Ferrite.jl/issues/265 for more details."
+    throw(ArgumentError(msg))
 end
 
 conformity(fe_values::AbstractValues) = conformity(function_interpolation(fe_values))
