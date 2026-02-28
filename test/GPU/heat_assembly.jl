@@ -5,7 +5,7 @@ import Adapt: Adapt, adapt, adapt_structure
 import KernelAbstractions: KernelAbstractions, get_backend
 using SparseArrays
 
-import Ferrite: TaskDescriptor, get_worker_part
+import Ferrite: get_substruct, as_structure_of_arrays
 
 function assemble_element!(Ke::AbstractMatrix, cv::CellValues)
     n_basefuncs = getnbasefunctions(cv)
@@ -25,7 +25,8 @@ end
 function assemble_cell!(Ke, cell, cv, assembler)
     reinit!(cv, nothing, cell.coords)
     assemble_element!(Ke, cv)
-    return assemble!(assembler, celldofs(cell), Ke)
+    assemble!(assembler, celldofs(cell), Ke)
+    return nothing
 end
 
 function assembly_kernel!(assembler, color, cell_cache, cv, Ke)
@@ -33,8 +34,8 @@ function assembly_kernel!(assembler, color, cell_cache, cv, Ke)
     i > length(color) && return
 
     cellid = color[i]
-    cv_i = get_worker_part(i, cv)
-    cc_i = get_worker_part(i, cell_cache, cellid)
+    cv_i = get_substruct(i, cv)
+    cc_i = get_substruct(i, cell_cache, cellid)
 
     reinit!(cc_i, cellid)
 
@@ -43,7 +44,7 @@ function assembly_kernel!(assembler, color, cell_cache, cv, Ke)
     return nothing
 end
 
-function assemble_global!(cv::CellValues, K::CuSparseMatrixCSC, cell_cache, colors::Vector, Ke)
+function assemble_global!(cv::CellValues, K, cell_cache, colors::Vector, Ke)
     assembler = start_assemble(K)
     for color in colors
         @cuda threads = length(color) assembly_kernel!(assembler, color, cell_cache, cv, Ke)
@@ -64,6 +65,7 @@ end
 
 ### --- Example / Tests ---
 
+# Regular CPU
 grid = generate_grid(Hexahedron, (10, 10, 10), Vec{3}((-1.0f0, -1.0f0, -1.0f0)), Vec{3}((1.0f0, 1.0f0, 1.0f0)))
 ip = Lagrange{RefHexahedron, 1}()
 qr = QuadratureRule{RefHexahedron}(Float32, 2)
@@ -72,21 +74,19 @@ dh = DofHandler(grid)
 add!(dh, :u, ip)
 close!(dh)
 K = allocate_matrix(SparseMatrixCSC{Float32, Int32}, dh)
+assemble_global!(cv, K, dh)
 
-colors = create_coloring(grid, collect(Int32, dh.subdofhandlers[1].cellset))
+# KA CUDA
+colors = create_coloring(grid)
 backend = CUDABackend()
 colors_gpu = [adapt(backend, c) for c in colors]
 n_workers = maximum(length.(colors_gpu))
-descriptor = TaskDescriptor(backend, n_workers)
-dh_gpu = adapt(descriptor, dh)
-sdh = dh_gpu.subdofhandlers[1]
+dh_gpu = adapt(backend, dh)
 K_gpu = allocate_matrix(CuSparseMatrixCSC{Float32, Int32}, dh)
-cv_gpu = adapt(descriptor, cv)
-cell_cache = Ferrite.CellCache(descriptor, sdh)
+cv_gpu = as_structure_of_arrays(backend, n_workers, cv)
+cell_cache = as_structure_of_arrays(backend, n_workers, CellCache, dh_gpu)
 Ke = KernelAbstractions.zeros(backend, Float32, n_workers, getnbasefunctions(cv), getnbasefunctions(cv))
-
 assemble_global!(cv_gpu, K_gpu, cell_cache, colors_gpu, Ke)
-assemble_global!(cv, K, dh)
 
 using Test
 @test CuSparseMatrixCSC(K) ≈ K_gpu

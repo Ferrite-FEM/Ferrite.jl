@@ -164,7 +164,7 @@ include("Export/VTK.jl")
 include("PointEvalHandler.jl")
 
 # Other
-include("accellerator.jl")
+include("soa_utils.jl")
 include("deprecations.jl")
 include("docs.jl")
 

@@ -4,7 +4,7 @@ using Ferrite, CUDA, SparseArrays
 
 import Adapt: Adapt, adapt, adapt_structure
 
-import Ferrite: get_grid, AbstractGrid, AbstractDofHandler, get_coordinate_eltype, TaskDescriptor, get_worker_part
+import Ferrite: get_grid, AbstractGrid, AbstractDofHandler, get_coordinate_eltype, as_structure_of_arrays, get_substruct
 
 import CUDA: CUDA.CUSPARSE.CuSparseMatrixCSC, CUDA.CUSPARSE.CuSparseMatrixCSR, @allowscalar
 import KernelAbstractions: KernelAbstractions, get_backend
@@ -32,8 +32,9 @@ end
 # ----------------- dofs --------------------
 
 struct GPUSubDofHandler{
+        dim,
         CS <: AbstractVector{Int}, CD <: AbstractVector{Int},
-        CO <: AbstractVector{Int}, FN, DR <: Tuple, G,
+        CO <: AbstractVector{Int}, FN, DR <: Tuple, G <: Ferrite.AbstractGrid{dim},
     }
     cellset::CS
     cell_dofs::CD
@@ -45,6 +46,8 @@ struct GPUSubDofHandler{
     dof_ranges::DR
     grid::G
 end
+
+Ferrite.get_grid(dh::GPUSubDofHandler) = dh.grid
 
 function Adapt.adapt_structure(to, sdh::GPUSubDofHandler)
     return GPUSubDofHandler(
@@ -98,8 +101,8 @@ function GPUDofHandler(backend, dh::DofHandler)
     return GPUDofHandler(subdofhandlers, gpu_grid)
 end
 
-function Adapt.adapt_structure(to::TaskDescriptor, dh::DofHandler)
-    return GPUDofHandler(to.device, dh)
+function Adapt.adapt_structure(to::KernelAbstractions.Backend, dh::DofHandler)
+    return GPUDofHandler(to, dh)
 end
 
 Ferrite.get_grid(dh::GPUDofHandler) = dh.grid
@@ -114,11 +117,23 @@ Adapt.@adapt_structure Ferrite.FunctionValues
 
 adapt(to, ip::Ferrite.Interpolation) = ip
 
-function adapt(to::TaskDescriptor, fv::Ferrite.FunctionValues)
-    N = to.num_workers
-    d = to.device
+function as_structure_of_arrays(d, outer_dim, ::Type{CellValues}, args...; kwargs...)
+    cv = CellValues(args...; kwargs...)
+    return as_structure_of_arrays(d, outer_dim, cv)
+end
+
+function as_structure_of_arrays(d, N, cv::CellValues)
+    return CellValues(
+        as_structure_of_arrays(d, N, cv.fun_values),
+        as_structure_of_arrays(d, N, cv.geo_mapping),
+        adapt(d, cv.qr),
+        KernelAbstractions.zeros(d, eltype(cv.detJdV), N, length(cv.detJdV)),
+    )
+end
+
+function as_structure_of_arrays(d, N, fv::Ferrite.FunctionValues)
     return Ferrite.FunctionValues(
-        adapt(to, fv.ip),
+        adapt(d, fv.ip),
         KernelAbstractions.zeros(d, eltype(fv.Nx), N, size(fv.Nx, 1), size(fv.Nx, 2)),
         adapt(d, collect(fv.Nξ)),
         KernelAbstractions.zeros(d, eltype(fv.dNdx), N, size(fv.dNdx, 1), size(fv.dNdx, 2)),
@@ -128,37 +143,20 @@ function adapt(to::TaskDescriptor, fv::Ferrite.FunctionValues)
     )
 end
 
-function adapt(to::TaskDescriptor, fv::Ferrite.GeometryMapping)
-    N = to.num_workers
-    d = to.device
+function as_structure_of_arrays(d, N, fv::Ferrite.GeometryMapping)
     return Ferrite.GeometryMapping(
-        adapt(to, fv.ip),
+        adapt(d, fv.ip),
         KernelAbstractions.zeros(d, eltype(fv.M), N, size(fv.M, 1), size(fv.M, 2)),
         fv.dMdξ === nothing ? nothing : adapt(d, collect(fv.dMdξ)),
         fv.d2Mdξ2 === nothing ? nothing : adapt(d, collect(fv.d2Mdξ2)),
     )
 end
 
-function adapt(to::TaskDescriptor, cv::CellValues)
-    N = to.num_workers
-    d = to.device
-    return CellValues(
-        adapt(to, cv.fun_values),
-        adapt(to, cv.geo_mapping),
-        adapt(to, cv.qr),
-        KernelAbstractions.zeros(d, eltype(cv.detJdV), N, length(cv.detJdV)),
-    )
-end
-
-function adapt(to::TaskDescriptor, qr::QuadratureRule{shape}) where {shape}
-    d = to.device
-    return QuadratureRule{shape}(adapt(d, collect(qr.weights)), adapt(d, collect(qr.points)))
-end
-
 function adapt(to, qr::QuadratureRule{shape}) where {shape}
     return QuadratureRule{shape}(adapt(to, qr.weights), adapt(to, qr.points))
 end
 
+# Adapt.@adapt_structure QuadratureRule does not work here due to the type parameter ctor.
 function adapt_structure(to, qr::QuadratureRule{shape}) where {shape}
     return QuadratureRule{shape}(adapt_structure(to, qr.weights), adapt_structure(to, qr.points))
 end
@@ -177,30 +175,36 @@ struct GPUCellCache{G <: AbstractGrid, SDH, IVT, VX}
 end
 Adapt.@adapt_structure GPUCellCache
 
-function GPUCellCache(
-        sdh::GPUSubDofHandler, grid::GPUGrid{dim}, descriptor::TaskDescriptor,
-        flags::UpdateFlags = UpdateFlags()
-    ) where {dim}
-    d = descriptor.device
+Ferrite.celldofs(cc::GPUCellCache) = cc.dofs
+
+function as_structure_of_arrays(d, outer_dim, ::Type{CellCache}, dh::GPUDofHandler, flags::UpdateFlags = UpdateFlags())
+    @assert length(dh.subdofhandlers) == 1 "GPUCellCache only works on GPUDofHandler's with a single subdomain. Please call the GPUCellCache adaptation on the GPUSubDofHandler."
+    return as_structure_of_arrays(d, outer_dim, CellCache, first(dh.subdofhandlers), flags)
+end
+
+function as_structure_of_arrays(d, outer_dim, ::Type{CellCache}, sdh::GPUSubDofHandler{dim}, flags::UpdateFlags = UpdateFlags()) where dim
+    grid = get_grid(sdh)
     @allowscalar begin
-        n = sdh.ndofs_per_cell
-        N = Ferrite.nnodes_per_cell(grid, 1)
-        W = descriptor.num_workers
-        nodes = KernelAbstractions.zeros(d, Int, W, N)
-        coords = KernelAbstractions.zeros(d, Vec{dim, get_coordinate_eltype(grid)}, W, N)
-        dofs = KernelAbstractions.zeros(d, Int, W, n)
+        n = Ferrite.ndofs_per_cell(sdh)
+        N = Ferrite.nnodes_per_cell(grid, first(sdh.cellset))
+        nodes = KernelAbstractions.zeros(d, Int, outer_dim, N)
+        coords = KernelAbstractions.zeros(d, Vec{dim, get_coordinate_eltype(grid)}, outer_dim, N)
+        dofs = KernelAbstractions.zeros(d, Int, outer_dim, n)
     end
     return GPUCellCache(flags, grid, -1, nodes, coords, sdh, dofs)
 end
 
-Ferrite.celldofs(cc::GPUCellCache) = cc.dofs
-
-# TODO I do not like this design.
-function Ferrite.CellCache(descriptor::TaskDescriptor, sdh::GPUSubDofHandler, flags::UpdateFlags = UpdateFlags())
-    return GPUCellCache(sdh, sdh.grid, descriptor, flags)
+function as_structure_of_arrays(d, outer_dim, ::Type{CellCache}, grid::GPUGrid, flags::UpdateFlags = UpdateFlags())
+    @allowscalar begin
+        N = Ferrite.nnodes_per_cell(grid, 1)
+        nodes = KernelAbstractions.zeros(d, Int, outer_dim, N)
+        coords = KernelAbstractions.zeros(d, Vec{dim, get_coordinate_eltype(grid)}, W, N)
+        nothing
+    end
+    return GPUCellCache(flags, grid, -1, nodes, coords, nothing, dofs)
 end
 
-function get_worker_part(i, cc::GPUCellCache, cellid)
+function get_substruct(i, cc::GPUCellCache, cellid)
     return GPUCellCache(
         cc.flags, cc.grid, cellid,
         view(cc.nodes, i, :), view(cc.coords, i, :), cc.sdh, view(cc.dofs, i, :)
