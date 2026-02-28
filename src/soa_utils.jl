@@ -1,4 +1,4 @@
-function as_structure_of_arrays(d, outer_dim, ::Type{ThingType}, args...; kwargs...) where ThingType
+function as_structure_of_arrays(d, outer_dim, ::Type{ThingType}, args...; kwargs...) where {ThingType}
     error("Structure of Arrays transformation not defined for object of type $(ThingType) device $d . Are all extensions loaded?")
 end
 

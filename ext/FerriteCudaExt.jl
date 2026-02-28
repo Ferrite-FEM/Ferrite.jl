@@ -182,7 +182,7 @@ function as_structure_of_arrays(d, outer_dim, ::Type{CellCache}, dh::GPUDofHandl
     return as_structure_of_arrays(d, outer_dim, CellCache, first(dh.subdofhandlers), flags)
 end
 
-function as_structure_of_arrays(d, outer_dim, ::Type{CellCache}, sdh::GPUSubDofHandler{dim}, flags::UpdateFlags = UpdateFlags()) where dim
+function as_structure_of_arrays(d, outer_dim, ::Type{CellCache}, sdh::GPUSubDofHandler{dim}, flags::UpdateFlags = UpdateFlags()) where {dim}
     grid = get_grid(sdh)
     @allowscalar begin
         n = Ferrite.ndofs_per_cell(sdh)

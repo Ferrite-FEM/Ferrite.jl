@@ -2,7 +2,7 @@ using Ferrite, CUDA
 import CUDA: CUDA.CUSPARSE.CuSparseMatrixCSC, @allowscalar
 import Ferrite: get_grid, AbstractGrid, AbstractDofHandler, get_coordinate_eltype
 import Adapt: Adapt, adapt, adapt_structure
-import KernelAbstractions:  get_backend, @kernel, @index
+import KernelAbstractions: get_backend, @kernel, @index
 import KernelAbstractions as KA
 using SparseArrays
 
@@ -49,7 +49,7 @@ function assemble_global!(backend, cv::CellValues, K, cell_cache, colors::Vector
     assembler = start_assemble(K)
     for color in colors
         # @cuda threads = length(color) assembly_kernel!(assembler, color, cell_cache, cv, Ke)
-        assembly_kernel(backend, length(color))(assembler, color, cell_cache, cv, Ke, ndrange=length(color))
+        assembly_kernel(backend, length(color))(assembler, color, cell_cache, cv, Ke, ndrange = length(color))
         KA.synchronize(backend)
     end
     return nothing
