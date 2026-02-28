@@ -2,7 +2,8 @@ using Ferrite, CUDA
 import CUDA: CUDA.CUSPARSE.CuSparseMatrixCSC, @allowscalar
 import Ferrite: get_grid, AbstractGrid, AbstractDofHandler, get_coordinate_eltype
 import Adapt: Adapt, adapt, adapt_structure
-import KernelAbstractions: KernelAbstractions, get_backend
+import KernelAbstractions:  get_backend, @kernel, @index
+import KernelAbstractions as KA
 using SparseArrays
 
 import Ferrite: get_substruct, as_structure_of_arrays
@@ -29,9 +30,9 @@ function assemble_cell!(Ke, cell, cv, assembler)
     return nothing
 end
 
-function assembly_kernel!(assembler, color, cell_cache, cv, Ke)
-    i = threadIdx().x
-    i > length(color) && return
+@kernel function assembly_kernel(assembler, color, cell_cache, cv, Ke)
+    i = @index(Global)
+    # i > length(color) && return
 
     cellid = color[i]
     cv_i = get_substruct(i, cv)
@@ -41,14 +42,15 @@ function assembly_kernel!(assembler, color, cell_cache, cv, Ke)
 
     assemble_cell!(view(Ke, i, :, :), cc_i, cv_i, assembler)
 
-    return nothing
+    # return nothing
 end
 
-function assemble_global!(cv::CellValues, K, cell_cache, colors::Vector, Ke)
+function assemble_global!(backend, cv::CellValues, K, cell_cache, colors::Vector, Ke)
     assembler = start_assemble(K)
     for color in colors
-        @cuda threads = length(color) assembly_kernel!(assembler, color, cell_cache, cv, Ke)
-        CUDA.synchronize()
+        # @cuda threads = length(color) assembly_kernel!(assembler, color, cell_cache, cv, Ke)
+        assembly_kernel(backend, length(color))(assembler, color, cell_cache, cv, Ke, ndrange=length(color))
+        KA.synchronize(backend)
     end
     return nothing
 end
@@ -85,8 +87,8 @@ dh_gpu = adapt(backend, dh)
 K_gpu = allocate_matrix(CuSparseMatrixCSC{Float32, Int32}, dh)
 cv_gpu = as_structure_of_arrays(backend, n_workers, cv)
 cell_cache = as_structure_of_arrays(backend, n_workers, CellCache, dh_gpu)
-Ke = KernelAbstractions.zeros(backend, Float32, n_workers, getnbasefunctions(cv), getnbasefunctions(cv))
-assemble_global!(cv_gpu, K_gpu, cell_cache, colors_gpu, Ke)
+Ke = KA.zeros(backend, Float32, n_workers, getnbasefunctions(cv), getnbasefunctions(cv))
+assemble_global!(backend, cv_gpu, K_gpu, cell_cache, colors_gpu, Ke)
 
 using Test
 @test CuSparseMatrixCSC(K) ≈ K_gpu
@@ -98,7 +100,7 @@ close!(ch)
 
 ch_gpu = adapt(backend, ch)
 f = zeros(Float32, ndofs(dh))
-f_gpu = KernelAbstractions.zeros(backend, Float32, ndofs(dh))
+f_gpu = KA.zeros(backend, Float32, ndofs(dh))
 
 apply!(K, f, ch)
 apply!(K_gpu, f_gpu, ch_gpu)
@@ -120,10 +122,23 @@ close!(ch2)
 
 ch_gpu2 = adapt(backend, ch2)
 f2 = zeros(Float32, ndofs(dh))
-f_gpu2 = KernelAbstractions.zeros(backend, Float32, ndofs(dh))
+f_gpu2 = KA.zeros(backend, Float32, ndofs(dh))
 
 apply!(K, f2, ch2)
 apply!(K_gpu, f_gpu2, ch_gpu2)
 
 @test CuSparseMatrixCSC(K) ≈ K_gpu
 @test CuVector(f2) ≈ f_gpu2
+
+# KA CPU
+begin
+    backend = KA.CPU()
+    colors_cpu = [adapt(backend, c) for c in colors]
+    n_workers = maximum(length.(colors_cpu))
+    dh_cpu = adapt(backend, dh)
+    K_cpu = allocate_matrix(SparseMatrixCSC{Float32, Int32}, dh)
+    cv_cpu = as_structure_of_arrays(backend, n_workers, cv)
+    cell_cache = as_structure_of_arrays(backend, n_workers, CellCache, dh_cpu)
+    Ke = KA.zeros(backend, Float32, n_workers, getnbasefunctions(cv), getnbasefunctions(cv))
+    assemble_global!(backend, cv_cpu, K_cpu, cell_cache, colors_cpu, Ke)
+end
