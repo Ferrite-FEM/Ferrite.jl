@@ -204,10 +204,19 @@ Store the degrees of freedom that belong to cell `i` in `global_dofs`.
 
 See also [`celldofs`](@ref).
 """
-function celldofs!(global_dofs::AbstractVector{Int}, dh::DofHandler, i::Int)
+function celldofs!(global_dofs::Vector{Int}, dh::DofHandler, i::Int)
     @assert isclosed(dh)
     @assert length(global_dofs) == ndofs_per_cell(dh, i)
     unsafe_copyto!(global_dofs, 1, dh.cell_dofs, dh.cell_dofs_offset[i], length(global_dofs))
+    return global_dofs
+end
+function celldofs!(global_dofs::AbstractVector{Int}, dh::AbstractDofHandler, i::Int)
+    @assert isclosed(dh)
+    @assert length(global_dofs) == ndofs_per_cell(dh, i)
+    offset = sdh.cell_dofs_offset[i] - 1
+    @inbounds for j in 1:n
+        global_dofs[j] = dh.cell_dofs[offset + j]
+    end
     return global_dofs
 end
 function celldofs!(global_dofs::AbstractVector{Int}, sdh::SubDofHandler, i::Int)
