@@ -245,7 +245,13 @@ start_assemble(K::Union{AbstractSparseMatrixCSC, Symmetric{<:Any, <:AbstractSpar
 
 function start_assemble(K::AbstractSparseMatrixCSC{T}, f::Vector = T[]; fillzero::Bool = true, maxcelldofs_hint::Int = 0) where {T}
     fillzero && (fillzero!(K); fillzero!(f))
-    return CSCAssembler(K, f, zeros(Int, maxcelldofs_hint), zeros(Int, maxcelldofs_hint), zeros(Int, maxcelldofs_hint), zeros(Int, maxcelldofs_hint))
+    if size(K, 1) == size(K, 2)
+        permutation = zeros(Int, maxcelldofs_hint)
+        sorteddofs = zeros(Int, maxcelldofs_hint)
+        return CSCAssembler(K, f, permutation, permutation, sorteddofs, sorteddofs)
+    else
+        return CSCAssembler(K, f, zeros(Int, maxcelldofs_hint), zeros(Int, maxcelldofs_hint), zeros(Int, maxcelldofs_hint), zeros(Int, maxcelldofs_hint))
+    end
 end
 function start_assemble(K::Symmetric{T, <:SparseMatrixCSC}, f::Vector = T[]; fillzero::Bool = true, maxcelldofs_hint::Int = 0) where {T}
     fillzero && (fillzero!(K); fillzero!(f))
@@ -261,15 +267,18 @@ end
 """
     assemble!(A::AbstractAssembler, dofs::AbstractVector{Int}, Ke::AbstractMatrix)
     assemble!(A::AbstractAssembler, dofs::AbstractVector{Int}, Ke::AbstractMatrix, fe::AbstractVector)
+
+Assemble the square element stiffness matrix `Ke` (and optional force vector `fe`) into the global
+stiffness (and force) in `A`, given the element degrees of freedom `dofs`.
+
+This is equivalent to `K[dofs, dofs] += Ke` and `f[dofs] += fe`, where `K` is the global stiffness matrix and `f` the global force/residual vector, but more efficient.
+
     assemble!(A::AbstractAssembler, rowdofs::AbstractVector{Int}, coldofs::AbstractVector{Int}, Ke::AbstractMatrix)
     assemble!(A::AbstractAssembler, rowdofs::AbstractVector{Int}, coldofs::AbstractVector{Int}, Ke::AbstractMatrix, fe::AbstractVector)
 
 Assemble the element stiffness matrix `Ke` (and optional force vector `fe`) into the global
-stiffness (and force) in `A`, given the element degrees of freedom `dofs`.
-
-This is equivalent to `K[rowdofs, coldofs] += Ke` and `f[rowdofs] += fe` efficiently, or
-equivalently this is applying `K[dofs, dofs] += Ke` and `f[dofs] += fe` efficiently, where
-`K` is the global stiffness matrix and `f` the global force/residual vector.
+stiffness (and force) in `A`, given the element row degrees of freedom, `rowdofs`, and element column degrees of freedom, `coldofs`. 
+This is equivalent to `K[rowdofs, coldofs] += Ke` and `f[rowdofs] += fe`, but more efficient.
 """
 assemble!(::AbstractAssembler, ::AbstractVector{<:Integer}, ::AbstractMatrix, ::AbstractVector)
 
@@ -315,7 +324,11 @@ end
     # a specific order, which might not be the sorted order. Hence we sort them.
     # Note that we are not allowed to mutate `dofs` in the process.
     sortedcoldofs, colpermutation = _sortdofs_for_assembly!(A.colpermutation, A.sortedcoldofs, coldofs)
-    sortedrowdofs, rowpermutation = _sortdofs_for_assembly!(A.rowpermutation, A.sortedrowdofs, rowdofs)
+    sortedrowdofs, rowpermutation = if A.sortedcoldofs !== A.sortedrowdofs
+         _sortdofs_for_assembly!(A.rowpermutation, A.sortedrowdofs, rowdofs)
+    else
+        sortedcoldofs, colpermutation
+    end
 
     return _assemble_inner!(K, Ke, rowdofs, sortedrowdofs, rowpermutation, coldofs, sortedcoldofs, colpermutation, sym)
 end

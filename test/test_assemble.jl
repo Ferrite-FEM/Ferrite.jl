@@ -46,25 +46,30 @@ import LinearAlgebra: Symmetric
     @test size(K) == (10, 10)
     @test length(f) == 10
 
-    # assemble with different row and col dofs
+    # COOAssembler: assemble with different row and col dofs
     rdofs = [1, 4, 6]
     cdofs = [1, 7]
     a = Ferrite.COOAssembler()
     Ke = rand(length(rdofs), length(cdofs))
     assemble!(a, rdofs, cdofs, Ke)
     K, _ = finish_assemble(a)
-    @test (K[rdofs, cdofs] .== Ke) |> all
+    @test all(K[rdofs, cdofs] .== Ke)
 
+    # CSCAssembler: assemble with different row and col dofs
     I = [1, 1, 4, 4, 6, 6]
     J = [1, 3, 1, 3, 1, 3]
     V = zeros(length(I))
     K = sparse(I, J, V)
-    assembler = start_assemble(K)
+    f = zeros(6)
+    assembler = start_assemble(K, f)
     rdofs = [1, 4, 6]
     cdofs = [1, 3]
     Ke = rand(length(rdofs), length(cdofs))
-    assemble!(assembler, rdofs, cdofs, Ke)
-    @test (K[rdofs, cdofs] .== Ke) |> all
+    fe = rand(length(rdofs))
+    assemble!(assembler, rdofs, cdofs, Ke, fe)
+    assemble!(assembler, rdofs, cdofs, Ke, fe)
+    @test all(K[rdofs, cdofs] .== 2Ke)
+    @test all(f[rdofs] .== 2fe)
 
     # SparseMatrix assembler
     K = spzeros(10, 10)
