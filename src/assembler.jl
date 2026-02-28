@@ -325,7 +325,7 @@ end
     # Note that we are not allowed to mutate `dofs` in the process.
     sortedcoldofs, colpermutation = _sortdofs_for_assembly!(A.colpermutation, A.sortedcoldofs, coldofs)
     sortedrowdofs, rowpermutation = if A.sortedcoldofs !== A.sortedrowdofs
-         _sortdofs_for_assembly!(A.rowpermutation, A.sortedrowdofs, rowdofs)
+        _sortdofs_for_assembly!(A.rowpermutation, A.sortedrowdofs, rowdofs)
     else
         sortedcoldofs, colpermutation
     end
