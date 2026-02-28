@@ -2,7 +2,7 @@
 
 using Base: @propagate_inbounds
 
-@noinline throw_detJ_not_pos(detJ) = error() # throw(ArgumentError("det(J) is not positive: det(J) = $(detJ)"))
+@noinline throw_detJ_not_pos(detJ) = throw(ArgumentError("det(J) is not positive")) # throw(ArgumentError("det(J) is not positive: det(J) = $(detJ)"))
 
 function checkquadpoint(fe_v::AbstractValues, qp::Int)
     0 < qp <= getnquadpoints(fe_v) || error("quadrature point out of range")
