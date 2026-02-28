@@ -586,7 +586,7 @@ Mutate `x` to the coordinates of the cell corresponding to `idx` or `cell`.
 """
 @inline function getcoordinates!(x::AbstractVector{Vec{dim, T}}, grid::AbstractGrid, cell::AbstractCell) where {dim, T}
     node_ids = get_node_ids(cell)
-    @inbounds for i in 1:length(x)
+    @inbounds for (i, node_id) in enumerate(node_ids)
         x[i] = get_node_coordinate(grid, node_ids[i])
     end
     return x
@@ -611,8 +611,9 @@ function cellnodes!(global_nodes::AbstractVector{Int}, grid::AbstractGrid, i::In
 end
 function _cellnodes!(global_nodes::AbstractVector{Int}, cell::AbstractCell)
     @assert length(global_nodes) == nnodes(cell)
-    @inbounds for i in 1:length(global_nodes)
-        global_nodes[i] = cell.nodes[i]
+    node_ids = get_node_ids(cell)
+    @inbounds for (i, node_id) in enumerate(node_ids)
+        global_nodes[i] = node_id
     end
     return global_nodes
 end
