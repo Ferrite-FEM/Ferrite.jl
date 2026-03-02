@@ -283,6 +283,7 @@ This is equivalent to `K[rowdofs, coldofs] += Ke` and `f[rowdofs] += fe`, but mo
 assemble!(::AbstractAssembler, ::AbstractVector{<:Integer}, ::AbstractMatrix, ::AbstractVector)
 
 @propagate_inbounds function assemble!(A::AbstractAssembler, dofs::AbstractVector{<:Integer}, Ke::AbstractMatrix, fe::Union{AbstractVector, Nothing} = nothing)
+    size(Ke, 1) == size(Ke, 2) || throw(ArgumentError("Ke is rectangular, but only a single dof range is provided. Please call assemble!(A, rowdofs, coldofs, Ke, fe) instead."))
     return _assemble!(A, dofs, dofs, Ke, fe, false)
 end
 @propagate_inbounds function assemble!(A::AbstractAssembler, rowdofs::AbstractVector{<:Integer}, coldofs::AbstractVector{<:Integer}, Ke::AbstractMatrix, fe::Union{AbstractVector, Nothing} = nothing)

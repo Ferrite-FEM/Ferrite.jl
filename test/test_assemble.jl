@@ -68,6 +68,7 @@ import LinearAlgebra: Symmetric
     fe = rand(length(rdofs))
     assemble!(assembler, rdofs, cdofs, Ke, fe)
     assemble!(assembler, rdofs, cdofs, Ke, fe)
+    @test_throws ArgumentError assemble!(assembler, rdofs, Ke, fe)
     @test all(K[rdofs, cdofs] .== 2Ke)
     @test all(f[rdofs] .== 2fe)
 
