@@ -200,10 +200,10 @@ Assembler for symmetric sparse matrix with CSC storage type.
 struct SymmetricCSCAssembler{Tv, Ti, MT <: Symmetric{Tv, <:AbstractSparseMatrixCSC{Tv, Ti}}} <: AbstractCSCAssembler
     K::MT
     f::Vector{Tv}
-    rowpermutation::Vector{Int}
-    colpermutation::Vector{Int}
-    sortedrowdofs::Vector{Int}
-    sortedcoldofs::Vector{Int}
+    rowpermutation::Vector{Int} # Symmetric assembly doesn't need separate row and
+    colpermutation::Vector{Int} # col permutation and dofs, but simplifies code reuse
+    sortedrowdofs::Vector{Int}  # reuse with non-symmetric cases. sortedrowdofs and
+    sortedcoldofs::Vector{Int}  # rowpermutation always aliased to sortedcoldofs and colpermutation.
 end
 
 function Base.show(io::IO, ::MIME"text/plain", a::Union{CSCAssembler, CSRAssembler, SymmetricCSCAssembler})
@@ -283,7 +283,7 @@ This is equivalent to `K[rowdofs, coldofs] += Ke` and `f[rowdofs] += fe`, but mo
 assemble!(::AbstractAssembler, ::AbstractVector{<:Integer}, ::AbstractMatrix, ::AbstractVector)
 
 @propagate_inbounds function assemble!(A::AbstractAssembler, dofs::AbstractVector{<:Integer}, Ke::AbstractMatrix, fe::Union{AbstractVector, Nothing} = nothing)
-    size(Ke, 1) == size(Ke, 2) || throw(ArgumentError("Ke is rectangular, but only a single dof range is provided. Please call assemble!(A, rowdofs, coldofs, Ke, fe) instead."))
+    size(Ke, 1) == size(Ke, 2) || throw(ArgumentError("Ke is rectangular, but only a single `dofs` vector is provided. Please call assemble!(A, rowdofs, coldofs, Ke, fe) instead."))
     return _assemble!(A, dofs, dofs, Ke, fe, false)
 end
 @propagate_inbounds function assemble!(A::AbstractAssembler, rowdofs::AbstractVector{<:Integer}, coldofs::AbstractVector{<:Integer}, Ke::AbstractMatrix, fe::Union{AbstractVector, Nothing} = nothing)
