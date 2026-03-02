@@ -277,7 +277,7 @@ This is equivalent to `K[dofs, dofs] += Ke` and `f[dofs] += fe`, where `K` is th
     assemble!(A::AbstractAssembler, rowdofs::AbstractVector{Int}, coldofs::AbstractVector{Int}, Ke::AbstractMatrix, fe::AbstractVector)
 
 Assemble the element stiffness matrix `Ke` (and optional force vector `fe`) into the global
-stiffness (and force) in `A`, given the element row degrees of freedom, `rowdofs`, and element column degrees of freedom, `coldofs`. 
+stiffness (and force) in `A`, given the element row degrees of freedom, `rowdofs`, and element column degrees of freedom, `coldofs`.
 This is equivalent to `K[rowdofs, coldofs] += Ke` and `f[rowdofs] += fe`, but more efficient.
 """
 assemble!(::AbstractAssembler, ::AbstractVector{<:Integer}, ::AbstractMatrix, ::AbstractVector)
@@ -291,9 +291,6 @@ end
 end
 @propagate_inbounds function assemble!(A::SymmetricCSCAssembler, dofs::AbstractVector{<:Integer}, Ke::AbstractMatrix, fe::Union{AbstractVector, Nothing} = nothing)
     return _assemble!(A, dofs, dofs, Ke, fe, true)
-end
-@propagate_inbounds function assemble!(A::SymmetricCSCAssembler, rowdofs::AbstractVector{<:Integer}, coldofs::AbstractVector{<:Integer}, Ke::AbstractMatrix, fe::Union{AbstractVector, Nothing} = nothing)
-    return _assemble!(A, rowdofs, coldofs, Ke, fe, true)
 end
 
 """
