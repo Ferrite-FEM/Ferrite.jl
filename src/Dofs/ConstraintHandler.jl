@@ -148,10 +148,10 @@ struct AffineConstraint{Tv, Ti}
 end
 
 """
-    ConstraintHandler([T=Float64], dh::AbstractDofHandler)
+    ConstraintHandler([Tv=Float64, [Ti=Int64]], dh::AbstractDofHandler)
 
 A collection of constraints associated with the dof handler `dh`.
-`T` is the numeric type for stored values.
+`Tv` is the numeric type for stored values and `Ti` the numric type for stored indices.
 """
 mutable struct ConstraintHandler{DH <: AbstractDofHandler, Tv, Ti}
     const dbcs::Vector{Dirichlet}
