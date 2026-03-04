@@ -26,5 +26,3 @@ end
 function get_substruct(i, fv::GeometryMapping)
     return GeometryMapping(fv.ip, view(fv.M, i, :, :), fv.dMdξ, fv.d2Mdξ2)
 end
-
-materialize(thing) = thing
