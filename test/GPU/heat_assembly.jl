@@ -8,7 +8,7 @@ import KernelAbstractions: @kernel, @index
 import KernelAbstractions as KA
 using SparseArrays
 
-import Ferrite: get_substruct, as_structure_of_arrays
+import Ferrite: CellValuesContainer, CellCacheContainer
 
 const NUM_THREADS = 64
 
@@ -66,10 +66,10 @@ end
 
         # Query the local evaluation buffer of the GPU worker.
         # As explained later this is the secret sauce.
-        cv_i = get_substruct(task_index, cv)
+        cv_i = cv[task_index]
 
         # Query work item cell cache.
-        cc_i = get_substruct(task_index, cc, cellid)
+        cc_i = cc[task_index](cellid) # FIXME is there a better way to sneak the cellid into the cache?
 
         # Fill buffer.
         reinit!(cc_i, cellid)
@@ -82,7 +82,7 @@ end
         assemble_cell!(Ke, fe, cc_i, cv_i, assembler)
     end
 end
-function assemble_global_ka!(backend, cv::CellValues, K, f, cc, colors::Vector, Ke, fe)
+function assemble_global_ka!(backend, cv::CellValuesContainer, K, f, cc, colors::Vector, Ke, fe)
     assembler = K === nothing ? nothing : start_assemble(K, f)
     for color in colors
         # We divide the work into blocks and fire up the kernel.
@@ -106,8 +106,8 @@ function cuda_assembly_kernel(assembler, color, cc, cv, Kes, fes)
     stride = gridDim().x * blockDim().x
     for i in task_index:stride:length(color)
         cellid = color[i]
-        cv_i = get_substruct(task_index, cv)
-        cc_i = get_substruct(task_index, cc, cellid)
+        cv_i = cv[task_index]
+        cc_i = cc[task_index](cellid)
         reinit!(cc_i, cellid)
         Ke = view(Kes, i, :, :)
         fe = view(fes, i, :)
@@ -115,7 +115,7 @@ function cuda_assembly_kernel(assembler, color, cc, cv, Kes, fes)
     end
     return nothing
 end
-function assemble_global_cuda!(cv::CellValues, K, f, cc, colors::Vector, Ke, fe)
+function assemble_global_cuda!(cv::CellValuesContainer, K, f, cc, colors::Vector, Ke, fe)
     assembler = K === nothing ? nothing : start_assemble(K, f)
     for color in colors
         n = length(color)
@@ -175,8 +175,8 @@ f_gpu = KA.zeros(backend, Float32, (ndofs(dh),))
 # into a suitable GPU format.
 # n_workers = ceil(Int, length(grid.cells) / NUM_THREADS) # FIXME does not match the used 493
 n_workers = getncells(grid)
-cv_gpu = as_structure_of_arrays(backend, n_workers, cv)
-cc_gpu = as_structure_of_arrays(backend, n_workers, CellCache, dh_gpu)
+cv_gpu = CellValuesContainer(backend, n_workers, cv)
+cc_gpu = CellCacheContainer(backend, n_workers, dh_gpu)
 # Technically we can also just get one Ke or fe per worker, but for demonstration
 # purposes we allocate the full block here for element-assembly style matrix-free GPU
 # usage.
@@ -221,8 +221,8 @@ begin
     dh_cpu = adapt(backend, dh)
     K_cpu = allocate_matrix(SparseMatrixCSC{Float32, Int32}, dh)
     f_cpu = KA.zeros(backend, Float32, ndofs(dh))
-    cv_cpu = as_structure_of_arrays(backend, n_workers, cv)
-    cell_cache = as_structure_of_arrays(backend, n_workers, CellCache, dh_cpu)
+    cv_cpu = CellValuesContainer(backend, n_workers, cv)
+    cell_cache = CellCacheContainer(backend, n_workers, dh_cpu)
     Kes_cpu = KA.zeros(backend, Float32, getncells(grid), getnbasefunctions(cv), getnbasefunctions(cv))
     fes_cpu = KA.zeros(backend, Float32, getncells(grid), getnbasefunctions(cv))
     # Assembly here does notw ork because we are missing a SOA transformation of the assembler.

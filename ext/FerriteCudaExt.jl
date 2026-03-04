@@ -7,7 +7,10 @@ using Ferrite, CUDA, SparseArrays
 
 import Adapt: Adapt, adapt, adapt_structure
 
-import Ferrite: get_grid, AbstractGrid, AbstractDofHandler, get_coordinate_eltype, as_structure_of_arrays, get_substruct, meandiag
+import Ferrite: get_grid, AbstractGrid, AbstractDofHandler, get_coordinate_eltype
+import Ferrite: as_structure_of_arrays, get_substruct
+import Ferrite: meandiag
+import Ferrite: CellCacheContainer, CellValuesContainer, CellCache
 
 import CUDA: CUDA.CUSPARSE.CuSparseMatrixCSC, CUDA.CUSPARSE.CuSparseMatrixCSR, @allowscalar
 import KernelAbstractions as KA
@@ -114,6 +117,10 @@ import Adapt: Adapt, adapt, adapt_structure
 Adapt.@adapt_structure CellValues
 Adapt.@adapt_structure Ferrite.GeometryMapping
 Adapt.@adapt_structure Ferrite.FunctionValues
+function adapt_structure(to, ccc::Ferrite.CellValuesContainer)
+    inner_values = adapt(to, ccc.values)
+    return Ferrite.CellValuesContainer{typeof(get_substruct(1, inner_values)), typeof(inner_values)}(inner_values)
+end
 
 adapt(to, ip::Ferrite.Interpolation) = ip
 
@@ -206,7 +213,12 @@ struct GPUCellCache{G <: AbstractGrid, SDH, IVT, VX}
     sdh::SDH
     dofs::IVT
 end
+(cc::GPUCellCache)(cellid::Int) = GPUCellCache(cc.flags, cc.grid, cellid, cc.nodes, cc.coords, cc.sdh, cc.dofs)
 Adapt.@adapt_structure GPUCellCache
+function adapt_structure(to, ccc::CellCacheContainer)
+    inner_values = adapt(to, ccc.values)
+    return CellCacheContainer{typeof(get_substruct(1, inner_values, -1)), typeof(inner_values)}(inner_values)
+end
 
 Ferrite.celldofs(cc::GPUCellCache) = cc.dofs
 
