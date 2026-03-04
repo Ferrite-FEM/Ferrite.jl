@@ -261,7 +261,7 @@ prescribed_dofs(ch::ConstraintHandler) = ch.prescribed_dofs
 
 # Equivalent to `copy!(out, setdiff(1:n_entries, diff))`, but requires that
 # `issorted(diff)` and that `1 ≤ diff[1] ≤ diff[end] ≤ n_entries`
-function _sorted_setdiff!(out::Vector{Ti}, n_entries::Ti, diff::Vector{Ti}) where {Ti}
+function _sorted_setdiff!(out::Vector{Ti}, n_entries::Integer, diff::Vector{Ti}) where {Ti}
     n_diff = length(diff)
     resize!(out, n_entries - n_diff)
     diff_ind = out_ind = 1
@@ -291,7 +291,7 @@ function close!(ch::ConstraintHandler{<:Any, <:Any, Ti}) where {Ti}
     ch.affine_inhomogeneities .= ch.affine_inhomogeneities[I]
     ch.dofcoefficients .= ch.dofcoefficients[I]
 
-    _sorted_setdiff!(ch.free_dofs, Ti(ndofs(ch.dh)), ch.prescribed_dofs)
+    _sorted_setdiff!(ch.free_dofs, ndofs(ch.dh), ch.prescribed_dofs)
 
     for i in 1:length(ch.prescribed_dofs)
         ch.dofmapping[ch.prescribed_dofs[i]] = i
@@ -1253,7 +1253,7 @@ function _add!(
             @assert rotation_matrix !== nothing
             for (i, ki) in pairs(k)
                 # u_mirror = R ⋅ u_image
-                vs = Pair{Int, eltype(Tv)}[v[j] => rotation_matrix[i, j] for j in 1:length(v)]
+                vs = Pair{Int, Tv}[v[j] => rotation_matrix[i, j] for j in 1:length(v)]
                 ac = AffineConstraint(ki, vs, zero(Tv))
                 add!(ch, ac)
             end
