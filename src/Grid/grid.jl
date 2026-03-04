@@ -760,23 +760,23 @@ struct OrientationInfo
     shift_index::Int
 end
 
-function OrientationInfo(edgenodes::NTuple{2, <: Integer})
+function OrientationInfo(edgenodes::NTuple{2, <:Integer})
     return OrientationInfo(get_edge_direction(edgenodes) < 0, 0)
 end
 
-function OrientationInfo(facenodes::NTuple{N, <: Integer}) where {N}
+function OrientationInfo(facenodes::NTuple{N, <:Integer}) where {N}
     min_idx = argmin(facenodes)
     shift_index = min_idx - 1
     flipped = get_face_direction(facenodes) < 0
     return OrientationInfo(flipped, shift_index)
 end
 
-function get_edge_direction(edgenodes::NTuple{2, <: Integer})
+function get_edge_direction(edgenodes::NTuple{2, <:Integer})
     positive = edgenodes[2] > edgenodes[1]
     return ifelse(positive, 1, -1)
 end
 
-function get_face_direction(facenodes::NTuple{N, <: Integer}) where {N}
+function get_face_direction(facenodes::NTuple{N, <:Integer}) where {N}
     N > 2 || throw(ArgumentError("A face must have at least 3 nodes"))
     min_idx = argmin(facenodes)
     if min_idx == 1
