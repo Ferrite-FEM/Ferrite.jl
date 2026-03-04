@@ -1,4 +1,4 @@
-# [Basic GPU Asembly](@id gpu_assembly_howto)
+# [GPU Assembly](@id gpu_assembly_howto)
 
 For some large problems it can be beneficial to use a GPU to assemble the residual and in some cases even the system.
 Before developing hand-written optimiezd assembly routines using Ferrite users can try to port their existing assembly

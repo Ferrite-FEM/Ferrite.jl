@@ -67,11 +67,8 @@ end
         ## As explained later this is the secret sauce.
         cv_i = cv[task_index]
 
-        ## Query work item cell cache.
-        cc_i = cc[task_index](cellid) # FIXME is there a better way to sneak the cellid into the cache?
-
-        ## Fill buffer.
-        reinit!(cc_i, cellid)
+        ## Query work item cell cache. The call on the item initializes replaces the reinit! call.
+        cc_i = cc[task_index](cellid)
 
         ## Query assembly buffer.
         Ke = view(Kes, i, :, :)
@@ -115,7 +112,6 @@ function cuda_assembly_kernel(assembler, color, cc, cv, Kes, fes)
         cellid = color[i]
         cv_i = cv[task_index]
         cc_i = cc[task_index](cellid)
-        reinit!(cc_i, cellid)
         Ke = view(Kes, i, :, :)
         fe = view(fes, i, :)
         assemble_cell!(Ke, fe, cc_i, cv_i, assembler)

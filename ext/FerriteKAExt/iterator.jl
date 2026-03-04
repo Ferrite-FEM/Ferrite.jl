@@ -9,7 +9,11 @@ struct ImmutableCellCache{G <: AbstractGrid, SDH, IVT, VX}
     sdh::SDH
     dofs::IVT
 end
-(cc::ImmutableCellCache)(cellid::Int) = ImmutableCellCache(cc.flags, cc.grid, cellid, cc.nodes, cc.coords, cc.sdh, cc.dofs)
+function (cc::ImmutableCellCache)(cellid::Int)
+    cc2 = ImmutableCellCache(cc.flags, cc.grid, cellid, cc.nodes, cc.coords, cc.sdh, cc.dofs)
+    reinit!(cc2, cellid)
+    return cc2
+end
 Adapt.@adapt_structure ImmutableCellCache
 function adapt_structure(to, ccc::CellCacheContainer)
     inner_values = adapt(to, ccc.values)
