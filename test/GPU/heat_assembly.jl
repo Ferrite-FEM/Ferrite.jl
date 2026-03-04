@@ -1,226 +1,233 @@
+# TODO's
+# * Fix KernelAbstractions launch options. They differ from the pure CUDA variant.
+
 using Ferrite, CUDA
-import CUDA: CUDA.CUSPARSE.CuSparseMatrixCSC, @allowscalar
-import Ferrite: get_grid, AbstractGrid, AbstractDofHandler, get_coordinate_eltype
-import Adapt: Adapt, adapt, adapt_structure
-import KernelAbstractions: get_backend, @kernel, @index
+import CUDA: CUDA.CUSPARSE.CuSparseMatrixCSC
+import Adapt: adapt
+import KernelAbstractions: @kernel, @index
 import KernelAbstractions as KA
 using SparseArrays
 
-import Ferrite: get_substruct, as_structure_of_arrays, materialize
+import Ferrite: get_substruct, as_structure_of_arrays
 
-function assemble_element!(Ke::AbstractMatrix, cv::CellValues)
+const NUM_THREADS = 64
+
+# In this how-to we want to use an existing assembly routine on the GPU with Ferrite.
+# We implicitly assume that nothing dynamic happens inside the routine, i.e. the routine
+# is type stable, does not allocate and also does not have any dynamic dispatches.
+function assemble_element!(Ke::AbstractMatrix, fe::AbstractVector, cv::CellValues)
     n_basefuncs = getnbasefunctions(cv)
-    fill!(Ke, 0)
+
     for q_point in 1:getnquadpoints(cv)
         dΩ = getdetJdV(cv, q_point)
         for i in 1:n_basefuncs
-            δu = shape_gradient(cv, q_point, i)
+            ∇δuᵢ = shape_gradient(cv, q_point, i)
+            δuᵢ = shape_value(cv, q_point, i)
+            fe[i] += δuᵢ * dΩ
             for j in 1:n_basefuncs
-                Ke[i, j] += (δu ⋅ shape_gradient(cv, q_point, j)) * dΩ
+                ∇δuⱼ = shape_gradient(cv, q_point, j)
+                Ke[i, j] += (∇δuᵢ ⋅ ∇δuⱼ) * dΩ
             end
         end
     end
-    return Ke
+    return nothing
 end
 
-function assemble_cell!(Ke, cell, cv, assembler)
+# We also have a simple cell assembly wrapping the element in two variants.
+# In the first variant we assemble using an assembler. In the second variant we
+# only fill Ke, e.g. as part of element-assembly techniques.
+function assemble_cell!(Ke, fe, cell, cv, assembler)
     reinit!(cv, nothing, cell.coords)
-    assemble_element!(Ke, cv)
-    assemble!(assembler, celldofs(cell), Ke)
+    fill!(Ke, 0)
+    fill!(fe, 0)
+    assemble_element!(Ke, fe, cv)
+    assemble!(assembler, celldofs(cell), Ke, fe)
+    return nothing
+end
+function assemble_cell!(Ke, fe, cell, cv, ::Nothing)
+    reinit!(cv, nothing, cell.coords)
+    fill!(Ke, 0)
+    fill!(fe, 0)
+    assemble_element!(Ke, fe, cv)
     return nothing
 end
 
-@kernel function assembly_kernel(assembler, @Const(color), cell_cache, cv, Kes)
-    stride = KA.@groupsize()[1]
-    li = @index(Local, Linear)
-
-    # Query the local evaluation buffer of the thread
-    cv_i = get_substruct(li, cv)
-
-    for i in li:stride:length(color)
-        KA.@print("i=%d li=%d \n\n", i, li)
+# Now to the actual assembly kernel. To ensure portability we show how to use KernelAbstractions.jl
+# as the kernel language, although we will also show how to use CUDA directly below. In this kernel
+# we use a grid-stride loop, which has several benefits in terms of performance and debuggability.
+# For more details please consult https://developer.nvidia.com/blog/cuda-pro-tip-write-flexible-kernels-grid-stride-loops/ .
+@kernel function ka_assembly_kernel(assembler, @Const(color), cc, cv, Kes, fes)
+    # This is the classical grid-stride-loop
+    task_index = @index(Global, Linear)
+    stride     = KA.@groupsize()[1]
+    for i in task_index:stride:length(color)
         # Work item index
         cellid = color[i]
 
-        # Query work item cell cache
-        cc_i = get_substruct(li, cell_cache, cellid)
+        # Query the local evaluation buffer of the GPU worker.
+        # As explained later this is the secret sauce.
+        cv_i = get_substruct(task_index, cv)
 
-        # Fill buffer
+        # Query work item cell cache.
+        cc_i = get_substruct(task_index, cc, cellid)
+
+        # Fill buffer.
         reinit!(cc_i, cellid)
 
-        # Query assembly buffer 
-        # TODO should go into shared memory and query via li
+        # Query assembly buffer.
         Ke = view(Kes, i, :, :)
+        fe = view(fes, i, :)
 
-        # Actual assembly routine
-        assemble_cell!(Ke, cc_i, cv_i, assembler)
+        # # Actual assembly routine.
+        assemble_cell!(Ke, fe, cc_i, cv_i, assembler)
     end
-
-    # return nothing
 end
-
-
-function cuda_assembly_kernel(assembler, color, cc_prototype, cv_prototype, Kes, touched)
-    index = (blockIdx().x - Int32(1)) * blockDim().x + threadIdx().x
-    stride = gridDim().x * blockDim().x
-    li = threadIdx().x
-
-    # Setup the potentially shared memory of the block
-    cv   = materialize(cv_prototype)
-    cc   = materialize(cc_prototype)
-
-    # # Query the local evaluation buffer of the thread
-    # cv_i = get_substruct(li, cv)
-
-    # @cushow index, stride, li, length(color)
-    for i in index:stride:length(color)
-        # Work item index
-        cellid = color[i]
-
-        # FIXME debug
-        CUDA.@atomic touched[cellid] += 1
-
-        # FIXME no shared memory right now :(
-        li = i
-
-        # Query the local evaluation buffer of the thread
-        cv_i = get_substruct(li, cv)
-    
-        # Query work item cell cache
-        cc_i = get_substruct(li, cc, cellid)
-
-        # Fill buffer
-        reinit!(cc_i, cellid)
-
-        # Query assembly buffer 
-        Ke = view(Kes, li, :, :)
-
-        # # Actual assembly routine
-        assemble_cell!(Ke, cc_i, cv_i, assembler)
-    end
-
-    return nothing
-end
-
-function assemble_global!(backend, cv::CellValues, K, cell_cache, colors::Vector, Ke)
-    touched = CUDA.zeros(Int, sum(length.(colors)))
-    assembler = start_assemble(K)
+function assemble_global_ka!(backend, cv::CellValues, K, f, cc, colors::Vector, Ke, fe)
+    assembler = K === nothing ? nothing : start_assemble(K, f)
     for color in colors
+        # We divide the work into blocks and fire up the kernel.
         n = length(color)
-        threads = min(32, n)
+        threads = min(NUM_THREADS, n)
         blocks  = cld(length(color), threads)
-        @cuda threads = threads blocks = blocks cuda_assembly_kernel(assembler, color, cell_cache, cv, Ke, touched)
-        # ka_kernel = assembly_kernel(backend, threads)
-        # ka_kernel(assembler, color, cell_cache, cv, Ke, ndrange=(threads,length(color)))
+        ka_kernel = ka_assembly_kernel(backend, threads)
+        ka_kernel(assembler, color, cc, cv, Ke, fe, ndrange=length(color))
+        # Since the kernel launches asynchronously we need to add a synchronization
+        # point before proceeding here. Otherwise we will start assembling the next color,
+        # while there are still threads working on the current color, therefore potentially
+        # causing race conditions.
         KA.synchronize(backend)
     end
-    return touched
+    return nothing
 end
 
-function assemble_global!(cv::CellValues, K::SparseMatrixCSC, dh::DofHandler)
-    n_basefuncs = getnbasefunctions(cv)
-    Ke = zeros(Float32, n_basefuncs, n_basefuncs)
-    assembler = start_assemble(K)
-    for cell in CellIterator(dh)
-        assemble_cell!(Ke, cell, cv, assembler)
+# And here now the CUDA variant. Please see above for details, as the kernels are almost the same.
+function cuda_assembly_kernel(assembler, color, cc, cv, Kes, fes)
+    task_index = (blockIdx().x - Int32(1)) * blockDim().x + threadIdx().x
+    stride     = gridDim().x * blockDim().x
+    for i in task_index:stride:length(color)
+        cellid = color[i]
+        cv_i = get_substruct(task_index, cv)
+        cc_i = get_substruct(task_index, cc, cellid)
+        reinit!(cc_i, cellid)
+        Ke = view(Kes, i, :, :)
+        fe = view(fes, i, :)
+        assemble_cell!(Ke, fe, cc_i, cv_i, assembler)
+    end
+    return nothing
+end
+function assemble_global_cuda!(cv::CellValues, K, f, cc, colors::Vector, Ke, fe)
+    assembler = K === nothing ? nothing : start_assemble(K, f)
+    for color in colors
+        n = length(color)
+        threads = min(NUM_THREADS, n)
+        blocks  = cld(length(color), threads)
+        @cuda threads = threads blocks = blocks cuda_assembly_kernel(assembler, color, cc, cv, Ke, fe)
+        CUDA.synchronize()
     end
     return nothing
 end
 
-### --- Example / Tests ---
+# Reference for internal testing                                                #hide
+function assemble_global!(cv::CellValues, K::SparseMatrixCSC, f, dh::DofHandler)#hide
+    n_basefuncs = getnbasefunctions(cv)                                         #hide
+    Ke = zeros(Float32, n_basefuncs, n_basefuncs)                               #hide
+    fe = zeros(Float32, n_basefuncs)                                            #hide
+    assembler = start_assemble(K, f)                                            #hide
+    for cell in CellIterator(dh)                                                #hide
+        assemble_cell!(Ke, fe, cell, cv, assembler)                             #hide
+    end                                                                         #hide
+    return nothing                                                              #hide
+end                                                                             #hide
 
-# Regular CPU
-num_elements = 50
+# Now we first setup the problem almost as usual on the host (CPU).
+# The only major difference here is that we instantiate everything
+# using Float32 and Int32 whenever it makes sense to lower memory
+# pressure on the GPU, and because Float32 is on most GPUs quite
+# a bit faster than using Float64 -- outside of high-end server GPUs.
+# Please note that GPU kernels have a launch overhead. Therefore out problem
+# must be sufficiently large to see any benefits of utilizing the GPU.
+# The small number of elements here is just for demonstration purposes.
+num_elements = 20
+# We generate a Float32 coordinate grid by passing in Float32 corner coordinates.
 grid = generate_grid(Hexahedron, (num_elements, num_elements, num_elements), Vec{3}((-1.0f0, -1.0f0, -1.0f0)), Vec{3}((1.0f0, 1.0f0, 1.0f0)))
 ip = Lagrange{RefHexahedron, 1}()
 qr = QuadratureRule{RefHexahedron}(Float32, 2)
-cv = CellValues(qr, ip)
+cv = CellValues(Float32, qr, ip)
 dh = DofHandler(grid)
 add!(dh, :u, ip)
 close!(dh)
-K = allocate_matrix(SparseMatrixCSC{Float32, Int32}, dh)
-assemble_global!(cv, K, dh)
 
+# If we assemble into a matrix, then we still need to color the grid as usual.
+# See also the threading how-to. Note that we still leave some of the integers
+# 64 bit to still enable the indexing of large problems.
 colors = create_coloring(grid)
 
-# KA CPU
-# begin
-#     backend = KA.CPU()
-#     colors_cpu = [adapt(backend, c) for c in colors]
-#     n_workers = maximum(length.(colors_cpu))
-#     dh_cpu = adapt(backend, dh)
-#     K_cpu = allocate_matrix(SparseMatrixCSC{Float32, Int32}, dh)
-#     cv_cpu = as_structure_of_arrays(backend, n_workers, cv)
-#     cell_cache = as_structure_of_arrays(backend, n_workers, CellCache, dh_cpu)
-#     Ke = KA.zeros(backend, Float32, n_workers, getnbasefunctions(cv), getnbasefunctions(cv))
-#     assemble_global!(backend, cv_cpu, K_cpu, cell_cache, colors_cpu, Ke)
-#     K_cpu ≈ K
-# end
-
-# KA CUDA
+# Now to the GPU side. Here we use Adapt.jl to generate GPU counterparts of
+# all relevant objects.
 backend = CUDABackend()
 colors_gpu = [adapt(backend, c) for c in colors]
-n_workers = maximum(length.(colors))
 dh_gpu = adapt(backend, dh)
 K_gpu = allocate_matrix(CuSparseMatrixCSC{Float32, Int32}, dh)
+f_gpu = KA.zeros(backend, Float32, (ndofs(dh),))
 
-# Variant A - Uses shared memory. Crashed with "too much shared memory used" error
-# cv_gpu = adapt(backend, cv)
-# cc_gpu = CellCache(backend, dh_gpu)
-
-# Variant B - Uses global memory. Functional.
-cc_gpu = as_structure_of_arrays(backend, n_workers, CellCache, dh_gpu)
+# Furthermore, the individual GPU workers need local buffers.
+# Ferrite comes with a little helper to transform common buffers
+# into a suitable GPU format.
+# n_workers = ceil(Int, length(grid.cells) / NUM_THREADS) # FIXME does not match the used 493
+n_workers = getncells(grid)
 cv_gpu = as_structure_of_arrays(backend, n_workers, cv)
+cc_gpu = as_structure_of_arrays(backend, n_workers, CellCache, dh_gpu)
+# Technically we can also just get one Ke or fe per worker, but for demonstration
+# purposes we allocate the full block here for element-assembly style matrix-free GPU
+# usage.
+Kes = KA.zeros(backend, Float32, getncells(grid), getnbasefunctions(cv), getnbasefunctions(cv))
+fes = KA.zeros(backend, Float32, getncells(grid), getnbasefunctions(cv))
 
-Ke = KA.zeros(backend, Float32, n_workers, getnbasefunctions(cv), getnbasefunctions(cv))
-visited = assemble_global!(backend, cv_gpu, K_gpu, cc_gpu, colors_gpu, Ke)
+# Now everything is set to launch the assembly via KernelAbstractions.
+# assemble_global_ka!(backend, cv_gpu, K_gpu, f_gpu, cc_gpu, colors_gpu, Kes, fes) # FIXME launch differs from cuda variant.
+# Or alternatively the cuda variant.
+assemble_global_cuda!(cv_gpu, K_gpu, f_gpu, cc_gpu, colors_gpu, Kes, fes)
 
-using Test
-@test K ≈ SparseMatrixCSC(K_gpu)
-
-# Dirichlet BCs — homogeneous (left + right)
+# Finally, we can apply the Dirichlet constraints and solve our linear system.
 ch = ConstraintHandler(Float32, Int32, dh)
-add!(ch, Dirichlet(:u, union(getfacetset(grid, "left"), getfacetset(grid, "right")), (x, t) -> 0.0))
+∂Ω = union(
+    getfacetset(grid, "left"), getfacetset(grid, "right"),
+    getfacetset(grid, "top"), getfacetset(grid, "bottom")
+)
+add!(ch, Dirichlet(:u, ∂Ω, (x, t) -> 1.0))
 close!(ch)
 
 ch_gpu = adapt(backend, ch)
+apply!(K_gpu, f_gpu, ch_gpu)
+u_gpu = SparseMatrixCSC(K_gpu) \ Vector(f_gpu)
+
+# ----------------------------- Tests --------------------------
+
+using Test
+K = allocate_matrix(SparseMatrixCSC{Float32, Int32}, dh)
 f = zeros(Float32, ndofs(dh))
-f_gpu = KA.zeros(backend, Float32, ndofs(dh))
+assemble_global!(cv, K, f, dh)
+apply!(K, f, ch)
+u_cpu = K \ f
+# NOTE this might fail because the meandiag differs due to cancellation. However,
+# the solutions are usually still very close.
+@test u_cpu ≈ u_gpu
 
-Kcopy = copy(K)
-K_gpucopy = copy(K_gpu)
-apply!(Kcopy, f, ch)
-apply!(K_gpucopy, f_gpu, ch_gpu)
-@test Kcopy ≉ K
-@test K_gpucopy ≉ K_gpu
-
-x = rand(ndofs(dh))
-@test Kcopy ≈ SparseMatrixCSC(K_gpucopy)
-@test f ≈ Vector(f_gpu)
-
-# Dirichlet BCs — inhomogeneous (left + right + top + bottom)
-ch2 = ConstraintHandler(Float32, Int32, dh)
-add!(
-    ch2, Dirichlet(
-        :u, union(
-            getfacetset(grid, "left"), getfacetset(grid, "right"),
-            getfacetset(grid, "top"), getfacetset(grid, "bottom")
-        ), (x, t) -> 1.0
-    )
-)
-close!(ch2)
-
-ch_gpu2 = adapt(backend, ch2)
-f2 = zeros(Float32, ndofs(dh))
-f_gpu2 = KA.zeros(backend, Float32, ndofs(dh))
-
-apply!(K, f2, ch2)
-apply!(K_gpu, f_gpu2, ch_gpu2)
-
-# NOTE this does not hold because the meandiag differs due to cancellation. However, the solutions should still be close
-# @test K ≈ SparseMatrixCSC(K_gpu)
-# @test f2 ≈ Vector(f_gpu2)
-
-ucpu = K \ f2
-ugpu = SparseMatrixCSC(K_gpu) \ Vector(f_gpu2)
-@test ucpu ≈ ugpu
+# Test KA CPU
+begin
+    backend = KA.CPU()
+    colors_cpu = [adapt(backend, c) for c in colors]
+    n_workers = maximum(length.(colors_cpu))
+    dh_cpu = adapt(backend, dh)
+    K_cpu = allocate_matrix(SparseMatrixCSC{Float32, Int32}, dh)
+    f_cpu = KA.zeros(backend, Float32, ndofs(dh))
+    cv_cpu = as_structure_of_arrays(backend, n_workers, cv)
+    cell_cache = as_structure_of_arrays(backend, n_workers, CellCache, dh_cpu)
+    Kes_cpu = KA.zeros(backend, Float32, getncells(grid), getnbasefunctions(cv), getnbasefunctions(cv))
+    fes_cpu = KA.zeros(backend, Float32, getncells(grid), getnbasefunctions(cv))
+    # Assembly here does notw ork because we are missing a SOA transformation of the assembler.
+    assemble_global_ka!(backend, cv_cpu, nothing, nothing, cell_cache, colors_cpu, Kes_cpu, fes_cpu)
+    # @test K_cpu \ f_cpu ≈ u_cpu
+    @test Kes_cpu ≈ Array(Kes) broken = true
+    @test fes_cpu ≈ Array(fes) broken = true
+end

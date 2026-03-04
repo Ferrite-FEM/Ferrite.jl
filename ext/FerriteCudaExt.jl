@@ -1,10 +1,13 @@
+# TODO's
+# * `update!` for ConstraintHandler on GPU.
+
 module FerriteCudaExt
 
 using Ferrite, CUDA, SparseArrays
 
 import Adapt: Adapt, adapt, adapt_structure
 
-import Ferrite: get_grid, AbstractGrid, AbstractDofHandler, get_coordinate_eltype, as_structure_of_arrays, get_substruct, materialize, meandiag
+import Ferrite: get_grid, AbstractGrid, AbstractDofHandler, get_coordinate_eltype, as_structure_of_arrays, get_substruct, meandiag
 
 import CUDA: CUDA.CUSPARSE.CuSparseMatrixCSC, CUDA.CUSPARSE.CuSparseMatrixCSR, @allowscalar
 import KernelAbstractions as KA
@@ -74,11 +77,7 @@ function Ferrite.dof_range(sdh::GPUSubDofHandler, field_name::Symbol)
 end
 
 function Ferrite.celldofs!(global_dofs::AbstractVector, sdh::GPUSubDofHandler, i::Integer)
-    offset = sdh.cell_dofs_offset[i] - 1
-    n = sdh.ndofs_per_cell
-    @inbounds for j in 1:n
-        global_dofs[j] = sdh.cell_dofs[offset + j]
-    end
+    copyto!(global_dofs, 1, sdh.cell_dofs, sdh.cell_dofs_offset[i], length(global_dofs))
     return global_dofs
 end
 
@@ -118,34 +117,12 @@ Adapt.@adapt_structure Ferrite.FunctionValues
 
 adapt(to, ip::Ferrite.Interpolation) = ip
 
-get_number_of_device_threads(_) = attribute(device(), CUDA.DEVICE_ATTRIBUTE_MAX_THREADS_PER_BLOCK)
-
-# The design below outmaneuvers the standard Ferrite setup logic. Here start with the setup of a *defective* FEValues object.
-# On the device we do not access the this object directly, but instead we have an accessor function which queries the shared
-# memory variant of this object (e.g. CuStaticSharedMemory). The main reason reason is that we cannot just allocate device
-# shared memory on the host, but using global memory is not optimal either.
-struct DeviceResidentSharedMemoryDescriptor{Tv, N, Dims, M} <: AbstractArray{Tv, M}
-end
-
-as_shared_array(d, N, a) = adapt(d, a)
-as_shared_array(d, N, a::Array{T, M}) where {T, M} = DeviceResidentSharedMemoryDescriptor{T, N, size(a), M}()
-# FIXME adjust the number of threads on kernel launch
-# as_shared_array(d::CUDA.KernelAdaptor, N, a::DeviceResidentSharedMemoryDescriptor) = DeviceResidentSharedMemoryDescriptor{eltype(T), N, size(a)}()
-
-function materialize(::DeviceResidentSharedMemoryDescriptor{Tv, N, Dims}) where {Tv, N, Dims}
-    # TODO KernelAbstractions v0.10
-    # return KA.KernelIntrinsics.localmemory(Tv, (N, Dims...))
-    return CuStaticSharedArray(Tv, N, Dims...)
-    # return KA.SharedMemory(Tv, (N, Dims...), KA.gensym("static_shmem"))
-end
-
 function adapt(d, cv::CellValues)
-    N = get_number_of_device_threads(d)
     return CellValues(
         adapt(d, cv.fun_values),
         adapt(d, cv.geo_mapping),
         adapt(d, cv.qr),
-        as_shared_array(d, N, cv.detJdV),
+        adapt(d, cv.detJdV),
     )
 end
 
@@ -164,12 +141,12 @@ function as_structure_of_arrays(d, N, cv::CellValues)
 end
 
 function adapt(d, fv::Ferrite.FunctionValues)
-    N = get_number_of_device_threads(d)
+    Nξ = adapt(d, fv.Nξ)
     return Ferrite.FunctionValues(
         adapt(d, fv.ip),
-        as_shared_array(d, N, fv.Nx),
-        adapt(d, fv.Nξ),
-        as_shared_array(d, N, fv.dNdx),
+        fv.Nξ === fv.Nx ? Nξ : adapt(fv.Nx), # Ensure proper aliasing
+        Nξ,
+        adapt(d, fv.dNdx),
         adapt(d, fv.dNdξ),
         fv.d2Ndx2 === nothing ? nothing : as_shared_array(d, N, fv.d2Ndx2),
         fv.d2Ndξ2 === nothing ? nothing : adapt(d, collect(fv.d2Ndξ2)),
@@ -177,11 +154,12 @@ function adapt(d, fv::Ferrite.FunctionValues)
 end
 
 function as_structure_of_arrays(d, N, fv::Ferrite.FunctionValues)
+    Nξ = adapt(d, fv.Nξ)
     return Ferrite.FunctionValues(
         adapt(d, fv.ip),
-        KA.zeros(d, eltype(fv.Nx), N, size(fv.Nx, 1), size(fv.Nx, 2)),
-        adapt(d, fv.Nξ),
-        KA.zeros(d, eltype(fv.dNdx), N, size(fv.dNdx, 1), size(fv.dNdx, 2)),
+        fv.Nξ === fv.Nx ? Nξ : KA.zeros(d, eltype(fv.Nx), N, size(fv.Nx, 1), size(fv.Nx, 2)), # Ensure proper aliasing,
+        Nξ,
+        fv.dNdx === nothing ? nothing : KA.zeros(d, eltype(fv.dNdx), N, size(fv.dNdx, 1), size(fv.dNdx, 2)),
         adapt(d, fv.dNdξ),
         fv.d2Ndx2 === nothing ? nothing : KA.zeros(d, eltype(fv.d2Ndx2), N, size(fv.d2Ndx2, 1), size(fv.d2Ndx2, 2)),
         fv.d2Ndξ2 === nothing ? nothing : adapt(d, fv.d2Ndξ2),
@@ -189,10 +167,9 @@ function as_structure_of_arrays(d, N, fv::Ferrite.FunctionValues)
 end
 
 function adapt(d, fv::Ferrite.GeometryMapping)
-    N = get_number_of_device_threads(d)
     return Ferrite.GeometryMapping(
         adapt(d, fv.ip),
-        as_shared_array(d, N, fv.M),
+        adapt(d, fv.M),
         fv.dMdξ === nothing ? nothing : adapt(d, fv.dMdξ),
         fv.d2Mdξ2 === nothing ? nothing : adapt(d, fv.d2Mdξ2),
     )
@@ -214,34 +191,6 @@ end
 # Adapt.@adapt_structure QuadratureRule does not work here due to the type parameter ctor.
 function adapt_structure(to, qr::QuadratureRule{shape}) where {shape}
     return QuadratureRule{shape}(adapt_structure(to, qr.weights), adapt_structure(to, qr.points))
-end
-
-function materialize(cv::CellValues)
-    return CellValues(
-        materialize(cv.fun_values),
-        materialize(cv.geo_mapping),
-        materialize(cv.qr),
-        materialize(cv.detJdV),
-    )
-end
-function materialize(fv::Ferrite.FunctionValues)
-    return Ferrite.FunctionValues(
-        materialize(fv.ip),
-        materialize(fv.Nx),
-        materialize(fv.Nξ),
-        materialize(fv.dNdx),
-        materialize(fv.dNdξ),
-        materialize(fv.d2Ndx2),
-        materialize(fv.d2Ndξ2),
-    )
-end
-function materialize(fv::Ferrite.GeometryMapping)
-    return Ferrite.GeometryMapping(
-        materialize(fv.ip),
-        materialize(fv.M),
-        materialize(fv.dMdξ),
-        materialize(fv.d2Mdξ2),
-    )
 end
 
 # -------------------- iterator ----------------------
@@ -294,40 +243,27 @@ function Ferrite.CellCache(d, dh::GPUDofHandler{dim}, flags::UpdateFlags = Updat
 end
 
 function Ferrite.CellCache(d, sdh::GPUSubDofHandler{dim}, flags::UpdateFlags = UpdateFlags()) where {dim}
-    outer_dim = get_number_of_device_threads(d)
     grid = get_grid(sdh)
     @allowscalar begin
-        n = Ferrite.ndofs_per_cell(sdh)
         N = Ferrite.nnodes_per_cell(grid, first(sdh.cellset))
-        nodes = as_shared_array(d, outer_dim, zeros(Int, N))
-        coords = as_shared_array(d, outer_dim, zeros(Vec{dim, get_coordinate_eltype(grid)}, N))
-        dofs = as_shared_array(d, outer_dim, zeros(Int, N))
+        nodes = KA.zeros(d, Int, N)
+        coords = KA.zeros(d, Vec{dim, get_coordinate_eltype(grid)}, N)
+
+        n = Ferrite.ndofs_per_cell(sdh)
+        dofs = KA.zeros(d, Int, n)
     end
     return GPUCellCache(flags, grid, -1, nodes, coords, sdh, dofs)
 end
 
 function adapt(d, cc::GPUCellCache)
-    outer_dim = get_number_of_device_threads(d)
     return GPUCellCache(
         cc.flags,
         adapt(d, cc.grid),
         -1,
-        as_shared_array(d, outer_dim, cc.nodes),
-        as_shared_array(d, outer_dim, cc.coords),
+        adapt(d, cc.nodes),
+        adapt(d, cc.coords),
         adapt(d, cc.sdh),
-        as_shared_array(d, outer_dim, cc.dofs),
-    )
-end
-
-function materialize(cc::GPUCellCache)
-    return GPUCellCache(
-        materialize(cc.flags),
-        materialize(cc.grid),
-        materialize(cc.cellid),
-        materialize(cc.nodes),
-        materialize(cc.coords),
-        materialize(cc.sdh),
-        materialize(cc.dofs),
+        adapt(d, cc.dofs),
     )
 end
 
@@ -347,18 +283,33 @@ end
 
 # -------------------- assembler ----------------------
 
-struct GPUCSCAssembler{KType}
+struct GPUCSCAssembler{KType, FType}
     K::KType
+    f::FType
 end
 Adapt.@adapt_structure GPUCSCAssembler
 
 # FIXME buffer
-function Ferrite.start_assemble(K::CuSparseMatrixCSC; fillzero::Bool = true)
+function Ferrite.start_assemble(K::CuSparseMatrixCSC, f::Union{CuVector, Nothing} = nothing; fillzero::Bool = true)
     fillzero && fill!(nonzeros(K), zero(eltype(K)))
-    return GPUCSCAssembler(K)
+    f !== nothing && fillzero && fill!(f, zero(eltype(f)))
+    return GPUCSCAssembler(K, f)
 end
 
-function Ferrite.assemble!(A::GPUCSCAssembler, dofs::AbstractVector{<:Integer}, Ke::AbstractMatrix, fe::Nothing = nothing)
+function Ferrite.assemble!(A::GPUCSCAssembler, dofs::AbstractVector{<:Integer}, Ke::AbstractMatrix, fe::AbstractVector)
+    Ferrite.assemble!(A, dofs, Ke)
+    Ferrite.assemble!(A, dofs, fe)
+    return nothing
+end
+
+function Ferrite.assemble!(A::GPUCSCAssembler, dofs::AbstractVector{<:Integer}, fe::AbstractVector)
+    for (i, dof) in enumerate(dofs)
+        A.f[dof] += fe[i]
+    end
+    return nothing
+end
+
+function Ferrite.assemble!(A::GPUCSCAssembler, dofs::AbstractVector{<:Integer}, Ke::AbstractMatrix)
     colptr = SparseArrays.getcolptr(A.K)
     rowval = rowvals(A.K)
     nzval  = nonzeros(A.K)

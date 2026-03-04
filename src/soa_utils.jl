@@ -15,9 +15,11 @@ function get_substruct(i, cv::CellValues)
 end
 
 function get_substruct(i, fv::FunctionValues)
+    Nx = fv.Nξ === fv.Nx ? fv.Nx : view(fv.Nx, i, :, :)
+    dNdx = fv.dNdx === nothing ? nothing : view(fv.dNdx, i, :, :)
     return FunctionValues(
-        fv.ip, view(fv.Nx, i, :, :), fv.Nξ,
-        view(fv.dNdx, i, :, :), fv.dNdξ, nothing, nothing
+        fv.ip, Nx, fv.Nξ,
+        dNdx, fv.dNdξ, nothing, nothing
     )
 end
 
