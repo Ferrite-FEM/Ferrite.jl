@@ -123,7 +123,7 @@ function meandiag_kernel!(diag, colptr, rowval, nzval, n)
     return nothing
 end
 
-# TODO The code below must be refactored a bit to use KernelAbstractions directly. 
+# TODO The code below must be refactored a bit to use KernelAbstractions directly.
 #      The limiting factor right now is not having a enough sparse matrix base types
 #      and related to this no interfaces to query the fields.
 

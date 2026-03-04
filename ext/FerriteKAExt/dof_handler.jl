@@ -1,4 +1,3 @@
-
 struct DeviceSubDofHandler{
         dim,
         CS <: AbstractVector{Int}, CD <: AbstractVector{Int},

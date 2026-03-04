@@ -133,7 +133,7 @@ function ProjectedDirichlet(field_name::Symbol, facets::AbstractVecOrSet, f::Fun
     return ProjectedDirichlet(f, convert_to_orderedset(facets), field_name, qr_order, nothing, nothing)
 end
 
-const DofCoefficients{T} = Vector{Pair{Int, T}}
+const DofCoefficients{Tv, Ti} = Vector{Pair{Ti, Tv}}
 """
     AffineConstraint(constrained_dof::Int, entries::Vector{Pair{Int,T}}, b::T) where T
 
@@ -143,7 +143,7 @@ where `i=constrained_dof` and each element in `entries` are `j => a[j]`
 """
 struct AffineConstraint{Tv, Ti}
     constrained_dof::Ti
-    entries::DofCoefficients{Tv} # masterdofs and factors
+    entries::DofCoefficients{Tv, Ti} # masterdofs and factors
     b::Tv # inhomogeneity
 end
 

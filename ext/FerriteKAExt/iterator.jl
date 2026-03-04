@@ -1,4 +1,3 @@
-
 # NOTE CellCache is mutable and hence inherently incompatible with GPU. So here is the
 # immutable variant. Making the CellCache immutable is considered breaking due to the reinit! API integration.
 struct ImmutableCellCache{G <: AbstractGrid, SDH, IVT, VX}
