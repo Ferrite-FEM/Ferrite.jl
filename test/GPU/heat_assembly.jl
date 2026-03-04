@@ -1,6 +1,3 @@
-# TODO's
-# * Fix KernelAbstractions launch options. They differ from the pure CUDA variant.
-
 using Ferrite, CUDA
 import CUDA: CUDA.CUSPARSE.CuSparseMatrixCSC
 import Adapt: adapt
