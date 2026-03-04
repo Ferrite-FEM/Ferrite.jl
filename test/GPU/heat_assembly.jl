@@ -1,4 +1,3 @@
-
 include("../../docs/src/howto/gpu_heat_howto_literate.jl")
 
 # ----------------------------- Tests --------------------------
