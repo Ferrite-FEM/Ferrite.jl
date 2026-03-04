@@ -59,7 +59,7 @@ end
 @kernel function ka_assembly_kernel(assembler, @Const(color), cc, cv, Kes, fes)
     # This is the classical grid-stride-loop
     task_index = @index(Global, Linear)
-    stride = KA.@groupsize()[1]
+    stride = prod(KA.@ndrange())
     for i in task_index:stride:length(color)
         # Work item index
         cellid = color[i]
@@ -87,10 +87,18 @@ function assemble_global_ka!(backend, cv::CellValuesContainer, K, f, cc, colors:
     for color in colors
         # We divide the work into blocks and fire up the kernel.
         n = length(color)
-        threads = min(NUM_THREADS, n)
-        blocks = cld(length(color), threads)
+        # Let's assign, arbitrarily, two element assembly tasks per GPU thread.
+        tasks_per_thread = min(2, n)
+        # To do so, let us first compute how many element groups we have to assemble.
+        n_effective = cld(n, tasks_per_thread)
+        # This potentially limits the number of usable threads, e.g. when a color just has a small
+        # number of elements.
+        threads = min(NUM_THREADS, n_effective)
+        # Furthermore, for CPU computing we typically group the tasks into blocks of worker threads.
+        blocks = cld(n, tasks_per_thread * threads)
+        # Now, we can build and execute the Kernel.
         ka_kernel = ka_assembly_kernel(backend, threads)
-        ka_kernel(assembler, color, cc, cv, Ke, fe, ndrange = length(color))
+        ka_kernel(assembler, color, cc, cv, Ke, fe, ndrange = threads * blocks)
         # Since the kernel launches asynchronously we need to add a synchronization
         # point before proceeding here. Otherwise we will start assembling the next color,
         # while there are still threads working on the current color, therefore potentially
@@ -119,8 +127,9 @@ function assemble_global_cuda!(cv::CellValuesContainer, K, f, cc, colors::Vector
     assembler = K === nothing ? nothing : start_assemble(K, f)
     for color in colors
         n = length(color)
+        tasks_per_thread = 2
         threads = min(NUM_THREADS, n)
-        blocks = cld(length(color), threads)
+        blocks = cld(n, tasks_per_thread * threads)
         @cuda threads = threads blocks = blocks cuda_assembly_kernel(assembler, color, cc, cv, Ke, fe)
         CUDA.synchronize()
     end
@@ -184,7 +193,7 @@ Kes = KA.zeros(backend, Float32, getncells(grid), getnbasefunctions(cv), getnbas
 fes = KA.zeros(backend, Float32, getncells(grid), getnbasefunctions(cv))
 
 # Now everything is set to launch the assembly via KernelAbstractions.
-# assemble_global_ka!(backend, cv_gpu, K_gpu, f_gpu, cc_gpu, colors_gpu, Kes, fes) # FIXME launch differs from cuda variant.
+# assemble_global_ka!(backend, cv_gpu, K_gpu, f_gpu, cc_gpu, colors_gpu, Kes, fes)
 # Or alternatively the cuda variant.
 assemble_global_cuda!(cv_gpu, K_gpu, f_gpu, cc_gpu, colors_gpu, Kes, fes)
 
@@ -213,21 +222,23 @@ u_cpu = K \ f
 # the solutions are usually still very close.
 @test u_cpu ≈ u_gpu
 
-# Test KA CPU
-begin
-    backend = KA.CPU()
-    colors_cpu = [adapt(backend, c) for c in colors]
-    n_workers = maximum(length.(colors_cpu))
-    dh_cpu = adapt(backend, dh)
-    K_cpu = allocate_matrix(SparseMatrixCSC{Float32, Int32}, dh)
-    f_cpu = KA.zeros(backend, Float32, ndofs(dh))
-    cv_cpu = CellValuesContainer(backend, n_workers, cv)
-    cell_cache = CellCacheContainer(backend, n_workers, dh_cpu)
-    Kes_cpu = KA.zeros(backend, Float32, getncells(grid), getnbasefunctions(cv), getnbasefunctions(cv))
-    fes_cpu = KA.zeros(backend, Float32, getncells(grid), getnbasefunctions(cv))
-    # Assembly here does notw ork because we are missing a SOA transformation of the assembler.
-    assemble_global_ka!(backend, cv_cpu, nothing, nothing, cell_cache, colors_cpu, Kes_cpu, fes_cpu)
-    # @test K_cpu \ f_cpu ≈ u_cpu
-    @test Kes_cpu ≈ Array(Kes) broken = true
-    @test fes_cpu ≈ Array(fes) broken = true
+# Test KA
+@testset "KernelAbstractions paths for $backend" for backend in [KA.CPU(), CUDABackend()]
+    colors_device = [adapt(backend, c) for c in colors]
+    n_workers = maximum(length.(colors_device))
+    dh_device = adapt(backend, dh)
+    K_device = if backend isa KA.CPU
+        allocate_matrix(SparseMatrixCSC{Float32, Int32}, dh)
+    else
+        allocate_matrix(CuSparseMatrixCSC{Float32, Int32}, dh)
+    end
+    f_device = KA.zeros(backend, Float32, ndofs(dh))
+    cv_device = CellValuesContainer(backend, n_workers, cv)
+    cell_cache = CellCacheContainer(backend, n_workers, dh_device)
+    Kes_device = KA.zeros(backend, Float32, getncells(grid), getnbasefunctions(cv), getnbasefunctions(cv))
+    fes_device = KA.zeros(backend, Float32, getncells(grid), getnbasefunctions(cv))
+    # Assembly here does not work because we are missing a SOA transformation of the assembler.
+    assemble_global_ka!(backend, cv_device, nothing, nothing, cell_cache, colors_device, Kes_device, fes_device)
+    @test Array(Kes_device) ≈ Array(Kes)
+    @test Array(fes_device) ≈ Array(fes)
 end
