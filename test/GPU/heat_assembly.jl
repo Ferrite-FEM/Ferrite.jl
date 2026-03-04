@@ -11,6 +11,7 @@ using SparseArrays
 import Ferrite: CellValuesContainer, CellCacheContainer
 
 const NUM_THREADS = 64
+const NUM_TASKS_PER_THREAD = 2
 
 # In this how-to we want to use an existing assembly routine on the GPU with Ferrite.
 # We implicitly assume that nothing dynamic happens inside the routine, i.e. the routine
@@ -88,7 +89,7 @@ function assemble_global_ka!(backend, cv::CellValuesContainer, K, f, cc, colors:
         # We divide the work into blocks and fire up the kernel.
         n = length(color)
         # Let's assign, arbitrarily, two element assembly tasks per GPU thread.
-        tasks_per_thread = min(2, n)
+        tasks_per_thread = min(NUM_TASKS_PER_THREAD, n)
         # To do so, let us first compute how many element groups we have to assemble.
         n_effective = cld(n, tasks_per_thread)
         # This potentially limits the number of usable threads, e.g. when a color just has a small
@@ -127,8 +128,8 @@ function assemble_global_cuda!(cv::CellValuesContainer, K, f, cc, colors::Vector
     assembler = K === nothing ? nothing : start_assemble(K, f)
     for color in colors
         n = length(color)
-        tasks_per_thread = 2
-        threads = min(NUM_THREADS, n)
+        tasks_per_thread = min(NUM_TASKS_PER_THREAD, n)
+        threads = min(NUM_THREADS, cld(n, tasks_per_thread))
         blocks = cld(n, tasks_per_thread * threads)
         @cuda threads = threads blocks = blocks cuda_assembly_kernel(assembler, color, cc, cv, Ke, fe)
         CUDA.synchronize()
