@@ -135,7 +135,7 @@ end
 
 const DofCoefficients{Tv, Ti} = Vector{Pair{Ti, Tv}}
 """
-    AffineConstraint(constrained_dof::Int, entries::Vector{Pair{Int,T}}, b::T) where T
+    AffineConstraint(constrained_dof::Integer, entries::Vector{Pair{Integer,T}}, b::T) where T
 
 Define an affine/linear constraint to constrain one degree of freedom, `u[i]`,
 such that `u[i] = ∑(u[j] * a[j]) + b`,
@@ -355,7 +355,7 @@ Add a constrained dof directly to the `ConstraintHandler`.
 This function checks if the `constrained_dof` is already constrained, and overrides the old
 constraint if true.
 """
-function add_prescribed_dof!(ch::ConstraintHandler, constrained_dof::Int, inhomogeneity, dofcoefficients = nothing)
+function add_prescribed_dof!(ch::ConstraintHandler, constrained_dof::Integer, inhomogeneity, dofcoefficients = nothing)
     @assert(!isclosed(ch))
     i = get(ch.dofmapping, constrained_dof, 0)
     if i != 0
@@ -418,7 +418,7 @@ function _local_facet_dofs_for_bc(interpolation, field_dim, components, offset, 
     return local_facet_dofs, local_facet_dofs_offset
 end
 
-function _add!(ch::ConstraintHandler{<:Any, <:Any, Ti}, dbc::Dirichlet, bcnodes::AbstractVecOrSet{<:Integer}, interpolation::Interpolation, field_dim::Int, offset::Int, bcvalue::BCValues, cellset::AbstractVecOrSet{<:Integer} = OrderedSet{Int}(1:getncells(get_grid(ch.dh)))) where {Ti}
+function _add!(ch::ConstraintHandler{<:Any, <:Any, Ti}, dbc::Dirichlet, bcnodes::AbstractVecOrSet{<:Integer}, interpolation::Interpolation, field_dim::Int, offset::Integer, bcvalue::BCValues, cellset::AbstractVecOrSet{<:Integer} = OrderedSet{Int}(1:getncells(get_grid(ch.dh)))) where {Ti}
     grid = get_grid(ch.dh)
     if interpolation !== geometric_interpolation(getcelltype(grid, first(cellset)))
         @warn("adding constraint to nodeset is not recommended for sub/super-parametric approximations.")

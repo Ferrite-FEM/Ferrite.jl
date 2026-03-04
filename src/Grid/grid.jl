@@ -458,14 +458,14 @@ end
 
 """
     getcells(grid::AbstractGrid)
-    getcells(grid::AbstractGrid, v::Union{Integer,Vector{<:Integer}}
+    getcells(grid::AbstractGrid, v::Union{Integer,AbstractVector{<:Integer}}
     getcells(grid::AbstractGrid, setname::String)
 
 Returns either all `cells::Collection{C<:AbstractCell}` of a `<:AbstractGrid` or a subset based on an `Int`, `Vector{Int}` or `String`.
 Whereas the last option tries to call a `cellset` of the `grid`. `Collection` can be any indexable type, for `Grid` it is `Vector{C<:AbstractCell}`.
 """
 @inline getcells(grid::AbstractGrid) = grid.cells
-@inline getcells(grid::AbstractGrid, v::Union{Integer, Vector{<:Integer}}) = grid.cells[v]
+@inline getcells(grid::AbstractGrid, v::Union{Integer, AbstractVector{<:Integer}}) = grid.cells[v]
 @inline getcells(grid::AbstractGrid, setname::String) = grid.cells[collect(getcellset(grid, setname))]
 "Returns the number of cells in the `<:AbstractGrid`."
 @inline getncells(grid::AbstractGrid) = length(grid.cells)
@@ -475,15 +475,15 @@ Whereas the last option tries to call a `cellset` of the `grid`. `Collection` ca
 
 """
     getnodes(grid::AbstractGrid)
-    getnodes(grid::AbstractGrid, v::Union{Integer,Vector{<:Integer}}
+    getnodes(grid::AbstractGrid, v::Union{Integer,AbstractVector{<:Integer}}
     getnodes(grid::AbstractGrid, setname::String)
 
-Returns either all `nodes::Collection{N}` of a `<:AbstractGrid` or a subset based on an `Integer`, `Vector{<:Integer}` or `String`.
+Returns either all `nodes::Collection{N}` of a `<:AbstractGrid` or a subset based on an `Integer`, `AbstractVector{<:Integer}` or `String`.
 The last option tries to call a `nodeset` of the `<:AbstractGrid`. `Collection{N}` refers to some indexable collection where each element corresponds
 to a Node.
 """
 @inline getnodes(grid::AbstractGrid) = grid.nodes
-@inline getnodes(grid::AbstractGrid, v::Union{Integer, Vector{<:Integer}}) = grid.nodes[v]
+@inline getnodes(grid::AbstractGrid, v::Union{Integer, AbstractVector{<:Integer}}) = grid.nodes[v]
 @inline getnodes(grid::AbstractGrid, setname::String) = grid.nodes[collect(getnodeset(grid, setname))]
 "Returns the number of nodes in the grid."
 @inline getnnodes(grid::AbstractGrid) = length(grid.nodes)
@@ -710,7 +710,7 @@ the shift index.
 """
 struct SurfaceOrientationInfo
     #flipped::Bool
-    #shift_index::Integer
+    #shift_index::Int
 end
 
 
@@ -757,26 +757,26 @@ which are flipped against each other.
 """
 struct OrientationInfo
     flipped::Bool
-    shift_index::Integer
+    shift_index::Int
 end
 
-function OrientationInfo(edgenodes::NTuple{2, Int})
+function OrientationInfo(edgenodes::NTuple{2, <: Integer})
     return OrientationInfo(get_edge_direction(edgenodes) < 0, 0)
 end
 
-function OrientationInfo(facenodes::NTuple{N, Int}) where {N}
+function OrientationInfo(facenodes::NTuple{N, <: Integer}) where {N}
     min_idx = argmin(facenodes)
     shift_index = min_idx - 1
     flipped = get_face_direction(facenodes) < 0
     return OrientationInfo(flipped, shift_index)
 end
 
-function get_edge_direction(edgenodes::NTuple{2, Int})
+function get_edge_direction(edgenodes::NTuple{2, <: Integer})
     positive = edgenodes[2] > edgenodes[1]
     return ifelse(positive, 1, -1)
 end
 
-function get_face_direction(facenodes::NTuple{N, Int}) where {N}
+function get_face_direction(facenodes::NTuple{N, <: Integer}) where {N}
     N > 2 || throw(ArgumentError("A face must have at least 3 nodes"))
     min_idx = argmin(facenodes)
     if min_idx == 1
