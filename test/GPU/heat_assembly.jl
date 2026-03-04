@@ -59,7 +59,7 @@ end
 @kernel function ka_assembly_kernel(assembler, @Const(color), cc, cv, Kes, fes)
     # This is the classical grid-stride-loop
     task_index = @index(Global, Linear)
-    stride     = KA.@groupsize()[1]
+    stride = KA.@groupsize()[1]
     for i in task_index:stride:length(color)
         # Work item index
         cellid = color[i]
@@ -88,9 +88,9 @@ function assemble_global_ka!(backend, cv::CellValues, K, f, cc, colors::Vector, 
         # We divide the work into blocks and fire up the kernel.
         n = length(color)
         threads = min(NUM_THREADS, n)
-        blocks  = cld(length(color), threads)
+        blocks = cld(length(color), threads)
         ka_kernel = ka_assembly_kernel(backend, threads)
-        ka_kernel(assembler, color, cc, cv, Ke, fe, ndrange=length(color))
+        ka_kernel(assembler, color, cc, cv, Ke, fe, ndrange = length(color))
         # Since the kernel launches asynchronously we need to add a synchronization
         # point before proceeding here. Otherwise we will start assembling the next color,
         # while there are still threads working on the current color, therefore potentially
@@ -103,7 +103,7 @@ end
 # And here now the CUDA variant. Please see above for details, as the kernels are almost the same.
 function cuda_assembly_kernel(assembler, color, cc, cv, Kes, fes)
     task_index = (blockIdx().x - Int32(1)) * blockDim().x + threadIdx().x
-    stride     = gridDim().x * blockDim().x
+    stride = gridDim().x * blockDim().x
     for i in task_index:stride:length(color)
         cellid = color[i]
         cv_i = get_substruct(task_index, cv)
@@ -120,7 +120,7 @@ function assemble_global_cuda!(cv::CellValues, K, f, cc, colors::Vector, Ke, fe)
     for color in colors
         n = length(color)
         threads = min(NUM_THREADS, n)
-        blocks  = cld(length(color), threads)
+        blocks = cld(length(color), threads)
         @cuda threads = threads blocks = blocks cuda_assembly_kernel(assembler, color, cc, cv, Ke, fe)
         CUDA.synchronize()
     end
@@ -128,7 +128,7 @@ function assemble_global_cuda!(cv::CellValues, K, f, cc, colors::Vector, Ke, fe)
 end
 
 # Reference for internal testing                                                #hide
-function assemble_global!(cv::CellValues, K::SparseMatrixCSC, f, dh::DofHandler)#hide
+function assemble_global!(cv::CellValues, K::SparseMatrixCSC, f, dh::DofHandler) #hide
     n_basefuncs = getnbasefunctions(cv)                                         #hide
     Ke = zeros(Float32, n_basefuncs, n_basefuncs)                               #hide
     fe = zeros(Float32, n_basefuncs)                                            #hide

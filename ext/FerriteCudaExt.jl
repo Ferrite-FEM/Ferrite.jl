@@ -312,7 +312,7 @@ end
 function Ferrite.assemble!(A::GPUCSCAssembler, dofs::AbstractVector{<:Integer}, Ke::AbstractMatrix)
     colptr = SparseArrays.getcolptr(A.K)
     rowval = rowvals(A.K)
-    nzval  = nonzeros(A.K)
+    nzval = nonzeros(A.K)
 
     ndofs = length(dofs)
     for j in 1:ndofs
