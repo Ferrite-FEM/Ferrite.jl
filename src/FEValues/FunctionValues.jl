@@ -5,35 +5,17 @@
 # vdim = vector dimension (dimension of the field)              #
 #################################################################
 
-# Scalar, sdim == rdim                                              sdim                    rdim
-typeof_N(::Type{T}, ::ScalarInterpolation, ::VectorizedInterpolation{dim, <:AbstractRefShape{dim}}) where {T, dim} = T
-typeof_dNdx(::Type{T}, ::ScalarInterpolation, ::VectorizedInterpolation{dim, <:AbstractRefShape{dim}}) where {T, dim} = Vec{dim, T}
-typeof_dNdξ(::Type{T}, ::ScalarInterpolation, ::VectorizedInterpolation{dim, <:AbstractRefShape{dim}}) where {T, dim} = Vec{dim, T}
-typeof_d2Ndx2(::Type{T}, ::ScalarInterpolation, ::VectorizedInterpolation{dim, <:AbstractRefShape{dim}}) where {T, dim} = Tensor{2, dim, T}
-typeof_d2Ndξ2(::Type{T}, ::ScalarInterpolation, ::VectorizedInterpolation{dim, <:AbstractRefShape{dim}}) where {T, dim} = Tensor{2, dim, T}
-
-# Vector, vdim == sdim == rdim           vdim                            sdim                    rdim
-typeof_N(::Type{T}, ::VectorInterpolation{dim}, ::VectorizedInterpolation{dim, <:AbstractRefShape{dim}}) where {T, dim} = Vec{dim, T}
-typeof_dNdx(::Type{T}, ::VectorInterpolation{dim}, ::VectorizedInterpolation{dim, <:AbstractRefShape{dim}}) where {T, dim} = Tensor{2, dim, T}
-typeof_dNdξ(::Type{T}, ::VectorInterpolation{dim}, ::VectorizedInterpolation{dim, <:AbstractRefShape{dim}}) where {T, dim} = Tensor{2, dim, T}
-typeof_d2Ndx2(::Type{T}, ::VectorInterpolation{dim}, ::VectorizedInterpolation{dim, <:AbstractRefShape{dim}}) where {T, dim} = Tensor{3, dim, T}
-typeof_d2Ndξ2(::Type{T}, ::VectorInterpolation{dim}, ::VectorizedInterpolation{dim, <:AbstractRefShape{dim}}) where {T, dim} = Tensor{3, dim, T}
-
-# Scalar, sdim != rdim (TODO: Use Vec if (s|r)dim <= 3?)
 typeof_N(::Type{T}, ::ScalarInterpolation, ::VectorizedInterpolation{sdim, <:AbstractRefShape{rdim}}) where {T, sdim, rdim} = T
-typeof_dNdx(::Type{T}, ::ScalarInterpolation, ::VectorizedInterpolation{sdim, <:AbstractRefShape{rdim}}) where {T, sdim, rdim} = SVector{sdim, T}
-typeof_dNdξ(::Type{T}, ::ScalarInterpolation, ::VectorizedInterpolation{sdim, <:AbstractRefShape{rdim}}) where {T, sdim, rdim} = SVector{rdim, T}
-typeof_d2Ndx2(::Type{T}, ::ScalarInterpolation, ::VectorizedInterpolation{sdim, <:AbstractRefShape{rdim}}) where {T, sdim, rdim} = SMatrix{sdim, sdim, T, sdim * sdim}
-typeof_d2Ndξ2(::Type{T}, ::ScalarInterpolation, ::VectorizedInterpolation{sdim, <:AbstractRefShape{rdim}}) where {T, sdim, rdim} = SMatrix{rdim, rdim, T, rdim * rdim}
+typeof_dNdx(::Type{T}, ::ScalarInterpolation, ::VectorizedInterpolation{sdim, <:AbstractRefShape{rdim}}) where {T, sdim, rdim} = Vec{sdim, T}
+typeof_dNdξ(::Type{T}, ::ScalarInterpolation, ::VectorizedInterpolation{sdim, <:AbstractRefShape{rdim}}) where {T, sdim, rdim} = Vec{rdim, T}
+typeof_d2Ndx2(::Type{T}, ::ScalarInterpolation, ::VectorizedInterpolation{sdim, <:AbstractRefShape{rdim}}) where {T, sdim, rdim} = Tensor{2, sdim, T}
+typeof_d2Ndξ2(::Type{T}, ::ScalarInterpolation, ::VectorizedInterpolation{sdim, <:AbstractRefShape{rdim}}) where {T, sdim, rdim} = Tensor{2, rdim, T}
 
-
-# Vector, vdim != sdim != rdim (TODO: Use Vec/Tensor if (s|r)dim <= 3?)
-typeof_N(::Type{T}, ::VectorInterpolation{vdim}, ::VectorizedInterpolation{sdim, <:AbstractRefShape{rdim}}) where {T, vdim, sdim, rdim} = SVector{vdim, T}
-typeof_dNdx(::Type{T}, ::VectorInterpolation{vdim}, ::VectorizedInterpolation{sdim, <:AbstractRefShape{rdim}}) where {T, vdim, sdim, rdim} = SMatrix{vdim, sdim, T, vdim * sdim}
-typeof_dNdξ(::Type{T}, ::VectorInterpolation{vdim}, ::VectorizedInterpolation{sdim, <:AbstractRefShape{rdim}}) where {T, vdim, sdim, rdim} = SMatrix{vdim, rdim, T, vdim * rdim}
-typeof_d2Ndx2(::Type{T}, ::VectorInterpolation{vdim}, ::VectorizedInterpolation{sdim, <:AbstractRefShape{rdim}}) where {T, vdim, sdim, rdim} = SArray{Tuple{vdim, sdim, sdim}, T, 3, vdim * sdim * sdim}
-typeof_d2Ndξ2(::Type{T}, ::VectorInterpolation{vdim}, ::VectorizedInterpolation{sdim, <:AbstractRefShape{rdim}}) where {T, vdim, sdim, rdim} = SArray{Tuple{vdim, rdim, rdim}, T, 3, vdim * rdim * rdim}
-
+typeof_N(::Type{T}, ::VectorInterpolation{vdim}, ::VectorizedInterpolation{sdim, <:AbstractRefShape{rdim}}) where {T, vdim, sdim, rdim} = Vec{vdim, T}
+typeof_dNdx(::Type{T}, ::VectorInterpolation{vdim}, ::VectorizedInterpolation{sdim, <:AbstractRefShape{rdim}}) where {T, vdim, sdim, rdim} = Tensors.regular_if_possible(MixedTensor2{vdim, sdim, T})
+typeof_dNdξ(::Type{T}, ::VectorInterpolation{vdim}, ::VectorizedInterpolation{sdim, <:AbstractRefShape{rdim}}) where {T, vdim, sdim, rdim} = Tensors.regular_if_possible(MixedTensor2{vdim, rdim, T})
+typeof_d2Ndx2(::Type{T}, ::VectorInterpolation{vdim}, ::VectorizedInterpolation{sdim, <:AbstractRefShape{rdim}}) where {T, vdim, sdim, rdim} = Tensors.regular_if_possible(MixedTensor3{vdim, sdim, sdim, T})
+typeof_d2Ndξ2(::Type{T}, ::VectorInterpolation{vdim}, ::VectorizedInterpolation{sdim, <:AbstractRefShape{rdim}}) where {T, vdim, sdim, rdim} = Tensors.regular_if_possible(MixedTensor3{vdim, rdim, rdim, T})
 
 """
     FunctionValues{DiffOrder}(::Type{T}, ip_fun, qr::QuadratureRule, ip_geo::VectorizedInterpolation)
@@ -140,9 +122,7 @@ shape_hessian_type(::FunctionValues{1}) = nothing
 
 
 # Checks that the user provides the right dimension of coordinates to reinit! methods to ensure good error messages if not
-sdim_from_gradtype(::Type{<:AbstractTensor{<:Any, sdim}}) where {sdim} = sdim
-sdim_from_gradtype(::Type{<:SVector{sdim}}) where {sdim} = sdim
-sdim_from_gradtype(::Type{<:SMatrix{<:Any, sdim}}) where {sdim} = sdim
+sdim_from_gradtype(::Type{<:TT}) where {TT <: AbstractTensor} = last(size(TT))
 
 # For performance, these must be fully inferable for the compiler.
 # args: valname (:CellValues or :FacetValues), shape_gradient_type, eltype(x)
@@ -179,17 +159,11 @@ required_geo_diff_order(::CovariantPiolaMapping, fun_diff_order::Int) = 1 + fun_
 
 # Support for embedded elements
 @inline calculate_Jinv(J::Tensor{2}) = inv(J)
-@inline calculate_Jinv(J::SMatrix) = pinv(J)
-
-# Hotfix to get the dots right for embedded elements until mixed tensors are merged.
-# Scalar/Vector interpolations with sdim == rdim (== vdim)
-@inline dothelper(A, B) = A ⋅ B
-# Vector interpolations with sdim == rdim != vdim
-@inline dothelper(A::SMatrix{vdim, dim}, B::Tensor{2, dim}) where {vdim, dim} = A * SMatrix{dim, dim}(B)
-# Scalar interpolations with sdim > rdim
-@inline dothelper(A::SVector{rdim}, B::SMatrix{rdim, sdim}) where {rdim, sdim} = B' * A
-# Vector interpolations with sdim > rdim
-@inline dothelper(B::SMatrix{vdim, rdim}, A::SMatrix{rdim, sdim}) where {vdim, rdim, sdim} = B * A
+# TODO: Have Tensors.jl support pinv?
+@inline function calculate_Jinv(J::MixedTensor2{dim1, dim2}) where {dim1, dim2}
+    Js = SMatrix{dim1, dim2}(J.data)
+    return MixedTensor2{dim2, dim1}((pinv(Js)...,))
+end
 
 # =============
 # Apply mapping
@@ -206,8 +180,7 @@ end
 @inline function apply_mapping!(funvals::FunctionValues{1}, ::IdentityMapping, q_point::Int, mapping_values, args...)
     Jinv = calculate_Jinv(getjacobian(mapping_values))
     @inbounds for j in 1:getnbasefunctions(funvals)
-        #funvals.dNdx[j, q_point] = funvals.dNdξ[j, q_point] ⋅ Jinv # TODO via Tensors.jl
-        funvals.dNdx[j, q_point] = dothelper(funvals.dNdξ[j, q_point], Jinv)
+        funvals.dNdx[j, q_point] = funvals.dNdξ[j, q_point] ⋅ Jinv
     end
     return nothing
 end
@@ -222,7 +195,7 @@ end
     is_vector_valued = first(funvals.Nx) isa Vec
     Jinv_otimesu_Jinv = is_vector_valued ? otimesu(Jinv, Jinv) : nothing
     @inbounds for j in 1:getnbasefunctions(funvals)
-        dNdx = dothelper(funvals.dNdξ[j, q_point], Jinv)
+        dNdx = funvals.dNdξ[j, q_point] ⋅ Jinv
         if is_vector_valued
             d2Ndx2 = (funvals.d2Ndξ2[j, q_point] - dNdx ⋅ H) ⊡ Jinv_otimesu_Jinv
         else
