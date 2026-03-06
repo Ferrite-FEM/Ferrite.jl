@@ -28,6 +28,7 @@ The following interpolations are implemented:
 * `Lagrange{RefHexahedron, 2}`
 * `Lagrange{RefTetrahedron, 1}`
 * `Lagrange{RefTetrahedron, 2}`
+* `Lagrange{RefTetrahedron, 3}`
 * `Lagrange{RefPrism, 1}`
 * `Lagrange{RefPrism, 2}`
 * `Lagrange{RefPyramid, 1}`
@@ -929,6 +930,80 @@ function reference_shape_value(ip::Lagrange{RefTetrahedron, 2}, ξ::Vec{3}, i::I
     i == 8  && return ξ_z * (-4 * ξ_x - 4 * ξ_y - 4 * ξ_z + 4)
     i == 9  && return 4 * ξ_x * ξ_z
     i == 10 && return 4 * ξ_y * ξ_z
+    throw(ArgumentError("no shape function $i for interpolation $ip"))
+end
+
+###################################
+# Lagrange RefTetrahedron order 3 #
+###################################
+getnbasefunctions(::Lagrange{RefTetrahedron, 3}) = 20
+
+facedof_indices(::Lagrange{RefTetrahedron, 3}) = ((1, 3, 2, 10, 9, 8, 7, 6, 5, 17), (1, 2, 4, 5, 6, 13, 14, 11, 12, 18), (2, 3, 4, 7, 8, 15, 16, 13, 14, 19), (1, 4, 3, 11, 12, 15, 16, 9, 10, 20))
+facedof_interior_indices(::Lagrange{RefTetrahedron, 3}) = ((17,), (18,), (19,), (20,))
+edgedof_indices(::Lagrange{RefTetrahedron, 3}) = ((1, 2, 5, 6), (2, 3, 7, 8), (3, 1, 9, 10), (1, 4, 11, 12), (2, 4, 13, 14), (3, 4, 15, 16))
+edgedof_interior_indices(::Lagrange{RefTetrahedron, 3}) = ((5, 6), (7, 8), (9, 10), (11, 12), (13, 14), (15, 16))
+
+function reference_coordinates(::Lagrange{RefTetrahedron, 3})
+    return [
+        # Vertices
+        Vec{3, Float64}((0.0, 0.0, 0.0)),
+        Vec{3, Float64}((1.0, 0.0, 0.0)),
+        Vec{3, Float64}((0.0, 1.0, 0.0)),
+        Vec{3, Float64}((0.0, 0.0, 1.0)),
+        # Edges
+        #1
+        Vec{3, Float64}((1 / 3, 0.0, 0.0)),
+        Vec{3, Float64}((2 / 3, 0.0, 0.0)),
+        #2
+        Vec{3, Float64}((2 / 3, 1 / 3, 0.0)),
+        Vec{3, Float64}((1 / 3, 2 / 3, 0.0)),
+        #3
+        Vec{3, Float64}((0.0, 2 / 3, 0.0)),
+        Vec{3, Float64}((0.0, 1 / 3, 0.0)),
+        #4
+        Vec{3, Float64}((0.0, 0.0, 1 / 3)),
+        Vec{3, Float64}((0.0, 0.0, 2 / 3)),
+        #5
+        Vec{3, Float64}((2 / 3, 0.0, 1 / 3)),
+        Vec{3, Float64}((1 / 3, 0.0, 2 / 3)),
+        #6
+        Vec{3, Float64}((0.0, 2 / 3, 1 / 3)),
+        Vec{3, Float64}((0.0, 1 / 3, 2 / 3)),
+        # Faces
+        Vec{3, Float64}((1 / 3, 1 / 3, 0.0)),
+        Vec{3, Float64}((1 / 3, 0.0, 1 / 3)),
+        Vec{3, Float64}((1 / 3, 1 / 3, 1 / 3)),
+        Vec{3, Float64}((0.0, 1 / 3, 1 / 3)),
+    ]
+end
+
+# Generated with the function descibed in the snippet below.
+# https://gist.github.com/termi-official/2d7f0c5e3cc8ea94921fab08395ab292
+function reference_shape_value(ip::Lagrange{RefTetrahedron, 3}, ξ::Vec{3, T}, i::Int) where {T}
+    ξ_x = ξ[1]
+    ξ_y = ξ[2]
+    ξ_z = ξ[3]
+    # TODO implement as tensor product form after https://github.com/Ferrite-FEM/Ferrite.jl/pull/1188 is merged
+    i == 1 && return T(1.0) + T(-5.5) * ξ_x + T(9.0) * ξ_x^2 + T(-4.5) * ξ_x^3 + T(-5.5) * ξ_y + T(18.0) * ξ_x * ξ_y + T(-13.5) * ξ_x^2 * ξ_y + T(9.0) * ξ_y^2 + T(-13.5) * ξ_x * ξ_y^2 + T(-4.5) * ξ_y^3 + T(-5.5) * ξ_z + T(18.0) * ξ_x * ξ_z + T(-13.5) * ξ_x^2 * ξ_z + T(18.0) * ξ_y * ξ_z + T(-27.0) * ξ_x * ξ_y * ξ_z + T(-13.5) * ξ_y^2 * ξ_z + T(9.0) * ξ_z^2 + T(-13.5) * ξ_x * ξ_z^2 + T(-13.5) * ξ_y * ξ_z^2 + T(-4.5) * ξ_z^3
+    i == 2 && return ξ_x + T(-4.5) * ξ_x^2 + T(4.5) * ξ_x^3
+    i == 3 && return ξ_y + T(-4.5) * ξ_y^2 + T(4.5) * ξ_y^3
+    i == 4 && return ξ_z + T(-4.5) * ξ_z^2 + T(4.5) * ξ_z^3
+    i == 5 && return T(9.0) * ξ_x + T(-22.5) * ξ_x^2 + T(13.5) * ξ_x^3 + T(-22.5) * ξ_x * ξ_y + T(27.0) * ξ_x^2 * ξ_y + T(13.5) * ξ_x * ξ_y^2 + T(-22.5) * ξ_x * ξ_z + T(27.0) * ξ_x^2 * ξ_z + T(27.0) * ξ_x * ξ_y * ξ_z + T(13.5) * ξ_x * ξ_z^2
+    i == 6 && return T(-4.5) * ξ_x + T(18.0) * ξ_x^2 + T(-13.5) * ξ_x^3 + T(4.5) * ξ_x * ξ_y + T(-13.5) * ξ_x^2 * ξ_y + T(4.5) * ξ_x * ξ_z + T(-13.5) * ξ_x^2 * ξ_z
+    i == 7 && return T(-4.5) * ξ_x * ξ_y + T(13.5) * ξ_x^2 * ξ_y
+    i == 8 && return T(-4.5) * ξ_x * ξ_y + T(13.5) * ξ_x * ξ_y^2
+    i == 9 && return T(-4.5) * ξ_y + T(4.5) * ξ_x * ξ_y + T(18) * ξ_y^2 + T(-13.5) * ξ_x * ξ_y^2 + T(-13.5) * ξ_y^3 + T(4.5) * ξ_y * ξ_z + T(-13.5) * ξ_y^2 * ξ_z
+    i == 10 && return T(9.0) * ξ_y + T(-22.5) * ξ_x * ξ_y + T(13.5) * ξ_x^2 * ξ_y + T(-22.5) * ξ_y^2 + T(27.0) * ξ_x * ξ_y^2 + T(13.5) * ξ_y^3 + T(-22.5) * ξ_y * ξ_z + T(27.0) * ξ_x * ξ_y * ξ_z + T(27.0) * ξ_y^2 * ξ_z + T(13.5) * ξ_y * ξ_z^2
+    i == 11 && return T(9.0) * ξ_z + T(-22.5) * ξ_x * ξ_z + T(13.5) * ξ_x^2 * ξ_z + T(-22.5) * ξ_y * ξ_z + T(27.0) * ξ_x * ξ_y * ξ_z + T(13.5) * ξ_y^2 * ξ_z + T(-22.5) * ξ_z^2 + T(27.0) * ξ_x * ξ_z^2 + T(27.0) * ξ_y * ξ_z^2 + T(13.5) * ξ_z^3
+    i == 12 && return T(-4.5) * ξ_z + T(4.5) * ξ_x * ξ_z + T(4.5) * ξ_y * ξ_z + T(18.0) * ξ_z^2 + T(-13.5) * ξ_x * ξ_z^2 + T(-13.5) * ξ_y * ξ_z^2 + T(-13.5) * ξ_z^3
+    i == 13 && return T(-4.5) * ξ_x * ξ_z + T(13.5) * ξ_x^2 * ξ_z
+    i == 14 && return T(-4.5) * ξ_x * ξ_z + T(13.5) * ξ_x * ξ_z^2
+    i == 15 && return T(-4.5) * ξ_y * ξ_z + T(13.5) * ξ_y^2 * ξ_z
+    i == 16 && return T(-4.5) * ξ_y * ξ_z + T(13.5) * ξ_y * ξ_z^2
+    i == 17 && return T(27.0) * ξ_x * ξ_y + T(-27.0) * ξ_x^2 * ξ_y + T(-27.0) * ξ_x * ξ_y^2 + T(-27.0) * ξ_x * ξ_y * ξ_z
+    i == 18 && return T(27.0) * ξ_x * ξ_z + T(-27.0) * ξ_x^2 * ξ_z + T(-27.0) * ξ_x * ξ_y * ξ_z + T(-27.0) * ξ_x * ξ_z^2
+    i == 19 && return T(27.0) * ξ_x * ξ_y * ξ_z
+    i == 20 && return T(27.0) * ξ_y * ξ_z + T(-27.0) * ξ_x * ξ_y * ξ_z + T(-27.0) * ξ_y^2 * ξ_z + T(-27.0) * ξ_y * ξ_z^2
     throw(ArgumentError("no shape function $i for interpolation $ip"))
 end
 
