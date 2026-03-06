@@ -103,7 +103,7 @@ using SparseArrays, LinearAlgebra
         @test all(f[rdofs] .== 2fe)
 
         # CSRAssembler: Assemble rectangular part in quadratic matrix
-        K = SparseMatrixCSR(6, 6, [K.colptr..., 7, 7, 7], K.rowval, K.nzval)
+        K = SparseMatrixCSR{1}(6, 6, K.rowptr, K.colval, K.nzval)
         assembler = start_assemble(K, f)
         rdofs = [1, 4, 6]
         cdofs = [1, 3]
