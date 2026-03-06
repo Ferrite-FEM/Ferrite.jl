@@ -12,7 +12,6 @@ using OrderedCollections
 using WriteVTK
 import Metis
 using HCubature: hcubature, hquadrature
-using Interpolations
 
 include("test_utils.jl")
 

@@ -53,8 +53,7 @@ function test_projection(order, elementtype)
         elseif dim == 3
             f_res = [f((x_1, x_2, x_3)) for x_1 in qp_1D_coord, x_2 in qp_1D_coord, x_3 in qp_1D_coord]
         end
-        interp_linear = linear_interpolation(ntuple(_ -> qp_1D_coord, dim), f_res; extrapolation_bc = Interpolations.Line())
-        ae = [interp_linear(coords...) for coords in cellcoords]
+        ae = [interp_linear(qp_1D_coord, f_res, coords...) for coords in cellcoords]
     elseif order == 2
         # For a quadratic approximation the analytical solution is recovered
         ae = zeros(length(point_vars))
@@ -67,7 +66,7 @@ function test_projection(order, elementtype)
     qp_values = analytical(f_vector)
     point_vars = project(proj, qp_values, qr)
     if order == 1
-        ae = [Vec{1, Float64}((interp_linear(coords...),)) for coords in cellcoords]
+        ae = [Vec{1, Float64}((interp_linear(qp_1D_coord, f_res, coords...),)) for coords in cellcoords]
     elseif order == 2
         ae = zeros(length(point_vars))
         apply_analytical!(ae, proj.dh, :_, x -> f_vector(x)[1])
@@ -82,7 +81,7 @@ function test_projection(order, elementtype)
     point_vars = project(proj, qp_values, qr)
     point_vars_2 = project(proj, qp_values_matrix, qr)
     if order == 1
-        ae = [Tensor{2, 2, Float64}((interp_linear(coords...), 2 * interp_linear(coords...), 3 * interp_linear(coords...), 4 * interp_linear(coords...))) for coords in cellcoords]
+        ae = [Tensor{2, 2, Float64}((interp_linear(qp_1D_coord, f_res, coords...), 2 * interp_linear(qp_1D_coord, f_res, coords...), 3 * interp_linear(qp_1D_coord, f_res, coords...), 4 * interp_linear(qp_1D_coord, f_res, coords...))) for coords in cellcoords]
     elseif order == 2
         ae = zeros(4, length(point_vars))
         for i in 1:4
@@ -99,7 +98,7 @@ function test_projection(order, elementtype)
     point_vars = project(proj, qp_values, qr)
     point_vars_2 = project(proj, qp_values_matrix, qr)
     if order == 1
-        ae = [SymmetricTensor{2, 2, Float64}((interp_linear(coords...), 2 * interp_linear(coords...), 3 * interp_linear(coords...))) for coords in cellcoords]
+        ae = [SymmetricTensor{2, 2, Float64}((interp_linear(qp_1D_coord, f_res, coords...), 2 * interp_linear(qp_1D_coord, f_res, coords...), 3 * interp_linear(qp_1D_coord, f_res, coords...))) for coords in cellcoords]
     elseif order == 2
         ae = zeros(3, length(point_vars))
         for i in 1:3
