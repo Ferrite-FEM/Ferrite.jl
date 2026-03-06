@@ -245,13 +245,7 @@ start_assemble(K::Union{AbstractSparseMatrixCSC, Symmetric{<:Any, <:AbstractSpar
 
 function start_assemble(K::AbstractSparseMatrixCSC{T}, f::Vector = T[]; fillzero::Bool = true, maxcelldofs_hint::Int = 0) where {T}
     fillzero && (fillzero!(K); fillzero!(f))
-    if size(K, 1) == size(K, 2)
-        permutation = zeros(Int, maxcelldofs_hint)
-        sorteddofs = zeros(Int, maxcelldofs_hint)
-        return CSCAssembler(K, f, permutation, permutation, sorteddofs, sorteddofs)
-    else
-        return CSCAssembler(K, f, zeros(Int, maxcelldofs_hint), zeros(Int, maxcelldofs_hint), zeros(Int, maxcelldofs_hint), zeros(Int, maxcelldofs_hint))
-    end
+    return CSCAssembler(K, f, zeros(Int, maxcelldofs_hint), zeros(Int, maxcelldofs_hint), zeros(Int, maxcelldofs_hint), zeros(Int, maxcelldofs_hint))
 end
 function start_assemble(K::Symmetric{T, <:SparseMatrixCSC}, f::Vector = T[]; fillzero::Bool = true, maxcelldofs_hint::Int = 0) where {T}
     fillzero && (fillzero!(K); fillzero!(f))
@@ -322,7 +316,7 @@ end
     # a specific order, which might not be the sorted order. Hence we sort them.
     # Note that we are not allowed to mutate `dofs` in the process.
     sortedcoldofs, colpermutation = _sortdofs_for_assembly!(A.colpermutation, A.sortedcoldofs, coldofs)
-    sortedrowdofs, rowpermutation = if A.sortedcoldofs !== A.sortedrowdofs
+    sortedrowdofs, rowpermutation = if rowdofs !== coldofs
         _sortdofs_for_assembly!(A.rowpermutation, A.sortedrowdofs, rowdofs)
     else
         sortedcoldofs, colpermutation

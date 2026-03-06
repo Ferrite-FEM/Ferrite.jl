@@ -68,7 +68,20 @@ import LinearAlgebra: Symmetric
     fe = rand(length(rdofs))
     assemble!(assembler, rdofs, cdofs, Ke, fe)
     assemble!(assembler, rdofs, cdofs, Ke, fe)
-    @test_throws ArgumentError assemble!(assembler, rdofs, Ke, fe)
+    @test_throws ArgumentError assemble!(assembler, rdofs, Ke, fe) # Not in sparsity pattern
+    @test all(K[rdofs, cdofs] .== 2Ke)
+    @test all(f[rdofs] .== 2fe)
+
+    # CSCAssembler: Assemble rectangular part in quadratic matrix
+    K = SparseMatrixCSC(6, 6, [K.colptr..., 7, 7, 7], K.rowval, K.nzval)
+    assembler = start_assemble(K, f)
+    rdofs = [1, 4, 6]
+    cdofs = [1, 3]
+    Ke = rand(length(rdofs), length(cdofs))
+    fe = rand(length(rdofs))
+    assemble!(assembler, rdofs, cdofs, Ke, fe)
+    assemble!(assembler, rdofs, cdofs, Ke, fe)
+    @test_throws ArgumentError assemble!(assembler, rdofs, Ke, fe) # Not in sparsity pattern
     @test all(K[rdofs, cdofs] .== 2Ke)
     @test all(f[rdofs] .== 2fe)
 
