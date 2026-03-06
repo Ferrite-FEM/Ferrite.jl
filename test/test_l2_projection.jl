@@ -524,7 +524,7 @@ function test_l2proj_errorpaths()
 end
 
 @testset "Test L2-Projection" begin
-    for ref_shape in (
+    for cell_type in (
                 Triangle,
                 Quadrilateral,
                 Hexahedron,
@@ -532,7 +532,7 @@ end
                 Pyramid,
                 Wedge
             ), degree in 1:2
-        test_projection(degree, ref_shape)
+        test_projection(degree, cell_type)
     end
     test_projection_subset_of_mixedgrid()
     test_add_projection_grid()
