@@ -707,6 +707,16 @@ end
     close!(dh)
     @test celldofs(dh, 1) == [1, 2, 3, 4, 5, 6, 7, 9, 8, 10]
     @test celldofs(dh, 2) == [2, 11, 3, 12, 13, 15, 14, 7, 6, 16]
+    # Should also agree with the remaining celldofs API
+    dofs = zeros(Int, 10)
+    celldofs!(dofs, dh, 1)
+    @test dofs == celldofs(dh, 1)
+    celldofs!(dofs, dh, 2)
+    @test dofs == celldofs(dh, 2)
+    celldofs!(view(dofs, :), dh, 1)
+    @test dofs == celldofs(dh, 1)
+    celldofs!(view(dofs, :), dh, 2)
+    @test dofs == celldofs(dh, 2)
 
     ## Lagrange{RefTriangle,3}
     # First dof per position per triangle
@@ -723,6 +733,16 @@ end
     close!(dh)
     @test celldofs(dh, 1) == [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 17, 18, 15, 16, 19, 20]
     @test celldofs(dh, 2) == [3, 4, 21, 22, 5, 6, 23, 24, 25, 26, 29, 30, 27, 28, 13, 14, 11, 12, 31, 32]
+    # Should also agree with the remaining celldofs API
+    dofs = zeros(Int, 20)
+    celldofs!(dofs, dh, 1)
+    @test dofs == celldofs(dh, 1)
+    celldofs!(dofs, dh, 2)
+    @test dofs == celldofs(dh, 2)
+    celldofs!(view(dofs, :), dh, 1)
+    @test dofs == celldofs(dh, 1)
+    celldofs!(view(dofs, :), dh, 2)
+    @test dofs == celldofs(dh, 2)
 end
 
 @testset "vectorization layer compat" begin
