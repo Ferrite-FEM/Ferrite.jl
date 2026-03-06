@@ -143,6 +143,15 @@ end
 function _mass_qr(::Lagrange{shape, 2}) where {shape <: RefSimplex}
     return QuadratureRule{shape}(4)
 end
+
+function _mass_qr(::Lagrange{RefPyramid, order}) where order
+    return QuadratureRule{RefPyramid}(order + 3)
+end
+
+function _mass_qr(::Lagrange{RefPrism, order}) where order
+    return QuadratureRule{RefPrism}(order + 4)
+end
+
 _mass_qr(ip::VectorizedInterpolation) = _mass_qr(ip.ip)
 
 function _assemble_L2_matrix(dh::DofHandler, qrs_lhs::Vector{<:QuadratureRule})
