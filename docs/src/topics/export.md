@@ -28,6 +28,7 @@ where `write_solution` is just one example of the following functions that can b
 * [`write_projection`](@ref)
 * [`Ferrite.write_cellset`](@ref)
 * [`Ferrite.write_nodeset`](@ref)
+* [`Ferrite.write_facetset`](@ref)
 * [`Ferrite.write_constraints`](@ref)
 * [`Ferrite.write_cell_colors`](@ref)
 
