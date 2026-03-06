@@ -21,7 +21,7 @@ struct ModelParams{V, T}
     G::T
 end
 
-struct ThreadCache{CV, T, DIM, F <: Function, GC <: GradientConfig, HC <: HessianConfig}
+struct TaskCache{CV, T, DIM, F <: Function, GC <: GradientConfig, HC <: HessianConfig}
     cvP::CV
     element_indices::Vector{Int}
     element_dofs::Vector{T}
@@ -32,7 +32,7 @@ struct ThreadCache{CV, T, DIM, F <: Function, GC <: GradientConfig, HC <: Hessia
     gradconf::GC
     hessconf::HC
 end
-function ThreadCache(dpc::Int, nodespercell, cvP::CellValues, modelparams, elpotential)
+function TaskCache(dpc::Int, nodespercell, cvP::CellValues, modelparams, elpotential)
     element_indices = zeros(Int, dpc)
     element_dofs = zeros(dpc)
     element_gradient = zeros(dpc)
@@ -41,20 +41,20 @@ function ThreadCache(dpc::Int, nodespercell, cvP::CellValues, modelparams, elpot
     potfunc = x -> elpotential(x, cvP, modelparams)
     gradconf = GradientConfig(potfunc, zeros(dpc), Chunk{12}())
     hessconf = HessianConfig(potfunc, zeros(dpc), Chunk{4}())
-    return ThreadCache(cvP, element_indices, element_dofs, element_gradient, element_hessian, element_coords, potfunc, gradconf, hessconf)
+    return TaskCache(cvP, element_indices, element_dofs, element_gradient, element_hessian, element_coords, potfunc, gradconf, hessconf)
 end
 
-mutable struct LandauModel{T, DH <: DofHandler, CH <: ConstraintHandler, TC <: ThreadCache}
+mutable struct LandauModel{T, DH <: DofHandler, CH <: ConstraintHandler, TC <: TaskCache}
     dofs::Vector{T}
     dofhandler::DH
     boundaryconds::CH
-    threadindices::Vector{Vector{Int}}
+    colors::Vector{Vector{Int}}
     caches::Vector{TC}
 end
 
 function LandauModel(α, G, gridsize, left::Vec{DIM, T}, right::Vec{DIM, T}, elpotential, ntasks) where {DIM, T}
     grid = generate_grid(Tetrahedron, gridsize, left, right)
-    threadindices = Ferrite.create_coloring(grid)
+    colors = create_coloring(grid)
 
     qr = QuadratureRule{RefTetrahedron}(2)
     ipP = Lagrange{RefTetrahedron, 1}()^3
@@ -77,8 +77,8 @@ function LandauModel(α, G, gridsize, left::Vec{DIM, T}, right::Vec{DIM, T}, elp
 
     dpc = ndofs_per_cell(dofhandler)
     cpc = length(grid.cells[1].nodes)
-    caches = [ThreadCache(dpc, cpc, copy(cvP), ModelParams(α, G), elpotential) for _ in 1:ntasks]
-    return LandauModel(dofvector, dofhandler, boundaryconds, threadindices, caches)
+    caches = [TaskCache(dpc, cpc, copy(cvP), ModelParams(α, G), elpotential) for _ in 1:ntasks]
+    return LandauModel(dofvector, dofhandler, boundaryconds, colors, caches)
 end
 
 function save_landau(path, model, dofs = model.dofs)
@@ -104,9 +104,9 @@ end
 
 function F(dofvector::Vector{T}, model) where {T}
     out = zero(T)
-    for indices in model.threadindices
+    for indices in model.colors
         partial = OhMyThreads.@tasks for (ichunk, range) in enumerate(chunks(indices; n = length(model.caches)))
-            @set reducer = +
+            OhMyThreads.@set reducer = +
             cache = model.caches[ichunk]
             local_energy = zero(T)
             for i in range
@@ -122,7 +122,7 @@ end
 
 function ∇F!(∇f::Vector{T}, dofvector::Vector{T}, model::LandauModel{T}) where {T}
     fill!(∇f, zero(T))
-    for indices in model.threadindices
+    for indices in model.colors
         OhMyThreads.@tasks for (ichunk, range) in enumerate(chunks(indices; n = length(model.caches)))
             cache = model.caches[ichunk]
             for i in range
@@ -139,7 +139,7 @@ function ∇²F!(∇²f::SparseMatrixCSC, dofvector::Vector{T}, model::LandauMod
     dh = model.dofhandler
     ntasks = length(model.caches)
     assemblers = [start_assemble(∇²f; fillzero = (i == 1)) for i in 1:ntasks]
-    for indices in model.threadindices
+    for indices in model.colors
         OhMyThreads.@tasks for (ichunk, range) in enumerate(chunks(indices; n = ntasks))
             cache = model.caches[ichunk]
             for i in range
@@ -214,7 +214,11 @@ right = Vec{3}((75.0, 25.0, 2.0))
 model = LandauModel(α, G, (50, 50, 2), left, right, element_potential, Threads.nthreads())
 
 save_landau("landauorig", model)
-@time minimize!(model)
+@time res = minimize!(model)
+@assert Optim.converged(res)
 save_landau("landaufinal", model)
+
+using Test # src
+@test Optim.minimum(res) ≈ -10858.806775 # src
 
 # This file was generated using Literate.jl, https://github.com/fredrikekre/Literate.jl
