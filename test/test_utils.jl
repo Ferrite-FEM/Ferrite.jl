@@ -377,27 +377,3 @@ function grid_with_inserted_quad(grid::Grid{2, Triangle}, nrs::NTuple{2, Int}; u
     end
     # TODO: Update sets (not needed for current usage)
 end
-
-function single_element_grid(::Type{CellType}) where {RefShape, CellType <: Ferrite.AbstractCell{RefShape}}
-    nodes = Node.(Ferrite.reference_coordinates(Lagrange{RefShape, 1}()))
-    cells = [CellType(ntuple(i -> i, length(nodes)))]
-    return Grid(cells, nodes)
-end
-
-interpolate_linear(t₁, t₂, y₁, y₂, t) = t₂>t₁ ? y₁*(t₂-t)/(t₂-t₁) .+ y₂*(t-t₁)/(t₂-t₁) : y₁
-# generic tensor-product interpolator using corner weights; handles any dim
-interp_linear = function (xs, ys, coords...)
-    # locate interval and compute weight for each dimension
-    is = map(c -> clamp(searchsortedlast(xs, c), 1, length(xs)-1), coords)
-    ws = [(coords[k] - xs[i])/(xs[i+1] - xs[i]) for (k,i) in enumerate(is)]
-    val = zero(eltype(ys))
-    for corner in Iterators.product((0:1 for _ in coords)...) # iterate over 2^dim corners
-        weight = one(val)
-        idxs = ntuple(k -> is[k] + corner[k], length(coords))
-        for k in 1:length(coords)
-            weight *= corner[k] == 0 ? 1 - ws[k] : ws[k]
-        end
-        val += weight * getindex(ys, idxs...)
-    end
-    return val
-end

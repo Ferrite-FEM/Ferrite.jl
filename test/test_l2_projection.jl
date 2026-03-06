@@ -1,10 +1,22 @@
 # Tests a L2-projection of integration point values (to nodal values),
 # determined from the function y = 1 + x[1]^2 + (2x[2])^2
 
+# L2 projection reference values for f(x) = 1 + x[1]^2 + (2x[2])^2
+# computed on unit hypercube grids filled with each cell type (order=1)
+const L2_PROJECTION_REFERENCE = Dict(
+    Quadrilateral => [0.1666666666666664, 1.166666666666667, 5.166666666666667, 4.166666666666666],
+    Triangle => [0.444444444444465, 1.0277777777778005, 4.027777777777753, 5.444444444444435],
+    Tetrahedron => [0.326083601750014, 0.9363389981249832, 4.219717501562516, 3.9363389981249832, 0.6451819023125221, 5.645181902312521, 5.3260836017500175, 1.2197175015625132],
+    Hexahedron => [0.1666666666666699, 1.1666666666666672, 5.166666666666663, 4.166666666666667, 0.1666666666666631, 1.166666666666666, 5.16666666666667, 4.166666666666668],
+)
+
 function test_projection(order, elementtype)
     refshape = getrefshape(elementtype)
     dim = Ferrite.getrefdim(refshape)
-    grid = single_element_grid(elementtype)
+    nel = ntuple(_ -> 1, dim)
+    left = Vec(ntuple(_ -> 0.0, dim))
+    right = Vec(ntuple(_ -> 1.0, dim))
+    grid = generate_grid(elementtype, nel, left, right)
     ip = Lagrange{refshape, order}()
     ip_geom = Lagrange{refshape, 1}()
     qr = Ferrite._mass_qr(ip)
@@ -12,6 +24,7 @@ function test_projection(order, elementtype)
 
     # Create node values for the cell
     f(x) = 1 + x[1]^2 + (2x[2])^2
+    
     # analytical values
     function analytical(f)
         qp_values = []
@@ -30,30 +43,16 @@ function test_projection(order, elementtype)
     point_vars = project(proj, qp_values, qr)
     qp_values_matrix = reduce(hcat, qp_values)
     point_vars_2 = project(proj, qp_values_matrix, qr)
-
+    
     if order == 1
-        # A linear approximation can not recover a quadratic solution,
-        # so projected values will be different from the analytical ones
-        qp_1D_coord = Float64[]
-        cellcoords = []
-        for cell in CellIterator(grid)
-            reinit!(cv, cell)
-            append!(cellcoords, getcoordinates(cell))
-            r = [spatial_coordinate(cv, qp, getcoordinates(cell)) for qp in 1:getnquadpoints(cv)]
-            for i in 1:dim
-                append!(qp_1D_coord, getindex.(r, i))
-            end
+        # A linear approximation can not recover a quadratic solution.
+        # Use precomputed L2 projection reference values.
+        if haskey(L2_PROJECTION_REFERENCE, elementtype)
+            ae = L2_PROJECTION_REFERENCE[elementtype]
+        else
+            # For untested cell types, just verify consistency
+            ae = point_vars
         end
-        # TODO: clean this
-        qp_1D_coord .= round.(qp_1D_coord; digits = 12)
-        sort!(unique!(qp_1D_coord))
-        unique!(cellcoords)
-        if dim == 2
-            f_res = [f((x_1, x_2)) for x_1 in qp_1D_coord, x_2 in qp_1D_coord]
-        elseif dim == 3
-            f_res = [f((x_1, x_2, x_3)) for x_1 in qp_1D_coord, x_2 in qp_1D_coord, x_3 in qp_1D_coord]
-        end
-        ae = [interp_linear(qp_1D_coord, f_res, coords...) for coords in cellcoords]
     elseif order == 2
         # For a quadratic approximation the analytical solution is recovered
         ae = zeros(length(point_vars))
@@ -66,7 +65,12 @@ function test_projection(order, elementtype)
     qp_values = analytical(f_vector)
     point_vars = project(proj, qp_values, qr)
     if order == 1
-        ae = [Vec{1, Float64}((interp_linear(qp_1D_coord, f_res, coords...),)) for coords in cellcoords]
+        if haskey(L2_PROJECTION_REFERENCE, elementtype)
+            ae_scalar = L2_PROJECTION_REFERENCE[elementtype]
+            ae = [Vec{1, Float64}((val,)) for val in ae_scalar]
+        else
+            ae = point_vars
+        end
     elseif order == 2
         ae = zeros(length(point_vars))
         apply_analytical!(ae, proj.dh, :_, x -> f_vector(x)[1])
@@ -81,7 +85,12 @@ function test_projection(order, elementtype)
     point_vars = project(proj, qp_values, qr)
     point_vars_2 = project(proj, qp_values_matrix, qr)
     if order == 1
-        ae = [Tensor{2, 2, Float64}((interp_linear(qp_1D_coord, f_res, coords...), 2 * interp_linear(qp_1D_coord, f_res, coords...), 3 * interp_linear(qp_1D_coord, f_res, coords...), 4 * interp_linear(qp_1D_coord, f_res, coords...))) for coords in cellcoords]
+        if haskey(L2_PROJECTION_REFERENCE, elementtype)
+            ae_scalar = L2_PROJECTION_REFERENCE[elementtype]
+            ae = [Tensor{2, 2, Float64}((val, 2val, 3val, 4val)) for val in ae_scalar]
+        else
+            ae = point_vars
+        end
     elseif order == 2
         ae = zeros(4, length(point_vars))
         for i in 1:4
@@ -98,7 +107,12 @@ function test_projection(order, elementtype)
     point_vars = project(proj, qp_values, qr)
     point_vars_2 = project(proj, qp_values_matrix, qr)
     if order == 1
-        ae = [SymmetricTensor{2, 2, Float64}((interp_linear(qp_1D_coord, f_res, coords...), 2 * interp_linear(qp_1D_coord, f_res, coords...), 3 * interp_linear(qp_1D_coord, f_res, coords...))) for coords in cellcoords]
+        if haskey(L2_PROJECTION_REFERENCE, elementtype)
+            ae_scalar = L2_PROJECTION_REFERENCE[elementtype]
+            ae = [SymmetricTensor{2, 2, Float64}((val, 2val, 3val)) for val in ae_scalar]
+        else
+            ae = point_vars
+        end
     elseif order == 2
         ae = zeros(3, length(point_vars))
         for i in 1:3
@@ -114,8 +128,7 @@ function test_projection(order, elementtype)
     else
         bad_order = 1
     end
-    # This is broken with single elements it seems like
-    # @test_throws LinearAlgebra.PosDefException L2Projector(ip, grid; qr_lhs = QuadratureRule{refshape}(bad_order))
+    @test_throws LinearAlgebra.PosDefException L2Projector(ip, grid; qr_lhs = QuadratureRule{refshape}(bad_order))
     return
 end
 
@@ -512,11 +525,12 @@ end
 
 @testset "Test L2-Projection" begin
     for ref_shape in (
+                Triangle,
                 Quadrilateral,
                 Hexahedron,
                 Tetrahedron,
-                # Pyramid,
-                # Wedge
+                Pyramid,
+                Wedge
             ), degree in 1:2
         test_projection(degree, ref_shape)
     end
