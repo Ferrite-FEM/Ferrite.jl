@@ -134,7 +134,15 @@ the `SubDofHandler` interface.
 
 ---
 
-#### [Tutorial 10: Incompressible Navier-Stokes equations](ns_vs_diffeq.md)
+#### [Tutorial 10: Discontinuous Galerkin shallow water equation (DG + RK)](@ref tutorial-swe-dg)
+
+This tutorial guides you through solving the **two-dimensional shallow water equations** (a nonlinear **hyperbolic** conservation law) using a **Discontinuous Galerkin (DG)** spatial discretization and an **explicit Runge–Kutta** time integrator. The tutorial introduces the hyperbolic DG workflow in Ferrite: assembling **volume terms** with `CellIterator`, coupling elements through **numerical fluxes** on **interfaces** via `InterfaceIterator`/`InterfaceValues` (two-sided traces with `here=true/false`), and treating boundary conditions using `FacetIterator`/`FacetValues`. A robust **Rusanov (local Lax–Friedrichs)** flux is used, and the semi-discrete system is advanced in time with `OrdinaryDiffEq`. The output is written as a sequence of VTK frames, ready to be combined into a GIF animation.
+
+**Keywords**: vector-valued solution, hyperbolic conservation laws, Discontinuous Galerkin, numerical flux, Runge–Kutta time integration, shallow water equations
+
+---
+
+#### [Tutorial 11: Incompressible Navier-Stokes equations](ns_vs_diffeq.md)
 
 In this tutorial the incompressible Navier-Stokes equations are solved. The domain is
 discretized in space with Ferrite as usual, and then formulated in a way to be compatible
@@ -145,7 +153,7 @@ for the time-integration.
 
 ---
 
-#### [Tutorial 11: Reactive surface](@ref tutorial-reactive-surface)
+#### [Tutorial 12: Reactive surface](@ref tutorial-reactive-surface)
 
 In this tutorial a reaction diffusion system on a sphere surface embedded in 3D is solved.
 Ferrite is used to assemble the diffusion operators and the mass matrices. The problem is
@@ -155,7 +163,7 @@ solved by using the usual first order reaction diffusion operator splitting.
 
 ---
 
-#### [Tutorial 12: Linear shell](@ref tutorial-linear-shell)
+#### [Tutorial 13: Linear shell](@ref tutorial-linear-shell)
 
 In this tutorial a linear shell element formulation is set up as a two-dimensional domain
 embedded in three-dimensional space. This will teach, and perhaps inspire, you on how
@@ -166,7 +174,7 @@ Ferrite.
 
 ---
 
-#### [Tutorial 13: Discontinuous Galerkin heat equation](@ref tutorial-dg-heat-equation)
+#### [Tutorial 14: Discontinuous Galerkin heat equation](@ref tutorial-dg-heat-equation)
 
 This tutorial guides you through the process of solving the linear stationary heat equation
 (i.e. Poisson's equation) on a unit square with inhomogeneous Dirichlet and Neumann boundary
