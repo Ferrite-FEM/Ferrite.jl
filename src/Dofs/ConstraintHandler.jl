@@ -1189,8 +1189,8 @@ function _add!(
             union!(all_node_idxs, nodes)
             for n in nodes
                 x = get_node_coordinate(grid, n)
-                min_x = Tx(i -> min(min_x[i], x[i]))
-                max_x = Tx(i -> max(max_x[i], x[i]))
+                min_x = Tx(min.(min_x.data, x.data))
+                max_x = Tx(max.(max_x.data, x.data))
             end
         end
         all_node_idxs_v = collect(all_node_idxs)
@@ -1455,7 +1455,7 @@ function __collect_boundary_facets(grid::Grid)
 end
 
 function __collect_periodic_facets_tree!(facet_map::Vector{PeriodicFacetPair}, grid::Grid, mset::Vector{FacetIndex}, iset::Vector{FacetIndex}, transformation::F, tol::Float64) where {F <: Function}
-    if length(mset) != length(mset)
+    if length(mset) != length(iset)
         error("different number of facets in mirror and image set")
     end
     Tx = get_coordinate_type(grid)

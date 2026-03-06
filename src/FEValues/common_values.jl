@@ -39,7 +39,7 @@ Creates a singleton type for specifying what parts of the AbstractValues should 
 API used to get type-stable construction. Keyword arguments in `AbstractValues` constructors are forwarded, and the public API
 is passing these as `Bool`, while the `ValuesUpdateFlags` method supports both boolean and `Val(::Bool)` keyword args.
 """
-function ValuesUpdateFlags(ip_fun::Interpolation; update_gradients = Val(true), update_hessians = Val(false), update_detJdV = Val(true))
+function ValuesUpdateFlags(ip_fun::Union{Interpolation, NamedTuple}; update_gradients = Val(true), update_hessians = Val(false), update_detJdV = Val(true))
     toval(v::Bool) = Val(v)
     toval(V::Val) = V
     return ValuesUpdateFlags(ip_fun, toval(update_gradients), toval(update_hessians), toval(update_detJdV))
@@ -51,14 +51,22 @@ function ValuesUpdateFlags(
     GeoDiffOrder = max(required_geo_diff_order(mapping_type(ip_fun), FunDiffOrder), update_detJdV)
     return ValuesUpdateFlags{FunDiffOrder, GeoDiffOrder, update_detJdV}()
 end
+function ValuesUpdateFlags( # For MultiFieldCellValues
+        ip_fun::NamedTuple, ::Val{update_gradients}, ::Val{update_hessians}, ::Val{update_detJdV}
+    ) where {update_gradients, update_hessians, update_detJdV}
+    FunDiffOrder = update_hessians ? 2 : (update_gradients ? 1 : 0)
+    GeoDiffOrder = max(maximum(ip -> required_geo_diff_order(mapping_type(ip), FunDiffOrder), ip_fun), update_detJdV)
+    return ValuesUpdateFlags{FunDiffOrder, GeoDiffOrder, update_detJdV}()
+end
 
 """
-    reinit!(cv::CellValues, cell::AbstractCell, x::AbstractVector)
-    reinit!(cv::CellValues, x::AbstractVector)
+    reinit!(cv::AbstractCellValues, cell::AbstractCell, x::AbstractVector)
+    reinit!(cv::AbstractCellValues, x::AbstractVector)
     reinit!(fv::FacetValues, cell::AbstractCell, x::AbstractVector, facet::Int)
-    reinit!(fv::FacetValues, x::AbstractVector, function_gradient::Int)
+    reinit!(fv::FacetValues, x::AbstractVector, facet::Int)
 
-Update the `CellValues`/`FacetValues` object for a cell or facet with cell coordinates `x`.
+Update the `CellValues`, `MultiFieldCellValues`, or `FacetValues` object for a cell or
+facet with cell coordinates `x`.
 The derivatives of the shape functions, and the new integration weights are computed.
 For interpolations with non-identity mappings, the current `cell` is also required.
 """
@@ -71,6 +79,15 @@ Return the number of quadrature points. For `FacetValues`,
 this is the number for the current facet.
 """
 function getnquadpoints end
+
+"""
+    getnbasefunctions(fe_v::AbstractValues)
+
+Get the number of base functions for the function interpolation in `fe_v`.
+Note that this is not supported for [`MultiFieldCellValues`](@ref) which has
+multiple function interpolations.
+"""
+getnbasefunctions(::AbstractValues)
 
 """
     getdetJdV(fe_v::AbstractValues, q_point::Int)

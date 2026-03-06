@@ -219,8 +219,8 @@ end
             end
         end
 
-        # Check for dirac delta property of interpolation
-        @testset "dirac delta property of dof $dof" for dof in 1:n_basefuncs
+        # Check for Kronecker delta property of interpolation
+        @testset "Kronecker delta property of dof $dof" for dof in 1:n_basefuncs
             for k in 1:n_basefuncs
                 N_dof = reference_shape_value(interpolation, coords[dof], k)
                 if k == dof

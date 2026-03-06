@@ -8,7 +8,7 @@ else
 end
 
 @testset "Grid, DofHandler, vtk" begin
-    for (celltype, dim) in (
+    @testset "$celltype" for (celltype, dim) in (
             (Line, 1),
             (QuadraticLine, 1),
             (Quadrilateral, 2),
@@ -44,6 +44,7 @@ end
             @test Ferrite.write_cellset(vtk, grid, "cell-1") === vtk
             @test Ferrite.write_cellset(vtk, grid, "middle-cells") === vtk
             @test Ferrite.write_nodeset(vtk, grid, "middle-nodes") === vtk
+            @test Ferrite.write_facetset(vtk, grid, "right") === vtk
         end
 
         # test the sha of the file
@@ -496,17 +497,26 @@ end
         ]
     )
     # test grids with mixed celltypes of same refdim
-    # (4)---(5)
-    #  |     | \
-    #  |  1  |2 \
-    # (1)---(2)-(3)
+    # (4)---(5)---(7)
+    #  |     | \    \
+    #  |  1  |2 \ 3  \
+    # (1)---(2)-(3)--(6)
     tet_quad_grid = Grid(
-        [Quadrilateral((1, 2, 5, 4)), Triangle((2, 3, 5))],
-        [Node(Float64.((x, y))) for (x, y) in ((0, 0), (1, 0), (2, 0), (0, 1), (1, 1))]
+        [Quadrilateral((1, 2, 5, 4)), Triangle((2, 3, 5)), Quadrilateral((3, 6, 7, 5))],
+        [Node(Float64.((x, y))) for (x, y) in ((0, 0), (1, 0), (2, 0), (0, 1), (1, 1), (3, 0), (2, 1))]
     )
     top = ExclusiveTopology(tet_quad_grid)
     @test getneighborhood(top, tet_quad_grid, FacetIndex(1, 2)) == [EdgeIndex(2, 3)]
     @test Set(getneighborhood(top, tet_quad_grid, FacetIndex(1, 2), true)) == Set([EdgeIndex(1, 2), EdgeIndex(2, 3)])
+
+    # This test relies on the assumption that the facet with the lowest cell is chosen
+    @test Set(facetskeleton(top, tet_quad_grid)) == Set(
+        [
+            (FacetIndex(1, i) for i in 1:4)...,
+            (FacetIndex(2, i) for i in 1:2)...,
+            (FacetIndex(3, i) for i in 1:3)...,
+        ]
+    )
 
     # test grids with mixed refdim
     cells = [

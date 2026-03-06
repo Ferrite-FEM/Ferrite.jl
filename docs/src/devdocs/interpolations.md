@@ -16,9 +16,11 @@ Ferrite.facedof_interior_indices(::Interpolation)
 Ferrite.edgedof_indices(::Interpolation)
 Ferrite.edgedof_interior_indices(::Interpolation)
 Ferrite.volumedof_interior_indices(::Interpolation)
-Ferrite.getnbasefunctions(::Interpolation)
 Ferrite.adjust_dofs_during_distribution(::Interpolation)
 Ferrite.conformity
+```
+```@docs; canonical=false
+getnbasefunctions(::Interpolation)
 ```
 
 ### For special interpolations
@@ -83,7 +85,7 @@ RefTriangle
 
 For this particular interpolation, we have one degree of freedom associated
 with each vertex, and one degree of freedom associated with each edge.
-Following the [Ferrite numbering rules](@ref "Ordering-of-dofs"), we start by enumerating the
+Following the [Ferrite numbering rules](@ref "Local-DoF-indices"), we start by enumerating the
 vertices first, followed by the edges. The numbering is based on the `RefTriangle` shown above, and the actual shape functions are taken from [defelement.org](https://defelement.org/elements/examples/triangle-lagrange-equispaced-2.html).
 ```@example InterpolationExample
 function Ferrite.reference_shape_value(ip::QTI, ξ::Vec{2}, shape_number::Int)

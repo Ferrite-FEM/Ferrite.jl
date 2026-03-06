@@ -84,7 +84,7 @@ function reinit!(cc::CellCache, i::Int)
 end
 
 # reinit! FEValues with CellCache
-function reinit!(cv::CellValues, cc::CellCache)
+function reinit!(cv::AbstractCellValues, cc::CellCache)
     cell = reinit_needs_cell(cv) ? getcells(cc.grid, cellid(cc)) : nothing
     return reinit!(cv, cell, cc.coords)
 end
@@ -363,24 +363,21 @@ function InterfaceIterator(
 end
 
 # Iterator interface
-function Base.iterate(ii::InterfaceIterator{<:Any, <:Grid{sdim}}, state...) where {sdim}
+@inline function Base.iterate(ii::InterfaceIterator, i::Integer)
     neighborhood = get_facet_facet_neighborhood(ii.topology, ii.grid) # TODO: This could be moved to InterfaceIterator constructor (potentially type-instable for non-union or mixed grids)
-    while true
-        it = iterate(facetskeleton(ii.topology, ii.grid), state...)
-        it === nothing && return nothing
-        facet_a, state = it
-        if isempty(neighborhood[facet_a[1], facet_a[2]])
-            continue
-        end
+    skeleton = facetskeleton(ii.topology, ii.grid)
+    while i <= length(skeleton)
+        facet_a = skeleton[i]; i += 1
         neighbors = neighborhood[facet_a[1], facet_a[2]]
-        length(neighbors) > 1 && error("multiple neighboring faces not supported yet")
+        isempty(neighbors) && continue
+        length(neighbors) > 1 && error("multiple neighboring facets not supported yet")
         facet_b = neighbors[1]
         reinit!(ii.cache, facet_a, facet_b)
-        return (ii.cache, state)
+        return ii.cache, i
     end
-    return
+    return nothing
 end
-
+@inline Base.iterate(ii::InterfaceIterator) = iterate(ii, 1)
 
 # Iterator interface for CellIterator/FacetIterator
 const GridIterators{C} = Union{CellIterator{C}, FacetIterator{C}, InterfaceIterator{C}}

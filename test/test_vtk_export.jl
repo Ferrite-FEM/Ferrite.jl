@@ -21,7 +21,7 @@
                 @test Ferrite.write_cell_colors(vtk, grid, colors) === vtk
             end
             @test v isa VTKGridFile
-            @test bytes2hex(open(SHA.sha1, fname * ".vtu")) == "b804d0b064121b672d8e35bcff8446eda361cac3"
+            @test bytes2hex(open(SHA.sha1, fname * ".vtu")) == "960aa8323da524f642376bba6ff7d8f7c349b218"
         end
     end
     @testset "constraints" begin
@@ -58,12 +58,33 @@
             end
             @test Ferrite.write_discontinuous(v)
             @test bytes2hex(open(SHA.sha1, fname * ".vtu")) == "9c159760c7d5e2c437ba2faed73967bf687aa9f3"
+        end
 
-            # Writing nodedata to a discontinuous grid is not supported, since the nodes in
-            # Ferrite are different from the nodes in vtk.
-            VTKGridFile(fname, dh) do vtk
-                @test_throws ArgumentError write_node_data(vtk, zeros(getnnodes(grid)), "nodedata")
+        ip = DiscontinuousLagrange{RefTetrahedron, 1}()
+        dh = DofHandler(grid)
+        add!(dh, :u, ip)
+        add!(dh, :v, Lagrange{RefTetrahedron, 1}())
+        close!(dh)
+        a = zeros(ndofs(dh))
+        apply_analytical!(a, dh, :u, x -> round(Int, sum(y -> y^2, x)))
+        apply_analytical!(a, dh, :v, x -> round(Int, sum(y -> y^2, x)))
+        nodedata_v = evaluate_at_grid_nodes(dh, a, :v)
+        ch = ConstraintHandler(dh)
+        add!(ch, Dirichlet(:u, getfacetset(grid, "left"), Returns(1.0)))
+        add!(ch, Dirichlet(:v, getfacetset(grid, "right"), Returns(2.0)))
+        close!(ch)
+        a2 = zeros(ndofs(dh))
+        apply!(a2, ch)
+        mktempdir() do tmp
+            fname = joinpath(tmp, "discontinuous_exports_of_continuous_field")
+            v = VTKGridFile(fname, dh) do vtk::VTKGridFile
+                write_solution(vtk, dh, a)
+                write_solution(vtk, dh, a2, "_bc")
+                write_node_data(vtk, nodedata_v, "nodedata_v")
+                Ferrite.write_constraints(vtk, ch)
             end
+            @test Ferrite.write_discontinuous(v)
+            @test bytes2hex(open(SHA.sha1, fname * ".vtu")) == "d665ec0c4d6bb5112614c3f081a7c684f8cb6356"
         end
 
         # Produce a u such that the overall shape is f(x, xc) = 2 * (x[1]^2 - x[2]^2) - (xc[1]^2 - xc[2]^2)
@@ -204,6 +225,25 @@
                     write_projection(vtk, proj, field, "cellid")
                 end
             end
+        end
+    end
+    @testset "discontinous_embedded" begin
+        mktempdir() do tmp
+            grid = generate_grid(Line, (2,), Vec((0.0, 0.0)), Vec((1.0, 0.5)))
+
+            qr = QuadratureRule{RefLine}(2)
+            ip = Lagrange{RefLine, 1}()^2
+            dh = DofHandler(grid)
+            add!(dh, :u, ip)
+            close!(dh)
+
+            u = collect(range(0, 1, ndofs(dh)))
+            VTKGridFile(joinpath(tmp, "output"), dh, write_discontinuous = true) do vtk
+                write_solution(vtk, dh, u)
+            end
+
+            sha = bytes2hex(open(SHA.sha1, joinpath(tmp, "output") * ".vtu"))
+            @test sha == "571c8a348d8e34bb0a1e0b9a2d9343e973d7c1f9"
         end
     end
 end
