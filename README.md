@@ -9,7 +9,26 @@
 [![code style: runic](https://img.shields.io/badge/code_style-%E1%9A%B1%E1%9A%A2%E1%9A%BE%E1%9B%81%E1%9A%B2-black)](https://github.com/fredrikekre/Runic.jl)
 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.13862652.svg)](https://doi.org/10.5281/zenodo.13862652)
 
-A finite element toolbox written in Julia.
+Ferrite.jl is a comprehensive toolbox for finite element analysis (FEA) in Julia. It is designed for researchers and engineers who want full control over their simulation pipelines—from the weak form definition to the assembly and solution strategies. If you want to implement your own finite element solver, perform novel multiphysics simulations, or experiment with new element types, Ferrite provides the high-performance building blocks you need.
+
+## Scope & Core Features
+
+Ferrite provides a general, performant, and mathematically abstract foundation for solving partial differential equations (PDEs). Key features include:
+
+*   **Versatile Grid Management**: Support for 1D, 2D, and 3D grids with mixed element types.
+*   **Flexible Degree of Freedom Handling**: Robust `DofHandler` for scalar and vector fields, supporting mixed interpolations and multiple fields.
+*   **Efficient Assembly**: Optimised routines for iterating over cells and faces, calculating shape functions, gradients, and numerical integration.
+*   **Boundary Conditions**: Easy definition of Dirichlet, Neumann, and Periodic boundary conditions.
+*   **High Performance**: Design that leverages Julia's multiple dispatch and type system for speed comparable to C/C++.
+*   **Visualization**: Native export to VTK (Paraview/VisIt) and integration with [FerriteViz.jl](https://github.com/Ferrite-FEM/FerriteViz.jl) for Makie-based visualization.
+
+## When NOT to use Ferrite
+
+While Ferrite is powerful, it might not be the right tool if:
+
+*   You are looking for a commercial-style "black box" solver with a graphical user interface (GUI) to merely configure and run standard simulations.
+*   You require a library with a vast built-in catalogue of material models or structural components (Ferrite focuses on the *engine*, letting you define the physics).
+*   You need complex built-in mesh generation. (Ferrite handles grid data structures excellently but relies on external tools like [Gmsh](https://gmsh.info/) (via [FerriteGmsh.jl](https://github.com/Ferrite-FEM/FerriteGmsh.jl)) for generating complex geometries).
 
 ## Documentation
 
