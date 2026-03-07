@@ -1,6 +1,6 @@
-abstract type AbstractAssembler end
-abstract type AbstractCSCAssembler <: AbstractAssembler end
-abstract type AbstractCSRAssembler <: AbstractAssembler end
+abstract type AbstractAssembler{Tv} end
+abstract type AbstractCSCAssembler{Tv} <: AbstractAssembler{Tv} end
+abstract type AbstractCSRAssembler{Tv} <: AbstractAssembler{Tv} end
 
 """
     struct COOAssembler{Tv, Ti}
@@ -8,7 +8,7 @@ abstract type AbstractCSRAssembler <: AbstractAssembler end
 This assembler creates a COO (**coo**rdinate format) representation of a sparse matrix
 during assembly and converts it into a `SparseMatrixCSC{Tv, Ti}` on finalization.
 """
-struct COOAssembler{Tv, Ti} # <: AbstractAssembler
+struct COOAssembler{Tv, Ti} # <: AbstractAssembler{Tv}
     nrows::Int
     ncols::Int
     f::Vector{Tv}
@@ -173,7 +173,7 @@ matrix_handle, vector_handle
 """
 Assembler for sparse matrix with CSC storage type.
 """
-struct CSCAssembler{Tv, Ti, MT <: AbstractSparseMatrixCSC{Tv, Ti}} <: AbstractCSCAssembler
+struct CSCAssembler{Tv, Ti, MT <: AbstractSparseMatrixCSC{Tv, Ti}} <: AbstractCSCAssembler{Tv}
     K::MT
     f::Vector{Tv}
     rowpermutation::Vector{Int}
@@ -185,7 +185,7 @@ end
 """
 Assembler for sparse matrix with CSR storage type.
 """
-struct CSRAssembler{Tv, Ti, MT <: AbstractSparseMatrix{Tv, Ti}} <: AbstractCSRAssembler #AbstractSparseMatrixCSR does not exist
+struct CSRAssembler{Tv, Ti, MT <: AbstractSparseMatrix{Tv, Ti}} <: AbstractCSRAssembler{Tv} #AbstractSparseMatrixCSR does not exist
     K::MT
     f::Vector{Tv}
     rowpermutation::Vector{Int}
@@ -197,7 +197,7 @@ end
 """
 Assembler for symmetric sparse matrix with CSC storage type.
 """
-struct SymmetricCSCAssembler{Tv, Ti, MT <: Symmetric{Tv, <:AbstractSparseMatrixCSC{Tv, Ti}}} <: AbstractCSCAssembler
+struct SymmetricCSCAssembler{Tv, Ti, MT <: Symmetric{Tv, <:AbstractSparseMatrixCSC{Tv, Ti}}} <: AbstractCSCAssembler{Tv}
     K::MT
     f::Vector{Tv}
     rowpermutation::Vector{Int} # Symmetric assembly doesn't need separate row and
@@ -222,15 +222,15 @@ matrix_handle(a::SymmetricCSCAssembler) = a.K.data
 vector_handle(a::Union{AbstractCSCAssembler, AbstractCSRAssembler}) = a.f
 
 """
-    start_assemble(K::AbstractSparseMatrixCSC;            fillzero::Bool=true) -> CSCAssembler
-    start_assemble(K::AbstractSparseMatrixCSC, f::Vector; fillzero::Bool=true) -> CSCAssembler
+    start_assemble(K::AbstractSparseMatrixCSC{Tv};            fillzero::Bool=true) -> CSCAssembler{Tv}
+    start_assemble(K::AbstractSparseMatrixCSC{Tv}, f::Vector{Tv}; fillzero::Bool=true) -> CSCAssembler{Tv}
 
-Create a `CSCAssembler` from the matrix `K` and optional vector `f`.
+Create a `CSCAssembler{Tv}` from the matrix `K` and optional vector `f` with value type `Tv`.
 
-    start_assemble(K::Symmetric{AbstractSparseMatrixCSC};                 fillzero::Bool=true) -> SymmetricCSCAssembler
-    start_assemble(K::Symmetric{AbstractSparseMatrixCSC}, f::Vector=Td[]; fillzero::Bool=true) -> SymmetricCSCAssembler
+    start_assemble(K::Symmetric{AbstractSparseMatrixCSC{Tv}};                 fillzero::Bool=true) -> SymmetricCSCAssembler{Tv}
+    start_assemble(K::Symmetric{AbstractSparseMatrixCSC{Tv}}, f::Vector=Tv[]; fillzero::Bool=true) -> SymmetricCSCAssembler{Tv}
 
-Create a `SymmetricCSCAssembler` from the matrix `K` and optional vector `f`.
+Create a `SymmetricCSCAssembler{Tv}` from the matrix `K` and optional vector `f` with value type `Tv`.
 
 `CSCAssembler` and `SymmetricCSCAssembler` allocate workspace
 necessary for efficient matrix assembly. To assemble the contribution from an element, use
