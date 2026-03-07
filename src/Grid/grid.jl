@@ -258,6 +258,22 @@ function reference_faces(::Type{RefPyramid})
     )
 end
 
+@generated function reference_face_edgenrs(::Type{RefShape}) where {RefShape <: AbstractRefShape}
+    expr = Expr(:tuple)
+    refedges = reference_edges(RefShape)
+    for face in reference_faces(RefShape)
+        expr_i = Expr(:tuple)
+        for j in 1:length(face)
+            v1 = face[j]
+            v2 = face[mod1(j + 1, length(face))]
+            edgenr = findfirst(refedge -> (refedge === (v1, v2) || refedge === (v2, v1)), refedges)
+            push!(expr_i.args, edgenr)
+        end
+        push!(expr.args, expr_i)
+    end
+    return :(return $expr)
+end
+
 ######################################################
 # Concrete implementations of AbstractCell interface #
 ######################################################
