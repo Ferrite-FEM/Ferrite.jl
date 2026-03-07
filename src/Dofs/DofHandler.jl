@@ -169,6 +169,14 @@ isclosed(dh::AbstractDofHandler) = dh.closed
 get_grid(dh::DofHandler) = dh.grid
 
 """
+    Ferrite.getrefdim(::DofHandler)
+
+Return the dimension of the degree of freedom handler.
+"""
+getrefdim(::DofHandler{dim, G}) where {dim, G} = dim
+getrefdim(::SubDofHandler{dh}) where {dh} = getrefdim(dh)
+
+"""
     ndofs(dh::AbstractDofHandler)
 
 Return the number of degrees of freedom in `dh`
