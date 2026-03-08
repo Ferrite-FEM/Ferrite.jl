@@ -78,21 +78,21 @@ function workstream_coloring(incidence_matrix, cellset)
     ###################
     # 1. Partitioning #
     ###################
-    zones = Set{Int}[]
+    zones = OrderedSet{Int}[]
     n_visited = 0
     Z = 1
-    Z0 = Set{Int}() # Dummy zone
-    remaining_cells = Set{Int}(cellset)
+    Z0 = OrderedSet{Int}() # Dummy zone
+    remaining_cells = OrderedSet{Int}(cellset)
     while n_visited < length(cellset)
         setdiff!(remaining_cells, zones...)
         ## Zone 1: Just the first element
         @assert length(remaining_cells) > 0
-        push!(zones, Set{Int}(first(remaining_cells)))
+        push!(zones, OrderedSet{Int}((first(remaining_cells),)))
         Z += 1
         n_visited += 1
         ## Zone N: All elements with connection to elements in Zone N-1
         while true
-            s = Set{Int}()
+            s = OrderedSet{Int}()
             # Loop over all elements in previous zone and add their neighbouring elements
             # unless they are in any of the previous 2 zones.
             empty_zone = true

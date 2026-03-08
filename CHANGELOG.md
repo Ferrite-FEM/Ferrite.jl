@@ -32,6 +32,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
    [#1235])
  - Relax vector input type from `Vector` to `AbstractVector` in `evaluate_at_points!`.
    ([#1183])
+- The result of grid coloring is now not dependent on iteration order of dictionaries and sets. This may change the coloring obtained from `create_coloring`
+  compared to previous Ferrite versions.
 
 ### Documentation updates
  - Extended assembly docs with information on how to support direct assembly into new matrix
