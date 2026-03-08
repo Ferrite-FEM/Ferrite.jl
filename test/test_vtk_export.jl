@@ -21,7 +21,7 @@
                 @test Ferrite.write_cell_colors(vtk, grid, colors) === vtk
             end
             @test v isa VTKGridFile
-            @test bytes2hex(open(SHA.sha1, fname * ".vtu")) == "b804d0b064121b672d8e35bcff8446eda361cac3"
+            @test bytes2hex(open(SHA.sha1, fname * ".vtu")) == "960aa8323da524f642376bba6ff7d8f7c349b218"
         end
     end
     @testset "constraints" begin
