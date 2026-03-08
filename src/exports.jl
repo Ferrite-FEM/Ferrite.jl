@@ -169,7 +169,6 @@ export
     interfacedofs,
 
     # assembly
-    AbstractAssembler,
     start_assemble,
     assemble!,
     finish_assemble,
