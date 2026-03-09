@@ -1,9 +1,9 @@
 # [Assembly](@id devdocs-assembly)
 
 An assembler handles the insertion of the element matrices and element vectors into the system matrix and vector.
-and should *normally* (the exact interface is yet to be fully established) subtype `AbstractAssembler{T}`. Here `T` is the 
+and should *normally* (the exact interface is yet to be fully established) subtype `AbstractAssembler{T}`. Here `T` is the
 `eltype` of the contained system matrix and vector. This allows the user to infer the eltype when preallocating the element
-matrix and vector, e.g. 
+matrix and vector, e.g.
 ```julia
 function doassemble!(assembler::Ferrite.AbstractAssembler{T}, ...) where {T}
     Ke = zeros(T, n, n) # n = dofs per cell
