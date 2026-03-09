@@ -1,20 +1,21 @@
 using Ferrite, Test
 
-function test_pe_scalar_field()
+function test_pe_scalar_field(celltype::Type{<:Ferrite.AbstractCell} = QuadraticQuadrilateral)
     # isoparametric approximation
-    mesh = generate_grid(QuadraticQuadrilateral, (3, 3))
-    perturb_standard_grid!(mesh, 1 / 10)
+    ref_shape = getrefshape(celltype)
+    dim = Ferrite.getrefdim(ref_shape)
+    mesh = generate_grid(celltype, ntuple(_ -> 3, dim))
+    # perturb_standard_grid!(mesh, 1 / 10)
 
-    f(x) = x[1] + x[2]
-
-    ip_f = Lagrange{RefQuadrilateral, 2}() # function interpolation
-    ip_g = Lagrange{RefQuadrilateral, 2}() # geometry interpolation
+    f(x) = sum(x)
+    ip_f = Lagrange{ref_shape, 2}() # function interpolation
+    ip_g = geometric_interpolation(celltype) # geometry interpolation
 
     # points where we want to retrieve field values
-    points = Vec{2, Float64}[]
+    points = Vec{dim, Float64}[]
 
     # compute values in quadrature points
-    qr = QuadratureRule{RefQuadrilateral}(3) # exactly integrate field
+    qr = Ferrite._mass_qr(ip_f) # exactly integrate field
     cv = CellValues(qr, ip_f, ip_g)
     qp_vals = [Vector{Float64}(undef, getnquadpoints(cv)) for _ in 1:getncells(mesh)]
     for cellid in eachindex(mesh.cells)
@@ -30,7 +31,6 @@ function test_pe_scalar_field()
     # do a L2Projection for getting values in dofs
     projector = L2Projector(ip_f, mesh)
     projector_vals = project(projector, qp_vals, qr)
-
     # set up PointEvalHandler and retrieve values
     @test_logs min_level = Logging.Warn PointEvalHandler(mesh, points)
     ph = PointEvalHandler(mesh, points)
@@ -482,6 +482,11 @@ end
 
     @testset "failure cases" begin
         test_pe_first_point_missing()
+    end
+
+    @testset "Pyramids and Wedges" begin
+        test_pe_scalar_field(Pyramid)
+        test_pe_scalar_field(Wedge)
     end
 end
 
