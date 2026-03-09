@@ -5,7 +5,7 @@ function test_pe_scalar_field(celltype::Type{<:Ferrite.AbstractCell} = Quadratic
     ref_shape = getrefshape(celltype)
     dim = Ferrite.getrefdim(ref_shape)
     mesh = generate_grid(celltype, ntuple(_ -> 3, dim))
-    # perturb_standard_grid!(mesh, 1 / 10)
+    perturb_standard_grid!(mesh, 1 / 10)
 
     f(x) = sum(x)
     ip_f = Lagrange{ref_shape, 2}() # function interpolation
