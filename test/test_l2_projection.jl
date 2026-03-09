@@ -24,7 +24,7 @@ function test_projection(order, elementtype)
 
     # Create node values for the cell
     f(x) = 1 + x[1]^2 + (2x[2])^2
-    
+
     # analytical values
     function analytical(f)
         qp_values = []
@@ -43,7 +43,7 @@ function test_projection(order, elementtype)
     point_vars = project(proj, qp_values, qr)
     qp_values_matrix = reduce(hcat, qp_values)
     point_vars_2 = project(proj, qp_values_matrix, qr)
-    
+
     if order == 1
         # A linear approximation can not recover a quadratic solution.
         # Use precomputed L2 projection reference values.
@@ -530,7 +530,7 @@ end
                 Hexahedron,
                 Tetrahedron,
                 Pyramid,
-                Wedge
+                Wedge,
             ), degree in 1:2
         test_projection(degree, cell_type)
     end

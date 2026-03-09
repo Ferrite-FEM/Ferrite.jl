@@ -144,11 +144,11 @@ function _mass_qr(::Lagrange{shape, 2}) where {shape <: RefSimplex}
     return QuadratureRule{shape}(4)
 end
 
-function _mass_qr(::Lagrange{RefPyramid, order}) where order
+function _mass_qr(::Lagrange{RefPyramid, order}) where {order}
     return QuadratureRule{RefPyramid}(order + 3)
 end
 
-function _mass_qr(::Lagrange{RefPrism, order}) where order
+function _mass_qr(::Lagrange{RefPrism, order}) where {order}
     return QuadratureRule{RefPrism}(order + 4)
 end
 
