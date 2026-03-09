@@ -586,8 +586,8 @@ Mutate `x` to the coordinates of the cell corresponding to `idx` or `cell`.
 """
 @propagate_inbounds function getcoordinates!(x::AbstractVector{Vec{dim, T}}, grid::AbstractGrid, cell::AbstractCell) where {dim, T}
     node_ids = get_node_ids(cell)
-    @boundscheck checkbounds(x, 1:length(node_ids))
-    @inbounds for (i, node_id) in enumerate(node_ids)
+    @boundscheck checkbounds(x, keys(node_ids))
+    @inbounds for (i, node_id) in pairs(node_ids)
         x[i] = get_node_coordinate(grid, node_id)
     end
     return x
