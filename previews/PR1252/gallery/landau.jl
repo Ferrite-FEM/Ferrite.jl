@@ -3,6 +3,7 @@ using Ferrite
 using Optim, LineSearches
 using SparseArrays
 using Tensors
+using OhMyThreads, ChunkSplitters
 
 function Fl(P::Vec{3, T}, α::Vec{3}) where {T}
     P2 = Vec{3, T}((P[1]^2, P[2]^2, P[3]^2))
@@ -20,7 +21,7 @@ struct ModelParams{V, T}
     G::T
 end
 
-struct ThreadCache{CV, T, DIM, F <: Function, GC <: GradientConfig, HC <: HessianConfig}
+struct TaskCache{CV, T, DIM, F <: Function, GC <: GradientConfig, HC <: HessianConfig}
     cvP::CV
     element_indices::Vector{Int}
     element_dofs::Vector{T}
@@ -31,7 +32,7 @@ struct ThreadCache{CV, T, DIM, F <: Function, GC <: GradientConfig, HC <: Hessia
     gradconf::GC
     hessconf::HC
 end
-function ThreadCache(dpc::Int, nodespercell, cvP::CellValues, modelparams, elpotential)
+function TaskCache(dpc::Int, nodespercell, cvP::CellValues, modelparams, elpotential)
     element_indices = zeros(Int, dpc)
     element_dofs = zeros(dpc)
     element_gradient = zeros(dpc)
@@ -40,20 +41,20 @@ function ThreadCache(dpc::Int, nodespercell, cvP::CellValues, modelparams, elpot
     potfunc = x -> elpotential(x, cvP, modelparams)
     gradconf = GradientConfig(potfunc, zeros(dpc), Chunk{12}())
     hessconf = HessianConfig(potfunc, zeros(dpc), Chunk{4}())
-    return ThreadCache(cvP, element_indices, element_dofs, element_gradient, element_hessian, element_coords, potfunc, gradconf, hessconf)
+    return TaskCache(cvP, element_indices, element_dofs, element_gradient, element_hessian, element_coords, potfunc, gradconf, hessconf)
 end
 
-mutable struct LandauModel{T, DH <: DofHandler, CH <: ConstraintHandler, TC <: ThreadCache}
+mutable struct LandauModel{T, DH <: DofHandler, CH <: ConstraintHandler, TC <: TaskCache}
     dofs::Vector{T}
     dofhandler::DH
     boundaryconds::CH
-    threadindices::Vector{Vector{Int}}
-    threadcaches::Vector{TC}
+    colors::Vector{Vector{Int}}
+    caches::Vector{TC}
 end
 
-function LandauModel(α, G, gridsize, left::Vec{DIM, T}, right::Vec{DIM, T}, elpotential) where {DIM, T}
+function LandauModel(α, G, gridsize, left::Vec{DIM, T}, right::Vec{DIM, T}, elpotential, ntasks) where {DIM, T}
     grid = generate_grid(Tetrahedron, gridsize, left, right)
-    threadindices = Ferrite.create_coloring(grid)
+    colors = create_coloring(grid)
 
     qr = QuadratureRule{RefTetrahedron}(2)
     ipP = Lagrange{RefTetrahedron, 1}()^3
@@ -76,8 +77,8 @@ function LandauModel(α, G, gridsize, left::Vec{DIM, T}, right::Vec{DIM, T}, elp
 
     dpc = ndofs_per_cell(dofhandler)
     cpc = length(grid.cells[1].nodes)
-    caches = [ThreadCache(dpc, cpc, copy(cvP), ModelParams(α, G), elpotential) for t in 1:Threads.maxthreadid()]
-    return LandauModel(dofvector, dofhandler, boundaryconds, threadindices, caches)
+    caches = [TaskCache(dpc, cpc, copy(cvP), ModelParams(α, G), elpotential) for _ in 1:ntasks]
+    return LandauModel(dofvector, dofhandler, boundaryconds, colors, caches)
 end
 
 function save_landau(path, model, dofs = model.dofs)
@@ -87,68 +88,68 @@ function save_landau(path, model, dofs = model.dofs)
     return
 end
 
-macro assemble!(innerbody)
-    return esc(
-        quote
-            dofhandler = model.dofhandler
-            for indices in model.threadindices
-                Threads.@threads for i in indices
-                    cache = model.threadcaches[Threads.threadid()]
-                    eldofs = cache.element_dofs
-                    nodeids = dofhandler.grid.cells[i].nodes
-                    for j in 1:length(cache.element_coords)
-                        cache.element_coords[j] = dofhandler.grid.nodes[nodeids[j]].x
-                    end
-                    reinit!(cache.cvP, cache.element_coords)
-
-                    celldofs!(cache.element_indices, dofhandler, i)
-                    for j in 1:length(cache.element_dofs)
-                        eldofs[j] = dofvector[cache.element_indices[j]]
-                    end
-                    $innerbody
-                end
-            end
-        end
-    )
+function setup_cell!(cache, dofhandler, dofvector, cellidx)
+    nodeids = dofhandler.grid.cells[cellidx].nodes
+    for j in 1:length(cache.element_coords)
+        cache.element_coords[j] = dofhandler.grid.nodes[nodeids[j]].x
+    end
+    reinit!(cache.cvP, cache.element_coords)
+    celldofs!(cache.element_indices, dofhandler, cellidx)
+    eldofs = cache.element_dofs
+    for j in 1:length(eldofs)
+        eldofs[j] = dofvector[cache.element_indices[j]]
+    end
+    return eldofs
 end
 
 function F(dofvector::Vector{T}, model) where {T}
-    outs = fill(zero(T), Threads.maxthreadid())
-    @assemble! begin
-        outs[Threads.threadid()] += cache.element_potential(eldofs)
+    out = zero(T)
+    for indices in model.colors
+        partial = OhMyThreads.@tasks for (ichunk, range) in enumerate(chunks(indices; n = length(model.caches)))
+            OhMyThreads.@set reducer = +
+            cache = model.caches[ichunk]
+            local_energy = zero(T)
+            for i in range
+                eldofs = setup_cell!(cache, model.dofhandler, dofvector, i)
+                local_energy += cache.element_potential(eldofs)
+            end
+            local_energy
+        end
+        out += partial
     end
-    return sum(outs)
+    return out
 end
 
 function ∇F!(∇f::Vector{T}, dofvector::Vector{T}, model::LandauModel{T}) where {T}
     fill!(∇f, zero(T))
-    @assemble! begin
-        ForwardDiff.gradient!(cache.element_gradient, cache.element_potential, eldofs, cache.gradconf)
-        @inbounds assemble!(∇f, cache.element_indices, cache.element_gradient)
+    for indices in model.colors
+        OhMyThreads.@tasks for (ichunk, range) in enumerate(chunks(indices; n = length(model.caches)))
+            cache = model.caches[ichunk]
+            for i in range
+                eldofs = setup_cell!(cache, model.dofhandler, dofvector, i)
+                ForwardDiff.gradient!(cache.element_gradient, cache.element_potential, eldofs, cache.gradconf)
+                @inbounds assemble!(∇f, cache.element_indices, cache.element_gradient)
+            end
+        end
     end
     return
 end
 
 function ∇²F!(∇²f::SparseMatrixCSC, dofvector::Vector{T}, model::LandauModel{T}) where {T}
-    assemblers = [start_assemble(∇²f) for t in 1:Threads.maxthreadid()]
-    @assemble! begin
-        ForwardDiff.hessian!(cache.element_hessian, cache.element_potential, eldofs, cache.hessconf)
-        @inbounds assemble!(assemblers[Threads.threadid()], cache.element_indices, cache.element_hessian)
+    dh = model.dofhandler
+    ntasks = length(model.caches)
+    assemblers = [start_assemble(∇²f; fillzero = (i == 1)) for i in 1:ntasks]
+    for indices in model.colors
+        OhMyThreads.@tasks for (ichunk, range) in enumerate(chunks(indices; n = ntasks))
+            cache = model.caches[ichunk]
+            for i in range
+                eldofs = setup_cell!(cache, dh, dofvector, i)
+                ForwardDiff.hessian!(cache.element_hessian, cache.element_potential, eldofs, cache.hessconf)
+                @inbounds assemble!(assemblers[ichunk], cache.element_indices, cache.element_hessian)
+            end
+        end
     end
     return
-end
-
-function calcall(∇²f::SparseMatrixCSC, ∇f::Vector{T}, dofvector::Vector{T}, model::LandauModel{T}) where {T}
-    outs = fill(zero(T), Threads.maxthreadid())
-    fill!(∇f, zero(T))
-    assemblers = [start_assemble(∇²f, ∇f) for t in 1:Threads.maxthreadid()]
-    @assemble! begin
-        outs[Threads.threadid()] += cache.element_potential(eldofs)
-        ForwardDiff.hessian!(cache.element_hessian, cache.element_potential, eldofs, cache.hessconf)
-        ForwardDiff.gradient!(cache.element_gradient, cache.element_potential, eldofs, cache.gradconf)
-        @inbounds assemble!(assemblers[Threads.threadid()], cache.element_indices, cache.element_gradient, cache.element_hessian)
-    end
-    return sum(outs)
 end
 
 function minimize!(model; kwargs...)
@@ -210,10 +211,14 @@ G = V2T(1.0e2, 0.0, 1.0e2)
 α = Vec{3}((-1.0, 1.0, 1.0))
 left = Vec{3}((-75.0, -25.0, -2.0))
 right = Vec{3}((75.0, 25.0, 2.0))
-model = LandauModel(α, G, (50, 50, 2), left, right, element_potential)
+model = LandauModel(α, G, (50, 50, 2), left, right, element_potential, Threads.nthreads())
 
 save_landau("landauorig", model)
-@time minimize!(model)
+@time res = minimize!(model)
+@assert Optim.converged(res)
 save_landau("landaufinal", model)
+
+using Test # src
+@test Optim.minimum(res) ≈ -10858.806775 # src
 
 # This file was generated using Literate.jl, https://github.com/fredrikekre/Literate.jl
