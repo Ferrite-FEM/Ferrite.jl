@@ -21,25 +21,25 @@
 # This means that they are performed for each cell separately instead of for the
 # grid as a whole.
 
-using ForwardDiff
-import ForwardDiff: GradientConfig, HessianConfig, Chunk
+using ForwardDiff: ForwardDiff, GradientConfig, HessianConfig, Chunk
 using Ferrite
 using Optim, LineSearches
 using SparseArrays
 using Tensors
-using Base.Threads
+using OhMyThreads, ChunkSplitters
+
 # ## Energy terms
 # ### 4th order Landau free energy
-function Fl(P::Vec{3, T}, α::Vec{3}) where T
+function Fl(P::Vec{3, T}, α::Vec{3}) where {T}
     P2 = Vec{3, T}((P[1]^2, P[2]^2, P[3]^2))
-    return (α[1] * sum(P2) +
-           α[2] * (P[1]^4 + P[2]^4 + P[3]^4)) +
-           α[3] * ((P2[1] * P2[2]  + P2[2]*P2[3]) + P2[1]*P2[3])
+    return α[1] * sum(P2) +
+        α[2] * (P[1]^4 + P[2]^4 + P[3]^4) +
+        α[3] * ((P2[1] * P2[2] + P2[2] * P2[3]) + P2[1] * P2[3])
 end
 # ### Ginzburg free energy
 @inline Fg(∇P, G) = 0.5(∇P ⊡ G) ⊡ ∇P
 # ### GL free energy
-F(P, ∇P, params)  = Fl(P, params.α) + Fg(∇P, params.G)
+F(P, ∇P, params) = Fl(P, params.α) + Fg(∇P, params.G)
 
 # ### Parameters that characterize the model
 struct ModelParams{V, T}
@@ -47,46 +47,47 @@ struct ModelParams{V, T}
     G::T
 end
 
-# ### ThreadCache
-# This holds the values that each thread will use during the assembly.
-struct ThreadCache{CV, T, DIM, F <: Function, GC <: GradientConfig, HC <: HessianConfig}
-    cvP              ::CV
-    element_indices  ::Vector{Int}
-    element_dofs     ::Vector{T}
-    element_gradient ::Vector{T}
-    element_hessian  ::Matrix{T}
-    element_coords   ::Vector{Vec{DIM, T}}
+# ### TaskCache
+# This holds the values that each task will use during the assembly.
+struct TaskCache{CV, T, DIM, F <: Function, GC <: GradientConfig, HC <: HessianConfig}
+    cvP::CV
+    element_indices::Vector{Int}
+    element_dofs::Vector{T}
+    element_gradient::Vector{T}
+    element_hessian::Matrix{T}
+    element_coords::Vector{Vec{DIM, T}}
     element_potential::F
-    gradconf         ::GC
-    hessconf         ::HC
+    gradconf::GC
+    hessconf::HC
 end
-function ThreadCache(dpc::Int, nodespercell, cvP::CellValues, modelparams, elpotential)
-    element_indices  = zeros(Int, dpc)
-    element_dofs     = zeros(dpc)
+function TaskCache(dpc::Int, nodespercell, cvP::CellValues, modelparams, elpotential)
+    element_indices = zeros(Int, dpc)
+    element_dofs = zeros(dpc)
     element_gradient = zeros(dpc)
-    element_hessian  = zeros(dpc, dpc)
-    element_coords   = zeros(Vec{3, Float64}, nodespercell)
-    potfunc          = x -> elpotential(x, cvP, modelparams)
-    gradconf         = GradientConfig(potfunc, zeros(dpc), Chunk{12}())
-    hessconf         = HessianConfig(potfunc, zeros(dpc), Chunk{4}())
-    return ThreadCache(cvP, element_indices, element_dofs, element_gradient, element_hessian, element_coords, potfunc, gradconf, hessconf)
+    element_hessian = zeros(dpc, dpc)
+    element_coords = zeros(Vec{3, Float64}, nodespercell)
+    potfunc = x -> elpotential(x, cvP, modelparams)
+    gradconf = GradientConfig(potfunc, zeros(dpc), Chunk{12}())
+    hessconf = HessianConfig(potfunc, zeros(dpc), Chunk{4}())
+    return TaskCache(cvP, element_indices, element_dofs, element_gradient, element_hessian, element_coords, potfunc, gradconf, hessconf)
 end
 
 # ## The Model
-# everything is combined into a model.
-mutable struct LandauModel{T, DH <: DofHandler, CH <: ConstraintHandler, TC <: ThreadCache}
-    dofs          ::Vector{T}
-    dofhandler    ::DH
-    boundaryconds ::CH
-    threadindices ::Vector{Vector{Int}}
-    threadcaches  ::Vector{TC}
+# Everything is combined into a model. The caches are pre-allocated (one per task)
+# and indexed by chunk index during assembly.
+mutable struct LandauModel{T, DH <: DofHandler, CH <: ConstraintHandler, TC <: TaskCache}
+    dofs::Vector{T}
+    dofhandler::DH
+    boundaryconds::CH
+    colors::Vector{Vector{Int}}
+    caches::Vector{TC}
 end
 
-function LandauModel(α, G, gridsize, left::Vec{DIM, T}, right::Vec{DIM, T}, elpotential) where {DIM, T}
+function LandauModel(α, G, gridsize, left::Vec{DIM, T}, right::Vec{DIM, T}, elpotential, ntasks) where {DIM, T}
     grid = generate_grid(Tetrahedron, gridsize, left, right)
-    threadindices = Ferrite.create_coloring(grid)
+    colors = create_coloring(grid)
 
-    qr  = QuadratureRule{RefTetrahedron}(2)
+    qr = QuadratureRule{RefTetrahedron}(2)
     ipP = Lagrange{RefTetrahedron, 1}()^3
     cvP = CellValues(qr, ipP)
 
@@ -105,86 +106,92 @@ function LandauModel(α, G, gridsize, left::Vec{DIM, T}, right::Vec{DIM, T}, elp
 
     apply!(dofvector, boundaryconds)
 
-    hessian = allocate_matrix(dofhandler)
     dpc = ndofs_per_cell(dofhandler)
     cpc = length(grid.cells[1].nodes)
-    caches = [ThreadCache(dpc, cpc, copy(cvP), ModelParams(α, G), elpotential) for t=1:nthreads()]
-    return LandauModel(dofvector, dofhandler, boundaryconds, threadindices, caches)
+    caches = [TaskCache(dpc, cpc, copy(cvP), ModelParams(α, G), elpotential) for _ in 1:ntasks]
+    return LandauModel(dofvector, dofhandler, boundaryconds, colors, caches)
 end
 
 # utility to quickly save a model
-function save_landau(path, model, dofs=model.dofs)
+function save_landau(path, model, dofs = model.dofs)
     VTKGridFile(path, model.dofhandler) do vtk
         write_solution(vtk, model.dofhandler, dofs)
     end
+    return
 end
 
 # ## Assembly
-# This macro defines most of the assembly step, since the structure is the same for
-# the energy, gradient and Hessian calculations.
-macro assemble!(innerbody)
-    esc(quote
-        dofhandler = model.dofhandler
-        for indices in model.threadindices
-            @threads for i in indices
-                cache     = model.threadcaches[threadid()]
-                eldofs    = cache.element_dofs
-                nodeids   = dofhandler.grid.cells[i].nodes
-                for j=1:length(cache.element_coords)
-                    cache.element_coords[j] = dofhandler.grid.nodes[nodeids[j]].x
-                end
-                reinit!(cache.cvP, cache.element_coords)
+# This helper sets up the cell data in the cache for a given cell index,
+# and returns the element dof values.
+function setup_cell!(cache, dofhandler, dofvector, cellidx)
+    nodeids = dofhandler.grid.cells[cellidx].nodes
+    for j in 1:length(cache.element_coords)
+        cache.element_coords[j] = dofhandler.grid.nodes[nodeids[j]].x
+    end
+    reinit!(cache.cvP, cache.element_coords)
+    celldofs!(cache.element_indices, dofhandler, cellidx)
+    eldofs = cache.element_dofs
+    for j in 1:length(eldofs)
+        eldofs[j] = dofvector[cache.element_indices[j]]
+    end
+    return eldofs
+end
 
-                celldofs!(cache.element_indices, dofhandler, i)
-                for j=1:length(cache.element_dofs)
-                    eldofs[j] = dofvector[cache.element_indices[j]]
-                end
-                $innerbody
+# This calculates the total energy of the grid.
+function F(dofvector::Vector{T}, model) where {T}
+    out = zero(T)
+    for indices in model.colors
+        partial = OhMyThreads.@tasks for (ichunk, range) in enumerate(chunks(indices; n = length(model.caches)))
+            OhMyThreads.@set reducer = +
+            cache = model.caches[ichunk]
+            local_energy = zero(T)
+            for i in range
+                eldofs = setup_cell!(cache, model.dofhandler, dofvector, i)
+                local_energy += cache.element_potential(eldofs)
+            end
+            local_energy
+        end
+        out += partial
+    end
+    return out
+end
+
+# The gradient calculation for each dof.
+# The grid coloring ensures no two tasks within a color share dofs,
+# so assembly is safe without locks.
+function ∇F!(∇f::Vector{T}, dofvector::Vector{T}, model::LandauModel{T}) where {T}
+    fill!(∇f, zero(T))
+    for indices in model.colors
+        OhMyThreads.@tasks for (ichunk, range) in enumerate(chunks(indices; n = length(model.caches)))
+            cache = model.caches[ichunk]
+            for i in range
+                eldofs = setup_cell!(cache, model.dofhandler, dofvector, i)
+                ForwardDiff.gradient!(cache.element_gradient, cache.element_potential, eldofs, cache.gradconf)
+                @inbounds assemble!(∇f, cache.element_indices, cache.element_gradient)
             end
         end
-    end)
-end
-
-# This calculates the total energy calculation of the grid
-function F(dofvector::Vector{T}, model) where T
-    outs = fill(zero(T), nthreads())
-    @assemble! begin
-        outs[threadid()] += cache.element_potential(eldofs)
     end
-    return sum(outs)
-end
-
-# The gradient calculation for each dof
-function ∇F!(∇f::Vector{T}, dofvector::Vector{T}, model::LandauModel{T}) where T
-    fill!(∇f, zero(T))
-    @assemble! begin
-        ForwardDiff.gradient!(cache.element_gradient, cache.element_potential, eldofs, cache.gradconf)
-        @inbounds assemble!(∇f, cache.element_indices, cache.element_gradient)
-    end
+    return
 end
 
 # The Hessian calculation for the whole grid
-function ∇²F!(∇²f::SparseMatrixCSC, dofvector::Vector{T}, model::LandauModel{T}) where T
-    assemblers = [start_assemble(∇²f) for t=1:nthreads()]
-    @assemble! begin
-        ForwardDiff.hessian!(cache.element_hessian, cache.element_potential, eldofs, cache.hessconf)
-        @inbounds assemble!(assemblers[threadid()], cache.element_indices, cache.element_hessian)
+function ∇²F!(∇²f::SparseMatrixCSC, dofvector::Vector{T}, model::LandauModel{T}) where {T}
+    dh = model.dofhandler
+    ntasks = length(model.caches)
+    assemblers = [start_assemble(∇²f; fillzero = (i == 1)) for i in 1:ntasks]
+    for indices in model.colors
+        OhMyThreads.@tasks for (ichunk, range) in enumerate(chunks(indices; n = ntasks))
+            cache = model.caches[ichunk]
+            for i in range
+                eldofs = setup_cell!(cache, dh, dofvector, i)
+                ForwardDiff.hessian!(cache.element_hessian, cache.element_potential, eldofs, cache.hessconf)
+                @inbounds assemble!(assemblers[ichunk], cache.element_indices, cache.element_hessian)
+            end
+        end
     end
+    return
 end
 
-# We can also calculate all things in one go!
-function calcall(∇²f::SparseMatrixCSC, ∇f::Vector{T}, dofvector::Vector{T}, model::LandauModel{T}) where T
-    outs = fill(zero(T), nthreads())
-    fill!(∇f, zero(T))
-    assemblers = [start_assemble(∇²f, ∇f) for t=1:nthreads()]
-    @assemble! begin
-        outs[threadid()] += cache.element_potential(eldofs)
-        ForwardDiff.hessian!(cache.element_hessian, cache.element_potential, eldofs, cache.hessconf)
-        ForwardDiff.gradient!(cache.element_gradient, cache.element_potential, eldofs, cache.gradconf)
-        @inbounds assemble!(assemblers[threadid()], cache.element_indices, cache.element_gradient, cache.element_hessian)
-    end
-    return sum(outs)
-end
 
 # ## Minimization
 # Now everything can be combined to minimize the energy, and find the equilibrium
@@ -196,11 +203,11 @@ function minimize!(model; kwargs...)
     ∇²f = allocate_matrix(dh)
     function g!(storage, x)
         ∇F!(storage, x, model)
-        apply_zero!(storage, model.boundaryconds)
+        return apply_zero!(storage, model.boundaryconds)
     end
     function h!(storage, x)
-        ∇²F!(storage, x, model)
-        #apply!(storage, model.boundaryconds)
+        return ∇²F!(storage, x, model)
+        ## apply!(storage, model.boundaryconds)
     end
     f(x) = F(x, model)
 
@@ -212,7 +219,7 @@ function minimize!(model; kwargs...)
     ## model.dofs .= res.minimizer
     ## to get the final convergence, Newton's method is more ideal since the energy landscape should be almost parabolic
     ##+
-    res = optimize(od, model.dofs, Newton(linesearch=BackTracking()), Optim.Options(show_trace=true, show_every=1, g_tol=1e-20))
+    res = optimize(od, model.dofs, Newton(linesearch = BackTracking()), Optim.Options(show_trace = true, show_every = 1, g_tol = 1.0e-20))
     model.dofs .= res.minimizer
     return res
 end
@@ -220,10 +227,10 @@ end
 # ## Testing it
 # This calculates the contribution of each element to the total energy,
 # it is also the function that will be put through ForwardDiff for the gradient and Hessian.
-function element_potential(eldofs::AbstractVector{T}, cvP, params) where T
+function element_potential(eldofs::AbstractVector{T}, cvP, params) where {T}
     energy = zero(T)
-    for qp=1:getnquadpoints(cvP)
-        P  = function_value(cvP, qp, eldofs)
+    for qp in 1:getnquadpoints(cvP)
+        P = function_value(cvP, qp, eldofs)
         ∇P = function_gradient(cvP, qp, eldofs)
         energy += F(P, ∇P, params) * getdetJdV(cvP, qp)
     end
@@ -235,27 +242,32 @@ function startingconditions!(dofvector, dofhandler)
     for cell in CellIterator(dofhandler)
         globaldofs = celldofs(cell)
         it = 1
-        for i=1:3:length(globaldofs)
-            dofvector[globaldofs[i]]   = -2.0
-            dofvector[globaldofs[i+1]] = 2.0
-            dofvector[globaldofs[i+2]] = -2.0tanh(cell.coords[it][1]/20)
+        for i in 1:3:length(globaldofs)
+            dofvector[globaldofs[i]] = -2.0
+            dofvector[globaldofs[i + 1]] = 2.0
+            dofvector[globaldofs[i + 2]] = -2.0tanh(cell.coords[it][1] / 20)
             it += 1
         end
     end
+    return
 end
 
 δ(i, j) = i == j ? one(i) : zero(i)
-V2T(p11, p12, p44) = Tensor{4, 3}((i,j,k,l) -> p11 * δ(i,j)*δ(k,l)*δ(i,k) + p12*δ(i,j)*δ(k,l)*(1 - δ(i,k)) + p44*δ(i,k)*δ(j,l)*(1 - δ(i,j)))
+V2T(p11, p12, p44) = Tensor{4, 3}((i, j, k, l) -> p11 * δ(i, j) * δ(k, l) * δ(i, k) + p12 * δ(i, j) * δ(k, l) * (1 - δ(i, k)) + p44 * δ(i, k) * δ(j, l) * (1 - δ(i, j)))
 
 G = V2T(1.0e2, 0.0, 1.0e2)
 α = Vec{3}((-1.0, 1.0, 1.0))
-left = Vec{3}((-75.,-25.,-2.))
-right = Vec{3}((75.,25.,2.))
-model = LandauModel(α, G, (50, 50, 2), left, right, element_potential)
+left = Vec{3}((-75.0, -25.0, -2.0))
+right = Vec{3}((75.0, 25.0, 2.0))
+model = LandauModel(α, G, (50, 50, 2), left, right, element_potential, Threads.nthreads())
 
 save_landau("landauorig", model)
-@time minimize!(model)
+@time res = minimize!(model)
+@assert Optim.converged(res)
 save_landau("landaufinal", model)
+
+using Test # src
+@test Optim.minimum(res) ≈ -10858.806775 # src
 
 # as we can see this runs very quickly even for relatively large gridsizes.
 # The key to get high performance like this is to minimize the allocations inside the threaded loops,

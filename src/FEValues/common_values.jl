@@ -9,48 +9,64 @@ function checkquadpoint(fe_v::AbstractValues, qp::Int)
     return nothing
 end
 
+@inline function reinit_needs_cell(fe_values::AbstractValues)
+    # TODO: Might need better logic for this, but for current implementations this
+    # is ok. If someone implements a non-identity mapping that doesn't require the cell
+    # as input, this is only a slight performance issue in some cases.
+    return !isa(mapping_type(get_fun_values(fe_values)), IdentityMapping)
+end
+
 @noinline function throw_incompatible_dof_length(length_ue, n_base_funcs)
-    throw(ArgumentError(
-        "the number of base functions ($(n_base_funcs)) does not match the length " *
+    msg = "the number of base functions ($(n_base_funcs)) does not match the length " *
         "of the vector ($(length_ue)). Perhaps you passed the global vector, " *
         "or forgot to pass a dof_range?"
-    ))
+    throw(ArgumentError(msg))
 end
 @noinline function throw_incompatible_coord_length(length_x, n_base_funcs)
-    throw(ArgumentError(
-        "the number of (geometric) base functions ($(n_base_funcs)) does not match " *
+    msg = "the number of (geometric) base functions ($(n_base_funcs)) does not match " *
         "the number of coordinates in the vector ($(length_x)). Perhaps you forgot to " *
         "use an appropriate geometric interpolation when creating FE values? See " *
         "https://github.com/Ferrite-FEM/Ferrite.jl/issues/265 for more details."
-    ))
+    throw(ArgumentError(msg))
 end
+
+conformity(fe_values::AbstractValues) = conformity(function_interpolation(fe_values))
 
 """
     ValuesUpdateFlags(ip_fun::Interpolation; update_gradients = Val(true), update_hessians = Val(false), update_detJdV = Val(true))
 
-Creates a singelton type for specifying what parts of the AbstractValues should be updated. Note that this is internal
+Creates a singleton type for specifying what parts of the AbstractValues should be updated. Note that this is internal
 API used to get type-stable construction. Keyword arguments in `AbstractValues` constructors are forwarded, and the public API
 is passing these as `Bool`, while the `ValuesUpdateFlags` method supports both boolean and `Val(::Bool)` keyword args.
 """
-function ValuesUpdateFlags(ip_fun::Interpolation; update_gradients = Val(true), update_hessians = Val(false), update_detJdV = Val(true))
+function ValuesUpdateFlags(ip_fun::Union{Interpolation, NamedTuple}; update_gradients = Val(true), update_hessians = Val(false), update_detJdV = Val(true))
     toval(v::Bool) = Val(v)
     toval(V::Val) = V
     return ValuesUpdateFlags(ip_fun, toval(update_gradients), toval(update_hessians), toval(update_detJdV))
 end
-function ValuesUpdateFlags(ip_fun::Interpolation, ::Val{update_gradients}, ::Val{update_hessians}, ::Val{update_detJdV}
-        ) where {update_gradients, update_hessians, update_detJdV}
+function ValuesUpdateFlags(
+        ip_fun::Interpolation, ::Val{update_gradients}, ::Val{update_hessians}, ::Val{update_detJdV}
+    ) where {update_gradients, update_hessians, update_detJdV}
     FunDiffOrder = update_hessians ? 2 : (update_gradients ? 1 : 0)
     GeoDiffOrder = max(required_geo_diff_order(mapping_type(ip_fun), FunDiffOrder), update_detJdV)
     return ValuesUpdateFlags{FunDiffOrder, GeoDiffOrder, update_detJdV}()
 end
+function ValuesUpdateFlags( # For MultiFieldCellValues
+        ip_fun::NamedTuple, ::Val{update_gradients}, ::Val{update_hessians}, ::Val{update_detJdV}
+    ) where {update_gradients, update_hessians, update_detJdV}
+    FunDiffOrder = update_hessians ? 2 : (update_gradients ? 1 : 0)
+    GeoDiffOrder = max(maximum(ip -> required_geo_diff_order(mapping_type(ip), FunDiffOrder), ip_fun), update_detJdV)
+    return ValuesUpdateFlags{FunDiffOrder, GeoDiffOrder, update_detJdV}()
+end
 
 """
-    reinit!(cv::CellValues, cell::AbstractCell, x::AbstractVector)
-    reinit!(cv::CellValues, x::AbstractVector)
-    reinit!(fv::FacetValues, cell::AbstractCell, x::AbstractVector, face::Int)
-    reinit!(fv::FacetValues, x::AbstractVector, face::Int)
+    reinit!(cv::AbstractCellValues, cell::AbstractCell, x::AbstractVector)
+    reinit!(cv::AbstractCellValues, x::AbstractVector)
+    reinit!(fv::FacetValues, cell::AbstractCell, x::AbstractVector, facet::Int)
+    reinit!(fv::FacetValues, x::AbstractVector, facet::Int)
 
-Update the `CellValues`/`FacetValues` object for a cell or face with coordinates `x`.
+Update the `CellValues`, `MultiFieldCellValues`, or `FacetValues` object for a cell or
+facet with cell coordinates `x`.
 The derivatives of the shape functions, and the new integration weights are computed.
 For interpolations with non-identity mappings, the current `cell` is also required.
 """
@@ -60,9 +76,18 @@ reinit!
     getnquadpoints(fe_v::AbstractValues)
 
 Return the number of quadrature points. For `FacetValues`,
-this is the number for the current face.
+this is the number for the current facet.
 """
 function getnquadpoints end
+
+"""
+    getnbasefunctions(fe_v::AbstractValues)
+
+Get the number of base functions for the function interpolation in `fe_v`.
+Note that this is not supported for [`MultiFieldCellValues`](@ref) which has
+multiple function interpolations.
+"""
+getnbasefunctions(::AbstractValues)
 
 """
     getdetJdV(fe_v::AbstractValues, q_point::Int)
@@ -71,7 +96,7 @@ Return the product between the determinant of the Jacobian and the quadrature
 point weight for the given quadrature point: ``\\det(J(\\mathbf{x})) w_q``.
 
 This value is typically used when one integrates a function on a
-finite element cell or face as
+finite element cell or facet as
 
 ``\\int\\limits_\\Omega f(\\mathbf{x}) d \\Omega \\approx \\sum\\limits_{q = 1}^{n_q} f(\\mathbf{x}_q) \\det(J(\\mathbf{x})) w_q``
 ``\\int\\limits_\\Gamma f(\\mathbf{x}) d \\Gamma \\approx \\sum\\limits_{q = 1}^{n_q} f(\\mathbf{x}_q) \\det(J(\\mathbf{x})) w_q``
@@ -133,8 +158,8 @@ quadrature point `q_point`.
 function shape_curl(cv::AbstractValues, q_point::Int, base_func::Int)
     return curl_from_gradient(shape_gradient(cv, q_point, base_func))
 end
-curl_from_gradient(∇v::SecondOrderTensor{3}) = Vec{3}((∇v[3,2] - ∇v[2,3], ∇v[1,3] - ∇v[3,1], ∇v[2,1] - ∇v[1,2]))
-curl_from_gradient(∇v::SecondOrderTensor{2}) = Vec{1}((∇v[2,1] - ∇v[1,2],)) # Alternatively define as Vec{3}((0,0,v))
+curl_from_gradient(∇v::SecondOrderTensor{3}) = Vec{3}((∇v[3, 2] - ∇v[2, 3], ∇v[1, 3] - ∇v[3, 1], ∇v[2, 1] - ∇v[1, 2]))
+curl_from_gradient(∇v::SecondOrderTensor{2}) = Vec{1}((∇v[2, 1] - ∇v[1, 2],)) # Alternatively define as Vec{3}((0, 0, v))
 
 """
     function_value(fe_v::AbstractValues, q_point::Int, u::AbstractVector, [dof_range])
@@ -372,16 +397,32 @@ function reference_shape_values!(values::AbstractMatrix, ip, qr_points::Abstract
     for (qp, ξ) in pairs(qr_points)
         reference_shape_values!(@view(values[:, qp]), ip, ξ)
     end
+    return
 end
 
 function reference_shape_gradients_and_values!(gradients::AbstractMatrix, values::AbstractMatrix, ip, qr_points::AbstractVector{<:Vec})
     for (qp, ξ) in pairs(qr_points)
         reference_shape_gradients_and_values!(@view(gradients[:, qp]), @view(values[:, qp]), ip, ξ)
     end
+    return
 end
 
 function reference_shape_hessians_gradients_and_values!(hessians::AbstractMatrix, gradients::AbstractMatrix, values::AbstractMatrix, ip, qr_points::AbstractVector{<:Vec})
     for (qp, ξ) in pairs(qr_points)
         reference_shape_hessians_gradients_and_values!(@view(hessians[:, qp]), @view(gradients[:, qp]), @view(values[:, qp]), ip, ξ)
     end
+    return
+end
+
+assert_same_refshapes(::Union{QuadratureRule{RS}, FacetQuadratureRule{RS}}, ::Interpolation{RS}, ::Interpolation{RS}) where {RS} = nothing
+function assert_same_refshapes(qr::Union{QuadratureRule, FacetQuadratureRule}, ipf::Interpolation, ipg::Interpolation)
+    throw(
+        ArgumentError(
+            """
+            The reference shapes of the quadrature rule ($(getrefshape(qr))),
+            function interpolation ($(getrefshape(ipf))), and geometric interpolation ($(getrefshape(ipg))),
+            must be equal.
+            """
+        )
+    )
 end

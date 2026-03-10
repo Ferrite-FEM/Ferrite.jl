@@ -43,7 +43,7 @@ function push_at_index!(b::ConstructionBuffer, val, indices::Vararg{Int, N}) whe
     if r.start == 0
         # `indices...` not previously added, allocate new space for it at the end of `b.data`
         resize!(b.data, n + b.sizehint)
-        b.data[n+1] = val
+        b.data[n + 1] = val
         setindex!(b.indices, AdaptiveRange(n + 1, 1, b.sizehint), indices...)
     elseif r.ncurrent == r.nmax
         # We have used up our space, move data associated with `indices...` to the end of `b.data`
@@ -73,13 +73,13 @@ end
 Base.size(cv::ArrayOfVectorViews) = size(cv.lin_idx)
 @inline function Base.getindex(cv::ArrayOfVectorViews, linear_index::Int)
     @boundscheck checkbounds(cv.lin_idx, linear_index)
-    return @inbounds view(cv.data, cv.indices[linear_index]:(cv.indices[linear_index+1]-1))
+    return @inbounds view(cv.data, cv.indices[linear_index]:(cv.indices[linear_index + 1] - 1))
 end
 @inline function Base.getindex(cv::ArrayOfVectorViews, idx...)
     linear_index = getindex(cv.lin_idx, idx...)
     return @inbounds getindex(cv, linear_index)
 end
-Base.IndexStyle(::Type{<:ArrayOfVectorViews{<:Any, N}}) where N = Base.IndexStyle(Array{Int, N})
+Base.IndexStyle(::Type{<:ArrayOfVectorViews{<:Any, N}}) where {N} = Base.IndexStyle(Array{Int, N})
 
 # Constructors
 """
@@ -114,10 +114,10 @@ end
 
 Creates the `ArrayOfVectorViews` directly from the `ConstructionBuffer` that was manually created and filled.
 """
-function ArrayOfVectorViews(b::ConstructionBuffer{T}) where T
+function ArrayOfVectorViews(b::ConstructionBuffer{T}) where {T}
     indices = Vector{Int}(undef, length(b.indices) + 1)
     lin_idx = LinearIndices(b.indices)
-    data_length = sum(ar.ncurrent for ar in b.indices; init=0)
+    data_length = sum(ar.ncurrent for ar in b.indices; init = 0)
     data = Vector{T}(undef, data_length)
     data_index = 1
     for (idx, ar) in pairs(b.indices)

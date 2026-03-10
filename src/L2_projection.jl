@@ -30,7 +30,7 @@ end
 
 Initiate an `L2Projector` for projecting quadrature data onto
 a function space. To define the function space, add interpolations for
-differents cell sets with `add!` before `close!`ing the projector,
+different cell sets with `add!` before `close!`ing the projector,
 see the example below.
 
 The `L2Projector` acts as the integrated left hand side of the projection equation:
@@ -104,9 +104,10 @@ Add an interpolation `ip` on the cells in `set` to the `L2Projector` `proj`.
   and defaults to a quadrature rule that integrates the mass-matrix exactly for the given interpolation `ip`.
 
 """
-function add!(proj::L2Projector, set::AbstractVecOrSet{Int}, ip::Interpolation;
+function add!(
+        proj::L2Projector, set::AbstractVecOrSet{Int}, ip::Interpolation;
         qr_rhs::Union{QuadratureRule, Nothing}, qr_lhs::QuadratureRule = _mass_qr(ip)
-        )
+    )
     # Validate user input
     isclosed(proj) && error("The L2Projector is already closed")
     if qr_rhs !== nothing
@@ -162,11 +163,12 @@ function _assemble_L2_matrix!(assembler, cellvalues::CellValues, sdh::SubDofHand
     Me = zeros(n, n)
 
     function symmetrize_to_lower!(K::Matrix)
-       for i in 1:size(K, 1)
-           for j in i+1:size(K, 1)
-               K[j, i] = K[i, j]
-           end
-       end
+        for i in 1:size(K, 1)
+            for j in (i + 1):size(K, 1)
+                K[j, i] = K[i, j]
+            end
+        end
+        return
     end
 
     ## Assemble contributions from each cell
@@ -175,11 +177,11 @@ function _assemble_L2_matrix!(assembler, cellvalues::CellValues, sdh::SubDofHand
         reinit!(cellvalues, cell)
 
         ## ∭( v ⋅ u )dΩ
-        for q_point = 1:getnquadpoints(cellvalues)
+        for q_point in 1:getnquadpoints(cellvalues)
             dΩ = getdetJdV(cellvalues, q_point)
-            for j = 1:n
+            for j in 1:n
                 v = shape_value(cellvalues, q_point, j)
-                for i = 1:j
+                for i in 1:j
                     u = shape_value(cellvalues, q_point, i)
                     Me[i, j] += v ⋅ u * dΩ
                 end
@@ -251,8 +253,9 @@ function project(p::L2Projector, vars::AbstractMatrix, args...)
     return project(p, collect(eachcol(vars)), args...)
 end
 
-function _project(proj::L2Projector, vars::Union{AbstractVector{TC}, AbstractDict{Int, TC}}, qrs_rhs::Vector{<:QuadratureRule}) where
-        {TC <: AbstractVector{T}} where T <: Union{Number, AbstractTensor}
+function _project(proj::L2Projector, vars::Union{AbstractVector{TC}, AbstractDict{Int, TC}}, qrs_rhs::Vector{<:QuadratureRule}) where {
+        T <: Union{Number, AbstractTensor}, TC <: AbstractVector{T},
+    }
 
     # Sanity checks for user input
     isclosed(proj) || error("The L2Projector is not closed")
@@ -273,7 +276,7 @@ function _project(proj::L2Projector, vars::Union{AbstractVector{TC}, AbstractDic
     return _project(proj, qrs_rhs, vars, M, T)::Vector{T}
 end
 
-function _project(proj::L2Projector, qrs_rhs::Vector{<:QuadratureRule}, vars::Union{AbstractVector, AbstractDict}, M::Integer, ::Type{T}) where T
+function _project(proj::L2Projector, qrs_rhs::Vector{<:QuadratureRule}, vars::Union{AbstractVector, AbstractDict}, M::Integer, ::Type{T}) where {T}
     f = zeros(ndofs(proj.dh), M)
     for (sdh, qr_rhs) in zip(proj.dh.subdofhandlers, qrs_rhs)
         ip_fun = only(sdh.field_interpolations)
@@ -308,10 +311,10 @@ function assemble_proj_rhs!(f::Matrix, cellvalues::CellValues, sdh::SubDofHandle
         length(cell_vars) == nqp || error("The number of variables per cell doesn't match the number of quadrature points")
         reinit!(cellvalues, cell)
 
-        for q_point = 1:nqp
+        for q_point in 1:nqp
             dΩ = getdetJdV(cellvalues, q_point)
             qp_vars = cell_vars[q_point]
-            for i = 1:n
+            for i in 1:n
                 v = shape_value(cellvalues, q_point, i)
                 for j in 1:M
                     fe[i, j] += v * get_data(qp_vars, j) * dΩ
@@ -324,6 +327,7 @@ function assemble_proj_rhs!(f::Matrix, cellvalues::CellValues, sdh::SubDofHandle
             f[dof, :] += fe[num, :]
         end
     end
+    return
 end
 
 evaluate_at_grid_nodes(proj::L2Projector, vals::AbstractVector) =
@@ -335,8 +339,8 @@ _evaluate_at_grid_nodes(proj::L2Projector, vals::AbstractVector{<:Number}, vtk) 
 
 # Deal with projected tensors
 function _evaluate_at_grid_nodes(
-    proj::L2Projector, vals::AbstractVector{S}, ::Val{vtk}
-) where {order, dim, T, M, S <: Union{Tensor{order,dim,T,M}, SymmetricTensor{order,dim,T,M}}, vtk}
+        proj::L2Projector, vals::AbstractVector{S}, ::Val{vtk}
+    ) where {order, dim, T, M, S <: Union{Tensor{order, dim, T, M}, SymmetricTensor{order, dim, T, M}}, vtk}
     dh = proj.dh
     # The internal dofhandler in the projector is a scalar field, but the values in vals
     # can be any tensor field, however, the number of dofs should always match the length of vals
@@ -359,7 +363,7 @@ function _evaluate_at_grid_nodes(
     return data
 end
 
-function _evaluate_at_grid_nodes!(data, cv, sdh, u::AbstractVector{S}) where S
+function _evaluate_at_grid_nodes!(data, cv, sdh, u::AbstractVector{S}) where {S}
     ue = zeros(S, getnbasefunctions(cv))
     for cell in CellIterator(sdh)
         reinit!(cv, cell)
