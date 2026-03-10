@@ -29,7 +29,7 @@
 #       commutative.
 #     - **Assembler task**: By using a designated task for the assembling we (obviously)
 #       ensure that only a single task assembles. The worker tasks (the tasks computing the
-#       element contributions) would then hand off their results to the assemly task. This
+#       element contributions) would then hand off their results to the assembly task. This
 #       can be a useful approach if computing the element contributions is much slower than
 #       the assembly -- otherwise the assembler task can't keep up with the worker tasks.
 #       There might also be some extra overhead because of task switching in the scheduler.
