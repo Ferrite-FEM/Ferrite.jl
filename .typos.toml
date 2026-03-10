@@ -5,14 +5,14 @@ extend-exclude = ["*.svg", "*.toml"]
 ue = "ue"
 ba = "ba"
 nd = "nd"
-Numer = "Numer"
-Secrest = "Secrest"
 
 [type.qrtables]
-extend-glob = ["**/gaussquad_*_table.jl"]
+extend-glob = ["**/gaussquad_*_table.jl", "**/generate_quadrature.jl"]
 
 [type.qrtables.extend-words]
 Methode = "Methode"
+Numer = "Numer"
+Secrest = "Secrest"
 
 [type.feintro]
 extend-glob = ["**/fe_intro.md"]
