@@ -202,7 +202,7 @@
         rm(dofhandlerfilename * ".vtu")
         rm(dofhandler_views_filename * ".vtu")
     end
-    @testset "discontinous_projection" begin
+    @testset "discontinuous_projection" begin
         mktempdir() do tmp
             grid = generate_grid(Quadrilateral, (2, 2), Vec{2}((0.0, 0.0)), Vec{2}((1.0, 1.0)))
             qr = QuadratureRule{RefQuadrilateral}(2)
@@ -227,7 +227,7 @@
             end
         end
     end
-    @testset "discontinous_embedded" begin
+    @testset "discontinuous_embedded" begin
         mktempdir() do tmp
             grid = generate_grid(Line, (2,), Vec((0.0, 0.0)), Vec((1.0, 0.5)))
 
