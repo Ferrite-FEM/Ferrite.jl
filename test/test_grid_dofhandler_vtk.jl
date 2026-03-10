@@ -181,6 +181,14 @@ end
 
     @test getcells(grid, "cell_set") == [getcells(grid, 1)]
 
+    # cellnodes via empty DofHandler
+    nodeids = zeros(Int, 9)
+    dh = DofHandler(grid)
+    close!(dh)
+    Ferrite.cellnodes!(nodeids, dh, 1)
+    # Note that the return types typically differ (Vector vs Tuple)
+    @test all(nodeids .== Ferrite.get_node_ids(getcells(grid, 1)))
+
     # CellIterator on a grid without DofHandler
     grid = generate_grid(Triangle, (4, 4))
     n = 0
@@ -545,7 +553,6 @@ end
         Line((6, 7)),
     ]
     nodes = [Node(coord) for coord in zeros(Vec{2, Float64}, 18)]
-    grid = Grid(cells, nodes)
     @test_throws ErrorException ExclusiveTopology(grid)
     # topology = ExclusiveTopology(grid)
     # @test_throws ArgumentError Ferrite.facetskeleton(topology, grid)
@@ -584,7 +591,7 @@ end
     @test Set(Ferrite.getstencil(stars, quadgrid, VertexIndex(5, 4))) == Set([VertexIndex(4, 2), VertexIndex(4, 4), VertexIndex(5, 1), VertexIndex(5, 3), VertexIndex(7, 1), VertexIndex(7, 3), VertexIndex(8, 2), VertexIndex(8, 4), VertexIndex(4, 3), VertexIndex(5, 4), VertexIndex(7, 2), VertexIndex(8, 1)])
     @test Set(Ferrite.toglobal.((quadgrid,), Ferrite.getstencil(stars, quadgrid, VertexIndex(1, 1)))) == Set([1, 2, 5])
     @test Set(Ferrite.toglobal.((quadgrid,), Ferrite.getstencil(stars, quadgrid, VertexIndex(2, 1)))) == Set([2, 1, 6, 3])
-    @test Set(Ferrite.toglobal.((quadgrid,), Ferrite.getstencil(stars, quadgrid, VertexIndex(5, 4)))) == Set([10, 6, 9, 11, 14])
+    @test Set(Ferrite.toglobal(quadgrid, collect(Ferrite.getstencil(stars, quadgrid, VertexIndex(5, 4))))) == Set([10, 6, 9, 11, 14])
 
     face_skeleton = Ferrite.facetskeleton(topology, quadgrid)
     @test Set(face_skeleton) == Set(
