@@ -90,8 +90,8 @@ import LinearAlgebra: Symmetric
         # SparseMatrix assembler
         K = spzeros(T, 10, 10)
         f = zeros(T, 10)
-        ke = [rand(T, 4, 4), rand(4, 4)]
-        fe = [rand(T, 4), rand(4)]
+        ke = [rand(T, 4, 4), rand(T, 4, 4)]
+        fe = [rand(T, 4), rand(T, 4)]
         dofs = [[1, 5, 3, 7], [10, 8, 2, 5]]
         for i in 1:2
             K[dofs[i], dofs[i]] += ke[i]
