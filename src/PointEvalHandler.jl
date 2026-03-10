@@ -115,6 +115,7 @@ cellcenter(::Type{<:RefSimplex{dim}}, _::Type{T}) where {dim, T} = Vec{dim, T}((
 
 _solve_helper(A::Tensor{2, dim}, b::Vec{dim}) where {dim} = inv(A) ⋅ b
 _solve_helper(A::SMatrix{idim, odim}, b::Vec{idim, T}) where {odim, idim, T} = Vec{odim, T}(pinv(A) * b)
+_solve_helper(A::SMatrix{idim, odim}, b::Vec{idim, T}) where {odim, idim, T <: ForwardDiff.Dual} = Vec{odim, T}(inv(A' * A) * (A' * b))
 
 # See https://discourse.julialang.org/t/finding-the-value-of-a-field-at-a-spatial-location-in-juafem/38975/2
 function find_local_coordinate(interpolation::Interpolation{refshape}, cell_coordinates::Vector{<:Vec{sdim}}, global_coordinate::Vec{sdim}, strategy::NewtonLineSearchPointFinder; warn::Bool = false) where {sdim, refshape}
