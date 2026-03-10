@@ -73,60 +73,60 @@ import LinearAlgebra: Symmetric
         @test_throws ArgumentError assemble!(assembler, rdofs, Ke, fe) # Not in sparsity pattern
         @test all(K[rdofs, cdofs] .== 2Ke)
         @test all(f[rdofs] .== 2fe)
+
+        # CSCAssembler: Assemble rectangular part in quadratic matrix
+        K = SparseMatrixCSC(6, 6, [K.colptr..., 7, 7, 7], K.rowval, K.nzval)
+        assembler = start_assemble(K, f)
+        rdofs = [1, 4, 6]
+        cdofs = [1, 3]
+        Ke = rand(T, length(rdofs), length(cdofs))
+        fe = rand(T, length(rdofs))
+        assemble!(assembler, rdofs, cdofs, Ke, fe)
+        assemble!(assembler, rdofs, cdofs, Ke, fe)
+        @test_throws ArgumentError assemble!(assembler, rdofs, Ke, fe) # Not in sparsity pattern
+        @test all(K[rdofs, cdofs] .== 2Ke)
+        @test all(f[rdofs] .== 2fe)
+
+        # SparseMatrix assembler
+        K = spzeros(T, 10, 10)
+        f = zeros(T, 10)
+        ke = [rand(T, 4, 4), rand(4, 4)]
+        fe = [rand(T, 4), rand(4)]
+        dofs = [[1, 5, 3, 7], [10, 8, 2, 5]]
+        for i in 1:2
+            K[dofs[i], dofs[i]] += ke[i]
+            f[dofs[i]] += fe[i]
+        end
+
+        Kc = copy(K)
+        fc = copy(f)
+
+        assembler = start_assemble(Kc)
+        @test all(iszero, Kc.nzval) # start_assemble zeroes
+        for i in 1:2
+            assemble!(assembler, dofs[i], ke[i])
+        end
+        @test Kc ≈ K
+
+        assembler = start_assemble(Kc, fc)
+        @test all(iszero, Kc.nzval)
+        @test all(iszero, fc)
+        for i in 1:2
+            assemble!(assembler, dofs[i], ke[i], fe[i])
+        end
+        @test Kc ≈ K
+        @test fc ≈ f
+
+        # No zero filling
+        assembler = start_assemble(Kc, fc; fillzero = false)
+        @test Kc ≈ K
+        @test fc ≈ f
+        for i in 1:2
+            assemble!(assembler, dofs[i], ke[i], fe[i])
+        end
+        @test Kc ≈ 2K
+        @test fc ≈ 2f
     end
-
-    # CSCAssembler: Assemble rectangular part in quadratic matrix
-    K = SparseMatrixCSC(6, 6, [K.colptr..., 7, 7, 7], K.rowval, K.nzval)
-    assembler = start_assemble(K, f)
-    rdofs = [1, 4, 6]
-    cdofs = [1, 3]
-    Ke = rand(length(rdofs), length(cdofs))
-    fe = rand(length(rdofs))
-    assemble!(assembler, rdofs, cdofs, Ke, fe)
-    assemble!(assembler, rdofs, cdofs, Ke, fe)
-    @test_throws ArgumentError assemble!(assembler, rdofs, Ke, fe) # Not in sparsity pattern
-    @test all(K[rdofs, cdofs] .== 2Ke)
-    @test all(f[rdofs] .== 2fe)
-
-    # SparseMatrix assembler
-    K = spzeros(10, 10)
-    f = zeros(10)
-    ke = [rand(4, 4), rand(4, 4)]
-    fe = [rand(4), rand(4)]
-    dofs = [[1, 5, 3, 7], [10, 8, 2, 5]]
-    for i in 1:2
-        K[dofs[i], dofs[i]] += ke[i]
-        f[dofs[i]] += fe[i]
-    end
-
-    Kc = copy(K)
-    fc = copy(f)
-
-    assembler = start_assemble(Kc)
-    @test all(iszero, Kc.nzval) # start_assemble zeroes
-    for i in 1:2
-        assemble!(assembler, dofs[i], ke[i])
-    end
-    @test Kc ≈ K
-
-    assembler = start_assemble(Kc, fc)
-    @test all(iszero, Kc.nzval)
-    @test all(iszero, fc)
-    for i in 1:2
-        assemble!(assembler, dofs[i], ke[i], fe[i])
-    end
-    @test Kc ≈ K
-    @test fc ≈ f
-
-    # No zero filling
-    assembler = start_assemble(Kc, fc; fillzero = false)
-    @test Kc ≈ K
-    @test fc ≈ f
-    for i in 1:2
-        assemble!(assembler, dofs[i], ke[i], fe[i])
-    end
-    @test Kc ≈ 2K
-    @test fc ≈ 2f
 
     # Error paths
     assembler = start_assemble(Kc, fc)
