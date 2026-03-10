@@ -177,7 +177,7 @@ Ferrite.adjust_dofs_during_distribution(::QTI) = false
 ```
 
 Finally, our interpolation results in continuous function values across
-cell borders, but the derivatives are discontinous. Hence, it describes
+cell borders, but the derivatives are discontinuous. Hence, it describes
 a $H_1$ conformity,
 ```@example InterpolationExample
 Ferrite.conformity(::QTI) = Ferrite.H1Conformity()

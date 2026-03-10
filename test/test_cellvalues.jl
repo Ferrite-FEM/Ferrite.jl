@@ -111,7 +111,7 @@ end
             end
 
             # Check if the non-linear mapping is correct
-            # Only do this for one interpolation becuase it relise on AD on "iterative function"
+            # Only do this for one interpolation because it relies on AD on "iterative function"
             if scalar_interpol === Lagrange{RefQuadrilateral, 2}()
                 coords_nl = [x + rand(x) * 0.01 for x in coords] # add some displacement to nodes
                 reinit!(cv, coords_nl)
@@ -193,7 +193,7 @@ end
             ip_geo = geometric_interpolation(CT)
             RefShape = Ferrite.getrefshape(ip_fun)
             x_ref = Ferrite.reference_coordinates(ip_geo)
-            # Random cell coordinates, but small pertubation to ensure 1-1 mapping.
+            # Random cell coordinates, but small perturbation to ensure 1-1 mapping.
             cell_coords = (1 .+ rand(length(x_ref)) / 10) .* x_ref
 
             function calculate_value_differentiable(ξ::Vec; i = 1)
@@ -303,7 +303,7 @@ end
         # Reinitialization
         cell = Quadrilateral((1, 2, 3, 4))
         ref_coords = Ferrite.reference_coordinates(Ferrite.geometric_interpolation(cmv))
-        x = map(xref -> xref + rand(typeof(xref)) / 5, ref_coords) # Random pertubation
+        x = map(xref -> xref + rand(typeof(xref)) / 5, ref_coords) # Random perturbation
         reinit!.((cvu, cvp, cmv, cmv_u, cmv3), (x,))
         reinit!.((cvrt, cmv_rt), (cell,), (x,))
 

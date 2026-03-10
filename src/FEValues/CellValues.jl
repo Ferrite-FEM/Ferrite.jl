@@ -169,7 +169,7 @@ single function interpolation as their `FunctionValues` are aliased.
 **Arguments:**
 * `T`: an optional argument (default to `Float64`) to determine the type the internal data is stored as.
 * `quad_rule`: an instance of a [`QuadratureRule`](@ref)
-* `func_interpols`: A named tuple with entires of type `Interpolation`, used to interpolate the approximated function identified by the key in `func_interpols`
+* `func_interpols`: A named tuple with entries of type `Interpolation`, used to interpolate the approximated function identified by the key in `func_interpols`
 * `geom_interpol`: an optional instance of a [`Interpolation`](@ref) which is used to interpolate the geometry.
   By default linear Lagrange interpolation is used. For embedded elements the geometric interpolations should
   be vectorized to the spatial dimension.

@@ -7,3 +7,9 @@ ba = "ba"
 nd = "nd"
 Numer = "Numer"
 Secrest = "Secrest"
+
+[type.qrtables]
+extend-glob=["src/Quadrature/gaussquad_*_table.jl"]
+
+[type.qrtables.extend-words]
+Methode = "Methode"

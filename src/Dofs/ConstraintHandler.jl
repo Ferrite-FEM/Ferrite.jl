@@ -71,7 +71,7 @@ by the FE approximation on the facet, ``\Gamma^f``. The arguments to the functio
 the coordinate, ``\boldsymbol{x}``, the time, ``t``, and the facet normal, ``\boldsymbol{n}``.
 The quadrature rule is automatically created, but the default order, `qr_order = 2 * ip_order`
 (may be refined in future releases),
-where `ip_order` is the order of the interpolation, can be overrided if desired.
+where `ip_order` is the order of the interpolation, can be overridden if desired.
 
 # H(div) interpolations
 For H(div), we want to prescribe the normal flux, ``q_\mathrm{n} = f(\boldsymbol{x}, t, \boldsymbol{n})``.
