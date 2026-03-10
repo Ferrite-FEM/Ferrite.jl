@@ -207,7 +207,7 @@ nothing # hide
 #     For a different problem setup where some cells might take longer to process (perhaps
 #     they experience plastic deformation and we need to solve a local problem) we might
 #     benefit from load balancing. The `DynamicScheduler` can be used also for load
-#     balancing by specifiying `nchunks` or `chunksize`. However, the `DynamicScheduler`
+#     balancing by specifying `nchunks` or `chunksize`. However, the `DynamicScheduler`
 #     will always spawn `nchunks` tasks which can become costly since we are allocating
 #     scratch data for every task. To limit the number of tasks, while allowing for more
 #     than `ntasks` chunks, we can use the `GreedyScheduler` *with chunking*. For example,
