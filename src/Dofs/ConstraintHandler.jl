@@ -133,51 +133,51 @@ function ProjectedDirichlet(field_name::Symbol, facets::AbstractVecOrSet, f::Fun
     return ProjectedDirichlet(f, convert_to_orderedset(facets), field_name, qr_order, nothing, nothing)
 end
 
-const DofCoefficients{T} = Vector{Pair{Int, T}}
+const DofCoefficients{Tv, Ti} = Vector{Pair{Ti, Tv}}
 """
-    AffineConstraint(constrained_dof::Int, entries::Vector{Pair{Int,T}}, b::T) where T
+    AffineConstraint(constrained_dof::Integer, entries::Vector{Pair{Integer,T}}, b::T) where T
 
 Define an affine/linear constraint to constrain one degree of freedom, `u[i]`,
 such that `u[i] = ∑(u[j] * a[j]) + b`,
 where `i=constrained_dof` and each element in `entries` are `j => a[j]`
 """
-struct AffineConstraint{T}
-    constrained_dof::Int
-    entries::DofCoefficients{T} # masterdofs and factors
-    b::T # inhomogeneity
+struct AffineConstraint{Tv, Ti}
+    constrained_dof::Ti
+    entries::DofCoefficients{Tv, Ti} # masterdofs and factors
+    b::Tv # inhomogeneity
 end
 
 """
-    ConstraintHandler([T=Float64], dh::AbstractDofHandler)
+    ConstraintHandler([Tv=Float64, [Ti=Int64]], dh::AbstractDofHandler)
 
 A collection of constraints associated with the dof handler `dh`.
-`T` is the numeric type for stored values.
+`Tv` is the numeric type for stored values and `Ti` the numric type for stored indices.
 """
-mutable struct ConstraintHandler{DH <: AbstractDofHandler, T}
+mutable struct ConstraintHandler{DH <: AbstractDofHandler, Tv, Ti}
     const dbcs::Vector{Dirichlet}
     const projbcs::Vector{ProjectedDirichlet}
-    const prescribed_dofs::Vector{Int}
-    const free_dofs::Vector{Int}
-    const inhomogeneities::Vector{T}
+    const prescribed_dofs::Vector{Ti}
+    const free_dofs::Vector{Ti}
+    const inhomogeneities::Vector{Tv}
     # Store the original constant inhomogeneities for affine constraints used to compute
     # "effective" inhomogeneities in `update!` and then stored in .inhomogeneities.
-    const affine_inhomogeneities::Vector{Union{Nothing, T}}
+    const affine_inhomogeneities::Vector{Union{Nothing, Tv}}
     # `nothing` for pure DBC constraint, otherwise affine constraint
-    const dofcoefficients::Vector{Union{Nothing, DofCoefficients{T}}}
+    const dofcoefficients::Vector{Union{Nothing, DofCoefficients{Tv}}}
     # global dof -> index into dofs and inhomogeneities and dofcoefficients
-    const dofmapping::Dict{Int, Int}
-    const bcvalues::Vector{BCValues{T}}
+    const dofmapping::Dict{Ti, Ti}
+    const bcvalues::Vector{BCValues{Tv}}
     const dh::DH
     closed::Bool
 end
 
-ConstraintHandler(dh::AbstractDofHandler) = ConstraintHandler(Float64, dh)
-
-function ConstraintHandler(::Type{T}, dh::AbstractDofHandler) where {T <: Number}
+ConstraintHandler(dh::AbstractDofHandler) = ConstraintHandler(Float64, Int64, dh)
+ConstraintHandler(::Type{Tv}, dh::AbstractDofHandler) where {Tv} = ConstraintHandler(Tv, Int64, dh)
+function ConstraintHandler(::Type{Tv}, ::Type{Ti}, dh::AbstractDofHandler) where {Tv <: Number, Ti <: Integer}
     @assert isclosed(dh)
     return ConstraintHandler(
-        Dirichlet[], ProjectedDirichlet[], Int[], Int[], T[], Union{Nothing, T}[],
-        Union{Nothing, DofCoefficients{T}}[], Dict{Int, Int}(), BCValues{T}[], dh, false,
+        Dirichlet[], ProjectedDirichlet[], Ti[], Ti[], Tv[], Union{Nothing, Tv}[],
+        Union{Nothing, DofCoefficients{Tv}}[], Dict{Ti, Ti}(), BCValues{Tv}[], dh, false,
     )
 end
 
@@ -186,9 +186,9 @@ end
 
 Stores the constrained columns and mean of the diagonal of stiffness matrix `A`.
 """
-struct RHSData{T}
-    m::T
-    constrained_columns::SparseMatrixCSC{T, Int}
+struct RHSData{Tv, Ti}
+    m::Tv
+    constrained_columns::SparseMatrixCSC{Tv, Ti}
 end
 
 """
@@ -261,7 +261,7 @@ prescribed_dofs(ch::ConstraintHandler) = ch.prescribed_dofs
 
 # Equivalent to `copy!(out, setdiff(1:n_entries, diff))`, but requires that
 # `issorted(diff)` and that `1 ≤ diff[1] ≤ diff[end] ≤ n_entries`
-function _sorted_setdiff!(out::Vector{Int}, n_entries::Int, diff::Vector{Int})
+function _sorted_setdiff!(out::Vector{Ti}, n_entries::Integer, diff::Vector{Ti}) where {Ti}
     n_diff = length(diff)
     resize!(out, n_entries - n_diff)
     diff_ind = out_ind = 1
@@ -281,7 +281,7 @@ end
 
 Close and finalize the `ConstraintHandler`.
 """
-function close!(ch::ConstraintHandler)
+function close!(ch::ConstraintHandler{<:Any, <:Any, Ti}) where {Ti}
     @assert(!isclosed(ch))
     @assert(allunique(ch.prescribed_dofs))
 
@@ -355,7 +355,7 @@ Add a constrained dof directly to the `ConstraintHandler`.
 This function checks if the `constrained_dof` is already constrained, and overrides the old
 constraint if true.
 """
-function add_prescribed_dof!(ch::ConstraintHandler, constrained_dof::Int, inhomogeneity, dofcoefficients = nothing)
+function add_prescribed_dof!(ch::ConstraintHandler, constrained_dof::Integer, inhomogeneity, dofcoefficients = nothing)
     @assert(!isclosed(ch))
     i = get(ch.dofmapping, constrained_dof, 0)
     if i != 0
@@ -418,7 +418,7 @@ function _local_facet_dofs_for_bc(interpolation, field_dim, components, offset, 
     return local_facet_dofs, local_facet_dofs_offset
 end
 
-function _add!(ch::ConstraintHandler, dbc::Dirichlet, bcnodes::AbstractVecOrSet{Int}, interpolation::Interpolation, field_dim::Int, offset::Int, bcvalue::BCValues, cellset::AbstractVecOrSet{Int} = OrderedSet{Int}(1:getncells(get_grid(ch.dh))))
+function _add!(ch::ConstraintHandler{<:Any, <:Any, Ti}, dbc::Dirichlet, bcnodes::AbstractVecOrSet{<:Integer}, interpolation::Interpolation, field_dim::Int, offset::Integer, bcvalue::BCValues, cellset::AbstractVecOrSet{<:Integer} = OrderedSet{Int}(1:getncells(get_grid(ch.dh)))) where {Ti}
     grid = get_grid(ch.dh)
     if interpolation !== geometric_interpolation(getcelltype(grid, first(cellset)))
         @warn("adding constraint to nodeset is not recommended for sub/super-parametric approximations.")
@@ -427,7 +427,7 @@ function _add!(ch::ConstraintHandler, dbc::Dirichlet, bcnodes::AbstractVecOrSet{
     ncomps = length(dbc.components)
     nnodes = getnnodes(grid)
     interpol_points = getnbasefunctions(interpolation)
-    node_dofs = zeros(Int, ncomps, nnodes)
+    node_dofs = zeros(Ti, ncomps, nnodes)
     visited = falses(nnodes)
     for cell in CellIterator(ch.dh, cellset) # only go over cells that belong to current SubDofHandler
         for idx in 1:min(interpol_points, length(cell.nodes))
@@ -443,7 +443,7 @@ function _add!(ch::ConstraintHandler, dbc::Dirichlet, bcnodes::AbstractVecOrSet{
         end
     end
 
-    constrained_dofs = Int[]
+    constrained_dofs = Ti[]
     sizehint!(constrained_dofs, ncomps * length(bcnodes))
     sizehint!(dbc.local_facet_dofs, length(bcnodes))
     for node in bcnodes
@@ -516,9 +516,9 @@ end
 
 # for facets, vertices, faces and edges
 function _update!(
-        inhomogeneities::Vector{T}, f::Function, boundary_entities::AbstractVecOrSet{<:BoundaryIndex}, local_facet_dofs::Vector{Int}, local_facet_dofs_offset::Vector{Int},
-        components::Vector{Int}, dh::AbstractDofHandler, boundaryvalues::BCValues,
-        dofmapping::Dict{Int, Int}, dofcoefficients::Vector{Union{Nothing, DofCoefficients{T}}}, time::Real
+        inhomogeneities::Vector{T}, f::Function, boundary_entities::AbstractVecOrSet{<:BoundaryIndex}, local_facet_dofs::Vector{<:Integer}, local_facet_dofs_offset::Vector{<:Integer},
+        components::Vector{<:Integer}, dh::AbstractDofHandler, boundaryvalues::BCValues,
+        dofmapping::Dict{<:Integer, <:Integer}, dofcoefficients::Vector{Union{Nothing, DofCoefficients{T}}}, time::Real
     ) where {T}
 
     cc = CellCache(dh, UpdateFlags(; nodes = false, coords = true, dofs = true))
@@ -556,9 +556,9 @@ end
 
 # for nodes
 function _update!(
-        inhomogeneities::Vector{T}, f::Function, ::AbstractVecOrSet{Int}, nodeidxs::Vector{Int}, globaldofs::Vector{Int},
-        components::Vector{Int}, dh::AbstractDofHandler, facetvalues::BCValues,
-        dofmapping::Dict{Int, Int}, dofcoefficients::Vector{Union{Nothing, DofCoefficients{T}}}, time::Real
+        inhomogeneities::Vector{T}, f::Function, ::AbstractVecOrSet{<:Integer}, nodeidxs::Vector{<:Integer}, globaldofs::Vector{<:Integer},
+        components::Vector{<:Integer}, dh::AbstractDofHandler, facetvalues::BCValues,
+        dofmapping::Dict{<:Integer, <:Integer}, dofcoefficients::Vector{Union{Nothing, DofCoefficients{T}}}, time::Real
     ) where {T}
     counter = 1
     for nodenumber in nodeidxs
@@ -770,18 +770,18 @@ end
 end
 
 """
-    _condense!(K::AbstractSparseMatrix, f::AbstractVector, dofcoefficients::Vector{Union{Nothing, DofCoefficients{T}}}, dofmapping::Dict{Int, Int}, sym::Bool = false)
+    _condense!(K::AbstractSparseMatrix, f::AbstractVector, dofcoefficients::Vector{Union{Nothing, DofCoefficients{T}}}, dofmapping::Dict{<:Integer, <:Integer}, sym::Bool = false)
 
 Condenses affine constraints K := C'*K*C and f := C'*f in-place, assuming the sparsity pattern is correct.
 """
-function _condense!(K::AbstractSparseMatrix, f::AbstractVector, dofcoefficients::Vector{Union{Nothing, DofCoefficients{T}}}, dofmapping::Dict{Int, Int}, sym::Bool = false) where {T}
+function _condense!(K::AbstractSparseMatrix, f::AbstractVector, dofcoefficients::Vector{Union{Nothing, DofCoefficients{T}}}, dofmapping::Dict{<:Integer, <:Integer}, sym::Bool = false) where {T}
     # Return early if there are no non-trivial affine constraints
     any(i -> !(i === nothing || isempty(i)), dofcoefficients) || return
     error("condensation of ::$(typeof(K)) matrix not supported")
 end
 
 # Condenses K and f: C'*K*C, C'*f, in-place assuming the sparsity pattern is correct
-function _condense!(K::SparseMatrixCSC, f::AbstractVector, dofcoefficients::Vector{Union{Nothing, DofCoefficients{T}}}, dofmapping::Dict{Int, Int}, sym::Bool = false) where {T}
+function _condense!(K::SparseMatrixCSC, f::AbstractVector, dofcoefficients::Vector{Union{Nothing, DofCoefficients{T}}}, dofmapping::Dict{<:Integer, <:Integer}, sym::Bool = false) where {T}
 
     ndofs = size(K, 1)
     condense_f = !(length(f) == 0)
@@ -936,7 +936,7 @@ end
 
 Add a `Dirichlet` boundary condition to the `ConstraintHandler`.
 """
-function add!(ch::ConstraintHandler, dbc::Dirichlet)
+function add!(ch::ConstraintHandler{<:Any, Tv, Ti}, dbc::Dirichlet) where {Tv, Ti}
     # Duplicate the Dirichlet constraint for every SubDofHandler
     dbc_added = false
     for sdh in ch.dh.subdofhandlers
@@ -967,7 +967,7 @@ function add!(ch::ConstraintHandler, dbc::Dirichlet)
             EntityType = FacetIndex
         end
         CT = getcelltype(sdh) # Same celltype enforced in SubDofHandler constructor
-        bcvalues = BCValues(interpolation, geometric_interpolation(CT), EntityType)
+        bcvalues = BCValues(Tv, Ti, interpolation, geometric_interpolation(CT), EntityType)
         # Recreate the Dirichlet(...) struct with the filtered set and call internal add!
         filtered_dbc = Dirichlet(dbc.field_name, filtered_set, dbc.f, components)
         _add!(
@@ -1102,9 +1102,9 @@ function add!(ch::ConstraintHandler, pdbc::PeriodicDirichlet)
 end
 
 function _add!(
-        ch::ConstraintHandler, pdbc::PeriodicDirichlet, interpolation::Interpolation,
-        field_dim::Int, offset::Int, is_legacy::Bool, rotation_matrix::Union{Matrix{T}, Nothing}, ::Type{dof_map_t}, iterator_f::F
-    ) where {T, dof_map_t, F <: Function}
+        ch::ConstraintHandler{<:Any, Tv, Ti}, pdbc::PeriodicDirichlet, interpolation::Interpolation,
+        field_dim::Int, offset::Int, is_legacy::Bool, rotation_matrix::Union{Matrix{Tv}, Nothing}, ::Type{dof_map_t}, iterator_f::F
+    ) where {Tv, Ti, dof_map_t, F <: Function}
     grid = get_grid(ch.dh)
     facet_map = pdbc.facet_map
 
@@ -1119,8 +1119,8 @@ function _add!(
     dof_map = Dict{dof_map_t, dof_map_t}()
 
     n = ndofs_per_cell(ch.dh, first(facet_map).mirror[1])
-    mirror_dofs = zeros(Int, n)
-    image_dofs = zeros(Int, n)
+    mirror_dofs = zeros(Ti, n)
+    image_dofs = zeros(Ti, n)
     for facet_pair in facet_map
         m = facet_pair.mirror
         i = facet_pair.image
@@ -1246,15 +1246,15 @@ function _add!(
     # Any remaining mappings are added as homogeneous AffineConstraints
     for (k, v) in dof_map
         if dof_map_t === Int
-            ac = AffineConstraint(k, [v => 1.0], inhomogeneity_map === nothing ? 0.0 : inhomogeneity_map[k])
+            ac = AffineConstraint(k, [v => one(Tv)], inhomogeneity_map === nothing ? zero(Tv) : inhomogeneity_map[k])
             add!(ch, ac)
         else
             @assert inhomogeneity_map === nothing
             @assert rotation_matrix !== nothing
             for (i, ki) in pairs(k)
                 # u_mirror = R ⋅ u_image
-                vs = Pair{Int, eltype(T)}[v[j] => rotation_matrix[i, j] for j in 1:length(v)]
-                ac = AffineConstraint(ki, vs, 0.0)
+                vs = Pair{Int, Tv}[v[j] => rotation_matrix[i, j] for j in 1:length(v)]
+                ac = AffineConstraint(ki, vs, zero(Tv))
                 add!(ch, ac)
             end
         end
@@ -1948,7 +1948,7 @@ end
 
 function _update_projected_dbc!(
         inhomogeneities::Vector{T}, f::Function, facets::AbstractVecOrSet{FacetIndex}, fv::FacetValues, facet_dofs::ArrayOfVectorViews,
-        dh::AbstractDofHandler, dofmapping::Dict{Int, Int}, dofcoefficients::Vector{Union{Nothing, DofCoefficients{T}}}, time::Real
+        dh::AbstractDofHandler, dofmapping::Dict{<:Integer, <:Integer}, dofcoefficients::Vector{Union{Nothing, DofCoefficients{T}}}, time::Real
     ) where {T}
     ip = get_base_interpolation(function_interpolation(fv)) # Ensures getting error message from `integrate_projected_dbc!`
     max_dofs_per_facet = maximum(length, dirichlet_facetdof_indices(ip))
