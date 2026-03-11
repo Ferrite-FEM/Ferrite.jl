@@ -80,6 +80,7 @@ bibtex_plugin = CitationBibliography(
             "topics/constraints.md",
             "topics/grid.md",
             "topics/export.md",
+            "topics/amr.md",
         ],
         "API reference" => [
             "Reference overview" => "reference/index.md",

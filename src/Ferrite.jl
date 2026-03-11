@@ -167,4 +167,8 @@ include("PointEvalHandler.jl")
 include("deprecations.jl")
 include("docs.jl")
 
+# Adaptiviy
+include("Adaptivity/AMR.jl")
+using .AMR
+
 end # module

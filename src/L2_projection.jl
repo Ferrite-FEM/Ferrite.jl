@@ -3,6 +3,7 @@ abstract type AbstractProjector end
 mutable struct L2Projector <: AbstractProjector
     M_cholesky #::SuiteSparse.CHOLMOD.Factor{Float64}
     dh::DofHandler
+    ch::Union{ConstraintHandler, Nothing}
     qrs_lhs::Vector{<:QuadratureRule}
     qrs_rhs::Vector{<:QuadratureRule}
 end
@@ -66,7 +67,7 @@ or with [`evaluate_at_grid_nodes`](@ref).
 """
 function L2Projector(grid::AbstractGrid)
     dh = DofHandler(grid)
-    return L2Projector(nothing, dh, QuadratureRule[], QuadratureRule[])
+    return L2Projector(nothing, dh, nothing, QuadratureRule[], QuadratureRule[])
 end
 
 """
@@ -127,12 +128,22 @@ end
     close!(proj::L2Projector)
 
 Close `proj` which assembles and calculates the left-hand-side of the projection equation, before doing a Cholesky factorization
-of the mass-matrix.
+of the mass-matrix. For `NonConformingGrid`s, a `ConformityConstraint` is automatically added to ensure continuity across hanging nodes.
 """
 function close!(proj::L2Projector)
     close!(proj.dh)
-    M = _assemble_L2_matrix(proj.dh, proj.qrs_lhs)
-    proj.M_cholesky = cholesky(Symmetric(M))
+    grid = get_grid(proj.dh)
+    if grid isa NonConformingGrid
+        ch = ConstraintHandler(proj.dh)
+        add!(ch, ConformityConstraint(:_))
+        close!(ch)
+        proj.ch = ch
+    end
+    M = _assemble_L2_matrix(proj.dh, proj.ch, proj.qrs_lhs)
+    if proj.ch !== nothing
+        apply!(M.data, proj.ch)
+    end
+    proj.M_cholesky = cholesky(M)
     return proj
 end
 
@@ -145,7 +156,19 @@ function _mass_qr(::Lagrange{shape, 2}) where {shape <: RefSimplex}
 end
 _mass_qr(ip::VectorizedInterpolation) = _mass_qr(ip.ip)
 
-function _assemble_L2_matrix(dh::DofHandler, qrs_lhs::Vector{<:QuadratureRule})
+function _assemble_L2_matrix(dh::DofHandler, ch::ConstraintHandler, qrs_lhs::Vector{<:QuadratureRule})
+    M = Symmetric(allocate_matrix(dh, ch))
+    assembler = start_assemble(M)
+    for (sdh, qr_lhs) in zip(dh.subdofhandlers, qrs_lhs)
+        ip_fun = only(sdh.field_interpolations)
+        ip_geo = geometric_interpolation(getcelltype(sdh))
+        cv = CellValues(qr_lhs, ip_fun, ip_geo; update_gradients = false)
+        _assemble_L2_matrix!(assembler, cv, sdh)
+    end
+    return M
+end
+
+function _assemble_L2_matrix(dh::DofHandler, ch::Nothing, qrs_lhs::Vector{<:QuadratureRule})
     M = Symmetric(allocate_matrix(dh))
     assembler = start_assemble(M)
     for (sdh, qr_lhs) in zip(dh.subdofhandlers, qrs_lhs)
@@ -285,8 +308,19 @@ function _project(proj::L2Projector, qrs_rhs::Vector{<:QuadratureRule}, vars::Un
         assemble_proj_rhs!(f, cv, sdh, vars)
     end
 
-    # solve for the projected nodal values
-    projected_vals = proj.M_cholesky \ f
+    if proj.ch !== nothing
+        # Non-conforming grid: apply hanging node constraints to solve
+        ch = proj.ch
+        projected_vals = similar(f)
+        for (i, col) in enumerate(eachcol(f))
+            apply!(col, ch)
+            u = proj.M_cholesky \ col
+            apply!(u, ch)
+            projected_vals[:, i] = u
+        end
+    else
+        projected_vals = proj.M_cholesky \ f
+    end
 
     # Recast to original input type
     make_T(vals) = T <: AbstractTensor ? T(Tuple(vals)) : vals[1]
