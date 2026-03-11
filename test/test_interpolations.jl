@@ -753,12 +753,17 @@ end
             dh_L2, _ = _setup_dh_fv_for_bc_test(DiscontinuousLagrange{RefTriangle, 1}()^2; nel = 1, qr_order = 1)
             dh_Hcurl_3d, _ = _setup_dh_fv_for_bc_test(Nedelec{RefTetrahedron, 1}(); nel = 1, qr_order = 1)
             for dh in (dh_H1, dh_L2, dh_Hcurl_3d)
-                dbc = ProjectedDirichlet(:u, Set([FacetIndex(1, 1)]), Returns(zero(Vec{2})))
+                dbc = ProjectedDirichlet(:u, Set([FacetIndex(1, 1)]), Returns(zero(Vec{Ferrite.getrefdim(dh)}) .+ 1))
                 ch = add!(ConstraintHandler(dh), dbc)
                 @test_throws "ProjectedDirichlet is not implemented for" close!(ch)
             end
         end
 
+		@testset "ProjectedDirichlet Returns(0)" begin
+			dh_Hcurl_3d, _ = _setup_dh_fv_for_bc_test(Nedelec{RefTetrahedron, 1}(); nel = 1, qr_order = 1)
+            dbc = ProjectedDirichlet(:u, Set([FacetIndex(1, 1)]), Returns(zero(Vec{3})))
+            ch = add!(ConstraintHandler(dh_Hcurl_3d), dbc)
+		end
     end
 
 end # testset
