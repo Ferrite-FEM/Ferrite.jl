@@ -681,3 +681,151 @@ function _allocate_matrix(::Type{SparseMatrixCSC{Tv, Ti}}, sp::AbstractSparsityP
     S = SparseMatrixCSC(getnrows(sp), getncols(sp), colptr, rowval, nzval)
     return S
 end
+
+## ================= ##
+# FastSparsityPattern #
+## ================= ##
+
+# Full `AbstractSparsityPattern` interface not supported
+mutable struct FastSparsityPattern{Ti} <: AbstractSparsityPattern
+    const rowlen::Vector{Ti} # Number of stored entries in each row
+    const marker::Vector{Ti} # Marker if column has been "visited" by certain row
+    const rowptr::Vector{Ti} # Index of stored entries at the start of each row
+    const colidx::Vector{Ti} # colidx[i] gives the column number of the ith stored entry
+    is_colidx_sorted::Bool   # Is colidx sorted for each row
+end
+function FastSparsityPattern(::Type{Ti}, ncols, nrows) where {Ti <: Integer}
+    rowlen = zeros(Ti, nrows)
+    marker = zeros(Ti, ncols)
+    rowptr = Vector{Ti}(undef, nrows + 1)
+    colidx = Vector{Ti}(undef, 0) # To be resized later
+    return FastSparsityPattern(rowlen, marker, rowptr, colidx, false)
+end
+
+FastSparsityPattern(dh::DofHandler) = FastSparsityPattern(Int, dh)
+function FastSparsityPattern(::Type{Ti}, dh::DofHandler) where {Ti}
+    sp = FastSparsityPattern(Ti, ndofs(dh), ndofs(dh))
+    # Step 1: Create cell_dof_views::ArrayOfVectorViews (would be nice in `DofHandler` directly)
+    ncells = getncells(dh.grid)
+    indices = copy(dh.cell_dofs_offset)
+    push!(indices, length(dh.cell_dofs) + 1)
+    cell_dofs_views = ArrayOfVectorViews(indices, dh.cell_dofs, LinearIndices((ncells,)))
+    # Step 2: Define mapping rownr to cells
+    row_to_cells = create_row_to_cells(cell_dofs_views, sp)
+    # Step 3: Count how many cols stored for each row
+    count_row_sizes!(sp, row_to_cells, cell_dofs_views)
+    # Step 4: Build the rowptr (indices for s)
+    build_rowptr!(sp)
+    fill_colidx!(sp, row_to_cells, cell_dofs_views)
+    return sp
+end
+
+getncols(sp::FastSparsityPattern) = length(sp.marker)
+getnrows(sp::FastSparsityPattern) = length(sp.rowlen)
+
+function create_row_to_cells(cell_dofs::ArrayOfVectorViews, sp)
+    nrows = getnrows(sp)
+    num_cells = zeros(Int, nrows)
+    # 1: Figure out how many cells are connected to each dof
+    n_connected = 0
+    @inbounds for rows in cell_dofs # dof = row
+        for row in rows
+            num_cells[row] += 1
+            n_connected += 1
+        end
+    end
+    # n_connected = sum(num_cells) better?
+
+    # 2: Create the correct datastructure
+    data = Vector{Int}(undef, n_connected)
+    indices = Vector{Int}(undef, nrows + 1)
+    indices[1] = 1
+    @inbounds for row in 1:nrows
+        indices[row + 1] = indices[row] + num_cells[row]
+    end
+    fill!(num_cells, 0) # Now we use this to count how many have been added
+    @inbounds for (cellnr, rows) in enumerate(cell_dofs)
+        for row in rows
+            data[indices[row] + num_cells[row]] = cellnr
+            num_cells[row] += 1
+        end
+    end
+    return ArrayOfVectorViews(indices, data, LinearIndices((nrows,)))
+end
+
+function count_row_sizes!(sp::FastSparsityPattern, row_to_cells::AbstractVector, cell_dofs::ArrayOfVectorViews)
+    @inbounds for row in 1:getnrows(sp)
+        for cnr in row_to_cells[row]
+            for col in cell_dofs[cnr]
+                if sp.marker[col] != row
+                    sp.marker[col] = row
+                    sp.rowlen[row] += 1
+                end
+            end
+        end
+    end
+    return sp
+end
+
+function build_rowptr!(sp)
+    sp.rowptr[1] = 1
+    @inbounds for row in 1:getnrows(sp)
+        sp.rowptr[row + 1] = sp.rowptr[row] + sp.rowlen[row]
+    end
+    return sp
+end
+
+function fill_colidx!(sp::FastSparsityPattern, row_to_cells::AbstractVector, cell_dofs::ArrayOfVectorViews)
+    resize!(sp.colidx, sp.rowptr[end] - 1) # nnz
+    fill!(sp.marker, 0)
+    @inbounds for row in 1:getnrows(sp)
+        pos = sp.rowptr[row]
+        for cnr in row_to_cells[row]
+            for col in cell_dofs[cnr]
+                if sp.marker[col] != row
+                    sp.marker[col] = row
+                    sp.colidx[pos] = col
+                    pos += 1
+                end
+            end
+        end
+    end
+    return sp
+end
+
+allocate_matrix(sp::FastSparsityPattern) = allocate_matrix(SparseMatrixCSC, sp)
+allocate_matrix(::Type{SparseMatrixCSC}, sp::FastSparsityPattern{Int}) = allocate_matrix(SparseMatrixCSC{Float64, Int}, sp)
+function allocate_matrix(::Type{<:SparseMatrixCSC{Tv, Ti}}, sp::FastSparsityPattern{Ti}) where {Ti, Tv}
+    nnz = length(sp.colidx)
+    ncols = getncols(sp)
+    nrows = getnrows(sp)
+
+    # Number of stored entries per column
+    collen = zeros(Ti, ncols)
+    @inbounds for col in sp.colidx
+        collen[col] += 1
+    end
+
+    # Index of stored entries at the start of each column
+    colptr = Vector{Ti}(undef, ncols + 1)
+    colptr[1] = 1
+    @inbounds for col in 1:ncols
+        colptr[col + 1] = colptr[col] + collen[col]
+    end
+
+    # Build rowidx[i] giving the row number of the ith stored entry
+    rowidx = Vector{Ti}(undef, nnz)
+    next = copy(colptr)
+    @inbounds for row in 1:nrows
+        for p in sp.rowptr[row]:(sp.rowptr[row + 1] - 1)
+            col = sp.colidx[p]
+            q = next[col]
+            rowidx[q] = row
+            next[col] = q + 1
+            # For a given col, next[col] is increasing, and row is
+            # increasing in the outer loop -> rowidx sorted for each col
+        end
+    end
+    nzval = zeros(Tv, nnz)
+    return SparseMatrixCSC(nrows, ncols, colptr, rowidx, nzval)
+end
