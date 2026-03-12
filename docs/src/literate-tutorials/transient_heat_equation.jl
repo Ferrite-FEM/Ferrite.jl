@@ -35,22 +35,28 @@
 # ```
 # The semidiscrete weak form is given by
 # ```math
-# \int_{\Omega}v \frac{\partial u}{\partial t} \ \mathrm{d}\Omega + \int_{\Omega} k \nabla v \cdot \nabla u \ \mathrm{d}\Omega = \int_{\Omega} f v \ \mathrm{d}\Omega,
+# \int_{\Omega}\delta u \frac{\partial u}{\partial t} \ \mathrm{d}\Omega + \int_{\Omega} k \nabla \delta u \cdot \nabla u \ \mathrm{d}\Omega = \int_{\Omega} f \delta u \ \mathrm{d}\Omega,
 # ```
-# where $v$ is a suitable test function. Now, we still need to discretize the time derivative. An implicit Euler scheme is applied,
+# where $\delta u$ is a suitable test function. Now, we still need to discretize the time derivative. An implicit Euler scheme is applied,
 # which yields:
 # ```math
-# \int_{\Omega} v\, u_{n+1}\ \mathrm{d}\Omega + \Delta t\int_{\Omega} k \nabla v \cdot \nabla u_{n+1} \ \mathrm{d}\Omega = \Delta t\int_{\Omega} f v \ \mathrm{d}\Omega + \int_{\Omega} v \, u_{n} \ \mathrm{d}\Omega.
+# \int_{\Omega} \delta u\, u_{n+1}\ \mathrm{d}\Omega + \Delta t\int_{\Omega} k \nabla \delta u \cdot \nabla u_{n+1} \ \mathrm{d}\Omega = \Delta t\int_{\Omega} f \delta u \ \mathrm{d}\Omega + \int_{\Omega} \delta u \, u_{n} \ \mathrm{d}\Omega.
 # ```
 # If we assemble the discrete operators, we get the following algebraic system:
 # ```math
 # \mathbf{M} \mathbf{u}_{n+1} + Δt \mathbf{K} \mathbf{u}_{n+1} = Δt \mathbf{f} + \mathbf{M} \mathbf{u}_{n}
 # ```
+# Here, `M` refers to the so called mass matrix, which always occurs in time related terms, i.e.
+# ```math
+# M_{ij} = \int_{\Omega} \delta u_i \, u_j \ \mathrm{d}\Omega,
+# ```
+# where $u_j$ and $\delta u_i$ are the shape functions of the trial and test functions, respectively.
 # In this example we apply the boundary conditions to the assembled discrete operators (mass matrix $\mathbf{M}$ and stiffnes matrix $\mathbf{K}$)
 # only once. We utilize the fact that in finite element computations Dirichlet conditions can be applied by
 # zero out rows and columns that correspond
 # to a prescribed dof in the system matrix ($\mathbf{A} = Δt \mathbf{K} + \mathbf{M}$) and setting the value of the right-hand side vector to the value
-# of the Dirichlet condition. Thus, we only need to apply in every time step the Dirichlet condition to the right-hand side of the problem.
+# of the Dirichlet condition. Thus, we only need to apply in every time step the Dirichlet condition to the right-hand side of the problem. For more details 
+# on the derivation and discretisation, see  the [Introduction to FEM](@ref fe-intro).
 #-
 # ## Commented program
 #
@@ -75,11 +81,6 @@ add!(dh, :u, ip)
 close!(dh);
 
 # By means of the `DofHandler` we can allocate the needed `SparseMatrixCSC`.
-# `M` refers here to the so called mass matrix, which always occurs in time related terms, i.e.
-# ```math
-# M_{ij} = \int_{\Omega} v_i \, u_j \ \mathrm{d}\Omega,
-# ```
-# where $u_i$ and $v_j$ are trial and test functions, respectively.
 K = allocate_matrix(dh);
 M = allocate_matrix(dh);
 # We also preallocate the right hand side
@@ -107,18 +108,21 @@ close!(ch)
 update!(ch, 0.0);
 
 # ### Assembling the linear system
-# As in the heat equation example we define a `doassemble!` function that assembles the diffusion parts of the equation:
-function doassemble_K!(K::SparseMatrixCSC, f::Vector, cellvalues::CellValues, dh::DofHandler)
+# As in the [heat equation example](@ref heat_equation.jl) we define a `doassemble!` function that assembles the diffusion and diffusive parts of the equation:
+function doassemble!(K::SparseMatrixCSC, M::SparseMatrixCSC, f::Vector, cellvalues::CellValues, dh::DofHandler)
 
     n_basefuncs = getnbasefunctions(cellvalues)
     Ke = zeros(n_basefuncs, n_basefuncs)
+    Me = zeros(n_basefuncs, n_basefuncs)
     fe = zeros(n_basefuncs)
 
     assembler = start_assemble(K, f)
-
+    assembler_M = start_assemble(M)
+    
     for cell in CellIterator(dh)
 
         fill!(Ke, 0)
+        fill!(Me, 0)
         fill!(fe, 0)
 
         reinit!(cellvalues, cell)
@@ -127,56 +131,27 @@ function doassemble_K!(K::SparseMatrixCSC, f::Vector, cellvalues::CellValues, dh
             dΩ = getdetJdV(cellvalues, q_point)
 
             for i in 1:n_basefuncs
-                v = shape_value(cellvalues, q_point, i)
-                ∇v = shape_gradient(cellvalues, q_point, i)
-                fe[i] += 0.1 * v * dΩ
+                δu = shape_value(cellvalues, q_point, i)
+                ∇δu = shape_gradient(cellvalues, q_point, i)
+                fe[i] += 0.1 * δu * dΩ
                 for j in 1:n_basefuncs
+                    u = shape_value(cellvalues, q_point, j)
                     ∇u = shape_gradient(cellvalues, q_point, j)
-                    Ke[i, j] += 1.0e-3 * (∇v ⋅ ∇u) * dΩ
+                    Ke[i, j] += 1.0e-3 * (∇δu ⋅ ∇u) * dΩ
+                    Me[i, j] += (δu * u) * dΩ
                 end
             end
         end
 
         assemble!(assembler, celldofs(cell), Ke, fe)
+        assemble!(assembler_M, celldofs(cell), Me)
     end
-    return K, f
-end
-#md nothing # hide
-# In addition to the diffusive part, we also need a function that assembles the mass matrix `M`.
-function doassemble_M!(M::SparseMatrixCSC, cellvalues::CellValues, dh::DofHandler)
-
-    n_basefuncs = getnbasefunctions(cellvalues)
-    Me = zeros(n_basefuncs, n_basefuncs)
-
-    assembler = start_assemble(M)
-
-    for cell in CellIterator(dh)
-
-        fill!(Me, 0)
-
-        reinit!(cellvalues, cell)
-
-        for q_point in 1:getnquadpoints(cellvalues)
-            dΩ = getdetJdV(cellvalues, q_point)
-
-            for i in 1:n_basefuncs
-                v = shape_value(cellvalues, q_point, i)
-                for j in 1:n_basefuncs
-                    u = shape_value(cellvalues, q_point, j)
-                    Me[i, j] += (v * u) * dΩ
-                end
-            end
-        end
-
-        assemble!(assembler, celldofs(cell), Me)
-    end
-    return M
+    return K, M, f
 end
 #md nothing # hide
 # ### Solution of the system
 # We first assemble all parts in the prior allocated `SparseMatrixCSC`.
-K, f = doassemble_K!(K, f, cellvalues, dh)
-M = doassemble_M!(M, cellvalues, dh)
+K, M, f = doassemble!(K, M, f, cellvalues, dh)
 A = (Δt .* K) + M;
 # Now, we need to save all boundary condition related values of the unaltered system matrix `A`, which is done
 # by `get_rhs_data`. The function returns a `RHSData` struct, which contains all needed information to apply
