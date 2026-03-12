@@ -54,9 +54,10 @@
 # In this example we apply the boundary conditions to the assembled discrete operators (mass matrix $\mathbf{M}$ and stiffnes matrix $\mathbf{K}$)
 # only once. We utilize the fact that in finite element computations Dirichlet conditions can be applied by
 # zero out rows and columns that correspond
-# to a prescribed dof in the system matrix ($\mathbf{A} = Δt \mathbf{K} + \mathbf{M}$) and setting the value of the right-hand side vector to the value
-# of the Dirichlet condition. Thus, we only need to apply in every time step the Dirichlet condition to the right-hand side of the problem. For more details 
-# on the derivation and discretisation, see  the [Introduction to FEM](@ref fe-intro).
+# to a prescribed dof in the system matrix ($\mathbf{A} = Δt \mathbf{K} + \mathbf{M}$) and setting the value of the 
+# right-hand side vector to the value of the Dirichlet condition. Thus, we only need to apply in every time step the
+# Dirichlet condition to the right-hand side of the problem. For more details 
+# on the derivation and discretisation, see [Introduction to FEM](@ref fe-intro).
 #-
 # ## Commented program
 #
@@ -108,7 +109,8 @@ close!(ch)
 update!(ch, 0.0);
 
 # ### Assembling the linear system
-# As in the [heat equation example](@ref heat_equation.jl) we define a `doassemble!` function that assembles the diffusion and diffusive parts of the equation:
+# As in the [heat equation example](@ref heat_equation.jl) we define a `doassemble!` function that assembles the
+# diffusion and diffusive parts of the equation:
 function doassemble!(K::SparseMatrixCSC, M::SparseMatrixCSC, f::Vector, cellvalues::CellValues, dh::DofHandler)
 
     n_basefuncs = getnbasefunctions(cellvalues)
@@ -118,7 +120,7 @@ function doassemble!(K::SparseMatrixCSC, M::SparseMatrixCSC, f::Vector, cellvalu
 
     assembler = start_assemble(K, f)
     assembler_M = start_assemble(M)
-    
+
     for cell in CellIterator(dh)
 
         fill!(Ke, 0)
@@ -126,7 +128,7 @@ function doassemble!(K::SparseMatrixCSC, M::SparseMatrixCSC, f::Vector, cellvalu
         fill!(fe, 0)
 
         reinit!(cellvalues, cell)
-
+        # assemble local contributions
         for q_point in 1:getnquadpoints(cellvalues)
             dΩ = getdetJdV(cellvalues, q_point)
 
@@ -142,13 +144,14 @@ function doassemble!(K::SparseMatrixCSC, M::SparseMatrixCSC, f::Vector, cellvalu
                 end
             end
         end
-
+        # update global matrices
         assemble!(assembler, celldofs(cell), Ke, fe)
         assemble!(assembler_M, celldofs(cell), Me)
     end
     return K, M, f
 end
 #md nothing # hide
+
 # ### Solution of the system
 # We first assemble all parts in the prior allocated `SparseMatrixCSC`.
 K, M, f = doassemble!(K, M, f, cellvalues, dh)
