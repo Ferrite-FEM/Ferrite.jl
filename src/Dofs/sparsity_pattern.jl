@@ -682,9 +682,9 @@ function _allocate_matrix(::Type{SparseMatrixCSC{Tv, Ti}}, sp::AbstractSparsityP
     return S
 end
 
-## ================== ##
+## ================= ##
 # FastSparsityPattern #
-## ================== ##
+## ================= ##
 
 # Full `AbstractSparsityPattern` interface not supported
 mutable struct FastSparsityPattern{Ti} <: AbstractSparsityPattern
@@ -829,47 +829,3 @@ function allocate_matrix(::Type{<:SparseMatrixCSC{Tv, Ti}}, sp::FastSparsityPatt
     nzval = zeros(Tv, nnz)
     return SparseMatrixCSC(nrows, ncols, colptr, rowidx, nzval)
 end
-
-#= # TODO: Move to extension
-function sort_rows!(sp)
-    sort_rows!(sp, 1:getnrows(sp))
-    sp.is_sorted = true
-    return sp
-end
-
-function sort_rows!(sp::FastSparsityPattern, rowrange::UnitRange)
-    @inbounds for row in rowrange
-        i1 = sp.rowptr[row]
-        i2 = sp.rowptr[row + 1] - 1
-        if i1 < i2
-            sort!(view(sp.colidx, i1:i2))
-        end
-    end
-    return sp
-end
-
-function sort_rows_threaded!(
-        sp::FastSparsityPattern, # Default ΔN ≥ 1000 and `n_tasks ≥ 1`
-        ntasks = max(min(Threads.nthreads() * 100, getnrows(sp) ÷ 1000), 1)
-        )               # Otherwise, 100 per thread for load balancing
-    nrows = getnrows(sp)
-    ΔN = nrows ÷ ntasks
-    Base.Experimental.@sync begin
-        for taskid in 1:ntasks
-            Threads.@spawn begin
-                first_idx = 1 + ΔN * (taskid - 1)
-                last_idx = min(first_idx + ΔN - 1, nrows)
-                sort_rows!(sp, first_idx:last_idx)
-            end
-        end
-    end
-    sp.is_sorted = true
-    return sp
-end
-
-function allocate_matrix(::Type{<:SparseMatrixCSR}, sp::FastSparsityPattern{Ti}) where {Ti}
-    sp.is_sorted || sort_rows_threaded!(sp) # Require sorted rows
-    nzval = zeros(Float64, length(sp.colidx))
-    return SparseMatrixCSR{1}(ndofs(sp), ndofs(sp), sp.rowptr, sp.colidx, nzval)
-end
-=#

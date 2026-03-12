@@ -1,7 +1,7 @@
 module FerriteSparseMatrixCSR
 
 using Ferrite, SparseArrays, SparseMatricesCSR
-import Ferrite: AbstractSparsityPattern, CSRAssembler
+import Ferrite: AbstractSparsityPattern, CSRAssembler, FastSparsityPattern, getnrows, getncols
 import Base: @propagate_inbounds
 
 # Could be generalized if https://github.com/JuliaSparse/SparseArrays.jl/pull/546 is merged
@@ -110,6 +110,53 @@ function _allocate_matrix(::Type{SparseMatrixCSR{1, Tv, Ti}}, sp::AbstractSparsi
     end
     S = SparseMatrixCSR{1}(Ferrite.getnrows(sp), Ferrite.getncols(sp), rowptr, colval, nzval)
     return S
+end
+
+## ================= ##
+# FastSparsityPattern #
+## ================= ##
+
+function _allocate_matrix(::Type{SparseMatrixCSR{1, Tv, Ti}}, sp::FastSparsityPattern{Ti}, sym::Bool) where {Tv, Ti}
+    sym && throw(ArgumentError("FastSparsityPattern does not support symmetric matrices yet"))
+    sp.is_colidx_sorted || sort_rows_threaded!(sp) # Require sorted rows
+    nzval = zeros(Tv, length(sp.colidx))
+    return SparseMatrixCSR{1}(getnrows(sp), getncols(sp), sp.rowptr, sp.colidx, nzval)
+end
+
+function sort_rows!(sp)
+    sort_rows!(sp, 1:getnrows(sp))
+    sp.is_colidx_sorted = true
+    return sp
+end
+
+function sort_rows!(sp::FastSparsityPattern, rowrange::UnitRange)
+    @inbounds for row in rowrange
+        i1 = sp.rowptr[row]
+        i2 = sp.rowptr[row + 1] - 1
+        if i1 < i2
+            sort!(view(sp.colidx, i1:i2))
+        end
+    end
+    return sp
+end
+
+function sort_rows_threaded!(
+        sp::FastSparsityPattern, # Default ΔN ≥ 1000 and `n_tasks ≥ 1`
+        ntasks = max(min(Threads.nthreads() * 100, getnrows(sp) ÷ 1000), 1)
+    )               # Otherwise, 100 per thread for load balancing
+    nrows = getnrows(sp)
+    ΔN = nrows ÷ ntasks
+    Base.Experimental.@sync begin
+        for taskid in 1:ntasks
+            Threads.@spawn begin
+                first_idx = 1 + ΔN * (taskid - 1)
+                last_idx = min(first_idx + ΔN - 1, nrows)
+                sort_rows!(sp, first_idx:last_idx)
+            end
+        end
+    end
+    sp.is_colidx_sorted = true
+    return sp
 end
 
 end
