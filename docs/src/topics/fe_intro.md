@@ -47,16 +47,16 @@ simplicity we will consider only constant conductivity $k$.
 ## Weak form
 
 The solution to the equation above is usually calculated from the corresponding weak
-form. By multiplying the equation with an arbitrary *test function* $\delta u$, integrating
+form. By multiplying the equation with an arbitrary *test function* $\varphi$, integrating
 over the domain and using partial integration we obtain the *weak form*. Now our problem
 can be stated as:
 
 Find $u \in \mathbb{U}$ s.t.
 
 ```math
-\int_\Omega \nabla \delta u \cdot (k \nabla u) \, \mathrm{d}\Omega =
-\int_{\Gamma_\mathrm{N}} \delta u \, q^\mathrm{p} \, \mathrm{d}\Gamma +
-\int_\Omega \delta u \, f \, \mathrm{d}\Omega \quad \forall \, \delta u \in \mathbb{T}
+\int_\Omega \nabla \varphi \cdot (k \nabla u) \, \mathrm{d}\Omega =
+\int_{\Gamma_\mathrm{N}} \varphi \, q^\mathrm{p} \, \mathrm{d}\Gamma +
+\int_\Omega \varphi \, f \, \mathrm{d}\Omega \quad \forall \, \varphi \in \mathbb{T}
 ```
 
 where $\mathbb{U}, \mathbb{T}$ are suitable function spaces with sufficiently regular
@@ -87,7 +87,7 @@ in our domain $\Omega$ as:
 
 ```math
 u_\mathrm{h}(\mathbf{x}) = \sum_{i=1}^{\mathrm{N}} \phi_i(\mathbf{x}) \, \hat{u}_i,\qquad
-\delta u_\mathrm{h}(\mathbf{x}) = \sum_{i=1}^{\mathrm{N}} \phi_i(\mathbf{x}) \, \delta \hat{u}_i \, .
+\varphi_\mathrm{h}(\mathbf{x}) = \sum_{i=1}^{\mathrm{N}} \phi_i(\mathbf{x}) \, \delta \hat{u}_i \, .
 ```
 
 Since test and trial functions are usually chosen in such a way, that they build the basis of
@@ -101,7 +101,7 @@ We may now insert these approximations in the weak form, which results in
 \int_{\Omega_\mathrm{h}} \phi_i \, f \, \mathrm{d}\Omega \right) \, .
 ```
 
-Since this equation must hold for arbitrary $\delta u_\mathrm{h}$, the equation must especially
+Since this equation must hold for arbitrary $\varphi_\mathrm{h}$, the equation must especially
 hold for the specific choice that only one of the nodal values $\delta \hat{u}_i$ is fixed to 1 while
 an all other coefficients are fixed to 0. Repeating this argument for all $i$ from 1 to N we obtain
 N linear equations. This way the discrete problem can be written as a system of linear equations
