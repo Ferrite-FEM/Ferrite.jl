@@ -54,9 +54,9 @@
 # In this example we apply the boundary conditions to the assembled discrete operators (mass matrix $\mathbf{M}$ and stiffnes matrix $\mathbf{K}$)
 # only once. We utilize the fact that in finite element computations Dirichlet conditions can be applied by
 # zero out rows and columns that correspond
-# to a prescribed dof in the system matrix ($\mathbf{A} = Δt \mathbf{K} + \mathbf{M}$) and setting the value of the 
+# to a prescribed dof in the system matrix ($\mathbf{A} = Δt \mathbf{K} + \mathbf{M}$) and setting the value of the
 # right-hand side vector to the value of the Dirichlet condition. Thus, we only need to apply in every time step the
-# Dirichlet condition to the right-hand side of the problem. For more details 
+# Dirichlet condition to the right-hand side of the problem. For more details
 # on the derivation and discretisation, see [Introduction to FEM](@ref fe-intro).
 #-
 # ## Commented program
