@@ -116,16 +116,16 @@ function doassemble!(K::SparseMatrixCSC, M::SparseMatrixCSC, f::Vector, cellvalu
     Ke = zeros(n_basefuncs, n_basefuncs)
     Me = zeros(n_basefuncs, n_basefuncs)
     fe = zeros(n_basefuncs)
-    # initiate assembler for matrices and vector
+    #Initiate assembler for matrices and vector
     assembler = start_assemble(K, f)
     assembler_M = start_assemble(M)
-    # iterate over cells
+    #Iterate over cells
     for cell in CellIterator(dh)
         fill!(Ke, 0)
         fill!(Me, 0)
         fill!(fe, 0)
         reinit!(cellvalues, cell)
-        # assemble local contributions
+        #Assemble local contributions
         for q_point in 1:getnquadpoints(cellvalues)
             dΩ = getdetJdV(cellvalues, q_point)
             for i in 1:n_basefuncs
@@ -140,7 +140,7 @@ function doassemble!(K::SparseMatrixCSC, M::SparseMatrixCSC, f::Vector, cellvalu
                 end
             end
         end
-        # update global matrices
+        #Update global matrices
         assemble!(assembler, celldofs(cell), Ke, fe)
         assemble!(assembler_M, celldofs(cell), Me)
     end
