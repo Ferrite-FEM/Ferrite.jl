@@ -2,6 +2,7 @@ using Ferrite
 using SparseMatricesCSR: SparseMatrixCSR
 using SparseArrays: SparseMatrixCSC
 using DataFrames
+using Ferrite: FastSparsityPattern
 
 function dh_scalar(grid)
     CT = getcelltype(grid)

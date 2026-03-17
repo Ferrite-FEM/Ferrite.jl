@@ -688,6 +688,9 @@ end
 ## ================= ##
 
 # Full `AbstractSparsityPattern` interface not supported
+# For now, this remains a non-public fast-path for `allocate_matrix(MatrixType, dh)`,
+# but can be extended in the future or potentially replace `SparsityPattern`.
+# See #1302 for details.
 mutable struct FastSparsityPattern{Ti} <: AbstractSparsityPattern
     const rowlen::Vector{Ti} # Number of stored entries in each row
     const marker::Vector{Ti} # Marker if column has been "visited" by certain row

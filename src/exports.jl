@@ -130,7 +130,6 @@ export
     # Sparsity pattern
     # AbstractSparsityPattern,
     SparsityPattern,
-    FastSparsityPattern,
     BlockSparsityPattern,
     init_sparsity_pattern,
     add_sparsity_entries!,
