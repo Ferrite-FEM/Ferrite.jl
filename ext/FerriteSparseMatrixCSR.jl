@@ -134,7 +134,7 @@ function sort_rows!(sp::FastSparsityPattern, rowrange::UnitRange)
         i1 = sp.rowptr[row]
         i2 = sp.rowptr[row + 1] - 1
         if i1 < i2
-            sort!(view(sp.colidx, i1:i2))
+            sort!(view(sp.colidx, i1:i2); alg = QuickSort)
         end
     end
     return sp
@@ -145,15 +145,11 @@ function sort_rows_threaded!(
         ntasks = max(min(Threads.nthreads() * 100, getnrows(sp) ÷ 1000), 1)
     )               # Otherwise, 100 per thread for load balancing
     nrows = getnrows(sp)
-    ΔN = nrows ÷ ntasks
-    Base.Experimental.@sync begin
-        for taskid in 1:ntasks
-            Threads.@spawn begin
-                first_idx = 1 + ΔN * (taskid - 1)
-                last_idx = min(first_idx + ΔN - 1, nrows)
-                sort_rows!(sp, first_idx:last_idx)
-            end
-        end
+    ΔN = (nrows + 1) ÷ ntasks
+    Threads.@threads for taskid in 1:ntasks
+        first_idx = 1 + ΔN * (taskid - 1)
+        last_idx = min(first_idx + ΔN - 1, nrows)
+        sort_rows!(sp, first_idx:last_idx)
     end
     sp.is_colidx_sorted = true
     return sp

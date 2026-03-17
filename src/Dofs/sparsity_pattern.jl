@@ -413,6 +413,7 @@ arguments `args` and keyword arguments `kwargs`.
     copy(K)`) instead.
 """
 function allocate_matrix(::Type{MatrixType}, dh::DofHandler, args...; kwargs...) where {MatrixType}
+    _can_use_fastsp(args...; kwargs...) && return allocate_matrix(MatrixType, FastSparsityPattern(dh, args...; kwargs...))
     sp = init_sparsity_pattern(dh)
     add_sparsity_entries!(sp, dh, args...; kwargs...)
     return allocate_matrix(MatrixType, sp)
@@ -700,6 +701,21 @@ function FastSparsityPattern(::Type{Ti}, ncols, nrows) where {Ti <: Integer}
     rowptr = Vector{Ti}(undef, nrows + 1)
     colidx = Vector{Ti}(undef, 0) # To be resized later
     return FastSparsityPattern(rowlen, marker, rowptr, colidx, false)
+end
+
+# _can_use_fastsp(args...; kwargs...) where args and kwargs are those passed to
+# `allocate_matrix`. See `add_sparsity_entries!` for a description of args/kwargs.
+function _can_use_fastsp(
+        ch = nothing;
+        topology = nothing,
+        keep_constrained = true,
+        coupling = nothing,
+        interface_coupling = nothing
+    )
+    if ch === topology === coupling === interface_coupling === nothing
+        return keep_constrained
+    end
+    return false
 end
 
 FastSparsityPattern(dh::DofHandler) = FastSparsityPattern(Int, dh)
