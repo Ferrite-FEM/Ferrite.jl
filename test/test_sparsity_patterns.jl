@@ -331,3 +331,29 @@ end
         @test_throws ErrorException add_sparsity_entries!(p, dh, ch_bad; keep_constrained = false)
     end
 end
+
+@testset "FastSparsityPattern" begin
+    # Internal fast-path for supported cases
+    for CT in (Line, Quadrilateral, Tetrahedron)
+        RS = getrefshape(CT)
+        dim = Ferrite.getrefdim(RS)
+        grid = generate_grid(CT, ntuple(_ -> 5, dim))
+        dh = DofHandler(grid)
+        add!(dh, :a, Lagrange{RS, 1}())
+        add!(dh, :b, Lagrange{RS, 2}()^dim)
+        close!(dh)
+        sp = add_sparsity_entries!(init_sparsity_pattern(dh), dh)
+        fsp = Ferrite.FastSparsityPattern(dh)
+        K1 = allocate_matrix(sp)
+        K2 = allocate_matrix(fsp)
+        compare_matrices(K1, K2) # For CSC only
+
+        sp = add_sparsity_entries!(init_sparsity_pattern(dh), dh)
+        fsp = Ferrite.FastSparsityPattern(dh)
+        K1_csr = allocate_matrix(SparseMatrixCSR, sp)
+        K2_csr = allocate_matrix(SparseMatrixCSR, fsp)
+        K1_csr.nzval .= 1:length(K1_csr.nzval)
+        K2_csr.nzval .= 1:length(K2_csr.nzval)
+        @test K1_csr == K2_csr
+    end
+end
