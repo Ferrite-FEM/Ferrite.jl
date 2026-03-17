@@ -75,7 +75,7 @@ of equations:
 ```
 
 The reduced system of equations can used to solve for ``\boldsymbol{a}_f``, which can then
-be used to calculate the dependent DoFs. Ferrite has functionaliy for setting up the
+be used to calculate the dependent DoFs. Ferrite has functionally for setting up the
 ``\hat{\boldsymbol{K}}`` and ``\hat{\boldsymbol{f}}`` in an efficient way.
 
 !!! note "Limitations"

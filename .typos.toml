@@ -1,0 +1,21 @@
+[files]
+extend-exclude = ["*.svg", "*.toml"]
+
+[default.extend-words]
+ue = "ue"
+ba = "ba"
+nd = "nd"
+
+[type.qrtables]
+extend-glob = ["**/gaussquad_*_table.jl", "**/generate_quadrature.jl"]
+
+[type.qrtables.extend-words]
+Methode = "Methode"
+Numer = "Numer"
+Secrest = "Secrest"
+
+[type.feintro]
+extend-glob = ["**/fe_intro.md"]
+
+[type.feintro.extend-words]
+Strang = "Strang"

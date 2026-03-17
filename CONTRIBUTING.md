@@ -85,6 +85,14 @@ configure pre-commit to run before each commit:
 pre-commit install
 ```
 
+### Spell-checking
+Ferrite uses [typos] for spell checking. If you have that installed,
+you run it locally with by running `typos` from the top level directory.
+To fix mistakes automatically, run `typos -w`, but be careful as e.g. names
+and words from other languages might be incorrectly corrected (which is why
+it is not included as a [pre-commit] hook). Exceptions should be added to
+`.typos.toml`.
+
 [documenter]: https://juliadocs.github.io/Documenter.jl/
 [first-contributions]: https://github.com/firstcontributions/first-contributions
 [gh-edit-files]: https://docs.github.com/en/repositories/working-with-files/managing-files/editing-files#editing-files-in-another-users-repository
@@ -101,3 +109,4 @@ pre-commit install
 [so-mre]: https://stackoverflow.com/help/minimal-reproducible-example
 [tim-doc]: https://youtu.be/ZpH1ry8qqfw
 [tim-git]: https://youtu.be/cquJ9kPkwR8
+[typos]: https://github.com/crate-ci/typos
