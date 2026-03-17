@@ -228,7 +228,7 @@ function solve()
 
     # Newton-Raphson loop
     NEWTON_TOL = 1 # 1 N
-    print("\n Starting Netwon iterations:\n")
+    print("\n Starting Newton iterations:\n")
 
     for timestep in 1:n_timesteps
         t = timestep # actual time (used for evaluating d-bndc)

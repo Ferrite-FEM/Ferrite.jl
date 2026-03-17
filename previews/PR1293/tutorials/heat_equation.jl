@@ -61,7 +61,7 @@ function assemble_global(cellvalues::CellValues, K::SparseMatrixCSC, dh::DofHand
     f = zeros(ndofs(dh))
     # Create an assembler
     assembler = start_assemble(K, f)
-    # Loop over all cels
+    # Loop over all cells
     for cell in CellIterator(dh)
         # Reinitialize cellvalues for this cell
         reinit!(cellvalues, cell)
