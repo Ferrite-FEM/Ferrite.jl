@@ -79,4 +79,4 @@ function make_df(timings)
 end
 
 display(make_df(make_timings(SparseMatrixCSC{Float64, Int})))
-display(make_df(make_timings(SparseMatrixCSR)))
+# display(make_df(make_timings(SparseMatrixCSR)))

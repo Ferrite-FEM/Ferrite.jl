@@ -739,17 +739,23 @@ end
 getncols(sp::FastSparsityPattern) = length(sp.marker)
 getnrows(sp::FastSparsityPattern) = length(sp.rowlen)
 
-function create_celldofs(dh)
+function create_celldofs(dh::DofHandler)
+    isclosed(dh) || throw(ArgumentError("DofHandler must be closed"))
     ncells = getncells(dh.grid)
     indices = similar(dh.cell_dofs_offset, ncells + 1)
     cell_dofs = similar(dh.cell_dofs)
     n = 1
-    for cell_idx in 1:getncells(dh.grid)
+    for cell_idx in 1:ncells
         indices[cell_idx] = n
-        r = n:(n + ndofs_per_cell(dh, cell_idx) - 1)
-        celldofs!(view(cell_dofs, r), dh, cell_idx)
+        num = ndofs_per_cell(dh, cell_idx)
+        num == 0 && continue
+        r = n:(n + num - 1)
+        #celldofs!(view(cell_dofs, r), dh, cell_idx), but faster without view:
+        soffs = dh.cell_dofs_offset[cell_idx]
+        copyto!(cell_dofs, n, dh.cell_dofs, soffs, num)
         n = last(r) + 1
     end
+    indices[end] = n
     return ArrayOfVectorViews(indices, cell_dofs, LinearIndices((ncells,)))
 end
 
@@ -764,7 +770,6 @@ function create_row_to_cells(cell_dofs::ArrayOfVectorViews, sp)
             n_connected += 1
         end
     end
-    # n_connected = sum(num_cells) better?
 
     # 2: Create the correct datastructure
     data = Vector{Int}(undef, n_connected)
