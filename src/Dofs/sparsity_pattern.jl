@@ -725,10 +725,7 @@ FastSparsityPattern(dh::DofHandler) = FastSparsityPattern(Int, dh)
 function FastSparsityPattern(::Type{Ti}, dh::DofHandler) where {Ti}
     sp = FastSparsityPattern(Ti, ndofs(dh), ndofs(dh))
     # Step 1: Create cell_dof_views::ArrayOfVectorViews (would be nice in `DofHandler` directly)
-    ncells = getncells(dh.grid)
-    indices = copy(dh.cell_dofs_offset)
-    push!(indices, length(dh.cell_dofs) + 1)
-    cell_dofs_views = ArrayOfVectorViews(indices, dh.cell_dofs, LinearIndices((ncells,)))
+    cell_dofs_views = create_celldofs(dh)
     # Step 2: Define mapping rownr to cells
     row_to_cells = create_row_to_cells(cell_dofs_views, sp)
     # Step 3: Count how many cols stored for each row
@@ -741,6 +738,20 @@ end
 
 getncols(sp::FastSparsityPattern) = length(sp.marker)
 getnrows(sp::FastSparsityPattern) = length(sp.rowlen)
+
+function create_celldofs(dh)
+    ncells = getncells(dh.grid)
+    indices = similar(dh.cell_dofs_offset, ncells + 1)
+    cell_dofs = similar(dh.cell_dofs)
+    n = 1
+    for cell_idx in 1:getncells(dh.grid)
+        indices[cell_idx] = n
+        r = n:(n + ndofs_per_cell(dh, cell_idx) - 1)
+        celldofs!(view(cell_dofs, r), dh, cell_idx)
+        n = last(r) + 1
+    end
+    return ArrayOfVectorViews(indices, cell_dofs, LinearIndices((ncells,)))
+end
 
 function create_row_to_cells(cell_dofs::ArrayOfVectorViews, sp)
     nrows = getnrows(sp)

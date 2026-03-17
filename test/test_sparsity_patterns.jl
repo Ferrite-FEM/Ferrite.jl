@@ -1,4 +1,5 @@
 using Ferrite, Test, SparseArrays, Random
+using SparseMatricesCSR: SparseMatrixCSR
 
 # Minimal implementation of a custom sparsity pattern
 struct TestPattern <: Ferrite.AbstractSparsityPattern
