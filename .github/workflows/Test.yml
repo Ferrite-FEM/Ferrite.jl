@@ -12,8 +12,7 @@ jobs:
     continue-on-error: ${{ matrix.julia-version == 'pre' }}
     strategy:
       matrix:
-        # julia-version: ['lts', '1', 'pre'] # lts doesn't support sources - so cannot work towards branch
-        julia-version: ['1'] # And pre fails anyways with vtk
+        julia-version: ['lts', '1', 'pre']
         os: ['ubuntu-latest']
         include:
           - os: windows-latest

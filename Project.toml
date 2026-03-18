@@ -37,7 +37,7 @@ OrderedCollections = "1"
 Preferences = "1"
 Reexport = "1"
 StaticArrays = "1"
-Tensors = "1.14"
+Tensors = "1.17"
 WriteVTK = "1.13"
 julia = "1.10"
 
@@ -60,9 +60,6 @@ SparseMatricesCSR = "a0a7dd2c-ebf4-11e9-1f05-cf50bc540ca1"
 TaskLocalValues = "ed4db957-447d-4319-bfb6-7fa9ae7ecf34"
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 TimerOutputs = "a759f4b9-e2f1-59dc-863e-4aeb61b1ea8f"
-
-[sources]
-Tensors = {url = "https://github.com/Ferrite-FEM/Tensors.jl.git", rev="kam/MixedTensors"}
 
 [targets]
 test = ["BlockArrays", "Downloads", "FerriteGmsh", "ForwardDiff", "Gmsh", "IterativeSolvers", "Metis", "NBInclude", "OhMyThreads", "ProgressMeter", "Random", "SHA", "SparseMatricesCSR", "TaskLocalValues", "Test", "TimerOutputs", "Logging", "HCubature"]
