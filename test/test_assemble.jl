@@ -56,9 +56,9 @@ import LinearAlgebra: Symmetric
     @test all(K[rdofs, cdofs] .== Ke)
 
     # CSCAssembler: assemble with different row and col dofs
+    I = [1, 1, 4, 4, 6, 6]
+    J = [1, 3, 1, 3, 1, 3]
     for T in (Float32, Float64)
-        I = [1, 1, 4, 4, 6, 6]
-        J = [1, 3, 1, 3, 1, 3]
         V = zeros(T, length(I))
         K = sparse(I, J, V)
         f = zeros(T, 6)
@@ -129,7 +129,8 @@ import LinearAlgebra: Symmetric
     end
 
     # Error paths
-    assembler = start_assemble(Kc, fc)
+    K = sparse(I, J, zeros(length(I)))
+    assembler = start_assemble(K, zeros(size(K, 1)))
     @test_throws BoundsError assemble!(assembler, [11, 1, 2, 3], rand(4, 4))
     @test_throws BoundsError assemble!(assembler, [11, 1, 2, 3], rand(4, 4), rand(4))
     @test_throws BoundsError assemble!(assembler, [11, 1, 2], rand(4, 4))
