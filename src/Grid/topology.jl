@@ -101,7 +101,7 @@ _get_facet_facet_neighborhood(t::ExclusiveTopology, #=rdim=# ::Val{1}) = t.verte
 _get_facet_facet_neighborhood(t::ExclusiveTopology, #=rdim=# ::Val{2}) = t.edge_edge_neighbor
 _get_facet_facet_neighborhood(t::ExclusiveTopology, #=rdim=# ::Val{3}) = t.face_face_neighbor
 function _get_facet_facet_neighborhood(::ExclusiveTopology, #=rdim=# ::Val{:mixed})
-    throw(ArgumentError("get_facet_facet_neightborhood is only supported for grids containing cells with the same reference dimension.
+    throw(ArgumentError("get_facet_facet_neighborhood is only supported for grids containing cells with the same reference dimension.
     Access the `vertex_vertex_neighbor`, `edge_edge_neighbor`, or `face_face_neighbor` fields explicitly instead."))
 end
 

@@ -182,7 +182,7 @@ end
             RannacherTurek{RefQuadrilateral, 1}(),
             RannacherTurek{RefHexahedron, 1}(),
         )
-        # Standard test all base interpolations must fullfill
+        # Standard test all base interpolations must fulfill
         test_interpolation_properties(interpolation)
 
         ref_dim = Ferrite.getrefdim(interpolation)
@@ -567,7 +567,7 @@ end
         _facet_poly_order(ip::Nedelec) = Ferrite.getorder(ip) - 1
         _facet_poly_order(ip::RaviartThomas) = Ferrite.getorder(ip) - 1
         _facet_poly_order(ip::BrezziDouglasMarini) = Ferrite.getorder(ip)
-        # Based on this order, p_facet, we expect that we should fullfill different criteria.
+        # Based on this order, p_facet, we expect that we should fulfill different criteria.
         # * If we prescribe a polynomial function to ProjectedDirichlet with a lower or equal order
         #   than p_facet, we expect that the interpolation should match the provided function pointwise.
         # * If we prescribe a polynomial function with higher order, but lower order than what the quadrature
