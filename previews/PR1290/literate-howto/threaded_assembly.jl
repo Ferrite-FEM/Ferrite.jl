@@ -29,7 +29,7 @@
 #       commutative.
 #     - **Assembler task**: By using a designated task for the assembling we (obviously)
 #       ensure that only a single task assembles. The worker tasks (the tasks computing the
-#       element contributions) would then hand off their results to the assemly task. This
+#       element contributions) would then hand off their results to the assembly task. This
 #       can be a useful approach if computing the element contributions is much slower than
 #       the assembly -- otherwise the assembler task can't keep up with the worker tasks.
 #       There might also be some extra overhead because of task switching in the scheduler.
@@ -207,7 +207,7 @@ nothing # hide
 #     For a different problem setup where some cells might take longer to process (perhaps
 #     they experience plastic deformation and we need to solve a local problem) we might
 #     benefit from load balancing. The `DynamicScheduler` can be used also for load
-#     balancing by specifiying `nchunks` or `chunksize`. However, the `DynamicScheduler`
+#     balancing by specifying `nchunks` or `chunksize`. However, the `DynamicScheduler`
 #     will always spawn `nchunks` tasks which can become costly since we are allocating
 #     scratch data for every task. To limit the number of tasks, while allowing for more
 #     than `ntasks` chunks, we can use the `GreedyScheduler` *with chunking*. For example,
