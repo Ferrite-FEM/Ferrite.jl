@@ -166,6 +166,7 @@ mutable struct ConstraintHandler{DH <: AbstractDofHandler, T}
     const dofcoefficients::Vector{Union{Nothing, DofCoefficients{T}}}
     # global dof -> index into dofs and inhomogeneities and dofcoefficients
     const dofmapping::Dict{Int, Int}
+    const isconstrained::BitVector # Fast check if dof is constrained or not
     const bcvalues::Vector{BCValues{T}}
     const dh::DH
     closed::Bool
@@ -177,7 +178,7 @@ function ConstraintHandler(::Type{T}, dh::AbstractDofHandler) where {T <: Number
     @assert isclosed(dh)
     return ConstraintHandler(
         Dirichlet[], ProjectedDirichlet[], Int[], Int[], T[], Union{Nothing, T}[],
-        Union{Nothing, DofCoefficients{T}}[], Dict{Int, Int}(), BCValues{T}[], dh, false,
+        Union{Nothing, DofCoefficients{T}}[], Dict{Int, Int}(), BitVector(), BCValues{T}[], dh, false,
     )
 end
 
@@ -259,21 +260,15 @@ isclosed(ch::ConstraintHandler) = ch.closed
 free_dofs(ch::ConstraintHandler) = ch.free_dofs
 prescribed_dofs(ch::ConstraintHandler) = ch.prescribed_dofs
 
-# Equivalent to `copy!(out, setdiff(1:n_entries, diff))`, but requires that
-# `issorted(diff)` and that `1 ≤ diff[1] ≤ diff[end] ≤ n_entries`
-function _sorted_setdiff!(out::Vector{Int}, n_entries::Int, diff::Vector{Int})
-    n_diff = length(diff)
-    resize!(out, n_entries - n_diff)
-    diff_ind = out_ind = 1
-    for i in 1:n_entries
-        if diff_ind ≤ n_diff && i == diff[diff_ind]
-            diff_ind += 1
-        else
-            out[out_ind] = i
-            out_ind += 1
-        end
+function set_freedofs!(free_dofs::Vector{Int}, isconstrained::BitVector, num_dofs::Int, num_prescribed::Int)
+    resize!(free_dofs, num_dofs - num_prescribed)
+    j = 1
+    for i in 1:num_dofs
+        isconstrained[i] && continue
+        free_dofs[j] = i
+        j += 1
     end
-    return out
+    return free_dofs
 end
 
 """
@@ -291,7 +286,12 @@ function close!(ch::ConstraintHandler)
     ch.affine_inhomogeneities .= ch.affine_inhomogeneities[I]
     ch.dofcoefficients .= ch.dofcoefficients[I]
 
-    _sorted_setdiff!(ch.free_dofs, ndofs(ch.dh), ch.prescribed_dofs)
+    resize!(ch.isconstrained, ndofs(ch.dh))
+    fill!(ch.isconstrained, false)
+    for dof in ch.prescribed_dofs
+        ch.isconstrained[dof] = true
+    end
+    set_freedofs!(ch.free_dofs, ch.isconstrained, ndofs(ch.dh), length(ch.prescribed_dofs))
 
     for i in 1:length(ch.prescribed_dofs)
         ch.dofmapping[ch.prescribed_dofs[i]] = i
@@ -915,9 +915,9 @@ end
 function zero_out_rows!(K::AbstractSparseMatrixCSC, ch::ConstraintHandler)
     rowval = K.rowval
     nzval = K.nzval
-    @inbounds for i in eachindex(rowval, nzval)
-        if haskey(ch.dofmapping, rowval[i])
-            nzval[i] = 0
+    @inbounds for (i, row) in pairs(rowval)
+        if ch.isconstrained[row]
+            nzval[i] = zero(eltype(K))
         end
     end
     return
