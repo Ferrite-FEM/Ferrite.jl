@@ -260,7 +260,7 @@ isclosed(ch::ConstraintHandler) = ch.closed
 free_dofs(ch::ConstraintHandler) = ch.free_dofs
 prescribed_dofs(ch::ConstraintHandler) = ch.prescribed_dofs
 
-function set_freedofs!(free_dofs::Vector{Int}, isconstrained::BitVector, num_dofs::Int, num_prescribed::Int)
+function _set_freedofs!(free_dofs::Vector{Int}, isconstrained::BitVector, num_dofs::Int, num_prescribed::Int)
     resize!(free_dofs, num_dofs - num_prescribed)
     j = 1
     for i in 1:num_dofs
@@ -291,7 +291,7 @@ function close!(ch::ConstraintHandler)
     for dof in ch.prescribed_dofs
         ch.isconstrained[dof] = true
     end
-    set_freedofs!(ch.free_dofs, ch.isconstrained, ndofs(ch.dh), length(ch.prescribed_dofs))
+    _set_freedofs!(ch.free_dofs, ch.isconstrained, ndofs(ch.dh), length(ch.prescribed_dofs))
 
     for i in 1:length(ch.prescribed_dofs)
         ch.dofmapping[ch.prescribed_dofs[i]] = i
@@ -913,6 +913,7 @@ function zero_out_columns!(K::AbstractSparseMatrixCSC, ch::ConstraintHandler) # 
 end
 
 function zero_out_rows!(K::AbstractSparseMatrixCSC, ch::ConstraintHandler)
+    @boundscheck checkbounds(ch.isconstrained, Base.OneTo(size(K, 2)))
     rowval = K.rowval
     nzval = K.nzval
     @inbounds for (i, row) in pairs(rowval)
@@ -1765,7 +1766,7 @@ function _apply_local!(
     # 3. Condense any affine constraints
     if has_nontrivial_affine_constraints
         # Condense this constraint locally if possible, and otherwise modifies the global arrays.
-        _condense_local!(local_matrix, local_vector, global_matrix, global_vector, global_dofs, ch.dofmapping, ch.dofcoefficients)
+        _condense_local!(local_matrix, local_vector, global_matrix, global_vector, global_dofs, ch.dofmapping, ch.dofcoefficients, ch.isconstrained)
     end
     # 4. Zero out columns/rows of local matrix and replace diagonal entries with the mean
     if has_constraints
@@ -1794,7 +1795,8 @@ end
 """
     _condense_local!(local_matrix::AbstractMatrix, local_vector::AbstractVector,
                     global_matrix#=::SparseMatrixCSC=#, global_vector#=::Vector=#,
-                    global_dofs::AbstractVector, dofmapping::Dict, dofcoefficients::Vector)
+                    global_dofs::AbstractVector, dofmapping::Dict, dofcoefficients::Vector,
+                    isconstrained::BitVector)
 
 Condensation of affine constraints on element level. If possible this function only
 modifies the local arrays.
@@ -1802,7 +1804,8 @@ modifies the local arrays.
 function _condense_local!(
         local_matrix::AbstractMatrix, local_vector::AbstractVector,
         global_matrix #=::SparseMatrixCSC=#, global_vector #=::Vector=#,
-        global_dofs::AbstractVector, dofmapping::Dict, dofcoefficients::Vector
+        global_dofs::AbstractVector, dofmapping::Dict, dofcoefficients::Vector,
+        isconstrained::BitVector,
     )
     @assert axes(local_matrix, 1) == axes(local_matrix, 2) ==
         axes(local_vector, 1) == axes(global_dofs, 1)
@@ -1821,7 +1824,7 @@ function _condense_local!(
                     if local_mrow === nothing
                         # Only modify the global array if this isn't prescribed since we
                         # can't zero it out later like with the local matrix.
-                        if !haskey(dofmapping, global_col) && !haskey(dofmapping, global_mrow)
+                        if !isconstrained[global_col] && !isconstrained[global_mrow]
                             has_global_arrays || missing_global()
                             addindex!(global_matrix, mw, global_mrow, global_col)
                         end
