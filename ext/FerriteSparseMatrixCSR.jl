@@ -67,7 +67,7 @@ function Ferrite.zero_out_rows!(K::SparseMatrixCSR, ch::ConstraintHandler)
 end
 
 function Ferrite.zero_out_columns!(K::SparseMatrixCSR, ch::ConstraintHandler)
-    @boundscheck checkbounds(ch.isconstrained, Base.OneTo(size(K, 1)))
+    @boundscheck checkbounds(ch.isconstrained, Base.OneTo(size(K, 2)))
     colval = K.colval
     nzval = K.nzval
     return @inbounds for (i, col) in pairs(colval)
