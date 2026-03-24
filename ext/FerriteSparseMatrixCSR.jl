@@ -67,10 +67,11 @@ function Ferrite.zero_out_rows!(K::SparseMatrixCSR, ch::ConstraintHandler)
 end
 
 function Ferrite.zero_out_columns!(K::SparseMatrixCSR, ch::ConstraintHandler)
+    @boundscheck checkbounds(ch.isconstrained, axes(K, 2))
     colval = K.colval
     nzval = K.nzval
-    return @inbounds for i in eachindex(colval, nzval)
-        if haskey(ch.dofmapping, colval[i])
+    return @inbounds for (i, col) in pairs(colval)
+        if ch.isconstrained[col]
             nzval[i] = 0
         end
     end
