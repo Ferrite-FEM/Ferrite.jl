@@ -913,7 +913,7 @@ function zero_out_columns!(K::AbstractSparseMatrixCSC, ch::ConstraintHandler) # 
 end
 
 function zero_out_rows!(K::AbstractSparseMatrixCSC, ch::ConstraintHandler)
-    @boundscheck checkbounds(ch.isconstrained, Base.OneTo(size(K, 1)))
+    @boundscheck checkbounds(ch.isconstrained, axes(K, 1))
     rowval = K.rowval
     nzval = K.nzval
     @inbounds for (i, row) in pairs(rowval)
