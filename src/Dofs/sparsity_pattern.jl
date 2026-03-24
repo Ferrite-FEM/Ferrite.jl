@@ -413,7 +413,12 @@ arguments `args` and keyword arguments `kwargs`.
     copy(K)`) instead.
 """
 function allocate_matrix(::Type{MatrixType}, dh::DofHandler, args...; kwargs...) where {MatrixType}
-    _can_use_fastsp(MatrixType, args...; kwargs...) && return allocate_matrix(MatrixType, FastSparsityPattern(dh, args...; kwargs...))
+    _get_Ti(::Type{<:AbstractMatrix}) = Int
+    _get_Ti(::Type{<:AbstractSparseMatrix{<:Any, Ti}}) where {Ti} = Ti
+    if _can_use_fastsp(MatrixType, args...; kwargs...)
+        fsp = FastSparsityPattern(_get_Ti(MatrixType), dh, args...; kwargs...)
+        return allocate_matrix(MatrixType, fsp)
+    end
     sp = init_sparsity_pattern(dh)
     add_sparsity_entries!(sp, dh, args...; kwargs...)
     return allocate_matrix(MatrixType, sp)

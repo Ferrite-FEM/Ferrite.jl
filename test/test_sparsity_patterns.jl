@@ -1,5 +1,6 @@
 using Ferrite, Test, SparseArrays, Random
 using SparseMatricesCSR: SparseMatrixCSR
+using LinearAlgebra
 
 # Minimal implementation of a custom sparsity pattern
 struct TestPattern <: Ferrite.AbstractSparsityPattern
@@ -334,15 +335,18 @@ end
 end
 
 @testset "FastSparsityPattern" begin
-    # Internal fast-path for supported cases
-    for CT in (Line, Quadrilateral, Tetrahedron)
+    function fsp_test_create_dh(CT)
         RS = getrefshape(CT)
         dim = Ferrite.getrefdim(RS)
         grid = generate_grid(CT, ntuple(_ -> 5, dim))
         dh = DofHandler(grid)
         add!(dh, :a, Lagrange{RS, 1}())
         add!(dh, :b, Lagrange{RS, 2}()^dim)
-        close!(dh)
+        return close!(dh)
+    end
+    # Internal fast-path for supported cases
+    for CT in (Line, Quadrilateral, Tetrahedron)
+        dh = fsp_test_create_dh(CT)
         sp = add_sparsity_entries!(init_sparsity_pattern(dh), dh)
         fsp = Ferrite.FastSparsityPattern(dh)
         K1 = allocate_matrix(sp)
@@ -356,5 +360,29 @@ end
         K1_csr.nzval .= 1:length(K1_csr.nzval)
         K2_csr.nzval .= 1:length(K2_csr.nzval)
         @test K1_csr == K2_csr
+    end
+    # Test different number types (Int32, Float32)
+    for Tv in (Float32, Float64)
+        for Ti in (Int32, Int64)
+            dh = fsp_test_create_dh(Quadrilateral)
+            MatrixType = SparseMatrixCSC{Float64, Ti}
+            K1 = allocate_matrix(MatrixType, dh)
+            @test isa(K1, MatrixType)
+            compare_matrices(K1, allocate_matrix(dh))
+
+            MatrixTypeCSR = SparseMatrixCSR{1, Tv, Ti}
+            K1_csr = allocate_matrix(MatrixTypeCSR, dh)
+            @test isa(K1_csr, MatrixTypeCSR)
+        end
+    end
+
+    # Test logic for Symmetric matrices works (will use SparsityPattern)
+    dh = fsp_test_create_dh(Triangle)
+    for MatrixType in (
+            Symmetric{Float64, SparseMatrixCSC{Float64, Int}},
+            # Symmetric{Float64, SparseMatrixCSR{1, Float64, Int}} # Does not work, see #1311
+        )
+        K1 = allocate_matrix(MatrixType, dh)
+        @test isa(K1, MatrixType)
     end
 end
