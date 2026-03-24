@@ -123,12 +123,6 @@ function _allocate_matrix(::Type{SparseMatrixCSR{1, Tv, Ti}}, sp::FastSparsityPa
     return SparseMatrixCSR{1}(getnrows(sp), getncols(sp), sp.rowptr, sp.colidx, nzval)
 end
 
-function sort_rows!(sp)
-    sort_rows!(sp, 1:getnrows(sp))
-    sp.is_colidx_sorted = true
-    return sp
-end
-
 function sort_rows!(sp::FastSparsityPattern, rowrange::UnitRange)
     @inbounds for row in rowrange
         i1 = sp.rowptr[row]
