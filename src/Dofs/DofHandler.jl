@@ -204,21 +204,23 @@ Store the degrees of freedom that belong to cell `i` in `global_dofs`.
 
 See also [`celldofs`](@ref).
 """
-function celldofs!(global_dofs::Vector{Int}, dh::DofHandler, i::Int)
-    @assert isclosed(dh)
-    @assert length(global_dofs) == ndofs_per_cell(dh, i)
-    unsafe_copyto!(global_dofs, 1, dh.cell_dofs, dh.cell_dofs_offset[i], length(global_dofs))
-    return global_dofs
-end
 function celldofs!(global_dofs::AbstractVector{Int}, dh::AbstractDofHandler, i::Int)
     @assert isclosed(dh)
     @assert length(global_dofs) == ndofs_per_cell(dh, i)
-    copyto!(global_dofs, 1, dh.cell_dofs, dh.cell_dofs_offset[i], length(global_dofs))
+    _celldofs!(global_dofs, dh.cell_dofs, dh.cell_dofs_offset[i], length(global_dofs))
     return global_dofs
 end
-function celldofs!(global_dofs::AbstractVector{Int}, sdh::SubDofHandler, i::Int)
-    @assert i in sdh.cellset
-    return celldofs!(global_dofs, sdh.dh, i)
+@propagate_inbounds function celldofs!(global_dofs::AbstractVector{Int}, sdh::SubDofHandler, i::Int)
+    @boundscheck (i in sdh.cellset || throw(KeyError(i)))
+    @boundscheck checkbounds(global_dofs, Base.OneTo(ndofs_per_cell(sdh)))
+    @assert isclosed(sdh.dh)
+    return @inbounds _celldofs!(global_dofs, sdh.dh.cell_dofs, sdh.dh.cell_dofs_offset[i], ndofs_per_cell(sdh))
+end
+@propagate_inbounds function _celldofs!(global_dofs::AbstractVector{Int}, cell_dofs, offset::Integer, ncelldofs::Integer)
+    return copyto!(global_dofs, 1, cell_dofs, offset, ncelldofs)
+end
+@propagate_inbounds function _celldofs!(global_dofs::Vector{Ti}, cell_dofs::Vector{Ti}, offset::Integer, ncelldofs::Integer) where {Ti <: Integer}
+    return unsafe_copyto!(global_dofs, 1, cell_dofs, offset, ncelldofs)
 end
 
 """
