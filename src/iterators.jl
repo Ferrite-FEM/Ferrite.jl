@@ -78,7 +78,7 @@ function reinit!(cc::CellCache, i::Int)
     end
     if cc.dh !== nothing && cc.flags.dofs
         resize!(cc.dofs, ndofs_per_cell(cc.dh, i))
-        celldofs!(cc.dofs, cc.dh, i)
+        @inbounds celldofs!(cc.dofs, cc.dh, i)
     end
     return cc
 end
