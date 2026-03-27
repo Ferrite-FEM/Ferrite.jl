@@ -106,6 +106,7 @@ mutable struct DofHandler{dim, G <: AbstractGrid{dim}} <: AbstractDofHandler
     closed::Bool
     const grid::G
     ndofs::Int
+    const celldofs::ArrayOfVectorViews{Int, 1}
 end
 
 """
@@ -137,7 +138,8 @@ close!(dh)
 function DofHandler(grid::G) where {dim, G <: AbstractGrid{dim}}
     ncells = getncells(grid)
     sdhs = SubDofHandler{DofHandler{dim, G}}[]
-    return DofHandler{dim, G}(sdhs, Symbol[], Int[], zeros(Int, ncells), zeros(Int, ncells), false, grid, -1)
+    celldofs = ArrayOfVectorViews{Int, 1}(Vector{Int}(undef, ncells + 1), Int[], LinearIndices((ncells,)))
+    return DofHandler{dim, G}(sdhs, Symbol[], Int[], zeros(Int, ncells), zeros(Int, ncells), false, grid, -1, celldofs)
 end
 
 function Base.show(io::IO, mime::MIME"text/plain", dh::DofHandler)
@@ -207,13 +209,13 @@ See also [`celldofs`](@ref).
 function celldofs!(global_dofs::Vector{Int}, dh::DofHandler, i::Int)
     @assert isclosed(dh)
     @assert length(global_dofs) == ndofs_per_cell(dh, i)
-    unsafe_copyto!(global_dofs, 1, dh.cell_dofs, dh.cell_dofs_offset[i], length(global_dofs))
+    unsafe_copyto!(global_dofs, 1, dh.celldofs.data, dh.celldofs.indices[i], length(global_dofs))
     return global_dofs
 end
 function celldofs!(global_dofs::AbstractVector{Int}, dh::AbstractDofHandler, i::Int)
     @assert isclosed(dh)
     @assert length(global_dofs) == ndofs_per_cell(dh, i)
-    copyto!(global_dofs, 1, dh.cell_dofs, dh.cell_dofs_offset[i], length(global_dofs))
+    copyto!(global_dofs, 1, dh.celldofs.data, dh.celldofs.indices[i], length(global_dofs))
     return global_dofs
 end
 function celldofs!(global_dofs::AbstractVector{Int}, sdh::SubDofHandler, i::Int)
@@ -390,92 +392,118 @@ function __close!(dh::DofHandler{dim}) where {dim}
     nextdof = 1  # next free dof to distribute
 
     @debug println("\n\nCreating dofs\n")
-    for (sdhi, sdh) in pairs(dh.subdofhandlers)
+    sdh_ip_infos = _create_ip_infos(dh)
+    allocate_celldofs!(dh, sdh_ip_infos)
+    for (sdh, ip_infos) in zip(dh.subdofhandlers, sdh_ip_infos)
         nextdof = _close_subdofhandler!(
             dh,
             sdh,
-            sdhi, # TODO: Store in the SubDofHandler?
+            ip_infos,
             nextdof,
             vertexdicts,
             edgedicts,
             facedicts,
         )
     end
-    dh.ndofs = maximum(dh.cell_dofs; init = 0)
+    dh.ndofs = nextdof - 1
     dh.closed = true
 
     return dh, vertexdicts, edgedicts, facedicts
 
 end
 
+# Check that the provided interpolation fulfills the requirements for dof distribution
+function _check_interpolation(interpolation::Interpolation)
+    base_ip = get_base_interpolation(interpolation)
+    next_dof_index = 1
+    for vdofs in vertexdof_indices(base_ip)
+        for dof_index in vdofs
+            @assert dof_index == next_dof_index "Vertex dof ordering not supported. Please consult the dev docs."
+            next_dof_index += 1
+        end
+    end
+    for vdofs in edgedof_interior_indices(base_ip)
+        for dof_index in vdofs
+            @assert dof_index == next_dof_index "Edge dof ordering not supported. Please consult the dev docs."
+            next_dof_index += 1
+        end
+    end
+    for vdofs in facedof_interior_indices(base_ip)
+        for dof_index in vdofs
+            @assert dof_index == next_dof_index "Face dof ordering not supported. Please consult the dev docs."
+            next_dof_index += 1
+        end
+    end
+    for dof_index in volumedof_interior_indices(base_ip)
+        @assert next_dof_index <= dof_index <= getnbasefunctions(base_ip) "Cell dof ordering not supported. Please consult the dev docs."
+    end
+    return nothing
+end
+
+function allocate_celldofs!(dh, sdh_ip_infos)
+    celldofs = dh.celldofs
+    @assert length(celldofs.data) == 0 # Not previously filled
+    ncelldofs = 0
+    sdh_ndofs_per_cell = zeros(Int, length(dh.subdofhandlers))
+    for (sdh_index, sdh) in enumerate(dh.subdofhandlers)
+        sdh.ndofs_per_cell = sum(_ndofs_per_cell, sdh_ip_infos[sdh_index])
+        sdh_ndofs_per_cell[sdh_index] = ndofs_per_cell(sdh)
+        ncelldofs += length(sdh.cellset) * sdh_ndofs_per_cell[sdh_index]
+        for ci in sdh.cellset
+            # TODO: _check_cellset_intersections can be removed in favor of this assertion
+            @assert dh.cell_to_subdofhandler[ci] == 0
+            dh.cell_to_subdofhandler[ci] = sdh_index
+        end
+    end
+    resize!(celldofs.data, ncelldofs)
+    celldofs.indices[1] = 1
+    for ci in 1:getncells(get_grid(dh))
+        sdh_index = dh.cell_to_subdofhandler[ci]
+        n = sdh_index == 0 ? 0 : sdh_ndofs_per_cell[sdh_index] # No extra dofs if no sdh for this cell
+        celldofs.indices[ci + 1] = celldofs.indices[ci] + n
+    end
+    return
+end
+
+function _create_ip_infos(dh::DofHandler{sdim}) where {sdim}
+    sdh_ip_infos = Vector{InterpolationInfo}[]
+    for sdh in dh.subdofhandlers
+        ip_infos = InterpolationInfo[]
+        for interpolation in sdh.field_interpolations
+            ip_info = InterpolationInfo(interpolation)
+            _check_interpolation(interpolation)
+            push!(ip_infos, ip_info)
+            # TODO: More than one face dof per face in 3D are not implemented yet. This requires
+            #       keeping track of the relative rotation between the faces, not just the
+            #       direction as for faces (i.e. edges) in 2D.
+            sdim == 3 && @assert !any(x -> x > 1, ip_info.nfacedofs)
+        end
+        push!(sdh_ip_infos, ip_infos)
+    end
+    return sdh_ip_infos
+end
+
 """
-    _close_subdofhandler!(dh::DofHandler{sdim}, sdh::SubDofHandler, sdh_index::Int, nextdof::Int, vertexdicts, edgedicts, facedicts) where {sdim}
+    _close_subdofhandler!(dh::DofHandler, sdh::SubDofHandler, ip_infos, nextdof::Int, vertexdicts, edgedicts, facedicts)
 
 Main entry point to distribute dofs for a single [`SubDofHandler`](@ref) on its subdomain.
 """
-function _close_subdofhandler!(dh::DofHandler{sdim}, sdh::SubDofHandler, sdh_index::Int, nextdof::Int, vertexdicts, edgedicts, facedicts) where {sdim}
-    ip_infos = InterpolationInfo[]
-    for interpolation in sdh.field_interpolations
-        ip_info = InterpolationInfo(interpolation)
-        base_ip = get_base_interpolation(interpolation)
-        begin
-            next_dof_index = 1
-            for vdofs in vertexdof_indices(base_ip)
-                for dof_index in vdofs
-                    @assert dof_index == next_dof_index "Vertex dof ordering not supported. Please consult the dev docs."
-                    next_dof_index += 1
-                end
-            end
-            for vdofs in edgedof_interior_indices(base_ip)
-                for dof_index in vdofs
-                    @assert dof_index == next_dof_index "Edge dof ordering not supported. Please consult the dev docs."
-                    next_dof_index += 1
-                end
-            end
-            for vdofs in facedof_interior_indices(base_ip)
-                for dof_index in vdofs
-                    @assert dof_index == next_dof_index "Face dof ordering not supported. Please consult the dev docs."
-                    next_dof_index += 1
-                end
-            end
-            for dof_index in volumedof_interior_indices(base_ip)
-                @assert next_dof_index <= dof_index <= getnbasefunctions(base_ip) "Cell dof ordering not supported. Please consult the dev docs."
-            end
-        end
-        push!(ip_infos, ip_info)
-        # TODO: More than one face dof per face in 3D are not implemented yet. This requires
-        #       keeping track of the relative rotation between the faces, not just the
-        #       direction as for faces (i.e. edges) in 2D.
-        sdim == 3 && @assert !any(x -> x > 1, ip_info.nfacedofs)
-    end
-
-    # TODO: Given the InterpolationInfo it should be possible to compute ndofs_per_cell, but
-    # doesn't quite work for embedded elements right now (they don't distribute all dofs
-    # "promised" by InterpolationInfo). Instead we compute it based on the number of dofs
-    # added for the first cell in the set.
-    first_cell = true
-    ndofs_per_cell = -1
-
+function _close_subdofhandler!(dh::DofHandler, sdh::SubDofHandler, ip_infos, nextdof::Int, vertexdicts, edgedicts, facedicts)
     # Mapping between the local field index and the global field index
     global_fidxs = Int[findfirst(gname -> gname === lname, dh.field_names) for lname in sdh.field_names]
 
     # loop over all the cells, and distribute dofs for all the fields
+    celldofs = zeros(Int, ndofs_per_cell(sdh))
     for ci in sdh.cellset
         @debug println("Creating dofs for cell #$ci")
-
-        # TODO: _check_cellset_intersections can be removed in favor of this assertion
-        @assert dh.cell_to_subdofhandler[ci] == 0
-        dh.cell_to_subdofhandler[ci] = sdh_index
-
+        resize!(celldofs, 0)
         cell = getcells(get_grid(dh), ci)
-        len_cell_dofs_start = length(dh.cell_dofs)
-        dh.cell_dofs_offset[ci] = len_cell_dofs_start + 1
 
         # Distribute dofs per field
         for (lidx, gidx) in pairs(global_fidxs)
             @debug println("\tfield: $(sdh.field_names[lidx])")
             nextdof = _distribute_dofs_for_cell!(
-                dh,
+                celldofs,
                 cell,
                 ip_infos[lidx],
                 nextdof,
@@ -484,16 +512,8 @@ function _close_subdofhandler!(dh::DofHandler{sdim}, sdh::SubDofHandler, sdh_ind
                 facedicts[gidx]
             )
         end
-
-        if first_cell
-            ndofs_per_cell = length(dh.cell_dofs) - len_cell_dofs_start
-            @assert ndofs_per_cell == sum(_ndofs_per_cell, ip_infos)
-            sdh.ndofs_per_cell = ndofs_per_cell
-            first_cell = false
-        else
-            @assert ndofs_per_cell == length(dh.cell_dofs) - len_cell_dofs_start
-        end
-        @debug println("\tDofs for cell #$ci:\t$(dh.cell_dofs[(end - ndofs_per_cell + 1):end])")
+        unsafe_copyto!(dh.celldofs.data, dh.celldofs.indices[ci], celldofs, 1, length(celldofs))
+        @debug println("\tDofs for cell #$ci:\t$(dh.celldofs[ci])")
     end # cell loop
     return nextdof
 end
@@ -503,31 +523,31 @@ end
 
 Main entry point to distribute dofs for a single cell.
 """
-function _distribute_dofs_for_cell!(dh::DofHandler{sdim}, cell::AbstractCell, ip_info::InterpolationInfo, nextdof::Int, vertexdict, edgedict, facedict) where {sdim}
+function _distribute_dofs_for_cell!(celldofs::Vector, cell::AbstractCell, ip_info::InterpolationInfo, nextdof::Int, vertexdict, edgedict, facedict)
 
     # Distribute dofs for vertices
     nextdof = add_vertex_dofs(
-        dh.cell_dofs, cell, vertexdict,
+        celldofs, cell, vertexdict,
         ip_info.nvertexdofs, nextdof, ip_info.n_copies,
     )
 
     # Distribute dofs for edges
     nextdof = add_edge_dofs(
-        dh.cell_dofs, cell, edgedict,
+        celldofs, cell, edgedict,
         ip_info.nedgedofs, nextdof,
         ip_info.adjust_during_distribution, ip_info.n_copies,
     )
 
     # Distribute dofs for faces.
     nextdof = add_face_dofs(
-        dh.cell_dofs, cell, facedict,
+        celldofs, cell, facedict,
         ip_info.nfacedofs, nextdof,
         ip_info.adjust_during_distribution, ip_info.n_copies,
     )
 
     # Distribute internal dofs for cells
     nextdof = add_volume_dofs(
-        dh.cell_dofs, ip_info.nvolumedofs, nextdof, ip_info.n_copies,
+        celldofs, ip_info.nvolumedofs, nextdof, ip_info.n_copies,
     )
 
     return nextdof

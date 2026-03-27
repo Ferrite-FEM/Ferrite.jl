@@ -81,8 +81,8 @@ end
 
 function _renumber!(dh::DofHandler, perm::AbstractVector{<:Integer})
     @assert isclosed(dh)
-    for i in eachindex(dh.cell_dofs)
-        dh.cell_dofs[i] = perm[dh.cell_dofs[i]]
+    for i in eachindex(dh.celldofs.data)
+        dh.celldofs.data[i] = perm[dh.celldofs.data[i]]
     end
     return dh
 end

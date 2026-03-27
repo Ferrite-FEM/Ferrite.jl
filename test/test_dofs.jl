@@ -179,21 +179,21 @@ end
     iperm = invperm(perm)
 
     # Roundtrip tests
-    original_dofs = copy(dh.cell_dofs)
+    original_dofs = copy(dh.celldofs)
     renumber!(dh, perm)
     renumber!(dh, iperm)
-    @test original_dofs == dh.cell_dofs
-    original_dofs_mdh = copy(mdh.cell_dofs)
+    @test original_dofs == dh.celldofs
+    original_dofs_mdh = copy(mdh.celldofs)
     renumber!(mdh, perm)
     renumber!(mdh, iperm)
-    @test original_dofs_mdh == mdh.cell_dofs
+    @test original_dofs_mdh == mdh.celldofs
     original_prescribed = copy(ch.prescribed_dofs)
     original_inhomogeneities = copy(ch.inhomogeneities)
     original_affine_inhomogeneities = copy(ch.affine_inhomogeneities)
     original_dofcoefficients = [c === nothing ? c : copy(c) for c in ch.dofcoefficients]
     renumber!(dh, ch, perm)
     renumber!(dh, ch, iperm)
-    @test original_dofs == dh.cell_dofs
+    @test original_dofs == dh.celldofs
     @test original_prescribed == ch.prescribed_dofs
     @test original_inhomogeneities == ch.inhomogeneities
     @test original_affine_inhomogeneities == ch.affine_inhomogeneities
