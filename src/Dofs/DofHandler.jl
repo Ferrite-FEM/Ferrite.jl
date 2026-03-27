@@ -487,6 +487,7 @@ function _close_subdofhandler!(dh::DofHandler{sdim}, sdh::SubDofHandler, sdh_ind
 
         if first_cell
             ndofs_per_cell = length(dh.cell_dofs) - len_cell_dofs_start
+            @assert ndofs_per_cell == sum(_ndofs_per_cell, ip_infos)
             sdh.ndofs_per_cell = ndofs_per_cell
             first_cell = false
         else
