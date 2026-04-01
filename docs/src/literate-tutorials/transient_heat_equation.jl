@@ -48,21 +48,21 @@
 # ```
 # Here, `M` refers to the so called mass matrix, which always occurs in time related terms, i.e.
 # ```math
-# M_{ij} = \int_{\Omega} \varphi_i \, u_j \ \mathrm{d}\Omega,
+# M_{ij} = \int_{\Omega} \delta u_i \, u_j \ \mathrm{d}\Omega,
 # ```
-# where $u_j$ and $\varphi_i$ are the shape functions of the trial and test functions, respectively.
+# where $u_j$ and $\delta u_i$ are the shape functions of the trial and test functions, respectively.
 # In this example we apply the boundary conditions to the assembled discrete operators (mass matrix $\mathbf{M}$ and stiffnes matrix $\mathbf{K}$)
 # only once. We utilize the fact that in finite element computations Dirichlet conditions can be applied by
 # zero out rows and columns that correspond
 # to a prescribed dof in the system matrix ($\mathbf{A} = Δt \mathbf{K} + \mathbf{M}$) and setting the value of the
 # right-hand side vector to the value of the Dirichlet condition. Thus, we only need to apply in every time step the
 # Dirichlet condition to the right-hand side of the problem. For more details
-# on the derivation and discretisation, see [Introduction to FEM](@ref fe-intro).
+# on the derivation and discretisation, see [Introduction to FEM](@ref).
 #-
 # ## Commented program
 #
 # Now we solve the problem in Ferrite. What follows is a program spliced with comments.
-#md # The full program, without comments, can be found in the next [section](@ref heat_equation-plain-program).
+#md # The full program, without comments, can be found in the next [section](@ref transient_heat_equation-plain-program).
 #
 # First we load Ferrite, and some other packages we need.
 using Ferrite, SparseArrays, WriteVTK
@@ -109,7 +109,7 @@ close!(ch)
 update!(ch, 0.0);
 
 # ### Assembling the linear system
-# As in the [heat equation example](@ref heat_equation.jl) we define a `doassemble!` function that assembles the
+# As in [Tutorial 1: Heat equation](heat_equation.md), we define a `doassemble!` function that assembles the
 # diffusion and diffusive parts of the equation:
 function doassemble!(K::SparseMatrixCSC, M::SparseMatrixCSC, f::Vector, cellvalues::CellValues, dh::DofHandler)
     n_basefuncs = getnbasefunctions(cellvalues)
@@ -129,14 +129,14 @@ function doassemble!(K::SparseMatrixCSC, M::SparseMatrixCSC, f::Vector, cellvalu
         for q_point in 1:getnquadpoints(cellvalues)
             dΩ = getdetJdV(cellvalues, q_point)
             for i in 1:n_basefuncs
-                ϕ = shape_value(cellvalues, q_point, i)
-                ∇ϕ = shape_gradient(cellvalues, q_point, i)
-                fe[i] += 0.1 * ϕ * dΩ
+                δu = shape_value(cellvalues, q_point, i)
+                ∇δu = shape_gradient(cellvalues, q_point, i)
+                fe[i] += 0.1 * δu * dΩ
                 for j in 1:n_basefuncs
                     u = shape_value(cellvalues, q_point, j)
                     ∇u = shape_gradient(cellvalues, q_point, j)
-                    Ke[i, j] += 1.0e-3 * (∇ϕ ⋅ ∇u) * dΩ
-                    Me[i, j] += (ϕ * u) * dΩ
+                    Ke[i, j] += 1.0e-3 * (∇δu ⋅ ∇u) * dΩ
+                    Me[i, j] += (δu * u) * dΩ
                 end
             end
         end
