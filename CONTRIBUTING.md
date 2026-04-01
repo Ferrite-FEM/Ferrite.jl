@@ -70,6 +70,28 @@ issues][open-issues].
 Remember to always include (when applicable): i) unit tests which exercises the new code,
 ii) documentation, iii) a note in the [CHANGELOG.md](CHANGELOG.md) file.
 
+### Code formatting and pre-commit hooks
+
+Ferrite uses [Runic.jl][runic] for code formatting, see the [README][runic-readme] for
+details on how to install and run manually. Alternatively, you can use Ferrite's
+[pre-commit] setup to run the same formatting checks as the github actions,
+including Runic formatting.
+
+After installing pre-commit (refer to the [pre-commit installation
+instructions][pre-commit-install]), run the following from the root of the repository to
+configure pre-commit to run before each commit:
+
+```shell
+pre-commit install
+```
+
+### Spell-checking
+Ferrite uses [typos] for spell checking. If you have that installed,
+you run it locally with by running `typos` from the top level directory.
+To fix mistakes automatically, run `typos -w`, but be careful as e.g. names
+and words from other languages might be incorrectly corrected (which is why
+it is not included as a [pre-commit] hook). Exceptions should be added to
+`.typos.toml`.
 
 [documenter]: https://juliadocs.github.io/Documenter.jl/
 [first-contributions]: https://github.com/firstcontributions/first-contributions
@@ -80,6 +102,11 @@ ii) documentation, iii) a note in the [CHANGELOG.md](CHANGELOG.md) file.
 [new-discussion]: https://github.com/Ferrite-FEM/Ferrite.jl/discussions/new
 [new-issue]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/new
 [open-issues]: https://github.com/Ferrite-FEM/Ferrite.jl/issues
+[pre-commit-install]: https://pre-commit.com/#install
+[pre-commit]: https://pre-commit.com/
+[runic-readme]: https://github.com/fredrikekre/Runic.jl/blob/master/README.md
+[runic]: https://github.com/fredrikekre/Runic.jl
 [so-mre]: https://stackoverflow.com/help/minimal-reproducible-example
 [tim-doc]: https://youtu.be/ZpH1ry8qqfw
 [tim-git]: https://youtu.be/cquJ9kPkwR8
+[typos]: https://github.com/crate-ci/typos

@@ -93,6 +93,22 @@ end
     Most examples make use of Dirichlet boundary conditions, for example [Heat
     Equation](@ref tutorial-heat-equation).
 
+## ProjectedDirichlet
+Some interpolations don't have nodal support points:
+``H(\mathrm{curl})`` interpolations, e.g., `Nedelec`, are associated to edges and faces,
+while ``H(\mathrm{div})`` interpolations, e.g. `RaviartThomas`, are associated to facets.
+While normal `Dirichlet` boundary conditions assume the existence of such nodal support points,
+Ferrite provides the `ProjectedDirichlet`, which instead finds the degree of freedom values that
+minimizes the L2-distance between the prescribed function, ``f(\boldsymbol{x},t,\boldsymbol{n})``,
+and the finite element interpolation space, cf. [Bartels2004:ProjectedDirichlet](@cite).
+Although standard interpolations are not currently supported,
+the figure below illustrates well the difference between applying a standard `Dirichlet` condition and an
+`ProjectedDirichlet` condition when the prescribed function cannot be described by the chosen FE-interpolation.
+
+![ProjectedDirichlet illustration](downloaded_assets/ProjectedDirichlet.svg)
+
+Here, we note that while the `Dirichlet` condition gives the correct value at the nodes, the `ProjectedDirichlet` gives
+a more accurate average boundary value (specifically the L2 projection of `f(x)` onto the finite element space).
 
 ## Neumann boundary conditions
 At the Neumann part of the boundary we know something about the gradient of the solution.
@@ -192,8 +208,8 @@ Sometimes this is written as
 ```
 
 where ``\llbracket \bullet \rrbracket := \bullet(\boldsymbol{x}^+) -
-\bullet(\boldsymbol{x}^-)`` is the "jump operator". Thus, this condition ensure that the
-jump, or difference, in the solution between the image and mirror boundary is the zero --
+\bullet(\boldsymbol{x}^-)`` is the "jump operator". Thus, this condition ensures that the
+jump, or difference, in the solution between the image and mirror boundary is zero --
 the solution becomes periodic. For a vector valued problem the periodicity constraint can in
 general be written as
 

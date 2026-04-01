@@ -201,7 +201,7 @@ K[I, J] = tmp2
 
 The key difference here is that we index using integers (`I`, `J`, `i`, and `j`) which means
 that `tmp1` and `tmp2` are scalars which don't need to be allocated on the heap. This
-stragety thus eliminates all allocations that were present in the first strategy. However,
+strategy thus eliminates all allocations that were present in the first strategy. However,
 we still lookup the same location in `K` twice, and we still have a random access pattern.
 
 #### Strategy 3: scalar indexing with single lookup
@@ -246,7 +246,7 @@ insert all elements of `Ke` in one go instead of having to lookup locations rand
 
 First we will compare the four functions above for a single assembly operation, i.e.
 inserting one local matrix into the global matrix. For this we simply create a random local
-matrix since we are not conserned with the actual values. We also pick the "middle" element
+matrix since we are not concerned with the actual values. We also pick the "middle" element
 and extract the dofs for that element. Finally, an assembler is created with
 `start_assemble` to use with the fourth strategy.
 

@@ -113,7 +113,7 @@
 #      \int_\Omega [\boldsymbol{\nabla} (u)] \cdot [\boldsymbol{\nabla}] (\delta u) \,\mathrm{d}\Omega - \int_\Gamma \llbracket u \rrbracket \cdot \{\boldsymbol{\nabla} (\delta u)\} + \llbracket \delta u \rrbracket  \cdot \{\boldsymbol{\nabla} (u)\}  \,\mathrm{d}\Gamma + \int_\Gamma \frac{\eta}{h_e} \llbracket u\rrbracket  \cdot \llbracket \delta u\rrbracket   \,\mathrm{d}\Gamma = \int_\Omega \delta u \,\mathrm{d}\Omega,\\
 #     ```
 # Since $\partial \Omega$ is constrained with both Dirichlet and Neumann boundary conditions the term $\int_{\partial \Omega} [\boldsymbol{\nabla} (u)] \cdot \boldsymbol{n} \delta u \,\mathrm{d} \Omega$ can be expressed as an integral over $\partial \Omega_N$, where $\partial \Omega_N$ is the boundaries with only prescribed Neumann boundary condition,
-# The resulting weak form is given given as follows: Find $u \in \mathbb{U}$ such that
+# The resulting weak form is given as follows: Find $u \in \mathbb{U}$ such that
 # ```math
 #  \int_\Omega [\boldsymbol{\nabla} (u)] \cdot [\boldsymbol{\nabla} (\delta u)] \,\mathrm{d}\Omega - \int_{\Gamma^0} \llbracket u\rrbracket \cdot \{\boldsymbol{\nabla} (\delta u)\} + \llbracket \delta u\rrbracket  \cdot \{\boldsymbol{\nabla} (u)\}  \,\mathrm{d}\Gamma^0 + \int_{\Gamma^0} \frac{\eta}{h_e} \llbracket u\rrbracket \cdot \llbracket \delta u\rrbracket   \,\mathrm{d}\Gamma^0 = \int_\Omega \delta u \,\mathrm{d}\Omega + \int_{\partial \Omega_N} ([\boldsymbol{\nabla} (u)] \cdot \boldsymbol{n}) \delta u \,\mathrm{d} \partial \Omega_N,\\
 # ```
@@ -125,7 +125,7 @@
 #
 # More details on DG formulations for elliptic problems can be found in [Cockburn:2002:unifiedanalysis](@cite).
 #-
-# ## Commented Program
+# ## Commented program
 #
 # Now we solve the problem in Ferrite. What follows is a program spliced with comments.
 #md # The full program, without comments, can be found in the next [section](@ref heat_equation-DG-plain-program).
@@ -155,8 +155,8 @@ facetvalues = FacetValues(facet_qr, ip);
 interfacevalues = InterfaceValues(facet_qr, ip);
 # ### Penalty term parameters
 # We define functions to calculate the diameter of a set of points, used to calculate the characteristic size $h_e$ in the assembly routine.
-getdistance(p1::Vec{N, T},p2::Vec{N, T}) where {N, T} = norm(p1-p2);
-getdiameter(cell_coords::Vector{Vec{N, T}}) where {N, T} = maximum(getdistance.(cell_coords, reshape(cell_coords, (1,:))));
+getdistance(p1::Vec{N, T}, p2::Vec{N, T}) where {N, T} = norm(p1 - p2);
+getdiameter(cell_coords::Vector{Vec{N, T}}) where {N, T} = maximum(getdistance.(cell_coords, reshape(cell_coords, (1, :))));
 
 # ### Degrees of freedom
 # Degrees of freedom distribution is handled using `DofHandler` as usual
@@ -167,7 +167,7 @@ close!(dh);
 # However, when generating the sparsity pattern we need to pass the topology and the cross-element coupling matrix when we're using
 # discontinuous interpolations. The cross-element coupling matrix is of size [1,1] in this case as
 # we have only one field and one DofHandler.
-K = allocate_matrix(dh, topology = topology, interface_coupling = trues(1,1));
+K = allocate_matrix(dh, topology = topology, interface_coupling = trues(1, 1));
 
 # ### Boundary conditions
 # The Dirichlet boundary conditions are treated
@@ -213,7 +213,7 @@ function assemble_element!(Ke::Matrix, fe::Vector, cellvalues::CellValues)
         dΩ = getdetJdV(cellvalues, q_point)
         ## Loop over test shape functions
         for i in 1:n_basefuncs
-            δu  = shape_value(cellvalues, q_point, i)
+            δu = shape_value(cellvalues, q_point, i)
             ∇δu = shape_gradient(cellvalues, q_point, i)
             ## Add contribution to fe
             fe[i] += δu * dΩ
@@ -248,7 +248,7 @@ function assemble_interface!(Ki::Matrix, iv::InterfaceValues, μ::Float64)
                 u_jump = shape_value_jump(iv, q_point, j) * (-normal)
                 ∇u_avg = shape_gradient_average(iv, q_point, j)
                 ## Add contribution to Ki
-                Ki[i, j] += -(δu_jump ⋅ ∇u_avg + ∇δu_avg ⋅ u_jump)*dΓ +  μ * (δu_jump ⋅ u_jump) * dΓ
+                Ki[i, j] += -(δu_jump ⋅ ∇u_avg + ∇δu_avg ⋅ u_jump) * dΓ + μ * (δu_jump ⋅ u_jump) * dΓ
             end
         end
     end
@@ -304,7 +304,7 @@ function assemble_global(cellvalues::CellValues, facetvalues::FacetValues, inter
         ## Reinitialize interfacevalues for this interface
         reinit!(interfacevalues, ic)
         ## Calculate the characteristic size hₑ as the face diameter
-        interfacecoords =  ∩(getcoordinates(ic)...)
+        interfacecoords = ∩(getcoordinates(ic)...)
         hₑ = getdiameter(interfacecoords)
         ## Calculate μ
         μ = (1 + order)^dim / hₑ

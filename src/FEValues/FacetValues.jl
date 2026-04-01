@@ -36,7 +36,7 @@ values of nodal functions, gradients and divergences of nodal functions etc. on 
 """
 FacetValues
 
-mutable struct FacetValues{FV, GM, FQR, detT, nT, V_FV<:AbstractVector{FV}, V_GM<:AbstractVector{GM}} <: AbstractFacetValues
+mutable struct FacetValues{FV, GM, FQR, detT, nT, V_FV <: AbstractVector{FV}, V_GM <: AbstractVector{GM}} <: AbstractFacetValues
     const fun_values::V_FV  # AbstractVector{FunctionValues}
     const geo_mapping::V_GM # AbstractVector{GeometryMapping}
     const fqr::FQR          # FacetQuadratureRule
@@ -45,24 +45,26 @@ mutable struct FacetValues{FV, GM, FQR, detT, nT, V_FV<:AbstractVector{FV}, V_GM
     current_facet::Int
 end
 
-function FacetValues(::Type{T}, fqr::FacetQuadratureRule, ip_fun::Interpolation, ip_geo::VectorizedInterpolation{sdim},
-        ::ValuesUpdateFlags{FunDiffOrder, GeoDiffOrder}) where {T, sdim, FunDiffOrder, GeoDiffOrder}
+function FacetValues(
+        ::Type{T}, fqr::FacetQuadratureRule, ip_fun::Interpolation, ip_geo::VectorizedInterpolation{sdim},
+        ::ValuesUpdateFlags{FunDiffOrder, GeoDiffOrder}
+    ) where {T, sdim, FunDiffOrder, GeoDiffOrder}
 
     # max(GeoDiffOrder, 1) ensures that we get the jacobian needed to calculate the normal.
-    geo_mapping = map(qr -> GeometryMapping{max(GeoDiffOrder, 1)}(T, ip_geo.ip, qr), fqr.face_rules)
-    fun_values = map(qr -> FunctionValues{FunDiffOrder}(T, ip_fun, qr, ip_geo), fqr.face_rules)
-    max_nquadpoints = maximum(qr -> length(getweights(qr)), fqr.face_rules)
+    geo_mapping = map(qr -> GeometryMapping{max(GeoDiffOrder, 1)}(T, ip_geo.ip, qr), fqr.facet_rules)
+    fun_values = map(qr -> FunctionValues{FunDiffOrder}(T, ip_fun, qr, ip_geo), fqr.facet_rules)
+    max_nquadpoints = maximum(qr -> length(getweights(qr)), fqr.facet_rules)
     # detJdV always calculated, since we needed to calculate the jacobian anyways for the normal.
-    detJdV  = fill(T(NaN), max_nquadpoints)
+    detJdV = fill(T(NaN), max_nquadpoints)
     normals = fill(zero(Vec{sdim, T}) * T(NaN), max_nquadpoints)
     return FacetValues(fun_values, geo_mapping, fqr, detJdV, normals, 1)
 end
 
 FacetValues(qr::FacetQuadratureRule, ip::Interpolation, args...; kwargs...) = FacetValues(Float64, qr, ip, args...; kwargs...)
-function FacetValues(::Type{T}, qr::FacetQuadratureRule, ip::Interpolation, ip_geo::ScalarInterpolation; kwargs...) where T
+function FacetValues(::Type{T}, qr::FacetQuadratureRule, ip::Interpolation, ip_geo::ScalarInterpolation; kwargs...) where {T}
     return FacetValues(T, qr, ip, VectorizedInterpolation(ip_geo); kwargs...)
 end
-function FacetValues(::Type{T}, qr::FacetQuadratureRule, ip::Interpolation, ip_geo::VectorizedInterpolation = default_geometric_interpolation(ip); kwargs...) where T
+function FacetValues(::Type{T}, qr::FacetQuadratureRule, ip::Interpolation, ip_geo::VectorizedInterpolation = default_geometric_interpolation(ip); kwargs...) where {T}
     return FacetValues(T, qr, ip, ip_geo, ValuesUpdateFlags(ip; kwargs...))
 end
 
@@ -110,20 +112,21 @@ getnormal(fv::FacetValues, qp::Int) = fv.normals[qp]
 
 nfacets(fv::FacetValues) = length(fv.geo_mapping)
 
-function set_current_facet!(fv::FacetValues, face_nr::Int)
-    # Checking face_nr before setting current_facet allows us to use @inbounds
+function set_current_facet!(fv::FacetValues, facet_nr::Int)
+    # Checking facet_nr before setting current_facet allows us to use @inbounds
     # when indexing by getcurrentfacet(fv) in other places!
-    checkbounds(Bool, 1:nfacets(fv), face_nr) || throw(ArgumentError("Face index out of range."))
-    fv.current_facet = face_nr
+    checkbounds(Bool, 1:nfacets(fv), facet_nr) || throw(ArgumentError("Facet nr is out of range."))
+    fv.current_facet = facet_nr
+    return
 end
 
-@inline function reinit!(fv::FacetValues, x::AbstractVector, face_nr::Int)
-    return reinit!(fv, nothing, x, face_nr)
+@inline function reinit!(fv::AbstractFacetValues, x::AbstractVector, facet_nr::Int)
+    return reinit!(fv, nothing, x, facet_nr)
 end
 
-function reinit!(fv::FacetValues, cell::Union{AbstractCell, Nothing}, x::AbstractVector{Vec{dim, T}}, face_nr::Int) where {dim, T}
+function reinit!(fv::FacetValues, cell::Union{AbstractCell, Nothing}, x::AbstractVector{Vec{dim, T}}, facet_nr::Int) where {dim, T}
     check_reinit_sdim_consistency(:FacetValues, shape_gradient_type(fv), eltype(x))
-    set_current_facet!(fv, face_nr)
+    set_current_facet!(fv, facet_nr)
     n_geom_basefuncs = getngeobasefunctions(fv)
     if !checkbounds(Bool, x, 1:n_geom_basefuncs) || length(x) != n_geom_basefuncs
         throw_incompatible_coord_length(length(x), n_geom_basefuncs)
@@ -132,21 +135,22 @@ function reinit!(fv::FacetValues, cell::Union{AbstractCell, Nothing}, x::Abstrac
     geo_mapping = get_geo_mapping(fv)
     fun_values = get_fun_values(fv)
 
-    if cell === nothing && !isa(mapping_type(fun_values), IdentityMapping)
+    if cell === nothing && reinit_needs_cell(fv)
         throw(ArgumentError("The cell::AbstractCell input is required to reinit! non-identity function mappings"))
     end
 
-    @inbounds for (q_point, w) in pairs(getweights(fv.fqr, face_nr))
+    @inbounds for (q_point, w) in pairs(getweights(fv.fqr, facet_nr))
         mapping = calculate_mapping(geo_mapping, q_point, x)
         J = getjacobian(mapping)
         # See the `Ferrite.embedding_det` docstring for more background
-        weight_norm = weighted_normal(J, getrefshape(geo_mapping.ip), face_nr)
+        weight_norm = weighted_normal(J, getrefshape(geo_mapping.ip), facet_nr)
         detJ = norm(weight_norm)
         detJ > 0.0 || throw_detJ_not_pos(detJ)
         @inbounds fv.detJdV[q_point] = detJ * w
         @inbounds fv.normals[q_point] = weight_norm / norm(weight_norm)
         apply_mapping!(fun_values, q_point, mapping, cell)
     end
+    return
 end
 
 function Base.show(io::IO, d::MIME"text/plain", fv::FacetValues)
@@ -155,17 +159,19 @@ function Base.show(io::IO, d::MIME"text/plain", fv::FacetValues)
     vdim = isa(shape_value(fv, 1, 1), Vec) ? length(shape_value(fv, 1, 1)) : 0
     GradT = shape_gradient_type(fv)
     sdim = GradT === nothing ? nothing : sdim_from_gradtype(GradT)
-    vstr = vdim==0 ? "scalar" : "vdim=$vdim"
+    vstr = vdim == 0 ? "scalar" : "vdim=$vdim"
     print(io, "FacetValues(", vstr, ", rdim=$rdim, sdim=$sdim): ")
-    nqp = getnquadpoints.(fv.fqr.face_rules)
-    if all(n==first(nqp) for n in nqp)
-        println(io, first(nqp), " quadrature points per face")
+    nqp = getnquadpoints.(fv.fqr.facet_rules)
+    if all(n == first(nqp) for n in nqp)
+        println(io, first(nqp), " quadrature points per facet")
     else
-        println(io, tuple(nqp...), " quadrature points on each face")
+        println(io, tuple(nqp...), " quadrature points on each facet")
     end
     print(io, " Function interpolation: "); show(io, d, function_interpolation(fv))
-    print(io, "\nGeometric interpolation: ");
+    print(io, "\nGeometric interpolation: ")
+    return sdim === nothing ? show(io, d, ip_geo) : show(io, d, ip_geo^sdim)
     sdim === nothing ? show(io, d, ip_geo) : show(io, d, ip_geo^sdim)
+    return
 end
 
 """
@@ -175,22 +181,22 @@ end
 for each dof-position determined by the `func_interpol`. Used mainly by the `ConstraintHandler`.
 """
 mutable struct BCValues{T}
-    const M::Array{T,3}
+    const M::Array{T, 3}
     const nqp::Array{Int}
     current_entity::Int
 end
 
-BCValues(func_interpol::Interpolation, geom_interpol::Interpolation, boundary_type::Type{<:BoundaryIndex} = FaceIndex) =
+BCValues(func_interpol::Interpolation, geom_interpol::Interpolation, boundary_type::Type{<:BoundaryIndex}) =
     BCValues(Float64, func_interpol, geom_interpol, boundary_type)
 
-function BCValues(::Type{T}, func_interpol::Interpolation{refshape}, geom_interpol::Interpolation{refshape}, boundary_type::Type{<:BoundaryIndex} = FaceIndex) where {T,dim,refshape <: AbstractRefShape{dim}}
+function BCValues(::Type{T}, func_interpol::Interpolation{refshape}, geom_interpol::Interpolation{refshape}, boundary_type::Type{<:BoundaryIndex}) where {T, dim, refshape <: AbstractRefShape{dim}}
     # set up quadrature rules for each boundary entity with dof-positions
     # (determined by func_interpol) as the quadrature points
     interpolation_coords = reference_coordinates(func_interpol)
 
-    qrs = QuadratureRule{refshape,Vector{T},Vector{Vec{dim,T}}}[]
+    qrs = QuadratureRule{refshape, Vector{T}, Vector{Vec{dim, T}}}[]
     for boundarydofs in dirichlet_boundarydof_indices(boundary_type)(func_interpol)
-        dofcoords = Vec{dim,T}[]
+        dofcoords = Vec{dim, T}[]
         for boundarydof in boundarydofs
             push!(dofcoords, interpolation_coords[boundarydof])
         end
@@ -199,10 +205,10 @@ function BCValues(::Type{T}, func_interpol::Interpolation{refshape}, geom_interp
     end
 
     n_boundary_entities = length(qrs)
-    n_qpoints = n_boundary_entities == 0 ? 0 : maximum(qr->length(getweights(qr)), qrs) # Bound number of qps correctly.
+    n_qpoints = n_boundary_entities == 0 ? 0 : maximum(qr -> length(getweights(qr)), qrs) # Bound number of qps correctly.
     n_geom_basefuncs = getnbasefunctions(geom_interpol)
-    M   = fill(zero(T) * T(NaN), n_geom_basefuncs, n_qpoints, n_boundary_entities)
-    nqp = zeros(Int,n_boundary_entities)
+    M = fill(zero(T) * T(NaN), n_geom_basefuncs, n_qpoints, n_boundary_entities)
+    nqp = zeros(Int, n_boundary_entities)
 
     for n_boundary_entity in 1:n_boundary_entities
         for (qp, ξ) in pairs(qrs[n_boundary_entity].points)
@@ -211,17 +217,17 @@ function BCValues(::Type{T}, func_interpol::Interpolation{refshape}, geom_interp
         nqp[n_boundary_entity] = length(qrs[n_boundary_entity].points)
     end
 
-    BCValues{T}(M, nqp, 0)
+    return BCValues{T}(M, nqp, 0)
 end
 
 getnquadpoints(bcv::BCValues) = bcv.nqp[bcv.current_entity]
-function spatial_coordinate(bcv::BCValues, q_point::Int, xh::AbstractVector{Vec{dim,T}}) where {dim,T}
+function spatial_coordinate(bcv::BCValues, q_point::Int, xh::AbstractVector{Vec{dim, T}}) where {dim, T}
     n_base_funcs = size(bcv.M, 1)
     length(xh) == n_base_funcs || throw_incompatible_coord_length(length(xh), n_base_funcs)
-    x = zero(Vec{dim,T})
-    face = bcv.current_entity[]
+    x = zero(Vec{dim, T})
+    facet = bcv.current_entity[]
     @inbounds for i in 1:n_base_funcs
-        x += bcv.M[i,q_point,face] * xh[i] # geometric_value(fe_v, q_point, i) * xh[i]
+        x += bcv.M[i, q_point, facet] * xh[i] # geometric_value(fe_v, q_point, i) * xh[i]
     end
     return x
 end

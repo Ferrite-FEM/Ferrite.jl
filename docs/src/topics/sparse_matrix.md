@@ -43,7 +43,7 @@ with linear Lagrange interpolation) this would be reduced to 216 MB.
 
     To give an example, in this one-dimensional heat problem (see the [Heat
     equation](../tutorials/heat_equation.md) tutorial for the weak form) we have 4 nodes
-    with 3 elements in between. For simplicitly DoF numbers and node numbers are the same
+    with 3 elements in between. For simplicity DoF numbers and node numbers are the same
     but this is not true in general since nodes and DoFs can be numbered independently (and
     in fact are numbered independently in Ferrite).
 

@@ -12,7 +12,7 @@ mutable struct Page{T}
     const blocksize::Int      # blocksize for this page
     const freelist::BitVector # block is free/used
     n_free::Int               # number of free blocks
-    function Page{T}(blocksize::Int) where T
+    function Page{T}(blocksize::Int) where {T}
         @assert isbitstype(T)
         buf = Vector{T}(undef, PAGE_SIZE ÷ sizeof(T))
         n_blocks, r = divrem(length(buf), blocksize)
@@ -80,7 +80,7 @@ end
 
 struct MemoryPool{T}
     books::Vector{Book{T}} # blocksizes 2, 4, 6, 8, ...
-    function MemoryPool{T}() where T
+    function MemoryPool{T}() where {T}
         mempool = new(Book{T}[])
         return mempool
     end
@@ -96,7 +96,7 @@ function free(mempool::MemoryPool)
     return
 end
 
-function mempool_stats(mempool::MemoryPool{T}) where T
+function mempool_stats(mempool::MemoryPool{T}) where {T}
     bytes_used = 0
     bytes_allocated = 0
     for bookidx in 1:length(mempool.books)
@@ -110,7 +110,7 @@ function mempool_stats(mempool::MemoryPool{T}) where T
     return bytes_used, bytes_allocated
 end
 
-function Base.show(io::IO, ::MIME"text/plain", mempool::MemoryPool{T}) where T
+function Base.show(io::IO, ::MIME"text/plain", mempool::MemoryPool{T}) where {T}
     n_books = count(i -> isassigned(mempool.books, i), 1:length(mempool.books))
     print(io, "PoolAllocator.MemoryPool{$(T)} with $(n_books) fixed size pools")
     n_books == 0 && return
@@ -121,7 +121,7 @@ function Base.show(io::IO, ::MIME"text/plain", mempool::MemoryPool{T}) where T
         blocksize = h.blocksize
         # @assert blocksize == 2^idx
         npages = length(h.pages)
-        n_free = mapreduce(p -> p.n_free, +, h.pages; init=0)
+        n_free = mapreduce(p -> p.n_free, +, h.pages; init = 0)
         n_tot = npages * PAGE_SIZE ÷ blocksize ÷ sizeof(T)
         println(io, " - blocksize: $(blocksize), npages: $(npages), usage: $(n_tot - n_free) / $(n_tot)")
     end
@@ -164,10 +164,10 @@ const PoolVector{T} = PoolArray{T, 1}
 
 # Constructors
 function malloc(mempool::MemoryPool, dim1::Int)
-    return malloc(mempool, (dim1, ))
+    return malloc(mempool, (dim1,))
 end
 function malloc(mempool::MemoryPool, dim1::Int, dim2::Int, dimx::Int...)
-    dims = (dim1, dim2, map(Int, dimx)..., )
+    dims = (dim1, dim2, map(Int, dimx)...)
     return malloc(mempool, dims)
 end
 
@@ -176,7 +176,7 @@ function free(x::PoolArray)
     return
 end
 
-function realloc(x::PoolArray{T}, newsize::Int) where T
+function realloc(x::PoolArray{T}, newsize::Int) where {T}
     @assert newsize > length(x) # TODO: Allow shrinkage?
     @assert newsize <= PAGE_SIZE ÷ sizeof(T) # TODO: Might be required
     # Find the page for the block to make sure it was allocated in this mempool
@@ -198,22 +198,22 @@ Base.IndexStyle(::Type{<:PoolArray}) = IndexLinear()
     @boundscheck checkbounds(mv, i)
     return @inbounds mv.page.buf[mv.offset + i]
 end
-@propagate_inbounds function Base.setindex!(mv::PoolArray{T}, v::T, i::Int) where T
+@propagate_inbounds function Base.setindex!(mv::PoolArray{T}, v::T, i::Int) where {T}
     @boundscheck checkbounds(mv, i)
     @inbounds mv.page.buf[mv.offset + i] = v
     return mv
 end
 
 # Utilities needed for the sparsity pattern
-@inline function resize(x::PoolVector{T}, n::Int) where T
+@inline function resize(x::PoolVector{T}, n::Int) where {T}
     if n > allocated_length(x)
         return realloc(x, n)
     else
-        return PoolVector{T}(x.mempool, x.page, x.offset, (n, ))
+        return PoolVector{T}(x.mempool, x.page, x.offset, (n,))
     end
 end
 
-@inline function insert(x::PoolVector{T}, k::Int, item::T) where T
+@inline function insert(x::PoolVector{T}, k::Int, item::T) where {T}
     lx = length(x)
     # Make room
     x = resize(x, lx + 1)

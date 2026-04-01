@@ -27,11 +27,12 @@ Ferrite.eachrow(tp::TestPattern, r::Int) = tp.data[r]
 function compare_patterns(p1, px...)
     @test all(p -> Ferrite.getnrows(p1) == Ferrite.getnrows(p), px)
     @test all(p -> Ferrite.getncols(p1) == Ferrite.getncols(p), px)
-    for rs in zip(Ferrite.eachrow.((p1, px...,))...)
+    for rs in zip(Ferrite.eachrow.((p1, px...))...)
         for cs in zip(rs...)
             @test all(c -> cs[1] == c, cs)
         end
     end
+    return
 end
 
 # Compare the storage of SparseMatrixCSC
@@ -67,16 +68,16 @@ end
         # Error paths
         @test_throws BoundsError Ferrite.add_entry!(dsp, 0, 1)
         @test_throws BoundsError Ferrite.add_entry!(dsp, 1, 0)
-        @test_throws BoundsError Ferrite.add_entry!(dsp, m+1, 1)
-        @test_throws BoundsError Ferrite.add_entry!(dsp, 1, n+1)
+        @test_throws BoundsError Ferrite.add_entry!(dsp, m + 1, 1)
+        @test_throws BoundsError Ferrite.add_entry!(dsp, 1, n + 1)
     end
 
     function testdhch()
         local grid, dh, ch
         grid = generate_grid(Quadrilateral, (2, 1))
         dh = DofHandler(grid)
-        add!(dh, :v, Lagrange{RefQuadrilateral,1}()^2)
-        add!(dh, :s, Lagrange{RefQuadrilateral,1}())
+        add!(dh, :v, Lagrange{RefQuadrilateral, 1}()^2)
+        add!(dh, :s, Lagrange{RefQuadrilateral, 1}())
         close!(dh)
         ch = ConstraintHandler(dh)
         add!(ch, Dirichlet(:v, getfacetset(grid, "left"), (x, t) -> 0, [2]))
@@ -225,7 +226,7 @@ end
     add!(dh, :p, Lagrange{RefHexahedron, 1}())
     close!(dh)
     ch = ConstraintHandler(dh)
-    add!(ch, Dirichlet(:p, union(getfacetset.(Ref(grid), ("left", "right", "top", "bottom", "front", "back"),)...), x -> 0))
+    add!(ch, Dirichlet(:p, union(getfacetset.(Ref(grid), ("left", "right", "top", "bottom", "front", "back"))...), x -> 0))
     add!(ch, PeriodicDirichlet(:u, collect_periodic_facets(grid)))
     close!(ch)
 
@@ -270,7 +271,7 @@ end
     # Ignore constrained dofs
     ps = make_patterns(dh)
     for p in ps
-        add_sparsity_entries!(p, dh, ch; keep_constrained=false)
+        add_sparsity_entries!(p, dh, ch; keep_constrained = false)
         # Test that prescribed dofs only have diagonal entry
         for row in ch.prescribed_dofs
             r = Ferrite.eachrow(p, row)
@@ -319,14 +320,14 @@ end
         BlockSparsityPattern([ndofs(dh) ÷ 2, ndofs(dh) - ndofs(dh) ÷ 2]),
     )
     for p in patterns
-        @test_throws ErrorException add_sparsity_entries!(p, dh; keep_constrained=false)
+        @test_throws ErrorException add_sparsity_entries!(p, dh; keep_constrained = false)
     end
     ch_open = ConstraintHandler(dh)
     for p in patterns
-        @test_throws ErrorException add_sparsity_entries!(p, dh, ch_open; keep_constrained=false)
+        @test_throws ErrorException add_sparsity_entries!(p, dh, ch_open; keep_constrained = false)
     end
     ch_bad = ConstraintHandler(close!(DofHandler(grid)))
     for p in patterns
-        @test_throws ErrorException add_sparsity_entries!(p, dh, ch_bad; keep_constrained=false)
+        @test_throws ErrorException add_sparsity_entries!(p, dh, ch_bad; keep_constrained = false)
     end
 end

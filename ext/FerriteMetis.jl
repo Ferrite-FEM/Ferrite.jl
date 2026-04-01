@@ -8,7 +8,7 @@ using Metis.LibMetis: idx_t
 using Metis: Metis
 
 struct MetisOrder <: DofOrder.Ext{Metis}
-    coupling::Union{Matrix{Bool},Nothing}
+    coupling::Union{Matrix{Bool}, Nothing}
 end
 
 """
@@ -21,16 +21,16 @@ DoFs the field/component coupling can be provided; see [`allocate_matrix`](@ref)
 details.
 """
 function DofOrder.Ext{Metis}(;
-    coupling::Union{AbstractMatrix{Bool},Nothing}=nothing,
-)
+        coupling::Union{AbstractMatrix{Bool}, Nothing} = nothing,
+    )
     return MetisOrder(coupling)
 end
 
 function Ferrite.compute_renumber_permutation(
-    dh::DofHandler,
-    ch::Union{ConstraintHandler,Nothing},
-    order::DofOrder.Ext{Metis}
-)
+        dh::DofHandler,
+        ch::Union{ConstraintHandler, Nothing},
+        order::DofOrder.Ext{Metis}
+    )
 
     # Expand the coupling matrix to size ndofs_per_cell × ndofs_per_cell
     coupling = order.coupling
