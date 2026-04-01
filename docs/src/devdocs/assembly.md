@@ -1,6 +1,19 @@
 # [Assembly](@id devdocs-assembly)
 
-The assembler handles the insertion of the element matrices and element vectors into the system matrix and right hand side.
+An assembler handles the insertion of the element matrices and element vectors into the system matrix and vector.
+and should *normally* (the exact interface is yet to be fully established) subtype `AbstractAssembler{T}`. Here `T` is the
+`eltype` of the contained system matrix and vector. This allows the user to infer the eltype when preallocating the element
+matrix and vector, e.g.
+```julia
+function doassemble!(assembler::Ferrite.AbstractAssembler{T}, ...) where {T}
+    Ke = zeros(T, n, n) # n = dofs per cell
+    fe = zeros(T, n)
+    for cell in CellIterator(...)
+        element_routine!(Ke, fe, cell, ...)
+        assemble!(assembler, celldofs(cell), Ke, fe)
+    end
+end
+```
 
 ## Custom matrix formats
 While the CSC and CSR formats are the most common sparse matrix formats in practice, users might want to have optimized custom matrix formats for their specific use-case. The default assemblers [`Ferrite.CSCAssembler`](@ref) and [`Ferrite.CSRAssembler`](@ref) should be able to handle most cases in practice. To support a custom format users have to dispatch the following functions on their matrix type. There is the public interface
