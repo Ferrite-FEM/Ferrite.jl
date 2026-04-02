@@ -692,10 +692,19 @@ end
 # FastSparsityPattern #
 ## ================= ##
 
-# Full `AbstractSparsityPattern` interface not supported
-# For now, this remains a non-public fast-path for `allocate_matrix(MatrixType, dh)`,
-# but can be extended in the future or potentially replace `SparsityPattern`.
-# See #1302 for details.
+"""
+    FastSparsityPattern([Ti = Int64], dh::DofHandler)
+
+This sparsity does not currently support the full `AbstractSparsityPattern` interface,
+but is used as an internal fast-path for `allocate_matrix(MatrixType, dh)` for some
+supported `MatrixType`s. It can be extended in the future or potentially be merged
+with `SparsityPattern`. See #1302 for details.
+
+!!! warning "Internal"
+    `FastSparsityPattern` is strictly internal and its interface and implementation
+    may change at any time.
+
+"""
 mutable struct FastSparsityPattern{Ti} <: AbstractSparsityPattern
     const rowlen::Vector{Ti} # Number of stored entries in each row
     const marker::Vector{Ti} # Marker if column has been "visited" by certain row
