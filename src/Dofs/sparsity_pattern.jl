@@ -698,7 +698,8 @@ end
 This sparsity does not currently support the full `AbstractSparsityPattern` interface,
 but is used as an internal fast-path for `allocate_matrix(MatrixType, dh)` for some
 supported `MatrixType`s. It can be extended in the future or potentially be merged
-with `SparsityPattern`. See #1302 for details.
+with `SparsityPattern`.
+See [#1302](https://github.com/Ferrite-FEM/Ferrite.jl/pull/1302) for details.
 
 !!! warning "Internal"
     `FastSparsityPattern` is strictly internal and its interface and implementation
