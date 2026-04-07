@@ -590,7 +590,7 @@ conditions specified in `ch` such that `K \\ rhs` gives the expected solution.
 !!! note
     `apply!(K, rhs, ch)` essentially calculates
     ```julia
-    rhs[free] = rhs[free] - K[constrained, constrained] * a[constrained]
+    rhs[free] = rhs[free] - K[free, constrained] * a[constrained]
     ```
     where `a[constrained]` are the inhomogeneities. Consequently, the sign of `rhs` matters
     (in contrast with `apply_zero!`).

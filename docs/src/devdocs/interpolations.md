@@ -11,9 +11,7 @@ order. The [how-to at bottom of this page](@ref devdocs-howto_new-interpolation)
 Ferrite.reference_shape_value(::Interpolation, ::Vec, ::Int)
 Ferrite.reference_coordinates(::Interpolation)
 Ferrite.vertexdof_indices(::Interpolation)
-Ferrite.facedof_indices(::Interpolation)
 Ferrite.facedof_interior_indices(::Interpolation)
-Ferrite.edgedof_indices(::Interpolation)
 Ferrite.edgedof_interior_indices(::Interpolation)
 Ferrite.volumedof_interior_indices(::Interpolation)
 Ferrite.adjust_dofs_during_distribution(::Interpolation)
@@ -39,6 +37,13 @@ mapping type must be specified.
 ```@docs
 Ferrite.mapping_type
 Ferrite.get_direction
+```
+
+#### Interpolations that cannot be constructed from their type
+For interpolations, `ip`, for which `ip == typeof(ip)()` is false (or doesn't work), the following must be implemented manually
+```@docs
+Ferrite.edgedof_indices(::Interpolation)
+Ferrite.facedof_indices(::Interpolation)
 ```
 
 ### The defaults should always work
