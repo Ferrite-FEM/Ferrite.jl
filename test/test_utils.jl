@@ -2,6 +2,46 @@
 
 using Ferrite: reference_shape_value
 
+struct TensorProductQ9TestInterpolation <: Ferrite.ScalarInterpolation{RefQuadrilateral, 2} end
+Ferrite.adjust_dofs_during_distribution(::TensorProductQ9TestInterpolation) = false
+Ferrite.getnbasefunctions(::TensorProductQ9TestInterpolation) = 9
+Ferrite.vertexdof_indices(::TensorProductQ9TestInterpolation) = ((1,), (3,), (9,), (7,))
+Ferrite.edgedof_indices(::TensorProductQ9TestInterpolation) = ((1, 3, 2), (3, 9, 6), (9, 7, 8), (7, 1, 4))
+Ferrite.edgedof_interior_indices(::TensorProductQ9TestInterpolation) = ((2,), (6,), (8,), (4,))
+Ferrite.facedof_indices(ip::TensorProductQ9TestInterpolation) = ((1, 3, 9, 7, 2, 6, 8, 4, 5),)
+Ferrite.facedof_interior_indices(::TensorProductQ9TestInterpolation) = ((5,),)
+Ferrite.conformity(::TensorProductQ9TestInterpolation) = Ferrite.H1Conformity()
+
+function Ferrite.reference_coordinates(::TensorProductQ9TestInterpolation)
+    return [
+        Vec{2, Float64}((-1.0, -1.0)),
+        Vec{2, Float64}((0.0, -1.0)),
+        Vec{2, Float64}((1.0, -1.0)),
+        Vec{2, Float64}((-1.0, 0.0)),
+        Vec{2, Float64}((0.0, 0.0)),
+        Vec{2, Float64}((1.0, 0.0)),
+        Vec{2, Float64}((-1.0, 1.0)),
+        Vec{2, Float64}((0.0, 1.0)),
+        Vec{2, Float64}((1.0, 1.0)),
+    ]
+end
+
+function Ferrite.reference_shape_value(ip::TensorProductQ9TestInterpolation, ξ::Vec{2}, i::Int)
+    ξ_x = ξ[1]
+    ξ_y = ξ[2]
+    i == 1 && return (ξ_x^2 - ξ_x) * (ξ_y^2 - ξ_y) / 4
+    i == 3 && return (ξ_x^2 + ξ_x) * (ξ_y^2 - ξ_y) / 4
+    i == 9 && return (ξ_x^2 + ξ_x) * (ξ_y^2 + ξ_y) / 4
+    i == 7 && return (ξ_x^2 - ξ_x) * (ξ_y^2 + ξ_y) / 4
+    i == 2 && return (1 - ξ_x^2) * (ξ_y^2 - ξ_y) / 2
+    i == 6 && return (ξ_x^2 + ξ_x) * (1 - ξ_y^2) / 2
+    i == 8 && return (1 - ξ_x^2) * (ξ_y^2 + ξ_y) / 2
+    i == 4 && return (ξ_x^2 - ξ_x) * (1 - ξ_y^2) / 2
+    i == 5 && return (1 - ξ_x^2) * (1 - ξ_y^2)
+    throw(ArgumentError("no shape function $i for interpolation $ip"))
+end
+
+
 #####################################
 # Volume for the reference elements #
 #####################################
