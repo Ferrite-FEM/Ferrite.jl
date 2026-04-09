@@ -29,7 +29,7 @@ end
 
 # -------------------- assembler ----------------------
 
-struct DeviceCSCAssembler{KType, FType}
+struct DeviceCSCAssembler{KType, FType} <: Ferrite.AbstractAssembler
     K::KType
     f::FType
 end
