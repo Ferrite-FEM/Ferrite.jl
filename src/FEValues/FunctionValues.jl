@@ -164,7 +164,9 @@ required_geo_diff_order(::CovariantPiolaMapping, fun_diff_order::Int) = 1 + fun_
             MixedTensor2{2, 1}, MixedTensor2{3, 1}, MixedTensor2{3, 2},
         }
     )
-    return inv(tdot(J)) ⋅ (J)' # Optimized pinv for invertible `J'⋅J`
+    # Optimized Moore-Penrose pseudo inverse.
+    # We assume that `J'⋅J` is invertible. This is a reasonable for non-degenerate elements.
+    return inv(tdot(J)) ⋅ (J)' 
 end
 
 # =============
