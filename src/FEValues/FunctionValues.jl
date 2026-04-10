@@ -4,7 +4,7 @@
 # rdim = reference dimension (dimension in isoparametric space) #
 # vdim = vector dimension (dimension of the field)              #
 #################################################################
-
+# The following internal dispatches are used to correctly preallocate fields in `FunctionValues` below
 typeof_N(::Type{T}, ::ScalarInterpolation, ::VectorizedInterpolation{sdim, <:AbstractRefShape{rdim}}) where {T, sdim, rdim} = T
 typeof_dNdx(::Type{T}, ::ScalarInterpolation, ::VectorizedInterpolation{sdim, <:AbstractRefShape{rdim}}) where {T, sdim, rdim} = Vec{sdim, T}
 typeof_dNdξ(::Type{T}, ::ScalarInterpolation, ::VectorizedInterpolation{sdim, <:AbstractRefShape{rdim}}) where {T, sdim, rdim} = Vec{rdim, T}
