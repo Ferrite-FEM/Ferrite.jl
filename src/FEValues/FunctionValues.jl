@@ -159,10 +159,12 @@ required_geo_diff_order(::CovariantPiolaMapping, fun_diff_order::Int) = 1 + fun_
 
 # Support for embedded elements
 @inline calculate_Jinv(J::Tensor{2}) = inv(J)
-# TODO: Have Tensors.jl support pinv?
-@inline function calculate_Jinv(J::MixedTensor2{dim1, dim2}) where {dim1, dim2}
-    Js = SMatrix{dim1, dim2}(J.data)
-    return MixedTensor2{dim2, dim1}((pinv(Js)...,))
+@inline function calculate_Jinv(
+        J::Union{ #MixedTensor2{sdim, rdim}
+            MixedTensor2{2, 1}, MixedTensor2{3, 1}, MixedTensor2{3, 2},
+        }
+    )
+    return inv(tdot(J)) ⋅ (J)' # Optimized pinv for invertible `J'⋅J`
 end
 
 # =============
