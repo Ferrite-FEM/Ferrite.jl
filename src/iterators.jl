@@ -412,3 +412,31 @@ function _check_same_celltype(grid::AbstractGrid, facetset::AbstractVecOrSet{<:B
     end
     return
 end
+
+
+# NOTE CellCache is mutable and hence inherently incompatible with GPU. So here is the
+# immutable variant. Making the CellCache immutable is considered breaking due to the reinit! API integration.
+struct ImmutableCellCache{G <: AbstractGrid, SDH, IVT, VX}
+    flags::UpdateFlags
+    grid::G
+    cellid::Int
+    nodes::IVT
+    coords::VX
+    sdh::SDH
+    dofs::IVT
+end
+function (cc::ImmutableCellCache)(cellid::Int)
+    cc2 = ImmutableCellCache(cc.flags, cc.grid, cellid, cc.nodes, cc.coords, cc.sdh, cc.dofs)
+    reinit!(cc2, cellid)
+    return cc2
+end
+
+function ImmutableCellCache(dh::AbstractDofHandler, flags::UpdateFlags = UpdateFlags())
+    grid = get_grid(dh)
+    n = ndofs_per_cell(dh, 1)
+    N = nnodes_per_cell(grid, 1)
+    nodes = zeros(Int, N)
+    coords = zeros(get_coordinate_type(grid), N)
+    celldofs = zeros(Int, n)
+    return ImmutableCellCache(flags, grid, -1, nodes, coords, dh, celldofs)
+end

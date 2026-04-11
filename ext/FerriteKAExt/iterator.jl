@@ -1,19 +1,4 @@
-# NOTE CellCache is mutable and hence inherently incompatible with GPU. So here is the
-# immutable variant. Making the CellCache immutable is considered breaking due to the reinit! API integration.
-struct ImmutableCellCache{G <: AbstractGrid, SDH, IVT, VX}
-    flags::UpdateFlags
-    grid::G
-    cellid::Int
-    nodes::IVT
-    coords::VX
-    sdh::SDH
-    dofs::IVT
-end
-function (cc::ImmutableCellCache)(cellid::Int)
-    cc2 = ImmutableCellCache(cc.flags, cc.grid, cellid, cc.nodes, cc.coords, cc.sdh, cc.dofs)
-    reinit!(cc2, cellid)
-    return cc2
-end
+
 Adapt.@adapt_structure ImmutableCellCache
 function adapt_structure(to, ccc::CellCacheContainer)
     inner_values = adapt(to, ccc.values)

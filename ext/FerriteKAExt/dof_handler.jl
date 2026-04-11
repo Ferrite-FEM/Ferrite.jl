@@ -68,6 +68,8 @@ function HostDofHandler(backend, dh::DofHandler)
     return HostDofHandler(subdofhandlers, gpu_grid, dh)
 end
 
+Ferrite.ndofs_per_cell(dh::HostDofHandler, i) = Ferrite.ndofs_per_cell(dh.original_dh, i)
+
 function Adapt.adapt_structure(to::KA.Backend, dh::DofHandler)
     return HostDofHandler(to, dh)
 end

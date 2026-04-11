@@ -5,7 +5,7 @@ import KernelAbstractions: @kernel, @index
 import KernelAbstractions as KA
 using SparseArrays
 
-import Ferrite: CellValuesContainer, CellCacheContainer
+import Ferrite: distribute_to_tasks, ImmutableCellCache
 
 # We start with some to be used in the following for simple convenience.
 const NUM_THREADS = 64
@@ -179,8 +179,8 @@ f_gpu = KA.zeros(backend, Float32, (ndofs(dh),))
 # into a suitable GPU format.
 # n_workers = ceil(Int, length(grid.cells) / NUM_THREADS) # FIXME does not match the used 493
 n_workers = getncells(grid)
-cv_gpu = CellValuesContainer(backend, n_workers, cv)
-cc_gpu = CellCacheContainer(backend, n_workers, dh_gpu)
+cv_gpu = distribute_to_tasks(backend, cv, n_workers)
+cc_gpu = distribute_to_tasks(backend, ImmutableCellCache(dh_gpu), n_workers)
 # Technically we can also just get one Ke or fe per worker, but for demonstration
 # purposes we allocate the full block here for element-assembly style matrix-free GPU
 # usage.
