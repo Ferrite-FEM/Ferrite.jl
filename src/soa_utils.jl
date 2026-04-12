@@ -1,65 +1,78 @@
+# General multithreading part
+"""
+    distribute_to_tasks(backend, obj, num_tasks)
+
+Distribute the object `obj` to `num_tasks` based on the chosen backend for task-based paralellism.
+Returns `d::AbstractVector{T}` where `T` is loosely equivalent to `typeof(obj)`, meaning that most
+methods are applicable to both types. Supported `backend`s are
+
+"""
+function distribute_to_tasks end
+
+#=
+# With https://github.com/Ferrite-FEM/Ferrite.jl/pull/1070 we can have
+
+struct FerriteCPU end
+
+"""
+    distribute_to_tasks(obj, num_tasks)
+
+Distribute the object `obj` to `num_tasks` for multithreaded CPU, equivalent to
+`distribute_to_tasks(FerriteCPU(), obj, num_tasks)`.
+"""
+distribute_to_tasks(obj, num_tasks) = distribute_to_tasks(FerriteCPU(), obj, num_tasks)
+
+function distribute_to_tasks(::FerriteCPU, obj, num_tasks)
+    return [task_local_copy(obj) for _ in 1:num_tasks]
+end
+=#
+
 # ------------------------------ User-facing part -------------------------------
-struct CellValuesContainer{ReturnedFEVType, InnerFEVType} <: AbstractVector{ReturnedFEVType}
-    values::InnerFEVType
+struct SoAContainer{T, T_inner} <: AbstractVector{T}
+    soa::T_inner
+    nels::Int
+    function SoAContainer(soa::T_inner, nels::Int) where {T_inner}
+        #TODO: Check bounds here so we can guarantee inbounds later?
+        T = typeof(get_substruct(1, soa))
+        return new{T, T_inner}(soa, nels)
+    end
 end
 
-Base.size(cv::CellValuesContainer) = size(cv.values.detJdV, 1)
-Base.axes(cv::CellValuesContainer) = (size(cv.values.detJdV, 1),)
-Base.getindex(cv::CellValuesContainer, i::Int) = get_substruct(i, cv.values)
-
-function CellValuesContainer(backend, outer_dim, cv::CellValues)
-    inner_values = as_structure_of_arrays(backend, outer_dim, cv)
-    return CellValuesContainer{typeof(get_substruct(1, inner_values)), typeof(inner_values)}(inner_values)
+Base.size(c::SoAContainer) = (c.nels,)
+Base.getindex(c::SoAContainer, i::Integer) = get_substruct(i, c.soa) # TODO: Why reverse indexing here???
+function Base.show(io::IO, d::MIME"text/plain", c::SoAContainer{T}) where {T}
+    println(io, "SoAContainer{$T}")
+    print(io, "Structure of Arrays container with $(c.nels) elements.")
+    #= # Requires GPUArraysCore dependency
+    println(io, " First element:")
+    GPUArraysCore.allowscalar() do
+        show(io, d, c[1])
+    end
+    =#
 end
 
-function CellValuesContainer(backend, outer_dim, args...; kwargs...)
-    inner_values = as_structure_of_arrays(backend, outer_dim, CellValues, args...; kwargs...)
-    return CellValuesContainer{typeof(get_substruct(1, inner_values)), typeof(inner_values)}(inner_values)
-end
 
-function FacetValuesContainer(backend, outer_dim, args...; kwargs...)
-    inner_values = as_structure_of_arrays(backend, outer_dim, FacetValues, args...; kwargs...)
-    return error("TODO: Implement FacetValuesContainer")
-end
-
-struct CellCacheContainer{ReturnedCCType, InnerCCType} <: AbstractVector{ReturnedCCType}
-    values::InnerCCType
-end
-Base.size(cc::CellCacheContainer) = size(cc.values.coords, 1)
-Base.axes(cc::CellCacheContainer) = (size(cc.values.coords, 1),)
-Base.getindex(cc::CellCacheContainer, i::Int) = get_substruct(i, cc.values, -1)
-
-function CellCacheContainer(backend, outer_dim, args...; kwargs...)
-    inner_values = as_structure_of_arrays(backend, outer_dim, CellCache, args...; kwargs...)
-    return CellCacheContainer{typeof(get_substruct(1, inner_values, -1)), typeof(inner_values)}(inner_values)
-end
-
-# ------------------------------ Internal part --------------------------------------
-function as_structure_of_arrays(d, outer_dim, ::Type{ThingType}, args...; kwargs...) where {ThingType}
-    error("Structure of Arrays transformation not defined for object of type $(ThingType) device $d . Are all extensions loaded?")
-end
-
-function as_structure_of_arrays(d, outer_dim, thing)
-    error("Structure of Arrays transformation not defined for object of type $(typeof(thing)) device $d . Are all extensions loaded?")
-end
+view_from_shared(::Nothing, i::Integer) = nothing
+view_from_shared(a::AbstractArray{<:Any, 2}, i::Integer) = view(a, i, :)
+view_from_shared(a::AbstractArray{<:Any, 3}, i::Integer) = view(a, i, :, :)
 
 # Extract the i-th worker's local slice from batched device data
 function get_substruct(i, cv::CellValues)
-    return CellValues(
-        get_substruct(i, cv.fun_values), get_substruct(i, cv.geo_mapping),
-        cv.qr, view(cv.detJdV, i, :)
-    )
+    fv = get_substruct(i, cv.fun_values)
+    return CellValues(fv, cv.geo_mapping, cv.qr, view_from_shared(cv.detJdV, i))
 end
 
 function get_substruct(i, fv::FunctionValues)
-    Nx = fv.Nξ === fv.Nx ? fv.Nx : view(fv.Nx, i, :, :)
-    dNdx = fv.dNdx === nothing ? nothing : view(fv.dNdx, i, :, :)
-    return FunctionValues(
-        fv.ip, Nx, fv.Nξ,
-        dNdx, fv.dNdξ, nothing, nothing
-    )
+    Nx = fv.Nξ === fv.Nx ? fv.Nx : view_from_shared(fv.Nx, i)
+    dNdx = view_from_shared(fv.dNdx, i)
+    d2Ndx2 = view_from_shared(fv.d2Ndx2, i)
+    return FunctionValues(fv.ip, Nx, fv.Nξ, dNdx, fv.dNdξ, d2Ndx2, fv.d2Ndξ2)
 end
 
-function get_substruct(i, fv::GeometryMapping)
-    return GeometryMapping(fv.ip, view(fv.M, i, :, :), fv.dMdξ, fv.d2Mdξ2)
+function get_substruct(i, cc::ImmutableCellCache)
+    return ImmutableCellCache(
+        cc.flags, cc.grid, -1,
+        view_from_shared(cc.nodes, i), view_from_shared(cc.coords, i), 
+        cc.sdh, view_from_shared(cc.dofs, i)
+    )
 end

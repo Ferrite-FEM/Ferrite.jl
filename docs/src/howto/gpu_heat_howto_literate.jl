@@ -5,7 +5,7 @@ import KernelAbstractions: @kernel, @index
 import KernelAbstractions as KA
 using SparseArrays
 
-import Ferrite: CellValuesContainer, CellCacheContainer
+import Ferrite: distribute_to_tasks, ImmutableCellCache
 
 # We start with some to be used in the following for simple convenience.
 const NUM_THREADS = 64
@@ -78,7 +78,7 @@ end
         assemble_cell!(Ke, fe, cc_i, cv_i, assembler)
     end
 end
-function assemble_global_ka!(backend, cv::CellValuesContainer, K, f, cc, colors::Vector, Ke, fe)
+function assemble_global_ka!(backend, cv, K, f, cc, colors::Vector, Ke, fe)
     assembler = K === nothing ? nothing : start_assemble(K, f)
     for color in colors
         ## We divide the work into blocks and fire up the kernel.
@@ -118,7 +118,7 @@ function cuda_assembly_kernel(assembler, color, cc, cv, Kes, fes)
     end
     return nothing
 end
-function assemble_global_cuda!(cv::CellValuesContainer, K, f, cc, colors::Vector, Ke, fe)
+function assemble_global_cuda!(cv, K, f, cc, colors::Vector, Ke, fe)
     assembler = K === nothing ? nothing : start_assemble(K, f)
     for color in colors
         n = length(color)
@@ -179,8 +179,8 @@ f_gpu = KA.zeros(backend, Float32, (ndofs(dh),))
 # into a suitable GPU format.
 # n_workers = ceil(Int, length(grid.cells) / NUM_THREADS) # FIXME does not match the used 493
 n_workers = getncells(grid)
-cv_gpu = CellValuesContainer(backend, n_workers, cv)
-cc_gpu = CellCacheContainer(backend, n_workers, dh_gpu)
+cv_gpu = distribute_to_tasks(backend, cv, n_workers)
+cc_gpu = distribute_to_tasks(backend, ImmutableCellCache(dh_gpu), n_workers)
 # Technically we can also just get one Ke or fe per worker, but for demonstration
 # purposes we allocate the full block here for element-assembly style matrix-free GPU
 # usage.
@@ -204,3 +204,10 @@ close!(ch)
 ch_gpu = adapt(backend, ch)
 apply!(K_gpu, f_gpu, ch_gpu)
 u_gpu = SparseMatrixCSC(K_gpu) \ Vector(f_gpu)
+
+using Test                                                  #hide
+K_cpu = allocate_matrix(SparseMatrixCSC{Float32, Int}, dh)  #hide
+f_cpu = zeros(Float32, ndofs(dh))                           #hide
+assemble_global!(cv, K_cpu, f_cpu, dh)                      #hide
+apply!(K_cpu, f_cpu, ch)                                    #hide
+@test u_gpu ≈ K_cpu \ f_cpu                                 #hide
