@@ -204,3 +204,10 @@ close!(ch)
 ch_gpu = adapt(backend, ch)
 apply!(K_gpu, f_gpu, ch_gpu)
 u_gpu = SparseMatrixCSC(K_gpu) \ Vector(f_gpu)
+
+using Test                                                  #hide
+K_cpu = allocate_matrix(SparseMatrixCSC{Float32, Int}, dh)  #hide
+f_cpu = zeros(Float32, ndofs(dh))                           #hide
+assemble_global!(cv, K_cpu, f_cpu, dh)                      #hide
+apply!(K_cpu, f_cpu, ch)                                    #hide
+@test u_gpu ≈ K_cpu \ f_cpu                                 #hide

@@ -51,13 +51,6 @@ function Base.show(io::IO, d::MIME"text/plain", c::SoAContainer{T}) where {T}
     =#
 end
 
-function as_structure_of_arrays(d, outer_dim, ::Type{ThingType}, args...; kwargs...) where {ThingType}
-    error("Structure of Arrays transformation not defined for object of type $(ThingType) device $d . Are all extensions loaded?")
-end
-
-function as_structure_of_arrays(d, outer_dim, thing)
-    error("Structure of Arrays transformation not defined for object of type $(typeof(thing)) device $d . Are all extensions loaded?")
-end
 
 view_from_shared(::Nothing, i::Integer) = nothing
 view_from_shared(a::AbstractArray{<:Any, 2}, i::Integer) = view(a, i, :)

@@ -6,14 +6,10 @@ This is a grid which can be transferred to devices (e.g. GPUs).
 """
 struct DeviceGrid{
         dim, C <: Ferrite.AbstractCell, T <: Real,
-        CA <: AbstractArray{C, 1}, NA <: AbstractArray{Node{dim, T}, 1},
-    } <: Ferrite.AbstractGrid{dim}
+        CA <: AbstractVector{C}, NA <: AbstractVector{Node{dim, T}},
+    } <: AbstractGrid{dim}
     cells::CA
     nodes::NA
-end
-
-function Adapt.adapt_structure(to, grid::DeviceGrid)
-    return DeviceGrid(Adapt.adapt_structure(to, grid.cells), Adapt.adapt_structure(to, grid.nodes))
 end
 
 function DeviceGrid(backend, grid::AbstractGrid)

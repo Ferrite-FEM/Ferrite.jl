@@ -4,15 +4,22 @@ function Ferrite.distribute_to_tasks(backend::KA.Backend, obj, num_tasks) # Coul
     return Ferrite.SoAContainer(soa, num_tasks)
 end
 
+# Helpers to initiate shared arrays filled with zeros
 zeros_shared(::Any, ::Nothing, ::Integer) = nothing
 function zeros_shared(backend, a::AbstractArray{T}, N::Integer) where {T}
     return KA.zeros(backend, T, N, size(a)...)
 end
 
+# Generate structure_of_arrays
+# TODO: Probably, these error paths are not required? 
+function as_structure_of_arrays(d, outer_dim, thing)
+    error("Structure of Arrays transformation not defined for object of type $(typeof(thing)) device $d . Are all extensions loaded?")
+end
+
 function as_structure_of_arrays(d, N, cv::CellValues)
     return CellValues(
         as_structure_of_arrays(d, N, cv.fun_values),
-        as_structure_of_arrays(d, N, cv.geo_mapping),
+        adapt(d, cv.geo_mapping),
         adapt(d, cv.qr),
         zeros_shared(d, cv.detJdV, N),
     )
@@ -28,13 +35,6 @@ function as_structure_of_arrays(d, N, fv::Ferrite.FunctionValues)
         adapt(d, fv.dNdξ),
         zeros_shared(d, fv.d2Ndx2, N),
         adapt(d, fv.d2Ndξ2),
-    )
-end
-
-function as_structure_of_arrays(d, N, fv::Ferrite.GeometryMapping)
-    return Ferrite.GeometryMapping(
-        fv.ip, zeros_shared(d, fv.M, N),
-        adapt(d, fv.dMdξ), adapt(d, fv.d2Mdξ2),
     )
 end
 
