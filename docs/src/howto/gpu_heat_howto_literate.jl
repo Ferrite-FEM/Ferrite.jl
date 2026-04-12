@@ -78,7 +78,7 @@ end
         assemble_cell!(Ke, fe, cc_i, cv_i, assembler)
     end
 end
-function assemble_global_ka!(backend, cv::CellValuesContainer, K, f, cc, colors::Vector, Ke, fe)
+function assemble_global_ka!(backend, cv, K, f, cc, colors::Vector, Ke, fe)
     assembler = K === nothing ? nothing : start_assemble(K, f)
     for color in colors
         ## We divide the work into blocks and fire up the kernel.
@@ -118,7 +118,7 @@ function cuda_assembly_kernel(assembler, color, cc, cv, Kes, fes)
     end
     return nothing
 end
-function assemble_global_cuda!(cv::CellValuesContainer, K, f, cc, colors::Vector, Ke, fe)
+function assemble_global_cuda!(cv, K, f, cc, colors::Vector, Ke, fe)
     assembler = K === nothing ? nothing : start_assemble(K, f)
     for color in colors
         n = length(color)

@@ -1,15 +1,17 @@
 # This file contains adapt rules for all relevant data structures in Ferrite.jl which do
 # not need customized GPU data structures.
 
-Adapt.@adapt_structure CellValues
-Adapt.@adapt_structure Ferrite.GeometryMapping
-Adapt.@adapt_structure Ferrite.FunctionValues
+#Adapt.@adapt_structure CellValues
+#Adapt.@adapt_structure Ferrite.GeometryMapping
+#Adapt.@adapt_structure Ferrite.FunctionValues
+#=
 function adapt_structure(to, ccc::Ferrite.CellValuesContainer)
     inner_values = adapt(to, ccc.values)
     return Ferrite.CellValuesContainer{typeof(get_substruct(1, inner_values)), typeof(inner_values)}(inner_values)
 end
 
 adapt(to, ip::Ferrite.Interpolation) = ip
+=#
 
 function adapt(d, cv::CellValues)
     return CellValues(

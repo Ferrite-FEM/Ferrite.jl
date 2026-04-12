@@ -22,3 +22,9 @@ end
 
 # This allows us to bypass the scalar indexing in the original implementation.
 Ferrite.get_coordinate_eltype(::DeviceGrid{<:Any, <:Any, T}) where {T} = T
+Ferrite.get_coordinate_type(::DeviceGrid{dim, <:Any, T}) where {dim, T} = Vec{dim, T}
+
+#TODO: Document as slow, but ok during setup
+function Ferrite.nnodes_per_cell(grid::DeviceGrid, i::Integer)
+    return @allowscalar Ferrite.nnodes(grid.cells[i])
+end

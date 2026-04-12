@@ -75,3 +75,11 @@ function get_substruct(i, fv::FunctionValues)
     d2Ndx2 = view_from_shared(fv.d2Ndx2, i)
     return FunctionValues(fv.ip, Nx, fv.Nξ, dNdx, fv.dNdξ, d2Ndx2, fv.d2Ndξ2)
 end
+
+function get_substruct(i, cc::ImmutableCellCache)
+    return ImmutableCellCache(
+        cc.flags, cc.grid, -1,
+        view_from_shared(cc.nodes, i), view_from_shared(cc.coords, i), 
+        cc.sdh, view_from_shared(cc.dofs, i)
+    )
+end

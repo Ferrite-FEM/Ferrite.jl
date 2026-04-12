@@ -1,15 +1,12 @@
 
+#=
 Adapt.@adapt_structure ImmutableCellCache
 function adapt_structure(to, ccc::CellCacheContainer)
     inner_values = adapt(to, ccc.values)
     return CellCacheContainer{typeof(get_substruct(1, inner_values, -1)), typeof(inner_values)}(inner_values)
 end
-
-@inline Ferrite.celldofs(cc::ImmutableCellCache) = cc.dofs
-@inline Ferrite.reinit!(cv::Ferrite.AbstractCellValues, cc::ImmutableCellCache) = reinit!(cv, cc.coords)
-@inline Ferrite.getcoordinates(cc::ImmutableCellCache) = cc.coords
-@inline Ferrite.cellid(cc::ImmutableCellCache) = cc.cellid
-
+=#
+#=
 function as_structure_of_arrays(backend, outer_dim, ::Type{CellCache}, dh::HostDofHandler, flags::UpdateFlags = UpdateFlags())
     @assert length(dh.subdofhandlers) == 1 "ImmutableCellCache only works on HostDofHandler's with a single subdomain. Please call the ImmutableCellCache adaptation on the DeviceSubDofHandler."
     return as_structure_of_arrays(backend, outer_dim, CellCache, first(dh.subdofhandlers), flags)
@@ -54,17 +51,4 @@ function adapt(backend, cc::ImmutableCellCache)
         adapt(backend, cc.dofs),
     )
 end
-
-function get_substruct(i, cc::ImmutableCellCache, cellid)
-    return ImmutableCellCache(
-        cc.flags, cc.grid, cellid,
-        view(cc.nodes, i, :), view(cc.coords, i, :), cc.sdh, view(cc.dofs, i, :)
-    )
-end
-
-function Ferrite.reinit!(cc_i::ImmutableCellCache, cellid::Integer)
-    cc_i.flags.nodes  && Ferrite.cellnodes!(cc_i.nodes, cc_i.grid, cellid)
-    cc_i.flags.coords && Ferrite.getcoordinates!(cc_i.coords, cc_i.grid, cellid)
-    cc_i.sdh !== nothing && cc_i.flags.dofs && Ferrite.celldofs!(cc_i.dofs, cc_i.sdh, cellid)
-    return nothing
-end
+=#
