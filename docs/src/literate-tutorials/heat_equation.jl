@@ -43,7 +43,7 @@
 # First we load Ferrite, and some other packages we need
 using Ferrite, SparseArrays
 # We start by generating a simple grid with 20x20 quadrilateral elements
-# using `generate_grid`. The generator defaults to the unit square,
+# using `generate_grid`. The generator defaults to the square ([-1,1]^2),
 # so we don't need to specify the corners of the domain.
 grid = generate_grid(Quadrilateral, (20, 20));
 
@@ -191,7 +191,7 @@ function assemble_global(cellvalues::CellValues, K::SparseMatrixCSC, dh::DofHand
     f = zeros(ndofs(dh))
     ## Create an assembler
     assembler = start_assemble(K, f)
-    ## Loop over all cels
+    ## Loop over all cells
     for cell in CellIterator(dh)
         ## Reinitialize cellvalues for this cell
         reinit!(cellvalues, cell)

@@ -21,7 +21,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
  - Support for directly assembling to `SparseMatrixCSR` (from `SparseMatricesCSR.jl`). ([#864])
  - Enhance `generate_grid` to support outputting line meshes embedded in two and three
-   spatial dimentions. ([#1122], [#1214])
+   spatial dimensions. ([#1122], [#1214])
 
 ### Fixes
  - Fix L2 projection of tensor fields on discontinuous interpolations. ([#1197], [#1198])
@@ -32,11 +32,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
    [#1235])
  - Relax vector input type from `Vector` to `AbstractVector` in `evaluate_at_points!`.
    ([#1183])
+- The result of grid coloring is now not dependent on iteration order of dictionaries and sets. This may change the coloring obtained from `create_coloring`
+  compared to previous Ferrite versions.
 
 ### Documentation updates
  - Extended assembly docs with information on how to support direct assembly into new matrix
    types. ([#864])
- - Add a list of reserach papers where Ferrite was used for numbeir simulations. Please add
+ - Add a list of research papers where Ferrite was used for simulations. Please add
    your paper! ([#1221])
  - Add section on global and local DoF numbering. ([#1089])
  - Fix some typos and grammar ([#1210], [#1224], [#1228])
@@ -685,7 +687,7 @@ poking into Ferrite internals:
  - Fix grid coloring for cell sets with 0 or 1 cells. ([#600])
 ### Other improvements
  - Documentation improvements:
-    - Simplications and clarifications to hyperelasticity example. ([#591])
+    - Simplifications and clarifications to hyperelasticity example. ([#591])
     - Remove duplicate docstring entry for `vtk_point_data`. ([#602])
     - Update documentation about initial conditions. ([#601], [#604])
 

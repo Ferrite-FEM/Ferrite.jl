@@ -24,7 +24,7 @@ jobs:
       - uses: julia-actions/setup-julia@v2
         with:
           version: ${{ matrix.julia-version }}
-      - uses: julia-actions/cache@v2
+      - uses: julia-actions/cache@v3
       - uses: julia-actions/julia-buildpkg@v1
       - uses: julia-actions/julia-runtest@v1
       - name: JET tests
@@ -34,11 +34,11 @@ jobs:
           Pkg.add("JET")
           Pkg.develop(path = pwd())
           include(joinpath(pwd(), "test/jet.jl"))
-        if: ${{ matrix.os == 'ubuntu-latest' && matrix.julia-version != 'nightly' }}
+        if: ${{ matrix.os == 'ubuntu-latest' && matrix.julia-version != 'pre' }}
       - uses: julia-actions/julia-processcoverage@v1
         with:
           directories: 'src,ext'
-      - uses: codecov/codecov-action@v5
+      - uses: codecov/codecov-action@v6
         with:
           files: lcov.info
           plugins: noop

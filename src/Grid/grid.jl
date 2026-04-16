@@ -258,6 +258,22 @@ function reference_faces(::Type{RefPyramid})
     )
 end
 
+@generated function reference_face_edgenrs(::Type{RefShape}) where {RefShape <: AbstractRefShape}
+    expr = Expr(:tuple)
+    refedges = reference_edges(RefShape)
+    for face in reference_faces(RefShape)
+        expr_i = Expr(:tuple)
+        for j in 1:length(face)
+            v1 = face[j]
+            v2 = face[mod1(j + 1, length(face))]
+            edgenr = findfirst(refedge -> (refedge === (v1, v2) || refedge === (v2, v1)), refedges)
+            push!(expr_i.args, edgenr)
+        end
+        push!(expr.args, expr_i)
+    end
+    return :(return $expr)
+end
+
 ######################################################
 # Concrete implementations of AbstractCell interface #
 ######################################################
@@ -425,7 +441,7 @@ get_coordinate_type(::Grid{dim, C, T}) where {dim, C, T} = Vec{dim, T} # Node is
 This function takes the local vertex representation (a `VertexIndex`) and looks up the unique global id (an `Int`).
 """
 toglobal(grid::AbstractGrid, vertexidx::VertexIndex) = vertices(getcells(grid, vertexidx[1]))[vertexidx[2]]
-toglobal(grid::AbstractGrid, vertexidx::Vector{VertexIndex}) = unique(toglobal.((grid,), vertexidx))
+toglobal(grid::AbstractGrid, vertexidx::AbstractVector{VertexIndex}) = unique(toglobal.((grid,), vertexidx))
 
 """
     Ferrite.getspatialdim(grid::AbstractGrid)
@@ -584,10 +600,11 @@ end
 
 Mutate `x` to the coordinates of the cell corresponding to `idx` or `cell`.
 """
-@inline function getcoordinates!(x::AbstractVector{Vec{dim, T}}, grid::AbstractGrid, cell::AbstractCell) where {dim, T}
+@propagate_inbounds function getcoordinates!(x::AbstractVector{Vec{dim, T}}, grid::AbstractGrid, cell::AbstractCell) where {dim, T}
     node_ids = get_node_ids(cell)
-    @inbounds for i in 1:length(x)
-        x[i] = get_node_coordinate(grid, node_ids[i])
+    @boundscheck checkbounds(x, keys(node_ids))
+    @inbounds for (i, node_id) in pairs(node_ids)
+        x[i] = get_node_coordinate(grid, node_id)
     end
     return x
 end
@@ -611,9 +628,8 @@ function cellnodes!(global_nodes::AbstractVector{Int}, grid::AbstractGrid, i::In
 end
 function _cellnodes!(global_nodes::AbstractVector{Int}, cell::AbstractCell)
     @assert length(global_nodes) == nnodes(cell)
-    @inbounds for i in 1:length(global_nodes)
-        global_nodes[i] = cell.nodes[i]
-    end
+    node_ids = get_node_ids(cell)
+    copyto!(global_nodes, node_ids)
     return global_nodes
 end
 

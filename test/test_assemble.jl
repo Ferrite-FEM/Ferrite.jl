@@ -1,3 +1,6 @@
+using Ferrite, SparseArrays
+import LinearAlgebra: Symmetric
+
 @testset "assemble" begin
     dofs = [1, 3, 5, 7]
     maxd = maximum(dofs)
@@ -43,57 +46,91 @@
     @test size(K) == (10, 10)
     @test length(f) == 10
 
-    # assemble with different row and col dofs
+    # COOAssembler: assemble with different row and col dofs
     rdofs = [1, 4, 6]
     cdofs = [1, 7]
     a = Ferrite.COOAssembler()
     Ke = rand(length(rdofs), length(cdofs))
     assemble!(a, rdofs, cdofs, Ke)
     K, _ = finish_assemble(a)
-    @test (K[rdofs, cdofs] .== Ke) |> all
+    @test all(K[rdofs, cdofs] .== Ke)
 
-    # SparseMatrix assembler
-    K = spzeros(10, 10)
-    f = zeros(10)
-    ke = [rand(4, 4), rand(4, 4)]
-    fe = [rand(4), rand(4)]
-    dofs = [[1, 5, 3, 7], [10, 8, 2, 5]]
-    for i in 1:2
-        K[dofs[i], dofs[i]] += ke[i]
-        f[dofs[i]] += fe[i]
+    # CSCAssembler: assemble with different row and col dofs
+    I = [1, 1, 4, 4, 6, 6]
+    J = [1, 3, 1, 3, 1, 3]
+    for T in (Float32, Float64)
+        V = zeros(T, length(I))
+        K = sparse(I, J, V)
+        f = zeros(T, 6)
+        assembler = start_assemble(K, f)
+        @test isa(assembler, Ferrite.AbstractAssembler{T})
+        rdofs = [1, 4, 6]
+        cdofs = [1, 3]
+        Ke = rand(T, length(rdofs), length(cdofs))
+        fe = rand(T, length(rdofs))
+        assemble!(assembler, rdofs, cdofs, Ke, fe)
+        assemble!(assembler, rdofs, cdofs, Ke, fe)
+        @test_throws ArgumentError assemble!(assembler, rdofs, Ke, fe) # Not in sparsity pattern
+        @test all(K[rdofs, cdofs] .== 2Ke)
+        @test all(f[rdofs] .== 2fe)
+
+        # CSCAssembler: Assemble rectangular part in quadratic matrix
+        K = SparseMatrixCSC(6, 6, [K.colptr..., 7, 7, 7], K.rowval, K.nzval)
+        assembler = start_assemble(K, f)
+        rdofs = [1, 4, 6]
+        cdofs = [1, 3]
+        Ke = rand(T, length(rdofs), length(cdofs))
+        fe = rand(T, length(rdofs))
+        assemble!(assembler, rdofs, cdofs, Ke, fe)
+        assemble!(assembler, rdofs, cdofs, Ke, fe)
+        @test_throws ArgumentError assemble!(assembler, rdofs, Ke, fe) # Not in sparsity pattern
+        @test all(K[rdofs, cdofs] .== 2Ke)
+        @test all(f[rdofs] .== 2fe)
+
+        # SparseMatrix assembler
+        K = spzeros(T, 10, 10)
+        f = zeros(T, 10)
+        ke = [rand(T, 4, 4), rand(T, 4, 4)]
+        fe = [rand(T, 4), rand(T, 4)]
+        dofs = [[1, 5, 3, 7], [10, 8, 2, 5]]
+        for i in 1:2
+            K[dofs[i], dofs[i]] += ke[i]
+            f[dofs[i]] += fe[i]
+        end
+
+        Kc = copy(K)
+        fc = copy(f)
+
+        assembler = start_assemble(Kc)
+        @test all(iszero, Kc.nzval) # start_assemble zeroes
+        for i in 1:2
+            assemble!(assembler, dofs[i], ke[i])
+        end
+        @test Kc ≈ K
+
+        assembler = start_assemble(Kc, fc)
+        @test all(iszero, Kc.nzval)
+        @test all(iszero, fc)
+        for i in 1:2
+            assemble!(assembler, dofs[i], ke[i], fe[i])
+        end
+        @test Kc ≈ K
+        @test fc ≈ f
+
+        # No zero filling
+        assembler = start_assemble(Kc, fc; fillzero = false)
+        @test Kc ≈ K
+        @test fc ≈ f
+        for i in 1:2
+            assemble!(assembler, dofs[i], ke[i], fe[i])
+        end
+        @test Kc ≈ 2K
+        @test fc ≈ 2f
     end
-
-    Kc = copy(K)
-    fc = copy(f)
-
-    assembler = start_assemble(Kc)
-    @test all(iszero, Kc.nzval) # start_assemble zeroes
-    for i in 1:2
-        assemble!(assembler, dofs[i], ke[i])
-    end
-    @test Kc ≈ K
-
-    assembler = start_assemble(Kc, fc)
-    @test all(iszero, Kc.nzval)
-    @test all(iszero, fc)
-    for i in 1:2
-        assemble!(assembler, dofs[i], ke[i], fe[i])
-    end
-    @test Kc ≈ K
-    @test fc ≈ f
-
-    # No zero filling
-    assembler = start_assemble(Kc, fc; fillzero = false)
-    @test Kc ≈ K
-    @test fc ≈ f
-    for i in 1:2
-        assemble!(assembler, dofs[i], ke[i], fe[i])
-    end
-    @test Kc ≈ 2K
-    @test fc ≈ 2f
 
     # Error paths
-    assembler = start_assemble(Kc, fc)
+    K = sparse(I, J, zeros(length(I)))
+    assembler = start_assemble(K, zeros(size(K, 1)))
     @test_throws BoundsError assemble!(assembler, [11, 1, 2, 3], rand(4, 4))
     @test_throws BoundsError assemble!(assembler, [11, 1, 2, 3], rand(4, 4), rand(4))
     @test_throws BoundsError assemble!(assembler, [11, 1, 2], rand(4, 4))

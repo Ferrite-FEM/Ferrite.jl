@@ -14,3 +14,8 @@ Ferrite.ArrayOfVectorViews
 Ferrite.ConstructionBuffer
 Ferrite.push_at_index!
 ```
+
+## `FastSparsityPattern`
+```@docs
+Ferrite.FastSparsityPattern
+```

@@ -43,6 +43,7 @@ using Ferrite, BlockArrays, SparseArrays, Test
     @test iszero(K)
     @test iszero(f)
     block_assembler = start_assemble(KB, fB)
+    @test isa(block_assembler, Ferrite.AbstractAssembler{Float64})
     @test iszero(KB)
     @test iszero(fB)
 

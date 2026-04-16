@@ -180,7 +180,7 @@ function function_value(fe_v::AbstractValues, q_point::Int, u::AbstractVector, d
     @boundscheck checkbounds(u, dof_range)
     @boundscheck checkquadpoint(fe_v, q_point)
     val = function_value_init(fe_v, u)
-    @inbounds for (i, j) in pairs(dof_range)
+    @inbounds for (i, j) in enumerate(dof_range)
         val += shape_value(fe_v, q_point, i) * u[j]
     end
     return val
@@ -220,20 +220,21 @@ function function_gradient(fe_v::AbstractValues, q_point::Int, u::AbstractVector
     @boundscheck checkbounds(u, dof_range)
     @boundscheck checkquadpoint(fe_v, q_point)
     grad = function_gradient_init(fe_v, u)
-    @inbounds for (i, j) in pairs(dof_range)
+    @inbounds for (i, j) in enumerate(dof_range)
         grad += shape_gradient(fe_v, q_point, i) * u[j]
     end
     return grad
 end
 
 # TODO: Deprecate this, nobody is using this in practice...
-function function_gradient(fe_v::AbstractValues, q_point::Int, u::AbstractVector{<:Vec})
+function function_gradient(fe_v::AbstractValues, q_point::Int, u::AbstractVector{<:Vec}, dof_range = eachindex(u))
     n_base_funcs = getnbasefunctions(fe_v)
-    length(u) == n_base_funcs || throw_incompatible_dof_length(length(u), n_base_funcs)
+    length(dof_range) == n_base_funcs || throw_incompatible_dof_length(length(dof_range), n_base_funcs)
+    @boundscheck checkbounds(u, dof_range)
     @boundscheck checkquadpoint(fe_v, q_point)
     grad = function_gradient_init(fe_v, u)
-    @inbounds for i in 1:n_base_funcs
-        grad += u[i] ⊗ shape_gradient(fe_v, q_point, i)
+    @inbounds for (i, j) in enumerate(dof_range)
+        grad += u[j] ⊗ shape_gradient(fe_v, q_point, i)
     end
     return grad
 end
@@ -267,7 +268,7 @@ function function_hessian(fe_v::AbstractValues, q_point::Int, u::AbstractVector,
     @boundscheck checkbounds(u, dof_range)
     @boundscheck checkquadpoint(fe_v, q_point)
     hess = function_hessian_init(fe_v, u)
-    @inbounds for (i, j) in pairs(dof_range)
+    @inbounds for (i, j) in enumerate(dof_range)
         hess += shape_hessian(fe_v, q_point, i) * u[j]
     end
     return hess
