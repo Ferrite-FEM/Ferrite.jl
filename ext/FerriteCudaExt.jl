@@ -97,7 +97,7 @@ struct GPUConstraintHandler{Tv, Ti, PD <: AbstractVector{Ti}, IH <: AbstractVect
     is_prescribed::IP
 end
 
-function adapt(backend, ch::ConstraintHandler)
+function adapt_structure(backend, ch::ConstraintHandler)
     @assert Ferrite.isclosed(ch)
     n = Ferrite.ndofs(ch.dh)
     is_prescribed = zeros(Bool, n)

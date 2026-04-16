@@ -21,15 +21,15 @@ function as_structure_of_arrays(d, N, fv::Ferrite.FunctionValues)
         fv.dNdx === nothing ? nothing : KA.zeros(d, eltype(fv.dNdx), N, size(fv.dNdx, 1), size(fv.dNdx, 2)),
         adapt(d, fv.dNdξ),
         fv.d2Ndx2 === nothing ? nothing : KA.zeros(d, eltype(fv.d2Ndx2), N, size(fv.d2Ndx2, 1), size(fv.d2Ndx2, 2)),
-        fv.d2Ndξ2 === nothing ? nothing : adapt(d, fv.d2Ndξ2),
+        adapt(d, fv.d2Ndξ2),
     )
 end
 
 function as_structure_of_arrays(d, N, fv::Ferrite.GeometryMapping)
     return Ferrite.GeometryMapping(
         adapt(d, fv.ip),
-        KA.zeros(d, eltype(fv.M), N, size(fv.M, 1), size(fv.M, 2)),
-        fv.dMdξ === nothing ? nothing : adapt(d, fv.dMdξ),
-        fv.d2Mdξ2 === nothing ? nothing : adapt(d, fv.d2Mdξ2),
+        adapt(d, fv.M),
+        adapt(d, fv.dMdξ),
+        adapt(d, fv.d2Mdξ2),
     )
 end

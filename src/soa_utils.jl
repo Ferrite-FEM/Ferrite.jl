@@ -61,5 +61,5 @@ function get_substruct(i, fv::FunctionValues)
 end
 
 function get_substruct(i, fv::GeometryMapping)
-    return GeometryMapping(fv.ip, view(fv.M, i, :, :), fv.dMdξ, fv.d2Mdξ2)
+    return GeometryMapping(fv.ip, fv.M, fv.dMdξ, fv.d2Mdξ2)
 end
