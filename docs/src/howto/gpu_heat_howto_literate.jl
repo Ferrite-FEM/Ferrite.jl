@@ -59,13 +59,14 @@ end
     ## This is the classical grid-stride-loop
     task_index = @index(Global, Linear)
     stride = prod(KA.@ndrange())
+
+    ## Query the local evaluation buffer of the GPU worker.
+    ## As explained later this is the secret sauce.
+    cv_i = cv[task_index]
+
     for i in task_index:stride:length(color)
         ## Work item index
         cellid = color[i]
-
-        ## Query the local evaluation buffer of the GPU worker.
-        ## As explained later this is the secret sauce.
-        cv_i = cv[task_index]
 
         ## Query work item cell cache. The call on the item initializes replaces the reinit! call.
         cc_i = cc[task_index](cellid)
@@ -108,9 +109,9 @@ end
 function cuda_assembly_kernel(assembler, color, cc, cv, Kes, fes)
     task_index = (blockIdx().x - Int32(1)) * blockDim().x + threadIdx().x
     stride = gridDim().x * blockDim().x
+    cv_i = cv[task_index]
     for i in task_index:stride:length(color)
         cellid = color[i]
-        cv_i = cv[task_index]
         cc_i = cc[task_index](cellid)
         Ke = view(Kes, i, :, :)
         fe = view(fes, i, :)
