@@ -32,6 +32,7 @@ FerriteSparseMatrixCSR = "SparseMatricesCSR"
 
 [compat]
 BlockArrays = "0.16, 1"
+CUDA = "5.9"
 EnumX = "1"
 HCubature = "1.7.0"
 ForwardDiff = "0.10, 1"
