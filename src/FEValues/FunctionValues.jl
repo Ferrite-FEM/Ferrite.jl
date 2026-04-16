@@ -166,7 +166,7 @@ required_geo_diff_order(::CovariantPiolaMapping, fun_diff_order::Int) = 1 + fun_
     )
     # Optimized Moore-Penrose pseudo inverse.
     # We assume that `J'⋅J` is invertible. This is a reasonable for non-degenerate elements.
-    return inv(tdot(J)) ⋅ (J)' 
+    return inv(tdot(J)) ⋅ (J)'
 end
 
 # =============
