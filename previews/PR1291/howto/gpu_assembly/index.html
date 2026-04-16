@@ -41,13 +41,14 @@ end</code></pre><p>Now to the actual assembly kernel. To ensure portability we s
     # This is the classical grid-stride-loop
     task_index = @index(Global, Linear)
     stride = prod(KA.@ndrange())
+
+    # Query the local evaluation buffer of the GPU worker.
+    # As explained later this is the secret sauce.
+    cv_i = cv[task_index]
+
     for i in task_index:stride:length(color)
         # Work item index
         cellid = color[i]
-
-        # Query the local evaluation buffer of the GPU worker.
-        # As explained later this is the secret sauce.
-        cv_i = cv[task_index]
 
         # Query work item cell cache. The call on the item initializes replaces the reinit! call.
         cc_i = cc[task_index](cellid)
@@ -87,9 +88,9 @@ function assemble_global_ka!(backend, cv::CellValuesContainer, K, f, cc, colors:
 end</code></pre><p>And here now the CUDA variant. Please see above for details, as the kernels are almost the same.</p><pre><code class="language-julia hljs">function cuda_assembly_kernel(assembler, color, cc, cv, Kes, fes)
     task_index = (blockIdx().x - Int32(1)) * blockDim().x + threadIdx().x
     stride = gridDim().x * blockDim().x
+    cv_i = cv[task_index]
     for i in task_index:stride:length(color)
         cellid = color[i]
-        cv_i = cv[task_index]
         cc_i = cc[task_index](cellid)
         Ke = view(Kes, i, :, :)
         fe = view(fes, i, :)
@@ -131,4 +132,4 @@ close!(ch)
 
 ch_gpu = adapt(backend, ch)
 apply!(K_gpu, f_gpu, ch_gpu)
-u_gpu = SparseMatrixCSC(K_gpu) \ Vector(f_gpu)</code></pre></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../threaded_assembly/">« Multi-threaded assembly</a><a class="docs-footer-nextpage" href="../../gallery/">Code gallery »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option><option value="catppuccin-latte">catppuccin-latte</option><option value="catppuccin-frappe">catppuccin-frappe</option><option value="catppuccin-macchiato">catppuccin-macchiato</option><option value="catppuccin-mocha">catppuccin-mocha</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.15.0 on <span class="colophon-date" title="Wednesday 4 March 2026 22:03">Wednesday 4 March 2026</span>. Using Julia version 1.12.5.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
+u_gpu = SparseMatrixCSC(K_gpu) \ Vector(f_gpu)</code></pre></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../threaded_assembly/">« Multi-threaded assembly</a><a class="docs-footer-nextpage" href="../../gallery/">Code gallery »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option><option value="catppuccin-latte">catppuccin-latte</option><option value="catppuccin-frappe">catppuccin-frappe</option><option value="catppuccin-macchiato">catppuccin-macchiato</option><option value="catppuccin-mocha">catppuccin-mocha</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.15.0 on <span class="colophon-date" title="Thursday 16 April 2026 19:23">Thursday 16 April 2026</span>. Using Julia version 1.12.6.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>

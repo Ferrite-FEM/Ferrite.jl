@@ -58,7 +58,7 @@
 # \nabla \chi_p \cdot \textbf{n} = \frac{1}{\Delta h} (\chi_w - \chi_e) = 0
 # ```
 # from which follows $\chi_w = \chi_e$. Thus for boundary elements we can replace the value for the missing neighbor by the value of the opposite neighbor.
-# In order to find the corresponding neighbor elements, we will make use of Ferrites grid topology funcionalities.
+# In order to find the corresponding neighbor elements, we will make use of Ferrite's grid topology functionalities.
 #
 # ## Commented Program
 # We now solve the problem in Ferrite. What follows is a program spliced with comments.
@@ -188,7 +188,7 @@ function compute_densities(states, dh)
 end
 #md nothing # hide
 
-# For the Laplacian we need some neighboorhood information which is constant throughout the analysis so we compute it once and cache it.
+# For the Laplacian we need some neighborhood information which is constant throughout the analysis so we compute it once and cache it.
 # We iterate through each facet of each element,
 # obtaining the neighboring element by using the `getneighborhood` function. For boundary facets,
 # the function call will return an empty object. In that case we use the dictionary to instead find the opposite
@@ -218,7 +218,7 @@ function cache_neighborhood(dh, topology)
 end
 #md nothing # hide
 
-# Now we calculate the Laplacian using the previously cached neighboorhood information.
+# Now we calculate the Laplacian using the previously cached neighborhood information.
 function approximate_laplacian(nbgs, χn, Δh)
     ∇²χ = zeros(length(nbgs))
     for i in 1:length(nbgs)
@@ -290,13 +290,13 @@ end
 # Finally, we put everything together to update the density. The loop ensures the stability of the
 # updated solution.
 
-function update_density(dh, states, mp, ρ, neighboorhoods, Δh)
+function update_density(dh, states, mp, ρ, neighborhoods, Δh)
     n_j = Int(ceil(6 * mp.β / (mp.η * Δh^2))) # iterations needed for stability
     χn = compute_densities(states, dh) # old density field
     χn1 = zeros(length(χn))
 
     for j in 1:n_j
-        ∇²χ = approximate_laplacian(neighboorhoods, χn, Δh) # Laplacian
+        ∇²χ = approximate_laplacian(neighborhoods, χn, Δh) # Laplacian
         pΨ = compute_driving_forces(states, mp, dh, χn) # driving forces
         p_Ω = compute_average_driving_force(mp, pΨ, χn) # average driving force
 
@@ -442,7 +442,7 @@ function topopt(ra, ρ, n, filename; output = :false)
     conv = :false
 
     topology = ExclusiveTopology(grid)
-    neighboorhoods = cache_neighborhood(dh, topology)
+    neighborhoods = cache_neighborhood(dh, topology)
 
     ## Newton-Raphson loop
     NEWTON_TOL = 1.0e-8
@@ -496,7 +496,7 @@ function topopt(ra, ρ, n, filename; output = :false)
         end
 
         ## update density
-        χ = update_density(dh, states, mp, ρ, neighboorhoods, Δh)
+        χ = update_density(dh, states, mp, ρ, neighborhoods, Δh)
 
         ## update old displacement, density and compliance
         un .= u
