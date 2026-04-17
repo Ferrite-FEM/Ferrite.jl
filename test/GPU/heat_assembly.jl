@@ -31,4 +31,6 @@ u_cpu = K \ f
     assemble_global_ka!(backend, cv_device, nothing, nothing, cell_cache, colors_device, Kes_device, fes_device)
     @test Array(Kes_device) ≈ Array(Kes)
     @test Array(fes_device) ≈ Array(fes)
+
+    @test @inferred dof_range(dh_device.subdofhandlers[1], 1) == @inferred dof_range(dh_device.subdofhandlers[1], :u)
 end
