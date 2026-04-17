@@ -129,14 +129,14 @@ function doassemble!(K::SparseMatrixCSC, M::SparseMatrixCSC, f::Vector, cellvalu
         for q_point in 1:getnquadpoints(cellvalues)
             dΩ = getdetJdV(cellvalues, q_point)
             for i in 1:n_basefuncs
-                δu = shape_value(cellvalues, q_point, i)
-                ∇δu = shape_gradient(cellvalues, q_point, i)
-                fe[i] += 0.1 * δu * dΩ
+                δNᵢ = shape_value(cellvalues, q_point, i)
+                ∇δNᵢ = shape_gradient(cellvalues, q_point, i)
+                fe[i] += 0.1 * δNᵢ * dΩ
                 for j in 1:n_basefuncs
-                    u = shape_value(cellvalues, q_point, j)
-                    ∇u = shape_gradient(cellvalues, q_point, j)
-                    Ke[i, j] += 1.0e-3 * (∇δu ⋅ ∇u) * dΩ
-                    Me[i, j] += (δu * u) * dΩ
+                    Nⱼ = shape_value(cellvalues, q_point, j)
+                    ∇Nⱼ = shape_gradient(cellvalues, q_point, j)
+                    Ke[i, j] += 1.0e-3 * (∇δNᵢ ⋅ ∇Nⱼ) * dΩ
+                    Me[i, j] += (δNᵢ * Nⱼ) * dΩ
                 end
             end
         end

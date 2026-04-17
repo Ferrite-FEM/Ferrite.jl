@@ -265,10 +265,10 @@ function assemble_mass_matrix(cv::MultiFieldCellValues, M::SparseMatrixCSC, dh::
             ## Remember that we assemble a vector mass term, hence the dot product.
             ## There is only one time derivative on the left hand side, so only one mass block is non-zero.
             for i in 1:n_basefuncs_v
-                φᵢ = shape_value(cv.v, q_point, i)
+                Nᵢ = shape_value(cv.v, q_point, i)
                 for j in 1:n_basefuncs_v
-                    φⱼ = shape_value(cv.v, q_point, j)
-                    Mₑ[BlockIndex((v▄, v▄), (i, j))] += φᵢ ⋅ φⱼ * dΩ
+                    Nⱼ = shape_value(cv.v, q_point, j)
+                    Mₑ[BlockIndex((v▄, v▄), (i, j))] += Nᵢ ⋅ Nⱼ * dΩ
                 end
             end
         end
@@ -309,10 +309,10 @@ function assemble_stokes_matrix(cv::MultiFieldCellValues, ν, K::SparseMatrixCSC
             # Assemble local viscosity block of $A$
             #+
             for i in 1:n_basefuncs_v
-                ∇φᵢ = shape_gradient(cv.v, q_point, i)
+                ∇Nᵢ = shape_gradient(cv.v, q_point, i)
                 for j in 1:n_basefuncs_v
-                    ∇φⱼ = shape_gradient(cv.v, q_point, j)
-                    Kₑ[BlockIndex((v▄, v▄), (i, j))] -= ν * ∇φᵢ ⊡ ∇φⱼ * dΩ
+                    ∇Nⱼ = shape_gradient(cv.v, q_point, j)
+                    Kₑ[BlockIndex((v▄, v▄), (i, j))] -= ν * ∇Nᵢ ⊡ ∇Nⱼ * dΩ
                 end
             end
             # Assemble local pressure and incompressibility blocks of $B^{\textrm{T}}$ and $B$.
@@ -411,7 +411,7 @@ function navierstokes_rhs_element!(dvₑ, vₑ, cv)
         ∇v = function_gradient(cv.v, q_point, vₑ)
         v = function_value(cv.v, q_point, vₑ)
         for j in 1:n_basefuncs
-            φⱼ = shape_value(cv.v, q_point, j)
+            Nⱼ = shape_value(cv.v, q_point, j)
             # Note that in Tensors.jl the definition $\textrm{grad} v = \nabla v$ holds.
             # With this information it can be quickly shown in index notation that
             # ```math
@@ -419,7 +419,7 @@ function navierstokes_rhs_element!(dvₑ, vₑ, cv)
             # ```
             # where we should pay attentation to the transpose of the gradient.
             #+
-            dvₑ[j] -= v ⋅ ∇v' ⋅ φⱼ * dΩ
+            dvₑ[j] -= v ⋅ ∇v' ⋅ Nⱼ * dΩ
         end
     end
     return
@@ -468,7 +468,7 @@ function navierstokes_jac_element!(Jₑ, vₑ, cv)
         ∇v = function_gradient(cv.v, q_point, vₑ)
         v = function_value(cv.v, q_point, vₑ)
         for j in 1:n_basefuncs
-            φⱼ = shape_value(cv.v, q_point, j)
+            Nⱼ = shape_value(cv.v, q_point, j)
             # Note that in Tensors.jl the definition $\textrm{grad} v = \nabla v$ holds.
             # With this information it can be quickly shown in index notation that
             # ```math
@@ -477,9 +477,9 @@ function navierstokes_jac_element!(Jₑ, vₑ, cv)
             # where we should pay attentation to the transpose of the gradient.
             #+
             for i in 1:n_basefuncs
-                φᵢ = shape_value(cv.v, q_point, i)
-                ∇φᵢ = shape_gradient(cv.v, q_point, i)
-                Jₑ[j, i] -= (φᵢ ⋅ ∇v' + v ⋅ ∇φᵢ') ⋅ φⱼ * dΩ
+                Nᵢ = shape_value(cv.v, q_point, i)
+                ∇Nᵢ = shape_gradient(cv.v, q_point, i)
+                Jₑ[j, i] -= (Nᵢ ⋅ ∇v' + v ⋅ ∇Nᵢ') ⋅ Nⱼ * dΩ
             end
         end
     end

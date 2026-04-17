@@ -80,7 +80,7 @@ Ferrite supports different approximations of the finite element fields and the g
 such basic numbering. For more details, see the [Ferrite numbering rules](@ref "Global-DoF-indices").
 
 Note that *shape functions* are sometimes referred to as *basis functions* or *trial functions*,
-and instead of $\phi_i$ they are sometimes denoted $N_i$. In this example we choose to approximate
+and instead of $\phi_i$ they are sometimes denoted by $N_i$. In this example we choose to approximate
 the test function in the same way. This approach is known as the *Bubnov-Galerkin finite element
 method*. Formally we write the evaluation of our approximations at a specific point $\mathbf{x}$
 in our domain $\Omega$ as:

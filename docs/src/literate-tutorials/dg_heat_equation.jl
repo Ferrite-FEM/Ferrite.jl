@@ -213,15 +213,15 @@ function assemble_element!(Ke::Matrix, fe::Vector, cellvalues::CellValues)
         dΩ = getdetJdV(cellvalues, q_point)
         ## Loop over test shape functions
         for i in 1:n_basefuncs
-            δu = shape_value(cellvalues, q_point, i)
-            ∇δu = shape_gradient(cellvalues, q_point, i)
+            δNᵢ = shape_value(cellvalues, q_point, i)
+            ∇δNᵢ = shape_gradient(cellvalues, q_point, i)
             ## Add contribution to fe
-            fe[i] += δu * dΩ
+            fe[i] += δNᵢ * dΩ
             ## Loop over trial shape functions
             for j in 1:n_basefuncs
-                ∇u = shape_gradient(cellvalues, q_point, j)
+                ∇Nⱼ = shape_gradient(cellvalues, q_point, j)
                 ## Add contribution to Ke
-                Ke[i, j] += (∇δu ⋅ ∇u) * dΩ
+                Ke[i, j] += (∇δNᵢ ⋅ ∇Nⱼ) * dΩ
             end
         end
     end
@@ -240,15 +240,15 @@ function assemble_interface!(Ki::Matrix, iv::InterfaceValues, μ::Float64)
         ## Loop over test shape functions
         for i in 1:getnbasefunctions(iv)
             ## Multiply the jump by the negative normal to get the definition from the theory section.
-            δu_jump = shape_value_jump(iv, q_point, i) * (-normal)
-            ∇δu_avg = shape_gradient_average(iv, q_point, i)
+            δNᵢ_jump = shape_value_jump(iv, q_point, i) * (-normal)
+            ∇δNᵢ_avg = shape_gradient_average(iv, q_point, i)
             ## Loop over trial shape functions
             for j in 1:getnbasefunctions(iv)
                 ## Multiply the jump by the negative normal to get the definition from the theory section.
                 u_jump = shape_value_jump(iv, q_point, j) * (-normal)
-                ∇u_avg = shape_gradient_average(iv, q_point, j)
+                ∇Nⱼ_avg = shape_gradient_average(iv, q_point, j)
                 ## Add contribution to Ki
-                Ki[i, j] += -(δu_jump ⋅ ∇u_avg + ∇δu_avg ⋅ u_jump) * dΓ + μ * (δu_jump ⋅ u_jump) * dΓ
+                Ki[i, j] += -(δNᵢ_jump ⋅ ∇Nⱼ_avg + ∇δNᵢ_avg ⋅ u_jump) * dΓ + μ * (δNᵢ_jump ⋅ u_jump) * dΓ
             end
         end
     end
@@ -266,9 +266,9 @@ function assemble_boundary!(fe::Vector, fv::FacetValues)
         ∂Ω = getdetJdV(fv, q_point)
         ## Loop over test shape functions
         for i in 1:getnbasefunctions(fv)
-            δu = shape_value(fv, q_point, i)
+            δNᵢ = shape_value(fv, q_point, i)
             boundary_flux = normal[2]
-            fe[i] = boundary_flux * δu * ∂Ω
+            fe[i] = boundary_flux * δNᵢ * ∂Ω
         end
     end
     return fe

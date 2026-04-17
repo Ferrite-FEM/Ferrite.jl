@@ -111,8 +111,8 @@ using Ferrite
 ip = Lagrange{RefTriangle, 2}()
 
 # DofHandler
-const N = 100
-grid = generate_grid(Triangle, (N, N))
+const N_grid = 100
+grid = generate_grid(Triangle, (N_grid, N_grid))
 const dh = DofHandler(grid)
 add!(dh, :u, ip)
 close!(dh)
@@ -253,7 +253,7 @@ and extract the dofs for that element. Finally, an assembler is created with
 ```@example assembly-perf
 dofs_per_cell = ndofs_per_cell(dh)
 const Ke = rand(dofs_per_cell, dofs_per_cell)
-const dofs = celldofs(dh, N * N ÷ 2)
+const dofs = celldofs(dh, N_grid * N_grid ÷ 2)
 
 const assembler = start_assemble(K)
 nothing # hide
@@ -320,10 +320,10 @@ function assemble_system!(assembler_function::F, K, dh, cv) where {F}
         for qp in 1:getnquadpoints(cv)
             dΩ = getdetJdV(cv, qp)
             for i in 1:n
-                ∇ϕi = shape_gradient(cv, qp, i)
+                ∇δNᵢ = shape_gradient(cv, qp, i)
                 for j in 1:n
-                    ∇ϕj = shape_gradient(cv, qp, j)
-                    ke[i, j] += ( ∇ϕi ⋅ ∇ϕj ) * dΩ
+                    ∇Nⱼ = shape_gradient(cv, qp, j)
+                    ke[i, j] += ( ∇δNᵢ ⋅ ∇Nⱼ ) * dΩ
                 end
             end
         end
