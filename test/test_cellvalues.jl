@@ -453,6 +453,15 @@ end
     end
 
     @testset "Embedded elements" begin
+        @testset "pinv for embedded" begin
+            for sdim in 2:3
+                for rdim in 1:(sdim - 1)
+                    J = rand(MixedTensor2{sdim, rdim})
+                    JM = SMatrix{sdim, rdim}(J)
+                    @test Ferrite.calculate_Jinv(J) ≈ pinv(JM)
+                end
+            end
+        end
         @testset "Scalar/vector on curves (vdim = $vdim)" for vdim in (0, 1, 2, 3)
             ip_base = Lagrange{RefLine, 1}()
             ip = vdim > 0 ? ip_base^vdim : ip_base
