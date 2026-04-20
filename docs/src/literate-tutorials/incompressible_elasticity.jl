@@ -137,14 +137,14 @@ function assemble_up!(Ke, fe, cell, cellvalues, facetvalues_u, grid, mp, t, dofr
         end
 
         for (iₚ, Iₚ) in pairs(dofrange_p)
-            δp = shape_value(cellvalues.p, q_point, iₚ)
+            δNpᵢ = shape_value(cellvalues.p, q_point, iₚ)
             for (jᵤ, Jᵤ) in pairs(dofrange_u)
-                divδu = shape_divergence(cellvalues.u, q_point, jᵤ)
-                Ke[Iₚ, Jᵤ] += -δp * divδu * dΩ
+                divδNuⱼ = shape_divergence(cellvalues.u, q_point, jᵤ)
+                Ke[Iₚ, Jᵤ] += -δNpᵢ * divδNuⱼ * dΩ
             end
             for (jₚ, Jₚ) in pairs(dofrange_p[1:iₚ])
-                p = shape_value(cellvalues.p, q_point, jₚ)
-                Ke[Iₚ, Jₚ] += - 1 / mp.K * δp * p * dΩ
+                Npⱼ = shape_value(cellvalues.p, q_point, jₚ)
+                Ke[Iₚ, Jₚ] += - 1 / mp.K * δNpᵢ * Npⱼ * dΩ
             end
 
         end
@@ -161,8 +161,8 @@ function assemble_up!(Ke, fe, cell, cellvalues, facetvalues_u, grid, mp, t, dofr
             for q_point in 1:getnquadpoints(facetvalues_u)
                 dΓ = getdetJdV(facetvalues_u, q_point)
                 for (iᵤ, Iᵤ) in pairs(dofrange_u)
-                    δu = shape_value(facetvalues_u, q_point, iᵤ)
-                    fe[Iᵤ] += (δu ⋅ t) * dΓ
+                    δNuᵢ = shape_value(facetvalues_u, q_point, iᵤ)
+                    fe[Iᵤ] += (δNuᵢ ⋅ t) * dΓ
                 end
             end
         end

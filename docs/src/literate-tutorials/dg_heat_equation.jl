@@ -245,10 +245,10 @@ function assemble_interface!(Ki::Matrix, iv::InterfaceValues, μ::Float64)
             ## Loop over trial shape functions
             for j in 1:getnbasefunctions(iv)
                 ## Multiply the jump by the negative normal to get the definition from the theory section.
-                u_jump = shape_value_jump(iv, q_point, j) * (-normal)
+                Nⱼ = shape_value_jump(iv, q_point, j) * (-normal)
                 ∇Nⱼ_avg = shape_gradient_average(iv, q_point, j)
                 ## Add contribution to Ki
-                Ki[i, j] += -(δNᵢ_jump ⋅ ∇Nⱼ_avg + ∇δNᵢ_avg ⋅ u_jump) * dΓ + μ * (δNᵢ_jump ⋅ u_jump) * dΓ
+                Ki[i, j] += -(δNᵢ_jump ⋅ ∇Nⱼ_avg + ∇δNᵢ_avg ⋅ Nⱼ) * dΓ + μ * (δNᵢ_jump ⋅ Nⱼ) * dΓ
             end
         end
     end

@@ -130,13 +130,11 @@ close!(ch)
 # value and gradient of the test function, `δu` and also the gradient of the trial function
 # `u`. We get all of these from `cellvalues`.
 #
-#!!! note "Notation"
-#Comparing with the brief finite element introduction in [Introduction to FEM](@ref),
-#the variables `δNᵢ`, `∇δNᵢ` and `∇Nⱼ` are actually $\phi_i(\textbf{x}_q)$, $\nabla
-#\phi_i(\textbf{x}_q)$ and $\nabla \phi_j(\textbf{x}_q)$, i.e. the evaluation of the
-#trial and test functions in the quadrature point ``\textbf{x}_q``. However, to
-#underline the strong parallel between the weak form and the implementation, this
-#example uses the symbols appearing in the weak form.
+# !!! note "Notation"
+#     Comparing with the brief finite element introduction in [Introduction to FEM](@ref),
+#     the variables `δNᵢ`, `∇δNᵢ` and `∇Nⱼ` are actually $\phi_i(\textbf{x}_q)$, $\nabla
+#     \phi_i(\textbf{x}_q)$ and $\nabla \phi_j(\textbf{x}_q)$, i.e. the evaluation of the
+#     trial and test functions in the quadrature point ``\textbf{x}_q``.
 
 function assemble_element!(Ke::Matrix, fe::Vector, cellvalues::CellValues)
     n_basefuncs = getnbasefunctions(cellvalues)
