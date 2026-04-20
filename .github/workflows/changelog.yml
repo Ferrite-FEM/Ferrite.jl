@@ -1,3 +1,5 @@
+# Taken from https://github.com/JuliaDocs/Documenter.jl/blob/8591fb1c85a9ddc78ea7ae91f43cd4edab9c1252/.github/workflows/Changelog.yml
+#
 # Enforces the update of a changelog file on every pull request
 # Can be skipped with the `Skip Changelog` label
 name: Changelog Update Check
