@@ -5,7 +5,33 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Next] - xxxx-xx-xx
+## [v1.4.0] - 2026-04-21
+
+### Added
+ - Support assembly of non-square sparse matrices [#1279]
+ - `MultiFieldCellValues` make it easier and faster to work with coupled problems [#872]
+ - Embedded `FEValues` (with sdim != refdim) returns [`MixedTensors`](https://github.com/Ferrite-FEM/Tensors.jl/pull/236)
+   instead of `SArrays` ([#1286])
+ - Add eltype of system vector/matrix to abstract assembler type [#1290]
+ - Automate `edgedof_indices` and `facedof_indices` implementation for new interpolations [#1293]
+
+
+### Fixes
+ - Allow generic float type in quadrature rule [#1274]
+ - Remove `Core.Box` cases [#1265]
+ - Make grid coloring invariant to dict iteration order [#1295]
+ - Support abstract vectors in grid and dofhandler functions [#1252]
+
+### Documentation
+ - Fix typos in tutorials [#1268], [#1271]
+ - Fix typo in `apply!` docstring [#1313]
+ - Replace `threadid` use with `OhMyThreads.jl`+`ChunkSplitters.jl` in landau [#1294]
+
+### Performance improvements
+ - Speed up `InterfaceIterator` [#1281]
+ - Avoid unnecessary views in `InterfaceValues` [#1306]
+ - Speed up `apply!` with bitvector [#1310]
+ - Speed up default sparsity creation with internal `FastSparsityPattern` [#1302]
 
 ## [v1.3.0] - 2026-01-09
 
