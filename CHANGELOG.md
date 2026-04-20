@@ -23,7 +23,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
  - Support abstract vectors in grid and dofhandler functions [#1252]
 
 ### Documentation
- - Fix typos in tutorials [#1268], [#1271]
+ - Fix faulty links [#1282]
+ - Fix typos in tutorials [#1268], [#1271], [#1298] 
  - Fix typo in `apply!` docstring [#1313]
  - Replace `threadid` use with `OhMyThreads.jl`+`ChunkSplitters.jl` in landau [#1294]
 
