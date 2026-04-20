@@ -26,7 +26,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
  - The default `allocate_matrix` call has been optimized using specialized code paths. ([#1302])
  - Remove redundant views in `InterfaceValues`. ([#1306])
  - Optimize `apply!` call on constraint handler. ([#1310])
- 
+
 ### Documentation
  - Fix typos in the tutorials. ([#865], [#1268], [#1271], [#1278], [#1298], [#1313])
  - Replace incorrect `threadid` calls with recommended threading approach in Landau example ([#1294])
