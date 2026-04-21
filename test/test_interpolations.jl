@@ -182,7 +182,7 @@ end
             RannacherTurek{RefQuadrilateral, 1}(),
             RannacherTurek{RefHexahedron, 1}(),
         )
-        # Standard test all base interpolations must fullfill
+        # Standard test all base interpolations must fulfill
         test_interpolation_properties(interpolation)
 
         ref_dim = Ferrite.getrefdim(interpolation)
@@ -305,19 +305,6 @@ end
     end
 
     @testset "Correctness of AD of embedded interpolations" begin
-        ip = Lagrange{RefHexahedron, 2}()^3
-        ξ = rand(Vec{3, Float64})
-        for I in 1:getnbasefunctions(ip)
-            #Call StaticArray-version
-            H_sa, G_sa, V_sa = Ferrite._reference_shape_hessian_gradient_and_value_static_array(ip, ξ, I)
-            #Call tensor AD version
-            H, G, V = Ferrite.reference_shape_hessian_gradient_and_value(ip, ξ, I)
-
-            @test V ≈ V_sa
-            @test G ≈ G_sa
-            @test H ≈ H_sa
-        end
-
         ips = Lagrange{RefQuadrilateral, 2}()
         vdim = 3
         ipv = ips^vdim
@@ -580,7 +567,7 @@ end
         _facet_poly_order(ip::Nedelec) = Ferrite.getorder(ip) - 1
         _facet_poly_order(ip::RaviartThomas) = Ferrite.getorder(ip) - 1
         _facet_poly_order(ip::BrezziDouglasMarini) = Ferrite.getorder(ip)
-        # Based on this order, p_facet, we expect that we should fullfill different criteria.
+        # Based on this order, p_facet, we expect that we should fulfill different criteria.
         # * If we prescribe a polynomial function to ProjectedDirichlet with a lower or equal order
         #   than p_facet, we expect that the interpolation should match the provided function pointwise.
         # * If we prescribe a polynomial function with higher order, but lower order than what the quadrature

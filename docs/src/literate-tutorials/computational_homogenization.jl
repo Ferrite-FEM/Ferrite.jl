@@ -158,7 +158,7 @@
 # \bar{\boldsymbol{\varepsilon}} = \begin{pmatrix}0 & 0.5\\ 0.5 & 0\end{pmatrix}
 # ```
 #
-# as the input to the RVE problem. When the sensitivies are solved we can compute the
+# as the input to the RVE problem. When the sensitivities are solved we can compute the
 # entries of the homogenized stiffness as follows
 #
 # ```math
@@ -288,7 +288,7 @@ Em = SymmetricTensor{4, 2}(
 Ei = 10 * Em;
 
 # As mentioned above, in order to compute the apparent/homogenized stiffness we will solve
-# the problem repeatedly with different macroscale strain tensors to compute the sensitvity
+# the problem repeatedly with different macroscale strain tensors to compute the sensitivity
 # of the homogenized stress, ``\bar{\boldsymbol{\sigma}}``, w.r.t. the macroscopic strain,
 # ``\bar{\boldsymbol{\varepsilon}}``. The corresponding unit strains are defined below,
 # and will result in three different right-hand-sides:

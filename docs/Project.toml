@@ -2,6 +2,7 @@
 Bibliography = "f1be7e48-bf82-45af-a471-ae754a193061"
 BlockArrays = "8e7c35d0-a365-5155-bbbb-fb81a777f24e"
 Changelog = "5217a498-cd5d-4ec6-b8c2-9b85a09b6e3e"
+ChunkSplitters = "ae650224-84b6-46f8-82ea-d812ca08434e"
 DiffEqBase = "2b5f629d-d688-5b77-993f-72d75c75574e"
 Documenter = "e30172f5-a6a5-5a46-863b-614d45cd2de4"
 DocumenterCitations = "daee34ce-89f3-4625-b898-19384cb65244"
@@ -27,3 +28,6 @@ TaskLocalValues = "ed4db957-447d-4319-bfb6-7fa9ae7ecf34"
 Tensors = "48a634ad-e948-5137-8d70-aa71f2a747f4"
 TimerOutputs = "a759f4b9-e2f1-59dc-863e-4aeb61b1ea8f"
 WriteVTK = "64499a7a-5c06-52f2-abe2-ccb03c286192"
+
+[compat]
+Optim = "1" # https://github.com/JuliaNLSolvers/Optim.jl/issues/1234

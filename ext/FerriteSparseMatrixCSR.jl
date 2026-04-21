@@ -1,40 +1,45 @@
 module FerriteSparseMatrixCSR
 
 using Ferrite, SparseArrays, SparseMatricesCSR
-import Ferrite: AbstractSparsityPattern, CSRAssembler
+import Ferrite: AbstractSparsityPattern, CSRAssembler, FastSparsityPattern, getnrows, getncols
 import Base: @propagate_inbounds
 
 # Could be generalized if https://github.com/JuliaSparse/SparseArrays.jl/pull/546 is merged
 function Ferrite.start_assemble(K::SparseMatrixCSR{<:Any, T}, f::Vector = T[]; fillzero::Bool = true, maxcelldofs_hint::Int = 0) where {T}
     fillzero && (Ferrite.fillzero!(K); Ferrite.fillzero!(f))
-    return CSRAssembler(K, f, zeros(Int, maxcelldofs_hint), zeros(Int, maxcelldofs_hint))
+    return CSRAssembler(K, f, zeros(Int, maxcelldofs_hint), zeros(Int, maxcelldofs_hint), zeros(Int, maxcelldofs_hint), zeros(Int, maxcelldofs_hint))
 end
 
-@propagate_inbounds function Ferrite._assemble_inner!(K::SparseMatrixCSR, Ke::AbstractMatrix, dofs::AbstractVector, sorteddofs::AbstractVector, permutation::AbstractVector, sym::Bool)
+@propagate_inbounds function Ferrite._assemble_inner!(
+        K::SparseMatrixCSR, Ke::AbstractMatrix,
+        rowdofs::AbstractVector, sortedrowdofs::AbstractVector, rowpermutation::AbstractVector,
+        coldofs::AbstractVector, sortedcoldofs::AbstractVector, colpermutation::AbstractVector,
+        sym::Bool
+    )
     current_row = 1
-    ld = length(dofs)
-    return @inbounds for Krow in sorteddofs
+    ld = length(coldofs)
+    return @inbounds for Krow in sortedrowdofs
         maxlookups = sym ? current_row : ld
-        Kerow = permutation[current_row]
+        Kerow = rowpermutation[current_row]
         ci = 1 # col index pointer for the local matrix
         Ci = 1 # col index pointer for the global matrix
         nzr = nzrange(K, Krow)
         while Ci <= length(nzr) && ci <= maxlookups
             C = nzr[Ci]
             Kcol = K.colval[C]
-            Kecol = permutation[ci]
+            Kecol = colpermutation[ci]
             val = Ke[Kerow, Kecol]
-            if Kcol == dofs[Kecol]
+            if Kcol == coldofs[Kecol]
                 # Match: add the value (if non-zero) and advance the pointers
                 if !iszero(val)
                     K.nzval[C] += val
                 end
                 ci += 1
                 Ci += 1
-            elseif Kcol < dofs[Kecol]
+            elseif Kcol < coldofs[Kecol]
                 # No match yet: advance the global matrix row pointer
                 Ci += 1
-            else # Kcol > dofs[Kecol]
+            else # Kcol > coldofs[Kecol]
                 # No match: no entry exist in the global matrix for this row. This is
                 # allowed as long as the value which would have been inserted is zero.
                 iszero(val) || Ferrite._missing_sparsity_pattern_error(Krow, Kcol)
@@ -44,8 +49,8 @@ end
         end
         # Make sure that remaining entries in this column of the local matrix are all zero
         for i in ci:maxlookups
-            if !iszero(Ke[Kerow, permutation[i]])
-                Ferrite._missing_sparsity_pattern_error(Krow, sorteddofs[i])
+            if !iszero(Ke[Kerow, colpermutation[i]])
+                Ferrite._missing_sparsity_pattern_error(Krow, sortedcoldofs[i])
             end
         end
         current_row += 1
@@ -62,10 +67,11 @@ function Ferrite.zero_out_rows!(K::SparseMatrixCSR, ch::ConstraintHandler)
 end
 
 function Ferrite.zero_out_columns!(K::SparseMatrixCSR, ch::ConstraintHandler)
+    @boundscheck checkbounds(ch.isconstrained, axes(K, 2))
     colval = K.colval
     nzval = K.nzval
-    return @inbounds for i in eachindex(colval, nzval)
-        if haskey(ch.dofmapping, colval[i])
+    return @inbounds for (i, col) in pairs(colval)
+        if ch.isconstrained[col]
             nzval[i] = 0
         end
     end
@@ -105,6 +111,43 @@ function _allocate_matrix(::Type{SparseMatrixCSR{1, Tv, Ti}}, sp::AbstractSparsi
     end
     S = SparseMatrixCSR{1}(Ferrite.getnrows(sp), Ferrite.getncols(sp), rowptr, colval, nzval)
     return S
+end
+
+## ================= ##
+# FastSparsityPattern #
+## ================= ##
+
+function _allocate_matrix(::Type{SparseMatrixCSR{1, Tv, Ti}}, sp::FastSparsityPattern{Ti}, sym::Bool) where {Tv, Ti}
+    sym && throw(ArgumentError("FastSparsityPattern does not support symmetric matrices yet"))
+    sp.is_colidx_sorted || sort_rows_threaded!(sp) # Require sorted rows
+    nzval = zeros(Tv, length(sp.colidx))
+    return SparseMatrixCSR{1}(getnrows(sp), getncols(sp), sp.rowptr, sp.colidx, nzval)
+end
+
+function sort_rows!(sp::FastSparsityPattern, rowrange::UnitRange)
+    @inbounds for row in rowrange
+        i1 = sp.rowptr[row]
+        i2 = sp.rowptr[row + 1] - 1
+        if i1 < i2
+            sort!(view(sp.colidx, i1:i2); alg = QuickSort)
+        end
+    end
+    return sp
+end
+
+function sort_rows_threaded!(
+        sp::FastSparsityPattern, # Default ΔN ≥ 1000 and `n_tasks ≥ 1`
+        ntasks = max(min(Threads.nthreads() * 100, getnrows(sp) ÷ 1000), 1)
+    )               # Otherwise, 100 per thread for load balancing
+    nrows = getnrows(sp)
+    ΔN = cld(nrows, ntasks)
+    Threads.@threads for taskid in 1:ntasks
+        first_idx = 1 + ΔN * (taskid - 1)
+        last_idx = min(first_idx + ΔN - 1, nrows)
+        sort_rows!(sp, first_idx:last_idx)
+    end
+    sp.is_colidx_sorted = true
+    return sp
 end
 
 end

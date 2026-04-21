@@ -21,7 +21,7 @@
                 @test Ferrite.write_cell_colors(vtk, grid, colors) === vtk
             end
             @test v isa VTKGridFile
-            @test bytes2hex(open(SHA.sha1, fname * ".vtu")) == "b804d0b064121b672d8e35bcff8446eda361cac3"
+            @test bytes2hex(open(SHA.sha1, fname * ".vtu")) == "960aa8323da524f642376bba6ff7d8f7c349b218"
         end
     end
     @testset "constraints" begin
@@ -202,7 +202,7 @@
         rm(dofhandlerfilename * ".vtu")
         rm(dofhandler_views_filename * ".vtu")
     end
-    @testset "discontinous_projection" begin
+    @testset "discontinuous_projection" begin
         mktempdir() do tmp
             grid = generate_grid(Quadrilateral, (2, 2), Vec{2}((0.0, 0.0)), Vec{2}((1.0, 1.0)))
             qr = QuadratureRule{RefQuadrilateral}(2)
@@ -227,7 +227,7 @@
             end
         end
     end
-    @testset "discontinous_embedded" begin
+    @testset "discontinuous_embedded" begin
         mktempdir() do tmp
             grid = generate_grid(Line, (2,), Vec((0.0, 0.0)), Vec((1.0, 0.5)))
 

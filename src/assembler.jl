@@ -1,6 +1,6 @@
-abstract type AbstractAssembler end
-abstract type AbstractCSCAssembler <: AbstractAssembler end
-abstract type AbstractCSRAssembler <: AbstractAssembler end
+abstract type AbstractAssembler{Tv} end
+abstract type AbstractCSCAssembler{Tv} <: AbstractAssembler{Tv} end
+abstract type AbstractCSRAssembler{Tv} <: AbstractAssembler{Tv} end
 
 """
     struct COOAssembler{Tv, Ti}
@@ -8,7 +8,7 @@ abstract type AbstractCSRAssembler <: AbstractAssembler end
 This assembler creates a COO (**coo**rdinate format) representation of a sparse matrix
 during assembly and converts it into a `SparseMatrixCSC{Tv, Ti}` on finalization.
 """
-struct COOAssembler{Tv, Ti} # <: AbstractAssembler
+struct COOAssembler{Tv, Ti} # <: AbstractAssembler{Tv}
     nrows::Int
     ncols::Int
     f::Vector{Tv}
@@ -173,31 +173,37 @@ matrix_handle, vector_handle
 """
 Assembler for sparse matrix with CSC storage type.
 """
-struct CSCAssembler{Tv, Ti, MT <: AbstractSparseMatrixCSC{Tv, Ti}} <: AbstractCSCAssembler
+struct CSCAssembler{Tv, Ti, MT <: AbstractSparseMatrixCSC{Tv, Ti}} <: AbstractCSCAssembler{Tv}
     K::MT
     f::Vector{Tv}
-    permutation::Vector{Int}
-    sorteddofs::Vector{Int}
+    rowpermutation::Vector{Int}
+    colpermutation::Vector{Int}
+    sortedrowdofs::Vector{Int}
+    sortedcoldofs::Vector{Int}
 end
 
 """
 Assembler for sparse matrix with CSR storage type.
 """
-struct CSRAssembler{Tv, Ti, MT <: AbstractSparseMatrix{Tv, Ti}} <: AbstractCSRAssembler #AbstractSparseMatrixCSR does not exist
+struct CSRAssembler{Tv, Ti, MT <: AbstractSparseMatrix{Tv, Ti}} <: AbstractCSRAssembler{Tv} #AbstractSparseMatrixCSR does not exist
     K::MT
     f::Vector{Tv}
-    permutation::Vector{Int}
-    sorteddofs::Vector{Int}
+    rowpermutation::Vector{Int}
+    colpermutation::Vector{Int}
+    sortedrowdofs::Vector{Int}
+    sortedcoldofs::Vector{Int}
 end
 
 """
 Assembler for symmetric sparse matrix with CSC storage type.
 """
-struct SymmetricCSCAssembler{Tv, Ti, MT <: Symmetric{Tv, <:AbstractSparseMatrixCSC{Tv, Ti}}} <: AbstractCSCAssembler
+struct SymmetricCSCAssembler{Tv, Ti, MT <: Symmetric{Tv, <:AbstractSparseMatrixCSC{Tv, Ti}}} <: AbstractCSCAssembler{Tv}
     K::MT
     f::Vector{Tv}
-    permutation::Vector{Int}
-    sorteddofs::Vector{Int}
+    rowpermutation::Vector{Int} # Symmetric assembly doesn't need separate row and
+    colpermutation::Vector{Int} # col permutation and dofs, but simplifies code reuse
+    sortedrowdofs::Vector{Int}  # reuse with non-symmetric cases. sortedrowdofs and
+    sortedcoldofs::Vector{Int}  # rowpermutation always aliased to sortedcoldofs and colpermutation.
 end
 
 function Base.show(io::IO, ::MIME"text/plain", a::Union{CSCAssembler, CSRAssembler, SymmetricCSCAssembler})
@@ -216,15 +222,15 @@ matrix_handle(a::SymmetricCSCAssembler) = a.K.data
 vector_handle(a::Union{AbstractCSCAssembler, AbstractCSRAssembler}) = a.f
 
 """
-    start_assemble(K::AbstractSparseMatrixCSC;            fillzero::Bool=true) -> CSCAssembler
-    start_assemble(K::AbstractSparseMatrixCSC, f::Vector; fillzero::Bool=true) -> CSCAssembler
+    start_assemble(K::AbstractSparseMatrixCSC{Tv};            fillzero::Bool=true) -> CSCAssembler{Tv}
+    start_assemble(K::AbstractSparseMatrixCSC{Tv}, f::Vector{Tv}; fillzero::Bool=true) -> CSCAssembler{Tv}
 
-Create a `CSCAssembler` from the matrix `K` and optional vector `f`.
+Create a `CSCAssembler{Tv}` from the matrix `K` and optional vector `f` with value type `Tv`.
 
-    start_assemble(K::Symmetric{AbstractSparseMatrixCSC};                 fillzero::Bool=true) -> SymmetricCSCAssembler
-    start_assemble(K::Symmetric{AbstractSparseMatrixCSC}, f::Vector=Td[]; fillzero::Bool=true) -> SymmetricCSCAssembler
+    start_assemble(K::Symmetric{AbstractSparseMatrixCSC{Tv}};                 fillzero::Bool=true) -> SymmetricCSCAssembler{Tv}
+    start_assemble(K::Symmetric{AbstractSparseMatrixCSC{Tv}}, f::Vector=Tv[]; fillzero::Bool=true) -> SymmetricCSCAssembler{Tv}
 
-Create a `SymmetricCSCAssembler` from the matrix `K` and optional vector `f`.
+Create a `SymmetricCSCAssembler{Tv}` from the matrix `K` and optional vector `f` with value type `Tv`.
 
 `CSCAssembler` and `SymmetricCSCAssembler` allocate workspace
 necessary for efficient matrix assembly. To assemble the contribution from an element, use
@@ -239,11 +245,13 @@ start_assemble(K::Union{AbstractSparseMatrixCSC, Symmetric{<:Any, <:AbstractSpar
 
 function start_assemble(K::AbstractSparseMatrixCSC{T}, f::Vector = T[]; fillzero::Bool = true, maxcelldofs_hint::Int = 0) where {T}
     fillzero && (fillzero!(K); fillzero!(f))
-    return CSCAssembler(K, f, zeros(Int, maxcelldofs_hint), zeros(Int, maxcelldofs_hint))
+    return CSCAssembler(K, f, zeros(Int, maxcelldofs_hint), zeros(Int, maxcelldofs_hint), zeros(Int, maxcelldofs_hint), zeros(Int, maxcelldofs_hint))
 end
 function start_assemble(K::Symmetric{T, <:SparseMatrixCSC}, f::Vector = T[]; fillzero::Bool = true, maxcelldofs_hint::Int = 0) where {T}
     fillzero && (fillzero!(K); fillzero!(f))
-    return SymmetricCSCAssembler(K, f, zeros(Int, maxcelldofs_hint), zeros(Int, maxcelldofs_hint))
+    permutation = zeros(Int, maxcelldofs_hint)
+    sorteddofs = zeros(Int, maxcelldofs_hint)
+    return SymmetricCSCAssembler(K, f, permutation, permutation, sorteddofs, sorteddofs)
 end
 
 function finish_assemble(a::Union{CSCAssembler, CSRAssembler, SymmetricCSCAssembler})
@@ -251,22 +259,32 @@ function finish_assemble(a::Union{CSCAssembler, CSRAssembler, SymmetricCSCAssemb
 end
 
 """
-    assemble!(A::AbstractAssembler, dofs::AbstractVector{Int}, Ke::AbstractMatrix)
-    assemble!(A::AbstractAssembler, dofs::AbstractVector{Int}, Ke::AbstractMatrix, fe::AbstractVector)
+    assemble!(A::Ferrite.AbstractAssembler, dofs::AbstractVector{Int}, Ke::AbstractMatrix)
+    assemble!(A::Ferrite.AbstractAssembler, dofs::AbstractVector{Int}, Ke::AbstractMatrix, fe::AbstractVector)
 
-Assemble the element stiffness matrix `Ke` (and optional force vector `fe`) into the global
+Assemble the square element stiffness matrix `Ke` (and optional force vector `fe`) into the global
 stiffness (and force) in `A`, given the element degrees of freedom `dofs`.
 
-This is equivalent to `K[dofs, dofs] += Ke` and `f[dofs] += fe`, where `K` is the global
-stiffness matrix and `f` the global force/residual vector, but more efficient.
+This is equivalent to `K[dofs, dofs] += Ke` and `f[dofs] += fe`, where `K` is the global stiffness matrix and `f` the global force/residual vector, but more efficient.
+
+    assemble!(A::Ferrite.AbstractAssembler, rowdofs::AbstractVector{Int}, coldofs::AbstractVector{Int}, Ke::AbstractMatrix)
+    assemble!(A::Ferrite.AbstractAssembler, rowdofs::AbstractVector{Int}, coldofs::AbstractVector{Int}, Ke::AbstractMatrix, fe::AbstractVector)
+
+Assemble the element stiffness matrix `Ke` (and optional force vector `fe`) into the global
+stiffness (and force) in `A`, given the element row degrees of freedom, `rowdofs`, and element column degrees of freedom, `coldofs`.
+This is equivalent to `K[rowdofs, coldofs] += Ke` and `f[rowdofs] += fe`, but more efficient.
 """
 assemble!(::AbstractAssembler, ::AbstractVector{<:Integer}, ::AbstractMatrix, ::AbstractVector)
 
 @propagate_inbounds function assemble!(A::AbstractAssembler, dofs::AbstractVector{<:Integer}, Ke::AbstractMatrix, fe::Union{AbstractVector, Nothing} = nothing)
-    return _assemble!(A, dofs, Ke, fe, false)
+    size(Ke, 1) == size(Ke, 2) || throw(ArgumentError("Ke is rectangular, but only a single `dofs` vector is provided. Please call assemble!(A, rowdofs, coldofs, Ke, fe) instead."))
+    return _assemble!(A, dofs, dofs, Ke, fe, false)
+end
+@propagate_inbounds function assemble!(A::AbstractAssembler, rowdofs::AbstractVector{<:Integer}, coldofs::AbstractVector{<:Integer}, Ke::AbstractMatrix, fe::Union{AbstractVector, Nothing} = nothing)
+    return _assemble!(A, rowdofs, coldofs, Ke, fe, false)
 end
 @propagate_inbounds function assemble!(A::SymmetricCSCAssembler, dofs::AbstractVector{<:Integer}, Ke::AbstractMatrix, fe::Union{AbstractVector, Nothing} = nothing)
-    return _assemble!(A, dofs, Ke, fe, true)
+    return _assemble!(A, dofs, dofs, Ke, fe, true)
 end
 
 """
@@ -283,53 +301,62 @@ Sorts the dofs into a separate buffer and returns it together with a permutation
     return sorteddofs, permutation
 end
 
-@propagate_inbounds function _assemble!(A::Union{AbstractCSCAssembler, AbstractCSRAssembler}, dofs::AbstractVector{<:Integer}, Ke::AbstractMatrix, fe::Union{AbstractVector, Nothing}, sym::Bool)
-    ld = length(dofs)
-    @boundscheck checkbounds(Ke, keys(dofs), keys(dofs))
+@propagate_inbounds function _assemble!(A::Union{AbstractCSCAssembler, AbstractCSRAssembler}, rowdofs::AbstractVector{<:Integer}, coldofs::AbstractVector{<:Integer}, Ke::AbstractMatrix, fe::Union{AbstractVector, Nothing}, sym::Bool)
+    @boundscheck checkbounds(Ke, keys(rowdofs), keys(coldofs))
     if fe !== nothing
-        @boundscheck checkbounds(fe, keys(dofs))
-        @boundscheck checkbounds(A.f, dofs)
-        @inbounds assemble!(A.f, dofs, fe)
+        @boundscheck checkbounds(fe, keys(rowdofs))
+        @boundscheck checkbounds(A.f, rowdofs)
+        @inbounds assemble!(A.f, rowdofs, fe)
     end
 
     K = matrix_handle(A)
-    @boundscheck checkbounds(K, dofs, dofs)
+    @boundscheck checkbounds(K, rowdofs, coldofs)
 
     # We assume that the input dofs are not sorted, because the cells need the dofs in
     # a specific order, which might not be the sorted order. Hence we sort them.
     # Note that we are not allowed to mutate `dofs` in the process.
-    sorteddofs, permutation = _sortdofs_for_assembly!(A.permutation, A.sorteddofs, dofs)
+    sortedcoldofs, colpermutation = _sortdofs_for_assembly!(A.colpermutation, A.sortedcoldofs, coldofs)
+    sortedrowdofs, rowpermutation = if rowdofs !== coldofs
+        _sortdofs_for_assembly!(A.rowpermutation, A.sortedrowdofs, rowdofs)
+    else
+        sortedcoldofs, colpermutation
+    end
 
-    return _assemble_inner!(K, Ke, dofs, sorteddofs, permutation, sym)
+    return _assemble_inner!(K, Ke, rowdofs, sortedrowdofs, rowpermutation, coldofs, sortedcoldofs, colpermutation, sym)
 end
 
-@propagate_inbounds function _assemble_inner!(K::SparseMatrixCSC, Ke::AbstractMatrix, dofs::AbstractVector, sorteddofs::AbstractVector, permutation::AbstractVector, sym::Bool)
+@propagate_inbounds function _assemble_inner!(
+        K::SparseMatrixCSC, Ke::AbstractMatrix,
+        rowdofs::AbstractVector, sortedrowdofs::AbstractVector, rowpermutation::AbstractVector,
+        coldofs::AbstractVector, sortedcoldofs::AbstractVector, colpermutation::AbstractVector,
+        sym::Bool
+    )
     current_col = 1
     Krows = rowvals(K)
     Kvals = nonzeros(K)
-    ld = length(dofs)
-    @inbounds for Kcol in sorteddofs
+    ld = length(rowdofs)
+    @inbounds for Kcol in sortedcoldofs
         maxlookups = sym ? current_col : ld
-        Kecol = permutation[current_col]
+        Kecol = colpermutation[current_col]
         ri = 1 # row index pointer for the local matrix
         Ri = 1 # row index pointer for the global matrix
         nzr = nzrange(K, Kcol)
         while Ri <= length(nzr) && ri <= maxlookups
             R = nzr[Ri]
             Krow = Krows[R]
-            Kerow = permutation[ri]
+            Kerow = rowpermutation[ri]
             val = Ke[Kerow, Kecol]
-            if Krow == dofs[Kerow]
+            if Krow == rowdofs[Kerow]
                 # Match: add the value (if non-zero) and advance the pointers
                 if !iszero(val)
                     Kvals[R] += val
                 end
                 ri += 1
                 Ri += 1
-            elseif Krow < dofs[Kerow]
+            elseif Krow < rowdofs[Kerow]
                 # No match yet: advance the global matrix row pointer
                 Ri += 1
-            else # Krow > dofs[Kerow]
+            else # Krow > rowdofs[Kerow]
                 # No match: no entry exist in the global matrix for this row. This is
                 # allowed as long as the value which would have been inserted is zero.
                 iszero(val) || _missing_sparsity_pattern_error(Krow, Kcol)
@@ -339,8 +366,8 @@ end
         end
         # Make sure that remaining entries in this column of the local matrix are all zero
         for i in ri:maxlookups
-            if !iszero(Ke[permutation[i], Kecol])
-                _missing_sparsity_pattern_error(sorteddofs[i], Kcol)
+            if !iszero(Ke[rowpermutation[i], Kecol])
+                _missing_sparsity_pattern_error(sortedrowdofs[i], Kcol)
             end
         end
         current_col += 1

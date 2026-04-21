@@ -16,5 +16,24 @@
                 end
             end
         end
+
+        @testset "reference_face_edgenrs" begin
+            vertices_count = zeros(Int, Ferrite.nvertices(RefShape))
+            for (faceedges, facevertices) in zip(
+                    Ferrite.reference_face_edgenrs(RefShape),
+                    Ferrite.reference_faces(RefShape)
+                )
+                # For a given face, each vertex should appear
+                # exactly twice when counting the containing edges
+                fill!(vertices_count, 0)
+                for edgenr in faceedges
+                    for v in Ferrite.reference_edges(RefShape)[edgenr]
+                        vertices_count[v] += 1
+                    end
+                end
+                @test all(i -> vertices_count[i] == 2, facevertices)  # Visited exactly twice
+                @test sum(vertices_count) == 2 * length(facevertices) # No other vertices visited
+            end
+        end
     end
 end

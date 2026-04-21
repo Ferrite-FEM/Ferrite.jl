@@ -71,7 +71,7 @@ by the FE approximation on the facet, ``\Gamma^f``. The arguments to the functio
 the coordinate, ``\boldsymbol{x}``, the time, ``t``, and the facet normal, ``\boldsymbol{n}``.
 The quadrature rule is automatically created, but the default order, `qr_order = 2 * ip_order`
 (may be refined in future releases),
-where `ip_order` is the order of the interpolation, can be overrided if desired.
+where `ip_order` is the order of the interpolation, can be overridden if desired.
 
 # H(div) interpolations
 For H(div), we want to prescribe the normal flux, ``q_\mathrm{n} = f(\boldsymbol{x}, t, \boldsymbol{n})``.
@@ -166,6 +166,7 @@ mutable struct ConstraintHandler{DH <: AbstractDofHandler, T}
     const dofcoefficients::Vector{Union{Nothing, DofCoefficients{T}}}
     # global dof -> index into dofs and inhomogeneities and dofcoefficients
     const dofmapping::Dict{Int, Int}
+    const isconstrained::BitVector # Fast check if dof is constrained or not
     const bcvalues::Vector{BCValues{T}}
     const dh::DH
     closed::Bool
@@ -177,7 +178,7 @@ function ConstraintHandler(::Type{T}, dh::AbstractDofHandler) where {T <: Number
     @assert isclosed(dh)
     return ConstraintHandler(
         Dirichlet[], ProjectedDirichlet[], Int[], Int[], T[], Union{Nothing, T}[],
-        Union{Nothing, DofCoefficients{T}}[], Dict{Int, Int}(), BCValues{T}[], dh, false,
+        Union{Nothing, DofCoefficients{T}}[], Dict{Int, Int}(), BitVector(), BCValues{T}[], dh, false,
     )
 end
 
@@ -259,21 +260,15 @@ isclosed(ch::ConstraintHandler) = ch.closed
 free_dofs(ch::ConstraintHandler) = ch.free_dofs
 prescribed_dofs(ch::ConstraintHandler) = ch.prescribed_dofs
 
-# Equivalent to `copy!(out, setdiff(1:n_entries, diff))`, but requires that
-# `issorted(diff)` and that `1 ≤ diff[1] ≤ diff[end] ≤ n_entries`
-function _sorted_setdiff!(out::Vector{Int}, n_entries::Int, diff::Vector{Int})
-    n_diff = length(diff)
-    resize!(out, n_entries - n_diff)
-    diff_ind = out_ind = 1
-    for i in 1:n_entries
-        if diff_ind ≤ n_diff && i == diff[diff_ind]
-            diff_ind += 1
-        else
-            out[out_ind] = i
-            out_ind += 1
-        end
+function _set_freedofs!(free_dofs::Vector{Int}, isconstrained::BitVector, num_dofs::Int, num_prescribed::Int)
+    resize!(free_dofs, num_dofs - num_prescribed)
+    j = 1
+    for i in 1:num_dofs
+        isconstrained[i] && continue
+        free_dofs[j] = i
+        j += 1
     end
-    return out
+    return free_dofs
 end
 
 """
@@ -291,7 +286,12 @@ function close!(ch::ConstraintHandler)
     ch.affine_inhomogeneities .= ch.affine_inhomogeneities[I]
     ch.dofcoefficients .= ch.dofcoefficients[I]
 
-    _sorted_setdiff!(ch.free_dofs, ndofs(ch.dh), ch.prescribed_dofs)
+    resize!(ch.isconstrained, ndofs(ch.dh))
+    fill!(ch.isconstrained, false)
+    for dof in ch.prescribed_dofs
+        ch.isconstrained[dof] = true
+    end
+    _set_freedofs!(ch.free_dofs, ch.isconstrained, ndofs(ch.dh), length(ch.prescribed_dofs))
 
     for i in 1:length(ch.prescribed_dofs)
         ch.dofmapping[ch.prescribed_dofs[i]] = i
@@ -590,7 +590,7 @@ conditions specified in `ch` such that `K \\ rhs` gives the expected solution.
 !!! note
     `apply!(K, rhs, ch)` essentially calculates
     ```julia
-    rhs[free] = rhs[free] - K[constrained, constrained] * a[constrained]
+    rhs[free] = rhs[free] - K[free, constrained] * a[constrained]
     ```
     where `a[constrained]` are the inhomogeneities. Consequently, the sign of `rhs` matters
     (in contrast with `apply_zero!`).
@@ -913,11 +913,12 @@ function zero_out_columns!(K::AbstractSparseMatrixCSC, ch::ConstraintHandler) # 
 end
 
 function zero_out_rows!(K::AbstractSparseMatrixCSC, ch::ConstraintHandler)
+    @boundscheck checkbounds(ch.isconstrained, axes(K, 1))
     rowval = K.rowval
     nzval = K.nzval
-    @inbounds for i in eachindex(rowval, nzval)
-        if haskey(ch.dofmapping, rowval[i])
-            nzval[i] = 0
+    @inbounds for (i, row) in pairs(rowval)
+        if ch.isconstrained[row]
+            nzval[i] = zero(eltype(K))
         end
     end
     return
@@ -1765,7 +1766,7 @@ function _apply_local!(
     # 3. Condense any affine constraints
     if has_nontrivial_affine_constraints
         # Condense this constraint locally if possible, and otherwise modifies the global arrays.
-        _condense_local!(local_matrix, local_vector, global_matrix, global_vector, global_dofs, ch.dofmapping, ch.dofcoefficients)
+        _condense_local!(local_matrix, local_vector, global_matrix, global_vector, global_dofs, ch.dofmapping, ch.dofcoefficients, ch.isconstrained)
     end
     # 4. Zero out columns/rows of local matrix and replace diagonal entries with the mean
     if has_constraints
@@ -1794,7 +1795,8 @@ end
 """
     _condense_local!(local_matrix::AbstractMatrix, local_vector::AbstractVector,
                     global_matrix#=::SparseMatrixCSC=#, global_vector#=::Vector=#,
-                    global_dofs::AbstractVector, dofmapping::Dict, dofcoefficients::Vector)
+                    global_dofs::AbstractVector, dofmapping::Dict, dofcoefficients::Vector,
+                    isconstrained::BitVector)
 
 Condensation of affine constraints on element level. If possible this function only
 modifies the local arrays.
@@ -1802,7 +1804,8 @@ modifies the local arrays.
 function _condense_local!(
         local_matrix::AbstractMatrix, local_vector::AbstractVector,
         global_matrix #=::SparseMatrixCSC=#, global_vector #=::Vector=#,
-        global_dofs::AbstractVector, dofmapping::Dict, dofcoefficients::Vector
+        global_dofs::AbstractVector, dofmapping::Dict, dofcoefficients::Vector,
+        isconstrained::BitVector,
     )
     @assert axes(local_matrix, 1) == axes(local_matrix, 2) ==
         axes(local_vector, 1) == axes(global_dofs, 1)
@@ -1821,7 +1824,7 @@ function _condense_local!(
                     if local_mrow === nothing
                         # Only modify the global array if this isn't prescribed since we
                         # can't zero it out later like with the local matrix.
-                        if !haskey(dofmapping, global_col) && !haskey(dofmapping, global_mrow)
+                        if !isconstrained[global_col] && !isconstrained[global_mrow]
                             has_global_arrays || missing_global()
                             addindex!(global_matrix, mw, global_mrow, global_col)
                         end
