@@ -265,10 +265,10 @@ function assemble_mass_matrix(cv::MultiFieldCellValues, M::SparseMatrixCSC, dh::
             ## Remember that we assemble a vector mass term, hence the dot product.
             ## There is only one time derivative on the left hand side, so only one mass block is non-zero.
             for i in 1:n_basefuncs_v
-                Nᵢ = shape_value(cv.v, q_point, i)
+                Nvᵢ = shape_value(cv.v, q_point, i)
                 for j in 1:n_basefuncs_v
-                    Nⱼ = shape_value(cv.v, q_point, j)
-                    Mₑ[BlockIndex((v▄, v▄), (i, j))] += Nᵢ ⋅ Nⱼ * dΩ
+                    δNvⱼ = shape_value(cv.v, q_point, j)
+                    Mₑ[BlockIndex((v▄, v▄), (i, j))] += Nvᵢ ⋅ δNvⱼ * dΩ
                 end
             end
         end
@@ -309,20 +309,20 @@ function assemble_stokes_matrix(cv::MultiFieldCellValues, ν, K::SparseMatrixCSC
             # Assemble local viscosity block of $A$
             #+
             for i in 1:n_basefuncs_v
-                ∇Nᵢ = shape_gradient(cv.v, q_point, i)
+                ∇Nvᵢ = shape_gradient(cv.v, q_point, i)
                 for j in 1:n_basefuncs_v
-                    ∇Nⱼ = shape_gradient(cv.v, q_point, j)
-                    Kₑ[BlockIndex((v▄, v▄), (i, j))] -= ν * ∇Nᵢ ⊡ ∇Nⱼ * dΩ
+                    ∇δNvⱼ = shape_gradient(cv.v, q_point, j)
+                    Kₑ[BlockIndex((v▄, v▄), (i, j))] -= ν * ∇Nvᵢ ⊡ ∇δNvⱼ * dΩ
                 end
             end
             # Assemble local pressure and incompressibility blocks of $B^{\textrm{T}}$ and $B$.
             #+
             for j in 1:n_basefuncs_p
-                ψ = shape_value(cv.p, q_point, j)
+                δNpⱼ = shape_value(cv.p, q_point, j)
                 for i in 1:n_basefuncs_v
-                    divφ = shape_divergence(cv.v, q_point, i)
-                    Kₑ[BlockIndex((v▄, p▄), (i, j))] += (divφ * ψ) * dΩ
-                    Kₑ[BlockIndex((p▄, v▄), (j, i))] += (ψ * divφ) * dΩ
+                    div_δNvᵢ = shape_divergence(cv.v, q_point, i)
+                    Kₑ[BlockIndex((v▄, p▄), (i, j))] += (div_δNvᵢ * δNpⱼ) * dΩ
+                    Kₑ[BlockIndex((p▄, v▄), (j, i))] += (δNpⱼ * div_δNvᵢ) * dΩ
                 end
             end
         end
@@ -411,7 +411,7 @@ function navierstokes_rhs_element!(dvₑ, vₑ, cv)
         ∇v = function_gradient(cv.v, q_point, vₑ)
         v = function_value(cv.v, q_point, vₑ)
         for j in 1:n_basefuncs
-            Nⱼ = shape_value(cv.v, q_point, j)
+            δNvⱼ = shape_value(cv.v, q_point, j)
             # Note that in Tensors.jl the definition $\textrm{grad} v = \nabla v$ holds.
             # With this information it can be quickly shown in index notation that
             # ```math
@@ -419,7 +419,7 @@ function navierstokes_rhs_element!(dvₑ, vₑ, cv)
             # ```
             # where we should pay attentation to the transpose of the gradient.
             #+
-            dvₑ[j] -= v ⋅ ∇v' ⋅ Nⱼ * dΩ
+            dvₑ[j] -= v ⋅ ∇v' ⋅ δNvⱼ * dΩ
         end
     end
     return
@@ -468,7 +468,7 @@ function navierstokes_jac_element!(Jₑ, vₑ, cv)
         ∇v = function_gradient(cv.v, q_point, vₑ)
         v = function_value(cv.v, q_point, vₑ)
         for j in 1:n_basefuncs
-            Nⱼ = shape_value(cv.v, q_point, j)
+            δNvⱼ = shape_value(cv.v, q_point, j)
             # Note that in Tensors.jl the definition $\textrm{grad} v = \nabla v$ holds.
             # With this information it can be quickly shown in index notation that
             # ```math
@@ -477,9 +477,9 @@ function navierstokes_jac_element!(Jₑ, vₑ, cv)
             # where we should pay attentation to the transpose of the gradient.
             #+
             for i in 1:n_basefuncs
-                Nᵢ = shape_value(cv.v, q_point, i)
-                ∇Nᵢ = shape_gradient(cv.v, q_point, i)
-                Jₑ[j, i] -= (Nᵢ ⋅ ∇v' + v ⋅ ∇Nᵢ') ⋅ Nⱼ * dΩ
+                Nvᵢ = shape_value(cv.v, q_point, i)
+                ∇Nvᵢ = shape_gradient(cv.v, q_point, i)
+                Jₑ[j, i] -= (Nvᵢ ⋅ ∇v' + v ⋅ ∇Nvᵢ') ⋅ δNvⱼ * dΩ
             end
         end
     end

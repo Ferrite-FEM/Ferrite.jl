@@ -169,6 +169,11 @@ being the chosen approximation when changing from the integral to the finite sum
 For an example of the implementation to solve a heat problem with Ferrite check out [this
 thoroughly commented example](@ref tutorial-heat-equation).
 
+### Notation (tutorials)
+For a function, `u` such that $u \approx \sum N_i a_i$, the corresponding test function is represented as `δu` such that $\delta u \approx \sum \delta N_i c_i$. In code, `N` / `δN` denote the `shape_value` for the function interpolation.
+In coupled problems, the function's name is appended to the shape functions, i.e., `Nu` / `δNu`.
+For assembly, these are subscripted with `i` or `j` based on the loop's variable, as in `Nuᵢ` / `δNuᵢ`.
+
 ## More details
 
 We finally want to note that this quick introduction barely scratches the surface of the finite element
