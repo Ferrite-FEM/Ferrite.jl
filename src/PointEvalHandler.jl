@@ -5,7 +5,7 @@ Base.@kwdef struct NewtonLineSearchPointFinder{T}
 end
 
 """
-    PointEvalHandler(grid::Grid, points::AbstractVector{Vec{dim,T}}; kwargs...) where {dim, T}
+    PointEvalHandler(grid::Grid, points::AbstractVector{Vec{dim, T}}; kwargs...) where {dim, T}
 
 The `PointEvalHandler` can be used for function evaluation in *arbitrary points* in the
 domain -- not just in quadrature points or nodes.
@@ -201,8 +201,8 @@ function _get_node_cell_map(grid::AbstractGrid)
 end
 
 """
-    evaluate_at_points(ph::PointEvalHandler, dh::AbstractDofHandler, dof_values::AbstractVector{T}, [fieldname::Symbol]) where T
-    evaluate_at_points(ph::PointEvalHandler, proj::L2Projector, dof_values::AbstractVector{T}) where T
+    evaluate_at_points(ph::PointEvalHandler, dh::AbstractDofHandler, dof_values::AbstractVector{T}, [fieldname::Symbol]) where {T}
+    evaluate_at_points(ph::PointEvalHandler, proj::L2Projector, dof_values::AbstractVector{T}) where {T}
 
 Return a `Vector{T}` (for a 1-dimensional field) or a `Vector{Vec{fielddim, T}}` (for a
 vector field) with the field values of field `fieldname` in the points of the

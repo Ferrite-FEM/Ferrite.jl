@@ -51,7 +51,7 @@ add!(proj, tria_set, Lagrange{RefTriangle, 1}(); qr_rhs = qr_tria)
 close!(proj)
 
 vals = Dict{Int, Vector{Float64}}() # Can also be Vector{Vector},
-                                    # indexed with cellnr
+# indexed with cellnr
 for (set, qr) in ((quad_set, qr_quad), (tria_set, qr_tria))
     nqp = getnquadpoints(qr)
     for cellnr in set
@@ -92,8 +92,10 @@ function L2Projector(
 end
 
 """
-    add!(proj::L2Projector, set::AbstractVecOrSet{Int}, ip::Interpolation;
-        qr_rhs, [qr_lhs])
+    add!(
+        proj::L2Projector, set::AbstractVecOrSet{Int}, ip::Interpolation;
+        qr_rhs, [qr_lhs]
+    )
 
 Add an interpolation `ip` on the cells in `set` to the `L2Projector` `proj`.
 

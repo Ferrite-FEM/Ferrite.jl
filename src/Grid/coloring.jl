@@ -158,7 +158,7 @@ const GREEDY = ColoringAlgorithm.Greedy
 const WORKSTREAM = ColoringAlgorithm.WorkStream
 
 """
-    create_coloring(g::Grid, cellset=1:getncells(g); alg::ColoringAlgorithm)
+    create_coloring(g::Grid, cellset = 1:getncells(g); alg::ColoringAlgorithm)
 
 Create a coloring of the cells in grid `g` such that no neighboring cells
 have the same color. If only a subset of cells should be colored, the cells to color can be specified by `cellset`.

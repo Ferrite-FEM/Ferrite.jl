@@ -251,7 +251,7 @@ n_components(sdh::SubDofHandler, field_idx::Int) = n_components(sdh.field_interp
 n_components(sdh::SubDofHandler, field_name::Symbol) = n_components(sdh, find_field(sdh, field_name))
 
 """
-    n_components(dh::DofHandler, field_idxs::NTuple{2,Int})
+    n_components(dh::DofHandler, field_idxs::NTuple{2, Int})
     n_components(dh::DofHandler, field_name::Symbol)
     n_components(sdh::SubDofHandler, field_idx::Int)
     n_components(sdh::SubDofHandler, field_name::Symbol)
@@ -663,7 +663,7 @@ described therein.
 end
 
 """
-    sortedge(edge::Tuple{Int,Int})
+    sortedge(edge::Tuple{Int, Int})
 
 Returns the unique representation of an edge and its orientation.
 Here the unique representation is the sorted node index tuple. The
@@ -688,9 +688,9 @@ end
 
 """
     sortface(face::Tuple{Int})
-    sortface(face::Tuple{Int,Int})
-    sortface(face::Tuple{Int,Int,Int})
-    sortface(face::Tuple{Int,Int,Int,Int})
+    sortface(face::Tuple{Int, Int})
+    sortface(face::Tuple{Int, Int, Int})
+    sortface(face::Tuple{Int, Int, Int, Int})
 
 Returns the unique representation of a face.
 Here the unique representation is the sorted node index tuple.
@@ -701,9 +701,9 @@ function sortface end
 
 """
     sortface_fast(face::Tuple{Int})
-    sortface_fast(face::Tuple{Int,Int})
-    sortface_fast(face::Tuple{Int,Int,Int})
-    sortface_fast(face::Tuple{Int,Int,Int,Int})
+    sortface_fast(face::Tuple{Int, Int})
+    sortface_fast(face::Tuple{Int, Int, Int})
+    sortface_fast(face::Tuple{Int, Int, Int, Int})
 
 Returns the unique representation of a face.
 Here the unique representation is the sorted node index tuple.
@@ -799,7 +799,7 @@ sortfacet_fast(facet::NTuple{3, Int}) = sortface_fast(facet)
 sortfacet_fast(facet::NTuple{4, Int}) = sortface_fast(facet)
 
 """
-    find_field(dh::DofHandler, field_name::Symbol)::NTuple{2,Int}
+    find_field(dh::DofHandler, field_name::Symbol)::NTuple{2, Int}
 
 Return the index of the field with name `field_name` in a `DofHandler`. The index is a
 `NTuple{2,Int}`, where the 1st entry is the index of the `SubDofHandler` within which the
@@ -886,7 +886,7 @@ julia> dof_range(dh, :u)
 julia> dof_range(dh, :p)
 10:12
 
-julia> dof_range(dh, (1,1)) # field :u
+julia> dof_range(dh, (1, 1)) # field :u
 1:9
 
 julia> dof_range(dh.subdofhandlers[1], 2) # field :p
@@ -910,7 +910,7 @@ function dof_range(dh::DofHandler, field_name::Symbol)
 end
 
 """
-    getfieldinterpolation(dh::DofHandler, field_idxs::NTuple{2,Int})
+    getfieldinterpolation(dh::DofHandler, field_idxs::NTuple{2, Int})
     getfieldinterpolation(sdh::SubDofHandler, field_idx::Int)
     getfieldinterpolation(sdh::SubDofHandler, field_name::Symbol)
 
@@ -926,7 +926,7 @@ getfieldinterpolation(sdh::SubDofHandler, field_idx::Int) = sdh.field_interpolat
 getfieldinterpolation(sdh::SubDofHandler, field_name::Symbol) = getfieldinterpolation(sdh, find_field(sdh, field_name))
 
 """
-    evaluate_at_grid_nodes(dh::AbstractDofHandler, u::AbstractVector{T}, fieldname::Symbol) where T
+    evaluate_at_grid_nodes(dh::AbstractDofHandler, u::AbstractVector{T}, fieldname::Symbol) where {T}
 
 Evaluate the approximated solution for field `fieldname` at the node
 coordinates of the grid given the Dof handler `dh` and the solution vector `u`.

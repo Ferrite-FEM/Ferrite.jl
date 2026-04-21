@@ -580,7 +580,7 @@ function transform_coordinates!(g::AbstractGrid, f::Function)
 end
 
 """
-    getcoordinates(grid::AbstractGrid, idx::Union{Int,CellIndex})
+    getcoordinates(grid::AbstractGrid, idx::Union{Int, CellIndex})
     getcoordinates(cache::CellCache)
 
 Get a vector with the coordinates of the cell corresponding to `idx` or `cache`
@@ -595,7 +595,7 @@ end
 @inline getcoordinates(grid::AbstractGrid, cell::CellIndex) = getcoordinates(grid, cell.idx)
 
 """
-    getcoordinates!(x::Vector{<:Vec}, grid::AbstractGrid, idx::Union{Int,CellIndex})
+    getcoordinates!(x::Vector{<:Vec}, grid::AbstractGrid, idx::Union{Int, CellIndex})
     getcoordinates!(x::Vector{<:Vec}, grid::AbstractGrid, cell::AbstractCell)
 
 Mutate `x` to the coordinates of the cell corresponding to `idx` or `cell`.
