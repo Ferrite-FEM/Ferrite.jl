@@ -341,15 +341,15 @@ geometric_interpolation(::Type{SerendipityQuadraticQuadrilateral}) = Serendipity
 geometric_interpolation(::Type{SerendipityQuadraticHexahedron}) = Serendipity{RefHexahedron, 2}()
 
 """
-    nvertices_on_face(cell::AbstractCell, local_face_index::Int)
+    nvertices_on_face(cell::AbstractCell, local_face_index::Integer)
 Specifies for each subtype of AbstractCell how many nodes form a face.
 """
-nvertices_on_face(cell::AbstractCell, local_face_index::Int) = length(faces(cell)[local_face_index])
+nvertices_on_face(cell::AbstractCell, local_face_index::Integer) = length(faces(cell)[local_face_index])
 """
-    nvertices_on_edge(::AbstractCell, local_edge_index::Int)
+    nvertices_on_edge(::AbstractCell, local_edge_index::Integer)
 Specifies for each subtype of AbstractCell how many nodes form an edge.
 """
-nvertices_on_edge(cell::AbstractCell, local_edge_index::Int) = length(edges(cell)[local_edge_index])
+nvertices_on_edge(cell::AbstractCell, local_edge_index::Integer) = length(edges(cell)[local_edge_index])
 
 """
     Ferrite.getrefdim(cell::AbstractCell)
@@ -454,7 +454,7 @@ getspatialdim(::AbstractGrid{sdim}) where {sdim} = sdim
     get_reference_dimension(grid::AbstractGrid) -> Union{Int, Symbol}
 
 Get information about the reference dimensions of the cells in the grid.
-If all cells have the same reference dimension, `rdim::Int` is returned.
+If all cells have the same reference dimension, `rdim::Integer` is returned.
 For grids with mixed reference dimensions, `:mixed` is returned.
 Used internally to dispatch facet-calls to the correct entity when `rdim isa Int`.
 """
@@ -474,43 +474,43 @@ end
 
 """
     getcells(grid::AbstractGrid)
-    getcells(grid::AbstractGrid, v::Union{Int,Vector{Int}}
+    getcells(grid::AbstractGrid, v::Union{Integer,AbstractVector{<:Integer}}
     getcells(grid::AbstractGrid, setname::String)
 
 Returns either all `cells::Collection{C<:AbstractCell}` of a `<:AbstractGrid` or a subset based on an `Int`, `Vector{Int}` or `String`.
 Whereas the last option tries to call a `cellset` of the `grid`. `Collection` can be any indexable type, for `Grid` it is `Vector{C<:AbstractCell}`.
 """
 @inline getcells(grid::AbstractGrid) = grid.cells
-@inline getcells(grid::AbstractGrid, v::Union{Int, AbstractVector{Int}}) = grid.cells[v]
+@inline getcells(grid::AbstractGrid, v::Union{Integer, AbstractVector{<:Integer}}) = grid.cells[v]
 @inline getcells(grid::AbstractGrid, setname::String) = grid.cells[collect(getcellset(grid, setname))]
 "Returns the number of cells in the `<:AbstractGrid`."
 @inline getncells(grid::AbstractGrid) = length(grid.cells)
 "Returns the celltype of the `<:AbstractGrid`."
 @inline getcelltype(grid::AbstractGrid) = eltype(grid.cells)
-@inline getcelltype(grid::AbstractGrid, i::Int) = typeof(grid.cells[i])
+@inline getcelltype(grid::AbstractGrid, i::Integer) = typeof(grid.cells[i])
 
 """
     getnodes(grid::AbstractGrid)
-    getnodes(grid::AbstractGrid, v::Union{Int,Vector{Int}}
+    getnodes(grid::AbstractGrid, v::Union{Integer,AbstractVector{<:Integer}}
     getnodes(grid::AbstractGrid, setname::String)
 
-Returns either all `nodes::Collection{N}` of a `<:AbstractGrid` or a subset based on an `Int`, `Vector{Int}` or `String`.
+Returns either all `nodes::Collection{N}` of a `<:AbstractGrid` or a subset based on an `Integer`, `AbstractVector{<:Integer}` or `String`.
 The last option tries to call a `nodeset` of the `<:AbstractGrid`. `Collection{N}` refers to some indexable collection where each element corresponds
 to a Node.
 """
 @inline getnodes(grid::AbstractGrid) = grid.nodes
-@inline getnodes(grid::AbstractGrid, v::Union{Int, AbstractVector{Int}}) = grid.nodes[v]
+@inline getnodes(grid::AbstractGrid, v::Union{Integer, AbstractVector{<:Integer}}) = grid.nodes[v]
 @inline getnodes(grid::AbstractGrid, setname::String) = grid.nodes[collect(getnodeset(grid, setname))]
 "Returns the number of nodes in the grid."
 @inline getnnodes(grid::AbstractGrid) = length(grid.nodes)
 "Returns the number of nodes of the `i`-th cell."
 function nnodes_per_cell(grid::AbstractGrid)
     if !isconcretetype(getcelltype(grid))
-        error("There are different celltypes in the `grid`. Use `nnodes_per_cell(grid, cellid::Int)` instead")
+        error("There are different celltypes in the `grid`. Use `nnodes_per_cell(grid, cellid::Integer)` instead")
     end
     return nnodes(first(grid.cells))
 end
-@inline nnodes_per_cell(grid::AbstractGrid, i::Int) = nnodes(grid.cells[i])
+@inline nnodes_per_cell(grid::AbstractGrid, i::Integer) = nnodes(grid.cells[i])
 
 "Return the number type of the nodal coordinates."
 @inline get_coordinate_eltype(grid::AbstractGrid) = get_coordinate_eltype(first(getnodes(grid)))
@@ -585,7 +585,7 @@ end
 
 Get a vector with the coordinates of the cell corresponding to `idx` or `cache`
 """
-@inline function getcoordinates(grid::AbstractGrid, idx::Int)
+@inline function getcoordinates(grid::AbstractGrid, idx::Integer)
     CT = get_coordinate_type(grid)
     cell = getcells(grid, idx)
     N = nnodes(cell)
@@ -608,20 +608,20 @@ Mutate `x` to the coordinates of the cell corresponding to `idx` or `cell`.
     end
     return x
 end
-@inline function getcoordinates!(x::AbstractVector{Vec{dim, T}}, grid::AbstractGrid, cellid::Int) where {dim, T}
+@inline function getcoordinates!(x::AbstractVector{Vec{dim, T}}, grid::AbstractGrid, cellid::Integer) where {dim, T}
     cell = getcells(grid, cellid)
     return getcoordinates!(x, grid, cell)
 end
-@inline getcoordinates!(x::Vector{Vec{dim, T}}, grid::AbstractGrid, cell::CellIndex) where {dim, T} = getcoordinates!(x, grid, cell.idx)
+@inline getcoordinates!(x::AbstractVector{Vec{dim, T}}, grid::AbstractGrid, cell::CellIndex) where {dim, T} = getcoordinates!(x, grid, cell.idx)
 
 """
-    get_node_coordinate(grid::AbstractGrid, n::Int)
+    get_node_coordinate(grid::AbstractGrid, n::Integer)
 
 Return the coordinate of the `n`th node in `grid`
 """
 get_node_coordinate(grid, n) = get_node_coordinate(getnodes(grid, n))
 
-function cellnodes!(global_nodes::AbstractVector{Int}, grid::AbstractGrid, i::Int)
+function cellnodes!(global_nodes::AbstractVector{Int}, grid::AbstractGrid, i::Integer)
     cell = getcells(grid, i)
     _cellnodes!(global_nodes, cell)
     return global_nodes
@@ -660,12 +660,12 @@ boundaryfunction(::Type{FacetIndex}) = facets
 for INDEX in (:VertexIndex, :EdgeIndex, :FaceIndex, :FacetIndex)
     @eval begin
         #Constructor
-        ($INDEX)(a::Int, b::Int) = ($INDEX)((a, b))
+        ($INDEX)(a::Integer, b::Integer) = ($INDEX)((a, b))
 
-        Base.getindex(I::($INDEX), i::Int) = I.idx[i]
+        Base.getindex(I::($INDEX), i::Integer) = I.idx[i]
 
         #To be able to do, e.g., `a,b = facetidx`
-        Base.iterate(I::($INDEX), state::Int = 1) = (state == 3) ? nothing : (I[state], state + 1)
+        Base.iterate(I::($INDEX), state::Integer = 1) = (state == 3) ? nothing : (I[state], state + 1)
 
         # Necessary to check if, e.g. `(cellid, facetnr) in facetset`
         Base.isequal(x::$INDEX, y::$INDEX) = x.idx == y.idx
@@ -776,23 +776,23 @@ struct OrientationInfo
     shift_index::Int
 end
 
-function OrientationInfo(edgenodes::NTuple{2, Int})
+function OrientationInfo(edgenodes::NTuple{2, <:Integer})
     return OrientationInfo(get_edge_direction(edgenodes) < 0, 0)
 end
 
-function OrientationInfo(facenodes::NTuple{N, Int}) where {N}
+function OrientationInfo(facenodes::NTuple{N, <:Integer}) where {N}
     min_idx = argmin(facenodes)
     shift_index = min_idx - 1
     flipped = get_face_direction(facenodes) < 0
     return OrientationInfo(flipped, shift_index)
 end
 
-function get_edge_direction(edgenodes::NTuple{2, Int})
+function get_edge_direction(edgenodes::NTuple{2, <:Integer})
     positive = edgenodes[2] > edgenodes[1]
     return ifelse(positive, 1, -1)
 end
 
-function get_face_direction(facenodes::NTuple{N, Int}) where {N}
+function get_face_direction(facenodes::NTuple{N, <:Integer}) where {N}
     N > 2 || throw(ArgumentError("A face must have at least 3 nodes"))
     min_idx = argmin(facenodes)
     if min_idx == 1

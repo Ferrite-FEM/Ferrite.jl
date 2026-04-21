@@ -180,35 +180,36 @@ end
 `BCValues` stores the shape values at all facet/faces/edges/vertices (depending on `boundary_type`) for the geometric interpolation (`geom_interpol`),
 for each dof-position determined by the `func_interpol`. Used mainly by the `ConstraintHandler`.
 """
-mutable struct BCValues{T}
-    const M::Array{T, 3}
-    const nqp::Array{Int}
-    current_entity::Int
+mutable struct BCValues{Tv, Ti}
+    const M::Array{Tv, 3}
+    const nqp::Array{Ti}
+    current_entity::Ti
 end
 
 BCValues(func_interpol::Interpolation, geom_interpol::Interpolation, boundary_type::Type{<:BoundaryIndex}) =
     BCValues(Float64, func_interpol, geom_interpol, boundary_type)
-
-function BCValues(::Type{T}, func_interpol::Interpolation{refshape}, geom_interpol::Interpolation{refshape}, boundary_type::Type{<:BoundaryIndex}) where {T, dim, refshape <: AbstractRefShape{dim}}
+BCValues(::Type{Tv}, func_interpol::Interpolation{refshape}, geom_interpol::Interpolation{refshape}, boundary_type::Type{<:BoundaryIndex}) where {Tv, dim, refshape <: AbstractRefShape{dim}} =
+    BCValues(Tv, Int64, func_interpol, geom_interpol, boundary_type)
+function BCValues(::Type{Tv}, ::Type{Ti}, func_interpol::Interpolation{refshape}, geom_interpol::Interpolation{refshape}, boundary_type::Type{<:BoundaryIndex}) where {Tv, Ti, dim, refshape <: AbstractRefShape{dim}}
     # set up quadrature rules for each boundary entity with dof-positions
     # (determined by func_interpol) as the quadrature points
     interpolation_coords = reference_coordinates(func_interpol)
 
-    qrs = QuadratureRule{refshape, Vector{T}, Vector{Vec{dim, T}}}[]
+    qrs = QuadratureRule{refshape, Vector{Tv}, Vector{Vec{dim, Tv}}}[]
     for boundarydofs in dirichlet_boundarydof_indices(boundary_type)(func_interpol)
-        dofcoords = Vec{dim, T}[]
+        dofcoords = Vec{dim, Tv}[]
         for boundarydof in boundarydofs
             push!(dofcoords, interpolation_coords[boundarydof])
         end
-        qrf = QuadratureRule{refshape}(fill(T(NaN), length(dofcoords)), dofcoords) # weights will not be used
+        qrf = QuadratureRule{refshape}(fill(Tv(NaN), length(dofcoords)), dofcoords) # weights will not be used
         push!(qrs, qrf)
     end
 
     n_boundary_entities = length(qrs)
     n_qpoints = n_boundary_entities == 0 ? 0 : maximum(qr -> length(getweights(qr)), qrs) # Bound number of qps correctly.
     n_geom_basefuncs = getnbasefunctions(geom_interpol)
-    M = fill(zero(T) * T(NaN), n_geom_basefuncs, n_qpoints, n_boundary_entities)
-    nqp = zeros(Int, n_boundary_entities)
+    M = fill(zero(Tv) * Tv(NaN), n_geom_basefuncs, n_qpoints, n_boundary_entities)
+    nqp = zeros(Ti, n_boundary_entities)
 
     for n_boundary_entity in 1:n_boundary_entities
         for (qp, ξ) in pairs(qrs[n_boundary_entity].points)
@@ -217,7 +218,7 @@ function BCValues(::Type{T}, func_interpol::Interpolation{refshape}, geom_interp
         nqp[n_boundary_entity] = length(qrs[n_boundary_entity].points)
     end
 
-    return BCValues{T}(M, nqp, 0)
+    return BCValues{Tv, Ti}(M, nqp, zero(Ti))
 end
 
 getnquadpoints(bcv::BCValues) = bcv.nqp[bcv.current_entity]

@@ -37,19 +37,19 @@ struct GeometryMapping{DiffOrder, IP, M_t, dMdξ_t, d2Mdξ2_t}
     d2Mdξ2::d2Mdξ2_t   # ::Union{AbstractMatrix{<:Tensor{2}}, Nothing} Hessians of geometric shape functions in ref-domain
     function GeometryMapping(
             ip::IP, M::M_t, ::Nothing, ::Nothing
-        ) where {IP <: ScalarInterpolation, M_t <: AbstractMatrix{<:Number}}
+        ) where {IP <: ScalarInterpolation, M_t <: AbstractArray{<:Number}}
         return new{0, IP, M_t, Nothing, Nothing}(ip, M, nothing, nothing)
     end
     function GeometryMapping(
             ip::IP, M::M_t, dMdξ::dMdξ_t, ::Nothing
-        ) where {IP <: ScalarInterpolation, M_t <: AbstractMatrix{<:Number}, dMdξ_t <: AbstractMatrix{<:Vec}}
+        ) where {IP <: ScalarInterpolation, M_t <: AbstractArray{<:Number}, dMdξ_t <: AbstractArray{<:Vec}}
         return new{1, IP, M_t, dMdξ_t, Nothing}(ip, M, dMdξ, nothing)
     end
     function GeometryMapping(
             ip::IP, M::M_t, dMdξ::dMdξ_t, d2Mdξ2::d2Mdξ2_t
         ) where {
-            IP <: ScalarInterpolation, M_t <: AbstractMatrix{<:Number},
-            dMdξ_t <: AbstractMatrix{<:Vec}, d2Mdξ2_t <: AbstractMatrix{<:Tensor{2}},
+            IP <: ScalarInterpolation, M_t <: AbstractArray{<:Number},
+            dMdξ_t <: AbstractArray{<:Vec}, d2Mdξ2_t <: AbstractArray{<:Tensor{2}},
         }
         return new{2, IP, M_t, dMdξ_t, d2Mdξ2_t}(ip, M, dMdξ, d2Mdξ2)
     end

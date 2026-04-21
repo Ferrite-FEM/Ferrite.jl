@@ -38,22 +38,22 @@ when indexing e.g. `cmv::MultiFieldCellValues` (e.g. `fv = cmv.u`), as `fv` supp
 """
 FunctionValues
 
-struct FunctionValues{DiffOrder, IP, N_t, dNdx_t, dNdξ_t, d2Ndx2_t, d2Ndξ2_t} <: AbstractValues
+struct FunctionValues{DiffOrder, IP, Nx_t, Nξ_t, dNdx_t, dNdξ_t, d2Ndx2_t, d2Ndξ2_t} <: AbstractValues
     ip::IP          # ::Interpolation
-    Nx::N_t         # ::AbstractMatrix{Union{<:Tensor,<:Number}}
-    Nξ::N_t         # ::AbstractMatrix{Union{<:Tensor,<:Number}}
+    Nx::Nx_t         # ::AbstractMatrix{Union{<:Tensor,<:Number}}
+    Nξ::Nξ_t         # ::AbstractMatrix{Union{<:Tensor,<:Number}}
     dNdx::dNdx_t    # ::AbstractMatrix{Union{<:Tensor,<:StaticArray}} or Nothing
     dNdξ::dNdξ_t    # ::AbstractMatrix{Union{<:Tensor,<:StaticArray}} or Nothing
     d2Ndx2::d2Ndx2_t   # ::AbstractMatrix{<:Tensor{2}}  Hessians of geometric shape functions in ref-domain
     d2Ndξ2::d2Ndξ2_t   # ::AbstractMatrix{<:Tensor{2}}  Hessians of geometric shape functions in ref-domain
-    function FunctionValues(ip::Interpolation, Nx::N_t, Nξ::N_t, ::Nothing, ::Nothing, ::Nothing, ::Nothing) where {N_t <: AbstractMatrix}
-        return new{0, typeof(ip), N_t, Nothing, Nothing, Nothing, Nothing}(ip, Nx, Nξ, nothing, nothing, nothing, nothing)
+    function FunctionValues(ip::Interpolation, Nx::Nx_t, Nξ::Nξ_t, ::Nothing, ::Nothing, ::Nothing, ::Nothing) where {Nx_t <: AbstractArray, Nξ_t <: AbstractArray}
+        return new{0, typeof(ip), Nx_t, Nξ_t, Nothing, Nothing, Nothing, Nothing}(ip, Nx, Nξ, nothing, nothing, nothing, nothing)
     end
-    function FunctionValues(ip::Interpolation, Nx::N_t, Nξ::N_t, dNdx::AbstractMatrix, dNdξ::AbstractMatrix, ::Nothing, ::Nothing) where {N_t <: AbstractMatrix}
-        return new{1, typeof(ip), N_t, typeof(dNdx), typeof(dNdξ), Nothing, Nothing}(ip, Nx, Nξ, dNdx, dNdξ, nothing, nothing)
+    function FunctionValues(ip::Interpolation, Nx::Nx_t, Nξ::Nξ_t, dNdx::AbstractArray, dNdξ::AbstractArray, ::Nothing, ::Nothing) where {Nx_t <: AbstractArray, Nξ_t <: AbstractArray}
+        return new{1, typeof(ip), Nx_t, Nξ_t, typeof(dNdx), typeof(dNdξ), Nothing, Nothing}(ip, Nx, Nξ, dNdx, dNdξ, nothing, nothing)
     end
-    function FunctionValues(ip::Interpolation, Nx::N_t, Nξ::N_t, dNdx::AbstractMatrix, dNdξ::AbstractMatrix, d2Ndx2::AbstractMatrix, d2Ndξ2::AbstractMatrix) where {N_t <: AbstractMatrix}
-        return new{2, typeof(ip), N_t, typeof(dNdx), typeof(dNdξ), typeof(d2Ndx2), typeof(d2Ndξ2)}(ip, Nx, Nξ, dNdx, dNdξ, d2Ndx2, d2Ndξ2)
+    function FunctionValues(ip::Interpolation, Nx::Nx_t, Nξ::Nξ_t, dNdx::AbstractArray, dNdξ::AbstractArray, d2Ndx2::AbstractArray, d2Ndξ2::AbstractArray) where {Nx_t <: AbstractArray, Nξ_t <: AbstractArray}
+        return new{2, typeof(ip), Nx_t, Nξ_t, typeof(dNdx), typeof(dNdξ), typeof(d2Ndx2), typeof(d2Ndξ2)}(ip, Nx, Nξ, dNdx, dNdξ, d2Ndx2, d2Ndξ2)
     end
 end
 function FunctionValues{DiffOrder}(::Type{T}, ip::Interpolation, qr::QuadratureRule, ip_geo::VectorizedInterpolation) where {DiffOrder, T}
