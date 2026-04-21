@@ -48,9 +48,9 @@
 # ```
 # Here, `M` refers to the so called mass matrix, which always occurs in time related terms, i.e.
 # ```math
-# M_{ij} = \int_{\Omega} \delta u_i \, u_j \ \mathrm{d}\Omega,
+# M_{ij} = \int_{\Omega} \delta N_i \, N_j \ \mathrm{d}\Omega,
 # ```
-# where $u_j$ and $\delta u_i$ are the shape functions of the trial and test functions, respectively.
+# where $N_j$ and $\delta N_i$ are the shape functions of the trial and test functions, respectively.
 # In this example we apply the boundary conditions to the assembled discrete operators (mass matrix $\mathbf{M}$ and stiffnes matrix $\mathbf{K}$)
 # only once. We utilize the fact that in finite element computations Dirichlet conditions can be applied by
 # zero out rows and columns that correspond
