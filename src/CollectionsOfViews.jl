@@ -81,6 +81,8 @@ end
 end
 Base.IndexStyle(::Type{<:ArrayOfVectorViews{<:Any, N}}) where {N} = Base.IndexStyle(Array{Int, N})
 
+Base.copy(v::T) where {T <: ArrayOfVectorViews} = T(copy(v.indices), copy(v.data), v.lin_idx)
+
 # Constructors
 """
     ArrayOfVectorViews(f!::Function, data::Vector{T}, dims::NTuple{N, Int}; sizehint)
