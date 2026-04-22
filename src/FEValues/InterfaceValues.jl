@@ -68,10 +68,10 @@ end
 
 # Same on both sides, default geometric mapping
 InterfaceValues(qr_here::FacetQuadratureRule, ip_here::Interpolation) =
-    InterfaceValues(qr_here, ip_here, deepcopy(qr_here), ip_here)
+    InterfaceValues(qr_here, ip_here, qr_here, ip_here)
 # Same on both sides, given geometric mapping
 InterfaceValues(qr_here::FacetQuadratureRule, ip_here::Interpolation, ipg_here::Interpolation) =
-    InterfaceValues(qr_here, ip_here, ipg_here, deepcopy(qr_here), ip_here, ipg_here)
+    InterfaceValues(qr_here, ip_here, ipg_here, qr_here, ip_here, ipg_here)
 # Different on both sides, default geometric mapping
 function InterfaceValues(
         qr_here::FacetQuadratureRule, ip_here::Interpolation,
@@ -83,7 +83,7 @@ function InterfaceValues(
     )
 end
 # From FacetValue(s)
-InterfaceValues(facetvalues_here::FVA, facetvalues_there::FVB = deepcopy(FacetValues_here)) where {FVA <: FacetValues, FVB <: FacetValues} =
+InterfaceValues(facetvalues_here::FVA, facetvalues_there::FVB = copy(facetvalues_here)) where {FVA <: FacetValues, FVB <: FacetValues} =
     InterfaceValues{FVA, FVB}(facetvalues_here, facetvalues_there)
 
 function Base.copy(iv::InterfaceValues)
