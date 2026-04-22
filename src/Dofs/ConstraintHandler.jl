@@ -841,15 +841,6 @@ function _condense!(K::SparseMatrixCSC, f::AbstractVector, dofcoefficients::Vect
     return
 end
 
-function _add_or_grow(cnt::Int, I::Vector{Int}, J::Vector{Int}, dofi::Int, dofj::Int)
-    if cnt > length(J)
-        resize!(I, trunc(Int, length(I) * 1.5))
-        resize!(J, trunc(Int, length(J) * 1.5))
-    end
-    I[cnt] = dofi
-    J[cnt] = dofj
-    return
-end
 
 """
     create_constraint_matrix(ch::ConstraintHandler)

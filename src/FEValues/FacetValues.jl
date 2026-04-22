@@ -170,8 +170,6 @@ function Base.show(io::IO, d::MIME"text/plain", fv::FacetValues)
     print(io, " Function interpolation: "); show(io, d, function_interpolation(fv))
     print(io, "\nGeometric interpolation: ")
     return sdim === nothing ? show(io, d, ip_geo) : show(io, d, ip_geo^sdim)
-    sdim === nothing ? show(io, d, ip_geo) : show(io, d, ip_geo^sdim)
-    return
 end
 
 """
