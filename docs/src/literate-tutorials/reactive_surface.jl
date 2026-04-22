@@ -305,12 +305,12 @@ function gray_scott_on_sphere(material::GrayScottMaterial, Δt::Real, T::Real, r
         ## later visualization purposes.
         if (iₜ % 10) == 0
             VTKGridFile("reactive-surface-$(iₜ)", dh) do vtk
-                write_solution(vtk, dh, uₜ₋₁)
+                write_solution(vtk, dh, uₜ)
                 pvd[t] = vtk
             end
         end
 
-        ## Finally we totate the solution to initialize the next timestep.
+        ## Finally we rotate the solution to initialize the next timestep.
         uₜ₋₁ .= uₜ
     end
     vtk_save(pvd)
