@@ -217,8 +217,8 @@ getcoordinates(ic::InterfaceCache) = (getcoordinates(ic.a), getcoordinates(ic.b)
 
 ## CellIterator ##
 """
-    CellIterator(grid::Grid, cellset=1:getncells(grid))
-    CellIterator(dh::AbstractDofHandler, cellset=1:getncells(dh))
+    CellIterator(grid::Grid, cellset = 1:getncells(grid))
+    CellIterator(dh::AbstractDofHandler, cellset = 1:getncells(dh))
 
 Create a `CellIterator` to conveniently iterate over all, or a subset, of the cells in a
 grid. The elements of the iterator are [`CellCache`](@ref)s which are properly
@@ -279,7 +279,7 @@ FaceIterator(args...) = error("FaceIterator is deprecated, use FacetIterator ins
 
 # Leaving flags undocumented as for CellIterator
 """
-    FacetIterator(gridordh::Union{Grid,AbstractDofHandler}, facetset::AbstractVecOrSet{FacetIndex})
+    FacetIterator(gridordh::Union{Grid, AbstractDofHandler}, facetset::AbstractVecOrSet{FacetIndex})
 
 Create a `FacetIterator` to conveniently iterate over the faces in `facestet`. The elements of
 the iterator are [`FacetCache`](@ref)s which are properly `reinit!`ialized. See

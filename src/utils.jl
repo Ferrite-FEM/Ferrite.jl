@@ -3,7 +3,7 @@ import Preferences
 const DEBUG = Preferences.@load_preference("use_debug", false)
 
 """
-    Ferrite.debug_mode(; enable=true)
+    Ferrite.debug_mode(; enable = true)
 
 Helper to turn on (`enable=true`) or off (`enable=false`) debug expressions in Ferrite.
 

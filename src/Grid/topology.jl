@@ -3,10 +3,10 @@
 ############
 
 """
-    getneighborhood(topology, grid::AbstractGrid, cellidx::CellIndex, include_self=false)
-    getneighborhood(topology, grid::AbstractGrid, faceidx::FaceIndex, include_self=false)
-    getneighborhood(topology, grid::AbstractGrid, vertexidx::VertexIndex, include_self=false)
-    getneighborhood(topology, grid::AbstractGrid, edgeidx::EdgeIndex, include_self=false)
+    getneighborhood(topology, grid::AbstractGrid, cellidx::CellIndex, include_self = false)
+    getneighborhood(topology, grid::AbstractGrid, faceidx::FaceIndex, include_self = false)
+    getneighborhood(topology, grid::AbstractGrid, vertexidx::VertexIndex, include_self = false)
+    getneighborhood(topology, grid::AbstractGrid, edgeidx::EdgeIndex, include_self = false)
 
 Returns all connected entities of the same type as defined by the respective topology. If `include_self` is true,
 the given entity is included in the returned list as well.
@@ -353,7 +353,7 @@ function getstencil(top::ArrayOfVectorViews{VertexIndex, 1}, grid::Grid, vertex_
 end
 
 """
-    _create_facet_skeleton(neighborhood::AbstractMatrix{AbstractVector{BI}}, grid::AbstractGrid) where BI <: Union{FaceIndex, EdgeIndex, VertexIndex}
+    _create_facet_skeleton(neighborhood::AbstractMatrix{AbstractVector{BI}}, grid::AbstractGrid) where {BI <: Union{FaceIndex, EdgeIndex, VertexIndex}}
 
 Materializes the skeleton from the `neighborhood` information by returning a `Vector{FacetIndex}` describing the
 unique facets in the grid.

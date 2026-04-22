@@ -161,7 +161,7 @@ more discussion).
   # Linear Lagrange interpolation for a vector problem on the triangle (vector dimension
   # same as the reference dimension)
   ip_scalar = Lagrange{RefTriangle, 1}()
-  ip_vector = ip_scalar ^ 2 # or VectorizedInterpolation{2}(ip_scalar)
+  ip_vector = ip_scalar^2 # or VectorizedInterpolation{2}(ip_scalar)
   ```
 
 - **Quadrature**: remove the first parameter (the reference dimension) and use new reference

@@ -1,6 +1,6 @@
 # abstract type Constraint end
 """
-    Dirichlet(u::Symbol, ∂Ω::AbstractVecOrSet, f::Function, components=nothing)
+    Dirichlet(u::Symbol, ∂Ω::AbstractVecOrSet, f::Function, components = nothing)
 
 Create a Dirichlet boundary condition on `u` on the `∂Ω` part of
 the boundary. `f` is a function of the form `f(x)` or `f(x, t)`
@@ -135,7 +135,7 @@ end
 
 const DofCoefficients{T} = Vector{Pair{Int, T}}
 """
-    AffineConstraint(constrained_dof::Int, entries::Vector{Pair{Int,T}}, b::T) where T
+    AffineConstraint(constrained_dof::Int, entries::Vector{Pair{Int, T}}, b::T) where {T}
 
 Define an affine/linear constraint to constrain one degree of freedom, `u[i]`,
 such that `u[i] = ∑(u[j] * a[j]) + b`,
@@ -148,7 +148,7 @@ struct AffineConstraint{T}
 end
 
 """
-    ConstraintHandler([T=Float64], dh::AbstractDofHandler)
+    ConstraintHandler([T = Float64], dh::AbstractDofHandler)
 
 A collection of constraints associated with the dof handler `dh`.
 `T` is the numeric type for stored values.
@@ -208,7 +208,7 @@ function get_rhs_data(ch::ConstraintHandler, A::SparseMatrixCSC)
 end
 
 """
-    apply_rhs!(data::RHSData, f::AbstractVector, ch::ConstraintHandler, applyzero::Bool=false)
+    apply_rhs!(data::RHSData, f::AbstractVector, ch::ConstraintHandler, applyzero::Bool = false)
 
 Applies the boundary condition to the right-hand-side vector without modifying the stiffness matrix.
 
@@ -349,7 +349,7 @@ function add!(ch::ConstraintHandler, ac::AffineConstraint)
 end
 
 """
-    add_prescribed_dof!(ch, constrained_dof::Int, inhomogeneity, dofcoefficients=nothing)
+    add_prescribed_dof!(ch, constrained_dof::Int, inhomogeneity, dofcoefficients = nothing)
 
 Add a constrained dof directly to the `ConstraintHandler`.
 This function checks if the `constrained_dof` is already constrained, and overrides the old
@@ -468,7 +468,7 @@ function _add!(ch::ConstraintHandler, dbc::Dirichlet, bcnodes::AbstractVecOrSet{
 end
 
 """
-    update!(ch::ConstraintHandler, time::Real=0.0)
+    update!(ch::ConstraintHandler, time::Real = 0.0)
 
 Update time-dependent inhomogeneities for the new time. This calls `f(x)` or `f(x, t)` when
 applicable, where `f` is the function(s) corresponding to the constraints in the handler, to
@@ -1011,9 +1011,9 @@ struct PeriodicFacetPair
 end
 
 """
-    PeriodicDirichlet(u::Symbol, facet_mapping, components=nothing)
-    PeriodicDirichlet(u::Symbol, facet_mapping, R::AbstractMatrix, components=nothing)
-    PeriodicDirichlet(u::Symbol, facet_mapping, f::Function, components=nothing)
+    PeriodicDirichlet(u::Symbol, facet_mapping, components = nothing)
+    PeriodicDirichlet(u::Symbol, facet_mapping, R::AbstractMatrix, components = nothing)
+    PeriodicDirichlet(u::Symbol, facet_mapping, f::Function, components = nothing)
 
 Create a periodic Dirichlet boundary condition for the field `u` on the facet-pairs given in
 `facet_mapping`. The mapping can be computed with [`collect_periodic_facets`](@ref). The
@@ -1373,7 +1373,7 @@ function rotate_local_dofs(local_facet_dofs, local_facet_dofs_offset, ip::Lagran
 end
 
 """
-    collect_periodic_facets(grid::Grid, mset, iset, transform::Union{Function,Nothing}=nothing; tol=1e-12)
+    collect_periodic_facets(grid::Grid, mset, iset, transform::Union{Function, Nothing} = nothing; tol = 1.0e-12)
 
 Match all mirror facets in `mset` with a corresponding image facet in `iset`. Return a
 dictionary which maps each mirror facet to a image facet. The result can then be passed to
@@ -1397,7 +1397,7 @@ function collect_periodic_facets(grid::Grid, mset::Union{AbstractSet{FacetIndex}
 end
 
 """
-    collect_periodic_facets(grid::Grid, all_facets::Union{AbstractSet{FacetIndex},String,Nothing}=nothing; tol=1e-12)
+    collect_periodic_facets(grid::Grid, all_facets::Union{AbstractSet{FacetIndex}, String, Nothing} = nothing; tol = 1.0e-12)
 
 Split all facets in `all_facets` into image and mirror sets. For each matching pair, the facet
 located further along the vector `(1, 1, 1)` becomes the image facet.
@@ -1413,7 +1413,7 @@ end
 
 
 """
-    collect_periodic_facets!(facet_map::Vector{PeriodicFacetPair}, grid::Grid, mset, iset, transform::Union{Function,Nothing}; tol=1e-12)
+    collect_periodic_facets!(facet_map::Vector{PeriodicFacetPair}, grid::Grid, mset, iset, transform::Union{Function, Nothing}; tol = 1.0e-12)
 
 Same as [`collect_periodic_facets`](@ref) but adds all matches to the existing `facet_map`.
 """
@@ -1793,10 +1793,12 @@ end
 @noinline missing_global() = error("can not condense constraint without the global matrix and vector")
 
 """
-    _condense_local!(local_matrix::AbstractMatrix, local_vector::AbstractVector,
-                    global_matrix#=::SparseMatrixCSC=#, global_vector#=::Vector=#,
-                    global_dofs::AbstractVector, dofmapping::Dict, dofcoefficients::Vector,
-                    isconstrained::BitVector)
+    _condense_local!(
+        local_matrix::AbstractMatrix, local_vector::AbstractVector,
+        global_matrix #=::SparseMatrixCSC=#, global_vector #=::Vector=#,
+        global_dofs::AbstractVector, dofmapping::Dict, dofcoefficients::Vector,
+        isconstrained::BitVector
+    )
 
 Condensation of affine constraints on element level. If possible this function only
 modifies the local arrays.

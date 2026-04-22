@@ -123,7 +123,7 @@ the relevant `facetset` by using the [`FacetIterator`](@ref).
 For a scalar field, this can be done as
 
 ```julia
-grid = generate_grid(Quadrilateral, (3,3))
+grid = generate_grid(Quadrilateral, (3, 3))
 dh = DofHandler(grid); push!(dh, :u, 1); close!(dh)
 fv = FacetValues(QuadratureRule{RefQuadrilateral}(2), Lagrange{RefQuadrilateral, 1}())
 f = zeros(ndofs(dh))
@@ -326,7 +326,7 @@ initial conditions can be specified by the [`apply_analytical!`](@ref) function.
 For example, specify the initial pressure as a function of the y-coordinate
 ```julia
 ρ = 1000; g = 9.81    # density [kg/m³] and gravity [N/kg]
-grid = generate_grid(Quadrilateral, (10,10))
+grid = generate_grid(Quadrilateral, (10, 10))
 dh = DofHandler(grid); add!(dh, :u, 2); add!(dh, :p, 1); close!(dh)
 u = zeros(ndofs(dh))
 apply_analytical!(u, dh, :p, x -> ρ * g * x[2])

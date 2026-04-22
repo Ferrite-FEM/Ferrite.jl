@@ -85,7 +85,7 @@ n_components(::VectorInterpolation{vdim}) where {vdim} = vdim
 n_dbc_components(ip::Interpolation) = n_components(ip)
 
 """
-    shape_value_type(ip::Interpolation, ::Type{T}) where T<:Number
+    shape_value_type(ip::Interpolation, ::Type{T}) where {T <: Number}
 
 Return the type of `shape_value(ip::Interpolation, ξ::Vec, ib::Int)`.
 """
