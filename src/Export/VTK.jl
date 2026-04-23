@@ -281,6 +281,7 @@ function write_nodeset(vtk, grid::AbstractGrid, nodeset::String)
 end
 
 """
+    write_facetset(vtk::VTKGridFile, grid::AbstractGrid)
     write_facetset(vtk::VTKGridFile, grid::AbstractGrid, facetsetname::String)
     write_facetset(vtk::VTKGridFile, grid::AbstractGrid, facetset::AbstractVecOrSet{FacetIndex}, facetsetname::String)
 
@@ -301,17 +302,25 @@ function write_facetset(vtk, grid::AbstractGrid, facetset::AbstractVecOrSet{Face
     return vtk
 end
 write_facetset(vtk, grid::AbstractGrid, facetsetname::String) = write_facetset(vtk, grid, getfacetset(grid, facetsetname), facetsetname)
+function write_facetset(vtk, grid::AbstractGrid)
+    for name in keys(getfacetsets(grid))
+        write_facetset(vtk, grid, name)
+    end
+    return vtk
+end
 
 """
     write_cellset(vtk, grid::AbstractGrid)
     write_cellset(vtk, grid::AbstractGrid, cellset::String)
-    write_cellset(vtk, grid::AbstractGrid, cellsets::Union{AbstractVector{String},AbstractSet{String})
+    write_cellset(vtk, grid::AbstractGrid, cellsets::Union{AbstractVector{String}, AbstractSet{String})
 
 Write all cell sets in the grid with name according to their keys and
 celldata 1 if the cell is in the set, and 0 otherwise. It is also possible to
 only export a single `cellset`, or multiple `cellsets`.
+
+If you want to write per cell data directly, please see [`write_cell_data`](@ref).
 """
-function write_cellset(vtk, grid::AbstractGrid, cellsets = keys(getcellsets(grid)))
+function write_cellset(vtk, grid::AbstractGrid, cellsets::AbstractVecOrSet{String} = keys(getcellsets(grid)))
     z = zeros(getncells(grid))
     for cellset in cellsets
         fill!(z, 0)
