@@ -47,16 +47,16 @@ simplicity we will consider only constant conductivity $k$.
 ## Weak form
 
 The solution to the equation above is usually calculated from the corresponding weak
-form. By multiplying the equation with an arbitrary *test function* $\delta u$, integrating
+form. By multiplying the equation with an arbitrary *test function* $\varphi$, integrating
 over the domain and using partial integration we obtain the *weak form*. Now our problem
 can be stated as:
 
 Find $u \in \mathbb{U}$ s.t.
 
 ```math
-\int_\Omega \nabla \delta u \cdot (k \nabla u) \, \mathrm{d}\Omega =
-\int_{\Gamma_\mathrm{N}} \delta u \, q^\mathrm{p} \, \mathrm{d}\Gamma +
-\int_\Omega \delta u \, f \, \mathrm{d}\Omega \quad \forall \, \delta u \in \mathbb{T}
+\int_\Omega \nabla \varphi \cdot (k \nabla u) \, \mathrm{d}\Omega =
+\int_{\Gamma_\mathrm{N}} \varphi \, q^\mathrm{p} \, \mathrm{d}\Gamma +
+\int_\Omega \varphi \, f \, \mathrm{d}\Omega \quad \forall \, \varphi \in \mathbb{T}
 ```
 
 where $\mathbb{U}, \mathbb{T}$ are suitable function spaces with sufficiently regular
@@ -80,14 +80,14 @@ Ferrite supports different approximations of the finite element fields and the g
 such basic numbering. For more details, see the [Ferrite numbering rules](@ref "Global-DoF-indices").
 
 Note that *shape functions* are sometimes referred to as *basis functions* or *trial functions*,
-and instead of $\phi_i$ they are sometimes denoted $N_i$. In this example we choose to approximate
+and instead of $\phi_i$ they are sometimes denoted by $N_i$. In this example we choose to approximate
 the test function in the same way. This approach is known as the *Bubnov-Galerkin finite element
 method*. Formally we write the evaluation of our approximations at a specific point $\mathbf{x}$
 in our domain $\Omega$ as:
 
 ```math
 u_\mathrm{h}(\mathbf{x}) = \sum_{i=1}^{\mathrm{N}} \phi_i(\mathbf{x}) \, \hat{u}_i,\qquad
-\delta u_\mathrm{h}(\mathbf{x}) = \sum_{i=1}^{\mathrm{N}} \phi_i(\mathbf{x}) \, \delta \hat{u}_i \, .
+\varphi_\mathrm{h}(\mathbf{x}) = \sum_{i=1}^{\mathrm{N}} \phi_i(\mathbf{x}) \, \delta \hat{u}_i \, .
 ```
 
 Since test and trial functions are usually chosen in such a way, that they build the basis of
@@ -101,7 +101,7 @@ We may now insert these approximations in the weak form, which results in
 \int_{\Omega_\mathrm{h}} \phi_i \, f \, \mathrm{d}\Omega \right) \, .
 ```
 
-Since this equation must hold for arbitrary $\delta u_\mathrm{h}$, the equation must especially
+Since this equation must hold for arbitrary $\varphi_\mathrm{h}$, the equation must especially
 hold for the specific choice that only one of the nodal values $\delta \hat{u}_i$ is fixed to 1 while
 an all other coefficients are fixed to 0. Repeating this argument for all $i$ from 1 to N we obtain
 N linear equations. This way the discrete problem can be written as a system of linear equations
@@ -168,6 +168,11 @@ being the chosen approximation when changing from the integral to the finite sum
 
 For an example of the implementation to solve a heat problem with Ferrite check out [this
 thoroughly commented example](@ref tutorial-heat-equation).
+
+### Notation (tutorials)
+For a function, `u` such that $u \approx \sum N_i a_i$, the corresponding test function is represented as `δu` such that $\delta u \approx \sum \delta N_i c_i$. In code, `N` / `δN` denote the `shape_value` for the function interpolation.
+In coupled problems, the function's name is appended to the shape functions, i.e., `Nu` / `δNu`.
+For assembly, these are subscripted with `i` or `j` based on the loop's variable, as in `Nuᵢ` / `δNuᵢ`.
 
 ## More details
 

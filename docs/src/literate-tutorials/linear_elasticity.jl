@@ -192,8 +192,8 @@ function assemble_external_forces!(f_ext, dh, facetset, facetvalues, prescribed_
             ## Get the integration weight for the current quadrature point.
             dΓ = getdetJdV(facetvalues, qp)
             for i in 1:getnbasefunctions(facetvalues)
-                Nᵢ = shape_value(facetvalues, qp, i)
-                fe_ext[i] += tₚ ⋅ Nᵢ * dΓ
+                δNᵢ = shape_value(facetvalues, qp, i)
+                fe_ext[i] += tₚ ⋅ δNᵢ * dΓ
             end
         end
         ## Add the local contributions to the correct indices in the global external force vector
@@ -267,11 +267,11 @@ function assemble_cell!(ke, cellvalues, C)
         dΩ = getdetJdV(cellvalues, q_point)
         for i in 1:getnbasefunctions(cellvalues)
             ## Gradient of the test function
-            ∇Nᵢ = shape_gradient(cellvalues, q_point, i)
+            ∇δNᵢ = shape_gradient(cellvalues, q_point, i)
             for j in 1:getnbasefunctions(cellvalues)
                 ## Symmetric gradient of the trial function
                 ∇ˢʸᵐNⱼ = shape_symmetric_gradient(cellvalues, q_point, j)
-                ke[i, j] += (∇Nᵢ ⊡ C ⊡ ∇ˢʸᵐNⱼ) * dΩ
+                ke[i, j] += (∇δNᵢ ⊡ C ⊡ ∇ˢʸᵐNⱼ) * dΩ
             end
         end
     end

@@ -132,11 +132,9 @@ close!(ch)
 #
 # !!! note "Notation"
 #     Comparing with the brief finite element introduction in [Introduction to FEM](@ref),
-#     the variables `δu`, `∇δu` and `∇u` are actually $\phi_i(\textbf{x}_q)$, $\nabla
+#     the variables `δNᵢ`, `∇δNᵢ` and `∇Nⱼ` are actually $\phi_i(\textbf{x}_q)$, $\nabla
 #     \phi_i(\textbf{x}_q)$ and $\nabla \phi_j(\textbf{x}_q)$, i.e. the evaluation of the
-#     trial and test functions in the quadrature point ``\textbf{x}_q``. However, to
-#     underline the strong parallel between the weak form and the implementation, this
-#     example uses the symbols appearing in the weak form.
+#     trial and test functions in the quadrature point ``\textbf{x}_q``.
 
 function assemble_element!(Ke::Matrix, fe::Vector, cellvalues::CellValues)
     n_basefuncs = getnbasefunctions(cellvalues)
@@ -149,15 +147,15 @@ function assemble_element!(Ke::Matrix, fe::Vector, cellvalues::CellValues)
         dΩ = getdetJdV(cellvalues, q_point)
         ## Loop over test shape functions
         for i in 1:n_basefuncs
-            δu = shape_value(cellvalues, q_point, i)
-            ∇δu = shape_gradient(cellvalues, q_point, i)
+            δNᵢ = shape_value(cellvalues, q_point, i)
+            ∇δNᵢ = shape_gradient(cellvalues, q_point, i)
             ## Add contribution to fe
-            fe[i] += δu * dΩ
+            fe[i] += δNᵢ * dΩ
             ## Loop over trial shape functions
             for j in 1:n_basefuncs
-                ∇u = shape_gradient(cellvalues, q_point, j)
+                ∇Nⱼ = shape_gradient(cellvalues, q_point, j)
                 ## Add contribution to Ke
-                Ke[i, j] += (∇δu ⋅ ∇u) * dΩ
+                Ke[i, j] += (∇δNᵢ ⋅ ∇Nⱼ) * dΩ
             end
         end
     end
