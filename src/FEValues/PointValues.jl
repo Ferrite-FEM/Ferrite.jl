@@ -51,6 +51,7 @@ shape_value_type(pv::PointValues) = shape_value_type(pv.cv)
 @propagate_inbounds shape_value(pv::PointValues, qp::Int, i::Int) = shape_value(pv.cv, qp, i)
 shape_gradient_type(pv::PointValues) = shape_gradient_type(pv.cv)
 @propagate_inbounds shape_gradient(pv::PointValues, qp::Int, i::Int) = shape_gradient(pv.cv, qp, i)
+@propagate_inbounds shape_symmetric_gradient(pv::PointValues, qp::Int, i::Int) = symmetric(shape_gradient(pv, qp, i))
 getnquadpoints(pv::PointValues) = 1
 
 # PointValues can default to quadrature point 1

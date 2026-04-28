@@ -513,8 +513,15 @@ end
     @test function_value(pvv, uv) ≈ function_value(cvv, 1, uv)
     @test function_gradient(pvv, uv) ≈ function_gradient(cvv, 1, uv)
     @test function_symmetric_gradient(pvv, uv) ≈ function_symmetric_gradient(cvv, 1, uv)
+
+    @test shape_gradient(pvv, 1, 1) ≈ shape_gradient(cvv, 1, 1)
+    @test shape_symmetric_gradient(pvv, 1, 1) ≈ shape_symmetric_gradient(cvv, 1, 1)
+
     reinit!(pvv, x, ξ₂)
     @test function_value(pvv, uv) ≈ function_value(cvv, 2, uv)
     @test function_gradient(pvv, uv) ≈ function_gradient(cvv, 2, uv)
     @test function_symmetric_gradient(pvv, uv) ≈ function_symmetric_gradient(cvv, 2, uv)
+
+    @test shape_gradient(pvv, 1, 1) ≈ shape_gradient(cvv, 2, 1)
+    @test shape_symmetric_gradient(pvv, 1, 1) ≈ shape_symmetric_gradient(cvv, 2, 1)
 end
