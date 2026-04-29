@@ -135,7 +135,7 @@ shape_gradient(fe_v::AbstractValues, q_point::Int, base_function::Int)
 Return the symmetric gradient of shape function `base_function` evaluated in
 quadrature point `q_point`.
 """
-function shape_symmetric_gradient end
+@propagate_inbounds shape_symmetric_gradient(cv::AbstractValues, q_point::Int, base_func::Int) = symmetric(shape_gradient(cv, q_point, base_func))
 
 """
     shape_divergence(fe_v::AbstractValues, q_point::Int, base_function::Int)
@@ -160,8 +160,6 @@ function shape_curl(cv::AbstractValues, q_point::Int, base_func::Int)
 end
 curl_from_gradient(∇v::SecondOrderTensor{3}) = Vec{3}((∇v[3, 2] - ∇v[2, 3], ∇v[1, 3] - ∇v[3, 1], ∇v[2, 1] - ∇v[1, 2]))
 curl_from_gradient(∇v::SecondOrderTensor{2}) = Vec{1}((∇v[2, 1] - ∇v[1, 2],)) # Alternatively define as Vec{3}((0, 0, v))
-
-@propagate_inbounds shape_symmetric_gradient(cv::AbstractValues, q_point::Int, base_func::Int) = symmetric(shape_gradient(cv, q_point, base_func))
 
 """
     function_value(fe_v::AbstractValues, q_point::Int, u::AbstractVector, [dof_range])
