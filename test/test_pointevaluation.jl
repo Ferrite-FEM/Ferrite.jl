@@ -515,6 +515,8 @@ end
     @test function_symmetric_gradient(pvv, uv) ≈ function_symmetric_gradient(cvv, 1, uv)
 
     @test shape_gradient(pvv, 1, 1) ≈ shape_gradient(cvv, 1, 1)
+    @test shape_divergence(pvv, 1, 1) ≈ shape_divergence(cvv, 1, 1)
+    @test shape_curl(pvv, 1, 1) ≈ shape_curl(cvv, 1, 1)
     @test shape_symmetric_gradient(pvv, 1, 1) ≈ shape_symmetric_gradient(cvv, 1, 1)
 
     reinit!(pvv, x, ξ₂)
@@ -523,5 +525,7 @@ end
     @test function_symmetric_gradient(pvv, uv) ≈ function_symmetric_gradient(cvv, 2, uv)
 
     @test shape_gradient(pvv, 1, 1) ≈ shape_gradient(cvv, 2, 1)
+    @test shape_divergence(pvv, 1, 1) ≈ shape_divergence(cvv, 2, 1)
+    @test shape_curl(pvv, 1, 1) ≈ shape_curl(cvv, 2, 1)
     @test shape_symmetric_gradient(pvv, 1, 1) ≈ shape_symmetric_gradient(cvv, 2, 1)
 end
