@@ -943,7 +943,7 @@ function_value_init(::ScalarInterpolation, ::AbstractVector{T}) where {T} = zero
 function_value_init(::VectorInterpolation{vdim}, ::AbstractVector{T}) where {vdim, T <: Number} = zero(Vec{vdim, T})
 
 # Internal method that have the vtk option to allocate the output differently
-function _evaluate_at_grid_nodes(dh::DofHandler{sdim}, u::AbstractVector{T}, fieldname::Symbol, ::Val{vtk} = Val(false)) where {T, vtk, sdim}
+function _evaluate_at_grid_nodes(dh::DofHandler{sdim}, u::AbstractVector{S}, fieldname::Symbol, ::Val{vtk} = Val(false)) where {order, sdim, dim, T<:Number, M, S <: Union{T, Tensor{order, dim, T, M}, SymmetricTensor{order, dim, T, M}}, vtk}
     # Make sure the field exists
     fieldname ∈ getfieldnames(dh) || error("Field $fieldname not found.")
     # Figure out the return type (scalar or vector)
@@ -952,13 +952,18 @@ function _evaluate_at_grid_nodes(dh::DofHandler{sdim}, u::AbstractVector{T}, fie
     if vtk
         # VTK output of solution field (or L2 projected scalar data)
         n_c = n_components(ip)
-        vtk_dim = n_c == 2 ? 3 : n_c # VTK wants vectors padded to 3D
+        vtk_dim = if S <: Number
+            n_c == 2 ? 3 : n_c # VTK wants vectors padded to 3D
+        else
+            @assert n_c == 1
+            S <: Vec{2} ? 3 : M # Pad 2D Vec to 3D
+        end
         # Float32 is the smallest float type supported by VTK
         TT = promote_type(T, Float32)
         data = fill!(Matrix{TT}(undef, vtk_dim, getnnodes(get_grid(dh))), NaN)
     else
         # Just evaluation at grid nodes
-        RT = typeof(function_value_init(ip, u))
+        RT = S <: Number ? typeof(function_value_init(ip, u)) : S
         data = fill(T(NaN) * zero(RT), getnnodes(get_grid(dh)))
     end
     # Loop over the subdofhandlers
@@ -993,10 +998,14 @@ function _evaluate_at_grid_nodes!(
             ue[i] = u[cell.dofs[I]]
         end
         for (qp, nodeid) in pairs(cell.nodes)
-            val = function_value(cv, qp, ue)
+            val = zero(T)
+            for i in 1:getnbasefunctions(cv)
+                val += shape_value(cv, qp, i) * ue[i]
+            end
             if data isa Matrix # VTK
-                data[1:length(val), nodeid] .= val
-                data[(length(val) + 1):end, nodeid] .= 0 # purge the NaN
+                dataview = @view data[:, nodeid]
+                fill!(dataview, 0) # purge the NaN
+                toparaview!(dataview, val)
             else
                 data[nodeid] = val
             end
