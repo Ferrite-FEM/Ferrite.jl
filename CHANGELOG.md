@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Next] - xxxx-xx-xx
 
 ### Fixes
+ - Untangle the tangled `AffineConstraints` in `close!` ([#1327])
  - Atomic assembly support for BlockAssembler. ([#1452])
  - `add_sparsity_entries!` (and thereby `allocate_matrix`) now guarantees that passing
    `interface_coupling` adds the requested interface entries: the `topology` keyword
