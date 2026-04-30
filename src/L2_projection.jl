@@ -335,7 +335,7 @@ end
 Return a vector of length `getnnodes(grid)` where the order corresponds with the node order 
 in the `grid` used to create `proj`.
 
-`vals` must have length `getnnodes(grid)`.
+`vals` should be the output from `project` using `proj`.
 """
 evaluate_at_grid_nodes(proj::L2Projector, vals::AbstractVector) =
     _evaluate_at_grid_nodes(proj, vals, Val(false))
