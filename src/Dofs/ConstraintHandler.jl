@@ -279,7 +279,7 @@ Close and finalize the `ConstraintHandler`.
 function close!(ch::ConstraintHandler)
     @assert(!isclosed(ch))
     @assert(allunique(ch.prescribed_dofs))
-
+    
     I = sortperm(ch.prescribed_dofs)
     ch.prescribed_dofs .= ch.prescribed_dofs[I]
     ch.inhomogeneities .= ch.inhomogeneities[I]
@@ -291,6 +291,7 @@ function close!(ch::ConstraintHandler)
     for dof in ch.prescribed_dofs
         ch.isconstrained[dof] = true
     end
+    
     _set_freedofs!(ch.free_dofs, ch.isconstrained, ndofs(ch.dh), length(ch.prescribed_dofs))
 
     for i in 1:length(ch.prescribed_dofs)
@@ -310,19 +311,47 @@ function close!(ch::ConstraintHandler)
     # - `add_prescribed_dof` make sure all prescribed dofs are unique by overwriting the old
     #   constraint when adding a new (TODO: Might change in the future, see comment in
     #   `add_prescribed_dof`.)
-    # - We allow affine constraints to have prescribed dofs as master dofs iff those master
-    #   dofs are constrained with just an inhomogeneity (i.e. DBC). The effective
-    #   inhomogeneity is computed in `update!`.
-    for coeffs in ch.dofcoefficients
-        coeffs === nothing && continue
-        for (d, _) in coeffs
-            i = get(ch.dofmapping, d, 0)
-            i == 0 && continue
-            icoeffs = ch.dofcoefficients[i]
-            if !(icoeffs === nothing || isempty(icoeffs))
-                error("nested affine constraints currently not supported")
+
+    if isnested(ch) # untangle affine constraints
+        @debug @warn "untangling nested affine constraints"
+        A, affine_equation_ordering, _, dofcoeffs_to_remove = _create_lhs_affine_constraint_matrix(ch)
+        
+        # update ch.dofcoefficients so that they can be used to construct `C`
+        for (k, v) in dofcoeffs_to_remove
+            deleteat!(ch.dofcoefficients[k], v)
+        end
+
+        C, g, affine_fdof_ordering = _create_rhs_affine_constraint_matrices(ch, affine_equation_ordering)
+
+        # TODO: maybe add possibility to warn user (if user chooses through kwarg) if `A` is ill conditioned 
+
+        luA = try
+            LinearAlgebra.lu(A; check=true)
+        catch e
+            if e isa LinearAlgebra.SingularException
+                throw("the affine constraints are nested and untangling them results in "* 
+                    "ill defined constraints. A possibility to avoid this is to guarantee that "*
+                    "the constraints are not nested before calling close!")
+            else
+                rethrow(e)
             end
         end
+    
+        C .= LinearAlgebra.ldiv(luA, C)
+        _update_dof_coefficents!(ch.dofcoefficients, C, affine_equation_ordering, affine_fdof_ordering)
+
+
+        # TODO: making affine constraint inhomogeneities time dependent requires (?) saving 
+        # `A⁻¹` or `luA` as it will be needed in update!
+        g .= LinearAlgebra.ldiv(luA, g)
+
+        # we need to update ch.affine_inhomogeneities NOT ch.inhomogeneities
+        # as ch.inhomogeneities will be computed in update!
+        for (k, v) in affine_equation_ordering
+            ch.affine_inhomogeneities[k] = g[v]
+        end
+       
+        @assert(!isnested(ch))
     end
 
     ch.closed = true
@@ -331,7 +360,7 @@ function close!(ch::ConstraintHandler)
     # common case where constraints does not depend on time it is annoying and easy to
     # forget to call this on the outside.
     update!(ch)
-
+    
     return ch
 end
 
@@ -357,9 +386,12 @@ constraint if true.
 """
 function add_prescribed_dof!(ch::ConstraintHandler, constrained_dof::Int, inhomogeneity, dofcoefficients = nothing)
     @assert(!isclosed(ch))
+    @assert(constrained_dof ≤ ndofs(ch.dh))
     i = get(ch.dofmapping, constrained_dof, 0)
+    # TODO: It would be cool not to override and just add regardless 
+    # and then untangle in close! This however not done yet.
     if i != 0
-        @debug @warn "dof $i already prescribed, overriding the old constraint"
+        @debug @warn "dof $constrained_dof already prescribed, overriding the old constraint"
         ch.prescribed_dofs[i] = constrained_dof
         ch.inhomogeneities[i] = inhomogeneity
         ch.affine_inhomogeneities[i] = dofcoefficients === nothing ? nothing : inhomogeneity
@@ -875,7 +907,7 @@ function create_constraint_matrix(ch::ConstraintHandler{dh, T}) where {dh, T}
 
     for (i, pdof) in enumerate(ch.prescribed_dofs)
         dofcoef = ch.dofcoefficients[i]
-        if dofcoef !== nothing #if affine constraint
+        if dofcoef !== nothing # if affine constraint
             for (d, v) in dofcoef
                 push!(I, pdof)
                 j = searchsortedfirst(ch.free_dofs, d)
