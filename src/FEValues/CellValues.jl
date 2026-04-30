@@ -100,7 +100,6 @@ shape_hessian_type(cv::CellValues) = shape_hessian_type(cv.fun_values)
 @propagate_inbounds shape_value(cv::CellValues, q_point::Int, i::Int) = shape_value(cv.fun_values, q_point, i)
 @propagate_inbounds shape_gradient(cv::CellValues, q_point::Int, i::Int) = shape_gradient(cv.fun_values, q_point, i)
 @propagate_inbounds shape_hessian(cv::CellValues, q_point::Int, i::Int) = shape_hessian(cv.fun_values, q_point, i)
-@propagate_inbounds shape_symmetric_gradient(cv::CellValues, q_point::Int, i::Int) = shape_symmetric_gradient(cv.fun_values, q_point, i)
 
 # Access quadrature rule values
 get_quadrature_rule(cv::CellValues) = cv.qr

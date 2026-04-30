@@ -135,7 +135,7 @@ shape_gradient(fe_v::AbstractValues, q_point::Int, base_function::Int)
 Return the symmetric gradient of shape function `base_function` evaluated in
 quadrature point `q_point`.
 """
-function shape_symmetric_gradient end
+@propagate_inbounds shape_symmetric_gradient(cv::AbstractValues, q_point::Int, base_func::Int) = symmetric(shape_gradient(cv, q_point, base_func))
 
 """
     shape_divergence(fe_v::AbstractValues, q_point::Int, base_function::Int)

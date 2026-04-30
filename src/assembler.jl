@@ -222,13 +222,13 @@ matrix_handle(a::SymmetricCSCAssembler) = a.K.data
 vector_handle(a::Union{AbstractCSCAssembler, AbstractCSRAssembler}) = a.f
 
 """
-    start_assemble(K::AbstractSparseMatrixCSC{Tv};            fillzero::Bool=true) -> CSCAssembler{Tv}
-    start_assemble(K::AbstractSparseMatrixCSC{Tv}, f::Vector{Tv}; fillzero::Bool=true) -> CSCAssembler{Tv}
+    start_assemble(K::AbstractSparseMatrixCSC{Tv}; fillzero::Bool = true) -> CSCAssembler{Tv}
+    start_assemble(K::AbstractSparseMatrixCSC{Tv}, f::Vector{Tv}; fillzero::Bool = true) -> CSCAssembler{Tv}
 
 Create a `CSCAssembler{Tv}` from the matrix `K` and optional vector `f` with value type `Tv`.
 
-    start_assemble(K::Symmetric{AbstractSparseMatrixCSC{Tv}};                 fillzero::Bool=true) -> SymmetricCSCAssembler{Tv}
-    start_assemble(K::Symmetric{AbstractSparseMatrixCSC{Tv}}, f::Vector=Tv[]; fillzero::Bool=true) -> SymmetricCSCAssembler{Tv}
+    start_assemble(K::Symmetric{AbstractSparseMatrixCSC{Tv}}; fillzero::Bool = true) -> SymmetricCSCAssembler{Tv}
+    start_assemble(K::Symmetric{AbstractSparseMatrixCSC{Tv}}, f::Vector = Tv[]; fillzero::Bool = true) -> SymmetricCSCAssembler{Tv}
 
 Create a `SymmetricCSCAssembler{Tv}` from the matrix `K` and optional vector `f` with value type `Tv`.
 
