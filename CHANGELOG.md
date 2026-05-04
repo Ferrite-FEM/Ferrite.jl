@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Next] - xxxx-xx-xx
  - Make `shape_symmetric_gradient` work for `PointValues` ([#1325])
- - Untangle the nested `AffineConstraints` in `close!` ([#TBC])
+ - Untangle the nested `AffineConstraints` in `close!` ([#1327])
 
 ## [v1.4.0] - 2026-04-20
 
