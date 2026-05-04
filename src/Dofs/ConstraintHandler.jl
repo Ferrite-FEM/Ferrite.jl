@@ -279,7 +279,7 @@ Close and finalize the `ConstraintHandler`.
 function close!(ch::ConstraintHandler)
     @assert(!isclosed(ch))
     @assert(allunique(ch.prescribed_dofs))
-    
+
     I = sortperm(ch.prescribed_dofs)
     ch.prescribed_dofs .= ch.prescribed_dofs[I]
     ch.inhomogeneities .= ch.inhomogeneities[I]
@@ -291,7 +291,7 @@ function close!(ch::ConstraintHandler)
     for dof in ch.prescribed_dofs
         ch.isconstrained[dof] = true
     end
-    
+
     _set_freedofs!(ch.free_dofs, ch.isconstrained, ndofs(ch.dh), length(ch.prescribed_dofs))
 
     for i in 1:length(ch.prescribed_dofs)
@@ -315,7 +315,7 @@ function close!(ch::ConstraintHandler)
     if isnested(ch) # untangle affine constraints
         @debug @warn "untangling nested affine constraints"
         A, affine_equation_ordering, _, dofcoeffs_to_remove = _create_lhs_affine_constraint_matrix(ch)
-        
+
         # update ch.dofcoefficients so that they can be used to construct `C`
         for (k, v) in dofcoeffs_to_remove
             deleteat!(ch.dofcoefficients[k], v)
@@ -323,25 +323,27 @@ function close!(ch::ConstraintHandler)
 
         C, g, affine_fdof_ordering = _create_rhs_affine_constraint_matrices(ch, affine_equation_ordering)
 
-        # TODO: maybe add possibility to warn user (if user chooses through kwarg) if `A` is ill conditioned 
+        # TODO: maybe add possibility to warn user (if user chooses through kwarg) if `A` is ill conditioned
 
         luA = try
-            LinearAlgebra.lu(A; check=true)
+            LinearAlgebra.lu(A; check = true)
         catch e
             if e isa LinearAlgebra.SingularException
-                throw("the affine constraints are nested and untangling them results in "* 
-                    "ill defined constraints. A possibility to avoid this is to guarantee that "*
-                    "the constraints are not nested before calling close!")
+                throw(
+                    "the affine constraints are nested and untangling them results in " *
+                        "ill defined constraints. A possibility to avoid this is to guarantee that " *
+                        "the constraints are not nested before calling close!"
+                )
             else
                 rethrow(e)
             end
         end
-    
+
         C .= LinearAlgebra.ldiv(luA, C)
-        _update_dof_coefficents!(ch.dofcoefficients, C, affine_equation_ordering, affine_fdof_ordering)
+        _update_dof_coefficients!(ch.dofcoefficients, C, affine_equation_ordering, affine_fdof_ordering)
 
 
-        # TODO: making affine constraint inhomogeneities time dependent requires (?) saving 
+        # TODO: making affine constraint inhomogeneities time dependent requires (?) saving
         # `A⁻¹` or `luA` as it will be needed in update!
         g .= LinearAlgebra.ldiv(luA, g)
 
@@ -350,7 +352,7 @@ function close!(ch::ConstraintHandler)
         for (k, v) in affine_equation_ordering
             ch.affine_inhomogeneities[k] = g[v]
         end
-       
+
         @assert(!isnested(ch))
     end
 
@@ -360,7 +362,7 @@ function close!(ch::ConstraintHandler)
     # common case where constraints does not depend on time it is annoying and easy to
     # forget to call this on the outside.
     update!(ch)
-    
+
     return ch
 end
 
@@ -388,7 +390,7 @@ function add_prescribed_dof!(ch::ConstraintHandler, constrained_dof::Int, inhomo
     @assert(!isclosed(ch))
     @assert(constrained_dof ≤ ndofs(ch.dh))
     i = get(ch.dofmapping, constrained_dof, 0)
-    # TODO: It would be cool not to override and just add regardless 
+    # TODO: It would be cool not to override and just add regardless
     # and then untangle in close! This however not done yet.
     if i != 0
         @debug @warn "dof $constrained_dof already prescribed, overriding the old constraint"

@@ -1398,26 +1398,26 @@ end # testset
     end # subtestset
 
     # Test when affine constraints weren't allowed to be nested
-    # 
+    #
     # @testset "error paths" begin
     #     ch = ConstraintHandler(dh)
     #     add!(ch, AffineConstraint(1, [2 => 1.0], 0.0))
     #     add!(ch, AffineConstraint(2, [3 => 1.0], 0.0))
-        
+
     #     @test_throws ErrorException("nested affine constraints currently not supported") close!(ch)
     # end # subtestset
 
     # Below we test if the untangling in close! can untangle the following system:
-    # 
+    #
     # u1 = u2 + u5
     # u2 = u3 + 4*u10 + 4.0
     # u9 = 3*u2 - 2.0
-    # 
+    #
     # A * a_c = C * a_f + g
     # | 1  -1  ⋅ | |u1|   |1  ⋅||u5|   | 1.0|
     # | ⋅   1  ⋅ | |u2| = |⋅  1||u3| + | 4.0|
     # | ⋅  -3  1 | |u9|   |⋅  ⋅|        |-2.0|
-    # 
+    #
     # Solving this system we get
     # |u1|   |1  1||u5|   | 5.0|
     # |u2| = |0  1||u3| + | 4.0|
@@ -1430,13 +1430,14 @@ end # testset
         add!(ch, AffineConstraint(9, [2 => 3.0], -2.0))
         close!(ch)
 
-        correct_dc = [[Pair(5, 1.0), Pair(3, 1)],
-              [Pair(3, 1.0)],
-              [Pair(3, 3.0)]
+        correct_dc = [
+            [Pair(5, 1.0), Pair(3, 1)],
+            [Pair(3, 1.0)],
+            [Pair(3, 3.0)],
         ]
         correct_inhomogeneities = [5.0, 4.0, 10.0]
 
-        @test ch.dofcoefficients == correct_dc 
+        @test ch.dofcoefficients == correct_dc
         @test ch.inhomogeneities ≈ correct_inhomogeneities
     end # subtestset
 
