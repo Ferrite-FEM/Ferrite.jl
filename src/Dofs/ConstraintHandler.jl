@@ -312,48 +312,9 @@ function close!(ch::ConstraintHandler)
     #   constraint when adding a new (TODO: Might change in the future, see comment in
     #   `add_prescribed_dof`.)
 
-    if isnested(ch) # untangle affine constraints
-        @debug @warn "untangling nested affine constraints"
-        A, affine_equation_ordering, _, dofcoeffs_to_remove = _create_lhs_affine_constraint_matrix(ch)
-
-        # update ch.dofcoefficients so that they can be used to construct `C`
-        for (k, v) in dofcoeffs_to_remove
-            deleteat!(ch.dofcoefficients[k], v)
-        end
-
-        C, g, affine_fdof_ordering = _create_rhs_affine_constraint_matrices(ch, affine_equation_ordering)
-
-        # TODO: maybe add possibility to warn user (if user chooses through kwarg) if `A` is ill conditioned
-
-        luA = try
-            LinearAlgebra.lu(A; check = true)
-        catch e
-            if e isa LinearAlgebra.SingularException
-                throw(
-                    "the affine constraints are nested and untangling them results in " *
-                        "ill defined constraints. A possibility to avoid this is to guarantee that " *
-                        "the constraints are not nested before calling close!"
-                )
-            else
-                rethrow(e)
-            end
-        end
-
-        C .= LinearAlgebra.ldiv(luA, C)
-        _update_dof_coefficients!(ch.dofcoefficients, C, affine_equation_ordering, affine_fdof_ordering)
-
-
-        # TODO: making affine constraint inhomogeneities time dependent requires (?) saving
-        # `A⁻¹` or `luA` as it will be needed in update!
-        g .= LinearAlgebra.ldiv(luA, g)
-
-        # we need to update ch.affine_inhomogeneities NOT ch.inhomogeneities
-        # as ch.inhomogeneities will be computed in update!
-        for (k, v) in affine_equation_ordering
-            ch.affine_inhomogeneities[k] = g[v]
-        end
-
-        @assert(!isnested(ch))
+    if istangled(ch) # untangle affine constraints
+        @debug @warn "untangling nested and cyclic affine constraints"
+        untangle_constraints!(ch)
     end
 
     ch.closed = true

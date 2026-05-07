@@ -1,11 +1,55 @@
-function _assign_new_index!(d::Dict{Int, Int}, k::Int)
-    return if !haskey(d, k)
-        d[k] = maximum(values(d); init = 0) + 1
+"""
+    untangle_constraints!(ch::ConstraintHandler)
+
+Untangle the constraints in `ch`. This function will error if the constraints are not tangled.
+"""
+function untangle_constraints!(ch::ConstraintHandler)
+    # Incase user calls this? Maybe not relevant if not exported?
+    @assert istangled(ch) "the constraints are not tangled"
+    A, affine_equation_ordering, _, dofcoeffs_to_remove = _create_lhs_affine_constraint_matrix(ch)
+
+    # update ch.dofcoefficients so that they can be used to construct `C`
+    for (k, v) in dofcoeffs_to_remove
+        deleteat!(ch.dofcoefficients[k], v)
     end
+
+    C, g, affine_fdof_ordering = _create_rhs_affine_constraint_matrices(ch, affine_equation_ordering)
+
+    # TODO: maybe add possibility to warn user (if user chooses through kwarg) if `A` is ill conditioned
+
+    luA = try
+        LinearAlgebra.lu(A; check = true)
+    catch e
+        if e isa LinearAlgebra.SingularException
+            throw(
+                "the affine constraints are nested and untangling them results in " *
+                    "ill defined constraints. A possibility to avoid this is to guarantee that " *
+                    "the constraints are not nested before calling close!"
+            )
+        else
+            rethrow(e)
+        end
+    end
+
+    C .= LinearAlgebra.ldiv(luA, C)
+    _update_dof_coefficients!(ch.dofcoefficients, C, affine_equation_ordering, affine_fdof_ordering)
+
+    # TODO: making affine constraint inhomogeneities time dependent requires (?) saving
+    # `A⁻¹` or `luA` as it will be needed in update!
+    g .= LinearAlgebra.ldiv(luA, g)
+
+    # we need to update ch.affine_inhomogeneities NOT ch.inhomogeneities
+    # as ch.inhomogeneities will be computed in update!
+    for (k, v) in affine_equation_ordering
+        ch.affine_inhomogeneities[k] = g[v]
+    end
+
+    @assert !istangled(ch)
+    return ch
 end
 
 """
-    _create_lhs_affine_constraint_matrix(ch::ConstraintHandler{DH,T}) where {DH,T}
+    _create_lhs_affine_constraint_matrix(ch::ConstraintHandler{DH, T}) where {DH, T}
 
 Create and returns the constraint matrix, `A`, that described the affine 
 nested constraints in `ch`. The matrix `A` relates constrained affine dofs, `a_c`, and free, `a_f`, degrees 
@@ -93,7 +137,7 @@ function _create_lhs_affine_constraint_matrix(ch::ConstraintHandler{DH, T}) wher
 end
 
 """
-    _create_rhs_affine_constraint_matrix(ch::ConstraintHandler{DH,T}, affine_equation_ordering::Dict{Int,Int}) where {DH,T}
+    _create_rhs_affine_constraint_matrices(ch::ConstraintHandler{DH, T}, affine_equation_ordering::Dict{Int, Int}) where {DH, T}
 
 Create and return the constraint matrix, `C`, and the inhomogeneities, `g`, from the nested affine
 constraints in `ch`. The constraint matrix relates constrained affine dofs, `a_c`, and free, `a_f`, degrees of freedom via
@@ -142,26 +186,30 @@ end
 function _update_dof_coefficients!(dc::Vector{Union{Nothing, DofCoefficients{T}}}, C::AbstractMatrix, affine_equation_ordering::Dict{Int, Int}, affine_fdof_ordering::Dict{Int, Int}) where {T}
 
     affine_fdof_mapping⁻¹ = Dict(v => k for (k, v) in affine_fdof_ordering) # Bijections.jl could avoid this but not really worth it
+    affine_equation_ordering⁻¹ = Dict(v => k for (k, v) in affine_equation_ordering)
 
-    for (eq, i) in pairs(affine_equation_ordering)
-        coeffs = Pair{Int, T}[]
-        for j in axes(C, 2)
-            C[i, j] == zero(T) && continue # skip zero entry
-            d = affine_fdof_mapping⁻¹[j]
-            push!(coeffs, (d => C[i, j]))
+    # first empty the dof coefficients that we want to overwrite
+    for (_, v) in affine_equation_ordering
+        dc[v] = DofCoefficients{T}()
+    end
+    SparseArrays.dropzeros!(C) # make the following loop over C shorter
+    for j in axes(C, 2)
+        for nz_i in nzrange(C, j)
+            i = C.rowval[nz_i]
+            dof = affine_fdof_mapping⁻¹[j]
+            coeffs = dc[affine_equation_ordering⁻¹[i]]
+            push!(coeffs, (dof => C.nzval[nz_i]))
         end
-        # overwrite the old coefficients
-        dc[eq] = coeffs
     end
     return dc
 end
 
 """
-    isnested(ch::ConstraintHandler)
+    istangled(ch::ConstraintHandler)
 
-Check if the constraint handler has any nested affine dofs.
+Check if the constraint handler has any tangled (nested) dofs.
 """
-function isnested(ch::ConstraintHandler)
+function istangled(ch::ConstraintHandler)
     for coeffs in ch.dofcoefficients
         coeffs === nothing && continue
         for (d, _) in coeffs
@@ -174,4 +222,10 @@ function isnested(ch::ConstraintHandler)
         end
     end
     return false
+end
+
+function _assign_new_index!(d::Dict{Int, Int}, k::Int)
+    return if !haskey(d, k)
+        d[k] = maximum(values(d); init = 0) + 1
+    end
 end
