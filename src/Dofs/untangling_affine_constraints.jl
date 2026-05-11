@@ -51,8 +51,8 @@ end
 """
     _create_lhs_affine_constraint_matrix(ch::ConstraintHandler{DH, T}) where {DH, T}
 
-Create and returns the constraint matrix, `A`, that described the affine 
-nested constraints in `ch`. The matrix `A` relates constrained affine dofs, `a_c`, and free, `a_f`, degrees 
+Create and returns the constraint matrix, `A`, that described the affine
+nested constraints in `ch`. The matrix `A` relates constrained affine dofs, `a_c`, and free, `a_f`, degrees
 of freedom via `A * a_c = C * a_f + g`. Three mappings are also returned.
 
     * `affine_cdof_ordering` which maps `constrained dof => column of A`
@@ -62,7 +62,7 @@ of freedom via `A * a_c = C * a_f + g`. Three mappings are also returned.
     * `dofcoeffs_to_remove` which maps `constraint (eq.) => position of dof coefficient to remove`
 
 !!! note
-    In this case, the system `A * a_c = C * a_f + g` only contains the affine 
+    In this case, the system `A * a_c = C * a_f + g` only contains the affine
     constraints that are nested. Therefore this function is not designed to be used after the
     `ConstraintHandler` has been closed.
 
@@ -145,7 +145,7 @@ constraints in `ch`. The constraint matrix relates constrained affine dofs, `a_c
 The rows are indexed using `affine_equation_ordering` from `_create_lhs_affine_constraint_matrix`.
 
 !!! note
-    In this case, the system `A * a_c = C * a_f + g` only contains the affine 
+    In this case, the system `A * a_c = C * a_f + g` only contains the affine
     constraints that are nested. Therefore this function is not designed to be used after the
     `ConstraintHandler` has been closed.
 """
@@ -188,10 +188,10 @@ function _update_dof_coefficients!(dc::Vector{Union{Nothing, DofCoefficients{T}}
     affine_fdof_mapping⁻¹ = Dict(v => k for (k, v) in affine_fdof_ordering) # Bijections.jl could avoid this but not really worth it
     affine_equation_ordering⁻¹ = Dict(v => k for (k, v) in affine_equation_ordering)
 
-    # first empty the dof coefficients that we want to overwrite
-    for (_, v) in affine_equation_ordering
-        dc[v] = DofCoefficients{T}()
+    for (k, _) in affine_equation_ordering
+        dc[k] = DofCoefficients{T}()
     end
+
     SparseArrays.dropzeros!(C) # make the following loop over C shorter
     for j in axes(C, 2)
         for nz_i in nzrange(C, j)
