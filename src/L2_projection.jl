@@ -159,7 +159,7 @@ function _assemble_L2_matrix(dh::DofHandler, qrs_lhs::Vector{<:QuadratureRule})
     return M
 end
 
-function _assemble_L2_matrix!(assembler, cellvalues::CellValues, sdh::SubDofHandler)
+function _assemble_L2_matrix!(assembler, cellvalues::AbstractCellValues, sdh::SubDofHandler)
 
     n = getnbasefunctions(cellvalues)
     Me = zeros(n, n)
@@ -295,7 +295,7 @@ function _project(proj::L2Projector, qrs_rhs::Vector{<:QuadratureRule}, vars::Un
     return T[make_T(x) for x in Base.eachrow(projected_vals)]
 end
 
-function assemble_proj_rhs!(f::Matrix, cellvalues::CellValues, sdh::SubDofHandler, vars::Union{AbstractVector, AbstractDict})
+function assemble_proj_rhs!(f::Matrix, cellvalues::AbstractCellValues, sdh::SubDofHandler, vars::Union{AbstractVector, AbstractDict})
     # Assemble the multi-column rhs, f = ∭( v ⋅ x̂ )dΩ
     # The number of columns corresponds to the length of the data-tuple in the tensor x̂.
     M = size(f, 2)

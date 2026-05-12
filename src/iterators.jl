@@ -242,7 +242,7 @@ end
     `CellIterator` is stateful and should not be used for things other than `for`-looping
     (e.g. broadcasting over, or collecting the iterator may yield unexpected results).
 """
-struct CellIterator{CC <: CellCache, IC <: IntegerCollection}
+struct CellIterator{CC, IC <: IntegerCollection}
     cc::CC
     set::IC
 end
