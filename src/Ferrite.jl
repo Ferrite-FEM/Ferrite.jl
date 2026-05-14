@@ -136,6 +136,7 @@ include("FEValues/facet_integrals.jl")
 include("Grid/grid.jl")
 include("Grid/topology.jl")
 include("Grid/utils.jl")
+include("Grid/grid_reorder.jl")
 include("Grid/grid_generators.jl")
 include("Grid/coloring.jl")
 
