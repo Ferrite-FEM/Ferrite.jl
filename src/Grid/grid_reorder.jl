@@ -127,7 +127,7 @@ function compute_morton_ordering!(
         isempty(children[child_idx]) && continue
         child_lo = Vec{dim}(d -> isodd((child_idx - 1) >> (d - 1)) ? mid[d] : lo[d])
         child_hi = Vec{dim}(d -> isodd((child_idx - 1) >> (d - 1)) ? hi[d] : mid[d])
-        _sfc_ordering!(ordering, centers, child_lo, child_hi, children[child_idx], depth + 1)
+        compute_morton_ordering!(ordering, centers, child_lo, child_hi, children[child_idx], depth + 1)
     end
     return
 end
