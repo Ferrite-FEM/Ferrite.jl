@@ -7,6 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Next] - xxxx-xx-xx
  - Make `shape_symmetric_gradient` work for `PointValues` ([#1325])
+ - Add Z-curve based reordering of Grids to boost assembly performance. ([#1334])
 
 ## [v1.4.0] - 2026-04-20
 
