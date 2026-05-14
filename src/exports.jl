@@ -113,6 +113,10 @@ export
     create_coloring,
     ColoringAlgorithm,
 
+    # Grid reordering
+    reorder_cells!,
+    compute_sfc_ordering,
+
     # Dofs
     DofHandler,
     SubDofHandler,
