@@ -79,8 +79,10 @@ end
         reorder_cells!(grid, shuffled_perm)
 
         function mean_consecutive_center_dist(g)
-            centers = [sum(get_node_coordinate(g, n) for n in Ferrite.get_node_ids(getcells(g, i))) /
-                       length(Ferrite.get_node_ids(getcells(g, i))) for i in 1:getncells(g)]
+            centers = [
+                sum(get_node_coordinate(g, n) for n in Ferrite.get_node_ids(getcells(g, i))) /
+                    length(Ferrite.get_node_ids(getcells(g, i))) for i in 1:getncells(g)
+            ]
             dists = [norm(centers[i + 1] - centers[i]) for i in 1:(length(centers) - 1)]
             sum(dists) / length(dists)
         end

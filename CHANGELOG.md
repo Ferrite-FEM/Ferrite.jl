@@ -28,6 +28,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
    updated [howto on multi-threaded
    assembly](https://ferrite-fem.github.io/Ferrite.jl/stable/howto/threaded_assembly/).
    ([#1417])
+ - Add Z-curve based reordering of Grids to boost assembly performance. ([#1334])
 
 ### Documentation
  - The figures for the documentation are now programmatically generated and made to have a consistent look.
