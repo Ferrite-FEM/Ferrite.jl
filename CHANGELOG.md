@@ -6,7 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Next] - xxxx-xx-xx
+
+### Fixes
  - Make `shape_symmetric_gradient` work for `PointValues` ([#1325])
+ - Make `getlowerorder` work for `VectorizedInterpolation` ([#1335])
 
 ## [v1.4.0] - 2026-04-20
 
