@@ -170,7 +170,7 @@ For an example of the implementation to solve a heat problem with Ferrite check 
 thoroughly commented example](@ref tutorial-heat-equation).
 
 ### Notation (tutorials)
-For a function, `u` such that $u \approx \sum N_i a_i$, the corresponding test function is represented as `δu` such that $\delta u \approx \sum \delta N_i c_i$. In code, `N` / `δN` denote the `shape_value` for the function interpolation.
+For a function, `u` such that $u \approx \sum N_i a_i$, the corresponding test function is represented as `δu`, even if the problem does not have variational structure, such that $\delta u \approx \sum \delta N_i c_i$. In code, `N` / `δN` denote the `shape_value` for the function interpolation.
 In coupled problems, the function's name is appended to the shape functions, i.e., `Nu` / `δNu`.
 For assembly, these are subscripted with `i` or `j` based on the loop's variable, as in `Nuᵢ` / `δNuᵢ`.
 
