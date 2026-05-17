@@ -294,6 +294,12 @@ end
                     @test @inferred(reference_shape_gradient(v_interpolation_3, x, dof)) isa Tensor{2, ref_dim, value_type}
                 end
             end
+
+            if applicable(Ferrite.getlowerorder, interpolation)
+                @test isa(Ferrite.getlowerorder(v_interpolation_1), Interpolation{ref_shape, func_order - 1})
+                @test isa(Ferrite.getlowerorder(v_interpolation_2), Interpolation{ref_shape, func_order - 1})
+                @test isa(Ferrite.getlowerorder(v_interpolation_3), Interpolation{ref_shape, func_order - 1})
+            end
         end
     end
 

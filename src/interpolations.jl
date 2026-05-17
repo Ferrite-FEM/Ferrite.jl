@@ -1579,6 +1579,7 @@ end
 conformity(ip::VectorizedInterpolation) = conformity(ip.ip)
 
 adjust_dofs_during_distribution(ip::VectorizedInterpolation) = adjust_dofs_during_distribution(ip.ip)
+getlowerorder(ip::VectorizedInterpolation{vdim}) where {vdim} = VectorizedInterpolation{vdim}(getlowerorder(ip.ip))
 
 # Vectorize to reference dimension by default
 function VectorizedInterpolation(ip::ScalarInterpolation{shape}) where {refdim, shape <: AbstractRefShape{refdim}}
