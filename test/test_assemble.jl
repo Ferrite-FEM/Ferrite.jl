@@ -167,6 +167,10 @@ function Base.:+(y::Float64, x::IgnoreMeIfZero)
     @test !iszero(x.x)
     return y + x.x
 end
+function Base.Float64(x::IgnoreMeIfZero)
+    @test !iszero(x.x)
+    return x.x
+end
 
 @testset "assemble! ignoring zeros" begin
     store_dofs = [1, 5, 2, 8]
