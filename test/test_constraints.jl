@@ -1397,15 +1397,6 @@ end # testset
 
     end # subtestset
 
-    # Test when affine constraints weren't allowed to be nested
-    #
-    # @testset "error paths" begin
-    #     ch = ConstraintHandler(dh)
-    #     add!(ch, AffineConstraint(1, [2 => 1.0], 0.0))
-    #     add!(ch, AffineConstraint(2, [3 => 1.0], 0.0))
-
-    #     @test_throws ErrorException("nested affine constraints currently not supported") close!(ch)
-    # end # subtestset
 
     # Below we test if the untangling in close! can untangle the following system:
     #
