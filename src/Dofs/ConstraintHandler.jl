@@ -313,7 +313,7 @@ function close!(ch::ConstraintHandler)
     #   `add_prescribed_dof`.)
 
     if istangled(ch) # untangle affine constraints
-        @debug @warn "untangling nested and cyclic affine constraints"
+        @debug @warn "untangling tangled and cyclic affine constraints"
         untangle_constraints!(ch)
     end
 
