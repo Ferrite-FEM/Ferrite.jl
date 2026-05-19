@@ -22,9 +22,9 @@ function untangle_constraints!(ch::ConstraintHandler)
     catch e
         if e isa LinearAlgebra.SingularException
             throw(
-                "the affine constraints are nested and untangling them results in " *
+                "the affine constraints are tangled and untangling them results in " *
                     "ill defined constraints. A possibility to avoid this is to guarantee that " *
-                    "the constraints are not nested before calling close!"
+                    "the constraints are not tangled before calling close!"
             )
         else
             rethrow(e)
@@ -52,7 +52,7 @@ end
     _create_lhs_affine_constraint_matrix(ch::ConstraintHandler{DH, T}) where {DH, T}
 
 Create and returns the constraint matrix, `A`, that described the affine
-nested constraints in `ch`. The matrix `A` relates constrained affine dofs, `a_c`, and free, `a_f`, degrees
+tangled constraints in `ch`. The matrix `A` relates constrained affine dofs, `a_c`, and free, `a_f`, degrees
 of freedom via `A * a_c = C * a_f + g`. Three mappings are also returned.
 
     * `affine_cdof_ordering` which maps `constrained dof => column of A`
@@ -63,7 +63,7 @@ of freedom via `A * a_c = C * a_f + g`. Three mappings are also returned.
 
 !!! note
     In this case, the system `A * a_c = C * a_f + g` only contains the affine
-    constraints that are nested. Therefore this function is not designed to be used after the
+    constraints that are tangled. Therefore this function is not designed to be used after the
     `ConstraintHandler` has been closed.
 
 """
@@ -83,17 +83,17 @@ function _create_lhs_affine_constraint_matrix(ch::ConstraintHandler{DH, T}) wher
         coeffs === nothing && continue # this constraint corresponds to a Dirichlet constraint
         dof_position_counter = 0
         for (d, c) in coeffs
-            nested_eq = get(ch.dofmapping, d, 0)
+            tangled_eq = get(ch.dofmapping, d, 0)
             dof_position_counter += 1
-            nested_eq == 0 && continue # skip as d is not in the prescribed dofs and therefore not nested
+            tangled_eq == 0 && continue # skip as d is not in the prescribed dofs and therefore not tangled
 
-            nested_coeffs = ch.dofcoefficients[nested_eq]
-            if !(nested_coeffs === nothing || isempty(nested_coeffs)) # nothing means Dirichlet, empty means Dirichlet but through AffineConstraint
+            tangled_coeffs = ch.dofcoefficients[tangled_eq]
+            if !(tangled_coeffs === nothing || isempty(tangled_coeffs)) # nothing means Dirichlet, empty means Dirichlet but through AffineConstraint
 
                 # add the dof to the affine_cdof_ordering
                 _assign_new_index!(affine_cdof_ordering, d)
                 # add the equation to affine_equation_ordering
-                _assign_new_index!(affine_equation_ordering, nested_eq)
+                _assign_new_index!(affine_equation_ordering, tangled_eq)
 
                 # add the master dof to affine_cdof_ordering
                 _assign_new_index!(affine_cdof_ordering, dofmapping⁻¹[eq])
@@ -139,21 +139,21 @@ end
 """
     _create_rhs_affine_constraint_matrices(ch::ConstraintHandler{DH, T}, affine_equation_ordering::Dict{Int, Int}) where {DH, T}
 
-Create and return the constraint matrix, `C`, and the inhomogeneities, `g`, from the nested affine
+Create and return the constraint matrix, `C`, and the inhomogeneities, `g`, from the tangled affine
 constraints in `ch`. The constraint matrix relates constrained affine dofs, `a_c`, and free, `a_f`, degrees of freedom via
 `A * a_c = C * a_f + g`. A mapping `affine_fdof_ordering` is also returned to index `C`, i.e. it maps "free" dof => column of C.
 The rows are indexed using `affine_equation_ordering` from `_create_lhs_affine_constraint_matrix`.
 
 !!! note
     In this case, the system `A * a_c = C * a_f + g` only contains the affine
-    constraints that are nested. Therefore this function is not designed to be used after the
+    constraints that are tangled. Therefore this function is not designed to be used after the
     `ConstraintHandler` has been closed.
 """
 function _create_rhs_affine_constraint_matrices(ch::ConstraintHandler{DH, T}, affine_equation_ordering::Dict{Int, Int}) where {DH, T}
 
-    n_nested_constraints = length(affine_equation_ordering)
+    n_tangled_constraints = length(affine_equation_ordering)
     I = Int[]; J = Int[]; V = T[]
-    g = Vector{T}(undef, n_nested_constraints) # inhomogeneities
+    g = Vector{T}(undef, n_tangled_constraints) # inhomogeneities
 
     # maps the free dofs to a position in `a_f`
     affine_fdof_ordering = Dict{Int, Int}()
@@ -162,7 +162,7 @@ function _create_rhs_affine_constraint_matrices(ch::ConstraintHandler{DH, T}, af
         (isnothing(coeffs) || !haskey(affine_equation_ordering, eq)) && continue
         i = affine_equation_ordering[eq]
         if isempty(coeffs) && haskey(affine_equation_ordering, eq)
-            # the constraint was filled with nested dofs and now the dof coefficients are empty
+            # the constraint was filled with tangled dofs and now the dof coefficients are empty
             # therefore no contribution in `C` only in `g`
             g[i] = ch.affine_inhomogeneities[eq]
         else
@@ -178,7 +178,7 @@ function _create_rhs_affine_constraint_matrices(ch::ConstraintHandler{DH, T}, af
     end
 
     n = length(affine_fdof_ordering)
-    C = SparseArrays.sparse(I, J, V, n_nested_constraints, n)
+    C = SparseArrays.sparse(I, J, V, n_tangled_constraints, n)
 
     return C, g, affine_fdof_ordering
 end
@@ -207,7 +207,7 @@ end
 """
     istangled(ch::ConstraintHandler)
 
-Check if the constraint handler has any tangled (nested) dofs.
+Check if the constraint handler has any tangled dofs.
 """
 function istangled(ch::ConstraintHandler)
     for coeffs in ch.dofcoefficients
