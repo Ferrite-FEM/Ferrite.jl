@@ -353,6 +353,7 @@ function add_prescribed_dof!(ch::ConstraintHandler, constrained_dof::Int, inhomo
     i = get(ch.dofmapping, constrained_dof, 0)
     # TODO: It would be cool not to override and just add regardless
     # and then untangle in close! This however not done yet.
+    # If you're interested in this see https://github.com/Ferrite-FEM/Ferrite.jl/pull/1327#discussion_r3278862479
     if i != 0
         @debug @warn "dof $constrained_dof already prescribed, overriding the old constraint"
         ch.prescribed_dofs[i] = constrained_dof
