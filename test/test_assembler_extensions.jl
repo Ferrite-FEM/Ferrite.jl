@@ -18,8 +18,8 @@ using SparseArrays, LinearAlgebra
         K0 = K0' * K0
         K1 = SparseMatrixCSR(transpose(copy(K0)))
         K2 = Symmetric(SparseMatrixCSR(transpose(copy(K0))))
-        @test K0 ≈ K1
-        @test K1 ≈ K2
+        @test K0 == K1
+        @test K1 == K2
         sol = [1.0, 2.0, 3.0]
         f0 = K0 * sol
         f1 = K1 * sol
@@ -27,8 +27,8 @@ using SparseArrays, LinearAlgebra
         apply!(K0, f0, ch)
         apply!(K1, f1, ch)
         apply!(K2, f2, ch)
-        @test K0 ≈ K1
-        @test K1 ≈ K2
+        @test K0 == K1
+        @test K1 == K2
         @test f0 ≈ f1
         @test f1 ≈ f2
         # Error for affine constraints
