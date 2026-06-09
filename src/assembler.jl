@@ -152,11 +152,11 @@ end
 
 Assembles the element residual `ge` into the global residual vector `g`.
 """
-@propagate_inbounds function assemble!(g::AbstractVector{T}, dofs::AbstractVector{Int}, ge::AbstractVector{T}) where {T}
+@propagate_inbounds function assemble!(g::AbstractVector{T}, dofs::AbstractVector{Int}, ge::AbstractVector{T}, op!::F = addindex!) where {T, F <: Function}
     @boundscheck checkbounds(g, dofs)
     @boundscheck checkbounds(ge, keys(dofs))
     @inbounds for (i, dof) in pairs(dofs)
-        addindex!(g, ge[i], dof)
+        op!(g, ge[i], dof)
     end
     return
 end
@@ -259,16 +259,16 @@ function finish_assemble(a::Union{CSCAssembler, CSRAssembler, SymmetricCSCAssemb
 end
 
 """
-    assemble!(A::Ferrite.AbstractAssembler, dofs::AbstractVector{Int}, Ke::AbstractMatrix)
-    assemble!(A::Ferrite.AbstractAssembler, dofs::AbstractVector{Int}, Ke::AbstractMatrix, fe::AbstractVector)
+    assemble!(A::Ferrite.AbstractAssembler, dofs::AbstractVector{Int}, Ke::AbstractMatrix [, op! = Ferrite.addindex!])
+    assemble!(A::Ferrite.AbstractAssembler, dofs::AbstractVector{Int}, Ke::AbstractMatrix, fe::AbstractVector [, op! = Ferrite.addindex!])
 
 Assemble the square element stiffness matrix `Ke` (and optional force vector `fe`) into the global
 stiffness (and force) in `A`, given the element degrees of freedom `dofs`.
 
 This is equivalent to `K[dofs, dofs] += Ke` and `f[dofs] += fe`, where `K` is the global stiffness matrix and `f` the global force/residual vector, but more efficient.
 
-    assemble!(A::Ferrite.AbstractAssembler, rowdofs::AbstractVector{Int}, coldofs::AbstractVector{Int}, Ke::AbstractMatrix)
-    assemble!(A::Ferrite.AbstractAssembler, rowdofs::AbstractVector{Int}, coldofs::AbstractVector{Int}, Ke::AbstractMatrix, fe::AbstractVector)
+    assemble!(A::Ferrite.AbstractAssembler, rowdofs::AbstractVector{Int}, coldofs::AbstractVector{Int}, Ke::AbstractMatrix [, op! = Ferrite.addindex!])
+    assemble!(A::Ferrite.AbstractAssembler, rowdofs::AbstractVector{Int}, coldofs::AbstractVector{Int}, Ke::AbstractMatrix, fe::AbstractVector [, op! = Ferrite.addindex!])
 
 Assemble the element stiffness matrix `Ke` (and optional force vector `fe`) into the global
 stiffness (and force) in `A`, given the element row degrees of freedom, `rowdofs`, and element column degrees of freedom, `coldofs`.
@@ -276,15 +276,25 @@ This is equivalent to `K[rowdofs, coldofs] += Ke` and `f[rowdofs] += fe`, but mo
 """
 assemble!(::AbstractAssembler, ::AbstractVector{<:Integer}, ::AbstractMatrix, ::AbstractVector)
 
-@propagate_inbounds function assemble!(A::AbstractAssembler, dofs::AbstractVector{<:Integer}, Ke::AbstractMatrix, fe::Union{AbstractVector, Nothing} = nothing)
+@propagate_inbounds function assemble!(A::AbstractAssembler, dofs::AbstractVector{<:Integer}, Ke::AbstractMatrix, fe::AbstractVector, op!::F = addindex!) where {F <: Function}
     size(Ke, 1) == size(Ke, 2) || throw(ArgumentError("Ke is rectangular, but only a single `dofs` vector is provided. Please call assemble!(A, rowdofs, coldofs, Ke, fe) instead."))
-    return _assemble!(A, dofs, dofs, Ke, fe, false)
+    return _assemble!(A, dofs, dofs, Ke, fe, false, op!)
 end
-@propagate_inbounds function assemble!(A::AbstractAssembler, rowdofs::AbstractVector{<:Integer}, coldofs::AbstractVector{<:Integer}, Ke::AbstractMatrix, fe::Union{AbstractVector, Nothing} = nothing)
-    return _assemble!(A, rowdofs, coldofs, Ke, fe, false)
+@propagate_inbounds function assemble!(A::AbstractAssembler, dofs::AbstractVector{<:Integer}, Ke::AbstractMatrix, op!::F = addindex!) where {F <: Function}
+    size(Ke, 1) == size(Ke, 2) || throw(ArgumentError("Ke is rectangular, but only a single `dofs` vector is provided. Please call assemble!(A, rowdofs, coldofs, Ke) instead."))
+    return _assemble!(A, dofs, dofs, Ke, nothing, false, op!)
 end
-@propagate_inbounds function assemble!(A::SymmetricCSCAssembler, dofs::AbstractVector{<:Integer}, Ke::AbstractMatrix, fe::Union{AbstractVector, Nothing} = nothing)
-    return _assemble!(A, dofs, dofs, Ke, fe, true)
+@propagate_inbounds function assemble!(A::AbstractAssembler, rowdofs::AbstractVector{<:Integer}, coldofs::AbstractVector{<:Integer}, Ke::AbstractMatrix, fe::AbstractVector, op!::F = addindex!) where {F <: Function}
+    return _assemble!(A, rowdofs, coldofs, Ke, fe, false, op!)
+end
+@propagate_inbounds function assemble!(A::AbstractAssembler, rowdofs::AbstractVector{<:Integer}, coldofs::AbstractVector{<:Integer}, Ke::AbstractMatrix, op!::F = addindex!) where {F <: Function}
+    return _assemble!(A, rowdofs, coldofs, Ke, nothing, false, op!)
+end
+@propagate_inbounds function assemble!(A::SymmetricCSCAssembler, dofs::AbstractVector{<:Integer}, Ke::AbstractMatrix, fe::AbstractVector, op!::F = addindex!) where {F <: Function}
+    return _assemble!(A, dofs, dofs, Ke, fe, true, op!)
+end
+@propagate_inbounds function assemble!(A::SymmetricCSCAssembler, dofs::AbstractVector{<:Integer}, Ke::AbstractMatrix, op!::F = addindex!) where {F <: Function}
+    return _assemble!(A, dofs, dofs, Ke, nothing, true, op!)
 end
 
 """
@@ -301,12 +311,12 @@ Sorts the dofs into a separate buffer and returns it together with a permutation
     return sorteddofs, permutation
 end
 
-@propagate_inbounds function _assemble!(A::Union{AbstractCSCAssembler, AbstractCSRAssembler}, rowdofs::AbstractVector{<:Integer}, coldofs::AbstractVector{<:Integer}, Ke::AbstractMatrix, fe::Union{AbstractVector, Nothing}, sym::Bool)
+@propagate_inbounds function _assemble!(A::Union{AbstractCSCAssembler, AbstractCSRAssembler}, rowdofs::AbstractVector{<:Integer}, coldofs::AbstractVector{<:Integer}, Ke::AbstractMatrix, fe::Union{AbstractVector, Nothing}, sym::Bool, op!::F = addindex!) where {F <: Function}
     @boundscheck checkbounds(Ke, keys(rowdofs), keys(coldofs))
     if fe !== nothing
         @boundscheck checkbounds(fe, keys(rowdofs))
         @boundscheck checkbounds(A.f, rowdofs)
-        @inbounds assemble!(A.f, rowdofs, fe)
+        @inbounds assemble!(A.f, rowdofs, fe, op!)
     end
 
     K = matrix_handle(A)
@@ -322,15 +332,16 @@ end
         sortedcoldofs, colpermutation
     end
 
-    return _assemble_inner!(K, Ke, rowdofs, sortedrowdofs, rowpermutation, coldofs, sortedcoldofs, colpermutation, sym)
+    return _assemble_inner!(K, Ke, rowdofs, sortedrowdofs, rowpermutation, coldofs, sortedcoldofs, colpermutation, sym, op!)
 end
 
 @propagate_inbounds function _assemble_inner!(
         K::SparseMatrixCSC, Ke::AbstractMatrix,
         rowdofs::AbstractVector, sortedrowdofs::AbstractVector, rowpermutation::AbstractVector,
         coldofs::AbstractVector, sortedcoldofs::AbstractVector, colpermutation::AbstractVector,
-        sym::Bool
-    )
+        sym::Bool,
+        op!::F,
+    ) where {F}
     current_col = 1
     Krows = rowvals(K)
     Kvals = nonzeros(K)
@@ -348,9 +359,7 @@ end
             val = Ke[Kerow, Kecol]
             if Krow == rowdofs[Kerow]
                 # Match: add the value (if non-zero) and advance the pointers
-                if !iszero(val)
-                    Kvals[R] += val
-                end
+                op!(Kvals, val, R)
                 ri += 1
                 Ri += 1
             elseif Krow < rowdofs[Kerow]

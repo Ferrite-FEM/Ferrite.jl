@@ -14,8 +14,9 @@ end
         K::SparseMatrixCSR, Ke::AbstractMatrix,
         rowdofs::AbstractVector, sortedrowdofs::AbstractVector, rowpermutation::AbstractVector,
         coldofs::AbstractVector, sortedcoldofs::AbstractVector, colpermutation::AbstractVector,
-        sym::Bool
-    )
+        sym::Bool,
+        op!::F = Ferrite.addindex!,
+    ) where {F}
     current_row = 1
     ld = length(coldofs)
     return @inbounds for Krow in sortedrowdofs
@@ -31,9 +32,7 @@ end
             val = Ke[Kerow, Kecol]
             if Kcol == coldofs[Kecol]
                 # Match: add the value (if non-zero) and advance the pointers
-                if !iszero(val)
-                    K.nzval[C] += val
-                end
+                op!(K.nzval, val, C)
                 ci += 1
                 Ci += 1
             elseif Kcol < coldofs[Kecol]

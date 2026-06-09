@@ -25,6 +25,7 @@ Fallback: `A[i, j] += v`.
 addindex!
 
 function addindex!(A::AbstractMatrix{T}, v, i::Integer, j::Integer) where {T}
+    iszero(v) && return A
     return addindex!(A, T(v), Int(i), Int(j))
 end
 function addindex!(A::AbstractMatrix{T}, v::T, i::Int, j::Int) where {T}
@@ -34,6 +35,7 @@ function addindex!(A::AbstractMatrix{T}, v::T, i::Int, j::Int) where {T}
 end
 
 function addindex!(b::AbstractVector{T}, v, i::Integer) where {T}
+    iszero(v) && return b
     return addindex!(b, T(v), Int(i))
 end
 function addindex!(b::AbstractVector{T}, v::T, i::Int) where {T}
