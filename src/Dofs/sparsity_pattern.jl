@@ -416,7 +416,10 @@ function allocate_matrix(::Type{MatrixType}, dh::DofHandler, args...; kwargs...)
     _get_Ti(::Type{<:AbstractMatrix}) = Int
     _get_Ti(::Type{<:AbstractSparseMatrix{<:Any, Ti}}) where {Ti} = Ti
     if _can_use_fastsp(MatrixType, args...; kwargs...)
-        fsp = FastSparsityPattern(_get_Ti(MatrixType), dh, args...; kwargs...)
+        # `_can_use_fastsp` guarantees that any `args` (a ConstraintHandler) and `kwargs`
+        # (e.g. `keep_constrained`) do not affect the resulting pattern, so they are not
+        # forwarded to the fast-path constructor.
+        fsp = FastSparsityPattern(_get_Ti(MatrixType), dh)
         return allocate_matrix(MatrixType, fsp)
     end
     sp = init_sparsity_pattern(dh)
@@ -731,12 +734,22 @@ function _can_use_fastsp(
         coupling = nothing,
         interface_coupling = nothing
     ) where {MatrixType}
-    if ch === topology === coupling === interface_coupling === nothing
+    if topology === coupling === interface_coupling === nothing && keep_constrained
         if MatrixType <: AbstractSparseMatrix # Symmetric/Block matrices not supported
-            return keep_constrained
+            # When `keep_constrained` is true, the only entries the slow path adds beyond the
+            # fast path are those from non-trivial affine constraints (`add_constraint_entries!`).
+            # A `ConstraintHandler` holding only Dirichlet constraints adds nothing, so the fast
+            # path produces an identical pattern and can be used.
+            return ch === nothing || (ch isa ConstraintHandler && !_has_nontrivial_affine_constraints(ch))
         end
     end
     return false
+end
+
+# Whether `ch` has any affine (non-Dirichlet) constraints, which add off-diagonal couplings to
+# the sparsity pattern. Mirrors the check in `_add_constraint_entries!`.
+function _has_nontrivial_affine_constraints(ch::ConstraintHandler)
+    return any(c -> !(c === nothing || isempty(c)), ch.dofcoefficients)
 end
 
 FastSparsityPattern(dh::DofHandler) = FastSparsityPattern(Int, dh)

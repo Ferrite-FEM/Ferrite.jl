@@ -344,22 +344,24 @@ end
         while Ri <= length(nzr) && ri <= maxlookups
             R = nzr[Ri]
             Krow = Krows[R]
-            Kerow = rowpermutation[ri]
-            val = Ke[Kerow, Kecol]
-            if Krow == rowdofs[Kerow]
+            # `sortedrowdofs[ri]` equals `rowdofs[rowpermutation[ri]]` by construction, but is
+            # a sequential (cache-friendly) read instead of a gather through the permutation.
+            Kerow_dof = sortedrowdofs[ri]
+            if Krow == Kerow_dof
                 # Match: add the value (if non-zero) and advance the pointers
+                val = Ke[rowpermutation[ri], Kecol]
                 if !iszero(val)
                     Kvals[R] += val
                 end
                 ri += 1
                 Ri += 1
-            elseif Krow < rowdofs[Kerow]
+            elseif Krow < Kerow_dof
                 # No match yet: advance the global matrix row pointer
                 Ri += 1
-            else # Krow > rowdofs[Kerow]
+            else # Krow > Kerow_dof
                 # No match: no entry exist in the global matrix for this row. This is
                 # allowed as long as the value which would have been inserted is zero.
-                iszero(val) || _missing_sparsity_pattern_error(Krow, Kcol)
+                iszero(Ke[rowpermutation[ri], Kecol]) || _missing_sparsity_pattern_error(Krow, Kcol)
                 # Advance the local matrix row pointer
                 ri += 1
             end
