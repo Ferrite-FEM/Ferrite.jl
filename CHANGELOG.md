@@ -11,6 +11,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
  - Make `shape_symmetric_gradient` work for `PointValues` ([#1325])
  - Make the internal function `getlowerorder` work for `VectorizedInterpolation` ([#1335])
 
+### Performance
+ - Distributing DoFs got a small performance gain by `sizehint`ing dictionaries, avoiding
+   excessive rehashing (#1342)
+
 ## [v1.4.0] - 2026-04-20
 
 ### Added
