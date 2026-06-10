@@ -94,9 +94,9 @@ cell_to_vtkcell(::Type{QuadraticTetrahedron}) = VTKCellTypes.VTK_QUADRATIC_TETRA
 cell_to_vtkcell(::Type{Wedge}) = VTKCellTypes.VTK_WEDGE
 cell_to_vtkcell(::Type{Pyramid}) = VTKCellTypes.VTK_PYRAMID
 
-nodes_to_vtkorder(cell::AbstractCell) = collect(cell.nodes)
-nodes_to_vtkorder(cell::Pyramid) = cell.nodes[[1, 2, 4, 3, 5]]
-nodes_to_vtkorder(cell::QuadraticHexahedron) = [
+nodes_to_vtkorder(cell::AbstractCell) = cell.nodes
+nodes_to_vtkorder(cell::Pyramid) = (cell.nodes[1], cell.nodes[2], cell.nodes[4], cell.nodes[3], cell.nodes[5])
+nodes_to_vtkorder(cell::QuadraticHexahedron) = (
     cell.nodes[1], # faces
     cell.nodes[2],
     cell.nodes[3],
@@ -124,13 +124,12 @@ nodes_to_vtkorder(cell::QuadraticHexahedron) = [
     cell.nodes[21],
     cell.nodes[26],
     cell.nodes[27], # interior
-]
+)
 
 function create_vtk_griddata(grid::AbstractGrid{sdim}) where {sdim}
-    cls = WriteVTK.MeshCell[]
-    for cell in getcells(grid)
+    cls = map(getcells(grid)) do cell
         celltype = cell_to_vtkcell(typeof(cell))
-        push!(cls, WriteVTK.MeshCell(celltype, nodes_to_vtkorder(cell)))
+        return WriteVTK.MeshCell(celltype, nodes_to_vtkorder(cell))
     end
     T = get_coordinate_eltype(grid)
     nodes_flat = reinterpret(T, getnodes(grid))
@@ -383,27 +382,26 @@ end
 # A discontinuous vtk grid data duplicates nodes such that each vtk node only belongs to
 # a single cell. `cellnodes[i]` give the indices of these nodes for cell `i`.
 function create_discontinuous_vtk_griddata(grid::Grid{dim, C, T}) where {dim, C, T}
-    cls = Vector{WriteVTK.MeshCell}(undef, getncells(grid))
     cellnodes = Vector{UnitRange{Int}}(undef, getncells(grid))
     ncoords = sum(nnodes, getcells(grid))
     coords = zeros(T, dim, ncoords)
     node_mapping = zeros(Int, ncoords)
     icoord = 0
     for cell in CellIterator(grid)
-        CT = getcelltype(grid, cellid(cell))
-        vtk_celltype = cell_to_vtkcell(CT)
         cell_coords = getcoordinates(cell)
         n = length(cell_coords)
         cellnodes[cellid(cell)] = (1:n) .+ icoord
-        let icoord = icoord
-            vtk_cellnodes = nodes_to_vtkorder(CT((ntuple(i -> i + icoord, n))))
-            cls[cellid(cell)] = WriteVTK.MeshCell(vtk_celltype, vtk_cellnodes)
-        end
         for (x, node_idx) in zip(cell_coords, getnodes(cell))
             icoord += 1
             coords[:, icoord] = x
             node_mapping[icoord] = node_idx
         end
+    end
+    cls = map(getcells(grid), cellnodes) do cell, node_range
+        CT = typeof(cell)
+        vtk_celltype = cell_to_vtkcell(CT)
+        vtk_cellnodes = nodes_to_vtkorder(CT(ntuple(i -> i + first(node_range) - 1, length(node_range))))
+        return WriteVTK.MeshCell(vtk_celltype, vtk_cellnodes)
     end
     return coords, cls, cellnodes, node_mapping
 end
