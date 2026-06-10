@@ -136,6 +136,7 @@ function InterpolationInfo(interpolation::Interpolation{shape}, n_copies) where 
     return info
 end
 InterpolationInfo(interpolation::Interpolation) = InterpolationInfo(interpolation, 1)
+_ndofs_per_cell(ii::InterpolationInfo) = (sum(sum, (ii.nvertexdofs, ii.nedgedofs, ii.nfacedofs)) + ii.nvolumedofs) * ii.n_copies
 
 nvertices(::Interpolation{RefShape}) where {RefShape} = nvertices(RefShape)
 nedges(::Interpolation{RefShape}) where {RefShape} = nedges(RefShape)
