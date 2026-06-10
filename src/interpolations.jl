@@ -110,6 +110,16 @@ interpolations, generally).
 adjust_dofs_during_distribution(::Interpolation)
 
 """
+    interior_facedofs_on_lattice(::Interpolation)
+
+Return `true` if the interior face dofs are placed on a regular lattice, enumerated in the
+order assumed by [`permute_and_push!`](@ref). This is required to distribute an
+interpolation with more than one dof on a face shared between 3D cells, and interpolations
+must opt in (the default is `false`).
+"""
+interior_facedofs_on_lattice(::Interpolation) = false
+
+"""
     InterpolationInfo
 
 Gathers all the information needed to distribute dofs for a given interpolation. Note that
@@ -123,6 +133,7 @@ struct InterpolationInfo
     nvolumedofs::Int
     reference_dim::Int
     adjust_during_distribution::Bool
+    interior_facedofs_on_lattice::Bool
     n_copies::Int
 end
 function InterpolationInfo(interpolation::Interpolation{shape}, n_copies) where {rdim, shape <: AbstractRefShape{rdim}}
@@ -133,6 +144,7 @@ function InterpolationInfo(interpolation::Interpolation{shape}, n_copies) where 
         length(volumedof_interior_indices(interpolation)),
         rdim,
         adjust_dofs_during_distribution(interpolation),
+        interior_facedofs_on_lattice(interpolation),
         n_copies
     )
     return info
@@ -559,6 +571,8 @@ conformity(::Lagrange) = H1Conformity()
 adjust_dofs_during_distribution(::Lagrange) = true
 adjust_dofs_during_distribution(::Lagrange{<:Any, 2}) = false
 adjust_dofs_during_distribution(::Lagrange{<:Any, 1}) = false
+
+interior_facedofs_on_lattice(::Lagrange) = true
 
 # Vertices for all Lagrange interpolations are the same
 vertexdof_indices(::Lagrange{RefLine}) = ((1,), (2,))
@@ -1662,6 +1676,7 @@ end
 conformity(ip::VectorizedInterpolation) = conformity(ip.ip)
 
 adjust_dofs_during_distribution(ip::VectorizedInterpolation) = adjust_dofs_during_distribution(ip.ip)
+interior_facedofs_on_lattice(ip::VectorizedInterpolation) = interior_facedofs_on_lattice(ip.ip)
 getlowerorder(ip::VectorizedInterpolation{vdim}) where {vdim} = VectorizedInterpolation{vdim}(getlowerorder(ip.ip))
 
 # Vectorize to reference dimension by default

@@ -850,6 +850,24 @@ end
     end
 end
 
+@testset "interior_facedofs_on_lattice opt-in" begin
+    # Permuting multiple dofs on a shared 3D face requires opting in to the lattice
+    # assumption; interpolations that have not opted in must error rather than silently
+    # produce a wrong (non-lattice) permutation.
+    @test Ferrite.interior_facedofs_on_lattice(Lagrange{RefTetrahedron, 4}())
+    @test Ferrite.interior_facedofs_on_lattice(Lagrange{RefTetrahedron, 4}()^3)
+    @test !Ferrite.interior_facedofs_on_lattice(Nedelec{RefTetrahedron, 1}()) # default
+
+    orientation = Ferrite.OrientationInfo((2, 3, 1)) # a rotated triangular face
+    dofs = 1:1:3 # three interior face dofs, n_copies = 1
+    # rdim = 3, adjust = true, multiple dofs, not on lattice => error
+    @test_throws ErrorException Ferrite.permute_and_push!(Int[], dofs, orientation, true, false, 3, 3)
+    # On a lattice it permutes the three dofs without error
+    cell_dofs = Int[]
+    Ferrite.permute_and_push!(cell_dofs, dofs, orientation, true, true, 3, 3)
+    @test length(cell_dofs) == 3
+end
+
 @testset "dof distribution on shared faces" begin
     # Two cells sharing an entity must associate the same global dof with the same location
     # on the entity, regardless of the relative orientation of the cells. For

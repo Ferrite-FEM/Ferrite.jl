@@ -519,7 +519,7 @@ function _distribute_dofs_for_cell!(dh::DofHandler{sdim}, cell::AbstractCell, ip
     nextdof = add_face_dofs(
         dh.cell_dofs, cell, facedict,
         ip_info.nfacedofs, nextdof,
-        ip_info.adjust_during_distribution, ip_info.n_copies,
+        ip_info.adjust_during_distribution, ip_info.interior_facedofs_on_lattice, ip_info.n_copies,
     )
 
     # Distribute internal dofs for cells
@@ -576,13 +576,13 @@ for the object (vertex, face) then simply return those, otherwise create new dof
     return nextdof, dofs
 end
 
-function add_face_dofs(cell_dofs::Vector{Int}, cell::AbstractCell, facedict::Dict, nfacedofs::Vector{Int}, nextdof::Int, adjust_during_distribution::Bool, n_copies::Int)
+function add_face_dofs(cell_dofs::Vector{Int}, cell::AbstractCell, facedict::Dict, nfacedofs::Vector{Int}, nextdof::Int, adjust_during_distribution::Bool, interior_facedofs_on_lattice::Bool, n_copies::Int)
     for (fi, face) in pairs(faces(cell))
         nfacedofs[fi] > 0 || continue # skip if no dof on this vertex
         sface, orientation = sortface(face)
         @debug println("\t\tface #$sface, $orientation")
         nextdof, dofs = get_or_create_dofs!(nextdof, nfacedofs[fi], n_copies, facedict, sface)
-        permute_and_push!(cell_dofs, dofs, orientation, adjust_during_distribution, length(face), getrefdim(cell))
+        permute_and_push!(cell_dofs, dofs, orientation, adjust_during_distribution, interior_facedofs_on_lattice, length(face), getrefdim(cell))
         @debug println("\t\t\tadjusted dofs: $(cell_dofs[(end - nfacedofs[fi] * n_copies + 1):end])")
     end
     return nextdof
@@ -711,7 +711,7 @@ so the unique representation is always a tuple length 3.
 function sortface_fast end
 
 """
-    permute_and_push!(cell_dofs::Vector{Int}, dofs::StepRange{Int, Int}, orientation::OrientationInfo, adjust_during_distribution::Bool, nfacenodes::Int, rdim::Int)
+    permute_and_push!(cell_dofs::Vector{Int}, dofs::StepRange{Int, Int}, orientation::OrientationInfo, adjust_during_distribution::Bool, interior_facedofs_on_lattice::Bool, nfacenodes::Int, rdim::Int)
 
 Push the dofs belonging to a face onto `cell_dofs`, in the order corresponding to the local
 orientation of the face.
@@ -728,7 +728,9 @@ interior of the cell itself, so the dofs are pushed in the stored order (such do
 also not necessarily placed on a lattice, e.g. for `RaviartThomas{RefTriangle, 2}`).
 
 The permutation assumes that the interior dofs are placed on a regular lattice, in the
-enumeration order specified by [`facedof_interior_indices`](@ref). For a triangular face
+enumeration order specified by [`facedof_interior_indices`](@ref). An interpolation must opt
+in to this assumption via [`interior_facedofs_on_lattice`](@ref); otherwise distributing more
+than one dof on a shared 3D face errors. For a triangular face
 with vertices ``(v_1, v_2, v_3)`` the interior dofs make up a smaller triangular lattice,
 which is traversed row by row, where rows are lines of constant barycentric ``v_2``-weight,
 starting with the row closest to the edge ``(v_3, v_1)``, and each row is traversed with
@@ -746,13 +748,14 @@ methodology described therein.
 # References
  - [Scroggs2022](@cite) Scroggs et al. ACM Trans. Math. Softw. 48 (2022).
 """
-@inline function permute_and_push!(cell_dofs::Vector{Int}, dofs::StepRange{Int, Int}, orientation::OrientationInfo, adjust_during_distribution::Bool, nfacenodes::Int, rdim::Int)
+@inline function permute_and_push!(cell_dofs::Vector{Int}, dofs::StepRange{Int, Int}, orientation::OrientationInfo, adjust_during_distribution::Bool, interior_facedofs_on_lattice::Bool, nfacenodes::Int, rdim::Int)
     # TODO Investigate if we can somehow pass the interpolation into this function in a
-    # typestable way.
+    # typestable way (instead of relying on the interior_facedofs_on_lattice trait).
     n_copies = step(dofs)
     @assert n_copies > 0
     ndofs = length(dofs)
     if rdim == 3 && adjust_during_distribution && ndofs > 1
+        interior_facedofs_on_lattice || error("Dof distribution for an interpolation with multiple dofs on a face shared between 3D cells requires the interior face dofs to be placed on a regular lattice; this interpolation has not opted in, see `Ferrite.interior_facedofs_on_lattice` and `Ferrite.permute_and_push!`.")
         if nfacenodes == 3 # triangular face
             q = _triangle_lattice_order(ndofs)
             for t2 in 0:q, t1 in 0:(q - t2)

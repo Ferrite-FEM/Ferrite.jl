@@ -30,6 +30,14 @@ Ferrite.dirichlet_facedof_indices(::Interpolation)
 Ferrite.dirichlet_edgedof_indices(::Interpolation)
 ```
 
+#### Multiple dofs per face in 3D
+For interpolations with more than one interior dof on a face shared between 3D cells, the
+interior face dofs must be placed on a regular lattice and the following must be implemented
+to opt in to the dof distribution permutation (see [`Ferrite.permute_and_push!`](@ref)).
+```@docs
+Ferrite.interior_facedofs_on_lattice(::Interpolation)
+```
+
 #### Non-identity mapping
 For interpolations that have a non-identity mapping (see
 [Mapping of finite elements](@ref mapping_theory)), the
