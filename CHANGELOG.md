@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Next] - xxxx-xx-xx
 
+### Added
+ - New interpolations `Lagrange{RefTetrahedron, 3}` and `Lagrange{RefTetrahedron, 4}`.
+   ([#1341])
+ - Dof distribution now supports interpolations with multiple dofs on faces shared between
+   cells (e.g. `Lagrange{RefTetrahedron, 4}`) by taking the relative orientation
+   (rotation and flip) of the face into account. Previously this errored. ([#1341])
+
 ### Fixes
  - Make default `edgedof_indices` and `facedof_indices` implementation work for externally defined interpolations ([#1365])
 
