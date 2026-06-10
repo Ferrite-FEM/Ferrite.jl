@@ -157,6 +157,8 @@ end
             Serendipity{RefHexahedron, 2}(),
             Lagrange{RefTetrahedron, 1}(),
             Lagrange{RefTetrahedron, 2}(),
+            Lagrange{RefTetrahedron, 3}(),
+            Lagrange{RefTetrahedron, 4}(),
             Lagrange{RefPrism, 1}(),
             Lagrange{RefPrism, 2}(),
             Lagrange{RefPyramid, 1}(),
@@ -299,6 +301,55 @@ end
                 @test isa(Ferrite.getlowerorder(v_interpolation_1), Interpolation{ref_shape, func_order - 1})
                 @test isa(Ferrite.getlowerorder(v_interpolation_2), Interpolation{ref_shape, func_order - 1})
                 @test isa(Ferrite.getlowerorder(v_interpolation_3), Interpolation{ref_shape, func_order - 1})
+            end
+        end
+    end
+
+    @testset "facedof interior lattice ordering" begin
+        # The dof distribution (see Ferrite.permute_and_push!) assumes that the interior
+        # face dofs of interpolations with adjust_dofs_during_distribution == true are
+        # ordered according to a regular lattice enumeration: row by row with rows of
+        # increasing barycentric v2-weight (triangles) or v1 → v4 coordinate
+        # (quadrilaterals), and within rows increasing barycentric v1-weight (triangles) or
+        # v1 → v2 coordinate (quadrilaterals). Check that the reference coordinates of the
+        # interior face dofs follow this enumeration.
+        for ip in (
+                Lagrange{RefTriangle, 4}(), Lagrange{RefTriangle, 5}(),
+                Lagrange{RefQuadrilateral, 3}(),
+                Lagrange{RefTetrahedron, 3}(), Lagrange{RefTetrahedron, 4}(),
+                Lagrange{RefHexahedron, 2}(),
+                Lagrange{RefPrism, 2}(), Lagrange{RefPyramid, 2}(),
+            )
+            refshape = Ferrite.getrefshape(ip)
+            order = Ferrite.getorder(ip)
+            vx = Ferrite.reference_coordinates(Lagrange{refshape, 1}())
+            coords = Ferrite.reference_coordinates(ip)
+            for (face, fdofs) in zip(Ferrite.reference_faces(refshape), Ferrite.facedof_interior_indices(ip))
+                isempty(fdofs) && continue
+                k = 0
+                if length(face) == 3
+                    # Lattice point (t1, t2) has barycentric weights (t1, t2, t3) .+ 1 with
+                    # respect to the face vertices
+                    q = Ferrite._triangle_lattice_order(length(fdofs))
+                    for t2 in 0:q, t1 in 0:(q - t2)
+                        t3 = q - t1 - t2
+                        x = ((t1 + 1) * vx[face[1]] + (t2 + 1) * vx[face[2]] + (t3 + 1) * vx[face[3]]) / order
+                        k += 1
+                        @test coords[fdofs[k]] ≈ x
+                    end
+                else # length(face) == 4
+                    # Lattice point (i, j) is located at the bilinear face coordinates
+                    # ((i + 1) / order, (j + 1) / order)
+                    m = isqrt(length(fdofs))
+                    @assert m * m == length(fdofs)
+                    for j in 0:(m - 1), i in 0:(m - 1)
+                        u, v = (i + 1) / order, (j + 1) / order
+                        x = (1 - u) * (1 - v) * vx[face[1]] + u * (1 - v) * vx[face[2]] +
+                            u * v * vx[face[3]] + (1 - u) * v * vx[face[4]]
+                        k += 1
+                        @test coords[fdofs[k]] ≈ x
+                    end
+                end
             end
         end
     end

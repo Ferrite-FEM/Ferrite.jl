@@ -700,38 +700,8 @@ struct PathOrientationInfo
     regular::Bool # Indicator whether the orientation is regular or inverted.
 end
 
-"""
-    SurfaceOrientationInfo
-
-Orientation information for 2D entities. Such an entity can be
-possibly flipped (i.e. the defining vertex order is reverse to the
-spanning vertex order) and the vertices can be rotated against each other.
-Take for example the faces
-```
-1---2 2---3
-| A | | B |
-4---3 1---4
-```
-which are rotated against each other by 90° (shift index is 1) or the faces
-```
-1---2 2---1
-| A | | B |
-4---3 3---4
-```
-which are flipped against each other. Any combination of these can happen.
-The combination to map this local face to the defining face is encoded with
-this data structure via ``rotate \\circ flip`` where the rotation is indiced by
-the shift index.
-    !!!NOTE TODO implement me.
-"""
-struct SurfaceOrientationInfo
-    #flipped::Bool
-    #shift_index::Int
-end
-
-
 @doc raw"""
-    InterfaceOrientationInfo
+    OrientationInfo
 
 Orientation information for 1D and 2D entities.
 The orientation is defined by the indices of the grid nodes

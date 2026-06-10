@@ -129,6 +129,9 @@
 
     test_ips = [
         Lagrange{RefTriangle, 2}(), Lagrange{RefQuadrilateral, 2}(), Lagrange{RefHexahedron, 2}()^3, # Test should also work for identity mapping
+        # Lagrange{RefTetrahedron, 3} has multiple dofs per edge and Lagrange{RefTetrahedron, 4}
+        # additionally has multiple dofs per face, testing the dof distribution permutations
+        Lagrange{RefTetrahedron, 3}(), Lagrange{RefTetrahedron, 4}(), Lagrange{RefTetrahedron, 4}()^3,
         Nedelec{RefTriangle, 1}(), Nedelec{RefTriangle, 2}(), Nedelec{RefQuadrilateral, 1}(), Nedelec{RefTetrahedron, 1}(), Nedelec{RefHexahedron, 1}(),
         RaviartThomas{RefTriangle, 1}(), RaviartThomas{RefTriangle, 2}(), RaviartThomas{RefQuadrilateral, 1}(), RaviartThomas{RefTetrahedron, 1}(), RaviartThomas{RefHexahedron, 1}(),
         BrezziDouglasMarini{RefTriangle, 1}(),
