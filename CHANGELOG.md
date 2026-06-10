@@ -14,6 +14,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Performance
  - Distributing DoFs got a small performance gain by `sizehint`ing dictionaries, avoiding
    excessive rehashing (#1342)
+ - Small performance improvement to `SparseMatrixCSR` and `SparseMatrixCSR` assembly by avoiding
+   some reductions operations. (#1341)
 
 ## [v1.4.0] - 2026-04-20
 
