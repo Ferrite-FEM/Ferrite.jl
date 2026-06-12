@@ -691,7 +691,7 @@ end
 Returns the unique representation of a face and its orientation.
 Here the unique representation is the sorted node index tuple. Note that in 3D we only need
 indices to uniquely identify a face, so the unique representation is always a tuple of
-length 3. The orientation is an [`OrientationInfo`](@ref) relating the face as spanned by
+length 3. The orientation is a [`SurfaceOrientationInfo`](@ref) relating the face as spanned by
 the local node tuple to the canonical face spanned by the sorted tuple, see
 [`permute_and_push!`](@ref).
 """
@@ -711,7 +711,7 @@ so the unique representation is always a tuple length 3.
 function sortface_fast end
 
 """
-    permute_and_push!(cell_dofs::Vector{Int}, dofs::StepRange{Int, Int}, orientation::OrientationInfo, adjust_during_distribution::Bool, interior_facedofs_on_lattice::Bool, nfacenodes::Int, rdim::Int)
+    permute_and_push!(cell_dofs::Vector{Int}, dofs::StepRange{Int, Int}, orientation::SurfaceOrientationInfo, adjust_during_distribution::Bool, interior_facedofs_on_lattice::Bool, nfacenodes::Int, rdim::Int)
 
 Push the dofs belonging to a face onto `cell_dofs`, in the order corresponding to the local
 orientation of the face.
@@ -720,7 +720,7 @@ For interpolations with multiple interior dofs per face the dofs must be permute
 all cells sharing the face associate the same dof with the same location on the face. The
 dofs are stored according to the canonical orientation of the face (the face as spanned by
 its sorted vertex tuple, see [`sortface`](@ref)) and this function maps them to the local
-orientation, given by `orientation` (see [`OrientationInfo`](@ref)).
+orientation, given by `orientation` (see [`SurfaceOrientationInfo`](@ref)).
 
 This adjustment is only necessary for faces that can be shared between cells, i.e. for
 cells with reference dimension 3. For cells with reference dimension 2 the face is the
@@ -748,7 +748,7 @@ methodology described therein.
 # References
  - [Scroggs2022](@cite) Scroggs et al. ACM Trans. Math. Softw. 48 (2022).
 """
-@inline function permute_and_push!(cell_dofs::Vector{Int}, dofs::StepRange{Int, Int}, orientation::OrientationInfo, adjust_during_distribution::Bool, interior_facedofs_on_lattice::Bool, nfacenodes::Int, rdim::Int)
+@inline function permute_and_push!(cell_dofs::Vector{Int}, dofs::StepRange{Int, Int}, orientation::SurfaceOrientationInfo, adjust_during_distribution::Bool, interior_facedofs_on_lattice::Bool, nfacenodes::Int, rdim::Int)
     # TODO Investigate if we can somehow pass the interpolation into this function in a
     # typestable way (instead of relying on the interior_facedofs_on_lattice trait).
     n_copies = step(dofs)
@@ -807,7 +807,7 @@ end
 # a flipped face the two non-minimum vertices are additionally swapped. The barycentric
 # weights with respect to the canonical face follow as c_σ(u) = t_u, and the linear index
 # from the lattice enumeration order (see permute_and_push!).
-function _canonical_facedof_index_triangle(t1::Int, t2::Int, q::Int, orientation::OrientationInfo)
+function _canonical_facedof_index_triangle(t1::Int, t2::Int, q::Int, orientation::SurfaceOrientationInfo)
     s = orientation.shift_index
     t = (t1, t2, q - t1 - t2)
     c1 = t[mod(s, 3) + 1]
@@ -821,7 +821,7 @@ end
 # lattice by the dihedral transformation that takes the local vertex at position u to
 # canonical position σ(u): a rotation by -shift_index quarter turns, followed by a diagonal
 # reflection (swapping positions 2 and 4) if the face is flipped.
-function _canonical_facedof_index_quadrilateral(i::Int, j::Int, m::Int, orientation::OrientationInfo)
+function _canonical_facedof_index_quadrilateral(i::Int, j::Int, m::Int, orientation::SurfaceOrientationInfo)
     M = m - 1
     r = mod(-orientation.shift_index, 4)
     ci, cj = if r == 0
@@ -840,7 +840,7 @@ function _canonical_facedof_index_quadrilateral(i::Int, j::Int, m::Int, orientat
 end
 
 function sortface(face::Tuple{Int, Int, Int})
-    return sortface_fast(face), OrientationInfo(face)
+    return sortface_fast(face), SurfaceOrientationInfo(face)
 end
 
 
@@ -854,7 +854,7 @@ end
 
 
 function sortface(face::Tuple{Int, Int, Int, Int})
-    return sortface_fast(face), OrientationInfo(face)
+    return sortface_fast(face), SurfaceOrientationInfo(face)
 end
 
 

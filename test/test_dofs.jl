@@ -810,7 +810,7 @@ end
     tri_point(t, fc) = (t[1] + 1) * tri_positions[fc[1]] + (t[2] + 1) * tri_positions[fc[2]] + (t[3] + 1) * tri_positions[fc[3]]
     tri_faces = ((1, 2, 3), (2, 3, 1), (3, 1, 2), (1, 3, 2), (3, 2, 1), (2, 1, 3))
     for q in 0:3, local_face in tri_faces
-        orientation = Ferrite.OrientationInfo(local_face)
+        orientation = Ferrite.SurfaceOrientationInfo(local_face)
         # Canonical enumeration of the lattice points for the sorted face (1, 2, 3)
         canonical_points = [tri_point((t1, t2, q - t1 - t2), (1, 2, 3)) for t2 in 0:q for t1 in 0:(q - t2)]
         cidxs = Int[]
@@ -837,7 +837,7 @@ end
         (1, 4, 3, 2), (4, 3, 2, 1), (3, 2, 1, 4), (2, 1, 4, 3), # reversed rotations
     )
     for m in 1:3, local_face in quad_faces
-        orientation = Ferrite.OrientationInfo(local_face)
+        orientation = Ferrite.SurfaceOrientationInfo(local_face)
         canonical_points = [quad_point(i, j, m, (1, 2, 3, 4)) for j in 0:(m - 1) for i in 0:(m - 1)]
         cidxs = Int[]
         for j in 0:(m - 1), i in 0:(m - 1)
@@ -858,7 +858,7 @@ end
     @test Ferrite.interior_facedofs_on_lattice(Lagrange{RefTetrahedron, 4}()^3)
     @test !Ferrite.interior_facedofs_on_lattice(Nedelec{RefTetrahedron, 1}()) # default
 
-    orientation = Ferrite.OrientationInfo((2, 3, 1)) # a rotated triangular face
+    orientation = Ferrite.SurfaceOrientationInfo((2, 3, 1)) # a rotated triangular face
     dofs = 1:1:3 # three interior face dofs, n_copies = 1
     # rdim = 3, adjust = true, multiple dofs, not on lattice => error
     @test_throws ErrorException Ferrite.permute_and_push!(Int[], dofs, orientation, true, false, 3, 3)
