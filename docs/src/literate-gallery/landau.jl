@@ -9,11 +9,19 @@
 # Optimized
 
 # In this example a basic Ginzburg-Landau model is solved.
-# This example gives an idea of how the API together with ForwardDiff can be leveraged to
-# performantly solve non standard problems on a FEM grid.
+# This example gives an idea of how the API together with automatic differentiation can be
+# leveraged to performantly solve non standard problems on a FEM grid.
 # A large portion of the code is there only for performance reasons,
 # but since this usually really matters and is what takes the most time to optimize,
 # it is included.
+#
+# The automatic differentiation is done through [DifferentiationInterface.jl](https://github.com/JuliaDiff/DifferentiationInterface.jl)
+# (DI), which provides a uniform API to many automatic differentiation backends. This lets
+# us swap out the backend used for the element gradient and Hessian without touching the
+# assembly code. Here we use it to compare two forward-mode backends for the element Hessian:
+# [ForwardDiff.jl](https://github.com/JuliaDiff/ForwardDiff.jl) and
+# [HyperHessians.jl](https://github.com/KristofferC/HyperHessians.jl), the latter being a
+# package specialized for computing Hessians efficiently using hyper-dual numbers.
 
 # The key to using a method like this for minimizing a free energy function directly,
 # rather than the weak form, as is usually done with FEM, is to split up the
@@ -21,7 +29,11 @@
 # This means that they are performed for each cell separately instead of for the
 # grid as a whole.
 
-using ForwardDiff: ForwardDiff, GradientConfig, HessianConfig, Chunk
+using DifferentiationInterface
+import DifferentiationInterface as DI
+using DifferentiationInterface: AutoForwardDiff, AutoHyperHessians, prepare_gradient, prepare_hessian
+using ForwardDiff: ForwardDiff
+using HyperHessians: HyperHessians # loads the `AutoHyperHessians` backend extension for DI
 using Ferrite
 using Optim, LineSearches
 using SparseArrays
@@ -49,7 +61,11 @@ end
 
 # ### TaskCache
 # This holds the values that each task will use during the assembly.
-struct TaskCache{CV, T, DIM, F <: Function, GC <: GradientConfig, HC <: HessianConfig}
+# The DI "preparation" objects (`grad_prep`/`hess_prep`) cache the backend specific work
+# (dual number buffers, configs, ...) and are reused for every cell handled by the task.
+# Since they contain mutable scratch storage there is one cache, and thus one set of prep
+# objects, per task so the assembly stays allocation free and thread safe.
+struct TaskCache{CV, T, DIM, F <: Function, GB, HB, GP, HP}
     cvP::CV
     element_indices::Vector{Int}
     element_dofs::Vector{T}
@@ -57,19 +73,22 @@ struct TaskCache{CV, T, DIM, F <: Function, GC <: GradientConfig, HC <: HessianC
     element_hessian::Matrix{T}
     element_coords::Vector{Vec{DIM, T}}
     element_potential::F
-    gradconf::GC
-    hessconf::HC
+    grad_backend::GB
+    hess_backend::HB
+    grad_prep::GP
+    hess_prep::HP
 end
-function TaskCache(dpc::Int, nodespercell, cvP::CellValues, modelparams, elpotential)
+function TaskCache(dpc::Int, nodespercell, cvP::CellValues, modelparams, elpotential, grad_backend, hess_backend)
     element_indices = zeros(Int, dpc)
     element_dofs = zeros(dpc)
     element_gradient = zeros(dpc)
     element_hessian = zeros(dpc, dpc)
     element_coords = zeros(Vec{3, Float64}, nodespercell)
     potfunc = x -> elpotential(x, cvP, modelparams)
-    gradconf = GradientConfig(potfunc, zeros(dpc), Chunk{12}())
-    hessconf = HessianConfig(potfunc, zeros(dpc), Chunk{4}())
-    return TaskCache(cvP, element_indices, element_dofs, element_gradient, element_hessian, element_coords, potfunc, gradconf, hessconf)
+    x0 = zeros(dpc)
+    grad_prep = prepare_gradient(potfunc, grad_backend, x0)
+    hess_prep = prepare_hessian(potfunc, hess_backend, x0)
+    return TaskCache(cvP, element_indices, element_dofs, element_gradient, element_hessian, element_coords, potfunc, grad_backend, hess_backend, grad_prep, hess_prep)
 end
 
 # ## The Model
@@ -83,7 +102,14 @@ mutable struct LandauModel{T, DH <: DofHandler, CH <: ConstraintHandler, TC <: T
     caches::Vector{TC}
 end
 
-function LandauModel(α, G, gridsize, left::Vec{DIM, T}, right::Vec{DIM, T}, elpotential, ntasks) where {DIM, T}
+# The element gradient is always computed with ForwardDiff (HyperHessians is a Hessian-only
+# package), while the backend used for the element Hessian is configurable through the
+# `hess_backend` keyword so we can compare `AutoForwardDiff` and `AutoHyperHessians`.
+function LandauModel(
+        α, G, gridsize, left::Vec{DIM, T}, right::Vec{DIM, T}, elpotential, ntasks;
+        grad_backend = AutoForwardDiff(; chunksize = 12),
+        hess_backend = AutoForwardDiff(; chunksize = 4),
+    ) where {DIM, T}
     grid = generate_grid(Tetrahedron, gridsize, left, right)
     colors = create_coloring(grid)
 
@@ -108,7 +134,7 @@ function LandauModel(α, G, gridsize, left::Vec{DIM, T}, right::Vec{DIM, T}, elp
 
     dpc = ndofs_per_cell(dofhandler)
     cpc = length(grid.cells[1].nodes)
-    caches = [TaskCache(dpc, cpc, copy(cvP), ModelParams(α, G), elpotential) for _ in 1:ntasks]
+    caches = [TaskCache(dpc, cpc, copy(cvP), ModelParams(α, G), elpotential, grad_backend, hess_backend) for _ in 1:ntasks]
     return LandauModel(dofvector, dofhandler, boundaryconds, colors, caches)
 end
 
@@ -166,7 +192,7 @@ function ∇F!(∇f::Vector{T}, dofvector::Vector{T}, model::LandauModel{T}) whe
             cache = model.caches[ichunk]
             for i in range
                 eldofs = setup_cell!(cache, model.dofhandler, dofvector, i)
-                ForwardDiff.gradient!(cache.element_gradient, cache.element_potential, eldofs, cache.gradconf)
+                DI.gradient!(cache.element_potential, cache.element_gradient, cache.grad_prep, cache.grad_backend, eldofs)
                 @inbounds assemble!(∇f, cache.element_indices, cache.element_gradient)
             end
         end
@@ -184,7 +210,7 @@ function ∇²F!(∇²f::SparseMatrixCSC, dofvector::Vector{T}, model::LandauMod
             cache = model.caches[ichunk]
             for i in range
                 eldofs = setup_cell!(cache, dh, dofvector, i)
-                ForwardDiff.hessian!(cache.element_hessian, cache.element_potential, eldofs, cache.hessconf)
+                DI.hessian!(cache.element_potential, cache.element_hessian, cache.hess_prep, cache.hess_backend, eldofs)
                 @inbounds assemble!(assemblers[ichunk], cache.element_indices, cache.element_hessian)
             end
         end
@@ -259,7 +285,7 @@ G = V2T(1.0e2, 0.0, 1.0e2)
 α = Vec{3}((-1.0, 1.0, 1.0))
 left = Vec{3}((-75.0, -25.0, -2.0))
 right = Vec{3}((75.0, 25.0, 2.0))
-model = LandauModel(α, G, (50, 50, 2), left, right, element_potential, Threads.nthreads())
+model = LandauModel(α, G, (50, 50, 2), left, right, element_potential, Threads.nthreads(); hess_backend = AutoHyperHessians(; chunksize = 4));
 
 save_landau("landauorig", model)
 @time res = minimize!(model)
@@ -269,6 +295,29 @@ save_landau("landaufinal", model)
 using Test # src
 @test Optim.minimum(res) ≈ -10858.806775 # src
 
-# as we can see this runs very quickly even for relatively large gridsizes.
+# As we can see this runs quickly even for relatively large gridsizes.
 # The key to get high performance like this is to minimize the allocations inside the threaded loops,
 # ideally to 0.
+
+# ## Comparing AD backends for the Hessian
+# Since the Hessian backend is just a keyword argument, we can build two otherwise identical
+# models and compare how `AutoForwardDiff` and `AutoHyperHessians` perform on the global
+# Hessian assembly. We assemble into a freshly allocated sparse matrix for each backend at
+# the converged solution and time the assembly (running it once first to exclude
+# compilation).
+function time_hessian_assembly(model)
+    ∇²f = allocate_matrix(model.dofhandler)
+    ∇²F!(∇²f, model.dofs, model) # warmup / compilation
+    @time ∇²F!(∇²f, model.dofs, model)
+    return ∇²f
+end
+
+model_fd = LandauModel(α, G, (50, 50, 2), left, right, element_potential, Threads.nthreads(); hess_backend = AutoForwardDiff(; chunksize = 4));
+model_hh = LandauModel(α, G, (50, 50, 2), left, right, element_potential, Threads.nthreads(); hess_backend = AutoHyperHessians(; chunksize = 4));
+model_fd.dofs .= model.dofs
+model_hh.dofs .= model.dofs
+
+println("ForwardDiff Hessian assembly:")
+H_fd = time_hessian_assembly(model_fd)
+println("HyperHessians Hessian assembly:")
+H_hh = time_hessian_assembly(model_hh)

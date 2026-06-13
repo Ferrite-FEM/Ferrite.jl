@@ -2,7 +2,7 @@
 
 julia_version = "1.12.6"
 manifest_format = "2.0"
-project_hash = "10e12ac998bcb2937af6b7915ba08b98af9976b3"
+project_hash = "94db70a0f465926a26cc0e5c9ac3a30e4536ef88"
 
 [[deps.ADTypes]]
 git-tree-sha1 = "bbc22a9a08a0ef6460041086d8a7b27940ed4ffd"
@@ -890,6 +890,20 @@ git-tree-sha1 = "baaaebd42ed9ee1bd9173cfd56910e55a8622ee1"
 uuid = "e33a78d0-f292-5ffc-b300-72abe9b543c8"
 version = "2.13.0+1"
 
+[[deps.HyperHessians]]
+deps = ["CommonSubexpressions"]
+git-tree-sha1 = "8b2f923baf6a16d80ffca63b26fd451f165492b5"
+uuid = "06b494a0-c8e0-40cc-ad32-d99506a00a6c"
+version = "0.2.3"
+weakdeps = ["DiffResults", "LogExpFunctions", "NaNMath", "SpecialFunctions", "StaticArrays"]
+
+    [deps.HyperHessians.extensions]
+    HyperHessiansDiffResultsExt = "DiffResults"
+    HyperHessiansLogExpFunctionsExt = "LogExpFunctions"
+    HyperHessiansNaNMathExt = ["NaNMath", "SpecialFunctions"]
+    HyperHessiansSpecialFunctionsExt = "SpecialFunctions"
+    HyperHessiansStaticArraysExt = "StaticArrays"
+
 [[deps.IOCapture]]
 deps = ["Logging", "Random"]
 git-tree-sha1 = "0ee181ec08df7d7c911901ea38baf16f755114dc"
@@ -1226,9 +1240,9 @@ version = "1.5.0"
 
 [[deps.LogExpFunctions]]
 deps = ["DocStringExtensions", "IrrationalConstants", "LinearAlgebra"]
-git-tree-sha1 = "bba2d9aa057d8f126415de240573e86a8f39d2a1"
+git-tree-sha1 = "13ca9e2586b89836fd20cccf56e57e2b9ae7f38f"
 uuid = "2ab3a3ac-af41-5b50-aa03-7779005ae688"
-version = "1.0.1"
+version = "0.3.29"
 
     [deps.LogExpFunctions.extensions]
     LogExpFunctionsChainRulesCoreExt = "ChainRulesCore"
