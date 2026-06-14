@@ -105,13 +105,13 @@ function assemble_element_mass!(Me::Matrix, cellvalues::CellValues)
         dΩ = getdetJdV(cellvalues, q_point)
         ## Loop over test shape functions
         for i in 1:n_basefuncs
-            δuᵢ = shape_value(cellvalues, q_point, i)
+            δNᵢ = shape_value(cellvalues, q_point, i)
             ## Loop over trial shape functions
             for j in 1:n_basefuncs
-                δuⱼ = shape_value(cellvalues, q_point, j)
+                Nⱼ = shape_value(cellvalues, q_point, j)
                 ## Add contribution to Ke
-                Me₁[i, j] += (δuᵢ * δuⱼ) * dΩ
-                Me₂[i, j] += (δuᵢ * δuⱼ) * dΩ
+                Me₁[i, j] += (δNᵢ * Nⱼ) * dΩ
+                Me₂[i, j] += (δNᵢ * Nⱼ) * dΩ
             end
         end
     end
@@ -136,13 +136,13 @@ function assemble_element_diffusion!(De::Matrix, cellvalues::CellValues, materia
         dΩ = getdetJdV(cellvalues, q_point)
         ## Loop over test shape functions
         for i in 1:n_basefuncs
-            ∇δuᵢ = shape_gradient(cellvalues, q_point, i)
+            ∇δNᵢ = shape_gradient(cellvalues, q_point, i)
             ## Loop over trial shape functions
             for j in 1:n_basefuncs
-                ∇δuⱼ = shape_gradient(cellvalues, q_point, j)
+                ∇Nⱼ = shape_gradient(cellvalues, q_point, j)
                 ## Add contribution to Ke
-                De₁[i, j] += D₁ * (∇δuᵢ ⋅ ∇δuⱼ) * dΩ
-                De₂[i, j] += D₂ * (∇δuᵢ ⋅ ∇δuⱼ) * dΩ
+                De₁[i, j] += D₁ * (∇δNᵢ ⋅ ∇Nⱼ) * dΩ
+                De₂[i, j] += D₂ * (∇δNᵢ ⋅ ∇Nⱼ) * dΩ
             end
         end
     end

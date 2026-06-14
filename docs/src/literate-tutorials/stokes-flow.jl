@@ -389,10 +389,10 @@ function assemble_system!(K, f, dh, cvu, cvp)
     ndofs_u = length(range_u)
     range_p = dof_range(dh, :p)
     ndofs_p = length(range_p)
-    ϕᵤ = Vector{Vec{2, Float64}}(undef, ndofs_u)
-    ∇ϕᵤ = Vector{Tensor{2, 2, Float64, 4}}(undef, ndofs_u)
-    divϕᵤ = Vector{Float64}(undef, ndofs_u)
-    ϕₚ = Vector{Float64}(undef, ndofs_p)
+    Nᵤ = Vector{Vec{2, Float64}}(undef, ndofs_u)
+    ∇Nᵤ = Vector{Tensor{2, 2, Float64, 4}}(undef, ndofs_u)
+    divNᵤ = Vector{Float64}(undef, ndofs_u)
+    Nₚ = Vector{Float64}(undef, ndofs_p)
     for cell in CellIterator(dh)
         reinit!(cvu, cell)
         reinit!(cvp, cell)
@@ -401,31 +401,31 @@ function assemble_system!(K, f, dh, cvu, cvp)
         for qp in 1:getnquadpoints(cvu)
             dΩ = getdetJdV(cvu, qp)
             for i in 1:ndofs_u
-                ϕᵤ[i] = shape_value(cvu, qp, i)
-                ∇ϕᵤ[i] = shape_gradient(cvu, qp, i)
-                divϕᵤ[i] = shape_divergence(cvu, qp, i)
+                Nᵤ[i] = shape_value(cvu, qp, i)
+                ∇Nᵤ[i] = shape_gradient(cvu, qp, i)
+                divNᵤ[i] = shape_divergence(cvu, qp, i)
             end
             for i in 1:ndofs_p
-                ϕₚ[i] = shape_value(cvp, qp, i)
+                Nₚ[i] = shape_value(cvp, qp, i)
             end
             ## u-u
             for (i, I) in pairs(range_u), (j, J) in pairs(range_u)
-                ke[I, J] += (∇ϕᵤ[i] ⊡ ∇ϕᵤ[j]) * dΩ
+                ke[I, J] += (∇Nᵤ[i] ⊡ ∇Nᵤ[j]) * dΩ
             end
             ## u-p
             for (i, I) in pairs(range_u), (j, J) in pairs(range_p)
-                ke[I, J] += (-divϕᵤ[i] * ϕₚ[j]) * dΩ
+                ke[I, J] += (-divNᵤ[i] * Nₚ[j]) * dΩ
             end
             ## p-u
             for (i, I) in pairs(range_p), (j, J) in pairs(range_u)
-                ke[I, J] += (-divϕᵤ[j] * ϕₚ[i]) * dΩ
+                ke[I, J] += (-divNᵤ[j] * Nₚ[i]) * dΩ
             end
             ## rhs
             for (i, I) in pairs(range_u)
                 x = spatial_coordinate(cvu, qp, getcoordinates(cell))
                 b = exp(-100 * norm(x - Vec{2}((0.75, 0.1)))^2)
                 bv = Vec{2}((b, 0.0))
-                fe[I] += (ϕᵤ[i] ⋅ bv) * dΩ
+                fe[I] += (Nᵤ[i] ⋅ bv) * dΩ
             end
         end
         assemble!(assembler, celldofs(cell), ke, fe)

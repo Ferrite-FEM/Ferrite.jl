@@ -122,11 +122,11 @@ function element_routine!(Ke, re, material::Elastic, cv::CellValues, a, args...)
         ϵ = function_symmetric_gradient(cv, q_point, a)
         σ = material.C ⊡ ϵ
         for i in 1:n_basefuncs
-            δ∇N = shape_symmetric_gradient(cv, q_point, i)
-            re[i] += (δ∇N ⊡ σ) * dΩ
+            ∇δNᵢ = shape_symmetric_gradient(cv, q_point, i)
+            re[i] += (∇δNᵢ ⊡ σ) * dΩ
             for j in 1:n_basefuncs
-                ∇N = shape_symmetric_gradient(cv, q_point, j)
-                Ke[i, j] += (δ∇N ⊡ material.C ⊡ ∇N) * dΩ
+                ∇Nⱼ = shape_symmetric_gradient(cv, q_point, j)
+                Ke[i, j] += (∇δNᵢ ⊡ material.C ⊡ ∇Nⱼ) * dΩ
             end
         end
     end
@@ -167,31 +167,31 @@ function element_routine!(Ke, re, m::PoroElastic, cv::MultiFieldCellValues, a, a
         σ_eff = C ⊡ ϵ
         ## Variation of u_i
         for (iᵤ, Iᵤ) in pairs(dr_u)
-            ∇δNu = shape_symmetric_gradient(cv.u, q_point, iᵤ)
-            div_δNu = shape_divergence(cv.u, q_point, iᵤ)
-            re[Iᵤ] += (∇δNu ⊡ σ_eff - div_δNu * p * m.α) * dΩ
+            ∇δNuᵢ = shape_symmetric_gradient(cv.u, q_point, iᵤ)
+            div_δNuᵢ = shape_divergence(cv.u, q_point, iᵤ)
+            re[Iᵤ] += (∇δNuᵢ ⊡ σ_eff - div_δNuᵢ * p * m.α) * dΩ
             for (jᵤ, Jᵤ) in pairs(dr_u)
-                ∇Nu = shape_symmetric_gradient(cv.u, q_point, jᵤ)
-                Ke[Iᵤ, Jᵤ] += (∇δNu ⊡ C ⊡ ∇Nu) * dΩ
+                ∇Nuⱼ = shape_symmetric_gradient(cv.u, q_point, jᵤ)
+                Ke[Iᵤ, Jᵤ] += (∇δNuᵢ ⊡ C ⊡ ∇Nuⱼ) * dΩ
             end
             for (jₚ, Jₚ) in pairs(dr_p)
-                Np = shape_value(cv.p, q_point, jₚ)
-                Ke[Iᵤ, Jₚ] -= (div_δNu * m.α * Np) * dΩ
+                Npⱼ = shape_value(cv.p, q_point, jₚ)
+                Ke[Iᵤ, Jₚ] -= (div_δNuᵢ * m.α * Npⱼ) * dΩ
             end
         end
         ## Variation of p_i
         for (iₚ, Iₚ) in pairs(dr_p)
-            δNp = shape_value(cv.p, q_point, iₚ)
-            ∇δNp = shape_gradient(cv.p, q_point, iₚ)
-            re[Iₚ] += (δNp * (m.α * tr_ϵ_dot + m.β * pdot) + m.k * (∇δNp ⋅ ∇p)) * dΩ
+            δNpᵢ = shape_value(cv.p, q_point, iₚ)
+            ∇δNpᵢ = shape_gradient(cv.p, q_point, iₚ)
+            re[Iₚ] += (δNpᵢ * (m.α * tr_ϵ_dot + m.β * pdot) + m.k * (∇δNpᵢ ⋅ ∇p)) * dΩ
             for (jᵤ, Jᵤ) in pairs(dr_u)
-                div_Nu = shape_divergence(cv.u, q_point, jᵤ)
-                Ke[Iₚ, Jᵤ] += δNp * (m.α / Δt) * div_Nu * dΩ
+                div_Nuⱼ = shape_divergence(cv.u, q_point, jᵤ)
+                Ke[Iₚ, Jᵤ] += δNpᵢ * (m.α / Δt) * div_Nuⱼ * dΩ
             end
             for (jₚ, Jₚ) in pairs(dr_p)
-                ∇Np = shape_gradient(cv.p, q_point, jₚ)
-                Np = shape_value(cv.p, q_point, jₚ)
-                Ke[Iₚ, Jₚ] += (δNp * m.β * Np / Δt + m.k * (∇δNp ⋅ ∇Np)) * dΩ
+                ∇Npⱼ = shape_gradient(cv.p, q_point, jₚ)
+                Npⱼ = shape_value(cv.p, q_point, jₚ)
+                Ke[Iₚ, Jₚ] += (δNpᵢ * m.β * Npⱼ / Δt + m.k * (∇δNpᵢ ⋅ ∇Npⱼ)) * dΩ
             end
         end
     end

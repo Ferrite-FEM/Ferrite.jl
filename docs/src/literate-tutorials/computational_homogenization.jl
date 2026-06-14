@@ -323,14 +323,14 @@ function doassemble!(cellvalues::CellValues, K::SparseMatrixCSC, dh::DofHandler,
         for q_point in 1:getnquadpoints(cellvalues)
             dΩ = getdetJdV(cellvalues, q_point)
             for i in 1:n_basefuncs
-                δεi = shape_symmetric_gradient(cellvalues, q_point, i)
+                δNεᵢ = shape_symmetric_gradient(cellvalues, q_point, i)
                 for j in 1:n_basefuncs
-                    δεj = shape_symmetric_gradient(cellvalues, q_point, j)
-                    Ke[i, j] += (δεi ⊡ E ⊡ δεj) * dΩ
+                    Nεⱼ = shape_symmetric_gradient(cellvalues, q_point, j)
+                    Ke[i, j] += (δNεᵢ ⊡ E ⊡ Nεⱼ) * dΩ
                 end
                 for (rhs, ε) in enumerate(εᴹ)
                     σᴹ = E ⊡ ε
-                    fe[i, rhs] += (- δεi ⊡ σᴹ) * dΩ
+                    fe[i, rhs] += (- δNεᵢ ⊡ σᴹ) * dΩ
                 end
             end
         end

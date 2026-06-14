@@ -211,11 +211,11 @@ function assemble_cell!(Ke, re, cell, cellvalues, material, ue, state, state_old
 
         dΩ = getdetJdV(cellvalues, q_point)
         for i in 1:n_basefuncs
-            δϵ = shape_symmetric_gradient(cellvalues, q_point, i)
-            re[i] += (δϵ ⊡ σ) * dΩ # add internal force to residual
+            δN_ϵ = shape_symmetric_gradient(cellvalues, q_point, i)
+            re[i] += (δN_ϵ ⊡ σ) * dΩ # add internal force to residual
             for j in 1:i # loop only over lower half
-                Δϵ = shape_symmetric_gradient(cellvalues, q_point, j)
-                Ke[i, j] += δϵ ⊡ D ⊡ Δϵ * dΩ
+                ΔN_ϵ = shape_symmetric_gradient(cellvalues, q_point, j)
+                Ke[i, j] += δN_ϵ ⊡ D ⊡ ΔN_ϵ * dΩ
             end
         end
     end
@@ -243,8 +243,8 @@ function doassemble_neumann!(r, dh, facetset, facetvalues, t)
         for q_point in 1:getnquadpoints(facetvalues)
             dΓ = getdetJdV(facetvalues, q_point)
             for i in 1:n_basefuncs
-                δu = shape_value(facetvalues, q_point, i)
-                re[i] -= (δu ⋅ t) * dΓ
+                δNuᵢ = shape_value(facetvalues, q_point, i)
+                re[i] -= (δNuᵢ ⋅ t) * dΓ
             end
         end
         assemble!(r, celldofs(fc), re)

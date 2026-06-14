@@ -135,8 +135,8 @@ for fc in FacetIterator(dh, getfacetset(grid, "right"))
     for q_point in 1:getnquadpoints(fv)
         dΓ = getdetJdV(fv, q_point)
         for i in 1:getnbasefunctions(fv)
-            δu = shape_value(fv, q_point, i)
-            fe[i] += δu * qn * dΓ
+            δNᵢ = shape_value(fv, q_point, i)
+            fe[i] += δNᵢ * qn * dΓ
         end
     end
     assemble!(f, celldofs(fc), fe)
@@ -149,7 +149,7 @@ through the local `fe` vector and then using `assemble!`):
 # ...
 dofs = celldofs(fc)
 for i in 1:getnbasefunctions(fv)
-    f[dofs[i]] += δu * qn * dΓ
+    f[dofs[i]] += δN * qn * dΓ
 end
 ```
 
@@ -164,8 +164,8 @@ for facet in 1:nfacets(cell)
         for q_point in 1:getnquadpoints(facetvalues)
             dΓ = getdetJdV(facetvalues, q_point)
             for i in 1:getnbasefunctions(facetvalues)
-                δu = shape_value(facetvalues, q_point, i)
-                fe[i] += δu * qn * dΓ
+                δNᵢ = shape_value(facetvalues, q_point, i)
+                fe[i] += δNᵢ * qn * dΓ
             end
         end
     end

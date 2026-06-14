@@ -262,16 +262,16 @@ function assemble_element!(ke, ge, cell, cv, fv, mp, ue, ΓN)
         ## Loop over test functions
         for i in 1:ndofs
             ## Test function and gradient
-            δui = shape_value(cv, qp, i)
-            ∇δui = shape_gradient(cv, qp, i)
+            δNᵢ = shape_value(cv, qp, i)
+            ∇δNᵢ = shape_gradient(cv, qp, i)
             ## Add contribution to the residual from this test function
-            ge[i] += (∇δui ⊡ P - δui ⋅ b) * dΩ
+            ge[i] += (∇δNᵢ ⊡ P - δNᵢ ⋅ b) * dΩ
 
-            ∇δui∂P∂F = ∇δui ⊡ ∂P∂F # Hoisted computation
+            ∇δNᵢ∂P∂F = ∇δNᵢ ⊡ ∂P∂F # Hoisted computation
             for j in 1:ndofs
-                ∇δuj = shape_gradient(cv, qp, j)
+                ∇δNⱼ = shape_gradient(cv, qp, j)
                 ## Add contribution to the tangent
-                ke[i, j] += (∇δui∂P∂F ⊡ ∇δuj) * dΩ
+                ke[i, j] += (∇δNᵢ∂P∂F ⊡ ∇δNⱼ) * dΩ
             end
         end
     end
@@ -284,8 +284,8 @@ function assemble_element!(ke, ge, cell, cv, fv, mp, ue, ΓN)
                 t = tn * getnormal(fv, q_point)
                 dΓ = getdetJdV(fv, q_point)
                 for i in 1:ndofs
-                    δui = shape_value(fv, q_point, i)
-                    ge[i] -= (δui ⋅ t) * dΓ
+                    δNᵢ = shape_value(fv, q_point, i)
+                    ge[i] -= (δNᵢ ⋅ t) * dΓ
                 end
             end
         end
