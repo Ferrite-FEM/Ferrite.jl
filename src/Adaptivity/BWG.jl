@@ -1309,9 +1309,11 @@ function balanceforest!(forest::ForestBWG{dim}) where {dim}
                             s_i -= 14
                             ec = forest.topology.edge_edge_neighbor[k, edge_perm[s_i]]
                             pivot_edge = edge(o, s_i, tree.b)
-                            contained_face = findall(x -> face_contains_edge(x, pivot_edge), rootfaces)
-                            if !isempty(contained_face) && !contains_edge(rootedges[s_i], pivot_edge) #check if pivot edge in interior of rootface and not octree edge
-                                for face_idx in contained_face
+                            if !contains_edge(rootedges[s_i], pivot_edge) # pivot edge interior to a root face, not an octree edge
+                                handled = false
+                                for (face_idx, rf) in enumerate(rootfaces)
+                                    face_contains_edge(rf, pivot_edge) || continue
+                                    handled = true
                                     fc = facet_neighborhood[k, perm_face[face_idx]]
                                     isempty(fc) && continue
                                     @assert length(fc) == 1
@@ -1319,7 +1321,7 @@ function balanceforest!(forest::ForestBWG{dim}) where {dim}
                                     k′, f′ = fc[1], perm_face_inv[fc[2]]
                                     balance_face(forest, k′, f′, o, s)
                                 end
-                                continue
+                                handled && continue
                             end
                             isempty(ec) && continue
                             for edge_connection in ec
