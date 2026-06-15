@@ -93,6 +93,32 @@ leaves) is non-trivial.
 
 ## Run log
 
+### 2026-06-15 — balanceforest! optimization (Tier 3 follow-on)
+`balanceforest!` became the dominant 3D cost after the creategrid wiring. Profiling
+the *real* function (the benchmark's `profile_balanceforest` reimplements the loop
++ uses the old `balancetree`, so it's misleading) found: sorting (isless→morton ×2
+per compare) in `balancetree`, then a per-leaf `possibleneighbors`+`inside.(26)`+
+`findall(.!)` over *every* leaf with runtime 26-tuple indexing. Fixes (all byte-identical):
+- `balancetree`: sort Q/R by precomputed `(morton-anchor, level)` key (morton once
+  per octant, not O(n log n) times) → `bal_tree` ~2.2–2.6×.
+- `possibleneighbors` 3D: `ntuple(26)` → `ntuple(Val(26))` (was n>10 type-unstable+alloc).
+- inter-tree loop: skip interior leaves (`_touches_tree_boundary`), iterate
+  `enumerate(ss)` (no runtime tuple index), skip in-tree neighbours inline (no
+  `findall` Vector), and drop the edge-branch `findall`.
+
+| case | balanceforest! (baseline → now) | total (baseline → now) |
+|------|---------------------------------|------------------------|
+| 3D 90112 (n8 l2) | 1.19 s → **0.54 s** (~2.2×) | 6.09 s → **1.38 s** (~4.4×) |
+| 3D 90112 (n4 l3) | 1.14 s → **0.43 s** (~2.6×) | 6.83 s → **1.26 s** (~5.4×) |
+| 2D 28672 | 107 ms → 38 ms | 409 ms → **123 ms** |
+
+`balanceforest!` and `creategrid` are now balanced (~0.5–0.6 s each on 90 k). Remaining
+`balanceforest!` cost is distributed: `possibleneighbors` (builds 26 neighbours/boundary
+leaf), `ExclusiveTopology` corner/edge `getindex` (Ferrite core), and the outer
+fix-point re-running `balancetree` on all trees each iteration.
+
+
+
 ### 2026-06-15 — Iterator wired into creategrid (Tier 3)
 `creategrid` Phase 5 now detects hanging nodes via the O(n) iterator
 (`iterate_hanging`) instead of the old `hangingnodes`. The old function stayed
