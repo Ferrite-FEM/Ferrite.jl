@@ -56,3 +56,4 @@ using HCubature: hcubature, hquadrature
 #
 include("test_p4est_example.jl")
 include("test_p4est.jl")
+include("test_p4est_golden.jl")
