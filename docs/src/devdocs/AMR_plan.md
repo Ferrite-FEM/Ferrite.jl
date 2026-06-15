@@ -103,12 +103,18 @@ O(n) traversal. Full build order + the corrected mental model are in
       pair). **Matches `creategrid`'s `conformity_info` on all 16 golden cases**
       (2D/3D, multi-tree, rotated, balanced, disc). Inter-tree part is per-boundary-leaf
       transform for now (not a coordinated descent) — correctness first.
-- [ ] **Node numbering** (the remaining hard piece — IBWG2015 §6 LNodes): assign each
-      geometric node an id via the descent, owner = min-Morton leaf touching it
-      (corner/edge/face ownership), + cell connectivity. Validate vs `creategrid`.
-      This is the genuine LNodes-ownership work; prototype + validate carefully.
-- [ ] Map iterator hanging coords → node ids; assemble an iterator `creategrid`,
-      validate byte-identical, retire the old multi-pass cost centers, make default.
+- [x] **`creategrid_iterator`** — full iterator materialization (2D+3D): one
+      `iterate_leaves` descent per tree, node identity = physical coordinate (shared
+      corners merge across trees automatically, no inter-octree merge), `iterate_hanging`
+      for constraints, `reconstruct_facetsets` for facetsets. Same mesh as `creategrid`
+      on all 16 golden cases; ~2× faster (~17× vs baseline). Kept beside `creategrid`.
+- [ ] **Dict-free LNodes ownership** (IBWG2015 §6, the paper's pure form): assign ids
+      by min-Morton-leaf ownership during the descent (corner coordination) instead of
+      the coord→id Dict; transform shared corners once. Removes the remaining iterator
+      alloc (Dict + redundant `transform_pointBWG`).
+- [ ] Make `creategrid_iterator` the default (`creategrid` → `creategrid_legacy`);
+      retire the coord→id bridge and the old `hangingnodes`/multi-pass.
+- [ ] Adaptivity tutorial/example on the iterator path.
 - [ ] (Optional) expose `dim(c)`-filtered volume/face/edge/corner callbacks as a
       thin API for downstream features.
 

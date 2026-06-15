@@ -93,6 +93,26 @@ leaves) is non-trivial.
 
 ## Run log
 
+### 2026-06-15 — creategrid_iterator (full iterator materialization)
+`creategrid_iterator` (kept beside `creategrid`): one `iterate_leaves` descent per
+tree, node identity = physical coordinate (shared corners across trees merge
+automatically → no topology/transform inter-octree merge), `iterate_hanging` for
+constraints, `reconstruct_facetsets` for facetsets. Same mesh as `creategrid`
+(renumbering-invariant, all 16 golden cases). best of 7:
+
+| cells | `creategrid` | `creategrid_iterator` |
+|------|--------------|-----------------------|
+| 2D 28672 | 53 ms / 87 MB | **19 ms / 57 MB** |
+| 3D 11264 | 53 ms / 96 MB | **29 ms / 78 MB** |
+| 3D 90112 | 570 ms / 709 MB | **278 ms / 585 MB** (~17× vs 4.6 s baseline) |
+
+The one-pass descent + coord dedup beats the 5-phase Dict pipeline despite redundant
+per-corner `transform_pointBWG` calls. Remaining iterator alloc/time: the redundant
+transforms (shared corners transformed per touching leaf), the coord→id Dict, and the
+descent closures — the Dict-free LNodes *ownership* numbering is the next step.
+
+
+
 ### 2026-06-15 — balanceforest! optimization (Tier 3 follow-on)
 `balanceforest!` became the dominant 3D cost after the creategrid wiring. Profiling
 the *real* function (the benchmark's `profile_balanceforest` reimplements the loop
