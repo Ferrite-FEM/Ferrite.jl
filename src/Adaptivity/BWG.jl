@@ -1009,13 +1009,18 @@ function creategrid(forest::ForestBWG{dim, C, T}) where {dim, C, T}
         end
     end
 
-    # Phase 5: Generate grid and haning nodes
-    facetsets = reconstruct_facetsets(forest) #TODO edge, node and cellsets
-    #facesets_ordered = OrderedSet(facetsets)
-    hnodes = hangingnodes(forest, nodeids, nodeowners)
-    hnodes_dedup = Dict{Int64, Vector{Int64}}()
-    for (constrained, constainers) in hnodes
-        hnodes_dedup[nodeids_dedup[constrained]] = [nodeids_dedup[constainer] for constainer in constainers]
+    # Phase 5: Generate grid and hanging nodes. Hanging nodes are detected by the
+    # IBWG2015 iterator (iterate_hanging) and mapped to node ids through their physical
+    # coordinates. TODO: have the iterator (LNodes) emit ids directly and drop this
+    # coordinate bridge — and then retire the old `hangingnodes`/multi-pass numbering.
+    facetsets = reconstruct_facetsets(forest)
+    coord2id = Dict{NTuple{dim, Float64}, Int}()
+    for (id, x) in enumerate(nodes_physical)
+        coord2id[ntuple(i -> round(x[i]; digits = 10), dim)] = id
+    end
+    hnodes_dedup = Dict{Int, Vector{Int}}()
+    for (hc, mcs) in iterate_hanging(forest)
+        hnodes_dedup[coord2id[hc]] = [coord2id[mc] for mc in mcs]
     end
     return NonConformingGrid(cells, nodes_physical .|> Node, facetsets = facetsets, conformity_info = hnodes_dedup)
 end

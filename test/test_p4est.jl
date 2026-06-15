@@ -1027,18 +1027,21 @@ end
     adaptive_grid = ForestBWG(grid,3)
     Ferrite.AMR.refine!(adaptive_grid.cells[1],adaptive_grid.cells[1].leaves[1])
     transfered_grid_rotated = Ferrite.AMR.creategrid(adaptive_grid)
-    @test transfered_grid_rotated.conformity_info[5] == [28,25]
-    @test transfered_grid_rotated.conformity_info[20] == [10,15]
-    @test transfered_grid_rotated.conformity_info[30] == [15,18]
-    @test transfered_grid_rotated.conformity_info[1] == [2,18]
-    @test transfered_grid_rotated.conformity_info[19] == [16,28]
-    @test transfered_grid_rotated.conformity_info[22] == [10,15,2,18]
-    @test transfered_grid_rotated.conformity_info[41] == [10,16,2,28]
-    @test transfered_grid_rotated.conformity_info[43] == [18,25]
-    @test transfered_grid_rotated.conformity_info[11] == [10,2]
-    @test transfered_grid_rotated.conformity_info[36] == [2,28]
-    @test transfered_grid_rotated.conformity_info[40] == [10,16]
-    @test transfered_grid_rotated.conformity_info[38] == [2,18,28,25]
+    # Constrainer order within each entry is functionally irrelevant (affine
+    # constraints sum); the iterator-based detection sorts constrainers, so these
+    # compare the constraint *sets*.
+    @test sort(transfered_grid_rotated.conformity_info[5]) == sort([28,25])
+    @test sort(transfered_grid_rotated.conformity_info[20]) == sort([10,15])
+    @test sort(transfered_grid_rotated.conformity_info[30]) == sort([15,18])
+    @test sort(transfered_grid_rotated.conformity_info[1]) == sort([2,18])
+    @test sort(transfered_grid_rotated.conformity_info[19]) == sort([16,28])
+    @test sort(transfered_grid_rotated.conformity_info[22]) == sort([10,15,2,18])
+    @test sort(transfered_grid_rotated.conformity_info[41]) == sort([10,16,2,28])
+    @test sort(transfered_grid_rotated.conformity_info[43]) == sort([18,25])
+    @test sort(transfered_grid_rotated.conformity_info[11]) == sort([10,2])
+    @test sort(transfered_grid_rotated.conformity_info[36]) == sort([2,28])
+    @test sort(transfered_grid_rotated.conformity_info[40]) == sort([10,16])
+    @test sort(transfered_grid_rotated.conformity_info[38]) == sort([2,18,28,25])
     @test length(transfered_grid_rotated.conformity_info) == 12
 
     #2D rotated case
@@ -1066,8 +1069,8 @@ end
     adaptive_grid = ForestBWG(grid,3)
     Ferrite.AMR.refine!(adaptive_grid.cells[2],adaptive_grid.cells[2].leaves[1])
     transfered_grid_rotated = Ferrite.AMR.creategrid(adaptive_grid)
-    @test transfered_grid_rotated.conformity_info[11] == [1,7]
-    @test transfered_grid_rotated.conformity_info[10] == [3,7]
+    @test sort(transfered_grid_rotated.conformity_info[11]) == sort([1,7])
+    @test sort(transfered_grid_rotated.conformity_info[10]) == sort([3,7])
 
     # multiple corner connections in 2D by disc discretization
     grid = Ferrite.generate_simple_disc_grid(Quadrilateral,10)
