@@ -93,6 +93,28 @@ leaves) is non-trivial.
 
 ## Run log
 
+### 2026-06-15 — Iterator wired into creategrid (Tier 3)
+`creategrid` Phase 5 now detects hanging nodes via the O(n) iterator
+(`iterate_hanging`) instead of the old `hangingnodes`. The old function stayed
+~422 ms even after Tier 1b (compute-bound: the 90k-iteration per-vertex×per-face
+`iscenter` scan + Dict lookups); the descent does it in a few ms. Clean
+full-pipeline, best of 3:
+
+| case | creategrid (baseline → Tier1b → iterator) | total (baseline → iterator) |
+|------|-------------------------------------------|-----------------------------|
+| 2D 28672 | 213 ms → 92 ms → **55 ms** | 409 ms → **175 ms** |
+| 3D 11264 | 745 ms → 571 ms → **61 ms** | — |
+| 3D 90112 (n8 l2) | 4.61 s → ~4.7 s → **0.59 s** (~8×) | 6.09 s → **1.88 s** (~3.2×) |
+| 3D 90112 (n4 l3) | 5.07 s → ~4.9 s → **0.55 s** (~9×) | 6.83 s → **1.82 s** |
+
+`balanceforest!` (~1.1 s on 90112) is now the dominant 3D cost. `iterate_hanging`
+itself is allocation-free (output Dict only); the remaining creategrid alloc/time
+is the Dict-based node numbering (Phases 1–4), the target of the LNodes rewrite.
+Output byte-identical (golden + invariants); conformity_info constraint sets
+unchanged (constrainer order now sorted).
+
+
+
 <!-- Append: ### <date> — <change> (commit), with the same tables or a delta vs baseline. -->
 
 ### 2026-06-15 — Bug fixes only (no perf-relevant change expected)
