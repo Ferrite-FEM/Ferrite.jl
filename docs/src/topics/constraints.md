@@ -8,7 +8,7 @@ In FEM, affine constraints (sometimes called linear constraints) are commonly us
 different degrees of freedom (DoFs). These constraints arise in cases such as [periodic
 boundary conditions](@ref "Periodic boundary conditions"), where the solution (and thus the
 DoFs) on one face should behave periodically with the solution on the opposing face. The
-constraint then take the following form, with DoF ``a_1`` mirroring DoF ``a_2``:
+constraint then takes the following form, with DoF ``a_1`` mirroring DoF ``a_2``:
 
 ```math
 a_1 = a_2,
@@ -22,7 +22,7 @@ and ``a_3``), i.e.
 a_1 = 0.5a_2 + 0.5a_3.
 ```
 
-Furthermore, affine constraints can also been viewed as a generalization of Dirichlet
+Furthermore, affine constraints can also be viewed as a generalization of Dirichlet
 boundary conditions of the form ``a_1 = c`` for some prescribed value ``c``. However,
 Dirichlet BCs are mathematically and implementation-wise much easier to handle.
 
@@ -74,8 +74,8 @@ of equations:
 \hat{\boldsymbol{K}} \boldsymbol{a}_f = \hat{\boldsymbol{f}}, \quad \hat{\boldsymbol{K}} = \boldsymbol{C}^T \boldsymbol{K} \boldsymbol{C}, \quad \hat{\boldsymbol{f}} = \boldsymbol{C}^T(\boldsymbol{f} - \boldsymbol{K}\boldsymbol{g})
 ```
 
-The reduced system of equations can used to solve for ``\boldsymbol{a}_f``, which can then
-be used to calculate the dependent DoFs. Ferrite has functionally for setting up the
+The reduced system of equations can be used to solve for ``\boldsymbol{a}_f``, which can then
+be used to calculate the dependent DoFs. Ferrite has functionality for setting up the
 ``\hat{\boldsymbol{K}}`` and ``\hat{\boldsymbol{f}}`` in an efficient way.
 
 !!! note "Limitations"
@@ -91,7 +91,7 @@ be used to calculate the dependent DoFs. Ferrite has functionally for setting up
 ### Affine Constraints in Ferrite
 
 To explain how affine constraints are handled in Ferrite, we will use the same example as
-above. The constraint equations can be constructed with `Ferrite.AffineConstraints` and
+above. The constraint equations can be constructed with `Ferrite.AffineConstraint` and
 added to the `ConstraintHandler`:
 
 ```julia

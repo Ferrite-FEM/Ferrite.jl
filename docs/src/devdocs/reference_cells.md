@@ -14,6 +14,7 @@ Ferrite.RefQuadrilateral
 Ferrite.RefTetrahedron
 Ferrite.RefHexahedron
 Ferrite.RefPrism
+Ferrite.RefPyramid
 ```
 
 ### Required methods to implement for all subtypes of `AbstractRefShape` to define a new reference shape

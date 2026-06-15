@@ -417,7 +417,7 @@ function navierstokes_rhs_element!(dvₑ, vₑ, cv)
             # ```math
             # [(v \cdot \nabla) v]_{\textrm{i}} = v_{\textrm{j}} (\partial_{\textrm{j}} v_{\textrm{i}}) = [v (\nabla v)^{\textrm{T}}]_{\textrm{i}}
             # ```
-            # where we should pay attentation to the transpose of the gradient.
+            # where we should pay attention to the transpose of the gradient.
             #+
             dvₑ[j] -= v ⋅ ∇v' ⋅ φⱼ * dΩ
         end
@@ -431,8 +431,8 @@ function navierstokes!(du, u_uc, p::RHSparams, t)
     (; K, ch, dh, cv, u) = p
 
     # We start by applying the time-dependent Dirichlet BCs. Note that we are
-    # not allowed to mutate `u_uc`! Furthermore not that we also can not pre-
-    # allocate a buffer for this variable variable if we want to use AD to derive
+    # not allowed to mutate `u_uc`! Furthermore note that we also can not pre-
+    # allocate a buffer for this variable if we want to use AD to derive
     # the Jacobian matrix, which appears in stiff solvers.
     # Therefore, for efficiency reasons, we simply pass down the jacobian analytically.
     #+
@@ -474,7 +474,7 @@ function navierstokes_jac_element!(Jₑ, vₑ, cv)
             # ```math
             # [(v \cdot \nabla) v]_{\textrm{i}} = v_{\textrm{j}} (\partial_{\textrm{j}} v_{\textrm{i}}) = [v (\nabla v)^{\textrm{T}}]_{\textrm{i}}
             # ```
-            # where we should pay attentation to the transpose of the gradient.
+            # where we should pay attention to the transpose of the gradient.
             #+
             for i in 1:n_basefuncs
                 φᵢ = shape_value(cv.v, q_point, i)
@@ -544,7 +544,7 @@ end
 (fe_norm::FreeDofErrorNorm)(u::AbstractArray, t) = DiffEqBase.ODE_DEFAULT_NORM(u[fe_norm.ch.free_dofs], t)
 
 # Now we can put everything together by specifying how to solve the problem.
-# We want to use an adaptive variant of the implicit Euler method. Further we
+# We want to use the adaptive Rosenbrock method Rodas5P. Further we
 # enable the progress bar with the `progress` and `progress_steps` arguments.
 # Finally we have to communicate the time step length and initialization
 # algorithm. Since we start with a valid initial state we do not use one of
