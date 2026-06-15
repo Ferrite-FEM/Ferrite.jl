@@ -290,3 +290,37 @@ end
         end
     end
 end
+
+# Face descent (3D intra-tree): full hanging (face-centre 4-constrainer +
+# edge-centre 2-constrainer) must match creategrid's conformity_info exactly.
+@testset "AMR iterator face descent (3D hanging)" begin
+    iter_cases = Tuple{String, Any}[]
+    let f = ForestBWG(generate_grid(Hexahedron, (1, 1, 1)), 3)
+        _AMR.refine_all!(f, 1); _AMR.refine!(f.cells[1], f.cells[1].leaves[1])
+        push!(iter_cases, ("refine1", f))
+    end
+    let f = ForestBWG(generate_grid(Hexahedron, (1, 1, 1)), 4)
+        _AMR.refine_all!(f, 1); _AMR.refine!(f.cells[1], f.cells[1].leaves[1])
+        _AMR.refine!(f.cells[1], f.cells[1].leaves[end]); _AMR.balanceforest!(f)
+        push!(iter_cases, ("refine1and8_balanced", f))
+    end
+    let f = ForestBWG(generate_grid(Hexahedron, (1, 1, 1)), 4)
+        _AMR.refine_all!(f, 1)
+        for c in (1, 4, 6); _AMR.refine!(f.cells[1], f.cells[1].leaves[c]); end
+        _AMR.balanceforest!(f)
+        push!(iter_cases, ("refine146_balanced", f))
+    end
+    for (name, f) in iter_cases
+        @testset "$name" begin
+            hang = _AMR.iterate_hanging_3d(f.cells[1])
+            iter_set = Set((_coord(_AMR.transform_pointBWG(f, 1, h)),
+                    sort([_coord(_AMR.transform_pointBWG(f, 1, m)) for m in ms]))
+                for (h, ms) in hang)
+            grid = _AMR.creategrid(f)
+            ncoord(id) = _coord(Ferrite.get_node_coordinate(grid.nodes[id]))
+            cg_set = Set((ncoord(hid), sort([ncoord(cid) for cid in cids]))
+                for (hid, cids) in grid.conformity_info)
+            @test iter_set == cg_set
+        end
+    end
+end

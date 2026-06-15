@@ -491,6 +491,81 @@ function iterate_hanging_2d(tree::OctreeBWG{2})
     return hang
 end
 
+# 3D face descent: same structure as 2D, faces have 4 corners; matching uses the
+# face centre (3D face-corner order differs between adjacent octants). The 12
+# internal child-child face interfaces of an octant (z-order children, bit0=x,
+# bit1=y, bit2=z), as (childL, childR, face-in-childL's-frame):
+const _internal_faces_3d = (
+    (1, 2, 2), (3, 4, 2), (5, 6, 2), (7, 8, 2),   # +x (p4est face 2)
+    (1, 3, 4), (2, 4, 4), (5, 7, 4), (6, 8, 4),   # +y (face 4)
+    (1, 5, 6), (2, 6, 6), (3, 7, 6), (4, 8, 6),   # +z (face 6)
+)
+
+# A coarse face `fc` (its 4 corner coords) borders a refined neighbour: its centre is
+# a hanging node (4 constrainers) and each of its 4 edge midpoints is a hanging node
+# (2 constrainers). For a 2:1-balanced mesh this also captures edge-centre hanging:
+# the 4 cells around any edge form a cycle, so a hanging edge always borders a
+# refined–coarse face pair — i.e. it is an edge of some coarse face processed here.
+# Hence no separate 4-way edge descent is needed.
+function _emit_coarse_face_3d!(hang, fc)
+    hang[center(fc)] = collect(fc)
+    for i in 1:4, j in (i + 1):4
+        count(d -> fc[i][d] != fc[j][d], 1:3) == 1 || continue   # adjacent corners ⇒ a face edge
+        hang[center((fc[i], fc[j]))] = [fc[i], fc[j]]
+    end
+    return
+end
+
+function _iter_face_3d!(hang, leaves, octL, loL, hiL, octR, loR, hiR, f::Integer, b::Integer)
+    lL = _isleaf(leaves, loL, hiL, octL); lR = _isleaf(leaves, loR, hiR, octR)
+    (lL && lR) && return
+    if lL && !lR
+        _emit_coarse_face_3d!(hang, face(octL, f, b)); return
+    elseif !lL && lR
+        _emit_coarse_face_3d!(hang, face(octR, opposite_face_3[f], b)); return
+    end
+    kL = split_bounds(leaves, loL, hiL, octL, b); cL = children(octL, b)
+    kR = split_bounds(leaves, loR, hiR, octR, b); cR = children(octR, b)
+    fo = opposite_face_3[f]
+    for i in 1:8
+        contains_facet(face(octL, f, b), face(cL[i], f, b)) || continue
+        ci = center(face(cL[i], f, b))
+        for j in 1:8
+            center(face(cR[j], fo, b)) == ci || continue
+            _iter_face_3d!(hang, leaves, cL[i], kL[i], kL[i + 1] - 1, cR[j], kR[j], kR[j + 1] - 1, f, b)
+        end
+    end
+    return
+end
+
+function _iter_volume_3d!(hang, leaves, oct, lo, hi, b::Integer)
+    (lo > hi || _isleaf(leaves, lo, hi, oct)) && return
+    k = split_bounds(leaves, lo, hi, oct, b); c = children(oct, b)
+    for i in 1:8
+        _iter_volume_3d!(hang, leaves, c[i], k[i], k[i + 1] - 1, b)
+    end
+    for (a, d, f) in _internal_faces_3d
+        _iter_face_3d!(hang, leaves, c[a], k[a], k[a + 1] - 1, c[d], k[d], k[d + 1] - 1, f, b)
+    end
+    return
+end
+
+"""
+    iterate_hanging_3d(tree::OctreeBWG{3}) -> Dict(constrained_coord => [constrainer_coords])
+
+Detect the hanging nodes of a single 3D tree via the face descent: each coarse face
+bordering a refined neighbour contributes its centre (4 constrainers) and its 4 edge
+midpoints (2 constrainers each). For 2:1-balanced meshes this captures both
+face-centre and edge-centre hanging — no separate edge descent needed (see
+`_emit_coarse_face_3d!`). Validated to reproduce `creategrid`'s `conformity_info`
+for single-tree 3D. Intra-tree only; inter-tree is the next step.
+"""
+function iterate_hanging_3d(tree::OctreeBWG{3})
+    hang = Dict{NTuple{3, Int}, Vector{NTuple{3, Int}}}()
+    _iter_volume_3d!(hang, tree.leaves, root(3), 1, length(tree.leaves), tree.b)
+    return hang
+end
+
 function search(octantarray, lo::Integer, hi::Integer, a::OctantBWG{dim, N, T1}, idxset::Vector{T2}, b::Integer, Match = match) where {dim, N, T1 <: Integer, T2}
     lo > hi && return eltype(idxset)[]
     isleaf = lo == hi && octantarray[lo] == a
