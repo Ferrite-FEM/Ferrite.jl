@@ -120,7 +120,7 @@ function lamina_coordsys(dNdξ, ζ, x, p, h)
 
     for i in 1:length(dNdξ)
         e1 += dNdξ[i][1] * x[i] + 0.5*h*ζ * dNdξ[i][1] * p[i]
-        e2 += dNdξ[i][2] * x[i] + 0.5*h*ζ * dNdξ[i][1] * p[i]
+        e2 += dNdξ[i][2] * x[i] + 0.5*h*ζ * dNdξ[i][2] * p[i]
     end
 
     e1 /= norm(e1)

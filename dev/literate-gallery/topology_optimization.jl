@@ -52,7 +52,7 @@
 # ```math
 # \nabla^2 \chi_p = \frac{1}{(\Delta h)^2} (\chi_n + \chi_s + \chi_w + \chi_e - 4 \chi_p)
 # ```
-# Here, the indices refer to the different cardinal directions. Boundary element do not have neighbors in each direction. However, we can calculate
+# Here, the indices refer to the different cardinal directions. Boundary elements do not have neighbors in each direction. However, we can calculate
 # the central difference to fulfill Neumann boundary condition. For example, if the element is on the left boundary, we have to fulfill
 # ```math
 # \nabla \chi_p \cdot \textbf{n} = \frac{1}{\Delta h} (\chi_w - \chi_e) = 0
@@ -79,7 +79,7 @@ function create_grid(n)
     ]
     grid = generate_grid(Quadrilateral, (2 * n, n), corners)
 
-    ## node-/facesets for boundary conditions
+    ## node- and facetsets for boundary conditions
     addnodeset!(grid, "clamped", x -> x[1] ≈ 0.0)
     addfacetset!(grid, "traction", x -> x[1] ≈ 2.0 && norm(x[2] - 0.5) <= 0.05)
     return grid
@@ -400,12 +400,12 @@ end
 # we create material states for each element and construct the topology of the grid.
 #
 # During each iteration step, first we solve our FE problem in the Newton-Raphson loop. With the solution of the
-# elastomechanic problem, we check for convergence of our topology design. The criteria has to be fulfilled twice in
+# elastomechanic problem, we check for convergence of our topology design. The criterion has to be fulfilled twice in
 # a row to avoid oscillations. If no convergence is reached yet, we update our design and prepare the next iteration step.
 # Finally, we output the results in paraview and calculate the relative stiffness of the final design, i.e. how much how
 # the stiffness increased compared to the starting point.
 
-function topopt(ra, ρ, n, filename; output = :false)
+function topopt(ra, ρ, n, filename; output = false)
     ## material
     mp = MaterialParameters(210.0e3, 0.3, 1.0e-3, 3.0, ra^2, 15.0)
 
@@ -439,7 +439,7 @@ function topopt(ra, ρ, n, filename; output = :false)
     compliance = 0.0
     compliance_0 = 0.0
     compliance_n = 0.0
-    conv = :false
+    conv = false
 
     topology = ExclusiveTopology(grid)
     neighborhoods = cache_neighborhood(dh, topology)
@@ -483,16 +483,16 @@ function topopt(ra, ρ, n, filename; output = :false)
             compliance_0 = compliance
         end
 
-        ## check convergence criterium (twice!)
+        ## check convergence criterion (twice!)
         if abs(compliance - compliance_n) / compliance < tol
             if conv
                 println("Converged at iteration number: ", it)
                 break
             else
-                conv = :true
+                conv = true
             end
         else
-            conv = :false
+            conv = false
         end
 
         ## update density
@@ -531,9 +531,9 @@ end
 # complete output with all iteration steps, it is possible to set the output
 # parameter to `true`.
 
-# grid, χ =topopt(0.02, 0.5, 60, "small_radius"; output=:false);
-@time topopt(0.03, 0.5, 60, "large_radius"; output = :false);
-#topopt(0.02, 0.5, 60, "topopt_animation"; output=:true); # can be used to create animations
+# grid, χ =topopt(0.02, 0.5, 60, "small_radius"; output=false);
+@time topopt(0.03, 0.5, 60, "large_radius"; output = false);
+#topopt(0.02, 0.5, 60, "topopt_animation"; output=true); # can be used to create animations
 
 # We observe, that the stiffness for the lower value of $ra$ is higher,
 # but also requires more iterations until convergence and finer structures to be manufactured, as can be seen in Figure 2:
