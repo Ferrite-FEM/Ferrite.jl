@@ -93,6 +93,24 @@ leaves) is non-trivial.
 
 ## Run log
 
+### 2026-06-15 — balanceforest! allocation 2.0 GiB → 450 MiB (type-stable possibleneighbors)
+`balanceforest!` allocated ~2 GiB (on an already-balanced forest that adds 0 cells — pure
+overhead). The allocation profiler (`Profile.Allocs`) pinned it, after a couple of false
+starts, to one root cause: **`possibleneighbors` returned `Union{NTuple{26}, Vector}`** —
+the `insidetree` kwarg returned the raw tuple when `false` but a `filter`ed `Vector` when
+`true`. That Union poisoned inference of the per-neighbour balance loop, boxing every
+element AND heap-allocating the 26-tuple per leaf (~1.5 GiB across the loop). Fix: drop the
+kwarg, always return the `NTuple` (`possibleneighbors` now 0 B/call); `balancetree` filters
+inline with `inside`. Supporting fixes: extracted the per-leaf inter-tree work into a typed
+`_balance_leaf!` (concrete args); `rootedges = dim==3 ? edges : nothing` → `_rootedges(Val)`
+(killed a `Union{Nothing,NTuple}`); removed the dead `o′ = transform_*(…)` in
+`balance_corner/face/edge`; `transform_edge`'s `zeros(T2,3)` → non-allocating ntuple scatter.
+
+3D 90112 (n8 l2): **balanceforest! 2017 → 450 MiB, 534 → 284 ms**; balancetree 165 → 69 MiB.
+Byte-identical (golden 16 + invariants 1643 + e2e solve); `test_p4est.jl` Balancing green.
+Remaining 450 MiB is distributed (balancetree rebuild ~69, inter-loop + `_sort_by_morton!`
++ `refine!` the rest) — no single hotspot.
+
 ### 2026-06-15 — iterate_hanging allocation (per-call hot-path fixes)
 `iterate_hanging` was the dominant `creategrid_iterator` alloc (24 MiB). Profiling the
 sub-parts: intra descent 0.04 MiB, `leafsets` 5.77 MiB, and ~18 MiB in the inter-tree
