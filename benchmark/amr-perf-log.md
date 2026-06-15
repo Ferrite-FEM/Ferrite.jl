@@ -93,6 +93,30 @@ leaves) is non-trivial.
 
 ## Run log
 
+### 2026-06-15 — min-Morton ownership numbering (Dict-free-ish creategrid_iterator)
+`creategrid_iterator` node numbering rewritten to **min-Morton ownership** (IBWG2015 §6):
+the descent visits leaves in Morton order, so "first encounter assigns the id" *is*
+min-Morton ownership. Dedup now keys on the octant's exact **integer** corner coordinate
+(`local2id`, one Dict reused across trees via `empty!`) → each unique node is transformed
+to physical space **once** instead of once per touching leaf (~7× fewer `_transform_point`
+calls). The physical-coord Dict (`coord2id`) shrinks to only the nodes that can be shared
+across trees — tree-boundary corners + hanging-constraint endpoints; interior nodes get
+ids directly. Per-tree work moved into `_materialize_tree!`/`_owner_id!` so the `do`-block
+closures capture stable function args, not boxed `for`-loop vars; `sizehint!` on
+`conns`/`nodecoords`. Byte-identical (all 16 golden cases; end-to-end solve identical).
+
+3D 90112 (n8 l2), best of 7 + `@allocated`:
+
+| | time | alloc |
+|--|------|-------|
+| `creategrid_iterator` (coord-keyed, prev) | 125 ms | 62.6 MiB |
+| `creategrid_iterator` (ownership, now)    | **90 ms** | **47.6 MiB** |
+
+Remaining alloc breakdown: **`iterate_hanging` 24.1 MiB (now the dominant 44%)**,
+inherent output (nodes 2.2 + cells 5.5 MiB + Vector growth ~15 MiB), descent bookkeeping
+(coord2id/local2id/closures) the rest. Next lever is `iterate_hanging` (per-tree leaf
+`Set`s + per-constraint `Vector`s + per-node `transform_pointBWG`), not the numbering.
+
 ### 2026-06-15 — creategrid_iterator (full iterator materialization)
 `creategrid_iterator` (kept beside `creategrid`): one `iterate_leaves` descent per
 tree, node identity = physical coordinate (shared corners across trees merge

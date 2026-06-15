@@ -108,10 +108,16 @@ O(n) traversal. Full build order + the corrected mental model are in
       corners merge across trees automatically, no inter-octree merge), `iterate_hanging`
       for constraints, `reconstruct_facetsets` for facetsets. Same mesh as `creategrid`
       on all 16 golden cases; ~2× faster (~17× vs baseline). Kept beside `creategrid`.
-- [ ] **Dict-free LNodes ownership** (IBWG2015 §6, the paper's pure form): assign ids
-      by min-Morton-leaf ownership during the descent (corner coordination) instead of
-      the coord→id Dict; transform shared corners once. Removes the remaining iterator
-      alloc (Dict + redundant `transform_pointBWG`).
+- [x] **Min-Morton ownership numbering** (IBWG2015 §6): the descent visits leaves in
+      Morton order, so "first encounter assigns the id" *is* min-Morton ownership. Dedup
+      keys on the octant's exact **integer** corner coordinate (`local2id`, reused per
+      tree) → each unique node transformed once (~7× fewer `_transform_point`). The
+      physical-coord Dict (`coord2id`) shrinks to only cross-tree-shareable nodes (tree
+      boundary + hanging endpoints); interior nodes get ids directly. 3D 90112: 125 ms /
+      62.6 MiB → **90 ms / 47.6 MiB**, byte-identical. NOTE: not literally Dict-free — a
+      small `coord2id` (boundary+hanging) + a reused integer `local2id` remain; a fully
+      Dict-free form needs topology-based inter-tree corner coordination (deferred — low
+      payoff). `iterate_hanging` (24 MiB) is now the dominant iterator alloc, not numbering.
 - [x] **End-to-end verification** (the "example working" goal): a 3D adaptive Poisson
       solve materializing the *same forest* with both `creategrid` and `creategrid_iterator`
       yields bit-identical FE systems (same `ndofs`, same `#constraints`, `max|Δu|=0` at every
