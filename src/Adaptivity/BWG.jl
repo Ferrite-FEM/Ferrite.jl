@@ -1330,10 +1330,20 @@ function balanceforest!(forest::ForestBWG{dim}) where {dim}
     return
 end
 
+# Sort octants in place by (Morton-anchor key, level) — the same total order as
+# `isless`, but computing each Morton key once instead of letting `sort!` call
+# `morton` twice per comparison (`morton` is a ~b·dim-bit interleave). `morton(o,
+# o.l, o.l)` is the level-independent anchor interleave and is bijective in `xyz`,
+# so `(key, level)` lexicographic == `isless`.
+function _sort_by_morton!(v::Vector{<:OctantBWG})
+    length(v) < 2 && return v
+    keys = [(morton(o, o.l, o.l), o.l) for o in v]
+    permute!(v, sortperm(keys))
+    return v
+end
+
 """
 Algorithm 7 of [SSB2008](@citet)
-
-TODO optimise the unnecessary allocations
 """
 function balancetree(tree::OctreeBWG)
     if length(tree.leaves) == 1
@@ -1349,7 +1359,7 @@ function balancetree(tree::OctreeBWG)
         for o in W
             o.l == l && push!(Q, o)
         end
-        sort!(Q)
+        _sort_by_morton!(Q)
         # T: one representative per distinct parent (first in Q order)
         empty!(T); empty!(Tparents)
         for x in Q
@@ -1369,7 +1379,7 @@ function balancetree(tree::OctreeBWG)
         append!(W, P)
         empty!(P)
     end
-    sort!(R) # be careful with sort, by=morton doesn't work due to ambuigity at max depth level
+    _sort_by_morton!(R) # (morton-anchor, level) key disambiguates at max depth
     linearise!(R, tree.b)
     return OctreeBWG(R, tree.b, tree.nodes)
 end
@@ -1418,7 +1428,7 @@ Returns a list of possible neighbors, where the first eight are corner neighbors
 After the first eight corner neighbors, the 6 possible face neighbors follow and after them, the edge neighbors.
 """
 function possibleneighbors(o::OctantBWG{3}, l, b; insidetree = true)
-    neighbors = ntuple(26) do i
+    neighbors = ntuple(Val(26)) do i
         if 8 < i ≤ 14
             j = i - 8
             facet_neighbor(o, j, b)
