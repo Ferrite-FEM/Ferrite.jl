@@ -325,11 +325,10 @@ end
     end
 end
 
-# Forest-level 2D hanging (intra descent + inter-tree via transform_facet) must
-# match creategrid on the multi-tree 2D golden cases (incl. rotated tree, disc).
-@testset "AMR iterator hanging (2D forest)" begin
+# Forest-level hanging (intra descent + inter-tree via transform_facet) must match
+# creategrid on ALL golden cases (2D/3D, multi-tree, rotated, balanced, disc).
+@testset "AMR iterator hanging (forest)" begin
     for (name, forest, grid, _) in AMR_CASES
-        startswith(name, "2d") || continue
         @testset "$name" begin
             hang = _AMR.iterate_hanging(forest)
             iter_set = Set((h, sort(ms)) for (h, ms) in hang)

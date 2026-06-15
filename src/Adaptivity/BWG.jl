@@ -649,33 +649,55 @@ function iterate_leaves(f::F, forest::ForestBWG) where {F}
     return
 end
 
-"""
-    iterate_hanging(forest::ForestBWG{2}) -> Dict(constrained_xyz => [constrainer_xyz])
+# A coarse octant face `fc` (its corner coords, in tree `k`) borders a refined
+# neighbour: emit (into the physical-coord `hang`) the face centre, constrained by
+# all its corners, and each face-edge midpoint (corner pair differing in one
+# coordinate), constrained by that pair. In 2D the face is an edge and these
+# coincide into one entry; in 3D this gives the face centre (4 constrainers) + 4
+# edge midpoints (2 constrainers).
+function _emit_coarse_face_phys!(hang, forest, k, fc)
+    P(c) = ntuple(i -> round(transform_pointBWG(forest, k, c)[i]; digits = 10), length(c))
+    hang[P(center(fc))] = sort([P(c) for c in fc])
+    for i in 1:length(fc), j in (i + 1):length(fc)
+        count(d -> fc[i][d] != fc[j][d], 1:length(fc[i])) == 1 || continue
+        hang[P(center((fc[i], fc[j])))] = sort([P(fc[i]), P(fc[j])])
+    end
+    return
+end
 
-Forest-level 2D hanging-node detection in physical coordinates: intra-tree via the
-face descent (`iterate_hanging_2d`) plus inter-tree, where a coarse boundary leaf
-facing a refined neighbour across a shared tree face contributes a hanging edge
-midpoint, the neighbour matched with `transform_facet` (handles tree rotations).
-Validated against `creategrid`'s `conformity_info` for multi-tree 2D (incl. rotated
-trees and the disc grid). NOTE: the inter-tree part is a per-boundary-leaf transform,
-not yet a coordinated descent — correctness first, that optimization is a follow-up.
 """
-function iterate_hanging(forest::ForestBWG{2})
-    hang = Dict{NTuple{2, Float64}, Vector{NTuple{2, Float64}}}()
-    _phys(k, c) = ntuple(i -> round(transform_pointBWG(forest, k, c)[i]; digits = 10), 2)
+    iterate_hanging(forest::ForestBWG{dim}) -> Dict(constrained_xyz => [constrainer_xyz])
+
+Forest-level hanging-node detection (2D and 3D) in physical coordinates: intra-tree
+via the face descent (`iterate_hanging_2d`/`iterate_hanging_3d`) plus inter-tree,
+where a coarse boundary leaf facing a refined neighbour across a shared tree face
+contributes hanging nodes (`_emit_coarse_face_phys!`), the neighbour matched with
+`transform_facet` (handles tree rotations). Only face neighbours are needed even at
+tree boundaries: every hanging node is face-interior and the 4 cells around an edge
+form a cycle via faces, so a hanging edge always borders a refined–coarse face pair.
+Validated against `creategrid`'s `conformity_info` on all golden cases (2D/3D,
+multi-tree, rotated, balanced, disc). NOTE: inter-tree is a per-boundary-leaf
+transform (not yet a coordinated descent) — correctness first.
+"""
+function iterate_hanging(forest::ForestBWG{dim}) where {dim}
+    hang = Dict{NTuple{dim, Float64}, Vector{NTuple{dim, Float64}}}()
+    _phys(k, c) = ntuple(i -> round(transform_pointBWG(forest, k, c)[i]; digits = 10), dim)
     for (k, tree) in enumerate(forest.cells)                      # intra-tree
-        for (h, ms) in iterate_hanging_2d(tree)
+        intra = dim == 2 ? iterate_hanging_2d(tree) : iterate_hanging_3d(tree)
+        for (h, ms) in intra
             hang[_phys(k, h)] = sort([_phys(k, m) for m in ms])
         end
     end
-    fn = Ferrite.get_facet_facet_neighborhood(forest)             # inter-tree
+    perm = dim == 2 ? 𝒱₂_perm : 𝒱₃_perm
+    perminv = dim == 2 ? 𝒱₂_perm_inv : 𝒱₃_perm_inv
+    fn = Ferrite.get_facet_facet_neighborhood(forest)             # inter-tree (face neighbours)
     for (k, tree) in enumerate(forest.cells)
         b = tree.b
-        rootfaces = faces(root(2), b)
-        for f in 1:4
-            nb = fn[k, 𝒱₂_perm[f]]
+        rootfaces = faces(root(dim), b)
+        for f in 1:(2 * dim)
+            nb = fn[k, perm[f]]
             isempty(nb) && continue
-            k′ = nb[1][1]; f′ = 𝒱₂_perm_inv[nb[1][2]]
+            k′ = nb[1][1]; f′ = perminv[nb[1][2]]
             kset′ = Set(forest.cells[k′].leaves)
             for C in tree.leaves
                 Cface = face(C, f, b)
@@ -683,7 +705,7 @@ function iterate_hanging(forest::ForestBWG{2})
                 nb′ = transform_facet(forest, k′, f′, facet_neighbor(C, f, b))
                 (nb′ ∈ kset′) && continue                         # same-size neighbour ⇒ conforming
                 any(c -> c ∈ kset′, children(nb′, b)) || continue # neighbour refined ⇒ C is coarse
-                hang[_phys(k, center(Cface))] = sort([_phys(k, e) for e in Cface])
+                _emit_coarse_face_phys!(hang, forest, k, Cface)
             end
         end
     end
