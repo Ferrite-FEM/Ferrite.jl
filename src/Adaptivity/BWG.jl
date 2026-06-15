@@ -1032,6 +1032,49 @@ function creategrid(forest::ForestBWG{dim, C, T}) where {dim, C, T}
     return NonConformingGrid(cells, nodes_physical .|> Node, facetsets = facetsets, conformity_info = hnodes_dedup)
 end
 
+"""
+    creategrid_iterator(forest::ForestBWG) -> NonConformingGrid
+
+Iterator-based grid materialization (IBWG2015 LNodes direction): a single
+`iterate_leaves` descent per tree assigns node ids, with the node's *physical
+coordinate* as its identity — so corners shared across trees merge automatically,
+replacing `creategrid`'s 5-phase pipeline (intra/inter-octree merge, dedup) with one
+pass. `iterate_hanging` supplies the constraints, `reconstruct_facetsets` the facetsets
+(cells are emitted in the same per-tree Morton order as `creategrid`). Produces the
+same mesh as `creategrid` (validated renumbering-invariant for 2D/3D, multi-tree,
+rotated, balanced, disc). Kept beside `creategrid` for comparison; numbering here is
+still coordinate-keyed (the descent does the traversal) — Dict-free LNodes ownership
+is the next step.
+"""
+function creategrid_iterator(forest::ForestBWG{dim}) where {dim}
+    node_map = dim == 2 ? node_map₂ : node_map₃
+    celltype = dim == 2 ? Quadrilateral : Hexahedron
+    coord2id = Dict{NTuple{dim, Float64}, Int}()
+    nodecoords = Vec{dim, Float64}[]
+    conns = NTuple{2^dim, Int}[]
+    for (k, tree) in enumerate(forest.cells)
+        b = tree.b
+        iterate_leaves(tree) do leaf
+            v = vertices(leaf, b)
+            ids = ntuple(2^dim) do i
+                p = transform_pointBWG(forest, k, v[i])
+                key = ntuple(d -> round(p[d]; digits = 10), dim)
+                get!(coord2id, key) do
+                    push!(nodecoords, p)
+                    length(nodecoords)
+                end
+            end
+            push!(conns, ntuple(i -> ids[node_map[i]], 2^dim))
+        end
+    end
+    cells = [celltype(c) for c in conns]
+    hnodes = Dict{Int, Vector{Int}}()
+    for (hc, mcs) in iterate_hanging(forest)
+        hnodes[coord2id[hc]] = [coord2id[mc] for mc in mcs]
+    end
+    return NonConformingGrid(cells, Node.(nodecoords); conformity_info = hnodes, facetsets = reconstruct_facetsets(forest))
+end
+
 function reconstruct_facetsets(forest::ForestBWG{dim}) where {dim}
     _perm = dim == 2 ? 𝒱₂_perm : 𝒱₃_perm
     _perm_inv = dim == 2 ? 𝒱₂_perm_inv : 𝒱₃_perm_inv

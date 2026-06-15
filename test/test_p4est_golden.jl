@@ -339,3 +339,13 @@ end
         end
     end
 end
+
+# Full iterator materialization: creategrid_iterator must produce the same mesh as
+# creategrid (renumbering-invariant: cells/nodes/hanging/facetsets by coordinate).
+@testset "AMR creategrid_iterator == creategrid" begin
+    for (name, forest, grid, _) in AMR_CASES
+        @testset "$name" begin
+            @test canonical_grid(_AMR.creategrid_iterator(forest)) == canonical_grid(grid)
+        end
+    end
+end
