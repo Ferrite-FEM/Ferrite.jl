@@ -324,3 +324,19 @@ end
         end
     end
 end
+
+# Forest-level 2D hanging (intra descent + inter-tree via transform_facet) must
+# match creategrid on the multi-tree 2D golden cases (incl. rotated tree, disc).
+@testset "AMR iterator hanging (2D forest)" begin
+    for (name, forest, grid, _) in AMR_CASES
+        startswith(name, "2d") || continue
+        @testset "$name" begin
+            hang = _AMR.iterate_hanging(forest)
+            iter_set = Set((h, sort(ms)) for (h, ms) in hang)
+            ncoord(id) = _coord(Ferrite.get_node_coordinate(grid.nodes[id]))
+            cg_set = Set((ncoord(hid), sort([ncoord(cid) for cid in cids]))
+                for (hid, cids) in grid.conformity_info)
+            @test iter_set == cg_set
+        end
+    end
+end

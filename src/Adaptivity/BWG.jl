@@ -649,6 +649,47 @@ function iterate_leaves(f::F, forest::ForestBWG) where {F}
     return
 end
 
+"""
+    iterate_hanging(forest::ForestBWG{2}) -> Dict(constrained_xyz => [constrainer_xyz])
+
+Forest-level 2D hanging-node detection in physical coordinates: intra-tree via the
+face descent (`iterate_hanging_2d`) plus inter-tree, where a coarse boundary leaf
+facing a refined neighbour across a shared tree face contributes a hanging edge
+midpoint, the neighbour matched with `transform_facet` (handles tree rotations).
+Validated against `creategrid`'s `conformity_info` for multi-tree 2D (incl. rotated
+trees and the disc grid). NOTE: the inter-tree part is a per-boundary-leaf transform,
+not yet a coordinated descent — correctness first, that optimization is a follow-up.
+"""
+function iterate_hanging(forest::ForestBWG{2})
+    hang = Dict{NTuple{2, Float64}, Vector{NTuple{2, Float64}}}()
+    _phys(k, c) = ntuple(i -> round(transform_pointBWG(forest, k, c)[i]; digits = 10), 2)
+    for (k, tree) in enumerate(forest.cells)                      # intra-tree
+        for (h, ms) in iterate_hanging_2d(tree)
+            hang[_phys(k, h)] = sort([_phys(k, m) for m in ms])
+        end
+    end
+    fn = Ferrite.get_facet_facet_neighborhood(forest)             # inter-tree
+    for (k, tree) in enumerate(forest.cells)
+        b = tree.b
+        rootfaces = faces(root(2), b)
+        for f in 1:4
+            nb = fn[k, 𝒱₂_perm[f]]
+            isempty(nb) && continue
+            k′ = nb[1][1]; f′ = 𝒱₂_perm_inv[nb[1][2]]
+            kset′ = Set(forest.cells[k′].leaves)
+            for C in tree.leaves
+                Cface = face(C, f, b)
+                contains_facet(rootfaces[f], Cface) || continue   # C on the shared tree face
+                nb′ = transform_facet(forest, k′, f′, facet_neighbor(C, f, b))
+                (nb′ ∈ kset′) && continue                         # same-size neighbour ⇒ conforming
+                any(c -> c ∈ kset′, children(nb′, b)) || continue # neighbour refined ⇒ C is coarse
+                hang[_phys(k, center(Cface))] = sort([_phys(k, e) for e in Cface])
+            end
+        end
+    end
+    return hang
+end
+
 function refine_all!(forest::ForestBWG, l)
     for tree in forest.cells
         for leaf in tree.leaves
