@@ -13,6 +13,7 @@ Pages = [
     "boundary_conditions.md",
     "constraints.md",
     "grid.md",
-    "export.md"
+    "export.md",
+    "amr.md"
 ]
 ```
