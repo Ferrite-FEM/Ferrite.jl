@@ -41,6 +41,12 @@
 #       predictable results because for a memory location which, for example, a "red",
 #       a "blue", and a "green" element will contribute to we will always add the red first,
 #       then the blue, and finally the green.
+#     - **Atomic additions**: By using atomic additions into the global matrix and vector
+#       we ensure that no contributions are lost even if two tasks add to the same memory
+#       location concurrently. This makes it safe to parallelize the loop over all cells
+#       directly, without coloring the grid first. The drawbacks are that atomic additions
+#       are more expensive than regular ones and that the results are not deterministic,
+#       for the same reason as for the locking approach.
 #  - **Scratch data**: In order to speed up the computation of the element contributions we
 #    typically pre-allocate some data structures that can be reused for every element. Such
 #    scratch data include, for example, the local matrix and vector, and the CellValues.
@@ -171,13 +177,18 @@ end
 # independent objects. For `cellvalues` we use `copy` which Ferrite defines for this
 # purpose. Finally, for the assembler we call `start_assemble` to create a new assembler but
 # note that we set `fillzero = false` because we don't want to risk that a task that starts
-# a bit later will zero out data that another task have already assembled.
-function ScratchData(dh::DofHandler, K::SparseMatrixCSC, f::Vector, cellvalues::CellValues)
+# a bit later will zero out data that another task have already assembled. The keyword
+# argument `atomic` is forwarded to `start_assemble` and will be used for the
+# [atomic assembly strategy](@ref howto-atomic-assembly) later in this howto.
+function ScratchData(
+        dh::DofHandler, K::SparseMatrixCSC, f::Vector, cellvalues::CellValues;
+        atomic::Bool = false
+    )
     cell_cache = CellCache(dh)
     n = ndofs_per_cell(dh)
     Ke = zeros(n, n)
     fe = zeros(n)
-    asm = start_assemble(K, f; fillzero = false)
+    asm = start_assemble(K, f; fillzero = false, atomic = atomic)
     return ScratchData(cell_cache, copy(cellvalues), Ke, fe, asm)
 end
 nothing # hide
@@ -275,10 +286,47 @@ nothing # hide
 #     end
 #     ```
 
-# We define the main function to setup everything and then time the call to
-# `assemble_global!`.
+# ### [Global assembly routine using atomic additions](@id howto-atomic-assembly)
+#
+# As an alternative to grid coloring we can pass `atomic = true` to `start_assemble`. This
+# makes the additions into the global matrix and vector atomic, which means that it is safe
+# for multiple tasks to assemble concurrently even if they share degrees of freedom. We can
+# therefore parallelize the loop over *all* cells directly and skip the outer loop over
+# colors. Note that each task still needs its own assembler since it contains buffers that
+# are modified during the call to `assemble!`.
 
-function main(; n = 20, ntasks = Threads.nthreads())
+function assemble_global_atomic!(
+        K::SparseMatrixCSC, f::Vector, dh::DofHandler,
+        cellvalues_template::CellValues; ntasks = Threads.nthreads()
+    )
+    ## Zero-out existing data in K and f
+    _ = start_assemble(K, f)
+    ## Body force and material stiffness
+    b = Vec{3}((0.0, 0.0, -1.0))
+    C = create_material_stiffness()
+    scheduler = OhMyThreads.DynamicScheduler(; ntasks)
+    ## Parallelize the loop over all cells
+    OhMyThreads.@tasks for cellidx in 1:getncells(dh.grid)
+        @set scheduler = scheduler
+        ## Obtain a task local scratch (with an atomic assembler) and unpack it
+        @local scratch = ScratchData(dh, K, f, cellvalues_template; atomic = true)
+        (; cell_cache, cellvalues, Ke, fe, assembler) = scratch
+        ## Reinitialize the cell cache and then the cellvalues
+        reinit!(cell_cache, cellidx)
+        reinit!(cellvalues, cell_cache)
+        ## Compute the local contribution of the cell
+        assemble_cell!(Ke, fe, cellvalues, C, b)
+        ## Assemble local contribution
+        assemble!(assembler, celldofs(cell_cache), Ke, fe)
+    end
+    return K, f
+end
+nothing # hide
+
+# We define the main function to setup everything and then time the call to
+# `assemble_global!` (or `assemble_global_atomic!` when `atomic = true` is passed).
+
+function main(; n = 20, ntasks = Threads.nthreads(), atomic = false)
     ## Interpolation, quadrature and cellvalues
     interpolation = Lagrange{RefHexahedron, 1}()^3
     quadrature = QuadratureRule{RefHexahedron}(2)
@@ -289,23 +337,35 @@ function main(; n = 20, ntasks = Threads.nthreads())
     ## Global matrix and vector
     K = allocate_matrix(dh)
     f = zeros(ndofs(dh))
-    ## Compile it
-    assemble_global!(K, f, dh, colors, cellvalues; ntasks = ntasks)
-    ## Time it
-    @time assemble_global!(K, f, dh, colors, cellvalues; ntasks = ntasks)
+    ## Compile and time it
+    if atomic
+        assemble_global_atomic!(K, f, dh, cellvalues; ntasks = ntasks)
+        @time assemble_global_atomic!(K, f, dh, cellvalues; ntasks = ntasks)
+    else
+        assemble_global!(K, f, dh, colors, cellvalues; ntasks = ntasks)
+        @time assemble_global!(K, f, dh, colors, cellvalues; ntasks = ntasks)
+    end
     return norm(K.nzval), norm(f) #src
     return
 end
 nothing # hide
 
-# On a machine with 4 cores, starting julia with `--threads=auto`, we obtain the following
-# timings:
+# Starting julia with `--threads=4` we obtain the following timings for the colored
+# assembly:
 # ```julia
-# main(; ntasks = 1) # 1.970784 seconds (902 allocations: 816.172 KiB)
-# main(; ntasks = 2) # 1.025065 seconds (1.64 k allocations: 1.564 MiB)
-# main(; ntasks = 3) # 0.700423 seconds (2.38 k allocations: 2.332 MiB)
-# main(; ntasks = 4) # 0.548356 seconds (3.12 k allocations: 3.099 MiB)
+# main(; ntasks = 1) # 1.223176 seconds (598 allocations: 658.664 KiB)
+# main(; ntasks = 2) # 0.627117 seconds (1.75 k allocations: 1.336 MiB)
+# main(; ntasks = 3) # 0.424703 seconds (2.44 k allocations: 1.986 MiB)
+# main(; ntasks = 4) # 0.329441 seconds (3.12 k allocations: 2.636 MiB)
 # ```
+# and for the atomic assembly:
+# ```julia
+# main(; ntasks = 1, atomic = true) # 1.251890 seconds (42 allocations: 41.188 KiB)
+# main(; ntasks = 2, atomic = true) # 0.632622 seconds (114 allocations: 85.688 KiB)
+# main(; ntasks = 3, atomic = true) # 0.428844 seconds (157 allocations: 127.258 KiB)
+# main(; ntasks = 4, atomic = true) # 0.334077 seconds (200 allocations: 168.828 KiB)
+# ```
+# For this problem the two strategies perform similarly.
 
 using Test                           #src
 nK1, nf1 = main(; n = 5, ntasks = 1) #src
@@ -313,6 +373,9 @@ nK2, nf2 = main(; n = 5, ntasks = 2) #src
 nK4, nf4 = main(; n = 5, ntasks = 4) #src
 @test nK1 == nK2 == nK4              #src
 @test nf1 == nf2 == nf4              #src
+nKa, nfa = main(; n = 5, ntasks = 4, atomic = true) #src
+@test nKa ≈ nK1                      #src
+@test nfa ≈ nf1                      #src
 
 #md # ## [Plain program](@id threaded_assembly-plain-program)
 #md #

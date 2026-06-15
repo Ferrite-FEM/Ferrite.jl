@@ -141,4 +141,41 @@ using SparseArrays, LinearAlgebra
         end
     end
 
+    @testset "atomic assembly" begin
+        grid = generate_grid(Quadrilateral, (20, 20))
+        dh = DofHandler(grid)
+        add!(dh, :u, Lagrange{RefQuadrilateral, 1}()^2)
+        close!(dh)
+        n = ndofs_per_cell(dh)
+        # Integer valued local contributions so that the additions are exact regardless of
+        # the order they are added in
+        Ke(cellid) = reshape(float.(1:(n * n)), n, n) .+ cellid
+        fe(cellid) = float.(1:n) .+ cellid
+
+        # Reference (serial assembly)
+        Kref = allocate_matrix(SparseMatrixCSR, dh)
+        fref = zeros(ndofs(dh))
+        asm = start_assemble(Kref, fref)
+        for cellid in 1:getncells(grid)
+            assemble!(asm, celldofs(dh, cellid), Ke(cellid), fe(cellid))
+        end
+
+        # Concurrent atomic assembly without coloring
+        K = allocate_matrix(SparseMatrixCSR, dh)
+        f = zeros(ndofs(dh))
+        chunks = collect(Iterators.partition(1:getncells(grid), getncells(grid) ÷ 7))
+        tasks = map(chunks) do chunk
+            Threads.@spawn begin
+                # One assembler per task
+                a = start_assemble(K, f; fillzero = false, atomic = true)
+                for cellid in chunk
+                    assemble!(a, celldofs(dh, cellid), Ke(cellid), fe(cellid))
+                end
+            end
+        end
+        foreach(wait, tasks)
+        @test K == Kref
+        @test f == fref
+    end
+
 end

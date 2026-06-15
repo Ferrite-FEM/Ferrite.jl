@@ -43,6 +43,28 @@ function addindex!(b::AbstractVector{T}, v::T, i::Int) where {T}
 end
 
 """
+    atomic_addindex!(b::Vector{T}, v::T, i::Int)
+
+Like [`addindex!`](@ref) but the addition is performed atomically, making it safe for
+concurrent additions to the same index from multiple tasks/threads.
+"""
+@propagate_inbounds function atomic_addindex!(b::Vector{T}, v::T, i::Int) where {T}
+    @boundscheck checkbounds(b, i)
+    iszero(v) && return b
+    # Manual compare-and-swap loop instead of `Base.unsafe_modify!(p, +, v, :monotonic)`
+    # since the latter compiles to a loop with a non-inlined call to `+`.
+    GC.@preserve b begin
+        p = pointer(b, i)
+        old = Base.unsafe_load(p)
+        while true
+            old, success = Base.unsafe_replace!(p, old, old + v, :monotonic, :monotonic)
+            success && break
+        end
+    end
+    return b
+end
+
+"""
     fillzero!(A::AbstractVecOrMat{T})
 
 Fill the (stored) entries of the vector or matrix `A` with zeros.

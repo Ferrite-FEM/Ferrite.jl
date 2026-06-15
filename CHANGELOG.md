@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Next] - xxxx-xx-xx
 
+### Added
+ - The assemblers returned from `start_assemble` now support the keyword argument `atomic`
+   which makes the additions into the matrix and vector atomic. This makes it possible to
+   assemble in parallel without using e.g. grid coloring. (#1344)
+
 ### Fixes
  - Make `shape_symmetric_gradient` work for `PointValues` ([#1325])
  - Make the internal function `getlowerorder` work for `VectorizedInterpolation` ([#1335])

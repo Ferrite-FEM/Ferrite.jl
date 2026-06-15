@@ -137,6 +137,51 @@ import LinearAlgebra: Symmetric
     @test_throws BoundsError assemble!(assembler, [11, 1, 2, 3], rand(4, 4), rand(3))
 end
 
+@testset "assemble! atomic" begin
+    grid = generate_grid(Quadrilateral, (20, 20))
+    dh = DofHandler(grid)
+    add!(dh, :u, Lagrange{RefQuadrilateral, 1}()^2)
+    close!(dh)
+    n = ndofs_per_cell(dh)
+    # Integer valued local contributions so that the additions are exact regardless of
+    # the order they are added in
+    Ke(cellid) = reshape(float.(1:(n * n)), n, n) .+ cellid
+    KeSym(cellid) = Symmetric(Ke(cellid) + Ke(cellid)')
+    fe(cellid) = float.(1:n) .+ cellid
+    chunks = collect(Iterators.partition(1:getncells(grid), getncells(grid) ÷ 7))
+
+    # Reference (serial assembly)
+    Kref = allocate_matrix(dh)
+    fref = zeros(ndofs(dh))
+    Sref = Symmetric(allocate_matrix(dh))
+    asm = start_assemble(Kref, fref)
+    asmsym = start_assemble(Sref)
+    for cellid in 1:getncells(grid)
+        assemble!(asm, celldofs(dh, cellid), Ke(cellid), fe(cellid))
+        assemble!(asmsym, celldofs(dh, cellid), KeSym(cellid))
+    end
+
+    # Concurrent atomic assembly without coloring
+    K = allocate_matrix(dh)
+    f = zeros(ndofs(dh))
+    S = Symmetric(allocate_matrix(dh))
+    tasks = map(chunks) do chunk
+        Threads.@spawn begin
+            # One assembler per task
+            a = start_assemble(K, f; fillzero = false, atomic = true)
+            asym = start_assemble(S; fillzero = false, atomic = true)
+            for cellid in chunk
+                assemble!(a, celldofs(dh, cellid), Ke(cellid), fe(cellid))
+                assemble!(asym, celldofs(dh, cellid), KeSym(cellid))
+            end
+        end
+    end
+    foreach(wait, tasks)
+    @test K == Kref
+    @test f == fref
+    @test S == Sref
+end
+
 @testset "Base.show for assemblers" begin
     A = sparse(rand(10, 10))
     S = Symmetric(A)

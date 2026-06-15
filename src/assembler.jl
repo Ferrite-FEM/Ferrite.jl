@@ -180,6 +180,7 @@ struct CSCAssembler{Tv, Ti, MT <: AbstractSparseMatrixCSC{Tv, Ti}} <: AbstractCS
     colpermutation::Vector{Int}
     sortedrowdofs::Vector{Int}
     sortedcoldofs::Vector{Int}
+    atomic::Bool
 end
 
 """
@@ -192,6 +193,7 @@ struct CSRAssembler{Tv, Ti, MT <: AbstractSparseMatrix{Tv, Ti}} <: AbstractCSRAs
     colpermutation::Vector{Int}
     sortedrowdofs::Vector{Int}
     sortedcoldofs::Vector{Int}
+    atomic::Bool
 end
 
 """
@@ -204,6 +206,7 @@ struct SymmetricCSCAssembler{Tv, Ti, MT <: Symmetric{Tv, <:AbstractSparseMatrixC
     colpermutation::Vector{Int} # col permutation and dofs, but simplifies code reuse
     sortedrowdofs::Vector{Int}  # reuse with non-symmetric cases. sortedrowdofs and
     sortedcoldofs::Vector{Int}  # rowpermutation always aliased to sortedcoldofs and colpermutation.
+    atomic::Bool
 end
 
 function Base.show(io::IO, ::MIME"text/plain", a::Union{CSCAssembler, CSRAssembler, SymmetricCSCAssembler})
@@ -239,19 +242,27 @@ necessary for efficient matrix assembly. To assemble the contribution from an el
 The keyword argument `fillzero` can be set to `false` if `K` and `f` should not be zeroed
 out, but instead keep their current values.
 
+The keyword argument `atomic` can be set to `true` to make the additions into `K` and `f`
+atomic. This makes it possible for multiple tasks to assemble into the same `K` and `f`
+concurrently, without using e.g. grid coloring, see
+[Multi-threaded assembly](@ref tutorial-threaded-assembly). Note that each task still needs
+its own assembler (created with `fillzero = false`) since the assembler contains buffers,
+and that the result is not deterministic since the order of additions to an entry depends
+on the task scheduling.
+
 Depending on the loaded extensions more assembly formats become available through this interface.
 """
-start_assemble(K::Union{AbstractSparseMatrixCSC, Symmetric{<:Any, <:AbstractSparseMatrixCSC}}, f::Vector; fillzero::Bool)
+start_assemble(K::Union{AbstractSparseMatrixCSC, Symmetric{<:Any, <:AbstractSparseMatrixCSC}}, f::Vector; fillzero::Bool, atomic::Bool)
 
-function start_assemble(K::AbstractSparseMatrixCSC{T}, f::Vector = T[]; fillzero::Bool = true, maxcelldofs_hint::Int = 0) where {T}
+function start_assemble(K::AbstractSparseMatrixCSC{T}, f::Vector = T[]; fillzero::Bool = true, maxcelldofs_hint::Int = 0, atomic::Bool = false) where {T}
     fillzero && (fillzero!(K); fillzero!(f))
-    return CSCAssembler(K, f, zeros(Int, maxcelldofs_hint), zeros(Int, maxcelldofs_hint), zeros(Int, maxcelldofs_hint), zeros(Int, maxcelldofs_hint))
+    return CSCAssembler(K, f, zeros(Int, maxcelldofs_hint), zeros(Int, maxcelldofs_hint), zeros(Int, maxcelldofs_hint), zeros(Int, maxcelldofs_hint), atomic)
 end
-function start_assemble(K::Symmetric{T, <:SparseMatrixCSC}, f::Vector = T[]; fillzero::Bool = true, maxcelldofs_hint::Int = 0) where {T}
+function start_assemble(K::Symmetric{T, <:SparseMatrixCSC}, f::Vector = T[]; fillzero::Bool = true, maxcelldofs_hint::Int = 0, atomic::Bool = false) where {T}
     fillzero && (fillzero!(K); fillzero!(f))
     permutation = zeros(Int, maxcelldofs_hint)
     sorteddofs = zeros(Int, maxcelldofs_hint)
-    return SymmetricCSCAssembler(K, f, permutation, permutation, sorteddofs, sorteddofs)
+    return SymmetricCSCAssembler(K, f, permutation, permutation, sorteddofs, sorteddofs, atomic)
 end
 
 function finish_assemble(a::Union{CSCAssembler, CSRAssembler, SymmetricCSCAssembler})
@@ -306,7 +317,13 @@ end
     if fe !== nothing
         @boundscheck checkbounds(fe, keys(rowdofs))
         @boundscheck checkbounds(A.f, rowdofs)
-        @inbounds assemble!(A.f, rowdofs, fe)
+        if A.atomic
+            @inbounds for (i, dof) in pairs(rowdofs)
+                atomic_addindex!(A.f, fe[i], dof)
+            end
+        else
+            @inbounds assemble!(A.f, rowdofs, fe)
+        end
     end
 
     K = matrix_handle(A)
@@ -322,14 +339,14 @@ end
         sortedcoldofs, colpermutation
     end
 
-    return _assemble_inner!(K, Ke, rowdofs, sortedrowdofs, rowpermutation, coldofs, sortedcoldofs, colpermutation, sym)
+    return _assemble_inner!(K, Ke, rowdofs, sortedrowdofs, rowpermutation, coldofs, sortedcoldofs, colpermutation, sym, A.atomic)
 end
 
 @propagate_inbounds function _assemble_inner!(
         K::SparseMatrixCSC, Ke::AbstractMatrix,
         rowdofs::AbstractVector, sortedrowdofs::AbstractVector, rowpermutation::AbstractVector,
         coldofs::AbstractVector, sortedcoldofs::AbstractVector, colpermutation::AbstractVector,
-        sym::Bool
+        sym::Bool, atomic::Bool
     )
     current_col = 1
     Krows = rowvals(K)
@@ -349,7 +366,11 @@ end
                 # Match: add the value (if non-zero) and advance the pointers
                 val = Ke[rowpermutation[ri], Kecol]
                 if !iszero(val)
-                    Kvals[R] += val
+                    if atomic
+                        atomic_addindex!(Kvals, val, R)
+                    else
+                        Kvals[R] += val
+                    end
                 end
                 ri += 1
                 Ri += 1
