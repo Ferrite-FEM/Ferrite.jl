@@ -93,6 +93,24 @@ leaves) is non-trivial.
 
 ## Run log
 
+### 2026-06-15 — iterate_hanging allocation (per-call hot-path fixes)
+`iterate_hanging` was the dominant `creategrid_iterator` alloc (24 MiB). Profiling the
+sub-parts: intra descent 0.04 MiB, `leafsets` 5.77 MiB, and ~18 MiB in the inter-tree
+per-leaf scan. The scan itself (`face`/`contains_facet`) is 0-alloc in a typed function;
+the cost was per-call heap allocs in the functions it calls for every boundary leaf:
+- `compute_face_orientation` built **two Vector comprehensions** (`nodes_f`, `nodes_f′`)
+  per call → `ntuple`. It depends only on `(k,f)` but runs per-leaf; this was ~11 MiB.
+- `transform_facet` (3D) allocated `xyz = zeros(T2, 3)` per call → non-allocating
+  `ntuple` scatter (`a` is a permutation of (0,1,2); the old commented tuple form
+  *gathered* instead of scattering — wrong unless `a` is an involution).
+- `face`/`edge` built a `SubArray` via `view(𝒱₃, f, :)` → direct `𝒱₃[f, i]` indexing.
+
+3D 90112: `iterate_hanging` **24.1 → 7.25 MiB**, `creategrid_iterator` **47.6 → 30.7 MiB**
+(time ~89 ms). Byte-identical (golden 16 + invariants 1643 + e2e solve); `test_p4est.jl`
+green (these functions are also used by `balanceforest!`/legacy `creategrid`). Residual
+`iterate_hanging` alloc is now mostly `leafsets` (5.77 MiB, `Set` of all leaves for O(1)
+membership) + a small `transform_facet` remainder.
+
 ### 2026-06-15 — min-Morton ownership numbering (Dict-free-ish creategrid_iterator)
 `creategrid_iterator` node numbering rewritten to **min-Morton ownership** (IBWG2015 §6):
 the descent visits leaves in Morton order, so "first encounter assigns the id" *is*

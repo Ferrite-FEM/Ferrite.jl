@@ -184,13 +184,11 @@ end
 
 face(octant::OctantBWG, f::OctantFaceIndex, b::Integer) = face(octant, f.idx, b)
 function face(octant::OctantBWG{2}, f::Integer, b::Integer)
-    cornerid = view(𝒱₂, f, :)
-    return ntuple(i -> vertex(octant, cornerid[i], b), 2)
+    return ntuple(i -> vertex(octant, 𝒱₂[f, i], b), 2)   # index directly; `view` here allocates a SubArray per call (hot path)
 end
 
 function face(octant::OctantBWG{3}, f::Integer, b::Integer)
-    cornerid = view(𝒱₃, f, :)
-    return ntuple(i -> vertex(octant, cornerid[i], b), 4)
+    return ntuple(i -> vertex(octant, 𝒱₃[f, i], b), 4)
 end
 
 """
@@ -206,8 +204,7 @@ end
 
 edge(octant::OctantBWG, e::OctantEdgeIndex, b::Integer) = edge(octant, e.idx, b)
 function edge(octant::OctantBWG{3}, e::Integer, b::Integer)
-    cornerid = view(𝒰, e, :)
-    return ntuple(i -> vertex(octant, cornerid[i], b), 2)
+    return ntuple(i -> vertex(octant, 𝒰[e, i], b), 2)
 end
 
 """
@@ -686,36 +683,52 @@ Validated against `creategrid`'s `conformity_info` on all golden cases (2D/3D,
 multi-tree, rotated, balanced, disc). NOTE: inter-tree is a per-boundary-leaf
 transform (not yet a coordinated descent) — correctness first.
 """
+# Physical coord (rounded) of octree-integer corner `c` in tree `k`.
+_phys_coord(forest::ForestBWG{dim}, k, c) where {dim} =
+    ntuple(i -> round(transform_pointBWG(forest, k, c)[i]; digits = 10), Val(dim))
+
+function _iterate_hanging_intra!(hang, forest::ForestBWG{dim}, k, tree) where {dim}
+    intra = dim == 2 ? iterate_hanging_2d(tree) : iterate_hanging_3d(tree)
+    for (h, ms) in intra
+        hang[_phys_coord(forest, k, h)] = sort([_phys_coord(forest, k, m) for m in ms])
+    end
+    return
+end
+
+# Inter-tree hanging for one tree, in its own function so the per-leaf scan
+# (`face`, `contains_facet`, …) infers concretely instead of boxing under the
+# big function's type instabilities — this scan is the bulk of `iterate_hanging`.
+function _iterate_hanging_inter!(hang, forest::ForestBWG{dim}, k, tree, fn, leafsets, perm, perminv) where {dim}
+    b = tree.b
+    rootfaces = faces(root(dim), b)
+    for f in 1:(2 * dim)
+        nb = fn[k, perm[f]]
+        isempty(nb) && continue
+        k′ = nb[1][1]; f′ = perminv[nb[1][2]]
+        kset′ = leafsets[k′]
+        for C in tree.leaves
+            Cface = face(C, f, b)
+            contains_facet(rootfaces[f], Cface) || continue   # C on the shared tree face
+            nb′ = transform_facet(forest, k′, f′, facet_neighbor(C, f, b))
+            (nb′ ∈ kset′) && continue                         # same-size neighbour ⇒ conforming
+            any(c -> c ∈ kset′, children(nb′, b)) || continue # neighbour refined ⇒ C is coarse
+            _emit_coarse_face_phys!(hang, forest, k, Cface)
+        end
+    end
+    return
+end
+
 function iterate_hanging(forest::ForestBWG{dim}) where {dim}
     hang = Dict{NTuple{dim, Float64}, Vector{NTuple{dim, Float64}}}()
-    _phys(k, c) = ntuple(i -> round(transform_pointBWG(forest, k, c)[i]; digits = 10), dim)
     for (k, tree) in enumerate(forest.cells)                      # intra-tree
-        intra = dim == 2 ? iterate_hanging_2d(tree) : iterate_hanging_3d(tree)
-        for (h, ms) in intra
-            hang[_phys(k, h)] = sort([_phys(k, m) for m in ms])
-        end
+        _iterate_hanging_intra!(hang, forest, k, tree)
     end
     perm = dim == 2 ? 𝒱₂_perm : 𝒱₃_perm
     perminv = dim == 2 ? 𝒱₂_perm_inv : 𝒱₃_perm_inv
     fn = Ferrite.get_facet_facet_neighborhood(forest)             # inter-tree (face neighbours)
     leafsets = [Set(tree.leaves) for tree in forest.cells]        # once per tree (not per tree×face)
     for (k, tree) in enumerate(forest.cells)
-        b = tree.b
-        rootfaces = faces(root(dim), b)
-        for f in 1:(2 * dim)
-            nb = fn[k, perm[f]]
-            isempty(nb) && continue
-            k′ = nb[1][1]; f′ = perminv[nb[1][2]]
-            kset′ = leafsets[k′]
-            for C in tree.leaves
-                Cface = face(C, f, b)
-                contains_facet(rootfaces[f], Cface) || continue   # C on the shared tree face
-                nb′ = transform_facet(forest, k′, f′, facet_neighbor(C, f, b))
-                (nb′ ∈ kset′) && continue                         # same-size neighbour ⇒ conforming
-                any(c -> c ∈ kset′, children(nb′, b)) || continue # neighbour refined ⇒ C is coarse
-                _emit_coarse_face_phys!(hang, forest, k, Cface)
-            end
-        end
+        _iterate_hanging_inter!(hang, forest, k, tree, fn, leafsets, perm, perminv)
     end
     return hang
 end
@@ -1757,8 +1770,8 @@ function compute_face_orientation(forest::ForestBWG{<:Any, <:OctreeBWG{dim, <:An
     k′, f′_ferrite = facet_neighbor_table[k, f_ferrite][1]
     f′ = f_perminv[f′_ferrite]
     reffacenodes = reference_faces_bwg(Ferrite.RefHypercube{dim})
-    nodes_f = [forest.cells[k].nodes[n_perm[ni]] for ni in reffacenodes[f]]
-    nodes_f′ = [forest.cells[k′].nodes[n_perm[ni]] for ni in reffacenodes[f′]]
+    nodes_f = ntuple(i -> forest.cells[k].nodes[n_perm[reffacenodes[f][i]]], length(reffacenodes[f]))
+    nodes_f′ = ntuple(i -> forest.cells[k′].nodes[n_perm[reffacenodes[f′][i]]], length(reffacenodes[f′]))
     if f > f′
         return T2(findfirst(isequal(nodes_f′[1]), nodes_f) - 1)
     else
@@ -1957,18 +1970,13 @@ function transform_facet(forest::ForestBWG, k::T1, f::T1, o::OctantBWG{3, <:Any,
     end
     maxlevel = forest.cells[1].b
     depth_offset = 2^maxlevel - 2^(maxlevel - o.l)
-    xyz = zeros(T2, 3)
-    xyz[a[1] + _one] = T2((s[1] == 0) ? o.xyz[b[1] + _one] : depth_offset - o.xyz[b[1] + _one])
-    xyz[a[2] + _one] = T2((s[2] == 0) ? o.xyz[b[2] + _one] : depth_offset - o.xyz[b[2] + _one])
-    xyz[a[3] + _one] = T2(a_sign * 2^maxlevel + s′ * depth_offset + (1 - 2 * s′) * o.xyz[b[3] + _one])
-    return OctantBWG(o.l, (xyz[1], xyz[2], xyz[3]))
-
-    # xyz = (
-    #     T2((s[1] == 0) ? o.xyz[b[1] + _one] : depth_offset - o.xyz[b[1] + _one]),
-    #     T2((s[2] == 0) ? o.xyz[b[2] + _one] : depth_offset - o.xyz[b[2] + _one]),
-    #     T2(a_sign*2^maxlevel + s′*depth_offset + (1-2*s′)*o.xyz[b[3] + _one])
-    # )
-    # return OctantBWG(o.l,(xyz[a[1] + _one],xyz[a[2] + _one],xyz[a[3] + _one]))
+    # `a` is a permutation of (0,1,2); scatter each value to output position a[i]+1
+    # (avoid the per-call `zeros(T2, 3)` Vector — this is on the hanging-node hot path).
+    v1 = T2((s[1] == 0) ? o.xyz[b[1] + _one] : depth_offset - o.xyz[b[1] + _one])
+    v2 = T2((s[2] == 0) ? o.xyz[b[2] + _one] : depth_offset - o.xyz[b[2] + _one])
+    v3 = T2(a_sign * 2^maxlevel + s′ * depth_offset + (1 - 2 * s′) * o.xyz[b[3] + _one])
+    xyz = ntuple(p -> (p == a[1] + _one ? v1 : (p == a[2] + _one ? v2 : v3)), Val(3))
+    return OctantBWG(o.l, xyz)
 end
 
 transform_facet(forest::ForestBWG, f::FacetIndex, oct::OctantBWG) = transform_facet(forest, f[1], f[2], oct)
