@@ -399,6 +399,38 @@ end
 
 split_array(tree::OctreeBWG, a::OctantBWG) = split_array(tree.leaves, a, tree.b)
 
+"""
+    iterate_leaves(f, tree::OctreeBWG)
+    iterate_leaves(f, forest::ForestBWG)
+
+Visit every leaf exactly once in Morton (z-) order and call `f(leaf)`, via the
+[IBWG2015](@citet) §5 recursive descent (the volume specialization of the node
+iterator, Algorithm 5.2):
+
+- the leaves contained in any octant form a *contiguous* sub-range of the
+  Morton-sorted leaf array, so at each internal octant `split_array` partitions
+  that sub-range among the `2^dim` children in O(log n);
+- the recursion stops when a sub-range is a single leaf equal to the octant.
+
+This is the base traversal the LNodes node-numbering will build on (no `findfirst`
+scans, no `Dict`). See `docs/src/devdocs/AMR_iterator.md`.
+"""
+function iterate_leaves(f::F, leaves, octant::OctantBWG, b::Integer) where {F}
+    n = length(leaves)
+    n == 0 && return
+    if n == 1 && leaves[1] == octant   # octant is a leaf of the forest -> stop
+        f(octant)
+        return
+    end
+    child_ranges = split_array(leaves, octant, b)   # 2^dim contiguous views
+    child_octants = children(octant, b)
+    for (child, sub) in zip(child_octants, child_ranges)
+        iterate_leaves(f, sub, child, b)
+    end
+    return
+end
+iterate_leaves(f::F, tree::OctreeBWG{dim}) where {F, dim} = iterate_leaves(f, tree.leaves, root(dim), tree.b)
+
 function search(octantarray, a::OctantBWG{dim, N, T1}, idxset::Vector{T2}, b::Integer, Match = match) where {dim, N, T1 <: Integer, T2}
     isempty(octantarray) && return
     isleaf = (length(octantarray) == 1 && a ∈ octantarray) ? true : false
@@ -472,6 +504,14 @@ end
 
 function Ferrite.get_facet_facet_neighborhood(g::ForestBWG{dim}) where {dim}
     return Ferrite._get_facet_facet_neighborhood(g.topology, Val(dim))
+end
+
+# forest-level base iterator (see iterate_leaves on OctreeBWG)
+function iterate_leaves(f::F, forest::ForestBWG) where {F}
+    for tree in forest.cells
+        iterate_leaves(f, tree)
+    end
+    return
 end
 
 function refine_all!(forest::ForestBWG, l)

@@ -80,8 +80,14 @@ Replaces the multi-pass `creategrid`+`hangingnodes` (BWG2011 Alg 20) with one
 O(n) traversal. Full build order + the corrected mental model are in
 `AMR_iterator.md`. Serial first; distributed pieces collapse to no-ops.
 
-- [ ] Verify the Morton-sort prerequisite holds for all leaf arrays (done for the
-      sampled cases; make it an invariant check).
+- [x] Verify the Morton-sort prerequisite (golden + the base-descent test confirm
+      `split_array` reconstructs the contiguous ordered leaves, 2D/3D).
+- [x] **Base recursive descent** `iterate_leaves` (volume specialization of Alg 5.2):
+      `split_array` partition + stop-at-singleton-leaf; visits exactly the leaves in
+      Morton order (tested on all 16 golden cases). This is the foundation + the
+      conceptual "base iterator" the team was blocked on.
+- [ ] Extend the descent to visit intra-tree face/corner interfaces (2D) so node
+      sharing between sibling leaves can be assigned without the Dict.
 - [ ] `Iterate_interior` (Alg 5.2) — point-centric recursion over `e ∈ part(c)`,
       reusing `split_array`/`ancestor_id`/`children`/`descendants`/`boundaryset`.
       **Do not** start from `search` (different algorithm).

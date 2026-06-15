@@ -244,3 +244,17 @@ end
         check_invariants(name, grid; box = box)
     end
 end
+
+# IBWG2015 §5 base iterator: the recursive split_array descent must visit exactly
+# the leaves of each tree, in Morton order (the foundation for LNodes numbering).
+@testset "AMR iterator base descent" begin
+    for (name, forest, _, _) in AMR_CASES
+        @testset "$name" begin
+            for tree in forest.cells
+                visited = eltype(tree.leaves)[]
+                _AMR.iterate_leaves(o -> push!(visited, o), tree)
+                @test visited == tree.leaves
+            end
+        end
+    end
+end
