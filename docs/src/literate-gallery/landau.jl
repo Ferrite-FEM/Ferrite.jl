@@ -107,9 +107,9 @@ end
 # `hess_backend` keyword so we can compare `AutoForwardDiff` and `AutoHyperHessians`.
 function LandauModel(
         α, G, gridsize, left::Vec{DIM, T}, right::Vec{DIM, T}, elpotential, ntasks;
-        # Chunk size chosen by empirical testing for what had good performance
-        # Hessian AD (second order) tends to benefit from smaller chunks than 
-        # gradients (first order).
+        ## Chunk size chosen by empirical testing for what had good performance
+        ## Hessian AD (second order) tends to benefit from smaller chunks than 
+        ## gradients (first order).
         grad_backend = AutoForwardDiff(; chunksize = 12),
         hess_backend = AutoForwardDiff(; chunksize = 4),
     ) where {DIM, T}
