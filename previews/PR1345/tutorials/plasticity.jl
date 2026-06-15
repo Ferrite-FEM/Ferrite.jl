@@ -208,7 +208,7 @@ function solve()
     grid = generate_grid(Tetrahedron, nels, P1, P2)
     interpolation = Lagrange{RefTetrahedron, 1}()^3
 
-    dh = create_dofhandler(grid, interpolation) # JuaFEM helper function
+    dh = create_dofhandler(grid, interpolation) # helper function defined above
     dbcs = create_bc(dh, grid) # create Dirichlet boundary-conditions
 
     cellvalues, facetvalues = create_values(interpolation)

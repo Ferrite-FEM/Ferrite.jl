@@ -137,7 +137,7 @@ for i in 1:size(rhs.periodic, 2)
     u_i = cholesky(Symmetric(K.periodic)) \ rhs_i      # Solve
     apply!(u_i, ch.periodic)                           # Apply BC on the solution
     push!(u.periodic, u_i)                             # Save the solution vector
-end</code></pre><p>When the solution(s) are known we can compute the averaged stress, <span>$\bar{\boldsymbol{\sigma}}$</span> in the RVE. We define a function that does this, and also returns the von Mise stress in every quadrature point for visualization.</p><pre><code class="language-julia hljs">function compute_stress(cellvalues::CellValues, dh::DofHandler, u, εᴹ)
+end</code></pre><p>When the solution(s) are known we can compute the averaged stress, <span>$\bar{\boldsymbol{\sigma}}$</span> in the RVE. We define a function that does this, and also returns the von Mises stress in every quadrature point for visualization.</p><pre><code class="language-julia hljs">function compute_stress(cellvalues::CellValues, dh::DofHandler, u, εᴹ)
     σvM_qpdata = zeros(getnquadpoints(cellvalues), getncells(dh.grid))
     σ̄Ω = zero(SymmetricTensor{2, 2})
     Ω = 0.0 # Total volume
@@ -155,7 +155,7 @@ end</code></pre><p>When the solution(s) are known we can compute the averaged st
     end
     σ̄ = σ̄Ω / Ω
     return σvM_qpdata, σ̄
-end;</code></pre><p>We now compute the homogenized stress and von Mise stress for all cases</p><pre><code class="language-julia hljs">σ̄ = (
+end;</code></pre><p>We now compute the homogenized stress and von Mises stress for all cases</p><pre><code class="language-julia hljs">σ̄ = (
     dirichlet = SymmetricTensor{2, 2}[],
     periodic = SymmetricTensor{2, 2}[],
 )
@@ -211,7 +211,7 @@ end</code></pre><pre class="documenter-example-output"><code class="nohighlight 
 
 [:, :, 2, 2] =
   1.43401e10  -2.18543e6
- -2.18543e6    4.30725e10</code></pre><p>We can check that the result are what we expect, namely that the stiffness with Dirichlet boundary conditions is higher than when using periodic boundary conditions, and that the Reuss assumption is an lower bound, and the Voigt assumption a upper bound. We first compute the volume fraction of the matrix, and then the Voigt and Reuss bounds:</p><pre><code class="language-julia hljs">function matrix_volume_fraction(grid, cellvalues)
+ -2.18543e6    4.30725e10</code></pre><p>We can check that the results are what we expect, namely that the stiffness with Dirichlet boundary conditions is higher than when using periodic boundary conditions, and that the Reuss assumption is a lower bound, and the Voigt assumption an upper bound. We first compute the volume fraction of the matrix, and then the Voigt and Reuss bounds:</p><pre><code class="language-julia hljs">function matrix_volume_fraction(grid, cellvalues)
     V = 0.0 # Total volume
     Vm = 0.0 # Volume of the matrix
     for c in CellIterator(grid)
@@ -478,4 +478,4 @@ VTKGridFile(&quot;homogenization&quot;, dh) do vtk
         write_solution(vtk, dh, uM + u.periodic[i], &quot;_periodic_$i&quot;)
         write_projection(vtk, projector, σ.periodic[i], &quot;σvM_periodic_$i&quot;)
     end
-end;</code></pre><hr/><p><em>This page was generated using <a href="https://github.com/fredrikekre/Literate.jl">Literate.jl</a>.</em></p></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../transient_heat_equation/">« Transient heat equation</a><a class="docs-footer-nextpage" href="../stokes-flow/">Stokes flow »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option><option value="catppuccin-latte">catppuccin-latte</option><option value="catppuccin-frappe">catppuccin-frappe</option><option value="catppuccin-macchiato">catppuccin-macchiato</option><option value="catppuccin-mocha">catppuccin-mocha</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.17.0 on <span class="colophon-date" title="Saturday 13 June 2026 21:08">Saturday 13 June 2026</span>. Using Julia version 1.12.6.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
+end;</code></pre><hr/><p><em>This page was generated using <a href="https://github.com/fredrikekre/Literate.jl">Literate.jl</a>.</em></p></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../transient_heat_equation/">« Transient heat equation</a><a class="docs-footer-nextpage" href="../stokes-flow/">Stokes flow »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option><option value="catppuccin-latte">catppuccin-latte</option><option value="catppuccin-frappe">catppuccin-frappe</option><option value="catppuccin-macchiato">catppuccin-macchiato</option><option value="catppuccin-mocha">catppuccin-mocha</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.17.0 on <span class="colophon-date" title="Monday 15 June 2026 15:50">Monday 15 June 2026</span>. Using Julia version 1.12.6.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>

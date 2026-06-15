@@ -55,7 +55,7 @@
 # ## Commented program
 #
 # Now we solve the problem in Ferrite. What follows is a program spliced with comments.
-#md # The full program, without comments, can be found in the next [section](@ref heat_equation-plain-program).
+#md # The full program, without comments, can be found in the next [section](@ref transient_heat_equation-plain-program).
 #
 # First we load Ferrite, and some other packages we need.
 using Ferrite, SparseArrays, WriteVTK
@@ -79,7 +79,7 @@ close!(dh);
 # ```math
 # M_{ij} = \int_{\Omega} v_i \, u_j \ \mathrm{d}\Omega,
 # ```
-# where $u_i$ and $v_j$ are trial and test functions, respectively.
+# where $u_j$ and $v_i$ are trial and test functions, respectively.
 K = allocate_matrix(dh);
 M = allocate_matrix(dh);
 # We also preallocate the right hand side

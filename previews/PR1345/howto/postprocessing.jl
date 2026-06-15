@@ -2,17 +2,14 @@ include("../tutorials/heat_equation.jl");
 
 function compute_heat_fluxes(cellvalues::CellValues, dh::DofHandler, a::AbstractVector{T}) where {T}
 
-    n = getnbasefunctions(cellvalues)
-    cell_dofs = zeros(Int, n)
     nqp = getnquadpoints(cellvalues)
 
     # Allocate storage for the fluxes to store
     q = [Vec{2, T}[] for _ in 1:getncells(dh.grid)]
 
-    for (cell_num, cell) in enumerate(CellIterator(dh))
-        q_cell = q[cell_num]
-        celldofs!(cell_dofs, dh, cell_num)
-        aᵉ = a[cell_dofs]
+    for cell in CellIterator(dh)
+        q_cell = q[cellid(cell)]
+        aᵉ = a[celldofs(cell)]
         reinit!(cellvalues, cell)
 
         for q_point in 1:nqp

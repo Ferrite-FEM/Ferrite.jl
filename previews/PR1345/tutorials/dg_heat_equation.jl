@@ -98,7 +98,7 @@ function assemble_boundary!(fe::Vector, fv::FacetValues)
         for i in 1:getnbasefunctions(fv)
             δu = shape_value(fv, q_point, i)
             boundary_flux = normal[2]
-            fe[i] = boundary_flux * δu * ∂Ω
+            fe[i] += boundary_flux * δu * ∂Ω
         end
     end
     return fe

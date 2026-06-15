@@ -9,7 +9,7 @@ function create_grid(n)
     ]
     grid = generate_grid(Quadrilateral, (2 * n, n), corners)
 
-    # node-/facesets for boundary conditions
+    # node- and facetsets for boundary conditions
     addnodeset!(grid, "clamped", x -> x[1] ≈ 0.0)
     addfacetset!(grid, "traction", x -> x[1] ≈ 2.0 && norm(x[2] - 0.5) <= 0.05)
     return grid
@@ -266,7 +266,7 @@ function symmetrize_lower!(K)
     return
 end
 
-function topopt(ra, ρ, n, filename; output = :false)
+function topopt(ra, ρ, n, filename; output = false)
     # material
     mp = MaterialParameters(210.0e3, 0.3, 1.0e-3, 3.0, ra^2, 15.0)
 
@@ -300,7 +300,7 @@ function topopt(ra, ρ, n, filename; output = :false)
     compliance = 0.0
     compliance_0 = 0.0
     compliance_n = 0.0
-    conv = :false
+    conv = false
 
     topology = ExclusiveTopology(grid)
     neighborhoods = cache_neighborhood(dh, topology)
@@ -344,16 +344,16 @@ function topopt(ra, ρ, n, filename; output = :false)
             compliance_0 = compliance
         end
 
-        # check convergence criterium (twice!)
+        # check convergence criterion (twice!)
         if abs(compliance - compliance_n) / compliance < tol
             if conv
                 println("Converged at iteration number: ", it)
                 break
             else
-                conv = :true
+                conv = true
             end
         else
-            conv = :false
+            conv = false
         end
 
         # update density
@@ -387,7 +387,7 @@ function topopt(ra, ρ, n, filename; output = :false)
     return
 end
 
-@time topopt(0.03, 0.5, 60, "large_radius"; output = :false);
-#topopt(0.02, 0.5, 60, "topopt_animation"; output=:true); # can be used to create animations
+@time topopt(0.03, 0.5, 60, "large_radius"; output = false);
+#topopt(0.02, 0.5, 60, "topopt_animation"; output=true); # can be used to create animations
 
 # This file was generated using Literate.jl, https://github.com/fredrikekre/Literate.jl
