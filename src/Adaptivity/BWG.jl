@@ -110,7 +110,8 @@ Thus, ancestors precede descendants (preordering).
 """
 function Base.isless(o1::OctantBWG, o2::OctantBWG)
     if o1.xyz != o2.xyz
-        #TODO verify b=o1.l/b=o2.l as argument potential bug otherwise
+        # morton(o, o.l, o.l) shifts by (b - l)*dim = 0, so it returns the full,
+        # level-independent anchor interleave: this compares anchors in Z-order.
         return morton(o1, o1.l, o1.l) < morton(o2, o2.l, o2.l)
     else
         return o1.l < o2.l
@@ -208,7 +209,7 @@ edges(octant::OctantBWG{3}, b::Integer) = ntuple(i -> edge(octant, i, b), 12)
 
 """
     boundaryset(o::OctantBWG{2}, i::Integer, b::Integer
-implements two dimensional boundaryset table from Fig.4.1 [IBWG2015](@citet)
+implements two dimensional boundaryset table from Figure 3 [IBWG2015](@citet)
 TODO: could be done little bit less ugly
 """
 function boundaryset(o::OctantBWG{2, N, T}, i::Integer, b::Integer) where {N, T}
@@ -227,7 +228,7 @@ end
 
 """
     boundaryset(o::OctantBWG{3}, i::Integer, b::Integer
-implements three dimensional boundaryset table from Fig.4.1 [IBWG2015](@citet)
+implements three dimensional boundaryset table from Figure 3 [IBWG2015](@citet)
 TODO: could be done little bit less ugly
 """
 function boundaryset(o::OctantBWG{3, N, T}, i::Integer, b::Integer) where {N, T}
@@ -396,17 +397,17 @@ function search(octantarray, a::OctantBWG{dim, N, T1}, idxset::Vector{T2}, b::In
             push!(idxset_match, q)
         end
     end
-    if isempty(idxset_match) && !isleaf
+    if !isempty(idxset_match) && !isleaf
         𝐇 = split_array(octantarray, a, b)
         _children = children(a, b)
         for (child, h) in zip(_children, 𝐇)
-            search(h, child, idxset_match, b)
+            search(h, child, idxset_match, b, Match)
         end
     end
     return idxset_match
 end
 
-search(tree::OctreeBWG, a::OctantBWG, idxset, Match = match) = search(tree.leaves, a, idxset, tree.b, match)
+search(tree::OctreeBWG, a::OctantBWG, idxset, Match = match) = search(tree.leaves, a, idxset, tree.b, Match)
 
 """
     match(o::OctantBWG, isleaf::Bool, q)
@@ -419,8 +420,6 @@ I don't understand what of a to check against index q
 """
 function match(o::OctantBWG, isleaf::Bool, q, b)
     isleaf && (return true)
-    println(q)
-    println(o)
     return false
 end
 
