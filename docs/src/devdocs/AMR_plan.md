@@ -86,17 +86,21 @@ O(n) traversal. Full build order + the corrected mental model are in
       `split_array` partition + stop-at-singleton-leaf; visits exactly the leaves in
       Morton order (tested on all 16 golden cases). This is the foundation + the
       conceptual "base iterator" the team was blocked on.
-- [ ] Extend the descent to visit intra-tree face/corner interfaces (2D) so node
-      sharing between sibling leaves can be assigned without the Dict.
-- [ ] `Iterate_interior` (Alg 5.2) — point-centric recursion over `e ∈ part(c)`,
-      reusing `split_array`/`ancestor_id`/`children`/`descendants`/`boundaryset`.
-      **Do not** start from `search` (different algorithm).
-- [ ] `Iterate` (Alg 5.3) driver — seed from tree-root closures. Validate the
-      visited point set + supports against `creategrid`.
-- [ ] `Lnodes_callback` (no paper pseudocode — design work): owner = min leaf in
-      `leaf_supp(c)`, node ids + connectivity. Validate vs `creategrid` (linear elems).
-- [ ] Hanging constraints via the remote-reference test (eq 6.1, `dim(c)<d-1`).
-      Validate vs `hangingnodes`.
+- [x] **`split_bounds`** (Alg 3.3): non-allocating index-based partition (stack
+      `NTuple` of child boundaries; no `𝐤` vector, no `SubArray` views). The descent
+      carries `(leaves, lo, hi)` ranges → `iterate_leaves` over 256 leaves: 0 bytes.
+- [x] **2D intra-tree hanging** (`iterate_hanging_2d`): face descent emits hanging
+      edge midpoints; matches `creategrid` `conformity_info` exactly (single-tree 2D).
+- [x] **3D intra-tree hanging** (`iterate_hanging_3d`): face descent emits face
+      centre (4 constrainers) + 4 face-edge midpoints (2 constrainers). Captures
+      face- AND edge-centre hanging for 2:1-balanced meshes (no 4-way edge descent
+      needed — proven via the edge-cycle argument). Matches `creategrid` (single-tree 3D).
+- [ ] **Inter-tree hanging** (multi-tree): descend the shared root-face across trees
+      using `transform_facet` (BWG2011 Alg 8) + orientation. The soft spot (the
+      `transform_*` "TODO understand this") — validate hard vs `creategrid` 4-tree/rotated.
+- [ ] **Node numbering** (corner/edge/face callbacks → ids + connectivity): owner =
+      min leaf touching the node (IBWG2015 §6 LNodes). Validate vs `creategrid`.
+- [ ] Map iterator hanging coords → node ids; assemble an iterator `creategrid`.
 - [ ] Retire the old multi-pass cost centers; make iterator the default.
 - [ ] (Optional) expose `dim(c)`-filtered volume/face/edge/corner callbacks as a
       thin API for downstream features.
