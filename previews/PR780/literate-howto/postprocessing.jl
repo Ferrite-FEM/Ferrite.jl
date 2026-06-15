@@ -17,7 +17,7 @@
 # different ways. Ferrite provides several tools to facilitate these tasks:
 #
 #  - L2 projection of (discrete) data onto FE interpolations using the `L2Projector`
-#  - Evalutation of fields (solutions, projections, etc) at arbitrary, user-defined, points
+#  - Evaluation of fields (solutions, projections, etc) at arbitrary, user-defined, points
 #    using the `PointEvalHandler`
 #  - Builtin functionality for exporting data (solutions, cell data, projections, etc) to
 #    the VTK format
@@ -30,7 +30,7 @@
 # domain.
 
 # !!! warning "Custom visualization"
-#     A common assumption is that the numbering of degrees of freedom matche the numbering
+#     A common assumption is that the numbering of degrees of freedom matches the numbering
 #     of the nodes in the grid. This is *NOT* the case in Ferrite. If the available tools
 #     don't suit your needs and you decide to "roll your own" visualization you need to be
 #     aware of this and take it into account. For the specific case of evaluating the

@@ -175,13 +175,13 @@ function compute_average_driving_force(mp, pΨ, χn)
     return p_Ω
 end
 
-function update_density(dh, states, mp, ρ, neighboorhoods, Δh)
+function update_density(dh, states, mp, ρ, neighborhoods, Δh)
     n_j = Int(ceil(6 * mp.β / (mp.η * Δh^2))) # iterations needed for stability
     χn = compute_densities(states, dh) # old density field
     χn1 = zeros(length(χn))
 
     for j in 1:n_j
-        ∇²χ = approximate_laplacian(neighboorhoods, χn, Δh) # Laplacian
+        ∇²χ = approximate_laplacian(neighborhoods, χn, Δh) # Laplacian
         pΨ = compute_driving_forces(states, mp, dh, χn) # driving forces
         p_Ω = compute_average_driving_force(mp, pΨ, χn) # average driving force
 
@@ -303,7 +303,7 @@ function topopt(ra, ρ, n, filename; output = :false)
     conv = :false
 
     topology = ExclusiveTopology(grid)
-    neighboorhoods = cache_neighborhood(dh, topology)
+    neighborhoods = cache_neighborhood(dh, topology)
 
     # Newton-Raphson loop
     NEWTON_TOL = 1.0e-8
@@ -357,7 +357,7 @@ function topopt(ra, ρ, n, filename; output = :false)
         end
 
         # update density
-        χ = update_density(dh, states, mp, ρ, neighboorhoods, Δh)
+        χ = update_density(dh, states, mp, ρ, neighborhoods, Δh)
 
         # update old displacement, density and compliance
         un .= u
