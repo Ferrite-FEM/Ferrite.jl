@@ -245,7 +245,7 @@ end
     end
 end
 
-# IBWG2015 §5 base iterator: the recursive split_array descent must visit exactly
+# IBWG2015 §5 base iterator: the recursive split_bounds descent must visit exactly
 # the leaves of each tree, in Morton order (the foundation for LNodes numbering).
 @testset "AMR iterator base descent" begin
     for (name, forest, _, _) in AMR_CASES
@@ -255,6 +255,38 @@ end
                 _AMR.iterate_leaves(o -> push!(visited, o), tree)
                 @test visited == tree.leaves
             end
+        end
+    end
+end
+
+# Face descent (2D intra-tree): hanging nodes from the iterator must match
+# creategrid's conformity_info exactly (compared in physical coordinates).
+@testset "AMR iterator face descent (2D hanging)" begin
+    iter_cases = Tuple{String, Any}[]
+    let f = ForestBWG(generate_grid(Quadrilateral, (1, 1)), 3)
+        _AMR.refine_all!(f, 1)
+        _AMR.refine!(f.cells[1], f.cells[1].leaves[1]); _AMR.refine!(f.cells[1], f.cells[1].leaves[1])
+        push!(iter_cases, ("nested", f))
+    end
+    let f = ForestBWG(generate_grid(Quadrilateral, (1, 1)), 4)
+        _AMR.refine_all!(f, 1); _AMR.refine!(f.cells[1], f.cells[1].leaves[1]); _AMR.balanceforest!(f)
+        push!(iter_cases, ("balanced", f))
+    end
+    let f = ForestBWG(generate_grid(Quadrilateral, (1, 1)), 4)
+        _AMR.refine_all!(f, 2); _AMR.refine!(f.cells[1], f.cells[1].leaves[1]); _AMR.balanceforest!(f)
+        push!(iter_cases, ("lvl2+1", f))
+    end
+    for (name, f) in iter_cases
+        @testset "$name" begin
+            hang = _AMR.iterate_hanging_2d(f.cells[1])
+            iter_set = Set((_coord(_AMR.transform_pointBWG(f, 1, h)),
+                    sort([_coord(_AMR.transform_pointBWG(f, 1, m)) for m in ms]))
+                for (h, ms) in hang)
+            grid = _AMR.creategrid(f)
+            ncoord(id) = _coord(Ferrite.get_node_coordinate(grid.nodes[id]))
+            cg_set = Set((ncoord(hid), sort([ncoord(cid) for cid in cids]))
+                for (hid, cids) in grid.conformity_info)
+            @test iter_set == cg_set
         end
     end
 end

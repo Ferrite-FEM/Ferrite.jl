@@ -372,32 +372,29 @@ end
 inside(tree::OctreeBWG{dim}, oct::OctantBWG{dim}) where {dim} = inside(oct, tree.b)
 
 """
-    split_array(octree::OctreeBWG, a::OctantBWG)
-    split_array(octantarray, a::OctantBWG, b::Integer)
-Algorithm 3.3 of [IBWG2015](@citet). Efficient binary search.
-"""
-function split_array(octantarray, a::OctantBWG{dim, N, T}, b::Integer) where {dim, N, T}
-    o = one(T)
-    𝐤 = T[i == 1 ? 1 : length(octantarray) + 1 for i in 1:(2^dim + 1)]
-    for i in 2:(2^dim)
-        m = 𝐤[i - 1]
-        while m < 𝐤[i]
-            n = m + (𝐤[i] - m) ÷ 2
-            c = ancestor_id(octantarray[n], a.l + o, b)
-            if c < i
-                m = n + 1
-            else
-                for j in i:c
-                    𝐤[j] = n
-                end
-            end
-        end
-    end
-    #TODO non-allocating way?
-    return ntuple(i -> view(octantarray, 𝐤[i]:(𝐤[i + 1] - 1)), 2^dim)
-end
+    split_bounds(leaves, lo, hi, a::OctantBWG, b) -> NTuple{2^dim+1, Int}
 
-split_array(tree::OctreeBWG, a::OctantBWG) = split_array(tree.leaves, a, tree.b)
+Algorithm 3.3 of [IBWG2015](@citet). Given the contiguous, Morton-sorted leaf
+sub-range `leaves[lo:hi]` (all strict descendants of `a`), return boundary indices
+`k` such that child `i` of `a` occupies `leaves[k[i]:k[i+1]-1]`. Non-allocating:
+returns a stack `NTuple` and binary-searches (the child key `ancestor_id` is
+monotone along the range) — no `𝐤` vector and no `SubArray` views, so the
+recursive descent that calls it at every internal octant stays allocation-free.
+"""
+function split_bounds(leaves, lo::Integer, hi::Integer, a::OctantBWG{dim, N, T}, b::Integer) where {dim, N, T}
+    l1 = a.l + one(T)
+    return ntuple(Val(N + 1)) do i
+        i == 1 && return Int(lo)
+        i == N + 1 && return Int(hi) + 1
+        # first index j ∈ lo:hi with ancestor_id(leaves[j], l1) ≥ i
+        alo = Int(lo); ahi = Int(hi) + 1
+        while alo < ahi
+            mid = (alo + ahi) >>> 1
+            ancestor_id(leaves[mid], l1, b) < i ? (alo = mid + 1) : (ahi = mid)
+        end
+        return alo
+    end
+end
 
 """
     iterate_leaves(f, tree::OctreeBWG)
@@ -408,32 +405,95 @@ Visit every leaf exactly once in Morton (z-) order and call `f(leaf)`, via the
 iterator, Algorithm 5.2):
 
 - the leaves contained in any octant form a *contiguous* sub-range of the
-  Morton-sorted leaf array, so at each internal octant `split_array` partitions
+  Morton-sorted leaf array, so at each internal octant `split_bounds` partitions
   that sub-range among the `2^dim` children in O(log n);
 - the recursion stops when a sub-range is a single leaf equal to the octant.
 
-This is the base traversal the LNodes node-numbering will build on (no `findfirst`
-scans, no `Dict`). See `docs/src/devdocs/AMR_iterator.md`.
+Allocation-free (carries index ranges, not views) — the base traversal the LNodes
+node-numbering will build on (no `findfirst`, no `Dict`). See
+`docs/src/devdocs/AMR_iterator.md`.
 """
-function iterate_leaves(f::F, leaves, octant::OctantBWG, b::Integer) where {F}
-    n = length(leaves)
-    n == 0 && return
-    if n == 1 && leaves[1] == octant   # octant is a leaf of the forest -> stop
+function iterate_leaves(f::F, leaves, lo::Int, hi::Int, octant::OctantBWG, b::Integer) where {F}
+    lo > hi && return
+    if lo == hi && leaves[lo] == octant   # octant is a leaf of the forest -> stop
         f(octant)
         return
     end
-    child_ranges = split_array(leaves, octant, b)   # 2^dim contiguous views
+    k = split_bounds(leaves, lo, hi, octant, b)
     child_octants = children(octant, b)
-    for (child, sub) in zip(child_octants, child_ranges)
-        iterate_leaves(f, sub, child, b)
+    for i in 1:length(child_octants)
+        iterate_leaves(f, leaves, k[i], k[i + 1] - 1, child_octants[i], b)
     end
     return
 end
-iterate_leaves(f::F, tree::OctreeBWG{dim}) where {F, dim} = iterate_leaves(f, tree.leaves, root(dim), tree.b)
+iterate_leaves(f::F, tree::OctreeBWG{dim}) where {F, dim} = iterate_leaves(f, tree.leaves, 1, length(tree.leaves), root(dim), tree.b)
 
-function search(octantarray, a::OctantBWG{dim, N, T1}, idxset::Vector{T2}, b::Integer, Match = match) where {dim, N, T1 <: Integer, T2}
-    isempty(octantarray) && return
-    isleaf = (length(octantarray) == 1 && a ∈ octantarray) ? true : false
+# --- WIP node iterator (Tier 3): face descent for hanging-node detection ---
+# 2D, intra-tree. A building block toward the full IBWG2015 LNodes iterator that
+# will replace creategrid/hangingnodes. Validated to reproduce creategrid's
+# conformity_info for single-tree 2D (see test/test_p4est_golden.jl). Allocation-free:
+# carries index ranges into the shared leaf array (no views).
+_isleaf(leaves, lo::Integer, hi::Integer, oct::OctantBWG) = lo == hi && leaves[lo] == oct
+
+# Descend the shared face `f` (in octL's frame) between face-adjacent octants
+# octL/octR of the same tree, given their leaf index ranges; record hanging nodes
+# into `hang`. When one side is a coarse leaf and the other refined, the coarse
+# face's midpoint is a hanging node constrained by that face's two endpoints.
+function _iter_face_2d!(hang, leaves, octL, loL, hiL, octR, loR, hiR, f::Integer, b::Integer)
+    lL = _isleaf(leaves, loL, hiL, octL); lR = _isleaf(leaves, loR, hiR, octR)
+    (lL && lR) && return                                  # conforming face
+    if lL && !lR
+        fc = face(octL, f, b); hang[center(fc)] = collect(fc); return
+    elseif !lL && lR
+        fc = face(octR, opposite_face_2[f], b); hang[center(fc)] = collect(fc); return
+    end
+    # both refined: recurse into matching child-pairs (adjacency derived from face
+    # coordinates via contains_facet/==, not a hand-built table).
+    kL = split_bounds(leaves, loL, hiL, octL, b); cL = children(octL, b)
+    kR = split_bounds(leaves, loR, hiR, octR, b); cR = children(octR, b)
+    fo = opposite_face_2[f]
+    for i in 1:4
+        contains_facet(face(octL, f, b), face(cL[i], f, b)) || continue
+        for j in 1:4
+            face(cR[j], fo, b) == face(cL[i], f, b) || continue
+            _iter_face_2d!(hang, leaves, cL[i], kL[i], kL[i + 1] - 1, cR[j], kR[j], kR[j + 1] - 1, f, b)
+        end
+    end
+    return
+end
+
+function _iter_volume_2d!(hang, leaves, oct, lo, hi, b::Integer)
+    (lo > hi || _isleaf(leaves, lo, hi, oct)) && return
+    k = split_bounds(leaves, lo, hi, oct, b); c = children(oct, b)
+    for i in 1:4
+        _iter_volume_2d!(hang, leaves, c[i], k[i], k[i + 1] - 1, b)
+    end
+    # 4 internal child-child face interfaces (z-order children 1=SW,2=SE,3=NW,4=NE)
+    _iter_face_2d!(hang, leaves, c[1], k[1], k[2] - 1, c[2], k[2], k[3] - 1, 2, b)  # SW|SE (+x)
+    _iter_face_2d!(hang, leaves, c[3], k[3], k[4] - 1, c[4], k[4], k[5] - 1, 2, b)  # NW|NE (+x)
+    _iter_face_2d!(hang, leaves, c[1], k[1], k[2] - 1, c[3], k[3], k[4] - 1, 4, b)  # SW|NW (+y)
+    _iter_face_2d!(hang, leaves, c[2], k[2], k[3] - 1, c[4], k[4], k[5] - 1, 4, b)  # SE|NE (+y)
+    return
+end
+
+"""
+    iterate_hanging_2d(tree::OctreeBWG{2}) -> Dict(constrained_coord => [constrainer_coords])
+
+WIP building block for the IBWG2015 node iterator (Tier 3): detect the hanging
+nodes of a single 2D tree by descending volume + face interfaces (no Dict over all
+nodes, no `findfirst`). Coordinates are octree integers. Validated to reproduce
+`creategrid`'s `conformity_info` for single-tree 2D. Intra-tree only for now;
+inter-tree, 3D (edge descent), and node numbering are the remaining steps.
+"""
+function iterate_hanging_2d(tree::OctreeBWG{2})
+    hang = Dict{NTuple{2, Int}, Vector{NTuple{2, Int}}}()
+    _iter_volume_2d!(hang, tree.leaves, root(2), 1, length(tree.leaves), tree.b)
+    return hang
+end
+
+function search(octantarray, lo::Integer, hi::Integer, a::OctantBWG{dim, N, T1}, idxset::Vector{T2}, b::Integer, Match = match) where {dim, N, T1 <: Integer, T2}
+    lo > hi && return eltype(idxset)[]
+    isleaf = lo == hi && octantarray[lo] == a
     idxset_match = eltype(idxset)[]
     for q in idxset
         if Match(a, isleaf, q, b)
@@ -441,16 +501,16 @@ function search(octantarray, a::OctantBWG{dim, N, T1}, idxset::Vector{T2}, b::In
         end
     end
     if !isempty(idxset_match) && !isleaf
-        𝐇 = split_array(octantarray, a, b)
+        k = split_bounds(octantarray, lo, hi, a, b)
         _children = children(a, b)
-        for (child, h) in zip(_children, 𝐇)
-            search(h, child, idxset_match, b, Match)
+        for i in 1:length(_children)
+            search(octantarray, k[i], k[i + 1] - 1, _children[i], idxset_match, b, Match)
         end
     end
     return idxset_match
 end
 
-search(tree::OctreeBWG, a::OctantBWG, idxset, Match = match) = search(tree.leaves, a, idxset, tree.b, Match)
+search(tree::OctreeBWG, a::OctantBWG, idxset, Match = match) = search(tree.leaves, 1, length(tree.leaves), a, idxset, tree.b, Match)
 
 """
     match(o::OctantBWG, isleaf::Bool, q)

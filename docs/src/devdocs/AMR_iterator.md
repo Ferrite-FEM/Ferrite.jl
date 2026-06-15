@@ -197,3 +197,46 @@ BWG.jl:632/656/706), `Global_numbering ≡` contiguous counter, `Reconstruct_rem
    single schedule/response round; 3D corner balancing incomplete (TODO :1033).
    2:1 balance is the load-bearing precondition for the iterator's `B_∩^i`
    selection — broken balance silently breaks descent assumptions.
+
+---
+
+## Implementation progress
+
+- **Step 1 (done):** `iterate_leaves` (BWG.jl) — base recursive `split_array`
+  descent, stop-at-singleton-leaf; visits exactly the leaves in Morton order.
+  Tested on all 16 golden cases.
+- **Step 2 (done — in `src`, tested):** a p4est_iterate-style **face descent**
+  (`iterate_hanging_2d`) that detects hanging nodes during traversal, reproducing
+  `creategrid`'s `conformity_info` exactly for single-tree 2D. The child-pair
+  adjacency is *derived* by matching face coordinates — no hand-built
+  CHILD_FACE_PAIRS table. Both descents are **allocation-free**: `split_array`
+  (which built a `𝐤` vector + `2^dim` `SubArray` views per call) was replaced by
+  `split_bounds`, returning the `2^dim+1` child boundary *indices* as a stack
+  `NTuple`; the descent carries `(leaves, lo, hi)` ranges, never materializing
+  views (`iterate_leaves` over 256 leaves: 0 bytes). Sketch (carries ranges):
+
+  ```julia
+  # during volume descent of an internal octant, visit its 4 internal child-child
+  # face interfaces (z-order children 1=SW,2=SE,3=NW,4=NE):
+  #   iter_face(c1,c2,+x); iter_face(c3,c4,+x); iter_face(c1,c3,+y); iter_face(c2,c4,+y)
+  function iter_face!(hang, octL, leavesL, octR, leavesR, f, b) # f = octL's face toward octR
+      lL = isleaf(leavesL, octL); lR = isleaf(leavesR, octR)
+      lL && lR && return                                  # conforming face
+      if lL && !lR                                        # coarse leaf vs refined → hanging
+          fc = face(octL, f, b); push!(hang, center(fc) => collect(fc)); return
+      elseif !lL && lR
+          fc = face(octR, opp(f), b); push!(hang, center(fc) => collect(fc)); return
+      end
+      subL, cL = split_array(leavesL, octL, b), children(octL, b)   # both refined → recurse
+      subR, cR = split_array(leavesR, octR, b), children(octR, b)
+      for i in 1:4, j in 1:4
+          contains_facet(face(octL, f, b), face(cL[i], f, b)) || continue
+          face(cR[j], opp(f), b) == face(cL[i], f, b) &&
+              iter_face!(hang, cL[i], subL[i], cR[j], subR[j], f, b)
+      end
+  end
+  ```
+  Hanging node = midpoint of the coarse face; constrainers = the coarse face's two
+  endpoints (matches the 0.5/0.5 affine constraint).
+- **Next:** corner descent (node sharing/numbering) → 3D (edge descent + face-centre
+  hanging) → inter-tree (orientation transforms) → wire into an iterator `creategrid`.
