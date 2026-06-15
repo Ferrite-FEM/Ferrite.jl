@@ -99,3 +99,33 @@ leaves) is non-trivial.
 Fixed `search` recurse-guard inversion + dropped callback, `boundaryset`
 docstring (Fig 3), removed `match` debug prints, clarified `isless` comment.
 None of these are on a hot path — baseline numbers above remain the reference.
+
+### 2026-06-15 — Tier 1b
+Root cause of the dominant 3D cost was **allocation**, not the `findfirst` leaf
+lookups the plan blamed. `hangingnodes` allocated 1.2 GB for 800 constraints:
+`edges()` used `ntuple(f, 12)` (n>10 → Base's type-unstable generic path,
+confirmed via `return_types`/`@allocated`; n≤10 const lengths were already
+stable), and `parent_`/`parentfaces`/`parentedges` were rebuilt 4–8× per leaf.
+Fix = `ntuple(f, Val(12))` in `edges` + hoist out of the vertex loop. Plus
+`balancetree` buffer reuse + Set parent-check, `creategrid` Phase-4 transform on
+unique nodes, a hash `Set` for O(1) leaf membership, and `children` rewritten to a
+direct z-order computation using the concrete `OctantBWG{dim,N,T}` constructor (it
+returned `NTuple{Union{OctantBWG{2,4},OctantBWG{3,8}}}` — type-unstable via the
+runtime-`dim` morton-decode constructor; now concrete `NTuple{N,OctantBWG{dim,N,T}}`).
+
+| case | metric | baseline | Tier 1b |
+|------|--------|----------|---------|
+| 3D 11264 | hangingnodes alloc | 1194 MB | **15 MB** |
+| 3D 11264 | hangingnodes time (min/25) | ~541 ms | ~429 ms |
+| 3D 11264 | creategrid alloc | 1274 MB | 94 MB |
+| 2D 28672 | creategrid time | 213 ms | ~50 ms |
+| 2D 28672 | balancetree (bal_tree) | 62 ms | ~50 ms |
+| 3D 90112 | balancetree (bal_tree) | 263 ms | ~200 ms |
+| 3D | children alloc / 100k calls | 205 MB | 38 MB (Union→concrete) |
+| 3D 11264 | balanceforest! | 125 ms | 119 ms |
+
+Allocation counts are deterministic and the reliable signal; 3D full-pipeline
+wall-clock is noisy on a loaded machine. `hangingnodes` is now compute-bound
+(Dict lookups + 90k-iteration vertex loop) — the iterator (Tier 3) is the next
+lever there. Dropped idea: binary-search leaf membership (`searchsortedfirst`
+rides on `isless→morton`, loses to cheap-`==` scans at realistic tree sizes).

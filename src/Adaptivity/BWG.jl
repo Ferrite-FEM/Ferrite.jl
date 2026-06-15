@@ -102,6 +102,10 @@ nchilds(::Type{OctantBWG{dim, N, T}}) where {dim, N, T} = N
 nchilds(o::OctantBWG) = nchilds(typeof(o)) # Follow z order, x before y before z for faces, edges and corners
 
 Base.isequal(o1::OctantBWG, o2::OctantBWG) = (o1.l == o2.l) && (o1.xyz == o2.xyz)
+# Cheap hash (no morton) consistent with isequal, so octants can be put in a Set
+# for O(1) membership queries — much cheaper than searchsortedfirst (which pays
+# two morton evaluations per isless comparison).
+Base.hash(o::OctantBWG, h::UInt) = hash(o.xyz, hash(o.l, h))
 """
     o1::OctantBWG < o2::OctantBWG
 Implements Algorithm 2.1 of [IBWG2015](@citet).
@@ -123,11 +127,18 @@ end
 Computes all childern of `octant`
 """
 function children(octant::OctantBWG{dim, N, T}, b::Integer) where {dim, N, T}
-    o = one(T)
-    _nchilds = nchilds(octant)
-    startid = morton(octant, octant.l + o, b)
-    endid = startid + _nchilds + o
-    return ntuple(i -> OctantBWG(dim, octant.l + o, (startid:endid)[i], b), _nchilds)
+    # Children in z-order: child `i` (1-based) carries the bit pattern `i-1`, i.e. it is
+    # shifted by the child half-size `h` in dimension `j` iff bit `j-1` of `i-1` is set
+    # (matches `child_id`). Computed directly to stay type-stable and allocation-free:
+    # `ntuple(_, Val(N))` unrolls, and the explicit `OctantBWG{dim,N,T}` constructor avoids
+    # the `Union`-typed morton-decode constructor. Equivalent to the previous morton-based
+    # implementation for all valid inputs (`octant.l + 1 ≤ b`).
+    l = octant.l + one(T)
+    h = T(_compute_size(b, l))
+    x = octant.xyz
+    return ntuple(Val(N)) do i
+        OctantBWG{dim, N, T}(l, ntuple(j -> x[j] + h * T(((i - 1) >> (j - 1)) & 1), Val(dim)))
+    end
 end
 
 abstract type OctantIndex{T <: Integer} end
@@ -205,7 +216,7 @@ end
 Computes all edges of a given `octant`. Each edge is encoded within the octree coordinates i.e. by integers.
 Further, each edge consists of two three-dimensional integer coordinates.
 """
-edges(octant::OctantBWG{3}, b::Integer) = ntuple(i -> edge(octant, i, b), 12)
+edges(octant::OctantBWG{3}, b::Integer) = ntuple(i -> edge(octant, i, b), Val(12))
 
 """
     boundaryset(o::OctantBWG{2}, i::Integer, b::Integer
@@ -741,11 +752,12 @@ function creategrid(forest::ForestBWG{dim, C, T}) where {dim, C, T}
             next_nodeid += 1
         end
     end
-    nodes_physical_all = transform_pointBWG(forest, nodes)
-    nodes_physical = zeros(eltype(nodes_physical_all), next_nodeid - 1)
-    for (ni, (kv, nodeid)) in enumerate(nodeids)
-        nodes_physical[nodeids_dedup[nodeid]] = nodes_physical_all[nodeid]
+    # Phase 4: transform only the unique owner nodes, not the pre-dedup duplicates
+    unique_kv = Vector{eltype(nodes)}(undef, next_nodeid - 1)
+    for (nodeid, compact) in nodeids_dedup
+        unique_kv[compact] = nodes[nodeid]
     end
+    nodes_physical = transform_pointBWG(forest, unique_kv)
 
     # Phase 4: Generate cells
     celltype = dim < 3 ? Quadrilateral : Hexahedron
@@ -805,6 +817,7 @@ function hangingnodes(forest::ForestBWG{dim}, nodeids, nodeowners) where {dim}
     facetable = dim == 2 ? 𝒱₂ : 𝒱₃
     opposite_face = dim == 2 ? opposite_face_2 : opposite_face_3
     hnodes = Dict{Int, Vector{Int}}()
+    leafsets = [Set(tree.leaves) for tree in forest.cells] # O(1) membership; hangingnodes does not mutate leaves
     facet_neighborhood = Ferrite.Ferrite.get_facet_facet_neighborhood(forest)
     for (k, tree) in enumerate(forest.cells)
         rootfaces = faces(root(dim), tree.b)
@@ -813,15 +826,15 @@ function hangingnodes(forest::ForestBWG{dim}, nodeids, nodeowners) where {dim}
             if leaf == root(dim)
                 continue
             end
+            parent_ = parent(leaf, tree.b)
+            parentfaces = faces(parent_, tree.b)
+            parentedges = dim > 2 ? edges(parent_, tree.b) : nothing
             for (ci, c) in enumerate(vertices(leaf, tree.b))
-                parent_ = parent(leaf, tree.b)
-                parentfaces = faces(parent_, tree.b)
                 for (pface_i, pface) in enumerate(parentfaces)
                     if iscenter(c, pface) #hanging node candidate
                         neighbor_candidate = facet_neighbor(parent_, pface_i, tree.b)
                         if inside(tree, neighbor_candidate) #intraoctree branch
-                            neighbor_candidate_idx = findfirst(x -> x == neighbor_candidate, tree.leaves)
-                            if neighbor_candidate_idx !== nothing
+                            if neighbor_candidate ∈ leafsets[k]
                                 neighbor_candidate_faces = faces(neighbor_candidate, tree.b)
                                 nf = findfirst(x -> x == pface, neighbor_candidate_faces)
                                 hnodes[nodeids[nodeowners[(k, c)]]] = [nodeids[nodeowners[(k, nc)]] for nc in neighbor_candidate_faces[nf]]
@@ -851,8 +864,7 @@ function hangingnodes(forest::ForestBWG{dim}, nodeids, nodeowners) where {dim}
                                 k′ = facet_neighbor_[1][1]
                                 ri′ = _perminv[facet_neighbor_[1][2]]
                                 interoctree_neighbor = transform_facet(forest, k′, ri′, neighbor_candidate)
-                                interoctree_neighbor_candidate_idx = findfirst(x -> x == interoctree_neighbor, forest.cells[k′].leaves)
-                                if interoctree_neighbor_candidate_idx !== nothing
+                                if interoctree_neighbor ∈ leafsets[k′]
                                     r = compute_face_orientation(forest, k, pface_i)
                                     neighbor_candidate_faces = faces(neighbor_candidate, forest.cells[k′].b)
                                     transformed_neighbor_faces = faces(interoctree_neighbor, forest.cells[k′].b)
@@ -888,7 +900,6 @@ function hangingnodes(forest::ForestBWG{dim}, nodeids, nodeowners) where {dim}
                     end
                 end
                 if dim > 2
-                    parentedges = edges(parent_, tree.b)
                     for (pedge_i, pedge) in enumerate(parentedges)
                         if iscenter(c, pedge) #hanging node candidate
                             neighbor_candidate = edge_neighbor(parent_, pedge_i, tree.b)
@@ -901,8 +912,7 @@ function hangingnodes(forest::ForestBWG{dim}, nodeids, nodeowners) where {dim}
                                     k′ = edge_neighbor_[1][1]
                                     ri′ = edge_perm_inv[edge_neighbor_[1][2]]
                                     interoctree_neighbor = transform_edge(forest, k′, ri′, neighbor_candidate, true)
-                                    interoctree_neighbor_candidate_idx = findfirst(x -> x == interoctree_neighbor, forest.cells[k′].leaves)
-                                    if interoctree_neighbor_candidate_idx !== nothing
+                                    if interoctree_neighbor ∈ leafsets[k′]
                                         neighbor_candidate_edges = edges(neighbor_candidate, forest.cells[k′].b)
                                         transformed_neighbor_edges = edges(interoctree_neighbor, forest.cells[k′].b)
                                         ne = findfirst(x -> iscenter(c, x), neighbor_candidate_edges)
@@ -1086,25 +1096,29 @@ function balancetree(tree::OctreeBWG)
     if length(tree.leaves) == 1
         return tree
     end
-    W = copy(tree.leaves); P = eltype(tree.leaves)[]; R = eltype(tree.leaves)[]
+    # Reusable buffers to avoid per-level reallocation. `Tparents` replaces the
+    # O(n²) `p ∉ parent.(T, b)` broadcast with O(1) set membership.
+    OT = eltype(tree.leaves)
+    W = copy(tree.leaves); P = OT[]; R = OT[]
+    Q = OT[]; T = OT[]; Tparents = Set{OT}()
     for l in tree.b:-1:1 #TODO verify to do this until level 1
-        Q = [o for o in W if o.l == l]
+        empty!(Q)
+        for o in W
+            o.l == l && push!(Q, o)
+        end
         sort!(Q)
-        #construct T
-        T = eltype(Q)[]
+        # T: one representative per distinct parent (first in Q order)
+        empty!(T); empty!(Tparents)
         for x in Q
-            if isempty(T)
-                push!(T, x)
-                continue
-            end
             p = parent(x, tree.b)
-            if p ∉ parent.(T, (tree.b,))
+            if p ∉ Tparents
                 push!(T, x)
+                push!(Tparents, p)
             end
         end
         for t in T
-            push!(R, t, siblings(t, tree.b)...)
-            push!(P, possibleneighbors(parent(t, tree.b), l - 1, tree.b)...)
+            append!(R, children(parent(t, tree.b), tree.b)) # == t and its siblings
+            append!(P, possibleneighbors(parent(t, tree.b), l - 1, tree.b))
         end
         append!(P, x for x in W if x.l == l - 1)
         filter!(x -> !(x.l == l - 1), W) #don't know why I have to negotiate like this, otherwise behaves weird

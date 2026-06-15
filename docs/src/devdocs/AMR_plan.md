@@ -28,28 +28,37 @@ rewrite and needs human design review; build it incrementally with the
 
 ---
 
-## Tier 1 — Safety net + quick wins (NEXT)
+## Tier 1 — Safety net + quick wins
 
-Goal: 20–100× on the dominant 3D path with zero behaviour change.
+Byte-identical against the golden oracle throughout. See `benchmark/amr-perf-log.md`.
 
-**1a. Golden-output regression tests** (prerequisite — current `test_p4est.jl`
-only asserts *counts*):
-- [ ] Pin full structure (cell connectivity, node coords, complete hanging-node
-      map, facetsets) for a 2D/3D × multi-tree × refinement-pattern matrix.
-- [ ] Make it a reusable oracle (`@test grid_new == grid_ref` style) every
-      optimization runs against.
+**1a. Golden-output + invariant tests** ✅
+- [x] Renumbering-invariant fingerprint of forest + grid frozen in
+      `test/amr_golden/` (16 cases: 2D/3D, multi-tree, rotated, balanced, disc).
+- [x] Independent correctness invariants (unique nodes, positive orientation,
+      box shape, hanging = mean-of-constrainers) — catch bugs the golden would enshrine.
 
-**1b. Quick-fixes** (each verified byte-identical vs 1a, then re-benchmark):
-- [ ] `hangingnodes`: `findfirst(==(x), tree.leaves)` → `searchsortedfirst`
-      (leaves are Morton-sorted — verified). Biggest 3D win (Phase 5 = 78% of 3D creategrid).
-- [ ] `balance_face/edge/corner`: replace `∉ neighbor_tree.leaves` linear scans
-      with binary search.
-- [ ] `refine!`/`coarsen!`: replace the `findfirst` leaf lookup with binary search.
-- [ ] `creategrid` Phase 4: run `transform_pointBWG` on **unique** nodes only
-      (3D: 103 ms wasted on pre-dedup duplicates).
-- [ ] `balancetree`: Set-based parent check instead of `p ∉ parent.(T,(b,))` (~10%).
-- [ ] `balanceforest!`: dirty-tree tracking — only re-balance changed trees.
-- [ ] Re-run benchmark; record before/after in the perf log.
+**1b. Quick-fixes** ✅ (the original plan mis-diagnosed the bottleneck; corrected below)
+- [x] `hangingnodes` was GC-bound (1.2 GB / 800 constraints), not lookup-bound:
+  - [x] `edges()` used `ntuple(f, 12)` → `n>10` hits Base's type-unstable generic
+        path (verified via `return_types`/`@allocated`; `n≤10` const lengths were
+        already stable). Now `ntuple(f, Val(12))`.
+  - [x] hoisted `parent_`/`parentfaces`/`parentedges` out of the per-vertex loop (4–8×/leaf).
+  - Result (3D, 11264 cells): **1194 → 15 MB, ~541 → 429 ms**.
+- [x] `balancetree`: reuse Q/T/Tparents buffers; Set parent-check replaces O(n²)
+      `p ∉ parent.(T,b)` (per Max's allocation note).
+- [x] `creategrid` Phase 4: `transform_pointBWG` only the unique owner nodes.
+- [x] `Base.hash(OctantBWG)` + `Set` membership in `hangingnodes` — O(1) leaf
+      lookup that scales to large trees.
+- [DROPPED] binary-search leaf membership: `searchsortedfirst` rides on
+  `isless→morton` (~120 bit-ops/compare), so it lost to cheap-`==` scans at
+  realistic tree sizes and regressed `balance_*`. A hash `Set` is the right
+  scalable membership; `balance_*`/`refine!`/`coarsen!` left as original scans.
+- [ ] `balanceforest!`: dirty-tree tracking (deferred — converges in 1 iteration
+      on tested cases; low priority).
+
+After 1b, `hangingnodes` is **compute-bound** (Dict lookups + the 90k-iteration
+vertex loop). Further gains there need the iterator (Tier 3).
 
 ---
 
