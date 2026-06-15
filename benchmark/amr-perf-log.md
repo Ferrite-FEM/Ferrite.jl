@@ -93,6 +93,19 @@ leaves) is non-trivial.
 
 ## Run log
 
+### 2026-06-15 — balanceforest! 450 → 77 MiB (`s_i` closure box)
+`@code_warntype` on `_balance_leaf!` showed `s_i@_24 = Core.Box()` — `s_i` was heap-boxed
+as `Any`. Cause: the 2D corner branch's `findall(x -> any(x .== s_i), 𝒱₂)` closure captures
+`s_i`, while `s_i -= 4/8/14` reassigns it; capture + reassignment ⇒ `Core.Box`, decided at
+*lowering* (before the dead 2D branch is dropped for 3D), so every `s_i` use in the 3D hot
+loop went through the box (≈370 MiB). Fix: `si = s_i` then close over `si` (assigned once,
+not reassigned ⇒ not boxed); `s_i` is no longer captured, so its reassignments don't box it.
+
+3D 90112: **balanceforest! 450 → 77 MiB, 284 → 96.6 ms**. Byte-identical (golden 16 +
+invariants 1643 + e2e + test_p4est). Cumulative vs session start: **2017 → 77 MiB (26×),
+534 → 96.6 ms (5.5×)**. `balancetree` (69 of the 77 MiB) is now the bulk — the per-tree
+rebuild (W copy, level loop, `_sort_by_morton!` keys+sortperm, `unique!`); more fundamental.
+
 ### 2026-06-15 — balanceforest! allocation 2.0 GiB → 450 MiB (type-stable possibleneighbors)
 `balanceforest!` allocated ~2 GiB (on an already-balanced forest that adds 0 cells — pure
 overhead). The allocation profiler (`Profile.Allocs`) pinned it, after a couple of false

@@ -1346,7 +1346,12 @@ function _balance_leaf!(forest::ForestBWG{dim}, k, tree, o, perm_face, perm_face
         if dim == 2 # need more clever s_i encoding
             if s_i <= 4 #corner neighbor, only true for 2D see possibleneighbors
                 cc = forest.topology.vertex_vertex_neighbor[k, perm_corner[s_i]]
-                participating_faces_idx = findall(x -> any(x .== s_i), 𝒱₂) #TODO! optimize by using inverted table
+                # `let` breaks the closure capture of `s_i`: capturing it while it is also
+                # reassigned (`s_i -= …`) below boxes `s_i` as `Core.Box`/`Any` for the whole
+                # function (decided at lowering, before the dead 2D branch is dropped for 3D),
+                # heap-boxing every `s_i` use in the hot loop.
+                si = s_i
+                participating_faces_idx = findall(x -> any(x .== si), 𝒱₂) #TODO! optimize by using inverted table
                 pivot_faces = faces(o, tree.b)
                 if isempty(cc)
                     # the branch below checks if we are in a newly introduced topologic tree connection
