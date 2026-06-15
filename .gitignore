@@ -24,3 +24,7 @@ docs/src/changelog.md
 LocalPreferences.toml
 docs/LocalPreferences.toml
 benchmark/tune.json
+
+# Local copies of the p4est papers (copyrighted, do not commit)
+BursteddeWilcoxGhattas11.pdf
+IsaacBursteddeWilcoxEtAl15.pdf

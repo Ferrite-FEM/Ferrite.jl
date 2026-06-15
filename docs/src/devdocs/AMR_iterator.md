@@ -118,7 +118,7 @@ LNodes callback (C519) — this is design work, not transcription.
 | `BWG.jl` symbol (line) | Paper algorithm | Status |
 |---|---|---|
 | `morton` (76) | BWG2011 Alg 3 / eq 2.3 | done |
-| `Base.isless` (111) | IBWG2015 Alg 2.1 (single-tree) | partial — morton-arg concern, see §6 |
+| `Base.isless` (111) | IBWG2015 Alg 2.1 (single-tree) | done — Morton order verified (morton-arg is level-independent), see §6 |
 | `child_id` (1272) | BWG2011 Alg 1 | done (1-based) |
 | `ancestor_id` (1289) | IBWG2015 Alg 3.2 | done — monotone |
 | `parent` (1301), `descendants` (1317) | BWG2011 Alg 2, 4 | done |
@@ -128,7 +128,7 @@ LNodes callback (C519) — this is design work, not transcription.
 | `find_range_boundaries` (261) | IBWG2015 Alg 4.2 | done — ghost machinery, not the iterator |
 | `transform_facet/edge/corner` (1508/1698/1612) | BWG2011 Alg 8/10/12 | partial — empirical orientation, see §6 |
 | `balanceforest!` (967) | BWG2011 Alg 17 | partial — serial fixpoint, 3D corner balancing incomplete |
-| `search` (390) | IBWG2015 Alg 3.1 | **buggy** — inverted recurse guard + dropped callback (§6). Do not use as template. |
+| `search` (390) | IBWG2015 Alg 3.1 | fixed — guard inversion + dropped callback corrected (§6); separate algo from the iterator |
 | `isrelevant` (296) | IBWG2015 Alg 5.1 | stub `return true` (correct for serial) |
 | `creategrid` (598) | BWG2011 Alg 20 (Nodes) | stand-in — to be replaced by LNodes |
 | `hangingnodes` (803) | eq 6.1 remote-reference (re-derived) | stand-in — to be folded into the callback |
@@ -173,17 +173,19 @@ BWG.jl:632/656/706), `Global_numbering ≡` contiguous counter, `Reconstruct_rem
 
 ## 6. Code divergences that are latent bugs
 
-1. **`search` recurse guard is inverted (BWG.jl:399).** `if isempty(idxset_match)
-   && !isleaf` — Alg 3.1 line 6 recurses when the match set is **non-empty**; this
-   recurses when it is **empty** (logical opposite). Line 403 also drops the
-   `Match` callback, and `match` (420) is an admitted stub. Do not mine `search`
-   as a template; irrelevant to LNodes if you write `Iterate_interior` fresh.
-2. **`isless` truncates each octant at its own level (BWG.jl:114):**
-   `morton(o1, o1.l, o1.l) < morton(o2, o2.l, o2.l)` (author TODO at :113). When
-   comparing octants of differing coordinate **and** differing level, the keys
-   live at different bit depths. This underpins the contiguity property (§1).
-   Verify the per-tree leaf arrays are genuinely Morton-sorted before trusting
-   `split_array`.
+1. **`search` (BWG.jl:399/403) — FIXED 2026-06-15.** The recurse guard was inverted
+   (`isempty(idxset_match)` — recursing on the *empty* match set, vs Alg 3.1 line 6
+   which recurses when non-empty) and the recursion dropped the `Match` callback.
+   Both corrected; verified the descent reaches every leaf. `match` (420) is still a
+   stub. This is the generic Search (Alg 3.1), a different algorithm from the
+   LNodes iterator — write `Iterate_interior` fresh, don't extend `search`.
+2. **`isless` (BWG.jl:113) — VERIFIED CORRECT (false alarm).**
+   `morton(o, o.l, o.l)` shifts by `(b-l)*dim = 0`, so it returns the full,
+   level-independent anchor interleave — the correct Alg 2.1 Z-order. Confirmed
+   empirically: `issorted` + `searchsortedfirst` locate every leaf and reject
+   refined parents in 2D/3D on balanced non-uniform forests, and `split_array`
+   reconstructs the contiguous ordered leaves. The `searchsortedfirst` quick-fixes
+   are safe. (Misleading TODO removed.)
 3. **`transform_facet/edge/corner` orientation logic is empirical** (BWG.jl:1533
    "arithmetic switch: TODO understand this", :1567 "What is this condition
    exactly?"). The inside-vs-remote normal-axis sign differs from the paper /
