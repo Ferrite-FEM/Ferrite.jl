@@ -95,13 +95,20 @@ O(n) traversal. Full build order + the corrected mental model are in
       centre (4 constrainers) + 4 face-edge midpoints (2 constrainers). Captures
       face- AND edge-centre hanging for 2:1-balanced meshes (no 4-way edge descent
       needed — proven via the edge-cycle argument). Matches `creategrid` (single-tree 3D).
-- [ ] **Inter-tree hanging** (multi-tree): descend the shared root-face across trees
-      using `transform_facet` (BWG2011 Alg 8) + orientation. The soft spot (the
-      `transform_*` "TODO understand this") — validate hard vs `creategrid` 4-tree/rotated.
-- [ ] **Node numbering** (corner/edge/face callbacks → ids + connectivity): owner =
-      min leaf touching the node (IBWG2015 §6 LNodes). Validate vs `creategrid`.
-- [ ] Map iterator hanging coords → node ids; assemble an iterator `creategrid`.
-- [ ] Retire the old multi-pass cost centers; make iterator the default.
+- [x] **Inter-tree hanging + unified `iterate_hanging(forest::ForestBWG{dim})`**
+      (2D+3D): intra descent + inter-tree face neighbours via `transform_facet`
+      (BWG2011 Alg 8, handles rotations). Only FACE neighbours are needed even at
+      tree boundaries (every hanging node is face-interior; the 4 cells around an
+      edge cycle through faces → a hanging edge always borders a refined–coarse face
+      pair). **Matches `creategrid`'s `conformity_info` on all 16 golden cases**
+      (2D/3D, multi-tree, rotated, balanced, disc). Inter-tree part is per-boundary-leaf
+      transform for now (not a coordinated descent) — correctness first.
+- [ ] **Node numbering** (the remaining hard piece — IBWG2015 §6 LNodes): assign each
+      geometric node an id via the descent, owner = min-Morton leaf touching it
+      (corner/edge/face ownership), + cell connectivity. Validate vs `creategrid`.
+      This is the genuine LNodes-ownership work; prototype + validate carefully.
+- [ ] Map iterator hanging coords → node ids; assemble an iterator `creategrid`,
+      validate byte-identical, retire the old multi-pass cost centers, make default.
 - [ ] (Optional) expose `dim(c)`-filtered volume/face/edge/corner callbacks as a
       thin API for downstream features.
 

@@ -238,5 +238,29 @@ BWG.jl:632/656/706), `Global_numbering ≡` contiguous counter, `Reconstruct_rem
   ```
   Hanging node = midpoint of the coarse face; constrainers = the coarse face's two
   endpoints (matches the 0.5/0.5 affine constraint).
-- **Next:** corner descent (node sharing/numbering) → 3D (edge descent + face-centre
-  hanging) → inter-tree (orientation transforms) → wire into an iterator `creategrid`.
+- **Step 3 (done — in `src`, tested):** `iterate_hanging_3d`. Same face descent,
+  faces have 4 corners; child matching uses the face *centre* (3D face-corner order
+  differs between adjacent octants). Each coarse face bordering a refined neighbour
+  emits its centre (4 constrainers) **and** its 4 edge midpoints (2 constrainers).
+  This captures both face-centre and edge-centre hanging **without a 4-way edge
+  descent**: the 4 cells around any edge form a cycle, so a hanging edge always
+  borders a refined–coarse face pair (so it is an edge of some coarse face processed
+  here). Matches `creategrid`'s `conformity_info` exactly on diverse single-tree 3D
+  cases. Allocation-free descent (output Dict only): 2D 0.8 µs, 3D 18 µs on small trees.
+- **Step 4 (done — in `src`, tested):** unified `iterate_hanging(forest::ForestBWG{dim})`
+  (2D+3D). Intra-tree via the face descent above, plus **inter-tree** face neighbours
+  matched with `transform_facet` (BWG2011 Alg 8, handles rotations) +
+  `_emit_coarse_face_phys!`. Key simplification: **only FACE neighbours are needed
+  even at tree boundaries** — every hanging node is face-interior, and the 4 cells
+  around any edge cycle through faces, so a hanging edge always borders a
+  refined–coarse face pair (no tree-edge/corner-neighbour handling). Matches
+  `creategrid`'s `conformity_info` on **all 16 golden cases** (2D/3D, multi-tree,
+  rotated trees, balanced, disc). The inter-tree part is a per-boundary-leaf
+  transform (not yet a coordinated descent) — correctness first.
+- **Next — node numbering (the remaining hard piece, IBWG2015 §6 LNodes):** assign
+  each geometric node an id during the descent, owner = min-Morton leaf touching it
+  (corner ownership; needs a corner-coordination pass), plus cell connectivity. Then
+  map the hanging coords → ids and assemble an iterator `creategrid`, validate
+  byte-identical (renumbering-invariant) vs the golden output, and make it the
+  default. This is the genuine LNodes-ownership work — prototype + validate carefully
+  (the team's other blocker); do not rush it.
