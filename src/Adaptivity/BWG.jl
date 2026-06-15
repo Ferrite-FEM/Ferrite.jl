@@ -371,6 +371,13 @@ end
 
 inside(tree::OctreeBWG{dim}, oct::OctantBWG{dim}) where {dim} = inside(oct, tree.b)
 
+# True iff octant `o` has a face on the tree boundary. Only such leaves can have
+# out-of-tree neighbours, so balanceforest! skips the interior leaves (the majority).
+function _touches_tree_boundary(o::OctantBWG{dim}, b) where {dim}
+    h = _compute_size(b, o.l); m = _maximum_size(b)
+    return any(d -> o.xyz[d] == 0 || o.xyz[d] + h == m, 1:dim)
+end
+
 """
     split_bounds(leaves, lo, hi, a::OctantBWG, b) -> NTuple{2^dim+1, Int}
 
@@ -1233,78 +1240,28 @@ function balanceforest!(forest::ForestBWG{dim}) where {dim}
             rootvertices = vertices(root_, tree.b)
             balanced = balancetree(tree)
             forest.cells[k] = balanced
-            for (o_i, o) in enumerate(forest.cells[k].leaves)
-                ss = possibleneighbors(o, o.l, tree.b, ; insidetree = false)
-                isinside = inside.(ss, (tree.b,))
-                notinsideidx = findall(.! isinside)
-                if !isempty(notinsideidx)
-                    # s_i encodes the type of neighborhood, since it is the index of possibleneighbors
-                    # see the docs of this function
-                    for s_i in notinsideidx
-                        s = ss[s_i]
-                        if dim == 2 # need more clever s_i encoding
-                            if s_i <= 4 #corner neighbor, only true for 2D see possibleneighbors
-                                cc = forest.topology.vertex_vertex_neighbor[k, perm_corner[s_i]]
-                                participating_faces_idx = findall(x -> any(x .== s_i), 𝒱₂) #TODO! optimize by using inverted table
-                                pivot_faces = faces(o, tree.b)
-                                if isempty(cc)
-                                    # the branch below checks if we are in a newly introduced topologic tree connection
-                                    # by checking if the corner neighbor is only accesible by transforming through a face
-                                    # TODO: enable a bool that either activates or deactivates the balancing over a corner
-                                    for face_idx in participating_faces_idx
-                                        face_idx = face_idx[1]
-                                        contained = contains_facet(rootfaces[face_idx], pivot_faces[face_idx])
-                                        if contained
-                                            fc = facet_neighborhood[k, perm_face[face_idx]]
-                                            isempty(fc) && continue
-                                            @assert length(fc) == 1
-                                            fc = fc[1]
-                                            k′, f′ = fc[1], perm_face_inv[fc[2]]
-                                            balance_face(forest, k′, f′, o, s)
-                                        end
-                                    end
-                                    continue
-                                else
-                                    for corner_connection in cc
-                                        !(vertex(o, s_i, tree.b) == rootvertices[s_i]) && continue
-                                        k′, c′ = corner_connection[1], perm_corner_inv[corner_connection[2]]
-                                        balance_corner(forest, k′, c′, o, s)
-                                    end
-                                end
-                            else # face neighbor, only true for 2D
-                                s_i -= 4
-                                fc = facet_neighborhood[k, perm_face[s_i]]
-                                isempty(fc) && continue
-                                @assert length(fc) == 1
-                                fc = fc[1]
-                                k′, f′ = fc[1], perm_face_inv[fc[2]]
-                                balance_face(forest, k′, f′, o, s)
-                            end
-                        else #TODO collapse this 3D branch with more clever s_i encoding into the 2D branch
-                            if s_i <= 8 #corner neighbor, only true for 2D see possibleneighbors
-                                #TODO a check of new introduced corner neighbors aka corner balancing, see 2D branch
-                                cc = forest.topology.vertex_vertex_neighbor[k, perm_corner[s_i]]
-                                isempty(cc) && continue
-                                for corner_connection in cc
-                                    !(vertex(o, s_i, tree.b) == rootvertices[s_i]) && continue
-                                    k′, c′ = corner_connection[1], perm_corner_inv[corner_connection[2]]
-                                    balance_corner(forest, k′, c′, o, s)
-                                end
-                            elseif 8 < s_i <= 14
-                                s_i -= 8
-                                fc = facet_neighborhood[k, perm_face[s_i]]
-                                isempty(fc) && continue
-                                @assert length(fc) == 1
-                                fc = fc[1]
-                                k′, f′ = fc[1], perm_face_inv[fc[2]]
-                                balance_face(forest, k′, f′, o, s)
-                            else
-                                s_i -= 14
-                                ec = forest.topology.edge_edge_neighbor[k, edge_perm[s_i]]
-                                pivot_edge = edge(o, s_i, tree.b)
-                                contained_face = findall(x -> face_contains_edge(x, pivot_edge), rootfaces)
-                                if !isempty(contained_face) && !contains_edge(rootedges[s_i], pivot_edge) #check if pivot edge in interior of rootface and not octree edge
-                                    for face_idx in contained_face
+            for o in forest.cells[k].leaves
+                # Only leaves touching the tree boundary can have out-of-tree neighbours;
+                # skip the interior (the majority) → no possibleneighbors/findall there.
+                _touches_tree_boundary(o, tree.b) || continue
+                ss = possibleneighbors(o, o.l, tree.b; insidetree = false)
+                # s_i indexes possibleneighbors (encodes the neighbourhood type). Iterate the
+                # tuple (unrolled, no runtime index) and skip in-tree neighbours inline.
+                for (s_i, s) in enumerate(ss)
+                    inside(s, tree.b) && continue
+                    if dim == 2 # need more clever s_i encoding
+                        if s_i <= 4 #corner neighbor, only true for 2D see possibleneighbors
+                            cc = forest.topology.vertex_vertex_neighbor[k, perm_corner[s_i]]
+                            participating_faces_idx = findall(x -> any(x .== s_i), 𝒱₂) #TODO! optimize by using inverted table
+                            pivot_faces = faces(o, tree.b)
+                            if isempty(cc)
+                                # the branch below checks if we are in a newly introduced topologic tree connection
+                                # by checking if the corner neighbor is only accesible by transforming through a face
+                                # TODO: enable a bool that either activates or deactivates the balancing over a corner
+                                for face_idx in participating_faces_idx
+                                    face_idx = face_idx[1]
+                                    contained = contains_facet(rootfaces[face_idx], pivot_faces[face_idx])
+                                    if contained
                                         fc = facet_neighborhood[k, perm_face[face_idx]]
                                         isempty(fc) && continue
                                         @assert length(fc) == 1
@@ -1312,14 +1269,63 @@ function balanceforest!(forest::ForestBWG{dim}) where {dim}
                                         k′, f′ = fc[1], perm_face_inv[fc[2]]
                                         balance_face(forest, k′, f′, o, s)
                                     end
-                                    continue
                                 end
-                                isempty(ec) && continue
-                                for edge_connection in ec
-                                    !contains_edge(rootedges[s_i], pivot_edge) && continue
-                                    k′, e′ = edge_connection[1], edge_perm_inv[edge_connection[2]]
-                                    balance_edge(forest, k′, e′, o, s)
+                                continue
+                            else
+                                for corner_connection in cc
+                                    !(vertex(o, s_i, tree.b) == rootvertices[s_i]) && continue
+                                    k′, c′ = corner_connection[1], perm_corner_inv[corner_connection[2]]
+                                    balance_corner(forest, k′, c′, o, s)
                                 end
+                            end
+                        else # face neighbor, only true for 2D
+                            s_i -= 4
+                            fc = facet_neighborhood[k, perm_face[s_i]]
+                            isempty(fc) && continue
+                            @assert length(fc) == 1
+                            fc = fc[1]
+                            k′, f′ = fc[1], perm_face_inv[fc[2]]
+                            balance_face(forest, k′, f′, o, s)
+                        end
+                    else #TODO collapse this 3D branch with more clever s_i encoding into the 2D branch
+                        if s_i <= 8 #corner neighbor, only true for 2D see possibleneighbors
+                            #TODO a check of new introduced corner neighbors aka corner balancing, see 2D branch
+                            cc = forest.topology.vertex_vertex_neighbor[k, perm_corner[s_i]]
+                            isempty(cc) && continue
+                            for corner_connection in cc
+                                !(vertex(o, s_i, tree.b) == rootvertices[s_i]) && continue
+                                k′, c′ = corner_connection[1], perm_corner_inv[corner_connection[2]]
+                                balance_corner(forest, k′, c′, o, s)
+                            end
+                        elseif 8 < s_i <= 14
+                            s_i -= 8
+                            fc = facet_neighborhood[k, perm_face[s_i]]
+                            isempty(fc) && continue
+                            @assert length(fc) == 1
+                            fc = fc[1]
+                            k′, f′ = fc[1], perm_face_inv[fc[2]]
+                            balance_face(forest, k′, f′, o, s)
+                        else
+                            s_i -= 14
+                            ec = forest.topology.edge_edge_neighbor[k, edge_perm[s_i]]
+                            pivot_edge = edge(o, s_i, tree.b)
+                            contained_face = findall(x -> face_contains_edge(x, pivot_edge), rootfaces)
+                            if !isempty(contained_face) && !contains_edge(rootedges[s_i], pivot_edge) #check if pivot edge in interior of rootface and not octree edge
+                                for face_idx in contained_face
+                                    fc = facet_neighborhood[k, perm_face[face_idx]]
+                                    isempty(fc) && continue
+                                    @assert length(fc) == 1
+                                    fc = fc[1]
+                                    k′, f′ = fc[1], perm_face_inv[fc[2]]
+                                    balance_face(forest, k′, f′, o, s)
+                                end
+                                continue
+                            end
+                            isempty(ec) && continue
+                            for edge_connection in ec
+                                !contains_edge(rootedges[s_i], pivot_edge) && continue
+                                k′, e′ = edge_connection[1], edge_perm_inv[edge_connection[2]]
+                                balance_edge(forest, k′, e′, o, s)
                             end
                         end
                     end
