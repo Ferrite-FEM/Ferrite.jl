@@ -814,12 +814,20 @@ Ferrite.getcelltype(grid::ForestBWG, i::Int) = eltype(grid.cells) # assume for n
 
 Transformation of a octree coordinate system point `vertex` (or a collection `vertices`) to the corresponding physical coordinate system.
 """
+# Corner coordinates of tree `k` as a stack tuple (no per-call Vector allocation).
+# Hoist this out of per-corner loops; the result is constant for a whole tree.
+_treecorners(forest::ForestBWG{dim}, k::Integer) where {dim} =
+    ntuple(j -> get_node_coordinate(forest.nodes[forest.cells[k].nodes[j]]), Val(2^dim))
+
+# Map an octree-integer `vertex` to physical coordinates via Q1 interpolation over the
+# tree's `cellnodes` (its corner coordinates). Allocation-free when `cellnodes` is a tuple.
+function _transform_point(cellnodes::NTuple{N}, b::Integer, vertex::NTuple{dim}) where {N, dim}
+    ξ = Vec{dim}(vertex .* (2 / (2^b)) .- 1)
+    return sum(j -> cellnodes[j] * Ferrite.reference_shape_value(Lagrange{Ferrite.RefHypercube{dim}, 1}(), ξ, j), 1:N)
+end
+
 function transform_pointBWG(forest::ForestBWG{dim}, k::Integer, vertex::NTuple{dim, T}) where {dim, T}
-    tree = forest.cells[k]
-    cellnodes = getnodes(forest, collect(tree.nodes)) .|> get_node_coordinate
-    vertex = vertex .* (2 / (2^tree.b)) .- 1
-    octant_physical_coordinates = sum(j -> cellnodes[j] * Ferrite.reference_shape_value(Lagrange{Ferrite.RefHypercube{dim}, 1}(), Vec{dim}(vertex), j), 1:length(cellnodes))
-    return Vec{dim}(octant_physical_coordinates)
+    return _transform_point(_treecorners(forest, k), forest.cells[k].b, vertex)
 end
 
 transform_pointBWG(forest, vertices) = transform_pointBWG.((forest,), first.(vertices), last.(vertices))
@@ -1054,10 +1062,11 @@ function creategrid_iterator(forest::ForestBWG{dim}) where {dim}
     conns = NTuple{2^dim, Int}[]
     for (k, tree) in enumerate(forest.cells)
         b = tree.b
+        cnodes = _treecorners(forest, k)   # tree corner coords once per tree (was per corner)
         iterate_leaves(tree) do leaf
             v = vertices(leaf, b)
             ids = ntuple(2^dim) do i
-                p = transform_pointBWG(forest, k, v[i])
+                p = _transform_point(cnodes, b, v[i])
                 key = ntuple(d -> round(p[d]; digits = 10), dim)
                 get!(coord2id, key) do
                     push!(nodecoords, p)
