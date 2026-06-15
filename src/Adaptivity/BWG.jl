@@ -698,6 +698,7 @@ function iterate_hanging(forest::ForestBWG{dim}) where {dim}
     perm = dim == 2 ? 𝒱₂_perm : 𝒱₃_perm
     perminv = dim == 2 ? 𝒱₂_perm_inv : 𝒱₃_perm_inv
     fn = Ferrite.get_facet_facet_neighborhood(forest)             # inter-tree (face neighbours)
+    leafsets = [Set(tree.leaves) for tree in forest.cells]        # once per tree (not per tree×face)
     for (k, tree) in enumerate(forest.cells)
         b = tree.b
         rootfaces = faces(root(dim), b)
@@ -705,7 +706,7 @@ function iterate_hanging(forest::ForestBWG{dim}) where {dim}
             nb = fn[k, perm[f]]
             isempty(nb) && continue
             k′ = nb[1][1]; f′ = perminv[nb[1][2]]
-            kset′ = Set(forest.cells[k′].leaves)
+            kset′ = leafsets[k′]
             for C in tree.leaves
                 Cface = face(C, f, b)
                 contains_facet(rootfaces[f], Cface) || continue   # C on the shared tree face
