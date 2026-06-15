@@ -1442,6 +1442,11 @@ function balanceforest!(forest::ForestBWG{dim}) where {dim}
     root_ = root(dim)
     nrefcells = 0
     facet_neighborhood = Ferrite.Ferrite.get_facet_facet_neighborhood(forest)
+    # `balancetree` sort buffers, allocated once and reused across every tree and pass.
+    OT = eltype(forest.cells[1].leaves)
+    s0 = forest.cells[1].leaves[1]
+    keybuf = Tuple{typeof(morton(s0, s0.l, s0.l)), typeof(s0.l)}[]
+    permbuf = Int[]; scratch = OT[]
     while nrefcells - getncells(forest) != 0
         nrefcells = getncells(forest)
         for k in 1:length(forest.cells)
@@ -1449,7 +1454,7 @@ function balanceforest!(forest::ForestBWG{dim}) where {dim}
             rootfaces = faces(root_, tree.b)
             rootedges = _rootedges(Val(dim), root_, tree.b)
             rootvertices = vertices(root_, tree.b)
-            balanced = balancetree(tree)
+            balanced = balancetree(tree, keybuf, permbuf, scratch)
             forest.cells[k] = balanced
             for o in forest.cells[k].leaves
                 # Only leaves touching the tree boundary can have out-of-tree neighbours;
@@ -1467,22 +1472,52 @@ end
 # `morton` twice per comparison (`morton` is a ~b·dim-bit interleave). `morton(o,
 # o.l, o.l)` is the level-independent anchor interleave and is bijective in `xyz`,
 # so `(key, level)` lexicographic == `isless`.
-function _sort_by_morton!(v::Vector{<:OctantBWG})
-    length(v) < 2 && return v
-    keys = [(morton(o, o.l, o.l), o.l) for o in v]
-    permute!(v, sortperm(keys))
+# Buffer-reuse variant: `keybuf`/`permbuf`/`scratch` are caller-owned and reused across
+# calls (resized, never reallocated per call). `QuickSort` is fine — keys `(morton, level)`
+# are unique (distinct octants ⇒ distinct anchor interleave or level), so no ties to break,
+# giving the same order as a stable sort. The manual gather avoids `permute!`'s internal copy.
+function _sort_by_morton!(v::Vector{OT}, keybuf::Vector, permbuf::Vector{Int}, scratch::Vector{OT}) where {OT <: OctantBWG}
+    n = length(v)
+    n < 2 && return v
+    resize!(keybuf, n)
+    @inbounds for i in 1:n
+        o = v[i]
+        keybuf[i] = (morton(o, o.l, o.l), o.l)
+    end
+    resize!(permbuf, n)
+    sortperm!(permbuf, keybuf; alg = QuickSort)
+    resize!(scratch, n)
+    @inbounds for i in 1:n
+        scratch[i] = v[permbuf[i]]
+    end
+    copyto!(v, scratch)
     return v
+end
+
+function _sort_by_morton!(v::Vector{OT}) where {OT <: OctantBWG}
+    length(v) < 2 && return v
+    s = v[1]
+    return _sort_by_morton!(v, Tuple{typeof(morton(s, s.l, s.l)), typeof(s.l)}[], Int[], OT[])
 end
 
 """
 Algorithm 7 of [SSB2008](@citet)
 """
+# Public entry (e.g. tests): allocate the sort buffers and delegate. In the
+# `balanceforest!` fix-point the buffers are allocated once and threaded in.
 function balancetree(tree::OctreeBWG)
+    length(tree.leaves) == 1 && return tree
+    OT = eltype(tree.leaves)
+    s0 = tree.leaves[1]
+    return balancetree(tree, Tuple{typeof(morton(s0, s0.l, s0.l)), typeof(s0.l)}[], Int[], OT[])
+end
+
+function balancetree(tree::OctreeBWG, keybuf, permbuf, scratch)
     if length(tree.leaves) == 1
         return tree
     end
-    # Reusable buffers to avoid per-level reallocation. `Tparents` replaces the
-    # O(n²) `p ∉ parent.(T, b)` broadcast with O(1) set membership.
+    # `Tparents` replaces the O(n²) `p ∉ parent.(T, b)` broadcast with O(1) set membership;
+    # `keybuf`/`permbuf`/`scratch` are caller-owned sort buffers reused across calls.
     OT = eltype(tree.leaves)
     W = copy(tree.leaves); P = OT[]; R = OT[]
     Q = OT[]; T = OT[]; Tparents = Set{OT}()
@@ -1491,7 +1526,7 @@ function balancetree(tree::OctreeBWG)
         for o in W
             o.l == l && push!(Q, o)
         end
-        _sort_by_morton!(Q)
+        _sort_by_morton!(Q, keybuf, permbuf, scratch)
         # T: one representative per distinct parent (first in Q order)
         empty!(T); empty!(Tparents)
         for x in Q
@@ -1513,7 +1548,7 @@ function balancetree(tree::OctreeBWG)
         append!(W, P)
         empty!(P)
     end
-    _sort_by_morton!(R) # (morton-anchor, level) key disambiguates at max depth
+    _sort_by_morton!(R, keybuf, permbuf, scratch) # (morton-anchor, level) key disambiguates at max depth
     linearise!(R, tree.b)
     return OctreeBWG(R, tree.b, tree.nodes)
 end

@@ -93,6 +93,21 @@ leaves) is non-trivial.
 
 ## Run log
 
+### 2026-06-15 — balancetree sort-buffer reuse (balanceforest! 77 → 62 MiB)
+`_sort_by_morton!` allocated `keys` + `sortperm` + `permute!`'s internal copy on every call
+(9× per `balancetree`: per-level Q + final R). Added a buffer-taking variant
+`_sort_by_morton!(v, keybuf, permbuf, scratch)` (0 B/call warm: `sortperm!(…; alg=QuickSort)`
+in-place — keys `(morton, level)` are unique so QuickSort matches the stable order — and a
+manual gather avoids `permute!`'s copy). The buffers are allocated **once in `balanceforest!`**
+and threaded through an internal `balancetree(tree, keybuf, permbuf, scratch)`; the public
+`balancetree(tree)` (used by tests) still allocates + delegates. NB: allocating the buffers
+per-`balancetree`-call instead made it *worse* (77→87, churn over 512 trees) — the win needs
+them hoisted to the fix-point.
+
+3D 90112: **balanceforest! 77 → 62 MiB, 96.6 → 92.8 ms**. Byte-identical (golden 16 +
+invariants 1643 + e2e + test_p4est). Remaining 62 MiB is balancetree's genuine working
+memory (W copy, per-level Q/T/R/P `push!`/`append!`, `unique!`) — no hotspot left.
+
 ### 2026-06-15 — balanceforest! 450 → 77 MiB (`s_i` closure box)
 `@code_warntype` on `_balance_leaf!` showed `s_i@_24 = Core.Box()` — `s_i` was heap-boxed
 as `Any`. Cause: the 2D corner branch's `findall(x -> any(x .== s_i), 𝒱₂)` closure captures
