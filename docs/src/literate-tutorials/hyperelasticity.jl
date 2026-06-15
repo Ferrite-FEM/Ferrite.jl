@@ -294,13 +294,14 @@ function assemble_element!(ke, ge, cell, cv, fv, mp, ue, ΓN)
 end;
 
 # Assembling global residual and tangent is also done in the usual way, just looping over
-# the elements, call the element routine and assemble in the the global matrix K and
+# the elements, call the element routine and assemble into the global matrix K and
 # residual g.
 
 function assemble_global!(K, g, dh, cv, fv, mp, u, ΓN)
     n = ndofs_per_cell(dh)
     ke = zeros(n, n)
     ge = zeros(n)
+    ue = zeros(n)
 
     ## start_assemble resets K and g
     assembler = start_assemble(K, g)
@@ -308,7 +309,7 @@ function assemble_global!(K, g, dh, cv, fv, mp, u, ΓN)
     ## Loop over all cells in the grid
     @timeit "assemble" for cell in CellIterator(dh)
         global_dofs = celldofs(cell)
-        ue = u[global_dofs] # element dofs
+        ue .= @view u[global_dofs] # element dofs
         @timeit "element assemble" assemble_element!(ke, ge, cell, cv, fv, mp, ue, ΓN)
         assemble!(assembler, global_dofs, ke, ge)
     end
@@ -360,7 +361,7 @@ function solve()
     end
 
     dbcs = ConstraintHandler(dh)
-    ## Add a homogeneous boundary condition on the "clamped" edge
+    ## Add a homogeneous boundary condition (fully fixed) on the "right" boundary
     dbc = Dirichlet(:u, getfacetset(grid, "right"), (x, t) -> [0.0, 0.0, 0.0], [1, 2, 3])
     add!(dbcs, dbc)
     dbc = Dirichlet(:u, getfacetset(grid, "left"), (x, t) -> rotation(x, t), [1, 2, 3])

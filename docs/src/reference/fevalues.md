@@ -17,7 +17,7 @@ FacetValues
 ```
 
 ## Applicable functions
-The following functions are applicable
+The following functions are applicable to
 `CellValues`, `FacetValues`, and `MultiFieldCellValues`
 
 ```@docs

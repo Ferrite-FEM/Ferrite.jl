@@ -1,7 +1,4 @@
-# ```@meta
-# Draft = false
-# ```
-# # [Multi-threaded assembly](@id tutorial-threaded-assembly)
+# # [Multi-threaded assembly](@id howto-threaded-assembly)
 #
 #-
 #md # !!! tip

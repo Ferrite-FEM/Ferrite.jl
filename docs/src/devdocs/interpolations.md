@@ -174,7 +174,7 @@ Ferrite.getnbasefunctions(::QTI) = 6
 For distributing the degrees of freedom, higher order interpolations
 require that we account for the ordering on their entity. For example,
 if we have two interior dofs associated with an edge, we must match
-them the edges of the for the cells that share the edge, to make sure
+them against the edges of the cells that share the edge, to make sure
 we consider the same ordering. Since we only have a single interior
 dof per edge, we don't need to adjust these, hence,
 ```@example InterpolationExample

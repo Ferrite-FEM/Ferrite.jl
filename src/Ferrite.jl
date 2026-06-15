@@ -37,7 +37,7 @@ include("exports.jl")
 Supertype for all reference shapes, with reference dimension `refdim`. Reference shapes are
 used to define grid cells, shape functions, and quadrature rules. Currently existing
 reference shapes are: [`RefLine`](@ref), [`RefTriangle`](@ref), [`RefQuadrilateral`](@ref),
-[`RefTetrahedron`](@ref), [`RefHexahedron`](@ref), [`RefPrism`](@ref).
+[`RefTetrahedron`](@ref), [`RefHexahedron`](@ref), [`RefPrism`](@ref), [`RefPyramid`](@ref).
 """
 abstract type AbstractRefShape{refdim} end
 

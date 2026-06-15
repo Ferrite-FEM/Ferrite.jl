@@ -196,3 +196,28 @@ Face numbers:                            | Face identifiers:
 ```
 """
 RefPrism
+
+"""
+    RefPyramid <: AbstractRefShape{3}
+
+Reference pyramid, reference dimension 3. The base is a quadrilateral (vertices v1–v4)
+and v5 is the apex, located directly above v1.
+```
+-----------------------------------------+----------------------------
+Vertex coordinates:                      | Edge identifiers:
+                                         |
+  v1: 𝛏 = (0.0, 0.0, 0.0)                | e1: (v1, v2),  e2: (v1, v3)
+  v2: 𝛏 = (1.0, 0.0, 0.0)                | e3: (v1, v5),  e4: (v2, v4)
+  v3: 𝛏 = (0.0, 1.0, 0.0)                | e5: (v2, v5),  e6: (v4, v3)
+  v4: 𝛏 = (1.0, 1.0, 0.0)                | e7: (v3, v5),  e8: (v4, v5)
+  v5: 𝛏 = (0.0, 0.0, 1.0)                |
+                                         | Face identifiers:
+                                         | f1: (v1, v3, v4, v2)  (base)
+                                         | f2: (v1, v2, v5)
+                                         | f3: (v1, v5, v3)
+                                         | f4: (v2, v4, v5)
+                                         | f5: (v3, v5, v4)
+-----------------------------------------+----------------------------
+```
+"""
+RefPyramid
