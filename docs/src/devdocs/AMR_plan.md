@@ -112,9 +112,15 @@ O(n) traversal. Full build order + the corrected mental model are in
       by min-Morton-leaf ownership during the descent (corner coordination) instead of
       the coord→id Dict; transform shared corners once. Removes the remaining iterator
       alloc (Dict + redundant `transform_pointBWG`).
+- [x] **End-to-end verification** (the "example working" goal): a 3D adaptive Poisson
+      solve materializing the *same forest* with both `creategrid` and `creategrid_iterator`
+      yields bit-identical FE systems (same `ndofs`, same `#constraints`, `max|Δu|=0` at every
+      node coordinate) over 4 adaptive steps, with monotone L2-error reduction. The published
+      `heat_adaptivity.jl` tutorial also runs to completion with `creategrid_iterator` swapped
+      in (ZZ + Dörfler loop, VTK output) — error converges as with the legacy path.
 - [ ] Make `creategrid_iterator` the default (`creategrid` → `creategrid_legacy`);
       retire the coord→id bridge and the old `hangingnodes`/multi-pass.
-- [ ] Adaptivity tutorial/example on the iterator path.
+- [ ] Switch the committed `heat_adaptivity.jl` tutorial to the iterator path (verified working).
 - [ ] (Optional) expose `dim(c)`-filtered volume/face/edge/corner callbacks as a
       thin API for downstream features.
 
