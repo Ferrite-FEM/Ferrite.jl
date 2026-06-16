@@ -331,10 +331,73 @@ end
 #   - the face callback (`dim(c)=dim-1`) emits the hanging nodes interior to every
 #     *non-conforming* coarse face (center + edge midpoints, constrained by the coarse
 #     face's corners — identical to `iterate_hanging`'s `_emit_coarse_face_int!`).
-# Inter-tree hanging at shared tree boundaries reuses the proven `_iterate_hanging_inter!`
-# pass (cross-tree coordinated descent is the documented next step). Cross-tree node
-# identity, compaction, physical coords, cells and facetsets reuse `creategrid`'s helpers.
+# Inter-tree hanging at shared tree boundaries uses the cross-tree two-sided face descent
+# `_iterate_interface_hanging!` (same recursive split-descent primitive, carried across the
+# shared face). Cross-tree node *identity* (a node shared between trees gets one global id)
+# is still resolved by `_merge_cross_tree_nodes!` — the per-tree numbering produces a
+# `(tree,coord)` key per incident tree, which the merge canonicalizes via the macro topology
+# + orientation transforms. (The fully-faithful Alg 5.3 alternative — seeding the iterator
+# from the *deduped* union of root closures so each shared node is visited once — would fold
+# that merge into the seeding, but needs cross-tree corner+edge descent too; deferred.)
+# Compaction, physical coords, cells and facetsets reuse `creategrid`'s helpers.
 # =============================================================================
+
+# Cross-tree hanging via a two-sided face descent — the iterator's recursive split-descent
+# (the same primitive `iterate_points` uses for intra-tree faces) carried across a shared
+# tree face. `octL ∈ tree kL` (leaves `lvsL`, native frame) and `octR ∈ tree kR` are images
+# of each other across the shared face; they descend in lock-step at equal levels. When the
+# `kL` side is a leaf and the `kR` side is refined, `kL` is the coarse side and the hanging
+# nodes lie on `octR`'s face `fR` in the *fine* tree `kR`'s frame (genuine fine-leaf vertices).
+# Children are matched across the boundary by the *validated* `transform_facet` pattern from
+# `_iterate_hanging_inter!`, so no new orientation logic is introduced. Each shared face is
+# descended once per direction (only the `kL`-coarse case emits; the `kR`-coarse case is
+# emitted when the descent runs from `(kR, fR)`), matching `_iterate_hanging_inter!` exactly.
+function _iter_interface!(hang, forest::ForestBWG, kL::Int, lvsL, octL::OctantBWG{dim, N}, loL::Int, hiL::Int, fL::Int,
+        kR::Int, lvsR, octR::OctantBWG{dim, N}, loR::Int, hiR::Int, fR::Int, bL::Integer, bR::Integer) where {dim, N}
+    lL = _isleaf(lvsL, loL, hiL, octL)
+    lR = _isleaf(lvsR, loR, hiR, octR)
+    lL && lR && return                                           # same-size leaves both sides -> conforming
+    if lL && !lR                                                 # kL coarse, kR refined -> hanging (fine = kR)
+        _emit_coarse_face_int!(hang, kR, face(octR, fR, bR))
+        return
+    elseif !lL && lR                                             # kL refined, kR coarse -> caught from (kR,fR)
+        return
+    end
+    kb = split_bounds(lvsL, loL, hiL, octL, bL); cL = children(octL, bL)
+    kbR = split_bounds(lvsR, loR, hiR, octR, bR); cR = children(octR, bR)
+    for i in 1:N
+        contains_facet(face(octL, fL, bL), face(cL[i], fL, bL)) || continue   # child i on the shared face
+        nbR = transform_facet(forest, kR, fR, facet_neighbor(cL[i], fL, bL))  # its image in kR
+        for j in 1:N
+            cR[j] == nbR || continue
+            _iter_interface!(hang, forest, kL, lvsL, cL[i], kb[i], kb[i + 1] - 1, fL,
+                kR, lvsR, cR[j], kbR[j], kbR[j + 1] - 1, fR, bL, bR)
+            break
+        end
+    end
+    return
+end
+
+# Forest inter-tree hanging: seed the cross-tree face descent at each shared tree face with
+# the two tree roots. Replaces the per-boundary-leaf scan `_iterate_hanging_inter!`.
+function _iterate_interface_hanging!(hang, forest::ForestBWG{dim}) where {dim}
+    perm = dim == 2 ? 𝒱₂_perm : 𝒱₃_perm
+    perminv = dim == 2 ? 𝒱₂_perm_inv : 𝒱₃_perm_inv
+    fn = Ferrite.get_facet_facet_neighborhood(forest)
+    r = root(dim)
+    for (k, tree) in enumerate(forest.cells)
+        bL = tree.b
+        for f in 1:(2 * dim)
+            nb = fn[k, perm[f]]
+            isempty(nb) && continue
+            k′ = nb[1][1]; f′ = perminv[nb[1][2]]
+            treeR = forest.cells[k′]
+            _iter_interface!(hang, forest, k, tree.leaves, r, 1, length(tree.leaves), f,
+                k′, treeR.leaves, r, 1, length(treeR.leaves), f′, bL, treeR.b)
+        end
+    end
+    return
+end
 
 # Number one leaf's vertices + push its cell connectivity. A top-level function barrier
 # (concrete args) so the `ntuple`/`get!` closures compile without boxing — exactly the role
@@ -360,9 +423,11 @@ literal point-centric iterator (`iterate_points`, IBWG2015 Alg 5.2/5.3) instead 
 specialization, `mindim = dim-1`: volumes + faces, no corner/edge descent) does it all:
 the leaf-volume callback numbers vertices + builds connectivity (Morton order ⇒ same
 min-Morton owner as `creategrid`), the non-conforming face callback emits the interior
-hanging nodes. Inter-tree hanging reuses `_iterate_hanging_inter!`; cross-tree identity,
-compaction and cells reuse `creategrid`'s machinery. Produces the **same grid** as
-`creategrid` (renumbering-invariant) on all golden cases, at memory parity.
+hanging nodes. Inter-tree hanging uses the cross-tree two-sided face descent
+`_iterate_interface_hanging!`. Cross-tree node *identity* still goes through
+`_merge_cross_tree_nodes!` (per-tree numbering ⇒ one `(tree,coord)` key per incident tree,
+canonicalized by the merge); compaction and cells reuse `creategrid`'s machinery. Produces
+the **same grid** as `creategrid` (byte-identical) on all golden cases, at memory parity.
 """
 function creategrid_iterator(forest::ForestBWG{dim}) where {dim}
     node_map = dim == 2 ? node_map₂ : node_map₃
@@ -392,14 +457,9 @@ function creategrid_iterator(forest::ForestBWG{dim}) where {dim}
         end
     end
 
-    # Phase 1b — inter-tree hanging across shared tree faces (reuse the proven pass).
-    perm = dim == 2 ? 𝒱₂_perm : 𝒱₃_perm
-    perminv = dim == 2 ? 𝒱₂_perm_inv : 𝒱₃_perm_inv
-    fn = Ferrite.get_facet_facet_neighborhood(forest)
-    leafsets = [Set(tree.leaves) for tree in forest.cells]
-    for (k, tree) in enumerate(forest.cells)
-        _iterate_hanging_inter!(hang, forest, k, tree, fn, leafsets, perm, perminv)
-    end
+    # Phase 1b — inter-tree hanging via the cross-tree two-sided face descent (iterator-style;
+    # replaces the per-boundary-leaf scan). Single-tree forests have no shared faces -> no-op.
+    _iterate_interface_hanging!(hang, forest)
 
     # Phase 3 — cross-tree identity merge + compaction + owner physical coords (reuse).
     _merge_cross_tree_nodes!(forest, nodeids, Dict{KeyT, KeyT}())
