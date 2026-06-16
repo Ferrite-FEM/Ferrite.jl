@@ -19,6 +19,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
    excessive rehashing (#1342)
  - Small performance improvement to `SparseMatrixCSR` and `SparseMatrixCSR` assembly by avoiding
    some reduction operations. (#1341)
+   
+### Documentation
+ - Update Navier-Stokes example to the new OrdinaryDiffEq v7 release (#1350)
 
 ## [v1.4.0] - 2026-04-20
 
