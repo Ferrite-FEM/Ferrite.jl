@@ -1,4 +1,5 @@
 [deps]
+ADTypes = "47edcb42-4c32-4615-8424-f2b9edc5f35b"
 Bibliography = "f1be7e48-bf82-45af-a471-ae754a193061"
 BlockArrays = "8e7c35d0-a365-5155-bbbb-fb81a777f24e"
 Changelog = "5217a498-cd5d-4ec6-b8c2-9b85a09b6e3e"
@@ -22,6 +23,8 @@ Optim = "429524aa-4258-5aef-a3af-852621145aeb"
 OrdinaryDiffEqRosenbrock = "43230ef6-c299-4910-a778-202eb28ce4ce"
 Plots = "91a5bcdd-55d7-5caf-9e0b-520d859cae80"
 ProgressMeter = "92933f4c-e287-5a05-a399-4b506db050ca"
+SciMLIterators = "efe4dcdd-3aed-4391-894d-a9dbd16a2f14"
+SciMLLogging = "a6db7da4-7206-11f0-1eab-35f2a5dbe1d1"
 StaticArrays = "90137ffa-7385-5640-81b9-e52037218182"
 TaskLocalValues = "ed4db957-447d-4319-bfb6-7fa9ae7ecf34"
 Tensors = "48a634ad-e948-5137-8d70-aa71f2a747f4"
@@ -29,4 +32,4 @@ TimerOutputs = "a759f4b9-e2f1-59dc-863e-4aeb61b1ea8f"
 WriteVTK = "64499a7a-5c06-52f2-abe2-ccb03c286192"
 
 [compat]
-OrdinaryDiffEqRosenbrock = "1" # OrdinaryDiffEq v7 breaking release not supported by ns_vs_diffeq tutorial
+OrdinaryDiffEqRosenbrock = "2"
