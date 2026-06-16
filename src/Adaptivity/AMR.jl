@@ -6,6 +6,7 @@ using SparseArrays
 using OrderedCollections
 
 include("BWG.jl")
+include("iterator.jl")
 include("ncgrid.jl")
 include("constraints.jl")
 
