@@ -123,108 +123,6 @@ function benchmark_creategrid(forest_template)
     return minimum(times), ncells
 end
 
-function benchmark_hangingnodes(forest_template)
-    forest = deepcopy(forest_template)
-    balanceforest!(forest)
-    # We need to run the node assignment phases from creategrid to get nodeids/nodeowners
-    # Extract timing of just the hanging node detection
-    dim = 2 # detect from forest type
-    if forest.cells[1] isa Ferrite.AMR.OctreeBWG{3}
-        dim = 3
-    end
-    _perm = dim == 2 ? Ferrite.AMR.𝒱₂_perm : Ferrite.AMR.𝒱₃_perm
-    _perminv = dim == 2 ? Ferrite.AMR.𝒱₂_perm_inv : Ferrite.AMR.𝒱₃_perm_inv
-    node_map = dim < 3 ? Ferrite.AMR.node_map₂ : Ferrite.AMR.node_map₃
-    node_map_inv = dim < 3 ? Ferrite.AMR.node_map₂_inv : Ferrite.AMR.node_map₃_inv
-
-    # Build nodeids and nodeowners (mirroring creategrid phases 1-2)
-    nodeids, nodeowners = _build_node_maps(forest, dim)
-
-    times = Float64[]
-    for _ in 1:5
-        t = @elapsed Ferrite.AMR.hangingnodes(forest, nodeids, nodeowners)
-        push!(times, t)
-    end
-    return minimum(times)
-end
-
-function _build_node_maps(forest, dim)
-    nodeids = Dict{Tuple{Int, NTuple{dim, Int32}}, Int}()
-    nodeowners = Dict{Tuple{Int, NTuple{dim, Int32}}, Tuple{Int, NTuple{dim, Int32}}}()
-    node_map = dim < 3 ? Ferrite.AMR.node_map₂ : Ferrite.AMR.node_map₃
-    _perm = dim == 2 ? Ferrite.AMR.𝒱₂_perm : Ferrite.AMR.𝒱₃_perm
-    _perminv = dim == 2 ? Ferrite.AMR.𝒱₂_perm_inv : Ferrite.AMR.𝒱₃_perm_inv
-    facet_neighborhood = Ferrite.get_facet_facet_neighborhood(forest)
-
-    pivot_nodeid = 1
-    for (k, tree) in enumerate(forest.cells)
-        for leaf in tree.leaves
-            _vertices = Ferrite.AMR.vertices(leaf, tree.b)
-            for v in _vertices
-                nodeids[(k, v)] = pivot_nodeid
-                pivot_nodeid += 1
-                nodeowners[(k, v)] = (k, v)
-            end
-        end
-    end
-
-    # Phase 2: vertex neighbors
-    for (k, tree) in enumerate(forest.cells)
-        _vertices = Ferrite.AMR.vertices(Ferrite.AMR.root(dim), tree.b)
-        for (v, vc) in enumerate(_vertices)
-            vertex_neighbor = forest.topology.vertex_vertex_neighbor[k, node_map[v]]
-            for (k′, v′) in vertex_neighbor
-                if k > k′
-                    new_v = Ferrite.AMR.vertex(Ferrite.AMR.root(dim), node_map[v′], tree.b)
-                    nodeids[(k, vc)] = nodeids[(k′, new_v)]
-                    nodeowners[(k, vc)] = (k′, new_v)
-                end
-            end
-        end
-        # Face neighbors (simplified - just enough for hanging node detection)
-        if dim > 1
-            _faces = Ferrite.AMR.faces(Ferrite.AMR.root(dim), tree.b)
-            for (f, fc) in enumerate(_faces)
-                facet_neighbor_ = facet_neighborhood[k, _perm[f]]
-                length(facet_neighbor_) == 0 && continue
-                k′, f′_ferrite = facet_neighbor_[1]
-                f′ = _perminv[f′_ferrite]
-                if k > k′
-                    tree′ = forest.cells[k′]
-                    for leaf in tree.leaves
-                        fnodes = Ferrite.AMR.face(leaf, f, tree.b)
-                        if !Ferrite.AMR.contains_facet(fc, fnodes)
-                            continue
-                        end
-                        neighbor_candidate = Ferrite.AMR.transform_facet(forest, k′, f′, leaf)
-                        f′candidate = Ferrite.AMR.p4est_opposite_face_index(f′)
-                        fnodes_neighbor = Ferrite.AMR.face(neighbor_candidate, f′candidate, tree′.b)
-                        r = Ferrite.AMR.compute_face_orientation(forest, k, f)
-                        if dim == 2
-                            for i in 1:Ferrite.AMR.ncorners_face2D
-                                i′ = Ferrite.AMR.rotation_permutation(r, i)
-                                if haskey(nodeids, (k′, fnodes_neighbor[i′]))
-                                    nodeids[(k, fnodes[i])] = nodeids[(k′, fnodes_neighbor[i′])]
-                                    nodeowners[(k, fnodes[i])] = (k′, fnodes_neighbor[i′])
-                                end
-                            end
-                        else
-                            for i in 1:Ferrite.AMR.ncorners_face3D
-                                rotated_ξ = Ferrite.AMR.rotation_permutation(f′, f, r, i)
-                                if haskey(nodeids, (k′, fnodes_neighbor[i]))
-                                    nodeids[(k, fnodes[rotated_ξ])] = nodeids[(k′, fnodes_neighbor[i])]
-                                    nodeowners[(k, fnodes[rotated_ξ])] = (k′, fnodes_neighbor[i])
-                                end
-                            end
-                        end
-                    end
-                end
-            end
-        end
-    end
-    return nodeids, nodeowners
-end
-
 #==============================================================================#
 # Full pipeline benchmark
 #==============================================================================#
@@ -536,72 +434,23 @@ function profile_creategrid(forest_template)
 
     forest = deepcopy(forest_template)
     balanceforest!(forest)
-
-    dim = forest.cells[1] isa Ferrite.AMR.OctreeBWG{3} ? 3 : 2
     ncells = Ferrite.getncells(forest)
-    nnodes_per_cell = 2^dim
 
-    # Phase 1: Intra-octree node assignment
-    t_phase1 = @elapsed begin
-        nodes = Vector{Tuple{Int, NTuple{dim, Int32}}}()
-        sizehint!(nodes, ncells * nnodes_per_cell)
-        nodeids = Dict{Tuple{Int, NTuple{dim, Int32}}, Int}()
-        nodeowners = Dict{Tuple{Int, NTuple{dim, Int32}}, Tuple{Int, NTuple{dim, Int32}}}()
-        pivot_nodeid = 1
-        for (k, tree) in enumerate(forest.cells)
-            for leaf in tree.leaves
-                _vertices = Ferrite.AMR.vertices(leaf, tree.b)
-                for v in _vertices
-                    push!(nodes, (k, v))
-                    nodeids[(k, v)] = pivot_nodeid
-                    pivot_nodeid += 1
-                    nodeowners[(k, v)] = (k, v)
-                end
-            end
-        end
-    end
-    println("  Phase 1 (intra-octree nodes):  $(fmt_time(t_phase1))  [$(length(nodes)) node entries, $(length(nodeids)) unique keys]")
+    # The IBWG2015 LNodes `creategrid` is a single integer pass (no separate node-assignment
+    # phases to profile in isolation). Time the whole call plus its two public sub-components:
+    # the base Morton descent, hanging-node detection, and facetset reconstruction.
+    t_descent = @elapsed (n = 0; Ferrite.AMR.iterate_leaves(_ -> (n += 1), forest))
+    println("  iterate_leaves (descent):  $(fmt_time(t_descent))  [$(n) leaves visited]")
 
-    # Phase 2: Inter-octree node merging
-    t_phase2 = @elapsed _build_node_maps(forest, dim)
-    println("  Phase 2 (inter-octree merge):  $(fmt_time(t_phase2))")
+    t_hang = @elapsed hnodes = Ferrite.AMR.iterate_hanging(forest)
+    println("  iterate_hanging:           $(fmt_time(t_hang))  [$(length(hnodes)) constraints]")
 
-    # Rebuild for phases 3-5
-    nodeids, nodeowners = _build_node_maps(forest, dim)
+    t_facets = @elapsed Ferrite.AMR.reconstruct_facetsets(forest)
+    println("  reconstruct_facetsets:     $(fmt_time(t_facets))")
 
-    # Phase 3: Deduplication
-    t_phase3 = @elapsed begin
-        nodeids_dedup = Dict{Int, Int}()
-        next_nodeid = 1
-        for (kv, nodeid) in nodeids
-            if !haskey(nodeids_dedup, nodeid)
-                nodeids_dedup[nodeid] = next_nodeid
-                next_nodeid += 1
-            end
-        end
-    end
-    println("  Phase 3 (deduplication):       $(fmt_time(t_phase3))  [$(next_nodeid - 1) unique nodes]")
-
-    # Phase 4: Node transform + cell generation
-    t_phase4 = @elapsed begin
-        nodes_physical_all = Ferrite.AMR.transform_pointBWG(forest, nodes)
-    end
-    println("  Phase 4 (coord transform):     $(fmt_time(t_phase4))")
-
-    # Phase 5: Hanging nodes
-    t_phase5 = @elapsed begin
-        hnodes = Ferrite.AMR.hangingnodes(forest, nodeids, nodeowners)
-    end
-    println("  Phase 5 (hanging nodes):       $(fmt_time(t_phase5))  [$(length(hnodes)) constraints]")
-
-    # Phase 6: Facetset reconstruction
-    t_phase6 = @elapsed begin
-        facetsets = Ferrite.AMR.reconstruct_facetsets(forest)
-    end
-    println("  Phase 6 (facetset reconstr):   $(fmt_time(t_phase6))")
-
-    total = t_phase1 + t_phase2 + t_phase3 + t_phase4 + t_phase5 + t_phase6
-    return println("  TOTAL:                         $(fmt_time(total))")
+    t_total = @elapsed grid = creategrid(forest)
+    println("  creategrid (TOTAL):        $(fmt_time(t_total))  [$(ncells) cells, $(getnnodes(grid)) nodes]")
+    return
 end
 
 #==============================================================================#

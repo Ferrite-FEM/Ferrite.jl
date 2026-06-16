@@ -1027,21 +1027,29 @@ end
     adaptive_grid = ForestBWG(grid,3)
     Ferrite.AMR.refine!(adaptive_grid.cells[1],adaptive_grid.cells[1].leaves[1])
     transfered_grid_rotated = Ferrite.AMR.creategrid(adaptive_grid)
-    # Constrainer order within each entry is functionally irrelevant (affine
-    # constraints sum); the iterator-based detection sorts constrainers, so these
-    # compare the constraint *sets*.
-    @test sort(transfered_grid_rotated.conformity_info[5]) == sort([28,25])
-    @test sort(transfered_grid_rotated.conformity_info[20]) == sort([10,15])
-    @test sort(transfered_grid_rotated.conformity_info[30]) == sort([15,18])
-    @test sort(transfered_grid_rotated.conformity_info[1]) == sort([2,18])
-    @test sort(transfered_grid_rotated.conformity_info[19]) == sort([16,28])
-    @test sort(transfered_grid_rotated.conformity_info[22]) == sort([10,15,2,18])
-    @test sort(transfered_grid_rotated.conformity_info[41]) == sort([10,16,2,28])
-    @test sort(transfered_grid_rotated.conformity_info[43]) == sort([18,25])
-    @test sort(transfered_grid_rotated.conformity_info[11]) == sort([10,2])
-    @test sort(transfered_grid_rotated.conformity_info[36]) == sort([2,28])
-    @test sort(transfered_grid_rotated.conformity_info[40]) == sort([10,16])
-    @test sort(transfered_grid_rotated.conformity_info[38]) == sort([2,18,28,25])
+    # Compare the hanging constraints renumbering-invariantly, as a set of
+    # (constrained coord => sorted constrainer coords). Node-id *labels* depend on the
+    # numbering scheme, but the geometry does not; each hanging node is the mean of its
+    # constrainers. (Same config as the golden case `3d_hanging_inter_rotated`.)
+    _hangcoords(grid) = begin
+        nc(id) = ntuple(i -> round(Ferrite.get_node_coordinate(grid.nodes[id])[i]; digits = 10),
+            length(Ferrite.get_node_coordinate(grid.nodes[id])))
+        Set((nc(h) => sort([nc(c) for c in cs])) for (h, cs) in grid.conformity_info)
+    end
+    @test _hangcoords(transfered_grid_rotated) == Set([
+        ((-0.5, 0.0, 0.0) => [(-1.0, 0.0, 0.0), (0.0, 0.0, 0.0)]),
+        ((0.0, -0.5, 0.0) => [(0.0, -1.0, 0.0), (0.0, 0.0, 0.0)]),
+        ((-0.5, -1.0, 0.0) => [(-1.0, -1.0, 0.0), (0.0, -1.0, 0.0)]),
+        ((0.0, 0.0, -0.5) => [(0.0, 0.0, -1.0), (0.0, 0.0, 0.0)]),
+        ((-0.5, -0.5, 0.0) => [(-1.0, -1.0, 0.0), (-1.0, 0.0, 0.0), (0.0, -1.0, 0.0), (0.0, 0.0, 0.0)]),
+        ((0.0, -1.0, -0.5) => [(0.0, -1.0, -1.0), (0.0, -1.0, 0.0)]),
+        ((-0.5, 0.0, -1.0) => [(-1.0, 0.0, -1.0), (0.0, 0.0, -1.0)]),
+        ((-0.5, 0.0, -0.5) => [(-1.0, 0.0, -1.0), (-1.0, 0.0, 0.0), (0.0, 0.0, -1.0), (0.0, 0.0, 0.0)]),
+        ((0.0, -0.5, -1.0) => [(0.0, -1.0, -1.0), (0.0, 0.0, -1.0)]),
+        ((0.0, -0.5, -0.5) => [(0.0, -1.0, -1.0), (0.0, -1.0, 0.0), (0.0, 0.0, -1.0), (0.0, 0.0, 0.0)]),
+        ((-1.0, -0.5, 0.0) => [(-1.0, -1.0, 0.0), (-1.0, 0.0, 0.0)]),
+        ((-1.0, 0.0, -0.5) => [(-1.0, 0.0, -1.0), (-1.0, 0.0, 0.0)]),
+    ])
     @test length(transfered_grid_rotated.conformity_info) == 12
 
     #2D rotated case
@@ -1069,8 +1077,11 @@ end
     adaptive_grid = ForestBWG(grid,3)
     Ferrite.AMR.refine!(adaptive_grid.cells[2],adaptive_grid.cells[2].leaves[1])
     transfered_grid_rotated = Ferrite.AMR.creategrid(adaptive_grid)
-    @test sort(transfered_grid_rotated.conformity_info[11]) == sort([1,7])
-    @test sort(transfered_grid_rotated.conformity_info[10]) == sort([3,7])
+    # Renumbering-invariant constraint set (same config as the golden case `2d_rotated`).
+    @test _hangcoords(transfered_grid_rotated) == Set([
+        ((0.0, -0.5) => [(0.0, -1.0), (0.0, 0.0)]),
+        ((0.5, 0.0) => [(0.0, 0.0), (1.0, 0.0)]),
+    ])
 
     # multiple corner connections in 2D by disc discretization
     grid = Ferrite.generate_simple_disc_grid(Quadrilateral,10)

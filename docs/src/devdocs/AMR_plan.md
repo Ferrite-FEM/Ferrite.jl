@@ -124,11 +124,20 @@ O(n) traversal. Full build order + the corrected mental model are in
       node coordinate) over 4 adaptive steps, with monotone L2-error reduction. The published
       `heat_adaptivity.jl` tutorial also runs to completion with `creategrid_iterator` swapped
       in (ZZ + Dörfler loop, VTK output) — error converges as with the legacy path.
-- [ ] Make `creategrid_iterator` the default (`creategrid` → `creategrid_legacy`);
-      retire the coord→id bridge and the old `hangingnodes`/multi-pass.
-- [ ] Switch the committed `heat_adaptivity.jl` tutorial to the iterator path (verified working).
-- [ ] (Optional) expose `dim(c)`-filtered volume/face/edge/corner callbacks as a
-      thin API for downstream features.
+- [x] Make the iterator the default `creategrid` and **delete** the legacy multi-pass
+      `creategrid` + `hangingnodes`. The physical-coordinate identity (coord→id bridge,
+      `round(…;digits=10)`) is gone everywhere — node identity is now purely integer
+      `(tree,coord)` + topological cross-tree merge (`_merge_cross_tree_nodes!`). This also
+      removed a latent round-off bug present in *both* old paths (false-merge on graded
+      meshes / false-split on rotated non-affine ones). Validated renumbering-invariant vs
+      the frozen golden refs (16 cases) + 1643 invariants + `test_p4est.jl`. Perf on the
+      90k-leaf 3D case: ~83 ms / 56 MiB (function-barrier `_build_cells` removed ~720k boxed
+      cell allocs: 141 ms / 94.7 MiB / 1.2M → 83 ms / 56 MiB / 33k).
+- [x] `heat_adaptivity.jl` tutorial uses the iterator path — it calls `creategrid`, which
+      *is* the iterator now (no tutorial change needed).
+- [ ] (Optional) expose `dim(c)`-filtered volume/face/edge/corner callbacks (the literal
+      point-centric `Iterate_interior`/`Iterate`, Alg 5.2/5.3) as a thin API for downstream
+      features. Not required for the serial node-numbering use case the iterator now covers.
 
 ---
 

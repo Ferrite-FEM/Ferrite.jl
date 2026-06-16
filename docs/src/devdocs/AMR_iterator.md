@@ -124,19 +124,20 @@ LNodes callback (C519) — this is design work, not transcription.
 | `parent` (1301), `descendants` (1317) | BWG2011 Alg 2, 4 | done |
 | `facet/edge/corner_neighbor` (1343/1735/1760) | BWG2011 Alg 5/6/7 | done |
 | `split_array` (367) | IBWG2015 Alg 3.3 | done — `2^d` contiguous views; reusable |
-| `boundaryset` (214/233) | Fig 3 / eq 4.5 (`B_∩^i`) | done (docstring mis-cites "Fig 4.1"; it is Figure 3) |
+| `boundaryset` (214/233) | Fig 3 / eq 4.5 (`B_∩^i`) | done — docstring correctly cites Figure 3 |
 | `find_range_boundaries` (261) | IBWG2015 Alg 4.2 | done — ghost machinery, not the iterator |
 | `transform_facet/edge/corner` (1508/1698/1612) | BWG2011 Alg 8/10/12 | partial — empirical orientation, see §6 |
 | `balanceforest!` (967) | BWG2011 Alg 17 | partial — serial fixpoint, 3D corner balancing incomplete |
 | `search` (390) | IBWG2015 Alg 3.1 | fixed — guard inversion + dropped callback corrected (§6); separate algo from the iterator |
 | `isrelevant` (296) | IBWG2015 Alg 5.1 | stub `return true` (correct for serial) |
-| `creategrid` (598) | BWG2011 Alg 20 (Nodes) | stand-in — to be replaced by LNodes |
-| `hangingnodes` (803) | eq 6.1 remote-reference (re-derived) | stand-in — to be folded into the callback |
-| `Iterate_interior` | IBWG2015 Alg 5.2 | **MISSING** |
-| `Iterate` | IBWG2015 Alg 5.3 | **MISSING** |
-| `Lnodes_callback` | Alg 6.2 line 3 | **MISSING** (no paper pseudocode) |
-| `Global_numbering` | Alg 6.1 | MISSING (serial: counter + offset) |
-| `Determine_owner_process` (6.3), `Reconstruct_remote` (6.4) | Alg 6.3/6.4 | MISSING — distributed-only; serial no-ops |
+| `iterate_leaves` | IBWG2015 Alg 5.2 (volume specialization) | done — integer `split_bounds` descent, Morton order |
+| `iterate_hanging` | eq 6.1 remote-reference (face-descent realization) | done — **integer** `(tree,coord)` keys, intra + inter-tree |
+| `_merge_cross_tree_nodes!` | inter-tree point identity (φ^t maps + Alg 8/10/12 transforms) | done — integer/topological, no physical coords |
+| `creategrid` / `_number_tree!` | IBWG2015 §6 LNodes; owner = min leaf supp (eq 6.2) | done — single-pass min-Morton numbering, the default materializer |
+| `hangingnodes` | (was BWG2011 Alg 20 "Nodes" multi-pass) | **deleted** — replaced by `iterate_hanging` |
+| legacy multi-pass `creategrid` | (was BWG2011 Alg 20) | **deleted** — replaced by the iterator above |
+| `Iterate_interior` / `Iterate` (literal point-centric) | IBWG2015 Alg 5.2 / 5.3 | not implemented as-such — the volume + face-descent specialization above covers the serial node-numbering use case (see §3) |
+| `Global_numbering` (6.1), `Determine_owner_process` (6.3), `Reconstruct_remote` (6.4) | Alg 6.1/6.3/6.4 | distributed-only; serial collapses to a contiguous counter + topological cross-tree merge |
 
 ---
 
@@ -257,10 +258,29 @@ BWG.jl:632/656/706), `Global_numbering ≡` contiguous counter, `Reconstruct_rem
   `creategrid`'s `conformity_info` on **all 16 golden cases** (2D/3D, multi-tree,
   rotated trees, balanced, disc). The inter-tree part is a per-boundary-leaf
   transform (not yet a coordinated descent) — correctness first.
-- **Next — node numbering (the remaining hard piece, IBWG2015 §6 LNodes):** assign
-  each geometric node an id during the descent, owner = min-Morton leaf touching it
-  (corner ownership; needs a corner-coordination pass), plus cell connectivity. Then
-  map the hanging coords → ids and assemble an iterator `creategrid`, validate
-  byte-identical (renumbering-invariant) vs the golden output, and make it the
-  default. This is the genuine LNodes-ownership work — prototype + validate carefully
-  (the team's other blocker); do not rush it.
+- **Step 5 (done — node numbering, IBWG2015 §6 LNodes):** `creategrid` (the default
+  materializer) assigns each node an id in a single `iterate_leaves` pass — owner =
+  min-Morton leaf touching it (eq 6.2), realized as first-encounter in Morton order.
+  Identity is the exact integer `(tree, octree-coord)`; cross-tree shared nodes are
+  merged by `_merge_cross_tree_nodes!` through the macro-mesh maps + orientation
+  transforms (`transform_corner/facet/edge`, `rotation_permutation`) — **no physical
+  coordinates, no rounding** (physical positions are emitted once per owner at the very
+  end). `iterate_hanging` supplies the constraints on the same integer points. Validated
+  renumbering-invariant against the frozen golden references on all 16 cases (2D/3D,
+  multi-tree, rotated, balanced, disc) + 1643 correctness invariants.
+- **Step 6 (done — cutover):** the legacy multi-pass `creategrid` (BWG2011 Alg 20 "Nodes")
+  and `hangingnodes` are **deleted**; the iterator is the sole `creategrid`. This also
+  removed a latent round-off bug shared by both old paths: rounded-physical-coordinate
+  node identity can false-merge graded meshes / false-split rotated non-affine ones
+  (silently breaking continuity); the integer/topological identity is immune.
+- **Performance (90,112-leaf 3D case):** ~83 ms / 56 MiB — ~4× faster and ~6× lighter than
+  the optimized legacy multi-pass, and faster than the (unsafe) physical-coordinate
+  prototype. A function barrier on the cell build (`_build_cells`, concrete-type parameter +
+  `map` over the connectivity tuple) removed ~720k boxed-cell allocations (was 141 ms /
+  94.7 MiB / 1.2M allocs before the barrier).
+
+> **Remaining (optional, not required for the serial use case):** the *literal*
+> point-centric `Iterate_interior`/`Iterate` (Alg 5.2/5.3) with `S` support arrays,
+> `part(c)`, and dim-dispatched callbacks (§2). The current volume + face-descent is a
+> proven, integer-faithful specialization for node numbering + hanging detection; the
+> point-centric engine would be the generalization for arbitrary per-dimension callbacks.

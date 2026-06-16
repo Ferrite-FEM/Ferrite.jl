@@ -5,7 +5,7 @@
 #  1. GOLDEN (regression): a canonical, renumbering-invariant fingerprint of the
 #     balanced forest and the materialized NonConformingGrid, frozen to files in
 #     test/amr_golden/. Detects whether a refactor/optimization of `creategrid`,
-#     `balanceforest!`, or `hangingnodes` *changed* the output. It pins current
+#     `balanceforest!`, or `iterate_hanging` *changed* the output. It pins current
 #     behavior — it does NOT certify that behavior is correct.
 #
 #  2. INVARIANTS (correctness): properties that must hold for ANY valid mesh of
@@ -325,27 +325,21 @@ end
     end
 end
 
-# Forest-level hanging (intra descent + inter-tree via transform_facet) must match
-# creategrid on ALL golden cases (2D/3D, multi-tree, rotated, balanced, disc).
+# Forest-level hanging (intra descent + inter-tree via transform_facet). `iterate_hanging`
+# now keys constraints on integer `(tree, octree-coord)` points; mapping each through the
+# tree transform must land on `creategrid`'s materialized hanging-node / constrainer
+# coordinates exactly (2D/3D, multi-tree, rotated, balanced, disc). This pins the
+# integer-point -> node-id wiring used by `creategrid`.
 @testset "AMR iterator hanging (forest)" begin
     for (name, forest, grid, _) in AMR_CASES
         @testset "$name" begin
             hang = _AMR.iterate_hanging(forest)
-            iter_set = Set((h, sort(ms)) for (h, ms) in hang)
+            phys((k, c)) = _coord(_AMR.transform_pointBWG(forest, k, c))
+            iter_set = Set((phys(h), sort([phys(m) for m in ms])) for (h, ms) in hang)
             ncoord(id) = _coord(Ferrite.get_node_coordinate(grid.nodes[id]))
             cg_set = Set((ncoord(hid), sort([ncoord(cid) for cid in cids]))
                 for (hid, cids) in grid.conformity_info)
             @test iter_set == cg_set
-        end
-    end
-end
-
-# Full iterator materialization: creategrid_iterator must produce the same mesh as
-# creategrid (renumbering-invariant: cells/nodes/hanging/facetsets by coordinate).
-@testset "AMR creategrid_iterator == creategrid" begin
-    for (name, forest, grid, _) in AMR_CASES
-        @testset "$name" begin
-            @test canonical_grid(_AMR.creategrid_iterator(forest)) == canonical_grid(grid)
         end
     end
 end

@@ -432,11 +432,10 @@ function iterate_leaves(f::F, leaves, lo::Int, hi::Int, octant::OctantBWG, b::In
 end
 iterate_leaves(f::F, tree::OctreeBWG{dim}) where {F, dim} = iterate_leaves(f, tree.leaves, 1, length(tree.leaves), root(dim), tree.b)
 
-# --- WIP node iterator (Tier 3): face descent for hanging-node detection ---
-# 2D, intra-tree. A building block toward the full IBWG2015 LNodes iterator that
-# will replace creategrid/hangingnodes. Validated to reproduce creategrid's
-# conformity_info for single-tree 2D (see test/test_p4est_golden.jl). Allocation-free:
-# carries index ranges into the shared leaf array (no views).
+# --- node iterator: face descent for hanging-node detection (single tree, 2D) ---
+# The §5-style face descent used by `iterate_hanging` to find intra-tree hanging nodes.
+# Reproduces `conformity_info` for single-tree 2D (see test/test_p4est_golden.jl).
+# Allocation-free: carries index ranges into the shared leaf array (no views).
 _isleaf(leaves, lo::Integer, hi::Integer, oct::OctantBWG) = lo == hi && leaves[lo] == oct
 
 # Descend the shared face `f` (in octL's frame) between face-adjacent octants
@@ -483,11 +482,9 @@ end
 """
     iterate_hanging_2d(tree::OctreeBWG{2}) -> Dict(constrained_coord => [constrainer_coords])
 
-WIP building block for the IBWG2015 node iterator (Tier 3): detect the hanging
-nodes of a single 2D tree by descending volume + face interfaces (no Dict over all
-nodes, no `findfirst`). Coordinates are octree integers. Validated to reproduce
-`creategrid`'s `conformity_info` for single-tree 2D. Intra-tree only for now;
-inter-tree, 3D (edge descent), and node numbering are the remaining steps.
+Detect the hanging nodes of a single 2D tree by descending volume + face interfaces
+(no Dict over all nodes, no `findfirst`). Coordinates are octree integers. The intra-tree
+building block of `iterate_hanging`; reproduces `conformity_info` for single-tree 2D.
 """
 function iterate_hanging_2d(tree::OctreeBWG{2})
     hang = Dict{NTuple{2, Int}, Vector{NTuple{2, Int}}}()
@@ -561,8 +558,8 @@ Detect the hanging nodes of a single 3D tree via the face descent: each coarse f
 bordering a refined neighbour contributes its centre (4 constrainers) and its 4 edge
 midpoints (2 constrainers each). For 2:1-balanced meshes this captures both
 face-centre and edge-centre hanging — no separate edge descent needed (see
-`_emit_coarse_face_3d!`). Validated to reproduce `creategrid`'s `conformity_info`
-for single-tree 3D. Intra-tree only; inter-tree is the next step.
+`_emit_coarse_face_3d!`). The intra-tree building block of `iterate_hanging`; reproduces
+`conformity_info` for single-tree 3D.
 """
 function iterate_hanging_3d(tree::OctreeBWG{3})
     hang = Dict{NTuple{3, Int}, Vector{NTuple{3, Int}}}()
@@ -653,47 +650,44 @@ function iterate_leaves(f::F, forest::ForestBWG) where {F}
     return
 end
 
+# Hanging-node identity key: `(tree_index, integer_octree_coord)`. Purely integer +
+# topological — no physical coordinates, no rounding (cf. IBWG2015 §2: a point is an
+# octant + boundary index, identity is integer/topological; physical positions are
+# emitted only at the very end). Each key is emitted in the frame of whichever tree the
+# constrained/constrainer points are genuine fine-leaf vertices of: the coarse leaf's own
+# tree `k` for an intra-tree interface, but the *refined neighbour's* tree `k′` for an
+# inter-tree interface (the coarse face centre is not a vertex of any leaf in `k`). The
+# cross-tree identification of a tree-boundary key with its image in another tree is then
+# resolved by the node-id canonicalization downstream, not here.
+const HangingKey{dim} = Tuple{Int, NTuple{dim, Int}}
+_intnode(k::Integer, c) = (Int(k), map(Int, c))
+
 # A coarse octant face `fc` (its corner coords, in tree `k`) borders a refined
-# neighbour: emit (into the physical-coord `hang`) the face centre, constrained by
-# all its corners, and each face-edge midpoint (corner pair differing in one
-# coordinate), constrained by that pair. In 2D the face is an edge and these
-# coincide into one entry; in 3D this gives the face centre (4 constrainers) + 4
-# edge midpoints (2 constrainers).
-function _emit_coarse_face_phys!(hang, forest, k, fc)
-    P(c) = ntuple(i -> round(transform_pointBWG(forest, k, c)[i]; digits = 10), length(c))
-    hang[P(center(fc))] = sort([P(c) for c in fc])
+# neighbour: emit the face centre, constrained by all its corners, and each face-edge
+# midpoint (corner pair differing in one coordinate), constrained by that pair. In 2D
+# the face is an edge and these coincide into one entry; in 3D this gives the face
+# centre (4 constrainers) + 4 edge midpoints (2 constrainers). All keyed on `(k, coord)`.
+function _emit_coarse_face_int!(hang, k, fc)
+    hang[_intnode(k, center(fc))] = sort([_intnode(k, c) for c in fc])
     for i in 1:length(fc), j in (i + 1):length(fc)
         count(d -> fc[i][d] != fc[j][d], 1:length(fc[i])) == 1 || continue
-        hang[P(center((fc[i], fc[j])))] = sort([P(fc[i]), P(fc[j])])
+        hang[_intnode(k, center((fc[i], fc[j])))] = sort([_intnode(k, fc[i]), _intnode(k, fc[j])])
     end
     return
 end
 
-"""
-    iterate_hanging(forest::ForestBWG{dim}) -> Dict(constrained_xyz => [constrainer_xyz])
-
-Forest-level hanging-node detection (2D and 3D) in physical coordinates: intra-tree
-via the face descent (`iterate_hanging_2d`/`iterate_hanging_3d`) plus inter-tree,
-where a coarse boundary leaf facing a refined neighbour across a shared tree face
-contributes hanging nodes (`_emit_coarse_face_phys!`), the neighbour matched with
-`transform_facet` (handles tree rotations). Only face neighbours are needed even at
-tree boundaries: every hanging node is face-interior and the 4 cells around an edge
-form a cycle via faces, so a hanging edge always borders a refined–coarse face pair.
-Validated against `creategrid`'s `conformity_info` on all golden cases (2D/3D,
-multi-tree, rotated, balanced, disc). NOTE: inter-tree is a per-boundary-leaf
-transform (not yet a coordinated descent) — correctness first.
-"""
-# Physical coord (rounded) of octree-integer corner `c` in tree `k`.
-_phys_coord(forest::ForestBWG{dim}, k, c) where {dim} =
-    ntuple(i -> round(transform_pointBWG(forest, k, c)[i]; digits = 10), Val(dim))
-
-function _iterate_hanging_intra!(hang, forest::ForestBWG{dim}, k, tree) where {dim}
+# Intra-tree hanging for one tree: the single-tree face descent, with each `(coord)` key
+# tagged with this tree's index `k` (the constrained centre/edge-mids are vertices of the
+# refined leaves *within* tree k, so tree k is the correct frame here).
+function _iterate_hanging_intra!(hang, k, tree)
+    dim = _dim(tree)
     intra = dim == 2 ? iterate_hanging_2d(tree) : iterate_hanging_3d(tree)
     for (h, ms) in intra
-        hang[_phys_coord(forest, k, h)] = sort([_phys_coord(forest, k, m) for m in ms])
+        hang[_intnode(k, h)] = sort([_intnode(k, m) for m in ms])
     end
     return
 end
+_dim(::OctreeBWG{dim}) where {dim} = dim
 
 # Inter-tree hanging for one tree, in its own function so the per-leaf scan
 # (`face`, `contains_facet`, …) infers concretely instead of boxing under the
@@ -706,22 +700,43 @@ function _iterate_hanging_inter!(hang, forest::ForestBWG{dim}, k, tree, fn, leaf
         isempty(nb) && continue
         k′ = nb[1][1]; f′ = perminv[nb[1][2]]
         kset′ = leafsets[k′]
+        b′ = forest.cells[k′].b
         for C in tree.leaves
             Cface = face(C, f, b)
             contains_facet(rootfaces[f], Cface) || continue   # C on the shared tree face
             nb′ = transform_facet(forest, k′, f′, facet_neighbor(C, f, b))
             (nb′ ∈ kset′) && continue                         # same-size neighbour ⇒ conforming
-            any(c -> c ∈ kset′, children(nb′, b)) || continue # neighbour refined ⇒ C is coarse
-            _emit_coarse_face_phys!(hang, forest, k, Cface)
+            any(c -> c ∈ kset′, children(nb′, b′)) || continue # neighbour refined ⇒ C is coarse
+            # Emit in the *fine neighbour's* frame `k′`: C's coarse boundary face coincides with
+            # face f′ of the same-size octant nb′ inside k′, whose children are the fine leaves —
+            # so its centre/edge-mids are genuine fine-leaf vertices (valid node keys), which they
+            # are NOT in the coarse tree k. Integer/topological — no coordinates.
+            _emit_coarse_face_int!(hang, k′, face(nb′, f′, b′))
         end
     end
     return
 end
 
+"""
+    iterate_hanging(forest::ForestBWG{dim}) -> Dict((tree,coord) => [(tree,coord)...])
+
+Forest-level hanging-node detection (2D and 3D), keyed on **integer** `(tree, octree
+coordinate)` points (no physical coordinates, no rounding). Intra-tree via the face
+descent (`iterate_hanging_2d`/`iterate_hanging_3d`); inter-tree, a coarse boundary leaf
+facing a refined neighbour across a shared tree face contributes hanging nodes
+(`_emit_coarse_face_int!`), the neighbour matched with `transform_facet` (handles tree
+rotations). Only face neighbours are needed even at tree boundaries: every hanging node is
+face-interior and the 4 cells around an edge form a cycle via faces, so a hanging edge
+always borders a refined–coarse face pair. Each key is a genuine fine-leaf vertex, emitted
+in that fine leaf's tree frame — the coarse leaf's tree `k` for an intra-tree interface,
+the refined neighbour's tree `k′` for an inter-tree one — so it maps straight to a node id
+downstream. Validated against the materialized `conformity_info` on all golden cases
+(2D/3D, multi-tree, rotated, balanced, disc).
+"""
 function iterate_hanging(forest::ForestBWG{dim}) where {dim}
-    hang = Dict{NTuple{dim, Float64}, Vector{NTuple{dim, Float64}}}()
+    hang = Dict{HangingKey{dim}, Vector{HangingKey{dim}}}()
     for (k, tree) in enumerate(forest.cells)                      # intra-tree
-        _iterate_hanging_intra!(hang, forest, k, tree)
+        _iterate_hanging_intra!(hang, k, tree)
     end
     perm = dim == 2 ? 𝒱₂_perm : 𝒱₃_perm
     perminv = dim == 2 ? 𝒱₂_perm_inv : 𝒱₃_perm_inv
@@ -867,70 +882,45 @@ end
 p4est_opposite_face_index(f) = ((f - 1) ⊻ 0b1) + 1
 p4est_opposite_edge_index(e) = ((e - 1) ⊻ 0b11) + 1
 
-#TODO: this function should wrap the LNodes Iterator of [IBWG2015](@citet)
-"""
-    creategrid(forest::ForestBWG) -> NonConformingGrid
-Materializes a p4est forest into a NonConformingGrid that can be used as usual to solve a finite element problem.
-"""
-function creategrid(forest::ForestBWG{dim, C, T}) where {dim, C, T}
-    nodes = Vector{Tuple{Int, NTuple{dim, Int32}}}()
-    sizehint!(nodes, getncells(forest) * 2^dim)
+# Cross-tree node-identity merge — purely integer/topological (IBWG2015 §2: an octant is
+# (tree, level, integer coords); shared points are identified through the macro-mesh maps +
+# orientation transforms, never physical coordinates). Forward sweep over trees: a boundary
+# node of tree `k` is linked to its image in an already-processed neighbour tree `k′ < k`
+# via `transform_corner` (vertex_vertex_neighbor), `transform_facet`, and `transform_edge`
+# (+ `rotation_permutation`/orientation). Lifted from the proven `creategrid` Phase 2 and
+# kept verbatim. Mutates `nodeids` (and `nodeowners`) so every shared `(tree, coord)` key
+# points to the single owner's provisional id.
+function _merge_cross_tree_nodes!(forest::ForestBWG{dim}, nodeids, nodeowners) where {dim}
     _perm = dim == 2 ? 𝒱₂_perm : 𝒱₃_perm
     _perminv = dim == 2 ? 𝒱₂_perm_inv : 𝒱₃_perm_inv
     node_map = dim < 3 ? node_map₂ : node_map₃
-    node_map_inv = dim < 3 ? node_map₂_inv : node_map₃_inv
-    nodeids = Dict{Tuple{Int, NTuple{dim, Int32}}, Int}()
-    nodeowners = Dict{Tuple{Int, NTuple{dim, Int32}}, Tuple{Int, NTuple{dim, Int32}}}()
-    facet_neighborhood = Ferrite.Ferrite.get_facet_facet_neighborhood(forest)
-
-    # Phase 1: Assign node owners intra-octree
-    pivot_nodeid = 1
+    facet_neighborhood = Ferrite.get_facet_facet_neighborhood(forest)
     for (k, tree) in enumerate(forest.cells)
-        for leaf in tree.leaves
-            _vertices = vertices(leaf, tree.b)
-            for v in _vertices
-                push!(nodes, (k, v))
-                nodeids[(k, v)] = pivot_nodeid
-                pivot_nodeid += 1
-                nodeowners[(k, v)] = (k, v)
-            end
-        end
-    end
-
-    # Phase 2: Assign node owners inter-octree
-    for (k, tree) in enumerate(forest.cells)
+        # Vertex (tree-corner) neighbours
         _vertices = vertices(root(dim), tree.b)
-        # Vertex neighbors
         @debug println("Setting vertex neighbors for octree $k")
         for (v, vc) in enumerate(_vertices)
-            vertex_neighbor = forest.topology.vertex_vertex_neighbor[k, node_map[v]]
-            for (k′, v′) in vertex_neighbor
+            for (k′, v′) in forest.topology.vertex_vertex_neighbor[k, node_map[v]]
                 @debug println("  pair $v $v′")
                 if k > k′
-                    #delete!(nodes,(k,v))
                     new_v = vertex(root(dim), node_map[v′], tree.b)
                     nodeids[(k, vc)] = nodeids[(k′, new_v)]
                     nodeowners[(k, vc)] = (k′, new_v)
                     @debug println("    Matching $vc (local) to $new_v (neighbor)")
                 end
             end
-            # TODO check if we need to also update the face neighbors
         end
         if dim > 1
             _faces = faces(root(dim), tree.b)
-            # Face neighbors
             @debug println("Updating face neighbors for octree $k")
             for (f, fc) in enumerate(_faces) # f in p4est notation
-                # Skip boundary edges
                 facet_neighbor_ = facet_neighborhood[k, _perm[f]]
-                if length(facet_neighbor_) == 0
-                    continue
-                end
+                length(facet_neighbor_) == 0 && continue
                 @debug @assert length(facet_neighbor_) == 1
                 k′, f′_ferrite = facet_neighbor_[1]
                 f′ = _perminv[f′_ferrite]
                 @debug println("  Neighboring tree: $k′, face $f′_ferrite (Ferrite)/$f′ (p4est)")
-                if k > k′ # Owner
+                if k > k′ # owner is the lower-index tree
                     tree′ = forest.cells[k′]
                     for leaf in tree.leaves
                         fnodes = face(leaf, f, tree.b)
@@ -968,19 +958,15 @@ function creategrid(forest::ForestBWG{dim, C, T}) where {dim, C, T}
             end
         end
         if dim > 2
-            # edge neighbors
             @debug println("Updating edge neighbors for octree $k")
             for (e, ec) in enumerate(edges(root(dim), tree.b)) # e in p4est notation
-                # Skip boundary edges
                 edge_neighbor_ = forest.topology.edge_edge_neighbor[k, edge_perm[e]]
-                if length(edge_neighbor_) == 0
-                    continue
-                end
+                length(edge_neighbor_) == 0 && continue
                 @debug @assert length(edge_neighbor_) == 1
                 k′, e′_ferrite = edge_neighbor_[1]
                 e′ = edge_perm_inv[e′_ferrite]
                 @debug println("  Neighboring tree: $k′, edge $e′_ferrite (Ferrite)/$e′ (p4est)")
-                if k > k′ # Owner
+                if k > k′ # owner is the lower-index tree
                     tree′ = forest.cells[k′]
                     for leaf in tree.leaves
                         # First we skip edges which are not on the current edge of the root element
@@ -992,7 +978,6 @@ function creategrid(forest::ForestBWG{dim, C, T}) where {dim, C, T}
                         neighbor_candidate = transform_edge(forest, k′, e′, leaf, false)
                         # Candidate must be the edge opposite to e'
                         e′candidate = p4est_opposite_edge_index(e′)
-
                         enodes_neighbor = edge(neighbor_candidate, e′candidate, tree′.b)
                         r = compute_edge_orientation(forest, k, e)
                         @debug println("  Trying to match $enodes (local) to $enodes_neighbor (neighbor $neighbor_candidate)")
@@ -1009,135 +994,99 @@ function creategrid(forest::ForestBWG{dim, C, T}) where {dim, C, T}
             end
         end
     end
-
-    # Phase 3: Compute unique physical nodes
-    nodeids_dedup = Dict{Int, Int}()
-    next_nodeid = 1
-    for (kv, nodeid) in nodeids
-        if !haskey(nodeids_dedup, nodeid)
-            nodeids_dedup[nodeid] = next_nodeid
-            next_nodeid += 1
-        end
-    end
-    # Phase 4: transform only the unique owner nodes, not the pre-dedup duplicates
-    unique_kv = Vector{eltype(nodes)}(undef, next_nodeid - 1)
-    for (nodeid, compact) in nodeids_dedup
-        unique_kv[compact] = nodes[nodeid]
-    end
-    nodes_physical = transform_pointBWG(forest, unique_kv)
-
-    # Phase 4: Generate cells
-    celltype = dim < 3 ? Quadrilateral : Hexahedron
-    cells = celltype[]
-    cellnodes = zeros(Int, 2^dim)
-    for (k, tree) in enumerate(forest.cells)
-        for leaf in tree.leaves
-            _vertices = vertices(leaf, tree.b)
-            cellnodes = ntuple(i -> nodeids_dedup[nodeids[nodeowners[(k, _vertices[i])]]], length(_vertices))
-            push!(cells, celltype(ntuple(i -> cellnodes[node_map[i]], length(cellnodes))))
-        end
-    end
-
-    # Phase 5: Generate grid and hanging nodes. Hanging nodes are detected by the
-    # IBWG2015 iterator (iterate_hanging) and mapped to node ids through their physical
-    # coordinates. TODO: have the iterator (LNodes) emit ids directly and drop this
-    # coordinate bridge — and then retire the old `hangingnodes`/multi-pass numbering.
-    facetsets = reconstruct_facetsets(forest)
-    coord2id = Dict{NTuple{dim, Float64}, Int}()
-    for (id, x) in enumerate(nodes_physical)
-        coord2id[ntuple(i -> round(x[i]; digits = 10), dim)] = id
-    end
-    hnodes_dedup = Dict{Int, Vector{Int}}()
-    for (hc, mcs) in iterate_hanging(forest)
-        hnodes_dedup[coord2id[hc]] = [coord2id[mc] for mc in mcs]
-    end
-    return NonConformingGrid(cells, nodes_physical .|> Node, facetsets = facetsets, conformity_info = hnodes_dedup)
+    return
 end
 
 """
-    creategrid_iterator(forest::ForestBWG) -> NonConformingGrid
+    creategrid(forest::ForestBWG) -> NonConformingGrid
 
-Iterator-based grid materialization (IBWG2015 LNodes direction): one `iterate_leaves`
-descent per tree assigns node ids by **min-Morton ownership** — the first leaf in Morton
-order to touch a corner owns it. Because the descent visits leaves in Morton order, the
-"first encounter assigns the id" rule *is* min-Morton ownership; we dedup on the octant's
-exact **integer** corner coordinate (`local2id`, per tree) so each unique node is
-transformed to physical space exactly **once** (vs once per touching leaf in the old
-coord-keyed version). Only nodes that can be shared *across trees* — corners on a tree
-boundary (`local2id` cannot see them, they live in two integer frames) and the endpoints
-of a hanging constraint — keep a physical-coordinate entry (`coord2id`) so they merge and
-so the hanging bridge can resolve them; every interior node gets its id directly. This
-replaces `creategrid`'s 5-phase Dict pipeline (intra/inter-octree merge, dedup) with one
-pass. `iterate_hanging` supplies the constraints, `reconstruct_facetsets` the facetsets
-(cells are emitted in the same per-tree Morton order as `creategrid`). Produces the same
-mesh as `creategrid` (validated renumbering-invariant for 2D/3D, multi-tree, rotated,
-balanced, disc). Kept beside `creategrid` for comparison.
+Materialize a `ForestBWG` into a `NonConformingGrid` for finite-element use, via the
+[IBWG2015](@citet) LNodes node iterator — **fully integer / topological**: no physical
+coordinates ever enter node identity (cf. IBWG2015 §2/§6).
+
+- **Numbering (Phase 1):** one `iterate_leaves` descent per tree assigns each corner a
+  provisional id at its first (Morton-order) encounter — the per-tree half of **min-Morton
+  ownership**. Keys are the exact integer `(tree, octree-coord)` point. Composed with the
+  Phase-2 lowest-tree-wins sweep, the surviving owner is `owner(c) = min leaf supp(c)` (eq 6.2).
+- **Cross-tree merge (Phase 2):** `_merge_cross_tree_nodes!` identifies boundary nodes shared
+  between trees through the macro-mesh maps + orientation transforms (`transform_corner/facet/
+  edge`, `rotation_permutation`) — exact integer topology, with no `round(physical; digits)`
+  bucket (which can false-merge graded meshes or false-split rotated non-affine ones).
+- **Constraints:** the integer `iterate_hanging` emits `(tree, coord)` points that are genuine
+  fine-leaf vertices, so they map straight to ids — no coordinate bridge.
+- Physical coordinates are computed **once per owner node**, at the very end, only to fill the
+  `Node` array.
+
+Validated renumbering-invariant against frozen golden references on all cases (2D/3D,
+multi-tree, rotated, balanced, disc); see `test/test_p4est_golden.jl`.
 """
-# Global id for octant integer corner `ic` (min-Morton ownership): deduped per tree on
-# the exact integer coordinate (`local2id`), transforming to physical space only on first
-# encounter. Nodes shared across trees (a tree-boundary corner — `local2id` cannot see the
-# other tree's frame) or referenced by a hanging constraint also get a physical-coord entry
-# (`coord2id`) so they merge / resolve; interior nodes get their id directly.
-function _owner_id!(local2id, coord2id, nodecoords::Vector{Vec{dim, T}}, need_phys, cnodes, b, hi, ic) where {dim, T}
-    return get!(local2id, ic) do
-        p = _transform_point(cnodes, b, ic)
-        key = ntuple(d -> round(p[d]; digits = 10), Val(dim))
-        if any(c -> c == 0 || c == hi, ic) || key in need_phys
-            return get!(coord2id, key) do
-                push!(nodecoords, p)
-                length(nodecoords)
-            end
-        else
-            push!(nodecoords, p)
-            return length(nodecoords)
-        end
-    end
-end
-
-# Per-tree descent in its own function so the `do`-block closures capture stable function
-# arguments rather than boxed `for`-loop variables.
-function _materialize_tree!(conns, nodecoords, coord2id, local2id, need_phys, tree, cnodes, b, node_map, ::Val{NV}) where {NV}
-    hi = 2^b   # root octant spans integer coords [0, 2^b]
+# Per-tree single-pass descent in its own function so the `iterate_leaves` `do`-block closures
+# capture stable function arguments rather than boxed `for`-loop variables.
+function _number_tree!(conns, nodeids, prov_key, tree, k, node_map, ::Val{NV}) where {NV}
+    b = tree.b
     iterate_leaves(tree) do leaf
         v = vertices(leaf, b)
-        ids = ntuple(i -> _owner_id!(local2id, coord2id, nodecoords, need_phys, cnodes, b, hi, v[i]), Val(NV))
+        ids = ntuple(Val(NV)) do i
+            key = (k, map(Int, v[i]))
+            get!(nodeids, key) do
+                push!(prov_key, key)        # prov_key[id] = the (tree, coord) first assigned id
+                length(prov_key)
+            end
+        end
         push!(conns, ntuple(i -> ids[node_map[i]], Val(NV)))
         return
     end
     return
 end
 
-function creategrid_iterator(forest::ForestBWG{dim}) where {dim}
+# Build the cell vector behind a function barrier: `CT` is a concrete type parameter (so
+# `CT(...)` is type-stable, no boxed cells) and the per-vertex id lookup uses `map` over the
+# connectivity tuple, whose closure captures only the stable `final_of_prov` (not the loop
+# variable), avoiding the boxed-comprehension-variable allocation.
+_build_cells(::Type{CT}, conns::Vector{NTuple{NV, Int}}, final_of_prov::Vector{Int}) where {CT, NV} =
+    [CT(map(j -> final_of_prov[j], c)) for c in conns]
+
+function creategrid(forest::ForestBWG{dim}) where {dim}
     node_map = dim == 2 ? node_map₂ : node_map₃
     celltype = dim == 2 ? Quadrilateral : Hexahedron
+    NV = 2^dim
+    KeyT = Tuple{Int, NTuple{dim, Int}}
     ncells = getncells(forest)
-    nodecoords = Vec{dim, Float64}[]
-    sizehint!(nodecoords, ncells)                    # #nodes ≈ #cells; avoids doubling reallocs
-    conns = NTuple{2^dim, Int}[]
-    sizehint!(conns, ncells)
 
-    # Hanging constraints (physical coords). An endpoint may be interior to a tree, so
-    # we must keep a physical id for every coord the bridge references, not just boundary ones.
-    hang = iterate_hanging(forest)
-    need_phys = Set{NTuple{dim, Float64}}()
-    for (h, ms) in hang
-        push!(need_phys, h)
-        for m in ms
-            push!(need_phys, m)
+    # Phase 1 — single-pass integer numbering + cell collection (Morton order). `nodeids` is
+    # global across trees so Phase 2 can resolve a boundary node to a lower-tree owner.
+    nodeids = Dict{KeyT, Int}();  sizehint!(nodeids, ncells)
+    prov_key = KeyT[];  sizehint!(prov_key, ncells)
+    conns = NTuple{NV, Int}[];  sizehint!(conns, ncells)
+    for (k, tree) in enumerate(forest.cells)
+        _number_tree!(conns, nodeids, prov_key, tree, k, node_map, Val(NV))
+    end
+
+    # Phase 2 — integer/topological cross-tree node identity merge (writes-only `nodeowners`,
+    # which we don't read; the merge mutates `nodeids` so shared keys point to one owner id).
+    _merge_cross_tree_nodes!(forest, nodeids, Dict{KeyT, KeyT}())
+
+    # Phase 3 — compact surviving owner ids to 1..N, build a dense provisional->final id map, and
+    # emit each owner's physical coordinate once. Tree corners are cached per tree (not per node).
+    treecorners = [_treecorners(forest, k) for k in eachindex(forest.cells)]
+    nprov = length(prov_key)
+    final_of_prov = Vector{Int}(undef, nprov)         # provisional id -> compact final id
+    compact = Dict{Int, Int}();  sizehint!(compact, nprov)
+    nodecoords = Vec{dim, Float64}[]
+    for p in 1:nprov
+        c = nodeids[prov_key[p]]                       # canonical (post-merge) id of provisional p
+        final_of_prov[p] = get!(compact, c) do
+             k = prov_key[c][1]                         # c is an owner id; prov_key[c] is its (tree,coord)
+            push!(nodecoords, _transform_point(treecorners[k], forest.cells[k].b, prov_key[c][2]))
+            length(compact) + 1
         end
     end
 
-    coord2id = Dict{NTuple{dim, Float64}, Int}()     # cross-tree merge: boundary + hanging coords only
-    local2id = Dict{NTuple{dim, Int32}, Int}()       # per-tree integer-coord ownership (reused via empty!)
-    for (k, tree) in enumerate(forest.cells)
-        empty!(local2id)
-        cnodes = _treecorners(forest, k)             # tree corner coords once per tree
-        _materialize_tree!(conns, nodecoords, coord2id, local2id, need_phys, tree, cnodes, tree.b, node_map, Val(2^dim))
-    end
-    cells = [celltype(c) for c in conns]
+    # Phase 4 — cells (dense provisional->final lookup, no Dict in the hot loop) and constraints.
+    cells = _build_cells(celltype, conns, final_of_prov)
     hnodes = Dict{Int, Vector{Int}}()
-    for (hc, mcs) in hang
-        hnodes[coord2id[hc]] = [coord2id[mc] for mc in mcs]
+    for (hkey, mkeys) in iterate_hanging(forest)
+        hnodes[compact[nodeids[hkey]]] = [compact[nodeids[m]] for m in mkeys]
     end
     return NonConformingGrid(cells, Node.(nodecoords); conformity_info = hnodes, facetsets = reconstruct_facetsets(forest))
 end
@@ -1165,133 +1114,6 @@ function reconstruct_facetsets(forest::ForestBWG{dim}) where {dim}
         new_facesets[facetsetname] = new_facetset
     end
     return new_facesets
-end
-
-"""
-    hangingnodes(forest,nodeids,nodeowners)
-Constructs a map from constrained nodeids to the ones that constraint
-"""
-function hangingnodes(forest::ForestBWG{dim}, nodeids, nodeowners) where {dim}
-    _perm = dim == 2 ? 𝒱₂_perm : 𝒱₃_perm
-    _perminv = dim == 2 ? 𝒱₂_perm_inv : 𝒱₃_perm_inv
-    facetable = dim == 2 ? 𝒱₂ : 𝒱₃
-    opposite_face = dim == 2 ? opposite_face_2 : opposite_face_3
-    hnodes = Dict{Int, Vector{Int}}()
-    leafsets = [Set(tree.leaves) for tree in forest.cells] # O(1) membership; hangingnodes does not mutate leaves
-    facet_neighborhood = Ferrite.Ferrite.get_facet_facet_neighborhood(forest)
-    for (k, tree) in enumerate(forest.cells)
-        rootfaces = faces(root(dim), tree.b)
-        for (l, leaf) in enumerate(tree.leaves)
-            c̃ = child_id(leaf, tree.b)
-            if leaf == root(dim)
-                continue
-            end
-            parent_ = parent(leaf, tree.b)
-            parentfaces = faces(parent_, tree.b)
-            parentedges = dim > 2 ? edges(parent_, tree.b) : nothing
-            for (ci, c) in enumerate(vertices(leaf, tree.b))
-                for (pface_i, pface) in enumerate(parentfaces)
-                    if iscenter(c, pface) #hanging node candidate
-                        neighbor_candidate = facet_neighbor(parent_, pface_i, tree.b)
-                        if inside(tree, neighbor_candidate) #intraoctree branch
-                            if neighbor_candidate ∈ leafsets[k]
-                                neighbor_candidate_faces = faces(neighbor_candidate, tree.b)
-                                nf = findfirst(x -> x == pface, neighbor_candidate_faces)
-                                hnodes[nodeids[nodeowners[(k, c)]]] = [nodeids[nodeowners[(k, nc)]] for nc in neighbor_candidate_faces[nf]]
-                                if dim > 2
-                                    vs = vertices(leaf, tree.b)
-                                    for ξ in 1:ncorners_face3D
-                                        c′ = facetable[pface_i, ξ]
-                                        if c′ ∉ (c̃, ci)
-                                            neighbor_candidate_edges = edges(neighbor_candidate, tree.b)
-                                            ne = findfirst(x -> iscenter(vs[c′], x), neighbor_candidate_edges)
-                                            if ne !== nothing
-                                                hnodes[nodeids[nodeowners[(k, vs[c′])]]] = [nodeids[nodeowners[(k, ne)]] for ne in neighbor_candidate_edges[ne]]
-                                            end
-                                        end
-                                    end
-                                end
-                                break
-                            end
-                        else #interoctree branch
-                            #for (ri,rf) in enumerate(rootfaces)
-                            #for (pi,pf) in enumerate(parentfaces)
-                            facet_neighbor_ = facet_neighborhood[k, _perm[pface_i]]
-                            if length(facet_neighbor_) == 0
-                                continue
-                            end
-                            if any(x -> contains_facet(x, pface), rootfaces)
-                                k′ = facet_neighbor_[1][1]
-                                ri′ = _perminv[facet_neighbor_[1][2]]
-                                interoctree_neighbor = transform_facet(forest, k′, ri′, neighbor_candidate)
-                                if interoctree_neighbor ∈ leafsets[k′]
-                                    r = compute_face_orientation(forest, k, pface_i)
-                                    neighbor_candidate_faces = faces(neighbor_candidate, forest.cells[k′].b)
-                                    transformed_neighbor_faces = faces(interoctree_neighbor, forest.cells[k′].b)
-
-                                    fnodes = transformed_neighbor_faces[ri′]
-                                    vs = vertices(leaf, tree.b)
-                                    if dim > 2
-                                        rotated_ξ = ntuple(i -> rotation_permutation(ri′, pface_i, r, i), ncorners_face3D)
-                                    else
-                                        rotated_ξ = ntuple(i -> rotation_permutation(r, i), ncorners_face2D)
-                                    end
-                                    hnodes[nodeids[nodeowners[(k, c)]]] = [nodeids[nodeowners[(k′, fnodes[ξ])]] for ξ in rotated_ξ]
-
-                                    if dim > 2
-                                        for ξ in rotated_ξ
-                                            c′ = facetable[pface_i, ξ]
-                                            if c′ ∉ (c̃, ci)
-                                                #neighbor_candidate_edges = edges(interoctree_neighbor,tree.b)
-                                                #ne = findfirst(x->iscenter(vs[c′],x),neighbor_candidate_edges)
-                                                neighbor_candidate_edges = edges(parent_, tree.b)
-                                                ne = findfirst(x -> iscenter(vs[c′], x), neighbor_candidate_edges)
-                                                if ne !== nothing
-                                                    hnodes[nodeids[nodeowners[(k, vs[c′])]]] = [nodeids[nodeowners[(k, ne)]] for ne in neighbor_candidate_edges[ne]]
-                                                end
-                                            end
-                                        end
-                                    end
-                                    break
-                                end
-                            end
-                            #end
-                        end
-                    end
-                end
-                if dim > 2
-                    for (pedge_i, pedge) in enumerate(parentedges)
-                        if iscenter(c, pedge) #hanging node candidate
-                            neighbor_candidate = edge_neighbor(parent_, pedge_i, tree.b)
-                            for (ri, re) in enumerate(edges(root(dim), tree.b))
-                                edge_neighbor_ = forest.topology.edge_edge_neighbor[k, edge_perm[ri]]
-                                if length(edge_neighbor_) == 0
-                                    continue
-                                end
-                                if contains_edge(re, pedge)
-                                    k′ = edge_neighbor_[1][1]
-                                    ri′ = edge_perm_inv[edge_neighbor_[1][2]]
-                                    interoctree_neighbor = transform_edge(forest, k′, ri′, neighbor_candidate, true)
-                                    if interoctree_neighbor ∈ leafsets[k′]
-                                        neighbor_candidate_edges = edges(neighbor_candidate, forest.cells[k′].b)
-                                        transformed_neighbor_edges = edges(interoctree_neighbor, forest.cells[k′].b)
-                                        ne = findfirst(x -> iscenter(c, x), neighbor_candidate_edges)
-                                        if ne !== nothing
-                                            hnodes[nodeids[nodeowners[(k, c)]]] = [nodeids[nodeowners[(k′, nc)]] for nc in transformed_neighbor_edges[ne]]
-                                        else
-                                            @error "things are messed up for hanging edge constraint interoctree at octree $k edge $(_perm[ri])"
-                                        end
-                                        break
-                                    end
-                                end
-                            end
-                        end
-                    end
-                end
-            end
-        end
-    end
-    return hnodes
 end
 
 function balance_corner(forest, k′, c′, o, s)
