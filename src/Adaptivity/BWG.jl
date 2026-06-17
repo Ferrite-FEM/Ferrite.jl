@@ -1078,6 +1078,28 @@ function _balance_leaf!(forest::ForestBWG{dim}, k, tree, o, perm_face, perm_face
     return
 end
 
+# Reusable scratch for `balancetree`, allocated once in `balanceforest!` and reused across
+# every tree and pass. Without reuse, the per-level `push!`/`append!` (and `unique!`'s hash
+# table) reallocate on every one of the hundreds of `balancetree` calls.
+struct BalanceBuffers{OT, K}
+    keybuf::Vector{K}     # (Morton-anchor, level) sort keys
+    permbuf::Vector{Int}
+    scratch::Vector{OT}
+    W::Vector{OT}
+    P::Vector{OT}
+    R::Vector{OT}
+    Q::Vector{OT}
+    T::Vector{OT}
+    Tparents::Set{OT}
+    seen::Set{OT}
+    inds::Vector{Int}
+end
+
+function BalanceBuffers(s0::OT) where {OT <: OctantBWG}
+    K = Tuple{typeof(morton(s0, s0.l, s0.l)), typeof(s0.l)}
+    return BalanceBuffers{OT, K}(K[], Int[], OT[], OT[], OT[], OT[], OT[], OT[], Set{OT}(), Set{OT}(), Int[])
+end
+
 """
     balanceforest!(forest)
 Algorithm 17 of [BWG2011](@citet)
@@ -1090,11 +1112,8 @@ function balanceforest!(forest::ForestBWG{dim}) where {dim}
     root_ = root(dim)
     nrefcells = 0
     facet_neighborhood = Ferrite.Ferrite.get_facet_facet_neighborhood(forest)
-    # `balancetree` sort buffers, allocated once and reused across every tree and pass.
-    OT = eltype(forest.cells[1].leaves)
-    s0 = forest.cells[1].leaves[1]
-    keybuf = Tuple{typeof(morton(s0, s0.l, s0.l)), typeof(s0.l)}[]
-    permbuf = Int[]; scratch = OT[]
+    # `balancetree` scratch, allocated once and reused across every tree and pass.
+    bb = BalanceBuffers(forest.cells[1].leaves[1])
     while nrefcells - getncells(forest) != 0
         nrefcells = getncells(forest)
         for k in 1:length(forest.cells)
@@ -1102,7 +1121,7 @@ function balanceforest!(forest::ForestBWG{dim}) where {dim}
             rootfaces = faces(root_, tree.b)
             rootedges = dim == 3 ? edges(root_, tree.b) : nothing
             rootvertices = vertices(root_, tree.b)
-            balanced = balancetree(tree, keybuf, permbuf, scratch)
+            balanced = balancetree(tree, bb)
             forest.cells[k] = balanced
             for o in forest.cells[k].leaves
                 # Only leaves touching the tree boundary can have out-of-tree neighbours;
@@ -1142,36 +1161,62 @@ function _sort_by_morton!(v::Vector{OT}) where {OT <: OctantBWG}
     return _sort_by_morton!(v, Tuple{typeof(morton(s, s.l, s.l)), typeof(s.l)}[], Int[], OT[])
 end
 
+# Drop all octants at level `lm1` from `W`, compacting in place. Unlike `filter!`, `resize!`
+# down keeps the buffer capacity, so the reused `W` is not reallocated by the next `append!`.
+function _drop_level!(W, lm1)
+    j = 0
+    @inbounds for x in W
+        if x.l != lm1
+            j += 1
+            W[j] = x
+        end
+    end
+    return resize!(W, j)
+end
+
+# Order-preserving in-place dedup with a reused `Set`, replacing `unique!` (which allocates
+# a fresh hash table on every call).
+function _unique!(P, seen)
+    empty!(seen)
+    j = 0
+    @inbounds for x in P
+        if x ∉ seen
+            push!(seen, x)
+            j += 1
+            P[j] = x
+        end
+    end
+    return resize!(P, j)
+end
+
 """
 Algorithm 7 of [SSB2008](@citet)
 """
 function balancetree(tree::OctreeBWG)
     length(tree.leaves) == 1 && return tree
-    OT = eltype(tree.leaves)
-    s0 = tree.leaves[1]
-    return balancetree(tree, Tuple{typeof(morton(s0, s0.l, s0.l)), typeof(s0.l)}[], Int[], OT[])
+    return balancetree(tree, BalanceBuffers(tree.leaves[1]))
 end
 
-function balancetree(tree::OctreeBWG, keybuf, permbuf, scratch)
-    if length(tree.leaves) == 1
-        return tree
-    end
-    OT = eltype(tree.leaves)
-    W = copy(tree.leaves); P = OT[]; R = OT[]
-    Q = OT[]; T = OT[]; Tparents = Set{OT}()
+function balancetree(tree::OctreeBWG, bb::BalanceBuffers)
+    length(tree.leaves) == 1 && return tree
+    W, P, R, Q, T = bb.W, bb.P, bb.R, bb.Q, bb.T
+    empty!(W)
+    append!(W, tree.leaves)
+    empty!(P)
+    empty!(R)
     for l in tree.b:-1:1 #TODO verify to do this until level 1
         empty!(Q)
         for o in W
             o.l == l && push!(Q, o)
         end
-        _sort_by_morton!(Q, keybuf, permbuf, scratch)
+        _sort_by_morton!(Q, bb.keybuf, bb.permbuf, bb.scratch)
         # T: one representative per distinct parent (first in Q order)
-        empty!(T); empty!(Tparents)
+        empty!(T); empty!(bb.Tparents)
         for x in Q
             p = parent(x, tree.b)
-            if p ∉ Tparents
+            if p ∉ bb.Tparents
                 push!(T, x)
-                push!(Tparents, p)
+                push!(bb.Tparents, p)
             end
         end
         for t in T
@@ -1181,14 +1226,14 @@ function balancetree(tree::OctreeBWG, keybuf, permbuf, scratch)
             end
         end
         append!(P, x for x in W if x.l == l - 1)
-        filter!(x -> !(x.l == l - 1), W) #don't know why I have to negotiate like this, otherwise behaves weird
-        unique!(P)
+        _drop_level!(W, l - 1) # capacity-preserving in-place filter (see note above)
+        _unique!(P, bb.seen)
         append!(W, P)
         empty!(P)
     end
-    _sort_by_morton!(R, keybuf, permbuf, scratch) # (morton-anchor, level) key disambiguates at max depth
-    linearise!(R, tree.b)
-    return OctreeBWG(R, tree.b, tree.nodes)
+    _sort_by_morton!(R, bb.keybuf, bb.permbuf, bb.scratch) # (morton-anchor, level) key disambiguates at max depth
+    linearise!(R, tree.b, bb.inds)
+    return OctreeBWG(copy(R), tree.b, tree.nodes) # copy: R is the reused buffer; the tree owns its leaves
 end
 
 """
@@ -1196,8 +1241,11 @@ Algorithm 8 of [SSB2008](@citet)
 
 Inverted the algorithm to delete! instead of add incrementally to a new array
 """
-function linearise!(leaves::Vector{T}, b) where {T <: OctantBWG}
-    inds = [i for i in 1:(length(leaves) - 1) if isancestor(leaves[i], leaves[i + 1], b)]
+function linearise!(leaves::Vector{T}, b, inds) where {T <: OctantBWG}
+    empty!(inds)
+    @inbounds for i in 1:(length(leaves) - 1)
+        isancestor(leaves[i], leaves[i + 1], b) && push!(inds, i)
+    end
     return deleteat!(leaves, inds)
 end
 
