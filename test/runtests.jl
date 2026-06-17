@@ -13,6 +13,10 @@ using WriteVTK
 import Metis
 using HCubature: hcubature, hquadrature
 
+if isdefined(Test, :detect_closure_boxes)
+    @test isempty(Test.detect_closure_boxes(Ferrite))
+end
+
 #include("test_utils.jl")
 
 # Unit tests
