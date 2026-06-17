@@ -19,10 +19,10 @@ order = 1 # linear interpolation
 ip = Lagrange{RefTriangle, order}()^dim; # vector valued interpolation
 
 qr = QuadratureRule{RefTriangle}(1) # 1 quadrature point
-qr_face = FacetQuadratureRule{RefTriangle}(1);
+facet_qr = FacetQuadratureRule{RefTriangle}(1);
 
 cellvalues = CellValues(qr, ip)
-facetvalues = FacetValues(qr_face, ip);
+facetvalues = FacetValues(facet_qr, ip);
 
 dh = DofHandler(grid)
 add!(dh, :u, ip)

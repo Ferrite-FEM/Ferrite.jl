@@ -126,6 +126,9 @@ using Ferrite, SparseArrays, BlockArrays, LinearAlgebra, WriteVTK
 # and the Rodas5P solver from OrdinaryDiffEqRosenbrock.
 using DiffEqBase
 using OrdinaryDiffEqRosenbrock: Rodas5P
+using SciMLIterators: intervals
+using ADTypes: AutoFiniteDiff
+import SciMLLogging
 
 # We start off by defining our only material parameter.
 ν = 1.0 / 1000.0; #dynamic viscosity
@@ -417,7 +420,7 @@ function navierstokes_rhs_element!(dvₑ, vₑ, cv)
             # ```math
             # [(v \cdot \nabla) v]_{\textrm{i}} = v_{\textrm{j}} (\partial_{\textrm{j}} v_{\textrm{i}}) = [v (\nabla v)^{\textrm{T}}]_{\textrm{i}}
             # ```
-            # where we should pay attentation to the transpose of the gradient.
+            # where we should pay attention to the transpose of the gradient.
             #+
             dvₑ[j] -= v ⋅ ∇v' ⋅ φⱼ * dΩ
         end
@@ -431,8 +434,8 @@ function navierstokes!(du, u_uc, p::RHSparams, t)
     (; K, ch, dh, cv, u) = p
 
     # We start by applying the time-dependent Dirichlet BCs. Note that we are
-    # not allowed to mutate `u_uc`! Furthermore not that we also can not pre-
-    # allocate a buffer for this variable variable if we want to use AD to derive
+    # not allowed to mutate `u_uc`! Furthermore note that we also can not pre-
+    # allocate a buffer for this variable if we want to use AD to derive
     # the Jacobian matrix, which appears in stiff solvers.
     # Therefore, for efficiency reasons, we simply pass down the jacobian analytically.
     #+
@@ -474,7 +477,7 @@ function navierstokes_jac_element!(Jₑ, vₑ, cv)
             # ```math
             # [(v \cdot \nabla) v]_{\textrm{i}} = v_{\textrm{j}} (\partial_{\textrm{j}} v_{\textrm{i}}) = [v (\nabla v)^{\textrm{T}}]_{\textrm{i}}
             # ```
-            # where we should pay attentation to the transpose of the gradient.
+            # where we should pay attention to the transpose of the gradient.
             #+
             for i in 1:n_basefuncs
                 φᵢ = shape_value(cv.v, q_point, i)
@@ -544,7 +547,7 @@ end
 (fe_norm::FreeDofErrorNorm)(u::AbstractArray, t) = DiffEqBase.ODE_DEFAULT_NORM(u[fe_norm.ch.free_dofs], t)
 
 # Now we can put everything together by specifying how to solve the problem.
-# We want to use an adaptive variant of the implicit Euler method. Further we
+# We want to use the adaptive Rosenbrock method Rodas5P. Further we
 # enable the progress bar with the `progress` and `progress_steps` arguments.
 # Finally we have to communicate the time step length and initialization
 # algorithm. Since we start with a valid initial state we do not use one of
@@ -555,7 +558,7 @@ end
 # To visualize the result we export the grid and our fields
 # to VTK-files, which can be viewed in [ParaView](https://www.paraview.org/)
 # by utilizing the corresponding pvd file.
-timestepper = Rodas5P(autodiff = false, step_limiter! = ferrite_limiter!);
+timestepper = Rodas5P(autodiff = AutoFiniteDiff(), step_limiter! = ferrite_limiter!);
 # timestepper = ImplicitEuler(nlsolve=NonlinearSolveAlg(OrdinaryDiffEq.NonlinearSolve.NewtonRaphson(autodiff=OrdinaryDiffEq.AutoFiniteDiff()); max_iter=50), step_limiter! = ferrite_limiter!) #src
 #NOTE!   This is left for future reference                                #src
 # function algebraicmultigrid(W,du,u,p,t,newW,Plprev,Prprev,solverdata)   #src
@@ -574,7 +577,7 @@ integrator = init(
     problem, timestepper; initializealg = NoInit(), dt = Δt₀,
     adaptive = true, abstol = 1.0e-4, reltol = 1.0e-5,
     progress = true, progress_steps = 1,
-    verbose = true, internalnorm = FreeDofErrorNorm(ch), d_discontinuities = [1.0]
+    verbose = DEVerbosity(SciMLLogging.Detailed()), internalnorm = FreeDofErrorNorm(ch), d_discontinuities = [1.0]
 );
 
 

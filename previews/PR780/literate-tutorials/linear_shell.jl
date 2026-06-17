@@ -52,7 +52,7 @@ ch = ConstraintHandler(dh)
 add!(ch,  Dirichlet(:u, getfacetset(grid, "left"), (x, t) -> (0.0, 0.0), [1,3])  )
 add!(ch,  Dirichlet(:θ, getfacetset(grid, "left"), (x, t) -> (0.0, 0.0), [1,2])  )
 
-# On the right edge, we also lock the displacements in the x- and z- directions, but apply a precribed rotation.
+# On the right edge, we also lock the displacements in the x- and z- directions, but apply a prescribed rotation.
 #+
 add!(ch,  Dirichlet(:u, getfacetset(grid, "right"), (x, t) -> (0.0, 0.0), [1,3])  )
 add!(ch,  Dirichlet(:θ, getfacetset(grid, "right"), (x, t) -> (0.0, pi/10), [1,2])  )
@@ -65,7 +65,7 @@ close!(ch)
 update!(ch, 0.0)
 
 # Next we define relevant data for the shell, such as shear correction factor and stiffness matrix for the material.
-# In this linear shell, plane stress is assumed, ie $\\sigma_{zz} = 0$. Therefor, the stiffness matrix is 5x5 (opposed to the normal 6x6).
+# In this linear shell, plane stress is assumed, i.e. $\sigma_{zz} = 0$. Therefore, the stiffness matrix is 5x5 (opposed to the normal 6x6).
 #+
 κ = 5/6 # Shear correction factor
 E = 210.0
@@ -138,10 +138,10 @@ end;
 # A brief description of the shell is given here.
 
 #md # !!! note
-#md #     This element might experience various locking phenomenas, and should only be seen as a proof of concept.
+#md #     This element might experience various locking phenomena, and should only be seen as a proof of concept.
 
 # ##### Fiber coordinate system
-# The element uses two coordinate systems. The first coordianate system, called the fiber system, is created for each
+# The element uses two coordinate systems. The first coordinate system, called the fiber system, is created for each
 # element node, and is used as a reference frame for the rotations. The function below implements an algorithm that return the
 # fiber directions, $\boldsymbol{e}^{f}_{a1}$, $\boldsymbol{e}^{f}_{a2}$ and $\boldsymbol{e}^{f}_{a3}$, at each node $a$.
 function fiber_coordsys(Ps::Vector{Vec{3,Float64}})
@@ -180,7 +180,7 @@ function lamina_coordsys(dNdξ, ζ, x, p, h)
 
     for i in 1:length(dNdξ)
         e1 += dNdξ[i][1] * x[i] + 0.5*h*ζ * dNdξ[i][1] * p[i]
-        e2 += dNdξ[i][2] * x[i] + 0.5*h*ζ * dNdξ[i][1] * p[i]
+        e2 += dNdξ[i][2] * x[i] + 0.5*h*ζ * dNdξ[i][2] * p[i]
     end
 
     e1 /= norm(e1)
@@ -207,8 +207,8 @@ end;
 # ```math
 # \boldsymbol x(\xi, \eta, \zeta) = \sum_{a=1}^{N_{\text{nodes}}} N_a(\xi, \eta) \boldsymbol{\bar{x}}_{a} + ζ \frac{h}{2} \boldsymbol{\bar{p}_a}
 # ```
-# where $\boldsymbol{\bar{x}}_{a}$ are nodal positions on the mid-surface, and $\boldsymbol{\bar{p}_a}$ is an vector that defines the fiber direction
-# on the reference surface. $N_a$ arethe shape functions.
+# where $\boldsymbol{\bar{x}}_{a}$ are nodal positions on the mid-surface, and $\boldsymbol{\bar{p}_a}$ is a vector that defines the fiber direction
+# on the reference surface. $N_a$ are the shape functions.
 #
 # Based on the definition of the position vector, we create an function for obtaining the Jacobian-matrix,
 # ```math

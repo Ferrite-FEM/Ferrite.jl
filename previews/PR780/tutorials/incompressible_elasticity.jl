@@ -8,7 +8,7 @@ function create_cook_grid(nx, ny)
         Vec{2}((0.0, 44.0)),
     ]
     grid = generate_grid(Triangle, (nx, ny), corners)
-    # facesets for boundary conditions
+    # facetsets for boundary conditions
     addfacetset!(grid, "clamped", x -> norm(x[1]) ≈ 0.0)
     addfacetset!(grid, "traction", x -> norm(x[1]) ≈ 48.0)
     return grid
@@ -113,9 +113,9 @@ function assemble_up!(Ke, fe, cell, cellvalues, facetvalues_u, grid, mp, t, dofr
 
     symmetrize_lower!(Ke)
 
-    # We integrate the Neumann boundary using the facevalues.
-    # We loop over all the faces in the cell, then check if the face
-    # is in our `"traction"` faceset.
+    # We integrate the Neumann boundary using the facetvalues.
+    # We loop over all the facets in the cell, then check if the facet
+    # is in our `"traction"` facetset.
     for facet in 1:nfacets(cell)
         if (cellid(cell), facet) ∈ getfacetset(grid, "traction")
             reinit!(facetvalues_u, cell, facet)
