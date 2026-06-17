@@ -221,10 +221,10 @@ end
 material = GrayScottMaterial(0.00016, 0.00008, 0.06, 0.062)
     gray_scott_on_sphere(material, 10.0, 32000.0, 3)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">Info    : Meshing 1D...
 Info    : [ 40%] Meshing curve 2 (Circle)
-Info    : Done meshing 1D (Wall 9.2718e-05s, CPU 9.4e-05s)
+Info    : Done meshing 1D (Wall 9.507e-05s, CPU 9.7e-05s)
 Info    : Meshing 2D...
 Info    : Meshing surface 1 (Sphere, Frontal-Delaunay)
-Info    : Done meshing 2D (Wall 0.00944179s, CPU 0.009441s)
+Info    : Done meshing 2D (Wall 0.00985087s, CPU 0.00985s)
 Info    : 162 nodes 332 elements
 Info    : Refining mesh...
 Info    : Meshing order 2 (curvilinear on)...
@@ -234,8 +234,8 @@ Info    : [ 50%] Meshing curve 3 order 2
 Info    : [ 70%] Meshing surface 1 order 2
 Info    : [ 90%] Meshing volume 1 order 2
 Info    : Surface mesh: worst distortion = 0.968739 (0 elements in ]0, 0.2]); worst gamma = 0.533321
-Info    : Done meshing order 2 (Wall 0.00102766s, CPU 0.001003s)
-Info    : Done refining mesh (Wall 0.00132685s, CPU 0.001302s)
+Info    : Done meshing order 2 (Wall 0.00103176s, CPU 0.001031s)
+Info    : Done refining mesh (Wall 0.00135772s, CPU 0.001357s)
 Info    : Refining mesh...
 Info    : Meshing order 2 (curvilinear on)...
 Info    : [  0%] Meshing curve 1 order 2
@@ -244,8 +244,8 @@ Info    : [ 50%] Meshing curve 3 order 2
 Info    : [ 70%] Meshing surface 1 order 2
 Info    : [ 90%] Meshing volume 1 order 2
 Info    : Surface mesh: worst distortion = 0.991679 (0 elements in ]0, 0.2]); worst gamma = 0.514495
-Info    : Done meshing order 2 (Wall 0.00362591s, CPU 0.002628s)
-Info    : Done refining mesh (Wall 0.00466147s, CPU 0.003664s)
+Info    : Done meshing order 2 (Wall 0.00386419s, CPU 0.003861s)
+Info    : Done refining mesh (Wall 0.00501408s, CPU 0.005012s)
 Info    : Refining mesh...
 Info    : Meshing order 2 (curvilinear on)...
 Info    : [  0%] Meshing curve 1 order 2
@@ -254,8 +254,8 @@ Info    : [ 50%] Meshing curve 3 order 2
 Info    : [ 70%] Meshing surface 1 order 2
 Info    : [ 90%] Meshing volume 1 order 2
 Info    : Surface mesh: worst distortion = 0.997887 (0 elements in ]0, 0.2]); worst gamma = 0.509717
-Info    : Done meshing order 2 (Wall 0.0138738s, CPU 0.013873s)
-Info    : Done refining mesh (Wall 0.0182292s, CPU 0.018227s)</code></pre><h2 id="reactive_surface-plain-program"><a class="docs-heading-anchor" href="#reactive_surface-plain-program">Plain program</a><a id="reactive_surface-plain-program-1"></a><a class="docs-heading-anchor-permalink" href="#reactive_surface-plain-program" title="Permalink"></a></h2><p>Here follows a version of the program without any comments. The file is also available here: <a href="../reactive_surface.jl"><code>reactive_surface.jl</code></a>.</p><pre><code class="language-julia hljs">using Ferrite, FerriteGmsh
+Info    : Done meshing order 2 (Wall 0.0144653s, CPU 0.014465s)
+Info    : Done refining mesh (Wall 0.0190484s, CPU 0.019048s)</code></pre><h2 id="reactive_surface-plain-program"><a class="docs-heading-anchor" href="#reactive_surface-plain-program">Plain program</a><a id="reactive_surface-plain-program-1"></a><a class="docs-heading-anchor-permalink" href="#reactive_surface-plain-program" title="Permalink"></a></h2><p>Here follows a version of the program without any comments. The file is also available here: <a href="../reactive_surface.jl"><code>reactive_surface.jl</code></a>.</p><pre><code class="language-julia hljs">using Ferrite, FerriteGmsh
 using BlockArrays, SparseArrays, LinearAlgebra, WriteVTK
 
 struct GrayScottMaterial{T}
