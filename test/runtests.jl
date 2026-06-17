@@ -14,7 +14,6 @@ import Metis
 using HCubature: hcubature, hquadrature
 
 if isdefined(Test, :detect_closure_boxes)
-    @info "testing"
     @test isempty(Test.detect_closure_boxes(Ferrite))
 end
 
