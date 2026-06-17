@@ -126,6 +126,9 @@ using Ferrite, SparseArrays, BlockArrays, LinearAlgebra, WriteVTK
 # and the Rodas5P solver from OrdinaryDiffEqRosenbrock.
 using DiffEqBase
 using OrdinaryDiffEqRosenbrock: Rodas5P
+using SciMLIterators: intervals
+using ADTypes: AutoFiniteDiff
+import SciMLLogging
 
 # We start off by defining our only material parameter.
 ν = 1.0 / 1000.0; #dynamic viscosity
@@ -555,7 +558,7 @@ end
 # To visualize the result we export the grid and our fields
 # to VTK-files, which can be viewed in [ParaView](https://www.paraview.org/)
 # by utilizing the corresponding pvd file.
-timestepper = Rodas5P(autodiff = false, step_limiter! = ferrite_limiter!);
+timestepper = Rodas5P(autodiff = AutoFiniteDiff(), step_limiter! = ferrite_limiter!);
 # timestepper = ImplicitEuler(nlsolve=NonlinearSolveAlg(OrdinaryDiffEq.NonlinearSolve.NewtonRaphson(autodiff=OrdinaryDiffEq.AutoFiniteDiff()); max_iter=50), step_limiter! = ferrite_limiter!) #src
 #NOTE!   This is left for future reference                                #src
 # function algebraicmultigrid(W,du,u,p,t,newW,Plprev,Prprev,solverdata)   #src
@@ -574,7 +577,7 @@ integrator = init(
     problem, timestepper; initializealg = NoInit(), dt = Δt₀,
     adaptive = true, abstol = 1.0e-4, reltol = 1.0e-5,
     progress = true, progress_steps = 1,
-    verbose = true, internalnorm = FreeDofErrorNorm(ch), d_discontinuities = [1.0]
+    verbose = DEVerbosity(SciMLLogging.Detailed()), internalnorm = FreeDofErrorNorm(ch), d_discontinuities = [1.0]
 );
 
 
