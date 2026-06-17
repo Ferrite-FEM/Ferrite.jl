@@ -340,13 +340,14 @@ function coarsen!(octree::OctreeBWG{dim, N, T}, o::OctantBWG{dim, N, T}) where {
     _two = T(2)
     leave_idx = findfirst(x -> x == o, octree.leaves)
     shift = child_id(o, octree.b) - one(T)
+    coarsen_target = o
     if shift != zero(T)
         old_morton = morton(o, o.l, octree.b)
-        o = OctantBWG(dim, o.l, old_morton, octree.b)
+        coarsen_target = OctantBWG(dim, o.l, old_morton, octree.b)
     end
     window_start = leave_idx - shift
     window_length = _two^dim - one(T)
-    new_octant = parent(o, octree.b)
+    new_octant = parent(coarsen_target, octree.b)
     octree.leaves[leave_idx - shift] = new_octant
     return deleteat!(octree.leaves, (leave_idx - shift + one(T)):(leave_idx - shift + window_length))
 end
@@ -759,7 +760,6 @@ function creategrid(forest::ForestBWG{dim, C, T}) where {dim, C, T}
     # Phase 4: Generate cells
     celltype = dim < 3 ? Quadrilateral : Hexahedron
     cells = celltype[]
-    cellnodes = zeros(Int, 2^dim)
     for (k, tree) in enumerate(forest.cells)
         for leaf in tree.leaves
             _vertices = vertices(leaf, tree.b)
@@ -840,9 +840,10 @@ function hangingnodes(forest::ForestBWG{dim}, nodeids, nodeowners) where {dim}
                                         c′ = facetable[pface_i, ξ]
                                         if c′ ∉ (c̃, ci)
                                             neighbor_candidate_edges = edges(neighbor_candidate, tree.b)
-                                            ne = findfirst(x -> iscenter(vs[c′], x), neighbor_candidate_edges)
+                                            vc′ = vs[c′]
+                                            ne = findfirst(x -> iscenter(vc′, x), neighbor_candidate_edges)
                                             if ne !== nothing
-                                                hnodes[nodeids[nodeowners[(k, vs[c′])]]] = [nodeids[nodeowners[(k, ne)]] for ne in neighbor_candidate_edges[ne]]
+                                                hnodes[nodeids[nodeowners[(k, vc′)]]] = [nodeids[nodeowners[(k, ne)]] for ne in neighbor_candidate_edges[ne]]
                                             end
                                         end
                                     end
@@ -882,9 +883,10 @@ function hangingnodes(forest::ForestBWG{dim}, nodeids, nodeowners) where {dim}
                                                 #neighbor_candidate_edges = edges(interoctree_neighbor,tree.b)
                                                 #ne = findfirst(x->iscenter(vs[c′],x),neighbor_candidate_edges)
                                                 neighbor_candidate_edges = edges(parent_, tree.b)
-                                                ne = findfirst(x -> iscenter(vs[c′], x), neighbor_candidate_edges)
+                                                vc′ = vs[c′]
+                                                ne = findfirst(x -> iscenter(vc′, x), neighbor_candidate_edges)
                                                 if ne !== nothing
-                                                    hnodes[nodeids[nodeowners[(k, vs[c′])]]] = [nodeids[nodeowners[(k, ne)]] for ne in neighbor_candidate_edges[ne]]
+                                                    hnodes[nodeids[nodeowners[(k, vc′)]]] = [nodeids[nodeowners[(k, ne)]] for ne in neighbor_candidate_edges[ne]]
                                                 end
                                             end
                                         end
