@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Next] - xxxx-xx-xx
 
+## [v1.4.1] - 2026-06-17
+
 ### Fixes
  - Make `shape_symmetric_gradient` work for `PointValues` ([#1325])
  - Make the internal function `getlowerorder` work for `VectorizedInterpolation` ([#1335])
@@ -19,7 +21,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
    excessive rehashing (#1342)
  - Small performance improvement to `SparseMatrixCSR` and `SparseMatrixCSR` assembly by avoiding
    some reduction operations. (#1341)
-   
+
 ### Documentation
  - Update Navier-Stokes example to the new OrdinaryDiffEq v7 release (#1350)
 
