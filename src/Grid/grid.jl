@@ -735,6 +735,20 @@ equilateral triangle (shift index is 2). Or the faces
 2-----1     3-----1
 ```
 which are flipped against each other.
+
+The same applies to quadrilateral faces. Take for example the faces
+```
+1---2     2---3
+| A |     | B |
+4---3     1---4
+```
+which are rotated against each other by 90° (shift index is 1). Or the faces
+```
+1---2     2---1
+| A |     | B |
+4---3     3---4
+```
+which are flipped against each other.
 """
 struct SurfaceOrientationInfo
     flipped::Bool
