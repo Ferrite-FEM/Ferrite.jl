@@ -1066,7 +1066,7 @@ function add!(ch::ConstraintHandler, pdbc::PeriodicDirichlet)
             collect_periodic_facets!(pdbc.facet_map, get_grid(ch.dh), mset, iset, identity) # TODO: Better transform
         end
     end
-    length(pdbc.facet_map) == 0 && return ch #notting to add
+    length(pdbc.facet_map) == 0 && return ch # nothing to add
 
     cellid_mirror = first(pdbc.facet_map).mirror[1]
     cellid_image = first(pdbc.facet_map).image[1]
