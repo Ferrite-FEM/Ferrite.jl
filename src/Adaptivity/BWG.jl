@@ -972,16 +972,13 @@ function _balance_leaf!(forest::ForestBWG{dim}, k, tree, o, perm_face, perm_face
         if dim == 2 # need more clever s_i encoding
             if s_i <= 4 #corner neighbor, only true for 2D see possibleneighbors
                 cc = forest.topology.vertex_vertex_neighbor[k, perm_corner[s_i]]
-                # Avoid Core.Box for s_i
-                si = s_i
-                participating_faces_idx = findall(x -> any(x .== si), 𝒱₂) #TODO! optimize by using inverted table
-                pivot_faces = faces(o, tree.b)
                 if isempty(cc)
                     # the branch below checks if we are in a newly introduced topologic tree connection
                     # by checking if the corner neighbor is only accesible by transforming through a face
                     # TODO: enable a bool that either activates or deactivates the balancing over a corner
-                    for face_idx in participating_faces_idx
-                        face_idx = face_idx[1]
+                    pivot_faces = faces(o, tree.b)
+                    for j in 1:2
+                        face_idx = 𝒱₂_inv[s_i, j] # the two faces touching corner s_i
                         contained = contains_facet(rootfaces[face_idx], pivot_faces[face_idx])
                         if contained
                             fc = facet_neighborhood[k, perm_face[face_idx]]
@@ -1928,6 +1925,14 @@ const 𝒱₂ = [
     2  4
     1  2
     3  4
+]
+
+# Inverse of 𝒱₂: row = corner, entries = the two faces touching that corner.
+const 𝒱₂_inv = [
+    1  3
+    2  3
+    1  4
+    2  4
 ]
 
 const 𝒱₃ = [
