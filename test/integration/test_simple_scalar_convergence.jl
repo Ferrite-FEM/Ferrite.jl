@@ -16,6 +16,7 @@ module ConvergenceTestHelper
 
     get_quadrature_order(::Lagrange{shape, order}) where {shape, order} = max(2 * order - 1, 2)
     get_quadrature_order(::Lagrange{RefTriangle, 5}) = 8
+    get_quadrature_order(::Lagrange{RefTetrahedron, 4}) = 5 # Maximum implemented quadrature order for RefTetrahedron
     get_quadrature_order(::Lagrange{RefPrism, order}) where {order} = 2 * order # Don't know why
     get_quadrature_order(::Serendipity{shape, order}) where {shape, order} = max(2 * order - 1, 2)
     get_quadrature_order(::CrouzeixRaviart{shape, order}) where {shape, order} = max(2 * order - 1, 2)
@@ -155,6 +156,8 @@ end # module ConvergenceTestHelper
             Lagrange{RefTriangle, 5}(),
             Lagrange{RefHexahedron, 1}(),
             Lagrange{RefTetrahedron, 1}(),
+            Lagrange{RefTetrahedron, 3}(),
+            Lagrange{RefTetrahedron, 4}(),
             Lagrange{RefPrism, 1}(),
             Lagrange{RefPyramid, 1}(),
             #

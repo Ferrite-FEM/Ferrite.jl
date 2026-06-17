@@ -28,6 +28,8 @@ The following interpolations are implemented:
 * `Lagrange{RefHexahedron, 2}`
 * `Lagrange{RefTetrahedron, 1}`
 * `Lagrange{RefTetrahedron, 2}`
+* `Lagrange{RefTetrahedron, 3}`
+* `Lagrange{RefTetrahedron, 4}`
 * `Lagrange{RefPrism, 1}`
 * `Lagrange{RefPrism, 2}`
 * `Lagrange{RefPyramid, 1}`
@@ -108,6 +110,16 @@ interpolations, generally).
 adjust_dofs_during_distribution(::Interpolation)
 
 """
+    interior_facedofs_on_lattice(::Interpolation)
+
+Return `true` if the interior face dofs are placed on a regular lattice, enumerated in the
+order assumed by [`permute_and_push!`](@ref). This is required to distribute an
+interpolation with more than one dof on a face shared between 3D cells, and interpolations
+must opt in (the default is `false`).
+"""
+interior_facedofs_on_lattice(::Interpolation) = false
+
+"""
     InterpolationInfo
 
 Gathers all the information needed to distribute dofs for a given interpolation. Note that
@@ -121,6 +133,7 @@ struct InterpolationInfo
     nvolumedofs::Int
     reference_dim::Int
     adjust_during_distribution::Bool
+    interior_facedofs_on_lattice::Bool
     n_copies::Int
 end
 function InterpolationInfo(interpolation::Interpolation{shape}, n_copies) where {rdim, shape <: AbstractRefShape{rdim}}
@@ -131,6 +144,7 @@ function InterpolationInfo(interpolation::Interpolation{shape}, n_copies) where 
         length(volumedof_interior_indices(interpolation)),
         rdim,
         adjust_dofs_during_distribution(interpolation),
+        interior_facedofs_on_lattice(interpolation),
         n_copies
     )
     return info
@@ -558,6 +572,8 @@ adjust_dofs_during_distribution(::Lagrange) = true
 adjust_dofs_during_distribution(::Lagrange{<:Any, 2}) = false
 adjust_dofs_during_distribution(::Lagrange{<:Any, 1}) = false
 
+interior_facedofs_on_lattice(::Lagrange) = true
+
 # Vertices for all Lagrange interpolations are the same
 vertexdof_indices(::Lagrange{RefLine}) = ((1,), (2,))
 vertexdof_indices(::Lagrange{RefQuadrilateral}) = ((1,), (2,), (3,), (4,))
@@ -927,6 +943,87 @@ function reference_shape_value(ip::Lagrange{RefTetrahedron, 2}, ξ::Vec{3}, i::I
     i == 9  && return 4 * ξ_x * ξ_z
     i == 10 && return 4 * ξ_y * ξ_z
     throw(ArgumentError("no shape function $i for interpolation $ip"))
+end
+
+######################################
+# Lagrange RefTetrahedron order 3, 4 #
+######################################
+
+const Lagrange3DTet34 = Union{
+    Lagrange{RefTetrahedron, 3},
+    Lagrange{RefTetrahedron, 4},
+}
+
+function getnbasefunctions(ip::Lagrange3DTet34)
+    order = getorder(ip)
+    return (order + 1) * (order + 2) * (order + 3) ÷ 6
+end
+
+edgedof_interior_indices(::Lagrange{RefTetrahedron, 3}) = ((5, 6), (7, 8), (9, 10), (11, 12), (13, 14), (15, 16))
+facedof_interior_indices(::Lagrange{RefTetrahedron, 3}) = ((17,), (18,), (19,), (20,))
+
+edgedof_interior_indices(::Lagrange{RefTetrahedron, 4}) = ((5, 6, 7), (8, 9, 10), (11, 12, 13), (14, 15, 16), (17, 18, 19), (20, 21, 22))
+facedof_interior_indices(::Lagrange{RefTetrahedron, 4}) = ((23, 24, 25), (26, 27, 28), (29, 30, 31), (32, 33, 34))
+volumedof_interior_indices(::Lagrange{RefTetrahedron, 4}) = (35,)
+
+# Barycentric multi-indices α (with |α| = order) for the nodes of the interpolation, in
+# local dof order: vertex dofs, then edge interior dofs (following the local edge
+# direction), then face interior dofs (in the lattice enumeration assumed by
+# `permute_and_push!`), and finally volume interior dofs. The node corresponding to α is
+# located at ∑ₜ αₜ xₜ / order, with xₜ the reference vertex coordinates.
+function _lagrange_tet_lattice_multiindices(order::Int)
+    # Topology of RefTetrahedron. This must match reference_edges/reference_faces in
+    # Grid/grid.jl, which are not yet defined when this file is included.
+    tet_edges = ((1, 2), (2, 3), (3, 1), (1, 4), (2, 4), (3, 4))
+    tet_faces = ((1, 3, 2), (1, 2, 4), (2, 3, 4), (1, 4, 3))
+    αs = NTuple{4, Int}[]
+    for v in 1:4 # vertex nodes
+        push!(αs, ntuple(t -> t == v ? order : 0, 4))
+    end
+    for (a, b) in tet_edges # edge interior nodes, from vertex a towards vertex b
+        for k in 1:(order - 1)
+            push!(αs, ntuple(t -> t == a ? order - k : (t == b ? k : 0), 4))
+        end
+    end
+    q = order - 3 # order of the face interior lattices
+    for (a, b, c) in tet_faces # face interior nodes
+        for t2 in 0:q, t1 in 0:(q - t2)
+            t3 = q - t1 - t2
+            push!(αs, ntuple(t -> t == a ? t1 + 1 : (t == b ? t2 + 1 : (t == c ? t3 + 1 : 0)), 4))
+        end
+    end
+    for s3 in 0:(order - 4), s2 in 0:(order - 4 - s3), s1 in 0:(order - 4 - s3 - s2) # volume interior nodes
+        push!(αs, (s1 + 1, s2 + 1, s3 + 1, order - 3 - s1 - s2 - s3))
+    end
+    return αs
+end
+
+const _lagrange_tet3_multiindices = _lagrange_tet_lattice_multiindices(3)
+const _lagrange_tet4_multiindices = _lagrange_tet_lattice_multiindices(4)
+_lattice_multiindices(::Lagrange{RefTetrahedron, 3}) = _lagrange_tet3_multiindices
+_lattice_multiindices(::Lagrange{RefTetrahedron, 4}) = _lagrange_tet4_multiindices
+
+function reference_coordinates(ip::Lagrange3DTet34)
+    order = getorder(ip)
+    return [Vec{3, Float64}((α[2], α[3], α[4]) ./ order) for α in _lattice_multiindices(ip)]
+end
+
+function reference_shape_value(ip::Lagrange3DTet34, ξ::Vec{3}, i::Int)
+    if !(0 < i <= getnbasefunctions(ip))
+        throw(ArgumentError("no shape function $i for interpolation $ip"))
+    end
+    order = getorder(ip)
+    α = _lattice_multiindices(ip)[i]
+    λ = (1 - ξ[1] - ξ[2] - ξ[3], ξ[1], ξ[2], ξ[3])
+    # The basis function for the node with barycentric multi-index α is
+    # N(λ) = ∏ₜ ∏ⱼ (order λₜ - j) / (j + 1) for j ∈ {0, ..., αₜ - 1}
+    val = one(λ[1])
+    for t in 1:4
+        for j in 0:(α[t] - 1)
+            val *= (order * λ[t] - j) / (j + 1)
+        end
+    end
+    return val
 end
 
 ##################################
@@ -1579,6 +1676,7 @@ end
 conformity(ip::VectorizedInterpolation) = conformity(ip.ip)
 
 adjust_dofs_during_distribution(ip::VectorizedInterpolation) = adjust_dofs_during_distribution(ip.ip)
+interior_facedofs_on_lattice(ip::VectorizedInterpolation) = interior_facedofs_on_lattice(ip.ip)
 getlowerorder(ip::VectorizedInterpolation{vdim}) where {vdim} = VectorizedInterpolation{vdim}(getlowerorder(ip.ip))
 
 # Vectorize to reference dimension by default

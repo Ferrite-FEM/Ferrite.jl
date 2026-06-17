@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Next] - xxxx-xx-xx
 
+### Added
+ - New interpolations `Lagrange{RefTetrahedron, 3}` and `Lagrange{RefTetrahedron, 4}`.
+   ([#1343])
+ - Dof distribution now supports interpolations with multiple dofs on faces shared between
+   cells (e.g. `Lagrange{RefTetrahedron, 4}`) by taking the relative orientation
+   (rotation and flip) of the face into account. Previously this errored. ([#1343])
+
 ### Fixes
  - Make `shape_symmetric_gradient` work for `PointValues` ([#1325])
  - Make the internal function `getlowerorder` work for `VectorizedInterpolation` ([#1335])
