@@ -119,8 +119,21 @@ function Base.isless(o1::OctantBWG, o2::OctantBWG)
 end
 
 """
-    children(octant::OctantBWG{dim,N,T}, b::Integer) -> NTuple{M,OctantBWG}
-Computes all childern of `octant`
+    children(octant::OctantBWG{dim, N, T}, b::Integer) -> NTuple{N, OctantBWG}
+Compute the `N = 2^dim` children of `octant`, returned in z-order (x before y before z).
+
+The first child's vertices of `octant` are utilized. Its `2^dim` vertices coincide
+exactly with the anchors (lower-left corners) of all children, so each child is simply the
+level-`l+1` octant placed at the corresponding vertex of `family`.
+
+In 2D, with parent anchor `⊙` at `(x,y)` and edge length `H = 2h`:
+
+    (x,y+H) +───────┬───────+ (x+H,y+H)
+            │  c3   │  c4   │            family = first child (c1), anchored at (x,y),
+    (x,y+h) ├───────┼───────┤            edge length h. Its four vertices
+            │  c1   │  c2   │              v1=(x,  y  )  v2=(x+h, y  )
+      (x,y) ⊙───────┴───────+ (x+H,y)      v3=(x,  y+h)  v4=(x+h, y+h)
+               (x+h,y)                 are exactly the anchors of c1..c4.
 """
 function children(octant::OctantBWG{dim, N, T}, b::Integer) where {dim, N, T}
     family = OctantBWG{dim, N, T}(octant.l + one(T), octant.xyz)
@@ -248,8 +261,8 @@ function boundaryset(o::OctantBWG{3, N, T}, i::Integer, b::Integer) where {N, T}
 end
 
 """
-    find_range_boundaries(f::OctantBWG{dim,N,T}, l::OctantBWG{dim,N,T}, s::OctantBWG{dim,N,T}, idxset, b)
-    find_range_boundaries(s::OctantBWG{dim,N,T}, idxset, b)
+    find_range_boundaries(f::OctantBWG{dim, N, T}, l::OctantBWG{dim, N, T}, s::OctantBWG{dim, N, T}, idxset, b)
+    find_range_boundaries(s::OctantBWG{dim, N, T}, idxset, b)
 Algorithm 4.2 of [IBWG2015](@citet)
 TODO: write tests
 """
@@ -420,7 +433,7 @@ function match(o::OctantBWG, isleaf::Bool, q, b)
 end
 
 """
-    ForestBWG{dim, C<:AbstractAdaptiveCell, T<:Real} <: AbstractAdaptiveGrid{dim}
+    ForestBWG{dim, C <: AbstractAdaptiveCell, T <: Real} <: AbstractAdaptiveGrid{dim}
 `p4est` adaptive grid implementation based on [BWG2011](@citet)
 and [IBWG2015](@citet).
 
@@ -565,7 +578,7 @@ end
 transform_pointBWG(forest, vertices) = transform_pointBWG.((forest,), first.(vertices), last.(vertices))
 
 """
-    rotation_permutation(::Val{2},r,i) -> i′
+    rotation_permutation(::Val{2}, r, i) -> i′
 computes based on the rotation indicator `r` ∈ {0,1} and a given corner index `i` ∈ {1,2} the permuted corner index `i′`
 """
 function rotation_permutation(r, i)
@@ -574,7 +587,7 @@ function rotation_permutation(r, i)
 end
 
 """
-    rotation_permutation(f,f′,r,i) -> i′
+    rotation_permutation(f, f′, r, i) -> i′
 computes based on the rotation indicator `r` ∈ {0,...,3} and a given corner index `i` ∈ {1,...,4} the permuted corner index `i′`
 See Table 3 and Theorem 2.2 [BWG2011](@citet).
 """
@@ -792,7 +805,7 @@ function reconstruct_facetsets(forest::ForestBWG{dim}) where {dim}
 end
 
 """
-    hangingnodes(forest,nodeids,nodeowners)
+    hangingnodes(forest, nodeids, nodeowners)
 Constructs a map from constrained nodeids to the ones that constraint
 """
 function hangingnodes(forest::ForestBWG{dim}, nodeids, nodeowners) where {dim}
@@ -961,8 +974,17 @@ function _touches_tree_boundary(o::OctantBWG{dim}, b) where {dim}
 end
 
 """
-    balanceforest!(forest)
-Algorithm 17 of [BWG2011](@citet)
+    _balance_leaf!(forest, k, tree, o, perm_face, perm_face_inv, perm_corner, perm_corner_inv, rootfaces, rootedges, rootvertices, facet_neighborhood)
+
+Per-leaf kernel of [`balanceforest!`](@ref) handling the *inter-tree* part of the 2:1 balance.
+
+Operates on a single "pivot" leaf `o` of tree `k`. In-tree balancing is already taken care
+of by `balancetree`; this function only propagates balance across tree boundaries. It walks
+the `possibleneighbors` of `o`, keeps those lying outside the current tree (reachable only
+through a corner/face/edge connection to another tree), decodes the neighbour type from the
+`possibleneighbors` index `s_i`, maps the pivot's local index into the neighbour tree via the
+permutation tables, and calls `balance_face`/`balance_corner`/`balance_edge` to refine the
+neighbour tree where the balance condition requires it.
 """
 function _balance_leaf!(forest::ForestBWG{dim}, k, tree, o, perm_face, perm_face_inv, perm_corner, perm_corner_inv, rootfaces, rootedges, rootvertices, facet_neighborhood) where {dim}
     ss = possibleneighbors(o, o.l, tree.b)
@@ -1054,6 +1076,10 @@ function _balance_leaf!(forest::ForestBWG{dim}, k, tree, o, perm_face, perm_face
     return
 end
 
+"""
+    balanceforest!(forest)
+Algorithm 17 of [BWG2011](@citet)
+"""
 function balanceforest!(forest::ForestBWG{dim}) where {dim}
     perm_face = dim == 2 ? 𝒱₂_perm : 𝒱₃_perm
     perm_face_inv = dim == 2 ? 𝒱₂_perm_inv : 𝒱₃_perm_inv
@@ -1182,7 +1208,7 @@ function siblings(o::OctantBWG, b; include_self = false)
 end
 
 """
-    possibleneighbors(o::OctantBWG{2},l,b)
+    possibleneighbors(o::OctantBWG{2}, l, b)
 Returns a tuple of possible neighbors, where the first four are corner neighbors that are exclusively connected via a corner.
 The other four possible neighbors are face neighbors. Always returns the full `NTuple` (type-stable);
 callers that want only in-tree neighbours filter with `inside`.
@@ -1199,7 +1225,7 @@ function possibleneighbors(o::OctantBWG{2}, l, b)
 end
 
 """
-    possibleneighbors(o::OctantBWG{3},l,b)
+    possibleneighbors(o::OctantBWG{3}, l, b)
 Returns a tuple of possible neighbors, where the first eight are corner neighbors that are exclusively connected via a corner.
 After the first eight corner neighbors, the 6 possible face neighbors follow and after them, the edge neighbors.
 Always returns the full `NTuple` (type-stable); callers that want only in-tree neighbours filter with `inside`.
@@ -1219,7 +1245,7 @@ function possibleneighbors(o::OctantBWG{3}, l, b)
 end
 
 """
-    isancestor(o1,o2,b) -> Bool
+    isancestor(o1, o2, b) -> Bool
 Is o2 an ancestor of o1
 """
 function isancestor(o1, o2, b)
@@ -1360,7 +1386,7 @@ function descendants(octant::OctantBWG{dim, N, T}, b::Integer = _maxlevel[dim - 
 end
 
 """
-    facet_neighbor(octant::OctantBWG{dim,N,T}, f::T, b::T=_maxlevel[2]) -> OctantBWG{dim,N,T}
+    facet_neighbor(octant::OctantBWG{dim, N, T}, f::T, b::T = _maxlevel[2]) -> OctantBWG{dim, N, T}
 Intraoctree face neighbor for a given faceindex `f` (in p4est, i.e. z order convention) and specified maximum refinement level `b`.
 Implements Algorithm 5 of [BWG2011](@citet).
 
@@ -1461,8 +1487,8 @@ function compute_edge_orientation(forest::ForestBWG{<:Any, <:OctreeBWG{3, <:Any,
 end
 
 """
-    transform_facet_remote(forest::ForestBWG, k::T1, f::T1, o::OctantBWG{dim,N,T2}) -> OctantBWG{dim,N,T1,T2}
-    transform_facet_remote(forest::ForestBWG, f::FacetIndex, o::OctantBWG{dim,N,T2}) -> OctantBWG{dim,N,T2}
+    transform_facet_remote(forest::ForestBWG, k::T1, f::T1, o::OctantBWG{dim, N, T2}) -> OctantBWG{dim, N, T1, T2}
+    transform_facet_remote(forest::ForestBWG, f::FacetIndex, o::OctantBWG{dim, N, T2}) -> OctantBWG{dim, N, T2}
 Interoctree coordinate transformation of an given octant `o` to the face-neighboring of octree `k` by virtually pushing `o`s coordinate system through `k`s face `f`.
 Implements Algorithm 8 of [BWG2011](@citet).
 
@@ -1635,8 +1661,8 @@ end
 transform_facet(forest::ForestBWG, f::FacetIndex, oct::OctantBWG) = transform_facet(forest, f[1], f[2], oct)
 
 """
-    transform_corner(forest,k,c',oct,inside::Bool)
-    transform_corner(forest,v::VertexIndex,oct,inside::Bool)
+    transform_corner(forest, k, c', oct, inside::Bool)
+    transform_corner(forest, v::VertexIndex, oct, inside::Bool)
 
 Algorithm 12 but with flipped logic in [BWG2011](@citet) to transform corner into different octree coordinate system
 Implements flipped logic in the sense of pushing the Octant `oct` through vertex v and stays within octree coordinate system `k`.
@@ -1658,8 +1684,8 @@ end
 transform_corner(forest::ForestBWG, v::VertexIndex, oct::OctantBWG, inside) = transform_corner(forest, v[1], v[2], oct, inside)
 
 """
-    transform_corner_remote(forest,k,c',oct,inside::Bool)
-    transform_corner_remote(forest,v::VertexIndex,oct,inside::Bool)
+    transform_corner_remote(forest, k, c', oct, inside::Bool)
+    transform_corner_remote(forest, v::VertexIndex, oct, inside::Bool)
 
 Algorithm 12 in [BWG2011](@citet) to transform corner into different octree coordinate system.
 Follows exactly the version of the paper by taking `oct` and looking from the neighbor octree coordinate system (neighboring to `k`,`v`) at `oct`.
@@ -1681,8 +1707,8 @@ transform_corner_remote(forest::ForestBWG, v::VertexIndex, oct::OctantBWG, insid
 
 
 """
-    transform_edge_remote(forest,k,e,oct,inside::Bool)
-    transform_edge_remote(forest,e::Edgeindex,oct,inside::Bool)
+    transform_edge_remote(forest, k, e, oct, inside::Bool)
+    transform_edge_remote(forest, e::Edgeindex, oct, inside::Bool)
 
 Algorithm 10 in [BWG2011](@citet) to transform edge into different octree coordinate system.
 This function looks at the octant from the octree coordinate system of the neighbor that can be found at (k,e)
@@ -1720,8 +1746,8 @@ end
 transform_edge_remote(forest::ForestBWG, e::EdgeIndex, oct::OctantBWG, inside) = transform_edge_remote(forest, e[1], e[2], oct, inside)
 
 """
-    transform_edge(forest,k,e,oct,inside::Bool)
-    transform_edge(forest,e::Edgeindex,oct,inside::Bool)
+    transform_edge(forest, k, e, oct, inside::Bool)
+    transform_edge(forest, e::Edgeindex, oct, inside::Bool)
 
 Algorithm 10 in [BWG2011](@citet) to transform cedge into different octree coordinate system but reversed logic.
 See `transform_edge_remote` with logic from paper.
