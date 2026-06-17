@@ -1670,9 +1670,9 @@ Implements flipped logic in the sense of pushing the Octant `oct` through vertex
 function transform_corner(forest::ForestBWG, k::T1, c::T1, oct::OctantBWG{dim, N, T2}, inside::Bool) where {dim, N, T1 <: Integer, T2 <: Integer}
     _perm = dim == 2 ? node_map₂ : node_map₃
     _perminv = dim == 2 ? node_map₂_inv : node_map₃_inv
-    k′, c′ = forest.topology.vertex_vertex_neighbor[k, _perm[c]][1]
-    k′, c′ = forest.topology.vertex_vertex_neighbor[k′, c′][1] #get the corner connection of neighbor to pivot oct
-    c′ = _perminv[c′]
+    k′, c′′ = forest.topology.vertex_vertex_neighbor[k, _perm[c]][1]
+    k′, c′′ = forest.topology.vertex_vertex_neighbor[k′, c′′][1] #get the corner connection of neighbor to pivot oct
+    c′ = _perminv[c′′] # assign c′ once so the ntuple closure below doesn't box it
     # make a dispatch that returns only the coordinates?
     b = forest.cells[k].b
     l = oct.l; g = 2^b - 2^(b - l)
@@ -1693,8 +1693,8 @@ Follows exactly the version of the paper by taking `oct` and looking from the ne
 function transform_corner_remote(forest::ForestBWG, k::T1, c::T1, oct::OctantBWG{dim, N, T2}, inside::Bool) where {dim, N, T1 <: Integer, T2 <: Integer}
     _perm = dim == 2 ? node_map₂ : node_map₃
     _perminv = dim == 2 ? node_map₂_inv : node_map₃_inv
-    k′, c′ = forest.topology.vertex_vertex_neighbor[k, _perm[c]][1]
-    c′ = _perminv[c′]
+    k′, c′′ = forest.topology.vertex_vertex_neighbor[k, _perm[c]][1]
+    c′ = _perminv[c′′] # assign c′ once so the ntuple closure below doesn't box it
     # make a dispatch that returns only the coordinates?
     b = forest.cells[k].b
     l = oct.l; g = 2^b - 2^(b - l)
