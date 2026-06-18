@@ -783,7 +783,7 @@ end # testset
         end
         return m
     end
-    function compare_by_dbc(dh, pdbc, dbc1, dbc2, times=[0.0])
+    function compare_by_dbc(dh, pdbc, dbc1, dbc2, times = [0.0])
         ch = ConstraintHandler(dh)
         add!(ch, pdbc)
         close!(ch)
@@ -795,16 +795,16 @@ end # testset
         close!(ch2)
         dof_map = get_dof_map(ch)
         @test issetequal(keys(dof_map), ch1.prescribed_dofs)
-        @test issetequal(getindex.(values(dof_map),1), ch2.prescribed_dofs)
-    
+        @test issetequal(getindex.(values(dof_map), 1), ch2.prescribed_dofs)
+
         for t in times
-            update!.((ch,ch1,ch2), t)
+            update!.((ch, ch1, ch2), t)
             for (mdof, value) in dof_map
                 idof = value
                 v = ch.affine_inhomogeneities[ch.dofmapping[mdof]]
                 v1 = ch1.inhomogeneities[ch1.dofmapping[mdof]]
                 v2 = ch2.inhomogeneities[ch2.dofmapping[idof]]
-                @test v1-v2 == v
+                @test v1 - v2 == v
             end
         end
     end
@@ -1229,9 +1229,9 @@ end # testset
         x̄ = Vec{D}(i -> 3.0)
         compare_by_dbc(
             dh,
-            PeriodicDirichlet(:s, collect_periodic_facets(grid, "top", "bottom"), (x,t) -> ū + ∇ū*t  ⋅ (x - x̄)),
-            Dirichlet(:s, getfacetset(grid, "top"), (x, t) -> ū + ∇ū*t  ⋅ (x - x̄)),
-            Dirichlet(:s, getfacetset(grid, "bottom"), (x, t) -> ū + ∇ū*t  ⋅ (x - x̄)),
+            PeriodicDirichlet(:s, collect_periodic_facets(grid, "top", "bottom"), (x, t) -> ū + ∇ū * t ⋅ (x - x̄)),
+            Dirichlet(:s, getfacetset(grid, "top"), (x, t) -> ū + ∇ū * t ⋅ (x - x̄)),
+            Dirichlet(:s, getfacetset(grid, "bottom"), (x, t) -> ū + ∇ū * t ⋅ (x - x̄)),
             [0.0, 1.0]
         )
         if D == 3
@@ -1275,13 +1275,13 @@ end # testset
             Dirichlet(:v, getfacetset(grid, "bottom"), (x, t) -> 0, [D]),
         )
         ū = Vec{D}(i -> 1.0)
-        ∇ū = Tensor{2,D}((i,j) -> 2.0)
+        ∇ū = Tensor{2, D}((i, j) -> 2.0)
         x̄ = Vec{D}(i -> 3.0)
         compare_by_dbc(
             dh,
-            PeriodicDirichlet(:v, collect_periodic_facets(grid, "top", "bottom"), (x,t) -> ū + ∇ū*t  ⋅ (x - x̄), 1:D),
-            Dirichlet(:v, getfacetset(grid, "top"), (x,t) -> ū + ∇ū*t  ⋅ (x - x̄), 1:D),
-            Dirichlet(:v, getfacetset(grid, "bottom"), (x,t) -> ū + ∇ū*t  ⋅ (x - x̄), 1:D),
+            PeriodicDirichlet(:v, collect_periodic_facets(grid, "top", "bottom"), (x, t) -> ū + ∇ū * t ⋅ (x - x̄), 1:D),
+            Dirichlet(:v, getfacetset(grid, "top"), (x, t) -> ū + ∇ū * t ⋅ (x - x̄), 1:D),
+            Dirichlet(:v, getfacetset(grid, "bottom"), (x, t) -> ū + ∇ū * t ⋅ (x - x̄), 1:D),
             [1.0, 2.0]
         )
         if D == 3

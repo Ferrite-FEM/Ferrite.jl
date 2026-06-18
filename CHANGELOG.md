@@ -8,8 +8,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Next] - xxxx-xx-xx
 
 ### Documentation
-
 - Landau example in code gallery now shows how to use DifferentiationInterface and HyperHessians as a backend. (#1345)
+
+### Added
+ - `PeriodicDirichlet` can now have time dependent inhomogenities. ([#1353])
 
 ## [v1.4.1] - 2026-06-17
 

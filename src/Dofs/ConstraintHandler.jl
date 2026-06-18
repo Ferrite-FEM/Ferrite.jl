@@ -170,15 +170,11 @@ mutable struct PeriodicDirichlet
     const rotation_matrix::Union{Matrix{Float64}, Nothing}
     bv::Union{Nothing, BCValues} #Populated in add!
 
-    #For mapping location/coordinates
-    const local_facet_indices::Vector{Int}
-    const local_facet_indices_offset::Vector{Int}
+    #For mapping location/coordinates from image to mirror
     const mirrored_indices::Vector{Int}
     rotated_indices::Matrix{Int}
-    field_offset::Int
-    nfield_components::Int
 
-    #For mapping Dofs
+    #For mapping dofs from image to mirror
     const local_facet_dofs::Vector{Int}
     const local_facet_dofs_offset::Vector{Int}
     const mirrored_dofs::Vector{Int}
@@ -193,15 +189,20 @@ PeriodicDirichlet(fn::Symbol, fp::Union{Vector{<:Pair}, Vector{PeriodicFacetPair
 # add!(::ConstraintHandler, ...) instead
 function PeriodicDirichlet(fn::Symbol, fp::Vector{<:Pair}, f::Union{Function, Nothing}, c = nothing)
     facet_map = PeriodicFacetPair[] # This will be populated in add!(::ConstraintHandler, ...) instead
-    return PeriodicDirichlet(fn, __to_components(c), fp, facet_map, f, nothing)
+    return PeriodicDirichlet(
+        fn, __to_components(c), fp, facet_map, f, nothing, nothing, Int[], zeros(Int, 1, 1),
+        Int[], Int[], Int[], zeros(Int, 1, 1)
+    )
 end
 
 function PeriodicDirichlet(fn::Symbol, fm::Vector{PeriodicFacetPair}, f_or_r::Union{AbstractMatrix, Function, Nothing}, c = nothing)
     f = f_or_r isa Function ? f_or_r : nothing
     rotation_matrix = f_or_r isa AbstractMatrix ? f_or_r : nothing
     components = __to_components(c)
-    return PeriodicDirichlet(fn, components, Pair{String, String}[], fm, f, rotation_matrix, nothing, Int[], Int[], Int[], zeros(Int, 1, 1), 0, 0,
-    Int[], Int[], Int[], zeros(Int, 1, 1))
+    return PeriodicDirichlet(
+        fn, components, Pair{String, String}[], fm, f, rotation_matrix, nothing, Int[], zeros(Int, 1, 1),
+        Int[], Int[], Int[], zeros(Int, 1, 1)
+    )
 end
 
 const DofCoefficients{T} = Vector{Pair{Int, T}}
@@ -568,10 +569,12 @@ function update!(ch::ConstraintHandler, time::Real = 0.0)
         if bc.func === nothing
             continue
         end
-        _update_periodic_bc!(ch.affine_inhomogeneities, bc.func, ch.dofmapping, bc.components, ch.dh, bc.bv, ch.dofcoefficients, bc.facet_map, 
-        bc.rotated_indices, bc.mirrored_indices, bc.nfield_components, bc.field_offset,
-        bc.local_facet_dofs, bc.local_facet_dofs_offset, bc.rotated_dofs, bc.mirrored_dofs,
-        time)
+        _update_periodic_bc!(
+            ch.affine_inhomogeneities, bc.func, ch.dofmapping, bc.components, ch.dh, bc.bv, ch.dofcoefficients, bc.facet_map,
+            bc.rotated_indices, bc.mirrored_indices,
+            bc.local_facet_dofs, bc.local_facet_dofs_offset, bc.rotated_dofs, bc.mirrored_dofs,
+            time
+        )
     end
 
     # Compute effective inhomogeneity for affine constraints with prescribed dofs in the
@@ -1125,39 +1128,33 @@ function add!(ch::ConstraintHandler, pdbc::PeriodicDirichlet)
         dof_map_t = Vector{Int}
         iterator_f = x -> Iterators.partition(x, nc)
     end
-    f_offset = field_offset(ch.dh.subdofhandlers[field_idx[1]], field_idx[2])
-    _add!(ch, pdbc, interpolation, n_comp, f_offset, is_legacy, pdbc.rotation_matrix, dof_map_t, iterator_f)
-    push!(ch.periodicbcs, pdbc)
-    
-    #
-    local_facet_indices, local_facet_indices_offset =
-        _local_facet_dofs_for_bc(interpolation, 1, [1], 0)
-    mirrored_indices =
-        mirror_local_dofs(local_facet_indices, local_facet_indices_offset, interpolation, 1)
-    rotated_indices = rotate_local_dofs(local_facet_indices, local_facet_indices_offset, interpolation, 1)
+    sdh = ch.dh.subdofhandlers[field_idx[1]]
+    f_offset = field_offset(sdh, field_idx[2])
 
-    copy!(pdbc.local_facet_indices, local_facet_indices)
-    copy!(pdbc.local_facet_indices_offset, local_facet_indices_offset)
-    copy!(pdbc.mirrored_indices, mirrored_indices)
-    #copy!(pdbc.rotated_indices, rotated_indices)
-    pdbc.rotated_indices = rotated_indices
-    pdbc.nfield_components = n_comp
-    pdbc.field_offset = f_offset
-
-    #
+    # Indices of the local dofs for the facets
     local_facet_dofs, local_facet_dofs_offset =
         _local_facet_dofs_for_bc(interpolation, n_comp, pdbc.components, f_offset)
     mirrored_dofs =
         mirror_local_dofs(local_facet_dofs, local_facet_dofs_offset, interpolation, length(pdbc.components))
     rotated_dofs = rotate_local_dofs(local_facet_dofs, local_facet_dofs_offset, interpolation, length(pdbc.components))
+
+    _add!(ch, pdbc, interpolation, is_legacy, pdbc.rotation_matrix, dof_map_t, iterator_f, local_facet_dofs, local_facet_dofs_offset, mirrored_dofs, rotated_dofs)
+    push!(ch.periodicbcs, pdbc)
+
+    # Create facet indices from mapping points on image facet to mirror facet
+    local_facet_indices, local_facet_indices_offset = _local_facet_dofs_for_bc(interpolation, 1, [1], 0)
+    mirrored_indices = mirror_local_dofs(local_facet_indices, local_facet_indices_offset, interpolation, 1)
+    rotated_indices = rotate_local_dofs(local_facet_indices, local_facet_indices_offset, interpolation, 1)
+
+    #Store all index and dof mappings to be used in update!
+    copy!(pdbc.mirrored_indices, mirrored_indices)
+    pdbc.rotated_indices = rotated_indices
     copy!(pdbc.local_facet_dofs, local_facet_dofs)
     copy!(pdbc.local_facet_dofs_offset, local_facet_dofs_offset)
     copy!(pdbc.mirrored_dofs, mirrored_dofs)
-    #copy!(pdbc.rotated_dofs, rotated_dofs)
     pdbc.rotated_dofs = rotated_dofs
 
-    sdh = ch.dh.subdofhandlers[1] #TODO
-    CT = getcelltype(sdh) # Same celltype enforced in SubDofHandler constructor
+    CT = getcelltype(sdh)
     bcvalues = BCValues(interpolation, geometric_interpolation(CT), FacetIndex)
     pdbc.bv = bcvalues
     return ch
@@ -1165,17 +1162,11 @@ end
 
 function _add!(
         ch::ConstraintHandler, pdbc::PeriodicDirichlet, interpolation::Interpolation,
-        field_dim::Int, offset::Int, is_legacy::Bool, rotation_matrix::Union{Matrix{T}, Nothing}, ::Type{dof_map_t}, iterator_f::F
+        is_legacy::Bool, rotation_matrix::Union{Matrix{T}, Nothing}, ::Type{dof_map_t}, iterator_f::F,
+        local_facet_dofs, local_facet_dofs_offset, mirrored_indices, rotated_indices
     ) where {T, dof_map_t, F <: Function}
     grid = get_grid(ch.dh)
     facet_map = pdbc.facet_map
-
-    # Indices of the local dofs for the facets
-    local_facet_dofs, local_facet_dofs_offset =
-        _local_facet_dofs_for_bc(interpolation, field_dim, pdbc.components, offset)
-    mirrored_indices =
-        mirror_local_dofs(local_facet_dofs, local_facet_dofs_offset, interpolation, length(pdbc.components))
-    rotated_indices = rotate_local_dofs(local_facet_dofs, local_facet_dofs_offset, interpolation, length(pdbc.components))
 
     # Dof map for mirror dof => image dof
     dof_map = Dict{dof_map_t, dof_map_t}()
@@ -1283,35 +1274,13 @@ function _add!(
         add!(ch, dbc)
     end
 
-    inhomogeneity_map = nothing
-    if pdbc.func !== nothing
-        # Create another temp constraint handler if we need to compute inhomogeneities
-        chtmp2 = ConstraintHandler(ch.dh)
-        all_facets = OrderedSet{FacetIndex}()
-        union!(all_facets, (x.mirror for x in facet_map))
-        union!(all_facets, (x.image for x in facet_map))
-        dbc_all = Dirichlet(pdbc.field_name, all_facets, pdbc.func, pdbc.components)
-        add!(chtmp2, dbc_all); close!(chtmp2)
-        # Call update! here since we need it to construct the affine constraints...
-        # TODO: This doesn't allow for time dependent constraints...
-        update!(chtmp2, 0.0)
-        inhomogeneity_map = Dict{Int, Float64}()
-        for (k, v) in dof_map
-            g = chtmp2.inhomogeneities
-            push!(
-                inhomogeneity_map,
-                k => - g[chtmp2.dofmapping[v]] + g[chtmp2.dofmapping[k]]
-            )
-        end
-    end
-
     # Any remaining mappings are added as homogeneous AffineConstraints
     for (k, v) in dof_map
         if dof_map_t === Int
-            ac = AffineConstraint(k, [v => 1.0], inhomogeneity_map === nothing ? 0.0 : inhomogeneity_map[k])
+            b = 0.0 # Inhomogeneities added in update!
+            ac = AffineConstraint(k, [v => 1.0], b)
             add!(ch, ac)
         else
-            @assert inhomogeneity_map === nothing
             @assert rotation_matrix !== nothing
             for (i, ki) in pairs(k)
                 # u_mirror = R ⋅ u_image
@@ -1411,7 +1380,7 @@ end
 
 function rotate_local_dofs(local_facet_dofs, local_facet_dofs_offset, ip::Lagrange{<:Union{RefQuadrilateral, RefTriangle}}, ncomponents)
     rotated = similar(local_facet_dofs, length(local_facet_dofs), 1)
-    rotated[:,1] = 1:length(local_facet_dofs)
+    rotated[:, 1] = 1:length(local_facet_dofs)
     return rotated
 end
 function rotate_local_dofs(local_facet_dofs, local_facet_dofs_offset, ip::Lagrange{<:Union{RefHexahedron, RefTetrahedron}, O}, ncomponents) where {O}
@@ -1439,13 +1408,13 @@ function _update_periodic_bc!(
         affine_inhomogeneities::Vector{T}, f::Function, dofmapping,
         components::Vector{Int}, dh::AbstractDofHandler, bv::BCValues,
         dofcoefficients,
-        facet_map::Vector{PeriodicFacetPair}, rotated_indices, mirrored_indices, field_dim::Int, field_offset::Int,
-        local_facet_dofs, local_facet_dofs_offset, rotated_dofs, mirrored_dofs,  time::Real
+        facet_map::Vector{PeriodicFacetPair}, rotated_indices, mirrored_indices,
+        local_facet_dofs, local_facet_dofs_offset, rotated_dofs, mirrored_dofs, time::Real
     ) where {T}
 
     ccm = CellCache(dh, UpdateFlags(; nodes = false, coords = true, dofs = true))
     cci = CellCache(dh, UpdateFlags(; nodes = false, coords = true, dofs = true))
-    
+
     for facet_pair in facet_map
         mirror = facet_pair.mirror
         image = facet_pair.image
@@ -1477,7 +1446,7 @@ function _update_periodic_bc!(
             for i in 1:length(components)
                 # Get the global dof on image side
                 global_image_dof = cci.dofs[local_facet_dofs[facet_range_image[counter]]]
-                
+
                 # Get corresponding mirror dof
                 rotated_md = rotated_dofs[facet_range_mirror[counter], facet_pair.rotation + 1]
                 mirrored_md = facet_pair.mirrored ? mirrored_dofs[rotated_md] : rotated_md
@@ -1487,7 +1456,7 @@ function _update_periodic_bc!(
 
                 dbc_index = dofmapping[global_mirror_dof]
                 dofcoeff = dofcoefficients[dbc_index]
-                
+
                 @debug "Found pair: $global_image_dof => $global_mirror_dof"
 
                 #Check if this constraint has been overwritten by a Dirichlet constraint:
