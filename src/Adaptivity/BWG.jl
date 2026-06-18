@@ -102,6 +102,7 @@ nchilds(::Type{OctantBWG{dim, N, T}}) where {dim, N, T} = N
 nchilds(o::OctantBWG) = nchilds(typeof(o)) # Follow z order, x before y before z for faces, edges and corners
 
 Base.isequal(o1::OctantBWG, o2::OctantBWG) = (o1.l == o2.l) && (o1.xyz == o2.xyz)
+Base.hash(o::OctantBWG, h::UInt) = hash(o.xyz, hash(o.l, h))
 """
     o1::OctantBWG < o2::OctantBWG
 Implements Algorithm 2.1 of [IBWG2015](@citet).
@@ -751,11 +752,14 @@ function creategrid(forest::ForestBWG{dim, C, T}) where {dim, C, T}
             next_nodeid += 1
         end
     end
-    nodes_physical_all = transform_pointBWG(forest, nodes)
-    nodes_physical = zeros(eltype(nodes_physical_all), next_nodeid - 1)
-    for (ni, (kv, nodeid)) in enumerate(nodeids)
-        nodes_physical[nodeids_dedup[nodeid]] = nodes_physical_all[nodeid]
+    # Transform only the unique owner nodes, not the pre-dedup duplicates: each compact
+    # slot maps back to its owner key via `nodes[nodeid]`, so we gather the owners first
+    # and call the (allocating) transform once on the deduplicated set.
+    unique_kv = Vector{eltype(nodes)}(undef, next_nodeid - 1)
+    for (nodeid, compact) in nodeids_dedup
+        unique_kv[compact] = nodes[nodeid]
     end
+    nodes_physical = transform_pointBWG(forest, unique_kv)
 
     # Phase 4: Generate cells
     celltype = dim < 3 ? Quadrilateral : Hexahedron
@@ -814,6 +818,7 @@ function hangingnodes(forest::ForestBWG{dim}, nodeids, nodeowners) where {dim}
     facetable = dim == 2 ? 𝒱₂ : 𝒱₃
     opposite_face = dim == 2 ? opposite_face_2 : opposite_face_3
     hnodes = Dict{Int, Vector{Int}}()
+    leafsets = [Set(tree.leaves) for tree in forest.cells]
     facet_neighborhood = Ferrite.Ferrite.get_facet_facet_neighborhood(forest)
     for (k, tree) in enumerate(forest.cells)
         rootfaces = faces(root(dim), tree.b)
@@ -829,8 +834,7 @@ function hangingnodes(forest::ForestBWG{dim}, nodeids, nodeowners) where {dim}
                     if iscenter(c, pface) #hanging node candidate
                         neighbor_candidate = facet_neighbor(parent_, pface_i, tree.b)
                         if inside(tree, neighbor_candidate) #intraoctree branch
-                            neighbor_candidate_idx = findfirst(x -> x == neighbor_candidate, tree.leaves)
-                            if neighbor_candidate_idx !== nothing
+                            if neighbor_candidate ∈ leafsets[k]
                                 neighbor_candidate_faces = faces(neighbor_candidate, tree.b)
                                 nf = findfirst(x -> x == pface, neighbor_candidate_faces)
                                 hnodes[nodeids[nodeowners[(k, c)]]] = [nodeids[nodeowners[(k, nc)]] for nc in neighbor_candidate_faces[nf]]
@@ -861,8 +865,7 @@ function hangingnodes(forest::ForestBWG{dim}, nodeids, nodeowners) where {dim}
                                 k′ = facet_neighbor_[1][1]
                                 ri′ = _perminv[facet_neighbor_[1][2]]
                                 interoctree_neighbor = transform_facet(forest, k′, ri′, neighbor_candidate)
-                                interoctree_neighbor_candidate_idx = findfirst(x -> x == interoctree_neighbor, forest.cells[k′].leaves)
-                                if interoctree_neighbor_candidate_idx !== nothing
+                                if interoctree_neighbor ∈ leafsets[k′]
                                     r = compute_face_orientation(forest, k, pface_i)
                                     neighbor_candidate_faces = faces(neighbor_candidate, forest.cells[k′].b)
                                     transformed_neighbor_faces = faces(interoctree_neighbor, forest.cells[k′].b)
@@ -912,8 +915,7 @@ function hangingnodes(forest::ForestBWG{dim}, nodeids, nodeowners) where {dim}
                                     k′ = edge_neighbor_[1][1]
                                     ri′ = edge_perm_inv[edge_neighbor_[1][2]]
                                     interoctree_neighbor = transform_edge(forest, k′, ri′, neighbor_candidate, true)
-                                    interoctree_neighbor_candidate_idx = findfirst(x -> x == interoctree_neighbor, forest.cells[k′].leaves)
-                                    if interoctree_neighbor_candidate_idx !== nothing
+                                    if interoctree_neighbor ∈ leafsets[k′]
                                         neighbor_candidate_edges = edges(neighbor_candidate, forest.cells[k′].b)
                                         transformed_neighbor_edges = edges(interoctree_neighbor, forest.cells[k′].b)
                                         ne = findfirst(x -> iscenter(c, x), neighbor_candidate_edges)
