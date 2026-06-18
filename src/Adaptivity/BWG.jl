@@ -883,15 +883,54 @@ Ferrite.getcelltype(grid::ForestBWG, i::Int) = eltype(grid.cells) # assume for n
 
 Transformation of a octree coordinate system point `vertex` (or a collection `vertices`) to the corresponding physical coordinate system.
 """
-function transform_pointBWG(forest::ForestBWG{dim}, k::Integer, vertex::NTuple{dim, T}) where {dim, T}
-    tree = forest.cells[k]
-    cellnodes = getnodes(forest, collect(tree.nodes)) .|> get_node_coordinate
-    vertex = vertex .* (2 / (2^tree.b)) .- 1
-    octant_physical_coordinates = sum(j -> cellnodes[j] * Ferrite.reference_shape_value(Lagrange{Ferrite.RefHypercube{dim}, 1}(), Vec{dim}(vertex), j), 1:length(cellnodes))
+# Physical coordinates of tree `k`'s 2^dim corner nodes, as an NTuple indexed in the same
+# Lagrange-shape-function order used by `transform_pointBWG`. `tree.nodes` is an
+# `NTuple{N,Int}`, so this indexes `forest.nodes` directly (no `collect`/index-vector/broadcast
+# allocations) and the result is fully concrete.
+@inline function _treecorners(forest::ForestBWG{dim}, k::Integer) where {dim}
+    nodes = forest.nodes
+    return ntuple(j -> get_node_coordinate(nodes[forest.cells[k].nodes[j]]), Val(2^dim))
+end
+
+# Interpolate a single octree-coordinate `vertex` through pre-computed tree `corners`
+# (trilinear/bilinear Lagrange map). `b` is the tree's max refinement level. Hoisting the
+# per-tree `corners` out lets the collection path reuse them across every vertex of a tree.
+@inline function _interp_treepoint(corners::NTuple{N, Vec{dim, V}}, b, vertex::NTuple{dim, T}) where {N, dim, V, T}
+    ξ = vertex .* (2 / (2^b)) .- 1
+    octant_physical_coordinates = sum(j -> corners[j] * Ferrite.reference_shape_value(Lagrange{Ferrite.RefHypercube{dim}, 1}(), Vec{dim}(ξ), j), 1:N)
     return Vec{dim}(octant_physical_coordinates)
 end
 
-transform_pointBWG(forest, vertices) = transform_pointBWG.((forest,), first.(vertices), last.(vertices))
+function transform_pointBWG(forest::ForestBWG{dim}, k::Integer, vertex::NTuple{dim, T}) where {dim, T}
+    return _interp_treepoint(_treecorners(forest, k), forest.cells[k].b, vertex)
+end
+
+# Collection path (used by `creategrid` Phase 3 over ~every unique node): the naive
+# `transform_pointBWG.(...)` recomputed each tree's corner coordinates once per vertex. Here
+# we group the `(k, coord)` pairs by tree index `k`, compute `_treecorners(forest, k)` ONCE per
+# distinct tree, and map every vertex of that tree through the cached corners. Output order is
+# preserved 1:1 with the input, so the result is byte-identical to the per-call version.
+function transform_pointBWG(forest::ForestBWG{dim, C, T}, vertices) where {dim, C, T}
+    n = length(vertices)
+    # Element type matches the per-call version exactly: Vec{dim,T} (node coord, T is the
+    # forest's coordinate scalar) scaled by a Float64 Lagrange value.
+    VT = Vec{dim, promote_type(T, Float64)}
+    physical = Vector{VT}(undef, n)
+    n == 0 && return physical
+    # group input indices by tree index k (= `first(kv)`)
+    bykv = Dict{Int, Vector{Int}}()
+    for (i, kv) in enumerate(vertices)
+        push!(get!(() -> Int[], bykv, first(kv)), i)
+    end
+    for (k, idxs) in bykv
+        corners = _treecorners(forest, k)
+        b = forest.cells[k].b
+        for i in idxs
+            physical[i] = _interp_treepoint(corners, b, last(vertices[i]))
+        end
+    end
+    return physical
+end
 
 """
     rotation_permutation(::Val{2}, r, i) -> i′
