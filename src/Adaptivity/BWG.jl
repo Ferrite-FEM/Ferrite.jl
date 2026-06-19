@@ -953,37 +953,16 @@ end
 p4est_opposite_face_index(f) = ((f - 1) ⊻ 0b1) + 1
 p4est_opposite_edge_index(e) = ((e - 1) ⊻ 0b11) + 1
 
-#TODO: this function should wrap the LNodes Iterator of [IBWG2015](@citet)
-"""
-    creategrid(forest::ForestBWG) -> NonConformingGrid
-Materializes a p4est forest into a NonConformingGrid that can be used as usual to solve a finite element problem.
-"""
-function creategrid(forest::ForestBWG{dim, C, T}) where {dim, C, T}
-    nodes = Vector{Tuple{Int, NTuple{dim, Int32}}}()
-    sizehint!(nodes, getncells(forest) * 2^dim)
+# Inter-octree node identification (`creategrid` Phase 2 / `creategrid_iterator` cross-tree
+# pass): match tree-boundary nodes shared between adjacent trees (vertex/face/edge
+# neighbours) and alias each onto its owner (the lowest-index incident tree) by overwriting
+# `nodeids`/`nodeowners`. Extracted from `creategrid` so the point-iterator materializer
+# `creategrid_iterator` can reuse the exact same cross-tree merge.
+function _merge_intertree_nodes!(forest::ForestBWG{dim}, nodeids, nodeowners) where {dim}
     _perm = dim == 2 ? 𝒱₂_perm : 𝒱₃_perm
     _perminv = dim == 2 ? 𝒱₂_perm_inv : 𝒱₃_perm_inv
     node_map = dim < 3 ? node_map₂ : node_map₃
-    node_map_inv = dim < 3 ? node_map₂_inv : node_map₃_inv
-    nodeids = Dict{Tuple{Int, NTuple{dim, Int32}}, Int}()
-    nodeowners = Dict{Tuple{Int, NTuple{dim, Int32}}, Tuple{Int, NTuple{dim, Int32}}}()
-    facet_neighborhood = Ferrite.Ferrite.get_facet_facet_neighborhood(forest)
-
-    # Phase 1: Assign node owners intra-octree
-    pivot_nodeid = 1
-    for (k, tree) in enumerate(forest.cells)
-        for leaf in tree.leaves
-            _vertices = vertices(leaf, tree.b)
-            for v in _vertices
-                push!(nodes, (k, v))
-                nodeids[(k, v)] = pivot_nodeid
-                pivot_nodeid += 1
-                nodeowners[(k, v)] = (k, v)
-            end
-        end
-    end
-
-    # Phase 2: Assign node owners inter-octree
+    facet_neighborhood = Ferrite.get_facet_facet_neighborhood(forest)
     for (k, tree) in enumerate(forest.cells)
         _vertices = vertices(root(dim), tree.b)
         # Vertex neighbors
@@ -1095,6 +1074,42 @@ function creategrid(forest::ForestBWG{dim, C, T}) where {dim, C, T}
             end
         end
     end
+    return
+end
+
+# Materialize the cell vector from per-cell provisional-id connectivity tuples `conns` and the
+# provisional→final node-id map `final_of_prov`. Used by `creategrid_iterator`.
+_build_cells(::Type{CT}, conns::Vector{NTuple{NV, Int}}, final_of_prov::Vector{Int}) where {CT, NV} =
+    [CT(map(j -> final_of_prov[j], c)) for c in conns]
+
+#TODO: this function should wrap the LNodes Iterator of [IBWG2015](@citet)
+"""
+    creategrid(forest::ForestBWG) -> NonConformingGrid
+Materializes a p4est forest into a NonConformingGrid that can be used as usual to solve a finite element problem.
+"""
+function creategrid(forest::ForestBWG{dim, C, T}) where {dim, C, T}
+    nodes = Vector{Tuple{Int, NTuple{dim, Int32}}}()
+    sizehint!(nodes, getncells(forest) * 2^dim)
+    node_map = dim < 3 ? node_map₂ : node_map₃
+    nodeids = Dict{Tuple{Int, NTuple{dim, Int32}}, Int}()
+    nodeowners = Dict{Tuple{Int, NTuple{dim, Int32}}, Tuple{Int, NTuple{dim, Int32}}}()
+
+    # Phase 1: Assign node owners intra-octree
+    pivot_nodeid = 1
+    for (k, tree) in enumerate(forest.cells)
+        for leaf in tree.leaves
+            _vertices = vertices(leaf, tree.b)
+            for v in _vertices
+                push!(nodes, (k, v))
+                nodeids[(k, v)] = pivot_nodeid
+                pivot_nodeid += 1
+                nodeowners[(k, v)] = (k, v)
+            end
+        end
+    end
+
+    # Phase 2: Assign node owners inter-octree
+    _merge_intertree_nodes!(forest, nodeids, nodeowners)
 
     # Phase 3: Compute unique physical nodes
     nodeids_dedup = Dict{Int, Int}()
