@@ -8,7 +8,6 @@ using OrderedCollections
 include("BWG.jl")
 include("ncgrid.jl")
 include("constraints.jl")
-include("iterators.jl")
 
 export ForestBWG,
     refine!,
@@ -16,7 +15,6 @@ export ForestBWG,
     coarsen!,
     balanceforest!,
     creategrid,
-    creategrid_iterator,
     ConformityConstraint,
     NonConformingGrid
 

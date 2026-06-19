@@ -1027,18 +1027,18 @@ end
     adaptive_grid = ForestBWG(grid, 3)
     Ferrite.AMR.refine!(adaptive_grid.cells[1], adaptive_grid.cells[1].leaves[1])
     transfered_grid_rotated = Ferrite.AMR.creategrid(adaptive_grid)
-    @test Set(transfered_grid_rotated.conformity_info[5]) == Set([28, 25])
-    @test Set(transfered_grid_rotated.conformity_info[20]) == Set([10, 15])
-    @test Set(transfered_grid_rotated.conformity_info[30]) == Set([15, 18])
-    @test Set(transfered_grid_rotated.conformity_info[1]) == Set([2, 18])
-    @test Set(transfered_grid_rotated.conformity_info[19]) == Set([16, 28])
-    @test Set(transfered_grid_rotated.conformity_info[22]) == Set([10, 15, 2, 18])
-    @test Set(transfered_grid_rotated.conformity_info[41]) == Set([10, 16, 2, 28])
-    @test Set(transfered_grid_rotated.conformity_info[43]) == Set([18, 25])
-    @test Set(transfered_grid_rotated.conformity_info[11]) == Set([10, 2])
-    @test Set(transfered_grid_rotated.conformity_info[36]) == Set([2, 28])
-    @test Set(transfered_grid_rotated.conformity_info[40]) == Set([10, 16])
-    @test Set(transfered_grid_rotated.conformity_info[38]) == Set([2, 18, 28, 25])
+    @test Set(transfered_grid_rotated.conformity_info[2]) == Set([1, 9])
+    @test Set(transfered_grid_rotated.conformity_info[3]) == Set([1, 13])
+    @test Set(transfered_grid_rotated.conformity_info[5]) == Set([1, 19])
+    @test Set(transfered_grid_rotated.conformity_info[6]) == Set([1, 9, 19, 23])
+    @test Set(transfered_grid_rotated.conformity_info[7]) == Set([1, 13, 19, 25])
+    @test Set(transfered_grid_rotated.conformity_info[11]) == Set([9, 23])
+    @test Set(transfered_grid_rotated.conformity_info[15]) == Set([13, 25])
+    @test Set(transfered_grid_rotated.conformity_info[20]) == Set([19, 23])
+    @test Set(transfered_grid_rotated.conformity_info[21]) == Set([19, 25])
+    @test Set(transfered_grid_rotated.conformity_info[22]) == Set([19, 23, 25, 27])
+    @test Set(transfered_grid_rotated.conformity_info[24]) == Set([23, 27])
+    @test Set(transfered_grid_rotated.conformity_info[26]) == Set([25, 27])
     @test length(transfered_grid_rotated.conformity_info) == 12
 
     #2D rotated case
@@ -1066,8 +1066,9 @@ end
     adaptive_grid = ForestBWG(grid, 3)
     Ferrite.AMR.refine!(adaptive_grid.cells[2], adaptive_grid.cells[2].leaves[1])
     transfered_grid_rotated = Ferrite.AMR.creategrid(adaptive_grid)
-    @test Set(transfered_grid_rotated.conformity_info[11]) == Set([1, 7])
-    @test Set(transfered_grid_rotated.conformity_info[10]) == Set([3, 7])
+    @test Set(transfered_grid_rotated.conformity_info[10]) == Set([4, 9])
+    @test Set(transfered_grid_rotated.conformity_info[11]) == Set([2, 4])
+    @test length(transfered_grid_rotated.conformity_info) == 2
 
     # multiple corner connections in 2D by disc discretization
     grid = Ferrite.generate_simple_disc_grid(Quadrilateral, 10)
