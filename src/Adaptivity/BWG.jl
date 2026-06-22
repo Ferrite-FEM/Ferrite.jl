@@ -546,7 +546,7 @@ end
 # topological — no physical coordinates, no rounding (cf. IBWG2015 §2: a point is an
 # octant + boundary index, identity is integer/topological; physical positions are
 # emitted only at the very end). The coordinate component is `Int32` to dovetail with
-# `creategrid`'s `nodeids`/`nodeowners` maps (`Tuple{Int, NTuple{dim, Int32}}`), so this
+# `creategrid`'s `nodeids` map (`Tuple{Int, NTuple{dim, Int32}}`), so this
 # additive iterator maps straight onto the existing node-id machinery at wire-in. Each
 # key is emitted in the frame of whichever tree the constrained/constrainer points are
 # genuine fine-leaf vertices of: the coarse leaf's own tree `k` for an intra-tree
@@ -760,16 +760,22 @@ p4est_opposite_face_index(f) = ((f - 1) ⊻ 0b1) + 1
 p4est_opposite_edge_index(e) = ((e - 1) ⊻ 0b11) + 1
 
 """
-    _merge_intertree_nodes!(forest::ForestBWG{dim}, nodeids, nodeowners)
+    _merge_intertree_nodes!(forest::ForestBWG{dim}, nodeids, alias)
 
 Identify nodes shared across tree boundaries (`creategrid`'s cross-tree pass). For each tree `k`,
 walk its root-vertex, root-face and (3D) root-edge neighbours; a node on a shared boundary is
 matched to its image in the lower-index neighbour `k′` via [`transform_facet`](@ref)/
 [`transform_corner`](@ref)/[`transform_edge`](@ref) (handling tree rotations), and aliased onto
-that owner by overwriting `nodeids`/`nodeowners`. Only the lower-index tree owns a shared node
-(`k > k′`), giving a single canonical id per geometric node across all incident trees.
+that owner. Only the lower-index tree owns a shared node (`k > k′`), giving a single canonical id
+per geometric node across all incident trees.
+
+`nodeids` is a read-only key→provisional-id map here; the canonicalization is recorded in
+`alias::Vector{Int}` (indexed by provisional id, identity-initialized): `alias[p]` is the
+provisional id that `p` is merged onto. This replaces the previous in-place rewriting of
+`nodeids` values, so the per-node canonical lookup in `creategrid` becomes an array index
+(`alias[p]`) instead of a hash probe — the key to linear scaling.
 """
-function _merge_intertree_nodes!(forest::ForestBWG{dim}, nodeids, nodeowners) where {dim}
+function _merge_intertree_nodes!(forest::ForestBWG{dim}, nodeids, alias::Vector{Int}) where {dim}
     _perm = dim == 2 ? 𝒱₂_perm : 𝒱₃_perm
     _perminv = dim == 2 ? 𝒱₂_perm_inv : 𝒱₃_perm_inv
     node_map = dim < 3 ? node_map₂ : node_map₃
@@ -785,8 +791,7 @@ function _merge_intertree_nodes!(forest::ForestBWG{dim}, nodeids, nodeowners) wh
                 if k > k′
                     #delete!(nodes,(k,v))
                     new_v = vertex(root(dim), node_map[v′], tree.b)
-                    nodeids[(k, vc)] = nodeids[(k′, new_v)]
-                    nodeowners[(k, vc)] = (k′, new_v)
+                    alias[nodeids[(k, vc)]] = alias[nodeids[(k′, new_v)]]
                     @debug println("    Matching $vc (local) to $new_v (neighbor)")
                 end
             end
@@ -825,8 +830,7 @@ function _merge_intertree_nodes!(forest::ForestBWG{dim}, nodeids, nodeowners) wh
                                 i′ = rotation_permutation(r, i)
                                 if haskey(nodeids, (k′, fnodes_neighbor[i′]))
                                     @debug println("    Updating $((k, fnodes[i])) $(nodeids[(k, fnodes[i])]) -> $(nodeids[(k′, fnodes_neighbor[i′])])")
-                                    nodeids[(k, fnodes[i])] = nodeids[(k′, fnodes_neighbor[i′])]
-                                    nodeowners[(k, fnodes[i])] = (k′, fnodes_neighbor[i′])
+                                    alias[nodeids[(k, fnodes[i])]] = alias[nodeids[(k′, fnodes_neighbor[i′])]]
                                 end
                             end
                         else
@@ -834,8 +838,7 @@ function _merge_intertree_nodes!(forest::ForestBWG{dim}, nodeids, nodeowners) wh
                                 rotated_ξ = rotation_permutation(f′, f, r, i)
                                 if haskey(nodeids, (k′, fnodes_neighbor[i]))
                                     @debug println("    Updating $((k, fnodes[i])) $(nodeids[(k, fnodes[rotated_ξ])]) -> $(nodeids[(k′, fnodes_neighbor[i])])")
-                                    nodeids[(k, fnodes[rotated_ξ])] = nodeids[(k′, fnodes_neighbor[i])]
-                                    nodeowners[(k, fnodes[rotated_ξ])] = (k′, fnodes_neighbor[i])
+                                    alias[nodeids[(k, fnodes[rotated_ξ])]] = alias[nodeids[(k′, fnodes_neighbor[i])]]
                                 end
                             end
                         end
@@ -876,8 +879,7 @@ function _merge_intertree_nodes!(forest::ForestBWG{dim}, nodeids, nodeowners) wh
                             i′ = rotation_permutation(r, i)
                             if haskey(nodeids, (k′, enodes_neighbor[i′]))
                                 @debug println("    Updating $((k, enodes[i])) $(nodeids[(k, enodes[i])]) -> $(nodeids[(k′, enodes_neighbor[i′])])")
-                                nodeids[(k, enodes[i])] = nodeids[(k′, enodes_neighbor[i′])]
-                                nodeowners[(k, enodes[i])] = (k′, enodes_neighbor[i′])
+                                alias[nodeids[(k, enodes[i])]] = alias[nodeids[(k′, enodes_neighbor[i′])]]
                             end
                         end
                     end
@@ -2765,27 +2767,35 @@ function creategrid(forest::ForestBWG{dim}) where {dim}
     # replaces the per-boundary-leaf scan). Single-tree forests have no shared faces -> no-op.
     _iterate_interface_hanging!(hang, forest)
 
-    # Phase 3 — cross-tree identity merge + compaction + owner physical coords (reuse).
-    _merge_intertree_nodes!(forest, nodeids, Dict{KeyT, KeyT}())
-    treecorners = [_treecorners(forest, k) for k in eachindex(forest.cells)]
+    # Phase 3 — cross-tree identity merge + compaction + owner physical coords (reuse). The merge
+    # records canonicalization in the dense `alias` array (alias[p] = provisional id p is merged
+    # onto) instead of rewriting `nodeids`, so the per-node canonical lookup below is an array
+    # index, not a hash probe. Densification likewise uses an array (`canon_to_dense`), not a Dict.
     nprov = length(prov_key)
+    alias = collect(1:nprov)
+    _merge_intertree_nodes!(forest, nodeids, alias)
+    treecorners = [_treecorners(forest, k) for k in eachindex(forest.cells)]
     final_of_prov = Vector{Int}(undef, nprov)
-    compact = Dict{Int, Int}(); sizehint!(compact, nprov)
+    canon_to_dense = zeros(Int, nprov)
     nodecoords = Vec{dim, Float64}[]
+    ndense = 0
     for p in 1:nprov
-        cid = nodeids[prov_key[p]]
-        final_of_prov[p] = get!(compact, cid) do
+        cid = alias[p]
+        d = canon_to_dense[cid]
+        if d == 0
             kk = prov_key[cid][1]
             push!(nodecoords, _interp_treepoint(treecorners[kk], forest.cells[kk].b, prov_key[cid][2]))
-            length(compact) + 1
+            ndense += 1; d = ndense; canon_to_dense[cid] = d
         end
+        final_of_prov[p] = d
     end
 
-    # Phase 4 — cells + hanging constraints.
+    # Phase 4 — cells + hanging constraints. `nodeids[key]` gives a provisional id; `final_of_prov`
+    # folds the alias canonicalization and densification into the final dense id.
     cells = _build_cells(celltype, conns, final_of_prov)
     hnodes = Dict{Int, Vector{Int}}()
     for (hkey, mkeys) in hang
-        hnodes[compact[nodeids[hkey]]] = [compact[nodeids[m]] for m in mkeys]
+        hnodes[final_of_prov[nodeids[hkey]]] = [final_of_prov[nodeids[m]] for m in mkeys]
     end
     return NonConformingGrid(cells, Node.(nodecoords); conformity_info = hnodes, facetsets = reconstruct_facetsets(forest))
 end
