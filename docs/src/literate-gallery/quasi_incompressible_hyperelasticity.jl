@@ -35,7 +35,7 @@
 # ```math
 #   \widehat{\Psi}(\mathbf{u}, p) = \sup_{J} \left[ p(J - 1) - \frac{\mu}{2}\left(I_1 - 3 \right) + \mu \log(J) - \frac{\lambda}{2}\left( J - 1\right){}^2 \right].
 # ```
-# The supremum, say $J^\star$, can be calculated in closed form by the first order optimailty condition $\partial\widehat{\Psi}/\partial J = 0$. This gives
+# The supremum, say $J^\star$, can be calculated in closed form by the first order optimality condition $\partial\widehat{\Psi}/\partial J = 0$. This gives
 # ```math
 #   J^\star(p) = \frac{\lambda + p + \sqrt{(\lambda + p){}^2 + 4 \lambda \mu }}{(2 \lambda)}.
 # ```
@@ -63,7 +63,7 @@
 # below for a more detailed explanation of the above mathematical trick. Now, in order to apply Newton's method to the
 # above problem, we further need to linearize the above equations and calculate the respective hessians (or tangents), namely, $\partial^2\Psi^\star/\partial \mathbf{F}^2$, $\partial^2\Psi^\star/\partial p^2$ and $\partial^2\Psi^\star/\partial \mathbf{F}\partial p$
 # which, using `Tensors.jl`, can be determined conveniently using automatic differentiation (see the code below). Hence we only need to define the above potential.
-# The remaineder of the example follows similarly.
+# The remainder of the example follows similarly.
 # ## References
 # 1. [A paradigm for higher-order polygonal elements in finite elasticity using a gradient correction scheme, CMAME 2016, 306, 216–251](http://pamies.cee.illinois.edu/Publications_files/CMAME_2016.pdf)
 # 2. [Approximation of incompressible large deformation elastic problems: some unresolved issues, Computational Mechanics, 2013](https://link.springer.com/content/pdf/10.1007/s00466-013-0869-0.pdf)
@@ -94,20 +94,23 @@ function importTestGrid()
 end;
 
 # The function to create corresponding cellvalues for the displacement field `u` and pressure `p`
-# follows in a similar fashion from the `incompressible_elasticity` example
+# follows in a similar fashion from the `incompressible_elasticity` example. Since both fields
+# share the same quadrature rule and geometric interpolation, we collect them in a single
+# [`MultiFieldCellValues`](@ref). The values for each field are then accessed as `cellvalues.u`
+# and `cellvalues.p`, while geometric quantities (e.g. `getdetJdV`) are queried on `cellvalues`
+# directly.
 function create_values(interpolation_u, interpolation_p)
     ## quadrature rules
     qr = QuadratureRule{RefTetrahedron}(4)
     facet_qr = FacetQuadratureRule{RefTetrahedron}(4)
 
-    ## cell and facetvalues for u
-    cellvalues_u = CellValues(qr, interpolation_u)
+    ## cellvalues for both the displacement, u, and pressure, p, fields
+    cellvalues = MultiFieldCellValues(qr, (u = interpolation_u, p = interpolation_p))
+
+    ## facetvalues for u
     facetvalues_u = FacetValues(facet_qr, interpolation_u)
 
-    ## cellvalues for p
-    cellvalues_p = CellValues(qr, interpolation_p)
-
-    return cellvalues_u, cellvalues_p, facetvalues_u
+    return cellvalues, facetvalues_u
 end;
 
 # We now create the function for Ψ*
@@ -156,12 +159,12 @@ end;
 
 # Also, since we are considering incompressible hyperelasticity, an interesting quantity that we can compute is the deformed volume of the solid.
 # It is easy to show that this is equal to ∫J*dΩ where J=det(F). This can be done at the level of each element (cell)
-function calculate_element_volume(cell, cellvalues_u, ue)
-    reinit!(cellvalues_u, cell)
+function calculate_element_volume(cell, cellvalues, ue)
+    reinit!(cellvalues, cell)
     evol::Float64 = 0.0
-    for qp in 1:getnquadpoints(cellvalues_u)
-        dΩ = getdetJdV(cellvalues_u, qp)
-        ∇u = function_gradient(cellvalues_u, qp, ue)
+    for qp in 1:getnquadpoints(cellvalues)
+        dΩ = getdetJdV(cellvalues, qp)
+        ∇u = function_gradient(cellvalues.u, qp, ue)
         F = one(∇u) + ∇u
         J = det(F)
         evol += J * dΩ
@@ -170,14 +173,14 @@ function calculate_element_volume(cell, cellvalues_u, ue)
 end;
 
 # and then assembled over all the cells (elements)
-function calculate_volume_deformed_mesh(w, dh::DofHandler, cellvalues_u)
+function calculate_volume_deformed_mesh(w, dh::DofHandler, cellvalues)
     evol::Float64 = 0.0
     for cell in CellIterator(dh)
         global_dofs = celldofs(cell)
-        nu = getnbasefunctions(cellvalues_u)
+        nu = getnbasefunctions(cellvalues.u)
         global_dofs_u = global_dofs[1:nu]
         ue = w[global_dofs_u]
-        δevol = calculate_element_volume(cell, cellvalues_u, ue)
+        δevol = calculate_element_volume(cell, cellvalues, ue)
         evol += δevol
     end
     return evol
@@ -185,22 +188,21 @@ end;
 
 # The function to assemble the element stiffness matrix for each element in the mesh now has a block structure like in
 # `incompressible_elasticity`.
-function assemble_element!(Ke, fe, cell, cellvalues_u, cellvalues_p, mp, ue, pe)
+function assemble_element!(Ke, fe, cell, cellvalues, mp, ue, pe)
     ## Reinitialize cell values, and reset output arrays
     ublock, pblock = 1, 2
-    reinit!(cellvalues_u, cell)
-    reinit!(cellvalues_p, cell)
+    reinit!(cellvalues, cell)
     fill!(Ke, 0.0)
     fill!(fe, 0.0)
 
-    n_basefuncs_u = getnbasefunctions(cellvalues_u)
-    n_basefuncs_p = getnbasefunctions(cellvalues_p)
+    n_basefuncs_u = getnbasefunctions(cellvalues.u)
+    n_basefuncs_p = getnbasefunctions(cellvalues.p)
 
-    for qp in 1:getnquadpoints(cellvalues_u)
-        dΩ = getdetJdV(cellvalues_u, qp)
+    for qp in 1:getnquadpoints(cellvalues)
+        dΩ = getdetJdV(cellvalues, qp)
         ## Compute deformation gradient F
-        ∇u = function_gradient(cellvalues_u, qp, ue)
-        p = function_value(cellvalues_p, qp, pe)
+        ∇u = function_gradient(cellvalues.u, qp, ue)
+        p = function_value(cellvalues.p, qp, pe)
         F = one(∇u) + ∇u
 
         ## Compute first Piola-Kirchhoff stress and tangent modulus
@@ -209,35 +211,35 @@ function assemble_element!(Ke, fe, cell, cellvalues_u, cellvalues_p, mp, ue, pe)
         ## Loop over the `u`-test functions to calculate the `u`-`u` and `u`-`p` blocks
         for i in 1:n_basefuncs_u
             ## gradient of the test function
-            ∇δui = shape_gradient(cellvalues_u, qp, i)
+            ∇δui = shape_gradient(cellvalues.u, qp, i)
             ## Add contribution to the residual from this test function
             fe[BlockIndex((ublock), (i))] += (∇δui ⊡ ∂Ψ∂F) * dΩ
 
             ∇δui∂S∂F = ∇δui ⊡ ∂²Ψ∂F²
             for j in 1:n_basefuncs_u
-                ∇δuj = shape_gradient(cellvalues_u, qp, j)
+                ∇δuj = shape_gradient(cellvalues.u, qp, j)
 
                 ## Add contribution to the tangent
                 Ke[BlockIndex((ublock, ublock), (i, j))] += (∇δui∂S∂F ⊡ ∇δuj) * dΩ
             end
             ## Loop over the `p`-test functions
             for j in 1:n_basefuncs_p
-                δp = shape_value(cellvalues_p, qp, j)
+                δp = shape_value(cellvalues.p, qp, j)
                 ## Add contribution to the tangent
                 Ke[BlockIndex((ublock, pblock), (i, j))] += (∂²Ψ∂F∂p ⊡ ∇δui) * δp * dΩ
             end
         end
         ## Loop over the `p`-test functions to calculate the `p-`u` and `p`-`p` blocks
         for i in 1:n_basefuncs_p
-            δp = shape_value(cellvalues_p, qp, i)
+            δp = shape_value(cellvalues.p, qp, i)
             fe[BlockIndex((pblock), (i))] += (δp * ∂Ψ∂p) * dΩ
 
             for j in 1:n_basefuncs_u
-                ∇δuj = shape_gradient(cellvalues_u, qp, j)
+                ∇δuj = shape_gradient(cellvalues.u, qp, j)
                 Ke[BlockIndex((pblock, ublock), (i, j))] += ∇δuj ⊡ ∂²Ψ∂F∂p * δp * dΩ
             end
             for j in 1:n_basefuncs_p
-                δp = shape_value(cellvalues_p, qp, j)
+                δp = shape_value(cellvalues.p, qp, j)
                 Ke[BlockIndex((pblock, pblock), (i, j))] += δp * ∂²Ψ∂p² * δp * dΩ
             end
         end
@@ -248,11 +250,11 @@ end;
 # The only thing that changes in the assembly of the global stiffness matrix is slicing the corresponding element
 # dofs for the displacement (see `global_dofsu`) and pressure (`global_dofsp`).
 function assemble_global!(
-        K::SparseMatrixCSC, f, cellvalues_u::CellValues,
-        cellvalues_p::CellValues, dh::DofHandler, mp::NeoHooke, w
+        K::SparseMatrixCSC, f, cellvalues::MultiFieldCellValues,
+        dh::DofHandler, mp::NeoHooke, w
     )
-    nu = getnbasefunctions(cellvalues_u)
-    np = getnbasefunctions(cellvalues_p)
+    nu = getnbasefunctions(cellvalues.u)
+    np = getnbasefunctions(cellvalues.p)
 
     ## start_assemble resets K and f
     fe = BlockedArray(zeros(nu + np), [nu, np]) # local force vector
@@ -267,7 +269,7 @@ function assemble_global!(
         @assert size(global_dofs, 1) == nu + np # sanity check
         ue = w[global_dofsu] # displacement dofs for the current cell
         pe = w[global_dofsp] # pressure dofs for the current cell
-        assemble_element!(ke, fe, cell, cellvalues_u, cellvalues_p, mp, ue, pe)
+        assemble_element!(ke, fe, cell, cellvalues, mp, ue, pe)
         assemble!(assembler, global_dofs, ke, fe)
     end
     return
@@ -275,7 +277,7 @@ end;
 
 # We now define a main function `solve`. For nonlinear quasistatic problems we often like to parameterize the
 # solution in terms of a pseudo time like parameter, which in this case is used to gradually apply the boundary
-# displacement on the right face. Also for definitenessm we consider λ/μ = 10⁴
+# displacement on the right face. Also for definiteness, we consider λ/μ = 10⁴
 function solve(interpolation_u, interpolation_p)
 
     ## import the mesh
@@ -288,7 +290,7 @@ function solve(interpolation_u, interpolation_p)
 
     ## Create the DofHandler and CellValues
     dh = create_dofhandler(grid, interpolation_u, interpolation_p)
-    cellvalues_u, cellvalues_p, facetvalues_u = create_values(interpolation_u, interpolation_p)
+    cellvalues, facetvalues_u = create_values(interpolation_u, interpolation_p)
 
     ## Create the DirichletBCs
     dbc = create_bc(dh)
@@ -319,7 +321,7 @@ function solve(interpolation_u, interpolation_p)
         fill!(ΔΔw, 0.0)
         while true
             newton_itr += 1
-            assemble_global!(K, f, cellvalues_u, cellvalues_p, dh, mp, w)
+            assemble_global!(K, f, cellvalues, dh, mp, w)
             norm_res = norm(f[Ferrite.free_dofs(dbc)])
             apply_zero!(K, f, dbc)
             ## Only display output at specific load steps
@@ -345,7 +347,7 @@ function solve(interpolation_u, interpolation_p)
         end
     end
     vtk_save(pvd)
-    vol_def = calculate_volume_deformed_mesh(w, dh, cellvalues_u)
+    vol_def = calculate_volume_deformed_mesh(w, dh, cellvalues)
     print("Deformed volume is $vol_def")
     return vol_def
 end;

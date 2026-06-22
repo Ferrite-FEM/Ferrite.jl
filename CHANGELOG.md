@@ -7,15 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Next] - xxxx-xx-xx
 
+### Documentation
+
+- Landau example in code gallery now shows how to use DifferentiationInterface and HyperHessians as a backend. (#1345)
+
+## [v1.4.1] - 2026-06-17
+
 ### Fixes
  - Make `shape_symmetric_gradient` work for `PointValues` ([#1325])
  - Make the internal function `getlowerorder` work for `VectorizedInterpolation` ([#1335])
+
+### Documentation
+ - The quasi-incompressible hyperelasticity example now uses `MultiCellValues`. (#1346)
 
 ### Performance
  - Distributing DoFs got a small performance gain by `sizehint`ing dictionaries, avoiding
    excessive rehashing (#1342)
  - Small performance improvement to `SparseMatrixCSR` and `SparseMatrixCSR` assembly by avoiding
-   some reductions operations. (#1341)
+   some reduction operations. (#1341)
+
+### Documentation
+ - Update Navier-Stokes example to the new OrdinaryDiffEq v7 release (#1350)
 
 ## [v1.4.0] - 2026-04-20
 

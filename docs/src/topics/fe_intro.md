@@ -67,13 +67,13 @@ form is identical to the solution to the strong form.
 
 
 Using the finite element method to solve partial differential equations is usually
-preceded with the construction of a discretization of the domain $\Omega$ into a finite
+preceded by the construction of a discretization of the domain $\Omega$ into a finite
 set of *elements* or *cells*. We call this geometric discretization *grid* (or *mesh*)
 and denote it with $\Omega_h$. In this example the corners of the triangles are called
 *nodes*.
 
 Next, we introduce the finite element approximation $u_\mathrm{h} \approx u$ as linear combination of
-*shape functions*, $\phi_i$. The corresponding weights are usually called *degree of freedoms* (dofs), $\hat{u}_i$.
+*shape functions*, $\phi_i$. The corresponding weights are usually called *degrees of freedom* (dofs), $\hat{u}_i$.
 Sometimes, the dofs are called *weights* or *nodal values*. In Ferrite, the numbering of the dofs does not correspond
 to the node numbers in the grid. While such numbering is common in basic finite element codes,
 Ferrite supports different approximations of the finite element fields and the geometry, prohibiting
@@ -91,7 +91,7 @@ u_\mathrm{h}(\mathbf{x}) = \sum_{i=1}^{\mathrm{N}} \phi_i(\mathbf{x}) \, \hat{u}
 ```
 
 Since test and trial functions are usually chosen in such a way, that they build the basis of
-some function space (basis as in basis of a vector space), sometimes are they are also called *basis
+some function space (basis as in basis of a vector space), they are sometimes also called *basis
 functions*. In the following the argument $\mathbf{x}$ is dropped to keep the notation compact.
 We may now insert these approximations in the weak form, which results in
 
@@ -103,7 +103,7 @@ We may now insert these approximations in the weak form, which results in
 
 Since this equation must hold for arbitrary $\delta u_\mathrm{h}$, the equation must especially
 hold for the specific choice that only one of the nodal values $\delta \hat{u}_i$ is fixed to 1 while
-an all other coefficients are fixed to 0. Repeating this argument for all $i$ from 1 to N we obtain
+all other coefficients are fixed to 0. Repeating this argument for all $i$ from 1 to N we obtain
 N linear equations. This way the discrete problem can be written as a system of linear equations
 
 ```math

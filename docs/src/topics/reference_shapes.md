@@ -28,7 +28,7 @@ of edges (e.g. for a `QuadraticLine` cell).
 
 To write dimensionally independent code, Ferrite also denotes entities by their
 [*codimension*](https://en.wikipedia.org/wiki/Codimension),
-defined relative the reference shape dimension. Specifically, Ferrite has the entities
+defined relative to the reference shape dimension. Specifically, Ferrite has the entities
 
 | Entity   | Description |
 | :------- | :---------- |
@@ -41,10 +41,10 @@ such as [`CellValues`](@ref) and [`FacetValues`](@ref).
 !!! note "Definition of codimension"
     In Ferrite, *codimension* is defined relative to the reference dimension of the specific entity.
     Note that other finite element codes may define it differently
-    (e.g. relative the highest reference dimension in the grid).
+    (e.g. relative to the highest reference dimension in the grid).
 
 ## Entity numbering
-Each reference shape defines the numbering of its vertices, edges, and faces entities,
+Each reference shape defines the numbering of its vertex, edge, and face entities,
 where the edge and face entities are defined from their vertex numbers.
 
 !!! note

@@ -131,7 +131,7 @@ which yields the gradient,
 ### Contravariant Piola mapping, H(div)
 `Ferrite.ContravariantPiolaMapping`
 
-The covariant Piola mapping of a vectorial base function preserves the normal components. For the value, the mapping is defined as
+The contravariant Piola mapping of a vectorial base function preserves the normal components. For the value, the mapping is defined as
 ```math
 \begin{align*}
     \boldsymbol{N}(\boldsymbol{x}) = \frac{\boldsymbol{J}}{\det(\boldsymbol{J})} \cdot \hat{\boldsymbol{N}}(\boldsymbol{\xi}(\boldsymbol{x}))
