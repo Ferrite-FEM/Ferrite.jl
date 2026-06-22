@@ -2,8 +2,8 @@ module AMR
 
 using .. Ferrite
 import Ferrite: @debug
-using SparseArrays
-using OrderedCollections
+using SparseArrays: SparseMatrixCSC, spzeros
+using OrderedCollections: OrderedSet
 
 include("BWG.jl")
 include("ncgrid.jl")
