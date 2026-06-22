@@ -30,7 +30,7 @@ struct OctantBWG{dim, N, T} <: AbstractCell{RefHypercube{dim}}
     #Refinement level
     l::T
     #x,y,z \in {0,...,2^b} where (0 ≤ l ≤ b)}
-    xyz::NTuple{dim,T}
+    xyz::NTuple{dim, T}
 end
 ```
 whenever coordinates are considered we follow the z order logic, meaning x before y before z.
@@ -42,11 +42,11 @@ The size of an octant at the lowest possible level `b` is always 1, sometimes th
 
 The octree is implemented as:
 ```julia
-struct OctreeBWG{dim,N,T} <: AbstractAdaptiveCell{RefHypercube{dim}}
-    leaves::Vector{OctantBWG{dim,N,T}}
+struct OctreeBWG{dim, N, T} <: AbstractAdaptiveCell{RefHypercube{dim}}
+    leaves::Vector{OctantBWG{dim, N, T}}
     #maximum refinement level
     b::T
-    nodes::NTuple{N,Int}
+    nodes::NTuple{N, Int}
 end
 ```
 
@@ -62,15 +62,15 @@ So, our root is on level 0 of size 8 and has the lower left coordinates `(0,0)`
 ```julia
 # different constructors available, first one OctantBWG(dim,level,mortonid,maximumlevel)
 # other possibility by giving directly level and a tuple of coordinates OctantBWG(level,(x,y))
-julia> dim = 2; level = 0; maximumlevel=3
-julia> oct = OctantBWG(dim,level,1,maximumlevel)
-OctantBWG{2,4,4}
-   l = 0
-   xy = 0,0
+julia > dim = 2; level = 0; maximumlevel = 3
+julia > oct = OctantBWG(dim, level, 1, maximumlevel)
+OctantBWG{2, 4, 4}
+l = 0
+xy = 0, 0
 ```
 The size of octants at a specific level can be computed by a simple operation
 ```julia
-julia> Ferrite.AMR._compute_size(#=b=#3,#=l=#0)
+julia > Ferrite.AMR._compute_size(#=b=# 3, #=l=# 0)
 8
 ```
 This computation is based on the relation $\text{size}=2^{b-l}$.
@@ -79,26 +79,26 @@ This means, that the octants are now of size $2^{3-1}=4$.
 Construct all level 1 octants based on mortonid:
 ```julia
 # note the arguments are dim,level,mortonid,maximumlevel
-julia> dim = 2; level = 1; maximumlevel = 3
-julia> oct = Ferrite.AMR.OctantBWG(dim, level, 1, maximumlevel)
-OctantBWG{2,4,4}
-   l = 1
-   xy = 0,0
+julia > dim = 2; level = 1; maximumlevel = 3
+julia > oct = Ferrite.AMR.OctantBWG(dim, level, 1, maximumlevel)
+OctantBWG{2, 4, 4}
+l = 1
+xy = 0, 0
 
-julia> oct = Ferrite.AMR.OctantBWG(dim, level, 2, maximumlevel)
-OctantBWG{2,4,4}
-   l = 1
-   xy = 4,0
+julia > oct = Ferrite.AMR.OctantBWG(dim, level, 2, maximumlevel)
+OctantBWG{2, 4, 4}
+l = 1
+xy = 4, 0
 
-julia> oct = Ferrite.AMR.OctantBWG(dim, level, 3, maximumlevel)
-OctantBWG{2,4,4}
-   l = 1
-   xy = 0,4
+julia > oct = Ferrite.AMR.OctantBWG(dim, level, 3, maximumlevel)
+OctantBWG{2, 4, 4}
+l = 1
+xy = 0, 4
 
-julia> oct = Ferrite.AMR.OctantBWG(dim, level, 4, maximumlevel)
-OctantBWG{2,4,4}
-   l = 1
-   xy = 4,4
+julia > oct = Ferrite.AMR.OctantBWG(dim, level, 4, maximumlevel)
+OctantBWG{2, 4, 4}
+l = 1
+xy = 4, 4
 ```
 
 So, the morton index is on **one** specific level just a x before y before z "cell" or "element" identifier
@@ -160,10 +160,10 @@ The assertion expresses that it is not possible to construct a morton index 8 oc
 The morton index of the lower right cell is 2 on level 1.
 
 ```julia
-julia> o = Ferrite.AMR.OctantBWG(2,1,2,3)
-OctantBWG{2,4,4}
-   l = 1
-   xy = 4,0
+julia > o = Ferrite.AMR.OctantBWG(2, 1, 2, 3)
+OctantBWG{2, 4, 4}
+l = 1
+xy = 4, 0
 ```
 
 ### Octant operation
@@ -177,7 +177,6 @@ Ferrite.AMR.children
 Ferrite.AMR.vertices
 Ferrite.AMR.edges
 Ferrite.AMR.faces
-Ferrite.AMR.transform_pointBWG
 ```
 
 ### Intraoctree operation
@@ -215,3 +214,178 @@ Ferrite.AMR.transform_facet_remote
 ```
 
 despite being never used in the code base so far.
+
+## From a forest to a `NonConformingGrid`
+
+The operations above manipulate the forest of octrees (refine, coarsen, balance, neighbour
+lookups). To actually solve a finite element problem we must turn that forest into a concrete
+grid — this is [`creategrid`](@ref Ferrite.AMR.creategrid), which produces a
+`NonConformingGrid`: an ordinary grid plus the *hanging-node constraints* (`conformity_info`)
+that make a conforming finite element field possible.
+
+Two ideas carry the whole construction:
+
+- **Integer / topological identity.** Every node is identified by an integer key
+  `(tree, octree-coordinate)`, never by a floating-point physical position. Two leaves that meet
+  at a vertex produce the *same* integer key, so shared nodes are recognised exactly, with no
+  tolerances. Physical coordinates are interpolated only at the very end.
+- **On a 2:1-balanced forest, hanging nodes are midpoints.** A non-conforming interface always
+  places a node at the midpoint of a coarse edge or the centre of a coarse face. Each such node
+  is recorded as a linear constraint: the hanging node equals the average of its *master* corners.
+
+### The point iterator (IBWG2015, Algorithm 5)
+
+The heart of the materialiser is a single recursive traversal, [`iterate_points`](@ref
+Ferrite.AMR.iterate_points), the literal realisation of Algorithm 5.2/5.3 of [IBWG2015](@citet).
+It visits every **non-hanging** topological entity of a tree — each leaf volume, and each
+face/edge/corner *between* leaves — exactly once, calling a user callback `visit(c, leaf_supp)`
+where `leaf_supp` are the leaves surrounding the entity `c`.
+
+An entity is encoded integer/topologically as an axis-aligned box, the `IteratePoint`:
+
+```julia
+struct IteratePoint{dim}
+    anchor::NTuple{dim, Int}   # minimum integer (octree) corner of the box
+    level::Int                 # so the box has edge length _compute_size(b, level)
+    axes::NTuple{dim, Bool}    # the directions the box extends along
+end
+```
+
+The number of extending axes is the *dimension of the entity*,
+`point_dim(c) = count(c.axes)`: `dim` for a volume, `dim-1` for a face, `1` for a 3D edge, `0`
+for a corner. The callback dispatches on it. The keyword `mindim` is the §5.4 specialisation:
+passing `mindim = dim-1` recurses into and fires the callback only for volumes and faces, which
+is all that hanging-node detection on a balanced mesh needs (faces capture the edge hangers too,
+see below).
+
+Because the leaves of an octant form a *contiguous* Morton-sorted range, the descent slices that
+range with [`split_bounds`](@ref Ferrite.AMR.split_bounds) instead of searching — it is
+allocation-free, carrying index ranges rather than views.
+
+### The `creategrid` pipeline
+
+`creategrid` drives the iterator and assembles the grid in a few phases. The call graph:
+
+```
+creategrid(forest)
+│
+├─ for each tree:  iterate_points(tree; mindim = dim-1)        # IBWG2015 Alg 5.2/5.3
+│      ├─ volume callback → _lnodes_number_leaf!               # number vertices + connectivity
+│      └─ face   callback → _emit_coarse_face_int!             # intra-tree hanging nodes
+│
+├─ _iterate_interface_hanging!(forest)                         # inter-tree hanging nodes
+│      └─ _iter_interface!  (per shared tree face)
+│             └─ _emit_coarse_face_int!
+│
+├─ _merge_intertree_nodes!         # unify node ids shared across tree boundaries
+├─ _treecorners / _interp_treepoint   # integer coords → physical coords (Q1 geometry map)
+├─ _build_cells                    # connectivity tuples → Quadrilateral / Hexahedron cells
+└─ reconstruct_facetsets           # carry named boundaries onto the refined grid
+```
+
+1. **Numbering, connectivity and intra-tree hanging** are *fused* into the single per-tree
+   `iterate_points` pass. The volume callback assigns each leaf vertex a provisional id keyed on
+   `(tree, coord)` and pushes the cell connectivity (Morton order); the face callback, whenever a
+   coarse face borders a finer leaf, emits that face's interior hanging nodes.
+2. **Inter-tree hanging** is collected by a cross-tree two-sided face descent
+   ([`_iter_interface!`](@ref Ferrite.AMR._iter_interface!)) seeded at every shared tree face —
+   the same idea as the intra-tree face callback, but matching the two sides across a tree
+   boundary via [`transform_facet`](@ref Ferrite.AMR.transform_facet) (handling rotations).
+3. **Cross-tree identity, compaction and coordinates.** Per-tree numbering yields one
+   `(tree,coord)` key per incident tree; [`_merge_intertree_nodes!`](@ref
+   Ferrite.AMR._merge_intertree_nodes!) canonicalises shared-boundary keys onto a single owner.
+   The provisional ids are then compacted to a dense range and each owner's physical coordinate
+   is computed once with the tree's ``Q_1`` geometry map.
+4. **Cells and constraints.** [`_build_cells`](@ref Ferrite.AMR._build_cells) maps connectivity
+   to final ids, the hanging map is translated to final ids, and
+   [`reconstruct_facetsets`](@ref Ferrite.AMR.reconstruct_facetsets) transfers the boundary sets.
+
+```@docs
+Ferrite.AMR.creategrid
+Ferrite.AMR.iterate_points
+Ferrite.AMR.split_bounds
+Ferrite.AMR._merge_intertree_nodes!
+Ferrite.AMR._build_cells
+Ferrite.AMR.reconstruct_facetsets
+```
+
+### Physical coordinates
+
+Node identity is purely integer; physical positions enter only here. Each macro element (tree) is
+an isoparametric ``Q_1`` cell, so an octree coordinate is mapped to physical space by interpolating
+the tree's corner nodes with the bi-/trilinear Lagrange shape functions.
+
+```@docs
+Ferrite.AMR._treecorners
+Ferrite.AMR._interp_treepoint
+```
+
+### Hanging nodes
+
+A hanging node is a node that exists on the fine side of a non-conforming interface but is not a
+vertex on the coarse side. On a 2:1-balanced forest these are exactly the **centre of a coarse
+face** (bordering a refined neighbour) and the **midpoints of that face's edges**.
+[`_emit_coarse_face_int!`](@ref Ferrite.AMR._emit_coarse_face_int!) records them, keyed on the
+integer `(tree, coord)` of the hanging node, with the value listing its master corners:
+
+```
+3D face fc = (c1,c2,c3,c4) in z-order — ● corner (master), ◆ face centre, ○ edge midpoint:
+
+    c3 ●━━━━━━━○━━━━━━━● c4      emitted:
+       ┃      m34      ┃          ◆  hang[c  ] = {c1,c2,c3,c4}
+       ┃               ┃          ○  hang[m12] = {c1,c2}
+    m13○       ◆c      ○m24       ○  hang[m34] = {c3,c4}
+       ┃   (centre)    ┃          ○  hang[m13] = {c1,c3}
+       ┃      m12      ┃          ○  hang[m24] = {c2,c4}
+    c1 ●━━━━━━━○━━━━━━━● c2
+```
+
+The diagonals `c1–c4` and `c2–c3` differ in *two* coordinates and are skipped — they are not
+octant edges. In 2D a face *is* an edge, so the face centre and the single edge midpoint coincide
+into one constraint with two masters.
+
+#### Why a face descent captures hanging *edges*
+
+It is not obvious that visiting only **faces** finds every hanging **edge** node. The argument:
+the descent runs over *every* coarse face bordering a refined neighbour and emits that face's four
+edge-midpoints, so a hanging edge-midpoint is captured as long as its edge is an edge of *some*
+emitted face — and it always is.
+
+Look down a coarse edge `E` (a point `⊙` in the cross-section); four cells surround it, and `E` is
+an edge of all four faces meeting at `E`. The midpoint `m = center(E)` becomes a node only if some
+surrounding cell is refined. The coarse owner `C` (level ℓ) and at least one refined cell
+(level ℓ+1) both sit around `E`, so going around the four-cell cycle a coarse cell must be
+face-adjacent to a refined one — that shared face is coarse-bordering-refined and has `E` as an
+edge, so the descent emits `m`. The subtle case is a refined cell *diagonal* to `C` (sharing only
+`E`, not a face):
+
+```
+    Q4 │ Q3      C|Q2 and C|Q4 are coarse–coarse (conforming), so C's own faces miss E.
+    ℓ  │ ℓ+1     But Q2|Q3 and Q4|Q3 are coarse(ℓ)–refined(ℓ+1): those faces are emitted,
+    ───⊙───      and E is one of their edges → m is still emitted. ✓
+    C  │ Q2
+   (ℓ) │ ℓ
+```
+
+2:1 balance is what makes this exhaustive: it caps the level jump at one, so hanging nodes are
+*always* midpoints (never ¼/¾ points from a two-level jump) and the finest cell around any edge is
+at most one level finer. Hence emitting face-centres + edge-midpoints over all coarse faces
+bordering refined neighbours captures every hanging node — no separate edge descent is needed.
+
+```@docs
+Ferrite.AMR._emit_coarse_face_int!
+Ferrite.AMR._iter_interface!
+Ferrite.AMR._iterate_interface_hanging!
+```
+
+### Conformity constraints
+
+The hanging-node map produced by `creategrid` is turned into affine constraints by adding a
+`ConformityConstraint` to a `ConstraintHandler`. For linear (``Q_1``) interpolations each hanging
+node is constrained to the **average** of its masters — weight `1/length(masters)`, i.e. `1/2` for
+an edge midpoint and `1/4` for a 3D face centre — which is exactly the value that makes the field
+continuous across the non-conforming interface.
+
+```@docs
+Ferrite.AMR.ConformityConstraint
+```
