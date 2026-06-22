@@ -215,6 +215,23 @@ Ferrite.AMR.transform_facet_remote
 
 despite being never used in the code base so far.
 
+### Balancing
+
+Before a forest can be materialised into a grid it must satisfy the **2:1 balance** condition:
+no two leaves sharing a face, edge or corner may differ by more than one refinement level. This
+is what guarantees that hanging nodes only ever appear at edge midpoints / face centres (see
+[Hanging nodes](@ref) below). [`balanceforest!`](@ref Ferrite.AMR.balanceforest!) enforces it,
+balancing each tree internally and propagating across tree boundaries for the leaves that touch
+them.
+
+```@docs
+Ferrite.AMR.balanceforest!
+Ferrite.AMR._balance_leaf!
+Ferrite.AMR._touches_tree_boundary
+Ferrite.AMR.inside
+Ferrite.AMR._maximum_size
+```
+
 ## From a forest to a `NonConformingGrid`
 
 The operations above manipulate the forest of octrees (refine, coarsen, balance, neighbour
@@ -304,6 +321,7 @@ creategrid(forest)
 Ferrite.AMR.creategrid
 Ferrite.AMR.iterate_points
 Ferrite.AMR.split_bounds
+Ferrite.AMR._lnodes_number_leaf!
 Ferrite.AMR._merge_intertree_nodes!
 Ferrite.AMR._build_cells
 Ferrite.AMR.reconstruct_facetsets
@@ -376,6 +394,8 @@ bordering refined neighbours captures every hanging node — no separate edge de
 Ferrite.AMR._emit_coarse_face_int!
 Ferrite.AMR._iter_interface!
 Ferrite.AMR._iterate_interface_hanging!
+Ferrite.AMR.center
+Ferrite.AMR.contains_facet
 ```
 
 ### Conformity constraints

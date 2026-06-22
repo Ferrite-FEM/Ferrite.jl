@@ -976,8 +976,13 @@ function balance_edge(forest, k′, e′, o, s)
     end
 end
 
-# True iff octant `o` has a face on the tree boundary. Only such leaves can have
-# out-of-tree neighbours, so balanceforest! skips the interior leaves (the majority).
+"""
+    _touches_tree_boundary(o::OctantBWG{dim}, b) -> Bool
+
+`true` iff octant `o` has a face on its tree's boundary (some axis anchor at `0` or at the root
+extent `2^b`). Only such leaves can have out-of-tree neighbours, so [`balanceforest!`](@ref) uses
+this to skip the interior leaves (the majority) when balancing across tree interfaces.
+"""
 function _touches_tree_boundary(o::OctantBWG{dim}, b) where {dim}
     h = _compute_size(b, o.l); m = _maximum_size(b)
     return any(d -> o.xyz[d] == 0 || o.xyz[d] + h == m, 1:dim)
