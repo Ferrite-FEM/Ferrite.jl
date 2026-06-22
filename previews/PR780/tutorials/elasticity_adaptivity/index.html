@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/><title>Adaptive Linear Elasticity · Ferrite.jl</title><meta name="title" content="Adaptive Linear Elasticity · Ferrite.jl"/><meta property="og:title" content="Adaptive Linear Elasticity · Ferrite.jl"/><meta property="twitter:title" content="Adaptive Linear Elasticity · Ferrite.jl"/><meta name="description" content="Documentation for Ferrite.jl."/><meta property="og:description" content="Documentation for Ferrite.jl."/><meta property="twitter:description" content="Documentation for Ferrite.jl."/><meta property="og:url" content="https://ferrite-fem.github.io/Ferrite.jl/stable/tutorials/elasticity_adaptivity/"/><meta property="twitter:url" content="https://ferrite-fem.github.io/Ferrite.jl/stable/tutorials/elasticity_adaptivity/"/><link rel="canonical" href="https://ferrite-fem.github.io/Ferrite.jl/stable/tutorials/elasticity_adaptivity/"/><script data-outdated-warner src="../../assets/warner.js"></script><link href="https://cdnjs.cloudflare.com/ajax/libs/lato-font/3.0.0/css/lato-font.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/juliamono/0.050/juliamono.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/fontawesome.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/solid.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/brands.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.8/katex.min.css" rel="stylesheet" type="text/css"/><script>documenterBaseURL="../.."</script><script src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.6/require.min.js" data-main="../../assets/documenter.js"></script><script src="../../search_index.js"></script><script src="../../siteinfo.js"></script><script src="../../../versions.js"></script><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/catppuccin-mocha.css" data-theme-name="catppuccin-mocha"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/catppuccin-macchiato.css" data-theme-name="catppuccin-macchiato"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/catppuccin-frappe.css" data-theme-name="catppuccin-frappe"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/catppuccin-latte.css" data-theme-name="catppuccin-latte"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/documenter-dark.css" data-theme-name="documenter-dark" data-theme-primary-dark/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/documenter-light.css" data-theme-name="documenter-light" data-theme-primary/><script src="../../assets/themeswap.js"></script><link href="../../assets/custom.css" rel="stylesheet" type="text/css"/><link href="../../assets/citations.css" rel="stylesheet" type="text/css"/><link href="../../assets/favicon.ico" rel="icon" type="image/x-icon"/></head><body><div id="documenter"><nav class="docs-sidebar"><a class="docs-logo" href="../../"><img src="../../assets/logo.svg" alt="Ferrite.jl logo"/></a><div class="docs-package-name"><span class="docs-autofit"><a href="../../">Ferrite.jl</a></span></div><button class="docs-search-query input is-rounded is-small is-clickable my-2 mx-auto py-1 px-2" id="documenter-search-query">Search docs (Ctrl + /)</button><ul class="docs-menu"><li><a class="tocitem" href="../../">Home</a></li><li><input class="collapse-toggle" id="menuitem-3" type="checkbox"/><label class="tocitem" for="menuitem-3"><span class="docs-label">Tutorials</span><i class="docs-chevron"></i></label><ul class="collapsed"><li><a class="tocitem" href="../">Tutorials overview</a></li><li><a class="tocitem" href="../heat_equation/">Heat equation</a></li><li><a class="tocitem" href="../linear_elasticity/">Linear elasticity</a></li><li><a class="tocitem" href="../incompressible_elasticity/">Incompressible elasticity</a></li><li><a class="tocitem" href="../hyperelasticity/">Hyperelasticity</a></li><li><a class="tocitem" href="../plasticity/">Von Mises plasticity</a></li><li><a class="tocitem" href="../transient_heat_equation/">Transient heat equation</a></li><li><a class="tocitem" href="../computational_homogenization/">Computational homogenization</a></li><li><a class="tocitem" href="../stokes-flow/">Stokes flow</a></li><li><a class="tocitem" href="../porous_media/">Porous media</a></li><li><a class="tocitem" href="../ns_vs_diffeq/">Incompressible Navier-Stokes equations via DifferentialEquations.jl</a></li><li><a class="tocitem" href="../reactive_surface/">Reactive surface</a></li><li><a class="tocitem" href="../linear_shell/">Linear shell</a></li><li><a class="tocitem" href="../dg_heat_equation/">Discontinuous Galerkin heat equation</a></li></ul></li><li><input class="collapse-toggle" id="menuitem-4" type="checkbox"/><label class="tocitem" for="menuitem-4"><span class="docs-label">Topic guides</span><i class="docs-chevron"></i></label><ul class="collapsed"><li><a class="tocitem" href="../../topics/">Topic guide overview</a></li><li><a class="tocitem" href="../../topics/fe_intro/">Introduction to FEM</a></li><li><a class="tocitem" href="../../topics/reference_shapes/">Reference shapes</a></li><li><a class="tocitem" href="../../topics/FEValues/">FEValues</a></li><li><a class="tocitem" href="../../topics/degrees_of_freedom/">Degrees of freedom</a></li><li><a class="tocitem" href="../../topics/sparse_matrix/">Sparsity pattern and sparse matrices</a></li><li><a class="tocitem" href="../../topics/assembly/">Assembly</a></li><li><a class="tocitem" href="../../topics/boundary_conditions/">Boundary and initial conditions</a></li><li><a class="tocitem" href="../../topics/constraints/">Affine constraints</a></li><li><a class="tocitem" href="../../topics/grid/">Grid</a></li><li><a class="tocitem" href="../../topics/export/">Export</a></li><li><a class="tocitem" href="../../topics/amr/">Adaptive Mesh Refinement</a></li></ul></li><li><input class="collapse-toggle" id="menuitem-5" type="checkbox"/><label class="tocitem" for="menuitem-5"><span class="docs-label">API reference</span><i class="docs-chevron"></i></label><ul class="collapsed"><li><a class="tocitem" href="../../reference/">Reference overview</a></li><li><a class="tocitem" href="../../reference/quadrature/">Quadrature</a></li><li><a class="tocitem" href="../../reference/interpolations/">Interpolation</a></li><li><a class="tocitem" href="../../reference/fevalues/">FEValues</a></li><li><a class="tocitem" href="../../reference/dofhandler/">Degrees of freedom</a></li><li><a class="tocitem" href="../../reference/sparsity_pattern/">Sparsity pattern and sparse matrices</a></li><li><a class="tocitem" href="../../reference/assembly/">Assembly</a></li><li><a class="tocitem" href="../../reference/boundary_conditions/">Boundary conditions</a></li><li><a class="tocitem" href="../../reference/grid/">Grid &amp; AbstractGrid</a></li><li><a class="tocitem" href="../../reference/export/">Postprocessing</a></li><li><a class="tocitem" href="../../reference/utils/">Development utility functions</a></li></ul></li><li><input class="collapse-toggle" id="menuitem-6" type="checkbox"/><label class="tocitem" for="menuitem-6"><span class="docs-label">How-to guides</span><i class="docs-chevron"></i></label><ul class="collapsed"><li><a class="tocitem" href="../../howto/">How-to guide overview</a></li><li><a class="tocitem" href="../../howto/postprocessing/">Post processing and visualization</a></li><li><a class="tocitem" href="../../howto/threaded_assembly/">Multi-threaded assembly</a></li></ul></li><br><li><a class="tocitem" href="../../gallery/">Code gallery</a></li><li><a class="tocitem" href="../../devdocs/">Developer documentation</a></li><li><a class="tocitem" href="../../cited-literature/">Cited literature</a></li><li><a class="tocitem" href="../../ferritepapers/">Papers using Ferrite</a></li></ul><div class="docs-version-selector field has-addons"><div class="control"><span class="docs-label button is-static is-size-7">Version</span></div><div class="docs-selector control is-expanded"><div class="select is-fullwidth is-size-7"><select id="documenter-version-selector"></select></div></div></div></nav><div class="docs-main"><header class="docs-navbar"><a class="docs-sidebar-button docs-navbar-link fa-solid fa-bars is-hidden-desktop" id="documenter-sidebar-button" href="#"></a><nav class="breadcrumb"><ul class="is-hidden-mobile"><li class="is-active"><a href>Adaptive Linear Elasticity</a></li></ul><ul class="is-hidden-tablet"><li class="is-active"><a href>Adaptive Linear Elasticity</a></li></ul></nav><div class="docs-right"><a class="docs-navbar-link" href="https://github.com/Ferrite-FEM/Ferrite.jl" title="View the repository on GitHub"><span class="docs-icon fa-brands"></span><span class="docs-label is-hidden-touch">GitHub</span></a><a class="docs-navbar-link" href="https://github.com/Ferrite-FEM/Ferrite.jl/blob/master/docs/src/literate-tutorials/elasticity_adaptivity.jl" title="Edit source on GitHub"><span class="docs-icon fa-solid"></span></a><a class="docs-settings-button docs-navbar-link fa-solid fa-gear" id="documenter-settings-button" href="#" title="Settings"></a><a class="docs-article-toggle-button fa-solid fa-chevron-up" id="documenter-article-toggle-button" href="javascript:;" title="Collapse all docstrings"></a></div></header><article class="content" id="documenter-page"><h1 id="tutorial-elasticity-adaptivity"><a class="docs-heading-anchor" href="#tutorial-elasticity-adaptivity">Adaptive Linear Elasticity</a><a id="tutorial-elasticity-adaptivity-1"></a><a class="docs-heading-anchor-permalink" href="#tutorial-elasticity-adaptivity" title="Permalink"></a></h1><h2 id="Introduction"><a class="docs-heading-anchor" href="#Introduction">Introduction</a><a id="Introduction-1"></a><a class="docs-heading-anchor-permalink" href="#Introduction" title="Permalink"></a></h2><p>This tutorial demonstrates adaptive mesh refinement (AMR) for 2D linear elasticity using Ferrite&#39;s <code>ForestBWG</code> — a p4est-style forest-of-octrees data structure. In contrast to the <a href="../heat_adaptivity/#tutorial-heat-adaptivity">heat equation AMR tutorial</a>, the mesh here is <em>imported from an Abaqus input file</em> with <a href="https://github.com/Ferrite-FEM/FerriteMeshParser.jl">FerriteMeshParser</a> rather than generated, showing that the adaptive machinery works on arbitrary quadrilateral meshes.</p><p>The domain <code>case1.inp</code> is the classic <strong>L-shape</strong>: the square <span>$[-1,1]^2$</span> with the upper-right quadrant <span>$[0,1]\times[0,1]$</span> removed, leaving a re-entrant corner at the origin <span>$(0,0)$</span>. That corner produces a stress singularity when the body is loaded — exactly the kind of localized feature that adaptive refinement resolves efficiently.</p><p>We clamp the left edge, pull the (lower) right edge with a horizontal traction, and drive refinement with a facet-jump (Kelly-type) error estimator combined with Dörfler (bulk) marking. Hanging nodes introduced by refinement are made conforming with a <code>ConformityConstraint</code>.</p><h2 id="Commented-Program"><a class="docs-heading-anchor" href="#Commented-Program">Commented Program</a><a id="Commented-Program-1"></a><a class="docs-heading-anchor-permalink" href="#Commented-Program" title="Permalink"></a></h2><p>First we load the required packages.</p><pre><code class="language-julia hljs">using Ferrite, FerriteMeshParser, Tensors, SparseArrays, WriteVTK, Downloads</code></pre><h3 id="Mesh-import"><a class="docs-heading-anchor" href="#Mesh-import">Mesh import</a><a id="Mesh-import-1"></a><a class="docs-heading-anchor-permalink" href="#Mesh-import" title="Permalink"></a></h3><p>We read the Abaqus mesh with FerriteMeshParser&#39;s <code>get_ferrite_grid</code>. The file uses <code>CPS4R</code> (4-node plane-stress quadrilaterals), which are mapped to Ferrite <code>Quadrilateral</code> cells — exactly the cell type required by <code>ForestBWG</code>. The mesh is fetched from the Ferrite asset storage if it is not available locally.</p><p>The input file does not define any node or element sets, so we attach the boundary facet sets we need geometrically: the straight left edge <span>$x=-1$</span> and the straight lower-right edge <span>$x=+1$</span>. These sets are carried through refinement by <code>creategrid</code>, so they remain valid on every adapted mesh.</p><pre><code class="language-julia hljs">function setup_grid()
+    gridfile = &quot;case1.inp&quot;
+    isfile(gridfile) || Downloads.download(Ferrite.asset_url(gridfile), gridfile)
+    grid = get_ferrite_grid(gridfile)
+    addfacetset!(grid, &quot;left&quot;, x -&gt; x[1] ≈ -1.0)
+    addfacetset!(grid, &quot;right&quot;, x -&gt; x[1] ≈ 1.0)
+    return grid
+end</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">setup_grid (generic function with 1 method)</code></pre><p>We wrap the imported grid in a <code>ForestBWG</code> that allows up to 7 levels of refinement. Each original quadrilateral becomes the root of an octree and is subdivided in reference space, with physical coordinates obtained by bilinear interpolation of the original element corners.</p><pre><code class="language-julia hljs">base_grid = setup_grid()
+forest = ForestBWG(base_grid, 20)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">ForestBWG with 
+   75 cells
+   75 trees
+</code></pre><h3 id="Material-behavior"><a class="docs-heading-anchor" href="#Material-behavior">Material behavior</a><a id="Material-behavior-1"></a><a class="docs-heading-anchor-permalink" href="#Material-behavior" title="Permalink"></a></h3><p>We use plane-stress linear isotropic elasticity (matching the <code>CPS4R</code> element type). Starting from Young&#39;s modulus <span>$E$</span> and Poisson&#39;s ratio <span>$\nu$</span>, the plane-stress stiffness in Voigt form is converted to a 4th-order tensor.</p><pre><code class="language-julia hljs">const Emod = 200.0e3 # Young&#39;s modulus [MPa]
+const ν = 0.3        # Poisson&#39;s ratio [-]
+const Cmat = let
+    C_voigt = Emod / (1 - ν^2) * [1.0 ν 0.0; ν 1.0 0.0; 0.0 0.0 (1 - ν) / 2]
+    fromvoigt(SymmetricTensor{4, 2}, C_voigt)
+end</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">2×2×2×2 SymmetricTensor{4, 2, Float64, 9}:
+[:, :, 1, 1] =
+ 2.1978e5      0.0
+ 0.0       65934.1
+
+[:, :, 2, 1] =
+     0.0  76923.1
+ 76923.1      0.0
+
+[:, :, 1, 2] =
+     0.0  76923.1
+ 76923.1      0.0
+
+[:, :, 2, 2] =
+ 65934.1  0.0
+     0.0  2.1978e5</code></pre><p>The applied traction on the right edge (a horizontal pull).</p><pre><code class="language-julia hljs">traction(x) = Vec{2}((1.0e3, 0.0))</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">traction (generic function with 1 method)</code></pre><h3 id="Element-assembly"><a class="docs-heading-anchor" href="#Element-assembly">Element assembly</a><a id="Element-assembly-1"></a><a class="docs-heading-anchor-permalink" href="#Element-assembly" title="Permalink"></a></h3><p>Standard small-strain elasticity stiffness, <span>$k_{ij} = \int_K \nabla N_i : \mathsf{C} : \nabla^\mathrm{sym} N_j \, \mathrm{d}\Omega$</span>.</p><pre><code class="language-julia hljs">function assemble_cell!(ke, cellvalues, C)
+    fill!(ke, 0.0)
+    for q_point in 1:getnquadpoints(cellvalues)
+        dΩ = getdetJdV(cellvalues, q_point)
+        for i in 1:getnbasefunctions(cellvalues)
+            ∇Nᵢ = shape_gradient(cellvalues, q_point, i)
+            for j in 1:getnbasefunctions(cellvalues)
+                ∇ˢʸᵐNⱼ = shape_symmetric_gradient(cellvalues, q_point, j)
+                ke[i, j] += (∇Nᵢ ⊡ C ⊡ ∇ˢʸᵐNⱼ) * dΩ
+            end
+        end
+    end
+    return ke
+end</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">assemble_cell! (generic function with 1 method)</code></pre><h3 id="Global-assembly"><a class="docs-heading-anchor" href="#Global-assembly">Global assembly</a><a id="Global-assembly-1"></a><a class="docs-heading-anchor-permalink" href="#Global-assembly" title="Permalink"></a></h3><pre><code class="language-julia hljs">function assemble_global!(K, dh, cellvalues, C)
+    n_basefuncs = getnbasefunctions(cellvalues)
+    ke = zeros(n_basefuncs, n_basefuncs)
+    assembler = start_assemble(K)
+    for cell in CellIterator(dh)
+        reinit!(cellvalues, cell)
+        assemble_cell!(ke, cellvalues, C)
+        assemble!(assembler, celldofs(cell), ke)
+    end
+    return K
+end</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">assemble_global! (generic function with 1 method)</code></pre><h3 id="External-(Neumann)-forces"><a class="docs-heading-anchor" href="#External-(Neumann)-forces">External (Neumann) forces</a><a id="External-(Neumann)-forces-1"></a><a class="docs-heading-anchor-permalink" href="#External-(Neumann)-forces" title="Permalink"></a></h3><p>The traction is integrated over the loaded facet set.</p><pre><code class="language-julia hljs">function assemble_external_forces!(f_ext, dh, facetset, facetvalues, prescribed_traction)
+    fe_ext = zeros(getnbasefunctions(facetvalues))
+    for facet in FacetIterator(dh, facetset)
+        reinit!(facetvalues, facet)
+        fill!(fe_ext, 0.0)
+        coords = getcoordinates(facet)
+        for qp in 1:getnquadpoints(facetvalues)
+            x = spatial_coordinate(facetvalues, qp, coords)
+            tₚ = prescribed_traction(x)
+            dΓ = getdetJdV(facetvalues, qp)
+            for i in 1:getnbasefunctions(facetvalues)
+                Nᵢ = shape_value(facetvalues, qp, i)
+                fe_ext[i] += tₚ ⋅ Nᵢ * dΓ
+            end
+        end
+        assemble!(f_ext, celldofs(facet), fe_ext)
+    end
+    return f_ext
+end</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">assemble_external_forces! (generic function with 1 method)</code></pre><h3 id="Solve-on-a-single-grid"><a class="docs-heading-anchor" href="#Solve-on-a-single-grid">Solve on a single grid</a><a id="Solve-on-a-single-grid-1"></a><a class="docs-heading-anchor-permalink" href="#Solve-on-a-single-grid" title="Permalink"></a></h3><p>Given a (non-conforming) grid we set up the FE problem with vector-valued bilinear quadrilateral elements: clamp the left edge, apply the traction on the right edge, and add a <code>ConformityConstraint</code> so the displacement is continuous across hanging nodes.</p><pre><code class="language-julia hljs">function solve(grid, C)
+    dim = 2
+    ip = Lagrange{RefQuadrilateral, 1}()^dim
+    qr = QuadratureRule{RefQuadrilateral}(2)
+    qr_facet = FacetQuadratureRule{RefQuadrilateral}(2)
+    cellvalues = CellValues(qr, ip)
+    facetvalues = FacetValues(qr_facet, ip)
+
+    dh = DofHandler(grid)
+    add!(dh, :u, ip)
+    close!(dh)
+
+    ch = ConstraintHandler(dh)
+    add!(ch, Dirichlet(:u, getfacetset(grid, &quot;left&quot;), (x, t) -&gt; 0.0, 1))
+    add!(ch, Dirichlet(:u, getfacetset(grid, &quot;left&quot;), (x, t) -&gt; 0.0, 2))
+    add!(ch, ConformityConstraint(:u))
+    close!(ch)
+
+    K = allocate_matrix(dh, ch)
+    f = zeros(ndofs(dh))
+    assemble_global!(K, dh, cellvalues, C)
+    assemble_external_forces!(f, dh, getfacetset(grid, &quot;right&quot;), facetvalues, traction)
+    apply!(K, f, ch)
+    u = K \ f
+    apply!(u, ch)
+    return u, dh, ch, cellvalues, qr
+end</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">solve (generic function with 1 method)</code></pre><h3 id="Facet-jump-(Kelly-type)-error-estimator"><a class="docs-heading-anchor" href="#Facet-jump-(Kelly-type)-error-estimator">Facet-jump (Kelly-type) error estimator</a><a id="Facet-jump-(Kelly-type)-error-estimator-1"></a><a class="docs-heading-anchor-permalink" href="#Facet-jump-(Kelly-type)-error-estimator" title="Permalink"></a></h3><p>A recovery-based (Zienkiewicz-Zhu) estimator is a poor fit here: it assumes flux superconvergence, which fails at the hanging-node interfaces created by octree refinement, so the indicator lights up along refinement fronts and <em>spreads</em> refinement instead of localizing it (the total estimate then grows with each step).</p><p>Instead we use a facet-jump (Kelly-type) estimator: the inter-element jump of the normal stress is the natural residual of an elasticity solution and vanishes as the mesh resolves the field. Per cell,</p><p class="math-container">\[ \eta_K^2 = \tfrac{1}{2}\sum_{F \subset \partial K} h_F \int_F \|[\![\sigma\cdot n]\!]\|^2 \, \mathrm{d}\Gamma ,\]</p><p>where <span>$[\![\sigma\cdot n]\!]$</span> is the traction jump across facet <span>$F$</span>. We use the cell-averaged stress <span>$\bar\sigma_K$</span> (piecewise constant), so each facet contributes <span>$|F|\,h_F\,\|(\bar\sigma_K - \bar\sigma_{K&#39;})\cdot n\|^2$</span> with <span>$h_F = |F|$</span>.</p><div class="admonition is-info" id="Why-not-ExclusiveTopology?-c12307cecbb72096"><header class="admonition-header">Why not `ExclusiveTopology`?<a class="admonition-anchor" href="#Why-not-ExclusiveTopology?-c12307cecbb72096" title="Permalink"></a></header><div class="admonition-body"><p>The facet neighbours must be the <em>true</em> faces of the refined forest, including coarse↔fine (hanging) and across-tree faces. <code>ExclusiveTopology</code> only knows the macro (root) mesh and would give a wrong estimator. We instead read the adjacency straight off the materialized grid: <code>creategrid</code> already merges shared nodes across trees, so conforming faces appear as shared node-pairs, and each hanging face is linked to its coarse neighbour through the hanging node&#39;s master nodes in <code>grid.conformity_info</code>.</p></div></div><pre><code class="language-julia hljs">function estimate_error(grid, dh, u, cv, C)
+    nc = getncells(grid)
+    cells = getcells(grid)
+    X = [get_node_coordinate(n) for n in getnodes(grid)]
+
+    # Cell-averaged stress σ̄_K.
+    σ̄ = Vector{SymmetricTensor{2, 2, Float64, 3}}(undef, nc)
+    for cell in CellIterator(dh)
+        reinit!(cv, cell)
+        s = zero(SymmetricTensor{2, 2})
+        vol = 0.0
+        for q_point in 1:getnquadpoints(cv)
+            dΩ = getdetJdV(cv, q_point)
+            s += (C ⊡ function_symmetric_gradient(cv, q_point, u, celldofs(cell))) * dΩ
+            vol += dΩ
+        end
+        σ̄[cellid(cell)] = s / vol
+    end
+
+    # Map every facet (as a sorted node-id pair) to the cell(s) that own it.
+    # TODO: this facet enumeration is hard-coded for 2D linear quadrilaterals — a facet
+    # is the node pair `(nids[f], nids[f+1])`. It does not generalize: in 3D a facet is a
+    # 4-node face, and higher-order geometric ansätze put extra nodes on each facet, so
+    # the &quot;sorted node tuple&quot; key would differ. This ownership/adjacency query (the true
+    # coarse↔fine and cross-tree facet neighbours of the refined forest) should instead
+    # be provided by `ForestBWG` itself, which knows the leaf topology for any dimension
+    # and ansatz, rather than being reconstructed here from the materialized grid.
+    facet_owner = Dict{Tuple{Int, Int}, Vector{Int}}()
+    for c in 1:nc
+        nids = Ferrite.get_node_ids(cells[c])
+        nf = length(nids)
+        for f in 1:nf
+            key = minmax(nids[f], nids[mod1(f + 1, nf)])
+            push!(get!(() -&gt; Int[], facet_owner, key), c)
+        end
+    end
+
+    # Accumulate the squared traction jump over each interior facet.
+    error_arr = zeros(nc)
+    hang = grid.conformity_info
+    function add_jump!(cA, cB, na, nb)
+        L = norm(X[nb] - X[na])
+        t = (X[nb] - X[na]) / L
+        n = Vec{2}((t[2], -t[1]))                      # facet normal
+        jump = (σ̄[cA] - σ̄[cB]) ⋅ n
+        contrib = L^2 * (jump ⋅ jump)                  # h_F * |F| * ‖[[σ·n]]‖²
+        error_arr[cA] += 0.5 * contrib
+        return error_arr[cB] += 0.5 * contrib
+    end
+    for (key, owners) in facet_owner
+        if length(owners) == 2
+            # Conforming face (possibly across trees): both cells share this facet.
+            add_jump!(owners[1], owners[2], key[1], key[2])
+        elseif length(owners) == 1
+            # A single owner is either a domain-boundary facet or the fine side of a
+            # hanging face. In the latter case one endpoint is a hanging node whose
+            # master pair spans the coarse facet → look up the coarse cell.
+            a, b = key
+            for (hn, oth) in ((a, b), (b, a))
+                if haskey(hang, hn) &amp;&amp; length(hang[hn]) == 2 &amp;&amp; oth in hang[hn]
+                    coarse_key = minmax(hang[hn][1], hang[hn][2])
+                    haskey(facet_owner, coarse_key) &amp;&amp; add_jump!(owners[1], facet_owner[coarse_key][1], a, b)
+                    break
+                end
+            end
+        end
+    end
+    return error_arr
+end</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">estimate_error (generic function with 1 method)</code></pre><h3 id="Dörfler-marking"><a class="docs-heading-anchor" href="#Dörfler-marking">Dörfler marking</a><a id="Dörfler-marking-1"></a><a class="docs-heading-anchor-permalink" href="#Dörfler-marking" title="Permalink"></a></h3><p>Sort cells by decreasing error and mark the smallest set whose cumulative error accounts for a fraction <span>$\theta$</span> of the total.</p><pre><code class="language-julia hljs">function dorfler_mark(error_arr, θ)
+    cells_to_refine = Int[]
+    total = sum(error_arr)
+    total &gt; 0 || return cells_to_refine, total
+    perm = sortperm(error_arr; rev = true)
+    target = θ * total
+    acc = 0.0
+    for idx in perm
+        push!(cells_to_refine, idx)
+        acc += error_arr[idx]
+        acc &gt;= target &amp;&amp; break
+    end
+    return cells_to_refine, total
+end</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">dorfler_mark (generic function with 1 method)</code></pre><h3 id="Adaptive-solve-loop"><a class="docs-heading-anchor" href="#Adaptive-solve-loop">Adaptive solve loop</a><a id="Adaptive-solve-loop-1"></a><a class="docs-heading-anchor-permalink" href="#Adaptive-solve-loop" title="Permalink"></a></h3><p>Repeat: materialize the forest, solve, estimate, mark, refine, and enforce 2:1 balance. <code>nsteps</code> is kept comfortably below the forest&#39;s maximum refinement level <code>b</code> (set when constructing the <code>ForestBWG</code>): a cell may not be refined past level <code>b</code>, so the corner — refined at almost every step — must not reach it.</p><pre><code class="language-julia hljs">function solve_adaptive(initial_forest; nsteps = 4, θ = 0.3)
+    forest = deepcopy(initial_forest)
+    pvd = paraview_collection(&quot;elasticity_amr&quot;)
+    for i in 1:nsteps
+        # Materialize the forest into a NonConformingGrid and solve.
+        grid = Ferrite.creategrid(forest)
+        u, dh, ch, cv, qr = solve(grid, Cmat)
+
+        # Estimate the error and mark cells with Dörfler marking.
+        error_arr = estimate_error(grid, dh, u, cv, Cmat)
+        cells_to_refine, total = dorfler_mark(error_arr, θ)
+        @info &quot;AMR step $i: $(getncells(grid)) cells, $(length(cells_to_refine)) marked, total error = $total&quot;
+
+        # Export displacement and the cell-wise error indicator.
+        VTKGridFile(&quot;elasticity_amr-$i&quot;, dh) do vtk
+            write_solution(vtk, dh, u)
+            write_cell_data(vtk, error_arr, &quot;error&quot;)
+            pvd[i] = vtk
+        end
+
+        isempty(cells_to_refine) &amp;&amp; break
+
+        # Refine the marked cells and restore 2:1 balance across the forest.
+        Ferrite.refine!(forest, cells_to_refine)
+        Ferrite.balanceforest!(forest)
+    end
+    vtk_save(pvd)
+    return forest
+end</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">solve_adaptive (generic function with 1 method)</code></pre><h3 id="Run"><a class="docs-heading-anchor" href="#Run">Run</a><a id="Run-1"></a><a class="docs-heading-anchor-permalink" href="#Run" title="Permalink"></a></h3><pre><code class="language-julia hljs">solve_adaptive(forest)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">ForestBWG with 
+   147 cells
+   75 trees
+</code></pre><hr/><p><em>This page was generated using <a href="https://github.com/fredrikekre/Literate.jl">Literate.jl</a>.</em></p></article><nav class="docs-footer"><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option><option value="catppuccin-latte">catppuccin-latte</option><option value="catppuccin-frappe">catppuccin-frappe</option><option value="catppuccin-macchiato">catppuccin-macchiato</option><option value="catppuccin-mocha">catppuccin-mocha</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.17.0 on <span class="colophon-date" title="Monday 22 June 2026 09:03">Monday 22 June 2026</span>. Using Julia version 1.12.6.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
