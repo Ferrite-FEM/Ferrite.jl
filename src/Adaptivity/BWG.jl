@@ -1951,6 +1951,8 @@ function Base.show(io::IO, ::MIME"text/plain", o::OctantBWG{2, N, M}) where {N, 
     return println(io, "   xy = $x,$y")
 end
 
+# Cold-path error so the hot `_compute_size` stays tiny and inlinable.
+@noinline _throw_octant_level(l, b) = throw(DomainError(l, "octant level $l exceeds the tree's maximum refinement level b = $b; keep refinement below level b (set when constructing `ForestBWG(grid, b)`)"))
 """
     _compute_size(b::Integer, l::Integer) -> Int
 
@@ -1961,8 +1963,6 @@ Edge length, in integer octree coordinates, of a level-`l` octant in a tree usin
 A level `l > b` is invalid (it would need a sub-atom octant) and throws a `DomainError` — this is
 the guard against refining or iterating past the tree's maximum refinement level `b`.
 """
-# Cold-path error so the hot `_compute_size` stays tiny and inlinable.
-@noinline _throw_octant_level(l, b) = throw(DomainError(l, "octant level $l exceeds the tree's maximum refinement level b = $b; keep refinement below level b (set when constructing `ForestBWG(grid, b)`)"))
 function _compute_size(b::Integer, l::Integer)
     l <= b || _throw_octant_level(l, b)
     return 1 << (b - l)
