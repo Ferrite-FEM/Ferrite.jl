@@ -180,11 +180,11 @@ end
         # ... and then pray to the gods of convergence.
         i = 0
         while L2norm > 1.0e-3 && i < 8
-            grid_transfered = Ferrite.creategrid(adaptive_grid)
-            dh, ch, cellvalues = ConvergenceTestHelper.setup_poisson_problem(grid_transfered, interpolation, interpolation_geo, qr, N)
+            grid_transferred = Ferrite.creategrid(adaptive_grid)
+            dh, ch, cellvalues = ConvergenceTestHelper.setup_poisson_problem(grid_transferred, interpolation, interpolation_geo, qr, N)
             u = ConvergenceTestHelper.solve(dh, ch, cellvalues)
             # q_gp = compute_fluxes(cellvalues, dh, u);
-            # projector = L2Projector(interpolation, grid_transfered);
+            # projector = L2Projector(interpolation, grid_transferred);
             # q_projected = project(projector, q_gp, qr);
             L2norm, _ = ConvergenceTestHelper.check_and_compute_convergence(dh, u, cellvalues, 1.0e-2, adaptive_grid)
             # vtk_grid("p4est_test$(i).vtu",dh) do vtk

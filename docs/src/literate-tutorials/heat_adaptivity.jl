@@ -161,8 +161,8 @@ function solve_adaptive(initial_grid)
     while !finished && i <= 3
         @show i
         ## Materialize the forest into a NonConformingGrid and solve
-        transfered_grid = Ferrite.creategrid(grid)
-        u, dh, ch, cv = solve(transfered_grid)
+        transferred_grid = Ferrite.creategrid(grid)
+        u, dh, ch, cv = solve(transferred_grid)
 
         ## Step 1: Compute the raw FE flux σ_h = ∇u_h at each quadrature point
         σ_gp = Vector{Vector{Vec{3, Float64}}}()
@@ -178,14 +178,14 @@ function solve_adaptive(initial_grid)
 
         ## Step 2: Recover a smooth flux field σ* by L2-projecting the raw
         ## quadrature-point fluxes onto a continuous nodal field.
-        projector = L2Projector(ip, transfered_grid)
+        projector = L2Projector(ip, transferred_grid)
         σ_dof = project(projector, σ_gp, qr)
 
         ## Step 3: Evaluate the ZZ error indicator per cell.
         ## For each cell we compare the recovered flux σ* (evaluated from the
         ## projected nodal values) against the raw flux σ_h at each quadrature point.
         cv_σ = CellValues(qr, ip^3)
-        error_arr = zeros(getncells(transfered_grid))
+        error_arr = zeros(getncells(transferred_grid))
         for (cellid, cell) in enumerate(CellIterator(projector.dh))
             reinit!(cv_σ, cell)
             @views σe = σ_dof[celldofs(cell)]
@@ -211,7 +211,7 @@ function solve_adaptive(initial_grid)
             end
         end
 
-        @info "AMR step $i: $(length(cells_to_refine))/$(getncells(transfered_grid)) cells marked, total error = $total"
+        @info "AMR step $i: $(length(cells_to_refine))/$(getncells(transferred_grid)) cells marked, total error = $total"
 
         ## Export the solution and cell-wise error to VTK for visualization
         VTKGridFile("heat_amr-$i", dh) do vtk

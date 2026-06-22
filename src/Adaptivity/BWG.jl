@@ -1011,7 +1011,7 @@ function _balance_leaf!(forest::ForestBWG{dim}, k, tree, o, perm_face, perm_face
                 cc = forest.topology.vertex_vertex_neighbor[k, perm_corner[s_i]]
                 if isempty(cc)
                     # the branch below checks if we are in a newly introduced topologic tree connection
-                    # by checking if the corner neighbor is only accesible by transforming through a face
+                    # by checking if the corner neighbor is only accessible by transforming through a face
                     # TODO: enable a bool that either activates or deactivates the balancing over a corner
                     pivot_faces = faces(o, tree.b)
                     for j in 1:2
@@ -2400,14 +2400,14 @@ end
 
 # Preallocated scratch for the allocation-free descent (IBWG2015 §5.4: the recursion is
 # `O(lmax)` deep, so all the per-node state — the support arrays `supp`/`S`, the
-# `Split_array` results `childs`/`splits`, and the `leaf_supp` buffer `L` — is preallocated
+# `Split_array` results `child_octants`/`splits`, and the `leaf_supp` buffer `L` — is preallocated
 # once per traversal and reused). Buffers are indexed by recursion depth: in a DFS only one
 # root-to-node path is live, so depth `d`'s buffers are free to refill for the next sibling
 # once depth `d`'s subtree returns. `M = N + 1` is the `split_bounds` tuple length.
 struct IterScratch{N, M, OT}
     supp::Vector{Vector{OT}}                  # [depth] -> support octants of the point at this depth
     S::Vector{Vector{NTuple{2, Int}}}         # [depth] -> leaf index ranges, one per support octant
-    childs::Vector{Vector{NTuple{N, OT}}}     # [depth] -> children of each support octant (Split_array)
+    child_octants::Vector{Vector{NTuple{N, OT}}}     # [depth] -> children of each support octant (Split_array)
     splits::Vector{Vector{NTuple{M, Int}}}    # [depth] -> split_bounds of each support octant
     L::Vector{OT}                             # reused leaf_supp buffer passed to the callback
 end
@@ -2492,10 +2492,10 @@ function _iterate_interior!(visit::F, c::IteratePoint{dim}, depth::Int, sc::Iter
 
     # No support octant is a leaf -> recurse over part(c) (lines 21-25). Every support
     # octant is internal; cache its children + leaf sub-ranges (H_i) in the depth buffers.
-    childs = sc.childs[depth]; splits = sc.splits[depth]
-    empty!(childs); empty!(splits)
+    child_octants = sc.child_octants[depth]; splits = sc.splits[depth]
+    empty!(child_octants); empty!(splits)
     for i in 1:m
-        push!(childs, children(supp[i], b))
+        push!(child_octants, children(supp[i], b))
         push!(splits, split_bounds(leaves, S[i][1], S[i][2], supp[i], b))
     end
     esupp = sc.supp[depth + 1]; eS = sc.S[depth + 1]   # the next depth's (reused) support buffers
@@ -2503,7 +2503,7 @@ function _iterate_interior!(visit::F, c::IteratePoint{dim}, depth::Int, sc::Iter
         point_dim(e) >= mindim || return
         empty!(esupp); empty!(eS)
         for i in 1:m
-            ch = childs[i]
+            ch = child_octants[i]
             for j in 1:N
                 if _pt_in_oct_closure(e, ch[j], b) && ch[j] ∉ esupp
                     push!(esupp, ch[j]); push!(eS, (splits[i][j], splits[i][j + 1] - 1))

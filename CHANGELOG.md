@@ -7,9 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Next] - xxxx-xx-xx
 
+### Added
+
+- Adaptive mesh refinement (AMR) for quadrilateral and hexahedral (linear) grids via a `p4est`-style
+  forest of octrees (`ForestBWG`). A grid can be refined (`refine!`), coarsened (`coarsen!`) and
+  2:1-balanced (`balanceforest!`), then materialized into a `NonConformingGrid` with `creategrid`.
+  Hanging nodes are made conforming by adding a `ConformityConstraint` to the `ConstraintHandler`. (#780)
+
 ### Documentation
 
 - Landau example in code gallery now shows how to use DifferentiationInterface and HyperHessians as a backend. (#1345)
+- Add adaptive mesh refinement tutorials (heat equation and linear elasticity) and a developer
+  documentation page describing the `p4est` implementation. (#780)
 
 ## [v1.4.1] - 2026-06-17
 

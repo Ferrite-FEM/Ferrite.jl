@@ -15,7 +15,7 @@ end
 function Ferrite.add!(ch::ConstraintHandler{<:DofHandler{<:Any, <:NonConformingGrid}}, cc::ConformityConstraint)
     @assert length(ch.dh.field_names) == 1 "Multiple fields not supported yet."
     @assert cc.field_name ∈ ch.dh.field_names "Field $(cc.field_name) not found in provided dof handler. Available fields are $(ch.dh.field_names)."
-    # One set of linear contraints per hanging node
+    # One set of linear constraints per hanging node
     for sdh in ch.dh.subdofhandlers
         field_idx = Ferrite._find_field(sdh, cc.field_name)
         field_idx !== nothing && _add_conformity_constraint(ch, field_idx, sdh.field_interpolations[field_idx])

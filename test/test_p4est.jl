@@ -511,60 +511,60 @@ end
     adaptive_grid = ForestBWG(grid, 3)
     Ferrite.AMR.refine_all!(adaptive_grid, 1)
     Ferrite.AMR.refine!(adaptive_grid.cells[1], adaptive_grid.cells[1].leaves[8])
-    transfered_grid = Ferrite.creategrid(adaptive_grid)
-    @test unique(transfered_grid.nodes) == transfered_grid.nodes
+    transferred_grid = Ferrite.creategrid(adaptive_grid)
+    @test unique(transferred_grid.nodes) == transferred_grid.nodes
     # Unrefined grid has 5 ^ dim nodes and the refined element introduces 6 face center, 12 edge center and 1 volume center nodes
-    @test length(transfered_grid.nodes) == 5^3 + (6 + 12 + 1)
+    @test length(transferred_grid.nodes) == 5^3 + (6 + 12 + 1)
     # 6 faces and 12 edges of the single refined element induces one hanging node each
-    @test length(transfered_grid.conformity_info) == 6 + 12
+    @test length(transferred_grid.conformity_info) == 6 + 12
 
     adaptive_grid = ForestBWG(grid, 3)
     Ferrite.AMR.refine_all!(adaptive_grid, 1)
     Ferrite.AMR.refine!(adaptive_grid.cells[1], adaptive_grid.cells[1].leaves[1])
-    transfered_grid = Ferrite.creategrid(adaptive_grid)
-    @test unique(transfered_grid.nodes) == transfered_grid.nodes
+    transferred_grid = Ferrite.creategrid(adaptive_grid)
+    @test unique(transferred_grid.nodes) == transferred_grid.nodes
     # Unrefined grid has 5 ^ dim nodes and the refined element introduces 6 face center, 12 edge center and 1 volume center nodes
-    @test length(transfered_grid.nodes) == 5^3 + (6 + 12 + 1)
+    @test length(transferred_grid.nodes) == 5^3 + (6 + 12 + 1)
     # 6 faces and 12 edges of the single refined element induces one hanging node each - minus 3 faces and 3 edges on the outer boundary
-    @test length(transfered_grid.conformity_info) == 6 + 12 - 2 * 3
+    @test length(transferred_grid.conformity_info) == 6 + 12 - 2 * 3
 
     adaptive_grid = ForestBWG(grid, 3)
     Ferrite.AMR.refine_all!(adaptive_grid, 1)
     Ferrite.AMR.refine!(adaptive_grid.cells[8], adaptive_grid.cells[8].leaves[8])
-    transfered_grid = Ferrite.creategrid(adaptive_grid)
-    @test unique(transfered_grid.nodes) == transfered_grid.nodes
+    transferred_grid = Ferrite.creategrid(adaptive_grid)
+    @test unique(transferred_grid.nodes) == transferred_grid.nodes
     # Unrefined grid has 5 ^ dim nodes and the refined element introduces 6 face center, 12 edge center and 1 volume center nodes
-    @test length(transfered_grid.nodes) == 5^3 + (6 + 12 + 1)
+    @test length(transferred_grid.nodes) == 5^3 + (6 + 12 + 1)
     # 6 faces and 12 edges of the single refined element induces one hanging node each - minus 3 faces and 3 edges on the outer boundary
-    @test length(transfered_grid.conformity_info) == 6 + 12 - 2 * 3
+    @test length(transferred_grid.conformity_info) == 6 + 12 - 2 * 3
 
     adaptive_grid = ForestBWG(grid, 3)
     Ferrite.AMR.refine_all!(adaptive_grid, 1)
     Ferrite.AMR.refine!(adaptive_grid.cells[8], adaptive_grid.cells[8].leaves[1])
-    transfered_grid = Ferrite.creategrid(adaptive_grid)
+    transferred_grid = Ferrite.creategrid(adaptive_grid)
     # Unrefined grid has 5 ^ dim nodes and the refined element introduces 6 face center, 12 edge center and 1 volume center nodes
-    @test length(transfered_grid.nodes) == 5^3 + (6 + 12 + 1)
+    @test length(transferred_grid.nodes) == 5^3 + (6 + 12 + 1)
     # 6 faces and 12 edges of the single refined element induces one hanging node each
-    @test length(transfered_grid.conformity_info) == 6 + 12
+    @test length(transferred_grid.conformity_info) == 6 + 12
 
     # Combined
     adaptive_grid = ForestBWG(grid, 3)
     Ferrite.AMR.refine_all!(adaptive_grid, 1)
     Ferrite.AMR.refine!(adaptive_grid.cells[1], adaptive_grid.cells[1].leaves[8])
     Ferrite.AMR.refine!(adaptive_grid.cells[1], adaptive_grid.cells[1].leaves[1])
-    transfered_grid = Ferrite.creategrid(adaptive_grid)
-    @test unique(transfered_grid.nodes) == transfered_grid.nodes
-    @test length(transfered_grid.nodes) == 5^3 + 2 * (6 + 12 + 1)
-    @test length(transfered_grid.conformity_info) == 2 * (6 + 12) - 2 * 3
+    transferred_grid = Ferrite.creategrid(adaptive_grid)
+    @test unique(transferred_grid.nodes) == transferred_grid.nodes
+    @test length(transferred_grid.nodes) == 5^3 + 2 * (6 + 12 + 1)
+    @test length(transferred_grid.conformity_info) == 2 * (6 + 12) - 2 * 3
 
     adaptive_grid = ForestBWG(grid, 3)
     Ferrite.AMR.refine_all!(adaptive_grid, 1)
     Ferrite.AMR.refine!(adaptive_grid.cells[8], adaptive_grid.cells[8].leaves[8])
     Ferrite.AMR.refine!(adaptive_grid.cells[8], adaptive_grid.cells[8].leaves[1])
-    transfered_grid = Ferrite.creategrid(adaptive_grid)
-    @test unique(transfered_grid.nodes) == transfered_grid.nodes
-    @test length(transfered_grid.nodes) == 5^3 + 2 * (6 + 12 + 1)
-    @test length(transfered_grid.conformity_info) == 2 * (6 + 12) - 2 * 3
+    transferred_grid = Ferrite.creategrid(adaptive_grid)
+    @test unique(transferred_grid.nodes) == transferred_grid.nodes
+    @test length(transferred_grid.nodes) == 5^3 + 2 * (6 + 12 + 1)
+    @test length(transferred_grid.conformity_info) == 2 * (6 + 12) - 2 * 3
 
     # Combined
     adaptive_grid = ForestBWG(grid, 3)
@@ -573,10 +573,10 @@ end
     Ferrite.AMR.refine!(adaptive_grid.cells[1], adaptive_grid.cells[1].leaves[1])
     Ferrite.AMR.refine!(adaptive_grid.cells[8], adaptive_grid.cells[8].leaves[8])
     Ferrite.AMR.refine!(adaptive_grid.cells[8], adaptive_grid.cells[8].leaves[1])
-    transfered_grid = Ferrite.creategrid(adaptive_grid)
-    @test unique(transfered_grid.nodes) == transfered_grid.nodes
-    @test length(transfered_grid.nodes) == 5^3 + 4 * (6 + 12 + 1)
-    @test length(transfered_grid.conformity_info) == 4 * (6 + 12) - 2 * 3 - 2 * 3
+    transferred_grid = Ferrite.creategrid(adaptive_grid)
+    @test unique(transferred_grid.nodes) == transferred_grid.nodes
+    @test length(transferred_grid.nodes) == 5^3 + 4 * (6 + 12 + 1)
+    @test length(transferred_grid.conformity_info) == 4 * (6 + 12) - 2 * 3 - 2 * 3
 
     # Combined and not rotated
     adaptive_grid = ForestBWG(grid, 3)
@@ -585,15 +585,15 @@ end
     Ferrite.AMR.refine!(adaptive_grid.cells[1], adaptive_grid.cells[1].leaves[1])
     Ferrite.AMR.refine!(adaptive_grid.cells[6], adaptive_grid.cells[6].leaves[6])
     Ferrite.AMR.refine!(adaptive_grid.cells[6], adaptive_grid.cells[6].leaves[3])
-    transfered_grid = Ferrite.creategrid(adaptive_grid)
-    @test unique(transfered_grid.nodes) == transfered_grid.nodes
+    transferred_grid = Ferrite.creategrid(adaptive_grid)
+    @test unique(transferred_grid.nodes) == transferred_grid.nodes
     # +5^3 on the coarse grid
     # +4 refined elements a 6 face nodes, 12 edge nodes and 1 volume nodes
     # -1 shared node between tree 1 and 6
-    @test length(transfered_grid.nodes) == 5^3 + 4 * (6 + 12 + 1) - 1
+    @test length(transferred_grid.nodes) == 5^3 + 4 * (6 + 12 + 1) - 1
     # 30 constraints from tree 1 (2*18 - 6 boundary) + 30 from tree 6 (2*18 - 6 boundary)
     # - 1 shared on common edge
-    @test length(transfered_grid.conformity_info) == 59
+    @test length(transferred_grid.conformity_info) == 59
 
     # Combined and rotated
     adaptive_grid = ForestBWG(grid, 3)
@@ -602,14 +602,14 @@ end
     Ferrite.AMR.refine!(adaptive_grid.cells[1], adaptive_grid.cells[1].leaves[1])
     Ferrite.AMR.refine!(adaptive_grid.cells[7], adaptive_grid.cells[7].leaves[6])
     Ferrite.AMR.refine!(adaptive_grid.cells[7], adaptive_grid.cells[7].leaves[3])
-    transfered_grid = Ferrite.creategrid(adaptive_grid)
-    @test unique(transfered_grid.nodes) == transfered_grid.nodes
+    transferred_grid = Ferrite.creategrid(adaptive_grid)
+    @test unique(transferred_grid.nodes) == transferred_grid.nodes
     # +5^3 on the coarse grid
     # +4 refined elements a 6 face nodes, 12 edge nodes and 1 volume nodes
     # -1 shared node between tree 1 and 7
-    @test length(transfered_grid.nodes) == 5^3 + 4 * (6 + 12 + 1) - 1
+    @test length(transferred_grid.nodes) == 5^3 + 4 * (6 + 12 + 1) - 1
     # 30 constraints from tree 1 + 30 from rotated tree 7 - 1 shared on common edge
-    @test length(transfered_grid.conformity_info) == 59
+    @test length(transferred_grid.conformity_info) == 59
 
     # Reproducer test for Fig.3 BWG 11
     grid = generate_grid(Hexahedron, (2, 1, 1))
@@ -733,7 +733,7 @@ end
     Ferrite.AMR.refine!(adaptive_grid.cells[7], adaptive_grid.cells[7].leaves[1])
     #Ferrite.AMR.refine!(adaptive_grid.cells[7],adaptive_grid.cells[7].leaves[1])
     Ferrite.AMR.balanceforest!(adaptive_grid)
-    transfered_grid_ref = Ferrite.AMR.creategrid(adaptive_grid)
+    transferred_grid_ref = Ferrite.AMR.creategrid(adaptive_grid)
 
     # Rotate three dimensional case
     grid = generate_grid(Hexahedron, (2, 2, 2))
@@ -766,9 +766,9 @@ end
     Ferrite.AMR.refine!(adaptive_grid.cells[7], adaptive_grid.cells[7].leaves[1])
     Ferrite.AMR.refine!(adaptive_grid.cells[7], adaptive_grid.cells[7].leaves[1])
     Ferrite.AMR.balanceforest!(adaptive_grid)
-    transfered_grid = Ferrite.AMR.creategrid(adaptive_grid)
-    @test length(transfered_grid.cells) == length(transfered_grid_ref.cells)
-    @test length(transfered_grid.cells) == 92
+    transferred_grid = Ferrite.AMR.creategrid(adaptive_grid)
+    @test length(transferred_grid.cells) == length(transferred_grid_ref.cells)
+    @test length(transferred_grid.cells) == 92
 
     # edge balancing for new introduced connection that is not within topology table
     grid = generate_grid(Hexahedron, (2, 1, 1))
@@ -854,10 +854,10 @@ end
     Ferrite.AMR.refine_all!(adaptive_grid, 1)
     Ferrite.AMR.refine!(adaptive_grid.cells[1], adaptive_grid.cells[1].leaves[1])
     Ferrite.AMR.refine!(adaptive_grid.cells[1], adaptive_grid.cells[1].leaves[1])
-    transfered_grid = Ferrite.AMR.creategrid(adaptive_grid)
-    @test length(transfered_grid.cells) == 10
-    @test length(transfered_grid.nodes) == 19
-    @test unique(transfered_grid.nodes) == transfered_grid.nodes
+    transferred_grid = Ferrite.AMR.creategrid(adaptive_grid)
+    @test length(transferred_grid.cells) == 10
+    @test length(transferred_grid.nodes) == 19
+    @test unique(transferred_grid.nodes) == transferred_grid.nodes
 
     #2D case with four trees and somewhat refinement pattern
     grid = generate_grid(Quadrilateral, (2, 2))
@@ -865,10 +865,10 @@ end
     Ferrite.AMR.refine_all!(adaptive_grid, 1)
     Ferrite.AMR.refine!(adaptive_grid.cells[1], adaptive_grid.cells[1].leaves[1])
     Ferrite.AMR.refine!(adaptive_grid.cells[1], adaptive_grid.cells[1].leaves[1])
-    transfered_grid = Ferrite.AMR.creategrid(adaptive_grid)
-    @test length(transfered_grid.cells) == 22
-    @test length(transfered_grid.nodes) == 35
-    @test unique(transfered_grid.nodes) == transfered_grid.nodes
+    transferred_grid = Ferrite.AMR.creategrid(adaptive_grid)
+    @test length(transferred_grid.cells) == 22
+    @test length(transferred_grid.nodes) == 35
+    @test unique(transferred_grid.nodes) == transferred_grid.nodes
 
     #more random refinement
     grid = generate_grid(Quadrilateral, (3, 3))
@@ -885,10 +885,10 @@ end
     Ferrite.AMR.refine!(adaptive_grid.cells[9], adaptive_grid.cells[9].leaves[end])
     Ferrite.AMR.refine!(adaptive_grid.cells[9], adaptive_grid.cells[9].leaves[end])
     Ferrite.AMR.refine!(adaptive_grid.cells[9], adaptive_grid.cells[9].leaves[end])
-    transfered_grid = Ferrite.AMR.creategrid(adaptive_grid)
-    @test length(transfered_grid.cells) == 45
-    @test length(transfered_grid.nodes) == 76
-    @test unique(transfered_grid.nodes) == transfered_grid.nodes
+    transferred_grid = Ferrite.AMR.creategrid(adaptive_grid)
+    @test length(transferred_grid.cells) == 45
+    @test length(transferred_grid.nodes) == 76
+    @test unique(transferred_grid.nodes) == transferred_grid.nodes
 
     #################################################
     ############ structured 3D examples #############
@@ -900,42 +900,42 @@ end
     Ferrite.AMR.refine_all!(adaptive_grid, 1)
     Ferrite.AMR.refine!(adaptive_grid.cells[1], adaptive_grid.cells[1].leaves[1])
     Ferrite.AMR.refine!(adaptive_grid.cells[1], adaptive_grid.cells[1].leaves[1])
-    transfered_grid = Ferrite.AMR.creategrid(adaptive_grid)
-    @test length(transfered_grid.cells) == 8 + 7 + 7
-    @test length(transfered_grid.nodes) == 65
-    @test unique(transfered_grid.nodes) == transfered_grid.nodes
+    transferred_grid = Ferrite.AMR.creategrid(adaptive_grid)
+    @test length(transferred_grid.cells) == 8 + 7 + 7
+    @test length(transferred_grid.nodes) == 65
+    @test unique(transferred_grid.nodes) == transferred_grid.nodes
 
     # Test only Interoctree by face connection
     grid = generate_grid(Hexahedron, (2, 1, 1))
     adaptive_grid = ForestBWG(grid, 3)
     Ferrite.AMR.refine_all!(adaptive_grid, 1)
-    transfered_grid = Ferrite.AMR.creategrid(adaptive_grid)
-    @test length(transfered_grid.cells) == 16
-    @test length(transfered_grid.nodes) == 45
-    @test unique(transfered_grid.nodes) == transfered_grid.nodes
+    transferred_grid = Ferrite.AMR.creategrid(adaptive_grid)
+    @test length(transferred_grid.cells) == 16
+    @test length(transferred_grid.nodes) == 45
+    @test unique(transferred_grid.nodes) == transferred_grid.nodes
     #rotate the case around
     grid = generate_grid(Hexahedron, (1, 2, 1))
     adaptive_grid = ForestBWG(grid, 3)
     Ferrite.AMR.refine_all!(adaptive_grid, 1)
-    transfered_grid = Ferrite.AMR.creategrid(adaptive_grid)
-    @test length(transfered_grid.cells) == 16
-    @test length(transfered_grid.nodes) == 45
-    @test unique(transfered_grid.nodes) == transfered_grid.nodes
+    transferred_grid = Ferrite.AMR.creategrid(adaptive_grid)
+    @test length(transferred_grid.cells) == 16
+    @test length(transferred_grid.nodes) == 45
+    @test unique(transferred_grid.nodes) == transferred_grid.nodes
     grid = generate_grid(Hexahedron, (1, 1, 2))
     adaptive_grid = ForestBWG(grid, 3)
     Ferrite.AMR.refine_all!(adaptive_grid, 1)
-    transfered_grid = Ferrite.AMR.creategrid(adaptive_grid)
-    @test length(transfered_grid.cells) == 16
-    @test length(transfered_grid.nodes) == 45
-    @test unique(transfered_grid.nodes) == transfered_grid.nodes
+    transferred_grid = Ferrite.AMR.creategrid(adaptive_grid)
+    @test length(transferred_grid.cells) == 16
+    @test length(transferred_grid.nodes) == 45
+    @test unique(transferred_grid.nodes) == transferred_grid.nodes
 
     grid = generate_grid(Hexahedron, (2, 2, 2))
     adaptive_grid = ForestBWG(grid, 3)
     Ferrite.AMR.refine_all!(adaptive_grid, 1)
-    transfered_grid = Ferrite.AMR.creategrid(adaptive_grid)
-    @test length(transfered_grid.cells) == 8^2
-    @test length(transfered_grid.nodes) == 125 # 5 per edge
-    @test unique(transfered_grid.nodes) == transfered_grid.nodes
+    transferred_grid = Ferrite.AMR.creategrid(adaptive_grid)
+    @test length(transferred_grid.cells) == 8^2
+    @test length(transferred_grid.nodes) == 125 # 5 per edge
+    @test unique(transferred_grid.nodes) == transferred_grid.nodes
 
     # Rotate three dimensional case
     grid = generate_grid(Hexahedron, (2, 2, 2))
@@ -962,10 +962,10 @@ end
     # x-----------x-----------x
     adaptive_grid = ForestBWG(grid, 3)
     Ferrite.AMR.refine_all!(adaptive_grid, 1)
-    transfered_grid = Ferrite.AMR.creategrid(adaptive_grid)
-    @test length(transfered_grid.cells) == 8^2
-    @test length(transfered_grid.nodes) == 125 # 5 per edge
-    @test unique(transfered_grid.nodes) == transfered_grid.nodes
+    transferred_grid = Ferrite.AMR.creategrid(adaptive_grid)
+    @test length(transferred_grid.cells) == 8^2
+    @test length(transferred_grid.nodes) == 125 # 5 per edge
+    @test unique(transferred_grid.nodes) == transferred_grid.nodes
     #TODO iterate over all rotated versions and check if det J > 0
 end
 
@@ -992,8 +992,8 @@ end
     # |     |     |           |
     # |     |     |           |
     # x-----x-----x-----------x
-    transfered_grid = Ferrite.AMR.creategrid(adaptive_grid)
-    @test length(transfered_grid.conformity_info) == 12
+    transferred_grid = Ferrite.AMR.creategrid(adaptive_grid)
+    @test length(transferred_grid.conformity_info) == 12
 
     # Easy Interoctree
     grid = generate_grid(Hexahedron, (2, 2, 2))
@@ -1016,8 +1016,8 @@ end
     # |     |     |           |
     # |     |     |           |
     # x-----x-----x-----------x
-    transfered_grid = Ferrite.AMR.creategrid(adaptive_grid)
-    @test length(transfered_grid.conformity_info) == 12
+    transferred_grid = Ferrite.AMR.creategrid(adaptive_grid)
+    @test length(transferred_grid.conformity_info) == 12
 
     #rotate the case from above in the first cell around
     grid = generate_grid(Hexahedron, (2, 2, 2))
@@ -1026,20 +1026,20 @@ end
     grid.cells[1] = Hexahedron((grid.cells[1].nodes[2], grid.cells[1].nodes[3], grid.cells[1].nodes[4], grid.cells[1].nodes[1], grid.cells[1].nodes[4 + 2], grid.cells[1].nodes[4 + 3], grid.cells[1].nodes[4 + 4], grid.cells[1].nodes[4 + 1]))
     adaptive_grid = ForestBWG(grid, 3)
     Ferrite.AMR.refine!(adaptive_grid.cells[1], adaptive_grid.cells[1].leaves[1])
-    transfered_grid_rotated = Ferrite.AMR.creategrid(adaptive_grid)
-    @test Set(transfered_grid_rotated.conformity_info[2]) == Set([1, 9])
-    @test Set(transfered_grid_rotated.conformity_info[3]) == Set([1, 13])
-    @test Set(transfered_grid_rotated.conformity_info[5]) == Set([1, 19])
-    @test Set(transfered_grid_rotated.conformity_info[6]) == Set([1, 9, 19, 23])
-    @test Set(transfered_grid_rotated.conformity_info[7]) == Set([1, 13, 19, 25])
-    @test Set(transfered_grid_rotated.conformity_info[11]) == Set([9, 23])
-    @test Set(transfered_grid_rotated.conformity_info[15]) == Set([13, 25])
-    @test Set(transfered_grid_rotated.conformity_info[20]) == Set([19, 23])
-    @test Set(transfered_grid_rotated.conformity_info[21]) == Set([19, 25])
-    @test Set(transfered_grid_rotated.conformity_info[22]) == Set([19, 23, 25, 27])
-    @test Set(transfered_grid_rotated.conformity_info[24]) == Set([23, 27])
-    @test Set(transfered_grid_rotated.conformity_info[26]) == Set([25, 27])
-    @test length(transfered_grid_rotated.conformity_info) == 12
+    transferred_grid_rotated = Ferrite.AMR.creategrid(adaptive_grid)
+    @test Set(transferred_grid_rotated.conformity_info[2]) == Set([1, 9])
+    @test Set(transferred_grid_rotated.conformity_info[3]) == Set([1, 13])
+    @test Set(transferred_grid_rotated.conformity_info[5]) == Set([1, 19])
+    @test Set(transferred_grid_rotated.conformity_info[6]) == Set([1, 9, 19, 23])
+    @test Set(transferred_grid_rotated.conformity_info[7]) == Set([1, 13, 19, 25])
+    @test Set(transferred_grid_rotated.conformity_info[11]) == Set([9, 23])
+    @test Set(transferred_grid_rotated.conformity_info[15]) == Set([13, 25])
+    @test Set(transferred_grid_rotated.conformity_info[20]) == Set([19, 23])
+    @test Set(transferred_grid_rotated.conformity_info[21]) == Set([19, 25])
+    @test Set(transferred_grid_rotated.conformity_info[22]) == Set([19, 23, 25, 27])
+    @test Set(transferred_grid_rotated.conformity_info[24]) == Set([23, 27])
+    @test Set(transferred_grid_rotated.conformity_info[26]) == Set([25, 27])
+    @test length(transferred_grid_rotated.conformity_info) == 12
 
     #2D rotated case
     grid = generate_grid(Quadrilateral, (2, 2))
@@ -1065,10 +1065,10 @@ end
     # x-----------x-----------x
     adaptive_grid = ForestBWG(grid, 3)
     Ferrite.AMR.refine!(adaptive_grid.cells[2], adaptive_grid.cells[2].leaves[1])
-    transfered_grid_rotated = Ferrite.AMR.creategrid(adaptive_grid)
-    @test Set(transfered_grid_rotated.conformity_info[10]) == Set([4, 9])
-    @test Set(transfered_grid_rotated.conformity_info[11]) == Set([2, 4])
-    @test length(transfered_grid_rotated.conformity_info) == 2
+    transferred_grid_rotated = Ferrite.AMR.creategrid(adaptive_grid)
+    @test Set(transferred_grid_rotated.conformity_info[10]) == Set([4, 9])
+    @test Set(transferred_grid_rotated.conformity_info[11]) == Set([2, 4])
+    @test length(transferred_grid_rotated.conformity_info) == 2
 
     # multiple corner connections in 2D by disc discretization
     grid = Ferrite.generate_simple_disc_grid(Quadrilateral, 10)
