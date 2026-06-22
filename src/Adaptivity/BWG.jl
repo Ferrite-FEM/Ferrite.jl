@@ -1955,17 +1955,26 @@ end
     _compute_size(b::Integer, l::Integer) -> Int
 
 Edge length, in integer octree coordinates, of a level-`l` octant in a tree using `b` bits:
-``2^{b-l}``. The root (`l = 0`) spans the whole domain (`2^b`); a leaf at the maximum level `b`
-has size `1` (the finest representable octant).
+``2^{b-l}``, computed as a bit shift `1 << (b - l)`. The root (`l = 0`) spans the whole domain
+(`2^b`); a leaf at the maximum level `b` has size `1` (the finest representable octant).
+
+A level `l > b` is invalid (it would need a sub-atom octant) and throws a `DomainError` — this is
+the guard against refining or iterating past the tree's maximum refinement level `b`.
 """
-_compute_size(b::Integer, l::Integer) = 2^(b - l)
+# Cold-path error so the hot `_compute_size` stays tiny and inlinable.
+@noinline _throw_octant_level(l, b) = throw(DomainError(l, "octant level $l exceeds the tree's maximum refinement level b = $b; keep refinement below level b (set when constructing `ForestBWG(grid, b)`)"))
+function _compute_size(b::Integer, l::Integer)
+    l <= b || _throw_octant_level(l, b)
+    return 1 << (b - l)
+end
 """
     _maximum_size(b::Integer) -> Int
 
-Integer extent `2^b` of the root octant along each axis: the octree coordinate domain of a tree is
-`[0, 2^b)^dim`. Used by [`inside`](@ref) to detect when an octant leaves its tree.
+Integer extent `2^b` of the root octant along each axis (computed as `1 << b`): the octree
+coordinate domain of a tree is `[0, 2^b)^dim`. Used by [`inside`](@ref) to detect when an octant
+leaves its tree.
 """
-_maximum_size(b::Integer) = 2^(b)
+_maximum_size(b::Integer) = 1 << b
 # return the two adjacent faces $f_i$ adjacent to edge `edge`
 _face(edge::Int) = 𝒮[edge, :]
 # return the `i`-th adjacent face fᵢ to edge `edge`
