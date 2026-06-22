@@ -1,14 +1,6 @@
 using Ferrite, SparseArrays, IterativeSolvers, WriteVTK
 
 grid = generate_grid(Hexahedron, (4, 4, 4));
-function random_deformation_field(x)
-    if any(x .≈ -1.0) || any(x .≈ 1.0)
-        return x
-    else
-        Vec{3}(x .+ (rand(3) .- 0.5) * 0.15)
-    end
-end
-transform_coordinates!(grid, random_deformation_field)
 grid = ForestBWG(grid, 10)
 Ferrite.AMR.refine_all!(grid, 1)
 

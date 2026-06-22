@@ -28,19 +28,10 @@
 using Ferrite, SparseArrays, IterativeSolvers, WriteVTK
 
 # ### Grid setup
-# We create a structured 4×4×4 hexahedral grid on $[-1,1]^3$, apply a random
-# perturbation to the interior nodes (to test robustness on deformed meshes),
+# We create a structured 4×4×4 hexahedral grid on $[-1,1]^3$
 # and wrap it in a `ForestBWG` that allows up to 10 levels of refinement.
 # One uniform refinement gives us a reasonable starting mesh of 512 cells.
 grid = generate_grid(Hexahedron, (4, 4, 4));
-function random_deformation_field(x)
-    if any(x .≈ -1.0) || any(x .≈ 1.0)
-        return x
-    else
-        Vec{3}(x .+ (rand(3) .- 0.5) * 0.15)
-    end
-end
-transform_coordinates!(grid, random_deformation_field)
 grid = ForestBWG(grid, 10)
 Ferrite.AMR.refine_all!(grid, 1)
 
