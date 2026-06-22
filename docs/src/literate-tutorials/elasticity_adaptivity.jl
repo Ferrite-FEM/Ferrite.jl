@@ -267,7 +267,7 @@ end
 # balance. `nsteps` is kept comfortably below the forest's maximum refinement level
 # `b` (set when constructing the `ForestBWG`): a cell may not be refined past level `b`,
 # so the corner — refined at almost every step — must not reach it.
-function solve_adaptive(initial_forest; nsteps = 15, θ = 0.3)
+function solve_adaptive(initial_forest; nsteps = 4, θ = 0.3)
     forest = deepcopy(initial_forest)
     pvd = paraview_collection("elasticity_amr")
     for i in 1:nsteps
