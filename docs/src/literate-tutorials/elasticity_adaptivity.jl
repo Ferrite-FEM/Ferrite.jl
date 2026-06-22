@@ -10,10 +10,10 @@
 # than generated, showing that the adaptive machinery works on arbitrary
 # quadrilateral meshes.
 #
-# The domain `case3.inp` is the square $[-1,1]^2$ with its top-right corner removed
-# (the boundary cuts from $(1,0)$ to $(0,1)$). This re-entrant notch produces a
-# stress concentration when the body is loaded, which is exactly the kind of
-# localized feature that adaptive refinement resolves efficiently.
+# The domain `case1.inp` is the classic **L-shape**: the square $[-1,1]^2$ with the
+# upper-right quadrant $[0,1]\times[0,1]$ removed, leaving a re-entrant corner at the
+# origin $(0,0)$. That corner produces a stress singularity when the body is loaded —
+# exactly the kind of localized feature that adaptive refinement resolves efficiently.
 #
 # We clamp the left edge, pull the (lower) right edge with a horizontal traction,
 # and drive refinement with a facet-jump (Kelly-type) error estimator combined with
@@ -23,19 +23,22 @@
 # ## Commented Program
 #
 # First we load the required packages.
-using Ferrite, FerriteMeshParser, Tensors, SparseArrays, WriteVTK
+using Ferrite, FerriteMeshParser, Tensors, SparseArrays, WriteVTK, Downloads
 
 # ### Mesh import
 # We read the Abaqus mesh with FerriteMeshParser's `get_ferrite_grid`. The file
 # uses `CPS4R` (4-node plane-stress quadrilaterals), which are mapped to Ferrite
-# `Quadrilateral` cells — exactly the cell type required by `ForestBWG`.
+# `Quadrilateral` cells — exactly the cell type required by `ForestBWG`. The mesh
+# is fetched from the Ferrite asset storage if it is not available locally.
 #
 # The input file does not define any node or element sets, so we attach the
 # boundary facet sets we need geometrically: the straight left edge $x=-1$ and the
 # straight lower-right edge $x=+1$. These sets are carried through refinement by
 # `creategrid`, so they remain valid on every adapted mesh.
 function setup_grid()
-    grid = get_ferrite_grid(joinpath(@__DIR__, "case1.inp"))
+    gridfile = "case1.inp"
+    isfile(gridfile) || Downloads.download(Ferrite.asset_url(gridfile), gridfile)
+    grid = get_ferrite_grid(gridfile)
     addfacetset!(grid, "left", x -> x[1] ≈ -1.0)
     addfacetset!(grid, "right", x -> x[1] ≈ 1.0)
     return grid
