@@ -81,8 +81,8 @@ end</code></pre><pre class="documenter-example-output"><code class="nohighlight 
     while !finished &amp;&amp; i &lt;= 3
         @show i
         # Materialize the forest into a NonConformingGrid and solve
-        transfered_grid = Ferrite.creategrid(grid)
-        u, dh, ch, cv = solve(transfered_grid)
+        transferred_grid = Ferrite.creategrid(grid)
+        u, dh, ch, cv = solve(transferred_grid)
 
         # Step 1: Compute the raw FE flux σ_h = ∇u_h at each quadrature point
         σ_gp = Vector{Vector{Vec{3, Float64}}}()
@@ -98,14 +98,14 @@ end</code></pre><pre class="documenter-example-output"><code class="nohighlight 
 
         # Step 2: Recover a smooth flux field σ* by L2-projecting the raw
         # quadrature-point fluxes onto a continuous nodal field.
-        projector = L2Projector(ip, transfered_grid)
+        projector = L2Projector(ip, transferred_grid)
         σ_dof = project(projector, σ_gp, qr)
 
         # Step 3: Evaluate the ZZ error indicator per cell.
         # For each cell we compare the recovered flux σ* (evaluated from the
         # projected nodal values) against the raw flux σ_h at each quadrature point.
         cv_σ = CellValues(qr, ip^3)
-        error_arr = zeros(getncells(transfered_grid))
+        error_arr = zeros(getncells(transferred_grid))
         for (cellid, cell) in enumerate(CellIterator(projector.dh))
             reinit!(cv_σ, cell)
             @views σe = σ_dof[celldofs(cell)]
@@ -131,7 +131,7 @@ end</code></pre><pre class="documenter-example-output"><code class="nohighlight 
             end
         end
 
-        @info &quot;AMR step $i: $(length(cells_to_refine))/$(getncells(transfered_grid)) cells marked, total error = $total&quot;
+        @info &quot;AMR step $i: $(length(cells_to_refine))/$(getncells(transferred_grid)) cells marked, total error = $total&quot;
 
         # Export the solution and cell-wise error to VTK for visualization
         VTKGridFile(&quot;heat_amr-$i&quot;, dh) do vtk
@@ -154,4 +154,4 @@ end</code></pre><pre class="documenter-example-output"><code class="nohighlight 
  &quot;heat_amr.pvd&quot;
  &quot;heat_amr-1.vtu&quot;
  &quot;heat_amr-2.vtu&quot;
- &quot;heat_amr-3.vtu&quot;</code></pre><hr/><p><em>This page was generated using <a href="https://github.com/fredrikekre/Literate.jl">Literate.jl</a>.</em></p></article><nav class="docs-footer"><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option><option value="catppuccin-latte">catppuccin-latte</option><option value="catppuccin-frappe">catppuccin-frappe</option><option value="catppuccin-macchiato">catppuccin-macchiato</option><option value="catppuccin-mocha">catppuccin-mocha</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.17.0 on <span class="colophon-date" title="Monday 22 June 2026 09:03">Monday 22 June 2026</span>. Using Julia version 1.12.6.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
+ &quot;heat_amr-3.vtu&quot;</code></pre><hr/><p><em>This page was generated using <a href="https://github.com/fredrikekre/Literate.jl">Literate.jl</a>.</em></p></article><nav class="docs-footer"><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option><option value="catppuccin-latte">catppuccin-latte</option><option value="catppuccin-frappe">catppuccin-frappe</option><option value="catppuccin-macchiato">catppuccin-macchiato</option><option value="catppuccin-mocha">catppuccin-mocha</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.17.0 on <span class="colophon-date" title="Monday 22 June 2026 09:38">Monday 22 June 2026</span>. Using Julia version 1.12.6.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
