@@ -167,6 +167,13 @@ Base.show(io::IO, ::MIME"text/plain", f::OctantFaceIndex) = print(io, "O-Face $(
 Base.show(io::IO, f::OctantFaceIndex) = print(io, "O-Face $(f.idx)")
 
 vertex(octant::OctantBWG, c::OctantCornerIndex, b::Integer) = vertex(octant, c.idx, b)
+"""
+    vertex(octant::OctantBWG{dim}, c::Integer, b::Integer) -> NTuple{dim, Int}
+
+Octree (integer) coordinate of the `c`-th corner of `octant`, `c ∈ 1:2^dim` in z-order. Along
+axis `d`, bit `d-1` of `c-1` selects the low corner `octant.xyz[d]` (bit 0) or the high corner
+`octant.xyz[d] + h` (bit 1), where `h = _compute_size(b, octant.l)` is the octant's edge length.
+"""
 function vertex(octant::OctantBWG{dim, N, T}, c::Integer, b::Integer) where {dim, N, T}
     h = T(_compute_size(b, octant.l))
     return ntuple(d -> ((c - 1) & (2^(d - 1))) == 0 ? octant.xyz[d] : octant.xyz[d] + h, dim)
@@ -183,6 +190,13 @@ function vertices(octant::OctantBWG{dim}, b::Integer) where {dim}
 end
 
 face(octant::OctantBWG, f::OctantFaceIndex, b::Integer) = face(octant, f.idx, b)
+"""
+    face(octant::OctantBWG{dim}, f::Integer, b::Integer) -> NTuple{2^(dim - 1), NTuple{dim, Int}}
+
+Octree (integer) coordinates of the corners of local face `f` of `octant` (`f ∈ 1:2dim`, p4est
+face order). Two corners in 2D, four in 3D, obtained from the face→corner lookup `𝒱₂`/`𝒱₃` and
+[`vertex`](@ref). The plural [`faces`](@ref) builds the full set.
+"""
 function face(octant::OctantBWG{2}, f::Integer, b::Integer)
     return ntuple(i -> vertex(octant, 𝒱₂[f, i], b), 2)
 end
@@ -203,6 +217,12 @@ function faces(octant::OctantBWG{dim}, b::Integer) where {dim}
 end
 
 edge(octant::OctantBWG, e::OctantEdgeIndex, b::Integer) = edge(octant, e.idx, b)
+"""
+    edge(octant::OctantBWG{3}, e::Integer, b::Integer) -> NTuple{2, NTuple{3, Int}}
+
+Octree (integer) coordinates of the two endpoints of local edge `e` of a 3D `octant`
+(`e ∈ 1:12`), via the edge→corner lookup `𝒰` and [`vertex`](@ref).
+"""
 function edge(octant::OctantBWG{3}, e::Integer, b::Integer)
     return ntuple(i -> vertex(octant, 𝒰[e, i], b), 2)
 end
@@ -337,6 +357,15 @@ function refine!(octree::OctreeBWG{dim, N, T}, pivot_octant::OctantBWG{dim, N, T
     return
 end
 
+"""
+    coarsen!(octree::OctreeBWG, o::OctantBWG)
+
+Replace the `2^dim`-sibling family that `o` belongs to with their common [`parent`](@ref) in the
+tree's Morton-sorted `leaves`. `o` is snapped back to the family's first sibling (via its
+[`child_id`](@ref)/morton), the parent is written in its slot, and the remaining `2^dim - 1`
+siblings are deleted — the inverse of [`refine!`](@ref). Assumes the whole family is present and
+at the same level (e.g. after [`balanceforest!`](@ref)).
+"""
 function coarsen!(octree::OctreeBWG{dim, N, T}, o::OctantBWG{dim, N, T}) where {dim, N, T <: Integer}
     _two = T(2)
     leave_idx = findfirst(x -> x == o, octree.leaves)
@@ -361,6 +390,15 @@ OctreeBWG(cell::Hexahedron, b = _maxlevel[1]) = OctreeBWG{3, 8}(cell.nodes, b)
 Base.length(tree::OctreeBWG) = length(tree.leaves)
 Base.eltype(::Type{OctreeBWG{dim, N, T}}) where {dim, N, T} = T
 
+"""
+    inside(oct::OctantBWG{dim}, b) -> Bool
+    inside(tree::OctreeBWG{dim}, oct::OctantBWG{dim}) -> Bool
+
+Whether `oct` lies within its tree's root domain `[0, 2^b)^dim` (see [`_maximum_size`](@ref)).
+A `false` means the octant has crossed a tree boundary — the signal that an inter-tree transform
+([`transform_facet`](@ref)/[`transform_corner`](@ref)) is needed to express it in the
+neighbouring tree's coordinate system.
+"""
 function inside(oct::OctantBWG{dim}, b) where {dim}
     maxsize = _maximum_size(b)
     outside = any(xyz -> xyz >= maxsize, oct.xyz) || any(xyz -> xyz < 0, oct.xyz)
@@ -519,11 +557,54 @@ end
 const HangingKey{dim} = Tuple{Int, NTuple{dim, Int32}}
 _intnode(k::Integer, c) = (Int(k), map(Int32, c))
 
-# A coarse octant face `fc` (its corner coords, in tree `k`) borders a refined
-# neighbour: emit the face centre, constrained by all its corners, and each face-edge
-# midpoint (corner pair differing in one coordinate), constrained by that pair. In 2D
-# the face is an edge and these coincide into one entry; in 3D this gives the face
-# centre (4 constrainers) + 4 edge midpoints (2 constrainers). All keyed on `(k, coord)`.
+"""
+    _emit_coarse_face_int!(hang, k, fc)
+
+A coarse octant face `fc` (its corner coordinates, in tree `k`) borders a refined neighbour, so
+its interior points hang. Emit into `hang` (keyed on integer `(tree, coord)`): the **face centre**
+([`center`](@ref) of all corners), constrained by every face corner, and each **face-edge
+midpoint** (a corner pair differing in exactly one coordinate), constrained by that pair. In 2D
+the face is an edge and the two coincide (one entry, 2 constrainers); in 3D this gives the face
+centre (4 constrainers) plus 4 edge midpoints (2 each).
+
+3D face `fc = (c1,c2,c3,c4)` in z-order — `●` corner (constrainer), `◆` face centre, `○` edge mid:
+
+    c3 ●━━━━━━━○━━━━━━━● c4      emitted:
+       ┃      m34      ┃          ◆  hang[c  ] = {c1,c2,c3,c4}
+       ┃               ┃          ○  hang[m12] = {c1,c2}
+    m13○       ◆c      ○m24       ○  hang[m34] = {c3,c4}
+       ┃   (centre)    ┃          ○  hang[m13] = {c1,c3}
+       ┃      m12      ┃          ○  hang[m24] = {c2,c4}
+    c1 ●━━━━━━━○━━━━━━━● c2
+
+The diagonals c1–c4, c2–c3 differ in *two* coordinates → skipped (they are not octant edges).
+
+# Why a face descent alone captures hanging *edges* (2:1-balanced meshes)
+
+The descent is global: it runs over every coarse face bordering a refined neighbour and emits
+that face's 4 edge-midpoints. A hanging edge-midpoint is therefore caught as long as the edge is
+an edge of *some* emitted face. It always is. Look down a coarse edge `E` (a point `⊙` in the
+cross-section); four cells surround it, and `E` is an edge of all four faces meeting at `E`:
+
+    Q4 │ Q3      `m = center(E)` becomes a node only if some surrounding cell is refined.
+    ───⊙───      The coarse owner `C` (level ℓ) and ≥1 refined cell (level ℓ+1) both sit
+    C  │ Q2      around `E`; going around the 4-cycle, a coarse cell must be face-adjacent
+   (ℓ) │         to a refined one — that shared face is coarse-bordering-refined and has
+                 `E` as an edge, so the descent emits `m`.
+
+The subtle case is a refined cell *diagonal* to `C` (shares only `E`, not a face):
+
+    Q4 │ Q3      C|Q2 and C|Q4 are coarse–coarse (conforming), so `C`'s own faces miss `E`.
+    ℓ  │ ℓ+1     But Q2|Q3 and Q4|Q3 are coarse(ℓ)–refined(ℓ+1): those faces are emitted,
+    ───⊙───      and `E` is one of their edges → `m` is still emitted. ✓
+    C  │ Q2
+   (ℓ) │ ℓ
+
+2:1 balance is what makes this exhaustive: it caps the level jump at one, so hanging nodes are
+*always* midpoints (never ¼/¾ points from a 2-level jump), and the finest cell around any edge is
+at most one level finer. Hence emitting face-centres + edge-midpoints over all coarse faces
+bordering refined neighbours captures every hanging node — no separate edge descent is needed.
+"""
 function _emit_coarse_face_int!(hang, k, fc)
     hang[_intnode(k, center(fc))] = sort([_intnode(k, c) for c in fc])
     for i in 1:length(fc), j in (i + 1):length(fc)
@@ -624,58 +705,37 @@ Ferrite.getcelltype(grid::ForestBWG) = eltype(grid.cells)
 Ferrite.getcelltype(grid::ForestBWG, i::Int) = eltype(grid.cells) # assume for now same cell type TODO
 
 """
-    transform_pointBWG(forest, vertices) -> Vector{Vec{dim}}
-    transform_pointBWG(forest::ForestBWG{dim}, k::Integer, vertex::NTuple{dim,T}) where {dim,T} -> Vec{dim}
+    _treecorners(forest::ForestBWG{dim}, k::Integer) -> NTuple{2^dim, Vec{dim}}
 
-Transformation of a octree coordinate system point `vertex` (or a collection `vertices`) to the corresponding physical coordinate system.
+Physical coordinates of macro-tree `k`'s `2^dim` corner nodes, in Ferrite's vertex order for the
+tree's cell. These are the interpolation support points for [`_interp_treepoint`](@ref); indexing
+`forest.nodes` through `forest.cells[k].nodes` directly keeps the result concrete and
+allocation-free.
 """
-# Physical coordinates of tree `k`'s 2^dim corner nodes, as an NTuple indexed in the same
-# Lagrange-shape-function order used by `transform_pointBWG`. `tree.nodes` is an
-# `NTuple{N,Int}`, so this indexes `forest.nodes` directly (no `collect`/index-vector/broadcast
-# allocations) and the result is fully concrete.
 @inline function _treecorners(forest::ForestBWG{dim}, k::Integer) where {dim}
     nodes = forest.nodes
     return ntuple(j -> get_node_coordinate(nodes[forest.cells[k].nodes[j]]), Val(2^dim))
 end
 
-# Interpolate a single octree-coordinate `vertex` through pre-computed tree `corners`
-# (trilinear/bilinear Lagrange map). `b` is the tree's max refinement level. Hoisting the
-# per-tree `corners` out lets the collection path reuse them across every vertex of a tree.
+"""
+    _interp_treepoint(corners::NTuple{N, Vec{dim}}, b, vertex::NTuple{dim}) -> Vec{dim}
+
+Map an integer octree coordinate `vertex` of a tree to physical space — the isoparametric ``Q_1``
+geometry map of the macro element (tree). Two steps:
+
+1. affine-scale the octree coordinate (in `[0, 2^b]^dim`, see [`_maximum_size`](@ref)) to the
+   reference cube ``\\xi \\in [-1,1]^{dim}`` via ``\\xi = \\texttt{vertex} \\cdot 2/2^b - 1``;
+2. interpolate the tree's physical `corners` with the bi-/trilinear Lagrange shape functions,
+   ``x = \\sum_{j=1}^{N} N_j(\\xi)\\, \\texttt{corners}[j]``.
+
+`corners` are the tree's `2^dim` physical corner nodes (see [`_treecorners`](@ref)), passed in
+explicitly so the per-tree corners are computed once and reused for every node of the tree. This
+is the single bridge from the integer/topological octree world into physical coordinates.
+"""
 @inline function _interp_treepoint(corners::NTuple{N, Vec{dim, V}}, b, vertex::NTuple{dim, T}) where {N, dim, V, T}
     ξ = vertex .* (2 / (2^b)) .- 1
     octant_physical_coordinates = sum(j -> corners[j] * Ferrite.reference_shape_value(Lagrange{Ferrite.RefHypercube{dim}, 1}(), Vec{dim}(ξ), j), 1:N)
     return Vec{dim}(octant_physical_coordinates)
-end
-
-function transform_pointBWG(forest::ForestBWG{dim}, k::Integer, vertex::NTuple{dim, T}) where {dim, T}
-    return _interp_treepoint(_treecorners(forest, k), forest.cells[k].b, vertex)
-end
-
-# Collection path (used by `creategrid` Phase 3 over ~every unique node): the naive
-# `transform_pointBWG.(...)` recomputed each tree's corner coordinates once per vertex. Here
-# we group the `(k, coord)` pairs by tree index `k`, compute `_treecorners(forest, k)` ONCE per
-# distinct tree, and map every vertex of that tree through the cached corners. Output order is
-# preserved 1:1 with the input, so the result is byte-identical to the per-call version.
-function transform_pointBWG(forest::ForestBWG{dim, C, T}, vertices) where {dim, C, T}
-    n = length(vertices)
-    # Element type matches the per-call version exactly: Vec{dim,T} (node coord, T is the
-    # forest's coordinate scalar) scaled by a Float64 Lagrange value.
-    VT = Vec{dim, promote_type(T, Float64)}
-    physical = Vector{VT}(undef, n)
-    n == 0 && return physical
-    # group input indices by tree index k (= `first(kv)`)
-    bykv = Dict{Int, Vector{Int}}()
-    for (i, kv) in enumerate(vertices)
-        push!(get!(() -> Int[], bykv, first(kv)), i)
-    end
-    for (k, idxs) in bykv
-        corners = _treecorners(forest, k)
-        b = forest.cells[k].b
-        for i in idxs
-            physical[i] = _interp_treepoint(corners, b, last(vertices[i]))
-        end
-    end
-    return physical
 end
 
 """
@@ -699,9 +759,16 @@ end
 p4est_opposite_face_index(f) = ((f - 1) ⊻ 0b1) + 1
 p4est_opposite_edge_index(e) = ((e - 1) ⊻ 0b11) + 1
 
-# Inter-octree node identification (`creategrid` cross-tree pass): match tree-boundary
-# nodes shared between adjacent trees (vertex/face/edge neighbours) and alias each onto its
-# owner (the lowest-index incident tree) by overwriting `nodeids`/`nodeowners`.
+"""
+    _merge_intertree_nodes!(forest::ForestBWG{dim}, nodeids, nodeowners)
+
+Identify nodes shared across tree boundaries (`creategrid`'s cross-tree pass). For each tree `k`,
+walk its root-vertex, root-face and (3D) root-edge neighbours; a node on a shared boundary is
+matched to its image in the lower-index neighbour `k′` via [`transform_facet`](@ref)/
+[`transform_corner`](@ref)/[`transform_edge`](@ref) (handling tree rotations), and aliased onto
+that owner by overwriting `nodeids`/`nodeowners`. Only the lower-index tree owns a shared node
+(`k > k′`), giving a single canonical id per geometric node across all incident trees.
+"""
 function _merge_intertree_nodes!(forest::ForestBWG{dim}, nodeids, nodeowners) where {dim}
     _perm = dim == 2 ? 𝒱₂_perm : 𝒱₃_perm
     _perminv = dim == 2 ? 𝒱₂_perm_inv : 𝒱₃_perm_inv
@@ -821,12 +888,26 @@ function _merge_intertree_nodes!(forest::ForestBWG{dim}, nodeids, nodeowners) wh
     return
 end
 
-# Materialize the cell vector from per-cell provisional-id connectivity tuples `conns` and the
-# provisional→final node-id map `final_of_prov`. Used by `creategrid`.
+"""
+    _build_cells(::Type{CT}, conns, final_of_prov) -> Vector{CT}
+
+Materialize the cell vector: each entry of `conns` is a leaf's connectivity in provisional node
+ids (the per-`(tree,coord)` numbering), remapped through `final_of_prov` to the compacted final
+node ids and wrapped in cell type `CT` (`Quadrilateral`/`Hexahedron`).
+"""
 _build_cells(::Type{CT}, conns::Vector{NTuple{NV, Int}}, final_of_prov::Vector{Int}) where {CT, NV} =
     [CT(map(j -> final_of_prov[j], c)) for c in conns]
 
 
+"""
+    reconstruct_facetsets(forest::ForestBWG{dim}) -> Dict{String, OrderedSet{FacetIndex}}
+
+Transfer the macro-mesh facet sets onto the materialized (refined) grid. For each original
+`FacetIndex` (tree, face), find every leaf face of that tree that lies on the root face
+([`contains_facet`](@ref)) and emit a `FacetIndex` for the corresponding fine cell, converting
+between p4est and Ferrite face ordering (`𝒱₂_perm`/`𝒱₃_perm`). This keeps named boundaries
+(e.g. Dirichlet/Neumann sets) valid after refinement.
+"""
 function reconstruct_facetsets(forest::ForestBWG{dim}) where {dim}
     _perm = dim == 2 ? 𝒱₂_perm : 𝒱₃_perm
     _perm_inv = dim == 2 ? 𝒱₂_perm_inv : 𝒱₃_perm_inv
@@ -852,6 +933,16 @@ function reconstruct_facetsets(forest::ForestBWG{dim}) where {dim}
     return new_facesets
 end
 
+"""
+    balance_corner(forest, k′, c′, o, s)   # and balance_face / balance_edge
+
+Restore 2:1 balance across a single tree interface (corner, face or edge respectively). `s` is the
+neighbour octant at pivot octant `o`'s level; transformed into the neighbour tree `k′` (via
+[`transform_corner`](@ref)/[`transform_facet`](@ref)/[`transform_edge`](@ref)) it is `s′`. If the
+neighbour there is more than one level coarser than `o` — neither `s′` nor `parent(s′)` is a leaf
+but `parent(parent(s′))` is — that grandparent leaf is [`refine!`](@ref)d, leaving the neighbour
+exactly one level coarser. Level-1 pivots need no balancing.
+"""
 function balance_corner(forest, k′, c′, o, s)
     o.l == 1 && return # no balancing needed for pivot octant level == 1
     s′ = transform_corner(forest, k′, c′, s, true) #TODO verify the bool here; I think it's correct
@@ -1018,8 +1109,15 @@ function BalanceBuffers(s0::OT) where {OT <: OctantBWG}
 end
 
 """
-    balanceforest!(forest)
-Algorithm 17 of [BWG2011](@citet)
+    balanceforest!(forest::ForestBWG)
+
+Enforce the 2:1 balance condition across the whole forest: no two leaves sharing a face, edge or
+corner may differ by more than one refinement level. Each tree is balanced internally
+(`balancetree`); boundary leaves ([`_touches_tree_boundary`](@ref)) are additionally balanced
+against their out-of-tree neighbours via [`_balance_leaf!`](@ref). Iterated to a fixed point, then
+duplicate/over-refined leaves are pruned and re-sorted into Morton order.
+
+Algorithm 17 of [BWG2011](@citet).
 """
 function balanceforest!(forest::ForestBWG{dim}) where {dim}
     perm_face = dim == 2 ? 𝒱₂_perm : 𝒱₃_perm
@@ -1166,14 +1264,6 @@ function linearise!(leaves::Vector{T}, b, inds) where {T <: OctantBWG}
     return deleteat!(leaves, inds)
 end
 
-function siblings(o::OctantBWG, b; include_self = false)
-    siblings = children(parent(o, b), b)
-    if !include_self
-        siblings = filter(x -> x !== o, siblings)
-    end
-    return siblings
-end
-
 """
     possibleneighbors(o::OctantBWG{2}, l, b)
 Returns a tuple of possible neighbors, where the first four are corner neighbors that are exclusively connected via a corner.
@@ -1230,6 +1320,15 @@ function isancestor(o1, o2, b)
     return ancestor
 end
 
+"""
+    contains_facet(mface, sface) -> Bool
+
+Whether the sub-facet `sface` is geometrically contained in the master facet `mface`, both given
+as octree corner coordinates. In 2D the facets are axis-aligned segments and containment is an
+interval test along the shared axis; in 3D `mface` is a face and `sface` is accepted iff its
+[`center`](@ref) lies inside `mface`'s bounding box. Used to decide whether a leaf face lies on a
+coarse/root face (refinement interfaces, boundary-set transfer).
+"""
 function contains_facet(mface::Tuple{Tuple{T1, T1}, Tuple{T1, T1}}, sface::Tuple{Tuple{T2, T2}, Tuple{T2, T2}}) where {T1 <: Integer, T2 <: Integer}
     if mface[1][1] == sface[1][1] && mface[2][1] == sface[2][1] # vertical
         return mface[1][2] ≤ sface[1][2] ≤ sface[2][2] ≤ mface[2][2]
@@ -1253,6 +1352,12 @@ function contains_facet(mface::NTuple{4, Tuple{T1, T1, T1}}, sface::NTuple{4, Tu
     end
 end
 
+"""
+    face_contains_edge(f, e) -> Bool
+
+Whether edge `e` lies on face `f` (3D), tested by checking `e`'s [`center`](@ref) against `f`'s
+bounding box.
+"""
 function face_contains_edge(f::NTuple{4, Tuple{T1, T1, T1}}, e::Tuple{Tuple{T2, T2, T2}, Tuple{T2, T2, T2}}) where {T1 <: Integer, T2 <: Integer}
     edge_center = center(e)
     lower_left = ntuple(i -> minimum(getindex.(f, i)), 3)
@@ -1264,6 +1369,12 @@ function face_contains_edge(f::NTuple{4, Tuple{T1, T1, T1}}, e::Tuple{Tuple{T2, 
     end
 end
 
+"""
+    contains_edge(medge, sedge) -> Bool
+
+3D analogue of [`contains_facet`](@ref) for edges: `sedge ⊆ medge` when the two share their two
+constant coordinates and `sedge` lies within `medge` along the varying axis.
+"""
 function contains_edge(medge::Tuple{Tuple{T1, T1, T1}, Tuple{T1, T1, T1}}, sedge::Tuple{Tuple{T2, T2, T2}, Tuple{T2, T2, T2}}) where {T1 <: Integer, T2 <: Integer}
     if (medge[1][1] == sedge[1][1] && medge[2][1] == sedge[2][1]) && (medge[1][2] == sedge[1][2] && medge[2][2] == sedge[2][2]) # x1 & x2 aligned
         return medge[1][3] ≤ sedge[1][3] ≤ sedge[2][3] ≤ medge[2][3]
@@ -1276,6 +1387,14 @@ function contains_edge(medge::Tuple{Tuple{T1, T1, T1}, Tuple{T1, T1, T1}}, sedge
     end
 end
 
+"""
+    center(pivot_face) -> NTuple{dim, Int}
+
+Integer centroid of a set of octree coordinates (the corners of a face or edge): the elementwise
+sum divided by the number of points. For a coarse face bordering a refined neighbour this is
+exactly the hanging node — the face centre (4 corners) or edge midpoint (2 corners) — in the same
+integer/topological frame (no physical coordinates).
+"""
 function center(pivot_face)
     centerpoint = ntuple(i -> 0, length(pivot_face[1]))
     for c in pivot_face
@@ -1283,8 +1402,6 @@ function center(pivot_face)
     end
     return centerpoint .÷ length(pivot_face)
 end
-
-iscenter(c, f) = c == center(f)
 
 function Base.show(io::IO, ::MIME"text/plain", agrid::ForestBWG)
     println(io, "ForestBWG with ")
@@ -1330,6 +1447,13 @@ function ancestor_id(octant::OctantBWG{dim, N, T}, l::Integer, b::Integer = _max
     return i + 0x01
 end
 
+"""
+    parent(octant::OctantBWG{dim}, b::Integer = _maxlevel[dim - 1]) -> OctantBWG
+
+The level-`(l-1)` ancestor of `octant`. Computed by clearing the bit that distinguishes the octant
+from its parent: `xyz .& ~h` with `h = _compute_size(b, l)` snaps the anchor back to the parent's
+anchor. The root returns itself.
+"""
 function parent(octant::OctantBWG{dim, N, T}, b::Integer = _maxlevel[dim - 1]) where {dim, N, T}
     if octant.l > zero(T)
         h = T(_compute_size(b, octant.l))
@@ -1808,14 +1932,6 @@ function corner_neighbor(octant::OctantBWG{2, N, T}, c::T, b::T = _maxlevel[1]) 
 end
 corner_neighbor(o::OctantBWG{dim, N, T1}, c::T2, b::T3) where {dim, N, T1 <: Integer, T2 <: Integer, T3 <: Integer} = corner_neighbor(o, T1(c), T1(b))
 
-function corner_face_participation(dim::T, c::T) where {T <: Integer}
-    if dim == 2
-        return 𝒱₂_perm[findall(x -> c ∈ x, eachrow(𝒱₂))]
-    else
-        return 𝒱₃_perm[findall(x -> c ∈ x, eachrow(𝒱₃))]
-    end
-end
-
 function Base.show(io::IO, ::MIME"text/plain", o::OctantBWG{3, N, M}) where {N, M}
     x, y, z = o.xyz
     println(io, "OctantBWG{3,$N,$M}")
@@ -1830,7 +1946,20 @@ function Base.show(io::IO, ::MIME"text/plain", o::OctantBWG{2, N, M}) where {N, 
     return println(io, "   xy = $x,$y")
 end
 
+"""
+    _compute_size(b::Integer, l::Integer) -> Int
+
+Edge length, in integer octree coordinates, of a level-`l` octant in a tree using `b` bits:
+``2^{b-l}``. The root (`l = 0`) spans the whole domain (`2^b`); a leaf at the maximum level `b`
+has size `1` (the finest representable octant).
+"""
 _compute_size(b::Integer, l::Integer) = 2^(b - l)
+"""
+    _maximum_size(b::Integer) -> Int
+
+Integer extent `2^b` of the root octant along each axis: the octree coordinate domain of a tree is
+`[0, 2^b)^dim`. Used by [`inside`](@ref) to detect when an octant leaves its tree.
+"""
 _maximum_size(b::Integer) = 2^(b)
 # return the two adjacent faces $f_i$ adjacent to edge `edge`
 _face(edge::Int) = 𝒮[edge, :]
@@ -2453,14 +2582,28 @@ end
 
 # Cross-tree hanging via a two-sided face descent — the iterator's recursive split-descent
 # (the same primitive `iterate_points` uses for intra-tree faces) carried across a shared
-# tree face. `octL ∈ tree kL` (leaves `lvsL`, native frame) and `octR ∈ tree kR` are images
-# of each other across the shared face; they descend in lock-step at equal levels. When the
-# `kL` side is a leaf and the `kR` side is refined, `kL` is the coarse side and the hanging
-# nodes lie on `octR`'s face `fR` in the *fine* tree `kR`'s frame (genuine fine-leaf vertices).
-# Children are matched across the boundary by the *validated* `transform_facet` pattern from
-# `_iterate_hanging_inter!`, so no new orientation logic is introduced. Each shared face is
-# descended once per direction (only the `kL`-coarse case emits; the `kR`-coarse case is
-# emitted when the descent runs from `(kR, fR)`), matching `_iterate_hanging_inter!` exactly.
+"""
+    _iter_interface!(
+        hang, forest, kL, lvsL, octL, loL, hiL, fL,
+        kR, lvsR, octR, loR, hiR, fR, bL, bR
+    )
+
+Synchronized two-sided descent of a shared *tree* face, emitting inter-tree hanging nodes into
+`hang`. `octL ∈ tree kL` (leaves `lvsL[loL:hiL]`, native frame) and `octR ∈ tree kR` are images
+of each other across the shared face — `fL`/`fR` are the local face indices toward it — and
+descend in lock-step at equal levels.
+
+- both sides leaves of equal size → conforming, nothing emitted;
+- one side a leaf, the other refined → the leaf is the **coarse** side and the hanging nodes lie
+  on the refined side's face in the *fine* tree's frame (genuine fine-leaf vertices), emitted via
+  [`_emit_coarse_face_int!`](@ref). Only the `kL`-coarse case emits here; the `kR`-coarse case is
+  emitted when the descent is run from `(kR, fR)`, so each interface is handled once per direction;
+- both refined → recurse, matching child `i` on the `kL` side to its image on the `kR` side via
+  [`transform_facet`](@ref) (the validated cross-tree orientation pattern — no new logic).
+
+The integer/topological analogue, across trees, of the intra-tree face descent that
+[`_emit_coarse_face_int!`](@ref) feeds.
+"""
 function _iter_interface!(
         hang, forest::ForestBWG, kL::Int, lvsL, octL::OctantBWG{dim, N}, loL::Int, hiL::Int, fL::Int,
         kR::Int, lvsR, octR::OctantBWG{dim, N}, loR::Int, hiR::Int, fR::Int, bL::Integer, bR::Integer
@@ -2491,8 +2634,15 @@ function _iter_interface!(
     return
 end
 
-# Forest inter-tree hanging: seed the cross-tree face descent at each shared tree face with
-# the two tree roots. Replaces the per-boundary-leaf scan `_iterate_hanging_inter!`.
+"""
+    _iterate_interface_hanging!(hang, forest::ForestBWG)
+
+Collect all *inter-tree* hanging nodes of `forest` into `hang`. For each shared tree face (found
+via the facet–facet neighbourhood), seed [`_iter_interface!`](@ref) with the two tree roots and
+let it descend both sides in lock-step. The forest-level counterpart of the intra-tree face
+descent; together they capture every hanging node of the materialized grid. Single-tree forests
+have no shared faces, so this is a no-op there.
+"""
 function _iterate_interface_hanging!(hang, forest::ForestBWG{dim}) where {dim}
     perm = dim == 2 ? 𝒱₂_perm : 𝒱₃_perm
     perminv = dim == 2 ? 𝒱₂_perm_inv : 𝒱₃_perm_inv
@@ -2514,9 +2664,16 @@ function _iterate_interface_hanging!(hang, forest::ForestBWG{dim}) where {dim}
     return
 end
 
-# Number one leaf's vertices + push its cell connectivity. A top-level function barrier
-# (concrete args) so the `ntuple`/`get!` closures compile without boxing — exactly the role
-# `_number_tree!` plays for `creategrid`; called from the iterator's leaf-volume callback.
+"""
+    _lnodes_number_leaf!(conns, nodeids, prov_key, leaf, k, b, node_map, ::Val{NV})
+
+Number one `leaf`'s `NV = 2^dim` vertices and push its cell connectivity. Each `(tree, coord)`
+key is assigned a provisional id on first sight (`get!` into `nodeids`, recording the key in
+`prov_key`), so a coordinate shared by two leaves of the same tree automatically reuses its id.
+The connectivity is pushed to `conns` reordered from octree z-order to Ferrite's vertex order via
+`node_map`. Called from the point iterator's leaf-volume callback; a top-level function barrier
+with concrete argument types so the `ntuple`/`get!` closures compile without boxing.
+"""
 function _lnodes_number_leaf!(conns, nodeids, prov_key, leaf::OctantBWG, k::Int, b::Integer, node_map, ::Val{NV}) where {NV}
     v = vertices(leaf, b)
     ids = ntuple(Val(NV)) do i
@@ -2532,17 +2689,35 @@ end
 """
     creategrid(forest::ForestBWG) -> NonConformingGrid
 
-Materialize the same `NonConformingGrid` as [`creategrid`](@ref), driven entirely by the
-literal point-centric iterator (`iterate_points`, IBWG2015 Alg 5.2/5.3) instead of the
-`iterate_leaves` + `iterate_hanging` specializations. ONE traversal per tree (§5.4 face
-specialization, `mindim = dim-1`: volumes + faces, no corner/edge descent) does it all:
-the leaf-volume callback numbers vertices + builds connectivity (Morton order ⇒ same
-min-Morton owner as `creategrid`), the non-conforming face callback emits the interior
-hanging nodes. Inter-tree hanging uses the cross-tree two-sided face descent
-`_iterate_interface_hanging!`. Cross-tree node *identity* still goes through
-`_merge_intertree_nodes!` (per-tree numbering ⇒ one `(tree,coord)` key per incident tree,
-canonicalized by the merge); compaction and cells reuse `creategrid`'s machinery. Produces
-the **same grid** as `creategrid` (byte-identical) on all golden cases, at memory parity.
+Materialize a `ForestBWG` (a forest of adaptively refined octrees) into a `NonConformingGrid`
+that can be used like any Ferrite grid, complete with the hanging-node constraints
+(`conformity_info`) and the transferred boundary sets (`facetsets`).
+
+Driven by the point-centric node iterator [`iterate_points`](@ref) (IBWG2015 Alg 5.2/5.3). The
+whole construction is **integer/topological** — node identity is decided on integer
+`(tree, octree-coord)` keys, never physical coordinates — and physical positions are computed
+once, at the very end, through the trees' ``Q_1`` geometry map ([`_interp_treepoint`](@ref)).
+
+Pipeline:
+
+1. **Number + connectivity + intra-tree hanging.** One `iterate_points` traversal per tree with
+   `mindim = dim-1` visits leaf volumes and faces. The volume callback numbers a leaf's vertices
+   and pushes its connectivity ([`_lnodes_number_leaf!`](@ref), Morton order); the face callback
+   emits the interior hanging nodes of any coarse face bordering a finer leaf
+   ([`_emit_coarse_face_int!`](@ref)).
+2. **Inter-tree hanging.** [`_iterate_interface_hanging!`](@ref) descends each shared tree face
+   from both sides and emits the cross-tree hanging nodes (no-op for a single-tree forest).
+3. **Cross-tree identity + compaction.** Per-tree numbering gives one `(tree,coord)` key per
+   incident tree; [`_merge_intertree_nodes!`](@ref) canonicalizes shared-boundary keys onto a
+   single owner, then the provisional ids are compacted to a dense range and each owner's
+   physical coordinate is computed once.
+4. **Cells + constraints.** [`_build_cells`](@ref) maps connectivity to final ids, the hanging
+   map is translated to final ids, and [`reconstruct_facetsets`](@ref) carries the named
+   boundaries onto the refined grid.
+
+Assumes a 2:1-balanced forest (see [`balanceforest!`](@ref)); under that condition the face
+passes capture every hanging node — see [`_emit_coarse_face_int!`](@ref) for why no separate
+edge descent is needed.
 """
 function creategrid(forest::ForestBWG{dim}) where {dim}
     node_map = dim == 2 ? node_map₂ : node_map₃
