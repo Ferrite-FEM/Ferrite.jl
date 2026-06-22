@@ -168,7 +168,7 @@ xy = 4, 0
 
 ### Octant operation
 
-There are multiple useful functions to compute information about an octant e.g. parent, childs, etc.
+There are multiple useful functions to compute information about an octant e.g. parent, children, etc.
 
 ```@docs
 Ferrite.AMR.isancestor

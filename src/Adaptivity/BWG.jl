@@ -1345,7 +1345,7 @@ function contains_facet(mface::Tuple{Tuple{T1, T1}, Tuple{T1, T1}}, sface::Tuple
 end
 
 # currently checking if sface centroid lies in mface
-# TODO should be checked if applicaple in general, I guess yes
+# TODO should be checked if applicable in general, I guess yes
 function contains_facet(mface::NTuple{4, Tuple{T1, T1, T1}}, sface::NTuple{4, Tuple{T2, T2, T2}}) where {T1 <: Integer, T2 <: Integer}
     sface_center = center(sface)
     lower_left = ntuple(i -> minimum(getindex.(mface, i)), 3)

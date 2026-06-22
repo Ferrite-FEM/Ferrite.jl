@@ -698,7 +698,7 @@ end
     Ferrite.AMR.balanceforest!(adaptive_grid)
     @test Ferrite.AMR.getncells(adaptive_grid) == 23
 
-    # 3D case intra treee simple test, non conformity level 2
+    # 3D case intra tree simple test, non conformity level 2
     grid = generate_grid(Hexahedron, (1, 1, 1))
     adaptive_grid = ForestBWG(grid, 3)
     Ferrite.AMR.refine_all!(adaptive_grid, 1)
