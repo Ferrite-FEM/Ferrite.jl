@@ -1,5 +1,7 @@
 # # [Adaptive Linear Elasticity](@id tutorial-elasticity-adaptivity)
 #
+# ![Adaptively refined L-shape mesh, concentrated at the re-entrant corner.](elasticity_adaptivity.png)
+#
 # ## Introduction
 #
 # This tutorial demonstrates adaptive mesh refinement (AMR) for 2D linear
