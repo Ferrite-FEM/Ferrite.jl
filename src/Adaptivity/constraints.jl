@@ -24,24 +24,29 @@ function Ferrite.add!(ch::ConstraintHandler{<:DofHandler{<:Any, <:NonConformingG
 end
 
 function _add_conformity_constraint(ch::ConstraintHandler, field_index::Int, interpolation::ScalarInterpolation)
+    # Reached only for a NonConformingGrid, so the entity maps are guaranteed to be present.
+    # type annotated for the compiler
+    vertices = (ch.dh.entitymaps::Ferrite.EntityMaps).vertices[field_index]
     for (hdof, mdof) in ch.dh.grid.conformity_info
         # A hanging node is the average of its masters: an edge midpoint of its 2 endpoints
         # (weight 1/2), a 3D face centre of its 4 face corners (weight 1/4).
         @debug @assert length(mdof) ∈ (2, 4)
         weight = 1 / length(mdof)
-        lc = AffineConstraint(ch.dh.vertexdicts[field_index][hdof], [ch.dh.vertexdicts[field_index][m] => weight for m in mdof], 0.0)
+        lc = AffineConstraint(vertices[hdof], [vertices[m] => weight for m in mdof], 0.0)
         add!(ch, lc)
     end
     return
 end
 
 function _add_conformity_constraint(ch::ConstraintHandler, field_index::Int, interpolation::VectorizedInterpolation{vdim}) where {vdim}
+    # Reached only for a NonConformingGrid, so the entity maps are guaranteed to be present.
+    vertices = (ch.dh.entitymaps::Ferrite.EntityMaps).vertices[field_index]
     for (hdof, mdof) in ch.dh.grid.conformity_info
         @debug @assert length(mdof) ∈ (2, 4)
         weight = 1 / length(mdof)
         # One constraint per component
         for vd in 1:vdim
-            lc = AffineConstraint(ch.dh.vertexdicts[field_index][hdof] + vd - 1, [ch.dh.vertexdicts[field_index][m] + vd - 1 => weight for m in mdof], 0.0) # TODO change for other interpolation types than linear
+            lc = AffineConstraint(vertices[hdof] + vd - 1, [vertices[m] + vd - 1 => weight for m in mdof], 0.0) # TODO change for other interpolation types than linear
             add!(ch, lc)
         end
     end
