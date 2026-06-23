@@ -341,13 +341,29 @@ struct OctreeBWG{dim, N, T} <: AbstractAdaptiveCell{Ferrite.RefHypercube{dim}}
     nodes::NTuple{N, Int}
 end
 
+"""
+    refine!(octree::OctreeBWG, pivot_octant::OctantBWG)
+
+Replace the leaf `pivot_octant` in `octree.leaves` by its `2^dim`
+[`children`](@ref Ferrite.AMR.children), spliced in z-order into the parent's slot so the
+Morton order of `leaves` is preserved. A no-op if `pivot_octant` is already at the tree's
+maximum level `octree.b`.
+
+`pivot_octant` is located with a `searchsortedfirst` binary search, which requires
+`octree.leaves` to be Morton-sorted (the `Base.isless` total order) — the standard
+invariant for a BWG octree. A single call is `O(n)` because of the in-place `insert!`;
+to refine many leaves at once prefer [`refine_all!`](@ref Ferrite.AMR.refine_all!) or the
+`refine!(forest, cellids)` vector method, which rebuild the leaf list in one linear pass
+instead of `n` shifts.
+"""
 function refine!(octree::OctreeBWG{dim, N, T}, pivot_octant::OctantBWG{dim, N, T}) where {dim, N, T <: Integer}
     if !(pivot_octant.l + 1 <= octree.b)
         return
     end
     o = one(T)
-    # TODO replace this with recursive search function
-    leave_idx = findfirst(x -> x == pivot_octant, octree.leaves)
+    # leaves are Morton-sorted (the `Base.isless` total order), so locate the
+    # pivot with a binary search instead of an O(N) linear scan.
+    leave_idx = searchsortedfirst(octree.leaves, pivot_octant)
     old_octant = popat!(octree.leaves, leave_idx)
     _children = children(pivot_octant, octree.b)
     for child in _children
@@ -360,11 +376,12 @@ end
 """
     coarsen!(octree::OctreeBWG, o::OctantBWG)
 
-Replace the `2^dim`-sibling family that `o` belongs to with their common [`parent`](@ref) in the
+Replace the `2^dim`-sibling family that `o` belongs to with their common `parent` in the
 tree's Morton-sorted `leaves`. `o` is snapped back to the family's first sibling (via its
-[`child_id`](@ref)/morton), the parent is written in its slot, and the remaining `2^dim - 1`
-siblings are deleted — the inverse of [`refine!`](@ref). Assumes the whole family is present and
-at the same level (e.g. after [`balanceforest!`](@ref)).
+`child_id`/morton), the parent is written in its slot, and the remaining `2^dim - 1`
+siblings are deleted — the inverse of [`refine!`](@ref Ferrite.AMR.refine!). Assumes the whole
+family is present and at the same level (e.g. after
+[`balanceforest!`](@ref Ferrite.AMR.balanceforest!)).
 """
 function coarsen!(octree::OctreeBWG{dim, N, T}, o::OctantBWG{dim, N, T}) where {dim, N, T <: Integer}
     _two = T(2)
@@ -615,19 +632,54 @@ function _emit_coarse_face_int!(hang, k, fc)
 end
 
 
+"""
+    refine_all!(forest::ForestBWG, l)
+
+Uniformly refine every leaf currently at level `l - 1` across all trees of `forest`,
+i.e. take a forest refined to level `l - 1` to level `l`. A convenience wrapper for a
+uniform refinement; adaptive refinement of marked cells goes through the
+`refine!(forest, cellids)` vector method.
+
+Runs in `O(n)`: each tree's leaf list is rebuilt in a single pass (children spliced in
+z-order in place of their parent, preserving Morton order) rather than via `n`
+in-place `insert!`s, which would be `O(n^2)`.
+"""
 function refine_all!(forest::ForestBWG, l)
     for tree in forest.cells
-        for leaf in tree.leaves
-            if leaf.l != l - 1 #maxlevel
-                continue
+        leaves = tree.leaves
+        b = tree.b
+        # Refine every level-(l-1) leaf in a single linear pass. Doing this with a
+        # per-leaf `refine!` is O(n^2): each in-place `insert!` memmoves the array
+        # tail. Instead, rebuild the leaf list once. Children are emitted in z-order
+        # in the parent's slot, so the result stays Morton-sorted.
+        any(leaf -> leaf.l == l - 1, leaves) || continue
+        refined = similar(leaves, 0)
+        sizehint!(refined, length(leaves))
+        for leaf in leaves
+            if leaf.l == l - 1 && leaf.l + 1 <= b
+                for child in children(leaf, b)
+                    push!(refined, child)
+                end
             else
-                refine!(tree, leaf)
+                push!(refined, leaf)
             end
         end
+        resize!(leaves, length(refined))
+        copyto!(leaves, refined)
     end
     return
 end
 
+"""
+    refine!(forest::ForestBWG, cellid::Integer)
+
+Refine the single leaf addressed by the global `cellid` (the same flat,
+tree-major / Morton-within-tree numbering used by the grid from
+[`creategrid`](@ref Ferrite.AMR.creategrid)). The owning tree is found from the per-tree
+leaf counts; the leaf is then refined via the `refine!(octree, octant)` method. To refine
+several cells, use the vector method below — it is linear, whereas looping this one is
+`O(n^2)`.
+"""
 function refine!(forest::ForestBWG, cellid::Integer)
     nleaves_k = length(forest.cells[1].leaves)
     prev_nleaves_k = 0
@@ -640,18 +692,88 @@ function refine!(forest::ForestBWG, cellid::Integer)
     return refine!(forest.cells[k], forest.cells[k].leaves[cellid - prev_nleaves_k])
 end
 
-function refine!(forest::ForestBWG, cellids::Vector{<:Integer})
-    sort!(cellids)
-    ncells = getncells(forest)
-    shift = 0
-    for cellid in cellids
-        refine!(forest, cellid + shift)
-        shift += getncells(forest) - ncells
-        ncells = getncells(forest)
+"""
+    refine!(forest::ForestBWG, cellids::AbstractVector{<:Integer})
+
+Refine all leaves addressed by the global `cellids` — the production refinement entry
+point, e.g. for the cells flagged by an error estimator in an adaptive FE loop. `cellids`
+are global cell ids in the grid's flat numbering (tree-major, Morton-within-tree);
+duplicates are ignored and ids at the maximum level `tree.b` are skipped.
+
+Runs in `O(n + k)` for `n` leaves and `k = length(cellids)`: the sorted ids are mapped to
+per-tree local indices in one merge pass and each tree's leaf list is rebuilt once
+(children spliced in z-order in place of their parent, preserving Morton order). This
+avoids the `O(n^2)` of refining cells one at a time, where every in-place `insert!`
+memmoves the leaf-array tail. The caller's `cellids` vector is not modified (a sorted
+copy is taken when needed).
+
+Combine with [`balanceforest!`](@ref Ferrite.AMR.balanceforest!) to restore 2:1 balance and
+[`coarsen!`](@ref Ferrite.AMR.coarsen!) / `coarsen_all!` for derefinement; all preserve the
+Morton-sorted leaf invariant this method relies on.
+"""
+function refine!(forest::ForestBWG, cellids::AbstractVector{<:Integer})
+    isempty(cellids) && return
+    # Refine all marked cells in a single linear pass per tree. Refining them one at
+    # a time (the cellid+shift loop) is O(n^2): every in-place `insert!` memmoves the
+    # leaf-array tail. Instead, map the (sorted) global ids to per-tree local leaf
+    # indices and rebuild each tree's leaf list once, splicing children in z-order
+    # in place of their parent so the result stays Morton-sorted. `sort` (not `sort!`)
+    # leaves the caller's marking vector untouched.
+    marked = issorted(cellids) ? cellids : sort(cellids)
+    cursor = 1                # cursor into `marked`
+    offset = 0                # number of leaves in already-processed trees
+    for tree in forest.cells
+        leaves = tree.leaves
+        n = length(leaves)
+        # marked global ids in (offset, offset + n] belong to this tree
+        first_marked = cursor
+        while cursor <= length(marked) && marked[cursor] <= offset + n
+            cursor += 1
+        end
+        if cursor > first_marked
+            b = tree.b
+            nchild = length(children(leaves[1], b))   # 2^dim
+            refined = similar(leaves, 0)
+            sizehint!(refined, n + (cursor - first_marked) * nchild)
+            m = first_marked
+            for localidx in 1:n
+                leaf = leaves[localidx]
+                if m < cursor && marked[m] - offset == localidx
+                    while m < cursor && marked[m] - offset == localidx # skip duplicate ids
+                        m += 1
+                    end
+                    if leaf.l + 1 <= b
+                        for child in children(leaf, b)
+                            push!(refined, child)
+                        end
+                        continue
+                    end
+                end
+                push!(refined, leaf)
+            end
+            resize!(leaves, length(refined))
+            copyto!(leaves, refined)
+        end
+        offset += n
     end
     return
 end
 
+"""
+    coarsen_all!(forest::ForestBWG)
+
+Coarsen every `2^dim`-sibling family in `forest` by one level — the inverse of
+[`refine_all!`](@ref Ferrite.AMR.refine_all!). Each leaf that is a first sibling
+(`child_id == 1`) is replaced by its parent via [`coarsen!`](@ref Ferrite.AMR.coarsen!).
+
+!!! warning
+    This assumes every first sibling has its complete same-level family present, which
+    holds for a uniformly refined forest but **not** for an arbitrary adaptively refined
+    one. Calling it on a forest with incomplete families violates [`coarsen!`](@ref
+    Ferrite.AMR.coarsen!)'s precondition and corrupts the leaf list. For selective
+    derefinement, coarsen individual complete families with [`coarsen!`](@ref
+    Ferrite.AMR.coarsen!) instead.
+"""
 function coarsen_all!(forest::ForestBWG)
     for tree in forest.cells
         for leaf in tree.leaves

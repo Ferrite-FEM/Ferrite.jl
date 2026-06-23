@@ -215,6 +215,26 @@ Ferrite.AMR.transform_facet_remote
 
 despite being never used in the code base so far.
 
+### Refinement and coarsening
+
+Refinement replaces a leaf by its `2^dim` children; coarsening replaces a `2^dim`-sibling
+family by its parent. Both operate on each tree's Morton-sorted `leaves` vector and preserve
+that order, which the rest of the pipeline (balancing, the point iterator) relies on.
+
+The production entry point is `refine!(forest, cellids)`: an adaptive FE step marks cells
+with an error estimator and passes their global ids here. It is implemented to scale
+linearly in the number of leaves — the marked ids are mapped to per-tree local indices and
+each tree's leaf list is rebuilt in a single pass, rather than refining cells one at a time
+(every in-place `insert!` would memmove the array tail, giving `O(n^2)`). `refine_all!` is
+the uniform-refinement convenience wrapper and is linear for the same reason.
+
+```@docs
+Ferrite.AMR.refine!
+Ferrite.AMR.refine_all!
+Ferrite.AMR.coarsen!
+Ferrite.AMR.coarsen_all!
+```
+
 ### Balancing
 
 Before a forest can be materialised into a grid it must satisfy the **2:1 balance** condition:
