@@ -1069,15 +1069,25 @@ function reconstruct_facetsets(forest::ForestBWG{dim}) where {dim}
         new_facetset = typeof(facetset)()
         for facetidx in facetset
             pivot_tree = forest.cells[facetidx[1]]
+            b = pivot_tree.b
+            rootlen = _compute_size(b, 0)                       # 2^b, the root extent
             last_cellid = facetidx[1] != 1 ? sum(length, @view(forest.cells[1:(facetidx[1] - 1)])) : 0
             pivot_faceid = facetidx[2]
-            pivot_face = faces(root(dim), pivot_tree.b)[_perm_inv[pivot_faceid]]
+            # The root face in p4est ordering, and the axis-aligned plane it pins. p4est faces
+            # pair up as (1,2)=(x-,x+), (3,4)=(y-,y+), (5,6)=(z-,z+): axis = (f-1)÷2+1, the odd
+            # index is the low face (coord 0), the even index the high face (coord 2^b). A leaf
+            # contributes a facet to this set iff it lies on that plane; staying inside one tree
+            # there is no rotation, so the contributing local face index equals the root's (`f`)
+            # — replacing the former O(#leaves · 2dim) `faces`/`contains_facet` scan (the loop
+            # below is O(#leaves) with an O(1) plane test and no per-leaf allocation).
+            f = _perm_inv[pivot_faceid]                         # p4est face index of the root face
+            axis = (f - 1) ÷ 2 + 1
+            is_low = isodd(f)
+            ferrite_leaf_face_idx = _perm[f]                    # == pivot_faceid
             for (leaf_idx, leaf) in enumerate(pivot_tree.leaves)
-                for (leaf_face_idx, leaf_face) in enumerate(faces(leaf, pivot_tree.b))
-                    if contains_facet(pivot_face, leaf_face)
-                        ferrite_leaf_face_idx = _perm[leaf_face_idx]
-                        push!(new_facetset, FacetIndex(last_cellid + leaf_idx, ferrite_leaf_face_idx))
-                    end
+                onface = is_low ? (leaf.xyz[axis] == 0) : (leaf.xyz[axis] + _compute_size(b, leaf.l) == rootlen)
+                if onface
+                    push!(new_facetset, FacetIndex(last_cellid + leaf_idx, ferrite_leaf_face_idx))
                 end
             end
         end
