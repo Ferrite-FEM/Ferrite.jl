@@ -1101,6 +1101,34 @@ function reconstruct_facetsets(forest::ForestBWG{dim}) where {dim}
     return new_facesets
 end
 
+# Membership test on a Morton-sorted leaf vector. Leaves are kept in `Base.isless` order
+# everywhere (balancetree linearises + sorts, refine! splices children in z-order), so this is an
+# O(log n) binary search instead of the O(n) linear scan that `∈ Vector` would do — the same idea
+# as in `refine!`. Used in the inter-tree balance hot path, once per boundary-leaf neighbour.
+#
+# The leaves are ordered by the `(morton-anchor, level)` key (== the `Base.isless` order). We
+# compute the *target* key once and compare against each probed leaf's key, rather than going
+# through `searchsortedfirst`/`isless` which recomputes `morton` for both sides every step
+# (`morton` is a ~b·dim-bit interleave — the dominant per-comparison cost on small per-tree arrays).
+@inline function _in_leaves(leaves::Vector{<:OctantBWG}, o::OctantBWG)
+    okey = (morton(o, o.l, o.l), o.l)
+    lo = 1
+    hi = length(leaves)
+    @inbounds while lo <= hi
+        mid = (lo + hi) >>> 1
+        lf = leaves[mid]
+        lkey = (morton(lf, lf.l, lf.l), lf.l)
+        if lkey < okey
+            lo = mid + 1
+        elseif lkey > okey
+            hi = mid - 1
+        else
+            return true                 # equal key uniquely identifies the octant
+        end
+    end
+    return false
+end
+
 """
     balance_corner(forest, k′, c′, o, s)   # and balance_face / balance_edge
 
@@ -1115,9 +1143,11 @@ function balance_corner(forest, k′, c′, o, s)
     o.l == 1 && return # no balancing needed for pivot octant level == 1
     s′ = transform_corner(forest, k′, c′, s, true) #TODO verify the bool here; I think it's correct
     neighbor_tree = forest.cells[k′]
-    return if s′ ∉ neighbor_tree.leaves && parent(s′, neighbor_tree.b) ∉ neighbor_tree.leaves
-        if parent(parent(s′, neighbor_tree.b), neighbor_tree.b) ∈ neighbor_tree.leaves
-            refine!(neighbor_tree, parent(parent(s′, neighbor_tree.b), neighbor_tree.b))
+    leaves = neighbor_tree.leaves
+    return if !_in_leaves(leaves, s′) && !_in_leaves(leaves, parent(s′, neighbor_tree.b))
+        gp = parent(parent(s′, neighbor_tree.b), neighbor_tree.b)
+        if _in_leaves(leaves, gp)
+            refine!(neighbor_tree, gp)
         end
     end
 end
@@ -1126,9 +1156,11 @@ function balance_face(forest, k′, f′, o, s)
     o.l == 1 && return # no balancing needed for pivot octant level == 1
     s′ = transform_facet(forest, k′, f′, s)
     neighbor_tree = forest.cells[k′]
-    return if s′ ∉ neighbor_tree.leaves && parent(s′, neighbor_tree.b) ∉ neighbor_tree.leaves
-        if parent(parent(s′, neighbor_tree.b), neighbor_tree.b) ∈ neighbor_tree.leaves
-            refine!(neighbor_tree, parent(parent(s′, neighbor_tree.b), neighbor_tree.b))
+    leaves = neighbor_tree.leaves
+    return if !_in_leaves(leaves, s′) && !_in_leaves(leaves, parent(s′, neighbor_tree.b))
+        gp = parent(parent(s′, neighbor_tree.b), neighbor_tree.b)
+        if _in_leaves(leaves, gp)
+            refine!(neighbor_tree, gp)
         end
     end
 end
@@ -1137,9 +1169,11 @@ function balance_edge(forest, k′, e′, o, s)
     o.l == 1 && return # no balancing needed for pivot octant level == 1
     s′ = transform_edge(forest, k′, e′, s, true)
     neighbor_tree = forest.cells[k′]
-    return if s′ ∉ neighbor_tree.leaves && parent(s′, neighbor_tree.b) ∉ neighbor_tree.leaves
-        if parent(parent(s′, neighbor_tree.b), neighbor_tree.b) ∈ neighbor_tree.leaves
-            refine!(neighbor_tree, parent(parent(s′, neighbor_tree.b), neighbor_tree.b))
+    leaves = neighbor_tree.leaves
+    return if !_in_leaves(leaves, s′) && !_in_leaves(leaves, parent(s′, neighbor_tree.b))
+        gp = parent(parent(s′, neighbor_tree.b), neighbor_tree.b)
+        if _in_leaves(leaves, gp)
+            refine!(neighbor_tree, gp)
         end
     end
 end
