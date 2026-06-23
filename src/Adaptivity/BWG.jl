@@ -574,6 +574,35 @@ end
 const HangingKey{dim} = Tuple{Int, NTuple{dim, Int32}}
 _intnode(k::Integer, c) = (Int(k), map(Int32, c))
 
+# Packed integer key for `creategrid`'s provisional node-id map. That map is logically keyed
+# on `(tree, octree-coord)`; hashing the nested coordinate tuple `Tuple{Int, NTuple{dim, Int}}`
+# dominates the materialize cost, because a corner shared by up to `2^dim` leaves is probed that
+# many times (`_lnodes_number_leaf!`). Packing the integer octree coordinate into one `UInt64`
+# turns the key into the cheap-to-hash `Tuple{Int, UInt64}`; node *identity* is unchanged, so the
+# numbering is byte-for-byte identical — only the key hash is cheaper.
+#
+# Valid because octree coords lie in `[0, 2^b]` with `b ≤ _maxlevel` (`[30, 19]` for 2D/3D):
+# 31 bits/axis × 2 = 62 bits (2D) and 21 bits/axis × 3 = 63 bits (3D) both fit a `UInt64` with no
+# overlap. Works for `Int` and `Int32` coords alike (`UInt64` of equal values agree), unifying the
+# `nodeids`/`HangingKey` key spaces. Only ever called on in-range, non-negative coords (the hot
+# path numbers leaf vertices; cross-tree merge lookups bounds-check first via `_nodekey_inrange`).
+@inline _packcoord(c::NTuple{2, <:Integer}) = UInt64(c[1]) | (UInt64(c[2]) << 31)
+@inline _packcoord(c::NTuple{3, <:Integer}) = UInt64(c[1]) | (UInt64(c[2]) << 21) | (UInt64(c[3]) << 42)
+@inline _nodekey(k::Integer, c::NTuple) = (Int(k), _packcoord(c))
+
+# Cross-tree merge lookups (`_merge_intertree_nodes!`) feed `transform_facet`/`_edge` images that
+# can land outside `[0, 2^b]` (the transforms place an octant's body across the shared boundary).
+# Such a coordinate is, by construction, not a node of tree `k` — so return `nothing`, which the
+# caller treats exactly as the old `haskey(nodeids, (k, coord))` returning `false`. This keeps
+# packing safe (never fed a negative/oversized coord) and behaviour identical.
+@inline function _nodekey_inrange(k::Integer, c::NTuple{dim, <:Integer}, b::Integer) where {dim}
+    hi = 1 << b
+    for d in 1:dim
+        (0 <= c[d] <= hi) || return nothing
+    end
+    return _nodekey(k, c)
+end
+
 """
     _emit_coarse_face_int!(hang, k, fc)
 
@@ -913,7 +942,7 @@ function _merge_intertree_nodes!(forest::ForestBWG{dim}, nodeids, alias::Vector{
                 if k > k′
                     #delete!(nodes,(k,v))
                     new_v = vertex(root(dim), node_map[v′], tree.b)
-                    alias[nodeids[(k, vc)]] = alias[nodeids[(k′, new_v)]]
+                    alias[nodeids[_nodekey(k, vc)]] = alias[nodeids[_nodekey(k′, new_v)]]
                     @debug println("    Matching $vc (local) to $new_v (neighbor)")
                 end
             end
@@ -950,17 +979,17 @@ function _merge_intertree_nodes!(forest::ForestBWG{dim}, nodeids, alias::Vector{
                         if dim == 2
                             for i in 1:ncorners_face2D
                                 i′ = rotation_permutation(r, i)
-                                if haskey(nodeids, (k′, fnodes_neighbor[i′]))
-                                    @debug println("    Updating $((k, fnodes[i])) $(nodeids[(k, fnodes[i])]) -> $(nodeids[(k′, fnodes_neighbor[i′])])")
-                                    alias[nodeids[(k, fnodes[i])]] = alias[nodeids[(k′, fnodes_neighbor[i′])]]
+                                nkey = _nodekey_inrange(k′, fnodes_neighbor[i′], tree′.b)
+                                if nkey !== nothing && haskey(nodeids, nkey)
+                                    alias[nodeids[_nodekey(k, fnodes[i])]] = alias[nodeids[nkey]]
                                 end
                             end
                         else
                             for i in 1:ncorners_face3D
                                 rotated_ξ = rotation_permutation(f′, f, r, i)
-                                if haskey(nodeids, (k′, fnodes_neighbor[i]))
-                                    @debug println("    Updating $((k, fnodes[i])) $(nodeids[(k, fnodes[rotated_ξ])]) -> $(nodeids[(k′, fnodes_neighbor[i])])")
-                                    alias[nodeids[(k, fnodes[rotated_ξ])]] = alias[nodeids[(k′, fnodes_neighbor[i])]]
+                                nkey = _nodekey_inrange(k′, fnodes_neighbor[i], tree′.b)
+                                if nkey !== nothing && haskey(nodeids, nkey)
+                                    alias[nodeids[_nodekey(k, fnodes[rotated_ξ])]] = alias[nodeids[nkey]]
                                 end
                             end
                         end
@@ -999,9 +1028,9 @@ function _merge_intertree_nodes!(forest::ForestBWG{dim}, nodeids, alias::Vector{
                         @debug println("  Trying to match $enodes (local) to $enodes_neighbor (neighbor $neighbor_candidate)")
                         for i in 1:ncorners_edge
                             i′ = rotation_permutation(r, i)
-                            if haskey(nodeids, (k′, enodes_neighbor[i′]))
-                                @debug println("    Updating $((k, enodes[i])) $(nodeids[(k, enodes[i])]) -> $(nodeids[(k′, enodes_neighbor[i′])])")
-                                alias[nodeids[(k, enodes[i])]] = alias[nodeids[(k′, enodes_neighbor[i′])]]
+                            nkey = _nodekey_inrange(k′, enodes_neighbor[i′], tree′.b)
+                            if nkey !== nothing && haskey(nodeids, nkey)
+                                alias[nodeids[_nodekey(k, enodes[i])]] = alias[nodeids[nkey]]
                             end
                         end
                     end
@@ -2815,9 +2844,9 @@ with concrete argument types so the `ntuple`/`get!` closures compile without box
 function _lnodes_number_leaf!(conns, nodeids, prov_key, leaf::OctantBWG, k::Int, b::Integer, node_map, ::Val{NV}) where {NV}
     v = vertices(leaf, b)
     ids = ntuple(Val(NV)) do i
-        key = (k, map(Int, v[i]))
-        get!(nodeids, key) do
-            push!(prov_key, key); length(prov_key)
+        coord = map(Int, v[i])
+        get!(nodeids, _nodekey(k, coord)) do
+            push!(prov_key, (k, coord)); length(prov_key)
         end
     end
     push!(conns, ntuple(i -> ids[node_map[i]], Val(NV)))
@@ -2864,7 +2893,10 @@ function creategrid(forest::ForestBWG{dim}) where {dim}
     KeyT = Tuple{Int, NTuple{dim, Int}}
     ncells = getncells(forest)
 
-    nodeids = Dict{KeyT, Int}(); sizehint!(nodeids, ncells)
+    # `nodeids` maps a packed integer key (`_nodekey`) -> provisional id; `prov_key` keeps the
+    # *unpacked* `(tree, coord)` per provisional id, since the integer coordinate is still needed
+    # at the end for the physical-coordinate interpolation (`_interp_treepoint`).
+    nodeids = Dict{Tuple{Int, UInt64}, Int}(); sizehint!(nodeids, ncells)
     prov_key = KeyT[]; sizehint!(prov_key, ncells)
     conns = NTuple{NV, Int}[]; sizehint!(conns, ncells)
     hang = Dict{HangingKey{dim}, Vector{HangingKey{dim}}}()
@@ -2912,12 +2944,13 @@ function creategrid(forest::ForestBWG{dim}) where {dim}
         final_of_prov[p] = d
     end
 
-    # Phase 4 — cells + hanging constraints. `nodeids[key]` gives a provisional id; `final_of_prov`
-    # folds the alias canonicalization and densification into the final dense id.
+    # Phase 4 — cells + hanging constraints. `nodeids[_nodekey(key...)]` gives a provisional id
+    # (hanging keys and their masters are genuine fine-leaf vertices, so they are in `nodeids`);
+    # `final_of_prov` folds the alias canonicalization and densification into the final dense id.
     cells = _build_cells(celltype, conns, final_of_prov)
     hnodes = Dict{Int, Vector{Int}}()
     for (hkey, mkeys) in hang
-        hnodes[final_of_prov[nodeids[hkey]]] = [final_of_prov[nodeids[m]] for m in mkeys]
+        hnodes[final_of_prov[nodeids[_nodekey(hkey[1], hkey[2])]]] = [final_of_prov[nodeids[_nodekey(m[1], m[2])]] for m in mkeys]
     end
     return NonConformingGrid(cells, Node.(nodecoords); conformity_info = hnodes, facetsets = reconstruct_facetsets(forest))
 end
