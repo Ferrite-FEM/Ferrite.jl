@@ -574,6 +574,35 @@ end
 const HangingKey{dim} = Tuple{Int, NTuple{dim, Int32}}
 _intnode(k::Integer, c) = (Int(k), map(Int32, c))
 
+# Packed integer key for `creategrid`'s provisional node-id map. That map is logically keyed
+# on `(tree, octree-coord)`; hashing the nested coordinate tuple `Tuple{Int, NTuple{dim, Int}}`
+# dominates the materialize cost, because a corner shared by up to `2^dim` leaves is probed that
+# many times (`_lnodes_number_leaf!`). Packing the integer octree coordinate into one `UInt64`
+# turns the key into the cheap-to-hash `Tuple{Int, UInt64}`; node *identity* is unchanged, so the
+# numbering is byte-for-byte identical — only the key hash is cheaper.
+#
+# Valid because octree coords lie in `[0, 2^b]` with `b ≤ _maxlevel` (`[30, 19]` for 2D/3D):
+# 31 bits/axis × 2 = 62 bits (2D) and 21 bits/axis × 3 = 63 bits (3D) both fit a `UInt64` with no
+# overlap. Works for `Int` and `Int32` coords alike (`UInt64` of equal values agree), unifying the
+# `nodeids`/`HangingKey` key spaces. Only ever called on in-range, non-negative coords (the hot
+# path numbers leaf vertices; cross-tree merge lookups bounds-check first via `_nodekey_inrange`).
+@inline _packcoord(c::NTuple{2, <:Integer}) = UInt64(c[1]) | (UInt64(c[2]) << 31)
+@inline _packcoord(c::NTuple{3, <:Integer}) = UInt64(c[1]) | (UInt64(c[2]) << 21) | (UInt64(c[3]) << 42)
+@inline _nodekey(k::Integer, c::NTuple) = (Int(k), _packcoord(c))
+
+# Cross-tree merge lookups (`_merge_intertree_nodes!`) feed `transform_facet`/`_edge` images that
+# can land outside `[0, 2^b]` (the transforms place an octant's body across the shared boundary).
+# Such a coordinate is, by construction, not a node of tree `k` — so return `nothing`, which the
+# caller treats exactly as the old `haskey(nodeids, (k, coord))` returning `false`. This keeps
+# packing safe (never fed a negative/oversized coord) and behaviour identical.
+@inline function _nodekey_inrange(k::Integer, c::NTuple{dim, <:Integer}, b::Integer) where {dim}
+    hi = 1 << b
+    for d in 1:dim
+        (0 <= c[d] <= hi) || return nothing
+    end
+    return _nodekey(k, c)
+end
+
 """
     _emit_coarse_face_int!(hang, k, fc)
 
@@ -913,7 +942,7 @@ function _merge_intertree_nodes!(forest::ForestBWG{dim}, nodeids, alias::Vector{
                 if k > k′
                     #delete!(nodes,(k,v))
                     new_v = vertex(root(dim), node_map[v′], tree.b)
-                    alias[nodeids[(k, vc)]] = alias[nodeids[(k′, new_v)]]
+                    alias[nodeids[_nodekey(k, vc)]] = alias[nodeids[_nodekey(k′, new_v)]]
                     @debug println("    Matching $vc (local) to $new_v (neighbor)")
                 end
             end
@@ -950,17 +979,17 @@ function _merge_intertree_nodes!(forest::ForestBWG{dim}, nodeids, alias::Vector{
                         if dim == 2
                             for i in 1:ncorners_face2D
                                 i′ = rotation_permutation(r, i)
-                                if haskey(nodeids, (k′, fnodes_neighbor[i′]))
-                                    @debug println("    Updating $((k, fnodes[i])) $(nodeids[(k, fnodes[i])]) -> $(nodeids[(k′, fnodes_neighbor[i′])])")
-                                    alias[nodeids[(k, fnodes[i])]] = alias[nodeids[(k′, fnodes_neighbor[i′])]]
+                                nkey = _nodekey_inrange(k′, fnodes_neighbor[i′], tree′.b)
+                                if nkey !== nothing && haskey(nodeids, nkey)
+                                    alias[nodeids[_nodekey(k, fnodes[i])]] = alias[nodeids[nkey]]
                                 end
                             end
                         else
                             for i in 1:ncorners_face3D
                                 rotated_ξ = rotation_permutation(f′, f, r, i)
-                                if haskey(nodeids, (k′, fnodes_neighbor[i]))
-                                    @debug println("    Updating $((k, fnodes[i])) $(nodeids[(k, fnodes[rotated_ξ])]) -> $(nodeids[(k′, fnodes_neighbor[i])])")
-                                    alias[nodeids[(k, fnodes[rotated_ξ])]] = alias[nodeids[(k′, fnodes_neighbor[i])]]
+                                nkey = _nodekey_inrange(k′, fnodes_neighbor[i], tree′.b)
+                                if nkey !== nothing && haskey(nodeids, nkey)
+                                    alias[nodeids[_nodekey(k, fnodes[rotated_ξ])]] = alias[nodeids[nkey]]
                                 end
                             end
                         end
@@ -999,9 +1028,9 @@ function _merge_intertree_nodes!(forest::ForestBWG{dim}, nodeids, alias::Vector{
                         @debug println("  Trying to match $enodes (local) to $enodes_neighbor (neighbor $neighbor_candidate)")
                         for i in 1:ncorners_edge
                             i′ = rotation_permutation(r, i)
-                            if haskey(nodeids, (k′, enodes_neighbor[i′]))
-                                @debug println("    Updating $((k, enodes[i])) $(nodeids[(k, enodes[i])]) -> $(nodeids[(k′, enodes_neighbor[i′])])")
-                                alias[nodeids[(k, enodes[i])]] = alias[nodeids[(k′, enodes_neighbor[i′])]]
+                            nkey = _nodekey_inrange(k′, enodes_neighbor[i′], tree′.b)
+                            if nkey !== nothing && haskey(nodeids, nkey)
+                                alias[nodeids[_nodekey(k, enodes[i])]] = alias[nodeids[nkey]]
                             end
                         end
                     end
@@ -1027,10 +1056,15 @@ _build_cells(::Type{CT}, conns::Vector{NTuple{NV, Int}}, final_of_prov::Vector{I
     reconstruct_facetsets(forest::ForestBWG{dim}) -> Dict{String, OrderedSet{FacetIndex}}
 
 Transfer the macro-mesh facet sets onto the materialized (refined) grid. For each original
-`FacetIndex` (tree, face), find every leaf face of that tree that lies on the root face
-([`contains_facet`](@ref)) and emit a `FacetIndex` for the corresponding fine cell, converting
-between p4est and Ferrite face ordering (`𝒱₂_perm`/`𝒱₃_perm`). This keeps named boundaries
-(e.g. Dirichlet/Neumann sets) valid after refinement.
+`FacetIndex` (tree, face), emit a `FacetIndex` for every leaf of that tree lying on the root
+face, converting between p4est and Ferrite face ordering (`𝒱₂_perm`/`𝒱₃_perm`). This keeps named
+boundaries (e.g. Dirichlet/Neumann sets) valid after refinement.
+
+Staying inside one tree there is no rotation, so a leaf is on the root face iff its anchor lies on
+that face's axis-aligned plane (`leaf.xyz[axis] == 0` for a low face, `== 2^b - leafsize` for a
+high face), and the contributing local face index is exactly the root face index. This is an
+`O(#leaves)` plane test, replacing a former `O(#leaves · 2dim)` [`contains_facet`](@ref) scan over
+each leaf's `faces`.
 """
 function reconstruct_facetsets(forest::ForestBWG{dim}) where {dim}
     _perm = dim == 2 ? 𝒱₂_perm : 𝒱₃_perm
@@ -1040,15 +1074,25 @@ function reconstruct_facetsets(forest::ForestBWG{dim}) where {dim}
         new_facetset = typeof(facetset)()
         for facetidx in facetset
             pivot_tree = forest.cells[facetidx[1]]
+            b = pivot_tree.b
+            rootlen = _compute_size(b, 0)                       # 2^b, the root extent
             last_cellid = facetidx[1] != 1 ? sum(length, @view(forest.cells[1:(facetidx[1] - 1)])) : 0
             pivot_faceid = facetidx[2]
-            pivot_face = faces(root(dim), pivot_tree.b)[_perm_inv[pivot_faceid]]
+            # The root face in p4est ordering, and the axis-aligned plane it pins. p4est faces
+            # pair up as (1,2)=(x-,x+), (3,4)=(y-,y+), (5,6)=(z-,z+): axis = (f-1)÷2+1, the odd
+            # index is the low face (coord 0), the even index the high face (coord 2^b). A leaf
+            # contributes a facet to this set iff it lies on that plane; staying inside one tree
+            # there is no rotation, so the contributing local face index equals the root's (`f`)
+            # — replacing the former O(#leaves · 2dim) `faces`/`contains_facet` scan (the loop
+            # below is O(#leaves) with an O(1) plane test and no per-leaf allocation).
+            f = _perm_inv[pivot_faceid]                         # p4est face index of the root face
+            axis = (f - 1) ÷ 2 + 1
+            is_low = isodd(f)
+            ferrite_leaf_face_idx = _perm[f]                    # == pivot_faceid
             for (leaf_idx, leaf) in enumerate(pivot_tree.leaves)
-                for (leaf_face_idx, leaf_face) in enumerate(faces(leaf, pivot_tree.b))
-                    if contains_facet(pivot_face, leaf_face)
-                        ferrite_leaf_face_idx = _perm[leaf_face_idx]
-                        push!(new_facetset, FacetIndex(last_cellid + leaf_idx, ferrite_leaf_face_idx))
-                    end
+                onface = is_low ? (leaf.xyz[axis] == 0) : (leaf.xyz[axis] + _compute_size(b, leaf.l) == rootlen)
+                if onface
+                    push!(new_facetset, FacetIndex(last_cellid + leaf_idx, ferrite_leaf_face_idx))
                 end
             end
         end
@@ -2815,9 +2859,9 @@ with concrete argument types so the `ntuple`/`get!` closures compile without box
 function _lnodes_number_leaf!(conns, nodeids, prov_key, leaf::OctantBWG, k::Int, b::Integer, node_map, ::Val{NV}) where {NV}
     v = vertices(leaf, b)
     ids = ntuple(Val(NV)) do i
-        key = (k, map(Int, v[i]))
-        get!(nodeids, key) do
-            push!(prov_key, key); length(prov_key)
+        coord = map(Int, v[i])
+        get!(nodeids, _nodekey(k, coord)) do
+            push!(prov_key, (k, coord)); length(prov_key)
         end
     end
     push!(conns, ntuple(i -> ids[node_map[i]], Val(NV)))
@@ -2864,7 +2908,10 @@ function creategrid(forest::ForestBWG{dim}) where {dim}
     KeyT = Tuple{Int, NTuple{dim, Int}}
     ncells = getncells(forest)
 
-    nodeids = Dict{KeyT, Int}(); sizehint!(nodeids, ncells)
+    # `nodeids` maps a packed integer key (`_nodekey`) -> provisional id; `prov_key` keeps the
+    # *unpacked* `(tree, coord)` per provisional id, since the integer coordinate is still needed
+    # at the end for the physical-coordinate interpolation (`_interp_treepoint`).
+    nodeids = Dict{Tuple{Int, UInt64}, Int}(); sizehint!(nodeids, ncells)
     prov_key = KeyT[]; sizehint!(prov_key, ncells)
     conns = NTuple{NV, Int}[]; sizehint!(conns, ncells)
     hang = Dict{HangingKey{dim}, Vector{HangingKey{dim}}}()
@@ -2912,12 +2959,13 @@ function creategrid(forest::ForestBWG{dim}) where {dim}
         final_of_prov[p] = d
     end
 
-    # Phase 4 — cells + hanging constraints. `nodeids[key]` gives a provisional id; `final_of_prov`
-    # folds the alias canonicalization and densification into the final dense id.
+    # Phase 4 — cells + hanging constraints. `nodeids[_nodekey(key...)]` gives a provisional id
+    # (hanging keys and their masters are genuine fine-leaf vertices, so they are in `nodeids`);
+    # `final_of_prov` folds the alias canonicalization and densification into the final dense id.
     cells = _build_cells(celltype, conns, final_of_prov)
     hnodes = Dict{Int, Vector{Int}}()
     for (hkey, mkeys) in hang
-        hnodes[final_of_prov[nodeids[hkey]]] = [final_of_prov[nodeids[m]] for m in mkeys]
+        hnodes[final_of_prov[nodeids[_nodekey(hkey[1], hkey[2])]]] = [final_of_prov[nodeids[_nodekey(m[1], m[2])]] for m in mkeys]
     end
     return NonConformingGrid(cells, Node.(nodecoords); conformity_info = hnodes, facetsets = reconstruct_facetsets(forest))
 end

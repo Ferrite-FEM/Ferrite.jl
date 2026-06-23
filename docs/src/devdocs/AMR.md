@@ -265,7 +265,10 @@ Two ideas carry the whole construction:
 - **Integer / topological identity.** Every node is identified by an integer key
   `(tree, octree-coordinate)`, never by a floating-point physical position. Two leaves that meet
   at a vertex produce the *same* integer key, so shared nodes are recognised exactly, with no
-  tolerances. Physical coordinates are interpolated only at the very end.
+  tolerances. Physical coordinates are interpolated only at the very end. The octree coordinate is
+  bit-packed into a single `UInt64` (`_packcoord`), so the per-vertex node-id map hashes a cheap
+  `(tree, UInt64)` key instead of a nested coordinate tuple — this is the hot path of
+  materialization, so the packing matters.
 - **On a 2:1-balanced forest, hanging nodes are midpoints.** A non-conforming interface always
   places a node at the midpoint of a coarse edge or the centre of a coarse face. Each such node
   is recorded as a linear constraint: the hanging node equals the average of its *master* corners.
