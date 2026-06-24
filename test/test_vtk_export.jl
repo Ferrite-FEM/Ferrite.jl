@@ -141,7 +141,27 @@
             @test bytes2hex(open(SHA.sha1, fname2 * ".vtu")) == testhash
         end
     end
+    @testset "write_facetsets" begin
+        # More tests in `test_grid_dofhandler_vtk.jl`
+        mktempdir() do tmp
+            grid = generate_grid(Quadrilateral, (2, 2))
 
+            v1 = VTKGridFile(joinpath(tmp, "g1"), grid) do vtk::VTKGridFile
+                @test Ferrite.write_facetset(vtk, grid, "left") === vtk
+                @test Ferrite.write_facetset(vtk, grid, "bottom") === vtk
+                @test Ferrite.write_facetset(vtk, grid, "right") === vtk
+                @test Ferrite.write_facetset(vtk, grid, "top") === vtk
+            end
+            @test v1 isa VTKGridFile
+
+            v2 = VTKGridFile(joinpath(tmp, "g2"), grid) do vtk::VTKGridFile
+                @test Ferrite.write_facetset(vtk, grid) === vtk
+            end
+            @test v2 isa VTKGridFile
+
+            @test bytes2hex(open(SHA.sha1, joinpath(tmp, "g1.vtu"))) == bytes2hex(open(SHA.sha1, joinpath(tmp, "g2.vtu")))
+        end
+    end
     @testset "write_cellset" begin
         # More tests in `test_grid_dofhandler_vtk.jl`, this just validates writing all sets in the grid
         # which is not tested there, see https://github.com/Ferrite-FEM/Ferrite.jl/pull/948
