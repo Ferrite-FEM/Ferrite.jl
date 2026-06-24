@@ -20,7 +20,7 @@ using WriteVTK:
     WriteVTK, VTKCellTypes
 using Tensors:
     Tensors, AbstractTensor, SecondOrderTensor, SymmetricTensor, Tensor, Vec, MixedTensor2, MixedTensor3,
-    gradient, rotation_tensor, symmetric, tovoigt!, hessian, otimesu, otimesl, tdot
+    gradient, rotation_tensor, symmetric, tovoigt!, hessian, otimesu, otimesl, tdot, rotate
 using ForwardDiff:
     ForwardDiff
 
@@ -164,5 +164,9 @@ include("PointEvalHandler.jl")
 # Other
 include("deprecations.jl")
 include("docs.jl")
+
+# Adaptiviy
+include("Adaptivity/AMR.jl")
+using .AMR
 
 end # module

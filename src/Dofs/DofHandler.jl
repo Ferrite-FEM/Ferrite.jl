@@ -95,6 +95,24 @@ function _print_field_information(io::IO, mime::MIME"text/plain", sdh::SubDofHan
     return
 end
 
+"""
+    EntityMaps
+
+Maps from grid entities (vertices, edges, faces) to the first dof distributed on that entity,
+one entry per field. Produced as scratch storage while distributing dofs and retained by a
+[`DofHandler`](@ref) only when its grid is a `NonConformingGrid`, where it is needed to build
+the affine constraints that tie hanging nodes to their masters.
+
+- `vertices[f][v]` is the first dof on vertex `v` for field `f` (`0` if unvisited).
+- `edges[f][(a, b)]` is the first dof on the edge between global vertices `a < b` (3D only).
+- `faces[f][(a, b, c)]` is the first dof on the face identified by global vertices `a, b, c`.
+"""
+struct EntityMaps
+    vertices::Vector{Vector{Int}}
+    edges::Vector{Dict{NTuple{2, Int}, Int}}
+    faces::Vector{Dict{NTuple{3, Int}, Int}}
+end
+
 mutable struct DofHandler{dim, G <: AbstractGrid{dim}} <: AbstractDofHandler
     const subdofhandlers::Vector{SubDofHandler{DofHandler{dim, G}}}
     const field_names::Vector{Symbol}
@@ -106,6 +124,10 @@ mutable struct DofHandler{dim, G <: AbstractGrid{dim}} <: AbstractDofHandler
     closed::Bool
     const grid::G
     ndofs::Int
+    # Maps from entity to dofs. These are scratch structures during dof distribution and are
+    # only retained afterwards for a `NonConformingGrid` (to build conformity constraints for
+    # hanging nodes), otherwise this is `nothing`. See [`EntityMaps`](@ref).
+    entitymaps::Union{Nothing, EntityMaps}
 end
 
 """
@@ -137,7 +159,7 @@ close!(dh)
 function DofHandler(grid::G) where {dim, G <: AbstractGrid{dim}}
     ncells = getncells(grid)
     sdhs = SubDofHandler{DofHandler{dim, G}}[]
-    return DofHandler{dim, G}(sdhs, Symbol[], Int[], zeros(Int, ncells), zeros(Int, ncells), false, grid, -1)
+    return DofHandler{dim, G}(sdhs, Symbol[], Int[], zeros(Int, ncells), zeros(Int, ncells), false, grid, -1, nothing)
 end
 
 function Base.show(io::IO, mime::MIME"text/plain", dh::DofHandler)
@@ -369,22 +391,18 @@ function __close!(dh::DofHandler{dim}) where {dim}
     end
     numfields = length(dh.field_names)
 
-    # NOTE: Maybe it makes sense to store *Index in the dicts instead.
+    # Entity -> dof maps. These are scratch storage for distribution; they are only kept
+    # afterwards if the grid is non-conforming (see the end of this function).
+    vertexdicts = Vector{Vector{Int}}(undef, numfields)
+    edgedicts = Vector{Dict{NTuple{2, Int}, Int}}(undef, numfields)
+    facedicts = Vector{Dict{NTuple{3, Int}, Int}}(undef, numfields)
 
-    # `vertexdict` keeps track of the visited vertices. The first dof added to vertex v is
-    # stored in vertexdict[v].
-    # TODO: No need to allocate this vector for fields that don't have vertex dofs
-    vertexdicts = [zeros(Int, getnnodes(get_grid(dh))) for _ in 1:numfields]
-
-    # `edgedict` keeps track of the visited edges.
-    # An edge is uniquely determined by two global vertices, with global direction going
-    # from low to high vertex node number, see sortedge
-    edgedicts = [Dict{NTuple{2, Int}, Int}() for _ in 1:numfields]
-
-    # `facedict` keeps track of the visited faces. We only need to store the first dof we
-    # add to the face since currently more dofs per face isn't supported.
-    # A face is uniquely determined by 3 vertex nodes, see sortface
-    facedicts = [Dict{NTuple{3, Int}, Int}() for _ in 1:numfields]
+    nnodes = getnnodes(get_grid(dh))
+    for fi in 1:numfields
+        vertexdicts[fi] = zeros(Int, nnodes)
+        edgedicts[fi] = Dict{NTuple{2, Int}, Int}()
+        facedicts[fi] = Dict{NTuple{3, Int}, Int}()
+    end
 
     # The edge/face dicts above are shared between all SubDofHandlers that contain a given
     # field, so `field_ncells[gidx]` counts the total number of cells carrying field `gidx`.
@@ -415,6 +433,12 @@ function __close!(dh::DofHandler{dim}) where {dim}
     end
     dh.ndofs = nextdof - 1
     dh.closed = true
+
+    # Retain the entity maps only for non-conforming grids, where they are needed to build
+    # the conformity (hanging-node) constraints. Conforming grids discard them.
+    if get_grid(dh) isa NonConformingGrid
+        dh.entitymaps = EntityMaps(vertexdicts, edgedicts, facedicts)
+    end
 
     return dh, vertexdicts, edgedicts, facedicts
 
