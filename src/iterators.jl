@@ -14,6 +14,8 @@ UpdateFlags(; nodes::Bool = true, coords::Bool = true, dofs::Bool = true) =
 ## CellCache ##
 ###############
 
+abstract type AbstractCellCache end
+
 """
     CellCache(grid::Grid)
     CellCache(dh::AbstractDofHandler)
@@ -32,7 +34,7 @@ cell. The cache is updated for a new cell by calling `reinit!(cache, cellid)` wh
 
 See also [`CellIterator`](@ref).
 """
-mutable struct CellCache{X, G <: AbstractGrid, DH <: Union{AbstractDofHandler, Nothing}}
+mutable struct CellCache{X, G <: AbstractGrid, DH <: Union{AbstractDofHandler, Nothing}} <: AbstractCellCache
     const flags::UpdateFlags
     const grid::G
     # Pretty useless to store this since you have it already for the reinit! call, but
@@ -121,7 +123,7 @@ calling `reinit!(cache, fi::FacetIndex)`.
 
 See also [`FacetIterator`](@ref).
 """
-mutable struct FacetCache{CC <: CellCache}
+mutable struct FacetCache{CC <: CellCache} <: AbstractCellCache
     const cc::CC  # const for julia > 1.8
     const dofs::Vector{Int} # aliasing cc.dofs
     current_facet_id::Int
@@ -170,7 +172,7 @@ interface. The cache is updated for a new cell by calling `reinit!(cache, facet_
 
 See also [`InterfaceIterator`](@ref).
 """
-struct InterfaceCache{FC <: FacetCache}
+struct InterfaceCache{FC <: FacetCache} <: AbstractCellCache
     a::FC
     b::FC
     dofs::Vector{Int}
@@ -242,7 +244,7 @@ end
     `CellIterator` is stateful and should not be used for things other than `for`-looping
     (e.g. broadcasting over, or collecting the iterator may yield unexpected results).
 """
-struct CellIterator{CC <: CellCache, IC <: IntegerCollection}
+struct CellIterator{CC <: AbstractCellCache, IC <: IntegerCollection}
     cc::CC
     set::IC
 end
