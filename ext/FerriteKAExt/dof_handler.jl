@@ -1,7 +1,7 @@
 struct DeviceSubDofHandler{
-        dim,
+        sdim,
         CS <: AbstractVector{Int}, CD <: AbstractVector{Int},
-        CO <: AbstractVector{Int}, FN <: NamedTuple, DR <: Tuple, G <: Ferrite.AbstractGrid{dim},
+        CO <: AbstractVector{Int}, FN <: NamedTuple, DR <: Tuple, G <: AbstractGrid{sdim}
     } <: AbstractDofHandler
     cellset::CS
     cell_dofs::CD
@@ -12,6 +12,7 @@ struct DeviceSubDofHandler{
     # be stored in device memory. Therefore we store index of the field as a namedtuple
     field_indices::FN
     dof_ranges::DR
+    # Grid information
     grid::G
 end
 
@@ -46,25 +47,38 @@ function Ferrite.celldofs!(global_dofs::AbstractVector, sdh::DeviceSubDofHandler
 end
 
 # Host-only container — not sent to the device!
-struct HostDofHandler{dim, G <: DeviceGrid{dim}, SDH <: DeviceSubDofHandler, DH <: AbstractDofHandler} <: AbstractDofHandler
-    subdofhandlers::Vector{SDH}
+struct HostDofHandler{sdim, G <: Grid{sdim}, DH <: AbstractDofHandler} <: AbstractDofHandler
+    subdofhandlers::Vector
     grid::G
     original_dh::DH
 end
 
 function HostDofHandler(backend, dh::DofHandler)
-    gpu_grid = DeviceGrid(backend, dh.grid)
+    grid_cpu  = get_grid(dh)
+    nodes_cpu = getnodes(grid_cpu)
+    nodes_gpu = adapt(backend, nodes_cpu)
     cell_dofs = adapt(backend, dh.cell_dofs)
     cell_dofs_offset = adapt(backend, dh.cell_dofs_offset)
     subdofhandlers = map(dh.subdofhandlers) do sdh
         dof_ranges = Tuple(Ferrite.dof_range(sdh, i) for i in 1:length(sdh.field_names))
         field_indices = NamedTuple{ntuple(i->dh.field_names[i], length(dh.field_names))}(collect(1:length(dh.field_names)))
+        # invert cellset and build a device container grid with only a single cell type
+        cellset = collect(Int, sdh.cellset)
+        global_to_local_cellid = zeros(Int, getncells(grid_cpu))
+        local_cells = Vector{typeof(getcells(grid_cpu, first(cellset)))}(undef, length(cellset))
+        for (i,cid) in enumerate(cellset)
+            global_to_local_cellid[cid] = i
+            local_cells[i] = getcells(grid_cpu, cid)
+        end
+        grid_gpu = DeviceSubGrid(adapt(backend, local_cells), nodes_gpu, adapt(backend, global_to_local_cellid))
+
         DeviceSubDofHandler(
-            adapt(backend, collect(Int, sdh.cellset)), cell_dofs, cell_dofs_offset,
-            sdh.ndofs_per_cell, nnodes_per_cell(dh.grid, first(sdh.cellset)), field_indices, dof_ranges, gpu_grid
+            adapt(backend, cellset), cell_dofs, cell_dofs_offset,
+            sdh.ndofs_per_cell, nnodes_per_cell(grid_cpu, first(cellset)), field_indices,
+            dof_ranges, grid_gpu,
         )
     end
-    return HostDofHandler(subdofhandlers, gpu_grid, dh)
+    return HostDofHandler(subdofhandlers, grid_cpu, dh)
 end
 
 function Adapt.adapt_structure(to::KA.Backend, dh::DofHandler)

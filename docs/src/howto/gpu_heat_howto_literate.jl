@@ -80,7 +80,7 @@ end
     end
 end
 function assemble_global_ka!(backend, cv::CellValuesContainer, K, f, cc, colors::Vector, Ke, fe)
-    assembler = K === nothing ? nothing : start_assemble(K, f)
+    assembler = K === nothing ? nothing : start_assemble(K, f; fillzero=false)
     for color in colors
         ## We divide the work into blocks and fire up the kernel.
         n = length(color)

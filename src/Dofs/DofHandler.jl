@@ -232,8 +232,12 @@ function celldofs(dh::AbstractDofHandler, i::Integer)
     return celldofs!(zeros(Int, ndofs_per_cell(dh, i)), dh, i)
 end
 
-function cellnodes!(global_nodes::AbstractVector{<:Integer}, dh::DofHandler, i::Union{<:Integer, <:AbstractCell})
+function cellnodes!(global_nodes::AbstractVector{<:Integer}, dh::AbstractDofHandler, i::Union{<:Integer, <:AbstractCell})
     return cellnodes!(global_nodes, get_grid(dh), i)
+end
+
+function getcoordinates!(coords::AbstractVector{<:Real}, dh::AbstractDofHandler, i::Integer)
+    return getcoordinates!(coords, get_grid(dh), i)
 end
 
 """

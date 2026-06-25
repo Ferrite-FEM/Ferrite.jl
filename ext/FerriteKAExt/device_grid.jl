@@ -1,24 +1,24 @@
 """
-    DeviceGrid(cells::AbstractArray, nodes::AbstractArray)
-    DeviceGrid(backend::KA.Backend, host_grid::AbstractGrid)
+    DeviceSubGrid(cells::AbstractArray, nodes::AbstractArray, global_to_local_cellid)
 
-This is a grid which can be transferred to devices (e.g. GPUs).
+This is a part of a grid which can be transferred to devices (e.g. GPUs).
 """
-struct DeviceGrid{
-        dim, C <: Ferrite.AbstractCell, T <: Real,
-        CA <: AbstractArray{C, 1}, NA <: AbstractArray{Node{dim, T}, 1},
-    } <: Ferrite.AbstractGrid{dim}
+struct DeviceSubGrid{
+        sdim, C <: Ferrite.AbstractCell, T <: Real,
+        CA <: AbstractArray{C, 1}, NA <: AbstractArray{Node{sdim, T}, 1},
+        GTLC,
+    } <: Ferrite.AbstractGrid{sdim}
     cells::CA
     nodes::NA
+    global_to_local_cellid::GTLC
 end
 
-function Adapt.adapt_structure(to, grid::DeviceGrid)
-    return DeviceGrid(Adapt.adapt_structure(to, grid.cells), Adapt.adapt_structure(to, grid.nodes))
-end
-
-function DeviceGrid(backend, grid::AbstractGrid)
-    return DeviceGrid(adapt(backend, getcells(grid)), adapt(backend, getnodes(grid)))
+function Adapt.adapt_structure(to, grid::DeviceSubGrid)
+    return DeviceSubGrid(Adapt.adapt(to, grid.cells), Adapt.adapt(to, grid.nodes), Adapt.adapt(to, grid.global_to_local_cellid))
 end
 
 # This allows us to bypass the scalar indexing in the original implementation.
-Ferrite.get_coordinate_eltype(::DeviceGrid{<:Any, <:Any, T}) where {T} = T
+Ferrite.get_coordinate_eltype(::DeviceSubGrid{<:Any, <:Any, T}) where {T} = T
+
+Ferrite.getcells(grid::DeviceSubGrid, i::Int) = grid.cells[grid.global_to_local_cellid[i]]
+Ferrite.getcells(grid::DeviceSubGrid{<:Any, <:Any, <:Any, <:Any, <:Any, Nothing}, i::Int) = grid.cells[i]
