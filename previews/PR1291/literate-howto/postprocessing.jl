@@ -40,7 +40,7 @@
 # determined on a square domain. In this example, we first compute the heat flux in each
 # integration point (based on the solved temperature field) and then we do an L2-projection
 # of the fluxes to the nodes of the mesh. By doing this, we can more easily visualize
-# integration points quantities. Finally, we visualize the temperature field and the heat fluxes along a cut-line.
+# integration point quantities. Finally, we visualize the temperature field and the heat fluxes along a cut-line.
 #
 # The L2-projection is defined as follows: Find projection ``q(\boldsymbol{x}) \in U_h(\Omega)`` such that
 # ```math
@@ -66,17 +66,14 @@ include("../tutorials/heat_equation.jl");
 # conductivity ``\lambda = 1 ⇒ q = - \nabla u``, where ``u`` is the temperature.
 function compute_heat_fluxes(cellvalues::CellValues, dh::DofHandler, a::AbstractVector{T}) where {T}
 
-    n = getnbasefunctions(cellvalues)
-    cell_dofs = zeros(Int, n)
     nqp = getnquadpoints(cellvalues)
 
     ## Allocate storage for the fluxes to store
     q = [Vec{2, T}[] for _ in 1:getncells(dh.grid)]
 
-    for (cell_num, cell) in enumerate(CellIterator(dh))
-        q_cell = q[cell_num]
-        celldofs!(cell_dofs, dh, cell_num)
-        aᵉ = a[cell_dofs]
+    for cell in CellIterator(dh)
+        q_cell = q[cellid(cell)]
+        aᵉ = a[celldofs(cell)]
         reinit!(cellvalues, cell)
 
         for q_point in 1:nqp
@@ -130,9 +127,8 @@ q_points = evaluate_at_points(ph, projector, q_projected);
 
 # We can also extract the field values, here the temperature, right away from the result
 # vector of the simulation, that is stored in `u`. These values are stored in the order of
-# our initial DofHandler so the input is not the `PointEvalHandler`, the original `DofHandler`,
+# our initial DofHandler so the input is now the `PointEvalHandler`, the original `DofHandler`,
 # the dof-vector `u`, and (optionally for single-field problems) the name of the field.
-# From the `L2Projection`, the values are stored in the order of the degrees of freedom.
 u_points = evaluate_at_points(ph, dh, u, :u);
 
 # Now, we can plot the temperature and flux values with the help of any plotting library, e.g. Plots.jl.

@@ -3,9 +3,6 @@ using Tensors
 using SparseArrays
 using LinearAlgebra
 
-const ∇ = Tensors.gradient
-const Δ = Tensors.hessian;
-
 grid = generate_grid(Quadrilateral, (150, 150))
 
 ip = Lagrange{RefQuadrilateral, 1}()
@@ -51,9 +48,9 @@ function doassemble(
     n_basefuncs = getnbasefunctions(cellvalues)
 
     fe = zeros(n_basefuncs) # Local force vector
-    Ke = zeros(n_basefuncs, n_basefuncs) # Local stiffness mastrix
+    Ke = zeros(n_basefuncs, n_basefuncs) # Local stiffness matrix
 
-    for (cellcount, cell) in enumerate(CellIterator(dh))
+    for cell in CellIterator(dh)
         fill!(Ke, 0)
         fill!(fe, 0)
         coords = getcoordinates(cell)
@@ -77,8 +74,8 @@ function doassemble(
         end
 
         for facet in 1:nfacets(cell)
-            if (cellcount, facet) ∈ getfacetset(grid, "left") ||
-                    (cellcount, facet) ∈ getfacetset(grid, "bottom")
+            if (cellid(cell), facet) ∈ getfacetset(grid, "left") ||
+                    (cellid(cell), facet) ∈ getfacetset(grid, "bottom")
                 reinit!(facetvalues, cell, facet)
                 for q_point in 1:getnquadpoints(facetvalues)
                     coords_qp = spatial_coordinate(facetvalues, q_point, coords)

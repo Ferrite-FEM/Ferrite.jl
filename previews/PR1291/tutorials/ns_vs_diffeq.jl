@@ -9,6 +9,9 @@ using Ferrite, SparseArrays, BlockArrays, LinearAlgebra, WriteVTK
 
 using DiffEqBase
 using OrdinaryDiffEqRosenbrock: Rodas5P
+using SciMLIterators: intervals
+using ADTypes: AutoFiniteDiff
+import SciMLLogging
 
 ν = 1.0 / 1000.0; #dynamic viscosity
 
@@ -299,13 +302,13 @@ end
 (fe_norm::FreeDofErrorNorm)(u::Union{AbstractFloat, Complex}, t) = DiffEqBase.ODE_DEFAULT_NORM(u, t)
 (fe_norm::FreeDofErrorNorm)(u::AbstractArray, t) = DiffEqBase.ODE_DEFAULT_NORM(u[fe_norm.ch.free_dofs], t)
 
-timestepper = Rodas5P(autodiff = false, step_limiter! = ferrite_limiter!);
+timestepper = Rodas5P(autodiff = AutoFiniteDiff(), step_limiter! = ferrite_limiter!);
 
 integrator = init(
     problem, timestepper; initializealg = NoInit(), dt = Δt₀,
     adaptive = true, abstol = 1.0e-4, reltol = 1.0e-5,
     progress = true, progress_steps = 1,
-    verbose = true, internalnorm = FreeDofErrorNorm(ch), d_discontinuities = [1.0]
+    verbose = DEVerbosity(SciMLLogging.Detailed()), internalnorm = FreeDofErrorNorm(ch), d_discontinuities = [1.0]
 );
 
 pvd = paraview_collection("vortex-street")

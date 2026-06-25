@@ -85,7 +85,7 @@ function assemble_matrices!(M::SparseMatrixCSC, D::SparseMatrixCSC, cellvalues::
     # Create an assembler
     M_assembler = start_assemble(M)
     D_assembler = start_assemble(D)
-    # Loop over all cels
+    # Loop over all cells
     for cell in CellIterator(dh)
         # Reinitialize cellvalues for this cell
         reinit!(cellvalues, cell)
@@ -163,12 +163,11 @@ function gray_scott_on_sphere(material::GrayScottMaterial, Δt::Real, T::Real, r
     # We have two options to add the reactants to the dof handler, which will give us slightly
     # different resulting dof distributions:
     # A) We can add a scalar-valued interpolation for each reactant.
-    # B) We can add one vectorized interpolation whose dimension is the number of reactants
-    #    number of reactants.
+    # B) We can add one vectorized interpolation whose dimension is the number of reactants.
     # In this tutorial we opt for B, because the dofs are distributed per cell entity -- or
     # to be specific for this tutorial, we use an isoparametric concept such that the nodes
-    # of our grid and the nodes of our solution approximation coincide. This way a reaction
-    # we can create simply reshape the solution vector u to a matrix where the inner index
+    # of our grid and the nodes of our solution approximation coincide. This way we can
+    # simply reshape the solution vector u into a matrix where the inner index
     # corresponds to the index of the reactant. Note that we will still use the scalar
     # interpolation for the assembly procedure.
     dh = DofHandler(grid)
@@ -219,12 +218,12 @@ function gray_scott_on_sphere(material::GrayScottMaterial, Δt::Real, T::Real, r
         # later visualization purposes.
         if (iₜ % 10) == 0
             VTKGridFile("reactive-surface-$(iₜ)", dh) do vtk
-                write_solution(vtk, dh, uₜ₋₁)
+                write_solution(vtk, dh, uₜ)
                 pvd[t] = vtk
             end
         end
 
-        # Finally we totate the solution to initialize the next timestep.
+        # Finally we rotate the solution to initialize the next timestep.
         uₜ₋₁ .= uₜ
     end
     vtk_save(pvd)

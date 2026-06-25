@@ -20,14 +20,13 @@ function create_values(interpolation_u, interpolation_p)
     qr = QuadratureRule{RefTetrahedron}(4)
     facet_qr = FacetQuadratureRule{RefTetrahedron}(4)
 
-    # cell and facetvalues for u
-    cellvalues_u = CellValues(qr, interpolation_u)
+    # cellvalues for both the displacement, u, and pressure, p, fields
+    cellvalues = MultiFieldCellValues(qr, (u = interpolation_u, p = interpolation_p))
+
+    # facetvalues for u
     facetvalues_u = FacetValues(facet_qr, interpolation_u)
 
-    # cellvalues for p
-    cellvalues_p = CellValues(qr, interpolation_p)
-
-    return cellvalues_u, cellvalues_p, facetvalues_u
+    return cellvalues, facetvalues_u
 end;
 
 function Ψ(F, p, mp::NeoHooke)
@@ -66,12 +65,12 @@ function create_bc(dh)
     return dbc
 end;
 
-function calculate_element_volume(cell, cellvalues_u, ue)
-    reinit!(cellvalues_u, cell)
+function calculate_element_volume(cell, cellvalues, ue)
+    reinit!(cellvalues, cell)
     evol::Float64 = 0.0
-    for qp in 1:getnquadpoints(cellvalues_u)
-        dΩ = getdetJdV(cellvalues_u, qp)
-        ∇u = function_gradient(cellvalues_u, qp, ue)
+    for qp in 1:getnquadpoints(cellvalues)
+        dΩ = getdetJdV(cellvalues, qp)
+        ∇u = function_gradient(cellvalues.u, qp, ue)
         F = one(∇u) + ∇u
         J = det(F)
         evol += J * dΩ
@@ -79,35 +78,34 @@ function calculate_element_volume(cell, cellvalues_u, ue)
     return evol
 end;
 
-function calculate_volume_deformed_mesh(w, dh::DofHandler, cellvalues_u)
+function calculate_volume_deformed_mesh(w, dh::DofHandler, cellvalues)
     evol::Float64 = 0.0
     for cell in CellIterator(dh)
         global_dofs = celldofs(cell)
-        nu = getnbasefunctions(cellvalues_u)
+        nu = getnbasefunctions(cellvalues.u)
         global_dofs_u = global_dofs[1:nu]
         ue = w[global_dofs_u]
-        δevol = calculate_element_volume(cell, cellvalues_u, ue)
+        δevol = calculate_element_volume(cell, cellvalues, ue)
         evol += δevol
     end
     return evol
 end;
 
-function assemble_element!(Ke, fe, cell, cellvalues_u, cellvalues_p, mp, ue, pe)
+function assemble_element!(Ke, fe, cell, cellvalues, mp, ue, pe)
     # Reinitialize cell values, and reset output arrays
     ublock, pblock = 1, 2
-    reinit!(cellvalues_u, cell)
-    reinit!(cellvalues_p, cell)
+    reinit!(cellvalues, cell)
     fill!(Ke, 0.0)
     fill!(fe, 0.0)
 
-    n_basefuncs_u = getnbasefunctions(cellvalues_u)
-    n_basefuncs_p = getnbasefunctions(cellvalues_p)
+    n_basefuncs_u = getnbasefunctions(cellvalues.u)
+    n_basefuncs_p = getnbasefunctions(cellvalues.p)
 
-    for qp in 1:getnquadpoints(cellvalues_u)
-        dΩ = getdetJdV(cellvalues_u, qp)
+    for qp in 1:getnquadpoints(cellvalues)
+        dΩ = getdetJdV(cellvalues, qp)
         # Compute deformation gradient F
-        ∇u = function_gradient(cellvalues_u, qp, ue)
-        p = function_value(cellvalues_p, qp, pe)
+        ∇u = function_gradient(cellvalues.u, qp, ue)
+        p = function_value(cellvalues.p, qp, pe)
         F = one(∇u) + ∇u
 
         # Compute first Piola-Kirchhoff stress and tangent modulus
@@ -116,35 +114,35 @@ function assemble_element!(Ke, fe, cell, cellvalues_u, cellvalues_p, mp, ue, pe)
         # Loop over the `u`-test functions to calculate the `u`-`u` and `u`-`p` blocks
         for i in 1:n_basefuncs_u
             # gradient of the test function
-            ∇δui = shape_gradient(cellvalues_u, qp, i)
+            ∇δui = shape_gradient(cellvalues.u, qp, i)
             # Add contribution to the residual from this test function
             fe[BlockIndex((ublock), (i))] += (∇δui ⊡ ∂Ψ∂F) * dΩ
 
             ∇δui∂S∂F = ∇δui ⊡ ∂²Ψ∂F²
             for j in 1:n_basefuncs_u
-                ∇δuj = shape_gradient(cellvalues_u, qp, j)
+                ∇δuj = shape_gradient(cellvalues.u, qp, j)
 
                 # Add contribution to the tangent
                 Ke[BlockIndex((ublock, ublock), (i, j))] += (∇δui∂S∂F ⊡ ∇δuj) * dΩ
             end
             # Loop over the `p`-test functions
             for j in 1:n_basefuncs_p
-                δp = shape_value(cellvalues_p, qp, j)
+                δp = shape_value(cellvalues.p, qp, j)
                 # Add contribution to the tangent
                 Ke[BlockIndex((ublock, pblock), (i, j))] += (∂²Ψ∂F∂p ⊡ ∇δui) * δp * dΩ
             end
         end
         # Loop over the `p`-test functions to calculate the `p-`u` and `p`-`p` blocks
         for i in 1:n_basefuncs_p
-            δp = shape_value(cellvalues_p, qp, i)
+            δp = shape_value(cellvalues.p, qp, i)
             fe[BlockIndex((pblock), (i))] += (δp * ∂Ψ∂p) * dΩ
 
             for j in 1:n_basefuncs_u
-                ∇δuj = shape_gradient(cellvalues_u, qp, j)
+                ∇δuj = shape_gradient(cellvalues.u, qp, j)
                 Ke[BlockIndex((pblock, ublock), (i, j))] += ∇δuj ⊡ ∂²Ψ∂F∂p * δp * dΩ
             end
             for j in 1:n_basefuncs_p
-                δp = shape_value(cellvalues_p, qp, j)
+                δp = shape_value(cellvalues.p, qp, j)
                 Ke[BlockIndex((pblock, pblock), (i, j))] += δp * ∂²Ψ∂p² * δp * dΩ
             end
         end
@@ -153,11 +151,11 @@ function assemble_element!(Ke, fe, cell, cellvalues_u, cellvalues_p, mp, ue, pe)
 end;
 
 function assemble_global!(
-        K::SparseMatrixCSC, f, cellvalues_u::CellValues,
-        cellvalues_p::CellValues, dh::DofHandler, mp::NeoHooke, w
+        K::SparseMatrixCSC, f, cellvalues::MultiFieldCellValues,
+        dh::DofHandler, mp::NeoHooke, w
     )
-    nu = getnbasefunctions(cellvalues_u)
-    np = getnbasefunctions(cellvalues_p)
+    nu = getnbasefunctions(cellvalues.u)
+    np = getnbasefunctions(cellvalues.p)
 
     # start_assemble resets K and f
     fe = BlockedArray(zeros(nu + np), [nu, np]) # local force vector
@@ -172,7 +170,7 @@ function assemble_global!(
         @assert size(global_dofs, 1) == nu + np # sanity check
         ue = w[global_dofsu] # displacement dofs for the current cell
         pe = w[global_dofsp] # pressure dofs for the current cell
-        assemble_element!(ke, fe, cell, cellvalues_u, cellvalues_p, mp, ue, pe)
+        assemble_element!(ke, fe, cell, cellvalues, mp, ue, pe)
         assemble!(assembler, global_dofs, ke, fe)
     end
     return
@@ -190,7 +188,7 @@ function solve(interpolation_u, interpolation_p)
 
     # Create the DofHandler and CellValues
     dh = create_dofhandler(grid, interpolation_u, interpolation_p)
-    cellvalues_u, cellvalues_p, facetvalues_u = create_values(interpolation_u, interpolation_p)
+    cellvalues, facetvalues_u = create_values(interpolation_u, interpolation_p)
 
     # Create the DirichletBCs
     dbc = create_bc(dh)
@@ -221,7 +219,7 @@ function solve(interpolation_u, interpolation_p)
         fill!(ΔΔw, 0.0)
         while true
             newton_itr += 1
-            assemble_global!(K, f, cellvalues_u, cellvalues_p, dh, mp, w)
+            assemble_global!(K, f, cellvalues, dh, mp, w)
             norm_res = norm(f[Ferrite.free_dofs(dbc)])
             apply_zero!(K, f, dbc)
             # Only display output at specific load steps
@@ -247,7 +245,7 @@ function solve(interpolation_u, interpolation_p)
         end
     end
     vtk_save(pvd)
-    vol_def = calculate_volume_deformed_mesh(w, dh, cellvalues_u)
+    vol_def = calculate_volume_deformed_mesh(w, dh, cellvalues)
     print("Deformed volume is $vol_def")
     return vol_def
 end;
