@@ -63,7 +63,7 @@ end
 
 function CellCache(sdh::SubDofHandler, flags::UpdateFlags = UpdateFlags())
     Tv = get_coordinate_type(sdh.dh.grid)
-    return CellCache(flags, sdh.dh.grid, -1, Int[], Tv[], sdh, Int[])
+    return CellCache(flags, sdh.dh.grid, [-1], Int[], Tv[], sdh, Int[])
 end
 
 function reinit!(cc::CellCache, i::Integer)
