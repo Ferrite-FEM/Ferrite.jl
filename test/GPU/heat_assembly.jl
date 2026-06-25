@@ -154,7 +154,7 @@ end
     )
     add!(ch, Dirichlet(:u, ∂Ω, (x, t) -> 1.0))
     close!(ch)
-    ch_device = adapt(backend, ch)
+    ch_device = backend isa KA.CPU ? ch : adapt(backend, ch)
     apply!(K_device, f_device, ch_device)
     u = SparseMatrixCSC(K_device) \ Vector(f_device)
 

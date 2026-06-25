@@ -32,24 +32,24 @@ cell. The cache is updated for a new cell by calling `reinit!(cache, cellid)` wh
 
 See also [`CellIterator`](@ref).
 """
-mutable struct CellCache{X, G <: AbstractGrid, DH <: Union{AbstractDofHandler, Nothing}}
-    const flags::UpdateFlags
-    const grid::G
+struct CellCache{X, G <: AbstractGrid, DH <: Union{AbstractDofHandler, Nothing}, CID <: AbstractArray, NID <: AbstractArray, DID <: AbstractArray, TX <: AbstractArray{X}}
+    flags::UpdateFlags
+    grid::G
     # Pretty useless to store this since you have it already for the reinit! call, but
     # needed for the CellIterator(...) workflow since the user doesn't necessarily control
     # the loop order in the cell subset.
-    cellid::Int
-    const nodes::Vector{Int}
-    const coords::Vector{X}
-    const dh::DH
-    const dofs::Vector{Int}
+    cellid::CID
+    nodes::NID
+    coords::TX
+    dh::DH
+    dofs::DID
 end
 
 function CellCache(grid::Grid{dim, C, T}, flags::UpdateFlags = UpdateFlags()) where {dim, C, T}
     N = nnodes_per_cell(grid, 1) # nodes and coords will be resized in `reinit!`
     nodes = zeros(Int, N)
     coords = zeros(Vec{dim, T}, N)
-    return CellCache(flags, grid, -1, nodes, coords, nothing, Int[])
+    return CellCache(flags, grid, [-1], nodes, coords, nothing, Int[])
 end
 
 function CellCache(dh::DofHandler{dim}, flags::UpdateFlags = UpdateFlags()) where {dim}
@@ -58,7 +58,7 @@ function CellCache(dh::DofHandler{dim}, flags::UpdateFlags = UpdateFlags()) wher
     nodes = zeros(Int, N)
     coords = zeros(Vec{dim, get_coordinate_eltype(get_grid(dh))}, N)
     celldofs = zeros(Int, n)
-    return CellCache(flags, get_grid(dh), -1, nodes, coords, dh, celldofs)
+    return CellCache(flags, get_grid(dh), [-1], nodes, coords, dh, celldofs)
 end
 
 function CellCache(sdh::SubDofHandler, flags::UpdateFlags = UpdateFlags())
@@ -66,8 +66,26 @@ function CellCache(sdh::SubDofHandler, flags::UpdateFlags = UpdateFlags())
     return CellCache(flags, sdh.dh.grid, -1, Int[], Tv[], sdh, Int[])
 end
 
-function reinit!(cc::CellCache, i::Int)
-    cc.cellid = i
+function reinit!(cc::CellCache, i::Integer)
+    cc.cellid[1] = i
+    _reinit!(cc, i, cc.nodes)
+    return cc
+end
+
+# FIXME Julia refuses to accept this dispatch, even though we have
+# ```
+#     julia> typeof(Ferrite.get_substruct(1, cc_gpu.values, 1)) <: CellCache{<:Any,<:Any,<:Any,<:Any,<:SubArray}
+#     true
+# ```
+# function reinit!(cc::CellCache{<:Any,<:Any,<:Any,<:Any,<:SubArray}, i::Integer)
+#     cc.cellid[1] = i
+#     cc.flags.nodes  && cellnodes!(cc.nodes, cc.grid, i)
+#     cc.flags.coords && getcoordinates!(cc.coords, cc.grid, i)
+#     cc.dh !== nothing && cc.flags.dofs && celldofs!(cc.dofs, cc.dh, i)
+#     return cc
+# end
+
+function _reinit!(cc::CellCache, i::Integer, ::Vector)
     if cc.flags.nodes
         resize!(cc.nodes, nnodes_per_cell(cc.grid, i))
         cellnodes!(cc.nodes, cc.grid, i)
@@ -83,12 +101,19 @@ function reinit!(cc::CellCache, i::Int)
     return cc
 end
 
+function _reinit!(cc::CellCache, i::Integer, ::SubArray)
+    cc.flags.nodes  && cellnodes!(cc.nodes, cc.grid, i)
+    cc.flags.coords && getcoordinates!(cc.coords, cc.grid, i)
+    cc.dh !== nothing && cc.flags.dofs && celldofs!(cc.dofs, cc.dh, i)
+    return nothing
+end
+
 # reinit! FEValues with CellCache
 function reinit!(cv::AbstractCellValues, cc::CellCache)
     cell = reinit_needs_cell(cv) ? getcells(cc.grid, cellid(cc)) : nothing
     return reinit!(cv, cell, cc.coords)
 end
-function reinit!(fv::FacetValues, cc::CellCache, f::Int)
+function reinit!(fv::FacetValues, cc::CellCache, f::Integer)
     cell = reinit_needs_cell(fv) ? getcells(cc.grid, cellid(cc)) : nothing
     return reinit!(fv, cell, cc.coords, f)
 end
@@ -97,10 +122,10 @@ end
 getnodes(cc::CellCache) = cc.nodes
 getcoordinates(cc::CellCache) = cc.coords
 celldofs(cc::CellCache) = cc.dofs
-cellid(cc::CellCache) = cc.cellid
+cellid(cc::CellCache) = cc.cellid[1]
 
 # TODO: These should really be replaced with something better...
-nfacets(cc::CellCache) = nfacets(getcells(cc.grid, cc.cellid))
+nfacets(cc::CellCache) = nfacets(getcells(cc.grid, cellid(cc)))
 
 
 """

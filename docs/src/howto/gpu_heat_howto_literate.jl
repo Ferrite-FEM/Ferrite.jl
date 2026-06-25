@@ -63,13 +63,14 @@ end
     ## Query the local evaluation buffer of the GPU worker.
     ## As explained later this is the secret sauce.
     cv_i = cv[task_index]
+    cc_i = cc[task_index]
 
     for i in task_index:stride:length(color)
         ## Work item index
         cellid = color[i]
 
-        ## Query work item cell cache. The call on the item initializes replaces the reinit! call.
-        cc_i = cc[task_index](cellid)
+        ## Query work item cell cache
+        reinit!(cc_i, cellid)
 
         ## Query assembly buffer.
         Ke = view(Kes, i, :, :)
@@ -110,9 +111,10 @@ function cuda_assembly_kernel(assembler, color, cc, cv, Kes, fes)
     task_index = (blockIdx().x - Int32(1)) * blockDim().x + threadIdx().x
     stride = gridDim().x * blockDim().x
     cv_i = cv[task_index]
+    cc_i = cc[task_index]
     for i in task_index:stride:length(color)
         cellid = color[i]
-        cc_i = cc[task_index](cellid)
+        reinit!(cc_i, cellid)
         Ke = view(Kes, i, :, :)
         fe = view(fes, i, :)
         assemble_cell!(Ke, fe, cc_i, cv_i, assembler)
@@ -181,7 +183,7 @@ f_gpu = KA.zeros(backend, Float32, (ndofs(dh),))
 # n_workers = ceil(Int, length(grid.cells) / NUM_THREADS) # FIXME does not match the used 493
 n_workers = getncells(grid)
 cv_gpu = CellValuesContainer(backend, n_workers, cv)
-cc_gpu = CellCacheContainer(backend, n_workers, dh_gpu)
+cc_gpu = CellCacheContainer(backend, n_workers, dh_gpu, UpdateFlags(), false)
 # Technically we can also just get one Ke or fe per worker, but for demonstration
 # purposes we allocate the full block here for element-assembly style matrix-free GPU
 # usage.
@@ -192,6 +194,7 @@ fes = KA.zeros(backend, Float32, getncells(grid), getnbasefunctions(cv))
 # assemble_global_ka!(backend, cv_gpu, K_gpu, f_gpu, cc_gpu, colors_gpu, Kes, fes)
 # Or alternatively the cuda variant.
 assemble_global_cuda!(cv_gpu, K_gpu, f_gpu, cc_gpu, colors_gpu, Kes, fes)
+@btime assemble_global_cuda!($cv_gpu, $K_gpu, $f_gpu, $cc_gpu, $colors_gpu, $Kes, $fes)
 
 # Finally, we can apply the Dirichlet constraints and solve our linear system.
 ch = ConstraintHandler(Float32, Int32, dh)

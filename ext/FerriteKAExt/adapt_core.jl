@@ -1,6 +1,7 @@
 # This file contains adapt rules for all relevant data structures in Ferrite.jl which do
 # not need customized GPU data structures.
 
+Adapt.@adapt_structure CellCache
 Adapt.@adapt_structure CellValues
 Adapt.@adapt_structure Ferrite.GeometryMapping
 function adapt_structure(to, ccc::Ferrite.CellValuesContainer)
