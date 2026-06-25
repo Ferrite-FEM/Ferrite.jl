@@ -20,7 +20,7 @@ dh = DofHandler(grid)
 ## Fields
 
 Before we can distribute the dofs we need to specify fields. A field is simply the unknown
-function(s) we are solving for. To add a field we need a name (a `Symbol`) and the the
+function(s) we are solving for. To add a field we need a name (a `Symbol`) and the
 interpolation describing the shape functions for the field. Here we add a scalar field `:u`,
 interpolated using linear (degree 1) shape functions on a triangle, and a vector field `:v`,
 also interpolated with linear shape functions on a triangle, but raised to the power 2 to

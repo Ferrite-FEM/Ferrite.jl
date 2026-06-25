@@ -93,7 +93,6 @@ get_fun_values(fv::FacetValues) = @inbounds fv.fun_values[getcurrentfacet(fv)]
 @propagate_inbounds shape_value(fv::FacetValues, q_point::Int, i::Int) = shape_value(get_fun_values(fv), q_point, i)
 @propagate_inbounds shape_gradient(fv::FacetValues, q_point::Int, i::Int) = shape_gradient(get_fun_values(fv), q_point, i)
 @propagate_inbounds shape_hessian(fv::FacetValues, q_point::Int, i::Int) = shape_hessian(get_fun_values(fv), q_point, i)
-@propagate_inbounds shape_symmetric_gradient(fv::FacetValues, q_point::Int, i::Int) = shape_symmetric_gradient(get_fun_values(fv), q_point, i)
 
 """
     getcurrentfacet(fv::FacetValues)

@@ -85,7 +85,7 @@
 # Using the Einstein summation convention, we can write this in short form as
 # $\boldsymbol{u} \approx \boldsymbol{N}_i \, \hat{u}_i$ and $\delta\boldsymbol{u} \approx \delta\boldsymbol{N}_i \, \delta\hat{u}_i$.
 #
-# Inserting the these into the weak form, and noting that that the equation should hold for all $\delta \hat{u}_i$, we get
+# Inserting these into the weak form, and noting that the equation should hold for all $\delta \hat{u}_i$, we get
 # ```math
 # \underbrace{\int_\Omega \mathrm{grad}(\delta \boldsymbol{N}_i) : \boldsymbol{\sigma}\ \mathrm{d}\Omega}_{f_i^\mathrm{int}} = \underbrace{\int_\Gamma \delta \boldsymbol{N}_i \cdot \boldsymbol{t}\ \mathrm{d}\Gamma}_{f_i^\mathrm{ext}}
 # ```
@@ -136,12 +136,12 @@ ip = Lagrange{RefTriangle, order}()^dim; # vector valued interpolation
 # linear interpolation, a single quadrature point suffices, both inside the cell and on the facet.
 # In 2d, a facet is the edge of the element.
 qr = QuadratureRule{RefTriangle}(1) # 1 quadrature point
-qr_face = FacetQuadratureRule{RefTriangle}(1);
+facet_qr = FacetQuadratureRule{RefTriangle}(1);
 
 # Finally, we collect the interpolations and quadrature rules into the `CellValues` and `FacetValues`
 # buffers, which we will later use to evaluate the integrals over the cells and facets.
 cellvalues = CellValues(qr, ip)
-facetvalues = FacetValues(qr_face, ip);
+facetvalues = FacetValues(facet_qr, ip);
 
 # ### Degrees of freedom
 # For distributing degrees of freedom, we define a `DofHandler`. The `DofHandler` knows that
@@ -260,7 +260,7 @@ C = gradient(ϵ -> 2 * Gmod * dev(ϵ) + 3 * Kmod * vol(ϵ), zero(SymmetricTensor
 # `ke` is pre-allocated and reused for all elements.
 #
 # Note that the elastic stiffness tensor $\mathsf{C}$ is constant.
-# Thus is needs to be computed and once and can then be used for all integration points.
+# Thus it needs to be computed only once and can then be used for all integration points.
 function assemble_cell!(ke, cellvalues, C)
     for q_point in 1:getnquadpoints(cellvalues)
         ## Get the integration weight for the quadrature point
@@ -357,7 +357,7 @@ end
 
 qp_stresses, avg_cell_stresses = calculate_stresses(grid, dh, cellvalues, u, C);
 
-# We now use the the L2Projector to project the stress-field onto the piecewise linear
+# We now use the L2Projector to project the stress-field onto the piecewise linear
 # finite element space that we used to solve the problem.
 proj = L2Projector(Lagrange{RefTriangle, 1}(), grid)
 stress_field = project(proj, qp_stresses, qr);

@@ -394,7 +394,7 @@ end
 
 # When the solution(s) are known we can compute the averaged stress,
 # ``\bar{\boldsymbol{\sigma}}`` in the RVE. We define a function that does this, and also
-# returns the von Mise stress in every quadrature point for visualization.
+# returns the von Mises stress in every quadrature point for visualization.
 
 function compute_stress(cellvalues::CellValues, dh::DofHandler, u, εᴹ)
     σvM_qpdata = zeros(getnquadpoints(cellvalues), getncells(dh.grid))
@@ -416,7 +416,7 @@ function compute_stress(cellvalues::CellValues, dh::DofHandler, u, εᴹ)
     return σvM_qpdata, σ̄
 end;
 
-# We now compute the homogenized stress and von Mise stress for all cases
+# We now compute the homogenized stress and von Mises stress for all cases
 
 σ̄ = (
     dirichlet = SymmetricTensor{2, 2}[],
@@ -474,9 +474,9 @@ E_periodic = SymmetricTensor{4, 2}() do i, j, k, l
     end
 end
 
-# We can check that the result are what we expect, namely that the stiffness with Dirichlet
+# We can check that the results are what we expect, namely that the stiffness with Dirichlet
 # boundary conditions is higher than when using periodic boundary conditions, and that
-# the Reuss assumption is an lower bound, and the Voigt assumption a upper bound. We first
+# the Reuss assumption is a lower bound, and the Voigt assumption an upper bound. We first
 # compute the volume fraction of the matrix, and then the Voigt and Reuss bounds:
 
 function matrix_volume_fraction(grid, cellvalues)

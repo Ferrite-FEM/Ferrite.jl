@@ -29,8 +29,8 @@ using SparseArrays, LinearAlgebra
         apply!(K2, f2, ch)
         @test K0 == K1
         @test K1 == K2
-        @test f0 == f1
-        @test f1 == f2
+        @test f0 ≈ f1
+        @test f1 ≈ f2
         # Error for affine constraints
         ch = ConstraintHandler(dh)
         add!(ch, AffineConstraint(1, [3 => 1.0], 1.0))

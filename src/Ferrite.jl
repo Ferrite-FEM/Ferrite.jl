@@ -8,7 +8,7 @@ using Base:
 using EnumX:
     EnumX, @enumx
 using LinearAlgebra:
-    LinearAlgebra, Symmetric, cholesky, det, norm, pinv, tr, mul!
+    LinearAlgebra, Symmetric, cholesky, det, norm, tr, mul!, normalize
 using NearestNeighbors:
     NearestNeighbors, KDTree, knn
 using OrderedCollections:
@@ -16,13 +16,11 @@ using OrderedCollections:
 using SparseArrays:
     SparseArrays, SparseMatrixCSC, nonzeros, nzrange, rowvals,
     AbstractSparseMatrix, AbstractSparseMatrixCSC, sparsevec
-using StaticArrays:
-    StaticArrays, MArray, MMatrix, SArray, SMatrix, SVector
 using WriteVTK:
     WriteVTK, VTKCellTypes
 using Tensors:
-    Tensors, AbstractTensor, SecondOrderTensor, SymmetricTensor, Tensor, Vec, gradient,
-    rotation_tensor, symmetric, tovoigt!, hessian, otimesu, otimesl
+    Tensors, AbstractTensor, SecondOrderTensor, SymmetricTensor, Tensor, Vec, MixedTensor2, MixedTensor3,
+    gradient, rotation_tensor, symmetric, tovoigt!, hessian, otimesu, otimesl, tdot
 using ForwardDiff:
     ForwardDiff
 
@@ -39,7 +37,7 @@ include("exports.jl")
 Supertype for all reference shapes, with reference dimension `refdim`. Reference shapes are
 used to define grid cells, shape functions, and quadrature rules. Currently existing
 reference shapes are: [`RefLine`](@ref), [`RefTriangle`](@ref), [`RefQuadrilateral`](@ref),
-[`RefTetrahedron`](@ref), [`RefHexahedron`](@ref), [`RefPrism`](@ref).
+[`RefTetrahedron`](@ref), [`RefHexahedron`](@ref), [`RefPrism`](@ref), [`RefPyramid`](@ref).
 """
 abstract type AbstractRefShape{refdim} end
 

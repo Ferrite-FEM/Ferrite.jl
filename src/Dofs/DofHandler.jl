@@ -251,7 +251,7 @@ n_components(sdh::SubDofHandler, field_idx::Int) = n_components(sdh.field_interp
 n_components(sdh::SubDofHandler, field_name::Symbol) = n_components(sdh, find_field(sdh, field_name))
 
 """
-    n_components(dh::DofHandler, field_idxs::NTuple{2,Int})
+    n_components(dh::DofHandler, field_idxs::NTuple{2, Int})
     n_components(dh::DofHandler, field_name::Symbol)
     n_components(sdh::SubDofHandler, field_idx::Int)
     n_components(sdh::SubDofHandler, field_name::Symbol)
@@ -386,6 +386,17 @@ function __close!(dh::DofHandler{dim}) where {dim}
     # A face is uniquely determined by 3 vertex nodes, see sortface
     facedicts = [Dict{NTuple{3, Int}, Int}() for _ in 1:numfields]
 
+    # The edge/face dicts above are shared between all SubDofHandlers that contain a given
+    # field, so `field_ncells[gidx]` counts the total number of cells carrying field `gidx`.
+    # This is used to reserve the dict capacity up front (see `_close_subdofhandler!`).
+    field_ncells = zeros(Int, numfields)
+    for sdh in dh.subdofhandlers
+        n = length(sdh.cellset)
+        for name in sdh.field_names
+            field_ncells[findfirst(==(name), dh.field_names)::Int] += n
+        end
+    end
+
     # Set initial values
     nextdof = 1  # next free dof to distribute
 
@@ -399,9 +410,10 @@ function __close!(dh::DofHandler{dim}) where {dim}
             vertexdicts,
             edgedicts,
             facedicts,
+            field_ncells,
         )
     end
-    dh.ndofs = maximum(dh.cell_dofs; init = 0)
+    dh.ndofs = nextdof - 1
     dh.closed = true
 
     return dh, vertexdicts, edgedicts, facedicts
@@ -413,7 +425,7 @@ end
 
 Main entry point to distribute dofs for a single [`SubDofHandler`](@ref) on its subdomain.
 """
-function _close_subdofhandler!(dh::DofHandler{sdim}, sdh::SubDofHandler, sdh_index::Int, nextdof::Int, vertexdicts, edgedicts, facedicts) where {sdim}
+function _close_subdofhandler!(dh::DofHandler{sdim}, sdh::SubDofHandler, sdh_index::Int, nextdof::Int, vertexdicts, edgedicts, facedicts, field_ncells) where {sdim}
     ip_infos = InterpolationInfo[]
     for interpolation in sdh.field_interpolations
         ip_info = InterpolationInfo(interpolation)
@@ -459,6 +471,29 @@ function _close_subdofhandler!(dh::DofHandler{sdim}, sdh::SubDofHandler, sdh_ind
     # Mapping between the local field index and the global field index
     global_fidxs = Int[findfirst(gname -> gname === lname, dh.field_names) for lname in sdh.field_names]
 
+    # Reserve capacity in the edge/face dicts up front to avoid repeatedly rehashing them
+    # while dofs are distributed. The number of unique edges/faces is within a small factor
+    # of the number of cells carrying the field (`field_ncells`, which spans all the
+    # SubDofHandlers sharing the dict). Edges (and faces in 3D) are shared between
+    # neighbouring cells, so the unique count is a couple of times the cell count; a 2D cell
+    # owns a single unshared face, so there the face dict reaches exactly the cell count.
+    # These hints are chosen to land in the same power-of-two bucket the dict reaches anyway
+    # (so no extra memory is reserved in the common cases), while skipping the intermediate
+    # rehashes during distribution. We only size a dict the first time it is touched (while
+    # still empty) so that a second SubDofHandler does not re-hint — and possibly shrink — a
+    # dict that another SubDofHandler already filled.
+    ncells = length(sdh.cellset)
+    for (lidx, gidx) in pairs(global_fidxs)
+        info = ip_infos[lidx]
+        ncf = field_ncells[gidx]
+        if any(>(0), info.nedgedofs) && isempty(edgedicts[gidx])
+            sizehint!(edgedicts[gidx], 2 * ncf)
+        end
+        if any(>(0), info.nfacedofs) && isempty(facedicts[gidx])
+            sizehint!(facedicts[gidx], info.reference_dim == 3 ? 2 * ncf : ncf)
+        end
+    end
+
     # loop over all the cells, and distribute dofs for all the fields
     for ci in sdh.cellset
         @debug println("Creating dofs for cell #$ci")
@@ -489,6 +524,7 @@ function _close_subdofhandler!(dh::DofHandler{sdim}, sdh::SubDofHandler, sdh_ind
             ndofs_per_cell = length(dh.cell_dofs) - len_cell_dofs_start
             sdh.ndofs_per_cell = ndofs_per_cell
             first_cell = false
+            sizehint!(dh.cell_dofs, len_cell_dofs_start + ndofs_per_cell * ncells)
         else
             @assert ndofs_per_cell == length(dh.cell_dofs) - len_cell_dofs_start
         end
@@ -663,7 +699,7 @@ described therein.
 end
 
 """
-    sortedge(edge::Tuple{Int,Int})
+    sortedge(edge::Tuple{Int, Int})
 
 Returns the unique representation of an edge and its orientation.
 Here the unique representation is the sorted node index tuple. The
@@ -688,9 +724,9 @@ end
 
 """
     sortface(face::Tuple{Int})
-    sortface(face::Tuple{Int,Int})
-    sortface(face::Tuple{Int,Int,Int})
-    sortface(face::Tuple{Int,Int,Int,Int})
+    sortface(face::Tuple{Int, Int})
+    sortface(face::Tuple{Int, Int, Int})
+    sortface(face::Tuple{Int, Int, Int, Int})
 
 Returns the unique representation of a face.
 Here the unique representation is the sorted node index tuple.
@@ -701,9 +737,9 @@ function sortface end
 
 """
     sortface_fast(face::Tuple{Int})
-    sortface_fast(face::Tuple{Int,Int})
-    sortface_fast(face::Tuple{Int,Int,Int})
-    sortface_fast(face::Tuple{Int,Int,Int,Int})
+    sortface_fast(face::Tuple{Int, Int})
+    sortface_fast(face::Tuple{Int, Int, Int})
+    sortface_fast(face::Tuple{Int, Int, Int, Int})
 
 Returns the unique representation of a face.
 Here the unique representation is the sorted node index tuple.
@@ -799,7 +835,7 @@ sortfacet_fast(facet::NTuple{3, Int}) = sortface_fast(facet)
 sortfacet_fast(facet::NTuple{4, Int}) = sortface_fast(facet)
 
 """
-    find_field(dh::DofHandler, field_name::Symbol)::NTuple{2,Int}
+    find_field(dh::DofHandler, field_name::Symbol)::NTuple{2, Int}
 
 Return the index of the field with name `field_name` in a `DofHandler`. The index is a
 `NTuple{2,Int}`, where the 1st entry is the index of the `SubDofHandler` within which the
@@ -886,7 +922,7 @@ julia> dof_range(dh, :u)
 julia> dof_range(dh, :p)
 10:12
 
-julia> dof_range(dh, (1,1)) # field :u
+julia> dof_range(dh, (1, 1)) # field :u
 1:9
 
 julia> dof_range(dh.subdofhandlers[1], 2) # field :p
@@ -910,7 +946,7 @@ function dof_range(dh::DofHandler, field_name::Symbol)
 end
 
 """
-    getfieldinterpolation(dh::DofHandler, field_idxs::NTuple{2,Int})
+    getfieldinterpolation(dh::DofHandler, field_idxs::NTuple{2, Int})
     getfieldinterpolation(sdh::SubDofHandler, field_idx::Int)
     getfieldinterpolation(sdh::SubDofHandler, field_name::Symbol)
 
@@ -926,7 +962,7 @@ getfieldinterpolation(sdh::SubDofHandler, field_idx::Int) = sdh.field_interpolat
 getfieldinterpolation(sdh::SubDofHandler, field_name::Symbol) = getfieldinterpolation(sdh, find_field(sdh, field_name))
 
 """
-    evaluate_at_grid_nodes(dh::AbstractDofHandler, u::AbstractVector{T}, fieldname::Symbol) where T
+    evaluate_at_grid_nodes(dh::AbstractDofHandler, u::AbstractVector{T}, fieldname::Symbol) where {T}
 
 Evaluate the approximated solution for field `fieldname` at the node
 coordinates of the grid given the Dof handler `dh` and the solution vector `u`.

@@ -1,11 +1,11 @@
 # # Porous media
 
 # Porous media is a two-phase material, consisting of solid parts and a liquid occupying
-# the pores inbetween.
+# the pores in between.
 # Using the porous media theory, we can model such a material without explicitly
 # resolving the microstructure, but by considering the interactions between the
 # solid and liquid. In this example, we will additionally consider larger linear
-# elastic solid aggregates that are impermeable. Hence, there is no liquids in
+# elastic solid aggregates that are impermeable. Hence, there is no liquid in
 # these particles and the only unknown variable is the displacement field `:u`.
 # In the porous media, denoted the matrix, we have both the displacement field,
 # `:u`, as well as the liquid pressure, `:p`, as unknown. The simulation result
@@ -32,7 +32,7 @@
 # \end{aligned}
 # ```
 # with
-# ``\boldsymbol{\mathsf{C}}=2G \boldsymbol{\mathsf{I}}^\mathrm{dev} + 3K \boldsymbol{I}\otimes\boldsymbol{I}``.
+# ``\boldsymbol{\mathsf{C}}=2G \boldsymbol{\mathsf{I}}^\mathrm{dev} + K \boldsymbol{I}\otimes\boldsymbol{I}``.
 # The material parameters are then the
 # shear modulus, ``G``,
 # bulk modulus, ``K``,

@@ -157,10 +157,6 @@ function toparaview!(v, x::SecondOrderTensor)
     tovoigt!(v, x)
     return v
 end
-function toparaview!(v::AbstractVector, x::SVector{D}) where {D}
-    v[1:D] .= x
-    return v
-end
 
 toparaview!(data::AbstractVector, val::Number) = (data[1] = val)
 
@@ -199,7 +195,7 @@ function component_names(::Type{S}) where {S}
 end
 
 """
-    write_solution(vtk::VTKGridFile, dh::AbstractDofHandler, u::AbstractVector, suffix="")
+    write_solution(vtk::VTKGridFile, dh::AbstractDofHandler, u::AbstractVector, suffix = "")
 
 Save the values at the nodes in the degree of freedom vector `u` to `vtk`.
 Each field in `dh` will be saved separately, and `suffix` can be used to append
@@ -367,7 +363,7 @@ function write_constraints(vtk, ch::ConstraintHandler)
 end
 
 """
-    write_cell_colors(vtk::VTKGridFile, grid::AbstractGrid, cell_colors, name="coloring")
+    write_cell_colors(vtk::VTKGridFile, grid::AbstractGrid, cell_colors, name = "coloring")
 
 Write cell colors (see [`create_coloring`](@ref)) to a VTK file for visualization.
 

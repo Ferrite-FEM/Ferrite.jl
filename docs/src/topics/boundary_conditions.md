@@ -102,7 +102,7 @@ Ferrite provides the `ProjectedDirichlet`, which instead finds the degree of fre
 minimizes the L2-distance between the prescribed function, ``f(\boldsymbol{x},t,\boldsymbol{n})``,
 and the finite element interpolation space, cf. [Bartels2004:ProjectedDirichlet](@cite).
 Although standard interpolations are not currently supported,
-the figure below illustrates well the difference between applying a standard `Dirichlet` condition and an
+the figure below illustrates well the difference between applying a standard `Dirichlet` condition and a
 `ProjectedDirichlet` condition when the prescribed function cannot be described by the chosen FE-interpolation.
 
 ![ProjectedDirichlet illustration](downloaded_assets/ProjectedDirichlet.svg)
@@ -123,8 +123,8 @@ the relevant `facetset` by using the [`FacetIterator`](@ref).
 For a scalar field, this can be done as
 
 ```julia
-grid = generate_grid(Quadrilateral, (3,3))
-dh = DofHandler(grid); push!(dh, :u, 1); close!(dh)
+grid = generate_grid(Quadrilateral, (3, 3))
+dh = DofHandler(grid); add!(dh, :u, Lagrange{RefQuadrilateral, 1}()); close!(dh)
 fv = FacetValues(QuadratureRule{RefQuadrilateral}(2), Lagrange{RefQuadrilateral, 1}())
 f = zeros(ndofs(dh))
 fe = zeros(ndofs_per_cell(dh))
@@ -244,10 +244,10 @@ ch = ConstraintHandler(dofhandler)
 
 # Compute the facet mapping
 φ(x) = x - Vec{2}((1.0, 0.0))
-face_mapping = collect_periodic_facets(grid, "left", "right", φ)
+facet_mapping = collect_periodic_facets(grid, "left", "right", φ)
 
 # Construct the periodic constraint for field :u
-pdbc = PeriodicDirichlet(:u, face_mapping, [1, 2])
+pdbc = PeriodicDirichlet(:u, facet_mapping, [1, 2])
 
 # Add the constraint to the constraint handler
 add!(ch, pdbc)
@@ -289,7 +289,7 @@ Here is an example of how to implement this type of boundary condition, for a kn
 ```julia
 pdbc = PeriodicDirichlet(
     :u,
-    face_mapping,
+    facet_mapping,
     (x, t) -> f(x),
     [1, 2],
 )
@@ -311,7 +311,7 @@ pdbc = PeriodicDirichlet(
     ```julia
     pdbc = PeriodicDirichlet(
         :u,
-        face_mapping,
+        facet_mapping,
         (x, t) -> ū + ∇ū  ⋅ (x - x̄)
     )
     ```
@@ -326,8 +326,8 @@ initial conditions can be specified by the [`apply_analytical!`](@ref) function.
 For example, specify the initial pressure as a function of the y-coordinate
 ```julia
 ρ = 1000; g = 9.81    # density [kg/m³] and gravity [N/kg]
-grid = generate_grid(Quadrilateral, (10,10))
-dh = DofHandler(grid); add!(dh, :u, 2); add!(dh, :p, 1); close!(dh)
+grid = generate_grid(Quadrilateral, (10, 10))
+dh = DofHandler(grid); add!(dh, :u, Lagrange{RefQuadrilateral, 1}()^2); add!(dh, :p, Lagrange{RefQuadrilateral, 1}()); close!(dh)
 u = zeros(ndofs(dh))
 apply_analytical!(u, dh, :p, x -> ρ * g * x[2])
 ```

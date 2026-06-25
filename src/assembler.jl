@@ -222,13 +222,13 @@ matrix_handle(a::SymmetricCSCAssembler) = a.K.data
 vector_handle(a::Union{AbstractCSCAssembler, AbstractCSRAssembler}) = a.f
 
 """
-    start_assemble(K::AbstractSparseMatrixCSC{Tv};            fillzero::Bool=true) -> CSCAssembler{Tv}
-    start_assemble(K::AbstractSparseMatrixCSC{Tv}, f::Vector{Tv}; fillzero::Bool=true) -> CSCAssembler{Tv}
+    start_assemble(K::AbstractSparseMatrixCSC{Tv}; fillzero::Bool = true) -> CSCAssembler{Tv}
+    start_assemble(K::AbstractSparseMatrixCSC{Tv}, f::Vector{Tv}; fillzero::Bool = true) -> CSCAssembler{Tv}
 
 Create a `CSCAssembler{Tv}` from the matrix `K` and optional vector `f` with value type `Tv`.
 
-    start_assemble(K::Symmetric{AbstractSparseMatrixCSC{Tv}};                 fillzero::Bool=true) -> SymmetricCSCAssembler{Tv}
-    start_assemble(K::Symmetric{AbstractSparseMatrixCSC{Tv}}, f::Vector=Tv[]; fillzero::Bool=true) -> SymmetricCSCAssembler{Tv}
+    start_assemble(K::Symmetric{AbstractSparseMatrixCSC{Tv}}; fillzero::Bool = true) -> SymmetricCSCAssembler{Tv}
+    start_assemble(K::Symmetric{AbstractSparseMatrixCSC{Tv}}, f::Vector = Tv[]; fillzero::Bool = true) -> SymmetricCSCAssembler{Tv}
 
 Create a `SymmetricCSCAssembler{Tv}` from the matrix `K` and optional vector `f` with value type `Tv`.
 
@@ -344,22 +344,22 @@ end
         while Ri <= length(nzr) && ri <= maxlookups
             R = nzr[Ri]
             Krow = Krows[R]
-            Kerow = rowpermutation[ri]
-            val = Ke[Kerow, Kecol]
-            if Krow == rowdofs[Kerow]
+            Kerow_dof = sortedrowdofs[ri]
+            if Krow == Kerow_dof
                 # Match: add the value (if non-zero) and advance the pointers
+                val = Ke[rowpermutation[ri], Kecol]
                 if !iszero(val)
                     Kvals[R] += val
                 end
                 ri += 1
                 Ri += 1
-            elseif Krow < rowdofs[Kerow]
+            elseif Krow < Kerow_dof
                 # No match yet: advance the global matrix row pointer
                 Ri += 1
-            else # Krow > rowdofs[Kerow]
+            else # Krow > Kerow_dof
                 # No match: no entry exist in the global matrix for this row. This is
                 # allowed as long as the value which would have been inserted is zero.
-                iszero(val) || _missing_sparsity_pattern_error(Krow, Kcol)
+                iszero(Ke[rowpermutation[ri], Kecol]) || _missing_sparsity_pattern_error(Krow, Kcol)
                 # Advance the local matrix row pointer
                 ri += 1
             end

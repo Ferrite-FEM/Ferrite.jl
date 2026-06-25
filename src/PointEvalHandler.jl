@@ -5,7 +5,7 @@ Base.@kwdef struct NewtonLineSearchPointFinder{T}
 end
 
 """
-    PointEvalHandler(grid::Grid, points::AbstractVector{Vec{dim,T}}; kwargs...) where {dim, T}
+    PointEvalHandler(grid::Grid, points::AbstractVector{Vec{dim, T}}; kwargs...) where {dim, T}
 
 The `PointEvalHandler` can be used for function evaluation in *arbitrary points* in the
 domain -- not just in quadrature points or nodes.
@@ -113,9 +113,6 @@ end
 cellcenter(::Type{<:RefHypercube{dim}}, _::Type{T}) where {dim, T} = zero(Vec{dim, T})
 cellcenter(::Type{<:RefSimplex{dim}}, _::Type{T}) where {dim, T} = Vec{dim, T}((ntuple(d -> 1 / 3, dim)))
 
-_solve_helper(A::Tensor{2, dim}, b::Vec{dim}) where {dim} = inv(A) ⋅ b
-_solve_helper(A::SMatrix{idim, odim}, b::Vec{idim, T}) where {odim, idim, T} = Vec{odim, T}(pinv(A) * b)
-
 # See https://discourse.julialang.org/t/finding-the-value-of-a-field-at-a-spatial-location-in-juafem/38975/2
 function find_local_coordinate(interpolation::Interpolation{refshape}, cell_coordinates::Vector{<:Vec{sdim}}, global_coordinate::Vec{sdim}, strategy::NewtonLineSearchPointFinder; warn::Bool = false) where {sdim, refshape}
     boundary_tolerance = √(strategy.residual_tolerance)
@@ -147,7 +144,8 @@ function find_local_coordinate(interpolation::Interpolation{refshape}, cell_coor
             warn && @warn "det(J) negative! Aborting! $(calculate_detJ(J))"
             break
         end
-        Δξ = _solve_helper(J, residual) # J \ b throws an error. TODO clean up when https://github.com/Ferrite-FEM/Tensors.jl/pull/188 is merged.
+        Δξ = calculate_Jinv(J) ⋅ residual # J \ residual
+
         # Do line search if the new guess is outside the element
         best_index = 1
         new_local_guess = local_guess - Δξ
@@ -203,8 +201,8 @@ function _get_node_cell_map(grid::AbstractGrid)
 end
 
 """
-    evaluate_at_points(ph::PointEvalHandler, dh::AbstractDofHandler, dof_values::AbstractVector{T}, [fieldname::Symbol]) where T
-    evaluate_at_points(ph::PointEvalHandler, proj::L2Projector, dof_values::AbstractVector{T}) where T
+    evaluate_at_points(ph::PointEvalHandler, dh::AbstractDofHandler, dof_values::AbstractVector{T}, [fieldname::Symbol]) where {T}
+    evaluate_at_points(ph::PointEvalHandler, proj::L2Projector, dof_values::AbstractVector{T}) where {T}
 
 Return a `Vector{T}` (for a 1-dimensional field) or a `Vector{Vec{fielddim, T}}` (for a
 vector field) with the field values of field `fieldname` in the points of the
