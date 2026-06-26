@@ -14,7 +14,7 @@ import Ferrite: CellCache
 
 import CUDA: CUDA.CUSPARSE.CuSparseMatrixCSC, CUDA.CUSPARSE.CuSparseMatrixCSR, @gputhrow, @device_override
 import KernelAbstractions as KA
-import KernelAbstractions: get_backend
+import KernelAbstractions: get_backend, @kernel, @index
 
 # ---------------- custom dispatches for error paths --------------------
 
@@ -87,131 +87,6 @@ end
 
 function Ferrite.allocate_matrix(::Type{CuSparseMatrixCSR{Tv, Ti}}, dh::DofHandler) where {Tv, Ti}
     return CuSparseMatrixCSR(allocate_matrix(SparseMatrixCSC{Tv, Ti}, dh))
-end
-
-# -------------------- constraints ----------------------
-
-struct GPUConstraintHandler{Tv, Ti, PD <: AbstractVector{Ti}, IH <: AbstractVector{Tv}, IP <: AbstractVector{Bool}}
-    prescribed_dofs::PD
-    inhomogeneities::IH
-    is_prescribed::IP
-end
-
-function adapt_structure(backend, ch::ConstraintHandler)
-    @assert Ferrite.isclosed(ch)
-    n = Ferrite.ndofs(ch.dh)
-    is_prescribed = zeros(Bool, n)
-    for d in ch.prescribed_dofs
-        is_prescribed[d] = true
-    end
-    return GPUConstraintHandler(
-        adapt(backend, ch.prescribed_dofs),
-        adapt(backend, ch.inhomogeneities),
-        adapt(backend, is_prescribed),
-    )
-end
-
-function meandiag_kernel!(diag, colptr, rowval, nzval, n)
-    j = threadIdx().x + (blockIdx().x - 1) * blockDim().x
-    j > n && return
-    for k in colptr[j]:(colptr[j + 1] - 1)
-        if rowval[k] == j
-            diag[j] = abs(nzval[k])
-            break
-        end
-    end
-    return nothing
-end
-
-# TODO The code below must be refactored a bit to use KernelAbstractions directly.
-#      The limiting factor right now is not having a enough sparse matrix base types
-#      and related to this no interfaces to query the fields.
-
-function meandiag(K::CuSparseMatrixCSC{T}) where {T}
-    n = size(K, 1)
-    backend = get_backend(nonzeros(K))
-    diag = KA.zeros(backend, T, n)
-    threads = min(256, n, CUDA.attribute(device(), CUDA.DEVICE_ATTRIBUTE_MAX_THREADS_PER_BLOCK))
-    @cuda threads = threads blocks = cld(n, threads) meandiag_kernel!(
-        diag, SparseArrays.getcolptr(K), rowvals(K), nonzeros(K), n
-    )
-    return sum(diag) / n
-end
-
-# Combined: f -= K[:, d] * inhom[d], then zero column d
-function apply_inhom_zero_cols_kernel!(f, colptr, rowval, nzval, prescribed_dofs, inhomogeneities, n_prescribed, applyzero)
-    idx = threadIdx().x + (blockIdx().x - 1) * blockDim().x
-    idx > n_prescribed && return
-    d = prescribed_dofs[idx]
-    v = inhomogeneities[idx]
-    for k in colptr[d]:(colptr[d + 1] - 1)
-        if !applyzero && !iszero(v)
-            CUDA.@atomic f[rowval[k]] -= v * nzval[k]
-        end
-        nzval[k] = zero(eltype(nzval))
-    end
-    return nothing
-end
-
-# Zero out prescribed rows
-function apply_zero_rows_kernel!(rowval, nzval, is_prescribed, nnz)
-    idx = threadIdx().x + (blockIdx().x - 1) * blockDim().x
-    idx > nnz && return
-    if is_prescribed[rowval[idx]]
-        nzval[idx] = zero(eltype(nzval))
-    end
-    return nothing
-end
-
-# Set K[d,d] = m and f[d] = inhom[d] * m
-function apply_set_diag_kernel!(colptr, rowval, nzval, f, prescribed_dofs, inhomogeneities, m, n_prescribed, applyzero)
-    idx = threadIdx().x + (blockIdx().x - 1) * blockDim().x
-    idx > n_prescribed && return
-    d = prescribed_dofs[idx]
-    for k in colptr[d]:(colptr[d + 1] - 1)
-        if rowval[k] == d
-            nzval[k] = m
-            break
-        end
-    end
-    f[d] = (applyzero ? zero(eltype(f)) : inhomogeneities[idx]) * m
-    return nothing
-end
-
-function Ferrite.apply!(K::CuSparseMatrixCSC{T}, f::CuVector{T}, ch::GPUConstraintHandler{T}, applyzero::Bool = false) where {T}
-    n_prescribed = length(ch.prescribed_dofs)
-    n_prescribed == 0 && return
-
-    colptr = SparseArrays.getcolptr(K)
-    rv = rowvals(K)
-    nz = nonzeros(K)
-    nnz = length(nz)
-    m = meandiag(K)
-    threads_p = min(256, n_prescribed, CUDA.attribute(device(), CUDA.DEVICE_ATTRIBUTE_MAX_THREADS_PER_BLOCK))
-    blocks_p = cld(n_prescribed, threads_p)
-
-    # TODO fuze into one kernel
-    # Step 1+2: f -= K[:,d]*v, then zero prescribed columns
-    @cuda threads = threads_p blocks = blocks_p apply_inhom_zero_cols_kernel!(
-        f, colptr, rv, nz, ch.prescribed_dofs, ch.inhomogeneities, n_prescribed, applyzero
-    )
-
-    # Step 3: zero prescribed rows
-    threads_z = min(256, nnz, CUDA.attribute(device(), CUDA.DEVICE_ATTRIBUTE_MAX_THREADS_PER_BLOCK))
-    @cuda threads = threads_z blocks = cld(nnz, threads_z) apply_zero_rows_kernel!(
-        rv, nz, ch.is_prescribed, nnz
-    )
-
-    # Step 4: set diagonal and rhs
-    @cuda threads = threads_p blocks = blocks_p apply_set_diag_kernel!(
-        colptr, rv, nz, f, ch.prescribed_dofs, ch.inhomogeneities, T(m), n_prescribed, applyzero
-    )
-
-    return
-end
-
-function Ferrite.apply_zero!(K::CuSparseMatrixCSC{T}, f::CuVector{T}, ch::GPUConstraintHandler{T}) where {T}
-    return Ferrite.apply!(K, f, ch, true)
 end
 
 end
