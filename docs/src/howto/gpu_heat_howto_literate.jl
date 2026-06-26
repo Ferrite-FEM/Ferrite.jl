@@ -144,6 +144,17 @@ function assemble_global!(cv::CellValues, K::SparseMatrixCSC, f, dh::DofHandler)
     return nothing                                                              #hide
 end                                                                             #hide
 
+function assemble_global!(cv::CellValues, K::SparseMatrixCSC, f, dh::SubDofHandler) #hide
+    n_basefuncs = getnbasefunctions(cv)                                         #hide
+    Ke = zeros(Float32, n_basefuncs, n_basefuncs)                               #hide
+    fe = zeros(Float32, n_basefuncs)                                            #hide
+    assembler = start_assemble(K, f; fillzero = false)                          #hide
+    for cell in CellIterator(dh)                                                #hide
+        assemble_cell!(Ke, fe, cell, cv, assembler)                             #hide
+    end                                                                         #hide
+    return nothing                                                              #hide
+end                                                                             #hide
+
 # Now we first setup the problem almost as usual on the host (CPU).
 # The only major difference here is that we instantiate everything
 # using Float32 and Int32 whenever it makes sense to lower memory

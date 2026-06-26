@@ -63,16 +63,16 @@ function generate_mixed_grid()
 end
 
 # ----------------------------- Tests --------------------------
-
-using Test
-K = allocate_matrix(SparseMatrixCSC{Float32, Int32}, dh)
-f = zeros(Float32, ndofs(dh))
-assemble_global!(cv, K, f, dh)
-apply!(K, f, ch)
-u_cpu = K \ f
-# NOTE this might fail because the meandiag differs due to cancellation. However,
-# the solutions are usually still very close.
-@test u_cpu ≈ u_gpu
+@testset "How-To correctness" begin
+    K = allocate_matrix(SparseMatrixCSC{Float32, Int32}, dh)
+    f = zeros(Float32, ndofs(dh))
+    assemble_global!(cv, K, f, dh)
+    apply!(K, f, ch)
+    u_cpu = K \ f
+    # NOTE this might fail because the meandiag differs due to cancellation. However,
+    # the solutions are usually still very close.
+    @test u_cpu ≈ u_gpu
+end
 
 # Test KA
 @testset "KernelAbstractions paths for heat problem on simple grid using $backend" for backend in [KA.CPU(), CUDABackend()]
@@ -155,10 +155,17 @@ end
     )
     add!(ch, Dirichlet(:u, ∂Ω, (x, t) -> 1.0))
     close!(ch)
+
     ch_device = backend isa KA.CPU ? ch : adapt(backend, ch)
     apply!(K_device, f_device, ch_device)
     u = SparseMatrixCSC(K_device) \ Vector(f_device)
 
-    # FIXME better test
-    @test norm(u) ≈ 40.385 atol = 0.1
+    K = allocate_matrix(SparseMatrixCSC{Float32, Int32}, dh)
+    f = zeros(Float32, ndofs(dh))
+    assemble_global!(cv1, K, f, dh.subdofhandlers[1])
+    assemble_global!(cv2, K, f, dh.subdofhandlers[2])
+    apply!(K, f, ch)
+    u_cpu = K \ f
+
+    @test u ≈ u_cpu
 end

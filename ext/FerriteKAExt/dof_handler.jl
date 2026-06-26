@@ -41,7 +41,7 @@ Base.@propagate_inbounds function Ferrite.dof_range(sdh::DeviceSubDofHandler, fi
     return Ferrite.dof_range(sdh, sdh.field_indices[field_name])
 end
 
-function Ferrite.celldofs!(global_dofs::AbstractVector, sdh::DeviceSubDofHandler, i::Integer)
+function Ferrite.celldofs!(global_dofs::AbstractVector{<:Integer}, sdh::DeviceSubDofHandler, i::Integer)
     copyto!(global_dofs, 1, sdh.cell_dofs, sdh.cell_dofs_offset[i], length(global_dofs))
     return global_dofs
 end
