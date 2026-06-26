@@ -152,7 +152,7 @@ end                                                                             
 # Please note that GPU kernels have a launch overhead. Therefore out problem
 # must be sufficiently large to see any benefits of utilizing the GPU.
 # The small number of elements here is just for demonstration purposes.
-num_elements = 100
+num_elements = 20
 # We generate a Float32 coordinate grid by passing in Float32 corner coordinates.
 grid = generate_grid(Hexahedron, (num_elements, num_elements, num_elements), Vec{3}((-1.0f0, -1.0f0, -1.0f0)), Vec{3}((1.0f0, 1.0f0, 1.0f0)))
 ip = Lagrange{RefHexahedron, 1}()
@@ -181,8 +181,7 @@ f_gpu = KA.zeros(backend, Float32, (ndofs(dh),))
 # n_workers = ceil(Int, length(grid.cells) / NUM_THREADS) # FIXME does not match the used 493
 n_workers = getncells(grid)
 cv_gpu = Ferrite.distribute_to_tasks(backend, cv, n_workers)
-cc_gpu = Ferrite.distribute_to_tasks(backend, CellCache(dh_gpu, UpdateFlags(), false), n_workers)
-icc_gpu = Ferrite.distribute_to_tasks(backend, CellCache(dh_gpu, UpdateFlags(), true), n_workers)
+cc_gpu = Ferrite.distribute_to_tasks(backend, CellCache(dh_gpu), n_workers)
 # Technically we can also just get one Ke or fe per worker, but for demonstration
 # purposes we allocate the full block here for element-assembly style matrix-free GPU
 # usage.
@@ -193,10 +192,6 @@ fes = KA.zeros(backend, Float32, getncells(grid), getnbasefunctions(cv))
 # assemble_global_ka!(backend, cv_gpu, K_gpu, f_gpu, cc_gpu, colors_gpu, Kes, fes)
 # Or alternatively the cuda variant.
 assemble_global_cuda!(cv_gpu, K_gpu, f_gpu, cc_gpu, colors_gpu, Kes, fes)
-
-# using BenchmarkTools
-# @btime assemble_global_cuda!($cv_gpu, $K_gpu, $f_gpu, $cc_gpu, $colors_gpu, $Kes, $fes)  # nel=100: 121.867 ms (4820 allocations: 100.81 KiB)
-# @btime assemble_global_cuda!($cv_gpu, $K_gpu, $f_gpu, $icc_gpu, $colors_gpu, $Kes, $fes) # nel=100: 120.501 ms (4804 allocations: 99.81 KiB)
 
 # Finally, we can apply the Dirichlet constraints and solve our linear system.
 ch = ConstraintHandler(Float32, Int32, dh)
@@ -209,5 +204,5 @@ close!(ch)
 
 ch_gpu = adapt(backend, ch)
 apply!(K_gpu, f_gpu, ch_gpu)
-# u_gpu = SparseMatrixCSC(K_gpu) \ Vector(f_gpu)
+u_gpu = SparseMatrixCSC(K_gpu) \ Vector(f_gpu)
 nothing

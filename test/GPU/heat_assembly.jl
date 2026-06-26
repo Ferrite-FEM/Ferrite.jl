@@ -85,8 +85,9 @@ u_cpu = K \ f
         allocate_matrix(CuSparseMatrixCSC{Float32, Int32}, dh)
     end
     f_device = KA.zeros(backend, Float32, ndofs(dh))
-    cv_device = CellValuesContainer(backend, n_workers, cv)
-    cell_cache = CellCacheContainer(backend, n_workers, dh_device)
+
+    cv_device = Ferrite.distribute_to_tasks(backend, cv, n_workers)
+    cell_cache = Ferrite.distribute_to_tasks(backend, CellCache(dh_device), n_workers)
     Kes_device = KA.zeros(backend, Float32, getncells(grid), getnbasefunctions(cv), getnbasefunctions(cv))
     fes_device = KA.zeros(backend, Float32, getncells(grid), getnbasefunctions(cv))
     # Assembly here does not work because we are missing a SOA transformation of the assembler.
@@ -136,17 +137,17 @@ end
     end
     f_device = KA.zeros(backend, Float32, ndofs(dh))
 
-    cv1_device = CellValuesContainer(backend, n_workers, cv1)
-    cell_cache1 = CellCacheContainer(backend, n_workers, dh_device.subdofhandlers[1])
+    cv1_device = Ferrite.distribute_to_tasks(backend, cv1, n_workers)
+    cc1 = Ferrite.distribute_to_tasks(backend, CellCache(dh_device.subdofhandlers[1]), n_workers)
     Kes_device = KA.zeros(backend, Float32, getncells(grid), getnbasefunctions(cv1), getnbasefunctions(cv1))
     fes_device = KA.zeros(backend, Float32, getncells(grid), getnbasefunctions(cv1))
-    assemble_global_ka!(backend, cv1_device, K_device, f_device, cell_cache1, colors1_device, Kes_device, fes_device)
+    assemble_global_ka!(backend, cv1_device, K_device, f_device, cc1, colors1_device, Kes_device, fes_device)
 
-    cv2_device = CellValuesContainer(backend, n_workers, cv2)
-    cell_cache2 = CellCacheContainer(backend, n_workers, dh_device.subdofhandlers[2])
+    cv2_device = Ferrite.distribute_to_tasks(backend, cv2, n_workers)
+    cc2 = Ferrite.distribute_to_tasks(backend, CellCache(dh_device.subdofhandlers[2]), n_workers)
     Kes_device = KA.zeros(backend, Float32, getncells(grid), getnbasefunctions(cv2), getnbasefunctions(cv2))
     fes_device = KA.zeros(backend, Float32, getncells(grid), getnbasefunctions(cv2))
-    assemble_global_ka!(backend, cv2_device, K_device, f_device, cell_cache2, colors2_device, Kes_device, fes_device)
+    assemble_global_ka!(backend, cv2_device, K_device, f_device, cc2, colors2_device, Kes_device, fes_device)
 
     ch = ConstraintHandler(Float32, Int32, dh)
     ∂Ω = union(

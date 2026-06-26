@@ -487,7 +487,7 @@ Whereas the last option tries to call a `cellset` of the `grid`. `Collection` ca
 @inline getncells(grid::AbstractGrid) = length(grid.cells)
 "Returns the celltype of the `<:AbstractGrid`."
 @inline getcelltype(grid::AbstractGrid) = eltype(grid.cells)
-@inline getcelltype(grid::AbstractGrid, i::Integer) = typeof(grid.cells[i])
+@inline getcelltype(grid::AbstractGrid, i::Integer) = typeof(getcells(grid, i))
 
 """
     getnodes(grid::AbstractGrid)
@@ -510,7 +510,7 @@ function nnodes_per_cell(grid::AbstractGrid)
     end
     return nnodes(first(grid.cells))
 end
-@inline nnodes_per_cell(grid::AbstractGrid, i::Integer) = nnodes(grid.cells[i])
+@inline nnodes_per_cell(grid::AbstractGrid, i::Integer) = nnodes(getcells(grid, i))
 
 "Return the number type of the nodal coordinates."
 @inline get_coordinate_eltype(grid::AbstractGrid) = get_coordinate_eltype(first(getnodes(grid)))
