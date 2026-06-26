@@ -1,6 +1,12 @@
-function as_structure_of_arrays(d, outer_dim, ::Type{CellValues}, args...; kwargs...)
-    cv = CellValues(args...; kwargs...)
-    return as_structure_of_arrays(d, outer_dim, cv)
+function Ferrite.distribute_to_tasks(backend::KA.Backend, obj, num_tasks) # Could also be KA.GPU <: KA.Backend, but nice to test logic on CPU probably...
+    num_tasks < 1 && throw(ArgumentError("num_tasks must be strictly positive"))
+    soa = as_structure_of_arrays(backend, num_tasks, obj)
+    return Ferrite.SoAContainer(soa, num_tasks)
+end
+
+zeros_shared(::Any, ::Nothing, ::Integer) = nothing
+function zeros_shared(backend, a::AbstractArray{T}, N::Integer) where {T}
+    return KA.zeros(backend, T, N, size(a)...)
 end
 
 function as_structure_of_arrays(d, N, cv::CellValues)
@@ -8,7 +14,7 @@ function as_structure_of_arrays(d, N, cv::CellValues)
         as_structure_of_arrays(d, N, cv.fun_values),
         as_structure_of_arrays(d, N, cv.geo_mapping),
         adapt(d, cv.qr),
-        KA.zeros(d, eltype(cv.detJdV), N, length(cv.detJdV)),
+        zeros_shared(d, cv.detJdV, N),
     )
 end
 
@@ -18,9 +24,9 @@ function as_structure_of_arrays(d, N, fv::Ferrite.FunctionValues)
         adapt(d, fv.ip),
         fv.Nξ === fv.Nx ? Nξ : KA.zeros(d, eltype(fv.Nx), N, size(fv.Nx, 1), size(fv.Nx, 2)), # Ensure proper aliasing,
         Nξ,
-        fv.dNdx === nothing ? nothing : KA.zeros(d, eltype(fv.dNdx), N, size(fv.dNdx, 1), size(fv.dNdx, 2)),
+        zeros_shared(d, fv.dNdx, N),
         adapt(d, fv.dNdξ),
-        fv.d2Ndx2 === nothing ? nothing : KA.zeros(d, eltype(fv.d2Ndx2), N, size(fv.d2Ndx2, 1), size(fv.d2Ndx2, 2)),
+        zeros_shared(d, fv.d2Ndx2, N),
         adapt(d, fv.d2Ndξ2),
     )
 end

@@ -8,9 +8,9 @@ using Ferrite, CUDA, SparseArrays
 import Adapt: Adapt, adapt, adapt_structure
 
 import Ferrite: get_grid, AbstractGrid, AbstractDofHandler, get_coordinate_eltype
-import Ferrite: as_structure_of_arrays, get_substruct
+import Ferrite: get_substruct
 import Ferrite: meandiag, nnodes_per_cell
-import Ferrite: CellCacheContainer, CellValuesContainer, CellCache
+import Ferrite: CellCache
 
 import CUDA: CUDA.CUSPARSE.CuSparseMatrixCSC, CUDA.CUSPARSE.CuSparseMatrixCSR, @gputhrow, @device_override
 import KernelAbstractions as KA
