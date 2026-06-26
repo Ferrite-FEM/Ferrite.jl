@@ -72,19 +72,6 @@ function reinit!(cc::CellCache, i::Integer)
     return cc
 end
 
-# FIXME Julia refuses to accept this dispatch, even though we have
-# ```
-#     julia> typeof(Ferrite.get_substruct(1, cc_gpu.values, 1)) <: CellCache{<:Any,<:Any,<:Any,<:Any,<:SubArray}
-#     true
-# ```
-# function reinit!(cc::CellCache{<:Any,<:Any,<:Any,<:Any,<:SubArray}, i::Integer)
-#     cc.cellid[1] = i
-#     cc.flags.nodes  && cellnodes!(cc.nodes, cc.grid, i)
-#     cc.flags.coords && getcoordinates!(cc.coords, cc.grid, i)
-#     cc.dh !== nothing && cc.flags.dofs && celldofs!(cc.dofs, cc.dh, i)
-#     return cc
-# end
-
 function _reinit!(cc::CellCache, i::Integer, ::Vector)
     if cc.flags.nodes
         resize!(cc.nodes, nnodes_per_cell(cc.grid, i))

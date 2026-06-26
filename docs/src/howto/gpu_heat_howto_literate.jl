@@ -79,7 +79,7 @@ end
     end
 end
 function assemble_global_ka!(backend, cv::Ferrite.SoAContainer{<:CellValues}, K, f, cc, colors::Vector, Ke, fe)
-    assembler = K === nothing ? nothing : start_assemble(K, f; fillzero=false)
+    assembler = K === nothing ? nothing : start_assemble(K, f; fillzero = false)
     for color in colors
         ## We divide the work into blocks and fire up the kernel.
         n = length(color)
@@ -205,4 +205,3 @@ close!(ch)
 ch_gpu = adapt(backend, ch)
 apply!(K_gpu, f_gpu, ch_gpu)
 u_gpu = SparseMatrixCSC(K_gpu) \ Vector(f_gpu)
-nothing

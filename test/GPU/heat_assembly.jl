@@ -56,10 +56,10 @@ function generate_mixed_grid()
     nodes = tonodes()
     elements, gmsh_eleidx = toelements(2)
     boundarydict = toboundary(1)
-    facetsets = tofacetsets(boundarydict,elements)
-    cellsets = tocellsets(2,gmsh_eleidx)
+    facetsets = tofacetsets(boundarydict, elements)
+    cellsets = tocellsets(2, gmsh_eleidx)
 
-    return Grid(elements,nodes,facetsets=facetsets,cellsets=cellsets)
+    return Grid(elements, nodes, facetsets = facetsets, cellsets = cellsets)
 end
 
 # ----------------------------- Tests --------------------------
@@ -160,5 +160,5 @@ end
     u = SparseMatrixCSC(K_device) \ Vector(f_device)
 
     # FIXME better test
-    @test norm(u) ≈ 40.385 atol=0.1
+    @test norm(u) ≈ 40.385 atol = 0.1
 end

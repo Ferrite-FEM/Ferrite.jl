@@ -1,6 +1,6 @@
 # This file contains adapt rules for all relevant data structures in Ferrite.jl.
-# During setup, these rules are typically called for a `KA.Backend` (e.g. `CUDABackend()`), 
-# and later during kernel construction, these are called for the specific kernel, 
+# During setup, these rules are typically called for a `KA.Backend` (e.g. `CUDABackend()`),
+# and later during kernel construction, these are called for the specific kernel,
 # e.g. CUDA.KernelAdaptor(). Please consult Adapt.jl for further details.
 
 Adapt.@adapt_structure CellCache

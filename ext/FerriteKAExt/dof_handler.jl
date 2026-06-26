@@ -1,7 +1,7 @@
 struct DeviceSubDofHandler{
         sdim,
         CS <: AbstractVector{Int}, CD <: AbstractVector{Int},
-        CO <: AbstractVector{Int}, FN <: NamedTuple, DR <: Tuple, G <: AbstractGrid{sdim}
+        CO <: AbstractVector{Int}, FN <: NamedTuple, DR <: Tuple, G <: AbstractGrid{sdim},
     } <: AbstractDofHandler
     cellset::CS
     cell_dofs::CD
@@ -54,19 +54,19 @@ struct HostDofHandler{sdim, G <: Grid{sdim}, DH <: AbstractDofHandler} <: Abstra
 end
 
 function HostDofHandler(backend, dh::DofHandler)
-    grid_cpu  = get_grid(dh)
+    grid_cpu = get_grid(dh)
     nodes_cpu = getnodes(grid_cpu)
     nodes_gpu = adapt(backend, nodes_cpu)
     cell_dofs = adapt(backend, dh.cell_dofs)
     cell_dofs_offset = adapt(backend, dh.cell_dofs_offset)
     subdofhandlers = map(dh.subdofhandlers) do sdh
         dof_ranges = Tuple(Ferrite.dof_range(sdh, i) for i in 1:length(sdh.field_names))
-        field_indices = NamedTuple{ntuple(i->dh.field_names[i], length(dh.field_names))}(collect(1:length(dh.field_names)))
+        field_indices = NamedTuple{ntuple(i -> dh.field_names[i], length(dh.field_names))}(collect(1:length(dh.field_names)))
         # invert cellset and build a device container grid with only a single cell type
         cellset = collect(Int, sdh.cellset)
         global_to_local_cellid = zeros(Int, getncells(grid_cpu))
         local_cells = Vector{typeof(getcells(grid_cpu, first(cellset)))}(undef, length(cellset))
-        for (i,cid) in enumerate(cellset)
+        for (i, cid) in enumerate(cellset)
             global_to_local_cellid[cid] = i
             local_cells[i] = getcells(grid_cpu, cid)
         end

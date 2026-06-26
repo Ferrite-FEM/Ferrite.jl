@@ -2,7 +2,7 @@
 """
     distribute_to_tasks(backend, obj, num_tasks)
 
-Distribute the object `obj` to `num_tasks` based on the chosen backend for task-based paralellism.
+Distribute the object `obj` to `num_tasks` based on the chosen backend for task-based parallelism.
 Returns `d::AbstractVector{T}` where `T` is loosely equivalent to `typeof(obj)`, meaning that most
 methods are applicable to both types. Supported `backend`s are
 
@@ -30,6 +30,7 @@ function Base.show(io::IO, d::MIME"text/plain", c::SoAContainer{T}) where {T}
         show(io, d, c[1])
     end
     =#
+    return nothing
 end
 
 # ------------------------------ Internal part --------------------------------------

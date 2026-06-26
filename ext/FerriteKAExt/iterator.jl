@@ -1,6 +1,6 @@
 function as_structure_of_arrays(backend, N, cc::CellCache)
     return Ferrite.CellCache(
-        cc.flags, cc.grid, 
+        cc.flags, cc.grid,
         KA.zeros(backend, eltype(cc.cellid), N),
         zeros_shared(backend, cc.nodes, N),
         zeros_shared(backend, cc.coords, N),
