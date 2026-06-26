@@ -81,7 +81,6 @@ end
 end
 
 
-
 function meandiag(K::GPUArrays.AbstractGPUSparseMatrixCSC{T}) where {T}
     n = size(K, 1)
     backend = get_backend(nonzeros(K))
@@ -132,4 +131,3 @@ end
 function Ferrite.apply_zero!(K::GPUArrays.AbstractGPUSparseMatrixCSC{T}, f::GPUArrays.AbstractGPUVector{T}, ch::DeviceConstraintHandler{T}) where {T}
     return Ferrite.apply!(K, f, ch, true)
 end
-
