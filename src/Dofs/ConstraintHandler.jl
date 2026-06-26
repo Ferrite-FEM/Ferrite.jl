@@ -135,7 +135,7 @@ end
 
 const DofCoefficients{Tv, Ti} = Vector{Pair{Ti, Tv}}
 """
-    AffineConstraint(constrained_dof::Integer, entries::Vector{Pair{Integer,T}}, b::T) where {T}
+    AffineConstraint(constrained_dof::Integer, entries::Vector{Pair{Integer, T}}, b::T) where {T}
 
 Define an affine/linear constraint to constrain one degree of freedom, `u[i]`,
 such that `u[i] = ∑(u[j] * a[j]) + b`,
