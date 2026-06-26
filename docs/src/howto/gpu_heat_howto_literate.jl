@@ -194,9 +194,9 @@ fes = KA.zeros(backend, Float32, getncells(grid), getnbasefunctions(cv))
 # Or alternatively the cuda variant.
 assemble_global_cuda!(cv_gpu, K_gpu, f_gpu, cc_gpu, colors_gpu, Kes, fes)
 
-using BenchmarkTools
-@btime assemble_global_cuda!($cv_gpu, $K_gpu, $f_gpu, $cc_gpu, $colors_gpu, $Kes, $fes)  # nel=100: 121.867 ms (4820 allocations: 100.81 KiB)
-@btime assemble_global_cuda!($cv_gpu, $K_gpu, $f_gpu, $icc_gpu, $colors_gpu, $Kes, $fes) # nel=100: 120.501 ms (4804 allocations: 99.81 KiB)
+# using BenchmarkTools
+# @btime assemble_global_cuda!($cv_gpu, $K_gpu, $f_gpu, $cc_gpu, $colors_gpu, $Kes, $fes)  # nel=100: 121.867 ms (4820 allocations: 100.81 KiB)
+# @btime assemble_global_cuda!($cv_gpu, $K_gpu, $f_gpu, $icc_gpu, $colors_gpu, $Kes, $fes) # nel=100: 120.501 ms (4804 allocations: 99.81 KiB)
 
 # Finally, we can apply the Dirichlet constraints and solve our linear system.
 ch = ConstraintHandler(Float32, Int32, dh)
