@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Next] - xxxx-xx-xx
 
+### Features
+
+- GPU support for assembly of type-stable, non-allocating element routines ([#1291])
+
 ### Documentation
 
 - Landau example in code gallery now shows how to use DifferentiationInterface and HyperHessians as a backend. (#1345)
