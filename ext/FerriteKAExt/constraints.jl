@@ -36,7 +36,7 @@ end
 
 # -------------------- KA kernels -----------------------------------
 
-@kernel function _meandiag_kernel!(diag, colptr, rowval, nzval)
+@kernel function _meandiag_kernel_csc!(diag, colptr, rowval, nzval)
     j = @index(Global, Linear)
     for k in colptr[j]:(colptr[j + 1] - 1)
         if rowval[k] == j
@@ -81,11 +81,11 @@ end
 end
 
 
-function meandiag(K::GPUArrays.AbstractGPUSparseMatrixCSC{T}) where {T}
+function meandiag(K::SparseArrays.AbstractSparseMatrixCSC{T}) where {T}
     n = size(K, 1)
     backend = get_backend(nonzeros(K))
     diag = KA.zeros(backend, T, n)
-    _meandiag_kernel!(backend)(
+    _meandiag_kernel_csc!(backend)(
         diag, SparseArrays.getcolptr(K), rowvals(K), nonzeros(K);
         ndrange = n
     )
@@ -94,6 +94,21 @@ function meandiag(K::GPUArrays.AbstractGPUSparseMatrixCSC{T}) where {T}
 end
 
 function Ferrite.apply!(K::GPUArrays.AbstractGPUSparseMatrixCSC{T}, f::GPUArrays.AbstractGPUVector{T}, ch::DeviceConstraintHandler{T}, applyzero::Bool = false) where {T}
+    _apply_ka_csc!(K, f, ch, applyzero)
+    return
+end
+
+function Ferrite.apply!(K::SparseArrays.AbstractSparseMatrixCSC{T}, f::AbstractVector{T}, ch::DeviceConstraintHandler{T}, applyzero::Bool = false) where {T}
+    _apply_ka_csc!(K, f, ch, applyzero)
+    return
+end
+
+function Ferrite.apply_zero!(K::GPUArrays.AbstractGPUSparseMatrixCSC{T}, f::GPUArrays.AbstractGPUVector{T}, ch::DeviceConstraintHandler{T}) where {T}
+    _apply_ka_csc!(K, f, ch, true)
+    return
+end
+
+function _apply_ka_csc!(K, f, ch::DeviceConstraintHandler{T}, applyzero::Bool = false) where {T}
     n_prescribed = length(ch.prescribed_dofs)
     n_prescribed == 0 && return
 
@@ -126,8 +141,4 @@ function Ferrite.apply!(K::GPUArrays.AbstractGPUSparseMatrixCSC{T}, f::GPUArrays
     KA.synchronize(backend)
 
     return
-end
-
-function Ferrite.apply_zero!(K::GPUArrays.AbstractGPUSparseMatrixCSC{T}, f::GPUArrays.AbstractGPUVector{T}, ch::DeviceConstraintHandler{T}) where {T}
-    return Ferrite.apply!(K, f, ch, true)
 end
