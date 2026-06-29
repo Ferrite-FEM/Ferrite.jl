@@ -81,7 +81,7 @@ end
 end
 
 
-function meandiag(K::SparseArrays.AbstractSparseMatrixCSC{T}) where {T}
+function meandiag(K::AbstractGPUSparseMatrixCSC{T}) where {T}
     n = size(K, 1)
     backend = get_backend(nonzeros(K))
     diag = KA.zeros(backend, T, n)
@@ -93,17 +93,17 @@ function meandiag(K::SparseArrays.AbstractSparseMatrixCSC{T}) where {T}
     return sum(diag) / n
 end
 
-function Ferrite.apply!(K::GPUArrays.AbstractGPUSparseMatrixCSC{T}, f::GPUArrays.AbstractGPUVector{T}, ch::DeviceConstraintHandler{T}, applyzero::Bool = false) where {T}
+function Ferrite.apply!(K::AbstractGPUSparseMatrixCSC{T}, f::AbstractGPUVector{T}, ch::DeviceConstraintHandler{T}, applyzero::Bool = false) where {T}
     _apply_ka_csc!(K, f, ch, applyzero)
     return
 end
 
-function Ferrite.apply!(K::SparseArrays.AbstractSparseMatrixCSC{T}, f::AbstractVector{T}, ch::DeviceConstraintHandler{T}, applyzero::Bool = false) where {T}
+function Ferrite.apply!(K::AbstractSparseMatrixCSC{T}, f::AbstractVector{T}, ch::DeviceConstraintHandler{T}, applyzero::Bool = false) where {T}
     _apply_ka_csc!(K, f, ch, applyzero)
     return
 end
 
-function Ferrite.apply_zero!(K::GPUArrays.AbstractGPUSparseMatrixCSC{T}, f::GPUArrays.AbstractGPUVector{T}, ch::DeviceConstraintHandler{T}) where {T}
+function Ferrite.apply_zero!(K::AbstractGPUSparseMatrixCSC{T}, f::AbstractGPUVector{T}, ch::DeviceConstraintHandler{T}) where {T}
     _apply_ka_csc!(K, f, ch, true)
     return
 end

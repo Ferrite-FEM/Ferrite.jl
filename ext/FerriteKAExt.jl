@@ -11,8 +11,9 @@ import Ferrite: meandiag, nnodes_per_cell
 import KernelAbstractions as KA
 import KernelAbstractions: get_backend, @kernel, @index
 
+import SparseArrays: AbstractSparseMatrixCSC
 import GPUArraysCore: @allowscalar
-import GPUArrays
+import GPUArrays: AbstractGPUSparseMatrixCSC, AbstractGPUVector
 
 include("FerriteKAExt/adapt_core.jl")
 include("FerriteKAExt/soa_core.jl")
