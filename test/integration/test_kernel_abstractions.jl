@@ -5,6 +5,7 @@ import KernelAbstractions as KA
 using SparseArrays
 using Test
 using GPUArrays
+import LinearAlgebra
 
 @testset "KernelAbstractions.jl integration" begin
 
@@ -131,7 +132,7 @@ using GPUArrays
     # Please note that GPU kernels have a launch overhead. Therefore out problem
     # must be sufficiently large to see any benefits of utilizing the GPU.
     # The small number of elements here is just for demonstration purposes.
-    num_elements = 20
+    num_elements = 10
     # We generate a Float32 coordinate grid by passing in Float32 corner coordinates.
     grid = generate_grid(Hexahedron, (num_elements, num_elements, num_elements), Vec{3}((-1.0f0, -1.0f0, -1.0f0)), Vec{3}((1.0f0, 1.0f0, 1.0f0)))
     ip = Lagrange{RefHexahedron, 1}()
@@ -181,14 +182,15 @@ using GPUArrays
 
     ch_device = adapt(backend, ch)
     apply!(K_device, f_device, ch_device)
-    u_device = K_device \ f_device
+    # Julia 1.10 cannot handle \ on Float32, Int32 CSC matrices
+    u_device = Float32.(LinearAlgebra.lu(K_device) \ f_device)
 
     K = allocate_matrix(SparseMatrixCSC{Float32, Int32}, dh)
     f = zeros(Float32, (ndofs(dh),))
     assemble_global!(cv, K, f, dh)
     apply!(K, f, ch)
-    uref = K \ f
-
+    # Julia 1.10 cannot handle \ on Float32, Int32 CSC matrices
+    uref = Float32.(LinearAlgebra.lu(K) \ f)
     @test u_device ≈ uref
 
 end
