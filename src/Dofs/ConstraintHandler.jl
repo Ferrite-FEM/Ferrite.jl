@@ -155,9 +155,11 @@ If the mapping is not aligned with the coordinate axis (e.g. rotated) a rotation
 should be passed to the constructor. This matrix rotates dofs on the mirror facet to the
 image facet. Note that this is only applicable for vector-valued problems.
 
-To construct an inhomogeneous periodic constraint it is possible to pass a function `f`.
-Note that this is currently only supported when the periodicity is aligned with the
-coordinate axes.
+To construct an inhomogeneous periodic constraint it is possible to pass a function `f`
+of the form `f(x)` or `f(x, t)`, where `x` is the spatial coordinate and `t` is the current
+time. The mirror dof is then constrained to the image dof plus the difference
+`f(x_mirror) - f(x_image)`, and is re-evaluated in [`update!`](@ref). Note that this is
+currently only supported when the periodicity is aligned with the coordinate axes.
 
 See the manual section on [Periodic boundary conditions](@ref) for more information.
 """
@@ -168,13 +170,13 @@ mutable struct PeriodicDirichlet
     const facet_map::Vector{PeriodicFacetPair}
     const func::Union{Function, Nothing}
     const rotation_matrix::Union{Matrix{Float64}, Nothing}
-    bv::Union{Nothing, BCValues} #Populated in add!
+    bv::Union{Nothing, BCValues} # Populated in add!
 
-    #For mapping location/coordinates from image to mirror
+    # For mapping location/coordinates from image to mirror
     const mirrored_indices::Vector{Int}
     rotated_indices::Matrix{Int}
 
-    #For mapping dofs from image to mirror
+    # For mapping dofs from image to mirror
     const local_facet_dofs::Vector{Int}
     const local_facet_dofs_offset::Vector{Int}
     const mirrored_dofs::Vector{Int}
@@ -569,8 +571,13 @@ function update!(ch::ConstraintHandler, time::Real = 0.0)
         if bc.func === nothing
             continue
         end
+        @assert bc.rotation_matrix === nothing
+        # If the BC function only accept one argument, i.e. f(x), we create a wrapper
+        # g(x, t) = f(x) that discards the second parameter so that _update_periodic_bc! can
+        # always call the function with two arguments internally.
+        wrapper_f = hasmethod(bc.func, Tuple{get_coordinate_type(get_grid(ch.dh)), typeof(time)}) ? bc.func : (x, _) -> bc.func(x)
         _update_periodic_bc!(
-            ch.affine_inhomogeneities, bc.func, ch.dofmapping, bc.components, ch.dh, bc.bv, ch.dofcoefficients, bc.facet_map,
+            ch.affine_inhomogeneities, wrapper_f, ch.dofmapping, bc.components, ch.dh, bc.bv, ch.dofcoefficients, bc.facet_map,
             bc.rotated_indices, bc.mirrored_indices,
             bc.local_facet_dofs, bc.local_facet_dofs_offset, bc.rotated_dofs, bc.mirrored_dofs,
             time
@@ -1146,7 +1153,7 @@ function add!(ch::ConstraintHandler, pdbc::PeriodicDirichlet)
     mirrored_indices = mirror_local_dofs(local_facet_indices, local_facet_indices_offset, interpolation, 1)
     rotated_indices = rotate_local_dofs(local_facet_indices, local_facet_indices_offset, interpolation, 1)
 
-    #Store all index and dof mappings to be used in update!
+    # Store all index and dof mappings to be used in update!
     copy!(pdbc.mirrored_indices, mirrored_indices)
     pdbc.rotated_indices = rotated_indices
     copy!(pdbc.local_facet_dofs, local_facet_dofs)
@@ -1431,7 +1438,7 @@ function _update_periodic_bc!(
             xi = spatial_coordinate(bv, location, cci.coords)
             vi = f(xi, time)
 
-            #Compute corresponding location on mirror
+            # Compute corresponding location on mirror
             _rotated = rotated_indices[location, facet_pair.rotation + 1]
             location_mirror = facet_pair.mirrored ? mirrored_indices[_rotated] : _rotated
 
@@ -1459,9 +1466,9 @@ function _update_periodic_bc!(
 
                 @debug "Found pair: $global_image_dof => $global_mirror_dof"
 
-                #Check if this constraint has been overwritten by a Dirichlet constraint:
+                # Check if this constraint has been overwritten by a Dirichlet constraint:
                 if dofcoeff !== nothing
-                    #Make sure the image dof is still the same
+                    # Make sure the image dof is still the same
                     if global_image_dof == first(first(dofcoeff))
                         affine_inhomogeneities[dbc_index] = Δv[i]
                     end

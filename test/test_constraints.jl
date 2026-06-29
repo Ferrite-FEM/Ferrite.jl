@@ -1227,12 +1227,20 @@ end # testset
         ū = 1.0
         ∇ū = Vec{D}(i -> 2.0)
         x̄ = Vec{D}(i -> 3.0)
+        # f(x, t)
         compare_by_dbc(
             dh,
             PeriodicDirichlet(:s, collect_periodic_facets(grid, "top", "bottom"), (x, t) -> ū + ∇ū * t ⋅ (x - x̄)),
             Dirichlet(:s, getfacetset(grid, "top"), (x, t) -> ū + ∇ū * t ⋅ (x - x̄)),
             Dirichlet(:s, getfacetset(grid, "bottom"), (x, t) -> ū + ∇ū * t ⋅ (x - x̄)),
             [0.0, 1.0]
+        )
+        # f(x)
+        compare_by_dbc(
+            dh,
+            PeriodicDirichlet(:s, collect_periodic_facets(grid, "top", "bottom"), x -> ū + ∇ū ⋅ (x - x̄)),
+            Dirichlet(:s, getfacetset(grid, "top"), x -> ū + ∇ū ⋅ (x - x̄)),
+            Dirichlet(:s, getfacetset(grid, "bottom"), x -> ū + ∇ū ⋅ (x - x̄)),
         )
         if D == 3
             compare_by_dbc(
@@ -1277,12 +1285,20 @@ end # testset
         ū = Vec{D}(i -> 1.0)
         ∇ū = Tensor{2, D}((i, j) -> 2.0)
         x̄ = Vec{D}(i -> 3.0)
+        # f(x, t)
         compare_by_dbc(
             dh,
             PeriodicDirichlet(:v, collect_periodic_facets(grid, "top", "bottom"), (x, t) -> ū + ∇ū * t ⋅ (x - x̄), 1:D),
             Dirichlet(:v, getfacetset(grid, "top"), (x, t) -> ū + ∇ū * t ⋅ (x - x̄), 1:D),
             Dirichlet(:v, getfacetset(grid, "bottom"), (x, t) -> ū + ∇ū * t ⋅ (x - x̄), 1:D),
             [1.0, 2.0]
+        )
+        # f(x)
+        compare_by_dbc(
+            dh,
+            PeriodicDirichlet(:v, collect_periodic_facets(grid, "top", "bottom"), x -> ū + ∇ū ⋅ (x - x̄), 1:D),
+            Dirichlet(:v, getfacetset(grid, "top"), x -> ū + ∇ū ⋅ (x - x̄), 1:D),
+            Dirichlet(:v, getfacetset(grid, "bottom"), x -> ū + ∇ū ⋅ (x - x̄), 1:D),
         )
         if D == 3
             compare_by_dbc(
