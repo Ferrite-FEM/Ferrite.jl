@@ -18,6 +18,7 @@ WriteVTK = "64499a7a-5c06-52f2-abe2-ccb03c286192"
 Adapt = "79e6a3ab-5dfb-504d-930d-738a2a938a0e"
 BlockArrays = "8e7c35d0-a365-5155-bbbb-fb81a777f24e"
 CUDA = "052768ef-5323-5732-b1bb-66c8b64840ba"
+CUDACore =  "bd0ed864-bdfe-4181-a5ed-ce625a5fdea2"
 GPUArrays = "0c68f7d7-f131-5f86-a1c3-88cf8149b2d7"
 GPUArraysCore = "46192b85-c4d5-4398-a991-12ede77f4527"
 Metis = "2679e427-3c69-5b7f-982b-ece356f1e94b"
@@ -26,14 +27,15 @@ SparseMatricesCSR = "a0a7dd2c-ebf4-11e9-1f05-cf50bc540ca1"
 
 [extensions]
 FerriteBlockArrays = "BlockArrays"
-FerriteCudaExt = ["Adapt", "CUDA", "GPUArrays", "GPUArraysCore", "KernelAbstractions"]
+FerriteCudaExt = ["Adapt", "CUDA", "CUDACore", "GPUArrays", "GPUArraysCore", "KernelAbstractions"]
 FerriteKAExt = ["Adapt", "GPUArrays", "GPUArraysCore", "KernelAbstractions"]
 FerriteMetis = "Metis"
 FerriteSparseMatrixCSR = "SparseMatricesCSR"
 
 [compat]
 BlockArrays = "0.16, 1"
-CUDA = "5.9"
+CUDA = "6"
+CUDACore = "6"
 EnumX = "1"
 HCubature = "1.7.0"
 ForwardDiff = "0.10, 1"

@@ -12,7 +12,8 @@ import Ferrite: get_substruct
 import Ferrite: meandiag, nnodes_per_cell
 import Ferrite: CellCache
 
-import CUDA: CUDA.CUSPARSE.CuSparseMatrixCSC, CUDA.CUSPARSE.CuSparseMatrixCSR, @gputhrow, @device_override
+import CUDA: CUDA.CUSPARSE.CuSparseMatrixCSC, CUDA.CUSPARSE.CuSparseMatrixCSR, @device_override
+import CUDACore: @gputhrow
 import KernelAbstractions as KA
 import KernelAbstractions: get_backend, @kernel, @index
 
