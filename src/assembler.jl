@@ -375,7 +375,7 @@ end
     return
 end
 
-function _missing_sparsity_pattern_error(Krow::Int, Kcol::Int)
+function _missing_sparsity_pattern_error(Krow::Integer, Kcol::Integer)
     msg = "You are trying to assemble values in to K[$(Krow), $(Kcol)], but K[$(Krow), " *
         "$(Kcol)] is missing in the sparsity pattern. Make sure you have called `K = " *
         "allocate_matrix(dh)` or `K = allocate_matrix(dh, ch)` if you " *

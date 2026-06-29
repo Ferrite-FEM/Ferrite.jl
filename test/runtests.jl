@@ -53,3 +53,4 @@ include("test_examples.jl")
 
 # Integration tests
 include("integration/test_simple_scalar_convergence.jl")
+include("integration/test_kernel_abstractions.jl")
