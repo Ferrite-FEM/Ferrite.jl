@@ -332,6 +332,5 @@ function assemble_proj_rhs!(f::Matrix, cellvalues::CellValues, sdh::SubDofHandle
     return
 end
 
-# Numbers can be handled by the method for DofHandler
 evaluate_at_grid_nodes(proj::L2Projector, vals::AbstractVector, vtk = Val(false)) =
     _evaluate_at_grid_nodes(proj.dh, vals, only(getfieldnames(proj.dh)), vtk)

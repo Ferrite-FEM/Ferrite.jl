@@ -943,7 +943,7 @@ function_value_init(::ScalarInterpolation, ::AbstractVector{T}) where {T} = zero
 function_value_init(::VectorInterpolation{vdim}, ::AbstractVector{T}) where {vdim, T <: Number} = zero(Vec{vdim, T})
 
 # Internal method that have the vtk option to allocate the output differently
-function _evaluate_at_grid_nodes(dh::DofHandler{sdim}, u::AbstractVector{S}, fieldname::Symbol, ::Val{vtk} = Val(false)) where {order, sdim, dim, T<:Number, M, S <: Union{T, Tensor{order, dim, T, M}, SymmetricTensor{order, dim, T, M}}, vtk}
+function _evaluate_at_grid_nodes(dh::DofHandler{sdim}, u::AbstractVector{S}, fieldname::Symbol, ::Val{vtk} = Val(false)) where {order, sdim, dim, T <: Number, M, S <: Union{T, Tensor{order, dim, T, M}, SymmetricTensor{order, dim, T, M}}, vtk}
     # Make sure the field exists
     fieldname ∈ getfieldnames(dh) || error("Field $fieldname not found.")
     # Figure out the return type (scalar or vector)
@@ -955,7 +955,7 @@ function _evaluate_at_grid_nodes(dh::DofHandler{sdim}, u::AbstractVector{S}, fie
         vtk_dim = if S <: Number
             n_c == 2 ? 3 : n_c # VTK wants vectors padded to 3D
         else
-            @assert n_c == 1
+            @assert n_c == 1 # L2Projector always stores scalar field
             S <: Vec{2} ? 3 : M # Pad 2D Vec to 3D
         end
         # Float32 is the smallest float type supported by VTK

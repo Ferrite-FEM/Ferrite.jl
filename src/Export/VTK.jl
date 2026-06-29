@@ -149,7 +149,7 @@ function create_vtk_grid(filename::AbstractString, grid::AbstractGrid, write_dis
     return WriteVTK.vtk_grid(filename, coords, cls; kwargs...), cellnodes, node_mapping
 end
 
-function toparaview!(v, x::Number) 
+function toparaview!(v, x::Number)
     v[1] = x
     return v
 end
