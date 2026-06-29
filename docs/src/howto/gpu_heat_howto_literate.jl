@@ -1,3 +1,6 @@
+# !!! warning "Experimental GPU Support"
+#    GPU support is considered experimental at this point and the interfaces shown
+#    in this how-to might break between minor releases.
 using Ferrite, CUDA
 import CUDA: CUDA.CUSPARSE.CuSparseMatrixCSC
 import Adapt: adapt
