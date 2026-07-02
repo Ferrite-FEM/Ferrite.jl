@@ -143,6 +143,7 @@ following the same convention, matching how we defined it above,
 ```@example InterpolationExample
 Ferrite.edgedof_interior_indices(::QTI) = ((4,), (5,), (6,))
 compare_test(Ferrite.edgedof_interior_indices) # hide
+compare_test(Ferrite.edgedof_indices)          # hide
 ```
 
 For the triangle, we only have a single face. However, all the dofs that
@@ -157,6 +158,7 @@ Finally, since this is a 2d element, we have no `volumedofs`, and thus
 ```@example InterpolationExample
 Ferrite.volumedof_interior_indices(::QTI) = ()
 compare_test(Ferrite.volumedof_interior_indices)            # hide
+compare_test(Ferrite.facedof_indices)                       # hide
 ```
 
 It is necessary to tell Ferrite the total number of base functions, e.g.,
