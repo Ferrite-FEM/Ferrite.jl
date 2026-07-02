@@ -323,12 +323,6 @@ Used internally in [`ConstraintHandler`](@ref) and defaults to [`vertexdof_indic
 """
 dirichlet_vertexdof_indices(ip::Interpolation) = vertexdof_indices(ip)
 
-# We need to have this defined outside the `@generated` function, otherwise it is
-# not compatible with defining new interpolation types in a later world-age,
-# since this creates a new function that didn't exist when the `@generated` function
-# was first defined.
-_create_ip_from_type(::Type{IP}) where {IP <: Interpolation} = IP()
-
 """
     edgedof_indices(ip::Interpolation)
 
@@ -339,20 +333,22 @@ enumeration of the corresponding geometrical cell.
 The dofs are guaranteed to be aligned with the local ordering of the entities on the oriented edge.
 Here the first entries are the vertex dofs, followed by the edge interior dofs.
 """
-@generated function edgedof_indices(IP::Interpolation{RefShape}) where {RefShape}
-    ip = _create_ip_from_type(IP)
-    vdofs = vertexdof_indices(ip)
-    edofs = edgedof_interior_indices(ip)
+@generated function edgedof_indices(ip::Interpolation{RefShape}) where {RefShape}
     expr = Expr(:tuple)
-    for (i, edge) in enumerate(reference_edges(RefShape))
-        expr_i = Expr(:tuple)
+    for (edgenr, edge) in enumerate(reference_edges(RefShape))
+        expr_edge = Expr(:tuple)
         for vertexnr in edge
-            foreach(vdof -> push!(expr_i.args, vdof), vdofs[vertexnr])
+            push!(expr_edge.args, :(vdofs[$vertexnr]...))
         end
-        foreach(edof -> push!(expr_i.args, edof), edofs[i])
-        push!(expr.args, expr_i)
+        push!(expr_edge.args, :(edofs[$edgenr]...))
+        push!(expr.args, expr_edge)
     end
-    return :(return $expr)
+
+    return quote
+        vdofs = vertexdof_indices(ip)
+        edofs = edgedof_interior_indices(ip)
+        return $expr
+    end
 end
 
 """
@@ -390,23 +386,24 @@ enumeration on a cell defined by [`faces(::Cell)`](@ref). The face enumeration m
 the face enumeration of the corresponding geometrical cell.
 """
 @generated function facedof_indices(IP::Interpolation{RefShape}) where {RefShape}
-    ip = _create_ip_from_type(IP)
-    vdofs = vertexdof_indices(ip)
-    edofs = edgedof_interior_indices(ip)
-    fdofs = facedof_interior_indices(ip)
     expr = Expr(:tuple)
-    for (i, face) in enumerate(reference_faces(RefShape))
-        expr_i = Expr(:tuple)
+    for (facenr, face) in enumerate(reference_faces(RefShape))
+        expr_facenr = Expr(:tuple)
         for vertexnr in face
-            foreach(vdof -> push!(expr_i.args, vdof), vdofs[vertexnr])
+            push!(expr_facenr.args, :(vdofs[$vertexnr]...))
         end
-        for edgenr in reference_face_edgenrs(RefShape)[i]
-            foreach(edof -> push!(expr_i.args, edof), edofs[edgenr])
+        for edgenr in reference_face_edgenrs(RefShape)[facenr]
+            push!(expr_facenr.args, :(edofs[$edgenr]...))
         end
-        foreach(fdof -> push!(expr_i.args, fdof), fdofs[i])
-        push!(expr.args, expr_i)
+        push!(expr_facenr.args, :(fdofs[$facenr]...))
+        push!(expr.args, expr_facenr)
     end
-    return :(return $expr)
+    return quote
+        vdofs = vertexdof_indices(ip)
+        edofs = edgedof_interior_indices(ip)
+        fdofs = facedof_interior_indices(ip)
+        return $expr
+    end
 end
 
 """
