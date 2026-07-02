@@ -209,5 +209,13 @@ N_qti, N_lag = shape_value.((cv_qti, cv_lag), 1, 1)         # hide
 @test N_qti ≈ N_lag                                         # hide
 dNdx_qti, dNdx_lag = shape_gradient.((cv_qti, cv_lag), 1, 1)# hide
 @test dNdx_qti ≈ dNdx_lag                                   # hide
+dbc = Dirichlet(:u, getfacetset(grid, "left"), x->x[2])     # hide
+ch_qti = close!(add!(ConstraintHandler(dh_qti), dbc))       # hide
+ch_lag = close!(add!(ConstraintHandler(dh_lag), dbc))       # hide
+a_qti = zeros(ndofs(dh_qti))                                # hide
+a_lag = zeros(ndofs(dh_lag))                                # hide
+apply!(a_qti, ch_qti)                                       # hide
+apply!(a_lag, ch_lag)                                       # hide
+@test a_qti ≈ a_lag                                         # hide
 nothing                                                     # hide
 ```

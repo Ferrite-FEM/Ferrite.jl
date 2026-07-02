@@ -323,6 +323,12 @@ Used internally in [`ConstraintHandler`](@ref) and defaults to [`vertexdof_indic
 """
 dirichlet_vertexdof_indices(ip::Interpolation) = vertexdof_indices(ip)
 
+# We need to have this defined outside the `@generated` function, otherwise it is
+# not compatible with defining new interpolation types in a later world-age,
+# since this creates a new function that didn't exist when the `@generated` function
+# was first defined.
+_create_ip_from_type(::Type{IP}) where {IP <: Interpolation} = IP()
+
 """
     edgedof_indices(ip::Interpolation)
 
@@ -334,7 +340,7 @@ The dofs are guaranteed to be aligned with the local ordering of the entities on
 Here the first entries are the vertex dofs, followed by the edge interior dofs.
 """
 @generated function edgedof_indices(IP::Interpolation{RefShape}) where {RefShape}
-    ip = IP() # we get IP as the type of interpolation
+    ip = _create_ip_from_type(IP)
     vdofs = vertexdof_indices(ip)
     edofs = edgedof_interior_indices(ip)
     expr = Expr(:tuple)
@@ -384,7 +390,7 @@ enumeration on a cell defined by [`faces(::Cell)`](@ref). The face enumeration m
 the face enumeration of the corresponding geometrical cell.
 """
 @generated function facedof_indices(IP::Interpolation{RefShape}) where {RefShape}
-    ip = IP() # we get IP as the type of interpolation
+    ip = _create_ip_from_type(IP)
     vdofs = vertexdof_indices(ip)
     edofs = edgedof_interior_indices(ip)
     fdofs = facedof_interior_indices(ip)
