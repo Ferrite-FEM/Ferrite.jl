@@ -442,8 +442,8 @@ Tuple containing the dof indices associated with the interior of a volume.
 volumedof_interior_indices(::Interpolation) = ()
 
 # Some helpers to skip boilerplate
-edgedof_interior_indices(ip::Interpolation) = ntuple(_ -> (), nedges(ip))
-facedof_interior_indices(ip::Interpolation) = ntuple(_ -> (), nfaces(ip))
+edgedof_interior_indices(ip::Interpolation) = ntuple(_ -> (), Val(nedges(ip)))
+facedof_interior_indices(ip::Interpolation) = ntuple(_ -> (), Val(nfaces(ip)))
 
 """
     boundarydof_indices(::Type{<:BoundaryIndex})
