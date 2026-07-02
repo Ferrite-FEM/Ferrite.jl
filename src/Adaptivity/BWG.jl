@@ -3112,8 +3112,17 @@ function _boundary_lookup(E, offsets, forest::ForestBWG{dim}) where {dim}
                 push!(v, (_packcoord(xyz), E[lc, off + li]))
             end
         end
-        sort!(v; by = first)
-        unique!(first, v)
+        sort!(v; alg = QuickSort, by = first)   # in-place; then dedup by coord in place (same coord => same id)
+        w = 0
+        prev = typemax(UInt64)
+        @inbounds for i in eachindex(v)
+            if w == 0 || v[i][1] != prev
+                w += 1
+                v[w] = v[i]
+                prev = v[i][1]
+            end
+        end
+        resize!(v, w)
         out[k] = v
     end
     return out
@@ -3254,6 +3263,7 @@ function creategrid_lnodes(forest::ForestBWG{dim}) where {dim}
 
     E = zeros(Int, NV, ncells)                       # element-node matrix (z-order) = paper's Ep
     nodecoords_prov = Vec{dim, Float64}[]            # physical coords, indexed by provisional id
+    sizehint!(nodecoords_prov, ncells)               # ~one node per cell; avoids push! realloc churn
     cnt = Ref(0)
     hang = Dict{HangingKey{dim}, Vector{HangingKey{dim}}}()
 
@@ -3261,8 +3271,9 @@ function creategrid_lnodes(forest::ForestBWG{dim}) where {dim}
     #      (Dict-free, no iterator, no leaf locates); fills every E slot, hanging corners incl. ----
     maxleaves = isempty(forest.cells) ? 0 : maximum(length(t.leaves) for t in forest.cells)
     entries = Vector{Tuple{UInt64, Int, Int}}(undef, maxleaves * NV)   # reused across trees
+    sortscratch = similar(entries)                                     # reused sort scratch (RadixSort)
     for (k, tree) in enumerate(forest.cells)
-        _number_tree_sort!(E, nodecoords_prov, cnt, forest, k, tree, offsets[k], entries, Val(NV))
+        _number_tree_sort!(E, nodecoords_prov, cnt, forest, k, tree, offsets[k], entries, sortscratch, Val(NV))
     end
     # ---- hanging detection: coarse faces bordering a finer leaf (intra- + inter-tree) ----
     for (k, tree) in enumerate(forest.cells)
@@ -3279,6 +3290,7 @@ function creategrid_lnodes(forest::ForestBWG{dim}) where {dim}
     final_of_prov = Vector{Int}(undef, nprov)
     canon_to_dense = zeros(Int, nprov)
     nodecoords = Vec{dim, Float64}[]
+    sizehint!(nodecoords, ncells)
     ndense = 0
     for p in 1:nprov
         cid = alias[p]
@@ -3316,12 +3328,13 @@ end
 # are genuine fine-leaf vertices, so they appear in the list). One provisional id per geometric
 # node per tree; cross-tree sharing is reconciled afterwards by the boundary merge. `_packcoord` is
 # injective on a tree's in-range integer coords, so equal keys ⟺ equal coordinate.
-function _number_tree_sort!(E, nodecoords, cnt::Ref{Int}, forest::ForestBWG{dim}, k::Int, tree, off::Int, entries::Vector{Tuple{UInt64, Int, Int}}, ::Val{NV}) where {dim, NV}
+function _number_tree_sort!(E, nodecoords, cnt::Ref{Int}, forest::ForestBWG{dim}, k::Int, tree, off::Int, entries::Vector{Tuple{UInt64, Int, Int}}, sortscratch::Vector{Tuple{UInt64, Int, Int}}, ::Val{NV}) where {dim, NV}
     b = tree.b
     leaves = tree.leaves
     treecorners = _treecorners(forest, k)
     n = length(leaves)
     resize!(entries, n * NV)                    # reused buffer (capacity kept across trees)
+    resize!(sortscratch, n * NV)
     idx = 0
     for li in 1:n
         o = leaves[li]
@@ -3330,7 +3343,7 @@ function _number_tree_sort!(E, nodecoords, cnt::Ref{Int}, forest::ForestBWG{dim}
             entries[idx] = (_packcoord(vertex(o, lc, b)), off + li, lc)
         end
     end
-    sort!(entries; by = first)
+    sort!(entries; by = first, scratch = sortscratch)   # RadixSort (fast) into a reused scratch buffer
     prevkey = typemax(UInt64)
     curid = 0
     for (key, gid, lc) in entries
