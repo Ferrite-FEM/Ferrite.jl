@@ -385,7 +385,7 @@ A tuple containing tuples of all local dof indices for the respective face in lo
 enumeration on a cell defined by [`faces(::Cell)`](@ref). The face enumeration must match
 the face enumeration of the corresponding geometrical cell.
 """
-@generated function facedof_indices(IP::Interpolation{RefShape}) where {RefShape}
+@generated function facedof_indices(ip::Interpolation{RefShape}) where {RefShape}
     expr = Expr(:tuple)
     for (facenr, face) in enumerate(reference_faces(RefShape))
         expr_facenr = Expr(:tuple)
