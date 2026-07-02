@@ -143,12 +143,7 @@ following the same convention, matching how we defined it above,
 ```@example InterpolationExample
 Ferrite.edgedof_interior_indices(::QTI) = ((4,), (5,), (6,))
 compare_test(Ferrite.edgedof_interior_indices) # hide
-Ferrite.edgedof_indices(::QTI) = ((1, 2, 4,), (2, 3, 5,), (3, 1, 6,))
-compare_test(Ferrite.edgedof_indices) # hide
 ```
-But here we need two functions, one for the `interior` indices (those that
-have not yet been included in lower-dimensional entities (vertices in this
-case)), and one for all indices for dofs that belong to the edge.
 
 For the triangle, we only have a single face. However, all the dofs that
 belong to the face, also belongs to either the vertices or edges,
@@ -156,8 +151,6 @@ hence we have no "interior" face dofs. So we get,
 ```@example InterpolationExample
 Ferrite.facedof_interior_indices(::QTI) = ((),)
 compare_test(Ferrite.facedof_interior_indices) # hide
-Ferrite.facedof_indices(::QTI) = ((1, 2, 3, 4, 5, 6),)
-compare_test(Ferrite.facedof_indices) # hide
 ```
 
 Finally, since this is a 2d element, we have no `volumedofs`, and thus
