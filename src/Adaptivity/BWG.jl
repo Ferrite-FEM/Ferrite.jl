@@ -2591,7 +2591,9 @@ end
 
 # Descend the subtree of support octant `s` (leaves[lo:hi]) to the leaf whose closure
 # contains the 0-point `c` — the realization of the `atom supp(c)` search (Alg 5.2 line
-# 18 / Prop 2.8): at each level pick the child whose box contains the corner.
+# 18 / Prop 2.8): at each level pick the child whose box contains the corner. Returns
+# `(leaf, index)` — the leaf octant and its index in `leaves` (so callers get the paper's
+# `Ep` element index `j` for free, no re-search).
 function _descend_to_corner(c::IteratePoint{dim}, s::OctantBWG{dim}, lo::Int, hi::Int, leaves, b::Integer) where {dim}
     o = s
     while !(lo == hi && leaves[lo] == o)
@@ -2603,10 +2605,10 @@ function _descend_to_corner(c::IteratePoint{dim}, s::OctantBWG{dim}, lo::Int, hi
                 idx = j; break
             end
         end
-        idx == 0 && return o
+        idx == 0 && return (o, lo)
         o = ch[idx]; lo = k[idx]; hi = k[idx + 1] - 1
     end
-    return o
+    return (o, lo)
 end
 
 # Preallocated scratch for the allocation-free descent (IBWG2015 §5.4: the recursion is
@@ -2621,14 +2623,15 @@ struct IterScratch{N, M, OT}
     child_octants::Vector{Vector{NTuple{N, OT}}}     # [depth] -> children of each support octant (Split_array)
     splits::Vector{Vector{NTuple{M, Int}}}    # [depth] -> split_bounds of each support octant
     L::Vector{OT}                             # reused leaf_supp buffer passed to the callback
-end
+    Lidx::Vector{Int}                         # parallel to `L`: each leaf's index in `leaves` (the
+end                                           # paper's `Ep` element index `j`); 0 for non-leaf entries
 
 function IterScratch(tree::OctreeBWG{dim, N, T}) where {dim, N, T}
     OT = OctantBWG{dim, N, T}
     nd = Int(tree.b) + 2                       # max recursion depth is the octree level + 1
     return IterScratch{N, N + 1, OT}(
         [OT[] for _ in 1:nd], [NTuple{2, Int}[] for _ in 1:nd],
-        [NTuple{N, OT}[] for _ in 1:nd], [NTuple{N + 1, Int}[] for _ in 1:nd], OT[]
+        [NTuple{N, OT}[] for _ in 1:nd], [NTuple{N + 1, Int}[] for _ in 1:nd], OT[], Int[]
     )
 end
 
@@ -2639,9 +2642,10 @@ end
 `c` at recursion `depth` has its support set in `sc.supp[depth]` (octants at `level(c)`
 whose closure contains `c`, eq 2.11) and `sc.S[depth][i] = (lo, hi)` the index range in
 `leaves` of the leaves descending from `supp[i]` (the `S` arrays of the paper). When `c`
-is finalized (`c ∈ PΩ`), `visit(c, leaf_supp)` is called with `leaf_supp` the local leaf
-support set (5.4); otherwise the recursion descends `part(c)`, slicing each `S[i]` with
-`split_bounds`. `leaf_supp` is the reused buffer `sc.L` — **copy it if you retain it.**
+is finalized (`c ∈ PΩ`), `visit(c, leaf_supp, leaf_idx)` is called with `leaf_supp` the local
+leaf support set (5.4) and `leaf_idx` their indices in `leaves`; otherwise the recursion descends
+`part(c)`, slicing each `S[i]` with `split_bounds`. `leaf_supp`/`leaf_idx` are the reused buffers
+`sc.L`/`sc.Lidx` — **copy them if you retain them.**
 
 Termination/finalization exactly as Alg 5.2:
 - `dim(c) > 0`: `stop` iff some `supp[i]` is itself a leaf (`S[i] = {supp[i]}`, line 7).
@@ -2667,12 +2671,14 @@ function _iterate_interior!(visit::F, c::IteratePoint{dim}, depth::Int, sc::Iter
 
     if dimc == 0                                       # 0-point: always stop (lines 15-18)
         if dimc >= mindim
-            L = sc.L; empty!(L)
+            L = sc.L; empty!(L); Lidx = sc.Lidx; empty!(Lidx)
             for i in 1:m
-                o = _descend_to_corner(c, supp[i], S[i][1], S[i][2], leaves, b)
-                o ∉ L && push!(L, o)                   # disjoint subtrees -> dedup is cheap (no Set)
+                o, oi = _descend_to_corner(c, supp[i], S[i][1], S[i][2], leaves, b)
+                if o ∉ L                               # disjoint subtrees -> dedup is cheap (no Set)
+                    push!(L, o); push!(Lidx, oi)       # carry the leaf's `leaves`-index (no re-search)
+                end
             end
-            visit(c, L)
+            visit(c, L, Lidx)
         end
         return
     end
@@ -2686,17 +2692,17 @@ function _iterate_interior!(visit::F, c::IteratePoint{dim}, depth::Int, sc::Iter
     end
     if stop                                            # finalize: build leaf_supp (lines 5-14)
         if dimc >= mindim
-            L = sc.L; empty!(L)
+            L = sc.L; empty!(L); Lidx = sc.Lidx; empty!(Lidx)
             for i in 1:m
                 if S[i][1] == S[i][2] && leaves[S[i][1]] == supp[i]
-                    supp[i] ∉ L && push!(L, supp[i])
+                    supp[i] ∉ L && (push!(L, supp[i]); push!(Lidx, S[i][1]))
                 else
                     for ch in children(supp[i], b)
-                        (_child_touches_point(ch, c, b) && ch ∉ L) && push!(L, ch)
+                        (_child_touches_point(ch, c, b) && ch ∉ L) && (push!(L, ch); push!(Lidx, 0))
                     end
                 end
             end
-            visit(c, L)
+            visit(c, L, Lidx)
         end
         return
     end
@@ -2732,9 +2738,11 @@ end
     iterate_points(visit, forest::ForestBWG; mindim = 0)
 
 [IBWG2015](@citet) Algorithm 5.3 (`Iterate`), serial: drive `_iterate_interior!` from the
-closure of each tree root. `visit(c::IteratePoint, leaf_supp)` is called once for every
+closure of each tree root. `visit(c::IteratePoint, leaf_supp, leaf_idx)` is called once for every
 point `c ∈ PΩ` (5.1) — every non-hanging volume / face / edge / corner — with `leaf_supp`
-the leaves surrounding it. Use `point_dim(c)` to dispatch per dimension (volume `= dim`,
+the leaves surrounding it and `leaf_idx[j]` the index of `leaf_supp[j]` in `tree.leaves` (the
+paper's `Ep` element index; `0` for the refined-neighbour children that are not themselves
+support leaves). Use `point_dim(c)` to dispatch per dimension (volume `= dim`,
 face `= dim-1`, edge `= 1`, corner `= 0`), or pass `mindim` for the §5.4 specialization
 (e.g. `mindim = dim - 1` to visit only volumes + faces). The descent is allocation-free
 (one `IterScratch` per tree); **`leaf_supp` is a reused buffer — copy it if you retain it.**
@@ -2954,7 +2962,7 @@ function creategrid(forest::ForestBWG{dim}) where {dim}
     # volume callback, Morton order) and intra-tree hanging (non-conforming face callback).
     for (k, tree) in enumerate(forest.cells)
         b = tree.b
-        iterate_points(tree; mindim = dim - 1) do c, leaf_supp
+        iterate_points(tree; mindim = dim - 1) do c, leaf_supp, _leaf_idx
             d = point_dim(c)
             if d == dim                                      # leaf volume: number vertices + cell
                 _lnodes_number_leaf!(conns, nodeids, prov_key, leaf_supp[1], k, b, node_map, Val(NV))
@@ -3048,37 +3056,34 @@ end
     return c
 end
 
-# Read the global (provisional) id assigned to the mesh node at tree-`k` integer coord `xyz`,
-# level-agnostic. A node's id is stored in the `E` slot of every incident leaf (the corner pass
-# scatters one id to all leaves touching a corner, any level), so it suffices to find *any* leaf
-# that has `xyz` as a corner: scan candidate levels finest→coarsest (skipping levels where `xyz`
-# is not grid-aligned, so a corner is impossible), and at each try the `≤ 2^dim` octants having
-# `xyz` as a corner. Returns 0 if `xyz` is out of range or not a node of tree `k` (mirrors the old
-# `haskey(nodeids, …)` guard). `off` is tree `k`'s cell offset. Off the hot path (merge + hanging).
+# Read the global (provisional) id assigned to the mesh node at tree-`k` integer coord `xyz`.
+# A node's id is stored in the `E` slot of every incident leaf, so we just find one such leaf:
+# descend to the leaf whose closure contains `xyz` (its actual local level, no level scan). If
+# `xyz` is a corner of that leaf, read its slot; otherwise `xyz` is a hanging point on the leaf's
+# boundary, so its incident (finer, 2:1) leaves are one level down — try the `≤ 2^dim` octants at
+# `leaf.l + 1` having `xyz` as a corner. Returns 0 if out of range / not a node (old `haskey`
+# guard). `off` is tree `k`'s cell offset. Off the hot path (hanging-constraint resolution).
 function _id_at_coord(E, off::Integer, leaves::Vector{<:OctantBWG}, xyz::NTuple{dim, Int}, b::Integer) where {dim}
     hilim = 1 << b
     for d in 1:dim
         (0 <= xyz[d] <= hilim) || return 0
     end
     isempty(leaves) && return 0
-    for lvl in b:-1:0                                  # incl. level 0: an unrefined tree's single
-        h = _compute_size(b, lvl)                      # leaf is the root, so its corners live there
-        aligned = true
+    od, oi = _descend_to_corner(IteratePoint{dim}(xyz, 0, ntuple(_ -> false, Val(dim))), root(dim), 1, length(leaves), leaves, b)
+    c = _corner_index(od, xyz, b)
+    vertex(od, c, b) == xyz && return E[c, off + oi]   # xyz is a corner of the containing leaf
+    lvl = od.l + 1                                     # else xyz is hanging on od's boundary -> finer
+    h = _compute_size(b, lvl)
+    for s in 0:(2^dim - 1)
+        a = ntuple(d -> xyz[d] - (((s >> (d - 1)) & 1) == 1 ? h : 0), dim)
+        ok = true
         for d in 1:dim
-            (xyz[d] % h == 0) || (aligned = false; break)
+            (0 <= a[d] <= hilim - h) || (ok = false; break)
         end
-        aligned || continue
-        for s in 0:(2^dim - 1)
-            a = ntuple(d -> xyz[d] - (((s >> (d - 1)) & 1) == 1 ? h : 0), dim)
-            ok = true
-            for d in 1:dim
-                (0 <= a[d] <= hilim - h) || (ok = false; break)
-            end
-            ok || continue
-            li = _locate_leaf(leaves, OctantBWG(lvl, a))
-            li == 0 && continue
-            return E[_corner_index(OctantBWG(lvl, a), xyz, b), off + li]
-        end
+        ok || continue
+        li = _locate_leaf(leaves, OctantBWG(lvl, a))
+        li == 0 && continue
+        return E[_corner_index(OctantBWG(lvl, a), xyz, b), off + li]
     end
     return 0
 end
@@ -3089,12 +3094,68 @@ end
 # `transform_*`, `rotation_permutation`) and, for `k > k′`, alias tree `k`'s provisional id onto the
 # lower-index owner `k′`'s. Ids are looked up by coordinate through `_id_at_coord` (reads `E`)
 # instead of the `nodeids` hash map.
-function _merge_intertree_nodes_E!(forest::ForestBWG{dim}, E, offsets, alias::Vector{Int}) where {dim}
+# Per-tree lookup of *boundary* nodes: sorted `(packed-coord, provisional-id)` pairs for every
+# leaf vertex lying on a root face/edge/vertex. Only shared-boundary nodes participate in the
+# cross-tree merge, so this small (O(surface)) table gives it O(log) lookups keyed on a cheap
+# `UInt64` (via [`_packcoord`](@ref)) — replacing the general, `morton`-heavy `_id_at_coord`.
+function _boundary_lookup(E, offsets, forest::ForestBWG{dim}) where {dim}
+    ntrees = length(forest.cells)
+    out = Vector{Vector{Tuple{UInt64, Int}}}(undef, ntrees)
+    for k in 1:ntrees
+        tree = forest.cells[k]
+        b = tree.b
+        hilim = 1 << b
+        off = offsets[k]
+        v = Tuple{UInt64, Int}[]
+        for (li, o) in enumerate(tree.leaves)
+            for lc in 1:(2^dim)
+                xyz = vertex(o, lc, b)
+                onb = false
+                for d in 1:dim
+                    (xyz[d] == 0 || xyz[d] == hilim) && (onb = true; break)
+                end
+                onb || continue
+                push!(v, (_packcoord(xyz), E[lc, off + li]))
+            end
+        end
+        sort!(v; by = first)
+        unique!(first, v)
+        out[k] = v
+    end
+    return out
+end
+
+# O(log) boundary lookup: provisional id of the node at integer coord `coord` in a tree whose
+# boundary table is `bnd`; 0 if out of range or not a (boundary) node (mirrors the old
+# `haskey`/`_nodekey_inrange` guards).
+@inline function _lookup(bnd::Vector{Tuple{UInt64, Int}}, coord::NTuple{dim, Int}, b::Integer) where {dim}
+    hi = 1 << b
+    for d in 1:dim
+        (0 <= coord[d] <= hi) || return 0
+    end
+    key = _packcoord(coord)
+    lo = 1
+    his = length(bnd)
+    @inbounds while lo <= his
+        mid = (lo + his) >>> 1
+        mk = bnd[mid][1]
+        if mk < key
+            lo = mid + 1
+        elseif mk > key
+            his = mid - 1
+        else
+            return bnd[mid][2]
+        end
+    end
+    return 0
+end
+
+function _merge_intertree_nodes_E!(forest::ForestBWG{dim}, E, offsets, alias::Vector{Int}, bnd) where {dim}
     _perm = dim == 2 ? 𝒱₂_perm : 𝒱₃_perm
     _perminv = dim == 2 ? 𝒱₂_perm_inv : 𝒱₃_perm_inv
     node_map = dim < 3 ? node_map₂ : node_map₃
     facet_neighborhood = Ferrite.get_facet_facet_neighborhood(forest)
-    idof(k, coord) = _id_at_coord(E, offsets[k], forest.cells[k].leaves, map(Int, coord), forest.cells[k].b)
+    idof(k, coord) = _lookup(bnd[k], map(Int, coord), forest.cells[k].b)
     for (k, tree) in enumerate(forest.cells)
         _vertices = vertices(root(dim), tree.b)
         for (v, vc) in enumerate(_vertices)
@@ -3219,7 +3280,8 @@ function creategrid_lnodes(forest::ForestBWG{dim}) where {dim}
     #      (Dict-free; reads `E`), then compact to a dense range (no hash map, no `nodeids`) ----
     nprov = cnt[]
     alias = collect(1:nprov)
-    _merge_intertree_nodes_E!(forest, E, offsets, alias)
+    bnd = _boundary_lookup(E, offsets, forest)
+    _merge_intertree_nodes_E!(forest, E, offsets, alias, bnd)
     final_of_prov = Vector{Int}(undef, nprov)
     canon_to_dense = zeros(Int, nprov)
     nodecoords = Vec{dim, Float64}[]
@@ -3261,17 +3323,15 @@ function _number_tree_corners_lnodes!(E, nodecoords, cnt::Ref{Int}, hang, forest
     b = tree.b
     leaves = tree.leaves
     treecorners = _treecorners(forest, k)
-    iterate_points(tree; mindim = 0) do c, leaf_supp
+    iterate_points(tree; mindim = 0) do c, leaf_supp, leaf_idx
         dc = point_dim(c)
         if dc == 0
             xyz = c.anchor
             cnt[] += 1
             id = cnt[]
             push!(nodecoords, _interp_treepoint(treecorners, b, xyz))
-            for o in leaf_supp
-                li = _locate_leaf(leaves, o)
-                li == 0 && continue
-                E[_corner_index(o, xyz, b), off + li] = id
+            for j in eachindex(leaf_supp)               # leaf_idx[j] = the leaf's index in `leaves`
+                E[_corner_index(leaf_supp[j], xyz, b), off + leaf_idx[j]] = id
             end
         elseif dc == dim - 1
             any(o -> o.l > c.level, leaf_supp) || return
