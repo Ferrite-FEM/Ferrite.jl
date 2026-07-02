@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Next] - xxxx-xx-xx
 
+### Fixes
+ - Make default `edgedof_indices` and `facedof_indices` implementation work for externally defined interpolations ([#1365])
+
 ### Documentation
 
 - Landau example in code gallery now shows how to use DifferentiationInterface and HyperHessians as a backend. (#1345)
