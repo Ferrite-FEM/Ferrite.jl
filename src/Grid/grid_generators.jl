@@ -71,11 +71,7 @@ function generate_grid(C::Type{<:AbstractCell{<:AbstractRefShape{2}}}, nel::NTup
 end
 
 function generate_grid(C::Type{<:AbstractCell{<:AbstractRefShape{2}}}, nel::NTuple{2, Int}, left::Vec{2, T} = Vec{2}((-1.0, -1.0)), right::Vec{2, T} = Vec{2}((1.0, 1.0))) where {T}
-    LL = left
-    UR = right
-    LR = Vec{2}((UR[1], LL[2]))
-    UL = Vec{2}((LL[1], UR[2]))
-    return generate_grid(C, nel, LL, LR, UR, UL)
+    return generate_grid(C, nel, _extrema_to_corners(RefQuadrilateral, left, right))
 end
 
 # Quadrilateral
@@ -552,12 +548,12 @@ function _calculate_coordinate(M::Vector{T}, coords::Vector{Vec{sdim, T}}) where
 end
 
 function _generate_nodes(ipg::ScalarInterpolation{<:AbstractRefShape{rdim}}, nnodes::NTuple{rdim, Int}, corners::Vector{Vec{sdim, T}}) where {rdim, sdim, T}
-    nodes = Node{sdim, T}[]
+    nodes = Vector{Node{sdim, T}}(undef, prod(nnodes))
     M = zeros(T, length(corners)) # geometric shape functions
-    for idx in Iterators.product(Base.OneTo.(nnodes)...)
+    for (i, idx) in enumerate(Iterators.product(Base.OneTo.(nnodes)...))
         ξ = Vec(2 .* T.(idx .- 1) ./ (nnodes .- 1) .- 1)
         reference_shape_values!(M, ipg, ξ)
-        push!(nodes, Node(_calculate_coordinate(M, corners)))
+        nodes[i] = Node(_calculate_coordinate(M, corners))
     end
     return nodes
 end
