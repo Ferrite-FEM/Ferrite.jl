@@ -482,24 +482,11 @@ function generate_grid(::Type{Tetrahedron}, cells_per_dim::NTuple{3, Int}, left:
     total_nodes = prod(nodes_per_dim)
     total_elements = cells_per_cube * prod(cells_per_dim)
 
-    n_nodes_x, n_nodes_y, n_nodes_z = nodes_per_dim
     n_cells_x, n_cells_y, n_cells_z = cells_per_dim
 
     # Generate nodes
-    coords_x = range(left[1], stop = right[1], length = n_nodes_x)
-    coords_y = range(left[2], stop = right[2], length = n_nodes_y)
-    coords_z = range(left[3], stop = right[3], length = n_nodes_z)
     numbering = reshape(1:total_nodes, nodes_per_dim)
-
-    # Pre-allocate the nodes & cells
-    nodes = _generate_nodes(Lagrange{RefHexahedron, 1}(), 2 .* nel .+ 1, left, right)
-
-    # Generate nodes
-    node_idx = 1
-    @inbounds for k in 1:n_nodes_z, j in 1:n_nodes_y, i in 1:n_nodes_x
-        nodes[node_idx] = Node((coords_x[i], coords_y[j], coords_z[k]))
-        node_idx += 1
-    end
+    nodes = _generate_nodes(Lagrange{RefHexahedron, 1}(), nodes_per_dim, left, right)
 
     # Generate cells, case 1 from: http://www.baumanneduard.ch/Splitting%20a%20cube%20in%20tetrahedras2.htm
     # cube = (1, 2, 3, 4, 5, 6, 7, 8)
