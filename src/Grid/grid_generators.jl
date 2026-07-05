@@ -13,8 +13,7 @@ function generate_grid(::Type{Line}, nel::NTuple{1, Int}, left::Vec = Vec{1}((-1
     n_nodes = nel_x + 1
 
     # Generate nodes
-    dx = (right - left) / nel_x
-    nodes = [Node(left + i * dx) for i in 0:(n_nodes - 1)]
+    nodes = _generate_nodes(Lagrange{RefLine, 1}(), (n_nodes,), left, right)
 
     # Generate cells
     cells = Line[]
@@ -43,8 +42,7 @@ function generate_grid(::Type{QuadraticLine}, nel::NTuple{1, Int}, left::Vec = V
     n_nodes = 2 * nel_x + 1
 
     # Generate nodes
-    dx = (right - left) / 2nel_x
-    nodes = [Node(left + i * dx) for i in 0:(n_nodes - 1)]
+    nodes = _generate_nodes(Lagrange{RefLine, 1}(), (n_nodes,), left, right)
 
     # Generate cells
     cells = QuadraticLine[]
@@ -67,26 +65,6 @@ function generate_grid(::Type{QuadraticLine}, nel::NTuple{1, Int}, left::Vec = V
     return Grid(cells, nodes, facetsets = facetsets)
 end
 
-function _generate_2d_nodes!(nodes::Vector{Node{2, T}}, nx, ny, LL, LR, UR, UL) where {T}
-    for i in 0:(ny - 1)
-        ratio_bounds = convert(T, i) / (ny - 1)
-
-        x0 = LL[1] * (1 - ratio_bounds) + ratio_bounds * UL[1]
-        x1 = LR[1] * (1 - ratio_bounds) + ratio_bounds * UR[1]
-
-        y0 = LL[2] * (1 - ratio_bounds) + ratio_bounds * UL[2]
-        y1 = LR[2] * (1 - ratio_bounds) + ratio_bounds * UR[2]
-
-        for j in 0:(nx - 1)
-            ratio = convert(T, j) / (nx - 1)
-            x = x0 * (1 - ratio) + ratio * x1
-            y = y0 * (1 - ratio) + ratio * y1
-            push!(nodes, Node((x, y)))
-        end
-    end
-    return
-end
-
 function generate_grid(C::Type{<:AbstractCell{<:AbstractRefShape{2}}}, nel::NTuple{2, Int}, X::Vector{Vec{2, T}}) where {T}
     @assert length(X) == 4
     return generate_grid(C, nel, X[1], X[2], X[3], X[4])
@@ -101,14 +79,13 @@ function generate_grid(C::Type{<:AbstractCell{<:AbstractRefShape{2}}}, nel::NTup
 end
 
 # Quadrilateral
-function generate_grid(C::Type{Quadrilateral}, nel::NTuple{2, Int}, LL::Vec{2, T}, LR::Vec{2, T}, UR::Vec{2, T}, UL::Vec{2, T}) where {T}
+function generate_grid(C::Type{Quadrilateral}, nel::NTuple{2, Int}, LL::XT, LR::XT, UR::XT, UL::XT) where {XT <: Vec}
     nel_x = nel[1]; nel_y = nel[2]; nel_tot = nel_x * nel_y
     n_nodes_x = nel_x + 1; n_nodes_y = nel_y + 1
     n_nodes = n_nodes_x * n_nodes_y
 
     # Generate nodes
-    nodes = Node{2, T}[]
-    _generate_2d_nodes!(nodes, n_nodes_x, n_nodes_y, LL, LR, UR, UL)
+    nodes = _generate_nodes(Lagrange{RefQuadrilateral, 1}(), nel .+ 1, [LL, LR, UR, UL])
 
     # Generate cells
     node_array = reshape(collect(1:n_nodes), (n_nodes_x, n_nodes_y))
@@ -139,14 +116,13 @@ function generate_grid(C::Type{Quadrilateral}, nel::NTuple{2, Int}, LL::Vec{2, T
 end
 
 # QuadraticQuadrilateral
-function generate_grid(::Type{QuadraticQuadrilateral}, nel::NTuple{2, Int}, LL::Vec{2, T}, LR::Vec{2, T}, UR::Vec{2, T}, UL::Vec{2, T}) where {T}
+function generate_grid(::Type{QuadraticQuadrilateral}, nel::NTuple{2, Int}, LL::XT, LR::XT, UR::XT, UL::XT) where {XT <: Vec}
     nel_x = nel[1]; nel_y = nel[2]; nel_tot = nel_x * nel_y
     n_nodes_x = 2 * nel_x + 1; n_nodes_y = 2 * nel_y + 1
     n_nodes = n_nodes_x * n_nodes_y
 
     # Generate nodes
-    nodes = Node{2, T}[]
-    _generate_2d_nodes!(nodes, n_nodes_x, n_nodes_y, LL, LR, UR, UL)
+    nodes = _generate_nodes(Lagrange{RefQuadrilateral, 1}(), 2 .* nel .+ 1, [LL, LR, UR, UL])
 
     # Generate cells
     node_array = reshape(collect(1:n_nodes), (n_nodes_x, n_nodes_y))
@@ -190,13 +166,7 @@ function generate_grid(::Type{Hexahedron}, nel::NTuple{3, Int}, left::Vec{3, T} 
     n_nodes = n_nodes_x * n_nodes_y * n_nodes_z
 
     # Generate nodes
-    coords_x = range(left[1], stop = right[1], length = n_nodes_x)
-    coords_y = range(left[2], stop = right[2], length = n_nodes_y)
-    coords_z = range(left[3], stop = right[3], length = n_nodes_z)
-    nodes = Node{3, T}[]
-    for k in 1:n_nodes_z, j in 1:n_nodes_y, i in 1:n_nodes_x
-        push!(nodes, Node((coords_x[i], coords_y[j], coords_z[k])))
-    end
+    nodes = _generate_nodes(Lagrange{RefHexahedron, 1}(), nel .+ 1, left, right)
 
     # Generate cells
     node_array = reshape(collect(1:n_nodes), (n_nodes_x, n_nodes_y, n_nodes_z))
@@ -243,13 +213,7 @@ function generate_grid(::Type{Wedge}, nel::NTuple{3, Int}, left::Vec{3, T} = Vec
     n_nodes = n_nodes_x * n_nodes_y * n_nodes_z
 
     # Generate nodes
-    coords_x = range(left[1], stop = right[1], length = n_nodes_x)
-    coords_y = range(left[2], stop = right[2], length = n_nodes_y)
-    coords_z = range(left[3], stop = right[3], length = n_nodes_z)
-    nodes = Node{3, T}[]
-    for k in 1:n_nodes_z, j in 1:n_nodes_y, i in 1:n_nodes_x
-        push!(nodes, Node((coords_x[i], coords_y[j], coords_z[k])))
-    end
+    nodes = _generate_nodes(Lagrange{RefHexahedron, 1}(), nel .+ 1, left, right)
 
     # Generate cells
     node_array = reshape(collect(1:n_nodes), (n_nodes_x, n_nodes_y, n_nodes_z))
@@ -427,8 +391,7 @@ function generate_grid(::Type{Triangle}, nel::NTuple{2, Int}, LL::Vec{2, T}, LR:
     n_nodes = n_nodes_x * n_nodes_y
 
     # Generate nodes
-    nodes = Node{2, T}[]
-    _generate_2d_nodes!(nodes, n_nodes_x, n_nodes_y, LL, LR, UR, UL)
+    nodes = _generate_nodes(Lagrange{RefQuadrilateral, 1}(), nel .+ 1, [LL, LR, UR, UL])
 
     # Generate cells
     node_array = reshape(collect(1:n_nodes), (n_nodes_x, n_nodes_y))
@@ -466,8 +429,7 @@ function generate_grid(::Type{QuadraticTriangle}, nel::NTuple{2, Int}, LL::Vec{2
     n_nodes = n_nodes_x * n_nodes_y
 
     # Generate nodes
-    nodes = Node{2, T}[]
-    _generate_2d_nodes!(nodes, n_nodes_x, n_nodes_y, LL, LR, UR, UL)
+    nodes = _generate_nodes(Lagrange{RefQuadrilateral, 1}(), 2 .* nel .+ 1, [LL, LR, UR, UL])
 
     # Generate cells
     node_array = reshape(collect(1:n_nodes), (n_nodes_x, n_nodes_y))
@@ -530,8 +492,7 @@ function generate_grid(::Type{Tetrahedron}, cells_per_dim::NTuple{3, Int}, left:
     numbering = reshape(1:total_nodes, nodes_per_dim)
 
     # Pre-allocate the nodes & cells
-    nodes = Vector{Node{3, T}}(undef, total_nodes)
-    cells = Vector{Tetrahedron}(undef, total_elements)
+    nodes = _generate_nodes(Lagrange{RefHexahedron, 1}(), 2 .* nel .+ 1, left, right)
 
     # Generate nodes
     node_idx = 1
@@ -545,6 +506,7 @@ function generate_grid(::Type{Tetrahedron}, cells_per_dim::NTuple{3, Int}, left:
     # left = (1, 4, 5, 8), right = (2, 3, 6, 7)
     # front = (1, 2, 5, 6), back = (3, 4, 7, 8)
     # bottom = (1, 2, 3, 4), top = (5, 6, 7, 8)
+    cells = Vector{Tetrahedron}(undef, total_elements)
     cell_idx = 0
     @inbounds for k in 1:n_cells_z, j in 1:n_cells_y, i in 1:n_cells_x
         cell = (
@@ -589,4 +551,45 @@ function generate_grid(::Type{Tetrahedron}, cells_per_dim::NTuple{3, Int}, left:
     foreach(s -> sort!(s, by = x -> x.idx), values(facetsets))
 
     return Grid(cells, nodes, facetsets = facetsets)
+end
+
+# ====================================================================== #
+# General node generator based on a reference shape                      #
+# ====================================================================== #
+function _calculate_coordinate(M::Vector{T}, coords::Vector{Vec{sdim, T}}) where {sdim, T}
+    x = zero(eltype(coords))
+    @inbounds for i in 1:length(M)
+        x += M[i] * coords[i]
+    end
+    return x
+end
+
+function _generate_nodes(ipg::ScalarInterpolation{<:AbstractRefShape{rdim}}, nnodes::NTuple{rdim, Int}, corners::Vector{Vec{sdim, T}}) where {rdim, sdim, T}
+    nodes = Node{sdim, T}[]
+    M = zeros(T, length(corners)) # geometric shape functions
+    for idx in Iterators.product(Base.OneTo.(nnodes)...)
+        ξ = Vec(2 .* T.(idx .- 1) ./ (nnodes .- 1) .- 1)
+        reference_shape_values!(M, ipg, ξ)
+        push!(nodes, Node(_calculate_coordinate(M, corners)))
+    end
+    return nodes
+end
+
+function _generate_nodes(ipg::ScalarInterpolation{RefShape}, nnodes::Tuple, x_left::Vec, x_right::Vec) where {RefShape}
+    return _generate_nodes(ipg, nnodes, _extrema_to_corners(RefHypercube{getrefdim(ipg)}, x_left, x_right))
+end
+
+function _extrema_to_corners(::Type{RefShape}, x_left::Vec{sdim, T}, x_right::Vec{sdim, T}) where {sdim, rdim, T, RefShape <: RefHypercube{rdim}}
+    @assert rdim ≤ sdim
+    ξ_left = -ones(Vec{rdim})
+    ξ_right = ones(Vec{rdim})
+    Δξ = ξ_right - ξ_left
+    Δx = x_right - x_left
+    A = Tensor{2, rdim}((i, j) -> i == j ? Δx[i] / Δξ[i] : zero(T))
+    return map(reference_coordinates(Lagrange{RefShape, 1}())) do ξ
+        dξ = ξ - ξ_left
+        dx = A ⋅ dξ # "in plane"
+        ds = dξ ⋅ Δξ / (Δξ ⋅ Δξ) # Relative distance along Δx or Δξ (these are equal)
+        x_left + Vec{sdim}(i -> i ≤ rdim ? dx[i] : ds * Δx[i])
+    end
 end
