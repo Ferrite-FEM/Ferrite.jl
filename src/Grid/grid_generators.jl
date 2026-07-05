@@ -564,8 +564,8 @@ end
 
 function _extrema_to_corners(::Type{RefShape}, x_left::Vec{sdim, T}, x_right::Vec{sdim, T}) where {sdim, rdim, T, RefShape <: RefHypercube{rdim}}
     @assert rdim ≤ sdim
-    ξ_left = -ones(Vec{rdim})
-    ξ_right = ones(Vec{rdim})
+    ξ_left = -ones(Vec{rdim, T})
+    ξ_right = ones(Vec{rdim, T})
     Δξ = ξ_right - ξ_left
     Δx = x_right - x_left
     A = Tensor{2, rdim}((i, j) -> i == j ? Δx[i] / Δξ[i] : zero(T))
@@ -573,6 +573,6 @@ function _extrema_to_corners(::Type{RefShape}, x_left::Vec{sdim, T}, x_right::Ve
         dξ = ξ - ξ_left
         dx = A ⋅ dξ # "in plane"
         ds = dξ ⋅ Δξ / (Δξ ⋅ Δξ) # Relative distance along Δx or Δξ (these are equal)
-        x_left + Vec{sdim}(i -> i ≤ rdim ? dx[i] : ds * Δx[i])
+        x_left + Vec{sdim, T}(i -> i ≤ rdim ? dx[i] : ds * Δx[i])
     end
 end
