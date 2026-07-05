@@ -65,12 +65,12 @@ function generate_grid(::Type{QuadraticLine}, nel::NTuple{1, Int}, left::Vec = V
     return Grid(cells, nodes, facetsets = facetsets)
 end
 
-function generate_grid(C::Type{<:AbstractCell{<:AbstractRefShape{2}}}, nel::NTuple{2, Int}, X::Vector{Vec{2, T}}) where {T}
+function generate_grid(C::Type{<:AbstractCell{<:AbstractRefShape{2}}}, nel::NTuple{2, Int}, X::Vector{<:Vec})
     @assert length(X) == 4
     return generate_grid(C, nel, X[1], X[2], X[3], X[4])
 end
 
-function generate_grid(C::Type{<:AbstractCell{<:AbstractRefShape{2}}}, nel::NTuple{2, Int}, left::Vec{2, T} = Vec{2}((-1.0, -1.0)), right::Vec{2, T} = Vec{2}((1.0, 1.0))) where {T}
+function generate_grid(C::Type{<:AbstractCell{<:AbstractRefShape{2}}}, nel::NTuple{2, Int}, left::Vec = Vec{2}((-1.0, -1.0)), right::Vec = Vec{2}((1.0, 1.0)))
     return generate_grid(C, nel, _extrema_to_corners(RefQuadrilateral, left, right))
 end
 
