@@ -114,17 +114,6 @@ end
 
 end; #end main functions
 
-# Below is the function that creates the shell mesh. It simply generates a 2d-quadrature mesh, and appends
-# a third coordinate (z-direction) to the node-positions.
-function generate_shell_grid(nels, size)
-    _grid = generate_grid(Quadrilateral, nels, Vec((0.0,0.0)), Vec(size))
-    nodes = [(n.x[1], n.x[2], 0.0) |> Vec{3} |> Node  for n in _grid.nodes]
-
-    grid = Grid(_grid.cells, nodes)
-
-    return grid
-end;
-
 # ## The shell element
 #
 # The shell presented here comes from the book "The finite element method - Linear static and dynamic finite element analysis" by Hughes (1987).
