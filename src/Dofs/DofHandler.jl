@@ -104,7 +104,7 @@ one entry per field. Produced as scratch storage while distributing dofs and ret
 the affine constraints that tie hanging nodes to their masters.
 
 - `vertices[f][v]` is the first dof on vertex `v` for field `f` (`0` if unvisited).
-- `edges[f][(a, b)]` is the first dof on the edge between global vertices `a < b` (3D only).
+- `edges[f][(a, b)]` is the first dof on the edge between global vertices `a < b`.
 - `faces[f][(a, b, c)]` is the first dof on the face identified by global vertices `a, b, c`.
 """
 struct EntityMaps
