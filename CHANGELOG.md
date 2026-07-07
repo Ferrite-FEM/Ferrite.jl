@@ -8,11 +8,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Next] - xxxx-xx-xx
 
 ### Features
+- GPU support for assembly using type-stable, non-allocating element routines ([#1291])
 
-- GPU support for assembly of type-stable, non-allocating element routines ([#1291])
+### Fixes
+ - Make default `edgedof_indices` and `facedof_indices` implementation work for externally defined interpolations ([#1365])
 
 ### Documentation
-
 - Landau example in code gallery now shows how to use DifferentiationInterface and HyperHessians as a backend. (#1345)
 
 ## [v1.4.1] - 2026-06-17
