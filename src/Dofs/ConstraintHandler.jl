@@ -243,6 +243,29 @@ function apply_rhs!(data::RHSData, f::AbstractVector, ch::ConstraintHandler, app
     return
 end
 
+"""
+    _condense_rhs!(f::AbstractVector, ch::ConstraintHandler)
+
+Condense the right-hand-side vector `f`, i.e. compute `f := C' f` where `C` is the
+constraint matrix, without access to the (already condensed) system matrix. This is the
+affine part of [`apply_rhs!`](@ref) and requires all constraints to be homogeneous
+(e.g. hanging node constraints from a [`ConformityConstraint`](@ref)).
+"""
+function _condense_rhs!(f::AbstractVector, ch::ConstraintHandler)
+    @boundscheck checkbounds(f, ch.prescribed_dofs)
+    @inbounds for (i, pdof) in pairs(ch.prescribed_dofs)
+        dofcoef = ch.dofcoefficients[i]
+        if dofcoef !== nothing # if affine constraint
+            iszero(ch.inhomogeneities[i]) || error("_condense_rhs! requires homogeneous constraints")
+            for (d, v) in dofcoef
+                f[d] += f[pdof] * v
+            end
+        end
+        f[pdof] = 0
+    end
+    return f
+end
+
 function Base.show(io::IO, ::MIME"text/plain", ch::ConstraintHandler)
     println(io, "ConstraintHandler:")
     if !isclosed(ch)

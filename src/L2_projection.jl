@@ -143,7 +143,10 @@ function close!(proj::L2Projector)
     end
     M = _assemble_L2_matrix(proj.dh, proj.ch, proj.qrs_lhs)
     if proj.ch !== nothing
-        apply!(M.data, proj.ch)
+        # Condense M := C' M C. The condensed matrix is symmetric again, so it can be
+        # wrapped for the Cholesky factorization.
+        apply!(M, proj.ch)
+        M = Symmetric(M)
     end
     proj.M_cholesky = cholesky(M)
     return proj
@@ -158,20 +161,11 @@ function _mass_qr(::Lagrange{shape, 2}) where {shape <: RefSimplex}
 end
 _mass_qr(ip::VectorizedInterpolation) = _mass_qr(ip.ip)
 
-function _assemble_L2_matrix(dh::DofHandler, ch::ConstraintHandler, qrs_lhs::Vector{<:QuadratureRule})
-    M = Symmetric(allocate_matrix(dh, ch))
-    assembler = start_assemble(M)
-    for (sdh, qr_lhs) in zip(dh.subdofhandlers, qrs_lhs)
-        ip_fun = only(sdh.field_interpolations)
-        ip_geo = geometric_interpolation(getcelltype(sdh))
-        cv = CellValues(qr_lhs, ip_fun, ip_geo; update_gradients = false)
-        _assemble_L2_matrix!(assembler, cv, sdh)
-    end
-    return M
-end
-
-function _assemble_L2_matrix(dh::DofHandler, ch::Nothing, qrs_lhs::Vector{<:QuadratureRule})
-    M = Symmetric(allocate_matrix(dh))
+function _assemble_L2_matrix(dh::DofHandler, ch::Union{Nothing, ConstraintHandler}, qrs_lhs::Vector{<:QuadratureRule})
+    # Condensation of the affine (hanging node) constraints in `apply!` needs the values
+    # in both triangles, so the symmetric (upper triangle only) assembly can only be used
+    # in the unconstrained case.
+    M = ch === nothing ? Symmetric(allocate_matrix(dh)) : allocate_matrix(dh, ch)
     assembler = start_assemble(M)
     for (sdh, qr_lhs) in zip(dh.subdofhandlers, qrs_lhs)
         ip_fun = only(sdh.field_interpolations)
@@ -311,17 +305,20 @@ function _project(proj::L2Projector, qrs_rhs::Vector{<:QuadratureRule}, vars::Un
     end
 
     if proj.ch !== nothing
-        # Non-conforming grid: apply hanging node constraints to solve
-        ch = proj.ch
-        projected_vals = similar(f)
-        for (i, col) in enumerate(eachcol(f))
-            apply!(col, ch)
-            u = proj.M_cholesky \ col
-            apply!(u, ch)
-            projected_vals[:, i] = u
+        # Non-conforming grid: condense the rhs (f := C' f) to match the matrix
+        # condensation from `close!`
+        for col in eachcol(f)
+            _condense_rhs!(col, proj.ch)
         end
-    else
-        projected_vals = proj.M_cholesky \ f
+    end
+
+    projected_vals = proj.M_cholesky \ f
+
+    if proj.ch !== nothing
+        # Compute the values of the hanging (slave) dofs from their masters
+        for col in eachcol(projected_vals)
+            apply!(col, proj.ch)
+        end
     end
 
     # Recast to original input type
