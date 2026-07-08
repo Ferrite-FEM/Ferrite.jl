@@ -334,7 +334,7 @@ end
     @test length(grid_new.conformity_info) == 4
 
     # more complex neighborhoods
-    grid = Ferrite.generate_simple_disc_grid(Quadrilateral, 6)
+    grid = generate_simple_disc_grid(Quadrilateral, 6)
     grid.cells[2] = Quadrilateral((grid.cells[2].nodes[2], grid.cells[2].nodes[3], grid.cells[2].nodes[4], grid.cells[2].nodes[1]))
     adaptive_grid = ForestBWG(grid, 3)
     Ferrite.AMR.refine!(adaptive_grid.cells[3], adaptive_grid.cells[3].leaves[1])
@@ -1071,7 +1071,7 @@ end
     @test length(transferred_grid_rotated.conformity_info) == 2
 
     # multiple corner connections in 2D by disc discretization
-    grid = Ferrite.generate_simple_disc_grid(Quadrilateral, 10)
+    grid = generate_simple_disc_grid(Quadrilateral, 10)
     adaptive_grid = ForestBWG(grid, 3)
     @test getncells(adaptive_grid) == 10
     Ferrite.refine!(adaptive_grid.cells[1], adaptive_grid.cells[1].leaves[1])
@@ -1081,7 +1081,7 @@ end
     @test getncells(adaptive_grid) == 9 * 4 + 3 + 4
 
     # multiple corner connections in 3D by cylinder discretization
-    grid = Ferrite.generate_simple_disc_grid(Hexahedron, 10)
+    grid = generate_simple_disc_grid(Hexahedron, 10)
     adaptive_grid = ForestBWG(grid, 3)
     @test getncells(adaptive_grid) == 10
     Ferrite.refine!(adaptive_grid.cells[1], adaptive_grid.cells[1].leaves[1])

@@ -1,4 +1,5 @@
 using Ferrite
+import Ferrite: geometric_interpolation, getrefdim
 using Tensors
 using Test
 using Logging
@@ -48,14 +49,15 @@ include("blockarrays.jl")
 include("test_assembler_extensions.jl")
 include("test_continuity.jl")
 include("test_examples.jl")
+include("integration/ConvergenceTestHelper.jl")
 include("test_p4est_example.jl")
 include("test_p4est.jl")
 
 @test all(x -> isdefined(Ferrite, x), names(Ferrite))  # Test that all exported symbols are defined
-# See which is not defined if fails
-for name in names(Ferrite)
-    isdefined(Ferrite, name) || @warn "Ferrite.$name is not defined but $name is exported"
-end
+# # See which is not defined if fails
+# for name in names(Ferrite)
+#     isdefined(Ferrite, name) || @warn "Ferrite.$name is not defined but $name is exported"
+# end
 
 # Integration tests
 include("integration/test_simple_scalar_convergence.jl")
