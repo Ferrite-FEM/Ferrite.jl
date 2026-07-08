@@ -14,6 +14,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   2:1-balanced (`balanceforest!`), then materialized into a `NonConformingGrid` with `creategrid`.
   Hanging nodes are made conforming by adding a `ConformityConstraint` to the `ConstraintHandler`. (#780)
 
+### Fixes
+ - Make default `edgedof_indices` and `facedof_indices` implementation work for externally defined interpolations ([#1365])
+
 ### Documentation
 
 - Landau example in code gallery now shows how to use DifferentiationInterface and HyperHessians as a backend. (#1345)
