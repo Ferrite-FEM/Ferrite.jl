@@ -25,6 +25,9 @@ module ConvergenceTestHelper
     get_num_elements(::Ferrite.Interpolation{RefHexahedron, 1}) = 11
     get_num_elements(::Ferrite.RannacherTurek{RefQuadrilateral, 1}) = 15
     get_num_elements(::Ferrite.RannacherTurek{RefHexahedron, 1}) = 13
+    # Much coarser than the generic order-1 default (21): the fine grid would
+    # otherwise be 42³ tets, which dominated the whole parallel suite.
+    get_num_elements(::Ferrite.CrouzeixRaviart{RefTetrahedron, 1}) = 12
     get_num_elements(::Ferrite.Interpolation{RefHexahedron, 2}) = 4
     get_num_elements(::Ferrite.Interpolation{shape, 3}) where {shape} = 8
     get_num_elements(::Ferrite.Interpolation{shape, 4}) where {shape} = 5
