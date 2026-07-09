@@ -21,6 +21,9 @@ for name in (
     delete!(testsuite, name)
 end
 
+# Auto CPU thread count detection in ParallelTestRunner is bad
+push!(ARGS, "--jobs=$(Sys.CPU_THREADS)")
+
 # `init_code` runs in each test's (isolated) sandbox module; `using Ferrite` is
 # the only setup common to all tests. `init_worker_code` runs once per worker in
 # `Main`: loading these there makes type names print unqualified (e.g.
