@@ -33,10 +33,20 @@ edge, only the face neighborhood is saved. The lower dimensional neighborhood is
 - `edge_skeleton::Union{Vector{EdgeIndex}, Nothing}`:     List of unique edges in the grid given as `EdgeIndex`
 - `vertex_skeleton::Union{Vector{VertexIndex}, Nothing}`: List of unique vertices in the grid given as `VertexIndex`
 
+Grids with mixed reference dimensions (e.g. a 3D grid containing both `Hexahedron` and
+`Quadrilateral` cells) are supported: the shared entity is classified by the number of
+shared vertices, so mixed-dimensional connections are stored in `vertex_vertex_neighbor`,
+`edge_edge_neighbor`, or `face_face_neighbor` accordingly. Per-entity queries with
+`VertexIndex`, `EdgeIndex`, `FaceIndex`, and `FacetIndex` work for such grids (the facet
+dimension is resolved per cell). The bulk operations [`facetskeleton`](@ref) and
+`get_facet_facet_neighborhood` remain unsupported, since they assume a common facet
+dimension across the whole grid.
+
 !!! warning "Limitations"
     The implementation only works with conforming grids, i.e. grids without "hanging nodes". Non-conforming grids will give unexpected results.
-    Grids with embedded cells (different reference dimension compared
-    to the spatial dimension) are not supported, and will error on construction.
+    Purely embedded grids, where the highest cell reference dimension is smaller than the
+    spatial dimension (e.g. a shell grid of `Quadrilateral`s in 3D space), are not
+    supported and will error on construction.
 
 """
 mutable struct ExclusiveTopology <: AbstractTopology
@@ -52,10 +62,10 @@ mutable struct ExclusiveTopology <: AbstractTopology
 end
 
 function ExclusiveTopology(grid::AbstractGrid{sdim}) where {sdim}
-    if sdim != get_reference_dimension(grid)
-        error("ExclusiveTopology does not support embedded cells (i.e. reference dimensions different from the spatial dimension)")
-    end
     cells = getcells(grid)
+    if _max_reference_dimension(cells) != sdim
+        error("ExclusiveTopology requires the highest cell reference dimension to equal the spatial dimension ($sdim). Purely embedded (e.g. shell) grids are not supported.")
+    end
     nnodes = getnnodes(grid)
     ncells = length(cells)
 
@@ -75,14 +85,21 @@ function ExclusiveTopology(grid::AbstractGrid{sdim}) where {sdim}
     for (cell_id, cell) in enumerate(cells)
         for neighbor_cell_id in cell_neighbor[cell_id]
             neighbor_cell = cells[neighbor_cell_id]
-            getrefdim(neighbor_cell) == getrefdim(cell) || error("Not supported")
             num_shared_vertices = _num_shared_vertices(cell, neighbor_cell)
+            # The number of shared vertices indicates the expected shared entity (1 -> vertex,
+            # 2 -> edge, >=3 -> face). For grids with mixed reference dimensions the shared
+            # vertices may not actually form that entity in both cells (e.g. a `Line` spanning
+            # the face-diagonal of a `Hexahedron` shares 2 vertices that are not a common edge).
+            # In that case we fall back to the next lower-dimensional entity.
             if num_shared_vertices == 1
                 _add_single_vertex_neighbor!(vertex_vertex_neighbor_buf, cell, cell_id, neighbor_cell, neighbor_cell_id)
-            elseif num_shared_vertices == 2 # Shared edge
-                _add_single_edge_neighbor!(edge_edge_neighbor_buf, cell, cell_id, neighbor_cell, neighbor_cell_id)
-            elseif num_shared_vertices >= 3 # Shared face
-                _add_single_face_neighbor!(face_face_neighbor_buf, cell, cell_id, neighbor_cell, neighbor_cell_id)
+            elseif num_shared_vertices == 2 # Shared edge (or two separate vertices)
+                _add_single_edge_neighbor!(edge_edge_neighbor_buf, cell, cell_id, neighbor_cell, neighbor_cell_id) ||
+                    _add_single_vertex_neighbor!(vertex_vertex_neighbor_buf, cell, cell_id, neighbor_cell, neighbor_cell_id)
+            elseif num_shared_vertices >= 3 # Shared face (or lower-dimensional entities)
+                _add_single_face_neighbor!(face_face_neighbor_buf, cell, cell_id, neighbor_cell, neighbor_cell_id) ||
+                    _add_single_edge_neighbor!(edge_edge_neighbor_buf, cell, cell_id, neighbor_cell, neighbor_cell_id) ||
+                    _add_single_vertex_neighbor!(vertex_vertex_neighbor_buf, cell, cell_id, neighbor_cell, neighbor_cell_id)
             else
                 error("Found connected elements without shared vertex... Mesh broken?")
             end
@@ -111,9 +128,15 @@ end
 function _getsizehint(g::AbstractGrid, ::Type{IDX}) where {IDX}
     CT = getcelltype(g)
     isconcretetype(CT) && return _getsizehint(getrefshape(CT)(), IDX)
-    rdim = get_reference_dimension(g)::Int
+    rdim = get_reference_dimension(g)
+    rdim isa Int || (rdim = getspatialdim(g)) # Mixed reference dimensions: use spatial dim (the highest rdim).
     return _getsizehint(RefSimplex{rdim}(), IDX) # Simplex is "worst case", used as default.
 end
+
+# Highest reference dimension among the cells. Equals `get_reference_dimension` for
+# grids with a single reference dimension, and is used to detect purely embedded grids.
+_max_reference_dimension(cells::AbstractVector{<:AbstractCell{<:AbstractRefShape{rdim}}}) where {rdim} = rdim
+_max_reference_dimension(cells::AbstractVector{<:AbstractCell}) = maximum(getrefdim, cells)
 _getsizehint(::AbstractRefShape, ::Type{FaceIndex}) = 1 # Always 1 or zero if not mixed rdim
 
 _getsizehint(::AbstractRefShape{1}, ::Type{EdgeIndex}) = 1
@@ -165,6 +188,9 @@ function _max_nentities_per_cell(cells::Vector{C}) where {C}
     end
 end
 
+# The `_add_single_*_neighbor!` functions return `true` if a shared entity was found and
+# recorded, so the caller can fall back to a lower-dimensional entity if not (relevant for
+# mixed reference dimension grids, see the construction loop).
 function _add_single_face_neighbor!(face_table::ConstructionBuffer, cell::AbstractCell, cell_id::Int, cell_neighbor::AbstractCell, cell_neighbor_id::Int)
     for (lfi, face) in enumerate(faces(cell))
         uniqueface = sortface_fast(face)
@@ -172,11 +198,11 @@ function _add_single_face_neighbor!(face_table::ConstructionBuffer, cell::Abstra
             uniqueface2 = sortface_fast(face_neighbor)
             if uniqueface == uniqueface2
                 push_at_index!(face_table, FaceIndex(cell_neighbor_id, lfi2), cell_id, lfi)
-                return
+                return true
             end
         end
     end
-    return
+    return false
 end
 
 function _add_single_edge_neighbor!(edge_table::ConstructionBuffer, cell::AbstractCell, cell_id::Int, cell_neighbor::AbstractCell, cell_neighbor_id::Int)
@@ -186,23 +212,25 @@ function _add_single_edge_neighbor!(edge_table::ConstructionBuffer, cell::Abstra
             uniqueedge2 = sortedge_fast(edge_neighbor)
             if uniqueedge == uniqueedge2
                 push_at_index!(edge_table, EdgeIndex(cell_neighbor_id, lei2), cell_id, lei)
-                return
+                return true
             end
         end
     end
-    return
+    return false
 end
 
 function _add_single_vertex_neighbor!(vertex_table::ConstructionBuffer, cell::AbstractCell, cell_id::Int, cell_neighbor::AbstractCell, cell_neighbor_id::Int)
+    found = false
     for (lvi, vertex) in enumerate(vertices(cell))
         for (lvi2, vertex_neighbor) in enumerate(vertices(cell_neighbor))
             if vertex_neighbor == vertex
                 push_at_index!(vertex_table, VertexIndex(cell_neighbor_id, lvi2), cell_id, lvi)
+                found = true
                 break
             end
         end
     end
-    return
+    return found
 end
 
 function build_vertex_to_cell(cells; max_vertices, nnodes)
@@ -261,7 +289,14 @@ function getneighborhood(top::ExclusiveTopology, grid::AbstractGrid, faceidx::Fa
     end
 end
 
-function getneighborhood(top::ExclusiveTopology, grid::AbstractGrid{2}, edgeidx::EdgeIndex, include_self = false)
+function getneighborhood(top::ExclusiveTopology, grid::AbstractGrid, edgeidx::EdgeIndex, include_self = false)
+    # The reference dimension of the specific cell (not the grid) determines whether the edge
+    # is a facet or a proper edge. This is well-defined even for mixed-dimensional grids.
+    if get_reference_dimension(grid, edgeidx[1]) == 3
+        return _getneighborhood_edge3(top, grid, edgeidx, include_self)
+    end
+    # For cells with reference dimension <= 2 the edge is a facet, shared by at most two
+    # cells, so the stored exclusive neighborhood is already complete.
     neighbors = top.edge_edge_neighbor[edgeidx[1], edgeidx[2]]
     if include_self
         return view(push!(collect(neighbors), edgeidx), 1:(length(neighbors) + 1))
@@ -285,17 +320,18 @@ function getneighborhood(top::ExclusiveTopology, grid::AbstractGrid, vertexidx::
     return view(self_reference_local, 1:length(self_reference_local))
 end
 
-function getneighborhood(top::ExclusiveTopology, grid::AbstractGrid{3}, edgeidx::EdgeIndex, include_self = false)
+# Recompute the full edge neighborhood for a reference-dimension-3 cell, where an edge is
+# shared by potentially many cells and only the exclusive neighborhood is stored.
+function _getneighborhood_edge3(top::ExclusiveTopology, grid::AbstractGrid, edgeidx::EdgeIndex, include_self)
     cellid, local_edgeidx = edgeidx[1], edgeidx[2]
     cell_edges = edges(getcells(grid, cellid))
     nonlocal_edgeid = cell_edges[local_edgeidx]
     cell_neighbors = getneighborhood(top, grid, CellIndex(cellid))
     self_reference_local = EdgeIndex[]
-    for cellid in cell_neighbors
-        local_neighbor_edgeid = findfirst(x -> issubset(x, nonlocal_edgeid), edges(getcells(grid, cellid)))
+    for neighbor_cellid in cell_neighbors
+        local_neighbor_edgeid = findfirst(x -> issubset(x, nonlocal_edgeid), edges(getcells(grid, neighbor_cellid)))
         local_neighbor_edgeid === nothing && continue
-        local_edge = EdgeIndex(cellid, local_neighbor_edgeid)
-        push!(self_reference_local, local_edge)
+        push!(self_reference_local, EdgeIndex(neighbor_cellid, local_neighbor_edgeid))
     end
     if include_self
         neighbors = unique([top.edge_edge_neighbor[cellid, local_edgeidx]; self_reference_local; edgeidx])
@@ -306,16 +342,14 @@ function getneighborhood(top::ExclusiveTopology, grid::AbstractGrid{3}, edgeidx:
 end
 
 function getneighborhood(top::ExclusiveTopology, grid::AbstractGrid, facetindex::FacetIndex, include_self = false)
-    rdim = get_reference_dimension(grid)
+    # The facet dimension is determined by the reference dimension of the specific cell, which
+    # is well-defined even for grids with mixed reference dimensions.
+    rdim = get_reference_dimension(grid, facetindex[1])
     return _getneighborhood(Val(rdim), top, grid, facetindex, include_self)
 end
 _getneighborhood(::Val{1}, top, grid, facetindex::FacetIndex, include_self) = getneighborhood(top, grid, VertexIndex(facetindex...), include_self)
 _getneighborhood(::Val{2}, top, grid, facetindex::FacetIndex, include_self) = getneighborhood(top, grid, EdgeIndex(facetindex...), include_self)
 _getneighborhood(::Val{3}, top, grid, facetindex::FacetIndex, include_self) = getneighborhood(top, grid, FaceIndex(facetindex...), include_self)
-function _getneighborhood(::Val{:mixed}, args...)
-    throw(ArgumentError("getneighborhood with FacetIndex is only supported for grids containing cells with a common reference dimension.
-    For mixed-dimensionality grid, use `VertexIndex`, `EdgeIndex`, and `FaceIndex` explicitly"))
-end
 
 """
     vertex_star_stencils(top::ExclusiveTopology, grid::Grid) -> AbstractVector{AbstractVector{VertexIndex}}

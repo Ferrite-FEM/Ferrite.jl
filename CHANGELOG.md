@@ -122,6 +122,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [v1.5.0] - 2026-07-13
 
+### Added
+ - `ExclusiveTopology` now supports grids with mixed reference dimensions (e.g. a 3D grid
+   containing both `Hexahedron` and `Quadrilateral` cells). Mixed-dimensional connections
+   are stored in `vertex_vertex_neighbor`, `edge_edge_neighbor`, and `face_face_neighbor`
+   according to the shared entity, and can be queried with `VertexIndex`, `EdgeIndex`,
+   `FaceIndex`, and (per cell) `FacetIndex`. The bulk operations `facetskeleton` and
+   `get_facet_facet_neighborhood` remain unsupported for such grids, since they assume a
+   common facet dimension across the whole grid. ([#843])
+
 ### Fixes
  - Make default `edgedof_indices` and `facedof_indices` implementation work for externally defined interpolations ([#1365])
 
@@ -1257,6 +1266,7 @@ poking into Ferrite internals:
 [#779]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/779
 [#780]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/780
 [#835]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/835
+[#843]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/843
 [#855]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/855
 [#864]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/864
 [#865]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/865

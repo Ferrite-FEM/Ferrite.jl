@@ -452,13 +452,18 @@ getspatialdim(::AbstractGrid{sdim}) where {sdim} = sdim
 
 """
     get_reference_dimension(grid::AbstractGrid) -> Union{Int, Symbol}
+    get_reference_dimension(grid::AbstractGrid, cellid::Int) -> Int
 
 Get information about the reference dimensions of the cells in the grid.
 If all cells have the same reference dimension, `rdim::Int` is returned.
 For grids with mixed reference dimensions, `:mixed` is returned.
 Used internally to dispatch facet-calls to the correct entity when `rdim isa Int`.
+
+When a `cellid` is given, the reference dimension of that specific cell is returned.
+This is well-defined even for grids with mixed reference dimensions.
 """
 get_reference_dimension(g::AbstractGrid) = _get_reference_dimension(getcells(g))
+get_reference_dimension(g::AbstractGrid, cellid::Int) = getrefdim(getcells(g, cellid))
 _get_reference_dimension(::AbstractVector{C}) where {C <: AbstractCell{<:AbstractRefShape{rdim}}} where {rdim} = rdim # Fast path for single rdim inferable from eltype
 function _get_reference_dimension(cells::AbstractVector{<:AbstractCell})
     # Could make fast-path for eltype being union of cells with different rdims, but @KristofferC recommends against that,
