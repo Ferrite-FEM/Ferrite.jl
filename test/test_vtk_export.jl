@@ -1,3 +1,6 @@
+# Imports for parallel (isolated) test execution:
+import SHA
+
 @testset "VTKGridFile" begin #TODO: Move all vtk tests here
     @testset "show(::VTKGridFile)" begin
         mktempdir() do tmp

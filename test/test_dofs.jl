@@ -1,3 +1,8 @@
+# Imports for parallel (isolated) test execution:
+using LinearAlgebra
+using SparseArrays
+import Metis
+
 @testset "DofHandler construction" begin
     grid = generate_grid(Quadrilateral, (2, 1))
     dh = DofHandler(grid)

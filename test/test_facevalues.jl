@@ -1,3 +1,7 @@
+# Imports for parallel (isolated) test execution:
+using LinearAlgebra
+include(joinpath(@__DIR__, "test_utils.jl"))
+
 @testset "FacetValues" begin
     for (scalar_interpol, quad_rule) in (
             (Lagrange{RefLine, 1}(), FacetQuadratureRule{RefLine}(2)),

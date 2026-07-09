@@ -1,3 +1,9 @@
+# Imports for parallel (isolated) test execution:
+using LinearAlgebra
+using ForwardDiff
+using HCubature: hcubature, hquadrature
+include(joinpath(@__DIR__, "test_utils.jl"))
+
 using Ferrite: reference_shape_value, reference_shape_gradient
 
 """
