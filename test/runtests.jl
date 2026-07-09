@@ -12,6 +12,8 @@ testsuite = find_tests(TESTDIR)
 # Drop files that are discovered but are not standalone test files to run here:
 for name in (
         "test_utils",       # shared helpers, `include`d by the tests that need them
+        "interpolation_test_utils",           # shared helpers for the test_interpolations* files
+        "integration/convergence_test_utils", # shared helpers for the integration convergence tests
         "jet",              # JET tests, run separately
         "test_notebooks",   # notebook tests, opt-in
         "coverage/coverage", # coverage tooling, not a test
