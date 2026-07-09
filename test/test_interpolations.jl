@@ -20,6 +20,7 @@ using Ferrite: reference_shape_value, reference_shape_gradient
             Lagrange{RefTriangle, 5}(),
             Lagrange{RefHexahedron, 1}(),
             Lagrange{RefHexahedron, 2}(),
+            Lagrange{RefHexahedron, 3}(),
             Serendipity{RefQuadrilateral, 2}(),
             Serendipity{RefHexahedron, 2}(),
             Lagrange{RefTetrahedron, 1}(),
@@ -184,7 +185,7 @@ using Ferrite: reference_shape_value, reference_shape_gradient
                 Lagrange{RefTriangle, 4}(), Lagrange{RefTriangle, 5}(),
                 Lagrange{RefQuadrilateral, 3}(),
                 Lagrange{RefTetrahedron, 3}(), Lagrange{RefTetrahedron, 4}(),
-                Lagrange{RefHexahedron, 2}(),
+                Lagrange{RefHexahedron, 2}(), Lagrange{RefHexahedron, 3}(),
                 Lagrange{RefPrism, 2}(), Lagrange{RefPyramid, 2}(),
             )
             refshape = Ferrite.getrefshape(ip)
