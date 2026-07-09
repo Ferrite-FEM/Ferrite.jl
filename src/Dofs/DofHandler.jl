@@ -618,7 +618,8 @@ function add_face_dofs(cell_dofs::Vector{Int}, cell::AbstractCell, facedict::Dic
         sface, orientation = sortface(face)
         @debug println("\t\tface #$sface, $orientation")
         nextdof, dofs = get_or_create_dofs!(nextdof, nfacedofs[fi], n_copies, facedict, sface)
-        permute_and_push!(cell_dofs, dofs, orientation, adjust_during_distribution, interior_facedofs_on_lattice, length(face), getrefdim(cell))
+        nfacevertices = length(face) # `faces` returns the vertices of the geometric entity only
+        permute_and_push!(cell_dofs, dofs, orientation, adjust_during_distribution, interior_facedofs_on_lattice, nfacevertices, getrefdim(cell))
         @debug println("\t\t\tadjusted dofs: $(cell_dofs[(end - nfacedofs[fi] * n_copies + 1):end])")
     end
     return nextdof
@@ -747,7 +748,7 @@ so the unique representation is always a tuple length 3.
 function sortface_fast end
 
 """
-    permute_and_push!(cell_dofs::Vector{Int}, dofs::StepRange{Int, Int}, orientation::SurfaceOrientationInfo, adjust_during_distribution::Bool, interior_facedofs_on_lattice::Bool, nfacenodes::Int, rdim::Int)
+    permute_and_push!(cell_dofs::Vector{Int}, dofs::StepRange{Int, Int}, orientation::SurfaceOrientationInfo, adjust_during_distribution::Bool, interior_facedofs_on_lattice::Bool, nfacevertices::Int, rdim::Int)
 
 Push the dofs belonging to a face onto `cell_dofs`, in the order corresponding to the local
 orientation of the face.
@@ -784,7 +785,7 @@ methodology described therein.
 # References
  - [Scroggs2022](@cite) Scroggs et al. ACM Trans. Math. Softw. 48 (2022).
 """
-@inline function permute_and_push!(cell_dofs::Vector{Int}, dofs::StepRange{Int, Int}, orientation::SurfaceOrientationInfo, adjust_during_distribution::Bool, interior_facedofs_on_lattice::Bool, nfacenodes::Int, rdim::Int)
+@inline function permute_and_push!(cell_dofs::Vector{Int}, dofs::StepRange{Int, Int}, orientation::SurfaceOrientationInfo, adjust_during_distribution::Bool, interior_facedofs_on_lattice::Bool, nfacevertices::Int, rdim::Int)
     # TODO Investigate if we can somehow pass the interpolation into this function in a
     # typestable way (instead of relying on the interior_facedofs_on_lattice trait).
     n_copies = step(dofs)
@@ -792,7 +793,7 @@ methodology described therein.
     ndofs = length(dofs)
     if rdim == 3 && adjust_during_distribution && ndofs > 1
         interior_facedofs_on_lattice || error("Dof distribution for an interpolation with multiple dofs on a face shared between 3D cells requires the interior face dofs to be placed on a regular lattice; this interpolation has not opted in, see `Ferrite.interior_facedofs_on_lattice` and `Ferrite.permute_and_push!`.")
-        if nfacenodes == 3 # triangular face
+        if nfacevertices == 3 # triangular face
             q = _triangle_lattice_order(ndofs)
             for t2 in 0:q, t1 in 0:(q - t2)
                 dof = dofs[_canonical_facedof_index_triangle(t1, t2, q, orientation)]
@@ -800,7 +801,7 @@ methodology described therein.
                     push!(cell_dofs, dof + (i - 1))
                 end
             end
-        elseif nfacenodes == 4 # quadrilateral face
+        elseif nfacevertices == 4 # quadrilateral face
             m = isqrt(ndofs)
             if m * m != ndofs
                 error("$ndofs interior dofs on a quadrilateral face do not make up a regular lattice.")
@@ -812,7 +813,7 @@ methodology described therein.
                 end
             end
         else
-            error("Faces with $nfacenodes vertices are not supported.")
+            error("Faces with $nfacevertices vertices are not supported.")
         end
     else
         for dof in dofs
