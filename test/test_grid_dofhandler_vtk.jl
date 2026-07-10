@@ -1,3 +1,8 @@
+# Imports for parallel (isolated) test execution:
+using LinearAlgebra
+using WriteVTK
+import SHA
+
 # to test vtk-files
 OVERWRITE_CHECKSUMS = false
 checksums_file = joinpath(dirname(@__FILE__), "checksums.sha1")

@@ -1,3 +1,6 @@
+# Imports for parallel (isolated) test execution:
+using LinearAlgebra, SparseArrays, Logging
+
 # misc constraint tests
 
 @testset "constructors and error checking" begin

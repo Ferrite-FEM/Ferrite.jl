@@ -1,3 +1,6 @@
+# Imports for parallel (isolated) test execution:
+using WriteVTK
+
 using Ferrite, Test
 
 @testset "Deprecations" begin

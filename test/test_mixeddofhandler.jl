@@ -1,3 +1,7 @@
+# Imports for parallel (isolated) test execution:
+using OrderedCollections
+import SHA
+
 # Some helper functions
 function get_cellset(cell_type, cells)
     return Set(findall(c -> typeof(c) == cell_type, cells))
