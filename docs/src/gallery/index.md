@@ -49,3 +49,14 @@ avoid numerical instabilities, a regularization scheme requiring the calculation
 Laplacian is imposed, which is done by using the grid topology functionalities.
 
 *Contributed by*: Mischa Blaszczyk ([@blaszm](https://github.com/blaszm)).
+
+---
+
+#### [Gradient crystal plasticity of a polycrystal](gradient_crystal_plasticity.md)
+
+A small-strain gradient (higher-order) crystal plasticity model is solved on a Neper-generated
+polycrystal RVE. The mesh is read with FerriteMeshParser, split along the grain boundaries with
+FerriteInterfaceElements, and the homogenized shear response is computed for a range of internal
+length scales to show the grain-size effect.
+
+*Contributed by*: Kristoffer Carlsson ([@KristofferC](https://github.com/KristofferC)).

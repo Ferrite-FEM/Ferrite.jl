@@ -106,6 +106,7 @@ bibtex_plugin = CitationBibliography(
         #     "gallery/quasi_incompressible_hyperelasticity.md",
         #     "gallery/landau.md",
         #     "gallery/topology_optimization.md",
+        #     "gallery/gradient_crystal_plasticity.md",
         # ],
         "devdocs/index.md",
         "cited-literature.md",
