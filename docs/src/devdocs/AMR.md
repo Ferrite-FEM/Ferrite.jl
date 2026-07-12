@@ -262,13 +262,16 @@ that make a conforming finite element field possible.
 
 Two ideas carry the whole construction:
 
-- **Integer / topological identity.** Every node is identified by an integer key
-  `(tree, octree-coordinate)`, never by a floating-point physical position. Two leaves that meet
-  at a vertex produce the *same* integer key, so shared nodes are recognised exactly, with no
-  tolerances. Physical coordinates are interpolated only at the very end. The octree coordinate is
-  bit-packed into a single `UInt64` (`_packcoord`), so the per-vertex node-id map hashes a cheap
-  `(tree, UInt64)` key instead of a nested coordinate tuple — this is the hot path of
-  materialization, so the packing matters.
+- **Integer / topological identity, no global node map.** Every node is identified integer /
+  topologically — a corner of the integer octree lattice of one tree — never by a floating-point
+  physical position, so shared nodes are recognised exactly, with no tolerances. Physical
+  coordinates are interpolated only once per node. There is **no coordinate→id map of any
+  kind**: node ids are assigned by the iterator callbacks and scattered into the element-node
+  matrix `E` (IBWG2015 §6, `Lnodes`), and only *tree-boundary* nodes additionally enter small
+  per-tree sorted tables (keyed on the coordinate bit-packed into a `UInt64`, `_packcoord`) used
+  to reconcile identity across tree boundaries. This is the data layout that generalizes to
+  distributed forests: each process numbers the nodes it owns, and only interface node ids are
+  exchanged.
 - **On a 2:1-balanced forest, hanging nodes are midpoints.** A non-conforming interface always
   places a node at the midpoint of a coarse edge or the centre of a coarse face. Each such node
   is recorded as a linear constraint: the hanging node equals the average of its *master* corners.
@@ -279,7 +282,9 @@ The heart of the materialiser is a single recursive traversal, [`iterate_points`
 Ferrite.AMR.iterate_points), the literal realisation of Algorithm 5.2/5.3 of [IBWG2015](@citet).
 It visits every **non-hanging** topological entity of a tree — each leaf volume, and each
 face/edge/corner *between* leaves — exactly once, calling a user callback `visit(c, leaf_supp)`
-where `leaf_supp` are the leaves surrounding the entity `c`.
+where `leaf_supp::LeafSupport` holds the leaves surrounding the entity `c` *and their leaf
+indices* (the element index `j` of IBWG2015 §6.4: "`Iterate` provides the index"), so callbacks
+can address per-element data without re-locating leaves.
 
 An entity is encoded integer/topologically as an axis-aligned box, the `IteratePoint`:
 
@@ -293,14 +298,19 @@ end
 
 The number of extending axes is the *dimension of the entity*,
 `point_dim(c) = count(c.axes)`: `dim` for a volume, `dim-1` for a face, `1` for a 3D edge, `0`
-for a corner. The callback dispatches on it. The keyword `mindim` is the §5.4 specialisation:
-passing `mindim = dim-1` recurses into and fires the callback only for volumes and faces, which
-is all that hanging-node detection on a balanced mesh needs (faces capture the edge hangers too,
-see below).
+for a corner. The callback dispatches on it. Three keywords give the §5.4 specialisations:
+`mindim` (don't recurse into / fire for entities below this dimension), `maxdim` (don't fire the
+callback above this dimension — the analogue of a `NULL` volume callback in `p4est_iterate`; the
+volume recursion still runs, being the spine of the traversal), and `skip_conforming` (skip the
+callback for faces/edges whose supports are all equal-level leaves — conforming interfaces — for
+callbacks that only act on non-conforming ones; corners always fire).
 
 Because the leaves of an octant form a *contiguous* Morton-sorted range, the descent slices that
 range with [`split_bounds`](@ref Ferrite.AMR.split_bounds) instead of searching — it is
-allocation-free, carrying index ranges rather than views.
+allocation-free, carrying index ranges rather than views. Which children of a support octant
+touch a given sub-entity is a combinatorial constant, served by precomputed tables
+(`_part_mask`); splits are memoized per recursion frame, since a support octant is shared by
+several sibling entities.
 
 ### The `creategrid` pipeline
 
@@ -309,42 +319,55 @@ allocation-free, carrying index ranges rather than views.
 ```
 creategrid(forest)
 │
-├─ for each tree:  iterate_points(tree; mindim = dim-1)        # IBWG2015 Alg 5.2/5.3
-│      ├─ volume callback → _lnodes_number_leaf!               # number vertices + connectivity
-│      └─ face   callback → _emit_coarse_face_int!             # intra-tree hanging nodes
+├─ for each tree:  iterate_points(tree; mindim = 0, maxdim = dim-1,   # IBWG2015 Alg 5.2/5.3
+│                                 skip_conforming = true)             #  = Alg 6.2 Lnodes
+│      ├─ corner callback → _visit_corner!    # create node id, scatter into E[slot, element]
+│      ├─ face   callback → _visit_face!      # hanging face midpoint (2D) / centre (3D)
+│      └─ edge   callback → _visit_edge3d!    # hanging edge midpoints (3D)
 │
-├─ _iterate_interface_hanging!(forest)                         # inter-tree hanging nodes
-│      └─ _iter_interface!  (per shared tree face)
-│             └─ _emit_coarse_face_int!
+├─ _iterate_interface_hanging!                # inter-tree hanging constraints (reads E)
+│      └─ _iter_interface!  (per shared tree face) → _emit_interface_face!
 │
-├─ _merge_intertree_nodes!         # unify node ids shared across tree boundaries
-├─ _treecorners / _interp_treepoint   # integer coords → physical coords (Q1 geometry map)
-├─ _build_cells                    # connectivity tuples → Quadrilateral / Hexahedron cells
-└─ reconstruct_facetsets           # carry named boundaries onto the refined grid
+├─ _merge_intertree_nodes!    # alias ids shared across tree boundaries (boundary tables)
+├─ _global_numbering          # Alg 6.1: final dense ids in one sweep over E
+├─ _build_cells               # E columns → Quadrilateral / Hexahedron cells
+└─ reconstruct_facetsets      # carry named boundaries onto the refined grid
 ```
 
-1. **Numbering, connectivity and intra-tree hanging** are *fused* into the single per-tree
-   `iterate_points` pass. The volume callback assigns each leaf vertex a provisional id keyed on
-   `(tree, coord)` and pushes the cell connectivity (Morton order); the face callback, whenever a
-   coarse face borders a finer leaf, emits that face's interior hanging nodes.
+1. **Numbering and hanging detection** happen inside the single per-tree `iterate_points` pass
+   (the `Lnodes_callback` of IBWG2015 Alg 6.2, [`LnodesVisitor`](@ref Ferrite.AMR.LnodesVisitor)).
+   The *corner* callback creates the node at the visited point — a running provisional id, its
+   physical coordinate, and a boundary-table entry if it lies on the tree boundary — and scatters
+   the id into the element-node matrix `E` of every supporting leaf ("complete the entries in
+   `Ep` that refer to `g`", §6.4). The *face*/*edge* callbacks detect non-conformity from the
+   level mismatch in their support, create the hanging vertex the same way (hanging vertices are
+   genuine fine-leaf corners) and record its constraint as `(element, slot)` references into `E`,
+   resolved after the traversal.
 2. **Inter-tree hanging** is collected by a cross-tree two-sided face descent
    ([`_iter_interface!`](@ref Ferrite.AMR._iter_interface!)) seeded at every shared tree face —
-   the same idea as the intra-tree face callback, but matching the two sides across a tree
+   the same idea as the intra-tree callbacks, but matching the two sides across a tree
    boundary via [`transform_facet`](@ref Ferrite.AMR.transform_facet) (handling rotations).
-3. **Cross-tree identity, compaction and coordinates.** Per-tree numbering yields one
-   `(tree,coord)` key per incident tree; [`_merge_intertree_nodes!`](@ref
-   Ferrite.AMR._merge_intertree_nodes!) canonicalises shared-boundary keys onto a single owner.
-   The provisional ids are then compacted to a dense range and each owner's physical coordinate
-   is computed once with the tree's ``Q_1`` geometry map.
-4. **Cells and constraints.** [`_build_cells`](@ref Ferrite.AMR._build_cells) maps connectivity
-   to final ids, the hanging map is translated to final ids, and
+3. **Cross-tree identity.** A point on a shared tree boundary is visited once per incident tree,
+   so one geometric node briefly holds one provisional id per tree;
+   [`_merge_intertree_nodes!`](@ref Ferrite.AMR._merge_intertree_nodes!) aliases them onto a
+   single owner, with lookups served by the per-tree sorted boundary tables filled during
+   numbering — `O(surface)` data, the only node-lookup structure of the materializer.
+4. **Global numbering, cells and constraints.** [`_global_numbering`](@ref
+   Ferrite.AMR._global_numbering) is the serial `Global_numbering` (Alg 6.1): one linear sweep
+   over `E` in (element, element-node) order assigns final dense ids by first encounter — with
+   the ownership rule `owner(c) = min leaf supp(c)` (eq 6.2) this is the paper's
+   partition-independent numbering. [`_build_cells`](@ref Ferrite.AMR._build_cells) then reads
+   the cells straight off `E`, the constraint records are resolved against `E`, and
    [`reconstruct_facetsets`](@ref Ferrite.AMR.reconstruct_facetsets) transfers the boundary sets.
 
 ```@docs
 Ferrite.AMR.creategrid
 Ferrite.AMR.iterate_points
+Ferrite.AMR.LeafSupport
 Ferrite.AMR.split_bounds
-Ferrite.AMR._lnodes_number_leaf!
+Ferrite.AMR.LnodesVisitor
+Ferrite.AMR._visit_corner!
+Ferrite.AMR._global_numbering
 Ferrite.AMR._merge_intertree_nodes!
 Ferrite.AMR._build_cells
 Ferrite.AMR.reconstruct_facetsets
@@ -365,57 +388,37 @@ Ferrite.AMR._interp_treepoint
 
 A hanging node is a node that exists on the fine side of a non-conforming interface but is not a
 vertex on the coarse side. On a 2:1-balanced forest these are exactly the **centre of a coarse
-face** (bordering a refined neighbour) and the **midpoints of that face's edges**.
-[`_emit_coarse_face_int!`](@ref Ferrite.AMR._emit_coarse_face_int!) records them, keyed on the
-integer `(tree, coord)` of the hanging node, with the value listing its master corners:
+face** (bordering a refined neighbour) and the **midpoint of a coarse edge** (bordering a finer
+leaf) — balance caps the level jump at one, so no ¼-points exist:
 
 ```
 3D face fc = (c1,c2,c3,c4) in z-order — ● corner (master), ◆ face centre, ○ edge midpoint:
 
-    c3 ●━━━━━━━○━━━━━━━● c4      emitted:
-       ┃      m34      ┃          ◆  hang[c  ] = {c1,c2,c3,c4}
-       ┃               ┃          ○  hang[m12] = {c1,c2}
-    m13○       ◆c      ○m24       ○  hang[m34] = {c3,c4}
-       ┃   (centre)    ┃          ○  hang[m13] = {c1,c3}
-       ┃      m12      ┃          ○  hang[m24] = {c2,c4}
+    c3 ●━━━━━━━○━━━━━━━● c4      constraints:
+       ┃      m34      ┃          ◆  hnodes[c  ] = {c1,c2,c3,c4}   (face callback)
+       ┃               ┃          ○  hnodes[m12] = {c1,c2}         (edge callbacks)
+    m13○       ◆c      ○m24       ○  hnodes[m34] = {c3,c4}
+       ┃   (centre)    ┃          ○  hnodes[m13] = {c1,c3}
+       ┃      m12      ┃          ○  hnodes[m24] = {c2,c4}
     c1 ●━━━━━━━○━━━━━━━● c2
 ```
 
-The diagonals `c1–c4` and `c2–c3` differ in *two* coordinates and are skipped — they are not
-octant edges. In 2D a face *is* an edge, so the face centre and the single edge midpoint coincide
-into one constraint with two masters.
-
-#### Why a face descent captures hanging *edges*
-
-It is not obvious that visiting only **faces** finds every hanging **edge** node. The argument:
-the descent runs over *every* coarse face bordering a refined neighbour and emits that face's four
-edge-midpoints, so a hanging edge-midpoint is captured as long as its edge is an edge of *some*
-emitted face — and it always is.
-
-Look down a coarse edge `E` (a point `⊙` in the cross-section); four cells surround it, and `E` is
-an edge of all four faces meeting at `E`. The midpoint `m = center(E)` becomes a node only if some
-surrounding cell is refined. The coarse owner `C` (level ℓ) and at least one refined cell
-(level ℓ+1) both sit around `E`, so going around the four-cell cycle a coarse cell must be
-face-adjacent to a refined one — that shared face is coarse-bordering-refined and has `E` as an
-edge, so the descent emits `m`. The subtle case is a refined cell *diagonal* to `C` (sharing only
-`E`, not a face):
-
-```
-    Q4 │ Q3      C|Q2 and C|Q4 are coarse–coarse (conforming), so C's own faces miss E.
-    ℓ  │ ℓ+1     But Q2|Q3 and Q4|Q3 are coarse(ℓ)–refined(ℓ+1): those faces are emitted,
-    ───⊙───      and E is one of their edges → m is still emitted. ✓
-    C  │ Q2
-   (ℓ) │ ℓ
-```
-
-2:1 balance is what makes this exhaustive: it caps the level jump at one, so hanging nodes are
-*always* midpoints (never ¼/¾ points from a two-level jump) and the finest cell around any edge is
-at most one level finer. Hence emitting face-centres + edge-midpoints over all coarse faces
-bordering refined neighbours captures every hanging node — no separate edge descent is needed.
+In 2D a face *is* an edge, so there is just the midpoint with its two masters. Because hanging
+points are exactly the points the iterator never visits, they are created by the *feature that
+owns them*: a non-conforming **face point** creates its centre, and a non-conforming **edge
+point** creates its midpoint ([`_visit_face!`](@ref Ferrite.AMR._visit_face!),
+[`_visit_edge3d!`](@ref Ferrite.AMR._visit_edge3d!)). Each hanging vertex belongs to exactly one
+such coarse feature (two octant edges cannot share their midpoints), and each feature is visited
+exactly once — even an edge shared by several non-conforming faces — so every hanging vertex is
+created exactly once, with its constraint recorded as `(element, slot)` references into `E` (a
+master corner may not be numbered yet when the feature is visited; the references are resolved
+after the traversal).
 
 ```@docs
-Ferrite.AMR._emit_coarse_face_int!
+Ferrite.AMR._visit_face!
+Ferrite.AMR._visit_edge3d!
 Ferrite.AMR._iter_interface!
+Ferrite.AMR._emit_interface_face!
 Ferrite.AMR._iterate_interface_hanging!
 Ferrite.AMR.center
 Ferrite.AMR.contains_facet
