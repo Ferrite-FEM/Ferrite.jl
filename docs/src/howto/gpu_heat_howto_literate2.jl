@@ -72,8 +72,8 @@ end
     ## As explained later this is the secret sauce.
     cv_i = cv[task_index]
     cc_i = cc[task_index]
-    Ke = Kes[task_index]
-    fe = fes[task_index]
+    Ke = view(Kes, task_index, :, :)
+    fe = view(fes, task_index, :)
 
     for i in task_index:stride:length(color)
         ## Work item index
@@ -144,14 +144,17 @@ K_gpu = allocate_matrix(CuSparseMatrixCSC{Float32, Int32}, dh)
 f_gpu = KA.zeros(backend, Float32, (ndofs(dh),))
 
 # Furthermore, the individual GPU workers need local buffers.
-# Ferrite comes with a little helper to transform common buffers
+# Ferrite comes with a helper, `Ferrite.distribute_to_taks`, which transforms common buffers
 # into a suitable GPU format.
 # n_workers = ceil(Int, length(grid.cells) / NUM_THREADS) # FIXME does not match the used 493
 n_workers = getncells(grid)
 cv_gpu = Ferrite.distribute_to_tasks(backend, cv, n_workers)
 cc_gpu = Ferrite.distribute_to_tasks(backend, CellCache(dh_gpu), n_workers)
-Kes = Ferrite.distribute_to_taks(backend, zeros(Float32, getnbasefunctions(cv), getnbasefunctions(cv)), n_workers)
-fes = Ferrite.distribute_to_taks(backend, zeros(Float32, getnbasefunctions(cv)), n_workers)
+# We also need a local buffer for the element vectors and matrices, 
+# and these are created as a global array which we use views into in the assembly kernel. 
+# TODO: Explain why we use row-major indexing here
+Kes = KA.zeros(backend, Float32, n_workers, getnbasefunctions(cv), getnbasefunctions(cv))
+fes = KA.zeros(backend, Float32, n_workers, getnbasefunctions(cv))
 
 # Now everything is set to launch the assembly via KernelAbstractions.
 assemble_global_ka!(backend, cv_gpu, K_gpu, f_gpu, cc_gpu, colors_gpu, Kes, fes)
@@ -176,13 +179,13 @@ Only minor differences from the portable `KernelAbstractions.jl` version above a
 for a specific CUDA-kernel. TODO: What's the point of writing specific CUDA-kernel? 
 =#
 
-function cuda_assembly_kernel(assembler, color, cc::SoAContainer, cv::SoAContainer, Kes::SoAContainer, fes::SoAContainer)
+function cuda_assembly_kernel(assembler, color, cc::SoAContainer, cv::SoAContainer, Kes::AbstractArray, fes::AbstractMatrix)
     task_index = (blockIdx().x - Int32(1)) * blockDim().x + threadIdx().x
     stride = gridDim().x * blockDim().x
     cv_i = cv[task_index]
     cc_i = cc[task_index]
-    Ke = Kes[task_index]
-    fe = Kes[task_index]
+    Ke = view(Kes, task_index, :, :)
+    fe = view(fes, task_index, :)
     for i in task_index:stride:length(color)
         cellid = color[i]
         reinit!(cc_i, cellid)
