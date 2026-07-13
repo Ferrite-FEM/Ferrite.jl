@@ -20,7 +20,7 @@
 # differentiation, to solve the non-linear system we use Newton's
 # method, and for solving the Newton increment we use conjugate gradients.
 #
-# The weak form is expressed in terms of the first Piola-Kirchoff stress ``\mathbf{P}``
+# The weak form is expressed in terms of the first Piola-Kirchhoff stress ``\mathbf{P}``
 # as follows: Find ``\mathbf{u} \in \mathbb{U}`` such that
 #
 # ```math
@@ -82,7 +82,7 @@ using Ferrite, Tensors, TimerOutputs, ProgressMeter, IterativeSolvers
 #     This shows the possible variety of $U(J)$ while all of them refer to compressible neo-Hookean models.
 #     Sometimes the modified first invariant $\overline{I}_1=\frac{I_1}{I_3^{1/3}}$ is used in $W(\mathbf{C})$ instead of $I_1$.
 
-# From the potential we obtain the second Piola-Kirchoff stress ``\mathbf{S}`` as
+# From the potential we obtain the second Piola-Kirchhoff stress ``\mathbf{S}`` as
 #
 # ```math
 # \mathbf{S} = 2 \frac{\partial \Psi}{\partial \mathbf{C}},
@@ -207,7 +207,7 @@ nothing                                                       #src
 # \underline{\underline{K}}(\underline{u}^{k}) \Delta \underline{u}^{k} = \underline{g}(\underline{u}^{k})
 # ```
 #
-# where the global residual, $\underline{g}$, and the Jacobi matrix,
+# where the global residual, $\underline{g}$, and the Jacobian matrix,
 # $\underline{\underline{K}} = \frac{\partial \underline{g}}{\partial \underline{u}}$, are
 # evaluated at the current guess $\underline{u}^k$. The entries of $\underline{g}$ are given
 # by

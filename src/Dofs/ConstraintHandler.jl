@@ -13,7 +13,7 @@ The set, `∂Ω`, can be an `AbstractSet` or `AbstractVector` with elements of
 type [`FacetIndex`](@ref), [`FaceIndex`](@ref), [`EdgeIndex`](@ref), [`VertexIndex`](@ref),
 or `Int`. For most cases, the element type is `FacetIndex`, as shown below.
 To constrain a single point, using `VertexIndex` is recommended, but it is also possible
-to constrain a specific nodes by giving the node numbers via `Int` elements.
+to constrain specific nodes by giving the node numbers via `Int` elements.
 To constrain e.g. an edge in 3d `EdgeIndex` elements can be given.
 
 For example, here we create a
@@ -198,7 +198,7 @@ end
 Returns the needed [`RHSData`](@ref) for [`apply_rhs!`](@ref).
 
 This must be used when the same stiffness matrix is reused for multiple steps,
-for example when timestepping, with different non-homogeneouos Dirichlet boundary
+for example when timestepping, with different non-homogeneous Dirichlet boundary
 conditions.
 """
 function get_rhs_data(ch::ConstraintHandler, A::SparseMatrixCSC)
@@ -632,7 +632,7 @@ prescribed by affine constraints, such that if `a` fulfills the constraints,
 `a ± v` also will.
 
 These methods are typically used in e.g. a Newton solver where the increment, `du`, should
-be prescribed to zero even for non-homogeneouos boundary conditions.
+be prescribed to zero even for non-homogeneous boundary conditions.
 
 See also: [`apply!`](@ref).
 

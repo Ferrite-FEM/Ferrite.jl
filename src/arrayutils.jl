@@ -1,4 +1,4 @@
-# This file contains utiltiies for working with (sparse) matrices and vectors.
+# This file contains utilities for working with (sparse) matrices and vectors.
 # These methods can be overloaded by other array types.
 
 struct SparsityError end

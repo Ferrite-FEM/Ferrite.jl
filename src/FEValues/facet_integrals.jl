@@ -25,10 +25,10 @@ align to the facet's local axis.
 function weighted_normal end
 
 """
-    create_facet_quad_rule(::Type{RefShape}, w::AbstractVectorä{T}, p::AbstractVectorä{Vec{N, T}})
+    create_facet_quad_rule(::Type{RefShape}, w::AbstractVector{T}, p::AbstractVector{Vec{N, T}})
     create_facet_quad_rule(
         ::Type{RefShape},
-        quad_faces::AbstractVectorä{Int}, w_quad::AbstractVector{T}, p_quad::AbstractVector{Vec{N, T}},
+        quad_faces::AbstractVector{Int}, w_quad::AbstractVector{T}, p_quad::AbstractVector{Vec{N, T}},
         tri_faces::AbstractVector{Int}, w_tri::AbstractVector{T}, p_tri::AbstractVector{Vec{N, T}}
     )
 

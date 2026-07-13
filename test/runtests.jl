@@ -21,8 +21,11 @@ for name in (
     delete!(testsuite, name)
 end
 
-# Auto CPU thread count detection in ParallelTestRunner is bad
-push!(ARGS, "--jobs=$(Sys.CPU_THREADS)")
+# Auto CPU thread count detection in ParallelTestRunner is bad. Preserve an
+# explicit job count supplied through `Pkg.test(test_args = ...)`.
+if !any(arg -> arg == "--jobs" || startswith(arg, "--jobs="), ARGS)
+    push!(ARGS, "--jobs=$(Sys.CPU_THREADS)")
+end
 
 # `init_code` runs in each test's (isolated) sandbox module; `using Ferrite` is
 # the only setup common to all tests. `init_worker_code` runs once per worker in
