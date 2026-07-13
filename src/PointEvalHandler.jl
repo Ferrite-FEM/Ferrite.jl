@@ -56,14 +56,17 @@ end
 #  - `newton_residual_tolerance`: Tolerance for the residual norm to indicate convergence in the
 #    inner Newton solver. Default value: `1e-10`.
 function PointEvalHandler(grid::AbstractGrid{dim}, points::AbstractVector{Vec{dim, T}}; search_nneighbors = 3, warn::Bool = true, strategy = NewtonLineSearchPointFinder()) where {dim, T}
+    T_local = float(promote_type(T, get_coordinate_eltype(grid)))
+    local_points = Vec{dim, T_local}[Vec{dim, T_local}(Tuple(point)) for point in points]
     node_cell_dicts = _get_node_cell_map(grid)
-    cells, local_coords = _get_cellcoords(points, grid, node_cell_dicts, search_nneighbors, warn, strategy)
+    cells, local_coords = _get_cellcoords(local_points, grid, node_cell_dicts, search_nneighbors, warn, strategy)
     return PointEvalHandler(grid, cells, local_coords)
 end
 
 function _get_cellcoords(points::AbstractVector{Vec{dim, T}}, grid::AbstractGrid, node_cell_dicts::Dict{C, Dict{Int, Vector{Int}}}, search_nneighbors, warn, strategy::NewtonLineSearchPointFinder) where {dim, T <: Real, C}
     # set up tree structure for finding nearest nodes to points
-    kdtree = KDTree(reinterpret(Vec{dim, T}, getnodes(grid)))
+    node_coordinates = Vec{dim, T}[Vec{dim, T}(Tuple(get_node_coordinate(node))) for node in getnodes(grid)]
+    kdtree = KDTree(node_coordinates)
     nearest_nodes, _ = knn(kdtree, points, search_nneighbors, true)
 
     cells = Vector{Union{Nothing, Int}}(nothing, length(points))
@@ -107,11 +110,75 @@ end
 # check if point is inside a cell based on isoparametric coordinate
 function check_isoparametric_boundaries(::Type{RefSimplex{dim}}, x_local::Vec{dim, T}, tol) where {dim, T}
     # Positive and below the plane 1 - ξx - ξy - ξz
-    return all(x -> x > -tol, x_local) && sum(x_local) - 1 < tol
+    return all(x -> x >= -tol, x_local) && sum(x_local) <= 1 + tol
 end
 
 cellcenter(::Type{<:RefHypercube{dim}}, _::Type{T}) where {dim, T} = zero(Vec{dim, T})
-cellcenter(::Type{<:RefSimplex{dim}}, _::Type{T}) where {dim, T} = Vec{dim, T}((ntuple(d -> 1 / 3, dim)))
+cellcenter(::Type{<:RefSimplex{dim}}, _::Type{T}) where {dim, T} = Vec(ntuple(_ -> one(T) / (dim + 1), dim))
+
+function project_to_reference_cell(::Type{<:RefHypercube{dim}}, x::Vec{dim, T}) where {dim, T}
+    return Vec(ntuple(i -> clamp(x[i], -one(T), one(T)), dim))
+end
+
+function project_to_reference_cell(::Type{<:RefSimplex{dim}}, x::Vec{dim, T}) where {dim, T}
+    xp = Vec(ntuple(i -> max(x[i], zero(T)), dim))
+    sum(xp) <= one(T) && return xp
+
+    # Euclidean projection onto the probability simplex. Reference simplices
+    # also contain points with sum(x) < 1, handled by the early return above.
+    u = sort(Tuple(x); rev = true)
+    cumulative_sum = zero(T)
+    threshold = zero(T)
+    for i in eachindex(u)
+        cumulative_sum += u[i]
+        candidate_threshold = (cumulative_sum - one(T)) / i
+        u[i] > candidate_threshold && (threshold = candidate_threshold)
+    end
+    return Vec(ntuple(i -> max(x[i] - threshold, zero(T)), dim))
+end
+
+function check_isoparametric_boundaries(::Type{RefPrism}, x_local::Vec{3}, tol)
+    x, y, z = x_local
+    return x >= -tol && y >= -tol && x + y <= 1 + tol && z >= -tol && z <= 1 + tol
+end
+cellcenter(::Type{RefPrism}, ::Type{T}) where {T} = Vec((one(T) / 3, one(T) / 3, one(T) / 2))
+function project_to_reference_cell(::Type{RefPrism}, x::Vec{3, T}) where {T}
+    xy = project_to_reference_cell(RefTriangle, Vec((x[1], x[2])))
+    return Vec((xy[1], xy[2], clamp(x[3], zero(T), one(T))))
+end
+
+function check_isoparametric_boundaries(::Type{RefPyramid}, x_local::Vec{3}, tol)
+    x, y, z = x_local
+    return x >= -tol && y >= -tol && z >= -tol && x + z <= 1 + tol && y + z <= 1 + tol
+end
+cellcenter(::Type{RefPyramid}, ::Type{T}) where {T} = Vec((3 * one(T) / 8, 3 * one(T) / 8, one(T) / 4))
+function project_to_reference_cell(::Type{RefPyramid}, x::Vec{3, T}) where {T}
+    z = clamp(x[3], zero(T), one(T))
+    upper = one(T) - z
+    return Vec((clamp(x[1], zero(T), upper), clamp(x[2], zero(T), upper), z))
+end
+
+function check_point_search_convergence(refshape, local_guess, J, residual_norm, strategy, boundary_tolerance, warn)
+    residual_norm <= strategy.residual_tolerance || return false
+    check_isoparametric_boundaries(refshape, local_guess, boundary_tolerance) || return false
+    detJ = calculate_detJ(J)
+    if detJ <= zero(detJ)
+        warn && @warn "det(J) is not positive at the converged point; rejecting the cell" detJ
+        return false
+    end
+    return true
+end
+
+function refine_local_coordinate(interpolation, cell_coordinates, global_coordinate, local_guess)
+    # Projected steps select the correct root but have non-smooth derivatives at
+    # reference-cell boundaries. Two unconstrained Newton steps at the selected
+    # root restore implicit derivatives (used by AD).
+    for _ in 1:2
+        J, global_guess = calculate_jacobian_and_spatial_coordinate(interpolation, local_guess, cell_coordinates)
+        local_guess -= calculate_Jinv(J) ⋅ (global_guess - global_coordinate)
+    end
+    return local_guess
+end
 
 # See https://discourse.julialang.org/t/finding-the-value-of-a-field-at-a-spatial-location-in-juafem/38975/2
 function find_local_coordinate(interpolation::Interpolation{refshape}, cell_coordinates::Vector{<:Vec{sdim}}, global_coordinate::Vec{sdim}, strategy::NewtonLineSearchPointFinder; warn::Bool = false) where {sdim, refshape}
@@ -121,7 +188,6 @@ function find_local_coordinate(interpolation::Interpolation{refshape}, cell_coor
     n_basefuncs = getnbasefunctions(interpolation)
     @assert length(cell_coordinates) == n_basefuncs
     local_guess = cellcenter(refshape, T)
-    converged = false
     for iter in 1:strategy.max_iters
         # Setup J(ξ) and x(ξ)
         J, global_guess = calculate_jacobian_and_spatial_coordinate(interpolation, local_guess, cell_coordinates)
@@ -129,54 +195,45 @@ function find_local_coordinate(interpolation::Interpolation{refshape}, cell_coor
         residual = global_guess - global_coordinate
         best_residual_norm = norm(residual) # for line search below
         # Early convergence check
-        if best_residual_norm ≤ strategy.residual_tolerance
-            converged = check_isoparametric_boundaries(refshape, local_guess, boundary_tolerance)
-            if converged
-                @debug println("Local point finder converged in $iter iterations with residual $best_residual_norm to $local_guess")
-            else
-                @debug println("Local point finder converged in $iter iterations with residual $best_residual_norm to a point outside the element: $local_guess")
-            end
-            break
-        end
-        # Report if the element is geometrically broken at the converged point
-        if converged && calculate_detJ(J) ≤ 0.0
-            converged = false
-            warn && @warn "det(J) negative! Aborting! $(calculate_detJ(J))"
-            break
-        end
+        best_residual_norm ≤ strategy.residual_tolerance && break
         Δξ = calculate_Jinv(J) ⋅ residual # J \ residual
 
-        # Do line search if the new guess is outside the element
-        best_index = 1
-        new_local_guess = local_guess - Δξ
-        global_guess = spatial_coordinate(interpolation, new_local_guess, cell_coordinates)
-        best_residual_norm = norm(global_guess - global_coordinate)
-        if !check_isoparametric_boundaries(refshape, new_local_guess, boundary_tolerance)
-            # Search for the residual minimizer, which is still inside the element
-            for next_index in 2:strategy.max_line_searches
-                new_local_guess = local_guess - Δξ / 2^(next_index - 1)
-                global_guess = spatial_coordinate(interpolation, new_local_guess, cell_coordinates)
-                residual_norm = norm(global_guess - global_coordinate)
-                if residual_norm < best_residual_norm && check_isoparametric_boundaries(refshape, new_local_guess, boundary_tolerance)
-                    best_residual_norm = residual_norm
-                    best_index = next_index
-                end
+        # Backtrack to the best projected trial point that decreases the residual.
+        # Projection is needed to converge to points on curved cell boundaries:
+        # simply rejecting an exterior Newton step can make the iteration stall.
+        best_index = 0
+        best_local_guess = local_guess
+        for next_index in 1:strategy.max_line_searches
+            new_local_guess = project_to_reference_cell(refshape, local_guess - Δξ / 2^(next_index - 1))
+            global_guess = spatial_coordinate(interpolation, new_local_guess, cell_coordinates)
+            residual_norm = norm(global_guess - global_coordinate)
+            if residual_norm < best_residual_norm
+                best_residual_norm = residual_norm
+                best_index = next_index
+                best_local_guess = new_local_guess
             end
         end
-        local_guess -= Δξ / 2^(best_index - 1)
+        best_index == 0 && break
+        local_guess = best_local_guess
         # Late convergence check
-        if best_residual_norm ≤ strategy.residual_tolerance
-            converged = check_isoparametric_boundaries(refshape, local_guess, boundary_tolerance)
-            if converged
-                @debug println("Local point finder converged in $iter iterations with residual $best_residual_norm to $local_guess")
-            else
-                @debug println("Local point finder converged in $iter iterations with residual $best_residual_norm to a point outside the element: $local_guess")
-            end
-            break
-        end
+        best_residual_norm ≤ strategy.residual_tolerance && break
         if iter == strategy.max_iters
             @debug println("Failed to converge in $(strategy.max_iters) iterations")
         end
+    end
+
+    J, global_guess = calculate_jacobian_and_spatial_coordinate(interpolation, local_guess, cell_coordinates)
+    residual_norm = norm(global_guess - global_coordinate)
+    if residual_norm <= boundary_tolerance
+        local_guess = refine_local_coordinate(interpolation, cell_coordinates, global_coordinate, local_guess)
+        J, global_guess = calculate_jacobian_and_spatial_coordinate(interpolation, local_guess, cell_coordinates)
+        residual_norm = norm(global_guess - global_coordinate)
+    end
+    converged = check_point_search_convergence(refshape, local_guess, J, residual_norm, strategy, boundary_tolerance, warn)
+    if converged
+        @debug println("Local point finder converged with residual $residual_norm to $local_guess")
+    else
+        @debug println("Local point finder failed to converge inside the element: residual $residual_norm, coordinate $local_guess")
     end
     return converged, local_guess
 end
@@ -186,15 +243,13 @@ function _get_node_cell_map(grid::AbstractGrid)
     cells = getcells(grid)
     C = eltype(cells) # possibly abstract
     cell_dicts = Dict{Type{<:C}, Dict{Int, Vector{Int}}}()
-    ctypes = Set{Type{<:C}}(typeof(c) for c in cells)
-    for ctype in ctypes
-        cell_dict = cell_dicts[ctype] = Dict{Int, Vector{Int}}()
-        for (cellidx, cell) in enumerate(cells)
-            cell isa ctype || continue
-            for node in cell.nodes
-                v = get!(Vector{Int}, cell_dict, node)
-                push!(v, cellidx)
-            end
+    for (cellidx, cell) in enumerate(cells)
+        cell_dict = get!(cell_dicts, typeof(cell)) do
+            Dict{Int, Vector{Int}}()
+        end
+        for node in cell.nodes
+            v = get!(Vector{Int}, cell_dict, node)
+            push!(v, cellidx)
         end
     end
     return cell_dicts

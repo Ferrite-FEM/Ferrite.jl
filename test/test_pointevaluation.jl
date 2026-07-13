@@ -453,6 +453,71 @@ function test_pe_first_point_missing()
 end
 
 @testset "PointEvalHandler" begin
+    @testset "reference-cell point finding" begin
+        @test Ferrite.cellcenter(RefTriangle, Float64) == Vec((1 / 3, 1 / 3))
+        @test Ferrite.cellcenter(RefTetrahedron, Float64) == Vec((1 / 4, 1 / 4, 1 / 4))
+
+        for (ip, ξ) in (
+                (Lagrange{RefPrism, 1}(), Vec((1 / 3, 1 / 3, 1 / 2))),
+                (Lagrange{RefPyramid, 1}(), Vec((3 / 8, 3 / 8, 1 / 4))),
+            )
+            x = Ferrite.reference_coordinates(ip)
+            global_coordinate = Ferrite.spatial_coordinate(ip, ξ, x)
+            found, local_coordinate = Ferrite.find_local_coordinate(
+                ip, x, global_coordinate, Ferrite.NewtonLineSearchPointFinder()
+            )
+            @test found
+            @test local_coordinate ≈ ξ
+        end
+
+        # Inverted cells must not be accepted as valid point locations.
+        ip = Lagrange{RefQuadrilateral, 1}()
+        x_inverted = Vec{2, Float64}[
+            Vec((-1.0, -1.0)), Vec((-1.0, 1.0)), Vec((1.0, 1.0)), Vec((1.0, -1.0)),
+        ]
+        found, _ = Ferrite.find_local_coordinate(
+            ip, x_inverted, Vec((0.0, 0.0)), Ferrite.NewtonLineSearchPointFinder()
+        )
+        @test !found
+
+        # A full Newton step leaves this valid curved cell. The projected line search
+        # must remain in the reference cell and recover the known coordinate.
+        ip = Lagrange{RefQuadrilateral, 2}()
+        x_curved = Vec{2, Float64}[
+            Vec((-0.8565669510504186, -0.6500194762803537)),
+            Vec((0.8753171157430797, -1.2369730105858427)),
+            Vec((0.10422707246878493, 1.393497566398762)),
+            Vec((-0.27176244654023074, 1.233812276726547)),
+            Vec((-0.1262574251472513, -0.8212467805233897)),
+            Vec((1.305925993214463, 0.04146412294880411)),
+            Vec((0.002368498392323069, 1.006511163841399)),
+            Vec((-1.4401728641150544, 0.19021442254465143)),
+            Vec((0.3254748943531501, -0.0902387832334179)),
+        ]
+        ξ = Vec((-0.6321328500901766, 0.9030970249979193))
+        global_coordinate = Ferrite.spatial_coordinate(ip, ξ, x_curved)
+        found, local_coordinate = Ferrite.find_local_coordinate(
+            ip, x_curved, global_coordinate, Ferrite.NewtonLineSearchPointFinder()
+        )
+        @test found
+        @test local_coordinate ≈ ξ
+    end
+
+    @testset "coordinate type promotion" begin
+        grid = generate_grid(Quadrilateral, (1, 1))
+        ph = PointEvalHandler(grid, Vec{2, Float32}[Vec((0, 0))])
+        @test only(ph.local_coords) ≈ Vec((0.0, 0.0))
+        @test only(ph.local_coords) isa Vec{2, Float64}
+
+        integer_grid = Grid(
+            [Quadrilateral((1, 2, 3, 4))],
+            [Node((0, 0)), Node((1, 0)), Node((1, 1)), Node((0, 1))],
+        )
+        ph_integer = PointEvalHandler(integer_grid, Vec{2, Int}[Vec((0, 0))])
+        @test only(ph_integer.local_coords) ≈ Vec((-1.0, -1.0))
+        @test only(ph_integer.local_coords) isa Vec{2, Float64}
+    end
+
     @testset "scalar field" begin
         test_pe_scalar_field()
         test_pe_embedded()
