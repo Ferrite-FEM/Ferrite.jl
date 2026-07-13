@@ -8,7 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Next] - xxxx-xx-xx
 
 ### Features
-- GPU support for assembly using type-stable, non-allocating element routines ([#1291])
+- Experimental GPU support for assembly using type-stable, non-allocating element routines ([#1291])
 
 ### Fixes
  - Make default `edgedof_indices` and `facedof_indices` implementation work for externally defined interpolations ([#1365])
