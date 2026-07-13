@@ -184,10 +184,10 @@ Constructing a `MultiFieldCellValues` for three fields, 2nd order interpolation 
 and 1st order interpolations for the pressure, `p`, and temperature, `T`.
 ```
 qr = QuadratureRule{RefQuadrilateral}(2)
-ip_geo = Lagrange{RefQuadrilateral,1}() # Optional
-ipu = Lagrange{RefQuadrilateral,2}()^2
-ipp = Lagrange{RefQuadrilateral,1}()
-ipT = Lagrange{RefQuadrilaterla,1}()
+ip_geo = Lagrange{RefQuadrilateral, 1}() # Optional
+ipu = Lagrange{RefQuadrilateral, 2}()^2
+ipp = Lagrange{RefQuadrilateral, 1}()
+ipT = Lagrange{RefQuadrilateral, 1}()
 cmv = MultiFieldCellValues(qr, (u = ipu, p = ipp, T = ipT), ip_geo)
 ```
 After calling [`reinit!`](@ref) on `cmv`, it can be used as, e.g.
