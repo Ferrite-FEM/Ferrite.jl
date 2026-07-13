@@ -21,11 +21,12 @@ end
 
 Create a buffer for creating an [`ArrayOfVectorViews`](@ref), representing an array with `N` axes.
 `sizehint` sets the number of elements in `data` allocated when a new index is added via `push_at_index!`,
-or when the current storage for the index is full, how much many additional elements are reserved for that index.
+or when the current storage for the index is full, how many additional elements are reserved for that index.
 Any content in `data` is overwritten, but performance is improved by pre-allocating it to a reasonable size or
 by `sizehint!`ing it.
 """
 function ConstructionBuffer(data::Vector, dims::NTuple{<:Any, Int}, sizehint::Int)
+    sizehint > 0 || throw(ArgumentError("sizehint must be positive"))
     indices = fill(AdaptiveRange(0, 0, 0), dims)
     return ConstructionBuffer(indices, empty!(data), sizehint)
 end
@@ -141,7 +142,7 @@ Creates the `ArrayOfVectorViews` directly where the user is responsible for havi
 Checking of the argument dimensions can be elided by setting `checkargs = false`, but incorrect dimensions
 may lead to illegal out of bounds access later.
 
-`data` is indexed by `indices[i]:indices[i+1]`, where `i = lin_idx[idx...]` and `idx...` are the user-provided
+`data` is indexed by `indices[i]:(indices[i+1] - 1)`, where `i = lin_idx[idx...]` and `idx...` are the user-provided
 indices to the `ArrayOfVectorViews`.
 """
 function ArrayOfVectorViews(indices::Vector{Int}, data::Vector{T}, lin_idx::LinearIndices{N}; checkargs = true) where {T, N}

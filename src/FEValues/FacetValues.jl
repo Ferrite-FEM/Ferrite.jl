@@ -105,7 +105,7 @@ getcurrentfacet(fv::FacetValues) = fv.current_facet[]
     getnormal(fv::FacetValues, qp::Int)
 
 Return the normal at the quadrature point `qp` for the active facet of the
-`FacetValues` object(from last `reinit!`).
+`FacetValues` object (from the last `reinit!`).
 """
 getnormal(fv::FacetValues, qp::Int) = fv.normals[qp]
 
@@ -146,7 +146,7 @@ function reinit!(fv::FacetValues, cell::Union{AbstractCell, Nothing}, x::Abstrac
         detJ = norm(weight_norm)
         detJ > 0.0 || throw_detJ_not_pos(detJ)
         @inbounds fv.detJdV[q_point] = detJ * w
-        @inbounds fv.normals[q_point] = weight_norm / norm(weight_norm)
+        @inbounds fv.normals[q_point] = weight_norm / detJ
         apply_mapping!(fun_values, q_point, mapping, cell)
     end
     return
@@ -169,8 +169,6 @@ function Base.show(io::IO, d::MIME"text/plain", fv::FacetValues)
     print(io, " Function interpolation: "); show(io, d, function_interpolation(fv))
     print(io, "\nGeometric interpolation: ")
     return sdim === nothing ? show(io, d, ip_geo) : show(io, d, ip_geo^sdim)
-    sdim === nothing ? show(io, d, ip_geo) : show(io, d, ip_geo^sdim)
-    return
 end
 
 """

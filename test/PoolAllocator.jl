@@ -78,4 +78,16 @@ using Test, Ferrite.PoolAllocator
     # Smoke test for `show`
     show(devnull, MIME"text/plain"(), mempool)
 
+    # Element sizes that do not divide PAGE_SIZE must still use the pool.
+    struct ThreeFloats
+        data::NTuple{3, Float64}
+    end
+    mempool_24byte = PoolAllocator.MemoryPool{ThreeFloats}()
+    x_24byte = PoolAllocator.malloc(mempool_24byte, 3)
+    fill!(x_24byte, ThreeFloats((1.0, 2.0, 3.0)))
+    @test all(==(ThreeFloats((1.0, 2.0, 3.0))), x_24byte)
+    bytes_used, bytes_allocated = PoolAllocator.mempool_stats(mempool_24byte)
+    @test bytes_used == 4 * sizeof(ThreeFloats) # allocation rounds up to a power of two
+    @test bytes_used <= bytes_allocated <= PoolAllocator.PAGE_SIZE
+
 end

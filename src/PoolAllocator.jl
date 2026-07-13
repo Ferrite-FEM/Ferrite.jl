@@ -14,9 +14,10 @@ mutable struct Page{T}
     n_free::Int               # number of free blocks
     function Page{T}(blocksize::Int) where {T}
         @assert isbitstype(T)
-        buf = Vector{T}(undef, PAGE_SIZE ÷ sizeof(T))
-        n_blocks, r = divrem(length(buf), blocksize)
-        @assert r == 0
+        block_bytes = blocksize * sizeof(T)
+        block_bytes <= PAGE_SIZE || throw(ArgumentError("block size exceeds page size"))
+        n_blocks = PAGE_SIZE ÷ block_bytes
+        buf = Vector{T}(undef, n_blocks * blocksize)
         return new{T}(buf, blocksize, trues(n_blocks), n_blocks)
     end
 end
@@ -102,8 +103,8 @@ function mempool_stats(mempool::MemoryPool{T}) where {T}
     for bookidx in 1:length(mempool.books)
         isassigned(mempool.books, bookidx) || continue
         book = mempool.books[bookidx]
-        bytes_allocated += length(book.pages) * PAGE_SIZE
         for page in book.pages
+            bytes_allocated += length(page.buf) * sizeof(T)
             bytes_used += count(!, page.freelist) * page.blocksize * sizeof(T)
         end
     end
@@ -122,7 +123,7 @@ function Base.show(io::IO, ::MIME"text/plain", mempool::MemoryPool{T}) where {T}
         # @assert blocksize == 2^idx
         npages = length(h.pages)
         n_free = mapreduce(p -> p.n_free, +, h.pages; init = 0)
-        n_tot = npages * PAGE_SIZE ÷ blocksize ÷ sizeof(T)
+        n_tot = mapreduce(p -> length(p.buf) ÷ blocksize, +, h.pages; init = 0)
         println(io, " - blocksize: $(blocksize), npages: $(npages), usage: $(n_tot - n_free) / $(n_tot)")
     end
     return

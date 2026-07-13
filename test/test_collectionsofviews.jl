@@ -1,4 +1,6 @@
 @testset "ArrayOfVectorViews" begin
+    @test_throws ArgumentError Ferrite.CollectionsOfViews.ConstructionBuffer(Int[], (1,), 0)
+
     # Create a vector sorting integers into bins and check
     test_ints = rand(0:99, 100)
     # Create for 3 different sizehints

@@ -95,7 +95,7 @@ for dim in 1:3
             @nloops $dim i j -> (1:order) begin
                 t = @ntuple $dim q -> p[$(Symbol("i" * "_q"))]
                 points[count] = Vec{$dim, T}(t)
-                weight = 1.0
+                weight = one(T)
                 @nexprs $dim j -> (weight *= w[i_{j}])
                 weights[count] = weight
                 count += 1
@@ -188,7 +188,7 @@ struct FacetQuadratureRule{shape, FacetRulesType}
     facet_rules::FacetRulesType # E.g. Tuple{QuadratureRule{RefLine,...}, QuadratureRule{RefLine,...}}
     function FacetQuadratureRule{shape}(facet_rules::Union{NTuple{<:Any, QRType}, AbstractVector{QRType}}) where {shape, QRType <: QuadratureRule{shape}}
         if length(facet_rules) != nfacets(shape)
-            throw(ArgumentError("number of quadrature rules does not not match number of facets (#rules=$(length(facet_rules)) != #facets=$(nfacets(shape)))"))
+            throw(ArgumentError("number of quadrature rules does not match number of facets (#rules=$(length(facet_rules)) != #facets=$(nfacets(shape)))"))
         end
         return new{shape, typeof(facet_rules)}(facet_rules)
     end
