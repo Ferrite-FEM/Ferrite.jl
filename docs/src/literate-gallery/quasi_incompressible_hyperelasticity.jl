@@ -120,7 +120,7 @@ function Ψ(F, p, mp::NeoHooke)
     Ic = tr(tdot(F))
     J = det(F)
     Js = (λ + p + sqrt((λ + p)^2.0 + 4.0 * λ * μ)) / (2.0 * λ)
-    return p * (Js - J) + μ / 2 * (Ic - 3) - μ * log(Js) + λ / 2 * (Js - 1)^2
+    return p * (J - Js) + μ / 2 * (Ic - 3) - μ * log(Js) + λ / 2 * (Js - 1)^2
 end;
 
 # and it's derivatives (required in computing the jacobian and hessian respectively)
@@ -239,8 +239,8 @@ function assemble_element!(Ke, fe, cell, cellvalues, mp, ue, pe)
                 Ke[BlockIndex((pblock, ublock), (i, j))] += ∇δuj ⊡ ∂²Ψ∂F∂p * δp * dΩ
             end
             for j in 1:n_basefuncs_p
-                δp = shape_value(cellvalues.p, qp, j)
-                Ke[BlockIndex((pblock, pblock), (i, j))] += δp * ∂²Ψ∂p² * δp * dΩ
+                δq = shape_value(cellvalues.p, qp, j)
+                Ke[BlockIndex((pblock, pblock), (i, j))] += δp * ∂²Ψ∂p² * δq * dΩ
             end
         end
     end
@@ -361,6 +361,38 @@ vol_def = solve(quadratic_u, linear_p)
 
 using Test                #src
 @test isapprox(vol_def, 1.0, atol = 1.0e-3) #src
+# Verify that the mixed potential recovers the original compressible energy when #src
+# pressure is chosen so that J⋆(p) = det(F). #src
+mp_test = NeoHooke(2.0, 1000.0) #src
+F_test = Tensor{2, 3}((1.1, 0.0, 0.0, 0.0, 0.95, 0.0, 0.0, 0.0, 1.02)) #src
+J_test = det(F_test) #src
+p_test = mp_test.λ * (J_test - 1) - mp_test.μ / J_test #src
+Ψ_original = mp_test.μ / 2 * (tr(tdot(F_test)) - 3) - mp_test.μ * log(J_test) + mp_test.λ / 2 * (J_test - 1)^2 #src
+@test Ψ(F_test, p_test, mp_test) ≈ Ψ_original #src
+@test constitutive_driver(F_test, p_test, mp_test)[3] ≈ 0.0 atol = 1.0e-10 #src
+
+# Check the assembled pressure-pressure block against a finite difference of the #src
+# pressure residual. #src
+grid_test = generate_grid(Tetrahedron, (1, 1, 1), zero(Vec{3}), ones(Vec{3})) #src
+cellvalues_test, _ = create_values(quadratic_u, linear_p) #src
+cell_test = first(CellIterator(grid_test)) #src
+nu_test = getnbasefunctions(cellvalues_test.u) #src
+np_test = getnbasefunctions(cellvalues_test.p) #src
+ue_test = zeros(nu_test) #src
+pe_test = fill(-mp_test.μ, np_test) #src
+Ke_test = BlockedArray(zeros(nu_test + np_test, nu_test + np_test), [nu_test, np_test], [nu_test, np_test]) #src
+fe_test = BlockedArray(zeros(nu_test + np_test), [nu_test, np_test]) #src
+assemble_element!(Ke_test, fe_test, cell_test, cellvalues_test, mp_test, ue_test, pe_test) #src
+δpe_test = collect(range(-0.2, 0.3; length = np_test)) #src
+h_test = 1.0e-6 #src
+function pressure_residual(pe) #src
+    Ke = similar(Ke_test) #src
+    fe = similar(fe_test) #src
+    assemble_element!(Ke, fe, cell_test, cellvalues_test, mp_test, ue_test, pe) #src
+    return collect(fe[Block(2)]) #src
+end #src
+fd_test = (pressure_residual(pe_test + h_test * δpe_test) - pressure_residual(pe_test - h_test * δpe_test)) / (2h_test) #src
+@test fd_test ≈ Ke_test[Block(2, 2)] * δpe_test rtol = 1.0e-7 #src
 
 #md # ## Plain program
 #md #
