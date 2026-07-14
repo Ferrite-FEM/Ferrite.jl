@@ -1,3 +1,8 @@
+# Imports for parallel (isolated) test execution:
+using StaticArrays
+using LinearAlgebra
+include(joinpath(@__DIR__, "test_utils.jl"))
+
 # Test that all values in the struct are equal,
 # but that bits-types are not aliased to eachother.
 function test_equal_but_unaliased(a::T, b::T) where {T}

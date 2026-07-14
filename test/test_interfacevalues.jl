@@ -1,3 +1,6 @@
+# Imports for parallel (isolated) test execution:
+include(joinpath(@__DIR__, "test_utils.jl"))
+
 @testset "InterfaceValues" begin
     function test_interfacevalues(grid::Ferrite.AbstractGrid, iv::InterfaceValues; tol = 0)
         ip_here = Ferrite.function_interpolation(iv.here)

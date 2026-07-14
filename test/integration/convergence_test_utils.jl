@@ -2,6 +2,7 @@ module ConvergenceTestHelper
 
 using Ferrite, SparseArrays, ForwardDiff, Test
 import LinearAlgebra: diag
+import Ferrite: getrefdim, geometric_interpolation
 
 get_geometry(::Ferrite.Interpolation{RefLine}) = Line
 get_geometry(::Ferrite.Interpolation{RefQuadrilateral}) = Quadrilateral
@@ -24,6 +25,9 @@ get_num_elements(::Ferrite.Interpolation{shape, 2}) where {shape} = 7
 get_num_elements(::Ferrite.Interpolation{RefHexahedron, 1}) = 11
 get_num_elements(::Ferrite.RannacherTurek{RefQuadrilateral, 1}) = 15
 get_num_elements(::Ferrite.RannacherTurek{RefHexahedron, 1}) = 13
+# Much coarser than the generic order-1 default (21): the fine grid would
+# otherwise be 42³ tets, which dominated the whole parallel suite.
+get_num_elements(::Ferrite.CrouzeixRaviart{RefTetrahedron, 1}) = 12
 get_num_elements(::Ferrite.Interpolation{RefHexahedron, 2}) = 4
 get_num_elements(::Ferrite.Interpolation{shape, 3}) where {shape} = 8
 get_num_elements(::Ferrite.Interpolation{shape, 4}) where {shape} = 5
@@ -145,6 +149,56 @@ function setup_poisson_problem(grid, interpolation, interpolation_geo, qr)
     cellvalues = CellValues(qr, interpolation, interpolation_geo)
 
     return dh, ch, cellvalues
+end
+
+# Test only for convergence within margins
+function run_convergence_analysis(interpolation)
+    return @testset failfast = true "$interpolation" begin
+        # Generate a grid ...
+        geometry = get_geometry(interpolation)
+        interpolation_geo = geometric_interpolation(geometry)
+        N = get_num_elements(interpolation)
+        grid = generate_grid(geometry, ntuple(x -> N, getrefdim(geometry)))
+        # ... a suitable quadrature rule ...
+        qr_order = get_quadrature_order(interpolation)
+        qr = QuadratureRule{getrefshape(interpolation)}(qr_order)
+        # ... and then pray to the gods of convergence.
+        dh, ch, cellvalues = setup_poisson_problem(grid, interpolation, interpolation_geo, qr)
+        u = solve(dh, ch, cellvalues)
+        check_and_compute_convergence_norms(dh, u, cellvalues, 1.0e-2)
+    end
+end
+
+# Test also for correct convergence rates
+function run_convergence_rate(interpolation)
+    return @testset failfast = true "$interpolation" begin
+        geometry = get_geometry(interpolation)
+        interpolation_geo = geometric_interpolation(geometry)
+        # "Coarse case"
+        N₁ = get_num_elements(interpolation)
+        grid = generate_grid(geometry, ntuple(x -> N₁, getrefdim(geometry)))
+        # ... a suitable quadrature rule ...
+        qr_order = get_quadrature_order(interpolation)
+        qr = QuadratureRule{getrefshape(interpolation)}(qr_order)
+        # ... and then pray to the gods of convergence.
+        dh, ch, cellvalues = setup_poisson_problem(grid, interpolation, interpolation_geo, qr)
+        u = solve(dh, ch, cellvalues)
+        L2₁, H1₁, _ = check_and_compute_convergence_norms(dh, u, cellvalues, 1.0e-2)
+
+        # "Fine case"
+        N₂ = 2 * N₁
+        grid = generate_grid(geometry, ntuple(x -> N₂, getrefdim(geometry)))
+        # ... a suitable quadrature rule ...
+        qr_order = get_quadrature_order(interpolation)
+        qr = QuadratureRule{getrefshape(interpolation)}(qr_order)
+        # ... and then pray to the gods of convergence.
+        dh, ch, cellvalues = setup_poisson_problem(grid, interpolation, interpolation_geo, qr)
+        u = solve(dh, ch, cellvalues)
+        L2₂, H1₂, _ = check_and_compute_convergence_norms(dh, u, cellvalues, 5.0e-3)
+
+        @test -(log(L2₂) - log(L2₁)) / (log(N₂) - log(N₁)) ≈ Ferrite.getorder(interpolation) + 1 atol = 0.1
+        @test -(log(H1₂) - log(H1₁)) / (log(N₂) - log(N₁)) ≈ Ferrite.getorder(interpolation) atol = 0.1
+    end
 end
 
 end # module ConvergenceTestHelper

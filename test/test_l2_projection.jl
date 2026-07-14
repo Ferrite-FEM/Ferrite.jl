@@ -1,3 +1,7 @@
+# Imports for parallel (isolated) test execution:
+using LinearAlgebra
+import SHA
+
 # Tests a L2-projection of integration point values (to nodal values),
 # determined from the function y = 1 + x[1]^2 + (2x[2])^2
 function test_projection(order, refshape)

@@ -1,3 +1,7 @@
+# Imports for parallel (isolated) test execution:
+using StaticArrays
+include(joinpath(@__DIR__, "test_utils.jl"))
+
 @testset "Field continuity" begin
     # Integration testing to ensure that correct continuity across facets are obtained
     # after dofdistribution with use of cell and facet values.

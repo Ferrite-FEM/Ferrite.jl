@@ -1,3 +1,7 @@
+# Imports for parallel (isolated) test execution:
+using Logging, OrderedCollections
+include(joinpath(@__DIR__, "test_utils.jl"))
+
 using Ferrite, Test
 
 function test_pe_scalar_field()

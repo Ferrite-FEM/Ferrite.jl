@@ -1,6 +1,8 @@
 # Some utility functions for testing Ferrite
 
+using Ferrite
 using Ferrite: reference_shape_value
+using LinearAlgebra: norm
 
 #####################################
 # Volume for the reference elements #

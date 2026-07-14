@@ -1,3 +1,8 @@
+using Ferrite, Test
+import Ferrite: geometric_interpolation, getrefdim
+
+include(joinpath(@__DIR__, "integration", "convergence_test_utils.jl"))
+
 # Squared elementwise L2 errors against the analytical solution, used as the
 # refinement indicator.
 function compute_cell_squared_l2_errors(dh, u, cellvalues)

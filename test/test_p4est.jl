@@ -1,3 +1,7 @@
+using Ferrite, Test
+
+include(joinpath(@__DIR__, "test_utils.jl"))
+
 @testset "OctantBWG Lookup Tables" begin
     @test Ferrite.AMR._face(1) == [3, 5]
     @test Ferrite.AMR._face(5) == [1, 5]
