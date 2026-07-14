@@ -5,9 +5,10 @@ It involves dynamically adjusting the mesh resolution based on some criteria.
 By refining the mesh in regions where the solution exhibits features of interest, AMR ensures that computational resources are concentrated where they are most needed, leading to more accurate results without a proportional increase in computational cost.
 This refinement can be achieved in different fashions by either adjusting the mesh size (h-adaptivity), the polynomial order of the Ansatz functions (p-adaptivity) or the nodal positions (r-adaptivity).
 
-In Ferrite.jl, adaptivity is achieved through a p4est type of implementation which covers h-adaptivity.
+Ferrite.jl supports efficient h-adaptivity through a p4est type of implementation.
 This approach is designed to handle unstructured hexahedral (in 3D) and quadrilateral (in 2D) meshes.
-A further restriction of the p4est type of implementation is isotropic refinement, meaning that elements are subdivided into smaller elements of the same shape.
+A further restriction of the p4est type of implementation is isotropic refinement, meaning that an element is always subdivided uniformly in all directions: a quadrilateral is split into four and a hexahedron into eight children.
+Anisotropic refinement, where an element is subdivided along only some of its axes, is not supported.
 
 In AMR different phenomena and vocabulary emerge which we group into the following aspects
 
@@ -77,8 +78,8 @@ This case complicates the `ConformityConstraint` massively and is therefore ofte
 Mesh balancing refers to the process of ensuring a smooth and gradual transition in element sizes across the computational mesh.
 This is especially important in adaptive mesh refinement (AMR), where different regions of the mesh may undergo varying levels of refinement based on the solution's characteristics.
 The goal of mesh balancing is to prevent isolated regions of excessive refinement, which can lead to inefficiencies in terms of constructing conformity constraints and numerical instability.
-A famous balancing approach is the 2:1 balance, where it is ensured that a hanging node only depends on non-hanging nodes.
-Therefore, exactly one level of non-conformity is allowed.
+A famous balancing approach is the 2:1 balance, where neighboring elements may differ by at most one level of refinement, i.e. exactly one level of non-conformity is allowed.
+As a consequence, every hanging node is constrained directly by regular, non-hanging nodes, ruling out nested — in the worst case even cyclic — constraint chains between hanging nodes.
 An example of this process is visualized below.
 
 ```
@@ -125,7 +126,7 @@ x-----x--x--x           |               x-----x--x--x-----x-----|
 x-----x-----x-----------x               x-----x-----x-----------x
 ```
 
-In Ferrite's p4est implementation, one can call `balanceforest!` to balance the adaptive grid.
+In Ferrite's p4est implementation, one must call `balanceforest!` to balance the adaptive grid to ensure all algorithms work correctly.
 
 ```julia
 Ferrite.balanceforest!(adaptive_grid)
@@ -139,3 +140,7 @@ Accurate error estimation guides the adaptive refinement process, ensuring that 
 In practice, error estimators evaluate the local error in the finite element solution by comparing it to an approximation of the true solution.
 Common techniques include residual-based error estimation, where the residuals of the finite element equations are used to estimate the local error, and recovery-based methods, which involve constructing a higher-order approximation of the solution and assessing the difference between this approximation and the finite element solution.
 By identifying elements with high estimated errors, these methods provide a targeted approach to mesh refinement, enhancing the overall efficiency and accuracy of the simulation.
+
+The estimated elementwise errors still need to be translated into a refinement decision, which is the job of a marking strategy.
+Common choices are maximum marking (refine every element whose error exceeds a fixed fraction of the largest elementwise error), fixed-fraction marking (refine a fixed share of the elements with the largest errors) and Dörfler (bulk) marking (refine the smallest set of elements that accounts for a prescribed fraction of the total error).
+Which strategy performs best is typically problem dependent.

@@ -121,25 +121,101 @@ function solve(grid)
     return u, dh, ch, cellvalues
 end
 
-# ### Adaptive solve loop
-# The adaptive loop repeats: solve, estimate, mark, refine.
-#
-# **Error estimation (Zienkiewicz-Zhu).**
+# ### Error estimation (Zienkiewicz-Zhu)
 # The ZZ error estimator is a recovery-based *a posteriori* error estimator.
 # The idea is to compare the raw finite element flux $\sigma_h = \nabla u_h$
 # against a *recovered* (smoothed) flux $\sigma^*$ obtained by L2-projecting
 # the element-wise gradients onto a continuous nodal field.
+# (For unit conductivity the heat flux is $-\nabla u_h$; the sign drops out of
+# the error norm, so we work with the gradient directly.)
 # Where the smoothed flux differs significantly from the raw flux, the local
 # approximation is poor and refinement is needed:
 # ```math
 #  \eta_K^2 = \int_K \|\sigma_h - \sigma^*\|^2 \, \mathrm{d}\Omega.
 # ```
-#
-# **Dörfler marking.**
+function estimate_error(grid, dh, u, cv, ip, qr)
+    ## Step 1: Compute the raw flux σ_h = ∇u_h at each quadrature point.
+    σ_gp = Vector{Vector{Vec{3, Float64}}}()
+    for cell in CellIterator(dh)
+        reinit!(cv, cell)
+        ue = u[celldofs(cell)]
+        σ_cell = Vec{3, Float64}[]
+        for q_point in 1:getnquadpoints(cv)
+            push!(σ_cell, function_gradient(cv, q_point, ue))
+        end
+        push!(σ_gp, σ_cell)
+    end
+
+    ## Step 2: Recover a smooth flux field σ* by L2-projecting the raw
+    ## quadrature-point fluxes onto a continuous nodal field.
+    projector = L2Projector(ip, grid)
+    σ_dof = project(projector, σ_gp, qr)
+
+    ## Step 3: Evaluate the ZZ error indicator per cell.
+    ## For each cell we compare the recovered flux σ* (evaluated from the
+    ## projected nodal values) against the raw flux σ_h at each quadrature point.
+    cv_σ = CellValues(qr, ip^3)
+    error_arr = zeros(getncells(grid))
+    for (cellid, cell) in enumerate(CellIterator(projector.dh))
+        reinit!(cv_σ, cell)
+        @views σe = σ_dof[celldofs(cell)]
+        for q_point in 1:getnquadpoints(cv_σ)
+            σ_star = function_value(cv_σ, q_point, reinterpret(Float64, σe))
+            σ_h = σ_gp[cellid][q_point]
+            error_arr[cellid] += norm(σ_star - σ_h)^2 * getdetJdV(cv_σ, q_point)
+        end
+    end
+    return error_arr
+end
+
+# ### True error
+# Since the solution is manufactured, we can also compute the *exact* elementwise
+# error in the same (H¹-seminorm) sense as the estimator,
+# ```math
+#  e_K^2 = \int_K \|\nabla u_h - \nabla u_{\mathrm{exact}}\|^2 \, \mathrm{d}\Omega,
+# ```
+# and export it alongside the estimate. Comparing the two fields in ParaView is a
+# quick check that the whole estimate–mark–refine pipeline works faithfully: the
+# estimated error should stay close to the true error.
+function true_error(grid, dh, u, cv)
+    error_arr = zeros(getncells(grid))
+    for (cellid, cell) in enumerate(CellIterator(dh))
+        reinit!(cv, cell)
+        ue = u[celldofs(cell)]
+        coords = getcoordinates(cell)
+        for q_point in 1:getnquadpoints(cv)
+            x = spatial_coordinate(cv, q_point, coords)
+            ∇u_exact = gradient(analytical_solution, x)
+            ∇u_h = function_gradient(cv, q_point, ue)
+            error_arr[cellid] += norm(∇u_h - ∇u_exact)^2 * getdetJdV(cv, q_point)
+        end
+    end
+    return error_arr
+end
+
+# ### Dörfler marking
 # Rather than using an absolute error threshold (which requires problem-dependent
 # tuning), we use Dörfler (bulk) marking: sort cells by decreasing error and mark
 # the smallest set whose cumulative error exceeds a fraction $\theta$ of the total.
 # This guarantees a fixed fraction of the error is addressed in each step.
+function dorfler_mark(error_arr, θ)
+    cells_to_refine = Int[]
+    sizehint!(cells_to_refine, length(error_arr))
+    total = sum(error_arr)
+    total > 0 || return cells_to_refine, total
+    perm = sortperm(error_arr; rev = true)
+    target = θ * total
+    acc = 0.0
+    for idx in perm
+        push!(cells_to_refine, idx)
+        acc += error_arr[idx]
+        acc >= target && break
+    end
+    return cells_to_refine, total
+end
+
+# ### Adaptive solve loop
+# The adaptive loop repeats: solve, estimate, mark, refine.
 function solve_adaptive(initial_grid)
     ip = Lagrange{RefHexahedron, 1}()
     qr = QuadratureRule{RefHexahedron}(2)
@@ -150,64 +226,21 @@ function solve_adaptive(initial_grid)
     θ = 0.5
 
     while !finished && i <= 3
-        @show i
         ## Materialize the forest into a NonConformingGrid and solve
         transferred_grid = Ferrite.creategrid(grid)
         u, dh, ch, cv = solve(transferred_grid)
 
-        ## Step 1: Compute the raw FE flux σ_h = ∇u_h at each quadrature point
-        σ_gp = Vector{Vector{Vec{3, Float64}}}()
-        for cell in CellIterator(dh)
-            reinit!(cv, cell)
-            ue = u[celldofs(cell)]
-            σ_cell = Vec{3, Float64}[]
-            for q_point in 1:getnquadpoints(cv)
-                push!(σ_cell, function_gradient(cv, q_point, ue))
-            end
-            push!(σ_gp, σ_cell)
-        end
-
-        ## Step 2: Recover a smooth flux field σ* by L2-projecting the raw
-        ## quadrature-point fluxes onto a continuous nodal field.
-        projector = L2Projector(ip, transferred_grid)
-        σ_dof = project(projector, σ_gp, qr)
-
-        ## Step 3: Evaluate the ZZ error indicator per cell.
-        ## For each cell we compare the recovered flux σ* (evaluated from the
-        ## projected nodal values) against the raw flux σ_h at each quadrature point.
-        cv_σ = CellValues(qr, ip^3)
-        error_arr = zeros(getncells(transferred_grid))
-        for (cellid, cell) in enumerate(CellIterator(projector.dh))
-            reinit!(cv_σ, cell)
-            @views σe = σ_dof[celldofs(cell)]
-            for q_point in 1:getnquadpoints(cv_σ)
-                σ_star = function_value(cv_σ, q_point, reinterpret(Float64, σe))
-                σ_h = σ_gp[cellid][q_point]
-                error_arr[cellid] += norm(σ_star - σ_h)^2 * getdetJdV(cv_σ, q_point)
-            end
-        end
-
-        ## Dörfler marking: sort cells by error and mark the smallest set
-        ## whose cumulative error accounts for a fraction θ of the total.
-        total = sum(error_arr)
-        cells_to_refine = Int[]
-        if total > 0
-            perm = sortperm(error_arr; rev = true)
-            target = θ * total
-            acc = 0.0
-            for idx in perm
-                push!(cells_to_refine, idx)
-                acc += error_arr[idx]
-                acc >= target && break
-            end
-        end
+        ## Estimate the error and mark cells with Dörfler marking
+        error_arr = estimate_error(transferred_grid, dh, u, cv, ip, qr)
+        cells_to_refine, total = dorfler_mark(error_arr, θ)
 
         @info "AMR step $i: $(length(cells_to_refine))/$(getncells(transferred_grid)) cells marked, total error = $total"
 
-        ## Export the solution and cell-wise error to VTK for visualization
+        ## Export the solution, the estimated error and the true error to VTK
         VTKGridFile("heat_amr-$i", dh) do vtk
             write_solution(vtk, dh, u)
-            write_cell_data(vtk, error_arr, "error")
+            write_cell_data(vtk, error_arr, "estimated error")
+            write_cell_data(vtk, true_error(transferred_grid, dh, u, cv), "true error")
             pvd[i] = vtk
         end
 

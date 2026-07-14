@@ -162,11 +162,20 @@ end
 # normal stress is the natural residual of an elasticity solution and vanishes as the
 # mesh resolves the field. Per cell,
 # ```math
-#  \eta_K^2 = \tfrac{1}{2}\sum_{F \subset \partial K} h_F \int_F \|[\![\sigma\cdot n]\!]\|^2 \, \mathrm{d}\Gamma ,
+#  \eta_K^2 = \tfrac{1}{2}\sum_{F \subset \partial K \setminus \partial\Omega} h_F \int_F \|[\![\sigma_h\cdot n]\!]\|^2 \, \mathrm{d}\Gamma
+#           + \sum_{F \subset \partial K \cap \Gamma_N} h_F \int_F \|g - \sigma_h\cdot n\|^2 \, \mathrm{d}\Gamma ,
 # ```
-# where ``[\![\sigma\cdot n]\!]`` is the traction jump across facet ``F``. We use the
-# cell-averaged stress ``\bar\sigma_K`` (piecewise constant), so each facet contributes
-# ``|F|\,h_F\,\|(\bar\sigma_K - \bar\sigma_{K'})\cdot n\|^2`` with ``h_F = |F|``.
+# where ``[\![\sigma_h\cdot n]\!]`` is the traction jump across the interior facet ``F``
+# and the second sum is the boundary residual on the Neumann boundary ``\Gamma_N`` with
+# prescribed traction ``g`` (``g = 0`` on traction-free surfaces). Facets on the
+# Dirichlet boundary do not contribute.
+#
+# Both integrals are evaluated with facet quadrature: the owning side is evaluated
+# with `FacetValues`, and the neighbouring cell's stress at the same physical
+# quadrature point is obtained by inverse mapping (`Ferrite.find_local_coordinate`)
+# followed by a `PointValues` evaluation. This treats conforming, across-tree and
+# hanging (coarse↔fine) facets uniformly — for a hanging facet the integration runs
+# over the fine subfacet and the neighbour is the coarse cell.
 #
 # !!! note "Why not `ExclusiveTopology`?"
 #     The facet neighbours must be the *true* faces of the refined forest, including
@@ -176,71 +185,122 @@ end
 #     trees, so conforming faces appear as shared node-pairs, and each hanging face is
 #     linked to its coarse neighbour through the hanging node's master nodes in
 #     `grid.conformity_info`.
-function estimate_error(grid, dh, u, cv, C)
+function estimate_error(grid, dh, u, C)
     nc = getncells(grid)
     cells = getcells(grid)
     X = [get_node_coordinate(n) for n in getnodes(grid)]
 
-    ## Cell-averaged stress σ̄_K.
-    σ̄ = Vector{SymmetricTensor{2, 2, Float64, 3}}(undef, nc)
-    for cell in CellIterator(dh)
-        reinit!(cv, cell)
-        s = zero(SymmetricTensor{2, 2})
-        vol = 0.0
-        for q_point in 1:getnquadpoints(cv)
-            dΩ = getdetJdV(cv, q_point)
-            s += (C ⊡ function_symmetric_gradient(cv, q_point, u, celldofs(cell))) * dΩ
-            vol += dΩ
-        end
-        σ̄[cellid(cell)] = s / vol
+    ip = Lagrange{RefQuadrilateral, 1}()^2
+    ip_geo = Lagrange{RefQuadrilateral, 1}()
+    fv = FacetValues(FacetQuadratureRule{RefQuadrilateral}(2), ip)
+    ## The neighbour side is evaluated at the owning side's quadrature points,
+    ## which are arbitrary points in the neighbour's reference cell: inverse-map
+    ## them with `find_local_coordinate` and evaluate with `PointValues`.
+    pv = PointValues(ip)
+    finder = Ferrite.NewtonLineSearchPointFinder()
+    function stress_at(c, x)
+        coords = getcoordinates(grid, c)
+        converged, ξ = Ferrite.find_local_coordinate(ip_geo, coords, x, finder)
+        @assert converged
+        reinit!(pv, coords, ξ)
+        return C ⊡ function_symmetric_gradient(pv, u[celldofs(dh, c)])
     end
 
-    ## Map every facet (as a sorted node-id pair) to the cell(s) that own it.
+    ## Map every facet (as a sorted node-id pair) to the `FacetIndex`(es) that own it.
     ## TODO: this facet enumeration is hard-coded for 2D linear quadrilaterals — a facet
-    ## is the node pair `(nids[f], nids[f+1])`. It does not generalize: in 3D a facet is a
-    ## 4-node face, and higher-order geometric ansätze put extra nodes on each facet, so
-    ## the "sorted node tuple" key would differ. This ownership/adjacency query (the true
-    ## coarse↔fine and cross-tree facet neighbours of the refined forest) should instead
-    ## be provided by `ForestBWG` itself, which knows the leaf topology for any dimension
-    ## and ansatz, rather than being reconstructed here from the materialized grid.
-    facet_owner = Dict{Tuple{Int, Int}, Vector{Int}}()
+    ## is a node pair. It does not generalize: in 3D a facet is a 4-node face, and
+    ## higher-order geometric ansätze put extra nodes on each facet, so the "sorted node
+    ## tuple" key would differ. This ownership/adjacency query (the true coarse↔fine and
+    ## cross-tree facet neighbours of the refined forest) should instead be provided by
+    ## `ForestBWG` itself, which knows the leaf topology for any dimension and ansatz,
+    ## rather than being reconstructed here from the materialized grid.
+    facet_owner = Dict{Tuple{Int, Int}, Vector{FacetIndex}}()
     for c in 1:nc
-        nids = Ferrite.get_node_ids(cells[c])
-        nf = length(nids)
-        for f in 1:nf
-            key = minmax(nids[f], nids[mod1(f + 1, nf)])
-            push!(get!(() -> Int[], facet_owner, key), c)
+        for (f, fnodes) in enumerate(Ferrite.facets(cells[c]))
+            key = minmax(fnodes...)
+            push!(get!(() -> FacetIndex[], facet_owner, key), FacetIndex(c, f))
         end
     end
 
-    ## Accumulate the squared traction jump over each interior facet.
     error_arr = zeros(nc)
-    hang = grid.conformity_info
-    function add_jump!(cA, cB, na, nb)
-        L = norm(X[nb] - X[na])
-        t = (X[nb] - X[na]) / L
-        n = Vec{2}((t[2], -t[1]))                      # facet normal
-        jump = (σ̄[cA] - σ̄[cB]) ⋅ n
-        contrib = L^2 * (jump ⋅ jump)                  # h_F * |F| * ‖[[σ·n]]‖²
+
+    ## Squared traction jump over the facet `fi` against neighbour cell `cB`,
+    ## split evenly between the two cells. For hanging facets `fi` is the fine
+    ## subfacet and `cB` the coarse cell.
+    function add_jump!(fi::FacetIndex, cB::Int, na::Int, nb::Int)
+        cA, fA = fi[1], fi[2]
+        coordsA = getcoordinates(grid, cA)
+        reinit!(fv, coordsA, fA)
+        ueA = u[celldofs(dh, cA)]
+        hF = norm(X[nb] - X[na])
+        s = 0.0
+        for qp in 1:getnquadpoints(fv)
+            x = spatial_coordinate(fv, qp, coordsA)
+            n = getnormal(fv, qp)
+            jump = (C ⊡ function_symmetric_gradient(fv, qp, ueA) - stress_at(cB, x)) ⋅ n
+            s += (jump ⋅ jump) * getdetJdV(fv, qp)
+        end
+        contrib = hF * s
         error_arr[cA] += 0.5 * contrib
-        return error_arr[cB] += 0.5 * contrib
+        error_arr[cB] += 0.5 * contrib
+        return nothing
     end
+
+    ## Boundary residual over the domain-boundary facet `fi` with prescribed traction `g`.
+    function add_boundary!(fi::FacetIndex, na::Int, nb::Int, g)
+        cA, fA = fi[1], fi[2]
+        coordsA = getcoordinates(grid, cA)
+        reinit!(fv, coordsA, fA)
+        ueA = u[celldofs(dh, cA)]
+        hF = norm(X[nb] - X[na])
+        s = 0.0
+        for qp in 1:getnquadpoints(fv)
+            x = spatial_coordinate(fv, qp, coordsA)
+            n = getnormal(fv, qp)
+            r = g(x) - (C ⊡ function_symmetric_gradient(fv, qp, ueA)) ⋅ n
+            s += (r ⋅ r) * getdetJdV(fv, qp)
+        end
+        error_arr[cA] += hF * s
+        return nothing
+    end
+
+    ## The coarse side of a hanging facet also shows up as a single-owner facet; its
+    ## jump is integrated from the fine side, so collect the coarse keys to make sure
+    ## they are not mistaken for domain-boundary facets below.
+    hang = grid.conformity_info
+    coarse_keys = Set(minmax(m[1], m[2]) for m in values(hang) if length(m) == 2)
+
+    ## Dirichlet facets carry no boundary residual; the Neumann facets the applied
+    ## traction; all other boundary facets are traction-free.
+    dirichlet_facets = getfacetset(grid, "left")
+    neumann_facets = getfacetset(grid, "right")
+    zero_traction(x) = zero(Vec{2})
+
     for (key, owners) in facet_owner
+        a, b = key
         if length(owners) == 2
-            ## Conforming face (possibly across trees): both cells share this facet.
-            add_jump!(owners[1], owners[2], key[1], key[2])
-        elseif length(owners) == 1
-            ## A single owner is either a domain-boundary facet or the fine side of a
-            ## hanging face. In the latter case one endpoint is a hanging node whose
+            ## Conforming facet (possibly across trees): both cells share this facet.
+            add_jump!(owners[1], owners[2][1], a, b)
+        elseif key in coarse_keys
+            ## Coarse side of a hanging facet: handled from the fine side.
+            continue
+        else
+            ## Fine side of a hanging facet: one endpoint is a hanging node whose
             ## master pair spans the coarse facet → look up the coarse cell.
-            a, b = key
+            hanging = false
             for (hn, oth) in ((a, b), (b, a))
                 if haskey(hang, hn) && length(hang[hn]) == 2 && oth in hang[hn]
                     coarse_key = minmax(hang[hn][1], hang[hn][2])
-                    haskey(facet_owner, coarse_key) && add_jump!(owners[1], facet_owner[coarse_key][1], a, b)
+                    haskey(facet_owner, coarse_key) && add_jump!(owners[1], facet_owner[coarse_key][1][1], a, b)
+                    hanging = true
                     break
                 end
             end
+            hanging && continue
+            ## Domain-boundary facet: Neumann/free-surface boundary residual.
+            owners[1] in dirichlet_facets && continue
+            g = owners[1] in neumann_facets ? traction : zero_traction
+            add_boundary!(owners[1], a, b, g)
         end
     end
     return error_arr
@@ -251,6 +311,7 @@ end
 # accounts for a fraction $\theta$ of the total.
 function dorfler_mark(error_arr, θ)
     cells_to_refine = Int[]
+    sizehint!(cells_to_refine, length(error_arr))
     total = sum(error_arr)
     total > 0 || return cells_to_refine, total
     perm = sortperm(error_arr; rev = true)
@@ -278,14 +339,14 @@ function solve_adaptive(initial_forest; nsteps = 4, θ = 0.3)
         u, dh, ch, cv, qr = solve(grid, Cmat)
 
         ## Estimate the error and mark cells with Dörfler marking.
-        error_arr = estimate_error(grid, dh, u, cv, Cmat)
+        error_arr = estimate_error(grid, dh, u, Cmat)
         cells_to_refine, total = dorfler_mark(error_arr, θ)
         @info "AMR step $i: $(getncells(grid)) cells, $(length(cells_to_refine)) marked, total error = $total"
 
         ## Export displacement and the cell-wise error indicator.
         VTKGridFile("elasticity_amr-$i", dh) do vtk
             write_solution(vtk, dh, u)
-            write_cell_data(vtk, error_arr, "error")
+            write_cell_data(vtk, error_arr, "error indicator")
             pvd[i] = vtk
         end
 
