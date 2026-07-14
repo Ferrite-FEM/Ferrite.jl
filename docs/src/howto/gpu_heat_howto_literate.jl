@@ -198,7 +198,9 @@ cv_gpu = Ferrite.distribute_to_tasks(backend, cv, n_workers)
 cc_gpu = Ferrite.distribute_to_tasks(backend, CellCache(dh_gpu), n_workers)
 # Technically we can also just get one Ke or fe per worker, but for demonstration
 # purposes we allocate the full block here for element-assembly style matrix-free GPU
-# usage.
+# usage. Since GPU thread groups favor coalesced memory access we allocate the buffers such
+# that we can access the data using row-major indexing. See, e.g. [this blog](https://developer.nvidia.com/blog/unlock-gpu-performance-global-memory-access-in-cuda/)
+# as starting point for further information.
 Kes = KA.zeros(backend, Float32, getncells(grid), getnbasefunctions(cv), getnbasefunctions(cv))
 fes = KA.zeros(backend, Float32, getncells(grid), getnbasefunctions(cv))
 
