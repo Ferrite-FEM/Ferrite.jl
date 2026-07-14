@@ -247,8 +247,8 @@ function write_cell_data(vtk::VTKGridFile, celldata::AbstractVector{T}, name) wh
 end
 function write_cell_data(vtk::VTKGridFile, celldata::AbstractVector{<:SymmetricTensor{O, D, T, M}}, name) where {O, D, T, M}
     noutputs = M
-    npoints  = length(celldata)
-    out      = zeros(T, noutputs, npoints)
+    npoints = length(celldata)
+    out = zeros(T, noutputs, npoints)
     for i in 1:npoints
         toparaview!(@view(out[:, i]), celldata[i])
     end
