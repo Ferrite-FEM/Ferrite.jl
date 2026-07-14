@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Next] - xxxx-xx-xx
 
+
+## [v1.5.0] - 2026-07-13
+
 ### Fixes
  - Make default `edgedof_indices` and `facedof_indices` implementation work for externally defined interpolations ([#1365])
 
