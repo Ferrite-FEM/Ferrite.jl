@@ -241,9 +241,22 @@ end
 
 Write the `celldata` that is ordered by the cells in the grid to the vtk file.
 """
-function write_cell_data(vtk::VTKGridFile, celldata, name)
+function write_cell_data(vtk::VTKGridFile, celldata::AbstractVector{T}, name) where {T <: Union{Real, Tensor}}
     WriteVTK.vtk_cell_data(vtk.vtk, celldata, name)
     return vtk
+end
+function write_cell_data(vtk::VTKGridFile, celldata::AbstractVector{<:SymmetricTensor{O, D, T, M}}, name) where {O, D, T, M}
+    noutputs = M
+    npoints  = length(celldata)
+    out      = zeros(T, noutputs, npoints)
+    for i in 1:npoints
+        toparaview!(@view(out[:, i]), celldata[i])
+    end
+    WriteVTK.vtk_cell_data(vtk.vtk, out, name)
+    return vtk
+end
+function write_cell_data(vtk::VTKGridFile, celldata::AbstractVector{T}, name) where {T}
+    error("Export of $T is not supported.")
 end
 
 """
