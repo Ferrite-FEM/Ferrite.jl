@@ -854,12 +854,16 @@ end
 p4est_opposite_face_index(f) = ((f - 1) ⊻ 0b1) + 1
 p4est_opposite_edge_index(e) = ((e - 1) ⊻ 0b11) + 1
 
-# O(log) lookup in a tree's sorted boundary node table `bnd` (`(packed coord, provisional id)`
-# pairs, see `_merge_intertree_nodes!`): the provisional id of the node at integer octree coord
-# `coord`, or `0` if `coord` is out of the tree's `[0, 2^b]` range or is not a node of that
-# tree. Both happen routinely during the cross-tree merge: the `transform_facet`/`transform_edge`
-# images can land outside the neighbour's domain, and a hanging node exists as a leaf vertex on
-# the refined side of an interface only.
+"""
+    _bnd_lookup(bnd, coord::NTuple{dim, <:Integer}, b) -> Int
+
+O(log) lookup in a tree's sorted boundary node table `bnd` (`(packed coord, provisional id)`
+pairs, see [`_merge_intertree_nodes!`](@ref)): the provisional id of the node at integer
+octree coord `coord`, or `0` if `coord` is out of the tree's `[0, 2^b]` range or is not a
+node of that tree. Both happen routinely during the cross-tree merge: the
+[`transform_facet`](@ref)/[`transform_edge`](@ref) images can land outside the neighbour's
+domain, and a hanging node exists as a leaf vertex on the refined side of an interface only.
+"""
 @inline function _bnd_lookup(bnd::Vector{Tuple{UInt64, Int}}, coord::NTuple{dim, <:Integer}, b::Integer) where {dim}
     hilim = 1 << b
     for d in 1:dim
@@ -1585,7 +1589,7 @@ end
 
 Integer centroid of a set of octree coordinates (the corners of a face or edge): the elementwise
 sum divided by the number of points. For a coarse face bordering a refined neighbour this is
-exactly the hanging node — the face centre (4 corners) or edge midpoint (2 corners) — in the same
+exactly the hanging node — the face center (4 corners) or edge midpoint (2 corners) — in the same
 integer/topological frame (no physical coordinates).
 """
 function center(pivot_face)
@@ -2432,27 +2436,6 @@ const node_map₃_inv = [
     7,
 ]
 
-############################################################################################
-# Point-centric forest iterator (IBWG2015 Alg 5.2/5.3) + `creategrid` materializer.
-# Moved here from the former `iterators.jl`. Provides `iterate_points` (and the inter-tree
-# face descent `_iter_interface!`) used for hanging-node detection and available for
-# face-based postprocessing such as error estimators.
-############################################################################################
-# =============================================================================
-# Literal point-centric node iterator — IBWG2015 Algorithm 5.2 (Iterate_interior)
-# and 5.3 (Iterate) — and a materializer (`creategrid`) built on top of it.
-#
-# This is the *general* engine described in §5.2: one recursion keyed on a point `c`,
-# carrying the support-leaf arrays `S` as state, descending over the child partition
-# `part(c)` (eq 2.7), and firing a callback dispatched by `dim(c)` (volume / face /
-# edge / corner) for arbitrary per-dimension callbacks (the `Lnodes` numbering of
-# `creategrid` below, and in the future higher-order Lnodes, face/edge functionals, …).
-# See the "point iterator" section of `docs/src/devdocs/AMR.md`.
-#
-# Everything is integer/topological (no physical coordinates): a *point* `c = (o, b)`
-# (§2.1) is the axis-aligned integer box `IteratePoint`.
-# =============================================================================
-
 """
     IteratePoint{dim}
 
@@ -2479,11 +2462,16 @@ point_dim(c::IteratePoint) = count(c.axes)
 # The volume point (o, v0) of an octant (Remark 2.2: an octant is the point (o, v0)).
 iteratepoint(o::OctantBWG{dim}) where {dim} = IteratePoint{dim}(map(Int, o.xyz), Int(o.l), ntuple(_ -> true, dim))
 
-# Geometric realization of the child-boundary-intersection set `B_∩^j` (eq 4.5 /
-# `boundaryset`, line 14 of Alg 5.2): does child octant `ch` (level c.level+1) touch the
-# point `c` (a feature of its parent at c.level)? True iff, along every axis where `c` is
-# degenerate, `ch` lies on `c`'s side (its box straddles that coordinate). Picks exactly
-# the parent's children adjacent to `c` — the ones in `leaf_supp(c)` under the 2:1 balance.
+"""
+    _child_touches_point(ch::OctantBWG, c::IteratePoint, b) -> Bool
+
+Does the point `c` lie in the *closure* of child octant `ch`? The geometric realization of
+the child-boundary-intersection set `B_∩^j` (eq 4.5 / `boundaryset`, line 14 of Alg 5.2 of
+[IBWG2015](@citet)): `ch` is at level `c.level + 1`, `c` a feature of its parent at
+`c.level`, and the test is true iff, along every axis where `c` is degenerate, `ch` lies on
+`c`'s side (its box straddles that coordinate). Picks exactly the parent's children
+adjacent to `c` — the ones in `leaf_supp(c)` under the 2:1 balance.
+"""
 function _child_touches_point(ch::OctantBWG{dim}, c::IteratePoint{dim}, b::Integer) where {dim}
     hc = _compute_size(b, ch.l)
     for d in 1:dim
@@ -2495,13 +2483,21 @@ function _child_touches_point(ch::OctantBWG{dim}, c::IteratePoint{dim}, b::Integ
     return true
 end
 
-# Call `f(e, combo)` for each point `e ∈ part(c)` (eq 2.7): the `3^dim(c)` points one level
-# finer whose (open) domain lies strictly inside dom(c). Along each axis `c` extends, a
-# child-partition point takes one of three slots — lower half `[x,x+h/2]`, the
-# strictly-interior mid plane `{x+h/2}` (degenerate), or upper half `[x+h/2,x+h]`;
-# degenerate axes of `c` stay fixed. No allocation of the point set (callback form).
-# `combo` is the base-3 encoding of the slots (one digit per extending axis, ascending),
-# the key into the precomputed part-support tables (`_part_mask`).
+"""
+    _foreach_partc(f, c::IteratePoint, b)
+
+Call `f(e, combo)` for each point `e ∈ part(c)` — the *partition* of `c` (eq 2.7 of
+[IBWG2015](@citet)): the `3^dim(c)` points one level finer whose (open) domain lies
+strictly inside `dom(c)`, i.e. what splitting the point once decomposes its interior into.
+Along each axis `c` extends, a sub-point takes one of three slots — lower half
+`[x, x+h/2]`, the strictly-interior mid plane `{x+h/2}` (degenerate), or upper half
+`[x+h/2, x+h]`; degenerate axes of `c` stay fixed. Boundary features of `c`'s box are
+*not* part of `part(c)` — they were produced when `c`'s own parent point was split, which
+is what makes the recursive descent visit every mesh entity exactly once. No allocation of
+the point set (callback form). `combo` is the base-3 encoding of the slots (one digit per
+extending axis, ascending), the key into the precomputed part-support tables
+(`_part_mask`).
+"""
 function _foreach_partc(f::F, c::IteratePoint{dim}, b::Integer) where {F, dim}
     h = _compute_size(b, c.level); hh = h ÷ 2
     nd = point_dim(c)
@@ -2584,9 +2580,16 @@ end
     return σ
 end
 
-# Call `f(c)` for each point in the closure of the tree root (Alg 5.3 line 4, single
-# tree): the root volume and all its boundary faces/edges/corners. Along each axis the
-# feature is pinned to the low face (coord 0), spans the full root, or the high face.
+"""
+    _foreach_root_closure(f, ::Val{dim}, b)
+
+Call `f(c)` for each point in the *closure* of the tree root (Alg 5.3 line 4 of
+[IBWG2015](@citet), single tree): the root volume and all its boundary faces/edges/corners
+— the `3^dim` seeds of the recursive descent. The root's boundary features have no parent
+split to produce them (unlike interior features, which arise as `part` of an ancestor), so
+they get their own descent seeds here. Along each axis the feature is pinned to the low
+face (coord 0), spans the full root, or is pinned to the high face.
+"""
 function _foreach_root_closure(f::F, ::Val{dim}, b::Integer) where {F, dim}
     h = _compute_size(b, 0)
     for combo in 0:(3^dim - 1)
@@ -2604,19 +2607,6 @@ function _foreach_root_closure(f::F, ::Val{dim}, b::Integer) where {F, dim}
     return
 end
 
-# Descend the subtree of support octant `s` (leaves[lo:hi]) to the leaf whose closure
-# contains the 0-point `c` — the realization of the `atom supp(c)` search (Alg 5.2 line
-# 18 / Prop 2.8). Returns `(leaf, index)`, the leaf octant and its index in `leaves` —
-# the paper's element index `j` (§6.4: "Iterate provides the index"), which the numbering
-# callback needs to scatter node ids into the element-node matrix without re-locating the
-# leaf.
-#
-# `c` is a *corner* of `s` (a support of a 0-point contains it as a corner), and the child
-# at a box corner has that corner at the same z-order slot — so the descent path is the
-# fixed `ci`-most path. The extreme slots resolve in O(1): the Morton-first leaf of a
-# subtree is the one anchored at its low corner, the Morton-last the one touching its high
-# corner. Interior slots construct the `ci` child directly (no children/closure scan) and
-# narrow the range with `split_bounds`.
 # The child of `o` at z-order corner slot `ci` (anchor offset by the child size along the
 # slot's high axes). A top-level helper so callers' loop variables are not captured by the
 # `ntuple` closure (a reassigned capture boxes).
@@ -2625,6 +2615,23 @@ end
     return OctantBWG{dim, N, T}(o.l + one(T), ntuple(d -> o.xyz[d] + (((ci - 1) >> (d - 1)) & 1) * hh, dim))
 end
 
+"""
+    _descend_to_corner(c::IteratePoint, s::OctantBWG, lo, hi, leaves, b) -> (leaf, index)
+
+Descend the subtree of support octant `s` (`leaves[lo:hi]`) to the leaf whose closure
+contains the 0-point `c` — the realization of the `atom supp(c)` search (Alg 5.2 line 18 /
+Prop 2.8 of [IBWG2015](@citet)). Returns `(leaf, index)`, the leaf octant and its index in
+`leaves` — the paper's element index `j` (§6.4: "`Iterate` provides the index"), which the
+numbering callback needs to scatter node ids into the element-node matrix without
+re-locating the leaf.
+
+`c` is a *corner* of `s` (a support of a 0-point contains it as a corner), and the child at
+a box corner has that corner at the same z-order slot — so the descent path is the fixed
+`ci`-most path. The extreme slots resolve in O(1): the Morton-first leaf of a subtree is
+the one anchored at its low corner, the Morton-last the one touching its high corner.
+Interior slots construct the `ci` child directly (no children/closure scan) and narrow the
+range with [`split_bounds`](@ref).
+"""
 function _descend_to_corner(c::IteratePoint{dim}, s::OctantBWG{dim, N, T}, lo::Int, hi::Int, leaves, b::Integer) where {dim, N, T}
     ci = _corner_slot(s, c.anchor)
     ci == 1 && return (leaves[lo], lo)
@@ -2638,12 +2645,21 @@ function _descend_to_corner(c::IteratePoint{dim}, s::OctantBWG{dim, N, T}, lo::I
     return (o, lo)
 end
 
-# Preallocated scratch for the allocation-free descent (IBWG2015 §5.4: the recursion is
-# `O(lmax)` deep, so all the per-node state — the support arrays `supp`/`S`, the
-# `Split_array` results `child_octants`/`splits`, and the `leaf_supp` buffer `L` — is preallocated
-# once per traversal and reused). Buffers are indexed by recursion depth: in a DFS only one
-# root-to-node path is live, so depth `d`'s buffers are free to refill for the next sibling
-# once depth `d`'s subtree returns. `M = N + 1` is the `split_bounds` tuple length.
+"""
+    IterScratch{N, M, OT}
+    IterScratch(tree::OctreeBWG)
+
+Preallocated working memory of the recursive descent — the `sc` argument of
+[`iterate_points`](@ref). Carries no meaning of its own: it exists so the traversal
+allocates nothing ([IBWG2015](@citet) §5.4: the recursion is `O(lmax)` deep, so all the
+per-node state — the support arrays `supp`/`S`, the `Split_array` results
+`child_octants`/`splits`, and the `leaf_supp` buffers `L`/`Lidx` — is preallocated once
+and reused). Buffers are indexed by recursion depth: in a DFS only one root-to-node path
+is live, so depth `d`'s buffers are free to refill for the next sibling once depth `d`'s
+subtree returns. `M = N + 1` is the `split_bounds` tuple length. The buffer sizes depend
+only on the maximum level `b`, so one scratch can be reused across every tree of a forest
+(`creategrid` does exactly that).
+"""
 struct IterScratch{N, M, OT}
     supp::Vector{Vector{OT}}                  # [depth] -> support octants of the point at this depth
     S::Vector{Vector{NTuple{2, Int}}}         # [depth] -> leaf index ranges, one per support octant
@@ -2892,40 +2908,6 @@ function iterate_points(visit::F, forest::ForestBWG{dim}; mindim::Int = 0, maxdi
     return
 end
 
-# =============================================================================
-# `creategrid` — the Lnodes materializer, IBWG2015 §6 built on the literal engine
-# above: node numbering by iterator callbacks through the element-node matrix `E`,
-# with no coordinate→id map of any kind (the paper's Alg 6.2 + serial Alg 6.1).
-#
-#   1. Per tree, ONE `iterate_points` traversal (`mindim = 0`) visits every non-hanging
-#      volume/face/edge/corner point exactly once with its leaf support and leaf indices.
-#      The *corner* callback creates the node at `c` — a running provisional id — and
-#      scatters it into `E[slot, element]` of every supporting leaf: the paper's
-#      "complete the entries in `Ep` that refer to `g`" (§6.4 step 4). The *face* (and 3D
-#      *edge*) callbacks detect non-conformity from the level mismatch in the support
-#      (coarse leaf + finer children, Fig 5), number the hanging vertex the same way,
-#      scatter it into the fine leaves — hanging vertices are genuine fine-leaf corners —
-#      and record the constraint as `(element, slot)` references into `E`, resolved after
-#      the traversal (a master corner may not be numbered yet when the face is visited).
-#   2. Cross-tree: a shared tree-boundary point is visited once per incident tree, so
-#      per-tree provisional ids coexist for one geometric node; `_merge_intertree_nodes!`
-#      aliases them onto one owner via the macro topology + orientation transforms, with
-#      lookups served by small per-tree sorted *boundary node tables* (`O(surface)`,
-#      filled during numbering). Inter-tree hanging constraints come from the two-sided
-#      interface descent `_iterate_interface_hanging!`, reading ids straight off `E`.
-#   3. `_global_numbering` — the serial Alg 6.1: one linear sweep over `E` in (element,
-#      element-node) order assigns final dense ids by first encounter. Combined with the
-#      ownership rule `owner(c) = min leaf supp(c)` (eq 6.2) this is the paper's
-#      partition-independent numbering, and it coincides with the id order the former
-#      hash-map materializer produced — the output grid is unchanged.
-#
-# No global data structure remains: `E` (per-element), the boundary tables (per-tree
-# surface) and the alias array carry all identity — the same data layout p4est's
-# distributed `p4est_lnodes` uses, where each process numbers the nodes it owns and only
-# interface node ids are reconciled. Everything is integer/topological; physical
-# coordinates are interpolated once per provisional node at creation (`_interp_treepoint`).
-# =============================================================================
-
 # An `(element, z-order corner slot)` reference into the element-node matrix `E`. Hanging
 # constraints are recorded as E-references and resolved after the numbering traversal.
 const ERef = Tuple{Int, Int}
@@ -3007,7 +2989,7 @@ The `kL` side of an interface octant pair is a leaf while the `kR` side `octR` (
 `lvs[lo:hi]`, element offset `off`) is refined: the interior points of the shared face hang.
 Every one of them is a vertex of `octR`'s face children — leaves under the 2:1 balance, already
 numbered by tree `kR`'s own traversal — so the constrained ids are read straight off `E` and the
-constraints recorded exactly like the intra-tree emitters: the face midpoint (2D) / face centre
+constraints recorded exactly like the intra-tree emitters: the face midpoint (2D) / face center
 (3D) constrained by the face corners, and in 3D each face-edge midpoint constrained by its edge's
 endpoints, masters in ascending coordinate order. (On a >1 level jump the ids are read from the
 corner leaves via `_subtree_corner_ref`'s descent.)
@@ -3030,7 +3012,7 @@ function _emit_interface_face!(cons2, cons4, E::Matrix{Int}, off::Int, lvs, lo::
             li, sl = _subtree_corner_ref(lvs, kb, ch, j[i], cc[i], b)
             (off + li, sl)
         end
-        # face centre, masters = the 4 corners in lexicographic coordinate order (c1, c3, c2, c4)
+        # face center, masters = the 4 corners in lexicographic coordinate order (c1, c3, c2, c4)
         m = (cc[1] .+ cc[4]) .÷ 2
         lm, sm = _subtree_corner_ref(lvs, kb, ch, j[1], m, b)
         push!(cons4, (E[sm, off + lm], r[1], r[3], r[2], r[4]))
@@ -3106,7 +3088,7 @@ struct LnodesVisitor{dim, N, T <: Integer}
     nodecoords_prov::Vector{Vec{dim, Float64}}         # physical coordinate per provisional id
     bnd::Vector{Tuple{UInt64, Int}}                    # this tree's boundary node table (sorted later)
     cons2::Vector{Tuple{Int, ERef, ERef}}              # hanging midpoints: (id, 2 master refs)
-    cons4::Vector{Tuple{Int, ERef, ERef, ERef, ERef}}  # 3D hanging face centres: (id, 4 master refs)
+    cons4::Vector{Tuple{Int, ERef, ERef, ERef, ERef}}  # 3D hanging face centers: (id, 4 master refs)
     treecorners::NTuple{N, Vec{dim, Float64}}          # tree geometry for _interp_treepoint
     b::T                                               # tree's max refinement level
     hilim::Int                                         # 2^b, the root extent
@@ -3160,9 +3142,17 @@ function _visit_corner!(v::LnodesVisitor{dim}, c::IteratePoint{dim}, ls::LeafSup
     return
 end
 
-# Non-conformity test of a stopped face/edge point (IBWG2015 Fig 5): a leaf support at
-# `level(c)` (the coarse side) coexisting with finer children. Returns the index of the first
-# coarse leaf in `ls` (its corners are the constraint masters) and whether finer leaves exist.
+"""
+    _mixed_support(c::IteratePoint, ls::LeafSupport) -> (coarse, fine)
+
+Non-conformity test of a finalized face/edge point ([IBWG2015](@citet) Fig 5): a leaf
+support at `level(c)` (the coarse side) coexisting with finer children. Returns the index
+of the first coarse leaf in `ls` (its corners are the constraint masters) and whether finer
+leaves exist — the interface hangs iff finer leaves coexist with the coarse one. A
+finalized face/edge always has at least one support that is itself a leaf at `level(c)`
+(that is what stopped the recursion in `_iterate_interior!`), so with all supports
+equal-level leaves the interface is conforming and there is nothing to do.
+"""
 @inline function _mixed_support(c::IteratePoint, ls::LeafSupport)
     lvl = c.level
     coarse = 0
@@ -3218,7 +3208,7 @@ end
 Face callback (`dim(c) == dim-1`). Conforming faces need no work. On a non-conforming face —
 a coarse leaf on one side, its refined neighbour's children on the other — the face's interior
 vertices hang: in 2D the face midpoint (constrained by the 2 endpoints), in 3D the face
-*centre* (constrained by the 4 face corners). The 3D face's edge midpoints are **not** emitted
+*center* (constrained by the 4 face corners). The 3D face's edge midpoints are **not** emitted
 here: each hanging edge is its own iterator point, visited exactly once even when shared by
 several non-conforming faces, and handled by [`_visit_edge3d!`](@ref).
 """
@@ -3264,7 +3254,7 @@ end
 
 Edge callback (3D, `dim(c) == 1`): the midpoint of a non-conforming coarse edge hangs,
 constrained by the edge's endpoints. On a 2:1-balanced forest every hanging vertex is either
-such an edge midpoint or a face centre ([`_visit_face!`](@ref)) — level jumps are capped at
+such an edge midpoint or a face center ([`_visit_face!`](@ref)) — level jumps are capped at
 one, so no ¼-points exist — and each is created by exactly one callback: the edge midpoint
 belongs to exactly one coarse edge (two distinct octant edges cannot share their midpoints),
 even when that edge borders several non-conforming faces.

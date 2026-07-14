@@ -29,7 +29,7 @@ function _add_conformity_constraint(ch::ConstraintHandler, field_index::Int, int
     vertices = (ch.dh.entitymaps::Ferrite.EntityMaps).vertices[field_index]
     for (hdof, mdof) in ch.dh.grid.conformity_info
         # A hanging node is the average of its masters: an edge midpoint of its 2 endpoints
-        # (weight 1/2), a 3D face centre of its 4 face corners (weight 1/4).
+        # (weight 1/2), a 3D face center of its 4 face corners (weight 1/4).
         @debug @assert length(mdof) ∈ (2, 4)
         weight = 1 / length(mdof)
         lc = AffineConstraint(vertices[hdof], [vertices[m] => weight for m in mdof], 0.0)
