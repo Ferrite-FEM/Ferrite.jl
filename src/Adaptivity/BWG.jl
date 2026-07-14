@@ -2479,37 +2479,6 @@ point_dim(c::IteratePoint) = count(c.axes)
 # The volume point (o, v0) of an octant (Remark 2.2: an octant is the point (o, v0)).
 iteratepoint(o::OctantBWG{dim}) where {dim} = IteratePoint{dim}(map(Int, o.xyz), Int(o.l), ntuple(_ -> true, dim))
 
-# Integer corner coordinates of a point's box: 2^point_dim(c) of them.
-function _pt_corners(c::IteratePoint{dim}, b::Integer) where {dim}
-    h = _compute_size(b, c.level)
-    extdims = ntuple(d -> c.axes[d], dim)
-    nd = point_dim(c)
-    out = NTuple{dim, Int}[]
-    for m in 0:(2^nd - 1)
-        coord = c.anchor; e = 0
-        for d in 1:dim
-            extdims[d] || continue
-            ((m >> e) & 1) == 1 && (coord = Base.setindex(coord, coord[d] + h, d))
-            e += 1
-        end
-        push!(out, coord)
-    end
-    return out
-end
-
-# Is the point-box of `c` contained in the closure of octant `o`'s box? Used to test
-# octant ∈ supp(point) (an octant at level(c) whose closure includes c, eq 2.11) and to
-# pick the descent child toward a corner (atom_supp, Prop 2.8).
-function _pt_in_oct_closure(c::IteratePoint{dim}, o::OctantBWG{dim}, b::Integer) where {dim}
-    h = _compute_size(b, c.level); ho = _compute_size(b, o.l)
-    for d in 1:dim
-        clo = c.anchor[d]; chi = c.anchor[d] + (c.axes[d] ? h : 0)
-        olo = Int(o.xyz[d]); ohi = olo + ho
-        (olo <= clo && chi <= ohi) || return false
-    end
-    return true
-end
-
 # Geometric realization of the child-boundary-intersection set `B_∩^j` (eq 4.5 /
 # `boundaryset`, line 14 of Alg 5.2): does child octant `ch` (level c.level+1) touch the
 # point `c` (a feature of its parent at c.level)? True iff, along every axis where `c` is
@@ -2561,8 +2530,8 @@ end
 # along the degenerate axes (`σ`, bit set = support anchored below `c`), and (c) the part
 # slot `combo` — not on levels or coordinates. Per axis, a child's bit must be: `0`/`1` for
 # a lower/upper-half slot, either for a mid slot (extending axes); opposite the support's
-# side (degenerate axes: the children touching the pinned plane). These tables replace the
-# per-child `_pt_in_oct_closure` scan in the recursion of `_iterate_interior!` with one
+# side (degenerate axes: the children touching the pinned plane). These tables give the
+# recursion of `_iterate_interior!` the support children of each part point with one
 # mask lookup — the realization of the boundary-set intersections `B_∩` of IBWG2015 §4
 # as compile-time data.
 function _build_part_table(dim::Int)
