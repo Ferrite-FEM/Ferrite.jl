@@ -26,7 +26,7 @@ and can construct each octant/quadrant solely by the `mortonidx` and a given lev
 
 The current implementation of an octant looks currently like this:
 ```julia
-struct OctantBWG{dim, N, T} <: AbstractCell{RefHypercube{dim}}
+struct OctantBWG{dim, N, T <: Integer} <: AbstractCell{RefHypercube{dim}}
     #Refinement level
     l::T
     #x,y,z \in {0,...,2^b} where (0 ≤ l ≤ b)}
@@ -42,7 +42,7 @@ The size of an octant at the lowest possible level `b` is always 1, sometimes th
 
 The octree is implemented as:
 ```julia
-struct OctreeBWG{dim, N, T} <: AbstractAdaptiveCell{RefHypercube{dim}}
+struct OctreeBWG{dim, N, T <: Integer} <: AbstractAdaptiveCell{RefHypercube{dim}}
     leaves::Vector{OctantBWG{dim, N, T}}
     #maximum refinement level
     b::T

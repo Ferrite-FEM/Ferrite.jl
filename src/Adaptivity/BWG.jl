@@ -16,7 +16,7 @@ function set_maxlevel(dim::Integer, maxlevel::Integer)
     return _maxlevel[dim - 1] = maxlevel
 end
 
-struct OctantBWG{dim, N, T} <: Ferrite.AbstractCell{Ferrite.RefHypercube{dim}}
+struct OctantBWG{dim, N, T <: Integer} <: Ferrite.AbstractCell{Ferrite.RefHypercube{dim}}
     #Refinement level
     l::T
     #x,y,z \in {0,...,2^b} where (0 ≤ l ≤ b)}
@@ -334,7 +334,7 @@ function isrelevant(xyz::NTuple{dim, T}, leafsuppₚ::Set{<:OctantBWG}) where {d
     return true
 end
 
-struct OctreeBWG{dim, N, T} <: AbstractAdaptiveCell{Ferrite.RefHypercube{dim}}
+struct OctreeBWG{dim, N, T <: Integer} <: AbstractAdaptiveCell{Ferrite.RefHypercube{dim}}
     leaves::Vector{OctantBWG{dim, N, T}}
     #maximum refinement level
     b::T
