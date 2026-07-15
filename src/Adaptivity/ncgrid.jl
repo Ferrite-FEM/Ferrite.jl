@@ -34,31 +34,18 @@ end
 
 Conformity information of a [`NonConformingGrid`](@ref): the purely topological
 hanging-interface records ([`HangingFacet`](@ref)/[`HangingEdge`](@ref)) from which the
-constraint builder derives the hanging-dof constraints for any interpolation, plus —
-transitional, until all consumers are ported — the legacy node-level map
-`hanging_nodes::Dict` from hanging vertex node id to its master node ids.
+constraint builder derives the hanging-dof constraints for any interpolation.
 
 `complete` is `false` when the forest had level jumps > 1 across a tree interface
-(unbalanced forest): such interfaces are not representable as records (the legacy
-node-level constraints tolerate them by constraining only the top-level midpoints), and
-the generic constraint builder refuses incomplete records instead of silently missing
-constraints.
-
-The container forwards `length`/`getindex`/`iterate`/`haskey`/`keys` to `hanging_nodes`
-so legacy consumers of the plain dict keep working during the migration.
+(unbalanced forest): such interfaces are not representable as records, and the constraint
+builder refuses incomplete records instead of silently missing constraints. Call
+`balanceforest!` before `creategrid` to guarantee complete records.
 """
 struct ConformityInfo
     hanging_facets::Vector{HangingFacet}
     hanging_edges::Vector{HangingEdge}
-    hanging_nodes::Dict{Int, Vector{Int}}
     complete::Bool
 end
-
-Base.length(ci::ConformityInfo) = length(ci.hanging_nodes)
-Base.getindex(ci::ConformityInfo, i::Int) = ci.hanging_nodes[i]
-Base.iterate(ci::ConformityInfo, state...) = iterate(ci.hanging_nodes, state...)
-Base.haskey(ci::ConformityInfo, i) = haskey(ci.hanging_nodes, i)
-Base.keys(ci::ConformityInfo) = keys(ci.hanging_nodes)
 
 """
     NonConformingGrid{dim, C<:AbstractCell, T<:Real, CIT} <: AbstractGrid}

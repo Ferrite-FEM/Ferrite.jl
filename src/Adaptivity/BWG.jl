@@ -2908,44 +2908,37 @@ function iterate_points(visit::F, forest::ForestBWG{dim}; mindim::Int = 0, maxdi
     return
 end
 
-# An `(element, z-order corner slot)` reference into the element-node matrix `E`. Hanging
-# constraints are recorded as E-references and resolved after the numbering traversal.
-const ERef = Tuple{Int, Int}
-
-# Cross-tree hanging via a two-sided face descent — the iterator's recursive split-descent
-# (the same primitive `iterate_points` uses for intra-tree faces) carried across a shared
 """
     _iter_interface!(
-        cons2, cons4, E, offR, forest, kL, lvsL, octL, loL, hiL, fL,
+        hfacets, incomplete, offL, offR, forest, kL, lvsL, octL, loL, hiL, fL,
         kR, lvsR, octR, loR, hiR, fR, bL, bR
     )
 
-Synchronized two-sided descent of a shared *tree* face, emitting inter-tree hanging-node
-constraints. `octL ∈ tree kL` (leaves `lvsL[loL:hiL]`, native frame) and `octR ∈ tree kR` are
-images of each other across the shared face — `fL`/`fR` are the local face indices toward it —
-and descend in lock-step at equal levels.
+Synchronized two-sided descent of a shared *tree* face, emitting inter-tree
+[`HangingFacet`](@ref) records. `octL ∈ tree kL` (leaves `lvsL[loL:hiL]`, native frame) and
+`octR ∈ tree kR` are images of each other across the shared face — `fL`/`fR` are the local
+face indices toward it — and descend in lock-step at equal levels.
 
 - both sides leaves of equal size → conforming, nothing emitted;
-- one side a leaf, the other refined → the leaf is the **coarse** side and the hanging nodes lie
-  on the refined side's face in the *fine* tree's frame (genuine fine-leaf vertices), emitted via
-  [`_emit_interface_face!`](@ref) as `(element, slot)` references into `E` (`offR` is tree `kR`'s
-  element offset). Only the `kL`-coarse case emits here; the `kR`-coarse case is emitted when the
-  descent is run from `(kR, fR)`, so each interface is handled once per direction;
+- one side a leaf, the other refined → the leaf is the **coarse** side and the hanging
+  sub-facets are the refined side's face children, emitted via
+  [`_emit_interface_face!`](@ref) (`offL`/`offR` are the trees' element offsets). Only the
+  `kL`-coarse case emits here; the `kR`-coarse case is emitted when the descent is run from
+  `(kR, fR)`, so each interface is handled once per direction;
 - both refined → recurse, matching child `i` on the `kL` side to its image on the `kR` side via
   [`transform_facet`](@ref) (the validated cross-tree orientation pattern — no new logic).
 
-The integer/topological analogue, across trees, of the intra-tree face/edge callbacks of the
-numbering traversal (see [`creategrid`](@ref)).
+The topological analogue, across trees, of the intra-tree [`_record_hanging_facet!`](@ref).
 """
 function _iter_interface!(
-        cons2, cons4, hfacets, incomplete::Base.RefValue{Bool}, E::Matrix{Int}, offL::Int, offR::Int, forest::ForestBWG, kL::Int, lvsL, octL::OctantBWG{dim, N}, loL::Int, hiL::Int, fL::Int,
+        hfacets, incomplete::Base.RefValue{Bool}, offL::Int, offR::Int, forest::ForestBWG, kL::Int, lvsL, octL::OctantBWG{dim, N}, loL::Int, hiL::Int, fL::Int,
         kR::Int, lvsR, octR::OctantBWG{dim, N}, loR::Int, hiR::Int, fR::Int, bL::Integer, bR::Integer
     ) where {dim, N}
     lL = _isleaf(lvsL, loL, hiL, octL)
     lR = _isleaf(lvsR, loR, hiR, octR)
     lL && lR && return                                           # same-size leaves both sides -> conforming
     if lL && !lR                                                 # kL coarse, kR refined -> hanging (fine = kR)
-        _emit_interface_face!(cons2, cons4, hfacets, incomplete, E, offL + loL, fL, offR, lvsR, loR, hiR, octR, fR, bR)
+        _emit_interface_face!(hfacets, incomplete, offL + loL, fL, offR, lvsR, loR, hiR, octR, fR, bR)
         return
     elseif !lL && lR                                             # kL refined, kR coarse -> caught from (kR,fR)
         return
@@ -2958,7 +2951,7 @@ function _iter_interface!(
         for j in 1:N
             cR[j] == nbR || continue
             _iter_interface!(
-                cons2, cons4, hfacets, incomplete, E, offL, offR, forest, kL, lvsL, cL[i], kb[i], kb[i + 1] - 1, fL,
+                hfacets, incomplete, offL, offR, forest, kL, lvsL, cL[i], kb[i], kb[i + 1] - 1, fL,
                 kR, lvsR, cR[j], kbR[j], kbR[j + 1] - 1, fR, bL, bR
             )
             break
@@ -2967,42 +2960,20 @@ function _iter_interface!(
     return
 end
 
-# `(leaf index, slot)` reference of the vertex at coord `x` within child `j`'s subtree
-# (`kb`/`ch` from the parent's `split_bounds`/`children`): the child itself when it is a leaf
-# — the only case on a 2:1-balanced forest — else the descent to the child's `x`-corner leaf.
-# The descent covers interfaces with a >1 level jump, which the materializer tolerates
-# (matching its legacy behaviour) by constraining only the top-level face-interior points.
-function _subtree_corner_ref(lvs, kb::NTuple, ch::NTuple, j::Int, x::NTuple{dim, Int}, b) where {dim}
-    lo = kb[j]; hi = kb[j + 1] - 1
-    o = ch[j]
-    if lo == hi && lvs[lo] == o
-        return (lo, _corner_slot(o, x))
-    end
-    leaf, li = _descend_to_corner(IteratePoint{dim}(x, Int(o.l), ntuple(_ -> false, dim)), o, lo, hi, lvs, b)
-    return (li, _corner_slot(leaf, x))
-end
-
 """
-    _emit_interface_face!(cons2, cons4, E, off, lvs, lo, hi, octR, fR, b)
+    _emit_interface_face!(hfacets, incomplete, cgidL, fL, off, lvs, lo, hi, octR, fR, b)
 
-The `kL` side of an interface octant pair is a leaf while the `kR` side `octR` (leaves
-`lvs[lo:hi]`, element offset `off`) is refined: the interior points of the shared face hang.
-Every one of them is a vertex of `octR`'s face children — leaves under the 2:1 balance, already
-numbered by tree `kR`'s own traversal — so the constrained ids are read straight off `E` and the
-constraints recorded exactly like the intra-tree emitters: the face midpoint (2D) / face center
-(3D) constrained by the face corners, and in 3D each face-edge midpoint constrained by its edge's
-endpoints, masters in ascending coordinate order. (On a >1 level jump the ids are read from the
-corner leaves via `_subtree_corner_ref`'s descent.)
+The `kL` side of an interface octant pair is a leaf (element `cgidL`, local face `fL`) while
+the `kR` side `octR` (leaves `lvs[lo:hi]`, element offset `off`) is refined: emit the
+[`HangingFacet`](@ref) record pairing the coarse facet with the refined side's face children,
+in Ferrite facet numbering. The face children must be leaves — exactly one level finer, the
+record contract. On a >1 level jump (unbalanced forest) the interface is not representable as
+a record: skip it and mark the records `incomplete`, which makes the constraint builder
+refuse the grid instead of silently missing constraints.
 """
-function _emit_interface_face!(cons2, cons4, hfacets, incomplete::Base.RefValue{Bool}, E::Matrix{Int}, cgidL::Int, fL::Int, off::Int, lvs, lo::Int, hi::Int, octR::OctantBWG{dim, N}, fR::Int, b) where {dim, N}
+function _emit_interface_face!(hfacets, incomplete::Base.RefValue{Bool}, cgidL::Int, fL::Int, off::Int, lvs, lo::Int, hi::Int, octR::OctantBWG{dim, N}, fR::Int, b) where {dim, N}
     kb = split_bounds(lvs, lo, hi, octR, b)
     ch = children(octR, b)
-    # Topological record: the coarse kL leaf's facet vs the fine face children of octR —
-    # exactly one level finer (the record contract). On a >1 level jump (unbalanced forest,
-    # tolerated by the legacy node-level constraints below via `_subtree_corner_ref`) the
-    # interface is not representable as a record: skip it and mark the records incomplete,
-    # which makes the generic constraint builder refuse the grid instead of silently
-    # missing constraints.
     perm = dim == 2 ? 𝒱₂_perm : 𝒱₃_perm
     fcorners = dim == 2 ? 𝒱₂ : 𝒱₃
     fine = Ferrite.FacetIndex[]
@@ -3012,49 +2983,23 @@ function _emit_interface_face!(cons2, cons4, hfacets, incomplete::Base.RefValue{
             push!(fine, Ferrite.FacetIndex(off + kb[cj], perm[fR]))
         else
             incomplete[] = true
-            break
+            return
         end
     end
-    length(fine) == size(fcorners, 2) && push!(hfacets, HangingFacet(Ferrite.FacetIndex(cgidL, perm[fL]), fine))
-    if dim == 2
-        j1 = 𝒱₂[fR, 1]; j2 = 𝒱₂[fR, 2]
-        c1 = map(Int, vertex(octR, j1, b)); c2 = map(Int, vertex(octR, j2, b))
-        m = (c1 .+ c2) .÷ 2
-        lm, sm = _subtree_corner_ref(lvs, kb, ch, j1, m, b)
-        r1 = _subtree_corner_ref(lvs, kb, ch, j1, c1, b)
-        r2 = _subtree_corner_ref(lvs, kb, ch, j2, c2, b)
-        push!(cons2, (E[sm, off + lm], (off + r1[1], r1[2]), (off + r2[1], r2[2])))
-    else
-        j = (𝒱₃[fR, 1], 𝒱₃[fR, 2], 𝒱₃[fR, 3], 𝒱₃[fR, 4])
-        cc = ntuple(i -> map(Int, vertex(octR, j[i], b)), Val(4))    # face corners, z-order
-        r = ntuple(Val(4)) do i
-            li, sl = _subtree_corner_ref(lvs, kb, ch, j[i], cc[i], b)
-            (off + li, sl)
-        end
-        # face center, masters = the 4 corners in lexicographic coordinate order (c1, c3, c2, c4)
-        m = (cc[1] .+ cc[4]) .÷ 2
-        lm, sm = _subtree_corner_ref(lvs, kb, ch, j[1], m, b)
-        push!(cons4, (E[sm, off + lm], r[1], r[3], r[2], r[4]))
-        # the 4 face-edge midpoints, each constrained by its (ascending) endpoint pair
-        for (i1, i2) in ((1, 2), (3, 4), (1, 3), (2, 4))
-            me = (cc[i1] .+ cc[i2]) .÷ 2
-            le, se = _subtree_corner_ref(lvs, kb, ch, j[i1], me, b)
-            push!(cons2, (E[se, off + le], r[i1], r[i2]))
-        end
-    end
+    push!(hfacets, HangingFacet(Ferrite.FacetIndex(cgidL, perm[fL]), fine))
     return
 end
 
 """
-    _iterate_interface_hanging!(cons2, cons4, E, offsets, forest::ForestBWG)
+    _iterate_interface_hanging!(hfacets, incomplete, offsets, forest::ForestBWG)
 
-Collect all *inter-tree* hanging-node constraints of `forest` into `cons2`/`cons4`. For each
+Collect all *inter-tree* [`HangingFacet`](@ref) records of `forest` into `hfacets`. For each
 shared tree face (found via the facet–facet neighbourhood), seed [`_iter_interface!`](@ref) with
 the two tree roots and let it descend both sides in lock-step. The forest-level counterpart of
-the intra-tree face/edge callbacks; together they capture every hanging node of the materialized
-grid. Single-tree forests have no shared faces, so this is a no-op there.
+the intra-tree face/edge callbacks; together they capture every hanging interface of the
+materialized grid. Single-tree forests have no shared faces, so this is a no-op there.
 """
-function _iterate_interface_hanging!(cons2, cons4, hfacets, incomplete::Base.RefValue{Bool}, E::Matrix{Int}, offsets::Vector{Int}, forest::ForestBWG{dim}) where {dim}
+function _iterate_interface_hanging!(hfacets, incomplete::Base.RefValue{Bool}, offsets::Vector{Int}, forest::ForestBWG{dim}) where {dim}
     perm = dim == 2 ? 𝒱₂_perm : 𝒱₃_perm
     perminv = dim == 2 ? 𝒱₂_perm_inv : 𝒱₃_perm_inv
     fn = Ferrite.get_facet_facet_neighborhood(forest)
@@ -3067,7 +3012,7 @@ function _iterate_interface_hanging!(cons2, cons4, hfacets, incomplete::Base.Ref
             k′ = nb[1][1]; f′ = perminv[nb[1][2]]
             treeR = forest.cells[k′]
             _iter_interface!(
-                cons2, cons4, hfacets, incomplete, E, offsets[k], offsets[k′], forest, k, tree.leaves, r, 1, length(tree.leaves), f,
+                hfacets, incomplete, offsets[k], offsets[k′], forest, k, tree.leaves, r, 1, length(tree.leaves), f,
                 k′, treeR.leaves, r, 1, length(treeR.leaves), f′, bL, treeR.b
             )
         end
@@ -3094,20 +3039,18 @@ end
 Per-tree numbering context of the [`creategrid`](@ref) traversal — the `Lnodes_callback` of
 [IBWG2015](@citet) Alg 6.2, as a callable struct (a concrete top-level type instead of a
 closure, so the captures don't box). One instance per tree: `E`, the provisional node data
-(`nodecoords_prov`, `cnt`) and the constraint records (`cons2`/`cons4`) are shared across
-trees; `bnd`, the geometry and the element offset are the tree's own.
+(`nodecoords_prov`, `cnt`) and the hanging-interface records (`hfacets`/`hedges`) are shared
+across trees; `bnd`, the geometry and the element offset are the tree's own.
 
 Callback dispatch by `point_dim(c)`: corners create + scatter node ids
 ([`_visit_corner!`](@ref)); non-conforming faces and (3D) edges create the hanging vertex and
-record its constraint ([`_visit_face!`](@ref), [`_visit_edge3d!`](@ref)); volumes need no work
-(cell connectivity IS the filled `E`).
+emit the topological interface record ([`_visit_face!`](@ref), [`_visit_edge3d!`](@ref));
+volumes need no work (cell connectivity IS the filled `E`).
 """
 struct LnodesVisitor{dim, N, T <: Integer}
     E::Matrix{Int}                                     # element-node matrix, NV × ncells, z-order slots
     nodecoords_prov::Vector{Vec{dim, Float64}}         # physical coordinate per provisional id
     bnd::Vector{Tuple{UInt64, Int}}                    # this tree's boundary node table (sorted later)
-    cons2::Vector{Tuple{Int, ERef, ERef}}              # hanging midpoints: (id, 2 master refs)
-    cons4::Vector{Tuple{Int, ERef, ERef, ERef, ERef}}  # 3D hanging face centers: (id, 4 master refs)
     hfacets::Vector{HangingFacet}                      # topological hanging-facet records
     hedges::Vector{HangingEdge}                        # topological hanging-edge records (3D)
     treecorners::NTuple{N, Vec{dim, Float64}}          # tree geometry for _interp_treepoint
@@ -3203,10 +3146,10 @@ function _scatter_hanging!(v::LnodesVisitor{dim}, ls::LeafSupport, lvl::Int, m::
     return
 end
 
-# Shared 1-dimensional hanging emitter (a 2D non-conforming face or a 3D non-conforming
-# edge): the midpoint of the coarse feature hangs, constrained by the feature's two endpoints
-# — corners of the coarse leaf `coarse` (element `cgid`) — in ascending coordinate order.
-function _emit_hanging_mid!(v::LnodesVisitor{dim}, c::IteratePoint{dim}, ls::LeafSupport, coarse::OctantBWG{dim}, cgid::Int, h::Int) where {dim}
+# Shared 1-dimensional hanging-vertex emitter (a 2D non-conforming face or a 3D
+# non-conforming edge): create the midpoint node of the coarse feature and scatter it into
+# the finer support leaves. The constraint itself lives in the topological records.
+function _emit_hanging_mid!(v::LnodesVisitor{dim}, c::IteratePoint{dim}, ls::LeafSupport, h::Int) where {dim}
     ax = 1
     for d in 1:dim
         if c.axes[d]
@@ -3218,8 +3161,6 @@ function _emit_hanging_mid!(v::LnodesVisitor{dim}, c::IteratePoint{dim}, ls::Lea
     m = Base.setindex(a, a[ax] + (h >> 1), ax)
     id = _create_node!(v, m)
     _scatter_hanging!(v, ls, c.level, m, id)
-    a2 = Base.setindex(a, a[ax] + h, ax)
-    push!(v.cons2, (id, (cgid, _corner_slot(coarse, a)), (cgid, _corner_slot(coarse, a2))))
     return
 end
 
@@ -3319,10 +3260,8 @@ function _visit_face!(v::LnodesVisitor{dim}, c::IteratePoint{dim}, ls::LeafSuppo
     (ci != 0 && fine) || return
     _record_hanging_facet!(v, c, ls, ci)
     h = Int(_compute_size(v.b, c.level))
-    coarse = ls.octs[ci]
-    cgid = v.off + ls.idxs[ci]
     if dim == 2
-        _emit_hanging_mid!(v, c, ls, coarse, cgid, h)
+        _emit_hanging_mid!(v, c, ls, h)
     else
         hh = h >> 1
         e1 = 0; e2 = 0                       # the two extending axes, e1 < e2
@@ -3335,19 +3274,6 @@ function _visit_face!(v::LnodesVisitor{dim}, c::IteratePoint{dim}, ls::LeafSuppo
         m = Base.setindex(Base.setindex(a, a[e1] + hh, e1), a[e2] + hh, e2)
         id = _create_node!(v, m)
         _scatter_hanging!(v, ls, c.level, m, id)
-        # face corners in z-order: a, c2 = a + h·e1, c3 = a + h·e2, c4 = a + h·(e1+e2);
-        # lexicographic coordinate order is (a, c3, c2, c4) — the +h on the lower axis
-        # sorts *later* — which is the master order of the constraint.
-        c2 = Base.setindex(a, a[e1] + h, e1)
-        c3 = Base.setindex(a, a[e2] + h, e2)
-        c4 = Base.setindex(c2, c2[e2] + h, e2)
-        push!(
-            v.cons4, (
-                id,
-                (cgid, _corner_slot(coarse, a)), (cgid, _corner_slot(coarse, c3)),
-                (cgid, _corner_slot(coarse, c2)), (cgid, _corner_slot(coarse, c4)),
-            )
-        )
     end
     return
 end
@@ -3366,7 +3292,7 @@ function _visit_edge3d!(v::LnodesVisitor{3}, c::IteratePoint{3}, ls::LeafSupport
     ci, fine = _mixed_support(c, ls)
     (ci != 0 && fine) || return
     _record_hanging_edge!(v, c, ls, ci)
-    _emit_hanging_mid!(v, c, ls, ls.octs[ci], v.off + ls.idxs[ci], Int(_compute_size(v.b, c.level)))
+    _emit_hanging_mid!(v, c, ls, Int(_compute_size(v.b, c.level)))
     return
 end
 
@@ -3425,16 +3351,16 @@ Pipeline:
 
 1. **Numbering + hanging detection.** One `iterate_points` traversal per tree (`mindim = 0`)
    fires the [`LnodesVisitor`](@ref) callbacks: corners create + scatter node ids, non-conforming
-   faces and (3D) edges create the hanging vertices and record their constraints as `(element,
-   slot)` references into `E`.
+   faces and (3D) edges create the hanging vertices and emit the topological interface records
+   ([`HangingFacet`](@ref)/[`HangingEdge`](@ref)).
 2. **Inter-tree hanging.** [`_iterate_interface_hanging!`](@ref) descends each shared tree face
-   from both sides and records the cross-tree hanging constraints (no-op for a single tree).
+   from both sides and records the cross-tree hanging interfaces (no-op for a single tree).
 3. **Cross-tree identity.** A shared boundary node has one provisional id per incident tree;
    [`_merge_intertree_nodes!`](@ref) aliases them onto a single owner through the per-tree
    boundary tables.
-4. **Global numbering + cells + constraints.** [`_global_numbering`](@ref) (Alg 6.1) assigns the
-   final dense ids in one sweep over `E`, [`_build_cells`](@ref) materializes the cells, the
-   constraint records are resolved against `E`, and [`reconstruct_facetsets`](@ref) carries the
+4. **Global numbering + cells.** [`_global_numbering`](@ref) (Alg 6.1) assigns the
+   final dense ids in one sweep over `E`, [`_build_cells`](@ref) materializes the cells,
+   and [`reconstruct_facetsets`](@ref) carries the
    named boundaries onto the refined grid.
 
 Requires a 2:1-balanced forest (see [`balanceforest!`](@ref)) — balance is what guarantees
@@ -3458,8 +3384,6 @@ function creategrid(forest::ForestBWG{dim}) where {dim}
     nodecoords_prov = Vec{dim, Float64}[]
     sizehint!(nodecoords_prov, ncells)
     bnd = [Tuple{UInt64, Int}[] for _ in 1:ntrees]
-    cons2 = Tuple{Int, ERef, ERef}[]
-    cons4 = Tuple{Int, ERef, ERef, ERef, ERef}[]
     hfacets = HangingFacet[]
     hedges = HangingEdge[]
     incomplete = Ref(false)
@@ -3472,7 +3396,7 @@ function creategrid(forest::ForestBWG{dim}) where {dim}
     sc = IterScratch(forest.cells[1])
     for (k, tree) in enumerate(forest.cells)
         visitor = LnodesVisitor(
-            E, nodecoords_prov, bnd[k], cons2, cons4, hfacets, hedges,
+            E, nodecoords_prov, bnd[k], hfacets, hedges,
             _treecorners(forest, k), tree.b, Int(_maximum_size(tree.b)), offsets[k], cnt
         )
         iterate_points(visitor, tree, sc; mindim = 0, maxdim = dim - 1, skip_conforming = true)
@@ -3480,7 +3404,7 @@ function creategrid(forest::ForestBWG{dim}) where {dim}
     end
 
     # Phase 2 — inter-tree hanging constraints (reads ids off `E`; no-op for a single tree).
-    _iterate_interface_hanging!(cons2, cons4, hfacets, incomplete, E, offsets, forest)
+    _iterate_interface_hanging!(hfacets, incomplete, offsets, forest)
 
     # Phase 3 — cross-tree identity: alias the provisional ids of shared boundary nodes onto
     # their owner (recorded in `alias`, an array — the canonical lookup is an index).
@@ -3491,19 +3415,9 @@ function creategrid(forest::ForestBWG{dim}) where {dim}
     # Phase 4 — final numbering (Alg 6.1 sweep), cells, constraint resolution.
     final_of_prov, nodecoords = _global_numbering(E, alias, nodecoords_prov)
     cells = _build_cells(celltype, E, node_map, final_of_prov, Val(NV))
-    hnodes = Dict{Int, Vector{Int}}()
-    for (p, m1, m2) in cons2
-        hnodes[final_of_prov[p]] = [final_of_prov[E[m1[2], m1[1]]], final_of_prov[E[m2[2], m2[1]]]]
-    end
-    for (p, m1, m2, m3, m4) in cons4
-        hnodes[final_of_prov[p]] = [
-            final_of_prov[E[m1[2], m1[1]]], final_of_prov[E[m2[2], m2[1]]],
-            final_of_prov[E[m3[2], m3[1]]], final_of_prov[E[m4[2], m4[1]]],
-        ]
-    end
     return NonConformingGrid(
         cells, Node.(nodecoords);
-        conformity_info = ConformityInfo(hfacets, hedges, hnodes, !incomplete[]),
+        conformity_info = ConformityInfo(hfacets, hedges, !incomplete[]),
         facetsets = reconstruct_facetsets(forest)
     )
 end

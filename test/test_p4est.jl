@@ -2,6 +2,35 @@ using Ferrite, Test
 
 include(joinpath(@__DIR__, "test_utils.jl"))
 
+# Reconstruct the node-level hanging-node map (hanging vertex -> master nodes) from the
+# topological ConformityInfo records — the golden values below were established for the
+# node-level map, so this doubles as a validation of the records themselves.
+function hanging_nodes_from_records(g)
+    ci = g.conformity_info
+    d = Dict{Int, Vector{Int}}()
+    for hf in ci.hanging_facets
+        cn = collect(Ferrite.facets(g.cells[hf.coarse[1]])[hf.coarse[2]])
+        fsets = [Set(Ferrite.facets(g.cells[ff[1]])[ff[2]]) for ff in hf.fine]
+        center = only(intersect(fsets...))
+        d[center] = cn
+        if length(hf.fine) == 4
+            shared = [only(intersect(fs, cn)) for fs in fsets]
+            for q1 in eachindex(fsets), q2 in (q1 + 1):length(fsets)
+                mid = setdiff(intersect(fsets[q1], fsets[q2]), center)
+                length(mid) == 1 || continue
+                d[only(mid)] = [shared[q1], shared[q2]]
+            end
+        end
+    end
+    for he in ci.hanging_edges
+        cn = collect(Ferrite.edges(g.cells[he.coarse[1]])[he.coarse[2]])
+        f1 = Set(Ferrite.edges(g.cells[he.fine[1][1]])[he.fine[1][2]])
+        f2 = Set(Ferrite.edges(g.cells[he.fine[2][1]])[he.fine[2][2]])
+        d[only(intersect(f1, f2))] = cn
+    end
+    return d
+end
+
 @testset "OctantBWG Lookup Tables" begin
     @test Ferrite.AMR._face(1) == [3, 5]
     @test Ferrite.AMR._face(5) == [1, 5]
@@ -211,7 +240,7 @@ end
 
     grid_new = Ferrite.AMR.creategrid(adaptive_grid)
     @test length(grid_new.nodes) == 9
-    @test length(grid_new.conformity_info) == 0
+    @test length(hanging_nodes_from_records(grid_new)) == 0
 
     grid.cells[4] = Quadrilateral((grid.cells[4].nodes[2], grid.cells[4].nodes[3], grid.cells[4].nodes[4], grid.cells[4].nodes[1]))
     grid.cells[4] = Quadrilateral((grid.cells[4].nodes[2], grid.cells[4].nodes[3], grid.cells[4].nodes[4], grid.cells[4].nodes[1]))
@@ -296,7 +325,7 @@ end
 
     grid_new = Ferrite.AMR.creategrid(adaptive_grid)
     @test length(grid_new.nodes) == 19
-    @test length(grid_new.conformity_info) == 4
+    @test length(hanging_nodes_from_records(grid_new)) == 4
 
     # octree holds now 3 first level and 4 second level
     @test length(adaptive_grid.cells[1].leaves) == 7
@@ -335,7 +364,14 @@ end
 
     grid_new = Ferrite.AMR.creategrid(adaptive_grid)
     @test length(grid_new.nodes) == 19
-    @test length(grid_new.conformity_info) == 4
+    # The level-2 patch touches the unrefined neighbour trees: a 2-level jump across the
+    # tree interfaces. Those interfaces are not representable as hanging records (the
+    # forest is unbalanced), so only the 2 intra-tree hangs are recorded and the records
+    # are marked incomplete — the constraint builder refuses such grids. (The removed
+    # legacy node-level path used to additionally emit partial top-level constraints on
+    # the deep interfaces, counting 4 here.)
+    @test length(hanging_nodes_from_records(grid_new)) == 2
+    @test !grid_new.conformity_info.complete
 
     # more complex neighborhoods
     grid = generate_simple_disc_grid(Quadrilateral, 6)
@@ -346,7 +382,7 @@ end
 
     grid_new = Ferrite.AMR.creategrid(adaptive_grid)
     @test length(grid_new.nodes) == 23
-    @test length(grid_new.conformity_info) == 4
+    @test length(hanging_nodes_from_records(grid_new)) == 4
 
     ##################################################################
     ####uniform refinement and coarsening for all cells and levels####
@@ -520,7 +556,7 @@ end
     # Unrefined grid has 5 ^ dim nodes and the refined element introduces 6 face center, 12 edge center and 1 volume center nodes
     @test length(transferred_grid.nodes) == 5^3 + (6 + 12 + 1)
     # 6 faces and 12 edges of the single refined element induces one hanging node each
-    @test length(transferred_grid.conformity_info) == 6 + 12
+    @test length(hanging_nodes_from_records(transferred_grid)) == 6 + 12
 
     adaptive_grid = ForestBWG(grid, 3)
     Ferrite.AMR.refine_all!(adaptive_grid, 1)
@@ -530,7 +566,7 @@ end
     # Unrefined grid has 5 ^ dim nodes and the refined element introduces 6 face center, 12 edge center and 1 volume center nodes
     @test length(transferred_grid.nodes) == 5^3 + (6 + 12 + 1)
     # 6 faces and 12 edges of the single refined element induces one hanging node each - minus 3 faces and 3 edges on the outer boundary
-    @test length(transferred_grid.conformity_info) == 6 + 12 - 2 * 3
+    @test length(hanging_nodes_from_records(transferred_grid)) == 6 + 12 - 2 * 3
 
     adaptive_grid = ForestBWG(grid, 3)
     Ferrite.AMR.refine_all!(adaptive_grid, 1)
@@ -540,7 +576,7 @@ end
     # Unrefined grid has 5 ^ dim nodes and the refined element introduces 6 face center, 12 edge center and 1 volume center nodes
     @test length(transferred_grid.nodes) == 5^3 + (6 + 12 + 1)
     # 6 faces and 12 edges of the single refined element induces one hanging node each - minus 3 faces and 3 edges on the outer boundary
-    @test length(transferred_grid.conformity_info) == 6 + 12 - 2 * 3
+    @test length(hanging_nodes_from_records(transferred_grid)) == 6 + 12 - 2 * 3
 
     adaptive_grid = ForestBWG(grid, 3)
     Ferrite.AMR.refine_all!(adaptive_grid, 1)
@@ -549,7 +585,7 @@ end
     # Unrefined grid has 5 ^ dim nodes and the refined element introduces 6 face center, 12 edge center and 1 volume center nodes
     @test length(transferred_grid.nodes) == 5^3 + (6 + 12 + 1)
     # 6 faces and 12 edges of the single refined element induces one hanging node each
-    @test length(transferred_grid.conformity_info) == 6 + 12
+    @test length(hanging_nodes_from_records(transferred_grid)) == 6 + 12
 
     # Combined
     adaptive_grid = ForestBWG(grid, 3)
@@ -559,7 +595,7 @@ end
     transferred_grid = Ferrite.creategrid(adaptive_grid)
     @test unique(transferred_grid.nodes) == transferred_grid.nodes
     @test length(transferred_grid.nodes) == 5^3 + 2 * (6 + 12 + 1)
-    @test length(transferred_grid.conformity_info) == 2 * (6 + 12) - 2 * 3
+    @test length(hanging_nodes_from_records(transferred_grid)) == 2 * (6 + 12) - 2 * 3
 
     adaptive_grid = ForestBWG(grid, 3)
     Ferrite.AMR.refine_all!(adaptive_grid, 1)
@@ -568,7 +604,7 @@ end
     transferred_grid = Ferrite.creategrid(adaptive_grid)
     @test unique(transferred_grid.nodes) == transferred_grid.nodes
     @test length(transferred_grid.nodes) == 5^3 + 2 * (6 + 12 + 1)
-    @test length(transferred_grid.conformity_info) == 2 * (6 + 12) - 2 * 3
+    @test length(hanging_nodes_from_records(transferred_grid)) == 2 * (6 + 12) - 2 * 3
 
     # Combined
     adaptive_grid = ForestBWG(grid, 3)
@@ -580,7 +616,7 @@ end
     transferred_grid = Ferrite.creategrid(adaptive_grid)
     @test unique(transferred_grid.nodes) == transferred_grid.nodes
     @test length(transferred_grid.nodes) == 5^3 + 4 * (6 + 12 + 1)
-    @test length(transferred_grid.conformity_info) == 4 * (6 + 12) - 2 * 3 - 2 * 3
+    @test length(hanging_nodes_from_records(transferred_grid)) == 4 * (6 + 12) - 2 * 3 - 2 * 3
 
     # Combined and not rotated
     adaptive_grid = ForestBWG(grid, 3)
@@ -597,7 +633,7 @@ end
     @test length(transferred_grid.nodes) == 5^3 + 4 * (6 + 12 + 1) - 1
     # 30 constraints from tree 1 (2*18 - 6 boundary) + 30 from tree 6 (2*18 - 6 boundary)
     # - 1 shared on common edge
-    @test length(transferred_grid.conformity_info) == 59
+    @test length(hanging_nodes_from_records(transferred_grid)) == 59
 
     # Combined and rotated
     adaptive_grid = ForestBWG(grid, 3)
@@ -613,7 +649,7 @@ end
     # -1 shared node between tree 1 and 7
     @test length(transferred_grid.nodes) == 5^3 + 4 * (6 + 12 + 1) - 1
     # 30 constraints from tree 1 + 30 from rotated tree 7 - 1 shared on common edge
-    @test length(transferred_grid.conformity_info) == 59
+    @test length(hanging_nodes_from_records(transferred_grid)) == 59
 
     # Reproducer test for Fig.3 BWG 11
     grid = generate_grid(Hexahedron, (2, 1, 1))
@@ -997,7 +1033,7 @@ end
     # |     |     |           |
     # x-----x-----x-----------x
     transferred_grid = Ferrite.AMR.creategrid(adaptive_grid)
-    @test length(transferred_grid.conformity_info) == 12
+    @test length(hanging_nodes_from_records(transferred_grid)) == 12
 
     # Easy Interoctree
     grid = generate_grid(Hexahedron, (2, 2, 2))
@@ -1021,7 +1057,7 @@ end
     # |     |     |           |
     # x-----x-----x-----------x
     transferred_grid = Ferrite.AMR.creategrid(adaptive_grid)
-    @test length(transferred_grid.conformity_info) == 12
+    @test length(hanging_nodes_from_records(transferred_grid)) == 12
 
     #rotate the case from above in the first cell around
     grid = generate_grid(Hexahedron, (2, 2, 2))
@@ -1031,19 +1067,19 @@ end
     adaptive_grid = ForestBWG(grid, 3)
     Ferrite.AMR.refine!(adaptive_grid.cells[1], adaptive_grid.cells[1].leaves[1])
     transferred_grid_rotated = Ferrite.AMR.creategrid(adaptive_grid)
-    @test Set(transferred_grid_rotated.conformity_info[2]) == Set([1, 9])
-    @test Set(transferred_grid_rotated.conformity_info[3]) == Set([1, 13])
-    @test Set(transferred_grid_rotated.conformity_info[5]) == Set([1, 19])
-    @test Set(transferred_grid_rotated.conformity_info[6]) == Set([1, 9, 19, 23])
-    @test Set(transferred_grid_rotated.conformity_info[7]) == Set([1, 13, 19, 25])
-    @test Set(transferred_grid_rotated.conformity_info[11]) == Set([9, 23])
-    @test Set(transferred_grid_rotated.conformity_info[15]) == Set([13, 25])
-    @test Set(transferred_grid_rotated.conformity_info[20]) == Set([19, 23])
-    @test Set(transferred_grid_rotated.conformity_info[21]) == Set([19, 25])
-    @test Set(transferred_grid_rotated.conformity_info[22]) == Set([19, 23, 25, 27])
-    @test Set(transferred_grid_rotated.conformity_info[24]) == Set([23, 27])
-    @test Set(transferred_grid_rotated.conformity_info[26]) == Set([25, 27])
-    @test length(transferred_grid_rotated.conformity_info) == 12
+    @test Set(hanging_nodes_from_records(transferred_grid_rotated)[2]) == Set([1, 9])
+    @test Set(hanging_nodes_from_records(transferred_grid_rotated)[3]) == Set([1, 13])
+    @test Set(hanging_nodes_from_records(transferred_grid_rotated)[5]) == Set([1, 19])
+    @test Set(hanging_nodes_from_records(transferred_grid_rotated)[6]) == Set([1, 9, 19, 23])
+    @test Set(hanging_nodes_from_records(transferred_grid_rotated)[7]) == Set([1, 13, 19, 25])
+    @test Set(hanging_nodes_from_records(transferred_grid_rotated)[11]) == Set([9, 23])
+    @test Set(hanging_nodes_from_records(transferred_grid_rotated)[15]) == Set([13, 25])
+    @test Set(hanging_nodes_from_records(transferred_grid_rotated)[20]) == Set([19, 23])
+    @test Set(hanging_nodes_from_records(transferred_grid_rotated)[21]) == Set([19, 25])
+    @test Set(hanging_nodes_from_records(transferred_grid_rotated)[22]) == Set([19, 23, 25, 27])
+    @test Set(hanging_nodes_from_records(transferred_grid_rotated)[24]) == Set([23, 27])
+    @test Set(hanging_nodes_from_records(transferred_grid_rotated)[26]) == Set([25, 27])
+    @test length(hanging_nodes_from_records(transferred_grid_rotated)) == 12
 
     #2D rotated case
     grid = generate_grid(Quadrilateral, (2, 2))
@@ -1070,9 +1106,9 @@ end
     adaptive_grid = ForestBWG(grid, 3)
     Ferrite.AMR.refine!(adaptive_grid.cells[2], adaptive_grid.cells[2].leaves[1])
     transferred_grid_rotated = Ferrite.AMR.creategrid(adaptive_grid)
-    @test Set(transferred_grid_rotated.conformity_info[10]) == Set([4, 9])
-    @test Set(transferred_grid_rotated.conformity_info[11]) == Set([2, 4])
-    @test length(transferred_grid_rotated.conformity_info) == 2
+    @test Set(hanging_nodes_from_records(transferred_grid_rotated)[10]) == Set([4, 9])
+    @test Set(hanging_nodes_from_records(transferred_grid_rotated)[11]) == Set([2, 4])
+    @test length(hanging_nodes_from_records(transferred_grid_rotated)) == 2
 
     # multiple corner connections in 2D by disc discretization
     grid = generate_simple_disc_grid(Quadrilateral, 10)
@@ -1107,17 +1143,31 @@ end
         return d
     end
 
-    function _build_ch(g, ip; legacy::Bool)
+    function _build_ch(g, ip)
         dh = DofHandler(g)
         add!(dh, :u, ip)
         close!(dh)
         ch = ConstraintHandler(dh)
-        if legacy
-            Ferrite.AMR._add_conformity_constraint(ch, 1, ip)
-        else
-            add!(ch, ConformityConstraint(:u))
+        add!(ch, ConformityConstraint(:u))
+        return dh, ch
+    end
+
+    # Golden Q1 constraints at node level: a hanging vertex is the average of its master
+    # nodes, one constraint per component (the historic node-level semantics).
+    function _expected_q1(dh, g, vdim)
+        hn = hanging_nodes_from_records(g)
+        nodedof = Dict{Int, Int}()
+        for cell in 1:getncells(g)
+            cd = celldofs(dh, cell)
+            for (i, n) in enumerate(Ferrite.get_node_ids(g.cells[cell]))
+                nodedof[n] = cd[(i - 1) * vdim + 1]
+            end
         end
-        return ch
+        d = Dict{Int, Dict{Int, Float64}}()
+        for (h, ms) in hn, c in 0:(vdim - 1)
+            d[nodedof[h] + c] = Dict(nodedof[m] + c => 1 / length(ms) for m in ms)
+        end
+        return d
     end
 
     # Physical coordinates of all nodal dofs (Q1 geometry); vector fields interleave
@@ -1226,11 +1276,11 @@ end
     @testset "$name" for (name, g) in fixtures
         dim = Ferrite.getspatialdim(g)
         shape = dim == 2 ? RefQuadrilateral : RefHexahedron
-        # Q1 parity: the generic builder reproduces the legacy node-level constraints exactly
-        for ip in (Lagrange{shape, 1}(), Lagrange{shape, 1}()^dim)
-            old = _extract_constraints(_build_ch(g, ip; legacy = true))
-            new = _extract_constraints(_build_ch(g, ip; legacy = false))
-            @test old == new
+        # Q1 golden: the builder reproduces the node-level hanging-vertex constraints exactly
+        for (ip, vdim) in ((Lagrange{shape, 1}(), 1), (Lagrange{shape, 1}()^dim, dim))
+            dh, ch = _build_ch(g, ip)
+            new = _extract_constraints(ch)
+            @test new == _expected_q1(dh, g, vdim)
             @test !isempty(new)
         end
         # patch tests: exact reproduction of a global polynomial of the field's order

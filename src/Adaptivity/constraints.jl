@@ -36,9 +36,8 @@ end
 #    coarse entity, and all fine entities share the hanging center node),
 #  - the weights are the coarse entity's trace shape functions evaluated at the fine dofs'
 #    reference positions — for nodal interpolations this is fully generic and exact (all
-#    evaluation points are dyadic).
-# Non-nodal interpolations (Nedelec, RaviartThomas) need their own trace interpolation
-# rule and are not supported yet.
+#    evaluation points are dyadic). Non-nodal interpolations (Nedelec, RaviartThomas)
+#    apply their pullback-invariant dof functionals instead (see further below).
 # ---------------------------------------------------------------------------------------
 
 _add_conformity_constraints!(ch::ConstraintHandler, sdh, fname::Symbol, ip::ScalarInterpolation) =
@@ -372,40 +371,5 @@ function _constrain_div_facet!(ch::ConstraintHandler, dh, rng, ip, cells, par, c
     end
     push!(seen, gdof)
     add!(ch, AffineConstraint(gdof, masters, 0.0))
-    return
-end
-
-# ---------------------------------------------------------------------------------------
-# Legacy node-level path (Q1 only, hardcoded weights). Kept during the migration for the
-# parity tests against the generic builder above; scheduled for removal.
-# ---------------------------------------------------------------------------------------
-
-function _add_conformity_constraint(ch::ConstraintHandler, field_index::Int, interpolation::ScalarInterpolation)
-    # Reached only for a NonConformingGrid, so the entity maps are guaranteed to be present.
-    # type annotated for the compiler
-    vertices = (ch.dh.entitymaps::Ferrite.EntityMaps).vertices[field_index]
-    for (hdof, mdof) in ch.dh.grid.conformity_info
-        # A hanging node is the average of its masters: an edge midpoint of its 2 endpoints
-        # (weight 1/2), a 3D face center of its 4 face corners (weight 1/4).
-        @debug @assert length(mdof) ∈ (2, 4)
-        weight = 1 / length(mdof)
-        lc = AffineConstraint(vertices[hdof], [vertices[m] => weight for m in mdof], 0.0)
-        add!(ch, lc)
-    end
-    return
-end
-
-function _add_conformity_constraint(ch::ConstraintHandler, field_index::Int, interpolation::VectorizedInterpolation{vdim}) where {vdim}
-    # Reached only for a NonConformingGrid, so the entity maps are guaranteed to be present.
-    vertices = (ch.dh.entitymaps::Ferrite.EntityMaps).vertices[field_index]
-    for (hdof, mdof) in ch.dh.grid.conformity_info
-        @debug @assert length(mdof) ∈ (2, 4)
-        weight = 1 / length(mdof)
-        # One constraint per component
-        for vd in 1:vdim
-            lc = AffineConstraint(vertices[hdof] + vd - 1, [vertices[m] + vd - 1 => weight for m in mdof], 0.0)
-            add!(ch, lc)
-        end
-    end
     return
 end

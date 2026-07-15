@@ -64,7 +64,7 @@ end
             η = compute_cell_squared_l2_errors(dh, u, cellvalues)
             push!(L2errors, √(sum(η)))
             push!(dofcounts, ndofs(dh))
-            solved_nonconforming_grid |= !isempty(grid_transferred.conformity_info)
+            solved_nonconforming_grid |= !isempty(grid_transferred.conformity_info.hanging_facets)
             last(L2errors) ≤ L2target && break
             Ferrite.refine!(forest, dorfler_marking(η, 0.5))
             Ferrite.balanceforest!(forest)
@@ -102,7 +102,7 @@ end
         Ferrite.balanceforest!(forest)
         ncgrid = Ferrite.creategrid(forest)
         # The refined grid must contain hanging nodes for this test to be meaningful
-        @test !isempty(ncgrid.conformity_info)
+        @test !isempty(ncgrid.conformity_info.hanging_facets)
 
         ip = geometric_interpolation(geometry)
         qr = QuadratureRule{getrefshape(ip)}(2)
