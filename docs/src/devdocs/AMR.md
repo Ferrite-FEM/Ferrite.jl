@@ -37,7 +37,7 @@ whenever coordinates are considered we follow the z order logic, meaning x befor
 Note that the acronym BWG stands for the initials of the surname of the authors of the p4est paper.
 The coordinates of an octant are described in the *octree coordinate system* which goes from $[0,2^b]^{dim}$.
 The parameter $b$ describes the maximum level of refinement and is set a priori.
-Another important aspect of the octree coordinate system is, that it is a discrete integer coordinate system.
+Another important aspect of the octree coordinate system is, that it is a discrete integer coordinate system, which has the advantage over float point based coordinate systems when matching coordinates that comparisons are guaranteed to be exact by construction.
 The size of an octant at the lowest possible level `b` is always 1, sometimes these octants are called atoms.
 
 The octree is implemented as:
