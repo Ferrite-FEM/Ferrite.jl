@@ -29,13 +29,11 @@ const NUM_THREADS = 64
 const NUM_TASKS_PER_THREAD = 2
 
 # In this how-to we want to use an existing element routine on the GPU with Ferrite,
-# and we use the `assemble_element!` from the [heat equation tutorial](heat_equation.md).
+# and we use the `assemble_element!` from the [heat equation tutorial](tutorial-heat-equation).
 # To be compatible with the GPU, the element routine must be allocation free
 # (this requires type stable code).
 function assemble_element!(Ke::AbstractMatrix, fe::AbstractVector, cv::CellValues)
     n_basefuncs = getnbasefunctions(cv)
-    fill!(Ke, 0)
-    fill!(fe, 0)
     for q_point in 1:getnquadpoints(cv)
         dΩ = getdetJdV(cv, q_point)
         for i in 1:n_basefuncs
@@ -54,6 +52,8 @@ end
 # We further define a simple cell assembly wrapping to simplify
 # the matrix-free demonstration later.
 function assemble_cell!(Ke, fe, cell, cv, assembler)
+    fill!(Ke, 0)
+    fill!(fe, 0)
     reinit!(cv, nothing, cell.coords)
     assemble_element!(Ke, fe, cv)
     assemble!(assembler, celldofs(cell), Ke, fe)
