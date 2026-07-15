@@ -24,7 +24,7 @@ import KernelAbstractions: @kernel, @index
 import KernelAbstractions as KA
 using SparseArrays
 
-# We start with some constants to be used in the following for convenience.
+# and define some constants to be used in the following for convenience.
 const NUM_THREADS = 64
 const NUM_TASKS_PER_THREAD = 2
 
@@ -46,7 +46,7 @@ function assemble_element!(Ke::AbstractMatrix, fe::AbstractVector, cv::CellValue
             end
         end
     end
-    return nothing
+    return Ke, fe
 end
 
 # We further define a simple cell assembly wrapping to simplify
@@ -68,12 +68,11 @@ end
     task_index = @index(Global, Linear)
     stride = prod(KA.@ndrange())
 
-    ## Query the local evaluation buffer of the GPU worker.
-    ## As explained later this is the secret sauce.
+    ## Get the local evaluation buffers for the GPU worker.
     cv_i = cv[task_index]
     cc_i = cc[task_index]
-    Ke = view(Kes, task_index, :, :)
-    fe = view(fes, task_index, :)
+    Ke = view(Kes, task_index, :, :) # Note row-major indexing, this
+    fe = view(fes, task_index, :)    # is further motivated below.
 
     for i in task_index:stride:length(color)
         ## Work item index
@@ -152,7 +151,10 @@ cv_gpu = Ferrite.distribute_to_tasks(backend, cv, n_workers)
 cc_gpu = Ferrite.distribute_to_tasks(backend, CellCache(dh_gpu), n_workers)
 # We also need a local buffer for the element vectors and matrices,
 # and these are created as a global array which we use views into in the assembly kernel.
-# TODO: Explain why we use row-major indexing here
+# Since GPU thread groups favor coalesced memory access we allocate the buffers such
+# that we can access the data using row-major indexing. See, e.g.
+# [this blog](https://developer.nvidia.com/blog/unlock-gpu-performance-global-memory-access-in-cuda/)
+# as starting point for further information.
 Kes = KA.zeros(backend, Float32, n_workers, getnbasefunctions(cv), getnbasefunctions(cv))
 fes = KA.zeros(backend, Float32, n_workers, getnbasefunctions(cv))
 
@@ -170,7 +172,7 @@ close!(ch)
 
 ch_gpu = adapt(backend, ch)
 apply!(K_gpu, f_gpu, ch_gpu)
-u_gpu = SparseMatrixCSC(K_gpu) \ Vector(f_gpu)
+u = SparseMatrixCSC(K_gpu) \ Vector(f_gpu)
 
 
 #=
@@ -252,5 +254,5 @@ end
 Kes = KA.zeros(backend, Float32, getncells(grid), getnbasefunctions(cv), getnbasefunctions(cv))
 fes = KA.zeros(backend, Float32, getncells(grid), getnbasefunctions(cv))
 
-# And assemble without using the global stiffness and load vectors, `K_gpu` and `f_gpu`.
+# And assemble without using the global stiffness, `K_gpu`, and load vector, `f_gpu`.
 assemble_global_cuda!(cv_gpu, cc_gpu, colors_gpu, Kes, fes)
