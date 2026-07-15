@@ -1466,3 +1466,163 @@ end
         @test all(m in fielddofs for (m, w) in coeffs)
     end
 end
+
+using Random
+
+@testset "trace continuity across hanging interfaces" begin
+    # The mathematical property itself, checked directly: evaluate u_h from the coarse
+    # cell and from the fine cells at the same physical points on every hanging interface
+    # and compare — the full value for H¹ (Lagrange), only the tangential components for
+    # H(curl) (Nedelec), only the normal component for H(div) (RaviartThomas). The field
+    # is a *random* constrained vector (apply!), so the check cannot be fooled by special
+    # functions; a negative control asserts the same sampling detects O(1) jumps when the
+    # constraints are not applied.
+
+    # Evaluate the FE field of `ip` at cell-reference coordinate ξ, with the proper mapping.
+    function _eval_at(dh, ip, u, cell, ξ)
+        g = dh.grid
+        geo = Lagrange{Ferrite.getrefshape(ip isa VectorizedInterpolation ? ip.ip : ip), 1}()
+        coords = getcoordinates(g, cell)
+        cd = celldofs(dh, cell)
+        mt = Ferrite.mapping_type(ip)
+        if mt isa Ferrite.IdentityMapping
+            base = ip isa VectorizedInterpolation ? ip.ip : ip
+            vdim = Ferrite.n_components(ip)
+            n = getnbasefunctions(base)
+            if vdim == 1
+                return sum(u[cd[i]] * Ferrite.reference_shape_value(base, ξ, i) for i in 1:n)
+            else
+                return sum(Vec{vdim}(c -> u[cd[(i - 1) * vdim + c]]) * Ferrite.reference_shape_value(base, ξ, i) for i in 1:n)
+            end
+        else
+            J = sum(coords[i] ⊗ Ferrite.reference_shape_gradient(geo, ξ, i) for i in 1:length(coords))
+            v̂ = sum(u[cd[i]] * Ferrite.get_direction(ip, i, g.cells[cell]) * Ferrite.reference_shape_value(ip, ξ, i) for i in 1:getnbasefunctions(ip))
+            return mt isa Ferrite.CovariantPiolaMapping ? transpose(inv(J)) ⋅ v̂ : (J ⋅ v̂) / det(J)
+        end
+    end
+
+    _jump(vf::Number, vc::Number, t, n, comp) = abs(vf - vc)
+    function _jump(vf::Vec, vc::Vec, tangents, normal, comp)
+        d = vf - vc
+        comp === :full && return norm(d)
+        comp === :tangential && return maximum(abs(d ⋅ t) for t in tangents)
+        return abs(d ⋅ normal) # :normal
+    end
+
+    # Max two-sided jump over sample points of all hanging interfaces of `g`.
+    function _max_interface_jump(dh, ip, u, comp)
+        g = dh.grid
+        base = ip isa VectorizedInterpolation ? ip.ip : ip
+        refshape = Ferrite.getrefshape(base)
+        dim = Ferrite.getspatialdim(g)
+        geo = Lagrange{refshape, 1}()
+        refc = Ferrite.reference_coordinates(geo)
+        rfacets = Ferrite.reference_facets(refshape)
+        finder = Ferrite.NewtonLineSearchPointFinder()
+        X(nid) = get_node_coordinate(getnodes(g)[nid])
+        s1d = (-0.63, 0.11, 0.47) # non-symmetric, to catch orientation errors
+        maxjump = 0.0
+        function sample!(cc, fcell, fverts, params)
+            ccoords = getcoordinates(g, cc)
+            fcoords = getcoordinates(g, fcell)
+            fr = Ferrite.AMR._entity_frame(refc, fverts)
+            fnid = map(i -> Ferrite.get_node_ids(g.cells[fcell])[i], fverts)
+            # tangents/normal of the (planar) fine sub-entity in physical space
+            local tangents, normal
+            if length(fverts) == 2
+                t = X(fnid[2]) - X(fnid[1])
+                tangents = (t / norm(t),)
+                normal = dim == 2 ? Vec(tangents[1][2], -tangents[1][1]) : zero(Vec{dim})
+            else
+                t1 = X(fnid[2]) - X(fnid[1]); t2 = X(fnid[4]) - X(fnid[1])
+                tangents = (t1 / norm(t1), t2 / norm(t2))
+                nrm = t1 × t2
+                normal = nrm / norm(nrm)
+            end
+            for s in params
+                ξf = Ferrite.AMR._frame_point(fr, s)
+                x = sum(Ferrite.reference_shape_value(geo, ξf, i) * fcoords[i] for i in 1:length(fcoords))
+                conv, ξc = Ferrite.find_local_coordinate(geo, ccoords, x, finder)
+                @assert conv
+                vf = _eval_at(dh, ip, u, fcell, ξf)
+                vc = _eval_at(dh, ip, u, cc, ξc)
+                maxjump = max(maxjump, _jump(vf, vc, tangents, normal, comp))
+            end
+            return
+        end
+        fparams = dim == 2 ? [(s,) for s in s1d] : [(s1, s2) for s1 in s1d for s2 in s1d]
+        for rec in g.conformity_info.hanging_facets
+            for ff in rec.fine
+                sample!(rec.coarse[1], ff[1], rfacets[ff[2]], fparams)
+            end
+        end
+        if dim == 3 && comp !== :normal # H(div) has no edge continuity requirement
+            redges = Ferrite.reference_edges(refshape)
+            for rec in g.conformity_info.hanging_edges
+                for fe in rec.fine
+                    sample!(rec.coarse[1], fe[1], redges[fe[2]], [(s,) for s in s1d])
+                end
+            end
+        end
+        return maxjump
+    end
+
+    function _continuity(g, ip, comp)
+        dh = DofHandler(g)
+        add!(dh, :u, ip)
+        close!(dh)
+        ch = ConstraintHandler(dh)
+        add!(ch, ConformityConstraint(:u))
+        close!(ch)
+        Random.seed!(0x5eed)
+        u = rand(ndofs(dh))
+        raw = _max_interface_jump(dh, ip, u, comp)   # negative control: unconstrained field jumps
+        apply!(u, ch)
+        constrained = _max_interface_jump(dh, ip, u, comp)
+        return constrained, raw
+    end
+
+    function cfix(dim)
+        if dim == 2
+            grid = generate_grid(Quadrilateral, (2, 2))
+            for _ in 1:2 # rotated macro element
+                c = grid.cells[2]
+                grid.cells[2] = Quadrilateral((c.nodes[2], c.nodes[3], c.nodes[4], c.nodes[1]))
+            end
+            f = ForestBWG(grid, 3)
+            Ferrite.AMR.refine!(f.cells[1], f.cells[1].leaves[1])
+            Ferrite.AMR.refine!(f.cells[4], f.cells[4].leaves[1])
+        else
+            grid = generate_grid(Hexahedron, (2, 2, 2))
+            for _ in 1:2 # rotated macro element
+                c = grid.cells[7]
+                grid.cells[7] = Hexahedron((c.nodes[2], c.nodes[3], c.nodes[4], c.nodes[1], c.nodes[6], c.nodes[7], c.nodes[8], c.nodes[5]))
+            end
+            f = ForestBWG(grid, 4)
+            Ferrite.AMR.refine_all!(f, 1)
+            Ferrite.AMR.refine!(f.cells[1], f.cells[1].leaves[8])
+            Ferrite.AMR.refine!(f.cells[7], f.cells[7].leaves[3])
+        end
+        Ferrite.balanceforest!(f)
+        return Ferrite.creategrid(f)
+    end
+
+    g2, g3 = cfix(2), cfix(3)
+    cases = [
+        ("2D Q1", g2, Lagrange{RefQuadrilateral, 1}(), :full),
+        ("2D Q2", g2, Lagrange{RefQuadrilateral, 2}(), :full),
+        ("2D Q3", g2, Lagrange{RefQuadrilateral, 3}(), :full),
+        ("2D Q2 vec", g2, Lagrange{RefQuadrilateral, 2}()^2, :full),
+        ("2D Nedelec", g2, Nedelec{RefQuadrilateral, 1}(), :tangential),
+        ("2D RT", g2, RaviartThomas{RefQuadrilateral, 1}(), :normal),
+        ("3D Q1", g3, Lagrange{RefHexahedron, 1}(), :full),
+        ("3D Q2", g3, Lagrange{RefHexahedron, 2}(), :full),
+        ("3D Nedelec", g3, Nedelec{RefHexahedron, 1}(), :tangential),
+        ("3D RT", g3, RaviartThomas{RefHexahedron, 1}(), :normal),
+    ]
+    @testset "$name" for (name, g, ip, comp) in cases
+        constrained, raw = _continuity(g, ip, comp)
+        @test constrained < 1.0e-10  # trace continuity of the constrained field
+        @test raw > 1.0e-3           # the sampling does detect unconstrained jumps
+    end
+end
