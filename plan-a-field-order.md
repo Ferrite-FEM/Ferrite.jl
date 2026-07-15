@@ -32,8 +32,11 @@
 >   error (needs the dof-functional/quadrature API from A.4).
 > - ✅ Multi-field on a single subdomain (single-field assert dropped; multiple
 >   subdomains still guarded with an error).
-> - ⬜ **M4** tutorial Kelly port to `hanging_facets`, legacy-path + `EntityMaps`
->   removal (ask before deleting), docs/changelog.
+> - 🟨 **M4** tutorial Kelly estimator ported to `hanging_facets` (verified end-to-end,
+>   error monotonically decreasing). Remaining, **pending user sign-off on deletions**:
+>   legacy `_add_conformity_constraint` + the node-level `hanging_nodes` dict (and its
+>   `getindex`/`iterate` forwarding), the `>1`-jump descent in `_subtree_corner_ref`,
+>   `EntityMaps` retention in `DofHandler`; then docs/changelog.
 
 **Goal:** support *every* interpolation Ferrite supports on the grid's reference shapes
 (`RefQuadrilateral`/`RefHexahedron`) on a `NonConformingGrid` produced by `creategrid` —
