@@ -1159,11 +1159,10 @@ end
 ##################################
 # Lagrange RefHexahedron order 3 #
 ##################################
-# Tricubic tensor-product interpolation. The 64 nodes sit on the 4×4×4 lattice of the
-# reference hexahedron, each node being a tensor product of the 1D order-3 Gauss-Lobatto
-# nodes (which have a smaller interpolation error than equispaced nodes). The interior face
-# dofs follow the lattice enumeration assumed by `permute_and_push!` (matching
-# `Lagrange{RefQuadrilateral, 3}`).
+# Tricubic tensor-product interpolation. The 64 nodes sit on the regular 4×4×4 lattice of
+# the reference hexahedron, each node being a tensor product of the equispaced 1D order-3
+# nodes. The interior face dofs follow the lattice enumeration assumed by
+# `permute_and_push!` (matching `Lagrange{RefQuadrilateral, 3}`).
 getnbasefunctions(::Lagrange{RefHexahedron, 3}) = 64
 
 edgedof_interior_indices(::Lagrange{RefHexahedron, 3}) = (
@@ -1176,8 +1175,9 @@ facedof_interior_indices(::Lagrange{RefHexahedron, 3}) = (
 )
 volumedof_interior_indices(::Lagrange{RefHexahedron, 3}) = (57, 58, 59, 60, 61, 62, 63, 64)
 
-# The 1D order-3 Gauss-Lobatto nodes on [-1, 1]: -1, -1/√5, 1/√5, 1.
-_lagrange_hex3_nodes_1d(::Type{T}) where {T} = (r = 1 / sqrt(T(5)); (-one(T), -r, r, one(T)))
+# The equispaced 1D order-3 Lagrange nodes on [-1, 1], scaled by 3 to keep them integer
+# (the actual nodes are these divided by 3: -1, -1/3, 1/3, 1).
+const _lagrange_hex3_nodes_1d_x3 = (-3, -1, 1, 3)
 
 # Tensor-product multi-indices (a, b, c) ∈ (1:4)³ for the 64 nodes, in local dof order:
 # vertices, edge interior dofs (following the local edge direction), face interior dofs (in
@@ -1224,22 +1224,22 @@ end
 const _lagrange_hex3_multiindices = _build_lagrange_hex3_multiindices()
 
 function reference_coordinates(::Lagrange{RefHexahedron, 3})
-    m = _lagrange_hex3_nodes_1d(Float64)
-    return [Vec{3, Float64}((m[α[1]], m[α[2]], m[α[3]])) for α in _lagrange_hex3_multiindices]
+    m = _lagrange_hex3_nodes_1d_x3
+    return [Vec{3, Float64}((m[α[1]] / 3, m[α[2]] / 3, m[α[3]] / 3)) for α in _lagrange_hex3_multiindices]
 end
 
-function reference_shape_value(ip::Lagrange{RefHexahedron, 3}, ξ::Vec{3, T}, i::Int) where {T}
+function reference_shape_value(ip::Lagrange{RefHexahedron, 3}, ξ::Vec{3}, i::Int)
     if !(0 < i <= 64)
         throw(ArgumentError("no shape function $i for interpolation $ip"))
     end
-    m = _lagrange_hex3_nodes_1d(T)
+    m = _lagrange_hex3_nodes_1d_x3
     α = _lagrange_hex3_multiindices[i]
     # Product of the 1D Lagrange basis L_a(t) = ∏_{b≠a} (t - x_b) / (x_a - x_b) per axis,
-    # with the nodes converted to T to preserve the element type of ξ.
+    # evaluated with the nodes scaled by 3 (s = 3t) to preserve the element type of ξ.
     val = one(ξ[1])
     for d in 1:3
         a = α[d]
-        s = ξ[d]
+        s = 3 * ξ[d]
         for b in 1:4
             b == a && continue
             val *= (s - m[b]) / (m[a] - m[b])
