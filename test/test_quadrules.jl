@@ -1,3 +1,8 @@
+# Imports for parallel (isolated) test execution:
+using LinearAlgebra
+using StaticArrays
+include(joinpath(@__DIR__, "test_utils.jl"))
+
 using Ferrite: reference_shape_value
 
 @testset "Quadrature testing" begin

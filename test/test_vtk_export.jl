@@ -1,3 +1,6 @@
+# Imports for parallel (isolated) test execution:
+import SHA
+
 @testset "VTKGridFile" begin #TODO: Move all vtk tests here
     @testset "show(::VTKGridFile)" begin
         mktempdir() do tmp
@@ -57,7 +60,7 @@
                 write_solution(vtk, dh, a)
             end
             @test Ferrite.write_discontinuous(v)
-            @test bytes2hex(open(SHA.sha1, fname * ".vtu")) == "9c159760c7d5e2c437ba2faed73967bf687aa9f3"
+            @test bytes2hex(open(SHA.sha1, fname * ".vtu")) == "4039e17bf22ba76b377d65e455af059a658257de"
         end
 
         ip = DiscontinuousLagrange{RefTetrahedron, 1}()
@@ -84,7 +87,7 @@
                 Ferrite.write_constraints(vtk, ch)
             end
             @test Ferrite.write_discontinuous(v)
-            @test bytes2hex(open(SHA.sha1, fname * ".vtu")) == "d665ec0c4d6bb5112614c3f081a7c684f8cb6356"
+            @test bytes2hex(open(SHA.sha1, fname * ".vtu")) == "8c0af3927f844cd9260640ece23296f06b24bfc4"
         end
 
         # Produce a u such that the overall shape is f(x, xc) = 2 * (x[1]^2 - x[2]^2) - (xc[1]^2 - xc[2]^2)
@@ -126,7 +129,7 @@
 
             u_dg = calculate_u(dh_dg)
 
-            testhash = "daf0cbe26ff709705f338526b19881ef5758f16b"
+            testhash = "f72a6106e1b0ea8f035e0116871857b25b079d9d"
 
             fname1 = joinpath(tmp, "discont_kwarg")
             VTKGridFile(fname1, grid; write_discontinuous = true) do vtk
