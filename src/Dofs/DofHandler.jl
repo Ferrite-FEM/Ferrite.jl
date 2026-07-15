@@ -759,10 +759,12 @@ dofs are stored according to the canonical orientation of the face (the face as 
 its sorted vertex tuple, see [`sortface`](@ref)) and this function maps them to the local
 orientation, given by `orientation` (see [`SurfaceOrientationInfo`](@ref)).
 
-This adjustment is only necessary for faces that can be shared between cells, i.e. for
-cells with reference dimension 3. For cells with reference dimension 2 the face is the
-interior of the cell itself, so the dofs are pushed in the stored order (such dofs are
-also not necessarily placed on a lattice, e.g. for `RaviartThomas{RefTriangle, 2}`).
+This adjustment is necessary for faces that can be shared between 3D cells. Lattice face
+dofs on 2D cells are canonicalized as well, because a 2D cell can share its interior with a
+face of a 3D cell when the same field is used in multiple [`SubDofHandler`](@ref)s. Face
+dofs on 2D cells that have not opted in to the lattice assumption are pushed in the stored
+order (such dofs are not necessarily placed on a lattice, e.g. for
+`RaviartThomas{RefTriangle, 2}`).
 
 The permutation assumes that the interior dofs are placed on a regular lattice, in the
 enumeration order specified by [`facedof_interior_indices`](@ref). An interpolation must opt
@@ -791,7 +793,9 @@ methodology described therein.
     n_copies = step(dofs)
     @assert n_copies > 0
     ndofs = length(dofs)
-    if rdim == 3 && adjust_during_distribution && ndofs > 1
+    should_permute = adjust_during_distribution && ndofs > 1 &&
+        (rdim == 3 || (rdim == 2 && interior_facedofs_on_lattice))
+    if should_permute
         interior_facedofs_on_lattice || error("Dof distribution for an interpolation with multiple dofs on a face shared between 3D cells requires the interior face dofs to be placed on a regular lattice; this interpolation has not opted in, see `Ferrite.interior_facedofs_on_lattice` and `Ferrite.permute_and_push!`.")
         if nfacevertices == 3 # triangular face
             q = _triangle_lattice_order(ndofs)
