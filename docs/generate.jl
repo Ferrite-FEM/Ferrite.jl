@@ -59,7 +59,7 @@ include("download_resources.jl")
         end
         if !liveserver
             @timeit dto "notebook()"  @timeit dto name begin
-                Literate.notebook(program, OUT, preprocess = nbpre, execute = is_ci) # Don't execute locally
+                Literate.notebook(program, OUT, preprocess = nbpre, execute = is_ci && !skip_execution) # Don't execute locally
             end
         end
     elseif any(endswith.(program, [".png", ".jpg", ".gif"]))
