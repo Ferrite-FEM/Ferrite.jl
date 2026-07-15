@@ -5,8 +5,8 @@ import Ferrite: @debug
 using SparseArrays: SparseMatrixCSC, spzeros
 using OrderedCollections: OrderedSet
 
-include("BWG.jl")
 include("ncgrid.jl")
+include("BWG.jl")
 include("constraints.jl")
 
 export ForestBWG,

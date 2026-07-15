@@ -1095,3 +1095,168 @@ end
     Ferrite.balanceforest!(adaptive_grid)
     @test getncells(adaptive_grid) == 9 * 8 + 7 + 8
 end
+
+@testset "generic conformity constraints" begin
+    # Constraint extraction: constrained dof -> (master dof -> weight)
+    function _extract_constraints(ch)
+        d = Dict{Int, Dict{Int, Float64}}()
+        for (i, dof) in enumerate(ch.prescribed_dofs)
+            coeffs = ch.dofcoefficients[i]
+            d[dof] = coeffs === nothing ? Dict{Int, Float64}() : Dict(coeffs)
+        end
+        return d
+    end
+
+    function _build_ch(g, ip; legacy::Bool)
+        dh = DofHandler(g)
+        add!(dh, :u, ip)
+        close!(dh)
+        ch = ConstraintHandler(dh)
+        if legacy
+            Ferrite.AMR._add_conformity_constraint(ch, 1, ip)
+        else
+            add!(ch, ConformityConstraint(:u))
+        end
+        return ch
+    end
+
+    # Physical coordinates of all nodal dofs (Q1 geometry); vector fields interleave
+    # `vdim` dofs per scalar slot, all at the same coordinate.
+    function _dofcoords(dh, ip)
+        base = ip isa VectorizedInterpolation ? ip.ip : ip
+        vdim = Ferrite.n_components(ip)
+        g = dh.grid
+        dim = Ferrite.getspatialdim(g)
+        geo = Lagrange{Ferrite.getrefshape(base), 1}()
+        refc = Ferrite.reference_coordinates(base)
+        X = Dict{Int, Vec{dim, Float64}}()
+        for cell in 1:getncells(g)
+            coords = getcoordinates(g, cell)
+            cd = celldofs(dh, cell)
+            for (l, ξ) in enumerate(refc)
+                x = sum(Ferrite.reference_shape_value(geo, ξ, i) * coords[i] for i in 1:length(coords))
+                for c in 1:vdim
+                    X[cd[(l - 1) * vdim + c]] = x
+                end
+            end
+        end
+        return X
+    end
+
+    # Patch identity: every hanging constraint must reproduce a global polynomial of the
+    # field's order exactly, p(x_slave) == Σ w_m p(x_master).
+    function _patch_maxerr(g, ip, p)
+        dh = DofHandler(g)
+        add!(dh, :u, ip)
+        close!(dh)
+        ch = ConstraintHandler(dh)
+        add!(ch, ConformityConstraint(:u))
+        X = _dofcoords(dh, ip)
+        maxerr = 0.0
+        nc = 0
+        for (i, dof) in enumerate(ch.prescribed_dofs)
+            coeffs = ch.dofcoefficients[i]
+            coeffs === nothing && continue
+            maxerr = max(maxerr, abs(p(X[dof]) - sum(w * p(X[m]) for (m, w) in coeffs)))
+            nc += 1
+        end
+        return maxerr, nc
+    end
+
+    # Fixtures: intra-tree, inter-tree, and macro elements rotated against each other
+    function fix2d_inter()
+        grid = generate_grid(Quadrilateral, (2, 1))
+        f = ForestBWG(grid, 3)
+        Ferrite.AMR.refine!(f.cells[1], f.cells[1].leaves[1])
+        Ferrite.balanceforest!(f)
+        return Ferrite.creategrid(f)
+    end
+    function fix2d_intra()
+        grid = generate_grid(Quadrilateral, (1, 1))
+        f = ForestBWG(grid, 4)
+        Ferrite.AMR.refine!(f.cells[1], f.cells[1].leaves[1])
+        Ferrite.AMR.refine!(f.cells[1], f.cells[1].leaves[1])
+        Ferrite.balanceforest!(f)
+        return Ferrite.creategrid(f)
+    end
+    function fix2d_rot()
+        grid = generate_grid(Quadrilateral, (2, 2))
+        for _ in 1:2 # rotate cell 2 topologically by 180°
+            c = grid.cells[2]
+            grid.cells[2] = Quadrilateral((c.nodes[2], c.nodes[3], c.nodes[4], c.nodes[1]))
+        end
+        f = ForestBWG(grid, 3)
+        Ferrite.AMR.refine!(f.cells[1], f.cells[1].leaves[1])
+        Ferrite.AMR.refine!(f.cells[4], f.cells[4].leaves[1])
+        Ferrite.balanceforest!(f)
+        return Ferrite.creategrid(f)
+    end
+    function fix3d_intra()
+        grid = generate_grid(Hexahedron, (1, 1, 1))
+        f = ForestBWG(grid, 4)
+        Ferrite.AMR.refine!(f.cells[1], f.cells[1].leaves[1])
+        Ferrite.AMR.refine!(f.cells[1], f.cells[1].leaves[1])
+        Ferrite.balanceforest!(f)
+        return Ferrite.creategrid(f)
+    end
+    function fix3d_rot() # the "Combined and rotated" two-patch case with tree 7 rotated
+        grid = generate_grid(Hexahedron, (2, 2, 2))
+        for _ in 1:2
+            c = grid.cells[7]
+            grid.cells[7] = Hexahedron((c.nodes[2], c.nodes[3], c.nodes[4], c.nodes[1], c.nodes[6], c.nodes[7], c.nodes[8], c.nodes[5]))
+        end
+        f = ForestBWG(grid, 3)
+        Ferrite.AMR.refine_all!(f, 1)
+        Ferrite.AMR.refine!(f.cells[1], f.cells[1].leaves[8])
+        Ferrite.AMR.refine!(f.cells[1], f.cells[1].leaves[1])
+        Ferrite.AMR.refine!(f.cells[7], f.cells[7].leaves[6])
+        Ferrite.AMR.refine!(f.cells[7], f.cells[7].leaves[3])
+        return Ferrite.creategrid(f)
+    end
+
+    fixtures = [
+        ("2d-inter", fix2d_inter()), ("2d-intra", fix2d_intra()), ("2d-rot", fix2d_rot()),
+        ("3d-intra", fix3d_intra()), ("3d-rot", fix3d_rot()),
+    ]
+
+    p1(x) = 2.0 + 3.0 * sum(x)
+    p2(x) = 1.0 + sum(i * x[i] for i in 1:length(x)) + sum(x[i] * x[j] * (i + j) for i in 1:length(x), j in 1:length(x)) / 4
+
+    @testset "$name" for (name, g) in fixtures
+        dim = Ferrite.getspatialdim(g)
+        shape = dim == 2 ? RefQuadrilateral : RefHexahedron
+        # Q1 parity: the generic builder reproduces the legacy node-level constraints exactly
+        for ip in (Lagrange{shape, 1}(), Lagrange{shape, 1}()^dim)
+            old = _extract_constraints(_build_ch(g, ip; legacy = true))
+            new = _extract_constraints(_build_ch(g, ip; legacy = false))
+            @test old == new
+            @test !isempty(new)
+        end
+        # patch tests: exact reproduction of a global polynomial of the field's order
+        for (ip, p) in ((Lagrange{shape, 1}(), p1), (Lagrange{shape, 2}(), p2))
+            maxerr, nc = _patch_maxerr(g, ip, p)
+            @test maxerr < 1.0e-13
+            @test nc > 0
+        end
+        # vectorized Q2 runs through the same generic path
+        maxerr, nc = _patch_maxerr(g, Lagrange{shape, 2}()^dim, p2)
+        @test maxerr < 1.0e-13
+    end
+
+    @testset "incomplete records refused" begin
+        # >1 level jump across a tree interface (unbalanced): the legacy node-level info
+        # tolerates it, but the topological records cannot represent it — the generic
+        # builder must refuse instead of missing constraints.
+        grid = generate_grid(Quadrilateral, (2, 1))
+        f = ForestBWG(grid, 3)
+        Ferrite.AMR.refine!(f.cells[1], f.cells[1].leaves[1])
+        Ferrite.AMR.refine!(f.cells[1], f.cells[1].leaves[2]) # the child on the tree interface
+        g = Ferrite.creategrid(f)
+        @test !g.conformity_info.complete
+        dh = DofHandler(g)
+        add!(dh, :u, Lagrange{RefQuadrilateral, 1}())
+        close!(dh)
+        ch = ConstraintHandler(dh)
+        @test_throws ErrorException add!(ch, ConformityConstraint(:u))
+    end
+end
