@@ -144,7 +144,7 @@ K_gpu = allocate_matrix(CuSparseMatrixCSC{Float32, Int32}, dh)
 f_gpu = KA.zeros(backend, Float32, (ndofs(dh),))
 
 # Furthermore, the individual GPU workers need local buffers.
-# Ferrite comes with a helper, `Ferrite.distribute_to_taks`, which transforms common buffers
+# Ferrite comes with a helper, `Ferrite.distribute_to_tasks`, which transforms common buffers
 # into a suitable GPU format.
 # n_workers = ceil(Int, length(grid.cells) / NUM_THREADS) # FIXME does not match the used 493
 n_workers = maximum(length, colors)
