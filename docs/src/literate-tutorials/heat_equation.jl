@@ -124,8 +124,8 @@ close!(ch)
 # #### Element assembly
 # We define the function `assemble_element!` (see below) which computes the contribution for
 # an element. The function takes pre-allocated `Ke` and `fe` (they are allocated once and
-# then reused for all elements) so we first need to make sure that they are all zeroes at
-# the start of the function by using `fill!`. Then we loop over all the quadrature points,
+# then reused for all elements) that have been filled with zeros outside this function.
+# Then we loop over all the quadrature points,
 # and for each quadrature point we loop over all the (local) shape functions. We need the
 # value and gradient of the test function, `δu` and also the gradient of the trial function
 # `u`. We get all of these from `cellvalues`.
@@ -140,9 +140,6 @@ close!(ch)
 
 function assemble_element!(Ke::Matrix, fe::Vector, cellvalues::CellValues)
     n_basefuncs = getnbasefunctions(cellvalues)
-    ## Reset to 0
-    fill!(Ke, 0)
-    fill!(fe, 0)
     ## Loop over quadrature points
     for q_point in 1:getnquadpoints(cellvalues)
         ## Get the quadrature weight
@@ -173,8 +170,8 @@ end
 # We also create an assembler by using `start_assemble`. The assembler lets us assemble into
 # `K` and `f` efficiently. We then start the loop over all the elements. In each loop
 # iteration we reinitialize `cellvalues` (to update derivatives of shape functions etc.),
-# compute the element contribution with `assemble_element!`, and then assemble into the
-# global `K` and `f` with `assemble!`.
+# fill `Ke` and `fe` with zeros using `fill!`, compute the element contribution with
+# `assemble_element!`, and then assemble into the global `K` and `f` with `assemble!`.
 #
 # !!! note "Notation"
 #     Comparing again with [Introduction to FEM](@ref), `f` and `u` correspond to
@@ -195,6 +192,9 @@ function assemble_global(cellvalues::CellValues, K::SparseMatrixCSC, dh::DofHand
     for cell in CellIterator(dh)
         ## Reinitialize cellvalues for this cell
         reinit!(cellvalues, cell)
+        ## Reset to 0
+        fill!(Ke, 0)
+        fill!(fe, 0)
         ## Compute element contribution
         assemble_element!(Ke, fe, cellvalues)
         ## Assemble Ke and fe into K and f
