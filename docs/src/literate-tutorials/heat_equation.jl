@@ -40,8 +40,8 @@
 # Now we solve the problem in Ferrite. What follows is a program spliced with comments.
 #md # The full program, without comments, can be found in the next [section](@ref heat_equation-plain-program).
 #
-# First we load Ferrite, and some other packages we need
-using Ferrite, SparseArrays
+# First we load Ferrite
+using Ferrite
 # We start by generating a simple grid with 20x20 quadrilateral elements
 # using `generate_grid`. The generator defaults to the square ([-1,1]^2),
 # so we don't need to specify the corners of the domain.
@@ -75,9 +75,10 @@ close!(dh);
 #     numbering of the nodes in the grid. This is *NOT* the case in Ferrite. For more
 #     details, see the [Ferrite numbering rules](@ref "Global-DoF-indices").
 
-# Now that we have distributed all our dofs we can create our tangent matrix,
-# using `allocate_matrix`. This function returns a sparse matrix
+# Now that we have distributed all our dofs we can create our global force vector, `f`,
+# and tangent matrix, `K`. The `allocate_matrix` function returns a sparse matrix
 # with the correct entries stored.
+f = zeros(ndofs(dh))
 K = allocate_matrix(dh)
 
 # ### Boundary conditions
@@ -123,8 +124,8 @@ close!(ch)
 #
 # #### Element assembly
 # We define the function `assemble_element!` (see below) which computes the contribution for
-# an element. The function takes pre-allocated `Ke` and `fe` (they are allocated once and
-# then reused for all elements) that have been filled with zeros outside this function.
+# an element. The function takes pre-allocated `Ke` and `fe`
+# that have been filled with zeros outside this function.
 # Then we loop over all the quadrature points,
 # and for each quadrature point we loop over all the (local) shape functions. We need the
 # value and gradient of the test function, `δu` and also the gradient of the trial function
@@ -164,9 +165,11 @@ end
 
 # #### Global assembly
 # We define the function `assemble_global` to loop over the elements and do the global
-# assembly. The function takes our `cellvalues`, the sparse matrix `K`, and our DofHandler
-# as input arguments and returns the assembled global stiffness matrix, and the assembled
-# global force vector. We start by allocating `Ke`, `fe`, and the global force vector `f`.
+# assembly. The function takes our global (sparse) matrix, `K`, global (dense) force vector,
+# `f`, `cellvalues`, and DofHandler, `dh` as input arguments. It assembles and and returns 
+# the assembled global stiffness matrix, and the global force vector. 
+# 
+# We start by allocating `Ke`, `fe`, and the global force vector `f`.
 # We also create an assembler by using `start_assemble`. The assembler lets us assemble into
 # `K` and `f` efficiently. We then start the loop over all the elements. In each loop
 # iteration we reinitialize `cellvalues` (to update derivatives of shape functions etc.),
@@ -179,13 +182,11 @@ end
 #     versions. However, through the code we use `f` and `u` instead to reflect the strong
 #     connection between the weak form and the Ferrite implementation.
 
-function assemble_global(cellvalues::CellValues, K::SparseMatrixCSC, dh::DofHandler)
+function assemble_global!(K, f, cellvalues::CellValues, dh::DofHandler)
     ## Allocate the element stiffness matrix and element force vector
     n_basefuncs = getnbasefunctions(cellvalues)
     Ke = zeros(n_basefuncs, n_basefuncs)
     fe = zeros(n_basefuncs)
-    ## Allocate global force vector f
-    f = zeros(ndofs(dh))
     ## Create an assembler
     assembler = start_assemble(K, f)
     ## Loop over all cells
@@ -206,8 +207,8 @@ end
 
 # ### Solution of the system
 # The last step is to solve the system. First we call `assemble_global`
-# to obtain the global stiffness matrix `K` and force vector `f`.
-K, f = assemble_global(cellvalues, K, dh);
+# to calculate the global stiffness matrix, `K`, and force vector, `f`.
+assemble_global!(K, f, cellvalues, dh);
 
 # To account for the boundary conditions we use the `apply!` function.
 # This modifies elements in `K` and `f` respectively, such that
