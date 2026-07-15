@@ -57,13 +57,15 @@ function _add_conformity_constraints!(ch::ConstraintHandler, sdh, fname::Symbol,
     refshape = Ferrite.getrefshape(ip)
     rfacets = Ferrite.reference_facets(refshape)
     fdofs = Ferrite.facetdof_indices(ip)
+    refc = Ferrite.reference_coordinates(Lagrange{refshape, 1}())
+    ipcoords = Ferrite.reference_coordinates(ip)
     # A dof can be reachable from several records (e.g. a hanging edge shared by two
     # hanging faces); the constraints coincide, so the first one wins.
     seen = Set{Int}()
     for rec in ci.hanging_facets
         cc, clf = rec.coarse[1], rec.coarse[2]
         _constrain_hanging_entity!(
-            ch, dh, rng, ip, vdim,
+            ch, dh, rng, ip, vdim, refc, ipcoords,
             cc, rfacets[clf], fdofs[clf],
             [f[1] for f in rec.fine], [rfacets[f[2]] for f in rec.fine], [fdofs[f[2]] for f in rec.fine],
             seen
@@ -75,7 +77,7 @@ function _add_conformity_constraints!(ch::ConstraintHandler, sdh, fname::Symbol,
         for rec in ci.hanging_edges
             cc, cle = rec.coarse[1], rec.coarse[2]
             _constrain_hanging_entity!(
-                ch, dh, rng, ip, vdim,
+                ch, dh, rng, ip, vdim, refc, ipcoords,
                 cc, redges[cle], edofs[cle],
                 [f[1] for f in rec.fine], [redges[f[2]] for f in rec.fine], [edofs[f[2]] for f in rec.fine],
                 seen
@@ -108,6 +110,27 @@ end
 @inline _frame_param(fr, x) = map(a -> ((x - fr[1]) ⋅ a) / (a ⋅ a), fr[2])
 
 """
+    _InterfaceParams{PD}
+
+Map from a hanging interface's node ids to their coarse-entity parameters — at most 9
+distinct nodes (4 corners, 4 edge midpoints, 1 center), stored inline and looked up by
+linear scan, so building and querying it is allocation-free.
+"""
+struct _InterfaceParams{PD}
+    ids::NTuple{9, Int}
+    ps::NTuple{9, NTuple{PD, Float64}}
+    n::Int
+end
+@inline function Base.getindex(pm::_InterfaceParams, id::Int)
+    for i in 1:pm.n
+        pm.ids[i] == id && return pm.ps[i]
+    end
+    return error("node $id is not on the hanging interface — inconsistent record")
+end
+
+@inline _tuple_contains(t::NTuple, x::Int) = any(y -> y == x, t)
+
+"""
     _interface_params(cells, refc, ccell, cverts, fcells, fverts_all) -> (par, cframe, fglob)
 
 Shared geometry derivation of one hanging-interface record: assign coarse-entity
@@ -124,23 +147,47 @@ function _interface_params(cells, refc, ccell::Int, cverts::NTuple{NC, Int}, fce
 
     cglob = ntuple(i -> Ferrite.get_node_ids(cells[ccell])[cverts[i]], Val(NC))
     fglob = [ntuple(i -> Ferrite.get_node_ids(cells[fcells[q]])[fverts_all[q][i]], Val(NC)) for q in eachindex(fcells)]
-    fsets = [Set(f) for f in fglob]
 
-    par = Dict{Int, NTuple{PD, Float64}}()
-    for i in 1:NC
-        par[cglob[i]] = P[i]
+    # the hanging center: the node common to all fine entities
+    center = 0
+    for x in fglob[1]
+        ok = true
+        for q in 2:length(fglob)
+            _tuple_contains(fglob[q], x) || (ok = false; break)
+        end
+        ok && (center = x; break)
     end
-    center = only(intersect(fsets...))                       # the hanging center node
-    par[center] = ntuple(_ -> 0.0, PD)
-    shared = [only(intersect(fsets[q], cglob)) for q in eachindex(fglob)]  # one coarse corner per fine entity
+    center == 0 && error("hanging record has no common fine node — inconsistent record")
+
+    ids = ntuple(i -> i <= NC ? cglob[i] : (i == NC + 1 ? center : 0), 9)
+    ps = ntuple(i -> i <= NC ? P[i] : ntuple(_ -> 0.0, PD), 9)
+    n = NC + 1
     if NC == 4
-        for q1 in eachindex(fglob), q2 in (q1 + 1):length(fglob)
-            s = setdiff(intersect(fsets[q1], fsets[q2]), center)
-            length(s) == 1 || continue                       # adjacent quadrants share an edge midpoint
-            par[only(s)] = (par[shared[q1]] .+ par[shared[q2]]) ./ 2
+        # one coarse corner per fine entity fixes its quadrant …
+        shared = ntuple(
+            q -> begin
+                sh = 0
+                for x in fglob[q]
+                    _tuple_contains(cglob, x) && (sh = x; break)
+                end
+                sh
+            end, 4
+        )
+        # … and adjacent quadrants share an edge midpoint (diagonal pairs share only the center)
+        for q1 in 1:4, q2 in (q1 + 1):4
+            mid = 0
+            for x in fglob[q1]
+                (x != center && _tuple_contains(fglob[q2], x)) && (mid = x; break)
+            end
+            mid == 0 && continue
+            i1 = findfirst(==(shared[q1]), cglob)::Int
+            i2 = findfirst(==(shared[q2]), cglob)::Int
+            n += 1
+            ids = Base.setindex(ids, mid, n)
+            ps = Base.setindex(ps, (P[i1] .+ P[i2]) ./ 2, n)
         end
     end
-    return par, _entity_frame(refc, cverts), fglob
+    return _InterfaceParams{PD}(ids, ps, n), _entity_frame(refc, cverts), fglob
 end
 
 """
@@ -161,16 +208,13 @@ Fine dofs that *are* coarse dofs (shared corner nodes) are conforming and skippe
 weights are dropped (exact — all evaluation points are dyadic).
 """
 function _constrain_hanging_entity!(
-        ch::ConstraintHandler, dh, rng, ip::ScalarInterpolation, vdim::Int,
+        ch::ConstraintHandler, dh, rng, ip::ScalarInterpolation, vdim::Int, refc, ipcoords,
         ccell::Int, cverts::NTuple{NC, Int}, cdofids,
         fcells::Vector{Int}, fverts_all::Vector{<:NTuple{NC, Int}}, fdofids_all::Vector,
         seen::Set{Int}
     ) where {NC}
     grid = dh.grid
     cells = grid.cells
-    refshape = Ferrite.getrefshape(ip)
-    refc = Ferrite.reference_coordinates(Lagrange{refshape, 1}())
-    ipcoords = Ferrite.reference_coordinates(ip)
     par, cframe, fglob = _interface_params(cells, refc, ccell, cverts, fcells, fverts_all)
     cdofs_coarse = Ferrite.celldofs(dh, ccell)[rng]
 
