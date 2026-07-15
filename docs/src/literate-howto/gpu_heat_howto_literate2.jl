@@ -2,16 +2,16 @@
 #     GPU support is considered experimental at this point and the interfaces shown
 #     in this how-to might break between minor releases.
 
-#= 
+#=
 # Heat equation on GPU
-In this how-to, we demonstrate the experimental API developed to use 
-graphics processing units (GPUs) with Ferrite. 
+In this how-to, we demonstrate the experimental API developed to use
+graphics processing units (GPUs) with Ferrite.
 The how-to is split into 3 parts, first we demonstrate a standard assembly
-with a portable implementation using `KernelAbstractions.jl`. Next, we show 
+with a portable implementation using `KernelAbstractions.jl`. Next, we show
 how a specific kernel for `CUDA` can be written, which leads to better performance (TODO: true?).
 While it is possible to assemble into a global sparse matrix with GPUs, another common strategy
 is to calculate and store each element matrix separately and then use this to build an efficient
-matrix-vector product, how to modify the code to assemble into such a structure is demonstrated 
+matrix-vector product, how to modify the code to assemble into such a structure is demonstrated
 at the end.
 
 ## Global matrix assembly with `KernelAbstractions.jl`
@@ -28,9 +28,9 @@ using SparseArrays
 const NUM_THREADS = 64
 const NUM_TASKS_PER_THREAD = 2
 
-# In this how-to we want to use an existing element routine on the GPU with Ferrite, 
-# and we use the `assemble_element!` from the [heat equation tutorial](heat_equation.md). 
-# To be compatible with the GPU, the element routine must be allocation free 
+# In this how-to we want to use an existing element routine on the GPU with Ferrite,
+# and we use the `assemble_element!` from the [heat equation tutorial](heat_equation.md).
+# To be compatible with the GPU, the element routine must be allocation free
 # (this requires type stable code).
 function assemble_element!(Ke::AbstractMatrix, fe::AbstractVector, cv::CellValues)
     n_basefuncs = getnbasefunctions(cv)
@@ -51,7 +51,7 @@ function assemble_element!(Ke::AbstractMatrix, fe::AbstractVector, cv::CellValue
     return nothing
 end
 
-# We further define a simple cell assembly wrapping to simplify 
+# We further define a simple cell assembly wrapping to simplify
 # the matrix-free demonstration later.
 function assemble_cell!(Ke, fe, cell, cv, assembler)
     reinit!(cv, nothing, cell.coords)
@@ -150,8 +150,8 @@ f_gpu = KA.zeros(backend, Float32, (ndofs(dh),))
 n_workers = maximum(length, colors)
 cv_gpu = Ferrite.distribute_to_tasks(backend, cv, n_workers)
 cc_gpu = Ferrite.distribute_to_tasks(backend, CellCache(dh_gpu), n_workers)
-# We also need a local buffer for the element vectors and matrices, 
-# and these are created as a global array which we use views into in the assembly kernel. 
+# We also need a local buffer for the element vectors and matrices,
+# and these are created as a global array which we use views into in the assembly kernel.
 # TODO: Explain why we use row-major indexing here
 Kes = KA.zeros(backend, Float32, n_workers, getnbasefunctions(cv), getnbasefunctions(cv))
 fes = KA.zeros(backend, Float32, n_workers, getnbasefunctions(cv))
@@ -176,7 +176,7 @@ u_gpu = SparseMatrixCSC(K_gpu) \ Vector(f_gpu)
 #=
 ## Global matrix assembly with `CUDA.jl`
 Only minor differences from the portable `KernelAbstractions.jl` version above are required
-for a specific CUDA-kernel. TODO: What's the point of writing specific CUDA-kernel? 
+for a specific CUDA-kernel. TODO: What's the point of writing specific CUDA-kernel?
 =#
 
 function cuda_assembly_kernel(assembler, color, cc::SoAContainer, cv::SoAContainer, Kes::AbstractArray, fes::AbstractMatrix)

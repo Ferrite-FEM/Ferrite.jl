@@ -9,11 +9,12 @@ GPU.
 
 ```@eval
 # Include the example here, but modify the Literate output to suit being embedded
-using Literate, Markdown
-base_name = "gpu_heat_howto_literate"
-Literate.markdown(string(base_name, ".jl"); name = base_name, execute = false, credit = false, documenter=false)
-content = read(string(base_name, ".md"), String)
-rm(string(base_name, ".md"))
-rm(string(base_name, ".jl"))
-Markdown.parse(content)
+#using Literate, Markdown
+#base_name = "gpu_heat_howto_literate"
+#Literate.markdown(string(base_name, ".jl"); name = base_name, execute = false, credit = false, documenter=false)
+#content = read(string(base_name, ".md"), String)
+#rm(string(base_name, ".md"))
+#rm(string(base_name, ".jl"))
+#Markdown.parse(content)
+nothing
 ```
