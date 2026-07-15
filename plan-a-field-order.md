@@ -32,11 +32,19 @@
 >   error (needs the dof-functional/quadrature API from A.4).
 > - ✅ Multi-field on a single subdomain (single-field assert dropped; multiple
 >   subdomains still guarded with an error).
-> - 🟨 **M4** tutorial Kelly estimator ported to `hanging_facets` (verified end-to-end,
->   error monotonically decreasing). Remaining, **pending user sign-off on deletions**:
->   legacy `_add_conformity_constraint` + the node-level `hanging_nodes` dict (and its
->   `getindex`/`iterate` forwarding), the `>1`-jump descent in `_subtree_corner_ref`,
->   `EntityMaps` retention in `DofHandler`; then docs/changelog.
+> - ✅ **M4** tutorial Kelly estimator ported to `hanging_facets` (verified end-to-end).
+>   Legacy removal done (user-approved): `_add_conformity_constraint`, the node-level
+>   `hanging_nodes` dict + forwarding, the `cons2`/`cons4`/`ERef` plumbing, the `>1`-jump
+>   descent (`_subtree_corner_ref` — such interfaces now yield `complete = false` and the
+>   builder refuses), and the `EntityMaps` struct/field/retention in `DofHandler`. The
+>   historic node-level golden values live on as tests via the
+>   `hanging_nodes_from_records` reconstruction helper. Full Ferrite suite green
+>   (8.68M tests).
+>
+> **Plan A is complete.** Follow-ups not in scope here: higher-order Nédélec/RT (guarded
+> with an error; needs a dof-functional quadrature API), multiple subdomains (guarded),
+> inter-tree edge-only hangs (two trees sharing just an edge — pre-existing gap, also
+> absent from the legacy path).
 
 **Goal:** support *every* interpolation Ferrite supports on the grid's reference shapes
 (`RefQuadrilateral`/`RefHexahedron`) on a `NonConformingGrid` produced by `creategrid` —
