@@ -274,9 +274,14 @@ Two ideas carry the whole construction:
   the pipeline below). This is the data layout that generalizes to
   distributed forests: each process numbers the nodes it owns, and only interface node ids are
   exchanged.
-- **On a 2:1-balanced forest, hanging nodes are midpoints.** A non-conforming interface always
-  places a node at the midpoint of a coarse edge or the center of a coarse face. Each such node
-  is recorded as a linear constraint: the hanging node equals the average of its *master* corners.
+- **2:1 balance is what keeps non-conformity tractable.** On a balanced forest the two sides of
+  a non-conforming interface differ by exactly one level, which buys the construction two
+  things. First, hanging nodes appear only at *predictable* integer coordinates — the midpoint
+  of a coarse edge or the center of a coarse face — so the traversal detects and numbers them
+  without any search (with larger level jumps they could sit at quarter points and deeper).
+  Second, the *masters* of a hanging node are nodes of the coarse entity and therefore regular
+  themselves: every conformity constraint is resolved within one level and never chains through
+  other hanging nodes. The algorithms of [IBWG2015](@citet) assume a balanced forest throughout.
 
 ### Vocabulary: points, closure, support, part
 
