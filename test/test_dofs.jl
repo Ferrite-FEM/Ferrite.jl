@@ -803,6 +803,65 @@ end
     @test dofsshell[9] == 24
 end
 
+@testset "dof distribution on a mixed-dimensional shared face" begin
+    # A 2D cell can share its interior face dofs with a face of a 3D cell through
+    # SubDofHandlers. Both cells must associate every shared global dof with the same
+    # physical location, regardless of the 2D cell orientation or which SubDofHandler is
+    # visited first.
+    solid_grid = generate_grid(Hexahedron, (1, 1, 1))
+    solid = solid_grid.cells[1]
+    nodes = solid_grid.nodes
+    face = (4, 3, 7, 8)
+    shell_orientations = (
+        face,
+        (face[2], face[3], face[4], face[1]),
+        (face[3], face[4], face[1], face[2]),
+        (face[4], face[1], face[2], face[3]),
+        reverse(face),
+        (face[3], face[2], face[1], face[4]),
+        (face[2], face[1], face[4], face[3]),
+        (face[1], face[4], face[3], face[2]),
+    )
+
+    ip_solid = Lagrange{RefHexahedron, 3}()
+    ip_shell = Lagrange{RefQuadrilateral, 3}()
+    ipg_solid = Lagrange{RefHexahedron, 1}()
+    ipg_shell = Lagrange{RefQuadrilateral, 1}()
+    for shell_nodes in shell_orientations, shell_first in (false, true)
+        grid = Grid([solid, Quadrilateral(shell_nodes)], nodes)
+        dh = DofHandler(grid)
+        if shell_first
+            sdh_shell = SubDofHandler(dh, Set(2))
+            add!(sdh_shell, :u, ip_shell)
+            sdh_solid = SubDofHandler(dh, Set(1))
+            add!(sdh_solid, :u, ip_solid)
+        else
+            sdh_solid = SubDofHandler(dh, Set(1))
+            add!(sdh_solid, :u, ip_solid)
+            sdh_shell = SubDofHandler(dh, Set(2))
+            add!(sdh_shell, :u, ip_shell)
+        end
+        close!(dh)
+
+        dof_location = Dict{Int, Vec{3, Float64}}()
+        nclash = 0
+        for (cellnr, ip, ipg) in (
+                (1, ip_solid, ipg_solid),
+                (2, ip_shell, ipg_shell),
+            )
+            x = getcoordinates(grid, cellnr)
+            for (dof, ξ) in zip(celldofs(dh, cellnr), Ferrite.reference_coordinates(ip))
+                xdof = sum(Ferrite.reference_shape_value(ipg, ξ, k) * x[k] for k in eachindex(x))
+                loc = get!(dof_location, dof, xdof)
+                isapprox(loc, xdof; atol = 1.0e-12) || (nclash += 1)
+            end
+        end
+        @test nclash == 0
+        shared = intersect(Set(celldofs(dh, 1)), Set(celldofs(dh, 2)))
+        @test length(shared) == 16 # 4 vertex + 4 * 2 edge + 4 face dofs
+    end
+end
+
 @testset "canonical facedof index helpers" begin
     # Brute-force geometric checks of the helpers used by Ferrite.permute_and_push! to
     # adjust face dofs to the orientation of the local face: the local lattice point must
@@ -871,6 +930,15 @@ end
     cell_dofs = Int[]
     Ferrite.permute_and_push!(cell_dofs, dofs, orientation, true, true, 3, 3)
     @test length(cell_dofs) == 3
+    # A lattice interpolation on a 2D cell uses the same canonical face ordering so it can
+    # share these dofs with a 3D face.
+    cell_dofs_2d = Int[]
+    Ferrite.permute_and_push!(cell_dofs_2d, dofs, orientation, true, true, 3, 2)
+    @test cell_dofs_2d == cell_dofs
+    # Non-lattice face dofs on a 2D cell retain their local ordering.
+    cell_dofs_2d_nonlattice = Int[]
+    Ferrite.permute_and_push!(cell_dofs_2d_nonlattice, dofs, orientation, true, false, 3, 2)
+    @test cell_dofs_2d_nonlattice == collect(dofs)
 end
 
 @testset "dof distribution on shared faces" begin
