@@ -166,9 +166,9 @@ end
 # #### Global assembly
 # We define the function `assemble_global` to loop over the elements and do the global
 # assembly. The function takes our global (sparse) matrix, `K`, global (dense) force vector,
-# `f`, `cellvalues`, and DofHandler, `dh` as input arguments. It assembles and and returns 
-# the assembled global stiffness matrix, and the global force vector. 
-# 
+# `f`, `cellvalues`, and DofHandler, `dh` as input arguments. It assembles and and returns
+# the assembled global stiffness matrix, and the global force vector.
+#
 # We start by allocating `Ke`, `fe`, and the global force vector `f`.
 # We also create an assembler by using `start_assemble`. The assembler lets us assemble into
 # `K` and `f` efficiently. We then start the loop over all the elements. In each loop
