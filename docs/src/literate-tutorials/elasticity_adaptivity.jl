@@ -180,11 +180,13 @@ end
 # !!! note "Why not `ExclusiveTopology`?"
 #     The facet neighbours must be the *true* faces of the refined forest, including
 #     coarse↔fine (hanging) and across-tree faces. `ExclusiveTopology` only knows the
-#     macro (root) mesh and would give a wrong estimator. We instead read the adjacency
-#     straight off the materialized grid: `creategrid` already merges shared nodes across
-#     trees, so conforming faces appear as shared node-pairs, and each hanging face is
-#     linked to its coarse neighbour through the hanging node's master nodes in
-#     `grid.conformity_info`.
+#     macro (root) mesh and would give a wrong estimator. The hanging (coarse↔fine)
+#     adjacency comes directly from the topological records in
+#     `grid.conformity_info.hanging_facets` — each record pairs the coarse facet with
+#     its covering fine sub-facets, which is exactly the facet-pair list a jump
+#     estimator needs. Conforming faces (also across trees) are read off the
+#     materialized grid: `creategrid` merges shared nodes across trees, so they appear
+#     as shared node-pairs.
 function estimate_error(grid, dh, u, C)
     nc = getncells(grid)
     cells = getcells(grid)
@@ -207,13 +209,10 @@ function estimate_error(grid, dh, u, C)
     end
 
     ## Map every facet (as a sorted node-id pair) to the `FacetIndex`(es) that own it.
-    ## TODO: this facet enumeration is hard-coded for 2D linear quadrilaterals — a facet
-    ## is a node pair. It does not generalize: in 3D a facet is a 4-node face, and
-    ## higher-order geometric ansätze put extra nodes on each facet, so the "sorted node
-    ## tuple" key would differ. This ownership/adjacency query (the true coarse↔fine and
-    ## cross-tree facet neighbours of the refined forest) should instead be provided by
-    ## `ForestBWG` itself, which knows the leaf topology for any dimension and ansatz,
-    ## rather than being reconstructed here from the materialized grid.
+    ## This resolves the *conforming* adjacency (hanging interfaces come from the
+    ## `hanging_facets` records below). TODO: the node-pair key is hard-coded for 2D —
+    ## in 3D a facet is a 4-node face; a conforming-adjacency service on `ForestBWG`
+    ## would generalize this.
     facet_owner = Dict{Tuple{Int, Int}, Vector{FacetIndex}}()
     for c in 1:nc
         for (f, fnodes) in enumerate(Ferrite.facets(cells[c]))
@@ -264,11 +263,18 @@ function estimate_error(grid, dh, u, C)
         return nothing
     end
 
-    ## The coarse side of a hanging facet also shows up as a single-owner facet; its
-    ## jump is integrated from the fine side, so collect the coarse keys to make sure
-    ## they are not mistaken for domain-boundary facets below.
-    hang = grid.conformity_info
-    coarse_keys = Set(minmax(m[1], m[2]) for m in values(hang) if length(m) == 2)
+    ## Hanging interfaces straight from the topological records: integrate the jump
+    ## over each fine sub-facet against the coarse neighbour cell, and remember both
+    ## sides' node-pair keys so the conforming/boundary loop below skips them.
+    hanging_keys = Set{Tuple{Int, Int}}()
+    for rec in grid.conformity_info.hanging_facets
+        push!(hanging_keys, minmax(Ferrite.facets(cells[rec.coarse[1]])[rec.coarse[2]]...))
+        for ff in rec.fine
+            fnodes = Ferrite.facets(cells[ff[1]])[ff[2]]
+            push!(hanging_keys, minmax(fnodes...))
+            add_jump!(ff, rec.coarse[1], fnodes[1], fnodes[2])
+        end
+    end
 
     ## Dirichlet facets carry no boundary residual; the Neumann facets the applied
     ## traction; all other boundary facets are traction-free.
@@ -277,26 +283,12 @@ function estimate_error(grid, dh, u, C)
     zero_traction(x) = zero(Vec{2})
 
     for (key, owners) in facet_owner
+        key in hanging_keys && continue
         a, b = key
         if length(owners) == 2
             ## Conforming facet (possibly across trees): both cells share this facet.
             add_jump!(owners[1], owners[2][1], a, b)
-        elseif key in coarse_keys
-            ## Coarse side of a hanging facet: handled from the fine side.
-            continue
         else
-            ## Fine side of a hanging facet: one endpoint is a hanging node whose
-            ## master pair spans the coarse facet → look up the coarse cell.
-            hanging = false
-            for (hn, oth) in ((a, b), (b, a))
-                if haskey(hang, hn) && length(hang[hn]) == 2 && oth in hang[hn]
-                    coarse_key = minmax(hang[hn][1], hang[hn][2])
-                    haskey(facet_owner, coarse_key) && add_jump!(owners[1], facet_owner[coarse_key][1][1], a, b)
-                    hanging = true
-                    break
-                end
-            end
-            hanging && continue
             ## Domain-boundary facet: Neumann/free-surface boundary residual.
             owners[1] in dirichlet_facets && continue
             g = owners[1] in neumann_facets ? traction : zero_traction
