@@ -260,6 +260,15 @@ grid — this is [`creategrid`](@ref Ferrite.AMR.creategrid), which produces a
 `NonConformingGrid`: an ordinary grid plus the *hanging-node constraints* (`conformity_info`)
 that make a conforming finite element field possible.
 
+!!! warning "`conformity_info` is subject to change"
+    `conformity_info` currently stores hanging *vertices* and their master vertices — exactly
+    the information a linear (Q1) discretization needs, and no more. For general
+    discretizations the non-conforming interface itself must be exposed: hanging *edges and
+    faces* need to be detected and stored as entities, so that a field of any order can
+    constrain all of its dofs on such an entity (with weights obtained by evaluating the
+    coarse side's basis). Expect the layout of this field to change when support for
+    higher-order discretizations lands.
+
 Two ideas carry the whole construction:
 
 - **Integer / topological identity, no global node map.** Every node is identified integer /
