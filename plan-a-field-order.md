@@ -1,5 +1,30 @@
 # Plan A — Higher-order field interpolations on adaptive meshes
 
+> **Status (2026-07-15, branch `mk/p4est_generalize_solution_interpolation`):**
+> - ✅ **A.1** `ConformityInfo` records (`HangingFacet`/`HangingEdge`) in `ncgrid.jl`; the
+>   legacy node-level dict is kept as a transitional field with `length`/`getindex`/
+>   `iterate` forwarding, so existing consumers (tests, tutorial) run unchanged.
+> - ✅ **A.2** Emission: intra-tree (`_record_hanging_facet!`/`_record_hanging_edge!`) and
+>   inter-tree (`_emit_interface_face!`, `offL` plumbed through `_iter_interface!`).
+>   *Deviation from A.2.5:* >1-level inter-tree jumps do **not** hard-error `creategrid`
+>   (an existing test codifies the legacy tolerance); instead the records are marked
+>   `complete = false` and the *builder* refuses such grids with an actionable error.
+> - ✅ **A.3** Generic builder for nodal interpolations (`_constrain_hanging_entity!`):
+>   child embedding + orientation derived from shared corner node ids, weights = coarse
+>   trace shape values at fine dof positions, per-component for `VectorizedInterpolation`.
+>   Multi-field still guarded by the single-field assert (next step). Legacy
+>   `_add_conformity_constraint` kept for the parity tests; deletion deferred to M4.
+> - ✅ **M1 parity gate**: Q1 scalar+vector bit-identical to legacy on intra-tree,
+>   inter-tree, and rotated-macro-element fixtures (2D+3D).
+> - ✅ **M2**: Q2 2D/3D patch tests exact (maxerr 0.0, incl. 285-constraint rotated 3D
+>   case); Q3 2D at fp precision (non-dyadic ±1/3 nodes); vectorized Q2. Testset
+>   "generic conformity constraints" (53 tests) in `test/test_p4est.jl`.
+> - ✅ Verified (theory + empirical): constraint chains (nested affine constraints) cannot
+>   occur on fully balanced forests at any order — `close!`'s nested-constraint error
+>   remains a pure balance-failure guard.
+> - ⬜ **M3** Nédélec/RT lowest order. ⬜ Multi-field. ⬜ **M4** tutorial Kelly port,
+>   legacy-path + `EntityMaps` removal (ask before deleting), docs/changelog.
+
 **Goal:** support *every* interpolation Ferrite supports on the grid's reference shapes
 (`RefQuadrilateral`/`RefHexahedron`) on a `NonConformingGrid` produced by `creategrid` —
 any-order `Lagrange`, `Serendipity`, `DiscontinuousLagrange`, `Nedelec`, `RaviartThomas`,
