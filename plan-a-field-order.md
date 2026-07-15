@@ -22,8 +22,18 @@
 > - ✅ Verified (theory + empirical): constraint chains (nested affine constraints) cannot
 >   occur on fully balanced forests at any order — `close!`'s nested-constraint error
 >   remains a pure balance-failure guard.
-> - ⬜ **M3** Nédélec/RT lowest order. ⬜ Multi-field. ⬜ **M4** tutorial Kelly port,
->   legacy-path + `EntityMaps` removal (ask before deleting), docs/changelog.
+> - ✅ **M3** Nédélec/RT order 1 (`_add_piola_conformity!`, `_constrain_curl_edge!`,
+>   `_constrain_div_facet!`): dof functionals are pullback-invariant under the Piola
+>   mappings, so weights are computed exactly in the coarse reference frame (midpoint
+>   rule); signs enter only via `get_direction` + ascending-node-id orientation, correct
+>   on rotated macro elements by construction. Validated against Ferrite's own
+>   `CellValues` conventions by L2-projecting in-space fields (machine precision on
+>   intra/inter-tree + rotated 2D/3D fixtures). Higher-order Nédélec/RT guarded with an
+>   error (needs the dof-functional/quadrature API from A.4).
+> - ✅ Multi-field on a single subdomain (single-field assert dropped; multiple
+>   subdomains still guarded with an error).
+> - ⬜ **M4** tutorial Kelly port to `hanging_facets`, legacy-path + `EntityMaps`
+>   removal (ask before deleting), docs/changelog.
 
 **Goal:** support *every* interpolation Ferrite supports on the grid's reference shapes
 (`RefQuadrilateral`/`RefHexahedron`) on a `NonConformingGrid` produced by `creategrid` —
