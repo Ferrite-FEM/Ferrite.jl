@@ -1221,6 +1221,7 @@ end
 
     p1(x) = 2.0 + 3.0 * sum(x)
     p2(x) = 1.0 + sum(i * x[i] for i in 1:length(x)) + sum(x[i] * x[j] * (i + j) for i in 1:length(x), j in 1:length(x)) / 4
+    p3(x) = 1.0 + x[1]^3 - 2 * x[2]^3 + x[1]^2 * x[2] + x[1] * x[2]
 
     @testset "$name" for (name, g) in fixtures
         dim = Ferrite.getspatialdim(g)
@@ -1241,6 +1242,12 @@ end
         # vectorized Q2 runs through the same generic path
         maxerr, nc = _patch_maxerr(g, Lagrange{shape, 2}()^dim, p2)
         @test maxerr < 1.0e-13
+        # Q3 (2D): non-dyadic node positions (±1/3), exact up to fp noise
+        if dim == 2
+            maxerr, nc = _patch_maxerr(g, Lagrange{shape, 3}(), p3)
+            @test maxerr < 1.0e-13
+            @test nc > 0
+        end
     end
 
     @testset "incomplete records refused" begin
