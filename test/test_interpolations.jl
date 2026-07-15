@@ -207,17 +207,11 @@ using Ferrite: reference_shape_value, reference_shape_gradient
                     end
                 else # length(face) == 4
                     # Lattice point (i, j) is located at the bilinear face coordinates
-                    # (us[i], us[j]) where us are the interior 1D node positions on [0, 1]:
-                    # Gauss-Lobatto for Lagrange{RefHexahedron, 3}, equispaced otherwise.
+                    # ((i + 1) / order, (j + 1) / order)
                     m = isqrt(length(fdofs))
                     @assert m * m == length(fdofs)
-                    us = if ip isa Lagrange{RefHexahedron, 3}
-                        ((1 - 1 / sqrt(5)) / 2, (1 + 1 / sqrt(5)) / 2)
-                    else
-                        ntuple(i -> i / order, m)
-                    end
-                    for j in 1:m, i in 1:m
-                        u, v = us[i], us[j]
+                    for j in 0:(m - 1), i in 0:(m - 1)
+                        u, v = (i + 1) / order, (j + 1) / order
                         x = (1 - u) * (1 - v) * vx[face[1]] + u * (1 - v) * vx[face[2]] +
                             u * v * vx[face[3]] + (1 - u) * v * vx[face[4]]
                         k += 1
