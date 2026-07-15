@@ -1267,3 +1267,152 @@ end
         @test_throws ErrorException add!(ch, ConformityConstraint(:u))
     end
 end
+
+@testset "conformity constraints for H(curl)/H(div)" begin
+    # Ground truth through Ferrite's own machinery: L2-project a field that lies in the
+    # (broken) FE space cellwise — the projection reproduces it exactly and the dof values
+    # carry Ferrite's get_direction sign conventions. Every hanging constraint must then
+    # hold for those dof values.
+    function _project_field(dh, ip, f)
+        qr = QuadratureRule{Ferrite.getrefshape(ip)}(3)
+        cv = CellValues(qr, ip, Lagrange{Ferrite.getrefshape(ip), 1}())
+        M = allocate_matrix(dh)
+        b = zeros(ndofs(dh))
+        asm = start_assemble(M, b)
+        n = getnbasefunctions(cv)
+        Me = zeros(n, n); be = zeros(n)
+        for cell in CellIterator(dh)
+            reinit!(cv, cell)
+            fill!(Me, 0.0); fill!(be, 0.0)
+            for qp in 1:getnquadpoints(cv)
+                dΩ = getdetJdV(cv, qp)
+                x = spatial_coordinate(cv, qp, getcoordinates(cell))
+                for i in 1:n
+                    Ni = shape_value(cv, qp, i)
+                    be[i] += (f(x) ⋅ Ni) * dΩ
+                    for j in 1:n
+                        Me[i, j] += (Ni ⋅ shape_value(cv, qp, j)) * dΩ
+                    end
+                end
+            end
+            assemble!(asm, celldofs(cell), Me, be)
+        end
+        return M \ b
+    end
+
+    function _constraint_maxerr(g, ip, fields)
+        dh = DofHandler(g)
+        add!(dh, :u, ip)
+        close!(dh)
+        ch = ConstraintHandler(dh)
+        add!(ch, ConformityConstraint(:u))
+        maxerr = 0.0
+        nc = 0
+        for f in fields
+            u = _project_field(dh, ip, f)
+            for (i, dof) in enumerate(ch.prescribed_dofs)
+                coeffs = ch.dofcoefficients[i]
+                coeffs === nothing && continue
+                maxerr = max(maxerr, abs(u[dof] - sum(w * u[m] for (m, w) in coeffs)))
+                nc += 1
+            end
+        end
+        return maxerr, nc
+    end
+
+    function hfix2d_inter()
+        grid = generate_grid(Quadrilateral, (2, 1))
+        f = ForestBWG(grid, 3)
+        Ferrite.AMR.refine!(f.cells[1], f.cells[1].leaves[1])
+        Ferrite.balanceforest!(f)
+        return Ferrite.creategrid(f)
+    end
+    function hfix2d_rot()
+        grid = generate_grid(Quadrilateral, (2, 2))
+        for _ in 1:2
+            c = grid.cells[2]
+            grid.cells[2] = Quadrilateral((c.nodes[2], c.nodes[3], c.nodes[4], c.nodes[1]))
+        end
+        f = ForestBWG(grid, 3)
+        Ferrite.AMR.refine!(f.cells[1], f.cells[1].leaves[1])
+        Ferrite.AMR.refine!(f.cells[4], f.cells[4].leaves[1])
+        Ferrite.balanceforest!(f)
+        return Ferrite.creategrid(f)
+    end
+    function hfix3d_intra()
+        grid = generate_grid(Hexahedron, (1, 1, 1))
+        f = ForestBWG(grid, 4)
+        Ferrite.AMR.refine!(f.cells[1], f.cells[1].leaves[1])
+        Ferrite.AMR.refine!(f.cells[1], f.cells[1].leaves[1])
+        Ferrite.balanceforest!(f)
+        return Ferrite.creategrid(f)
+    end
+    function hfix3d_rot()
+        grid = generate_grid(Hexahedron, (2, 2, 2))
+        for _ in 1:2
+            c = grid.cells[7]
+            grid.cells[7] = Hexahedron((c.nodes[2], c.nodes[3], c.nodes[4], c.nodes[1], c.nodes[6], c.nodes[7], c.nodes[8], c.nodes[5]))
+        end
+        f = ForestBWG(grid, 3)
+        Ferrite.AMR.refine_all!(f, 1)
+        Ferrite.AMR.refine!(f.cells[1], f.cells[1].leaves[8])
+        Ferrite.AMR.refine!(f.cells[1], f.cells[1].leaves[1])
+        Ferrite.AMR.refine!(f.cells[7], f.cells[7].leaves[6])
+        Ferrite.AMR.refine!(f.cells[7], f.cells[7].leaves[3])
+        return Ferrite.creategrid(f)
+    end
+
+    # constants + linear fields inside the respective lowest-order spaces
+    fields2d_curl = [x -> Vec(1.0, 0.0), x -> Vec(0.0, 1.0), x -> Vec(0.3 * x[2] + 0.7, -0.2 * x[1])]
+    fields2d_div = [x -> Vec(1.0, 0.0), x -> Vec(0.0, 1.0), x -> Vec(0.4 * x[1] - 0.1, 0.8 * x[2] + 0.2)]
+    fields3d_curl = [x -> Vec(1.0, 0.0, 0.0), x -> Vec(0.0, 1.0, 0.0), x -> Vec(0.0, 0.0, 1.0), x -> Vec(0.3 * x[2], -0.4 * x[3], 0.2 * x[1])]
+    fields3d_div = [x -> Vec(1.0, 0.0, 0.0), x -> Vec(0.0, 1.0, 0.0), x -> Vec(0.0, 0.0, 1.0), x -> Vec(0.5 * x[1], -0.3 * x[2], 0.1 * x[3])]
+
+    @testset "$name" for (name, g) in [("2d-inter", hfix2d_inter()), ("2d-rot", hfix2d_rot())]
+        for (ip, fields) in ((Nedelec{RefQuadrilateral, 1}(), fields2d_curl), (RaviartThomas{RefQuadrilateral, 1}(), fields2d_div))
+            maxerr, nc = _constraint_maxerr(g, ip, fields)
+            @test maxerr < 1.0e-12
+            @test nc > 0
+        end
+    end
+    @testset "$name" for (name, g) in [("3d-intra", hfix3d_intra()), ("3d-rot", hfix3d_rot())]
+        for (ip, fields) in ((Nedelec{RefHexahedron, 1}(), fields3d_curl), (RaviartThomas{RefHexahedron, 1}(), fields3d_div))
+            maxerr, nc = _constraint_maxerr(g, ip, fields)
+            @test maxerr < 1.0e-12
+            @test nc > 0
+        end
+    end
+end
+
+@testset "conformity constraints multi-field" begin
+    grid = generate_grid(Quadrilateral, (2, 1))
+    f = ForestBWG(grid, 3)
+    Ferrite.AMR.refine!(f.cells[1], f.cells[1].leaves[1])
+    Ferrite.balanceforest!(f)
+    g = Ferrite.creategrid(f)
+    dh = DofHandler(g)
+    add!(dh, :u, Lagrange{RefQuadrilateral, 2}()^2)
+    add!(dh, :p, Lagrange{RefQuadrilateral, 1}())
+    close!(dh)
+    ch = ConstraintHandler(dh)
+    add!(ch, ConformityConstraint(:u))
+    add!(ch, ConformityConstraint(:p))
+    close!(ch)
+    # Q2 vector field: 3 hanging scalar slots × 2 components; Q1: 1 hanging vertex
+    @test length(ch.prescribed_dofs) == 3 * 2 + 1
+    # constraints must never couple the two fields: classify dofs by field via the
+    # cell-local dof ranges and check each slave's masters stay in the slave's field
+    sdh = dh.subdofhandlers[1]
+    udofs = Set{Int}(); pdofs = Set{Int}()
+    for cell in 1:getncells(g)
+        cd = celldofs(dh, cell)
+        union!(udofs, cd[Ferrite.dof_range(sdh, :u)])
+        union!(pdofs, cd[Ferrite.dof_range(sdh, :p)])
+    end
+    for (i, dof) in enumerate(ch.prescribed_dofs)
+        coeffs = ch.dofcoefficients[i]
+        coeffs === nothing && continue
+        fielddofs = dof in udofs ? udofs : pdofs
+        @test all(m in fielddofs for (m, w) in coeffs)
+    end
+end
