@@ -147,7 +147,7 @@ f_gpu = KA.zeros(backend, Float32, (ndofs(dh),))
 # Ferrite comes with a helper, `Ferrite.distribute_to_taks`, which transforms common buffers
 # into a suitable GPU format.
 # n_workers = ceil(Int, length(grid.cells) / NUM_THREADS) # FIXME does not match the used 493
-n_workers = getncells(grid)
+n_workers = maximum(length, colors)
 cv_gpu = Ferrite.distribute_to_tasks(backend, cv, n_workers)
 cc_gpu = Ferrite.distribute_to_tasks(backend, CellCache(dh_gpu), n_workers)
 # We also need a local buffer for the element vectors and matrices, 
@@ -230,8 +230,8 @@ function cuda_assembly_kernel(color, cc, cv, Kes, fes)
     for i in task_index:stride:length(color)
         cellid = color[i]
         reinit!(cc_i, cellid)
-        Ke = view(Kes, i, :, :)
-        fe = view(fes, i, :)
+        Ke = view(Kes, cellid, :, :)
+        fe = view(fes, cellid, :)
         assemble_cell!(Ke, fe, cc_i, cv_i, assembler)
     end
     return nothing
