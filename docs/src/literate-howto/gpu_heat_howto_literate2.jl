@@ -29,7 +29,7 @@ const NUM_THREADS = 64
 const NUM_TASKS_PER_THREAD = 2
 
 # In this how-to we want to use an existing element routine on the GPU with Ferrite,
-# and we use the `assemble_element!` from the [heat equation tutorial](tutorial-heat-equation).
+# and we use the `assemble_element!` from the [heat equation tutorial](@ref tutorial-heat-equation).
 # To be compatible with the GPU, the element routine must be allocation free
 # (this requires type stable code).
 function assemble_element!(Ke::AbstractMatrix, fe::AbstractVector, cv::CellValues)
