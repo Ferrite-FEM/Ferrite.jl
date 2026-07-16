@@ -33,7 +33,7 @@ using ForwardDiff, ImplicitDifferentiation, StaticArrays
 
 # We define a Voce-plasticity-material, precomputing the shear modulus G and the
 # elastic stiffness tensor Dᵉ so they are not recomputed at every Gauss point.
-struct J2VocePlasticity{T, S <: SymmetricTensor{4,3,T}}
+struct J2VocePlasticity{T, S <: SymmetricTensor{4, 3, T}}
     G::T   # shear modulus
     σ₀::T
     Q::T
@@ -41,23 +41,23 @@ struct J2VocePlasticity{T, S <: SymmetricTensor{4,3,T}}
     Dᵉ::S  # elastic stiffness tensor
 end
 
-function J2VocePlasticity(E::T, ν::T, σ₀::T, Q::T, b::T) where T
+function J2VocePlasticity(E::T, ν::T, σ₀::T, Q::T, b::T) where {T}
     G = E / (2(1 + ν))
     λ = E * ν / ((1 + ν) * (1 - 2ν))
     δ(i, j) = i == j ? one(T) : zero(T)
-    Dᵉ = SymmetricTensor{4,3}((i,j,k,l) -> λ*δ(i,j)*δ(k,l) + G*(δ(i,k)*δ(j,l) + δ(i,l)*δ(j,k)))
+    Dᵉ = SymmetricTensor{4, 3}((i, j, k, l) -> λ * δ(i, j) * δ(k, l) + G * (δ(i, k) * δ(j, l) + δ(i, l) * δ(j, k)))
     return J2VocePlasticity(G, σ₀, Q, b, Dᵉ)
 end
 
 # Define a `struct` to store the material state for a Gauss point.
-struct MaterialState{T, S1 <: SymmetricTensor{2,3}, S2 <: SymmetricTensor{2,3}}
+struct MaterialState{T, S1 <: SymmetricTensor{2, 3}, S2 <: SymmetricTensor{2, 3}}
     εᵖ::S1  # plastic strain
     σ::S2   # stress
     γ::T   # equivalent plastic strain
 end
 
 # Constructor for initializing a material state. Every quantity is set to zero.
-MaterialState() = MaterialState(zero(SymmetricTensor{2,3}), zero(SymmetricTensor{2,3}), 0.0)
+MaterialState() = MaterialState(zero(SymmetricTensor{2, 3}), zero(SymmetricTensor{2, 3}), 0.0)
 Base.zero(::MaterialState) = MaterialState()
 
 # --- SVector interface for ImplicitDifferentiation ---
@@ -65,34 +65,34 @@ Base.zero(::MaterialState) = MaterialState()
 # SVector{6} for strains and SVector{13} for the full state (both in Mandel convention).
 # Layout: [εᵖ(1:6), σ(7:12), γ(13)] with off-diagonal Mandel factor √2.
 
-@inline function to_svec(A::SymmetricTensor{2,3,T}) where T
+@inline function to_svec(A::SymmetricTensor{2, 3, T}) where {T}
     sq2 = T(√2)
-    SVector{6,T}(A[1,1], A[2,2], A[3,3], sq2*A[2,3], sq2*A[1,3], sq2*A[1,2])
+    return SVector{6, T}(A[1, 1], A[2, 2], A[3, 3], sq2 * A[2, 3], sq2 * A[1, 3], sq2 * A[1, 2])
 end
 
 @inline function to_svec(state::MaterialState)
     e = to_svec(state.εᵖ)
     s = to_svec(state.σ)
-    SVector{13}(e[1], e[2], e[3], e[4], e[5], e[6], s[1], s[2], s[3], s[4], s[5], s[6], state.γ)
+    return SVector{13}(e[1], e[2], e[3], e[4], e[5], e[6], s[1], s[2], s[3], s[4], s[5], s[6], state.γ)
 end
 
-@inline function from_svec(::Type{SymmetricTensor{2,3}}, sv::AbstractVector{T}) where T
+@inline function from_svec(::Type{SymmetricTensor{2, 3}}, sv::AbstractVector{T}) where {T}
     isq2 = inv(T(√2))
-    SymmetricTensor{2,3,T}((sv[1], isq2*sv[6], isq2*sv[5], sv[2], isq2*sv[4], sv[3]))
+    return SymmetricTensor{2, 3, T}((sv[1], isq2 * sv[6], isq2 * sv[5], sv[2], isq2 * sv[4], sv[3]))
 end
 
-@inline function from_svec(::Type{MaterialState}, sv::AbstractVector{T}) where T
+@inline function from_svec(::Type{MaterialState}, sv::AbstractVector{T}) where {T}
     isq2 = inv(T(√2))
-    εᵖ = SymmetricTensor{2,3,T}((sv[1],  isq2*sv[6],  isq2*sv[5],  sv[2],  isq2*sv[4],  sv[3]))
-    σ  = SymmetricTensor{2,3,T}((sv[7],  isq2*sv[12], isq2*sv[11], sv[8],  isq2*sv[10], sv[9]))
+    εᵖ = SymmetricTensor{2, 3, T}((sv[1], isq2 * sv[6], isq2 * sv[5], sv[2], isq2 * sv[4], sv[3]))
+    σ = SymmetricTensor{2, 3, T}((sv[7], isq2 * sv[12], isq2 * sv[11], sv[8], isq2 * sv[10], sv[9]))
     return MaterialState(εᵖ, σ, sv[13])
 end
 
 # For later use, during the post-processing step, we define a function to
 # compute the von Mises effective stress.
-function vonMises(σ::SymmetricTensor{2,3})
+function vonMises(σ::SymmetricTensor{2, 3})
     s = dev(σ)
-    return sqrt(3/2 * s ⊡ s)
+    return sqrt(3 / 2 * s ⊡ s)
 end;
 
 # ## FE-problem
@@ -149,7 +149,7 @@ function doassemble!(
         ue = u[eldofs]
         state = @view states[:, i]
         state_old = @view states_old[:, i]
-        residual! = (re, ue)->assemble_cell!(re, cell, cv, material, ue, state, state_old)
+        residual! = (re, ue) -> assemble_cell!(re, cell, cv, material, ue, state, state_old)
         ke .= ForwardDiff.jacobian(residual!, re, ue)
         assemble!(assembler, eldofs, ke, re)
     end
@@ -163,42 +163,42 @@ end
 # State SVector layout: [εᵖ(1:6), σ(7:12), γ(13)]
 function local_forward(ε_sv::SVector{6}, old_state_sv::SVector{13}, material)
     old_state = from_svec(MaterialState, old_state_sv)
-    εᵖ_old   = old_state.εᵖ
-    γ_old    = old_state.γ
+    εᵖ_old = old_state.εᵖ
+    γ_old = old_state.γ
     (; G, σ₀, Q, b, Dᵉ) = material
 
     ## Elastic trial stress
-    ε = from_svec(SymmetricTensor{2,3}, ε_sv)
+    ε = from_svec(SymmetricTensor{2, 3}, ε_sv)
     σ_trial = Dᵉ ⊡ (ε - εᵖ_old)
     s_trial = dev(σ_trial)
-    σ_eq_trial = sqrt(3/2 * s_trial ⊡ s_trial)
+    σ_eq_trial = sqrt(3 / 2 * s_trial ⊡ s_trial)
     σ_y_old = σ₀ + Q * (1 - exp(-b * γ_old))
 
-    if σ_eq_trial - σ_y_old <= 1e-10 * σ_eq_trial
+    if σ_eq_trial - σ_y_old <= 1.0e-10 * σ_eq_trial
         ## Elastic step
         return collect(to_svec(MaterialState(εᵖ_old, σ_trial, γ_old))), false
     else
         ## Plastic step: local Newton for Δγ
         Δγ = zero(σ_eq_trial)
-        tol = 1e-9 * σ_eq_trial
+        tol = 1.0e-9 * σ_eq_trial
         for iter in 1:30
-            γ   = γ_old + Δγ
+            γ = γ_old + Δγ
             σ_y = σ₀ + Q * (1 - exp(-b * γ))
             dσ_y = Q * b * exp(-b * γ)
-            R   = σ_eq_trial - 3G * Δγ - σ_y
-            dR  = -3G - dσ_y
+            R = σ_eq_trial - 3G * Δγ - σ_y
+            dR = -3G - dσ_y
             Δγ -= R / dR
             abs(R) < tol && break
             iter == 30 && error("local newton diverged (R=$R)")
         end
 
         ## Flow direction (unit deviatoric normal)
-        n = s_trial / sqrt(s_trial ⊡ s_trial + 1e-20)
+        n = s_trial / sqrt(s_trial ⊡ s_trial + 1.0e-20)
 
-        Δεᵖ = sqrt(3/2) * Δγ * n
-        σ   = σ_trial - 2G * Δεᵖ
-        εᵖ  = εᵖ_old + Δεᵖ
-        γ   = γ_old + Δγ
+        Δεᵖ = sqrt(3 / 2) * Δγ * n
+        σ = σ_trial - 2G * Δεᵖ
+        εᵖ = εᵖ_old + Δεᵖ
+        γ = γ_old + Δγ
 
         return collect(to_svec(MaterialState(εᵖ, σ, γ))), true
     end
@@ -207,23 +207,23 @@ end
 # 2. Conditions: Physical residuals governing equilibrium.
 # Residual SVector layout matches state: [εᵖ_res(1:6), σ_res(7:12), Φ_or_γ_res(13)]
 function local_conditions(ε_sv::SVector{6}, state_sv::AbstractVector, is_plastic, old_state_sv::AbstractVector, material)
-    state     = from_svec(MaterialState, state_sv)
+    state = from_svec(MaterialState, state_sv)
     old_state = from_svec(MaterialState, old_state_sv)
     εᵖ = state.εᵖ;  σ = state.σ;  γ = state.γ
     εᵖ_old = old_state.εᵖ;  γ_old = old_state.γ
     (; G, σ₀, Q, b, Dᵉ) = material
-    ε = from_svec(SymmetricTensor{2,3}, ε_sv)
+    ε = from_svec(SymmetricTensor{2, 3}, ε_sv)
 
     if !is_plastic
         εᵖ_res = εᵖ - εᵖ_old
-        σ_res  = σ  - Dᵉ ⊡ (ε - εᵖ_old)
-        γ_res  = γ  - γ_old
+        σ_res = σ - Dᵉ ⊡ (ε - εᵖ_old)
+        γ_res = γ - γ_old
     else
         s = dev(σ)
-        n = s / sqrt(s ⊡ s + 1e-20)
-        εᵖ_res    = εᵖ - εᵖ_old - sqrt(3/2) * (γ - γ_old) * n
-        σ_res     = σ  - Dᵉ ⊡ (ε - εᵖ)
-        σ_eq      = sqrt(3/2 * s ⊡ s)
+        n = s / sqrt(s ⊡ s + 1.0e-20)
+        εᵖ_res = εᵖ - εᵖ_old - sqrt(3 / 2) * (γ - γ_old) * n
+        σ_res = σ - Dᵉ ⊡ (ε - εᵖ)
+        σ_eq = sqrt(3 / 2 * s ⊡ s)
         γ_res_val = σ_eq - (σ₀ + Q * (1 - exp(-b * γ)))
     end
 
@@ -241,9 +241,9 @@ material_update = ImplicitFunction(
     representation = MatrixRepresentation()
 )
 
-function stress_function(ε::SymmetricTensor{2,3}, old_state::MaterialState, material)
-    ε_sv       = to_svec(ε)
-    old_sv     = to_svec(old_state)
+function stress_function(ε::SymmetricTensor{2, 3}, old_state::MaterialState, material)
+    ε_sv = to_svec(ε)
+    old_sv = to_svec(old_state)
     result_sv, is_plastic = material_update(ε_sv, old_sv, material)
     return from_svec(MaterialState, result_sv), is_plastic
 end
@@ -268,14 +268,14 @@ function assemble_cell!(re, cell, cv, material, ue::AbstractVector{T}, state_new
         ε_sv = to_svec(ε)
 
         ## 3. Stress and algorithmic tangent via AD (single primal + one Jacobian pass)
-        σ_sv   = stress_from_strain(ε_sv)
+        σ_sv = stress_from_strain(ε_sv)
 
         ## 4. Store new state (re-uses the primal solve result)
         result_sv, _ = material_update(ε_sv, old_sv, material)
         state_new[q_point] = from_svec(MaterialState, ForwardDiff.value.(result_sv))
 
         ## 5. Recover stress as SymmetricTensor for inner products
-        σ = from_svec(SymmetricTensor{2,3}, σ_sv)
+        σ = from_svec(SymmetricTensor{2, 3}, σ_sv)
 
         ## 6. Element integration using tensor inner products (no Mandel arrays needed)
         for i in 1:n_basefuncs
@@ -313,7 +313,7 @@ function solve()
     Q = E / 20   # [Pa]
     ν = 0.3      # [-]
     σ₀ = 1.0e6 # [Pa]
-    b  = 2.0     # [-]
+    b = 2.0     # [-]
     material = J2VocePlasticity(E, ν, σ₀, Q, b)
 
     L = 10.0 # beam length [m]
