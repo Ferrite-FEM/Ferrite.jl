@@ -181,12 +181,12 @@ function local_forward(ε_sv::SVector{6}, old_state_sv::SVector{13}, material)
         ## Plastic step: local Newton for Δγ
         Δγ = zero(σ_eq_trial)
         tol = 1.0e-9 * σ_eq_trial
+
+        ## This is the residual derived from the yield surface
+        residual(Δγ) = σ_eq_trial - 3G * Δγ - (σ₀ + Q * (1 - exp(-b * (γ_old + Δγ))))
         for iter in 1:30
-            γ = γ_old + Δγ
-            σ_y = σ₀ + Q * (1 - exp(-b * γ))
-            dσ_y = Q * b * exp(-b * γ)
-            R = σ_eq_trial - 3G * Δγ - σ_y
-            dR = -3G - dσ_y
+            R = residual(Δγ)
+            dR = ForwardDiff.derivative(residual, Δγ)
             Δγ -= R / dR
             abs(R) < tol && break
             iter == 30 && error("local newton diverged (R=$R)")
