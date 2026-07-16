@@ -37,7 +37,7 @@ using Ferrite, Tensors, SparseArrays, LinearAlgebra, Printf
 using ForwardDiff, ImplicitDifferentiation, StaticArrays
 
 # TODO
-# - ImplicitDifferentiation does not support StaticArrays yet
+# - ImplicitDifferentiation does not support StaticArrays yet, so we introduce temporary collect calls
 # - I could not figure out how to pre-allocate buffers for ImplicitDifferentiation (analogue to ForwardDiff)
 
 # We define a Voce-plasticity-material, precomputing the shear modulus G and the
@@ -59,9 +59,9 @@ function J2VocePlasticity(E::T, ν::T, σ₀::T, Q::T, b::T) where T
 end
 
 # Define a `struct` to store the material state for a Gauss point.
-struct MaterialState{T, S <: SymmetricTensor{2,3,T}}
-    εᵖ::S  # plastic strain
-    σ::S   # stress
+struct MaterialState{T, S1 <: SymmetricTensor{2,3}, S2 <: SymmetricTensor{2,3}}
+    εᵖ::S1  # plastic strain
+    σ::S2   # stress
     γ::T   # equivalent plastic strain
 end
 
@@ -158,7 +158,8 @@ function doassemble!(
         ue = u[eldofs]
         state = @view states[:, i]
         state_old = @view states_old[:, i]
-        assemble_cell!(ke, re, cell, cv, material, ue, state, state_old)
+        residual! = (re, ue)->assemble_cell!(re, cell, cv, material, ue, state, state_old)
+        ke .= ForwardDiff.jacobian(residual!, re, ue)
         assemble!(assembler, eldofs, ke, re)
     end
     return K, r
@@ -256,7 +257,7 @@ function stress_function(ε::SymmetricTensor{2,3}, old_state::MaterialState, mat
     return from_svec(MaterialState, result_sv), is_plastic
 end
 
-function assemble_cell!(Ke, re, cell, cv, material, ue, state_new, state_old)
+function assemble_cell!(re, cell, cv, material, ue::AbstractVector{T}, state_new, state_old) where {T}
     n_basefuncs = getnbasefunctions(cv)
     reinit!(cv, cell)
 
@@ -277,26 +278,18 @@ function assemble_cell!(Ke, re, cell, cv, material, ue, state_new, state_old)
 
         # 3. Stress and algorithmic tangent via AD (single primal + one Jacobian pass)
         σ_sv   = stress_from_strain(ε_sv)
-        D_mat  = ForwardDiff.jacobian(stress_from_strain, ε_sv)
 
         # 4. Store new state (re-uses the primal solve result)
         result_sv, _ = material_update(ε_sv, old_sv, material)
-        state_new[q_point] = from_svec(MaterialState, result_sv)
+        state_new[q_point] = from_svec(MaterialState, ForwardDiff.value.(result_sv))
 
-        # 5. Convert algorithmic tangent to SymmetricTensor{4,3} for tensor contractions
-        D_alg = Tensors.frommandel(SymmetricTensor{4,3}, D_mat)
-
-        # 6. Recover stress as SymmetricTensor for inner products
+        # 5. Recover stress as SymmetricTensor for inner products
         σ = from_svec(SymmetricTensor{2,3}, σ_sv)
 
-        # 7. Element integration using tensor inner products (no Mandel arrays needed)
+        # 6. Element integration using tensor inner products (no Mandel arrays needed)
         for i in 1:n_basefuncs
             ∇δN = shape_symmetric_gradient(cv, q_point, i)
             re[i] += (∇δN ⊡ σ) * dΩ
-            for j in 1:n_basefuncs
-                ∇N = shape_symmetric_gradient(cv, q_point, j)
-                Ke[i, j] += (∇δN ⊡ D_alg ⊡ ∇N) * dΩ
-            end
         end
     end
 
