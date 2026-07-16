@@ -2,7 +2,7 @@
 
 julia_version = "1.12.6"
 manifest_format = "2.0"
-project_hash = "94db70a0f465926a26cc0e5c9ac3a30e4536ef88"
+project_hash = "c1cbc2a8851256bf71edb46252029cc570d26020"
 
 [[deps.ADTypes]]
 git-tree-sha1 = "ec6be48a85c93d995563b84bff8a86bc98df45ce"
@@ -919,6 +919,22 @@ git-tree-sha1 = "0ee181ec08df7d7c911901ea38baf16f755114dc"
 uuid = "b5f81e59-6552-4d32-b1f0-c071b021bf89"
 version = "1.0.0"
 
+[[deps.ImplicitDifferentiation]]
+deps = ["ADTypes", "DifferentiationInterface", "KrylovKit", "LinearAlgebra"]
+git-tree-sha1 = "dd130deff953d662011ce4977d209e3acdca7812"
+uuid = "57b37032-215b-411a-8a7c-41a003a55207"
+version = "0.9.3"
+
+    [deps.ImplicitDifferentiation.extensions]
+    ImplicitDifferentiationChainRulesCoreExt = "ChainRulesCore"
+    ImplicitDifferentiationForwardDiffExt = "ForwardDiff"
+    ImplicitDifferentiationZygoteExt = "Zygote"
+
+    [deps.ImplicitDifferentiation.weakdeps]
+    ChainRulesCore = "d360d2e6-b24c-11e9-a2a3-2a2ae2dbcce4"
+    ForwardDiff = "f6369f11-7733-5829-9624-2563aa707210"
+    Zygote = "e88e6eb3-aa80-5325-afca-941959d7151f"
+
 [[deps.InitialValues]]
 git-tree-sha1 = "4da0f88e9a39111c2fa3add390ab15f3a44f3ca3"
 uuid = "22cec73e-a1b8-11e9-2c92-598750a2cf9c"
@@ -1013,6 +1029,18 @@ deps = ["LinearAlgebra", "Printf", "SparseArrays"]
 git-tree-sha1 = "fc2e5bc665dfa1be33fac60b5762d462bccfae7b"
 uuid = "ba0b0d4f-ebba-5204-a429-3ac8c609bfb7"
 version = "0.10.8"
+
+[[deps.KrylovKit]]
+deps = ["LinearAlgebra", "PackageExtensionCompat", "Printf", "Random", "VectorInterface"]
+git-tree-sha1 = "a3babd26e875e83b461e1c0f945bff52701e8181"
+uuid = "0b1a1467-8014-51b9-945f-bf0ae24f4b77"
+version = "0.10.4"
+
+    [deps.KrylovKit.extensions]
+    KrylovKitChainRulesCoreExt = "ChainRulesCore"
+
+    [deps.KrylovKit.weakdeps]
+    ChainRulesCore = "d360d2e6-b24c-11e9-a2a3-2a2ae2dbcce4"
 
 [[deps.LAME_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl"]
@@ -1592,6 +1620,12 @@ version = "2.2.1"
 deps = ["Artifacts", "Libdl"]
 uuid = "efcefdf7-47ab-520b-bdef-62a2eaa19f15"
 version = "10.44.0+1"
+
+[[deps.PackageExtensionCompat]]
+git-tree-sha1 = "fb28e33b8a95c4cee25ce296c817d89cc2e53518"
+uuid = "65ce6f38-6b18-4e1d-a461-8949797d7930"
+version = "1.0.2"
+weakdeps = ["Requires", "TOML"]
 
 [[deps.Pango_jll]]
 deps = ["Artifacts", "Cairo_jll", "Fontconfig_jll", "FreeType2_jll", "FriBidi_jll", "Glib_jll", "HarfBuzz_jll", "JLLWrappers", "Libdl"]
@@ -2225,6 +2259,24 @@ version = "0.2.0"
 git-tree-sha1 = "c2d0db3ef09f1942d08ea455a9e252594be5f3b6"
 uuid = "4004b06d-e244-455f-a6ce-a5f9919cc534"
 version = "1.0.1"
+
+[[deps.VectorInterface]]
+deps = ["LinearAlgebra"]
+git-tree-sha1 = "949dd28df19a5bf0973214e4a9d36c19079d4d45"
+uuid = "409d34a3-91d5-4945-b6ec-7529ddf182d8"
+version = "0.6.0"
+
+    [deps.VectorInterface.extensions]
+    VectorInterfaceChainRulesCoreExt = "ChainRulesCore"
+    VectorInterfaceEnzymeExt = "Enzyme"
+    VectorInterfaceMooncakeExt = "Mooncake"
+    VectorInterfaceStaticArraysExt = "StaticArrays"
+
+    [deps.VectorInterface.weakdeps]
+    ChainRulesCore = "d360d2e6-b24c-11e9-a2a3-2a2ae2dbcce4"
+    Enzyme = "7da242da-08ed-463a-9acd-ee780be4f1d9"
+    Mooncake = "da2b9cff-9c12-43a0-ae48-6db2b0edb7d6"
+    StaticArrays = "90137ffa-7385-5640-81b9-e52037218182"
 
 [[deps.Vulkan_Loader_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl", "Wayland_jll", "Xorg_libX11_jll", "Xorg_libXrandr_jll", "xkbcommon_jll"]
