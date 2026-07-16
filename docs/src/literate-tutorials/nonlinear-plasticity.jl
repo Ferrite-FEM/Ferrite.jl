@@ -398,7 +398,7 @@ function solve()
     for (el, cell_states) in enumerate(eachcol(states))
         for state in cell_states
             mises_values[el] += vonMises(state.σ)
-            # κ_values[el] += state.k * material.H
+            ## κ_values[el] += state.k * material.H
         end
         mises_values[el] /= length(cell_states) # average von Mises stress
         κ_values[el] /= length(cell_states)     # average drag stress
