@@ -90,7 +90,7 @@ end
     SymmetricTensor{2,3,T}((sv[1], isq2*sv[6], isq2*sv[5], sv[2], isq2*sv[4], sv[3]))
 end
 
-@inline function from_svec(sv::AbstractVector{T}) where T
+@inline function from_svec(::Type{MaterialState}, sv::AbstractVector{T}) where T
     isq2 = inv(T(√2))
     εᵖ = SymmetricTensor{2,3,T}((sv[1],  isq2*sv[6],  isq2*sv[5],  sv[2],  isq2*sv[4],  sv[3]))
     σ  = SymmetricTensor{2,3,T}((sv[7],  isq2*sv[12], isq2*sv[11], sv[8],  isq2*sv[10], sv[9]))
@@ -170,7 +170,7 @@ end
 # All physics is done with SymmetricTensor objects.
 # State SVector layout: [εᵖ(1:6), σ(7:12), γ(13)]
 function local_forward(ε_sv::SVector{6}, old_state_sv::SVector{13}, material)
-    old_state = from_svec(old_state_sv)
+    old_state = from_svec(MaterialState, old_state_sv)
     εᵖ_old   = old_state.εᵖ
     γ_old    = old_state.γ
     (; G, σ₀, Q, b, Dᵉ) = material
@@ -215,8 +215,8 @@ end
 # 2. Conditions: Physical residuals governing equilibrium.
 # Residual SVector layout matches state: [εᵖ_res(1:6), σ_res(7:12), Φ_or_γ_res(13)]
 function local_conditions(ε_sv::SVector{6}, state_sv::AbstractVector, is_plastic, old_state_sv::AbstractVector, material)
-    state     = from_svec(state_sv)
-    old_state = from_svec(old_state_sv)
+    state     = from_svec(MaterialState, state_sv)
+    old_state = from_svec(MaterialState, old_state_sv)
     εᵖ = state.εᵖ;  σ = state.σ;  γ = state.γ
     εᵖ_old = old_state.εᵖ;  γ_old = old_state.γ
     (; G, σ₀, Q, b, Dᵉ) = material
@@ -253,7 +253,7 @@ function stress_function(ε::SymmetricTensor{2,3}, old_state::MaterialState, mat
     ε_sv       = to_svec(ε)
     old_sv     = to_svec(old_state)
     result_sv, is_plastic = material_update(ε_sv, old_sv, material)
-    return from_svec(result_sv), is_plastic
+    return from_svec(MaterialState, result_sv), is_plastic
 end
 
 function assemble_cell!(Ke, re, cell, cv, material, ue, state_new, state_old)
@@ -281,7 +281,7 @@ function assemble_cell!(Ke, re, cell, cv, material, ue, state_new, state_old)
 
         # 4. Store new state (re-uses the primal solve result)
         result_sv, _ = material_update(ε_sv, old_sv, material)
-        state_new[q_point] = from_svec(result_sv)
+        state_new[q_point] = from_svec(MaterialState, result_sv)
 
         # 5. Convert algorithmic tangent to SymmetricTensor{4,3} for tensor contractions
         D_alg = Tensors.frommandel(SymmetricTensor{4,3}, D_mat)
