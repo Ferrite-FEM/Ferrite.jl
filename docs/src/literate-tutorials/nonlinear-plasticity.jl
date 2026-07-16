@@ -36,9 +36,9 @@
 using Ferrite, Tensors, SparseArrays, LinearAlgebra, Printf
 using ForwardDiff, ImplicitDifferentiation, StaticArrays
 
-# TODO
-# - ImplicitDifferentiation does not support StaticArrays yet, so we introduce temporary collect calls
-# - I could not figure out how to pre-allocate buffers for ImplicitDifferentiation (analogue to ForwardDiff)
+# !!! todo
+#     1. ImplicitDifferentiation does not support StaticArrays/Tensors yet, so we introduce temporary collect calls
+#     2. I could not figure out how to pre-allocate buffers for ImplicitDifferentiation (analogue to ForwardDiff)
 
 # We define a Voce-plasticity-material, precomputing the shear modulus G and the
 # elastic stiffness tensor Dᵉ so they are not recomputed at every Gauss point.
@@ -176,7 +176,7 @@ function local_forward(ε_sv::SVector{6}, old_state_sv::SVector{13}, material)
     γ_old    = old_state.γ
     (; G, σ₀, Q, b, Dᵉ) = material
 
-    # Elastic trial stress
+    ## Elastic trial stress
     ε = from_svec(SymmetricTensor{2,3}, ε_sv)
     σ_trial = Dᵉ ⊡ (ε - εᵖ_old)
     s_trial = dev(σ_trial)
@@ -184,10 +184,10 @@ function local_forward(ε_sv::SVector{6}, old_state_sv::SVector{13}, material)
     σ_y_old = σ₀ + Q * (1 - exp(-b * γ_old))
 
     if σ_eq_trial - σ_y_old <= 1e-10 * σ_eq_trial
-        # Elastic step
+        ## Elastic step
         return collect(to_svec(MaterialState(εᵖ_old, σ_trial, γ_old))), false
     else
-        # Plastic step: local Newton for Δγ
+        ## Plastic step: local Newton for Δγ
         Δγ = zero(σ_eq_trial)
         tol = 1e-9 * σ_eq_trial
         for iter in 1:30
@@ -201,7 +201,7 @@ function local_forward(ε_sv::SVector{6}, old_state_sv::SVector{13}, material)
             iter == 30 && error("local newton diverged (R=$R)")
         end
 
-        # Flow direction (unit deviatoric normal)
+        ## Flow direction (unit deviatoric normal)
         n = s_trial / sqrt(s_trial ⊡ s_trial + 1e-20)
 
         Δεᵖ = sqrt(3/2) * Δγ * n
@@ -264,10 +264,10 @@ function assemble_cell!(re, cell, cv, material, ue::AbstractVector{T}, state_new
     for q_point in 1:getnquadpoints(cv)
         dΩ = getdetJdV(cv, q_point)
 
-        # 1. Strain from Ferrite (SymmetricTensor, no conversion needed)
+        ## 1. Strain from Ferrite (SymmetricTensor, no conversion needed)
         ε = function_symmetric_gradient(cv, q_point, ue)
 
-        # 2. Differentiable stress-from-strain closure (SVector → SVector for AD)
+        ## 2. Differentiable stress-from-strain closure (SVector → SVector for AD)
         old_sv = to_svec(state_old[q_point])
         function stress_from_strain(ε_sv::AbstractVector)
             result_sv, _ = material_update(SVector{6}(ε_sv), old_sv, material)
@@ -276,17 +276,17 @@ function assemble_cell!(re, cell, cv, material, ue::AbstractVector{T}, state_new
 
         ε_sv = to_svec(ε)
 
-        # 3. Stress and algorithmic tangent via AD (single primal + one Jacobian pass)
+        ## 3. Stress and algorithmic tangent via AD (single primal + one Jacobian pass)
         σ_sv   = stress_from_strain(ε_sv)
 
-        # 4. Store new state (re-uses the primal solve result)
+        ## 4. Store new state (re-uses the primal solve result)
         result_sv, _ = material_update(ε_sv, old_sv, material)
         state_new[q_point] = from_svec(MaterialState, ForwardDiff.value.(result_sv))
 
-        # 5. Recover stress as SymmetricTensor for inner products
+        ## 5. Recover stress as SymmetricTensor for inner products
         σ = from_svec(SymmetricTensor{2,3}, σ_sv)
 
-        # 6. Element integration using tensor inner products (no Mandel arrays needed)
+        ## 6. Element integration using tensor inner products (no Mandel arrays needed)
         for i in 1:n_basefuncs
             ∇δN = shape_symmetric_gradient(cv, q_point, i)
             re[i] += (∇δN ⊡ σ) * dΩ
