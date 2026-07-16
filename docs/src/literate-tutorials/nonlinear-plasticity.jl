@@ -34,54 +34,74 @@
 #
 # Start by loading some necessary packages
 using Ferrite, Tensors, SparseArrays, LinearAlgebra, Printf
-using ForwardDiff, ImplicitDifferentiation
+using ForwardDiff, ImplicitDifferentiation, StaticArrays
 
-# We define a Voce-plasticity-material, containing material parameters and the elastic
-# stiffness Dᵉ (since it is constant)
-struct J2VocePlasticity{T}
-    E::T
-    ν::T
+# TODO
+# - ImplicitDifferentiation does not support StaticArrays yet
+# - I could not figure out how to pre-allocate buffers for ImplicitDifferentiation (analogue to ForwardDiff)
+
+# We define a Voce-plasticity-material, precomputing the shear modulus G and the
+# elastic stiffness tensor Dᵉ so they are not recomputed at every Gauss point.
+struct J2VocePlasticity{T, S <: SymmetricTensor{4,3,T}}
+    G::T   # shear modulus
     σ₀::T
     Q::T
     b::T
+    Dᵉ::S  # elastic stiffness tensor
+end
+
+function J2VocePlasticity(E::T, ν::T, σ₀::T, Q::T, b::T) where T
+    G = E / (2(1 + ν))
+    λ = E * ν / ((1 + ν) * (1 - 2ν))
+    δ(i, j) = i == j ? one(T) : zero(T)
+    Dᵉ = SymmetricTensor{4,3}((i,j,k,l) -> λ*δ(i,j)*δ(k,l) + G*(δ(i,k)*δ(j,l) + δ(i,l)*δ(j,k)))
+    return J2VocePlasticity(G, σ₀, Q, b, Dᵉ)
 end
 
 # Define a `struct` to store the material state for a Gauss point.
-struct MaterialState{T, S}
-    ## Store "converged" values
-    εᵖ::S # plastic strain
-    σ::S # stress
-    γ::T # effective plastic strain
-end
-
-# Helper function to convert MaterialState to flat array
-function to_array(state::MaterialState)
-    return [Tensors.tomandel(state.εᵖ)..., Tensors.tomandel(state.σ)..., state.γ]
-end
-
-# Helper function to convert flat array to MaterialState
-function from_array(arr::AbstractVector)
-    εᵖ = Tensors.frommandel(SymmetricTensor{2,3}, arr[1:6])
-    σ = Tensors.frommandel(SymmetricTensor{2,3}, arr[7:12])
-    γ = arr[13]
-    return MaterialState(εᵖ, σ, γ)
+struct MaterialState{T, S <: SymmetricTensor{2,3,T}}
+    εᵖ::S  # plastic strain
+    σ::S   # stress
+    γ::T   # equivalent plastic strain
 end
 
 # Constructor for initializing a material state. Every quantity is set to zero.
-function MaterialState()
-    return MaterialState(
-        zero(SymmetricTensor{2, 3}),
-        zero(SymmetricTensor{2, 3}),
-        0.0
-    )
-end
+MaterialState() = MaterialState(zero(SymmetricTensor{2,3}), zero(SymmetricTensor{2,3}), 0.0)
 Base.zero(::MaterialState) = MaterialState()
+
+# --- SVector interface for ImplicitDifferentiation ---
+# ImplicitDifferentiation requires AbstractArray inputs/outputs. We use allocation-free
+# SVector{6} for strains and SVector{13} for the full state (both in Mandel convention).
+# Layout: [εᵖ(1:6), σ(7:12), γ(13)] with off-diagonal Mandel factor √2.
+
+@inline function to_svec(A::SymmetricTensor{2,3,T}) where T
+    sq2 = T(√2)
+    SVector{6,T}(A[1,1], A[2,2], A[3,3], sq2*A[2,3], sq2*A[1,3], sq2*A[1,2])
+end
+
+@inline function to_svec(state::MaterialState)
+    e = to_svec(state.εᵖ)
+    s = to_svec(state.σ)
+    SVector{13}(e[1], e[2], e[3], e[4], e[5], e[6], s[1], s[2], s[3], s[4], s[5], s[6], state.γ)
+end
+
+@inline function from_svec(::Type{SymmetricTensor{2,3}}, sv::AbstractVector{T}) where T
+    isq2 = inv(T(√2))
+    SymmetricTensor{2,3,T}((sv[1], isq2*sv[6], isq2*sv[5], sv[2], isq2*sv[4], sv[3]))
+end
+
+@inline function from_svec(sv::AbstractVector{T}) where T
+    isq2 = inv(T(√2))
+    εᵖ = SymmetricTensor{2,3,T}((sv[1],  isq2*sv[6],  isq2*sv[5],  sv[2],  isq2*sv[4],  sv[3]))
+    σ  = SymmetricTensor{2,3,T}((sv[7],  isq2*sv[12], isq2*sv[11], sv[8],  isq2*sv[10], sv[9]))
+    return MaterialState(εᵖ, σ, sv[13])
+end
 
 # For later use, during the post-processing step, we define a function to
 # compute the von Mises effective stress.
-function vonMises(σ)
-    s = dev(SymmetricTensor{2,3}(σ))
-    return sqrt(3.0 / 2.0 * s ⊡ s)
+function vonMises(σ::SymmetricTensor{2,3})
+    s = dev(σ)
+    return sqrt(3/2 * s ⊡ s)
 end;
 
 # ## FE-problem
@@ -145,116 +165,81 @@ function doassemble!(
 end
 
 
-function elastic_stiffness_mandel(E, ν)
-    λ = E * ν / ((1.0 + ν) * (1.0 - 2.0 * ν))
-    μ = E / (2.0 * (1.0 + ν))
-    T = promote_type(typeof(E), typeof(ν))
-    D = zeros(T, 6, 6)
+# 1. Forward Pass: Computes updated state using a 1D Local Newton solver for Δγ.
+# Input/output use SVector (Mandel convention, stack-allocated) for ImplicitDifferentiation.
+# All physics is done with SymmetricTensor objects.
+# State SVector layout: [εᵖ(1:6), σ(7:12), γ(13)]
+function local_forward(ε_sv::SVector{6}, old_state_sv::SVector{13}, material)
+    old_state = from_svec(old_state_sv)
+    εᵖ_old   = old_state.εᵖ
+    γ_old    = old_state.γ
+    (; G, σ₀, Q, b, Dᵉ) = material
 
-    # Normal components
-    D[1,1] = D[2,2] = D[3,3] = λ + 2μ
-    # Shear components (Mandel scale factor makes these 2μ instead of μ)
-    D[4,4] = D[5,5] = D[6,6] = 2μ
-    # Off-diagonals
-    D[1,2] = D[1,3] = D[2,1] = D[2,3] = D[3,1] = D[3,2] = λ
-    return D
-end
+    # Elastic trial stress
+    ε = from_svec(SymmetricTensor{2,3}, ε_sv)
+    σ_trial = Dᵉ ⊡ (ε - εᵖ_old)
+    s_trial = dev(σ_trial)
+    σ_eq_trial = sqrt(3/2 * s_trial ⊡ s_trial)
+    σ_y_old = σ₀ + Q * (1 - exp(-b * γ_old))
 
-# Compute Von Mises Equivalent Stress in Mandel Space
-function von_mises_mandel(σ_mandel)
-    σ_m = sum(σ_mandel[1:3]) / 3.0
-    s = [σ_mandel[1]-σ_m, σ_mandel[2]-σ_m, σ_mandel[3]-σ_m, σ_mandel[4], σ_mandel[5], σ_mandel[6]]
-    s_norm = sqrt(dot(s, s) + 1e-20) # Regularized for AD safety at zero stress
-    return sqrt(1.5) * s_norm
-end
-
-# 1. Forward Pass: Computes updated state using a 1D Local Newton solver for Δγ
-# Works entirely in Mandel array form to avoid SymmetricTensor indexing pitfalls.
-# state_array layout: [εᵖ_mandel(1:6), σ_mandel(7:12), γ(13)]  (matches to_array/from_array)
-function local_forward(ε_mandel, old_state_array, material)
-    εᵖ_old_mandel = old_state_array[1:6]
-    γ_old = old_state_array[13]
-    (; E, ν, σ₀, Q, b) = material
-
-    G = E / (2.0 * (1.0 + ν))
-    D_e = elastic_stiffness_mandel(E, ν)
-
-    # Elastic Trial State (all in Mandel)
-    σ_trial_mandel = D_e * (ε_mandel - εᵖ_old_mandel)
-    σ_eq_trial = von_mises_mandel(σ_trial_mandel)
-    σ_y_old = σ₀ + Q * (1.0 - exp(-b * γ_old))
-
-    if σ_eq_trial - σ_y_old <= 1e-10 * σ_eq_trial # Relative tolerance
-        # Elastic: state unchanged except stress update
-        return [εᵖ_old_mandel..., σ_trial_mandel..., γ_old], false
+    if σ_eq_trial - σ_y_old <= 1e-10 * σ_eq_trial
+        # Elastic step
+        return collect(to_svec(MaterialState(εᵖ_old, σ_trial, γ_old))), false
     else
-        # Plastic Step: Solve Φ(Δγ) = 0 via Local Newton-Raphson
-        Δγ = 0.0
+        # Plastic step: local Newton for Δγ
+        Δγ = zero(σ_eq_trial)
         tol = 1e-9 * σ_eq_trial
         for iter in 1:30
-            γ = γ_old + Δγ
-            σ_y = σ₀ + Q * (1.0 - exp(-b * γ))
+            γ   = γ_old + Δγ
+            σ_y = σ₀ + Q * (1 - exp(-b * γ))
             dσ_y = Q * b * exp(-b * γ)
-
-            R = σ_eq_trial - 3.0 * G * Δγ - σ_y
-            dR = -3.0 * G - dσ_y
-
+            R   = σ_eq_trial - 3G * Δγ - σ_y
+            dR  = -3G - dσ_y
             Δγ -= R / dR
-            if abs(R) < tol
-                break
-            end
-            if iter == 30
-                error("local newton diverged (R=$R)")
-            end
+            abs(R) < tol && break
+            iter == 30 && error("local newton diverged (R=$R)")
         end
 
-        # Flow direction in Mandel form
-        σ_m_trial = sum(σ_trial_mandel[1:3]) / 3.0
-        s_trial = [σ_trial_mandel[1]-σ_m_trial, σ_trial_mandel[2]-σ_m_trial, σ_trial_mandel[3]-σ_m_trial,
-                   σ_trial_mandel[4], σ_trial_mandel[5], σ_trial_mandel[6]]
-        n = s_trial ./ sqrt(dot(s_trial, s_trial) + 1e-20)
+        # Flow direction (unit deviatoric normal)
+        n = s_trial / sqrt(s_trial ⊡ s_trial + 1e-20)
 
-        # Updates (all in Mandel; D_e:Δεᵖ = 2G*Δεᵖ for deviatoric Δεᵖ)
-        Δεᵖ_mandel = sqrt(1.5) * Δγ .* n
-        σ_mandel   = σ_trial_mandel .- 2.0 * G .* Δεᵖ_mandel
-        εᵖ_mandel  = εᵖ_old_mandel  .+ Δεᵖ_mandel
-        γ = γ_old + Δγ
+        Δεᵖ = sqrt(3/2) * Δγ * n
+        σ   = σ_trial - 2G * Δεᵖ
+        εᵖ  = εᵖ_old + Δεᵖ
+        γ   = γ_old + Δγ
 
-        return [εᵖ_mandel..., σ_mandel..., γ], true
+        return collect(to_svec(MaterialState(εᵖ, σ, γ))), true
     end
 end
 
-# 2. Conditions: The exact physical residuals governing the system at equilibrium.
-# Works entirely in Mandel array form.
-# Residual ordering matches state_array: [εᵖ_eq(1:6), σ_eq(7:12), γ_eq(13)]
-function local_conditions(ε_mandel, state_array, is_plastic, old_state_array, material)
-    εᵖ_mandel     = state_array[1:6]
-    σ_mandel      = state_array[7:12]
-    γ             = state_array[13]
-    εᵖ_old_mandel = old_state_array[1:6]
-    γ_old         = old_state_array[13]
-
-    (; E, ν, σ₀, Q, b) = material
-    D_e = elastic_stiffness_mandel(E, ν)
+# 2. Conditions: Physical residuals governing equilibrium.
+# Residual SVector layout matches state: [εᵖ_res(1:6), σ_res(7:12), Φ_or_γ_res(13)]
+function local_conditions(ε_sv::SVector{6}, state_sv::AbstractVector, is_plastic, old_state_sv::AbstractVector, material)
+    state     = from_svec(state_sv)
+    old_state = from_svec(old_state_sv)
+    εᵖ = state.εᵖ;  σ = state.σ;  γ = state.γ
+    εᵖ_old = old_state.εᵖ;  γ_old = old_state.γ
+    (; G, σ₀, Q, b, Dᵉ) = material
+    ε = from_svec(SymmetricTensor{2,3}, ε_sv)
 
     if !is_plastic
-        # Elastic residuals: εᵖ = εᵖ_old, σ = D_e:(ε - εᵖ_old), γ = γ_old
-        εᵖ_res = εᵖ_mandel .- εᵖ_old_mandel
-        σ_res  = σ_mandel  .- D_e * (ε_mandel .- εᵖ_old_mandel)
-        γ_res  = γ - γ_old
-        return [εᵖ_res..., σ_res..., γ_res]
+        εᵖ_res = εᵖ - εᵖ_old
+        σ_res  = σ  - Dᵉ ⊡ (ε - εᵖ_old)
+        γ_res  = γ  - γ_old
     else
-        # Plastic residuals: flow rule, constitutive, yield condition
-        σ_m = sum(σ_mandel[1:3]) / 3.0
-        s = [σ_mandel[1]-σ_m, σ_mandel[2]-σ_m, σ_mandel[3]-σ_m,
-             σ_mandel[4], σ_mandel[5], σ_mandel[6]]
-        n = s ./ sqrt(dot(s, s) + 1e-20)
-
-        flow_res  = εᵖ_mandel .- εᵖ_old_mandel .- sqrt(1.5) * (γ - γ_old) .* n
-        σ_res     = σ_mandel  .- D_e * (ε_mandel .- εᵖ_mandel)
-        yield_res = von_mises_mandel(σ_mandel) - (σ₀ + Q * (1.0 - exp(-b * γ)))
-        return [flow_res..., σ_res..., yield_res]
+        s = dev(σ)
+        n = s / sqrt(s ⊡ s + 1e-20)
+        εᵖ_res    = εᵖ - εᵖ_old - sqrt(3/2) * (γ - γ_old) * n
+        σ_res     = σ  - Dᵉ ⊡ (ε - εᵖ)
+        σ_eq      = sqrt(3/2 * s ⊡ s)
+        γ_res_val = σ_eq - (σ₀ + Q * (1 - exp(-b * γ)))
     end
+
+    e = to_svec(εᵖ_res)
+    r = to_svec(σ_res)
+    γ_scalar = is_plastic ? γ_res_val : γ_res
+    sv = SVector{13}(e[1], e[2], e[3], e[4], e[5], e[6], r[1], r[2], r[3], r[4], r[5], r[6], γ_scalar)
+    return collect(sv)
 end
 
 material_update = ImplicitFunction(
@@ -264,13 +249,11 @@ material_update = ImplicitFunction(
     representation = MatrixRepresentation()
 )
 
-function stress_function(ϵ_mandel, state, material)
-    # Convert state to array for ImplicitFunction
-    state_array = to_array(state)
-    result_array, is_plastic = material_update(ϵ_mandel, state_array, material)
-    # Convert result back to struct
-    result_state = from_array(result_array)
-    return result_state, is_plastic
+function stress_function(ε::SymmetricTensor{2,3}, old_state::MaterialState, material)
+    ε_sv       = to_svec(ε)
+    old_sv     = to_svec(old_state)
+    result_sv, is_plastic = material_update(ε_sv, old_sv, material)
+    return from_svec(result_sv), is_plastic
 end
 
 function assemble_cell!(Ke, re, cell, cv, material, ue, state_new, state_old)
@@ -280,37 +263,39 @@ function assemble_cell!(Ke, re, cell, cv, material, ue, state_new, state_old)
     for q_point in 1:getnquadpoints(cv)
         dΩ = getdetJdV(cv, q_point)
 
-        # 1. Strain calculation from Ferrite
+        # 1. Strain from Ferrite (SymmetricTensor, no conversion needed)
         ε = function_symmetric_gradient(cv, q_point, ue)
-        ε_mandel = Tensors.tomandel(ε)
 
-        # 2. AD Wrapper: ε_mandel (6) -> σ_mandel (6)
-        function stress_from_strain(strain_mandel)
-            (out, _) = stress_function(strain_mandel, state_old[q_point], material)
-            return Tensors.tomandel(out.σ)
+        # 2. Differentiable stress-from-strain closure (SVector → SVector for AD)
+        old_sv = to_svec(state_old[q_point])
+        function stress_from_strain(ε_sv::AbstractVector)
+            result_sv, _ = material_update(SVector{6}(ε_sv), old_sv, material)
+            return result_sv[SVector{6}(7, 8, 9, 10, 11, 12)]  # σ components
         end
 
-        # 3. Extract exact stress and algorithmic tangent (D_mandel) via AD
-        σ_mandel = stress_from_strain(ε_mandel)
-        D_mandel = ForwardDiff.jacobian(stress_from_strain, ε_mandel)
+        ε_sv = to_svec(ε)
 
-        # 4. Store new internal states
-        (out_full, _) = stress_function(ε_mandel, state_old[q_point], material)
-        state_new[q_point] = out_full
+        # 3. Stress and algorithmic tangent via AD (single primal + one Jacobian pass)
+        σ_sv   = stress_from_strain(ε_sv)
+        D_mat  = ForwardDiff.jacobian(stress_from_strain, ε_sv)
 
-        # 6. Element Integration using Mandel dot products
+        # 4. Store new state (re-uses the primal solve result)
+        result_sv, _ = material_update(ε_sv, old_sv, material)
+        state_new[q_point] = from_svec(result_sv)
+
+        # 5. Convert algorithmic tangent to SymmetricTensor{4,3} for tensor contractions
+        D_alg = Tensors.frommandel(SymmetricTensor{4,3}, D_mat)
+
+        # 6. Recover stress as SymmetricTensor for inner products
+        σ = from_svec(SymmetricTensor{2,3}, σ_sv)
+
+        # 7. Element integration using tensor inner products (no Mandel arrays needed)
         for i in 1:n_basefuncs
             ∇δN = shape_symmetric_gradient(cv, q_point, i)
-            ∇δN_mandel = Tensors.tomandel(∇δN)
-
-            re[i] += dot(∇δN_mandel, σ_mandel) * dΩ
-
+            re[i] += (∇δN ⊡ σ) * dΩ
             for j in 1:n_basefuncs
                 ∇N = shape_symmetric_gradient(cv, q_point, j)
-                ∇N_mandel = Tensors.tomandel(∇N)
-
-                # Perfect representation of virtual work: δW_int = ∫ ∇δN : D : ∇N dΩ
-                Ke[i, j] += dot(∇δN_mandel, D_mandel * ∇N_mandel) * dΩ
+                Ke[i, j] += (∇δN ⊡ D_alg ⊡ ∇N) * dΩ
             end
         end
     end
