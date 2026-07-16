@@ -1,15 +1,6 @@
-# # [Von Mises plasticity](@id tutorial-plasticity)
+# # [Voce plasticity with AD](@id tutorial-plasticity-ad)
 #
-# ![Shows the von Mises stress distribution in a cantilever beam.](plasticity.png)
-#
-# *Figure 1.* A coarse mesh solution of a cantilever beam subjected to a load
-# causing plastic deformations. The initial yield limit is 200 MPa but due to
-# hardening it increases up to approximately 240 MPa.
-#
-#-
-#md # !!! tip
-#md #     This example is also available as a Jupyter notebook:
-#md #     [`plasticity.ipynb`](@__NBVIEWER_ROOT_URL__/tutorials/plasticity.ipynb).
+# TODO update this
 #-
 #
 # ## Introduction

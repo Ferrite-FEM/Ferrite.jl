@@ -178,3 +178,15 @@ Galerkin Infrastructure For the finite element toolbox
 Ferrite.jl"](https://summerofcode.withgoogle.com/programs/2023/projects/SLGbRNI5).
 
 **Keywords**: scalar-valued solution, Dirichlet boundary conditions, Discontinuous Galerkin, Interior penalty.
+
+#### [Tutorial 14: Voce Plasticity](nonlinear-plasticity.md)
+
+This tutorial extends the cantilever beam problem from [Tutorial 5: von Mises
+plasticity](plasticity.md), but instead of standard a J2 plastic model a Voce kinematic hardening model is
+used for the constitutive relation. You will learn how to solve a problem which require the
+solution of a local material problem, and the storage of material state, in each quadrature
+point. Newton's method is used both locally in the material routine, and globally on the
+finite element level, where the consistent tangent is computed using automatic differentiation.
+
+**Keywords**: non-linear finite element, plasticity, material modeling, state variables,
+Newton’s method, automatic differentiation.
