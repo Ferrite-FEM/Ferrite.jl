@@ -26,6 +26,7 @@
 # Start by loading some necessary packages
 using Ferrite, Tensors, SparseArrays, LinearAlgebra, Printf
 using ForwardDiff, ImplicitDifferentiation, StaticArrays
+using WriteVTK
 
 # !!! todo
 #     1. ImplicitDifferentiation does not support StaticArrays/Tensors yet, so we introduce temporary collect calls
@@ -313,18 +314,19 @@ function solve()
     Q = E / 20   # [Pa]
     ν = 0.3      # [-]
     σ₀ = 1.0e6 # [Pa]
-    b = 2.0     # [-]
+    b = 10.0     # [-]
     material = J2VocePlasticity(E, ν, σ₀, Q, b)
 
     L = 10.0 # beam length [m]
     w = 1.0  # beam width [m]
     h = 1.0  # beam height[m]
-    n_timesteps = 3
+    n_loading = 5
+    traction_magnitude = 1.0e7 * [range(0.0, 1.0, length = n_loading)..., range(1.0, -5.0, length = n_loading)..., range(-5.0, 0.0, length = n_loading)...]
+    n_timesteps = length(traction_magnitude)
     u_max = zeros(n_timesteps)
-    traction_magnitude = 1.0e6 * range(0.0, 1.0, length = n_timesteps)
 
     ## Create geometry, dofs and boundary conditions
-    n = 2
+    n = 4
     nels = (10n, n, 2n) # number of elements in each spatial direction
     P1 = Vec((0.0, 0.0, 0.0))  # start point for geometry
     P2 = Vec((L, w, h))        # end point for geometry
@@ -352,6 +354,8 @@ function solve()
     ## Newton-Raphson loop
     NEWTON_TOL = 1 # 1 N
     print("\n Starting Newton iterations:\n")
+
+    pvd = paraview_collection("plasti")
 
     for timestep in 1:n_timesteps
         t = timestep # actual time (used for evaluating d-bndc)
@@ -387,27 +391,45 @@ function solve()
         states_old .= states
 
         u_max[timestep] = maximum(abs, u) # maximum displacement in current timestep
+
+        VTKGridFile("plasti-$timestep", dh) do vtk
+            mises_values = zeros(getncells(grid))
+            κ_values = zeros(getncells(grid))
+            for (el, cell_states) in enumerate(eachcol(states))
+                for state in cell_states
+                    mises_values[el] += vonMises(state.σ)
+                    κ_values[el] += material.Q * (1 - exp(-material.b * (state.γ)))
+                end
+                mises_values[el] /= length(cell_states) # average von Mises stress
+                κ_values[el] /= length(cell_states)
+            end
+            write_solution(vtk, dh, u)
+            write_cell_data(vtk, mises_values, "von Mises [Pa]")
+            write_cell_data(vtk, κ_values, "Drag stress [Pa]")
+            pvd[t] = vtk
+        end
     end
+    vtk_save(pvd);
 
     ## ## Postprocessing
     ## Only a vtu-file corresponding to the last time-step is exported.
     ##
     ## The following is a quick (and dirty) way of extracting average cell data for export.
-    mises_values = zeros(getncells(grid))
-    κ_values = zeros(getncells(grid))
-    for (el, cell_states) in enumerate(eachcol(states))
-        for state in cell_states
-            mises_values[el] += vonMises(state.σ)
-            ## κ_values[el] += state.k * material.H
-        end
-        mises_values[el] /= length(cell_states) # average von Mises stress
-        κ_values[el] /= length(cell_states)     # average drag stress
-    end
-    VTKGridFile("plasticity", dh) do vtk
-        write_solution(vtk, dh, u) # displacement field
-        write_cell_data(vtk, mises_values, "von Mises [Pa]")
-        write_cell_data(vtk, κ_values, "Drag stress [Pa]")
-    end
+    ## mises_values = zeros(getncells(grid))
+    ## κ_values = zeros(getncells(grid))
+    ## for (el, cell_states) in enumerate(eachcol(states))
+    ##     for state in cell_states
+    ##         mises_values[el] += vonMises(state.σ)
+    ##         κ_values[el] += state.k * material.H
+    ##     end
+    ##     mises_values[el] /= length(cell_states) # average von Mises stress
+    ##     κ_values[el] /= length(cell_states)     # average drag stress
+    ## end
+    ## VTKGridFile("plasticity", dh) do vtk
+    ##     write_solution(vtk, dh, u) # displacement field
+    ##     write_cell_data(vtk, mises_values, "von Mises [Pa]")
+    ##     write_cell_data(vtk, κ_values, "Drag stress [Pa]")
+    ## end
 
     return u_max, traction_magnitude
 end
