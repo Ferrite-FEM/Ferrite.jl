@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Next] - xxxx-xx-xx
 
+### Added
+ - `PointEvalHandler` can assign points slightly outside the grid to the closest cell with
+   the new keyword argument `extrapolation_tolerance`, such that evaluation extrapolates
+   from that cell. ([#1238])
+
 
 ## [v1.5.0] - 2026-07-13
 
@@ -1179,3 +1184,4 @@ poking into Ferrite internals:
 [#1226]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1226
 [#1228]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1228
 [#1235]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1235
+[#1238]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1238

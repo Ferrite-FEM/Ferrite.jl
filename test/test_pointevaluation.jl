@@ -452,6 +452,77 @@ function test_pe_first_point_missing()
     return
 end
 
+function test_pe_extrapolation()
+    f(x) = x[1] + 2x[2]
+
+    # Quadrilaterals
+    mesh = generate_grid(Quadrilateral, (2, 2)) # covers [-1, 1] x [-1, 1]
+    dh = DofHandler(mesh)
+    add!(dh, :s, Lagrange{RefQuadrilateral, 1}())
+    close!(dh)
+    u = zeros(ndofs(dh))
+    apply_analytical!(u, dh, :s, f)
+
+    points = [Vec((1.04, 0.5)), Vec((-1.02, -1.03)), Vec((0.0, 1.001))]
+
+    # Without extrapolation the points are not assigned to cells
+    ph = @test_logs (:warn,) (:warn,) (:warn,) PointEvalHandler(mesh, points)
+    @test all(isnothing, ph.cells)
+    @test all(isnan, evaluate_at_points(ph, dh, u, :s))
+
+    # With extrapolation the points are assigned to the closest cells and the values
+    # extrapolated (exactly, since f is linear)
+    @test_logs min_level = Logging.Warn PointEvalHandler(mesh, points; extrapolation_tolerance = 0.2)
+    ph = PointEvalHandler(mesh, points; extrapolation_tolerance = 0.2)
+    @test all(!isnothing, ph.cells)
+    @test evaluate_at_points(ph, dh, u, :s) ≈ f.(points)
+
+    # Points further outside than the tolerance are still not assigned
+    ph = PointEvalHandler(mesh, [Vec((1.5, 0.5))]; extrapolation_tolerance = 0.2, warn = false)
+    @test isnothing(ph.cells[1])
+
+    # Cells containing a point are preferred over extrapolation candidates
+    inside_point = [Vec((0.1, 0.1))]
+    ph_ref = PointEvalHandler(mesh, inside_point)
+    ph = PointEvalHandler(mesh, inside_point; extrapolation_tolerance = 2.0)
+    @test ph.cells[1] == ph_ref.cells[1]
+    @test Ferrite.boundary_violation(RefQuadrilateral, ph.local_coords[1]) ≤ 1.0e-5
+
+    # Triangles
+    mesh = generate_grid(Triangle, (2, 2))
+    dh = DofHandler(mesh)
+    add!(dh, :s, Lagrange{RefTriangle, 1}())
+    close!(dh)
+    u = zeros(ndofs(dh))
+    apply_analytical!(u, dh, :s, f)
+
+    points = [Vec((1.04, 0.5)), Vec((-0.5, -1.03))]
+    ph = PointEvalHandler(mesh, points; warn = false)
+    @test all(isnothing, ph.cells)
+    ph = PointEvalHandler(mesh, points; extrapolation_tolerance = 0.2)
+    @test all(!isnothing, ph.cells)
+    @test evaluate_at_points(ph, dh, u, :s) ≈ f.(points)
+    return
+end
+
+function test_pe_extrapolation_mixed_grid()
+    # Cells containing the point must be preferred over extrapolation candidates also
+    # when the candidates are of a different celltype
+    nodes = Node.(Vec{2, Float64}.([(0.0, 0.0), (1.0, 0.0), (0.0, 1.0), (1.0, 1.0), (0.0, 2.0), (1.0, 2.0)]))
+    cells = Ferrite.AbstractCell[
+        Quadrilateral((1, 2, 4, 3)),
+        Triangle((3, 4, 6)),
+        Triangle((3, 6, 5)),
+    ]
+    mesh = Grid(cells, nodes)
+    # First point inside triangle 2 (close to quad 1), second point inside quad 1
+    # (close to triangle 2); both are within the extrapolation tolerance of the other cell
+    points = [Vec((0.5, 1.05)), Vec((0.5, 0.95))]
+    ph = PointEvalHandler(mesh, points; extrapolation_tolerance = 1.0)
+    @test ph.cells == [2, 1]
+    return
+end
+
 @testset "PointEvalHandler" begin
     @testset "scalar field" begin
         test_pe_scalar_field()
@@ -486,6 +557,11 @@ end
 
     @testset "failure cases" begin
         test_pe_first_point_missing()
+    end
+
+    @testset "extrapolation" begin
+        test_pe_extrapolation()
+        test_pe_extrapolation_mixed_grid()
     end
 end
 

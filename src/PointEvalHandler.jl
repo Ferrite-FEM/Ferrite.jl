@@ -19,6 +19,12 @@ within the cell, for each point. The fields of the `PointEvalHandler` are:
    (i.e. coordinates in the reference configuration) for the points, with `nothing` for
    points that could not be found.
 
+By default, a point is only assigned to a cell if it is inside the cell (up to a small
+tolerance). Passing the keyword argument `extrapolation_tolerance > 0` also assigns points
+that are at most this far outside a cell, measured in the reference coordinates of the
+cell. Evaluation in such points extrapolates from the assigned cell. Cells containing the
+point are always preferred over extrapolation candidates.
+
 There are two ways to use the `PointEvalHandler` to evaluate functions:
 
  - [`evaluate_at_points`](@ref): can be used when the function is described by
@@ -55,67 +61,82 @@ end
 #  - `newton_max_iters::Int`: Maximum number of inner Newton iterations. Default value: `10`.
 #  - `newton_residual_tolerance`: Tolerance for the residual norm to indicate convergence in the
 #    inner Newton solver. Default value: `1e-10`.
-function PointEvalHandler(grid::AbstractGrid{dim}, points::AbstractVector{Vec{dim, T}}; search_nneighbors = 3, warn::Bool = true, strategy = NewtonLineSearchPointFinder()) where {dim, T}
+function PointEvalHandler(grid::AbstractGrid{dim}, points::AbstractVector{Vec{dim, T}}; search_nneighbors = 3, warn::Bool = true, extrapolation_tolerance::Real = 0.0, strategy = NewtonLineSearchPointFinder()) where {dim, T}
     node_cell_dicts = _get_node_cell_map(grid)
-    cells, local_coords = _get_cellcoords(points, grid, node_cell_dicts, search_nneighbors, warn, strategy)
+    cells, local_coords = _get_cellcoords(points, grid, node_cell_dicts, search_nneighbors, warn, extrapolation_tolerance, strategy)
     return PointEvalHandler(grid, cells, local_coords)
 end
 
-function _get_cellcoords(points::AbstractVector{Vec{dim, T}}, grid::AbstractGrid, node_cell_dicts::Dict{C, Dict{Int, Vector{Int}}}, search_nneighbors, warn, strategy::NewtonLineSearchPointFinder) where {dim, T <: Real, C}
+function _get_cellcoords(points::AbstractVector{Vec{dim, T}}, grid::AbstractGrid, node_cell_dicts::Dict{C, Dict{Int, Vector{Int}}}, search_nneighbors, warn, extrapolation_tolerance, strategy::NewtonLineSearchPointFinder) where {dim, T <: Real, C}
     # set up tree structure for finding nearest nodes to points
     kdtree = KDTree(reinterpret(Vec{dim, T}, getnodes(grid)))
     nearest_nodes, _ = knn(kdtree, points, search_nneighbors, true)
 
     cells = Vector{Union{Nothing, Int}}(nothing, length(points))
     local_coords = Vector{Union{Nothing, Vec{1, T}, Vec{2, T}, Vec{3, T}}}(nothing, length(points))
+    inside_tolerance = √(strategy.residual_tolerance)
 
     for point_idx in 1:length(points)
         cell_found = false
+        best_violation = T(Inf)
         for (CT, node_cell_dict) in node_cell_dicts
             geom_interpol = geometric_interpolation(CT)
+            refshape = getrefshape(geom_interpol)
             # loop over points
             for node in nearest_nodes[point_idx]
                 possible_cells = get(node_cell_dict, node, nothing)
                 possible_cells === nothing && continue # if node is not part of the subdofhandler, try the next node
                 for cell in possible_cells
                     cell_coords = getcoordinates(grid, cell)
-                    is_in_cell, local_coord = find_local_coordinate(geom_interpol, cell_coords, points[point_idx], strategy; warn)
-                    if is_in_cell
+                    is_in_cell, local_coord = find_local_coordinate(geom_interpol, cell_coords, points[point_idx], strategy; warn, extrapolation_tolerance)
+                    is_in_cell || continue
+                    violation = boundary_violation(refshape, local_coord)
+                    if violation ≤ inside_tolerance
                         cell_found = true
                         cells[point_idx] = cell
                         local_coords[point_idx] = local_coord
                         break
+                    elseif violation < best_violation
+                        # Outside the cell but within extrapolation_tolerance: use the
+                        # closest cell unless a cell containing the point is found later
+                        best_violation = violation
+                        cells[point_idx] = cell
+                        local_coords[point_idx] = local_coord
                     end
                 end
                 cell_found && break
             end
             cell_found && break
         end
-        if !cell_found && warn
+        if cells[point_idx] === nothing && warn
             @warn("No cell found for point number $point_idx, coordinate: $(points[point_idx]).")
         end
     end
     return cells, local_coords
 end
 
-# check if point is inside a cell based on isoparametric coordinate
-function check_isoparametric_boundaries(::Type{RefHypercube{dim}}, x_local::Vec{dim, T}, tol) where {dim, T}
+# Maximum violation of the reference shape boundaries in local coordinates (≤ 0 if inside)
+function boundary_violation(::Type{RefHypercube{dim}}, x_local::Vec{dim}) where {dim}
     # All in the range [-1, 1]^dim
-    return all(x -> abs(x) - 1 ≤ tol, x_local)
+    return maximum(abs, x_local) - 1
+end
+
+function boundary_violation(::Type{RefSimplex{dim}}, x_local::Vec{dim}) where {dim}
+    # Positive and below the plane 1 - ξx - ξy - ξz
+    return max(-minimum(x_local), sum(x_local) - 1)
 end
 
 # check if point is inside a cell based on isoparametric coordinate
-function check_isoparametric_boundaries(::Type{RefSimplex{dim}}, x_local::Vec{dim, T}, tol) where {dim, T}
-    # Positive and below the plane 1 - ξx - ξy - ξz
-    return all(x -> x > -tol, x_local) && sum(x_local) - 1 < tol
+function check_isoparametric_boundaries(refshape::Type{<:AbstractRefShape}, x_local::Vec, tol)
+    return boundary_violation(refshape, x_local) ≤ tol
 end
 
 cellcenter(::Type{<:RefHypercube{dim}}, _::Type{T}) where {dim, T} = zero(Vec{dim, T})
 cellcenter(::Type{<:RefSimplex{dim}}, _::Type{T}) where {dim, T} = Vec{dim, T}((ntuple(d -> 1 / 3, dim)))
 
 # See https://discourse.julialang.org/t/finding-the-value-of-a-field-at-a-spatial-location-in-juafem/38975/2
-function find_local_coordinate(interpolation::Interpolation{refshape}, cell_coordinates::Vector{<:Vec{sdim}}, global_coordinate::Vec{sdim}, strategy::NewtonLineSearchPointFinder; warn::Bool = false) where {sdim, refshape}
-    boundary_tolerance = √(strategy.residual_tolerance)
+function find_local_coordinate(interpolation::Interpolation{refshape}, cell_coordinates::Vector{<:Vec{sdim}}, global_coordinate::Vec{sdim}, strategy::NewtonLineSearchPointFinder; warn::Bool = false, extrapolation_tolerance::Real = 0.0) where {sdim, refshape}
+    boundary_tolerance = max(√(strategy.residual_tolerance), extrapolation_tolerance)
 
     T = promote_type(eltype(cell_coordinates[1]), eltype(global_coordinate))
     n_basefuncs = getnbasefunctions(interpolation)
