@@ -21,7 +21,7 @@ grid = generate_grid(Quadrilateral, (10, 10), zero(Vec{3}), Vec((10.0, 10.0, 0.0
 
 # Here we define the bi-linear interpolation used for the geometrical description of the shell.
 # We also create two quadrature rules for the in-plane and out-of-plane directions. Note that we use
-# under integration for the inplane integration, to avoid shear locking.
+# reduced integration for the in-plane integration, to avoid shear locking.
 #+
 ip = Lagrange{RefQuadrilateral,1}()
 qr_inplane = QuadratureRule{RefQuadrilateral}(1)
@@ -53,7 +53,7 @@ add!(ch,  Dirichlet(:θ, getfacetset(grid, "right"), (x, t) -> (0.0, pi/10), [1,
 
 # In order to not get rigid body motion, we lock the y-displacement in one of the corners.
 #+
-add!(ch,  Dirichlet(:θ, getvertexset(grid, "corner"), (x, t) -> (0.0), [2])  )
+add!(ch,  Dirichlet(:u, getvertexset(grid, "corner"), (x, t) -> (0.0), [2])  )
 
 close!(ch)
 update!(ch, 0.0)
@@ -125,7 +125,7 @@ end; #end main functions
 
 # ##### Fiber coordinate system
 # The element uses two coordinate systems. The first coordinate system, called the fiber system, is created for each
-# element node, and is used as a reference frame for the rotations. The function below implements an algorithm that return the
+# element node, and is used as a reference frame for the rotations. The function below implements an algorithm that returns the
 # fiber directions, $\boldsymbol{e}^{f}_{a1}$, $\boldsymbol{e}^{f}_{a2}$ and $\boldsymbol{e}^{f}_{a3}$, at each node $a$.
 function fiber_coordsys(Ps::Vector{Vec{3,Float64}})
 
@@ -247,7 +247,7 @@ end;
 
 # ##### Main element routine
 # Below is the main routine that calculates the stiffness matrix of the shell element.
-# Since it is a so called degenerate shell element, the code is similar to that for an standard continuum element.
+# Since it is a so-called degenerate shell element, the code is similar to that for a standard continuum element.
 shape_reference_gradient(cv::CellValues, q_point, i) = cv.fun_values.dNdξ[i, q_point]
 
 function integrate_shell!(ke, cv, qr_ooplane, X, data)
@@ -283,7 +283,9 @@ function integrate_shell!(ke, cv, qr_ooplane, X, data)
             B = ForwardDiff.jacobian(
                 (a) -> strain(a, N, dNdx, ζ, dζdx, q, ef1, ef2, h), zeros(Float64, ndofs) )
 
-            dV = qr_ooplane.weights[oqp] * getdetJdV(cv, iqp)
+            detJ = det(J)
+            detJ > 0 || error("det(J) is not positive: det(J) = $detJ")
+            dV = qr_ooplane.weights[oqp] * cv.qr.weights[iqp] * detJ
             ke .+= B'*data.C*B * dV
         end
     end
