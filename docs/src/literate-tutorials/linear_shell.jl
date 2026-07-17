@@ -15,13 +15,9 @@ using ForwardDiff
 
 function main() #wrap everything in a function...
 
-# First we generate a flat rectangular mesh. There is currently no built-in function for generating
-# shell meshes in Ferrite, so we have to create our own simple mesh generator (see the
-# function `generate_shell_grid` further down in this file).
+# First we generate a flat rectangular mesh embedded in 3D.
 #+
-nels = (10,10)
-size = (10.0, 10.0)
-grid = generate_shell_grid(nels, size)
+grid = generate_grid(Quadrilateral, (10, 10), zero(Vec{3}), Vec((10.0, 10.0, 0.0)))
 
 # Here we define the bi-linear interpolation used for the geometrical description of the shell.
 # We also create two quadrature rules for the in-plane and out-of-plane directions. Note that we use
@@ -39,12 +35,10 @@ add!(dh, :u, ip^3)
 add!(dh, :θ, ip^2)
 close!(dh)
 
-# In order to apply our boundary conditions, we first need to create some facet- and vertex-sets. This
-# is done with `addfacetset!` and `addvertexset!`
+# For the boundary conditions, we also want a vertex set for one corner, in addition to the
+# facet sets already included in the generated grid.
 #+
-addfacetset!(grid, "left",  (x) -> x[1] ≈ 0.0)
-addfacetset!(grid, "right", (x) -> x[1] ≈ size[1])
-addvertexset!(grid, "corner", (x) -> x[1] ≈ 0.0 && x[2] ≈ 0.0 && x[3] ≈ 0.0)
+addvertexset!(grid, "corner", x -> norm(x) < 1e-6)
 
 # Here we define the boundary conditions. On the left edge, we lock the displacements in the x- and z- directions, and all the rotations.
 #+
@@ -52,7 +46,7 @@ ch = ConstraintHandler(dh)
 add!(ch,  Dirichlet(:u, getfacetset(grid, "left"), (x, t) -> (0.0, 0.0), [1,3])  )
 add!(ch,  Dirichlet(:θ, getfacetset(grid, "left"), (x, t) -> (0.0, 0.0), [1,2])  )
 
-# On the right edge, we also lock the displacements in the x- and z- directions, but apply a precribed rotation.
+# On the right edge, we also lock the displacements in the x- and z- directions, but apply a prescribed rotation.
 #+
 add!(ch,  Dirichlet(:u, getfacetset(grid, "right"), (x, t) -> (0.0, 0.0), [1,3])  )
 add!(ch,  Dirichlet(:θ, getfacetset(grid, "right"), (x, t) -> (0.0, pi/10), [1,2])  )
@@ -65,7 +59,7 @@ close!(ch)
 update!(ch, 0.0)
 
 # Next we define relevant data for the shell, such as shear correction factor and stiffness matrix for the material.
-# In this linear shell, plane stress is assumed, ie $\\sigma_{zz} = 0$. Therefor, the stiffness matrix is 5x5 (opposed to the normal 6x6).
+# In this linear shell, plane stress is assumed, i.e. $\sigma_{zz} = 0$. Therefore, the stiffness matrix is 5x5 (opposed to the normal 6x6).
 #+
 κ = 5/6 # Shear correction factor
 E = 210.0
@@ -120,17 +114,6 @@ end
 
 end; #end main functions
 
-# Below is the function that creates the shell mesh. It simply generates a 2d-quadrature mesh, and appends
-# a third coordinate (z-direction) to the node-positions.
-function generate_shell_grid(nels, size)
-    _grid = generate_grid(Quadrilateral, nels, Vec((0.0,0.0)), Vec(size))
-    nodes = [(n.x[1], n.x[2], 0.0) |> Vec{3} |> Node  for n in _grid.nodes]
-
-    grid = Grid(_grid.cells, nodes)
-
-    return grid
-end;
-
 # ## The shell element
 #
 # The shell presented here comes from the book "The finite element method - Linear static and dynamic finite element analysis" by Hughes (1987).
@@ -138,10 +121,10 @@ end;
 # A brief description of the shell is given here.
 
 #md # !!! note
-#md #     This element might experience various locking phenomenas, and should only be seen as a proof of concept.
+#md #     This element might experience various locking phenomena, and should only be seen as a proof of concept.
 
 # ##### Fiber coordinate system
-# The element uses two coordinate systems. The first coordianate system, called the fiber system, is created for each
+# The element uses two coordinate systems. The first coordinate system, called the fiber system, is created for each
 # element node, and is used as a reference frame for the rotations. The function below implements an algorithm that return the
 # fiber directions, $\boldsymbol{e}^{f}_{a1}$, $\boldsymbol{e}^{f}_{a2}$ and $\boldsymbol{e}^{f}_{a3}$, at each node $a$.
 function fiber_coordsys(Ps::Vector{Vec{3,Float64}})
@@ -180,7 +163,7 @@ function lamina_coordsys(dNdξ, ζ, x, p, h)
 
     for i in 1:length(dNdξ)
         e1 += dNdξ[i][1] * x[i] + 0.5*h*ζ * dNdξ[i][1] * p[i]
-        e2 += dNdξ[i][2] * x[i] + 0.5*h*ζ * dNdξ[i][1] * p[i]
+        e2 += dNdξ[i][2] * x[i] + 0.5*h*ζ * dNdξ[i][2] * p[i]
     end
 
     e1 /= norm(e1)
@@ -207,8 +190,8 @@ end;
 # ```math
 # \boldsymbol x(\xi, \eta, \zeta) = \sum_{a=1}^{N_{\text{nodes}}} N_a(\xi, \eta) \boldsymbol{\bar{x}}_{a} + ζ \frac{h}{2} \boldsymbol{\bar{p}_a}
 # ```
-# where $\boldsymbol{\bar{x}}_{a}$ are nodal positions on the mid-surface, and $\boldsymbol{\bar{p}_a}$ is an vector that defines the fiber direction
-# on the reference surface. $N_a$ arethe shape functions.
+# where $\boldsymbol{\bar{x}}_{a}$ are nodal positions on the mid-surface, and $\boldsymbol{\bar{p}_a}$ is a vector that defines the fiber direction
+# on the reference surface. $N_a$ are the shape functions.
 #
 # Based on the definition of the position vector, we create an function for obtaining the Jacobian-matrix,
 # ```math

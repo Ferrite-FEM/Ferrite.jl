@@ -20,7 +20,7 @@ The tutorials are listed in roughly increasing order of complexity. However, sin
 focus on different aspects, and solve different problems, it is suggested to have a look at
 the brief descriptions below to get an idea about what you will learn from each tutorial.
 
-If you are new to Ferrite then Tutorial 1 - Tutorial 6 is the best place to start. These
+If you are new to Ferrite then Tutorials 1 - 6 are the best place to start. These
 tutorials introduce and teach most of the basic finite element techniques (e.g. linear
 and non-linear problems, scalar- and vector-valued problems, Dirichlet and Neumann boundary
 conditions, mixed finite elements, time integration, direct and iterative linear solvers,
@@ -108,13 +108,13 @@ element (RVE) consisting of a soft matrix material with stiff inclusions. The co
 mesh is read from an external mesh file generated with Gmsh. Dirichlet and periodic boundary
 conditions are used.
 
-**Keywords**: Gmsh mesh reading, Dirichlet and periodic boundary conditions
+**Keywords**: Gmsh mesh reading, Dirichlet and periodic boundary conditions.
 
 ---
 
 #### [Tutorial 8: Stokes flow](stokes-flow.md)
 
-In this tutorial Stokes flow with (vector) velocity and (scalar) pressure is solved on on a
+In this tutorial Stokes flow with (vector) velocity and (scalar) pressure is solved on a
 quarter circle. Rotationally periodic boundary conditions is used for the inlet/outlet
 coupling. To obtain a unique solution, a mean value constraint is applied on the pressure
 using an affine constraint. The computational mesh is generated directly using the Gmsh API.
@@ -130,7 +130,7 @@ This tutorial introduces how to solve a complex linear problem, where there are 
 fields on different subdomains, and different cell types in the grid. This requires using
 the `SubDofHandler` interface.
 
-**Keywords**: Mixed grids, multiple fields, porous media, `SubDofHandler`
+**Keywords**: Mixed grids, multiple fields, porous media, `SubDofHandler`.
 
 ---
 
@@ -141,7 +141,7 @@ discretized in space with Ferrite as usual, and then formulated in a way to be c
 with the [OrdinaryDiffEq.jl](https://docs.sciml.ai/OrdinaryDiffEq/) package, which is used
 for the time-integration.
 
-**Keywords**: non-linear time dependent problem
+**Keywords**: non-linear time dependent problem.
 
 ---
 
@@ -151,7 +151,7 @@ In this tutorial a reaction diffusion system on a sphere surface embedded in 3D 
 Ferrite is used to assemble the diffusion operators and the mass matrices. The problem is
 solved by using the usual first order reaction diffusion operator splitting.
 
-**Keywords**: embedded elements, operator splitting, gmsh
+**Keywords**: embedded elements, operator splitting, gmsh.
 
 ---
 
@@ -162,7 +162,7 @@ embedded in three-dimensional space. This will teach, and perhaps inspire, you o
 Ferrite can be used for non-standard things and how to add "hacks" that build on top of
 Ferrite.
 
-**Keywords**: shell elements, automatic differentiation
+**Keywords**: shell elements, automatic differentiation.
 
 ---
 
@@ -171,10 +171,10 @@ Ferrite.
 This tutorial guides you through the process of solving the linear stationary heat equation
 (i.e. Poisson's equation) on a unit square with inhomogeneous Dirichlet and Neumann boundary
 conditions using the interior penalty discontinuous Galerkin method. This tutorial follows
-the [heat equation tutorial](@ref tutorial-heat-equation), introducing face and interface
+the [heat equation tutorial](@ref tutorial-heat-equation), introducing facet and interface
 iterators, jump and average operators, and cross-element coupling in sparsity patterns. This
 example was developed as part of the *Google Summer of Code* funded project ["Discontinuous
 Galerkin Infrastructure For the finite element toolbox
 Ferrite.jl"](https://summerofcode.withgoogle.com/programs/2023/projects/SLGbRNI5).
 
-**Keywords**: scalar-valued solution, Dirichlet boundary conditions, Discontinuous Galerkin, Interior penalty
+**Keywords**: scalar-valued solution, Dirichlet boundary conditions, Discontinuous Galerkin, Interior penalty.

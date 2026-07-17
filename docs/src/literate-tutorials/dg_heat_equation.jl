@@ -110,7 +110,7 @@
 #     ```
 #     Where $\mu = \eta h_e^{-1}$, the weak form becomes
 #     ```math
-#      \int_\Omega [\boldsymbol{\nabla} (u)] \cdot [\boldsymbol{\nabla}] (\delta u) \,\mathrm{d}\Omega - \int_\Gamma \llbracket u \rrbracket \cdot \{\boldsymbol{\nabla} (\delta u)\} + \llbracket \delta u \rrbracket  \cdot \{\boldsymbol{\nabla} (u)\}  \,\mathrm{d}\Gamma + \int_\Gamma \frac{\eta}{h_e} \llbracket u\rrbracket  \cdot \llbracket \delta u\rrbracket   \,\mathrm{d}\Gamma = \int_\Omega \delta u \,\mathrm{d}\Omega,\\
+#      \int_\Omega [\boldsymbol{\nabla} (u)] \cdot [\boldsymbol{\nabla} (\delta u)] \,\mathrm{d}\Omega - \int_\Gamma \llbracket u \rrbracket \cdot \{\boldsymbol{\nabla} (\delta u)\} + \llbracket \delta u \rrbracket  \cdot \{\boldsymbol{\nabla} (u)\}  \,\mathrm{d}\Gamma + \int_\Gamma \frac{\eta}{h_e} \llbracket u\rrbracket  \cdot \llbracket \delta u\rrbracket   \,\mathrm{d}\Gamma = \int_\Omega \delta u \,\mathrm{d}\Omega,\\
 #     ```
 # Since $\partial \Omega$ is constrained with both Dirichlet and Neumann boundary conditions the term $\int_{\partial \Omega} [\boldsymbol{\nabla} (u)] \cdot \boldsymbol{n} \delta u \,\mathrm{d} \Omega$ can be expressed as an integral over $\partial \Omega_N$, where $\partial \Omega_N$ is the boundaries with only prescribed Neumann boundary condition,
 # The resulting weak form is given as follows: Find $u \in \mathbb{U}$ such that
@@ -268,7 +268,7 @@ function assemble_boundary!(fe::Vector, fv::FacetValues)
         for i in 1:getnbasefunctions(fv)
             δu = shape_value(fv, q_point, i)
             boundary_flux = normal[2]
-            fe[i] = boundary_flux * δu * ∂Ω
+            fe[i] += boundary_flux * δu * ∂Ω
         end
     end
     return fe
@@ -340,7 +340,7 @@ end;
 
 ## test the result                #src
 using Test                        #src
-@test norm(u) ≈ 27.888811116291766 #src
+@test norm(u) ≈ 29.379018948337237 #src
 
 #md # ## References
 #md # ```@bibliography

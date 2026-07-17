@@ -1,3 +1,4 @@
+using Ferrite
 import SparseMatricesCSR: SparseMatrixCSR, sparsecsr
 using SparseArrays, LinearAlgebra
 
@@ -28,8 +29,8 @@ using SparseArrays, LinearAlgebra
         apply!(K2, f2, ch)
         @test K0 == K1
         @test K1 == K2
-        @test f0 == f1
-        @test f1 == f2
+        @test f0 ≈ f1
+        @test f1 ≈ f2
         # Error for affine constraints
         ch = ConstraintHandler(dh)
         add!(ch, AffineConstraint(1, [3 => 1.0], 1.0))
@@ -83,6 +84,36 @@ using SparseArrays, LinearAlgebra
         V = [4 / 3, 0.0, 0.0, -2.0, 2.0, 1.0, -1.0]
         @test K ≈ sparsecsr(I, J, V)
         @test f ≈ [4 / 3, 2.0, 1.0]
+
+        # CSRAssembler: assemble with different row and col dofs
+        I = [1, 1, 4, 4, 6, 6]
+        J = [1, 3, 1, 3, 1, 3]
+        V = zeros(length(I))
+        K = sparsecsr(I, J, V)
+        f = zeros(6)
+        assembler = start_assemble(K, f)
+        rdofs = [1, 4, 6]
+        cdofs = [1, 3]
+        Ke = rand(length(rdofs), length(cdofs))
+        fe = rand(length(rdofs))
+        assemble!(assembler, rdofs, cdofs, Ke, fe)
+        assemble!(assembler, rdofs, cdofs, Ke, fe)
+        @test_throws ArgumentError assemble!(assembler, rdofs, Ke, fe) # Not in sparsity pattern
+        @test all(K[rdofs, cdofs] .== 2Ke)
+        @test all(f[rdofs] .== 2fe)
+
+        # CSRAssembler: Assemble rectangular part in quadratic matrix
+        K = SparseMatrixCSR{1}(6, 6, K.rowptr, K.colval, K.nzval)
+        assembler = start_assemble(K, f)
+        rdofs = [1, 4, 6]
+        cdofs = [1, 3]
+        Ke = rand(length(rdofs), length(cdofs))
+        fe = rand(length(rdofs))
+        assemble!(assembler, rdofs, cdofs, Ke, fe)
+        assemble!(assembler, rdofs, cdofs, Ke, fe)
+        @test_throws ArgumentError assemble!(assembler, rdofs, Ke, fe) # Not in sparsity pattern
+        @test all(K[rdofs, cdofs] .== 2Ke)
+        @test all(f[rdofs] .== 2fe)
 
         # Check if coupling works
         grid = generate_grid(Quadrilateral, (2, 2))

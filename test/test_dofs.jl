@@ -1,3 +1,8 @@
+# Imports for parallel (isolated) test execution:
+using LinearAlgebra
+using SparseArrays
+import Metis
+
 @testset "DofHandler construction" begin
     grid = generate_grid(Quadrilateral, (2, 1))
     dh = DofHandler(grid)
@@ -641,7 +646,7 @@ end
                         j_dofs = dof_range(sdh2, field2_idx)
                         ip2 = sdh2.field_interpolations[field2_idx]
                         vdim[2] = typeof(ip2) <: VectorizedInterpolation && size(coupling)[1] == 4 ? Ferrite.get_n_copies(ip2) : 1
-                        for  dim2 in 1:vdim[2]
+                        for dim2 in 1:vdim[2]
                             i_dofs_v = i_dofs[dim1:vdim[1]:end]
                             j_dofs_v = j_dofs[dim2:vdim[2]:end]
                             for i_idx in i_dofs_v, j_idx in j_dofs_v

@@ -1,5 +1,6 @@
 # [FEValues](@id fevalues_topicguide)
-A key type of object in Ferrite is the so-called `FEValues`, where the most common ones are `CellValues` and `FacetValues`. These objects are used inside the element routines and are used to query the integration weights, shape function values and gradients, and much more; see [`CellValues`](@ref) and [`FacetValues`](@ref). For these values to be correct, it is necessary to reinitialize these for the current cell by using the [`reinit!`](@ref) function. This function maps the values from the reference cell to the actual cell, a process described in detail below, see [Mapping of finite elements](@ref mapping_theory). After that, we show an implementation of a [`SimpleCellValues`](@ref SimpleCellValues) type to illustrate how `CellValues` work for the most standard case, excluding the generalizations and optimization that complicates the actual code.
+A key type of object in Ferrite is the so-called `FEValues`, where the most common ones are `CellValues` and `FacetValues`. These objects are used inside the element routines and are used to query the integration weights, shape function values and gradients, and much more; see [`CellValues`](@ref),
+[`MultiFieldCellValues`](@ref), and [`FacetValues`](@ref). For these values to be correct, it is necessary to reinitialize these for the current cell by using the [`reinit!`](@ref) function. This function maps the values from the reference cell to the actual cell, a process described in detail below, see [Mapping of finite elements](@ref mapping_theory). After that, we show an implementation of a [`SimpleCellValues`](@ref SimpleCellValues) type to illustrate how `CellValues` work for the most standard case, excluding the generalizations and optimization that complicates the actual code.
 
 ## [Mapping of finite elements](@id mapping_theory)
 The shape functions and gradients stored in an `FEValues` object, are reinitialized for each cell by calling the `reinit!` function.
@@ -46,7 +47,7 @@ Second order gradients of the shape functions are computed as
 
 ```math
 \begin{align*}
-    \mathrm{grad}(\mathrm{grad}(N(\boldsymbol{x}))) = \frac{\mathrm{d}^2 N}{\mathrm{d}\boldsymbol{x}^2} = \boldsymbol{J}^{-T} \cdot \frac{\mathrm{d}^2\hat{N}}{\mathrm{d}\boldsymbol{\xi}^2} \cdot \boldsymbol{J}^{-1} -  \boldsymbol{J}^{-T} \cdot\mathrm{grad}(N) \cdot \boldsymbol{\mathcal{H}}  \cdot \boldsymbol{J}^{-1}
+    \mathrm{grad}(\mathrm{grad}(N(\boldsymbol{x}))) = \frac{\mathrm{d}^2 N}{\mathrm{d}\boldsymbol{x}^2} = \boldsymbol{J}^{-T} \cdot \left[\frac{\mathrm{d}^2\hat{N}}{\mathrm{d}\boldsymbol{\xi}^2} -  \mathrm{grad}(N) \cdot \boldsymbol{\mathcal{H}} \right]  \cdot \boldsymbol{J}^{-1}
 \end{align*}
 ```
 !!! details "Derivation"
@@ -130,7 +131,7 @@ which yields the gradient,
 ### Contravariant Piola mapping, H(div)
 `Ferrite.ContravariantPiolaMapping`
 
-The covariant Piola mapping of a vectorial base function preserves the normal components. For the value, the mapping is defined as
+The contravariant Piola mapping of a vectorial base function preserves the normal components. For the value, the mapping is defined as
 ```math
 \begin{align*}
     \boldsymbol{N}(\boldsymbol{x}) = \frac{\boldsymbol{J}}{\det(\boldsymbol{J})} \cdot \hat{\boldsymbol{N}}(\boldsymbol{\xi}(\boldsymbol{x}))

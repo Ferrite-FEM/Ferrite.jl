@@ -136,7 +136,7 @@ function compute_stress_tangent(ϵ::SymmetricTensor{2, 3}, material::J2Plasticit
 end
 
 # ## FE-problem
-# What follows are methods for assembling and and solving the FE-problem.
+# What follows are methods for assembling and solving the FE-problem.
 function create_values(interpolation)
     ## setup quadrature rules
     qr = QuadratureRule{RefTetrahedron}(2)
@@ -276,7 +276,7 @@ function solve()
     grid = generate_grid(Tetrahedron, nels, P1, P2)
     interpolation = Lagrange{RefTetrahedron, 1}()^3
 
-    dh = create_dofhandler(grid, interpolation) # JuaFEM helper function
+    dh = create_dofhandler(grid, interpolation) # helper function defined above
     dbcs = create_bc(dh, grid) # create Dirichlet boundary-conditions
 
     cellvalues, facetvalues = create_values(interpolation)
@@ -296,7 +296,7 @@ function solve()
 
     ## Newton-Raphson loop
     NEWTON_TOL = 1 # 1 N
-    print("\n Starting Netwon iterations:\n")
+    print("\n Starting Newton iterations:\n")
 
     for timestep in 1:n_timesteps
         t = timestep # actual time (used for evaluating d-bndc)

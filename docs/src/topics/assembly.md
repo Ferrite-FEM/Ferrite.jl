@@ -14,7 +14,7 @@ the row/column which corresponds to the degrees of freedom for the cell:
 
 ```julia
 K[celldofs, celldofs] += ke
-f[celldofs]           += fe
+f[celldofs] += fe
 ```
 
 where `celldofs` is the vector containing the degrees of freedom for the cell.
@@ -57,7 +57,7 @@ which perform the following operations in an efficient manner:
 
 ```julia
 K[celldofs, celldofs] += ke
-f[celldofs]           += fe
+f[celldofs] += fe
 ```
 
 ## Pseudo-code for efficient assembly
@@ -246,7 +246,7 @@ insert all elements of `Ke` in one go instead of having to lookup locations rand
 
 First we will compare the four functions above for a single assembly operation, i.e.
 inserting one local matrix into the global matrix. For this we simply create a random local
-matrix since we are not conserned with the actual values. We also pick the "middle" element
+matrix since we are not concerned with the actual values. We also pick the "middle" element
 and extract the dofs for that element. Finally, an assembler is created with
 `start_assemble` to use with the fourth strategy.
 

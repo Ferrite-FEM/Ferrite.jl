@@ -145,7 +145,7 @@ function reinit!(
 end
 
 """
-    getnormal(iv::InterfaceValues, qp::Int; here::Bool=true)
+    getnormal(iv::InterfaceValues, qp::Int; here::Bool = true)
 
 Return the normal vector in the quadrature point `qp` on the interface. If `here = true`
 (default) the outward normal to the "here" element is returned, otherwise the outward normal
@@ -326,10 +326,10 @@ for func in (:function_value, :function_gradient)
             @boundscheck checkbounds(u, 1:getnbasefunctions(iv))
             if here
                 dof_range_here = 1:getnbasefunctions(iv.here)
-                return $(func)(iv.here, q_point, @view(u[dof_range_here]))
+                return $(func)(iv.here, q_point, u, dof_range_here)
             else # there
                 dof_range_there = (1:getnbasefunctions(iv.there)) .+ getnbasefunctions(iv.here)
-                return $(func)(iv.there, q_point, @view(u[dof_range_there]))
+                return $(func)(iv.there, q_point, u, dof_range_there)
             end
         end
         function $(func)(
@@ -360,8 +360,8 @@ for (func, f_, is_avg) in (
             @boundscheck checkbounds(u, getnbasefunctions(iv))
             dof_range_here = 1:getnbasefunctions(iv.here)
             dof_range_there = (1:getnbasefunctions(iv.there)) .+ getnbasefunctions(iv.here)
-            f_here = $(f_)(iv.here, qp, @view(u[dof_range_here]))
-            f_there = $(f_)(iv.there, qp, @view(u[dof_range_there]))
+            f_here = $(f_)(iv.here, qp, u, dof_range_here)
+            f_there = $(f_)(iv.there, qp, u, dof_range_there)
             return $(is_avg ? :((f_here + f_there) / 2) : :(f_there - f_here))
         end
         function $(func)(

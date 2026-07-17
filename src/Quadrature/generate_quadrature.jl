@@ -83,10 +83,6 @@ const left = EndPt('L')
 const right = EndPt('R')
 const both = EndPt('B')
 
-# Maximum number of QL iterations used by steig!.
-# You might need to increase this.
-maxiterations = Dict(Float32 => 30, Float64 => 30, BigFloat => 40)
-
 """
 x, w = legendre(T, n, endpt=neither)
 Returns points x and weights w for the n-point Gauss-Legendre rule
@@ -154,7 +150,7 @@ end
 function custom_gauss_rule(
         lo::T, hi::T,
         a::Array{T, 1}, b::Array{T, 1}, muzero::T, endpt::EndPt,
-        maxits::Integer = maxiterations[T]
+        maxits::Integer = 50
     ) where {T <: AbstractFloat}
     #
     # On entry:

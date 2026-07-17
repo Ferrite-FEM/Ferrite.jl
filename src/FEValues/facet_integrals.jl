@@ -89,10 +89,10 @@ function weighted_normal(::Tensor{2, 1, T}, ::Type{RefLine}, facet::Int) where {
 end
 
 # Embedded lines
-function weighted_normal(J::SMatrix{dim, 1, T}, ::Type{RefLine}, facet::Int) where {dim, T}
+function weighted_normal(J::MixedTensor2{dim1, 1, T}, ::Type{RefLine}, facet::Int) where {dim1, T}
     (facet < 1 || facet > 2) && throw(ArgumentError("unknown facet number"))
     s = facet == 1 ? -1 : 1
-    return s * Vec{dim, T}((J...,))
+    return s * normalize(Vec{dim1, T}((J...,)))
 end
 
 ###########################

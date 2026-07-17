@@ -7,7 +7,8 @@ end
 """
     apply_analytical!(
         a::AbstractVector, dh::AbstractDofHandler, fieldname::Symbol,
-        f::Function, cellset=1:getncells(get_grid(dh)))
+        f::Function, cellset = 1:getncells(get_grid(dh))
+    )
 
 Apply a solution `f(x)` by modifying the values in the degree of freedom vector `a`
 pertaining to the field `fieldname` for all cells in `cellset`.
