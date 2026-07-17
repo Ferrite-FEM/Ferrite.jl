@@ -8,9 +8,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Next] - xxxx-xx-xx
 
 ### Added
- - `PointEvalHandler` can assign points slightly outside the grid to the closest cell with
+ - `PointEvalHandler` can assign points slightly outside the grid to a nearby cell with
    the new keyword argument `extrapolation_tolerance`, such that evaluation extrapolates
    from that cell. ([#1238])
+ - The point search of `PointEvalHandler` can be restricted to a subdomain with the new
+   keyword argument `cellset`. This is required for correct results when evaluating fields
+   that are only defined on a subdomain, or that are discontinuous across subdomain
+   interfaces. In addition, `evaluate_at_points` now warns when points are assigned to
+   cells where the evaluated field is not defined. ([#1181])
 
 
 ## [v1.5.0] - 2026-07-13
@@ -1170,6 +1175,7 @@ poking into Ferrite internals:
 [#1162]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1162
 [#1176]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1176
 [#1178]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1178
+[#1181]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1181
 [#1183]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1183
 [#1194]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1194
 [#1197]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1197

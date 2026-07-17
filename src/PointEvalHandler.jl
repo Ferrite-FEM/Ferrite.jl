@@ -21,9 +21,16 @@ within the cell, for each point. The fields of the `PointEvalHandler` are:
 
 By default, a point is only assigned to a cell if it is inside the cell (up to a small
 tolerance). Passing the keyword argument `extrapolation_tolerance > 0` also assigns points
-that are at most this far outside a cell, measured in the reference coordinates of the
-cell. Evaluation in such points extrapolates from the assigned cell. Cells containing the
-point are always preferred over extrapolation candidates.
+whose local coordinate is at most this far outside the reference shape of a cell.
+Evaluation in such points extrapolates from the assigned cell. Cells containing the point
+are always preferred; among extrapolation candidates the cell with the smallest violation
+of the reference shape bounds (measured in reference coordinates) is chosen.
+
+The keyword argument `cellset` restricts the search to those cells. This is required to
+obtain correct results when evaluating a field that is only defined on a subdomain, or
+that is discontinuous across subdomain interfaces, since a point is otherwise assigned to
+an arbitrary cell containing it, where the field may not be defined (evaluating to `NaN`)
+or where it has the value from the "wrong" side of the interface.
 
 There are two ways to use the `PointEvalHandler` to evaluate functions:
 
@@ -61,16 +68,39 @@ end
 #  - `newton_max_iters::Int`: Maximum number of inner Newton iterations. Default value: `10`.
 #  - `newton_residual_tolerance`: Tolerance for the residual norm to indicate convergence in the
 #    inner Newton solver. Default value: `1e-10`.
-function PointEvalHandler(grid::AbstractGrid{dim}, points::AbstractVector{Vec{dim, T}}; search_nneighbors = 3, warn::Bool = true, extrapolation_tolerance::Real = 0.0, strategy = NewtonLineSearchPointFinder()) where {dim, T}
-    node_cell_dicts = _get_node_cell_map(grid)
-    cells, local_coords = _get_cellcoords(points, grid, node_cell_dicts, search_nneighbors, warn, extrapolation_tolerance, strategy)
+function PointEvalHandler(
+        grid::AbstractGrid{dim}, points::AbstractVector{Vec{dim, T}};
+        search_nneighbors = 3, warn::Bool = true, extrapolation_tolerance::Real = 0.0,
+        cellset::Union{IntegerCollection, Nothing} = nothing,
+        strategy = NewtonLineSearchPointFinder()
+    ) where {dim, T}
+    extrapolation_tolerance ≥ 0 || throw(ArgumentError("extrapolation_tolerance must be non-negative"))
+    cset = cellset === nothing ? nothing : convert_to_orderedset(cellset)
+    node_cell_dicts = _get_node_cell_map(grid, cset)
+    cells, local_coords = _get_cellcoords(points, grid, node_cell_dicts, search_nneighbors, warn, extrapolation_tolerance, strategy, cset)
     return PointEvalHandler(grid, cells, local_coords)
 end
 
-function _get_cellcoords(points::AbstractVector{Vec{dim, T}}, grid::AbstractGrid, node_cell_dicts::Dict{C, Dict{Int, Vector{Int}}}, search_nneighbors, warn, extrapolation_tolerance, strategy::NewtonLineSearchPointFinder) where {dim, T <: Real, C}
+function _get_cellcoords(points::AbstractVector{Vec{dim, T}}, grid::AbstractGrid, node_cell_dicts::Dict{C, Dict{Int, Vector{Int}}}, search_nneighbors, warn, extrapolation_tolerance, strategy::NewtonLineSearchPointFinder, cellset = nothing) where {dim, T <: Real, C}
     # set up tree structure for finding nearest nodes to points
-    kdtree = KDTree(reinterpret(Vec{dim, T}, getnodes(grid)))
-    nearest_nodes, _ = knn(kdtree, points, search_nneighbors, true)
+    if cellset === nothing
+        kdtree = KDTree(reinterpret(Vec{dim, T}, getnodes(grid)))
+        nearest_nodes, _ = knn(kdtree, points, search_nneighbors, true)
+    else
+        # Only nodes of cells in the cellset are relevant for the search
+        node_ids = Int[]
+        for cell_dict in values(node_cell_dicts)
+            append!(node_ids, keys(cell_dict))
+        end
+        unique!(sort!(node_ids))
+        if isempty(node_ids)
+            nearest_nodes = [Int[] for _ in 1:length(points)]
+        else
+            node_coords = [get_node_coordinate(grid, i) for i in node_ids]
+            sub_nearest, _ = knn(KDTree(node_coords), points, min(search_nneighbors, length(node_ids)), true)
+            nearest_nodes = [node_ids[idxs] for idxs in sub_nearest]
+        end
+    end
 
     cells = Vector{Union{Nothing, Int}}(nothing, length(points))
     local_coords = Vector{Union{Nothing, Vec{1, T}, Vec{2, T}, Vec{3, T}}}(nothing, length(points))
@@ -203,7 +233,7 @@ function find_local_coordinate(interpolation::Interpolation{refshape}, cell_coor
 end
 
 # return a Dict with a key for each node that contains a vector with the adjacent cells as value
-function _get_node_cell_map(grid::AbstractGrid)
+function _get_node_cell_map(grid::AbstractGrid, cellset::Union{AbstractSet{<:Integer}, Nothing} = nothing)
     cells = getcells(grid)
     C = eltype(cells) # possibly abstract
     cell_dicts = Dict{Type{<:C}, Dict{Int, Vector{Int}}}()
@@ -212,6 +242,7 @@ function _get_node_cell_map(grid::AbstractGrid)
         cell_dict = cell_dicts[ctype] = Dict{Int, Vector{Int}}()
         for (cellidx, cell) in enumerate(cells)
             cell isa ctype || continue
+            cellset === nothing || cellidx ∈ cellset || continue
             for node in cell.nodes
                 v = get!(Vector{Int}, cell_dict, node)
                 push!(v, cellidx)
@@ -288,6 +319,16 @@ function evaluate_at_points!(
             pv = PointValues(T_ph, ip, ip_geo; update_gradients = Val(false))
             _evaluate_at_points!(out_vals, dof_vals, ph, dh, pv, cellset, dofrange)
         end
+    end
+    n_undefined = count(ph.cells) do cellid
+        cellid === nothing && return false
+        return !any(
+            i -> func_interpolations[i] !== nothing && cellid ∈ dh.subdofhandlers[i].cellset,
+            eachindex(dh.subdofhandlers)
+        )
+    end
+    if n_undefined > 0
+        @warn "$n_undefined point(s) were assigned to cells where field :$fname is not defined and could not be evaluated. If the field is defined on a subdomain, construct the PointEvalHandler with the corresponding `cellset` to restrict the point search."
     end
     return out_vals
 end
