@@ -105,10 +105,13 @@ function _get_cellcoords(points::AbstractVector{Vec{dim, T}}, grid::AbstractGrid
     cells = Vector{Union{Nothing, Int}}(nothing, length(points))
     local_coords = Vector{Union{Nothing, Vec{1, T}, Vec{2, T}, Vec{3, T}}}(nothing, length(points))
     inside_tolerance = √(strategy.residual_tolerance)
+    visited_cells = Set{Int}()
+    cell_coords = zeros(Vec{dim, get_coordinate_eltype(grid)}, 0) # resize!d per cell
 
     for point_idx in 1:length(points)
         cell_found = false
         best_violation = T(Inf)
+        empty!(visited_cells)
         for (CT, node_cell_dict) in node_cell_dicts
             geom_interpol = geometric_interpolation(CT)
             refshape = getrefshape(geom_interpol)
@@ -117,7 +120,10 @@ function _get_cellcoords(points::AbstractVector{Vec{dim, T}}, grid::AbstractGrid
                 possible_cells = get(node_cell_dict, node, nothing)
                 possible_cells === nothing && continue # if node is not part of the subdofhandler, try the next node
                 for cell in possible_cells
-                    cell_coords = getcoordinates(grid, cell)
+                    cell ∈ visited_cells && continue # cell shared with an already searched node
+                    push!(visited_cells, cell)
+                    cellobj = getcells(grid, cell)
+                    getcoordinates!(resize!(cell_coords, nnodes(cellobj)), grid, cellobj)
                     is_in_cell, local_coord = find_local_coordinate(geom_interpol, cell_coords, points[point_idx], strategy; warn, extrapolation_tolerance)
                     is_in_cell || continue
                     violation = boundary_violation(refshape, local_coord)
