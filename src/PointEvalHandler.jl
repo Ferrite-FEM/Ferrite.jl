@@ -188,7 +188,7 @@ function check_isoparametric_boundaries(refshape::Type{<:AbstractRefShape}, x_lo
 end
 
 cellcenter(::Type{<:RefHypercube{dim}}, _::Type{T}) where {dim, T} = zero(Vec{dim, T})
-cellcenter(::Type{<:RefSimplex{dim}}, _::Type{T}) where {dim, T} = Vec{dim, T}((ntuple(d -> 1 / 3, dim)))
+cellcenter(::Type{<:RefSimplex{dim}}, _::Type{T}) where {dim, T} = Vec{dim, T}((ntuple(d -> 1 / (dim + 1), dim))) # barycenter
 cellcenter(::Type{RefPrism}, _::Type{T}) where {T} = Vec{3, T}((1 / 3, 1 / 3, 1 / 2))
 cellcenter(::Type{RefPyramid}, _::Type{T}) where {T} = Vec{3, T}((3 / 8, 3 / 8, 1 / 4)) # centroid
 
