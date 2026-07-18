@@ -467,6 +467,15 @@ function test_pe_first_point_missing()
     return
 end
 
+function test_pe_tiny_grid()
+    # Fewer nodes in the grid than requested nearest neighbors
+    mesh = generate_grid(Line, (1,))
+    ph = PointEvalHandler(mesh, [Vec((0.5,))])
+    @test ph.cells == [1]
+    @test ph.local_coords[1] ≈ Vec((0.5,))
+    return
+end
+
 function test_pe_inverted_cell()
     # Cell with clockwise node numbering, i.e. det(J) < 0 everywhere
     nodes = Node.(Vec{2, Float64}.([(0.0, 0.0), (0.0, 1.0), (1.0, 1.0), (1.0, 0.0)]))
@@ -700,6 +709,10 @@ end
 
     @testset "failure cases" begin
         test_pe_first_point_missing()
+    end
+
+    @testset "tiny grid" begin
+        test_pe_tiny_grid()
     end
 
     @testset "inverted cell" begin

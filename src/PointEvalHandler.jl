@@ -91,7 +91,7 @@ function _get_cellcoords(points::AbstractVector{Vec{dim, T}}, grid::AbstractGrid
     # set up tree structure for finding nearest nodes to points
     if cellset === nothing
         kdtree = KDTree(reinterpret(Vec{dim, T}, getnodes(grid)))
-        nearest_nodes, _ = knn(kdtree, points, search_nneighbors, true)
+        nearest_nodes, _ = knn(kdtree, points, min(search_nneighbors, getnnodes(grid)), true)
     else
         # Only nodes of cells in the cellset are relevant for the search
         node_ids = Int[]
