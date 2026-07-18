@@ -290,7 +290,7 @@ function _get_node_cell_map(grid::AbstractGrid, cellset::Union{AbstractSet{<:Int
 end
 
 """
-    evaluate_at_points(ph::PointEvalHandler, dh::AbstractDofHandler, dof_values::AbstractVector{T}, [fieldname::Symbol]) where {T}
+    evaluate_at_points(ph::PointEvalHandler, dh::DofHandler, dof_values::AbstractVector{T}, [fieldname::Symbol]) where {T}
     evaluate_at_points(ph::PointEvalHandler, proj::L2Projector, dof_values::AbstractVector{T}) where {T}
 
 Return a `Vector{T}` (for a 1-dimensional field) or a `Vector{Vec{fielddim, T}}` (for a
@@ -298,7 +298,7 @@ vector field) with the field values of field `fieldname` in the points of the
 `PointEvalHandler`. The `fieldname` can be omitted if only one field is stored in `dh`.
 The field values are computed based on the `dof_values` and interpolated to the local
 coordinates by the function interpolation of the corresponding `field` stored in the
-`AbstractDofHandler` or the `L2Projector`.
+`DofHandler` or the `L2Projector`.
 
 Points that could not be found in the domain when constructing the `PointEvalHandler` will
 have `NaN`s for the corresponding entries in the output vector.
@@ -310,7 +310,7 @@ function evaluate_at_points(ph::PointEvalHandler, proj::L2Projector, dof_vals::A
 end
 
 function evaluate_at_points(
-        ph::PointEvalHandler{<:Any, T1}, dh::AbstractDofHandler, dof_vals::AbstractVector{T2},
+        ph::PointEvalHandler{<:Any, T1}, dh::DofHandler, dof_vals::AbstractVector{T2},
         fname::Symbol = find_single_field(dh)
     ) where {T1, T2}
     npoints = length(ph.cells)
