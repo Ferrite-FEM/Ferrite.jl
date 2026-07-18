@@ -23,11 +23,19 @@ By default, a point is only assigned to a cell if it is inside the cell (up to a
 tolerance). Passing the keyword argument `extrapolation_tolerance > 0` also assigns points
 whose local coordinate is at most this far outside the reference shape of a cell.
 Evaluation in such points extrapolates from the assigned cell. Cells containing the point
-are always preferred; among extrapolation candidates the cell with the smallest violation
+are preferred; among extrapolation candidates the cell with the smallest violation
 of the reference shape bounds (measured in reference coordinates) is chosen. Note that,
 since the tolerance is measured in reference coordinates, the physical distance a given
 tolerance corresponds to scales with the size of the cell (and depends on the reference
 shape).
+
+!!! note
+    The search only considers cells connected to the `search_nneighbors` (default: 3)
+    nodes nearest to each point. In meshes with large differences in cell size the cell
+    containing a point may be missed by this search, in which case the point is not
+    found -- or, with `extrapolation_tolerance > 0`, may be assigned to a nearby cell
+    that does not contain it. Increasing `search_nneighbors` makes the search more
+    robust.
 
 The keyword argument `cellset` restricts the search to those cells. This is required to
 obtain correct results when evaluating a field that is only defined on a subdomain, or
