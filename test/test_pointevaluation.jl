@@ -459,6 +459,19 @@ function test_pe_first_point_missing()
     return
 end
 
+function test_pe_inverted_cell()
+    # Cell with clockwise node numbering, i.e. det(J) < 0 everywhere
+    nodes = Node.(Vec{2, Float64}.([(0.0, 0.0), (0.0, 1.0), (1.0, 1.0), (1.0, 0.0)]))
+    grid = Grid([Quadrilateral((1, 2, 3, 4))], nodes)
+    # The first point converges in the first Newton iteration (early convergence check),
+    # the second point needs a Newton step (late convergence check)
+    for point in (Vec((0.5, 0.5)), Vec((0.6, 0.5)))
+        ph = @test_logs (:warn, r"det\(J\) negative") (:warn, r"No cell found") PointEvalHandler(grid, [point])
+        @test ph.cells[1] === nothing
+    end
+    return
+end
+
 function test_pe_extrapolation()
     f(x) = x[1] + 2x[2]
 
@@ -638,6 +651,10 @@ end
 
     @testset "failure cases" begin
         test_pe_first_point_missing()
+    end
+
+    @testset "inverted cell" begin
+        test_pe_inverted_cell()
     end
 
     @testset "extrapolation" begin

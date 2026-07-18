@@ -164,6 +164,22 @@ end
 cellcenter(::Type{<:RefHypercube{dim}}, _::Type{T}) where {dim, T} = zero(Vec{dim, T})
 cellcenter(::Type{<:RefSimplex{dim}}, _::Type{T}) where {dim, T} = Vec{dim, T}((ntuple(d -> 1 / 3, dim)))
 
+# Check that a converged point is within the element boundaries (up to tolerance) and
+# that the element is not geometrically broken (inverted) at the point. Note that a
+# negative det(J) at intermediate Newton iterates is fine: the geometric map of a
+# healthy element may fold outside the element. det(J) == 0 is also accepted since the
+# map of a healthy element may be degenerate in single points (e.g. the pyramid apex).
+function check_converged_point(interpolation::Interpolation{refshape}, cell_coordinates, local_guess, boundary_tolerance, warn) where {refshape}
+    check_isoparametric_boundaries(refshape, local_guess, boundary_tolerance) || return false
+    J, _ = calculate_jacobian_and_spatial_coordinate(interpolation, local_guess, cell_coordinates)
+    detJ = calculate_detJ(J)
+    if detJ < 0
+        warn && @warn "det(J) negative at the converged point! Aborting! $detJ"
+        return false
+    end
+    return true
+end
+
 # See https://discourse.julialang.org/t/finding-the-value-of-a-field-at-a-spatial-location-in-juafem/38975/2
 function find_local_coordinate(interpolation::Interpolation{refshape}, cell_coordinates::Vector{<:Vec{sdim}}, global_coordinate::Vec{sdim}, strategy::NewtonLineSearchPointFinder; warn::Bool = false, extrapolation_tolerance::Real = 0.0) where {sdim, refshape}
     boundary_tolerance = max(√(strategy.residual_tolerance), extrapolation_tolerance)
@@ -178,21 +194,15 @@ function find_local_coordinate(interpolation::Interpolation{refshape}, cell_coor
         J, global_guess = calculate_jacobian_and_spatial_coordinate(interpolation, local_guess, cell_coordinates)
         # Check if converged
         residual = global_guess - global_coordinate
-        best_residual_norm = norm(residual) # for line search below
+        residual_norm = norm(residual)
         # Early convergence check
-        if best_residual_norm ≤ strategy.residual_tolerance
-            converged = check_isoparametric_boundaries(refshape, local_guess, boundary_tolerance)
+        if residual_norm ≤ strategy.residual_tolerance
+            converged = check_converged_point(interpolation, cell_coordinates, local_guess, boundary_tolerance, warn)
             if converged
-                @debug println("Local point finder converged in $iter iterations with residual $best_residual_norm to $local_guess")
+                @debug println("Local point finder converged in $iter iterations with residual $residual_norm to $local_guess")
             else
-                @debug println("Local point finder converged in $iter iterations with residual $best_residual_norm to a point outside the element: $local_guess")
+                @debug println("Local point finder converged in $iter iterations with residual $residual_norm to a point outside the element (or with a broken geometric map): $local_guess")
             end
-            break
-        end
-        # Report if the element is geometrically broken at the converged point
-        if converged && calculate_detJ(J) ≤ 0.0
-            converged = false
-            warn && @warn "det(J) negative! Aborting! $(calculate_detJ(J))"
             break
         end
         Δξ = calculate_Jinv(J) ⋅ residual # J \ residual
@@ -203,7 +213,10 @@ function find_local_coordinate(interpolation::Interpolation{refshape}, cell_coor
         global_guess = spatial_coordinate(interpolation, new_local_guess, cell_coordinates)
         best_residual_norm = norm(global_guess - global_coordinate)
         if !check_isoparametric_boundaries(refshape, new_local_guess, boundary_tolerance)
-            # Search for the residual minimizer, which is still inside the element
+            # Among the halved steps that stay inside the element, use the one with the
+            # smallest residual, but only if it also improves on the full step. Otherwise
+            # the full step is taken, and if the iteration converges to a point outside
+            # the element the boundary check at convergence rejects the cell.
             for next_index in 2:strategy.max_line_searches
                 new_local_guess = local_guess - Δξ / 2^(next_index - 1)
                 global_guess = spatial_coordinate(interpolation, new_local_guess, cell_coordinates)
@@ -217,11 +230,11 @@ function find_local_coordinate(interpolation::Interpolation{refshape}, cell_coor
         local_guess -= Δξ / 2^(best_index - 1)
         # Late convergence check
         if best_residual_norm ≤ strategy.residual_tolerance
-            converged = check_isoparametric_boundaries(refshape, local_guess, boundary_tolerance)
+            converged = check_converged_point(interpolation, cell_coordinates, local_guess, boundary_tolerance, warn)
             if converged
                 @debug println("Local point finder converged in $iter iterations with residual $best_residual_norm to $local_guess")
             else
-                @debug println("Local point finder converged in $iter iterations with residual $best_residual_norm to a point outside the element: $local_guess")
+                @debug println("Local point finder converged in $iter iterations with residual $best_residual_norm to a point outside the element (or with a broken geometric map): $local_guess")
             end
             break
         end
