@@ -88,9 +88,11 @@ function PointEvalHandler(
 end
 
 function _get_cellcoords(points::AbstractVector{Vec{dim, T}}, grid::AbstractGrid, node_cell_dicts::Dict{C, Dict{Int, Vector{Int}}}, search_nneighbors, warn, extrapolation_tolerance, strategy::NewtonLineSearchPointFinder, cellset = nothing) where {dim, T <: Real, C}
+    Tg = get_coordinate_eltype(grid)
+    Tl = promote_type(T, Tg) # scalar type of the local coordinates
     # set up tree structure for finding nearest nodes to points
     if cellset === nothing
-        kdtree = KDTree(reinterpret(Vec{dim, T}, getnodes(grid)))
+        kdtree = KDTree(reinterpret(Vec{dim, Tg}, getnodes(grid)))
         nearest_nodes, _ = knn(kdtree, points, min(search_nneighbors, getnnodes(grid)), true)
     else
         # Only nodes of cells in the cellset are relevant for the search
@@ -109,14 +111,14 @@ function _get_cellcoords(points::AbstractVector{Vec{dim, T}}, grid::AbstractGrid
     end
 
     cells = Vector{Union{Nothing, Int}}(nothing, length(points))
-    local_coords = Vector{Union{Nothing, Vec{1, T}, Vec{2, T}, Vec{3, T}}}(nothing, length(points))
+    local_coords = Vector{Union{Nothing, Vec{1, Tl}, Vec{2, Tl}, Vec{3, Tl}}}(nothing, length(points))
     inside_tolerance = √(strategy.residual_tolerance)
     visited_cells = Set{Int}()
-    cell_coords = zeros(Vec{dim, get_coordinate_eltype(grid)}, 0) # resize!d per cell
+    cell_coords = zeros(Vec{dim, Tg}, 0) # resize!d per cell
 
     for point_idx in 1:length(points)
         cell_found = false
-        best_violation = T(Inf)
+        best_violation = Tl(Inf)
         empty!(visited_cells)
         for (CT, node_cell_dict) in node_cell_dicts
             geom_interpol = geometric_interpolation(CT)

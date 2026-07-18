@@ -476,6 +476,34 @@ function test_pe_tiny_grid()
     return
 end
 
+function test_pe_scalar_type_promotion()
+    f(x) = x[1] + 2x[2]
+    # Float32 points on a Float64 grid
+    grid = generate_grid(Quadrilateral, (2, 2))
+    dh = DofHandler(grid)
+    add!(dh, :s, Lagrange{RefQuadrilateral, 1}())
+    close!(dh)
+    u = zeros(ndofs(dh))
+    apply_analytical!(u, dh, :s, f)
+    points32 = [Vec(0.1f0, 0.2f0), Vec(-0.5f0, 0.5f0)]
+    ph = PointEvalHandler(grid, points32)
+    @test all(x -> x !== nothing, ph.cells)
+    @test evaluate_at_points(ph, dh, u, :s) ≈ f.(points32)
+
+    # Float64 points on a Float32 grid
+    grid = generate_grid(Quadrilateral, (2, 2), Vec(-1.0f0, -1.0f0), Vec(1.0f0, 1.0f0))
+    dh = DofHandler(grid)
+    add!(dh, :s, Lagrange{RefQuadrilateral, 1}())
+    close!(dh)
+    u = zeros(Float32, ndofs(dh))
+    apply_analytical!(u, dh, :s, f)
+    points64 = [Vec(0.1, 0.2), Vec(-0.5, 0.5)]
+    ph = PointEvalHandler(grid, points64)
+    @test all(x -> x !== nothing, ph.cells)
+    @test evaluate_at_points(ph, dh, u, :s) ≈ f.(points64) rtol = √(eps(Float32))
+    return
+end
+
 function test_pe_inverted_cell()
     # Cell with clockwise node numbering, i.e. det(J) < 0 everywhere
     nodes = Node.(Vec{2, Float64}.([(0.0, 0.0), (0.0, 1.0), (1.0, 1.0), (1.0, 0.0)]))
@@ -713,6 +741,10 @@ end
 
     @testset "tiny grid" begin
         test_pe_tiny_grid()
+    end
+
+    @testset "scalar type promotion" begin
+        test_pe_scalar_type_promotion()
     end
 
     @testset "inverted cell" begin
