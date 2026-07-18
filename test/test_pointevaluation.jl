@@ -495,6 +495,32 @@ function test_pe_show()
     return
 end
 
+function test_pe_prism_pyramid()
+    f(x) = x[1] + 2x[2] - 3x[3]
+    for (CT, ip) in ((Wedge, Lagrange{RefPrism, 1}()), (Pyramid, Lagrange{RefPyramid, 1}()))
+        grid = generate_grid(CT, (2, 2, 2)) # covers [-1, 1]^3
+        dh = DofHandler(grid)
+        add!(dh, :s, ip)
+        close!(dh)
+        u = zeros(ndofs(dh))
+        apply_analytical!(u, dh, :s, f)
+
+        points = [Vec((0.12, -0.34, 0.56)), Vec((-1.0, -1.0, -1.0)), Vec((0.5, 0.5, 0.5))]
+        ph = PointEvalHandler(grid, points)
+        @test all(x -> x !== nothing, ph.cells)
+        @test evaluate_at_points(ph, dh, u, :s) ≈ f.(points)
+
+        # Extrapolation from prism/pyramid cells
+        outside_points = [Vec((1.02, 0.3, 0.3)), Vec((-0.2, -1.03, 0.4))]
+        ph = PointEvalHandler(grid, outside_points; warn = false)
+        @test all(isnothing, ph.cells)
+        ph = PointEvalHandler(grid, outside_points; extrapolation_tolerance = 0.2)
+        @test all(x -> x !== nothing, ph.cells)
+        @test evaluate_at_points(ph, dh, u, :s) ≈ f.(outside_points)
+    end
+    return
+end
+
 function test_pe_extrapolation()
     f(x) = x[1] + 2x[2]
 
@@ -682,6 +708,10 @@ end
 
     @testset "show" begin
         test_pe_show()
+    end
+
+    @testset "prism and pyramid cells" begin
+        test_pe_prism_pyramid()
     end
 
     @testset "extrapolation" begin

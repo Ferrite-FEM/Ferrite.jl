@@ -156,6 +156,18 @@ function boundary_violation(::Type{RefSimplex{dim}}, x_local::Vec{dim}) where {d
     return max(-minimum(x_local), sum(x_local) - 1)
 end
 
+function boundary_violation(::Type{RefPrism}, x_local::Vec{3})
+    # Triangle in the ξx-ξy plane, ξz in the range [0, 1]
+    (x, y, z) = x_local
+    return max(-x, -y, x + y - 1, -z, z - 1)
+end
+
+function boundary_violation(::Type{RefPyramid}, x_local::Vec{3})
+    # Unit square base in the ξx-ξy plane with the apex in (0, 0, 1)
+    (x, y, z) = x_local
+    return max(-x, -y, -z, x + z - 1, y + z - 1)
+end
+
 # check if point is inside a cell based on isoparametric coordinate
 function check_isoparametric_boundaries(refshape::Type{<:AbstractRefShape}, x_local::Vec, tol)
     return boundary_violation(refshape, x_local) ≤ tol
@@ -163,6 +175,8 @@ end
 
 cellcenter(::Type{<:RefHypercube{dim}}, _::Type{T}) where {dim, T} = zero(Vec{dim, T})
 cellcenter(::Type{<:RefSimplex{dim}}, _::Type{T}) where {dim, T} = Vec{dim, T}((ntuple(d -> 1 / 3, dim)))
+cellcenter(::Type{RefPrism}, _::Type{T}) where {T} = Vec{3, T}((1 / 3, 1 / 3, 1 / 2))
+cellcenter(::Type{RefPyramid}, _::Type{T}) where {T} = Vec{3, T}((3 / 8, 3 / 8, 1 / 4)) # centroid
 
 # Check that a converged point is within the element boundaries (up to tolerance) and
 # that the element is not geometrically broken (inverted) at the point. Note that a
