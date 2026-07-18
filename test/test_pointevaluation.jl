@@ -480,6 +480,21 @@ function test_pe_inverted_cell()
     return
 end
 
+function test_pe_show()
+    mesh = generate_grid(Quadrilateral, (2, 2))
+    ph = PointEvalHandler(mesh, [Vec(0.0, 0.0), Vec(2.0, 0.0)]; warn = false)
+    str = sprint(show, MIME"text/plain"(), ph)
+    @test occursin("number of points: 2", str)
+    @test occursin("Could not find corresponding cell for 1 points.", str)
+
+    # No points
+    ph = PointEvalHandler(mesh, Vec{2, Float64}[])
+    str = sprint(show, MIME"text/plain"(), ph)
+    @test occursin("number of points: 0", str)
+    @test occursin("Found corresponding cell for all points.", str)
+    return
+end
+
 function test_pe_extrapolation()
     f(x) = x[1] + 2x[2]
 
@@ -663,6 +678,10 @@ end
 
     @testset "inverted cell" begin
         test_pe_inverted_cell()
+    end
+
+    @testset "show" begin
+        test_pe_show()
     end
 
     @testset "extrapolation" begin

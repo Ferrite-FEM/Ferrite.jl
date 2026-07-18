@@ -51,7 +51,7 @@ end
 function Base.show(io::IO, ::MIME"text/plain", ph::PointEvalHandler)
     println(io, typeof(ph))
     println(io, "  number of points: ", length(ph.local_coords))
-    n_missing = sum(x -> x === nothing, ph.cells)
+    n_missing = count(x -> x === nothing, ph.cells)
     if n_missing == 0
         print(io, "  Found corresponding cell for all points.")
     else
