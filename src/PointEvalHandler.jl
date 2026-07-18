@@ -429,8 +429,7 @@ struct PointIterator{PH <: PointEvalHandler, V <: Vec}
 end
 
 function PointIterator(ph::PointEvalHandler{G}) where {D, C, T, G <: Grid{D, C, T}}
-    n = nnodes_per_cell(ph.grid)
-    coords = zeros(Vec{D, T}, n) # resize!d later if needed
+    coords = Vec{D, T}[] # resize!d in iterate to the size of each cell
     return PointIterator(ph, coords)
 end
 

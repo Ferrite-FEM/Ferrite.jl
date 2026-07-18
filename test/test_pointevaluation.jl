@@ -403,6 +403,14 @@ function test_pe_mixed_grid()
     @test all(x -> x !== nothing, ph.cells)
     vals = evaluate_at_points(ph, dh, dof_vals, :v)
     @test vals ≈ [Vec((i, i)) for i in 1.0:6.0]
+
+    # PointIterator with cells of different celltypes (and different number of nodes)
+    for (pointid, point) in enumerate(PointIterator(ph))
+        point === nothing && continue
+        cid = cellid(point)
+        @test cid == ph.cells[pointid]
+        @test point.coords ≈ getcoordinates(mesh, cid)
+    end
     return
 end
 
