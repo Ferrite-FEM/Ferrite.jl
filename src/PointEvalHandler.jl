@@ -24,7 +24,10 @@ tolerance). Passing the keyword argument `extrapolation_tolerance > 0` also assi
 whose local coordinate is at most this far outside the reference shape of a cell.
 Evaluation in such points extrapolates from the assigned cell. Cells containing the point
 are always preferred; among extrapolation candidates the cell with the smallest violation
-of the reference shape bounds (measured in reference coordinates) is chosen.
+of the reference shape bounds (measured in reference coordinates) is chosen. Note that,
+since the tolerance is measured in reference coordinates, the physical distance a given
+tolerance corresponds to scales with the size of the cell (and depends on the reference
+shape).
 
 The keyword argument `cellset` restricts the search to those cells. This is required to
 obtain correct results when evaluating a field that is only defined on a subdomain, or
@@ -61,13 +64,16 @@ function Base.show(io::IO, ::MIME"text/plain", ph::PointEvalHandler)
 end
 
 # Internals:
-# `PointEvalHandler` takes the following keyword arguments:
+# `PointEvalHandler` takes the following additional keyword arguments:
 #  - `search_nneighbors`: How many nodes should be found in the nearest neighbor search for each
 #    point. Usually there is no need to change this setting. Default value: `3`.
 #  - `warn::Bool`: Show a warning if a point is not found. Default value: `true`.
-#  - `newton_max_iters::Int`: Maximum number of inner Newton iterations. Default value: `10`.
-#  - `newton_residual_tolerance`: Tolerance for the residual norm to indicate convergence in the
-#    inner Newton solver. Default value: `1e-10`.
+#  - `strategy`: Method used to find the local coordinate of a point within a cell. Default
+#    value: `NewtonLineSearchPointFinder()`, with the fields:
+#     - `max_iters::Int`: Maximum number of Newton iterations. Default value: `10`.
+#     - `max_line_searches::Int`: Maximum number of line search steps. Default value: `5`.
+#     - `residual_tolerance`: Tolerance for the residual norm to indicate convergence in
+#       the Newton solver. Default value: `1e-10`.
 function PointEvalHandler(
         grid::AbstractGrid{dim}, points::AbstractVector{Vec{dim, T}};
         search_nneighbors = 3, warn::Bool = true, extrapolation_tolerance::Real = 0.0,
@@ -335,7 +341,6 @@ function evaluate_at_points!(
         func_interpolations
     ) where {T2, T_ph, T}
 
-    # TODO: I don't think this is correct??
     length(dof_vals) == ndofs(dh) || error("You must supply values for all $(ndofs(dh)) dofs.")
 
     for (sdh_idx, sdh) in pairs(dh.subdofhandlers)
