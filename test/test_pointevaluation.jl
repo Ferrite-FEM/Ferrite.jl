@@ -467,6 +467,18 @@ function test_pe_first_point_missing()
     return
 end
 
+function test_pe_pointiterator_collect()
+    mesh = generate_grid(Quadrilateral, (2, 2))
+    ph = PointEvalHandler(mesh, [Vec(0.1, 0.1), Vec(2.0, 0.0), Vec(-0.5, 0.5)]; warn = false)
+    it = PointIterator(ph)
+    @test length(it) == 3
+    collected = collect(it)
+    @test length(collected) == 3
+    @test collected[2] === nothing
+    @test cellid(collected[1]) == ph.cells[1]
+    return
+end
+
 function test_pe_tiny_grid()
     # Fewer nodes in the grid than requested nearest neighbors
     mesh = generate_grid(Line, (1,))
@@ -777,6 +789,10 @@ end
 
     @testset "embedded cells" begin
         test_pe_embedded_line()
+    end
+
+    @testset "PointIterator collect" begin
+        test_pe_pointiterator_collect()
     end
 
     @testset "show" begin

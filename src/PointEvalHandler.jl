@@ -433,6 +433,11 @@ point could be found in the grid, or `nothing`, if the point was not found.
 A `PointLocation` can be used to query the cell ID with the `cellid` function, and can be used
 to reinitialize [`PointValues`](@ref) with [`reinit!`](@ref).
 
+!!! note
+    The `PointLocation`s returned by the iterator share a single cell coordinate buffer
+    (similar to `CellIterator`): a `PointLocation` is only valid until the next
+    iteration.
+
 # Examples
 ```julia
 ph = PointEvalHandler(grid, points)
@@ -473,6 +478,8 @@ struct PointLocation{VL <: Vec, VC <: Vec}
     local_coord::VL
     coords::Vector{VC}
 end
+
+Base.length(p::PointIterator) = length(p.ph.cells)
 
 function Base.iterate(p::PointIterator, state = 1)
     if state > length(p.ph.cells)
