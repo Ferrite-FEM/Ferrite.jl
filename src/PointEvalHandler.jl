@@ -270,16 +270,12 @@ function _get_node_cell_map(grid::AbstractGrid, cellset::Union{AbstractSet{<:Int
     cells = getcells(grid)
     C = eltype(cells) # possibly abstract
     cell_dicts = Dict{Type{<:C}, Dict{Int, Vector{Int}}}()
-    ctypes = Set{Type{<:C}}(typeof(c) for c in cells)
-    for ctype in ctypes
-        cell_dict = cell_dicts[ctype] = Dict{Int, Vector{Int}}()
-        for (cellidx, cell) in enumerate(cells)
-            cell isa ctype || continue
-            cellset === nothing || cellidx ∈ cellset || continue
-            for node in cell.nodes
-                v = get!(Vector{Int}, cell_dict, node)
-                push!(v, cellidx)
-            end
+    cellidxs = cellset === nothing ? eachindex(cells) : sort!(collect(cellset))
+    for cellidx in cellidxs
+        cell = cells[cellidx]
+        cell_dict = get!(Dict{Int, Vector{Int}}, cell_dicts, typeof(cell))
+        for node in cell.nodes
+            push!(get!(Vector{Int}, cell_dict, node), cellidx)
         end
     end
     return cell_dicts
