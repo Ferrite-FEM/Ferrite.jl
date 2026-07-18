@@ -517,6 +517,30 @@ function test_pe_inverted_cell()
     return
 end
 
+function test_pe_embedded_line()
+    # Line cells embedded in 2D: the local coordinates have lower dimension than the
+    # spatial coordinates
+    nodes = Node.(Vec{2, Float64}.([(0.0, 0.0), (1.0, 1.0), (2.0, 2.0)]))
+    grid = Grid([Line((1, 2)), Line((2, 3))], nodes)
+    points = [Vec((0.5, 0.5)), Vec((1.5, 1.5))]
+    ph = PointEvalHandler(grid, points)
+    @test ph.cells == [1, 2]
+
+    ip = Lagrange{RefLine, 1}()
+    pv = PointValues(Float64, ip, ip^2)
+    f(x) = x[1] + 2x[2]
+    ue = zeros(2)
+    for (pointid, point) in enumerate(PointIterator(ph))
+        @test cellid(point) == ph.cells[pointid]
+        reinit!(pv, point)
+        for i in 1:2
+            ue[i] = f(point.coords[i]) # nodal values of f
+        end
+        @test function_value(pv, 1, ue) ≈ f(points[pointid])
+    end
+    return
+end
+
 function test_pe_show()
     mesh = generate_grid(Quadrilateral, (2, 2))
     ph = PointEvalHandler(mesh, [Vec(0.0, 0.0), Vec(2.0, 0.0)]; warn = false)
@@ -749,6 +773,10 @@ end
 
     @testset "inverted cell" begin
         test_pe_inverted_cell()
+    end
+
+    @testset "embedded cells" begin
+        test_pe_embedded_line()
     end
 
     @testset "show" begin

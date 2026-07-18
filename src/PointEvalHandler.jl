@@ -464,11 +464,14 @@ Element of a [`PointIterator`](@ref), typically used to reinitialize
  - `cid::Int`: ID of the cell containing the point
  - `local_coord::Vec`: the local (reference) coordinate of the point
  - `coords::Vector{Vec}`: the coordinates of the cell
+
+Note that the local coordinate and the cell coordinates are of different dimension for
+embedded cells (e.g. `Line` cells in a two-dimensional grid).
 """
-struct PointLocation{V}
+struct PointLocation{VL <: Vec, VC <: Vec}
     cid::Int
-    local_coord::V
-    coords::Vector{V}
+    local_coord::VL
+    coords::Vector{VC}
 end
 
 function Base.iterate(p::PointIterator, state = 1)
