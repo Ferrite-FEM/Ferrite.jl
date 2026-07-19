@@ -109,7 +109,7 @@ end
 getnodes(cc::CellCache) = cc.nodes
 getcoordinates(cc::CellCache) = cc.coords
 celldofs(cc::CellCache) = cc.dofs
-cellid(cc::CellCache) = cc.cellid[1]
+cellid(cc::CellCache) = only(cc.cellid)
 
 # TODO: These should really be replaced with something better...
 nfacets(cc::CellCache) = nfacets(getcells(cc.grid, cellid(cc)))

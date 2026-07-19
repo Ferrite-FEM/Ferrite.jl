@@ -474,7 +474,7 @@ end
 
 """
     getcells(grid::AbstractGrid)
-    getcells(grid::AbstractGrid, v::Union{Integer,AbstractVector{<:Integer}}
+    getcells(grid::AbstractGrid, v::Union{Integer, AbstractVector{<:Integer}}
     getcells(grid::AbstractGrid, setname::String)
 
 Returns either all `cells::Collection{C<:AbstractCell}` of a `<:AbstractGrid` or a subset based on an `Int`, `Vector{Int}` or `String`.
@@ -491,7 +491,7 @@ Whereas the last option tries to call a `cellset` of the `grid`. `Collection` ca
 
 """
     getnodes(grid::AbstractGrid)
-    getnodes(grid::AbstractGrid, v::Union{Integer,AbstractVector{<:Integer}}
+    getnodes(grid::AbstractGrid, v::Union{Integer, AbstractVector{<:Integer}}
     getnodes(grid::AbstractGrid, setname::String)
 
 Returns either all `nodes::Collection{N}` of a `<:AbstractGrid` or a subset based on an `Integer`, `AbstractVector{<:Integer}` or `String`.

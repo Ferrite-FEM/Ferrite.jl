@@ -181,7 +181,7 @@ for each dof-position determined by the `func_interpol`. Used mainly by the `Con
 """
 mutable struct BCValues{Tv, Ti}
     const M::Array{Tv, 3}
-    const nqp::Array{Ti}
+    const nqp::Vector{Ti}
     current_entity::Ti
 end
 

@@ -143,7 +143,7 @@ where `i=constrained_dof` and each element in `entries` are `j => a[j]`
 """
 struct AffineConstraint{Tv, Ti}
     constrained_dof::Ti
-    entries::DofCoefficients{Tv, Ti} # masterdofs and factors
+    entries::DofCoefficients{Tv, Ti} # masterdofs::It and factors::Tv
     b::Tv # inhomogeneity
 end
 
@@ -167,18 +167,18 @@ mutable struct ConstraintHandler{DH <: AbstractDofHandler, Tv, Ti}
     # global dof -> index into dofs and inhomogeneities and dofcoefficients
     const dofmapping::Dict{Ti, Ti}
     const isconstrained::BitVector # Fast check if dof is constrained or not
-    const bcvalues::Vector{BCValues{Tv}}
+    const bcvalues::Vector{BCValues{Tv, Ti}}
     const dh::DH
     closed::Bool
 end
 
-ConstraintHandler(dh::AbstractDofHandler) = ConstraintHandler(Float64, Int64, dh)
-ConstraintHandler(::Type{Tv}, dh::AbstractDofHandler) where {Tv} = ConstraintHandler(Tv, Int64, dh)
+ConstraintHandler(dh::AbstractDofHandler) = ConstraintHandler(Float64, dh)
+ConstraintHandler(::Type{Tv}, dh::AbstractDofHandler) where {Tv} = ConstraintHandler(Tv, Int, dh)
 function ConstraintHandler(::Type{Tv}, ::Type{Ti}, dh::AbstractDofHandler) where {Tv <: Number, Ti <: Integer}
     @assert isclosed(dh)
     return ConstraintHandler(
         Dirichlet[], ProjectedDirichlet[], Ti[], Ti[], Tv[], Union{Nothing, Tv}[],
-        Union{Nothing, DofCoefficients{Tv}}[], Dict{Ti, Ti}(), BitVector(), BCValues{Tv}[], dh, false,
+        Union{Nothing, DofCoefficients{Tv}}[], Dict{Ti, Ti}(), BitVector(), BCValues{Tv, Ti}[], dh, false,
     )
 end
 
@@ -276,7 +276,7 @@ end
 
 Close and finalize the `ConstraintHandler`.
 """
-function close!(ch::ConstraintHandler{<:Any, <:Any, Ti}) where {Ti}
+function close!(ch::ConstraintHandler)
     @assert(!isclosed(ch))
     @assert(allunique(ch.prescribed_dofs))
 

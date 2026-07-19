@@ -236,9 +236,6 @@ function cellnodes!(global_nodes::AbstractVector{<:Integer}, dh::AbstractDofHand
     return cellnodes!(global_nodes, get_grid(dh), i)
 end
 
-function getcoordinates!(coords::AbstractVector{<:Real}, dh::AbstractDofHandler, i::Integer)
-    return getcoordinates!(coords, get_grid(dh), i)
-end
 
 """
     getfieldnames(dh::DofHandler)
