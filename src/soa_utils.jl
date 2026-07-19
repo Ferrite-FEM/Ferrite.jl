@@ -14,7 +14,7 @@ struct SoAContainer{T, T_inner} <: AbstractVector{T}
     nels::Int
     function SoAContainer(soa::T_inner, nels::Int) where {T_inner}
         #TODO: Check bounds here so we can guarantee inbounds later?
-        T = typeof(get_substruct(1, soa))
+        T = typeof(get_substruct(soa, 1))
         return new{T, T_inner}(soa, nels)
     end
 end
@@ -40,19 +40,19 @@ view_from_shared(a::AbstractArray{<:Any, 2}, i::Integer) = view(a, i, :)
 view_from_shared(a::AbstractArray{<:Any, 3}, i::Integer) = view(a, i, :, :)
 
 # Extract the i-th worker's local slice from batched device data
-function get_substruct(i, cv::CellValues)
-    fv = get_substruct(i, cv.fun_values)
+function get_substruct(cv::CellValues, i)
+    fv = get_substruct(cv.fun_values, i)
     return CellValues(fv, cv.geo_mapping, cv.qr, view_from_shared(cv.detJdV, i))
 end
 
-function get_substruct(i, fv::FunctionValues)
+function get_substruct(fv::FunctionValues, i)
     Nx = fv.Nξ === fv.Nx ? fv.Nx : view_from_shared(fv.Nx, i)
     dNdx = view_from_shared(fv.dNdx, i)
     d2Ndx2 = view_from_shared(fv.d2Ndx2, i)
     return FunctionValues(fv.ip, Nx, fv.Nξ, dNdx, fv.dNdξ, d2Ndx2, fv.d2Ndξ2)
 end
 
-function get_substruct(i, cc::CellCache)
+function get_substruct(cc::CellCache, i)
     return CellCache(
         cc.flags, cc.grid, view_from_shared(cc.cellid, i),
         view_from_shared(cc.nodes, i), view_from_shared(cc.coords, i),
