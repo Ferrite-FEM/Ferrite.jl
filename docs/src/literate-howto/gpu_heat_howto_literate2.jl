@@ -8,7 +8,7 @@ In this how-to, we demonstrate the experimental API developed to use
 graphics processing units (GPUs) with Ferrite.
 The how-to is split into 3 parts, first we demonstrate a standard assembly
 with a portable implementation using `KernelAbstractions.jl`. Next, we show
-how a specific kernel for `CUDA` can be written, which leads to better performance (TODO: true?).
+how a specific kernel for `CUDA` can be written, which can be beneficial when special CUDA features are used in the element assembly function.
 While it is possible to assemble into a global sparse matrix with GPUs, another common strategy
 is to calculate and store each element matrix separately and then use this to build an efficient
 matrix-vector product, how to modify the code to assemble into such a structure is demonstrated
@@ -17,7 +17,8 @@ at the end.
 ## Global matrix assembly with `KernelAbstractions.jl`
 We start by using the required packages,
 =#
-using Ferrite, CUDA
+using Ferrite
+using CUDA
 import CUDA: CUDA.CUSPARSE.CuSparseMatrixCSC
 import Adapt: adapt
 import KernelAbstractions: @kernel, @index
@@ -62,7 +63,7 @@ end
 
 # Now to the actual assembly kernel using KernelAbstractions.jl.
 # We use a grid-stride loop, which has several benefits in terms of performance and debuggability.
-# For more details please consult https://developer.nvidia.com/blog/cuda-pro-tip-write-flexible-kernels-grid-stride-loops/ .
+# For more details please consult [this blog post](https://developer.nvidia.com/blog/cuda-pro-tip-write-flexible-kernels-grid-stride-loops/) .
 @kernel function ka_assembly_kernel(assembler, @Const(color), cc, cv, Kes, fes)
     ## This is the classical grid-stride-loop
     task_index = @index(Global, Linear)
@@ -145,10 +146,10 @@ f_gpu = KA.zeros(backend, Float32, (ndofs(dh),))
 # Furthermore, the individual GPU workers need local buffers.
 # Ferrite comes with a helper, `Ferrite.distribute_to_tasks`, which transforms common buffers
 # into a suitable GPU format.
-# n_workers = ceil(Int, length(grid.cells) / NUM_THREADS) # FIXME does not match the used 493
 n_workers = maximum(length, colors)
 cv_gpu = Ferrite.distribute_to_tasks(backend, cv, n_workers)
-cc_gpu = Ferrite.distribute_to_tasks(backend, CellCache(dh_gpu), n_workers)
+cc = CellCache(dh_gpu)
+cc_gpu = Ferrite.distribute_to_tasks(backend, cc, n_workers)
 # We also need a local buffer for the element vectors and matrices,
 # and these are created as a global array which we use views into in the assembly kernel.
 # Since GPU thread groups favor coalesced memory access we allocate the buffers such
@@ -172,18 +173,22 @@ close!(ch)
 
 ch_gpu = adapt(backend, ch)
 apply!(K_gpu, f_gpu, ch_gpu)
+# To not complicate the description further, we simply solve the system on the CPU with a direct solver.
 u = SparseMatrixCSC(K_gpu) \ Vector(f_gpu)
 
 
 #=
 ## Global matrix assembly with `CUDA.jl`
 Only minor differences from the portable `KernelAbstractions.jl` version above are required
-for a specific CUDA-kernel. TODO: What's the point of writing specific CUDA-kernel?
+for a specific CUDA-kernel. While this section does not use any CUDA specific features like the tensor cores
+it shows how to perform the assembly using CUDA only.
 =#
 
 function cuda_assembly_kernel(assembler, color, cc::SoAContainer, cv::SoAContainer, Kes::AbstractArray, fes::AbstractMatrix)
+    ## The main difference to the KernelAbstractions.jl is this portion to compute stride and task index.
     task_index = (blockIdx().x - Int32(1)) * blockDim().x + threadIdx().x
     stride = gridDim().x * blockDim().x
+    ## The remaining code remains the same, as we do not show any CUDA specific features here. 
     cv_i = cv[task_index]
     cc_i = cc[task_index]
     Ke = view(Kes, task_index, :, :)
@@ -224,6 +229,7 @@ function assemble_cell!(Ke, fe, cell, cv)
     return nothing
 end
 
+# This is the element-assembly kernel to setup the element matrices and vectors only.
 function cuda_assembly_kernel(color, cc, cv, Kes, fes)
     task_index = (blockIdx().x - Int32(1)) * blockDim().x + threadIdx().x
     stride = gridDim().x * blockDim().x
