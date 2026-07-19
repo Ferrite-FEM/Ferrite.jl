@@ -21,5 +21,5 @@ end
 Ferrite.get_coordinate_eltype(::DeviceSubGrid{<:Any, <:Any, T}) where {T} = T
 Ferrite.get_coordinate_type(::DeviceSubGrid{dim, <:Any, T}) where {dim, T} = Vec{dim, T}
 
-Ferrite.getcells(grid::DeviceSubGrid, i::Int) = grid.cells[grid.global_to_local_cellid[i]]
-Ferrite.getcells(grid::DeviceSubGrid{<:Any, <:Any, <:Any, <:Any, <:Any, Nothing}, i::Int) = grid.cells[i]
+Ferrite.getcells(grid::DeviceSubGrid, i::Integer) = grid.cells[grid.global_to_local_cellid[i]]
+Ferrite.getcells(grid::DeviceSubGrid{<:Any, <:Any, <:Any, <:Any, <:Any, Nothing}, i::Integer) = grid.cells[i]

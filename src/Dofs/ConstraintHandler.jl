@@ -163,7 +163,7 @@ mutable struct ConstraintHandler{DH <: AbstractDofHandler, Tv, Ti}
     # "effective" inhomogeneities in `update!` and then stored in .inhomogeneities.
     const affine_inhomogeneities::Vector{Union{Nothing, Tv}}
     # `nothing` for pure DBC constraint, otherwise affine constraint
-    const dofcoefficients::Vector{Union{Nothing, DofCoefficients{Tv}}}
+    const dofcoefficients::Vector{Union{Nothing, DofCoefficients{Tv, Ti}}}
     # global dof -> index into dofs and inhomogeneities and dofcoefficients
     const dofmapping::Dict{Ti, Ti}
     const isconstrained::BitVector # Fast check if dof is constrained or not

@@ -61,7 +61,7 @@ function HostDofHandler(backend, dh::DofHandler)
     cell_dofs_offset = adapt(backend, dh.cell_dofs_offset)
     subdofhandlers = map(dh.subdofhandlers) do sdh
         dof_ranges = Tuple(Ferrite.dof_range(sdh, i) for i in 1:length(sdh.field_names))
-        field_indices = NamedTuple{ntuple(i -> dh.field_names[i], length(dh.field_names))}(collect(1:length(dh.field_names)))
+        field_indices = NamedTuple{ntuple(i -> sdh.field_names[i], length(sdh.field_names))}(collect(1:length(sdh.field_names)))
         # invert cellset and build a device container grid with only a single cell type
         cellset = collect(Int, sdh.cellset)
         global_to_local_cellid = zeros(Int, getncells(grid_cpu))

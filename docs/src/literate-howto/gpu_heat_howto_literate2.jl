@@ -86,7 +86,7 @@ end
         assemble_cell!(Ke, fe, cc_i, cv_i, assembler)
     end
 end
-function assemble_global_ka!(backend, cellvalues::SoAContainer, K, f, cc, colors::Vector, Ke::SoAContainer, fe::SoAContainer)
+function assemble_global_ka!(backend, cellvalues::Ferrite.SoAContainer, K, f, cc, colors::Vector, Ke::Ferrite.SoAContainer, fe::Ferrite.SoAContainer)
     assembler = start_assemble(K, f)
     for color in colors
         ## We divide the work into blocks and fire up the kernel.
@@ -184,8 +184,7 @@ for a specific CUDA-kernel. While this section does not use any CUDA specific fe
 it shows how to perform the assembly using CUDA only.
 =#
 
-function cuda_assembly_kernel(assembler, color, cc::SoAContainer, cv::SoAContainer, Kes::AbstractArray, fes::AbstractMatrix)
-    ## The main difference to the KernelAbstractions.jl is this portion to compute stride and task index.
+function cuda_assembly_kernel(assembler, color, cc::Ferrite.SoAContainer, cv::Ferrite.SoAContainer, Kes::AbstractArray, fes::AbstractMatrix)
     task_index = (blockIdx().x - Int32(1)) * blockDim().x + threadIdx().x
     stride = gridDim().x * blockDim().x
     ## The remaining code remains the same, as we do not show any CUDA specific features here. 
@@ -201,7 +200,7 @@ function cuda_assembly_kernel(assembler, color, cc::SoAContainer, cv::SoAContain
     return nothing
 end
 
-function assemble_global_cuda!(cv::SoAContainer, K, f, cc, colors::Vector, Kes, fes)
+function assemble_global_cuda!(cv::Ferrite.SoAContainer, K, f, cc, colors::Vector, Kes, fes)
     assembler = start_assemble(K, f)
     for color in colors
         n = length(color)
@@ -240,11 +239,11 @@ function cuda_assembly_kernel(color, cc, cv, Kes, fes)
         reinit!(cc_i, cellid)
         Ke = view(Kes, cellid, :, :)
         fe = view(fes, cellid, :)
-        assemble_cell!(Ke, fe, cc_i, cv_i, assembler)
+        assemble_cell!(Ke, fe, cc_i, cv_i)
     end
     return nothing
 end
-function assemble_global_cuda!(cv::SoAContainer, cc, colors::Vector, Ke, fe)
+function assemble_global_cuda!(cv::Ferrite.SoAContainer, cc, colors::Vector, Ke, fe)
     for color in colors
         n = length(color)
         tasks_per_thread = min(NUM_TASKS_PER_THREAD, n)

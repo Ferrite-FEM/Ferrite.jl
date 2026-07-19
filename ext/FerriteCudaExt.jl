@@ -1,5 +1,6 @@
 # TODO's
 # * `update!` for ConstraintHandler on GPU.
+# * Rectangular matrix assembly support
 
 module FerriteCudaExt
 
@@ -28,6 +29,10 @@ end
     @gputhrow("ArgumentError", "the number of (geometric) base functions does not match the number of coordinates in the vector. Perhaps you forgot to use an appropriate geometric interpolation when creating FE values? See https://github.com/Ferrite-FEM/Ferrite.jl/issues/265 for more details. Please check the values on CPU.")
 end
 
+@device_override @noinline function Ferrite._missing_sparsity_pattern_error(Krow::Integer, Kcol::Integer)
+    @gputhrow("ErrorException", "You are trying to assemble values in to K, but the entry, $is missing in the sparsity pattern. Make sure you have called `K = allocate_matrix(dh)` or `K = allocate_matrix(dh, ch)` if you have affine constraints. This error might also happen if you are using the assembler in a threaded assembly loop (you need to create one `assembler` for each task).")
+end
+
 # -------------------- assembler ----------------------
 
 struct DeviceCSCAssembler{Tv, Ti, KType <: AbstractSparseArray{Tv, Ti, 2}, FType <: AbstractVector{Tv}} <: Ferrite.AbstractAssembler{Tv}
@@ -37,9 +42,9 @@ end
 Adapt.@adapt_structure DeviceCSCAssembler
 
 # FIXME buffer
-function Ferrite.start_assemble(K::CuSparseMatrixCSC, f::Union{CuVector, Nothing} = nothing; fillzero::Bool = true)
+function Ferrite.start_assemble(K::CuSparseMatrixCSC, f::CuVector = CUDA.zeros(0); fillzero::Bool = true)
     fillzero && fill!(nonzeros(K), zero(eltype(K)))
-    f !== nothing && fillzero && fill!(f, zero(eltype(f)))
+    fillzero && fill!(f, zero(eltype(f)))
     return DeviceCSCAssembler(K, f)
 end
 
@@ -75,6 +80,9 @@ function Ferrite.assemble!(A::DeviceCSCAssembler, dofs::AbstractVector{<:Integer
                 if rowval[idx] == row
                     nzval[idx] += val
                     break
+                end
+                if rowval[idx] > row
+                    Ferrite._missing_sparsity_pattern_error(row, col)
                 end
             end
         end
