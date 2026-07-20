@@ -187,7 +187,7 @@ it shows how to perform the assembly using CUDA only.
 function cuda_assembly_kernel(assembler, color, cc::Ferrite.SoAContainer, cv::Ferrite.SoAContainer, Kes::AbstractArray, fes::AbstractMatrix)
     task_index = (blockIdx().x - Int32(1)) * blockDim().x + threadIdx().x
     stride = gridDim().x * blockDim().x
-    ## The remaining code remains the same, as we do not show any CUDA specific features here. 
+    ## The remaining code remains the same, as we do not show any CUDA specific features here.
     cv_i = cv[task_index]
     cc_i = cc[task_index]
     Ke = view(Kes, task_index, :, :)
