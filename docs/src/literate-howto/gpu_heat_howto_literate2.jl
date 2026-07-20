@@ -79,12 +79,13 @@ end
 # Now to the actual assembly kernel using KernelAbstractions.jl.
 # We use a grid-stride loop, which has several benefits in terms of performance and debuggability.
 # For more details please consult [this blog post](https://developer.nvidia.com/blog/cuda-pro-tip-write-flexible-kernels-grid-stride-loops/) .
-@kernel function ka_assembly_kernel(assembler, @Const(color), cc, cv, Kes, fes)
+@kernel function ka_assembly_kernel(assemblers, @Const(color), cc, cv, Kes, fes)
     ## This is the classical grid-stride-loop
     task_index = @index(Global, Linear)
     stride = prod(KA.@ndrange())
 
     ## Get the local evaluation buffers for the GPU worker.
+    assembler = assemblers[task_index]
     cv_i = cv[task_index]
     cc_i = cc[task_index]
     Ke = view(Kes, task_index, :, :) # Note row-major indexing, this
@@ -101,15 +102,15 @@ end
         assemble_cell!(Ke, fe, cc_i, cv_i, assembler)
     end
 end
-function assemble_global_ka!(backend, cellvalues::Ferrite.SoAContainer, K, f, cc, colors::Vector, Ke::Ferrite.SoAContainer, fe::Ferrite.SoAContainer)
-    assembler = start_assemble(K, f)
+function assemble_global_ka!(backend, cellvalues::Ferrite.SoAContainer, K, f, cc, colors::Vector, Ke::Ferrite.SoAContainer, fe::Ferrite.SoAContainer, n_workers)
+    assemblers = Ferrite.distribute_to_tasks(backend, start_assemble(K, f), n_workers)
     for color in colors
         ## We divide the work into blocks and fire up the kernel.
         n = length(color)
         threads, blocks = compute_threads_and_blocks(n)
         ## Now, we can build and execute the Kernel.
         ka_kernel = ka_assembly_kernel(backend, threads)
-        ka_kernel(assembler, color, cc, cellvalues, Ke, fe, ndrange = threads * blocks)
+        ka_kernel(assemblers, color, cc, cellvalues, Ke, fe, ndrange = threads * blocks)
         ## Since the kernel launches asynchronously we need to add a synchronization
         ## point before proceeding here. Otherwise we will start assembling the next color,
         ## while there are still threads working on the current color, therefore potentially
@@ -169,7 +170,7 @@ Kes = KA.zeros(backend, Float32, n_workers, getnbasefunctions(cv), getnbasefunct
 fes = KA.zeros(backend, Float32, n_workers, getnbasefunctions(cv))
 
 # Now everything is set to launch the assembly via KernelAbstractions.
-assemble_global_ka!(backend, cv_gpu, K_gpu, f_gpu, cc_gpu, colors_gpu, Kes, fes)
+assemble_global_ka!(backend, cv_gpu, K_gpu, f_gpu, cc_gpu, colors_gpu, Kes, fes, n_workers)
 
 # Finally, we can apply the Dirichlet constraints and solve our linear system.
 ch = ConstraintHandler(Float32, Int32, dh)
@@ -193,10 +194,11 @@ for a specific CUDA-kernel. While this section does not use any CUDA specific fe
 it shows how to perform the assembly using CUDA only.
 =#
 
-function cuda_assembly_kernel(assembler, color, cc::Ferrite.SoAContainer, cv::Ferrite.SoAContainer, Kes::AbstractArray, fes::AbstractMatrix)
+function cuda_assembly_kernel(assemblers, color, cc::Ferrite.SoAContainer, cv::Ferrite.SoAContainer, Kes::AbstractArray, fes::AbstractMatrix)
     task_index = (blockIdx().x - Int32(1)) * blockDim().x + threadIdx().x
     stride = gridDim().x * blockDim().x
     ## The remaining code remains the same, as we do not show any CUDA specific features here.
+    assembler = assemblers[task_index]
     cv_i = cv[task_index]
     cc_i = cc[task_index]
     Ke = view(Kes, task_index, :, :)
@@ -209,21 +211,19 @@ function cuda_assembly_kernel(assembler, color, cc::Ferrite.SoAContainer, cv::Fe
     return nothing
 end
 
-function assemble_global_cuda!(cv::Ferrite.SoAContainer, K, f, cc, colors::Vector, Kes, fes)
-    assembler = start_assemble(K, f)
+function assemble_global_cuda!(cv::Ferrite.SoAContainer, K, f, cc, colors::Vector, Kes, fes, n_workers)
+    assemblers = Ferrite.distribute_to_tasks(backend, start_assemble(K, f), n_workers)
     for color in colors
         n = length(color)
-        tasks_per_thread = min(NUM_TASKS_PER_THREAD, n)
-        threads = min(NUM_THREADS, cld(n, tasks_per_thread))
-        blocks = cld(n, tasks_per_thread * threads)
-        @cuda threads = threads blocks = blocks cuda_assembly_kernel(assembler, color, cc, cv, Kes, fes)
+        threads, blocks = compute_threads_and_blocks(n)
+        @cuda threads = threads blocks = blocks cuda_assembly_kernel(assemblers, color, cc, cv, Kes, fes)
         CUDA.synchronize()
     end
     return nothing
 end
 
 # And now we can assemble the same way as for the `KernelAbstractions.jl` version
-assemble_global_cuda!(cv_gpu, K_gpu, f_gpu, cc_gpu, colors_gpu, Kes, fes)
+assemble_global_cuda!(cv_gpu, K_gpu, f_gpu, cc_gpu, colors_gpu, Kes, fes, n_workers)
 
 
 #=

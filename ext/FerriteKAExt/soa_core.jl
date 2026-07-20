@@ -39,3 +39,17 @@ function as_structure_of_arrays(d, N, fv::Ferrite.GeometryMapping)
         adapt(d, fv.d2Mdξ2),
     )
 end
+
+# We do not need a soa container for the CPU variant.
+function Ferrite.distribute_to_tasks(backend::KA.CPU, a::Ferrite.AbstractAssembler, num_tasks)
+    return [
+        a; [start_assemble(a.K, a.f) for _ in 2:num_tasks]
+    ]
+end
+
+# So far the GPU assemblers are safe to use in parallel directly.
+function Ferrite.distribute_to_tasks(backend::KA.GPU, a::Ferrite.AbstractAssembler, num_tasks)
+    return Ferrite.SoAContainer(a, num_tasks)
+end
+
+Ferrite.get_substruct(a::Ferrite.AbstractAssembler, i::Integer) = a
