@@ -20,7 +20,7 @@ struct SoAContainer{T, T_inner} <: AbstractVector{T}
 end
 
 Base.size(c::SoAContainer) = (c.nels,)
-Base.getindex(c::SoAContainer, i::Integer) = get_substruct(i, c.soa) # TODO: Why reverse indexing here???
+Base.getindex(c::SoAContainer, i::Integer) = get_substruct(c.soa, i)
 function Base.show(io::IO, d::MIME"text/plain", c::SoAContainer{T}) where {T}
     println(io, "SoAContainer{$T}")
     print(io, "Structure of Arrays container with $(c.nels) elements.")
