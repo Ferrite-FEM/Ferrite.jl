@@ -156,7 +156,7 @@ f_gpu = KA.zeros(backend, Float32, (ndofs(dh),))
 # into a suitable GPU format. Since we parallelize over the colors, we need to allocate
 # buffers large enough. Since we use a grid-stride loop.
 max_color_size = maximum(length.(colors))
-n_workers = prod(compute_threads_and_blocks(max_color_size)) # Rembember, we have `threads × blocks` workers.
+n_workers = prod(compute_threads_and_blocks(max_color_size)) # Remember, we have `threads × blocks` workers.
 cv_gpu = Ferrite.distribute_to_tasks(backend, cv, n_workers)
 cc = CellCache(dh_gpu)
 cc_gpu = Ferrite.distribute_to_tasks(backend, cc, n_workers)
