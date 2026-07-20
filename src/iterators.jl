@@ -66,33 +66,23 @@ function CellCache(sdh::SubDofHandler, flags::UpdateFlags = UpdateFlags())
     return CellCache(flags, sdh.dh.grid, [-1], Int[], Tv[], sdh, Int[])
 end
 
+_isresizable(::Vector) = true
+_isresizable(::SubArray) = false
 function reinit!(cc::CellCache, i::Integer)
     cc.cellid[1] = i
-    _reinit!(cc, i, cc.nodes)
-    return cc
-end
-
-function _reinit!(cc::CellCache, i::Integer, ::Vector)
     if cc.flags.nodes
-        resize!(cc.nodes, nnodes_per_cell(cc.grid, i))
+        _isresizable(cc.nodes) && resize!(cc.nodes, nnodes_per_cell(cc.grid, i))
         cellnodes!(cc.nodes, cc.grid, i)
     end
     if cc.flags.coords
-        resize!(cc.coords, nnodes_per_cell(cc.grid, i))
+        _isresizable(cc.coords) && resize!(cc.coords, nnodes_per_cell(cc.grid, i))
         getcoordinates!(cc.coords, cc.grid, i)
     end
     if cc.dh !== nothing && cc.flags.dofs
-        resize!(cc.dofs, ndofs_per_cell(cc.dh, i))
+        _isresizable(cc.dofs) && resize!(cc.dofs, ndofs_per_cell(cc.dh, i))
         celldofs!(cc.dofs, cc.dh, i)
     end
     return cc
-end
-
-function _reinit!(cc::CellCache, i::Integer, ::SubArray)
-    cc.flags.nodes  && cellnodes!(cc.nodes, cc.grid, i)
-    cc.flags.coords && getcoordinates!(cc.coords, cc.grid, i)
-    cc.dh !== nothing && cc.flags.dofs && celldofs!(cc.dofs, cc.dh, i)
-    return nothing
 end
 
 # reinit! FEValues with CellCache
