@@ -10,8 +10,22 @@ import LinearAlgebra
 @testset "KernelAbstractions.jl integration" begin
 
     # We start with some to be used in the following for simple convenience.
-    NUM_THREADS = 64
-    NUM_TASKS_PER_THREAD = 2
+    NUM_THREADS = Threads.nthreads()
+    NUM_TASKS_PER_THREAD = 4
+
+    function compute_threads_and_blocks(n)
+        ## Let's assign, arbitrarily, two element assembly tasks per GPU thread.
+        tasks_per_thread = min(NUM_TASKS_PER_THREAD, n)
+        ## To do so, let us first compute how many element groups we have to assemble.
+        n_effective = cld(n, tasks_per_thread)
+        ## This potentially limits the number of usable threads, e.g. when a color just has a small
+        ## number of elements.
+        threads = min(NUM_THREADS, n_effective)
+        ## Furthermore, for CPU computing we typically group the tasks into blocks of worker threads.
+        blocks = cld(n, tasks_per_thread * threads)
+
+        return threads, blocks
+    end
 
     # In this how-to we want to use an existing assembly routine on the GPU with Ferrite.
     # We implicitly assume that nothing dynamic happens inside the routine, i.e. the routine
@@ -50,7 +64,7 @@ import LinearAlgebra
     # as the kernel language, although we will also show how to use CUDA directly below. In this kernel
     # we use a grid-stride loop, which has several benefits in terms of performance and debuggability.
     # For more details please consult https://developer.nvidia.com/blog/cuda-pro-tip-write-flexible-kernels-grid-stride-loops/ .
-    @kernel function ka_assembly_kernel(assembler, @Const(color), cc, cv, Kes, fes)
+    @kernel function ka_assembly_kernel(assemblers, @Const(color), cc, cv, Kes, fes)
         ## This is the classical grid-stride-loop
         task_index = @index(Global, Linear)
         stride = prod(KA.@ndrange())
@@ -59,7 +73,7 @@ import LinearAlgebra
         ## As explained later this is the secret sauce.
         cv_i = cv[task_index]
         cc_i = cc[task_index]
-
+        assembler = assemblers[task_index]
         for i in task_index:stride:length(color)
             ## Work item index
             cellid = color[i]
@@ -75,20 +89,18 @@ import LinearAlgebra
             assemble_cell!(Ke, fe, cc_i, cv_i, assembler)
         end
     end
-    function assemble_global_ka!(backend, cv::Ferrite.SoAContainer{<:CellValues}, K, f, cc, colors::Vector, Ke, fe)
-        assembler = K === nothing ? nothing : start_assemble(K, f; fillzero = false)
+    function assemble_global_ka!(backend, cv::Ferrite.SoAContainer{<:CellValues}, K, f, cc, colors::Vector, Ke, fe, n_workers)
+        assembler = if K === nothing
+            nothing
+        elseif backend isa KA.GPU
+            start_assemble(K, f; fillzero = false)
+        else
+            [start_assemble(K, f; fillzero = false) for i in 1:n_workers]
+        end
         for color in colors
             ## We divide the work into blocks and fire up the kernel.
             n = length(color)
-            ## Let's assign, arbitrarily, two element assembly tasks per GPU thread.
-            tasks_per_thread = min(NUM_TASKS_PER_THREAD, n)
-            ## To do so, let us first compute how many element groups we have to assemble.
-            n_effective = cld(n, tasks_per_thread)
-            ## This potentially limits the number of usable threads, e.g. when a color just has a small
-            ## number of elements.
-            threads = min(NUM_THREADS, n_effective)
-            ## Furthermore, for CPU computing we typically group the tasks into blocks of worker threads.
-            blocks = cld(n, tasks_per_thread * threads)
+            threads, blocks = compute_threads_and_blocks(n)
             ## Now, we can build and execute the Kernel.
             ka_kernel = ka_assembly_kernel(backend, threads)
             ka_kernel(assembler, color, cc, cv, Ke, fe, ndrange = threads * blocks)
@@ -159,9 +171,11 @@ import LinearAlgebra
     # Ferrite comes with a little helper to transform common buffers
     # into a suitable GPU format.
     # n_workers = ceil(Int, length(grid.cells) / NUM_THREADS) # FIXME does not match the used 493
-    n_workers = getncells(grid)
+    # n_workers = getncells(grid)
+    n_workers = prod(compute_threads_and_blocks(maximum(length.(colors))))
     cv_device = Ferrite.distribute_to_tasks(backend, cv, n_workers)
-    cc_device = Ferrite.distribute_to_tasks(backend, CellCache(dh_device), n_workers)
+    cc = CellCache(dh_device)
+    cc_device = Ferrite.distribute_to_tasks(backend, cc, n_workers)
     # Technically we can also just get one Ke or fe per worker, but for demonstration
     # purposes we allocate the full block here for element-assembly style matrix-free GPU
     # usage.
@@ -169,7 +183,7 @@ import LinearAlgebra
     fes = KA.zeros(backend, Float32, getncells(grid), getnbasefunctions(cv))
 
     # Now everything is set to launch the assembly via KernelAbstractions.
-    assemble_global_ka!(backend, cv_device, K_device, f_device, cc_device, colors_device, Kes, fes)
+    assemble_global_ka!(backend, cv_device, K_device, f_device, cc_device, colors_device, Kes, fes, n_workers)
 
     # Finally, we can apply the Dirichlet constraints and solve our linear system.
     ch = ConstraintHandler(Float32, Int32, dh)

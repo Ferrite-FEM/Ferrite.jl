@@ -26,8 +26,23 @@ import KernelAbstractions as KA
 using SparseArrays
 
 # and define some constants to be used in the following for convenience.
-const NUM_THREADS = 64
+# Note that for a real problem we want to increase these numbers suitably.
+const NUM_THREADS = 8
 const NUM_TASKS_PER_THREAD = 2
+
+function compute_threads_and_blocks(n)
+    ## Let's assign, arbitrarily, two element assembly tasks per GPU thread.
+    tasks_per_thread = min(NUM_TASKS_PER_THREAD, n)
+    ## To do so, let us first compute how many element groups we have to assemble.
+    n_effective = cld(n, tasks_per_thread)
+    ## This potentially limits the number of usable threads, e.g. when a color just has a small
+    ## number of elements.
+    threads = min(NUM_THREADS, n_effective)
+    ## Furthermore, for CPU computing we typically group the tasks into blocks of worker threads.
+    blocks = cld(n, tasks_per_thread * threads)
+
+    return threads, blocks
+end
 
 # In this how-to we want to use an existing element routine on the GPU with Ferrite,
 # and we use the `assemble_element!` from the [heat equation tutorial](@ref tutorial-heat-equation).
@@ -91,15 +106,7 @@ function assemble_global_ka!(backend, cellvalues::Ferrite.SoAContainer, K, f, cc
     for color in colors
         ## We divide the work into blocks and fire up the kernel.
         n = length(color)
-        ## Let's assign, arbitrarily, two element assembly tasks per GPU thread.
-        tasks_per_thread = min(NUM_TASKS_PER_THREAD, n)
-        ## To do so, let us first compute how many element groups we have to assemble.
-        n_effective = cld(n, tasks_per_thread)
-        ## This potentially limits the number of usable threads, e.g. when a color just has a small
-        ## number of elements.
-        threads = min(NUM_THREADS, n_effective)
-        ## Furthermore, for CPU computing we typically group the tasks into blocks of worker threads.
-        blocks = cld(n, tasks_per_thread * threads)
+        threads, blocks = compute_threads_and_blocks(n)
         ## Now, we can build and execute the Kernel.
         ka_kernel = ka_assembly_kernel(backend, threads)
         ka_kernel(assembler, color, cc, cellvalues, Ke, fe, ndrange = threads * blocks)
@@ -145,8 +152,10 @@ f_gpu = KA.zeros(backend, Float32, (ndofs(dh),))
 
 # Furthermore, the individual GPU workers need local buffers.
 # Ferrite comes with a helper, `Ferrite.distribute_to_tasks`, which transforms common buffers
-# into a suitable GPU format.
-n_workers = maximum(length, colors)
+# into a suitable GPU format. Since we parallelize over the colors, we need to allocate
+# buffers large enough. Since we use a grid-stride loop.
+max_color_size = maximum(length.(colors))
+n_workers = prod(compute_threads_and_blocks(max_color_size)) # Rembember, we have `threads × blocks` workers.
 cv_gpu = Ferrite.distribute_to_tasks(backend, cv, n_workers)
 cc = CellCache(dh_gpu)
 cc_gpu = Ferrite.distribute_to_tasks(backend, cc, n_workers)
