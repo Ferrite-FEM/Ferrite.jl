@@ -517,9 +517,9 @@ function _add_cell_entries!(
 end
 
 function _add_constraint_entries!(
-        sp::AbstractSparsityPattern, dofcoefficients::Vector{Union{DofCoefficients{T}, Nothing}},
+        sp::AbstractSparsityPattern, dofcoefficients::Vector{Union{DofCoefficients{T, Ti}, Nothing}},
         dofmapping::Dict{Int, Int}, keep_constrained::Bool,
-    ) where {T}
+    ) where {T, Ti}
 
     # Return early if there are no non-trivial affine constraints
     any(i -> !(i === nothing || isempty(i)), dofcoefficients) || return

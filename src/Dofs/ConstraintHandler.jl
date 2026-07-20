@@ -143,7 +143,7 @@ where `i=constrained_dof` and each element in `entries` are `j => a[j]`
 """
 struct AffineConstraint{Tv, Ti}
     constrained_dof::Ti
-    entries::DofCoefficients{Tv, Ti} # masterdofs::It and factors::Tv
+    entries::DofCoefficients{Tv, Ti} # masterdofs::Ti and factors::Tv
     b::Tv # inhomogeneity
 end
 
@@ -178,7 +178,7 @@ function ConstraintHandler(::Type{Tv}, ::Type{Ti}, dh::AbstractDofHandler) where
     @assert isclosed(dh)
     return ConstraintHandler(
         Dirichlet[], ProjectedDirichlet[], Ti[], Ti[], Tv[], Union{Nothing, Tv}[],
-        Union{Nothing, DofCoefficients{Tv}}[], Dict{Ti, Ti}(), BitVector(), BCValues{Tv, Ti}[], dh, false,
+        Union{Nothing, DofCoefficients{Tv, Ti}}[], Dict{Ti, Ti}(), BitVector(), BCValues{Tv, Ti}[], dh, false,
     )
 end
 
@@ -518,8 +518,8 @@ end
 function _update!(
         inhomogeneities::Vector{T}, f::Function, boundary_entities::AbstractVecOrSet{<:BoundaryIndex}, local_facet_dofs::Vector{<:Integer}, local_facet_dofs_offset::Vector{<:Integer},
         components::Vector{<:Integer}, dh::AbstractDofHandler, boundaryvalues::BCValues,
-        dofmapping::Dict{<:Integer, <:Integer}, dofcoefficients::Vector{Union{Nothing, DofCoefficients{T}}}, time::Real
-    ) where {T}
+        dofmapping::Dict{<:Integer, <:Integer}, dofcoefficients::Vector{Union{Nothing, DofCoefficients{T, Ti}}}, time::Real
+    ) where {T, Ti}
 
     cc = CellCache(dh, UpdateFlags(; nodes = false, coords = true, dofs = true))
     for (cellidx, entityidx) in boundary_entities
@@ -558,8 +558,8 @@ end
 function _update!(
         inhomogeneities::Vector{T}, f::Function, ::AbstractVecOrSet{<:Integer}, nodeidxs::Vector{<:Integer}, globaldofs::Vector{<:Integer},
         components::Vector{<:Integer}, dh::AbstractDofHandler, facetvalues::BCValues,
-        dofmapping::Dict{<:Integer, <:Integer}, dofcoefficients::Vector{Union{Nothing, DofCoefficients{T}}}, time::Real
-    ) where {T}
+        dofmapping::Dict{<:Integer, <:Integer}, dofcoefficients::Vector{Union{Nothing, DofCoefficients{T, Ti}}}, time::Real
+    ) where {T, Ti}
     counter = 1
     for nodenumber in nodeidxs
         x = get_node_coordinate(get_grid(dh), nodenumber)
@@ -774,14 +774,14 @@ end
 
 Condenses affine constraints K := C'*K*C and f := C'*f in-place, assuming the sparsity pattern is correct.
 """
-function _condense!(K::AbstractSparseMatrix, f::AbstractVector, dofcoefficients::Vector{Union{Nothing, DofCoefficients{T}}}, dofmapping::Dict{<:Integer, <:Integer}, sym::Bool = false) where {T}
+function _condense!(K::AbstractSparseMatrix, f::AbstractVector, dofcoefficients::Vector{Union{Nothing, DofCoefficients{T, Ti}}}, dofmapping::Dict{<:Integer, <:Integer}, sym::Bool = false) where {T, Ti}
     # Return early if there are no non-trivial affine constraints
     any(i -> !(i === nothing || isempty(i)), dofcoefficients) || return
     error("condensation of ::$(typeof(K)) matrix not supported")
 end
 
 # Condenses K and f: C'*K*C, C'*f, in-place assuming the sparsity pattern is correct
-function _condense!(K::SparseMatrixCSC, f::AbstractVector, dofcoefficients::Vector{Union{Nothing, DofCoefficients{T}}}, dofmapping::Dict{<:Integer, <:Integer}, sym::Bool = false) where {T}
+function _condense!(K::SparseMatrixCSC, f::AbstractVector, dofcoefficients::Vector{Union{Nothing, DofCoefficients{T, Ti}}}, dofmapping::Dict{<:Integer, <:Integer}, sym::Bool = false) where {T, Ti}
 
     ndofs = size(K, 1)
     condense_f = !(length(f) == 0)
@@ -1953,8 +1953,8 @@ end
 
 function _update_projected_dbc!(
         inhomogeneities::Vector{T}, f::Function, facets::AbstractVecOrSet{FacetIndex}, fv::FacetValues, facet_dofs::ArrayOfVectorViews,
-        dh::AbstractDofHandler, dofmapping::Dict{<:Integer, <:Integer}, dofcoefficients::Vector{Union{Nothing, DofCoefficients{T}}}, time::Real
-    ) where {T}
+        dh::AbstractDofHandler, dofmapping::Dict{<:Integer, <:Integer}, dofcoefficients::Vector{Union{Nothing, DofCoefficients{T, Ti}}}, time::Real
+    ) where {T, Ti}
     ip = get_base_interpolation(function_interpolation(fv)) # Ensures getting error message from `integrate_projected_dbc!`
     max_dofs_per_facet = maximum(length, dirichlet_facetdof_indices(ip))
     Kᶠ = zeros(max_dofs_per_facet, max_dofs_per_facet)
