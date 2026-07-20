@@ -454,7 +454,7 @@ getspatialdim(::AbstractGrid{sdim}) where {sdim} = sdim
     get_reference_dimension(grid::AbstractGrid) -> Union{Int, Symbol}
 
 Get information about the reference dimensions of the cells in the grid.
-If all cells have the same reference dimension, `rdim::Integer` is returned.
+If all cells have the same reference dimension, `rdim::Int` is returned.
 For grids with mixed reference dimensions, `:mixed` is returned.
 Used internally to dispatch facet-calls to the correct entity when `rdim isa Int`.
 """
