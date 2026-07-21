@@ -1,6 +1,7 @@
 # # [Discontinuous Galerkin heat equation](@id tutorial-dg-heat-equation)
 #
-# ![](dg_heat_equation.png)
+# ![](dg_heat_equation-light.png)
+# ![](dg_heat_equation-dark.png)
 #
 # *Figure 1*: Temperature field on the unit square with an internal uniform heat source
 # solved with inhomogeneous Dirichlet boundary conditions on the left and right boundaries

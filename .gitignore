@@ -9,6 +9,8 @@
 examples/.ipynb_checkpoints/
 docs/build/
 docs/site/
+docs/screenshot-data/
+docs/screenshot-assets/
 docs/src/examples/
 docs/src/tutorials/
 docs/src/howto/

@@ -1,6 +1,7 @@
 # # [Heat equation](@id tutorial-heat-equation)
 #
-# ![](heat_square.png)
+# ![](heat_equation-light.png)
+# ![](heat_equation-dark.png)
 #
 # *Figure 1*: Temperature field on the unit square with an internal uniform heat source
 # solved with homogeneous Dirichlet boundary conditions on the boundary.

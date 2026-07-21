@@ -2,9 +2,11 @@
 #
 # **Keywords**: *Topology optimization*, *weak and strong form*, *non-linear problem*, *Laplacian*, *grid topology*
 #
-# ![](bending_animation.gif)
+# ![](topology_optimization-light.webp)
+# ![](topology_optimization-dark.webp)
 #
-# *Figure 1*: Optimization of the bending beam. Evolution of the density for fixed total mass.
+# *Figure 1*: Evolution of the material density during topology optimization of the
+# bending beam for a fixed total mass.
 #
 #-
 #md # !!! tip
@@ -534,6 +536,7 @@ end
 # grid, χ =topopt(0.02, 0.5, 60, "small_radius"; output=false);
 @time topopt(0.03, 0.5, 60, "large_radius"; output = false);
 #topopt(0.02, 0.5, 60, "topopt_animation"; output=true); # can be used to create animations
+topopt(0.03, 0.5, 60, "topopt_frames"; output = true); #src iteration series for the docs animation (docs/screenshots.py)
 
 # We observe, that the stiffness for the lower value of $ra$ is higher,
 # but also requires more iterations until convergence and finer structures to be manufactured, as can be seen in Figure 2:

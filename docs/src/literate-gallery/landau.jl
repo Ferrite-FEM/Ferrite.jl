@@ -1,10 +1,12 @@
 # # [Ginzburg-Landau model energy minimization](@id tutorial-ginzburg-landau-minimizer)
 
-# ![landau_orig.png](landau_orig.png)
+# ![landau_orig.png](landau_orig-light.png)
+# ![landau_orig.png](landau_orig-dark.png)
 
 # Original
 
-# ![landau_opt.png](landau_opt.png)
+# ![landau_opt.png](landau_opt-light.png)
+# ![landau_opt.png](landau_opt-dark.png)
 
 # Optimized
 

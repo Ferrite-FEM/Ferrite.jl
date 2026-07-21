@@ -99,14 +99,13 @@ bibtex_plugin = CitationBibliography(
             "howto/postprocessing.md",
             "howto/threaded_assembly.md",
         ],
-        "gallery/index.md",
-        # "Code gallery" => [
-        #     "Code gallery overview" => "gallery/index.md",
-        #     "gallery/helmholtz.md",
-        #     "gallery/quasi_incompressible_hyperelasticity.md",
-        #     "gallery/landau.md",
-        #     "gallery/topology_optimization.md",
-        # ],
+        "Code gallery" => [
+            "Code gallery overview" => "gallery/index.md",
+            "gallery/helmholtz.md",
+            "gallery/quasi_incompressible_hyperelasticity.md",
+            "gallery/landau.md",
+            "gallery/topology_optimization.md",
+        ],
         "devdocs/index.md",
         "cited-literature.md",
         "ferritepapers.md",
@@ -125,8 +124,9 @@ end
 for (root, _, files) in walkdir(joinpath(@__DIR__, "build")), file in joinpath.(root, files)
     endswith(file, ".html") || continue
     str = read(file, String)
-    # Insert <br> after "Reference" (before "Code gallery")
-    str = replace(str, r"""(<li(?: class="is-active")?><a class="tocitem" href(?:="[\./\w]+")?>Code gallery</a></li>)""" => s"<br>\1")
+    # Insert <br> after "Reference" (before "Code gallery"). The gallery is a
+    # collapsible menu group, so match the group label markup.
+    str = replace(str, r"""(<li(?: class="[^"]*")?>(?:<input[^>]*>)?<label class="tocitem"[^>]*>(?:<span class="docs-label">)?Code gallery)""" => s"<br>\1")
     write(file, str)
 end
 

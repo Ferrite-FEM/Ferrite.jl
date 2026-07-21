@@ -19,7 +19,8 @@
 # Here Γ₁ is the union of the top and the right boundary of the square,
 # while Γ₂ is the union of the bottom and the left boundary.
 #
-# ![](helmholtz.png)
+# ![](helmholtz-light.png)
+# ![](helmholtz-dark.png)
 #
 # We will use the following weak formulation:
 # ```math

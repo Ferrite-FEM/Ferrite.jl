@@ -1,5 +1,10 @@
 # # [Incompressible elasticity](@id tutorial-incompressible-elasticity)
 #
+# ![](incompressible_elasticity-light.png)
+# ![](incompressible_elasticity-dark.png)
+#
+# *Figure 1*: von Mises stress on the deformed Cook's membrane.
+#
 #-
 #md # !!! tip
 #md #     This example is also available as a Jupyter notebook:
