@@ -98,9 +98,7 @@ bibtex_plugin = CitationBibliography(
             "How-to guide overview" => "howto/index.md",
             "howto/postprocessing.md",
             "howto/threaded_assembly.md",
-            "howto/gpu_assembly.md", # To be merged with the one below
             "howto/gpu_heat_howto_literate.md",
-            "howto/gpu_heat_howto_literate2.md", # Only one of these to be kept
         ],
         "gallery/index.md",
         # "Code gallery" => [
