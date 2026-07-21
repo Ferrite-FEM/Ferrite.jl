@@ -333,20 +333,22 @@ enumeration of the corresponding geometrical cell.
 The dofs are guaranteed to be aligned with the local ordering of the entities on the oriented edge.
 Here the first entries are the vertex dofs, followed by the edge interior dofs.
 """
-@generated function edgedof_indices(IP::Interpolation{RefShape}) where {RefShape}
-    ip = IP() # we get IP as the type of interpolation
-    vdofs = vertexdof_indices(ip)
-    edofs = edgedof_interior_indices(ip)
+@generated function edgedof_indices(ip::Interpolation{RefShape}) where {RefShape}
     expr = Expr(:tuple)
-    for (i, edge) in enumerate(reference_edges(RefShape))
-        expr_i = Expr(:tuple)
+    for (edgenr, edge) in enumerate(reference_edges(RefShape))
+        expr_edge = Expr(:tuple)
         for vertexnr in edge
-            foreach(vdof -> push!(expr_i.args, vdof), vdofs[vertexnr])
+            push!(expr_edge.args, :(vdofs[$vertexnr]...))
         end
-        foreach(edof -> push!(expr_i.args, edof), edofs[i])
-        push!(expr.args, expr_i)
+        push!(expr_edge.args, :(edofs[$edgenr]...))
+        push!(expr.args, expr_edge)
     end
-    return :(return $expr)
+
+    return quote
+        vdofs = vertexdof_indices(ip)
+        edofs = edgedof_interior_indices(ip)
+        return $expr
+    end
 end
 
 """
@@ -383,24 +385,25 @@ A tuple containing tuples of all local dof indices for the respective face in lo
 enumeration on a cell defined by [`faces(::Cell)`](@ref). The face enumeration must match
 the face enumeration of the corresponding geometrical cell.
 """
-@generated function facedof_indices(IP::Interpolation{RefShape}) where {RefShape}
-    ip = IP() # we get IP as the type of interpolation
-    vdofs = vertexdof_indices(ip)
-    edofs = edgedof_interior_indices(ip)
-    fdofs = facedof_interior_indices(ip)
+@generated function facedof_indices(ip::Interpolation{RefShape}) where {RefShape}
     expr = Expr(:tuple)
-    for (i, face) in enumerate(reference_faces(RefShape))
-        expr_i = Expr(:tuple)
+    for (facenr, face) in enumerate(reference_faces(RefShape))
+        expr_facenr = Expr(:tuple)
         for vertexnr in face
-            foreach(vdof -> push!(expr_i.args, vdof), vdofs[vertexnr])
+            push!(expr_facenr.args, :(vdofs[$vertexnr]...))
         end
-        for edgenr in reference_face_edgenrs(RefShape)[i]
-            foreach(edof -> push!(expr_i.args, edof), edofs[edgenr])
+        for edgenr in reference_face_edgenrs(RefShape)[facenr]
+            push!(expr_facenr.args, :(edofs[$edgenr]...))
         end
-        foreach(fdof -> push!(expr_i.args, fdof), fdofs[i])
-        push!(expr.args, expr_i)
+        push!(expr_facenr.args, :(fdofs[$facenr]...))
+        push!(expr.args, expr_facenr)
     end
-    return :(return $expr)
+    return quote
+        vdofs = vertexdof_indices(ip)
+        edofs = edgedof_interior_indices(ip)
+        fdofs = facedof_interior_indices(ip)
+        return $expr
+    end
 end
 
 """
@@ -439,8 +442,8 @@ Tuple containing the dof indices associated with the interior of a volume.
 volumedof_interior_indices(::Interpolation) = ()
 
 # Some helpers to skip boilerplate
-edgedof_interior_indices(ip::Interpolation) = ntuple(_ -> (), nedges(ip))
-facedof_interior_indices(ip::Interpolation) = ntuple(_ -> (), nfaces(ip))
+edgedof_interior_indices(ip::Interpolation) = ntuple(_ -> (), Val(nedges(ip)))
+facedof_interior_indices(ip::Interpolation) = ntuple(_ -> (), Val(nfaces(ip)))
 
 """
     boundarydof_indices(::Type{<:BoundaryIndex})

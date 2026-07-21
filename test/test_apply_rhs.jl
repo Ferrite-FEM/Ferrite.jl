@@ -1,3 +1,6 @@
+# Imports for parallel (isolated) test execution:
+using SparseArrays
+
 function test_apply_rhs()
     grid = generate_grid(Quadrilateral, (20, 20))
     ip = Lagrange{RefQuadrilateral, 1}()

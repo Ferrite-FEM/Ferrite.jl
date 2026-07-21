@@ -15,17 +15,13 @@ using ForwardDiff
 
 function main() #wrap everything in a function...
 
-# First we generate a flat rectangular mesh. There is currently no built-in function for generating
-# shell meshes in Ferrite, so we have to create our own simple mesh generator (see the
-# function `generate_shell_grid` further down in this file).
+# First we generate a flat rectangular mesh embedded in 3D.
 #+
-nels = (10,10)
-size = (10.0, 10.0)
-grid = generate_shell_grid(nels, size)
+grid = generate_grid(Quadrilateral, (10, 10), zero(Vec{3}), Vec((10.0, 10.0, 0.0)))
 
 # Here we define the bi-linear interpolation used for the geometrical description of the shell.
 # We also create two quadrature rules for the in-plane and out-of-plane directions. Note that we use
-# under integration for the inplane integration, to avoid shear locking.
+# reduced integration for the in-plane integration, to avoid shear locking.
 #+
 ip = Lagrange{RefQuadrilateral,1}()
 qr_inplane = QuadratureRule{RefQuadrilateral}(1)
@@ -39,12 +35,10 @@ add!(dh, :u, ip^3)
 add!(dh, :θ, ip^2)
 close!(dh)
 
-# In order to apply our boundary conditions, we first need to create some facet- and vertex-sets. This
-# is done with `addfacetset!` and `addvertexset!`
+# For the boundary conditions, we also want a vertex set for one corner, in addition to the
+# facet sets already included in the generated grid.
 #+
-addfacetset!(grid, "left",  (x) -> x[1] ≈ 0.0)
-addfacetset!(grid, "right", (x) -> x[1] ≈ size[1])
-addvertexset!(grid, "corner", (x) -> x[1] ≈ 0.0 && x[2] ≈ 0.0 && x[3] ≈ 0.0)
+addvertexset!(grid, "corner", x -> norm(x) < 1e-6)
 
 # Here we define the boundary conditions. On the left edge, we lock the displacements in the x- and z- directions, and all the rotations.
 #+
@@ -59,7 +53,7 @@ add!(ch,  Dirichlet(:θ, getfacetset(grid, "right"), (x, t) -> (0.0, pi/10), [1,
 
 # In order to not get rigid body motion, we lock the y-displacement in one of the corners.
 #+
-add!(ch,  Dirichlet(:θ, getvertexset(grid, "corner"), (x, t) -> (0.0), [2])  )
+add!(ch,  Dirichlet(:u, getvertexset(grid, "corner"), (x, t) -> (0.0), [2])  )
 
 close!(ch)
 update!(ch, 0.0)
@@ -120,17 +114,6 @@ end
 
 end; #end main functions
 
-# Below is the function that creates the shell mesh. It simply generates a 2d-quadrature mesh, and appends
-# a third coordinate (z-direction) to the node-positions.
-function generate_shell_grid(nels, size)
-    _grid = generate_grid(Quadrilateral, nels, Vec((0.0,0.0)), Vec(size))
-    nodes = [(n.x[1], n.x[2], 0.0) |> Vec{3} |> Node  for n in _grid.nodes]
-
-    grid = Grid(_grid.cells, nodes)
-
-    return grid
-end;
-
 # ## The shell element
 #
 # The shell presented here comes from the book "The finite element method - Linear static and dynamic finite element analysis" by Hughes (1987).
@@ -142,7 +125,7 @@ end;
 
 # ##### Fiber coordinate system
 # The element uses two coordinate systems. The first coordinate system, called the fiber system, is created for each
-# element node, and is used as a reference frame for the rotations. The function below implements an algorithm that return the
+# element node, and is used as a reference frame for the rotations. The function below implements an algorithm that returns the
 # fiber directions, $\boldsymbol{e}^{f}_{a1}$, $\boldsymbol{e}^{f}_{a2}$ and $\boldsymbol{e}^{f}_{a3}$, at each node $a$.
 function fiber_coordsys(Ps::Vector{Vec{3,Float64}})
 
@@ -264,7 +247,7 @@ end;
 
 # ##### Main element routine
 # Below is the main routine that calculates the stiffness matrix of the shell element.
-# Since it is a so called degenerate shell element, the code is similar to that for an standard continuum element.
+# Since it is a so-called degenerate shell element, the code is similar to that for a standard continuum element.
 shape_reference_gradient(cv::CellValues, q_point, i) = cv.fun_values.dNdξ[i, q_point]
 
 function integrate_shell!(ke, cv, qr_ooplane, X, data)
@@ -300,7 +283,9 @@ function integrate_shell!(ke, cv, qr_ooplane, X, data)
             B = ForwardDiff.jacobian(
                 (a) -> strain(a, N, dNdx, ζ, dζdx, q, ef1, ef2, h), zeros(Float64, ndofs) )
 
-            dV = qr_ooplane.weights[oqp] * getdetJdV(cv, iqp)
+            detJ = det(J)
+            detJ > 0 || error("det(J) is not positive: det(J) = $detJ")
+            dV = qr_ooplane.weights[oqp] * cv.qr.weights[iqp] * detJ
             ke .+= B'*data.C*B * dV
         end
     end
