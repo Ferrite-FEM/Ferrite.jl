@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Next] - xxxx-xx-xx
 
+### Documentation
+- Showcase how to use nested automatic differentiation to solve nested plasticity problems ([#1378])
 
 ## [v1.5.0] - 2026-07-13
 
