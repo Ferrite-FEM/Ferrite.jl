@@ -71,6 +71,8 @@ end
     u_cpu = K \ f
     # NOTE this might fail because the meandiag differs due to cancellation. However,
     # the solutions are usually still very close.
+    @test SparseMatrixCSC(K_gpu) ≈ K
+    @test SparseMatrixCSC(f_gpu) ≈ f
     @test u_cpu ≈ SparseMatrixCSC(K_gpu) \ Vector(f_gpu)
 end
 
