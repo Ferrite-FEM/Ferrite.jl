@@ -58,6 +58,9 @@ struct CellValues{FV, GM, QR, detT} <: AbstractCellValues
     fun_values::FV # FunctionValues
     geo_mapping::GM # GeometryMapping
     qr::QR         # QuadratureRule
+    # CellValues are only functional if a vector-like type is used here.
+    # However, for device support (e.g. GPUs), we allow order 3 tensors to be passed here to allow this struct to be used as a struct-of-arrays type.
+    # Also see `soa_utils.jl` for the SoA transformation infrastructure.
     detJdV::detT   # AbstractVector{<:Number} or Nothing
 end
 function CellValues(

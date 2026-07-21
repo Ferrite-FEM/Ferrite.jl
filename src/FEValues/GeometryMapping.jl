@@ -32,6 +32,9 @@ GeometryMapping
 
 struct GeometryMapping{DiffOrder, IP, M_t, dMdξ_t, d2Mdξ2_t}
     ip::IP             # ::Interpolation                Geometric interpolation
+    # GeometryMapping is only functional if a matrix-like type is used here.
+    # However, for device support (e.g. GPUs), we allow order 3 tensors to be passed here to allow this struct to be used as a struct-of-arrays type.
+    # Also see `soa_utils.jl` for the SoA transformation infrastructure.
     M::M_t             # ::AbstractMatrix{<:Number}     Values of geometric shape functions
     dMdξ::dMdξ_t       # ::AbstractMatrix{<:Vec}        Gradients of geometric shape functions in ref-domain
     d2Mdξ2::d2Mdξ2_t   # ::Union{AbstractMatrix{<:Tensor{2}}, Nothing} Hessians of geometric shape functions in ref-domain
