@@ -228,7 +228,7 @@ assemble_global_cuda!(cv_gpu, K_gpu, f_gpu, cc_gpu, colors_gpu, Kes, fes, n_work
 
 #=
 ## Matrix-free assembly with `CUDA.jl`
-TODO: Short description why we want to do this.
+Using CSR and CSC matrix formats are known to be bad on the GPU (see e.g. [Settgast2023:plm; Figure 1/2](@cite)). The reason for the bad performance is that GPUs are typically used for large problems requiring an iterative solver of some form. These iterative solvers typically require sparse-matrix vector (or transpose) products as a key component. CSR and CSC have extremely low arithmetic intensity, so we cannot fully utilize the potential of the GPU, which really shines on high arithmetic intensity tasks. In finite element problems a very simple technique is called ,,Element Assembly'' (see e.g. the [MFEM docs](https://mfem.org/howto/assembly_levels/)) where we simply assemble the element matrices once, such that the sparse matrix-vector product becomes a sequence of many small dense matrix-vector products, i.e. the local products of the element matrix and element vectors. There are techniques with even higher arithmetic intensity, but they typically require modifications of the element routines. Therefore, we present the element assembly technique here as a starting point for users which want to boost their simulations further. Finally we want to highlight that a downside of matrix-free techniques is that we have the issue that most known preconditioners cannot be applied anymore. Finding efficient preconditioners for matrix-free techniques is a very active research area (see, e.g. [Schussnig2025:mhf](@cite) or [Wichrowski2026:tmp](@cite)).
 =#
 
 function assemble_cell!(Ke, fe, cell, cv)
@@ -270,3 +270,11 @@ fes = KA.zeros(backend, Float32, getncells(grid), getnbasefunctions(cv))
 
 # And assemble without using the global stiffness, `K_gpu`, and load vector, `f_gpu`.
 assemble_global_cuda!(cv_gpu, cc_gpu, colors_gpu, Kes, fes)
+
+
+## References
+
+```@bibliography
+Pages = ["gpu_heat_howto_literate.md"]
+Canonical = false
+```
