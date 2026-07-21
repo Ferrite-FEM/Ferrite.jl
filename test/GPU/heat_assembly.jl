@@ -91,7 +91,7 @@ end
     Kes_device = KA.zeros(backend, Float32, getncells(grid), getnbasefunctions(cv), getnbasefunctions(cv))
     fes_device = KA.zeros(backend, Float32, getncells(grid), getnbasefunctions(cv))
     # Assembly here does not work because we are missing a SOA transformation of the assembler.
-    assemble_global_ka!(backend, cv_device, nothing, nothing, cell_cache, colors_device, Kes_device, fes_device)
+    assemble_global_ka!(backend, cv_device, nothing, nothing, cell_cache, colors_device, Kes_device, fes_device, n_workers)
     @test Array(Kes_device) ≈ Array(Kes)
     @test Array(fes_device) ≈ Array(fes)
 
@@ -141,13 +141,13 @@ end
     cc1 = Ferrite.distribute_to_tasks(backend, CellCache(dh_device.subdofhandlers[1]), n_workers)
     Kes_device = KA.zeros(backend, Float32, getncells(grid), getnbasefunctions(cv1), getnbasefunctions(cv1))
     fes_device = KA.zeros(backend, Float32, getncells(grid), getnbasefunctions(cv1))
-    assemble_global_ka!(backend, cv1_device, K_device, f_device, cc1, colors1_device, Kes_device, fes_device)
+    assemble_global_ka!(backend, cv1_device, K_device, f_device, cc1, colors1_device, Kes_device, fes_device, n_workers)
 
     cv2_device = Ferrite.distribute_to_tasks(backend, cv2, n_workers)
     cc2 = Ferrite.distribute_to_tasks(backend, CellCache(dh_device.subdofhandlers[2]), n_workers)
     Kes_device = KA.zeros(backend, Float32, getncells(grid), getnbasefunctions(cv2), getnbasefunctions(cv2))
     fes_device = KA.zeros(backend, Float32, getncells(grid), getnbasefunctions(cv2))
-    assemble_global_ka!(backend, cv2_device, K_device, f_device, cc2, colors2_device, Kes_device, fes_device)
+    assemble_global_ka!(backend, cv2_device, K_device, f_device, cc2, colors2_device, Kes_device, fes_device, n_workers)
 
     ch = ConstraintHandler(Float32, Int32, dh)
     ∂Ω = union(

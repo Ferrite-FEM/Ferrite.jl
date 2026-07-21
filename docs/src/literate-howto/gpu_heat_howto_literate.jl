@@ -102,7 +102,7 @@ end
         assemble_cell!(Ke, fe, cc_i, cv_i, assembler)
     end
 end
-function assemble_global_ka!(backend, cellvalues::Ferrite.SoAContainer, K, f, cc, colors::Vector, Ke::Ferrite.SoAContainer, fe::Ferrite.SoAContainer, n_workers)
+function assemble_global_ka!(backend, cellvalues::Ferrite.SoAContainer, K, f, cc, colors::Vector, Ke, fe, n_workers)
     assemblers = Ferrite.distribute_to_tasks(backend, start_assemble(K, f), n_workers)
     for color in colors
         ## We divide the work into blocks and fire up the kernel.
