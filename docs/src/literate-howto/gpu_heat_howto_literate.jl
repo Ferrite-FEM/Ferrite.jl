@@ -271,6 +271,28 @@ fes = KA.zeros(backend, Float32, getncells(grid), getnbasefunctions(cv))
 # And assemble without using the global stiffness, `K_gpu`, and load vector, `f_gpu`.
 assemble_global_cuda!(cv_gpu, cc_gpu, colors_gpu, Kes, fes)
 
+# Reference for internal testing                                                #hide
+function assemble_global!(cv::CellValues, K::SparseMatrixCSC, f, dh::DofHandler) #hide
+    n_basefuncs = getnbasefunctions(cv)                                         #hide
+    Ke = zeros(Float32, n_basefuncs, n_basefuncs)                               #hide
+    fe = zeros(Float32, n_basefuncs)                                            #hide
+    assembler = start_assemble(K, f)                                            #hide
+    for cell in CellIterator(dh)                                                #hide
+        assemble_cell!(Ke, fe, cell, cv, assembler)                             #hide
+    end                                                                         #hide
+    return nothing                                                              #hide
+end                                                                             #hide
+
+function assemble_global!(cv::CellValues, K::SparseMatrixCSC, f, dh::SubDofHandler) #hide
+    n_basefuncs = getnbasefunctions(cv)                                         #hide
+    Ke = zeros(Float32, n_basefuncs, n_basefuncs)                               #hide
+    fe = zeros(Float32, n_basefuncs)                                            #hide
+    assembler = start_assemble(K, f; fillzero = false)                          #hide
+    for cell in CellIterator(dh)                                                #hide
+        assemble_cell!(Ke, fe, cell, cv, assembler)                             #hide
+    end                                                                         #hide
+    return nothing                                                              #hide
+end                                                                             #hide
 
 ## References
 
