@@ -9,11 +9,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
  - New interpolations `Lagrange{RefTetrahedron, 3}`, `Lagrange{RefTetrahedron, 4}` and
-   `Lagrange{RefHexahedron, 3}`. ([#1343])
+   `Lagrange{RefHexahedron, 3}`. ([#1390])
  - Dof distribution now supports interpolations with multiple nodal dofs on faces shared
    between cells (e.g. `Lagrange{RefTetrahedron, 4}`) by taking the relative orientation
    (rotation and flip) of the face into account. The interpolation has to follow a specific
    tensor product ordering of the dofs, as described in the devdocs. ([#1343])
+ - New quadrature rule type `:polyquad` for `RefTetrahedron` supporting orders 1 to 10, with
+   positive weights and points strictly inside the reference tetrahedron (Witherden and
+   Vincent, 2015). This is the same family of rules already used for `RefPrism` and
+   `RefPyramid`, and extends tetrahedral quadrature beyond the previous maximum order 5 of
+   the Keast rules. ([#1389])
+
+## [v1.5.0] - 2026-07-13
 
 ### Fixes
  - Make default `edgedof_indices` and `facedof_indices` implementation work for externally defined interpolations ([#1365])
@@ -1184,3 +1191,6 @@ poking into Ferrite internals:
 [#1226]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1226
 [#1228]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1228
 [#1235]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1235
+[#1343]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1343
+[#1389]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1389
+[#1390]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1390
