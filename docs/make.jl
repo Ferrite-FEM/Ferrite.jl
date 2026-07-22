@@ -18,6 +18,10 @@ const FerriteBlockArrays = Base.get_extension(Ferrite, :FerriteBlockArrays)
 
 const is_ci = haskey(ENV, "GITHUB_ACTIONS")
 
+# Plots/GR is used in some tutorials; make sure rendering is headless and does not
+# (try to) open a display window (CI sets this in the workflow file).
+haskey(ENV, "GKSwstype") || (ENV["GKSwstype"] = "100")
+
 # Generate tutorials and how-to guides
 include("generate.jl")
 
