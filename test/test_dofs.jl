@@ -803,6 +803,112 @@ end
     @test dofsshell[9] == 24
 end
 
+# Test-local nodal interpolations with multiple interior dofs per edge and face, mimicking
+# the dof layout of cubic/quartic Lagrange interpolations. Only what the dof distribution
+# needs is implemented (dof index tables and reference coordinates; no shape functions), so
+# that Ferrite.permute_and_push! can be tested independently of the interpolations shipped
+# by Ferrite.
+struct LatticeTestInterpolation{shape, order} <: Ferrite.ScalarInterpolation{shape, order} end
+Ferrite.adjust_dofs_during_distribution(::LatticeTestInterpolation) = true
+Ferrite.interior_facedofs_on_lattice(::LatticeTestInterpolation) = true
+
+Ferrite.getnbasefunctions(::LatticeTestInterpolation{RefTetrahedron, order}) where {order} = (order + 1) * (order + 2) * (order + 3) ÷ 6
+Ferrite.vertexdof_indices(::LatticeTestInterpolation{RefTetrahedron}) = ((1,), (2,), (3,), (4,))
+Ferrite.edgedof_interior_indices(::LatticeTestInterpolation{RefTetrahedron, 3}) = ((5, 6), (7, 8), (9, 10), (11, 12), (13, 14), (15, 16))
+Ferrite.facedof_interior_indices(::LatticeTestInterpolation{RefTetrahedron, 3}) = ((17,), (18,), (19,), (20,))
+Ferrite.edgedof_interior_indices(::LatticeTestInterpolation{RefTetrahedron, 4}) = ((5, 6, 7), (8, 9, 10), (11, 12, 13), (14, 15, 16), (17, 18, 19), (20, 21, 22))
+Ferrite.facedof_interior_indices(::LatticeTestInterpolation{RefTetrahedron, 4}) = ((23, 24, 25), (26, 27, 28), (29, 30, 31), (32, 33, 34))
+Ferrite.volumedof_interior_indices(::LatticeTestInterpolation{RefTetrahedron, 4}) = (35,)
+
+# Barycentric multi-indices α (with |α| = order) for the nodes, in local dof order: vertex
+# dofs, then edge interior dofs (following the local edge direction), then face interior
+# dofs (in the lattice enumeration assumed by Ferrite.permute_and_push!), and finally
+# volume interior dofs. The node corresponding to α is located at ∑ₜ αₜ xₜ / order, with xₜ
+# the reference vertex coordinates.
+function lattice_test_tet_multiindices(order::Int)
+    tet_edges = ((1, 2), (2, 3), (3, 1), (1, 4), (2, 4), (3, 4))
+    tet_faces = ((1, 3, 2), (1, 2, 4), (2, 3, 4), (1, 4, 3))
+    αs = NTuple{4, Int}[]
+    for v in 1:4 # vertex nodes
+        push!(αs, ntuple(t -> t == v ? order : 0, 4))
+    end
+    for (a, b) in tet_edges # edge interior nodes, from vertex a towards vertex b
+        for k in 1:(order - 1)
+            push!(αs, ntuple(t -> t == a ? order - k : (t == b ? k : 0), 4))
+        end
+    end
+    q = order - 3 # order of the face interior lattices
+    for (a, b, c) in tet_faces # face interior nodes
+        for t2 in 0:q, t1 in 0:(q - t2)
+            t3 = q - t1 - t2
+            push!(αs, ntuple(t -> t == a ? t1 + 1 : (t == b ? t2 + 1 : (t == c ? t3 + 1 : 0)), 4))
+        end
+    end
+    for s3 in 0:(order - 4), s2 in 0:(order - 4 - s3), s1 in 0:(order - 4 - s3 - s2) # volume interior nodes
+        push!(αs, (s1 + 1, s2 + 1, s3 + 1, order - 3 - s1 - s2 - s3))
+    end
+    return αs
+end
+
+function Ferrite.reference_coordinates(::LatticeTestInterpolation{RefTetrahedron, order}) where {order}
+    return [Vec{3, Float64}((α[2], α[3], α[4]) ./ order) for α in lattice_test_tet_multiindices(order)]
+end
+
+Ferrite.getnbasefunctions(::LatticeTestInterpolation{RefHexahedron, 3}) = 64
+Ferrite.vertexdof_indices(::LatticeTestInterpolation{RefHexahedron}) = ((1,), (2,), (3,), (4,), (5,), (6,), (7,), (8,))
+Ferrite.edgedof_interior_indices(::LatticeTestInterpolation{RefHexahedron, 3}) = (
+    (9, 10), (11, 12), (13, 14), (15, 16), (17, 18), (19, 20),
+    (21, 22), (23, 24), (25, 26), (27, 28), (29, 30), (31, 32),
+)
+Ferrite.facedof_interior_indices(::LatticeTestInterpolation{RefHexahedron, 3}) = (
+    (33, 34, 35, 36), (37, 38, 39, 40), (41, 42, 43, 44),
+    (45, 46, 47, 48), (49, 50, 51, 52), (53, 54, 55, 56),
+)
+Ferrite.volumedof_interior_indices(::LatticeTestInterpolation{RefHexahedron, 3}) = (57, 58, 59, 60, 61, 62, 63, 64)
+
+# Tensor-product multi-indices (a, b, c) ∈ (1:4)³ for the 64 nodes of the 4×4×4 lattice, in
+# the same local dof order as above. The node for (a, b, c) is located at (x_a, x_b, x_c)
+# with x the equispaced 1D nodes (-1, -1/3, 1/3, 1).
+function lattice_test_hex3_multiindices()
+    vertex_idx = (
+        (1, 1, 1), (4, 1, 1), (4, 4, 1), (1, 4, 1),
+        (1, 1, 4), (4, 1, 4), (4, 4, 4), (1, 4, 4),
+    )
+    hex_edges = (
+        (1, 2), (2, 3), (3, 4), (4, 1), (5, 6), (6, 7),
+        (7, 8), (8, 5), (1, 5), (2, 6), (3, 7), (4, 8),
+    )
+    hex_faces = (
+        (1, 4, 3, 2), (1, 2, 6, 5), (2, 3, 7, 6),
+        (3, 4, 8, 7), (1, 5, 8, 4), (5, 6, 7, 8),
+    )
+    αs = NTuple{3, Int}[]
+    for v in 1:8 # vertex nodes
+        push!(αs, vertex_idx[v])
+    end
+    for (a, b) in hex_edges # edge interior nodes, from vertex a towards vertex b
+        ia, ib = vertex_idx[a], vertex_idx[b]
+        for k in 1:2
+            push!(αs, ntuple(t -> ia[t] + (k * (ib[t] - ia[t])) ÷ 3, 3))
+        end
+    end
+    for (a, b, _, d) in hex_faces # face interior nodes, i (a→b) fastest, j (a→d) slowest
+        ia, ib, id = vertex_idx[a], vertex_idx[b], vertex_idx[d]
+        for j in 0:1, i in 0:1
+            push!(αs, ntuple(t -> ia[t] + ((i + 1) * (ib[t] - ia[t]) + (j + 1) * (id[t] - ia[t])) ÷ 3, 3))
+        end
+    end
+    for c in (2, 3), b in (2, 3), a in (2, 3) # volume interior nodes
+        push!(αs, (a, b, c))
+    end
+    return αs
+end
+
+function Ferrite.reference_coordinates(::LatticeTestInterpolation{RefHexahedron, 3})
+    m = (-3, -1, 1, 3) # 1D nodes scaled by 3
+    return [Vec{3, Float64}((m[α[1]] / 3, m[α[2]] / 3, m[α[3]] / 3)) for α in lattice_test_hex3_multiindices()]
+end
+
 @testset "dof distribution on a mixed-dimensional shared face" begin
     # A 2D cell can share its interior face dofs with a face of a 3D cell through
     # SubDofHandlers. Both cells must associate every shared global dof with the same
@@ -823,7 +929,7 @@ end
         (face[1], face[4], face[3], face[2]),
     )
 
-    ip_solid = Lagrange{RefHexahedron, 3}()
+    ip_solid = LatticeTestInterpolation{RefHexahedron, 3}()
     ip_shell = Lagrange{RefQuadrilateral, 3}()
     ipg_solid = Lagrange{RefHexahedron, 1}()
     ipg_shell = Lagrange{RefQuadrilateral, 1}()
@@ -918,8 +1024,9 @@ end
     # Permuting multiple dofs on a shared 3D face requires opting in to the lattice
     # assumption; interpolations that have not opted in must error rather than silently
     # produce a wrong (non-lattice) permutation.
-    @test Ferrite.interior_facedofs_on_lattice(Lagrange{RefTetrahedron, 4}())
-    @test Ferrite.interior_facedofs_on_lattice(Lagrange{RefTetrahedron, 4}()^3)
+    @test Ferrite.interior_facedofs_on_lattice(LatticeTestInterpolation{RefTetrahedron, 4}())
+    @test Ferrite.interior_facedofs_on_lattice(LatticeTestInterpolation{RefTetrahedron, 4}()^3)
+    @test Ferrite.interior_facedofs_on_lattice(Lagrange{RefQuadrilateral, 3}())
     @test !Ferrite.interior_facedofs_on_lattice(Nedelec{RefTetrahedron, 1}()) # default
 
     orientation = Ferrite.SurfaceOrientationInfo((2, 3, 1)) # a rotated triangular face
@@ -943,10 +1050,9 @@ end
 
 @testset "dof distribution on shared faces" begin
     # Two cells sharing an entity must associate the same global dof with the same location
-    # on the entity, regardless of the relative orientation of the cells. For
-    # Lagrange{RefTetrahedron, 3} this requires adjusting multiple dofs per edge, and for
-    # Lagrange{RefTetrahedron, 4} additionally multiple dofs per face, see
-    # Ferrite.permute_and_push!.
+    # on the entity, regardless of the relative orientation of the cells. For the cubic
+    # lattice interpolation this requires adjusting multiple dofs per edge, and for the
+    # quartic one additionally multiple dofs per face, see Ferrite.permute_and_push!.
     all_permutations(t::NTuple{4, Int}) = [
         (t[i], t[j], t[k], t[l]) for i in 1:4 for j in 1:4 for k in 1:4 for l in 1:4
             if length(unique((i, j, k, l))) == 4
@@ -960,9 +1066,9 @@ end
     ipg = Lagrange{RefTetrahedron, 1}() # geometric interpolation of Tetrahedron
     for (ip, nshared) in (
             (Lagrange{RefTetrahedron, 2}(), 6),  # 3 vertex + 3 * 1 edge dofs
-            (Lagrange{RefTetrahedron, 3}(), 10), # 3 vertex + 3 * 2 edge + 1 face dofs
-            (Lagrange{RefTetrahedron, 4}(), 15), # 3 vertex + 3 * 3 edge + 3 face dofs
-            (Lagrange{RefTetrahedron, 4}()^2, 30),
+            (LatticeTestInterpolation{RefTetrahedron, 3}(), 10), # 3 vertex + 3 * 2 edge + 1 face dofs
+            (LatticeTestInterpolation{RefTetrahedron, 4}(), 15), # 3 vertex + 3 * 3 edge + 3 face dofs
+            (LatticeTestInterpolation{RefTetrahedron, 4}()^2, 30),
         )
         base_ip = ip isa VectorizedInterpolation ? ip.ip : ip
         n_copies = ip isa VectorizedInterpolation ? Ferrite.get_n_copies(ip) : 1
@@ -1000,9 +1106,9 @@ end
 
 @testset "dof distribution on shared faces (hexahedron)" begin
     # Two hexahedra sharing a quadrilateral face must associate the same global dof with the
-    # same location on the face for any relative orientation of the cells. For
-    # Lagrange{RefHexahedron, 3} the shared face carries multiple interior dofs, exercising
-    # the quadrilateral branch of Ferrite.permute_and_push!.
+    # same location on the face for any relative orientation of the cells. For the tricubic
+    # lattice interpolation the shared face carries multiple interior dofs, exercising the
+    # quadrilateral branch of Ferrite.permute_and_push!.
 
     # Centered coordinates of the 8 hex corners in Ferrite (reference) node ordering.
     corner = (
@@ -1040,8 +1146,8 @@ end
     ipg = Lagrange{RefHexahedron, 1}() # geometric interpolation of Hexahedron
     for (ip, nshared) in (
             (Lagrange{RefHexahedron, 2}(), 9),  # 4 vertex + 4 * 1 edge + 1 face dofs
-            (Lagrange{RefHexahedron, 3}(), 16), # 4 vertex + 4 * 2 edge + 4 face dofs
-            (Lagrange{RefHexahedron, 3}()^2, 32),
+            (LatticeTestInterpolation{RefHexahedron, 3}(), 16), # 4 vertex + 4 * 2 edge + 4 face dofs
+            (LatticeTestInterpolation{RefHexahedron, 3}()^2, 32),
         )
         base_ip = ip isa VectorizedInterpolation ? ip.ip : ip
         n_copies = ip isa VectorizedInterpolation ? Ferrite.get_n_copies(ip) : 1

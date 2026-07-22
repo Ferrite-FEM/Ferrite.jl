@@ -8,7 +8,6 @@ include(joinpath(@__DIR__, "convergence_test_utils.jl"))
             Lagrange{RefTriangle, 4}(),
             Lagrange{RefTriangle, 5}(),
             Lagrange{RefHexahedron, 1}(),
-            Lagrange{RefHexahedron, 3}(),
             Lagrange{RefTetrahedron, 1}(),
             Lagrange{RefPrism, 1}(),
             Lagrange{RefPyramid, 1}(),

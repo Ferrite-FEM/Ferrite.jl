@@ -8,12 +8,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Next] - xxxx-xx-xx
 
 ### Added
- - New interpolations `Lagrange{RefTetrahedron, 3}`, `Lagrange{RefTetrahedron, 4}` and
-   `Lagrange{RefHexahedron, 3}`. ([#1343])
  - Dof distribution now supports interpolations with multiple nodal dofs on faces shared
-   between cells (e.g. `Lagrange{RefTetrahedron, 4}`) by taking the relative orientation
-   (rotation and flip) of the face into account. The interpolation has to follow a specific
-   tensor product ordering of the dofs, as described in the devdocs. ([#1343])
+   between cells (e.g. a quartic tetrahedron or a cubic hexahedron) by taking the relative
+   orientation (rotation and flip) of the face into account. The interpolation has to
+   follow a specific lattice ordering of the dofs, as described in the devdocs. ([#1343])
 
 ### Fixes
  - Make default `edgedof_indices` and `facedof_indices` implementation work for externally defined interpolations ([#1365])
