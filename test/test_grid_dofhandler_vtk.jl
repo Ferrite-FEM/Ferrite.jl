@@ -229,17 +229,20 @@ end
         dh = DofHandler(grid); add!(dh, :u, ip); close!(dh)
         facetset = getfacetset(grid, "right")
         for dh_or_grid in (grid, dh)
-            @test first(FacetIterator(dh_or_grid, facetset)) isa FacetCache
-            area = 0.0
-            for face in FacetIterator(dh_or_grid, facetset)
-                reinit!(fv, face)
-                for q_point in 1:getnquadpoints(fv)
-                    area += getdetJdV(fv, q_point)
+            # The set can be passed as an OrderedSet, Set, or Vector
+            for set in (facetset, Set(facetset), collect(facetset))
+                @test first(FacetIterator(dh_or_grid, set)) isa FacetCache
+                area = 0.0
+                for face in FacetIterator(dh_or_grid, set)
+                    reinit!(fv, face)
+                    for q_point in 1:getnquadpoints(fv)
+                        area += getdetJdV(fv, q_point)
+                    end
                 end
+                dim == 1 && @test area ≈ 1.0
+                dim == 2 && @test area ≈ 2.0
+                dim == 3 && @test area ≈ 4.0
             end
-            dim == 1 && @test area ≈ 1.0
-            dim == 2 && @test area ≈ 2.0
-            dim == 3 && @test area ≈ 4.0
         end
     end
 
