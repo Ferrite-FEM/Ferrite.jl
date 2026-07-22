@@ -14,12 +14,19 @@ get_geometry(::Ferrite.Interpolation{RefPyramid}) = Pyramid
 
 get_quadrature_order(::Lagrange{shape, order}) where {shape, order} = max(2 * order - 1, 2)
 get_quadrature_order(::Lagrange{RefTriangle, 5}) = 8
-get_quadrature_order(::Lagrange{RefTetrahedron, 4}) = 5 # Maximum implemented quadrature order for RefTetrahedron
 get_quadrature_order(::Lagrange{RefPrism, order}) where {order} = 2 * order # Don't know why
 get_quadrature_order(::Serendipity{shape, order}) where {shape, order} = max(2 * order - 1, 2)
 get_quadrature_order(::CrouzeixRaviart{shape, order}) where {shape, order} = max(2 * order - 1, 2)
 get_quadrature_order(::RannacherTurek{shape, order}) where {shape, order} = max(2 * order - 1, 2)
 get_quadrature_order(::BubbleEnrichedLagrange{shape, order}) where {shape, order} = max(2 * order - 1, 2)
+
+get_quadrature_rule(ip::Interpolation) = QuadratureRule{getrefshape(ip)}(get_quadrature_order(ip))
+# The default (Keast) tetrahedron rules only support order <= 5; use the
+# Witherden-Vincent (:polyquad) rules for higher orders.
+function get_quadrature_rule(ip::Interpolation{RefTetrahedron})
+    order = get_quadrature_order(ip)
+    return QuadratureRule{RefTetrahedron}(order <= 5 ? :keast_minimal : :polyquad, order)
+end
 
 get_num_elements(::Ferrite.Interpolation{shape, 1}) where {shape} = 21
 get_num_elements(::Ferrite.Interpolation{shape, 2}) where {shape} = 7
@@ -156,8 +163,7 @@ function run_convergence_analysis(interpolation)
         N = get_num_elements(interpolation)
         grid = generate_grid(geometry, ntuple(x -> N, getrefdim(geometry)))
         # ... a suitable quadrature rule ...
-        qr_order = get_quadrature_order(interpolation)
-        qr = QuadratureRule{getrefshape(interpolation)}(qr_order)
+        qr = get_quadrature_rule(interpolation)
         # ... and then pray to the gods of convergence.
         dh, ch, cellvalues = setup_poisson_problem(grid, interpolation, interpolation_geo, qr)
         u = solve(dh, ch, cellvalues)
@@ -174,8 +180,7 @@ function run_convergence_rate(interpolation)
         N₁ = get_num_elements(interpolation)
         grid = generate_grid(geometry, ntuple(x -> N₁, getrefdim(geometry)))
         # ... a suitable quadrature rule ...
-        qr_order = get_quadrature_order(interpolation)
-        qr = QuadratureRule{getrefshape(interpolation)}(qr_order)
+        qr = get_quadrature_rule(interpolation)
         # ... and then pray to the gods of convergence.
         dh, ch, cellvalues = setup_poisson_problem(grid, interpolation, interpolation_geo, qr)
         u = solve(dh, ch, cellvalues)
@@ -185,8 +190,7 @@ function run_convergence_rate(interpolation)
         N₂ = 2 * N₁
         grid = generate_grid(geometry, ntuple(x -> N₂, getrefdim(geometry)))
         # ... a suitable quadrature rule ...
-        qr_order = get_quadrature_order(interpolation)
-        qr = QuadratureRule{getrefshape(interpolation)}(qr_order)
+        qr = get_quadrature_rule(interpolation)
         # ... and then pray to the gods of convergence.
         dh, ch, cellvalues = setup_poisson_problem(grid, interpolation, interpolation_geo, qr)
         u = solve(dh, ch, cellvalues)
