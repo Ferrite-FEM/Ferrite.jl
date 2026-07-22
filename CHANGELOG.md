@@ -10,6 +10,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Features
 - Experimental GPU support for assembly using type-stable, non-allocating element routines ([#1291])
 
+### Fixes
+ - `FacetIterator` now works with `AbstractVector{FacetIndex}` and `AbstractSet{FacetIndex}` inputs as documented, instead of requiring an `OrderedSet` ([#1384])
+
 ## [v1.5.0] - 2026-07-13
 
 ### Fixes

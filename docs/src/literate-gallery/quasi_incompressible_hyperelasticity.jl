@@ -120,7 +120,7 @@ function Ψ(F, p, mp::NeoHooke)
     Ic = tr(tdot(F))
     J = det(F)
     Js = (λ + p + sqrt((λ + p)^2.0 + 4.0 * λ * μ)) / (2.0 * λ)
-    return p * (Js - J) + μ / 2 * (Ic - 3) - μ * log(Js) + λ / 2 * (Js - 1)^2
+    return p * (J - Js) + μ / 2 * (Ic - 3) - μ * log(Js) + λ / 2 * (Js - 1)^2
 end;
 
 # and it's derivatives (required in computing the jacobian and hessian respectively)
@@ -239,8 +239,8 @@ function assemble_element!(Ke, fe, cell, cellvalues, mp, ue, pe)
                 Ke[BlockIndex((pblock, ublock), (i, j))] += ∇δuj ⊡ ∂²Ψ∂F∂p * δp * dΩ
             end
             for j in 1:n_basefuncs_p
-                δp = shape_value(cellvalues.p, qp, j)
-                Ke[BlockIndex((pblock, pblock), (i, j))] += δp * ∂²Ψ∂p² * δp * dΩ
+                δq = shape_value(cellvalues.p, qp, j)
+                Ke[BlockIndex((pblock, pblock), (i, j))] += δp * ∂²Ψ∂p² * δq * dΩ
             end
         end
     end
