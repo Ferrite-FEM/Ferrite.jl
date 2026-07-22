@@ -62,8 +62,67 @@ function generate_mixed_grid()
     return Grid(elements, nodes, facetsets = facetsets, cellsets = cellsets)
 end
 
+# Reference for internal testing
+function assemble_global!(cv::CellValues, K::SparseMatrixCSC, f, dh::DofHandler)
+    n_basefuncs = getnbasefunctions(cv)
+    Ke = zeros(Float32, n_basefuncs, n_basefuncs)
+    fe = zeros(Float32, n_basefuncs)
+    assembler = start_assemble(K, f)
+    for cell in CellIterator(dh)
+        assemble_cell!(Ke, fe, cell, cv, assembler)
+    end
+    return nothing
+end
+
+function assemble_global!(cv::CellValues, K::SparseMatrixCSC, f, dh::SubDofHandler)
+    n_basefuncs = getnbasefunctions(cv)
+    Ke = zeros(Float32, n_basefuncs, n_basefuncs)
+    fe = zeros(Float32, n_basefuncs)
+    assembler = start_assemble(K, f; fillzero = false)
+    for cell in CellIterator(dh)
+        assemble_cell!(Ke, fe, cell, cv, assembler)
+    end
+    return nothing
+end
+
+@kernel function ka_assembly_kernel_mf(@Const(color), cc, cv, Kes, fes)
+    ## This is the classical grid-stride-loop
+    task_index = @index(Global, Linear)
+    stride = prod(KA.@ndrange())
+
+    ## Get the local evaluation buffers for the GPU worker.
+    cv_i = cv[task_index]
+    cc_i = cc[task_index]
+
+    for i in task_index:stride:length(color)
+        ## Work item index
+        cellid = color[i]
+
+        Ke = view(Kes, cellid, :, :) # Note row-major indexing, this
+        fe = view(fes, cellid, :)    # is further motivated below.
+
+        ## Query work item cell cache
+        reinit!(cc_i, cellid)
+
+        ## Actual assembly routine.
+        assemble_cell!(Ke, fe, cc_i, cv_i)
+    end
+end
+function assemble_global_ka!(backend, cellvalues::Ferrite.SoAContainer, cc, colors::Vector, Ke, fe, n_workers)
+    for color in colors
+        n = length(color)
+        threads, blocks = compute_threads_and_blocks(n)
+        ka_kernel = ka_assembly_kernel_mf(backend, threads)
+        ka_kernel(color, cc, cellvalues, Ke, fe, ndrange = threads * blocks)
+        KA.synchronize(backend)
+    end
+    return nothing
+end
+
 # ----------------------------- Tests --------------------------
 @testset "How-To correctness" begin
+    @test u_ka ≈ u_cuda
+
     K = allocate_matrix(SparseMatrixCSC{Float32, Int32}, dh)
     f = zeros(Float32, ndofs(dh))
     assemble_global!(cv, K, f, dh)
@@ -73,27 +132,21 @@ end
     # the solutions are usually still very close.
     @test SparseMatrixCSC(K_gpu) ≈ K
     @test Vector(f_gpu) ≈ f
-    @test u_cpu ≈ SparseMatrixCSC(K_gpu) \ Vector(f_gpu)
+    @test u_cpu ≈ u_ka
 end
 
 # Test KA
 @testset "KernelAbstractions paths for heat problem on simple grid using $backend" for backend in [KA.CPU(), CUDABackend()]
     colors_device = [adapt(backend, c) for c in colors]
-    n_workers = maximum(length.(colors_device))
+    max_color_size = maximum(length.(colors))
+    n_workers = prod(compute_threads_and_blocks(max_color_size))
     dh_device = adapt(backend, dh)
-    K_device = if backend isa KA.CPU
-        allocate_matrix(SparseMatrixCSC{Float32, Int32}, dh)
-    else
-        allocate_matrix(CuSparseMatrixCSC{Float32, Int32}, dh)
-    end
-    f_device = KA.zeros(backend, Float32, ndofs(dh))
-
     cv_device = Ferrite.distribute_to_tasks(backend, cv, n_workers)
     cell_cache = Ferrite.distribute_to_tasks(backend, CellCache(dh_device), n_workers)
     Kes_device = KA.zeros(backend, Float32, getncells(grid), getnbasefunctions(cv), getnbasefunctions(cv))
     fes_device = KA.zeros(backend, Float32, getncells(grid), getnbasefunctions(cv))
     # Assembly here does not work because we are missing a SOA transformation of the assembler.
-    assemble_global_ka!(backend, cv_device, nothing, nothing, cell_cache, colors_device, Kes_device, fes_device, n_workers)
+    assemble_global_ka!(backend, cv_device, cell_cache, colors_device, Kes_device, fes_device, n_workers)
     @test Array(Kes_device) ≈ Array(Kes)
     @test Array(fes_device) ≈ Array(fes)
 
@@ -126,8 +179,6 @@ end
     colors1_device = [adapt(backend, c) for c in colors1]
     colors2_device = [adapt(backend, c) for c in colors2]
 
-    n_workers = max(maximum(length.(colors1_device)), maximum(length.(colors2_device)))
-
     dh_device = adapt(backend, dh)
     K_device = allocate_matrix(CuSparseMatrixCSC{Float32, Int32}, dh)
     f_device = KA.zeros(backend, Float32, (ndofs(dh),))
@@ -139,17 +190,19 @@ end
     end
     f_device = KA.zeros(backend, Float32, ndofs(dh))
 
+    n_workers = maximum(length.(colors1_device))
     cv1_device = Ferrite.distribute_to_tasks(backend, cv1, n_workers)
     cc1 = Ferrite.distribute_to_tasks(backend, CellCache(dh_device.subdofhandlers[1]), n_workers)
-    Kes_device = KA.zeros(backend, Float32, getncells(grid), getnbasefunctions(cv1), getnbasefunctions(cv1))
-    fes_device = KA.zeros(backend, Float32, getncells(grid), getnbasefunctions(cv1))
-    assemble_global_ka!(backend, cv1_device, K_device, f_device, cc1, colors1_device, Kes_device, fes_device, n_workers)
+    Kes_device = KA.zeros(backend, Float32, n_workers, getnbasefunctions(cv1), getnbasefunctions(cv1))
+    fes_device = KA.zeros(backend, Float32, n_workers, getnbasefunctions(cv1))
+    assemble_global_ka!(backend, cv1_device, K_device, f_device, cc1, colors1_device, Kes_device, fes_device, n_workers; fillzero = true)
 
+    n_workers = maximum(length.(colors2_device))
     cv2_device = Ferrite.distribute_to_tasks(backend, cv2, n_workers)
     cc2 = Ferrite.distribute_to_tasks(backend, CellCache(dh_device.subdofhandlers[2]), n_workers)
-    Kes_device = KA.zeros(backend, Float32, getncells(grid), getnbasefunctions(cv2), getnbasefunctions(cv2))
-    fes_device = KA.zeros(backend, Float32, getncells(grid), getnbasefunctions(cv2))
-    assemble_global_ka!(backend, cv2_device, K_device, f_device, cc2, colors2_device, Kes_device, fes_device, n_workers)
+    Kes_device = KA.zeros(backend, Float32, n_workers, getnbasefunctions(cv2), getnbasefunctions(cv2))
+    fes_device = KA.zeros(backend, Float32, n_workers, getnbasefunctions(cv2))
+    assemble_global_ka!(backend, cv2_device, K_device, f_device, cc2, colors2_device, Kes_device, fes_device, n_workers; fillzero = false)
 
     ch = ConstraintHandler(Float32, Int32, dh)
     ∂Ω = union(

@@ -102,8 +102,8 @@ end
         assemble_cell!(Ke, fe, cc_i, cv_i, assembler)
     end
 end
-function assemble_global_ka!(backend, cellvalues::Ferrite.SoAContainer, K, f, cc, colors::Vector, Ke, fe, n_workers)
-    assemblers = Ferrite.distribute_to_tasks(backend, start_assemble(K, f), n_workers)
+function assemble_global_ka!(backend, cellvalues::Ferrite.SoAContainer, K, f, cc, colors::Vector, Ke, fe, n_workers; fillzero = true)
+    assemblers = Ferrite.distribute_to_tasks(backend, start_assemble(K, f; fillzero), n_workers)
     for color in colors
         ## We divide the work into blocks and fire up the kernel.
         n = length(color)
@@ -184,7 +184,7 @@ close!(ch)
 ch_gpu = adapt(backend, ch)
 apply!(K_gpu, f_gpu, ch_gpu)
 # To not complicate the description further, we simply solve the system on the CPU with a direct solver.
-u = SparseMatrixCSC(K_gpu) \ Vector(f_gpu)
+u_ka = SparseMatrixCSC(K_gpu) \ Vector(f_gpu)
 
 
 #=
@@ -211,8 +211,8 @@ function cuda_assembly_kernel(assemblers, color, cc::Ferrite.SoAContainer, cv::F
     return nothing
 end
 
-function assemble_global_cuda!(cv::Ferrite.SoAContainer, K, f, cc, colors::Vector, Kes, fes, n_workers)
-    assemblers = Ferrite.distribute_to_tasks(backend, start_assemble(K, f), n_workers)
+function assemble_global_cuda!(cv::Ferrite.SoAContainer, K, f, cc, colors::Vector, Kes, fes, n_workers; fillzero = true)
+    assemblers = Ferrite.distribute_to_tasks(backend, start_assemble(K, f; fillzero), n_workers)
     for color in colors
         n = length(color)
         threads, blocks = compute_threads_and_blocks(n)
@@ -224,7 +224,8 @@ end
 
 # And now we can assemble the same way as for the `KernelAbstractions.jl` version
 assemble_global_cuda!(cv_gpu, K_gpu, f_gpu, cc_gpu, colors_gpu, Kes, fes, n_workers)
-
+apply!(K_gpu, f_gpu, ch_gpu)
+u_cuda = SparseMatrixCSC(K_gpu) \ Vector(f_gpu)
 
 #=
 ## Matrix-free assembly with `CUDA.jl`
@@ -271,29 +272,6 @@ fes = KA.zeros(backend, Float32, getncells(grid), getnbasefunctions(cv))
 
 # And assemble without using the global stiffness, `K_gpu`, and load vector, `f_gpu`.
 assemble_global_cuda!(cv_gpu, cc_gpu, colors_gpu, Kes, fes)
-
-# Reference for internal testing                                                #hide
-function assemble_global!(cv::CellValues, K::SparseMatrixCSC, f, dh::DofHandler) #hide
-    n_basefuncs = getnbasefunctions(cv)                                         #hide
-    Ke = zeros(Float32, n_basefuncs, n_basefuncs)                               #hide
-    fe = zeros(Float32, n_basefuncs)                                            #hide
-    assembler = start_assemble(K, f)                                            #hide
-    for cell in CellIterator(dh)                                                #hide
-        assemble_cell!(Ke, fe, cell, cv, assembler)                             #hide
-    end                                                                         #hide
-    return nothing                                                              #hide
-end                                                                             #hide
-
-function assemble_global!(cv::CellValues, K::SparseMatrixCSC, f, dh::SubDofHandler) #hide
-    n_basefuncs = getnbasefunctions(cv)                                         #hide
-    Ke = zeros(Float32, n_basefuncs, n_basefuncs)                               #hide
-    fe = zeros(Float32, n_basefuncs)                                            #hide
-    assembler = start_assemble(K, f; fillzero = false)                          #hide
-    for cell in CellIterator(dh)                                                #hide
-        assemble_cell!(Ke, fe, cell, cv, assembler)                             #hide
-    end                                                                         #hide
-    return nothing                                                              #hide
-end                                                                             #hide
 
 ## References
 
