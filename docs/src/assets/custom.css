@@ -12,17 +12,17 @@ div.docs-package-name {
     font-size: 1.7rem !important;
 }
 
-/* Example screenshots/animations come in light/dark pairs (docs/screenshots.py);
-   show the variant matching the active theme. */
-img[src$="-dark.png"], img[src$="-dark.gif"], img[src$="-dark.webp"] {
+/* Example screenshots/animations (docs/screenshots.py) and plots generated during the
+   docs build come in light/dark pairs; show the variant matching the active theme. */
+img[src$="-dark.png"], img[src$="-dark.gif"], img[src$="-dark.webp"], img[src$="-dark.svg"] {
     display: none;
 }
 
-html:is(.theme--documenter-dark, .theme--catppuccin-frappe, .theme--catppuccin-macchiato, .theme--catppuccin-mocha) :is(img[src$="-light.png"], img[src$="-light.gif"], img[src$="-light.webp"]) {
+html:is(.theme--documenter-dark, .theme--catppuccin-frappe, .theme--catppuccin-macchiato, .theme--catppuccin-mocha) :is(img[src$="-light.png"], img[src$="-light.gif"], img[src$="-light.webp"], img[src$="-light.svg"]) {
     display: none;
 }
 
-html:is(.theme--documenter-dark, .theme--catppuccin-frappe, .theme--catppuccin-macchiato, .theme--catppuccin-mocha) :is(img[src$="-dark.png"], img[src$="-dark.gif"], img[src$="-dark.webp"]) {
+html:is(.theme--documenter-dark, .theme--catppuccin-frappe, .theme--catppuccin-macchiato, .theme--catppuccin-mocha) :is(img[src$="-dark.png"], img[src$="-dark.gif"], img[src$="-dark.webp"], img[src$="-dark.svg"]) {
     display: inline;
 }
 
