@@ -7,7 +7,8 @@ end                        #hide
 nothing                    #hide
 # # [Incompressible Navier-Stokes equations via DifferentialEquations.jl](@id tutorial-ins-ordinarydiffeq)
 #
-# ![nsdiffeq](nsdiffeq.gif)
+# ![nsdiffeq](ns_vs_diffeq-light.webp)
+# ![nsdiffeq](ns_vs_diffeq-dark.webp)
 #
 #
 # In this example we focus on a simple but visually appealing problem from

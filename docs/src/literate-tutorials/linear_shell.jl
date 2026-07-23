@@ -1,7 +1,10 @@
 # runic: off
 # # [Linear shell](@id tutorial-linear-shell)
 #
-# ![](linear_shell.png)
+# ![](linear_shell-light.png)
+# ![](linear_shell-dark.png)
+#
+# *Figure 1*: Magnitude of the deflection of the shell (deformation magnified).
 #-
 # ## Introduction
 #

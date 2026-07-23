@@ -8,10 +8,12 @@
 # elastic solid aggregates that are impermeable. Hence, there is no liquid in
 # these particles and the only unknown variable is the displacement field `:u`.
 # In the porous media, denoted the matrix, we have both the displacement field,
-# `:u`, as well as the liquid pressure, `:p`, as unknown. The simulation result
-# is shown below
+# `:u`, as well as the liquid pressure, `:p`, as unknown. The simulation results,
+# the vertical strain (defined on the whole domain) and the liquid pressure (only
+# defined in the porous matrix), are shown below
 #
-# ![Pressure evolution.](porous_media.gif)
+# ![Vertical strain (left) and pressure (right) evolution.](porous_media-light.webp)
+# ![Vertical strain (left) and pressure (right) evolution.](porous_media-dark.webp)
 #
 # ## Theory of porous media
 # The strong forms are given as
