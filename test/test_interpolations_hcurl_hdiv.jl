@@ -409,6 +409,39 @@ using Ferrite: reference_shape_value
         end
     end
 
+    @testset "ProjectedDirichlet in mixed DofHandler" begin
+        # Regression test: the constrained field is not the first field in the
+        # DofHandler, so its facet dofs are offset in the cell dof vector.
+        for ip in (RaviartThomas{RefTriangle, 2}(), Nedelec{RefTriangle, 2}())
+            grid = generate_grid(Triangle, (2, 2))
+            transform_coordinates!(grid, x -> x + 0.1 * Vec(abs(x[2])^2, abs(x[1])^2))
+            facetset = getfacetset(grid, "right")
+            f_bc = if Ferrite.conformity(ip) isa Ferrite.HdivConformity
+                (x, t, n) -> x[1] + 2 * x[2]
+            else
+                (x, t, n) -> Vec(0.0, 0.0, x[1] + 2 * x[2])
+            end
+            function solve_with_fields(fields...)
+                dh = DofHandler(grid)
+                for (name, field_ip) in fields
+                    add!(dh, name, field_ip)
+                end
+                close!(dh)
+                ch = close!(add!(ConstraintHandler(dh), ProjectedDirichlet(:u, facetset, f_bc)))
+                a = zeros(ndofs(dh))
+                apply!(a, ch)
+                return dh, a
+            end
+            dh_single, a_single = solve_with_fields((:u, ip))
+            dh_mixed, a_mixed = solve_with_fields((:p, Lagrange{RefTriangle, 1}()), (:u, ip))
+            for (cellidx, _) in facetset
+                dofs_single = celldofs(dh_single, cellidx)[dof_range(dh_single.subdofhandlers[1], :u)]
+                dofs_mixed = celldofs(dh_mixed, cellidx)[dof_range(dh_mixed.subdofhandlers[1], :u)]
+                @test a_mixed[dofs_mixed] ≈ a_single[dofs_single]
+            end
+        end
+    end
+
     @testset "ProjectedDirichlet error path" begin
         dh_H1, _ = _setup_dh_fv_for_bc_test(Lagrange{RefTriangle, 1}()^2; nel = 1, qr_order = 1)
         dh_L2, _ = _setup_dh_fv_for_bc_test(DiscontinuousLagrange{RefTriangle, 1}()^2; nel = 1, qr_order = 1)

@@ -1964,8 +1964,11 @@ function _update_projected_dbc!(
         reinit!(fv, fc)
         shape_nrs = dirichlet_facetdof_indices(ip)[getcurrentfacet(fv)]
         solve_projected_dbc!(aᶠ, Kᶠ, fᶠ, f, fv, shape_nrs, getcoordinates(fc), time)
-        for (idof, shape_nr) in enumerate(shape_nrs)
-            globaldof = celldofs(fc)[shape_nr]
+        # facet_dofs (unlike shape_nrs) includes the field offset in the cell dof vector,
+        # which matters when the constrained field is not the first field in the SubDofHandler.
+        local_dofs = facet_dofs[getcurrentfacet(fv)]
+        for idof in eachindex(shape_nrs)
+            globaldof = celldofs(fc)[local_dofs[idof]]
             dbc_index = dofmapping[globaldof]
             # Only DBC dofs are currently update!-able so don't modify inhomogeneities
             # for affine constraints
