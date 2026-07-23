@@ -112,6 +112,7 @@ bibtex_plugin = CitationBibliography(
             "gallery/quasi_incompressible_hyperelasticity.md",
             "gallery/landau.md",
             "gallery/topology_optimization.md",
+            "gallery/elasticity_adaptivity.md",
         ],
         "devdocs/index.md",
         "cited-literature.md",

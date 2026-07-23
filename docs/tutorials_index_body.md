@@ -191,3 +191,14 @@ Galerkin Infrastructure For the finite element toolbox
 Ferrite.jl"](https://summerofcode.withgoogle.com/programs/2023/projects/SLGbRNI5).
 
 **Keywords**: scalar-valued solution, Dirichlet boundary conditions, Discontinuous Galerkin, Interior penalty.
+
+---
+
+#### [Tutorial 14: Adaptive heat equation](@ref tutorial-heat-adaptivity)
+
+In this tutorial the heat equation is solved on a cube with adaptive mesh refinement (AMR).
+A manufactured solution with a sharp spherical feature drives the refinement, using a
+Zienkiewicz-Zhu error estimator and Dörfler marking. The hanging nodes introduced by the
+refinement are constrained to keep the approximation conforming.
+
+**Keywords**: adaptive mesh refinement, error estimation, non-conforming grid, hanging nodes.

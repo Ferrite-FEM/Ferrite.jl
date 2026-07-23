@@ -385,6 +385,32 @@ def scene_linear_shell():
     finish(view, "linear_shell", azimuth=30, elevation=65, zoom=1.0)
 
 
+# --- heat_adaptivity: AMR iterations, cube cut open at the ring feature
+@scene("heat_adaptivity")
+def scene_heat_adaptivity():
+    view = new_view()
+    r = OpenDataFile(datadir + "/heat_amr.pvd")
+    # crinkle clip: keep whole cells, so the cut exposes the true mesh faces
+    # (a plain clip would triangulate the hexahedra and clutter the edges);
+    # the offset must stay below half the finest cell size for a flat cut
+    c = Clip(Input=r)
+    c.ClipType.Origin = [0.0, 0.0, -0.0005]
+    c.ClipType.Normal = [0.0, 0.0, 1.0]
+    c.Crinkleclip = 1
+    d = surface(c, view)
+    d.EdgeColor = [0.55, 0.55, 0.55]  # the default dark edges vanish on the blue field
+    # outline of the full cube, to make clear the mesh is cut in half
+    o = Show(r, view)
+    o.Representation = "Outline"
+    o.AmbientColor = o.DiffuseColor = [0.55, 0.55, 0.55]  # reads on both themes
+    o.LineWidth = 2.0
+    lut = colorbar(d, view, ("POINTS", "u"), title="u")
+    # the exact-solution range; the polluted early coarse-mesh steps clip into it
+    lut.RescaleTransferFunction(0.0, 1.0)
+    finish_anim(view, r, "heat_adaptivity", azimuth=30, elevation=30, zoom=1.1,
+                delay=100)
+
+
 # === animations (time-stepping examples) ===================================
 
 # --- transient_heat_equation: temperature evolving on the unit square
@@ -544,6 +570,24 @@ def scene_quasi_incompressible_hyperelasticity():
     lut.RescaleTransferFunction(*data_range_over_time(r, ("POINTS", "u")))
     finish_anim(view, r, "quasi_incompressible_hyperelasticity",
                azimuth=35, elevation=20, zoom=1.1)
+
+
+# --- elasticity_adaptivity: AMR iterations refining toward the corner
+@scene("elasticity_adaptivity")
+def scene_elasticity_adaptivity():
+    view = new_view()
+    r = OpenDataFile(datadir + "/elasticity_amr.pvd")
+    w = warp(r, "u", 20.0)
+    d = surface(w, view)
+    # the colour bar sits in the cut-out quadrant of the L
+    lut = colorbar(d, view, ("CELLS", "von Mises [MPa]"),
+                   title="von Mises [MPa]", pos=[0.62, 0.52], fmt="%.0f")
+    # fixed range at ~the 95th percentile of the final step: the stress is
+    # singular at the corner, so an auto range washes out the rest of the
+    # field (the corner region saturates red instead)
+    lut.RescaleTransferFunction(0.0, 1800.0)
+    finish_anim(view, r, "elasticity_adaptivity", twod=True, zoom=0.95,
+                res=[1000, 920], delay=60)
 
 
 names = selected or list(SCENES)

@@ -1,6 +1,11 @@
 # # [Adaptive Linear Elasticity](@id gallery-elasticity-adaptivity)
 #
-# ![Adaptively refined L-shape mesh, concentrated at the re-entrant corner.](elasticity_adaptivity.png)
+# ![](elasticity_adaptivity-light.webp)
+# ![](elasticity_adaptivity-dark.webp)
+#
+# *Figure 1*: The adaptive refinement loop, colored by the von Mises stress:
+# the refinement concentrates at the stress singularity of the re-entrant
+# corner (displacements exaggerated).
 #
 # ## Introduction
 #
@@ -25,7 +30,7 @@
 # ## Commented Program
 #
 # First we load the required packages.
-using Ferrite, FerriteMeshParser, Tensors, SparseArrays, WriteVTK, Downloads
+using Ferrite, FerriteMeshParser, WriteVTK, Downloads
 
 # ### Mesh import
 # We read the Abaqus mesh with FerriteMeshParser's `get_ferrite_grid`. The file
@@ -45,6 +50,7 @@ function setup_grid()
     addfacetset!(grid, "right", x -> x[1] ≈ 1.0)
     return grid
 end
+#md nothing # hide
 
 # We wrap the imported grid in a `ForestBWG` that allows up to 20 levels of
 # refinement. Each original quadrilateral becomes the root of an octree and is
@@ -63,14 +69,15 @@ const Cmat = let
     C_voigt = Emod / (1 - ν^2) * [1.0 ν 0.0; ν 1.0 0.0; 0.0 0.0 (1 - ν) / 2]
     fromvoigt(SymmetricTensor{4, 2}, C_voigt)
 end
+#md nothing # hide
 
 # The applied traction on the right edge (a horizontal pull).
 traction(x) = Vec{2}((1.0e3, 0.0))
+#md nothing # hide
 
 # ### Element assembly
 # Standard small-strain elasticity stiffness, $k_{ij} = \int_K \nabla N_i : \mathsf{C} : \nabla^\mathrm{sym} N_j \, \mathrm{d}\Omega$.
 function assemble_cell!(ke, cellvalues, C)
-    fill!(ke, 0.0)
     for q_point in 1:getnquadpoints(cellvalues)
         dΩ = getdetJdV(cellvalues, q_point)
         for i in 1:getnbasefunctions(cellvalues)
@@ -83,6 +90,7 @@ function assemble_cell!(ke, cellvalues, C)
     end
     return ke
 end
+#md nothing # hide
 
 # ### Global assembly
 function assemble_global!(K, dh, cellvalues, C)
@@ -91,11 +99,13 @@ function assemble_global!(K, dh, cellvalues, C)
     assembler = start_assemble(K)
     for cell in CellIterator(dh)
         reinit!(cellvalues, cell)
+        fill!(ke, 0.0)
         assemble_cell!(ke, cellvalues, C)
         assemble!(assembler, celldofs(cell), ke)
     end
     return K
 end
+#md nothing # hide
 
 # ### External (Neumann) forces
 # The traction is integrated over the loaded facet set.
@@ -118,6 +128,7 @@ function assemble_external_forces!(f_ext, dh, facetset, facetvalues, prescribed_
     end
     return f_ext
 end
+#md nothing # hide
 
 # ### Solve on a single grid
 # Given a (non-conforming) grid we set up the FE problem with vector-valued
@@ -137,8 +148,7 @@ function solve(grid, C)
     close!(dh)
 
     ch = ConstraintHandler(dh)
-    add!(ch, Dirichlet(:u, getfacetset(grid, "left"), (x, t) -> 0.0, 1))
-    add!(ch, Dirichlet(:u, getfacetset(grid, "left"), (x, t) -> 0.0, 2))
+    add!(ch, Dirichlet(:u, getfacetset(grid, "left"), (x, t) -> zero(Vec{2})))
     add!(ch, ConformityConstraint(:u))
     close!(ch)
 
@@ -149,8 +159,29 @@ function solve(grid, C)
     apply!(K, f, ch)
     u = K \ f
     apply!(u, ch)
-    return u, dh, ch, cellvalues, qr
+    return u, dh, cellvalues
 end
+#md nothing # hide
+
+# ### Stress post-processing
+# For visualization we also compute the cell-average von Mises stress
+# (plane stress, i.e. $\sigma_{33} = 0$), which brings out the stress
+# concentration at the re-entrant corner.
+function vonmises_stress(grid, dh, u, cv, C)
+    σvM = zeros(getncells(grid))
+    for cell in CellIterator(dh)
+        reinit!(cv, cell)
+        ue = u[celldofs(cell)]
+        s = 0.0
+        for qp in 1:getnquadpoints(cv)
+            σ = C ⊡ function_symmetric_gradient(cv, qp, ue)
+            s += sqrt(σ[1, 1]^2 - σ[1, 1] * σ[2, 2] + σ[2, 2]^2 + 3 * σ[1, 2]^2)
+        end
+        σvM[cellid(cell)] = s / getnquadpoints(cv)
+    end
+    return σvM
+end
+#md nothing # hide
 
 # ### Facet-jump (Kelly-type) error estimator
 # A recovery-based (Zienkiewicz-Zhu) estimator is a poor fit here: it assumes flux
@@ -280,6 +311,7 @@ function estimate_error(forest, grid, dh, u, C)
     end
     return error_arr
 end
+#md nothing # hide
 
 # ### Dörfler marking
 # Sort cells by decreasing error and mark the smallest set whose cumulative error
@@ -299,6 +331,7 @@ function dorfler_mark(error_arr, θ)
     end
     return cells_to_refine, total
 end
+#md nothing # hide
 
 # ### Adaptive solve loop
 # Repeat: materialize the forest, solve, estimate, mark, refine, and enforce 2:1
@@ -310,16 +343,17 @@ function solve_adaptive(initial_forest; nsteps = 4, θ = 0.3)
     for i in 1:nsteps
         ## Materialize the forest into a NonConformingGrid and solve.
         grid = Ferrite.creategrid(forest)
-        u, dh, ch, cv, qr = solve(grid, Cmat)
+        u, dh, cv = solve(grid, Cmat)
 
         ## Estimate the error and mark cells with Dörfler marking.
         error_arr = estimate_error(forest, grid, dh, u, Cmat)
         cells_to_refine, total = dorfler_mark(error_arr, θ)
         @info "AMR step $i: $(getncells(grid)) cells, $(length(cells_to_refine)) marked, total error = $total"
 
-        ## Export displacement and the cell-wise error indicator.
+        ## Export displacement, von Mises stress and the cell-wise error indicator.
         VTKGridFile("elasticity_amr-$i", dh) do vtk
             write_solution(vtk, dh, u)
+            write_cell_data(vtk, vonmises_stress(grid, dh, u, cv, Cmat), "von Mises [MPa]")
             write_cell_data(vtk, error_arr, "error indicator")
             pvd[i] = vtk
         end
@@ -333,6 +367,7 @@ function solve_adaptive(initial_forest; nsteps = 4, θ = 0.3)
     vtk_save(pvd)
     return forest
 end
+#md nothing # hide
 
 # ### Run
-solve_adaptive(forest)
+solve_adaptive(forest);

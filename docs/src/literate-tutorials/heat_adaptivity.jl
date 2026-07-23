@@ -1,6 +1,11 @@
 # # [Adaptive Heat Equation](@id tutorial-heat-adaptivity)
 #
-# ![Shows refined mesh for the problem.](heat_adaptivity.png)
+# ![](heat_adaptivity-light.webp)
+# ![](heat_adaptivity-dark.webp)
+#
+# *Figure 1*: The adaptive refinement loop, shown on a cross section of the cube.
+# On the coarse initial meshes the solution is badly polluted; as the mesh refines
+# around the sharp spherical feature the solution converges.
 #
 # ## Introduction
 #
@@ -18,14 +23,14 @@
 # The right-hand side $f$ is chosen via the method of manufactured solutions
 # so that the exact solution is a Gaussian ring
 # ```math
-#  u_{\mathrm{exact}}(\textbf{x}) = \exp\!\Bigl(-\bigl(\tfrac{\|\textbf{x}\|-0.5}{\varepsilon}\bigr)^2\Bigr), \quad \varepsilon = 0.02,
+#  u_{\mathrm{exact}}(\textbf{x}) = \exp\!\Bigl(-\bigl(\tfrac{\|\textbf{x}\|-0.5}{\varepsilon}\bigr)^2\Bigr), \quad \varepsilon = 0.05,
 # ```
 # which is essentially zero at the boundary and has a sharp peak on the sphere $\|\textbf{x}\|=0.5$.
 #
 # ## Commented Program
 #
 # First we load the required packages.
-using Ferrite, SparseArrays, IterativeSolvers, WriteVTK
+using Ferrite, IterativeSolvers, WriteVTK
 
 # ### Grid setup
 # We create a structured 4×4×4 hexahedral grid on $[-1,1]^3$
@@ -33,24 +38,25 @@ using Ferrite, SparseArrays, IterativeSolvers, WriteVTK
 # One uniform refinement gives us a reasonable starting mesh of 512 cells.
 grid = generate_grid(Hexahedron, (4, 4, 4));
 grid = ForestBWG(grid, 10)
-Ferrite.AMR.refine_all!(grid, 1)
+Ferrite.AMR.refine_all!(grid, 1);
 
 # ### Manufactured solution
 # The exact solution is a Gaussian ring concentrated on the sphere $\|\textbf{x}\|=0.5$
-# with width $\varepsilon = 0.02$. It is essentially zero at the origin and at the
+# with width $\varepsilon = 0.05$. It is essentially zero at the origin and at the
 # boundary of the cube, so homogeneous Dirichlet conditions are appropriate.
+# Note that the width must be resolvable by the mesh: a much sharper feature than
+# this would be misintegrated by the quadrature on the coarse initial mesh, which
+# pollutes the discrete solution globally.
 # The right-hand side is obtained by applying the negative Laplacian via
 # automatic differentiation (`Tensors.laplace`).
-analytical_solution(x) = exp(-((norm(x) - 0.5) / 0.02)^2)
+analytical_solution(x) = exp(-((norm(x) - 0.5) / 0.05)^2)
 analytical_rhs(x) = -laplace(analytical_solution, x)
+#md nothing # hide
 
 # ### Element assembly
 # Standard Galerkin assembly for the Poisson equation. For each quadrature point
 # we evaluate the manufactured right-hand side at the physical coordinate.
-function assemble_cell!(ke, fe, cellvalues, ue, coords)
-    fill!(ke, 0.0)
-    fill!(fe, 0.0)
-
+function assemble_cell!(ke, fe, cellvalues, coords)
     n_basefuncs = getnbasefunctions(cellvalues)
     for q_point in 1:getnquadpoints(cellvalues)
         x = spatial_coordinate(cellvalues, q_point, coords)
@@ -67,24 +73,27 @@ function assemble_cell!(ke, fe, cellvalues, ue, coords)
     end
     return
 end
+#md nothing # hide
 
 # ### Global assembly
 # Loop over all cells, reinitialize `CellValues` for the current cell geometry,
 # compute the element contribution and assemble into the global system.
-function assemble_global!(K, f, a, dh, cellvalues)
+function assemble_global!(K, f, dh, cellvalues)
     n_basefuncs = getnbasefunctions(cellvalues)
     ke = zeros(n_basefuncs, n_basefuncs)
     fe = zeros(n_basefuncs)
     assembler = start_assemble(K, f)
     for cell in CellIterator(dh)
         reinit!(cellvalues, cell)
-        @views ue = a[celldofs(cell)]
         coords = getcoordinates(cell)
-        assemble_cell!(ke, fe, cellvalues, ue, coords)
+        fill!(ke, 0.0)
+        fill!(fe, 0.0)
+        assemble_cell!(ke, fe, cellvalues, coords)
         assemble!(assembler, celldofs(cell), ke, fe)
     end
     return K, f
 end
+#md nothing # hide
 
 # ### Solve on a single grid
 # Given a (non-conforming) grid, set up the FE problem with trilinear hexahedral
@@ -93,9 +102,7 @@ end
 # across hanging nodes introduced by adaptive refinement.
 # We use a conjugate gradient solver since the system is symmetric positive definite.
 function solve(grid)
-    dim = 3
-    order = 1
-    ip = Lagrange{RefHexahedron, order}()
+    ip = Lagrange{RefHexahedron, 1}()
     qr = QuadratureRule{RefHexahedron}(2)
     cellvalues = CellValues(qr, ip)
 
@@ -113,13 +120,13 @@ function solve(grid)
 
     K = allocate_matrix(dh, ch)
     f = zeros(ndofs(dh))
-    a = zeros(ndofs(dh))
-    assemble_global!(K, f, a, dh, cellvalues)
+    assemble_global!(K, f, dh, cellvalues)
     apply!(K, f, ch)
     u = cg(K, f; maxiter = 2000)
     apply!(u, ch)
-    return u, dh, ch, cellvalues
+    return u, dh, cellvalues, ip, qr
 end
+#md nothing # hide
 
 # ### Error estimation (Zienkiewicz-Zhu)
 # The ZZ error estimator is a recovery-based *a posteriori* error estimator.
@@ -167,6 +174,7 @@ function estimate_error(grid, dh, u, cv, ip, qr)
     end
     return error_arr
 end
+#md nothing # hide
 
 # ### True error
 # Since the solution is manufactured, we can also compute the *exact* elementwise
@@ -192,6 +200,7 @@ function true_error(grid, dh, u, cv)
     end
     return error_arr
 end
+#md nothing # hide
 
 # ### Dörfler marking
 # Rather than using an absolute error threshold (which requires problem-dependent
@@ -213,22 +222,18 @@ function dorfler_mark(error_arr, θ)
     end
     return cells_to_refine, total
 end
+#md nothing # hide
 
 # ### Adaptive solve loop
-# The adaptive loop repeats: solve, estimate, mark, refine.
-function solve_adaptive(initial_grid)
-    ip = Lagrange{RefHexahedron, 1}()
-    qr = QuadratureRule{RefHexahedron}(2)
-    finished = false
-    i = 1
+# The adaptive loop repeats: solve, estimate, mark, refine. `nsteps` caps the
+# number of refinement steps (kept low here to limit the runtime).
+function solve_adaptive(initial_grid; nsteps = 3, θ = 0.5)
     grid = deepcopy(initial_grid)
     pvd = paraview_collection("heat_amr")
-    θ = 0.5
-
-    while !finished && i <= 3
+    for i in 1:nsteps
         ## Materialize the forest into a NonConformingGrid and solve
         transferred_grid = Ferrite.creategrid(grid)
-        u, dh, ch, cv = solve(transferred_grid)
+        u, dh, cv, ip, qr = solve(transferred_grid)
 
         ## Estimate the error and mark cells with Dörfler marking
         error_arr = estimate_error(transferred_grid, dh, u, cv, ip, qr)
@@ -244,18 +249,16 @@ function solve_adaptive(initial_grid)
             pvd[i] = vtk
         end
 
+        isempty(cells_to_refine) && break
+
         ## Refine marked cells and enforce 2:1 balance across the forest
         Ferrite.refine!(grid, cells_to_refine)
         Ferrite.balanceforest!(grid)
-
-        i += 1
-        if isempty(cells_to_refine)
-            finished = true
-        end
     end
     return vtk_save(pvd)
 end
+#md nothing # hide
 
 # ### Run
 # Finally, we call `solve_adaptive` with our initial forest grid.
-solve_adaptive(grid)
+solve_adaptive(grid);

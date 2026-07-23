@@ -38,7 +38,7 @@ fetch_assets(
                 "linear_elasticity_stress", "elastodynamics_modes",
             ], ".png"
         ),
-        variants(["transient_heat", "elastodynamics", "porous_media", "ns_vs_diffeq", "reactive_surface"], ".webp"),
+        variants(["transient_heat", "elastodynamics", "porous_media", "ns_vs_diffeq", "reactive_surface", "heat_adaptivity"], ".webp"),
     ),
 )
 
@@ -47,7 +47,7 @@ fetch_assets(
     joinpath(@__DIR__, "src", "gallery"),
     vcat(
         variants(["helmholtz", "landau_orig", "landau_opt"], ".png"),
-        variants(["quasi_incompressible_hyperelasticity", "topology_optimization"], ".webp"),
+        variants(["quasi_incompressible_hyperelasticity", "topology_optimization", "elasticity_adaptivity"], ".webp"),
     ),
 )
 
