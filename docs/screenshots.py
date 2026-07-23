@@ -113,15 +113,23 @@ def colorbar(display, view, array, title=None, preset="Cool to Warm",
     return lut
 
 
-def _set_camera(view, azimuth, elevation, zoom, twod, pan_y=0.0):
-    view.ResetCamera(False)
+def _set_camera(view, azimuth, elevation, zoom, twod, pan_y=0.0, bounds=None,
+                parallel=False):
+    # bounds: frame these explicit bounds instead of the currently shown data
+    # (see bounds_over_time), e.g. so an oscillating geometry stays in view.
+    # parallel: orthographic projection for the 3d camera, e.g. so copies of a
+    # domain stacked for comparison keep their alignment and relative size.
+    reset = (lambda: view.ResetCamera(*bounds, False)) if bounds else (lambda: view.ResetCamera(False))
+    reset()
     cam = GetActiveCamera()
     if twod:
         view.CameraParallelProjection = 1
     else:
         cam.Azimuth(azimuth)
         cam.Elevation(elevation)
-    view.ResetCamera(False)
+        if parallel:
+            view.CameraParallelProjection = 1
+    reset()
     cam.Zoom(zoom)
     # pan_y < 0 shifts the scene up in the frame, freeing space for a
     # horizontal colour bar below the mesh
@@ -136,13 +144,13 @@ def _apply_variant(view, text, bg):
 
 
 def finish(view, name, azimuth=30, elevation=25, zoom=1.0, twod=False, res=None,
-           pan_y=0.0):
+           pan_y=0.0, parallel=False):
     # res overrides the frame size (default RES); use a matching aspect ratio for
     # non-square domains so the scene fills the frame instead of leaving margins.
     res = res or RES
     view.ViewSize = res
     Render()  # settle the render window / scalar-bar layout at the new size first
-    _set_camera(view, azimuth, elevation, zoom, twod, pan_y)
+    _set_camera(view, azimuth, elevation, zoom, twod, pan_y, parallel=parallel)
     for variant, text, bg in VARIANTS:
         _apply_variant(view, text, bg)
         Render()
@@ -171,8 +179,23 @@ def data_range_over_time(source, array, comp=None, times=None):
     return lo, hi
 
 
+def bounds_over_time(source, times):
+    # Union of the geometry bounds over the timesteps, e.g. of a warp filter
+    # whose output moves around (readers carry TimestepValues, filters need
+    # them passed in). Pass the result as frame_bounds to finish_anim when no
+    # single timestep covers the whole motion.
+    b = [float("inf"), float("-inf")] * 3
+    for t in times:
+        source.UpdatePipeline(t)
+        tb = source.GetDataInformation().GetBounds()
+        for i in range(3):
+            b[2 * i] = min(b[2 * i], tb[2 * i])
+            b[2 * i + 1] = max(b[2 * i + 1], tb[2 * i + 1])
+    return b
+
+
 def finish_anim(view, source, name, azimuth=30, elevation=25, zoom=1.0,
-                twod=False, delay=8, res=None, pan_y=0.0):
+                twod=False, delay=8, res=None, pan_y=0.0, frame_bounds=None):
     # Frames are rendered directly at the final animation size (res, default
     # ANIM_RES; use a matching aspect ratio for non-square domains) --
     # downscaling afterwards would blur the annotation text. Saved as animated
@@ -184,10 +207,11 @@ def finish_anim(view, source, name, azimuth=30, elevation=25, zoom=1.0,
     if len(times) > ANIM_FRAMES:
         step = -(-len(times) // ANIM_FRAMES)  # ceil, so the result stays <= ANIM_FRAMES
         times = times[::step]
-    # Frame once at the last step (largest extent for deforming geometry).
+    # Frame once at the last step (largest extent for deforming geometry),
+    # unless explicit frame_bounds are given.
     view.ViewTime = times[-1]
     Render()  # settle the render window / scalar-bar layout at the new size first
-    _set_camera(view, azimuth, elevation, zoom, twod, pan_y)
+    _set_camera(view, azimuth, elevation, zoom, twod, pan_y, bounds=frame_bounds)
     for variant, text, bg in VARIANTS:
         _apply_variant(view, text, bg)
         with tempfile.TemporaryDirectory() as frames:
@@ -372,6 +396,53 @@ def scene_transient_heat():
     lut = colorbar(d, view, ("POINTS", "u"), title="T")
     lut.RescaleTransferFunction(*data_range_over_time(r, ("POINTS", "u")))
     finish_anim(view, r, "transient_heat", twod=True, zoom=0.95)
+
+
+# --- elastodynamics: vibration modes and free vibration of a cantilever beam
+@scene("elastodynamics")
+def scene_elastodynamics():
+    # Figure 2 of the tutorial: the four lowest vibration modes, stacked with
+    # mode 1 on top. The mode shapes are normalized (max dof value 1), so one
+    # warp factor and one colour scale serve all of them; the scale itself is
+    # arbitrary, so no colour bar. Parallel projection keeps the stack aligned.
+    view = new_view()
+    for i in range(1, 5):
+        r = OpenDataFile(datadir + "/elastodynamics_mode_%d.vtu" % i)
+        shifted = Transform(Input=warp(r, "u", 0.13))
+        # rotate the weak-axis modes (deflecting in z) a quarter turn about the
+        # beam axis so every mode bends in the screen plane, and stack along y,
+        # which projects to screen-vertical for this camera
+        if i != 2:
+            shifted.Transform.Rotate = [-90.0, 0.0, 0.0]
+        shifted.Transform.Translate = [0.0, 0.35 * (4 - i), 0.0]
+        d = surface(shifted, view)
+        ColorBy(d, ("POINTS", "u"))  # they share the "u" transfer function
+    lut = GetColorTransferFunction("u")
+    lut.ApplyPreset("Cool to Warm", True)
+    lut.RescaleTransferFunction(0.0, 1.0)
+    finish(view, "elastodynamics_modes", azimuth=-30, elevation=20, zoom=1.15,
+           res=[1500, 1100], parallel=True)
+
+    # Animation: free vibration ("twang") after releasing the static tip load.
+    view = new_view()
+    r = OpenDataFile(datadir + "/elastodynamics.pvd")
+    w = warp(r, "u", 75.0)
+    # colour by the (unexaggerated) deflection in mm: the raw values in m need
+    # exponent labels which grow too wide for the bar
+    calc = Calculator(Input=w)
+    calc.ResultArrayName = "u_mm"
+    calc.Function = "1000*mag(u)"
+    d = surface(calc, view)
+    lut = colorbar(d, view, ("POINTS", "u_mm"), title="$\\vert u \\vert$ [mm]",
+                   horizontal=True, fmt="%.1f")
+    lo, hi = data_range_over_time(r, ("POINTS", "u"))
+    lut.RescaleTransferFunction(1000 * lo, 1000 * hi)
+    # the beam swings above and below the undeformed axis, so frame the union
+    # of the warped bounds over time instead of a single step
+    times = list(r.TimestepValues)
+    finish_anim(view, r, "elastodynamics", azimuth=-35, elevation=20, zoom=1.9,
+                res=[1200, 560], pan_y=-0.16,
+                frame_bounds=bounds_over_time(w, times))
 
 
 # --- porous_media: vertical strain (whole domain) and pressure evolution

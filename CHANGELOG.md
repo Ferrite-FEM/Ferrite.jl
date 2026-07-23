@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Documentation
  - The figures for the documentation are now programmatically generated and made to have a consistent look.
+ - New tutorial: Elastodynamics and modal analysis of a cantilever beam (mass matrix, generalized eigenvalue problem, Rayleigh damping, Newmark time integration).
 
 ### Fixes
  - `FacetIterator` now works with `AbstractVector{FacetIndex}` and `AbstractSet{FacetIndex}` inputs as documented, instead of requiring an `OrderedSet` ([#1384])

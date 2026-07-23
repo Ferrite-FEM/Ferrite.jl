@@ -60,6 +60,7 @@ bibtex_plugin = CitationBibliography(
             "Tutorials overview" => "tutorials/index.md",
             "tutorials/heat_equation.md",
             "tutorials/linear_elasticity.md",
+            "tutorials/elastodynamics.md",
             "tutorials/incompressible_elasticity.md",
             "tutorials/hyperelasticity.md",
             "tutorials/plasticity.md",

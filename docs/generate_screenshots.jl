@@ -41,6 +41,7 @@ const EXAMPLES = Dict(
     "linear_shell" => "literate-tutorials/linear_shell.jl",
     # Time-stepping examples rendered as animations (write a .pvd collection).
     "transient_heat" => "literate-tutorials/transient_heat_equation.jl",
+    "elastodynamics" => "literate-tutorials/elastodynamics.jl",
     "porous_media" => "literate-tutorials/porous_media.jl",
     "ns_vs_diffeq" => "literate-tutorials/ns_vs_diffeq.jl",
     "reactive_surface" => "literate-tutorials/reactive_surface.jl",
@@ -63,6 +64,7 @@ const POSTRUN = Dict(
 # belong to a scene when uploading a subset.
 const OUTPUTS = Dict(
     "linear_elasticity" => ["linear_elasticity", "linear_elasticity_stress"],
+    "elastodynamics" => ["elastodynamics", "elastodynamics_modes"],
     "landau" => ["landau_orig", "landau_opt"],
 )
 
