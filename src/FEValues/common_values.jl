@@ -9,11 +9,14 @@ function checkquadpoint(fe_v::AbstractValues, qp::Int)
     return nothing
 end
 
+# Whether apply_mapping! for the given mapping requires the cell as input, e.g. to look up
+# the orientation of entities. Defaults to true as the safe option for new mappings.
+mapping_needs_cell(::Any) = true
+mapping_needs_cell(::IdentityMapping) = false
+mapping_needs_cell(::HermiteMapping) = false # the sign of J handles the orientation
+
 @inline function reinit_needs_cell(fe_values::AbstractValues)
-    # TODO: Might need better logic for this, but for current implementations this
-    # is ok. If someone implements a non-identity mapping that doesn't require the cell
-    # as input, this is only a slight performance issue in some cases.
-    return !isa(mapping_type(get_fun_values(fe_values)), IdentityMapping)
+    return mapping_needs_cell(mapping_type(get_fun_values(fe_values)))
 end
 
 @noinline function throw_incompatible_dof_length(length_ue, n_base_funcs)
@@ -68,7 +71,8 @@ end
 Update the `CellValues`, `MultiFieldCellValues`, or `FacetValues` object for a cell or
 facet with cell coordinates `x`.
 The derivatives of the shape functions, and the new integration weights are computed.
-For interpolations with non-identity mappings, the current `cell` is also required.
+For interpolations whose mapping requires it (e.g. the Piola mappings), the current `cell`
+is also required.
 """
 reinit!
 

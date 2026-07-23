@@ -58,6 +58,7 @@ struct FunctionValues{DiffOrder, IP, N_t, dNdx_t, dNdξ_t, d2Ndx2_t, d2Ndξ2_t} 
 end
 function FunctionValues{DiffOrder}(::Type{T}, ip::Interpolation, qr::QuadratureRule, ip_geo::VectorizedInterpolation) where {DiffOrder, T}
     assert_same_refshapes(qr, ip, ip_geo)
+    check_geometry_compatibility(ip, ip_geo)
     n_shape = getnbasefunctions(ip)
     n_qpoints = getnquadpoints(qr)
 
@@ -142,8 +143,28 @@ end
 struct IdentityMapping end
 struct CovariantPiolaMapping end
 struct ContravariantPiolaMapping end
+struct HermiteMapping end
 
 mapping_type(fv::FunctionValues) = mapping_type(fv.ip)
+
+"""
+    check_geometry_compatibility(ip_fun::Interpolation, ip_geo::VectorizedInterpolation)
+
+Check that the geometric interpolation is supported for the function interpolation, and
+throw an `ArgumentError` if not. Defaults to no restriction.
+"""
+check_geometry_compatibility(::Interpolation, ::VectorizedInterpolation) = nothing
+function check_geometry_compatibility(ip::Hermite, ip_geo::VectorizedInterpolation{sdim}) where {sdim}
+    if !(sdim == 1 && ip_geo.ip isa Lagrange{RefLine, 1})
+        throw(
+            ArgumentError(
+                "$(ip) requires an affine geometry in 1D (ip_geo = Lagrange{RefLine, 1}()^1), got $(ip_geo). " *
+                    "Embedded (sdim > 1) or curved line elements are not supported."
+            )
+        )
+    end
+    return nothing
+end
 
 """
     required_geo_diff_order(fun_mapping, fun_diff_order::Int)
@@ -155,6 +176,7 @@ to the physical cell geometry.
 required_geo_diff_order(::IdentityMapping, fun_diff_order::Int) = fun_diff_order
 required_geo_diff_order(::ContravariantPiolaMapping, fun_diff_order::Int) = 1 + fun_diff_order
 required_geo_diff_order(::CovariantPiolaMapping, fun_diff_order::Int) = 1 + fun_diff_order
+required_geo_diff_order(::HermiteMapping, fun_diff_order::Int) = 1 # J needed for the values, affine geometry ⇒ H ≡ 0
 
 # Support for embedded elements
 @inline calculate_Jinv(J::Tensor{2}) = inv(J)
@@ -207,6 +229,43 @@ end
 
         funvals.dNdx[j, q_point] = dNdx
         funvals.d2Ndx2[j, q_point] = d2Ndx2
+    end
+    return nothing
+end
+
+# Hermite mapping
+# Basis functions associated with derivative dofs are scaled by the (cell-constant) Jacobian
+# such that the global dof is the physical derivative, consistent across cells of different
+# length. Restricted to affine geometries (enforced in check_geometry_compatibility), so no
+# geometry-hessian chain-rule terms appear.
+@inline function apply_mapping!(funvals::FunctionValues{0}, ::HermiteMapping, q_point::Int, mapping_values, args...)
+    J = getjacobian(mapping_values)
+    @inbounds for j in 1:getnbasefunctions(funvals)
+        s = hermite_derivative_scaling(funvals.ip, j, J)
+        funvals.Nx[j, q_point] = s * funvals.Nξ[j, q_point]
+    end
+    return nothing
+end
+
+@inline function apply_mapping!(funvals::FunctionValues{1}, ::HermiteMapping, q_point::Int, mapping_values, args...)
+    J = getjacobian(mapping_values)
+    Jinv = inv(J)
+    @inbounds for j in 1:getnbasefunctions(funvals)
+        s = hermite_derivative_scaling(funvals.ip, j, J)
+        funvals.Nx[j, q_point] = s * funvals.Nξ[j, q_point]
+        funvals.dNdx[j, q_point] = s * (funvals.dNdξ[j, q_point] ⋅ Jinv)
+    end
+    return nothing
+end
+
+@inline function apply_mapping!(funvals::FunctionValues{2}, ::HermiteMapping, q_point::Int, mapping_values, args...)
+    J = getjacobian(mapping_values)
+    Jinv = inv(J)
+    @inbounds for j in 1:getnbasefunctions(funvals)
+        s = hermite_derivative_scaling(funvals.ip, j, J)
+        funvals.Nx[j, q_point] = s * funvals.Nξ[j, q_point]
+        funvals.dNdx[j, q_point] = s * (funvals.dNdξ[j, q_point] ⋅ Jinv)
+        funvals.d2Ndx2[j, q_point] = s * (Jinv' ⋅ funvals.d2Ndξ2[j, q_point] ⋅ Jinv)
     end
     return nothing
 end

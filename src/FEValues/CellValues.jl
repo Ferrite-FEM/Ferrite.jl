@@ -123,7 +123,7 @@ function reinit!(cv::AbstractCellValues, cell::Union{AbstractCell, Nothing}, x::
 
     check_reinit_sdim_consistency(cv, x)
     if cell === nothing && reinit_needs_cell(cv)
-        throw(ArgumentError("The cell::AbstractCell input is required to reinit! non-identity function mappings"))
+        throw(ArgumentError("The cell::AbstractCell input is required to reinit! this function mapping"))
     end
     if !checkbounds(Bool, x, 1:n_geom_basefuncs) || length(x) != n_geom_basefuncs
         throw_incompatible_coord_length(length(x), n_geom_basefuncs)
@@ -274,7 +274,7 @@ get_quadrature_rule(cv::MultiFieldCellValues) = getfield(cv, :qr)
 end
 
 @inline function reinit_needs_cell(cv::MultiFieldCellValues)
-    return any(map(fv -> !isa(mapping_type(fv), IdentityMapping), get_fun_values(cv)))
+    return any(map(fv -> mapping_needs_cell(mapping_type(fv)), get_fun_values(cv)))
 end
 
 function check_reinit_sdim_consistency(cmv::MultiFieldCellValues, ::AbstractVector{VT}) where {VT}

@@ -135,7 +135,7 @@ function reinit!(fv::FacetValues, cell::Union{AbstractCell, Nothing}, x::Abstrac
     fun_values = get_fun_values(fv)
 
     if cell === nothing && reinit_needs_cell(fv)
-        throw(ArgumentError("The cell::AbstractCell input is required to reinit! non-identity function mappings"))
+        throw(ArgumentError("The cell::AbstractCell input is required to reinit! this function mapping"))
     end
 
     @inbounds for (q_point, w) in pairs(getweights(fv.fqr, facet_nr))
