@@ -964,9 +964,10 @@ function add!(ch::ConstraintHandler, dbc::Dirichlet)
         # Create BCValues for coordinate evaluation at dof-locations
         EntityType = eltype(dbc.facets) # (Facet|Face|Edge|Vertex)Index
         if EntityType <: Integer
-            if !(mapping_type(interpolation) isa IdentityMapping)
+            if !physical_basis_is_reference_basis(interpolation)
                 # The node idx -> local dof idx assumption in _add! below does not hold
-                # when dofs are not nodal values (e.g. for H(div)/H(curl) interpolations)
+                # when dofs are not nodal values (e.g. for H(div)/H(curl) interpolations,
+                # or for Hermite with its derivative dofs)
                 throw(ArgumentError("Dirichlet conditions on a nodeset are not supported for $(interpolation), use a facetset or vertexset instead."))
             end
             # BCValues are just dummy for nodesets so set to FacetIndex
@@ -1077,7 +1078,7 @@ function add!(ch::ConstraintHandler, pdbc::PeriodicDirichlet)
     if interpolation isa VectorizedInterpolation
         interpolation = interpolation.ip
     end
-    if !(mapping_type(interpolation) isa IdentityMapping)
+    if !physical_basis_is_reference_basis(interpolation)
         # Would pair only the dofs from dirichlet_facetdof_indices (which may not be all
         # dofs on the facet) and lacks mirror_local_dofs methods
         throw(ArgumentError("PeriodicDirichlet is not supported for $(interpolation)."))

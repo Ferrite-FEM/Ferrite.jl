@@ -135,7 +135,7 @@ function reinit!(fv::FacetValues, cell::Union{AbstractCell, Nothing}, x::Abstrac
     fun_values = get_fun_values(fv)
 
     if cell === nothing && reinit_needs_cell(fv)
-        throw(ArgumentError("The cell::AbstractCell input is required to reinit! non-identity function mappings"))
+        throw(ArgumentError("The cell::AbstractCell input is required to reinit! this function mapping"))
     end
 
     @inbounds for (q_point, w) in pairs(getweights(fv.fqr, facet_nr))
@@ -148,6 +148,7 @@ function reinit!(fv::FacetValues, cell::Union{AbstractCell, Nothing}, x::Abstrac
         @inbounds fv.detJdV[q_point] = detJ * w
         @inbounds fv.normals[q_point] = weight_norm / norm(weight_norm)
         apply_mapping!(fun_values, q_point, mapping, cell)
+        apply_dof_transformation!(fun_values, q_point, mapping, cell)
     end
     return
 end

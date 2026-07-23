@@ -58,11 +58,14 @@ struct FunctionValues{DiffOrder, IP, N_t, dNdx_t, dNdξ_t, d2Ndx2_t, d2Ndξ2_t} 
 end
 function FunctionValues{DiffOrder}(::Type{T}, ip::Interpolation, qr::QuadratureRule, ip_geo::VectorizedInterpolation) where {DiffOrder, T}
     assert_same_refshapes(qr, ip, ip_geo)
+    check_geometry_compatibility(ip, ip_geo)
     n_shape = getnbasefunctions(ip)
     n_qpoints = getnquadpoints(qr)
 
     Nξ = zeros(typeof_N(T, ip, ip_geo), n_shape, n_qpoints)
-    Nx = isa(mapping_type(ip), IdentityMapping) ? Nξ : similar(Nξ)
+    # The physical values can alias the reference values only when they are guaranteed
+    # equal, i.e. for the identity mapping without a dof transformation.
+    Nx = physical_basis_is_reference_basis(ip) ? Nξ : similar(Nξ)
     dNdξ = dNdx = d2Ndξ2 = d2Ndx2 = nothing
 
     if DiffOrder >= 1
@@ -145,6 +148,43 @@ struct ContravariantPiolaMapping end
 
 mapping_type(fv::FunctionValues) = mapping_type(fv.ip)
 
+# Dof transformation types
+# In the factorization ψᵢ = Σⱼ Mᵢⱼ (F φ̂ⱼ) of the physical basis functions ψᵢ, the reference
+# basis functions φ̂ⱼ are first pushed forward by the mapping F (`apply_mapping!`, determined
+# by the function space), and then recombined with the cell-constant matrix M (determined by
+# the element's dof functionals) to restore duality between the basis functions and the
+# physical dofs shared between cells. Most elements have M = I (`NoDofTransformation`).
+# `DiagonalDofTransformation` covers elements whose M is diagonal, i.e. a pure per-basis-
+# function scaling (see `get_dof_scaling`), such as `Hermite` where the basis functions of
+# derivative dofs are scaled by the cell Jacobian.
+# Note that the separation is not yet complete: the orientation signs of the Piola-mapped
+# elements (`get_direction`), conceptually the signed-permutation part of M, are still
+# folded into their `apply_mapping!` methods. Migrating them here is a possible future
+# consolidation.
+struct NoDofTransformation end
+struct DiagonalDofTransformation end
+
+dof_transformation(fv::FunctionValues) = dof_transformation(fv.ip)
+
+"""
+    check_geometry_compatibility(ip_fun::Interpolation, ip_geo::VectorizedInterpolation)
+
+Check that the geometric interpolation is supported for the function interpolation, and
+throw an `ArgumentError` if not. Defaults to no restriction.
+"""
+check_geometry_compatibility(::Interpolation, ::VectorizedInterpolation) = nothing
+function check_geometry_compatibility(ip::Hermite, ip_geo::VectorizedInterpolation{sdim}) where {sdim}
+    if !(sdim == 1 && ip_geo.ip isa Lagrange{RefLine, 1})
+        throw(
+            ArgumentError(
+                "$(ip) requires an affine geometry in 1D (ip_geo = Lagrange{RefLine, 1}()^1), got $(ip_geo). " *
+                    "Embedded (sdim > 1) or curved line elements are not supported."
+            )
+        )
+    end
+    return nothing
+end
+
 """
     required_geo_diff_order(fun_mapping, fun_diff_order::Int)
 
@@ -155,6 +195,11 @@ to the physical cell geometry.
 required_geo_diff_order(::IdentityMapping, fun_diff_order::Int) = fun_diff_order
 required_geo_diff_order(::ContravariantPiolaMapping, fun_diff_order::Int) = 1 + fun_diff_order
 required_geo_diff_order(::CovariantPiolaMapping, fun_diff_order::Int) = 1 + fun_diff_order
+
+# Dof transformations may require geometric derivatives independently of the function
+# derivative order, e.g. the Jacobian for the scaling of the Hermite basis functions.
+required_geo_diff_order(::NoDofTransformation) = 0
+required_geo_diff_order(::DiagonalDofTransformation) = 1 # J needed for the scaling
 
 # Support for embedded elements
 @inline calculate_Jinv(J::Tensor{2}) = inv(J)
@@ -176,11 +221,28 @@ end
 end
 
 # Identity mapping
-@inline function apply_mapping!(::FunctionValues{0}, ::IdentityMapping, ::Int, mapping_values, args...)
+# The physical values Nx normally alias the reference values Nξ, but when a dof
+# transformation is present they are separate arrays and the values must be copied over
+# before the transformation is applied. Dispatch on the dof transformation (a compile-time
+# constant of the interpolation type) keeps this a static no-op in the aliased case.
+@inline function copy_identity_mapped_values!(funvals::FunctionValues, q_point::Int)
+    return copy_identity_mapped_values!(funvals, dof_transformation(funvals.ip), q_point)
+end
+@inline copy_identity_mapped_values!(::FunctionValues, ::NoDofTransformation, ::Int) = nothing
+@inline function copy_identity_mapped_values!(funvals::FunctionValues, ::Any, q_point::Int)
+    @inbounds for j in 1:getnbasefunctions(funvals)
+        funvals.Nx[j, q_point] = funvals.Nξ[j, q_point]
+    end
+    return nothing
+end
+
+@inline function apply_mapping!(funvals::FunctionValues{0}, ::IdentityMapping, q_point::Int, mapping_values, args...)
+    copy_identity_mapped_values!(funvals, q_point)
     return nothing
 end
 
 @inline function apply_mapping!(funvals::FunctionValues{1}, ::IdentityMapping, q_point::Int, mapping_values, args...)
+    copy_identity_mapped_values!(funvals, q_point)
     Jinv = calculate_Jinv(getjacobian(mapping_values))
     @inbounds for j in 1:getnbasefunctions(funvals)
         funvals.dNdx[j, q_point] = funvals.dNdξ[j, q_point] ⋅ Jinv
@@ -189,6 +251,7 @@ end
 end
 
 @inline function apply_mapping!(funvals::FunctionValues{2}, ::IdentityMapping, q_point::Int, mapping_values, args...)
+    copy_identity_mapped_values!(funvals, q_point)
     Jinv = calculate_Jinv(getjacobian(mapping_values))
 
     sdim, rdim = size(Jinv)
@@ -262,6 +325,51 @@ end
         Nξ = funvals.Nξ[j, q_point]
         funvals.Nx[j, q_point] = d * (J ⋅ Nξ) / detJ
         funvals.dNdx[j, q_point] = d * (J ⋅ dNdξ ⋅ Jinv / detJ + A1 ⋅ Nξ - (J ⋅ Nξ) ⊗ A2)
+    end
+    return nothing
+end
+
+# ========================
+# Apply dof transformation
+# ========================
+# Applied in `reinit!` after `apply_mapping!`, recombining the mapped basis functions with
+# the cell-constant matrix M (see the note on dof transformation types above). Since M is
+# constant on the cell it applies uniformly to values, gradients, and hessians.
+@inline function apply_dof_transformation!(funvals::FunctionValues, q_point::Int, args...)
+    return apply_dof_transformation!(funvals, dof_transformation(funvals.ip), q_point, args...)
+end
+
+@inline function apply_dof_transformation!(::FunctionValues, ::NoDofTransformation, ::Int, mapping_values, args...)
+    return nothing
+end
+
+# Diagonal M: each basis function is scaled independently, no mixing.
+@inline function apply_dof_transformation!(funvals::FunctionValues{0}, ::DiagonalDofTransformation, q_point::Int, mapping_values, args...)
+    J = getjacobian(mapping_values)
+    @inbounds for j in 1:getnbasefunctions(funvals)
+        s = get_dof_scaling(funvals.ip, j, J)
+        funvals.Nx[j, q_point] = s * funvals.Nx[j, q_point]
+    end
+    return nothing
+end
+
+@inline function apply_dof_transformation!(funvals::FunctionValues{1}, ::DiagonalDofTransformation, q_point::Int, mapping_values, args...)
+    J = getjacobian(mapping_values)
+    @inbounds for j in 1:getnbasefunctions(funvals)
+        s = get_dof_scaling(funvals.ip, j, J)
+        funvals.Nx[j, q_point] = s * funvals.Nx[j, q_point]
+        funvals.dNdx[j, q_point] = s * funvals.dNdx[j, q_point]
+    end
+    return nothing
+end
+
+@inline function apply_dof_transformation!(funvals::FunctionValues{2}, ::DiagonalDofTransformation, q_point::Int, mapping_values, args...)
+    J = getjacobian(mapping_values)
+    @inbounds for j in 1:getnbasefunctions(funvals)
+        s = get_dof_scaling(funvals.ip, j, J)
+        funvals.Nx[j, q_point] = s * funvals.Nx[j, q_point]
+        funvals.dNdx[j, q_point] = s * funvals.dNdx[j, q_point]
+        funvals.d2Ndx2[j, q_point] = s * funvals.d2Ndx2[j, q_point]
     end
     return nothing
 end

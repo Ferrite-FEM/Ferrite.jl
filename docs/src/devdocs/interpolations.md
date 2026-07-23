@@ -39,6 +39,29 @@ Ferrite.mapping_type
 Ferrite.get_direction
 ```
 
+#### Dof transformations
+For interpolations whose physical basis functions are a cell-dependent recombination of the
+mapped reference basis functions (e.g. `Hermite`, where the basis functions of derivative
+dofs are scaled by the cell Jacobian), the dof transformation must be specified.
+```@docs
+Ferrite.dof_transformation
+Ferrite.get_dof_scaling
+Ferrite.physical_basis_is_reference_basis
+```
+
+Currently only diagonal transformations (a per-basis-function scaling, sufficient for
+`Hermite` on the supported geometries) are implemented. The design extends to elements
+that need a non-diagonal ``M`` by adding a new transformation type returned from
+`dof_transformation` and a corresponding `apply_dof_transformation!` method: since the
+transformation stage runs after the mapping for each quadrature point, a method is free to
+recombine (not just scale) the mapped basis function values/gradients/hessians. For
+example, the tensor product Hermite elements (e.g. Bogner-Fox-Schmit on quadrilaterals)
+remain diagonal but only on axis-aligned cells, the cubic Hermite triangle needs 2×2
+blocks ``Jᵀ`` mixing the two gradient dofs of each vertex (valid on all affine
+triangles), and Argyris/Morley type elements need a full ``M`` that additionally uses the
+edge orientations (available through the `cell` argument, with
+`dof_transformation_needs_cell` returning `true`).
+
 #### Interpolations that cannot be constructed from their type
 For interpolations, `ip`, for which `ip == typeof(ip)()` is false (or doesn't work), the following must be implemented manually
 ```@docs

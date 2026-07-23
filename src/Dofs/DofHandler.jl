@@ -1022,9 +1022,9 @@ function _evaluate_at_grid_nodes!(
         u::AbstractVector{T}, cv::CellValues, drange::UnitRange
     ) where {T}
     ue = zeros(T, length(drange))
-    # For identity mappings the physical shape values alias the reference values, but other
-    # mappings require reinit! to compute them
-    needs_reinit = !isa(mapping_type(function_interpolation(cv)), IdentityMapping)
+    # When the physical shape values equal the reference values they are precomputed and
+    # alias each other, otherwise reinit! is required to compute them
+    needs_reinit = !physical_basis_is_reference_basis(function_interpolation(cv))
     for cell in CellIterator(sdh)
         needs_reinit && reinit!(cv, cell)
         @assert getnquadpoints(cv) == length(cell.nodes)

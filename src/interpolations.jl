@@ -24,6 +24,7 @@ The following interpolations are implemented:
 * `CrouzeixRaviart{RefTetrahedron, 1}`
 * `RannacherTurek{RefQuadrilateral, 1}`
 * `RannacherTurek{RefHexahedron, 1}`
+* `Hermite{RefLine, 3}`
 * `Lagrange{RefHexahedron, 1}`
 * `Lagrange{RefHexahedron, 2}`
 * `Lagrange{RefTetrahedron, 1}`
@@ -292,7 +293,8 @@ end
 
 Returns a vector of coordinates with length [`getnbasefunctions(::Interpolation)`](@ref)
 and indices corresponding to the indices of a dof in [`vertices`](@ref), [`faces`](@ref) and
-[`edges`](@ref). Only applicable to nodal interpolations.
+[`edges`](@ref). Mainly applicable to nodal interpolations; for interpolations with
+multiple dofs per entity (e.g. [`Hermite`](@ref)) the same coordinate is repeated.
 """
 reference_coordinates(::Interpolation)
 
@@ -318,8 +320,9 @@ match the vertex enumeration of the corresponding geometrical cell.
 Used internally in [`ConstraintHandler`](@ref) and defaults to [`vertexdof_indices(ip::Interpolation)`](@ref) for continuous interpolation.
 
 !!! note
-    The dofs appearing in the tuple must be continuous and increasing! The first dof must be
-    the 1, as vertex dofs are enumerated first.
+    The dofs appearing in the tuple must be a subset of the interpolation's dofs for the
+    corresponding vertex, but may leave out dofs that should not be constrained by
+    `Dirichlet` (e.g. derivative dofs, see [`Hermite`](@ref)).
 """
 dirichlet_vertexdof_indices(ip::Interpolation) = vertexdof_indices(ip)
 
@@ -1570,12 +1573,76 @@ function reference_shape_value(ip::RannacherTurek{RefHexahedron, 1}, ξ::Vec{3, 
     throw(ArgumentError("no shape function $i for interpolation $ip"))
 end
 
+##########################################
+# Cubic Hermite on the line (C1 element) #
+##########################################
+"""
+    Hermite{RefLine, 3} <: ScalarInterpolation
+
+Cubic Hermite interpolation with two dofs per vertex: the function value and its
+derivative. Since both are shared between neighboring cells the interpolation is
+C¹-continuous, as required for fourth-order problems such as the Euler-Bernoulli beam.
+
+The local dof order is `(u₁, u₁', u₂, u₂')` where the derivative dofs are *physical*
+derivatives `du/dx` (the corresponding basis functions are scaled by the geometric
+Jacobian). Only affine 1D geometries are supported, i.e. `Line` cells with the default
+`Lagrange{RefLine, 1}` geometric interpolation; embedded or curved elements are not.
+
+[`Dirichlet`](@ref) conditions on facet- or vertex-sets constrain only the value dofs.
+To also clamp the derivative at a boundary vertex, prescribe the corresponding global dof
+directly with a master-less [`AffineConstraint`](@ref), e.g. for vertex 1 of cell 1:
+```julia
+add!(ch, AffineConstraint(celldofs(dh, 1)[2], Pair{Int, Float64}[], 0.0))
+```
+`Dirichlet` conditions on node-sets and `PeriodicDirichlet` are not supported.
+"""
+struct Hermite{shape, order} <: ScalarInterpolation{shape, order} end
+
+conformity(::Hermite) = H1Conformity() # C¹ ⊂ C⁰; finer classification is not needed
+mapping_type(::Hermite) = IdentityMapping()
+dof_transformation(::Hermite) = DiagonalDofTransformation()
+adjust_dofs_during_distribution(::Hermite) = false
+
+getnbasefunctions(::Hermite{RefLine, 3}) = 4
+vertexdof_indices(::Hermite{RefLine, 3}) = ((1, 2), (3, 4))
+# Only the value dofs (not the derivative dofs) are constrained by Dirichlet conditions
+dirichlet_vertexdof_indices(::Hermite{RefLine, 3}) = ((1,), (3,))
+
+function reference_coordinates(::Hermite{RefLine, 3})
+    return [
+        Vec{1, Float64}((-1.0,)),
+        Vec{1, Float64}((-1.0,)),
+        Vec{1, Float64}((1.0,)),
+        Vec{1, Float64}((1.0,)),
+    ]
+end
+
+function reference_shape_value(ip::Hermite{RefLine, 3}, ξ::Vec{1, T}, i::Int) where {T}
+    x = ξ[1]
+    i == 1 && return (1 - x)^2 * (2 + x) / 4
+    i == 2 && return (1 - x)^2 * (1 + x) / 4
+    i == 3 && return (1 + x)^2 * (2 - x) / 4
+    i == 4 && return -(1 + x)^2 * (1 - x) / 4
+    throw(ArgumentError("no shape function $i for interpolation $ip"))
+end
+
+# Basis functions for derivative dofs are scaled by the Jacobian such that the dof value is
+# the physical derivative du/dx (consistent between cells of different length). The sign of
+# J accounts for reversed cell orientation.
+@inline function get_dof_scaling(::Hermite{RefLine, 3}, shape_nr::Int, J::Tensor{2, 1})
+    return (shape_nr == 2 || shape_nr == 4) ? J[1, 1] : one(J[1, 1])
+end
+
 ##################################################
 # VectorizedInterpolation{<:ScalarInterpolation} #
 ##################################################
 struct VectorizedInterpolation{vdim, refshape, order, SI <: ScalarInterpolation{refshape, order}} <: VectorInterpolation{vdim, refshape, order}
     ip::SI
     function VectorizedInterpolation{vdim}(ip::SI) where {vdim, refshape, order, SI <: ScalarInterpolation{refshape, order}}
+        # The vectorized interpolation uses the identity mapping without dof transformation,
+        # so interpolations with a non-trivial mapping or a dof transformation (e.g.
+        # Hermite) cannot be vectorized.
+        physical_basis_is_reference_basis(ip) || throw(ArgumentError("$(ip) cannot be vectorized since it has a non-identity mapping or a dof transformation"))
         return new{vdim, refshape, order, SI}(ip)
     end
 end
@@ -1644,6 +1711,54 @@ function mapping_type end
 
 mapping_type(::ScalarInterpolation) = IdentityMapping()
 mapping_type(::VectorizedInterpolation) = IdentityMapping()
+
+"""
+    dof_transformation(ip::Interpolation)
+
+Get the dof transformation applied to the mapped basis functions of `ip`. In the
+factorization ``ψᵢ = ∑ⱼ Mᵢⱼ (F φ̂ⱼ)`` of the physical basis functions ``ψᵢ``, the mapping
+``F`` (see [`Ferrite.mapping_type`](@ref)) is determined by the function space, while the
+cell-constant matrix ``M`` is determined by the element's dof functionals and restores
+duality between the basis functions and the physical dofs shared between cells.
+
+Defaults to `NoDofTransformation()` (``M = I``). Interpolations whose ``M`` is diagonal
+(e.g. [`Hermite`](@ref)) return `DiagonalDofTransformation()` and implement
+[`Ferrite.get_dof_scaling`](@ref).
+
+!!! note
+    The separation is not yet complete: the orientation signs of the Piola-mapped
+    elements ([`Ferrite.get_direction`](@ref)), conceptually the signed-permutation part
+    of ``M``, are currently still applied as part of the mapping.
+"""
+dof_transformation(::Interpolation) = NoDofTransformation()
+
+"""
+    get_dof_scaling(ip::Interpolation, shape_nr::Int, J::Tensor{2})
+
+For interpolations with a `DiagonalDofTransformation` (see
+[`Ferrite.dof_transformation`](@ref)), return the diagonal entry ``M_{jj}``,
+`j = shape_nr`, of the dof transformation matrix given the cell Jacobian `J`, i.e. the
+scaling applied to the mapped basis function `shape_nr`.
+"""
+function get_dof_scaling end
+
+"""
+    physical_basis_is_reference_basis(ip::Interpolation)
+
+Return `true` if the physical basis functions of `ip` coincide with the reference basis
+functions on any cell, i.e. if `ip` has the identity mapping (see
+[`Ferrite.mapping_type`](@ref)) and no dof transformation (see
+[`Ferrite.dof_transformation`](@ref)). `reinit!` does not affect the shape values of such
+interpolations, and the physical dof functionals coincide with the reference dof
+functionals. For all such interpolations currently implemented in Ferrite the dofs are
+point evaluations at the reference coordinates ("nodal" values), which e.g.
+[`apply_analytical!`](@ref) and `Dirichlet` conditions on nodesets rely on; an
+interpolation with non-point-evaluation dofs and untransformed basis functions (e.g. a
+modal basis with moment dofs) would need a finer distinction at those call sites.
+"""
+function physical_basis_is_reference_basis(ip::Interpolation)
+    return mapping_type(ip) isa IdentityMapping && dof_transformation(ip) isa NoDofTransformation
+end
 
 """
     get_direction(interpolation::Interpolation, shape_nr::Int, cell::AbstractCell)

@@ -38,10 +38,11 @@ function apply_analytical!(
     for sdh in dh.subdofhandlers
         isnothing(_find_field(sdh, fieldname)) && continue
         ip_fun = getfieldinterpolation(sdh, find_field(sdh, fieldname))
-        if !(mapping_type(ip_fun) isa IdentityMapping)
+        if !physical_basis_is_reference_basis(ip_fun)
             error(
                 "apply_analytical! is only supported for interpolations where the dof values " *
-                    "are function values at the nodes (identity mapping), got $(ip_fun)."
+                    "are function values at the nodes (identity mapping and no dof " *
+                    "transformation), got $(ip_fun)."
             )
         end
     end

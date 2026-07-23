@@ -14,6 +14,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
    `RefPyramid`, and extends tetrahedral quadrature beyond the previous maximum order 5 of
    the Keast rules. ([#1389])
  - `function_hessian` is now exported (`shape_hessian` already was). ([#1405])
+ - New interpolation `Hermite{RefLine, 3}`: a C1-continuous cubic Hermite interpolation
+   with value and derivative dofs, usable for fourth-order problems such as
+   Euler-Bernoulli beams. ([#1391])
 
 ### Documentation
  - The figures for the documentation are now programmatically generated and made to have a consistent look.
