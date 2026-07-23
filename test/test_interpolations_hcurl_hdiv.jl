@@ -409,6 +409,31 @@ using Ferrite: reference_shape_value
         end
     end
 
+    @testset "solve_small_spd!" begin
+        # The 1x1/2x2 fast paths must be scale-safe: forming products of the
+        # matrix entries (e.g. Cramer's rule) would overflow for these scales.
+        for T in (Float32, Float64)
+            overflow_scale = T == Float32 ? T(1.0e20) : 1.0e160
+            for scale in (T(1) / overflow_scale, T(1), overflow_scale)
+                K2 = T[2 1 / 2; 1 / 2 1] .* scale
+                x_exact = T[1, -2]
+                b = K2 * x_exact
+                x = zeros(T, 2)
+                Ferrite.solve_small_spd!(x, copy(K2), b)
+                @test x ≈ x_exact rtol = sqrt(eps(T))
+                K1 = fill(scale, 1, 1)
+                Ferrite.solve_small_spd!(view(x, 1:1), K1, T[3scale])
+                @test x[1] ≈ 3 rtol = sqrt(eps(T))
+            end
+        end
+        # Generic (Cholesky) path against `\`
+        M = [2.0 0.5 0.1; 0.5 1.0 0.2; 0.1 0.2 3.0]
+        b3 = [1.0, -2.0, 0.5]
+        x3 = zeros(3)
+        Ferrite.solve_small_spd!(x3, copy(M), copy(b3))
+        @test x3 ≈ M \ b3
+    end
+
     @testset "ProjectedDirichlet in mixed DofHandler" begin
         # Regression test: the constrained field is not the first field in the
         # DofHandler, so its facet dofs are offset in the cell dof vector.
