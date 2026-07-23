@@ -49,3 +49,15 @@ avoid numerical instabilities, a regularization scheme requiring the calculation
 Laplacian is imposed, which is done by using the grid topology functionalities.
 
 *Contributed by*: Mischa Blaszczyk ([@blaszm](https://github.com/blaszm)).
+
+---
+
+#### [Adaptive linear elasticity](elasticity_adaptivity.md)
+
+Linear elasticity on an L-shaped domain with adaptive mesh refinement: a Kelly-type
+facet-jump error estimator with Dörfler marking drives `p4est`-style refinement of a
+non-conforming quadrilateral mesh, with hanging-node constraints keeping the
+approximation conforming. The mesh is read from an Abaqus input file using
+[FerriteMeshParser](https://github.com/Ferrite-FEM/FerriteMeshParser.jl).
+
+*Contributed by*: Maximilian Köhler ([@koehlerson](https://github.com/koehlerson)).

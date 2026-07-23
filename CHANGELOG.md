@@ -7,9 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Next] - xxxx-xx-xx
 
+### Added
+- Adaptive mesh refinement (AMR) for quadrilateral and hexahedral (linear) grids via a `p4est`-style
+  forest of octrees (`ForestBWG`). A grid can be refined (`refine!`), coarsened (`coarsen!`) and
+  2:1-balanced (`balanceforest!`), then materialized into a `NonConformingGrid` with `creategrid`.
+  Hanging nodes are made conforming by adding a `ConformityConstraint` to the `ConstraintHandler`. (#780)
+
 ### Documentation
  - The figures for the documentation are now programmatically generated and made to have a consistent look.
  - New tutorial: Elastodynamics and modal analysis of a cantilever beam (mass matrix, generalized eigenvalue problem, Rayleigh damping, Newmark time integration).
+ - Add adaptive mesh refinement tutorials (heat equation and linear elasticity) and a developer
+   documentation page describing the `p4est` implementation. (#780)
 
 ### Fixes
  - `FacetIterator` now works with `AbstractVector{FacetIndex}` and `AbstractSet{FacetIndex}` inputs as documented, instead of requiring an `OrderedSet` ([#1384])
