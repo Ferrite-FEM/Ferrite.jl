@@ -24,6 +24,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
    clamped beam ends. ([#1391])
 
 ### Documentation
+ - New tutorial: "Euler-Bernoulli beam", solving a fourth-order problem with the new
+   `Hermite{RefLine, 3}` interpolation, including point loads and point moments. ([#1392])
  - The figures for the documentation are now programmatically generated and made to have a consistent look.
  - New tutorial: Elastodynamics and modal analysis of a cantilever beam (mass matrix, generalized eigenvalue problem, Rayleigh damping, Newmark time integration).
 

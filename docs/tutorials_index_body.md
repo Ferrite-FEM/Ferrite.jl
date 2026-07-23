@@ -20,7 +20,7 @@ The tutorials are listed in roughly increasing order of complexity. However, sin
 focus on different aspects, and solve different problems, it is suggested to have a look at
 the brief descriptions below to get an idea about what you will learn from each tutorial.
 
-If you are new to Ferrite then Tutorials 1 - 7 are the best place to start. These
+If you are new to Ferrite then Tutorials 1 - 8 are the best place to start. These
 tutorials introduce and teach most of the basic finite element techniques (e.g. linear
 and non-linear problems, scalar- and vector-valued problems, Dirichlet and Neumann boundary
 conditions, mixed finite elements, time integration, direct and iterative linear solvers,
@@ -63,7 +63,20 @@ frequencies, modal analysis, Rayleigh damping, Newmark time integration.
 
 ---
 
-#### [Tutorial 4: Incompressible elasticity](incompressible_elasticity.md)
+#### [Tutorial 4: Euler-Bernoulli beam](euler_bernoulli_beam.md)
+
+This tutorial solves a fourth-order problem, the Euler-Bernoulli beam equation, using a
+C1-continuous cubic Hermite interpolation with both deflection and slope degrees of
+freedom. It introduces second derivatives of shape functions (hessians) in the assembly,
+and shows how point loads and point moments are applied directly to individual degrees of
+freedom.
+
+**Keywords**: C1-continuous interpolation, Hermite shape functions, second derivatives,
+point loads and point moments.
+
+---
+
+#### [Tutorial 5: Incompressible elasticity](incompressible_elasticity.md)
 
 This tutorial focuses on a mixed formulation of linear elasticity, with (vector)
 displacement and (scalar) pressure as the two unknowns, suitable for incompressibility.
@@ -75,7 +88,7 @@ incompressible limit.
 
 ---
 
-#### [Tutorial 5: Hyperelasticity](hyperelasticity.md)
+#### [Tutorial 6: Hyperelasticity](hyperelasticity.md)
 
 In this tutorial you will learn how to solve a non-linear finite element problem. In
 particular, a hyperelastic material model, in a finite strain setting, is used to solve the
@@ -88,7 +101,7 @@ Newton's method, conjugate gradient (CG).
 
 ---
 
-#### [Tutorial 6: von Mises Plasticity](plasticity.md)
+#### [Tutorial 7: von Mises Plasticity](plasticity.md)
 
 This tutorial revisits the cantilever beam problem from [Tutorial 2: Linear
 elasticity](linear_elasticity.md), but instead of linear elasticity a plasticity model is
@@ -102,7 +115,7 @@ Newton’s method.
 
 ---
 
-#### [Tutorial 7: Transient heat equation](@ref tutorial-transient-heat-equation)
+#### [Tutorial 8: Transient heat equation](@ref tutorial-transient-heat-equation)
 
 In this tutorial the transient heat equation is solved on the unit square. The problem to be
 solved is thus similar to the one solved in the first tutorial, [Heat
@@ -114,7 +127,7 @@ integration.
 
 ---
 
-#### [Tutorial 8: Computational homogenization](computational_homogenization.md)
+#### [Tutorial 9: Computational homogenization](computational_homogenization.md)
 
 This tutorial guides you through computational homogenization of a representative volume
 element (RVE) consisting of a soft matrix material with stiff inclusions. The computational
@@ -125,7 +138,7 @@ conditions are used.
 
 ---
 
-#### [Tutorial 9: Stokes flow](stokes-flow.md)
+#### [Tutorial 10: Stokes flow](stokes-flow.md)
 
 In this tutorial Stokes flow with (vector) velocity and (scalar) pressure is solved on a
 quarter circle. Rotationally periodic boundary conditions is used for the inlet/outlet
@@ -137,7 +150,7 @@ Gmsh.
 
 ---
 
-#### [Tutorial 10: Porous media (SubDofHandler)](porous_media.md)
+#### [Tutorial 11: Porous media (SubDofHandler)](porous_media.md)
 
 This tutorial introduces how to solve a complex linear problem, where there are different
 fields on different subdomains, and different cell types in the grid. This requires using
@@ -147,7 +160,7 @@ the `SubDofHandler` interface.
 
 ---
 
-#### [Tutorial 11: Incompressible Navier-Stokes equations](ns_vs_diffeq.md)
+#### [Tutorial 12: Incompressible Navier-Stokes equations](ns_vs_diffeq.md)
 
 In this tutorial the incompressible Navier-Stokes equations are solved. The domain is
 discretized in space with Ferrite as usual, and then formulated in a way to be compatible
@@ -158,7 +171,7 @@ for the time-integration.
 
 ---
 
-#### [Tutorial 12: Reactive surface](@ref tutorial-reactive-surface)
+#### [Tutorial 13: Reactive surface](@ref tutorial-reactive-surface)
 
 In this tutorial a reaction diffusion system on a sphere surface embedded in 3D is solved.
 Ferrite is used to assemble the diffusion operators and the mass matrices. The problem is
@@ -168,7 +181,7 @@ solved by using the usual first order reaction diffusion operator splitting.
 
 ---
 
-#### [Tutorial 13: Linear shell](@ref tutorial-linear-shell)
+#### [Tutorial 14: Linear shell](@ref tutorial-linear-shell)
 
 In this tutorial a linear shell element formulation is set up as a two-dimensional domain
 embedded in three-dimensional space. This will teach, and perhaps inspire, you on how
@@ -179,7 +192,7 @@ Ferrite.
 
 ---
 
-#### [Tutorial 14: Discontinuous Galerkin heat equation](@ref tutorial-dg-heat-equation)
+#### [Tutorial 15: Discontinuous Galerkin heat equation](@ref tutorial-dg-heat-equation)
 
 This tutorial guides you through the process of solving the linear stationary heat equation
 (i.e. Poisson's equation) on a unit square with inhomogeneous Dirichlet and Neumann boundary
