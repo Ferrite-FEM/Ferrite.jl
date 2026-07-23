@@ -22,8 +22,8 @@ Neumann boundary conditions and the method of manufactured solutions.
 
 #### [Nearly incompressible hyperelasticity](quasi_incompressible_hyperelasticity.md)
 
-This program combines the ideas from [Tutorial 3: Incompressible
-elasticity](../tutorials/incompressible_elasticity.md) and [Tutorial 4:
+This program combines the ideas from [Tutorial 4: Incompressible
+elasticity](../tutorials/incompressible_elasticity.md) and [Tutorial 5:
 Hyperelasticity](../tutorials/hyperelasticity.md) to construct a mixed element
 solving three-dimensional displacement-pressure equations.
 
