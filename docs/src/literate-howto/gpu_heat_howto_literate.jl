@@ -27,7 +27,7 @@ using SparseArrays
 
 # and define some constants to be used in the following for convenience.
 function compute_threads_and_blocks(n)
-    # Note that for a real problem we want to increase these numbers suitably.
+    ## Note that for a real problem we want to increase these numbers suitably.
     MAX_NUM_THREADS = 8
     NUM_TASKS_PER_THREAD = 2
     ## Let's assign, arbitrarily, two element assembly tasks per GPU thread.
