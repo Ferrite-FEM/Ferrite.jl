@@ -2,7 +2,7 @@
 import Literate
 
 # Skip execution of the following files
-DONT_EXECUTE = Set(("gpu_heat_howto_literate.jl"))
+DONT_EXECUTE = Set(["gpu_heat_howto_literate.jl"])
 
 # Tutorials
 TUTORIALS_IN = joinpath(@__DIR__, "src", "literate-tutorials")
