@@ -43,7 +43,7 @@ end
 # We do not need a soa container for the CPU variant.
 function Ferrite.distribute_to_tasks(backend::KA.CPU, a::Ferrite.AbstractAssembler, num_tasks)
     return [
-        a; [start_assemble(a.K, a.f; fillzero = false) for _ in 2:num_tasks] 
+        a; [start_assemble(a.K, a.f; fillzero = false) for _ in 2:num_tasks]
     ]
 end
 
