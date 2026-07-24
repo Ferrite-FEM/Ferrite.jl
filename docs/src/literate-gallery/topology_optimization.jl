@@ -110,9 +110,9 @@ function create_dofhandler(grid)
     return dh
 end
 
-function create_bc(dh)
+function create_bc(dh, grid)
     dbc = ConstraintHandler(dh)
-    add!(dbc, Dirichlet(:u, getnodeset(dh.grid, "clamped"), (x, t) -> zero(Vec{2}), [1, 2]))
+    add!(dbc, Dirichlet(:u, getnodeset(grid, "clamped"), (x, t) -> zero(Vec{2}), [1, 2]))
     close!(dbc)
     t = 0.0
     update!(dbc, t)
@@ -191,28 +191,28 @@ end
 #md nothing # hide
 
 # For the Laplacian we need some neighborhood information which is constant throughout the analysis so we compute it once and cache it.
-# We iterate through each facet of each element,
-# obtaining the neighboring element by using the `getneighborhood` function. For boundary facets,
-# the function call will return an empty object. In that case we use the dictionary to instead find the opposite
-# facet, as discussed in the introduction.
+# The facet-facet neighborhood of the grid is obtained with `get_facet_facet_neighborhood`, which returns, for
+# each cell and local facet, the neighboring facets across that facet. We iterate through each facet of each element
+# and store the id of the neighboring cell. For boundary facets the neighborhood is empty, and we instead use the
+# neighbor across the opposite facet, as discussed in the introduction.
 
-function cache_neighborhood(dh, topology)
-    nbgs = Vector{Vector{Int}}(undef, getncells(dh.grid))
-    _nfacets = nfacets(dh.grid.cells[1])
-    opp = Dict(1 => 3, 2 => 4, 3 => 1, 4 => 2)
+function cache_neighborhood(grid, topology)
+    opp = (3, 4, 1, 2) # opposite facet of facets 1, 2, 3, 4
+    neighborhood = Ferrite.get_facet_facet_neighborhood(topology, grid)
+    nbgs = Vector{Vector{Int}}(undef, getncells(grid))
 
-    for element in CellIterator(dh)
-        nbg = zeros(Int, _nfacets)
+    for element in CellIterator(grid)
         i = cellid(element)
+        _nfacets = nfacets(element)
+        nbg = zeros(Int, _nfacets)
         for j in 1:_nfacets
-            nbg_cellid = getneighborhood(topology, dh.grid, FacetIndex(i, j))
-            if !isempty(nbg_cellid)
-                nbg[j] = first(nbg_cellid)[1] # assuming only one facet neighbor per cell
+            neighbor_facets = neighborhood[i, j]
+            if !isempty(neighbor_facets)
+                nbg[j] = neighbor_facets[1][1] # assuming only one facet neighbor per cell
             else # boundary facet
-                nbg[j] = first(getneighborhood(topology, dh.grid, FacetIndex(i, opp[j])))[1]
+                nbg[j] = neighborhood[i, opp[j]][1][1]
             end
         end
-
         nbgs[i] = nbg
     end
 
@@ -415,7 +415,7 @@ function topopt(ra, ρ, n, filename; output = false)
     grid = create_grid(n)
     dh = create_dofhandler(grid)
     Δh = 1 / n # element edge length
-    dbc = create_bc(dh)
+    dbc = create_bc(dh, grid)
 
     ## cellvalues
     cellvalues, facetvalues = create_values()
@@ -429,9 +429,9 @@ function topopt(ra, ρ, n, filename; output = false)
     ΔΔu = zeros(n_dofs) # new displacement correction
 
     ## create material states
-    states = [MaterialState(ρ, getnquadpoints(cellvalues)) for _ in 1:getncells(dh.grid)]
+    states = [MaterialState(ρ, getnquadpoints(cellvalues)) for _ in 1:getncells(grid)]
 
-    χ = zeros(getncells(dh.grid))
+    χ = zeros(getncells(grid))
 
     r = zeros(n_dofs) # residual
     K = allocate_matrix(dh) # stiffness matrix
@@ -444,7 +444,7 @@ function topopt(ra, ρ, n, filename; output = false)
     conv = false
 
     topology = ExclusiveTopology(grid)
-    neighborhoods = cache_neighborhood(dh, topology)
+    neighborhoods = cache_neighborhood(grid, topology)
 
     ## Newton-Raphson loop
     NEWTON_TOL = 1.0e-8
