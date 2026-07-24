@@ -26,7 +26,8 @@ using ForwardDiff:
 
 include("CollectionsOfViews.jl")
 using .CollectionsOfViews:
-    CollectionsOfViews, ArrayOfVectorViews, push_at_index!, ConstructionBuffer
+    CollectionsOfViews, AdaptiveRange, ArrayOfVectorViews, push_at_index!,
+    insert_sorted_at_index!, ConstructionBuffer
 
 include("exports.jl")
 
@@ -120,7 +121,6 @@ const AbstractVecOrSet{T} = Union{AbstractSet{T}, AbstractVector{T}}
 const IntegerCollection = AbstractVecOrSet{<:Integer}
 
 include("utils.jl")
-include("PoolAllocator.jl")
 
 # Matrix/Vector utilities
 include("arrayutils.jl")

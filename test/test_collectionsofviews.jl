@@ -44,3 +44,24 @@
         end
     end
 end
+
+@testset "insert_sorted_at_index!" begin
+    using Ferrite.CollectionsOfViews: ConstructionBuffer, insert_sorted_at_index!
+    # Insert random values (with duplicates) at random indices; every view must equal the
+    # sorted-unique values inserted at that index, for good and bad sizehints.
+    vals = rand(0:99, 500)
+    idxs = rand(1:10, 500)
+    for sizehint in (1, 4, 64)
+        b = ConstructionBuffer(Int[], (10,), sizehint)
+        for (idx, v) in zip(idxs, vals)
+            insert_sorted_at_index!(b, v, idx)
+        end
+        aov = Ferrite.ArrayOfVectorViews(b)
+        for i in 1:10
+            expected = sort!(unique!(vals[idxs .== i]))
+            @test aov[i] == expected
+        end
+    end
+    # Only defined for one-dimensional buffers
+    @test_throws MethodError insert_sorted_at_index!(ConstructionBuffer(Int[], (3, 3), 2), 1, 2, 3)
+end

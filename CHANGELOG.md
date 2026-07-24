@@ -39,6 +39,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
    resulting coloring is independent of the number of threads, and unchanged for cellsets
    that iterate in ascending order. For unordered cellsets (e.g. `Set`) the coloring is
    now deterministic and may differ from previous releases. ([#1475])
+ - Creating a sparsity pattern, and allocating a matrix from it, is now significantly faster:
+   typically 3-8x for builds without interface entries (the more so when `coupling` and/or
+   `keep_constrained = false` are used) and 10-25x for builds with `interface_coupling`
+   (e.g. DG), at roughly half the peak memory use. This applies to all entry points
+   (`allocate_matrix`, `add_sparsity_entries!`, ...) and the resulting patterns and
+   matrices are unchanged. ([#1397])
+
+### Internal changes
+ - `SparsityPattern` has been rewritten: all rows are now stored in a single contiguous
+   buffer and filled by an exact-counting fast path with lazily sorted rows. The internal
+   `FastSparsityPattern` (from [#1302]) and the internal `Ferrite.PoolAllocator` module have
+   been removed. ([#1397])
+ - The documented contract of `Ferrite.eachrow(sp[, row])` for `AbstractSparsityPattern` now
+   states that column indices are iterated in sorted order. ([#1397])
 
 ## [v1.6.0] - 2026-08-02
 
@@ -1384,6 +1398,7 @@ poking into Ferrite internals:
 [#1423]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1423
 [#1426]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1426
 [#1428]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1428
+[#1397]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1397
 [#1432]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1432
 [#1434]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1434
 [#1468]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1468

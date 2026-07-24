@@ -1,7 +1,7 @@
 module FerriteSparseMatrixCSR
 
 using Ferrite, SparseArrays, SparseMatricesCSR
-import Ferrite: AbstractSparsityPattern, CSRAssembler, FastSparsityPattern, getnrows, getncols
+import Ferrite: AbstractSparsityPattern, CSRAssembler, getnrows, getncols
 import Base: @propagate_inbounds
 
 # Could be generalized if https://github.com/JuliaSparse/SparseArrays.jl/pull/546 is merged
@@ -121,69 +121,43 @@ function Ferrite.allocate_matrix(::Type{SparseMatrixCSR{1, Tv, Ti}}, sp::Abstrac
     return _allocate_matrix(SparseMatrixCSR{1, Tv, Ti}, sp, false)
 end
 
+# Copy one pattern row into `dest` starting at `k` (only used by _allocate_matrix below):
+# bulk copy for `AbstractVector` rows (e.g. `SparsityPattern`), iteration fallback for other
+# iterables (e.g. `BlockSparsityPattern`'s lazy rows).
+function _copyto!(dest::Vector, k::Int, colidxs::AbstractVector)
+    copyto!(dest, k, colidxs, 1, length(colidxs))
+    return k + length(colidxs)
+end
+function _copyto!(dest::Vector, k::Int, colidxs)
+    for col in colidxs
+        dest[k] = col
+        k += 1
+    end
+    return k
+end
+
+# The pattern rows are exactly CSR's rows: `eachrow` hands out the sorted column indices
+# (for `SparsityPattern` this sorts the rows lazily, a no-op if already sorted), so `rowptr`
+# follows from the row lengths and each row is copied straight into `colval`.
 function _allocate_matrix(::Type{SparseMatrixCSR{1, Tv, Ti}}, sp::AbstractSparsityPattern, sym::Bool) where {Tv, Ti}
+    sym && throw(ArgumentError("Symmetric SparseMatrixCSR is not supported"))
+    nrows = Ferrite.getnrows(sp)
     # 1. Setup rowptr
-    rowptr = zeros(Ti, Ferrite.getnrows(sp) + 1)
+    rowptr = Vector{Ti}(undef, nrows + 1)
     rowptr[1] = 1
     for (row, colidxs) in enumerate(Ferrite.eachrow(sp))
-        for col in colidxs
-            sym && row > col && continue
-            rowptr[row + 1] += 1
-        end
+        rowptr[row + 1] = rowptr[row] + length(colidxs)
     end
-    cumsum!(rowptr, rowptr)
     nnz = rowptr[end] - 1
     # 2. Allocate colval and nzval now that nnz is known
     colval = Vector{Ti}(undef, nnz)
     nzval = zeros(Tv, nnz)
-    # 3. Populate colval.
+    # 3. Populate colval row by row
     k = 1
-    for (row, colidxs) in zip(1:Ferrite.getnrows(sp), Ferrite.eachrow(sp)) # pairs(eachrow(sp))
-        for col in colidxs
-            sym && row > col && continue
-            colval[k] = col
-            k += 1
-        end
+    for colidxs in Ferrite.eachrow(sp)
+        k = _copyto!(colval, k, colidxs)
     end
-    S = SparseMatrixCSR{1}(Ferrite.getnrows(sp), Ferrite.getncols(sp), rowptr, colval, nzval)
-    return S
-end
-
-## ================= ##
-# FastSparsityPattern #
-## ================= ##
-
-function _allocate_matrix(::Type{SparseMatrixCSR{1, Tv, Ti}}, sp::FastSparsityPattern{Ti}, sym::Bool) where {Tv, Ti}
-    sym && throw(ArgumentError("FastSparsityPattern does not support symmetric matrices yet"))
-    sp.is_colidx_sorted || sort_rows_threaded!(sp) # Require sorted rows
-    nzval = zeros(Tv, length(sp.colidx))
-    return SparseMatrixCSR{1}(getnrows(sp), getncols(sp), sp.rowptr, sp.colidx, nzval)
-end
-
-function sort_rows!(sp::FastSparsityPattern, rowrange::UnitRange)
-    @inbounds for row in rowrange
-        i1 = sp.rowptr[row]
-        i2 = sp.rowptr[row + 1] - 1
-        if i1 < i2
-            sort!(view(sp.colidx, i1:i2); alg = QuickSort)
-        end
-    end
-    return sp
-end
-
-function sort_rows_threaded!(
-        sp::FastSparsityPattern, # Default ΔN ≥ 1000 and `n_tasks ≥ 1`
-        ntasks = max(min(Threads.nthreads() * 100, getnrows(sp) ÷ 1000), 1)
-    )               # Otherwise, 100 per thread for load balancing
-    nrows = getnrows(sp)
-    ΔN = cld(nrows, ntasks)
-    Threads.@threads for taskid in 1:ntasks
-        first_idx = 1 + ΔN * (taskid - 1)
-        last_idx = min(first_idx + ΔN - 1, nrows)
-        sort_rows!(sp, first_idx:last_idx)
-    end
-    sp.is_colidx_sorted = true
-    return sp
+    return SparseMatrixCSR{1}(nrows, Ferrite.getncols(sp), rowptr, colval, nzval)
 end
 
 end
