@@ -40,9 +40,9 @@ FunctionValues
 
 struct FunctionValues{DiffOrder, IP, Nx_t, Nξ_t, dNdx_t, dNdξ_t, d2Ndx2_t, d2Ndξ2_t} <: AbstractValues
     ip::IP          # ::Interpolation
-    # FunctionValues is only functional if a matrix-like type is used here.
-    # However, for device support (e.g. GPUs), we allow order 3 tensors to be passed here to allow this struct to be used as a struct-of-arrays type.
-    # Also see `soa_utils.jl` for the SoA transformation infrastructure.
+    # FunctionValues are only functional for the types in the comments for the fields below.
+    # However, e.g. for GPU support, we allow arrays of one order higher to be passed, allowing this type to be used as a struct-of-arrays (SoA) type.
+    # See `soa_utils.jl` for the SoA transformation infrastructure.
     Nx::Nx_t         # ::AbstractMatrix{Union{<:Tensor,<:Number}}
     Nξ::Nξ_t         # ::AbstractMatrix{Union{<:Tensor,<:Number}}
     dNdx::dNdx_t    # ::AbstractMatrix{Union{<:Tensor,<:StaticArray}} or Nothing

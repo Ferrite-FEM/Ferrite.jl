@@ -40,9 +40,9 @@ mutable struct FacetValues{FV, GM, FQR, detT, nT, V_FV <: AbstractVector{FV}, V_
     const fun_values::V_FV  # AbstractVector{FunctionValues}
     const geo_mapping::V_GM # AbstractVector{GeometryMapping}
     const fqr::FQR          # FacetQuadratureRule
-    # FacetValues are only functional if a vector-like type is used here.
-    # However, for device support (e.g. GPUs), we allow order 3 tensors to be passed here to allow this struct to be used as a struct-of-arrays type.
-    # Also see `soa_utils.jl` for the SoA transformation infrastructure.
+    # FacetValues are only functional for the types in the comments for the fields below.
+    # However, e.g. for GPU support, we allow arrays of one order higher to be passed, allowing this type to be used as a struct-of-arrays (SoA) type.
+    # See `soa_utils.jl` for the SoA transformation infrastructure.
     const detJdV::detT      # AbstractVector{<:Number}
     const normals::nT       # AbstractVector{<:Vec}
     current_facet::Int
