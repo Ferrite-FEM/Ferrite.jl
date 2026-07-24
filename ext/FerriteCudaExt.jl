@@ -40,6 +40,7 @@ struct DeviceCSCAssembler{Tv, Ti, KType <: AbstractSparseArray{Tv, Ti, 2}, FType
     f::FType
 end
 Adapt.@adapt_structure DeviceCSCAssembler
+get_substruct(a::DeviceCSCAssembler, i) = a
 
 # FIXME buffer
 function Ferrite.start_assemble(K::CuSparseMatrixCSC, f::CuVector = CUDA.zeros(0); fillzero::Bool = true)
