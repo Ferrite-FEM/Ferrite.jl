@@ -35,7 +35,7 @@ end
 
 # -------------------- assembler ----------------------
 
-struct DeviceCSCAssembler{Tv, Ti, KType <: AbstractSparseArray{Tv, Ti, 2}, FType <: AbstractVector{Tv}} <: Ferrite.AbstractAssembler{Tv}
+struct DeviceCSCAssembler{Tv, Ti, KType <: AbstractSparseArray{Tv, Ti, 2}, FType <: AbstractVector{Tv}} <: Ferrite.AbstractThreadSafeAssembler{Tv}
     K::KType
     f::FType
 end

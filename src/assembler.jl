@@ -1,6 +1,7 @@
 abstract type AbstractAssembler{Tv} end
 abstract type AbstractCSCAssembler{Tv} <: AbstractAssembler{Tv} end
 abstract type AbstractCSRAssembler{Tv} <: AbstractAssembler{Tv} end
+abstract type AbstractThreadSafeAssembler{Tv} <: AbstractAssembler{Tv} end
 
 """
     struct COOAssembler{Tv, Ti}
