@@ -26,11 +26,10 @@ import KernelAbstractions as KA
 using SparseArrays
 
 # and define some constants to be used in the following for convenience.
-# Note that for a real problem we want to increase these numbers suitably.
-const NUM_THREADS = 8
-const NUM_TASKS_PER_THREAD = 2
-
 function compute_threads_and_blocks(n)
+    # Note that for a real problem we want to increase these numbers suitably.
+    MAX_NUM_THREADS = 8
+    NUM_TASKS_PER_THREAD = 2
     ## Let's assign, arbitrarily, two element assembly tasks per GPU thread.
     tasks_per_thread = min(NUM_TASKS_PER_THREAD, n)
     ## To do so, let us first compute how many element groups we have to assemble.
@@ -256,10 +255,7 @@ function cuda_assembly_kernel(color, cc, cv, Kes, fes)
 end
 function assemble_global_cuda!(cv::Ferrite.SoAContainer, cc, colors::Vector, Ke, fe)
     for color in colors
-        n = length(color)
-        tasks_per_thread = min(NUM_TASKS_PER_THREAD, n)
-        threads = min(NUM_THREADS, cld(n, tasks_per_thread))
-        blocks = cld(n, tasks_per_thread * threads)
+        threads, blocks = compute_threads_and_blocks(length(color))
         @cuda threads = threads blocks = blocks cuda_assembly_kernel(color, cc, cv, Ke, fe)
         CUDA.synchronize()
     end
