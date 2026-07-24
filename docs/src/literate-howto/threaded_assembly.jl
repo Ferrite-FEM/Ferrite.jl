@@ -44,6 +44,17 @@
 #    Each task need their own copy of the scratch data since they will be modified for each
 #    element.
 
+#md # !!! warning "Global fields"
+#md #     Grid coloring is based on the grid topology only and can therefore *not* be used
+#md #     to parallelize assembly of cells that carry a global field (see
+#md #     [`GlobalConstant`](@ref)): every such cell shares the global field's dofs with
+#md #     every other cell of the `SubDofHandler`, so no valid coloring exists. For such
+#md #     problems, assemble serially, or accumulate the contributions to the
+#md #     global-dof/global-dof block and the global-dof entries of the right hand side in
+#md #     task-local buffers that are reduced after the loop (entries where only one of the
+#md #     row/column is a global dof are written to distinct memory locations by cells of
+#md #     the same color and remain safe).
+
 # ## Grid coloring
 #
 # Ferrite include functionality to color the grid with the [`create_coloring`](@ref)

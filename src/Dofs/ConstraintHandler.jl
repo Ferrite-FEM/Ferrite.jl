@@ -950,6 +950,9 @@ function add!(ch::ConstraintHandler, dbc::Dirichlet)
         # Fetch information about the field on this SubDofHandler
         field_idx = find_field(sdh, dbc.field_name)
         interpolation = getfieldinterpolation(sdh, field_idx)
+        if is_global_field_interpolation(interpolation)
+            error("Cannot add a Dirichlet boundary condition on the global field :$(dbc.field_name): global fields have no dofs on grid entities. Constrain the dofs directly using an AffineConstraint (see `global_field_dofs`).")
+        end
         # Internally we use the devectorized version
         n_comp = n_dbc_components(interpolation)
         if interpolation isa VectorizedInterpolation
@@ -1068,6 +1071,9 @@ function add!(ch::ConstraintHandler, pdbc::PeriodicDirichlet)
     end
     field_idx = find_field(ch.dh, pdbc.field_name)
     interpolation = getfieldinterpolation(ch.dh, field_idx)
+    if is_global_field_interpolation(interpolation)
+        error("Cannot add a PeriodicDirichlet boundary condition on the global field :$(pdbc.field_name): global fields have no dofs on grid entities. Constrain the dofs directly using an AffineConstraint (see `global_field_dofs`).")
+    end
     n_comp = n_dbc_components(interpolation)
     if interpolation isa VectorizedInterpolation
         interpolation = interpolation.ip
@@ -1912,6 +1918,9 @@ function add!(ch::ConstraintHandler, bc::ProjectedDirichlet)
         # Fetch information about the field on this SubDofHandler
         field_idx = find_field(sdh, bc.field_name)
         interpolation = getfieldinterpolation(sdh, field_idx)
+        if is_global_field_interpolation(interpolation)
+            error("Cannot add a ProjectedDirichlet boundary condition on the global field :$(bc.field_name): global fields have no dofs on grid entities. Constrain the dofs directly using an AffineConstraint (see `global_field_dofs`).")
+        end
         CT = getcelltype(sdh) # Same celltype enforced in SubDofHandler constructor
         qr_order = _default_bc_qr_order(bc.qr_order, interpolation)
         fqr = FacetQuadratureRule{getrefshape(interpolation)}(qr_order)

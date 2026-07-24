@@ -22,4 +22,5 @@ DiscontinuousLagrange
 BubbleEnrichedLagrange
 CrouzeixRaviart
 RannacherTurek
+GlobalConstant
 ```

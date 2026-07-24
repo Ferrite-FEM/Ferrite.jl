@@ -763,6 +763,9 @@ end
 @testset "vectorization layer compat" begin
     struct VectorLagrangeTest{shape, order, vdim} <: ScalarInterpolation{shape, order} end
     Ferrite.adjust_dofs_during_distribution(ip::VectorLagrangeTest{<:Any, order}) where {order} = order > 2
+    # `getnbasefunctions` is a required part of the interpolation interface (dof
+    # distribution asserts that all base functions are classified)
+    Ferrite.getnbasefunctions(::VectorLagrangeTest{shape, 1, vdim}) where {shape, vdim} = Ferrite.nvertices(shape) * vdim
 
     @testset "1d" begin
         grid = generate_grid(Line, (2,))

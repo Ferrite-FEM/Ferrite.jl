@@ -297,6 +297,13 @@ between cells as described by the DofHandler `dh`.
    (`keep_constrained = true`) or eliminated (`keep_constrained = false`) from the sparsity
    pattern. `keep_constrained = false` requires passing the ConstraintHandler `ch`.
  - `interface_coupling`: the coupling between fields/components across the interface.
+
+!!! note "Global fields"
+    The dofs of a global field (see [`GlobalConstant`](@ref)) are shared between the cells
+    on both sides of an interface and are therefore skipped here -- they couple through
+    the *cell* entries. Enabling `interface_coupling` for a global field thus has no
+    effect: enable the corresponding entry in the `coupling` keyword of
+    [`add_cell_entries!`](@ref) instead.
 """
 function add_interface_entries!(
         sp::SparsityPattern, dh::DofHandler, ch::Union{ConstraintHandler, Nothing} = nothing;
@@ -492,6 +499,14 @@ function _add_cell_entries!(
     # Add all connections between dofs for every cell while filtering based
     # on a) constraints, and b) field/dof coupling.
     cc = CellCache(dh)
+    # The row of a global dof (see `GlobalConstant`) accumulates the union of all dofs of
+    # all cells in the SubDofHandler(s) carrying the field. Inserting these entries one by
+    # one into the sorted rows costs O(ncells * rowlength), so instead the columns for
+    # these rows are buffered (with the same constraint/coupling filters applied) and
+    # inserted sorted and deduplicated after the cell loops. Note that global dofs in the
+    # *column* direction take the regular path: those rows stay cell-local in size.
+    global_rows = isempty(dh.global_field_dofs) ? nothing :
+        Dict{Int, Vector{Int}}(d => Int[] for dofs in values(dh.global_field_dofs) for d in dofs)
     for (sdhi, sdh) in pairs(dh.subdofhandlers)
         set = BitSet(sdh.cellset)
         coupling === nothing || (coupling_sdh = coupling[sdhi])
@@ -500,6 +515,7 @@ function _add_cell_entries!(
             for (i, row) in pairs(cc.dofs)
                 # a) check constraint for row
                 !keep_constrained && haskey(ch.dofmapping, row) && continue
+                buffer = global_rows === nothing ? nothing : get(global_rows, row, nothing)
                 # TODO: Extracting the row here and reinserting after the j-loop
                 #       should give some nice speedup
                 for (j, col) in pairs(cc.dofs)
@@ -507,9 +523,24 @@ function _add_cell_entries!(
                     coupling === nothing || coupling_sdh[i, j] || continue
                     # a) check constraint for col
                     !keep_constrained && haskey(ch.dofmapping, col) && continue
-                    # Insert col as a non zero index for this row
-                    add_entry!(sp, row, col)
+                    if buffer === nothing
+                        # Insert col as a non zero index for this row
+                        add_entry!(sp, row, col)
+                    else
+                        push!(buffer, col)
+                    end
                 end
+            end
+        end
+    end
+    # Flush the buffered global dof rows (once, after all SubDofHandlers, so that fields
+    # supported on multiple SubDofHandlers get a single sorted insertion pass)
+    if global_rows !== nothing
+        for (row, buffer) in global_rows
+            sort!(buffer)
+            unique!(buffer)
+            for col in buffer
+                add_entry!(sp, row, col)
             end
         end
     end
