@@ -269,9 +269,15 @@ fes = KA.zeros(backend, Float32, getncells(grid), getnbasefunctions(cv))
 # And assemble without using the global stiffness, `K_gpu`, and load vector, `f_gpu`.
 assemble_global_cuda!(cv_gpu, cc_gpu, colors_gpu, Kes, fes)
 
+# !!! note "Matrix-free Dirichlet boundary conditions"
+#     The local matrices need special treatment to support Dirichlet boundary condtions which are not yet
+#     implemented for the GPU constraint handler.
+
+#=
 ## References
 
-# ```@bibliography
-# Pages = ["gpu_heat_howto_literate.md"]
-# Canonical = false
-# ```
+```@bibliography
+Pages = ["gpu_heat_howto_literate.md"]
+Canonical = false
+```
+=#
