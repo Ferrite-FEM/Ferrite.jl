@@ -1,13 +1,13 @@
 # ------------------------------ User-facing part -------------------------------
 """
-    distribute_to_tasks(backend, obj, num_tasks)
+    distribute_to_workers(backend, obj, num_tasks)
 
 Distribute the object `obj` to `num_tasks` based on the chosen backend for task-based parallelism.
 Returns `d::AbstractVector{T}` where `T` is loosely equivalent to `typeof(obj)`, meaning that most
 methods are applicable to both types. Supported `backend`s are
 
 """
-function distribute_to_tasks end
+function distribute_to_workers end
 
 struct SoAContainer{T, T_inner} <: AbstractVector{T}
     soa::T_inner

@@ -1,4 +1,4 @@
-function Ferrite.distribute_to_tasks(backend::KA.Backend, obj, num_tasks) # Could also be KA.GPU <: KA.Backend, but nice to test logic on CPU probably...
+function Ferrite.distribute_to_workers(backend::KA.Backend, obj, num_tasks) # Could also be KA.GPU <: KA.Backend, but nice to test logic on CPU probably...
     num_tasks < 1 && throw(ArgumentError("num_tasks must be strictly positive"))
     soa = as_structure_of_arrays(backend, num_tasks, obj)
     return Ferrite.SoAContainer(soa, num_tasks)
@@ -41,13 +41,13 @@ function as_structure_of_arrays(d, N, fv::Ferrite.GeometryMapping)
 end
 
 # We do not need a soa container for the CPU variant.
-function Ferrite.distribute_to_tasks(backend::KA.CPU, a::Ferrite.AbstractAssembler, num_tasks)
+function Ferrite.distribute_to_workers(backend::KA.CPU, a::Ferrite.AbstractAssembler, num_tasks)
     return [
         a; [start_assemble(a.K, a.f; fillzero = false) for _ in 2:num_tasks]
     ]
 end
 
 # Only supported for thread safe assemblers
-function Ferrite.distribute_to_tasks(backend::KA.GPU, a::Ferrite.AbstractThreadSafeAssembler, num_tasks)
+function Ferrite.distribute_to_workers(backend::KA.GPU, a::Ferrite.AbstractThreadSafeAssembler, num_tasks)
     return Ferrite.SoAContainer(a, num_tasks)
 end

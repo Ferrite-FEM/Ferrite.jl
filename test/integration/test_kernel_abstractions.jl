@@ -173,9 +173,9 @@ import LinearAlgebra
     # n_workers = ceil(Int, length(grid.cells) / NUM_THREADS) # FIXME does not match the used 493
     # n_workers = getncells(grid)
     n_workers = prod(compute_threads_and_blocks(maximum(length.(colors))))
-    cv_device = Ferrite.distribute_to_tasks(backend, cv, n_workers)
+    cv_device = Ferrite.distribute_to_workers(backend, cv, n_workers)
     cc = CellCache(dh_device)
-    cc_device = Ferrite.distribute_to_tasks(backend, cc, n_workers)
+    cc_device = Ferrite.distribute_to_workers(backend, cc, n_workers)
     # Technically we can also just get one Ke or fe per worker, but for demonstration
     # purposes we allocate the full block here for element-assembly style matrix-free GPU
     # usage.

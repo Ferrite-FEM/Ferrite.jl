@@ -102,7 +102,7 @@ end
     end
 end
 function assemble_global_ka!(backend, cellvalues::Ferrite.SoAContainer, K, f, cc, colors::Vector, Ke, fe, n_workers; fillzero = true)
-    assemblers = Ferrite.distribute_to_tasks(backend, start_assemble(K, f; fillzero), n_workers)
+    assemblers = Ferrite.distribute_to_workers(backend, start_assemble(K, f; fillzero), n_workers)
     for color in colors
         ## We divide the work into blocks and fire up the kernel.
         n = length(color)
@@ -151,14 +151,14 @@ K_gpu = allocate_matrix(CuSparseMatrixCSC{Float32, Int32}, dh)
 f_gpu = KA.zeros(backend, Float32, (ndofs(dh),))
 
 # Furthermore, the individual GPU workers need local buffers.
-# Ferrite comes with a helper, `Ferrite.distribute_to_tasks`, which transforms common buffers
+# Ferrite comes with a helper, `Ferrite.distribute_to_workers`, which transforms common buffers
 # into a suitable GPU format. Since we parallelize over the colors, we need to allocate
 # buffers large enough. Since we use a grid-stride loop.
 max_color_size = maximum(length.(colors))
 n_workers = prod(compute_threads_and_blocks(max_color_size)) # Remember, we have `threads × blocks` workers.
-cv_gpu = Ferrite.distribute_to_tasks(backend, cv, n_workers)
+cv_gpu = Ferrite.distribute_to_workers(backend, cv, n_workers)
 cc = CellCache(dh_gpu)
-cc_gpu = Ferrite.distribute_to_tasks(backend, cc, n_workers)
+cc_gpu = Ferrite.distribute_to_workers(backend, cc, n_workers)
 # We also need a local buffer for the element vectors and matrices,
 # and these are created as a global array which we use views into in the assembly kernel.
 # Since GPU thread groups favor coalesced memory access we allocate the buffers such
@@ -211,7 +211,7 @@ function cuda_assembly_kernel(assemblers, color, cc::Ferrite.SoAContainer, cv::F
 end
 
 function assemble_global_cuda!(cv::Ferrite.SoAContainer, K, f, cc, colors::Vector, Kes, fes, n_workers; fillzero = true)
-    assemblers = Ferrite.distribute_to_tasks(backend, start_assemble(K, f; fillzero), n_workers)
+    assemblers = Ferrite.distribute_to_workers(backend, start_assemble(K, f; fillzero), n_workers)
     for color in colors
         n = length(color)
         threads, blocks = compute_threads_and_blocks(n)
