@@ -270,7 +270,7 @@ fes = KA.zeros(backend, Float32, getncells(grid), getnbasefunctions(cv))
 assemble_global_cuda!(cv_gpu, cc_gpu, colors_gpu, Kes, fes)
 
 # !!! note "Matrix-free Dirichlet boundary conditions"
-#     The local matrices need special treatment to support Dirichlet boundary condtions which are not yet
+#     The local matrices need special treatment to support Dirichlet boundary conditions which are not yet
 #     implemented for the GPU constraint handler.
 
 #=
