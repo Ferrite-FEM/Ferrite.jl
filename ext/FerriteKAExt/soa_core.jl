@@ -47,7 +47,7 @@ function Ferrite.distribute_to_tasks(backend::KA.CPU, a::Ferrite.AbstractAssembl
     ]
 end
 
-# So far the GPU assemblers are safe to use in parallel directly.
+# Only supported for thread safe assemblers
 function Ferrite.distribute_to_tasks(backend::KA.GPU, a::Ferrite.AbstractThreadSafeAssembler, num_tasks)
     return Ferrite.SoAContainer(a, num_tasks)
 end
