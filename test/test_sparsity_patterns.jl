@@ -49,7 +49,7 @@ function compare_matrices(A1, Ax...)
 end
 
 function is_stored(dsp::SparsityPattern, i, j)
-    return findfirst(k -> k == j, dsp.rows[i]) !== nothing
+    return findfirst(k -> k == j, Ferrite.eachrow(dsp, i)) !== nothing
 end
 
 @testset "SparsityPattern" begin
@@ -338,7 +338,7 @@ end
     compare_patterns(sp_ic, sp_ic_topo)
 end
 
-@testset "FastSparsityPattern" begin
+@testset "SparsityPattern fast path" begin
     function fsp_test_create_dh(CT)
         RS = getrefshape(CT)
         dim = Ferrite.getrefdim(RS)
@@ -348,22 +348,27 @@ end
         add!(dh, :b, Lagrange{RS, 2}()^dim)
         return close!(dh)
     end
-    # Internal fast-path for supported cases
+    # The internal fast (marker fill) path is taken for a fresh pattern with default arguments.
+    # Passing an all-true coupling forces the generic per-entry path but describes the same
+    # pattern (full coupling is the default), so the two must produce identical matrices.
     for CT in (Line, Quadrilateral, Tetrahedron)
         dh = fsp_test_create_dh(CT)
         sp = add_sparsity_entries!(init_sparsity_pattern(dh), dh)
-        fsp = Ferrite.FastSparsityPattern(dh)
+        sp_gen = add_sparsity_entries!(init_sparsity_pattern(dh), dh; coupling = trues(2, 2))
         K1 = allocate_matrix(sp)
-        K2 = allocate_matrix(fsp)
+        K2 = allocate_matrix(sp_gen)
+        K3 = allocate_matrix(dh)
         compare_matrices(K1, K2) # For CSC only
+        compare_matrices(K1, K3)
 
-        sp = add_sparsity_entries!(init_sparsity_pattern(dh), dh)
-        fsp = Ferrite.FastSparsityPattern(dh)
         K1_csr = allocate_matrix(SparseMatrixCSR, sp)
-        K2_csr = allocate_matrix(SparseMatrixCSR, fsp)
+        K2_csr = allocate_matrix(SparseMatrixCSR, sp_gen)
+        K3_csr = allocate_matrix(SparseMatrixCSR, dh)
         K1_csr.nzval .= 1:length(K1_csr.nzval)
         K2_csr.nzval .= 1:length(K2_csr.nzval)
+        K3_csr.nzval .= 1:length(K3_csr.nzval)
         @test K1_csr == K2_csr
+        @test K1_csr == K3_csr
     end
     # Test different number types (Int32, Float32)
     for Tv in (Float32, Float64)

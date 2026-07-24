@@ -94,6 +94,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
  - The compat bound for OrderedCollections.jl has been widened to allow version 2.
    ([#1355])
 
+### Performance
+ - `SparsityPattern` has been rewritten: all rows are now stored in a single contiguous buffer
+   (instead of one pool-allocated vector per row) and the common
+   `add_sparsity_entries!`/`allocate_matrix` case is filled with a fast marker-based algorithm
+   with lazily sorted rows. Constructing a sparsity pattern and allocating a matrix from it is
+   around 3x faster for typical problems, with unchanged behavior across the full interface
+   (constraints, coupling, `keep_constrained`, interfaces). ([#1397])
+ - The internal `FastSparsityPattern` (from [#1302]) has been removed: its algorithm is now the
+   built-in fast path of `SparsityPattern`, so `allocate_matrix(dh)` keeps the same speed while
+   supporting all matrix types and keyword arguments through one code path. ([#1397])
+
+### Added
+ - New function `Ferrite.compact!(sp::SparsityPattern)` which repacks the internal storage to
+   its minimal size, reclaiming the transient memory overhead left behind after rows outgrow
+   their initial reservation (e.g. after adding many constraint entries). ([#1397])
+
+### Internal changes
+ - The internal `Ferrite.PoolAllocator` module has been removed since the new `SparsityPattern`
+   storage no longer needs it. ([#1397])
+ - New function `CollectionsOfViews.insert_sorted_at_index!`: like `push_at_index!` but keeps
+   each view sorted and free of duplicates, with geometric reservation growth. ([#1397])
+
 ### Documentation
  - Code blocks in the documentation now have line numbers, and individual lines can be
    selected and linked to, similar to code on GitHub. ([#1415])

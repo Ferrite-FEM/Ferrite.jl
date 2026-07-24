@@ -68,21 +68,24 @@ See the constructor [`SparsityPattern(::Int, ::Int)`](@ref) for the user-facing
 documentation.
 
 # Struct fields
- - `nrows::Int`: number of rows
- - `ncols::Int`: number of column
- - `rows::Vector{Vector{Int}}`: vector of length `nrows`, where `rows[i]` is a
-   *sorted* vector of column indices for non zero entries in row `i`.
+ - `ncols::Int`: number of columns.
+ - `buffer::CollectionsOfViews.ConstructionBuffer{Int, 1}`: contiguous storage where each row's
+   column indices live as a slice; `length(buffer.indices)` is the number of rows. Backing all
+   rows with a single growable buffer (plus an isbits metadata array) keeps GC pressure low.
+ - `sorted::Bool`: whether each row's column indices are currently sorted. Rows are filled unsorted
+   by the fast path and sorted lazily on demand (see `eachrow`/`add_entry!`).
 
 !!! warning "Internal struct"
     The specific implementation of this struct, such as struct fields, type layout and type
     parameters, are internal and should not be relied upon.
 """
-struct SparsityPattern <: AbstractSparsityPattern
-    nrows::Int
-    ncols::Int
-    mempool::PoolAllocator.MemoryPool{Int}
-    rows::Vector{PoolAllocator.PoolVector{Int}}
+mutable struct SparsityPattern <: AbstractSparsityPattern
+    const ncols::Int
+    buffer::CollectionsOfViews.ConstructionBuffer{Int, 1}
+    sorted::Bool
 end
+
+const AdaptiveRange = CollectionsOfViews.AdaptiveRange
 
 """
     SparsityPattern(nrows::Int, ncols::Int; nnz_per_row::Int = 8)
@@ -115,13 +118,8 @@ more details):
    the pattern. The default matrix type is `SparseMatrixCSC{Float64, Int}`.
 """
 function SparsityPattern(nrows::Int, ncols::Int; nnz_per_row::Int = 8)
-    mempool = PoolAllocator.MemoryPool{Int}()
-    rows = Vector{PoolAllocator.PoolVector{Int}}(undef, nrows)
-    for i in 1:nrows
-        rows[i] = PoolAllocator.resize(PoolAllocator.malloc(mempool, nnz_per_row), 0)
-    end
-    sp = SparsityPattern(nrows, ncols, mempool, rows)
-    return sp
+    buffer = ConstructionBuffer(Int[], (nrows,), nnz_per_row)
+    return SparsityPattern(ncols, buffer, true)
 end
 
 function Base.show(io::IO, ::MIME"text/plain", sp::SparsityPattern)
@@ -146,35 +144,141 @@ function Base.show(io::IO, ::MIME"text/plain", sp::SparsityPattern)
     avg_entries = round(stored_entries / getnrows(sp) * 10) / 10
     println(iob, " - Entries per row (min, max, avg): $(min_entries), $(max_entries), $(avg_entries)")
     # Compute memory estimate
-    @assert getnrows(sp) * sizeof(eltype(sp.rows)) == sizeof(sp.rows)
-    bytes_used = sizeof(sp.rows) + stored_entries * sizeof(Int)
-    bytes_allocated = sizeof(sp.rows) + PoolAllocator.mempool_stats(sp.mempool)[2]
+    meta_bytes = sizeof(sp.buffer.indices)
+    bytes_used = meta_bytes + stored_entries * sizeof(Int)
+    bytes_allocated = meta_bytes + length(sp.buffer.data) * sizeof(Int)
     print(iob, " - Memory estimate: $(Base.format_bytes(bytes_used)) used, $(Base.format_bytes(bytes_allocated)) allocated")
     write(io, seekstart(iob))
     return
 end
 
-getnrows(sp::SparsityPattern) = sp.nrows
+getnrows(sp::SparsityPattern) = length(sp.buffer.indices)
 getncols(sp::SparsityPattern) = sp.ncols
+
+## Storage helpers ##
+
+# The sorted, de-duplicating insert (with geometric growth on overflow) is
+# `CollectionsOfViews.insert_sorted_at_index!`. A row that overflows its reservation relocates to
+# the end of `data`, leaving a transient hole; see `compact!`.
+
+# Lay out `data` so each row gets its own exact block [start, start+cap): one allocation, no holes.
+function _presize_buffer(rowlen::Vector{Int}, sizehint::Int)
+    n = length(rowlen)
+    indices = Vector{AdaptiveRange}(undef, n)
+    total = 0
+    @inbounds for r in 1:n
+        total += max(rowlen[r], 1)
+    end
+    data = Vector{Int}(undef, total)
+    start = 1
+    @inbounds for r in 1:n
+        cap = max(rowlen[r], 1)
+        indices[r] = AdaptiveRange(start, 0, cap)
+        start += cap
+    end
+    return ConstructionBuffer{Int, 1}(indices, data, sizehint)
+end
+
+# Sort each row's slice in place (rows are already deduplicated). QuickSort is allocation-free.
+# TODO(radix): a reusable radix-sort scratch may beat QuickSort for Int columns; measure first.
+function _ensure_sorted!(sp::SparsityPattern)
+    sp.sorted && return sp
+    b = sp.buffer
+    data = b.data
+    @inbounds for row in 1:length(b.indices)
+        r = b.indices[row]
+        r.ncurrent > 1 && sort!(data, r.start, r.start + r.ncurrent - 1, QuickSort, Base.Order.Forward)
+    end
+    sp.sorted = true
+    return sp
+end
+
+# Fast path: count exact per-row sizes with a column marker, presize the buffer, then marker-dedup
+# fill each row UNSORTED (sorted lazily). Includes the diagonal (a dof couples with itself in its
+# cell). Assumes full coupling and keep_constrained (the emptiness gate guarantees it).
+function _fast_fill_cells!(sp::SparsityPattern, dh::DofHandler)
+    nd = ndofs(dh)
+    cell_dofs = create_celldofs(dh)
+    row_to_cells = create_row_to_cells(cell_dofs, nd)
+    rowlen = zeros(Int, nd)
+    marker = zeros(Int, nd)
+    count_row_sizes!(rowlen, marker, row_to_cells, cell_dofs)
+    buffer = _presize_buffer(rowlen, sp.buffer.sizehint)
+    data = buffer.data
+    fill!(marker, 0)
+    @inbounds for row in 1:nd
+        r = buffer.indices[row]
+        p = 0
+        for cnr in row_to_cells[row]
+            for col in cell_dofs[cnr]
+                if marker[col] != row
+                    marker[col] = row
+                    data[r.start + p] = col
+                    p += 1
+                end
+            end
+        end
+        buffer.indices[row] = AdaptiveRange(r.start, p, r.nmax)
+    end
+    sp.buffer = buffer
+    sp.sorted = false
+    return sp
+end
+
+"""
+    Ferrite.compact!(sp::SparsityPattern)
+
+Rebuild the internal buffer with each row packed to exactly its stored size, reclaiming the holes
+left behind when rows overflow their reservation (e.g. after adding many constraint or custom
+entries). Purely a memory optimization; does not change the stored pattern.
+"""
+function compact!(sp::SparsityPattern)
+    sp.sorted || _ensure_sorted!(sp)
+    b = sp.buffer
+    n = length(b.indices)
+    total = 0
+    @inbounds for row in 1:n
+        total += b.indices[row].ncurrent
+    end
+    newdata = Vector{Int}(undef, total)
+    newidx = Vector{AdaptiveRange}(undef, n)
+    pos = 1
+    @inbounds for row in 1:n
+        r = b.indices[row]
+        for i in 0:(r.ncurrent - 1)
+            newdata[pos + i] = b.data[r.start + i]
+        end
+        newidx[row] = AdaptiveRange(pos, r.ncurrent, r.ncurrent)
+        pos += r.ncurrent
+    end
+    sp.buffer = ConstructionBuffer{Int, 1}(newidx, newdata, b.sizehint)
+    sp.sorted = true
+    return sp
+end
+
+@inline function _row_view(sp::SparsityPattern, row::Int)
+    r = @inbounds sp.buffer.indices[row]
+    r.ncurrent == 0 && return view(sp.buffer.data, 1:0)
+    return view(sp.buffer.data, r.start:(r.start + r.ncurrent - 1))
+end
+
+## AbstractSparsityPattern interface ##
 
 @inline function add_entry!(sp::SparsityPattern, row::Int, col::Int)
     @boundscheck (1 <= row <= getnrows(sp) && 1 <= col <= getncols(sp)) || throw(BoundsError(sp, (row, col)))
-    r = @inbounds sp.rows[row]
-    r = insert_sorted(r, col)
-    @inbounds sp.rows[row] = r
+    sp.sorted || _ensure_sorted!(sp) # a sorted insert needs the row sorted
+    insert_sorted_at_index!(sp.buffer, col, row)
     return
 end
 
-@inline function insert_sorted(x::PoolAllocator.PoolVector{Int}, item::Int)
-    k = searchsortedfirst(x, item)
-    if k == length(x) + 1 || @inbounds(x[k]) != item
-        x = PoolAllocator.insert(x, k, item)
-    end
-    return x
+function eachrow(sp::SparsityPattern, row::Int)
+    sp.sorted || _ensure_sorted!(sp)
+    return _row_view(sp, row)
 end
-
-eachrow(sp::SparsityPattern) = sp.rows
-eachrow(sp::SparsityPattern, row::Int) = sp.rows[row]
+function eachrow(sp::SparsityPattern)
+    sp.sorted || _ensure_sorted!(sp)
+    return (_row_view(sp, row) for row in 1:getnrows(sp))
+end
 
 
 ################################################
@@ -243,6 +347,33 @@ function add_sparsity_entries!(
     if ch !== nothing
         add_constraint_entries!(sp, ch; keep_constrained)
     end
+    return sp
+end
+
+# SparsityPattern takes an emptiness-gated fast path: when the pattern is fresh and the request is
+# simple (no coupling, keep_constrained, no interface) the cell entries are filled with the fast
+# marker fill (which subsumes the diagonal); otherwise it falls back to the generic per-entry path.
+# Constraints always layer on afterwards.
+function add_sparsity_entries!(
+        sp::SparsityPattern, dh::DofHandler, ch::Union{ConstraintHandler, Nothing} = nothing;
+        keep_constrained::Bool = true,
+        coupling::Union{AbstractMatrix{Bool}, Nothing} = nothing,
+        interface_coupling::Union{AbstractMatrix{Bool}, Nothing} = nothing,
+        topology = nothing,
+    )
+    isclosed(dh) || error("the DofHandler must be closed")
+    if getnrows(sp) < ndofs(dh) || getncols(sp) < ndofs(dh)
+        error("number of rows ($(getnrows(sp))) or columns ($(getncols(sp))) in the sparsity pattern is smaller than number of dofs ($(ndofs(dh)))")
+    end
+    can_fast = isempty(sp.buffer.data) && coupling === nothing && keep_constrained && topology === nothing
+    if can_fast
+        _fast_fill_cells!(sp, dh) # marker fill (unsorted); includes the diagonal
+    else
+        add_diagonal_entries!(sp)
+        add_cell_entries!(sp, dh, ch; keep_constrained, coupling)
+        topology !== nothing && add_interface_entries!(sp, dh, ch; topology, keep_constrained, interface_coupling)
+    end
+    ch !== nothing && add_constraint_entries!(sp, ch; keep_constrained)
     return sp
 end
 
@@ -389,6 +520,38 @@ This method is a shorthand for the equivalent
 """
 allocate_matrix(sp::SparsityPattern) = allocate_matrix(SparseMatrixCSC{Float64, Int}, sp)
 
+# Specialized: read the (possibly unsorted) rows directly from the buffer and let the CSC transpose
+# sort rowval by row order — so the fast path never sorts. Holes are skipped (only ncurrent read).
+function allocate_matrix(::Type{SparseMatrixCSC{Tv, Ti}}, sp::SparsityPattern) where {Tv, Ti}
+    nrows = getnrows(sp)
+    ncols = getncols(sp)
+    b = sp.buffer
+    data = b.data
+    colptr = zeros(Ti, ncols + 1)
+    colptr[1] = 1
+    @inbounds for row in 1:nrows
+        r = b.indices[row]
+        for p in 0:(r.ncurrent - 1)
+            colptr[data[r.start + p] + 1] += 1
+        end
+    end
+    cumsum!(colptr, colptr)
+    nnz = colptr[end] - 1
+    rowval = Vector{Ti}(undef, nnz)
+    nzval = zeros(Tv, nnz)
+    nextinds = copy(colptr)
+    @inbounds for row in 1:nrows
+        r = b.indices[row]
+        for p in 0:(r.ncurrent - 1)
+            col = data[r.start + p]
+            k = nextinds[col]
+            rowval[k] = row
+            nextinds[col] = k + 1
+        end
+    end
+    return SparseMatrixCSC(nrows, ncols, colptr, rowval, nzval)
+end
+
 """
     allocate_matrix(MatrixType, dh::DofHandler, args...; kwargs...)
 
@@ -425,12 +588,6 @@ arguments `args` and keyword arguments `kwargs`.
     copy(K)`) instead.
 """
 function allocate_matrix(::Type{MatrixType}, dh::DofHandler, args...; kwargs...) where {MatrixType}
-    _get_Ti(::Type{<:AbstractMatrix}) = Int
-    _get_Ti(::Type{<:AbstractSparseMatrix{<:Any, Ti}}) where {Ti} = Ti
-    if _can_use_fastsp(MatrixType, args...; kwargs...)
-        fsp = FastSparsityPattern(_get_Ti(MatrixType), dh, args...; kwargs...)
-        return allocate_matrix(MatrixType, fsp)
-    end
     sp = init_sparsity_pattern(dh)
     add_sparsity_entries!(sp, dh, args...; kwargs...)
     return allocate_matrix(MatrixType, sp)
@@ -542,6 +699,13 @@ function _add_cell_entries!(
     return sp
 end
 
+# Sorted, de-duplicating insert into a plain Vector (used for the constraint scratch below).
+@inline function insert_sorted!(v::Vector{Int}, item::Int)
+    k = searchsortedfirst(v, item)
+    (k == length(v) + 1 || @inbounds(v[k]) != item) && insert!(v, k, item)
+    return v
+end
+
 function _add_constraint_entries!(
         sp::AbstractSparsityPattern, dofcoefficients::Vector{Union{DofCoefficients{T, Ti}, Nothing}},
         dofmapping::Dict{Int, Int}, keep_constrained::Bool,
@@ -552,8 +716,7 @@ function _add_constraint_entries!(
 
     # New entries tracked separately and inserted after since it is not possible to modify
     # the datastructure while looping over it.
-    mempool = PoolAllocator.MemoryPool{Int}()
-    sp′ = Dict{Int, PoolAllocator.PoolVector{Int}}()
+    sp′ = Dict{Int, Vector{Int}}()
 
     for (row, colidxs) in zip(1:getnrows(sp), eachrow(sp)) # pairs(eachrow(sp))
         row_coeffs = coefficients_for_dof(dofmapping, dofcoefficients, row)
@@ -568,11 +731,7 @@ function _add_constraint_entries!(
                 else
                     # ... this column _is_ constrained, distribute to columns.
                     for (col′, _) in col_coeffs
-                        r = get(sp′, row) do
-                            PoolAllocator.resize(PoolAllocator.malloc(mempool, 8), 0)
-                        end
-                        r = insert_sorted(r, col′)
-                        sp′[row] = r
+                        insert_sorted!(get!(() -> Int[], sp′, row), col′)
                     end
                 end
             end
@@ -584,11 +743,7 @@ function _add_constraint_entries!(
                     # ... this column is _not_ constrained, distribute to rows.
                     !keep_constrained && haskey(dofmapping, col) && continue
                     for (row′, _) in row_coeffs
-                        r = get(sp′, row′) do
-                            PoolAllocator.resize(PoolAllocator.malloc(mempool, 8), 0)
-                        end
-                        r = insert_sorted(r, col)
-                        sp′[row′] = r
+                        insert_sorted!(get!(() -> Int[], sp′, row′), col)
                     end
                 else
                     # ... this column _is_ constrained, double-distribute to columns/rows.
@@ -596,11 +751,7 @@ function _add_constraint_entries!(
                         !keep_constrained && haskey(dofmapping, row′) && continue
                         for (col′, _) in col_coeffs
                             !keep_constrained && haskey(dofmapping, col′) && continue
-                            r = get(sp′, row′) do
-                                PoolAllocator.resize(PoolAllocator.malloc(mempool, 8), 0)
-                            end
-                            r = insert_sorted(r, col′)
-                            sp′[row′] = r
+                            insert_sorted!(get!(() -> Int[], sp′, row′), col′)
                         end
                     end
                 end
@@ -715,74 +866,12 @@ function _allocate_matrix(::Type{SparseMatrixCSC{Tv, Ti}}, sp::AbstractSparsityP
     return S
 end
 
-## ================= ##
-# FastSparsityPattern #
-## ================= ##
+## ================== ##
+# Fast-path helpers    #
+## ================== ##
 
-"""
-    FastSparsityPattern([Ti = Int64], dh::DofHandler)
-
-This sparsity does not currently support the full `AbstractSparsityPattern` interface,
-but is used as an internal fast-path for `allocate_matrix(MatrixType, dh)` for some
-supported `MatrixType`s. It can be extended in the future or potentially be merged
-with `SparsityPattern`.
-See [#1302](https://github.com/Ferrite-FEM/Ferrite.jl/pull/1302) for details.
-
-!!! warning "Internal"
-    `FastSparsityPattern` is strictly internal and its interface and implementation
-    may change at any time.
-
-"""
-mutable struct FastSparsityPattern{Ti} <: AbstractSparsityPattern
-    const rowlen::Vector{Ti} # Number of stored entries in each row
-    const marker::Vector{Ti} # Marker if column has been "visited" by certain row
-    const rowptr::Vector{Ti} # Index of stored entries at the start of each row
-    const colidx::Vector{Ti} # colidx[i] gives the column number of the ith stored entry
-    is_colidx_sorted::Bool   # Is colidx sorted for each row
-end
-function FastSparsityPattern(::Type{Ti}, ncols, nrows) where {Ti <: Integer}
-    rowlen = zeros(Ti, nrows)
-    marker = zeros(Ti, ncols)
-    rowptr = Vector{Ti}(undef, nrows + 1)
-    colidx = Vector{Ti}(undef, 0) # To be resized later
-    return FastSparsityPattern(rowlen, marker, rowptr, colidx, false)
-end
-
-# _can_use_fastsp(MatrixType, args...; kwargs...) where args and kwargs are those passed to
-# `allocate_matrix`. See `add_sparsity_entries!` for a description of args/kwargs.
-function _can_use_fastsp(
-        ::Type{MatrixType},
-        ch = nothing;
-        topology = nothing,
-        keep_constrained = true,
-        coupling = nothing,
-        interface_coupling = nothing
-    ) where {MatrixType}
-    if ch === topology === coupling === interface_coupling === nothing
-        if MatrixType <: AbstractSparseMatrix # Symmetric/Block matrices not supported
-            return keep_constrained
-        end
-    end
-    return false
-end
-
-FastSparsityPattern(dh::DofHandler) = FastSparsityPattern(Int, dh)
-function FastSparsityPattern(::Type{Ti}, dh::DofHandler) where {Ti}
-    sp = FastSparsityPattern(Ti, ndofs(dh), ndofs(dh))
-    # Step 1: Create cell_dof_views::ArrayOfVectorViews (would be nice in `DofHandler` directly)
-    cell_dofs_views = create_celldofs(dh)
-    # Step 2: Define mapping rownr to cells
-    row_to_cells = create_row_to_cells(cell_dofs_views, sp)
-    # Step 3: Count how many cols stored for each row
-    count_row_sizes!(sp, row_to_cells, cell_dofs_views)
-    # Step 4: Build the rowptr (indices for s)
-    build_rowptr!(sp)
-    fill_colidx!(sp, row_to_cells, cell_dofs_views)
-    return sp
-end
-
-getncols(sp::FastSparsityPattern) = length(sp.marker)
-getnrows(sp::FastSparsityPattern) = length(sp.rowlen)
+# Helpers for `_fast_fill_cells!`: build cell → dofs and row → cells maps, then count the exact
+# number of distinct columns per row using a column marker.
 
 function create_celldofs(dh::DofHandler)
     isclosed(dh) || throw(ArgumentError("DofHandler must be closed"))
@@ -804,8 +893,7 @@ function create_celldofs(dh::DofHandler)
     return ArrayOfVectorViews(indices, cell_dofs, LinearIndices((ncells,)))
 end
 
-function create_row_to_cells(cell_dofs::ArrayOfVectorViews, sp)
-    nrows = getnrows(sp)
+function create_row_to_cells(cell_dofs::ArrayOfVectorViews, nrows::Int)
     num_cells = zeros(Int, nrows)
     # 1: Figure out how many cells are connected to each dof
     n_connected = 0
@@ -833,79 +921,16 @@ function create_row_to_cells(cell_dofs::ArrayOfVectorViews, sp)
     return ArrayOfVectorViews(indices, data, LinearIndices((nrows,)))
 end
 
-function count_row_sizes!(sp::FastSparsityPattern, row_to_cells::AbstractVector, cell_dofs::ArrayOfVectorViews)
-    @inbounds for row in 1:getnrows(sp)
+function count_row_sizes!(rowlen::Vector{Int}, marker::Vector{Int}, row_to_cells::AbstractVector, cell_dofs::ArrayOfVectorViews)
+    @inbounds for row in 1:length(rowlen)
         for cnr in row_to_cells[row]
             for col in cell_dofs[cnr]
-                if sp.marker[col] != row
-                    sp.marker[col] = row
-                    sp.rowlen[row] += 1
+                if marker[col] != row
+                    marker[col] = row
+                    rowlen[row] += 1
                 end
             end
         end
     end
-    return sp
-end
-
-function build_rowptr!(sp)
-    sp.rowptr[1] = 1
-    @inbounds for row in 1:getnrows(sp)
-        sp.rowptr[row + 1] = sp.rowptr[row] + sp.rowlen[row]
-    end
-    return sp
-end
-
-function fill_colidx!(sp::FastSparsityPattern, row_to_cells::AbstractVector, cell_dofs::ArrayOfVectorViews)
-    resize!(sp.colidx, sp.rowptr[end] - 1) # nnz
-    fill!(sp.marker, 0)
-    @inbounds for row in 1:getnrows(sp)
-        pos = sp.rowptr[row]
-        for cnr in row_to_cells[row]
-            for col in cell_dofs[cnr]
-                if sp.marker[col] != row
-                    sp.marker[col] = row
-                    sp.colidx[pos] = col
-                    pos += 1
-                end
-            end
-        end
-    end
-    return sp
-end
-
-allocate_matrix(sp::FastSparsityPattern) = allocate_matrix(SparseMatrixCSC, sp)
-allocate_matrix(::Type{SparseMatrixCSC}, sp::FastSparsityPattern{Int}) = allocate_matrix(SparseMatrixCSC{Float64, Int}, sp)
-function allocate_matrix(::Type{<:SparseMatrixCSC{Tv, Ti}}, sp::FastSparsityPattern{Ti}) where {Ti, Tv}
-    nnz = length(sp.colidx)
-    ncols = getncols(sp)
-    nrows = getnrows(sp)
-
-    # Number of stored entries per column
-    collen = zeros(Ti, ncols)
-    @inbounds for col in sp.colidx
-        collen[col] += 1
-    end
-
-    # Index of stored entries at the start of each column
-    colptr = Vector{Ti}(undef, ncols + 1)
-    colptr[1] = 1
-    @inbounds for col in 1:ncols
-        colptr[col + 1] = colptr[col] + collen[col]
-    end
-
-    # Build rowidx[i] giving the row number of the ith stored entry
-    rowidx = Vector{Ti}(undef, nnz)
-    next = copy(colptr)
-    @inbounds for row in 1:nrows
-        for p in sp.rowptr[row]:(sp.rowptr[row + 1] - 1)
-            col = sp.colidx[p]
-            q = next[col]
-            rowidx[q] = row
-            next[col] = q + 1
-            # For a given col, next[col] is increasing, and row is
-            # increasing in the outer loop -> rowidx sorted for each col
-        end
-    end
-    nzval = zeros(Tv, nnz)
-    return SparseMatrixCSC(nrows, ncols, colptr, rowidx, nzval)
+    return rowlen
 end

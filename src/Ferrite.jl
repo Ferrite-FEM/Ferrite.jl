@@ -26,7 +26,8 @@ using ForwardDiff:
 
 include("CollectionsOfViews.jl")
 using .CollectionsOfViews:
-    CollectionsOfViews, ArrayOfVectorViews, push_at_index!, ConstructionBuffer
+    CollectionsOfViews, ArrayOfVectorViews, push_at_index!, insert_sorted_at_index!,
+    ConstructionBuffer
 
 include("exports.jl")
 

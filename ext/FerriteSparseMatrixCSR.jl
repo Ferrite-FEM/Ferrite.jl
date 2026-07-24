@@ -1,7 +1,7 @@
 module FerriteSparseMatrixCSR
 
 using Ferrite, SparseArrays, SparseMatricesCSR
-import Ferrite: AbstractSparsityPattern, CSRAssembler, FastSparsityPattern, getnrows, getncols
+import Ferrite: AbstractSparsityPattern, CSRAssembler, getnrows, getncols
 import Base: @propagate_inbounds
 
 # Could be generalized if https://github.com/JuliaSparse/SparseArrays.jl/pull/546 is merged
@@ -149,41 +149,29 @@ function _allocate_matrix(::Type{SparseMatrixCSR{1, Tv, Ti}}, sp::AbstractSparsi
     return S
 end
 
-## ================= ##
-# FastSparsityPattern #
-## ================= ##
-
-function _allocate_matrix(::Type{SparseMatrixCSR{1, Tv, Ti}}, sp::FastSparsityPattern{Ti}, sym::Bool) where {Tv, Ti}
-    sym && throw(ArgumentError("FastSparsityPattern does not support symmetric matrices yet"))
-    sp.is_colidx_sorted || sort_rows_threaded!(sp) # Require sorted rows
-    nzval = zeros(Tv, length(sp.colidx))
-    return SparseMatrixCSR{1}(getnrows(sp), getncols(sp), sp.rowptr, sp.colidx, nzval)
-end
-
-function sort_rows!(sp::FastSparsityPattern, rowrange::UnitRange)
-    @inbounds for row in rowrange
-        i1 = sp.rowptr[row]
-        i2 = sp.rowptr[row + 1] - 1
-        if i1 < i2
-            sort!(view(sp.colidx, i1:i2); alg = QuickSort)
-        end
-    end
-    return sp
-end
-
-function sort_rows_threaded!(
-        sp::FastSparsityPattern, # Default ΔN ≥ 1000 and `n_tasks ≥ 1`
-        ntasks = max(min(Threads.nthreads() * 100, getnrows(sp) ÷ 1000), 1)
-    )               # Otherwise, 100 per thread for load balancing
+# Specialized for SparsityPattern: the pattern is row-based like CSR, so after sorting the rows
+# (lazy, no-op if already sorted) the raw row slices can be copied straight into colval, skipping
+# the view-based double iteration of the generic method above.
+function _allocate_matrix(::Type{SparseMatrixCSR{1, Tv, Ti}}, sp::Ferrite.SparsityPattern, sym::Bool) where {Tv, Ti}
+    sym && throw(ArgumentError("Symmetric SparseMatrixCSR is not supported"))
+    Ferrite._ensure_sorted!(sp) # CSR requires sorted colval within each row
+    b = sp.buffer
     nrows = getnrows(sp)
-    ΔN = cld(nrows, ntasks)
-    Threads.@threads for taskid in 1:ntasks
-        first_idx = 1 + ΔN * (taskid - 1)
-        last_idx = min(first_idx + ΔN - 1, nrows)
-        sort_rows!(sp, first_idx:last_idx)
+    rowptr = Vector{Ti}(undef, nrows + 1)
+    rowptr[1] = 1
+    @inbounds for row in 1:nrows
+        rowptr[row + 1] = rowptr[row] + b.indices[row].ncurrent
     end
-    sp.is_colidx_sorted = true
-    return sp
+    nnz = rowptr[end] - 1
+    colval = Vector{Ti}(undef, nnz)
+    k = 1
+    @inbounds for row in 1:nrows
+        r = b.indices[row]
+        copyto!(colval, k, b.data, r.start, r.ncurrent)
+        k += r.ncurrent
+    end
+    nzval = zeros(Tv, nnz)
+    return SparseMatrixCSR{1}(nrows, getncols(sp), rowptr, colval, nzval)
 end
 
 end
