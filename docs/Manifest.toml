@@ -2,7 +2,7 @@
 
 julia_version = "1.12.6"
 manifest_format = "2.0"
-project_hash = "5a3dd18bbf1e2f8993496117114bd2ed96a6d165"
+project_hash = "99a31a4a0210780a2e137c3dab935ba03bab16da"
 
 [[deps.ADTypes]]
 git-tree-sha1 = "ec6be48a85c93d995563b84bff8a86bc98df45ce"
@@ -918,6 +918,22 @@ deps = ["Logging", "Random"]
 git-tree-sha1 = "0ee181ec08df7d7c911901ea38baf16f755114dc"
 uuid = "b5f81e59-6552-4d32-b1f0-c071b021bf89"
 version = "1.0.0"
+
+[[deps.ImplicitDifferentiation]]
+deps = ["ADTypes", "DifferentiationInterface", "KrylovKit", "LinearAlgebra"]
+git-tree-sha1 = "dd130deff953d662011ce4977d209e3acdca7812"
+uuid = "57b37032-215b-411a-8a7c-41a003a55207"
+version = "0.9.3"
+
+    [deps.ImplicitDifferentiation.extensions]
+    ImplicitDifferentiationChainRulesCoreExt = "ChainRulesCore"
+    ImplicitDifferentiationForwardDiffExt = "ForwardDiff"
+    ImplicitDifferentiationZygoteExt = "Zygote"
+
+    [deps.ImplicitDifferentiation.weakdeps]
+    ChainRulesCore = "d360d2e6-b24c-11e9-a2a3-2a2ae2dbcce4"
+    ForwardDiff = "f6369f11-7733-5829-9624-2563aa707210"
+    Zygote = "e88e6eb3-aa80-5325-afca-941959d7151f"
 
 [[deps.InitialValues]]
 git-tree-sha1 = "4da0f88e9a39111c2fa3add390ab15f3a44f3ca3"
