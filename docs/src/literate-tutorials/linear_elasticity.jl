@@ -1,8 +1,10 @@
 # # [Linear elasticity](@id tutorial-linear-elasticity)
 #
-# ![](linear_elasticity.svg)
+# ![](linear_elasticity-light.png)
+# ![](linear_elasticity-dark.png)
 #
-# *Figure 1*: Linear elastically deformed 1mm $\times$ 1mm Ferrite logo.
+# *Figure 1*: Vertical normal stress $\sigma_{22}$ (MPa) on the deformed geometry. The
+# computational mesh is generated from the 1mm $\times$ 1mm Ferrite logo.
 #
 #md # !!! tip
 #md #     This tutorial is also available as a Jupyter notebook:
@@ -394,7 +396,8 @@ end
 # and in *Figure 2*, we demonstrate the difference between the interpolated stress
 # field and the constant stress in each cell.
 
-# ![](linear_elasticity_stress.png)
+# ![](linear_elasticity_stress-light.png)
+# ![](linear_elasticity_stress-dark.png)
 #
 # *Figure 2*: Vertical normal stresses (MPa) exported using the `L2Projector` (left)
 # and constant stress in each cell (right).
