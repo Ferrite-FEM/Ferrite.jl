@@ -36,7 +36,7 @@ function compute_threads_and_blocks(n)
     n_effective = cld(n, tasks_per_thread)
     ## This potentially limits the number of usable threads, e.g. when a color just has a small
     ## number of elements.
-    threads = min(NUM_THREADS, n_effective)
+    threads = min(MAX_NUM_THREADS, n_effective)
     ## Furthermore, for CPU computing we typically group the tasks into blocks of worker threads.
     blocks = cld(n, tasks_per_thread * threads)
 
