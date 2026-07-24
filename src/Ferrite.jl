@@ -121,7 +121,6 @@ const AbstractVecOrSet{T} = Union{AbstractSet{T}, AbstractVector{T}}
 const IntegerCollection = AbstractVecOrSet{<:Integer}
 
 include("utils.jl")
-include("PoolAllocator.jl")
 
 # Matrix/Vector utilities
 include("arrayutils.jl")

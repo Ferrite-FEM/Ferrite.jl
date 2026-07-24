@@ -66,7 +66,6 @@ function BlockSparsityPattern(blk_sizes::AbstractVector{<:Integer})
     block_sizes = collect(Int, blk_sizes)
     nrows = ncols = sum(block_sizes)
     nblocks = length(block_sizes)
-    # TODO: Maybe all of these could/should share the same PoolAllocator?
     blocks = [SparsityPattern(block_sizes[i], block_sizes[j]) for i in 1:nblocks, j in 1:nblocks]
     return BlockSparsityPattern(nrows, ncols, block_sizes, blocks)
 end
