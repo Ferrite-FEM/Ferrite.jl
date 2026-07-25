@@ -335,12 +335,27 @@ end
     Krows = rowvals(K)
     Kvals = nonzeros(K)
     ld = length(rowdofs)
+    nrows = size(K, 1)
     @inbounds for Kcol in sortedcoldofs
         maxlookups = sym ? current_col : ld
         Kecol = colpermutation[current_col]
+        nzr = nzrange(K, Kcol)
+        # Fast path for a fully dense column (e.g. the column of a global-field dof, which
+        # couples with every dof). Then `rowval[nzr]` is exactly `1:nrows`, so the entry
+        # for global row `r` lives at `first(nzr) - 1 + r` and we can index it directly
+        # instead of merge-walking the whole (dense) column for every cell -- turning the
+        # per-cell cost from O(nrows) into O(ndofs_per_cell).
+        if length(nzr) == nrows
+            offset = first(nzr) - 1
+            for ri in 1:maxlookups
+                val = Ke[rowpermutation[ri], Kecol]
+                iszero(val) || (Kvals[offset + sortedrowdofs[ri]] += val)
+            end
+            current_col += 1
+            continue
+        end
         ri = 1 # row index pointer for the local matrix
         Ri = 1 # row index pointer for the global matrix
-        nzr = nzrange(K, Kcol)
         while Ri <= length(nzr) && ri <= maxlookups
             R = nzr[Ri]
             Krow = Krows[R]
