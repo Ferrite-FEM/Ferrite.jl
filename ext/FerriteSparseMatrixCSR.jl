@@ -5,7 +5,8 @@ import Ferrite: AbstractSparsityPattern, CSRAssembler, FastSparsityPattern, getn
 import Base: @propagate_inbounds
 
 # Could be generalized if https://github.com/JuliaSparse/SparseArrays.jl/pull/546 is merged
-function Ferrite.start_assemble(K::SparseMatrixCSR{<:Any, T}, f::Vector = T[]; fillzero::Bool = true, maxcelldofs_hint::Int = 0) where {T}
+function Ferrite.start_assemble(K::SparseMatrixCSR{<:Any, T}, f::Vector = T[]; fillzero::Bool = true, maxcelldofs_hint::Int = 0, cache::Union{Bool, Type{<:Integer}} = false) where {T}
+    cache === false || throw(ArgumentError("assembly caching (`cache`) is not yet supported for the CSR assembler"))
     fillzero && (Ferrite.fillzero!(K); Ferrite.fillzero!(f))
     return CSRAssembler(K, f, zeros(Int, maxcelldofs_hint), zeros(Int, maxcelldofs_hint), zeros(Int, maxcelldofs_hint), zeros(Int, maxcelldofs_hint))
 end
@@ -14,7 +15,7 @@ end
         K::SparseMatrixCSR, Ke::AbstractMatrix,
         rowdofs::AbstractVector, sortedrowdofs::AbstractVector, rowpermutation::AbstractVector,
         coldofs::AbstractVector, sortedcoldofs::AbstractVector, colpermutation::AbstractVector,
-        sym::Bool
+        sym::Bool, cache::Union{Nothing, Ferrite.AssemblyCache} = nothing # caching not supported for CSR; `cache` is always `nothing`
     )
     current_row = 1
     ld = length(coldofs)

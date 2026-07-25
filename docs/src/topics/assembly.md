@@ -85,6 +85,68 @@ for t in 1:timesteps
 end
 ```
 
+## [Caching the assembly pattern](@id man-assembly-cache)
+
+Every call to [`assemble!`](@ref) has to locate, for each entry of the local matrix, the
+corresponding entry in the global sparse matrix. Internally this is done by a merge between
+the (sorted) cell dofs and the sparsity pattern of each column -- an operation that is
+memory bound and repeated for every cell on every assembly. When the sparsity pattern is
+fixed and the assembly is repeated many times (Newton iterations, time steps, sensitivity
+sweeps, ...) this local-to-global lookup is *identical* every pass and can be cached.
+
+Passing `cache = true` to [`start_assemble`](@ref) enables this: on the first assembly pass
+the index map is recorded, and on every subsequent pass it is replayed, scattering directly
+into the global matrix and skipping both the dof sort and the merge. This typically makes
+the scatter **3-5x faster**. To reuse the assembler across passes, keep it alive, re-zero
+`K` (and `f`), and call [`rewind!`](@ref) before each new pass:
+
+```julia
+K = allocate_matrix(dh)
+f = zeros(ndofs(dh))
+
+A = start_assemble(K, f; cache = true)  # enable the assembly cache
+
+for t in 1:timesteps
+    if t > 1
+        # `start_assemble` is *not* called again -- that would discard the cache.
+        # Re-zero the system manually and rewind the cache to replay the pattern.
+        fill!(K.nzval, 0)
+        fill!(f, 0)
+        rewind!(A)
+    end
+    for cell in CellIterator(dh)
+        ke, fe = element_routine(...)
+        assemble!(A, celldofs(cell), ke, fe)
+    end
+    # Apply boundary conditions and solve for u(t)
+    # ...
+end
+```
+
+The cache stores one integer per structural entry of every element matrix, so it trades some
+memory (roughly the size of the stored matrix values) for speed. The index type is chosen
+automatically (`Int32` when it can address every stored entry, otherwise `Int`); pass an
+explicit type such as `cache = Int32` to force it, e.g. to halve the cache memory when you
+know the number of stored entries fits.
+
+As an indication, replaying a recorded scatter for the quadratic scalar field used in the
+[benchmark below](@ref "Comparison of assembly strategies") is about 3x faster than the
+already-fast assembler (`assemble_v4`), and for a full-mesh scatter loop the cached version
+is roughly 3x faster than the merge-based one.
+
+!!! note "When caching helps"
+    Caching only speeds up the scatter, i.e. the part of `assemble!` that places the local
+    matrix into the global one. Whether it matters for the total runtime depends on how large
+    a fraction of it the assembly is: it is worthwhile when the element routine is
+    inexpensive and/or the assembly is repeated many times, but it will not show up if the
+    runtime is dominated by e.g. an expensive element routine or a direct linear solve.
+
+!!! note
+    The cache assumes the sequence of `assemble!` calls (the cells and their dofs) is the
+    same on every pass -- which is exactly the situation where the sparsity pattern is
+    reused. It is currently supported for the (non-symmetric) `SparseMatrixCSC` assembler.
+    Caching also works together with [`apply_assemble!`](@ref) for the assembled cell block.
+
 ## Comparison of assembly strategies
 
 As discussed above there are various ways to assemble the local matrix into the global one.
