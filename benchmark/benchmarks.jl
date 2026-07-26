@@ -20,3 +20,6 @@ end
 if runall || selected == "boundary-conditions"
     include("benchmarks-boundary-conditions.jl")
 end
+if runall || selected == "sparsity-pattern"
+    include("benchmarks-sparsity-pattern.jl")
+end
