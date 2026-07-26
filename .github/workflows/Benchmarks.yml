@@ -28,8 +28,8 @@ jobs:
     # with the `record` job in BenchmarkTracking.yml -- the noise band is derived from that time
     # series, and variance is a property of the runner.
     runs-on: macos-latest
-    # A pass is ~200 s locally (~35 s to build the suite, ~165 s to run it), and `nruns: 1`
-    # means two of them, one per revision.
+    # A pass is ~130 s locally (~30 s to build the suite, ~100 s to run it), and `nruns: 2`
+    # means four of them, two per revision.
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@v7
@@ -57,7 +57,10 @@ jobs:
         with:
           julia-version: '1'
           script: benchmark/benchmarks.jl
-          nruns: '1'
+          # Two interleaved passes per revision: a regression has to reproduce in both. On a
+          # no-op diff a single pass reported 10 regressions and 13 improvements out of 337
+          # benchmarks, all of them noise.
+          nruns: '2'
           time-tolerance: '0.05'
           time-floor: '1us'
           noise-history: ${{ runner.temp }}/tacho-history/benchmarks/data
