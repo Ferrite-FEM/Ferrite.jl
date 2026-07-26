@@ -51,6 +51,7 @@ jobs:
         continue-on-error: true
 
       - uses: KristofferC/Tachometer.jl@0ea32437d4a7aba6f8598f4ce7efa26316ca09e8 # v1
+        id: tachometer
         with:
           julia-version: '1'
           script: benchmark/benchmarks.jl
@@ -58,3 +59,14 @@ jobs:
           time-tolerance: '0.05'
           time-floor: '1us'
           noise-history: ${{ runner.temp }}/tacho-history/benchmarks/data
+
+      # `errored` means no comparison was produced at all -- the suite failed to load or run on
+      # one of the revisions. Without this the job is green either way, which is how the
+      # assembly benchmarks managed to measure nothing for as long as they did. `not_comparable`
+      # is deliberately not an error: it is the normal result when a PR adds or removes
+      # benchmarks.
+      - name: Fail if the benchmarks did not run
+        if: steps.tachometer.outputs.status == 'errored'
+        run: |
+          echo "::error::Tachometer reported status=errored: no benchmark comparison was produced."
+          exit 1
