@@ -1,3 +1,14 @@
+# Entry point for the benchmark suite, defining `SUITE` as expected by PkgBenchmark and
+# Tachometer. See benchmark/README.md for the design of the suite.
+#
+# The suite deliberately does NOT sweep over all combinations of element type,
+# interpolation, order etc. -- each benchmark group picks the few configurations that
+# exercise structurally different code paths for the functionality it covers. Per-cell
+# operations are measured over a batch of cells, because Tachometer discards differences
+# below ~1 us as noise (`time-floor` in .github/workflows/Benchmarks.yml); a benchmark
+# below that floor can never report a regression and only wastes CI time. Keep every
+# benchmark above ~5 us and below ~10 ms where possible.
+
 using BenchmarkTools
 using Ferrite
 
@@ -14,30 +25,43 @@ end
 if runall || selected == "dofs"
     include("benchmarks-dofs.jl")
 end
+if runall || selected == "fevalues"
+    include("benchmarks-fevalues.jl")
+end
 if runall || selected == "assembly"
     include("benchmarks-assembly.jl")
 end
-if runall || selected == "boundary-conditions"
-    include("benchmarks-boundary-conditions.jl")
+if runall || selected == "constraints"
+    include("benchmarks-constraints.jl")
 end
 if runall || selected == "sparsity-pattern"
     include("benchmarks-sparsity-pattern.jl")
 end
-
-# `gctrial` runs a full `gcscrub()` before every benchmark, which costs ~0.7 s each and thus
-# dominates a suite of this size (~300 of the ~340 benchmarks measure well under a
-# millisecond). Disabling it cuts a full pass from ~410 s to ~120 s; the minimum estimator
-# already discards samples that a GC pause landed in. The budget is capped for the same
-# reason -- 1 s is far more than these need.
-for (_, b) in BenchmarkTools.leaves(SUITE)
-    b.params.seconds = min(b.params.seconds, 1.0)
-    b.params.samples = min(b.params.samples, 1000)
-    b.params.gctrial = false
+if runall || selected == "postprocessing"
+    include("benchmarks-postprocessing.jl")
 end
 
-# `evals` is expensive to derive (`tune!` over the whole suite takes ~5 min, more than twice
-# what running it costs) but changes rarely, so it is committed in tune.json and loaded here.
-# Regenerate with `make tune` after adding or substantially changing benchmarks.
-let paramsfile = joinpath(@__DIR__, "tune.json")
-    isfile(paramsfile) && loadparams!(SUITE, BenchmarkTools.load(paramsfile)[1], :evals, :samples)
+# Runtime is controlled by explicit parameters instead of tuning:
+#  - `evals = 1` is declared on every benchmark (everything measures well above the timer
+#    resolution). This also marks `evals_set`, which makes `tune!` a no-op, so regenerating
+#    tune.json with `make tune` takes seconds. The file still has to exist because
+#    Tachometer falls back to `tune!` without it.
+#  - `samples`/`seconds` default to 1000/0.5 s below, which bounds a full pass by roughly
+#    0.5 s per benchmark. Benchmarks that declare other values (e.g. `seconds = 1.0` for
+#    the ones with millisecond runtimes or expensive `setup`) keep them.
+#  - `gctrial = false` because a full `gcscrub()` before every benchmark costs ~0.7 s each
+#    and would dominate the suite; the minimum estimator already discards samples that a
+#    GC pause landed in.
+for (_, b) in BenchmarkTools.leaves(SUITE)
+    p = b.params
+    p.gctrial = false
+    if !p.evals_set
+        error("benchmark without explicit `evals`; declare `evals = 1` (see the comment above)")
+    end
+    if p.seconds == BenchmarkTools.DEFAULT_PARAMETERS.seconds
+        p.seconds = 0.5
+    end
+    if p.samples == BenchmarkTools.DEFAULT_PARAMETERS.samples
+        p.samples = 1000
+    end
 end
