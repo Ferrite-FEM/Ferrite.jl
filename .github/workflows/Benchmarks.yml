@@ -23,14 +23,33 @@ concurrency:
 jobs:
   benchmark:
     name: Benchmark
-    runs-on: ubuntu-latest
-    # The full suite is ~7 min per pass locally, and `nruns: 2` means four passes
+    # Apple Silicon rather than ubuntu-latest: this suite is single-threaded CPU work, where the
+    # macOS runners are both faster and less noisy than the shared Linux VMs. Keep this in sync
+    # with the `record` job in BenchmarkTracking.yml -- the noise band is derived from that time
+    # series, and variance is a property of the runner.
+    runs-on: macos-latest
+    # The full suite is ~7 min per pass on a local machine, and `nruns: 2` means four passes
     # (two revisions x two runs) on top of the Julia setup.
     timeout-minutes: 90
     steps:
       - uses: actions/checkout@v7
         with:
           fetch-depth: 0 # full history so that the merge-base can be resolved
+
+      # The noise model is derived READ-ONLY from the master time series published by
+      # BenchmarkTracking.yml, so a PR can never train it. Extract it from the trusted gh-pages
+      # ref into a directory OUTSIDE the PR checkout (via `git archive`, so a PR-committed
+      # directory can't stand in for it). Until gh-pages has benchmark data the directory is
+      # empty and the flat time-tolerance below is used instead.
+      - name: Fetch published history (read-only noise source)
+        run: |
+          dest="${RUNNER_TEMP}/tacho-history"
+          rm -rf "$dest"; mkdir -p "$dest"
+          if git fetch --no-tags --depth=1 origin gh-pages 2>/dev/null; then
+            git archive FETCH_HEAD benchmarks/data 2>/dev/null | tar -x -C "$dest" 2>/dev/null || true
+          fi
+        continue-on-error: true
+
       - uses: KristofferC/Tachometer.jl@0ea32437d4a7aba6f8598f4ce7efa26316ca09e8 # v1
         with:
           julia-version: '1'
@@ -38,3 +57,4 @@ jobs:
           nruns: '2'
           time-tolerance: '0.05'
           time-floor: '1us'
+          noise-history: ${{ runner.temp }}/tacho-history/benchmarks/data
