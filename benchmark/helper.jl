@@ -1,7 +1,6 @@
 module FerriteBenchmarkHelper
 
     using Ferrite
-    using LinearAlgebra: Symmetric
 
     function geo_types_for_spatial_dim(spatial_dim)
         spatial_dim == 1 && return [Line, QuadraticLine]
@@ -17,6 +16,7 @@ end
 module FerriteAssemblyHelper
 
     using Ferrite
+    using LinearAlgebra: Symmetric
 
     # Minimal Ritz-Galerkin type local assembly loop.
     function _generalized_ritz_galerkin_assemble_local_matrix(grid::Ferrite.AbstractGrid, cellvalues::CellValues, f_shape, f_test, op)

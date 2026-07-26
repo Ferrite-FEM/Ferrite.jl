@@ -24,7 +24,7 @@ for spatial_dim in 1:3
             ip_vectorized = ip^spatial_dim
 
             # Skip over elements which are not implemented
-            !applicable(Ferrite.shape_value, ip, ξ_dummy, 1) && continue
+            !applicable(Ferrite.reference_shape_value, ip, ξ_dummy, 1) && continue
 
             qr = QuadratureRule{ref_type}(2 * order - 1)
 

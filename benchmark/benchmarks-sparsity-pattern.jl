@@ -76,9 +76,3 @@ let SP = SPARSITY_PATTERN_SUITE["add_entry!"]
     SP["within-reservation"] = @benchmarkable build_pattern_by_entry(10_000, 10_000, 8, 0)
     SP["outgrowing-reservation"] = @benchmarkable build_pattern_by_entry(10_000, 10_000, 8, 24)
 end
-
-# Everything above is in the 1-50 ms range, so 1 s still gives plenty of samples and keeps the
-# runtime of the whole group at ~15 s.
-for (_, b) in BenchmarkTools.leaves(SPARSITY_PATTERN_SUITE)
-    b.params.seconds = 1.0
-end
