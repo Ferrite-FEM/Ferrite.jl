@@ -21,7 +21,7 @@ for spatial_dim in [2]
     qr = QuadratureRule{ref_type}(2 * order - 1)
     cellvalues = CellValues(qr, ip, ip_geo)
     dh = DofHandler(grid)
-    push!(dh, :u, 1, ip)
+    add!(dh, :u, ip)
     close!(dh)
 
     ch = ConstraintHandler(dh)

@@ -27,7 +27,7 @@ for spatial_dim in [3] # 1:3
 
                     # Skip over elements which are not implemented
                     ξ_dummy = Vec{spatial_dim}(ntuple(x -> 0.0, spatial_dim))
-                    !applicable(Ferrite.shape_value, ip, ξ_dummy, 1) && continue
+                    !applicable(Ferrite.reference_shape_value, ip, ξ_dummy, 1) && continue
 
                     NUMBERING_FIELD_DIM_SUITE["Lagrange", order] = BenchmarkGroup()
                     LAGRANGE_SUITE = NUMBERING_FIELD_DIM_SUITE["Lagrange", order]
@@ -38,15 +38,15 @@ for spatial_dim in [3] # 1:3
 
                     close_helper = function (grid, ip)
                         dh = DofHandler(grid)
-                        push!(dh, :u, field_dim, ip)
+                        add!(dh, :u, ip^field_dim)
                         return close!(dh)
                     end
                     LAGRANGE_SUITE["DofHandler"]["one-field"] = @benchmarkable $close_helper($grid, $ip)
 
                     close_helper = function (grid, ip, ip2)
                         dh = DofHandler(grid)
-                        push!(dh, :u, field_dim, ip)
-                        push!(dh, :p, 1, ip2)
+                        add!(dh, :u, ip^field_dim)
+                        add!(dh, :p, ip2)
                         return close!(dh)
                     end
                     LAGRANGE_SUITE["DofHandler"]["two-fields"] = @benchmarkable $close_helper($grid, $ip, $ip2)
