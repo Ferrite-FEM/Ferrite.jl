@@ -2164,3 +2164,20 @@ adjust_dofs_during_distribution(::Nedelec{RefHexahedron, 1}) = false
 function get_direction(::Nedelec{RefHexahedron, 1}, shape_nr, cell)
     return get_edge_direction(cell, shape_nr) # shape_nr = edge_nr
 end
+
+#TODO: docs
+struct GlobalConstant{shape} <: ScalarInterpolation{shape, 0}
+    function GlobalConstant{shape}() where {shape <: AbstractRefShape}
+        return new{shape}()
+    end
+end
+
+conformity(::GlobalConstant) = H1Conformity()
+adjust_dofs_during_distribution(::GlobalConstant) = false
+getnbasefunctions(::GlobalConstant) = 1
+n_global_dofs(::GlobalConstant) = 1
+
+function reference_shape_value(ip::GlobalConstant{shape}, ::Vec{dim, T}, i::Int) where {dim, shape <: AbstractRefShape{dim}, T}
+    i == 1 && return one(T)
+    throw(ArgumentError("no shape function $i for interpolation $ip"))
+end

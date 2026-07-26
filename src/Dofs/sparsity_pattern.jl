@@ -344,6 +344,33 @@ function add_diagonal_entries!(sp::AbstractSparsityPattern)
     return sp
 end
 
+"""
+    add_system_variable_entires!(sp::AbstractSparsityPattern, dh::DofHandler, cells, name::Symbol)
+
+Add full coupling between the degrees of freedom associated with the cells in `cells` and
+all degrees of freedom in the global dof block named `name`.
+
+The resulting sparsity pattern contains both `(dof, gdof)` and `(gdof, dof)` entries for
+all cell dofs `dof` and global dofs `gdof` in the selected cells and global dof block.
+"""
+function add_system_variable_entires!(sp::AbstractSparsityPattern, dh::DofHandler, cellset, name::Symbol)
+    isclosed(dh) || error("the DofHandler must be closed")
+    name ∈ dh.system_variables_names || throw(KeyError(name))
+    if getnrows(sp) < ndofs(dh) || getncols(sp) < ndofs(dh)
+        error("number of rows ($(getnrows(sp))) or columns ($(getncols(sp))) in the sparsity pattern is smaller than number of dofs ($(ndofs(dh)))")
+    end
+
+    global_dofs = system_variable_dofs(dh, name)
+    for celldata in CellIterator(dh, cellset)
+        dofs = celldofs(celldata)
+        for dof in dofs, gdof in global_dofs
+            add_entry!(sp, dof, gdof)
+            add_entry!(sp, gdof, dof)
+        end
+    end
+    return sp
+end
+
 
 ############################################################
 # Sparse matrix instantiation from AbstractSparsityPattern #

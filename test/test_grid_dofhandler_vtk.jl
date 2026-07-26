@@ -1,5 +1,7 @@
 # Imports for parallel (isolated) test execution:
+using Ferrite
 using LinearAlgebra
+using Test
 using WriteVTK
 import SHA
 
@@ -114,6 +116,101 @@ end
 end # of testset
 
 close(csio)
+
+@testset "DofHandler: system variables" begin
+    grid = generate_grid(Quadrilateral, (5, 5))
+    ip = Lagrange{RefQuadrilateral, 1}()
+
+    # dh1: One standard field
+    dh1 = close!(add!(DofHandler(grid), :u, ip))
+
+    # dh1a: dh1 + one system-variable entry
+    dh1a = DofHandler(grid)
+    add!(dh1a, :u, ip)
+    Ferrite.add!(dh1a, :λ, Ferrite.SystemVariable{2}())
+    @test_throws ArgumentError Ferrite.add!(dh1a, :λ, Ferrite.SystemVariable{3}()) # duplicate name
+    @test_throws AssertionError Ferrite.system_variable_dofs(dh1a, :λ) # Not closed
+    close!(dh1a)
+    @test_throws AssertionError Ferrite.add!(dh1a, :x, Ferrite.SystemVariable{2}()) # Closed
+    @test ndofs(dh1a) == ndofs(dh1) + 2
+    @test Ferrite.system_variable_dofs(dh1a, :λ) == collect((ndofs(dh1) + 1):(ndofs(dh1) + 2)) # system variables added at the end
+    @test Ferrite.getfieldnames(dh1a) == [:u]
+    @test dh1a.system_variables_names == [:λ]
+    @test Ferrite.n_components(dh1a.system_variables[1]) == 2
+    @test Ferrite.n_components(Ferrite.SystemVariable{Vec{3, Float64}}()) == 3
+    @test Ferrite.n_components(Ferrite.SystemVariable{SymmetricTensor{2, 2, Float64}}()) == 3
+    @test_throws ArgumentError Ferrite.SystemVariable{NTuple{2, Int}}()
+
+    showstring = sprint(show, MIME"text/plain"(), dh1a)
+    @test contains(showstring, "System variables: λ (2 dofs)")
+
+    # dh1b: dh1 + two system-variable entries, added before and after standard field.
+    dh1b = DofHandler(grid)
+    Ferrite.add!(dh1b, :λ1, Ferrite.SystemVariable{2}())
+    add!(dh1b, :u, ip)
+    Ferrite.add!(dh1b, :λ2, Ferrite.SystemVariable{1}())
+    close!(dh1b)
+    @test ndofs(dh1b) == ndofs(dh1) + 3
+    @test Ferrite.system_variable_dofs(dh1b, :λ1) == collect((ndofs(dh1) + 1):(ndofs(dh1) + 2))
+    @test Ferrite.system_variable_dofs(dh1b, :λ2) == collect((ndofs(dh1) + 3):(ndofs(dh1) + 3))
+
+    showstring = sprint(show, MIME"text/plain"(), dh1b)
+    @test contains(showstring, "System variables: λ1 (2 dofs), λ2 (1 dof)")
+
+    # dh1c: component-counted system-variable blocks
+    dh1c = DofHandler(grid)
+    add!(dh1c, :u, ip)
+    Ferrite.add!(dh1c, :λ_vec, Ferrite.SystemVariable{3}())
+    Ferrite.add!(dh1c, :λ_sym, Ferrite.SystemVariable{3}())
+    close!(dh1c)
+    @test ndofs(dh1c) == ndofs(dh1) + 6
+    @test Ferrite.system_variable_dofs(dh1c, :λ_vec) == collect((ndofs(dh1) + 1):(ndofs(dh1) + 3))
+    @test Ferrite.system_variable_dofs(dh1c, :λ_sym) == collect((ndofs(dh1) + 4):(ndofs(dh1) + 6))
+
+    # dh2: Use subdofhandlers, dh2a adds system variables in addition to the standard fields in dh2
+    domain1 = Ferrite.create_cellset(grid, x -> norm(x) < 0.75)
+    domain2 = setdiff!(Set(1:getncells(grid)), domain1)
+
+    (dh2, dh2a) = map((false, true)) do add_globals
+        dh = DofHandler(grid)
+        add_globals && Ferrite.add!(dh, :λ1, Ferrite.SystemVariable{1}())
+        sdh1 = SubDofHandler(dh, domain1)
+        add!(sdh1, :s, ip)
+        add!(sdh1, :v, ip^2)
+        add_globals && Ferrite.add!(dh, :λ2, Ferrite.SystemVariable{2}())
+        sdh2 = SubDofHandler(dh, domain2)
+        add!(sdh2, :v, ip^2)
+        add_globals && Ferrite.add!(dh, :λ3, Ferrite.SystemVariable{3}())
+        close!(dh)
+        dh
+    end
+    @test ndofs(dh2a) == ndofs(dh2) + 6
+    @test Ferrite.system_variable_dofs(dh2a, :λ1) == collect(ndofs(dh2) .+ (1:1))
+    @test Ferrite.system_variable_dofs(dh2a, :λ2) == collect(ndofs(dh2) .+ (2:3))
+    @test Ferrite.system_variable_dofs(dh2a, :λ3) == collect(ndofs(dh2) .+ (4:6))
+
+    # Renumbering should include system-variable dofs as logical dof blocks.
+    grid_small = generate_grid(Quadrilateral, (2, 2))
+    dh1d = DofHandler(grid_small)
+    add!(dh1d, :u, Lagrange{RefQuadrilateral, 1}())
+    add!(dh1d, :λ, Ferrite.SystemVariable{2}())
+    close!(dh1d)
+
+    perm_field = Ferrite.compute_renumber_permutation(dh1d, nothing, Ferrite.DofOrder.FieldWise())
+    @test isperm(perm_field)
+    @test perm_field[1:4] == 1:4
+    @test perm_field[5:6] == 5:6
+
+    perm_component = Ferrite.compute_renumber_permutation(dh1d, nothing, Ferrite.DofOrder.ComponentWise())
+    @test isperm(perm_component)
+    @test perm_component[1:4] == 1:4
+    @test perm_component[5:6] == 5:6
+
+    perm = [3, 4, 5, 6, 1, 2, 7, 8, 9, 11, 10]
+    old_lambda_dofs = collect(Ferrite.system_variable_dofs(dh1d, :λ))
+    Ferrite.renumber!(dh1d, perm)
+    @test Ferrite.system_variable_dofs(dh1d, :λ) == perm[old_lambda_dofs]
+end
 
 @testset "vtk tensor export" begin
     # open files

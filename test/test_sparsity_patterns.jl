@@ -216,7 +216,6 @@ end
             allocate_matrix(add_sparsity_entries!(dsp, dh, ch; kwargs...))
         end,
     )
-
 end
 
 @testset "Sparsity pattern generics" begin
@@ -331,6 +330,28 @@ end
     ch_bad = ConstraintHandler(close!(DofHandler(grid)))
     for p in patterns
         @test_throws ErrorException add_sparsity_entries!(p, dh, ch_bad; keep_constrained = false)
+    end
+end
+
+@testset "Global dof coupling" begin
+    grid = generate_grid(Triangle, (2, 2))
+    dh = DofHandler(grid)
+    add!(dh, :u, Lagrange{RefTriangle, 1}()^2)
+    add!(dh, :λ, Ferrite.SystemVariable{Vec{3, Float64}}())
+    close!(dh)
+
+    sp = init_sparsity_pattern(dh)
+    add_sparsity_entries!(sp, dh)
+    add_system_variable_entires!(sp, dh, 1:getncells(grid), :λ)
+
+    λ_dofs = system_variable_dofs(dh, :λ)
+    for cell in 1:getncells(grid)
+        for dof in celldofs(dh, cell)
+            for gdof in λ_dofs
+                @test is_stored(sp, dof, gdof)
+                @test is_stored(sp, gdof, dof)
+            end
+        end
     end
 end
 

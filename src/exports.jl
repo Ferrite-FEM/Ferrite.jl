@@ -20,6 +20,7 @@ export
     Nedelec,
     RaviartThomas,
     BrezziDouglasMarini,
+    GlobalConstant,
     getnbasefunctions,
     getrefshape,
 
@@ -130,6 +131,7 @@ export
     celldofs!,
     celldofs,
     dof_range,
+    system_variable_dofs,
     renumber!,
     DofOrder,
     evaluate_at_grid_nodes,
@@ -142,6 +144,7 @@ export
     init_sparsity_pattern,
     add_sparsity_entries!,
     add_cell_entries!,
+    add_system_variable_entires!,
     add_interface_entries!,
     add_constraint_entries!,
     allocate_matrix,
