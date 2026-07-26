@@ -50,7 +50,9 @@ jobs:
           fi
         continue-on-error: true
 
-      - uses: KristofferC/Tachometer.jl@0ea32437d4a7aba6f8598f4ce7efa26316ca09e8 # v1
+      # Intentionally unpinned: Tachometer is developed alongside this setup, so track its
+      # default branch rather than bumping a SHA here on every change.
+      - uses: KristofferC/Tachometer.jl@main
         id: tachometer
         with:
           julia-version: '1'

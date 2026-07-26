@@ -33,7 +33,7 @@ jobs:
       - uses: actions/checkout@v7
         with:
           repository: KristofferC/Tachometer.jl
-          ref: 0ea32437d4a7aba6f8598f4ce7efa26316ca09e8 # v1
+          ref: main
           path: .tachometer-action
 
       - name: Flag the sticky comment as re-running
@@ -89,7 +89,7 @@ jobs:
         if: steps.pr.outputs.number != ''
         with:
           repository: KristofferC/Tachometer.jl
-          ref: 0ea32437d4a7aba6f8598f4ce7efa26316ca09e8 # v1
+          ref: main
           path: .tachometer-action
 
       - uses: julia-actions/setup-julia@v3
