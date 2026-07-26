@@ -12,4 +12,7 @@ include(joinpath(@__DIR__, "benchmarks.jl"))
 @info "Tuning $(length(BenchmarkTools.leaves(SUITE))) benchmarks, this takes a few minutes..."
 tune!(SUITE)
 BenchmarkTools.save(paramsfile, BenchmarkTools.params(SUITE))
+open(paramsfile, "a") do io # `save` does not write one, and pre-commit requires it
+    write(io, "\n")
+end
 @info "Wrote $(paramsfile)"
