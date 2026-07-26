@@ -77,7 +77,7 @@ jobs:
         run: |
           julia --project=.tacho -e '
             using Pkg
-            Pkg.add(url = "https://github.com/KristofferC/Tachometer.jl", rev = "0ea32437d4a7aba6f8598f4ce7efa26316ca09e8") # v1
+            Pkg.add(url = "https://github.com/KristofferC/Tachometer.jl")
             Pkg.instantiate()'
 
       - name: Record
@@ -128,7 +128,7 @@ jobs:
         run: |
           julia --project=.tacho -e '
             using Pkg
-            Pkg.add(url = "https://github.com/KristofferC/Tachometer.jl", rev = "0ea32437d4a7aba6f8598f4ce7efa26316ca09e8") # v1
+            Pkg.add(url = "https://github.com/KristofferC/Tachometer.jl")
             Pkg.instantiate()'
 
       - name: Download record

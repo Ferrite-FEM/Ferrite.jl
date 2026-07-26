@@ -11,7 +11,9 @@ for spatial_dim in [2]
     DIRICHLET_SUITE["global"] = BenchmarkGroup()
 
     geo_type = Quadrilateral
-    grid = generate_grid(geo_type, ntuple(x -> 2, spatial_dim))
+    # Large enough that `apply!` clears the 1 us floor a regression has to beat -- on a 2x2
+    # grid these measured ~20 ns and could never report anything.
+    grid = generate_grid(geo_type, ntuple(x -> 50, spatial_dim))
     ref_type = FerriteBenchmarkHelper.getrefshape(geo_type)
     ip_geo = Ferrite.geometric_interpolation(geo_type)
     order = 2
