@@ -1,0 +1,133 @@
+# Trusted half of the two-workflow Tachometer setup: this never runs code from the PR, it only
+# re-renders the artifact produced by Benchmarks.yml and posts it as a sticky PR comment.
+name: Benchmark report
+
+on:
+  workflow_run:
+    workflows: [Benchmarks]
+    types: [requested, completed]
+
+permissions:
+  pull-requests: write
+  actions: read
+  contents: read
+
+jobs:
+  mark:
+    name: Mark previous results stale
+    runs-on: ubuntu-latest
+    if: >-
+      github.event.action == 'requested' &&
+      github.event.workflow_run.event == 'pull_request'
+    concurrency:
+      group: tachometer-mark-${{ github.event.workflow_run.head_repository.full_name }}-${{ github.event.workflow_run.head_branch }}
+      cancel-in-progress: true
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      REPO: ${{ github.repository }}
+      HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+      HEAD_BRANCH: ${{ github.event.workflow_run.head_branch }}
+      HEAD_REPO: ${{ github.event.workflow_run.head_repository.full_name }}
+      RUN_URL: ${{ github.event.workflow_run.html_url }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          repository: KristofferC/Tachometer.jl
+          ref: 0ea32437d4a7aba6f8598f4ce7efa26316ca09e8 # v1
+          path: .tachometer-action
+
+      - name: Flag the sticky comment as re-running
+        run: |
+          set -euo pipefail
+          pr="$(gh api "repos/${REPO}/commits/${HEAD_SHA}/pulls" \
+                | jq -r --arg b "$HEAD_BRANCH" --arg r "$HEAD_REPO" \
+                  '[.[] | select(.state=="open" and .head.ref==$b and .head.repo.full_name==$r)][0].number // empty')"
+          if [ -z "$pr" ]; then
+            echo "no matching open PR for ${HEAD_SHA}; nothing to mark"
+            exit 0
+          fi
+          bash .tachometer-action/scripts/mark-running.sh \
+            "$REPO" "$pr" "tachometer" "$HEAD_SHA" "$RUN_URL"
+
+  report:
+    name: Post report
+    runs-on: ubuntu-latest
+    if: >-
+      github.event.action == 'completed' &&
+      github.event.workflow_run.event == 'pull_request' &&
+      github.event.workflow_run.conclusion != 'cancelled'
+    concurrency:
+      group: tachometer-report-${{ github.event.workflow_run.head_repository.full_name }}-${{ github.event.workflow_run.head_branch }}
+      cancel-in-progress: false
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      REPO: ${{ github.repository }}
+      HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+      HEAD_BRANCH: ${{ github.event.workflow_run.head_branch }}
+      HEAD_REPO: ${{ github.event.workflow_run.head_repository.full_name }}
+    steps:
+      - name: Resolve target PR
+        id: pr
+        run: |
+          set -euo pipefail
+          pr="$(gh api "repos/${REPO}/commits/${HEAD_SHA}/pulls" \
+                | jq -r --arg b "$HEAD_BRANCH" --arg r "$HEAD_REPO" \
+                  '[.[] | select(.state=="open" and .head.ref==$b and .head.repo.full_name==$r)][0].number // empty')"
+          if [ -z "$pr" ]; then
+            echo "no matching open PR for ${HEAD_SHA}; skipping"
+            exit 0
+          fi
+
+          cur="$(gh api "repos/${REPO}/pulls/${pr}" --jq '.head.sha')"
+          if [ "$cur" != "$HEAD_SHA" ]; then
+            echo "PR #${pr} head moved; skipping stale report"
+            exit 0
+          fi
+          echo "number=${pr}" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/checkout@v7
+        if: steps.pr.outputs.number != ''
+        with:
+          repository: KristofferC/Tachometer.jl
+          ref: 0ea32437d4a7aba6f8598f4ce7efa26316ca09e8 # v1
+          path: .tachometer-action
+
+      - uses: julia-actions/setup-julia@v3
+        if: steps.pr.outputs.number != ''
+        with:
+          version: '1'
+      - name: Install the trusted renderer
+        if: steps.pr.outputs.number != ''
+        run: julia --project=.tacho -e 'using Pkg; Pkg.develop(PackageSpec(path=".tachometer-action")); Pkg.instantiate()'
+
+      - name: Download report artifacts
+        if: steps.pr.outputs.number != ''
+        uses: actions/download-artifact@v4
+        with:
+          pattern: tachometer-report-*
+          path: artifacts
+          run-id: ${{ github.event.workflow_run.id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Re-render and post
+        if: steps.pr.outputs.number != ''
+        env:
+          PR: ${{ steps.pr.outputs.number }}
+        run: |
+          set -euo pipefail
+          cur="$(gh api "repos/${REPO}/pulls/${PR}" --jq '.head.sha')"
+          [ "$cur" = "$HEAD_SHA" ] || { echo "PR #$PR head moved; skipping stale report"; exit 0; }
+
+          script="$(julia --project=.tacho -e 'using Tachometer; print(joinpath(pkgdir(Tachometer),"scripts","comment.sh"))')"
+          shopt -s nullglob
+          for dir in artifacts/*/; do
+            [ -f "$dir/report.json" ] || continue
+            bytes=$(wc -c < "$dir/report.json"); [ "$bytes" -le 2000000 ] || { echo "report.json too large; skipping $dir"; continue; }
+            marker="$(cat "$dir/marker.txt" 2>/dev/null || echo tachometer)"
+            [[ "$marker" =~ ^[A-Za-z0-9._-]+$ ]] || marker=tachometer
+            TACHOMETER_MODE=render TACHOMETER_MARKER="$marker" \
+              TACHOMETER_RUN_URL="${GITHUB_SERVER_URL}/${REPO}/actions/runs/${{ github.event.workflow_run.id }}" \
+              TACHOMETER_REPORT_IN="$dir/report.json" TACHOMETER_REPORT_OUT="$dir/rendered.md" \
+              julia --project=.tacho --startup-file=no -e 'using Tachometer; Tachometer.main()'
+            bash "$script" "$REPO" "$PR" "$marker" "$dir/rendered.md"
+          done

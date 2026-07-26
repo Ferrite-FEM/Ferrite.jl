@@ -1,0 +1,40 @@
+# Untrusted half of the two-workflow Tachometer setup: this runs the PR's benchmark code, so
+# it gets a read-only token and no secrets. It only measures and uploads an artifact, which
+# the trusted reporter (BenchmarksReport.yml) picks up and posts as a PR comment.
+name: Benchmarks
+
+on:
+  pull_request:
+    branches: ['master']
+    # Docs-only PRs can't move the numbers. NOTE: a skipped workflow never reports a status,
+    # so drop this filter if the benchmark is ever made a required check.
+    paths-ignore:
+      - '**/*.md'
+      - 'docs/**'
+      - 'LICENSE'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: tachometer-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  benchmark:
+    name: Benchmark
+    runs-on: ubuntu-latest
+    # The full suite is ~7 min per pass locally, and `nruns: 2` means four passes
+    # (two revisions x two runs) on top of the Julia setup.
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0 # full history so that the merge-base can be resolved
+      - uses: KristofferC/Tachometer.jl@0ea32437d4a7aba6f8598f4ce7efa26316ca09e8 # v1
+        with:
+          julia-version: '1'
+          script: benchmark/benchmarks.jl
+          nruns: '2'
+          time-tolerance: '0.05'
+          time-floor: '1us'
