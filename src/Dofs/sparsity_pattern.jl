@@ -68,7 +68,7 @@ See the constructor [`SparsityPattern(::Int, ::Int)`](@ref) for the user-facing
 documentation.
 
 # Struct fields
- - `nrows::Int`: number of rows (`== length(buffer.indices)`).
+ - `nrows::Int`: number of rows.
  - `ncols::Int`: number of columns.
  - `buffer::CollectionsOfViews.ConstructionBuffer{Int, 1}`: contiguous storage where each row's
    column indices live as a slice. Backing all rows with a single growable buffer (plus an
@@ -182,18 +182,43 @@ function _presize_buffer(rowlen::Vector{Int}, sizehint::Int)
     return ConstructionBuffer{Int, 1}(indices, data, sizehint)
 end
 
-# Sort each row's slice in place (rows are already deduplicated). QuickSort is allocation-free.
+# Hot-path guard: kept tiny so that it inlines into callers; the actual sorting is out of
+# line in _sort_pattern! and only runs when the pattern is unsorted.
+@inline function _ensure_sorted!(sp::SparsityPattern)
+    sp.sorted || _sort_pattern!(sp)
+    return sp
+end
+
+# Sort each row's slice in place (rows are already deduplicated). Rows are disjoint slices of
+# `data`, so they can be sorted in parallel; chunk the rows over tasks like the row sorting
+# that FastSparsityPattern's CSR path used to do. QuickSort is allocation-free.
 # TODO(radix): a reusable radix-sort scratch may beat QuickSort for Int columns; measure first.
-function _ensure_sorted!(sp::SparsityPattern)
-    sp.sorted && return sp
-    b = sp.buffer
-    data = b.data
-    @inbounds for row in 1:length(b.indices)
-        r = b.indices[row]
-        r.ncurrent > 1 && sort!(data, r.start, r.start + r.ncurrent - 1, QuickSort, Base.Order.Forward)
+@noinline function _sort_pattern!(sp::SparsityPattern)
+    nrows = getnrows(sp)
+    # At least 1000 rows per task, at most ~100 tasks per thread (load balancing)
+    ntasks = max(min(Threads.nthreads() * 100, nrows ÷ 1000), 1)
+    if ntasks == 1
+        _sort_rows!(sp, 1:nrows)
+    else
+        chunksize = cld(nrows, ntasks)
+        Threads.@threads for taskid in 1:ntasks
+            firstrow = 1 + chunksize * (taskid - 1)
+            lastrow = min(firstrow + chunksize - 1, nrows)
+            _sort_rows!(sp, firstrow:lastrow)
+        end
     end
     sp.sorted = true
     return sp
+end
+
+function _sort_rows!(sp::SparsityPattern, rowrange::UnitRange{Int})
+    b = sp.buffer
+    data = b.data
+    @inbounds for row in rowrange
+        r = b.indices[row]
+        r.ncurrent > 1 && sort!(data, r.start, r.start + r.ncurrent - 1, QuickSort, Base.Order.Forward)
+    end
+    return
 end
 
 # Fast path: count exact per-row sizes with a column marker, presize the buffer, then marker-dedup
@@ -238,7 +263,7 @@ left behind when rows overflow their reservation (e.g. after adding many constra
 entries). Purely a memory optimization; does not change the stored pattern.
 """
 function compact!(sp::SparsityPattern)
-    sp.sorted || _ensure_sorted!(sp)
+    _ensure_sorted!(sp)
     b = sp.buffer
     n = length(b.indices)
     total = 0
@@ -271,17 +296,17 @@ end
 
 @inline function add_entry!(sp::SparsityPattern, row::Int, col::Int)
     @boundscheck (1 <= row <= getnrows(sp) && 1 <= col <= getncols(sp)) || throw(BoundsError(sp, (row, col)))
-    sp.sorted || _ensure_sorted!(sp) # a sorted insert needs the row sorted
+    _ensure_sorted!(sp) # a sorted insert needs the row sorted
     insert_sorted_at_index!(sp.buffer, col, row)
     return
 end
 
 function eachrow(sp::SparsityPattern, row::Int)
-    sp.sorted || _ensure_sorted!(sp)
+    _ensure_sorted!(sp)
     return _row_view(sp, row)
 end
 function eachrow(sp::SparsityPattern)
-    sp.sorted || _ensure_sorted!(sp)
+    _ensure_sorted!(sp)
     return (_row_view(sp, row) for row in 1:getnrows(sp))
 end
 
@@ -355,7 +380,6 @@ function add_sparsity_entries!(
     return sp
 end
 
-# SparsityPattern takes an emptiness-gated fast path: when the pattern is fresh and the request is
 # SparsityPattern takes a fast path whenever it is empty: cell entries (including the diagonal,
 # and respecting `coupling` and `keep_constrained`) are exactly counted, the buffer is presized in
 # one allocation, and rows are filled with a marker-dedup append. A non-empty pattern falls back
@@ -373,6 +397,10 @@ function add_sparsity_entries!(
         error("number of rows ($(getnrows(sp))) or columns ($(getncols(sp))) in the sparsity pattern is smaller than number of dofs ($(ndofs(dh)))")
     end
     interfaces_filled = false
+    # TODO: The fast path could also handle a non-empty pattern by treating the existing row
+    #       slices as an extra candidate source in the count and fill passes (the row-major
+    #       marker dedups them against the new entries for free, keeping counts exact and
+    #       avoiding duplicates entirely). That would retire the generic branch below.
     if isempty(sp.buffer.data)
         keep_constrained || _check_keep_constrained_args(dh, ch)
         couplings = coupling === nothing ? nothing : _coupling_to_local_dof_coupling(dh, coupling)
@@ -441,12 +469,22 @@ function _check_keep_constrained_args(dh::DofHandler, ch::Union{ConstraintHandle
     return
 end
 
-# The facet-neighbor interface enumeration in _visit_row_candidates! emits exactly the entries
-# add_interface_entries! would insert iff (a) no dof is shared between neighboring cells (all
-# dofs interior to the cell volume), so the shared-dof skip rules can never fire, (b) a single
-# subdofhandler, so the mask indices apply to every neighbor, and (c) symmetric masks, so both
-# orientations of a pair agree. Then the interface entries can be filled directly by the fast
-# fill and add_interface_entries! skipped.
+# The facet-neighbor interface enumeration in _visit_row_candidates! visits a SUPERSET of the
+# entries add_interface_entries! would insert. For the *reservation* (count pass) that is
+# harmless: over-counting only leaves unused capacity. But the *fill* pass stores every visited
+# candidate as an actual pattern entry, so filling from this enumeration is only allowed when
+# the superset is exactly the insertion set -- otherwise the pattern would contain extra
+# (wrong) entries, not just extra memory. The sets are equal iff:
+#  (a) no dof is shared between neighboring cells (all dofs interior to the cell volume, e.g.
+#      DiscontinuousLagrange), so the shared-dof skip rules in _add_interface_entries! can
+#      never remove anything the enumeration visited,
+#  (b) there is a single subdofhandler, so the coupling mask indices apply to every neighbor
+#      (for foreign-sdh neighbors the enumeration counts all dofs unmasked, see
+#      _visit_row_candidates!), and
+#  (c) the masks are symmetric, so the either-orientation OR used by the enumeration equals
+#      the actual insertion gate.
+# Then the fast fill can emit the interface entries directly and add_interface_entries! is
+# skipped; in all other cases the enumeration is used for reservation only.
 function _can_fill_interfaces_directly(dh::DofHandler, interface_couplings::Vector{Matrix{Bool}})
     length(dh.subdofhandlers) == 1 || return false
     all(_all_dofs_volume_interior, dh.subdofhandlers[1].field_interpolations) || return false
@@ -1004,7 +1042,8 @@ function create_row_to_cells(cell_dofs::ArrayOfVectorViews, nrows::Int)
     return ArrayOfVectorViews(indices, cells, lin), ArrayOfVectorViews(indices, localidx, lin)
 end
 
-# Count (emit === nothing) or fill (emit = buffer) the per-row candidate columns: the diagonal,
+# Count (data === nothing) or fill (data/indices from the presized buffer) the per-row
+# candidate columns: the diagonal,
 # plus for every incident cell the cell's dofs, filtered by the (expanded) coupling mask and, for
 # keep_constrained = false, the constrained-dof filter. The count and fill passes MUST enumerate
 # identically; both go through this function to guarantee that.
@@ -1044,15 +1083,20 @@ function _visit_row_candidates!(
                 end
             end
             # Interface entries: visit the dofs of facet-neighbor cells, filtered by the expanded
-            # interface_coupling mask. A single mask entry [i, j] gates the insertions into both
-            # rows of the pair, so a column is visited if either orientation couples. In the
-            # count pass this reserves an upper bound on what add_interface_entries! can insert
-            # (remaining looseness: the shared-dof skip rules, and neighbors in a different
-            # subdofhandler where the mask indices do not apply and everything is counted);
-            # over-reservation only leaves slack, never wrong entries. The fill pass receives
-            # `neighbor_cells` only when this enumeration is provably exact (see
-            # _can_fill_interfaces_directly), in which case the interface entries are emitted
-            # here directly and add_interface_entries! is skipped.
+            # interface_coupling mask. Note that _add_interface_entries! checks the mask ONCE per
+            # local pair -- `coupling_sdh[dof_i, dof_j] || continue` -- and then inserts BOTH
+            # directed entries, (dofi, dofj) and (dofj, dofi) (the two _add_interface_entry
+            # calls). Seen from this row, a neighbor column c is therefore inserted if the mask
+            # couples (row, c) in EITHER orientation, hence `imask[li, j] || imask[j, li]`. For a
+            # neighbor in a different subdofhandler the mask's local indices do not apply (other
+            # layout, possibly other size), so all of its dofs are counted unmasked -- a
+            # deliberate over-count that only costs reservation slack (the direct fill is gated
+            # to a single subdofhandler by _can_fill_interfaces_directly). In the count pass this
+            # reserves an upper bound on what add_interface_entries! can insert (also loose under
+            # the shared-dof skip rules); over-reservation only leaves slack, never wrong
+            # entries. The fill pass receives `neighbor_cells` only when this enumeration is
+            # provably exact (see _can_fill_interfaces_directly), in which case the interface
+            # entries are emitted here directly and add_interface_entries! is skipped.
             if neighbor_cells !== nothing
                 for k in 1:length(cells)
                     cnr = cells[k]
