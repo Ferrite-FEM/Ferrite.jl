@@ -212,3 +212,66 @@ end
     @test_throws errr(2, 2) assemble!(a, [2, 1], [1.0 0.0; 3.0 4.0])
     @test_throws errr(2, 2) assemble!(as, [2, 1], [1.0 0.0; 3.0 4.0])
 end
+
+@testset "caching assembler ($(cache))" for cache in (true, Int32, Int64)
+    grid = generate_grid(Quadrilateral, (4, 4))
+    dh = DofHandler(grid)
+    add!(dh, :u, Lagrange{RefQuadrilateral, 1}()^2)
+    close!(dh)
+    ncells = getncells(grid)
+    nd = ndofs_per_cell(dh)
+    n = ndofs(dh)
+
+    # Distinct element matrices/vectors per cell and per pass; include exact zeros to
+    # exercise structural-zero recording. The cached assembler is reused across passes
+    # (records on pass 1, replays afterwards), and must match a plain merge assembler.
+    Kes = [[(M = rand(nd, nd); M[1, 2] = 0.0; M) for _ in 1:ncells] for _ in 1:3]
+    fes = [[rand(nd) for _ in 1:ncells] for _ in 1:3]
+
+    Kc = allocate_matrix(dh)
+    fc = zeros(n)
+    ac = start_assemble(Kc, fc; cache = cache)
+    for pass in 1:3
+        # Reference: fresh merge assembler on this pass's data
+        Kref = allocate_matrix(dh)
+        fref = zeros(n)
+        aref = start_assemble(Kref, fref)
+
+        if pass > 1
+            Ferrite.fillzero!(Kc)
+            fill!(fc, 0)
+            rewind!(ac)
+        end
+        for (c, cc) in enumerate(CellIterator(dh))
+            dofs = celldofs(cc)
+            assemble!(ac, dofs, Kes[pass][c], fes[pass][c])
+            assemble!(aref, dofs, Kes[pass][c], fes[pass][c])
+        end
+        @test Kc ≈ Kref
+        @test fc ≈ fref
+    end
+
+    # rectangular element matrix (rowdofs != coldofs), recorded then replayed
+    rd = collect(1:nd)
+    cd = collect((n - nd + 1):n)
+    Kfull = sparse(ones(n, n))
+    Ke1 = rand(nd, nd)
+    Ke2 = rand(nd, nd)
+    arect = start_assemble(Kfull; cache = cache)
+    assemble!(arect, rd, cd, Ke1)
+    Ferrite.fillzero!(Kfull)
+    rewind!(arect)
+    assemble!(arect, rd, cd, Ke2)
+    ref = zeros(n, n)
+    ref[rd, cd] .+= Ke2
+    @test Array(Kfull) ≈ ref
+end
+
+@testset "caching assembler errors" begin
+    K = sparse(rand(4, 4))
+    # symmetric and (below) rectangular-index-type mismatches are not supported
+    @test_throws ArgumentError start_assemble(Symmetric(K); cache = true)
+    # index type too narrow to address all stored entries
+    Kbig = spdiagm(0 => ones(3))
+    @test_throws ArgumentError start_assemble(Kbig; cache = Bool)
+end
