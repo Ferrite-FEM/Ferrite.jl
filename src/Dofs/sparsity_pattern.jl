@@ -233,11 +233,13 @@ function _fast_fill_cells!(
         interface_couplings::Union{Nothing, Vector{Matrix{Bool}}} = nothing;
         fill_interfaces::Bool = false,
     )
-    nd = ndofs(dh)
+    # Note: sized by the pattern's dimensions, which may exceed ndofs(dh) (rows without cells
+    # simply keep their diagonal entry)
+    nrows = getnrows(sp)
     cell_dofs = create_celldofs(dh)
-    row_to_cells, row_to_localidx = create_row_to_cells(cell_dofs, nd)
-    rowlen = zeros(Int, nd)
-    marker = zeros(Int, nd)
+    row_to_cells, row_to_localidx = create_row_to_cells(cell_dofs, nrows)
+    rowlen = zeros(Int, nrows)
+    marker = zeros(Int, getncols(sp))
     cell_to_sdh = dh.cell_to_subdofhandler
     _visit_row_candidates!(
         rowlen, nothing, nothing, marker, row_to_cells, row_to_localidx, cell_dofs,
@@ -1058,10 +1060,14 @@ function _visit_row_candidates!(
     counting = data === nothing
     @inbounds for row in 1:length(rowlen)
         start = counting ? 0 : indices[row].start
-        # The diagonal is always stored (cf. add_diagonal_entries!)
-        marker[row] = row
-        counting || (data[start] = row)
-        p = 1
+        p = 0
+        # The diagonal is always stored (cf. add_diagonal_entries!) when the column exists
+        # (the pattern may have more rows than columns)
+        if row <= length(marker)
+            marker[row] = row
+            counting || (data[start] = row)
+            p = 1
+        end
         # For keep_constrained = false a constrained row stores only the diagonal
         if !(isconstrained !== nothing && isconstrained[row])
             cells = row_to_cells[row]

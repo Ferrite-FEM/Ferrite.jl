@@ -423,6 +423,18 @@ end
             compare_matrices(allocate_matrix(sp), allocate_matrix(sp_gen))
         end
     end
+    # Patterns allocated larger than ndofs(dh) work with the fast path (the extra rows and
+    # columns get diagonal-only entries)
+    let
+        dh = fsp_test_create_dh(Quadrilateral)
+        n = ndofs(dh) + 3
+        sp_big = add_sparsity_entries!(SparsityPattern(n, n), dh)
+        @test Ferrite.getnrows(sp_big) == n
+        sp_big_gen = SparsityPattern(n, n)
+        Ferrite.add_entry!(sp_big_gen, 1, 1) # forces the generic branch
+        add_sparsity_entries!(sp_big_gen, dh)
+        compare_matrices(allocate_matrix(sp_big), allocate_matrix(sp_big_gen))
+    end
     # Test different number types (Int32, Float32)
     for Tv in (Float32, Float64)
         for Ti in (Int32, Int64)
