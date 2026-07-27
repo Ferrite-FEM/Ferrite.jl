@@ -78,7 +78,7 @@ function _add_conformity_constraint(ch::ConstraintHandler, field_index::Int, int
         weight = 1 / length(mdof)
         # One constraint per component
         for vd in 1:vdim
-            lc = AffineConstraint(vertices[hdof] + vd - 1, [vertices[m] + vd - 1 => weight for m in mdof], 0.0) # TODO change for other interpolation types than linear
+            lc = AffineConstraint(vertices[hdof] + vd - 1, [vertices[m] + vd - 1 => weight for m in mdof], 0.0)
             add!(ch, lc)
         end
     end

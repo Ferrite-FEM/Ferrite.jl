@@ -25,8 +25,7 @@ function OctantBWG(dim::Integer, l::T1, m::T2, b::T1 = DEFAULT_MAXLEVEL[dim]) wh
     @assert l ≤ b #maximum refinement level exceeded
     @assert m ≤ (one(T1) + one(T1))^(dim * l)
     x, y, z = (zero(T1), zero(T1), zero(T1))
-    # TODO make the coordinate integer type adjustable by defining the `OctantBWG` type once
-    # per `ForestBWG` instance, instead of hardcoding `Int32` here.
+    # `Int32` is fixed here rather than following from the octant's coordinate type; see #1406.
     h = Int32(_compute_size(b, l))
     _zero = zero(T1)
     _one = one(T1)
@@ -1198,7 +1197,6 @@ function _balance_leaf!(forest::ForestBWG{dim}, k, tree, o, perm_face, perm_face
                     # interior to a root face, not on a macro vertex): the diagonal octant
                     # leaves the tree through a face touching the corner, so route it through
                     # the face transform of that face's neighbour tree
-                    # TODO: enable a bool that either activates or deactivates the balancing over a corner
                     pivot_faces = faces(o, tree.b)
                     for j in 1:2
                         face_idx = 𝒱₂_inv[s_i, j] # the two faces touching corner s_i
@@ -1220,7 +1218,7 @@ function _balance_leaf!(forest::ForestBWG{dim}, k, tree, o, perm_face, perm_face
                 k′, f′ = fc[1], perm_face_inv[fc[2]]
                 balance_face(forest, k′, f′, o, s)
             end
-        else #TODO collapse this 3D branch with more clever s_i encoding into the 2D branch
+        else # the 3D branch mirrors the 2D one above; unifying them is tracked in #1408
             if s_i <= 8 #corner neighbor
                 if vertex(o, s_i, tree.b) == rootvertices[s_i]
                     # pivot corner at the tree's corner: balance across the macro (pure vertex)
@@ -1236,7 +1234,6 @@ function _balance_leaf!(forest::ForestBWG{dim}, k, tree, o, perm_face, perm_face
                     # route it through the respective face/edge transform of that neighbour
                     # tree (the transform of a route the octant does not leave through lands
                     # outside the neighbour's root and is a no-op in balance_face/balance_edge)
-                    # TODO: enable a bool that either activates or deactivates the balancing over a corner
                     pivot_faces = faces(o, tree.b)
                     for j in 1:3
                         face_idx = 𝒱₃_inv[s_i, j] # the three faces touching corner s_i
