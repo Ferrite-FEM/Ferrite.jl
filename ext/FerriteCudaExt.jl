@@ -75,17 +75,20 @@ function Ferrite.assemble!(A::DeviceCSCAssembler, dofs::AbstractVector{<:Integer
         for i in 1:ndofs
             val = Ke[i, j]
             iszero(val) && continue
+            inserted_value = false
             row = dofs[i]
             # Linear search for the row in this column's nonzeros
             for idx in r1:r2
                 if rowval[idx] == row
                     nzval[idx] += val
+                    inserted_value = true
                     break
                 end
                 if rowval[idx] > row
                     Ferrite._missing_sparsity_pattern_error(row, col)
                 end
             end
+            !inserted_value && Ferrite._missing_sparsity_pattern_error(row, col)
         end
     end
     return nothing
