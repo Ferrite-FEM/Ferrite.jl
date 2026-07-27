@@ -89,7 +89,7 @@ i.e. the local indices for the `:u` field are `1:3` and for the `:v` field `4:9`
 matches directly with the number of dofs for each field: 3 for `:u` and 6 for `:v`. The
 ranges are used when assembling the blocks of the matrix, i.e. if `Ke` is the local matrix,
 then `Ke[u_range, u_range]` corresponds to the ``K_{uu}``, `Ke[u_range, v_range]` to
-``K_{uv}``, etc. See for example [Tutorial 8: Stokes flow](../tutorials/stokes-flow.md) for
+``K_{uv}``, etc. See for example [Tutorial 9: Stokes flow](../tutorials/stokes-flow.md) for
 how the ranges are used.
 
 

@@ -123,6 +123,7 @@ write_overview(
         ("heat_equation", "Heat equation", ["heat_equation-light.png", "heat_equation-dark.png"]),
         ("linear_elasticity", "Linear elasticity", ["linear_elasticity-light.png", "linear_elasticity-dark.png"]),
         ("elastodynamics", "Elastodynamics and modal analysis", ["elastodynamics-light.webp", "elastodynamics-dark.webp"]),
+        ("euler_bernoulli_beam", "Euler-Bernoulli beam", ["euler_bernoulli_beam-light.png", "euler_bernoulli_beam-dark.png"]),
         ("incompressible_elasticity", "Incompressible elasticity", ["incompressible_elasticity-light.png", "incompressible_elasticity-dark.png"]),
         ("hyperelasticity", "Hyperelasticity", ["hyperelasticity-light.png", "hyperelasticity-dark.png"]),
         ("plasticity", "von Mises plasticity", ["plasticity-light.png", "plasticity-dark.png"]),
