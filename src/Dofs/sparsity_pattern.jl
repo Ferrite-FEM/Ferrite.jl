@@ -202,7 +202,8 @@ function _fast_fill_cells!(
         couplings::Union{Nothing, Vector{Matrix{Bool}}} = nothing,
         isconstrained::Union{Nothing, Vector{Bool}} = nothing,
         neighbor_cells::Union{Nothing, ArrayOfVectorViews} = nothing,
-        interface_couplings::Union{Nothing, Vector{Matrix{Bool}}} = nothing,
+        interface_couplings::Union{Nothing, Vector{Matrix{Bool}}} = nothing;
+        fill_interfaces::Bool = false,
     )
     nd = ndofs(dh)
     cell_dofs = create_celldofs(dh)
@@ -218,7 +219,8 @@ function _fast_fill_cells!(
     fill!(marker, 0)
     _visit_row_candidates!(
         rowlen, buffer.data, buffer.indices, marker, row_to_cells, row_to_localidx, cell_dofs,
-        cell_to_sdh, couplings, isconstrained
+        cell_to_sdh, couplings, isconstrained,
+        fill_interfaces ? neighbor_cells : nothing, fill_interfaces ? interface_couplings : nothing
     )
     sp.buffer = buffer
     sp.sorted = false
@@ -367,24 +369,30 @@ function add_sparsity_entries!(
     if getnrows(sp) < ndofs(dh) || getncols(sp) < ndofs(dh)
         error("number of rows ($(getnrows(sp))) or columns ($(getncols(sp))) in the sparsity pattern is smaller than number of dofs ($(ndofs(dh)))")
     end
+    interfaces_filled = false
     if isempty(sp.buffer.data)
         keep_constrained || _check_keep_constrained_args(dh, ch)
         couplings = coupling === nothing ? nothing : _coupling_to_local_dof_coupling(dh, coupling)
         isconstrained = keep_constrained ? nothing : _isconstrained_by_dof(ch)
         # With interface entries coming (added below), reserve row space for them up front so
-        # they land in place instead of relocating rows (see _visit_row_candidates!).
+        # they land in place instead of relocating rows. When the reservation enumeration is
+        # provably exact it doubles as the insertion itself (see _visit_row_candidates!).
         if topology === nothing || !(interface_coupling isa AbstractMatrix{Bool})
             neighbor_cells = interface_couplings = nothing
         else
             neighbor_cells = create_cell_to_neighbors(dh.grid, topology)
             interface_couplings = _coupling_to_local_dof_coupling(dh, interface_coupling)
+            interfaces_filled = _can_fill_interfaces_directly(dh, interface_couplings)
         end
-        _fast_fill_cells!(sp, dh, couplings, isconstrained, neighbor_cells, interface_couplings)
+        _fast_fill_cells!(
+            sp, dh, couplings, isconstrained, neighbor_cells, interface_couplings;
+            fill_interfaces = interfaces_filled
+        )
     else
         add_diagonal_entries!(sp)
         add_cell_entries!(sp, dh, ch; keep_constrained, coupling)
     end
-    topology !== nothing && add_interface_entries!(sp, dh, ch; topology, keep_constrained, interface_coupling)
+    topology !== nothing && !interfaces_filled && add_interface_entries!(sp, dh, ch; topology, keep_constrained, interface_coupling)
     ch !== nothing && add_constraint_entries!(sp, ch; keep_constrained)
     return sp
 end
@@ -428,6 +436,23 @@ function _check_keep_constrained_args(dh::DofHandler, ch::Union{ConstraintHandle
     isclosed(ch) || error("the ConstraintHandler must be closed")
     ch.dh === dh || error("the DofHandler and the ConstraintHandler's DofHandler must be the same")
     return
+end
+
+# The facet-neighbor interface enumeration in _visit_row_candidates! emits exactly the entries
+# add_interface_entries! would insert iff (a) no dof is shared between neighboring cells (all
+# dofs interior to the cell volume), so the shared-dof skip rules can never fire, (b) a single
+# subdofhandler, so the mask indices apply to every neighbor, and (c) symmetric masks, so both
+# orientations of a pair agree. Then the interface entries can be filled directly by the fast
+# fill and add_interface_entries! skipped.
+function _can_fill_interfaces_directly(dh::DofHandler, interface_couplings::Vector{Matrix{Bool}})
+    length(dh.subdofhandlers) == 1 || return false
+    all(_all_dofs_volume_interior, dh.subdofhandlers[1].field_interpolations) || return false
+    return all(m -> m == transpose(m), interface_couplings)
+end
+
+function _all_dofs_volume_interior(ip::Interpolation)
+    base = ip isa VectorizedInterpolation ? ip.ip : ip
+    return length(volumedof_interior_indices(base)) == getnbasefunctions(base)
 end
 
 # Bool per dof: is it constrained? (`ch` is validated by _check_keep_constrained_args.)
@@ -1015,14 +1040,16 @@ function _visit_row_candidates!(
                     end
                 end
             end
-            # Count-only (never passed in the fill pass): reserve space for interface entries by
-            # also counting the dofs of facet-neighbor cells, filtered by the expanded
+            # Interface entries: visit the dofs of facet-neighbor cells, filtered by the expanded
             # interface_coupling mask. A single mask entry [i, j] gates the insertions into both
-            # rows of the pair, so a column is counted if either orientation couples. This is an
-            # upper bound on what add_interface_entries! can insert (exact for discontinuous
-            # interpolations; remaining looseness: the shared-dof skip rules, and neighbors in a
-            # different subdofhandler where the mask indices do not apply and everything is
-            # counted); over-reservation only leaves slack, never wrong entries.
+            # rows of the pair, so a column is visited if either orientation couples. In the
+            # count pass this reserves an upper bound on what add_interface_entries! can insert
+            # (remaining looseness: the shared-dof skip rules, and neighbors in a different
+            # subdofhandler where the mask indices do not apply and everything is counted);
+            # over-reservation only leaves slack, never wrong entries. The fill pass receives
+            # `neighbor_cells` only when this enumeration is provably exact (see
+            # _can_fill_interfaces_directly), in which case the interface entries are emitted
+            # here directly and add_interface_entries! is skipped.
             if neighbor_cells !== nothing
                 for k in 1:length(cells)
                     cnr = cells[k]
@@ -1040,6 +1067,7 @@ function _visit_row_candidates!(
                             isconstrained !== nothing && isconstrained[col] && continue
                             if marker[col] != row
                                 marker[col] = row
+                                counting || (data[start + p] = col)
                                 p += 1
                             end
                         end

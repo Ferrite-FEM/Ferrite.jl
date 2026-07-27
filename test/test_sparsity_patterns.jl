@@ -411,6 +411,17 @@ end
                 @test sum(r -> r.nmax, sp.buffer.indices) == sum(length, Ferrite.eachrow(sp))
             end
         end
+        # Mixed continuous/discontinuous fields: the direct interface fill must NOT trigger
+        # (shared dofs on the continuous field) and the layered path must match the generic one.
+        dh2 = DofHandler(grid)
+        add!(dh2, :a, Lagrange{RefQuadrilateral, 1}())
+        add!(dh2, :b, DiscontinuousLagrange{RefQuadrilateral, 1}()^2)
+        close!(dh2)
+        for ic in (trues(2, 2), [false false; false true])
+            sp = add_sparsity_entries!(init_sparsity_pattern(dh2), dh2; topology = topo, interface_coupling = ic)
+            sp_gen = fsp_test_build_generic(dh2; topology = topo, interface_coupling = ic)
+            compare_matrices(allocate_matrix(sp), allocate_matrix(sp_gen))
+        end
     end
     # Test different number types (Int32, Float32)
     for Tv in (Float32, Float64)
