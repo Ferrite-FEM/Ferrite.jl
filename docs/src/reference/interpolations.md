@@ -23,3 +23,11 @@ BubbleEnrichedLagrange
 CrouzeixRaviart
 RannacherTurek
 ```
+
+Scalar interpolations can be used for vector-valued fields by vectorizing them with
+`ip ^ dim`, and for second order tensor-valued fields by wrapping them in a
+[`TensorizedInterpolation`](@ref):
+
+```@docs
+TensorizedInterpolation
+```

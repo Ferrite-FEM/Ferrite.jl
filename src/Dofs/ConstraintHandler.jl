@@ -35,6 +35,11 @@ dbc = Dirichlet(:v, ∂Ω, x -> 0 * x)
 dbc = Dirichlet(:v, ∂Ω, (x, t) -> [sin(t), cos(t)], [2, 3])
 ```
 
+For a tensor-valued field (see [`TensorizedInterpolation`](@ref)), `f` may return the
+tensor value itself, from which the prescribed `components` (referring to the tensor's
+data order) are extracted, or, as for vector fields, a collection with one entry per
+prescribed component.
+
 `Dirichlet` boundary conditions are added to a [`ConstraintHandler`](@ref)
 which applies the condition via [`apply!`](@ref) and/or [`apply_zero!`](@ref).
 """
@@ -932,6 +937,23 @@ function meandiag(K::AbstractMatrix)
     return z / size(K, 1)
 end
 
+# Wrapper for functions prescribing tensor-valued fields, allowing the function to return
+# the natural tensor value (e.g. `x -> SymmetricTensor{2, 2}((1.0, 2.0, 3.0))`) from which
+# the prescribed components (in the tensor's data order) are extracted. Returning a
+# collection with one entry per prescribed component (as for vector fields) is also
+# supported and passed through as is.
+function _wrap_tensor_bc_function(f::F, ::TensorInterpolation{TB}, components::Vector{Int}) where {F, TB}
+    function tensor_bc_function(x, t)
+        raw = hasmethod(f, Tuple{typeof(x), typeof(t)}) ? f(x, t) : f(x)
+        return _select_tensor_components(TB, raw, components)
+    end
+    return tensor_bc_function
+end
+# Only second order tensors are treated as the natural tensor value: e.g. a `Vec` return
+# is a collection of the selected components, just like for vector fields.
+_select_tensor_components(::Type{TB}, v::SecondOrderTensor, components::Vector{Int}) where {TB} = map(c -> TB(v).data[c], components)
+_select_tensor_components(::Type{TB}, v, ::Vector{Int}) where {TB} = v
+
 """
     add!(ch::ConstraintHandler, dbc::Dirichlet)
 
@@ -952,15 +974,21 @@ function add!(ch::ConstraintHandler, dbc::Dirichlet)
         interpolation = getfieldinterpolation(sdh, field_idx)
         # Internally we use the devectorized version
         n_comp = n_dbc_components(interpolation)
-        if interpolation isa VectorizedInterpolation
-            interpolation = interpolation.ip
-        end
-        getorder(interpolation) == 0 && error("No dof prescribed for order 0 interpolations")
+        base_interpolation = get_base_interpolation(interpolation)
+        getorder(base_interpolation) == 0 && error("No dof prescribed for order 0 interpolations")
         # Set up components to prescribe (empty input means prescribe all components)
         components = isempty(dbc.components) ? collect(Int, 1:n_comp) : dbc.components
         if !all(c -> 0 < c <= n_comp, components)
             error("components $(components) not within range of field :$(dbc.field_name) ($(n_comp) dimension(s))")
         end
+        # For tensor-valued fields the function may return the tensor value: normalize the
+        # return value to the prescribed components (in the tensor's data order)
+        if interpolation isa TensorInterpolation
+            f = _wrap_tensor_bc_function(dbc.f, interpolation, components)
+        else
+            f = dbc.f
+        end
+        interpolation = base_interpolation
         # Create BCValues for coordinate evaluation at dof-locations
         EntityType = eltype(dbc.facets) # (Facet|Face|Edge|Vertex)Index
         if EntityType <: Integer
@@ -970,7 +998,7 @@ function add!(ch::ConstraintHandler, dbc::Dirichlet)
         CT = getcelltype(sdh) # Same celltype enforced in SubDofHandler constructor
         bcvalues = BCValues(interpolation, geometric_interpolation(CT), EntityType)
         # Recreate the Dirichlet(...) struct with the filtered set and call internal add!
-        filtered_dbc = Dirichlet(dbc.field_name, filtered_set, dbc.f, components)
+        filtered_dbc = Dirichlet(dbc.field_name, filtered_set, f, components)
         _add!(
             ch, filtered_dbc, filtered_dbc.facets, interpolation, n_comp,
             field_offset(sdh, field_idx), bcvalues, sdh.cellset,
@@ -1069,9 +1097,12 @@ function add!(ch::ConstraintHandler, pdbc::PeriodicDirichlet)
     field_idx = find_field(ch.dh, pdbc.field_name)
     interpolation = getfieldinterpolation(ch.dh, field_idx)
     n_comp = n_dbc_components(interpolation)
-    if interpolation isa VectorizedInterpolation
-        interpolation = interpolation.ip
+    if interpolation isa TensorInterpolation && pdbc.rotation_matrix !== nothing
+        # The rotation matrix is a physical (sdim × sdim) rotation; how to map it onto the
+        # independent tensor components is an open API question.
+        throw(ArgumentError("PeriodicDirichlet with a rotation matrix is not supported for tensor-valued fields"))
     end
+    interpolation = get_base_interpolation(interpolation)
 
     if !all(c -> 0 < c <= n_comp, pdbc.components)
         error("components $(pdbc.components) not within range of field :$(pdbc.field_name) ($(n_comp) dimension(s))")

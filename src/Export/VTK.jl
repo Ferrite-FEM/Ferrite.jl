@@ -214,7 +214,14 @@ function write_solution(vtk::VTKGridFile, dh::AbstractDofHandler, u::AbstractVec
         else
             data = _evaluate_at_grid_nodes(dh, u, name, #=vtk=# Val(true))
         end
-        _vtk_write_node_data(vtk.vtk, data, string(name, suffix))
+        ip = getfieldinterpolation(dh, find_field(dh, name))
+        if ip isa TensorInterpolation
+            # Tensor-valued fields are exported in Voigt order; label the components
+            names = component_names(shape_value_type(ip, Float64))
+            _vtk_write_node_data(vtk.vtk, data, string(name, suffix); component_names = names)
+        else
+            _vtk_write_node_data(vtk.vtk, data, string(name, suffix))
+        end
     end
     return vtk
 end
@@ -337,6 +344,16 @@ function write_constraints(vtk, ch::ConstraintHandler)
 
     for field in unique_fields
         nd = n_components(ch.dh, field)
+        ip = getfieldinterpolation(ch.dh, find_field(ch.dh, field))
+        if ip isa TensorInterpolation
+            # Tensor-valued solution fields are exported in Voigt order: permute the
+            # component masks the same way (and label them) so the rows line up.
+            perm = _voigt_position_of_components(ip)
+            names = component_names(shape_value_type(ip, Float64))
+        else
+            perm = 1:nd
+            names = nothing
+        end
         data = zeros(Float64, nd, getnnodes(get_grid(ch.dh)))
         for dbc in ch.dbcs
             dbc.field_name != field && continue
@@ -345,21 +362,36 @@ function write_constraints(vtk, ch::ConstraintHandler)
                 for (cellidx, facetidx) in dbc.facets
                     for facetnode in functype(getcells(get_grid(ch.dh), cellidx))[facetidx]
                         for component in dbc.components
-                            data[component, facetnode] = 1
+                            data[perm[component], facetnode] = 1
                         end
                     end
                 end
             else
                 for nodeidx in dbc.facets
                     for component in dbc.components
-                        data[component, nodeidx] = 1
+                        data[perm[component], nodeidx] = 1
                     end
                 end
             end
         end
-        write_node_data(vtk, data, string(field, "_bc"))
+        if write_discontinuous(vtk)
+            data = _map_to_discontinuous_nodes(vtk.node_mapping, data)
+        end
+        _vtk_write_node_data(vtk.vtk, data, string(field, "_bc"); component_names = names)
     end
     return vtk
+end
+
+# The position in the Voigt (`tovoigt!`) output of each independent tensor component
+# (data order), i.e. `voigt[_voigt_position_of_components(ip)[c]]` corresponds to
+# data component `c`.
+function _voigt_position_of_components(ip::TensorInterpolation{TB}) where {TB}
+    nc = n_components(ip)
+    v = zeros(Float64, nc)
+    return map(1:nc) do c
+        tovoigt!(v, _tensorized_basis(TB, c, 1.0))
+        return findfirst(==(1.0), v)::Int
+    end
 end
 
 """
@@ -421,6 +453,7 @@ function evaluate_at_discontinuous_vtkgrid_nodes(dh::DofHandler{sdim}, u::Vector
 
     get_vtk_dim(::ScalarInterpolation, ::AbstractVector{<:SymmetricTensor{order, dim, T, M}}) where {order, dim, T, M} = M
     get_vtk_dim(::ScalarInterpolation, ::AbstractVector{<:Tensor{order, dim, T, M}}) where {order, dim, T, M} = M
+    get_vtk_dim(ip::TensorInterpolation, ::AbstractVector{<:Number}) = n_components(ip)
 
     vtk_dim = get_vtk_dim(ip, u)
     n_vtk_nodes = maximum(maximum, cellnodes)

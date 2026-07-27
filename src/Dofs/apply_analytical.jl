@@ -14,7 +14,9 @@ Apply a solution `f(x)` by modifying the values in the degree of freedom vector 
 pertaining to the field `fieldname` for all cells in `cellset`.
 The function `f(x)` are given the spatial coordinate
 of the degree of freedom. For scalar fields, `f(x)::Number`,
-and for vector fields with dimension `dim`, `f(x)::Vec{dim}`.
+for vector fields with dimension `dim`, `f(x)::Vec{dim}`, and for tensor-valued fields
+with value type `TB`, `f(x)` should return a tensor convertible to `TB`
+(e.g. `f(x)::SymmetricTensor{2, dim}`).
 
 This function can be used to apply initial conditions for time dependent problems.
 
@@ -66,7 +68,8 @@ function _apply_analytical!(
     f_dofs = zeros(Int, length(celldofinds))
 
     # Check f before looping
-    length(f(first(coords))) == field_dim || error("length(f(x)) must be equal to dimension of the field ($field_dim)")
+    length(_analytical_dof_values(ip_fun, f(first(coords)))) == field_dim ||
+        error("length(f(x)) must be equal to dimension of the field ($field_dim)")
 
     for cellnr in cellset
         getcoordinates!(coords, get_grid(dh), cellnr)
@@ -74,15 +77,22 @@ function _apply_analytical!(
         for (i, celldofind) in enumerate(celldofinds)
             f_dofs[i] = c_dofs[celldofind]
         end
-        _apply_analytical!(a, f_dofs, coords, field_dim, cv, f)
+        _apply_analytical!(a, f_dofs, coords, field_dim, cv, f, ip_fun)
     end
     return a
 end
 
-function _apply_analytical!(a::AbstractVector, dofs::Vector{Int}, coords::Vector{<:Vec}, field_dim, cv::CellValues, f)
+# The dof values (in the interpolation's component order) corresponding to the function
+# value `fval`. For tensor-valued fields the independent tensor components are used
+# (`length(fval)` counts all matrix entries, which for symmetric tensors differs from the
+# number of components, and iteration order does not match the data order).
+_analytical_dof_values(::Interpolation, fval) = fval
+_analytical_dof_values(::TensorInterpolation{TB}, fval) where {TB} = TB(fval).data
+
+function _apply_analytical!(a::AbstractVector, dofs::Vector{Int}, coords::Vector{<:Vec}, field_dim, cv::CellValues, f, ip_fun::Interpolation)
     for i_dof in 1:getnquadpoints(cv)
         x_dof = spatial_coordinate(cv, i_dof, coords)
-        for (idim, icval) in enumerate(f(x_dof))
+        for (idim, icval) in enumerate(_analytical_dof_values(ip_fun, f(x_dof)))
             a[dofs[field_dim * (i_dof - 1) + idim]] = icval
         end
     end

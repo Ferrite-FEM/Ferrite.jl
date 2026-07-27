@@ -17,6 +17,14 @@ typeof_dNdξ(::Type{T}, ::VectorInterpolation{vdim}, ::VectorizedInterpolation{s
 typeof_d2Ndx2(::Type{T}, ::VectorInterpolation{vdim}, ::VectorizedInterpolation{sdim, <:AbstractRefShape{rdim}}) where {T, vdim, sdim, rdim} = Tensors.regular_if_possible(MixedTensor3{vdim, sdim, sdim, T})
 typeof_d2Ndξ2(::Type{T}, ::VectorInterpolation{vdim}, ::VectorizedInterpolation{sdim, <:AbstractRefShape{rdim}}) where {T, vdim, sdim, rdim} = Tensors.regular_if_possible(MixedTensor3{vdim, rdim, rdim, T})
 
+# Second order tensor-valued fields. Values keep the (compact) tensor type `TB`, while
+# gradients are stored as full third order tensors also for symmetric `TB` (Tensors.jl has
+# no minor-symmetric third order tensor type). Second derivatives are not supported (see
+# the FunctionValues constructor below).
+typeof_N(::Type{T}, ::TensorInterpolation{TB}, ::VectorizedInterpolation{sdim, <:AbstractRefShape{rdim}}) where {T, TB, sdim, rdim} = TB{T}
+typeof_dNdx(::Type{T}, ::TensorInterpolation{<:Union{Tensor{2, vdim}, SymmetricTensor{2, vdim}}}, ::VectorizedInterpolation{sdim, <:AbstractRefShape{rdim}}) where {T, vdim, sdim, rdim} = Tensors.regular_if_possible(MixedTensor3{vdim, vdim, sdim, T})
+typeof_dNdξ(::Type{T}, ::TensorInterpolation{<:Union{Tensor{2, vdim}, SymmetricTensor{2, vdim}}}, ::VectorizedInterpolation{sdim, <:AbstractRefShape{rdim}}) where {T, vdim, sdim, rdim} = Tensors.regular_if_possible(MixedTensor3{vdim, vdim, rdim, T})
+
 """
     FunctionValues{DiffOrder}(::Type{T}, ip_fun, qr::QuadratureRule, ip_geo::VectorizedInterpolation)
 
@@ -57,6 +65,9 @@ struct FunctionValues{DiffOrder, IP, N_t, dNdx_t, dNdξ_t, d2Ndx2_t, d2Ndξ2_t} 
     end
 end
 function FunctionValues{DiffOrder}(::Type{T}, ip::Interpolation, qr::QuadratureRule, ip_geo::VectorizedInterpolation) where {DiffOrder, T}
+    if DiffOrder >= 2 && ip isa TensorInterpolation
+        throw(ArgumentError("second derivatives (hessians) are not yet supported for tensor-valued interpolations"))
+    end
     assert_same_refshapes(qr, ip, ip_geo)
     n_shape = getnbasefunctions(ip)
     n_qpoints = getnquadpoints(qr)
@@ -119,6 +130,11 @@ shape_hessian_type(funvals::FunctionValues) = eltype(funvals.d2Ndx2)
 shape_hessian_type(::FunctionValues{0}) = nothing
 shape_hessian_type(::FunctionValues{1}) = nothing
 
+
+# Short description of the field kind based on the shape value type, used in show methods
+_field_kind_string(::Number) = "scalar"
+_field_kind_string(v::Vec) = "vdim=$(length(v))"
+_field_kind_string(v::SecondOrderTensor) = string(Tensors.get_base(typeof(v)))
 
 # Checks that the user provides the right dimension of coordinates to reinit! methods to ensure good error messages if not
 sdim_from_gradtype(::Type{<:TT}) where {TT <: AbstractTensor} = last(size(TT))
