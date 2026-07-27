@@ -51,7 +51,7 @@ using SparseArrays
 # number of used blocks and threads on the GPU (as well as on our CPU backend).
 function compute_threads_and_blocks(n)
     ## Note that for a real problem we want to increase these numbers suitably.
-    ## If you are using CUDA.jl you can compute a suitable number of threads using the 
+    ## If you are using CUDA.jl you can compute a suitable number of threads using the
     ## [launch configuration functionality](https://cuda.juliagpu.org/stable/lib/cudadrv/#CUDACore.launch_configuration).
     MAX_NUM_THREADS = 8
     NUM_TASKS_PER_THREAD = 2
@@ -143,7 +143,7 @@ end
 # pressure on the GPU, and because Float32 is on most GPUs quite
 # a bit faster than using Float64 -- outside of high-end server GPUs (for now).
 #
-# !!! warning 
+# !!! warning
 #     We want to highlight that less bits is not free. Using Int32 caps the maximum
 #     number of dofs to about 2 million. So, if your problem has more than 2
 #     million unknowns you must stay at Int64 to avoid integer overflow problems.
