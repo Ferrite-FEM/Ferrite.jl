@@ -92,10 +92,8 @@ import LinearAlgebra
     function assemble_global_ka!(backend, cv::Ferrite.SoAContainer{<:CellValues}, K, f, cc, colors::Vector, Ke, fe, n_workers)
         assembler = if K === nothing
             nothing
-        elseif backend isa KA.GPU
-            start_assemble(K, f; fillzero = false)
         else
-            [start_assemble(K, f; fillzero = false) for i in 1:n_workers]
+            Ferrite.distribute_to_workers(backend, start_assemble(K, f; fillzero = false), n_workers)
         end
         for color in colors
             ## We divide the work into blocks and fire up the kernel.
