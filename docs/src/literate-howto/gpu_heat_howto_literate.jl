@@ -136,8 +136,8 @@ dh = DofHandler(grid)
 add!(dh, :u, ip)
 close!(dh)
 
-# If we assemble into a matrix, then we still need to color the grid as usual.
-# See also the threading how-to. Note that we still leave some of the integers
+# As the GPU assembles the matrix in parallel, we create a coloring of the cells,
+# as also shown the threading how-to. Note that we still leave some of the integers
 # 64 bit to still enable the indexing of large problems.
 colors = create_coloring(grid)
 
