@@ -168,8 +168,6 @@ import LinearAlgebra
     # Furthermore, the individual GPU workers need local buffers.
     # Ferrite comes with a little helper to transform common buffers
     # into a suitable GPU format.
-    # n_workers = ceil(Int, length(grid.cells) / NUM_THREADS) # FIXME does not match the used 493
-    # n_workers = getncells(grid)
     n_workers = prod(compute_threads_and_blocks(maximum(length.(colors))))
     cv_device = Ferrite.distribute_to_workers(backend, cv, n_workers)
     cc = CellCache(dh_device)

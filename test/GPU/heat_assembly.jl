@@ -180,8 +180,6 @@ end
     colors2_device = [adapt(backend, c) for c in colors2]
 
     dh_device = adapt(backend, dh)
-    K_device = allocate_matrix(CuSparseMatrixCSC{Float32, Int32}, dh)
-    f_device = KA.zeros(backend, Float32, (ndofs(dh),))
 
     K_device = if backend isa KA.CPU
         allocate_matrix(SparseMatrixCSC{Float32, Int32}, dh)
