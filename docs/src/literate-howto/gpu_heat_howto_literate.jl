@@ -272,7 +272,10 @@ assemble_global_cuda!(cv_gpu, cc_gpu, colors_gpu, Kes, fes)
 
 # !!! note "Matrix-free Dirichlet boundary conditions"
 #     The local matrices need special treatment to support Dirichlet boundary conditions which are not yet
-#     implemented for the GPU constraint handler.
+#     implemented for the GPU constraint handler. An example for the matrix-vector product will be provided
+#     later, when the local constraint application is ported. However, the construct shown above is still
+#     useful for some PDE problems which do not require strong enforcement of constraints or for PDEs which
+#     do not need Dirichlet constraints in first place.
 
 #=
 ## References
