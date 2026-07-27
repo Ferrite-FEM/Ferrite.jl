@@ -27,7 +27,7 @@ without running into race-conditions.
 
 ---
 
-#### [GPU assembly](gpu_heat_howto_literate.md)
+#### [GPU assembly](gpu_assembly.md)
 
 This guide builds on top of [Tutorial 1: Heat equation](../tutorials/heat_equation.md) such
 that the program is using CUDA to parallelize the assembly procedure. Concretely

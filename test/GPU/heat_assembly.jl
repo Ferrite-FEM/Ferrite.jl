@@ -1,4 +1,4 @@
-include(joinpath(@__DIR__, "..", "..", "docs", "src", "literate-howto", "gpu_heat_howto_literate.jl"))
+include(joinpath(@__DIR__, "..", "..", "docs", "src", "literate-howto", "gpu_assembly.jl"))
 
 using FerriteGmsh
 

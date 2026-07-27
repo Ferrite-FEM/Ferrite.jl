@@ -314,7 +314,7 @@ assemble_global_cuda!(cv_gpu, cc_gpu, colors_gpu, Kes, fes)
 ## References
 
 ```@bibliography
-Pages = ["gpu_heat_howto_literate.md"]
+Pages = ["gpu_assembly.md"]
 Canonical = false
 ```
 =#
