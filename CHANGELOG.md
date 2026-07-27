@@ -100,7 +100,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
    counting marker-based algorithm with lazily sorted rows. The fast fill handles `coupling`
    (all forms) and `keep_constrained = false` by applying them as filters in the counting and
    filling passes, and builds with `topology` (interface entries, e.g. for DG) use it for the
-   cell portion with the interface entries layered on top like constraints. Constructing a
+   cell portion, with row space for the interface entries reserved up front (counted from the
+   facet-neighbor cells) so that layering them on top does not grow the buffer. Constructing a
    sparsity pattern and allocating a matrix from it is around 3x faster for typical problems
    (up to ~10x with coupling/`keep_constrained`), with unchanged behavior across the full
    interface. ([#1397])

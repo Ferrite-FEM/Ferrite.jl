@@ -201,6 +201,7 @@ function _fast_fill_cells!(
         sp::SparsityPattern, dh::DofHandler,
         couplings::Union{Nothing, Vector{Matrix{Bool}}} = nothing,
         isconstrained::Union{Nothing, Vector{Bool}} = nothing,
+        neighbor_cells::Union{Nothing, ArrayOfVectorViews} = nothing,
     )
     nd = ndofs(dh)
     cell_dofs = create_celldofs(dh)
@@ -210,7 +211,7 @@ function _fast_fill_cells!(
     cell_to_sdh = dh.cell_to_subdofhandler
     _visit_row_candidates!(
         rowlen, nothing, nothing, marker, row_to_cells, row_to_localidx, cell_dofs,
-        cell_to_sdh, couplings, isconstrained
+        cell_to_sdh, couplings, isconstrained, neighbor_cells
     )
     buffer = _presize_buffer(rowlen, sp.buffer.sizehint)
     fill!(marker, 0)
@@ -369,7 +370,14 @@ function add_sparsity_entries!(
         keep_constrained || _check_keep_constrained_args(dh, ch)
         couplings = coupling === nothing ? nothing : _coupling_to_local_dof_coupling(dh, coupling)
         isconstrained = keep_constrained ? nothing : _isconstrained_by_dof(ch)
-        _fast_fill_cells!(sp, dh, couplings, isconstrained)
+        # With interface entries coming (added below), reserve row space for them up front so
+        # they land in place instead of relocating rows (see _visit_row_candidates!).
+        neighbor_cells = if topology === nothing || !(interface_coupling isa AbstractMatrix{Bool})
+            nothing
+        else
+            create_cell_to_neighbors(dh.grid, topology)
+        end
+        _fast_fill_cells!(sp, dh, couplings, isconstrained, neighbor_cells)
     else
         add_diagonal_entries!(sp)
         add_cell_entries!(sp, dh, ch; keep_constrained, coupling)
@@ -904,6 +912,34 @@ function create_celldofs(dh::DofHandler)
     return ArrayOfVectorViews(indices, cell_dofs, LinearIndices((ncells,)))
 end
 
+# For each cell, the cells sharing a facet with it (used by the fast path to reserve row space
+# for interface entries).
+function create_cell_to_neighbors(grid::AbstractGrid, topology)
+    ncells = getncells(grid)
+    counts = zeros(Int, ncells)
+    for cell in 1:ncells
+        for facet in 1:nfacets(getcells(grid, cell))
+            counts[cell] += length(getneighborhood(topology, grid, FacetIndex(cell, facet)))
+        end
+    end
+    indices = Vector{Int}(undef, ncells + 1)
+    indices[1] = 1
+    for cell in 1:ncells
+        indices[cell + 1] = indices[cell] + counts[cell]
+    end
+    data = Vector{Int}(undef, indices[end] - 1)
+    fill!(counts, 0)
+    for cell in 1:ncells
+        for facet in 1:nfacets(getcells(grid, cell))
+            for nb in getneighborhood(topology, grid, FacetIndex(cell, facet))
+                data[indices[cell] + counts[cell]] = nb.idx[1]
+                counts[cell] += 1
+            end
+        end
+    end
+    return ArrayOfVectorViews(indices, data, LinearIndices((ncells,)))
+end
+
 # Inverse of cell_dofs: for each row (dof), the connected cells and, in parallel, the row's
 # local dof index within each such cell (needed to apply coupling masks).
 function create_row_to_cells(cell_dofs::ArrayOfVectorViews, nrows::Int)
@@ -947,6 +983,7 @@ function _visit_row_candidates!(
         marker::Vector{Int}, row_to_cells::ArrayOfVectorViews, row_to_localidx::ArrayOfVectorViews,
         cell_dofs::ArrayOfVectorViews, cell_to_sdh::Vector{Int},
         couplings::Union{Nothing, Vector{Matrix{Bool}}}, isconstrained::Union{Nothing, Vector{Bool}},
+        neighbor_cells::Union{Nothing, ArrayOfVectorViews} = nothing,
     )
     counting = data === nothing
     @inbounds for row in 1:length(rowlen)
@@ -972,6 +1009,25 @@ function _visit_row_candidates!(
                         marker[col] = row
                         counting || (data[start + p] = col)
                         p += 1
+                    end
+                end
+            end
+            # Count-only (never passed in the fill pass): reserve space for interface entries by
+            # also counting the dofs of facet-neighbor cells. This is an upper bound on what
+            # add_interface_entries! can insert (exact for discontinuous interpolations with full
+            # interface coupling); over-reservation only leaves slack, never wrong entries.
+            if neighbor_cells !== nothing
+                for k in 1:length(cells)
+                    for nbc in neighbor_cells[cells[k]]
+                        nbdofs = cell_dofs[nbc]
+                        for j in 1:length(nbdofs)
+                            col = nbdofs[j]
+                            isconstrained !== nothing && isconstrained[col] && continue
+                            if marker[col] != row
+                                marker[col] = row
+                                p += 1
+                            end
+                        end
                     end
                 end
             end
