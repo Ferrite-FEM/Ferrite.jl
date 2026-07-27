@@ -40,6 +40,9 @@ end
 if runall || selected == "postprocessing"
     include("benchmarks-postprocessing.jl")
 end
+if runall || selected == "amr"
+    include("benchmarks-amr.jl")
+end
 
 # Runtime is controlled by explicit parameters instead of tuning:
 #  - `evals = 1` is declared on every benchmark (everything measures well above the timer
