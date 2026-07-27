@@ -64,12 +64,11 @@ function assemble_element!(Ke::AbstractMatrix, fe::AbstractVector, cv::CellValue
     return Ke, fe
 end
 
-# We further define a simple cell assembly wrapping to simplify
-# the matrix-free demonstration later.
+# We further define a simple cell assembly wrapping to reuse for the CUDA-kernel later.
 function assemble_cell!(Ke, fe, cell, cv, assembler)
     fill!(Ke, 0)
     fill!(fe, 0)
-    reinit!(cv, nothing, cell.coords)
+    reinit!(cv, cell)
     assemble_element!(Ke, fe, cv)
     assemble!(assembler, celldofs(cell), Ke, fe)
     return nothing
@@ -78,27 +77,27 @@ end
 # Now to the actual assembly kernel using KernelAbstractions.jl.
 # We use a grid-stride loop, which has several benefits in terms of performance and debuggability.
 # For more details please consult [this blog post](https://developer.nvidia.com/blog/cuda-pro-tip-write-flexible-kernels-grid-stride-loops/) .
-@kernel function ka_assembly_kernel(assemblers, @Const(color), cc, cv, Kes, fes)
+@kernel function ka_assembly_kernel(assemblers, @Const(color), ccs, cvs, Kes, fes)
     ## This is the classical grid-stride-loop
-    task_index = @index(Global, Linear)
+    worker_index = @index(Global, Linear)
     stride = prod(KA.@ndrange())
 
     ## Get the local evaluation buffers for the GPU worker.
-    assembler = assemblers[task_index]
-    cv_i = cv[task_index]
-    cc_i = cc[task_index]
-    Ke = view(Kes, task_index, :, :) # Note row-major indexing, this
-    fe = view(fes, task_index, :)    # is further motivated below.
+    assembler = assemblers[worker_index]
+    cv = cvs[worker_index]
+    cc = ccs[worker_index]
+    Ke = view(Kes, worker_index, :, :) # Note row-major indexing, this
+    fe = view(fes, worker_index, :)    # is further motivated below.
 
-    for i in task_index:stride:length(color)
+    for task_index in worker_index:stride:length(color)
         ## Work item index
-        cellid = color[i]
+        cellid = color[task_index]
 
         ## Query work item cell cache
-        reinit!(cc_i, cellid)
+        reinit!(cc, cellid)
 
         ## Actual assembly routine.
-        assemble_cell!(Ke, fe, cc_i, cv_i, assembler)
+        assemble_cell!(Ke, fe, cc, cv, assembler)
     end
 end
 function assemble_global_ka!(backend, cellvalues::Ferrite.SoAContainer, K, f, cc, colors::Vector, Ke, fe, n_workers; fillzero = true)
@@ -193,19 +192,19 @@ for a specific CUDA-kernel. While this section does not use any CUDA specific fe
 it shows how to perform the assembly using CUDA only.
 =#
 
-function cuda_assembly_kernel(assemblers, color, cc::Ferrite.SoAContainer, cv::Ferrite.SoAContainer, Kes::AbstractArray, fes::AbstractMatrix)
-    task_index = (blockIdx().x - Int32(1)) * blockDim().x + threadIdx().x
+function cuda_assembly_kernel(assemblers, color, ccs::Ferrite.SoAContainer, cvs::Ferrite.SoAContainer, Kes::AbstractArray, fes::AbstractMatrix)
+    worker_index = (blockIdx().x - Int32(1)) * blockDim().x + threadIdx().x
     stride = gridDim().x * blockDim().x
     ## The remaining code remains the same, as we do not show any CUDA specific features here.
-    assembler = assemblers[task_index]
-    cv_i = cv[task_index]
-    cc_i = cc[task_index]
-    Ke = view(Kes, task_index, :, :)
-    fe = view(fes, task_index, :)
-    for i in task_index:stride:length(color)
-        cellid = color[i]
-        reinit!(cc_i, cellid)
-        assemble_cell!(Ke, fe, cc_i, cv_i, assembler)
+    assembler = assemblers[worker_index]
+    cv = cvs[worker_index]
+    cc = ccs[worker_index]
+    Ke = view(Kes, worker_index, :, :)
+    fe = view(fes, worker_index, :)
+    for task_index in worker_index:stride:length(color)
+        cellid = color[task_index]
+        reinit!(cc, cellid)
+        assemble_cell!(Ke, fe, cc, cv, assembler)
     end
     return nothing
 end
@@ -233,23 +232,25 @@ Using CSR and CSC matrix formats are known to be bad on the GPU (see e.g. [Settg
 function assemble_cell!(Ke, fe, cell, cv)
     fill!(Ke, 0)
     fill!(fe, 0)
-    reinit!(cv, nothing, cell.coords)
+    reinit!(cv, cell)
     assemble_element!(Ke, fe, cv)
     return nothing
 end
 
 # This is the element-assembly kernel to setup the element matrices and vectors only.
-function cuda_assembly_kernel(color, cc, cv, Kes, fes)
-    task_index = (blockIdx().x - Int32(1)) * blockDim().x + threadIdx().x
+function cuda_assembly_kernel(color, ccs, cvs, Kes, fes)
+    worker_index = (blockIdx().x - Int32(1)) * blockDim().x + threadIdx().x
     stride = gridDim().x * blockDim().x
-    cv_i = cv[task_index]
-    cc_i = cc[task_index]
-    for i in task_index:stride:length(color)
-        cellid = color[i]
-        reinit!(cc_i, cellid)
+    cv = cvs[worker_index]
+    cc = ccs[worker_index]
+    for task_index in worker_index:stride:length(color)
+        cellid = color[task_index]
+        reinit!(cc, cellid)
+        ## For this case, we have one element
+        ## matrix and vector per cell
         Ke = view(Kes, cellid, :, :)
         fe = view(fes, cellid, :)
-        assemble_cell!(Ke, fe, cc_i, cv_i)
+        assemble_cell!(Ke, fe, cc, cv)
     end
     return nothing
 end
