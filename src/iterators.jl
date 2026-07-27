@@ -66,6 +66,7 @@ function CellCache(sdh::SubDofHandler, flags::UpdateFlags = UpdateFlags())
     return CellCache(flags, sdh.dh.grid, [-1], Int[], Tv[], sdh, Int[])
 end
 
+_isresizable(::AbstractArray) = false
 _isresizable(::Vector) = true
 _isresizable(::SubArray) = false
 function reinit!(cc::CellCache, i::Integer)
