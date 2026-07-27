@@ -169,3 +169,16 @@ using LinearAlgebra
         @test_throws ErrorException apply_analytical!(zeros(ndofs(mdh)), mdh, :u, x -> 0.0)  # Should be f(x)::Vec{2}
     end
 end
+
+@testset "apply_analytical! errors for non-identity mappings" begin
+    # The dofs of e.g. H(curl) interpolations are not nodal function values, so assigning
+    # f(x) to them directly would silently compute wrong values.
+    grid = generate_grid(Triangle, (2, 2))
+    dh = DofHandler(grid)
+    add!(dh, :A, Nedelec{RefTriangle, 1}())
+    close!(dh)
+    a = rand(ndofs(dh))
+    a0 = copy(a)
+    @test_throws ErrorException apply_analytical!(a, dh, :A, x -> zero(Vec{2}))
+    @test a == a0 # `a` must not be partially modified
+end

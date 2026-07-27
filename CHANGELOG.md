@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
    Vincent, 2015). This is the same family of rules already used for `RefPrism` and
    `RefPyramid`, and extends tetrahedral quadrature beyond the previous maximum order 5 of
    the Keast rules. ([#1389])
+ - `function_hessian` is now exported (`shape_hessian` already was). ([#1405])
 
 ### Documentation
  - The figures for the documentation are now programmatically generated and made to have a consistent look.
@@ -23,6 +24,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
  - `ProjectedDirichlet` now updates the correct dofs when the constrained field is not the first
    field in the `DofHandler`; previously the dof lookup ignored the field offset in the cell dof
    vector (typically causing a `KeyError` during `update!`) ([#1393])
+ - `evaluate_at_grid_nodes` (and thus `write_solution`) now returns correct values for
+   interpolations with non-identity mappings by calling `reinit!` internally. ([#1405])
+ - `apply_analytical!`, `Dirichlet` conditions on a nodeset, and `PeriodicDirichlet` now
+   throw an error for interpolations with non-identity mappings (e.g. `Nedelec` and
+   `RaviartThomas`) instead of silently computing wrong values, since the dofs of such
+   interpolations are not nodal function values. ([#1405])
 
 ## [v1.5.0] - 2026-07-13
 
