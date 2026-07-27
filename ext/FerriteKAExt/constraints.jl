@@ -27,6 +27,7 @@ function adapt_structure(backend::KA.Backend, ch::ConstraintHandler)
     for d in ch.prescribed_dofs
         is_prescribed[d] = true
     end
+    @assert all(x->x===nothing, ch.affine_inhomogeneities) && all(x->x===nothing, ch.dofcoefficients)  "Affine constraints not supported on GPUs."
     return DeviceConstraintHandler(
         adapt(backend, ch.prescribed_dofs),
         adapt(backend, ch.inhomogeneities),
