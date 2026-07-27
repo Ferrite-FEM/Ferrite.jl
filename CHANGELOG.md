@@ -20,6 +20,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixes
  - `FacetIterator` now works with `AbstractVector{FacetIndex}` and `AbstractSet{FacetIndex}` inputs as documented, instead of requiring an `OrderedSet` ([#1384])
+ - `ProjectedDirichlet` now updates the correct dofs when the constrained field is not the first
+   field in the `DofHandler`; previously the dof lookup ignored the field offset in the cell dof
+   vector (typically causing a `KeyError` during `update!`) ([#1393])
 
 ## [v1.5.0] - 2026-07-13
 
