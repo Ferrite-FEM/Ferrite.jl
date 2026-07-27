@@ -98,6 +98,7 @@ bibtex_plugin = CitationBibliography(
             "reference/assembly.md",
             "reference/boundary_conditions.md",
             "reference/grid.md",
+            "reference/amr.md",
             "reference/export.md",
             "reference/utils.md",
         ],

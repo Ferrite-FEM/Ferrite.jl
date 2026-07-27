@@ -225,9 +225,6 @@ each tree's leaf list is rebuilt in a single pass, rather than refining cells on
 the uniform-refinement convenience wrapper and is linear for the same reason.
 
 ```@docs
-Ferrite.AMR.refine!
-Ferrite.AMR.refine_all!
-Ferrite.AMR.coarsen!
 Ferrite.AMR.coarsen_all!
 ```
 
@@ -241,7 +238,6 @@ balancing each tree internally and propagating across tree boundaries for the le
 them.
 
 ```@docs
-Ferrite.AMR.balanceforest!
 Ferrite.AMR._balance_leaf!
 Ferrite.AMR._touches_tree_boundary
 Ferrite.AMR.inside
@@ -538,7 +534,6 @@ creategrid(forest)
    inherits its tree's set membership).
 
 ```@docs
-Ferrite.AMR.creategrid
 Ferrite.AMR.LeafSupport
 Ferrite.AMR.LnodesVisitor
 Ferrite.AMR._visit_corner!
@@ -629,8 +624,5 @@ The hanging-node map produced by `creategrid` is turned into affine constraints 
 `ConformityConstraint` to a `ConstraintHandler`. For linear (``Q_1``) interpolations each hanging
 node is constrained to the **average** of its masters — weight `1/length(masters)`, i.e. `1/2` for
 an edge midpoint and `1/4` for a 3D face center — which is exactly the value that makes the field
-continuous across the non-conforming interface.
-
-```@docs
-Ferrite.AMR.ConformityConstraint
-```
+continuous across the non-conforming interface. See [`ConformityConstraint`](@ref) for the
+user-facing documentation.

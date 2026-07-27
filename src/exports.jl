@@ -110,6 +110,12 @@ export
     generate_grid,
     # AdaptiveGrid
     ForestBWG,
+    refine!,
+    refine_all!,
+    refine_and_coarsen!,
+    coarsen!,
+    balanceforest!,
+    creategrid,
 
     # Grid coloring
     create_coloring,
