@@ -320,9 +320,8 @@ match the vertex enumeration of the corresponding geometrical cell.
 Used internally in [`ConstraintHandler`](@ref) and defaults to [`vertexdof_indices(ip::Interpolation)`](@ref) for continuous interpolation.
 
 !!! note
-    The dofs appearing in the tuple must be a subset of the interpolation's dofs for the
-    corresponding vertex, but may leave out dofs that should not be constrained by
-    `Dirichlet` (e.g. derivative dofs, see [`Hermite`](@ref)).
+    The dofs appearing in the tuple must be continuous and increasing! The first dof must be
+    the 1, as vertex dofs are enumerated first.
 """
 dirichlet_vertexdof_indices(ip::Interpolation) = vertexdof_indices(ip)
 
@@ -485,6 +484,17 @@ dirichlet_boundarydof_indices(::Type{FaceIndex}) = dirichlet_facedof_indices
 dirichlet_boundarydof_indices(::Type{EdgeIndex}) = dirichlet_edgedof_indices
 dirichlet_boundarydof_indices(::Type{VertexIndex}) = dirichlet_vertexdof_indices
 dirichlet_boundarydof_indices(::Type{FacetIndex}) = dirichlet_facetdof_indices
+
+"""
+    dof_kinds(ip::Interpolation)
+
+A tuple of length [`getnbasefunctions(::Interpolation)`](@ref) with a `Symbol` classifying
+the kind of each local dof. By default all dofs are `:value` dofs, i.e. the dof value is
+the value of the approximated function at the dof location. Interpolations with other kinds
+of dofs overload this function, e.g. [`Hermite`](@ref) which also has `:derivative` dofs.
+The kind is used by [`Dirichlet`](@ref) to select which dofs a condition constrains.
+"""
+dof_kinds(ip::Interpolation) = ntuple(_ -> :value, getnbasefunctions(ip))
 
 
 get_edge_direction(cell, edgenr) = get_edge_direction(edges(cell)[edgenr])
@@ -1588,11 +1598,12 @@ derivatives `du/dx` (the corresponding basis functions are scaled by the geometr
 Jacobian). Only affine 1D geometries are supported, i.e. `Line` cells with the default
 `Lagrange{RefLine, 1}` geometric interpolation; embedded or curved elements are not.
 
-[`Dirichlet`](@ref) conditions on facet- or vertex-sets constrain only the value dofs.
-To also clamp the derivative at a boundary vertex, prescribe the corresponding global dof
-directly with a master-less [`AffineConstraint`](@ref), e.g. for vertex 1 of cell 1:
+[`Dirichlet`](@ref) conditions on facet- or vertex-sets constrain the value dofs by
+default. To also clamp the derivative at a boundary, add a second `Dirichlet` with
+`kind = :derivative`:
 ```julia
-add!(ch, AffineConstraint(celldofs(dh, 1)[2], Pair{Int, Float64}[], 0.0))
+add!(ch, Dirichlet(:w, ∂Ω, Returns(0.0)))                     # w = 0
+add!(ch, Dirichlet(:w, ∂Ω, Returns(0.0); kind = :derivative)) # dw/dx = 0
 ```
 `Dirichlet` conditions on node-sets and `PeriodicDirichlet` are not supported.
 """
@@ -1604,8 +1615,7 @@ adjust_dofs_during_distribution(::Hermite) = false
 
 getnbasefunctions(::Hermite{RefLine, 3}) = 4
 vertexdof_indices(::Hermite{RefLine, 3}) = ((1, 2), (3, 4))
-# Only the value dofs (not the derivative dofs) are constrained by Dirichlet conditions
-dirichlet_vertexdof_indices(::Hermite{RefLine, 3}) = ((1,), (3,))
+dof_kinds(::Hermite{RefLine, 3}) = (:value, :derivative, :value, :derivative)
 
 function reference_coordinates(::Hermite{RefLine, 3})
     return [

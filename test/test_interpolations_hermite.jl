@@ -145,9 +145,10 @@ using Ferrite: reference_shape_value, reference_shape_gradient, OrderedSet
         end
     end
 
-    @testset "Dirichlet constrains only value dofs" begin
+    @testset "Dirichlet on value and derivative dofs" begin
         grid = generate_grid(Line, (2,), Vec((0.0,)), Vec((1.0,)))
         dh = DofHandler(grid); add!(dh, :w, ip); close!(dh)
+        # default kind = :value constrains only the value dofs
         ch = ConstraintHandler(dh)
         add!(ch, Dirichlet(:w, union(getfacetset(grid, "left"), getfacetset(grid, "right")), x -> x[1] + 42.0))
         close!(ch); update!(ch, 0.0)
@@ -156,14 +157,26 @@ using Ferrite: reference_shape_value, reference_shape_gradient, OrderedSet
         @test sort(ch.prescribed_dofs) == sort([left_dof, right_dof])
         @test ch.inhomogeneities[findfirst(==(left_dof), ch.prescribed_dofs)] ≈ 42.0
         @test ch.inhomogeneities[findfirst(==(right_dof), ch.prescribed_dofs)] ≈ 43.0
-        # derivative dof pinning via a master-less AffineConstraint
+        # kind = :derivative constrains only the derivative dofs, and f prescribes du/dx
         ch2 = ConstraintHandler(dh)
         add!(ch2, Dirichlet(:w, getfacetset(grid, "left"), Returns(0.0)))
-        add!(ch2, AffineConstraint(celldofs(dh, 1)[2], Pair{Int, Float64}[], 1.5))
+        add!(ch2, Dirichlet(:w, union(getfacetset(grid, "left"), getfacetset(grid, "right")), (x, t) -> x[1] + t; kind = :derivative))
         close!(ch2); update!(ch2, 0.0)
-        @test celldofs(dh, 1)[2] in ch2.prescribed_dofs
+        left_deriv = celldofs(dh, 1)[2]
+        right_deriv = celldofs(dh, 2)[4]
+        @test sort(ch2.prescribed_dofs) == sort([left_dof, left_deriv, right_deriv])
         a = zeros(ndofs(dh)); apply!(a, ch2)
-        @test a[celldofs(dh, 1)[2]] ≈ 1.5
+        @test a[left_dof] ≈ 0.0
+        @test a[left_deriv] ≈ 0.0
+        @test a[right_deriv] ≈ 1.0
+        update!(ch2, 2.0) # derivative BCs are update!-able in time
+        apply!(a, ch2)
+        @test a[left_deriv] ≈ 2.0
+        @test a[right_deriv] ≈ 3.0
+        # requesting a dof kind the interpolation does not have errors
+        @test_throws ErrorException add!(ConstraintHandler(dh), Dirichlet(:w, getfacetset(grid, "left"), Returns(0.0); kind = :nope))
+        dh_lag = DofHandler(grid); add!(dh_lag, :u, Lagrange{RefLine, 1}()); close!(dh_lag)
+        @test_throws ErrorException add!(ConstraintHandler(dh_lag), Dirichlet(:u, getfacetset(grid, "left"), Returns(0.0); kind = :derivative))
     end
 
     @testset "unsupported usage errors" begin
@@ -190,7 +203,7 @@ using Ferrite: reference_shape_value, reference_shape_gradient, OrderedSet
             dh = DofHandler(grid); add!(dh, :w, ip); close!(dh)
             ch = ConstraintHandler(dh)
             add!(ch, Dirichlet(:w, getfacetset(grid, "left"), Returns(0.0)))
-            add!(ch, AffineConstraint(celldofs(dh, 1)[2], Pair{Int, Float64}[], 0.0))
+            add!(ch, Dirichlet(:w, getfacetset(grid, "left"), Returns(0.0); kind = :derivative))
             close!(ch)
             cv = CellValues(QuadratureRule{RefLine}(2), ip; update_hessians = true)
             K = allocate_matrix(dh)
