@@ -36,8 +36,8 @@ using Ferrite, IterativeSolvers, WriteVTK
 # We create a structured 4×4×4 hexahedral grid on $[-1,1]^3$
 # and wrap it in a `ForestBWG` that allows up to 10 levels of refinement.
 # One uniform refinement gives us a reasonable starting mesh of 512 cells.
-grid = generate_grid(Hexahedron, (4, 4, 4));
-grid = ForestBWG(grid, 10)
+base_grid = generate_grid(Hexahedron, (4, 4, 4));
+grid = ForestBWG(base_grid, 10)
 Ferrite.AMR.refine_all!(grid, 1);
 
 # ### Manufactured solution
