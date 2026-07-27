@@ -34,6 +34,18 @@ function apply_analytical!(
     fieldname ∉ getfieldnames(dh) && error("The fieldname $fieldname was not found in the dof handler")
     ip_geos = _geometric_interpolations(dh)
 
+    # Check all field interpolations before mutating `a` to avoid partial application
+    for sdh in dh.subdofhandlers
+        isnothing(_find_field(sdh, fieldname)) && continue
+        ip_fun = getfieldinterpolation(sdh, find_field(sdh, fieldname))
+        # The implementation below evaluates f at the reference coordinates, which
+        # requires the dof values to be function values at these points (not the case
+        # for e.g. H(div)/H(curl) interpolations, whose dofs are integral moments)
+        if !applicable(reference_coordinates, ip_fun)
+            error("apply_analytical! is not implemented for $(ip_fun).")
+        end
+    end
+
     for (sdh, ip_geo) in zip(dh.subdofhandlers, ip_geos)
         isnothing(_find_field(sdh, fieldname)) && continue
         field_idx = find_field(sdh, fieldname)
