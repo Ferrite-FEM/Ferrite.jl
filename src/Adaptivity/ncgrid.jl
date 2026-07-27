@@ -28,7 +28,7 @@ mutable struct NonConformingGrid{dim, C <: Ferrite.AbstractCell, T <: Real, CIT}
     vertexsets::Dict{String, OrderedSet{Ferrite.VertexIndex}}
     # Hanging nodes
     # Will change, see AMR devdocs: Currently a `Dict{Int, Vector{Int}}` that
-    conformity_info::CIT # maps slave vertices to master vertices (2 or 4). 
+    conformity_info::CIT # maps slave vertices to master vertices (2 or 4).
 end
 
 function NonConformingGrid(
