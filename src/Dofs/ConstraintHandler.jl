@@ -135,11 +135,12 @@ end
 
 const DofCoefficients{Tv, Ti} = Vector{Pair{Ti, Tv}}
 """
-    AffineConstraint(constrained_dof::Integer, entries::Vector{Pair{Integer, T}}, b::T) where {T}
+    AffineConstraint(constrained_dof::Integer, entries::Vector{Pair{Ti, Tv}}, b::Tv) where {Ti, Tv}
 
 Define an affine/linear constraint to constrain one degree of freedom, `u[i]`,
 such that `u[i] = ∑(u[j] * a[j]) + b`,
-where `i=constrained_dof` and each element in `entries` are `j => a[j]`
+where `i=constrained_dof` and each element in `entries` are `j => a[j]`.
+Here `Tv` refers to the value type and `Ti` to the index type.
 """
 struct AffineConstraint{Tv, Ti}
     constrained_dof::Ti
@@ -148,10 +149,10 @@ struct AffineConstraint{Tv, Ti}
 end
 
 """
-    ConstraintHandler([Tv = Float64, [Ti = Int64]], dh::AbstractDofHandler)
+    ConstraintHandler([Tv = Float64, [Ti = Int]], dh::AbstractDofHandler)
 
 A collection of constraints associated with the dof handler `dh`.
-`Tv` is the numeric type for stored values and `Ti` the numric type for stored indices.
+`Tv` is the numeric type for stored values and `Ti` the numeric type for stored indices.
 """
 mutable struct ConstraintHandler{DH <: AbstractDofHandler, Tv, Ti}
     const dbcs::Vector{Dirichlet}
