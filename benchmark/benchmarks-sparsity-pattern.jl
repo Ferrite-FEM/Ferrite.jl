@@ -28,10 +28,10 @@ build_pattern(args...; kwargs...) = add_sparsity_entries!(init_sparsity_pattern(
 # Pattern construction, i.e. everything except the final matrix allocation.
 SPARSITY_PATTERN_SUITE["pattern"] = BenchmarkGroup()
 let SP = SPARSITY_PATTERN_SUITE["pattern"]
-    SP["cells"] = @benchmarkable build_pattern()
-    SP["cells+constraints"] = @benchmarkable build_pattern($SP_CH)
+    SP["cells"] = @benchmarkable build_pattern() evals = 1 seconds = 1.0
+    SP["cells+constraints"] = @benchmarkable build_pattern($SP_CH) evals = 1 seconds = 1.0
     # Full coupling, i.e. the same pattern as "cells" but constructed entry by entry
-    SP["cells, coupling"] = @benchmarkable build_pattern(; coupling = $(trues(2, 2)))
+    SP["cells, coupling"] = @benchmarkable build_pattern(; coupling = $(trues(2, 2))) evals = 1 seconds = 1.0
 end
 
 # Matrix allocation from an already constructed pattern. `setup` builds a fresh pattern for
@@ -44,15 +44,15 @@ let SP = SPARSITY_PATTERN_SUITE["matrix-from-pattern"]
             "SparseMatrixCSR" => SparseMatrixCSR{1, Float64, Int},
             "Symmetric" => Symmetric{Float64, SparseMatrixCSC{Float64, Int}},
         )
-        SP[name] = @benchmarkable(allocate_matrix($MatrixType, sp), setup = (sp = build_pattern()), evals = 1)
+        SP[name] = @benchmarkable(allocate_matrix($MatrixType, sp), setup = (sp = build_pattern()), evals = 1, seconds = 1.0)
     end
 end
 
 # The full user facing path: DofHandler (+ ConstraintHandler) to matrix.
 SPARSITY_PATTERN_SUITE["matrix-from-dofhandler"] = BenchmarkGroup()
 let SP = SPARSITY_PATTERN_SUITE["matrix-from-dofhandler"]
-    SP["SparseMatrixCSC"] = @benchmarkable allocate_matrix(SparseMatrixCSC{Float64, Int}, $SP_DH)
-    SP["SparseMatrixCSC, constraints"] = @benchmarkable allocate_matrix(SparseMatrixCSC{Float64, Int}, $SP_DH, $SP_CH)
+    SP["SparseMatrixCSC"] = @benchmarkable allocate_matrix(SparseMatrixCSC{Float64, Int}, $SP_DH) evals = 1 seconds = 1.0
+    SP["SparseMatrixCSC, constraints"] = @benchmarkable allocate_matrix(SparseMatrixCSC{Float64, Int}, $SP_DH, $SP_CH) evals = 1 seconds = 1.0
 end
 
 # Building a pattern manually. Entries are added out of order to exercise insertion in the
@@ -73,6 +73,6 @@ end
 
 SPARSITY_PATTERN_SUITE["add_entry!"] = BenchmarkGroup()
 let SP = SPARSITY_PATTERN_SUITE["add_entry!"]
-    SP["within-reservation"] = @benchmarkable build_pattern_by_entry(10_000, 10_000, 8, 0)
-    SP["outgrowing-reservation"] = @benchmarkable build_pattern_by_entry(10_000, 10_000, 8, 24)
+    SP["within-reservation"] = @benchmarkable build_pattern_by_entry(10_000, 10_000, 8, 0) evals = 1
+    SP["outgrowing-reservation"] = @benchmarkable build_pattern_by_entry(10_000, 10_000, 8, 24) evals = 1
 end

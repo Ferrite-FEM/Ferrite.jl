@@ -1,74 +1,65 @@
 #----------------------------------------------------------------------#
-# Benchmarks around the dof management
+# Dof management: dof distribution (close!), renumbering and dof queries
 #----------------------------------------------------------------------#
-SUITE["dof-management"] = BenchmarkGroup()
-SUITE["dof-management"]["numbering"] = BenchmarkGroup()
-# !!! NOTE close! must wrapped into a custom function, because consecutive calls to close!, since the dofs are already distributed.
-NUMBERING_SUITE = SUITE["dof-management"]["numbering"]
-for spatial_dim in [3] # 1:3
-    NUMBERING_SUITE["spatial-dim", spatial_dim] = BenchmarkGroup()
-    for geo_type in FerriteBenchmarkHelper.geo_types_for_spatial_dim(spatial_dim)
-        NUMBERING_SUITE["spatial-dim", spatial_dim][string(geo_type)] = BenchmarkGroup()
+SUITE["dofs"] = BenchmarkGroup()
 
-        ref_type = FerriteBenchmarkHelper.getrefshape(geo_type)
+# Dof distribution. One benchmark per structurally different case rather than a sweep:
+#  - vertex dofs only (linear vector field on hexahedra),
+#  - vertex + edge + face dofs (quadratic scalar field on tetrahedra),
+#  - several fields of different order (Taylor-Hood),
+#  - fields on subdomains (two SubDofHandlers with different fields).
+SUITE["dofs"]["close!"] = BenchmarkGroup()
+let g = SUITE["dofs"]["close!"]
+    hexgrid = generate_grid(Hexahedron, (10, 10, 10))
+    tetgrid = generate_grid(Tetrahedron, (8, 8, 8))
+    quadgrid = generate_grid(Quadrilateral, (40, 40))
 
-        for grid_size in [2] #[3, 6, 9] #multiple grid sized to estimate computational complexity...
-            NUMBERING_SUITE["spatial-dim", spatial_dim][string(geo_type)]["grid-size-", grid_size] = BenchmarkGroup()
-            NUMBERING_SUITE["spatial-dim", spatial_dim][string(geo_type)]["grid-size-", grid_size] = BenchmarkGroup()
-
-            grid = generate_grid(geo_type, ntuple(x -> grid_size, spatial_dim))
-
-            for field_dim in [3] #1:3
-                NUMBERING_SUITE["spatial-dim", spatial_dim][string(geo_type)]["grid-size-", grid_size]["field-dim-", field_dim] = BenchmarkGroup()
-                NUMBERING_FIELD_DIM_SUITE = NUMBERING_SUITE["spatial-dim", spatial_dim][string(geo_type)]["grid-size-", grid_size]["field-dim-", field_dim]
-                # Lagrange tests
-                for order in 1:2
-                    ip = Lagrange{ref_type, order}()
-
-                    # Skip over elements which are not implemented
-                    ξ_dummy = Vec{spatial_dim}(ntuple(x -> 0.0, spatial_dim))
-                    !applicable(Ferrite.reference_shape_value, ip, ξ_dummy, 1) && continue
-
-                    NUMBERING_FIELD_DIM_SUITE["Lagrange", order] = BenchmarkGroup()
-                    LAGRANGE_SUITE = NUMBERING_FIELD_DIM_SUITE["Lagrange", order]
-                    order2 = max(order - 1, 1)
-                    ip2 = Lagrange{ref_type, order2}()
-
-                    LAGRANGE_SUITE["DofHandler"] = BenchmarkGroup()
-
-                    close_helper = function (grid, ip)
-                        dh = DofHandler(grid)
-                        add!(dh, :u, ip^field_dim)
-                        return close!(dh)
-                    end
-                    LAGRANGE_SUITE["DofHandler"]["one-field"] = @benchmarkable $close_helper($grid, $ip)
-
-                    close_helper = function (grid, ip, ip2)
-                        dh = DofHandler(grid)
-                        add!(dh, :u, ip^field_dim)
-                        add!(dh, :p, ip2)
-                        return close!(dh)
-                    end
-                    LAGRANGE_SUITE["DofHandler"]["two-fields"] = @benchmarkable $close_helper($grid, $ip, $ip2)
-
-                    close_helper = function (grid)
-                        dh = DofHandler(grid)
-                        sdh = SubDofHandler(dh, Set(1:Int(round(getncells(grid) / 2))))
-                        add!(sdh, :u, ip^field_dim)
-                        return close!(dh)
-                    end
-                    LAGRANGE_SUITE["DofHandler"]["one-field-subdomain"] = @benchmarkable $close_helper($grid)
-
-                    close_helper = function (grid)
-                        dh = DofHandler(grid)
-                        sdh = SubDofHandler(dh, Set(1:Int(round(getncells(grid) / 2))))
-                        add!(sdh, :u, ip^field_dim)
-                        add!(sdh, :p, ip2)
-                        return close!(dh)
-                    end
-                    LAGRANGE_SUITE["DofHandler"]["two-fields-subdomain"] = @benchmarkable $close_helper($grid)
-                end
-            end
-        end
+    close_singlefield = function (grid, ip)
+        dh = DofHandler(grid)
+        add!(dh, :u, ip)
+        return close!(dh)
     end
+    g["Lagrange{1}^3 (Hexahedron 10×10×10)"] = @benchmarkable(
+        $close_singlefield($hexgrid, $(Lagrange{RefHexahedron, 1}()^3)), evals = 1
+    )
+    g["Lagrange{2} (Tetrahedron 8×8×8)"] = @benchmarkable(
+        $close_singlefield($tetgrid, $(Lagrange{RefTetrahedron, 2}())), evals = 1
+    )
+
+    close_taylorhood = function (grid)
+        dh = DofHandler(grid)
+        add!(dh, :u, Lagrange{RefQuadrilateral, 2}()^2)
+        add!(dh, :p, Lagrange{RefQuadrilateral, 1}())
+        return close!(dh)
+    end
+    g["Taylor-Hood (Quadrilateral 40×40)"] = @benchmarkable $close_taylorhood($quadgrid) evals = 1
+
+    close_subdomains = function (grid)
+        dh = DofHandler(grid)
+        half = getncells(grid) ÷ 2
+        sdh1 = SubDofHandler(dh, Set(1:half))
+        add!(sdh1, :u, Lagrange{RefQuadrilateral, 2}()^2)
+        add!(sdh1, :p, Lagrange{RefQuadrilateral, 1}())
+        sdh2 = SubDofHandler(dh, Set((half + 1):getncells(grid)))
+        add!(sdh2, :u, Lagrange{RefQuadrilateral, 2}()^2)
+        return close!(dh)
+    end
+    g["two subdomains (Quadrilateral 40×40)"] = @benchmarkable $close_subdomains($quadgrid) evals = 1
+end
+
+# Renumbering and dof queries on a larger Taylor-Hood setup (the celldofs! sweep runs at a
+# few ns per cell and needs the cell count to clear the noise floor).
+let
+    grid = generate_grid(Quadrilateral, (80, 80))
+    dh = DofHandler(grid)
+    add!(dh, :u, Lagrange{RefQuadrilateral, 2}()^2)
+    add!(dh, :p, Lagrange{RefQuadrilateral, 1}())
+    close!(dh)
+
+    # Recomputing and applying the permutation is the same amount of work whether or not
+    # the dofs are already in fieldwise order, so the same handler is reused across samples.
+    SUITE["dofs"]["renumber! fieldwise (Taylor-Hood)"] = @benchmarkable renumber!($dh, $(DofOrder.FieldWise())) evals = 1
+
+    dofs = zeros(Int, ndofs_per_cell(dh))
+    SUITE["dofs"]["celldofs! all cells (Taylor-Hood)"] = @benchmarkable FerriteBenchmarkHelpers.celldofs_sweep!($dofs, $dh) evals = 1
 end

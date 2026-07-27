@@ -14,8 +14,8 @@ Manifest.toml:
 benchmark: Manifest.toml
 	${JULIA_CMD} --project=${BENCHMARK_DIR} ${BENCHMARK_DIR}/runbenchmarks.jl benchmark/benchmarks.jl
 
-# Regenerate the committed `evals` parameters. Run after adding benchmarks; the suite falls
-# back to untuned defaults for any benchmark missing from tune.json.
+# Regenerate the committed benchmark parameters (fast, see tune.jl). Run after adding,
+# removing or renaming benchmarks.
 tune: Manifest.toml
 	${JULIA_CMD} --project=${BENCHMARK_DIR} ${BENCHMARK_DIR}/tune.jl
 

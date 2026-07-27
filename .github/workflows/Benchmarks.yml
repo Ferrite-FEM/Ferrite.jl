@@ -28,8 +28,9 @@ jobs:
     # with the `record` job in BenchmarkTracking.yml -- the noise band is derived from that time
     # series, and variance is a property of the runner.
     runs-on: macos-latest
-    # A pass is ~130 s locally (~30 s to build the suite, ~100 s to run it), and `nruns: 2`
-    # means four of them, two per revision.
+    # A pass is ~40 s locally (~10 s to build the suite, ~30 s to run it), and `nruns: 2`
+    # means four of them, two per revision; the rest of the budget is checkout, package
+    # instantiation and precompilation for both revisions.
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@v7
