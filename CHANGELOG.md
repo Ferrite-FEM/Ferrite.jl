@@ -7,8 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Next] - xxxx-xx-xx
 
-### Features
-- Experimental GPU support for assembly using type-stable, non-allocating element routines ([#1291])
+=======
+### Added
+ - New quadrature rule type `:polyquad` for `RefTetrahedron` supporting orders 1 to 10, with
+   positive weights and points strictly inside the reference tetrahedron (Witherden and
+   Vincent, 2015). This is the same family of rules already used for `RefPrism` and
+   `RefPyramid`, and extends tetrahedral quadrature beyond the previous maximum order 5 of
+   the Keast rules. ([#1389])
+ - Experimental GPU support for assembly using type-stable, non-allocating element routines ([#1291])
 
 ### Documentation
  - The figures for the documentation are now programmatically generated and made to have a consistent look.
@@ -16,6 +22,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixes
  - `FacetIterator` now works with `AbstractVector{FacetIndex}` and `AbstractSet{FacetIndex}` inputs as documented, instead of requiring an `OrderedSet` ([#1384])
+ - `ProjectedDirichlet` now updates the correct dofs when the constrained field is not the first
+   field in the `DofHandler`; previously the dof lookup ignored the field offset in the cell dof
+   vector (typically causing a `KeyError` during `update!`) ([#1393])
+ - The error thrown when assembling into a matrix entry that is missing from the sparsity
+   pattern now reports the row that is actually missing, rather than an unrelated row that
+   happened to be stored in the same column ([#1414])
 
 ## [v1.5.0] - 2026-07-13
 
@@ -1187,3 +1199,5 @@ poking into Ferrite internals:
 [#1226]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1226
 [#1228]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1228
 [#1235]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1235
+[#1389]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1389
+[#1414]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1414

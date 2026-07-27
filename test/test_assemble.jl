@@ -207,8 +207,8 @@ end
     @test_throws errr(2, 1) assemble!(a, [1, 2], [1.0 0.0; 3.0 4.0])
     @test_throws errr(2, 1) assemble!(a, [2, 1], [1.0 2.0; 0.0 4.0])
     ## Errors above diagonal
-    @test_throws errr(2, 2) assemble!(a, [1, 2], [1.0 2.0; 0.0 4.0])
-    @test_throws errr(2, 2) assemble!(as, [1, 2], [1.0 2.0; 0.0 4.0])
-    @test_throws errr(2, 2) assemble!(a, [2, 1], [1.0 0.0; 3.0 4.0])
-    @test_throws errr(2, 2) assemble!(as, [2, 1], [1.0 0.0; 3.0 4.0])
+    @test_throws errr(1, 2) assemble!(a, [1, 2], [1.0 2.0; 0.0 4.0])
+    @test_throws errr(1, 2) assemble!(as, [1, 2], [1.0 2.0; 0.0 4.0])
+    @test_throws errr(1, 2) assemble!(a, [2, 1], [1.0 0.0; 3.0 4.0])
+    @test_throws errr(1, 2) assemble!(as, [2, 1], [1.0 0.0; 3.0 4.0])
 end
