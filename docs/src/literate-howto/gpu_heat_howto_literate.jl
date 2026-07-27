@@ -6,6 +6,28 @@
 # Heat equation on GPU
 In this how-to, we demonstrate the experimental API developed to use
 graphics processing units (GPUs) with Ferrite.
+
+GPUs are designed to perform repeated compute-intensive tasks, as reflected in their
+hardware architecture which differs significantly from a typical CPU.
+On GPUs threads are grouped together into units called differently between vendors
+(e.g. warps by NVidia or wavefronts by AMD).
+While the assembly of finite element discretizations is typically limited by the
+memory transfer speed (i.e. we have memory-bound algorithms), for large enough problems
+we can still observe various amounts of speedups over a threaded assembly using all CPU cores.
+However, the speedup to be expected heavily relies on the used ansatz space, quadrature order
+and even the physics -- where we can generally say that more speedup can be expected with
+compute heavy elements.
+Therefore, users should expect less speedup when using GPUs for a mass matrix assembly on the GPU
+using linear tetrahedra in contrast to an elasticity element with compute heavy material laws
+using quadratic hexahedra with high order quadrature rules formulated with an optimized technique
+called sum-factorization (see, e.g., [this technical report](https://www.tu-chemnitz.de/sfb393/Files/PDF/sfb05-08.pdf) for details).
+For the interested reader developing custom assembly codes, an overview of hardware effects to
+consider when implementing GPU kernels is given in [this GitHub repository](https://github.com/Kobzol/hardware-effects-gpu) by Jakub Beranek.
+
+For this how-to we expect the reader to know a bare minimum about GPU programming,
+as for example shown in the [CUDA.jl introduction](https://cuda.juliagpu.org/stable/tutorials/introduction/)
+or the [KernelAbstractions.jl quickstart](https://juliagpu.github.io/KernelAbstractions.jl/stable/quickstart/#Quickstart).
+
 The how-to is split into 3 parts, first we demonstrate a standard assembly
 with a portable implementation using `KernelAbstractions.jl`. Next, we show
 how a specific kernel for `CUDA` can be written, which can be beneficial when special CUDA features are used in the element assembly function.
@@ -25,9 +47,12 @@ import KernelAbstractions: @kernel, @index
 import KernelAbstractions as KA
 using SparseArrays
 
-# and define some constants to be used in the following for convenience.
+# To stay consistent through the how-to, we start with a helper function to compute the
+# number of used blocks and threads on the GPU (as well as on our CPU backend).
 function compute_threads_and_blocks(n)
     ## Note that for a real problem we want to increase these numbers suitably.
+    ## If you are using CUDA.jl you can compute a suitable number of threads using the 
+    ## [launch configuration functionality](https://cuda.juliagpu.org/stable/lib/cudadrv/#CUDACore.launch_configuration).
     MAX_NUM_THREADS = 8
     NUM_TASKS_PER_THREAD = 2
     ## Let's assign, arbitrarily, two element assembly tasks per GPU thread.
@@ -122,7 +147,17 @@ end
 # The only major difference here is that we instantiate everything
 # using Float32 and Int32 whenever it makes sense to lower memory
 # pressure on the GPU, and because Float32 is on most GPUs quite
-# a bit faster than using Float64 -- outside of high-end server GPUs.
+# a bit faster than using Float64 -- outside of high-end server GPUs (for now).
+#
+# !!! warning 
+#     We want to highlight that less bits is not free. Using Int32 caps the maximum
+#     number of dofs to about 2 million. So, if your problem has more than 2
+#     million unknowns you must stay at Int64 to avoid integer overflow problems.
+#     Using Float32 (or types with even smaller bits used) also comes at a price.
+#     Float32 has a significantly smaller precision than Float64. Therefore, for
+#     problems with bad conditioning or fine mesh sizes, we sometimes observe that
+#     solvers start to diverge when switching from Float64 to Float32.
+#
 # Please note that GPU kernels have a launch overhead. Therefore our problem
 # must be sufficiently large to see any benefits of utilizing the GPU.
 # The small number of elements here is just for demonstration purposes.
