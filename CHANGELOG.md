@@ -96,13 +96,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Performance
  - `SparsityPattern` has been rewritten: all rows are now stored in a single contiguous buffer
-   (instead of one pool-allocated vector per row) and the common
-   `add_sparsity_entries!`/`allocate_matrix` case is filled with a fast marker-based algorithm
-   with lazily sorted rows. Constructing a sparsity pattern and allocating a matrix from it is
-   around 3x faster for typical problems, with unchanged behavior across the full interface
-   (constraints, coupling, `keep_constrained`, interfaces). Builds with `topology` (interface
-   entries, e.g. for DG) also use the fast fill for the cell portion, with the interface
-   entries layered on top like constraints. ([#1397])
+   (instead of one pool-allocated vector per row) and cell entries are filled with a fast
+   counting marker-based algorithm with lazily sorted rows. The fast fill handles `coupling`
+   (all forms) and `keep_constrained = false` by applying them as filters in the counting and
+   filling passes, and builds with `topology` (interface entries, e.g. for DG) use it for the
+   cell portion with the interface entries layered on top like constraints. Constructing a
+   sparsity pattern and allocating a matrix from it is around 3x faster for typical problems
+   (up to ~10x with coupling/`keep_constrained`), with unchanged behavior across the full
+   interface. ([#1397])
  - The internal `FastSparsityPattern` (from [#1302]) has been removed: its algorithm is now the
    built-in fast path of `SparsityPattern`, so `allocate_matrix(dh)` keeps the same speed while
    supporting all matrix types and keyword arguments through one code path. ([#1397])

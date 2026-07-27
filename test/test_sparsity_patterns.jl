@@ -348,13 +348,18 @@ end
         add!(dh, :b, Lagrange{RS, 2}()^dim)
         return close!(dh)
     end
-    # The internal fast (marker fill) path is taken for a fresh pattern with default arguments.
-    # Passing an all-true coupling forces the generic per-entry path but describes the same
-    # pattern (full coupling is the default), so the two must produce identical matrices.
+    # The internal fast (count-presize marker fill) path is taken for any fresh pattern. Force
+    # the generic per-entry path for comparison by seeding one diagonal entry first (the
+    # diagonal is always part of the pattern, so the built patterns must be identical).
+    function fsp_test_build_generic(dh, args...; kwargs...)
+        sp = init_sparsity_pattern(dh)
+        Ferrite.add_entry!(sp, 1, 1)
+        return add_sparsity_entries!(sp, dh, args...; kwargs...)
+    end
     for CT in (Line, Quadrilateral, Tetrahedron)
         dh = fsp_test_create_dh(CT)
         sp = add_sparsity_entries!(init_sparsity_pattern(dh), dh)
-        sp_gen = add_sparsity_entries!(init_sparsity_pattern(dh), dh; coupling = trues(2, 2))
+        sp_gen = fsp_test_build_generic(dh)
         K1 = allocate_matrix(sp)
         K2 = allocate_matrix(sp_gen)
         K3 = allocate_matrix(dh)
@@ -369,6 +374,24 @@ end
         K3_csr.nzval .= 1:length(K3_csr.nzval)
         @test K1_csr == K2_csr
         @test K1_csr == K3_csr
+    end
+    # Coupling and keep_constrained are handled by the fast path (masked/filtered counting);
+    # compare against the generic path for the same arguments.
+    for CT in (Quadrilateral, Tetrahedron)
+        dh = fsp_test_create_dh(CT)
+        ch = ConstraintHandler(dh)
+        add!(ch, Dirichlet(:a, getfacetset(dh.grid, "left"), x -> 0))
+        close!(ch)
+        for kwargs in (
+                (; coupling = [true true; false true]),
+                (; coupling = [true false; false true]),
+                (; keep_constrained = false),
+                (; coupling = [true true; false true], keep_constrained = false),
+            )
+            sp_fast = add_sparsity_entries!(init_sparsity_pattern(dh), dh, ch; kwargs...)
+            sp_gen = fsp_test_build_generic(dh, ch; kwargs...)
+            compare_matrices(allocate_matrix(sp_fast), allocate_matrix(sp_gen))
+        end
     end
     # Test different number types (Int32, Float32)
     for Tv in (Float32, Float64)

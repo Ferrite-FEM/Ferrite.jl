@@ -194,32 +194,30 @@ function _ensure_sorted!(sp::SparsityPattern)
 end
 
 # Fast path: count exact per-row sizes with a column marker, presize the buffer, then marker-dedup
-# fill each row UNSORTED (sorted lazily). Includes the diagonal (a dof couples with itself in its
-# cell). Assumes full coupling and keep_constrained (the emptiness gate guarantees it).
-function _fast_fill_cells!(sp::SparsityPattern, dh::DofHandler)
+# fill each row UNSORTED (sorted lazily). Always includes the diagonal. Non-full `coupling` and
+# `keep_constrained = false` are handled by applying the expanded coupling masks and the
+# constrained-dof filter identically in the count and the fill pass (see _visit_row_candidates!).
+function _fast_fill_cells!(
+        sp::SparsityPattern, dh::DofHandler,
+        couplings::Union{Nothing, Vector{Matrix{Bool}}} = nothing,
+        isconstrained::Union{Nothing, Vector{Bool}} = nothing,
+    )
     nd = ndofs(dh)
     cell_dofs = create_celldofs(dh)
-    row_to_cells = create_row_to_cells(cell_dofs, nd)
+    row_to_cells, row_to_localidx = create_row_to_cells(cell_dofs, nd)
     rowlen = zeros(Int, nd)
     marker = zeros(Int, nd)
-    count_row_sizes!(rowlen, marker, row_to_cells, cell_dofs)
+    cell_to_sdh = dh.cell_to_subdofhandler
+    _visit_row_candidates!(
+        rowlen, nothing, nothing, marker, row_to_cells, row_to_localidx, cell_dofs,
+        cell_to_sdh, couplings, isconstrained
+    )
     buffer = _presize_buffer(rowlen, sp.buffer.sizehint)
-    data = buffer.data
     fill!(marker, 0)
-    @inbounds for row in 1:nd
-        r = buffer.indices[row]
-        p = 0
-        for cnr in row_to_cells[row]
-            for col in cell_dofs[cnr]
-                if marker[col] != row
-                    marker[col] = row
-                    data[r.start + p] = col
-                    p += 1
-                end
-            end
-        end
-        buffer.indices[row] = AdaptiveRange(r.start, p, r.nmax)
-    end
+    _visit_row_candidates!(
+        rowlen, buffer.data, buffer.indices, marker, row_to_cells, row_to_localidx, cell_dofs,
+        cell_to_sdh, couplings, isconstrained
+    )
     sp.buffer = buffer
     sp.sorted = false
     return sp
@@ -351,10 +349,11 @@ function add_sparsity_entries!(
 end
 
 # SparsityPattern takes an emptiness-gated fast path: when the pattern is fresh and the request is
-# simple (no coupling, keep_constrained) the cell entries are filled with the fast marker fill
-# (which subsumes the diagonal); otherwise it falls back to the generic per-entry path. Interface
-# entries (topology) and constraints always layer on afterwards, so they are compatible with the
-# fast path.
+# SparsityPattern takes a fast path whenever it is empty: cell entries (including the diagonal,
+# and respecting `coupling` and `keep_constrained`) are exactly counted, the buffer is presized in
+# one allocation, and rows are filled with a marker-dedup append. A non-empty pattern falls back
+# to the generic per-entry path. Interface entries (topology) and constraints always layer on
+# afterwards, so they are compatible with the fast path.
 function add_sparsity_entries!(
         sp::SparsityPattern, dh::DofHandler, ch::Union{ConstraintHandler, Nothing} = nothing;
         keep_constrained::Bool = true,
@@ -366,9 +365,11 @@ function add_sparsity_entries!(
     if getnrows(sp) < ndofs(dh) || getncols(sp) < ndofs(dh)
         error("number of rows ($(getnrows(sp))) or columns ($(getncols(sp))) in the sparsity pattern is smaller than number of dofs ($(ndofs(dh)))")
     end
-    can_fast = isempty(sp.buffer.data) && coupling === nothing && keep_constrained
-    if can_fast
-        _fast_fill_cells!(sp, dh) # marker fill (unsorted); includes the diagonal
+    if isempty(sp.buffer.data)
+        keep_constrained || _check_keep_constrained_args(dh, ch)
+        couplings = coupling === nothing ? nothing : _coupling_to_local_dof_coupling(dh, coupling)
+        isconstrained = keep_constrained ? nothing : _isconstrained_by_dof(ch)
+        _fast_fill_cells!(sp, dh, couplings, isconstrained)
     else
         add_diagonal_entries!(sp)
         add_cell_entries!(sp, dh, ch; keep_constrained, coupling)
@@ -407,12 +408,25 @@ function add_cell_entries!(
     if coupling !== nothing
         coupling = _coupling_to_local_dof_coupling(dh, coupling)
     end
-    if !keep_constrained
-        ch === nothing && error("must pass ConstraintHandler when `keep_constrained = true`")
-        isclosed(ch) || error("the ConstraintHandler must be closed")
-        ch.dh === dh || error("the DofHandler and the ConstraintHandler's DofHandler must be the same")
-    end
+    keep_constrained || _check_keep_constrained_args(dh, ch)
     return _add_cell_entries!(sp, dh, ch, keep_constrained, coupling)
+end
+
+# Argument checking for methods with `keep_constrained = false`
+function _check_keep_constrained_args(dh::DofHandler, ch::Union{ConstraintHandler, Nothing})
+    ch === nothing && error("must pass ConstraintHandler when `keep_constrained = true`")
+    isclosed(ch) || error("the ConstraintHandler must be closed")
+    ch.dh === dh || error("the DofHandler and the ConstraintHandler's DofHandler must be the same")
+    return
+end
+
+# Bool per dof: is it constrained? (`ch` is validated by _check_keep_constrained_args.)
+function _isconstrained_by_dof(ch::ConstraintHandler)
+    isconstrained = zeros(Bool, ndofs(ch.dh))
+    for d in keys(ch.dofmapping)
+        isconstrained[d] = true
+    end
+    return isconstrained
 end
 
 """
@@ -444,11 +458,7 @@ function add_interface_entries!(
         topology::Union{ExclusiveTopology, Nothing} = nothing, keep_constrained::Bool = true,
         interface_coupling::AbstractMatrix{Bool},
     )
-    if !keep_constrained
-        ch === nothing && error("must pass ConstraintHandler when `keep_constrained = true`")
-        isclosed(ch) || error("the ConstraintHandler must be closed")
-        ch.dh === dh || error("the DofHandler and the ConstraintHandler's DofHandler must be the same")
-    end
+    keep_constrained || _check_keep_constrained_args(dh, ch)
     if topology === nothing
         topology = ExclusiveTopology(get_grid(dh))
     end
@@ -894,6 +904,8 @@ function create_celldofs(dh::DofHandler)
     return ArrayOfVectorViews(indices, cell_dofs, LinearIndices((ncells,)))
 end
 
+# Inverse of cell_dofs: for each row (dof), the connected cells and, in parallel, the row's
+# local dof index within each such cell (needed to apply coupling masks).
 function create_row_to_cells(cell_dofs::ArrayOfVectorViews, nrows::Int)
     num_cells = zeros(Int, nrows)
     # 1: Figure out how many cells are connected to each dof
@@ -906,7 +918,8 @@ function create_row_to_cells(cell_dofs::ArrayOfVectorViews, nrows::Int)
     end
 
     # 2: Create the correct datastructure
-    data = Vector{Int}(undef, n_connected)
+    cells = Vector{Int}(undef, n_connected)
+    localidx = Vector{Int}(undef, n_connected)
     indices = Vector{Int}(undef, nrows + 1)
     indices[1] = 1
     @inbounds for row in 1:nrows
@@ -914,24 +927,61 @@ function create_row_to_cells(cell_dofs::ArrayOfVectorViews, nrows::Int)
     end
     fill!(num_cells, 0) # Now we use this to count how many have been added
     @inbounds for (cellnr, rows) in enumerate(cell_dofs)
-        for row in rows
-            data[indices[row] + num_cells[row]] = cellnr
+        for (li, row) in enumerate(rows)
+            k = indices[row] + num_cells[row]
+            cells[k] = cellnr
+            localidx[k] = li
             num_cells[row] += 1
         end
     end
-    return ArrayOfVectorViews(indices, data, LinearIndices((nrows,)))
+    lin = LinearIndices((nrows,))
+    return ArrayOfVectorViews(indices, cells, lin), ArrayOfVectorViews(indices, localidx, lin)
 end
 
-function count_row_sizes!(rowlen::Vector{Int}, marker::Vector{Int}, row_to_cells::AbstractVector, cell_dofs::ArrayOfVectorViews)
+# Count (emit === nothing) or fill (emit = buffer) the per-row candidate columns: the diagonal,
+# plus for every incident cell the cell's dofs, filtered by the (expanded) coupling mask and, for
+# keep_constrained = false, the constrained-dof filter. The count and fill passes MUST enumerate
+# identically; both go through this function to guarantee that.
+function _visit_row_candidates!(
+        rowlen::Vector{Int}, data::Union{Nothing, Vector{Int}}, indices::Union{Nothing, Vector{AdaptiveRange}},
+        marker::Vector{Int}, row_to_cells::ArrayOfVectorViews, row_to_localidx::ArrayOfVectorViews,
+        cell_dofs::ArrayOfVectorViews, cell_to_sdh::Vector{Int},
+        couplings::Union{Nothing, Vector{Matrix{Bool}}}, isconstrained::Union{Nothing, Vector{Bool}},
+    )
+    counting = data === nothing
     @inbounds for row in 1:length(rowlen)
-        for cnr in row_to_cells[row]
-            for col in cell_dofs[cnr]
-                if marker[col] != row
-                    marker[col] = row
-                    rowlen[row] += 1
+        start = counting ? 0 : indices[row].start
+        # The diagonal is always stored (cf. add_diagonal_entries!)
+        marker[row] = row
+        counting || (data[start] = row)
+        p = 1
+        # For keep_constrained = false a constrained row stores only the diagonal
+        if !(isconstrained !== nothing && isconstrained[row])
+            cells = row_to_cells[row]
+            lidxs = row_to_localidx[row]
+            for k in 1:length(cells)
+                cnr = cells[k]
+                dofs = cell_dofs[cnr]
+                mask = couplings === nothing ? nothing : couplings[cell_to_sdh[cnr]]
+                li = lidxs[k]
+                for j in 1:length(dofs)
+                    mask === nothing || mask[li, j] || continue
+                    col = dofs[j]
+                    isconstrained !== nothing && isconstrained[col] && continue
+                    if marker[col] != row
+                        marker[col] = row
+                        counting || (data[start + p] = col)
+                        p += 1
+                    end
                 end
             end
         end
+        if counting
+            rowlen[row] = p
+        else
+            r = indices[row]
+            indices[row] = AdaptiveRange(r.start, p, r.nmax)
+        end
     end
-    return rowlen
+    return
 end
