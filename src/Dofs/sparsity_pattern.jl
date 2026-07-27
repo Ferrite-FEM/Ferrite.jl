@@ -68,10 +68,11 @@ See the constructor [`SparsityPattern(::Int, ::Int)`](@ref) for the user-facing
 documentation.
 
 # Struct fields
+ - `nrows::Int`: number of rows (`== length(buffer.indices)`).
  - `ncols::Int`: number of columns.
  - `buffer::CollectionsOfViews.ConstructionBuffer{Int, 1}`: contiguous storage where each row's
-   column indices live as a slice; `length(buffer.indices)` is the number of rows. Backing all
-   rows with a single growable buffer (plus an isbits metadata array) keeps GC pressure low.
+   column indices live as a slice. Backing all rows with a single growable buffer (plus an
+   isbits metadata array) keeps GC pressure low.
  - `sorted::Bool`: whether each row's column indices are currently sorted. Rows are filled unsorted
    by the fast path and sorted lazily on demand (see `eachrow`/`add_entry!`).
 
@@ -80,19 +81,21 @@ documentation.
     parameters, are internal and should not be relied upon.
 """
 mutable struct SparsityPattern <: AbstractSparsityPattern
+    const nrows::Int
     const ncols::Int
     buffer::CollectionsOfViews.ConstructionBuffer{Int, 1}
     sorted::Bool
 end
 
-const AdaptiveRange = CollectionsOfViews.AdaptiveRange
-
 """
     SparsityPattern(nrows::Int, ncols::Int; nnz_per_row::Int = 8)
 
 Create an empty [`SparsityPattern`](@ref) with `nrows` rows and `ncols` columns.
-`nnz_per_row` is used as a memory hint for the number of non zero entries per
-row.
+`nnz_per_row` is used as a memory hint for the number of non zero entries per row: it is the
+initial reservation for a row that receives its first entry through [`add_entry!`](@ref
+Ferrite.add_entry!), and the minimum increment when a full row has to grow. It does not
+reserve any memory up front, and the counting fast path in [`add_sparsity_entries!`](@ref)
+sizes rows exactly without consulting it.
 
 `SparsityPattern` is the default sparsity pattern type for the standard DofHandler and is
 therefore commonly constructed using [`init_sparsity_pattern`](@ref) instead of with this
@@ -119,7 +122,7 @@ more details):
 """
 function SparsityPattern(nrows::Int, ncols::Int; nnz_per_row::Int = 8)
     buffer = ConstructionBuffer(Int[], (nrows,), nnz_per_row)
-    return SparsityPattern(ncols, buffer, true)
+    return SparsityPattern(nrows, ncols, buffer, true)
 end
 
 function Base.show(io::IO, ::MIME"text/plain", sp::SparsityPattern)
@@ -152,7 +155,7 @@ function Base.show(io::IO, ::MIME"text/plain", sp::SparsityPattern)
     return
 end
 
-getnrows(sp::SparsityPattern) = length(sp.buffer.indices)
+getnrows(sp::SparsityPattern) = sp.nrows
 getncols(sp::SparsityPattern) = sp.ncols
 
 ## Storage helpers ##
