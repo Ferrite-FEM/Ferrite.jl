@@ -175,10 +175,10 @@ function Base.show(io::IO, d::MIME"text/plain", fv::FacetValues)
 end
 
 """
-    BCValues(func_interpol::Interpolation, geom_interpol::Interpolation, boundary_type::Union{Type{<:BoundaryIndex}})
+    BCValues(func_interpol::Interpolation, geom_interpol::Interpolation, boundary_type::Union{Type{<:BoundaryIndex}}, kind::Symbol = :value)
 
 `BCValues` stores the shape values at all facet/faces/edges/vertices (depending on `boundary_type`) for the geometric interpolation (`geom_interpol`),
-for each dof-position determined by the `func_interpol`. Used mainly by the `ConstraintHandler`.
+for each dof-position of kind `kind` (cf. [`Ferrite.dof_kinds`](@ref)) determined by the `func_interpol`. Used mainly by the `ConstraintHandler`.
 """
 mutable struct BCValues{T}
     const M::Array{T, 3}
@@ -186,18 +186,21 @@ mutable struct BCValues{T}
     current_entity::Int
 end
 
-BCValues(func_interpol::Interpolation, geom_interpol::Interpolation, boundary_type::Type{<:BoundaryIndex}) =
-    BCValues(Float64, func_interpol, geom_interpol, boundary_type)
+BCValues(func_interpol::Interpolation, geom_interpol::Interpolation, boundary_type::Type{<:BoundaryIndex}, kind::Symbol = :value) =
+    BCValues(Float64, func_interpol, geom_interpol, boundary_type, kind)
 
-function BCValues(::Type{T}, func_interpol::Interpolation{refshape}, geom_interpol::Interpolation{refshape}, boundary_type::Type{<:BoundaryIndex}) where {T, dim, refshape <: AbstractRefShape{dim}}
+function BCValues(::Type{T}, func_interpol::Interpolation{refshape}, geom_interpol::Interpolation{refshape}, boundary_type::Type{<:BoundaryIndex}, kind::Symbol = :value) where {T, dim, refshape <: AbstractRefShape{dim}}
     # set up quadrature rules for each boundary entity with dof-positions
-    # (determined by func_interpol) as the quadrature points
+    # (determined by func_interpol, filtered to dofs of the requested kind) as the
+    # quadrature points
     interpolation_coords = reference_coordinates(func_interpol)
+    kinds = dof_kinds(func_interpol)
 
     qrs = QuadratureRule{refshape, Vector{T}, Vector{Vec{dim, T}}}[]
     for boundarydofs in dirichlet_boundarydof_indices(boundary_type)(func_interpol)
         dofcoords = Vec{dim, T}[]
         for boundarydof in boundarydofs
+            kinds[boundarydof] === kind || continue
             push!(dofcoords, interpolation_coords[boundarydof])
         end
         qrf = QuadratureRule{refshape}(fill(T(NaN), length(dofcoords)), dofcoords) # weights will not be used

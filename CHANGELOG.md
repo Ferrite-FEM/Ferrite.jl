@@ -17,6 +17,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
  - New interpolation `Hermite{RefLine, 3}`: a C1-continuous cubic Hermite interpolation
    with value and derivative dofs, usable for fourth-order problems such as
    Euler-Bernoulli beams. ([#1391])
+ - `Dirichlet` now accepts a `kind` keyword argument to select which kind of dofs the
+   condition constrains, for interpolations with more than one kind (cf. the new
+   `Ferrite.dof_kinds` trait). The default `kind = :value` constrains value dofs as before;
+   for `Hermite` fields, `kind = :derivative` prescribes the derivative dofs, e.g. for
+   clamped beam ends. ([#1391])
 
 ### Documentation
  - The figures for the documentation are now programmatically generated and made to have a consistent look.

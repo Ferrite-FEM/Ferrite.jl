@@ -62,6 +62,14 @@ triangles), and Argyris/Morley type elements need a full ``M`` that additionally
 edge orientations (available through the `cell` argument, with
 `dof_transformation_needs_cell` returning `true`).
 
+#### Interpolations with multiple kinds of dofs
+For interpolations whose dofs are not all function values (e.g. `Hermite` with its
+derivative dofs), the kind of each dof must be specified so that `Dirichlet` can select
+which dofs to constrain.
+```@docs
+Ferrite.dof_kinds(::Interpolation)
+```
+
 #### Interpolations that cannot be constructed from their type
 For interpolations, `ip`, for which `ip == typeof(ip)()` is false (or doesn't work), the following must be implemented manually
 ```@docs

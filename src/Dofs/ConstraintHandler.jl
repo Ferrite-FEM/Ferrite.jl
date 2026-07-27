@@ -1,6 +1,6 @@
 # abstract type Constraint end
 """
-    Dirichlet(u::Symbol, ∂Ω::AbstractVecOrSet, f::Function, components = nothing)
+    Dirichlet(u::Symbol, ∂Ω::AbstractVecOrSet, f::Function, components = nothing; kind::Symbol = :value)
 
 Create a Dirichlet boundary condition on `u` on the `∂Ω` part of
 the boundary. `f` is a function of the form `f(x)` or `f(x, t)`
@@ -8,6 +8,18 @@ where `x` is the spatial coordinate and `t` is the current time,
 and returns the prescribed value. `components` specify the components
 of `u` that are prescribed by this condition. By default all components
 of `u` are prescribed.
+
+`kind` selects which kind of dofs the condition constrains, for interpolations that have
+more than one kind (cf. [`Ferrite.dof_kinds`](@ref)). The default, `:value`, constrains the
+dofs that represent the value of the function on the boundary. For example, for a field
+approximated with [`Hermite`](@ref) interpolation, `kind = :derivative` instead constrains
+the derivative dofs, and `f` then returns the prescribed derivative, e.g. for a clamped
+beam end:
+
+```julia
+add!(ch, Dirichlet(:w, ∂Ω, Returns(0.0)))                     # w = 0
+add!(ch, Dirichlet(:w, ∂Ω, Returns(0.0); kind = :derivative)) # dw/dx = 0
+```
 
 The set, `∂Ω`, can be an `AbstractSet` or `AbstractVector` with elements of
 type [`FacetIndex`](@ref), [`FaceIndex`](@ref), [`EdgeIndex`](@ref), [`VertexIndex`](@ref),
@@ -43,11 +55,12 @@ struct Dirichlet # <: Constraint
     facets::OrderedSet{T} where {T <: Union{Int, FacetIndex, FaceIndex, EdgeIndex, VertexIndex}}
     field_name::Symbol
     components::Vector{Int} # components of the field
+    kind::Symbol # kind of dofs to constrain (cf. dof_kinds), :value by default
     local_facet_dofs::Vector{Int}
     local_facet_dofs_offset::Vector{Int}
 end
-function Dirichlet(field_name::Symbol, facets::AbstractVecOrSet, f::Function, components = nothing)
-    return Dirichlet(f, convert_to_orderedset(facets), field_name, __to_components(components), Int[], Int[])
+function Dirichlet(field_name::Symbol, facets::AbstractVecOrSet, f::Function, components = nothing; kind::Symbol = :value)
+    return Dirichlet(f, convert_to_orderedset(facets), field_name, __to_components(components), kind, Int[], Int[])
 end
 
 # components=nothing is default and means that all components should be constrained
@@ -251,6 +264,7 @@ function Base.show(io::IO, ::MIME"text/plain", ch::ConstraintHandler)
         print(io, "  BCs:")
         for dbc in ch.dbcs
             print(io, "\n    ", "Field: ", dbc.field_name, ", ", "Components: ", dbc.components)
+            dbc.kind === :value || print(io, ", Kind: :", dbc.kind)
         end
     end
     return
@@ -378,7 +392,7 @@ end
 # Dirichlet on (facet|face|edge|vertex)set
 function _add!(ch::ConstraintHandler, dbc::Dirichlet, bcfacets::AbstractVecOrSet{Index}, interpolation::Interpolation, field_dim::Int, offset::Int, bcvalue::BCValues, _) where {Index <: BoundaryIndex}
     local_facet_dofs, local_facet_dofs_offset =
-        _local_facet_dofs_for_bc(interpolation, field_dim, dbc.components, offset, dirichlet_boundarydof_indices(eltype(bcfacets)))
+        _local_facet_dofs_for_bc(interpolation, field_dim, dbc.components, offset, dirichlet_boundarydof_indices(eltype(bcfacets)), dbc.kind)
     copy!(dbc.local_facet_dofs, local_facet_dofs)
     copy!(dbc.local_facet_dofs_offset, local_facet_dofs_offset)
 
@@ -403,14 +417,18 @@ end
 
 # Calculate which local dof index live on each facet:
 # facet `i` have dofs `local_facet_dofs[local_facet_dofs_offset[i]:local_facet_dofs_offset[i+1]-1]
-function _local_facet_dofs_for_bc(interpolation, field_dim, components, offset, boundaryfunc::F = dirichlet_facetdof_indices) where {F}
+function _local_facet_dofs_for_bc(interpolation, field_dim, components, offset, boundaryfunc::F = dirichlet_facetdof_indices, kind::Symbol = :value) where {F}
     @assert issorted(components)
+    kinds = dof_kinds(interpolation)
     local_facet_dofs = Int[]
     local_facet_dofs_offset = Int[1]
-    for (_, facet) in enumerate(boundaryfunc(interpolation))
-        for fdof in facet, d in 1:field_dim
-            if d in components
-                push!(local_facet_dofs, (fdof - 1) * field_dim + d + offset)
+    for facet in boundaryfunc(interpolation)
+        for fdof in facet
+            kinds[fdof] === kind || continue
+            for d in 1:field_dim
+                if d in components
+                    push!(local_facet_dofs, (fdof - 1) * field_dim + d + offset)
+                end
             end
         end
         push!(local_facet_dofs_offset, length(local_facet_dofs) + 1)
@@ -956,6 +974,9 @@ function add!(ch::ConstraintHandler, dbc::Dirichlet)
             interpolation = interpolation.ip
         end
         getorder(interpolation) == 0 && error("No dof prescribed for order 0 interpolations")
+        if dbc.kind ∉ dof_kinds(interpolation)
+            error("interpolation $(interpolation) for field :$(dbc.field_name) has no dofs of kind :$(dbc.kind) (existing kinds: $(join(unique(dof_kinds(interpolation)), ", ")))")
+        end
         # Set up components to prescribe (empty input means prescribe all components)
         components = isempty(dbc.components) ? collect(Int, 1:n_comp) : dbc.components
         if !all(c -> 0 < c <= n_comp, components)
@@ -974,9 +995,9 @@ function add!(ch::ConstraintHandler, dbc::Dirichlet)
             EntityType = FacetIndex
         end
         CT = getcelltype(sdh) # Same celltype enforced in SubDofHandler constructor
-        bcvalues = BCValues(interpolation, geometric_interpolation(CT), EntityType)
+        bcvalues = BCValues(interpolation, geometric_interpolation(CT), EntityType, dbc.kind)
         # Recreate the Dirichlet(...) struct with the filtered set and call internal add!
-        filtered_dbc = Dirichlet(dbc.field_name, filtered_set, dbc.f, components)
+        filtered_dbc = Dirichlet(dbc.field_name, filtered_set, dbc.f, components; kind = dbc.kind)
         _add!(
             ch, filtered_dbc, filtered_dbc.facets, interpolation, n_comp,
             field_offset(sdh, field_idx), bcvalues, sdh.cellset,
