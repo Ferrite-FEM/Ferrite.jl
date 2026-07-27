@@ -24,6 +24,7 @@ The following interpolations are implemented:
 * `CrouzeixRaviart{RefTetrahedron, 1}`
 * `RannacherTurek{RefQuadrilateral, 1}`
 * `RannacherTurek{RefHexahedron, 1}`
+* `Hermite{RefLine, 3}`
 * `Lagrange{RefHexahedron, 1}`
 * `Lagrange{RefHexahedron, 2}`
 * `Lagrange{RefTetrahedron, 1}`
@@ -292,7 +293,8 @@ end
 
 Returns a vector of coordinates with length [`getnbasefunctions(::Interpolation)`](@ref)
 and indices corresponding to the indices of a dof in [`vertices`](@ref), [`faces`](@ref) and
-[`edges`](@ref). Only applicable to nodal interpolations.
+[`edges`](@ref). Mainly applicable to nodal interpolations; for interpolations with
+multiple dofs per entity (e.g. [`Hermite`](@ref)) the same coordinate is repeated.
 """
 reference_coordinates(::Interpolation)
 
@@ -482,6 +484,17 @@ dirichlet_boundarydof_indices(::Type{FaceIndex}) = dirichlet_facedof_indices
 dirichlet_boundarydof_indices(::Type{EdgeIndex}) = dirichlet_edgedof_indices
 dirichlet_boundarydof_indices(::Type{VertexIndex}) = dirichlet_vertexdof_indices
 dirichlet_boundarydof_indices(::Type{FacetIndex}) = dirichlet_facetdof_indices
+
+"""
+    dof_kinds(ip::Interpolation)
+
+A tuple of length [`getnbasefunctions(::Interpolation)`](@ref) with a `Symbol` classifying
+the kind of each local dof. By default all dofs are `:value` dofs, i.e. the dof value is
+the value of the approximated function at the dof location. Interpolations with other kinds
+of dofs overload this function, e.g. [`Hermite`](@ref) which also has `:derivative` dofs.
+The kind is used by [`Dirichlet`](@ref) to select which dofs a condition constrains.
+"""
+dof_kinds(ip::Interpolation) = ntuple(_ -> :value, getnbasefunctions(ip))
 
 
 get_edge_direction(cell, edgenr) = get_edge_direction(edges(cell)[edgenr])
@@ -1570,12 +1583,74 @@ function reference_shape_value(ip::RannacherTurek{RefHexahedron, 1}, ξ::Vec{3, 
     throw(ArgumentError("no shape function $i for interpolation $ip"))
 end
 
+##########################################
+# Cubic Hermite on the line (C1 element) #
+##########################################
+"""
+    Hermite{RefLine, 3} <: ScalarInterpolation
+
+Cubic Hermite interpolation with two dofs per vertex: the function value and its
+derivative. Since both are shared between neighboring cells the interpolation is
+C¹-continuous, as required for fourth-order problems such as the Euler-Bernoulli beam.
+
+The local dof order is `(u₁, u₁', u₂, u₂')` where the derivative dofs are *physical*
+derivatives `du/dx` (the corresponding basis functions are scaled by the geometric
+Jacobian). Only affine 1D geometries are supported, i.e. `Line` cells with the default
+`Lagrange{RefLine, 1}` geometric interpolation; embedded or curved elements are not.
+
+[`Dirichlet`](@ref) conditions on facet- or vertex-sets constrain the value dofs by
+default. To also clamp the derivative at a boundary, add a second `Dirichlet` with
+`kind = :derivative`:
+```julia
+add!(ch, Dirichlet(:w, ∂Ω, Returns(0.0)))                     # w = 0
+add!(ch, Dirichlet(:w, ∂Ω, Returns(0.0); kind = :derivative)) # dw/dx = 0
+```
+`Dirichlet` conditions on node-sets and `PeriodicDirichlet` are not supported.
+"""
+struct Hermite{shape, order} <: ScalarInterpolation{shape, order} end
+
+conformity(::Hermite) = H1Conformity() # C¹ ⊂ C⁰; finer classification is not needed
+mapping_type(::Hermite) = HermiteMapping()
+adjust_dofs_during_distribution(::Hermite) = false
+
+getnbasefunctions(::Hermite{RefLine, 3}) = 4
+vertexdof_indices(::Hermite{RefLine, 3}) = ((1, 2), (3, 4))
+dof_kinds(::Hermite{RefLine, 3}) = (:value, :derivative, :value, :derivative)
+
+function reference_coordinates(::Hermite{RefLine, 3})
+    return [
+        Vec{1, Float64}((-1.0,)),
+        Vec{1, Float64}((-1.0,)),
+        Vec{1, Float64}((1.0,)),
+        Vec{1, Float64}((1.0,)),
+    ]
+end
+
+function reference_shape_value(ip::Hermite{RefLine, 3}, ξ::Vec{1, T}, i::Int) where {T}
+    x = ξ[1]
+    i == 1 && return (1 - x)^2 * (2 + x) / 4
+    i == 2 && return (1 - x)^2 * (1 + x) / 4
+    i == 3 && return (1 + x)^2 * (2 - x) / 4
+    i == 4 && return -(1 + x)^2 * (1 - x) / 4
+    throw(ArgumentError("no shape function $i for interpolation $ip"))
+end
+
+# Scaling of basis functions for derivative dofs, applied by the HermiteMapping such that
+# the dof value is the physical derivative du/dx (consistent between cells of different
+# length). The sign of J accounts for reversed cell orientation.
+@inline function hermite_derivative_scaling(::Hermite{RefLine, 3}, shape_nr::Int, J::Tensor{2, 1})
+    return (shape_nr == 2 || shape_nr == 4) ? J[1, 1] : one(J[1, 1])
+end
+
 ##################################################
 # VectorizedInterpolation{<:ScalarInterpolation} #
 ##################################################
 struct VectorizedInterpolation{vdim, refshape, order, SI <: ScalarInterpolation{refshape, order}} <: VectorInterpolation{vdim, refshape, order}
     ip::SI
     function VectorizedInterpolation{vdim}(ip::SI) where {vdim, refshape, order, SI <: ScalarInterpolation{refshape, order}}
+        # The vectorized interpolation uses the identity mapping, so interpolations with a
+        # non-trivial mapping (e.g. Hermite) cannot be vectorized.
+        mapping_type(ip) isa IdentityMapping || throw(ArgumentError("$(ip) cannot be vectorized"))
         return new{vdim, refshape, order, SI}(ip)
     end
 end

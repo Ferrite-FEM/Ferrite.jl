@@ -14,6 +14,7 @@ export
     BubbleEnrichedLagrange,
     CrouzeixRaviart,
     RannacherTurek,
+    Hermite,
     Lagrange,
     DiscontinuousLagrange,
     Serendipity,
