@@ -25,6 +25,7 @@ Furthermore we have implemented
 * `:gaussjacobi` for triangles (order 9-15)
 * `:keast_minimal` (see [Keast:1986:mtq](@cite)) for tetrahedra (order 1-5), containing negative weights
 * `:keast_positive` (see [Keast:1986:mtq](@cite)) for tetrahedra (order 1-5), containing only positive weights
+* `:polyquad` (see [WitVin:2015:isq](@cite)) for tetrahedra (order 1-10), containing only positive weights
 
 A `QuadratureRule` is used to approximate an integral on a domain by a weighted sum of
 function values at specific points:
@@ -118,6 +119,8 @@ for dim in 2:3
                 data = _get_keast_a_tet_quadrature_data(order)
             elseif $dim == 3 && quad_type === :keast_positive
                 data = _get_keast_b_tet_quadrature_data(order)
+            elseif $dim == 3 && quad_type === :polyquad
+                data = _get_gauss_tetdata_polyquad(order)
             else
                 throw(ArgumentError("unsupported quadrature rule"))
             end

@@ -8,10 +8,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Next] - xxxx-xx-xx
 
 ### Added
-- Adaptive mesh refinement (AMR) for quadrilateral and hexahedral (linear) grids via a `p4est`-style
-  forest of octrees (`ForestBWG`). A grid can be refined (`refine!`), coarsened (`coarsen!`) and
-  2:1-balanced (`balanceforest!`), then materialized into a `NonConformingGrid` with `creategrid`.
-  Hanging nodes are made conforming by adding a `ConformityConstraint` to the `ConstraintHandler`. (#780)
+ - Adaptive mesh refinement (AMR) for quadrilateral and hexahedral (linear) grids via a `p4est`-style
+   forest of octrees (`ForestBWG`). A grid can be refined (`refine!`), coarsened (`coarsen!`) and
+   2:1-balanced (`balanceforest!`), then materialized into a `NonConformingGrid` with `creategrid`.
+   Hanging nodes are made conforming by adding a `ConformityConstraint` to the `ConstraintHandler`. (#780)
+ - New quadrature rule type `:polyquad` for `RefTetrahedron` supporting orders 1 to 10, with
+   positive weights and points strictly inside the reference tetrahedron (Witherden and
+   Vincent, 2015). This is the same family of rules already used for `RefPrism` and
+   `RefPyramid`, and extends tetrahedral quadrature beyond the previous maximum order 5 of
+   the Keast rules. ([#1389])
 
 ### Documentation
  - The figures for the documentation are now programmatically generated and made to have a consistent look.
@@ -1193,3 +1198,4 @@ poking into Ferrite internals:
 [#1226]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1226
 [#1228]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1228
 [#1235]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1235
+[#1389]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1389

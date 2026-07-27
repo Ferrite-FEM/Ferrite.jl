@@ -1,0 +1,153 @@
+# Record master benchmark results over time and publish a dashboard to GitHub Pages. Runs on
+# push to master (benchmark + publish) and on release tag pushes (refresh the release markers
+# only, no re-benchmark). Docs-only commits skip the benchmark -- see the `record` job.
+#
+# The dashboard is published additively under benchmarks/ on the gh-pages branch, so it
+# coexists with the Documenter docs already there. The site ends up at
+# https://ferrite-fem.github.io/Ferrite.jl/benchmarks/.
+#
+# The time series doubles as the noise source for Benchmarks.yml, which reads it to derive a
+# per-benchmark noise band instead of using the flat time-tolerance.
+name: Benchmark tracking
+
+on:
+  push:
+    branches: ['master']
+    tags: ['v*']
+
+permissions:
+  contents: read
+
+jobs:
+  # Measuring and publishing are separate jobs on purpose. GitHub keeps at most ONE run pending
+  # per concurrency group and cancels any earlier pending one, so with the long benchmark inside
+  # `gh-pages-publish` a burst of merges would silently drop the middle commits from the history.
+  # Only the short publish is serialized, and the record survives as an artifact either way.
+  record:
+    name: Record
+    # Tag pushes only refresh the release markers; there is nothing to benchmark.
+    if: github.ref_type != 'tag'
+    # Must match the runner in Benchmarks.yml: this series is what the PR noise band is derived
+    # from, and a series recorded on a different runner says nothing about variance on this one.
+    runs-on: macos-latest
+    timeout-minutes: 45
+    concurrency:
+      group: tachometer-record-${{ github.sha }}
+      cancel-in-progress: false
+    outputs:
+      benchmarked: ${{ steps.scope.outputs.code-changed }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0 # full history + tags for metadata and release detection
+
+      # Don't re-measure identical code for a docs-only commit. Done as a step rather than a
+      # workflow-level `paths-ignore` because path filters would also apply to the tag trigger
+      # above, which must never be filtered out.
+      - name: Check for code changes
+        id: scope
+        env:
+          BEFORE: ${{ github.event.before }}
+        run: |
+          set -euo pipefail
+          if [ -z "${BEFORE:-}" ] || [ "$BEFORE" = "0000000000000000000000000000000000000000" ] \
+             || ! git cat-file -e "${BEFORE}^{commit}" 2>/dev/null; then
+            echo "no usable base commit (new branch or force-push); benchmarking"
+            echo "code-changed=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          changed="$(git diff --name-only "$BEFORE" "$GITHUB_SHA" -- . \
+            ':(exclude,glob)**/*.md' ':(exclude,glob)docs/**' ':(exclude)LICENSE')"
+          if [ -n "$changed" ]; then
+            echo "code-changed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "docs-only push; skipping benchmark"
+            echo "code-changed=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: julia-actions/setup-julia@v3
+        if: steps.scope.outputs.code-changed == 'true'
+        with:
+          version: '1'
+      - uses: julia-actions/cache@v3
+        if: steps.scope.outputs.code-changed == 'true'
+
+      - name: Install Tachometer
+        if: steps.scope.outputs.code-changed == 'true'
+        run: |
+          julia --project=.tacho -e '
+            using Pkg
+            Pkg.add(url = "https://github.com/KristofferC/Tachometer.jl")
+            Pkg.instantiate()'
+
+      - name: Record
+        if: steps.scope.outputs.code-changed == 'true'
+        env:
+          TACHOMETER_MODE: record
+          TACHOMETER_SCRIPT: benchmark/benchmarks.jl
+          TACHOMETER_RECORD_OUT: ${{ github.workspace }}/tachometer-record.json
+        run: julia --project=.tacho --startup-file=no -e 'using Tachometer; Tachometer.main()'
+
+      - uses: actions/upload-artifact@v4
+        if: steps.scope.outputs.code-changed == 'true'
+        with:
+          name: tachometer-record
+          path: ${{ github.workspace }}/tachometer-record.json
+          retention-days: 7
+
+  publish:
+    name: Publish to Pages
+    needs: [record]
+    # Runs for tag pushes (marker refresh only, `record` skipped) and for commits that were
+    # actually benchmarked. A docs-only push has nothing new to publish.
+    if: >-
+      always() && (
+        github.ref_type == 'tag' ||
+        (needs.record.result == 'success' && needs.record.outputs.benchmarked == 'true')
+      )
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: write # to push to the gh-pages branch
+    concurrency:
+      # Serialize publishes. The publisher retries, so this does not need to be shared with the
+      # Documenter deploy in Documentation.yml, even though both push to gh-pages.
+      group: gh-pages-publish
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0 # full history + tags for metadata and release detection
+
+      - uses: julia-actions/setup-julia@v3
+        with:
+          version: '1'
+      - uses: julia-actions/cache@v3
+
+      - name: Install Tachometer
+        run: |
+          julia --project=.tacho -e '
+            using Pkg
+            Pkg.add(url = "https://github.com/KristofferC/Tachometer.jl")
+            Pkg.instantiate()'
+
+      - name: Download record
+        if: github.ref_type != 'tag'
+        uses: actions/download-artifact@v4
+        with:
+          name: tachometer-record
+          path: ${{ runner.temp }}/record
+
+      - name: Publish to Pages
+        env:
+          REPO: ${{ github.workspace }}
+          PAGES_BRANCH: gh-pages
+          SUBDIR: benchmarks
+          RECORD: ${{ github.ref_type != 'tag' && format('{0}/record/tachometer-record.json', runner.temp) || '' }}
+          JULIA_PROJECT: ${{ github.workspace }}/.tacho
+          REPO_URL: ${{ github.server_url }}/${{ github.repository }}
+          PACKAGE_NAME: ${{ github.event.repository.name }}
+        run: |
+          # The publish script ships inside the installed package.
+          script="$(julia --project=.tacho -e 'using Tachometer; print(joinpath(pkgdir(Tachometer), "scripts", "publish-timeseries.sh"))')"
+          bash "$script"

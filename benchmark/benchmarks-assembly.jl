@@ -1,87 +1,142 @@
 #----------------------------------------------------------------------#
-# Assembly functionality benchmarks
+# Assembly: element kernels, global assembly loops and sparse scatter
 #----------------------------------------------------------------------#
+using SparseArrays: SparseMatrixCSC
+using SparseMatricesCSR: SparseMatrixCSR
+using LinearAlgebra: Symmetric
+
 SUITE["assembly"] = BenchmarkGroup()
 
-# Permute over common combinations for some commonly required local matrices.
-SUITE["assembly"]["common-local"] = BenchmarkGroup()
-COMMON_LOCAL_ASSEMBLY = SUITE["assembly"]["common-local"]
-for spatial_dim in 1:3
-    ξ_dummy = Vec{spatial_dim}(ntuple(x -> 0.0, spatial_dim))
-    COMMON_LOCAL_ASSEMBLY["spatial-dim", spatial_dim] = BenchmarkGroup()
-    for geo_type in FerriteBenchmarkHelper.geo_types_for_spatial_dim(spatial_dim)
-        COMMON_LOCAL_ASSEMBLY["spatial-dim", spatial_dim][string(geo_type)] = BenchmarkGroup()
+# Element kernels (reinit! + Ke fill) over a batch of cells: the per-cell work of an
+# assembly loop without iterator and scatter. One kernel per shape-function query:
+# shape_value (mass), shape_gradient (Laplace) and shape_symmetric_gradient (elasticity).
+SUITE["assembly"]["element kernels"] = BenchmarkGroup()
+let g = SUITE["assembly"]["element kernels"]
+    nbatch = 64
+    sweep! = FerriteBenchmarkHelpers.element_sweep!
 
-        grid = generate_grid(geo_type, tuple(repeat([2], spatial_dim)...))
-        topology = ExclusiveTopology(grid)
-        ip_geo = Ferrite.geometric_interpolation(geo_type)
-        ref_type = FerriteBenchmarkHelper.getrefshape(geo_type)
+    quadgrid = generate_grid(Quadrilateral, (8, 8))
+    quadbatch = FerriteBenchmarkHelpers.cell_coordinate_batch(quadgrid, nbatch)
+    cv = CellValues(QuadratureRule{RefQuadrilateral}(3), Lagrange{RefQuadrilateral, 2}())
+    Ke = zeros(getnbasefunctions(cv), getnbasefunctions(cv))
+    g["mass Lagrange{2} (Quadrilateral, $nbatch cells)"] = @benchmarkable(
+        $sweep!($Ke, $cv, $quadbatch, $(FerriteBenchmarkHelpers.mass_kernel!)), evals = 1
+    )
 
-        # Nodal interpolation tests
-        for order in 1:2, ip_type in [Lagrange, Serendipity]
-            ip_type == Serendipity && (order < 2 || ref_type ∉ (RefQuadrilateral, RefHexahedron)) && continue
-            ip = ip_type{ref_type, order}()
-            ip_vectorized = ip^spatial_dim
+    tetgrid = generate_grid(Tetrahedron, (4, 4, 4))
+    tetbatch = FerriteBenchmarkHelpers.cell_coordinate_batch(tetgrid, nbatch)
+    cv = CellValues(QuadratureRule{RefTetrahedron}(2), Lagrange{RefTetrahedron, 2}())
+    Ke = zeros(getnbasefunctions(cv), getnbasefunctions(cv))
+    g["Laplace Lagrange{2} (Tetrahedron, $nbatch cells)"] = @benchmarkable(
+        $sweep!($Ke, $cv, $tetbatch, $(FerriteBenchmarkHelpers.laplace_kernel!)), evals = 1
+    )
 
-            # Skip over elements which are not implemented
-            !applicable(Ferrite.shape_value, ip, ξ_dummy, 1) && continue
+    hexgrid = generate_grid(Hexahedron, (4, 4, 4))
+    hexbatch = FerriteBenchmarkHelpers.cell_coordinate_batch(hexgrid, nbatch)
+    cv = CellValues(QuadratureRule{RefHexahedron}(2), Lagrange{RefHexahedron, 1}()^3)
+    Ke = zeros(getnbasefunctions(cv), getnbasefunctions(cv))
+    C = FerriteBenchmarkHelpers.elasticity_tensor(3)
+    g["elasticity Lagrange{1}^3 (Hexahedron, $nbatch cells)"] = @benchmarkable(
+        $sweep!($Ke, $cv, $hexbatch, $(FerriteBenchmarkHelpers.elasticity_kernel!), $C), evals = 1
+    )
 
-            qr = QuadratureRule{ref_type}(2 * order - 1)
+    # The divergence coupling block of a mixed u-p formulation, via MultiFieldCellValues.
+    cmv = MultiFieldCellValues(
+        QuadratureRule{RefQuadrilateral}(2),
+        (u = Lagrange{RefQuadrilateral, 2}()^2, p = Lagrange{RefQuadrilateral, 1}()),
+    )
+    Ke = zeros(getnbasefunctions(cmv.u), getnbasefunctions(cmv.p))
+    g["mixed divergence u-p (Quadrilateral, $nbatch cells)"] = @benchmarkable(
+        $sweep!($Ke, $cmv, $quadbatch, $(FerriteBenchmarkHelpers.mixed_divergence_kernel!)), evals = 1
+    )
+end
 
-            # Currently we just benchmark nodal Lagrange bases.
-            COMMON_LOCAL_ASSEMBLY["spatial-dim", spatial_dim][string(geo_type)][string(ip_type), string(order)] = BenchmarkGroup()
-            LAGRANGE_SUITE = COMMON_LOCAL_ASSEMBLY["spatial-dim", spatial_dim][string(geo_type)][string(ip_type), string(order)]
-            LAGRANGE_SUITE["fe-values"] = BenchmarkGroup()
-            LAGRANGE_SUITE["ritz-galerkin"] = BenchmarkGroup()
-            LAGRANGE_SUITE["petrov-galerkin"] = BenchmarkGroup()
+# Full global assembly loops: CellIterator, reinit!, kernel and scatter, i.e. what a user's
+# `assemble_global` looks like in the tutorials. `start_assemble` zeroes the matrix, so the
+# same matrix can be reused across samples.
+SUITE["assembly"]["global loop"] = BenchmarkGroup()
+let g = SUITE["assembly"]["global loop"]
+    assemble! = FerriteBenchmarkHelpers.assemble_global!
 
-            # Note: at the time of writing this PR the ctor makes the heavy lifting and caches important values.
-            LAGRANGE_SUITE["fe-values"]["scalar"] = @benchmarkable CellValues($qr, $ip, $ip_geo)
-            LAGRANGE_SUITE["fe-values"]["vector"] = @benchmarkable CellValues($qr, $ip_vectorized, $ip_geo)
+    quadgrid = generate_grid(Quadrilateral, (40, 40))
+    dh = DofHandler(quadgrid)
+    add!(dh, :u, Lagrange{RefQuadrilateral, 2}())
+    close!(dh)
+    cv = CellValues(QuadratureRule{RefQuadrilateral}(3), Lagrange{RefQuadrilateral, 2}())
+    K = allocate_matrix(dh)
+    f = zeros(ndofs(dh))
+    g["Laplace Lagrange{2} (Quadrilateral 40×40)"] = @benchmarkable(
+        $assemble!($K, $f, $dh, $cv, $(FerriteBenchmarkHelpers.laplace_kernel!)),
+        evals = 1, seconds = 1.0,
+    )
 
-            csv = CellValues(qr, ip, ip_geo)
-            csv2 = CellValues(qr, ip, ip_geo)
+    hexgrid = generate_grid(Hexahedron, (8, 8, 8))
+    dh = DofHandler(hexgrid)
+    add!(dh, :u, Lagrange{RefHexahedron, 1}()^3)
+    close!(dh)
+    cv = CellValues(QuadratureRule{RefHexahedron}(2), Lagrange{RefHexahedron, 1}()^3)
+    K = allocate_matrix(dh)
+    f = zeros(ndofs(dh))
+    C = FerriteBenchmarkHelpers.elasticity_tensor(3)
+    g["elasticity Lagrange{1}^3 (Hexahedron 8×8×8)"] = @benchmarkable(
+        $assemble!($K, $f, $dh, $cv, $(FerriteBenchmarkHelpers.elasticity_kernel!), $C),
+        evals = 1, seconds = 1.0,
+    )
+end
 
-            cvv = CellValues(qr, ip_vectorized, ip_geo)
-            cvv2 = CellValues(qr, ip_vectorized, ip_geo)
+# Scatter-only loops with a precomputed element matrix, isolating the sparse `assemble!`
+# cost for each supported matrix type.
+SUITE["assembly"]["scatter"] = BenchmarkGroup()
+let g = SUITE["assembly"]["scatter"]
+    scatter! = FerriteBenchmarkHelpers.assemble_scatter!
 
-            # Scalar shape φ and test ψ: ∫ φ ψ
-            LAGRANGE_SUITE["ritz-galerkin"]["mass"] = @benchmarkable FerriteAssemblyHelper._generalized_ritz_galerkin_assemble_local_matrix($grid, $csv, shape_value, shape_value, *)
-            LAGRANGE_SUITE["petrov-galerkin"]["mass"] = @benchmarkable FerriteAssemblyHelper._generalized_petrov_galerkin_assemble_local_matrix($grid, $csv, shape_value, $csv2, shape_value, *)
-            # Vectorial shape φ and test ψ: ∫ φ ⋅ ψ
-            LAGRANGE_SUITE["ritz-galerkin"]["vector-mass"] = @benchmarkable FerriteAssemblyHelper._generalized_ritz_galerkin_assemble_local_matrix($grid, $cvv, shape_value, shape_value, ⋅)
-            LAGRANGE_SUITE["petrov-galerkin"]["vector-mass"] = @benchmarkable FerriteAssemblyHelper._generalized_petrov_galerkin_assemble_local_matrix($grid, $cvv, shape_value, $cvv2, shape_value, ⋅)
-            # Scalar shape φ and test ψ: ∫ ∇φ ⋅ ∇ψ
-            LAGRANGE_SUITE["ritz-galerkin"]["Laplace"] = @benchmarkable FerriteAssemblyHelper._generalized_ritz_galerkin_assemble_local_matrix($grid, $csv, shape_gradient, shape_gradient, ⋅)
-            LAGRANGE_SUITE["petrov-galerkin"]["Laplace"] = @benchmarkable FerriteAssemblyHelper._generalized_petrov_galerkin_assemble_local_matrix($grid, $csv, shape_gradient, $csv2, shape_gradient, ⋅)
-            # Vectorial shape φ and test ψ: ∫ ∇φ : ∇ψ
-            LAGRANGE_SUITE["ritz-galerkin"]["vector-Laplace"] = @benchmarkable FerriteAssemblyHelper._generalized_ritz_galerkin_assemble_local_matrix($grid, $cvv, shape_gradient, shape_gradient, ⊡)
-            LAGRANGE_SUITE["petrov-galerkin"]["vector-Laplace"] = @benchmarkable FerriteAssemblyHelper._generalized_petrov_galerkin_assemble_local_matrix($grid, $cvv, shape_gradient, $cvv2, shape_gradient, ⊡)
-            # Vectorial shape φ and scalar test ψ: ∫ (∇ ⋅ φ) ψ
-            LAGRANGE_SUITE["petrov-galerkin"]["pressure-velocity"] = @benchmarkable FerriteAssemblyHelper._generalized_petrov_galerkin_assemble_local_matrix($grid, $cvv, shape_divergence, $csv, shape_value, *)
+    grid = generate_grid(Quadrilateral, (40, 40))
+    dh = DofHandler(grid)
+    add!(dh, :u, Lagrange{RefQuadrilateral, 2}())
+    close!(dh)
+    dofs_batch = FerriteBenchmarkHelpers.celldofs_batch(dh, getncells(grid))
+    n = ndofs_per_cell(dh)
+    Ke = rand(n, n)
+    Ke = Ke + Ke' # assembling into Symmetric requires a symmetric Ke
 
-            if spatial_dim > 1
-                qr_facet = FacetQuadratureRule{ref_type}(2 * order - 1)
-                fsv = FacetValues(qr_facet, ip, ip_geo)
-                fsv2 = FacetValues(qr_facet, ip, ip_geo)
+    K = allocate_matrix(SparseMatrixCSC{Float64, Int}, dh)
+    g["SparseMatrixCSC (Quadrilateral 40×40)"] = @benchmarkable $scatter!($K, $dofs_batch, $Ke) evals = 1
 
-                LAGRANGE_SUITE["ritz-galerkin"]["face-flux"] = @benchmarkable FerriteAssemblyHelper._generalized_ritz_galerkin_assemble_local_matrix($grid, $fsv, shape_gradient, shape_value, *)
-                LAGRANGE_SUITE["petrov-galerkin"]["face-flux"] = @benchmarkable FerriteAssemblyHelper._generalized_petrov_galerkin_assemble_local_matrix($grid, $fsv, shape_gradient, $fsv2, shape_value, *)
+    Ksym = allocate_matrix(Symmetric{Float64, SparseMatrixCSC{Float64, Int}}, dh)
+    g["Symmetric CSC (Quadrilateral 40×40)"] = @benchmarkable $scatter!($Ksym, $dofs_batch, $Ke) evals = 1
 
-                ip = DiscontinuousLagrange{ref_type, order}()
-                isv = InterfaceValues(qr_facet, ip, ip_geo)
-                isv2 = InterfaceValues(qr_facet, ip, ip_geo)
-                dh = DofHandler(grid)
-                add!(dh, :u, ip)
-                close!(dh)
+    Kcsr = allocate_matrix(SparseMatrixCSR{1, Float64, Int}, dh)
+    g["SparseMatrixCSR (Quadrilateral 40×40)"] = @benchmarkable $scatter!($Kcsr, $dofs_batch, $Ke) evals = 1
+end
 
-                LAGRANGE_SUITE["ritz-galerkin"]["interface-{grad}⋅[[val]]"] = @benchmarkable FerriteAssemblyHelper._generalized_ritz_galerkin_assemble_interfaces($dh, $isv, shape_gradient_average, shape_value_jump, ⋅)
-                LAGRANGE_SUITE["petrov-galerkin"]["interface-{grad}⋅[[val]]"] = @benchmarkable FerriteAssemblyHelper._generalized_petrov_galerkin_assemble_interfaces($dh, $isv, shape_gradient_average, $isv2, shape_value_jump, ⋅)
+# Boundary load assembly: FacetIterator, FacetValues reinit! and vector scatter.
+SUITE["assembly"]["facet loop"] = BenchmarkGroup()
+let g = SUITE["assembly"]["facet loop"]
+    grid = generate_grid(Hexahedron, (10, 10, 10))
+    dh = DofHandler(grid)
+    add!(dh, :u, Lagrange{RefHexahedron, 1}()^3)
+    close!(dh)
+    fv = FacetValues(FacetQuadratureRule{RefHexahedron}(2), Lagrange{RefHexahedron, 1}()^3)
+    facetset = getfacetset(grid, "right")
+    f = zeros(ndofs(dh))
+    g["Neumann load Lagrange{1}^3 (Hexahedron 10×10×10, right)"] = @benchmarkable(
+        FerriteBenchmarkHelpers.assemble_facet_load!($f, $dh, $fv, $facetset), evals = 1
+    )
+end
 
-                LAGRANGE_SUITE["ritz-galerkin"]["interface-interior-penalty"] = @benchmarkable FerriteAssemblyHelper._generalized_ritz_galerkin_assemble_interfaces($dh, $isv, shape_value_jump, shape_value_jump, ⋅)
-                LAGRANGE_SUITE["petrov-galerkin"]["interface-interior-penalty"] = @benchmarkable FerriteAssemblyHelper._generalized_petrov_galerkin_assemble_interfaces($dh, $isv, shape_value_jump, $isv2, shape_value_jump, ⋅)
-
-            end
-        end
-    end
+# DG interface assembly: InterfaceIterator, InterfaceValues reinit! and scatter of the
+# cross-element interface matrix.
+SUITE["assembly"]["interface loop"] = BenchmarkGroup()
+let g = SUITE["assembly"]["interface loop"]
+    grid = generate_grid(Quadrilateral, (16, 16))
+    topology = ExclusiveTopology(grid)
+    ip = DiscontinuousLagrange{RefQuadrilateral, 1}()
+    dh = DofHandler(grid)
+    add!(dh, :u, ip)
+    close!(dh)
+    iv = InterfaceValues(FacetQuadratureRule{RefQuadrilateral}(2), ip)
+    K = allocate_matrix(dh; topology, interface_coupling = trues(1, 1))
+    g["interior penalty DiscontinuousLagrange{1} (Quadrilateral 16×16)"] = @benchmarkable(
+        FerriteBenchmarkHelpers.assemble_interfaces!($K, $dh, $iv, $topology), evals = 1
+    )
 end
