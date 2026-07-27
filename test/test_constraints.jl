@@ -1683,3 +1683,16 @@ end # testset
     close!(ch)
     @test_throws ErrorException("condensation of ::Symmetric matrix not supported") apply!(K2, f2, ch)
 end
+
+@testset "errors for non-identity mappings" begin
+    # The dofs of e.g. H(curl) interpolations are not nodal function values, so the
+    # node idx -> dof idx assumption for nodeset conditions does not hold, and
+    # PeriodicDirichlet would pair only the dirichlet_facetdof_indices dofs.
+    grid = generate_grid(Triangle, (2, 2))
+    dh = DofHandler(grid)
+    add!(dh, :A, Nedelec{RefTriangle, 1}())
+    close!(dh)
+    ch = ConstraintHandler(dh)
+    @test_throws ArgumentError add!(ch, Dirichlet(:A, Set([1]), Returns(0.0))) # nodeset
+    @test_throws ArgumentError add!(ch, PeriodicDirichlet(:A, Ferrite.PeriodicFacetPair[]))
+end

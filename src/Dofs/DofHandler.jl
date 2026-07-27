@@ -1022,8 +1022,11 @@ function _evaluate_at_grid_nodes!(
         u::AbstractVector{T}, cv::CellValues, drange::UnitRange
     ) where {T}
     ue = zeros(T, length(drange))
+    # For identity mappings the physical shape values alias the reference values, but other
+    # mappings require reinit! to compute them
+    needs_reinit = !isa(mapping_type(function_interpolation(cv)), IdentityMapping)
     for cell in CellIterator(sdh)
-        # Note: We are only using the shape functions: no reinit!(cv, cell) necessary
+        needs_reinit && reinit!(cv, cell)
         @assert getnquadpoints(cv) == length(cell.nodes)
         for (i, I) in pairs(drange)
             ue[i] = u[cell.dofs[I]]
