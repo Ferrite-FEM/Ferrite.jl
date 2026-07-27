@@ -43,6 +43,20 @@ dofs for the fields we added.
 close!(dh)
 ```
 
+### Global fields
+
+Fields added with the [`GlobalConstant`](@ref) interpolation are *global fields*: they have
+a fixed number of dofs (one for the scalar `GlobalConstant{refshape}()`, ``n`` for the
+vectorized `GlobalConstant{refshape}()^n`) that are *shared between all cells* of the
+(Sub)DofHandler the field is added to. The dofs are part of [`celldofs`](@ref) of every
+such cell, which means that a global field couples with all other fields on those cells and
+that assembly, sparsity patterns, and `dof_range` work like for any other field. Typical
+use cases are Lagrange multipliers for integral constraints (e.g. a mean value constraint)
+and macroscopic unknowns in computational homogenization. To restrict the coupling of a
+global field to only a part of the grid, add the field to a `SubDofHandler` covering those
+cells (the other cells go in a second `SubDofHandler`, with the regular fields repeated).
+The dof numbers of a global field can be retrieved with [`global_field_dofs`](@ref).
+
 ## Local DoF indices
 
 Locally on each element the DoFs are ordered by field, in the same order they were added

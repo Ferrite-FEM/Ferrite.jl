@@ -30,6 +30,7 @@ ndofs_per_cell
 dof_range
 celldofs
 celldofs!
+global_field_dofs
 ```
 
 # Grid iterators

@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Next] - xxxx-xx-xx
 
+### Added
+ - Global fields: fields whose degrees of freedom are shared between *all* cells of the
+   `SubDofHandler` they are added to, declared with the new interpolation
+   `GlobalConstant{refshape}` (vector valued via e.g. `GlobalConstant{refshape}()^3`).
+   Typical use cases are Lagrange multipliers for integral constraints (e.g. mean value
+   constraints) and macroscopic unknowns in computational homogenization. The dofs are
+   part of `celldofs` of every cell in the `SubDofHandler`, so sparsity patterns,
+   assembly, `dof_range`, `CellValues`, and export work like for any other field. The new
+   function `global_field_dofs(dh, fieldname)` returns the dof numbers of a global field.
+   Note that colored threaded assembly is not safe for cells carrying a global field (see
+   the `GlobalConstant` docstring). ([#1395])
+
 ### Documentation
  - The figures for the documentation are now programmatically generated and made to have a consistent look.
  - New tutorial: Elastodynamics and modal analysis of a cantilever beam (mass matrix, generalized eigenvalue problem, Rayleigh damping, Newmark time integration).
@@ -1185,3 +1197,5 @@ poking into Ferrite internals:
 [#1226]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1226
 [#1228]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1228
 [#1235]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1235
+[#1384]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1384
+[#1395]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1395

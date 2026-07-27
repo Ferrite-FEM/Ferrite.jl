@@ -38,6 +38,9 @@ function apply_analytical!(
         isnothing(_find_field(sdh, fieldname)) && continue
         field_idx = find_field(sdh, fieldname)
         ip_fun = getfieldinterpolation(sdh, field_idx)
+        if is_global_field_interpolation(ip_fun)
+            error("apply_analytical! is not supported for the global field :$fieldname: the dofs have no associated coordinates. Set the values directly using the dofs from `global_field_dofs`.")
+        end
         field_dim = n_components(sdh, field_idx)
         celldofinds = dof_range(sdh, fieldname)
         set_intersection = if length(cellset) == length(sdh.cellset) == getncells(get_grid(dh))

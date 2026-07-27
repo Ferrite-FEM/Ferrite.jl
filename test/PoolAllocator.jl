@@ -75,6 +75,30 @@ using Test, Ferrite.PoolAllocator
     B = PoolAllocator.malloc(mempool, (64, 32))
     @test size(B) == (64, 32)
 
+    # Oversized blocks (larger than the regular page size), e.g. sparsity pattern rows
+    # for global dofs coupling with a large part of the total number of dofs
+    mempool = PoolAllocator.MemoryPool{Int}()
+    page_length = PoolAllocator.PAGE_SIZE ÷ sizeof(Int)
+    x = PoolAllocator.malloc(mempool, page_length ÷ 2 + 1) # rounds up to exactly one page
+    @test length(x) == page_length ÷ 2 + 1
+    x .= 1:length(x)
+    x = PoolAllocator.realloc(x, page_length + 1) # beyond the regular page size
+    @test length(x) == page_length + 1
+    @test x[1:(page_length ÷ 2 + 1)] == 1:(page_length ÷ 2 + 1)
+    x = PoolAllocator.resize(x, 4 * page_length)
+    x .= 1:length(x)
+    @test length(x) == 4 * page_length
+    y = PoolAllocator.malloc(mempool, 3 * page_length) # same (power of two) oversized book
+    @test length(y) == 3 * page_length
+    y .= -1
+    @test x == 1:(4 * page_length) # not aliased
+    used, allocated = PoolAllocator.mempool_stats(mempool)
+    @test used >= 7 * page_length * sizeof(Int)
+    @test allocated >= used
+    PoolAllocator.free(x)
+    PoolAllocator.free(y)
+    show(devnull, MIME"text/plain"(), mempool)
+
     # Smoke test for `show`
     show(devnull, MIME"text/plain"(), mempool)
 

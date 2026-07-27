@@ -84,6 +84,21 @@ n_components(::VectorInterpolation{vdim}) where {vdim} = vdim
 # Number of components that are allowed to prescribe in e.g. Dirichlet BC
 n_dbc_components(ip::Interpolation) = n_components(ip)
 
+# Number of dofs that are shared between *all* cells of the SubDofHandler the field is
+# added to ("global dofs"), see `GlobalConstant`. This is non-zero only for global field
+# interpolations, and counts the dofs of the scalar base interpolation (vectorization is
+# handled via `n_copies` just like for the entity dofs).
+n_global_dofs(::Interpolation) = 0
+
+"""
+    is_global_field_interpolation(ip::Interpolation)
+
+Return `true` if `ip` is an interpolation for a global field (e.g. [`GlobalConstant`](@ref)
+or a vectorized version of one), i.e. an interpolation whose dofs are shared between all
+cells of the `SubDofHandler` the field is added to.
+"""
+is_global_field_interpolation(ip::Interpolation) = n_global_dofs(get_base_interpolation(ip)) > 0
+
 """
     shape_value_type(ip::Interpolation, ::Type{T}) where {T <: Number}
 
@@ -119,6 +134,7 @@ struct InterpolationInfo
     nedgedofs::Vector{Int}
     nfacedofs::Vector{Int}
     nvolumedofs::Int
+    nglobaldofs::Int
     reference_dim::Int
     adjust_during_distribution::Bool
     n_copies::Int
@@ -129,6 +145,7 @@ function InterpolationInfo(interpolation::Interpolation{shape}, n_copies) where 
         [length(i) for i in edgedof_interior_indices(interpolation)],
         [length(i) for i in facedof_interior_indices(interpolation)],
         length(volumedof_interior_indices(interpolation)),
+        n_global_dofs(interpolation),
         rdim,
         adjust_dofs_during_distribution(interpolation),
         n_copies
@@ -538,6 +555,67 @@ function reference_coordinates(ip::DiscontinuousLagrange{RefTetrahedron, 0})
 end
 
 function reference_shape_value(ip::DiscontinuousLagrange{shape, 0}, ::Vec{dim, T}, i::Int) where {dim, shape <: AbstractRefShape{dim}, T}
+    i == 1 && return one(T)
+    throw(ArgumentError("no shape function $i for interpolation $ip"))
+end
+
+##################
+# GlobalConstant #
+##################
+"""
+    GlobalConstant{refshape} <: ScalarInterpolation
+
+Interpolation for a *global field*: a field with a single degree of freedom that is shared
+between **all** cells of the `SubDofHandler` it is added to, with the constant shape
+function ``N(\\boldsymbol{\\xi}) = 1``. Typical use cases are Lagrange multipliers that
+enforce integral constraints (e.g. a mean value constraint) and macroscopic quantities in
+computational homogenization.
+
+The dofs of a global field are appended to the cell dofs of every cell in the
+`SubDofHandler`, i.e. the field couples with all other fields on those cells: sparsity
+patterns, `dof_range`, assembly, and export work like for any other field. Adding the same
+global field (same name) to several `SubDofHandler`s shares the dofs between them. Use
+[`global_field_dofs`](@ref) to retrieve the dof numbers of a global field.
+
+Vector-valued global fields are created with the usual vectorization syntax, e.g.
+`GlobalConstant{RefTriangle}()^3` for three global dofs. Note that the components of such
+a field need not represent a spatial vector -- they are often abstract quantities, e.g.
+the (Voigt) components of a macroscopic strain in computational homogenization.
+
+# Examples
+```julia
+grid = generate_grid(Triangle, (10, 10))
+dh = DofHandler(grid)
+add!(dh, :u, Lagrange{RefTriangle, 1}())
+add!(dh, :λ, GlobalConstant{RefTriangle}()) # e.g. multiplier for a mean value constraint
+close!(dh)
+```
+
+!!! warning "Threaded assembly"
+    Every cell of the `SubDofHandler` carries the dofs of the global field, so *no valid
+    coloring exists* for the cells of that `SubDofHandler`: colored threaded assembly
+    (see [`create_coloring`](@ref)) would race on the global dof rows/columns. Assemble
+    serially, or accumulate the global field contributions in task-local buffers that are
+    reduced after the loop.
+
+!!! note
+    Boundary conditions (`Dirichlet`, `PeriodicDirichlet`, `ProjectedDirichlet`) cannot be
+    applied to global fields since the dofs are not associated with grid entities.
+    To constrain a global dof, use an [`AffineConstraint`](@ref) with the dof numbers from
+    [`global_field_dofs`](@ref).
+"""
+struct GlobalConstant{shape} <: ScalarInterpolation{shape, 0}
+    function GlobalConstant{shape}() where {shape <: AbstractRefShape}
+        return new{shape}()
+    end
+end
+
+conformity(::GlobalConstant) = H1Conformity()
+adjust_dofs_during_distribution(::GlobalConstant) = false
+getnbasefunctions(::GlobalConstant) = 1
+n_global_dofs(::GlobalConstant) = 1
+
+function reference_shape_value(ip::GlobalConstant{shape}, ::Vec{dim, T}, i::Int) where {dim, shape <: AbstractRefShape{dim}, T}
     i == 1 && return one(T)
     throw(ArgumentError("no shape function $i for interpolation $ip"))
 end

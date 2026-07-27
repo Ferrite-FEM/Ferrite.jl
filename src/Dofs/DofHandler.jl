@@ -103,6 +103,10 @@ mutable struct DofHandler{dim, G <: AbstractGrid{dim}} <: AbstractDofHandler
     const cell_dofs::Vector{Int}
     const cell_dofs_offset::Vector{Int}
     const cell_to_subdofhandler::Vector{Int} # maps cell id -> SubDofHandler id
+    # Dofs for global fields (fields with dofs shared between all cells of the
+    # SubDofHandler, see `GlobalConstant`), populated in close!. The dof numbers are stored
+    # in component order (and are kept up to date by `renumber!`).
+    const global_field_dofs::Dict{Symbol, Vector{Int}}
     closed::Bool
     const grid::G
     ndofs::Int
@@ -137,7 +141,7 @@ close!(dh)
 function DofHandler(grid::G) where {dim, G <: AbstractGrid{dim}}
     ncells = getncells(grid)
     sdhs = SubDofHandler{DofHandler{dim, G}}[]
-    return DofHandler{dim, G}(sdhs, Symbol[], Int[], zeros(Int, ncells), zeros(Int, ncells), false, grid, -1)
+    return DofHandler{dim, G}(sdhs, Symbol[], Int[], zeros(Int, ncells), zeros(Int, ncells), Dict{Symbol, Vector{Int}}(), false, grid, -1)
 end
 
 function Base.show(io::IO, mime::MIME"text/plain", dh::DofHandler)
@@ -286,6 +290,11 @@ function add!(sdh::SubDofHandler, name::Symbol, ip::Interpolation)
             if n_components(ip) != n_components(_ip)
                 error("Field :$name has a different number of components in another SubDofHandler. Use a different field name.")
             end
+            # A field must be global in all SubDofHandlers or in none (note that e.g. a
+            # scalar GlobalConstant and a scalar Lagrange pass the n_components check)
+            if is_global_field_interpolation(ip) != is_global_field_interpolation(_ip)
+                error("Field :$name is a global field in one SubDofHandler but not in another. Use a different field name.")
+            end
             if getorder(ip) != getorder(_ip)
                 @warn "Field :$name uses a different interpolation order in another SubDofHandler."
             end
@@ -358,6 +367,11 @@ so first the dofs for field 1 are distributed, then field 2, etc.
 For each cell dofs are first distributed on its vertices, then on the interior of edges (if applicable), then on the
 interior of faces (if applicable), and finally on the cell interior.
 The entity ordering follows the geometrical ordering found in [`vertices`](@ref), [`faces`](@ref) and [`edges`](@ref).
+
+Global fields (see [`GlobalConstant`](@ref)) are handled specially: their dofs are created
+once, when the first cell carrying the field is visited, and the same dof numbers are
+appended (in the regular field position) to the cell dofs of every cell in the
+SubDofHandler(s) with the field.
 """
 function __close!(dh::DofHandler{dim}) where {dim}
     @assert !isclosed(dh)
@@ -386,6 +400,12 @@ function __close!(dh::DofHandler{dim}) where {dim}
     # A face is uniquely determined by 3 vertex nodes, see sortface
     facedicts = [Dict{NTuple{3, Int}, Int}() for _ in 1:numfields]
 
+    # `globaldofs_first[gidx]` stores the first dof of the global field with (global) field
+    # index gidx (see `GlobalConstant`), or 0 if the dofs have not been created yet. The
+    # dofs are created for the first cell carrying the field and reused for all other
+    # cells, also across SubDofHandlers.
+    globaldofs_first = zeros(Int, numfields)
+
     # The edge/face dicts above are shared between all SubDofHandlers that contain a given
     # field, so `field_ncells[gidx]` counts the total number of cells carrying field `gidx`.
     # This is used to reserve the dict capacity up front (see `_close_subdofhandler!`).
@@ -410,9 +430,23 @@ function __close!(dh::DofHandler{dim}) where {dim}
             vertexdicts,
             edgedicts,
             facedicts,
+            globaldofs_first,
             field_ncells,
         )
     end
+
+    # Record the dofs for global fields for `global_field_dofs`
+    empty!(dh.global_field_dofs)
+    for sdh in dh.subdofhandlers
+        for (name, ip) in zip(sdh.field_names, sdh.field_interpolations)
+            is_global_field_interpolation(ip) || continue
+            haskey(dh.global_field_dofs, name) && continue
+            first_dof = globaldofs_first[findfirst(==(name), dh.field_names)::Int]
+            @assert first_dof > 0
+            dh.global_field_dofs[name] = collect(first_dof:(first_dof + getnbasefunctions(ip) - 1))
+        end
+    end
+
     dh.ndofs = nextdof - 1
     dh.closed = true
 
@@ -421,11 +455,11 @@ function __close!(dh::DofHandler{dim}) where {dim}
 end
 
 """
-    _close_subdofhandler!(dh::DofHandler{sdim}, sdh::SubDofHandler, sdh_index::Int, nextdof::Int, vertexdicts, edgedicts, facedicts) where {sdim}
+    _close_subdofhandler!(dh::DofHandler{sdim}, sdh::SubDofHandler, sdh_index::Int, nextdof::Int, vertexdicts, edgedicts, facedicts, globaldofs_first) where {sdim}
 
 Main entry point to distribute dofs for a single [`SubDofHandler`](@ref) on its subdomain.
 """
-function _close_subdofhandler!(dh::DofHandler{sdim}, sdh::SubDofHandler, sdh_index::Int, nextdof::Int, vertexdicts, edgedicts, facedicts, field_ncells) where {sdim}
+function _close_subdofhandler!(dh::DofHandler{sdim}, sdh::SubDofHandler, sdh_index::Int, nextdof::Int, vertexdicts, edgedicts, facedicts, globaldofs_first, field_ncells) where {sdim}
     ip_infos = InterpolationInfo[]
     for interpolation in sdh.field_interpolations
         ip_info = InterpolationInfo(interpolation)
@@ -451,8 +485,18 @@ function _close_subdofhandler!(dh::DofHandler{sdim}, sdh::SubDofHandler, sdh_ind
                 end
             end
             for dof_index in volumedof_interior_indices(base_ip)
-                @assert next_dof_index <= dof_index <= getnbasefunctions(base_ip) "Cell dof ordering not supported. Please consult the dev docs."
+                @assert dof_index == next_dof_index "Volume dof ordering not supported. Please consult the dev docs."
+                next_dof_index += 1
             end
+            # Every base function must be owned exactly once, by a vertex, edge, face,
+            # or volume, or be a global dof (see `GlobalConstant`). The count is checked
+            # through the `InterpolationInfo` (which drives the dof distribution below)
+            # so that the check also covers wrapper interpolations from external
+            # packages that forward `InterpolationInfo` but not the individual
+            # dof-index accessor functions (for those the walk above is empty).
+            nentitydofs = sum(ip_info.nvertexdofs) + sum(ip_info.nedgedofs) +
+                sum(ip_info.nfacedofs) + ip_info.nvolumedofs
+            @assert (nentitydofs + ip_info.nglobaldofs) * ip_info.n_copies == getnbasefunctions(interpolation) "All base functions must be classified exactly once as vertex, edge, face, volume, or global dofs. Please consult the dev docs."
         end
         push!(ip_infos, ip_info)
         # TODO: More than one face dof per face in 3D are not implemented yet. This requires
@@ -509,15 +553,24 @@ function _close_subdofhandler!(dh::DofHandler{sdim}, sdh::SubDofHandler, sdh_ind
         # Distribute dofs per field
         for (lidx, gidx) in pairs(global_fidxs)
             @debug println("\tfield: $(sdh.field_names[lidx])")
-            nextdof = _distribute_dofs_for_cell!(
-                dh,
-                cell,
-                ip_infos[lidx],
-                nextdof,
-                vertexdicts[gidx],
-                edgedicts[gidx],
-                facedicts[gidx]
-            )
+            ip_info = ip_infos[lidx]
+            if ip_info.nglobaldofs > 0
+                # Global field: the same dofs are pushed for every cell
+                nextdof = add_global_dofs!(
+                    dh.cell_dofs, globaldofs_first, gidx,
+                    ip_info.nglobaldofs, nextdof, ip_info.n_copies,
+                )
+            else
+                nextdof = _distribute_dofs_for_cell!(
+                    dh,
+                    cell,
+                    ip_info,
+                    nextdof,
+                    vertexdicts[gidx],
+                    edgedicts[gidx],
+                    facedicts[gidx]
+                )
+            end
         end
 
         if first_cell
@@ -644,6 +697,23 @@ function add_volume_dofs(cell_dofs::CD, nvolumedofs::Int, nextdof::Int, n_copies
     for _ in 1:nvolumedofs, _ in 1:n_copies
         push!(cell_dofs, nextdof)
         nextdof += 1
+    end
+    return nextdof
+end
+
+# Push the dofs of a global field (see `GlobalConstant`) for one cell. The dofs are created
+# for the first cell carrying the field (`globaldofs_first[gidx] == 0`) and reused for
+# every other cell (also across SubDofHandlers).
+function add_global_dofs!(cell_dofs::Vector{Int}, globaldofs_first::Vector{Int}, gidx::Int, nglobaldofs::Int, nextdof::Int, n_copies::Int)
+    first_dof = globaldofs_first[gidx]
+    if first_dof == 0 # create dofs
+        first_dof = nextdof
+        globaldofs_first[gidx] = first_dof
+        nextdof += nglobaldofs * n_copies
+    end
+    @debug println("\t\tglobaldofs #$first_dof:$(first_dof + nglobaldofs * n_copies - 1)")
+    for i in 0:(nglobaldofs * n_copies - 1)
+        push!(cell_dofs, first_dof + i)
     end
     return nextdof
 end
@@ -943,6 +1013,28 @@ function dof_range(dh::DofHandler, field_name::Symbol)
     end
     sdh_idx, field_idx = find_field(dh, field_name)
     return dof_range(dh.subdofhandlers[sdh_idx], field_idx)
+end
+
+"""
+    global_field_dofs(dh::DofHandler, field_name::Symbol) -> Vector{Int}
+
+Return the global dof numbers, in component order, for the global field `field_name` (a
+field with a [`GlobalConstant`](@ref) interpolation). This makes it possible to access the
+values of a global field in the solution vector without going through a cell, e.g.
+`u[global_field_dofs(dh, :λ)]`, and to constrain global dofs with
+[`AffineConstraint`](@ref)s.
+
+The returned vector is a copy. The dof numbers stored in the DofHandler are updated by
+[`renumber!`](@ref), so call this function again after renumbering (a previously returned
+vector is not updated).
+"""
+function global_field_dofs(dh::DofHandler, field_name::Symbol)
+    isclosed(dh) || error("the DofHandler must be closed")
+    dofs = get(dh.global_field_dofs, field_name, nothing)
+    if dofs === nothing
+        error("field :$field_name is not a global field in the DofHandler (existing global fields: $(collect(keys(dh.global_field_dofs))))")
+    end
+    return copy(dofs)
 end
 
 """

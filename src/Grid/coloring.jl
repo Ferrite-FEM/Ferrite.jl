@@ -181,6 +181,13 @@ Two different algorithms are available, specified with the `alg` keyword argumen
 
 The resulting colors can be visualized using [`Ferrite.write_cell_colors`](@ref).
 
+!!! warning "Global fields"
+    The coloring is based on the grid topology only. Cells carrying a global field (see
+    [`GlobalConstant`](@ref)) share the global field's dofs with *all* cells of the
+    `SubDofHandler`, which the coloring cannot account for -- assembling such cells in
+    parallel based on the coloring is not safe. See the [threaded assembly
+    how-to](@ref howto-threaded-assembly) for details.
+
 !!! note "Cell to color mapping"
     In a previous version of Ferrite this function returned a dictionary mapping
     cell ID to color numbers as the first argument. If you need this mapping you

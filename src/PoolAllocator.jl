@@ -5,8 +5,11 @@ const var"@propagate_inbounds" = Base.var"@propagate_inbounds"
 
 const PAGE_SIZE = 4 * 1024 * 1024 # 4 MiB
 
-# A page corresponds to a memory block of size `PAGE_SIZE` bytes.
+# A page corresponds to a memory block of (at least) `PAGE_SIZE` bytes.
 # Allocations of arrays are views into this block.
+# For blocksizes that are larger than `PAGE_SIZE` the page is a single block of the
+# requested (power of two) size. This is required for e.g. sparsity pattern rows for
+# "global dofs" which can couple to a large part of the total number of dofs.
 mutable struct Page{T}
     const buf::Vector{T}      # data buffer (TODO: Memory in recent Julias?)
     const blocksize::Int      # blocksize for this page
@@ -14,7 +17,8 @@ mutable struct Page{T}
     n_free::Int               # number of free blocks
     function Page{T}(blocksize::Int) where {T}
         @assert isbitstype(T)
-        buf = Vector{T}(undef, PAGE_SIZE ÷ sizeof(T))
+        buflength = max(PAGE_SIZE ÷ sizeof(T), blocksize)
+        buf = Vector{T}(undef, buflength)
         n_blocks, r = divrem(length(buf), blocksize)
         @assert r == 0
         return new{T}(buf, blocksize, trues(n_blocks), n_blocks)
@@ -102,8 +106,8 @@ function mempool_stats(mempool::MemoryPool{T}) where {T}
     for bookidx in 1:length(mempool.books)
         isassigned(mempool.books, bookidx) || continue
         book = mempool.books[bookidx]
-        bytes_allocated += length(book.pages) * PAGE_SIZE
         for page in book.pages
+            bytes_allocated += length(page.buf) * sizeof(T)
             bytes_used += count(!, page.freelist) * page.blocksize * sizeof(T)
         end
     end
@@ -122,7 +126,7 @@ function Base.show(io::IO, ::MIME"text/plain", mempool::MemoryPool{T}) where {T}
         # @assert blocksize == 2^idx
         npages = length(h.pages)
         n_free = mapreduce(p -> p.n_free, +, h.pages; init = 0)
-        n_tot = npages * PAGE_SIZE ÷ blocksize ÷ sizeof(T)
+        n_tot = mapreduce(p -> length(p.buf) ÷ blocksize, +, h.pages; init = 0)
         println(io, " - blocksize: $(blocksize), npages: $(npages), usage: $(n_tot - n_free) / $(n_tot)")
     end
     return
@@ -178,7 +182,6 @@ end
 
 function realloc(x::PoolArray{T}, newsize::Int) where {T}
     @assert newsize > length(x) # TODO: Allow shrinkage?
-    @assert newsize <= PAGE_SIZE ÷ sizeof(T) # TODO: Might be required
     # Find the page for the block to make sure it was allocated in this mempool
     # page = find_page(x.mempool, )
     # Allocate the new block

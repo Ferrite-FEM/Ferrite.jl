@@ -84,6 +84,13 @@ function _renumber!(dh::DofHandler, perm::AbstractVector{<:Integer})
     for i in eachindex(dh.cell_dofs)
         dh.cell_dofs[i] = perm[dh.cell_dofs[i]]
     end
+    # Keep the stored dofs of global fields in sync (note: no sorting, the component order
+    # must be preserved)
+    for dofs in values(dh.global_field_dofs)
+        for i in eachindex(dofs)
+            dofs[i] = perm[dofs[i]]
+        end
+    end
     return dh
 end
 
