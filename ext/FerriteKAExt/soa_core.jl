@@ -41,9 +41,9 @@ function as_structure_of_arrays(d, N, fv::Ferrite.GeometryMapping)
 end
 
 # We do not need a soa container for the CPU variant.
-function Ferrite.distribute_to_workers(backend::KA.CPU, a::Ferrite.AbstractAssembler, num_workers)
+function Ferrite.distribute_to_workers(backend::KA.CPU, a::AT, num_workers) where {AT <: Ferrite.AbstractAssembler}
     return [
-        a; [start_assemble(a.K, a.f; fillzero = false) for _ in 2:num_workers]
+        a; [start_assemble(a.K, a.f; fillzero = false)::AT for _ in 2:num_workers]
     ]
 end
 
