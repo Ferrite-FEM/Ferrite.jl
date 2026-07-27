@@ -1,8 +1,8 @@
 # ------------------------------ User-facing part -------------------------------
 """
-    distribute_to_workers(backend, obj, num_tasks)
+    distribute_to_workers(backend, obj, num_workers)
 
-Distribute the object `obj` to `num_tasks` based on the chosen backend for task-based parallelism.
+Distribute the object `obj` to `num_workers` based on the chosen backend for task-based parallelism.
 Returns `d::AbstractVector{T}` where `T` is loosely equivalent to `typeof(obj)`, meaning that most
 methods are applicable to both types. Supported `backend`s are
 
