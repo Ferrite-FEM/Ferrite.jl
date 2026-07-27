@@ -480,18 +480,15 @@ end
 # (wrong) entries, not just extra memory. The sets are equal iff:
 #  (a) no dof is shared between neighboring cells (all dofs interior to the cell volume, e.g.
 #      DiscontinuousLagrange), so the shared-dof skip rules in _add_interface_entries! can
-#      never remove anything the enumeration visited,
+#      never remove anything the enumeration visited, and
 #  (b) there is a single subdofhandler, so the coupling mask indices apply to every neighbor
 #      (for foreign-sdh neighbors the enumeration counts all dofs unmasked, see
-#      _visit_row_candidates!), and
-#  (c) the masks are symmetric, so the either-orientation OR used by the enumeration equals
-#      the actual insertion gate.
+#      _visit_row_candidates!).
 # Then the fast fill can emit the interface entries directly and add_interface_entries! is
 # skipped; in all other cases the enumeration is used for reservation only.
 function _can_fill_interfaces_directly(dh::DofHandler, interface_couplings::Vector{Matrix{Bool}})
     length(dh.subdofhandlers) == 1 || return false
-    all(_all_dofs_volume_interior, dh.subdofhandlers[1].field_interpolations) || return false
-    return all(m -> m == transpose(m), interface_couplings)
+    return all(_all_dofs_volume_interior, dh.subdofhandlers[1].field_interpolations)
 end
 
 function _all_dofs_volume_interior(ip::Interpolation)
@@ -1086,20 +1083,20 @@ function _visit_row_candidates!(
                 end
             end
             # Interface entries: visit the dofs of facet-neighbor cells, filtered by the expanded
-            # interface_coupling mask. Note that _add_interface_entries! checks the mask ONCE per
-            # local pair -- `coupling_sdh[dof_i, dof_j] || continue` -- and then inserts BOTH
-            # directed entries, (dofi, dofj) and (dofj, dofi) (the two _add_interface_entry
-            # calls). Seen from this row, a neighbor column c is therefore inserted if the mask
-            # couples (row, c) in EITHER orientation, hence `imask[li, j] || imask[j, li]`. For a
-            # neighbor in a different subdofhandler the mask's local indices do not apply (other
-            # layout, possibly other size), so all of its dofs are counted unmasked -- a
+            # interface_coupling mask. add_interface_entries! inserts (row, col) across an
+            # interface iff the mask couples them with the row cell as the test (first) index --
+            # exactly `imask[li, j]` seen from this row; both orientations of every interface are
+            # covered here because every row visits all facet-neighbors of all its cells. For a
+            # neighbor in a different subdofhandler the square mask's local indices do not apply
+            # (other layout, possibly other size), so all of its dofs are counted unmasked -- a
             # deliberate over-count that only costs reservation slack (the direct fill is gated
             # to a single subdofhandler by _can_fill_interfaces_directly). In the count pass this
-            # reserves an upper bound on what add_interface_entries! can insert (also loose under
-            # the shared-dof skip rules); over-reservation only leaves slack, never wrong
-            # entries. The fill pass receives `neighbor_cells` only when this enumeration is
-            # provably exact (see _can_fill_interfaces_directly), in which case the interface
-            # entries are emitted here directly and add_interface_entries! is skipped.
+            # reserves an upper bound on what add_interface_entries! can insert (loose only under
+            # the shared-dof skip rules and the unmasked cross-sdh fallback); over-reservation
+            # only leaves slack, never wrong entries. The fill pass receives `neighbor_cells`
+            # only when this enumeration is provably exact (see _can_fill_interfaces_directly),
+            # in which case the interface entries are emitted here directly and
+            # add_interface_entries! is skipped.
             if neighbor_cells !== nothing
                 for k in 1:length(cells)
                     cnr = cells[k]
@@ -1112,7 +1109,7 @@ function _visit_row_candidates!(
                             nothing
                         end
                         for j in 1:length(nbdofs)
-                            imask === nothing || imask[li, j] || imask[j, li] || continue
+                            imask === nothing || imask[li, j] || continue
                             col = nbdofs[j]
                             isconstrained !== nothing && isconstrained[col] && continue
                             if marker[col] != row

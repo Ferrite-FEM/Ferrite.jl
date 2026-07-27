@@ -407,9 +407,9 @@ end
             sp = add_sparsity_entries!(init_sparsity_pattern(dh), dh; topology = topo, interface_coupling = ic)
             sp_gen = fsp_test_build_generic(dh; topology = topo, interface_coupling = ic)
             compare_matrices(allocate_matrix(sp), allocate_matrix(sp_gen))
-            if ic == trues(2, 2) || ic == [false false; false true] # symmetric masks
-                @test sum(r -> r.nmax, sp.buffer.indices) == sum(length, Ferrite.eachrow(sp))
-            end
+            # The reservation is exact for a fully discontinuous single-sdh discretization,
+            # asymmetric masks included
+            @test sum(r -> r.nmax, sp.buffer.indices) == sum(length, Ferrite.eachrow(sp))
         end
         # Mixed continuous/discontinuous fields: the direct interface fill must NOT trigger
         # (shared dofs on the continuous field) and the layered path must match the generic one.
