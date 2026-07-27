@@ -446,6 +446,9 @@ described by the DofHandler `dh`.
    pattern. `keep_constrained = false` requires passing the ConstraintHandler `ch`.
  - `coupling`: the coupling between fields/components within each cell. By default
    (`coupling = nothing`) it is assumed that all DoFs in each cell couple with each other.
+   `coupling[f1, f2] == true` means that the equation for field `f1` (i.e. the rows
+   corresponding to the test functions of `f1`) contains the unknown field `f2` (i.e. the
+   columns corresponding to the trial functions of `f2`).
 """
 function add_cell_entries!(
         sp::AbstractSparsityPattern,
