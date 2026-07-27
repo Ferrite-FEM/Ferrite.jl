@@ -359,7 +359,7 @@ end
             else # Krow > Kerow_dof
                 # No match: no entry exist in the global matrix for this row. This is
                 # allowed as long as the value which would have been inserted is zero.
-                iszero(Ke[rowpermutation[ri], Kecol]) || _missing_sparsity_pattern_error(Krow, Kcol)
+                iszero(Ke[rowpermutation[ri], Kecol]) || _missing_sparsity_pattern_error(Kerow_dof, Kcol)
                 # Advance the local matrix row pointer
                 ri += 1
             end

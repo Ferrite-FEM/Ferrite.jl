@@ -23,6 +23,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
  - `ProjectedDirichlet` now updates the correct dofs when the constrained field is not the first
    field in the `DofHandler`; previously the dof lookup ignored the field offset in the cell dof
    vector (typically causing a `KeyError` during `update!`) ([#1393])
+ - The error thrown when assembling into a matrix entry that is missing from the sparsity
+   pattern now reports the row that is actually missing, rather than an unrelated row that
+   happened to be stored in the same column ([#1414])
 
 ## [v1.5.0] - 2026-07-13
 
@@ -1196,3 +1199,4 @@ poking into Ferrite internals:
 [#1228]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1228
 [#1235]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1235
 [#1389]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1389
+[#1414]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1414
