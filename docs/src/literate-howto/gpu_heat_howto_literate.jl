@@ -176,7 +176,7 @@ ch = ConstraintHandler(Float32, Int32, dh)
     getfacetset(grid, "left"), getfacetset(grid, "right"),
     getfacetset(grid, "top"), getfacetset(grid, "bottom")
 )
-add!(ch, Dirichlet(:u, ∂Ω, (x, t) -> 1.0))
+add!(ch, Dirichlet(:u, ∂Ω, (x, t) -> 1.0f0))
 close!(ch)
 
 ch_gpu = adapt(backend, ch)
