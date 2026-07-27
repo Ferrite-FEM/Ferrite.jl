@@ -43,7 +43,7 @@ Adapt.@adapt_structure DeviceCSCAssembler
 get_substruct(a::DeviceCSCAssembler, i) = a
 
 # FIXME buffer
-function Ferrite.start_assemble(K::CuSparseMatrixCSC, f::CuVector = CUDA.zeros(0); fillzero::Bool = true)
+function Ferrite.start_assemble(K::CuSparseMatrixCSC, f::CuVector = CUDA.zeros(eltype(K), 0); fillzero::Bool = true)
     fillzero && fill!(nonzeros(K), zero(eltype(K)))
     fillzero && fill!(f, zero(eltype(f)))
     return DeviceCSCAssembler(K, f)
