@@ -1,7 +1,9 @@
 # generate examples
 import Literate
 
-# Skip execution of the following files
+# Skip execution of the following files.
+# These are tested directly in the CI, as they need additional dependencies
+# and/or special machines (e.g. GPUs) to run on.
 DONT_EXECUTE = Set(["gpu_heat_howto_literate.jl"])
 
 # Tutorials
