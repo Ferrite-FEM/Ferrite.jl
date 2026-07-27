@@ -108,13 +108,28 @@
 # use the lowest order stable pair: the flux is interpolated with `RaviartThomas`
 # functions, which are associated with the element *facets* and have continuous normal
 # components across them, and the pressure with element-wise constants
-# (`DiscontinuousLagrange` of order 0). See [BofBreFor:2013:mfe](@cite) for the theory.
+# (`DiscontinuousLagrange` of order 0). Higher order pairs follow the same pattern:
+# `RaviartThomas{RefTriangle, k}`, or alternatively `BrezziDouglasMarini{RefTriangle, k}`,
+# together with `DiscontinuousLagrange{RefTriangle, k-1}`. See [Gatica2014](@cite) for an
+# accessible introduction to mixed methods and [BofBreFor:2013:mfe](@cite) for the full
+# theory.
 #
 # !!! note "Naming convention"
 #     Ferrite's `RaviartThomas{RefTriangle, 1}` is the *lowest order* Raviart-Thomas
 #     element, which much of the literature (and e.g.
 #     [DefElement](https://defelement.org/elements/raviart-thomas.html)) denotes
 #     ``\mathrm{RT}_0``.
+#
+# It is worth spelling out what the degrees of freedom of an ``H(\mathrm{div})``
+# interpolation actually are, since it explains much of what follows: they are not point
+# values, but *moments of the normal flux over a facet*,
+# ``\int_F (\boldsymbol{N} \cdot \boldsymbol{n})\, s\, \mathrm{d}\Gamma`` for a set of
+# weight functions ``s`` — for the lowest order element simply the average normal flux
+# through the facet. Two consequences follow. Neighboring elements share these facet dofs,
+# which is precisely why the normal component of the flux is continuous across facets and
+# the tangential component is not. And there are no nodal support points at which a
+# boundary value could be prescribed, so the essential boundary condition needs different
+# treatment than usual.
 #
 # Testing the mass balance with ``\delta p = 1`` on a single element immediately shows
 # where local conservation comes from: since ``\delta p`` may be chosen as the indicator
@@ -166,11 +181,12 @@ add!(dh, :p, ip_p)
 close!(dh);
 
 # but for the essential boundary condition ``\boldsymbol{q} \cdot \boldsymbol{n} = 0`` we
-# cannot use a regular `Dirichlet` condition: the Raviart-Thomas interpolation has no
-# nodal support points where a value could be prescribed. Instead,
+# cannot use a regular `Dirichlet` condition: as discussed above, the Raviart-Thomas
+# interpolation has no nodal support points where a value could be prescribed. Instead,
 # [`ProjectedDirichlet`](@ref) determines the facet dof values by an L2 projection of the
-# prescribed normal flux onto the facet. The prescribed function receives the coordinate,
-# time, and facet normal as arguments.
+# prescribed normal flux onto the facet — which is exactly the kind of quantity the facet
+# dofs represent. The prescribed function receives the coordinate, time, and facet normal
+# as arguments.
 ch = ConstraintHandler(dh)
 add!(ch, ProjectedDirichlet(:q, union(getfacetset(grid, "top"), getfacetset(grid, "bottom")), (x, t, n) -> 0.0))
 close!(ch);
@@ -489,12 +505,24 @@ J_primal = flux_jump_primal(dh_primal, p_primal, k, topology)
 # refinement (they are bounded by the flux approximation error), whereas the mixed method
 # is exactly conservative on any mesh.
 #
+# The mixed method is not universally preferable, however. The gain in flux quality is
+# paid for with a larger system — both fields are unknowns — which is moreover a saddle
+# point problem, indefinite rather than positive definite, so it puts different demands on
+# the linear solver. And the quantity that the primal method is good at, the pressure, is
+# approximated *worse*: here it is only element-wise constant, against the continuous
+# linear pressure of the primal method. The mixed formulation is the right choice when the
+# flux, and in particular its conservation, is the quantity of interest.
+#
 # ## Suggestions for tweaking the program
 # - Increase the order of the flux and pressure interpolations to
-#   `RaviartThomas{RefTriangle, 2}` / `DiscontinuousLagrange{RefTriangle, 1}` (also
-#   available: `BrezziDouglasMarini{RefTriangle, 1}`) and verify with a manufactured
-#   solution, e.g. ``p = \sin(\pi x)\sin(\pi y)`` with the corresponding source term
-#   ``f = \mathrm{div}(\boldsymbol{q})``, that the convergence rates increase accordingly.
+#   `RaviartThomas{RefTriangle, 2}` / `DiscontinuousLagrange{RefTriangle, 1}`, and verify
+#   with a manufactured solution, e.g. ``p = \sin(\pi x)\sin(\pi y)`` with the
+#   corresponding source term ``f = \mathrm{div}(\boldsymbol{q})``, that the convergence
+#   rates increase accordingly.
+# - Swap the Raviart-Thomas space for the Brezzi-Douglas-Marini one:
+#   `BrezziDouglasMarini{RefTriangle, 1}` is an alternative to
+#   `RaviartThomas{RefTriangle, 1}` for the same element-wise constant pressure, with a
+#   full linear flux field (six facet dofs per triangle instead of three).
 # - Make the barrier fully impermeable by removing its cells from the grid instead of
 #   lowering the permeability, and compare the results. Note that this exposes new
 #   boundary facets around the removed cells, which by default get the natural condition
