@@ -68,8 +68,12 @@ function assemble_global!(cv::CellValues, K::SparseMatrixCSC, f, dh::DofHandler)
     Ke = zeros(Float32, n_basefuncs, n_basefuncs)
     fe = zeros(Float32, n_basefuncs)
     assembler = start_assemble(K, f)
-    for cell in CellIterator(dh)
-        assemble_cell!(Ke, fe, cell, cv, assembler)
+    for cc in CellIterator(dh)
+        fill!(Ke, 0)
+        fill!(fe, 0)
+        reinit!(cv, cc)
+        assemble_element!(Ke, fe, cv)
+        assemble!(assembler, celldofs(cc), Ke, fe)
     end
     return nothing
 end
@@ -79,41 +83,48 @@ function assemble_global!(cv::CellValues, K::SparseMatrixCSC, f, dh::SubDofHandl
     Ke = zeros(Float32, n_basefuncs, n_basefuncs)
     fe = zeros(Float32, n_basefuncs)
     assembler = start_assemble(K, f; fillzero = false)
-    for cell in CellIterator(dh)
-        assemble_cell!(Ke, fe, cell, cv, assembler)
+    for cc in CellIterator(dh)
+        fill!(Ke, 0)
+        fill!(fe, 0)
+        reinit!(cv, cc)
+        assemble_element!(Ke, fe, cv)
+        assemble!(assembler, celldofs(cc), Ke, fe)
     end
     return nothing
 end
 
-@kernel function ka_assembly_kernel_mf(@Const(color), cc, cv, Kes, fes)
+@kernel function ka_assembly_kernel_mf(@Const(color), ccs, cvs, Kes, fes)
     ## This is the classical grid-stride-loop
-    task_index = @index(Global, Linear)
+    worker_index = @index(Global, Linear)
     stride = prod(KA.@ndrange())
 
     ## Get the local evaluation buffers for the GPU worker.
-    cv_i = cv[task_index]
-    cc_i = cc[task_index]
+    cv = cvs[worker_index]
+    cc = ccs[worker_index]
 
-    for i in task_index:stride:length(color)
+    for task_index in worker_index:stride:length(color)
         ## Work item index
-        cellid = color[i]
+        cellid = color[task_index]
 
         Ke = view(Kes, cellid, :, :) # Note row-major indexing, this
         fe = view(fes, cellid, :)    # is further motivated below.
 
         ## Query work item cell cache
-        reinit!(cc_i, cellid)
+        reinit!(cc, cellid)
 
         ## Actual assembly routine.
-        assemble_cell!(Ke, fe, cc_i, cv_i)
+        fill!(Ke, 0)
+        fill!(fe, 0)
+        reinit!(cv, cc)
+        assemble_element!(Ke, fe, cv)
     end
 end
-function assemble_global_ka!(backend, cellvalues::Ferrite.SoAContainer, cc, colors::Vector, Ke, fe, n_workers)
+function assemble_global_ka!(backend, cellvalues::Ferrite.SoAContainer, ccs, colors::Vector, Kes, fes, n_workers)
     for color in colors
         n = length(color)
         threads, blocks = compute_threads_and_blocks(n)
         ka_kernel = ka_assembly_kernel_mf(backend, threads)
-        ka_kernel(color, cc, cellvalues, Ke, fe, ndrange = threads * blocks)
+        ka_kernel(color, ccs, cellvalues, Kes, fes, ndrange = threads * blocks)
         KA.synchronize(backend)
     end
     return nothing

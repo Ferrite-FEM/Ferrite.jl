@@ -89,16 +89,6 @@ function assemble_element!(Ke::AbstractMatrix, fe::AbstractVector, cv::CellValue
     return Ke, fe
 end
 
-# We further define a simple cell assembly wrapping to reuse for the CUDA-kernel later.
-function assemble_cell!(Ke, fe, cell, cv, assembler)
-    fill!(Ke, 0)
-    fill!(fe, 0)
-    reinit!(cv, cell)
-    assemble_element!(Ke, fe, cv)
-    assemble!(assembler, celldofs(cell), Ke, fe)
-    return nothing
-end
-
 # Now to the actual assembly kernel using KernelAbstractions.jl.
 # We use a grid-stride loop, which has several benefits in terms of performance and debuggability.
 # For more details please consult [this blog post](https://developer.nvidia.com/blog/cuda-pro-tip-write-flexible-kernels-grid-stride-loops/) .
@@ -122,7 +112,11 @@ end
         reinit!(cc, cellid)
 
         ## Actual assembly routine.
-        assemble_cell!(Ke, fe, cc, cv, assembler)
+        fill!(Ke, 0)
+        fill!(fe, 0)
+        reinit!(cv, cc)
+        assemble_element!(Ke, fe, cv)
+        assemble!(assembler, celldofs(cc), Ke, fe)
     end
 end
 function assemble_global_ka!(backend, cellvalues::Ferrite.SoAContainer, K, f, cc, colors::Vector, Ke, fe, n_workers; fillzero = true)
@@ -243,7 +237,11 @@ function cuda_assembly_kernel(assemblers, color, ccs::Ferrite.SoAContainer, cvs:
     for task_index in worker_index:stride:length(color)
         cellid = color[task_index]
         reinit!(cc, cellid)
-        assemble_cell!(Ke, fe, cc, cv, assembler)
+        fill!(Ke, 0)
+        fill!(fe, 0)
+        reinit!(cv, cc)
+        assemble_element!(Ke, fe, cv)
+        assemble!(assembler, celldofs(cc), Ke, fe)
     end
     return nothing
 end
@@ -268,13 +266,6 @@ u_cuda = SparseMatrixCSC(K_gpu) \ Vector(f_gpu)
 ## Matrix-free assembly with `CUDA.jl`
 CSR and CSC matrix formats are known to give suboptimal performance on the GPU due to the low arithmetic intensity (see e.g. [Settgast2023:plm; Figure 1/2](@cite)). The reason for the bad performance is that GPUs are typically used for large problems requiring an iterative solver of some form. These iterative solvers typically require sparse-matrix vector (or transpose) products as a key component. CSR and CSC have extremely low arithmetic intensity, so we cannot fully utilize the potential of the GPU, which really shines on high arithmetic intensity tasks. In finite element problems a very simple technique is called ,,Element Assembly'' (see e.g. the [MFEM docs](https://mfem.org/howto/assembly_levels/)) where we simply assemble the element matrices once, such that the sparse matrix-vector product becomes a sequence of many small dense matrix-vector products, i.e. the local products of the element matrix and element vectors. There are techniques with even higher arithmetic intensity, but they typically require modifications of the element routines. Therefore, we present the element assembly technique here as a starting point for users which want to boost their simulations further. Finally we want to highlight that a downside of matrix-free techniques is that we have the issue that most known preconditioners cannot be applied anymore. Finding efficient preconditioners for matrix-free techniques is a very active research area (see, e.g. [Schussnig2025:mhf](@cite) or [Wichrowski2026:tmp](@cite)).
 =#
-function assemble_cell!(Ke, fe, cell, cv)
-    fill!(Ke, 0)
-    fill!(fe, 0)
-    reinit!(cv, cell)
-    assemble_element!(Ke, fe, cv)
-    return nothing
-end
 
 # This is the element-assembly kernel to setup the element matrices and vectors only.
 function cuda_assembly_kernel(color, ccs, cvs, Kes, fes)
@@ -289,7 +280,10 @@ function cuda_assembly_kernel(color, ccs, cvs, Kes, fes)
         ## matrix and vector per cell
         Ke = view(Kes, cellid, :, :)
         fe = view(fes, cellid, :)
-        assemble_cell!(Ke, fe, cc, cv)
+        fill!(Ke, 0)
+        fill!(fe, 0)
+        reinit!(cv, cc)
+        assemble_element!(Ke, fe, cv)
     end
     return nothing
 end
