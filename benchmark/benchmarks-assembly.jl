@@ -102,6 +102,8 @@ let g = SUITE["assembly"]["scatter"]
     K = allocate_matrix(SparseMatrixCSC{Float64, Int}, dh)
     g["SparseMatrixCSC (Quadrilateral 40×40)"] = @benchmarkable $scatter!($K, $dofs_batch, $Ke) evals = 1
 
+    g["SparseMatrixCSC atomic (Quadrilateral 40×40)"] = @benchmarkable $scatter!($K, $dofs_batch, $Ke; atomic = true) evals = 1
+
     Ksym = allocate_matrix(Symmetric{Float64, SparseMatrixCSC{Float64, Int}}, dh)
     g["Symmetric CSC (Quadrilateral 40×40)"] = @benchmarkable $scatter!($Ksym, $dofs_batch, $Ke) evals = 1
 

@@ -13,6 +13,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
    Vincent, 2015). This is the same family of rules already used for `RefPrism` and
    `RefPyramid`, and extends tetrahedral quadrature beyond the previous maximum order 5 of
    the Keast rules. ([#1389])
+ - `start_assemble(K, f; atomic = true)` returns an assembler that accumulates into `K`
+   and `f` using atomic additions (supported for `SparseMatrixCSC`, `Symmetric`-wrapped
+   `SparseMatrixCSC`, and `SparseMatrixCSR`, with eltypes `Float32`/`Float64`). This
+   makes it safe to assemble from multiple concurrent tasks without partitioning the
+   cells into independent sets ("grid coloring"), at the cost of some accumulation
+   overhead and non-deterministic (but correct up to summation order) results. See the
+   updated [howto on multi-threaded
+   assembly](https://ferrite-fem.github.io/Ferrite.jl/stable/howto/threaded_assembly/).
+   ([#XXXX])
 
 ### Documentation
  - The figures for the documentation are now programmatically generated and made to have a consistent look.

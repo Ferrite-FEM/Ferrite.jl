@@ -236,12 +236,17 @@ end
 
 # Scatter-only loop with a precomputed element matrix, isolating `assemble!` into the
 # sparse matrix from the kernel cost above.
-function assemble_scatter!(K, dofs_batch, Ke)
-    assembler = start_assemble(K)
+function assemble_scatter!(K, dofs_batch, Ke; kwargs...)
+    assembler = start_assemble(K; kwargs...)
+    # Function barrier: the assembler type depends on the value of the `atomic` keyword
+    # argument, which does not constant-propagate through the `kwargs` splat.
+    return _assemble_scatter_loop!(assembler, dofs_batch, Ke)
+end
+function _assemble_scatter_loop!(assembler, dofs_batch, Ke)
     for dofs in dofs_batch
         assemble!(assembler, dofs, Ke)
     end
-    return K
+    return
 end
 
 # Boundary load assembly (a pressure load p n ⋅ φ) over a facet set, for a vector field.
