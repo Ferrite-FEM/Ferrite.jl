@@ -72,12 +72,15 @@ end
 @kernel function _apply_set_diag_kernel!(colptr, rowval, nzval, f, prescribed_dofs, inhomogeneities, m, applyzero)
     idx = @index(Global, Linear)
     d = prescribed_dofs[idx]
+    written_entry = false
     for k in colptr[d]:(colptr[d + 1] - 1)
         if rowval[k] == d
             nzval[k] = m
+            written_entry = true
             break
         end
     end
+    (!written_entry && !iszero(m)) && Ferrite._missing_sparsity_pattern_error(d, d)
     f[d] = (applyzero ? zero(eltype(f)) : inhomogeneities[idx]) * m
 end
 
