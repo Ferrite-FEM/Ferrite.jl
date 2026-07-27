@@ -325,6 +325,11 @@ end
     return _assemble_inner!(K, Ke, rowdofs, sortedrowdofs, rowpermutation, coldofs, sortedcoldofs, colpermutation, sym)
 end
 
+# Number of stored entries per local row above which a column is searched with binary
+# search instead of the linear merge walk in `_assemble_inner!`. For a regular mesh a
+# column holds only a few entries per local row, where the merge walk is cheaper.
+const SPARSE_COLUMN_SEARCH_RATIO = 8
+
 @propagate_inbounds function _assemble_inner!(
         K::SparseMatrixCSC, Ke::AbstractMatrix,
         rowdofs::AbstractVector, sortedrowdofs::AbstractVector, rowpermutation::AbstractVector,
@@ -350,6 +355,33 @@ end
             for ri in 1:maxlookups
                 val = Ke[rowpermutation[ri], Kecol]
                 iszero(val) || (Kvals[offset + sortedrowdofs[ri]] += val)
+            end
+            current_col += 1
+            continue
+        end
+        # Fast path for a column with many entries per local row, but not dense enough for
+        # the branch above: the column of a global-field dof that is restricted to a
+        # SubDofHandler, or a column densified by affine constraint condensation. The merge
+        # walk below is O(length(nzr)) per cell, so every cell writing into such a column
+        # pays for the whole column, which is quadratic in the number of such cells. Binary
+        # searching for each local row instead costs O(ndofs_per_cell * log(length(nzr))).
+        # `lo` is carried between the (sorted) local rows so the searched range shrinks.
+        if length(nzr) > SPARSE_COLUMN_SEARCH_RATIO * maxlookups
+            lo = first(nzr)
+            hi = last(nzr)
+            for ri in 1:maxlookups
+                Kerow_dof = sortedrowdofs[ri]
+                R = searchsortedfirst(Krows, Kerow_dof, lo, hi, Base.Order.Forward)
+                if R <= hi && Krows[R] == Kerow_dof
+                    val = Ke[rowpermutation[ri], Kecol]
+                    iszero(val) || (Kvals[R] += val)
+                    lo = R + 1
+                else
+                    # No entry exists in the global matrix for this row, which is allowed
+                    # as long as the value which would have been inserted is zero.
+                    iszero(Ke[rowpermutation[ri], Kecol]) || _missing_sparsity_pattern_error(Kerow_dof, Kcol)
+                    lo = R
+                end
             end
             current_col += 1
             continue

@@ -212,3 +212,61 @@ end
     @test_throws errr(2, 2) assemble!(a, [2, 1], [1.0 0.0; 3.0 4.0])
     @test_throws errr(2, 2) assemble!(as, [2, 1], [1.0 0.0; 3.0 4.0])
 end
+
+@testset "assemble! into long columns" begin
+    # Cells 1:ncells each own `nl` consecutive dofs; the first `nshared` of them
+    # additionally share the dof `g`, so column `g` holds many more entries than any
+    # element has dofs. Such a column is scattered into with a binary search instead of a
+    # merge walk over the whole column, and when *every* cell shares `g` the column is
+    # dense and is indexed directly. All paths must agree with a plain COO assembly.
+    nl, ncells = 8, 200
+    g = nl + ncells
+    for (nshared, dense) in ((ncells ÷ 2, false), (ncells, true))
+        cells = [vcat(collect(c:(c + nl - 1)), c <= nshared ? [g] : Int[]) for c in 1:ncells]
+        I, J = Int[], Int[]
+        for dofs in cells, j in dofs, i in dofs
+            push!(I, i); push!(J, j)
+        end
+        K = sparse(I, J, zeros(length(I)), g, g)
+        # The two fast paths in `_assemble_inner!` are keyed on the column length
+        @test (length(nzrange(K, g)) == size(K, 1)) == dense
+        dense || @test length(nzrange(K, g)) > Ferrite.SPARSE_COLUMN_SEARCH_RATIO * (nl + 1)
+
+        Kref = copy(K)
+        a = start_assemble(K)
+        for (c, dofs) in pairs(cells)
+            m = length(dofs)
+            ke = reshape(collect(1.0:(m^2)), m, m) .+ c
+            ke .= ke .+ ke'
+            assemble!(a, dofs, ke)
+            for (jj, j) in pairs(dofs), (ii, i) in pairs(dofs)
+                Kref[i, j] += ke[ii, jj]
+            end
+        end
+        @test K == Kref
+
+        # Symmetric assembler (upper triangle only) must agree as well
+        Ks = sparse(I, J, zeros(length(I)), g, g)
+        as = start_assemble(Symmetric(Ks))
+        for (c, dofs) in pairs(cells)
+            m = length(dofs)
+            ke = reshape(collect(1.0:(m^2)), m, m) .+ c
+            ke .= ke .+ ke'
+            assemble!(as, dofs, ke)
+        end
+        @test triu(Ks) == triu(Kref)
+    end
+
+    # A missing entry in a long column must still be reported
+    cells = [vcat(collect(c:(c + nl - 1)), [g]) for c in 1:(ncells ÷ 2)]
+    I, J = Int[], Int[]
+    for dofs in cells, j in dofs, i in dofs
+        push!(I, i); push!(J, j)
+    end
+    K = sparse(I, J, zeros(length(I)), g, g)
+    a = start_assemble(K)
+    orphan = g - 1 # owned only by the last cells, which do not share `g`
+    @test K[orphan, g] == 0 && !(orphan in rowvals(K)[nzrange(K, g)])
+    ke = zeros(2, 2); ke[1, 2] = 1.0
+    @test_throws ErrorException assemble!(a, [orphan, g], ke)
+end
