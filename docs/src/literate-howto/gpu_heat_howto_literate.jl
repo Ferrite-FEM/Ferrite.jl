@@ -193,9 +193,13 @@ it shows how to perform the assembly using CUDA only.
 =#
 
 function cuda_assembly_kernel(assemblers, color, ccs::Ferrite.SoAContainer, cvs::Ferrite.SoAContainer, Kes::AbstractArray, fes::AbstractMatrix)
+    ## In this CUDA kernel only the computation of the worker index and stride differs from the
+    ## KernelAbstractions kernel.
     worker_index = (blockIdx().x - Int32(1)) * blockDim().x + threadIdx().x
     stride = gridDim().x * blockDim().x
-    ## The remaining code remains the same, as we do not show any CUDA specific features here.
+    ## The remaining code remains the same, as we do not show any CUDA specific features.
+    ## The code is explicitly not wrapped into a separate function to directly see the
+    ## full assembly loop, which is quite compact.
     assembler = assemblers[worker_index]
     cv = cvs[worker_index]
     cc = ccs[worker_index]
