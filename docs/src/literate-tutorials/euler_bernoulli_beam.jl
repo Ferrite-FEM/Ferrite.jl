@@ -127,17 +127,15 @@ close!(dh);
 #     deflection *or* a slope dof.
 
 # ### Boundary conditions
-# The clamped end requires both $w(0) = 0$ and $w'(0) = 0$. `Dirichlet` conditions on a
-# Hermite field constrain only the *deflection* dofs (prescribing a function value to a
-# slope dof would be wrong).
+# The clamped end requires both $w(0) = 0$ and $w'(0) = 0$. By default a `Dirichlet`
+# condition on a Hermite field constrains only the *deflection* dofs (prescribing a
+# function value to a slope dof would be wrong).
 ch = ConstraintHandler(dh)
 add!(ch, Dirichlet(:w, getfacetset(grid, "left"), (x, t) -> 0.0));
 
-# The slope dof is instead prescribed directly with a master-less `AffineConstraint`.
-# Local dof 2 is the slope at vertex 1 (cf. `vertexdof_indices` above), so the global dof
-# number at the clamped end of the first cell is `celldofs(dh, 1)[2]`.
-slope_dof = celldofs(dh, 1)[2]
-add!(ch, AffineConstraint(slope_dof, Pair{Int, Float64}[], 0.0))
+# The slope dofs are constrained with a second `Dirichlet` with `kind = :derivative`, where
+# the function now prescribes the derivative $w'$ instead of the value:
+add!(ch, Dirichlet(:w, getfacetset(grid, "left"), (x, t) -> 0.0; kind = :derivative))
 close!(ch);
 
 # ### Assembling the linear system
