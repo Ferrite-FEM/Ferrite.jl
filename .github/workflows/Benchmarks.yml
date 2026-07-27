@@ -23,14 +23,17 @@ concurrency:
 jobs:
   benchmark:
     name: Benchmark
-    # Apple Silicon rather than ubuntu-latest: this suite is single-threaded CPU work, where the
-    # macOS runners are both faster and less noisy than the shared Linux VMs. Keep this in sync
-    # with the `record` job in BenchmarkTracking.yml -- the noise band is derived from that time
-    # series, and variance is a property of the runner.
-    runs-on: macos-latest
-    # A pass is ~40 s locally (~10 s to build the suite, ~30 s to run it), and `nruns: 2`
-    # means four of them, two per revision; the rest of the budget is checkout, package
-    # instantiation and precompilation for both revisions.
+    # Chosen empirically by the RunnerNoise experiment (same-commit null comparisons, 5 jobs x
+    # 8 passes per runner, actions/runs/30251228313): the arm runners had by far the least noise
+    # (run-to-run |dt| p50 0.8% vs 4.4% on macos-latest, whole-suite drift 0.3% vs 6.9%) and a
+    # homogeneous CPU fleet, where macos-latest drifted mid-job and ubuntu-latest mixed three
+    # CPU models across five jobs. Keep this in sync with the `record` job in
+    # BenchmarkTracking.yml -- the noise band is derived from that time series, and variance is
+    # a property of the runner.
+    runs-on: ubuntu-24.04-arm
+    # A pass is ~2 min on this runner, and `nruns: 3` means six of them, three per revision;
+    # the rest of the budget is checkout, package instantiation and precompilation for both
+    # revisions.
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@v7
@@ -58,10 +61,11 @@ jobs:
         with:
           julia-version: '1'
           script: benchmark/benchmarks.jl
-          # Two interleaved passes per revision: a regression has to reproduce in both. On a
-          # no-op diff a single pass reported 10 regressions and 13 improvements out of 337
-          # benchmarks, all of them noise.
-          nruns: '2'
+          # Three interleaved passes per revision: a regression has to reproduce in all three.
+          # In the RunnerNoise null comparisons on this runner, nruns=2 still let through 16
+          # false flags in 10 comparisons; nruns=3 left 3, all from the known-bimodal
+          # matrix-from-pattern benchmarks, which the learned noise band absorbs over time.
+          nruns: '3'
           time-tolerance: '0.05'
           time-floor: '1us'
           noise-history: ${{ runner.temp }}/tacho-history/benchmarks/data
