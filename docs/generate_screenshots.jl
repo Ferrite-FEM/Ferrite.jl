@@ -38,6 +38,7 @@ const EXAMPLES = Dict(
     "hyperelasticity" => "literate-tutorials/hyperelasticity.jl",
     "stokes-flow" => "literate-tutorials/stokes-flow.jl",
     "computational_homogenization" => "literate-tutorials/computational_homogenization.jl",
+    "stress_driven_homogenization" => "literate-tutorials/stress_driven_homogenization.jl",
     "linear_shell" => "literate-tutorials/linear_shell.jl",
     # Time-stepping examples rendered as animations (write a .pvd collection).
     "transient_heat" => "literate-tutorials/transient_heat_equation.jl",

@@ -176,6 +176,13 @@
 # \frac{1}{|\Omega_\Box|} \int_{\Omega_\Box}
 # \mathsf{E} : \boldsymbol{\varepsilon}[\boldsymbol{u}]\ \mathrm{d}\Omega.
 # ```
+#
+# In this tutorial the macroscopic strain ``\bar{\boldsymbol{\varepsilon}}`` is
+# *prescribed* -- the RVE problem is strain-driven. The complementary, stress-driven,
+# case -- prescribing the average stress and solving for the then unknown
+# ``\bar{\boldsymbol{\varepsilon}}`` -- is treated in the
+# [stress-driven homogenization](@ref tutorial-stress-driven-homogenization) tutorial,
+# which builds on this one.
 
 
 # ## Commented program

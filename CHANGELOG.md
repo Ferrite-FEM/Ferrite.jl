@@ -22,6 +22,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Documentation
  - The figures for the documentation are now programmatically generated and made to have a consistent look.
  - New tutorial: Elastodynamics and modal analysis of a cantilever beam (mass matrix, generalized eigenvalue problem, Rayleigh damping, Newmark time integration).
+ - New tutorial: Stress-driven computational homogenization, where the macroscopic
+   strain is an unknown global field and the prescribed average stress acts as the
+   load, including a blocked-matrix Schur complement solve of the coupled system.
+   ([#1396])
 
 ### Fixes
  - `FacetIterator` now works with `AbstractVector{FacetIndex}` and `AbstractSet{FacetIndex}` inputs as documented, instead of requiring an `OrderedSet` ([#1384])
@@ -1202,3 +1206,4 @@ poking into Ferrite internals:
 [#1235]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1235
 [#1384]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1384
 [#1395]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1395
+[#1396]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1396
