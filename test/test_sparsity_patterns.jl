@@ -393,6 +393,25 @@ end
             compare_matrices(allocate_matrix(sp_fast), allocate_matrix(sp_gen))
         end
     end
+    # Interface entries (topology) are reserved up front, filtered by interface_coupling. For a
+    # fully discontinuous discretization with a symmetric mask the reservation is exact, i.e.
+    # the layered interface insertion causes no row relocations.
+    let
+        grid = generate_grid(Quadrilateral, (5, 5))
+        dh = DofHandler(grid)
+        add!(dh, :a, DiscontinuousLagrange{RefQuadrilateral, 1}())
+        add!(dh, :b, DiscontinuousLagrange{RefQuadrilateral, 1}()^2)
+        close!(dh)
+        topo = ExclusiveTopology(grid)
+        for ic in (trues(2, 2), [false false; false true], [true true; false true])
+            sp = add_sparsity_entries!(init_sparsity_pattern(dh), dh; topology = topo, interface_coupling = ic)
+            sp_gen = fsp_test_build_generic(dh; topology = topo, interface_coupling = ic)
+            compare_matrices(allocate_matrix(sp), allocate_matrix(sp_gen))
+            if ic == trues(2, 2) || ic == [false false; false true] # symmetric masks
+                @test sum(r -> r.nmax, sp.buffer.indices) == sum(length, Ferrite.eachrow(sp))
+            end
+        end
+    end
     # Test different number types (Int32, Float32)
     for Tv in (Float32, Float64)
         for Ti in (Int32, Int64)

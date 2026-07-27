@@ -202,6 +202,7 @@ function _fast_fill_cells!(
         couplings::Union{Nothing, Vector{Matrix{Bool}}} = nothing,
         isconstrained::Union{Nothing, Vector{Bool}} = nothing,
         neighbor_cells::Union{Nothing, ArrayOfVectorViews} = nothing,
+        interface_couplings::Union{Nothing, Vector{Matrix{Bool}}} = nothing,
     )
     nd = ndofs(dh)
     cell_dofs = create_celldofs(dh)
@@ -211,7 +212,7 @@ function _fast_fill_cells!(
     cell_to_sdh = dh.cell_to_subdofhandler
     _visit_row_candidates!(
         rowlen, nothing, nothing, marker, row_to_cells, row_to_localidx, cell_dofs,
-        cell_to_sdh, couplings, isconstrained, neighbor_cells
+        cell_to_sdh, couplings, isconstrained, neighbor_cells, interface_couplings
     )
     buffer = _presize_buffer(rowlen, sp.buffer.sizehint)
     fill!(marker, 0)
@@ -372,12 +373,13 @@ function add_sparsity_entries!(
         isconstrained = keep_constrained ? nothing : _isconstrained_by_dof(ch)
         # With interface entries coming (added below), reserve row space for them up front so
         # they land in place instead of relocating rows (see _visit_row_candidates!).
-        neighbor_cells = if topology === nothing || !(interface_coupling isa AbstractMatrix{Bool})
-            nothing
+        if topology === nothing || !(interface_coupling isa AbstractMatrix{Bool})
+            neighbor_cells = interface_couplings = nothing
         else
-            create_cell_to_neighbors(dh.grid, topology)
+            neighbor_cells = create_cell_to_neighbors(dh.grid, topology)
+            interface_couplings = _coupling_to_local_dof_coupling(dh, interface_coupling)
         end
-        _fast_fill_cells!(sp, dh, couplings, isconstrained, neighbor_cells)
+        _fast_fill_cells!(sp, dh, couplings, isconstrained, neighbor_cells, interface_couplings)
     else
         add_diagonal_entries!(sp)
         add_cell_entries!(sp, dh, ch; keep_constrained, coupling)
@@ -984,6 +986,7 @@ function _visit_row_candidates!(
         cell_dofs::ArrayOfVectorViews, cell_to_sdh::Vector{Int},
         couplings::Union{Nothing, Vector{Matrix{Bool}}}, isconstrained::Union{Nothing, Vector{Bool}},
         neighbor_cells::Union{Nothing, ArrayOfVectorViews} = nothing,
+        interface_couplings::Union{Nothing, Vector{Matrix{Bool}}} = nothing,
     )
     counting = data === nothing
     @inbounds for row in 1:length(rowlen)
@@ -1013,14 +1016,26 @@ function _visit_row_candidates!(
                 end
             end
             # Count-only (never passed in the fill pass): reserve space for interface entries by
-            # also counting the dofs of facet-neighbor cells. This is an upper bound on what
-            # add_interface_entries! can insert (exact for discontinuous interpolations with full
-            # interface coupling); over-reservation only leaves slack, never wrong entries.
+            # also counting the dofs of facet-neighbor cells, filtered by the expanded
+            # interface_coupling mask. A single mask entry [i, j] gates the insertions into both
+            # rows of the pair, so a column is counted if either orientation couples. This is an
+            # upper bound on what add_interface_entries! can insert (exact for discontinuous
+            # interpolations; remaining looseness: the shared-dof skip rules, and neighbors in a
+            # different subdofhandler where the mask indices do not apply and everything is
+            # counted); over-reservation only leaves slack, never wrong entries.
             if neighbor_cells !== nothing
                 for k in 1:length(cells)
-                    for nbc in neighbor_cells[cells[k]]
+                    cnr = cells[k]
+                    li = lidxs[k]
+                    for nbc in neighbor_cells[cnr]
                         nbdofs = cell_dofs[nbc]
+                        imask = if interface_couplings !== nothing && cell_to_sdh[nbc] == cell_to_sdh[cnr]
+                            interface_couplings[cell_to_sdh[cnr]]
+                        else
+                            nothing
+                        end
                         for j in 1:length(nbdofs)
+                            imask === nothing || imask[li, j] || imask[j, li] || continue
                             col = nbdofs[j]
                             isconstrained !== nothing && isconstrained[col] && continue
                             if marker[col] != row
