@@ -1031,13 +1031,16 @@ coordinate axes.
 
 See the manual section on [Periodic boundary conditions](@ref) for more information.
 """
-struct PeriodicDirichlet
+struct PeriodicDirichlet{Tv, Ti}
     field_name::Symbol
-    components::Vector{Int} # components of the field
+    components::Vector{Ti} # components of the field
     facet_pairs::Vector{Pair{String, String}} # legacy that will populate facet_map on add!
     facet_map::Vector{PeriodicFacetPair}
     func::Union{Function, Nothing}
-    rotation_matrix::Union{Matrix{Float64}, Nothing}
+    rotation_matrix::Union{Matrix{Tv}, Nothing}
+    PeriodicDirichlet(field_name, components, facet_pairs, facet_map, func, rotation_matrix) = new{rotation_matrix === nothing ? Nothing : eltype(rotation_matrix), eltype(components)}(
+        field_name, components, facet_pairs, facet_map, func, rotation_matrix
+    )
 end
 
 # Default to no inhomogeneity function/rotation
