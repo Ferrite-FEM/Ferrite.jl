@@ -29,7 +29,7 @@ jobs:
     if: github.ref_type != 'tag'
     # Must match the runner in Benchmarks.yml: this series is what the PR noise band is derived
     # from, and a series recorded on a different runner says nothing about variance on this one.
-    runs-on: macos-latest
+    runs-on: ubuntu-24.04-arm
     timeout-minutes: 45
     concurrency:
       group: tachometer-record-${{ github.sha }}
