@@ -351,9 +351,10 @@ function add_sparsity_entries!(
 end
 
 # SparsityPattern takes an emptiness-gated fast path: when the pattern is fresh and the request is
-# simple (no coupling, keep_constrained, no interface) the cell entries are filled with the fast
-# marker fill (which subsumes the diagonal); otherwise it falls back to the generic per-entry path.
-# Constraints always layer on afterwards.
+# simple (no coupling, keep_constrained) the cell entries are filled with the fast marker fill
+# (which subsumes the diagonal); otherwise it falls back to the generic per-entry path. Interface
+# entries (topology) and constraints always layer on afterwards, so they are compatible with the
+# fast path.
 function add_sparsity_entries!(
         sp::SparsityPattern, dh::DofHandler, ch::Union{ConstraintHandler, Nothing} = nothing;
         keep_constrained::Bool = true,
@@ -365,14 +366,14 @@ function add_sparsity_entries!(
     if getnrows(sp) < ndofs(dh) || getncols(sp) < ndofs(dh)
         error("number of rows ($(getnrows(sp))) or columns ($(getncols(sp))) in the sparsity pattern is smaller than number of dofs ($(ndofs(dh)))")
     end
-    can_fast = isempty(sp.buffer.data) && coupling === nothing && keep_constrained && topology === nothing
+    can_fast = isempty(sp.buffer.data) && coupling === nothing && keep_constrained
     if can_fast
         _fast_fill_cells!(sp, dh) # marker fill (unsorted); includes the diagonal
     else
         add_diagonal_entries!(sp)
         add_cell_entries!(sp, dh, ch; keep_constrained, coupling)
-        topology !== nothing && add_interface_entries!(sp, dh, ch; topology, keep_constrained, interface_coupling)
     end
+    topology !== nothing && add_interface_entries!(sp, dh, ch; topology, keep_constrained, interface_coupling)
     ch !== nothing && add_constraint_entries!(sp, ch; keep_constrained)
     return sp
 end
