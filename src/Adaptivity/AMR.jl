@@ -2,7 +2,6 @@ module AMR
 
 using .. Ferrite
 import Ferrite: @debug
-using SparseArrays: SparseMatrixCSC, spzeros
 using OrderedCollections: OrderedSet
 
 include("BWG.jl")

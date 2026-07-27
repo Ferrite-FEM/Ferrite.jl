@@ -225,7 +225,7 @@ each tree's leaf list is rebuilt in a single pass, rather than refining cells on
 the uniform-refinement convenience wrapper and is linear for the same reason.
 
 ```@docs
-Ferrite.AMR.coarsen_all!
+Ferrite.AMR._coarsen_all!
 ```
 
 ### Balancing

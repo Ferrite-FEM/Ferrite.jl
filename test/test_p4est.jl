@@ -365,7 +365,7 @@ end
     end
     #now go back from finest to coarsest
     for l in 7:-1:0
-        Ferrite.AMR.coarsen_all!(adaptive_grid)
+        Ferrite.AMR._coarsen_all!(adaptive_grid)
         for tree in adaptive_grid.cells
             @test all(Ferrite.AMR.morton.(tree.leaves, l, 8) == collect(1:(2^(2 * l))))
         end
@@ -505,7 +505,7 @@ end
     end
     #now go back from finest to coarsest
     for l in 4:-1:0
-        Ferrite.AMR.coarsen_all!(adaptive_grid)
+        Ferrite.AMR._coarsen_all!(adaptive_grid)
         for tree in adaptive_grid.cells
             @test all(Ferrite.AMR.morton.(tree.leaves, l, 5) == collect(1:(2^(3 * l))))
         end
@@ -1581,12 +1581,12 @@ end
     end
 
     # on a uniformly refined forest, coarsening every cell with require_all_siblings
-    # reproduces coarsen_all!
+    # reproduces _coarsen_all!
     f1 = ForestBWG(generate_grid(CT, ntuple(_ -> 1, dim)), 4)
     Ferrite.AMR.refine_all!(f1, 1)
     Ferrite.AMR.refine_all!(f1, 2)
     f2 = deepcopy(f1)
-    Ferrite.AMR.coarsen_all!(f1)
+    Ferrite.AMR._coarsen_all!(f1)
     Ferrite.AMR.coarsen!(f2, collect(1:getncells(f2)); require_all_siblings = true)
     @test getcells(f1) == getcells(f2)
 

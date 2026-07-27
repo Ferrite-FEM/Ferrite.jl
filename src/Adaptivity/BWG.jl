@@ -1,8 +1,3 @@
-# TODO we should remove the mixture of indices. Maybe with these:
-# - struct FacetIndexBWG ... end
-# - struct QuadrilateralBWG ... end
-# - struct HexahedronBWG ... end
-
 abstract type AbstractAdaptiveGrid{dim} <: Ferrite.AbstractGrid{dim} end
 abstract type AbstractAdaptiveCell{refshape <: Ferrite.AbstractRefShape} <: Ferrite.AbstractCell{refshape} end
 
@@ -10,7 +5,10 @@ const ncorners_face3D = 4
 const ncorners_face2D = 2
 const ncorners_edge = ncorners_face2D
 
-_maxlevel = [30, 19]
+# `DEFAULT_MAXLEVEL[dim]`: default maximum refinement level for `dim`. The 2D/3D values are
+# p4est's `P4EST_MAXLEVEL`/`P8EST_MAXLEVEL`, which bound the octant coordinates to 32 bits.
+# Pass `b` explicitly to `ForestBWG(grid, b)` to use a different limit.
+const DEFAULT_MAXLEVEL = (0, 30, 19)
 
 struct OctantBWG{dim, N, T <: Integer} <: Ferrite.AbstractCell{Ferrite.RefHypercube{dim}}
     #Refinement level
@@ -23,10 +21,12 @@ end
     OctantBWG(dim::Integer, l::Integer, m::Integer, b::Integer)
 Construct an `octant` based on dimension `dim`, level `l`, morton index `m` and maximum refinement level `b`
 """
-function OctantBWG(dim::Integer, l::T1, m::T2, b::T1 = _maxlevel[dim - 1]) where {T1 <: Integer, T2 <: Integer}
+function OctantBWG(dim::Integer, l::T1, m::T2, b::T1 = DEFAULT_MAXLEVEL[dim]) where {T1 <: Integer, T2 <: Integer}
     @assert l ≤ b #maximum refinement level exceeded
     @assert m ≤ (one(T1) + one(T1))^(dim * l)
     x, y, z = (zero(T1), zero(T1), zero(T1))
+    # TODO make the coordinate integer type adjustable by defining the `OctantBWG` type once
+    # per `ForestBWG` instance, instead of hardcoding `Int32` here.
     h = Int32(_compute_size(b, l))
     _zero = zero(T1)
     _one = one(T1)
@@ -43,16 +43,11 @@ function OctantBWG(dim::Integer, l::T1, m::T2, b::T1 = _maxlevel[dim - 1]) where
     end
 end
 
-#OctantBWG(dim::Int,l::Int,m::Int,b::Int=_maxlevel[dim-1]) = OctantBWG(dim,l,m,b)
-#OctantBWG(dim::Int,l::Int,m::Int,b::Int32) = OctantBWG(dim,l,m,b)
-#OctantBWG(dim::Int,l::Int32,m::Int,b::Int32) = OctantBWG(dim,l,Int32(m),b)
 function OctantBWG(level::T, coords::NTuple) where {T <: Integer}
     dim = length(coords)
     nnodes = 2^dim
     return OctantBWG{dim, nnodes, eltype(coords)}(level, coords)
 end
-#OctantBWG(level::Int32,coords::NTuple) = OctantBWG(level,Int32.(coords))
-#OctantBWG(level::Int32, coords::NTuple{dim,Int32}) where dim = OctantBWG{dim,2^dim,2*dim,Int32}(level,coords)
 
 """
 From [BWG2011](@citet);
@@ -66,8 +61,6 @@ further we assume the following
 > where the highest digit denotes the negated appropriate power of two, bitwise operations as used,
 > for example, in Algorithm 1 yield the correct result even for negative coordinates.
 also from [BWG2011](@citet)
-
-TODO: use LUT method from https://www.forceflow.be/2013/10/07/morton-encodingdecoding-through-bit-interleaving-implementations/
 """
 function morton(octant::OctantBWG{dim, N, T}, l::T, b::T) where {dim, N, T <: Integer}
     o = one(T)
@@ -263,10 +256,10 @@ function coarsen!(octree::OctreeBWG{dim, N, T}, o::OctantBWG{dim, N, T}) where {
     return deleteat!(octree.leaves, (leave_idx - shift + one(T)):(leave_idx - shift + window_length))
 end
 
-OctreeBWG{3, 8}(nodes::NTuple, b = _maxlevel[2]) = OctreeBWG{3, 8, Int64}([zero(OctantBWG{3, 8})], Int64(b), nodes)
-OctreeBWG{2, 4}(nodes::NTuple, b = _maxlevel[1]) = OctreeBWG{2, 4, Int64}([zero(OctantBWG{2, 4})], Int64(b), nodes)
-OctreeBWG(cell::Quadrilateral, b = _maxlevel[1]) = OctreeBWG{2, 4}(cell.nodes, b)
-OctreeBWG(cell::Hexahedron, b = _maxlevel[2]) = OctreeBWG{3, 8}(cell.nodes, b)
+OctreeBWG{3, 8}(nodes::NTuple, b = DEFAULT_MAXLEVEL[3]) = OctreeBWG{3, 8, Int64}([zero(OctantBWG{3, 8})], Int64(b), nodes)
+OctreeBWG{2, 4}(nodes::NTuple, b = DEFAULT_MAXLEVEL[2]) = OctreeBWG{2, 4, Int64}([zero(OctantBWG{2, 4})], Int64(b), nodes)
+OctreeBWG(cell::Quadrilateral, b = DEFAULT_MAXLEVEL[2]) = OctreeBWG{2, 4}(cell.nodes, b)
+OctreeBWG(cell::Hexahedron, b = DEFAULT_MAXLEVEL[3]) = OctreeBWG{3, 8}(cell.nodes, b)
 
 Base.length(tree::OctreeBWG) = length(tree.leaves)
 Base.eltype(::Type{OctreeBWG{dim, N, T}}) where {dim, N, T} = T
@@ -354,8 +347,9 @@ _isleaf(leaves, lo::Integer, hi::Integer, oct::OctantBWG) = lo == hi && leaves[l
 and [IBWG2015](@citet).
 
 ## Constructor
-    ForestBWG(grid::AbstractGrid{dim}, b=_maxlevel[dim-1]) where dim
-Builds an adaptive grid based on a non-adaptive one `grid` and a given max refinement level `b`.
+    ForestBWG(grid::AbstractGrid{dim}, b) where dim
+Builds an adaptive grid based on a non-adaptive one `grid` and a given max refinement level `b`,
+i.e. no leaf may be refined beyond level `b`. Defaults to `30` in 2D and `19` in 3D.
 """
 struct ForestBWG{dim, C <: OctreeBWG, T <: Real} <: AbstractAdaptiveGrid{dim}
     cells::Vector{C}
@@ -369,7 +363,7 @@ struct ForestBWG{dim, C <: OctreeBWG, T <: Real} <: AbstractAdaptiveGrid{dim}
     topology::ExclusiveTopology
 end
 
-function ForestBWG(grid::Ferrite.AbstractGrid{dim}, b = _maxlevel[dim - 1]) where {dim}
+function ForestBWG(grid::Ferrite.AbstractGrid{dim}, b = DEFAULT_MAXLEVEL[dim]) where {dim}
     cells = getcells(grid)
     C = eltype(cells)
     @assert isconcretetype(C)
@@ -394,7 +388,7 @@ end
 # a point is an octant + boundary index; physical positions are emitted only at the very
 # end), so an in-range coordinate packs losslessly:
 #
-# Octree coords lie in `[0, 2^b]` with `b ≤ _maxlevel` (`[30, 19]` for 2D/3D):
+# Octree coords lie in `[0, 2^b]` with `b ≤ DEFAULT_MAXLEVEL[dim]` (`30`/`19` for 2D/3D):
 # 31 bits/axis × 2 = 62 bits (2D) and 21 bits/axis × 3 = 63 bits (3D) both fit a `UInt64` with
 # no overlap. Works for `Int` and `Int32` coords alike (`UInt64` of equal values agree). Only
 # ever called on in-range, non-negative coords (`_bnd_lookup` bounds-checks first).
@@ -477,8 +471,8 @@ memmoves the leaf-array tail. The caller's `cellids` vector is not modified (a s
 copy is taken when needed).
 
 Combine with [`balanceforest!`](@ref Ferrite.AMR.balanceforest!) to restore 2:1 balance and
-[`coarsen!`](@ref Ferrite.AMR.coarsen!) / `coarsen_all!` for derefinement; all preserve the
-Morton-sorted leaf invariant this method relies on.
+[`coarsen!`](@ref Ferrite.AMR.coarsen!) for derefinement; both preserve the Morton-sorted
+leaf invariant this method relies on.
 """
 function refine!(forest::ForestBWG, cellids::AbstractVector{<:Integer})
     isempty(cellids) && return
@@ -703,7 +697,9 @@ function _is_complete_family(leaves, i, firstchild::OctantBWG, b, nchild)
 end
 
 """
-    coarsen_all!(forest::ForestBWG)
+    _coarsen_all!(forest::ForestBWG)
+
+Internal convenience for tests and development — not part of the public API.
 
 Coarsen every `2^dim`-sibling family in `forest` by one level — the inverse of
 [`refine_all!`](@ref Ferrite.AMR.refine_all!). Each leaf that is a first sibling
@@ -717,7 +713,7 @@ Coarsen every `2^dim`-sibling family in `forest` by one level — the inverse of
     derefinement, coarsen individual complete families with [`coarsen!`](@ref
     Ferrite.AMR.coarsen!) instead.
 """
-function coarsen_all!(forest::ForestBWG)
+function _coarsen_all!(forest::ForestBWG)
     for tree in forest.cells
         for leaf in tree.leaves
             if child_id(leaf, tree.b) == 1
@@ -755,13 +751,11 @@ function Ferrite.getcells(forest::ForestBWG{dim, C}) where {dim, C}
 end
 
 function Ferrite.getcells(forest::ForestBWG{dim}, cellid::Int) where {dim}
-    @warn "Slow dispatch, consider to call `getcells(forest)` once instead" maxlog = 1 #TODO doc page for performance
-    #TODO should nleaves be saved by forest?
+    #Only here to fulfill AbstractGrid for now, but a little pointless #TODO remove?
+    @warn "Slow dispatch, consider to call `getcells(forest)` once instead" maxlog = 1
     nleaves = length.(forest.cells) # cells=trees
-    #TODO remove that later by for loop or [IBWG2015](@citet) iterator approach
     nleaves_cumsum = cumsum(nleaves)
     k = findfirst(x -> cellid <= x, nleaves_cumsum)
-    #TODO is this actually correct?
     leafid = k == 1 ? cellid : cellid - (nleaves_cumsum[k] - nleaves[k])
     return forest.cells[k].leaves[leafid]
 end
@@ -797,11 +791,9 @@ geometry map of the macro element (tree). Two steps:
 explicitly so the per-tree corners are computed once and reused for every node of the tree. This
 is the single bridge from the integer/topological octree world into physical coordinates.
 """
-@inline function _interp_treepoint(corners::NTuple{N, Vec{dim, V}}, b, vertex::NTuple{dim, T}) where {N, dim, V, T}
-    ξ = vertex .* (2 / (2^b)) .- 1
-    octant_physical_coordinates = sum(j -> corners[j] * Ferrite.reference_shape_value(Lagrange{Ferrite.RefHypercube{dim}, 1}(), Vec{dim}(ξ), j), 1:N)
-    # ξ is Float64, so the sum promotes; convert back to the grid's coordinate type V
-    return convert(Vec{dim, V}, octant_physical_coordinates)
+@inline function _interp_treepoint(corners::NTuple{N, Vec{dim, V}}, b, vertex::NTuple{dim, <:Integer}) where {N, dim, V}
+    ξ = Vec(vertex .* (convert(V, 2) / (2^b)) .- 1)
+    return sum(j -> corners[j] * Ferrite.reference_shape_value(Lagrange{Ferrite.RefHypercube{dim}, 1}(), ξ, j), 1:N)
 end
 
 """
@@ -1125,7 +1117,7 @@ exactly one level coarser. Level-1 pivots need no balancing.
 """
 function balance_corner(forest, k′, c′, o, s)
     o.l == 1 && return # no balancing needed for pivot octant level == 1
-    s′ = transform_corner(forest, k′, c′, s, true) #TODO verify the bool here; I think it's correct
+    s′ = transform_corner(forest, k′, c′, s, true)
     neighbor_tree = forest.cells[k′]
     leaves = neighbor_tree.leaves
     return if !_in_leaves(leaves, s′) && !_in_leaves(leaves, parent(s′, neighbor_tree.b))
@@ -1629,7 +1621,7 @@ note the following quote from Bursedde et al:
   4, . . . , 7 being the four children on top of the children 0, . . . , 3.
 shifted by 1 due to julia 1 based indexing
 """
-function child_id(octant::OctantBWG{dim, N, T}, b::Integer = _maxlevel[dim - 1]) where {dim, N, T <: Integer}
+function child_id(octant::OctantBWG{dim, N, T}, b::Integer = DEFAULT_MAXLEVEL[dim]) where {dim, N, T <: Integer}
     i = 0x00
     t = T(2)
     z = zero(T)
@@ -1646,7 +1638,7 @@ end
 Algorithm 3.2 of [IBWG2015](@citet) that generalizes `child_id` for different queried levels.
 Applied to a single octree, i.e. the array of leaves, yields a monotonic sequence
 """
-function ancestor_id(octant::OctantBWG{dim, N, T}, l::Integer, b::Integer = _maxlevel[dim - 1]) where {dim, N, T <: Integer}
+function ancestor_id(octant::OctantBWG{dim, N, T}, l::Integer, b::Integer = DEFAULT_MAXLEVEL[dim]) where {dim, N, T <: Integer}
     @assert 0 < l ≤ octant.l
     i = 0x00
     t = T(2)
@@ -1659,13 +1651,13 @@ function ancestor_id(octant::OctantBWG{dim, N, T}, l::Integer, b::Integer = _max
 end
 
 """
-    parent(octant::OctantBWG{dim}, b::Integer = _maxlevel[dim - 1]) -> OctantBWG
+    parent(octant::OctantBWG{dim}, b::Integer = DEFAULT_MAXLEVEL[dim]) -> OctantBWG
 
 The level-`(l-1)` ancestor of `octant`. Computed by clearing the bit that distinguishes the octant
 from its parent: `xyz .& ~h` with `h = _compute_size(b, l)` snaps the anchor back to the parent's
 anchor. The root returns itself.
 """
-function parent(octant::OctantBWG{dim, N, T}, b::Integer = _maxlevel[dim - 1]) where {dim, N, T}
+function parent(octant::OctantBWG{dim, N, T}, b::Integer = DEFAULT_MAXLEVEL[dim]) where {dim, N, T}
     if octant.l > zero(T)
         h = T(_compute_size(b, octant.l))
         l = octant.l - one(T)
@@ -1681,14 +1673,14 @@ Given an `octant`, computes the two smallest possible octants that fit into the 
 of `octant`, respectively. These computed octants are called first and last descendants of `octant`
 since they are connected to `octant` by a path down the octree to the maximum level  `b`
 """
-function descendants(octant::OctantBWG{dim, N, T}, b::Integer = _maxlevel[dim - 1]) where {dim, N, T}
+function descendants(octant::OctantBWG{dim, N, T}, b::Integer = DEFAULT_MAXLEVEL[dim]) where {dim, N, T}
     l1 = b; l2 = b
     h = T(_compute_size(b, octant.l))
     return OctantBWG(l1, octant.xyz), OctantBWG(l2, octant.xyz .+ (h - one(T)))
 end
 
 """
-    facet_neighbor(octant::OctantBWG{dim, N, T}, f::T, b::T = _maxlevel[dim - 1]) -> OctantBWG{dim, N, T}
+    facet_neighbor(octant::OctantBWG{dim, N, T}, f::T, b::T = DEFAULT_MAXLEVEL[dim]) -> OctantBWG{dim, N, T}
 Intraoctree face neighbor for a given faceindex `f` (in p4est, i.e. z order convention) and specified maximum refinement level `b`.
 Implements Algorithm 5 of [BWG2011](@citet).
 
@@ -1707,7 +1699,7 @@ Then, the computed face neighbor will be octant 2 with `xyz=(1,0)`.
 Note that the function is not sensitive in terms of leaving the octree boundaries.
 For the above example, a query for face index 1 (marked as `o`) will return an octant outside of the octree with `xyz=(-1,0)`.
 """
-function facet_neighbor(octant::OctantBWG{3, N, T}, f::T, b::T = _maxlevel[2]) where {N, T <: Integer}
+function facet_neighbor(octant::OctantBWG{3, N, T}, f::T, b::T = DEFAULT_MAXLEVEL[3]) where {N, T <: Integer}
     l = octant.l
     h = T(_compute_size(b, octant.l))
     x, y, z = octant.xyz
@@ -1716,7 +1708,7 @@ function facet_neighbor(octant::OctantBWG{3, N, T}, f::T, b::T = _maxlevel[2]) w
     z += ((f == T(5)) ? -h : ((f == T(6)) ? h : zero(T)))
     return OctantBWG(l, (x, y, z))
 end
-function facet_neighbor(octant::OctantBWG{2, N, T}, f::T, b::T = _maxlevel[1]) where {N, T <: Integer}
+function facet_neighbor(octant::OctantBWG{2, N, T}, f::T, b::T = DEFAULT_MAXLEVEL[2]) where {N, T <: Integer}
     l = octant.l
     h = T(_compute_size(b, octant.l))
     x, y = octant.xyz
@@ -1897,7 +1889,7 @@ function transform_facet(forest::ForestBWG, k::T1, f::T1, o::OctantBWG{2, <:Any,
     maxlevel = forest.cells[1].b
     depth_offset = 2^maxlevel - 2^(maxlevel - o.l)
 
-    s′ = _one - (((f - _one) & _one) ⊻ ((f′ - _one) & _one)) # arithmetic switch: TODO understand this.
+    s′ = _one - (((f - _one) & _one) ⊻ ((f′ - _one) & _one)) # arithmetic switch
 
     # xyz = zeros(T2, 2)
     # xyz[a[1] + _one] = T2((r == 0) ? o.xyz[b[1] + _one] : depth_offset - o.xyz[b[1] + _one])
@@ -2092,7 +2084,7 @@ transform_edge(forest::ForestBWG, e::EdgeIndex, oct::OctantBWG, inside) = transf
     edge_neighbor(octant::OctantBWG, e::Integer, b::Integer)
 Computes the edge neighbor octant which is only connected by the edge `e` to `octant`.
 """
-function edge_neighbor(octant::OctantBWG{3, N, T}, e::T, b::T = _maxlevel[2]) where {N, T <: Integer}
+function edge_neighbor(octant::OctantBWG{3, N, T}, e::T, b::T = DEFAULT_MAXLEVEL[3]) where {N, T <: Integer}
     @assert 1 ≤ e ≤ 12
     _one = one(T)
     _two = T(2)
@@ -2117,7 +2109,7 @@ edge_neighbor(o::OctantBWG{3, N, T1}, e::T2, b::T3) where {N, T1 <: Integer, T2 
     corner_neighbor(octant::OctantBWG, c::Integer, b::Integer)
 Computes the corner neighbor octant which is only connected by the corner `c` to `octant`
 """
-function corner_neighbor(octant::OctantBWG{3, N, T}, c::T, b::T = _maxlevel[2]) where {N, T <: Integer}
+function corner_neighbor(octant::OctantBWG{3, N, T}, c::T, b::T = DEFAULT_MAXLEVEL[3]) where {N, T <: Integer}
     c -= one(T)
     l = octant.l
     h = T(_compute_size(b, octant.l))
@@ -2130,7 +2122,7 @@ function corner_neighbor(octant::OctantBWG{3, N, T}, c::T, b::T = _maxlevel[2]) 
     return OctantBWG(l, (x, y, z))
 end
 
-function corner_neighbor(octant::OctantBWG{2, N, T}, c::T, b::T = _maxlevel[1]) where {N, T <: Integer}
+function corner_neighbor(octant::OctantBWG{2, N, T}, c::T, b::T = DEFAULT_MAXLEVEL[2]) where {N, T <: Integer}
     c -= one(T)
     l = octant.l
     h = _compute_size(b, octant.l)

@@ -165,8 +165,18 @@ include("PointEvalHandler.jl")
 include("deprecations.jl")
 include("docs.jl")
 
-# Adaptiviy
+# Adaptivity
 include("Adaptivity/AMR.jl")
-using .AMR
+# `NonConformingGrid` is used inside Ferrite itself (`DofHandler`, `L2Projector`); the rest are
+# re-exported from `exports.jl` as the public AMR API.
+using .AMR: ForestBWG,
+    refine!,
+    refine_all!,
+    coarsen!,
+    refine_and_coarsen!,
+    balanceforest!,
+    creategrid,
+    ConformityConstraint,
+    NonConformingGrid
 
 end # module
