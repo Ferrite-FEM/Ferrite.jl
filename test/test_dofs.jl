@@ -605,6 +605,13 @@ end
             true  true  true
             false  true  true
         ],
+        # Asymmetric coupling: entries in the (i-rows × j-cols) block are gated by
+        # coupling[i, j] alone, for cell and interface coupling alike
+        [
+            true   true   true
+            false  true   true
+            false  false  true
+        ],
 
         # Component coupling
         [
@@ -624,6 +631,13 @@ end
             true    true    true    true
             true    true    true    true
             false    true    true    true
+        ],
+        # Asymmetric component coupling
+        [
+            true     true     true     true
+            false    true     true     true
+            false    false    true     true
+            false    false    false    true
         ],
     ]
     function is_stored(A, i, j)
@@ -694,6 +708,38 @@ end
     @test_throws ErrorException("coupling not square") allocate_matrix(dh; coupling = [true true])
     # @test_throws ErrorException("coupling not symmetric") allocate_matrix(dh; coupling=[true true; false true])
     @test_throws ErrorException("could not create coupling") allocate_matrix(dh; coupling = falses(100, 100))
+
+    # Orientation independence for asymmetric interface coupling: build the same two-cell
+    # DG mesh with both cell orderings and check that the coupled blocks follow
+    # interface_coupling[i, j] <=> entries in (rows of field i) × (columns of field j),
+    # independent of which cell the interface iterator visits first
+    grid0 = generate_grid(Triangle, (1, 1))
+    for cellorder in ([1, 2], [2, 1])
+        grid = Grid(getcells(grid0)[cellorder], grid0.nodes)
+        topology = ExclusiveTopology(grid)
+        dh = DofHandler(grid)
+        add!(dh, :u, DiscontinuousLagrange{RefTriangle, 1}())
+        add!(dh, :p, DiscontinuousLagrange{RefTriangle, 0}())
+        close!(dh)
+        # [p, u] = false: p test functions see no u trial functions from the neighbor
+        K = allocate_matrix(dh; coupling = trues(2, 2), topology = topology, interface_coupling = [true true; false true])
+        sdh = dh.subdofhandlers[1]
+        for (cell, nbr) in ((1, 2), (2, 1))
+            urows = celldofs(dh, cell)[dof_range(sdh, :u)]
+            prows = celldofs(dh, cell)[dof_range(sdh, :p)]
+            ucols = celldofs(dh, nbr)[dof_range(sdh, :u)]
+            pcols = celldofs(dh, nbr)[dof_range(sdh, :p)]
+            for i in urows, j in vcat(ucols, pcols)
+                @test is_stored(K, i, j)
+            end
+            for i in prows, j in ucols
+                @test !is_stored(K, i, j)
+            end
+            for i in prows, j in pcols
+                @test is_stored(K, i, j)
+            end
+        end
+    end
 
     # Test coupling with subdomains
     # Note: `check_coupling` works for this case only because the second domain has dofs from the first domain in order. Otherwise tests like in continuous ip are required.

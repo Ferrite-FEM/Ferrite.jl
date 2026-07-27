@@ -35,6 +35,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
  - The error thrown when assembling into a matrix entry that is missing from the sparsity
    pattern now reports the row that is actually missing, rather than an unrelated row that
    happened to be stored in the same column ([#1414])
+ - Asymmetric `interface_coupling` masks in `allocate_matrix`/`add_interface_entries!` now
+   follow the same convention as the cell `coupling`: `interface_coupling[i, j] = true`
+   creates entries in the blocks (rows of field `i`) × (columns of field `j`) for both
+   orientations of every interface. Previously `interface_coupling[i, j] = true` created
+   entries in both the `(i, j)` and the transposed `(j, i)` block, and the result could
+   depend on the (internal) orientation of the interface. Symmetric masks, for which the
+   two conventions coincide, are not affected. In addition, interface entries are no
+   longer computed twice for interfaces where both cells belong to the same
+   `SubDofHandler`.
 
 ## [v1.5.0] - 2026-07-13
 
