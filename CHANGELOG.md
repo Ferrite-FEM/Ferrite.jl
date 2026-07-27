@@ -25,6 +25,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixes
  - `FacetIterator` now works with `AbstractVector{FacetIndex}` and `AbstractSet{FacetIndex}` inputs as documented, instead of requiring an `OrderedSet` ([#1384])
+ - The error thrown when assembling into a matrix entry that is missing from the sparsity
+   pattern now reports the row that is actually missing, rather than an unrelated row that
+   happened to be stored in the same column ([#1395])
 
 ## [v1.5.0] - 2026-07-13
 
