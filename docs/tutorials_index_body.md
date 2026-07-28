@@ -191,3 +191,19 @@ Galerkin Infrastructure For the finite element toolbox
 Ferrite.jl"](https://summerofcode.withgoogle.com/programs/2023/projects/SLGbRNI5).
 
 **Keywords**: scalar-valued solution, Dirichlet boundary conditions, Discontinuous Galerkin, Interior penalty.
+
+---
+
+#### [Tutorial 15: Buckling: snap-through of a shallow arch](@ref tutorial-buckling)
+
+This tutorial computes the snap-through buckling of a shallow hyperelastic arch with
+numerical continuation, using
+[BifurcationKit.jl](https://bifurcationkit.github.io/BifurcationKitDocs.jl/stable/). You
+will learn how to trace equilibrium branches through folds (limit points) where plain
+load stepping fails, how to detect and classify bifurcation points from the finite
+element tangent stiffness, and how to switch onto bifurcated branches — recovering the
+classical result that the arch escapes through an unstable asymmetric mode slightly
+below the symmetric limit load.
+
+**Keywords**: buckling, snap-through, bifurcation, numerical continuation, finite
+strain, stability.

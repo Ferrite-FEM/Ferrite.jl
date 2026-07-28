@@ -445,6 +445,32 @@ def scene_elastodynamics():
                 frame_bounds=bounds_over_time(w, times))
 
 
+# --- buckling: snap-through of a shallow arch, traced with BifurcationKit
+# (stable ascent up to the symmetry-breaking bifurcation, then the unstable
+# snap corridor onto the inverted branch; the "timesteps" are continuation
+# steps, not physical time)
+@scene("buckling")
+def scene_buckling():
+    view = new_view()
+    r = OpenDataFile(datadir + "/buckling.pvd")
+    w = warp(r, "u", 1.0)  # true deformation, no exaggeration
+    # rotate the arch (spanning x, height along z in the data) so its height
+    # projects to screen-vertical for this camera; it snaps downwards in the
+    # screen plane
+    t = Transform(Input=w)
+    t.Transform.Rotate = [-90.0, 0.0, 0.0]
+    d = surface(t, view)
+    lut = colorbar(d, view, ("POINTS", "u"), title="$\\vert u \\vert$",
+                   horizontal=True, fmt="%.1f")
+    lo, hi = data_range_over_time(r, ("POINTS", "u"))
+    lut.RescaleTransferFunction(lo, hi)
+    times = list(r.TimestepValues)
+    # near-side-on view so the snap reads clearly in silhouette
+    finish_anim(view, r, "buckling", azimuth=-12, elevation=10, zoom=1.6,
+                res=[1200, 620], pan_y=-0.12,
+                frame_bounds=bounds_over_time(t, times))
+
+
 # --- porous_media: vertical strain (whole domain) and pressure evolution
 @scene("porous_media")
 def scene_porous_media():

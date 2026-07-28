@@ -45,6 +45,7 @@ const EXAMPLES = Dict(
     "porous_media" => "literate-tutorials/porous_media.jl",
     "ns_vs_diffeq" => "literate-tutorials/ns_vs_diffeq.jl",
     "reactive_surface" => "literate-tutorials/reactive_surface.jl",
+    "buckling" => "literate-tutorials/buckling.jl",
     # Code gallery.
     "helmholtz" => "literate-gallery/helmholtz.jl",
     "quasi_incompressible_hyperelasticity" => "literate-gallery/quasi_incompressible_hyperelasticity.jl",

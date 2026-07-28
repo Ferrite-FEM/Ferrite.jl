@@ -38,7 +38,7 @@ fetch_assets(
                 "linear_elasticity_stress", "elastodynamics_modes",
             ], ".png"
         ),
-        variants(["transient_heat", "elastodynamics", "porous_media", "ns_vs_diffeq", "reactive_surface"], ".webp"),
+        variants(["transient_heat", "elastodynamics", "porous_media", "ns_vs_diffeq", "reactive_surface", "buckling"], ".webp"),
     ),
 )
 
