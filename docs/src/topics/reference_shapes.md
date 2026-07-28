@@ -55,7 +55,8 @@ where the edge and face entities are defined from their vertex numbers.
 The `RefQuadrilateral` is defined on the domain ``[-1, 1] \times [-1, 1]``
 in the local ``\xi_1-\xi_2`` coordinate system.
 
-![local element](./assets/local_element.svg)
+![Vertex and edge numbering of the reference quadrilateral](./assets/reference_quadrilateral-light.svg)
+![Vertex and edge numbering of the reference quadrilateral](./assets/reference_quadrilateral-dark.svg)
 
 The vertices of a `RefQuadrilateral` are then
 ```@example

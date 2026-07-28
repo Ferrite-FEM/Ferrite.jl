@@ -42,22 +42,17 @@ fetch_assets(
     ),
 )
 
+# How-to guides
+fetch_assets(
+    joinpath(@__DIR__, "src", "howto"),
+    variants(["postprocessing", "postprocessing_cutline", "coloring"], ".png"),
+)
+
 # Code gallery
 fetch_assets(
     joinpath(@__DIR__, "src", "gallery"),
     vcat(
-        variants(["helmholtz", "landau_orig", "landau_opt"], ".png"),
+        variants(["helmholtz", "landau_orig", "landau_opt", "topology_optimization_result"], ".png"),
         variants(["quasi_incompressible_hyperelasticity", "topology_optimization"], ".webp"),
     ),
 )
-
-# Topics
-const topics_directory = joinpath(@__DIR__, "src", "topics", "downloaded_assets")
-mkpath(topics_directory)
-
-for (file, url) in [
-        "ProjectedDirichlet.svg" => "https://raw.githubusercontent.com/Ferrite-FEM/Ferrite.jl/gh-pages/assets/ProjectedDirichlet.svg",
-    ]
-    afile = joinpath(topics_directory, file)
-    isfile(afile) || Downloads.download(url, afile)
-end

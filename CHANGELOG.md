@@ -1200,3 +1200,5 @@ poking into Ferrite internals:
 [#1235]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1235
 [#1389]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1389
 [#1414]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1414
+[#1416]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1416
+[#1421]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1421

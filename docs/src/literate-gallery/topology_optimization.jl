@@ -541,7 +541,8 @@ topopt(0.03, 0.5, 60, "topopt_frames"; output = true); #src iteration series for
 # We observe, that the stiffness for the lower value of $ra$ is higher,
 # but also requires more iterations until convergence and finer structures to be manufactured, as can be seen in Figure 2:
 #
-# ![](bending.png)
+# ![](topology_optimization_result-light.png)
+# ![](topology_optimization_result-dark.png)
 #
 # *Figure 2*: Optimization results of the bending beam for smaller (left) and larger (right) value of the regularization parameter $\beta$.
 #
