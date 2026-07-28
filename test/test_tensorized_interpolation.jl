@@ -186,6 +186,19 @@ using SparseArrays
             end
         end
 
+        # Bool tensor masks: the same conditions with `true` entries marking the
+        # prescribed components must give the same result
+        chm = ConstraintHandler(dh)
+        add!(chm, Dirichlet(:σ, getfacetset(grid, "left"), σbc, SymmetricTensor{2, 2}((i, j) -> true)))
+        add!(chm, Dirichlet(:σ, getfacetset(grid, "right"), (x, t) -> SymmetricTensor{2, 2}((10.0, -1.0, 20.0)), SymmetricTensor{2, 2}((i, j) -> i == j)))
+        add!(chm, Dirichlet(:σ, getfacetset(grid, "top"), σbc, SymmetricTensor{2, 2}((i, j) -> i != j)))
+        add!(chm, Dirichlet(:σ, getfacetset(grid, "bottom"), x -> SymmetricTensor{2, 2}((30.0, -1.0, 40.0)), SymmetricTensor{2, 2}((i, j) -> i == j)))
+        close!(chm)
+        update!(chm, 0.0)
+        am = zeros(ndofs(dh))
+        apply!(am, chm)
+        @test am == a
+
         # PeriodicDirichlet: inhomogeneous works (through the Dirichlet wrapper) ...
         chp = ConstraintHandler(dh)
         facet_map = collect_periodic_facets(grid, "left", "right", x -> x + Vec{2}((2.0, 0.0)))
@@ -228,6 +241,36 @@ using SparseArrays
         # Duplicates and mixed input are rejected already in the constructor
         @test_throws ErrorException Dirichlet(:σ, getfacetset(grid, "left"), σbc, [(1, 1), (1, 1)])
         @test_throws MethodError Dirichlet(:σ, getfacetset(grid, "left"), σbc, [1, (1, 2)])
+
+        # Vec Bool mask for vector fields: full-vector return, masked components extracted
+        chvm = ConstraintHandler(dhv)
+        add!(chvm, Dirichlet(:u, getfacetset(grid, "left"), x -> Vec(x[2], -x[2]), Vec(false, true)))
+        close!(chvm)
+        update!(chvm, 0.0)
+        av = zeros(ndofs(dhv))
+        apply!(av, chvm)
+        valsv = evaluate_at_grid_nodes(dhv, av, :u)
+        for (nodeid, node) in enumerate(getnodes(grid))
+            x = get_node_coordinate(node)
+            if x[1] ≈ -1.0
+                @test valsv[nodeid][1] == 0.0 # un-prescribed
+                @test valsv[nodeid][2] ≈ -x[2]
+            end
+        end
+
+        # Mask base type must match the field value type
+        @test_throws ErrorException add!(ConstraintHandler(dh), Dirichlet(:σ, getfacetset(grid, "left"), σbc, Tensor{2, 2}((i, j) -> i == j)))
+        @test_throws ErrorException add!(ConstraintHandler(dh), Dirichlet(:σ, getfacetset(grid, "left"), σbc, Vec(true, true)))
+        @test_throws ErrorException add!(ConstraintHandler(dhv), Dirichlet(:u, getfacetset(grid, "left"), x -> zero(Vec{2}), SymmetricTensor{2, 2}((i, j) -> true)))
+        @test_throws ErrorException add!(ConstraintHandler(dhv), Dirichlet(:u, getfacetset(grid, "left"), x -> zero(Vec{2}), Vec(true, false, true)))
+        # Masks are not applicable to scalar fields
+        dhs = DofHandler(grid)
+        add!(dhs, :s, Lagrange{RefQuadrilateral, 1}())
+        close!(dhs)
+        @test_throws ErrorException add!(ConstraintHandler(dhs), Dirichlet(:s, getfacetset(grid, "left"), x -> 0.0, Vec(true, false)))
+        # At least one component must be prescribed, and entries must be Bool
+        @test_throws ErrorException Dirichlet(:σ, getfacetset(grid, "left"), σbc, SymmetricTensor{2, 2}((i, j) -> false))
+        @test_throws ErrorException Dirichlet(:σ, getfacetset(grid, "left"), σbc, one(SymmetricTensor{2, 2}))
     end
 
     @testset "apply_analytical! collection return" begin

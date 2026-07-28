@@ -18,7 +18,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
    divergence), `DofHandler`, `Dirichlet` and `PeriodicDirichlet` conditions (the
    condition function can return the tensor value or one value per prescribed component,
    and `Dirichlet` components can be given as Cartesian `(i, j)` tuples, e.g.
-   `[(1, 2)]`), `apply_analytical!`, `L2Projector`,
+   `[(1, 2)]`, or as a Bool-valued tensor mask, e.g. `SymmetricTensor{2, 2}((i, j) -> i == j)`;
+   for vector fields a `Vec` of `Bool`s is also accepted, in which case the condition
+   function may return the full `Vec`), `apply_analytical!`, `L2Projector`,
    `evaluate_at_points`, and VTK export (written in Voigt order with component names,
    consistent with `write_projection`).
  - New quadrature rule type `:polyquad` for `RefTetrahedron` supporting orders 1 to 10, with
