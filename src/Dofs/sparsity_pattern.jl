@@ -474,28 +474,22 @@ function _check_keep_constrained_args(dh::DofHandler, ch::Union{ConstraintHandle
     return
 end
 
-# The facet-neighbor interface enumeration in _visit_row_candidates! visits a SUPERSET of the
-# entries add_interface_entries! would insert. For the *reservation* (count pass) that is
+# The facet-neighbor interface enumeration in _visit_row_candidates! may visit a SUPERSET of
+# the entries add_interface_entries! would insert. For the *reservation* (count pass) that is
 # harmless: over-counting only leaves unused capacity. But the *fill* pass stores every visited
 # candidate as an actual pattern entry, so filling from this enumeration is only allowed when
 # the superset is exactly the insertion set -- otherwise the pattern would contain extra
-# (wrong) entries, not just extra memory. The sets are equal iff:
-#  (a) no dof is shared between neighboring cells (all dofs interior to the cell volume, e.g.
-#      DiscontinuousLagrange), so the shared-dof skip rules in _add_interface_entries! can
-#      never remove anything the enumeration visited, and
-#  (b) there is a single subdofhandler, so the coupling mask indices apply to every neighbor
-#      (for foreign-sdh neighbors the enumeration counts all dofs unmasked, see
-#      _visit_row_candidates!).
-# Then the fast fill can emit the interface entries directly and add_interface_entries! is
-# skipped; in all other cases the enumeration is used for reservation only.
+# (wrong) entries, not just extra memory. add_interface_entries! inserts, per interface, every
+# masked pair over the union of the two cells' dofs (cross blocks and same-side blocks alike);
+# the enumeration visits exactly those pairs -- masked neighbor-cell dofs plus masked own-cell
+# dofs of interface-participating cells -- for any interpolation continuity, PROVIDED there is
+# a single subdofhandler: for a neighbor in a different subdofhandler the square mask's local
+# indices do not apply, so all of its dofs are counted unmasked (reservation slack, see
+# _visit_row_candidates!). With a single subdofhandler the fast fill therefore emits the
+# interface entries directly and add_interface_entries! is skipped; otherwise the enumeration
+# is used for reservation only.
 function _can_fill_interfaces_directly(dh::DofHandler, interface_couplings::Vector{Matrix{Bool}})
-    length(dh.subdofhandlers) == 1 || return false
-    return all(_all_dofs_volume_interior, dh.subdofhandlers[1].field_interpolations)
-end
-
-function _all_dofs_volume_interior(ip::Interpolation)
-    base = ip isa VectorizedInterpolation ? ip.ip : ip
-    return length(volumedof_interior_indices(base)) == getnbasefunctions(base)
+    return length(dh.subdofhandlers) == 1
 end
 
 # Bool per dof: is it constrained? (`ch` is validated by _check_keep_constrained_args.)
@@ -1076,9 +1070,20 @@ function _visit_row_candidates!(
                 cnr = cells[k]
                 dofs = cell_dofs[cnr]
                 mask = couplings === nothing ? nothing : couplings[cell_to_sdh[cnr]]
+                # Same-side interface blocks: for a cell that participates in an interface,
+                # add_interface_entries! also inserts the masked pairs within the cell itself
+                # (the own cell is always in its own subdofhandler, so the square mask applies
+                # even with multiple subdofhandlers). A candidate therefore passes if either
+                # the cell coupling or the interface coupling allows it.
+                imask = if neighbor_cells !== nothing && interface_couplings !== nothing &&
+                        !isempty(neighbor_cells[cnr])
+                    interface_couplings[cell_to_sdh[cnr]]
+                else
+                    nothing
+                end
                 li = lidxs[k]
                 for j in 1:length(dofs)
-                    mask === nothing || mask[li, j] || continue
+                    mask === nothing || mask[li, j] || (imask !== nothing && imask[li, j]) || continue
                     col = dofs[j]
                     isconstrained !== nothing && isconstrained[col] && continue
                     if marker[col] != row
@@ -1088,21 +1093,21 @@ function _visit_row_candidates!(
                     end
                 end
             end
-            # Interface entries: visit the dofs of facet-neighbor cells, filtered by the expanded
-            # interface_coupling mask. add_interface_entries! inserts (row, col) across an
-            # interface iff the mask couples them with the row cell as the test (first) index --
-            # exactly `imask[li, j]` seen from this row; both orientations of every interface are
-            # covered here because every row visits all facet-neighbors of all its cells. For a
+            # Interface entries, cross blocks: visit the dofs of facet-neighbor cells, filtered
+            # by the expanded interface_coupling mask. add_interface_entries! inserts (row, col)
+            # across an interface iff the mask couples them with the row cell as the test
+            # (first) index -- exactly `imask[li, j]` seen from this row; both orientations of
+            # every interface are covered here because every row visits all facet-neighbors of
+            # all its cells (the same-side blocks are covered by the own-cell loop above). For a
             # neighbor in a different subdofhandler the square mask's local indices do not apply
             # (other layout, possibly other size), so all of its dofs are counted unmasked -- a
             # deliberate over-count that only costs reservation slack (the direct fill is gated
             # to a single subdofhandler by _can_fill_interfaces_directly). In the count pass this
-            # reserves an upper bound on what add_interface_entries! can insert (loose only under
-            # the shared-dof skip rules and the unmasked cross-sdh fallback); over-reservation
-            # only leaves slack, never wrong entries. The fill pass receives `neighbor_cells`
-            # only when this enumeration is provably exact (see _can_fill_interfaces_directly),
-            # in which case the interface entries are emitted here directly and
-            # add_interface_entries! is skipped.
+            # reserves what add_interface_entries! inserts (loose only under the unmasked
+            # cross-sdh fallback); over-reservation only leaves slack, never wrong entries. The
+            # fill pass receives `neighbor_cells` only when the enumeration is provably exact
+            # (see _can_fill_interfaces_directly), in which case the interface entries are
+            # emitted here directly and add_interface_entries! is skipped.
             if neighbor_cells !== nothing
                 for k in 1:length(cells)
                     cnr = cells[k]

@@ -394,8 +394,8 @@ end
         end
     end
     # Interface entries (topology) are reserved up front, filtered by interface_coupling. For a
-    # fully discontinuous discretization with a symmetric mask the reservation is exact, i.e.
-    # the layered interface insertion causes no row relocations.
+    # single-subdofhandler discretization the reservation is exact and doubles as the fill
+    # itself, i.e. no row relocations and no layered interface insertion.
     let
         grid = generate_grid(Quadrilateral, (5, 5))
         dh = DofHandler(grid)
@@ -411,8 +411,9 @@ end
             # asymmetric masks included
             @test sum(r -> r.nmax, sp.buffer.indices) == sum(length, Ferrite.eachrow(sp))
         end
-        # Mixed continuous/discontinuous fields: the direct interface fill must NOT trigger
-        # (shared dofs on the continuous field) and the layered path must match the generic one.
+        # Mixed continuous/discontinuous fields: with the self-sufficient interface semantics
+        # the enumeration is exact for any continuity (single subdofhandler), so the direct
+        # fill and exact reservation apply here too.
         dh2 = DofHandler(grid)
         add!(dh2, :a, Lagrange{RefQuadrilateral, 1}())
         add!(dh2, :b, DiscontinuousLagrange{RefQuadrilateral, 1}()^2)
@@ -420,6 +421,33 @@ end
         for ic in (trues(2, 2), [false false; false true])
             sp = add_sparsity_entries!(init_sparsity_pattern(dh2), dh2; topology = topo, interface_coupling = ic)
             sp_gen = fsp_test_build_generic(dh2; topology = topo, interface_coupling = ic)
+            compare_matrices(allocate_matrix(sp), allocate_matrix(sp_gen))
+            @test sum(r -> r.nmax, sp.buffer.indices) == sum(length, Ferrite.eachrow(sp))
+        end
+        # Same-side interface blocks: with a restricted cell coupling the interface pass also
+        # provides masked pairs within each interface cell, so the own-cell candidates in the
+        # fast fill must pass on the interface mask too.
+        for (cc, ic) in (
+                ([true false; false true], [false true; false false]),
+                ([true false; false true], trues(2, 2)),
+            )
+            sp = add_sparsity_entries!(init_sparsity_pattern(dh2), dh2; coupling = cc, topology = topo, interface_coupling = ic)
+            sp_gen = fsp_test_build_generic(dh2; coupling = cc, topology = topo, interface_coupling = ic)
+            compare_matrices(allocate_matrix(sp), allocate_matrix(sp_gen))
+            @test sum(r -> r.nmax, sp.buffer.indices) == sum(length, Ferrite.eachrow(sp))
+        end
+        # Multiple subdofhandlers: the direct interface fill must NOT trigger (the square
+        # coupling masks do not apply to cross-subdofhandler neighbors in the walk) and the
+        # layered path must match the generic one.
+        dh3 = DofHandler(grid)
+        sdh_a = SubDofHandler(dh3, Set(1:12))
+        add!(sdh_a, :a, DiscontinuousLagrange{RefQuadrilateral, 1}())
+        sdh_b = SubDofHandler(dh3, Set(13:25))
+        add!(sdh_b, :a, DiscontinuousLagrange{RefQuadrilateral, 1}())
+        close!(dh3)
+        let ic = trues(1, 1)
+            sp = add_sparsity_entries!(init_sparsity_pattern(dh3), dh3; topology = topo, interface_coupling = ic)
+            sp_gen = fsp_test_build_generic(dh3; topology = topo, interface_coupling = ic)
             compare_matrices(allocate_matrix(sp), allocate_matrix(sp_gen))
         end
     end
