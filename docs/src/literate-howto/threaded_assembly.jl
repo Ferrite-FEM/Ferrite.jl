@@ -74,10 +74,11 @@ end
 
 create_example_2d_grid()
 
-# ![](coloring.png)
+# ![](coloring-light.png)
+# ![](coloring-dark.png)
 #
 # *Figure 1*: Element coloring using the "workstream"-algorithm (left) and the "greedy"-
-# algorithm (right).
+# algorithm (right). The swatches below each grid are the colors the algorithm used.
 
 # ## Multithreaded assembly of a cantilever beam in 3D
 #

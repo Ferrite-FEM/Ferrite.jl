@@ -17,12 +17,27 @@ import tempfile
 
 from paraview.simple import *
 
+try:
+    # VTK typesets the "$...$" scalar bar titles through matplotlib. Without it they
+    # render literally and the labels come out in a different size and weight, so bail
+    # out rather than write assets that don't match the rest.
+    import matplotlib  # noqa: F401
+except ImportError:
+    sys.exit(
+        "matplotlib is not importable by pvbatch, which is needed to typeset the scalar\n"
+        "bar titles. Install it into ParaView's Python, or install it elsewhere and point\n"
+        "PYTHONPATH at that directory:\n"
+        "    pip install --target=/tmp/pvlibs matplotlib\n"
+        "    PYTHONPATH=/tmp/pvlibs julia --project=docs docs/generate_screenshots.jl ..."
+    )
+
 datadir, outdir = sys.argv[1], sys.argv[2]
 selected = sys.argv[3:]
 RES = [1600, 1200]
 ANIM_RES = [1000, 750]  # animations are rendered directly at their final size
 EDGE = [0.15, 0.15, 0.15]  # mesh edge color (reads on both light and dark surfaces)
 BARS = []  # scalar bars whose text flips between the variants
+ANNOTS = []  # displays drawn in the annotation color, which also flips
 # (suffix, annotation color, background color): the two theme variants each
 # scene is saved as. The saved images are transparent, but edge antialiasing
 # blends against the render background, so match it to the docs theme to
@@ -64,6 +79,27 @@ def surface(source, view, edges=True):
     return d
 
 
+def annotate(source, view, width=3.0):
+    # Draw source as flat, unshaded geometry in the annotation color, e.g. glyphs
+    # or a marked-up cut line. The color follows the theme variant, so unlike a
+    # data-colored display it stays readable on both backgrounds.
+    d = Show(source, view)
+    d.Representation = "Surface"
+    d.ColorArrayName = ["POINTS", ""]
+    d.Ambient, d.Diffuse = 1.0, 0.0  # no headlight shading, so it reads as line art
+    d.LineWidth = width
+    ANNOTS.append(d)
+    return d
+
+
+def lift(source, dz=0.05):
+    # Nudge geometry towards the camera of a 2d view, so overlays drawn on top of
+    # a surface in the z = 0 plane don't z-fight with it.
+    t = Transform(Input=source)
+    t.Transform.Translate = [0.0, 0.0, dz]
+    return t
+
+
 def warp(source, array, factor):
     w = WarpByVector(Input=source, Vectors=["POINTS", array])
     w.ScaleFactor = factor
@@ -78,11 +114,20 @@ def open_series(pattern):
 
 
 def colorbar(display, view, array, title=None, preset="Cool to Warm",
-             horizontal=False, pos=None, fmt=None):
+             horizontal=False, pos=None, fmt=None, labels=None, categories=0,
+             length=None):
+    # categories: the array holds a category index 1..n rather than a magnitude (e.g. a
+    # coloring), so give each one its own swatch from a qualitative preset. The indices
+    # themselves carry no order, so the swatches are drawn without tick labels.
     ColorBy(display, array)
     display.SetScalarBarVisibility(view, True)
     lut = GetColorTransferFunction(array[1])
-    lut.ApplyPreset(preset, True)
+    if categories:
+        lut.ApplyPreset(preset if preset != "Cool to Warm" else "Brewer Qualitative Set1", True)
+        lut.InterpretValuesAsCategories = 1
+        lut.Annotations = [s for i in range(1, categories + 1) for s in (str(i), "")]
+    else:
+        lut.ApplyPreset(preset, True)
     bar = GetScalarBar(lut, view)
     bar.Title = title or array[1]
     bar.ComponentTitle = ""
@@ -93,13 +138,15 @@ def colorbar(display, view, array, title=None, preset="Cool to Warm",
         else:
             bar.WindowLocation = "Any Location"
             bar.Position = pos
+        if length is not None:
+            bar.ScalarBarLength = length
     else:
         # right of the mesh, vertically centred, with the title on top
         bar.Orientation = "Vertical"
         bar.HorizontalTitle = 1
         bar.WindowLocation = "Any Location"
         bar.Position = pos or [0.83, 0.32]
-        bar.ScalarBarLength = 0.36
+        bar.ScalarBarLength = length or 0.36
     bar.ScalarBarThickness = 24
     bar.TitleFontSize = 36
     bar.LabelFontSize = 32
@@ -109,6 +156,14 @@ def colorbar(display, view, array, title=None, preset="Cool to Warm",
         # e.g. "%.0f": plain numbers for the min/max labels where the default
         # exponent format grows too wide (the in-between labels stay automatic)
         bar.RangeLabelFormat = fmt
+    if categories:
+        bar.DrawTickMarks = bar.DrawTickLabels = bar.DrawAnnotations = 0
+    if labels is not None:
+        # Fixed in-between labels, shown alongside the min/max ones. Use where the
+        # automatic labels crowd together, which also makes the tick spacing
+        # independent of how many labels the ParaView version decides to fit.
+        bar.UseCustomLabels = 1
+        bar.CustomLabels = labels
     BARS.append(bar)
     return lut
 
@@ -141,6 +196,9 @@ def _apply_variant(view, text, bg):
     for bar in BARS:
         bar.TitleColor = text
         bar.LabelColor = text
+    for d in ANNOTS:
+        d.AmbientColor = text
+        d.DiffuseColor = text
 
 
 def finish(view, name, azimuth=30, elevation=25, zoom=1.0, twod=False, res=None,
@@ -159,7 +217,13 @@ def finish(view, name, azimuth=30, elevation=25, zoom=1.0, twod=False, res=None,
             ImageResolution=res, TransparentBackground=1,
         )
     BARS.clear()
+    ANNOTS.clear()
     Delete(view)
+
+
+def cell_range(source, name):
+    info = source.GetDataInformation().GetCellDataInformation().GetArrayInformation(name)
+    return info.GetComponentRange(0)
 
 
 def data_range_over_time(source, array, comp=None, times=None):
@@ -236,6 +300,7 @@ def finish_anim(view, source, name, azimuth=30, elevation=25, zoom=1.0,
                 check=True,
             )
     BARS.clear()
+    ANNOTS.clear()
     Delete(view)
 
 
@@ -303,7 +368,8 @@ def scene_linear_elasticity():
     shifted.Transform.Translate = [1.1, 0.0, 0.0]
     right = surface(shifted, view)
     lut_cell = colorbar(right, view, ("CELLS", "sigma_22"),
-                        title="$\\sigma_{22}$", horizontal=True)
+                        title="$\\sigma_{22}$", horizontal=True,
+                        labels=[5000.0, 10000.0, 15000.0])
     lut_proj = GetColorTransferFunction("stress field")
     lut_proj.ApplyPreset("Cool to Warm", True)
     lut_proj.VectorMode = "Component"
@@ -315,9 +381,6 @@ def scene_linear_elasticity():
     lo, hi = min(pr[0], cr[0]), max(pr[1], cr[1])
     lut_proj.RescaleTransferFunction(lo, hi)
     lut_cell.RescaleTransferFunction(lo, hi)
-    bar = GetScalarBar(lut_cell, view)
-    bar.UseCustomLabels = 1  # the auto labels crowd together for this range
-    bar.CustomLabels = [5000.0, 10000.0, 15000.0]
     finish(view, "linear_elasticity_stress", twod=True, zoom=1.3, res=[1600, 950])
 
 
@@ -358,15 +421,13 @@ def scene_computational_homogenization():
     shifted.Transform.Translate = [(b[1] - b[0]) * 1.35, 0.0, 0.0]
     right = surface(shifted, view, edges=False)
     lut_p = colorbar(right, view, ("POINTS", "σvM_periodic_3"),
-                     title="von Mises [Pa]", horizontal=True)
+                     title="von Mises [Pa]", horizontal=True,
+                     labels=[2.0e10, 4.0e10, 6.0e10])
     pd = r.GetDataInformation().GetPointDataInformation()
     hi = max(pd.GetArrayInformation("σvM_dirichlet_3").GetComponentRange(0)[1],
              pd.GetArrayInformation("σvM_periodic_3").GetComponentRange(0)[1])
     lut_d.RescaleTransferFunction(0.0, hi)
     lut_p.RescaleTransferFunction(0.0, hi)
-    bar = GetScalarBar(lut_p, view)
-    bar.UseCustomLabels = 1  # the auto labels crowd together for this range
-    bar.CustomLabels = [2.0e10, 4.0e10, 6.0e10]
     finish(view, "computational_homogenization", twod=True, zoom=1.25,
            res=[1600, 950], pan_y=-0.12)
 
@@ -383,6 +444,62 @@ def scene_linear_shell():
     # moderate warp and a view from above so it reads as a flat plate (a
     # grazing view also makes the headlight shading unnaturally dark)
     finish(view, "linear_shell", azimuth=30, elevation=65, zoom=1.0)
+
+
+# === how-to guides =========================================================
+
+# --- threaded_assembly: the two grid coloring algorithms side by side
+@scene("threaded_assembly")
+def scene_threaded_assembly():
+    view = new_view()
+    r = OpenDataFile(datadir + "/colored.vtu")
+    left = surface(r, view)
+    n_ws = int(cell_range(r, "workstream-coloring")[1])
+    colorbar(left, view, ("CELLS", "workstream-coloring"), title="workstream",
+             horizontal=True, pos=[0.25, 0.15], length=0.21, categories=n_ws)
+    # the same grid again, shifted along its own width, so the two colorings can be
+    # compared cell by cell
+    b = r.GetDataInformation().GetBounds()
+    shifted = Transform(Input=r)
+    shifted.Transform.Translate = [(b[1] - b[0]) * 1.12, 0.0, 0.0]
+    right = surface(shifted, view)
+    n_gr = int(cell_range(r, "greedy-coloring")[1])
+    colorbar(right, view, ("CELLS", "greedy-coloring"), title="greedy",
+             horizontal=True, pos=[0.54, 0.15], length=0.21, categories=n_gr)
+    finish(view, "coloring", twod=True, zoom=1.25, res=[1600, 700], pan_y=-0.13)
+
+# --- postprocessing: the L2-projected heat flux, and the cut line that the
+# point evaluation runs along
+@scene("postprocessing")
+def scene_postprocessing():
+    view = new_view()
+    r = OpenDataFile(datadir + "/heat_equation_flux.vtu")
+    d = surface(r, view)
+    colorbar(d, view, ("POINTS", "q"), title="$\\vert q \\vert$", fmt="%.2f",
+             labels=[0.2, 0.4])
+    # Arrows for the flux direction, in the annotation color rather than coloured
+    # by magnitude: the surface underneath already carries that, and one scale is
+    # easier to read than two. Stride 2 thins them to every other node so the
+    # arrows near the boundary, where the flux is largest, don't overlap.
+    g = Glyph(Input=r, GlyphType="Arrow")
+    g.OrientationArray = ["POINTS", "q"]
+    g.ScaleArray = ["POINTS", "q"]
+    g.VectorScaleMode = "Scale by Magnitude"
+    g.ScaleFactor = 0.22
+    g.GlyphMode = "Every Nth Point"
+    g.Stride = 2
+    annotate(lift(g), view)
+    finish(view, "postprocessing", twod=True, zoom=0.95)
+
+    # Figure 2: the horizontal cut line the PointEvalHandler samples, drawn on
+    # the temperature field that the first of those plots shows.
+    view = new_view()
+    r = OpenDataFile(datadir + "/heat_equation.vtu")
+    d = surface(r, view)
+    colorbar(d, view, ("POINTS", "u"), title="u", fmt="%.2f", labels=[0.1, 0.2])
+    cut = Line(Point1=[-1.0, 0.75, 0.0], Point2=[1.0, 0.75, 0.0])
+    annotate(lift(cut), view, width=6.0)
+    finish(view, "postprocessing_cutline", twod=True, zoom=0.95)
 
 
 # === animations (time-stepping examples) ===================================
@@ -523,10 +640,28 @@ def scene_landau():
 # --- topology_optimization: density evolution during optimisation (SIMP)
 @scene("topology_optimization")
 def scene_topology_optimization():
+    # Figure 2 of the example: the converged density for the smaller regularization
+    # radius (left) next to the larger one (right), on the shared SIMP scale. The
+    # smaller radius comes from the POSTRUN entry in generate_screenshots.jl.
+    view = new_view()
+    small = OpenDataFile(datadir + "/small_radius.vtu")
+    left = surface(small, view, edges=False)
+    ColorBy(left, ("CELLS", "density"))  # shares the "density" transfer function
+    b = small.GetDataInformation().GetBounds()
+    shifted = Transform(Input=OpenDataFile(datadir + "/large_radius.vtu"))
+    shifted.Transform.Translate = [(b[1] - b[0]) * 1.1, 0.0, 0.0]
+    right = surface(shifted, view, edges=False)
+    lut = colorbar(right, view, ("CELLS", "density"), title="density", horizontal=True,
+                   fmt="%.1f", labels=[0.25, 0.5, 0.75])
+    lut.RescaleTransferFunction(0.0, 1.0)  # SIMP density in [0, 1]
+    finish(view, "topology_optimization_result", twod=True, zoom=2.2,
+           res=[1600, 620], pan_y=-0.2)
+
     view = new_view()
     r = open_series(datadir + "/topopt_frames_*.vtu")
     d = surface(r, view, edges=False)
-    lut = colorbar(d, view, ("CELLS", "density"), title="density", horizontal=True)
+    lut = colorbar(d, view, ("CELLS", "density"), title="density", horizontal=True,
+                   fmt="%.1f", labels=[0.25, 0.5, 0.75])
     lut.RescaleTransferFunction(0.0, 1.0)  # SIMP density in [0, 1]
     # wide beam domain -> wide frame, horizontal colour bar centred below the mesh
     finish_anim(view, r, "topology_optimization", twod=True, zoom=1.4,
