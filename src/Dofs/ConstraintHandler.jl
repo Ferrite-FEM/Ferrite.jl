@@ -291,6 +291,7 @@ function close!(ch::ConstraintHandler)
     for dof in ch.prescribed_dofs
         ch.isconstrained[dof] = true
     end
+
     _set_freedofs!(ch.free_dofs, ch.isconstrained, ndofs(ch.dh), length(ch.prescribed_dofs))
 
     for i in 1:length(ch.prescribed_dofs)
@@ -310,19 +311,10 @@ function close!(ch::ConstraintHandler)
     # - `add_prescribed_dof` make sure all prescribed dofs are unique by overwriting the old
     #   constraint when adding a new (TODO: Might change in the future, see comment in
     #   `add_prescribed_dof`.)
-    # - We allow affine constraints to have prescribed dofs as master dofs iff those master
-    #   dofs are constrained with just an inhomogeneity (i.e. DBC). The effective
-    #   inhomogeneity is computed in `update!`.
-    for coeffs in ch.dofcoefficients
-        coeffs === nothing && continue
-        for (d, _) in coeffs
-            i = get(ch.dofmapping, d, 0)
-            i == 0 && continue
-            icoeffs = ch.dofcoefficients[i]
-            if !(icoeffs === nothing || isempty(icoeffs))
-                error("nested affine constraints currently not supported")
-            end
-        end
+
+    if istangled(ch) # untangle affine constraints
+        @debug @warn "untangling tangled and cyclic affine constraints"
+        untangle_constraints!(ch)
     end
 
     ch.closed = true
@@ -357,9 +349,13 @@ constraint if true.
 """
 function add_prescribed_dof!(ch::ConstraintHandler, constrained_dof::Int, inhomogeneity, dofcoefficients = nothing)
     @assert(!isclosed(ch))
+    @assert(constrained_dof ≤ ndofs(ch.dh))
     i = get(ch.dofmapping, constrained_dof, 0)
+    # TODO: It would be cool not to override and just add regardless
+    # and then untangle in close! This however not done yet.
+    # If you're interested in this see https://github.com/Ferrite-FEM/Ferrite.jl/pull/1327#discussion_r3278862479
     if i != 0
-        @debug @warn "dof $i already prescribed, overriding the old constraint"
+        @debug @warn "dof $constrained_dof already prescribed, overriding the old constraint"
         ch.prescribed_dofs[i] = constrained_dof
         ch.inhomogeneities[i] = inhomogeneity
         ch.affine_inhomogeneities[i] = dofcoefficients === nothing ? nothing : inhomogeneity
@@ -875,7 +871,7 @@ function create_constraint_matrix(ch::ConstraintHandler{dh, T}) where {dh, T}
 
     for (i, pdof) in enumerate(ch.prescribed_dofs)
         dofcoef = ch.dofcoefficients[i]
-        if dofcoef !== nothing #if affine constraint
+        if dofcoef !== nothing # if affine constraint
             for (d, v) in dofcoef
                 push!(I, pdof)
                 j = searchsortedfirst(ch.free_dofs, d)
