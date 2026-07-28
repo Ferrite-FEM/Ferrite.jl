@@ -67,10 +67,6 @@ function _apply_analytical!(
     c_dofs = celldofs(dh, first(cellset))
     f_dofs = zeros(Int, length(celldofinds))
 
-    # Check f before looping
-    length(_analytical_dof_values(ip_fun, f(first(coords)))) == field_dim ||
-        error("length(f(x)) must be equal to dimension of the field ($field_dim)")
-
     for cellnr in cellset
         getcoordinates!(coords, get_grid(dh), cellnr)
         celldofs!(c_dofs, dh, cellnr)
@@ -83,16 +79,22 @@ function _apply_analytical!(
 end
 
 # The dof values (in the interpolation's component order) corresponding to the function
-# value `fval`. For tensor-valued fields the independent tensor components are used
-# (`length(fval)` counts all matrix entries, which for symmetric tensors differs from the
-# number of components, and iteration order does not match the data order).
-_analytical_dof_values(::Interpolation, fval) = fval
-_analytical_dof_values(::TensorInterpolation{TB}, fval) where {TB <: SecondOrderTensor} = TB(fval).data
+# value `fval`. For scalar/vector fields the value is a collection with one entry per
+# component; for tensor-valued fields it is the tensor value, whose independent components
+# (the data tuple of the value converted to the field's tensor type) are the dof values.
+@inline function _analytical_dof_values(::Interpolation, fval, field_dim::Int)
+    length(fval) == field_dim || error("length(f(x)) must be equal to dimension of the field ($field_dim)")
+    return fval
+end
+@inline _analytical_dof_values(::TensorInterpolation{TB}, fval::SecondOrderTensor, ::Int) where {TB <: SecondOrderTensor} = TB(fval).data
+function _analytical_dof_values(::TensorInterpolation{TB}, fval, ::Int) where {TB <: SecondOrderTensor}
+    return error("f(x) for a tensor-valued field must return the tensor value (convertible to $(TB)), got $(typeof(fval))")
+end
 
 function _apply_analytical!(a::AbstractVector, dofs::Vector{Int}, coords::Vector{<:Vec}, field_dim, cv::CellValues, f, ip_fun::Interpolation)
     for i_dof in 1:getnquadpoints(cv)
         x_dof = spatial_coordinate(cv, i_dof, coords)
-        for (idim, icval) in enumerate(_analytical_dof_values(ip_fun, f(x_dof)))
+        for (idim, icval) in enumerate(_analytical_dof_values(ip_fun, f(x_dof), field_dim))
             a[dofs[field_dim * (i_dof - 1) + idim]] = icval
         end
     end

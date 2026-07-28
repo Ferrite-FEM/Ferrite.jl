@@ -245,6 +245,8 @@ using SparseArrays
         a = zeros(ndofs(dh))
         # Non-symmetric tensor cannot be converted to the symmetric value type
         @test_throws InexactError apply_analytical!(a, dh, :σ, x -> Tensor{2, 2}((1.0, 2.0, 3.0, 4.0)))
+        # Non-tensor returns are rejected
+        @test_throws ErrorException apply_analytical!(a, dh, :σ, x -> (1.0, 2.0, 3.0))
     end
 
     @testset "VTK export" begin
