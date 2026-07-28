@@ -11,12 +11,10 @@ typeof_dNdξ(::Type{T}, ::ScalarInterpolation, ::VectorizedInterpolation{sdim, <
 typeof_d2Ndx2(::Type{T}, ::ScalarInterpolation, ::VectorizedInterpolation{sdim, <:AbstractRefShape{rdim}}) where {T, sdim, rdim} = Tensor{2, sdim, T}
 typeof_d2Ndξ2(::Type{T}, ::ScalarInterpolation, ::VectorizedInterpolation{sdim, <:AbstractRefShape{rdim}}) where {T, sdim, rdim} = Tensor{2, rdim, T}
 
-# Tensor-valued fields (`TensorInterpolation{TB}` covers both vector-valued
-# interpolations, TB <: Vec, and second order tensor-valued interpolations). Values keep
-# the (compact) tensor type `TB`, while gradients gain one dimension (stored as full
-# tensors also for symmetric `TB`; Tensors.jl has no minor-symmetric third order tensor
-# type). Second derivatives are only supported for vector-valued fields (see the
-# FunctionValues constructor below).
+# Tensor-valued fields: values keep the (compact) tensor type `TB`, gradients gain one
+# dimension and are stored as full tensors also for symmetric `TB` (Tensors.jl has no
+# minor-symmetric third order tensor type). Second derivatives are only supported for
+# vector-valued fields (see the FunctionValues constructor below).
 typeof_N(::Type{T}, ::TensorInterpolation{TB}, ::VectorizedInterpolation{sdim, <:AbstractRefShape{rdim}}) where {T, TB, sdim, rdim} = TB{T}
 typeof_dNdx(::Type{T}, ::TensorInterpolation{<:Vec{vdim}}, ::VectorizedInterpolation{sdim, <:AbstractRefShape{rdim}}) where {T, vdim, sdim, rdim} = Tensors.regular_if_possible(MixedTensor2{vdim, sdim, T})
 typeof_dNdξ(::Type{T}, ::TensorInterpolation{<:Vec{vdim}}, ::VectorizedInterpolation{sdim, <:AbstractRefShape{rdim}}) where {T, vdim, sdim, rdim} = Tensors.regular_if_possible(MixedTensor2{vdim, rdim, T})
@@ -131,7 +129,7 @@ shape_hessian_type(::FunctionValues{0}) = nothing
 shape_hessian_type(::FunctionValues{1}) = nothing
 
 
-# Short description of the field kind based on the shape value type, used in show methods
+# Short description of the field kind for show methods
 _field_kind_string(::Number) = "scalar"
 _field_kind_string(v::Vec) = "vdim=$(length(v))"
 _field_kind_string(v::SecondOrderTensor) = string(Tensors.get_base(typeof(v)))

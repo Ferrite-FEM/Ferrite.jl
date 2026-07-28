@@ -286,14 +286,10 @@ function add!(sdh::SubDofHandler, name::Symbol, ip::Interpolation)
     for _sdh in sdh.dh.subdofhandlers
         for (_name, _ip) in zip(_sdh.field_names, _sdh.field_interpolations)
             _name != name && continue
-            # same field name, check for same field dimension
-            if n_components(ip) != n_components(_ip)
-                error("Field :$name has a different number of components in another SubDofHandler. Use a different field name.")
-            end
-            # ... and the same kind of value (e.g. a Vec{4} field and a Tensor{2,2} field
-            # both have 4 components but are not compatible)
+            # same field name: require the same value type (this also covers the number
+            # of components, and e.g. distinguishes Vec{4} from Tensor{2,2})
             if shape_value_type(ip, Float64) != shape_value_type(_ip, Float64)
-                error("Field :$name has a different value type in another SubDofHandler. Use a different field name.")
+                error("Field :$name has value type $(shape_value_type(ip, Float64)) but $(shape_value_type(_ip, Float64)) in another SubDofHandler. Use a different field name.")
             end
             if getorder(ip) != getorder(_ip)
                 @warn "Field :$name uses a different interpolation order in another SubDofHandler."
@@ -997,11 +993,9 @@ function _evaluate_at_grid_nodes(dh::DofHandler{sdim}, u::AbstractVector{T}, fie
     if vtk
         # VTK output of solution field (or L2 projected scalar data)
         n_c = n_components(ip)
-        if ip isa TensorInterpolation{<:SecondOrderTensor}
-            vtk_dim = n_c # tensor components are written as-is (in Voigt order), no padding
-        else
-            vtk_dim = n_c == 2 ? 3 : n_c # VTK wants vectors padded to 3D
-        end
+        # VTK wants 2D vectors padded to 3D; only Vec{2} has 2 components, second order
+        # tensors are written as-is (in Voigt order) without padding
+        vtk_dim = n_c == 2 ? 3 : n_c
         # Float32 is the smallest float type supported by VTK
         TT = promote_type(T, Float32)
         data = fill!(Matrix{TT}(undef, vtk_dim, getnnodes(get_grid(dh))), NaN)

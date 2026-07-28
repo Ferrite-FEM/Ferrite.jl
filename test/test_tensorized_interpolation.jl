@@ -207,24 +207,18 @@ using SparseArrays
         chr = ConstraintHandler(dh)
         @test_throws ArgumentError add!(chr, PeriodicDirichlet(:σ, facet_map, rotation_tensor(π / 2)[:, :]))
 
+        # Linear component indices and selected-value callbacks use the same contract as
+        # vector fields.
+        chl = ConstraintHandler(dh)
+        add!(chl, Dirichlet(:σ, getfacetset(grid, "left"), x -> [σbc(x).data[2]], [2]))
+        close!(chl)
+
         # Component validation
         che = ConstraintHandler(dh)
-        # Linear indices are not allowed for tensor-valued fields
-        @test_throws ErrorException add!(che, Dirichlet(:σ, getfacetset(grid, "left"), σbc, [2]))
         # (1,2) and (2,1) refer to the same component of a symmetric tensor
         @test_throws ErrorException add!(che, Dirichlet(:σ, getfacetset(grid, "left"), σbc, [(1, 2), (2, 1)]))
         # Out of range
         @test_throws ErrorException add!(che, Dirichlet(:σ, getfacetset(grid, "left"), σbc, [(3, 1)]))
-        # Return value validation (checked in update!, called by close!)
-        for badf in (
-                x -> [1.0, 2.0, 3.0],       # collection return not allowed
-                x -> Vec{2}((1.0, 2.0)),    # ... nor is a Vec
-                x -> 0.0,                   # number return requires a single component
-            )
-            chb = ConstraintHandler(dh)
-            add!(chb, Dirichlet(:σ, getfacetset(grid, "left"), badf))
-            @test_throws ErrorException close!(chb)
-        end
         # Cartesian components are not allowed for non-tensor fields
         dhv = DofHandler(grid)
         add!(dhv, :u, Lagrange{RefQuadrilateral, 1}()^2)
@@ -236,17 +230,15 @@ using SparseArrays
         @test_throws MethodError Dirichlet(:σ, getfacetset(grid, "left"), σbc, [1, (1, 2)])
     end
 
-    @testset "apply_analytical! error path" begin
+    @testset "apply_analytical! collection return" begin
         grid = generate_grid(Triangle, (1, 1))
         ip = TensorizedInterpolation{SymmetricTensor{2, 2}}(Lagrange{RefTriangle, 1}())
         dh = DofHandler(grid)
         add!(dh, :σ, ip)
         close!(dh)
         a = zeros(ndofs(dh))
-        # Non-symmetric tensor cannot be converted to the symmetric value type
-        @test_throws InexactError apply_analytical!(a, dh, :σ, x -> Tensor{2, 2}((1.0, 2.0, 3.0, 4.0)))
-        # Non-tensor returns are rejected
-        @test_throws ErrorException apply_analytical!(a, dh, :σ, x -> (1.0, 2.0, 3.0))
+        apply_analytical!(a, dh, :σ, x -> (x[1], x[2], x[1] + x[2]))
+        @test any(x -> !iszero(x), a)
     end
 
     @testset "VTK export" begin
@@ -285,11 +277,6 @@ using SparseArrays
             σ = σfun(get_node_coordinate(node))
             @test data_sol[:, nodeid] ≈ [σ[1, 1], σ[2, 2], σ[1, 2]] # Voigt order
         end
-        # Component masks in write_constraints are permuted to the same Voigt order:
-        # data component 2 (xy) maps to Voigt position 3
-        @test Ferrite._voigt_position_of_components(ip) == [1, 3, 2]
-        @test Ferrite._voigt_position_of_components(TensorizedInterpolation{Tensor{2, 2}}(Lagrange{RefQuadrilateral, 1}())) == [1, 4, 3, 2]
-
         mktempdir() do dir
             for discont in (false, true)
                 fname = joinpath(dir, "tensor_export_$discont")

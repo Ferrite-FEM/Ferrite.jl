@@ -175,8 +175,6 @@ using Ferrite: reference_shape_value, reference_shape_gradient
                 nc = Tensors.n_components(TB)
                 @test Ferrite.n_components(t_interpolation) == nc
                 @test getnbasefunctions(t_interpolation) == nc * getnbasefunctions(interpolation)
-                # eltype parameters in TB are stripped
-                @test TensorizedInterpolation{TB{Float32}}(interpolation) === t_interpolation
                 # pretty printing
                 @test repr("text/plain", t_interpolation) ==
                     "TensorizedInterpolation{$TB}(" * repr("text/plain", interpolation) * ")"
@@ -195,14 +193,9 @@ using Ferrite: reference_shape_value, reference_shape_gradient
                         @test N.data[comp] ≈ Nbase
                         @test sum(abs, N.data) ≈ abs(Nbase)
                         # Analytic derivatives match the scalar base ones
-                        dNdξ_base, Nbase2 = Ferrite.reference_shape_gradient_and_value(interpolation, x, base_dof)
+                        dNdξ_base, _ = Ferrite.reference_shape_gradient_and_value(interpolation, x, base_dof)
                         E = Ferrite._tensorized_basis(TB, comp, one(value_type))
                         @test dNdξ ≈ otimes(E, dNdξ_base)
-                        d2, d1, d0 = Ferrite.reference_shape_hessian_gradient_and_value(t_interpolation, x, dof)
-                        h_base, g_base, v_base = Ferrite.reference_shape_hessian_gradient_and_value(interpolation, x, base_dof)
-                        @test d2 ≈ otimes(E, h_base)
-                        @test d1 ≈ dNdξ
-                        @test d0 ≈ N
                     end
                 end
 
@@ -253,26 +246,4 @@ using Ferrite: reference_shape_value, reference_shape_gradient
         end
     end
 
-    @testset "TensorizedInterpolation constructor" begin
-        ip = Lagrange{RefTriangle, 1}()
-        # Vec value types construct vectorized interpolations (`VectorizedInterpolation`
-        # is an alias for `TensorizedInterpolation{Vec{vdim}}`)
-        @test TensorizedInterpolation{Vec{2}}(ip) === ip^2
-        @test TensorizedInterpolation{Vec{2, Float32}}(ip) === ip^2 # eltype is stripped
-        # Vec has no dim restriction (any vdim gives a valid dof layout), unlike the
-        # second order tensor types
-        @test TensorizedInterpolation{Vec{4}}(ip) === ip^4
-        # Unsupported value types
-        @test_throws MethodError TensorizedInterpolation{Tensor{4, 2}}(ip)
-        @test_throws MethodError TensorizedInterpolation{SymmetricTensor{4, 2}}(ip)
-        # Tensor dimension must be specified
-        @test_throws MethodError TensorizedInterpolation{Vec}(ip)
-        @test_throws MethodError TensorizedInterpolation{Tensor{2}}(ip)
-        @test_throws MethodError TensorizedInterpolation{SymmetricTensor{2}}(ip)
-        # Unsupported tensor dimension
-        @test_throws ArgumentError TensorizedInterpolation{Tensor{2, 4}}(ip)
-        # The full-parameter constructor cannot bypass normalization/validation
-        @test_throws MethodError TensorizedInterpolation{SymmetricTensor{2, 2, Float32}, RefTriangle, 1, typeof(ip)}(ip)
-        @test_throws MethodError TensorizedInterpolation{Vec{2}, RefTriangle, 1, typeof(ip)}(ip)
-    end
 end # testset

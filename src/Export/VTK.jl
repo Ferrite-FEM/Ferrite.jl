@@ -345,15 +345,6 @@ function write_constraints(vtk, ch::ConstraintHandler)
     for field in unique_fields
         nd = n_components(ch.dh, field)
         ip = getfieldinterpolation(ch.dh, find_field(ch.dh, field))
-        if ip isa TensorInterpolation{<:SecondOrderTensor}
-            # Tensor-valued solution fields are exported in Voigt order: permute the
-            # component masks the same way (and label them) so the rows line up.
-            perm = _voigt_position_of_components(ip)
-            names = component_names(shape_value_type(ip, Float64))
-        else
-            perm = 1:nd
-            names = nothing
-        end
         data = zeros(Float64, nd, getnnodes(get_grid(ch.dh)))
         for dbc in ch.dbcs
             dbc.field_name != field && continue
@@ -362,36 +353,28 @@ function write_constraints(vtk, ch::ConstraintHandler)
                 for (cellidx, facetidx) in dbc.facets
                     for facetnode in functype(getcells(get_grid(ch.dh), cellidx))[facetidx]
                         for component in dbc.components
-                            data[perm[component], facetnode] = 1
+                            data[component, facetnode] = 1
                         end
                     end
                 end
             else
                 for nodeidx in dbc.facets
                     for component in dbc.components
-                        data[perm[component], nodeidx] = 1
+                        data[component, nodeidx] = 1
                     end
                 end
             end
         end
-        if write_discontinuous(vtk)
-            data = _map_to_discontinuous_nodes(vtk.node_mapping, data)
+        if ip isa TensorInterpolation{<:SecondOrderTensor}
+            # Delegate Voigt ordering, component names, and discontinuous-node mapping to
+            # the regular tensor node-data path.
+            T = shape_value_type(ip, Float64)
+            write_node_data(vtk, map(column -> T(Tuple(column)), eachcol(data)), string(field, "_bc"))
+        else
+            write_node_data(vtk, data, string(field, "_bc"))
         end
-        _vtk_write_node_data(vtk.vtk, data, string(field, "_bc"); component_names = names)
     end
     return vtk
-end
-
-# The position in the Voigt (`tovoigt!`) output of each independent tensor component
-# (data order), i.e. `voigt[_voigt_position_of_components(ip)[c]]` corresponds to
-# data component `c`.
-function _voigt_position_of_components(ip::TensorInterpolation{TB}) where {TB <: SecondOrderTensor}
-    nc = n_components(ip)
-    v = zeros(Float64, nc)
-    return map(1:nc) do c
-        tovoigt!(v, _tensorized_basis(TB, c, 1.0))
-        return findfirst(==(1.0), v)::Int
-    end
 end
 
 """

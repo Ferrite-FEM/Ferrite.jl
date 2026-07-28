@@ -90,9 +90,8 @@ let g = SUITE["constraints"]
     )
 end
 
-# Dirichlet on a tensor-valued field: the BC function returns the tensor value, from which
-# the prescribed components are extracted by a wrapper set up in add! — a code path of its
-# own in update!.
+# Dirichlet on a tensor-valued field: update! goes through the tensor-return
+# normalization wrapper set up in add!.
 let g = SUITE["constraints"]
     grid = generate_grid(Quadrilateral, (50, 50))
     dh = DofHandler(grid)

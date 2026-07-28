@@ -148,9 +148,9 @@ quadrature point `q_point`.
 end
 divergence_from_gradient(grad::Vec) = sum(grad)
 divergence_from_gradient(grad::Tensor{2}) = tr(grad)
-# Row-wise divergence of a second order tensor-valued field, (div A)ᵢ = ∂Aᵢⱼ/∂xⱼ, from its
-# third order gradient. Only defined when the two contracted dimensions match: for a field
-# on an embedded cell with tensor dimension != sdim there is no canonical contraction.
+# Row-wise divergence of a second order tensor-valued field, (div A)ᵢ = ∂Aᵢⱼ/∂xⱼ. Only
+# defined when the contracted dimensions match: with tensor dimension != sdim (embedded
+# cells) there is no canonical contraction.
 divergence_from_gradient(grad::Tensor{3, dim}) where {dim} = Vec{dim}(i -> sum(grad[i, j, j] for j in 1:dim))
 divergence_from_gradient(grad::MixedTensor3{vdim, dim, dim}) where {vdim, dim} = Vec{vdim}(i -> sum(grad[i, j, j] for j in 1:dim))
 

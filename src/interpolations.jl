@@ -63,13 +63,11 @@ abstract type Interpolation{shape #=<: AbstractRefShape=#, order} end
 const InterpolationByDim{dim} = Interpolation{<:AbstractRefShape{dim}}
 
 abstract type ScalarInterpolation{refshape, order} <: Interpolation{refshape, order} end
-# Interpolations whose value is a tensor of type `TB` (e.g. `Vec{vdim}` for vector-valued
-# interpolations, or a second order tensor type for tensor-valued interpolations).
+# Interpolations whose value is a tensor of type `TB` (e.g. `Vec{vdim}` or a second order
+# tensor type).
 abstract type TensorInterpolation{TB, refshape, order} <: Interpolation{refshape, order} end
-# Vector-valued interpolations: both standalone ones (e.g. H(div)/H(curl) type
-# interpolations such as `RaviartThomas` and `Nedelec`, which subtype
-# `VectorInterpolation{vdim, refshape, order}` directly) and vectorized scalar
-# interpolations (`ip ^ vdim`, see `VectorizedInterpolation`).
+# Vector-valued interpolations: both standalone ones (e.g. `RaviartThomas` and `Nedelec`)
+# and vectorized scalar interpolations (`ip ^ vdim`, see `VectorizedInterpolation`).
 const VectorInterpolation{vdim} = TensorInterpolation{Vec{vdim}}
 
 struct L2Conformity end     # Discontinuous across cell boundaries
@@ -85,9 +83,8 @@ or `H1Conformity()`, for the interpolation.
 """
 function conformity end
 
-# Number of independent components of the tensor type TB. This is
-# `Tensors.n_components`, except that it also supports `Vec{dim}` (a `UnionAll`
-# which `Tensors.n_components` does not have a method for).
+# Like `Tensors.n_components`, but also supports the `Vec{dim}` alias (a `UnionAll` that
+# `Tensors.n_components` has no method for).
 _ncomponents(::Type{<:Vec{vdim}}) where {vdim} = vdim
 _ncomponents(::Type{TB}) where {TB} = Tensors.n_components(TB)
 
@@ -1589,22 +1586,17 @@ end
     TensorizedInterpolation{TB}(ip::ScalarInterpolation)
 
 Interpolation for a tensor-valued field, using the scalar base functions of `ip` for each
-independent tensor component. `TB` is the tensor type of the field's values: `Vec{vdim}`,
-or `Tensor{2, dim}`/`SymmetricTensor{2, dim}` with `dim ∈ 1:3` (an eltype parameter in
-`TB` is ignored; the numeric type is determined by e.g. `CellValues` as for all other
-interpolations). Vectorizing a scalar interpolation with `ip ^ vdim` (see
-[`VectorizedInterpolation`](@ref)) constructs `TensorizedInterpolation{Vec{vdim}}(ip)`.
-Note that "tensorized" here refers to the *value* of the field being a tensor, not to a
-tensor-product construction of the polynomial basis.
+independent tensor component. `TB` is the tensor type of the field's values: `Vec{vdim}`
+(equivalent to `ip ^ vdim`, see [`VectorizedInterpolation`](@ref)), or
+`Tensor{2, dim}`/`SymmetricTensor{2, dim}` with `dim ∈ 1:3`. "Tensorized" refers to the
+field *value* being a tensor, not to a tensor-product construction of the basis.
 
-Each base function of `ip` is repeated once per independent tensor component, and
-component `c` always refers to the `c`-th entry of `TB`'s internal data tuple:
-column-major order for `Tensor{2}`, i.e. `(1,1), (2,1), ..., (1,2), (2,2), ...`, and
-lower-triangle column-major order for `SymmetricTensor{2}`, i.e.
-`(1,1), (2,1), (3,1), (2,2), (3,2), (3,3)` in 3D. This ordering applies wherever field
-components are indexed, e.g. `Dirichlet` components and sparsity pattern coupling. For a
-`SymmetricTensor{2}` field the off-diagonal components are single degrees of freedom that
-represent both `(i,j)` and `(j,i)` entries.
+Component `c` refers to the `c`-th entry of `TB`'s internal data tuple: column-major
+order for `Tensor{2}`, and lower-triangle column-major order for `SymmetricTensor{2}`,
+e.g. `(1,1), (2,1), (3,1), (2,2), (3,2), (3,3)` in 3D. This ordering applies wherever
+field components are indexed linearly, e.g. linear `Dirichlet` components and sparsity
+pattern coupling. For a `SymmetricTensor{2}` field the off-diagonal components are single
+degrees of freedom that represent both `(i,j)` and `(j,i)` entries.
 
 # Examples
 ```julia
@@ -1614,23 +1606,13 @@ ip = TensorizedInterpolation{SymmetricTensor{2, 2}}(Lagrange{RefTriangle, 1}())
 """
 struct TensorizedInterpolation{TB, refshape, order, SI <: ScalarInterpolation{refshape, order}} <: TensorInterpolation{TB, refshape, order}
     ip::SI
-    # The inner constructors normalize `TB` (strip eltype parameters) and replace the
-    # default constructor so that invalid or non-normalized `TB` parameters cannot be
-    # constructed. The second order tensor dimension is validated; `Vec` accepts any
-    # vdim since it gives a valid dof layout regardless (FE-value evaluation requires
-    # Tensors.jl support, i.e. vdim ∈ 1:3).
-    function TensorizedInterpolation{TB}(ip::SI) where {vdim, TB <: Vec{vdim}, refshape, order, SI <: ScalarInterpolation{refshape, order}}
-        return new{Vec{vdim}, refshape, order, SI}(ip)
-    end
-    function TensorizedInterpolation{TB}(ip::SI) where {dim, TB <: Tensor{2, dim}, refshape, order, SI <: ScalarInterpolation{refshape, order}}
-        1 <= dim <= 3 || throw(ArgumentError("only tensor dimensions 1, 2, and 3 are supported"))
-        return new{Tensor{2, dim}, refshape, order, SI}(ip)
-    end
-    function TensorizedInterpolation{TB}(ip::SI) where {dim, TB <: SymmetricTensor{2, dim}, refshape, order, SI <: ScalarInterpolation{refshape, order}}
-        1 <= dim <= 3 || throw(ArgumentError("only tensor dimensions 1, 2, and 3 are supported"))
-        return new{SymmetricTensor{2, dim}, refshape, order, SI}(ip)
-    end
 end
+TensorizedInterpolation{Vec{vdim}}(ip::SI) where {vdim, refshape, order, SI <: ScalarInterpolation{refshape, order}} =
+    TensorizedInterpolation{Vec{vdim}, refshape, order, SI}(ip)
+TensorizedInterpolation{Tensor{2, dim}}(ip::SI) where {dim, refshape, order, SI <: ScalarInterpolation{refshape, order}} =
+    TensorizedInterpolation{Tensor{2, dim}, refshape, order, SI}(ip)
+TensorizedInterpolation{SymmetricTensor{2, dim}}(ip::SI) where {dim, refshape, order, SI <: ScalarInterpolation{refshape, order}} =
+    TensorizedInterpolation{SymmetricTensor{2, dim}, refshape, order, SI}(ip)
 
 """
     VectorizedInterpolation{vdim}(ip::ScalarInterpolation)
@@ -1694,8 +1676,7 @@ function getnbasefunctions(ipt::TensorizedInterpolation)
 end
 
 # The tensor with `v` in the `c`th independent component (`TB`'s data order) and zeros
-# elsewhere. For `SymmetricTensor` the off-diagonal components materialize at both `(i, j)`
-# and `(j, i)`.
+# elsewhere.
 @inline function _tensorized_basis(::Type{TB}, c::Int, v::T) where {TB, T}
     return TB(ntuple(k -> k == c ? v : zero(v), Val(_ncomponents(TB))))
 end
@@ -1706,26 +1687,20 @@ function reference_shape_value(ipt::TensorizedInterpolation{TB}, ξ::Vec{refdim,
     return _tensorized_basis(TB, c0 + 1, v)
 end
 
-# Analytic derivatives: the derivative of `E ⊗ N(ξ)` w.r.t. `ξ` is `E ⊗ ∇N(ξ)` with `E`
-# constant. This is cheaper than the AD fallbacks, and Tensors.jl's AD does not support
-# `SymmetricTensor`-valued functions of a `Vec`.
-function reference_shape_gradient(ipt::TensorizedInterpolation{TB}, ξ::Vec{refdim, T}, I::Int) where {TB, refdim, T}
+# Tensors.jl's AD does not support `SymmetricTensor`-valued functions of a `Vec`, so use
+# the analytic derivative E ⊗ ∇N(ξ) for second order tensor fields. Vectorized
+# interpolations retain the generic AD path.
+function reference_shape_gradient(ipt::TensorizedInterpolation{TB}, ξ::Vec{refdim, T}, I::Int) where {TB <: SecondOrderTensor, refdim, T}
     i0, c0 = divrem(I - 1, n_components(ipt))
     dN = reference_shape_gradient(ipt.ip, ξ, i0 + 1)
     E = _tensorized_basis(TB, c0 + 1, one(T))
     return E ⊗ dN
 end
-function reference_shape_gradient_and_value(ipt::TensorizedInterpolation{TB}, ξ::Vec{refdim, T}, I::Int) where {TB, refdim, T}
+function reference_shape_gradient_and_value(ipt::TensorizedInterpolation{TB}, ξ::Vec{refdim, T}, I::Int) where {TB <: SecondOrderTensor, refdim, T}
     i0, c0 = divrem(I - 1, n_components(ipt))
     dN, N = reference_shape_gradient_and_value(ipt.ip, ξ, i0 + 1)
     E = _tensorized_basis(TB, c0 + 1, one(T))
     return E ⊗ dN, E * N
-end
-function reference_shape_hessian_gradient_and_value(ipt::TensorizedInterpolation{TB}, ξ::Vec{refdim, T}, I::Int) where {TB, refdim, T}
-    i0, c0 = divrem(I - 1, n_components(ipt))
-    d2N, dN, N = reference_shape_hessian_gradient_and_value(ipt.ip, ξ, i0 + 1)
-    E = _tensorized_basis(TB, c0 + 1, one(T))
-    return E ⊗ d2N, E ⊗ dN, E * N
 end
 
 """
