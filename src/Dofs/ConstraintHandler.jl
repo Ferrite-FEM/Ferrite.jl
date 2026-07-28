@@ -977,28 +977,40 @@ function meandiag(K::AbstractMatrix)
 end
 
 # Resolve user-given components to sorted linear indices in the field's component order.
-# Empty input means all components. Cartesian (i, j) components of tensor fields are
-# mapped to the tensor's data order.
-function _resolve_dbc_components(components::Vector{Int}, ::Interpolation, n_comp::Int, field_name::Symbol)
-    isempty(components) && return collect(Int, 1:n_comp)
-    if !all(c -> 0 < c <= n_comp, components)
-        error("components $(components) not within range of field :$(field_name) ($(n_comp) dimension(s))")
+# Empty input means all components. Cartesian (i, j) tuples and Bool tensor masks of
+# tensor-valued fields are mapped to the tensor's data order.
+function _resolve_dbc_components(
+        components::Union{Vector{Int}, Vector{NTuple{2, Int}}, ComponentMask},
+        ip::Interpolation, n_comp::Int, field_name::Symbol
+    )
+    is_tensor_field = ip isa TensorInterpolation{<:SecondOrderTensor}
+    if components isa Vector{Int}
+        # Linear indices; already in component order but rejected for tensor fields
+        # where the data order is not obvious
+        isempty(components) && return collect(Int, 1:n_comp)
+        is_tensor_field && error("components of the tensor-valued field :$(field_name) must be given as Cartesian (i, j) tuples, e.g. [(1, 2), (2, 2)], or a Bool tensor mask")
+        all(c -> 0 < c <= n_comp, components) ||
+            error("components $(components) not within range of field :$(field_name) ($(n_comp) dimension(s))")
+        return components
+    elseif components isa Vector{NTuple{2, Int}}
+        # Cartesian (i, j) tuples; tensor fields only
+        is_tensor_field || error("Cartesian (i, j) components are only supported for fields with a second order tensor value (field :$(field_name))")
+        return _cartesian_to_linear_components(components, ip, field_name)
+    else
+        # Bool mask; must be of the same base type as the field's value, and its data
+        # order is the field's component order
+        mask_base = Tensors.get_base(typeof(components))
+        if !(ip isa TensorInterpolation) || Tensors.get_base(_value_type(ip)) !== mask_base
+            error("components mask $(mask_base) does not match the value type of field :$(field_name)")
+        end
+        return Int[i for (i, active) in pairs(components.data) if active]
     end
-    return components
-end
-function _resolve_dbc_components(components::Vector{Int}, ::TensorInterpolation{TB}, n_comp::Int, field_name::Symbol) where {TB <: SecondOrderTensor}
-    isempty(components) && return collect(Int, 1:n_comp)
-    return error("components of the tensor-valued field :$(field_name) must be given as Cartesian (i, j) tuples, e.g. [(1, 2), (2, 2)], or a Bool tensor mask")
-end
-function _resolve_dbc_components(components::Vector{NTuple{2, Int}}, ::Interpolation, ::Int, field_name::Symbol)
-    return error("Cartesian (i, j) components are only supported for fields with a second order tensor value (field :$(field_name))")
-end
-function _resolve_dbc_components(mask::ComponentMask, ::Interpolation, ::Int, field_name::Symbol)
-    return error("components mask $(Tensors.get_base(typeof(mask))) is not applicable to field :$(field_name)")
 end
 
-function _resolve_dbc_components(
-        components::Vector{NTuple{2, Int}}, ::TensorInterpolation{TB}, ::Int, field_name::Symbol
+_value_type(::TensorInterpolation{TB}) where {TB} = TB
+
+function _cartesian_to_linear_components(
+        components::Vector{NTuple{2, Int}}, ::TensorInterpolation{TB}, field_name::Symbol
     ) where {dim, TB <: Union{Tensor{2, dim}, SymmetricTensor{2, dim}}}
     for (i, j) in components
         if !(0 < i <= dim && 0 < j <= dim)
@@ -1011,26 +1023,21 @@ function _resolve_dbc_components(
     return sort!(resolved)
 end
 
-function _resolve_dbc_components(
-        mask::ComponentMask, ::TensorInterpolation{TB}, ::Int, field_name::Symbol
-    ) where {TB <: Union{Vec, Tensor{2}, SymmetricTensor{2}}}
-    if Tensors.get_base(typeof(mask)) !== Tensors.get_base(TB)
-        error("components mask $(Tensors.get_base(typeof(mask))) does not match the value type $(TB) of field :$(field_name)")
-    end
-    # The mask's data order is the field's component order
-    return Int[i for (i, active) in pairs(mask.data) if active]
-end
-
 # Where internal code with resolved linear components constructs a user-facing Dirichlet
 # (see PeriodicDirichlet), convert back to a components form and a zero-value function
 # accepted for the field
-_dirichlet_components(::Interpolation, components::Vector{Int}) = components
-function _dirichlet_components(::TensorInterpolation{TB}, components::Vector{Int}) where {TB <: SecondOrderTensor}
-    B = Tensors.get_base(TB)
+function _dirichlet_components(ip::Interpolation, components::Vector{Int})
+    ip isa TensorInterpolation{<:SecondOrderTensor} || return components
+    B = Tensors.get_base(_value_type(ip))
     return B(ntuple(c -> c in components, Tensors.n_components(B)))
 end
-_dbc_zero_function(::Interpolation, components::Vector{Int}) = (x, _) -> components * eltype(x)(0)
-_dbc_zero_function(::TensorInterpolation{TB}, ::Vector{Int}) where {TB <: SecondOrderTensor} = (x, _) -> zero(TB)
+function _dbc_zero_function(ip::Interpolation, components::Vector{Int})
+    if ip isa TensorInterpolation{<:SecondOrderTensor}
+        TB = _value_type(ip)
+        return (x, _) -> zero(TB)
+    end
+    return (x, _) -> components * eltype(x)(0)
+end
 
 # Normalize full-value-returning boundary functions to the internal Dirichlet contract:
 # one returned value per resolved component. Tensor-valued fields always take the full
@@ -1057,12 +1064,15 @@ end
 # their mapping to the tensor's data order is error prone.
 function _select_dbc_components(::Type{TB}, value, components::Vector{Int}) where {TB <: Union{SecondOrderTensor, Vec}}
     if value isa Number
+        # A single prescribed component is effectively a scalar condition
         length(components) == 1 || error("a Dirichlet function for a tensor-valued field may only return a number when a single component is prescribed ($(length(components)) components)")
         return value
     end
     if !(value isa (TB <: Vec ? Vec : SecondOrderTensor))
         error("a Dirichlet function for a tensor-valued field must return the field value (convertible to $(TB)), got $(typeof(value))")
     end
+    # The conversion validates mismatched kinds (e.g. symmetry for Tensor ->
+    # SymmetricTensor); the isa fast path makes the exact-type case a no-op
     data = (value isa TB ? value : TB(value)).data
     return map(c -> data[c], components)
 end
