@@ -98,8 +98,6 @@ function assemble_element_mass!(Me::Matrix, cellvalues::CellValues)
     r₂range = 2:num_reactants:(num_reactants * n_basefuncs)
     Me₁ = @view Me[r₁range, r₁range]
     Me₂ = @view Me[r₂range, r₂range]
-    ## Reset to 0
-    fill!(Me, 0)
     ## Loop over quadrature points
     for q_point in 1:getnquadpoints(cellvalues)
         ## Get the quadrature weight
@@ -129,8 +127,6 @@ function assemble_element_diffusion!(De::Matrix, cellvalues::CellValues, materia
     r₂range = 2:num_reactants:(num_reactants * n_basefuncs)
     De₁ = @view De[r₁range, r₁range]
     De₂ = @view De[r₂range, r₂range]
-    ## Reset to 0
-    fill!(De, 0)
     ## Loop over quadrature points
     for q_point in 1:getnquadpoints(cellvalues)
         ## Get the quadrature weight
@@ -164,6 +160,8 @@ function assemble_matrices!(M::SparseMatrixCSC, D::SparseMatrixCSC, cellvalues::
     for cell in CellIterator(dh)
         ## Reinitialize cellvalues for this cell
         reinit!(cellvalues, cell)
+        fill!(Me, 0)
+        fill!(De, 0)
         ## Compute element contribution
         assemble_element_mass!(Me, cellvalues)
         assemble!(M_assembler, celldofs(cell), Me)
