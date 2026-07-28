@@ -604,8 +604,11 @@ This method is a shorthand for the equivalent
 allocate_matrix(sp::SparsityPattern) = allocate_matrix(SparseMatrixCSC{Float64, Int}, sp)
 
 # Specialized: read the (possibly unsorted) rows directly from the buffer and let the CSC transpose
-# sort rowval by row order — so the fast path never sorts. Holes are skipped (only ncurrent read).
-function allocate_matrix(::Type{SparseMatrixCSC{Tv, Ti}}, sp::SparsityPattern) where {Tv, Ti}
+# sort rowval by row order — so the fast path never sorts. Row-internal order is irrelevant to the
+# transpose (per-column rowval order comes from the ascending outer row loop), which also makes the
+# `sym` filter — a per-entry predicate — valid on unsorted rows, so the Symmetric wrapper shares
+# this path. Holes are skipped (only ncurrent read).
+function _allocate_matrix(::Type{SparseMatrixCSC{Tv, Ti}}, sp::SparsityPattern, sym::Bool) where {Tv, Ti}
     nrows = getnrows(sp)
     ncols = getncols(sp)
     b = sp.buffer
@@ -615,7 +618,9 @@ function allocate_matrix(::Type{SparseMatrixCSC{Tv, Ti}}, sp::SparsityPattern) w
     @inbounds for row in 1:nrows
         r = b.indices[row]
         for p in 0:(r.ncurrent - 1)
-            colptr[data[r.start + p] + 1] += 1
+            col = data[r.start + p]
+            sym && row > col && continue
+            colptr[col + 1] += 1
         end
     end
     cumsum!(colptr, colptr)
@@ -627,6 +632,7 @@ function allocate_matrix(::Type{SparseMatrixCSC{Tv, Ti}}, sp::SparsityPattern) w
         r = b.indices[row]
         for p in 0:(r.ncurrent - 1)
             col = data[r.start + p]
+            sym && row > col && continue
             k = nextinds[col]
             rowval[k] = row
             nextinds[col] = k + 1
