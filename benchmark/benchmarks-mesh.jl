@@ -23,6 +23,12 @@ let g = SUITE["mesh"]["topology"]
     g["ExclusiveTopology (Hexahedron 10×10×10)"] = @benchmarkable ExclusiveTopology($hexgrid) evals = 1
     g["ExclusiveTopology (Triangle 25×25)"] = @benchmarkable ExclusiveTopology($trigrid) evals = 1
     g["getneighborhood all cells (Hexahedron 10×10×10)"] = @benchmarkable FerriteBenchmarkHelpers.neighborhood_sweep($hextopo, $hexgrid) evals = 1
+    # Iteration over the raw vertex/edge/face adjacency storage (issue #1019).
+    g["neighbor iteration (Hexahedron 10×10×10)"] = @benchmarkable FerriteBenchmarkHelpers.neighbor_index_sum($hextopo) evals = 1
+    # getneighborhood through the FacetIndex path for every skeleton facet (issue #1019).
+    # The skeleton is precomputed; its construction is measured by the benchmark below.
+    hexskeleton = facetskeleton(hextopo, hexgrid)
+    g["getneighborhood skeleton facets (Hexahedron 10×10×10)"] = @benchmarkable FerriteBenchmarkHelpers.skeleton_neighborhood_sweep($hextopo, $hexgrid, $hexskeleton) evals = 1
     # facetskeleton memoizes its result in the topology, so the cache must be cleared in
     # setup or every sample after the first measures a field read.
     g["facetskeleton (Hexahedron 10×10×10)"] = @benchmarkable(
