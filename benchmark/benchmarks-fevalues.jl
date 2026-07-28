@@ -23,6 +23,7 @@ end
 #  - linear scalar on quadrilaterals: the cheapest, most common 2D path
 #  - quadratic scalar on tetrahedra: 3D simplex
 #  - linear vector field on hexahedra: 3D tensor product with a vectorized interpolation
+#  - tensor-valued field on hexahedra: third order shape gradients through the mapping
 #  - Raviart-Thomas on triangles: non-identity (Piola) mapping
 #  - MultiFieldCellValues: shared geometry mapping for several fields
 SUITE["fevalues"]["reinit!"] = BenchmarkGroup()
@@ -47,6 +48,9 @@ let g = SUITE["fevalues"]["reinit!"]
 
     cv = CellValues(QuadratureRule{RefHexahedron}(2), Lagrange{RefHexahedron, 1}()^3)
     g["CellValues Lagrange{1}^3 (Hexahedron, $batchname)"] = @benchmarkable $sweep($cv, $hexbatch) evals = 1
+
+    cv = CellValues(QuadratureRule{RefHexahedron}(2), TensorizedInterpolation{SymmetricTensor{2, 3}}(Lagrange{RefHexahedron, 1}()))
+    g["CellValues SymmetricTensor{2,3} Lagrange{1} (Hexahedron, $batchname)"] = @benchmarkable $sweep($cv, $hexbatch) evals = 1
 
     cv = CellValues(QuadratureRule{RefTriangle}(2), RaviartThomas{RefTriangle, 1}())
     # The Piola mappings need the cell for the edge orientations, hence the extra argument.
@@ -92,6 +96,12 @@ let g = SUITE["fevalues"]["function values"]
     reinit!(cv, getcoordinates(hexgrid, 1))
     ue_batch = [rand(getnbasefunctions(cv)) for _ in 1:nreps]
     g["vector Lagrange{1}^3 (Hexahedron, $nreps cells)"] = @benchmarkable $sweep($cv, $ue_batch) evals = 1
+
+    # Tensor-valued field: compact symmetric values and third order gradients.
+    cv = CellValues(QuadratureRule{RefHexahedron}(2), TensorizedInterpolation{SymmetricTensor{2, 3}}(Lagrange{RefHexahedron, 1}()))
+    reinit!(cv, getcoordinates(hexgrid, 1))
+    ue_batch = [rand(getnbasefunctions(cv)) for _ in 1:nreps]
+    g["tensor SymmetricTensor{2,3} Lagrange{1} (Hexahedron, $nreps cells)"] = @benchmarkable $sweep($cv, $ue_batch) evals = 1
 
     # Mapping quadrature points to spatial coordinates, e.g. for evaluating source terms.
     hexgrid_sc = generate_grid(Hexahedron, (8, 8, 8))

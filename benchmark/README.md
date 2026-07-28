@@ -41,9 +41,9 @@ revision), so every second added to a pass costs four in CI. A full pass should 
 |--------------------|------------------------------------------------------------------------|
 | `mesh`             | `generate_grid`, `ExclusiveTopology` + queries (`getneighborhood`, `facetskeleton`, `vertex_star_stencils`), facet sets, coloring |
 | `dofs`             | `close!` (single/multi-field, subdomains), `renumber!`, `celldofs!`     |
-| `fevalues`         | `CellValues`/`FacetValues`/`MultiFieldCellValues` construction; `reinit!` for identity, Piola (Raviart–Thomas, Nedelec) and hessian-enabled mappings; `function_value/gradient`, `spatial_coordinate` |
+| `fevalues`         | `CellValues`/`FacetValues`/`MultiFieldCellValues` construction; `reinit!` for identity (scalar, vector and tensor-valued fields), Piola (Raviart–Thomas, Nedelec) and hessian-enabled mappings; `function_value/gradient`, `spatial_coordinate` |
 | `assembly`         | element kernels (incl. `shape_symmetric_gradient` and a mixed `shape_divergence` block), full global assembly loops, sparse scatter (CSC/CSR/Symmetric), facet and DG interface loops |
-| `constraints`      | `ConstraintHandler` close/update (`Dirichlet`, `PeriodicDirichlet`, `ProjectedDirichlet`), `apply!`/`apply_zero!`/`apply_rhs!`/`apply_local!`, periodic (affine) condensation |
+| `constraints`      | `ConstraintHandler` close/update (`Dirichlet` incl. tensor-valued fields, `PeriodicDirichlet`, `ProjectedDirichlet`), `apply!`/`apply_zero!`/`apply_rhs!`/`apply_local!`, periodic (affine) condensation |
 | `sparsity-pattern` | pattern construction, `add_entry!`, matrix instantiation                |
 | `postprocessing`   | `L2Projector`, `PointEvalHandler`, `evaluate_at_grid_nodes`, `apply_analytical!` |
 

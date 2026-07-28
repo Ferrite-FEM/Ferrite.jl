@@ -943,16 +943,23 @@ end
 # collection with one entry per prescribed component (as for vector fields) is also
 # supported and passed through as is.
 function _wrap_tensor_bc_function(f::F, ::TensorInterpolation{TB}, components::Vector{Int}) where {F, TB <: SecondOrderTensor}
-    function tensor_bc_function(x, t)
-        raw = hasmethod(f, Tuple{typeof(x), typeof(t)}) ? f(x, t) : f(x)
-        return _select_tensor_components(TB, raw, components)
+    # A tuple (of statically known length) so that the component selection below is
+    # allocation-free.
+    comps = Tuple(components)
+    # The `f(x)` vs `f(x, t)` arity of `f` is resolved here, once, from the method table
+    # (the argument types needed for a `hasmethod` probe as in `update!` are not known
+    # here). The wrapper itself always takes `(x, t)` so that `update!` passes it through
+    # without an extra adapter closure.
+    if any(m -> m.nargs >= 3 || m.isva, methods(f))
+        return (x, t) -> _select_tensor_components(TB, f(x, t), comps)
+    else
+        return (x, _) -> _select_tensor_components(TB, f(x), comps)
     end
-    return tensor_bc_function
 end
 # Only second order tensors are treated as the natural tensor value: e.g. a `Vec` return
 # is a collection of the selected components, just like for vector fields.
-_select_tensor_components(::Type{TB}, v::SecondOrderTensor, components::Vector{Int}) where {TB} = map(c -> TB(v).data[c], components)
-_select_tensor_components(::Type{TB}, v, ::Vector{Int}) where {TB} = v
+_select_tensor_components(::Type{TB}, v::SecondOrderTensor, components::Tuple{Vararg{Int}}) where {TB} = map(c -> TB(v).data[c], components)
+_select_tensor_components(::Type{TB}, v, ::Tuple{Vararg{Int}}) where {TB} = v
 
 """
     add!(ch::ConstraintHandler, dbc::Dirichlet)
