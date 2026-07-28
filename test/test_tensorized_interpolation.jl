@@ -220,14 +220,10 @@ using SparseArrays
         chr = ConstraintHandler(dh)
         @test_throws ArgumentError add!(chr, PeriodicDirichlet(:σ, facet_map, rotation_tensor(π / 2)[:, :]))
 
-        # Linear component indices and selected-value callbacks use the same contract as
-        # vector fields.
-        chl = ConstraintHandler(dh)
-        add!(chl, Dirichlet(:σ, getfacetset(grid, "left"), x -> [σbc(x).data[2]], [2]))
-        close!(chl)
-
         # Component validation
         che = ConstraintHandler(dh)
+        # Linear indices are not allowed for tensor-valued fields
+        @test_throws ErrorException add!(che, Dirichlet(:σ, getfacetset(grid, "left"), σbc, [2]))
         # (1,2) and (2,1) refer to the same component of a symmetric tensor
         @test_throws ErrorException add!(che, Dirichlet(:σ, getfacetset(grid, "left"), σbc, [(1, 2), (2, 1)]))
         # Out of range
@@ -241,6 +237,16 @@ using SparseArrays
         # Duplicates and mixed input are rejected already in the constructor
         @test_throws ErrorException Dirichlet(:σ, getfacetset(grid, "left"), σbc, [(1, 1), (1, 1)])
         @test_throws MethodError Dirichlet(:σ, getfacetset(grid, "left"), σbc, [1, (1, 2)])
+        # Return value validation (checked in update!, called by close!)
+        for badf in (
+                x -> [1.0, 2.0, 3.0],       # collection return not allowed
+                x -> Vec{2}((1.0, 2.0)),    # ... nor is a Vec
+                x -> 0.0,                   # number return requires a single component
+            )
+            chb = ConstraintHandler(dh)
+            add!(chb, Dirichlet(:σ, getfacetset(grid, "left"), badf))
+            @test_throws ErrorException close!(chb)
+        end
 
         # Vec Bool mask for vector fields: full-vector return, masked components extracted
         chvm = ConstraintHandler(dhv)
@@ -257,6 +263,10 @@ using SparseArrays
                 @test valsv[nodeid][2] ≈ -x[2]
             end
         end
+        # With a mask the function must return the full vector
+        chvb = ConstraintHandler(dhv)
+        add!(chvb, Dirichlet(:u, getfacetset(grid, "left"), x -> [1.0], Vec(false, true)))
+        @test_throws ErrorException close!(chvb)
 
         # Mask base type must match the field value type
         @test_throws ErrorException add!(ConstraintHandler(dh), Dirichlet(:σ, getfacetset(grid, "left"), σbc, Tensor{2, 2}((i, j) -> i == j)))
@@ -273,15 +283,19 @@ using SparseArrays
         @test_throws ErrorException Dirichlet(:σ, getfacetset(grid, "left"), σbc, one(SymmetricTensor{2, 2}))
     end
 
-    @testset "apply_analytical! collection return" begin
+    @testset "apply_analytical! return validation" begin
         grid = generate_grid(Triangle, (1, 1))
         ip = TensorizedInterpolation{SymmetricTensor{2, 2}}(Lagrange{RefTriangle, 1}())
         dh = DofHandler(grid)
         add!(dh, :σ, ip)
         close!(dh)
         a = zeros(ndofs(dh))
-        apply_analytical!(a, dh, :σ, x -> (x[1], x[2], x[1] + x[2]))
+        apply_analytical!(a, dh, :σ, x -> SymmetricTensor{2, 2}((x[1], x[2], x[1] + x[2])))
         @test any(x -> !iszero(x), a)
+        # Non-symmetric tensor cannot be converted to the symmetric value type
+        @test_throws InexactError apply_analytical!(a, dh, :σ, x -> Tensor{2, 2}((1.0, 2.0, 3.0, 4.0)))
+        # Non-tensor returns are rejected
+        @test_throws ErrorException apply_analytical!(a, dh, :σ, x -> (1.0, 2.0, 3.0))
     end
 
     @testset "VTK export" begin

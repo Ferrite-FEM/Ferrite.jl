@@ -15,8 +15,7 @@ pertaining to the field `fieldname` for all cells in `cellset`.
 The function `f(x)` are given the spatial coordinate
 of the degree of freedom. For scalar fields, `f(x)::Number`,
 for vector fields with dimension `dim`, `f(x)::Vec{dim}`, and for tensor-valued fields
-`f(x)` may return the tensor value (e.g. `f(x)::SymmetricTensor{2, dim}`) or another
-collection with one value per independent component.
+`f(x)` must return the tensor value (e.g. `f(x)::SymmetricTensor{2, dim}`).
 
 This function can be used to apply initial conditions for time dependent problems.
 
@@ -84,7 +83,9 @@ function _normalize_analytical_function(f::F, ::TensorInterpolation{TB}) where {
     return x -> _select_analytical_components(TB, f(x))
 end
 _select_analytical_components(::Type{TB}, value::SecondOrderTensor) where {TB <: SecondOrderTensor} = TB(value).data
-_select_analytical_components(::Type{TB}, value) where {TB <: SecondOrderTensor} = value
+function _select_analytical_components(::Type{TB}, value) where {TB <: SecondOrderTensor}
+    return error("the function for a tensor-valued field must return the tensor value (convertible to $(TB)), got $(typeof(value))")
+end
 
 function _apply_analytical!(a::AbstractVector, dofs::Vector{Int}, coords::Vector{<:Vec}, field_dim, cv::CellValues, f)
     for i_dof in 1:getnquadpoints(cv)

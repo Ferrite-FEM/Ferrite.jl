@@ -54,16 +54,17 @@ dbc = Dirichlet(:σ, ∂Ω, x -> SymmetricTensor{2, 2}((0.0, x[1], x[2])), mask)
 
 For vector- and tensor-valued fields, `components` can be given as a Bool-valued tensor
 of the same base type as the field value, where `true` entries mark prescribed
-components, e.g. `SymmetricTensor{2, 2}((i, j) -> i == j)` for the diagonal. With a
-mask, `f` may return the complete field value from which the prescribed components are
-extracted.
+components, e.g. `SymmetricTensor{2, 2}((i, j) -> i == j)` for the diagonal. For a
+tensor-valued field (see [`TensorizedInterpolation`](@ref)), `components` can
+alternatively be given as Cartesian `(i, j)` tuples in any order, e.g.
+`[(1, 2), (2, 2)]` (for symmetric tensors `(i, j)` and `(j, i)` refer to the same
+component).
 
-For a tensor-valued field (see [`TensorizedInterpolation`](@ref)), `components` can
-alternatively be given as Cartesian `(i, j)` tuples in any order, e.g. `[(1, 2), (2, 2)]`
-(for symmetric tensors `(i, j)` and `(j, i)` refer to the same component). Linear
-component indices in the interpolation's component order are also accepted. `f` may
-return the complete tensor value, from which the prescribed components are extracted,
-or one value per prescribed component as for vector fields.
+In both cases `f` must return the complete field value (convertible to the field's
+value type), from which the prescribed components are extracted; entries of
+un-prescribed components are ignored. When a single component is prescribed `f` may
+return a plain number instead. Positional collection returns as for vector fields are
+not accepted since their mapping to the tensor's component order is error prone.
 
 `Dirichlet` boundary conditions are added to a [`ConstraintHandler`](@ref)
 which applies the condition via [`apply!`](@ref) and/or [`apply_zero!`](@ref).
@@ -985,6 +986,10 @@ function _resolve_dbc_components(components::Vector{Int}, ::Interpolation, n_com
     end
     return components
 end
+function _resolve_dbc_components(components::Vector{Int}, ::TensorInterpolation{TB}, n_comp::Int, field_name::Symbol) where {TB <: SecondOrderTensor}
+    isempty(components) && return collect(Int, 1:n_comp)
+    return error("components of the tensor-valued field :$(field_name) must be given as Cartesian (i, j) tuples, e.g. [(1, 2), (2, 2)], or a Bool tensor mask")
+end
 function _resolve_dbc_components(components::Vector{NTuple{2, Int}}, ::Interpolation, ::Int, field_name::Symbol)
     return error("Cartesian (i, j) components are only supported for fields with a second order tensor value (field :$(field_name))")
 end
@@ -1016,10 +1021,21 @@ function _resolve_dbc_components(
     return Int[i for (i, active) in pairs(mask.data) if active]
 end
 
-# Normalize tensor-valued boundary functions to the existing Dirichlet contract: one
-# returned value per resolved component. For vector-valued fields the established
-# contract is one value per prescribed component, so full-vector returns are only
-# enabled when the components were given as a mask.
+# Where internal code with resolved linear components constructs a user-facing Dirichlet
+# (see PeriodicDirichlet), convert back to a components form and a zero-value function
+# accepted for the field
+_dirichlet_components(::Interpolation, components::Vector{Int}) = components
+function _dirichlet_components(::TensorInterpolation{TB}, components::Vector{Int}) where {TB <: SecondOrderTensor}
+    B = Tensors.get_base(TB)
+    return B(ntuple(c -> c in components, Tensors.n_components(B)))
+end
+_dbc_zero_function(::Interpolation, components::Vector{Int}) = (x, _) -> components * eltype(x)(0)
+_dbc_zero_function(::TensorInterpolation{TB}, ::Vector{Int}) where {TB <: SecondOrderTensor} = (x, _) -> zero(TB)
+
+# Normalize full-value-returning boundary functions to the internal Dirichlet contract:
+# one returned value per resolved component. For vector-valued fields the established
+# contract is one value per prescribed component, so the full-vector return (and its
+# validation) only applies when the components were given as a mask.
 _normalize_dbc_function(f::Function, ::Interpolation, given, ::Vector{Int}) = f
 function _normalize_dbc_function(f::F, ::TensorInterpolation{TB}, given, components::Vector{Int}) where {F <: Function, TB <: SecondOrderTensor}
     return _component_extracting_function(f, TB, components)
@@ -1036,16 +1052,24 @@ function _component_extracting_function(f::F, ::Type{TB}, components::Vector{Int
     end
     return normalized_f
 end
+# The function must return the full field value; a plain number is accepted when a
+# single component is prescribed. Positional collection returns are not allowed since
+# their mapping to the tensor's data order is error prone.
 function _select_dbc_components(::Type{TB}, value::SecondOrderTensor, components::Vector{Int}) where {TB <: SecondOrderTensor}
     data = TB(value).data
     return map(c -> data[c], components)
 end
-_select_dbc_components(::Type{<:SecondOrderTensor}, value, ::Vector{Int}) = value
 function _select_dbc_components(::Type{TB}, value::Vec, components::Vector{Int}) where {TB <: Vec}
     data = TB(value).data
     return map(c -> data[c], components)
 end
-_select_dbc_components(::Type{<:Vec}, value, ::Vector{Int}) = value
+function _select_dbc_components(::Type{TB}, value::Number, components::Vector{Int}) where {TB <: Union{SecondOrderTensor, Vec}}
+    length(components) == 1 || error("a Dirichlet function for a tensor-valued field may only return a number when a single component is prescribed ($(length(components)) components)")
+    return value
+end
+function _select_dbc_components(::Type{TB}, value, ::Vector{Int}) where {TB <: Union{SecondOrderTensor, Vec}}
+    return error("a Dirichlet function for a tensor-valued field must return the field value (convertible to $(TB)), got $(typeof(value))")
+end
 
 """
     add!(ch::ConstraintHandler, dbc::Dirichlet)
@@ -1314,10 +1338,11 @@ function _add!(
         idxs, _ = NearestNeighbors.nn(tree, points)
         corner_set = OrderedSet{Int}(all_node_idxs_v[i] for i in idxs)
 
+        field_ip = getfieldinterpolation(ch.dh, find_field(ch.dh, pdbc.field_name))
         dbc = Dirichlet(
             pdbc.field_name, corner_set,
-            pdbc.func === nothing ? (x, _) -> pdbc.components * eltype(x)(0) : pdbc.func,
-            pdbc.components
+            pdbc.func === nothing ? _dbc_zero_function(field_ip, pdbc.components) : pdbc.func,
+            _dirichlet_components(field_ip, pdbc.components)
         )
 
         # Create a temp constraint handler just to find the dofs in the nodes...
@@ -1343,7 +1368,8 @@ function _add!(
         all_facets = OrderedSet{FacetIndex}()
         union!(all_facets, (x.mirror for x in facet_map))
         union!(all_facets, (x.image for x in facet_map))
-        dbc_all = Dirichlet(pdbc.field_name, all_facets, pdbc.func, pdbc.components)
+        field_ip = getfieldinterpolation(ch.dh, find_field(ch.dh, pdbc.field_name))
+        dbc_all = Dirichlet(pdbc.field_name, all_facets, pdbc.func, _dirichlet_components(field_ip, pdbc.components))
         add!(chtmp2, dbc_all); close!(chtmp2)
         # Call update! here since we need it to construct the affine constraints...
         # TODO: This doesn't allow for time dependent constraints...
