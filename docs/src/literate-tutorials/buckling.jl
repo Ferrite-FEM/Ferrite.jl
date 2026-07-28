@@ -165,6 +165,22 @@ end;
 # system that BifurcationKit sees, which keeps the eigenvalue computations free of
 # constraint bookkeeping. (Inhomogeneous or affine constraints would require proper
 # condensation instead.)
+#
+# !!! note "Why not keep the full-size system, like the other tutorials?"
+#     Ferrite's usual workflow keeps the full matrix and enforces Dirichlet conditions
+#     with [`apply!`](@ref), which zeroes the constrained rows and columns and puts a
+#     scaling factor on their diagonal. That can be made to work with BifurcationKit
+#     too, but with two subtleties. The residual entries of constrained dofs must be
+#     replaced by the dof values themselves (*not* zeroed with [`apply_zero!`](@ref) —
+#     a residual that is identically zero in those entries paired with the eliminated
+#     matrix rows would make the Jacobian silently singular). And the elimination
+#     introduces artificial eigenvalues at the diagonal scaling factor, which stay out
+#     of the way of the shift-invert eigensolver only as long as that factor is large
+#     compared to the physical eigenvalues near zero. Since this tutorial revolves
+#     around the eigenvalues of the tangent stiffness, we condense instead: every
+#     eigenvalue of the reduced matrix is a physical one. The price is the sparse
+#     extraction `K[fdofs, fdofs]` on every tangent evaluation — about a millisecond
+#     for this problem, negligible next to the factorization it feeds.
 
 struct ArchModel{CV, FV, DH, CH, TF}
     dh::DH
