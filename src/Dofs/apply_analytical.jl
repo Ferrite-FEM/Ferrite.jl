@@ -80,11 +80,11 @@ end
 
 _normalize_analytical_function(f::Function, ::Interpolation) = f
 function _normalize_analytical_function(f::F, ::TensorInterpolation{TB}) where {F <: Function, TB <: SecondOrderTensor}
-    return x -> _select_analytical_components(TB, f(x))
-end
-_select_analytical_components(::Type{TB}, value::SecondOrderTensor) where {TB <: SecondOrderTensor} = TB(value).data
-function _select_analytical_components(::Type{TB}, value) where {TB <: SecondOrderTensor}
-    return error("the function for a tensor-valued field must return the tensor value (convertible to $(TB)), got $(typeof(value))")
+    return function (x)
+        value = f(x)
+        value isa SecondOrderTensor || error("the function for a tensor-valued field must return the tensor value (convertible to $(TB)), got $(typeof(value))")
+        return (value isa TB ? value : TB(value)).data
+    end
 end
 
 function _apply_analytical!(a::AbstractVector, dofs::Vector{Int}, coords::Vector{<:Vec}, field_dim, cv::CellValues, f)

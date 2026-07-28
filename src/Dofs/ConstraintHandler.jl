@@ -1033,17 +1033,17 @@ _dbc_zero_function(::Interpolation, components::Vector{Int}) = (x, _) -> compone
 _dbc_zero_function(::TensorInterpolation{TB}, ::Vector{Int}) where {TB <: SecondOrderTensor} = (x, _) -> zero(TB)
 
 # Normalize full-value-returning boundary functions to the internal Dirichlet contract:
-# one returned value per resolved component. For vector-valued fields the established
-# contract is one value per prescribed component, so the full-vector return (and its
-# validation) only applies when the components were given as a mask.
-_normalize_dbc_function(f::Function, ::Interpolation, given, ::Vector{Int}) = f
-function _normalize_dbc_function(f::F, ::TensorInterpolation{TB}, given, components::Vector{Int}) where {F <: Function, TB <: SecondOrderTensor}
-    return _component_extracting_function(f, TB, components)
+# one returned value per resolved component. Tensor-valued fields always take the full
+# value return; vector-valued fields only when the components were given as a mask,
+# since their established contract is one positional value per prescribed component.
+function _normalize_dbc_function(f::Function, ip::Interpolation, given, components::Vector{Int})
+    if ip isa TensorInterpolation{<:SecondOrderTensor} || (ip isa TensorInterpolation{<:Vec} && given isa ComponentMask)
+        return _component_extracting_function(f, ip, components)
+    end
+    return f
 end
-function _normalize_dbc_function(f::F, ::TensorInterpolation{TB}, ::Vec{vdim, Bool}, components::Vector{Int}) where {F <: Function, vdim, TB <: Vec{vdim}}
-    return _component_extracting_function(f, TB, components)
-end
-function _component_extracting_function(f::F, ::Type{TB}, components::Vector{Int}) where {F <: Function, TB}
+# Function barrier so that the returned closure is fully typed on TB
+function _component_extracting_function(f::F, ::TensorInterpolation{TB}, components::Vector{Int}) where {F <: Function, TB}
     function normalized_f(x, t)
         # update!'s f(x)-or-f(x, t) resolution only sees this wrapper, so the arity of
         # the user's f must be resolved here (applicable const-folds, so this is free).
@@ -1055,20 +1055,16 @@ end
 # The function must return the full field value; a plain number is accepted when a
 # single component is prescribed. Positional collection returns are not allowed since
 # their mapping to the tensor's data order is error prone.
-function _select_dbc_components(::Type{TB}, value::SecondOrderTensor, components::Vector{Int}) where {TB <: SecondOrderTensor}
-    data = TB(value).data
+function _select_dbc_components(::Type{TB}, value, components::Vector{Int}) where {TB <: Union{SecondOrderTensor, Vec}}
+    if value isa Number
+        length(components) == 1 || error("a Dirichlet function for a tensor-valued field may only return a number when a single component is prescribed ($(length(components)) components)")
+        return value
+    end
+    if !(value isa (TB <: Vec ? Vec : SecondOrderTensor))
+        error("a Dirichlet function for a tensor-valued field must return the field value (convertible to $(TB)), got $(typeof(value))")
+    end
+    data = (value isa TB ? value : TB(value)).data
     return map(c -> data[c], components)
-end
-function _select_dbc_components(::Type{TB}, value::Vec, components::Vector{Int}) where {TB <: Vec}
-    data = TB(value).data
-    return map(c -> data[c], components)
-end
-function _select_dbc_components(::Type{TB}, value::Number, components::Vector{Int}) where {TB <: Union{SecondOrderTensor, Vec}}
-    length(components) == 1 || error("a Dirichlet function for a tensor-valued field may only return a number when a single component is prescribed ($(length(components)) components)")
-    return value
-end
-function _select_dbc_components(::Type{TB}, value, ::Vector{Int}) where {TB <: Union{SecondOrderTensor, Vec}}
-    return error("a Dirichlet function for a tensor-valued field must return the field value (convertible to $(TB)), got $(typeof(value))")
 end
 
 """
