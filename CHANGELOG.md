@@ -16,7 +16,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
    with unchanged behavior. Second order tensor-valued fields are supported throughout:
    `CellValues`/`FacetValues`/`InterfaceValues`/`PointValues` (values, gradients, and
    divergence), `DofHandler`, `Dirichlet` and `PeriodicDirichlet` conditions (the
-   condition function may return the tensor value), `apply_analytical!`, `L2Projector`,
+   condition function returns the tensor value, or a number for a single prescribed
+   component, and `Dirichlet` components are given as Cartesian `(i, j)` tuples, e.g.
+   `[(1, 2)]`), `apply_analytical!`, `L2Projector`,
    `evaluate_at_points`, and VTK export (written in Voigt order with component names,
    consistent with `write_projection`).
  - New quadrature rule type `:polyquad` for `RefTetrahedron` supporting orders 1 to 10, with

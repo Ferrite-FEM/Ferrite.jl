@@ -33,12 +33,18 @@ dbc = Dirichlet(:v, ∂Ω, x -> 0 * x)
 
 # Prescribe component 2 and 3 of vector field :v on ∂Ω to [sin(t), cos(t)]
 dbc = Dirichlet(:v, ∂Ω, (x, t) -> [sin(t), cos(t)], [2, 3])
+
+# Prescribe the (1,2) and (2,2) components of tensor field :σ on ∂Ω; entries of
+# un-prescribed components in the returned tensor are ignored
+dbc = Dirichlet(:σ, ∂Ω, x -> SymmetricTensor{2, 2}((0.0, x[1], x[2])), [(1, 2), (2, 2)])
 ```
 
-For a tensor-valued field (see [`TensorizedInterpolation`](@ref)), `f` may return the
-tensor value itself, from which the prescribed `components` (referring to the tensor's
-data order) are extracted, or, as for vector fields, a collection with one entry per
-prescribed component.
+For a tensor-valued field (see [`TensorizedInterpolation`](@ref)), `components` are given
+as Cartesian `(i, j)` tuples in any order, e.g. `[(1, 2), (2, 2)]` (for symmetric tensors
+`(i, j)` and `(j, i)` refer to the same component). `f` must return the tensor value
+(convertible to the field's value type), from which the prescribed components are
+extracted; entries of un-prescribed components are ignored. When a single component is
+prescribed `f` may return a plain number instead.
 
 `Dirichlet` boundary conditions are added to a [`ConstraintHandler`](@ref)
 which applies the condition via [`apply!`](@ref) and/or [`apply_zero!`](@ref).
@@ -47,18 +53,31 @@ struct Dirichlet # <: Constraint
     f::Function # f(x) or f(x,t) -> value(s)
     facets::OrderedSet{T} where {T <: Union{Int, FacetIndex, FaceIndex, EdgeIndex, VertexIndex}}
     field_name::Symbol
-    components::Vector{Int} # components of the field
+    components::Union{Vector{Int}, Vector{NTuple{2, Int}}} # components of the field
     local_facet_dofs::Vector{Int}
     local_facet_dofs_offset::Vector{Int}
+    # Tensor type of the field's value for tensor-valued fields (set in add! where the
+    # field's interpolation is known), used to extract the prescribed components when the
+    # BC function returns the tensor value (see _bc_dof_values)
+    value_type::Union{Nothing, Type{<:SecondOrderTensor}}
 end
 function Dirichlet(field_name::Symbol, facets::AbstractVecOrSet, f::Function, components = nothing)
-    return Dirichlet(f, convert_to_orderedset(facets), field_name, __to_components(components), Int[], Int[])
+    return Dirichlet(f, convert_to_orderedset(facets), field_name, __to_components(components), Int[], Int[], nothing)
 end
 
 # components=nothing is default and means that all components should be constrained
 # but since number of components isn't known here it will be populated in add!
 __to_components(::Nothing) = Int[]
+__to_components(c::CartesianIndex{2}) = __to_components((Tuple(c),))
 function __to_components(c)
+    # Cartesian (i, j) components for tensor-valued fields: stored as given, resolved to
+    # linear (data order) components in add! where the tensor type is known
+    if eltype(c) <: Union{NTuple{2, Int}, CartesianIndex{2}}
+        components = NTuple{2, Int}[Tuple(x) for x in vec(collect(c))]
+        isempty(components) && error("components are empty: $c")
+        allunique(components) || error("components not unique: $c")
+        return components
+    end
     components = convert(Vector{Int}, vec(collect(Int, c)))
     isempty(components) && error("components are empty: $c")
     issorted(components) || error("components not sorted: $c")
@@ -491,7 +510,7 @@ function update!(ch::ConstraintHandler, time::Real = 0.0)
         # Function barrier
         _update!(
             ch.inhomogeneities, wrapper_f, dbc.facets, dbc.local_facet_dofs, dbc.local_facet_dofs_offset,
-            dbc.components, ch.dh, ch.bcvalues[i], ch.dofmapping, ch.dofcoefficients, time
+            dbc.components, dbc.value_type, ch.dh, ch.bcvalues[i], ch.dofmapping, ch.dofcoefficients, time
         )
     end
     for bc in ch.projbcs
@@ -519,12 +538,36 @@ function update!(ch::ConstraintHandler, time::Real = 0.0)
     return nothing
 end
 
+# Validate and normalize the BC function return value. For scalar/vector fields
+# (value_type === nothing) the value is a collection mapping positionally to `components`.
+# For tensor-valued fields (`value_type` is the field's tensor type) the value must be the
+# tensor value, which is converted to `value_type` (entries of un-prescribed components
+# are ignored), or a plain number when a single component is prescribed. The individual
+# dof values are then extracted with `_bc_dof_value`, avoiding an intermediate collection.
+@inline function _bc_value(::Nothing, fval, components::Vector{Int})
+    @assert length(fval) == length(components)
+    return fval
+end
+@inline _bc_value(::Type{TB}, fval::SecondOrderTensor, ::Vector{Int}) where {TB <: SecondOrderTensor} = TB(fval)
+@inline function _bc_value(::Type{TB}, fval::Number, components::Vector{Int}) where {TB <: SecondOrderTensor}
+    length(components) == 1 || error("a Dirichlet function for a tensor-valued field may only return a number when a single component is prescribed ($(length(components)) components)")
+    return fval
+end
+function _bc_value(::Type{TB}, fval, ::Vector{Int}) where {TB <: SecondOrderTensor}
+    return error("a Dirichlet function for a tensor-valued field must return the tensor value (convertible to $(TB)), got $(typeof(fval))")
+end
+
+# The dof value of the i-th prescribed component of a normalized BC value
+@inline _bc_dof_value(::Nothing, bc_value, ::Vector{Int}, i::Int) = bc_value[i]
+@inline _bc_dof_value(::Type{TB}, bc_value::SecondOrderTensor, components::Vector{Int}, i::Int) where {TB <: SecondOrderTensor} = bc_value.data[components[i]]
+@inline _bc_dof_value(::Type{TB}, bc_value::Number, ::Vector{Int}, ::Int) where {TB <: SecondOrderTensor} = bc_value
+
 # for facets, vertices, faces and edges
 function _update!(
         inhomogeneities::Vector{T}, f::Function, boundary_entities::AbstractVecOrSet{<:BoundaryIndex}, local_facet_dofs::Vector{Int}, local_facet_dofs_offset::Vector{Int},
-        components::Vector{Int}, dh::AbstractDofHandler, boundaryvalues::BCValues,
+        components::Vector{Int}, value_type::VT, dh::AbstractDofHandler, boundaryvalues::BCValues,
         dofmapping::Dict{Int, Int}, dofcoefficients::Vector{Union{Nothing, DofCoefficients{T}}}, time::Real
-    ) where {T}
+    ) where {T, VT <: Union{Nothing, Type{<:SecondOrderTensor}}}
 
     cc = CellCache(dh, UpdateFlags(; nodes = false, coords = true, dofs = true))
     for (cellidx, entityidx) in boundary_entities
@@ -538,8 +581,7 @@ function _update!(
         counter = 1
         for location in 1:getnquadpoints(boundaryvalues)
             x = spatial_coordinate(boundaryvalues, location, cc.coords)
-            bc_value = f(x, time)
-            @assert length(bc_value) == length(components)
+            bc_value = _bc_value(value_type, f(x, time), components)
 
             for i in 1:length(components)
                 # find the global dof
@@ -550,8 +592,9 @@ function _update!(
                 # Only DBC dofs are currently update!-able so don't modify inhomogeneities
                 # for affine constraints
                 if dofcoefficients[dbc_index] === nothing
-                    inhomogeneities[dbc_index] = bc_value[i]
-                    @debug println("prescribing value $(bc_value[i]) on global dof $(globaldof)")
+                    v = _bc_dof_value(value_type, bc_value, components, i)
+                    inhomogeneities[dbc_index] = v
+                    @debug println("prescribing value $(v) on global dof $(globaldof)")
                 end
             end
         end
@@ -562,15 +605,15 @@ end
 # for nodes
 function _update!(
         inhomogeneities::Vector{T}, f::Function, ::AbstractVecOrSet{Int}, nodeidxs::Vector{Int}, globaldofs::Vector{Int},
-        components::Vector{Int}, dh::AbstractDofHandler, facetvalues::BCValues,
+        components::Vector{Int}, value_type::VT, dh::AbstractDofHandler, facetvalues::BCValues,
         dofmapping::Dict{Int, Int}, dofcoefficients::Vector{Union{Nothing, DofCoefficients{T}}}, time::Real
-    ) where {T}
+    ) where {T, VT <: Union{Nothing, Type{<:SecondOrderTensor}}}
     counter = 1
     for nodenumber in nodeidxs
         x = get_node_coordinate(get_grid(dh), nodenumber)
-        bc_value = f(x, time)
-        @assert length(bc_value) == length(components)
-        for v in bc_value
+        bc_value = _bc_value(value_type, f(x, time), components)
+        for i in 1:length(components)
+            v = _bc_dof_value(value_type, bc_value, components, i)
             globaldof = globaldofs[counter]
             counter += 1
             dbc_index = dofmapping[globaldof]
@@ -937,29 +980,55 @@ function meandiag(K::AbstractMatrix)
     return z / size(K, 1)
 end
 
-# Wrapper for functions prescribing tensor-valued fields, allowing the function to return
-# the natural tensor value (e.g. `x -> SymmetricTensor{2, 2}((1.0, 2.0, 3.0))`) from which
-# the prescribed components (in the tensor's data order) are extracted. Returning a
-# collection with one entry per prescribed component (as for vector fields) is also
-# supported and passed through as is.
-function _wrap_tensor_bc_function(f::F, ::TensorInterpolation{TB}, components::Vector{Int}) where {F, TB <: SecondOrderTensor}
-    # A tuple (of statically known length) so that the component selection below is
-    # allocation-free.
-    comps = Tuple(components)
-    # The `f(x)` vs `f(x, t)` arity of `f` is resolved here, once, from the method table
-    # (the argument types needed for a `hasmethod` probe as in `update!` are not known
-    # here). The wrapper itself always takes `(x, t)` so that `update!` passes it through
-    # without an extra adapter closure.
-    if any(m -> m.nargs >= 3 || m.isva, methods(f))
-        return (x, t) -> _select_tensor_components(TB, f(x, t), comps)
-    else
-        return (x, _) -> _select_tensor_components(TB, f(x), comps)
+# Value type of the field for tensor-valued fields (`nothing` otherwise), stored in the
+# Dirichlet struct and used in _update! to extract components from tensor return values.
+_dbc_value_type(::Interpolation) = nothing
+_dbc_value_type(::TensorInterpolation{TB}) where {TB <: SecondOrderTensor} = TB
+
+# Resolve user-given components to sorted linear indices in the field's component order.
+# Empty input means all components. Tensor-valued fields require Cartesian (i, j)
+# components, which are mapped to the tensor's data order.
+function _resolve_dbc_components(components::Vector{Int}, ::Interpolation, n_comp::Int, field_name::Symbol)
+    isempty(components) && return collect(Int, 1:n_comp)
+    if !all(c -> 0 < c <= n_comp, components)
+        error("components $(components) not within range of field :$(field_name) ($(n_comp) dimension(s))")
     end
+    return components
 end
-# Only second order tensors are treated as the natural tensor value: e.g. a `Vec` return
-# is a collection of the selected components, just like for vector fields.
-_select_tensor_components(::Type{TB}, v::SecondOrderTensor, components::Tuple{Vararg{Int}}) where {TB} = map(c -> TB(v).data[c], components)
-_select_tensor_components(::Type{TB}, v, ::Tuple{Vararg{Int}}) where {TB} = v
+function _resolve_dbc_components(components::Vector{Int}, ::TensorInterpolation{TB}, n_comp::Int, field_name::Symbol) where {TB <: SecondOrderTensor}
+    isempty(components) && return collect(Int, 1:n_comp)
+    return error("components of the tensor-valued field :$(field_name) must be given as Cartesian (i, j) tuples, e.g. [(1, 2), (2, 2)]")
+end
+function _resolve_dbc_components(components::Vector{NTuple{2, Int}}, ::Interpolation, ::Int, field_name::Symbol)
+    return error("Cartesian (i, j) components are only supported for fields with a second order tensor value (field :$(field_name))")
+end
+
+# Inverse of Tensors.compute_index: the Cartesian (i, j) index (lower triangle for
+# SymmetricTensor) of data component c. Used where internal code with resolved linear
+# components constructs a user-facing Dirichlet (see PeriodicDirichlet).
+function _cartesian_component(::Type{TB}, c::Int) where {dim, TB <: Union{Tensor{2, dim}, SymmetricTensor{2, dim}}}
+    for j in 1:dim, i in 1:dim
+        Tensors.compute_index(TB, i, j) == c && return (i, j)
+    end
+    throw(ArgumentError("no component $c in $TB"))
+end
+_dirichlet_components(::Nothing, components::Vector{Int}) = components
+function _dirichlet_components(::Type{TB}, components::Vector{Int}) where {TB <: SecondOrderTensor}
+    return NTuple{2, Int}[_cartesian_component(TB, c) for c in components]
+end
+function _resolve_dbc_components(
+        components::Vector{NTuple{2, Int}}, ::TensorInterpolation{TB}, ::Int, field_name::Symbol
+    ) where {dim, TB <: Union{Tensor{2, dim}, SymmetricTensor{2, dim}}}
+    for (i, j) in components
+        if !(0 < i <= dim && 0 < j <= dim)
+            error("component ($i, $j) not within range of field :$(field_name) (tensor dimension $(dim))")
+        end
+    end
+    resolved = Int[Tensors.compute_index(TB, i, j) for (i, j) in components]
+    # For SymmetricTensor (i, j) and (j, i) refer to the same component
+    allunique(resolved) || error("components $(components) refer to duplicate components of $(TB)")
+    return sort!(resolved)
+end
 
 """
     add!(ch::ConstraintHandler, dbc::Dirichlet)
@@ -983,18 +1052,10 @@ function add!(ch::ConstraintHandler, dbc::Dirichlet)
         n_comp = n_dbc_components(interpolation)
         base_interpolation = get_base_interpolation(interpolation)
         getorder(base_interpolation) == 0 && error("No dof prescribed for order 0 interpolations")
-        # Set up components to prescribe (empty input means prescribe all components)
-        components = isempty(dbc.components) ? collect(Int, 1:n_comp) : dbc.components
-        if !all(c -> 0 < c <= n_comp, components)
-            error("components $(components) not within range of field :$(dbc.field_name) ($(n_comp) dimension(s))")
-        end
-        # For tensor-valued fields the function may return the tensor value: normalize the
-        # return value to the prescribed components (in the tensor's data order)
-        if interpolation isa TensorInterpolation{<:SecondOrderTensor}
-            f = _wrap_tensor_bc_function(dbc.f, interpolation, components)
-        else
-            f = dbc.f
-        end
+        # Set up components to prescribe (empty input means prescribe all components,
+        # Cartesian (i, j) components are resolved to the tensor's data order)
+        components = _resolve_dbc_components(dbc.components, interpolation, n_comp, dbc.field_name)
+        value_type = _dbc_value_type(interpolation)
         interpolation = base_interpolation
         # Create BCValues for coordinate evaluation at dof-locations
         EntityType = eltype(dbc.facets) # (Facet|Face|Edge|Vertex)Index
@@ -1005,7 +1066,7 @@ function add!(ch::ConstraintHandler, dbc::Dirichlet)
         CT = getcelltype(sdh) # Same celltype enforced in SubDofHandler constructor
         bcvalues = BCValues(interpolation, geometric_interpolation(CT), EntityType)
         # Recreate the Dirichlet(...) struct with the filtered set and call internal add!
-        filtered_dbc = Dirichlet(dbc.field_name, filtered_set, f, components)
+        filtered_dbc = Dirichlet(dbc.f, filtered_set, dbc.field_name, components, Int[], Int[], value_type)
         _add!(
             ch, filtered_dbc, filtered_dbc.facets, interpolation, n_comp,
             field_offset(sdh, field_idx), bcvalues, sdh.cellset,
@@ -1238,10 +1299,12 @@ function _add!(
         idxs, _ = NearestNeighbors.nn(tree, points)
         corner_set = OrderedSet{Int}(all_node_idxs_v[i] for i in idxs)
 
+        value_type = _dbc_value_type(getfieldinterpolation(ch.dh, find_field(ch.dh, pdbc.field_name)))
+        zero_f = value_type === nothing ? (x, _) -> pdbc.components * eltype(x)(0) : (x, _) -> zero(value_type)
         dbc = Dirichlet(
             pdbc.field_name, corner_set,
-            pdbc.func === nothing ? (x, _) -> pdbc.components * eltype(x)(0) : pdbc.func,
-            pdbc.components
+            pdbc.func === nothing ? zero_f : pdbc.func,
+            _dirichlet_components(value_type, pdbc.components)
         )
 
         # Create a temp constraint handler just to find the dofs in the nodes...
@@ -1267,7 +1330,10 @@ function _add!(
         all_facets = OrderedSet{FacetIndex}()
         union!(all_facets, (x.mirror for x in facet_map))
         union!(all_facets, (x.image for x in facet_map))
-        dbc_all = Dirichlet(pdbc.field_name, all_facets, pdbc.func, pdbc.components)
+        dbc_all = Dirichlet(
+            pdbc.field_name, all_facets, pdbc.func,
+            _dirichlet_components(_dbc_value_type(getfieldinterpolation(ch.dh, find_field(ch.dh, pdbc.field_name))), pdbc.components)
+        )
         add!(chtmp2, dbc_all); close!(chtmp2)
         # Call update! here since we need it to construct the affine constraints...
         # TODO: This doesn't allow for time dependent constraints...

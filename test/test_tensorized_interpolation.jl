@@ -155,12 +155,12 @@ using SparseArrays
         ch = ConstraintHandler(dh)
         # Natural tensor-valued return, all components
         add!(ch, Dirichlet(:σ, getfacetset(grid, "left"), σbc))
-        # Collection return for selected components (1 = xx, 3 = yy in data order)
-        add!(ch, Dirichlet(:σ, getfacetset(grid, "right"), (x, t) -> [10.0, 20.0], [1, 3]))
-        # Tensor-valued return for a single selected component (2 = xy = yx)
-        add!(ch, Dirichlet(:σ, getfacetset(grid, "top"), σbc, [2]))
-        # Vec return is a collection of the selected components, not a tensor value
-        add!(ch, Dirichlet(:σ, getfacetset(grid, "bottom"), x -> Vec{2}((30.0, 40.0)), [1, 3]))
+        # Selected components (xx and yy) in any order; the un-prescribed (2,1) entry of
+        # the returned tensor is ignored
+        add!(ch, Dirichlet(:σ, getfacetset(grid, "right"), (x, t) -> SymmetricTensor{2, 2}((10.0, -1.0, 20.0)), [(2, 2), (1, 1)]))
+        # Tensor-valued return for a single selected component ((1,2) = (2,1) = one dof)
+        add!(ch, Dirichlet(:σ, getfacetset(grid, "top"), σbc, [(1, 2)]))
+        add!(ch, Dirichlet(:σ, getfacetset(grid, "bottom"), x -> SymmetricTensor{2, 2}((30.0, -1.0, 40.0)), [(1, 1), (2, 2)]))
         close!(ch)
         update!(ch, 0.0)
         a = zeros(ndofs(dh))
@@ -169,7 +169,7 @@ using SparseArrays
         vals = evaluate_at_grid_nodes(dh, a, :σ)
         for (nodeid, node) in enumerate(getnodes(grid))
             x = get_node_coordinate(node)
-            if x[2] ≈ -1.0 # bottom: xx and yy from the Vec return (added last, wins at corners)
+            if x[2] ≈ -1.0 # bottom: xx and yy (added last, wins at corners)
                 @test vals[nodeid][1, 1] ≈ 30.0
                 @test vals[nodeid][2, 2] ≈ 40.0
                 if x[1] ≈ -1.0 # bottom-left corner: xy still from the left condition
@@ -206,6 +206,34 @@ using SparseArrays
         # ... but a rotation matrix is not supported for tensor-valued fields
         chr = ConstraintHandler(dh)
         @test_throws ArgumentError add!(chr, PeriodicDirichlet(:σ, facet_map, rotation_tensor(π / 2)[:, :]))
+
+        # Component validation
+        che = ConstraintHandler(dh)
+        # Linear indices are not allowed for tensor-valued fields
+        @test_throws ErrorException add!(che, Dirichlet(:σ, getfacetset(grid, "left"), σbc, [2]))
+        # (1,2) and (2,1) refer to the same component of a symmetric tensor
+        @test_throws ErrorException add!(che, Dirichlet(:σ, getfacetset(grid, "left"), σbc, [(1, 2), (2, 1)]))
+        # Out of range
+        @test_throws ErrorException add!(che, Dirichlet(:σ, getfacetset(grid, "left"), σbc, [(3, 1)]))
+        # Return value validation (checked in update!, called by close!)
+        for badf in (
+                x -> [1.0, 2.0, 3.0],       # collection return not allowed
+                x -> Vec{2}((1.0, 2.0)),    # ... nor is a Vec
+                x -> 0.0,                   # number return requires a single component
+            )
+            chb = ConstraintHandler(dh)
+            add!(chb, Dirichlet(:σ, getfacetset(grid, "left"), badf))
+            @test_throws ErrorException close!(chb)
+        end
+        # Cartesian components are not allowed for non-tensor fields
+        dhv = DofHandler(grid)
+        add!(dhv, :u, Lagrange{RefQuadrilateral, 1}()^2)
+        close!(dhv)
+        chv = ConstraintHandler(dhv)
+        @test_throws ErrorException add!(chv, Dirichlet(:u, getfacetset(grid, "left"), x -> zero(Vec{2}), [(1, 1)]))
+        # Duplicates and mixed input are rejected already in the constructor
+        @test_throws ErrorException Dirichlet(:σ, getfacetset(grid, "left"), σbc, [(1, 1), (1, 1)])
+        @test_throws MethodError Dirichlet(:σ, getfacetset(grid, "left"), σbc, [1, (1, 2)])
     end
 
     @testset "apply_analytical! error path" begin
@@ -230,7 +258,7 @@ using SparseArrays
         apply_analytical!(a, dh, :σ, σfun)
 
         ch = ConstraintHandler(dh)
-        add!(ch, Dirichlet(:σ, getfacetset(grid, "left"), x -> 0.0, [2]))
+        add!(ch, Dirichlet(:σ, getfacetset(grid, "left"), x -> 0.0, [(2, 1)]))
         close!(ch)
 
         # Project the same analytical field: write_solution and write_projection must agree
