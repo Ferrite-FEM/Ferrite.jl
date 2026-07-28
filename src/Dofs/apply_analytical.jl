@@ -87,7 +87,7 @@ end
 # (`length(fval)` counts all matrix entries, which for symmetric tensors differs from the
 # number of components, and iteration order does not match the data order).
 _analytical_dof_values(::Interpolation, fval) = fval
-_analytical_dof_values(::TensorInterpolation{TB}, fval) where {TB} = TB(fval).data
+_analytical_dof_values(::TensorInterpolation{TB}, fval) where {TB <: SecondOrderTensor} = TB(fval).data
 
 function _apply_analytical!(a::AbstractVector, dofs::Vector{Int}, coords::Vector{<:Vec}, field_dim, cv::CellValues, f, ip_fun::Interpolation)
     for i_dof in 1:getnquadpoints(cv)

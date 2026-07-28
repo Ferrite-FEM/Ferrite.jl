@@ -942,7 +942,7 @@ end
 # the prescribed components (in the tensor's data order) are extracted. Returning a
 # collection with one entry per prescribed component (as for vector fields) is also
 # supported and passed through as is.
-function _wrap_tensor_bc_function(f::F, ::TensorInterpolation{TB}, components::Vector{Int}) where {F, TB}
+function _wrap_tensor_bc_function(f::F, ::TensorInterpolation{TB}, components::Vector{Int}) where {F, TB <: SecondOrderTensor}
     function tensor_bc_function(x, t)
         raw = hasmethod(f, Tuple{typeof(x), typeof(t)}) ? f(x, t) : f(x)
         return _select_tensor_components(TB, raw, components)
@@ -983,7 +983,7 @@ function add!(ch::ConstraintHandler, dbc::Dirichlet)
         end
         # For tensor-valued fields the function may return the tensor value: normalize the
         # return value to the prescribed components (in the tensor's data order)
-        if interpolation isa TensorInterpolation
+        if interpolation isa TensorInterpolation{<:SecondOrderTensor}
             f = _wrap_tensor_bc_function(dbc.f, interpolation, components)
         else
             f = dbc.f
@@ -1097,7 +1097,7 @@ function add!(ch::ConstraintHandler, pdbc::PeriodicDirichlet)
     field_idx = find_field(ch.dh, pdbc.field_name)
     interpolation = getfieldinterpolation(ch.dh, field_idx)
     n_comp = n_dbc_components(interpolation)
-    if interpolation isa TensorInterpolation && pdbc.rotation_matrix !== nothing
+    if interpolation isa TensorInterpolation{<:SecondOrderTensor} && pdbc.rotation_matrix !== nothing
         # The rotation matrix is a physical (sdim × sdim) rotation; how to map it onto the
         # independent tensor components is an open API question.
         throw(ArgumentError("PeriodicDirichlet with a rotation matrix is not supported for tensor-valued fields"))

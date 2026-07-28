@@ -150,9 +150,8 @@ function Base.show(io::IO, mime::MIME"text/plain", dh::DofHandler)
             ip = getfieldinterpolation(dh, find_field(dh, fieldname))
             if ip isa ScalarInterpolation
                 field_type = "scalar"
-            elseif ip isa VectorInterpolation
-                _getvdim(::VectorInterpolation{vdim}) where {vdim} = vdim
-                field_type = "Vec{$(_getvdim(ip))}"
+            elseif ip isa TensorInterpolation{<:Vec}
+                field_type = "Vec{$(n_components(ip))}"
             elseif ip isa TensorInterpolation
                 _get_tensor_base(::TensorInterpolation{TB}) where {TB} = TB
                 field_type = string(_get_tensor_base(ip))
@@ -986,7 +985,6 @@ function evaluate_at_grid_nodes(dh::DofHandler, u::AbstractVector, fieldname::Sy
 end
 
 function_value_init(::ScalarInterpolation, ::AbstractVector{T}) where {T} = zero(T)
-function_value_init(::VectorInterpolation{vdim}, ::AbstractVector{T}) where {vdim, T <: Number} = zero(Vec{vdim, T})
 function_value_init(::TensorInterpolation{TB}, ::AbstractVector{T}) where {TB, T <: Number} = zero(TB{T})
 
 # Internal method that have the vtk option to allocate the output differently
@@ -999,7 +997,7 @@ function _evaluate_at_grid_nodes(dh::DofHandler{sdim}, u::AbstractVector{T}, fie
     if vtk
         # VTK output of solution field (or L2 projected scalar data)
         n_c = n_components(ip)
-        if ip isa TensorInterpolation
+        if ip isa TensorInterpolation{<:SecondOrderTensor}
             vtk_dim = n_c # tensor components are written as-is (in Voigt order), no padding
         else
             vtk_dim = n_c == 2 ? 3 : n_c # VTK wants vectors padded to 3D

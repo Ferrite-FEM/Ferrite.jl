@@ -379,4 +379,60 @@ using SparseArrays
         @test occursin(":σ, SymmetricTensor{2, 2}", dh_repr)
         @test occursin(":u, Vec{2}", dh_repr)
     end
+
+    @testset "VectorizedInterpolation" begin
+        ip = Lagrange{RefTriangle, 1}()
+        # VectorizedInterpolation is an alias for TensorizedInterpolation{Vec{vdim}}
+        @test VectorizedInterpolation{2} === TensorizedInterpolation{Vec{2}}
+        @test ip^2 === VectorizedInterpolation{2}(ip) === TensorizedInterpolation{Vec{2}}(ip)
+        @test VectorizedInterpolation(ip) === ip^2 # vectorize to refdim by default
+        @test Ferrite.n_components(ip^2) == 2
+        @test getnbasefunctions(ip^2) == 2 * getnbasefunctions(ip)
+        @test Ferrite.shape_value_type(ip^2, Float64) == Vec{2, Float64}
+        @test repr("text/plain", ip^2) == "Lagrange{RefTriangle, 1}()^2"
+
+        # Type hierarchy: VectorInterpolation is the alias TensorInterpolation{Vec{vdim}}
+        # and covers both standalone vector interpolations (Nedelec etc.) and vectorized
+        # wrappers
+        @test Ferrite.VectorInterpolation{2} === Ferrite.TensorInterpolation{Vec{2}}
+        @test Nedelec{RefTriangle, 1}() isa Ferrite.VectorInterpolation
+        @test Nedelec{RefTriangle, 1}() isa Ferrite.VectorInterpolation{2}
+        @test ip^2 isa Ferrite.VectorInterpolation
+        @test ip^2 isa Ferrite.VectorInterpolation{2}
+
+        # Values/gradients/hessians of a vectorized interpolation match the scalar base
+        # interpolation componentwise
+        ipv = Lagrange{RefTriangle, 2}()^2
+        ξ = Vec{2}((0.2, 0.3))
+        for I in 1:getnbasefunctions(ipv)
+            i, c = divrem(I - 1, 2) .+ (1, 1)
+            d2N, dN, N = Ferrite.reference_shape_hessian_gradient_and_value(ipv.ip, ξ, i)
+            d2Nv, dNv, Nv = Ferrite.reference_shape_hessian_gradient_and_value(ipv, ξ, I)
+            @test Nv[c] == N
+            @test iszero(Nv[3 - c])
+            @test all(dNv[c, j] == dN[j] for j in 1:2)
+            @test all(iszero(dNv[3 - c, j]) for j in 1:2)
+            @test all(d2Nv[c, j, k] == d2N[j, k] for j in 1:2, k in 1:2)
+            @test all(iszero(d2Nv[3 - c, j, k]) for j in 1:2, k in 1:2)
+        end
+        # Hessians are supported in CellValues for vectorized interpolations (unlike for
+        # second order tensor-valued interpolations)
+        cv = CellValues(QuadratureRule{RefTriangle}(2), ipv; update_hessians = true)
+        grid = generate_grid(Triangle, (1, 1))
+        reinit!(cv, getcoordinates(grid, 1))
+        @test Ferrite.shape_hessian(cv, 1, 1) isa Tensor{3, 2, Float64}
+
+        # Embedded case (vdim = 3 on rdim = 2): mixed-dimension gradient, matching the
+        # scalar base interpolation
+        ipe = Lagrange{RefTriangle, 1}()^3
+        for I in 1:getnbasefunctions(ipe)
+            i, c = divrem(I - 1, 3) .+ (1, 1)
+            dN, N = Ferrite.reference_shape_gradient_and_value(ipe.ip, ξ, i)
+            dNe, Ne = Ferrite.reference_shape_gradient_and_value(ipe, ξ, I)
+            @test Ne isa Vec{3, Float64}
+            @test dNe isa Tensors.MixedTensor2{3, 2, Float64}
+            @test all(Ne[v] == (v == c ? N : 0.0) for v in 1:3)
+            @test all(dNe[v, j] == (v == c ? dN[j] : 0.0) for v in 1:3, j in 1:2)
+        end
+    end
 end

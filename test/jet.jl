@@ -26,7 +26,7 @@ include("test_utils.jl")
         tensor_interpol = TensorizedInterpolation{Tensor{2, Ferrite.getrefdim(scalar_interpol)}}(scalar_interpol)
         for func_interpol in (scalar_interpol, VectorizedInterpolation(scalar_interpol), tensor_interpol), DiffOrder in 1:2
             (DiffOrder == 2 && Ferrite.getorder(func_interpol) == 1) && continue # No need to test linear interpolations again
-            (DiffOrder == 2 && func_interpol isa TensorInterpolation) && continue # Hessians not supported for tensor-valued fields
+            (DiffOrder == 2 && func_interpol isa TensorInterpolation{<:SecondOrderTensor}) && continue # Hessians not supported for second order tensor-valued fields
             geom_interpol = scalar_interpol # Tests below assume this
             update_gradients = true
             update_hessians = (DiffOrder == 2 && Ferrite.getorder(func_interpol) > 1)

@@ -11,17 +11,17 @@ typeof_dNdξ(::Type{T}, ::ScalarInterpolation, ::VectorizedInterpolation{sdim, <
 typeof_d2Ndx2(::Type{T}, ::ScalarInterpolation, ::VectorizedInterpolation{sdim, <:AbstractRefShape{rdim}}) where {T, sdim, rdim} = Tensor{2, sdim, T}
 typeof_d2Ndξ2(::Type{T}, ::ScalarInterpolation, ::VectorizedInterpolation{sdim, <:AbstractRefShape{rdim}}) where {T, sdim, rdim} = Tensor{2, rdim, T}
 
-typeof_N(::Type{T}, ::VectorInterpolation{vdim}, ::VectorizedInterpolation{sdim, <:AbstractRefShape{rdim}}) where {T, vdim, sdim, rdim} = Vec{vdim, T}
-typeof_dNdx(::Type{T}, ::VectorInterpolation{vdim}, ::VectorizedInterpolation{sdim, <:AbstractRefShape{rdim}}) where {T, vdim, sdim, rdim} = Tensors.regular_if_possible(MixedTensor2{vdim, sdim, T})
-typeof_dNdξ(::Type{T}, ::VectorInterpolation{vdim}, ::VectorizedInterpolation{sdim, <:AbstractRefShape{rdim}}) where {T, vdim, sdim, rdim} = Tensors.regular_if_possible(MixedTensor2{vdim, rdim, T})
-typeof_d2Ndx2(::Type{T}, ::VectorInterpolation{vdim}, ::VectorizedInterpolation{sdim, <:AbstractRefShape{rdim}}) where {T, vdim, sdim, rdim} = Tensors.regular_if_possible(MixedTensor3{vdim, sdim, sdim, T})
-typeof_d2Ndξ2(::Type{T}, ::VectorInterpolation{vdim}, ::VectorizedInterpolation{sdim, <:AbstractRefShape{rdim}}) where {T, vdim, sdim, rdim} = Tensors.regular_if_possible(MixedTensor3{vdim, rdim, rdim, T})
-
-# Second order tensor-valued fields. Values keep the (compact) tensor type `TB`, while
-# gradients are stored as full third order tensors also for symmetric `TB` (Tensors.jl has
-# no minor-symmetric third order tensor type). Second derivatives are not supported (see
-# the FunctionValues constructor below).
+# Tensor-valued fields (`TensorInterpolation{TB}` covers both vector-valued
+# interpolations, TB <: Vec, and second order tensor-valued interpolations). Values keep
+# the (compact) tensor type `TB`, while gradients gain one dimension (stored as full
+# tensors also for symmetric `TB`; Tensors.jl has no minor-symmetric third order tensor
+# type). Second derivatives are only supported for vector-valued fields (see the
+# FunctionValues constructor below).
 typeof_N(::Type{T}, ::TensorInterpolation{TB}, ::VectorizedInterpolation{sdim, <:AbstractRefShape{rdim}}) where {T, TB, sdim, rdim} = TB{T}
+typeof_dNdx(::Type{T}, ::TensorInterpolation{<:Vec{vdim}}, ::VectorizedInterpolation{sdim, <:AbstractRefShape{rdim}}) where {T, vdim, sdim, rdim} = Tensors.regular_if_possible(MixedTensor2{vdim, sdim, T})
+typeof_dNdξ(::Type{T}, ::TensorInterpolation{<:Vec{vdim}}, ::VectorizedInterpolation{sdim, <:AbstractRefShape{rdim}}) where {T, vdim, sdim, rdim} = Tensors.regular_if_possible(MixedTensor2{vdim, rdim, T})
+typeof_d2Ndx2(::Type{T}, ::TensorInterpolation{<:Vec{vdim}}, ::VectorizedInterpolation{sdim, <:AbstractRefShape{rdim}}) where {T, vdim, sdim, rdim} = Tensors.regular_if_possible(MixedTensor3{vdim, sdim, sdim, T})
+typeof_d2Ndξ2(::Type{T}, ::TensorInterpolation{<:Vec{vdim}}, ::VectorizedInterpolation{sdim, <:AbstractRefShape{rdim}}) where {T, vdim, sdim, rdim} = Tensors.regular_if_possible(MixedTensor3{vdim, rdim, rdim, T})
 typeof_dNdx(::Type{T}, ::TensorInterpolation{<:Union{Tensor{2, vdim}, SymmetricTensor{2, vdim}}}, ::VectorizedInterpolation{sdim, <:AbstractRefShape{rdim}}) where {T, vdim, sdim, rdim} = Tensors.regular_if_possible(MixedTensor3{vdim, vdim, sdim, T})
 typeof_dNdξ(::Type{T}, ::TensorInterpolation{<:Union{Tensor{2, vdim}, SymmetricTensor{2, vdim}}}, ::VectorizedInterpolation{sdim, <:AbstractRefShape{rdim}}) where {T, vdim, sdim, rdim} = Tensors.regular_if_possible(MixedTensor3{vdim, vdim, rdim, T})
 
@@ -65,8 +65,8 @@ struct FunctionValues{DiffOrder, IP, N_t, dNdx_t, dNdξ_t, d2Ndx2_t, d2Ndξ2_t} 
     end
 end
 function FunctionValues{DiffOrder}(::Type{T}, ip::Interpolation, qr::QuadratureRule, ip_geo::VectorizedInterpolation) where {DiffOrder, T}
-    if DiffOrder >= 2 && ip isa TensorInterpolation
-        throw(ArgumentError("second derivatives (hessians) are not yet supported for tensor-valued interpolations"))
+    if DiffOrder >= 2 && ip isa TensorInterpolation{<:SecondOrderTensor}
+        throw(ArgumentError("second derivatives (hessians) are not yet supported for second order tensor-valued interpolations"))
     end
     assert_same_refshapes(qr, ip, ip_geo)
     n_shape = getnbasefunctions(ip)

@@ -215,7 +215,7 @@ function write_solution(vtk::VTKGridFile, dh::AbstractDofHandler, u::AbstractVec
             data = _evaluate_at_grid_nodes(dh, u, name, #=vtk=# Val(true))
         end
         ip = getfieldinterpolation(dh, find_field(dh, name))
-        if ip isa TensorInterpolation
+        if ip isa TensorInterpolation{<:SecondOrderTensor}
             # Tensor-valued fields are exported in Voigt order; label the components
             names = component_names(shape_value_type(ip, Float64))
             _vtk_write_node_data(vtk.vtk, data, string(name, suffix); component_names = names)
@@ -345,7 +345,7 @@ function write_constraints(vtk, ch::ConstraintHandler)
     for field in unique_fields
         nd = n_components(ch.dh, field)
         ip = getfieldinterpolation(ch.dh, find_field(ch.dh, field))
-        if ip isa TensorInterpolation
+        if ip isa TensorInterpolation{<:SecondOrderTensor}
             # Tensor-valued solution fields are exported in Voigt order: permute the
             # component masks the same way (and label them) so the rows line up.
             perm = _voigt_position_of_components(ip)
@@ -385,7 +385,7 @@ end
 # The position in the Voigt (`tovoigt!`) output of each independent tensor component
 # (data order), i.e. `voigt[_voigt_position_of_components(ip)[c]]` corresponds to
 # data component `c`.
-function _voigt_position_of_components(ip::TensorInterpolation{TB}) where {TB}
+function _voigt_position_of_components(ip::TensorInterpolation{TB}) where {TB <: SecondOrderTensor}
     nc = n_components(ip)
     v = zeros(Float64, nc)
     return map(1:nc) do c
@@ -449,11 +449,11 @@ function evaluate_at_discontinuous_vtkgrid_nodes(dh::DofHandler{sdim}, u::Vector
 
     get_vtk_dim(::ScalarInterpolation, ::AbstractVector{<:Number}) = 1
     get_vtk_dim(::ScalarInterpolation, ::AbstractVector{<:Vec{dim}}) where {dim} = dim == 2 ? 3 : dim
-    get_vtk_dim(::VectorInterpolation{vdim}, ::AbstractVector{<:Number}) where {vdim} = vdim == 2 ? 3 : vdim
+    get_vtk_dim(::TensorInterpolation{<:Vec{vdim}}, ::AbstractVector{<:Number}) where {vdim} = vdim == 2 ? 3 : vdim
 
     get_vtk_dim(::ScalarInterpolation, ::AbstractVector{<:SymmetricTensor{order, dim, T, M}}) where {order, dim, T, M} = M
     get_vtk_dim(::ScalarInterpolation, ::AbstractVector{<:Tensor{order, dim, T, M}}) where {order, dim, T, M} = M
-    get_vtk_dim(ip::TensorInterpolation, ::AbstractVector{<:Number}) = n_components(ip)
+    get_vtk_dim(ip::TensorInterpolation{<:SecondOrderTensor}, ::AbstractVector{<:Number}) = n_components(ip)
 
     vtk_dim = get_vtk_dim(ip, u)
     n_vtk_nodes = maximum(maximum, cellnodes)

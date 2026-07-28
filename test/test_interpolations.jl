@@ -221,7 +221,7 @@ using Ferrite: reference_shape_value, reference_shape_gradient
         @test Ferrite.reference_coordinates(DiscontinuousLagrange{RefHexahedron, 0}()) ≈ [Vec{3, Float64}((0, 0, 0))]
     end
 
-    @testset "Correctness of AD of embedded interpolations" begin
+    @testset "Correctness of derivatives of embedded interpolations" begin
         ips = Lagrange{RefQuadrilateral, 2}()
         vdim = 3
         ipv = ips^vdim
@@ -255,11 +255,18 @@ using Ferrite: reference_shape_value, reference_shape_gradient
 
     @testset "TensorizedInterpolation constructor" begin
         ip = Lagrange{RefTriangle, 1}()
+        # Vec value types construct vectorized interpolations (`VectorizedInterpolation`
+        # is an alias for `TensorizedInterpolation{Vec{vdim}}`)
+        @test TensorizedInterpolation{Vec{2}}(ip) === ip^2
+        @test TensorizedInterpolation{Vec{2, Float32}}(ip) === ip^2 # eltype is stripped
+        # Vec has no dim restriction (any vdim gives a valid dof layout), unlike the
+        # second order tensor types
+        @test TensorizedInterpolation{Vec{4}}(ip) === ip^4
         # Unsupported value types
-        @test_throws MethodError TensorizedInterpolation{Vec{2}}(ip)
         @test_throws MethodError TensorizedInterpolation{Tensor{4, 2}}(ip)
         @test_throws MethodError TensorizedInterpolation{SymmetricTensor{4, 2}}(ip)
         # Tensor dimension must be specified
+        @test_throws MethodError TensorizedInterpolation{Vec}(ip)
         @test_throws MethodError TensorizedInterpolation{Tensor{2}}(ip)
         @test_throws MethodError TensorizedInterpolation{SymmetricTensor{2}}(ip)
         # Unsupported tensor dimension
