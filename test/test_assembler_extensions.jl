@@ -85,6 +85,21 @@ using SparseArrays, LinearAlgebra
         @test K ≈ sparsecsr(I, J, V)
         @test f ≈ [4 / 3, 2.0, 1.0]
 
+        # Atomic accumulation gives identical results sequentially
+        Ka = allocate_matrix(SparseMatrixCSR, dh)
+        fa = zeros(3)
+        assembler = start_assemble(Ka, fa; atomic = true)
+        assemble!(assembler, [1, 2], ke, fe)
+        assemble!(assembler, [3, 2], ke, fe)
+        I = [1, 1, 2, 2, 2, 3, 3]
+        J = [1, 2, 1, 2, 3, 2, 3]
+        V = [-1.0, 1.0, 2.0, -2.0, 2.0, 1.0, -1.0]
+        @test Ka == sparsecsr(I, J, V)
+        @test fa == [1.0, 4.0, 1.0]
+        # Atomic accumulation is only supported for Float32/Float64 matrices
+        Kint = sparsecsr([1, 2], [1, 2], zeros(Int, 2))
+        @test_throws ArgumentError start_assemble(Kint; atomic = true)
+
         # CSRAssembler: assemble with different row and col dofs
         I = [1, 1, 4, 4, 6, 6]
         J = [1, 3, 1, 3, 1, 3]

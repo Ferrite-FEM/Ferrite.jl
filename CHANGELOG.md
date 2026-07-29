@@ -17,6 +17,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
    Vincent, 2015). This is the same family of rules already used for `RefPrism` and
    `RefPyramid`, and extends tetrahedral quadrature beyond the previous maximum order 5 of
    the Keast rules. ([#1389])
+ - `start_assemble(K, f; atomic = true)` returns an assembler that accumulates into `K`
+   and `f` using atomic additions (supported for `SparseMatrixCSC`, `Symmetric`-wrapped
+   `SparseMatrixCSC`, and `SparseMatrixCSR`, with eltypes `Float32`/`Float64`). This
+   makes it safe to assemble from multiple concurrent tasks without partitioning the
+   cells into independent sets ("grid coloring"), at the cost of some accumulation
+   overhead and non-deterministic (but correct up to summation order) results. See the
+   updated [howto on multi-threaded
+   assembly](https://ferrite-fem.github.io/Ferrite.jl/stable/howto/threaded_assembly/).
+   ([#XXXX])
 
 ### Documentation
  - The figures for the documentation are now programmatically generated and made to have a consistent look.
@@ -26,6 +35,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixes
  - `FacetIterator` now works with `AbstractVector{FacetIndex}` and `AbstractSet{FacetIndex}` inputs as documented, instead of requiring an `OrderedSet` ([#1384])
+ - `ProjectedDirichlet` now updates the correct dofs when the constrained field is not the first
+   field in the `DofHandler`; previously the dof lookup ignored the field offset in the cell dof
+   vector (typically causing a `KeyError` during `update!`) ([#1393])
+ - The error thrown when assembling into a matrix entry that is missing from the sparsity
+   pattern now reports the row that is actually missing, rather than an unrelated row that
+   happened to be stored in the same column ([#1414])
 
 ## [v1.5.0] - 2026-07-13
 
@@ -1199,3 +1214,6 @@ poking into Ferrite internals:
 [#1228]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1228
 [#1235]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1235
 [#1389]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1389
+[#1414]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1414
+[#1416]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1416
+[#1421]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1421

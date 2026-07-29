@@ -5,16 +5,18 @@ import Ferrite: AbstractSparsityPattern, CSRAssembler, FastSparsityPattern, getn
 import Base: @propagate_inbounds
 
 # Could be generalized if https://github.com/JuliaSparse/SparseArrays.jl/pull/546 is merged
-function Ferrite.start_assemble(K::SparseMatrixCSR{<:Any, T}, f::Vector = T[]; fillzero::Bool = true, maxcelldofs_hint::Int = 0) where {T}
+# See src/assembler.jl for the `@constprop` annotation (concrete return type for literal `atomic`).
+Base.@constprop :aggressive function Ferrite.start_assemble(K::SparseMatrixCSR{<:Any, T, Ti}, f::Vector = T[]; fillzero::Bool = true, maxcelldofs_hint::Int = 0, atomic::Bool = false) where {T, Ti}
+    Ferrite._check_atomic_eltype(atomic, T)
     fillzero && (Ferrite.fillzero!(K); Ferrite.fillzero!(f))
-    return CSRAssembler(K, f, zeros(Int, maxcelldofs_hint), zeros(Int, maxcelldofs_hint), zeros(Int, maxcelldofs_hint), zeros(Int, maxcelldofs_hint))
+    return CSRAssembler{T, Ti, typeof(K), atomic}(K, f, zeros(Int, maxcelldofs_hint), zeros(Int, maxcelldofs_hint), zeros(Int, maxcelldofs_hint), zeros(Int, maxcelldofs_hint))
 end
 
 @propagate_inbounds function Ferrite._assemble_inner!(
         K::SparseMatrixCSR, Ke::AbstractMatrix,
         rowdofs::AbstractVector, sortedrowdofs::AbstractVector, rowpermutation::AbstractVector,
         coldofs::AbstractVector, sortedcoldofs::AbstractVector, colpermutation::AbstractVector,
-        sym::Bool
+        sym::Bool, atomic::Val = Val(false)
     )
     current_row = 1
     ld = length(coldofs)
@@ -32,7 +34,7 @@ end
                 # Match: add the value (if non-zero) and advance the pointers
                 val = Ke[Kerow, colpermutation[ci]]
                 if !iszero(val)
-                    K.nzval[C] += val
+                    Ferrite._addindex!(K.nzval, C, val, atomic)
                 end
                 ci += 1
                 Ci += 1

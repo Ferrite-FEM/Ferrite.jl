@@ -15,7 +15,6 @@ docs/src/examples/
 docs/src/tutorials/
 docs/src/howto/
 docs/src/gallery/
-docs/src/topics/downloaded_assets/
 docs/src/changelog.md
 *.DS_Store
 /Manifest.toml

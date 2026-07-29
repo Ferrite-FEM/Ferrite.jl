@@ -198,8 +198,9 @@ function setup_grid(h = 0.05)
     ## Add the periodicity constraint using 4x4 affine transformation matrix,
     ## see https://en.wikipedia.org/wiki/Transformation_matrix#Affine_transformations
     transformation_matrix = zeros(4, 4)
+    ## In the 2D rotation block, cos(-pi/2) gives the zero diagonal entries.
     transformation_matrix[1, 2] = 1  # -sin(-pi/2)
-    transformation_matrix[2, 1] = -1 #  cos(-pi/2)
+    transformation_matrix[2, 1] = -1 #  sin(-pi/2)
     transformation_matrix[3, 3] = 1
     transformation_matrix[4, 4] = 1
     transformation_matrix = vec(transformation_matrix')
