@@ -452,6 +452,31 @@ function test_pe_first_point_missing()
     return
 end
 
+function test_pe_mapped_interpolations()
+    cell = Triangle((1, 2, 3))
+    coords = Vec{2, Float64}.([(0.0, 0.0), (2.0, 0.5), (0.5, 2.0)])
+    grid = Grid([cell], Node.(coords))
+    local_coords = Vec{2, Float64}.([(0.2, 0.3), (0.1, 0.4)])
+
+    for ip in (Nedelec{RefTriangle, 1}(), RaviartThomas{RefTriangle, 1}())
+        qr = QuadratureRule{RefTriangle}(ones(length(local_coords)), local_coords)
+        cv = CellValues(qr, ip)
+        reinit!(cv, cell, coords)
+        points = [spatial_coordinate(cv, qp, coords) for qp in eachindex(local_coords)]
+        ph = PointEvalHandler(grid, points)
+        pv = PointValues(cv)
+        u = collect(1.0:getnbasefunctions(ip))
+
+        for (qp, point) in enumerate(PointIterator(ph))
+            @test point !== nothing
+            reinit!(pv, point)
+            @test function_value(pv, u) ≈ function_value(cv, qp, u)
+            @test function_gradient(pv, u) ≈ function_gradient(cv, qp, u)
+        end
+    end
+    return
+end
+
 @testset "PointEvalHandler" begin
     @testset "scalar field" begin
         test_pe_scalar_field()
@@ -486,6 +511,10 @@ end
 
     @testset "failure cases" begin
         test_pe_first_point_missing()
+    end
+
+    @testset "mapped interpolations" begin
+        test_pe_mapped_interpolations()
     end
 end
 
