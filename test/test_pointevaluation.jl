@@ -532,4 +532,21 @@ end
     @test shape_divergence(pvv, 1, 1) ≈ shape_divergence(cvv, 2, 1)
     @test shape_curl(pvv, 1, 1) ≈ shape_curl(cvv, 2, 1)
     @test shape_symmetric_gradient(pvv, 1, 1) ≈ shape_symmetric_gradient(cvv, 2, 1)
+
+    # PointValues for interpolations with non-identity mappings
+    cell = Triangle((1, 2, 3))
+    x_mapped = Vec{2, Float64}.([(0.0, 0.0), (2.0, 0.5), (0.5, 2.0)])
+    ξs = Vec{2, Float64}.([(0.2, 0.3), (0.1, 0.4)])
+    for ip_mapped in (Nedelec{RefTriangle, 1}(), RaviartThomas{RefTriangle, 1}())
+        qr_mapped = QuadratureRule{RefTriangle}([1.0, 1.0], ξs)
+        cv_mapped = CellValues(qr_mapped, ip_mapped)
+        reinit!(cv_mapped, cell, x_mapped)
+        pv_mapped = PointValues(cv_mapped)
+        u_mapped = rand(getnbasefunctions(ip_mapped))
+        for (qp, ξ) in pairs(ξs)
+            reinit!(pv_mapped, cell, x_mapped, ξ)
+            @test function_value(pv_mapped, u_mapped) ≈ function_value(cv_mapped, qp, u_mapped)
+            @test function_gradient(pv_mapped, u_mapped) ≈ function_gradient(cv_mapped, qp, u_mapped)
+        end
+    end
 end
