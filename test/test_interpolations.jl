@@ -168,6 +168,43 @@ using Ferrite: reference_shape_value, reference_shape_gradient
                 @test isa(Ferrite.getlowerorder(v_interpolation_3), Interpolation{ref_shape, func_order - 1})
             end
         end
+
+        @testset "TensorizedInterpolation" begin
+            @testset "TB = $TB" for TB in (Tensor{2, ref_dim}, SymmetricTensor{2, ref_dim})
+                t_interpolation = TensorizedInterpolation{TB}(interpolation)
+                nc = Tensors.n_components(TB)
+                @test Ferrite.n_components(t_interpolation) == nc
+                @test getnbasefunctions(t_interpolation) == nc * getnbasefunctions(interpolation)
+                # pretty printing
+                @test repr("text/plain", t_interpolation) ==
+                    "TensorizedInterpolation{$TB}(" * repr("text/plain", interpolation) * ")"
+
+                @testset "Value Type $value_type" for value_type in (Float32, Float64)
+                    x = Vec{ref_dim, value_type}(sample_random_point(ref_shape))
+                    GradT = Tensors.regular_if_possible(MixedTensor3{ref_dim, ref_dim, ref_dim, value_type})
+                    for dof in 1:getnbasefunctions(t_interpolation)
+                        base_dof, comp = fldmod1(dof, nc)
+                        N = @inferred(reference_shape_value(t_interpolation, x, dof))
+                        @test N isa TB{value_type}
+                        dNdξ = @inferred(reference_shape_gradient(t_interpolation, x, dof))
+                        @test dNdξ isa GradT
+                        # One-hot in data component `comp`, scaled by the scalar base function
+                        Nbase = reference_shape_value(interpolation, x, base_dof)
+                        @test N.data[comp] ≈ Nbase
+                        @test sum(abs, N.data) ≈ abs(Nbase)
+                        # Analytic derivatives match the scalar base ones
+                        dNdξ_base, _ = Ferrite.reference_shape_gradient_and_value(interpolation, x, base_dof)
+                        E = Ferrite._tensorized_basis(TB, comp, one(value_type))
+                        @test dNdξ ≈ otimes(E, dNdξ_base)
+                    end
+                end
+
+                if applicable(Ferrite.getlowerorder, interpolation)
+                    @test Ferrite.getlowerorder(t_interpolation) ===
+                        TensorizedInterpolation{TB}(Ferrite.getlowerorder(interpolation))
+                end
+            end
+        end
     end
 
     @testset "Discontinuous interpolations" begin
@@ -177,7 +214,7 @@ using Ferrite: reference_shape_value, reference_shape_gradient
         @test Ferrite.reference_coordinates(DiscontinuousLagrange{RefHexahedron, 0}()) ≈ [Vec{3, Float64}((0, 0, 0))]
     end
 
-    @testset "Correctness of AD of embedded interpolations" begin
+    @testset "Correctness of derivatives of embedded interpolations" begin
         ips = Lagrange{RefQuadrilateral, 2}()
         vdim = 3
         ipv = ips^vdim
@@ -193,15 +230,20 @@ using Ferrite: reference_shape_value, reference_shape_gradient
     end
 
     @testset "Errors for entitydof_indices on VectorizedInterpolations" begin
-        ip = Lagrange{RefQuadrilateral, 2}()^2
-        @test_throws ArgumentError Ferrite.vertexdof_indices(ip)
-        @test_throws ArgumentError Ferrite.edgedof_indices(ip)
-        @test_throws ArgumentError Ferrite.facedof_indices(ip)
-        @test_throws ArgumentError Ferrite.facetdof_indices(ip)
+        for ip in (
+                Lagrange{RefQuadrilateral, 2}()^2,
+                TensorizedInterpolation{SymmetricTensor{2, 2}}(Lagrange{RefQuadrilateral, 2}()),
+            )
+            @test_throws ArgumentError Ferrite.vertexdof_indices(ip)
+            @test_throws ArgumentError Ferrite.edgedof_indices(ip)
+            @test_throws ArgumentError Ferrite.facedof_indices(ip)
+            @test_throws ArgumentError Ferrite.facetdof_indices(ip)
 
-        @test_throws ArgumentError Ferrite.edgedof_interior_indices(ip)
-        @test_throws ArgumentError Ferrite.facedof_interior_indices(ip)
-        @test_throws ArgumentError Ferrite.volumedof_interior_indices(ip)
-        @test_throws ArgumentError Ferrite.facetdof_interior_indices(ip)
+            @test_throws ArgumentError Ferrite.edgedof_interior_indices(ip)
+            @test_throws ArgumentError Ferrite.facedof_interior_indices(ip)
+            @test_throws ArgumentError Ferrite.volumedof_interior_indices(ip)
+            @test_throws ArgumentError Ferrite.facetdof_interior_indices(ip)
+        end
     end
+
 end # testset

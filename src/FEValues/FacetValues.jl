@@ -155,10 +155,9 @@ end
 function Base.show(io::IO, d::MIME"text/plain", fv::FacetValues)
     ip_geo = geometric_interpolation(fv)
     rdim = getrefdim(ip_geo)
-    vdim = isa(shape_value(fv, 1, 1), Vec) ? length(shape_value(fv, 1, 1)) : 0
     GradT = shape_gradient_type(fv)
     sdim = GradT === nothing ? nothing : sdim_from_gradtype(GradT)
-    vstr = vdim == 0 ? "scalar" : "vdim=$vdim"
+    vstr = _field_kind_string(shape_value(fv, 1, 1))
     print(io, "FacetValues(", vstr, ", rdim=$rdim, sdim=$sdim): ")
     nqp = getnquadpoints.(fv.fqr.facet_rules)
     if all(n == first(nqp) for n in nqp)

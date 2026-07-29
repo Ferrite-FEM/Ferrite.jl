@@ -119,7 +119,7 @@ function add!(
     getrefshape(ip) == getrefshape(qr_lhs) || error("The reference shape of the interpolation and the qr_lhs must be the same")
 
     sdh = SubDofHandler(proj.dh, set)
-    add!(sdh, :_, ip isa VectorizedInterpolation ? ip.ip : ip)
+    add!(sdh, :_, get_base_interpolation(ip))
     push!(proj.qrs_lhs, qr_lhs)
 
     return proj
@@ -145,7 +145,7 @@ end
 function _mass_qr(::Lagrange{shape, 2}) where {shape <: RefSimplex}
     return QuadratureRule{shape}(4)
 end
-_mass_qr(ip::VectorizedInterpolation) = _mass_qr(ip.ip)
+_mass_qr(ip::TensorizedInterpolation) = _mass_qr(ip.ip)
 
 function _assemble_L2_matrix(dh::DofHandler, qrs_lhs::Vector{<:QuadratureRule})
     M = Symmetric(allocate_matrix(dh))

@@ -150,9 +150,13 @@ function Base.show(io::IO, mime::MIME"text/plain", dh::DofHandler)
             ip = getfieldinterpolation(dh, find_field(dh, fieldname))
             if ip isa ScalarInterpolation
                 field_type = "scalar"
-            elseif ip isa VectorInterpolation
-                _getvdim(::VectorInterpolation{vdim}) where {vdim} = vdim
-                field_type = "Vec{$(_getvdim(ip))}"
+            elseif ip isa TensorInterpolation{<:Vec}
+                field_type = "Vec{$(n_components(ip))}"
+            elseif ip isa TensorInterpolation
+                _get_tensor_base(::TensorInterpolation{TB}) where {TB} = TB
+                field_type = string(_get_tensor_base(ip))
+            else
+                field_type = string(typeof(ip))
             end
             println(io, "    ", repr(fieldname), ", ", field_type)
         end
@@ -282,9 +286,10 @@ function add!(sdh::SubDofHandler, name::Symbol, ip::Interpolation)
     for _sdh in sdh.dh.subdofhandlers
         for (_name, _ip) in zip(_sdh.field_names, _sdh.field_interpolations)
             _name != name && continue
-            # same field name, check for same field dimension
-            if n_components(ip) != n_components(_ip)
-                error("Field :$name has a different number of components in another SubDofHandler. Use a different field name.")
+            # same field name: require the same value type (this also covers the number
+            # of components, and e.g. distinguishes Vec{4} from Tensor{2,2})
+            if shape_value_type(ip, Float64) != shape_value_type(_ip, Float64)
+                error("Field :$name has value type $(shape_value_type(ip, Float64)) but $(shape_value_type(_ip, Float64)) in another SubDofHandler. Use a different field name.")
             end
             if getorder(ip) != getorder(_ip)
                 @warn "Field :$name uses a different interpolation order in another SubDofHandler."
@@ -976,7 +981,7 @@ function evaluate_at_grid_nodes(dh::DofHandler, u::AbstractVector, fieldname::Sy
 end
 
 function_value_init(::ScalarInterpolation, ::AbstractVector{T}) where {T} = zero(T)
-function_value_init(::VectorInterpolation{vdim}, ::AbstractVector{T}) where {vdim, T <: Number} = zero(Vec{vdim, T})
+function_value_init(::TensorInterpolation{TB}, ::AbstractVector{T}) where {TB, T <: Number} = zero(TB{T})
 
 # Internal method that have the vtk option to allocate the output differently
 function _evaluate_at_grid_nodes(dh::DofHandler{sdim}, u::AbstractVector{T}, fieldname::Symbol, ::Val{vtk} = Val(false)) where {T, vtk, sdim}
@@ -988,7 +993,9 @@ function _evaluate_at_grid_nodes(dh::DofHandler{sdim}, u::AbstractVector{T}, fie
     if vtk
         # VTK output of solution field (or L2 projected scalar data)
         n_c = n_components(ip)
-        vtk_dim = n_c == 2 ? 3 : n_c # VTK wants vectors padded to 3D
+        # VTK wants 2D vectors padded to 3D; only Vec{2} has 2 components, second order
+        # tensors are written as-is (in Voigt order) without padding
+        vtk_dim = n_c == 2 ? 3 : n_c
         # Float32 is the smallest float type supported by VTK
         TT = promote_type(T, Float32)
         data = fill!(Matrix{TT}(undef, vtk_dim, getnnodes(get_grid(dh))), NaN)
@@ -1031,8 +1038,13 @@ function _evaluate_at_grid_nodes!(
         for (qp, nodeid) in pairs(cell.nodes)
             val = function_value(cv, qp, ue)
             if data isa Matrix # VTK
-                data[1:length(val), nodeid] .= val
-                data[(length(val) + 1):end, nodeid] .= 0 # purge the NaN
+                if val isa SecondOrderTensor
+                    # Voigt order, consistent with e.g. write_projection of tensor data
+                    toparaview!(@view(data[:, nodeid]), val)
+                else
+                    data[1:length(val), nodeid] .= val
+                    data[(length(val) + 1):end, nodeid] .= 0 # purge the NaN
+                end
             else
                 data[nodeid] = val
             end

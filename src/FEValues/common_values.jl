@@ -148,6 +148,11 @@ quadrature point `q_point`.
 end
 divergence_from_gradient(grad::Vec) = sum(grad)
 divergence_from_gradient(grad::Tensor{2}) = tr(grad)
+# Row-wise divergence of a second order tensor-valued field, (div A)ᵢ = ∂Aᵢⱼ/∂xⱼ. Only
+# defined when the contracted dimensions match: with tensor dimension != sdim (embedded
+# cells) there is no canonical contraction.
+divergence_from_gradient(grad::Tensor{3, dim}) where {dim} = Vec{dim}(i -> sum(grad[i, j, j] for j in 1:dim))
+divergence_from_gradient(grad::MixedTensor3{vdim, dim, dim}) where {vdim, dim} = Vec{vdim}(i -> sum(grad[i, j, j] for j in 1:dim))
 
 """
     shape_curl(fe_v::AbstractValues, q_point::Int, base_function::Int)
@@ -310,11 +315,18 @@ end
 """
     function_divergence(fe_v::AbstractValues, q_point::Int, u::AbstractVector, [dof_range])
 
-Compute the divergence of the vector valued function in a quadrature point.
+Compute the divergence of the vector (or second order tensor) valued function in a
+quadrature point.
 
 The divergence of a vector valued functions in the quadrature point ``\\mathbf{x}_q)`` is computed as
 ``\\mathbf{\\nabla} \\cdot \\mathbf{u}(\\mathbf{x_q}) = \\sum\\limits_{i = 1}^n \\mathbf{\\nabla} N_i (\\mathbf{x_q}) \\cdot \\mathbf{u}_i``
 where ``\\mathbf{u}_i`` are the nodal values of the function.
+
+For a second order tensor valued function the row-wise divergence,
+``[\\mathbf{\\nabla} \\cdot \\mathbf{A}]_i = \\partial A_{ij} / \\partial x_j``, is computed
+from the third order gradient. This requires the second tensor dimension to equal the
+spatial dimension, which for fields on embedded cells only holds when the tensor
+dimension equals `sdim`.
 """
 function function_divergence(fe_v::AbstractValues, q_point::Int, u::AbstractVector, dof_range = eachindex(u))
     return divergence_from_gradient(function_gradient(fe_v, q_point, u, dof_range))

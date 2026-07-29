@@ -63,7 +63,12 @@ abstract type Interpolation{shape #=<: AbstractRefShape=#, order} end
 const InterpolationByDim{dim} = Interpolation{<:AbstractRefShape{dim}}
 
 abstract type ScalarInterpolation{refshape, order} <: Interpolation{refshape, order} end
-abstract type VectorInterpolation{vdim, refshape, order} <: Interpolation{refshape, order} end
+# Interpolations whose value is a tensor of type `TB` (e.g. `Vec{vdim}` or a second order
+# tensor type).
+abstract type TensorInterpolation{TB, refshape, order} <: Interpolation{refshape, order} end
+# Vector-valued interpolations: both standalone ones (e.g. `RaviartThomas` and `Nedelec`)
+# and vectorized scalar interpolations (`ip ^ vdim`, see `VectorizedInterpolation`).
+const VectorInterpolation{vdim} = TensorInterpolation{Vec{vdim}}
 
 struct L2Conformity end     # Discontinuous across cell boundaries
 struct HdivConformity end   # Normal continuity across cell boundaries
@@ -78,9 +83,14 @@ or `H1Conformity()`, for the interpolation.
 """
 function conformity end
 
+# Like `Tensors.n_components`, but also supports the `Vec{dim}` alias (a `UnionAll` that
+# `Tensors.n_components` has no method for).
+_ncomponents(::Type{<:Vec{vdim}}) where {vdim} = vdim
+_ncomponents(::Type{TB}) where {TB} = Tensors.n_components(TB)
+
 # Number of components for the interpolation.
 n_components(::ScalarInterpolation) = 1
-n_components(::VectorInterpolation{vdim}) where {vdim} = vdim
+n_components(::TensorInterpolation{TB}) where {TB} = _ncomponents(TB)
 # Number of components that are allowed to prescribe in e.g. Dirichlet BC
 n_dbc_components(ip::Interpolation) = n_components(ip)
 
@@ -92,8 +102,7 @@ Return the type of `shape_value(ip::Interpolation, ξ::Vec, ib::Int)`.
 shape_value_type(::Interpolation, ::Type{T}) where {T <: Number}
 
 shape_value_type(::ScalarInterpolation, ::Type{T}) where {T <: Number} = T
-shape_value_type(::VectorInterpolation{vdim}, ::Type{T}) where {vdim, T <: Number} = Vec{vdim, T}
-#shape_value_type(::MatrixInterpolation, T::Type) = Tensor  #958
+shape_value_type(::TensorInterpolation{TB}, ::Type{T}) where {TB, T <: Number} = TB{T}
 
 # TODO: Add a fallback that errors if there are multiple dofs per edge/face instead to force
 #       interpolations to opt-out instead of silently do nothing.
@@ -1570,19 +1579,52 @@ function reference_shape_value(ip::RannacherTurek{RefHexahedron, 1}, ξ::Vec{3, 
     throw(ArgumentError("no shape function $i for interpolation $ip"))
 end
 
-##################################################
-# VectorizedInterpolation{<:ScalarInterpolation} #
-##################################################
-struct VectorizedInterpolation{vdim, refshape, order, SI <: ScalarInterpolation{refshape, order}} <: VectorInterpolation{vdim, refshape, order}
-    ip::SI
-    function VectorizedInterpolation{vdim}(ip::SI) where {vdim, refshape, order, SI <: ScalarInterpolation{refshape, order}}
-        return new{vdim, refshape, order, SI}(ip)
-    end
-end
-conformity(ip::VectorizedInterpolation) = conformity(ip.ip)
+###############################################################
+# TensorizedInterpolation / VectorizedInterpolation wrappers  #
+###############################################################
+"""
+    TensorizedInterpolation{TB}(ip::ScalarInterpolation)
 
-adjust_dofs_during_distribution(ip::VectorizedInterpolation) = adjust_dofs_during_distribution(ip.ip)
-getlowerorder(ip::VectorizedInterpolation{vdim}) where {vdim} = VectorizedInterpolation{vdim}(getlowerorder(ip.ip))
+Interpolation for a tensor-valued field, using the scalar base functions of `ip` for each
+independent tensor component. `TB` is the tensor type of the field's values: `Vec{vdim}`
+(equivalent to `ip ^ vdim`, see [`VectorizedInterpolation`](@ref)), or
+`Tensor{2, dim}`/`SymmetricTensor{2, dim}` with `dim ∈ 1:3`. "Tensorized" refers to the
+field *value* being a tensor, not to a tensor-product construction of the basis.
+
+Component `c` refers to the `c`-th entry of `TB`'s internal data tuple: column-major
+order for `Tensor{2}`, and lower-triangle column-major order for `SymmetricTensor{2}`,
+e.g. `(1,1), (2,1), (3,1), (2,2), (3,2), (3,3)` in 3D. This ordering applies wherever
+field components are indexed linearly, e.g. linear `Dirichlet` components and sparsity
+pattern coupling. For a `SymmetricTensor{2}` field the off-diagonal components are single
+degrees of freedom that represent both `(i,j)` and `(j,i)` entries.
+
+# Examples
+```julia
+# A symmetric second order tensor field in 2D, e.g. a stress field
+ip = TensorizedInterpolation{SymmetricTensor{2, 2}}(Lagrange{RefTriangle, 1}())
+```
+"""
+struct TensorizedInterpolation{TB, refshape, order, SI <: ScalarInterpolation{refshape, order}} <: TensorInterpolation{TB, refshape, order}
+    ip::SI
+end
+TensorizedInterpolation{Vec{vdim}}(ip::SI) where {vdim, refshape, order, SI <: ScalarInterpolation{refshape, order}} =
+    TensorizedInterpolation{Vec{vdim}, refshape, order, SI}(ip)
+TensorizedInterpolation{Tensor{2, dim}}(ip::SI) where {dim, refshape, order, SI <: ScalarInterpolation{refshape, order}} =
+    TensorizedInterpolation{Tensor{2, dim}, refshape, order, SI}(ip)
+TensorizedInterpolation{SymmetricTensor{2, dim}}(ip::SI) where {dim, refshape, order, SI <: ScalarInterpolation{refshape, order}} =
+    TensorizedInterpolation{SymmetricTensor{2, dim}, refshape, order, SI}(ip)
+
+"""
+    VectorizedInterpolation{vdim}(ip::ScalarInterpolation)
+    ip::ScalarInterpolation^vdim
+
+Interpolation for a vector-valued field, using the scalar base functions of `ip` for each
+vector component: an alias for [`TensorizedInterpolation`](@ref) with tensor type
+`Vec{vdim}`. Construction is typically done by raising a scalar interpolation to the
+vector dimension, e.g. `Lagrange{RefTriangle, 1}()^2`. Evaluation of function values
+requires `vdim ∈ 1:3` (a Tensors.jl restriction).
+"""
+const VectorizedInterpolation{vdim} = TensorizedInterpolation{Vec{vdim}}
 
 # Vectorize to reference dimension by default
 function VectorizedInterpolation(ip::ScalarInterpolation{shape}) where {refdim, shape <: AbstractRefShape{refdim}}
@@ -1594,6 +1636,19 @@ function Base.literal_pow(::typeof(^), ip::ScalarInterpolation, ::Val{vdim}) whe
     return VectorizedInterpolation{vdim}(ip)
 end
 
+conformity(ip::TensorizedInterpolation) = conformity(ip.ip)
+adjust_dofs_during_distribution(ip::TensorizedInterpolation) = adjust_dofs_during_distribution(ip.ip)
+getlowerorder(ip::TensorizedInterpolation{TB}) where {TB} = TensorizedInterpolation{TB}(getlowerorder(ip.ip))
+reference_coordinates(ip::TensorizedInterpolation) = reference_coordinates(ip.ip)
+get_base_interpolation(ip::Interpolation) = ip
+get_base_interpolation(ip::TensorizedInterpolation) = ip.ip
+
+function Base.show(io::IO, mime::MIME"text/plain", ip::TensorizedInterpolation{TB}) where {TB}
+    print(io, "TensorizedInterpolation{", TB, "}(")
+    show(io, mime, ip.ip)
+    print(io, ")")
+    return
+end
 function Base.show(io::IO, mime::MIME"text/plain", ip::VectorizedInterpolation{vdim}) where {vdim}
     show(io, mime, ip.ip)
     print(io, "^", vdim)
@@ -1601,49 +1656,65 @@ function Base.show(io::IO, mime::MIME"text/plain", ip::VectorizedInterpolation{v
 end
 
 # Helper to get number of copies for DoF distribution
-get_n_copies(::VectorizedInterpolation{vdim}) where {vdim} = vdim
-InterpolationInfo(ip::VectorizedInterpolation) = InterpolationInfo(ip.ip, get_n_copies(ip))
+get_n_copies(ip::TensorizedInterpolation) = n_components(ip)
+InterpolationInfo(ip::TensorizedInterpolation) = InterpolationInfo(ip.ip, get_n_copies(ip))
 
-# Error when trying to get dof indices from vectorized interpolations.
+# Error when trying to get dof indices from vectorized/tensorized interpolations.
 # Currently, this should only be done for the scalar interpolation.
 function _entitydof_indices_vectorized_ip_error(f::Symbol)
-    throw(ArgumentError(string(f, " is not implemented for VectorizedInterpolations and should be called on the scalar base interpolation")))
+    throw(ArgumentError(string(f, " is not implemented for VectorizedInterpolations/TensorizedInterpolations and should be called on the scalar base interpolation")))
 end
-vertexdof_indices(::VectorizedInterpolation) = _entitydof_indices_vectorized_ip_error(:vertexdof_indices)
-edgedof_indices(::VectorizedInterpolation) = _entitydof_indices_vectorized_ip_error(:edgedof_indices)
-facedof_indices(::VectorizedInterpolation) = _entitydof_indices_vectorized_ip_error(:facedof_indices)
-edgedof_interior_indices(::VectorizedInterpolation) = _entitydof_indices_vectorized_ip_error(:edgedof_interior_indices)
-facedof_interior_indices(::VectorizedInterpolation) = _entitydof_indices_vectorized_ip_error(:facedof_interior_indices)
-volumedof_interior_indices(::VectorizedInterpolation) = _entitydof_indices_vectorized_ip_error(:volumedof_interior_indices)
+vertexdof_indices(::TensorizedInterpolation) = _entitydof_indices_vectorized_ip_error(:vertexdof_indices)
+edgedof_indices(::TensorizedInterpolation) = _entitydof_indices_vectorized_ip_error(:edgedof_indices)
+facedof_indices(::TensorizedInterpolation) = _entitydof_indices_vectorized_ip_error(:facedof_indices)
+edgedof_interior_indices(::TensorizedInterpolation) = _entitydof_indices_vectorized_ip_error(:edgedof_interior_indices)
+facedof_interior_indices(::TensorizedInterpolation) = _entitydof_indices_vectorized_ip_error(:facedof_interior_indices)
+volumedof_interior_indices(::TensorizedInterpolation) = _entitydof_indices_vectorized_ip_error(:volumedof_interior_indices)
 
-get_base_interpolation(ip::Interpolation) = ip
-get_base_interpolation(ip::VectorizedInterpolation) = ip.ip
-
-function getnbasefunctions(ipv::VectorizedInterpolation{vdim}) where {vdim}
-    return vdim * getnbasefunctions(ipv.ip)
-end
-function reference_shape_value(ipv::VectorizedInterpolation{vdim, shape}, ξ::Vec{refdim, T}, I::Int) where {vdim, refdim, shape <: AbstractRefShape{refdim}, T}
-    i0, c0 = divrem(I - 1, vdim)
-    i = i0 + 1
-    c = c0 + 1
-    v = reference_shape_value(ipv.ip, ξ, i)
-    return Vec{vdim, T}(j -> j == c ? v : zero(v))
+function getnbasefunctions(ipt::TensorizedInterpolation)
+    return n_components(ipt) * getnbasefunctions(ipt.ip)
 end
 
-reference_coordinates(ip::VectorizedInterpolation) = reference_coordinates(ip.ip)
+# The tensor with `v` in the `c`th independent component (`TB`'s data order) and zeros
+# elsewhere.
+@inline function _tensorized_basis(::Type{TB}, c::Int, v::T) where {TB, T}
+    return TB(ntuple(k -> k == c ? v : zero(v), Val(_ncomponents(TB))))
+end
+
+function reference_shape_value(ipt::TensorizedInterpolation{TB}, ξ::Vec{refdim, T}, I::Int) where {TB, refdim, T}
+    i0, c0 = divrem(I - 1, n_components(ipt))
+    v = reference_shape_value(ipt.ip, ξ, i0 + 1)
+    return _tensorized_basis(TB, c0 + 1, v)
+end
+
+# Tensors.jl's AD does not support `SymmetricTensor`-valued functions of a `Vec`, so use
+# the analytic derivative E ⊗ ∇N(ξ) for second order tensor fields. Vectorized
+# interpolations retain the generic AD path.
+function reference_shape_gradient(ipt::TensorizedInterpolation{TB}, ξ::Vec{refdim, T}, I::Int) where {TB <: SecondOrderTensor, refdim, T}
+    i0, c0 = divrem(I - 1, n_components(ipt))
+    dN = reference_shape_gradient(ipt.ip, ξ, i0 + 1)
+    E = _tensorized_basis(TB, c0 + 1, one(T))
+    return E ⊗ dN
+end
+function reference_shape_gradient_and_value(ipt::TensorizedInterpolation{TB}, ξ::Vec{refdim, T}, I::Int) where {TB <: SecondOrderTensor, refdim, T}
+    i0, c0 = divrem(I - 1, n_components(ipt))
+    dN, N = reference_shape_gradient_and_value(ipt.ip, ξ, i0 + 1)
+    E = _tensorized_basis(TB, c0 + 1, one(T))
+    return E ⊗ dN, E * N
+end
 
 """
     mapping_type(ip::Interpolation)
 
 Get the type of mapping from the reference cell to the real cell for an
-interpolation `ip`. Subtypes of `ScalarInterpolation` and `VectorizedInterpolation`
-return `IdentityMapping()`, but other non-scalar interpolations may request different
-mapping types.
+interpolation `ip`. Scalar interpolations and `TensorizedInterpolation`s (including
+vectorized interpolations, `ip ^ vdim`) return `IdentityMapping()`, but other
+non-scalar interpolations may request different mapping types.
 """
 function mapping_type end
 
 mapping_type(::ScalarInterpolation) = IdentityMapping()
-mapping_type(::VectorizedInterpolation) = IdentityMapping()
+mapping_type(::TensorizedInterpolation) = IdentityMapping()
 
 """
     get_direction(interpolation::Interpolation, shape_nr::Int, cell::AbstractCell)

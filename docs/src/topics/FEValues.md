@@ -40,7 +40,7 @@ Depending on the function interpolation, we may want different types of mappings
 ### Identity mapping
 `Ferrite.IdentityMapping`
 
-For scalar fields, we always use scalar base functions. For tensorial fields (non-scalar, e.g. vector-fields), the base functions can be constructed from scalar base functions, by using e.g. `VectorizedInterpolation`. From the perspective of the mapping, however, each component is mapped as an individual scalar base function. And for scalar base functions, we only require that the value of the base function is invariant to the element shape (real coordinate), and only depends on the reference coordinate, i.e.
+For scalar fields, we always use scalar base functions. For tensorial fields (non-scalar, e.g. vector- or tensor-valued fields), the base functions can be constructed from scalar base functions, by using e.g. `VectorizedInterpolation` (`ip ^ dim`) or [`TensorizedInterpolation`](@ref). From the perspective of the mapping, however, each component is mapped as an individual scalar base function. And for scalar base functions, we only require that the value of the base function is invariant to the element shape (real coordinate), and only depends on the reference coordinate, i.e.
 ```math
 \begin{align*}
     N(\boldsymbol{x}) &= \hat{N}(\boldsymbol{\xi}(\boldsymbol{x}))\nonumber \\

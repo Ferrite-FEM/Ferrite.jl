@@ -140,10 +140,9 @@ function Base.show(io::IO, d::MIME"text/plain", cv::CellValues)
     ip_geo = geometric_interpolation(cv)
     ip_fun = function_interpolation(cv)
     rdim = getrefdim(ip_geo)
-    vdim = isa(shape_value(cv, 1, 1), Vec) ? length(shape_value(cv, 1, 1)) : 0
     GradT = shape_gradient_type(cv)
     sdim = GradT === nothing ? nothing : sdim_from_gradtype(GradT)
-    vstr = vdim == 0 ? "scalar" : "vdim=$vdim"
+    vstr = _field_kind_string(shape_value(cv, 1, 1))
     print(io, "CellValues(", vstr, ", rdim=$rdim, and sdim=$sdim): ")
     print(io, getnquadpoints(cv), " quadrature points")
     print(io, "\n Function interpolation: "); show(io, d, ip_fun)

@@ -8,6 +8,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Next] - xxxx-xx-xx
 
 ### Added
+ - `TensorizedInterpolation{TB}(ip::ScalarInterpolation)` for tensor-valued fields (`TB`
+   being `Vec{vdim}`, `Tensor{2, dim}`, or `SymmetricTensor{2, dim}`), generalizing the
+   vectorization of a scalar interpolation with `ip ^ vdim`: `VectorizedInterpolation{vdim}`
+   is now an alias for `TensorizedInterpolation{Vec{vdim}}` (and the abstract type
+   `Ferrite.VectorInterpolation{vdim}` an alias for `Ferrite.TensorInterpolation{Vec{vdim}}`),
+   with unchanged behavior. Second order tensor-valued fields are supported throughout:
+   `CellValues`/`FacetValues`/`InterfaceValues`/`PointValues` (values, gradients, and
+   divergence), `DofHandler`, `Dirichlet` and `PeriodicDirichlet` conditions (the
+   condition function returns the tensor value, from which prescribed components are
+   extracted, and `Dirichlet` components can be given as Cartesian `(i, j)` tuples, e.g.
+   `[(1, 2)]`, or as a Bool-valued tensor mask, e.g. `SymmetricTensor{2, 2}((i, j) -> i == j)`;
+   for vector fields a `Vec` of `Bool`s is also accepted, in which case the condition
+   function returns the full `Vec`), `apply_analytical!`, `L2Projector`,
+   `evaluate_at_points`, and VTK export (written in Voigt order with component names,
+   consistent with `write_projection`).
  - New quadrature rule type `:polyquad` for `RefTetrahedron` supporting orders 1 to 10, with
    positive weights and points strictly inside the reference tetrahedron (Witherden and
    Vincent, 2015). This is the same family of rules already used for `RefPrism` and

@@ -90,6 +90,20 @@ let g = SUITE["constraints"]
     )
 end
 
+# Dirichlet on a tensor-valued field: update! goes through the tensor-return
+# normalization wrapper set up in add!.
+let g = SUITE["constraints"]
+    grid = generate_grid(Quadrilateral, (50, 50))
+    dh = DofHandler(grid)
+    add!(dh, :s, TensorizedInterpolation{SymmetricTensor{2, 2}}(Lagrange{RefQuadrilateral, 2}()))
+    close!(dh)
+    dirichlet_set = union(getfacetset.((grid,), ("left", "bottom", "right", "top"))...)
+    ch = ConstraintHandler(dh)
+    add!(ch, Dirichlet(:s, dirichlet_set, (x, t) -> SymmetricTensor{2, 2}((t * x[1], x[2], 0.0))))
+    close!(ch)
+    g["update! Dirichlet tensor field (8 timesteps)"] = @benchmarkable FerriteBenchmarkHelpers.update_sweep!($ch, 8) evals = 1
+end
+
 # ProjectedDirichlet: boundary conditions for non-nodal (here H(div)) interpolations,
 # enforced by an L2 projection on each facet. close! includes the projection solves.
 let g = SUITE["constraints"]

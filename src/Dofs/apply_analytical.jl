@@ -14,7 +14,8 @@ Apply a solution `f(x)` by modifying the values in the degree of freedom vector 
 pertaining to the field `fieldname` for all cells in `cellset`.
 The function `f(x)` are given the spatial coordinate
 of the degree of freedom. For scalar fields, `f(x)::Number`,
-and for vector fields with dimension `dim`, `f(x)::Vec{dim}`.
+for vector fields with dimension `dim`, `f(x)::Vec{dim}`, and for tensor-valued fields
+`f(x)` must return the tensor value (e.g. `f(x)::SymmetricTensor{2, dim}`).
 
 This function can be used to apply initial conditions for time dependent problems.
 
@@ -64,9 +65,7 @@ function _apply_analytical!(
     cv = CellValues(qr, ip_geo, ip_geo)
     c_dofs = celldofs(dh, first(cellset))
     f_dofs = zeros(Int, length(celldofinds))
-
-    # Check f before looping
-    length(f(first(coords))) == field_dim || error("length(f(x)) must be equal to dimension of the field ($field_dim)")
+    normalized_f = _normalize_analytical_function(f, ip_fun)
 
     for cellnr in cellset
         getcoordinates!(coords, get_grid(dh), cellnr)
@@ -74,15 +73,26 @@ function _apply_analytical!(
         for (i, celldofind) in enumerate(celldofinds)
             f_dofs[i] = c_dofs[celldofind]
         end
-        _apply_analytical!(a, f_dofs, coords, field_dim, cv, f)
+        _apply_analytical!(a, f_dofs, coords, field_dim, cv, normalized_f)
     end
     return a
+end
+
+_normalize_analytical_function(f::Function, ::Interpolation) = f
+function _normalize_analytical_function(f::F, ::TensorInterpolation{TB}) where {F <: Function, TB <: SecondOrderTensor}
+    return function (x)
+        value = f(x)
+        value isa SecondOrderTensor || error("the function for a tensor-valued field must return the tensor value (convertible to $(TB)), got $(typeof(value))")
+        return (value isa TB ? value : TB(value)).data
+    end
 end
 
 function _apply_analytical!(a::AbstractVector, dofs::Vector{Int}, coords::Vector{<:Vec}, field_dim, cv::CellValues, f)
     for i_dof in 1:getnquadpoints(cv)
         x_dof = spatial_coordinate(cv, i_dof, coords)
-        for (idim, icval) in enumerate(f(x_dof))
+        values = f(x_dof)
+        length(values) == field_dim || error("length(f(x)) must be equal to dimension of the field ($field_dim)")
+        for (idim, icval) in enumerate(values)
             a[dofs[field_dim * (i_dof - 1) + idim]] = icval
         end
     end
