@@ -334,7 +334,7 @@ end
         close!(ch)
 
         C, _ = Ferrite.create_constraint_matrix(ch)
-        K = sparse(reshape(1.0:121.0, 11, 11))
+        K = sparse(reshape(1.0:ndofs(dh)^2, ndofs(dh), ndofs(dh)))
         Kcondensed = C' * K * C
         apply!(K, ch)
         @test K[ch.free_dofs, ch.free_dofs] == Kcondensed
