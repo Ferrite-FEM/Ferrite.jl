@@ -35,6 +35,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
  - The error thrown when assembling into a matrix entry that is missing from the sparsity
    pattern now reports the row that is actually missing, rather than an unrelated row that
    happened to be stored in the same column ([#1414])
+ - Fix bug applying the transpose operation in condensation of `AffineConstraints`. This bug gave
+   silently wrong results when used on non-symmetric system matrices, but did not affect system matrices
+   that were symmetric ([#1426])
+
 
 ## [v1.5.0] - 2026-07-13
 
