@@ -237,7 +237,11 @@ function _fast_fill_cells!(
     # simply keep their diagonal entry)
     nrows = getnrows(sp)
     cell_dofs = create_celldofs(dh)
-    row_to_cells, row_to_localidx = create_row_to_cells(cell_dofs, nrows)
+    # The local-index map only exists to index the expanded coupling masks; skip building it
+    # when no mask is in play (`_visit_row_candidates!` never reads it then).
+    row_to_cells, row_to_localidx = create_row_to_cells(
+        cell_dofs, nrows, couplings !== nothing || interface_couplings !== nothing
+    )
     rowlen = zeros(Int, nrows)
     marker = zeros(Int, getncols(sp))
     cell_to_sdh = dh.cell_to_subdofhandler
@@ -1011,8 +1015,11 @@ function create_cell_to_neighbors(grid::AbstractGrid, topology)
 end
 
 # Inverse of cell_dofs: for each row (dof), the connected cells and, in parallel, the row's
-# local dof index within each such cell (needed to apply coupling masks).
-function create_row_to_cells(cell_dofs::ArrayOfVectorViews, nrows::Int)
+# local dof index within each such cell. The local index differs per incident cell (a dof
+# shared by two cells generally has different local numbers in them) and is only needed to
+# apply the (expanded, locally indexed) coupling masks -- when no masks are in play the
+# second map is skipped (`nothing`).
+function create_row_to_cells(cell_dofs::ArrayOfVectorViews, nrows::Int, build_localidx::Bool)
     num_cells = zeros(Int, nrows)
     # 1: Figure out how many cells are connected to each dof
     n_connected = 0
@@ -1025,7 +1032,7 @@ function create_row_to_cells(cell_dofs::ArrayOfVectorViews, nrows::Int)
 
     # 2: Create the correct datastructure
     cells = Vector{Int}(undef, n_connected)
-    localidx = Vector{Int}(undef, n_connected)
+    localidx = build_localidx ? Vector{Int}(undef, n_connected) : nothing
     indices = Vector{Int}(undef, nrows + 1)
     indices[1] = 1
     @inbounds for row in 1:nrows
@@ -1036,12 +1043,13 @@ function create_row_to_cells(cell_dofs::ArrayOfVectorViews, nrows::Int)
         for (li, row) in enumerate(rows)
             k = indices[row] + num_cells[row]
             cells[k] = cellnr
-            localidx[k] = li
+            localidx === nothing || (localidx[k] = li)
             num_cells[row] += 1
         end
     end
     lin = LinearIndices((nrows,))
-    return ArrayOfVectorViews(indices, cells, lin), ArrayOfVectorViews(indices, localidx, lin)
+    return ArrayOfVectorViews(indices, cells, lin),
+        localidx === nothing ? nothing : ArrayOfVectorViews(indices, localidx, lin)
 end
 
 # Count (data === nothing) or fill (data/indices from the presized buffer) the per-row
@@ -1051,7 +1059,7 @@ end
 # identically; both go through this function to guarantee that.
 function _visit_row_candidates!(
         rowlen::Vector{Int}, data::Union{Nothing, Vector{Int}}, indices::Union{Nothing, Vector{AdaptiveRange}},
-        marker::Vector{Int}, row_to_cells::ArrayOfVectorViews, row_to_localidx::ArrayOfVectorViews,
+        marker::Vector{Int}, row_to_cells::ArrayOfVectorViews, row_to_localidx::Union{Nothing, ArrayOfVectorViews},
         cell_dofs::ArrayOfVectorViews, cell_to_sdh::Vector{Int},
         couplings::Union{Nothing, Vector{Matrix{Bool}}}, isconstrained::Union{Nothing, Vector{Bool}},
         neighbor_cells::Union{Nothing, ArrayOfVectorViews} = nothing,
@@ -1071,7 +1079,9 @@ function _visit_row_candidates!(
         # For keep_constrained = false a constrained row stores only the diagonal
         if !(isconstrained !== nothing && isconstrained[row])
             cells = row_to_cells[row]
-            lidxs = row_to_localidx[row]
+            # `row_to_localidx` is `nothing` exactly when no coupling mask is passed (see the
+            # call site) -- then `li` is never consulted and the placeholder is dead code.
+            lidxs = row_to_localidx === nothing ? nothing : row_to_localidx[row]
             for k in 1:length(cells)
                 cnr = cells[k]
                 dofs = cell_dofs[cnr]
@@ -1087,7 +1097,7 @@ function _visit_row_candidates!(
                 else
                     nothing
                 end
-                li = lidxs[k]
+                li = lidxs === nothing ? 0 : lidxs[k]
                 for j in 1:length(dofs)
                     mask === nothing || mask[li, j] || (imask !== nothing && imask[li, j]) || continue
                     col = dofs[j]
@@ -1117,7 +1127,7 @@ function _visit_row_candidates!(
             if neighbor_cells !== nothing
                 for k in 1:length(cells)
                     cnr = cells[k]
-                    li = lidxs[k]
+                    li = lidxs === nothing ? 0 : lidxs[k]
                     for nbc in neighbor_cells[cnr]
                         nbdofs = cell_dofs[nbc]
                         imask = if interface_couplings !== nothing && cell_to_sdh[nbc] == cell_to_sdh[cnr]
