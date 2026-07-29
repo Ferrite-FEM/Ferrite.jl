@@ -195,8 +195,11 @@ end
 # TODO(radix): a reusable radix-sort scratch may beat QuickSort for Int columns; measure first.
 @noinline function _sort_pattern!(sp::SparsityPattern)
     nrows = getnrows(sp)
-    # At least 1000 rows per task, at most ~100 tasks per thread (load balancing)
-    ntasks = max(min(Threads.nthreads() * 100, nrows ÷ 1000), 1)
+    # One chunk per thread: rows have similar cost so load balancing is not needed (and
+    # `@threads :dynamic` splits the range statically over one task per thread anyway, so
+    # finer chunking would only add overhead). At least 1000 rows per task keeps small
+    # patterns on the serial path.
+    ntasks = max(min(Threads.nthreads(), nrows ÷ 1000), 1)
     if ntasks == 1
         _sort_rows!(sp, 1:nrows)
     else
