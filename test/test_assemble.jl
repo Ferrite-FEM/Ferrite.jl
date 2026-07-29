@@ -212,3 +212,78 @@ end
     @test_throws errr(1, 2) assemble!(a, [2, 1], [1.0 0.0; 3.0 4.0])
     @test_throws errr(1, 2) assemble!(as, [2, 1], [1.0 0.0; 3.0 4.0])
 end
+
+@testset "assemble! with atomic accumulation" begin
+    grid = generate_grid(Quadrilateral, (10, 10))
+    dh = DofHandler(grid)
+    add!(dh, :u, Lagrange{RefQuadrilateral, 2}())
+    close!(dh)
+
+    # Deterministic fake element contributions computed from the dofs
+    element_matrix(dofs, ::Type{T}) where {T} = T[sin(T(i) * T(j) / 100) for i in dofs, j in dofs]
+    element_vector(dofs, ::Type{T}) where {T} = T[cos(T(i)) for i in dofs]
+
+    for T in (Float64, Float32)
+        K = allocate_matrix(SparseMatrixCSC{T, Int}, dh)
+        f = zeros(T, ndofs(dh))
+        Ka = allocate_matrix(SparseMatrixCSC{T, Int}, dh)
+        fa = zeros(T, ndofs(dh))
+        a = start_assemble(K, f)
+        aa = start_assemble(Ka, fa; atomic = true)
+        for cell in CellIterator(dh)
+            dofs = celldofs(cell)
+            assemble!(a, dofs, element_matrix(dofs, T), element_vector(dofs, T))
+            assemble!(aa, dofs, element_matrix(dofs, T), element_vector(dofs, T))
+        end
+        # Sequential atomic assembly gives bitwise identical results
+        @test K == Ka
+        @test f == fa
+    end
+
+    # Concurrent assembly: shared K and f, but one assembler per task and no coloring
+    K = allocate_matrix(dh)
+    f = zeros(ndofs(dh))
+    a = start_assemble(K, f)
+    for cell in CellIterator(dh)
+        dofs = celldofs(cell)
+        assemble!(a, dofs, element_matrix(dofs, Float64), element_vector(dofs, Float64))
+    end
+    Ka = allocate_matrix(dh)
+    fa = zeros(ndofs(dh))
+    _ = start_assemble(Ka, fa) # zero out
+    @sync for chunk in Iterators.partition(1:getncells(grid), cld(getncells(grid), 4))
+        Threads.@spawn begin
+            asm = start_assemble(Ka, fa; fillzero = false, atomic = true)
+            for cellidx in chunk
+                dofs = celldofs(dh, cellidx)
+                assemble!(asm, dofs, element_matrix(dofs, Float64), element_vector(dofs, Float64))
+            end
+        end
+    end
+    # Equal up to the (task dependent) summation order
+    @test Ka.nzval ≈ K.nzval rtol = 1.0e-14
+    @test fa ≈ f rtol = 1.0e-14
+
+    # Symmetric assembler with atomic accumulation
+    Ks = allocate_matrix(Symmetric{Float64, SparseMatrixCSC{Float64, Int}}, dh)
+    Ksa = allocate_matrix(Symmetric{Float64, SparseMatrixCSC{Float64, Int}}, dh)
+    a = start_assemble(Ks)
+    aa = start_assemble(Ksa; atomic = true)
+    for cell in CellIterator(dh)
+        dofs = celldofs(cell)
+        assemble!(a, dofs, element_matrix(dofs, Float64)) # element_matrix is symmetric
+        assemble!(aa, dofs, element_matrix(dofs, Float64))
+    end
+    @test Ks == Ksa
+
+    # Atomic accumulation is only supported for Float32/Float64 matrices
+    @test_throws ArgumentError start_assemble(spzeros(Int, 4, 4); atomic = true)
+    @test_throws ArgumentError start_assemble(Symmetric(spzeros(Int, 4, 4)); atomic = true)
+
+    # Literal `atomic` values propagate to the type parameter (concrete return type)
+    K4 = spzeros(4, 4)
+    CSCA = Ferrite.CSCAssembler{Float64, Int, SparseMatrixCSC{Float64, Int}} # UnionAll over atomic
+    @test (@inferred (K -> start_assemble(K; atomic = true))(K4)) isa CSCA{true}
+    @test (@inferred (K -> start_assemble(K; atomic = false))(K4)) isa CSCA{false}
+    @test (@inferred (K -> start_assemble(K))(K4)) isa CSCA{false}
+end
