@@ -84,10 +84,19 @@ let SP = SPARSITY_PATTERN_SUITE["matrix-from-pattern"]
     end
 end
 
-# The full user facing path: DofHandler (+ ConstraintHandler) to matrix.
+# The full user facing path: DofHandler (+ ConstraintHandler) to matrix. Every matrix type in
+# "matrix-from-pattern" above is repeated here, since the split between building the pattern and
+# allocating the matrix is an internal one: work can move across that boundary without the end
+# to end cost changing, and only these numbers say what a user actually pays.
 SPARSITY_PATTERN_SUITE["matrix-from-dofhandler"] = BenchmarkGroup()
 let SP = SPARSITY_PATTERN_SUITE["matrix-from-dofhandler"]
-    SP["SparseMatrixCSC"] = @benchmarkable allocate_matrix(SparseMatrixCSC{Float64, Int}, $SP_DH) evals = 1 seconds = 1.0
+    for (name, MatrixType) in (
+            "SparseMatrixCSC" => SparseMatrixCSC{Float64, Int},
+            "SparseMatrixCSR" => SparseMatrixCSR{1, Float64, Int},
+            "Symmetric" => Symmetric{Float64, SparseMatrixCSC{Float64, Int}},
+        )
+        SP[name] = @benchmarkable allocate_matrix($MatrixType, $SP_DH) evals = 1 seconds = 1.0
+    end
     SP["SparseMatrixCSC, constraints"] = @benchmarkable allocate_matrix(SparseMatrixCSC{Float64, Int}, $SP_DH, $SP_CH) evals = 1 seconds = 1.0
 end
 
