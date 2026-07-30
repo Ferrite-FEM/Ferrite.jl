@@ -32,6 +32,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
  - New tutorial: Elastodynamics and modal analysis of a cantilever beam (mass matrix, generalized eigenvalue problem, Rayleigh damping, Newmark time integration).
  - Add adaptive mesh refinement tutorials (heat equation and linear elasticity) and a developer
    documentation page describing the `p4est` implementation. (#780)
+ - New tutorial on Darcy flow using H(div)-conforming Raviart-Thomas elements ([#1388])
 
 ### Fixes
  - `FacetIterator` now works with `AbstractVector{FacetIndex}` and `AbstractSet{FacetIndex}` inputs as documented, instead of requiring an `OrderedSet` ([#1384])
@@ -41,6 +42,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
  - The error thrown when assembling into a matrix entry that is missing from the sparsity
    pattern now reports the row that is actually missing, rather than an unrelated row that
    happened to be stored in the same column ([#1414])
+ - Fix bug applying the transpose operation in condensation of `AffineConstraints`. This bug gave
+   silently wrong results when used on non-symmetric system matrices, but did not affect system matrices
+   that were symmetric ([#1426])
+
 
 ## [v1.5.0] - 2026-07-13
 
@@ -1213,6 +1218,7 @@ poking into Ferrite internals:
 [#1226]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1226
 [#1228]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1228
 [#1235]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1235
+[#1388]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1388
 [#1389]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1389
 [#1414]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1414
 [#1416]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1416

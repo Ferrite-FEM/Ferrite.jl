@@ -194,7 +194,21 @@ Ferrite.jl"](https://summerofcode.withgoogle.com/programs/2023/projects/SLGbRNI5
 
 ---
 
-#### [Tutorial 14: Adaptive heat equation](@ref tutorial-heat-adaptivity)
+#### [Tutorial 14: Darcy flow with H(div) elements](@ref tutorial-darcy-flow)
+
+In this tutorial Darcy flow through a domain with an almost impermeable barrier is solved
+using the mixed form of the Poisson problem, with the flux as an explicit unknown
+discretized by H(div)-conforming Raviart-Thomas elements paired with a discontinuous
+pressure. Pressure boundary conditions enter weakly, while the normal flux is prescribed
+with `ProjectedDirichlet`. The local (element-wise) mass conservation of the mixed method
+is verified and compared against the standard primal formulation.
+
+**Keywords**: mixed finite elements, H(div), Raviart-Thomas, weak (natural) boundary
+conditions, `ProjectedDirichlet`, local conservation.
+
+---
+
+#### [Tutorial 15: Adaptive heat equation](@ref tutorial-heat-adaptivity)
 
 In this tutorial the heat equation is solved on a cube with adaptive mesh refinement (AMR).
 A manufactured solution with a sharp spherical feature drives the refinement, using a

@@ -848,7 +848,7 @@ function _condense!(K::SparseMatrixCSC, f::AbstractVector, dofcoefficients::Vect
                         addindex!(K, v * Kval, row, d)
                     end
                 else
-                    for (d1, v1) in col_coeffs, (d2, v2) in row_coeffs
+                    for (d1, v1) in row_coeffs, (d2, v2) in col_coeffs
                         addindex!(K, v1 * v2 * Kval, d1, d2)
                     end
                 end

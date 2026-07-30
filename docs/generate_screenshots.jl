@@ -40,6 +40,7 @@ const EXAMPLES = Dict(
     "computational_homogenization" => "literate-tutorials/computational_homogenization.jl",
     "linear_shell" => "literate-tutorials/linear_shell.jl",
     "heat_adaptivity" => "literate-tutorials/heat_adaptivity.jl",
+    "darcy_flow" => "literate-tutorials/darcy_flow.jl",
     # How-to guides.
     "postprocessing" => "literate-howto/postprocessing.jl",
     "threaded_assembly" => "literate-howto/threaded_assembly.jl",

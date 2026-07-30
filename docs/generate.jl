@@ -135,6 +135,7 @@ write_overview(
         ("linear_shell", "Linear shell", ["linear_shell-light.png", "linear_shell-dark.png"]),
         ("dg_heat_equation", "DG heat equation", ["dg_heat_equation-light.png", "dg_heat_equation-dark.png"]),
         ("heat_adaptivity", "Adaptive heat equation", ["heat_adaptivity-light.webp", "heat_adaptivity-dark.webp"]),
+        ("darcy_flow", "Darcy flow", ["darcy_flow-light.png", "darcy_flow-dark.png"]),
     ],
 )
 

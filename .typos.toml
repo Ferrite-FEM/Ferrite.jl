@@ -1,6 +1,10 @@
 [files]
 extend-exclude = ["*.svg", "*.toml"]
 
+[default.extend-identifiers]
+# Citation key for Boffi, Brezzi, Fortin (2013)
+BofBreFor = "BofBreFor"
+
 [default.extend-words]
 ue = "ue"
 ba = "ba"

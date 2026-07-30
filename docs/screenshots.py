@@ -470,6 +470,40 @@ def scene_heat_adaptivity():
     lut.RescaleTransferFunction(0.0, 1.0)
     finish_anim(view, r, "heat_adaptivity", azimuth=30, elevation=30, zoom=1.1,
                 delay=100)
+
+
+# --- darcy_flow: pressure (left) next to flux magnitude (right), showing the
+# flow forced through the gap in the almost impermeable barrier
+@scene("darcy_flow")
+def scene_darcy_flow():
+    view = new_view()
+    r = OpenDataFile(datadir + "/darcy_flow.vtu")
+    left = surface(r, view, edges=False)
+    colorbar(left, view, ("CELLS", "p"), title="p", pos=[0.02, 0.32], fmt="%.1f")
+    shifted = Transform(Input=r)
+    shifted.Transform.Translate = [1.1, 0.0, 0.0]
+    right = surface(shifted, view, edges=False)
+    colorbar(right, view, ("POINTS", "q"), title="$\\vert q \\vert$",
+             pos=[0.87, 0.32], fmt="%.1f")
+    # arrows on the flux panel showing the flow direction through the gap,
+    # on a regular lattice (resampled) so the arrangement reads calmly
+    lattice = ResampleToImage(Input=shifted)
+    lattice.UseInputBounds = 0
+    lattice.SamplingBounds = [1.135, 2.065, 0.035, 0.965, 0.0, 0.0]
+    lattice.SamplingDimensions = [13, 13, 1]
+    g = Glyph(Input=lattice, GlyphType="Arrow")
+    g.OrientationArray = ["POINTS", "q"]
+    g.ScaleArray = ["POINTS", "q"]
+    g.VectorScaleMode = "Scale by Magnitude"
+    g.ScaleFactor = 0.05
+    g.GlyphMode = "All Points"
+    gd = Show(g, view)
+    ColorBy(gd, ("POINTS", None))
+    gd.AmbientColor = EDGE
+    gd.DiffuseColor = EDGE
+    finish(view, "darcy_flow", twod=True, zoom=1.8, res=[1600, 620])
+
+
 # === how-to guides =========================================================
 
 # --- threaded_assembly: the two grid coloring algorithms side by side

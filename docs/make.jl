@@ -73,6 +73,7 @@ bibtex_plugin = CitationBibliography(
             "tutorials/linear_shell.md",
             "tutorials/dg_heat_equation.md",
             "tutorials/heat_adaptivity.md",
+            "tutorials/darcy_flow.md",
         ],
         "Topic guides" => [
             "Topic guide overview" => "topics/index.md",
