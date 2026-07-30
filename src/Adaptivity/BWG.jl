@@ -963,12 +963,12 @@ function _merge_intertree_nodes!(forest::ForestBWG{dim}, bnd::Vector{Vector{Tupl
                             @debug println("  Rejecting leaf $leaf because its edge $enodes is not on the octant boundary")
                             continue
                         end
-                        neighbor_candidate = transform_edge(forest, k′, e′, leaf, false)
+                        neighbor_candidate = transform_edge(forest, k, e, k′, e′, leaf, false)
                         # Candidate must be the edge opposite to e'
                         e′candidate = p4est_opposite_edge_index(e′)
 
                         enodes_neighbor = edge(neighbor_candidate, e′candidate, tree′.b)
-                        r = compute_edge_orientation(forest, k, e)
+                        r = compute_edge_orientation(forest, k, e, k′, e′)
                         @debug println("  Trying to match $enodes (local) to $enodes_neighbor (neighbor $neighbor_candidate)")
                         for i in 1:ncorners_edge
                             i′ = rotation_permutation(r, i)
@@ -1105,10 +1105,11 @@ end
 end
 
 """
-    balance_corner(forest, k′, c′, o, s)   # and balance_face / balance_edge
+    balance_corner(forest, k′, c′, o, s)   # and balance_face / balance_edge(forest, k, e, k′, e′, o, s)
 
 Restore 2:1 balance across a single tree interface (corner, face or edge respectively). `s` is the
-neighbour octant at pivot octant `o`'s level; transformed into the neighbour tree `k′` (via
+neighbour octant at pivot octant `o`'s level (`balance_edge` additionally takes the pivot tree `k`
+and its edge `e`, needed to orient the along-edge coordinate); transformed into the neighbour tree `k′` (via
 [`transform_corner`](@ref)/[`transform_facet`](@ref)/[`transform_edge`](@ref)) it is `s′`. If the
 neighbour there is more than one level coarser than `o` — neither `s′` nor `parent(s′)` is a leaf
 but `parent(parent(s′))` is — that grandparent leaf is [`refine!`](@ref)d, leaving the neighbour
@@ -1140,9 +1141,9 @@ function balance_face(forest, k′, f′, o, s)
     end
 end
 
-function balance_edge(forest, k′, e′, o, s)
+function balance_edge(forest, k, e, k′, e′, o, s)
     o.l == 1 && return # no balancing needed for pivot octant level == 1
-    s′ = transform_edge(forest, k′, e′, s, true)
+    s′ = transform_edge(forest, k, e, k′, e′, s, true)
     neighbor_tree = forest.cells[k′]
     leaves = neighbor_tree.leaves
     return if !_in_leaves(leaves, s′) && !_in_leaves(leaves, parent(s′, neighbor_tree.b))
@@ -1250,7 +1251,7 @@ function _balance_leaf!(forest::ForestBWG{dim}, k, tree, o, perm_face, perm_face
                         contains_edge(rootedges[edge_idx], edge(o, edge_idx, tree.b)) || continue
                         for edge_connection in forest.topology.edge_edge_neighbor[k, edge_perm[edge_idx]]
                             k′, e′ = edge_connection[1], edge_perm_inv[edge_connection[2]]
-                            balance_edge(forest, k′, e′, o, s)
+                            balance_edge(forest, k, edge_idx, k′, e′, o, s)
                         end
                     end
                 end
@@ -1284,7 +1285,7 @@ function _balance_leaf!(forest::ForestBWG{dim}, k, tree, o, perm_face, perm_face
                 for edge_connection in ec
                     !contains_edge(rootedges[s_i], pivot_edge) && continue
                     k′, e′ = edge_connection[1], edge_perm_inv[edge_connection[2]]
-                    balance_edge(forest, k′, e′, o, s)
+                    balance_edge(forest, k, s_i, k′, e′, o, s)
                 end
             end
         end
@@ -1752,29 +1753,32 @@ function compute_face_orientation(forest::ForestBWG{<:Any, <:OctreeBWG{dim, <:An
 end
 
 """
+    compute_edge_orientation(forest::ForestBWG, k::Integer, e::Integer, k′::Integer, e′::Integer)
     compute_edge_orientation(forest::ForestBWG, k::Integer, e::Integer)
 Slow implementation for the determination of the edge orientation of edge `e` from octree `k` following definition below Table 3 [BWG2011](@citet).
 
+`0` if trees `k` and `k′` traverse the shared macro edge (edge `e` of `k`, edge `e′` of `k′`, both
+in BWG numbering) in the same direction, `1` if in opposite directions. The two-argument form
+orients against `edge_edge_neighbor[k, e][1]`, which is only well defined when exactly two trees
+share the macro edge.
+
 TODO use some table?
 """
-function compute_edge_orientation(forest::ForestBWG{<:Any, <:OctreeBWG{3, <:Any, T2}}, k::T1, e::T1) where {T1, T2}
-    n_perm = node_map₃
-    n_perminv = node_map₃_inv
-    e_perm = edge_perm
-    e_perminv = edge_perm_inv
-
-    e_ferrite = e_perm[e]
-    k′, e′_ferrite = forest.topology.edge_edge_neighbor[k, e_ferrite][1]
-    e′ = e_perminv[e′_ferrite]
+function compute_edge_orientation(forest::ForestBWG{<:Any, <:OctreeBWG{3, <:Any, T2}}, k::T1, e::T1, k′::T1, e′::T1) where {T1, T2}
     refedgenodes = reference_edges_bwg(Ferrite.RefHypercube{3})
-    nodes_e = ntuple(i -> forest.cells[k].nodes[n_perm[refedgenodes[e][i]]], length(refedgenodes[e]))
-    nodes_e′ = ntuple(i -> forest.cells[k′].nodes[n_perm[refedgenodes[e′][i]]], length(refedgenodes[e′]))
+    nodes_e = ntuple(i -> forest.cells[k].nodes[node_map₃[refedgenodes[e][i]]], length(refedgenodes[e]))
+    nodes_e′ = ntuple(i -> forest.cells[k′].nodes[node_map₃[refedgenodes[e′][i]]], length(refedgenodes[e′]))
     if nodes_e == nodes_e′
         s = T2(0)
     else
         s = T2(1)
     end
     return s
+end
+
+function compute_edge_orientation(forest::ForestBWG{<:Any, <:OctreeBWG{3, <:Any, T2}}, k::T1, e::T1) where {T1, T2}
+    k′, e′_ferrite = forest.topology.edge_edge_neighbor[k, edge_perm[e]][1]
+    return compute_edge_orientation(forest, k, e, T1(k′), T1(edge_perm_inv[e′_ferrite]))
 end
 
 """
@@ -2037,43 +2041,50 @@ end
 transform_edge_remote(forest::ForestBWG, e::EdgeIndex, oct::OctantBWG, inside) = transform_edge_remote(forest, e[1], e[2], oct, inside)
 
 """
-    transform_edge(forest, k, e, oct, inside::Bool)
-    transform_edge(forest, e::Edgeindex, oct, inside::Bool)
+    transform_edge(forest, k, e, k′, e′, oct, inside::Bool)
+    transform_edge(forest, k′, e′, oct, inside::Bool)
+    transform_edge(forest, e′::EdgeIndex, oct, inside::Bool)
 
 Algorithm 10 in [BWG2011](@citet) to transform cedge into different octree coordinate system but reversed logic.
 See `transform_edge_remote` with logic from paper.
-In this function we stick to the coordinate system of the pivot tree k and transform an octant through edge e into this k-th octree coordinate system.
+Transform the octant `oct`, which sits at edge `e` of pivot tree `k` (in `k`'s coordinates),
+into the coordinate system of the neighbouring tree `k′` at its edge `e′`. The along-edge
+coordinate is taken from the pivot's edge axis and mirrored iff trees `k` and `k′` traverse the
+shared macro edge in opposite directions.
+
+Both the pivot pair `(k, e)` and the target pair `(k′, e′)` must be passed explicitly: a macro
+edge can be shared by more than two trees, so neither the pivot nor the relative orientation can
+be re-derived from `edge_edge_neighbor[..][1]` lookups (those pick an arbitrary incident tree).
+The two shorter forms assume exactly two trees at the macro edge and take
+`edge_edge_neighbor[k′, e′][1]` as the pivot.
 """
-function transform_edge(forest::ForestBWG, k::T1, e::T1, oct::OctantBWG{3, N, T2}, inside::Bool) where {N, T1 <: Integer, T2 <: Integer}
+function transform_edge(forest::ForestBWG, k::T1, e::T1, k′::T1, e′::T1, oct::OctantBWG{3, N, T2}, inside::Bool) where {N, T1 <: Integer, T2 <: Integer}
     _four = T2(4)
     _one = T2(1)
     _two = T2(2)
     z = zero(T2)
-    e_perm = edge_perm
-    e_perminv = edge_perm_inv
-
-    # `e` is already the edge of tree `k` at the shared macro edge (resolved by the caller from
-    # the edge connection), so it must not be re-derived through `edge_edge_neighbor[..][1]`
-    # round trips — those pick an arbitrary incident tree and return the wrong edge as soon as
-    # more than two trees meet at the macro edge.
-    e′ = e
-    #see Algorithm 9, line 18
+    #see Algorithm 9, line 18: axes of the target edge e′ in tree k′
     𝐛 = (
         ((e′ - _one) ÷ _four),
         e′ - _one < 4 ? 1 : 0,
         e′ - _one < 8 ? 2 : 1,
     )
-    a₀ = ((e - _one) ÷ _four) #subtract 1 based index
-    a₀ += _one #add it again
-    b = forest.cells[k].b
+    a₀ = ((e - _one) ÷ _four) #subtract 1 based index; `oct` is in pivot coordinates, so the
+    a₀ += _one #add it again    along-edge axis is the pivot edge's axis
+    b = forest.cells[k′].b
     l = oct.l; g = _two^b - _two^(b - l)
     h⁻ = inside ? z : -_two^(b - l); h⁺ = inside ? g : _two^b
-    s = compute_edge_orientation(forest, k, e)
+    s = compute_edge_orientation(forest, k, e, k′, e′)
     v1 = T2(s * g + (_one - (_two * s)) * oct.xyz[a₀])
     v2 = ((e′ - _one) & 1) == 0 ? h⁻ : h⁺
     v3 = ((e′ - _one) & 2) == 0 ? h⁻ : h⁺
     xyz = ntuple(p -> (p == 𝐛[1] + _one ? v1 : (p == 𝐛[2] + _one ? v2 : v3)), Val(3))
     return OctantBWG(l, xyz)
+end
+
+function transform_edge(forest::ForestBWG, k′::T1, e′::T1, oct::OctantBWG{3, <:Any, <:Integer}, inside::Bool) where {T1 <: Integer}
+    k, e_ferrite = forest.topology.edge_edge_neighbor[k′, edge_perm[e′]][1]
+    return transform_edge(forest, T1(k), T1(edge_perm_inv[e_ferrite]), k′, e′, oct, inside)
 end
 
 transform_edge(forest::ForestBWG, e::EdgeIndex, oct::OctantBWG, inside) = transform_edge(forest, e[1], e[2], oct, inside)

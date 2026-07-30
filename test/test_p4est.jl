@@ -983,6 +983,54 @@ end
     end
 end
 
+@testset "edge balance at a multi-tree edge with mixed orientations" begin
+    # Five hexes sharing the central vertical edge (0,0,0)-(0,0,1) — the 5-quad fan extruded in
+    # z — with trees 3 and 5 listed "upside down" (reversed node tuple = 180° rotation, still
+    # positively oriented), so the trees traverse the shared macro edge in opposite directions.
+    # `transform_edge` must then take the along-edge flip from the actual (pivot, neighbor) pair:
+    # orienting against `edge_edge_neighbor[..][1]` pairs with an arbitrary incident tree and
+    # mirrors the balance refinement to the far end of the edge.
+    nq = 5
+    base = [Vec((0.0, 0.0))]
+    for i in 0:(nq - 1)
+        θ1 = 2π * i / nq
+        θm = 2π * (i + 0.5) / nq
+        push!(base, Vec((cos(θ1), sin(θ1))))
+        push!(base, Vec(1.3 .* (cos(θm), sin(θm))))
+    end
+    nodes3 = Node{3, Float64}[]
+    for z in (0.0, 1.0), p in base
+        push!(nodes3, Node(Vec((p[1], p[2], z))))
+    end
+    nb = length(base)
+    cells3 = map(0:(nq - 1)) do i
+        q = (1, 2 + 2i, 3 + 2i, i == nq - 1 ? 2 : 4 + 2i)
+        t = (q..., (q .+ nb)...)
+        return (i + 1) in (3, 5) ? Hexahedron(reverse(t)) : Hexahedron(t)
+    end
+    forest = ForestBWG(Grid(cells3, nodes3), 6)
+    # refine all trees toward the bottom end of the central edge, balancing in between
+    target = Vec((0.0, 0.0, 0.0))
+    for _ in 1:3
+        g = Ferrite.AMR.creategrid(forest)
+        marked = [c for c in 1:getncells(g) if any(n -> norm(n - target) < 1.0e-12, getcoordinates(g, c))]
+        Ferrite.AMR.refine!(forest, marked)
+        Ferrite.AMR.balanceforest!(forest)
+    end
+    g = Ferrite.AMR.creategrid(forest)
+    minsz_at_target = Inf
+    for c in 1:getncells(g)
+        coords = getcoordinates(g, c)
+        sz = maximum(maximum(x -> x[d], coords) - minimum(x -> x[d], coords) for d in 1:3)
+        ctr = sum(coords) / length(coords)
+        # fine cells may only exist in the graded halo around the refined bottom vertex — a
+        # mirrored edge balance plants them near the top end of the central edge instead
+        sz < 0.3 && @test norm(ctr - target) <= 0.75
+        any(n -> norm(n - target) < 1.0e-12, coords) && (minsz_at_target = min(minsz_at_target, sz))
+    end
+    @test minsz_at_target < 0.2 # the target refinement itself happened
+end
+
 @testset "Materializing Grid" begin
     #################################################
     ############ structured 2D examples #############
