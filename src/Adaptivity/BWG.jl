@@ -1,6 +1,3 @@
-abstract type AbstractAdaptiveGrid{dim} <: Ferrite.AbstractGrid{dim} end
-abstract type AbstractAdaptiveCell{refshape <: Ferrite.AbstractRefShape} <: Ferrite.AbstractCell{refshape} end
-
 const ncorners_face3D = 4
 const ncorners_face2D = 2
 const ncorners_edge = ncorners_face2D
@@ -190,7 +187,7 @@ Further, each edge consists of two three-dimensional integer coordinates.
 """
 edges(octant::OctantBWG{3}, b::Integer) = ntuple(i -> edge(octant, i, b), Val(12))
 
-struct OctreeBWG{dim, N, T <: Integer} <: AbstractAdaptiveCell{Ferrite.RefHypercube{dim}}
+struct OctreeBWG{dim, N, T <: Integer} <: Ferrite.AbstractCell{Ferrite.RefHypercube{dim}}
     leaves::Vector{OctantBWG{dim, N, T}}
     #maximum refinement level
     b::T
@@ -351,7 +348,7 @@ end
 _isleaf(leaves, lo::Integer, hi::Integer, oct::OctantBWG) = lo == hi && leaves[lo] == oct
 
 """
-    ForestBWG{dim, C <: AbstractAdaptiveCell, T <: Real} <: AbstractAdaptiveGrid{dim}
+    ForestBWG{dim, C <: OctreeBWG, T <: Real} <: Ferrite.AbstractGrid{dim}
 `p4est` adaptive grid implementation based on [BWG2011](@citet)
 and [IBWG2015](@citet).
 
@@ -360,7 +357,7 @@ and [IBWG2015](@citet).
 Builds an adaptive grid based on a non-adaptive one `grid` and a given max refinement level `b`,
 i.e. no leaf may be refined beyond level `b`. Defaults to `30` in 2D and `19` in 3D.
 """
-struct ForestBWG{dim, C <: OctreeBWG, T <: Real} <: AbstractAdaptiveGrid{dim}
+struct ForestBWG{dim, C <: OctreeBWG, T <: Real} <: Ferrite.AbstractGrid{dim}
     cells::Vector{C}
     nodes::Vector{Node{dim, T}}
     # Sets

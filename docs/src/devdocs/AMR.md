@@ -45,7 +45,7 @@ The size of an octant at the lowest possible level `b` is always 1, sometimes th
 
 The octree is implemented as:
 ```julia
-struct OctreeBWG{dim, N, T <: Integer} <: AbstractAdaptiveCell{RefHypercube{dim}}
+struct OctreeBWG{dim, N, T <: Integer} <: AbstractCell{RefHypercube{dim}}
     leaves::Vector{OctantBWG{dim, N, T}}
     #maximum refinement level
     b::T
