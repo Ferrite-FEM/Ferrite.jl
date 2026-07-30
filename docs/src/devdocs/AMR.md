@@ -152,7 +152,7 @@ julia> o = Ferrite.AMR.OctantBWG(2,1,8,3)
 ERROR: AssertionError: m ≤ (one(T1) + one(T1)) ^ (dim * l)
 Stacktrace:
  [1] OctantBWG(dim::Int64, l::Int64, m::Int64, b::Int64)
-   @ Ferrite.AMR ~/repos/Ferrite.jl/src/Adaptivity/BWG.jl:28
+   @ Ferrite.AMR ~/repos/Ferrite.jl/src/Adaptivity/octree.jl:32
  [2] top-level scope
    @ REPL[1]:1
 ```

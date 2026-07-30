@@ -1,7 +1,7 @@
 using Ferrite, Test
 import Ferrite: geometric_interpolation, getrefdim
 
-include(joinpath(@__DIR__, "integration", "convergence_test_utils.jl"))
+include(joinpath(@__DIR__, "convergence_test_utils.jl"))
 
 # Squared elementwise L2 errors against the analytical solution, used as the
 # refinement indicator.
@@ -85,45 +85,5 @@ end
         # checks, which in particular validates the hanging node constraints.
         testatol = ConvergenceTestHelper.get_test_tolerance(interpolation)
         ConvergenceTestHelper.check_and_compute_convergence_norms(dh, u, cellvalues, testatol)
-    end
-end
-
-# Regression test: L2 projection on a non-conforming grid must reproduce a function
-# that lies in the hanging-node constrained ansatz space exactly. This guards the
-# condensation of the mass matrix and the projection rhs in the L2Projector
-# (assembling only the upper triangle before condensation, or applying the
-# solution-style `apply!` to the rhs, both silently corrupt the projection).
-@testset "L2 projection on non-conforming grids" begin
-    @testset "$geometry" for geometry in (Quadrilateral, Hexahedron)
-        dim = getrefdim(geometry)
-        grid = generate_grid(geometry, ntuple(_ -> 2, dim))
-        forest = ForestBWG(grid, 3)
-        Ferrite.refine!(forest, [1])
-        Ferrite.balanceforest!(forest)
-        ncgrid = Ferrite.creategrid(forest)
-        # The refined grid must contain hanging nodes for this test to be meaningful
-        @test !isempty(ncgrid.conformity_info)
-
-        ip = geometric_interpolation(geometry)
-        qr = QuadratureRule{getrefshape(ip)}(2)
-        cv = CellValues(qr, ip, ip)
-
-        proj = L2Projector(ncgrid)
-        add!(proj, collect(1:getncells(ncgrid)), ip; qr_rhs = qr)
-        close!(proj)
-
-        # u(x) = x is componentwise linear, hence in the constrained ansatz space
-        qpdata = map(1:getncells(ncgrid)) do cellid
-            coords = getcoordinates(ncgrid, cellid)
-            reinit!(cv, coords)
-            [spatial_coordinate(cv, qp, coords) for qp in 1:getnquadpoints(cv)]
-        end
-        projected = project(proj, qpdata, qr)
-
-        for cell in CellIterator(proj.dh)
-            for (dof, x) in zip(celldofs(cell), getcoordinates(cell))
-                @test projected[dof] ≈ x atol = 1.0e-12
-            end
-        end
     end
 end

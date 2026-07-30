@@ -410,3 +410,74 @@ include(joinpath(@__DIR__, "test_utils.jl"))
         )
     end
 end # of testset
+
+
+# --- InterfaceValues on the facet skeleton of a non-conforming (AMR) grid ---
+@testset "InterfaceValues on facet skeleton" begin
+    # Every skeleton pair — conforming, hanging, across trees, rotated macro elements —
+    # must reinit! an InterfaceValues via AffineInterfaceTransformation such that the two
+    # sides' quadrature points coincide physically, and a globally linear field (whose
+    # nodal values automatically satisfy the hanging midpoint constraints) is continuous
+    # with continuous gradient across the interface.
+    function check_interfacevalues(forest, refshape)
+        dim = refshape === RefQuadrilateral ? 2 : 3
+        grid = Ferrite.AMR.creategrid(forest)
+        skel = Ferrite.facetskeleton(forest)
+        cells = Ferrite.getcells(grid)
+        iv = InterfaceValues(FacetQuadratureRule{refshape}(2), Lagrange{refshape, 1}())
+        u_lin(x) = 1.0 + 2.0 * x[1] - 3.0 * x[dim] + (dim == 3 ? 0.5 * x[2] : 0.0)
+        ∇u_lin = Tensors.gradient(u_lin, zero(Vec{dim}))
+        for (fiA, fiB) in skel
+            cA, fA = fiA[1], fiA[2]
+            cB, fB = fiB[1], fiB[2]
+            coordsA = getcoordinates(grid, cA)
+            coordsB = getcoordinates(grid, cB)
+            trans = Ferrite.AffineInterfaceTransformation(cells[cA], coordsA, fA, cells[cB], coordsB, fB)
+            reinit!(iv, cells[cA], coordsA, fA, cells[cB], coordsB, fB, trans)
+            ue = [u_lin.(coordsA); u_lin.(coordsB)]
+            for qp in 1:getnquadpoints(iv)
+                xh = spatial_coordinate(iv, qp, coordsA, coordsB; here = true)
+                xt = spatial_coordinate(iv, qp, coordsA, coordsB; here = false)
+                @test xh ≈ xt
+                @test function_value(iv, qp, ue; here = true) ≈ u_lin(xh)
+                @test function_value(iv, qp, ue; here = false) ≈ u_lin(xh)
+                @test function_gradient(iv, qp, ue; here = true) ≈ ∇u_lin
+                @test function_gradient(iv, qp, ue; here = false) ≈ ∇u_lin
+                # opposing outward normals (straight facets for these grids)
+                @test getnormal(iv, qp; here = true) ≈ -getnormal(iv, qp; here = false)
+            end
+        end
+        return
+    end
+
+    # 2D multi-level, intra- + inter-tree, conforming + hanging
+    forest = ForestBWG(generate_grid(Quadrilateral, (2, 2)), 5)
+    Ferrite.refine!(forest, [1])
+    Ferrite.balanceforest!(forest)
+    Ferrite.refine!(forest, [1, 2, 7])
+    Ferrite.balanceforest!(forest)
+    check_interfacevalues(forest, RefQuadrilateral)
+
+    # 2D rotated macro element
+    grid = generate_grid(Quadrilateral, (2, 2))
+    grid.cells[2] = Quadrilateral((grid.cells[2].nodes[2], grid.cells[2].nodes[3], grid.cells[2].nodes[4], grid.cells[2].nodes[1]))
+    forest = ForestBWG(grid, 3)
+    Ferrite.AMR.refine_octant!(forest.cells[2], forest.cells[2].leaves[1])
+    check_interfacevalues(forest, RefQuadrilateral)
+
+    # 3D multi-level, intra- + inter-tree
+    forest = ForestBWG(generate_grid(Hexahedron, (2, 2, 2)), 4)
+    Ferrite.refine!(forest, [1])
+    Ferrite.balanceforest!(forest)
+    Ferrite.refine!(forest, [1])
+    Ferrite.balanceforest!(forest)
+    check_interfacevalues(forest, RefHexahedron)
+
+    # 3D rotated macro element (cf. "hanging nodes" testset)
+    grid = generate_grid(Hexahedron, (2, 2, 2))
+    grid.cells[1] = Hexahedron((grid.cells[1].nodes[2], grid.cells[1].nodes[3], grid.cells[1].nodes[4], grid.cells[1].nodes[1], grid.cells[1].nodes[6], grid.cells[1].nodes[7], grid.cells[1].nodes[8], grid.cells[1].nodes[5]))
+    grid.cells[1] = Hexahedron((grid.cells[1].nodes[2], grid.cells[1].nodes[3], grid.cells[1].nodes[4], grid.cells[1].nodes[1], grid.cells[1].nodes[6], grid.cells[1].nodes[7], grid.cells[1].nodes[8], grid.cells[1].nodes[5]))
+    forest = ForestBWG(grid, 3)
+    Ferrite.AMR.refine_octant!(forest.cells[1], forest.cells[1].leaves[1])
+    check_interfacevalues(forest, RefHexahedron)
+end

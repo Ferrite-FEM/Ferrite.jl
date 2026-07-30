@@ -4,7 +4,10 @@ using .. Ferrite
 import Ferrite: @debug
 using OrderedCollections: OrderedSet
 
-include("BWG.jl")
+# `octree.jl` defines the octant/octree types the rest builds signatures on, so it has to
+# come first; the remaining files only call into what precedes them.
+include("octree.jl")
+include("forest.jl")
 include("ncgrid.jl")
 include("constraints.jl")
 
