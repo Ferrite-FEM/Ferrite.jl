@@ -121,57 +121,45 @@ function Ferrite.allocate_matrix(::Type{SparseMatrixCSR{1, Tv, Ti}}, sp::Abstrac
     return _allocate_matrix(SparseMatrixCSR{1, Tv, Ti}, sp, false)
 end
 
+# Row length and row copy for the pattern rows handed out by `eachrow`: the expected thing
+# for `AbstractVector` rows (`SparsityPattern`, and what implementations preferably return),
+# with an iteration fallback for plain iterables (e.g. `BlockSparsityPattern`'s lazy rows).
+_length(colidxs::AbstractVector) = length(colidxs)
+_length(colidxs) = count(Returns(true), colidxs)
+function _copyto!(dest::Vector, k::Int, colidxs::AbstractVector)
+    copyto!(dest, k, colidxs, 1, length(colidxs))
+    return k + length(colidxs)
+end
+function _copyto!(dest::Vector, k::Int, colidxs)
+    for col in colidxs
+        dest[k] = col
+        k += 1
+    end
+    return k
+end
+
+# The pattern rows are exactly CSR's rows: `eachrow` hands out the sorted column indices
+# (for `SparsityPattern` this sorts the rows lazily, a no-op if already sorted), so `rowptr`
+# follows from the row lengths and each row is copied straight into `colval`.
 function _allocate_matrix(::Type{SparseMatrixCSR{1, Tv, Ti}}, sp::AbstractSparsityPattern, sym::Bool) where {Tv, Ti}
+    sym && throw(ArgumentError("Symmetric SparseMatrixCSR is not supported"))
+    nrows = Ferrite.getnrows(sp)
     # 1. Setup rowptr
-    rowptr = zeros(Ti, Ferrite.getnrows(sp) + 1)
+    rowptr = Vector{Ti}(undef, nrows + 1)
     rowptr[1] = 1
     for (row, colidxs) in enumerate(Ferrite.eachrow(sp))
-        for col in colidxs
-            sym && row > col && continue
-            rowptr[row + 1] += 1
-        end
+        rowptr[row + 1] = rowptr[row] + _length(colidxs)
     end
-    cumsum!(rowptr, rowptr)
     nnz = rowptr[end] - 1
     # 2. Allocate colval and nzval now that nnz is known
     colval = Vector{Ti}(undef, nnz)
     nzval = zeros(Tv, nnz)
-    # 3. Populate colval.
+    # 3. Populate colval row by row
     k = 1
-    for (row, colidxs) in zip(1:Ferrite.getnrows(sp), Ferrite.eachrow(sp)) # pairs(eachrow(sp))
-        for col in colidxs
-            sym && row > col && continue
-            colval[k] = col
-            k += 1
-        end
+    for colidxs in Ferrite.eachrow(sp)
+        k = _copyto!(colval, k, colidxs)
     end
-    S = SparseMatrixCSR{1}(Ferrite.getnrows(sp), Ferrite.getncols(sp), rowptr, colval, nzval)
-    return S
-end
-
-# Specialized for SparsityPattern: the pattern is row-based like CSR, so after sorting the rows
-# (lazy, no-op if already sorted) the raw row slices can be copied straight into colval, skipping
-# the view-based double iteration of the generic method above.
-function _allocate_matrix(::Type{SparseMatrixCSR{1, Tv, Ti}}, sp::Ferrite.SparsityPattern, sym::Bool) where {Tv, Ti}
-    sym && throw(ArgumentError("Symmetric SparseMatrixCSR is not supported"))
-    Ferrite._ensure_sorted!(sp) # CSR requires sorted colval within each row
-    b = sp.buffer
-    nrows = getnrows(sp)
-    rowptr = Vector{Ti}(undef, nrows + 1)
-    rowptr[1] = 1
-    @inbounds for row in 1:nrows
-        rowptr[row + 1] = rowptr[row] + b.indices[row].ncurrent
-    end
-    nnz = rowptr[end] - 1
-    colval = Vector{Ti}(undef, nnz)
-    k = 1
-    @inbounds for row in 1:nrows
-        r = b.indices[row]
-        copyto!(colval, k, b.data, r.start, r.ncurrent)
-        k += r.ncurrent
-    end
-    nzval = zeros(Tv, nnz)
-    return SparseMatrixCSR{1}(nrows, getncols(sp), rowptr, colval, nzval)
+    return SparseMatrixCSR{1}(nrows, Ferrite.getncols(sp), rowptr, colval, nzval)
 end
 
 end

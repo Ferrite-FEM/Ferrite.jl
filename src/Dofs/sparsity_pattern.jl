@@ -39,14 +39,18 @@ function eachrow end
     eachrow(sp::AbstractSparsityPattern)
 
 Return an iterator over the rows of the sparsity pattern `sp`.
-Each element of the iterator iterates indices of the stored *columns* for that row.
+Each element of the iterator iterates the indices of the stored *columns* for that row, in
+sorted order. Implementations should preferably return the rows as `AbstractVector`s, which
+enables faster code paths (e.g. for matrix instantiation).
 """
 eachrow(sp::AbstractSparsityPattern)
 
 """
     eachrow(sp::AbstractSparsityPattern, row::Int)
 
-Return an iterator over *column* indices in row `row` of the sparsity pattern.
+Return an iterator over the stored *column* indices in row `row` of the sparsity pattern,
+in sorted order. Implementations should preferably return the row as an `AbstractVector`,
+which enables faster code paths (e.g. for matrix instantiation).
 
 Conceptually this is equivalent to [`eachrow(sp)[row]`](@ref
 eachrow(::AbstractSparsityPattern)). However, the iterator `eachrow(sp)` isn't always

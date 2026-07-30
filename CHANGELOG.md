@@ -109,6 +109,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
    been removed. ([#1397])
  - New function `CollectionsOfViews.insert_sorted_at_index!`: like `push_at_index!` but keeps
    each view sorted and free of duplicates, with geometric reservation growth. ([#1397])
+ - The documented contract of `Ferrite.eachrow(sp[, row])` for `AbstractSparsityPattern` now
+   states that column indices are iterated in sorted order, and that rows should preferably
+   be `AbstractVector`s. The `SparseMatrixCSR` instantiation is now a single generic method
+   for all patterns, with fast length/copy for vector rows and an iteration fallback.
+   ([#1397])
 
 ### Documentation
  - Code blocks in the documentation now have line numbers, and individual lines can be

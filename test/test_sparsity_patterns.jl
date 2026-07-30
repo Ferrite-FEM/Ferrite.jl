@@ -246,6 +246,14 @@ end
         add_sparsity_entries!(p, dh)
     end
     compare_patterns(ps...)
+    # The generic SparseMatrixCSR instantiation works for any pattern whose eachrow iterates
+    # sorted column indices; equal patterns give identical storage. This covers both helper
+    # branches: AbstractVector rows (TestPattern, SparsityPattern) and the iteration
+    # fallback (BlockSparsityPattern's lazy rows).
+    let csrs = [allocate_matrix(SparseMatrixCSR{1, Float64, Int}, p) for p in ps]
+        @test all(K -> K.rowptr == csrs[1].rowptr, csrs)
+        @test all(K -> K.colval == csrs[1].colval, csrs)
+    end
 
     # DofHandler + ConstraintHandler
     ps = make_patterns(dh)
