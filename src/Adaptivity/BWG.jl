@@ -1957,18 +1957,18 @@ transform_facet(forest::ForestBWG, f::FacetIndex, oct::OctantBWG) = transform_fa
 
 Algorithm 12 but with flipped logic in [BWG2011](@citet) to transform corner into different octree coordinate system
 Implements flipped logic in the sense of pushing the Octant `oct` through vertex v and stays within octree coordinate system `k`.
+
+`c` is the corner of tree `k` (in BWG corner numbering) at the shared vertex; `oct` is placed at
+that corner of `k`, inside the root (`inside = true`) or diagonally outside of it (`inside = false`).
+A corner octant is fully determined by the corner index and the level, so no connectivity lookup is
+needed — in particular the corner must not be re-derived from `vertex_vertex_neighbor[k, ...][1]`,
+which is ambiguous (and wrong) as soon as more than two trees meet at the vertex.
 """
 function transform_corner(forest::ForestBWG, k::T1, c::T1, oct::OctantBWG{dim, N, T2}, inside::Bool) where {dim, N, T1 <: Integer, T2 <: Integer}
-    _perm = dim == 2 ? node_map₂ : node_map₃
-    _perminv = dim == 2 ? node_map₂_inv : node_map₃_inv
-    k′, c′′ = forest.topology.vertex_vertex_neighbor[k, _perm[c]][1]
-    k′, c′′ = forest.topology.vertex_vertex_neighbor[k′, c′′][1] #get the corner connection of neighbor to pivot oct
-    c′ = _perminv[c′′] # assign c′ once so the ntuple closure below doesn't box it
-    # make a dispatch that returns only the coordinates?
     b = forest.cells[k].b
     l = oct.l; g = 2^b - 2^(b - l)
     h⁻ = inside ? 0 : -2^(b - l); h⁺ = inside ? g : 2^b
-    xyz = ntuple(i -> ((c′ - 1) & 2^(i - 1) == 0) ? h⁻ : h⁺, dim)
+    xyz = ntuple(i -> ((c - 1) & 2^(i - 1) == 0) ? h⁻ : h⁺, dim)
     return OctantBWG(l, xyz)
 end
 
@@ -2052,10 +2052,11 @@ function transform_edge(forest::ForestBWG, k::T1, e::T1, oct::OctantBWG{3, N, T2
     e_perm = edge_perm
     e_perminv = edge_perm_inv
 
-    e_ferrite = e_perm[e]
-    k′, e′_ferrite = forest.topology.edge_edge_neighbor[k, e_ferrite][1]
-    k′, e′_ferrite = forest.topology.edge_edge_neighbor[k′, e′_ferrite][1] #get pivot connection from neighbor perspective
-    e′ = e_perminv[e′_ferrite]
+    # `e` is already the edge of tree `k` at the shared macro edge (resolved by the caller from
+    # the edge connection), so it must not be re-derived through `edge_edge_neighbor[..][1]`
+    # round trips — those pick an arbitrary incident tree and return the wrong edge as soon as
+    # more than two trees meet at the macro edge.
+    e′ = e
     #see Algorithm 9, line 18
     𝐛 = (
         ((e′ - _one) ÷ _four),
@@ -2067,7 +2068,7 @@ function transform_edge(forest::ForestBWG, k::T1, e::T1, oct::OctantBWG{3, N, T2
     b = forest.cells[k].b
     l = oct.l; g = _two^b - _two^(b - l)
     h⁻ = inside ? z : -_two^(b - l); h⁺ = inside ? g : _two^b
-    s = compute_edge_orientation(forest, k′, e′)
+    s = compute_edge_orientation(forest, k, e)
     v1 = T2(s * g + (_one - (_two * s)) * oct.xyz[a₀])
     v2 = ((e′ - _one) & 1) == 0 ? h⁻ : h⁺
     v3 = ((e′ - _one) & 2) == 0 ? h⁻ : h⁺

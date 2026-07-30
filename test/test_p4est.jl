@@ -408,13 +408,13 @@ end
     @test_throws BoundsError Ferrite.AMR.transform_facet_remote(adaptive_grid, FacetIndex(8, 6), o)
 
     #corners
-    @test_throws BoundsError Ferrite.AMR.transform_corner(adaptive_grid, VertexIndex(1, 1), o, false) == Ferrite.AMR.OctantBWG(0, (-8, -8, -8))
-    @test_throws BoundsError Ferrite.AMR.transform_corner(adaptive_grid, VertexIndex(1, 2), o, false) == Ferrite.AMR.OctantBWG(0, (8, -8, -8))
-    @test_throws BoundsError Ferrite.AMR.transform_corner(adaptive_grid, VertexIndex(1, 3), o, false) == Ferrite.AMR.OctantBWG(0, (-8, 8, -8))
-    @test_throws BoundsError Ferrite.AMR.transform_corner(adaptive_grid, VertexIndex(1, 4), o, false) == Ferrite.AMR.OctantBWG(0, (8, 8, -8))
-    @test_throws BoundsError Ferrite.AMR.transform_corner(adaptive_grid, VertexIndex(1, 5), o, false) == Ferrite.AMR.OctantBWG(0, (-8, -8, 8))
-    @test_throws BoundsError Ferrite.AMR.transform_corner(adaptive_grid, VertexIndex(1, 6), o, false) == Ferrite.AMR.OctantBWG(0, (8, -8, 8))
-    @test_throws BoundsError Ferrite.AMR.transform_corner(adaptive_grid, VertexIndex(1, 7), o, false) == Ferrite.AMR.OctantBWG(0, (-8, 8, 8))
+    @test Ferrite.AMR.transform_corner(adaptive_grid, VertexIndex(1, 1), o, false) == Ferrite.AMR.OctantBWG(0, (-8, -8, -8))
+    @test Ferrite.AMR.transform_corner(adaptive_grid, VertexIndex(1, 2), o, false) == Ferrite.AMR.OctantBWG(0, (8, -8, -8))
+    @test Ferrite.AMR.transform_corner(adaptive_grid, VertexIndex(1, 3), o, false) == Ferrite.AMR.OctantBWG(0, (-8, 8, -8))
+    @test Ferrite.AMR.transform_corner(adaptive_grid, VertexIndex(1, 4), o, false) == Ferrite.AMR.OctantBWG(0, (8, 8, -8))
+    @test Ferrite.AMR.transform_corner(adaptive_grid, VertexIndex(1, 5), o, false) == Ferrite.AMR.OctantBWG(0, (-8, -8, 8))
+    @test Ferrite.AMR.transform_corner(adaptive_grid, VertexIndex(1, 6), o, false) == Ferrite.AMR.OctantBWG(0, (8, -8, 8))
+    @test Ferrite.AMR.transform_corner(adaptive_grid, VertexIndex(1, 7), o, false) == Ferrite.AMR.OctantBWG(0, (-8, 8, 8))
     @test Ferrite.AMR.transform_corner(adaptive_grid, VertexIndex(1, 8), o, false) == Ferrite.AMR.OctantBWG(0, (8, 8, 8))
     @test_throws BoundsError Ferrite.AMR.transform_corner_remote(adaptive_grid, VertexIndex(1, 1), o, false)
     @test_throws BoundsError Ferrite.AMR.transform_corner_remote(adaptive_grid, VertexIndex(1, 2), o, false)
@@ -934,6 +934,53 @@ end
     Ferrite.AMR.refine!(forest.cells[2], forest.cells[2].leaves[1])
     refine_towards_and_balance!(forest, 2, 2, o -> Int(o.xyz[1]) == 0 && Int(o.xyz[2]) == m ÷ 2)
     @test count_unbalanced_contacts(forest) == 0
+end
+
+@testset "corner balance at a multi-tree vertex" begin
+    # Five quads sharing a central vertex, with rotated connectivity so the center sits at a
+    # different local corner in each tree (as in unstructured meshes). The vertex-only
+    # neighbor lists at the center then have two entries whose corner indices differ, so
+    # `transform_corner` must place the balance octant at the corner the caller resolved from
+    # the connection — re-deriving it from `vertex_vertex_neighbor[..][1]` picks an arbitrary
+    # incident tree and plants refinement at a wrong (far-away) corner. See the report in
+    # PR #1349: spurious refinement clusters one macro cell away from the refined notch tip.
+    nodes = [Node(Vec((0.0, 0.0)))]  # center
+    nquads = 5
+    for i in 0:(nquads - 1)
+        θ1 = 2π * i / nquads
+        θm = 2π * (i + 0.5) / nquads
+        push!(nodes, Node(Vec((cos(θ1), sin(θ1)))))          # ring node shared by quads i-1, i
+        push!(nodes, Node(Vec(1.3 .* (cos(θm), sin(θm)))))   # outer kite node of quad i
+    end
+    cells = map(0:(nquads - 1)) do i
+        t = (1, 2 + 2i, 3 + 2i, i == nquads - 1 ? 2 : 4 + 2i)
+        r = i % 4 # cyclic rotation keeps orientation but moves the center's local index
+        return Quadrilateral(ntuple(j -> t[mod1(j + r, 4)], 4))
+    end
+    forest = ForestBWG(Grid(cells, nodes), 6)
+    # refine all trees toward the central vertex three times, balancing in between
+    for _ in 1:3
+        g = Ferrite.AMR.creategrid(forest)
+        marked = [c for c in 1:getncells(g) if any(n -> norm(n) < 1.0e-12, getcoordinates(g, c))]
+        Ferrite.AMR.refine!(forest, marked)
+        Ferrite.AMR.balanceforest!(forest)
+    end
+    for (k, tree) in enumerate(forest.cells)
+        b = tree.b
+        c_bwg = Ferrite.AMR.node_map₂_inv[findfirst(==(1), cells[k].nodes)]
+        vc = Ferrite.AMR.vertex(Ferrite.AMR.root(2), c_bwg, b)
+        maxlvl_at_corner = 0
+        for leaf in tree.leaves
+            h = Ferrite.AMR._compute_size(b, leaf.l)
+            # Chebyshev distance from the leaf's box to the tree corner at the central vertex
+            cheb = maximum(d -> max(leaf.xyz[d] - vc[d], vc[d] - (leaf.xyz[d] + h), 0), 1:2)
+            cheb == 0 && (maxlvl_at_corner = max(maxlvl_at_corner, Int(leaf.l)))
+            # deep leaves may only appear in the graded halo around the central vertex
+            leaf.l >= 2 && @test cheb <= 2h
+        end
+        # ... and the 2:1 balance against the level-3 corner leaves must actually hold
+        @test maxlvl_at_corner >= 2
+    end
 end
 
 @testset "Materializing Grid" begin
