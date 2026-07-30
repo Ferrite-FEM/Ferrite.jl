@@ -5,9 +5,10 @@
 SUITE["amr"] = BenchmarkGroup()
 
 # The forests are built by `FerriteBenchmarkHelpers.adaptive_forest`: a uniform refinement
-# followed by one more level for every fourth cell, so that 2:1 violations and hanging
-# nodes are spread over all trees and tree boundaries. 2D and 3D are both covered where the
-# code paths differ structurally: balancing propagates over faces and corners in 2D but
+# followed by two scattered every-fourth-leaf passes (no balancing in between), so that 2:1
+# violations and hanging nodes are spread over all trees and tree boundaries. 2D and 3D
+# are both covered where the code paths differ structurally: balancing propagates over
+# faces and corners in 2D but
 # faces, edges and corners in 3D, and `creategrid` emits edge-midpoint hanging nodes in 2D
 # but face-center and edge hanging nodes in 3D.
 #
@@ -15,8 +16,9 @@ SUITE["amr"] = BenchmarkGroup()
 # which the mesh group covers. `coarsen!`/`refine_and_coarsen!` share the marked-leaf-list
 # rebuild machinery with `refine!`.
 let g = SUITE["amr"]
-    # 8×8 quadrilateral base grid (64 trees) refined to 1024 cells uniformly + 256 marks;
-    # 4×4×4 hexahedron base grid (64 trees) refined to 512 cells uniformly + 128 marks.
+    # 8×8 quadrilateral base grid (64 trees) refined to 1024 cells uniformly + two
+    # scattered passes; 4×4×4 hexahedron base grid (64 trees) refined to 512 cells
+    # uniformly + two scattered passes.
     quadforest = FerriteBenchmarkHelpers.adaptive_forest(Quadrilateral, (8, 8), 2)
     hexforest = FerriteBenchmarkHelpers.adaptive_forest(Hexahedron, (4, 4, 4), 1)
 

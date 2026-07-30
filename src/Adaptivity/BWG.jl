@@ -1540,8 +1540,10 @@ function contains_facet(mface::Tuple{Tuple{T1, T1}, Tuple{T1, T1}}, sface::Tuple
     end
 end
 
-# currently checking if sface centroid lies in mface
-# TODO should be checked if applicable in general, I guess yes
+# The center test is exact here (not just a heuristic): octant faces are dyadic — their size is
+# a power of two and their position a multiple of that size — so two axis-aligned dyadic faces
+# either nest or have disjoint interiors. `sface`'s center is an interior point of `sface`, hence
+# it lies in `mface`'s (closed, degenerate-in-normal-direction) bounding box iff `sface ⊆ mface`.
 function contains_facet(mface::NTuple{4, Tuple{T1, T1, T1}}, sface::NTuple{4, Tuple{T2, T2, T2}}) where {T1 <: Integer, T2 <: Integer}
     sface_center = center(sface)
     lower_left = ntuple(i -> minimum(getindex.(mface, i)), 3)
@@ -1718,19 +1720,13 @@ facet_neighbor(o::OctantBWG{dim, N, T1}, f::T2, b::T3) where {dim, N, T1 <: Inte
 
 reference_faces_bwg(::Type{Ferrite.RefHypercube{2}}) = ((1, 3), (2, 4), (1, 2), (3, 4))
 reference_faces_bwg(::Type{Ferrite.RefHypercube{3}}) = ((1, 3, 5, 7), (2, 4, 6, 8), (1, 2, 5, 6), (3, 4, 7, 8), (1, 2, 3, 4), (5, 6, 7, 8)) # p4est consistent ordering
-reference_edges_bwg(::Type{Ferrite.RefHypercube{3}}) = (
-    (𝒰[1, 1], 𝒰[1, 2]), (𝒰[2, 1], 𝒰[2, 2]), (𝒰[3, 1], 𝒰[3, 2]),
-    (𝒰[4, 1], 𝒰[4, 2]), (𝒰[5, 1], 𝒰[5, 2]), (𝒰[6, 1], 𝒰[6, 2]),
-    (𝒰[7, 1], 𝒰[7, 2]), (𝒰[8, 1], 𝒰[8, 2]), (𝒰[9, 1], 𝒰[9, 2]),
-    (𝒰[10, 1], 𝒰[10, 2]), (𝒰[11, 1], 𝒰[11, 2]), (𝒰[12, 1], 𝒰[12, 2]),
-) # TODO maybe remove, unnecessary, can directly use the table
-# reference_faces_bwg(::Type{RefHypercube{3}}) = ((1,3,7,5) , (2,4,8,6), (1,2,6,5), (3,4,8,7), (1,2,4,4), (5,6,8,7)) # Note that this does NOT follow P4est order!
 
 """
     compute_face_orientation(forest::ForestBWG, k::Integer, f::Integer)
-Slow implementation for the determination of the face orientation of face `f` from octree `k` following definition 2.1 from [BWG2011](@citet).
-
-TODO use table 3 for more vroom
+Determine the face orientation of face `f` from octree `k` following definition 2.1 from
+[BWG2011](@citet), by comparing the macro node numbers of the two incident trees. Deliberately
+simple; a faster table-driven version (Table 3 of the paper) is possible if this ever shows up
+in profiles.
 """
 function compute_face_orientation(forest::ForestBWG{<:Any, <:OctreeBWG{dim, <:Any, T2}}, k::T1, f::T1) where {dim, T1, T2}
     f_perm = (dim == 2 ? 𝒱₂_perm : 𝒱₃_perm)
@@ -1755,19 +1751,18 @@ end
 """
     compute_edge_orientation(forest::ForestBWG, k::Integer, e::Integer, k′::Integer, e′::Integer)
     compute_edge_orientation(forest::ForestBWG, k::Integer, e::Integer)
-Slow implementation for the determination of the edge orientation of edge `e` from octree `k` following definition below Table 3 [BWG2011](@citet).
+Determine the edge orientation of edge `e` from octree `k` following the definition below Table 3
+[BWG2011](@citet), by comparing the macro node numbers of the two incident trees (deliberately
+simple, like [`compute_face_orientation`](@ref)).
 
 `0` if trees `k` and `k′` traverse the shared macro edge (edge `e` of `k`, edge `e′` of `k′`, both
 in BWG numbering) in the same direction, `1` if in opposite directions. The two-argument form
 orients against `edge_edge_neighbor[k, e][1]`, which is only well defined when exactly two trees
 share the macro edge.
-
-TODO use some table?
 """
 function compute_edge_orientation(forest::ForestBWG{<:Any, <:OctreeBWG{3, <:Any, T2}}, k::T1, e::T1, k′::T1, e′::T1) where {T1, T2}
-    refedgenodes = reference_edges_bwg(Ferrite.RefHypercube{3})
-    nodes_e = ntuple(i -> forest.cells[k].nodes[node_map₃[refedgenodes[e][i]]], length(refedgenodes[e]))
-    nodes_e′ = ntuple(i -> forest.cells[k′].nodes[node_map₃[refedgenodes[e′][i]]], length(refedgenodes[e′]))
+    nodes_e = ntuple(i -> forest.cells[k].nodes[node_map₃[𝒰[e, i]]], ncorners_edge)
+    nodes_e′ = ntuple(i -> forest.cells[k′].nodes[node_map₃[𝒰[e′, i]]], ncorners_edge)
     if nodes_e == nodes_e′
         s = T2(0)
     else
@@ -1885,19 +1880,15 @@ function transform_facet(forest::ForestBWG, k::T1, f::T1, o::OctantBWG{2, <:Any,
         f′ ≤ 2, # tangent
         f′ > 2,  # normal
     )
-    # b_sign = _two*(f′ & 1) - _one
 
     maxlevel = forest.cells[1].b
     depth_offset = 2^maxlevel - 2^(maxlevel - o.l)
 
     s′ = _one - (((f - _one) & _one) ⊻ ((f′ - _one) & _one)) # arithmetic switch
 
-    # xyz = zeros(T2, 2)
-    # xyz[a[1] + _one] = T2((r == 0) ? o.xyz[b[1] + _one] : depth_offset - o.xyz[b[1] + _one])
-    # xyz[a[2] + _one] = T2(a_sign*2^maxlevel + s′*depth_offset + (1-2*s′)*o.xyz[b[2] + _one])
-    # return OctantBWG(o.l,(xyz[1],xyz[2]))
-
-    # We can do this because the permutation and inverse permutation are the same
+    # Scattering the values into positions `a` (Algorithm 8 writes result[a[i]] = value[i])
+    # is here the same as gathering them from positions `a` below: `a` permutes the two
+    # axes {0, 1}, and every permutation of two elements is its own inverse.
     xyz = (
         T2((r == 0) ? o.xyz[b[1] + _one] : depth_offset - o.xyz[b[1] + _one]),
         T2(a_sign * 2^maxlevel + s′ * depth_offset + (1 - 2 * s′) * o.xyz[b[2] + _one]),
@@ -1937,7 +1928,6 @@ function transform_facet(forest::ForestBWG, k::T1, f::T1, o::OctantBWG{3, <:Any,
             (f′ - _one) ÷ 2,
         )
     end
-    # b_sign = _two*(f′ & 1) - _one
 
     s = if ℛ[f, f′] == 1 + 1 # R is one-based
         (r & 2, r & 1)

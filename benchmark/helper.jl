@@ -167,14 +167,17 @@ end
 # AMR
 #----------------------------------------------------------------------#
 
-# An adaptively refined, unbalanced forest: uniform refinement to `levels`, then one more
-# level for every fourth cell. The scattered marks spread 2:1 violations and hanging nodes
-# across all trees and tree boundaries, unlike a single refined block.
+# An adaptively refined, unbalanced forest: uniform refinement to `levels`, then two
+# scattered every-fourth-leaf passes without balancing in between. A single pass from the
+# uniform (conforming) state can only produce level differences of 1, which never violates
+# 2:1; the second pass creates level differences of 2, so `balanceforest!` actually has
+# violations to resolve, spread across all trees and tree boundaries.
 function adaptive_forest(celltype, dims, levels)
     forest = ForestBWG(generate_grid(celltype, dims))
     for l in 1:levels
         refine_all!(forest, l)
     end
+    refine!(forest, 1:4:getncells(forest))
     refine!(forest, 1:4:getncells(forest))
     return forest
 end
