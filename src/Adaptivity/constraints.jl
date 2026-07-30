@@ -1,24 +1,31 @@
 """
-    This constraint can be passed to the constraint handler when working with non-conforming meshes to
-    add the affine constraints required to make the associated interpolation conforming. It applies to
-    the single field `field_name`; combine several `ConformityConstraint`s to constrain several fields
-    of a multi-field `DofHandler`.
+    ConformityConstraint(field_name::Symbol)
 
-    The named field must be defined on every cell of the grid: subdomains (`SubDofHandler`s covering
-    only part of the grid, e.g. via `L2Projector(...; set = ...)`) are not supported yet and
-    throw an `ArgumentError`.
+This constraint can be passed to the constraint handler when working with non-conforming meshes to
+add the affine constraints required to make the associated interpolation conforming. It applies to
+the single field `field_name`; combine several `ConformityConstraint`s to constrain several fields
+of a multi-field `DofHandler`.
 
-    For a full example visit the AMR tutorial.
+The named field must be defined on every cell of the grid: subdomains (`SubDofHandler`s covering
+only part of the grid, e.g. via `L2Projector(...; set = ...)`) are not supported yet and
+throw an `ArgumentError`.
+
+For a full example visit the [adaptive heat equation tutorial](@ref tutorial-heat-adaptivity).
 """
 struct ConformityConstraint
     field_name::Symbol
 end
 
-function Ferrite.add!(ch::ConstraintHandler{<:DofHandler{<:Any, <:Grid}}, cc::ConformityConstraint)
+# Redispatch on the grid type instead of constraining the `ConstraintHandler` type parameters.
+function Ferrite.add!(ch::ConstraintHandler{<:DofHandler}, cc::ConformityConstraint)
+    return _add_conformity_constraints!(ch, Ferrite.get_grid(ch.dh), cc)
+end
+
+function _add_conformity_constraints!(ch::ConstraintHandler, ::Ferrite.AbstractGrid, cc::ConformityConstraint)
     return @warn "Trying to add conformity constraint to $(cc.field_name) on a conforming grid. Skipping."
 end
 
-function Ferrite.add!(ch::ConstraintHandler{<:DofHandler{<:Any, <:NonConformingGrid}}, cc::ConformityConstraint)
+function _add_conformity_constraints!(ch::ConstraintHandler, grid::NonConformingGrid, cc::ConformityConstraint)
     dh = ch.dh
     cc.field_name ∈ dh.field_names || throw(ArgumentError("Field $(cc.field_name) not found in provided dof handler. Available fields are $(dh.field_names)."))
     # The entity maps (vertexdicts) are indexed by the *global* field position, so the
@@ -33,7 +40,7 @@ function Ferrite.add!(ch::ConstraintHandler{<:DofHandler{<:Any, <:NonConformingG
     # to dof 0). Two ways to violate this: a cell belonging to no SubDofHandler at all
     # (`cell_to_subdofhandler == 0`), or the field itself living on only part of the grid.
     vertices = (dh.entitymaps::Ferrite.EntityMaps).vertices[global_fidx]
-    if any(iszero, dh.cell_to_subdofhandler) || _has_uncovered_hanging_vertex(dh.grid.conformity_info, vertices)
+    if any(iszero, dh.cell_to_subdofhandler) || _has_uncovered_hanging_vertex(grid.conformity_info, vertices)
         throw(ArgumentError("ConformityConstraint requires the field :$(cc.field_name) on every cell of the non-conforming grid, but it covers only part of it. Subdomains (e.g. `L2Projector(...; set = ...)`) are not supported on non-conforming grids yet."))
     end
     # One set of linear constraints per hanging node

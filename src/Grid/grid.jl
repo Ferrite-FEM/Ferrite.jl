@@ -433,7 +433,7 @@ end
 
 Get the datatype for a single point in the grid.
 """
-get_coordinate_type(grid::AbstractGrid{sdim}) where {sdim} = get_coordinate_type(first(getnodes(grid)))
+get_coordinate_type(grid::AbstractGrid{sdim}) where {sdim} = get_coordinate_type(getnodes(grid, 1)) # the scalar accessor cannot trigger materialization of all nodes
 get_coordinate_type(::Grid{dim, C, T}) where {dim, C, T} = Vec{dim, T} # Node is baked into the mesh type.
 
 """

@@ -44,3 +44,15 @@ function NonConformingGrid(
 end
 
 get_coordinate_type(::NonConformingGrid{dim, C, T}) where {dim, C, T} = Vec{dim, T}
+
+function Base.show(io::IO, ::MIME"text/plain", grid::NonConformingGrid)
+    print(io, "$(typeof(grid)) with $(getncells(grid)) ")
+    if isconcretetype(eltype(grid.cells))
+        typestrs = [repr(eltype(grid.cells))]
+    else
+        typestrs = sort!(repr.(OrderedSet(typeof(x) for x in grid.cells)))
+    end
+    join(io, typestrs, '/')
+    print(io, " cells, $(getnnodes(grid)) nodes and $(length(grid.conformity_info)) hanging nodes")
+    return
+end

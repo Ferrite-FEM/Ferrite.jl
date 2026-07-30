@@ -1605,6 +1605,22 @@ end
     # instead of hitting the generic fallback, which would return a whole tree
     @test_throws ArgumentError getcells(forest, 7)
     @test_throws ArgumentError getcells(forest, [1, 2])
+
+    # marking a cell already at the maximum level is a documented no-op — also when the
+    # tree's *first* leaf is the max-level one (used to throw from the 2^dim size hint)
+    let f = ForestBWG(generate_grid(Quadrilateral, (2, 2)), 2)
+        Ferrite.AMR.refine!(f, [1])
+        Ferrite.AMR.balanceforest!(f)
+        Ferrite.AMR.refine!(f, [1])
+        Ferrite.AMR.balanceforest!(f)
+        n = getncells(f)
+        Ferrite.AMR.refine!(f, [1])            # cell 1 = first leaf of tree 1, at max level
+        @test getncells(f) == n
+        Ferrite.AMR.refine_and_coarsen!(f, [1], Int[]) # same guard in the fused path
+        @test getncells(f) == n
+        g = Ferrite.AMR.creategrid(f)
+        @test getncells(g) == n
+    end
     leaves = getcells(forest)
     @test length(leaves) == getncells(forest)
     @test leaves[7] == forest.cells[2].leaves[3]

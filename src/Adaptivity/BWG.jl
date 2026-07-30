@@ -197,6 +197,10 @@ struct OctreeBWG{dim, N, T <: Integer} <: AbstractAdaptiveCell{Ferrite.RefHyperc
     nodes::NTuple{N, Int}
 end
 
+# Number of children an octant of this tree splits into (== 2^dim == N, the corner count),
+# straight from the type so it works regardless of the leaves' levels.
+_nchildren(::OctreeBWG{dim, N}) where {dim, N} = N
+
 """
     refine_octant!(octree::OctreeBWG, pivot_octant::OctantBWG)
 
@@ -500,7 +504,9 @@ function refine!(forest::ForestBWG, cellids::AbstractVector{<:Integer})
         end
         if cursor > first_marked
             b = tree.b
-            nchild = length(children(leaves[1], b))   # 2^dim
+            # NOT `length(children(leaves[1], b))`: that throws if the first leaf happens to
+            # sit at the maximum level, even when every marked id is legitimately skippable.
+            nchild = _nchildren(tree)
             refined = similar(leaves, 0)
             sizehint!(refined, n + (cursor - first_marked) * nchild)
             m = first_marked
@@ -630,7 +636,7 @@ function _refine_coarsen_tree!(
     leaves = tree.leaves
     n = length(leaves)
     b = tree.b
-    nchild = length(children(leaves[1], b))   # 2^dim
+    nchild = _nchildren(tree) # NOT via `children(leaves[1], b)`, which throws at max level
     buf = similar(leaves, 0)
     sizehint!(buf, n + (rlast - rfirst) * nchild)
     cc = cfirst               # cursor into `cmarked`; local index = cmarked[cc] - offset
@@ -828,6 +834,19 @@ end
 
 p4est_opposite_face_index(f) = ((f - 1) ⊻ 0b1) + 1
 p4est_opposite_edge_index(e) = ((e - 1) ⊻ 0b11) + 1
+
+# Named decodings of the p4est face/edge/corner index encodings (Section 2.1 of [BWG2011]),
+# so that the transform kernels below read as geometry instead of bit magic. All returned
+# axes/sides are 0-based, matching the coordinate arithmetic they feed.
+# Faces come in axis pairs: 1/2 = x∓, 3/4 = y∓, 5/6 = z∓.
+@inline _face_axis(f) = (f - one(f)) ÷ 2 # the axis of the face normal
+@inline _face_side(f) = (f - one(f)) & one(f) # 0 = lower face on that axis, 1 = upper
+# 3D edges come in axis quadruples: 1-4 along x, 5-8 along y, 9-12 along z.
+@inline _edge_axis(e) = (e - one(e)) ÷ 4 # the along-edge axis
+# An edge's position on its i-th transverse axis (i ∈ (1, 2), ascending axis order):
+@inline _edge_side(e, i) = ((e - one(e)) >> (i - 1)) & one(e) # 0 = lower end, 1 = upper
+# Corner c sits at the upper end of (1-based) axis i iff bit i-1 of c-1 is set:
+@inline _corner_side(c, i) = ((c - one(c)) >> (i - 1)) & one(c) # 0 = lower end, 1 = upper
 
 """
     _bnd_lookup(bnd, coord::NTuple{dim, <:Integer}, b) -> Int
@@ -1337,6 +1356,13 @@ corner may differ by more than one refinement level. Each tree is balanced inter
 against their out-of-tree neighbours via [`_balance_leaf!`](@ref). Iterated to a fixed point, then
 duplicate/over-refined leaves are pruned and re-sorted into Morton order.
 
+A balance refinement can itself create new 2:1 violations (also in trees processed earlier in the
+same pass), which is why the outer loop reruns until a whole pass adds no cells. This ripple can
+cascade across the domain, but it always terminates: balancing only ever *refines*, the cell
+count is strictly increasing across repeated passes, and it is bounded above by the uniformly
+max-refined forest. On return the invariant holds globally — the non-conformity level after
+`refine!` + `balanceforest!` is always exactly one, independent of the refinement history.
+
 Algorithm 17 of [BWG2011](@citet).
 """
 function balanceforest!(forest::ForestBWG{dim}) where {dim}
@@ -1433,7 +1459,8 @@ function balancetree(tree::OctreeBWG, bb::BalanceBuffers)
     append!(W, tree.leaves)
     empty!(P)
     empty!(R)
-    for l in tree.b:-1:1 #TODO verify to do this until level 1
+    for l in tree.b:-1:1 # levels b..1 as in Alg. 3 of [BWG2011]; a level-0 leaf is the root
+        # itself, so there is nothing coarser left to balance against
         empty!(Q)
         for o in W
             o.l == l && push!(Q, o)
@@ -1817,12 +1844,12 @@ function transform_facet_remote(forest::ForestBWG, k::T1, f::T1, o::OctantBWG{di
     facet_neighbor_table = Ferrite.get_facet_facet_neighborhood(forest)
     k′, f′ = facet_neighbor_table[k, _perm[f]][1]
     f′ = _perminv[f′]
-    s′ = _one - (((f - _one) & _one) ⊻ ((f′ - _one) & _one))
+    s′ = _one - (_face_side(f) ⊻ _face_side(f′))
     s = zeros(T2, dim - 1)
     a = zeros(T2, 3) # Coordinate axes of f
     b = zeros(T2, 3) # Coordinate axes of f'
     r = compute_face_orientation(forest, k, f)
-    a[3] = (f - _one) ÷ 2; b[3] = (f′ - _one) ÷ 2 # origin and target normal axis
+    a[3] = _face_axis(f); b[3] = _face_axis(f′) # origin and target normal axis
     if dim == 2
         a[1] = 1 - a[3]; b[1] = 1 - b[3]; s[1] = r
     else
@@ -1839,7 +1866,7 @@ function transform_facet_remote(forest::ForestBWG, k::T1, f::T1, o::OctantBWG{di
     l = o.l; g = 2^maxlevel - 2^(maxlevel - l)
     xyz = zeros(T2, dim)
     xyz[b[1] + _one] = T2((s[1] == 0) ? o.xyz[a[1] + _one] : g - o.xyz[a[1] + _one])
-    xyz[b[3] + _one] = T2(((_two * ((f′ - _one) & 1)) - _one) * 2^maxlevel + s′ * g + (1 - 2 * s′) * o.xyz[a[3] + _one])
+    xyz[b[3] + _one] = T2((_two * _face_side(f′) - _one) * 2^maxlevel + s′ * g + (1 - 2 * s′) * o.xyz[a[3] + _one])
     if dim == 2
         return OctantBWG(l, (xyz[1], xyz[2]))
     else
@@ -1887,7 +1914,7 @@ function transform_facet(forest::ForestBWG, k::T1, f::T1, o::OctantBWG{2, <:Any,
         f ≤ 2, # tangent
         f > 2,  # normal
     )
-    a_sign = _two * ((f - _one) & 1) - _one
+    a_sign = _two * _face_side(f) - _one # -1 for a lower face, +1 for an upper face
     # Coordinate axes of f'
     b = (
         f′ ≤ 2, # tangent
@@ -1897,7 +1924,7 @@ function transform_facet(forest::ForestBWG, k::T1, f::T1, o::OctantBWG{2, <:Any,
     maxlevel = forest.cells[1].b
     depth_offset = 2^maxlevel - 2^(maxlevel - o.l)
 
-    s′ = _one - (((f - _one) & _one) ⊻ ((f′ - _one) & _one)) # arithmetic switch
+    s′ = _one - (_face_side(f) ⊻ _face_side(f′)) # arithmetic switch: 1 iff the two faces sit on the same side of their axes
 
     # Scattering the values into positions `a` (Algorithm 8 writes result[a[i]] = value[i])
     # is here the same as gathering them from positions `a` below: `a` permutes the two
@@ -1916,29 +1943,29 @@ function transform_facet(forest::ForestBWG, k::T1, f::T1, o::OctantBWG{3, <:Any,
     _perminv = 𝒱₃_perm_inv
     k′, f′ = forest.topology.face_face_neighbor[k, _perm[f]][1]
     f′ = _perminv[f′]
-    s′ = _one - (((f - _one) & _one) ⊻ ((f′ - _one) & _one))
+    s′ = _one - (_face_side(f) ⊻ _face_side(f′))
     r = compute_face_orientation(forest, k, f)
 
     # Coordinate axes of f
     a = (
         (f ≤ 2) ? 1 : 0,
         (f ≤ 4) ? 2 : 1,
-        (f - _one) ÷ 2,
+        _face_axis(f),
     )
-    a_sign = _two * ((f - _one) & 1) - _one
+    a_sign = _two * _face_side(f) - _one # -1 for a lower face, +1 for an upper face
 
     # Coordinate axes of f'
     b = if Bool(ℛ[1, f] - _one) ⊻ Bool(ℛ[1, f′] - _one) ⊻ (((r == 0) || (r == 3))) # What is this condition exactly?
         (
             (f′ < 5) ? 2 : 1,
             (f′ < 3) ? 1 : 0,
-            (f′ - _one) ÷ 2,
+            _face_axis(f′),
         )
     else
         (
             (f′ < 3) ? 1 : 0,
             (f′ < 5) ? 2 : 1,
-            (f′ - _one) ÷ 2,
+            _face_axis(f′),
         )
     end
 
@@ -1975,7 +2002,7 @@ function transform_corner(forest::ForestBWG, k::T1, c::T1, oct::OctantBWG{dim, N
     b = forest.cells[k].b
     l = oct.l; g = 2^b - 2^(b - l)
     h⁻ = inside ? 0 : -2^(b - l); h⁺ = inside ? g : 2^b
-    xyz = ntuple(i -> ((c - 1) & 2^(i - 1) == 0) ? h⁻ : h⁺, dim)
+    xyz = ntuple(i -> (_corner_side(c, i) == 0) ? h⁻ : h⁺, dim)
     return OctantBWG(l, xyz)
 end
 
@@ -1997,7 +2024,7 @@ function transform_corner_remote(forest::ForestBWG, k::T1, c::T1, oct::OctantBWG
     b = forest.cells[k].b
     l = oct.l; g = 2^b - 2^(b - l)
     h⁻ = inside ? 0 : -2^(b - l); h⁺ = inside ? g : 2^b
-    xyz = ntuple(i -> ((c′ - 1) & 2^(i - 1) == 0) ? h⁻ : h⁺, dim)
+    xyz = ntuple(i -> (_corner_side(c′, i) == 0) ? h⁻ : h⁺, dim)
     return OctantBWG(l, xyz)
 end
 
@@ -2024,20 +2051,19 @@ function transform_edge_remote(forest::ForestBWG, k::T1, e::T1, oct::OctantBWG{3
     e′ = e_perminv[e′_ferrite]
     #see Algorithm 9, line 18
     𝐛 = (
-        ((e′ - _one) ÷ _four),
+        _edge_axis(e′),
         e′ - _one < 4 ? 1 : 0,
         e′ - _one < 8 ? 2 : 1,
     )
-    a₀ = ((e - _one) ÷ _four) #subtract 1 based index
-    a₀ += _one #add it again
+    a₀ = _edge_axis(e) + _one # 1-based along-edge axis
     b = forest.cells[k].b
     l = oct.l; g = _two^b - _two^(b - l)
     h⁻ = inside ? z : -_two^(b - l); h⁺ = inside ? g : _two^b
     s = compute_edge_orientation(forest, k, e)
     xyz = zeros(T2, 3)
     xyz[𝐛[1] + _one] = s * g + (_one - (_two * s)) * oct.xyz[a₀]
-    xyz[𝐛[2] + _one] = ((e′ - _one) & 1) == 0 ? h⁻ : h⁺
-    xyz[𝐛[3] + _one] = ((e′ - _one) & 2) == 0 ? h⁻ : h⁺
+    xyz[𝐛[2] + _one] = _edge_side(e′, 1) == 0 ? h⁻ : h⁺
+    xyz[𝐛[3] + _one] = _edge_side(e′, 2) == 0 ? h⁻ : h⁺
     return OctantBWG(l, (xyz[1], xyz[2], xyz[3]))
 end
 
@@ -2068,19 +2094,18 @@ function transform_edge(forest::ForestBWG, k::T1, e::T1, k′::T1, e′::T1, oct
     z = zero(T2)
     #see Algorithm 9, line 18: axes of the target edge e′ in tree k′
     𝐛 = (
-        ((e′ - _one) ÷ _four),
+        _edge_axis(e′),
         e′ - _one < 4 ? 1 : 0,
         e′ - _one < 8 ? 2 : 1,
     )
-    a₀ = ((e - _one) ÷ _four) #subtract 1 based index; `oct` is in pivot coordinates, so the
-    a₀ += _one #add it again    along-edge axis is the pivot edge's axis
+    a₀ = _edge_axis(e) + _one # 1-based; `oct` is in pivot coordinates, so the along-edge axis is the pivot edge's
     b = forest.cells[k′].b
     l = oct.l; g = _two^b - _two^(b - l)
     h⁻ = inside ? z : -_two^(b - l); h⁺ = inside ? g : _two^b
     s = compute_edge_orientation(forest, k, e, k′, e′)
     v1 = T2(s * g + (_one - (_two * s)) * oct.xyz[a₀])
-    v2 = ((e′ - _one) & 1) == 0 ? h⁻ : h⁺
-    v3 = ((e′ - _one) & 2) == 0 ? h⁻ : h⁺
+    v2 = _edge_side(e′, 1) == 0 ? h⁻ : h⁺
+    v3 = _edge_side(e′, 2) == 0 ? h⁻ : h⁺
     xyz = ntuple(p -> (p == 𝐛[1] + _one ? v1 : (p == 𝐛[2] + _one ? v2 : v3)), Val(3))
     return OctantBWG(l, xyz)
 end
@@ -2531,6 +2556,10 @@ end
 # as compile-time data.
 function _build_part_table(dim::Int)
     n = 2^dim
+    # UInt8 (not Int8): entries are 2^dim-bit child masks, up to 0xff in 3D, which does not
+    # fit Int8. Signedness carries no performance implication in Julia (integer overflow is
+    # defined two's-complement wrap-around, unlike C/C++), and the use site widens the mask
+    # to `Int` before working with it.
     tab = zeros(UInt8, n * n * 3^dim)
     for A in 0:(n - 1), σ in 0:(n - 1)
         (σ & A) == 0 || continue                     # σ ranges over degenerate axes only
