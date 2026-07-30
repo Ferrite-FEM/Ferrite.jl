@@ -9,6 +9,7 @@
 using Ferrite
 using Ferrite.AMR
 using Printf
+using Dates
 
 #==============================================================================#
 # Helpers
@@ -414,6 +415,5 @@ end
 
 # If run as a standalone script
 if abspath(PROGRAM_FILE) == @__FILE__
-    using Dates
     run_all_benchmarks()
 end

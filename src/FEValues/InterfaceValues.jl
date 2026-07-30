@@ -139,9 +139,10 @@ end
 Update the [`InterfaceValues`](@ref) with an explicitly given here → there quadrature point
 transformation instead of the [`InterfaceOrientationInfo`](@ref) derived from the facets'
 shared vertices. This is required for *non-matching* interfaces, where the two facets do
-not coincide and share no vertex set — e.g. the fine subfacet against the coarse facet of a
-hanging-node interface — in which case an [`AffineInterfaceTransformation`](@ref) describes
-how the here facet embeds into the there facet.
+not coincide and thus do not share the same vertex set — e.g. the fine subfacet against the
+coarse facet of a hanging-node interface — in which case an
+[`AffineInterfaceTransformation`](@ref) describes how the here facet embeds into the there
+facet.
 """
 function reinit!(
         iv::InterfaceValues,

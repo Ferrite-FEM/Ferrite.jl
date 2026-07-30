@@ -448,7 +448,9 @@ end
 function Ferrite.getcells(forest::ForestBWG, cellid::Union{Int, AbstractVector{Int}})
     throw(ArgumentError("getcells(forest, cellid) is not supported: a leaf octant is not interpretable without its tree. Use getcells(forest) for all leaves, or forest.cells[k].leaves for tree-local work."))
 end
-Ferrite.getcelltype(grid::ForestBWG, i::Int) = eltype(grid.cells) # assume for now same cell type TODO
+# All trees share one octree type (the `ForestBWG` constructor requires a concrete,
+# uniform cell type), so the celltype does not depend on `i`.
+Ferrite.getcelltype(grid::ForestBWG, i::Int) = eltype(grid.cells)
 
 """
     _treecorners(forest::ForestBWG{dim}, k::Integer) -> NTuple{2^dim, Vec{dim}}
@@ -823,7 +825,7 @@ function _balance_leaf!(forest::ForestBWG{dim}, k, tree, o, perm_face, perm_face
     # s_i indexes possibleneighbors (encodes the neighbourhood type); skip in-tree neighbours inline.
     for (s_i, s) in enumerate(ss)
         inside(s, tree.b) && continue
-        if dim == 2 # need more clever s_i encoding
+        if dim == 2
             if s_i <= 4 #corner neighbor, only true for 2D see possibleneighbors
                 if vertex(o, s_i, tree.b) == rootvertices[s_i]
                     # pivot corner at the tree's corner: balance across the macro (pure vertex)
@@ -979,7 +981,7 @@ function balanceforest!(forest::ForestBWG{dim}) where {dim}
     perm_corner_inv = dim == 2 ? node_map₂_inv : node_map₃_inv
     root_ = root(dim)
     nrefcells = 0
-    facet_neighborhood = Ferrite.Ferrite.get_facet_facet_neighborhood(forest)
+    facet_neighborhood = Ferrite.get_facet_facet_neighborhood(forest)
     # `balancetree` scratch, allocated once and reused across every tree and pass.
     bb = BalanceBuffers(forest.cells[1].leaves[1])
     while nrefcells - getncells(forest) != 0
@@ -1174,7 +1176,7 @@ function compute_edge_orientation(forest::ForestBWG{<:Any, <:OctreeBWG{3, <:Any,
 end
 
 """
-    transform_facet_remote(forest::ForestBWG, k::T1, f::T1, o::OctantBWG{dim, N, T2}) -> OctantBWG{dim, N, T1, T2}
+    transform_facet_remote(forest::ForestBWG, k::T1, f::T1, o::OctantBWG{dim, N, T2}) -> OctantBWG{dim, N, T2}
     transform_facet_remote(forest::ForestBWG, f::FacetIndex, o::OctantBWG{dim, N, T2}) -> OctantBWG{dim, N, T2}
 Interoctree coordinate transformation of an given octant `o` to the face-neighboring of octree `k` by virtually pushing `o`s coordinate system through `k`s face `f`.
 Implements Algorithm 8 of [BWG2011](@citet).
@@ -1312,7 +1314,9 @@ function transform_facet(forest::ForestBWG, k::T1, f::T1, o::OctantBWG{3, <:Any,
     a_sign = _two * _face_side(f) - _one # -1 for a lower face, +1 for an upper face
 
     # Coordinate axes of f'
-    b = if Bool(ℛ[1, f] - _one) ⊻ Bool(ℛ[1, f′] - _one) ⊻ (((r == 0) || (r == 3))) # What is this condition exactly?
+    # Whether the two tangent axes of f swap when mapped onto f′, decided by the alignment
+    # cases ℛ of the two faces together with the orientation r (Table 3 of [BWG2011]).
+    b = if Bool(ℛ[1, f] - _one) ⊻ Bool(ℛ[1, f′] - _one) ⊻ (((r == 0) || (r == 3)))
         (
             (f′ < 5) ? 2 : 1,
             (f′ < 3) ? 1 : 0,
@@ -1343,7 +1347,7 @@ end
 transform_facet(forest::ForestBWG, f::FacetIndex, oct::OctantBWG) = transform_facet(forest, f[1], f[2], oct)
 
 """
-    transform_corner(forest, k, c', oct, inside::Bool)
+    transform_corner(forest, k, c, oct, inside::Bool)
     transform_corner(forest, v::VertexIndex, oct, inside::Bool)
 
 Algorithm 12 but with flipped logic in [BWG2011](@citet) to transform corner into different octree coordinate system
@@ -1366,7 +1370,7 @@ end
 transform_corner(forest::ForestBWG, v::VertexIndex, oct::OctantBWG, inside) = transform_corner(forest, v[1], v[2], oct, inside)
 
 """
-    transform_corner_remote(forest, k, c', oct, inside::Bool)
+    transform_corner_remote(forest, k, c, oct, inside::Bool)
     transform_corner_remote(forest, v::VertexIndex, oct, inside::Bool)
 
 Algorithm 12 in [BWG2011](@citet) to transform corner into different octree coordinate system.
@@ -1377,7 +1381,6 @@ function transform_corner_remote(forest::ForestBWG, k::T1, c::T1, oct::OctantBWG
     _perminv = dim == 2 ? node_map₂_inv : node_map₃_inv
     k′, c′′ = forest.topology.vertex_vertex_neighbor[k, _perm[c]][1]
     c′ = _perminv[c′′] # assign c′ once so the ntuple closure below doesn't box it
-    # make a dispatch that returns only the coordinates?
     b = forest.cells[k].b
     l = oct.l; g = 2^b - 2^(b - l)
     h⁻ = inside ? 0 : -2^(b - l); h⁺ = inside ? g : 2^b
@@ -1390,7 +1393,7 @@ transform_corner_remote(forest::ForestBWG, v::VertexIndex, oct::OctantBWG, insid
 
 """
     transform_edge_remote(forest, k, e, oct, inside::Bool)
-    transform_edge_remote(forest, e::Edgeindex, oct, inside::Bool)
+    transform_edge_remote(forest, e::EdgeIndex, oct, inside::Bool)
 
 Algorithm 10 in [BWG2011](@citet) to transform edge into different octree coordinate system.
 This function looks at the octant from the octree coordinate system of the neighbor that can be found at (k,e)
@@ -1431,7 +1434,7 @@ transform_edge_remote(forest::ForestBWG, e::EdgeIndex, oct::OctantBWG, inside) =
     transform_edge(forest, k′, e′, oct, inside::Bool)
     transform_edge(forest, e′::EdgeIndex, oct, inside::Bool)
 
-Algorithm 10 in [BWG2011](@citet) to transform cedge into different octree coordinate system but reversed logic.
+Algorithm 10 in [BWG2011](@citet) to transform an edge into a different octree coordinate system, but with reversed logic.
 See `transform_edge_remote` with logic from paper.
 Transform the octant `oct`, which sits at edge `e` of pivot tree `k` (in `k`'s coordinates),
 into the coordinate system of the neighbouring tree `k′` at its edge `e′`. The along-edge
@@ -1898,8 +1901,6 @@ end
 # constraints are recorded as E-references and resolved after the numbering traversal.
 const ERef = Tuple{Int, Int}
 
-# Cross-tree hanging via a two-sided face descent — the iterator's recursive split-descent
-# (the same primitive `iterate_points` uses for intra-tree faces) carried across a shared
 """
     _iter_interface!(
         cons2, cons4, E, offR, forest, kL, lvsL, octL, loL, hiL, fL,

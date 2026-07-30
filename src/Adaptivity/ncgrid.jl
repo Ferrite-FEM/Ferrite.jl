@@ -1,5 +1,5 @@
 """
-    NonConformingGrid{dim, C<:AbstractCell, T<:Real, CIT} <: AbstractGrid}
+    NonConformingGrid{dim, C<:AbstractCell, T<:Real, CIT} <: AbstractGrid{dim}
 
 A `NonConformingGrid` is a collection of `Cells` and `Node`s which covers the computational domain, together with sets of cells, nodes,
 facets and vertices, and associated information about the conformity.

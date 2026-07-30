@@ -108,7 +108,7 @@ export
     addcellset!,
     transform_coordinates!,
     generate_grid,
-    # AdaptiveGrid
+    # Adaptive mesh refinement (AMR)
     ForestBWG,
     refine!,
     refine_all!,

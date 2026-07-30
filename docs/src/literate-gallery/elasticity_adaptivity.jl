@@ -342,7 +342,7 @@ function solve_adaptive(initial_forest; nsteps = 4, θ = 0.3)
     pvd = paraview_collection("elasticity_amr")
     for i in 1:nsteps
         ## Materialize the forest into a NonConformingGrid and solve.
-        grid = Ferrite.creategrid(forest)
+        grid = creategrid(forest)
         u, dh, cv = solve(grid, Cmat)
 
         ## Estimate the error and mark cells with Dörfler marking.
@@ -361,8 +361,8 @@ function solve_adaptive(initial_forest; nsteps = 4, θ = 0.3)
         isempty(cells_to_refine) && break
 
         ## Refine the marked cells and restore 2:1 balance across the forest.
-        Ferrite.refine!(forest, cells_to_refine)
-        Ferrite.balanceforest!(forest)
+        refine!(forest, cells_to_refine)
+        balanceforest!(forest)
     end
     vtk_save(pvd)
     return forest

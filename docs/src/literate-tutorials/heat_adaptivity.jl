@@ -43,7 +43,7 @@ using Ferrite, IterativeSolvers, WriteVTK
 # One uniform refinement gives us a reasonable starting mesh of 512 cells.
 base_grid = generate_grid(Hexahedron, (4, 4, 4));
 grid = ForestBWG(base_grid, 10)
-Ferrite.AMR.refine_all!(grid, 1);
+refine_all!(grid, 1);
 
 # ### Manufactured solution
 # The exact solution is a Gaussian ring concentrated on the sphere $\|\textbf{x}\|=0.5$
@@ -60,7 +60,7 @@ analytical_rhs(x) = -laplace(analytical_solution, x)
 
 # ### Element assembly
 # Standard Galerkin assembly for the Poisson equation — this function and the global
-# assembly below are exactly as in the [heat equation tutorial](@ref tutorial-heat-equation);
+# assembly below are essentially as in the [heat equation tutorial](@ref tutorial-heat-equation);
 # nothing about the element routines changes for AMR. For each quadrature point
 # we evaluate the manufactured right-hand side at the physical coordinate.
 function assemble_cell!(ke, fe, cellvalues, coords)
@@ -239,7 +239,7 @@ function solve_adaptive(initial_grid; nsteps = 3, θ = 0.5)
     pvd = paraview_collection("heat_amr")
     for i in 1:nsteps
         ## Materialize the forest into a NonConformingGrid and solve
-        transferred_grid = Ferrite.creategrid(grid)
+        transferred_grid = creategrid(grid)
         u, dh, cv, ip, qr = solve(transferred_grid)
 
         ## Estimate the error and mark cells with Dörfler marking
@@ -259,8 +259,8 @@ function solve_adaptive(initial_grid; nsteps = 3, θ = 0.5)
         isempty(cells_to_refine) && break
 
         ## Refine marked cells and enforce 2:1 balance across the forest
-        Ferrite.refine!(grid, cells_to_refine)
-        Ferrite.balanceforest!(grid)
+        refine!(grid, cells_to_refine)
+        balanceforest!(grid)
     end
     return vtk_save(pvd)
 end

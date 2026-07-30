@@ -59,32 +59,32 @@ end
 end
 
 @testset "OctantBWG Encoding" begin
-    #    # Tests from Figure 3a) and 3b) of Burstedde et al
-    o = Ferrite.AMR.Ferrite.AMR.OctantBWG(3, 2, 21, 3)
+    # Tests from Figure 3a) and 3b) of Burstedde et al
+    o = Ferrite.AMR.OctantBWG(3, 2, 21, 3)
     b = 3
     @test Ferrite.AMR.child_id(o, b) == 5
     @test Ferrite.AMR.child_id(Ferrite.AMR.parent(o, b), b) == 3
-    @test Ferrite.AMR.parent(Ferrite.AMR.parent(o, b), b) == Ferrite.AMR.Ferrite.AMR.OctantBWG(3, 0, 1, b)
+    @test Ferrite.AMR.parent(Ferrite.AMR.parent(o, b), b) == Ferrite.AMR.OctantBWG(3, 0, 1, b)
     @test Ferrite.AMR.parent(Ferrite.AMR.parent(Ferrite.AMR.parent(o, b), b), b) == Ferrite.AMR.root(3)
-    o = Ferrite.AMR.Ferrite.AMR.OctantBWG(3, 2, 4, 3)
+    o = Ferrite.AMR.OctantBWG(3, 2, 4, 3)
     @test Ferrite.AMR.child_id(o, b) == 4
     @test Ferrite.AMR.child_id(Ferrite.AMR.parent(o, b), b) == 1
-    @test Ferrite.AMR.parent(Ferrite.AMR.parent(o, b), b) == Ferrite.AMR.Ferrite.AMR.OctantBWG(3, 0, 1, b)
+    @test Ferrite.AMR.parent(Ferrite.AMR.parent(o, b), b) == Ferrite.AMR.OctantBWG(3, 0, 1, b)
     @test Ferrite.AMR.parent(Ferrite.AMR.parent(Ferrite.AMR.parent(o, b), b), b) == Ferrite.AMR.root(3)
 
-    @test Ferrite.AMR.child_id(Ferrite.AMR.Ferrite.AMR.OctantBWG(2, 1, 1, 3), 3) == 1
-    @test Ferrite.AMR.child_id(Ferrite.AMR.Ferrite.AMR.OctantBWG(2, 1, 2, 3), 3) == 2
-    @test Ferrite.AMR.child_id(Ferrite.AMR.Ferrite.AMR.OctantBWG(2, 1, 3, 3), 3) == 3
-    @test Ferrite.AMR.child_id(Ferrite.AMR.Ferrite.AMR.OctantBWG(2, 1, 4, 3), 3) == 4
-    @test Ferrite.AMR.child_id(Ferrite.AMR.Ferrite.AMR.OctantBWG(2, 2, 1, 3), 3) == 1
-    @test Ferrite.AMR.child_id(Ferrite.AMR.Ferrite.AMR.OctantBWG(3, 2, 1, 3), 3) == 1
-    @test Ferrite.AMR.child_id(Ferrite.AMR.Ferrite.AMR.OctantBWG(3, 2, 2, 3), 3) == 2
-    @test Ferrite.AMR.child_id(Ferrite.AMR.Ferrite.AMR.OctantBWG(3, 2, 3, 3), 3) == 3
-    @test Ferrite.AMR.child_id(Ferrite.AMR.Ferrite.AMR.OctantBWG(3, 2, 4, 3), 3) == 4
-    @test Ferrite.AMR.child_id(Ferrite.AMR.Ferrite.AMR.OctantBWG(3, 2, 16, 3), 3) == 8
-    @test Ferrite.AMR.child_id(Ferrite.AMR.Ferrite.AMR.OctantBWG(3, 2, 24, 3), 3) == 8
-    @test Ferrite.AMR.child_id(Ferrite.AMR.Ferrite.AMR.OctantBWG(3, 2, 64, 3), 3) == 8
-    @test Ferrite.AMR.child_id(Ferrite.AMR.Ferrite.AMR.OctantBWG(3, 2, 9, 3), 3) == 1
+    @test Ferrite.AMR.child_id(Ferrite.AMR.OctantBWG(2, 1, 1, 3), 3) == 1
+    @test Ferrite.AMR.child_id(Ferrite.AMR.OctantBWG(2, 1, 2, 3), 3) == 2
+    @test Ferrite.AMR.child_id(Ferrite.AMR.OctantBWG(2, 1, 3, 3), 3) == 3
+    @test Ferrite.AMR.child_id(Ferrite.AMR.OctantBWG(2, 1, 4, 3), 3) == 4
+    @test Ferrite.AMR.child_id(Ferrite.AMR.OctantBWG(2, 2, 1, 3), 3) == 1
+    @test Ferrite.AMR.child_id(Ferrite.AMR.OctantBWG(3, 2, 1, 3), 3) == 1
+    @test Ferrite.AMR.child_id(Ferrite.AMR.OctantBWG(3, 2, 2, 3), 3) == 2
+    @test Ferrite.AMR.child_id(Ferrite.AMR.OctantBWG(3, 2, 3, 3), 3) == 3
+    @test Ferrite.AMR.child_id(Ferrite.AMR.OctantBWG(3, 2, 4, 3), 3) == 4
+    @test Ferrite.AMR.child_id(Ferrite.AMR.OctantBWG(3, 2, 16, 3), 3) == 8
+    @test Ferrite.AMR.child_id(Ferrite.AMR.OctantBWG(3, 2, 24, 3), 3) == 8
+    @test Ferrite.AMR.child_id(Ferrite.AMR.OctantBWG(3, 2, 64, 3), 3) == 8
+    @test Ferrite.AMR.child_id(Ferrite.AMR.OctantBWG(3, 2, 9, 3), 3) == 1
     #maxlevel = 10 takes too long
     maxlevel = 6
     levels = collect(1:maxlevel)
@@ -103,59 +103,59 @@ end
 end
 
 @testset "OctantBWG Operations" begin
-    o = Ferrite.AMR.Ferrite.AMR.OctantBWG(1, (2, 0, 0))
-    @test Ferrite.AMR.facet_neighbor(o, 1, 2) == Ferrite.AMR.Ferrite.AMR.OctantBWG(1, (0, 0, 0))
-    @test Ferrite.AMR.facet_neighbor(o, 2, 2) == Ferrite.AMR.Ferrite.AMR.OctantBWG(1, (4, 0, 0))
-    @test Ferrite.AMR.facet_neighbor(o, 3, 2) == Ferrite.AMR.Ferrite.AMR.OctantBWG(1, (2, -2, 0))
-    @test Ferrite.AMR.facet_neighbor(o, 4, 2) == Ferrite.AMR.Ferrite.AMR.OctantBWG(1, (2, 2, 0))
-    @test Ferrite.AMR.facet_neighbor(o, 5, 2) == Ferrite.AMR.Ferrite.AMR.OctantBWG(1, (2, 0, -2))
-    @test Ferrite.AMR.facet_neighbor(o, 6, 2) == Ferrite.AMR.Ferrite.AMR.OctantBWG(1, (2, 0, 2))
-    @test Ferrite.AMR.descendants(o, 2) == (Ferrite.AMR.Ferrite.AMR.OctantBWG(2, (2, 0, 0)), Ferrite.AMR.Ferrite.AMR.OctantBWG(2, (3, 1, 1)))
-    @test Ferrite.AMR.descendants(o, 3) == (Ferrite.AMR.Ferrite.AMR.OctantBWG(3, (2, 0, 0)), Ferrite.AMR.Ferrite.AMR.OctantBWG(3, (5, 3, 3)))
+    o = Ferrite.AMR.OctantBWG(1, (2, 0, 0))
+    @test Ferrite.AMR.facet_neighbor(o, 1, 2) == Ferrite.AMR.OctantBWG(1, (0, 0, 0))
+    @test Ferrite.AMR.facet_neighbor(o, 2, 2) == Ferrite.AMR.OctantBWG(1, (4, 0, 0))
+    @test Ferrite.AMR.facet_neighbor(o, 3, 2) == Ferrite.AMR.OctantBWG(1, (2, -2, 0))
+    @test Ferrite.AMR.facet_neighbor(o, 4, 2) == Ferrite.AMR.OctantBWG(1, (2, 2, 0))
+    @test Ferrite.AMR.facet_neighbor(o, 5, 2) == Ferrite.AMR.OctantBWG(1, (2, 0, -2))
+    @test Ferrite.AMR.facet_neighbor(o, 6, 2) == Ferrite.AMR.OctantBWG(1, (2, 0, 2))
+    @test Ferrite.AMR.descendants(o, 2) == (Ferrite.AMR.OctantBWG(2, (2, 0, 0)), Ferrite.AMR.OctantBWG(2, (3, 1, 1)))
+    @test Ferrite.AMR.descendants(o, 3) == (Ferrite.AMR.OctantBWG(3, (2, 0, 0)), Ferrite.AMR.OctantBWG(3, (5, 3, 3)))
 
-    o = Ferrite.AMR.Ferrite.AMR.OctantBWG(1, (0, 0, 0))
-    @test Ferrite.AMR.facet_neighbor(o, 1, 2) == Ferrite.AMR.Ferrite.AMR.OctantBWG(1, (-2, 0, 0))
-    @test Ferrite.AMR.facet_neighbor(o, 2, 2) == Ferrite.AMR.Ferrite.AMR.OctantBWG(1, (2, 0, 0))
-    @test Ferrite.AMR.facet_neighbor(o, 3, 2) == Ferrite.AMR.Ferrite.AMR.OctantBWG(1, (0, -2, 0))
-    @test Ferrite.AMR.facet_neighbor(o, 4, 2) == Ferrite.AMR.Ferrite.AMR.OctantBWG(1, (0, 2, 0))
-    @test Ferrite.AMR.facet_neighbor(o, 5, 2) == Ferrite.AMR.Ferrite.AMR.OctantBWG(1, (0, 0, -2))
-    @test Ferrite.AMR.facet_neighbor(o, 6, 2) == Ferrite.AMR.Ferrite.AMR.OctantBWG(1, (0, 0, 2))
-    o = Ferrite.AMR.Ferrite.AMR.OctantBWG(0, (0, 0, 0))
-    @test Ferrite.AMR.descendants(o, 2) == (Ferrite.AMR.Ferrite.AMR.OctantBWG(2, (0, 0, 0)), Ferrite.AMR.Ferrite.AMR.OctantBWG(2, (3, 3, 3)))
-    @test Ferrite.AMR.descendants(o, 3) == (Ferrite.AMR.Ferrite.AMR.OctantBWG(3, (0, 0, 0)), Ferrite.AMR.Ferrite.AMR.OctantBWG(3, (7, 7, 7)))
+    o = Ferrite.AMR.OctantBWG(1, (0, 0, 0))
+    @test Ferrite.AMR.facet_neighbor(o, 1, 2) == Ferrite.AMR.OctantBWG(1, (-2, 0, 0))
+    @test Ferrite.AMR.facet_neighbor(o, 2, 2) == Ferrite.AMR.OctantBWG(1, (2, 0, 0))
+    @test Ferrite.AMR.facet_neighbor(o, 3, 2) == Ferrite.AMR.OctantBWG(1, (0, -2, 0))
+    @test Ferrite.AMR.facet_neighbor(o, 4, 2) == Ferrite.AMR.OctantBWG(1, (0, 2, 0))
+    @test Ferrite.AMR.facet_neighbor(o, 5, 2) == Ferrite.AMR.OctantBWG(1, (0, 0, -2))
+    @test Ferrite.AMR.facet_neighbor(o, 6, 2) == Ferrite.AMR.OctantBWG(1, (0, 0, 2))
+    o = Ferrite.AMR.OctantBWG(0, (0, 0, 0))
+    @test Ferrite.AMR.descendants(o, 2) == (Ferrite.AMR.OctantBWG(2, (0, 0, 0)), Ferrite.AMR.OctantBWG(2, (3, 3, 3)))
+    @test Ferrite.AMR.descendants(o, 3) == (Ferrite.AMR.OctantBWG(3, (0, 0, 0)), Ferrite.AMR.OctantBWG(3, (7, 7, 7)))
 
-    @test Ferrite.AMR.edge_neighbor(Ferrite.AMR.Ferrite.AMR.OctantBWG(2, (2, 0, 0)), 1, 3) == Ferrite.AMR.Ferrite.AMR.OctantBWG(2, (2, -2, -2))
-    @test Ferrite.AMR.edge_neighbor(Ferrite.AMR.Ferrite.AMR.OctantBWG(2, (2, 0, 0)), 4, 3) == Ferrite.AMR.Ferrite.AMR.OctantBWG(2, (2, 2, 2))
-    @test Ferrite.AMR.edge_neighbor(Ferrite.AMR.Ferrite.AMR.OctantBWG(2, (2, 0, 0)), 6, 3) == Ferrite.AMR.Ferrite.AMR.OctantBWG(2, (4, 0, -2))
-    @test Ferrite.AMR.edge_neighbor(Ferrite.AMR.Ferrite.AMR.OctantBWG(2, (2, 0, 0)), 9, 3) == Ferrite.AMR.Ferrite.AMR.OctantBWG(2, (0, -2, 0))
-    @test Ferrite.AMR.edge_neighbor(Ferrite.AMR.Ferrite.AMR.OctantBWG(2, (2, 0, 0)), 12, 3) == Ferrite.AMR.Ferrite.AMR.OctantBWG(2, (4, 2, 0))
+    @test Ferrite.AMR.edge_neighbor(Ferrite.AMR.OctantBWG(2, (2, 0, 0)), 1, 3) == Ferrite.AMR.OctantBWG(2, (2, -2, -2))
+    @test Ferrite.AMR.edge_neighbor(Ferrite.AMR.OctantBWG(2, (2, 0, 0)), 4, 3) == Ferrite.AMR.OctantBWG(2, (2, 2, 2))
+    @test Ferrite.AMR.edge_neighbor(Ferrite.AMR.OctantBWG(2, (2, 0, 0)), 6, 3) == Ferrite.AMR.OctantBWG(2, (4, 0, -2))
+    @test Ferrite.AMR.edge_neighbor(Ferrite.AMR.OctantBWG(2, (2, 0, 0)), 9, 3) == Ferrite.AMR.OctantBWG(2, (0, -2, 0))
+    @test Ferrite.AMR.edge_neighbor(Ferrite.AMR.OctantBWG(2, (2, 0, 0)), 12, 3) == Ferrite.AMR.OctantBWG(2, (4, 2, 0))
 
-    @test Ferrite.AMR.edge_neighbor(Ferrite.AMR.Ferrite.AMR.OctantBWG(3, (0, 0, 0)), 1, 4) == Ferrite.AMR.Ferrite.AMR.OctantBWG(3, (0, -2, -2))
-    @test Ferrite.AMR.edge_neighbor(Ferrite.AMR.Ferrite.AMR.OctantBWG(3, (0, 0, 0)), 12, 4) == Ferrite.AMR.Ferrite.AMR.OctantBWG(3, (2, 2, 0))
+    @test Ferrite.AMR.edge_neighbor(Ferrite.AMR.OctantBWG(3, (0, 0, 0)), 1, 4) == Ferrite.AMR.OctantBWG(3, (0, -2, -2))
+    @test Ferrite.AMR.edge_neighbor(Ferrite.AMR.OctantBWG(3, (0, 0, 0)), 12, 4) == Ferrite.AMR.OctantBWG(3, (2, 2, 0))
 
-    @test Ferrite.AMR.edge_neighbor(Ferrite.AMR.Ferrite.AMR.OctantBWG(2, (0, 0, 0)), 1, 4) == Ferrite.AMR.Ferrite.AMR.OctantBWG(2, (0, -4, -4))
-    @test Ferrite.AMR.edge_neighbor(Ferrite.AMR.Ferrite.AMR.OctantBWG(2, (0, 0, 0)), 2, 4) == Ferrite.AMR.Ferrite.AMR.OctantBWG(2, (0, 4, -4))
-    @test Ferrite.AMR.edge_neighbor(Ferrite.AMR.Ferrite.AMR.OctantBWG(2, (0, 0, 0)), 3, 4) == Ferrite.AMR.Ferrite.AMR.OctantBWG(2, (0, -4, 4))
-    @test Ferrite.AMR.edge_neighbor(Ferrite.AMR.Ferrite.AMR.OctantBWG(2, (0, 0, 0)), 4, 4) == Ferrite.AMR.Ferrite.AMR.OctantBWG(2, (0, 4, 4))
-    @test Ferrite.AMR.edge_neighbor(Ferrite.AMR.Ferrite.AMR.OctantBWG(2, (0, 0, 0)), 5, 4) == Ferrite.AMR.Ferrite.AMR.OctantBWG(2, (-4, 0, -4))
-    @test Ferrite.AMR.edge_neighbor(Ferrite.AMR.Ferrite.AMR.OctantBWG(2, (0, 0, 0)), 6, 4) == Ferrite.AMR.Ferrite.AMR.OctantBWG(2, (4, 0, -4))
-    @test Ferrite.AMR.edge_neighbor(Ferrite.AMR.Ferrite.AMR.OctantBWG(2, (0, 0, 0)), 7, 4) == Ferrite.AMR.Ferrite.AMR.OctantBWG(2, (-4, 0, 4))
-    @test Ferrite.AMR.edge_neighbor(Ferrite.AMR.Ferrite.AMR.OctantBWG(2, (0, 0, 0)), 8, 4) == Ferrite.AMR.Ferrite.AMR.OctantBWG(2, (4, 0, 4))
-    @test Ferrite.AMR.edge_neighbor(Ferrite.AMR.Ferrite.AMR.OctantBWG(2, (0, 0, 0)), 9, 4) == Ferrite.AMR.Ferrite.AMR.OctantBWG(2, (-4, -4, 0))
-    @test Ferrite.AMR.edge_neighbor(Ferrite.AMR.Ferrite.AMR.OctantBWG(2, (0, 0, 0)), 10, 4) == Ferrite.AMR.Ferrite.AMR.OctantBWG(2, (4, -4, 0))
-    @test Ferrite.AMR.edge_neighbor(Ferrite.AMR.Ferrite.AMR.OctantBWG(2, (0, 0, 0)), 11, 4) == Ferrite.AMR.Ferrite.AMR.OctantBWG(2, (-4, 4, 0))
-    @test Ferrite.AMR.edge_neighbor(Ferrite.AMR.Ferrite.AMR.OctantBWG(2, (0, 0, 0)), 12, 4) == Ferrite.AMR.Ferrite.AMR.OctantBWG(2, (4, 4, 0))
+    @test Ferrite.AMR.edge_neighbor(Ferrite.AMR.OctantBWG(2, (0, 0, 0)), 1, 4) == Ferrite.AMR.OctantBWG(2, (0, -4, -4))
+    @test Ferrite.AMR.edge_neighbor(Ferrite.AMR.OctantBWG(2, (0, 0, 0)), 2, 4) == Ferrite.AMR.OctantBWG(2, (0, 4, -4))
+    @test Ferrite.AMR.edge_neighbor(Ferrite.AMR.OctantBWG(2, (0, 0, 0)), 3, 4) == Ferrite.AMR.OctantBWG(2, (0, -4, 4))
+    @test Ferrite.AMR.edge_neighbor(Ferrite.AMR.OctantBWG(2, (0, 0, 0)), 4, 4) == Ferrite.AMR.OctantBWG(2, (0, 4, 4))
+    @test Ferrite.AMR.edge_neighbor(Ferrite.AMR.OctantBWG(2, (0, 0, 0)), 5, 4) == Ferrite.AMR.OctantBWG(2, (-4, 0, -4))
+    @test Ferrite.AMR.edge_neighbor(Ferrite.AMR.OctantBWG(2, (0, 0, 0)), 6, 4) == Ferrite.AMR.OctantBWG(2, (4, 0, -4))
+    @test Ferrite.AMR.edge_neighbor(Ferrite.AMR.OctantBWG(2, (0, 0, 0)), 7, 4) == Ferrite.AMR.OctantBWG(2, (-4, 0, 4))
+    @test Ferrite.AMR.edge_neighbor(Ferrite.AMR.OctantBWG(2, (0, 0, 0)), 8, 4) == Ferrite.AMR.OctantBWG(2, (4, 0, 4))
+    @test Ferrite.AMR.edge_neighbor(Ferrite.AMR.OctantBWG(2, (0, 0, 0)), 9, 4) == Ferrite.AMR.OctantBWG(2, (-4, -4, 0))
+    @test Ferrite.AMR.edge_neighbor(Ferrite.AMR.OctantBWG(2, (0, 0, 0)), 10, 4) == Ferrite.AMR.OctantBWG(2, (4, -4, 0))
+    @test Ferrite.AMR.edge_neighbor(Ferrite.AMR.OctantBWG(2, (0, 0, 0)), 11, 4) == Ferrite.AMR.OctantBWG(2, (-4, 4, 0))
+    @test Ferrite.AMR.edge_neighbor(Ferrite.AMR.OctantBWG(2, (0, 0, 0)), 12, 4) == Ferrite.AMR.OctantBWG(2, (4, 4, 0))
 
-    @test Ferrite.AMR.edge_neighbor(Ferrite.AMR.Ferrite.AMR.OctantBWG(1, (0, 0, 0)), 1, 4) == Ferrite.AMR.Ferrite.AMR.OctantBWG(1, (0, -8, -8))
-    @test Ferrite.AMR.edge_neighbor(Ferrite.AMR.Ferrite.AMR.OctantBWG(1, (0, 0, 0)), 12, 4) == Ferrite.AMR.Ferrite.AMR.OctantBWG(1, (8, 8, 0))
+    @test Ferrite.AMR.edge_neighbor(Ferrite.AMR.OctantBWG(1, (0, 0, 0)), 1, 4) == Ferrite.AMR.OctantBWG(1, (0, -8, -8))
+    @test Ferrite.AMR.edge_neighbor(Ferrite.AMR.OctantBWG(1, (0, 0, 0)), 12, 4) == Ferrite.AMR.OctantBWG(1, (8, 8, 0))
 
-    @test Ferrite.AMR.corner_neighbor(Ferrite.AMR.Ferrite.AMR.OctantBWG(2, (2, 0, 0)), 1, 3) == Ferrite.AMR.Ferrite.AMR.OctantBWG(2, (0, -2, -2))
-    @test Ferrite.AMR.corner_neighbor(Ferrite.AMR.Ferrite.AMR.OctantBWG(2, (2, 0, 0)), 4, 3) == Ferrite.AMR.Ferrite.AMR.OctantBWG(2, (4, 2, -2))
-    @test Ferrite.AMR.corner_neighbor(Ferrite.AMR.Ferrite.AMR.OctantBWG(2, (2, 0, 0)), 8, 3) == Ferrite.AMR.Ferrite.AMR.OctantBWG(2, (4, 2, 2))
+    @test Ferrite.AMR.corner_neighbor(Ferrite.AMR.OctantBWG(2, (2, 0, 0)), 1, 3) == Ferrite.AMR.OctantBWG(2, (0, -2, -2))
+    @test Ferrite.AMR.corner_neighbor(Ferrite.AMR.OctantBWG(2, (2, 0, 0)), 4, 3) == Ferrite.AMR.OctantBWG(2, (4, 2, -2))
+    @test Ferrite.AMR.corner_neighbor(Ferrite.AMR.OctantBWG(2, (2, 0, 0)), 8, 3) == Ferrite.AMR.OctantBWG(2, (4, 2, 2))
 
-    @test Ferrite.AMR.corner_neighbor(Ferrite.AMR.Ferrite.AMR.OctantBWG(2, (2, 0)), 1, 3) == Ferrite.AMR.Ferrite.AMR.OctantBWG(2, (0, -2))
-    @test Ferrite.AMR.corner_neighbor(Ferrite.AMR.Ferrite.AMR.OctantBWG(2, (2, 0)), 2, 3) == Ferrite.AMR.Ferrite.AMR.OctantBWG(2, (4, -2))
-    @test Ferrite.AMR.corner_neighbor(Ferrite.AMR.Ferrite.AMR.OctantBWG(2, (2, 0)), 4, 3) == Ferrite.AMR.Ferrite.AMR.OctantBWG(2, (4, 2))
+    @test Ferrite.AMR.corner_neighbor(Ferrite.AMR.OctantBWG(2, (2, 0)), 1, 3) == Ferrite.AMR.OctantBWG(2, (0, -2))
+    @test Ferrite.AMR.corner_neighbor(Ferrite.AMR.OctantBWG(2, (2, 0)), 2, 3) == Ferrite.AMR.OctantBWG(2, (4, -2))
+    @test Ferrite.AMR.corner_neighbor(Ferrite.AMR.OctantBWG(2, (2, 0)), 4, 3) == Ferrite.AMR.OctantBWG(2, (4, 2))
 end
 
 @testset "isancestor" begin

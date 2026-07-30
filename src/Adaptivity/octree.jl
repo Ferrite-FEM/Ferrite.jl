@@ -34,7 +34,7 @@ end
 struct OctantBWG{dim, N, T <: Integer} <: Ferrite.AbstractCell{Ferrite.RefHypercube{dim}}
     #Refinement level
     l::T
-    #x,y,z \in {0,...,2^b} where (0 ≤ l ≤ b)}
+    #x,y,z \in {0,...,2^b} where (0 ≤ l ≤ b)
     xyz::NTuple{dim, T}
 end
 
@@ -103,7 +103,7 @@ Base.zero(::Type{OctantBWG{2, 4}}) = OctantBWG(2, 0, 1)
 root(dim::T) where {T <: Integer} = zero(OctantBWG{dim, 2^dim})
 
 nchilds(::Type{OctantBWG{dim, N, T}}) where {dim, N, T} = N
-nchilds(o::OctantBWG) = nchilds(typeof(o)) # Follow z order, x before y before z for faces, edges and corners
+nchilds(o::OctantBWG) = nchilds(typeof(o))
 
 Base.isequal(o1::OctantBWG, o2::OctantBWG) = (o1.l == o2.l) && (o1.xyz == o2.xyz)
 Base.hash(o::OctantBWG, h::UInt) = hash(o.xyz, hash(o.l, h))
@@ -574,7 +574,7 @@ end
 """
     child_id(octant::OctantBWG, b::Integer)
 Given some OctantBWG `octant` and maximum refinement level `b`, compute the child_id of `octant`
-note the following quote from Bursedde et al:
+note the following quote from Burstedde et al:
   children are numbered from 0 for the front lower left child,
   to 1 for the front lower right child, to 2 for the back lower left, and so on, with
   4, . . . , 7 being the four children on top of the children 0, . . . , 3.
@@ -783,7 +783,7 @@ _face_edge_corners(edge::Int, face::Int) = 𝒯[edge, face]
 _edge_corners(edge::Int) = 𝒰[edge, :]
 # return the `i`-th edge corner of `edge`
 _edge_corners(edge::Int, i::Int) = 𝒰[edge, i]
-# finds face corner ξ′ in f′ for two associated faces f,f′ in {1,...,6} and their orientation r in {1,...,4}}
+# finds face corner ξ′ in f′ for two associated faces f,f′ in {1,...,6} and their orientation r in {1,...,4}
 _neighbor_corner(f::Int, f′::Int, r::Int, ξ::Int) = 𝒫[𝒬[ℛ[f, f′], r], ξ]
 
 # map given `face` to its corners `c`. Need to provide dim for different lookup

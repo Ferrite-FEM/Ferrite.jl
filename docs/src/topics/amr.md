@@ -45,8 +45,8 @@ x-----------x-----------x   -------->   x-----x-----x-----------x
 x-----------x-----------x               x-----x-----x-----------x
  1           2           3               1     10     2           3
 ```
-The new introduced nodes 10, 11 and 12 are shared and therefore are not hanging nodes.
-However, the nodes 14 and 13 are not shared with the neighboring coarser element and therefore hanging.
+The newly introduced nodes 10 and 11 lie on the domain boundary and node 12 is shared by all four new elements, so none of them is hanging.
+However, the nodes 13 and 14 lie on edges of the neighboring coarser elements without being nodes of those elements and are therefore hanging.
 
 ### Implications of Hanging Nodes
 
@@ -64,12 +64,12 @@ For example, in a linear finite element method, the value at a hanging node can 
 As for the example above node 13 could be constrained to $\boldsymbol{u}[13]=0.5\boldsymbol{u}[5]+0.5\boldsymbol{u}[2]$.
 In general, for linear ($Q_1$) interpolations each hanging node is constrained to the average of its masters — weight `1/length(masters)`, i.e. `1/2` for an edge midpoint and `1/4` for a face center in 3D — which is exactly the value that makes the field continuous across the non-conforming interface.
 As soon as higher polynomial degrees are involved, things become more involved.
-In Ferrite, a conformity constraint can be constructed with the ConstraintHandler when using a DofHandler which has been constructed with a grid passed from `Ferrite.creategrid(adaptive_grid::ForestBWG)`.
+In Ferrite, a conformity constraint can be constructed with the ConstraintHandler when using a DofHandler which has been constructed with a grid passed from `creategrid(adaptive_grid::ForestBWG)`.
 This conformity constraint ensures that each hanging node is constrained appropriately.
 
 ```julia
 ch = ConstraintHandler(dh)
-add!(ch, Ferrite.ConformityConstraint(:u))
+add!(ch, ConformityConstraint(:u))
 ```
 
 ## Balancing
@@ -103,9 +103,9 @@ x-----x--x--x           |               x-----x--x--x-----x-----|
 x-----x-----x-----------x               x-----x-----x-----------x
 ```
 
-Note that in the example above, the top right element hasn't been refined.
-However, in some cases it is advantageous to do so in order to have a smoother transition in element size.
-Therefore, by default, the adaptive mesh is also refined over this vertex, leading to the following result:
+Note that in the example above, the top right element hasn't been refined: it touches the finest elements only at a single vertex, so a scheme that balances only across faces would leave it untouched.
+Ferrite enforces the 2:1 balance also across vertices (and edges in 3D), both for a smoother transition in element size and because the constraint construction requires it.
+The mesh is therefore also refined over this vertex, leading to the following result:
 
 ```
 x-----------x-----------x               x-----------x-----------x
@@ -130,7 +130,7 @@ x-----x-----x-----------x               x-----x-----x-----------x
 In Ferrite's p4est implementation, one must call `balanceforest!` to balance the adaptive grid to ensure all algorithms work correctly.
 
 ```julia
-Ferrite.balanceforest!(adaptive_grid)
+balanceforest!(adaptive_grid)
 ```
 
 ## Error Estimation

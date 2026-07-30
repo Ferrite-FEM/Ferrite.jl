@@ -21,7 +21,7 @@ include(joinpath(@__DIR__, "test_utils.jl"))
     @test length(transferred_grid.nodes) == 19
     @test unique(transferred_grid.nodes) == transferred_grid.nodes
 
-    #2D case with four trees and somewhat refinement pattern
+    #2D case with four trees and a nonuniform refinement pattern
     grid = generate_grid(Quadrilateral, (2, 2))
     adaptive_grid = ForestBWG(grid, 3)
     Ferrite.AMR.refine_all!(adaptive_grid, 1)

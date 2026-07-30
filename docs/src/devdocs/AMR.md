@@ -24,15 +24,15 @@ The basic idea is that each Octant (in 3D) or quadrant (in 2D) can be encoded by
 - the lower left (front) coordinates `xyz`
 
 Based on them a unique identifier, the morton index, can be computed.
-The mapping from (`l`, `xyz`) -> `mortonidx(l,xyz)` is bijective, meaning we can flip the approach
-and can construct each octant/quadrant solely by the `mortonidx` and a given level `l`.
+The mapping from (`l`, `xyz`) to the morton index is bijective, meaning we can flip the approach
+and construct each octant/quadrant solely from the morton index and a given level `l`.
 
-The current implementation of an octant looks currently like this:
+The current implementation of an octant looks like this:
 ```julia
 struct OctantBWG{dim, N, T <: Integer} <: AbstractCell{RefHypercube{dim}}
     #Refinement level
     l::T
-    #x,y,z \in {0,...,2^b} where (0 ≤ l ≤ b)}
+    #x,y,z \in {0,...,2^b} where (0 ≤ l ≤ b)
     xyz::NTuple{dim, T}
 end
 ```
@@ -41,7 +41,7 @@ Note that the acronym BWG stands for the initials of the surname of the authors 
 The coordinates of an octant are described in the *octree coordinate system* which goes from $[0,2^b]^{dim}$.
 The parameter $b$ describes the maximum level of refinement and is set a priori.
 Another important aspect of the octree coordinate system is, that it is a discrete integer coordinate system, which has the advantage over float point based coordinate systems when matching coordinates that comparisons are guaranteed to be exact by construction.
-The size of an octant at the lowest possible level `b` is always 1, sometimes these octants are called atoms.
+The size of an octant at the finest possible level `b` is always 1, sometimes these octants are called atoms.
 
 The octree is implemented as:
 ```julia
@@ -65,15 +65,15 @@ So, our root is on level 0 of size 8 and has the lower left coordinates `(0,0)`
 ```julia
 # different constructors available, first one OctantBWG(dim,level,mortonid,maximumlevel)
 # other possibility by giving directly level and a tuple of coordinates OctantBWG(level,(x,y))
-julia > dim = 2; level = 0; maximumlevel = 3
-julia > oct = Ferrite.AMR.OctantBWG(dim, level, 1, maximumlevel)
-OctantBWG{2, 4, Int64}
-l = 0
-xy = 0, 0
+julia> dim = 2; level = 0; maximumlevel = 3
+julia> oct = Ferrite.AMR.OctantBWG(dim, level, 1, maximumlevel)
+OctantBWG{2,4,Int64}
+   l = 0
+   xy = 0,0
 ```
 The size of octants at a specific level can be computed by a simple operation
 ```julia
-julia > Ferrite.AMR._compute_size(#=b=# 3, #=l=# 0)
+julia> Ferrite.AMR._compute_size(#=b=# 3, #=l=# 0)
 8
 ```
 This computation is based on the relation $\text{size}=2^{b-l}$.
@@ -82,29 +82,29 @@ This means, that the octants are now of size $2^{3-1}=4$.
 Construct all level 1 octants based on mortonid:
 ```julia
 # note the arguments are dim,level,mortonid,maximumlevel
-julia > dim = 2; level = 1; maximumlevel = 3
-julia > oct = Ferrite.AMR.OctantBWG(dim, level, 1, maximumlevel)
-OctantBWG{2, 4, Int64}
-l = 1
-xy = 0, 0
+julia> dim = 2; level = 1; maximumlevel = 3
+julia> oct = Ferrite.AMR.OctantBWG(dim, level, 1, maximumlevel)
+OctantBWG{2,4,Int64}
+   l = 1
+   xy = 0,0
 
-julia > oct = Ferrite.AMR.OctantBWG(dim, level, 2, maximumlevel)
-OctantBWG{2, 4, Int64}
-l = 1
-xy = 4, 0
+julia> oct = Ferrite.AMR.OctantBWG(dim, level, 2, maximumlevel)
+OctantBWG{2,4,Int64}
+   l = 1
+   xy = 4,0
 
-julia > oct = Ferrite.AMR.OctantBWG(dim, level, 3, maximumlevel)
-OctantBWG{2, 4, Int64}
-l = 1
-xy = 0, 4
+julia> oct = Ferrite.AMR.OctantBWG(dim, level, 3, maximumlevel)
+OctantBWG{2,4,Int64}
+   l = 1
+   xy = 0,4
 
-julia > oct = Ferrite.AMR.OctantBWG(dim, level, 4, maximumlevel)
-OctantBWG{2, 4, Int64}
-l = 1
-xy = 4, 4
+julia> oct = Ferrite.AMR.OctantBWG(dim, level, 4, maximumlevel)
+OctantBWG{2,4,Int64}
+   l = 1
+   xy = 4,4
 ```
 
-So, the morton index is on **one** specific level just a x before y before z "cell" or "element" identifier
+So, the morton index is on **one** specific level just an x before y before z "cell" or "element" identifier
 ```
 x-----------x-----------x
 |           |           |
@@ -123,7 +123,7 @@ x-----------x-----------x
 
 The operation to compute octants/quadrants is cheap, since it is just bitshifting.
 An important aspect of the morton index is that it's only consecutive on **one** level in this specific implementation.
-Note that other implementation exists that incorporate the level integer within the morton identifier and by that have a unique identifier across levels.
+Note that other implementations exist that incorporate the level integer within the morton identifier and thereby have a unique identifier across levels.
 If you have a tree like this below:
 
 ```
@@ -152,7 +152,7 @@ julia> o = Ferrite.AMR.OctantBWG(2,1,8,3)
 ERROR: AssertionError: m ≤ (one(T1) + one(T1)) ^ (dim * l)
 Stacktrace:
  [1] OctantBWG(dim::Int64, l::Int64, m::Int64, b::Int64)
-   @ Ferrite.AMR ~/repos/Ferrite.jl/src/Adaptivity/octree.jl:32
+   @ Ferrite.AMR Ferrite.jl/src/Adaptivity/octree.jl:47
  [2] top-level scope
    @ REPL[1]:1
 ```
@@ -161,13 +161,13 @@ The assertion expresses that it is not possible to construct a morton index 8 oc
 The morton index of the lower right cell is 2 on level 1.
 
 ```julia
-julia > o = Ferrite.AMR.OctantBWG(2, 1, 2, 3)
-OctantBWG{2, 4, Int64}
-l = 1
-xy = 4, 0
+julia> o = Ferrite.AMR.OctantBWG(2, 1, 2, 3)
+OctantBWG{2,4,Int64}
+   l = 1
+   xy = 4,0
 ```
 
-### Octant operation
+### Octant operations
 
 There are multiple useful functions to compute information about an octant e.g. parent, children, etc.
 
@@ -180,9 +180,9 @@ Ferrite.AMR.edges
 Ferrite.AMR.faces
 ```
 
-### Intraoctree operation
+### Intraoctree operations
 
-Intraoctree operation stay within one octree and compute octants that are attached in some way to a pivot octant `o`.
+Intraoctree operations stay within one octree and compute octants that are attached in some way to a pivot octant `o`.
 These operations are useful to collect unique entities within a single octree or to compute possible neighbors of `o`.
 [BWG2011](@citet) Algorithm 5, 6, and 7 describe the following intraoctree operations:
 
@@ -193,9 +193,9 @@ Ferrite.AMR.facet_neighbor
 Ferrite.AMR.possibleneighbors
 ```
 
-### Interoctree operation
+### Interoctree operations
 
-Interoctree operation are in contrast to intraoctree operation by computing octant transformations across different octrees.
+Interoctree operations, in contrast to intraoctree operations, compute octant transformations across different octrees.
 Thereby, one needs to account for topological connections between the octrees as well as possible rotations of the octrees.
 [BWG2011](@citet) Algorithm 8, 10, and 12 explain the algorithms that are implemented in the following functions:
 
@@ -205,7 +205,7 @@ Ferrite.AMR.transform_edge
 Ferrite.AMR.transform_facet
 ```
 
-Note that we flipped the input and to expected output logic a bit to the proposed algorithms of the paper.
+Note that, compared to the algorithms proposed in the paper, we flipped the input and output logic a bit.
 However, the original proposed versions are implemented as well in:
 
 ```@docs
@@ -214,7 +214,7 @@ Ferrite.AMR.transform_edge_remote
 Ferrite.AMR.transform_facet_remote
 ```
 
-despite being never used in the code base so far.
+although they are currently only used in the test suite.
 
 ### Refinement and coarsening
 

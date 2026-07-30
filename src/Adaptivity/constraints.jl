@@ -72,7 +72,6 @@ end
 
 function _add_conformity_constraint(ch::ConstraintHandler, field_index::Int, interpolation::Lagrange{<:Any, 1})
     # Reached only for a NonConformingGrid, so the entity maps are guaranteed to be present.
-    # type annotated for the compiler
     vertices = (ch.dh.entitymaps::Ferrite.EntityMaps).vertices[field_index]
     for (hdof, mdof) in ch.dh.grid.conformity_info
         # A hanging node is the average of its masters: an edge midpoint of its 2 endpoints
