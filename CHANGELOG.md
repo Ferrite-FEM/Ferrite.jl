@@ -43,6 +43,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
  - New tutorial on Darcy flow using H(div)-conforming Raviart-Thomas elements ([#1388])
 
 ### Fixes
+ - `PointValues` can now be reinitialized with the current cell, enabling evaluation of
+   interpolations with non-identity mappings such as Nedelec and Raviart-Thomas elements.
+   ([#1420])
  - `FacetIterator` now works with `AbstractVector{FacetIndex}` and `AbstractSet{FacetIndex}` inputs as documented, instead of requiring an `OrderedSet` ([#1384])
  - `ProjectedDirichlet` now updates the correct dofs when the constrained field is not the first
    field in the `DofHandler`; previously the dof lookup ignored the field offset in the cell dof
@@ -50,10 +53,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
  - The error thrown when assembling into a matrix entry that is missing from the sparsity
    pattern now reports the row that is actually missing, rather than an unrelated row that
    happened to be stored in the same column ([#1414])
+ - Asymmetric `interface_coupling` masks in `allocate_matrix`/`add_interface_entries!` now
+   follow the same convention as the cell `coupling`: `interface_coupling[i, j] = true`
+   creates entries in the blocks (rows of field `i`) × (columns of field `j`) for both
+   orientations of every interface. Previously `interface_coupling[i, j] = true` created
+   entries in both the `(i, j)` and the transposed `(j, i)` block, and the result could
+   depend on the (internal) orientation of the interface. Symmetric masks, for which the
+   two conventions coincide, are not affected. In addition, interface entries are no
+   longer computed twice for interfaces where both cells belong to the same
+   `SubDofHandler`.
  - Fix bug applying the transpose operation in condensation of `AffineConstraints`. This bug gave
    silently wrong results when used on non-symmetric system matrices, but did not affect system matrices
    that were symmetric ([#1426])
-
 
 ## [v1.5.0] - 2026-07-13
 
@@ -1227,12 +1238,9 @@ poking into Ferrite internals:
 [#1226]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1226
 [#1228]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1228
 [#1235]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1235
-<<<<<<< HEAD
 [#1238]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1238
-=======
 [#1388]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1388
 [#1389]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1389
 [#1414]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1414
 [#1416]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1416
 [#1421]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1421
->>>>>>> master
