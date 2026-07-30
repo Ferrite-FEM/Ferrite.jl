@@ -27,9 +27,12 @@ end
             (Lagrange{RefTriangle, 4}(), QuadratureRule{RefTriangle}(2)),
             (Lagrange{RefTriangle, 5}(), QuadratureRule{RefTriangle}(2)),
             (Lagrange{RefHexahedron, 1}(), QuadratureRule{RefHexahedron}(2)),
+            (Lagrange{RefHexahedron, 3}(), QuadratureRule{RefHexahedron}(2)),
             (Serendipity{RefQuadrilateral, 2}(), QuadratureRule{RefQuadrilateral}(2)),
             (Lagrange{RefTriangle, 1}(), QuadratureRule{RefTriangle}(2)),
             (Lagrange{RefTetrahedron, 2}(), QuadratureRule{RefTetrahedron}(2)),
+            (Lagrange{RefTetrahedron, 3}(), QuadratureRule{RefTetrahedron}(2)),
+            (Lagrange{RefTetrahedron, 4}(), QuadratureRule{RefTetrahedron}(2)),
             (Lagrange{RefPrism, 2}(), QuadratureRule{RefPrism}(2)),
             (Lagrange{RefPyramid, 2}(), QuadratureRule{RefPyramid}(2)),
         )

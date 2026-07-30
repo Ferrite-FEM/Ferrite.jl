@@ -416,11 +416,20 @@ end
     InterfaceOrientationInfo(cell_a::AbstractCell, cell_b::AbstractCell, facet_a::Int, facet_b::Int)
 
 Return the relative orientation info for facet B with regards to facet A.
-Relative orientation is computed using a [`OrientationInfo`](@ref) for each side of the interface.
+Relative orientation is computed using a [`PathOrientationInfo`](@ref) (for 2D cells, where
+the facets are 1D entities) or a [`SurfaceOrientationInfo`](@ref) (for 3D cells, where the
+facets are 2D entities) for each side of the interface.
 """
-function InterfaceOrientationInfo(cell_a::AbstractCell{RefShapeA}, cell_b::AbstractCell{RefShapeB}, facet_a::Int, facet_b::Int) where {RefShapeA <: AbstractRefShape, RefShapeB <: AbstractRefShape}
-    OI_a = OrientationInfo(facets(cell_a)[facet_a])
-    OI_b = OrientationInfo(facets(cell_b)[facet_b])
+function InterfaceOrientationInfo(cell_a::AbstractCell{RefShapeA}, cell_b::AbstractCell{RefShapeB}, facet_a::Int, facet_b::Int) where {RefShapeA <: AbstractRefShape{2}, RefShapeB <: AbstractRefShape{2}}
+    OI_a = PathOrientationInfo(facets(cell_a)[facet_a])
+    OI_b = PathOrientationInfo(facets(cell_b)[facet_b])
+    flipped = OI_a.regular != OI_b.regular
+    return InterfaceOrientationInfo{RefShapeA, RefShapeB}(flipped, 0, 0, facet_a, facet_b)
+end
+
+function InterfaceOrientationInfo(cell_a::AbstractCell{RefShapeA}, cell_b::AbstractCell{RefShapeB}, facet_a::Int, facet_b::Int) where {RefShapeA <: AbstractRefShape{3}, RefShapeB <: AbstractRefShape{3}}
+    OI_a = SurfaceOrientationInfo(facets(cell_a)[facet_a])
+    OI_b = SurfaceOrientationInfo(facets(cell_b)[facet_b])
     flipped = OI_a.flipped != OI_b.flipped
     shift_index = OI_b.shift_index - OI_a.shift_index
     return InterfaceOrientationInfo{RefShapeA, RefShapeB}(flipped, shift_index, OI_b.shift_index, facet_a, facet_b)

@@ -802,3 +802,279 @@ end
     #Shared face dof
     @test dofsshell[9] == 24
 end
+
+@testset "dof distribution on a mixed-dimensional shared face" begin
+    # A 2D cell can share its interior face dofs with a face of a 3D cell through
+    # SubDofHandlers. Both cells must associate every shared global dof with the same
+    # physical location, regardless of the 2D cell orientation or which SubDofHandler is
+    # visited first.
+    solid_grid = generate_grid(Hexahedron, (1, 1, 1))
+    solid = solid_grid.cells[1]
+    nodes = solid_grid.nodes
+    face = (4, 3, 7, 8)
+    shell_orientations = (
+        face,
+        (face[2], face[3], face[4], face[1]),
+        (face[3], face[4], face[1], face[2]),
+        (face[4], face[1], face[2], face[3]),
+        reverse(face),
+        (face[3], face[2], face[1], face[4]),
+        (face[2], face[1], face[4], face[3]),
+        (face[1], face[4], face[3], face[2]),
+    )
+
+    ip_solid = Lagrange{RefHexahedron, 3}()
+    ip_shell = Lagrange{RefQuadrilateral, 3}()
+    ipg_solid = Lagrange{RefHexahedron, 1}()
+    ipg_shell = Lagrange{RefQuadrilateral, 1}()
+    for shell_nodes in shell_orientations, shell_first in (false, true)
+        grid = Grid([solid, Quadrilateral(shell_nodes)], nodes)
+        dh = DofHandler(grid)
+        if shell_first
+            sdh_shell = SubDofHandler(dh, Set(2))
+            add!(sdh_shell, :u, ip_shell)
+            sdh_solid = SubDofHandler(dh, Set(1))
+            add!(sdh_solid, :u, ip_solid)
+        else
+            sdh_solid = SubDofHandler(dh, Set(1))
+            add!(sdh_solid, :u, ip_solid)
+            sdh_shell = SubDofHandler(dh, Set(2))
+            add!(sdh_shell, :u, ip_shell)
+        end
+        close!(dh)
+
+        dof_location = Dict{Int, Vec{3, Float64}}()
+        nclash = 0
+        for (cellnr, ip, ipg) in (
+                (1, ip_solid, ipg_solid),
+                (2, ip_shell, ipg_shell),
+            )
+            x = getcoordinates(grid, cellnr)
+            for (dof, ξ) in zip(celldofs(dh, cellnr), Ferrite.reference_coordinates(ip))
+                xdof = sum(Ferrite.reference_shape_value(ipg, ξ, k) * x[k] for k in eachindex(x))
+                loc = get!(dof_location, dof, xdof)
+                isapprox(loc, xdof; atol = 1.0e-12) || (nclash += 1)
+            end
+        end
+        @test nclash == 0
+        shared = intersect(Set(celldofs(dh, 1)), Set(celldofs(dh, 2)))
+        @test length(shared) == 16 # 4 vertex + 4 * 2 edge + 4 face dofs
+    end
+end
+
+@testset "canonical facedof index helpers" begin
+    # Brute-force geometric checks of the helpers used by Ferrite.permute_and_push! to
+    # adjust face dofs to the orientation of the local face: the local lattice point must
+    # map to the index of the canonical lattice point at the same location.
+
+    # Triangular faces: all 6 orientations of a face spanned by nodes (1, 2, 3). The
+    # position (scaled by q + 3) of the lattice point with sub-multi-index t relative to
+    # the face fc is given by the barycentric weights (t .+ 1) on the face vertices.
+    tri_positions = (Vec((0, 0)), Vec((1, 0)), Vec((0, 1)))
+    tri_point(t, fc) = (t[1] + 1) * tri_positions[fc[1]] + (t[2] + 1) * tri_positions[fc[2]] + (t[3] + 1) * tri_positions[fc[3]]
+    tri_faces = ((1, 2, 3), (2, 3, 1), (3, 1, 2), (1, 3, 2), (3, 2, 1), (2, 1, 3))
+    for q in 0:3, local_face in tri_faces
+        orientation = Ferrite.SurfaceOrientationInfo(local_face)
+        # Canonical enumeration of the lattice points for the sorted face (1, 2, 3)
+        canonical_points = [tri_point((t1, t2, q - t1 - t2), (1, 2, 3)) for t2 in 0:q for t1 in 0:(q - t2)]
+        cidxs = Int[]
+        for t2 in 0:q, t1 in 0:(q - t2)
+            x = tri_point((t1, t2, q - t1 - t2), local_face)
+            cidx = Ferrite._canonical_facedof_index_triangle(t1, t2, q, orientation)
+            push!(cidxs, cidx)
+            @test canonical_points[cidx] == x
+        end
+        @test sort(cidxs) == 1:length(canonical_points) # bijection
+    end
+
+    # Quadrilateral faces: all 8 orientations of a face spanned by nodes (1, 2, 3, 4). The
+    # position (scaled by (m + 1)²) of the interior lattice point (i, j) relative to the
+    # face fc follows from bilinear interpolation of the corners.
+    quad_positions = (Vec((0, 0)), Vec((1, 0)), Vec((1, 1)), Vec((0, 1)))
+    function quad_point(i, j, m, fc)
+        u, v, w = i + 1, j + 1, m + 1
+        return (w - u) * (w - v) * quad_positions[fc[1]] + u * (w - v) * quad_positions[fc[2]] +
+            u * v * quad_positions[fc[3]] + (w - u) * v * quad_positions[fc[4]]
+    end
+    quad_faces = (
+        (1, 2, 3, 4), (2, 3, 4, 1), (3, 4, 1, 2), (4, 1, 2, 3), # rotations
+        (1, 4, 3, 2), (4, 3, 2, 1), (3, 2, 1, 4), (2, 1, 4, 3), # reversed rotations
+    )
+    for m in 1:3, local_face in quad_faces
+        orientation = Ferrite.SurfaceOrientationInfo(local_face)
+        canonical_points = [quad_point(i, j, m, (1, 2, 3, 4)) for j in 0:(m - 1) for i in 0:(m - 1)]
+        cidxs = Int[]
+        for j in 0:(m - 1), i in 0:(m - 1)
+            x = quad_point(i, j, m, local_face)
+            cidx = Ferrite._canonical_facedof_index_quadrilateral(i, j, m, orientation)
+            push!(cidxs, cidx)
+            @test canonical_points[cidx] == x
+        end
+        @test sort(cidxs) == 1:length(canonical_points) # bijection
+    end
+end
+
+@testset "interior_facedofs_on_lattice opt-in" begin
+    # Permuting multiple dofs on a shared 3D face requires opting in to the lattice
+    # assumption; interpolations that have not opted in must error rather than silently
+    # produce a wrong (non-lattice) permutation.
+    @test Ferrite.interior_facedofs_on_lattice(Lagrange{RefTetrahedron, 4}())
+    @test Ferrite.interior_facedofs_on_lattice(Lagrange{RefTetrahedron, 4}()^3)
+    @test !Ferrite.interior_facedofs_on_lattice(Nedelec{RefTetrahedron, 1}()) # default
+
+    orientation = Ferrite.SurfaceOrientationInfo((2, 3, 1)) # a rotated triangular face
+    dofs = 1:1:3 # three interior face dofs, n_copies = 1
+    # rdim = 3, adjust = true, multiple dofs, not on lattice => error
+    @test_throws ErrorException Ferrite.permute_and_push!(Int[], dofs, orientation, true, false, 3, 3)
+    # On a lattice it permutes the three dofs without error
+    cell_dofs = Int[]
+    Ferrite.permute_and_push!(cell_dofs, dofs, orientation, true, true, 3, 3)
+    @test length(cell_dofs) == 3
+    # A lattice interpolation on a 2D cell uses the same canonical face ordering so it can
+    # share these dofs with a 3D face.
+    cell_dofs_2d = Int[]
+    Ferrite.permute_and_push!(cell_dofs_2d, dofs, orientation, true, true, 3, 2)
+    @test cell_dofs_2d == cell_dofs
+    # Non-lattice face dofs on a 2D cell retain their local ordering.
+    cell_dofs_2d_nonlattice = Int[]
+    Ferrite.permute_and_push!(cell_dofs_2d_nonlattice, dofs, orientation, true, false, 3, 2)
+    @test cell_dofs_2d_nonlattice == collect(dofs)
+end
+
+@testset "dof distribution on shared faces" begin
+    # Two cells sharing an entity must associate the same global dof with the same location
+    # on the entity, regardless of the relative orientation of the cells. For
+    # Lagrange{RefTetrahedron, 3} this requires adjusting multiple dofs per edge, and for
+    # Lagrange{RefTetrahedron, 4} additionally multiple dofs per face, see
+    # Ferrite.permute_and_push!.
+    all_permutations(t::NTuple{4, Int}) = [
+        (t[i], t[j], t[k], t[l]) for i in 1:4 for j in 1:4 for k in 1:4 for l in 1:4
+            if length(unique((i, j, k, l))) == 4
+    ]
+    nodes = Node.(
+        [
+            Vec((0.0, 0.0, 0.0)), Vec((1.0, 0.0, 0.0)), Vec((0.0, 1.0, 0.0)),
+            Vec((0.0, 0.0, 1.0)), Vec((1.0, 1.0, 1.0)),
+        ]
+    )
+    ipg = Lagrange{RefTetrahedron, 1}() # geometric interpolation of Tetrahedron
+    for (ip, nshared) in (
+            (Lagrange{RefTetrahedron, 2}(), 6),  # 3 vertex + 3 * 1 edge dofs
+            (Lagrange{RefTetrahedron, 3}(), 10), # 3 vertex + 3 * 2 edge + 1 face dofs
+            (Lagrange{RefTetrahedron, 4}(), 15), # 3 vertex + 3 * 3 edge + 3 face dofs
+            (Lagrange{RefTetrahedron, 4}()^2, 30),
+        )
+        base_ip = ip isa VectorizedInterpolation ? ip.ip : ip
+        n_copies = ip isa VectorizedInterpolation ? Ferrite.get_n_copies(ip) : 1
+        ξs = Ferrite.reference_coordinates(base_ip)
+        # Loop over all orderings of the cell vertices for both cells. The cells share the
+        # face spanned by nodes (2, 3, 4).
+        for tet1 in all_permutations((1, 2, 3, 4)), tet2 in all_permutations((2, 3, 4, 5))
+            grid = Grid([Tetrahedron(tet1), Tetrahedron(tet2)], nodes)
+            dh = close!(add!(DofHandler(grid), :u, ip))
+            # Compute the location of each global dof from each cell and check consistency
+            dof_location = Dict{Int, Tuple{Vec{3, Float64}, Int}}()
+            nclash = 0
+            for cellnr in 1:2
+                x = getcoordinates(grid, cellnr)
+                cdofs = celldofs(dh, cellnr)
+                for (i, ξ) in pairs(ξs)
+                    xdof = sum(Ferrite.reference_shape_value(ipg, ξ, k) * x[k] for k in 1:length(x))
+                    for c in 1:n_copies
+                        dof = cdofs[(i - 1) * n_copies + c]
+                        loc = get!(dof_location, dof, (xdof, c))
+                        if !(isapprox(loc[1], xdof; atol = 1.0e-12) && loc[2] == c)
+                            nclash += 1
+                        end
+                    end
+                end
+            end
+            @test nclash == 0
+            # Check that the expected number of dofs are shared between the cells
+            shared = intersect(Set(celldofs(dh, 1)), Set(celldofs(dh, 2)))
+            @test length(shared) == nshared
+            @test ndofs(dh) == 2 * getnbasefunctions(ip) - nshared
+        end
+    end
+end
+
+@testset "dof distribution on shared faces (hexahedron)" begin
+    # Two hexahedra sharing a quadrilateral face must associate the same global dof with the
+    # same location on the face for any relative orientation of the cells. For
+    # Lagrange{RefHexahedron, 3} the shared face carries multiple interior dofs, exercising
+    # the quadrilateral branch of Ferrite.permute_and_push!.
+
+    # Centered coordinates of the 8 hex corners in Ferrite (reference) node ordering.
+    corner = (
+        (-1, -1, -1), (1, -1, -1), (1, 1, -1), (-1, 1, -1),
+        (-1, -1, 1), (1, -1, 1), (1, 1, 1), (-1, 1, 1),
+    )
+    col_perms = ((1, 2, 3), (1, 3, 2), (2, 1, 3), (2, 3, 1), (3, 1, 2), (3, 2, 1))
+    matvec(R, v) = ntuple(r -> sum(R[r][c] * v[c] for c in 1:3), 3)
+    det3(R) =
+        R[1][1] * (R[2][2] * R[3][3] - R[2][3] * R[3][2]) -
+        R[1][2] * (R[2][1] * R[3][3] - R[2][3] * R[3][1]) +
+        R[1][3] * (R[2][1] * R[3][2] - R[2][2] * R[3][1])
+    # All 24 proper rotations of the cube, as permutations of the corner slots that keep the
+    # (positively oriented) hexahedron valid.
+    rotations = NTuple{8, Int}[]
+    for cols in col_perms, s1 in (-1, 1), s2 in (-1, 1), s3 in (-1, 1)
+        s = (s1, s2, s3)
+        R = ntuple(r -> ntuple(c -> (c == cols[r] ? s[r] : 0), 3), 3)
+        det3(R) == 1 || continue
+        push!(rotations, ntuple(j -> findfirst(==(matvec(R, corner[j])), corner), 8))
+    end
+    @test length(rotations) == 24
+
+    # Two stacked unit cubes: the bottom cube (nodes 1-8) and the top cube (nodes 5-8 shared
+    # with the bottom cube, plus new nodes 9-12), sharing the z = 1 face.
+    nodes = Node.(
+        [
+            Vec((0.0, 0.0, 0.0)), Vec((1.0, 0.0, 0.0)), Vec((1.0, 1.0, 0.0)), Vec((0.0, 1.0, 0.0)),
+            Vec((0.0, 0.0, 1.0)), Vec((1.0, 0.0, 1.0)), Vec((1.0, 1.0, 1.0)), Vec((0.0, 1.0, 1.0)),
+            Vec((0.0, 0.0, 2.0)), Vec((1.0, 0.0, 2.0)), Vec((1.0, 1.0, 2.0)), Vec((0.0, 1.0, 2.0)),
+        ]
+    )
+    bottom = (1, 2, 3, 4, 5, 6, 7, 8)
+    top = (5, 6, 7, 8, 9, 10, 11, 12)
+    ipg = Lagrange{RefHexahedron, 1}() # geometric interpolation of Hexahedron
+    for (ip, nshared) in (
+            (Lagrange{RefHexahedron, 2}(), 9),  # 4 vertex + 4 * 1 edge + 1 face dofs
+            (Lagrange{RefHexahedron, 3}(), 16), # 4 vertex + 4 * 2 edge + 4 face dofs
+            (Lagrange{RefHexahedron, 3}()^2, 32),
+        )
+        base_ip = ip isa VectorizedInterpolation ? ip.ip : ip
+        n_copies = ip isa VectorizedInterpolation ? Ferrite.get_n_copies(ip) : 1
+        ξs = Ferrite.reference_coordinates(base_ip)
+        # Loop over all rotations of both cells (i.e. all relative orientations of the shared
+        # face).
+        for rot1 in rotations, rot2 in rotations
+            h1 = Hexahedron(ntuple(k -> bottom[rot1[k]], 8))
+            h2 = Hexahedron(ntuple(k -> top[rot2[k]], 8))
+            grid = Grid([h1, h2], nodes)
+            dh = close!(add!(DofHandler(grid), :u, ip))
+            # Compute the location of each global dof from each cell and check consistency
+            dof_location = Dict{Int, Tuple{Vec{3, Float64}, Int}}()
+            nclash = 0
+            for cellnr in 1:2
+                x = getcoordinates(grid, cellnr)
+                cdofs = celldofs(dh, cellnr)
+                for (i, ξ) in pairs(ξs)
+                    xdof = sum(Ferrite.reference_shape_value(ipg, ξ, k) * x[k] for k in 1:length(x))
+                    for c in 1:n_copies
+                        dof = cdofs[(i - 1) * n_copies + c]
+                        loc = get!(dof_location, dof, (xdof, c))
+                        if !(isapprox(loc[1], xdof; atol = 1.0e-12) && loc[2] == c)
+                            nclash += 1
+                        end
+                    end
+                end
+            end
+            @test nclash == 0
+            # Check that the expected number of dofs are shared between the cells
+            shared = intersect(Set(celldofs(dh, 1)), Set(celldofs(dh, 2)))
+            @test length(shared) == nshared
+            @test ndofs(dh) == 2 * getnbasefunctions(ip) - nshared
+        end
+    end
+end
