@@ -1,0 +1,31 @@
+# Trusted half of the two-workflow Tachometer setup: this never runs code from the PR. The
+# reporter action resolves the PR from the trusted workflow_run event, downloads the benchmark
+# artifact produced by Benchmarks.yml, validates and re-renders report.json, and updates the
+# sticky PR comment (marking it stale while a new run is in progress).
+name: Benchmark report
+
+on:
+  workflow_run:
+    workflows: [Benchmarks] # must match the `name` in Benchmarks.yml
+    types: [requested, completed]
+
+permissions:
+  pull-requests: write
+  actions: read
+  contents: read
+
+jobs:
+  report:
+    name: Report
+    if: github.event.workflow_run.event == 'pull_request'
+    runs-on: ubuntu-latest
+    concurrency:
+      # Requested and completed events use separate groups: a quick "running" marker never
+      # waits behind a report, while newer markers supersede old ones.
+      group: tachometer-report-${{ github.event.action }}-${{ github.event.workflow_run.head_repository.full_name }}-${{ github.event.workflow_run.head_branch }}
+      cancel-in-progress: ${{ github.event.action == 'requested' }}
+    steps:
+      # Intentionally unpinned, same as in Benchmarks.yml: Tachometer is developed alongside
+      # this setup. Note that this action runs with the pull-requests write token, so pin it
+      # to a reviewed commit SHA if that ever changes.
+      - uses: KristofferC/Tachometer.jl/reporter@main

@@ -9,11 +9,12 @@
 examples/.ipynb_checkpoints/
 docs/build/
 docs/site/
+docs/screenshot-data/
+docs/screenshot-assets/
 docs/src/examples/
 docs/src/tutorials/
 docs/src/howto/
 docs/src/gallery/
-docs/src/topics/downloaded_assets/
 docs/src/changelog.md
 *.DS_Store
 /Manifest.toml
@@ -23,4 +24,3 @@ docs/src/changelog.md
 
 LocalPreferences.toml
 docs/LocalPreferences.toml
-benchmark/tune.json

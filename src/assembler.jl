@@ -152,11 +152,16 @@ end
 
 Assembles the element residual `ge` into the global residual vector `g`.
 """
-@propagate_inbounds function assemble!(g::AbstractVector{T}, dofs::AbstractVector{Int}, ge::AbstractVector{T}) where {T}
+@propagate_inbounds function assemble!(g::AbstractVector{T}, dofs::AbstractVector{Int}, ge::AbstractVector{T}, ::Val{atomic} = Val(false)) where {T, atomic}
     @boundscheck checkbounds(g, dofs)
     @boundscheck checkbounds(ge, keys(dofs))
     @inbounds for (i, dof) in pairs(dofs)
-        addindex!(g, ge[i], dof)
+        if atomic
+            v = ge[i]
+            iszero(v) || _atomic_add!(g, dof, v)
+        else
+            addindex!(g, ge[i], dof)
+        end
     end
     return
 end
@@ -170,10 +175,18 @@ assembly operations.
 """
 matrix_handle, vector_handle
 
+# The `atomic` type parameter of the assemblers below is a `Bool` deciding whether the
+# accumulation into the global matrix and vector uses atomic additions (see
+# `start_assemble` and `_addindex!`). It is a type parameter, and not a field, so that
+# the atomic and non-atomic assembly paths compile to separate specializations: with a
+# runtime flag the never-executed atomic code slows down the non-atomic path by 5-10%
+# (LLVM neither unswitches a branch at the accumulation site out of the assembly loops,
+# nor generates as good code when both paths are inlined next to each other).
+
 """
 Assembler for sparse matrix with CSC storage type.
 """
-struct CSCAssembler{Tv, Ti, MT <: AbstractSparseMatrixCSC{Tv, Ti}} <: AbstractCSCAssembler{Tv}
+struct CSCAssembler{Tv, Ti, MT <: AbstractSparseMatrixCSC{Tv, Ti}, atomic} <: AbstractCSCAssembler{Tv}
     K::MT
     f::Vector{Tv}
     rowpermutation::Vector{Int}
@@ -185,7 +198,7 @@ end
 """
 Assembler for sparse matrix with CSR storage type.
 """
-struct CSRAssembler{Tv, Ti, MT <: AbstractSparseMatrix{Tv, Ti}} <: AbstractCSRAssembler{Tv} #AbstractSparseMatrixCSR does not exist
+struct CSRAssembler{Tv, Ti, MT <: AbstractSparseMatrix{Tv, Ti}, atomic} <: AbstractCSRAssembler{Tv} #AbstractSparseMatrixCSR does not exist
     K::MT
     f::Vector{Tv}
     rowpermutation::Vector{Int}
@@ -197,13 +210,28 @@ end
 """
 Assembler for symmetric sparse matrix with CSC storage type.
 """
-struct SymmetricCSCAssembler{Tv, Ti, MT <: Symmetric{Tv, <:AbstractSparseMatrixCSC{Tv, Ti}}} <: AbstractCSCAssembler{Tv}
+struct SymmetricCSCAssembler{Tv, Ti, MT <: Symmetric{Tv, <:AbstractSparseMatrixCSC{Tv, Ti}}, atomic} <: AbstractCSCAssembler{Tv}
     K::MT
     f::Vector{Tv}
     rowpermutation::Vector{Int} # Symmetric assembly doesn't need separate row and
     colpermutation::Vector{Int} # col permutation and dofs, but simplifies code reuse
     sortedrowdofs::Vector{Int}  # reuse with non-symmetric cases. sortedrowdofs and
     sortedcoldofs::Vector{Int}  # rowpermutation always aliased to sortedcoldofs and colpermutation.
+end
+
+# Whether accumulation into the global matrix and vector uses atomic additions. This is a
+# compile time constant (see comment above) and the fallback covers assemblers that do
+# not support atomic assembly.
+_is_atomic(::CSCAssembler{<:Any, <:Any, <:Any, atomic}) where {atomic} = atomic::Bool
+_is_atomic(::CSRAssembler{<:Any, <:Any, <:Any, atomic}) where {atomic} = atomic::Bool
+_is_atomic(::SymmetricCSCAssembler{<:Any, <:Any, <:Any, atomic}) where {atomic} = atomic::Bool
+_is_atomic(::AbstractAssembler) = false
+
+function _check_atomic_eltype(atomic::Bool, ::Type{T}) where {T}
+    if atomic && !(T <: Union{Float32, Float64})
+        throw(ArgumentError("atomic assembly is only supported for eltypes Float32 and Float64, got $T"))
+    end
+    return
 end
 
 function Base.show(io::IO, ::MIME"text/plain", a::Union{CSCAssembler, CSRAssembler, SymmetricCSCAssembler})
@@ -222,13 +250,13 @@ matrix_handle(a::SymmetricCSCAssembler) = a.K.data
 vector_handle(a::Union{AbstractCSCAssembler, AbstractCSRAssembler}) = a.f
 
 """
-    start_assemble(K::AbstractSparseMatrixCSC{Tv}; fillzero::Bool = true) -> CSCAssembler{Tv}
-    start_assemble(K::AbstractSparseMatrixCSC{Tv}, f::Vector{Tv}; fillzero::Bool = true) -> CSCAssembler{Tv}
+    start_assemble(K::AbstractSparseMatrixCSC{Tv}; fillzero = true, atomic = false) -> CSCAssembler{Tv}
+    start_assemble(K::AbstractSparseMatrixCSC{Tv}, f::Vector{Tv}; fillzero = true, atomic = false) -> CSCAssembler{Tv}
 
 Create a `CSCAssembler{Tv}` from the matrix `K` and optional vector `f` with value type `Tv`.
 
-    start_assemble(K::Symmetric{AbstractSparseMatrixCSC{Tv}}; fillzero::Bool = true) -> SymmetricCSCAssembler{Tv}
-    start_assemble(K::Symmetric{AbstractSparseMatrixCSC{Tv}}, f::Vector = Tv[]; fillzero::Bool = true) -> SymmetricCSCAssembler{Tv}
+    start_assemble(K::Symmetric{AbstractSparseMatrixCSC{Tv}}; fillzero = true, atomic = false) -> SymmetricCSCAssembler{Tv}
+    start_assemble(K::Symmetric{AbstractSparseMatrixCSC{Tv}}, f::Vector = Tv[]; fillzero = true, atomic = false) -> SymmetricCSCAssembler{Tv}
 
 Create a `SymmetricCSCAssembler{Tv}` from the matrix `K` and optional vector `f` with value type `Tv`.
 
@@ -239,19 +267,37 @@ necessary for efficient matrix assembly. To assemble the contribution from an el
 The keyword argument `fillzero` can be set to `false` if `K` and `f` should not be zeroed
 out, but instead keep their current values.
 
+The keyword argument `atomic` can be set to `true` to make the accumulation into `K` and
+`f` use atomic additions. This makes it safe to assemble from multiple concurrent tasks
+*without* partitioning the cells into independent sets ("grid coloring"), at the cost of
+some overhead and a non-deterministic result: the order in which contributions are added
+to a given entry depends on the task scheduling, and floating point addition is not
+associative. Atomic accumulation is only supported for value types `Float32` and
+`Float64` (other value types throw an `ArgumentError`). Note that each task still needs
+its own assembler since the assembler contains buffers that are modified during
+`assemble!`. Note also that the value of `atomic` determines a type parameter of the
+returned assembler, so for a type stable setup the value should be a literal (or
+otherwise a compile time constant). See the [howto on multi-threaded assembly](@ref
+howto-threaded-assembly) for more details.
+
 Depending on the loaded extensions more assembly formats become available through this interface.
 """
 start_assemble(K::Union{AbstractSparseMatrixCSC, Symmetric{<:Any, <:AbstractSparseMatrixCSC}}, f::Vector; fillzero::Bool)
 
-function start_assemble(K::AbstractSparseMatrixCSC{T}, f::Vector = T[]; fillzero::Bool = true, maxcelldofs_hint::Int = 0) where {T}
+# The `@constprop :aggressive` makes sure that a literal `atomic = true/false` keyword
+# argument propagates into the `atomic` type parameter of the returned assembler, i.e.
+# that the return type is concrete (the default constprop heuristics give up here).
+Base.@constprop :aggressive function start_assemble(K::AbstractSparseMatrixCSC{T, Ti}, f::Vector = T[]; fillzero::Bool = true, maxcelldofs_hint::Int = 0, atomic::Bool = false) where {T, Ti}
+    _check_atomic_eltype(atomic, T)
     fillzero && (fillzero!(K); fillzero!(f))
-    return CSCAssembler(K, f, zeros(Int, maxcelldofs_hint), zeros(Int, maxcelldofs_hint), zeros(Int, maxcelldofs_hint), zeros(Int, maxcelldofs_hint))
+    return CSCAssembler{T, Ti, typeof(K), atomic}(K, f, zeros(Int, maxcelldofs_hint), zeros(Int, maxcelldofs_hint), zeros(Int, maxcelldofs_hint), zeros(Int, maxcelldofs_hint))
 end
-function start_assemble(K::Symmetric{T, <:SparseMatrixCSC}, f::Vector = T[]; fillzero::Bool = true, maxcelldofs_hint::Int = 0) where {T}
+Base.@constprop :aggressive function start_assemble(K::Symmetric{T, <:SparseMatrixCSC{T, Ti}}, f::Vector = T[]; fillzero::Bool = true, maxcelldofs_hint::Int = 0, atomic::Bool = false) where {T, Ti}
+    _check_atomic_eltype(atomic, T)
     fillzero && (fillzero!(K); fillzero!(f))
     permutation = zeros(Int, maxcelldofs_hint)
     sorteddofs = zeros(Int, maxcelldofs_hint)
-    return SymmetricCSCAssembler(K, f, permutation, permutation, sorteddofs, sorteddofs)
+    return SymmetricCSCAssembler{T, Ti, typeof(K), atomic}(K, f, permutation, permutation, sorteddofs, sorteddofs)
 end
 
 function finish_assemble(a::Union{CSCAssembler, CSRAssembler, SymmetricCSCAssembler})
@@ -302,11 +348,12 @@ Sorts the dofs into a separate buffer and returns it together with a permutation
 end
 
 @propagate_inbounds function _assemble!(A::Union{AbstractCSCAssembler, AbstractCSRAssembler}, rowdofs::AbstractVector{<:Integer}, coldofs::AbstractVector{<:Integer}, Ke::AbstractMatrix, fe::Union{AbstractVector, Nothing}, sym::Bool)
+    atomic = Val(_is_atomic(A))
     @boundscheck checkbounds(Ke, keys(rowdofs), keys(coldofs))
     if fe !== nothing
         @boundscheck checkbounds(fe, keys(rowdofs))
         @boundscheck checkbounds(A.f, rowdofs)
-        @inbounds assemble!(A.f, rowdofs, fe)
+        @inbounds assemble!(A.f, rowdofs, fe, atomic)
     end
 
     K = matrix_handle(A)
@@ -322,14 +369,14 @@ end
         sortedcoldofs, colpermutation
     end
 
-    return _assemble_inner!(K, Ke, rowdofs, sortedrowdofs, rowpermutation, coldofs, sortedcoldofs, colpermutation, sym)
+    return _assemble_inner!(K, Ke, rowdofs, sortedrowdofs, rowpermutation, coldofs, sortedcoldofs, colpermutation, sym, atomic)
 end
 
 @propagate_inbounds function _assemble_inner!(
         K::SparseMatrixCSC, Ke::AbstractMatrix,
         rowdofs::AbstractVector, sortedrowdofs::AbstractVector, rowpermutation::AbstractVector,
         coldofs::AbstractVector, sortedcoldofs::AbstractVector, colpermutation::AbstractVector,
-        sym::Bool
+        sym::Bool, atomic::Val = Val(false)
     )
     current_col = 1
     Krows = rowvals(K)
@@ -349,7 +396,7 @@ end
                 # Match: add the value (if non-zero) and advance the pointers
                 val = Ke[rowpermutation[ri], Kecol]
                 if !iszero(val)
-                    Kvals[R] += val
+                    _addindex!(Kvals, R, val, atomic)
                 end
                 ri += 1
                 Ri += 1
@@ -359,7 +406,7 @@ end
             else # Krow > Kerow_dof
                 # No match: no entry exist in the global matrix for this row. This is
                 # allowed as long as the value which would have been inserted is zero.
-                iszero(Ke[rowpermutation[ri], Kecol]) || _missing_sparsity_pattern_error(Krow, Kcol)
+                iszero(Ke[rowpermutation[ri], Kecol]) || _missing_sparsity_pattern_error(Kerow_dof, Kcol)
                 # Advance the local matrix row pointer
                 ri += 1
             end
@@ -371,6 +418,46 @@ end
             end
         end
         current_col += 1
+    end
+    return
+end
+
+# Atomic accumulation primitive used for assembling with `atomic = true`.
+#
+# This is written with `llvmcall` since the built-in alternatives in Julia currently
+# generate bad code for floating point addition: `Core.Intrinsics.atomic_pointermodify`
+# (and thus `@atomic`) lowers `+` on floats to a compare-exchange loop with a non-inlined
+# call to `+` inside, whereas this generates a single `atomicrmw fadd` instruction.
+#
+# Monotonic ordering is sufficient since no other memory is synchronized through these
+# additions -- the task join at the end of a threaded assembly loop is the synchronization
+# point that makes the accumulated values visible.
+for (T, llvmT) in ((Float64, "double"), (Float32, "float"))
+    @eval @propagate_inbounds function _atomic_add!(x::Vector{$T}, i::Int, v::$T)
+        @boundscheck checkbounds(x, i)
+        GC.@preserve x begin
+            p = pointer(x, i)
+            Base.llvmcall(
+                $(
+                    """
+                    %p = inttoptr i$(Sys.WORD_SIZE) %0 to $(llvmT)*
+                    %rv = atomicrmw fadd $(llvmT)* %p, $llvmT %1 monotonic
+                    ret void
+                    """
+                ), Cvoid, Tuple{Ptr{$T}, $T}, p, v
+            )
+        end
+        return
+    end
+end
+
+# Accumulate `v` into `x[i]`, atomically if `atomic` is `Val(true)`. This is the only
+# point where the atomic and non-atomic matrix assembly kernels differ.
+@propagate_inbounds function _addindex!(x::AbstractVector, i::Integer, v, ::Val{atomic}) where {atomic}
+    if atomic
+        _atomic_add!(x, Int(i), convert(eltype(x), v))
+    else
+        x[i] += v
     end
     return
 end

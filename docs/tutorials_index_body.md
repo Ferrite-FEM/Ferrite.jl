@@ -20,7 +20,7 @@ The tutorials are listed in roughly increasing order of complexity. However, sin
 focus on different aspects, and solve different problems, it is suggested to have a look at
 the brief descriptions below to get an idea about what you will learn from each tutorial.
 
-If you are new to Ferrite then Tutorials 1 - 6 are the best place to start. These
+If you are new to Ferrite then Tutorials 1 - 7 are the best place to start. These
 tutorials introduce and teach most of the basic finite element techniques (e.g. linear
 and non-linear problems, scalar- and vector-valued problems, Dirichlet and Neumann boundary
 conditions, mixed finite elements, time integration, direct and iterative linear solvers,
@@ -50,7 +50,20 @@ This tutorial guides you through the process of solving the linear elasticity pr
 
 ---
 
-#### [Tutorial 3: Incompressible elasticity](incompressible_elasticity.md)
+#### [Tutorial 3: Elastodynamics and modal analysis](@ref tutorial-elastodynamics)
+
+This tutorial extends [Tutorial 2: Linear elasticity](linear_elasticity.md) from statics to
+dynamics: the natural frequencies and vibration modes of a cantilever beam are computed by
+solving a generalized eigenvalue problem, and the free vibration after releasing a static
+tip load is simulated using Newmark time integration. Both parts are verified against
+analytical beam theory.
+
+**Keywords**: structural dynamics, mass matrix, generalized eigenvalue problem, natural
+frequencies, modal analysis, Rayleigh damping, Newmark time integration.
+
+---
+
+#### [Tutorial 4: Incompressible elasticity](incompressible_elasticity.md)
 
 This tutorial focuses on a mixed formulation of linear elasticity, with (vector)
 displacement and (scalar) pressure as the two unknowns, suitable for incompressibility.
@@ -62,7 +75,7 @@ incompressible limit.
 
 ---
 
-#### [Tutorial 4: Hyperelasticity](hyperelasticity.md)
+#### [Tutorial 5: Hyperelasticity](hyperelasticity.md)
 
 In this tutorial you will learn how to solve a non-linear finite element problem. In
 particular, a hyperelastic material model, in a finite strain setting, is used to solve the
@@ -75,7 +88,7 @@ Newton's method, conjugate gradient (CG).
 
 ---
 
-#### [Tutorial 5: von Mises Plasticity](plasticity.md)
+#### [Tutorial 6: von Mises Plasticity](plasticity.md)
 
 This tutorial revisits the cantilever beam problem from [Tutorial 2: Linear
 elasticity](linear_elasticity.md), but instead of linear elasticity a plasticity model is
@@ -89,7 +102,7 @@ Newton’s method.
 
 ---
 
-#### [Tutorial 6: Transient heat equation](@ref tutorial-transient-heat-equation)
+#### [Tutorial 7: Transient heat equation](@ref tutorial-transient-heat-equation)
 
 In this tutorial the transient heat equation is solved on the unit square. The problem to be
 solved is thus similar to the one solved in the first tutorial, [Heat
@@ -101,7 +114,7 @@ integration.
 
 ---
 
-#### [Tutorial 7: Computational homogenization](computational_homogenization.md)
+#### [Tutorial 8: Computational homogenization](computational_homogenization.md)
 
 This tutorial guides you through computational homogenization of a representative volume
 element (RVE) consisting of a soft matrix material with stiff inclusions. The computational
@@ -112,7 +125,7 @@ conditions are used.
 
 ---
 
-#### [Tutorial 8: Stokes flow](stokes-flow.md)
+#### [Tutorial 9: Stokes flow](stokes-flow.md)
 
 In this tutorial Stokes flow with (vector) velocity and (scalar) pressure is solved on a
 quarter circle. Rotationally periodic boundary conditions is used for the inlet/outlet
@@ -124,7 +137,7 @@ Gmsh.
 
 ---
 
-#### [Tutorial 9: Porous media (SubDofHandler)](porous_media.md)
+#### [Tutorial 10: Porous media (SubDofHandler)](porous_media.md)
 
 This tutorial introduces how to solve a complex linear problem, where there are different
 fields on different subdomains, and different cell types in the grid. This requires using
@@ -134,7 +147,7 @@ the `SubDofHandler` interface.
 
 ---
 
-#### [Tutorial 10: Incompressible Navier-Stokes equations](ns_vs_diffeq.md)
+#### [Tutorial 11: Incompressible Navier-Stokes equations](ns_vs_diffeq.md)
 
 In this tutorial the incompressible Navier-Stokes equations are solved. The domain is
 discretized in space with Ferrite as usual, and then formulated in a way to be compatible
@@ -145,7 +158,7 @@ for the time-integration.
 
 ---
 
-#### [Tutorial 11: Reactive surface](@ref tutorial-reactive-surface)
+#### [Tutorial 12: Reactive surface](@ref tutorial-reactive-surface)
 
 In this tutorial a reaction diffusion system on a sphere surface embedded in 3D is solved.
 Ferrite is used to assemble the diffusion operators and the mass matrices. The problem is
@@ -155,7 +168,7 @@ solved by using the usual first order reaction diffusion operator splitting.
 
 ---
 
-#### [Tutorial 12: Linear shell](@ref tutorial-linear-shell)
+#### [Tutorial 13: Linear shell](@ref tutorial-linear-shell)
 
 In this tutorial a linear shell element formulation is set up as a two-dimensional domain
 embedded in three-dimensional space. This will teach, and perhaps inspire, you on how
@@ -166,7 +179,7 @@ Ferrite.
 
 ---
 
-#### [Tutorial 13: Discontinuous Galerkin heat equation](@ref tutorial-dg-heat-equation)
+#### [Tutorial 14: Discontinuous Galerkin heat equation](@ref tutorial-dg-heat-equation)
 
 This tutorial guides you through the process of solving the linear stationary heat equation
 (i.e. Poisson's equation) on a unit square with inhomogeneous Dirichlet and Neumann boundary
@@ -178,3 +191,17 @@ Galerkin Infrastructure For the finite element toolbox
 Ferrite.jl"](https://summerofcode.withgoogle.com/programs/2023/projects/SLGbRNI5).
 
 **Keywords**: scalar-valued solution, Dirichlet boundary conditions, Discontinuous Galerkin, Interior penalty.
+
+---
+
+#### [Tutorial 14: Darcy flow with H(div) elements](@ref tutorial-darcy-flow)
+
+In this tutorial Darcy flow through a domain with an almost impermeable barrier is solved
+using the mixed form of the Poisson problem, with the flux as an explicit unknown
+discretized by H(div)-conforming Raviart-Thomas elements paired with a discontinuous
+pressure. Pressure boundary conditions enter weakly, while the normal flux is prescribed
+with `ProjectedDirichlet`. The local (element-wise) mass conservation of the mixed method
+is verified and compared against the standard primal formulation.
+
+**Keywords**: mixed finite elements, H(div), Raviart-Thomas, weak (natural) boundary
+conditions, `ProjectedDirichlet`, local conservation.

@@ -824,7 +824,7 @@ function _condense!(K::SparseMatrixCSC, f::AbstractVector, dofcoefficients::Vect
                         addindex!(K, v * Kval, row, d)
                     end
                 else
-                    for (d1, v1) in col_coeffs, (d2, v2) in row_coeffs
+                    for (d1, v1) in row_coeffs, (d2, v2) in col_coeffs
                         addindex!(K, v1 * v2 * Kval, d1, d2)
                     end
                 end
@@ -1952,9 +1952,9 @@ end
 
 
 function _update_projected_dbc!(
-        inhomogeneities::Vector{T}, f::Function, facets::AbstractVecOrSet{FacetIndex}, fv::FacetValues, facet_dofs::ArrayOfVectorViews,
+        inhomogeneities::Vector{T}, f::F, facets::AbstractVecOrSet{FacetIndex}, fv::FacetValues, facet_dofs::ArrayOfVectorViews,
         dh::AbstractDofHandler, dofmapping::Dict{Int, Int}, dofcoefficients::Vector{Union{Nothing, DofCoefficients{T}}}, time::Real
-    ) where {T}
+    ) where {T, F <: Function}
     ip = get_base_interpolation(function_interpolation(fv)) # Ensures getting error message from `integrate_projected_dbc!`
     max_dofs_per_facet = maximum(length, dirichlet_facetdof_indices(ip))
     Kᶠ = zeros(max_dofs_per_facet, max_dofs_per_facet)
@@ -1964,8 +1964,11 @@ function _update_projected_dbc!(
         reinit!(fv, fc)
         shape_nrs = dirichlet_facetdof_indices(ip)[getcurrentfacet(fv)]
         solve_projected_dbc!(aᶠ, Kᶠ, fᶠ, f, fv, shape_nrs, getcoordinates(fc), time)
-        for (idof, shape_nr) in enumerate(shape_nrs)
-            globaldof = celldofs(fc)[shape_nr]
+        # facet_dofs (unlike shape_nrs) includes the field offset in the cell dof vector,
+        # which matters when the constrained field is not the first field in the SubDofHandler.
+        local_dofs = facet_dofs[getcurrentfacet(fv)]
+        for idof in eachindex(shape_nrs)
+            globaldof = celldofs(fc)[local_dofs[idof]]
             dbc_index = dofmapping[globaldof]
             # Only DBC dofs are currently update!-able so don't modify inhomogeneities
             # for affine constraints
@@ -1977,7 +1980,33 @@ function _update_projected_dbc!(
     return nothing
 end
 
-function solve_projected_dbc!(aᶠ, Kᶠ, fᶠ, bc_fun, fv, shape_nrs, cell_coords, time)
+# Solve x = K \ b for a small symmetric positive definite K (a Gram matrix from
+# an L2 projection): closed form for the common 1x1 and 2x2 cases, otherwise
+# in-place Cholesky, to avoid allocations.
+function solve_small_spd!(x::AbstractVector, K::AbstractMatrix, b::AbstractVector)
+    n = length(x)
+    if n == 1
+        x[1] = b[1] / K[1, 1]
+    elseif n == 2
+        # Unrolled Cholesky (K = LLᵀ) with forward/backward substitution. Unlike
+        # Cramer's rule this does not form products of matrix entries, so it does
+        # not overflow/underflow for extreme (but representable) entry magnitudes.
+        L11 = sqrt(K[1, 1])
+        L21 = K[2, 1] / L11
+        L22 = sqrt(K[2, 2] - L21^2)
+        y1 = b[1] / L11
+        y2 = (b[2] - L21 * y1) / L22
+        x[2] = y2 / L22
+        x[1] = (y1 - L21 * x[2]) / L11
+    else
+        ldiv!(x, cholesky!(Symmetric(K)), b)
+    end
+    return x
+end
+
+# Note: the `bc_fun::F` type parameters force specialization on the function argument in
+# the methods that only pass it through (otherwise the inner call is a dynamic dispatch).
+function solve_projected_dbc!(aᶠ, Kᶠ, fᶠ, bc_fun::F, fv, shape_nrs, cell_coords, time) where {F}
     fill!(Kᶠ, 0)
     fill!(fᶠ, 0)
     # Supporting varying number of facetdofs (for ref shapes with different facet types) requires
@@ -1986,11 +2015,11 @@ function solve_projected_dbc!(aᶠ, Kᶠ, fᶠ, bc_fun, fv, shape_nrs, cell_coor
     # end
     @assert length(shape_nrs) == size(Kᶠ, 1)
     integrate_projected_dbc!(Kᶠ, fᶠ, bc_fun, fv, shape_nrs, cell_coords, time)
-    aᶠ .= Kᶠ \ fᶠ # Could be done non-allocating if required, using e.g. SMatrix
+    solve_small_spd!(aᶠ, Kᶠ, fᶠ)
     return aᶠ
 end
 
-function integrate_projected_dbc!(Kᶠ, fᶠ, bc_fun, fv, shape_nrs, cell_coords, time)
+function integrate_projected_dbc!(Kᶠ, fᶠ, bc_fun::F, fv, shape_nrs, cell_coords, time) where {F}
     return integrate_projected_dbc!(conformity(fv), Kᶠ, fᶠ, bc_fun, fv, shape_nrs, cell_coords, time)
 end
 

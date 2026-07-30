@@ -11,12 +11,16 @@ if liveserver
 end
 
 using Documenter, DocumenterCitations, Ferrite, FerriteGmsh, FerriteMeshParser,
-    SparseArrays, LinearAlgebra, Changelog
+    SparseArrays, LinearAlgebra, Changelog, DocumenterCodeBlocks
 
 using BlockArrays
 const FerriteBlockArrays = Base.get_extension(Ferrite, :FerriteBlockArrays)
 
 const is_ci = haskey(ENV, "GITHUB_ACTIONS")
+
+# Plots/GR is used in some tutorials; make sure rendering is headless and does not
+# (try to) open a display window (CI sets this in the workflow file).
+haskey(ENV, "GKSwstype") || (ENV["GKSwstype"] = "100")
 
 # Generate tutorials and how-to guides
 include("generate.jl")
@@ -56,6 +60,7 @@ bibtex_plugin = CitationBibliography(
             "Tutorials overview" => "tutorials/index.md",
             "tutorials/heat_equation.md",
             "tutorials/linear_elasticity.md",
+            "tutorials/elastodynamics.md",
             "tutorials/incompressible_elasticity.md",
             "tutorials/hyperelasticity.md",
             "tutorials/plasticity.md",
@@ -67,6 +72,7 @@ bibtex_plugin = CitationBibliography(
             "tutorials/reactive_surface.md",
             "tutorials/linear_shell.md",
             "tutorials/dg_heat_equation.md",
+            "tutorials/darcy_flow.md",
         ],
         "Topic guides" => [
             "Topic guide overview" => "topics/index.md",
@@ -99,20 +105,20 @@ bibtex_plugin = CitationBibliography(
             "howto/postprocessing.md",
             "howto/threaded_assembly.md",
         ],
-        "gallery/index.md",
-        # "Code gallery" => [
-        #     "Code gallery overview" => "gallery/index.md",
-        #     "gallery/helmholtz.md",
-        #     "gallery/quasi_incompressible_hyperelasticity.md",
-        #     "gallery/landau.md",
-        #     "gallery/topology_optimization.md",
-        # ],
+        "Code gallery" => [
+            "Code gallery overview" => "gallery/index.md",
+            "gallery/helmholtz.md",
+            "gallery/quasi_incompressible_hyperelasticity.md",
+            "gallery/landau.md",
+            "gallery/topology_optimization.md",
+        ],
         "devdocs/index.md",
         "cited-literature.md",
         "ferritepapers.md",
     ],
     plugins = [
         bibtex_plugin,
+        CodeBlocks(),
     ]
 )
 
@@ -125,8 +131,9 @@ end
 for (root, _, files) in walkdir(joinpath(@__DIR__, "build")), file in joinpath.(root, files)
     endswith(file, ".html") || continue
     str = read(file, String)
-    # Insert <br> after "Reference" (before "Code gallery")
-    str = replace(str, r"""(<li(?: class="is-active")?><a class="tocitem" href(?:="[\./\w]+")?>Code gallery</a></li>)""" => s"<br>\1")
+    # Insert <br> after "Reference" (before "Code gallery"). The gallery is a
+    # collapsible menu group, so match the group label markup.
+    str = replace(str, r"""(<li(?: class="[^"]*")?>(?:<input[^>]*>)?<label class="tocitem"[^>]*>(?:<span class="docs-label">)?Code gallery)""" => s"<br>\1")
     write(file, str)
 end
 

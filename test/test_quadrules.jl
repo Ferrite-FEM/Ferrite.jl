@@ -59,6 +59,7 @@ using Ferrite: reference_shape_value
             (:jinyun, 1:3),
             (:keast_minimal, 1:5),
             (:keast_positive, 1:5),
+            (:polyquad, 1:10),
         ]
         g = (x) -> sqrt(sum(x))
         dim = 3
@@ -66,6 +67,18 @@ using Ferrite: reference_shape_value
             qr = QuadratureRule{RefTetrahedron}(rulename, order)
             @test integrate(qr, g) ≈ 0.142857142857143 atol = 0.01 / order^2
             @test sum(qr.weights) ≈ ref_tet_vol(dim)
+        end
+    end
+
+    # Polynomial exactness on tetrahedra: ∫ x^a y^b z^c = a! b! c! / (a + b + c + 3)!
+    @testset "Polynomial exactness on tetrahedra of :polyquad" begin
+        for order in 1:10
+            qr = QuadratureRule{RefTetrahedron}(:polyquad, order)
+            @test all(w -> w > 0, Ferrite.getweights(qr))
+            for a in 0:order, b in 0:(order - a), c in 0:(order - a - b)
+                exact = factorial(a) * factorial(b) * factorial(c) / factorial(a + b + c + 3)
+                @test integrate(qr, x -> x[1]^a * x[2]^b * x[3]^c) ≈ exact atol = 1.0e-15
+            end
         end
     end
     @test_throws ArgumentError QuadratureRule{RefTetrahedron}(:einstein, 2)

@@ -3,7 +3,8 @@
 # **Keywords**: *hyperelasticity*, *finite strain*, *large deformations*, *Newton's method*,
 # *conjugate gradient*, *automatic differentiation*
 #
-# ![hyperelasticity.png](hyperelasticity.png)
+# ![](hyperelasticity-light.png)
+# ![](hyperelasticity-dark.png)
 #
 # *Figure 1*: Cube loaded in torsion modeled with a hyperelastic material model and
 # finite strain.

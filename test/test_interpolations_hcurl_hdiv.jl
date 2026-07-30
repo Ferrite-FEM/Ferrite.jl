@@ -409,6 +409,64 @@ using Ferrite: reference_shape_value
         end
     end
 
+    @testset "solve_small_spd!" begin
+        # The 1x1/2x2 fast paths must be scale-safe: forming products of the
+        # matrix entries (e.g. Cramer's rule) would overflow for these scales.
+        for T in (Float32, Float64)
+            overflow_scale = T == Float32 ? T(1.0e20) : 1.0e160
+            for scale in (T(1) / overflow_scale, T(1), overflow_scale)
+                K2 = T[2 1 / 2; 1 / 2 1] .* scale
+                x_exact = T[1, -2]
+                b = K2 * x_exact
+                x = zeros(T, 2)
+                Ferrite.solve_small_spd!(x, copy(K2), b)
+                @test x ≈ x_exact rtol = sqrt(eps(T))
+                K1 = fill(scale, 1, 1)
+                Ferrite.solve_small_spd!(view(x, 1:1), K1, T[3scale])
+                @test x[1] ≈ 3 rtol = sqrt(eps(T))
+            end
+        end
+        # Generic (Cholesky) path against `\`
+        M = [2.0 0.5 0.1; 0.5 1.0 0.2; 0.1 0.2 3.0]
+        b3 = [1.0, -2.0, 0.5]
+        x3 = zeros(3)
+        Ferrite.solve_small_spd!(x3, copy(M), copy(b3))
+        @test x3 ≈ M \ b3
+    end
+
+    @testset "ProjectedDirichlet in mixed DofHandler" begin
+        # Regression test: the constrained field is not the first field in the
+        # DofHandler, so its facet dofs are offset in the cell dof vector.
+        for ip in (RaviartThomas{RefTriangle, 2}(), Nedelec{RefTriangle, 2}())
+            grid = generate_grid(Triangle, (2, 2))
+            transform_coordinates!(grid, x -> x + 0.1 * Vec(abs(x[2])^2, abs(x[1])^2))
+            facetset = getfacetset(grid, "right")
+            f_bc = if Ferrite.conformity(ip) isa Ferrite.HdivConformity
+                (x, t, n) -> x[1] + 2 * x[2]
+            else
+                (x, t, n) -> Vec(0.0, 0.0, x[1] + 2 * x[2])
+            end
+            function solve_with_fields(fields...)
+                dh = DofHandler(grid)
+                for (name, field_ip) in fields
+                    add!(dh, name, field_ip)
+                end
+                close!(dh)
+                ch = close!(add!(ConstraintHandler(dh), ProjectedDirichlet(:u, facetset, f_bc)))
+                a = zeros(ndofs(dh))
+                apply!(a, ch)
+                return dh, a
+            end
+            dh_single, a_single = solve_with_fields((:u, ip))
+            dh_mixed, a_mixed = solve_with_fields((:p, Lagrange{RefTriangle, 1}()), (:u, ip))
+            for (cellidx, _) in facetset
+                dofs_single = celldofs(dh_single, cellidx)[dof_range(dh_single.subdofhandlers[1], :u)]
+                dofs_mixed = celldofs(dh_mixed, cellidx)[dof_range(dh_mixed.subdofhandlers[1], :u)]
+                @test a_mixed[dofs_mixed] ≈ a_single[dofs_single]
+            end
+        end
+    end
+
     @testset "ProjectedDirichlet error path" begin
         dh_H1, _ = _setup_dh_fv_for_bc_test(Lagrange{RefTriangle, 1}()^2; nel = 1, qr_order = 1)
         dh_L2, _ = _setup_dh_fv_for_bc_test(DiscontinuousLagrange{RefTriangle, 1}()^2; nel = 1, qr_order = 1)

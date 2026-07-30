@@ -1,6 +1,7 @@
 # # [Nearly Incompressible Hyperelasticity](@id tutorial-nearly-incompressible-hyperelasticity)
 #
-# ![](quasi_incompressible_hyperelasticity.gif)
+# ![](quasi_incompressible_hyperelasticity-light.webp)
+# ![](quasi_incompressible_hyperelasticity-dark.webp)
 #-
 #md # !!! tip
 #md #     This example is also available as a Jupyter notebook:

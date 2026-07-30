@@ -7,10 +7,10 @@
 #md #     [`stokes-flow.ipynb`](@__NBVIEWER_ROOT_URL__/tutorials/stokes-flow.ipynb).
 #-
 #
-# ![](stokes-flow.png)
-# *Figure 1*: Left: Computational domain ``\Omega`` with boundaries ``\Gamma_1``,
-# ``\Gamma_3`` (periodic boundary conditions) and ``\Gamma_2``, ``\Gamma_4`` (homogeneous
-# Dirichlet boundary conditions). Right: Magnitude of the resulting velocity field.
+# ![](stokes-flow-light.png)
+# ![](stokes-flow-dark.png)
+# *Figure 1*: Magnitude of the resulting velocity field on the quarter disk
+# domain ``\Omega`` (see *Figure 2*).
 
 # ## Introduction and problem formulation
 #
@@ -33,7 +33,7 @@
 # \end{align*}
 # ```
 # where the domain is defined as ``\Omega = \{\boldsymbol{x} \in (0, 1)^2:
-# \ ||\boldsymbol{x}|| \in (0.5, 1)\}``, see *Figure 1*. For the velocity we use periodic
+# \ ||\boldsymbol{x}|| \in (0.5, 1)\}``, see *Figure 2*. For the velocity we use periodic
 # boundary conditions on the inlet ``\Gamma_1`` and outlet ``\Gamma_3``:
 # ```math
 # \begin{align*}
@@ -46,6 +46,13 @@
 # \boldsymbol{u} = \boldsymbol{0} \quad \forall \boldsymbol{x}\ \in\
 # \Gamma_2 \cup \Gamma_4 := \{ \boldsymbol{x}:\ ||\boldsymbol{x}|| \in \{0.5, 1\}\}.
 # ```
+#
+# ![](stokes-flow-geometry-light.png)
+# ![](stokes-flow-geometry-dark.png)
+#
+# *Figure 2*: Computational domain ``\Omega`` with boundaries ``\Gamma_1``,
+# ``\Gamma_3`` (periodic boundary conditions) and ``\Gamma_2``, ``\Gamma_4``
+# (homogeneous Dirichlet boundary conditions).
 #
 # The corresponding weak form reads as follows: Find ``(\boldsymbol{u}, p) \in \mathbb{U}
 # \times \mathrm{L}_2`` s.t.
@@ -191,8 +198,9 @@ function setup_grid(h = 0.05)
     ## Add the periodicity constraint using 4x4 affine transformation matrix,
     ## see https://en.wikipedia.org/wiki/Transformation_matrix#Affine_transformations
     transformation_matrix = zeros(4, 4)
+    ## In the 2D rotation block, cos(-pi/2) gives the zero diagonal entries.
     transformation_matrix[1, 2] = 1  # -sin(-pi/2)
-    transformation_matrix[2, 1] = -1 #  cos(-pi/2)
+    transformation_matrix[2, 1] = -1 #  sin(-pi/2)
     transformation_matrix[3, 3] = 1
     transformation_matrix[4, 4] = 1
     transformation_matrix = vec(transformation_matrix')
@@ -486,9 +494,8 @@ function check_L2(dh, cvu, cvp, u)                                          #src
     return                                                                  #src
 end                                                                         #src
 
-function main()
+function main(h = 0.05) # h: approximate element size
     ## Grid
-    h = 0.05 # approximate element size
     grid = setup_grid(h)
     ## Interpolations
     ipu = Lagrange{RefTriangle, 2}()^2 # quadratic
@@ -515,9 +522,11 @@ function main()
         write_solution(vtk, dh, u)
     end
 
-    ## Check the result                #src
-    check_L2(dh, cvu, cvp, u)          #src
-    check_mean_constraint(dh, fvp, u)  #src
+    ## Check the result (reference values depend on the mesh size) #src
+    if h == 0.05                           #src
+        check_L2(dh, cvu, cvp, u)          #src
+        check_mean_constraint(dh, fvp, u)  #src
+    end                                    #src
 
     return
 end

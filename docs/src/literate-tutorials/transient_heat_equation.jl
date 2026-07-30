@@ -1,7 +1,7 @@
 # # [Transient heat equation](@id tutorial-transient-heat-equation)
 #
-# ![](transient_heat.gif)
-# ![](transient_heat_colorbar.svg)
+# ![](transient_heat-light.webp)
+# ![](transient_heat-dark.webp)
 #
 # *Figure 1*: Visualization of the temperature time evolution on a unit
 # square where the prescribed temperature on the upper and lower parts

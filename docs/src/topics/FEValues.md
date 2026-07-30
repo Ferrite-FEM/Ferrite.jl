@@ -9,7 +9,12 @@ defined on the reference cell, to the actual cell.
 
 The geometric mapping of a finite element from the reference coordinates to the real coordinates is shown in the following illustration.
 
-![mapping_figure](https://raw.githubusercontent.com/Ferrite-FEM/Ferrite.jl/gh-pages/assets/fe_mapping.svg)
+![Geometric mapping from the reference cell to the physical cell](./assets/fe_mapping-light.svg)
+![Geometric mapping from the reference cell to the physical cell](./assets/fe_mapping-dark.svg)
+
+Here, $\xi_i$ is reference coordinate $i$ and $x_i$ the corresponding real coordinate, while
+$\hat{\boldsymbol{\xi}}_\alpha$ and $\hat{\boldsymbol{x}}_\alpha$ are the reference and real
+positions of node $\alpha$.
 
 This mapping is given by the geometric shape functions, $\hat{N}_i^g(\boldsymbol{\xi})$, such that
 ```math

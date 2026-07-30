@@ -312,7 +312,7 @@ function FacetIterator(
         # Keep here to maintain same settings as for CellIterator
         _check_same_celltype(get_grid(gridordh), set)
     end
-    return FacetIterator(FacetCache(gridordh, flags), set)
+    return FacetIterator(FacetCache(gridordh, flags), convert_to_orderedset(set))
 end
 
 @inline _getcache(fi::FacetIterator) = fi.fc

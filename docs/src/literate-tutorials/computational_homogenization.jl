@@ -1,6 +1,7 @@
 # # [Computational homogenization](@id tutorial-computational-homogenization)
 #
-# ![](rve_homogenization.png)
+# ![](computational_homogenization-light.png)
+# ![](computational_homogenization-dark.png)
 #
 # *Figure 1*: von Mises stress in an RVE with 5 stiff inclusions embedded in a softer matrix
 # material that is loaded in shear. The problem is solved by using homogeneous Dirichlet
