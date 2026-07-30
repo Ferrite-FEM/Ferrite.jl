@@ -1,3 +1,5 @@
+using OrderedCollections, Random
+
 @testset "reorder_cells!" begin
     @testset "identity permutation leaves grid unchanged" begin
         grid = generate_grid(Quadrilateral, (3, 2))
