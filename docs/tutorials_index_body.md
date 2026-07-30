@@ -216,4 +216,3 @@ is verified and compared against the standard primal formulation.
 
 **Keywords**: mixed finite elements, H(div), Raviart-Thomas, weak (natural) boundary
 conditions, `ProjectedDirichlet`, local conservation.
-

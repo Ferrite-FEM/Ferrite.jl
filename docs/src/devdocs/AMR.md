@@ -65,15 +65,15 @@ So, our root is on level 0 of size 8 and has the lower left coordinates `(0,0)`
 ```julia
 # different constructors available, first one OctantBWG(dim,level,mortonid,maximumlevel)
 # other possibility by giving directly level and a tuple of coordinates OctantBWG(level,(x,y))
-julia> dim = 2; level = 0; maximumlevel = 3
-julia> oct = Ferrite.AMR.OctantBWG(dim, level, 1, maximumlevel)
-OctantBWG{2,4,Int64}
-   l = 0
-   xy = 0,0
+julia > dim = 2; level = 0; maximumlevel = 3
+julia > oct = Ferrite.AMR.OctantBWG(dim, level, 1, maximumlevel)
+OctantBWG{2, 4, Int64}
+l = 0
+xy = 0, 0
 ```
 The size of octants at a specific level can be computed by a simple operation
 ```julia
-julia> Ferrite.AMR._compute_size(#=b=# 3, #=l=# 0)
+julia > Ferrite.AMR._compute_size(#=b=# 3, #=l=# 0)
 8
 ```
 This computation is based on the relation $\text{size}=2^{b-l}$.
@@ -82,26 +82,26 @@ This means, that the octants are now of size $2^{3-1}=4$.
 Construct all level 1 octants based on mortonid:
 ```julia
 # note the arguments are dim,level,mortonid,maximumlevel
-julia> dim = 2; level = 1; maximumlevel = 3
-julia> oct = Ferrite.AMR.OctantBWG(dim, level, 1, maximumlevel)
-OctantBWG{2,4,Int64}
-   l = 1
-   xy = 0,0
+julia > dim = 2; level = 1; maximumlevel = 3
+julia > oct = Ferrite.AMR.OctantBWG(dim, level, 1, maximumlevel)
+OctantBWG{2, 4, Int64}
+l = 1
+xy = 0, 0
 
-julia> oct = Ferrite.AMR.OctantBWG(dim, level, 2, maximumlevel)
-OctantBWG{2,4,Int64}
-   l = 1
-   xy = 4,0
+julia > oct = Ferrite.AMR.OctantBWG(dim, level, 2, maximumlevel)
+OctantBWG{2, 4, Int64}
+l = 1
+xy = 4, 0
 
-julia> oct = Ferrite.AMR.OctantBWG(dim, level, 3, maximumlevel)
-OctantBWG{2,4,Int64}
-   l = 1
-   xy = 0,4
+julia > oct = Ferrite.AMR.OctantBWG(dim, level, 3, maximumlevel)
+OctantBWG{2, 4, Int64}
+l = 1
+xy = 0, 4
 
-julia> oct = Ferrite.AMR.OctantBWG(dim, level, 4, maximumlevel)
-OctantBWG{2,4,Int64}
-   l = 1
-   xy = 4,4
+julia > oct = Ferrite.AMR.OctantBWG(dim, level, 4, maximumlevel)
+OctantBWG{2, 4, Int64}
+l = 1
+xy = 4, 4
 ```
 
 So, the morton index is on **one** specific level just an x before y before z "cell" or "element" identifier
@@ -161,10 +161,10 @@ The assertion expresses that it is not possible to construct a morton index 8 oc
 The morton index of the lower right cell is 2 on level 1.
 
 ```julia
-julia> o = Ferrite.AMR.OctantBWG(2, 1, 2, 3)
-OctantBWG{2,4,Int64}
-   l = 1
-   xy = 4,0
+julia > o = Ferrite.AMR.OctantBWG(2, 1, 2, 3)
+OctantBWG{2, 4, Int64}
+l = 1
+xy = 4, 0
 ```
 
 ### Octant operations
