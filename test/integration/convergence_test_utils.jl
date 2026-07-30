@@ -160,7 +160,7 @@ function run_convergence_analysis(interpolation)
         grid = generate_grid(geometry, ntuple(x -> N, getrefdim(geometry)))
         # ... a suitable quadrature rule ...
         qr_order = get_quadrature_order(interpolation)
-        qr_name  = get_quadrature_rule_name(getrefshape(interpolation), qr_order)
+        qr_name = get_quadrature_rule_name(getrefshape(interpolation), qr_order)
         qr = QuadratureRule{getrefshape(interpolation)}(qr_name, qr_order)
         # ... and then pray to the gods of convergence.
         dh, ch, cellvalues = setup_poisson_problem(grid, interpolation, interpolation_geo, qr)
@@ -179,7 +179,7 @@ function run_convergence_rate(interpolation)
         grid = generate_grid(geometry, ntuple(x -> N₁, getrefdim(geometry)))
         # ... a suitable quadrature rule ...
         qr_order = get_quadrature_order(interpolation)
-        qr_name  = get_quadrature_rule_name(getrefshape(interpolation), qr_order)
+        qr_name = get_quadrature_rule_name(getrefshape(interpolation), qr_order)
         qr = QuadratureRule{getrefshape(interpolation)}(qr_name, qr_order)
         # ... and then pray to the gods of convergence.
         dh, ch, cellvalues = setup_poisson_problem(grid, interpolation, interpolation_geo, qr)
@@ -191,7 +191,7 @@ function run_convergence_rate(interpolation)
         grid = generate_grid(geometry, ntuple(x -> N₂, getrefdim(geometry)))
         # ... a suitable quadrature rule ...
         qr_order = get_quadrature_order(interpolation)
-        qr_name  = get_quadrature_rule_name(getrefshape(interpolation), qr_order)
+        qr_name = get_quadrature_rule_name(getrefshape(interpolation), qr_order)
         qr = QuadratureRule{getrefshape(interpolation)}(qr_name, qr_order)
         # ... and then pray to the gods of convergence.
         dh, ch, cellvalues = setup_poisson_problem(grid, interpolation, interpolation_geo, qr)
