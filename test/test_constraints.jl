@@ -327,6 +327,19 @@ end
     add!(dh, :u, Lagrange{RefLine, 1}())
     close!(dh)
 
+    @testset "nonsymmetric matrix condensation" begin
+        ch = ConstraintHandler(dh)
+        add!(ch, AffineConstraint(1, [3 => 2.0], 0.0))
+        add!(ch, AffineConstraint(2, [4 => 3.0], 0.0))
+        close!(ch)
+
+        C, _ = Ferrite.create_constraint_matrix(ch)
+        K = sparse(reshape(1.0:(ndofs(dh)^2), ndofs(dh), ndofs(dh)))
+        Kcondensed = C' * K * C
+        apply!(K, ch)
+        @test K[ch.free_dofs, ch.free_dofs] == Kcondensed
+    end
+
     test_acs = [
         # Simple homogeneous constraint
         [AffineConstraint(4, [(7 => 1.0)], 0.0)],

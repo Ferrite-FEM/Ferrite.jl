@@ -11,7 +11,7 @@ if liveserver
 end
 
 using Documenter, DocumenterCitations, Ferrite, FerriteGmsh, FerriteMeshParser,
-    SparseArrays, LinearAlgebra, Changelog
+    SparseArrays, LinearAlgebra, Changelog, DocumenterCodeBlocks
 
 using BlockArrays
 const FerriteBlockArrays = Base.get_extension(Ferrite, :FerriteBlockArrays)
@@ -72,6 +72,7 @@ bibtex_plugin = CitationBibliography(
             "tutorials/reactive_surface.md",
             "tutorials/linear_shell.md",
             "tutorials/dg_heat_equation.md",
+            "tutorials/darcy_flow.md",
         ],
         "Topic guides" => [
             "Topic guide overview" => "topics/index.md",
@@ -117,6 +118,7 @@ bibtex_plugin = CitationBibliography(
     ],
     plugins = [
         bibtex_plugin,
+        CodeBlocks(),
     ]
 )
 

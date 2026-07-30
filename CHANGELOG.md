@@ -19,10 +19,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
    between cells (e.g. `Lagrange{RefTetrahedron, 4}`) by taking the relative orientation
    (rotation and flip) of the face into account. The interpolation has to follow a specific
    tensor product ordering of the dofs, as described in the devdocs. ([#1343])
+ - `start_assemble(K, f; atomic = true)` returns an assembler that accumulates into `K`
+   and `f` using atomic additions (supported for `SparseMatrixCSC`, `Symmetric`-wrapped
+   `SparseMatrixCSC`, and `SparseMatrixCSR`, with eltypes `Float32`/`Float64`). This
+   makes it safe to assemble from multiple concurrent tasks without partitioning the
+   cells into independent sets ("grid coloring"), at the cost of some accumulation
+   overhead and non-deterministic (but correct up to summation order) results. See the
+   updated [howto on multi-threaded
+   assembly](https://ferrite-fem.github.io/Ferrite.jl/stable/howto/threaded_assembly/).
+   ([#1417])
 
 ### Documentation
  - The figures for the documentation are now programmatically generated and made to have a consistent look.
  - New tutorial: Elastodynamics and modal analysis of a cantilever beam (mass matrix, generalized eigenvalue problem, Rayleigh damping, Newmark time integration).
+ - New tutorial on Darcy flow using H(div)-conforming Raviart-Thomas elements ([#1388])
 
 ### Fixes
  - `FacetIterator` now works with `AbstractVector{FacetIndex}` and `AbstractSet{FacetIndex}` inputs as documented, instead of requiring an `OrderedSet` ([#1384])
@@ -32,6 +42,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
  - The error thrown when assembling into a matrix entry that is missing from the sparsity
    pattern now reports the row that is actually missing, rather than an unrelated row that
    happened to be stored in the same column ([#1414])
+ - Fix bug applying the transpose operation in condensation of `AffineConstraints`. This bug gave
+   silently wrong results when used on non-symmetric system matrices, but did not affect system matrices
+   that were symmetric ([#1426])
+
 
 ## [v1.5.0] - 2026-07-13
 
@@ -1204,5 +1218,8 @@ poking into Ferrite internals:
 [#1226]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1226
 [#1228]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1228
 [#1235]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1235
+[#1388]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1388
 [#1389]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1389
 [#1414]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1414
+[#1416]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1416
+[#1421]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1421

@@ -105,7 +105,8 @@ Although standard interpolations are not currently supported,
 the figure below illustrates well the difference between applying a standard `Dirichlet` condition and a
 `ProjectedDirichlet` condition when the prescribed function cannot be described by the chosen FE-interpolation.
 
-![ProjectedDirichlet illustration](downloaded_assets/ProjectedDirichlet.svg)
+![Dirichlet compared with ProjectedDirichlet for a prescribed function that the interpolation cannot represent exactly](assets/projected_dirichlet-light.svg)
+![Dirichlet compared with ProjectedDirichlet for a prescribed function that the interpolation cannot represent exactly](assets/projected_dirichlet-dark.svg)
 
 Here, we note that while the `Dirichlet` condition gives the correct value at the nodes, the `ProjectedDirichlet` gives
 a more accurate average boundary value (specifically the L2 projection of `f(x)` onto the finite element space).

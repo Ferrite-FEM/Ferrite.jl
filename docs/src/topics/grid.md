@@ -57,7 +57,8 @@ n1 = Node((0.0, 0.0))
 `Cell`s are defined based on the `Node` IDs. Hence, they collect IDs in a N-Tuple.
 Consider the following 2D mesh:
 
-![global mesh](./assets/global_mesh.svg)
+![Node and cell numbering of a 2 by 2 quadrilateral grid](./assets/global_mesh-light.svg)
+![Node and cell numbering of a 2 by 2 quadrilateral grid](./assets/global_mesh-dark.svg)
 
 The cells of the grid can be described in the following way
 
