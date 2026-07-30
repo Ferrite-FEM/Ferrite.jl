@@ -4,12 +4,12 @@ include(joinpath(@__DIR__, "convergence_test_utils.jl"))
 # These test only for convergence within margins
 @testset "convergence analysis" begin
     for interpolation in (
-            # Lagrange{RefTriangle, 3}(),
-            # Lagrange{RefTriangle, 4}(),
-            # Lagrange{RefTriangle, 5}(),
-            # Lagrange{RefHexahedron, 1}(),
-            # Lagrange{RefHexahedron, 3}(),
-            # Lagrange{RefTetrahedron, 1}(),
+            Lagrange{RefTriangle, 3}(),
+            Lagrange{RefTriangle, 4}(),
+            Lagrange{RefTriangle, 5}(),
+            Lagrange{RefHexahedron, 1}(),
+            Lagrange{RefHexahedron, 3}(),
+            Lagrange{RefTetrahedron, 1}(),
             Lagrange{RefTetrahedron, 4}(),
             Lagrange{RefPrism, 1}(),
             Lagrange{RefPyramid, 1}(),
