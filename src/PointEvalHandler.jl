@@ -365,11 +365,13 @@ end
 Element of a [`PointIterator`](@ref), typically used to reinitialize
 [`PointValues`](@ref). Fields:
  - `cid::Int`: ID of the cell containing the point
+ - `cell::AbstractCell`: cell containing the point
  - `local_coord::Vec`: the local (reference) coordinate of the point
  - `coords::Vector{Vec}`: the coordinates of the cell
 """
-struct PointLocation{V}
+struct PointLocation{C <: AbstractCell, V}
     cid::Int
+    cell::C
     local_coord::V
     coords::Vector{V}
 end
@@ -384,7 +386,7 @@ function Base.iterate(p::PointIterator, state = 1)
         local_coord = (p.ph.local_coords[state])::Vec
         n = nnodes_per_cell(p.ph.grid, cid)
         getcoordinates!(resize!(p.coords, n), p.ph.grid, cid)
-        point = PointLocation(cid, local_coord, p.coords)
+        point = PointLocation(cid, p.ph.grid.cells[cid], local_coord, p.coords)
         return (point, state + 1)
     end
 end
@@ -392,6 +394,6 @@ end
 cellid(p::PointLocation) = p.cid
 
 function reinit!(pv::PointValues, point::PointLocation)
-    reinit!(pv, point.coords, point.local_coord)
+    reinit!(pv, point.cell, point.coords, point.local_coord)
     return pv
 end

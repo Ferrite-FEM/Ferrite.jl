@@ -35,6 +35,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
  - New tutorial on Darcy flow using H(div)-conforming Raviart-Thomas elements ([#1388])
 
 ### Fixes
+ - `PointValues` can now be reinitialized with the current cell, enabling evaluation of
+   interpolations with non-identity mappings such as Nedelec and Raviart-Thomas elements.
+   ([#1420])
  - `FacetIterator` now works with `AbstractVector{FacetIndex}` and `AbstractSet{FacetIndex}` inputs as documented, instead of requiring an `OrderedSet` ([#1384])
  - `ProjectedDirichlet` now updates the correct dofs when the constrained field is not the first
    field in the `DofHandler`; previously the dof lookup ignored the field offset in the cell dof
