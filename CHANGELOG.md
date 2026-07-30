@@ -95,31 +95,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
    ([#1355])
 
 ### Performance
- - `SparsityPattern` has been rewritten: all rows are now stored in a single contiguous buffer
-   (instead of one pool-allocated vector per row) and cell entries are filled with a fast
-   counting marker-based algorithm with lazily sorted rows. The fast fill handles `coupling`
-   (all forms) and `keep_constrained = false` by applying them as filters in the counting and
-   filling passes, and builds with `topology` (interface entries, e.g. for DG) use it for the
-   cell portion, with row space for the interface entries reserved up front (counted from the
-   facet-neighbor cells) so that layering them on top does not grow the buffer. For
-   discretizations with a single `SubDofHandler` (any interpolation continuity, any
-   `interface_coupling` mask) the interface entries are even filled directly by the same fast
-   pass (~25x faster interface builds). Constructing a
-   sparsity pattern and allocating a matrix from it is around 3x faster for typical problems
-   (up to ~10x with coupling/`keep_constrained`), with unchanged behavior across the full
-   interface. ([#1397])
- - The internal `FastSparsityPattern` (from [#1302]) has been removed: its algorithm is now the
-   built-in fast path of `SparsityPattern`, so `allocate_matrix(dh)` keeps the same speed while
-   supporting all matrix types and keyword arguments through one code path. ([#1397])
-
-### Added
- - New function `Ferrite.compact!(sp::SparsityPattern)` which repacks the internal storage to
-   its minimal size, reclaiming the transient memory overhead left behind after rows outgrow
-   their initial reservation (e.g. after adding many constraint entries). ([#1397])
+ - Creating a sparsity pattern, and allocating a matrix from it, is now significantly faster:
+   typically 3-8x for builds without interface entries (the more so when `coupling` and/or
+   `keep_constrained = false` are used) and 10-25x for builds with `topology` (e.g. DG), at
+   roughly half the peak memory use. This applies to all entry points (`allocate_matrix`,
+   `add_sparsity_entries!`, ...) and the resulting patterns and matrices are unchanged.
+   ([#1397])
 
 ### Internal changes
- - The internal `Ferrite.PoolAllocator` module has been removed since the new `SparsityPattern`
-   storage no longer needs it. ([#1397])
+ - `SparsityPattern` has been rewritten: all rows are now stored in a single contiguous
+   buffer and filled by an exact-counting fast path with lazily sorted rows. The internal
+   `FastSparsityPattern` (from [#1302]) and the internal `Ferrite.PoolAllocator` module have
+   been removed. ([#1397])
  - New function `CollectionsOfViews.insert_sorted_at_index!`: like `push_at_index!` but keeps
    each view sorted and free of duplicates, with geometric reservation growth. ([#1397])
 

@@ -25,7 +25,6 @@ Ferrite.add_entry!
 SparsityPattern(::Int, ::Int)
 allocate_matrix(::SparsityPattern)
 SparsityPattern
-Ferrite.compact!
 ```
 
 ### `BlockSparsityPattern`

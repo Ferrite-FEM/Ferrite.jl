@@ -62,12 +62,6 @@ end
             @test aov[i] == expected
         end
     end
-    # Multi-dimensional indices work like push_at_index!
-    b = ConstructionBuffer(Int[], (3, 3), 2)
-    for v in (5, 3, 5, 1)
-        insert_sorted_at_index!(b, v, 2, 3)
-    end
-    aov = Ferrite.ArrayOfVectorViews(b)
-    @test aov[2, 3] == [1, 3, 5]
-    @test isempty(aov[1, 1])
+    # Only defined for one-dimensional buffers
+    @test_throws MethodError insert_sorted_at_index!(ConstructionBuffer(Int[], (3, 3), 2), 1, 2, 3)
 end

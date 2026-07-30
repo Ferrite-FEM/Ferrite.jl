@@ -395,7 +395,10 @@ end
     end
     # Interface entries (topology) are reserved up front, filtered by interface_coupling. For a
     # single-subdofhandler discretization the reservation is exact and doubles as the fill
-    # itself, i.e. no row relocations and no layered interface insertion.
+    # itself, i.e. no row relocations and no layered interface insertion. (Multiple
+    # subdofhandlers still take the layered path: the fast fill's expanded masks are square
+    # per-subdofhandler and do not apply to a neighbor with a different dof layout;
+    # rectangular per-(sdh, sdh) masks in the walk would lift that, as a follow-up.)
     let
         grid = generate_grid(Quadrilateral, (5, 5))
         dh = DofHandler(grid)

@@ -61,24 +61,24 @@ function push_at_index!(b::ConstructionBuffer, val, indices::Vararg{Int, N}) whe
 end
 
 """
-    insert_sorted_at_index!(b::ConstructionBuffer, val, indices::Int...)
+    insert_sorted_at_index!(b::ConstructionBuffer{<:Any, 1}, val, index::Int)
 
-Insert the value `val` into the `Vector` view at the index given by `indices`, keeping the view
-sorted and free of duplicates (`val` is dropped if already stored). The view must already be
-sorted, which holds when it is filled exclusively through this function.
+Insert the value `val` into the `Vector` view at index `index` of the one-dimensional buffer
+`b`, keeping the view sorted and free of duplicates (`val` is dropped if already stored). The
+view must already be sorted, which holds when it is filled exclusively through this function.
 
 Unlike [`push_at_index!`](@ref), the reservation for a view grows *geometrically* when it
 overflows, so repeatedly growing the same view is amortized O(length) copies instead of
 O(length^2 / sizehint).
 """
-function insert_sorted_at_index!(b::ConstructionBuffer, val, indices::Vararg{Int, N}) where {N}
-    r = getindex(b.indices, indices...)
+function insert_sorted_at_index!(b::ConstructionBuffer{<:Any, 1}, val, index::Int)
+    r = b.indices[index]
     n = length(b.data)
     if r.start == 0
-        # `indices...` not previously added, allocate new space for it at the end of `b.data`
+        # `index` not previously added, allocate new space for it at the end of `b.data`
         resize!(b.data, n + b.sizehint)
         @inbounds b.data[n + 1] = val
-        setindex!(b.indices, AdaptiveRange(n + 1, 1, b.sizehint), indices...)
+        b.indices[index] = AdaptiveRange(n + 1, 1, b.sizehint)
         return b
     end
     lo = r.start
@@ -92,7 +92,7 @@ function insert_sorted_at_index!(b::ConstructionBuffer, val, indices::Vararg{Int
             b.data[i + 1] = b.data[i]
         end
         @inbounds b.data[k] = val
-        setindex!(b.indices, AdaptiveRange(r.start, r.ncurrent + 1, r.nmax), indices...)
+        b.indices[index] = AdaptiveRange(r.start, r.ncurrent + 1, r.nmax)
     else
         # Reservation full: move the view to the end of `b.data` with a geometrically grown
         # reservation, inserting `val` at its sorted position during the copy
@@ -107,7 +107,7 @@ function insert_sorted_at_index!(b::ConstructionBuffer, val, indices::Vararg{Int
         @inbounds for i in krel:(r.ncurrent - 1)
             b.data[newstart + i + 1] = b.data[r.start + i]
         end
-        setindex!(b.indices, AdaptiveRange(newstart, r.ncurrent + 1, newmax), indices...)
+        b.indices[index] = AdaptiveRange(newstart, r.ncurrent + 1, newmax)
     end
     return b
 end

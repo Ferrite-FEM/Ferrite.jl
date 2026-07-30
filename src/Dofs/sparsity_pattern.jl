@@ -190,33 +190,23 @@ end
 end
 
 # Sort each row's slice in place (rows are already deduplicated). Rows are disjoint slices of
-# `data`, so they can be sorted in parallel; chunk the rows over tasks like the row sorting
-# that FastSparsityPattern's CSR path used to do. QuickSort is allocation-free and, measured
-# on real pattern buffers, ~1.3x faster than Base's radix sort with a reusable scratch:
-# marker-order rows are a few concatenated ascending runs (~99% ascending adjacent pairs;
-# own-cell dofs first, then each neighbor cell's, each block in dof order), which QuickSort
-# exploits while radix pays its fixed passes regardless (radix only wins on random data).
+# `data`, so they can be sorted in parallel by chunking the rows over tasks.
 @noinline function _sort_pattern!(sp::SparsityPattern)
     nrows = getnrows(sp)
-    # One chunk per thread: rows have similar cost so load balancing is not needed (and
-    # `@threads :dynamic` splits the range statically over one task per thread anyway, so
-    # finer chunking would only add overhead). At least 1000 rows per task keeps small
-    # patterns on the serial path.
+    # One chunk per thread (rows have similar cost so no load balancing is needed), but at
+    # least 1000 rows per task so that small patterns don't spawn useless tasks.
     ntasks = max(min(Threads.nthreads(), nrows ÷ 1000), 1)
-    if ntasks == 1
-        _sort_rows!(sp, 1:nrows)
-    else
-        chunksize = cld(nrows, ntasks)
-        Threads.@threads for taskid in 1:ntasks
-            firstrow = 1 + chunksize * (taskid - 1)
-            lastrow = min(firstrow + chunksize - 1, nrows)
-            _sort_rows!(sp, firstrow:lastrow)
-        end
+    chunksize = cld(nrows, ntasks)
+    @sync for taskid in 1:ntasks
+        firstrow = 1 + chunksize * (taskid - 1)
+        lastrow = min(firstrow + chunksize - 1, nrows)
+        Threads.@spawn _sort_rows!(sp, firstrow:lastrow)
     end
     sp.sorted = true
     return sp
 end
 
+# QuickSort explicitly since the default sorting algorithm (radix) allocates.
 function _sort_rows!(sp::SparsityPattern, rowrange::UnitRange{Int})
     b = sp.buffer
     data = b.data
@@ -239,9 +229,8 @@ function _fast_fill_cells!(
         interface_couplings::Union{Nothing, Vector{Matrix{Bool}}} = nothing;
         fill_interfaces::Bool = false,
     )
-    # Note: sized by the pattern's dimensions, which may exceed ndofs(dh) (rows without cells
-    # simply keep their diagonal entry)
     nrows = getnrows(sp)
+    #...
     cell_dofs = create_celldofs(dh)
     # The local-index map only exists to index the expanded coupling masks; skip building it
     # when no mask is in play (`_visit_row_candidates!` never reads it then).
@@ -415,6 +404,9 @@ function add_sparsity_entries!(
     #       avoiding duplicates entirely). That would retire the generic branch below.
     if isempty(sp.buffer.data)
         keep_constrained || _check_keep_constrained_args(dh, ch)
+        # An explicitly full coupling mask restricts nothing: normalize to `nothing` so the
+        # fast fill skips mask evaluation (and the local-index map it requires).
+        coupling = coupling !== nothing && all(coupling) ? nothing : coupling
         couplings = coupling === nothing ? nothing : _coupling_to_local_dof_coupling(dh, coupling)
         isconstrained = keep_constrained ? nothing : _isconstrained_by_dof(ch)
         # With interface entries coming (added below), reserve row space for them up front so
@@ -424,7 +416,12 @@ function add_sparsity_entries!(
             neighbor_cells = interface_couplings = nothing
         else
             neighbor_cells = create_cell_to_neighbors(dh.grid, topology)
-            interface_couplings = _coupling_to_local_dof_coupling(dh, interface_coupling)
+            # A full interface mask can likewise be dropped (the walk then visits neighbor
+            # dofs unmasked, the same set) -- but only when the cell coupling imposes no
+            # restriction either, since with a restricted cell coupling the own-cell
+            # candidates consult the interface mask for the same-side interface blocks.
+            interface_couplings = couplings === nothing && all(interface_coupling) ? nothing :
+                _coupling_to_local_dof_coupling(dh, interface_coupling)
             interfaces_filled = _can_fill_interfaces_directly(dh, interface_couplings)
         end
         _fast_fill_cells!(
@@ -498,7 +495,7 @@ end
 # _visit_row_candidates!). With a single subdofhandler the fast fill therefore emits the
 # interface entries directly and add_interface_entries! is skipped; otherwise the enumeration
 # is used for reservation only.
-function _can_fill_interfaces_directly(dh::DofHandler, interface_couplings::Vector{Matrix{Bool}})
+function _can_fill_interfaces_directly(dh::DofHandler, interface_couplings::Union{Nothing, Vector{Matrix{Bool}}})
     return length(dh.subdofhandlers) == 1
 end
 
@@ -965,13 +962,8 @@ function _allocate_matrix(::Type{SparseMatrixCSC{Tv, Ti}}, sp::AbstractSparsityP
     return S
 end
 
-## ================== ##
-# Fast-path helpers    #
-## ================== ##
-
-# Helpers for `_fast_fill_cells!`: build cell → dofs and row → cells maps, then count the exact
-# number of distinct columns per row using a column marker.
-
+# Build the cell → global dofs map as an ArrayOfVectorViews (a compact copy of the
+# DofHandler's cell dof storage).
 function create_celldofs(dh::DofHandler)
     isclosed(dh) || throw(ArgumentError("DofHandler must be closed"))
     ncells = getncells(dh.grid)
@@ -983,7 +975,7 @@ function create_celldofs(dh::DofHandler)
         num = ndofs_per_cell(dh, cell_idx)
         num == 0 && continue
         r = n:(n + num - 1)
-        #celldofs!(view(cell_dofs, r), dh, cell_idx), but faster without view:
+        # Equivalent to celldofs!(view(cell_dofs, r), dh, cell_idx) but this avoids the view
         soffs = dh.cell_dofs_offset[cell_idx]
         copyto!(cell_dofs, n, dh.cell_dofs, soffs, num)
         n = last(r) + 1
@@ -992,8 +984,8 @@ function create_celldofs(dh::DofHandler)
     return ArrayOfVectorViews(indices, cell_dofs, LinearIndices((ncells,)))
 end
 
-# For each cell, the cells sharing a facet with it (used by the fast path to reserve row space
-# for interface entries).
+# For each cell, the cells sharing a facet with it (used by the fast path to reserve row
+# space for interface entries).
 function create_cell_to_neighbors(grid::AbstractGrid, topology)
     ncells = getncells(grid)
     counts = zeros(Int, ncells)
@@ -1023,8 +1015,8 @@ end
 # Inverse of cell_dofs: for each row (dof), the connected cells and, in parallel, the row's
 # local dof index within each such cell. The local index differs per incident cell (a dof
 # shared by two cells generally has different local numbers in them) and is only needed to
-# apply the (expanded, locally indexed) coupling masks -- when no masks are in play the
-# second map is skipped (`nothing`).
+# apply the (expanded, locally indexed) coupling masks. With full coupling the second map
+# is skipped (`nothing`).
 function create_row_to_cells(cell_dofs::ArrayOfVectorViews, nrows::Int, build_localidx::Bool)
     num_cells = zeros(Int, nrows)
     # 1: Figure out how many cells are connected to each dof
@@ -1035,7 +1027,6 @@ function create_row_to_cells(cell_dofs::ArrayOfVectorViews, nrows::Int, build_lo
             n_connected += 1
         end
     end
-
     # 2: Create the correct datastructure
     cells = Vector{Int}(undef, n_connected)
     localidx = build_localidx ? Vector{Int}(undef, n_connected) : nothing
@@ -1044,7 +1035,10 @@ function create_row_to_cells(cell_dofs::ArrayOfVectorViews, nrows::Int, build_lo
     @inbounds for row in 1:nrows
         indices[row + 1] = indices[row] + num_cells[row]
     end
-    fill!(num_cells, 0) # Now we use this to count how many have been added
+    # Reset and reuse `num_cells` as a per-row write cursor: in the loop below
+    # `num_cells[row]` counts how many incident cells have been recorded for `row` so far,
+    # making `indices[row] + num_cells[row]` the next free slot in `row`'s block.
+    fill!(num_cells, 0)
     @inbounds for (cellnr, rows) in enumerate(cell_dofs)
         for (li, row) in enumerate(rows)
             k = indices[row] + num_cells[row]
@@ -1054,8 +1048,9 @@ function create_row_to_cells(cell_dofs::ArrayOfVectorViews, nrows::Int, build_lo
         end
     end
     lin = LinearIndices((nrows,))
-    return ArrayOfVectorViews(indices, cells, lin),
-        localidx === nothing ? nothing : ArrayOfVectorViews(indices, localidx, lin)
+    row_to_cells = ArrayOfVectorViews(indices, cells, lin)
+    row_to_localidx = localidx === nothing ? nothing : ArrayOfVectorViews(indices, localidx, lin)
+    return row_to_cells, row_to_localidx
 end
 
 # Count (data === nothing) or fill (data/indices from the presized buffer) the per-row
@@ -1072,21 +1067,25 @@ function _visit_row_candidates!(
         interface_couplings::Union{Nothing, Vector{Matrix{Bool}}} = nothing,
     )
     counting = data === nothing
+    ncols = length(marker) # marker has one slot per column
     @inbounds for row in 1:length(rowlen)
         start = counting ? 0 : indices[row].start
         p = 0
-        # The diagonal is always stored (cf. add_diagonal_entries!) when the column exists
-        # (the pattern may have more rows than columns)
-        if row <= length(marker)
+        # The diagonal is always stored when the column exists (the pattern may have more
+        # rows than columns)
+        if row <= ncols
             marker[row] = row
             counting || (data[start] = row)
             p = 1
         end
-        # For keep_constrained = false a constrained row stores only the diagonal
+        # For keep_constrained = false a constrained row stores only the diagonal (included
+        # in the pattern just above)
         if !(isconstrained !== nothing && isconstrained[row])
             cells = row_to_cells[row]
-            # `row_to_localidx` is `nothing` exactly when no coupling mask is passed (see the
-            # call site) -- then `li` is never consulted and the placeholder is dead code.
+            # `row_to_localidx` is `nothing` exactly when no mask restricts the candidates:
+            # no coupling/interface_coupling passed, or explicitly full masks (normalized to
+            # `nothing` in add_sparsity_entries!). Then `li` is never consulted and the
+            # placeholder below is dead code.
             lidxs = row_to_localidx === nothing ? nothing : row_to_localidx[row]
             for k in 1:length(cells)
                 cnr = cells[k]
