@@ -749,7 +749,10 @@ Collect the leaf octants of all trees of `forest` into a single vector, in ascen
 order (tree by tree, Morton order within each tree) — i.e. the octant `getcells(forest)[i]`
 materializes into cell `i` of [`creategrid`](@ref Ferrite.AMR.creategrid)`(forest)`.
 
-Note that this allocates a fresh vector of all leaves on every call; hoist it out of loops.
+!!! warning "Allocates on every call"
+    This materializes a fresh vector of all leaves each time it is called — `O(n)` in the
+    number of cells. Call it once and reuse the result instead of calling it inside loops.
+
 The returned octants live in the coordinate system of their respective tree, so the scalar
 `getcells(forest, cellid)` from the `AbstractGrid` interface is deliberately not supported
 (an octant is not interpretable without its tree) and throws instead of falling back to
