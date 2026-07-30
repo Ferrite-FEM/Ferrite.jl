@@ -909,6 +909,25 @@ end
     @test leaves[7] == forest.cells[2].leaves[3]
     @test leaves[1] == forest.cells[1].leaves[1]
 
+    # The maximum refinement level is bounded by p4est's P4EST_MAXLEVEL/P8EST_MAXLEVEL:
+    # beyond it an octree coordinate no longer fits the per-axis bit budget of the UInt64
+    # boundary-table keys, whose collisions would silently merge unrelated nodes across
+    # tree boundaries (creategrid used to return a grid with too many nodes instead).
+    @test_throws DomainError ForestBWG(generate_grid(Quadrilateral, (2, 1)), 31)
+    @test_throws DomainError ForestBWG(generate_grid(Hexahedron, (2, 1, 1)), 20)
+    @test_throws DomainError ForestBWG(generate_grid(Quadrilateral, (2, 1)), -1)
+    # the bounds themselves are admissible and are the defaults
+    @test ForestBWG(generate_grid(Quadrilateral, (2, 1)), 30).cells[1].b == 30
+    @test ForestBWG(generate_grid(Hexahedron, (2, 1, 1)), 19).cells[1].b == 19
+    @test ForestBWG(generate_grid(Quadrilateral, (2, 1))).cells[1].b == 30
+    @test ForestBWG(generate_grid(Hexahedron, (2, 1, 1))).cells[1].b == 19
+    # a two-tree forest refined once has 45 (3D) / 15 (2D) nodes; a b past the limit used
+    # to inflate these because the shared face nodes failed to merge
+    let f = ForestBWG(generate_grid(Hexahedron, (2, 1, 1)), 19)
+        Ferrite.AMR.refine_all!(f, 1)
+        @test getnnodes(Ferrite.AMR.creategrid(f)) == 45
+    end
+
     # NOTE: getcelltype currently exposes the octree (tree) type; this will change
     @test getcelltype(forest) === eltype(forest.cells) === getcelltype(forest, 1)
     @test getcelltype(forest) <: Ferrite.AMR.OctreeBWG

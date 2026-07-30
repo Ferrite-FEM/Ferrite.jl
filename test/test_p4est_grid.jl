@@ -198,6 +198,26 @@ end
     @test Ferrite.getcellsets(unrefined) == Ferrite.getcellsets(grid)
 end
 
+@testset "vertex/node sets are not transferred $dim D" for (dim, CT) in ((2, Quadrilateral), (3, Hexahedron))
+    # creategrid only carries cellsets and facetsets onto the refined grid. The forest keeps
+    # the macro vertex/node sets, but the materialized grid has both empty -- documented on
+    # `creategrid`/`NonConformingGrid`, pinned here so the behaviour cannot drift silently.
+    grid = generate_grid(CT, ntuple(_ -> 2, dim))
+    addvertexset!(grid, "vs", x -> x[1] ≈ -1.0)
+    grid.nodesets["ns"] = Ferrite.OrderedSet([1, 2])
+    forest = ForestBWG(grid, 3)
+    @test Ferrite.getvertexsets(forest) == Ferrite.getvertexsets(grid)
+    @test Ferrite.getnodesets(forest) == Ferrite.getnodesets(grid)
+
+    Ferrite.AMR.refine!(forest, [1])
+    Ferrite.AMR.balanceforest!(forest)
+    transferred_grid = Ferrite.AMR.creategrid(forest)
+    @test isempty(Ferrite.getvertexsets(transferred_grid))
+    @test isempty(Ferrite.getnodesets(transferred_grid))
+    # the sets that *are* transferred still are
+    @test keys(Ferrite.getfacetsets(transferred_grid)) == keys(Ferrite.getfacetsets(grid))
+end
+
 @testset "hanging nodes" begin
     #Easy Intraoctree
     grid = generate_grid(Hexahedron, (1, 1, 1))

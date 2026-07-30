@@ -14,8 +14,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
    refined (`refine!`), coarsened (`coarsen!`, `refine_and_coarsen!`) or refined uniformly
    (`refine_all!`); `balanceforest!` restores the 2:1 balance across faces, edges and
    corners (also across tree boundaries) that materialization requires. `creategrid` then
-   materializes the forest into a `NonConformingGrid`, reconstructing the cell-, facet- and
-   vertex-sets of the base grid and recording the hanging-node constraints, which are applied by
+   materializes the forest into a `NonConformingGrid`, reconstructing the cell- and facet-sets
+   of the base grid and recording the hanging-node constraints, which are applied by
    adding a `ConformityConstraint` per field to the `ConstraintHandler` (multiple fields and
    `InterfaceValues` on hanging interfaces via `facetskeleton` are supported). The
    feature is experimental: the API may change in minor releases without following semantic

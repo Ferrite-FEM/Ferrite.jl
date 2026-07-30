@@ -11,10 +11,25 @@ const ncorners_face3D = 4
 const ncorners_face2D = 2
 const ncorners_edge = ncorners_face2D
 
-# `DEFAULT_MAXLEVEL[dim]`: default maximum refinement level for `dim`. The 2D/3D values are
-# p4est's `P4EST_MAXLEVEL`/`P8EST_MAXLEVEL`, which bound the octant coordinates to 32 bits.
-# Pass `b` explicitly to `ForestBWG(grid, b)` to use a different limit.
+# `DEFAULT_MAXLEVEL[dim]`: default *and* largest admissible maximum refinement level for
+# `dim`. The 2D/3D values are p4est's `P4EST_MAXLEVEL`/`P8EST_MAXLEVEL`, which bound the
+# octant coordinates to 32 bits. Pass `b` explicitly to `ForestBWG(grid, b)` to use a
+# smaller limit; larger ones are rejected (see `_check_maxlevel`).
 const DEFAULT_MAXLEVEL = (0, 30, 19)
+
+@noinline function _throw_maxlevel(dim, b)
+    msg = "maximum refinement level b = $b is out of range for a $(dim)D forest, it must satisfy 0 ≤ b ≤ $(DEFAULT_MAXLEVEL[dim]) (p4est's $(dim == 2 ? "P4EST_MAXLEVEL" : "P8EST_MAXLEVEL")). Beyond it an octree coordinate no longer fits the UInt64 keys of the cross-tree boundary node tables, whose collisions would silently merge unrelated nodes."
+    return throw(DomainError(b, msg))
+end
+
+# Validate a tree's maximum refinement level: `b` must lie in `0:DEFAULT_MAXLEVEL[dim]`, since a
+# larger `b` pushes octree coordinates past the per-axis bit budget of `_packcoord`, whose keys
+# would then collide and silently merge unrelated nodes across tree boundaries. Called from the
+# `OctreeBWG` constructors, i.e. on every path into `ForestBWG`.
+@inline function _check_maxlevel(dim::Integer, b::Integer)
+    (0 <= b <= DEFAULT_MAXLEVEL[dim]) || _throw_maxlevel(dim, b)
+    return b
+end
 
 struct OctantBWG{dim, N, T <: Integer} <: Ferrite.AbstractCell{Ferrite.RefHypercube{dim}}
     #Refinement level
@@ -271,8 +286,8 @@ function coarsen_octant!(octree::OctreeBWG{dim, N, T}, o::OctantBWG{dim, N, T}) 
     return deleteat!(octree.leaves, (leave_idx - shift + one(T)):(leave_idx - shift + window_length))
 end
 
-OctreeBWG{3, 8}(nodes::NTuple, b = DEFAULT_MAXLEVEL[3]) = OctreeBWG{3, 8, Int64}([zero(OctantBWG{3, 8})], Int64(b), nodes)
-OctreeBWG{2, 4}(nodes::NTuple, b = DEFAULT_MAXLEVEL[2]) = OctreeBWG{2, 4, Int64}([zero(OctantBWG{2, 4})], Int64(b), nodes)
+OctreeBWG{3, 8}(nodes::NTuple, b = DEFAULT_MAXLEVEL[3]) = OctreeBWG{3, 8, Int64}([zero(OctantBWG{3, 8})], Int64(_check_maxlevel(3, b)), nodes)
+OctreeBWG{2, 4}(nodes::NTuple, b = DEFAULT_MAXLEVEL[2]) = OctreeBWG{2, 4, Int64}([zero(OctantBWG{2, 4})], Int64(_check_maxlevel(2, b)), nodes)
 OctreeBWG(cell::Quadrilateral, b = DEFAULT_MAXLEVEL[2]) = OctreeBWG{2, 4}(cell.nodes, b)
 OctreeBWG(cell::Hexahedron, b = DEFAULT_MAXLEVEL[3]) = OctreeBWG{3, 8}(cell.nodes, b)
 
@@ -457,21 +472,18 @@ end
 
 """
     isancestor(o1, o2, b) -> Bool
-Is o2 an ancestor of o1
+Is `o1` a strict ancestor of `o2`, i.e. is `o2` a descendant of `o1`? Walks `o2`'s parent
+chain up to the root, which is itself a valid ancestor (`parent` of the root is the root,
+hence the level-0 stop instead of a levels-remaining counter).
 """
 function isancestor(o1, o2, b)
-    ancestor = false
-    l = o2.l - 1
+    o2.l > o1.l || return false     # an ancestor is strictly coarser
     p = parent(o2, b)
-    while l > 0
-        if p == o1
-            ancestor = true
-            break
-        end
-        l -= 1
+    while p.l > zero(p.l)
+        p == o1 && return true
         p = parent(p, b)
     end
-    return ancestor
+    return p == o1                  # the walk ended at the root, itself a valid ancestor
 end
 
 """

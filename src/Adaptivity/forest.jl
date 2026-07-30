@@ -17,7 +17,14 @@ and [IBWG2015](@citet).
 ## Constructor
     ForestBWG(grid::AbstractGrid{dim}, b) where dim
 Builds an adaptive grid based on a non-adaptive one `grid` and a given max refinement level `b`,
-i.e. no leaf may be refined beyond level `b`. Defaults to `30` in 2D and `19` in 3D.
+i.e. no leaf may be refined beyond level `b`.
+
+`b` must satisfy `0 ≤ b ≤ 30` in 2D and `0 ≤ b ≤ 19` in 3D, and defaults to those upper bounds
+(p4est's `P4EST_MAXLEVEL`/`P8EST_MAXLEVEL`). They are hard limits, not just defaults: a larger
+`b` makes octree coordinates exceed the per-axis bit budget of the `UInt64` boundary-table keys
+that [`creategrid`](@ref Ferrite.AMR.creategrid) uses to identify nodes across tree boundaries.
+An out-of-range `b` therefore throws a `DomainError` rather than silently producing a grid with
+wrongly merged nodes.
 """
 struct ForestBWG{dim, C <: OctreeBWG, T <: Real} <: Ferrite.AbstractGrid{dim}
     cells::Vector{C}
@@ -2305,6 +2312,11 @@ Materialize a `ForestBWG` (a forest of adaptively refined octrees) into a `NonCo
 that can be used like any Ferrite grid, complete with the hanging-node constraints
 (`conformity_info`) and the transferred boundary and subdomain sets (`facetsets`, `cellsets`).
 
+!!! warning "Only `facetsets` and `cellsets` are transferred"
+    The `vertexsets` and `nodesets` of the base grid are **not** carried onto the materialized
+    grid — they are kept on the `ForestBWG` but the returned `NonConformingGrid` has both
+    empty. Re-attach them on the refined grid if you need them (e.g. with `addvertexset!`).
+
 This is the Lnodes construction of [IBWG2015](@citet) §6 on the point iterator
 [`iterate_points`](@ref) (Alg 5.2/5.3): node ids are assigned inside the iterator callbacks and
 scattered into the element-node matrix `E` — there is **no global node map**; identity is carried
@@ -2327,7 +2339,8 @@ Pipeline:
 4. **Global numbering + cells + constraints.** [`_global_numbering`](@ref) (Alg 6.1) assigns the
    final dense ids in one sweep over `E`, [`_build_cells`](@ref) materializes the cells, the
    constraint records are resolved against `E`, and [`reconstruct_facetsets`](@ref) /
-   [`reconstruct_cellsets`](@ref) carry the named boundaries and subdomains onto the refined grid.
+   [`reconstruct_cellsets`](@ref) carry the named boundaries and subdomains onto the refined grid
+   (vertex and node sets are not transferred, see the warning above).
 
 Requires a 2:1-balanced forest (see [`balanceforest!`](@ref)) — balance is what guarantees
 hanging vertices are simple feature midpoints with non-hanging masters, and it is checked (an

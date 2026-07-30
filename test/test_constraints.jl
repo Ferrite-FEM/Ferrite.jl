@@ -1734,6 +1734,19 @@ end
     add!(ch2, ConformityConstraint(:u))
     close!(ch2)
     @test length(ch2.prescribed_dofs) == length(transferred_grid.conformity_info)
+
+    # ... but the same field at *different* interpolations on different SubDofHandlers must
+    # be rejected: `find_field` only reports the first match, so the linear-Lagrange guard
+    # would otherwise pass on the linear subdomain and leave the higher-order dofs of the
+    # other one silently unconstrained.
+    dh3 = DofHandler(transferred_grid)
+    sdh3a = SubDofHandler(dh3, Ferrite.OrderedSet(1:half))
+    add!(sdh3a, :u, ip)
+    sdh3b = SubDofHandler(dh3, Ferrite.OrderedSet((half + 1):getncells(transferred_grid)))
+    add!(sdh3b, :u, Lagrange{RefQuadrilateral, 2}())
+    close!(dh3)
+    ch3 = ConstraintHandler(dh3)
+    @test_throws ArgumentError add!(ch3, ConformityConstraint(:u))
 end
 
 @testset "ConformityConstraint fallbacks and vector fields" begin

@@ -1,22 +1,25 @@
 """
     NonConformingGrid{dim, C<:AbstractCell, T<:Real, CIT} <: AbstractGrid}
 
-A `NonConformingGrid` is a collection of `Cells` and `Node`s which covers the computational domain, together with Sets of cells, nodes, faces
-and associated information about the conformity.
+A `NonConformingGrid` is a collection of `Cells` and `Node`s which covers the computational domain, together with sets of cells, nodes,
+facets and vertices, and associated information about the conformity.
 There are multiple helper structures to apply boundary conditions or define subdomains. They are gathered in the `cellsets`, `nodesets`,
-`facesets`, `edgesets` and `vertexsets`.
+`facetsets` and `vertexsets`.
 
 This grid serves as an entry point for non-intrusive adaptive grid libraries.
 
 # Fields
 - `cells::Vector{C}`: stores all cells of the grid
 - `nodes::Vector{Node{dim,T}}`: stores the `dim` dimensional nodes of the grid
-- `cellsets::Dict{String,Set{Int}}`: maps a `String` key to a `Set` of cell ids
-- `nodesets::Dict{String,Set{Int}}`: maps a `String` key to a `Set` of global node ids
-- `facesets::Dict{String,Set{FaceIndex}}`: maps a `String` to a `Set` of `Set{FaceIndex} (global_cell_id, local_face_id)`
-- `edgesets::Dict{String,Set{EdgeIndex}}`: maps a `String` to a `Set` of `Set{EdgeIndex} (global_cell_id, local_edge_id`
-- `vertexsets::Dict{String,Set{VertexIndex}}`: maps a `String` key to a `Set` of local vertex ids
+- `cellsets::Dict{String,OrderedSet{Int}}`: maps a `String` key to an `OrderedSet` of cell ids
+- `nodesets::Dict{String,OrderedSet{Int}}`: maps a `String` key to an `OrderedSet` of global node ids
+- `facetsets::Dict{String,OrderedSet{FacetIndex}}`: maps a `String` to an `OrderedSet` of `FacetIndex (global_cell_id, local_facet_id)`
+- `vertexsets::Dict{String,OrderedSet{VertexIndex}}`: maps a `String` key to an `OrderedSet` of `VertexIndex (global_cell_id, local_vertex_id)`
 - `conformity_info::CIT`: a container for conformity information
+
+!!! note
+    A grid produced by [`creategrid`](@ref Ferrite.AMR.creategrid) only carries the `cellsets`
+    and `facetsets` of the base grid; its `nodesets` and `vertexsets` are empty.
 """
 mutable struct NonConformingGrid{dim, C <: Ferrite.AbstractCell, T <: Real, CIT} <: Ferrite.AbstractGrid{dim}
     cells::Vector{C}
@@ -26,9 +29,10 @@ mutable struct NonConformingGrid{dim, C <: Ferrite.AbstractCell, T <: Real, CIT}
     nodesets::Dict{String, OrderedSet{Int}}
     facetsets::Dict{String, OrderedSet{Ferrite.FacetIndex}}
     vertexsets::Dict{String, OrderedSet{Ferrite.VertexIndex}}
-    # Hanging nodes
-    # Will change, see AMR devdocs: Currently a `Dict{Int, Vector{Int}}` that
-    conformity_info::CIT # maps slave vertices to master vertices (2 or 4).
+    # Hanging nodes. Currently a `Dict{Int, Vector{Int}}` mapping each hanging (slave) vertex
+    # to its 2 or 4 master vertices. The layout will change once hanging edges/faces are
+    # exposed as entities for higher-order fields — see the warning in the AMR devdocs.
+    conformity_info::CIT
 end
 
 function NonConformingGrid(
@@ -43,7 +47,9 @@ function NonConformingGrid(
     return NonConformingGrid(cells, nodes, cellsets, nodesets, facetsets, vertexsets, conformity_info)
 end
 
-get_coordinate_type(::NonConformingGrid{dim, C, T}) where {dim, C, T} = Vec{dim, T}
+# Must be qualified: `get_coordinate_type` is not exported from Ferrite, so an unqualified
+# definition here would create a separate `AMR.get_coordinate_type` instead of extending it.
+Ferrite.get_coordinate_type(::NonConformingGrid{dim, C, T}) where {dim, C, T} = Vec{dim, T}
 
 function Base.show(io::IO, ::MIME"text/plain", grid::NonConformingGrid)
     print(io, "$(typeof(grid)) with $(getncells(grid)) ")

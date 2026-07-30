@@ -35,6 +35,14 @@ function _add_conformity_constraints!(ch::ConstraintHandler, grid::NonConforming
     global_fidx = findfirst(==(cc.field_name), dh.field_names)::Int
     sdh_idx, local_fidx = Ferrite.find_field(dh, cc.field_name)
     interpolation = dh.subdofhandlers[sdh_idx].field_interpolations[local_fidx]
+    # `find_field` only reports the first match, so check that the other SubDofHandlers agree:
+    # a field that is linear on one subdomain and higher order on another would otherwise pass
+    # the linear-Lagrange guard below and leave the higher-order dofs unconstrained.
+    for sdh in dh.subdofhandlers
+        fidx = Ferrite._find_field(sdh, cc.field_name)
+        fidx === nothing || typeof(sdh.field_interpolations[fidx]) === typeof(interpolation) ||
+            throw(ArgumentError("ConformityConstraint requires the field :$(cc.field_name) to use the same interpolation on every SubDofHandler."))
+    end
     # The hanging/master node lookup assumes every vertex touched by the conformity relations
     # carries a dof of this field, which does not hold on subdomains (uncovered vertices map
     # to dof 0). Two ways to violate this: a cell belonging to no SubDofHandler at all

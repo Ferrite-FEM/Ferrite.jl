@@ -157,3 +157,26 @@ end
     @test Ferrite.AMR.corner_neighbor(Ferrite.AMR.Ferrite.AMR.OctantBWG(2, (2, 0)), 2, 3) == Ferrite.AMR.Ferrite.AMR.OctantBWG(2, (4, -2))
     @test Ferrite.AMR.corner_neighbor(Ferrite.AMR.Ferrite.AMR.OctantBWG(2, (2, 0)), 4, 3) == Ferrite.AMR.Ferrite.AMR.OctantBWG(2, (4, 2))
 end
+
+@testset "isancestor" begin
+    b = 5
+    for dim in (2, 3)
+        r = Ferrite.AMR.root(dim)
+        first_child = Ferrite.AMR.children(r, b)[1]
+        grandchild = Ferrite.AMR.children(first_child, b)[1]
+        other = Ferrite.AMR.children(r, b)[end]
+
+        # the root is an ancestor of everything below it (used to be missed because the
+        # parent walk stopped before reaching level 0)
+        @test Ferrite.AMR.isancestor(r, first_child, b)
+        @test Ferrite.AMR.isancestor(r, grandchild, b)
+        # direct parent and grandparent
+        @test Ferrite.AMR.isancestor(first_child, grandchild, b)
+        # strict: an octant is not its own ancestor, and finer is never an ancestor of coarser
+        @test !Ferrite.AMR.isancestor(r, r, b)
+        @test !Ferrite.AMR.isancestor(grandchild, first_child, b)
+        @test !Ferrite.AMR.isancestor(first_child, r, b)
+        # a different branch at the same level is unrelated
+        @test !Ferrite.AMR.isancestor(other, grandchild, b)
+    end
+end
