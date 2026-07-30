@@ -446,247 +446,33 @@ def scene_linear_shell():
     finish(view, "linear_shell", azimuth=30, elevation=65, zoom=1.0)
 
 
-# === how-to guides =========================================================
-
-# --- threaded_assembly: the two grid coloring algorithms side by side
-@scene("threaded_assembly")
-def scene_threaded_assembly():
+# --- darcy_flow: pressure (left) next to flux magnitude (right), showing the
+# flow forced through the gap in the almost impermeable barrier
+@scene("darcy_flow")
+def scene_darcy_flow():
     view = new_view()
-    r = OpenDataFile(datadir + "/colored.vtu")
-    left = surface(r, view)
-    n_ws = int(cell_range(r, "workstream-coloring")[1])
-    colorbar(left, view, ("CELLS", "workstream-coloring"), title="workstream",
-             horizontal=True, pos=[0.25, 0.15], length=0.21, categories=n_ws)
-    # the same grid again, shifted along its own width, so the two colorings can be
-    # compared cell by cell
-    b = r.GetDataInformation().GetBounds()
+    r = OpenDataFile(datadir + "/darcy_flow.vtu")
+    left = surface(r, view, edges=False)
+    colorbar(left, view, ("CELLS", "p"), title="p", pos=[0.02, 0.32], fmt="%.1f")
     shifted = Transform(Input=r)
-    shifted.Transform.Translate = [(b[1] - b[0]) * 1.12, 0.0, 0.0]
-    right = surface(shifted, view)
-    n_gr = int(cell_range(r, "greedy-coloring")[1])
-    colorbar(right, view, ("CELLS", "greedy-coloring"), title="greedy",
-             horizontal=True, pos=[0.54, 0.15], length=0.21, categories=n_gr)
-    finish(view, "coloring", twod=True, zoom=1.25, res=[1600, 700], pan_y=-0.13)
-
-# --- postprocessing: the L2-projected heat flux, and the cut line that the
-# point evaluation runs along
-@scene("postprocessing")
-def scene_postprocessing():
-    view = new_view()
-    r = OpenDataFile(datadir + "/heat_equation_flux.vtu")
-    d = surface(r, view)
-    colorbar(d, view, ("POINTS", "q"), title="$\\vert q \\vert$", fmt="%.2f",
-             labels=[0.2, 0.4])
-    # Arrows for the flux direction, in the annotation color rather than coloured
-    # by magnitude: the surface underneath already carries that, and one scale is
-    # easier to read than two. Stride 2 thins them to every other node so the
-    # arrows near the boundary, where the flux is largest, don't overlap.
-    g = Glyph(Input=r, GlyphType="Arrow")
+    shifted.Transform.Translate = [1.1, 0.0, 0.0]
+    right = surface(shifted, view, edges=False)
+    colorbar(right, view, ("POINTS", "q"), title="$\\vert q \\vert$",
+             pos=[0.87, 0.32], fmt="%.1f")
+    # arrows on the flux panel showing the flow direction through the gap,
+    # on a regular lattice (resampled) so the arrangement reads calmly
+    lattice = ResampleToImage(Input=shifted)
+    lattice.UseInputBounds = 0
+    lattice.SamplingBounds = [1.135, 2.065, 0.035, 0.965, 0.0, 0.0]
+    lattice.SamplingDimensions = [13, 13, 1]
+    g = Glyph(Input=lattice, GlyphType="Arrow")
     g.OrientationArray = ["POINTS", "q"]
     g.ScaleArray = ["POINTS", "q"]
     g.VectorScaleMode = "Scale by Magnitude"
-    g.ScaleFactor = 0.22
-    g.GlyphMode = "Every Nth Point"
-    g.Stride = 2
-    annotate(lift(g), view)
-    finish(view, "postprocessing", twod=True, zoom=0.95)
-
-    # Figure 2: the horizontal cut line the PointEvalHandler samples, drawn on
-    # the temperature field that the first of those plots shows.
-    view = new_view()
-    r = OpenDataFile(datadir + "/heat_equation.vtu")
-    d = surface(r, view)
-    colorbar(d, view, ("POINTS", "u"), title="u", fmt="%.2f", labels=[0.1, 0.2])
-    cut = Line(Point1=[-1.0, 0.75, 0.0], Point2=[1.0, 0.75, 0.0])
-    annotate(lift(cut), view, width=6.0)
-    finish(view, "postprocessing_cutline", twod=True, zoom=0.95)
-
-
-# === animations (time-stepping examples) ===================================
-
-# --- transient_heat_equation: temperature evolving on the unit square
-@scene("transient_heat")
-def scene_transient_heat():
-    view = new_view()
-    r = OpenDataFile(datadir + "/transient-heat.pvd")
-    d = surface(r, view, edges=False)
-    lut = colorbar(d, view, ("POINTS", "u"), title="T")
-    lut.RescaleTransferFunction(*data_range_over_time(r, ("POINTS", "u")))
-    finish_anim(view, r, "transient_heat", twod=True, zoom=0.95)
-
-
-# --- elastodynamics: vibration modes and free vibration of a cantilever beam
-@scene("elastodynamics")
-def scene_elastodynamics():
-    # Figure 2 of the tutorial: the four lowest vibration modes, stacked with
-    # mode 1 on top. The mode shapes are normalized (max dof value 1), so one
-    # warp factor and one colour scale serve all of them; the scale itself is
-    # arbitrary, so no colour bar. Parallel projection keeps the stack aligned.
-    view = new_view()
-    for i in range(1, 5):
-        r = OpenDataFile(datadir + "/elastodynamics_mode_%d.vtu" % i)
-        shifted = Transform(Input=warp(r, "u", 0.13))
-        # rotate the weak-axis modes (deflecting in z) a quarter turn about the
-        # beam axis so every mode bends in the screen plane, and stack along y,
-        # which projects to screen-vertical for this camera
-        if i != 2:
-            shifted.Transform.Rotate = [-90.0, 0.0, 0.0]
-        shifted.Transform.Translate = [0.0, 0.35 * (4 - i), 0.0]
-        d = surface(shifted, view)
-        ColorBy(d, ("POINTS", "u"))  # they share the "u" transfer function
-    lut = GetColorTransferFunction("u")
-    lut.ApplyPreset("Cool to Warm", True)
-    lut.RescaleTransferFunction(0.0, 1.0)
-    finish(view, "elastodynamics_modes", azimuth=-30, elevation=20, zoom=1.15,
-           res=[1500, 1100], parallel=True)
-
-    # Animation: free vibration ("twang") after releasing the static tip load.
-    view = new_view()
-    r = OpenDataFile(datadir + "/elastodynamics.pvd")
-    w = warp(r, "u", 75.0)
-    # colour by the (unexaggerated) deflection in mm: the raw values in m need
-    # exponent labels which grow too wide for the bar
-    calc = Calculator(Input=w)
-    calc.ResultArrayName = "u_mm"
-    calc.Function = "1000*mag(u)"
-    d = surface(calc, view)
-    lut = colorbar(d, view, ("POINTS", "u_mm"), title="$\\vert u \\vert$ [mm]",
-                   horizontal=True, fmt="%.1f")
-    lo, hi = data_range_over_time(r, ("POINTS", "u"))
-    lut.RescaleTransferFunction(1000 * lo, 1000 * hi)
-    # the beam swings above and below the undeformed axis, so frame the union
-    # of the warped bounds over time instead of a single step
-    times = list(r.TimestepValues)
-    finish_anim(view, r, "elastodynamics", azimuth=-35, elevation=20, zoom=1.9,
-                res=[1200, 560], pan_y=-0.16,
-                frame_bounds=bounds_over_time(w, times))
-
-
-# --- porous_media: vertical strain (whole domain) and pressure evolution
-@scene("porous_media")
-def scene_porous_media():
-    view = new_view()
-    r = OpenDataFile(datadir + "/porous_media.pvd")
-    # left panel: vertical strain from the displacement gradient; unlike the
-    # pressure it is defined on the whole domain (also the solid parts)
-    grad = Gradient(Input=r)
-    grad.ScalarArray = ["POINTS", "u"]
-    left = surface(grad, view, edges=False)
-    lut_e = colorbar(left, view, ("POINTS", "Gradient"),
-                     title="$\\epsilon_{22}$", pos=[0.02, 0.32], fmt="%.3f")
-    lut_e.VectorMode = "Component"
-    lut_e.VectorComponent = 4  # du_y/dy
-    lut_e.RescaleTransferFunction(
-        *data_range_over_time(grad, ("POINTS", "Gradient"), comp=4,
-                              times=list(r.TimestepValues)))
-    # right panel: pressure (NaN in the solid inclusions)
-    shifted = Transform(Input=r)
-    shifted.Transform.Translate = [6.5, 0.0, 0.0]
-    right = surface(shifted, view, edges=False)
-    lut_p = colorbar(right, view, ("POINTS", "p"), title="p", pos=[0.84, 0.32],
-                     fmt="%.0f")
-    lut_p.RescaleTransferFunction(*data_range_over_time(r, ("POINTS", "p")))
-    lut_p.NanColor = [0.7, 0.7, 0.7]  # solid inclusions carry no pressure dof
-    finish_anim(view, r, "porous_media", twod=True, zoom=0.92, res=[900, 750])
-
-
-# --- ns_vs_diffeq: velocity magnitude, von Karman vortex street
-@scene("ns_vs_diffeq")
-def scene_ns_vs_diffeq():
-    view = new_view()
-    r = OpenDataFile(datadir + "/vortex-street.pvd")
-    d = surface(r, view)
-    lut = colorbar(d, view, ("POINTS", "v"), title="speed", horizontal=True)
-    lut.RescaleTransferFunction(*data_range_over_time(r, ("POINTS", "v")))
-    # wide channel domain -> wide frame, horizontal colour bar centred below the flow
-    finish_anim(view, r, "ns_vs_diffeq", twod=True, zoom=1.7, res=[1146, 650],
-                pan_y=-0.18)
-
-
-# --- reactive_surface: reaction-diffusion pattern on a sphere
-@scene("reactive_surface")
-def scene_reactive_surface():
-    view = new_view()
-    r = OpenDataFile(datadir + "/reactive-surface.pvd")
-    d = surface(r, view, edges=False)
-    lut = colorbar(d, view, ("POINTS", "reactants"), title="reactant")
-    lut.RescaleTransferFunction(*data_range_over_time(r, ("POINTS", "reactants")))
-    finish_anim(view, r, "reactive_surface", azimuth=30, elevation=20, zoom=1.0)
-
-
-# === code gallery ==========================================================
-
-# --- helmholtz: solution of the Helmholtz equation on the unit square
-@scene("helmholtz")
-def scene_helmholtz():
-    view = new_view()
-    r = OpenDataFile(datadir + "/helmholtz.vtu")
-    d = surface(r, view)
-    colorbar(d, view, ("POINTS", "u"), title="u")
-    finish(view, "helmholtz", twod=True, zoom=0.95)
-
-
-# --- landau: Ginzburg-Landau polarisation, initial and minimised states
-@scene("landau")
-def scene_landau():
-    for src, name in (("landauorig", "landau_orig"), ("landaufinal", "landau_opt")):
-        view = new_view()
-        r = OpenDataFile(datadir + "/" + src + ".vtu")
-        d = surface(r, view, edges=False)
-        colorbar(d, view, ("POINTS", "P"), title="$\\vert P \\vert$")
-        finish(view, name, azimuth=30, elevation=35, zoom=1.0)
-
-
-# --- topology_optimization: density evolution during optimisation (SIMP)
-@scene("topology_optimization")
-def scene_topology_optimization():
-    # Figure 2 of the example: the converged density for the smaller regularization
-    # radius (left) next to the larger one (right), on the shared SIMP scale. The
-    # smaller radius comes from the POSTRUN entry in generate_screenshots.jl.
-    view = new_view()
-    small = OpenDataFile(datadir + "/small_radius.vtu")
-    left = surface(small, view, edges=False)
-    ColorBy(left, ("CELLS", "density"))  # shares the "density" transfer function
-    b = small.GetDataInformation().GetBounds()
-    shifted = Transform(Input=OpenDataFile(datadir + "/large_radius.vtu"))
-    shifted.Transform.Translate = [(b[1] - b[0]) * 1.1, 0.0, 0.0]
-    right = surface(shifted, view, edges=False)
-    lut = colorbar(right, view, ("CELLS", "density"), title="density", horizontal=True,
-                   fmt="%.1f", labels=[0.25, 0.5, 0.75])
-    lut.RescaleTransferFunction(0.0, 1.0)  # SIMP density in [0, 1]
-    finish(view, "topology_optimization_result", twod=True, zoom=2.2,
-           res=[1600, 620], pan_y=-0.2)
-
-    view = new_view()
-    r = open_series(datadir + "/topopt_frames_*.vtu")
-    d = surface(r, view, edges=False)
-    lut = colorbar(d, view, ("CELLS", "density"), title="density", horizontal=True,
-                   fmt="%.1f", labels=[0.25, 0.5, 0.75])
-    lut.RescaleTransferFunction(0.0, 1.0)  # SIMP density in [0, 1]
-    # wide beam domain -> wide frame, horizontal colour bar centred below the mesh
-    finish_anim(view, r, "topology_optimization", twod=True, zoom=1.4,
-                res=[1200, 770], pan_y=-0.15)
-
-
-# --- quasi_incompressible_hyperelasticity: deforming mixed u/p cube
-@scene("quasi_incompressible_hyperelasticity")
-def scene_quasi_incompressible_hyperelasticity():
-    view = new_view()
-    r = OpenDataFile(datadir + "/hyperelasticity_incomp_mixed.pvd")
-    w = warp(r, "u", 1.0)
-    d = surface(w, view, edges=False)
-    lut = colorbar(d, view, ("POINTS", "u"), title="$\\vert u \\vert$")
-    lut.RescaleTransferFunction(*data_range_over_time(r, ("POINTS", "u")))
-    finish_anim(view, r, "quasi_incompressible_hyperelasticity",
-               azimuth=35, elevation=20, zoom=1.1)
-
-
-names = selected or list(SCENES)
-unknown = [n for n in names if n not in SCENES]
-if unknown:
-    sys.exit("unknown scene(s): " + ", ".join(unknown))
-for i, name in enumerate(names):
-    print("[%d/%d] %s" % (i + 1, len(names), name), flush=True)
-    SCENES[name]()
-
-print("screenshots for", ", ".join(names), "written to", outdir)
+    g.ScaleFactor = 0.05
+    g.GlyphMode = "All Points"
+    gd = Show(g, view)
+    ColorBy(gd, ("POINTS", None))
+    gd.AmbientColor = EDGE
+    gd.DiffuseColor = EDGE
+    finish(view, "darcy_flow", twod=True, zoom=1.8, res=[1600, 620])

@@ -188,6 +188,19 @@ function calculate_volume(::Lagrange{RefHexahedron, 1}, x::Vector{Vec{3, T}}) wh
     return vol
 end
 
+# Only correct for straight-sided hexahedra, where the volume is determined by the eight
+# vertex nodes (indices 1:8). Error out for curved geometries, where every higher-order node
+# would have to lie on the trilinear map of the vertices, since the result would be wrong.
+function calculate_volume(ip::Lagrange{RefHexahedron, order}, x::Vector{Vec{3, T}}) where {T, order}
+    lin = Lagrange{RefHexahedron, 1}()
+    for (i, ξ) in pairs(Ferrite.reference_coordinates(ip))
+        x_straight = sum(reference_shape_value(lin, ξ, k) * x[k] for k in 1:8)
+        isapprox(x[i], x_straight; atol = 1.0e-10) ||
+            error("calculate_volume for Lagrange{RefHexahedron, $order} only supports straight-sided hexahedra")
+    end
+    return calculate_volume(lin, x)
+end
+
 function calculate_volume(::Lagrange{RefPrism, order}, x::Vector{Vec{3, T}}) where {T, order}
     vol = norm((x[4] - x[1]) ⋅ ((x[2] - x[1]) × (x[3] - x[1]))) / 2.0
     return vol

@@ -13,6 +13,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
    Vincent, 2015). This is the same family of rules already used for `RefPrism` and
    `RefPyramid`, and extends tetrahedral quadrature beyond the previous maximum order 5 of
    the Keast rules. ([#1389])
+ - New interpolations `Lagrange{RefTetrahedron, 3}`, `Lagrange{RefTetrahedron, 4}` and
+   `Lagrange{RefHexahedron, 3}`. ([#1343])
+ - Dof distribution now supports interpolations with multiple nodal dofs on faces shared
+   between cells (e.g. `Lagrange{RefTetrahedron, 4}`) by taking the relative orientation
+   (rotation and flip) of the face into account. The interpolation has to follow a specific
+   tensor product ordering of the dofs, as described in the devdocs. ([#1343])
  - `start_assemble(K, f; atomic = true)` returns an assembler that accumulates into `K`
    and `f` using atomic additions (supported for `SparseMatrixCSC`, `Symmetric`-wrapped
    `SparseMatrixCSC`, and `SparseMatrixCSR`, with eltypes `Float32`/`Float64`). This
@@ -21,13 +27,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
    overhead and non-deterministic (but correct up to summation order) results. See the
    updated [howto on multi-threaded
    assembly](https://ferrite-fem.github.io/Ferrite.jl/stable/howto/threaded_assembly/).
-   ([#XXXX])
+   ([#1417])
 
 ### Documentation
  - The figures for the documentation are now programmatically generated and made to have a consistent look.
  - New tutorial: Elastodynamics and modal analysis of a cantilever beam (mass matrix, generalized eigenvalue problem, Rayleigh damping, Newmark time integration).
+ - New tutorial on Darcy flow using H(div)-conforming Raviart-Thomas elements ([#1388])
 
 ### Fixes
+ - `PointValues` can now be reinitialized with the current cell, enabling evaluation of
+   interpolations with non-identity mappings such as Nedelec and Raviart-Thomas elements.
+   ([#1420])
  - `FacetIterator` now works with `AbstractVector{FacetIndex}` and `AbstractSet{FacetIndex}` inputs as documented, instead of requiring an `OrderedSet` ([#1384])
  - `ProjectedDirichlet` now updates the correct dofs when the constrained field is not the first
    field in the `DofHandler`; previously the dof lookup ignored the field offset in the cell dof
@@ -44,6 +54,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
    two conventions coincide, are not affected. In addition, interface entries are no
    longer computed twice for interfaces where both cells belong to the same
    `SubDofHandler`.
+ - Fix bug applying the transpose operation in condensation of `AffineConstraints`. This bug gave
+   silently wrong results when used on non-symmetric system matrices, but did not affect system matrices
+   that were symmetric ([#1426])
 
 ## [v1.5.0] - 2026-07-13
 
@@ -1216,6 +1229,7 @@ poking into Ferrite internals:
 [#1226]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1226
 [#1228]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1228
 [#1235]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1235
+[#1388]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1388
 [#1389]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1389
 [#1414]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1414
 [#1416]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1416
