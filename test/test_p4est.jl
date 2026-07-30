@@ -282,12 +282,12 @@ end
     # x--x--x     |           |
     # |  |  |     |           |
     # x--x--x-----x-----------x
-    Ferrite.AMR.refine!(adaptive_grid.cells[1], adaptive_grid.cells[1].leaves[1])
+    Ferrite.AMR.refine_octant!(adaptive_grid.cells[1], adaptive_grid.cells[1].leaves[1])
     @test length(adaptive_grid.cells[1].leaves) == 4
     for (m, octant) in zip(1:4, adaptive_grid.cells[1].leaves)
         @test octant == Ferrite.AMR.OctantBWG(2, 1, m, adaptive_grid.cells[1].b)
     end
-    Ferrite.AMR.refine!(adaptive_grid.cells[1], adaptive_grid.cells[1].leaves[1])
+    Ferrite.AMR.refine_octant!(adaptive_grid.cells[1], adaptive_grid.cells[1].leaves[1])
 
     @test Ferrite.AMR.transform_facet(adaptive_grid, FacetIndex(2, 4), adaptive_grid.cells[1].leaves[5]) == Ferrite.AMR.OctantBWG(1, (0, 8))
     @test Ferrite.AMR.transform_facet(adaptive_grid, FacetIndex(2, 4), adaptive_grid.cells[1].leaves[7]) == Ferrite.AMR.OctantBWG(1, (4, 8))
@@ -321,8 +321,8 @@ end
     # |     |     |           |
     # x-----x-----x-----------x
     adaptive_grid = ForestBWG(grid, 3)
-    Ferrite.AMR.refine!(adaptive_grid.cells[1], adaptive_grid.cells[1].leaves[1])
-    Ferrite.AMR.refine!(adaptive_grid.cells[1], adaptive_grid.cells[1].leaves[4])
+    Ferrite.AMR.refine_octant!(adaptive_grid.cells[1], adaptive_grid.cells[1].leaves[1])
+    Ferrite.AMR.refine_octant!(adaptive_grid.cells[1], adaptive_grid.cells[1].leaves[4])
     @test length(adaptive_grid.cells[1].leaves) == 7
     @test all(getproperty.(adaptive_grid.cells[1].leaves[1:3], :l) .== 1)
 
@@ -341,8 +341,8 @@ end
     grid = generate_simple_disc_grid(Quadrilateral, 6)
     grid.cells[2] = Quadrilateral((grid.cells[2].nodes[2], grid.cells[2].nodes[3], grid.cells[2].nodes[4], grid.cells[2].nodes[1]))
     adaptive_grid = ForestBWG(grid, 3)
-    Ferrite.AMR.refine!(adaptive_grid.cells[3], adaptive_grid.cells[3].leaves[1])
-    Ferrite.AMR.refine!(adaptive_grid.cells[5], adaptive_grid.cells[5].leaves[1])
+    Ferrite.AMR.refine_octant!(adaptive_grid.cells[3], adaptive_grid.cells[3].leaves[1])
+    Ferrite.AMR.refine_octant!(adaptive_grid.cells[5], adaptive_grid.cells[5].leaves[1])
 
     grid_new = Ferrite.AMR.creategrid(adaptive_grid)
     @test length(grid_new.nodes) == 23
@@ -478,19 +478,19 @@ end
     @test Ferrite.AMR.transform_corner(adaptive_grid, 7, 3, Ferrite.AMR.OctantBWG(0, (0, 0, 0)), false) == Ferrite.AMR.OctantBWG(0, (-8, 8, -8))
 
     #refinement
-    Ferrite.AMR.refine!(adaptive_grid.cells[1], adaptive_grid.cells[1].leaves[1])
+    Ferrite.AMR.refine_octant!(adaptive_grid.cells[1], adaptive_grid.cells[1].leaves[1])
     @test length(adaptive_grid.cells[1].leaves) == 8
     for (m, octant) in zip(1:8, adaptive_grid.cells[1].leaves)
         @test octant == Ferrite.AMR.OctantBWG(3, 1, m, adaptive_grid.cells[1].b)
     end
-    Ferrite.AMR.refine!(adaptive_grid.cells[1], adaptive_grid.cells[1].leaves[1])
+    Ferrite.AMR.refine_octant!(adaptive_grid.cells[1], adaptive_grid.cells[1].leaves[1])
     @test length(adaptive_grid.cells[1].leaves) == 15
     for (m, octant) in zip(1:8, adaptive_grid.cells[1].leaves)
         @test octant == Ferrite.AMR.OctantBWG(3, 2, m, adaptive_grid.cells[1].b)
     end
     adaptive_grid = ForestBWG(grid, 3)
-    Ferrite.AMR.refine!(adaptive_grid.cells[1], adaptive_grid.cells[1].leaves[1])
-    Ferrite.AMR.refine!(adaptive_grid.cells[1], adaptive_grid.cells[1].leaves[4])
+    Ferrite.AMR.refine_octant!(adaptive_grid.cells[1], adaptive_grid.cells[1].leaves[1])
+    Ferrite.AMR.refine_octant!(adaptive_grid.cells[1], adaptive_grid.cells[1].leaves[4])
     @test length(adaptive_grid.cells[1].leaves) == 15
     @test all(getproperty.(adaptive_grid.cells[1].leaves[1:3], :l) .== 1)
     @test all(getproperty.(adaptive_grid.cells[1].leaves[4:11], :l) .== 2)
@@ -514,7 +514,7 @@ end
     # Single
     adaptive_grid = ForestBWG(grid, 3)
     Ferrite.AMR.refine_all!(adaptive_grid, 1)
-    Ferrite.AMR.refine!(adaptive_grid.cells[1], adaptive_grid.cells[1].leaves[8])
+    Ferrite.AMR.refine_octant!(adaptive_grid.cells[1], adaptive_grid.cells[1].leaves[8])
     transferred_grid = Ferrite.creategrid(adaptive_grid)
     @test unique(transferred_grid.nodes) == transferred_grid.nodes
     # Unrefined grid has 5 ^ dim nodes and the refined element introduces 6 face center, 12 edge center and 1 volume center nodes
@@ -524,7 +524,7 @@ end
 
     adaptive_grid = ForestBWG(grid, 3)
     Ferrite.AMR.refine_all!(adaptive_grid, 1)
-    Ferrite.AMR.refine!(adaptive_grid.cells[1], adaptive_grid.cells[1].leaves[1])
+    Ferrite.AMR.refine_octant!(adaptive_grid.cells[1], adaptive_grid.cells[1].leaves[1])
     transferred_grid = Ferrite.creategrid(adaptive_grid)
     @test unique(transferred_grid.nodes) == transferred_grid.nodes
     # Unrefined grid has 5 ^ dim nodes and the refined element introduces 6 face center, 12 edge center and 1 volume center nodes
@@ -534,7 +534,7 @@ end
 
     adaptive_grid = ForestBWG(grid, 3)
     Ferrite.AMR.refine_all!(adaptive_grid, 1)
-    Ferrite.AMR.refine!(adaptive_grid.cells[8], adaptive_grid.cells[8].leaves[8])
+    Ferrite.AMR.refine_octant!(adaptive_grid.cells[8], adaptive_grid.cells[8].leaves[8])
     transferred_grid = Ferrite.creategrid(adaptive_grid)
     @test unique(transferred_grid.nodes) == transferred_grid.nodes
     # Unrefined grid has 5 ^ dim nodes and the refined element introduces 6 face center, 12 edge center and 1 volume center nodes
@@ -544,7 +544,7 @@ end
 
     adaptive_grid = ForestBWG(grid, 3)
     Ferrite.AMR.refine_all!(adaptive_grid, 1)
-    Ferrite.AMR.refine!(adaptive_grid.cells[8], adaptive_grid.cells[8].leaves[1])
+    Ferrite.AMR.refine_octant!(adaptive_grid.cells[8], adaptive_grid.cells[8].leaves[1])
     transferred_grid = Ferrite.creategrid(adaptive_grid)
     # Unrefined grid has 5 ^ dim nodes and the refined element introduces 6 face center, 12 edge center and 1 volume center nodes
     @test length(transferred_grid.nodes) == 5^3 + (6 + 12 + 1)
@@ -554,8 +554,8 @@ end
     # Combined
     adaptive_grid = ForestBWG(grid, 3)
     Ferrite.AMR.refine_all!(adaptive_grid, 1)
-    Ferrite.AMR.refine!(adaptive_grid.cells[1], adaptive_grid.cells[1].leaves[8])
-    Ferrite.AMR.refine!(adaptive_grid.cells[1], adaptive_grid.cells[1].leaves[1])
+    Ferrite.AMR.refine_octant!(adaptive_grid.cells[1], adaptive_grid.cells[1].leaves[8])
+    Ferrite.AMR.refine_octant!(adaptive_grid.cells[1], adaptive_grid.cells[1].leaves[1])
     transferred_grid = Ferrite.creategrid(adaptive_grid)
     @test unique(transferred_grid.nodes) == transferred_grid.nodes
     @test length(transferred_grid.nodes) == 5^3 + 2 * (6 + 12 + 1)
@@ -563,8 +563,8 @@ end
 
     adaptive_grid = ForestBWG(grid, 3)
     Ferrite.AMR.refine_all!(adaptive_grid, 1)
-    Ferrite.AMR.refine!(adaptive_grid.cells[8], adaptive_grid.cells[8].leaves[8])
-    Ferrite.AMR.refine!(adaptive_grid.cells[8], adaptive_grid.cells[8].leaves[1])
+    Ferrite.AMR.refine_octant!(adaptive_grid.cells[8], adaptive_grid.cells[8].leaves[8])
+    Ferrite.AMR.refine_octant!(adaptive_grid.cells[8], adaptive_grid.cells[8].leaves[1])
     transferred_grid = Ferrite.creategrid(adaptive_grid)
     @test unique(transferred_grid.nodes) == transferred_grid.nodes
     @test length(transferred_grid.nodes) == 5^3 + 2 * (6 + 12 + 1)
@@ -573,10 +573,10 @@ end
     # Combined
     adaptive_grid = ForestBWG(grid, 3)
     Ferrite.AMR.refine_all!(adaptive_grid, 1)
-    Ferrite.AMR.refine!(adaptive_grid.cells[1], adaptive_grid.cells[1].leaves[8])
-    Ferrite.AMR.refine!(adaptive_grid.cells[1], adaptive_grid.cells[1].leaves[1])
-    Ferrite.AMR.refine!(adaptive_grid.cells[8], adaptive_grid.cells[8].leaves[8])
-    Ferrite.AMR.refine!(adaptive_grid.cells[8], adaptive_grid.cells[8].leaves[1])
+    Ferrite.AMR.refine_octant!(adaptive_grid.cells[1], adaptive_grid.cells[1].leaves[8])
+    Ferrite.AMR.refine_octant!(adaptive_grid.cells[1], adaptive_grid.cells[1].leaves[1])
+    Ferrite.AMR.refine_octant!(adaptive_grid.cells[8], adaptive_grid.cells[8].leaves[8])
+    Ferrite.AMR.refine_octant!(adaptive_grid.cells[8], adaptive_grid.cells[8].leaves[1])
     transferred_grid = Ferrite.creategrid(adaptive_grid)
     @test unique(transferred_grid.nodes) == transferred_grid.nodes
     @test length(transferred_grid.nodes) == 5^3 + 4 * (6 + 12 + 1)
@@ -585,10 +585,10 @@ end
     # Combined and not rotated
     adaptive_grid = ForestBWG(grid, 3)
     Ferrite.AMR.refine_all!(adaptive_grid, 1)
-    Ferrite.AMR.refine!(adaptive_grid.cells[1], adaptive_grid.cells[1].leaves[8])
-    Ferrite.AMR.refine!(adaptive_grid.cells[1], adaptive_grid.cells[1].leaves[1])
-    Ferrite.AMR.refine!(adaptive_grid.cells[6], adaptive_grid.cells[6].leaves[6])
-    Ferrite.AMR.refine!(adaptive_grid.cells[6], adaptive_grid.cells[6].leaves[3])
+    Ferrite.AMR.refine_octant!(adaptive_grid.cells[1], adaptive_grid.cells[1].leaves[8])
+    Ferrite.AMR.refine_octant!(adaptive_grid.cells[1], adaptive_grid.cells[1].leaves[1])
+    Ferrite.AMR.refine_octant!(adaptive_grid.cells[6], adaptive_grid.cells[6].leaves[6])
+    Ferrite.AMR.refine_octant!(adaptive_grid.cells[6], adaptive_grid.cells[6].leaves[3])
     transferred_grid = Ferrite.creategrid(adaptive_grid)
     @test unique(transferred_grid.nodes) == transferred_grid.nodes
     # +5^3 on the coarse grid
@@ -602,10 +602,10 @@ end
     # Combined and rotated
     adaptive_grid = ForestBWG(grid, 3)
     Ferrite.AMR.refine_all!(adaptive_grid, 1)
-    Ferrite.AMR.refine!(adaptive_grid.cells[1], adaptive_grid.cells[1].leaves[8])
-    Ferrite.AMR.refine!(adaptive_grid.cells[1], adaptive_grid.cells[1].leaves[1])
-    Ferrite.AMR.refine!(adaptive_grid.cells[7], adaptive_grid.cells[7].leaves[6])
-    Ferrite.AMR.refine!(adaptive_grid.cells[7], adaptive_grid.cells[7].leaves[3])
+    Ferrite.AMR.refine_octant!(adaptive_grid.cells[1], adaptive_grid.cells[1].leaves[8])
+    Ferrite.AMR.refine_octant!(adaptive_grid.cells[1], adaptive_grid.cells[1].leaves[1])
+    Ferrite.AMR.refine_octant!(adaptive_grid.cells[7], adaptive_grid.cells[7].leaves[6])
+    Ferrite.AMR.refine_octant!(adaptive_grid.cells[7], adaptive_grid.cells[7].leaves[3])
     transferred_grid = Ferrite.creategrid(adaptive_grid)
     @test unique(transferred_grid.nodes) == transferred_grid.nodes
     # +5^3 on the coarse grid
@@ -619,8 +619,8 @@ end
     grid = generate_grid(Hexahedron, (2, 1, 1))
     # (a)
     adaptive_grid = ForestBWG(grid, 3)
-    Ferrite.AMR.refine!(adaptive_grid.cells[2], adaptive_grid.cells[2].leaves[1])
-    Ferrite.AMR.refine!(adaptive_grid.cells[2], adaptive_grid.cells[2].leaves[3])
+    Ferrite.AMR.refine_octant!(adaptive_grid.cells[2], adaptive_grid.cells[2].leaves[1])
+    Ferrite.AMR.refine_octant!(adaptive_grid.cells[2], adaptive_grid.cells[2].leaves[3])
     @test adaptive_grid.cells[2].leaves[3 + 4] == Ferrite.AMR.OctantBWG(2, (0, 4, 2))
     @test Ferrite.AMR.transform_facet(adaptive_grid, FacetIndex(1, 2), adaptive_grid.cells[2].leaves[3 + 4]) == Ferrite.AMR.OctantBWG(2, (8, 4, 2))
     # (b) Rotate elements topologically
@@ -628,8 +628,8 @@ end
     grid.cells[2] = Hexahedron((grid.cells[2].nodes[4], grid.cells[2].nodes[1], grid.cells[2].nodes[2], grid.cells[2].nodes[3], grid.cells[2].nodes[8], grid.cells[2].nodes[5], grid.cells[2].nodes[6], grid.cells[2].nodes[7]))
     # grid.cells[2] = Hexahedron((grid.cells[2].nodes[1], grid.cells[2].nodes[3], grid.cells[2].nodes[4], grid.cells[2].nodes[8], grid.cells[2].nodes[6], grid.cells[2].nodes[2], grid.cells[2].nodes[7], grid.cells[2].nodes[5])) How to rotate along diagonal? :)
     adaptive_grid = ForestBWG(grid, 3)
-    Ferrite.AMR.refine!(adaptive_grid.cells[2], adaptive_grid.cells[2].leaves[1])
-    Ferrite.AMR.refine!(adaptive_grid.cells[2], adaptive_grid.cells[2].leaves[1])
+    Ferrite.AMR.refine_octant!(adaptive_grid.cells[2], adaptive_grid.cells[2].leaves[1])
+    Ferrite.AMR.refine_octant!(adaptive_grid.cells[2], adaptive_grid.cells[2].leaves[1])
     @test adaptive_grid.cells[2].leaves[6] == Ferrite.AMR.OctantBWG(2, (2, 0, 2))
     @test Ferrite.AMR.transform_facet(adaptive_grid, FacetIndex(1, 3), adaptive_grid.cells[2].leaves[6]) == Ferrite.AMR.OctantBWG(2, (4, -2, 2))
 end
@@ -650,45 +650,45 @@ end
     grid = generate_grid(Quadrilateral, (1, 1))
     adaptive_grid = ForestBWG(grid, 3)
     Ferrite.AMR.refine_all!(adaptive_grid, 1)
-    Ferrite.AMR.refine!(adaptive_grid.cells[1], adaptive_grid.cells[1].leaves[2])
-    Ferrite.AMR.refine!(adaptive_grid.cells[1], adaptive_grid.cells[1].leaves[6])
-    Ferrite.AMR.refine!(adaptive_grid.cells[1], adaptive_grid.cells[1].leaves[6])
+    Ferrite.AMR.refine_octant!(adaptive_grid.cells[1], adaptive_grid.cells[1].leaves[2])
+    Ferrite.AMR.refine_octant!(adaptive_grid.cells[1], adaptive_grid.cells[1].leaves[6])
+    Ferrite.AMR.refine_octant!(adaptive_grid.cells[1], adaptive_grid.cells[1].leaves[6])
     balanced = Ferrite.AMR.balancetree(adaptive_grid.cells[1])
     @test length(balanced.leaves) == 16
 
     #more complex non-conformity level 3 and 4 that needs to be balanced
     adaptive_grid = ForestBWG(grid, 5)
     Ferrite.AMR.refine_all!(adaptive_grid, 1)
-    Ferrite.AMR.refine!(adaptive_grid.cells[1], adaptive_grid.cells[1].leaves[2])
-    Ferrite.AMR.refine!(adaptive_grid.cells[1], adaptive_grid.cells[1].leaves[4])
-    Ferrite.AMR.refine!(adaptive_grid.cells[1], adaptive_grid.cells[1].leaves[7])
-    Ferrite.AMR.refine!(adaptive_grid.cells[1], adaptive_grid.cells[1].leaves[12])
-    Ferrite.AMR.refine!(adaptive_grid.cells[1], adaptive_grid.cells[1].leaves[12])
-    Ferrite.AMR.refine!(adaptive_grid.cells[1], adaptive_grid.cells[1].leaves[15])
-    Ferrite.AMR.refine!(adaptive_grid.cells[1], adaptive_grid.cells[1].leaves[16])
+    Ferrite.AMR.refine_octant!(adaptive_grid.cells[1], adaptive_grid.cells[1].leaves[2])
+    Ferrite.AMR.refine_octant!(adaptive_grid.cells[1], adaptive_grid.cells[1].leaves[4])
+    Ferrite.AMR.refine_octant!(adaptive_grid.cells[1], adaptive_grid.cells[1].leaves[7])
+    Ferrite.AMR.refine_octant!(adaptive_grid.cells[1], adaptive_grid.cells[1].leaves[12])
+    Ferrite.AMR.refine_octant!(adaptive_grid.cells[1], adaptive_grid.cells[1].leaves[12])
+    Ferrite.AMR.refine_octant!(adaptive_grid.cells[1], adaptive_grid.cells[1].leaves[15])
+    Ferrite.AMR.refine_octant!(adaptive_grid.cells[1], adaptive_grid.cells[1].leaves[16])
     balanced = Ferrite.AMR.balancetree(adaptive_grid.cells[1])
     @test length(balanced.leaves) == 64
 
     grid = generate_grid(Quadrilateral, (2, 1))
     adaptive_grid = ForestBWG(grid, 2)
-    Ferrite.AMR.refine!(adaptive_grid.cells[1], adaptive_grid.cells[1].leaves[1])
-    Ferrite.AMR.refine!(adaptive_grid.cells[1], adaptive_grid.cells[1].leaves[2])
+    Ferrite.AMR.refine_octant!(adaptive_grid.cells[1], adaptive_grid.cells[1].leaves[1])
+    Ferrite.AMR.refine_octant!(adaptive_grid.cells[1], adaptive_grid.cells[1].leaves[2])
     Ferrite.AMR.balanceforest!(adaptive_grid)
     @test Ferrite.AMR.getncells(adaptive_grid) == 11
 
     grid = generate_grid(Quadrilateral, (2, 2))
     adaptive_grid = ForestBWG(grid, 2)
-    Ferrite.AMR.refine!(adaptive_grid.cells[1], adaptive_grid.cells[1].leaves[1])
-    Ferrite.AMR.refine!(adaptive_grid.cells[1], adaptive_grid.cells[1].leaves[4])
+    Ferrite.AMR.refine_octant!(adaptive_grid.cells[1], adaptive_grid.cells[1].leaves[1])
+    Ferrite.AMR.refine_octant!(adaptive_grid.cells[1], adaptive_grid.cells[1].leaves[4])
     Ferrite.AMR.balanceforest!(adaptive_grid)
     @test Ferrite.AMR.getncells(adaptive_grid) == 19
 
     # 2D example with balancing over a corner connection that is not within the topology tables
     grid = generate_grid(Quadrilateral, (2, 1))
     adaptive_grid = ForestBWG(grid, 3)
-    Ferrite.AMR.refine!(adaptive_grid.cells[1], adaptive_grid.cells[1].leaves[1])
-    Ferrite.AMR.refine!(adaptive_grid.cells[1], adaptive_grid.cells[1].leaves[2])
-    Ferrite.AMR.refine!(adaptive_grid.cells[1], adaptive_grid.cells[1].leaves[5])
+    Ferrite.AMR.refine_octant!(adaptive_grid.cells[1], adaptive_grid.cells[1].leaves[1])
+    Ferrite.AMR.refine_octant!(adaptive_grid.cells[1], adaptive_grid.cells[1].leaves[2])
+    Ferrite.AMR.refine_octant!(adaptive_grid.cells[1], adaptive_grid.cells[1].leaves[5])
     Ferrite.AMR.balanceforest!(adaptive_grid)
     @test Ferrite.AMR.getncells(adaptive_grid) == 23
 
@@ -696,9 +696,9 @@ end
     grid = generate_grid(Quadrilateral, (2, 1))
     grid.cells[1] = Quadrilateral((grid.cells[1].nodes[2], grid.cells[1].nodes[3], grid.cells[1].nodes[4], grid.cells[1].nodes[1]))
     adaptive_grid = ForestBWG(grid, 3)
-    Ferrite.AMR.refine!(adaptive_grid.cells[1], adaptive_grid.cells[1].leaves[1])
-    Ferrite.AMR.refine!(adaptive_grid.cells[1], adaptive_grid.cells[1].leaves[1])
-    Ferrite.AMR.refine!(adaptive_grid.cells[1], adaptive_grid.cells[1].leaves[2])
+    Ferrite.AMR.refine_octant!(adaptive_grid.cells[1], adaptive_grid.cells[1].leaves[1])
+    Ferrite.AMR.refine_octant!(adaptive_grid.cells[1], adaptive_grid.cells[1].leaves[1])
+    Ferrite.AMR.refine_octant!(adaptive_grid.cells[1], adaptive_grid.cells[1].leaves[2])
     Ferrite.AMR.balanceforest!(adaptive_grid)
     @test Ferrite.AMR.getncells(adaptive_grid) == 23
 
@@ -706,36 +706,36 @@ end
     grid = generate_grid(Hexahedron, (1, 1, 1))
     adaptive_grid = ForestBWG(grid, 3)
     Ferrite.AMR.refine_all!(adaptive_grid, 1)
-    Ferrite.AMR.refine!(adaptive_grid.cells[1], adaptive_grid.cells[1].leaves[2])
-    Ferrite.AMR.refine!(adaptive_grid.cells[1], adaptive_grid.cells[1].leaves[6])
-    Ferrite.AMR.refine!(adaptive_grid.cells[1], adaptive_grid.cells[1].leaves[6])
+    Ferrite.AMR.refine_octant!(adaptive_grid.cells[1], adaptive_grid.cells[1].leaves[2])
+    Ferrite.AMR.refine_octant!(adaptive_grid.cells[1], adaptive_grid.cells[1].leaves[6])
+    Ferrite.AMR.refine_octant!(adaptive_grid.cells[1], adaptive_grid.cells[1].leaves[6])
     balanced = Ferrite.AMR.balancetree(adaptive_grid.cells[1])
     @test length(balanced.leaves) == 43
 
     #3D case intra tree non conformity level 3 at two different places
     adaptive_grid = ForestBWG(grid, 4)
     Ferrite.AMR.refine_all!(adaptive_grid, 1)
-    Ferrite.AMR.refine!(adaptive_grid.cells[1], adaptive_grid.cells[1].leaves[2])
-    Ferrite.AMR.refine!(adaptive_grid.cells[1], adaptive_grid.cells[1].leaves[4])
-    Ferrite.AMR.refine!(adaptive_grid.cells[1], adaptive_grid.cells[1].leaves[7])
-    Ferrite.AMR.refine!(adaptive_grid.cells[1], adaptive_grid.cells[1].leaves[12])
-    Ferrite.AMR.refine!(adaptive_grid.cells[1], adaptive_grid.cells[1].leaves[28])
-    Ferrite.AMR.refine!(adaptive_grid.cells[1], adaptive_grid.cells[1].leaves[29])
-    Ferrite.AMR.refine!(adaptive_grid.cells[1], adaptive_grid.cells[1].leaves[37])
-    Ferrite.AMR.refine!(adaptive_grid.cells[1], adaptive_grid.cells[1].leaves[39])
+    Ferrite.AMR.refine_octant!(adaptive_grid.cells[1], adaptive_grid.cells[1].leaves[2])
+    Ferrite.AMR.refine_octant!(adaptive_grid.cells[1], adaptive_grid.cells[1].leaves[4])
+    Ferrite.AMR.refine_octant!(adaptive_grid.cells[1], adaptive_grid.cells[1].leaves[7])
+    Ferrite.AMR.refine_octant!(adaptive_grid.cells[1], adaptive_grid.cells[1].leaves[12])
+    Ferrite.AMR.refine_octant!(adaptive_grid.cells[1], adaptive_grid.cells[1].leaves[28])
+    Ferrite.AMR.refine_octant!(adaptive_grid.cells[1], adaptive_grid.cells[1].leaves[29])
+    Ferrite.AMR.refine_octant!(adaptive_grid.cells[1], adaptive_grid.cells[1].leaves[37])
+    Ferrite.AMR.refine_octant!(adaptive_grid.cells[1], adaptive_grid.cells[1].leaves[39])
     balanced = Ferrite.AMR.balancetree(adaptive_grid.cells[1])
     @test length(balanced.leaves) == 127
 
     #3D case inter tree non conformity level 3 at two different places
     grid = generate_grid(Hexahedron, (2, 2, 2))
     adaptive_grid = ForestBWG(grid, 4)
-    Ferrite.AMR.refine!(adaptive_grid.cells[1], adaptive_grid.cells[1].leaves[1])
-    Ferrite.AMR.refine!(adaptive_grid.cells[1], adaptive_grid.cells[1].leaves[2])
-    Ferrite.AMR.refine!(adaptive_grid.cells[1], adaptive_grid.cells[1].leaves[4])
-    #Ferrite.AMR.refine!(adaptive_grid.cells[1],adaptive_grid.cells[1].leaves[7])
-    Ferrite.AMR.refine!(adaptive_grid.cells[7], adaptive_grid.cells[7].leaves[1])
-    Ferrite.AMR.refine!(adaptive_grid.cells[7], adaptive_grid.cells[7].leaves[1])
-    #Ferrite.AMR.refine!(adaptive_grid.cells[7],adaptive_grid.cells[7].leaves[1])
+    Ferrite.AMR.refine_octant!(adaptive_grid.cells[1], adaptive_grid.cells[1].leaves[1])
+    Ferrite.AMR.refine_octant!(adaptive_grid.cells[1], adaptive_grid.cells[1].leaves[2])
+    Ferrite.AMR.refine_octant!(adaptive_grid.cells[1], adaptive_grid.cells[1].leaves[4])
+    #Ferrite.AMR.refine_octant!(adaptive_grid.cells[1],adaptive_grid.cells[1].leaves[7])
+    Ferrite.AMR.refine_octant!(adaptive_grid.cells[7], adaptive_grid.cells[7].leaves[1])
+    Ferrite.AMR.refine_octant!(adaptive_grid.cells[7], adaptive_grid.cells[7].leaves[1])
+    #Ferrite.AMR.refine_octant!(adaptive_grid.cells[7],adaptive_grid.cells[7].leaves[1])
     Ferrite.AMR.balanceforest!(adaptive_grid)
     transferred_grid_ref = Ferrite.AMR.creategrid(adaptive_grid)
 
@@ -763,12 +763,12 @@ end
     grid.cells[7] = Hexahedron((grid.cells[7].nodes[2], grid.cells[7].nodes[3], grid.cells[7].nodes[4], grid.cells[7].nodes[1], grid.cells[7].nodes[4 + 2], grid.cells[7].nodes[4 + 3], grid.cells[7].nodes[4 + 4], grid.cells[7].nodes[4 + 1]))
     grid.cells[7] = Hexahedron((grid.cells[7].nodes[2], grid.cells[7].nodes[3], grid.cells[7].nodes[4], grid.cells[7].nodes[1], grid.cells[7].nodes[4 + 2], grid.cells[7].nodes[4 + 3], grid.cells[7].nodes[4 + 4], grid.cells[7].nodes[4 + 1]))
     adaptive_grid = ForestBWG(grid, 3)
-    Ferrite.AMR.refine!(adaptive_grid.cells[1], adaptive_grid.cells[1].leaves[1])
-    Ferrite.AMR.refine!(adaptive_grid.cells[1], adaptive_grid.cells[1].leaves[2])
-    Ferrite.AMR.refine!(adaptive_grid.cells[1], adaptive_grid.cells[1].leaves[4])
-    #Ferrite.AMR.refine!(adaptive_grid.cells[1],adaptive_grid.cells[1].leaves[7])
-    Ferrite.AMR.refine!(adaptive_grid.cells[7], adaptive_grid.cells[7].leaves[1])
-    Ferrite.AMR.refine!(adaptive_grid.cells[7], adaptive_grid.cells[7].leaves[1])
+    Ferrite.AMR.refine_octant!(adaptive_grid.cells[1], adaptive_grid.cells[1].leaves[1])
+    Ferrite.AMR.refine_octant!(adaptive_grid.cells[1], adaptive_grid.cells[1].leaves[2])
+    Ferrite.AMR.refine_octant!(adaptive_grid.cells[1], adaptive_grid.cells[1].leaves[4])
+    #Ferrite.AMR.refine_octant!(adaptive_grid.cells[1],adaptive_grid.cells[1].leaves[7])
+    Ferrite.AMR.refine_octant!(adaptive_grid.cells[7], adaptive_grid.cells[7].leaves[1])
+    Ferrite.AMR.refine_octant!(adaptive_grid.cells[7], adaptive_grid.cells[7].leaves[1])
     Ferrite.AMR.balanceforest!(adaptive_grid)
     transferred_grid = Ferrite.AMR.creategrid(adaptive_grid)
     @test length(transferred_grid.cells) == length(transferred_grid_ref.cells)
@@ -812,40 +812,40 @@ end
 
     grid = generate_grid(Hexahedron, (2, 2, 2))
     adaptive_grid = ForestBWG(grid, 3)
-    Ferrite.AMR.refine!(adaptive_grid.cells[4], adaptive_grid.cells[4].leaves[1])
+    Ferrite.AMR.refine_octant!(adaptive_grid.cells[4], adaptive_grid.cells[4].leaves[1])
     Ferrite.AMR.balanceforest!(adaptive_grid)
     @test Ferrite.AMR.getncells(adaptive_grid) == 15
 
     #yet another edge balancing case
     grid = generate_grid(Hexahedron, (2, 2, 2))
     adaptive_grid = ForestBWG(grid, 3)
-    Ferrite.AMR.refine!(adaptive_grid.cells[4], adaptive_grid.cells[4].leaves[1])
+    Ferrite.AMR.refine_octant!(adaptive_grid.cells[4], adaptive_grid.cells[4].leaves[1])
     Ferrite.AMR.balanceforest!(adaptive_grid)
-    Ferrite.AMR.refine!(adaptive_grid.cells[4], adaptive_grid.cells[4].leaves[1])
+    Ferrite.AMR.refine_octant!(adaptive_grid.cells[4], adaptive_grid.cells[4].leaves[1])
     Ferrite.AMR.balanceforest!(adaptive_grid)
     @test Ferrite.AMR.getncells(adaptive_grid) == 43
 
     #yet another edge balancing case
     grid = generate_grid(Hexahedron, (2, 2, 2))
     adaptive_grid = ForestBWG(grid, 3)
-    Ferrite.AMR.refine!(adaptive_grid.cells[4], adaptive_grid.cells[4].leaves[1])
+    Ferrite.AMR.refine_octant!(adaptive_grid.cells[4], adaptive_grid.cells[4].leaves[1])
     Ferrite.AMR.balanceforest!(adaptive_grid)
-    Ferrite.AMR.refine!(adaptive_grid.cells[4], adaptive_grid.cells[4].leaves[1])
+    Ferrite.AMR.refine_octant!(adaptive_grid.cells[4], adaptive_grid.cells[4].leaves[1])
     Ferrite.AMR.balanceforest!(adaptive_grid)
-    Ferrite.AMR.refine!(adaptive_grid.cells[3], adaptive_grid.cells[3].leaves[2])
-    Ferrite.AMR.refine!(adaptive_grid.cells[4], adaptive_grid.cells[4].leaves[10])
-    Ferrite.AMR.refine!(adaptive_grid.cells[4], adaptive_grid.cells[4].leaves[3])
+    Ferrite.AMR.refine_octant!(adaptive_grid.cells[3], adaptive_grid.cells[3].leaves[2])
+    Ferrite.AMR.refine_octant!(adaptive_grid.cells[4], adaptive_grid.cells[4].leaves[10])
+    Ferrite.AMR.refine_octant!(adaptive_grid.cells[4], adaptive_grid.cells[4].leaves[3])
     Ferrite.AMR.balanceforest!(adaptive_grid)
     @test Ferrite.AMR.getncells(adaptive_grid) == 71
 
     #yet another edge balancing case
     grid = generate_grid(Hexahedron, (2, 2, 2))
     adaptive_grid = ForestBWG(grid, 3)
-    Ferrite.AMR.refine!(adaptive_grid.cells[4], adaptive_grid.cells[4].leaves[1])
+    Ferrite.AMR.refine_octant!(adaptive_grid.cells[4], adaptive_grid.cells[4].leaves[1])
     Ferrite.AMR.balanceforest!(adaptive_grid)
-    Ferrite.AMR.refine!(adaptive_grid.cells[4], adaptive_grid.cells[4].leaves[1])
+    Ferrite.AMR.refine_octant!(adaptive_grid.cells[4], adaptive_grid.cells[4].leaves[1])
     Ferrite.AMR.balanceforest!(adaptive_grid)
-    Ferrite.AMR.refine!(adaptive_grid.cells[4], adaptive_grid.cells[4].leaves[7])
+    Ferrite.AMR.refine_octant!(adaptive_grid.cells[4], adaptive_grid.cells[4].leaves[7])
     Ferrite.AMR.balanceforest!(adaptive_grid)
     # 127 = 120 + 7: one additional leaf from refinement-introduced corner balancing
     @test Ferrite.AMR.getncells(adaptive_grid) == 127
@@ -884,7 +884,7 @@ end
     function refine_towards_and_balance!(forest, treeid, nsteps, pred)
         for _ in 1:nsteps
             t = forest.cells[treeid]
-            Ferrite.AMR.refine!(t, only(filter(pred, t.leaves)))
+            Ferrite.AMR.refine_octant!(t, only(filter(pred, t.leaves)))
         end
         Ferrite.AMR.balanceforest!(forest)
         return forest
@@ -897,13 +897,13 @@ end
     # 3D corner in the middle of the shared macro face
     forest = ForestBWG(generate_grid(Hexahedron, (2, 1, 1)), 4)
     m = Int(Ferrite.AMR._maximum_size(forest.cells[1].b))
-    Ferrite.AMR.refine!(forest.cells[2], forest.cells[2].leaves[1])
+    Ferrite.AMR.refine_octant!(forest.cells[2], forest.cells[2].leaves[1])
     refine_towards_and_balance!(forest, 2, 2, o -> Int(o.xyz[1]) == 0 && Int(o.xyz[2]) == m ÷ 2 && Int(o.xyz[3]) == m ÷ 2)
     @test count_unbalanced_contacts(forest) == 0
 
     # 3D corner in the middle of the shared macro edge (diagonal tree is an exclusive edge neighbour)
     forest = ForestBWG(generate_grid(Hexahedron, (2, 2, 1)), 4)
-    Ferrite.AMR.refine!(forest.cells[4], forest.cells[4].leaves[1])
+    Ferrite.AMR.refine_octant!(forest.cells[4], forest.cells[4].leaves[1])
     refine_towards_and_balance!(forest, 4, 2, o -> Int(o.xyz[1]) == 0 && Int(o.xyz[2]) == 0 && Int(o.xyz[3]) == m ÷ 2)
     @test count_unbalanced_contacts(forest) == 0
     # the balanced forest must still materialize into a conforming constrained space
@@ -915,7 +915,7 @@ end
     # 2D corner in the middle of the shared macro face while the tree's root corner in that
     # direction has an exclusive vertex neighbour (grid center) — must not shadow the fallback
     forest = ForestBWG(generate_grid(Quadrilateral, (2, 2)), 4)
-    Ferrite.AMR.refine!(forest.cells[2], forest.cells[2].leaves[1])
+    Ferrite.AMR.refine_octant!(forest.cells[2], forest.cells[2].leaves[1])
     refine_towards_and_balance!(forest, 2, 2, o -> Int(o.xyz[1]) == 0 && Int(o.xyz[2]) + Int(Ferrite.AMR._compute_size(forest.cells[2].b, o.l)) == m ÷ 2)
     @test count_unbalanced_contacts(forest) == 0
 
@@ -924,14 +924,14 @@ end
     for _ in 1:3
         t = forest.cells[4]
         leaf = only(filter(o -> o.xyz[1] == 0 && o.xyz[2] == 0 && Int(o.xyz[3]) + Int(Ferrite.AMR._compute_size(t.b, o.l)) == m, t.leaves))
-        Ferrite.AMR.refine!(t, leaf)
+        Ferrite.AMR.refine_octant!(t, leaf)
     end
     Ferrite.AMR.balanceforest!(forest)
     @test count_unbalanced_contacts(forest) == 0
 
     # regression: 2D through-face corner with no macro corner connection at all
     forest = ForestBWG(generate_grid(Quadrilateral, (2, 1)), 4)
-    Ferrite.AMR.refine!(forest.cells[2], forest.cells[2].leaves[1])
+    Ferrite.AMR.refine_octant!(forest.cells[2], forest.cells[2].leaves[1])
     refine_towards_and_balance!(forest, 2, 2, o -> Int(o.xyz[1]) == 0 && Int(o.xyz[2]) == m ÷ 2)
     @test count_unbalanced_contacts(forest) == 0
 end
@@ -1040,8 +1040,8 @@ end
     grid = generate_grid(Quadrilateral, (1, 1))
     adaptive_grid = ForestBWG(grid, 3)
     Ferrite.AMR.refine_all!(adaptive_grid, 1)
-    Ferrite.AMR.refine!(adaptive_grid.cells[1], adaptive_grid.cells[1].leaves[1])
-    Ferrite.AMR.refine!(adaptive_grid.cells[1], adaptive_grid.cells[1].leaves[1])
+    Ferrite.AMR.refine_octant!(adaptive_grid.cells[1], adaptive_grid.cells[1].leaves[1])
+    Ferrite.AMR.refine_octant!(adaptive_grid.cells[1], adaptive_grid.cells[1].leaves[1])
     transferred_grid = Ferrite.AMR.creategrid(adaptive_grid)
     @test length(transferred_grid.cells) == 10
     @test length(transferred_grid.nodes) == 19
@@ -1051,8 +1051,8 @@ end
     grid = generate_grid(Quadrilateral, (2, 2))
     adaptive_grid = ForestBWG(grid, 3)
     Ferrite.AMR.refine_all!(adaptive_grid, 1)
-    Ferrite.AMR.refine!(adaptive_grid.cells[1], adaptive_grid.cells[1].leaves[1])
-    Ferrite.AMR.refine!(adaptive_grid.cells[1], adaptive_grid.cells[1].leaves[1])
+    Ferrite.AMR.refine_octant!(adaptive_grid.cells[1], adaptive_grid.cells[1].leaves[1])
+    Ferrite.AMR.refine_octant!(adaptive_grid.cells[1], adaptive_grid.cells[1].leaves[1])
     transferred_grid = Ferrite.AMR.creategrid(adaptive_grid)
     @test length(transferred_grid.cells) == 22
     @test length(transferred_grid.nodes) == 35
@@ -1061,18 +1061,18 @@ end
     #more random refinement
     grid = generate_grid(Quadrilateral, (3, 3))
     adaptive_grid = ForestBWG(grid, 3)
-    Ferrite.AMR.refine!(adaptive_grid.cells[1], adaptive_grid.cells[1].leaves[1])
-    Ferrite.AMR.refine!(adaptive_grid.cells[1], adaptive_grid.cells[1].leaves[1])
-    Ferrite.AMR.refine!(adaptive_grid.cells[1], adaptive_grid.cells[1].leaves[1])
-    Ferrite.AMR.refine!(adaptive_grid.cells[3], adaptive_grid.cells[3].leaves[1])
-    Ferrite.AMR.refine!(adaptive_grid.cells[3], adaptive_grid.cells[3].leaves[2])
-    Ferrite.AMR.refine!(adaptive_grid.cells[3], adaptive_grid.cells[3].leaves[3])
-    Ferrite.AMR.refine!(adaptive_grid.cells[7], adaptive_grid.cells[7].leaves[1])
-    Ferrite.AMR.refine!(adaptive_grid.cells[7], adaptive_grid.cells[7].leaves[3])
-    Ferrite.AMR.refine!(adaptive_grid.cells[7], adaptive_grid.cells[7].leaves[5])
-    Ferrite.AMR.refine!(adaptive_grid.cells[9], adaptive_grid.cells[9].leaves[end])
-    Ferrite.AMR.refine!(adaptive_grid.cells[9], adaptive_grid.cells[9].leaves[end])
-    Ferrite.AMR.refine!(adaptive_grid.cells[9], adaptive_grid.cells[9].leaves[end])
+    Ferrite.AMR.refine_octant!(adaptive_grid.cells[1], adaptive_grid.cells[1].leaves[1])
+    Ferrite.AMR.refine_octant!(adaptive_grid.cells[1], adaptive_grid.cells[1].leaves[1])
+    Ferrite.AMR.refine_octant!(adaptive_grid.cells[1], adaptive_grid.cells[1].leaves[1])
+    Ferrite.AMR.refine_octant!(adaptive_grid.cells[3], adaptive_grid.cells[3].leaves[1])
+    Ferrite.AMR.refine_octant!(adaptive_grid.cells[3], adaptive_grid.cells[3].leaves[2])
+    Ferrite.AMR.refine_octant!(adaptive_grid.cells[3], adaptive_grid.cells[3].leaves[3])
+    Ferrite.AMR.refine_octant!(adaptive_grid.cells[7], adaptive_grid.cells[7].leaves[1])
+    Ferrite.AMR.refine_octant!(adaptive_grid.cells[7], adaptive_grid.cells[7].leaves[3])
+    Ferrite.AMR.refine_octant!(adaptive_grid.cells[7], adaptive_grid.cells[7].leaves[5])
+    Ferrite.AMR.refine_octant!(adaptive_grid.cells[9], adaptive_grid.cells[9].leaves[end])
+    Ferrite.AMR.refine_octant!(adaptive_grid.cells[9], adaptive_grid.cells[9].leaves[end])
+    Ferrite.AMR.refine_octant!(adaptive_grid.cells[9], adaptive_grid.cells[9].leaves[end])
     transferred_grid = Ferrite.AMR.creategrid(adaptive_grid)
     @test length(transferred_grid.cells) == 45
     @test length(transferred_grid.nodes) == 76
@@ -1086,8 +1086,8 @@ end
     grid = generate_grid(Hexahedron, (1, 1, 1))
     adaptive_grid = ForestBWG(grid, 3)
     Ferrite.AMR.refine_all!(adaptive_grid, 1)
-    Ferrite.AMR.refine!(adaptive_grid.cells[1], adaptive_grid.cells[1].leaves[1])
-    Ferrite.AMR.refine!(adaptive_grid.cells[1], adaptive_grid.cells[1].leaves[1])
+    Ferrite.AMR.refine_octant!(adaptive_grid.cells[1], adaptive_grid.cells[1].leaves[1])
+    Ferrite.AMR.refine_octant!(adaptive_grid.cells[1], adaptive_grid.cells[1].leaves[1])
     transferred_grid = Ferrite.AMR.creategrid(adaptive_grid)
     @test length(transferred_grid.cells) == 8 + 7 + 7
     @test length(transferred_grid.nodes) == 65
@@ -1167,7 +1167,7 @@ end
 
     forests = map((grid64, grid32)) do grid
         forest = ForestBWG(grid, 3)
-        Ferrite.AMR.refine!(forest.cells[1], forest.cells[1].leaves[1])
+        Ferrite.AMR.refine_octant!(forest.cells[1], forest.cells[1].leaves[1])
         Ferrite.AMR.balanceforest!(forest)
         forest
     end
@@ -1201,8 +1201,8 @@ end
     addcellset!(grid, "left", x -> x[1] <= 0)
     addcellset!(grid, "right", x -> x[1] >= 0)
     forest = ForestBWG(grid, 3)
-    Ferrite.AMR.refine!(forest.cells[1], forest.cells[1].leaves[1])
-    Ferrite.AMR.refine!(forest.cells[1], forest.cells[1].leaves[1])
+    Ferrite.AMR.refine_octant!(forest.cells[1], forest.cells[1].leaves[1])
+    Ferrite.AMR.refine_octant!(forest.cells[1], forest.cells[1].leaves[1])
     Ferrite.AMR.balanceforest!(forest)
     transferred_grid = Ferrite.AMR.creategrid(forest)
 
@@ -1231,7 +1231,7 @@ end
     # `AffineConstraint(0, ...)` (BoundsError at isconstrained[0]).
     grid = generate_grid(Quadrilateral, (2, 2))
     forest = ForestBWG(grid, 3)
-    Ferrite.AMR.refine!(forest.cells[1], forest.cells[1].leaves[1])
+    Ferrite.AMR.refine_octant!(forest.cells[1], forest.cells[1].leaves[1])
     Ferrite.AMR.balanceforest!(forest)
     transferred_grid = Ferrite.AMR.creategrid(forest)
     ip = Lagrange{RefQuadrilateral, 1}()
@@ -1266,7 +1266,7 @@ end
     grid = generate_grid(Hexahedron, (1, 1, 1))
     adaptive_grid = ForestBWG(grid, 3)
     Ferrite.AMR.refine_all!(adaptive_grid, 1)
-    Ferrite.AMR.refine!(adaptive_grid.cells[1], adaptive_grid.cells[1].leaves[1])
+    Ferrite.AMR.refine_octant!(adaptive_grid.cells[1], adaptive_grid.cells[1].leaves[1])
     # x-----------x-----------x
     # |           |           |
     # |           |           |
@@ -1290,7 +1290,7 @@ end
     # Easy Interoctree
     grid = generate_grid(Hexahedron, (2, 2, 2))
     adaptive_grid = ForestBWG(grid, 3)
-    Ferrite.AMR.refine!(adaptive_grid.cells[1], adaptive_grid.cells[1].leaves[1])
+    Ferrite.AMR.refine_octant!(adaptive_grid.cells[1], adaptive_grid.cells[1].leaves[1])
     # x-----------x-----------x
     # |           |           |
     # |           |           |
@@ -1317,7 +1317,7 @@ end
     grid.cells[1] = Hexahedron((grid.cells[1].nodes[2], grid.cells[1].nodes[3], grid.cells[1].nodes[4], grid.cells[1].nodes[1], grid.cells[1].nodes[4 + 2], grid.cells[1].nodes[4 + 3], grid.cells[1].nodes[4 + 4], grid.cells[1].nodes[4 + 1]))
     grid.cells[1] = Hexahedron((grid.cells[1].nodes[2], grid.cells[1].nodes[3], grid.cells[1].nodes[4], grid.cells[1].nodes[1], grid.cells[1].nodes[4 + 2], grid.cells[1].nodes[4 + 3], grid.cells[1].nodes[4 + 4], grid.cells[1].nodes[4 + 1]))
     adaptive_grid = ForestBWG(grid, 3)
-    Ferrite.AMR.refine!(adaptive_grid.cells[1], adaptive_grid.cells[1].leaves[1])
+    Ferrite.AMR.refine_octant!(adaptive_grid.cells[1], adaptive_grid.cells[1].leaves[1])
     transferred_grid_rotated = Ferrite.AMR.creategrid(adaptive_grid)
     @test Set(transferred_grid_rotated.conformity_info[2]) == Set([1, 9])
     @test Set(transferred_grid_rotated.conformity_info[3]) == Set([1, 13])
@@ -1356,7 +1356,7 @@ end
     # |1    3    2|4    1    1|
     # x-----------x-----------x
     adaptive_grid = ForestBWG(grid, 3)
-    Ferrite.AMR.refine!(adaptive_grid.cells[2], adaptive_grid.cells[2].leaves[1])
+    Ferrite.AMR.refine_octant!(adaptive_grid.cells[2], adaptive_grid.cells[2].leaves[1])
     transferred_grid_rotated = Ferrite.AMR.creategrid(adaptive_grid)
     @test Set(transferred_grid_rotated.conformity_info[10]) == Set([4, 9])
     @test Set(transferred_grid_rotated.conformity_info[11]) == Set([2, 4])
@@ -1366,8 +1366,8 @@ end
     grid = generate_simple_disc_grid(Quadrilateral, 10)
     adaptive_grid = ForestBWG(grid, 3)
     @test getncells(adaptive_grid) == 10
-    Ferrite.refine!(adaptive_grid.cells[1], adaptive_grid.cells[1].leaves[1])
-    Ferrite.refine!(adaptive_grid.cells[1], adaptive_grid.cells[1].leaves[3])
+    Ferrite.AMR.refine_octant!(adaptive_grid.cells[1], adaptive_grid.cells[1].leaves[1])
+    Ferrite.AMR.refine_octant!(adaptive_grid.cells[1], adaptive_grid.cells[1].leaves[3])
     @test getncells(adaptive_grid) == 16
     Ferrite.balanceforest!(adaptive_grid)
     @test getncells(adaptive_grid) == 9 * 4 + 3 + 4
@@ -1376,9 +1376,9 @@ end
     grid = generate_simple_disc_grid(Hexahedron, 10)
     adaptive_grid = ForestBWG(grid, 3)
     @test getncells(adaptive_grid) == 10
-    Ferrite.refine!(adaptive_grid.cells[1], adaptive_grid.cells[1].leaves[1])
+    Ferrite.AMR.refine_octant!(adaptive_grid.cells[1], adaptive_grid.cells[1].leaves[1])
     @test getncells(adaptive_grid) == 17
-    Ferrite.refine!(adaptive_grid.cells[1], adaptive_grid.cells[1].leaves[3])
+    Ferrite.AMR.refine_octant!(adaptive_grid.cells[1], adaptive_grid.cells[1].leaves[3])
     @test getncells(adaptive_grid) == 24
     Ferrite.balanceforest!(adaptive_grid)
     @test getncells(adaptive_grid) == 9 * 8 + 7 + 8
@@ -1498,7 +1498,7 @@ end
     grid = generate_grid(Quadrilateral, (2, 2))
     grid.cells[2] = Quadrilateral((grid.cells[2].nodes[2], grid.cells[2].nodes[3], grid.cells[2].nodes[4], grid.cells[2].nodes[1]))
     forest = ForestBWG(grid, 3)
-    Ferrite.AMR.refine!(forest.cells[2], forest.cells[2].leaves[1])
+    Ferrite.AMR.refine_octant!(forest.cells[2], forest.cells[2].leaves[1])
     tg = Ferrite.AMR.creategrid(forest)
     skel = Ferrite.facetskeleton(forest)
     @test skeleton_canonical_2d(tg, skel) == skeleton_groundtruth_2d(tg)
@@ -1507,7 +1507,7 @@ end
     # 3D intra-octree hanging (cf. "hanging nodes" testset)
     forest = ForestBWG(generate_grid(Hexahedron, (1, 1, 1)), 3)
     Ferrite.AMR.refine_all!(forest, 1)
-    Ferrite.AMR.refine!(forest.cells[1], forest.cells[1].leaves[1])
+    Ferrite.AMR.refine_octant!(forest.cells[1], forest.cells[1].leaves[1])
     tg = Ferrite.AMR.creategrid(forest)
     skel = Ferrite.facetskeleton(forest)
     # 8 octants -> 12 coarse interfaces; refining one octant replaces 3 of them by 4
@@ -1575,7 +1575,7 @@ end
     grid = generate_grid(Quadrilateral, (2, 2))
     grid.cells[2] = Quadrilateral((grid.cells[2].nodes[2], grid.cells[2].nodes[3], grid.cells[2].nodes[4], grid.cells[2].nodes[1]))
     forest = ForestBWG(grid, 3)
-    Ferrite.AMR.refine!(forest.cells[2], forest.cells[2].leaves[1])
+    Ferrite.AMR.refine_octant!(forest.cells[2], forest.cells[2].leaves[1])
     check_interfacevalues(forest, RefQuadrilateral)
 
     # 3D multi-level, intra- + inter-tree
@@ -1591,7 +1591,7 @@ end
     grid.cells[1] = Hexahedron((grid.cells[1].nodes[2], grid.cells[1].nodes[3], grid.cells[1].nodes[4], grid.cells[1].nodes[1], grid.cells[1].nodes[6], grid.cells[1].nodes[7], grid.cells[1].nodes[8], grid.cells[1].nodes[5]))
     grid.cells[1] = Hexahedron((grid.cells[1].nodes[2], grid.cells[1].nodes[3], grid.cells[1].nodes[4], grid.cells[1].nodes[1], grid.cells[1].nodes[6], grid.cells[1].nodes[7], grid.cells[1].nodes[8], grid.cells[1].nodes[5]))
     forest = ForestBWG(grid, 3)
-    Ferrite.AMR.refine!(forest.cells[1], forest.cells[1].leaves[1])
+    Ferrite.AMR.refine_octant!(forest.cells[1], forest.cells[1].leaves[1])
     check_interfacevalues(forest, RefHexahedron)
 end
 
@@ -1600,12 +1600,15 @@ end
     forest = ForestBWG(grid, 3)
     Ferrite.AMR.refine_all!(forest, 1)
 
-    # scalar getcells must warn about its slow dispatch and agree with the vector variant
+    # getcells collects the leaves of all trees in cell id order (tree by tree, Morton
+    # order within each tree); the scalar getcells(forest, cellid) deliberately throws
+    # instead of hitting the generic fallback, which would return a whole tree
+    @test_throws ArgumentError getcells(forest, 7)
+    @test_throws ArgumentError getcells(forest, [1, 2])
     leaves = getcells(forest)
-    c7 = @test_logs (:warn, r"Slow dispatch") getcells(forest, 7)
-    @test c7 == leaves[7] == forest.cells[2].leaves[3]
-    c1 = @test_logs (:warn, r"Slow dispatch") getcells(forest, 1)
-    @test c1 == leaves[1] == forest.cells[1].leaves[1]
+    @test length(leaves) == getncells(forest)
+    @test leaves[7] == forest.cells[2].leaves[3]
+    @test leaves[1] == forest.cells[1].leaves[1]
 
     # NOTE: getcelltype currently exposes the octree (tree) type; this will change
     @test getcelltype(forest) === eltype(forest.cells) === getcelltype(forest, 1)
@@ -1646,7 +1649,7 @@ end
     Ferrite.AMR.refine_all!(forest, 1)
     tree = forest.cells[1]
     @test length(tree.leaves) == 4
-    Ferrite.AMR.coarsen!(tree, tree.leaves[2])
+    Ferrite.AMR.coarsen_octant!(tree, tree.leaves[2])
     @test length(tree.leaves) == 1
     @test tree.leaves[1].l == 0
 
@@ -1803,7 +1806,7 @@ end
         end
         grid.cells[2] = Hexahedron(c)
         forest = ForestBWG(grid, 3)
-        Ferrite.AMR.refine!(forest.cells[refine_tree], forest.cells[refine_tree].leaves[1])
+        Ferrite.AMR.refine_octant!(forest.cells[refine_tree], forest.cells[refine_tree].leaves[1])
         Ferrite.AMR.balanceforest!(forest)
         g = Ferrite.AMR.creategrid(forest)
         @test getncells(g) == getncells(forest)

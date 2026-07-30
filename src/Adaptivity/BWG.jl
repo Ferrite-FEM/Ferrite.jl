@@ -198,7 +198,10 @@ struct OctreeBWG{dim, N, T <: Integer} <: AbstractAdaptiveCell{Ferrite.RefHyperc
 end
 
 """
-    refine!(octree::OctreeBWG, pivot_octant::OctantBWG)
+    refine_octant!(octree::OctreeBWG, pivot_octant::OctantBWG)
+
+Internal, octree-level refinement primitive; the user-facing entry point is
+[`refine!`](@ref)`(forest, cellids)`.
 
 Replace the leaf `pivot_octant` in `octree.leaves` by its `2^dim`
 [`children`](@ref Ferrite.AMR.children), spliced in z-order into the parent's slot so the
@@ -212,7 +215,7 @@ to refine many leaves at once prefer [`refine_all!`](@ref Ferrite.AMR.refine_all
 `refine!(forest, cellids)` vector method, which rebuild the leaf list in one linear pass
 instead of `n` shifts.
 """
-function refine!(octree::OctreeBWG{dim, N, T}, pivot_octant::OctantBWG{dim, N, T}) where {dim, N, T <: Integer}
+function refine_octant!(octree::OctreeBWG{dim, N, T}, pivot_octant::OctantBWG{dim, N, T}) where {dim, N, T <: Integer}
     if !(pivot_octant.l + 1 <= octree.b)
         return
     end
@@ -230,16 +233,19 @@ function refine!(octree::OctreeBWG{dim, N, T}, pivot_octant::OctantBWG{dim, N, T
 end
 
 """
-    coarsen!(octree::OctreeBWG, o::OctantBWG)
+    coarsen_octant!(octree::OctreeBWG, o::OctantBWG)
+
+Internal, octree-level coarsening primitive; the user-facing entry point is
+[`coarsen!`](@ref)`(forest, cellids)`.
 
 Replace the `2^dim`-sibling family that `o` belongs to with their common `parent` in the
 tree's Morton-sorted `leaves`. `o` is snapped back to the family's first sibling (via its
 `child_id`/morton), the parent is written in its slot, and the remaining `2^dim - 1`
-siblings are deleted — the inverse of [`refine!`](@ref Ferrite.AMR.refine!). Assumes the whole
-family is present and at the same level (e.g. after
+siblings are deleted — the inverse of [`refine_octant!`](@ref Ferrite.AMR.refine_octant!).
+Assumes the whole family is present and at the same level (e.g. after
 [`balanceforest!`](@ref Ferrite.AMR.balanceforest!)).
 """
-function coarsen!(octree::OctreeBWG{dim, N, T}, o::OctantBWG{dim, N, T}) where {dim, N, T <: Integer}
+function coarsen_octant!(octree::OctreeBWG{dim, N, T}, o::OctantBWG{dim, N, T}) where {dim, N, T <: Integer}
     _two = T(2)
     leave_idx = findfirst(x -> x == o, octree.leaves)
     shift = child_id(o, octree.b) - one(T)
@@ -438,7 +444,7 @@ end
 Refine the single leaf addressed by the global `cellid` (the same flat,
 tree-major / Morton-within-tree numbering used by the grid from
 [`creategrid`](@ref Ferrite.AMR.creategrid)). The owning tree is found from the per-tree
-leaf counts; the leaf is then refined via the `refine!(octree, octant)` method. To refine
+leaf counts; the leaf is then refined via the `refine_octant!(octree, octant)` method. To refine
 several cells, use the vector method below — it is linear, whereas looping this one is
 `O(n^2)`.
 """
@@ -451,7 +457,7 @@ function refine!(forest::ForestBWG, cellid::Integer)
         prev_nleaves_k = nleaves_k
         nleaves_k += length(forest.cells[k].leaves)
     end
-    return refine!(forest.cells[k], forest.cells[k].leaves[cellid - prev_nleaves_k])
+    return refine_octant!(forest.cells[k], forest.cells[k].leaves[cellid - prev_nleaves_k])
 end
 
 """
@@ -532,7 +538,7 @@ common parent (one level up).
 `require_all_siblings` selects the trigger policy:
 - `true` (default): a family is coarsened only if **all** `2^dim` of its children are in `cellids`
   (standard p4est semantics; never collapses un-flagged cells).
-- `false`: a single marked sibling collapses its whole family (like `coarsen!(octree, octant)`).
+- `false`: a single marked sibling collapses its whole family (like `coarsen_octant!(octree, octant)`).
 
 Only complete families count: a family is coarsened solely when its full `2^dim` same-level sibling
 set is physically present and contiguous in the leaves. Ids addressing an incomplete family (e.g. a
@@ -716,7 +722,7 @@ function _coarsen_all!(forest::ForestBWG)
     for tree in forest.cells
         for leaf in tree.leaves
             if child_id(leaf, tree.b) == 1
-                coarsen!(tree, leaf)
+                coarsen_octant!(tree, leaf)
             end
         end
     end
@@ -733,8 +739,21 @@ function Ferrite.getncells(grid::ForestBWG)
     return numcells
 end
 
+"""
+    getcells(forest::ForestBWG) -> Vector{OctantBWG}
+
+Collect the leaf octants of all trees of `forest` into a single vector, in ascending cell id
+order (tree by tree, Morton order within each tree) — i.e. the octant `getcells(forest)[i]`
+materializes into cell `i` of [`creategrid`](@ref Ferrite.AMR.creategrid)`(forest)`.
+
+Note that this allocates a fresh vector of all leaves on every call; hoist it out of loops.
+The returned octants live in the coordinate system of their respective tree, so the scalar
+`getcells(forest, cellid)` from the `AbstractGrid` interface is deliberately not supported
+(an octant is not interpretable without its tree) and throws instead of falling back to
+`forest.cells[cellid]`, which would inconsistently return a whole tree. Take
+`forest.cells[k].leaves` for tree-local work.
+"""
 function Ferrite.getcells(forest::ForestBWG{dim, C}) where {dim, C}
-    treetype = C
     ncells = getncells(forest)
     nnodes = 2^dim
     cellvector = Vector{OctantBWG{dim, nnodes, eltype(C)}}(undef, ncells)
@@ -749,17 +768,11 @@ function Ferrite.getcells(forest::ForestBWG{dim, C}) where {dim, C}
     return cellvector
 end
 
-function Ferrite.getcells(forest::ForestBWG{dim}, cellid::Int) where {dim}
-    #Only here to fulfill AbstractGrid for now, but a little pointless #TODO remove?
-    @warn "Slow dispatch, consider to call `getcells(forest)` once instead" maxlog = 1
-    nleaves = length.(forest.cells) # cells=trees
-    nleaves_cumsum = cumsum(nleaves)
-    k = findfirst(x -> cellid <= x, nleaves_cumsum)
-    leafid = k == 1 ? cellid : cellid - (nleaves_cumsum[k] - nleaves[k])
-    return forest.cells[k].leaves[leafid]
+# Block the generic `getcells(grid, i) = grid.cells[i]` fallback: `forest.cells` are trees,
+# not cells, so it would silently return a whole tree while `getcells(forest)` returns leaves.
+function Ferrite.getcells(forest::ForestBWG, cellid::Union{Int, AbstractVector{Int}})
+    throw(ArgumentError("getcells(forest, cellid) is not supported: a leaf octant is not interpretable without its tree. Use getcells(forest) for all leaves, or forest.cells[k].leaves for tree-local work."))
 end
-
-Ferrite.getcelltype(grid::ForestBWG) = eltype(grid.cells)
 Ferrite.getcelltype(grid::ForestBWG, i::Int) = eltype(grid.cells) # assume for now same cell type TODO
 
 """
@@ -1112,7 +1125,7 @@ neighbour octant at pivot octant `o`'s level (`balance_edge` additionally takes 
 and its edge `e`, needed to orient the along-edge coordinate); transformed into the neighbour tree `k′` (via
 [`transform_corner`](@ref)/[`transform_facet`](@ref)/[`transform_edge`](@ref)) it is `s′`. If the
 neighbour there is more than one level coarser than `o` — neither `s′` nor `parent(s′)` is a leaf
-but `parent(parent(s′))` is — that grandparent leaf is [`refine!`](@ref)d, leaving the neighbour
+but `parent(parent(s′))` is — that grandparent leaf is [`refine_octant!`](@ref Ferrite.AMR.refine_octant!)ed, leaving the neighbour
 exactly one level coarser. Level-1 pivots need no balancing.
 """
 function balance_corner(forest, k′, c′, o, s)
@@ -1123,7 +1136,7 @@ function balance_corner(forest, k′, c′, o, s)
     return if !_in_leaves(leaves, s′) && !_in_leaves(leaves, parent(s′, neighbor_tree.b))
         gp = parent(parent(s′, neighbor_tree.b), neighbor_tree.b)
         if _in_leaves(leaves, gp)
-            refine!(neighbor_tree, gp)
+            refine_octant!(neighbor_tree, gp)
         end
     end
 end
@@ -1136,7 +1149,7 @@ function balance_face(forest, k′, f′, o, s)
     return if !_in_leaves(leaves, s′) && !_in_leaves(leaves, parent(s′, neighbor_tree.b))
         gp = parent(parent(s′, neighbor_tree.b), neighbor_tree.b)
         if _in_leaves(leaves, gp)
-            refine!(neighbor_tree, gp)
+            refine_octant!(neighbor_tree, gp)
         end
     end
 end
@@ -1149,7 +1162,7 @@ function balance_edge(forest, k, e, k′, e′, o, s)
     return if !_in_leaves(leaves, s′) && !_in_leaves(leaves, parent(s′, neighbor_tree.b))
         gp = parent(parent(s′, neighbor_tree.b), neighbor_tree.b)
         if _in_leaves(leaves, gp)
-            refine!(neighbor_tree, gp)
+            refine_octant!(neighbor_tree, gp)
         end
     end
 end

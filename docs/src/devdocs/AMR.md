@@ -222,9 +222,12 @@ with an error estimator and passes their global ids here. It is implemented to s
 linearly in the number of leaves — the marked ids are mapped to per-tree local indices and
 each tree's leaf list is rebuilt in a single pass, rather than refining cells one at a time
 (every in-place `insert!` would memmove the array tail, giving `O(n^2)`). `refine_all!` is
-the uniform-refinement convenience wrapper and is linear for the same reason.
+the uniform-refinement convenience wrapper and is linear for the same reason. The
+single-octant primitives underlying all of these are `refine_octant!` and `coarsen_octant!`.
 
 ```@docs
+Ferrite.AMR.refine_octant!
+Ferrite.AMR.coarsen_octant!
 Ferrite.AMR._coarsen_all!
 ```
 
