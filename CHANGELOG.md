@@ -9,9 +9,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
  - Adaptive mesh refinement (AMR) for quadrilateral and hexahedral (linear) grids via a `p4est`-style
-   forest of octrees (`ForestBWG`). A grid can be refined (`refine!`), coarsened (`coarsen!`) and
-   2:1-balanced (`balanceforest!`), then materialized into a `NonConformingGrid` with `creategrid`.
-   Hanging nodes are made conforming by adding a `ConformityConstraint` to the `ConstraintHandler`. (#780)
+   forest of octrees (`ForestBWG`), constructed from any conforming `Quadrilateral`/`Hexahedron`
+   `Grid` (structured or unstructured, including rotated neighboring cells). Marked cells can be
+   refined (`refine!`), coarsened (`coarsen!`, `refine_and_coarsen!`) or refined uniformly
+   (`refine_all!`); `balanceforest!` restores the 2:1 balance across faces, edges and
+   corners (also across tree boundaries) that materialization requires. `creategrid` then
+   materializes the forest into a `NonConformingGrid`, reconstructing the cell-, facet- and
+   vertex-sets of the base grid and recording the hanging-node constraints, which are applied by
+   adding a `ConformityConstraint` per field to the `ConstraintHandler` (multiple fields and
+   `InterfaceValues` on hanging interfaces via `facetskeleton` are supported). The
+   feature is experimental: the API may change in minor releases without following semantic
+   versioning. See the new AMR topic guide, the adaptive heat equation tutorial and the adaptive
+   linear elasticity gallery example. (#780)
  - New quadrature rule type `:polyquad` for `RefTetrahedron` supporting orders 1 to 10, with
    positive weights and points strictly inside the reference tetrahedron (Witherden and
    Vincent, 2015). This is the same family of rules already used for `RefPrism` and

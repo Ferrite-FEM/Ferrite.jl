@@ -1,5 +1,10 @@
 # Adaptive Mesh Refinement (AMR)
 
+This page documents the *internals* of the AMR implementation. If you landed here looking
+for how to *use* AMR, see the [AMR topic guide](@ref topic-amr) for the concepts (hanging
+nodes, balancing, error estimation) and the [AMR reference](../reference/amr.md) for the
+public API — the three pages are complementary.
+
 ## P4est
 
 Ferrite's P4est implementation is based on these papers:
@@ -624,8 +629,6 @@ Ferrite.AMR._element_offsets
 ### Conformity constraints
 
 The hanging-node map produced by `creategrid` is turned into affine constraints by adding a
-`ConformityConstraint` to a `ConstraintHandler`. For linear (``Q_1``) interpolations each hanging
-node is constrained to the **average** of its masters — weight `1/length(masters)`, i.e. `1/2` for
-an edge midpoint and `1/4` for a 3D face center — which is exactly the value that makes the field
-continuous across the non-conforming interface. See [`ConformityConstraint`](@ref) for the
-user-facing documentation.
+`ConformityConstraint` to a `ConstraintHandler`; the constraint weights and their
+justification are user-facing and documented in the [AMR topic guide](@ref topic-amr) and
+[`ConformityConstraint`](@ref).

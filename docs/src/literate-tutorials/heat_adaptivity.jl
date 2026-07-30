@@ -27,6 +27,11 @@
 # ```
 # which is essentially zero at the boundary and has a sharp peak on the sphere $\|\textbf{x}\|=0.5$.
 #
+# For an introduction to the concepts behind AMR — hanging nodes, 2:1 balancing and error
+# estimation — see the [AMR topic guide](@ref topic-amr). In the gallery we also show how to
+# adaptively solve an [elasticity problem together with a Kelly error
+# indicator](@ref gallery-elasticity-adaptivity).
+#
 # ## Commented Program
 #
 # First we load the required packages.
@@ -54,7 +59,9 @@ analytical_rhs(x) = -laplace(analytical_solution, x)
 #md nothing # hide
 
 # ### Element assembly
-# Standard Galerkin assembly for the Poisson equation. For each quadrature point
+# Standard Galerkin assembly for the Poisson equation — this function and the global
+# assembly below are exactly as in the [heat equation tutorial](@ref tutorial-heat-equation);
+# nothing about the element routines changes for AMR. For each quadrature point
 # we evaluate the manufactured right-hand side at the physical coordinate.
 function assemble_cell!(ke, fe, cellvalues, coords)
     n_basefuncs = getnbasefunctions(cellvalues)

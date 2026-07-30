@@ -1,4 +1,4 @@
-# Adaptive Mesh Refinement
+# [Adaptive Mesh Refinement](@id topic-amr)
 
 Adaptive mesh refinement (AMR) is a computational technique used in finite element analysis to enhance the accuracy and efficiency of simulations.
 It involves dynamically adjusting the mesh resolution based on some criteria.
@@ -62,6 +62,7 @@ To address the issues introduced by hanging nodes, specific strategies and const
 The degrees of freedom (DoFs) associated with hanging nodes are constrained based on the surrounding coarser mesh elements.
 For example, in a linear finite element method, the value at a hanging node can be constrained to be the average of the values at the adjacent vertices of the coarser element.
 As for the example above node 13 could be constrained to $\boldsymbol{u}[13]=0.5\boldsymbol{u}[5]+0.5\boldsymbol{u}[2]$.
+In general, for linear ($Q_1$) interpolations each hanging node is constrained to the average of its masters — weight `1/length(masters)`, i.e. `1/2` for an edge midpoint and `1/4` for a face center in 3D — which is exactly the value that makes the field continuous across the non-conforming interface.
 As soon as higher polynomial degrees are involved, things become more involved.
 In Ferrite, a conformity constraint can be constructed with the ConstraintHandler when using a DofHandler which has been constructed with a grid passed from `Ferrite.creategrid(adaptive_grid::ForestBWG)`.
 This conformity constraint ensures that each hanging node is constrained appropriately.
