@@ -858,15 +858,33 @@ methodology described therein.
     ndofs = length(dofs)
     should_permute = adjust_during_distribution && ndofs > 1 &&
         (rdim == 3 || (rdim == 2 && interior_facedofs_on_lattice))
+    # Three index spaces meet in this function, and they must not be confused:
+    #  * `l`: the *local* lattice index, i.e. the position of a dof in the enumeration order
+    #    of `facedof_interior_indices(ip)[fi]` for *this* cell. This is the running counter
+    #    of the lattice loops below, since those traverse the lattice in exactly that order.
+    #  * `k`: the *canonical* (storage) index, i.e. the position of the same physical dof in
+    #    the enumeration of the face as spanned by its sorted vertex tuple (`sortface`).
+    #    This is what `dofs` — the range handed out by `get_or_create_dofs!` and shared with
+    #    every cell touching the face — is indexed by.
+    #  * `local_dof_table[l]`: the cell-local dof slot that the interpolation wants the
+    #    `l`-th interior face dof written to. This is the user-defined ordering, and it is
+    #    indexed by the *local* index `l`, never by the canonical index `k`.
+    # So the composition is `cell_dofs[local_dof_table[l]] = dofs[canonical(l)]`: the
+    # orientation permutation maps local → canonical, and `local_dof_table` maps local →
+    # storage slot. Indexing the table with `k` instead of `l` composes the table with the
+    # orientation permutation and cancels it out — the permutation then silently becomes a
+    # no-op, which is exactly the non-permuted branch below.
     if should_permute
         interior_facedofs_on_lattice || error("Dof distribution for an interpolation with multiple dofs on a face shared between 3D cells requires the interior face dofs to be placed on a regular lattice; this interpolation has not opted in, see `Ferrite.interior_facedofs_on_lattice` and `Ferrite.permute_and_set!`.")
         if nfacevertices == 3 # triangular face
             q = _triangle_lattice_order(ndofs)
+            l = 0
             for t2 in 0:q, t1 in 0:(q - t2)
+                l += 1 # local lattice index, matching the traversal order documented above
                 k = _canonical_facedof_index_triangle(t1, t2, q, orientation)
                 dof = dofs[k]
                 for d in 1:n_copies
-                    di = n_copies * (local_dof_table[k] - 1) + d
+                    di = n_copies * (local_dof_table[l] - 1) + d
                     cell_dofs[di] = (dof - 1) + d
                 end
             end
@@ -875,11 +893,13 @@ methodology described therein.
             if m * m != ndofs
                 error("$ndofs interior dofs on a quadrilateral face do not make up a regular lattice.")
             end
+            l = 0
             for j in 0:(m - 1), i in 0:(m - 1)
+                l += 1 # local lattice index, matching the traversal order documented above
                 k = _canonical_facedof_index_quadrilateral(i, j, m, orientation)
                 dof = dofs[k]
                 for d in 1:n_copies
-                    di = n_copies * (local_dof_table[k] - 1) + d
+                    di = n_copies * (local_dof_table[l] - 1) + d
                     cell_dofs[di] = (dof - 1) + d
                 end
             end
@@ -887,10 +907,11 @@ methodology described therein.
             error("Faces with $nfacevertices vertices are not supported.")
         end
     else
-        for (i, dof) in enumerate(dofs)
+        # No permutation: local index and canonical index coincide.
+        for (l, dof) in enumerate(dofs)
             for d in 1:n_copies
-                j = n_copies * (local_dof_table[i] - 1) + d
-                cell_dofs[j] = (dof - 1) + d
+                di = n_copies * (local_dof_table[l] - 1) + d
+                cell_dofs[di] = (dof - 1) + d
             end
         end
     end
