@@ -433,19 +433,25 @@ end
 # additions -- the task join at the end of a threaded assembly loop is the synchronization
 # point that makes the accumulated values visible.
 for (T, llvmT) in ((Float64, "double"), (Float32, "float"))
+    # Julia 1.12 passes `Ptr` arguments as actual LLVM pointers, before that they are passed
+    # as integers which have to be converted with `inttoptr`.
+    ir = if VERSION >= v"1.12.0-DEV"
+        """
+        %rv = atomicrmw fadd ptr %0, $llvmT %1 monotonic
+        ret void
+        """
+    else
+        """
+        %p = inttoptr i$(Sys.WORD_SIZE) %0 to $(llvmT)*
+        %rv = atomicrmw fadd $(llvmT)* %p, $llvmT %1 monotonic
+        ret void
+        """
+    end
     @eval @propagate_inbounds function _atomic_add!(x::Vector{$T}, i::Int, v::$T)
         @boundscheck checkbounds(x, i)
         GC.@preserve x begin
             p = pointer(x, i)
-            Base.llvmcall(
-                $(
-                    """
-                    %p = inttoptr i$(Sys.WORD_SIZE) %0 to $(llvmT)*
-                    %rv = atomicrmw fadd $(llvmT)* %p, $llvmT %1 monotonic
-                    ret void
-                    """
-                ), Cvoid, Tuple{Ptr{$T}, $T}, p, v
-            )
+            Base.llvmcall($ir, Cvoid, Tuple{Ptr{$T}, $T}, p, v)
         end
         return
     end
