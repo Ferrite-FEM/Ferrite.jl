@@ -1696,3 +1696,170 @@ end # testset
     close!(ch)
     @test_throws ErrorException("condensation of ::Symmetric matrix not supported") apply!(K2, f2, ch)
 end
+
+
+# --- ConformityConstraint: hanging-node constraints on non-conforming (AMR) grids ---
+@testset "ConformityConstraint subdomain guard" begin
+    # Subdomains (fields not living on the whole grid) are not supported with conformity
+    # constraints yet: the hanging/master node lookup assumes every vertex carries a dof.
+    # Requesting one must throw a descriptive error instead of crashing in close!(ch) with
+    # `AffineConstraint(0, ...)` (BoundsError at isconstrained[0]).
+    grid = generate_grid(Quadrilateral, (2, 2))
+    forest = ForestBWG(grid, 3)
+    Ferrite.AMR.refine_octant!(forest.cells[1], forest.cells[1].leaves[1])
+    Ferrite.AMR.balanceforest!(forest)
+    transferred_grid = Ferrite.AMR.creategrid(forest)
+    ip = Lagrange{RefQuadrilateral, 1}()
+
+    # partial coverage through a plain SubDofHandler
+    dh = DofHandler(transferred_grid)
+    sdh = SubDofHandler(dh, Ferrite.OrderedSet(1:(getncells(transferred_grid) - 1)))
+    add!(sdh, :u, ip)
+    close!(dh)
+    ch = ConstraintHandler(dh)
+    @test_throws ArgumentError add!(ch, ConformityConstraint(:u))
+
+    # partial coverage through the documented L2Projector set kwarg
+    @test_throws ArgumentError L2Projector(ip, transferred_grid; set = Ferrite.OrderedSet(1:(getncells(transferred_grid) - 1)))
+
+    # full coverage split over two SubDofHandlers is legitimate and must keep working
+    dh2 = DofHandler(transferred_grid)
+    half = getncells(transferred_grid) ÷ 2
+    sdh1 = SubDofHandler(dh2, Ferrite.OrderedSet(1:half))
+    add!(sdh1, :u, ip)
+    sdh2 = SubDofHandler(dh2, Ferrite.OrderedSet((half + 1):getncells(transferred_grid)))
+    add!(sdh2, :u, ip)
+    close!(dh2)
+    ch2 = ConstraintHandler(dh2)
+    add!(ch2, ConformityConstraint(:u))
+    close!(ch2)
+    @test length(ch2.prescribed_dofs) == length(transferred_grid.conformity_info)
+
+    # ... but the same field at *different* interpolations on different SubDofHandlers must
+    # be rejected: `find_field` only reports the first match, so the linear-Lagrange guard
+    # would otherwise pass on the linear subdomain and leave the higher-order dofs of the
+    # other one silently unconstrained.
+    dh3 = DofHandler(transferred_grid)
+    sdh3a = SubDofHandler(dh3, Ferrite.OrderedSet(1:half))
+    add!(sdh3a, :u, ip)
+    sdh3b = SubDofHandler(dh3, Ferrite.OrderedSet((half + 1):getncells(transferred_grid)))
+    add!(sdh3b, :u, Lagrange{RefQuadrilateral, 2}())
+    close!(dh3)
+    ch3 = ConstraintHandler(dh3)
+    @test_throws ArgumentError add!(ch3, ConformityConstraint(:u))
+end
+
+@testset "ConformityConstraint fallbacks and vector fields" begin
+    # warn-and-skip on a conforming grid
+    grid = generate_grid(Quadrilateral, (2, 2))
+    dh = DofHandler(grid)
+    add!(dh, :u, Lagrange{RefQuadrilateral, 1}())
+    close!(dh)
+    ch = ConstraintHandler(dh)
+    @test_logs (:warn, r"conforming grid") add!(ch, ConformityConstraint(:u))
+
+    # a non-conforming grid with two hanging nodes
+    forest = ForestBWG(generate_grid(Quadrilateral, (2, 2)), 3)
+    Ferrite.refine!(forest, [1])
+    Ferrite.balanceforest!(forest)
+    ncgrid = Ferrite.AMR.creategrid(forest)
+    @test Ferrite.get_coordinate_type(ncgrid) == Vec{2, Float64}
+    nhanging = length(ncgrid.conformity_info)
+    @test nhanging == 2
+
+    # only linear Lagrange (and vectorizations) are supported
+    dh2 = DofHandler(ncgrid)
+    add!(dh2, :u, Lagrange{RefQuadrilateral, 2}())
+    close!(dh2)
+    ch2 = ConstraintHandler(dh2)
+    @test_throws ArgumentError add!(ch2, ConformityConstraint(:u))
+
+    # vector-valued field: one affine constraint per component per hanging node
+    dhv = DofHandler(ncgrid)
+    add!(dhv, :u, Lagrange{RefQuadrilateral, 1}()^2)
+    close!(dhv)
+    chv = ConstraintHandler(dhv)
+    add!(chv, ConformityConstraint(:u))
+    close!(chv)
+    @test length(chv.prescribed_dofs) == 2 * nhanging
+    pdofs = Set(chv.prescribed_dofs)
+    for (i, d) in pairs(chv.prescribed_dofs)
+        dc = chv.dofcoefficients[i]
+        # edge midpoint: average of the 2 edge endpoints, componentwise
+        @test dc !== nothing && length(dc) == 2
+        @test all(p -> p.second ≈ 0.5, dc)
+        # the sibling component dof of the same hanging vertex is constrained as well
+        partner = isodd(d) ? d + 1 : d - 1
+        @test partner in pdofs
+    end
+end
+
+@testset "ConformityConstraint multiple fields" begin
+    # unit test for the per-field coverage guard: a hanging vertex (or one of its masters)
+    # that maps to dof 0 (field absent there) must be rejected.
+    ci = Dict(3 => [1, 2])
+    @test Ferrite.AMR._has_uncovered_hanging_vertex(ci, [10, 11, 12]) == false
+    @test Ferrite.AMR._has_uncovered_hanging_vertex(ci, [10, 11, 0]) == true  # hanging uncovered
+    @test Ferrite.AMR._has_uncovered_hanging_vertex(ci, [0, 11, 12]) == true  # master uncovered
+
+    # a non-conforming grid with two hanging nodes
+    forest = ForestBWG(generate_grid(Quadrilateral, (2, 2)), 3)
+    Ferrite.refine!(forest, [1])
+    Ferrite.balanceforest!(forest)
+    ncgrid = Ferrite.AMR.creategrid(forest)
+    nhanging = length(ncgrid.conformity_info)
+    @test nhanging == 2
+    ip = Lagrange{RefQuadrilateral, 1}()
+
+    # collect the global dofs belonging to a given field
+    fielddofs(dh, name) = mapreduce(union!, dh.subdofhandlers; init = Set{Int}()) do sdh
+        name in sdh.field_names || return Set{Int}()
+        r = Ferrite.dof_range(sdh, name)
+        Set{Int}(d for c in sdh.cellset for d in celldofs(dh, c)[r])
+    end
+
+    # two scalar fields on the whole grid: each field is constrained independently and only
+    # against dofs of its own field (regression for the global-vs-local field index).
+    dh = DofHandler(ncgrid)
+    add!(dh, :u, ip)
+    add!(dh, :p, ip)
+    close!(dh)
+    udofs = fielddofs(dh, :u)
+    pdofs = fielddofs(dh, :p)
+    @test isempty(intersect(udofs, pdofs))
+
+    ch = ConstraintHandler(dh)
+    add!(ch, ConformityConstraint(:u))
+    add!(ch, ConformityConstraint(:p))
+    close!(ch)
+    @test length(ch.prescribed_dofs) == 2 * nhanging
+    @test count(in(udofs), ch.prescribed_dofs) == nhanging
+    @test count(in(pdofs), ch.prescribed_dofs) == nhanging
+    # every constrained dof and all its masters live in the same field
+    for (i, d) in pairs(ch.prescribed_dofs)
+        fieldset = d in udofs ? udofs : pdofs
+        @test all(p -> p.first in fieldset, ch.dofcoefficients[i])
+    end
+
+    # constraining only one field must leave the other field's dofs untouched
+    chu = ConstraintHandler(dh)
+    add!(chu, ConformityConstraint(:u))
+    close!(chu)
+    @test length(chu.prescribed_dofs) == nhanging
+    @test all(in(udofs), chu.prescribed_dofs)
+    @test isempty(intersect(Set(chu.prescribed_dofs), pdofs))
+
+    # Taylor–Hood-like mix: vector displacement + scalar pressure, both linear
+    dhth = DofHandler(ncgrid)
+    add!(dhth, :u, ip^2)
+    add!(dhth, :p, ip)
+    close!(dhth)
+    chth = ConstraintHandler(dhth)
+    add!(chth, ConformityConstraint(:u))
+    add!(chth, ConformityConstraint(:p))
+    close!(chth)
+    # 2 displacement components + 1 pressure per hanging node
+    @test length(chth.prescribed_dofs) == 3 * nhanging
+    @test count(in(fielddofs(dhth, :u)), chth.prescribed_dofs) == 2 * nhanging
+    @test count(in(fielddofs(dhth, :p)), chth.prescribed_dofs) == nhanging
+end

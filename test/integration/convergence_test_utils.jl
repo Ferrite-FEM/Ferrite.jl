@@ -126,9 +126,11 @@ end
 
 # Assemble and solve
 function solve(dh, ch, cellvalues)
-    K, f = assemble_global(cellvalues, allocate_matrix(dh), dh)
+    K, f = assemble_global(cellvalues, allocate_matrix(dh, ch), dh)
     apply!(K, f, ch)
-    return K \ f
+    u = K \ f
+    apply!(u, ch)
+    return u
 end
 
 function setup_poisson_problem(grid, interpolation, interpolation_geo, qr)
@@ -143,6 +145,9 @@ function setup_poisson_problem(grid, interpolation, interpolation_geo, qr)
     )
     dbc = Dirichlet(:u, ∂Ω, (x, t) -> analytical_solution(x))
     add!(ch, dbc)
+    # Hanging nodes on adaptively refined grids must be constrained to
+    # their masters for the approximation to stay H¹-conforming.
+    grid isa Ferrite.NonConformingGrid && add!(ch, ConformityConstraint(:u))
     close!(ch)
 
     cellvalues = CellValues(qr, interpolation, interpolation_geo)

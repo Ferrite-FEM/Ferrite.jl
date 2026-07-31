@@ -46,6 +46,7 @@ revision), so every second added to a pass costs four in CI. A full pass should 
 | `constraints`      | `ConstraintHandler` close/update (`Dirichlet`, `PeriodicDirichlet`, `ProjectedDirichlet`), `apply!`/`apply_zero!`/`apply_rhs!`/`apply_local!`, periodic (affine) condensation |
 | `sparsity-pattern` | pattern construction, `add_entry!`, matrix instantiation                |
 | `postprocessing`   | `L2Projector`, `PointEvalHandler`, `evaluate_at_grid_nodes`, `apply_analytical!` |
+| `amr`              | `refine!`, `balanceforest!` (2D/3D), `creategrid` (2D/3D), `ConformityConstraint` |
 
 Run a single group locally with e.g. `make benchmark-assembly`, or set the environment
 variable `FERRITE_SELECTED_BENCHMARKS=assembly` when including `benchmarks.jl` directly.
@@ -61,3 +62,6 @@ variable `FERRITE_SELECTED_BENCHMARKS=assembly` when including `benchmarks.jl` d
   element types do not exercise more cheaply.
 - **`BlockSparsityPattern`**: niche, and shares the `add_entry!` machinery with the covered
   `SparsityPattern`.
+- **`ForestBWG` construction**: dominated by `ExclusiveTopology`, covered in `mesh`.
+  **`coarsen!`/`refine_and_coarsen!`**: share the marked-leaf-list rebuild machinery with
+  the covered `refine!`.

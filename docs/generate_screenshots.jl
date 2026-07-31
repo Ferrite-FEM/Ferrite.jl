@@ -39,6 +39,7 @@ const EXAMPLES = Dict(
     "stokes-flow" => "literate-tutorials/stokes-flow.jl",
     "computational_homogenization" => "literate-tutorials/computational_homogenization.jl",
     "linear_shell" => "literate-tutorials/linear_shell.jl",
+    "heat_adaptivity" => "literate-tutorials/heat_adaptivity.jl",
     "darcy_flow" => "literate-tutorials/darcy_flow.jl",
     # How-to guides.
     "postprocessing" => "literate-howto/postprocessing.jl",
@@ -54,6 +55,7 @@ const EXAMPLES = Dict(
     "quasi_incompressible_hyperelasticity" => "literate-gallery/quasi_incompressible_hyperelasticity.jl",
     "landau" => "literate-gallery/landau.jl",
     "topology_optimization" => "literate-gallery/topology_optimization.jl",
+    "elasticity_adaptivity" => "literate-gallery/elasticity_adaptivity.jl",
 )
 
 # Extra code evaluated in the example's module after running it, e.g. to
@@ -61,6 +63,9 @@ const EXAMPLES = Dict(
 # default the example uses.
 const POSTRUN = Dict(
     "stokes-flow" => :(main(0.02)),
+    # More AMR steps than the (cheap) example default, for a properly refined mesh.
+    "heat_adaptivity" => :(solve_adaptive(grid; nsteps = 7)),
+    "elasticity_adaptivity" => :(solve_adaptive(forest; nsteps = 12)),
     # The example only runs the larger regularization radius; the figure comparing the
     # two needs the smaller one as well.
     "topology_optimization" => :(topopt(0.02, 0.5, 60, "small_radius"; output = false)),

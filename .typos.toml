@@ -9,6 +9,8 @@ BofBreFor = "BofBreFor"
 ue = "ue"
 ba = "ba"
 nd = "nd"
+OT = "OT"
+alo = "alo"
 
 [type.qrtables]
 extend-glob = ["**/gaussquad_*_table.jl", "**/generate_quadrature.jl"]
