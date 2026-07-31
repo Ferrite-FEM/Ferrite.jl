@@ -12,10 +12,10 @@ special-cased in the code base.
 A) Length of `<entity>dof_indices` and `<entity>dof_interior_indices`
    matches number of reference shape entities (e.g. `edge`)
 B) Numbering convention
-   - vertices -> edges -> faces -> volume
-   - Numbered in entity order (e.g. edge 1 has lower indices than edge 2)
-   - Continuous and increasing numbering within entity (e.g. `edgedof_interior_indices(ip)[edgenr]`)
-     can be `(4, 5)`, but not `(4, 6)` or `(5, 4)`.
+   - The entity tuples are ordered by increasing codimension (vertices -> edges -> faces
+     -> volume) and, within that, by entity number. The dof index *values*, however, may
+     be assigned freely (e.g. to obtain a lexicographic/tensor-product local ordering),
+     so only disjointness and the `1:N` range are required here.
 C) Lower-dimensional entities' dof indices + current interior dof indices
    matches current dof indices (e.g. vertexdof + edge_interior => edgedofs) for each entity.
 D) The dof indices values matches `1:N` without duplication (follows from B, but also checked separately)
@@ -88,16 +88,16 @@ function _test_interpolation_properties(dofs::NamedTuple, rs::NamedTuple)
     @test all(1 .≤ all_dofs .≤ dofs.n)
     @test length(all_dofs) == length(Set(all_dofs))
     if rs.rdim ≥ 1 # Test edges
-        # Edges numbered next, no gaps or missing numbers. Sorted by edge number.
+        # Interior edgedofs are disjoint from the vertexdofs, but their values need not
+        # follow the vertexdofs.
         all_edofs_i = collect_all_dofs(dofs.edge_i)
-        @test all(all_edofs_i .== length(all_dofs) .+ (1:length(all_edofs_i)))
         # - all edge dofs include both vertexdofs and interior edegdofs, and nothing more.
         append!(all_dofs, all_edofs_i)
         @test all(1 .≤ all_dofs .≤ dofs.n)
         @test length(all_dofs) == length(Set(all_dofs))
         @test length(all_dofs) == length(collect_all_dofs(dofs.vert)) + length(all_edofs_i)
         # Coarse check for C
-        @test Set(collect_all_dofs(dofs.edge)) == Set(1:length(all_dofs))
+        @test Set(collect_all_dofs(dofs.edge)) == Set(all_dofs)
         # - test each edge individually (Detailed check for C)
         for (edge_nr, edge_vertices) in enumerate(rs.edges)
             vdofs_e = Int[] # dofs.vert for vertices belonging to the current edge
@@ -108,15 +108,15 @@ function _test_interpolation_properties(dofs::NamedTuple, rs::NamedTuple)
         end
     end
     if rs.rdim ≥ 2 # Test faces
-        # Face numbered next, no gaps or missing numbers. Sorted by face number.
+        # Interior facedofs are disjoint from the vertex- and edgedofs, but their values
+        # need not follow them.
         all_fdofs_i = collect_all_dofs(dofs.face_i)
-        @test all(all_fdofs_i .== length(all_dofs) .+ (1:length(all_fdofs_i)))
         # - all dofs now include vertex dofs, edge dofs and face dofs, but not volume dofs.
         append!(all_dofs, all_fdofs_i)
         @test all(1 .≤ all_dofs .≤ dofs.n)
         @test length(all_dofs) == length(Set(all_dofs))
         # Coarse check for C
-        @test Set(collect_all_dofs(dofs.face)) == Set(1:length(all_dofs))
+        @test Set(collect_all_dofs(dofs.face)) == Set(all_dofs)
         # - test each face individually (Detailed check for C)
         for (facenr, face_verts) in enumerate(rs.faces)
             vdofs_f = Int[]
@@ -136,7 +136,7 @@ function _test_interpolation_properties(dofs::NamedTuple, rs::NamedTuple)
     # Test volume
     # We always test this, since volumedofs are also used by lower-dimensional
     # discontinuous inteprolations to make them internal to the cell, e.g. DiscontinuousLagrange
-    # Volumedofs numbered last
+    # Volumedofs are disjoint from all of the above
     append!(all_dofs, collect(dofs.vol_i))
     @test all(1 .≤ all_dofs .≤ dofs.n)
     @test length(all_dofs) == length(Set(all_dofs))
