@@ -370,14 +370,7 @@ function add_sparsity_entries!(
     #       avoiding duplicates entirely). That would retire the generic branch below.
     if isempty(sp.buffer.data)
         keep_constrained || _check_keep_constrained_args(dh, ch)
-        # An explicitly full coupling mask restricts nothing: normalize to `nothing` so the
-        # fast fill skips mask evaluation (and the local-index map it requires). Validate
-        # the dimensions first, since normalization skips the expansion that normally does it.
-        if coupling !== nothing && all(coupling)
-            _check_coupling_dims(dh, coupling)
-            coupling = nothing
-        end
-        couplings = coupling === nothing ? nothing : _coupling_to_local_dof_coupling(dh, coupling)
+        couplings = _coupling_to_local_dof_coupling(dh, coupling)
         isconstrained = keep_constrained ? nothing : _isconstrained_by_dof(ch)
         # With interface entries coming (added below), reserve row space for them up front so
         # they land in place instead of relocating rows. When the reservation enumeration is
@@ -386,16 +379,7 @@ function add_sparsity_entries!(
             neighbor_cells = interface_couplings = nothing
         else
             neighbor_cells = create_cell_to_neighbors(dh.grid, topology)
-            # A full interface mask can likewise be dropped (the walk then visits neighbor
-            # dofs unmasked, the same set) -- but only when the cell coupling imposes no
-            # restriction either, since with a restricted cell coupling the own-cell
-            # candidates consult the interface mask for the same-side interface blocks.
-            interface_couplings = if couplings === nothing && all(interface_coupling)
-                _check_coupling_dims(dh, interface_coupling)
-                nothing
-            else
-                _coupling_to_local_dof_coupling(dh, interface_coupling)
-            end
+            interface_couplings = _coupling_to_local_dof_coupling(dh, interface_coupling)
             interfaces_filled = _can_fill_interfaces_directly(dh, interface_couplings)
         end
         _fast_fill_cells!(
@@ -438,11 +422,10 @@ function add_cell_entries!(
         dh::DofHandler, ch::Union{ConstraintHandler, Nothing} = nothing;
         keep_constrained::Bool = true, coupling::Union{AbstractMatrix{Bool}, Nothing} = nothing,
     )
-    # Expand coupling from nfields × nfields to ndofs_per_cell × ndofs_per_cell
+    # Expand coupling from nfields x nfields to ndofs_per_cell x ndofs_per_cell
+    # (nothing and full masks expand to nothing = no restriction).
     # TODO: Perhaps this can be done in the loop over SubDofHandlers instead.
-    if coupling !== nothing
-        coupling = _coupling_to_local_dof_coupling(dh, coupling)
-    end
+    coupling = _coupling_to_local_dof_coupling(dh, coupling)
     keep_constrained || _check_keep_constrained_args(dh, ch)
     return _add_cell_entries!(sp, dh, ch, keep_constrained, coupling)
 end
@@ -698,7 +681,12 @@ function _check_coupling_dims(dh::DofHandler, coupling::AbstractMatrix{Bool})
     error("could not create coupling")
 end
 
+_coupling_to_local_dof_coupling(::DofHandler, ::Nothing) = nothing
 function _coupling_to_local_dof_coupling(dh::DofHandler, coupling::AbstractMatrix{Bool})
+    _check_coupling_dims(dh, coupling)
+    # A full mask does not restrict anything: normalize to `nothing`, which all consumers
+    # treat as every-pair-passes, so that mask evaluation is skipped entirely.
+    all(coupling) && return nothing
     # Return one matrix per (potential) sub-domain
     return Matrix{Bool}[
         _coupling_to_local_dof_coupling(dh, coupling, sdh, sdh) for sdh in dh.subdofhandlers
@@ -1076,19 +1064,18 @@ function _visit_row_candidates!(
                 dofs = cell_dofs[cnr]
                 mask = couplings === nothing ? nothing : couplings[cell_to_sdh[cnr]]
                 # Same-side interface blocks: for a cell that participates in an interface,
-                # add_interface_entries! also inserts the masked pairs within the cell itself
-                # (the own cell is always in its own subdofhandler, so the square mask applies
-                # even with multiple subdofhandlers). A candidate therefore passes if either
-                # the cell coupling or the interface coupling allows it.
-                imask = if neighbor_cells !== nothing && interface_couplings !== nothing &&
-                        !isempty(neighbor_cells[cnr])
-                    interface_couplings[cell_to_sdh[cnr]]
-                else
-                    nothing
-                end
+                # add_interface_entries! also inserts the pairs the interface mask allows
+                # within the cell itself, where `interface_couplings === nothing` means no
+                # restriction (nothing/full mask), i.e. every pair. The own cell is always in
+                # its own subdofhandler, so the square mask applies even with multiple
+                # subdofhandlers. A candidate therefore passes if either the cell coupling or
+                # the interface coupling allows it.
+                on_interface = neighbor_cells !== nothing && !isempty(neighbor_cells[cnr])
+                imask = on_interface && interface_couplings !== nothing ?
+                    interface_couplings[cell_to_sdh[cnr]] : nothing
                 li = lidxs === nothing ? 0 : lidxs[k]
                 for j in 1:length(dofs)
-                    mask === nothing || mask[li, j] || (imask !== nothing && imask[li, j]) || continue
+                    mask === nothing || mask[li, j] || (on_interface && (imask === nothing || imask[li, j])) || continue
                     col = dofs[j]
                     isconstrained !== nothing && isconstrained[col] && continue
                     if marker[col] != row
