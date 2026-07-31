@@ -1,7 +1,4 @@
-# ```@meta
-# Draft = false
-# ```
-# # [Multi-threaded assembly](@id tutorial-threaded-assembly)
+# # [Multi-threaded assembly](@id howto-threaded-assembly)
 #
 #-
 #md # !!! tip
@@ -29,7 +26,7 @@
 #       commutative.
 #     - **Assembler task**: By using a designated task for the assembling we (obviously)
 #       ensure that only a single task assembles. The worker tasks (the tasks computing the
-#       element contributions) would then hand off their results to the assemly task. This
+#       element contributions) would then hand off their results to the assembly task. This
 #       can be a useful approach if computing the element contributions is much slower than
 #       the assembly -- otherwise the assembler task can't keep up with the worker tasks.
 #       There might also be some extra overhead because of task switching in the scheduler.
@@ -41,6 +38,13 @@
 #       predictable results because for a memory location which, for example, a "red",
 #       a "blue", and a "green" element will contribute to we will always add the red first,
 #       then the blue, and finally the green.
+#     - **Atomic accumulation**: By accumulating the values into the global matrix and
+#       vector with atomic additions we can let all tasks assemble concurrently without
+#       any partitioning of the cells: even if two tasks add to the same memory location
+#       at the same time the result is correct. Similar to the locking approach the
+#       results are not deterministic since the order of the additions depend on the task
+#       scheduling. See [the last section](@ref howto-threaded-assembly-atomic) of this
+#       howto for more details.
 #  - **Scratch data**: In order to speed up the computation of the element contributions we
 #    typically pre-allocate some data structures that can be reused for every element. Such
 #    scratch data include, for example, the local matrix and vector, and the CellValues.
@@ -77,10 +81,11 @@ end
 
 create_example_2d_grid()
 
-# ![](coloring.png)
+# ![](coloring-light.png)
+# ![](coloring-dark.png)
 #
 # *Figure 1*: Element coloring using the "workstream"-algorithm (left) and the "greedy"-
-# algorithm (right).
+# algorithm (right). The swatches below each grid are the colors the algorithm used.
 
 # ## Multithreaded assembly of a cantilever beam in 3D
 #
@@ -171,13 +176,21 @@ end
 # independent objects. For `cellvalues` we use `copy` which Ferrite defines for this
 # purpose. Finally, for the assembler we call `start_assemble` to create a new assembler but
 # note that we set `fillzero = false` because we don't want to risk that a task that starts
-# a bit later will zero out data that another task have already assembled.
-function ScratchData(dh::DofHandler, K::SparseMatrixCSC, f::Vector, cellvalues::CellValues)
+# a bit later will zero out data that another task have already assembled. The `atomic`
+# flag is forwarded to `start_assemble` and will be used for the [atomic
+# accumulation](@ref howto-threaded-assembly-atomic) version at the end of this howto.
+# Note that it is passed as `Val(true)`/`Val(false)`: the type of the returned assembler
+# depends on the flag, so passing it in the type domain makes sure that the `ScratchData`
+# type (and thus the assembly loop) is concretely typed.
+function ScratchData(
+        dh::DofHandler, K::SparseMatrixCSC, f::Vector, cellvalues::CellValues,
+        ::Val{atomic} = Val(false)
+    ) where {atomic}
     cell_cache = CellCache(dh)
     n = ndofs_per_cell(dh)
     Ke = zeros(n, n)
     fe = zeros(n)
-    asm = start_assemble(K, f; fillzero = false)
+    asm = start_assemble(K, f; fillzero = false, atomic = atomic)
     return ScratchData(cell_cache, copy(cellvalues), Ke, fe, asm)
 end
 nothing # hide
@@ -207,7 +220,7 @@ nothing # hide
 #     For a different problem setup where some cells might take longer to process (perhaps
 #     they experience plastic deformation and we need to solve a local problem) we might
 #     benefit from load balancing. The `DynamicScheduler` can be used also for load
-#     balancing by specifiying `nchunks` or `chunksize`. However, the `DynamicScheduler`
+#     balancing by specifying `nchunks` or `chunksize`. However, the `DynamicScheduler`
 #     will always spawn `nchunks` tasks which can become costly since we are allocating
 #     scratch data for every task. To limit the number of tasks, while allowing for more
 #     than `ntasks` chunks, we can use the `GreedyScheduler` *with chunking*. For example,
@@ -275,8 +288,65 @@ nothing # hide
 #     end
 #     ```
 
-# We define the main function to setup everything and then time the call to
-# `assemble_global!`.
+# ### [Assembly without coloring: atomic accumulation](@id howto-threaded-assembly-atomic)
+#
+# The grid coloring above ensures that no two concurrently running tasks write to the
+# same entries of `K` and `f`. An alternative is to allow concurrent writes, but make the
+# additions atomic: passing `atomic = true` to `start_assemble` returns an assembler
+# where the accumulation into the global matrix and vector uses atomic instructions.
+# Compared to the coloring approach this has some advantages:
+#  - No coloring of the grid is needed. The coloring computation itself takes time (often
+#    comparable to one assembly) and for some grids/couplings it can be hard to obtain a
+#    good coloring.
+#  - The cells can be processed in their natural order, in a single parallel loop. This
+#    gives better memory locality (the cells of one color are by construction spread out
+#    over the grid) which can make assembly faster even when comparing at the same number
+#    of tasks.
+# and some drawbacks:
+#  - Atomic additions are more expensive than regular ones, which cost a few percent in
+#    the serial limit for a typical assembly loop (more if the element routine is very
+#    cheap relative to the scatter into the global matrix).
+#  - The result is not deterministic: the order in which contributions are added to a
+#    given entry of `K` and `f` depends on the task scheduling, and since floating point
+#    addition is not associative the result changes slightly between runs (this is the
+#    same drawback as the locking and assembler task approaches have, whereas the
+#    coloring approach is deterministic).
+#
+# Note that each task still needs its own assembler (the assembler wraps buffers that are
+# used during `assemble!`) which is why the `atomic` flag is part of `ScratchData` above.
+# The global assembly routine is like before, but with a single loop over all cells:
+
+function assemble_global_atomic!(
+        K::SparseMatrixCSC, f::Vector, dh::DofHandler,
+        cellvalues_template::CellValues; ntasks = Threads.nthreads()
+    )
+    ## Zero-out existing data in K and f
+    _ = start_assemble(K, f)
+    ## Body force and material stiffness
+    b = Vec{3}((0.0, 0.0, -1.0))
+    C = create_material_stiffness()
+    scheduler = OhMyThreads.DynamicScheduler(; ntasks)
+    ## Parallelize the loop over all cells
+    OhMyThreads.@tasks for cellidx in 1:getncells(dh.grid)
+        ## Tell the @tasks loop to use the scheduler defined above
+        @set scheduler = scheduler
+        ## Obtain a task local scratch (with an atomic assembler) and unpack it
+        @local scratch = ScratchData(dh, K, f, cellvalues_template, #= atomic = =# Val(true))
+        (; cell_cache, cellvalues, Ke, fe, assembler) = scratch
+        ## Reinitialize the cell cache and then the cellvalues
+        reinit!(cell_cache, cellidx)
+        reinit!(cellvalues, cell_cache)
+        ## Compute the local contribution of the cell
+        assemble_cell!(Ke, fe, cellvalues, C, b)
+        ## Assemble local contribution
+        assemble!(assembler, celldofs(cell_cache), Ke, fe)
+    end
+    return K, f
+end
+nothing # hide
+
+# We define the main function to setup everything and then time the calls to
+# `assemble_global!` and `assemble_global_atomic!`.
 
 function main(; n = 20, ntasks = Threads.nthreads())
     ## Interpolation, quadrature and cellvalues
@@ -289,30 +359,51 @@ function main(; n = 20, ntasks = Threads.nthreads())
     ## Global matrix and vector
     K = allocate_matrix(dh)
     f = zeros(ndofs(dh))
-    ## Compile it
+    ## Compile and time the colored version
     assemble_global!(K, f, dh, colors, cellvalues; ntasks = ntasks)
-    ## Time it
     @time assemble_global!(K, f, dh, colors, cellvalues; ntasks = ntasks)
-    return norm(K.nzval), norm(f) #src
+    nK, nf = norm(K.nzval), norm(f) #src
+    ## Compile and time the atomic version
+    assemble_global_atomic!(K, f, dh, cellvalues; ntasks = ntasks)
+    @time assemble_global_atomic!(K, f, dh, cellvalues; ntasks = ntasks)
+    return nK, nf, norm(K.nzval), norm(f) #src
     return
 end
 nothing # hide
 
-# On a machine with 4 cores, starting julia with `--threads=auto`, we obtain the following
-# timings:
+# On a machine with 10 (performance) cores, starting julia with `--threads=auto`, we
+# obtain the following timings, where the first `@time` is the colored version and the
+# second the atomic version:
 # ```julia
-# main(; ntasks = 1) # 1.970784 seconds (902 allocations: 816.172 KiB)
-# main(; ntasks = 2) # 1.025065 seconds (1.64 k allocations: 1.564 MiB)
-# main(; ntasks = 3) # 0.700423 seconds (2.38 k allocations: 2.332 MiB)
-# main(; ntasks = 4) # 0.548356 seconds (3.12 k allocations: 3.099 MiB)
+# main(; ntasks = 1) # 0.820127 seconds (596 allocations: 688.125 KiB)
+#                    # 0.734474 seconds (42 allocations: 43.156 KiB)
+# main(; ntasks = 2) # 0.414206 seconds (1.75 k allocations: 1.398 MiB)
+#                    # 0.364351 seconds (114 allocations: 89.625 KiB)
+# main(; ntasks = 4) # 0.211400 seconds (3.12 k allocations: 2.759 MiB)
+#                    # 0.188947 seconds (200 allocations: 176.703 KiB)
+# main(; ntasks = 8) # 0.112129 seconds (5.88 k allocations: 5.483 MiB)
+#                    # 0.096397 seconds (372 allocations: 350.859 KiB)
 # ```
+# Both versions scale well with the number of tasks. In this example the atomic version
+# is even a bit faster than the colored version: the atomic overhead in the accumulation
+# is more than compensated for by processing the cells in their natural order (and, for
+# the timings above, the atomic version doesn't pay for the grid coloring itself, which
+# for this grid takes about 0.3 seconds).
 
-using Test                           #src
-nK1, nf1 = main(; n = 5, ntasks = 1) #src
-nK2, nf2 = main(; n = 5, ntasks = 2) #src
-nK4, nf4 = main(; n = 5, ntasks = 4) #src
-@test nK1 == nK2 == nK4              #src
-@test nf1 == nf2 == nf4              #src
+using Test                                               #src
+nK1, nf1, aK1, af1 = main(; n = 5, ntasks = 1)           #src
+nK2, nf2, aK2, af2 = main(; n = 5, ntasks = 2)           #src
+nK4, nf4, aK4, af4 = main(; n = 5, ntasks = 4)           #src
+## Coloring gives deterministic results                  #src
+@test nK1 == nK2 == nK4                                  #src
+@test nf1 == nf2 == nf4                                  #src
+## Atomic accumulation is exact up to summation order    #src
+@test aK1 ≈ nK1                                          #src
+@test af1 ≈ nf1                                          #src
+@test aK2 ≈ nK1                                          #src
+@test af2 ≈ nf1                                          #src
+@test aK4 ≈ nK1                                          #src
+@test af4 ≈ nf1                                          #src
 
 #md # ## [Plain program](@id threaded_assembly-plain-program)
 #md #

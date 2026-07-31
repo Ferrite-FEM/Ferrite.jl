@@ -7,12 +7,151 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Next] - xxxx-xx-xx
 
+### Added
+ - Adaptive mesh refinement (AMR) for quadrilateral and hexahedral (linear) grids via a `p4est`-style
+   forest of octrees (`ForestBWG`), constructed from any conforming `Quadrilateral`/`Hexahedron`
+   `Grid` (structured or unstructured, including rotated neighboring cells). Marked cells can be
+   refined (`refine!`), coarsened (`coarsen!`, `refine_and_coarsen!`) or refined uniformly
+   (`refine_all!`); `balanceforest!` restores the 2:1 balance across faces, edges and
+   corners (also across tree boundaries) that materialization requires. `creategrid` then
+   materializes the forest into a `NonConformingGrid`, reconstructing the cell- and facet-sets
+   of the base grid and recording the hanging-node constraints, which are applied by
+   adding a `ConformityConstraint` per field to the `ConstraintHandler` (multiple fields and
+   `InterfaceValues` on hanging interfaces via `facetskeleton` are supported). The
+   feature is experimental: the API may change in minor releases without following semantic
+   versioning. See the new AMR topic guide, the adaptive heat equation tutorial and the adaptive
+   linear elasticity gallery example. ([#780])
+ - New quadrature rule type `:polyquad` for `RefTetrahedron` supporting orders 1 to 10, with
+   positive weights and points strictly inside the reference tetrahedron (Witherden and
+   Vincent, 2015). This is the same family of rules already used for `RefPrism` and
+   `RefPyramid`, and extends tetrahedral quadrature beyond the previous maximum order 5 of
+   the Keast rules. ([#1389])
+ - New interpolations `Lagrange{RefTetrahedron, 3}`, `Lagrange{RefTetrahedron, 4}` and
+   `Lagrange{RefHexahedron, 3}`. ([#1343])
+ - Dof distribution now supports interpolations with multiple nodal dofs on faces shared
+   between cells (e.g. `Lagrange{RefTetrahedron, 4}`) by taking the relative orientation
+   (rotation and flip) of the face into account. The interpolation has to follow a specific
+   tensor product ordering of the dofs, as described in the devdocs. ([#1343])
+ - `start_assemble(K, f; atomic = true)` returns an assembler that accumulates into `K`
+   and `f` using atomic additions (supported for `SparseMatrixCSC`, `Symmetric`-wrapped
+   `SparseMatrixCSC`, and `SparseMatrixCSR`, with eltypes `Float32`/`Float64`). This
+   makes it safe to assemble from multiple concurrent tasks without partitioning the
+   cells into independent sets ("grid coloring"), at the cost of some accumulation
+   overhead and non-deterministic (but correct up to summation order) results. See the
+   updated [howto on multi-threaded
+   assembly](https://ferrite-fem.github.io/Ferrite.jl/stable/howto/threaded_assembly/).
+   ([#1417])
+
+### Documentation
+ - The figures for the documentation are now programmatically generated and made to have a consistent look.
+ - New tutorial: Elastodynamics and modal analysis of a cantilever beam (mass matrix, generalized eigenvalue problem, Rayleigh damping, Newmark time integration).
+ - Add adaptive mesh refinement tutorials (heat equation and linear elasticity) and a developer
+   documentation page describing the `p4est` implementation. ([#780])
+ - New tutorial on Darcy flow using H(div)-conforming Raviart-Thomas elements ([#1388])
+
+### Fixes
+ - `PointValues` can now be reinitialized with the current cell, enabling evaluation of
+   interpolations with non-identity mappings such as Nedelec and Raviart-Thomas elements.
+   ([#1420])
+ - `FacetIterator` now works with `AbstractVector{FacetIndex}` and `AbstractSet{FacetIndex}` inputs as documented, instead of requiring an `OrderedSet` ([#1384])
+ - `ProjectedDirichlet` now updates the correct dofs when the constrained field is not the first
+   field in the `DofHandler`; previously the dof lookup ignored the field offset in the cell dof
+   vector (typically causing a `KeyError` during `update!`) ([#1393])
+ - The error thrown when assembling into a matrix entry that is missing from the sparsity
+   pattern now reports the row that is actually missing, rather than an unrelated row that
+   happened to be stored in the same column ([#1414])
+ - Asymmetric `interface_coupling` masks in `allocate_matrix`/`add_interface_entries!` now
+   follow the same convention as the cell `coupling`: `interface_coupling[i, j] = true`
+   creates entries in the blocks (rows of field `i`) × (columns of field `j`) for both
+   orientations of every interface. Previously `interface_coupling[i, j] = true` created
+   entries in both the `(i, j)` and the transposed `(j, i)` block, and the result could
+   depend on the (internal) orientation of the interface. Symmetric masks, for which the
+   two conventions coincide, are not affected. In addition, interface entries are no
+   longer computed twice for interfaces where both cells belong to the same
+   `SubDofHandler`.
+ - Fix bug applying the transpose operation in condensation of `AffineConstraints`. This bug gave
+   silently wrong results when used on non-symmetric system matrices, but did not affect system matrices
+   that were symmetric ([#1426])
+
+## [v1.5.0] - 2026-07-13
+
+### Fixes
+ - Make default `edgedof_indices` and `facedof_indices` implementation work for externally defined interpolations ([#1365])
+
+### Added
+ - Support generating embedded 2D-grids by passing coordinates `x::Vec{3}` with 2D reference shapes. Note: New calculation of node position leads to slight floating point precision differences in node positions. ([#1367])
+
+### Documentation
+
+- Landau example in code gallery now shows how to use DifferentiationInterface and HyperHessians as a backend. (#1345)
+
+## [v1.4.1] - 2026-06-17
+
+### Fixes
+ - Make `shape_symmetric_gradient` work for `PointValues` ([#1325])
+ - Make the internal function `getlowerorder` work for `VectorizedInterpolation` ([#1335])
+
+### Documentation
+ - The quasi-incompressible hyperelasticity example now uses `MultiCellValues`. (#1346)
+
+### Performance
+ - Distributing DoFs got a small performance gain by `sizehint`ing dictionaries, avoiding
+   excessive rehashing (#1342)
+ - Small performance improvement to `SparseMatrixCSR` and `SparseMatrixCSR` assembly by avoiding
+   some reduction operations. (#1341)
+
+### Documentation
+ - Update Navier-Stokes example to the new OrdinaryDiffEq v7 release (#1350)
+
+## [v1.4.0] - 2026-04-20
+
+### Added
+ - Add `MultiFieldCellValues` as a `FEValues` object optimized for problems with multiple
+   fields. ([#872])
+ - Embedded elements now return mixed tensors
+   ([https://github.com/Ferrite-FEM/Tensors.jl/pull/236]) instead of static arrays.
+   ([#1286])
+ - `facedof_indices` and `edgedof_indices` are now generated by default. ([#1293])
+ - Widen interfaces to allow more vector types ([#1252])
+ - Assembly of rectangular matrices. ([#1279])
+
+### Fixes
+- The result of grid coloring is now not dependent on iteration order of dictionaries and
+  sets. This may change the coloring obtained from `create_coloring` compared to previous
+  Ferrite versions. ([#1295])
+
+### Performance
+ - Simplify `InterfaceIterator`. ([#1281])
+ - The default `allocate_matrix` call has been optimized using specialized code paths.
+   ([#1302])
+ - Remove redundant views in `InterfaceValues`. ([#1306])
+ - Optimize `apply!` call on constraint handler. ([#1310])
+
+### Documentation
+ - Fix typos in the tutorials. ([#865], [#1268], [#1271], [#1278], [#1298], [#1313])
+ - Replace incorrect `threadid` calls with recommended threading approach in Landau example
+   ([#1294])
+
+### CI
+ - Add typo checker to CI. ([#865])
+ - Add changelog check to CI. ([#1321])
+ - Update actions. ([#1314], [#1315])
+
+## [v1.3.0] - 2026-01-09
+
+### Added
+ - New function `Ferrite.write_facetset` for exporting facet sets to VTK. ([#1132], [#1259])
+
+### Documentation
+ - Fix errors in incompressible elasticity tutorial. ([#1251])
+ - Add utility for downloading meshes (and other assets) for tutorials. ([#1037])
+
 ## [v1.2.0] - 2025-11-14
 
 ### Added
  - Support for directly assembling to `SparseMatrixCSR` (from `SparseMatricesCSR.jl`). ([#864])
  - Enhance `generate_grid` to support outputting line meshes embedded in two and three
-   spatial dimentions. ([#1122], [#1214])
+   spatial dimensions. ([#1122], [#1214])
 
 ### Fixes
  - Fix L2 projection of tensor fields on discontinuous interpolations. ([#1197], [#1198])
@@ -27,7 +166,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Documentation updates
  - Extended assembly docs with information on how to support direct assembly into new matrix
    types. ([#864])
- - Add a list of reserach papers where Ferrite was used for numbeir simulations. Please add
+ - Add a list of research papers where Ferrite was used for simulations. Please add
    your paper! ([#1221])
  - Add section on global and local DoF numbering. ([#1089])
  - Fix some typos and grammar ([#1210], [#1224], [#1228])
@@ -118,7 +257,7 @@ more discussion).
   # Linear Lagrange interpolation for a vector problem on the triangle (vector dimension
   # same as the reference dimension)
   ip_scalar = Lagrange{RefTriangle, 1}()
-  ip_vector = ip_scalar ^ 2 # or VectorizedInterpolation{2}(ip_scalar)
+  ip_vector = ip_scalar^2 # or VectorizedInterpolation{2}(ip_scalar)
   ```
 
 - **Quadrature**: remove the first parameter (the reference dimension) and use new reference
@@ -676,7 +815,7 @@ poking into Ferrite internals:
  - Fix grid coloring for cell sets with 0 or 1 cells. ([#600])
 ### Other improvements
  - Documentation improvements:
-    - Simplications and clarifications to hyperelasticity example. ([#591])
+    - Simplifications and clarifications to hyperelasticity example. ([#591])
     - Remove duplicate docstring entry for `vtk_point_data`. ([#602])
     - Update documentation about initial conditions. ([#601], [#604])
 
@@ -1064,6 +1203,7 @@ poking into Ferrite internals:
 [#756]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/756
 [#759]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/759
 [#779]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/779
+[#780]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/780
 [#835]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/835
 [#855]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/855
 [#864]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/864
@@ -1105,3 +1245,8 @@ poking into Ferrite internals:
 [#1226]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1226
 [#1228]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1228
 [#1235]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1235
+[#1388]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1388
+[#1389]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1389
+[#1414]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1414
+[#1416]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1416
+[#1421]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1421

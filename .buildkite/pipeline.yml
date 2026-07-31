@@ -16,7 +16,6 @@ steps:
       julia --code-coverage=@ --project=test/GPU -e 'using Pkg; Pkg.instantiate()'
       julia --code-coverage=@ --project=test/GPU test/GPU/runtests.jl
     agents:
-      queue: "juliagpu"
-      cuda: "*"
+      queue: "cuda"
     if: build.message !~ /\[skip tests\]/
     timeout_in_minutes: 60

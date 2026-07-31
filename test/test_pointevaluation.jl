@@ -1,3 +1,7 @@
+# Imports for parallel (isolated) test execution:
+using Logging, OrderedCollections
+include(joinpath(@__DIR__, "test_utils.jl"))
+
 using Ferrite, Test
 
 function test_pe_scalar_field()
@@ -448,6 +452,31 @@ function test_pe_first_point_missing()
     return
 end
 
+function test_pe_mapped_interpolations()
+    cell = Triangle((1, 2, 3))
+    coords = Vec{2, Float64}.([(0.0, 0.0), (2.0, 0.5), (0.5, 2.0)])
+    grid = Grid([cell], Node.(coords))
+    local_coords = Vec{2, Float64}.([(0.2, 0.3), (0.1, 0.4)])
+
+    for ip in (Nedelec{RefTriangle, 1}(), RaviartThomas{RefTriangle, 1}())
+        qr = QuadratureRule{RefTriangle}(ones(length(local_coords)), local_coords)
+        cv = CellValues(qr, ip)
+        reinit!(cv, cell, coords)
+        points = [spatial_coordinate(cv, qp, coords) for qp in eachindex(local_coords)]
+        ph = PointEvalHandler(grid, points)
+        pv = PointValues(cv)
+        u = collect(1.0:getnbasefunctions(ip))
+
+        for (qp, point) in enumerate(PointIterator(ph))
+            @test point !== nothing
+            reinit!(pv, point)
+            @test function_value(pv, u) ≈ function_value(cv, qp, u)
+            @test function_gradient(pv, u) ≈ function_gradient(cv, qp, u)
+        end
+    end
+    return
+end
+
 @testset "PointEvalHandler" begin
     @testset "scalar field" begin
         test_pe_scalar_field()
@@ -483,6 +512,10 @@ end
     @testset "failure cases" begin
         test_pe_first_point_missing()
     end
+
+    @testset "mapped interpolations" begin
+        test_pe_mapped_interpolations()
+    end
 end
 
 @testset "PointValues" begin
@@ -513,8 +546,36 @@ end
     @test function_value(pvv, uv) ≈ function_value(cvv, 1, uv)
     @test function_gradient(pvv, uv) ≈ function_gradient(cvv, 1, uv)
     @test function_symmetric_gradient(pvv, uv) ≈ function_symmetric_gradient(cvv, 1, uv)
+
+    @test shape_gradient(pvv, 1, 1) ≈ shape_gradient(cvv, 1, 1)
+    @test shape_divergence(pvv, 1, 1) ≈ shape_divergence(cvv, 1, 1)
+    @test shape_curl(pvv, 1, 1) ≈ shape_curl(cvv, 1, 1)
+    @test shape_symmetric_gradient(pvv, 1, 1) ≈ shape_symmetric_gradient(cvv, 1, 1)
+
     reinit!(pvv, x, ξ₂)
     @test function_value(pvv, uv) ≈ function_value(cvv, 2, uv)
     @test function_gradient(pvv, uv) ≈ function_gradient(cvv, 2, uv)
     @test function_symmetric_gradient(pvv, uv) ≈ function_symmetric_gradient(cvv, 2, uv)
+
+    @test shape_gradient(pvv, 1, 1) ≈ shape_gradient(cvv, 2, 1)
+    @test shape_divergence(pvv, 1, 1) ≈ shape_divergence(cvv, 2, 1)
+    @test shape_curl(pvv, 1, 1) ≈ shape_curl(cvv, 2, 1)
+    @test shape_symmetric_gradient(pvv, 1, 1) ≈ shape_symmetric_gradient(cvv, 2, 1)
+
+    # PointValues for interpolations with non-identity mappings
+    cell = Triangle((1, 2, 3))
+    x_mapped = Vec{2, Float64}.([(0.0, 0.0), (2.0, 0.5), (0.5, 2.0)])
+    ξs = Vec{2, Float64}.([(0.2, 0.3), (0.1, 0.4)])
+    for ip_mapped in (Nedelec{RefTriangle, 1}(), RaviartThomas{RefTriangle, 1}())
+        qr_mapped = QuadratureRule{RefTriangle}([1.0, 1.0], ξs)
+        cv_mapped = CellValues(qr_mapped, ip_mapped)
+        reinit!(cv_mapped, cell, x_mapped)
+        pv_mapped = PointValues(cv_mapped)
+        u_mapped = rand(getnbasefunctions(ip_mapped))
+        for (qp, ξ) in pairs(ξs)
+            reinit!(pv_mapped, cell, x_mapped, ξ)
+            @test function_value(pv_mapped, u_mapped) ≈ function_value(cv_mapped, qp, u_mapped)
+            @test function_gradient(pv_mapped, u_mapped) ≈ function_gradient(cv_mapped, qp, u_mapped)
+        end
+    end
 end

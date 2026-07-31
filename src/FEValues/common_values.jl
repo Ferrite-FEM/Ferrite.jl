@@ -39,7 +39,7 @@ Creates a singleton type for specifying what parts of the AbstractValues should 
 API used to get type-stable construction. Keyword arguments in `AbstractValues` constructors are forwarded, and the public API
 is passing these as `Bool`, while the `ValuesUpdateFlags` method supports both boolean and `Val(::Bool)` keyword args.
 """
-function ValuesUpdateFlags(ip_fun::Interpolation; update_gradients = Val(true), update_hessians = Val(false), update_detJdV = Val(true))
+function ValuesUpdateFlags(ip_fun::Union{Interpolation, NamedTuple}; update_gradients = Val(true), update_hessians = Val(false), update_detJdV = Val(true))
     toval(v::Bool) = Val(v)
     toval(V::Val) = V
     return ValuesUpdateFlags(ip_fun, toval(update_gradients), toval(update_hessians), toval(update_detJdV))
@@ -51,14 +51,22 @@ function ValuesUpdateFlags(
     GeoDiffOrder = max(required_geo_diff_order(mapping_type(ip_fun), FunDiffOrder), update_detJdV)
     return ValuesUpdateFlags{FunDiffOrder, GeoDiffOrder, update_detJdV}()
 end
+function ValuesUpdateFlags( # For MultiFieldCellValues
+        ip_fun::NamedTuple, ::Val{update_gradients}, ::Val{update_hessians}, ::Val{update_detJdV}
+    ) where {update_gradients, update_hessians, update_detJdV}
+    FunDiffOrder = update_hessians ? 2 : (update_gradients ? 1 : 0)
+    GeoDiffOrder = max(maximum(ip -> required_geo_diff_order(mapping_type(ip), FunDiffOrder), ip_fun), update_detJdV)
+    return ValuesUpdateFlags{FunDiffOrder, GeoDiffOrder, update_detJdV}()
+end
 
 """
-    reinit!(cv::CellValues, cell::AbstractCell, x::AbstractVector)
-    reinit!(cv::CellValues, x::AbstractVector)
+    reinit!(cv::AbstractCellValues, cell::AbstractCell, x::AbstractVector)
+    reinit!(cv::AbstractCellValues, x::AbstractVector)
     reinit!(fv::FacetValues, cell::AbstractCell, x::AbstractVector, facet::Int)
-    reinit!(fv::FacetValues, x::AbstractVector, function_gradient::Int)
+    reinit!(fv::FacetValues, x::AbstractVector, facet::Int)
 
-Update the `CellValues`/`FacetValues` object for a cell or facet with cell coordinates `x`.
+Update the `CellValues`, `MultiFieldCellValues`, or `FacetValues` object for a cell or
+facet with cell coordinates `x`.
 The derivatives of the shape functions, and the new integration weights are computed.
 For interpolations with non-identity mappings, the current `cell` is also required.
 """
@@ -71,6 +79,15 @@ Return the number of quadrature points. For `FacetValues`,
 this is the number for the current facet.
 """
 function getnquadpoints end
+
+"""
+    getnbasefunctions(fe_v::AbstractValues)
+
+Get the number of base functions for the function interpolation in `fe_v`.
+Note that this is not supported for [`MultiFieldCellValues`](@ref) which has
+multiple function interpolations.
+"""
+getnbasefunctions(::AbstractValues)
 
 """
     getdetJdV(fe_v::AbstractValues, q_point::Int)
@@ -118,7 +135,7 @@ shape_gradient(fe_v::AbstractValues, q_point::Int, base_function::Int)
 Return the symmetric gradient of shape function `base_function` evaluated in
 quadrature point `q_point`.
 """
-function shape_symmetric_gradient end
+@propagate_inbounds shape_symmetric_gradient(cv::AbstractValues, q_point::Int, base_func::Int) = symmetric(shape_gradient(cv, q_point, base_func))
 
 """
     shape_divergence(fe_v::AbstractValues, q_point::Int, base_function::Int)
@@ -163,7 +180,7 @@ function function_value(fe_v::AbstractValues, q_point::Int, u::AbstractVector, d
     @boundscheck checkbounds(u, dof_range)
     @boundscheck checkquadpoint(fe_v, q_point)
     val = function_value_init(fe_v, u)
-    @inbounds for (i, j) in pairs(dof_range)
+    @inbounds for (i, j) in enumerate(dof_range)
         val += shape_value(fe_v, q_point, i) * u[j]
     end
     return val
@@ -203,20 +220,21 @@ function function_gradient(fe_v::AbstractValues, q_point::Int, u::AbstractVector
     @boundscheck checkbounds(u, dof_range)
     @boundscheck checkquadpoint(fe_v, q_point)
     grad = function_gradient_init(fe_v, u)
-    @inbounds for (i, j) in pairs(dof_range)
+    @inbounds for (i, j) in enumerate(dof_range)
         grad += shape_gradient(fe_v, q_point, i) * u[j]
     end
     return grad
 end
 
 # TODO: Deprecate this, nobody is using this in practice...
-function function_gradient(fe_v::AbstractValues, q_point::Int, u::AbstractVector{<:Vec})
+function function_gradient(fe_v::AbstractValues, q_point::Int, u::AbstractVector{<:Vec}, dof_range = eachindex(u))
     n_base_funcs = getnbasefunctions(fe_v)
-    length(u) == n_base_funcs || throw_incompatible_dof_length(length(u), n_base_funcs)
+    length(dof_range) == n_base_funcs || throw_incompatible_dof_length(length(dof_range), n_base_funcs)
+    @boundscheck checkbounds(u, dof_range)
     @boundscheck checkquadpoint(fe_v, q_point)
     grad = function_gradient_init(fe_v, u)
-    @inbounds for i in 1:n_base_funcs
-        grad += u[i] ⊗ shape_gradient(fe_v, q_point, i)
+    @inbounds for (i, j) in enumerate(dof_range)
+        grad += u[j] ⊗ shape_gradient(fe_v, q_point, i)
     end
     return grad
 end
@@ -250,7 +268,7 @@ function function_hessian(fe_v::AbstractValues, q_point::Int, u::AbstractVector,
     @boundscheck checkbounds(u, dof_range)
     @boundscheck checkquadpoint(fe_v, q_point)
     hess = function_hessian_init(fe_v, u)
-    @inbounds for (i, j) in pairs(dof_range)
+    @inbounds for (i, j) in enumerate(dof_range)
         hess += shape_hessian(fe_v, q_point, i) * u[j]
     end
     return hess

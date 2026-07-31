@@ -57,15 +57,18 @@ n1 = Node((0.0, 0.0))
 `Cell`s are defined based on the `Node` IDs. Hence, they collect IDs in a N-Tuple.
 Consider the following 2D mesh:
 
-![global mesh](./assets/global_mesh.svg)
+![Node and cell numbering of a 2 by 2 quadrilateral grid](./assets/global_mesh-light.svg)
+![Node and cell numbering of a 2 by 2 quadrilateral grid](./assets/global_mesh-dark.svg)
 
 The cells of the grid can be described in the following way
 
 ```julia
-cells = [Quadrilateral((1, 2, 5, 4)),
-         Quadrilateral((2, 3, 6, 5)),
-         Quadrilateral((4, 5, 8, 7)),
-         Quadrilateral((5, 6, 9, 8))]
+cells = [
+    Quadrilateral((1, 2, 5, 4)),
+    Quadrilateral((2, 3, 6, 5)),
+    Quadrilateral((4, 5, 8, 7)),
+    Quadrilateral((5, 6, 9, 8)),
+]
 ```
 
 where each `Quadrilateral <: AbstractCell` is defined by the tuple of node IDs.
@@ -106,9 +109,9 @@ In case that certain structures are preserved from the `Ferrite.Grid` type, you 
 As a starting point, we choose a minimal working example from the test suite:
 
 ```julia
-struct SmallGrid{dim,N,C<:Ferrite.AbstractCell} <: Ferrite.AbstractGrid{dim}
-    nodes_test::Vector{NTuple{dim,Float64}}
-    cells_test::NTuple{N,C}
+struct SmallGrid{dim, N, C <: Ferrite.AbstractCell} <: Ferrite.AbstractGrid{dim}
+    nodes_test::Vector{NTuple{dim, Float64}}
+    cells_test::NTuple{N, C}
 end
 ```
 
@@ -119,7 +122,7 @@ We start with the utility functions that are associated with the cells of the gr
 ```julia
 Ferrite.getcells(grid::SmallGrid) = grid.cells_test
 Ferrite.getcells(grid::SmallGrid, v::Union{Int, Vector{Int}}) = grid.cells_test[v]
-Ferrite.getncells(grid::SmallGrid{dim,N}) where {dim,N} = N
+Ferrite.getncells(grid::SmallGrid{dim, N}) where {dim, N} = N
 Ferrite.getcelltype(grid::SmallGrid) = eltype(grid.cells_test)
 Ferrite.getcelltype(grid::SmallGrid, i::Int) = typeof(grid.cells_test[i])
 ```
@@ -131,8 +134,8 @@ Ferrite.getnodes(grid::SmallGrid) = grid.nodes_test
 Ferrite.getnodes(grid::SmallGrid, v::Union{Int, Vector{Int}}) = grid.nodes_test[v]
 Ferrite.getnnodes(grid::SmallGrid) = length(grid.nodes_test)
 Ferrite.get_coordinate_eltype(::SmallGrid) = Float64
-Ferrite.get_coordinate_type(::SmallGrid{dim}) where dim = Vec{dim,Float64}
-Ferrite.nnodes_per_cell(grid::SmallGrid, i::Int=1) = Ferrite.nnodes(grid.cells_test[i])
+Ferrite.get_coordinate_type(::SmallGrid{dim}) where {dim} = Vec{dim, Float64}
+Ferrite.nnodes_per_cell(grid::SmallGrid, i::Int = 1) = Ferrite.nnodes(grid.cells_test[i])
 ```
 
 These definitions make many of Ferrite functions work out of the box, e.g. you can now call

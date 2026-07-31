@@ -17,11 +17,9 @@ and iii) to keep mathematical abstractions.
 !!! note
     Please help improve this documentation -- if something confuses you, chances are you're
     not alone. It's easy to do as you read along: just click on the "Edit on GitHub" link at
-    the top of each page, and then [edit the files directly in your browser]
-    (https://help.github.com/articles/editing-files-in-another-user-s-repository/). Your
-    changes will be vetted by developers before becoming permanent, so don't worry about
-    whether you might say something wrong. See also [Contributing to Ferrite](@ref) for more
-    details.
+    the top of each page, and then [edit the files directly in your browser](https://help.github.com/articles/editing-files-in-another-user-s-repository/). Your changes will be vetted by developers
+    before becoming permanent, so don't worry about whether you might say something wrong.
+    See also [Contributing to Ferrite](@ref) for more details.
 
 ## How the documentation is organized
 

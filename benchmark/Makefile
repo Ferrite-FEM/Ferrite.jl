@@ -14,6 +14,11 @@ Manifest.toml:
 benchmark: Manifest.toml
 	${JULIA_CMD} --project=${BENCHMARK_DIR} ${BENCHMARK_DIR}/runbenchmarks.jl benchmark/benchmarks.jl
 
+# Regenerate the committed benchmark parameters (fast, see tune.jl). Run after adding,
+# removing or renaming benchmarks.
+tune: Manifest.toml
+	${JULIA_CMD} --project=${BENCHMARK_DIR} ${BENCHMARK_DIR}/tune.jl
+
 benchmark-%: Manifest.toml
 	${JULIA_CMD} --project=${BENCHMARK_DIR} ${BENCHMARK_DIR}/runbenchmarks.jl benchmark/benchmarks.jl ${@:benchmark-%=%}
 
@@ -23,4 +28,4 @@ compare: Manifest.toml
 compare-%: Manifest.toml
 	${JULIA_CMD} --project=${BENCHMARK_DIR} ${BENCHMARK_DIR}/runcomparison.jl ${target} ${baseline} benchmark/benchmarks.jl ${@:benchmark-%=%}
 
-.PHONY: default clean benchmark benchmark-% compare compare-%
+.PHONY: default clean benchmark benchmark-% compare compare-% tune

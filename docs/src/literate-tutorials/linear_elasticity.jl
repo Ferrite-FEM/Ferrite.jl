@@ -1,8 +1,10 @@
 # # [Linear elasticity](@id tutorial-linear-elasticity)
 #
-# ![](linear_elasticity.svg)
+# ![](linear_elasticity-light.png)
+# ![](linear_elasticity-dark.png)
 #
-# *Figure 1*: Linear elastically deformed 1mm $\times$ 1mm Ferrite logo.
+# *Figure 1*: Vertical normal stress $\sigma_{22}$ (MPa) on the deformed geometry. The
+# computational mesh is generated from the 1mm $\times$ 1mm Ferrite logo.
 #
 #md # !!! tip
 #md #     This tutorial is also available as a Jupyter notebook:
@@ -85,7 +87,7 @@
 # Using the Einstein summation convention, we can write this in short form as
 # $\boldsymbol{u} \approx \boldsymbol{N}_i \, \hat{u}_i$ and $\delta\boldsymbol{u} \approx \delta\boldsymbol{N}_i \, \delta\hat{u}_i$.
 #
-# Inserting the these into the weak form, and noting that that the equation should hold for all $\delta \hat{u}_i$, we get
+# Inserting these into the weak form, and noting that the equation should hold for all $\delta \hat{u}_i$, we get
 # ```math
 # \underbrace{\int_\Omega \mathrm{grad}(\delta \boldsymbol{N}_i) : \boldsymbol{\sigma}\ \mathrm{d}\Omega}_{f_i^\mathrm{int}} = \underbrace{\int_\Gamma \delta \boldsymbol{N}_i \cdot \boldsymbol{t}\ \mathrm{d}\Gamma}_{f_i^\mathrm{ext}}
 # ```
@@ -136,12 +138,12 @@ ip = Lagrange{RefTriangle, order}()^dim; # vector valued interpolation
 # linear interpolation, a single quadrature point suffices, both inside the cell and on the facet.
 # In 2d, a facet is the edge of the element.
 qr = QuadratureRule{RefTriangle}(1) # 1 quadrature point
-qr_face = FacetQuadratureRule{RefTriangle}(1);
+facet_qr = FacetQuadratureRule{RefTriangle}(1);
 
 # Finally, we collect the interpolations and quadrature rules into the `CellValues` and `FacetValues`
 # buffers, which we will later use to evaluate the integrals over the cells and facets.
 cellvalues = CellValues(qr, ip)
-facetvalues = FacetValues(qr_face, ip);
+facetvalues = FacetValues(facet_qr, ip);
 
 # ### Degrees of freedom
 # For distributing degrees of freedom, we define a `DofHandler`. The `DofHandler` knows that
@@ -242,7 +244,7 @@ C = gradient(ϵ -> 2 * Gmod * dev(ϵ) + 3 * Kmod * vol(ϵ), zero(SymmetricTensor
 #md #     the elastic stiffness tensor should be changed to reflect this. The plane stress elasticity
 #md #     stiffness matrix in Voigt notation for engineering shear strains, is given as
 #md #     ```math
-#md #     \underline{\underline{\boldsymbol{E}}} = \frac{E}{1 - \nu^2}\begin{bmatrix}
+#md #     \underline{\underline{\boldsymbol{C}}} = \frac{E}{1 - \nu^2}\begin{bmatrix}
 #md #     1 & \nu & 0 \\
 #md #     \nu & 1 & 0 \\
 #md #     0 & 0 & (1 - \nu)/2
@@ -251,7 +253,7 @@ C = gradient(ϵ -> 2 * Gmod * dev(ϵ) + 3 * Kmod * vol(ϵ), zero(SymmetricTensor
 #md #     This matrix can be converted into the 4th order elastic stiffness tensor as
 #md #     ```julia
 #md #     C_voigt = Emod * [1.0 ν 0.0; ν 1.0 0.0; 0.0 0.0 (1-ν)/2] / (1 - ν^2)
-#md #     C = fromvoigt(SymmetricTensor{4,2}, E_voigt)
+#md #     C = fromvoigt(SymmetricTensor{4,2}, C_voigt)
 #md #     ```
 #md #
 # ### Element routine
@@ -260,7 +262,7 @@ C = gradient(ϵ -> 2 * Gmod * dev(ϵ) + 3 * Kmod * vol(ϵ), zero(SymmetricTensor
 # `ke` is pre-allocated and reused for all elements.
 #
 # Note that the elastic stiffness tensor $\mathsf{C}$ is constant.
-# Thus is needs to be computed and once and can then be used for all integration points.
+# Thus it needs to be computed only once and can then be used for all integration points.
 function assemble_cell!(ke, cellvalues, C)
     for q_point in 1:getnquadpoints(cellvalues)
         ## Get the integration weight for the quadrature point
@@ -357,7 +359,7 @@ end
 
 qp_stresses, avg_cell_stresses = calculate_stresses(grid, dh, cellvalues, u, C);
 
-# We now use the the L2Projector to project the stress-field onto the piecewise linear
+# We now use the L2Projector to project the stress-field onto the piecewise linear
 # finite element space that we used to solve the problem.
 proj = L2Projector(Lagrange{RefTriangle, 1}(), grid)
 stress_field = project(proj, qp_stresses, qr);
@@ -394,7 +396,8 @@ end
 # and in *Figure 2*, we demonstrate the difference between the interpolated stress
 # field and the constant stress in each cell.
 
-# ![](linear_elasticity_stress.png)
+# ![](linear_elasticity_stress-light.png)
+# ![](linear_elasticity_stress-dark.png)
 #
 # *Figure 2*: Vertical normal stresses (MPa) exported using the `L2Projector` (left)
 # and constant stress in each cell (right).

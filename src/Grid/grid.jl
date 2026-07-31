@@ -258,6 +258,22 @@ function reference_faces(::Type{RefPyramid})
     )
 end
 
+@generated function reference_face_edgenrs(::Type{RefShape}) where {RefShape <: AbstractRefShape}
+    expr = Expr(:tuple)
+    refedges = reference_edges(RefShape)
+    for face in reference_faces(RefShape)
+        expr_i = Expr(:tuple)
+        for j in 1:length(face)
+            v1 = face[j]
+            v2 = face[mod1(j + 1, length(face))]
+            edgenr = findfirst(refedge -> (refedge === (v1, v2) || refedge === (v2, v1)), refedges)
+            push!(expr_i.args, edgenr)
+        end
+        push!(expr.args, expr_i)
+    end
+    return :(return $expr)
+end
+
 ######################################################
 # Concrete implementations of AbstractCell interface #
 ######################################################
@@ -425,7 +441,7 @@ get_coordinate_type(::Grid{dim, C, T}) where {dim, C, T} = Vec{dim, T} # Node is
 This function takes the local vertex representation (a `VertexIndex`) and looks up the unique global id (an `Int`).
 """
 toglobal(grid::AbstractGrid, vertexidx::VertexIndex) = vertices(getcells(grid, vertexidx[1]))[vertexidx[2]]
-toglobal(grid::AbstractGrid, vertexidx::Vector{VertexIndex}) = unique(toglobal.((grid,), vertexidx))
+toglobal(grid::AbstractGrid, vertexidx::AbstractVector{VertexIndex}) = unique(toglobal.((grid,), vertexidx))
 
 """
     Ferrite.getspatialdim(grid::AbstractGrid)
@@ -465,7 +481,7 @@ Returns either all `cells::Collection{C<:AbstractCell}` of a `<:AbstractGrid` or
 Whereas the last option tries to call a `cellset` of the `grid`. `Collection` can be any indexable type, for `Grid` it is `Vector{C<:AbstractCell}`.
 """
 @inline getcells(grid::AbstractGrid) = grid.cells
-@inline getcells(grid::AbstractGrid, v::Union{Int, Vector{Int}}) = grid.cells[v]
+@inline getcells(grid::AbstractGrid, v::Union{Int, AbstractVector{Int}}) = grid.cells[v]
 @inline getcells(grid::AbstractGrid, setname::String) = grid.cells[collect(getcellset(grid, setname))]
 "Returns the number of cells in the `<:AbstractGrid`."
 @inline getncells(grid::AbstractGrid) = length(grid.cells)
@@ -483,7 +499,7 @@ The last option tries to call a `nodeset` of the `<:AbstractGrid`. `Collection{N
 to a Node.
 """
 @inline getnodes(grid::AbstractGrid) = grid.nodes
-@inline getnodes(grid::AbstractGrid, v::Union{Int, Vector{Int}}) = grid.nodes[v]
+@inline getnodes(grid::AbstractGrid, v::Union{Int, AbstractVector{Int}}) = grid.nodes[v]
 @inline getnodes(grid::AbstractGrid, setname::String) = grid.nodes[collect(getnodeset(grid, setname))]
 "Returns the number of nodes in the grid."
 @inline getnnodes(grid::AbstractGrid) = length(grid.nodes)
@@ -564,7 +580,7 @@ function transform_coordinates!(g::AbstractGrid, f::Function)
 end
 
 """
-    getcoordinates(grid::AbstractGrid, idx::Union{Int,CellIndex})
+    getcoordinates(grid::AbstractGrid, idx::Union{Int, CellIndex})
     getcoordinates(cache::CellCache)
 
 Get a vector with the coordinates of the cell corresponding to `idx` or `cache`
@@ -579,19 +595,20 @@ end
 @inline getcoordinates(grid::AbstractGrid, cell::CellIndex) = getcoordinates(grid, cell.idx)
 
 """
-    getcoordinates!(x::Vector{<:Vec}, grid::AbstractGrid, idx::Union{Int,CellIndex})
+    getcoordinates!(x::Vector{<:Vec}, grid::AbstractGrid, idx::Union{Int, CellIndex})
     getcoordinates!(x::Vector{<:Vec}, grid::AbstractGrid, cell::AbstractCell)
 
 Mutate `x` to the coordinates of the cell corresponding to `idx` or `cell`.
 """
-@inline function getcoordinates!(x::Vector{Vec{dim, T}}, grid::AbstractGrid, cell::AbstractCell) where {dim, T}
+@propagate_inbounds function getcoordinates!(x::AbstractVector{Vec{dim, T}}, grid::AbstractGrid, cell::AbstractCell) where {dim, T}
     node_ids = get_node_ids(cell)
-    @inbounds for i in 1:length(x)
-        x[i] = get_node_coordinate(grid, node_ids[i])
+    @boundscheck checkbounds(x, keys(node_ids))
+    @inbounds for (i, node_id) in pairs(node_ids)
+        x[i] = get_node_coordinate(grid, node_id)
     end
     return x
 end
-@inline function getcoordinates!(x::Vector{Vec{dim, T}}, grid::AbstractGrid, cellid::Int) where {dim, T}
+@inline function getcoordinates!(x::AbstractVector{Vec{dim, T}}, grid::AbstractGrid, cellid::Int) where {dim, T}
     cell = getcells(grid, cellid)
     return getcoordinates!(x, grid, cell)
 end
@@ -604,16 +621,15 @@ Return the coordinate of the `n`th node in `grid`
 """
 get_node_coordinate(grid, n) = get_node_coordinate(getnodes(grid, n))
 
-function cellnodes!(global_nodes::Vector{Int}, grid::AbstractGrid, i::Int)
+function cellnodes!(global_nodes::AbstractVector{Int}, grid::AbstractGrid, i::Int)
     cell = getcells(grid, i)
     _cellnodes!(global_nodes, cell)
     return global_nodes
 end
-function _cellnodes!(global_nodes::Vector{Int}, cell::AbstractCell)
+function _cellnodes!(global_nodes::AbstractVector{Int}, cell::AbstractCell)
     @assert length(global_nodes) == nnodes(cell)
-    @inbounds for i in 1:length(global_nodes)
-        global_nodes[i] = cell.nodes[i]
-    end
+    node_ids = get_node_ids(cell)
+    copyto!(global_nodes, node_ids)
     return global_nodes
 end
 
@@ -684,51 +700,16 @@ struct PathOrientationInfo
     regular::Bool # Indicator whether the orientation is regular or inverted.
 end
 
-"""
-    SurfaceOrientationInfo
-
-Orientation information for 2D entities. Such an entity can be
-possibly flipped (i.e. the defining vertex order is reverse to the
-spanning vertex order) and the vertices can be rotated against each other.
-Take for example the faces
-```
-1---2 2---3
-| A | | B |
-4---3 1---4
-```
-which are rotated against each other by 90° (shift index is 1) or the faces
-```
-1---2 2---1
-| A | | B |
-4---3 3---4
-```
-which are flipped against each other. Any combination of these can happen.
-The combination to map this local face to the defining face is encoded with
-this data structure via ``rotate \\circ flip`` where the rotation is indiced by
-the shift index.
-    !!!NOTE TODO implement me.
-"""
-struct SurfaceOrientationInfo
-    #flipped::Bool
-    #shift_index::Int
+function PathOrientationInfo(edgenodes::NTuple{2, Int})
+    return PathOrientationInfo(get_edge_direction(edgenodes) > 0)
 end
 
-
 @doc raw"""
-    InterfaceOrientationInfo
+    SurfaceOrientationInfo
 
-Orientation information for 1D and 2D entities.
-The orientation is defined by the indices of the grid nodes
-associated to the vertices. To give an example, the oriented path
-```
-1 ---> 2
-```
-is called *regular*, indicated by `flipped=false`, while the oriented path
-```
-2 ---> 1
-```
-is called *inverted*, indicated by `flipped=true`.
+Orientation information for 2D entities.
 
+The orientation is defined by the indices of the grid nodes associated to the vertices.
 2D entities can be flipped (i.e. the defining vertex order is reverse to the
 spanning vertex order) and the vertices can be rotated against each other.
 
@@ -743,7 +724,7 @@ Take for example the faces
 |    \      |    \
 2-----3     3-----1
 ```
-which are rotated against each other by 240° after tranfroming to an
+which are rotated against each other by 240° after transforming to an
 equilateral triangle (shift index is 2). Or the faces
 ```
 3           2
@@ -754,21 +735,31 @@ equilateral triangle (shift index is 2). Or the faces
 2-----1     3-----1
 ```
 which are flipped against each other.
+
+The same applies to quadrilateral faces. Take for example the faces
+```
+1---2     2---3
+| A |     | B |
+4---3     1---4
+```
+which are rotated against each other by 90° (shift index is 1). Or the faces
+```
+1---2     2---1
+| A |     | B |
+4---3     3---4
+```
+which are flipped against each other.
 """
-struct OrientationInfo
+struct SurfaceOrientationInfo
     flipped::Bool
     shift_index::Int
 end
 
-function OrientationInfo(edgenodes::NTuple{2, Int})
-    return OrientationInfo(get_edge_direction(edgenodes) < 0, 0)
-end
-
-function OrientationInfo(facenodes::NTuple{N, Int}) where {N}
+function SurfaceOrientationInfo(facenodes::NTuple{N, Int}) where {N}
     min_idx = argmin(facenodes)
     shift_index = min_idx - 1
     flipped = get_face_direction(facenodes) < 0
-    return OrientationInfo(flipped, shift_index)
+    return SurfaceOrientationInfo(flipped, shift_index)
 end
 
 function get_edge_direction(edgenodes::NTuple{2, Int})

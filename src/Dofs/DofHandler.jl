@@ -95,6 +95,24 @@ function _print_field_information(io::IO, mime::MIME"text/plain", sdh::SubDofHan
     return
 end
 
+"""
+    EntityMaps
+
+Maps from grid entities (vertices, edges, faces) to the first dof distributed on that entity,
+one entry per field. Produced as scratch storage while distributing dofs and retained by a
+[`DofHandler`](@ref) only when its grid is a `NonConformingGrid`, where it is needed to build
+the affine constraints that tie hanging nodes to their masters.
+
+- `vertices[f][v]` is the first dof on vertex `v` for field `f` (`0` if unvisited).
+- `edges[f][(a, b)]` is the first dof on the edge between global vertices `a < b`.
+- `faces[f][(a, b, c)]` is the first dof on the face identified by global vertices `a, b, c`.
+"""
+struct EntityMaps
+    vertices::Vector{Vector{Int}}
+    edges::Vector{Dict{NTuple{2, Int}, Int}}
+    faces::Vector{Dict{NTuple{3, Int}, Int}}
+end
+
 mutable struct DofHandler{dim, G <: AbstractGrid{dim}} <: AbstractDofHandler
     const subdofhandlers::Vector{SubDofHandler{DofHandler{dim, G}}}
     const field_names::Vector{Symbol}
@@ -106,6 +124,10 @@ mutable struct DofHandler{dim, G <: AbstractGrid{dim}} <: AbstractDofHandler
     closed::Bool
     const grid::G
     ndofs::Int
+    # Maps from entity to dofs. These are scratch structures during dof distribution and are
+    # only retained afterwards for a `NonConformingGrid` (to build conformity constraints for
+    # hanging nodes), otherwise this is `nothing`. See [`EntityMaps`](@ref).
+    entitymaps::Union{Nothing, EntityMaps}
 end
 
 """
@@ -137,7 +159,7 @@ close!(dh)
 function DofHandler(grid::G) where {dim, G <: AbstractGrid{dim}}
     ncells = getncells(grid)
     sdhs = SubDofHandler{DofHandler{dim, G}}[]
-    return DofHandler{dim, G}(sdhs, Symbol[], Int[], zeros(Int, ncells), zeros(Int, ncells), false, grid, -1)
+    return DofHandler{dim, G}(sdhs, Symbol[], Int[], zeros(Int, ncells), zeros(Int, ncells), false, grid, -1, nothing)
 end
 
 function Base.show(io::IO, mime::MIME"text/plain", dh::DofHandler)
@@ -210,7 +232,13 @@ function celldofs!(global_dofs::Vector{Int}, dh::DofHandler, i::Int)
     unsafe_copyto!(global_dofs, 1, dh.cell_dofs, dh.cell_dofs_offset[i], length(global_dofs))
     return global_dofs
 end
-function celldofs!(global_dofs::Vector{Int}, sdh::SubDofHandler, i::Int)
+function celldofs!(global_dofs::AbstractVector{Int}, dh::AbstractDofHandler, i::Int)
+    @assert isclosed(dh)
+    @assert length(global_dofs) == ndofs_per_cell(dh, i)
+    copyto!(global_dofs, 1, dh.cell_dofs, dh.cell_dofs_offset[i], length(global_dofs))
+    return global_dofs
+end
+function celldofs!(global_dofs::AbstractVector{Int}, sdh::SubDofHandler, i::Int)
     @assert i in sdh.cellset
     return celldofs!(global_dofs, sdh.dh, i)
 end
@@ -226,7 +254,7 @@ function celldofs(dh::AbstractDofHandler, i::Int)
     return celldofs!(zeros(Int, ndofs_per_cell(dh, i)), dh, i)
 end
 
-function cellnodes!(global_nodes::Vector{Int}, dh::DofHandler, i::Union{Int, <:AbstractCell})
+function cellnodes!(global_nodes::AbstractVector{Int}, dh::DofHandler, i::Union{Int, <:AbstractCell})
     return cellnodes!(global_nodes, get_grid(dh), i)
 end
 
@@ -245,7 +273,7 @@ n_components(sdh::SubDofHandler, field_idx::Int) = n_components(sdh.field_interp
 n_components(sdh::SubDofHandler, field_name::Symbol) = n_components(sdh, find_field(sdh, field_name))
 
 """
-    n_components(dh::DofHandler, field_idxs::NTuple{2,Int})
+    n_components(dh::DofHandler, field_idxs::NTuple{2, Int})
     n_components(dh::DofHandler, field_name::Symbol)
     n_components(sdh::SubDofHandler, field_idx::Int)
     n_components(sdh::SubDofHandler, field_name::Symbol)
@@ -365,7 +393,8 @@ function __close!(dh::DofHandler)
     end
     numfields = length(dh.field_names)
 
-    # NOTE: Maybe it makes sense to store *Index in the dicts instead.
+    # Entity -> dof maps. These are scratch storage for distribution; they are only kept
+    # afterwards if the grid is non-conforming (see the end of this function).
 
     # `vertexdict` keeps track of the visited vertices. The first dof added to vertex v is
     # stored in vertexdict[v].
@@ -378,9 +407,22 @@ function __close!(dh::DofHandler)
     edgedicts = [Dict{NTuple{2, Int}, Int}() for _ in 1:numfields]
 
     # `facedict` keeps track of the visited faces. We only need to store the first dof we
-    # add to the face since currently more dofs per face isn't supported.
+    # add to the face since they are enumerated contiguously: the dofs are stored according
+    # to the canonical orientation of the face and each cell maps them to its local
+    # orientation, see sortface and permute_and_set!.
     # A face is uniquely determined by 3 vertex nodes, see sortface
     facedicts = [Dict{NTuple{3, Int}, Int}() for _ in 1:numfields]
+
+    # The edge/face dicts above are shared between all SubDofHandlers that contain a given
+    # field, so `field_ncells[gidx]` counts the total number of cells carrying field `gidx`.
+    # This is used to reserve the dict capacity up front (see `_close_subdofhandler!`).
+    field_ncells = zeros(Int, numfields)
+    for sdh in dh.subdofhandlers
+        n = length(sdh.cellset)
+        for name in sdh.field_names
+            field_ncells[findfirst(==(name), dh.field_names)::Int] += n
+        end
+    end
 
     # Set initial values
     nextdof = 1  # next free dof to distribute
@@ -395,21 +437,28 @@ function __close!(dh::DofHandler)
             vertexdicts,
             edgedicts,
             facedicts,
+            field_ncells,
         )
     end
     dh.ndofs = maximum(dh.cell_dofs; init = 0)
     dh.ndofs > 0 && @assert minimum(dh.cell_dofs; init = dh.ndofs) == 1
     dh.closed = true
 
+    # Retain the entity maps only for non-conforming grids, where they are needed to build
+    # the conformity (hanging-node) constraints. Conforming grids discard them.
+    if get_grid(dh) isa NonConformingGrid
+        dh.entitymaps = EntityMaps(vertexdicts, edgedicts, facedicts)
+    end
+
     return dh, vertexdicts, edgedicts, facedicts
 end
 
 """
-    _close_subdofhandler!(dh::DofHandler{sdim}, sdh::SubDofHandler, sdh_index::Int, nextdof::Int, vertexdicts, edgedicts, facedicts) where {sdim}
+    _close_subdofhandler!(dh::DofHandler{sdim}, sdh::SubDofHandler, sdh_index::Int, nextdof::Int, vertexdicts, edgedicts, facedicts, field_ncells) where {sdim}
 
 Main entry point to distribute dofs for a single [`SubDofHandler`](@ref) on its subdomain with the same interpolation kind per cell.
 """
-function _close_subdofhandler!(dh::DofHandler{sdim}, sdh::SubDofHandler, sdh_index::Int, nextdof::Int, vertexdicts, edgedicts, facedicts) where {sdim}
+function _close_subdofhandler!(dh::DofHandler{sdim}, sdh::SubDofHandler, sdh_index::Int, nextdof::Int, vertexdicts, edgedicts, facedicts, field_ncells) where {sdim}
     # First we allocate space to store the indices.
     sdh.ndofs_per_cell = sum([getnbasefunctions(ip) for ip in sdh.field_interpolations]; init = 0)::Int
     field_offsets_cell = cumsum([1; [getnbasefunctions(ip) for ip in sdh.field_interpolations]])::Vector{Int}
@@ -426,10 +475,6 @@ function _close_subdofhandler!(dh::DofHandler{sdim}, sdh::SubDofHandler, sdh_ind
             @assert maximum(alldofs) == length(alldofs) && minimum(alldofs) == 1 "Interpolation is not continously numbered."
         end
         push!(ip_infos, ip_info)
-        # TODO: More than one face dof per face in 3D are not implemented yet. This requires
-        #       keeping track of the relative rotation between the faces, not just the
-        #       direction as for faces (i.e. edges) in 2D.
-        sdim == 3 && @assert !any(x -> x > 1, ip_info.lfacedofoffsets[2:end] .- ip_info.lfacedofoffsets[1:(end - 1)])
     end
 
     # Mapping between the local field index and the global field index
@@ -450,6 +495,7 @@ function _close_subdofhandler!(dh::DofHandler{sdim}, sdh::SubDofHandler, sdh_ind
         vertexdicts,
         edgedicts,
         facedicts,
+        field_ncells,
     )
 
     append!(dh.cell_dofs, subdomain_cell_dofs)
@@ -472,8 +518,32 @@ function _distribute_dofs_on_subdomain!(
         vertexdicts,
         edgedicts,
         facedicts,
+        field_ncells,
     )
     current_celldofs_offset = 1
+    # Reserve capacity in the edge/face dicts up front to avoid repeatedly rehashing them
+    # while dofs are distributed. The number of unique edges/faces is within a small factor
+    # of the number of cells carrying the field (`field_ncells`, which spans all the
+    # SubDofHandlers sharing the dict). Edges (and faces in 3D) are shared between
+    # neighbouring cells, so the unique count is a couple of times the cell count; a 2D cell
+    # owns a single unshared face, so there the face dict reaches exactly the cell count.
+    # These hints are chosen to land in the same power-of-two bucket the dict reaches anyway
+    # (so no extra memory is reserved in the common cases), while skipping the intermediate
+    # rehashes during distribution. We only size a dict the first time it is touched (while
+    # still empty) so that a second SubDofHandler does not re-hint — and possibly shrink — a
+    # dict that another SubDofHandler already filled.
+    ncells = length(sdh.cellset)
+    for (lidx, gidx) in pairs(global_fidxs)
+        info = ip_infos[lidx]
+        ncf = field_ncells[gidx]
+        if any(>(0), length(info.ledgedofs)) && isempty(edgedicts[gidx])
+            sizehint!(edgedicts[gidx], 2 * ncf)
+        end
+        if any(>(0), length(info.lfacedofs)) && isempty(facedicts[gidx])
+            sizehint!(facedicts[gidx], info.reference_dim == 3 ? 2 * ncf : ncf)
+        end
+    end
+
     # loop over all the cells, and distribute dofs for all the fields
     for ci in sdh.cellset
         @debug println("Creating dofs for cell #$ci")
@@ -541,7 +611,7 @@ function _distribute_field_dofs_for_cell!(cell_field_dofs, cell::AbstractCell, i
     nextdof = add_face_dofs(
         cell_field_dofs, cell, facedict,
         ip_info.lfacedofs, ip_info.lfacedofoffsets, nextdof,
-        ip_info.adjust_during_distribution, ip_info.n_copies,
+        ip_info.adjust_during_distribution, ip_info.interior_facedofs_on_lattice, ip_info.n_copies,
     )
 
     # Distribute internal dofs for cells
@@ -599,7 +669,7 @@ for the object (vertex, face) then simply return those, otherwise create new dof
     return nextdof, dofs
 end
 
-function add_face_dofs(cell_dofs, cell::AbstractCell, facedict::Dict, allfdofs::Vector{Int}, offsets::Vector{Int}, nextdof::Int, adjust_during_distribution::Bool, n_copies::Int)
+function add_face_dofs(cell_dofs, cell::AbstractCell, facedict::Dict, allfdofs::Vector{Int}, offsets::Vector{Int}, nextdof::Int, adjust_during_distribution::Bool, interior_facedofs_on_lattice::Bool, n_copies::Int)
     length(allfdofs) == 0 && return nextdof
     for (fi, face) in pairs(faces(cell))
         fdofids = @view allfdofs[offsets[fi]:(offsets[fi + 1] - 1)]
@@ -608,7 +678,8 @@ function add_face_dofs(cell_dofs, cell::AbstractCell, facedict::Dict, allfdofs::
         sface, orientation = sortface(face)
         @debug println("\t\tface #$sface, $orientation")
         nextdof, dofs = get_or_create_dofs!(nextdof, nfacedofs, n_copies, facedict, sface)
-        permute_and_set!(cell_dofs, fdofids, dofs, orientation, adjust_during_distribution, getrefdim(cell)) # TODO: passing rdim of cell is temporary, simply to check if facedofs are internal to cell
+        nfacevertices = length(face) # `faces` returns the vertices of the geometric entity only
+        permute_and_set!(cell_dofs, fdofids, dofs, orientation, adjust_during_distribution, interior_facedofs_on_lattice, nfacevertices, getrefdim(cell)) # TODO: passing rdim of cell is temporary, simply to check if facedofs are internal to cell
         @debug println("\t\t\tadjusted dofs: $(cell_dofs)")
     end
     return nextdof
@@ -690,7 +761,7 @@ described therein.
 end
 
 """
-    sortedge(edge::Tuple{Int,Int})
+    sortedge(edge::Tuple{Int, Int})
 
 Returns the unique representation of an edge and its orientation.
 Here the unique representation is the sorted node index tuple. The
@@ -714,23 +785,23 @@ function sortedge_fast(edge::Tuple{Int, Int})
 end
 
 """
-    sortface(face::Tuple{Int})
-    sortface(face::Tuple{Int,Int})
-    sortface(face::Tuple{Int,Int,Int})
-    sortface(face::Tuple{Int,Int,Int,Int})
+    sortface(face::Tuple{Int, Int, Int})
+    sortface(face::Tuple{Int, Int, Int, Int})
 
-Returns the unique representation of a face.
-Here the unique representation is the sorted node index tuple.
-Note that in 3D we only need indices to uniquely identify a face,
-so the unique representation is always a tuple length 3.
+Returns the unique representation of a face and its orientation.
+Here the unique representation is the sorted node index tuple. Note that in 3D we only need
+indices to uniquely identify a face, so the unique representation is always a tuple of
+length 3. The orientation is a [`SurfaceOrientationInfo`](@ref) relating the face as spanned by
+the local node tuple to the canonical face spanned by the sorted tuple, see
+[`permute_and_set!`](@ref).
 """
 function sortface end
 
 """
     sortface_fast(face::Tuple{Int})
-    sortface_fast(face::Tuple{Int,Int})
-    sortface_fast(face::Tuple{Int,Int,Int})
-    sortface_fast(face::Tuple{Int,Int,Int,Int})
+    sortface_fast(face::Tuple{Int, Int})
+    sortface_fast(face::Tuple{Int, Int, Int})
+    sortface_fast(face::Tuple{Int, Int, Int, Int})
 
 Returns the unique representation of a face.
 Here the unique representation is the sorted node index tuple.
@@ -740,40 +811,145 @@ so the unique representation is always a tuple length 3.
 function sortface_fast end
 
 """
-    !!!NOTE TODO implement me.
+    permute_and_set!(cell_dofs::Vector{Int}, dofs::StepRange{Int, Int}, orientation::SurfaceOrientationInfo, adjust_during_distribution::Bool, interior_facedofs_on_lattice::Bool, nfacevertices::Int, rdim::Int)
 
-For more details we refer to [1] as we follow the methodology described therein.
+Push the dofs belonging to a face onto `cell_dofs`, in the order corresponding to the local
+orientation of the face.
 
-[1] Scroggs, M. W., Dokken, J. S., Richardson, C. N., & Wells, G. N. (2022).
-    Construction of arbitrary order finite element degree-of-freedom maps on
-    polygonal and polyhedral cell meshes. ACM Transactions on Mathematical
-    Software (TOMS), 48(2), 1-23.
+For interpolations with multiple interior dofs per face the dofs must be permuted such that
+all cells sharing the face associate the same dof with the same location on the face. The
+dofs are stored according to the canonical orientation of the face (the face as spanned by
+its sorted vertex tuple, see [`sortface`](@ref)) and this function maps them to the local
+orientation, given by `orientation` (see [`SurfaceOrientationInfo`](@ref)).
 
-    !!!TODO citation via software.
+This adjustment is necessary for faces that can be shared between 3D cells. Lattice face
+dofs on 2D cells are canonicalized as well, because a 2D cell can share its interior with a
+face of a 3D cell when the same field is used in multiple [`SubDofHandler`](@ref)s. Face
+dofs on 2D cells that have not opted in to the lattice assumption are pushed in the stored
+order (such dofs are not necessarily placed on a lattice, e.g. for
+`RaviartThomas{RefTriangle, 2}`).
 
-    !!!TODO Investigate if we can somehow pass the interpolation into this function in a typestable way.
+The permutation assumes that the interior dofs are placed on a regular lattice, in the
+enumeration order specified by [`facedof_interior_indices`](@ref). An interpolation must opt
+in to this assumption via [`interior_facedofs_on_lattice`](@ref); otherwise distributing more
+than one dof on a shared 3D face errors. For a triangular face
+with vertices ``(v_1, v_2, v_3)`` the interior dofs make up a smaller triangular lattice,
+which is traversed row by row, where rows are lines of constant barycentric ``v_2``-weight,
+starting with the row closest to the edge ``(v_3, v_1)``, and each row is traversed with
+increasing barycentric ``v_1``-weight (i.e. starting from the point closest to ``v_3``).
+This matches the interior node ordering of `Lagrange{RefTriangle, order}`. For a
+quadrilateral face the interior dofs make up a regular grid which is traversed row by row,
+where rows are lines of constant local ``v_1 \\to v_4`` coordinate, starting with the row
+closest to the edge ``(v_1, v_2)``, and each row is traversed in the direction
+``v_1 \\to v_2``. This matches the interior node ordering of
+`Lagrange{RefQuadrilateral, order}`.
+
+For more details we refer to Scroggs et al. [Scroggs2022](@cite) as we follow the
+methodology described therein.
+
+# References
+ - [Scroggs2022](@cite) Scroggs et al. ACM Trans. Math. Softw. 48 (2022).
 """
-@inline function permute_and_set!(cell_dofs, local_dof_table, dofs::StepRange{Int, Int}, ::SurfaceOrientationInfo, adjust_during_distribution::Bool, rdim::Int)
-    if rdim == 3 && adjust_during_distribution && length(dofs) > 1
-        error("Dof distribution for interpolations with multiple dofs per face not implemented yet.")
-    end
+@inline function permute_and_set!(cell_dofs::AbstractVector{Int}, local_dof_table::AbstractVector{Int}, dofs::StepRange{Int, Int}, orientation::SurfaceOrientationInfo, adjust_during_distribution::Bool, interior_facedofs_on_lattice::Bool, nfacevertices::Int, rdim::Int)
+    # TODO Investigate if we can somehow pass the interpolation into this function in a
+    # typestable way (instead of relying on the interior_facedofs_on_lattice trait).
     n_copies = step(dofs)
     @assert n_copies > 0
-    for (i, dof) in enumerate(dofs)
-        for d in 1:n_copies
-            j = n_copies * (local_dof_table[i] - 1) + d
-            cell_dofs[j] = (dof - 1) + d
+    ndofs = length(dofs)
+    should_permute = adjust_during_distribution && ndofs > 1 &&
+        (rdim == 3 || (rdim == 2 && interior_facedofs_on_lattice))
+    if should_permute
+        interior_facedofs_on_lattice || error("Dof distribution for an interpolation with multiple dofs on a face shared between 3D cells requires the interior face dofs to be placed on a regular lattice; this interpolation has not opted in, see `Ferrite.interior_facedofs_on_lattice` and `Ferrite.permute_and_set!`.")
+        if nfacevertices == 3 # triangular face
+            q = _triangle_lattice_order(ndofs)
+            for t2 in 0:q, t1 in 0:(q - t2)
+                k = _canonical_facedof_index_triangle(t1, t2, q, orientation)
+                dof = dofs[k]
+                for d in 1:n_copies
+                    j = n_copies * (local_dof_table[k] - 1) + d
+                    cell_dofs[j] = (dof - 1) + d
+                end
+            end
+        elseif nfacevertices == 4 # quadrilateral face
+            m = isqrt(ndofs)
+            if m * m != ndofs
+                error("$ndofs interior dofs on a quadrilateral face do not make up a regular lattice.")
+            end
+            for j in 0:(m - 1), i in 0:(m - 1)
+                k = _canonical_facedof_index_quadrilateral(i, j, m, orientation)
+                dof = dofs[k]
+                for d in 1:n_copies
+                    j = n_copies * (local_dof_table[k] - 1) + d
+                    cell_dofs[j] = (dof - 1) + d
+                end
+            end
+        else
+            error("Faces with $nfacevertices vertices are not supported.")
+        end
+    else
+        for (i, dof) in enumerate(dofs)
+            for d in 1:n_copies
+                j = n_copies * (local_dof_table[i] - 1) + d
+                cell_dofs[j] = (dof - 1) + d
+            end
         end
     end
     return nothing
 end
 
+# Return the order q of the triangular lattice made up by `ndofs` interior face dofs, i.e.
+# q such that (q + 1) * (q + 2) / 2 == ndofs. For a complete Lagrange interpolation of
+# order p, the interior dofs of a triangular face make up a lattice of order q = p - 3.
+function _triangle_lattice_order(ndofs::Int)
+    q = (isqrt(8 * ndofs + 1) - 3) ÷ 2
+    if (q + 1) * (q + 2) ÷ 2 != ndofs
+        error("$ndofs interior dofs on a triangular face do not make up a regular lattice.")
+    end
+    return q
+end
+
+# Compute the canonical (storage) index of the interior face dof at local lattice position
+# (t1, t2) of a triangular face. The lattice point has barycentric weights
+# (t1 + 1, t2 + 1, t3 + 1) ~ (v1, v2, v3) with respect to the local face vertices, where
+# t3 = q - t1 - t2. The vertex with local position u takes canonical position σ(u),
+# determined by the orientation: for a regular face σ(u) = u - shift_index (mod 3), and for
+# a flipped face the two non-minimum vertices are additionally swapped. The barycentric
+# weights with respect to the canonical face follow as c_σ(u) = t_u, and the linear index
+# from the lattice enumeration order (see permute_and_set!).
+function _canonical_facedof_index_triangle(t1::Int, t2::Int, q::Int, orientation::SurfaceOrientationInfo)
+    s = orientation.shift_index
+    t = (t1, t2, q - t1 - t2)
+    c1 = t[mod(s, 3) + 1]
+    c2 = orientation.flipped ? t[mod(s + 2, 3) + 1] : t[mod(s + 1, 3) + 1]
+    return c2 * (q + 1) - c2 * (c2 - 1) ÷ 2 + c1 + 1
+end
+
+# Compute the canonical (storage) index of the interior face dof at local lattice position
+# (i, j) of a quadrilateral face, with i, j ∈ {0, ..., m - 1} counted along the local
+# v1 → v2 and v1 → v4 directions, respectively. The local lattice maps to the canonical
+# lattice by the dihedral transformation that takes the local vertex at position u to
+# canonical position σ(u): a rotation by -shift_index quarter turns, followed by a diagonal
+# reflection (swapping positions 2 and 4) if the face is flipped.
+function _canonical_facedof_index_quadrilateral(i::Int, j::Int, m::Int, orientation::SurfaceOrientationInfo)
+    M = m - 1
+    r = mod(-orientation.shift_index, 4)
+    ci, cj = if r == 0
+        (i, j)
+    elseif r == 1
+        (M - j, i)
+    elseif r == 2
+        (M - i, M - j)
+    else # r == 3
+        (j, M - i)
+    end
+    if orientation.flipped
+        ci, cj = cj, ci
+    end
+    return cj * m + ci + 1
+end
+
 function sortface(face::Tuple{Int, Int, Int})
-    a, b, c = face
-    b, c = minmax(b, c)
-    a, c = minmax(a, c)
-    a, b = minmax(a, b)
-    return (a, b, c), SurfaceOrientationInfo() # TODO fill struct
+    return sortface_fast(face), SurfaceOrientationInfo(face)
 end
 
 
@@ -787,14 +963,7 @@ end
 
 
 function sortface(face::Tuple{Int, Int, Int, Int})
-    a, b, c, d = face
-    c, d = minmax(c, d)
-    b, d = minmax(b, d)
-    a, d = minmax(a, d)
-    b, c = minmax(b, c)
-    a, c = minmax(a, c)
-    a, b = minmax(a, b)
-    return (a, b, c), SurfaceOrientationInfo() # TODO fill struct
+    return sortface_fast(face), SurfaceOrientationInfo(face)
 end
 
 
@@ -827,7 +996,7 @@ sortfacet_fast(facet::NTuple{3, Int}) = sortface_fast(facet)
 sortfacet_fast(facet::NTuple{4, Int}) = sortface_fast(facet)
 
 """
-    find_field(dh::DofHandler, field_name::Symbol)::NTuple{2,Int}
+    find_field(dh::DofHandler, field_name::Symbol)::NTuple{2, Int}
 
 Return the index of the field with name `field_name` in a `DofHandler`. The index is a
 `NTuple{2,Int}`, where the 1st entry is the index of the `SubDofHandler` within which the
@@ -914,7 +1083,7 @@ julia> dof_range(dh, :u)
 julia> dof_range(dh, :p)
 10:12
 
-julia> dof_range(dh, (1,1)) # field :u
+julia> dof_range(dh, (1, 1)) # field :u
 1:9
 
 julia> dof_range(dh.subdofhandlers[1], 2) # field :p
@@ -938,7 +1107,7 @@ function dof_range(dh::DofHandler, field_name::Symbol)
 end
 
 """
-    getfieldinterpolation(dh::DofHandler, field_idxs::NTuple{2,Int})
+    getfieldinterpolation(dh::DofHandler, field_idxs::NTuple{2, Int})
     getfieldinterpolation(sdh::SubDofHandler, field_idx::Int)
     getfieldinterpolation(sdh::SubDofHandler, field_name::Symbol)
 
@@ -954,7 +1123,7 @@ getfieldinterpolation(sdh::SubDofHandler, field_idx::Int) = sdh.field_interpolat
 getfieldinterpolation(sdh::SubDofHandler, field_name::Symbol) = getfieldinterpolation(sdh, find_field(sdh, field_name))
 
 """
-    evaluate_at_grid_nodes(dh::AbstractDofHandler, u::AbstractVector{T}, fieldname::Symbol) where T
+    evaluate_at_grid_nodes(dh::AbstractDofHandler, u::AbstractVector{T}, fieldname::Symbol) where {T}
 
 Evaluate the approximated solution for field `fieldname` at the node
 coordinates of the grid given the Dof handler `dh` and the solution vector `u`.

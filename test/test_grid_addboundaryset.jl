@@ -195,7 +195,7 @@
         @test extractboundary(grid, topology) == extractboundarycheck(grid)
 
         filter_function(x) = x[1] > 0
-        # Test that the sets are actually addeed to the grid's dict
+        # Test that the sets are actually added to the grid's dict
         addboundaryvertexset!(grid, topology, "test_boundary_vertexset", filter_function)
         @test getvertexset(grid, "test_boundary_vertexset") == Ferrite.create_boundaryvertexset(grid, topology, filter_function)
         addboundaryfacetset!(grid, topology, "test_boundary_facetset", filter_function)

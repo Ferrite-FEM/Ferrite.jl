@@ -1,9 +1,11 @@
 # # [Post processing and visualization](@id howto-postprocessing)
 #
-# ![](heat_square_fluxes.png)
+# ![](postprocessing-light.png)
+# ![](postprocessing-dark.png)
 #
-# *Figure 1*: Heat flux computed from the solution to the heat equation on
-# the unit square, see previous example: [Heat equation](@ref tutorial-heat-equation).
+# *Figure 1*: Heat flux computed from the solution to the heat equation on the unit square,
+# coloured by magnitude with arrows for the direction. See the previous example:
+# [Heat equation](@ref tutorial-heat-equation).
 #
 #-
 #md # !!! tip
@@ -17,7 +19,7 @@
 # different ways. Ferrite provides several tools to facilitate these tasks:
 #
 #  - L2 projection of (discrete) data onto FE interpolations using the `L2Projector`
-#  - Evalutation of fields (solutions, projections, etc) at arbitrary, user-defined, points
+#  - Evaluation of fields (solutions, projections, etc) at arbitrary, user-defined, points
 #    using the `PointEvalHandler`
 #  - Builtin functionality for exporting data (solutions, cell data, projections, etc) to
 #    the VTK format
@@ -30,7 +32,7 @@
 # domain.
 
 # !!! warning "Custom visualization"
-#     A common assumption is that the numbering of degrees of freedom matche the numbering
+#     A common assumption is that the numbering of degrees of freedom matches the numbering
 #     of the nodes in the grid. This is *NOT* the case in Ferrite. If the available tools
 #     don't suit your needs and you decide to "roll your own" visualization you need to be
 #     aware of this and take it into account. For the specific case of evaluating the
@@ -40,7 +42,7 @@
 # determined on a square domain. In this example, we first compute the heat flux in each
 # integration point (based on the solved temperature field) and then we do an L2-projection
 # of the fluxes to the nodes of the mesh. By doing this, we can more easily visualize
-# integration points quantities. Finally, we visualize the temperature field and the heat fluxes along a cut-line.
+# integration point quantities. Finally, we visualize the temperature field and the heat fluxes along a cut-line.
 #
 # The L2-projection is defined as follows: Find projection ``q(\boldsymbol{x}) \in U_h(\Omega)`` such that
 # ```math
@@ -66,17 +68,14 @@ include("../tutorials/heat_equation.jl");
 # conductivity ``\lambda = 1 ⇒ q = - \nabla u``, where ``u`` is the temperature.
 function compute_heat_fluxes(cellvalues::CellValues, dh::DofHandler, a::AbstractVector{T}) where {T}
 
-    n = getnbasefunctions(cellvalues)
-    cell_dofs = zeros(Int, n)
     nqp = getnquadpoints(cellvalues)
 
     ## Allocate storage for the fluxes to store
     q = [Vec{2, T}[] for _ in 1:getncells(dh.grid)]
 
-    for (cell_num, cell) in enumerate(CellIterator(dh))
-        q_cell = q[cell_num]
-        celldofs!(cell_dofs, dh, cell_num)
-        aᵉ = a[cell_dofs]
+    for cell in CellIterator(dh)
+        q_cell = q[cellid(cell)]
+        aᵉ = a[celldofs(cell)]
         reinit!(cellvalues, cell)
 
         for q_point in 1:nqp
@@ -110,12 +109,13 @@ VTKGridFile("heat_equation_flux", grid) do vtk
 end;
 
 # ## Point evaluation
-# ![](heat_square_pointevaluation.png)
+# ![](postprocessing_cutline-light.png)
+# ![](postprocessing_cutline-dark.png)
 #
-# *Figure 2*: Visualization of the cut line where we want to compute
-# the temperature and heat flux.
+# *Figure 2*: The temperature field, with the cut line along which we want to compute
+# the temperature and heat flux drawn on top.
 
-# Consider a cut-line through the domain like the black line in *Figure 2* above.
+# Consider a cut-line through the domain like the one in *Figure 2* above.
 # We will evaluate the temperature and the heat flux distribution along a horizontal line.
 points = [Vec((x, 0.75)) for x in range(-1.0, 1.0, length = 101)];
 
@@ -130,9 +130,8 @@ q_points = evaluate_at_points(ph, projector, q_projected);
 
 # We can also extract the field values, here the temperature, right away from the result
 # vector of the simulation, that is stored in `u`. These values are stored in the order of
-# our initial DofHandler so the input is not the `PointEvalHandler`, the original `DofHandler`,
+# our initial DofHandler so the input is now the `PointEvalHandler`, the original `DofHandler`,
 # the dof-vector `u`, and (optionally for single-field problems) the name of the field.
-# From the `L2Projection`, the values are stored in the order of the degrees of freedom.
 u_points = evaluate_at_points(ph, dh, u, :u);
 
 # Now, we can plot the temperature and flux values with the help of any plotting library, e.g. Plots.jl.

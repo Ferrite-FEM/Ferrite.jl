@@ -1,3 +1,8 @@
+# Imports for parallel (isolated) test execution:
+using LinearAlgebra
+using WriteVTK
+import SHA
+
 # to test vtk-files
 OVERWRITE_CHECKSUMS = false
 checksums_file = joinpath(dirname(@__FILE__), "checksums.sha1")
@@ -8,7 +13,7 @@ else
 end
 
 @testset "Grid, DofHandler, vtk" begin
-    for (celltype, dim) in (
+    @testset "$celltype" for (celltype, dim) in (
             (Line, 1),
             (QuadraticLine, 1),
             (Quadrilateral, 2),
@@ -44,6 +49,7 @@ end
             @test Ferrite.write_cellset(vtk, grid, "cell-1") === vtk
             @test Ferrite.write_cellset(vtk, grid, "middle-cells") === vtk
             @test Ferrite.write_nodeset(vtk, grid, "middle-nodes") === vtk
+            @test Ferrite.write_facetset(vtk, grid, "right") === vtk
         end
 
         # test the sha of the file
@@ -181,6 +187,14 @@ end
 
     @test getcells(grid, "cell_set") == [getcells(grid, 1)]
 
+    # cellnodes via empty DofHandler
+    nodeids = zeros(Int, 9)
+    dh = DofHandler(grid)
+    close!(dh)
+    Ferrite.cellnodes!(nodeids, dh, 1)
+    # Note that the return types typically differ (Vector vs Tuple)
+    @test all(nodeids .== Ferrite.get_node_ids(getcells(grid, 1)))
+
     # CellIterator on a grid without DofHandler
     grid = generate_grid(Triangle, (4, 4))
     n = 0
@@ -215,17 +229,20 @@ end
         dh = DofHandler(grid); add!(dh, :u, ip); close!(dh)
         facetset = getfacetset(grid, "right")
         for dh_or_grid in (grid, dh)
-            @test first(FacetIterator(dh_or_grid, facetset)) isa FacetCache
-            area = 0.0
-            for face in FacetIterator(dh_or_grid, facetset)
-                reinit!(fv, face)
-                for q_point in 1:getnquadpoints(fv)
-                    area += getdetJdV(fv, q_point)
+            # The set can be passed as an OrderedSet, Set, or Vector
+            for set in (facetset, Set(facetset), collect(facetset))
+                @test first(FacetIterator(dh_or_grid, set)) isa FacetCache
+                area = 0.0
+                for face in FacetIterator(dh_or_grid, set)
+                    reinit!(fv, face)
+                    for q_point in 1:getnquadpoints(fv)
+                        area += getdetJdV(fv, q_point)
+                    end
                 end
+                dim == 1 && @test area ≈ 1.0
+                dim == 2 && @test area ≈ 2.0
+                dim == 3 && @test area ≈ 4.0
             end
-            dim == 1 && @test area ≈ 1.0
-            dim == 2 && @test area ≈ 2.0
-            dim == 3 && @test area ≈ 4.0
         end
     end
 
@@ -545,7 +562,6 @@ end
         Line((6, 7)),
     ]
     nodes = [Node(coord) for coord in zeros(Vec{2, Float64}, 18)]
-    grid = Grid(cells, nodes)
     @test_throws ErrorException ExclusiveTopology(grid)
     # topology = ExclusiveTopology(grid)
     # @test_throws ArgumentError Ferrite.facetskeleton(topology, grid)
@@ -584,7 +600,7 @@ end
     @test Set(Ferrite.getstencil(stars, quadgrid, VertexIndex(5, 4))) == Set([VertexIndex(4, 2), VertexIndex(4, 4), VertexIndex(5, 1), VertexIndex(5, 3), VertexIndex(7, 1), VertexIndex(7, 3), VertexIndex(8, 2), VertexIndex(8, 4), VertexIndex(4, 3), VertexIndex(5, 4), VertexIndex(7, 2), VertexIndex(8, 1)])
     @test Set(Ferrite.toglobal.((quadgrid,), Ferrite.getstencil(stars, quadgrid, VertexIndex(1, 1)))) == Set([1, 2, 5])
     @test Set(Ferrite.toglobal.((quadgrid,), Ferrite.getstencil(stars, quadgrid, VertexIndex(2, 1)))) == Set([2, 1, 6, 3])
-    @test Set(Ferrite.toglobal.((quadgrid,), Ferrite.getstencil(stars, quadgrid, VertexIndex(5, 4)))) == Set([10, 6, 9, 11, 14])
+    @test Set(Ferrite.toglobal(quadgrid, collect(Ferrite.getstencil(stars, quadgrid, VertexIndex(5, 4))))) == Set([10, 6, 9, 11, 14])
 
     face_skeleton = Ferrite.facetskeleton(topology, quadgrid)
     @test Set(face_skeleton) == Set(
@@ -706,6 +722,16 @@ end
     close!(dh)
     @test celldofs(dh, 1) == [1, 2, 3, 4, 5, 6, 7, 9, 8, 10]
     @test celldofs(dh, 2) == [2, 11, 3, 12, 13, 15, 14, 7, 6, 16]
+    # Should also agree with the remaining celldofs API
+    dofs = zeros(Int, 10)
+    celldofs!(dofs, dh, 1)
+    @test dofs == celldofs(dh, 1)
+    celldofs!(dofs, dh, 2)
+    @test dofs == celldofs(dh, 2)
+    celldofs!(view(dofs, :), dh, 1)
+    @test dofs == celldofs(dh, 1)
+    celldofs!(view(dofs, :), dh, 2)
+    @test dofs == celldofs(dh, 2)
 
     ## Lagrange{RefTriangle,3}
     # First dof per position per triangle
@@ -722,6 +748,16 @@ end
     close!(dh)
     @test celldofs(dh, 1) == [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 17, 18, 15, 16, 19, 20]
     @test celldofs(dh, 2) == [3, 4, 21, 22, 5, 6, 23, 24, 25, 26, 29, 30, 27, 28, 13, 14, 11, 12, 31, 32]
+    # Should also agree with the remaining celldofs API
+    dofs = zeros(Int, 20)
+    celldofs!(dofs, dh, 1)
+    @test dofs == celldofs(dh, 1)
+    celldofs!(dofs, dh, 2)
+    @test dofs == celldofs(dh, 2)
+    celldofs!(view(dofs, :), dh, 1)
+    @test dofs == celldofs(dh, 1)
+    celldofs!(view(dofs, :), dh, 2)
+    @test dofs == celldofs(dh, 2)
 end
 
 @testset "vectorization layer compat" begin

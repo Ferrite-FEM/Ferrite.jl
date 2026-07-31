@@ -6,6 +6,8 @@ module ConvergenceTestHelper
     using Ferrite, SparseArrays, ForwardDiff, Test
     import LinearAlgebra: diag
 
+    include(joinpath(@__DIR__, "..", "test_utils.jl"))
+
     get_geometry(::Ferrite.Interpolation{RefLine}) = Line
     get_geometry(::Ferrite.Interpolation{RefQuadrilateral}) = Quadrilateral
     get_geometry(::Ferrite.Interpolation{RefTriangle}) = Triangle
@@ -14,7 +16,7 @@ module ConvergenceTestHelper
     get_geometry(::Ferrite.Interpolation{RefTetrahedron}) = Tetrahedron
     get_geometry(::Ferrite.Interpolation{RefPyramid}) = Pyramid
 
-    get_quadrature_order(::Main.TensorProductQ9TestInterpolation) = 3
+    get_quadrature_order(::TensorProductQ9TestInterpolation) = 3
     get_quadrature_order(::Lagrange{shape, order}) where {shape, order} = max(2 * order - 1, 2)
     get_quadrature_order(::Lagrange{RefTriangle, 5}) = 8
     get_quadrature_order(::Lagrange{RefPrism, order}) where {order} = 2 * order # Don't know why
@@ -160,7 +162,7 @@ end # module ConvergenceTestHelper
             Lagrange{RefPyramid, 1}(),
             #
             Serendipity{RefQuadrilateral, 2}(),
-            TensorProductQ9TestInterpolation(),
+            ConvergenceTestHelper.TensorProductQ9TestInterpolation(),
             Serendipity{RefHexahedron, 2}(),
             #
             BubbleEnrichedLagrange{RefTriangle, 1}(),

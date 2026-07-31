@@ -14,6 +14,7 @@ This file handler can be used to to write data with
 * [`write_node_data`](@ref).
 * [`Ferrite.write_cellset`](@ref)
 * [`Ferrite.write_nodeset`](@ref)
+* [`Ferrite.write_facetset`](@ref)
 * [`Ferrite.write_constraints`](@ref)
 
 It is necessary to call `close(::VTKGridFile)` to save the data after writing
@@ -156,10 +157,6 @@ function toparaview!(v, x::SecondOrderTensor)
     tovoigt!(v, x)
     return v
 end
-function toparaview!(v::AbstractVector, x::SVector{D}) where {D}
-    v[1:D] .= x
-    return v
-end
 
 toparaview!(data::AbstractVector, val::Number) = (data[1] = val)
 
@@ -198,7 +195,7 @@ function component_names(::Type{S}) where {S}
 end
 
 """
-    write_solution(vtk::VTKGridFile, dh::AbstractDofHandler, u::AbstractVector, suffix="")
+    write_solution(vtk::VTKGridFile, dh::AbstractDofHandler, u::AbstractVector, suffix = "")
 
 Save the values at the nodes in the degree of freedom vector `u` to `vtk`.
 Each field in `dh` will be saved separately, and `suffix` can be used to append
@@ -284,6 +281,28 @@ function write_nodeset(vtk, grid::AbstractGrid, nodeset::String)
 end
 
 """
+    write_facetset(vtk::VTKGridFile, grid::AbstractGrid, facetsetname::String)
+    write_facetset(vtk::VTKGridFile, grid::AbstractGrid, facetset::AbstractVecOrSet{FacetIndex}, facetsetname::String)
+
+Write nodal values of 1 for nodes of the faces in `facetset`, and 0 otherwise
+"""
+function write_facetset(vtk, grid::AbstractGrid, facetset::AbstractVecOrSet{FacetIndex}, facetsetname::String)
+    z = zeros(getnnodes(grid))
+    for (cellid, lfi) in facetset
+        cell = getcells(grid, cellid)
+        gip = geometric_interpolation(cell)
+        facetnodes = facetdof_indices(gip)[lfi]
+        for facetnode in facetnodes
+            i = get_node_ids(cell)[facetnode]
+            z[i] = 1.0
+        end
+    end
+    write_node_data(vtk, z, facetsetname)
+    return vtk
+end
+write_facetset(vtk, grid::AbstractGrid, facetsetname::String) = write_facetset(vtk, grid, getfacetset(grid, facetsetname), facetsetname)
+
+"""
     write_cellset(vtk, grid::AbstractGrid)
     write_cellset(vtk, grid::AbstractGrid, cellset::String)
     write_cellset(vtk, grid::AbstractGrid, cellsets::Union{AbstractVector{String},AbstractSet{String})
@@ -344,7 +363,7 @@ function write_constraints(vtk, ch::ConstraintHandler)
 end
 
 """
-    write_cell_colors(vtk::VTKGridFile, grid::AbstractGrid, cell_colors, name="coloring")
+    write_cell_colors(vtk::VTKGridFile, grid::AbstractGrid, cell_colors, name = "coloring")
 
 Write cell colors (see [`create_coloring`](@ref)) to a VTK file for visualization.
 
@@ -376,8 +395,10 @@ function create_discontinuous_vtk_griddata(grid::Grid{dim, C, T}) where {dim, C,
         cell_coords = getcoordinates(cell)
         n = length(cell_coords)
         cellnodes[cellid(cell)] = (1:n) .+ icoord
-        vtk_cellnodes = nodes_to_vtkorder(CT((ntuple(i -> i + icoord, n))))
-        cls[cellid(cell)] = WriteVTK.MeshCell(vtk_celltype, vtk_cellnodes)
+        let icoord = icoord
+            vtk_cellnodes = nodes_to_vtkorder(CT((ntuple(i -> i + icoord, n))))
+            cls[cellid(cell)] = WriteVTK.MeshCell(vtk_celltype, vtk_cellnodes)
+        end
         for (x, node_idx) in zip(cell_coords, getnodes(cell))
             icoord += 1
             coords[:, icoord] = x

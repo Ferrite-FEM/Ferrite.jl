@@ -297,6 +297,10 @@ between cells as described by the DofHandler `dh`.
    (`keep_constrained = true`) or eliminated (`keep_constrained = false`) from the sparsity
    pattern. `keep_constrained = false` requires passing the ConstraintHandler `ch`.
  - `interface_coupling`: the coupling between fields/components across the interface.
+   `interface_coupling[i, j] = true` means that entries exist for (rows of field/component
+   `i` in one cell) × (columns of field/component `j` in the other cell), for both
+   orientations of every interface. As for cell `coupling`, rows correspond to test
+   functions and columns to trial functions.
 """
 function add_interface_entries!(
         sp::SparsityPattern, dh::DofHandler, ch::Union{ConstraintHandler, Nothing} = nothing;
@@ -413,6 +417,12 @@ arguments `args` and keyword arguments `kwargs`.
     copy(K)`) instead.
 """
 function allocate_matrix(::Type{MatrixType}, dh::DofHandler, args...; kwargs...) where {MatrixType}
+    _get_Ti(::Type{<:AbstractMatrix}) = Int
+    _get_Ti(::Type{<:AbstractSparseMatrix{<:Any, Ti}}) where {Ti} = Ti
+    if _can_use_fastsp(MatrixType, args...; kwargs...)
+        fsp = FastSparsityPattern(_get_Ti(MatrixType), dh, args...; kwargs...)
+        return allocate_matrix(MatrixType, fsp)
+    end
     sp = init_sparsity_pattern(dh)
     add_sparsity_entries!(sp, dh, args...; kwargs...)
     return allocate_matrix(MatrixType, sp)
@@ -442,41 +452,55 @@ end
 # (ndofs_per_cell × ndofs_per_cell) specifying coupling between all local dofs, i.e. a
 # "template" local matrix.
 function _coupling_to_local_dof_coupling(dh::DofHandler, coupling::AbstractMatrix{Bool})
+    # Return one matrix per (potential) sub-domain
+    return Matrix{Bool}[
+        _coupling_to_local_dof_coupling(dh, coupling, sdh, sdh) for sdh in dh.subdofhandlers
+    ]
+end
+
+# Compute a rectangular coupling matrix of size
+# (ndofs_per_cell(sdh_row) × ndofs_per_cell(sdh_col)) where the rows are local dof indices
+# in `sdh_row`'s layout and the columns local dof indices in `sdh_col`'s layout. With
+# `sdh_row === sdh_col` this is the local coupling matrix of a cell; with different
+# subdofhandlers it is used for the coupling across an interface between the two.
+function _coupling_to_local_dof_coupling(
+        dh::DofHandler, coupling::AbstractMatrix{Bool},
+        sdh_row::SubDofHandler, sdh_col::SubDofHandler,
+    )
     sz = size(coupling, 1)
     sz == size(coupling, 2) || error("coupling not square")
 
-    # Return one matrix per (potential) sub-domain
-    outs = Matrix{Bool}[]
     field_dims = map(fieldname -> n_components(dh, fieldname), dh.field_names)
 
-    for sdh in dh.subdofhandlers
-        out = zeros(Bool, ndofs_per_cell(sdh), ndofs_per_cell(sdh))
-        push!(outs, out)
+    out = zeros(Bool, ndofs_per_cell(sdh_row), ndofs_per_cell(sdh_col))
 
-        dof_ranges = [dof_range(sdh, f) for f in sdh.field_names]
-        global_idxs = [findfirst(x -> x === f, dh.field_names) for f in sdh.field_names]
+    dof_ranges_row = [dof_range(sdh_row, f) for f in sdh_row.field_names]
+    dof_ranges_col = [dof_range(sdh_col, f) for f in sdh_col.field_names]
+    global_idxs_row = [findfirst(x -> x === f, dh.field_names) for f in sdh_row.field_names]
+    global_idxs_col = [findfirst(x -> x === f, dh.field_names) for f in sdh_col.field_names]
 
-        if sz == length(dh.field_names) # Coupling given by fields
-            for (j, jrange) in pairs(dof_ranges), (i, irange) in pairs(dof_ranges)
-                out[irange, jrange] .= coupling[global_idxs[i], global_idxs[j]]
-            end
-        elseif sz == sum(field_dims) # Coupling given by components
-            component_offsets = pushfirst!(cumsum(field_dims), 0)
-            for (jf, jrange) in pairs(dof_ranges), (j, J) in pairs(jrange)
-                jc = mod1(j, field_dims[global_idxs[jf]]) + component_offsets[global_idxs[jf]]
-                for (i_f, irange) in pairs(dof_ranges), (i, I) in pairs(irange)
-                    ic = mod1(i, field_dims[global_idxs[i_f]]) + component_offsets[global_idxs[i_f]]
-                    out[I, J] = coupling[ic, jc]
-                end
-            end
-        elseif sz == ndofs_per_cell(sdh) # Coupling given by template local matrix
-            # TODO: coupling[fieldhandler_idx] if different template per subddomain
-            out .= coupling
-        else
-            error("could not create coupling")
+    if sz == length(dh.field_names) # Coupling given by fields
+        for (j, jrange) in pairs(dof_ranges_col), (i, irange) in pairs(dof_ranges_row)
+            out[irange, jrange] .= coupling[global_idxs_row[i], global_idxs_col[j]]
         end
+    elseif sz == sum(field_dims) # Coupling given by components
+        component_offsets = pushfirst!(cumsum(field_dims), 0)
+        for (jf, jrange) in pairs(dof_ranges_col), (j, J) in pairs(jrange)
+            jc = mod1(j, field_dims[global_idxs_col[jf]]) + component_offsets[global_idxs_col[jf]]
+            for (i_f, irange) in pairs(dof_ranges_row), (i, I) in pairs(irange)
+                ic = mod1(i, field_dims[global_idxs_row[i_f]]) + component_offsets[global_idxs_row[i_f]]
+                out[I, J] = coupling[ic, jc]
+            end
+        end
+    elseif sz == ndofs_per_cell(sdh_row) == ndofs_per_cell(sdh_col)
+        # Coupling given by template local matrix. Note that this assumes matching local
+        # dof layouts in `sdh_row` and `sdh_col`.
+        # TODO: coupling[fieldhandler_idx] if different template per subddomain
+        out .= coupling
+    else
+        error("could not create coupling")
     end
-    return outs
+    return out
 end
 
 function _add_cell_entries!(
@@ -605,25 +629,32 @@ function _add_interface_entries!(
         topology::ExclusiveTopology, keep_constrained::Bool,
         interface_coupling::AbstractMatrix{Bool},
     )
-    couplings = _coupling_to_local_dof_coupling(dh, interface_coupling)
+    # Expanded coupling masks, lazily created per (row cell sdh, column cell sdh) pair
+    couplings = Dict{NTuple{2, Int}, Matrix{Bool}}()
+    to_check = Dict{Int, Vector{Int}}()
     for ic in InterfaceIterator(dh, topology)
         # TODO: This looks like it can be optimized for the common case where
         #       the cells are in the same subdofhandler
         sdhs_idx = dh.cell_to_subdofhandler[cellid.([ic.a, ic.b])]
         sdhs = dh.subdofhandlers[sdhs_idx]
-        to_check = Dict{Int, Vector{Int}}()
-        for (i, sdh) in pairs(sdhs)
-            sdh_idx = sdhs_idx[i]
-            coupling_sdh = couplings[sdh_idx]
+        # Two iterations, one per orientation of the interface: the first iteration adds
+        # the entries with rows from `ic.a` and columns from `ic.b`, the second iteration
+        # the entries with rows from `ic.b` and columns from `ic.a`. Both directions are
+        # gated by the coupling mask with the row cell as the first (test function) index
+        # and the neighbor cell as the second (trial function) index.
+        for it in 1:2
+            sdh = sdhs[it]
+            sdh2 = sdhs[it == 1 ? 2 : 1]
+            cell_dofs = celldofs(it == 1 ? ic.a : ic.b)
+            neighbor_dofs = celldofs(it == 1 ? ic.b : ic.a)
+            coupling_sdh = get!(couplings, (sdhs_idx[it], sdhs_idx[it == 1 ? 2 : 1])) do
+                _coupling_to_local_dof_coupling(dh, interface_coupling, sdh, sdh2)
+            end
             for cell_field in sdh.field_names
                 dofrange1 = dof_range(sdh, cell_field)
-                cell_dofs = celldofs(sdh_idx == 1 ? ic.a : ic.b)
                 cell_field_dofs = @view cell_dofs[dofrange1]
-                for neighbor_field in sdh.field_names
-                    sdh2 = sdhs[i == 1 ? 2 : 1]
-                    neighbor_field ∈ sdh2.field_names || continue
+                for neighbor_field in sdh2.field_names
                     dofrange2 = dof_range(sdh2, neighbor_field)
-                    neighbor_dofs = celldofs(sdh_idx == 2 ? ic.a : ic.b)
                     neighbor_field_dofs = @view neighbor_dofs[dofrange2]
 
                     empty!(to_check)
@@ -640,7 +671,6 @@ function _add_interface_entries!(
                         for i in is
                             cell_field_dofs[i] ∈ neighbor_dofs && continue
                             _add_interface_entry(sp, cell_field_dofs, neighbor_field_dofs, i, j, keep_constrained, ch)
-                            _add_interface_entry(sp, neighbor_field_dofs, cell_field_dofs, j, i, keep_constrained, ch)
                         end
                     end
                 end
@@ -680,4 +710,199 @@ function _allocate_matrix(::Type{SparseMatrixCSC{Tv, Ti}}, sp::AbstractSparsityP
     @assert all(i -> nextinds[i] == colptr[i + 1], 1:getncols(sp))
     S = SparseMatrixCSC(getnrows(sp), getncols(sp), colptr, rowval, nzval)
     return S
+end
+
+## ================= ##
+# FastSparsityPattern #
+## ================= ##
+
+"""
+    FastSparsityPattern([Ti = Int64], dh::DofHandler)
+
+This sparsity does not currently support the full `AbstractSparsityPattern` interface,
+but is used as an internal fast-path for `allocate_matrix(MatrixType, dh)` for some
+supported `MatrixType`s. It can be extended in the future or potentially be merged
+with `SparsityPattern`.
+See [#1302](https://github.com/Ferrite-FEM/Ferrite.jl/pull/1302) for details.
+
+!!! warning "Internal"
+    `FastSparsityPattern` is strictly internal and its interface and implementation
+    may change at any time.
+
+"""
+mutable struct FastSparsityPattern{Ti} <: AbstractSparsityPattern
+    const rowlen::Vector{Ti} # Number of stored entries in each row
+    const marker::Vector{Ti} # Marker if column has been "visited" by certain row
+    const rowptr::Vector{Ti} # Index of stored entries at the start of each row
+    const colidx::Vector{Ti} # colidx[i] gives the column number of the ith stored entry
+    is_colidx_sorted::Bool   # Is colidx sorted for each row
+end
+function FastSparsityPattern(::Type{Ti}, ncols, nrows) where {Ti <: Integer}
+    rowlen = zeros(Ti, nrows)
+    marker = zeros(Ti, ncols)
+    rowptr = Vector{Ti}(undef, nrows + 1)
+    colidx = Vector{Ti}(undef, 0) # To be resized later
+    return FastSparsityPattern(rowlen, marker, rowptr, colidx, false)
+end
+
+# _can_use_fastsp(MatrixType, args...; kwargs...) where args and kwargs are those passed to
+# `allocate_matrix`. See `add_sparsity_entries!` for a description of args/kwargs.
+function _can_use_fastsp(
+        ::Type{MatrixType},
+        ch = nothing;
+        topology = nothing,
+        keep_constrained = true,
+        coupling = nothing,
+        interface_coupling = nothing
+    ) where {MatrixType}
+    if ch === topology === coupling === interface_coupling === nothing
+        if MatrixType <: AbstractSparseMatrix # Symmetric/Block matrices not supported
+            return keep_constrained
+        end
+    end
+    return false
+end
+
+FastSparsityPattern(dh::DofHandler) = FastSparsityPattern(Int, dh)
+function FastSparsityPattern(::Type{Ti}, dh::DofHandler) where {Ti}
+    sp = FastSparsityPattern(Ti, ndofs(dh), ndofs(dh))
+    # Step 1: Create cell_dof_views::ArrayOfVectorViews (would be nice in `DofHandler` directly)
+    cell_dofs_views = create_celldofs(dh)
+    # Step 2: Define mapping rownr to cells
+    row_to_cells = create_row_to_cells(cell_dofs_views, sp)
+    # Step 3: Count how many cols stored for each row
+    count_row_sizes!(sp, row_to_cells, cell_dofs_views)
+    # Step 4: Build the rowptr (indices for s)
+    build_rowptr!(sp)
+    fill_colidx!(sp, row_to_cells, cell_dofs_views)
+    return sp
+end
+
+getncols(sp::FastSparsityPattern) = length(sp.marker)
+getnrows(sp::FastSparsityPattern) = length(sp.rowlen)
+
+function create_celldofs(dh::DofHandler)
+    isclosed(dh) || throw(ArgumentError("DofHandler must be closed"))
+    ncells = getncells(dh.grid)
+    indices = similar(dh.cell_dofs_offset, ncells + 1)
+    cell_dofs = similar(dh.cell_dofs)
+    n = 1
+    for cell_idx in 1:ncells
+        indices[cell_idx] = n
+        num = ndofs_per_cell(dh, cell_idx)
+        num == 0 && continue
+        r = n:(n + num - 1)
+        #celldofs!(view(cell_dofs, r), dh, cell_idx), but faster without view:
+        soffs = dh.cell_dofs_offset[cell_idx]
+        copyto!(cell_dofs, n, dh.cell_dofs, soffs, num)
+        n = last(r) + 1
+    end
+    indices[end] = n
+    return ArrayOfVectorViews(indices, cell_dofs, LinearIndices((ncells,)))
+end
+
+function create_row_to_cells(cell_dofs::ArrayOfVectorViews, sp)
+    nrows = getnrows(sp)
+    num_cells = zeros(Int, nrows)
+    # 1: Figure out how many cells are connected to each dof
+    n_connected = 0
+    @inbounds for rows in cell_dofs # dof = row
+        for row in rows
+            num_cells[row] += 1
+            n_connected += 1
+        end
+    end
+
+    # 2: Create the correct datastructure
+    data = Vector{Int}(undef, n_connected)
+    indices = Vector{Int}(undef, nrows + 1)
+    indices[1] = 1
+    @inbounds for row in 1:nrows
+        indices[row + 1] = indices[row] + num_cells[row]
+    end
+    fill!(num_cells, 0) # Now we use this to count how many have been added
+    @inbounds for (cellnr, rows) in enumerate(cell_dofs)
+        for row in rows
+            data[indices[row] + num_cells[row]] = cellnr
+            num_cells[row] += 1
+        end
+    end
+    return ArrayOfVectorViews(indices, data, LinearIndices((nrows,)))
+end
+
+function count_row_sizes!(sp::FastSparsityPattern, row_to_cells::AbstractVector, cell_dofs::ArrayOfVectorViews)
+    @inbounds for row in 1:getnrows(sp)
+        for cnr in row_to_cells[row]
+            for col in cell_dofs[cnr]
+                if sp.marker[col] != row
+                    sp.marker[col] = row
+                    sp.rowlen[row] += 1
+                end
+            end
+        end
+    end
+    return sp
+end
+
+function build_rowptr!(sp)
+    sp.rowptr[1] = 1
+    @inbounds for row in 1:getnrows(sp)
+        sp.rowptr[row + 1] = sp.rowptr[row] + sp.rowlen[row]
+    end
+    return sp
+end
+
+function fill_colidx!(sp::FastSparsityPattern, row_to_cells::AbstractVector, cell_dofs::ArrayOfVectorViews)
+    resize!(sp.colidx, sp.rowptr[end] - 1) # nnz
+    fill!(sp.marker, 0)
+    @inbounds for row in 1:getnrows(sp)
+        pos = sp.rowptr[row]
+        for cnr in row_to_cells[row]
+            for col in cell_dofs[cnr]
+                if sp.marker[col] != row
+                    sp.marker[col] = row
+                    sp.colidx[pos] = col
+                    pos += 1
+                end
+            end
+        end
+    end
+    return sp
+end
+
+allocate_matrix(sp::FastSparsityPattern) = allocate_matrix(SparseMatrixCSC, sp)
+allocate_matrix(::Type{SparseMatrixCSC}, sp::FastSparsityPattern{Int}) = allocate_matrix(SparseMatrixCSC{Float64, Int}, sp)
+function allocate_matrix(::Type{<:SparseMatrixCSC{Tv, Ti}}, sp::FastSparsityPattern{Ti}) where {Ti, Tv}
+    nnz = length(sp.colidx)
+    ncols = getncols(sp)
+    nrows = getnrows(sp)
+
+    # Number of stored entries per column
+    collen = zeros(Ti, ncols)
+    @inbounds for col in sp.colidx
+        collen[col] += 1
+    end
+
+    # Index of stored entries at the start of each column
+    colptr = Vector{Ti}(undef, ncols + 1)
+    colptr[1] = 1
+    @inbounds for col in 1:ncols
+        colptr[col + 1] = colptr[col] + collen[col]
+    end
+
+    # Build rowidx[i] giving the row number of the ith stored entry
+    rowidx = Vector{Ti}(undef, nnz)
+    next = copy(colptr)
+    @inbounds for row in 1:nrows
+        for p in sp.rowptr[row]:(sp.rowptr[row + 1] - 1)
+            col = sp.colidx[p]
+            q = next[col]
+            rowidx[q] = row
+            next[col] = q + 1
+            # For a given col, next[col] is increasing, and row is
+            # increasing in the outer loop -> rowidx sorted for each col
+        end
+    end
+    nzval = zeros(Tv, nnz)
+    return SparseMatrixCSC(nrows, ncols, colptr, rowidx, nzval)
 end

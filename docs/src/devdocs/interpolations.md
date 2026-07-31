@@ -11,14 +11,14 @@ order. The [how-to at bottom of this page](@ref devdocs-howto_new-interpolation)
 Ferrite.reference_shape_value(::Interpolation, ::Vec, ::Int)
 Ferrite.reference_coordinates(::Interpolation)
 Ferrite.vertexdof_indices(::Interpolation)
-Ferrite.facedof_indices(::Interpolation)
 Ferrite.facedof_interior_indices(::Interpolation)
-Ferrite.edgedof_indices(::Interpolation)
 Ferrite.edgedof_interior_indices(::Interpolation)
 Ferrite.volumedof_interior_indices(::Interpolation)
-Ferrite.getnbasefunctions(::Interpolation)
 Ferrite.adjust_dofs_during_distribution(::Interpolation)
 Ferrite.conformity
+```
+```@docs; canonical=false
+getnbasefunctions(::Interpolation)
 ```
 
 ### For special interpolations
@@ -30,6 +30,14 @@ Ferrite.dirichlet_facedof_indices(::Interpolation)
 Ferrite.dirichlet_edgedof_indices(::Interpolation)
 ```
 
+#### Multiple dofs per face in 3D
+For interpolations with more than one interior dof on a face shared between 3D cells, the
+interior face dofs must be placed on a regular lattice and the following must be implemented
+to opt in to the dof distribution permutation (see [`Ferrite.permute_and_push!`](@ref)).
+```@docs
+Ferrite.interior_facedofs_on_lattice(::Interpolation)
+```
+
 #### Non-identity mapping
 For interpolations that have a non-identity mapping (see
 [Mapping of finite elements](@ref mapping_theory)), the
@@ -37,6 +45,13 @@ mapping type must be specified.
 ```@docs
 Ferrite.mapping_type
 Ferrite.get_direction
+```
+
+#### Interpolations that cannot be constructed from their type
+For interpolations, `ip`, for which `ip == typeof(ip)()` is false (or doesn't work), the following must be implemented manually
+```@docs
+Ferrite.edgedof_indices(::Interpolation)
+Ferrite.facedof_indices(::Interpolation)
 ```
 
 ### The defaults should always work
@@ -140,11 +155,8 @@ Ferrite.edgedof_interior_indices(::QTI) = ((4,), (5,), (6,))
 compare_test(Ferrite.edgedof_interior_indices) # hide
 #                                  v1 v2 e1    v2 v3 e2    v3 v1 e3
 Ferrite.edgedof_indices(::QTI) = ((1, 2, 4,), (2, 3, 5,), (3, 1, 6,))
-compare_test(Ferrite.edgedof_indices) # hide
+compare_test(Ferrite.edgedof_indices)          # hide
 ```
-But here we need two functions, one for the `interior` indices (those that
-have not yet been included in lower-dimensional entities (vertices in this
-case)), and one for all indices for dofs that belong to the edge.
 
 For the triangle, we only have a single face. However, all the dofs that
 belong to the face, also belongs to either the vertices or edges,
@@ -152,14 +164,13 @@ hence we have no "interior" face dofs. So we get,
 ```@example InterpolationExample
 Ferrite.facedof_interior_indices(::QTI) = ((),)
 compare_test(Ferrite.facedof_interior_indices) # hide
-Ferrite.facedof_indices(::QTI) = ((1, 2, 3, 4, 5, 6),)
-compare_test(Ferrite.facedof_indices) # hide
 ```
 
 Finally, since this is a 2d element, we have no `volumedofs`, and thus
 ```@example InterpolationExample
 Ferrite.volumedof_interior_indices(::QTI) = ()
 compare_test(Ferrite.volumedof_interior_indices)            # hide
+compare_test(Ferrite.facedof_indices)                       # hide
 ```
 
 It is necessary to tell Ferrite the total number of base functions, e.g.,
@@ -170,7 +181,7 @@ Ferrite.getnbasefunctions(::QTI) = 6
 For distributing the degrees of freedom, higher order interpolations
 require that we account for the ordering on their entity. For example,
 if we have two interior dofs associated with an edge, we must match
-them the edges of the for the cells that share the edge, to make sure
+them against the edges of the cells that share the edge, to make sure
 we consider the same ordering. Since we only have a single interior
 dof per edge, we don't need to adjust these, hence,
 ```@example InterpolationExample
@@ -178,7 +189,7 @@ Ferrite.adjust_dofs_during_distribution(::QTI) = false
 ```
 
 Finally, our interpolation results in continuous function values across
-cell borders, but the derivatives are discontinous. Hence, it describes
+cell borders, but the derivatives are discontinuous. Hence, it describes
 a $H_1$ conformity,
 ```@example InterpolationExample
 Ferrite.conformity(::QTI) = Ferrite.H1Conformity()
@@ -205,5 +216,13 @@ N_qti, N_lag = shape_value.((cv_qti, cv_lag), 1, 1)         # hide
 @test N_qti ≈ N_lag                                         # hide
 dNdx_qti, dNdx_lag = shape_gradient.((cv_qti, cv_lag), 1, 1)# hide
 @test dNdx_qti ≈ dNdx_lag                                   # hide
+dbc = Dirichlet(:u, getfacetset(grid, "left"), x->x[2])     # hide
+ch_qti = close!(add!(ConstraintHandler(dh_qti), dbc))       # hide
+ch_lag = close!(add!(ConstraintHandler(dh_lag), dbc))       # hide
+a_qti = zeros(ndofs(dh_qti))                                # hide
+a_lag = zeros(ndofs(dh_lag))                                # hide
+apply!(a_qti, ch_qti)                                       # hide
+apply!(a_lag, ch_lag)                                       # hide
+@test a_qti ≈ a_lag                                         # hide
 nothing                                                     # hide
 ```

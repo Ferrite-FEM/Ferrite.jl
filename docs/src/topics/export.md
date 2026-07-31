@@ -28,6 +28,7 @@ where `write_solution` is just one example of the following functions that can b
 * [`write_projection`](@ref)
 * [`Ferrite.write_cellset`](@ref)
 * [`Ferrite.write_nodeset`](@ref)
+* [`Ferrite.write_facetset`](@ref)
 * [`Ferrite.write_constraints`](@ref)
 * [`Ferrite.write_cell_colors`](@ref)
 
@@ -43,7 +44,7 @@ The data written by `write_solution`, `write_cell_data`, `write_node_data`, and 
 
 For simulations with multiple time steps, typically one `VTK` (`.vtu`) file is written
 for each time step. In order to connect the actual time with each of these files,
-the `paraview_collection` can function from `WriteVTK.jl` can be used. This will create
+the `paraview_collection` function from `WriteVTK.jl` can be used. This will create
 one paraview datafile (`.pvd`) file and one `VTKGridFile` (`.vtu`) for each time step.
 
 ```@example export

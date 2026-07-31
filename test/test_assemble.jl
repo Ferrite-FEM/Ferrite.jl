@@ -1,3 +1,6 @@
+using Ferrite, SparseArrays
+import LinearAlgebra: Symmetric
+
 @testset "assemble" begin
     dofs = [1, 3, 5, 7]
     maxd = maximum(dofs)
@@ -43,57 +46,91 @@
     @test size(K) == (10, 10)
     @test length(f) == 10
 
-    # assemble with different row and col dofs
+    # COOAssembler: assemble with different row and col dofs
     rdofs = [1, 4, 6]
     cdofs = [1, 7]
     a = Ferrite.COOAssembler()
     Ke = rand(length(rdofs), length(cdofs))
     assemble!(a, rdofs, cdofs, Ke)
     K, _ = finish_assemble(a)
-    @test (K[rdofs, cdofs] .== Ke) |> all
+    @test all(K[rdofs, cdofs] .== Ke)
 
-    # SparseMatrix assembler
-    K = spzeros(10, 10)
-    f = zeros(10)
-    ke = [rand(4, 4), rand(4, 4)]
-    fe = [rand(4), rand(4)]
-    dofs = [[1, 5, 3, 7], [10, 8, 2, 5]]
-    for i in 1:2
-        K[dofs[i], dofs[i]] += ke[i]
-        f[dofs[i]] += fe[i]
+    # CSCAssembler: assemble with different row and col dofs
+    I = [1, 1, 4, 4, 6, 6]
+    J = [1, 3, 1, 3, 1, 3]
+    for T in (Float32, Float64)
+        V = zeros(T, length(I))
+        K = sparse(I, J, V)
+        f = zeros(T, 6)
+        assembler = start_assemble(K, f)
+        @test isa(assembler, Ferrite.AbstractAssembler{T})
+        rdofs = [1, 4, 6]
+        cdofs = [1, 3]
+        Ke = rand(T, length(rdofs), length(cdofs))
+        fe = rand(T, length(rdofs))
+        assemble!(assembler, rdofs, cdofs, Ke, fe)
+        assemble!(assembler, rdofs, cdofs, Ke, fe)
+        @test_throws ArgumentError assemble!(assembler, rdofs, Ke, fe) # Not in sparsity pattern
+        @test all(K[rdofs, cdofs] .== 2Ke)
+        @test all(f[rdofs] .== 2fe)
+
+        # CSCAssembler: Assemble rectangular part in quadratic matrix
+        K = SparseMatrixCSC(6, 6, [K.colptr..., 7, 7, 7], K.rowval, K.nzval)
+        assembler = start_assemble(K, f)
+        rdofs = [1, 4, 6]
+        cdofs = [1, 3]
+        Ke = rand(T, length(rdofs), length(cdofs))
+        fe = rand(T, length(rdofs))
+        assemble!(assembler, rdofs, cdofs, Ke, fe)
+        assemble!(assembler, rdofs, cdofs, Ke, fe)
+        @test_throws ArgumentError assemble!(assembler, rdofs, Ke, fe) # Not in sparsity pattern
+        @test all(K[rdofs, cdofs] .== 2Ke)
+        @test all(f[rdofs] .== 2fe)
+
+        # SparseMatrix assembler
+        K = spzeros(T, 10, 10)
+        f = zeros(T, 10)
+        ke = [rand(T, 4, 4), rand(T, 4, 4)]
+        fe = [rand(T, 4), rand(T, 4)]
+        dofs = [[1, 5, 3, 7], [10, 8, 2, 5]]
+        for i in 1:2
+            K[dofs[i], dofs[i]] += ke[i]
+            f[dofs[i]] += fe[i]
+        end
+
+        Kc = copy(K)
+        fc = copy(f)
+
+        assembler = start_assemble(Kc)
+        @test all(iszero, Kc.nzval) # start_assemble zeroes
+        for i in 1:2
+            assemble!(assembler, dofs[i], ke[i])
+        end
+        @test Kc ≈ K
+
+        assembler = start_assemble(Kc, fc)
+        @test all(iszero, Kc.nzval)
+        @test all(iszero, fc)
+        for i in 1:2
+            assemble!(assembler, dofs[i], ke[i], fe[i])
+        end
+        @test Kc ≈ K
+        @test fc ≈ f
+
+        # No zero filling
+        assembler = start_assemble(Kc, fc; fillzero = false)
+        @test Kc ≈ K
+        @test fc ≈ f
+        for i in 1:2
+            assemble!(assembler, dofs[i], ke[i], fe[i])
+        end
+        @test Kc ≈ 2K
+        @test fc ≈ 2f
     end
-
-    Kc = copy(K)
-    fc = copy(f)
-
-    assembler = start_assemble(Kc)
-    @test all(iszero, Kc.nzval) # start_assemble zeroes
-    for i in 1:2
-        assemble!(assembler, dofs[i], ke[i])
-    end
-    @test Kc ≈ K
-
-    assembler = start_assemble(Kc, fc)
-    @test all(iszero, Kc.nzval)
-    @test all(iszero, fc)
-    for i in 1:2
-        assemble!(assembler, dofs[i], ke[i], fe[i])
-    end
-    @test Kc ≈ K
-    @test fc ≈ f
-
-    # No zero filling
-    assembler = start_assemble(Kc, fc; fillzero = false)
-    @test Kc ≈ K
-    @test fc ≈ f
-    for i in 1:2
-        assemble!(assembler, dofs[i], ke[i], fe[i])
-    end
-    @test Kc ≈ 2K
-    @test fc ≈ 2f
 
     # Error paths
-    assembler = start_assemble(Kc, fc)
+    K = sparse(I, J, zeros(length(I)))
+    assembler = start_assemble(K, zeros(size(K, 1)))
     @test_throws BoundsError assemble!(assembler, [11, 1, 2, 3], rand(4, 4))
     @test_throws BoundsError assemble!(assembler, [11, 1, 2, 3], rand(4, 4), rand(4))
     @test_throws BoundsError assemble!(assembler, [11, 1, 2], rand(4, 4))
@@ -170,8 +207,83 @@ end
     @test_throws errr(2, 1) assemble!(a, [1, 2], [1.0 0.0; 3.0 4.0])
     @test_throws errr(2, 1) assemble!(a, [2, 1], [1.0 2.0; 0.0 4.0])
     ## Errors above diagonal
-    @test_throws errr(2, 2) assemble!(a, [1, 2], [1.0 2.0; 0.0 4.0])
-    @test_throws errr(2, 2) assemble!(as, [1, 2], [1.0 2.0; 0.0 4.0])
-    @test_throws errr(2, 2) assemble!(a, [2, 1], [1.0 0.0; 3.0 4.0])
-    @test_throws errr(2, 2) assemble!(as, [2, 1], [1.0 0.0; 3.0 4.0])
+    @test_throws errr(1, 2) assemble!(a, [1, 2], [1.0 2.0; 0.0 4.0])
+    @test_throws errr(1, 2) assemble!(as, [1, 2], [1.0 2.0; 0.0 4.0])
+    @test_throws errr(1, 2) assemble!(a, [2, 1], [1.0 0.0; 3.0 4.0])
+    @test_throws errr(1, 2) assemble!(as, [2, 1], [1.0 0.0; 3.0 4.0])
+end
+
+@testset "assemble! with atomic accumulation" begin
+    grid = generate_grid(Quadrilateral, (10, 10))
+    dh = DofHandler(grid)
+    add!(dh, :u, Lagrange{RefQuadrilateral, 2}())
+    close!(dh)
+
+    # Deterministic fake element contributions computed from the dofs
+    element_matrix(dofs, ::Type{T}) where {T} = T[sin(T(i) * T(j) / 100) for i in dofs, j in dofs]
+    element_vector(dofs, ::Type{T}) where {T} = T[cos(T(i)) for i in dofs]
+
+    for T in (Float64, Float32)
+        K = allocate_matrix(SparseMatrixCSC{T, Int}, dh)
+        f = zeros(T, ndofs(dh))
+        Ka = allocate_matrix(SparseMatrixCSC{T, Int}, dh)
+        fa = zeros(T, ndofs(dh))
+        a = start_assemble(K, f)
+        aa = start_assemble(Ka, fa; atomic = true)
+        for cell in CellIterator(dh)
+            dofs = celldofs(cell)
+            assemble!(a, dofs, element_matrix(dofs, T), element_vector(dofs, T))
+            assemble!(aa, dofs, element_matrix(dofs, T), element_vector(dofs, T))
+        end
+        # Sequential atomic assembly gives bitwise identical results
+        @test K == Ka
+        @test f == fa
+    end
+
+    # Concurrent assembly: shared K and f, but one assembler per task and no coloring
+    K = allocate_matrix(dh)
+    f = zeros(ndofs(dh))
+    a = start_assemble(K, f)
+    for cell in CellIterator(dh)
+        dofs = celldofs(cell)
+        assemble!(a, dofs, element_matrix(dofs, Float64), element_vector(dofs, Float64))
+    end
+    Ka = allocate_matrix(dh)
+    fa = zeros(ndofs(dh))
+    _ = start_assemble(Ka, fa) # zero out
+    @sync for chunk in Iterators.partition(1:getncells(grid), cld(getncells(grid), 4))
+        Threads.@spawn begin
+            asm = start_assemble(Ka, fa; fillzero = false, atomic = true)
+            for cellidx in chunk
+                dofs = celldofs(dh, cellidx)
+                assemble!(asm, dofs, element_matrix(dofs, Float64), element_vector(dofs, Float64))
+            end
+        end
+    end
+    # Equal up to the (task dependent) summation order
+    @test Ka.nzval ≈ K.nzval rtol = 1.0e-14
+    @test fa ≈ f rtol = 1.0e-14
+
+    # Symmetric assembler with atomic accumulation
+    Ks = allocate_matrix(Symmetric{Float64, SparseMatrixCSC{Float64, Int}}, dh)
+    Ksa = allocate_matrix(Symmetric{Float64, SparseMatrixCSC{Float64, Int}}, dh)
+    a = start_assemble(Ks)
+    aa = start_assemble(Ksa; atomic = true)
+    for cell in CellIterator(dh)
+        dofs = celldofs(cell)
+        assemble!(a, dofs, element_matrix(dofs, Float64)) # element_matrix is symmetric
+        assemble!(aa, dofs, element_matrix(dofs, Float64))
+    end
+    @test Ks == Ksa
+
+    # Atomic accumulation is only supported for Float32/Float64 matrices
+    @test_throws ArgumentError start_assemble(spzeros(Int, 4, 4); atomic = true)
+    @test_throws ArgumentError start_assemble(Symmetric(spzeros(Int, 4, 4)); atomic = true)
+
+    # Literal `atomic` values propagate to the type parameter (concrete return type)
+    K4 = spzeros(4, 4)
+    CSCA = Ferrite.CSCAssembler{Float64, Int, SparseMatrixCSC{Float64, Int}} # UnionAll over atomic
+    @test (@inferred (K -> start_assemble(K; atomic = true))(K4)) isa CSCA{true}
+    @test (@inferred (K -> start_assemble(K; atomic = false))(K4)) isa CSCA{false}
+    @test (@inferred (K -> start_assemble(K))(K4)) isa CSCA{false}
 end

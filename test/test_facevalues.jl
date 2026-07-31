@@ -1,3 +1,7 @@
+# Imports for parallel (isolated) test execution:
+using LinearAlgebra
+include(joinpath(@__DIR__, "test_utils.jl"))
+
 @testset "FacetValues" begin
     for (scalar_interpol, quad_rule) in (
             (Lagrange{RefLine, 1}(), FacetQuadratureRule{RefLine}(2)),
@@ -99,7 +103,7 @@
                 end
 
                 # Check if the non-linear mapping is correct
-                # Only do this for one interpolation becuase it relise on AD on "iterative function"
+                # Only do this for one interpolation because it relies on AD on "iterative function"
                 if scalar_interpol === Lagrange{RefQuadrilateral, 2}()
                     coords_nl = [x + rand(x) * 0.01 for x in coords] # add some displacement to nodes
                     reinit!(fv, coords_nl, facet)
@@ -226,6 +230,7 @@ end # of testset
             x2 = spatial_coordinate(cv, 2, cell_coords)
             @assert norm(x1 - spatial_coordinate(fv, 1, cell_coords)) < 1.0e-14 # Handle x ≈ 0
             @test getnormal(fv, 1) ≈ normalize(x1 - x2) atol = 1.0e-6
+            @test getdetJdV(fv, 1) ≈ 1
 
             # Facet 2
             reinit!(fv, cell_coords, 2)
@@ -233,9 +238,10 @@ end # of testset
             x4 = spatial_coordinate(cv, 4, cell_coords)
             @assert x4 ≈ spatial_coordinate(fv, 1, cell_coords)
             @test getnormal(fv, 1) ≈ normalize(x4 - x3) atol = 1.0e-6
+            @test getdetJdV(fv, 1) ≈ 1
         end
     end
 
     # Test unknown facet error path as its not yet tested in "test_quadrules.jl"
-    @test_throws ArgumentError Ferrite.weighted_normal(zero(SMatrix{2, 1}), RefLine, 3)
+    @test_throws ArgumentError Ferrite.weighted_normal(zero(MixedTensor2{2, 1}), RefLine, 3)
 end

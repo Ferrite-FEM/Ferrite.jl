@@ -3,10 +3,10 @@
 ############
 
 """
-    getneighborhood(topology, grid::AbstractGrid, cellidx::CellIndex, include_self=false)
-    getneighborhood(topology, grid::AbstractGrid, faceidx::FaceIndex, include_self=false)
-    getneighborhood(topology, grid::AbstractGrid, vertexidx::VertexIndex, include_self=false)
-    getneighborhood(topology, grid::AbstractGrid, edgeidx::EdgeIndex, include_self=false)
+    getneighborhood(topology, grid::AbstractGrid, cellidx::CellIndex, include_self = false)
+    getneighborhood(topology, grid::AbstractGrid, faceidx::FaceIndex, include_self = false)
+    getneighborhood(topology, grid::AbstractGrid, vertexidx::VertexIndex, include_self = false)
+    getneighborhood(topology, grid::AbstractGrid, edgeidx::EdgeIndex, include_self = false)
 
 Returns all connected entities of the same type as defined by the respective topology. If `include_self` is true,
 the given entity is included in the returned list as well.
@@ -101,7 +101,7 @@ _get_facet_facet_neighborhood(t::ExclusiveTopology, #=rdim=# ::Val{1}) = t.verte
 _get_facet_facet_neighborhood(t::ExclusiveTopology, #=rdim=# ::Val{2}) = t.edge_edge_neighbor
 _get_facet_facet_neighborhood(t::ExclusiveTopology, #=rdim=# ::Val{3}) = t.face_face_neighbor
 function _get_facet_facet_neighborhood(::ExclusiveTopology, #=rdim=# ::Val{:mixed})
-    throw(ArgumentError("get_facet_facet_neightborhood is only supported for grids containing cells with the same reference dimension.
+    throw(ArgumentError("get_facet_facet_neighborhood is only supported for grids containing cells with the same reference dimension.
     Access the `vertex_vertex_neighbor`, `edge_edge_neighbor`, or `face_face_neighbor` fields explicitly instead."))
 end
 
@@ -353,7 +353,7 @@ function getstencil(top::ArrayOfVectorViews{VertexIndex, 1}, grid::Grid, vertex_
 end
 
 """
-    _create_facet_skeleton(neighborhood::AbstractMatrix{AbstractVector{BI}}, grid::AbstractGrid) where BI <: Union{FaceIndex, EdgeIndex, VertexIndex}
+    _create_facet_skeleton(neighborhood::AbstractMatrix{AbstractVector{BI}}, grid::AbstractGrid) where {BI <: Union{FaceIndex, EdgeIndex, VertexIndex}}
 
 Materializes the skeleton from the `neighborhood` information by returning a `Vector{FacetIndex}` describing the
 unique facets in the grid.

@@ -123,12 +123,38 @@ function reinit!(
         cell_there::AbstractCell, coords_there::AbstractVector{Vec{dim, T}}, facet_there::Int
     ) where {dim, T}
 
+    dim == 1 && (reinit!(iv.here, cell_here, coords_here, facet_here); return reinit!(iv.there, cell_there, coords_there, facet_there))
+    interface_transformation = InterfaceOrientationInfo(cell_here, cell_there, facet_here, facet_there)
+    return reinit!(iv, cell_here, coords_here, facet_here, cell_there, coords_there, facet_there, interface_transformation)
+end
+
+"""
+    reinit!(
+        iv::InterfaceValues,
+        cell_here::AbstractCell, coords_here::AbstractVector{Vec{dim, T}}, facet_here::Int,
+        cell_there::AbstractCell, coords_there::AbstractVector{Vec{dim, T}}, facet_there::Int,
+        interface_transformation
+    )
+
+Update the [`InterfaceValues`](@ref) with an explicitly given here → there quadrature point
+transformation instead of the [`InterfaceOrientationInfo`](@ref) derived from the facets'
+shared vertices. This is required for *non-matching* interfaces, where the two facets do
+not coincide and thus do not share the same vertex set — e.g. the fine subfacet against the
+coarse facet of a hanging-node interface — in which case an
+[`AffineInterfaceTransformation`](@ref) describes how the here facet embeds into the there
+facet.
+"""
+function reinit!(
+        iv::InterfaceValues,
+        cell_here::AbstractCell, coords_here::AbstractVector{Vec{dim, T}}, facet_here::Int,
+        cell_there::AbstractCell, coords_there::AbstractVector{Vec{dim, T}}, facet_there::Int,
+        interface_transformation
+    ) where {dim, T}
+
     # reinit! the here side as normal
     reinit!(iv.here, cell_here, coords_here, facet_here)
-    dim == 1 && return reinit!(iv.there, cell_there, coords_there, facet_there)
     # Transform the quadrature points from the here side to the there side
     set_current_facet!(iv.there, facet_there) # Includes boundscheck
-    interface_transformation = InterfaceOrientationInfo(cell_here, cell_there, facet_here, facet_there)
     quad_points_a = getpoints(iv.here.fqr, facet_here)
     quad_points_b = getpoints(iv.there.fqr, facet_there)
     transform_interface_points!(quad_points_b, quad_points_a, interface_transformation)
@@ -145,7 +171,7 @@ function reinit!(
 end
 
 """
-    getnormal(iv::InterfaceValues, qp::Int; here::Bool=true)
+    getnormal(iv::InterfaceValues, qp::Int; here::Bool = true)
 
 Return the normal vector in the quadrature point `qp` on the interface. If `here = true`
 (default) the outward normal to the "here" element is returned, otherwise the outward normal
@@ -317,7 +343,7 @@ multiply by minus the outward facing normal to the first element's side of the i
 """
 function function_gradient_jump end
 
-for func in (:function_value, :function_gradient)
+for func in (:function_value, :function_gradient, :function_symmetric_gradient)
     @eval begin
         function $(func)(
                 iv::InterfaceValues, q_point::Int, u::AbstractVector;
@@ -326,10 +352,10 @@ for func in (:function_value, :function_gradient)
             @boundscheck checkbounds(u, 1:getnbasefunctions(iv))
             if here
                 dof_range_here = 1:getnbasefunctions(iv.here)
-                return $(func)(iv.here, q_point, @view(u[dof_range_here]))
+                return $(func)(iv.here, q_point, u, dof_range_here)
             else # there
                 dof_range_there = (1:getnbasefunctions(iv.there)) .+ getnbasefunctions(iv.here)
-                return $(func)(iv.there, q_point, @view(u[dof_range_there]))
+                return $(func)(iv.there, q_point, u, dof_range_there)
             end
         end
         function $(func)(
@@ -360,8 +386,8 @@ for (func, f_, is_avg) in (
             @boundscheck checkbounds(u, getnbasefunctions(iv))
             dof_range_here = 1:getnbasefunctions(iv.here)
             dof_range_there = (1:getnbasefunctions(iv.there)) .+ getnbasefunctions(iv.here)
-            f_here = $(f_)(iv.here, qp, @view(u[dof_range_here]))
-            f_there = $(f_)(iv.there, qp, @view(u[dof_range_there]))
+            f_here = $(f_)(iv.here, qp, u, dof_range_here)
+            f_there = $(f_)(iv.there, qp, u, dof_range_there)
             return $(is_avg ? :((f_here + f_there) / 2) : :(f_there - f_here))
         end
         function $(func)(
@@ -416,11 +442,20 @@ end
     InterfaceOrientationInfo(cell_a::AbstractCell, cell_b::AbstractCell, facet_a::Int, facet_b::Int)
 
 Return the relative orientation info for facet B with regards to facet A.
-Relative orientation is computed using a [`OrientationInfo`](@ref) for each side of the interface.
+Relative orientation is computed using a [`PathOrientationInfo`](@ref) (for 2D cells, where
+the facets are 1D entities) or a [`SurfaceOrientationInfo`](@ref) (for 3D cells, where the
+facets are 2D entities) for each side of the interface.
 """
-function InterfaceOrientationInfo(cell_a::AbstractCell{RefShapeA}, cell_b::AbstractCell{RefShapeB}, facet_a::Int, facet_b::Int) where {RefShapeA <: AbstractRefShape, RefShapeB <: AbstractRefShape}
-    OI_a = OrientationInfo(facets(cell_a)[facet_a])
-    OI_b = OrientationInfo(facets(cell_b)[facet_b])
+function InterfaceOrientationInfo(cell_a::AbstractCell{RefShapeA}, cell_b::AbstractCell{RefShapeB}, facet_a::Int, facet_b::Int) where {RefShapeA <: AbstractRefShape{2}, RefShapeB <: AbstractRefShape{2}}
+    OI_a = PathOrientationInfo(facets(cell_a)[facet_a])
+    OI_b = PathOrientationInfo(facets(cell_b)[facet_b])
+    flipped = OI_a.regular != OI_b.regular
+    return InterfaceOrientationInfo{RefShapeA, RefShapeB}(flipped, 0, 0, facet_a, facet_b)
+end
+
+function InterfaceOrientationInfo(cell_a::AbstractCell{RefShapeA}, cell_b::AbstractCell{RefShapeB}, facet_a::Int, facet_b::Int) where {RefShapeA <: AbstractRefShape{3}, RefShapeB <: AbstractRefShape{3}}
+    OI_a = SurfaceOrientationInfo(facets(cell_a)[facet_a])
+    OI_b = SurfaceOrientationInfo(facets(cell_b)[facet_b])
     flipped = OI_a.flipped != OI_b.flipped
     shift_index = OI_b.shift_index - OI_a.shift_index
     return InterfaceOrientationInfo{RefShapeA, RefShapeB}(flipped, shift_index, OI_b.shift_index, facet_a, facet_b)
@@ -568,6 +603,131 @@ function transform_interface_points!(dst::AbstractVector{Vec{2, Float64}}, point
         face_point = element_to_facet_transformation(point, RefShapeA, facet_a)
         flipped && (face_point *= -1)
         dst[idx] = facet_to_element_transformation(face_point, RefShapeB, facet_b)
+    end
+    return nothing
+end
+
+@doc raw"""
+    AffineInterfaceTransformation
+
+Affine here → there quadrature point transformation for interfaces whose facets are
+*nested* rather than coinciding: the here facet is contained in (a part of) the there
+facet. The prime example is a hanging-node interface on an adaptively refined mesh, where
+the here side is a fine subfacet — half (2D) or a quadrant (3D) — of the coarse there
+facet. Conforming interfaces are the special case where the embedding is onto.
+
+Compared to [`InterfaceOrientationInfo`](@ref) — which describes coinciding facets by
+their relative rotation/flip derived from the shared vertex set — this stores the full
+affine map between the two facets' reference parametrizations (rotation/flip *and*
+scaling/translation) in homogeneous form. It is constructed geometrically from the two
+cells' physical coordinates (see the constructor below) and passed to [`reinit!`](@ref)
+as the trailing `interface_transformation` argument.
+"""
+struct AffineInterfaceTransformation{RefShapeA, RefShapeB, MT}
+    M::MT       # homogeneous affine map between the facet reference parametrizations
+    facet_a::Int
+    facet_b::Int
+end
+
+# Physical coordinate of the facet-reference point `fp` of facet `facet`: chain the
+# facet -> element reference transformation with the cell's geometric interpolation.
+function _facet_param_to_spatial(fp::Vec, ::Type{RefShape}, facet::Int, ip_geo::ScalarInterpolation, coords::AbstractVector{<:Vec}) where {RefShape <: AbstractRefShape}
+    ξ = facet_to_element_transformation(fp, RefShape, facet)
+    x = zero(eltype(coords))
+    for i in 1:getnbasefunctions(ip_geo)
+        x += reference_shape_value(ip_geo, ξ, i) * coords[i]
+    end
+    return x
+end
+
+"""
+    AffineInterfaceTransformation(
+        cell_here::AbstractCell, coords_here::AbstractVector{Vec{dim, T}}, facet_here::Int,
+        cell_there::AbstractCell, coords_there::AbstractVector{Vec{dim, T}}, facet_there::Int
+    )
+
+Construct the affine facet-parameter transformation for the (possibly non-matching)
+interface between `facet_here` of `cell_here` and `facet_there` of `cell_there`, from the
+cells' physical coordinates: each corner of the here facet is located on the there facet
+by matching its physical position against the there facet's geometric mapping at the
+half-point lattice of its reference domain, and the affine map is assembled from the
+corner correspondences.
+
+This assumes the here facet is exactly nested in the there facet with corners on the there
+facet's half-point lattice — i.e. the facets either coincide (a conforming interface) or
+relate by one level of bisection refinement (a 2:1 hanging interface, the guarantee of a
+balanced adaptive mesh). If a corner cannot be matched an error is raised. Supported facet
+shapes are lines (2D cells) and quadrilaterals (3D cells).
+"""
+function AffineInterfaceTransformation(
+        cell_here::AbstractCell{RefShapeA}, coords_here::AbstractVector{Vec{dim, T}}, facet_here::Int,
+        cell_there::AbstractCell{RefShapeB}, coords_there::AbstractVector{Vec{dim, T}}, facet_there::Int
+    ) where {dim, T, RefShapeA <: AbstractRefShape{dim}, RefShapeB <: AbstractRefShape{dim}}
+    ipg_here = geometric_interpolation(typeof(cell_here))
+    ipg_there = geometric_interpolation(typeof(cell_there))
+    nfc_here = length(reference_facets(RefShapeA)[facet_here])
+    nfc_there = length(reference_facets(RefShapeB)[facet_there])
+    fdim = dim - 1
+    expected = fdim == 1 ? 2 : 4
+    (nfc_here == expected && nfc_there == expected) ||
+        throw(ArgumentError("AffineInterfaceTransformation supports line and quadrilateral facets only"))
+
+    # The half-point lattice of the there facet's reference domain: the corners of a
+    # coinciding or 2:1-nested here facet land exactly on these points.
+    candidates = fdim == 1 ?
+        [Vec{1, T}((c,)) for c in (-1, 0, 1)] :
+        [Vec{2, T}((c1, c2)) for c1 in (-1, 0, 1) for c2 in (-1, 0, 1)]
+    xcand = [_facet_param_to_spatial(c, RefShapeB, facet_there, ipg_there, coords_there) for c in candidates]
+    tol = sqrt(eps(T)) * maximum(norm(xc - xcand[1]) for xc in xcand)
+
+    corners_here = fdim == 1 ?
+        [Vec{1, T}((-1,)), Vec{1, T}((1,))] :
+        [Vec{2, T}((-1, -1)), Vec{2, T}((1, -1)), Vec{2, T}((-1, 1)), Vec{2, T}((1, 1))]
+    u = map(corners_here) do fp
+        x = _facet_param_to_spatial(fp, RefShapeA, facet_here, ipg_here, coords_here)
+        i = findfirst(xc -> norm(x - xc) <= tol, xcand)
+        i === nothing && throw(
+            ArgumentError(
+                "facets are not nested: corner $(fp) of the here facet does not lie on the " *
+                    "half-point lattice of the there facet (only conforming and 2:1 interfaces are supported)"
+            )
+        )
+        candidates[i]
+    end
+
+    if fdim == 1
+        a = (u[2][1] - u[1][1]) / 2
+        b = (u[2][1] + u[1][1]) / 2
+        M = Tensor{2, 2}((a, zero(T), b, one(T)))
+        return AffineInterfaceTransformation{RefShapeA, RefShapeB, typeof(M)}(M, facet_here, facet_there)
+    else
+        # Affine map fixed by three corners; the fourth checks the affine assumption.
+        col1 = (u[2] - u[1]) / 2
+        col2 = (u[3] - u[1]) / 2
+        norm(u[1] + 2 * (col1 + col2) - u[4]) <= sqrt(eps(T)) ||
+            throw(ArgumentError("facets are not affinely nested"))
+        col3 = u[1] + col1 + col2
+        M = Tensor{2, 3}((col1[1], col1[2], zero(T), col2[1], col2[2], zero(T), col3[1], col3[2], one(T)))
+        return AffineInterfaceTransformation{RefShapeA, RefShapeB, typeof(M)}(M, facet_here, facet_there)
+    end
+end
+
+function transform_interface_points!(dst::AbstractVector{Vec{3, Float64}}, points::AbstractVector{Vec{3, Float64}}, interface_transformation::AffineInterfaceTransformation{RefShapeA, RefShapeB}) where {RefShapeA <: AbstractRefShape{3}, RefShapeB <: AbstractRefShape{3}}
+    M = interface_transformation.M
+    for (idx, point) in pairs(points)
+        face_point = element_to_facet_transformation(point, RefShapeA, interface_transformation.facet_a)
+        result = M ⋅ Vec(face_point[1], face_point[2], 1.0)
+        dst[idx] = facet_to_element_transformation(Vec(result[1], result[2]), RefShapeB, interface_transformation.facet_b)
+    end
+    return nothing
+end
+
+function transform_interface_points!(dst::AbstractVector{Vec{2, Float64}}, points::AbstractVector{Vec{2, Float64}}, interface_transformation::AffineInterfaceTransformation{RefShapeA, RefShapeB}) where {RefShapeA <: AbstractRefShape{2}, RefShapeB <: AbstractRefShape{2}}
+    M = interface_transformation.M
+    for (idx, point) in pairs(points)
+        face_point = element_to_facet_transformation(point, RefShapeA, interface_transformation.facet_a)
+        result = M ⋅ Vec(face_point[1], 1.0)
+        dst[idx] = facet_to_element_transformation(Vec(result[1]), RefShapeB, interface_transformation.facet_b)
     end
     return nothing
 end

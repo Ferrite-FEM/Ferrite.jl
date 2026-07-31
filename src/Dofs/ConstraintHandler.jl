@@ -1,6 +1,6 @@
 # abstract type Constraint end
 """
-    Dirichlet(u::Symbol, ∂Ω::AbstractVecOrSet, f::Function, components=nothing)
+    Dirichlet(u::Symbol, ∂Ω::AbstractVecOrSet, f::Function, components = nothing)
 
 Create a Dirichlet boundary condition on `u` on the `∂Ω` part of
 the boundary. `f` is a function of the form `f(x)` or `f(x, t)`
@@ -71,7 +71,7 @@ by the FE approximation on the facet, ``\Gamma^f``. The arguments to the functio
 the coordinate, ``\boldsymbol{x}``, the time, ``t``, and the facet normal, ``\boldsymbol{n}``.
 The quadrature rule is automatically created, but the default order, `qr_order = 2 * ip_order`
 (may be refined in future releases),
-where `ip_order` is the order of the interpolation, can be overrided if desired.
+where `ip_order` is the order of the interpolation, can be overridden if desired.
 
 # H(div) interpolations
 For H(div), we want to prescribe the normal flux, ``q_\mathrm{n} = f(\boldsymbol{x}, t, \boldsymbol{n})``.
@@ -135,7 +135,7 @@ end
 
 const DofCoefficients{T} = Vector{Pair{Int, T}}
 """
-    AffineConstraint(constrained_dof::Int, entries::Vector{Pair{Int,T}}, b::T) where T
+    AffineConstraint(constrained_dof::Int, entries::Vector{Pair{Int, T}}, b::T) where {T}
 
 Define an affine/linear constraint to constrain one degree of freedom, `u[i]`,
 such that `u[i] = ∑(u[j] * a[j]) + b`,
@@ -148,7 +148,7 @@ struct AffineConstraint{T}
 end
 
 """
-    ConstraintHandler([T=Float64], dh::AbstractDofHandler)
+    ConstraintHandler([T = Float64], dh::AbstractDofHandler)
 
 A collection of constraints associated with the dof handler `dh`.
 `T` is the numeric type for stored values.
@@ -166,6 +166,7 @@ mutable struct ConstraintHandler{DH <: AbstractDofHandler, T}
     const dofcoefficients::Vector{Union{Nothing, DofCoefficients{T}}}
     # global dof -> index into dofs and inhomogeneities and dofcoefficients
     const dofmapping::Dict{Int, Int}
+    const isconstrained::BitVector # Fast check if dof is constrained or not
     const bcvalues::Vector{BCValues{T}}
     const dh::DH
     closed::Bool
@@ -177,7 +178,7 @@ function ConstraintHandler(::Type{T}, dh::AbstractDofHandler) where {T <: Number
     @assert isclosed(dh)
     return ConstraintHandler(
         Dirichlet[], ProjectedDirichlet[], Int[], Int[], T[], Union{Nothing, T}[],
-        Union{Nothing, DofCoefficients{T}}[], Dict{Int, Int}(), BCValues{T}[], dh, false,
+        Union{Nothing, DofCoefficients{T}}[], Dict{Int, Int}(), BitVector(), BCValues{T}[], dh, false,
     )
 end
 
@@ -207,7 +208,7 @@ function get_rhs_data(ch::ConstraintHandler, A::SparseMatrixCSC)
 end
 
 """
-    apply_rhs!(data::RHSData, f::AbstractVector, ch::ConstraintHandler, applyzero::Bool=false)
+    apply_rhs!(data::RHSData, f::AbstractVector, ch::ConstraintHandler, applyzero::Bool = false)
 
 Applies the boundary condition to the right-hand-side vector without modifying the stiffness matrix.
 
@@ -242,6 +243,29 @@ function apply_rhs!(data::RHSData, f::AbstractVector, ch::ConstraintHandler, app
     return
 end
 
+"""
+    _condense_rhs!(f::AbstractVector, ch::ConstraintHandler)
+
+Condense the right-hand-side vector `f`, i.e. compute `f := C' f` where `C` is the
+constraint matrix, without access to the (already condensed) system matrix. This is the
+affine part of [`apply_rhs!`](@ref) and requires all constraints to be homogeneous
+(e.g. hanging node constraints from a [`ConformityConstraint`](@ref)).
+"""
+function _condense_rhs!(f::AbstractVector, ch::ConstraintHandler)
+    @boundscheck checkbounds(f, ch.prescribed_dofs)
+    @inbounds for (i, pdof) in pairs(ch.prescribed_dofs)
+        dofcoef = ch.dofcoefficients[i]
+        if dofcoef !== nothing # if affine constraint
+            iszero(ch.inhomogeneities[i]) || error("_condense_rhs! requires homogeneous constraints")
+            for (d, v) in dofcoef
+                f[d] += f[pdof] * v
+            end
+        end
+        f[pdof] = 0
+    end
+    return f
+end
+
 function Base.show(io::IO, ::MIME"text/plain", ch::ConstraintHandler)
     println(io, "ConstraintHandler:")
     if !isclosed(ch)
@@ -259,21 +283,15 @@ isclosed(ch::ConstraintHandler) = ch.closed
 free_dofs(ch::ConstraintHandler) = ch.free_dofs
 prescribed_dofs(ch::ConstraintHandler) = ch.prescribed_dofs
 
-# Equivalent to `copy!(out, setdiff(1:n_entries, diff))`, but requires that
-# `issorted(diff)` and that `1 ≤ diff[1] ≤ diff[end] ≤ n_entries`
-function _sorted_setdiff!(out::Vector{Int}, n_entries::Int, diff::Vector{Int})
-    n_diff = length(diff)
-    resize!(out, n_entries - n_diff)
-    diff_ind = out_ind = 1
-    for i in 1:n_entries
-        if diff_ind ≤ n_diff && i == diff[diff_ind]
-            diff_ind += 1
-        else
-            out[out_ind] = i
-            out_ind += 1
-        end
+function _set_freedofs!(free_dofs::Vector{Int}, isconstrained::BitVector, num_dofs::Int, num_prescribed::Int)
+    resize!(free_dofs, num_dofs - num_prescribed)
+    j = 1
+    for i in 1:num_dofs
+        isconstrained[i] && continue
+        free_dofs[j] = i
+        j += 1
     end
-    return out
+    return free_dofs
 end
 
 """
@@ -291,7 +309,12 @@ function close!(ch::ConstraintHandler)
     ch.affine_inhomogeneities .= ch.affine_inhomogeneities[I]
     ch.dofcoefficients .= ch.dofcoefficients[I]
 
-    _sorted_setdiff!(ch.free_dofs, ndofs(ch.dh), ch.prescribed_dofs)
+    resize!(ch.isconstrained, ndofs(ch.dh))
+    fill!(ch.isconstrained, false)
+    for dof in ch.prescribed_dofs
+        ch.isconstrained[dof] = true
+    end
+    _set_freedofs!(ch.free_dofs, ch.isconstrained, ndofs(ch.dh), length(ch.prescribed_dofs))
 
     for i in 1:length(ch.prescribed_dofs)
         ch.dofmapping[ch.prescribed_dofs[i]] = i
@@ -320,6 +343,7 @@ function close!(ch::ConstraintHandler)
             i == 0 && continue
             icoeffs = ch.dofcoefficients[i]
             if !(icoeffs === nothing || isempty(icoeffs))
+                @debug println("Nested affine constraint detected: master dof $d of $coeffs is itself affinely constrained")
                 error("nested affine constraints currently not supported")
             end
         end
@@ -349,7 +373,7 @@ function add!(ch::ConstraintHandler, ac::AffineConstraint)
 end
 
 """
-    add_prescribed_dof!(ch, constrained_dof::Int, inhomogeneity, dofcoefficients=nothing)
+    add_prescribed_dof!(ch, constrained_dof::Int, inhomogeneity, dofcoefficients = nothing)
 
 Add a constrained dof directly to the `ConstraintHandler`.
 This function checks if the `constrained_dof` is already constrained, and overrides the old
@@ -468,7 +492,7 @@ function _add!(ch::ConstraintHandler, dbc::Dirichlet, bcnodes::AbstractVecOrSet{
 end
 
 """
-    update!(ch::ConstraintHandler, time::Real=0.0)
+    update!(ch::ConstraintHandler, time::Real = 0.0)
 
 Update time-dependent inhomogeneities for the new time. This calls `f(x)` or `f(x, t)` when
 applicable, where `f` is the function(s) corresponding to the constraints in the handler, to
@@ -590,7 +614,7 @@ conditions specified in `ch` such that `K \\ rhs` gives the expected solution.
 !!! note
     `apply!(K, rhs, ch)` essentially calculates
     ```julia
-    rhs[free] = rhs[free] - K[constrained, constrained] * a[constrained]
+    rhs[free] = rhs[free] - K[free, constrained] * a[constrained]
     ```
     where `a[constrained]` are the inhomogeneities. Consequently, the sign of `rhs` matters
     (in contrast with `apply_zero!`).
@@ -824,7 +848,7 @@ function _condense!(K::SparseMatrixCSC, f::AbstractVector, dofcoefficients::Vect
                         addindex!(K, v * Kval, row, d)
                     end
                 else
-                    for (d1, v1) in col_coeffs, (d2, v2) in row_coeffs
+                    for (d1, v1) in row_coeffs, (d2, v2) in col_coeffs
                         addindex!(K, v1 * v2 * Kval, d1, d2)
                     end
                 end
@@ -913,11 +937,12 @@ function zero_out_columns!(K::AbstractSparseMatrixCSC, ch::ConstraintHandler) # 
 end
 
 function zero_out_rows!(K::AbstractSparseMatrixCSC, ch::ConstraintHandler)
+    @boundscheck checkbounds(ch.isconstrained, axes(K, 1))
     rowval = K.rowval
     nzval = K.nzval
-    @inbounds for i in eachindex(rowval, nzval)
-        if haskey(ch.dofmapping, rowval[i])
-            nzval[i] = 0
+    @inbounds for (i, row) in pairs(rowval)
+        if ch.isconstrained[row]
+            nzval[i] = zero(eltype(K))
         end
     end
     return
@@ -1010,9 +1035,9 @@ struct PeriodicFacetPair
 end
 
 """
-    PeriodicDirichlet(u::Symbol, facet_mapping, components=nothing)
-    PeriodicDirichlet(u::Symbol, facet_mapping, R::AbstractMatrix, components=nothing)
-    PeriodicDirichlet(u::Symbol, facet_mapping, f::Function, components=nothing)
+    PeriodicDirichlet(u::Symbol, facet_mapping, components = nothing)
+    PeriodicDirichlet(u::Symbol, facet_mapping, R::AbstractMatrix, components = nothing)
+    PeriodicDirichlet(u::Symbol, facet_mapping, f::Function, components = nothing)
 
 Create a periodic Dirichlet boundary condition for the field `u` on the facet-pairs given in
 `facet_mapping`. The mapping can be computed with [`collect_periodic_facets`](@ref). The
@@ -1189,8 +1214,8 @@ function _add!(
             union!(all_node_idxs, nodes)
             for n in nodes
                 x = get_node_coordinate(grid, n)
-                min_x = Tx(i -> min(min_x[i], x[i]))
-                max_x = Tx(i -> max(max_x[i], x[i]))
+                min_x = Tx(min.(min_x.data, x.data))
+                max_x = Tx(max.(max_x.data, x.data))
             end
         end
         all_node_idxs_v = collect(all_node_idxs)
@@ -1372,7 +1397,7 @@ function rotate_local_dofs(local_facet_dofs, local_facet_dofs_offset, ip::Lagran
 end
 
 """
-    collect_periodic_facets(grid::Grid, mset, iset, transform::Union{Function,Nothing}=nothing; tol=1e-12)
+    collect_periodic_facets(grid::Grid, mset, iset, transform::Union{Function, Nothing} = nothing; tol = 1.0e-12)
 
 Match all mirror facets in `mset` with a corresponding image facet in `iset`. Return a
 dictionary which maps each mirror facet to a image facet. The result can then be passed to
@@ -1396,7 +1421,7 @@ function collect_periodic_facets(grid::Grid, mset::Union{AbstractSet{FacetIndex}
 end
 
 """
-    collect_periodic_facets(grid::Grid, all_facets::Union{AbstractSet{FacetIndex},String,Nothing}=nothing; tol=1e-12)
+    collect_periodic_facets(grid::Grid, all_facets::Union{AbstractSet{FacetIndex}, String, Nothing} = nothing; tol = 1.0e-12)
 
 Split all facets in `all_facets` into image and mirror sets. For each matching pair, the facet
 located further along the vector `(1, 1, 1)` becomes the image facet.
@@ -1412,7 +1437,7 @@ end
 
 
 """
-    collect_periodic_facets!(facet_map::Vector{PeriodicFacetPair}, grid::Grid, mset, iset, transform::Union{Function,Nothing}; tol=1e-12)
+    collect_periodic_facets!(facet_map::Vector{PeriodicFacetPair}, grid::Grid, mset, iset, transform::Union{Function, Nothing}; tol = 1.0e-12)
 
 Same as [`collect_periodic_facets`](@ref) but adds all matches to the existing `facet_map`.
 """
@@ -1765,7 +1790,7 @@ function _apply_local!(
     # 3. Condense any affine constraints
     if has_nontrivial_affine_constraints
         # Condense this constraint locally if possible, and otherwise modifies the global arrays.
-        _condense_local!(local_matrix, local_vector, global_matrix, global_vector, global_dofs, ch.dofmapping, ch.dofcoefficients)
+        _condense_local!(local_matrix, local_vector, global_matrix, global_vector, global_dofs, ch.dofmapping, ch.dofcoefficients, ch.isconstrained)
     end
     # 4. Zero out columns/rows of local matrix and replace diagonal entries with the mean
     if has_constraints
@@ -1792,9 +1817,12 @@ end
 @noinline missing_global() = error("can not condense constraint without the global matrix and vector")
 
 """
-    _condense_local!(local_matrix::AbstractMatrix, local_vector::AbstractVector,
-                    global_matrix#=::SparseMatrixCSC=#, global_vector#=::Vector=#,
-                    global_dofs::AbstractVector, dofmapping::Dict, dofcoefficients::Vector)
+    _condense_local!(
+        local_matrix::AbstractMatrix, local_vector::AbstractVector,
+        global_matrix #=::SparseMatrixCSC=#, global_vector #=::Vector=#,
+        global_dofs::AbstractVector, dofmapping::Dict, dofcoefficients::Vector,
+        isconstrained::BitVector
+    )
 
 Condensation of affine constraints on element level. If possible this function only
 modifies the local arrays.
@@ -1802,7 +1830,8 @@ modifies the local arrays.
 function _condense_local!(
         local_matrix::AbstractMatrix, local_vector::AbstractVector,
         global_matrix #=::SparseMatrixCSC=#, global_vector #=::Vector=#,
-        global_dofs::AbstractVector, dofmapping::Dict, dofcoefficients::Vector
+        global_dofs::AbstractVector, dofmapping::Dict, dofcoefficients::Vector,
+        isconstrained::BitVector,
     )
     @assert axes(local_matrix, 1) == axes(local_matrix, 2) ==
         axes(local_vector, 1) == axes(global_dofs, 1)
@@ -1821,7 +1850,7 @@ function _condense_local!(
                     if local_mrow === nothing
                         # Only modify the global array if this isn't prescribed since we
                         # can't zero it out later like with the local matrix.
-                        if !haskey(dofmapping, global_col) && !haskey(dofmapping, global_mrow)
+                        if !isconstrained[global_col] && !isconstrained[global_mrow]
                             has_global_arrays || missing_global()
                             addindex!(global_matrix, mw, global_mrow, global_col)
                         end
@@ -1947,9 +1976,9 @@ end
 
 
 function _update_projected_dbc!(
-        inhomogeneities::Vector{T}, f::Function, facets::AbstractVecOrSet{FacetIndex}, fv::FacetValues, facet_dofs::ArrayOfVectorViews,
+        inhomogeneities::Vector{T}, f::F, facets::AbstractVecOrSet{FacetIndex}, fv::FacetValues, facet_dofs::ArrayOfVectorViews,
         dh::AbstractDofHandler, dofmapping::Dict{Int, Int}, dofcoefficients::Vector{Union{Nothing, DofCoefficients{T}}}, time::Real
-    ) where {T}
+    ) where {T, F <: Function}
     ip = get_base_interpolation(function_interpolation(fv)) # Ensures getting error message from `integrate_projected_dbc!`
     max_dofs_per_facet = maximum(length, dirichlet_facetdof_indices(ip))
     Kᶠ = zeros(max_dofs_per_facet, max_dofs_per_facet)
@@ -1959,8 +1988,11 @@ function _update_projected_dbc!(
         reinit!(fv, fc)
         shape_nrs = dirichlet_facetdof_indices(ip)[getcurrentfacet(fv)]
         solve_projected_dbc!(aᶠ, Kᶠ, fᶠ, f, fv, shape_nrs, getcoordinates(fc), time)
-        for (idof, shape_nr) in enumerate(shape_nrs)
-            globaldof = celldofs(fc)[shape_nr]
+        # facet_dofs (unlike shape_nrs) includes the field offset in the cell dof vector,
+        # which matters when the constrained field is not the first field in the SubDofHandler.
+        local_dofs = facet_dofs[getcurrentfacet(fv)]
+        for idof in eachindex(shape_nrs)
+            globaldof = celldofs(fc)[local_dofs[idof]]
             dbc_index = dofmapping[globaldof]
             # Only DBC dofs are currently update!-able so don't modify inhomogeneities
             # for affine constraints
@@ -1972,7 +2004,33 @@ function _update_projected_dbc!(
     return nothing
 end
 
-function solve_projected_dbc!(aᶠ, Kᶠ, fᶠ, bc_fun, fv, shape_nrs, cell_coords, time)
+# Solve x = K \ b for a small symmetric positive definite K (a Gram matrix from
+# an L2 projection): closed form for the common 1x1 and 2x2 cases, otherwise
+# in-place Cholesky, to avoid allocations.
+function solve_small_spd!(x::AbstractVector, K::AbstractMatrix, b::AbstractVector)
+    n = length(x)
+    if n == 1
+        x[1] = b[1] / K[1, 1]
+    elseif n == 2
+        # Unrolled Cholesky (K = LLᵀ) with forward/backward substitution. Unlike
+        # Cramer's rule this does not form products of matrix entries, so it does
+        # not overflow/underflow for extreme (but representable) entry magnitudes.
+        L11 = sqrt(K[1, 1])
+        L21 = K[2, 1] / L11
+        L22 = sqrt(K[2, 2] - L21^2)
+        y1 = b[1] / L11
+        y2 = (b[2] - L21 * y1) / L22
+        x[2] = y2 / L22
+        x[1] = (y1 - L21 * x[2]) / L11
+    else
+        ldiv!(x, cholesky!(Symmetric(K)), b)
+    end
+    return x
+end
+
+# Note: the `bc_fun::F` type parameters force specialization on the function argument in
+# the methods that only pass it through (otherwise the inner call is a dynamic dispatch).
+function solve_projected_dbc!(aᶠ, Kᶠ, fᶠ, bc_fun::F, fv, shape_nrs, cell_coords, time) where {F}
     fill!(Kᶠ, 0)
     fill!(fᶠ, 0)
     # Supporting varying number of facetdofs (for ref shapes with different facet types) requires
@@ -1981,11 +2039,11 @@ function solve_projected_dbc!(aᶠ, Kᶠ, fᶠ, bc_fun, fv, shape_nrs, cell_coor
     # end
     @assert length(shape_nrs) == size(Kᶠ, 1)
     integrate_projected_dbc!(Kᶠ, fᶠ, bc_fun, fv, shape_nrs, cell_coords, time)
-    aᶠ .= Kᶠ \ fᶠ # Could be done non-allocating if required, using e.g. SMatrix
+    solve_small_spd!(aᶠ, Kᶠ, fᶠ)
     return aᶠ
 end
 
-function integrate_projected_dbc!(Kᶠ, fᶠ, bc_fun, fv, shape_nrs, cell_coords, time)
+function integrate_projected_dbc!(Kᶠ, fᶠ, bc_fun::F, fv, shape_nrs, cell_coords, time) where {F}
     return integrate_projected_dbc!(conformity(fv), Kᶠ, fᶠ, bc_fun, fv, shape_nrs, cell_coords, time)
 end
 
