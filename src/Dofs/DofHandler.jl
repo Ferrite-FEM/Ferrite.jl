@@ -866,8 +866,8 @@ methodology described therein.
                 k = _canonical_facedof_index_triangle(t1, t2, q, orientation)
                 dof = dofs[k]
                 for d in 1:n_copies
-                    j = n_copies * (local_dof_table[k] - 1) + d
-                    cell_dofs[j] = (dof - 1) + d
+                    jdi= n_copies * (local_dof_table[k] - 1) + d
+                    cell_dofs[di] = (dof - 1) + d
                 end
             end
         elseif nfacevertices == 4 # quadrilateral face
@@ -879,8 +879,8 @@ methodology described therein.
                 k = _canonical_facedof_index_quadrilateral(i, j, m, orientation)
                 dof = dofs[k]
                 for d in 1:n_copies
-                    j = n_copies * (local_dof_table[k] - 1) + d
-                    cell_dofs[j] = (dof - 1) + d
+                    di = n_copies * (local_dof_table[k] - 1) + d
+                    cell_dofs[di] = (dof - 1) + d
                 end
             end
         else
