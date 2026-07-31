@@ -371,8 +371,12 @@ function add_sparsity_entries!(
     if isempty(sp.buffer.data)
         keep_constrained || _check_keep_constrained_args(dh, ch)
         # An explicitly full coupling mask restricts nothing: normalize to `nothing` so the
-        # fast fill skips mask evaluation (and the local-index map it requires).
-        coupling = coupling !== nothing && all(coupling) ? nothing : coupling
+        # fast fill skips mask evaluation (and the local-index map it requires). Validate
+        # the dimensions first, since normalization skips the expansion that normally does it.
+        if coupling !== nothing && all(coupling)
+            _check_coupling_dims(dh, coupling)
+            coupling = nothing
+        end
         couplings = coupling === nothing ? nothing : _coupling_to_local_dof_coupling(dh, coupling)
         isconstrained = keep_constrained ? nothing : _isconstrained_by_dof(ch)
         # With interface entries coming (added below), reserve row space for them up front so
@@ -386,8 +390,12 @@ function add_sparsity_entries!(
             # dofs unmasked, the same set) -- but only when the cell coupling imposes no
             # restriction either, since with a restricted cell coupling the own-cell
             # candidates consult the interface mask for the same-side interface blocks.
-            interface_couplings = couplings === nothing && all(interface_coupling) ? nothing :
+            interface_couplings = if couplings === nothing && all(interface_coupling)
+                _check_coupling_dims(dh, interface_coupling)
+                nothing
+            else
                 _coupling_to_local_dof_coupling(dh, interface_coupling)
+            end
             interfaces_filled = _can_fill_interfaces_directly(dh, interface_couplings)
         end
         _fast_fill_cells!(
@@ -678,6 +686,18 @@ end
 # ii) (ncomponents × ncomponents) specifying coupling between components, or iii)
 # (ndofs_per_cell × ndofs_per_cell) specifying coupling between all local dofs, i.e. a
 # "template" local matrix.
+# Validate the dimensions of a user-provided coupling mask without expanding it (the same
+# checks the expansion below performs). Used before the full-mask normalization in
+# add_sparsity_entries!, which skips the expansion where validation normally happens.
+function _check_coupling_dims(dh::DofHandler, coupling::AbstractMatrix{Bool})
+    sz = size(coupling, 1)
+    sz == size(coupling, 2) || error("coupling not square")
+    sz == length(dh.field_names) && return # coupling by fields
+    sz == sum(fieldname -> n_components(dh, fieldname), dh.field_names) && return # by components
+    all(sdh -> sz == ndofs_per_cell(sdh), dh.subdofhandlers) && return # template local matrix
+    error("could not create coupling")
+end
+
 function _coupling_to_local_dof_coupling(dh::DofHandler, coupling::AbstractMatrix{Bool})
     # Return one matrix per (potential) sub-domain
     return Matrix{Bool}[

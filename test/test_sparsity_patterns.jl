@@ -409,6 +409,15 @@ end
             compare_matrices(allocate_matrix(sp_fast), allocate_matrix(sp_gen))
         end
     end
+    # Full masks are normalized away in the fast path but must still be validated
+    # (dh has 2 fields, 3 components, 22 dofs/cell, so trues(4, 4) matches nothing)
+    let dh = fsp_test_create_dh(Quadrilateral)
+        sp() = init_sparsity_pattern(dh)
+        @test_throws ErrorException("coupling not square") add_sparsity_entries!(sp(), dh; coupling = [true true])
+        @test_throws ErrorException("could not create coupling") add_sparsity_entries!(sp(), dh; coupling = trues(4, 4))
+        topo = ExclusiveTopology(dh.grid)
+        @test_throws ErrorException("coupling not square") add_sparsity_entries!(sp(), dh; topology = topo, interface_coupling = [true true])
+    end
     # Interface entries (topology) are reserved up front, filtered by interface_coupling. For a
     # single-subdofhandler discretization the reservation is exact and doubles as the fill
     # itself, i.e. no row relocations and no layered interface insertion. (Multiple
