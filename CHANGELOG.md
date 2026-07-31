@@ -42,6 +42,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
    assembly](https://ferrite-fem.github.io/Ferrite.jl/stable/howto/threaded_assembly/).
    ([#1417])
 
+### Changed
+ - `interface_coupling` in `allocate_matrix`/`add_sparsity_entries!`/`add_interface_entries!`
+   is now self-sufficient for interface assembly: `interface_coupling[i, j] = true` creates
+   entries for *every* (test dof of field `i`, trial dof of field `j`) pair within the union
+   of the dofs of the two cells sharing an interface. Previously, pairs where either dof was
+   shared between the two cells (continuous interpolations), as well as pairs where both
+   dofs belong to the same cell, were left to the cell `coupling` to provide, so assembling
+   interface terms with nonzero values at shared dofs (e.g. flux-type couplings of
+   continuous fields) could hit missing sparsity pattern entries when a restricted cell
+   `coupling` was used. Patterns built with full cell coupling (the default,
+   `coupling = nothing`) are unchanged; the additional entries appear only for `topology`
+   builds that combine a restricted cell `coupling` with `interface_coupling`. ([#1432])
+
 ### Documentation
  - The figures for the documentation are now programmatically generated and made to have a consistent look.
  - New tutorial: Elastodynamics and modal analysis of a cantilever beam (mass matrix, generalized eigenvalue problem, Rayleigh damping, Newmark time integration).
@@ -1250,3 +1263,4 @@ poking into Ferrite internals:
 [#1414]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1414
 [#1416]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1416
 [#1421]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1421
+[#1432]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1432
