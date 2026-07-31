@@ -175,7 +175,7 @@ using Ferrite: reference_shape_value, reference_shape_gradient
     end
 
     @testset "facedof interior lattice ordering" begin
-        # The dof distribution (see Ferrite.permute_and_push!) assumes that the interior
+        # The dof distribution (see Ferrite.permute_and_set!) assumes that the interior
         # face dofs of interpolations with adjust_dofs_during_distribution == true are
         # ordered according to a regular lattice enumeration: row by row with rows of
         # increasing barycentric v2-weight (triangles) or v1 → v4 coordinate
