@@ -239,10 +239,8 @@ nothing                                                       #src
 # as usual, with loops over quadrature points and shape functions:
 
 function assemble_element!(ke, ge, cell, cv, fv, mp, ue, ΓN)
-    ## Reinitialize cell values, and reset output arrays
+    ## Reinitialize cell values
     reinit!(cv, cell)
-    fill!(ke, 0.0)
-    fill!(ge, 0.0)
 
     b = Vec{3}((0.0, -0.5, 0.0)) # Body force
     tn = 0.1 # Traction (to be scaled with surface normal)
@@ -311,6 +309,8 @@ function assemble_global!(K, g, dh, cv, fv, mp, u, ΓN)
     @timeit "assemble" for cell in CellIterator(dh)
         global_dofs = celldofs(cell)
         ue .= @view u[global_dofs] # element dofs
+        fill!(ke, 0.0)
+        fill!(ge, 0.0)
         @timeit "element assemble" assemble_element!(ke, ge, cell, cv, fv, mp, ue, ΓN)
         assemble!(assembler, global_dofs, ke, ge)
     end

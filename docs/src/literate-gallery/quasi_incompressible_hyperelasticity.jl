@@ -190,11 +190,9 @@ end;
 # The function to assemble the element stiffness matrix for each element in the mesh now has a block structure like in
 # `incompressible_elasticity`.
 function assemble_element!(Ke, fe, cell, cellvalues, mp, ue, pe)
-    ## Reinitialize cell values, and reset output arrays
+    ## Reinitialize cell values
     ublock, pblock = 1, 2
     reinit!(cellvalues, cell)
-    fill!(Ke, 0.0)
-    fill!(fe, 0.0)
 
     n_basefuncs_u = getnbasefunctions(cellvalues.u)
     n_basefuncs_p = getnbasefunctions(cellvalues.p)
@@ -270,6 +268,8 @@ function assemble_global!(
         @assert size(global_dofs, 1) == nu + np # sanity check
         ue = w[global_dofsu] # displacement dofs for the current cell
         pe = w[global_dofsp] # pressure dofs for the current cell
+        fill!(ke, 0.0)
+        fill!(fe, 0.0)
         assemble_element!(ke, fe, cell, cellvalues, mp, ue, pe)
         assemble!(assembler, global_dofs, ke, fe)
     end

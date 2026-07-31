@@ -103,8 +103,6 @@ create_example_2d_grid()
 
 ## Element routine
 function assemble_cell!(Ke::Matrix, fe::Vector, cellvalues::CellValues, C::SymmetricTensor, b::Vec)
-    fill!(Ke, 0)
-    fill!(fe, 0)
     for q_point in 1:getnquadpoints(cellvalues)
         dΩ = getdetJdV(cellvalues, q_point)
         for i in 1:getnbasefunctions(cellvalues)
@@ -255,6 +253,8 @@ function assemble_global!(
             ## Reinitialize the cell cache and then the cellvalues
             reinit!(cell_cache, cellidx)
             reinit!(cellvalues, cell_cache)
+            fill!(Ke, 0)
+            fill!(fe, 0)
             ## Compute the local contribution of the cell
             assemble_cell!(Ke, fe, cellvalues, C, b)
             ## Assemble local contribution
@@ -281,6 +281,8 @@ nothing # hide
 #         # Reinitialize the cell cache and then the cellvalues
 #         reinit!(cell_cache, cellidx)
 #         reinit!(cellvalues, cell_cache)
+#         fill!(Ke, 0)
+#         fill!(fe, 0)
 #         # Compute the local contribution of the cell
 #         assemble_cell!(Ke, fe, cellvalues, C, b)
 #         # Assemble local contribution
