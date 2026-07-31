@@ -98,6 +98,36 @@ function neighborhood_sweep(top, grid)
     return acc
 end
 
+# Iterate every vertex/edge/face neighbor list stored in the topology, i.e. a sweep over
+# the raw adjacency storage (`ArrayOfVectorViews`), complementing `neighborhood_sweep`
+# which goes through the `getneighborhood` query path (see issue #1019).
+function neighbor_index_sum(neighbors::AbstractMatrix)
+    acc = 0
+    for nbs in neighbors
+        for n in nbs
+            acc += n[1] + n[2]
+        end
+    end
+    return acc
+end
+
+function neighbor_index_sum(top::ExclusiveTopology)
+    acc = neighbor_index_sum(top.vertex_vertex_neighbor)
+    acc += neighbor_index_sum(top.edge_edge_neighbor)
+    acc += neighbor_index_sum(top.face_face_neighbor)
+    return acc
+end
+
+# getneighborhood for every facet of the (precomputed) facet skeleton: the FacetIndex
+# query path, as used e.g. when assembling over interior facets (see issue #1019).
+function skeleton_neighborhood_sweep(top, grid, skeleton)
+    acc = 0
+    for facetidx in skeleton
+        acc += sum(n[1] + n[2] for n in getneighborhood(top, grid, facetidx); init = 0)
+    end
+    return acc
+end
+
 # A single CellValues construction is below the floor, so construct several.
 function construction_sweep(qr, ip, ip_geo, n)
     local cv
@@ -131,6 +161,40 @@ function apply_rhs_sweep!(data, f, ch, n)
         apply_rhs!(data, f, ch)
     end
     return f
+end
+
+#----------------------------------------------------------------------#
+# AMR
+#----------------------------------------------------------------------#
+
+# An adaptively refined, unbalanced forest: uniform refinement to `levels`, then two
+# scattered every-fourth-leaf passes without balancing in between. A single pass from the
+# uniform (conforming) state can only produce level differences of 1, which never violates
+# 2:1; the second pass creates level differences of 2, so `balanceforest!` actually has
+# violations to resolve, spread across all trees and tree boundaries.
+function adaptive_forest(celltype, dims, levels)
+    forest = ForestBWG(generate_grid(celltype, dims))
+    for l in 1:levels
+        refine_all!(forest, l)
+    end
+    refine!(forest, 1:4:getncells(forest))
+    refine!(forest, 1:4:getncells(forest))
+    return forest
+end
+
+function balanced_forest(celltype, dims, levels)
+    forest = adaptive_forest(celltype, dims, levels)
+    balanceforest!(forest)
+    return forest
+end
+
+# The constraint side of the AMR pipeline: turn the conformity info of a non-conforming
+# grid into affine constraints and close the handler.
+function conformity_constraints(dh)
+    ch = ConstraintHandler(dh)
+    add!(ch, ConformityConstraint(:u))
+    close!(ch)
+    return ch
 end
 
 #----------------------------------------------------------------------#
@@ -236,12 +300,17 @@ end
 
 # Scatter-only loop with a precomputed element matrix, isolating `assemble!` into the
 # sparse matrix from the kernel cost above.
-function assemble_scatter!(K, dofs_batch, Ke)
-    assembler = start_assemble(K)
+function assemble_scatter!(K, dofs_batch, Ke; kwargs...)
+    assembler = start_assemble(K; kwargs...)
+    # Function barrier: the assembler type depends on the value of the `atomic` keyword
+    # argument, which does not constant-propagate through the `kwargs` splat.
+    return _assemble_scatter_loop!(assembler, dofs_batch, Ke)
+end
+function _assemble_scatter_loop!(assembler, dofs_batch, Ke)
     for dofs in dofs_batch
         assemble!(assembler, dofs, Ke)
     end
-    return K
+    return
 end
 
 # Boundary load assembly (a pressure load p n ⋅ φ) over a facet set, for a vector field.

@@ -244,6 +244,29 @@ function apply_rhs!(data::RHSData, f::AbstractVector, ch::ConstraintHandler, app
     return
 end
 
+"""
+    _condense_rhs!(f::AbstractVector, ch::ConstraintHandler)
+
+Condense the right-hand-side vector `f`, i.e. compute `f := C' f` where `C` is the
+constraint matrix, without access to the (already condensed) system matrix. This is the
+affine part of [`apply_rhs!`](@ref) and requires all constraints to be homogeneous
+(e.g. hanging node constraints from a [`ConformityConstraint`](@ref)).
+"""
+function _condense_rhs!(f::AbstractVector, ch::ConstraintHandler)
+    @boundscheck checkbounds(f, ch.prescribed_dofs)
+    @inbounds for (i, pdof) in pairs(ch.prescribed_dofs)
+        dofcoef = ch.dofcoefficients[i]
+        if dofcoef !== nothing # if affine constraint
+            iszero(ch.inhomogeneities[i]) || error("_condense_rhs! requires homogeneous constraints")
+            for (d, v) in dofcoef
+                f[d] += f[pdof] * v
+            end
+        end
+        f[pdof] = 0
+    end
+    return f
+end
+
 function Base.show(io::IO, ::MIME"text/plain", ch::ConstraintHandler)
     println(io, "ConstraintHandler:")
     if !isclosed(ch)
@@ -321,6 +344,7 @@ function close!(ch::ConstraintHandler)
             i == 0 && continue
             icoeffs = ch.dofcoefficients[i]
             if !(icoeffs === nothing || isempty(icoeffs))
+                @debug println("Nested affine constraint detected: master dof $d of $coeffs is itself affinely constrained")
                 error("nested affine constraints currently not supported")
             end
         end
@@ -825,7 +849,7 @@ function _condense!(K::SparseMatrixCSC, f::AbstractVector, dofcoefficients::Vect
                         addindex!(K, v * Kval, row, d)
                     end
                 else
-                    for (d1, v1) in col_coeffs, (d2, v2) in row_coeffs
+                    for (d1, v1) in row_coeffs, (d2, v2) in col_coeffs
                         addindex!(K, v1 * v2 * Kval, d1, d2)
                     end
                 end

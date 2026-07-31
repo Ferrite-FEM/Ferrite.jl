@@ -297,6 +297,10 @@ between cells as described by the DofHandler `dh`.
    (`keep_constrained = true`) or eliminated (`keep_constrained = false`) from the sparsity
    pattern. `keep_constrained = false` requires passing the ConstraintHandler `ch`.
  - `interface_coupling`: the coupling between fields/components across the interface.
+   `interface_coupling[i, j] = true` means that entries exist for (rows of field/component
+   `i` in one cell) × (columns of field/component `j` in the other cell), for both
+   orientations of every interface. As for cell `coupling`, rows correspond to test
+   functions and columns to trial functions.
 """
 function add_interface_entries!(
         sp::SparsityPattern, dh::DofHandler, ch::Union{ConstraintHandler, Nothing} = nothing;
@@ -448,41 +452,55 @@ end
 # (ndofs_per_cell × ndofs_per_cell) specifying coupling between all local dofs, i.e. a
 # "template" local matrix.
 function _coupling_to_local_dof_coupling(dh::DofHandler, coupling::AbstractMatrix{Bool})
+    # Return one matrix per (potential) sub-domain
+    return Matrix{Bool}[
+        _coupling_to_local_dof_coupling(dh, coupling, sdh, sdh) for sdh in dh.subdofhandlers
+    ]
+end
+
+# Compute a rectangular coupling matrix of size
+# (ndofs_per_cell(sdh_row) × ndofs_per_cell(sdh_col)) where the rows are local dof indices
+# in `sdh_row`'s layout and the columns local dof indices in `sdh_col`'s layout. With
+# `sdh_row === sdh_col` this is the local coupling matrix of a cell; with different
+# subdofhandlers it is used for the coupling across an interface between the two.
+function _coupling_to_local_dof_coupling(
+        dh::DofHandler, coupling::AbstractMatrix{Bool},
+        sdh_row::SubDofHandler, sdh_col::SubDofHandler,
+    )
     sz = size(coupling, 1)
     sz == size(coupling, 2) || error("coupling not square")
 
-    # Return one matrix per (potential) sub-domain
-    outs = Matrix{Bool}[]
     field_dims = map(fieldname -> n_components(dh, fieldname), dh.field_names)
 
-    for sdh in dh.subdofhandlers
-        out = zeros(Bool, ndofs_per_cell(sdh), ndofs_per_cell(sdh))
-        push!(outs, out)
+    out = zeros(Bool, ndofs_per_cell(sdh_row), ndofs_per_cell(sdh_col))
 
-        dof_ranges = [dof_range(sdh, f) for f in sdh.field_names]
-        global_idxs = [findfirst(x -> x === f, dh.field_names) for f in sdh.field_names]
+    dof_ranges_row = [dof_range(sdh_row, f) for f in sdh_row.field_names]
+    dof_ranges_col = [dof_range(sdh_col, f) for f in sdh_col.field_names]
+    global_idxs_row = [findfirst(x -> x === f, dh.field_names) for f in sdh_row.field_names]
+    global_idxs_col = [findfirst(x -> x === f, dh.field_names) for f in sdh_col.field_names]
 
-        if sz == length(dh.field_names) # Coupling given by fields
-            for (j, jrange) in pairs(dof_ranges), (i, irange) in pairs(dof_ranges)
-                out[irange, jrange] .= coupling[global_idxs[i], global_idxs[j]]
-            end
-        elseif sz == sum(field_dims) # Coupling given by components
-            component_offsets = pushfirst!(cumsum(field_dims), 0)
-            for (jf, jrange) in pairs(dof_ranges), (j, J) in pairs(jrange)
-                jc = mod1(j, field_dims[global_idxs[jf]]) + component_offsets[global_idxs[jf]]
-                for (i_f, irange) in pairs(dof_ranges), (i, I) in pairs(irange)
-                    ic = mod1(i, field_dims[global_idxs[i_f]]) + component_offsets[global_idxs[i_f]]
-                    out[I, J] = coupling[ic, jc]
-                end
-            end
-        elseif sz == ndofs_per_cell(sdh) # Coupling given by template local matrix
-            # TODO: coupling[fieldhandler_idx] if different template per subddomain
-            out .= coupling
-        else
-            error("could not create coupling")
+    if sz == length(dh.field_names) # Coupling given by fields
+        for (j, jrange) in pairs(dof_ranges_col), (i, irange) in pairs(dof_ranges_row)
+            out[irange, jrange] .= coupling[global_idxs_row[i], global_idxs_col[j]]
         end
+    elseif sz == sum(field_dims) # Coupling given by components
+        component_offsets = pushfirst!(cumsum(field_dims), 0)
+        for (jf, jrange) in pairs(dof_ranges_col), (j, J) in pairs(jrange)
+            jc = mod1(j, field_dims[global_idxs_col[jf]]) + component_offsets[global_idxs_col[jf]]
+            for (i_f, irange) in pairs(dof_ranges_row), (i, I) in pairs(irange)
+                ic = mod1(i, field_dims[global_idxs_row[i_f]]) + component_offsets[global_idxs_row[i_f]]
+                out[I, J] = coupling[ic, jc]
+            end
+        end
+    elseif sz == ndofs_per_cell(sdh_row) == ndofs_per_cell(sdh_col)
+        # Coupling given by template local matrix. Note that this assumes matching local
+        # dof layouts in `sdh_row` and `sdh_col`.
+        # TODO: coupling[fieldhandler_idx] if different template per subddomain
+        out .= coupling
+    else
+        error("could not create coupling")
     end
-    return outs
+    return out
 end
 
 function _add_cell_entries!(
@@ -611,25 +629,32 @@ function _add_interface_entries!(
         topology::ExclusiveTopology, keep_constrained::Bool,
         interface_coupling::AbstractMatrix{Bool},
     )
-    couplings = _coupling_to_local_dof_coupling(dh, interface_coupling)
+    # Expanded coupling masks, lazily created per (row cell sdh, column cell sdh) pair
+    couplings = Dict{NTuple{2, Int}, Matrix{Bool}}()
+    to_check = Dict{Int, Vector{Int}}()
     for ic in InterfaceIterator(dh, topology)
         # TODO: This looks like it can be optimized for the common case where
         #       the cells are in the same subdofhandler
         sdhs_idx = dh.cell_to_subdofhandler[cellid.([ic.a, ic.b])]
         sdhs = dh.subdofhandlers[sdhs_idx]
-        to_check = Dict{Int, Vector{Int}}()
-        for (i, sdh) in pairs(sdhs)
-            sdh_idx = sdhs_idx[i]
-            coupling_sdh = couplings[sdh_idx]
+        # Two iterations, one per orientation of the interface: the first iteration adds
+        # the entries with rows from `ic.a` and columns from `ic.b`, the second iteration
+        # the entries with rows from `ic.b` and columns from `ic.a`. Both directions are
+        # gated by the coupling mask with the row cell as the first (test function) index
+        # and the neighbor cell as the second (trial function) index.
+        for it in 1:2
+            sdh = sdhs[it]
+            sdh2 = sdhs[it == 1 ? 2 : 1]
+            cell_dofs = celldofs(it == 1 ? ic.a : ic.b)
+            neighbor_dofs = celldofs(it == 1 ? ic.b : ic.a)
+            coupling_sdh = get!(couplings, (sdhs_idx[it], sdhs_idx[it == 1 ? 2 : 1])) do
+                _coupling_to_local_dof_coupling(dh, interface_coupling, sdh, sdh2)
+            end
             for cell_field in sdh.field_names
                 dofrange1 = dof_range(sdh, cell_field)
-                cell_dofs = celldofs(sdh_idx == 1 ? ic.a : ic.b)
                 cell_field_dofs = @view cell_dofs[dofrange1]
-                for neighbor_field in sdh.field_names
-                    sdh2 = sdhs[i == 1 ? 2 : 1]
-                    neighbor_field ∈ sdh2.field_names || continue
+                for neighbor_field in sdh2.field_names
                     dofrange2 = dof_range(sdh2, neighbor_field)
-                    neighbor_dofs = celldofs(sdh_idx == 2 ? ic.a : ic.b)
                     neighbor_field_dofs = @view neighbor_dofs[dofrange2]
 
                     empty!(to_check)
@@ -646,7 +671,6 @@ function _add_interface_entries!(
                         for i in is
                             cell_field_dofs[i] ∈ neighbor_dofs && continue
                             _add_interface_entry(sp, cell_field_dofs, neighbor_field_dofs, i, j, keep_constrained, ch)
-                            _add_interface_entry(sp, neighbor_field_dofs, cell_field_dofs, j, i, keep_constrained, ch)
                         end
                     end
                 end

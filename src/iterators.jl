@@ -284,7 +284,7 @@ FaceIterator(args...) = error("FaceIterator is deprecated, use FacetIterator ins
 """
     FacetIterator(gridordh::Union{Grid, AbstractDofHandler}, facetset::AbstractVecOrSet{FacetIndex})
 
-Create a `FacetIterator` to conveniently iterate over the faces in `facestet`. The elements of
+Create a `FacetIterator` to conveniently iterate over the faces in `facetset`. The elements of
 the iterator are [`FacetCache`](@ref)s which are properly `reinit!`ialized. See
 [`FacetCache`](@ref) for more details.
 
@@ -301,6 +301,7 @@ for faceindex in facetset
     reinit!(fc, faceindex)
     # ...
 end
+```
 """
 struct FacetIterator{FC <: FacetCache}
     fc::FC

@@ -39,6 +39,11 @@ const EXAMPLES = Dict(
     "stokes-flow" => "literate-tutorials/stokes-flow.jl",
     "computational_homogenization" => "literate-tutorials/computational_homogenization.jl",
     "linear_shell" => "literate-tutorials/linear_shell.jl",
+    "heat_adaptivity" => "literate-tutorials/heat_adaptivity.jl",
+    "darcy_flow" => "literate-tutorials/darcy_flow.jl",
+    # How-to guides.
+    "postprocessing" => "literate-howto/postprocessing.jl",
+    "threaded_assembly" => "literate-howto/threaded_assembly.jl",
     # Time-stepping examples rendered as animations (write a .pvd collection).
     "transient_heat" => "literate-tutorials/transient_heat_equation.jl",
     "elastodynamics" => "literate-tutorials/elastodynamics.jl",
@@ -50,6 +55,7 @@ const EXAMPLES = Dict(
     "quasi_incompressible_hyperelasticity" => "literate-gallery/quasi_incompressible_hyperelasticity.jl",
     "landau" => "literate-gallery/landau.jl",
     "topology_optimization" => "literate-gallery/topology_optimization.jl",
+    "elasticity_adaptivity" => "literate-gallery/elasticity_adaptivity.jl",
 )
 
 # Extra code evaluated in the example's module after running it, e.g. to
@@ -57,6 +63,12 @@ const EXAMPLES = Dict(
 # default the example uses.
 const POSTRUN = Dict(
     "stokes-flow" => :(main(0.02)),
+    # More AMR steps than the (cheap) example default, for a properly refined mesh.
+    "heat_adaptivity" => :(solve_adaptive(grid; nsteps = 7)),
+    "elasticity_adaptivity" => :(solve_adaptive(forest; nsteps = 12)),
+    # The example only runs the larger regularization radius; the figure comparing the
+    # two needs the smaller one as well.
+    "topology_optimization" => :(topopt(0.02, 0.5, 60, "small_radius"; output = false)),
 )
 
 # Output file basenames (before the -light/-dark suffix) each scene renders;
@@ -66,11 +78,23 @@ const OUTPUTS = Dict(
     "linear_elasticity" => ["linear_elasticity", "linear_elasticity_stress"],
     "elastodynamics" => ["elastodynamics", "elastodynamics_modes"],
     "landau" => ["landau_orig", "landau_opt"],
+    "postprocessing" => ["postprocessing", "postprocessing_cutline"],
+    "threaded_assembly" => ["coloring"],
+    "topology_optimization" => ["topology_optimization", "topology_optimization_result"],
 )
 
 const DOCS = @__DIR__
 const DATADIR = joinpath(DOCS, "screenshot-data")     # gitignored .vtu scratch
 const OUTDIR = joinpath(DOCS, "screenshot-assets")    # gitignored; upload to gh-pages/assets
+
+# Examples that build on another one include it by its generated path
+# (docs/src/tutorials/...), which only exists once Literate has run. Map such a
+# path back to the literate source, which is what this script runs from.
+function resolve_example(dir, path)
+    file = normpath(joinpath(dir, path))
+    isfile(file) && return file
+    return replace(file, r"([/\\])(tutorials|howto|gallery)([/\\])" => s"\1literate-\2\3")
+end
 
 # Copy the rendered assets for the given scenes into the gh-pages `assets/`
 # folder and push them, so docs/download_resources.jl can fetch them at build
@@ -121,6 +145,11 @@ if !render_only
         # Each example runs in its own module so their `using`s and definitions
         # don't clash (e.g. several packages export `update!`).
         mod = Module(Symbol("Example_", name))
+        # A module created at runtime has no `include`, which examples building on
+        # another one need (e.g. the postprocessing how-to). Give it one resolving
+        # relative to the example file, not to the data directory we run in.
+        dir = dirname(script)
+        Core.eval(mod, :(include(path) = $(Base.include)($mod, $resolve_example($dir, path))))
         cd(() -> Base.include(mod, script), DATADIR)
         if haskey(POSTRUN, name)
             cd(() -> Core.eval(mod, POSTRUN[name]), DATADIR)

@@ -147,6 +147,8 @@ write_overview(
         ("reactive_surface", "Reactive surface", ["reactive_surface-light.webp", "reactive_surface-dark.webp"]),
         ("linear_shell", "Linear shell", ["linear_shell-light.png", "linear_shell-dark.png"]),
         ("dg_heat_equation", "DG heat equation", ["dg_heat_equation-light.png", "dg_heat_equation-dark.png"]),
+        ("heat_adaptivity", "Adaptive heat equation", ["heat_adaptivity-light.webp", "heat_adaptivity-dark.webp"]),
+        ("darcy_flow", "Darcy flow", ["darcy_flow-light.png", "darcy_flow-dark.png"]),
     ],
 )
 
@@ -158,5 +160,6 @@ write_overview(
         ("quasi_incompressible_hyperelasticity", "Nearly incompressible hyperelasticity", ["quasi_incompressible_hyperelasticity-light.webp", "quasi_incompressible_hyperelasticity-dark.webp"]),
         ("landau", "Ginzburg–Landau minimization", ["landau_opt-light.png", "landau_opt-dark.png"]),
         ("topology_optimization", "Topology optimization", ["topology_optimization-light.webp", "topology_optimization-dark.webp"]),
+        ("elasticity_adaptivity", "Adaptive linear elasticity", ["elasticity_adaptivity-light.webp", "elasticity_adaptivity-dark.webp"]),
     ],
 )

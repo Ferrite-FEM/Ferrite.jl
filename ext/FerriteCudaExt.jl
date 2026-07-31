@@ -102,4 +102,10 @@ function Ferrite.allocate_matrix(::Type{CuSparseMatrixCSR{Tv, Ti}}, dh::DofHandl
     return CuSparseMatrixCSR(allocate_matrix(SparseMatrixCSC{Tv, Ti}, dh))
 end
 
+@propagate_inbounds function Ferrite._atomic_add!(x::CuVector{T}, i::Integer, v::T) where {T}
+    @boundscheck checkbounds(x, i)
+    CUDA.@atomic x[i] += v
+    return
+end
+
 end

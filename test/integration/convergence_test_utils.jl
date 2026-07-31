@@ -12,8 +12,12 @@ get_geometry(::Ferrite.Interpolation{RefHexahedron}) = Hexahedron
 get_geometry(::Ferrite.Interpolation{RefTetrahedron}) = Tetrahedron
 get_geometry(::Ferrite.Interpolation{RefPyramid}) = Pyramid
 
+get_quadrature_rule_name(refshape, qr_order) = Ferrite._default_quadrature_rule(refshape)
+get_quadrature_rule_name(refshape::Type{RefTetrahedron}, qr_order) = qr_order < 6 ? Ferrite._default_quadrature_rule(refshape) : :polyquad
+
 get_quadrature_order(::Lagrange{shape, order}) where {shape, order} = max(2 * order - 1, 2)
 get_quadrature_order(::Lagrange{RefTriangle, 5}) = 8
+get_quadrature_order(::Lagrange{RefTetrahedron, 4}) = 6
 get_quadrature_order(::Lagrange{RefPrism, order}) where {order} = 2 * order # Don't know why
 get_quadrature_order(::Serendipity{shape, order}) where {shape, order} = max(2 * order - 1, 2)
 get_quadrature_order(::CrouzeixRaviart{shape, order}) where {shape, order} = max(2 * order - 1, 2)
@@ -122,9 +126,11 @@ end
 
 # Assemble and solve
 function solve(dh, ch, cellvalues)
-    K, f = assemble_global(cellvalues, allocate_matrix(dh), dh)
+    K, f = assemble_global(cellvalues, allocate_matrix(dh, ch), dh)
     apply!(K, f, ch)
-    return K \ f
+    u = K \ f
+    apply!(u, ch)
+    return u
 end
 
 function setup_poisson_problem(grid, interpolation, interpolation_geo, qr)
@@ -139,6 +145,9 @@ function setup_poisson_problem(grid, interpolation, interpolation_geo, qr)
     )
     dbc = Dirichlet(:u, ∂Ω, (x, t) -> analytical_solution(x))
     add!(ch, dbc)
+    # Hanging nodes on adaptively refined grids must be constrained to
+    # their masters for the approximation to stay H¹-conforming.
+    grid isa Ferrite.NonConformingGrid && add!(ch, ConformityConstraint(:u))
     close!(ch)
 
     cellvalues = CellValues(qr, interpolation, interpolation_geo)
@@ -156,7 +165,8 @@ function run_convergence_analysis(interpolation)
         grid = generate_grid(geometry, ntuple(x -> N, getrefdim(geometry)))
         # ... a suitable quadrature rule ...
         qr_order = get_quadrature_order(interpolation)
-        qr = QuadratureRule{getrefshape(interpolation)}(qr_order)
+        qr_name = get_quadrature_rule_name(getrefshape(interpolation), qr_order)
+        qr = QuadratureRule{getrefshape(interpolation)}(qr_name, qr_order)
         # ... and then pray to the gods of convergence.
         dh, ch, cellvalues = setup_poisson_problem(grid, interpolation, interpolation_geo, qr)
         u = solve(dh, ch, cellvalues)
@@ -174,7 +184,8 @@ function run_convergence_rate(interpolation)
         grid = generate_grid(geometry, ntuple(x -> N₁, getrefdim(geometry)))
         # ... a suitable quadrature rule ...
         qr_order = get_quadrature_order(interpolation)
-        qr = QuadratureRule{getrefshape(interpolation)}(qr_order)
+        qr_name = get_quadrature_rule_name(getrefshape(interpolation), qr_order)
+        qr = QuadratureRule{getrefshape(interpolation)}(qr_name, qr_order)
         # ... and then pray to the gods of convergence.
         dh, ch, cellvalues = setup_poisson_problem(grid, interpolation, interpolation_geo, qr)
         u = solve(dh, ch, cellvalues)
@@ -185,7 +196,8 @@ function run_convergence_rate(interpolation)
         grid = generate_grid(geometry, ntuple(x -> N₂, getrefdim(geometry)))
         # ... a suitable quadrature rule ...
         qr_order = get_quadrature_order(interpolation)
-        qr = QuadratureRule{getrefshape(interpolation)}(qr_order)
+        qr_name = get_quadrature_rule_name(getrefshape(interpolation), qr_order)
+        qr = QuadratureRule{getrefshape(interpolation)}(qr_name, qr_order)
         # ... and then pray to the gods of convergence.
         dh, ch, cellvalues = setup_poisson_problem(grid, interpolation, interpolation_geo, qr)
         u = solve(dh, ch, cellvalues)
