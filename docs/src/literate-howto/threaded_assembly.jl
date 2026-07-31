@@ -338,6 +338,8 @@ function assemble_global_atomic!(
         ## Reinitialize the cell cache and then the cellvalues
         reinit!(cell_cache, cellidx)
         reinit!(cellvalues, cell_cache)
+        fill!(Ke, 0)
+        fill!(fe, 0)
         ## Compute the local contribution of the cell
         assemble_cell!(Ke, fe, cellvalues, C, b)
         ## Assemble local contribution
