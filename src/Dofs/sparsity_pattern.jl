@@ -40,8 +40,7 @@ function eachrow end
 
 Return an iterator over the rows of the sparsity pattern `sp`.
 Each element of the iterator iterates the indices of the stored *columns* for that row, in
-sorted order. Implementations should preferably return the rows as `AbstractVector`s, which
-enables faster code paths (e.g. for matrix instantiation).
+sorted order.
 """
 eachrow(sp::AbstractSparsityPattern)
 
@@ -49,8 +48,7 @@ eachrow(sp::AbstractSparsityPattern)
     eachrow(sp::AbstractSparsityPattern, row::Int)
 
 Return an iterator over the stored *column* indices in row `row` of the sparsity pattern,
-in sorted order. Implementations should preferably return the row as an `AbstractVector`,
-which enables faster code paths (e.g. for matrix instantiation).
+in sorted order.
 
 Conceptually this is equivalent to [`eachrow(sp)[row]`](@ref
 eachrow(::AbstractSparsityPattern)). However, the iterator `eachrow(sp)` isn't always
@@ -97,9 +95,7 @@ end
 Create an empty [`SparsityPattern`](@ref) with `nrows` rows and `ncols` columns.
 `nnz_per_row` is used as a memory hint for the number of non zero entries per row: it is the
 initial reservation for a row that receives its first entry through [`add_entry!`](@ref
-Ferrite.add_entry!), and the minimum increment when a full row has to grow. It does not
-reserve any memory up front, and the counting fast path in [`add_sparsity_entries!`](@ref)
-sizes rows exactly without consulting it.
+Ferrite.add_entry!), and the minimum increment when a full row has to grow.
 
 `SparsityPattern` is the default sparsity pattern type for the standard DofHandler and is
 therefore commonly constructed using [`init_sparsity_pattern`](@ref) instead of with this
@@ -166,7 +162,7 @@ getncols(sp::SparsityPattern) = sp.ncols
 
 # The sorted, de-duplicating insert (with geometric growth on overflow) is
 # `CollectionsOfViews.insert_sorted_at_index!`. A row that overflows its reservation relocates to
-# the end of `data`, leaving a transient hole; see `compact!`.
+# the end of `data`, leaving a transient hole.
 
 # Lay out `data` so each row gets its own exact block [start, start+cap): one allocation, no holes.
 function _presize_buffer(rowlen::Vector{Int}, sizehint::Int)
@@ -198,13 +194,10 @@ end
 @noinline function _sort_pattern!(sp::SparsityPattern)
     nrows = getnrows(sp)
     # One chunk per thread (rows have similar cost so no load balancing is needed), but at
-    # least 1000 rows per task so that small patterns don't spawn useless tasks.
-    ntasks = max(min(Threads.nthreads(), nrows ÷ 1000), 1)
-    chunksize = cld(nrows, ntasks)
-    @sync for taskid in 1:ntasks
-        firstrow = 1 + chunksize * (taskid - 1)
-        lastrow = min(firstrow + chunksize - 1, nrows)
-        Threads.@spawn _sort_rows!(sp, firstrow:lastrow)
+    # least 1000 rows per chunk so that small patterns don't spawn useless tasks.
+    chunksize = max(1000, cld(nrows, Threads.nthreads()))
+    @sync for rowrange in Iterators.partition(1:nrows, chunksize)
+        Threads.@spawn _sort_rows!(sp, rowrange)
     end
     sp.sorted = true
     return sp
@@ -257,37 +250,6 @@ function _fast_fill_cells!(
     )
     sp.buffer = buffer
     sp.sorted = false
-    return sp
-end
-
-"""
-    Ferrite.compact!(sp::SparsityPattern)
-
-Rebuild the internal buffer with each row packed to exactly its stored size, reclaiming the holes
-left behind when rows overflow their reservation (e.g. after adding many constraint or custom
-entries). Purely a memory optimization; does not change the stored pattern.
-"""
-function compact!(sp::SparsityPattern)
-    _ensure_sorted!(sp)
-    b = sp.buffer
-    n = length(b.indices)
-    total = 0
-    @inbounds for row in 1:n
-        total += b.indices[row].ncurrent
-    end
-    newdata = Vector{Int}(undef, total)
-    newidx = Vector{AdaptiveRange}(undef, n)
-    pos = 1
-    @inbounds for row in 1:n
-        r = b.indices[row]
-        for i in 0:(r.ncurrent - 1)
-            newdata[pos + i] = b.data[r.start + i]
-        end
-        newidx[row] = AdaptiveRange(pos, r.ncurrent, r.ncurrent)
-        pos += r.ncurrent
-    end
-    sp.buffer = ConstructionBuffer{Int, 1}(newidx, newdata, b.sizehint)
-    sp.sorted = true
     return sp
 end
 
@@ -966,7 +928,7 @@ function _allocate_matrix(::Type{SparseMatrixCSC{Tv, Ti}}, sp::AbstractSparsityP
     return S
 end
 
-# Build the cell → global dofs map as an ArrayOfVectorViews (a compact copy of the
+# Build the cell -> global dofs map as an ArrayOfVectorViews (a compact copy of the
 # DofHandler's cell dof storage).
 function create_celldofs(dh::DofHandler)
     isclosed(dh) || throw(ArgumentError("DofHandler must be closed"))
@@ -979,9 +941,7 @@ function create_celldofs(dh::DofHandler)
         num = ndofs_per_cell(dh, cell_idx)
         num == 0 && continue
         r = n:(n + num - 1)
-        # Equivalent to celldofs!(view(cell_dofs, r), dh, cell_idx) but this avoids the view
-        soffs = dh.cell_dofs_offset[cell_idx]
-        copyto!(cell_dofs, n, dh.cell_dofs, soffs, num)
+        celldofs!(view(cell_dofs, r), dh, cell_idx)
         n = last(r) + 1
     end
     indices[end] = n

@@ -37,6 +37,17 @@ function compare_patterns(p1, px...)
     return
 end
 
+# Compare the storage of SparseMatrixCSR
+function compare_matrices_csr(A1, Ax...)
+    @assert A1 isa SparseMatrixCSR
+    @assert length(Ax) > 0
+    @assert all(A -> A isa SparseMatrixCSR, Ax)
+    @test all(A -> size(A1) == size(A), Ax)
+    @test all(A -> A1.rowptr == A.rowptr, Ax)
+    @test all(A -> A1.colval == A.colval, Ax)
+    return
+end
+
 # Compare the storage of SparseMatrixCSC
 function compare_matrices(A1, Ax...)
     @assert A1 isa SparseMatrixCSC
@@ -246,14 +257,11 @@ end
         add_sparsity_entries!(p, dh)
     end
     compare_patterns(ps...)
-    # The generic SparseMatrixCSR instantiation works for any pattern whose eachrow iterates
-    # sorted column indices; equal patterns give identical storage. This covers both helper
+    # The SparseMatrixCSR instantiation works for any pattern whose eachrow iterates sorted
+    # column indices; equal patterns give identical storage. This covers both row copy
     # branches: AbstractVector rows (TestPattern, SparsityPattern) and the iteration
     # fallback (BlockSparsityPattern's lazy rows).
-    let csrs = [allocate_matrix(SparseMatrixCSR{1, Float64, Int}, p) for p in ps]
-        @test all(K -> K.rowptr == csrs[1].rowptr, csrs)
-        @test all(K -> K.colval == csrs[1].colval, csrs)
-    end
+    compare_matrices_csr((allocate_matrix(SparseMatrixCSR{1, Float64, Int}, p) for p in ps)...)
 
     # DofHandler + ConstraintHandler
     ps = make_patterns(dh)

@@ -121,11 +121,9 @@ function Ferrite.allocate_matrix(::Type{SparseMatrixCSR{1, Tv, Ti}}, sp::Abstrac
     return _allocate_matrix(SparseMatrixCSR{1, Tv, Ti}, sp, false)
 end
 
-# Row length and row copy for the pattern rows handed out by `eachrow`: the expected thing
-# for `AbstractVector` rows (`SparsityPattern`, and what implementations preferably return),
-# with an iteration fallback for plain iterables (e.g. `BlockSparsityPattern`'s lazy rows).
-_length(colidxs::AbstractVector) = length(colidxs)
-_length(colidxs) = count(Returns(true), colidxs)
+# Copy one pattern row into `dest` starting at `k`: bulk copy for `AbstractVector` rows
+# (e.g. `SparsityPattern`), iteration fallback for other iterables (e.g.
+# `BlockSparsityPattern`'s lazy rows).
 function _copyto!(dest::Vector, k::Int, colidxs::AbstractVector)
     copyto!(dest, k, colidxs, 1, length(colidxs))
     return k + length(colidxs)
@@ -148,7 +146,7 @@ function _allocate_matrix(::Type{SparseMatrixCSR{1, Tv, Ti}}, sp::AbstractSparsi
     rowptr = Vector{Ti}(undef, nrows + 1)
     rowptr[1] = 1
     for (row, colidxs) in enumerate(Ferrite.eachrow(sp))
-        rowptr[row + 1] = rowptr[row] + _length(colidxs)
+        rowptr[row + 1] = rowptr[row] + length(colidxs)
     end
     nnz = rowptr[end] - 1
     # 2. Allocate colval and nzval now that nnz is known

@@ -125,6 +125,14 @@ function Base.iterate(it::BSPRowIterator, state = (1, 1))
     end
 end
 
+function Base.length(it::BSPRowIterator)
+    bsp = it.bsp
+    return sum(
+        length(eachrow(bsp.blocks[it.row_block, col_block], it.row_local))
+            for col_block in 1:length(bsp.block_sizes)
+    )
+end
+
 # TODO: eltype of the generator do not infer; might need another auxiliary struct.
 eachrow(bsp::BlockSparsityPattern) = (BSPRowIterator(bsp, row) for row in 1:getnrows(bsp))
 eachrow(bsp::BlockSparsityPattern, row::Int) = BSPRowIterator(bsp, row)
