@@ -471,8 +471,8 @@ function _close_subdofhandler!(dh::DofHandler{sdim}, sdh::SubDofHandler, sdh_ind
         base_ip = get_base_interpolation(interpolation)
         begin
             alldofs = [ip_info.lvertexdofs; ip_info.ledgedofs; ip_info.lfacedofs; ip_info.lvolumedofs]
-            @assert length(alldofs) == length(Set(alldofs)) "Interpolation has non-unqiue dof assignment."
-            @assert maximum(alldofs) == length(alldofs) && minimum(alldofs) == 1 "Interpolation is not continously numbered."
+            @assert length(alldofs) == length(Set(alldofs)) "Interpolation has non-unique dof assignment."
+            @assert maximum(alldofs) == length(alldofs) && minimum(alldofs) == 1 "Interpolation is not continuously numbered."
         end
         push!(ip_infos, ip_info)
     end
