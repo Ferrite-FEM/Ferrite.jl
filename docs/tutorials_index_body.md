@@ -194,7 +194,7 @@ Ferrite.jl"](https://summerofcode.withgoogle.com/programs/2023/projects/SLGbRNI5
 
 ---
 
-#### [Tutorial 15: Adaptive heat equation](@ref tutorial-heat-adaptivity)
+#### [Tutorial 15: Heat equation with adaptive mesh refinement](@ref tutorial-heat-adaptivity)
 
 In this tutorial the heat equation is solved on a cube with adaptive mesh refinement (AMR).
 A manufactured solution with a sharp spherical feature drives the refinement, using a

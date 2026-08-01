@@ -1,4 +1,4 @@
-# # [Adaptive Heat Equation](@id tutorial-heat-adaptivity)
+# # [Heat equation with adaptive mesh refinement](@id tutorial-heat-adaptivity)
 #
 # ![](heat_adaptivity-light.webp)
 # ![](heat_adaptivity-dark.webp)
@@ -32,7 +32,7 @@
 # adaptively solve an [elasticity problem together with a Kelly error
 # indicator](@ref gallery-elasticity-adaptivity).
 #
-# ## Commented Program
+# ## Commented program
 #
 # First we load the required packages.
 using Ferrite, IterativeSolvers, WriteVTK

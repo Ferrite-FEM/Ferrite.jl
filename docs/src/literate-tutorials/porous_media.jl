@@ -135,7 +135,7 @@ function element_routine!(Ke, re, material::Elastic, cv::CellValues, a, args...)
     return
 end;
 
-# ### PoroElasticity
+# ### Poroelasticity
 # To define the poroelastic material, we re-use the elastic part from above for
 # the skeleton, and add the additional required material parameters.
 struct PoroElastic{T}

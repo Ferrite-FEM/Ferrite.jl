@@ -16,7 +16,7 @@ add!(::SubDofHandler, ::Symbol, ::Interpolation)
 close!(::DofHandler)
 ```
 
-## Dof renumbering
+## DoF renumbering
 ```@docs
 renumber!
 DofOrder.FieldWise
@@ -32,7 +32,7 @@ celldofs
 celldofs!
 ```
 
-# Grid iterators
+## Grid iterators
 ```@docs
 CellCache
 CellIterator

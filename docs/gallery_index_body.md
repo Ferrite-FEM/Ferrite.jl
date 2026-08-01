@@ -52,7 +52,7 @@ Laplacian is imposed, which is done by using the grid topology functionalities.
 
 ---
 
-#### [Adaptive linear elasticity](elasticity_adaptivity.md)
+#### [Linear elasticity with adaptive mesh refinement](elasticity_adaptivity.md)
 
 Linear elasticity on an L-shaped domain with adaptive mesh refinement: a Kelly-type
 facet-jump error estimator with Dörfler marking drives `p4est`-style refinement of a
