@@ -392,3 +392,45 @@ function grid_with_inserted_quad(grid::Grid{2, Triangle}, nrs::NTuple{2, Int}; u
     end
     # TODO: Update sets (not needed for current usage)
 end
+
+function generate_simple_disc_grid(::Type{Quadrilateral}, n; radius = 1.0)
+    nnodes = 2n + 1
+    θ = deg2rad(360 / 2n)
+
+    nodepos = Vec((0.0, radius))
+    nodes = [rotate(nodepos, θ * i) for i in 0:(2n - 1)]
+    push!(nodes, Vec((0.0, 0.0)))
+
+    elements = [Quadrilateral((2i - 1 == 0 ? nnodes - 1 : 2i - 1, 2i, 2i + 1 == nnodes ? 1 : 2i + 1, nnodes)) for i in 1:n]
+
+    facetsets = Dict(
+        "boundary" => Set([FacetIndex(i, 1) for i in 1:n]) ∪ Set([FacetIndex(i, 2) for i in 1:n]),
+    )
+
+    return Grid(elements, Node.(nodes); facetsets = facetsets)
+end
+
+function generate_simple_disc_grid(::Type{Hexahedron}, n; radius = 1.0, layers = 1, height = 1.0)
+    nnodes = 2n + 1
+    θ = deg2rad(360 / 2n)
+
+    nodepos_bottom = Vec((0.0, radius, 0.0))
+    nodes = [rotate(nodepos_bottom, Vec{3}((0, 0, 1)), θ * i) for i in 0:(2n - 1)]
+    push!(nodes, Vec((0.0, 0.0, 0.0)))
+
+    # TODO generalize for n layers by looping over layers
+    nodepos_layer = Vec((0.0, radius, height))
+    nodes_layer = [rotate(nodepos_layer, Vec{3}((0, 0, 1)), θ * i) for i in 0:(2n - 1)]
+    push!(nodes_layer, Vec((0.0, 0.0, 1.0)))
+    nodes = vcat(nodes, nodes_layer)
+
+    elements = [Hexahedron((2i - 1 == 0 ? nnodes - 1 : 2i - 1, 2i, 2i + 1 == nnodes ? 1 : 2i + 1, nnodes, 2i - 1 == 0 ? nnodes - 1 : 2i - 1 + (2 * n + 1), 2i + (2 * n + 1), 2i + 1 == nnodes ? (2 * n + 2) : 2i + 1 + (2 * n + 1), nnodes * (layers + 1))) for i in 1:(n * layers)]
+
+    facetsets = Dict(
+        "side" => Set([FacetIndex(i, 1) for i in 1:n]) ∪ Set([FacetIndex(i, 2) for i in 1:n]),
+        "top" => Set([FacetIndex(i, 5) for i in 1:n]),
+        "bottom" => Set([FacetIndex(i, 6) for i in 1:n]),
+    )
+
+    return Grid(elements, Node.(nodes); facetsets = facetsets)
+end

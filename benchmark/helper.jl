@@ -164,6 +164,40 @@ function apply_rhs_sweep!(data, f, ch, n)
 end
 
 #----------------------------------------------------------------------#
+# AMR
+#----------------------------------------------------------------------#
+
+# An adaptively refined, unbalanced forest: uniform refinement to `levels`, then two
+# scattered every-fourth-leaf passes without balancing in between. A single pass from the
+# uniform (conforming) state can only produce level differences of 1, which never violates
+# 2:1; the second pass creates level differences of 2, so `balanceforest!` actually has
+# violations to resolve, spread across all trees and tree boundaries.
+function adaptive_forest(celltype, dims, levels)
+    forest = ForestBWG(generate_grid(celltype, dims))
+    for l in 1:levels
+        refine_all!(forest, l)
+    end
+    refine!(forest, 1:4:getncells(forest))
+    refine!(forest, 1:4:getncells(forest))
+    return forest
+end
+
+function balanced_forest(celltype, dims, levels)
+    forest = adaptive_forest(celltype, dims, levels)
+    balanceforest!(forest)
+    return forest
+end
+
+# The constraint side of the AMR pipeline: turn the conformity info of a non-conforming
+# grid into affine constraints and close the handler.
+function conformity_constraints(dh)
+    ch = ConstraintHandler(dh)
+    add!(ch, ConformityConstraint(:u))
+    close!(ch)
+    return ch
+end
+
+#----------------------------------------------------------------------#
 # Element kernels
 #----------------------------------------------------------------------#
 

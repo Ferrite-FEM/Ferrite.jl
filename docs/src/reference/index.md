@@ -9,6 +9,7 @@ Pages = [
     "assembly.md",
     "boundary_conditions.md",
     "grid.md",
+    "amr.md",
     "export.md",
     "utils.md",
 ]
