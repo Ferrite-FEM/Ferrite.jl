@@ -41,6 +41,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
    updated [howto on multi-threaded
    assembly](https://ferrite-fem.github.io/Ferrite.jl/stable/howto/threaded_assembly/).
    ([#1417])
+ - Add Z-curve based reordering of Grids to boost assembly performance. ([#1334])
 
 ### Changed
  - `interface_coupling` in `allocate_matrix`/`add_sparsity_entries!`/`add_interface_entries!`
