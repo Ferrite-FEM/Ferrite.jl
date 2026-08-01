@@ -74,8 +74,8 @@ function VTKHDF.write_timestep(f::Function, vtk::VTKHDFGridFile, t::Real; kwargs
     return vtk
 end
 
-# ---- node data conversion (mirrors Ferrite's WriteVTK path, minus component
-# names, which the VTKHDF format does not support) ----
+# Node data conversion mirrors the WriteVTK path, minus component names,
+# which the VTKHDF format does not support.
 
 function _node_matrix(nodedata::Vector{S}) where {O, D, T, M, S <: Union{Tensor{O, D, T, M}, SymmetricTensor{O, D, T, M}}}
     noutputs = S <: Vec{2} ? 3 : M # pad 2D Vec to 3D
