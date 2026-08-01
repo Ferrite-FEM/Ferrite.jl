@@ -60,3 +60,18 @@ end
 vtk_save(pvd);
 ```
 See [Transient heat equation](@ref tutorial-transient-heat-equation) for an example
+
+# Evaluating the Solution at a list of Points for Plotting using Plots.jl
+The solution can also be evaluated at a list of points and plotted using `Plots.jl`. For the [heat equation](@ref tutorial-heat-equation) example it can be done like this:
+```
+using Plots
+# The domain extends from -1 to 1 by default
+xrange = yrange = range(-1.0, 1.0, length=100)
+# evaluating outside of the domain returns NaN
+points = [Vec((x, y)) for x in xrange for y in yrange];
+ph = PointEvalHandler(grid, points)
+u_points = evaluate_at_points(ph, dh, u, :u)
+# reorganize the data for plotting
+u_points = reshape(u_points, length(xrange), length(yrange))
+heatmap(xrange, yrange, u_points, xlabel="x", ylabel="y", title="u(x, y)", aspect_ratio=:equal)
+```
