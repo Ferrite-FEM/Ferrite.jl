@@ -41,6 +41,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
    updated [howto on multi-threaded
    assembly](https://ferrite-fem.github.io/Ferrite.jl/stable/howto/threaded_assembly/).
    ([#1417])
+ - `VTKHDFGridFile` for exporting to the HDF5-based VTKHDF file format via the
+   new package extension for [VTKHDF.jl](https://github.com/Ferrite-FEM/VTKHDF.jl).
+   A whole simulation can be stored in a single file, with the grid written
+   only once for time series on a fixed mesh. ([#1381])
 
 ### Changed
  - `interface_coupling` in `allocate_matrix`/`add_sparsity_entries!`/`add_interface_entries!`
