@@ -1387,6 +1387,7 @@ poking into Ferrite internals:
 [#1423]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1423
 [#1426]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1426
 [#1428]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1428
+[#1397]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1397
 [#1432]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1432
 [#1434]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1434
 [#1468]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1468

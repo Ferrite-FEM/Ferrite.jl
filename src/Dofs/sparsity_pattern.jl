@@ -380,7 +380,7 @@ function add_sparsity_entries!(
         else
             neighbor_cells = create_cell_to_neighbors(dh.grid, topology)
             interface_couplings = _coupling_to_local_dof_coupling(dh, interface_coupling)
-            interfaces_filled = _can_fill_interfaces_directly(dh, interface_couplings)
+            interfaces_filled = _can_fill_interfaces_directly(dh)
         end
         _fast_fill_cells!(
             sp, dh, couplings, isconstrained, neighbor_cells, interface_couplings;
@@ -452,7 +452,7 @@ end
 # _visit_row_candidates!). With a single subdofhandler the fast fill therefore emits the
 # interface entries directly and add_interface_entries! is skipped; otherwise the enumeration
 # is used for reservation only.
-function _can_fill_interfaces_directly(dh::DofHandler, interface_couplings::Union{Nothing, Vector{Matrix{Bool}}})
+function _can_fill_interfaces_directly(dh::DofHandler)
     return length(dh.subdofhandlers) == 1
 end
 
