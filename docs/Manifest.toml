@@ -2,7 +2,7 @@
 
 julia_version = "1.12.6"
 manifest_format = "2.0"
-project_hash = "efc8ea969a3f1659ad6b2e82f89041c4045794dd"
+project_hash = "8bc9f5c0108d82776caf192618c5ffa1b7222253"
 
 [[deps.ADTypes]]
 git-tree-sha1 = "ec6be48a85c93d995563b84bff8a86bc98df45ce"
@@ -2275,6 +2275,12 @@ git-tree-sha1 = "c2d0db3ef09f1942d08ea455a9e252594be5f3b6"
 uuid = "4004b06d-e244-455f-a6ce-a5f9919cc534"
 version = "1.0.1"
 
+[[deps.VTKHDF]]
+deps = ["HDF5", "VTKBase"]
+git-tree-sha1 = "631f0913cc368feee1323e6f031922b58f4aba6e"
+uuid = "45d8cf6f-ab5f-45bc-ab92-77e36ab192e6"
+version = "1.0.0"
+
 [[deps.VectorInterface]]
 deps = ["LinearAlgebra"]
 git-tree-sha1 = "949dd28df19a5bf0973214e4a9d36c19079d4d45"
@@ -2292,14 +2298,6 @@ version = "0.6.0"
     Enzyme = "7da242da-08ed-463a-9acd-ee780be4f1d9"
     Mooncake = "da2b9cff-9c12-43a0-ae48-6db2b0edb7d6"
     StaticArrays = "90137ffa-7385-5640-81b9-e52037218182"
-
-[[deps.VTKHDF]]
-deps = ["HDF5", "VTKBase"]
-git-tree-sha1 = "133bed37f81058598a2958d16adec40c15f9d1a3"
-repo-rev = "master"
-repo-url = "https://github.com/Ferrite-FEM/VTKHDF.jl"
-uuid = "45d8cf6f-ab5f-45bc-ab92-77e36ab192e6"
-version = "0.1.0"
 
 [[deps.Vulkan_Loader_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl", "Wayland_jll", "Xorg_libX11_jll", "Xorg_libXrandr_jll", "xkbcommon_jll"]

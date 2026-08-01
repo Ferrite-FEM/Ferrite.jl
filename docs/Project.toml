@@ -38,6 +38,3 @@ WriteVTK = "64499a7a-5c06-52f2-abe2-ccb03c286192"
 
 [compat]
 OrdinaryDiffEqRosenbrock = "2"
-
-[sources]
-VTKHDF = {url = "https://github.com/Ferrite-FEM/VTKHDF.jl"}
