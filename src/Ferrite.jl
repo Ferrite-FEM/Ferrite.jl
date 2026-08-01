@@ -72,13 +72,17 @@ Abstract type which is used as identifier for faces, edges and vertices
 abstract type BoundaryIndex end
 
 """
-A `CellIndex` wraps an Int and corresponds to a cell with that number in the mesh
+    CellIndex(cellid::Int)
+
+A `CellIndex` wraps an Int and corresponds to a cell with that number in the mesh.
 """
 struct CellIndex
     idx::Int
 end
 
 """
+    FaceIndex(cellid::Int, faceid::Int)
+
 A `FaceIndex` wraps an (Int, Int) and defines a local face by pointing to a (cell, face).
 """
 struct FaceIndex <: BoundaryIndex
@@ -86,13 +90,17 @@ struct FaceIndex <: BoundaryIndex
 end
 
 """
-A `EdgeIndex` wraps an (Int, Int) and defines a local edge by pointing to a (cell, edge).
+    EdgeIndex(cellid::Int, edgeid::Int)
+
+An `EdgeIndex` wraps an (Int, Int) and defines a local edge by pointing to a (cell, edge).
 """
 struct EdgeIndex <: BoundaryIndex
     idx::Tuple{Int, Int} # cell and side
 end
 
 """
+    VertexIndex(cellid::Int, vertexid::Int)
+
 A `VertexIndex` wraps an (Int, Int) and defines a local vertex by pointing to a (cell, vert).
 """
 struct VertexIndex <: BoundaryIndex
@@ -100,6 +108,8 @@ struct VertexIndex <: BoundaryIndex
 end
 
 """
+    FacetIndex(cellid::Int, facetid::Int)
+
 A `FacetIndex` wraps an (Int, Int) and defines a local facet by pointing to a (cell, facet).
 """
 struct FacetIndex <: BoundaryIndex

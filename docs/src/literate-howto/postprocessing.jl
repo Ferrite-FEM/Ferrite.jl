@@ -1,4 +1,4 @@
-# # [Post processing and visualization](@id howto-postprocessing)
+# # [Postprocessing and visualization](@id howto-postprocessing)
 #
 # ![](postprocessing-light.png)
 # ![](postprocessing-dark.png)

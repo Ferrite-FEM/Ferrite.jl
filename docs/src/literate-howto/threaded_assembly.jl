@@ -1,4 +1,4 @@
-# # [Multi-threaded assembly](@id howto-threaded-assembly)
+# # [Multithreaded assembly](@id howto-threaded-assembly)
 #
 #-
 #md # !!! tip

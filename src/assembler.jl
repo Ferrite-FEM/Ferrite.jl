@@ -277,7 +277,7 @@ associative. Atomic accumulation is only supported for value types `Float32` and
 its own assembler since the assembler contains buffers that are modified during
 `assemble!`. Note also that the value of `atomic` determines a type parameter of the
 returned assembler, so for a type stable setup the value should be a literal (or
-otherwise a compile time constant). See the [howto on multi-threaded assembly](@ref
+otherwise a compile time constant). See the [howto on multithreaded assembly](@ref
 howto-threaded-assembly) for more details.
 
 Depending on the loaded extensions more assembly formats become available through this interface.

@@ -3,7 +3,7 @@ CurrentModule = Ferrite
 DocTestSetup = :(using Ferrite)
 ```
 
-# [Interpolation](@id reference-interpolation)
+# [Interpolations](@id reference-interpolation)
 
 ```@docs
 Interpolation

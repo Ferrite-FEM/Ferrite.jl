@@ -190,10 +190,10 @@ gmsh.model.mesh.generate(dim)
 grid = togrid()
 Gmsh.finalize();
 
-#  ### Function space
-#  To ensure stability we utilize the Taylor-Hood element pair Q2-Q1.
-#  We have to utilize the same quadrature rule for the pressure as for the velocity, because in the weak form the
-#  linear pressure term is tested against a quadratic function.
+# ### Function space
+# To ensure stability we utilize the Taylor-Hood element pair Q2-Q1.
+# We have to utilize the same quadrature rule for the pressure as for the velocity, because in the weak form the
+# linear pressure term is tested against a quadratic function.
 ip_v = Lagrange{RefQuadrilateral, 2}()^dim
 qr = QuadratureRule{RefQuadrilateral}(4)
 ip_p = Lagrange{RefQuadrilateral, 1}()

@@ -62,7 +62,7 @@
 # from which follows $\chi_w = \chi_e$. Thus for boundary elements we can replace the value for the missing neighbor by the value of the opposite neighbor.
 # In order to find the corresponding neighbor elements, we will make use of Ferrite's grid topology functionalities.
 #
-# ## Commented Program
+# ## Commented program
 # We now solve the problem in Ferrite. What follows is a program spliced with comments.
 #md # The full program, without comments, can be found in the next [section](@ref topology_optimization-plain-program).
 #

@@ -507,6 +507,8 @@ get_face_direction(cell, facenr) = get_face_direction(faces(cell)[facenr])
 #########################
 # TODO generalize to arbitrary basis positionings.
 """
+    DiscontinuousLagrange{refshape, order} <: ScalarInterpolation
+
 Piecewise discontinuous Lagrange basis via Gauss-Lobatto points.
 """
 struct DiscontinuousLagrange{shape, order} <: ScalarInterpolation{shape, order}
