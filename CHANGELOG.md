@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Next] - xxxx-xx-xx
+## [v1.6.0] - 2026-08-02
 
 ### Added
  - `PointEvalHandler` can assign points slightly outside the grid to a nearby cell with
@@ -16,6 +16,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
    that are only defined on a subdomain, or that are discontinuous across subdomain
    interfaces. In addition, `evaluate_at_points` now warns when points are assigned to
    cells where the evaluated field is not defined. ([#1181])
+ - `PointEvalHandler` now supports grids with `Wedge` and `Pyramid` cells; previously the
+   point search threw a `MethodError` for these cell types. ([#1434])
  - Adaptive mesh refinement (AMR) for quadrilateral and hexahedral (linear) grids via a `p4est`-style
    forest of octrees (`ForestBWG`), constructed from any conforming `Quadrilateral`/`Hexahedron`
    `Grid` (structured or unstructured, including rotated neighboring cells). Marked cells can be
@@ -108,6 +110,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
  - Fix bug applying the transpose operation in condensation of `AffineConstraints`. This bug gave
    silently wrong results when used on non-symmetric system matrices, but did not affect system matrices
    that were symmetric ([#1426])
+ - `PointIterator` now works for grids with mixed cell types; previously the constructor
+   threw an error. ([#1434])
+ - `show` of a `PointEvalHandler` for which no points were found no longer throws.
+   ([#1434])
+
+### Performance
+ - The point search in `PointEvalHandler` no longer searches candidate cells more than once
+   per point, and the node-to-cell map is now built in a single pass over the cells.
+   ([#1434])
 
 ## [v1.5.0] - 2026-07-13
 
@@ -1322,6 +1333,7 @@ poking into Ferrite internals:
 [#1376]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1376
 [#1379]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1379
 [#1380]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1380
+[#1381]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1381
 [#1382]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1382
 [#1384]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1384
 [#1387]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1387
@@ -1337,4 +1349,5 @@ poking into Ferrite internals:
 [#1426]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1426
 [#1428]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1428
 [#1432]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1432
+[#1434]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1434
 [#1438]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1438
