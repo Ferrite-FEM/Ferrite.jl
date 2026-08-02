@@ -58,11 +58,33 @@ include("download_resources.jl")
     end
 end
 
-# remove any .vtu files in the generated dir (should not be deployed)
+# In CI, smoke-test every ParaView scene using the VTK files that notebook
+# execution just produced. This avoids running the examples a second time.
+# The --check mode renders small images and only a few animation frames; these
+# assets are intentionally left in the gitignored screenshot-assets directory
+# and are never uploaded.
+const VTK_EXTENSIONS = (".vtu", ".pvd", ".vtkhdf")
+if get(ENV, "FERRITE_SCREENSHOT_CHECK", "false") == "true"
+    datadir = joinpath(@__DIR__, "screenshot-data")
+    outdir = joinpath(@__DIR__, "screenshot-assets")
+    rm(datadir; recursive = true, force = true)
+    mkpath(datadir)
+    mkpath(outdir)
+    for dir in (TUTORIALS_OUT, HOWTO_OUT, GALLERY_OUT), file in readdir(dir)
+        any(ext -> endswith(file, ext), VTK_EXTENSIONS) || continue
+        cp(joinpath(dir, file), joinpath(datadir, file); force = true)
+    end
+    @timeit dto "screenshots" run(
+        `pvbatch --force-offscreen-rendering $(joinpath(@__DIR__, "screenshots.py")) $datadir $outdir --check`
+    )
+end
+
+# Remove generated VTK files; they should not be deployed with the docs.
 @timeit dto "remove vtk files" for dir in [TUTORIALS_OUT, HOWTO_OUT, GALLERY_OUT]
     cd(dir) do
-        foreach(file -> endswith(file, ".vtu") && rm(file), readdir())
-        foreach(file -> endswith(file, ".pvd") && rm(file), readdir())
+        foreach(readdir()) do file
+            any(ext -> endswith(file, ext), VTK_EXTENSIONS) && rm(file)
+        end
     end
 end
 
