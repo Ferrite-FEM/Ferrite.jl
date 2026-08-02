@@ -121,9 +121,9 @@ function Ferrite.allocate_matrix(::Type{SparseMatrixCSR{1, Tv, Ti}}, sp::Abstrac
     return _allocate_matrix(SparseMatrixCSR{1, Tv, Ti}, sp, false)
 end
 
-# Copy one pattern row into `dest` starting at `k`: bulk copy for `AbstractVector` rows
-# (e.g. `SparsityPattern`), iteration fallback for other iterables (e.g.
-# `BlockSparsityPattern`'s lazy rows).
+# Copy one pattern row into `dest` starting at `k` (only used by _allocate_matrix below):
+# bulk copy for `AbstractVector` rows (e.g. `SparsityPattern`), iteration fallback for other
+# iterables (e.g. `BlockSparsityPattern`'s lazy rows).
 function _copyto!(dest::Vector, k::Int, colidxs::AbstractVector)
     copyto!(dest, k, colidxs, 1, length(colidxs))
     return k + length(colidxs)

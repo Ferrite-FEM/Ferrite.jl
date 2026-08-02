@@ -364,10 +364,6 @@ function add_sparsity_entries!(
         error("number of rows ($(getnrows(sp))) or columns ($(getncols(sp))) in the sparsity pattern is smaller than number of dofs ($(ndofs(dh)))")
     end
     interfaces_filled = false
-    # TODO: The fast path could also handle a non-empty pattern by treating the existing row
-    #       slices as an extra candidate source in the count and fill passes (the row-major
-    #       marker dedups them against the new entries for free, keeping counts exact and
-    #       avoiding duplicates entirely). That would retire the generic branch below.
     if isempty(sp.buffer.data)
         keep_constrained || _check_keep_constrained_args(dh, ch)
         couplings = _coupling_to_local_dof_coupling(dh, coupling)
@@ -438,20 +434,10 @@ function _check_keep_constrained_args(dh::DofHandler, ch::Union{ConstraintHandle
     return
 end
 
-# The facet-neighbor interface enumeration in _visit_row_candidates! may visit a SUPERSET of
-# the entries add_interface_entries! would insert. For the *reservation* (count pass) that is
-# harmless: over-counting only leaves unused capacity. But the *fill* pass stores every visited
-# candidate as an actual pattern entry, so filling from this enumeration is only allowed when
-# the superset is exactly the insertion set -- otherwise the pattern would contain extra
-# (wrong) entries, not just extra memory. add_interface_entries! inserts, per interface, every
-# masked pair over the union of the two cells' dofs (cross blocks and same-side blocks alike);
-# the enumeration visits exactly those pairs -- masked neighbor-cell dofs plus masked own-cell
-# dofs of interface-participating cells -- for any interpolation continuity, PROVIDED there is
-# a single subdofhandler: for a neighbor in a different subdofhandler the square mask's local
-# indices do not apply, so all of its dofs are counted unmasked (reservation slack, see
-# _visit_row_candidates!). With a single subdofhandler the fast fill therefore emits the
-# interface entries directly and add_interface_entries! is skipped; otherwise the enumeration
-# is used for reservation only.
+# For now interfaces can not be fast-filled with multiple SubDofHandlers (the expanded
+# coupling masks are per-sdh and do not apply to a neighbor with a different dof layout);
+# the enumeration still (over)counts cross-sdh neighbors so the reservation covers what
+# add_interface_entries! inserts afterwards.
 function _can_fill_interfaces_directly(dh::DofHandler)
     return length(dh.subdofhandlers) == 1
 end
@@ -571,7 +557,11 @@ allocate_matrix(sp::SparsityPattern) = allocate_matrix(SparseMatrixCSC{Float64, 
 # sort rowval by row order — so the fast path never sorts. Row-internal order is irrelevant to the
 # transpose (per-column rowval order comes from the ascending outer row loop), which also makes the
 # `sym` filter — a per-entry predicate — valid on unsorted rows, so the Symmetric wrapper shares
-# this path. Holes are skipped (only ncurrent read).
+# this path. Holes are skipped (only ncurrent read). Unlike the CSR case this can NOT be
+# collapsed into the generic method above: the generic one reads rows through `eachrow`,
+# whose contract (sorted order) forces the lazy sort even though the transpose does not need
+# it — measured 3.4x slower on a freshly built (unsorted) pattern, identical when the
+# pattern is already sorted.
 function _allocate_matrix(::Type{SparseMatrixCSC{Tv, Ti}}, sp::SparsityPattern, sym::Bool) where {Tv, Ti}
     nrows = getnrows(sp)
     ncols = getncols(sp)
