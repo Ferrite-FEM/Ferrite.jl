@@ -9,6 +9,11 @@ jobs:
     name: Julia 1.12 - ubuntu-latest
     runs-on: ubuntu-latest
     timeout-minutes: 60
+    env:
+      # Force Mesa's CPU renderer; the EGL ParaView build is headless and does
+      # not require a GPU on the runner.
+      EGL_PLATFORM: surfaceless
+      LIBGL_ALWAYS_SOFTWARE: '1'
     steps:
       - uses: actions/checkout@v7
       - uses: julia-actions/setup-julia@v3
@@ -20,10 +25,10 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ${{ runner.temp }}/paraview
-          key: paraview-5.13.3-osmesa-linux-x86_64
+          key: paraview-5.13.3-egl-linux-x86_64
       - name: Install screenshot dependencies
         env:
-          PARAVIEW_ARCHIVE: ParaView-5.13.3-osmesa-MPI-Linux-Python3.10-x86_64
+          PARAVIEW_ARCHIVE: ParaView-5.13.3-egl-MPI-Linux-Python3.10-x86_64
         run: |
           if [ "${{ steps.cache-paraview.outputs.cache-hit }}" != "true" ]; then
             curl --fail --location --retry 3 \
@@ -36,9 +41,11 @@ jobs:
           fi
           echo "${RUNNER_TEMP}/paraview/bin" >> "${GITHUB_PATH}"
           sudo apt-get update
-          # The OSMesa bundle expects libglapi.so.0 from the host system.
-          sudo apt-get install --yes imagemagick libglapi-mesa
+          sudo apt-get install --yes \
+            imagemagick libegl1 libopengl0 libgl1 libgl1-mesa-dri libgomp1
           "${RUNNER_TEMP}/paraview/bin/pvbatch" --version
+          "${RUNNER_TEMP}/paraview/bin/pvpython" -c \
+            'from paraview.simple import CreateRenderView, Render; Render(CreateRenderView())'
       - name: Install dependencies
         run: julia --project=docs -e 'using Pkg; Pkg.instantiate(); Pkg.precompile()'
       - name: Build and deploy
