@@ -15,6 +15,28 @@ jobs:
         with:
           version: '1.12'
       - uses: julia-actions/cache@v3
+      - name: Cache ParaView
+        id: cache-paraview
+        uses: actions/cache@v4
+        with:
+          path: ${{ runner.temp }}/paraview
+          key: paraview-5.13.3-osmesa-linux-x86_64
+      - name: Install screenshot dependencies
+        env:
+          PARAVIEW_ARCHIVE: ParaView-5.13.3-osmesa-MPI-Linux-Python3.10-x86_64
+        run: |
+          if [ "${{ steps.cache-paraview.outputs.cache-hit }}" != "true" ]; then
+            curl --fail --location --retry 3 \
+              "https://www.paraview.org/files/v5.13/${PARAVIEW_ARCHIVE}.tar.gz" \
+              --output "${RUNNER_TEMP}/paraview.tar.gz"
+            tar --extract --gzip --file "${RUNNER_TEMP}/paraview.tar.gz" \
+              --directory "${RUNNER_TEMP}"
+            mv "${RUNNER_TEMP}/${PARAVIEW_ARCHIVE}" "${RUNNER_TEMP}/paraview"
+            rm "${RUNNER_TEMP}/paraview.tar.gz"
+          fi
+          echo "${RUNNER_TEMP}/paraview/bin" >> "${GITHUB_PATH}"
+          sudo apt-get update
+          sudo apt-get install --yes imagemagick
       - name: Install dependencies
         run: julia --project=docs -e 'using Pkg; Pkg.instantiate(); Pkg.precompile()'
       - name: Build and deploy
@@ -22,4 +44,5 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           DOCUMENTER_KEY: ${{ secrets.DOCUMENTER_KEY }}
           GKSwstype: '100'
+          FERRITE_SCREENSHOT_CHECK: 'true'
         run: julia --project=docs --color=yes docs/make.jl

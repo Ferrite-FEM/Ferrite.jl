@@ -6,6 +6,7 @@
 *.pvtu
 *.pvtk
 *.pvd
+*.vtkhdf
 examples/.ipynb_checkpoints/
 docs/build/
 docs/site/
