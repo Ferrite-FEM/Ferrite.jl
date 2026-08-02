@@ -36,7 +36,9 @@ jobs:
           fi
           echo "${RUNNER_TEMP}/paraview/bin" >> "${GITHUB_PATH}"
           sudo apt-get update
-          sudo apt-get install --yes imagemagick
+          # The OSMesa bundle expects libglapi.so.0 from the host system.
+          sudo apt-get install --yes imagemagick libglapi-mesa
+          "${RUNNER_TEMP}/paraview/bin/pvbatch" --version
       - name: Install dependencies
         run: julia --project=docs -e 'using Pkg; Pkg.instantiate(); Pkg.precompile()'
       - name: Build and deploy
