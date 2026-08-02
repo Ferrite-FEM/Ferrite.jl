@@ -167,6 +167,7 @@ include("L2_projection.jl")
 
 # Export
 include("Export/VTK.jl")
+include("Export/VTKHDF.jl")
 
 # Point Evaluation
 include("PointEvalHandler.jl")

@@ -42,10 +42,37 @@ close(vtk);
 
 The data written by `write_solution`, `write_cell_data`, `write_node_data`, and `write_projection` may be either scalar (`Vector{<:Number}`) or tensor (`Vector{<:AbstractTensor}`) data.
 
-For simulations with multiple time steps, typically one `VTK` (`.vtu`) file is written
-for each time step. In order to connect the actual time with each of these files,
-the `paraview_collection` function from `WriteVTK.jl` can be used. This will create
-one paraview datafile (`.pvd`) file and one `VTKGridFile` (`.vtu`) for each time step.
+For simulations with multiple time steps there are two options.
+
+## Time series with VTKHDF (recommended)
+
+A [`VTKHDFGridFile`](@ref) — the HDF5-based
+[VTKHDF format](https://docs.vtk.org/en/latest/vtk_file_formats/vtkhdf_file_format/index.html) —
+can hold a whole time series in a *single* file, with the grid stored only once,
+no matter how many steps are saved. This requires
+[VTKHDF.jl](https://github.com/Ferrite-FEM/VTKHDF.jl) to be loaded. Open the file
+with `temporal = true` and write each step with `write_timestep`:
+
+```julia
+using VTKHDF
+vtkhdf = VTKHDFGridFile("my_results.vtkhdf", dh; temporal = true)
+for t in range(0, 1, 5)
+    # Do calculations to update u
+    write_timestep(vtkhdf, t) do vtk
+        write_solution(vtk, dh, u)
+    end
+end
+close(vtkhdf);
+```
+The same data functions as above are supported. See
+[Transient heat equation](@ref tutorial-transient-heat-equation) for an example.
+
+## Time series with a Paraview collection (`.pvd`)
+
+Alternatively, with the XML-based formats one `VTK` (`.vtu`) file is written for
+each time step. To connect the actual time with each of these files, the
+`paraview_collection` function from `WriteVTK.jl` can be used. This creates one
+paraview datafile (`.pvd`) and one `VTKGridFile` (`.vtu`) for each time step.
 
 ```@example export
 using WriteVTK
@@ -59,4 +86,3 @@ for (step, t) in enumerate(range(0, 1, 5))
 end
 vtk_save(pvd);
 ```
-See [Transient heat equation](@ref tutorial-transient-heat-equation) for an example

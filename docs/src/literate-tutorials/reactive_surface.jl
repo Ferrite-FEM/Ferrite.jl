@@ -78,7 +78,7 @@ nothing                    #hide
 # First we load Ferrite, and some other packages we need
 
 using Ferrite, FerriteGmsh
-using BlockArrays, SparseArrays, LinearAlgebra, WriteVTK
+using BlockArrays, SparseArrays, LinearAlgebra, VTKHDF
 
 # ### Assembly routines
 # Before we head into the assembly, we define a helper struct to control the dispatches.
@@ -274,11 +274,11 @@ function gray_scott_on_sphere(material::GrayScottMaterial, Δt::Real, T::Real, r
     uₜ₋₁ = ones(ndofs(dh))
     setup_initial_conditions!(uₜ₋₁, cellvalues, dh)
 
-    ## And prepare output for visualization.
-    pvd = paraview_collection("reactive-surface")
-    VTKGridFile("reactive-surface-0", dh) do vtk
+    ## And prepare output for visualization. The whole time series is stored in
+    ## a single temporal VTKHDF file, with the grid written only once.
+    vtkhdf = VTKHDFGridFile("reactive-surface.vtkhdf", dh; temporal = true)
+    write_timestep(vtkhdf, 0.0) do vtk
         write_solution(vtk, dh, uₜ₋₁)
-        pvd[0.0] = vtk
     end
 
     ## This is now the main solve loop.
@@ -299,19 +299,18 @@ function gray_scott_on_sphere(material::GrayScottMaterial, Δt::Real, T::Real, r
             rvₜ[2, i] += Δt * (r₁ * r₂^2 - r₂ * (F + k))
         end
 
-        ## The solution is then stored every 10th step to vtk files for
+        ## The solution is then stored every 10th step to the VTKHDF file for
         ## later visualization purposes.
         if (iₜ % 10) == 0
-            VTKGridFile("reactive-surface-$(iₜ)", dh) do vtk
+            write_timestep(vtkhdf, t) do vtk
                 write_solution(vtk, dh, uₜ)
-                pvd[t] = vtk
             end
         end
 
         ## Finally we rotate the solution to initialize the next timestep.
         uₜ₋₁ .= uₜ
     end
-    vtk_save(pvd)
+    close(vtkhdf)
     return
 end
 

@@ -58,7 +58,7 @@
 #md # The full program, without comments, can be found in the next [section](@ref transient_heat_equation-plain-program).
 #
 # First we load Ferrite, and some other packages we need.
-using Ferrite, SparseArrays, WriteVTK
+using Ferrite, SparseArrays, VTKHDF
 # We create the same grid as in the heat equation example.
 grid = generate_grid(Quadrilateral, (100, 100));
 
@@ -189,11 +189,13 @@ apply_analytical!(uₙ, dh, :u, x -> (x[1]^2 - 1) * (x[2]^2 - 1) * max_temp);
 # Here, we apply **once** the boundary conditions to the system matrix `A`.
 apply!(A, ch);
 
-# To store the solution, we initialize a paraview collection (.pvd) file,
-pvd = paraview_collection("transient-heat")
-VTKGridFile("transient-heat-0", dh) do vtk
+# To store the solution we open a single temporal VTKHDF file. Unlike the
+# XML-based formats — where every time step is a new `.vtu` file tied together
+# by a `.pvd` collection — the whole time series is stored in one file, and
+# the grid is written only once, no matter how many time steps we save.
+vtkhdf = VTKHDFGridFile("transient-heat.vtkhdf", dh; temporal = true)
+write_timestep(vtkhdf, 0.0) do vtk
     write_solution(vtk, dh, uₙ)
-    pvd[0.0] = vtk
 end
 
 # At this point everything is set up and we can finally approach the time loop.
@@ -209,15 +211,15 @@ for (step, t) in enumerate(Δt:Δt:T)
     #Finally, we can solve the time step and save the solution afterwards.
     u = A \ b
 
-    VTKGridFile("transient-heat-$step", dh) do vtk
+    write_timestep(vtkhdf, t) do vtk
         write_solution(vtk, dh, u)
-        pvd[t] = vtk
     end
     #At the end of the time loop, we set the previous solution to the current one and go to the next time step.
     uₙ .= u
 end
-# In order to use the .pvd file we need to store it to the disk, which is done by:
-vtk_save(pvd);
+# Finally we close the file, after which `transient-heat.vtkhdf` can be opened
+# directly in ParaView:
+close(vtkhdf);
 
 #md # ## [Plain program](@id transient_heat_equation-plain-program)
 #md #

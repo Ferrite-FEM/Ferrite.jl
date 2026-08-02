@@ -184,6 +184,7 @@ export
 
     # exporting data
     VTKGridFile,
+    VTKHDFGridFile,
     write_solution,
     write_cell_data,
     write_projection,
