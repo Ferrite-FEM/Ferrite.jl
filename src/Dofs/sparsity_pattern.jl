@@ -277,6 +277,13 @@ function eachrow(sp::SparsityPattern)
     return (_row_view(sp, row) for row in 1:getnrows(sp))
 end
 
+# Internal variant of `eachrow` with no ordering guarantee, for consumers that do not need
+# sorted rows. The default is `eachrow`; `SparsityPattern` hands out its raw row slices
+# without triggering the lazy sort (this is what keeps the common
+# pattern-to-SparseMatrixCSC path sort-free).
+_eachrow_anyorder(sp::AbstractSparsityPattern) = eachrow(sp)
+_eachrow_anyorder(sp::SparsityPattern) = (_row_view(sp, row) for row in 1:getnrows(sp))
+
 
 ################################################
 ## Adding entries to AbstractSparsityPatterns ##
@@ -552,48 +559,6 @@ This method is a shorthand for the equivalent
 (@ref allocate_matrix(::Type{S}, sp::Ferrite.AbstractSparsityPattern) where {Tv, Ti, S <: SparseMatrixCSC{Tv, Ti}}).
 """
 allocate_matrix(sp::SparsityPattern) = allocate_matrix(SparseMatrixCSC{Float64, Int}, sp)
-
-# Specialized: read the (possibly unsorted) rows directly from the buffer and let the CSC transpose
-# sort rowval by row order — so the fast path never sorts. Row-internal order is irrelevant to the
-# transpose (per-column rowval order comes from the ascending outer row loop), which also makes the
-# `sym` filter — a per-entry predicate — valid on unsorted rows, so the Symmetric wrapper shares
-# this path. Holes are skipped (only ncurrent read). Unlike the CSR case this can NOT be
-# collapsed into the generic method above: the generic one reads rows through `eachrow`,
-# whose contract (sorted order) forces the lazy sort even though the transpose does not need
-# it — measured 3.4x slower on a freshly built (unsorted) pattern, identical when the
-# pattern is already sorted.
-function _allocate_matrix(::Type{SparseMatrixCSC{Tv, Ti}}, sp::SparsityPattern, sym::Bool) where {Tv, Ti}
-    nrows = getnrows(sp)
-    ncols = getncols(sp)
-    b = sp.buffer
-    data = b.data
-    colptr = zeros(Ti, ncols + 1)
-    colptr[1] = 1
-    @inbounds for row in 1:nrows
-        r = b.indices[row]
-        for p in 0:(r.ncurrent - 1)
-            col = data[r.start + p]
-            sym && row > col && continue
-            colptr[col + 1] += 1
-        end
-    end
-    cumsum!(colptr, colptr)
-    nnz = colptr[end] - 1
-    rowval = Vector{Ti}(undef, nnz)
-    nzval = zeros(Tv, nnz)
-    nextinds = copy(colptr)
-    @inbounds for row in 1:nrows
-        r = b.indices[row]
-        for p in 0:(r.ncurrent - 1)
-            col = data[r.start + p]
-            sym && row > col && continue
-            k = nextinds[col]
-            rowval[k] = row
-            nextinds[col] = k + 1
-        end
-    end
-    return SparseMatrixCSC(nrows, ncols, colptr, rowval, nzval)
-end
 
 """
     allocate_matrix(MatrixType, dh::DofHandler, args...; kwargs...)
@@ -895,11 +860,14 @@ function _add_interface_entries!(
 end
 
 # Internal matrix instantiation for SparseMatrixCSC and Symmetric{SparseMatrixCSC}
+# The counting transpose does not need sorted rows: per-column rowval order comes from the
+# ascending outer row loop, and the `sym` filter is a per-entry predicate. Rows are
+# therefore read through _eachrow_anyorder, which for SparsityPattern skips the lazy sort.
 function _allocate_matrix(::Type{SparseMatrixCSC{Tv, Ti}}, sp::AbstractSparsityPattern, sym::Bool) where {Tv, Ti}
     # 1. Setup colptr
     colptr = zeros(Ti, getncols(sp) + 1)
     colptr[1] = 1
-    for (row, colidxs) in enumerate(eachrow(sp))
+    for (row, colidxs) in enumerate(_eachrow_anyorder(sp))
         for col in colidxs
             sym && row > col && continue
             colptr[col + 1] += 1
@@ -910,10 +878,10 @@ function _allocate_matrix(::Type{SparseMatrixCSC{Tv, Ti}}, sp::AbstractSparsityP
     # 2. Allocate rowval and nzval now that nnz is known
     rowval = Vector{Ti}(undef, nnz)
     nzval = zeros(Tv, nnz)
-    # 3. Populate rowval. Since SparsityPattern is row-based we need to allocate an extra
+    # 3. Populate rowval. Since patterns are row-based we need to allocate an extra
     #    work buffer here to keep track of the next index into rowval
     nextinds = copy(colptr)
-    for (row, colidxs) in zip(1:getnrows(sp), eachrow(sp)) # pairs(eachrow(sp))
+    for (row, colidxs) in zip(1:getnrows(sp), _eachrow_anyorder(sp))
         for col in colidxs
             sym && row > col && continue
             k = nextinds[col]

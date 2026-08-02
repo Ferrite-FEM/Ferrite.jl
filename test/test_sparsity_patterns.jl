@@ -515,18 +515,16 @@ end
         K1 = allocate_matrix(MatrixType, dh)
         @test isa(K1, MatrixType)
     end
-    # Symmetric shares the specialized raw-read path, which must handle unsorted rows;
-    # compare against the generic AbstractSparsityPattern method (which sorts) on the same
-    # pattern. Order matters: the specialized call must run first, while rows are unsorted.
+    # CSC/Symmetric instantiation reads rows without sorting (_eachrow_anyorder) and must
+    # give the same matrix for unsorted and sorted rows. Order matters: the first call must
+    # run while rows are still unsorted from the fast fill.
     let dh = fsp_test_create_dh(Quadrilateral)
         sp = add_sparsity_entries!(init_sparsity_pattern(dh), dh)
+        @test !sp.sorted
         K = allocate_matrix(Symmetric{Float64, SparseMatrixCSC{Float64, Int}}, sp)
-        S = Base.invoke(
-            Ferrite._allocate_matrix,
-            Tuple{Type{SparseMatrixCSC{Float64, Int}}, Ferrite.AbstractSparsityPattern, Bool},
-            SparseMatrixCSC{Float64, Int}, sp, true
-        )
-        @test K.data.colptr == S.colptr
-        @test K.data.rowval == S.rowval
+        Ferrite._ensure_sorted!(sp)
+        S = allocate_matrix(Symmetric{Float64, SparseMatrixCSC{Float64, Int}}, sp)
+        @test K.data.colptr == S.data.colptr
+        @test K.data.rowval == S.data.rowval
     end
 end
