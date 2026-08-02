@@ -33,6 +33,7 @@ fetch_assets(
         variants(
             [
                 "heat_equation", "linear_elasticity", "incompressible_elasticity",
+                "incompressible_elasticity_pressure",
                 "hyperelasticity", "plasticity", "computational_homogenization",
                 "stokes-flow", "dg_heat_equation", "linear_shell",
                 "linear_elasticity_stress", "elastodynamics_modes", "darcy_flow",

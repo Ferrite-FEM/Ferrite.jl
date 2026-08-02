@@ -420,6 +420,25 @@ def scene_incompressible_elasticity():
     colorbar(d, view, ("CELLS", "sigma von Mises"), title="von Mises")
     finish(view, "incompressible_elasticity", twod=True, zoom=0.95)
 
+    # Figure 2 of the tutorial: pressure field of the unstable linear/linear
+    # element (left, checkerboard modes) next to the stable quadratic/linear
+    # element (right), on a shared color scale fitted to the stable solution.
+    view = new_view()
+    rlin = OpenDataFile(datadir + "/cook_linear_linear.vtu")
+    rquad = OpenDataFile(datadir + "/cook_quadratic_linear.vtu")
+    left = surface(warp(rlin, "u", 1.0), view, edges=False)
+    shifted = Transform(Input=warp(rquad, "u", 1.0))
+    shifted.Transform.Translate = [60.0, 0.0, 0.0]
+    right = surface(shifted, view, edges=False)
+    ColorBy(left, ("POINTS", "p"))
+    lut = colorbar(right, view, ("POINTS", "p"), title="$p$", horizontal=True, fmt="%.2f")
+    # Clip the shared scale to the stable solution's range: the checkerboard
+    # oscillations of the linear/linear pressure are ~30x larger and would
+    # otherwise wash out both fields.
+    pr = rquad.GetDataInformation().GetPointDataInformation().GetArrayInformation("p").GetComponentRange(0)
+    lut.RescaleTransferFunction(pr[0], pr[1])
+    finish(view, "incompressible_elasticity_pressure", twod=True, zoom=1.25, res=[1600, 950])
+
 
 # --- stokes-flow: velocity magnitude on the quarter disk
 @scene("stokes-flow")
