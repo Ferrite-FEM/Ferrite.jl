@@ -150,7 +150,7 @@ In order to use boundaries, e.g. for Dirichlet constraints in the ConstraintHand
 Ferrite.jl's `Grid` type offers experimental features w.r.t. topology information. The functions [`getneighborhood`](@ref) and [`facetskeleton`](@ref)
 are the interface to obtain topological information.The [`getneighborhood`](@ref) can construct lists of directly connected entities based on a given entity
 (`CellIndex`, `FacetIndex`, `FaceIndex`, `EdgeIndex`, or `VertexIndex`). Please remember that the dimensions of faces (dim=2) and edges (dim=1) are fixed, i.e.
-they are defined independent of the spatial dimension of the grid. You can consult [the entity naming page](topics/reference_shapes.md#Entity-naming) for details.
+they are defined independent of the spatial dimension of the grid. You can consult [the entity naming page](@ref entity-naming-docs) for details.
 The [`facetskeleton`](@ref) function can be used to evaluate integrals over material interfaces or computing element interface values such as jumps.
 
 When working with the topology it can be helpful to express algorithms in terms of
