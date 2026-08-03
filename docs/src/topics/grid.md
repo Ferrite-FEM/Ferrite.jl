@@ -152,3 +152,32 @@ are the interface to obtain topological information.The [`getneighborhood`](@ref
 (`CellIndex`, `FacetIndex`, `FaceIndex`, `EdgeIndex`, or `VertexIndex`). Please remember that the dimensions of faces (dim=2) and edges (dim=1) are fixed, i.e.
 they are defined independent of the spatial dimension of the grid. You can consult [the entity naming page](topics/reference_shapes/#Entity-naming) for details.
 The [`facetskeleton`](@ref) function can be used to evaluate integrals over material interfaces or computing element interface values such as jumps.
+
+When working with the topology it can be helpful to express algorithms in terms of
+dimension and co-dimension. This can be especially interesting when dealing with
+embedded elements in mixed dimensional grids, because the neighbour can now have a
+different reference dimension. For example we could have a line attached to a
+quadrilateral in 2D as sketched below:
+```
++-----+ +
+|     | |
+|  1  | 2
+|     | |
++-----+ +
+|     |
+|  3  |
+|     |
++-----+
+```
+Then we can handle the following cases
+```julia
+for n in getneighborhood(topo, grid, FacetIndex(1, 2))
+    if Ferrite.entity_codim(grid, n) == 0
+        # This case is the standard facet-to-facet coupling with element 3 in this example
+    elseif Ferrite.entity_codim(grid, n) == 1
+        # neighbor is the embedded element 2
+    end
+end
+```
+Please note that this relation is not symmetric and we cannot use the exact same code
+when dealing with the "1D subdomain" (containing a single element in this example).

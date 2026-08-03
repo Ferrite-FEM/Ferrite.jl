@@ -439,3 +439,20 @@ function facetskeleton(top::ExclusiveTopology, grid::AbstractGrid)
     end
     return top.facet_skeleton
 end
+
+"""
+    entity_dim(index_type::Union{VertexIndex, EdgeIndex, FaceIndex})
+
+Queries the dimension of an entity. Spatial and reference dimensions coincide
+for this query.
+"""
+entity_dim(::VertexIndex) = 0
+entity_dim(::EdgeIndex)   = 1
+entity_dim(::FaceIndex)   = 2
+
+"""
+    entity_codim(grid::AbstractGrid, index_type::Union{VertexIndex, EdgeIndex, FaceIndex}) = Ferrite.get_reference_dimension(grid, idx[1]) - entity_dim(idx)
+
+Queries the relative dimension of an entity by its index type (i.e. `spatial dimension of grid - reference dimension of entity`).
+"""
+entity_codim(grid::AbstractGrid, index_type::Union{VertexIndex, EdgeIndex, FaceIndex}) = Ferrite.get_reference_dimension(grid, idx[1]) - entity_dim(idx)
