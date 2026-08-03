@@ -38,9 +38,11 @@ Grids with mixed reference dimensions (e.g. a 3D grid containing both `Hexahedro
 shared vertices, so mixed-dimensional connections are stored in `vertex_vertex_neighbor`,
 `edge_edge_neighbor`, or `face_face_neighbor` accordingly. Per-entity queries with
 `VertexIndex`, `EdgeIndex`, `FaceIndex`, and `FacetIndex` work for such grids (the facet
-dimension is resolved per cell). The bulk operations [`facetskeleton`](@ref) and
-`get_facet_facet_neighborhood` remain unsupported, since they assume a common facet
-dimension across the whole grid.
+dimension is resolved per cell). Please remember that the dimensions of faces (dim=2) and
+edges (dim=1) are fixed, i.e. they are defined independent of the spatial dimension of the
+grid. You can consult [the entity naming page](topics/reference_shapes/#Entity-naming) for
+details. The bulk operations [`facetskeleton`](@ref) and `get_facet_facet_neighborhood`
+remain unsupported, since they assume a common facet dimension across the whole grid.
 
 !!! warning "Limitations"
     The implementation only works with conforming grids, i.e. grids without "hanging nodes". Non-conforming grids will give unexpected results.
