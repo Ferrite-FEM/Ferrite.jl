@@ -40,7 +40,7 @@ shared vertices, so mixed-dimensional connections are stored in `vertex_vertex_n
 `VertexIndex`, `EdgeIndex`, `FaceIndex`, and `FacetIndex` work for such grids (the facet
 dimension is resolved per cell). Please remember that the dimensions of faces (dim=2) and
 edges (dim=1) are fixed, i.e. they are defined independent of the spatial dimension of the
-grid. You can consult [the entity naming page](topics/reference_shapes/#Entity-naming) for
+grid. You can consult [the entity naming page](topics/reference_shapes.md#Entity-naming) for
 details. The bulk operations [`facetskeleton`](@ref) and `get_facet_facet_neighborhood`
 remain unsupported, since they assume a common facet dimension across the whole grid.
 
