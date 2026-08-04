@@ -39,7 +39,7 @@ nothing                    #hide
 # \end{aligned}
 # ```
 #
-# For the scope of this example we utilize the FitzHugh-Nagumo neuronal cell cell model, given by
+# For the scope of this example we utilize the FitzHugh-Nagumo neuronal cell model, given by
 #
 # ```math
 # \begin{aligned}
@@ -101,7 +101,7 @@ using Ferrite, SparseArrays, LinearAlgebra, BlockArrays, VTKHDF
 # differentiate the right hand side with forward-mode AD.
 import DiffEqBase: ODEFunction, ODEProblem, init, NoInit
 import OrdinaryDiffEqRosenbrock: Rodas5P
-import SciMLIterators: intervals
+import SciMLIterators: tuples
 import ADTypes: AutoForwardDiff
 #
 # Now, we define the computational domain and cellvalues. We exploit the fact that all fields of
@@ -121,7 +121,7 @@ ip = Lagrange{RefQuadrilateral, 1}()
 qr = QuadratureRule{RefQuadrilateral}(2)
 cellvalues = CellValues(qr, ip);
 #
-# We need to intialize a DofHandler. The DofHandler needs to be aware of three different fields
+# We need to initialize a DofHandler. The DofHandler needs to be aware of three different fields
 # which are all first order approximations. After adding all fields to the DofHandler, we `close`
 # it and thereby distribute the dofs of the problem.
 dh = DofHandler(grid)
@@ -165,10 +165,11 @@ end;
 #
 # Boundary conditions are added to the problem in the usual way.
 # Please check out the other examples for an in depth explanation.
-# Here we force the extracellular porential to be zero at the boundary.
+# With no flux conditions everywhere the extracellular potential is only determined up to a
+# constant, so we ground it by forcing it to zero in the single node of the "ground" set.
 ch = ConstraintHandler(dh)
-∂Ω = getnodeset(grid, "ground")
-dbc = Dirichlet(:ϕₑ, ∂Ω, (x, t) -> 0)
+ground = getnodeset(grid, "ground")
+dbc = Dirichlet(:ϕₑ, ground, (x, t) -> 0.0)
 add!(ch, dbc)
 close!(ch)
 update!(ch, 0.0);
@@ -218,7 +219,7 @@ function doassemble_linear!(cellvalues::CellValues, K::SparseMatrixCSC, M::Spars
         #get the coordinates of the current cell
         coords = getcoordinates(cell)
 
-        Ferrite.reinit!(cellvalues, cell)
+        reinit!(cellvalues, cell)
         #loop over all Gauss points
         for q_point in 1:getnquadpoints(cellvalues)
             #get the spatial coordinates of the current gauss point
@@ -233,22 +234,26 @@ function doassemble_linear!(cellvalues::CellValues, K::SparseMatrixCSC, M::Spars
             for i in 1:n_basefuncs
                 Nᵢ = shape_value(cellvalues, q_point, i)
                 ∇Nᵢ = shape_gradient(cellvalues, q_point, i)
+                κᵢ∇Nᵢ = κᵢ_loc ⋅ ∇Nᵢ
+                κᵢₑ∇Nᵢ = (κₑ_loc + κᵢ_loc) ⋅ ∇Nᵢ
                 for j in 1:n_basefuncs
                     Nⱼ = shape_value(cellvalues, q_point, j)
                     ∇Nⱼ = shape_gradient(cellvalues, q_point, j)
+                    NᵢNⱼdΩ = Nᵢ * Nⱼ * dΩ
                     #diffusion parts
-                    Ke[BlockIndex((ϕₘ▄, ϕₘ▄), (i, j))] -= ((κᵢ_loc ⋅ ∇Nᵢ) ⋅ ∇Nⱼ) * dΩ
-                    Ke[BlockIndex((ϕₘ▄, ϕₑ▄), (i, j))] -= ((κᵢ_loc ⋅ ∇Nᵢ) ⋅ ∇Nⱼ) * dΩ
-                    Ke[BlockIndex((ϕₑ▄, ϕₘ▄), (i, j))] -= ((κᵢ_loc ⋅ ∇Nᵢ) ⋅ ∇Nⱼ) * dΩ
-                    Ke[BlockIndex((ϕₑ▄, ϕₑ▄), (i, j))] -= (((κₑ_loc + κᵢ_loc) ⋅ ∇Nᵢ) ⋅ ∇Nⱼ) * dΩ
+                    κᵢ∇Nᵢ∇NⱼdΩ = (κᵢ∇Nᵢ ⋅ ∇Nⱼ) * dΩ
+                    Ke[BlockIndex((ϕₘ▄, ϕₘ▄), (i, j))] -= κᵢ∇Nᵢ∇NⱼdΩ
+                    Ke[BlockIndex((ϕₘ▄, ϕₑ▄), (i, j))] -= κᵢ∇Nᵢ∇NⱼdΩ
+                    Ke[BlockIndex((ϕₑ▄, ϕₘ▄), (i, j))] -= κᵢ∇Nᵢ∇NⱼdΩ
+                    Ke[BlockIndex((ϕₑ▄, ϕₑ▄), (i, j))] -= (κᵢₑ∇Nᵢ ⋅ ∇Nⱼ) * dΩ
                     #linear reaction parts
-                    Ke[BlockIndex((ϕₘ▄, ϕₘ▄), (i, j))] -= params.a * Nᵢ * Nⱼ * dΩ
-                    Ke[BlockIndex((ϕₘ▄, s▄), (i, j))] -= Nᵢ * Nⱼ * dΩ
-                    Ke[BlockIndex((s▄, ϕₘ▄), (i, j))] += params.e * params.b * Nᵢ * Nⱼ * dΩ
-                    Ke[BlockIndex((s▄, s▄), (i, j))] -= params.e * params.c * Nᵢ * Nⱼ * dΩ
+                    Ke[BlockIndex((ϕₘ▄, ϕₘ▄), (i, j))] -= params.a * NᵢNⱼdΩ
+                    Ke[BlockIndex((ϕₘ▄, s▄), (i, j))] -= NᵢNⱼdΩ
+                    Ke[BlockIndex((s▄, ϕₘ▄), (i, j))] += params.e * params.b * NᵢNⱼdΩ
+                    Ke[BlockIndex((s▄, s▄), (i, j))] -= params.e * params.c * NᵢNⱼdΩ
                     #mass matrices
-                    Me[BlockIndex((ϕₘ▄, ϕₘ▄), (i, j))] += Cₘ_loc * χ_loc * Nᵢ * Nⱼ * dΩ
-                    Me[BlockIndex((s▄, s▄), (i, j))] += Nᵢ * Nⱼ * dΩ
+                    Me[BlockIndex((ϕₘ▄, ϕₘ▄), (i, j))] += Cₘ_loc * χ_loc * NᵢNⱼdΩ
+                    Me[BlockIndex((s▄, s▄), (i, j))] += NᵢNⱼdΩ
                 end
             end
         end
@@ -284,13 +289,15 @@ end;
 function apply_nonlinear!(du, u, p, t)
     (; dh, params, cellvalues) = p
     n_basefuncs = getnbasefunctions(cellvalues)
+    ϕₘ_dofrange = dof_range(dh, :ϕₘ)
+    s_dofrange = dof_range(dh, :s)
 
     for cell in CellIterator(dh)
-        Ferrite.reinit!(cellvalues, cell)
+        reinit!(cellvalues, cell)
         _celldofs = celldofs(cell)
-        ϕₘ_celldofs = _celldofs[dof_range(dh, :ϕₘ)]
-        s_celldofs = _celldofs[dof_range(dh, :s)]
-        ϕₘe = u[ϕₘ_celldofs]
+        ϕₘ_celldofs = @view _celldofs[ϕₘ_dofrange]
+        s_celldofs = @view _celldofs[s_dofrange]
+        ϕₘe = @view u[ϕₘ_celldofs]
         coords = getcoordinates(cell)
         for q_point in 1:getnquadpoints(cellvalues)
             x_qp = spatial_coordinate(cellvalues, q_point, coords)
@@ -367,7 +374,7 @@ integrator = init(
 function export_solution(integrator, dh, filename; Δt_export = 5.0)
     t_next_export = 0.0
     vtkhdf = VTKHDFGridFile(filename, dh; temporal = true)
-    for (u, t) in intervals(integrator)
+    for (u, t) in tuples(integrator)
         t < t_next_export && continue
         t_next_export = t + Δt_export
         write_timestep(vtkhdf, t) do vtk
