@@ -171,11 +171,13 @@ quadrilateral in 2D as sketched below:
 ```
 Then we can handle the following cases
 ```julia
-for n in getneighborhood(topo, grid, FacetIndex(1, 2))
-    if Ferrite.entity_codim(grid, n) == 0
-        # This case is the standard facet-to-facet coupling with element 3 in this example
-    elseif Ferrite.entity_codim(grid, n) == 1
-        # neighbor is the embedded element 2
+for local_face_index in 1:4
+    for neighbor in getneighborhood(topo, mixed_grid, FacetIndex(1, local_face_index)) # neighbor is an EdgeIndex
+        if Ferrite.entity_codim(mixed_grid, neighbor) == 0
+            # This case is the standard facet-to-facet coupling with element 3 in this example
+        elseif Ferrite.entity_codim(mixed_grid, neighbor) == 1
+            # neighbor is the embedded element 2
+        end
     end
 end
 ```

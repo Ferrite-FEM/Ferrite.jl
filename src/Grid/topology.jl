@@ -455,4 +455,4 @@ entity_dim(::FaceIndex) = 2
 
 Queries the relative dimension of an entity by its index type (i.e. `spatial dimension of grid - reference dimension of entity`).
 """
-entity_codim(grid::AbstractGrid, index_type::Union{VertexIndex, EdgeIndex, FaceIndex}) = get_reference_dimension(grid, idx[1]) - entity_dim(idx)
+entity_codim(grid::AbstractGrid, idx::Union{VertexIndex, EdgeIndex, FaceIndex}) = get_reference_dimension(grid, idx[1]) - entity_dim(idx)
