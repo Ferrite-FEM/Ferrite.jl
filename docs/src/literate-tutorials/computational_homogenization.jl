@@ -278,7 +278,6 @@ cellvalues = CellValues(qr, ip);
 # We define a dof handler with a displacement field `:u`:
 dh = DofHandler(grid)
 add!(dh, :u, ip)
-add!(dh_neumann, :λ, Ferrite.SystemVariable{SymmetricTensor{2,2,Float64}}())
 close!(dh);
 
 #For Neumann boundary conditions, we also have to add a system variable for σ-bar
@@ -354,7 +353,7 @@ K_periodic = allocate_matrix(dofhandlers.periodic, ch.periodic)
 
 sparsity = init_sparsity_pattern(dofhandlers.neumann)
 add_sparsity_entries!(sparsity, dofhandlers.neumann)
-add_system_variable_entires!(sparsity, dofhandlers.neumann, 1:getncells(grid), :λ)
+add_system_variable_entries!(sparsity, dofhandlers.neumann, 1:getncells(grid), cell_fields=[:u], system_variable = :λ)
 K_neumann = allocate_matrix(sparsity)
 
 K = (
