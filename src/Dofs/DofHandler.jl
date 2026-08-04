@@ -1158,11 +1158,8 @@ function dof_range(dh::DofHandler, field_name::Symbol)
     if length(dh.subdofhandlers) > 1
         error("The given DofHandler has $(length(dh.subdofhandlers)) SubDofHandlers. Extracting the dof range based on the fieldname might not be a unique problem in this case. Use `dof_range(sdh::SubDofHandler, field_name)` instead.")
     end
-    idx = find_field(dh, field_name)
-    if idx === nothing
-        error("Did not find field :$field_name in DofHandler (existing fields: $(getfieldnames(dh))).")
-    end
-    return dof_range(dh.subdofhandlers[idx[1]], idx[2])
+    sdh_idx, field_idx = find_field(dh, field_name)
+    return dof_range(dh.subdofhandlers[sdh_idx], field_idx)
 end
 
 """
