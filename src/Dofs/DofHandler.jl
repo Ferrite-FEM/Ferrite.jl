@@ -192,7 +192,7 @@ function DofHandler(grid::G) where {dim, G <: AbstractGrid{dim}}
     return DofHandler{dim, G}(
         sdhs, Symbol[], Int[], zeros(Int, ncells), zeros(Int, ncells),
         SystemVariable[], Symbol[], Int[], Int[],
-        false, grid, -1
+        false, grid, -1, nothing
     )
 end
 

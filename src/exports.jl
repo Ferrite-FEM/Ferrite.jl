@@ -125,6 +125,7 @@ export
     # Dofs
     DofHandler,
     SubDofHandler,
+    SystemVariable,
     close!,
     ndofs,
     ndofs_per_cell,
@@ -144,7 +145,7 @@ export
     init_sparsity_pattern,
     add_sparsity_entries!,
     add_cell_entries!,
-    add_system_variable_entires!,
+    add_system_variable_entries!,
     add_interface_entries!,
     add_constraint_entries!,
     allocate_matrix,

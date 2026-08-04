@@ -333,25 +333,117 @@ end
     end
 end
 
-@testset "Global dof coupling" begin
-    grid = generate_grid(Triangle, (2, 2))
-    dh = DofHandler(grid)
-    add!(dh, :u, Lagrange{RefTriangle, 1}()^2)
-    add!(dh, :λ, Ferrite.SystemVariable{Vec{3, Float64}}())
-    close!(dh)
-
-    sp = init_sparsity_pattern(dh)
-    add_sparsity_entries!(sp, dh)
-    add_system_variable_entires!(sp, dh, 1:getncells(grid), :λ)
-
-    λ_dofs = system_variable_dofs(dh, :λ)
-    for cell in 1:getncells(grid)
-        for dof in celldofs(dh, cell)
+function check_stored(sdh, dh, sp, cellset, cell_field, system_variable_name)
+    λ_dofs = system_variable_dofs(dh, system_variable_name)
+    drange = dof_range(sdh, cell_field)
+    for cell in CellIterator(dh, cellset)
+        dofs = celldofs(cell)
+        for k in drange
+            dof = dofs[k]
             for gdof in λ_dofs
                 @test is_stored(sp, dof, gdof)
                 @test is_stored(sp, gdof, dof)
             end
         end
+    end
+end
+
+@testset "Global dof coupling" begin
+    grid = generate_grid(Triangle, (2, 2))
+    
+    # --------------------------------------------------
+    # 1. Single DofHandler with multiple field combinations
+    # --------------------------------------------------
+    @testset "Single DofHandler combinations" begin
+        dh = DofHandler(grid)
+        add!(dh, :u, Lagrange{RefTriangle, 1}())
+        add!(dh, :v, Lagrange{RefTriangle, 2}()^2)
+        add!(dh, :λ1, Ferrite.SystemVariable{Vec{3, Float64}}())
+        add!(dh, :λ2, Ferrite.SystemVariable{Vec{2, Float64}}())
+        close!(dh)
+
+        cellset_all = 1:getncells(grid)
+        cellset_sub = 1:2
+        
+        # Single field :u with :λ1 (all cells)
+        sp = init_sparsity_pattern(dh)
+        add_system_variable_entries!(sp, dh, cellset_all; cell_fields=[:u], system_variable = :λ1)
+        check_stored(dh, dh, sp, cellset_all, :u, :λ1)
+
+        # Single field :v with :λ2 (subset of cells)
+        sp = init_sparsity_pattern(dh)
+        add_system_variable_entries!(sp, dh, cellset_sub; cell_fields=[:v], system_variable = :λ2)
+        check_stored(dh, dh, sp, cellset_sub, :v, :λ2)
+
+        # Multiple fields [:u, :v] with :λ1 (subset of cells)
+        sp = init_sparsity_pattern(dh)
+        add_system_variable_entries!(sp, dh, cellset_sub; cell_fields=[:u, :v], system_variable = :λ1)
+        check_stored(dh, dh, sp, cellset_sub, :u, :λ1)
+        check_stored(dh, dh, sp, cellset_sub, :v, :λ1)
+
+        # Non-existent field coupling error
+        sp = init_sparsity_pattern(dh)
+        @test_throws Exception add_system_variable_entries!(sp, dh, cellset_all; cell_fields=[:nonexistent_field], system_variable = :λ1)
+    end
+
+    # --------------------------------------------------
+    # 2. SubDofHandlers with disjoint fields & cellsets
+    # --------------------------------------------------
+    @testset "SubDofHandler combinations" begin
+        dh = DofHandler(grid)
+        
+        cellset1 = Set(1:2)
+        cellset2 = Set(3:8) # Assuming 2x2 quad mesh of triangles = 8 elements
+
+        # Create two SubDofHandlers with different fields
+        sdh1 = SubDofHandler(dh, cellset1)
+        add!(sdh1, :u, Lagrange{RefTriangle, 1}()^2)
+
+        sdh2 = SubDofHandler(dh, cellset2)
+        add!(sdh2, :v, Lagrange{RefTriangle, 2}()^2)
+
+        # Global system variables
+        add!(dh, :λ1, Ferrite.SystemVariable{Vec{3, Float64}}())
+        add!(dh, :λ2, Ferrite.SystemVariable{Vec{2, Float64}}())
+        close!(dh)
+
+        
+        # Valid coupling on SubDofHandler 1 (:u is present)
+        sp = init_sparsity_pattern(dh)
+        add_system_variable_entries!(sp, dh, cellset1; cell_fields=[:u], system_variable = :λ1)
+        check_stored(sdh1, dh, sp, cellset1, :u, :λ1)
+
+        # Valid coupling on SubDofHandler 2 (:v is present)
+        sp = init_sparsity_pattern(dh)
+        add_system_variable_entries!(sp, dh, cellset2; cell_fields=[:v], system_variable = :λ2)
+        check_stored(sdh2, dh, sp, cellset2, :v, :λ2)
+
+        # Valid cross-coupling (:u with :λ2 on SubDofHandler 1)
+        sp = init_sparsity_pattern(dh)
+        add_system_variable_entries!(sp, dh, cellset1; cell_fields=[:u], system_variable = :λ2)
+        check_stored(sdh1, dh, sp, cellset1, :u, :λ2)
+
+        # --------------------------------------------------
+        # 3. Test Error Handling (Invalid Field/SubDofHandler)
+        # --------------------------------------------------
+
+        # Try coupling field :v on cellset1 (where only :u exists)
+        sp = init_sparsity_pattern(dh)
+        @test_throws Exception add_system_variable_entries!(
+            sp, dh, cellset1; cell_fields=[:v], system_variable = :λ1
+        )
+
+        # Try coupling field :u on cellset2 (where only :v exists)
+        sp = init_sparsity_pattern(dh)
+        @test_throws Exception add_system_variable_entries!(
+            sp, dh, cellset2; cell_fields=[:u], system_variable = :λ2
+        )
+
+        # Mixed valid and invalid cell fields on cellset1
+        sp = init_sparsity_pattern(dh)
+        @test_throws Exception add_system_variable_entries!(
+            sp, dh, cellset1; cell_fields=[:u, :v], system_variable = :λ1
+        )
     end
 end
 

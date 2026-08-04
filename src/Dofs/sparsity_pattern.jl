@@ -353,24 +353,33 @@ all degrees of freedom in the global dof block named `name`.
 The resulting sparsity pattern contains both `(dof, gdof)` and `(gdof, dof)` entries for
 all cell dofs `dof` and global dofs `gdof` in the selected cells and global dof block.
 """
-function add_system_variable_entires!(sp::AbstractSparsityPattern, dh::DofHandler, cellset, name::Symbol)
+function add_system_variable_entries!(sp::AbstractSparsityPattern, dh::DofHandler, cellset #=::OrderedSet=#; cell_fields::Vector{Symbol}, system_variable::Symbol)
     isclosed(dh) || error("the DofHandler must be closed")
-    name ∈ dh.system_variables_names || throw(KeyError(name))
-    if getnrows(sp) < ndofs(dh) || getncols(sp) < ndofs(dh)
-        error("number of rows ($(getnrows(sp))) or columns ($(getncols(sp))) in the sparsity pattern is smaller than number of dofs ($(ndofs(dh)))")
-    end
+    system_variable ∈ dh.system_variables_names || throw(KeyError(system_variable))
+    system_dofs = system_variable_dofs(dh, system_variable)
+    
+    #The given cellset might extend multiple subdofhandlers.
+    for sdh in dh.subdofhandlers
+        filtered_cells = intersect(sdh.cellset, cellset)
+        length(filtered_cells) == 0 && continue
+        for cell_field in cell_fields
+            field_idx = _find_field(sdh, cell_field)
+            field_idx === nothing && throw(ArgumentError("One of the elements in the cellset (e.g. cellid=$(first(filtered_cells))) does not have field $cell_field."))
+            dofrange = dof_range(sdh, field_idx)
 
-    global_dofs = system_variable_dofs(dh, name)
-    for celldata in CellIterator(dh, cellset)
-        dofs = celldofs(celldata)
-        for dof in dofs, gdof in global_dofs
-            add_entry!(sp, dof, gdof)
-            add_entry!(sp, gdof, dof)
+            # Loop over the filtered sets and couple the celldofs with the global field
+            for celldata in CellIterator(dh, filtered_cells)
+                dofs = celldofs(celldata)
+                for k in dofrange, gdof in system_dofs
+                    dof = dofs[k]
+                    add_entry!(sp, dof, gdof)
+                    add_entry!(sp, gdof, dof)
+                end
+            end
         end
     end
     return sp
 end
-
 
 ############################################################
 # Sparse matrix instantiation from AbstractSparsityPattern #
