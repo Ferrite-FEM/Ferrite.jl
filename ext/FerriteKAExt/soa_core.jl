@@ -1,4 +1,6 @@
-function Ferrite.distribute_to_workers(backend::KA.Backend, obj, num_workers) # Could also be KA.GPU <: KA.Backend, but nice to test logic on CPU probably...
+# We intentionally do not restrict the path to KA.GPU <: KA.Backend, as the CPU backend
+# can be helpful to isolate problems in the assembly kernels.
+function Ferrite.distribute_to_workers(backend::KA.Backend, obj, num_workers)
     num_workers < 1 && throw(ArgumentError("num_workers must be strictly positive"))
     soa = as_structure_of_arrays(backend, num_workers, obj)
     return Ferrite.SoAContainer(soa, num_workers)
