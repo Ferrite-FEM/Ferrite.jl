@@ -438,11 +438,11 @@ end
     function setup_system_var_dhch()
         grid = generate_grid(Quadrilateral, (2, 1))
         dh = DofHandler(grid)
-        
+
         # Add cell fields
         add!(dh, :u, Lagrange{RefQuadrilateral, 1}()^2)
         add!(dh, :s, Lagrange{RefQuadrilateral, 1}())
-        
+
         # Add global system variables
         add!(dh, :λ1, Ferrite.SystemVariable{Vec{2, Float64}}()) # 2 dofs
         add!(dh, :λ2, Ferrite.SystemVariable{1}())          # 1 dof
@@ -489,7 +489,7 @@ end
 
     @testset "FieldWise Ordering" begin
         dh, ch = setup_system_var_dhch()
-        
+
         dho, cho = setup_system_var_dhch()
 
         # Renumber field wise
@@ -497,14 +497,14 @@ end
         λ1_dofs = system_variable_dofs(dh, :λ1)
         λ2_dofs = system_variable_dofs(dh, :λ2)
 
-        @test λ1_dofs == [19,20]
+        @test λ1_dofs == [19, 20]
         @test λ2_dofs == [21]
         @test celldofs(dh, 1) == [1, 2, 3, 4, 5, 6, 7, 8, 13, 14, 15, 16]
         @test celldofs(dh, 2) == [3, 4, 9, 10, 11, 12, 5, 6, 14, 17, 18, 15]
 
         # Contiguity check
-        @test λ1_dofs == collect(range(first(λ1_dofs), length=length(λ1_dofs)))
-        @test λ2_dofs == collect(range(first(λ2_dofs), length=length(λ2_dofs)))
+        @test λ1_dofs == collect(range(first(λ1_dofs), length = length(λ1_dofs)))
+        @test λ2_dofs == collect(range(first(λ2_dofs), length = length(λ2_dofs)))
 
         # Relative ordering stability within system variables
         @test sign.(diff(λ1_dofs)) == sign.(diff(system_variable_dofs(dho, :λ1)))
@@ -513,13 +513,13 @@ end
         # Custom block target reordering
         dh_custom, ch_custom = setup_system_var_dhch()
         n_fields = length(Ferrite.getfieldnames(dh_custom)) + length(dh_custom.system_variables_names)
-        
+
         # Reverse all field/system variable blocks
         custom_blocks = collect(n_fields:-1:1)
         renumber!(dh_custom, ch_custom, DofOrder.FieldWise(custom_blocks))
         @test celldofs(dh_custom, 1) == [7, 8, 9, 10, 11, 12, 13, 14, 1, 2, 3, 4] .+ 3
         @test celldofs(dh_custom, 2) == [9, 10, 15, 16, 17, 18, 11, 12, 2, 5, 6, 3] .+ 3
-        @test system_variable_dofs(dh_custom, :λ1) == [2,3]
+        @test system_variable_dofs(dh_custom, :λ1) == [2, 3]
         @test system_variable_dofs(dh_custom, :λ2) == [1]
     end
 
@@ -539,8 +539,8 @@ end
         @test celldofs(dh, 2) == [2, 8, 5, 11, 6, 12, 3, 9, 14, 17, 18, 15]
 
         # Contiguity check
-        @test λ1_dofs == collect(range(first(λ1_dofs), length=length(λ1_dofs)))
-        @test λ2_dofs == collect(range(first(λ2_dofs), length=length(λ2_dofs)))
+        @test λ1_dofs == collect(range(first(λ1_dofs), length = length(λ1_dofs)))
+        @test λ2_dofs == collect(range(first(λ2_dofs), length = length(λ2_dofs)))
 
         # Relative ordering stability within system variables
         @test sign.(diff(λ1_dofs)) == sign.(diff(system_variable_dofs(dho, :λ1)))
@@ -548,10 +548,10 @@ end
 
         # Custom component block target reordering
         dh_custom, ch_custom = setup_system_var_dhch()
-        
+
         # Calculate total components across cell fields and system variables (6 total)
         n_components = sum([Ferrite.n_components(dh_custom, field) for field in dh.field_names]) +
-                    sum(Ferrite.n_components, dh_custom.system_variables)
+            sum(Ferrite.n_components, dh_custom.system_variables)
 
         # Reverse all component blocks [6, 5, 4, 3, 2, 1]
         custom_blocks = collect(n_components:-1:1)
@@ -564,7 +564,7 @@ end
         @test system_variable_dofs(dh_custom, :λ2) == [1]
     end
 
-    @testset "Renumbering with metis" begin 
+    @testset "Renumbering with metis" begin
         dh, ch = setup_system_var_dhch()
         renumber!(dh, DofOrder.Ext{Metis}())
         renumber!(dh, DofOrder.Ext{Metis}(coupling = [true true; true false]))

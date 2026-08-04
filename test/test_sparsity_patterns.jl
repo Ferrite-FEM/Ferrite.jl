@@ -346,11 +346,12 @@ function check_stored(sdh, dh, sp, cellset, cell_field, system_variable_name)
             end
         end
     end
+    return
 end
 
 @testset "Global dof coupling" begin
     grid = generate_grid(Triangle, (2, 2))
-    
+
     # --------------------------------------------------
     # 1. Single DofHandler with multiple field combinations
     # --------------------------------------------------
@@ -364,26 +365,26 @@ end
 
         cellset_all = 1:getncells(grid)
         cellset_sub = 1:2
-        
+
         # Single field :u with :λ1 (all cells)
         sp = init_sparsity_pattern(dh)
-        add_system_variable_entries!(sp, dh, cellset_all; cell_fields=[:u], system_variable = :λ1)
+        add_system_variable_entries!(sp, dh, cellset_all; cell_fields = [:u], system_variable = :λ1)
         check_stored(dh, dh, sp, cellset_all, :u, :λ1)
 
         # Single field :v with :λ2 (subset of cells)
         sp = init_sparsity_pattern(dh)
-        add_system_variable_entries!(sp, dh, cellset_sub; cell_fields=[:v], system_variable = :λ2)
+        add_system_variable_entries!(sp, dh, cellset_sub; cell_fields = [:v], system_variable = :λ2)
         check_stored(dh, dh, sp, cellset_sub, :v, :λ2)
 
         # Multiple fields [:u, :v] with :λ1 (subset of cells)
         sp = init_sparsity_pattern(dh)
-        add_system_variable_entries!(sp, dh, cellset_sub; cell_fields=[:u, :v], system_variable = :λ1)
+        add_system_variable_entries!(sp, dh, cellset_sub; cell_fields = [:u, :v], system_variable = :λ1)
         check_stored(dh, dh, sp, cellset_sub, :u, :λ1)
         check_stored(dh, dh, sp, cellset_sub, :v, :λ1)
 
         # Non-existent field coupling error
         sp = init_sparsity_pattern(dh)
-        @test_throws Exception add_system_variable_entries!(sp, dh, cellset_all; cell_fields=[:nonexistent_field], system_variable = :λ1)
+        @test_throws Exception add_system_variable_entries!(sp, dh, cellset_all; cell_fields = [:nonexistent_field], system_variable = :λ1)
     end
 
     # --------------------------------------------------
@@ -391,7 +392,7 @@ end
     # --------------------------------------------------
     @testset "SubDofHandler combinations" begin
         dh = DofHandler(grid)
-        
+
         cellset1 = Set(1:2)
         cellset2 = Set(3:8) # Assuming 2x2 quad mesh of triangles = 8 elements
 
@@ -407,20 +408,20 @@ end
         add!(dh, :λ2, Ferrite.SystemVariable{Vec{2, Float64}}())
         close!(dh)
 
-        
+
         # Valid coupling on SubDofHandler 1 (:u is present)
         sp = init_sparsity_pattern(dh)
-        add_system_variable_entries!(sp, dh, cellset1; cell_fields=[:u], system_variable = :λ1)
+        add_system_variable_entries!(sp, dh, cellset1; cell_fields = [:u], system_variable = :λ1)
         check_stored(sdh1, dh, sp, cellset1, :u, :λ1)
 
         # Valid coupling on SubDofHandler 2 (:v is present)
         sp = init_sparsity_pattern(dh)
-        add_system_variable_entries!(sp, dh, cellset2; cell_fields=[:v], system_variable = :λ2)
+        add_system_variable_entries!(sp, dh, cellset2; cell_fields = [:v], system_variable = :λ2)
         check_stored(sdh2, dh, sp, cellset2, :v, :λ2)
 
         # Valid cross-coupling (:u with :λ2 on SubDofHandler 1)
         sp = init_sparsity_pattern(dh)
-        add_system_variable_entries!(sp, dh, cellset1; cell_fields=[:u], system_variable = :λ2)
+        add_system_variable_entries!(sp, dh, cellset1; cell_fields = [:u], system_variable = :λ2)
         check_stored(sdh1, dh, sp, cellset1, :u, :λ2)
 
         # --------------------------------------------------
@@ -430,19 +431,19 @@ end
         # Try coupling field :v on cellset1 (where only :u exists)
         sp = init_sparsity_pattern(dh)
         @test_throws Exception add_system_variable_entries!(
-            sp, dh, cellset1; cell_fields=[:v], system_variable = :λ1
+            sp, dh, cellset1; cell_fields = [:v], system_variable = :λ1
         )
 
         # Try coupling field :u on cellset2 (where only :v exists)
         sp = init_sparsity_pattern(dh)
         @test_throws Exception add_system_variable_entries!(
-            sp, dh, cellset2; cell_fields=[:u], system_variable = :λ2
+            sp, dh, cellset2; cell_fields = [:u], system_variable = :λ2
         )
 
         # Mixed valid and invalid cell fields on cellset1
         sp = init_sparsity_pattern(dh)
         @test_throws Exception add_system_variable_entries!(
-            sp, dh, cellset1; cell_fields=[:u, :v], system_variable = :λ1
+            sp, dh, cellset1; cell_fields = [:u, :v], system_variable = :λ1
         )
     end
 end

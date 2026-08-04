@@ -357,7 +357,7 @@ function add_system_variable_entries!(sp::AbstractSparsityPattern, dh::DofHandle
     isclosed(dh) || error("the DofHandler must be closed")
     system_variable ∈ dh.system_variables_names || throw(KeyError(system_variable))
     system_dofs = system_variable_dofs(dh, system_variable)
-    
+
     #The given cellset might extend multiple subdofhandlers.
     for sdh in dh.subdofhandlers
         filtered_cells = intersect(sdh.cellset, cellset)
