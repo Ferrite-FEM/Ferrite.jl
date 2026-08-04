@@ -156,12 +156,7 @@ Assembles the element residual `ge` into the global residual vector `g`.
     @boundscheck checkbounds(g, dofs)
     @boundscheck checkbounds(ge, keys(dofs))
     @inbounds for (i, dof) in pairs(dofs)
-        if atomic
-            v = ge[i]
-            iszero(v) || _atomic_add!(g, dof, v)
-        else
-            addindex!(g, ge[i], dof)
-        end
+        addindex!(g, ge[i], dof, Val(atomic))
     end
     return
 end
@@ -396,7 +391,7 @@ end
                 # Match: add the value (if non-zero) and advance the pointers
                 val = Ke[rowpermutation[ri], Kecol]
                 if !iszero(val)
-                    addindex!(Kvals, R, val, atomic)
+                    addindex!(Kvals, val, R, atomic)
                 end
                 ri += 1
                 Ri += 1

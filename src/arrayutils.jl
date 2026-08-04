@@ -64,7 +64,7 @@ for (T, llvmT) in ((Float64, "double"), (Float32, "float"))
         ret void
         """
     end
-    @eval @propagate_inbounds function _atomic_add!(x::Vector{$T}, i::Int, v::$T)
+    @eval @propagate_inbounds function _atomic_add!(x::Vector{$T}, v::$T, i::Int)
         @boundscheck checkbounds(x, i)
         GC.@preserve x begin
             p = pointer(x, i)
@@ -78,7 +78,7 @@ end
 # point where the atomic and non-atomic matrix assembly kernels differ.
 @propagate_inbounds function addindex!(x::AbstractVector, v, i::Int, ::Val{atomic} = Val(false)) where {atomic}
     if atomic
-        _atomic_add!(x, Int(i), convert(eltype(x), v))
+        _atomic_add!(x, v, i)
     else
         x[i] += v
     end
@@ -113,7 +113,7 @@ function addindex!(A::SparseMatrixCSC{Tv}, v::Tv, i::Int, j::Int, ::Val{atomic} 
     if searchk <= coljlastk && rowvals(A)[searchk] == i
         # Column j contains entry A[i,j]. Update and return.
         nzs = nonzeros(A)
-        addindex!(nzs, searchk, v, Val{atomic}())
+        addindex!(nzs, v, searchk, Val{atomic}())
         return A
     else
         # (i, j) not stored. Throw.
