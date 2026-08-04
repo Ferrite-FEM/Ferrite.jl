@@ -214,7 +214,7 @@ Convenience method for doing the common task of calling [`add_cell_entries!`](@r
 [`add_interface_entries!`](@ref), and [`add_constraint_entries!`](@ref), depending on what
 arguments are passed:
  - `add_cell_entries!` is always called
- - `add_interface_entries!` is called if `topology` is provided (i.e. not `nothing`)
+ - `add_interface_entries!` is called if `interface_coupling` is provided (i.e. not `nothing`)
  - `add_constraint_entries!` is called if the ConstraintHandler is provided
 
 For more details about arguments and keyword arguments, see the respective functions.
@@ -235,7 +235,8 @@ function add_sparsity_entries!(
     # Add all entries
     add_diagonal_entries!(sp)
     add_cell_entries!(sp, dh, ch; keep_constrained, coupling)
-    if topology !== nothing
+    if interface_coupling !== nothing
+        topology === nothing && error("`interface_coupling` requires passing the `topology` keyword argument")
         add_interface_entries!(sp, dh, ch; topology, keep_constrained, interface_coupling)
     end
     if ch !== nothing

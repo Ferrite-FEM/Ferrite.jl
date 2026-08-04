@@ -332,6 +332,8 @@ end
     for p in patterns
         @test_throws ErrorException add_sparsity_entries!(p, dh, ch_bad; keep_constrained = false)
     end
+    # interface_coupling requires the topology for locating the interfaces
+    @test_throws ErrorException("`interface_coupling` requires passing the `topology` keyword argument") add_sparsity_entries!(SparsityPattern(ndofs(dh), ndofs(dh)), dh; interface_coupling = trues(2, 2))
 end
 
 @testset "FastSparsityPattern" begin
