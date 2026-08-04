@@ -58,7 +58,7 @@ function Ferrite.get_facet_facet_neighborhood(g::ForestBWG{dim}) where {dim}
 end
 
 # Directly working with mixed-dimensional forests is not supported for now.
-get_reference_dimension(g::ForestBWG, cellid::Int) = get_reference_dimension(g)
+Ferrite.get_reference_dimension(g::ForestBWG, cellid::Int) = Ferrite.get_reference_dimension(g)
 
 # Pack an integer octree coordinate into a single `UInt64` — the key of the per-tree
 # *boundary node tables* that resolve node identity across tree boundaries (see
