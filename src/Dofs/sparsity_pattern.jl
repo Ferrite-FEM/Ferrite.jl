@@ -357,8 +357,8 @@ end
 # SparsityPattern takes a fast path whenever it is empty: cell entries (including the diagonal,
 # and respecting `coupling` and `keep_constrained`) are exactly counted, the buffer is presized in
 # one allocation, and rows are filled with a marker-dedup append. A non-empty pattern falls back
-# to the generic per-entry path. Interface entries (topology) and constraints always layer on
-# afterwards, so they are compatible with the fast path.
+# to the generic per-entry path. Interface entries (interface_coupling) and constraints always
+# layer on afterwards, so they are compatible with the fast path.
 function add_sparsity_entries!(
         sp::SparsityPattern, dh::DofHandler, ch::Union{ConstraintHandler, Nothing} = nothing;
         keep_constrained::Bool = true,
@@ -378,9 +378,12 @@ function add_sparsity_entries!(
         # With interface entries coming (added below), reserve row space for them up front so
         # they land in place instead of relocating rows. When the reservation enumeration is
         # provably exact it doubles as the insertion itself (see _visit_row_candidates!).
-        if topology === nothing || !(interface_coupling isa AbstractMatrix{Bool})
+        if interface_coupling === nothing
             neighbor_cells = interface_couplings = nothing
         else
+            if topology === nothing
+                topology = ExclusiveTopology(get_grid(dh))
+            end
             neighbor_cells = create_cell_to_neighbors(dh.grid, topology)
             interface_couplings = _coupling_to_local_dof_coupling(dh, interface_coupling)
             interfaces_filled = _can_fill_interfaces_directly(dh)
@@ -393,7 +396,7 @@ function add_sparsity_entries!(
         add_diagonal_entries!(sp)
         add_cell_entries!(sp, dh, ch; keep_constrained, coupling)
     end
-    topology !== nothing && !interfaces_filled && add_interface_entries!(sp, dh, ch; topology, keep_constrained, interface_coupling)
+    interface_coupling !== nothing && !interfaces_filled && add_interface_entries!(sp, dh, ch; topology, keep_constrained, interface_coupling)
     ch !== nothing && add_constraint_entries!(sp, ch; keep_constrained)
     return sp
 end
