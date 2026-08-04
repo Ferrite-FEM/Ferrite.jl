@@ -1,10 +1,8 @@
-# TODO's
-# * `update!` for ConstraintHandler on GPU.
-# * Rectangular matrix assembly support
-
 module FerriteCudaExt
 
 using Ferrite, CUDA, SparseArrays
+
+import Base: @propagate_inbounds
 
 import Adapt: Adapt, adapt, adapt_structure
 
