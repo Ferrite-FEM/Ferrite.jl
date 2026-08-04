@@ -37,13 +37,8 @@ function addindex!(A::AbstractMatrix{T}, v::T, i::Int, j::Int, ::Val{atomic}) wh
     return A
 end
 
-function addindex!(b::AbstractVector{T}, v, i::Integer, ::Val{atomic}) where {T, atomic}
+function addindex!(b::AbstractVector{T}, v, i::Integer, ::Val{atomic} = Val(false)) where {T, atomic}
     return addindex!(b, T(v), Int(i), Val(atomic))
-end
-function addindex!(b::AbstractVector{T}, v::T, i::Int) where {T}
-    iszero(v) && return b
-    b[i] += v
-    return b
 end
 
 # Atomic accumulation primitive used for assembling with `atomic = true`.
@@ -81,7 +76,7 @@ end
 
 # Accumulate `v` into `x[i]`, atomically if `atomic` is `Val(true)`. This is the only
 # point where the atomic and non-atomic matrix assembly kernels differ.
-@propagate_inbounds function addindex!(x::AbstractVector, i::Integer, v, ::Val{atomic}) where {atomic}
+@propagate_inbounds function addindex!(x::AbstractVector, v, i::Int, ::Val{atomic} = Val(false)) where {atomic}
     if atomic
         _atomic_add!(x, Int(i), convert(eltype(x), v))
     else
