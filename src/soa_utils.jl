@@ -24,12 +24,6 @@ Base.getindex(c::SoAContainer, i::Integer) = get_substruct(c.soa, i)
 function Base.show(io::IO, d::MIME"text/plain", c::SoAContainer{T}) where {T}
     println(io, "SoAContainer{$T}")
     print(io, "Structure of Arrays container with $(c.nels) elements.")
-    #= # Requires GPUArraysCore dependency
-    println(io, " First element:")
-    GPUArraysCore.allowscalar() do
-        show(io, d, c[1])
-    end
-    =#
     return nothing
 end
 

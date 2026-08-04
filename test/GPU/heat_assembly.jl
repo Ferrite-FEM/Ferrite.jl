@@ -156,7 +156,6 @@ end
     cell_cache = Ferrite.distribute_to_workers(backend, CellCache(dh_device), n_workers)
     Kes_device = KA.zeros(backend, Float32, getncells(grid), getnbasefunctions(cv), getnbasefunctions(cv))
     fes_device = KA.zeros(backend, Float32, getncells(grid), getnbasefunctions(cv))
-    # Assembly here does not work because we are missing a SOA transformation of the assembler.
     assemble_global_ka!(backend, cv_device, cell_cache, colors_device, Kes_device, fes_device, n_workers)
     @test Array(Kes_device) ≈ Array(Kes)
     @test Array(fes_device) ≈ Array(fes)
