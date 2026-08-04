@@ -36,6 +36,8 @@ geometric_interpolation(::Ferrite.AbstractCell)
 get_node_coordinate
 Ferrite.getspatialdim(::Ferrite.AbstractGrid)
 Ferrite.getrefdim(::Ferrite.AbstractCell)
+Ferrite.entity_dim
+Ferrite.entity_codim
 ```
 
 ### Topology

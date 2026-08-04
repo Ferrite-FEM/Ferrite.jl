@@ -12,7 +12,7 @@ Currently, the following reference shapes are defined
 * `RefPrism`
 * `RefPyramid`
 
-## Entity naming
+## [Entity naming](@id entity-naming-docs)
 Ferrite denotes the entities of a reference shape as follows
 
 | Entity   | Description |

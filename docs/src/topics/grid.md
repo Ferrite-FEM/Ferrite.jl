@@ -148,6 +148,38 @@ In order to use boundaries, e.g. for Dirichlet constraints in the ConstraintHand
 ## Topology
 
 Ferrite.jl's `Grid` type offers experimental features w.r.t. topology information. The functions [`getneighborhood`](@ref) and [`facetskeleton`](@ref)
-are the interface to obtain topological information. The [`getneighborhood`](@ref) can construct lists of directly connected entities based on a given entity
-(`CellIndex`, `FacetIndex`, `FaceIndex`, `EdgeIndex`, or `VertexIndex`).
+are the interface to obtain topological information.The [`getneighborhood`](@ref) can construct lists of directly connected entities based on a given entity
+(`CellIndex`, `FacetIndex`, `FaceIndex`, `EdgeIndex`, or `VertexIndex`). Please remember that the dimensions of faces (dim=2) and edges (dim=1) are fixed, i.e.
+they are defined independent of the spatial dimension of the grid. You can consult [the entity naming page](@ref entity-naming-docs) for details.
 The [`facetskeleton`](@ref) function can be used to evaluate integrals over material interfaces or computing element interface values such as jumps.
+
+When working with the topology it can be helpful to express algorithms in terms of
+dimension and co-dimension. This can be especially interesting when dealing with
+embedded elements in mixed dimensional grids, because the neighbour can now have a
+different reference dimension. For example we could have a line attached to a
+quadrilateral in 2D as sketched below:
+```
++-----+ +
+|     | |
+|  1  | 2
+|     | |
++-----+ +
+|     |
+|  3  |
+|     |
++-----+
+```
+Then we can handle the following cases
+```julia
+for local_face_index in 1:4
+    for neighbor in getneighborhood(topo, mixed_grid, FacetIndex(1, local_face_index)) # neighbor is an EdgeIndex
+        if Ferrite.entity_codim(mixed_grid, neighbor) == 0
+            # This case is the standard facet-to-facet coupling with element 3 in this example
+        elseif Ferrite.entity_codim(mixed_grid, neighbor) == 1
+            # neighbor is the embedded element 2
+        end
+    end
+end
+```
+Please note that this relation is not symmetric and we cannot use the exact same code
+when dealing with the "1D subdomain" (containing a single element in this example).

@@ -310,11 +310,27 @@ end
 
 @testset "Grid topology" begin
     # Error paths
+    # Purely embedded (shell) grids, where the highest reference dimension is smaller than
+    # the spatial dimension, are not supported.
+    shell_grid = Grid([Quadrilateral((1, 2, 3, 4))], [Node(c) for c in zeros(Vec{3, Float64}, 4)])
+    @test_throws ErrorException ExclusiveTopology(shell_grid)
+
+    # Mixed reference dimensions are supported (issue #843). Per-entity queries (including
+    # per-cell `FacetIndex`) work, while the bulk `facetskeleton` / `get_facet_facet_neighborhood`
+    # remain unsupported since they assume a common facet dimension.
     mixed_rdim_grid = Grid([Triangle((1, 2, 3)), Line((2, 3))], [Node((0.0, 0.0)), Node((1.0, 0.0)), Node((1.0, 1.1))])
-    @test_throws ErrorException ExclusiveTopology(mixed_rdim_grid)
+    mixed_rdim_topo = ExclusiveTopology(mixed_rdim_grid)
+    @test mixed_rdim_topo.edge_edge_neighbor[1, 2] == [EdgeIndex(2, 1)]
+    @test mixed_rdim_topo.edge_edge_neighbor[2, 1] == [EdgeIndex(1, 2)]
+    @test Set(getneighborhood(mixed_rdim_topo, mixed_rdim_grid, EdgeIndex(1, 2))) == Set([EdgeIndex(2, 1)])
+    # Triangle (rdim 2): facet == edge; Line (rdim 1): facet == vertex.
+    @test getneighborhood(mixed_rdim_topo, mixed_rdim_grid, FacetIndex(1, 2)) == getneighborhood(mixed_rdim_topo, mixed_rdim_grid, EdgeIndex(1, 2))
+    @test getneighborhood(mixed_rdim_topo, mixed_rdim_grid, FacetIndex(2, 1)) == getneighborhood(mixed_rdim_topo, mixed_rdim_grid, VertexIndex(2, 1))
+    @test_throws ArgumentError Ferrite.get_facet_facet_neighborhood(mixed_rdim_topo, mixed_rdim_grid)
+    @test_throws ArgumentError Ferrite.facetskeleton(mixed_rdim_topo, mixed_rdim_grid)
+
     top_line = ExclusiveTopology(generate_grid(Line, (3,)))
     @test_throws ArgumentError Ferrite.get_facet_facet_neighborhood(top_line, mixed_rdim_grid)
-    @test_throws ArgumentError Ferrite.getneighborhood(top_line, mixed_rdim_grid, FacetIndex(1, 2))
 
     #
     # (1) (2) (3) (4)
@@ -534,7 +550,11 @@ end
         ]
     )
 
-    # test grids with mixed refdim
+    # test grids with mixed refdim (issue #843). The shared entity is classified by the
+    # number of shared vertices, independent of the cells' reference dimensions.
+    #
+    # Two Hexahedra (cells 1, 2) each share an edge with the neighboring Quadrilateral,
+    # and the two Quadrilaterals (cells 3, 4) share an edge with each other.
     cells = [
         Hexahedron((1, 2, 3, 4, 5, 6, 7, 8)),
         Hexahedron((11, 13, 14, 12, 15, 16, 17, 18)),
@@ -543,30 +563,64 @@ end
     ]
     nodes = [Node(coord) for coord in zeros(Vec{3, Float64}, 18)]
     grid = Grid(cells, nodes)
-    @test_throws ErrorException ExclusiveTopology(grid)
-    # topology = ExclusiveTopology(grid)
+    topology = ExclusiveTopology(grid)
+    # Hex1 edge (2,3) <-> Quad3 edge (3,2)
+    @test topology.edge_edge_neighbor[1, 2] == [EdgeIndex(3, 4)]
+    @test topology.edge_edge_neighbor[3, 4] == [EdgeIndex(1, 2)]
+    # Hex2 edge (11,12) <-> Quad4 edge (11,12)
+    @test topology.edge_edge_neighbor[2, 4] == [EdgeIndex(4, 2)]
+    @test topology.edge_edge_neighbor[4, 2] == [EdgeIndex(2, 4)]
+    # Quad3 edge (9,10) <-> Quad4 edge (10,9)
+    @test topology.edge_edge_neighbor[3, 2] == [EdgeIndex(4, 4)]
+    @test topology.edge_edge_neighbor[4, 4] == [EdgeIndex(3, 2)]
+    # No face connections (the Hexahedra only touch the Quadrilaterals along edges)
+    @test all(isempty, topology.face_face_neighbor)
+    # Per-cell FacetIndex queries resolve to the cell's facet type: Hex (rdim 3) -> face,
+    # Quad (rdim 2) -> edge.
+    @test getneighborhood(topology, grid, FacetIndex(1, 1)) == getneighborhood(topology, grid, FaceIndex(1, 1))
+    @test getneighborhood(topology, grid, FacetIndex(3, 4)) == getneighborhood(topology, grid, EdgeIndex(3, 4))
+    @test EdgeIndex(1, 2) in getneighborhood(topology, grid, FacetIndex(3, 4))
+    # Bulk facet operations remain unsupported for mixed-dimensional grids
+    @test_throws ArgumentError Ferrite.facetskeleton(topology, grid)
+    @test_throws ArgumentError Ferrite.get_facet_facet_neighborhood(topology, grid)
 
-    # @test_throws ArgumentError Ferrite.facetskeleton(topology, grid)
-    # @test topology.face_face_neighbor[3,4] == [EdgeIndex(1,2))
-    # @test topology.edge_edge_neighbor[1,2] == [FaceIndex(3,4))
-    # # regression that it doesn't error for boundary faces, see https://github.com/Ferrite-FEM/Ferrite.jl/issues/518
-    # @test topology.face_face_neighbor[1,6] == topology.face_face_neighbor[1,1] == zero(Ferrite.EntityNeighborhood{FaceIndex})
-    # @test topology.edge_edge_neighbor[1,1] == topology.edge_edge_neighbor[1,3] == zero(Ferrite.EntityNeighborhood{FaceIndex})
-    # @test topology.face_face_neighbor[3,1] == topology.face_face_neighbor[3,3] == zero(Ferrite.EntityNeighborhood{FaceIndex})
-    # @test topology.face_face_neighbor[4,1] == topology.face_face_neighbor[4,3] == zero(Ferrite.EntityNeighborhood{FaceIndex})
-
+    # 2D grid with Quadrilaterals connected to Lines at single vertices.
     cells = [
         Quadrilateral((1, 2, 6, 5)),
         Quadrilateral((3, 4, 8, 7)),
         Line((2, 3)),
         Line((6, 7)),
     ]
-    nodes = [Node(coord) for coord in zeros(Vec{2, Float64}, 18)]
-    @test_throws ErrorException ExclusiveTopology(grid)
-    # topology = ExclusiveTopology(grid)
-    # @test_throws ArgumentError Ferrite.facetskeleton(topology, grid)
-    # @test_throws ArgumentError getneighborhood(topology, grid, FacetIndex(1,1))
-    # @test_throws ArgumentError Ferrite.get_facet_facet_neighborhood(topology, grid)
+    nodes = [Node(coord) for coord in zeros(Vec{2, Float64}, 8)]
+    grid = Grid(cells, nodes)
+    topology = ExclusiveTopology(grid)
+    @test topology.vertex_vertex_neighbor[1, 2] == [VertexIndex(3, 1)]
+    @test topology.vertex_vertex_neighbor[3, 1] == [VertexIndex(1, 2)]
+    @test topology.vertex_vertex_neighbor[2, 4] == [VertexIndex(4, 2)]
+    @test topology.vertex_vertex_neighbor[4, 2] == [VertexIndex(2, 4)]
+    @test all(isempty, topology.edge_edge_neighbor)
+    # Quad (rdim 2) -> facet == edge; Line (rdim 1) -> facet == vertex.
+    @test getneighborhood(topology, grid, FacetIndex(1, 1)) == getneighborhood(topology, grid, EdgeIndex(1, 1))
+    @test getneighborhood(topology, grid, FacetIndex(3, 1)) == getneighborhood(topology, grid, VertexIndex(3, 1))
+    @test_throws ArgumentError Ferrite.facetskeleton(topology, grid)
+    @test_throws ArgumentError Ferrite.get_facet_facet_neighborhood(topology, grid)
+
+    # An embedded cell may share vertices with a neighbor without sharing an actual entity:
+    # here `Line((1, 8))` spans the face-diagonal of the first Hexahedron (nodes 1 and 8 are
+    # not a hex edge). The two shared vertices must be recorded as separate vertex neighbors,
+    # not dropped as a non-existing shared edge (issue #843).
+    hexgrid = generate_grid(Hexahedron, (2, 1, 1))
+    diag_grid = Grid([hexgrid.cells..., Line((1, 8))], hexgrid.nodes)
+    topology = ExclusiveTopology(diag_grid)
+    # node 1 is local vertex 1 of hex 1 and vertex 1 of the line
+    @test topology.vertex_vertex_neighbor[3, 1] == [VertexIndex(1, 1)]
+    @test topology.vertex_vertex_neighbor[1, 1] == [VertexIndex(3, 1)]
+    # node 8 is shared by hex 1 (local vertex 6), hex 2 (local vertex 5) and the line (vertex 2)
+    @test Set(topology.vertex_vertex_neighbor[3, 2]) == Set([VertexIndex(1, 6), VertexIndex(2, 5)])
+    @test topology.vertex_vertex_neighbor[1, 6] == [VertexIndex(3, 2)]
+    @test topology.vertex_vertex_neighbor[2, 5] == [VertexIndex(3, 2)]
+    # No spurious edge connection is created for the diagonal line
+    @test all(isempty, @view topology.edge_edge_neighbor[3, :])
 
     #
     # +-----+-----+-----+
