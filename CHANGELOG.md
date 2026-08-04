@@ -129,8 +129,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
  - Support generating embedded 2D-grids by passing coordinates `x::Vec{3}` with 2D reference shapes. Note: New calculation of node position leads to slight floating point precision differences in node positions. ([#1367])
 
 ### Documentation
-
 - Landau example in code gallery now shows how to use DifferentiationInterface and HyperHessians as a backend. (#1345)
+
+### Added
+ - `PeriodicDirichlet` can now have time dependent inhomogeneities. ([#1353])
 
 ## [v1.4.1] - 2026-06-17
 
