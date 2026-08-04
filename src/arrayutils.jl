@@ -24,13 +24,16 @@ Fallback: `A[i, j] += v`.
 """
 addindex!
 
-function addindex!(A::AbstractMatrix{T}, v, i::Integer, j::Integer) where {T}
-    return addindex!(A, T(v), Int(i), Int(j))
+function addindex!(A::AbstractMatrix{T}, v, i::Integer, j::Integer, ::Val{atomic} = Val(false)) where {T, atomic}
+    return addindex!(A, T(v), Int(i), Int(j), Val{atomic}())
 end
-function addindex!(A::AbstractMatrix{T}, v::T, i::Int, j::Int) where {T}
+function addindex!(A::AbstractMatrix{T}, v::T, i::Int, j::Int, ::Val{false}) where {T}
     iszero(v) && return A
     A[i, j] += v
     return A
+end
+function addindex!(A::AbstractMatrix{T}, v::T, i::Int, j::Int, ::Val{true}) where {T}
+    error("Atomic addindex! not supported for matrices.")
 end
 
 function addindex!(b::AbstractVector{T}, v, i::Integer) where {T}
@@ -59,7 +62,7 @@ end
 ## SparseArrays.SparseMatrixCSC ##
 ##################################
 
-function addindex!(A::SparseMatrixCSC{Tv}, v::Tv, i::Int, j::Int) where {Tv}
+function addindex!(A::SparseMatrixCSC{Tv}, v::Tv, i::Int, j::Int, ::Val{atomic} = Val(false)) where {Tv, atomic}
     @boundscheck checkbounds(A, i, j)
     # Return early if v is 0
     iszero(v) && return A
@@ -69,7 +72,8 @@ function addindex!(A::SparseMatrixCSC{Tv}, v::Tv, i::Int, j::Int) where {Tv}
     searchk = searchsortedfirst(rowvals(A), i, coljfirstk, coljlastk, Base.Order.Forward)
     if searchk <= coljlastk && rowvals(A)[searchk] == i
         # Column j contains entry A[i,j]. Update and return.
-        nonzeros(A)[searchk] += v
+        nzs = nonzeros(A)
+        addindex!(nzs, searchk, v, Val{atomic}())
         return A
     else
         # (i, j) not stored. Throw.

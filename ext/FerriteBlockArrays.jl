@@ -5,7 +5,7 @@ using BlockArrays: BlockArray, BlockIndex, BlockMatrix, BlockVector, block, bloc
 using BlockArrays: Block, BlockArray, BlockIndex, BlockMatrix, BlockVector, block,
     blockaxes, blockindex, blocks, findblockindex, undef_blocks
 using Ferrite:
-    Ferrite, BlockSparsityPattern, ConstraintHandler, _addindex!, allocate_matrix, assemble!,
+    Ferrite, BlockSparsityPattern, ConstraintHandler, addindex!, allocate_matrix, assemble!,
     fillzero!, _is_atomic
 using SparseArrays: SparseMatrixCSC
 
@@ -102,7 +102,7 @@ function Ferrite.assemble!(assembler::BlockAssembler, dofs::AbstractVector{<:Int
         for (i, blockindex_i) in pairs(blockindices)
             Bi, li = splindex(blockindex_i)
             KB = @view K[Bi, Bj]
-            _addindex!(KB, ke[i, j], li, lj, atomic)
+            addindex!(KB, ke[i, j], li, lj, atomic)
         end
     end
 
@@ -112,7 +112,7 @@ function Ferrite.assemble!(assembler::BlockAssembler, dofs::AbstractVector{<:Int
         @inbounds for (i, blockindex_i) in pairs(blockindices)
             Bi, li = splindex(blockindex_i)
             fB = @view f[Bi]
-            _addindex!(fB, fe[i], li, atomic)
+            addindex!(fB, fe[i], li, atomic)
         end
     else
         # ... otherwise, use regular indexing in fallback assemble!
@@ -134,12 +134,12 @@ Ferrite._is_atomic(::BlockAssembler{<:Any, <:Any, <:Any, atomic}) where {atomic}
 ## Overloaded assembly pieces from src/arrayutils.jl ##
 #######################################################
 
-function Ferrite._addindex!(B::BlockMatrix{Tv}, v::Tv, i::Int, j::Int, ::Val{atomic}) where {Tv, atomic}
+function Ferrite.addindex!(B::BlockMatrix{Tv}, v::Tv, i::Int, j::Int, ::Val{atomic} = Val(false)) where {Tv, atomic}
     @boundscheck checkbounds(B, i, j)
     Bi, li = splindex(findblockindex(axes(B, 1), i))
     Bj, lj = splindex(findblockindex(axes(B, 2), j))
     BB = @view B[Bi, Bj]
-    @inbounds _addindex!(BB, v, li, lj, Val{atomic}())
+    @inbounds addindex!(BB, v, li, lj, Val{atomic}())
     return B
 end
 
