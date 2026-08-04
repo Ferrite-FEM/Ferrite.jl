@@ -698,6 +698,37 @@ def scene_reactive_surface():
     finish_anim(view, r, "reactive_surface", azimuth=30, elevation=20, zoom=1.0)
 
 
+# --- bidomain: spiral wave in the three fields of the bidomain/FitzHugh-Nagumo model
+@scene("bidomain")
+def scene_bidomain():
+    # The three fields side by side, in the order they are added to the DofHandler.
+    # They live on very different scales, so each panel gets its own colour scale
+    # and bar, drawn below it.
+    view = new_view()
+    r = OpenDataFile(datadir + "/bidomain.vtkhdf")
+    # (name, bar title, range label format, in-between labels)
+    fields = [
+        ("phi_m", "$\\varphi_\\mathrm{m}$", "%.1f", [0.0, 0.5]),
+        ("phi_e", "$\\varphi_\\mathrm{e}$", "%.1f", [-0.5, 0.0, 0.5]),
+        ("s", "$s$", "%.2f", [0.0, 0.1]),
+    ]
+    width = 2.75  # domain is 2.5 wide, so this leaves a small gap between panels
+    for i, (name, title, fmt, labels) in enumerate(fields):
+        panel = r
+        if i:
+            panel = Transform(Input=r)
+            panel.Transform.Translate = [i * width, 0.0, 0.0]
+        d = surface(panel, view, edges=False)
+        lut = colorbar(d, view, ("POINTS", name), title=title, horizontal=True,
+                       pos=[(2 * i + 1) / 6.0 - 0.115, 0.04], length=0.23, fmt=fmt,
+                       labels=labels)
+        lut.RescaleTransferFunction(*data_range_over_time(r, ("POINTS", name)))
+    # wide row of panels -> wide frame; the zoom compensates for ResetCamera framing
+    # the bounding sphere, and the pan lifts the meshes clear of the colour bars
+    finish_anim(view, r, "bidomain", twod=True, zoom=2.2, res=[1500, 620],
+                pan_y=-0.24)
+
+
 # === code gallery ==========================================================
 
 # --- helmholtz: solution of the Helmholtz equation on the unit square

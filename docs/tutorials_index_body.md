@@ -216,3 +216,17 @@ is verified and compared against the standard primal formulation.
 
 **Keywords**: mixed finite elements, H(div), Raviart-Thomas, weak (natural) boundary
 conditions, `ProjectedDirichlet`, local conservation.
+
+---
+
+#### [Tutorial 17: Bidomain model](@ref tutorial-bidomain)
+
+In this tutorial the bidomain model of cardiac electrophysiology, coupled to the
+FitzHugh-Nagumo cell model, is solved on a square patch of tissue. The three coupled fields
+are discretized in space with Ferrite, which yields a differential-algebraic system in mass
+matrix form, and integrated in time with an adaptive stiff solver from
+[DifferentialEquations.jl](https://github.com/SciML/DifferentialEquations.jl). The solution
+develops into a spiral wave.
+
+**Keywords**: multiple coupled fields, block matrices, mass matrix form, DAE,
+DifferentialEquations.jl, anisotropic diffusion.

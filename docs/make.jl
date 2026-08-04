@@ -74,6 +74,7 @@ bibtex_plugin = CitationBibliography(
             "tutorials/dg_heat_equation.md",
             "tutorials/heat_adaptivity.md",
             "tutorials/darcy_flow.md",
+            "tutorials/bidomain.md",
         ],
         "Topic guides" => [
             "Topic guide overview" => "topics/index.md",

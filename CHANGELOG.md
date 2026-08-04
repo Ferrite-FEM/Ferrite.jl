@@ -79,6 +79,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
  - Add adaptive mesh refinement tutorials (heat equation and linear elasticity) and a developer
    documentation page describing the `p4est` implementation. ([#780])
  - New tutorial on Darcy flow using H(div)-conforming Raviart-Thomas elements ([#1388])
+ - New tutorial on the bidomain model of cardiac electrophysiology, solved as a
+   differential-algebraic system in mass matrix form with a time integrator from
+   DifferentialEquations.jl. ([#325])
  - Tutorials and howtos now zero the local matrix and vector outside of the element routine
    to better reflect recommended practice. ([#1376], [#1423], [#1438])
  - Fix bugs in the linear shell tutorial ([#1380]) and in the incompressible
@@ -1074,6 +1077,7 @@ poking into Ferrite internals:
 [v1.4.1]: https://github.com/Ferrite-FEM/Ferrite.jl/releases/tag/v1.4.1
 [v1.5.0]: https://github.com/Ferrite-FEM/Ferrite.jl/releases/tag/v1.5.0
 [v1.6.0]: https://github.com/Ferrite-FEM/Ferrite.jl/releases/tag/v1.6.0
+[#325]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/325
 [#352]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/352
 [#363]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/363
 [#378]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/378

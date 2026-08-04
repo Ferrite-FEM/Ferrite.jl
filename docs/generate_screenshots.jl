@@ -28,6 +28,12 @@
 #
 # Requires `pvbatch` (ParaView) on PATH.
 
+# Examples run from here can check `isdefined(Main, :is_figure)` to use settings that are
+# too expensive for the docs build but give a better figure, e.g. a finer mesh. This
+# mirrors the `is_ci` flag that docs/make.jl defines. Use POSTRUN below instead when the
+# example is structured such that it can simply be re-run with different arguments.
+is_figure = true
+
 # Each example maps to the literate file that, when run, writes its VTK data.
 const EXAMPLES = Dict(
     "heat_equation" => "literate-tutorials/heat_equation.jl",
@@ -50,6 +56,7 @@ const EXAMPLES = Dict(
     "porous_media" => "literate-tutorials/porous_media.jl",
     "ns_vs_diffeq" => "literate-tutorials/ns_vs_diffeq.jl",
     "reactive_surface" => "literate-tutorials/reactive_surface.jl",
+    "bidomain" => "literate-tutorials/bidomain.jl",
     # Code gallery.
     "helmholtz" => "literate-gallery/helmholtz.jl",
     "quasi_incompressible_hyperelasticity" => "literate-gallery/quasi_incompressible_hyperelasticity.jl",
