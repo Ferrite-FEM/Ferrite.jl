@@ -62,12 +62,12 @@
 # from which follows $\chi_w = \chi_e$. Thus for boundary elements we can replace the value for the missing neighbor by the value of the opposite neighbor.
 # In order to find the corresponding neighbor elements, we will make use of Ferrite's grid topology functionalities.
 #
-# ## Commented Program
+# ## Commented program
 # We now solve the problem in Ferrite. What follows is a program spliced with comments.
 #md # The full program, without comments, can be found in the next [section](@ref topology_optimization-plain-program).
 #
 # First we load all necessary packages.
-using Ferrite, SparseArrays, LinearAlgebra, Tensors, Printf
+using Ferrite, SparseArrays, LinearAlgebra, Tensors, Printf, VTKHDF
 # Next, we create a simple square grid of the size 2x1. We apply a fixed Dirichlet boundary condition
 # to the left facet set, called `clamped`. On the right facet, we create a small set `traction`, where we
 # will later apply a force in negative y-direction.
@@ -450,6 +450,10 @@ function topopt(ra, ρ, n, filename; output = false)
     NEWTON_TOL = 1.0e-8
     print("\n Starting Newton iterations\n")
 
+    ## When `output = true` the density of every iteration is stored as one time
+    ## step in a single temporal VTKHDF file so the evolution can be animated.
+    vtkhdf = output ? VTKHDFGridFile(string(filename, ".vtkhdf"), grid; temporal = true) : nothing
+
     for it in 1:i_max
         apply_zero!(u, dbc)
         newton_itr = -1
@@ -508,14 +512,13 @@ function topopt(ra, ρ, n, filename; output = false)
 
         ## output during calculation
         if output
-            i = @sprintf("%3.3i", it)
-            filename_it = string(filename, "_", i)
-
-            VTKGridFile(filename_it, grid) do vtk
+            write_timestep(vtkhdf, Float64(it)) do vtk
                 write_cell_data(vtk, χ, "density")
             end
         end
     end
+
+    output && close(vtkhdf)
 
     ## export converged results
     if !output

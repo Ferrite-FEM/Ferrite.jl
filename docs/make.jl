@@ -127,9 +127,11 @@ bibtex_plugin = CitationBibliography(
     ]
 )
 
-# make sure there are no *.vtu files left around from the build
+# Make sure there are no generated VTK files left around from the build.
 @timeit dto "remove vtk files" cd(joinpath(@__DIR__, "build", "tutorials")) do
-    foreach(file -> endswith(file, ".vtu") && rm(file), readdir())
+    foreach(readdir()) do file
+        any(ext -> endswith(file, ext), (".vtu", ".pvd", ".vtkhdf")) && rm(file)
+    end
 end
 
 # Insert some <br> in the side menu

@@ -1,4 +1,4 @@
-# # [Adaptive Linear Elasticity](@id gallery-elasticity-adaptivity)
+# # [Linear elasticity with adaptive mesh refinement](@id gallery-elasticity-adaptivity)
 #
 # ![](elasticity_adaptivity-light.webp)
 # ![](elasticity_adaptivity-dark.webp)
@@ -27,7 +27,7 @@
 # Dörfler (bulk) marking. Hanging nodes introduced by refinement are made conforming
 # with a `ConformityConstraint`.
 #
-# ## Commented Program
+# ## Commented program
 #
 # First we load the required packages.
 using Ferrite, FerriteMeshParser, WriteVTK, Downloads

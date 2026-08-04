@@ -1,4 +1,4 @@
-# [Adaptive Mesh Refinement](@id topic-amr)
+# [Adaptive mesh refinement](@id topic-amr)
 
 Adaptive mesh refinement (AMR) is a computational technique used in finite element analysis to enhance the accuracy and efficiency of simulations.
 It involves dynamically adjusting the mesh resolution based on some criteria.
@@ -16,8 +16,8 @@ In AMR different phenomena and vocabulary emerge which we group into the followi
 - balancing
 - error estimation
 
-## Hanging Nodes
-### What Are Hanging Nodes?
+## Hanging nodes
+### What are hanging nodes?
 
 Hanging nodes occur during the process of mesh refinement.
 When a mesh is refined, some elements may be subdivided while their neighboring elements are not.
@@ -48,7 +48,7 @@ x-----------x-----------x               x-----x-----x-----------x
 The newly introduced nodes 10 and 11 lie on the domain boundary and node 12 is shared by all four new elements, so none of them is hanging.
 However, the nodes 13 and 14 lie on edges of the neighboring coarser elements without being nodes of those elements and are therefore hanging.
 
-### Implications of Hanging Nodes
+### Implications of hanging nodes
 
 The presence of hanging nodes poses the challenge of non-conformity:
 A mesh with hanging nodes is non-conforming because the finite element mesh no longer adheres to the requirement that elements meet only at their nodes or along entire edges or faces.
@@ -56,7 +56,7 @@ This lack of conformity can lead to difficulties in maintaining the continuity o
 However we can recover the continuity of the solution by constraining the hanging nodes.
 
 
-### How to Treat Hanging Nodes
+### How to treat hanging nodes
 
 To address the issues introduced by hanging nodes, specific strategies and constraints are employed.
 The degrees of freedom (DoFs) associated with hanging nodes are constrained based on the surrounding coarser mesh elements.
@@ -133,7 +133,7 @@ In Ferrite's p4est implementation, one must call `balanceforest!` to balance the
 balanceforest!(adaptive_grid)
 ```
 
-## Error Estimation
+## Error estimation
 Error estimation is a critical component of adaptive mesh refinement (AMR) in finite element analysis.
 The primary objective of error estimation is to identify regions of the computational domain where the numerical solution is less accurate and requires further refinement.
 Accurate error estimation guides the adaptive refinement process, ensuring that computational resources are concentrated in areas where they will have the most significant impact on improving solution accuracy.

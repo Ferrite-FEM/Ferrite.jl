@@ -2309,8 +2309,8 @@ end
 """
     creategrid(forest::ForestBWG) -> NonConformingGrid
 
-Materialize a `ForestBWG` (a forest of adaptively refined octrees) into a `NonConformingGrid`
-that can be used like any Ferrite grid, complete with the hanging-node constraints
+Materialize a `ForestBWG` (a forest of adaptively refined octrees) into a `NonConformingGrid`.
+The returned grid can be used like any Ferrite grid, complete with the hanging-node constraints
 (`conformity_info`) and the transferred boundary and subdomain sets (`facetsets`, `cellsets`).
 
 !!! warning "Only `facetsets` and `cellsets` are transferred"
@@ -2535,8 +2535,8 @@ end
 """
     facetskeleton(forest::ForestBWG{dim}) -> Vector{NTuple{2, FacetIndex}}
 
-Materialize the interior facet skeleton of the *refined* forest: one entry per leaf-level
-facet interface, as a pair of `FacetIndex` into the grid returned by [`creategrid`](@ref)
+Materialize the interior facet skeleton of the *refined* forest. The skeleton holds one entry
+per leaf-level facet interface, as a pair of `FacetIndex` into the grid returned by [`creategrid`](@ref)
 (the cell numbering is identical — tree by tree, leaves in Morton order). For a conforming
 interface the pair holds the two equal-size cells sharing the facet. For a non-conforming
 (hanging) interface each **fine subfacet** gets its own pair, fine side first and the

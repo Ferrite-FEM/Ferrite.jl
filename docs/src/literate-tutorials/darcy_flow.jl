@@ -154,7 +154,7 @@ addcellset!(grid, "barrier", x -> 0.4 ≤ x[1] ≤ 0.6 && (x[2] ≤ 0.4 || x[2] 
 k = fill(1.0, getncells(grid))            # matrix permeability
 k[collect(getcellset(grid, "barrier"))] .= 1.0e-4; # barrier permeability
 
-# ### Interpolations, dof distribution and boundary conditions
+# ### Interpolations, DoF distribution and boundary conditions
 # The flux field `:q` uses the Raviart-Thomas interpolation whose degrees of freedom sit
 # on the facets (edges in 2d), and the pressure field `:p` a single constant per element.
 # The geometry is interpolated with the standard linear Lagrange functions.

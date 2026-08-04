@@ -512,7 +512,11 @@ function nnodes_per_cell(grid::AbstractGrid)
 end
 @inline nnodes_per_cell(grid::AbstractGrid, i::Integer) = nnodes(getcells(grid, i))
 
-"Return the number type of the nodal coordinates."
+"""
+    get_coordinate_eltype(grid::AbstractGrid)
+
+Return the number type of the nodal coordinates.
+"""
 @inline get_coordinate_eltype(grid::AbstractGrid) = get_coordinate_eltype(first(getnodes(grid)))
 
 """

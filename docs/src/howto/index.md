@@ -6,7 +6,7 @@ or build on top of, the tutorials and, therefore, some familiarity with Ferrite 
 
 ---
 
-#### [Post processing and visualization](postprocessing.md)
+#### [Postprocessing and visualization](postprocessing.md)
 
 This guide builds on top of [Tutorial 1: Heat equation](../tutorials/heat_equation.md) and
 discusses various post processing techniques with the goal of visualizing primary fields
@@ -18,7 +18,7 @@ Concretely, this guide answers:
 
 ---
 
-#### [Multi-threaded assembly](threaded_assembly.md)
+#### [Multithreaded assembly](threaded_assembly.md)
 
 This guide modifies [Tutorial 2: Linear elasticity](../tutorials/linear_elasticity.md) such
 that the program is using multi-threading to parallelize the assembly procedure. Concretely

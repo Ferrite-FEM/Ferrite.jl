@@ -17,12 +17,13 @@ variant matching the active Documenter theme.
 The pipeline consists of the following pieces:
 
 - `docs/generate_screenshots.jl` runs each example registered in its `EXAMPLES`
-  dictionary, collecting the `.vtu`/`.pvd` output in `docs/screenshot-data/` (gitignored),
+  dictionary, collecting its `.vtu`/`.pvd`/`.vtkhdf` output in
+  `docs/screenshot-data/` (gitignored),
   and then invokes `pvbatch` on `docs/screenshots.py`.
 - `docs/screenshots.py` contains one small ParaView scene per example and renders the
   light/dark pair for each into `docs/screenshot-assets/` (gitignored). Static scenes are
   saved with `finish(...)` (PNG) and time series with `finish_anim(...)` (animated WebP,
-  requires ImageMagick's `magick` on `PATH`).
+  requires ImageMagick's `magick` or `convert` on `PATH`).
 - The rendered files are *not* committed to the main branch. They are uploaded to the
   `assets/` directory on the `gh-pages` branch (pass `--upload` to
   `generate_screenshots.jl`), from where `docs/download_resources.jl` fetches them during
@@ -36,11 +37,11 @@ The pipeline consists of the following pieces:
 ### Adding a figure for a new example
 
 1. Make sure the example writes its result to a VTK file (`VTKGridFile`), or, for an
-   animation, a paraview collection (`WriteVTK.paraview_collection`) with one file per
-   time step. This output is what the figure is rendered from. If the figure needs data
-   the example does not write by default — a second parameter set to compare against, a
-   finer mesh — put that extra call in the `POSTRUN` dictionary instead of making the
-   example itself slower for every docs build.
+   animation, a temporal `VTKHDFGridFile` (or a `WriteVTK.paraview_collection` with one
+   file per time step). This output is what the figure is rendered from. If the figure
+   needs data the example does not write by default — a second parameter set to compare
+   against, a finer mesh — put that extra call in the `POSTRUN` dictionary instead of
+   making the example itself slower for every docs build.
 2. Register the example in the `EXAMPLES` dictionary in `docs/generate_screenshots.jl`,
    mapping a screenshot name to the literate source file.
 3. Add a scene for it in `docs/screenshots.py` (copying a similar existing scene is the
@@ -70,6 +71,10 @@ The pipeline consists of the following pieces:
 9. Once happy, upload the assets to `gh-pages` with
    `julia --project=docs docs/generate_screenshots.jl --render-only <name> --upload`
    (requires push rights to the repository).
+
+The Documenter CI job also runs every scene in `--check` mode. It reuses the VTK output
+from notebook execution, renders at reduced resolution with only a few animation frames,
+and never uploads those smoke-test assets.
 
 ## Illustrations in the topic guides
 

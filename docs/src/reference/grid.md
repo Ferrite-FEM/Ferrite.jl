@@ -2,7 +2,7 @@
 DocTestSetup = :(using Ferrite)
 ```
 
-# Grid & AbstractGrid
+# Grid
 
 ## Grid
 
@@ -17,7 +17,7 @@ FacetIndex
 Grid
 ```
 
-### Utility Functions
+### Utility functions
 
 ```@docs
 getcells
@@ -48,7 +48,7 @@ vertex_star_stencils
 getstencil
 ```
 
-### Grid Sets Utility
+### Grid sets utility
 
 ```@docs
 addcellset!
@@ -59,7 +59,7 @@ addboundaryvertexset!
 addnodeset!
 ```
 
-### Multithreaded Assembly
+### Multithreaded assembly
 ```@docs
 create_coloring
 ```
