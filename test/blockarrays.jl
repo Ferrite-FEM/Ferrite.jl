@@ -39,7 +39,7 @@ using Ferrite, BlockArrays, SparseArrays, Test
     @test K == KB
 
     # Zeroing out in start_assemble
-    assembler = start_assemble(K, f)
+    assembler = start_assemble(K, f; atomic = false)
     @test iszero(K)
     @test iszero(f)
     block_assembler = start_assemble(KB, fB)

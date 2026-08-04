@@ -5,8 +5,8 @@ using BlockArrays: BlockArray, BlockIndex, BlockMatrix, BlockVector, block, bloc
 using BlockArrays: Block, BlockArray, BlockIndex, BlockMatrix, BlockVector, block,
     blockaxes, blockindex, blocks, findblockindex, undef_blocks
 using Ferrite:
-    Ferrite, BlockSparsityPattern, ConstraintHandler, addindex!, allocate_matrix, assemble!,
-    fillzero!
+    Ferrite, BlockSparsityPattern, ConstraintHandler, _addindex!, allocate_matrix, assemble!,
+    fillzero!, _is_atomic
 using SparseArrays: SparseMatrixCSC
 
 
@@ -61,7 +61,7 @@ end
 ## BlockAssembler and associated methods ##
 ###########################################
 
-struct BlockAssembler{Tv, BM <: BlockMatrix{Tv}, Bv <: AbstractVector{Tv}} <: Ferrite.AbstractAssembler{Tv}
+struct BlockAssembler{Tv, BM <: BlockMatrix{Tv}, Bv <: AbstractVector{Tv}, atomic} <: Ferrite.AbstractAssembler{Tv}
     K::BM
     f::Bv
     blockindices::Vector{BlockIndex{1}}
@@ -70,15 +70,17 @@ end
 Ferrite.matrix_handle(ba::BlockAssembler) = ba.K
 Ferrite.vector_handle(ba::BlockAssembler) = ba.f
 
-function Ferrite.start_assemble(K::BlockMatrix, f; fillzero::Bool = true)
+function Ferrite.start_assemble(K::BlockMatrix, f; fillzero::Bool = true, atomic = false)
     fillzero && (fillzero!(K); fillzero!(f))
-    return BlockAssembler(K, f, BlockIndex{1}[])
+    return BlockAssembler{eltype(K), typeof(K), typeof(f), atomic}(K, f, BlockIndex{1}[])
 end
 
 # Split into the block and the local index
 splindex(idx::BlockIndex{1}) = (block(idx), blockindex(idx))
 
 function Ferrite.assemble!(assembler::BlockAssembler, dofs::AbstractVector{<:Integer}, ke::AbstractMatrix, fe::AbstractVector)
+    atomic = Val(_is_atomic(assembler))
+
     K = assembler.K
     f = assembler.f
     blockindices = assembler.blockindices
@@ -100,7 +102,7 @@ function Ferrite.assemble!(assembler::BlockAssembler, dofs::AbstractVector{<:Int
         for (i, blockindex_i) in pairs(blockindices)
             Bi, li = splindex(blockindex_i)
             KB = @view K[Bi, Bj]
-            addindex!(KB, ke[i, j], li, lj)
+            _addindex!(KB, ke[i, j], li, lj, atomic)
         end
     end
 
@@ -110,7 +112,7 @@ function Ferrite.assemble!(assembler::BlockAssembler, dofs::AbstractVector{<:Int
         @inbounds for (i, blockindex_i) in pairs(blockindices)
             Bi, li = splindex(blockindex_i)
             fB = @view f[Bi]
-            addindex!(fB, fe[i], li)
+            _addindex!(fB, fe[i], li, atomic)
         end
     else
         # ... otherwise, use regular indexing in fallback assemble!
@@ -126,17 +128,18 @@ function Ferrite.apply!(::BlockMatrix, ::AbstractVector, ::ConstraintHandler)
     )
 end
 
+Ferrite._is_atomic(::BlockAssembler{<:Any, <:Any, <:Any, atomic}) where {atomic} = atomic::Bool
 
 #######################################################
 ## Overloaded assembly pieces from src/arrayutils.jl ##
 #######################################################
 
-function Ferrite.addindex!(B::BlockMatrix{Tv}, v::Tv, i::Int, j::Int) where {Tv}
+function Ferrite._addindex!(B::BlockMatrix{Tv}, v::Tv, i::Int, j::Int, ::Val{atomic}) where {Tv, atomic}
     @boundscheck checkbounds(B, i, j)
     Bi, li = splindex(findblockindex(axes(B, 1), i))
     Bj, lj = splindex(findblockindex(axes(B, 2), j))
     BB = @view B[Bi, Bj]
-    @inbounds addindex!(BB, v, li, lj)
+    @inbounds _addindex!(BB, v, li, lj, Val{atomic}())
     return B
 end
 
