@@ -24,7 +24,7 @@ function as_structure_of_arrays(d, N, fv::Ferrite.FunctionValues)
     Nξ = adapt(d, fv.Nξ)
     return Ferrite.FunctionValues(
         adapt(d, fv.ip),
-        fv.Nξ === fv.Nx ? Nξ : KA.zeros(d, eltype(fv.Nx), N, size(fv.Nx, 1), size(fv.Nx, 2)), # Ensure proper aliasing,
+        fv.Nξ === fv.Nx ? Nξ : KA.zeros(d, eltype(fv.Nx), N, size(fv.Nx, 1), size(fv.Nx, 2)), # Ensure proper aliasing
         Nξ,
         zeros_shared(d, fv.dNdx, N),
         adapt(d, fv.dNdξ),
