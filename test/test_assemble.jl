@@ -213,6 +213,94 @@ end
     @test_throws errr(1, 2) assemble!(as, [2, 1], [1.0 0.0; 3.0 4.0])
 end
 
+@testset "assemble! dense column fast paths" begin
+    # Columns with many stored entries compared to the number of local dofs are
+    # processed with binary search instead of the linear merge walk, and fully dense
+    # columns with direct indexing (see `_assemble_inner!` for `SparseMatrixCSC`).
+    N = 40
+    dofs = [19, 40, 3] # intentionally unsorted
+    ratio = Ferrite.SPARSE_COLUMN_SEARCH_RATIO
+    entries = Set{Tuple{Int, Int}}((d1, d2) for d1 in dofs, d2 in dofs)
+    for i in 1:N # fully dense column (and row) 3
+        push!(entries, (i, 3), (3, i))
+    end
+    for i in 1:30 # column (and row) 19: dense enough for the binary search path
+        push!(entries, (i, 19), (19, i))
+    end
+    K = sparse(first.(collect(entries)), last.(collect(entries)), zeros(length(entries)), N, N)
+    @test length(nzrange(K, 3)) == N                    # dense column fast path
+    @test length(nzrange(K, 19)) > ratio * length(dofs) # binary search fast path
+    @test length(nzrange(K, 40)) < ratio * length(dofs) # linear merge walk
+
+    f = zeros(N)
+    Ke = rand(3, 3)
+    Ke[1, 1] = 0 # exercise the iszero skip in the binary search path (entry (19, 19))
+    Ke[2, 3] = 0 # exercise the iszero skip in the dense column path (entry (40, 3))
+    fe = rand(3)
+    for atomic in (false, true)
+        a = start_assemble(K, f; atomic)
+        D = zeros(N, N)
+        F = zeros(N)
+        for _ in 1:2
+            assemble!(a, dofs, Ke, fe)
+            D[dofs, dofs] += Ke
+            F[dofs] += fe
+        end
+        @test Matrix(K) == D
+        @test f == F
+    end
+
+    # A local dof missing from a binary searched column is allowed when the local
+    # value is zero, and errors otherwise
+    dofs2 = [5, 19, 32] # rows 5 and 19 are stored in column 19, row 32 is not
+    Ke2 = zeros(3, 3)
+    Ke2[1, 2] = 1.0 # entry (5, 19)
+    Ke2[2, 2] = 2.0 # entry (19, 19)
+    a = start_assemble(K)
+    assemble!(a, dofs2, Ke2)
+    @test K[5, 19] == 1.0
+    @test K[19, 19] == 2.0
+    Ke2[3, 2] = 3.0 # entry (32, 19) is not in the sparsity pattern
+    @test_throws ErrorException assemble!(a, dofs2, Ke2)
+
+    # Symmetric assembler: the binary search threshold scales with the number of
+    # lookups for the current column
+    entries = Set{Tuple{Int, Int}}()
+    for i in 1:N # fully dense (stored) column 40
+        push!(entries, (i, 40))
+    end
+    for i in 1:19 # binary search path for column 19
+        push!(entries, (i, 19))
+    end
+    for i in 1:20 # binary search path for column 25, with row 25 missing
+        push!(entries, (i, 25))
+    end
+    push!(entries, (2, 2))
+    S = Symmetric(sparse(first.(collect(entries)), last.(collect(entries)), zeros(length(entries)), N, N))
+    @test length(nzrange(S.data, 40)) == N
+    @test length(nzrange(S.data, 19)) > ratio * 2 # 2 lookups when processing column 19 of [2, 19, 40]
+    sdofs = [2, 19, 40]
+    Kes = rand(3, 3)
+    Kes = Kes + Kes' # symmetric element matrix
+    for atomic in (false, true)
+        a = start_assemble(S; atomic)
+        Ds = zeros(N, N)
+        for _ in 1:2
+            assemble!(a, sdofs, Kes)
+            Ds[sdofs, sdofs] += Kes
+        end
+        @test Matrix(S) == Ds
+    end
+    ## Missing entries in binary searched columns
+    Kem = [1.0 2.0; 2.0 0.0]
+    a = start_assemble(S)
+    assemble!(a, [19, 25], Kem)
+    @test S[19, 19] == 1.0
+    @test S[19, 25] == 2.0
+    Kem[2, 2] = 3.0 # entry (25, 25) is not in the sparsity pattern
+    @test_throws ErrorException assemble!(a, [19, 25], Kem)
+end
+
 @testset "assemble! with atomic accumulation" begin
     grid = generate_grid(Quadrilateral, (10, 10))
     dh = DofHandler(grid)
