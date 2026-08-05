@@ -70,7 +70,7 @@ end
 Ferrite.matrix_handle(ba::BlockAssembler) = ba.K
 Ferrite.vector_handle(ba::BlockAssembler) = ba.f
 
-function Ferrite.start_assemble(K::BlockMatrix, f; fillzero::Bool = true, atomic = false)
+Base.@constprop :aggressive function Ferrite.start_assemble(K::BlockMatrix, f; fillzero::Bool = true, atomic = false)
     fillzero && (fillzero!(K); fillzero!(f))
     return BlockAssembler{eltype(K), typeof(K), typeof(f), atomic}(K, f, BlockIndex{1}[])
 end

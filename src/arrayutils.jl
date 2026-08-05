@@ -8,10 +8,11 @@ function Base.showerror(io::IO, ::SparsityError)
 end
 
 """
-    addindex!(A::AbstractMatrix{T}, v::T, i::Int, j::Int)
-    addindex!(b::AbstractVector{T}, v::T, i::Int)
+    addindex!(A::AbstractMatrix{T}, v::T, i::Integer, j::Integer, ::Val{atomic} = Val(false))
+    addindex!(b::AbstractVector{T}, v::T, i::Integer, ::Val{atomic} = Val(false))
 
-Equivalent to `A[i, j] += v` but more efficient.
+Equivalent to `A[i, j] += v` but more efficient. The optional `atomic` input controls
+whether the operation should be performed atomically (i.e. concurrency-safe) or not.
 
 `A[i, j] += v` is lowered to `A[i, j] = A[i, j] + v` which requires a double lookup of the
 memory location for index `(i, j)` -- one time for the read, and one time for the write.
