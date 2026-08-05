@@ -15,10 +15,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
    `FaceIndex`, and (per cell) `FacetIndex`. The bulk operations `facetskeleton` and
    `get_facet_facet_neighborhood` remain unsupported for such grids, since they assume a
    common facet dimension across the whole grid. ([#843])
+ - Experimental CUDA GPU support for assembly using type-stable, non-allocating element
+   routines. ([#1291])
 
 ## [v1.6.0] - 2026-08-02
 
-=======
 ### Added
  - `PointEvalHandler` can assign points slightly outside the grid to a nearby cell with
    the new keyword argument `extrapolation_tolerance`, such that evaluation extrapolates
@@ -48,7 +49,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
    Vincent, 2015). This is the same family of rules already used for `RefPrism` and
    `RefPyramid`, and extends tetrahedral quadrature beyond the previous maximum order 5 of
    the Keast rules. ([#1389])
- - Experimental GPU support for assembly using type-stable, non-allocating element routines ([#1291])
  - New interpolations `Lagrange{RefTetrahedron, 3}`, `Lagrange{RefTetrahedron, 4}` and
    `Lagrange{RefHexahedron, 3}`. ([#1343])
  - Dof distribution now supports interpolations with multiple nodal dofs on faces shared
