@@ -9,6 +9,7 @@ on:
 
 jobs:
   changelog:
+    if: ${{ !startsWith(github.head_ref, 'dependabot/') }}
     runs-on: ubuntu-latest
     steps:
     - uses: dangoslen/changelog-enforcer@v3

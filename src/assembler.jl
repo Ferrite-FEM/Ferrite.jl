@@ -1,6 +1,7 @@
 abstract type AbstractAssembler{Tv} end
 abstract type AbstractCSCAssembler{Tv} <: AbstractAssembler{Tv} end
 abstract type AbstractCSRAssembler{Tv} <: AbstractAssembler{Tv} end
+abstract type AbstractThreadSafeAssembler{Tv} <: AbstractAssembler{Tv} end
 
 """
     struct COOAssembler{Tv, Ti}
@@ -417,7 +418,51 @@ end
     return
 end
 
-function _missing_sparsity_pattern_error(Krow::Int, Kcol::Int)
+# Atomic accumulation primitive used for assembling with `atomic = true`.
+#
+# This is written with `llvmcall` since the built-in alternatives in Julia currently
+# generate bad code for floating point addition: `Core.Intrinsics.atomic_pointermodify`
+# (and thus `@atomic`) lowers `+` on floats to a compare-exchange loop with a non-inlined
+# call to `+` inside, whereas this generates a single `atomicrmw fadd` instruction.
+#
+# Monotonic ordering is sufficient since no other memory is synchronized through these
+# additions -- the task join at the end of a threaded assembly loop is the synchronization
+# point that makes the accumulated values visible.
+for (T, llvmT) in ((Float64, "double"), (Float32, "float"))
+    ir = if VERSION >= v"1.12.0-DEV"
+        """
+        %rv = atomicrmw fadd ptr %0, $llvmT %1 monotonic
+        ret void
+        """
+    else
+        """
+        %p = inttoptr i$(Sys.WORD_SIZE) %0 to $(llvmT)*
+        %rv = atomicrmw fadd $(llvmT)* %p, $llvmT %1 monotonic
+        ret void
+        """
+    end
+    @eval @propagate_inbounds function _atomic_add!(x::Vector{$T}, i::Int, v::$T)
+        @boundscheck checkbounds(x, i)
+        GC.@preserve x begin
+            p = pointer(x, i)
+            Base.llvmcall($ir, Cvoid, Tuple{Ptr{$T}, $T}, p, v)
+        end
+        return
+    end
+end
+
+# Accumulate `v` into `x[i]`, atomically if `atomic` is `Val(true)`. This is the only
+# point where the atomic and non-atomic matrix assembly kernels differ.
+@propagate_inbounds function _addindex!(x::AbstractVector, i::Integer, v, ::Val{atomic}) where {atomic}
+    if atomic
+        _atomic_add!(x, Int(i), convert(eltype(x), v))
+    else
+        x[i] += v
+    end
+    return
+end
+
+function _missing_sparsity_pattern_error(Krow::Integer, Kcol::Integer)
     msg = "You are trying to assemble values in to K[$(Krow), $(Kcol)], but K[$(Krow), " *
         "$(Kcol)] is missing in the sparsity pattern. Make sure you have called `K = " *
         "allocate_matrix(dh)` or `K = allocate_matrix(dh, ch)` if you " *

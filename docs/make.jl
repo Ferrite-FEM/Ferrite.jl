@@ -107,6 +107,7 @@ bibtex_plugin = CitationBibliography(
             "How-to guide overview" => "howto/index.md",
             "howto/postprocessing.md",
             "howto/threaded_assembly.md",
+            "howto/gpu_assembly.md",
         ],
         "Code gallery" => [
             "Code gallery overview" => "gallery/index.md",
@@ -143,9 +144,13 @@ for (root, _, files) in walkdir(joinpath(@__DIR__, "build")), file in joinpath.(
     write(file, str)
 end
 
+# Pull requests from dependabot come from a branch on the correct repository so Documenter
+# thinks it can publish previews but the PR doesn't have access to the SSH key
+const dependabot = get(ENV, "GITHUB_EVENT_NAME", "") == "pull_request" &&
+    startswith(get(ENV, "GITHUB_HEAD_REF", ""), "dependabot/")
 
 # Deploy built documentation
-if !liveserver
+if !(liveserver || dependabot)
     @timeit dto "deploydocs" deploydocs(
         repo = "github.com/Ferrite-FEM/Ferrite.jl.git",
         push_preview = true,

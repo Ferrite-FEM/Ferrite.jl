@@ -10,6 +10,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixes
  - Atomic assembly support for BlockAssembler. ([#1452])
 
+### Added
+ - `ExclusiveTopology` now supports grids with mixed reference dimensions (e.g. a 3D grid
+   containing both `Hexahedron` and `Quadrilateral` cells). Mixed-dimensional connections
+   are stored in `vertex_vertex_neighbor`, `edge_edge_neighbor`, and `face_face_neighbor`
+   according to the shared entity, and can be queried with `VertexIndex`, `EdgeIndex`,
+   `FaceIndex`, and (per cell) `FacetIndex`. The bulk operations `facetskeleton` and
+   `get_facet_facet_neighborhood` remain unsupported for such grids, since they assume a
+   common facet dimension across the whole grid. ([#843])
+ - Experimental CUDA GPU support for assembly using type-stable, non-allocating element
+   routines. ([#1291])
+
 ## [v1.6.0] - 2026-08-02
 
 ### Added
@@ -134,7 +145,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
  - Support generating embedded 2D-grids by passing coordinates `x::Vec{3}` with 2D reference shapes. Note: New calculation of node position leads to slight floating point precision differences in node positions. ([#1367])
 
 ### Documentation
-
 - Landau example in code gallery now shows how to use DifferentiationInterface and HyperHessians as a backend. (#1345)
 
 ## [v1.4.1] - 2026-06-17
@@ -1262,6 +1272,7 @@ poking into Ferrite internals:
 [#779]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/779
 [#780]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/780
 [#835]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/835
+[#843]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/843
 [#855]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/855
 [#864]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/864
 [#865]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/865
