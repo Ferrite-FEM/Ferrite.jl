@@ -58,6 +58,9 @@ struct CellValues{FV, GM, QR, detT} <: AbstractCellValues
     fun_values::FV # FunctionValues
     geo_mapping::GM # GeometryMapping
     qr::QR         # QuadratureRule
+    # CellValues are only functional for `detT <: AbstractVector{<:Number}`.
+    # However, e.g. for GPU support, we allow AbstractMatrix{<:Number} to be passed, allowing this type to be used as a struct-of-arrays (SoA) type.
+    # See `soa_utils.jl` for the SoA transformation infrastructure.
     detJdV::detT   # AbstractVector{<:Number} or Nothing
 end
 function CellValues(

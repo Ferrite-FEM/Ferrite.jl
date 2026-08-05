@@ -173,6 +173,7 @@ include("Export/VTKHDF.jl")
 include("PointEvalHandler.jl")
 
 # Other
+include("soa_utils.jl")
 include("deprecations.jl")
 include("docs.jl")
 

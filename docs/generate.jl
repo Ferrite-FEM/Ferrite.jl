@@ -1,6 +1,11 @@
 # generate examples
 import Literate
 
+# Skip execution of the following files.
+# These are tested directly in the CI, as they need additional dependencies
+# and/or special machines (e.g. GPUs) to run on.
+DONT_EXECUTE = Set(["gpu_assembly.jl"])
+
 # Tutorials
 TUTORIALS_IN = joinpath(@__DIR__, "src", "literate-tutorials")
 TUTORIALS_OUT = joinpath(@__DIR__, "src", "tutorials")
@@ -23,11 +28,14 @@ include("download_resources.jl")
 @timeit dto "Literate." for (IN, OUT) in [(TUTORIALS_IN, TUTORIALS_OUT), (HOWTO_IN, HOWTO_OUT), (GALLERY_IN, GALLERY_OUT)], program in readdir(IN; join = true)
     name = basename(program)
     if endswith(program, ".jl")
-        if !liveserver
+        skip_execution = name ∈ DONT_EXECUTE
+        if skip_execution
+            code = "<< script output is skipped for this example >>"
+        elseif liveserver
+            code = "<< no script output when building as draft >>"
+        else # Generate output
             script = @timeit dto "script()" @timeit dto name Literate.script(program, OUT)
             code = strip(read(script, String))
-        else
-            code = "<< no script output when building as draft >>"
         end
 
         # remove "hidden" lines which are not shown in the markdown
@@ -44,11 +52,16 @@ include("download_resources.jl")
         end
 
         @timeit dto "markdown()" @timeit dto name begin
-            Literate.markdown(program, OUT, postprocess = mdpost)
+            if skip_execution
+                # Don't use the default `@example` to avoid execution
+                Literate.markdown(program, OUT; postprocess = mdpost, codefence = "````julia" => "````")
+            else
+                Literate.markdown(program, OUT, postprocess = mdpost)
+            end
         end
         if !liveserver
             @timeit dto "notebook()"  @timeit dto name begin
-                Literate.notebook(program, OUT, preprocess = nbpre, execute = is_ci) # Don't execute locally
+                Literate.notebook(program, OUT, preprocess = nbpre, execute = is_ci && !skip_execution) # Don't execute locally
             end
         end
     elseif any(endswith.(program, [".png", ".jpg", ".gif", ".webp"]))

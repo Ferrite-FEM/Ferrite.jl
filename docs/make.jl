@@ -107,6 +107,7 @@ bibtex_plugin = CitationBibliography(
             "How-to guide overview" => "howto/index.md",
             "howto/postprocessing.md",
             "howto/threaded_assembly.md",
+            "howto/gpu_assembly.md",
         ],
         "Code gallery" => [
             "Code gallery overview" => "gallery/index.md",
