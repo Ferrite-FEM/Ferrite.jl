@@ -373,6 +373,10 @@ end
     return _assemble_inner!(K, Ke, rowdofs, sortedrowdofs, rowpermutation, coldofs, sortedcoldofs, colpermutation, sym, atomic)
 end
 
+# Number of stored entries per local row above which a column is searched with binary
+# search instead of the linear merge walk in `_assemble_inner!`.
+const SPARSE_COLUMN_SEARCH_RATIO = 8
+
 @propagate_inbounds function _assemble_inner!(
         K::SparseMatrixCSC, Ke::AbstractMatrix,
         rowdofs::AbstractVector, sortedrowdofs::AbstractVector, rowpermutation::AbstractVector,
@@ -383,12 +387,45 @@ end
     Krows = rowvals(K)
     Kvals = nonzeros(K)
     ld = length(rowdofs)
+    nrows = size(K, 1)
     @inbounds for Kcol in sortedcoldofs
         maxlookups = sym ? current_col : ld
         Kecol = colpermutation[current_col]
+        nzr = nzrange(K, Kcol)
+        # Fast path for a fully dense column
+        if length(nzr) == nrows
+            offset = first(nzr) - 1
+            for ri in 1:maxlookups
+                val = Ke[rowpermutation[ri], Kecol]
+                iszero(val) || _addindex!(Kvals, offset + sortedrowdofs[ri], val, atomic)
+            end
+            current_col += 1
+            continue
+        end
+        # Fast path for a column with many entries per local row, but not dense enough for
+        # the branch above
+        if length(nzr) > SPARSE_COLUMN_SEARCH_RATIO * maxlookups
+            lo = first(nzr)
+            hi = last(nzr)
+            for ri in 1:maxlookups
+                Kerow_dof = sortedrowdofs[ri]
+                R = searchsortedfirst(Krows, Kerow_dof, lo, hi, Base.Order.Forward)
+                if R <= hi && Krows[R] == Kerow_dof
+                    val = Ke[rowpermutation[ri], Kecol]
+                    iszero(val) || _addindex!(Kvals, R, val, atomic)
+                    lo = R + 1
+                else
+                    # No entry exists in the global matrix for this row, which is allowed
+                    # as long as the value which would have been inserted is zero.
+                    iszero(Ke[rowpermutation[ri], Kecol]) || _missing_sparsity_pattern_error(Kerow_dof, Kcol)
+                    lo = R
+                end
+            end
+            current_col += 1
+            continue
+        end
         ri = 1 # row index pointer for the local matrix
         Ri = 1 # row index pointer for the global matrix
-        nzr = nzrange(K, Kcol)
         while Ri <= length(nzr) && ri <= maxlookups
             R = nzr[Ri]
             Krow = Krows[R]

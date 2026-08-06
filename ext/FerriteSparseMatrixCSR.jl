@@ -20,12 +20,46 @@ end
     )
     current_row = 1
     ld = length(coldofs)
+    ncols = size(K, 2)
+    threshold = Ferrite.SPARSE_COLUMN_SEARCH_RATIO * ld
     return @inbounds for Krow in sortedrowdofs
         maxlookups = sym ? current_row : ld
         Kerow = rowpermutation[current_row]
         ci = 1 # col index pointer for the local matrix
         Ci = 1 # col index pointer for the global matrix
         nzr = nzrange(K, Krow)
+        # Fast paths for rows holding many entries per local column, mirroring the
+        # corresponding column fast paths in `Ferrite._assemble_inner!` for
+        # `SparseMatrixCSC` in src/assembler.jl
+        if length(nzr) == ncols
+            offset = first(nzr) - 1
+            for ci in 1:maxlookups
+                val = Ke[Kerow, colpermutation[ci]]
+                iszero(val) || Ferrite._addindex!(K.nzval, offset + sortedcoldofs[ci], val, atomic)
+            end
+            current_row += 1
+            continue
+        end
+        if length(nzr) > (sym ? Ferrite.SPARSE_COLUMN_SEARCH_RATIO * maxlookups : threshold)
+            lo = first(nzr)
+            hi = last(nzr)
+            for ci in 1:maxlookups
+                Kecol_dof = sortedcoldofs[ci]
+                C = searchsortedfirst(K.colval, Kecol_dof, lo, hi, Base.Order.Forward)
+                if C <= hi && K.colval[C] == Kecol_dof
+                    val = Ke[Kerow, colpermutation[ci]]
+                    iszero(val) || Ferrite._addindex!(K.nzval, C, val, atomic)
+                    lo = C + 1
+                else
+                    # No entry exists in the global matrix for this column, which is
+                    # allowed as long as the value which would have been inserted is zero.
+                    iszero(Ke[Kerow, colpermutation[ci]]) || Ferrite._missing_sparsity_pattern_error(Krow, Kecol_dof)
+                    lo = C
+                end
+            end
+            current_row += 1
+            continue
+        end
         while Ci <= length(nzr) && ci <= maxlookups
             C = nzr[Ci]
             Kcol = K.colval[C]
@@ -44,7 +78,7 @@ end
             else # Kcol > Kecol_dof
                 # No match: no entry exist in the global matrix for this row. This is
                 # allowed as long as the value which would have been inserted is zero.
-                iszero(Ke[Kerow, colpermutation[ci]]) || Ferrite._missing_sparsity_pattern_error(Krow, Kcol)
+                iszero(Ke[Kerow, colpermutation[ci]]) || Ferrite._missing_sparsity_pattern_error(Krow, Kecol_dof)
                 # Advance the local matrix row pointer
                 ci += 1
             end
