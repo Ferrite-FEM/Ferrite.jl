@@ -69,6 +69,7 @@ codeblocks_plugin = CodeBlocks(
             "tutorials/plasticity.md",
             "tutorials/transient_heat_equation.md",
             "tutorials/computational_homogenization.md",
+            "tutorials/stress_driven_homogenization.md",
             "tutorials/stokes-flow.md",
             "tutorials/porous_media.md",
             "tutorials/ns_vs_diffeq.md",

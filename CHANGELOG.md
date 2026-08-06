@@ -69,6 +69,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
    tetrahedral grids), `vertex_star_stencils` (roughly 30x), and `getneighborhood` with an
    `EdgeIndex` (roughly 4x). ([#1466])
 
+### Documentation
+ - New tutorial: Stress-driven computational homogenization, where the macroscopic
+   strain is an unknown algebraic variable and the prescribed average stress acts as
+   the load, including a blocked-matrix Schur complement solve of the coupled system.
+   ([#1396])
+
 ## [v1.6.0] - 2026-08-02
 
 ### Added
@@ -1401,6 +1407,7 @@ poking into Ferrite internals:
 [#1381]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1381
 [#1382]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1382
 [#1384]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1384
+[#1396]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1396
 [#1387]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1387
 [#1388]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1388
 [#1389]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1389
