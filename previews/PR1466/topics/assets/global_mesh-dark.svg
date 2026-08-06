@@ -1,0 +1,53 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 430 378" width="430" height="378">
+<defs>
+<marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7"
+        orient="auto-start-reverse"><path d="M0,0.6 L10,5 L0,9.4 z" fill="#dfe4ea"/></marker>
+<pattern id="hatch" width="7" height="7" patternTransform="rotate(45)" patternUnits="userSpaceOnUse">
+<line x1="0" y1="0" x2="0" y2="7" stroke="#98a2b0" stroke-width="1.1"/></pattern>
+</defs>
+<rect x="108.0" y="152.0" width="118.0" height="104.0" rx="0" fill="#56b4e9" fill-opacity="0.05" stroke="none" stroke-width="2.0"/>
+<rect x="226.0" y="152.0" width="118.0" height="104.0" rx="0" fill="#56b4e9" fill-opacity="0.05" stroke="none" stroke-width="2.0"/>
+<rect x="108.0" y="48.0" width="118.0" height="104.0" rx="0" fill="#56b4e9" fill-opacity="0.05" stroke="none" stroke-width="2.0"/>
+<rect x="226.0" y="48.0" width="118.0" height="104.0" rx="0" fill="#56b4e9" fill-opacity="0.05" stroke="none" stroke-width="2.0"/>
+<line x1="108.0" y1="256.0" x2="108.0" y2="48.0" stroke="#dfe4ea" stroke-width="2.0" stroke-linecap="round"/>
+<line x1="226.0" y1="256.0" x2="226.0" y2="48.0" stroke="#dfe4ea" stroke-width="2.0" stroke-linecap="round"/>
+<line x1="344.0" y1="256.0" x2="344.0" y2="48.0" stroke="#dfe4ea" stroke-width="2.0" stroke-linecap="round"/>
+<line x1="108.0" y1="256.0" x2="344.0" y2="256.0" stroke="#dfe4ea" stroke-width="2.0" stroke-linecap="round"/>
+<line x1="108.0" y1="152.0" x2="344.0" y2="152.0" stroke="#dfe4ea" stroke-width="2.0" stroke-linecap="round"/>
+<line x1="108.0" y1="48.0" x2="344.0" y2="48.0" stroke="#dfe4ea" stroke-width="2.0" stroke-linecap="round"/>
+<circle cx="108.0" cy="256.0" r="7.0" fill="#56b4e9"/>
+<text x="95.0" y="281.0" fill="#56b4e9" font-family="Lato,'Helvetica Neue',Helvetica,Arial,sans-serif" font-size="19" font-weight="700" font-style="normal" text-anchor="end">1</text>
+<circle cx="226.0" cy="256.0" r="7.0" fill="#56b4e9"/>
+<text x="239.0" y="281.0" fill="#56b4e9" font-family="Lato,'Helvetica Neue',Helvetica,Arial,sans-serif" font-size="19" font-weight="700" font-style="normal" text-anchor="start">2</text>
+<circle cx="344.0" cy="256.0" r="7.0" fill="#56b4e9"/>
+<text x="357.0" y="281.0" fill="#56b4e9" font-family="Lato,'Helvetica Neue',Helvetica,Arial,sans-serif" font-size="19" font-weight="700" font-style="normal" text-anchor="start">3</text>
+<circle cx="108.0" cy="152.0" r="7.0" fill="#56b4e9"/>
+<text x="95.0" y="140.0" fill="#56b4e9" font-family="Lato,'Helvetica Neue',Helvetica,Arial,sans-serif" font-size="19" font-weight="700" font-style="normal" text-anchor="end">4</text>
+<circle cx="226.0" cy="152.0" r="7.0" fill="#56b4e9"/>
+<text x="239.0" y="140.0" fill="#56b4e9" font-family="Lato,'Helvetica Neue',Helvetica,Arial,sans-serif" font-size="19" font-weight="700" font-style="normal" text-anchor="start">5</text>
+<circle cx="344.0" cy="152.0" r="7.0" fill="#56b4e9"/>
+<text x="357.0" y="140.0" fill="#56b4e9" font-family="Lato,'Helvetica Neue',Helvetica,Arial,sans-serif" font-size="19" font-weight="700" font-style="normal" text-anchor="start">6</text>
+<circle cx="108.0" cy="48.0" r="7.0" fill="#56b4e9"/>
+<text x="95.0" y="36.0" fill="#56b4e9" font-family="Lato,'Helvetica Neue',Helvetica,Arial,sans-serif" font-size="19" font-weight="700" font-style="normal" text-anchor="end">7</text>
+<circle cx="226.0" cy="48.0" r="7.0" fill="#56b4e9"/>
+<text x="239.0" y="36.0" fill="#56b4e9" font-family="Lato,'Helvetica Neue',Helvetica,Arial,sans-serif" font-size="19" font-weight="700" font-style="normal" text-anchor="start">8</text>
+<circle cx="344.0" cy="48.0" r="7.0" fill="#56b4e9"/>
+<text x="357.0" y="36.0" fill="#56b4e9" font-family="Lato,'Helvetica Neue',Helvetica,Arial,sans-serif" font-size="19" font-weight="700" font-style="normal" text-anchor="start">9</text>
+<rect x="153.0" y="193.5" width="28.0" height="21.0" rx="10.5" fill="#e69f00" fill-opacity="1" stroke="none" stroke-width="2.0"/>
+<text x="167.0" y="209.25" fill="#12171c" font-family="Lato,'Helvetica Neue',Helvetica,Arial,sans-serif" font-size="15" font-weight="700" font-style="normal" text-anchor="middle">1</text>
+<rect x="271.0" y="193.5" width="28.0" height="21.0" rx="10.5" fill="#e69f00" fill-opacity="1" stroke="none" stroke-width="2.0"/>
+<text x="285.0" y="209.25" fill="#12171c" font-family="Lato,'Helvetica Neue',Helvetica,Arial,sans-serif" font-size="15" font-weight="700" font-style="normal" text-anchor="middle">2</text>
+<rect x="153.0" y="89.5" width="28.0" height="21.0" rx="10.5" fill="#e69f00" fill-opacity="1" stroke="none" stroke-width="2.0"/>
+<text x="167.0" y="105.25" fill="#12171c" font-family="Lato,'Helvetica Neue',Helvetica,Arial,sans-serif" font-size="15" font-weight="700" font-style="normal" text-anchor="middle">3</text>
+<rect x="271.0" y="89.5" width="28.0" height="21.0" rx="10.5" fill="#e69f00" fill-opacity="1" stroke="none" stroke-width="2.0"/>
+<text x="285.0" y="105.25" fill="#12171c" font-family="Lato,'Helvetica Neue',Helvetica,Arial,sans-serif" font-size="15" font-weight="700" font-style="normal" text-anchor="middle">4</text>
+<line x1="46.0" y1="330.0" x2="98.0" y2="330.0" stroke="#dfe4ea" stroke-width="1.6" stroke-linecap="round" marker-end="url(#arrow)"/>
+<line x1="46.0" y1="330.0" x2="46.0" y2="278.0" stroke="#dfe4ea" stroke-width="1.6" stroke-linecap="round" marker-end="url(#arrow)"/>
+<text x="107.0" y="336.0" fill="#dfe4ea" font-family="'Latin Modern Math','STIX Two Math','DejaVu Serif',Georgia,serif" font-size="18" font-weight="400" font-style="italic" text-anchor="start">x</text>
+<text x="43.0" y="271.0" fill="#dfe4ea" font-family="'Latin Modern Math','STIX Two Math','DejaVu Serif',Georgia,serif" font-size="18" font-weight="400" font-style="italic" text-anchor="middle">y</text>
+<circle cx="129.0" cy="362.0" r="6.0" fill="#56b4e9"/>
+<text x="150.0" y="367.04" fill="#98a2b0" font-family="Lato,'Helvetica Neue',Helvetica,Arial,sans-serif" font-size="14" font-weight="400" font-style="normal" text-anchor="start">node n</text>
+<rect x="242.0" y="353.0" width="22.0" height="18.0" rx="9.0" fill="#e69f00" fill-opacity="1" stroke="none" stroke-width="2.0"/>
+<text x="253.0" y="366.2" fill="#12171c" font-family="Lato,'Helvetica Neue',Helvetica,Arial,sans-serif" font-size="12" font-weight="700" font-style="normal" text-anchor="middle">n</text>
+<text x="270.0" y="367.04" fill="#98a2b0" font-family="Lato,'Helvetica Neue',Helvetica,Arial,sans-serif" font-size="14" font-weight="400" font-style="normal" text-anchor="start">cell n</text>
+</svg>
