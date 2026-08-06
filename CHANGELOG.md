@@ -11,6 +11,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
  - Atomic assembly support for BlockAssembler. ([#1452])
 
 ### Added
+ - Algebraic (mesh-free) variables: `add!(dh, :σ̄, AlgebraicVariable{SymmetricTensor{2, 2}}())`
+   declares a typed unknown (scalar, `Vec`, `Tensor` or `SymmetricTensor` of order 2 or 4,
+   with an optional `active_components` subset) that receives globally numbered dofs without any
+   mesh domain — its dofs never appear in `celldofs`. Where the variable couples to
+   spatial fields is declared explicitly with the new structural coupling descriptors
+   `CellCoupling`, `FacetCoupling` (using all dofs of the adjacent cell), and
+   `AlgebraicCoupling`, constructed with an `algebraic_coupling` specification: a
+   collection of `:u => :σ̄` pairs (directional, test-trial) and/or `(:u, :σ̄)` tuples
+   (both directions), or a `Bool` matrix together with `fields` for component-level
+   control. Descriptors are passed to `allocate_matrix`/`add_sparsity_entries!` via the
+   new `algebraic_couplings` keyword and additively union their entries with the ordinary
+   cell pattern. Assembly of coupled terms uses the ordinary iterators together with
+   `local_dofs(entity, descriptor)` (or the non-allocating in-place `local_dofs!` for hot
+   loops), which returns a `LocalDofLayout` (ordinary cell dofs followed by the
+   descriptor's algebraic dofs, with `dof_range(layout, name)` queries) that is passed to
+   the existing square `assemble!`/`apply_assemble!` methods. New
+   accessors: `getalgebraicvariablenames`, `algebraic_variable`, `algebraic_dofs`,
+   `active_components`, and `algebraic_value(dh, a, name)` (typed value reconstruction
+   from the global solution vector, for postprocessing). Inside assembly kernels the
+   variable is queried on an `AlgebraicValues` — the algebraic counterpart of
+   `CellValues`, created once during setup and passed into the kernel — with the
+   type-stable queries `algebraic_value(av, u, [dof_range])` (value reconstruction from
+   local coefficients; the scalar type follows the input so AD dual numbers pass
+   through), `algebraic_basis_value(av, i)` (constant basis directions for
+   linearization), and `ndofs(av)`.
+   Renumbering includes algebraic dofs (`DofOrder.FieldWise`/`ComponentWise` treat them as
+   trailing variables/components), and spatial-only APIs (`Dirichlet`,
+   `apply_analytical!`, evaluation, export, ...) reject algebraic names with descriptive
+   errors. See the new "Algebraic variables" topic guide. ([#1422])
  - `ExclusiveTopology` now supports grids with mixed reference dimensions (e.g. a 3D grid
    containing both `Hexahedron` and `Quadrilateral` cells). Mixed-dimensional connections
    are stored in `vertex_vertex_neighbor`, `edge_edge_neighbor`, and `face_face_neighbor`
@@ -1361,6 +1390,7 @@ poking into Ferrite internals:
 [#1417]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1417
 [#1420]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1420
 [#1421]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1421
+[#1422]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1422
 [#1423]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1423
 [#1426]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1426
 [#1428]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1428

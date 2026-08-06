@@ -128,6 +128,12 @@ mutable struct DofHandler{dim, G <: AbstractGrid{dim}} <: AbstractDofHandler
     # only retained afterwards for a `NonConformingGrid` (to build conformity constraints for
     # hanging nodes), otherwise this is `nothing`. See [`EntityMaps`](@ref).
     entitymaps::Union{Nothing, EntityMaps}
+    # Algebraic (mesh-free) variables, see `AlgebraicVariable`. Names and descriptors are
+    # populated by `add!` in declaration order; `algebraic_dofs[i]` holds the current global
+    # dof numbers of variable `i` (populated in `close!`, mutated by `renumber!`).
+    const algebraic_names::Vector{Symbol}
+    const algebraic_variables::Vector{AlgebraicVariable}
+    const algebraic_dofs::Vector{Vector{Int}}
 end
 
 """
@@ -159,13 +165,17 @@ close!(dh)
 function DofHandler(grid::G) where {dim, G <: AbstractGrid{dim}}
     ncells = getncells(grid)
     sdhs = SubDofHandler{DofHandler{dim, G}}[]
-    return DofHandler{dim, G}(sdhs, Symbol[], Int[], zeros(Int, ncells), zeros(Int, ncells), false, grid, -1, nothing)
+    return DofHandler{dim, G}(sdhs, Symbol[], Int[], zeros(Int, ncells), zeros(Int, ncells), false, grid, -1, nothing, Symbol[], AlgebraicVariable[], Vector{Int}[])
 end
 
 function Base.show(io::IO, mime::MIME"text/plain", dh::DofHandler)
     println(io, typeof(dh))
     if length(dh.subdofhandlers) == 1
-        _print_field_information(io, mime, dh.subdofhandlers[1])
+        println(io, "  Fields:")
+        sdh = dh.subdofhandlers[1]
+        for (i, fieldname) in pairs(sdh.field_names)
+            println(io, "    ", repr(mime, fieldname), ", ", repr(mime, sdh.field_interpolations[i]))
+        end
     else
         println(io, "  Fields:")
         for fieldname in getfieldnames(dh)
@@ -179,9 +189,18 @@ function Base.show(io::IO, mime::MIME"text/plain", dh::DofHandler)
             println(io, "    ", repr(fieldname), ", ", field_type)
         end
     end
+    if !isempty(dh.algebraic_names)
+        println(io, "  Algebraic variables:")
+        for (name, var) in zip(dh.algebraic_names, dh.algebraic_variables)
+            println(io, "    ", repr(name), ", ", var)
+        end
+    end
     if !isclosed(dh)
         print(io, "  Not closed!")
     else
+        if length(dh.subdofhandlers) == 1
+            println(io, "  Dofs per cell: ", ndofs_per_cell(dh.subdofhandlers[1]))
+        end
         print(io, "  Total dofs: ", ndofs(dh))
     end
     return
@@ -208,7 +227,8 @@ function ndofs_per_cell(dh::DofHandler)
     if length(dh.subdofhandlers) > 1
         error("There are more than one subdofhandler. Use `ndofs_per_cell(dh, cellid::Int)` instead.")
     end
-    @assert length(dh.subdofhandlers) != 0
+    # A purely algebraic DofHandler has no SubDofHandlers and thus no cell dofs
+    isempty(dh.subdofhandlers) && return 0
     return @inbounds ndofs_per_cell(dh.subdofhandlers[1])
 end
 function ndofs_per_cell(dh::DofHandler, cell::Int)
@@ -289,6 +309,112 @@ function n_components(dh::DofHandler, field_idxs::NTuple{2, Int})
 end
 n_components(dh::DofHandler, name::Symbol) = n_components(dh, find_field(dh, name))
 
+###########################################
+# Algebraic variable introspection API    #
+###########################################
+
+# Internal: whether the handler contains any algebraic variables. Other AbstractDofHandler
+# implementations do not support algebraic variables.
+has_algebraic_variables(dh::DofHandler) = !isempty(dh.algebraic_names)
+has_algebraic_variables(::AbstractDofHandler) = false
+
+_is_algebraic_variable_name(dh::DofHandler, name::Symbol) = name in dh.algebraic_names
+_is_algebraic_variable_name(::AbstractDofHandler, ::Symbol) = false
+
+# Internal: index of the algebraic variable `name` in the registries, or `nothing`.
+function _find_algebraic_variable(dh::DofHandler, name::Symbol)
+    return findfirst(x -> x === name, dh.algebraic_names)
+end
+
+# Internal: throw a descriptive wrong-kind error if `name` is an algebraic variable, for
+# use in operations that require a spatial field.
+function _check_not_algebraic_variable(dh::AbstractDofHandler, name::Symbol, what::String)
+    if _is_algebraic_variable_name(dh, name)
+        error(
+            ":$name is an algebraic variable, not a spatial field, and $what requires a spatial field. " *
+                "Algebraic variables are accessed with e.g. `algebraic_dofs(dh, :$name)` and `algebraic_value(dh, a, :$name)`."
+        )
+    end
+    return
+end
+
+function _algebraic_variable_index(dh::DofHandler, name::Symbol)
+    idx = _find_algebraic_variable(dh, name)
+    if idx === nothing
+        if name in getfieldnames(dh) || any(sdh -> name in sdh.field_names, dh.subdofhandlers)
+            error(":$name is a spatial field, not an algebraic variable")
+        end
+        error("Did not find algebraic variable :$name in DofHandler (existing algebraic variables: $(dh.algebraic_names)).")
+    end
+    return idx
+end
+
+"""
+    getalgebraicvariablenames(dh::DofHandler)
+
+Return a vector with the names of all algebraic variables in `dh`, in the order in which
+they were added. Analogous to [`getfieldnames`](@ref), which continues to return the names
+of the spatial fields only. The returned vector is a copy.
+"""
+getalgebraicvariablenames(dh::DofHandler) = copy(dh.algebraic_names)
+
+"""
+    algebraic_variable(dh::DofHandler, name::Symbol)
+
+Return the [`AlgebraicVariable`](@ref) descriptor registered as `name` in `dh`. The
+descriptor carries the declared value shape and the active-component selection, not the
+value or the dof numbers (see [`algebraic_value`](@ref) and [`algebraic_dofs`](@ref) for
+those). The variables are stored in an untyped registry, so the concrete type of the
+returned descriptor is not inferable; for queries inside assembly kernels wrap it in an
+[`AlgebraicValues`](@ref).
+"""
+function algebraic_variable(dh::DofHandler, name::Symbol)
+    return dh.algebraic_variables[_algebraic_variable_index(dh, name)]
+end
+
+"""
+    algebraic_dofs(dh::DofHandler, name::Symbol)
+
+Return the current global dof numbers of the algebraic variable `name`, in
+active-component order (see [`active_components`](@ref)). The returned vector is a copy:
+it reflects the numbering at the time of the call and is not updated by later
+[`renumber!`](@ref) calls. Note that the dof numbers are not guaranteed to be contiguous
+after renumbering.
+"""
+function algebraic_dofs(dh::DofHandler, name::Symbol)
+    isclosed(dh) || error("the DofHandler must be closed before dofs can be queried")
+    return copy(dh.algebraic_dofs[_algebraic_variable_index(dh, name)])
+end
+
+"""
+    algebraic_value(dh::DofHandler, a::AbstractVector, name::Symbol)
+
+Reconstruct the typed value of the algebraic variable `name` from the global solution
+vector `a`. For a scalar variable this returns the single coefficient; for vector and
+tensor valued variables the full typed value is reconstructed from the active global dofs,
+with `zero(eltype(a))` inserted in inactive components. The scalar type of the result
+follows `eltype(a)`.
+
+The result is the unknown contribution in the declared coordinate subspace. Prescribed
+values of inactive components are problem data and are added explicitly by the user, e.g.
+`σ = σ_prescribed + algebraic_value(dh, a, :σ̄)`.
+
+This method looks the variable up by name and is intended for postprocessing; inside an
+assembly kernel, reconstruct the value from the local unknowns with the type-stable
+method `algebraic_value(av, u, [dof_range])` on an [`AlgebraicValues`](@ref).
+"""
+function algebraic_value(dh::DofHandler, a::AbstractVector, name::Symbol)
+    isclosed(dh) || error("the DofHandler must be closed before values can be reconstructed")
+    if _find_algebraic_variable(dh, name) === nothing && name in getfieldnames(dh)
+        error(":$name is a spatial field, not an algebraic variable. Spatial fields are evaluated through `CellValues` (see `function_value`) or e.g. `evaluate_at_grid_nodes`.")
+    end
+    idx = _algebraic_variable_index(dh, name)
+    if length(a) != ndofs(dh)
+        error("the length of the solution vector ($(length(a))) does not match the number of dofs ($(ndofs(dh)))")
+    end
+    return _reconstruct_algebraic_value(dh.algebraic_variables[idx], a, dh.algebraic_dofs[idx])
+end
+
 """
     add!(sdh::SubDofHandler, name::Symbol, ip::Interpolation)
 
@@ -299,6 +425,10 @@ function add!(sdh::SubDofHandler, name::Symbol, ip::Interpolation)
     # Verify that name doesn't exist
     if name in sdh.field_names
         error("field already exist")
+    end
+    # Spatial fields and algebraic variables share one name namespace
+    if name in sdh.dh.algebraic_names
+        error("an algebraic variable with the name :$name already exists in the DofHandler; spatial fields and algebraic variables share one namespace")
     end
     # Verify that fields with the same name in other SubDofHandler have compatible
     # interpolation
@@ -355,6 +485,35 @@ function add!(dh::DofHandler, name::Symbol, ip::Interpolation)
     end
     # Add to SubDofHandler
     add!(sdh, name, ip)
+    return dh
+end
+
+"""
+    add!(dh::DofHandler, name::Symbol, variable::AlgebraicVariable)
+
+Add the algebraic (mesh-free) variable `variable` called `name` to the DofHandler `dh`.
+
+Algebraic variables receive one global dof per active component (see
+[`AlgebraicVariable`](@ref)), numbered after all spatial dofs in `close!`. They have no
+implicit mesh support: their dofs do not appear in `celldofs`, and coupling to spatial
+fields is declared explicitly with [`CellCoupling`](@ref), [`FacetCoupling`](@ref), and
+[`AlgebraicCoupling`](@ref). Spatial fields and algebraic variables share one name
+namespace.
+"""
+function add!(dh::DofHandler, name::Symbol, variable::AlgebraicVariable)
+    isclosed(dh) && error("cannot add algebraic variable :$name, the DofHandler is already closed")
+    # Spatial fields and algebraic variables share one name namespace. Note that
+    # `dh.field_names` is only populated in `close!`, so scan the SubDofHandlers.
+    if name in dh.algebraic_names
+        error("an algebraic variable with the name :$name already exists in the DofHandler")
+    end
+    for sdh in dh.subdofhandlers
+        if name in sdh.field_names
+            error("a spatial field with the name :$name already exists in the DofHandler; spatial fields and algebraic variables share one namespace")
+        end
+    end
+    push!(dh.algebraic_names, name)
+    push!(dh.algebraic_variables, variable)
     return dh
 end
 
@@ -439,6 +598,14 @@ function __close!(dh::DofHandler{dim}) where {dim}
             field_ncells,
         )
     end
+    # Distribute dofs for algebraic variables, in declaration order, after all spatial
+    # dofs. These dofs are *not* added to `cell_dofs`.
+    for variable in dh.algebraic_variables
+        n = n_algebraic_dofs(variable)
+        push!(dh.algebraic_dofs, collect(nextdof:(nextdof + n - 1)))
+        nextdof += n
+    end
+
     dh.ndofs = nextdof - 1
     dh.closed = true
 
@@ -975,6 +1142,7 @@ function find_field(dh::DofHandler, field_name::Symbol)
         field_idx = _find_field(sdh, field_name)
         !isnothing(field_idx) && return (sdh_idx, field_idx)
     end
+    _check_not_algebraic_variable(dh, field_name, "this operation")
     error("Did not find field :$field_name in DofHandler (existing fields: $(getfieldnames(dh))).")
 end
 
@@ -989,6 +1157,7 @@ See also: [`find_field(dh::DofHandler, field_name::Symbol)`](@ref), [`_find_fiel
 function find_field(sdh::SubDofHandler, field_name::Symbol)
     field_idx = _find_field(sdh, field_name)
     if field_idx === nothing
+        _check_not_algebraic_variable(sdh.dh, field_name, "this operation")
         error("Did not find field :$field_name in SubDofHandler (existing fields: $(sdh.field_names))")
     end
     return field_idx
@@ -1103,7 +1272,8 @@ function_value_init(::VectorInterpolation{vdim}, ::AbstractVector{T}) where {vdi
 
 # Internal method that have the vtk option to allocate the output differently
 function _evaluate_at_grid_nodes(dh::DofHandler{sdim}, u::AbstractVector{T}, fieldname::Symbol, ::Val{vtk} = Val(false)) where {T, vtk, sdim}
-    # Make sure the field exists
+    # Make sure the field exists (and is not an algebraic variable)
+    _check_not_algebraic_variable(dh, fieldname, "evaluation at grid nodes")
     fieldname ∈ getfieldnames(dh) || error("Field $fieldname not found.")
     # Figure out the return type (scalar or vector)
     field_idx = find_field(dh, fieldname)

@@ -31,6 +31,12 @@ module DofOrder
     DoF permutation order from external package `T`. Currently supported extensions:
     - `DofOrder.Ext{Metis}`: Fill-reducing permutation from
       [Metis.jl](https://github.com/JuliaSparse/Metis.jl).
+
+    !!! note
+        The Metis dof graph is constructed from the cell dofs only and is unaware of
+        coupling descriptors: dofs of algebraic variables are treated as isolated vertices
+        while computing the ordering. The resulting permutation is still valid, but not
+        necessarily fill-reducing for the coupled entries.
     """
     abstract type Ext{T} end
     function Ext{T}(args...; kwargs...) where {T}
@@ -84,6 +90,11 @@ function _renumber!(dh::DofHandler, perm::AbstractVector{<:Integer})
     for i in eachindex(dh.cell_dofs)
         dh.cell_dofs[i] = perm[dh.cell_dofs[i]]
     end
+    for dofs in dh.algebraic_dofs
+        for i in eachindex(dofs)
+            dofs[i] = perm[dofs[i]]
+        end
+    end
     return dh
 end
 
@@ -134,8 +145,10 @@ globally blocked system.
 
 The default behavior is to group dofs of each field into their own block, with the same
 order as in the DofHandler. This can be customized by passing a vector of the same length
-as the total number of fields in the DofHandler (see `getfieldnames(dh)`)
-that maps each field to a "target block": to renumber a DofHandler with three fields `:u`,
+as the total number of variables in the DofHandler -- the spatial fields (see
+`getfieldnames(dh)`) followed by the algebraic variables (see
+`getalgebraicvariablenames(dh)`), each algebraic variable counting as one block --
+that maps each variable to a "target block": to renumber a DofHandler with three fields `:u`,
 `:v`, `:w` such that dofs for `:u` and `:w` end up in the first global block, and dofs for
 `:v` in the second global block use `DofOrder.FieldWise([1, 2, 1])`.
 
@@ -144,14 +157,22 @@ target block is maintained.
 """
 DofOrder.FieldWise
 
+# Number of dof components of each variable in the combined variable ordering: the spatial
+# fields in `getfieldnames(dh)` order followed by the algebraic variables in declaration
+# order (counting active components only).
+function _combined_variable_dims(dh::DofHandler)
+    field_dims = Int[n_components(dh, fieldname) for fieldname in dh.field_names]
+    append!(field_dims, n_algebraic_dofs(v) for v in dh.algebraic_variables)
+    return field_dims
+end
+
 function compute_renumber_permutation(dh::DofHandler, _, order::DofOrder.FieldWise)
-    field_names = getfieldnames(dh)
-    field_dims = map(fieldname -> n_components(dh, fieldname), dh.field_names)
+    field_dims = _combined_variable_dims(dh)
     target_blocks = if isempty(order.target_blocks)
         Int[i for (i, dim) in pairs(field_dims) for _ in 1:dim]
     else
-        if length(order.target_blocks) != length(field_names)
-            error("length of target block vector does not match number of fields in DofHandler")
+        if length(order.target_blocks) != length(field_dims)
+            error("length of target block vector does not match number of fields and algebraic variables in DofHandler")
         end
         Int[order.target_blocks[i] for (i, dim) in pairs(field_dims) for _ in 1:dim]
     end
@@ -168,7 +189,9 @@ a globally blocked system.
 The default behavior is to group dofs of each component into their own block, with the same
 order as in the DofHandler. This can be customized by passing a vector of length
 `ncomponents` that maps each component to a "target block" (see [`DofOrder.FieldWise`](@ref)
-for details).
+for details). The components are those of the spatial fields (in `getfieldnames(dh)`
+order) followed by the *active* components of the algebraic variables (in
+`getalgebraicvariablenames(dh)` order).
 
 This renumbering is stable such that the original relative ordering of dofs within each
 target block is maintained.
@@ -178,15 +201,16 @@ DofOrder.ComponentWise
 function compute_renumber_permutation(dh::DofHandler, _, order::DofOrder.ComponentWise)
     # Note: This assumes fields have the same dimension regardless of subdomain
     field_dims = map(fieldname -> n_components(dh, fieldname), dh.field_names)
+    combined_dims = _combined_variable_dims(dh)
     target_blocks = if isempty(order.target_blocks)
-        collect(Int, 1:sum(field_dims))
+        collect(Int, 1:sum(combined_dims; init = 0))
     else
-        if length(order.target_blocks) != sum(field_dims)
+        if length(order.target_blocks) != sum(combined_dims; init = 0)
             error("length of target block vector does not match number of components in DofHandler")
         end
         order.target_blocks
     end
-    @assert length(target_blocks) == sum(field_dims)
+    @assert length(target_blocks) == sum(combined_dims; init = 0)
     @assert sort!(unique(target_blocks)) == 1:maximum(target_blocks)
     # Collect all dofs into the corresponding block according to target_blocks
     nblocks = maximum(target_blocks)
@@ -209,6 +233,15 @@ function compute_renumber_permutation(dh::DofHandler, _, order::DofOrder.Compone
                 end
             end
         end
+    end
+    # Algebraic dofs: one component per active component, after all spatial components
+    component_offset = sum(field_dims; init = 0)
+    for (vidx, variable) in pairs(dh.algebraic_variables)
+        for (k, dof) in pairs(dh.algebraic_dofs[vidx])
+            block = target_blocks[component_offset + k]
+            push!(dofs_for_blocks[block], dof)
+        end
+        component_offset += n_algebraic_dofs(variable)
     end
     @assert sum(length, dofs_for_blocks) == ndofs(dh)
     # Construct the inverse permutation. Sorting the dofs for each field is necessary to
