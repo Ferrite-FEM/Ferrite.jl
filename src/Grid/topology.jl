@@ -72,7 +72,7 @@ function ExclusiveTopology(grid::AbstractGrid{sdim}) where {sdim}
     ncells = length(cells)
 
     max_vertices, max_edges, max_faces = _max_nentities_per_cell(cells)
-    vertex_to_cell = build_vertex_to_cell(cells; max_vertices, nnodes)
+    vertex_to_cell = build_vertex_to_cell(cells; nnodes)
     cell_neighbor = build_cell_neighbor(grid, cells, vertex_to_cell; ncells)
 
     # Here we don't use the convenience constructor taking a function,
@@ -96,10 +96,25 @@ function ExclusiveTopology(grid::AbstractGrid{sdim}) where {sdim}
             if num_shared_vertices == 1
                 _add_single_vertex_neighbor!(vertex_vertex_neighbor_buf, cell, cell_id, neighbor_cell, neighbor_cell_id)
             elseif num_shared_vertices == 2 # Shared edge (or two separate vertices)
-                _add_single_edge_neighbor!(edge_edge_neighbor_buf, cell, cell_id, neighbor_cell, neighbor_cell_id) ||
+                # For cells with reference dimension <= 2 the pairwise search is over so
+                # few edges that it beats collecting the shared vertices for a targeted
+                # lookup first (the branch is static for concrete cell types).
+                added = if getrefdim(cell) == 3
+                    g1, g2, _, _ = _first_shared_vertices(cell, neighbor_cell)
+                    _add_edge_neighbor!(edge_edge_neighbor_buf, cell, cell_id, neighbor_cell, neighbor_cell_id, sortedge_fast((g1, g2)))
+                else
+                    _add_single_edge_neighbor!(edge_edge_neighbor_buf, cell, cell_id, neighbor_cell, neighbor_cell_id)
+                end
+                added || _add_single_vertex_neighbor!(vertex_vertex_neighbor_buf, cell, cell_id, neighbor_cell, neighbor_cell_id)
+            elseif num_shared_vertices == 3 # Shared triangular face (or lower-dimensional entities)
+                g1, g2, g3, _ = _first_shared_vertices(cell, neighbor_cell)
+                _add_face_neighbor!(face_face_neighbor_buf, cell, cell_id, neighbor_cell, neighbor_cell_id, sortface_fast((g1, g2, g3))) ||
+                    _add_single_edge_neighbor!(edge_edge_neighbor_buf, cell, cell_id, neighbor_cell, neighbor_cell_id) ||
                     _add_single_vertex_neighbor!(vertex_vertex_neighbor_buf, cell, cell_id, neighbor_cell, neighbor_cell_id)
-            elseif num_shared_vertices >= 3 # Shared face (or lower-dimensional entities)
-                _add_single_face_neighbor!(face_face_neighbor_buf, cell, cell_id, neighbor_cell, neighbor_cell_id) ||
+            elseif num_shared_vertices >= 4 # Shared quadrilateral face (or lower-dimensional entities)
+                g1, g2, g3, g4 = _first_shared_vertices(cell, neighbor_cell)
+                _add_face_neighbor!(face_face_neighbor_buf, cell, cell_id, neighbor_cell, neighbor_cell_id, sortface_fast((g1, g2, g3, g4))) ||
+                    _add_single_face_neighbor!(face_face_neighbor_buf, cell, cell_id, neighbor_cell, neighbor_cell_id) ||
                     _add_single_edge_neighbor!(edge_edge_neighbor_buf, cell, cell_id, neighbor_cell, neighbor_cell_id) ||
                     _add_single_vertex_neighbor!(vertex_vertex_neighbor_buf, cell, cell_id, neighbor_cell, neighbor_cell_id)
             else
@@ -161,13 +176,37 @@ function _num_shared_vertices(cell_a::C1, cell_b::C2) where {C1, C2}
     num_shared_vertices = 0
     for vertex in vertices(cell_a)
         for vertex_neighbor in vertices(cell_b)
-            if vertex_neighbor == vertex
-                num_shared_vertices += 1
-                continue
-            end
+            # Branch-free accumulation so that the loops vectorize (a cell never contains
+            # the same vertex twice, so each match is a distinct shared vertex).
+            num_shared_vertices += Int(vertex_neighbor == vertex)
         end
     end
     return num_shared_vertices
+end
+
+# Global ids of the first four vertices shared by `cell_a` and `cell_b` (0 if fewer), used
+# to look up the shared edge or face directly instead of comparing all pairs of them.
+function _first_shared_vertices(cell_a::C1, cell_b::C2) where {C1, C2}
+    num_shared_vertices = 0
+    g1 = g2 = g3 = 0
+    for vertex in vertices(cell_a)
+        for vertex_neighbor in vertices(cell_b)
+            if vertex_neighbor == vertex
+                num_shared_vertices += 1
+                if num_shared_vertices == 1
+                    g1 = vertex
+                elseif num_shared_vertices == 2
+                    g2 = vertex
+                elseif num_shared_vertices == 3
+                    g3 = vertex
+                else
+                    return (g1, g2, g3, vertex)
+                end
+                break
+            end
+        end
+    end
+    return (g1, g2, g3, 0)
 end
 
 "Return the highest number of vertices, edges, and faces per cell"
@@ -188,6 +227,37 @@ function _max_nentities_per_cell(cells::Vector{C}) where {C}
         end
         return max_vertices, max_edges, max_faces
     end
+end
+
+# Add the face neighbor when the shared face is known to consist of the shared vertices,
+# with `sorted_face` their unique representation from `sortface_fast` (3 indices identify
+# a face, also for quadrilateral faces, see `sortface_fast`).
+# Return `true` if both cells have such a face and the entry was recorded.
+function _add_face_neighbor!(face_table::ConstructionBuffer, cell::AbstractCell, cell_id::Int, cell_neighbor::AbstractCell, cell_neighbor_id::Int, sorted_face::Tuple{Int, Int, Int})
+    lfi = _find_local_entity(faces(cell), sortface_fast, sorted_face)
+    lfi == 0 && return false
+    lfi2 = _find_local_entity(faces(cell_neighbor), sortface_fast, sorted_face)
+    lfi2 == 0 && return false
+    push_at_index!(face_table, FaceIndex(cell_neighbor_id, lfi2), cell_id, lfi)
+    return true
+end
+
+# Like `_add_face_neighbor!` but for the edge with sorted vertices `sorted_edge`.
+function _add_edge_neighbor!(edge_table::ConstructionBuffer, cell::AbstractCell, cell_id::Int, cell_neighbor::AbstractCell, cell_neighbor_id::Int, sorted_edge::Tuple{Int, Int})
+    lei = _find_local_entity(edges(cell), sortedge_fast, sorted_edge)
+    lei == 0 && return false
+    lei2 = _find_local_entity(edges(cell_neighbor), sortedge_fast, sorted_edge)
+    lei2 == 0 && return false
+    push_at_index!(edge_table, EdgeIndex(cell_neighbor_id, lei2), cell_id, lei)
+    return true
+end
+
+# Local index of the entity in `entities` whose sorted vertices are `sorted_entity`, or 0.
+function _find_local_entity(entities::Tuple, sortfun::F, sorted_entity::Tuple) where {F}
+    for (i, entity) in pairs(entities)
+        sortfun(entity) == sorted_entity && return i
+    end
+    return 0
 end
 
 # The `_add_single_*_neighbor!` functions return `true` if a shared entity was found and
@@ -235,15 +305,30 @@ function _add_single_vertex_neighbor!(vertex_table::ConstructionBuffer, cell::Ab
     return found
 end
 
-function build_vertex_to_cell(cells; max_vertices, nnodes)
-    vertex_to_cell = ArrayOfVectorViews(sizehint!(Int[], max_vertices * nnodes), (nnodes,); sizehint = max_vertices) do cov
-        for (cellid, cell) in enumerate(cells)
-            for vertex in vertices(cell)
-                push_at_index!(cov, cellid, vertex)
-            end
+function build_vertex_to_cell(cells; nnodes)
+    # Two-pass construction: count the number of cells for each vertex, compute the view
+    # offsets, and then fill in the cell ids. This allocates exactly the required memory
+    # and avoids the data relocations of the generic `ConstructionBuffer` approach.
+    nextidx = zeros(Int, nnodes)
+    for cell in cells
+        for vertex in vertices(cell)
+            nextidx[vertex] += 1
         end
     end
-    return vertex_to_cell
+    indices = Vector{Int}(undef, nnodes + 1)
+    indices[1] = 1
+    for v in 1:nnodes
+        indices[v + 1] = indices[v] + nextidx[v]
+        nextidx[v] = indices[v] # Next free data slot for vertex v
+    end
+    data = Vector{Int}(undef, indices[end] - 1)
+    for (cellid, cell) in enumerate(cells)
+        for vertex in vertices(cell)
+            data[nextidx[vertex]] = cellid
+            nextidx[vertex] += 1
+        end
+    end
+    return ArrayOfVectorViews(indices, data, LinearIndices(1:nnodes); checkargs = false)
 end
 
 function build_cell_neighbor(grid, cells, vertex_to_cell; ncells)
@@ -253,23 +338,28 @@ function build_cell_neighbor(grid, cells, vertex_to_cell; ncells)
     data = empty!(Vector{Int}(undef, ncells * sizehint))
 
     indices = Vector{Int}(undef, ncells + 1)
-    cell_neighbor_ids = Int[]
+    # last_recorded_by[c] is the latest cell that pushed c as its neighbor, giving O(1)
+    # deduplication instead of a linear scan over the neighbors found so far.
+    last_recorded_by = zeros(Int, ncells)
     n = 1
     for (cell_id, cell) in enumerate(cells)
-        empty!(cell_neighbor_ids)
+        indices[cell_id] = n
         for vertex in vertices(cell)
             for vertex_cell_id in vertex_to_cell[vertex]
-                if vertex_cell_id != cell_id
-                    vertex_cell_id ∈ cell_neighbor_ids || push!(cell_neighbor_ids, vertex_cell_id)
+                if vertex_cell_id != cell_id && last_recorded_by[vertex_cell_id] != cell_id
+                    last_recorded_by[vertex_cell_id] = cell_id
+                    push!(data, vertex_cell_id)
+                    n += 1
                 end
             end
         end
-        indices[cell_id] = n
-        append!(data, cell_neighbor_ids)
-        n += length(cell_neighbor_ids)
     end
     indices[end] = n
-    sizehint!(data, length(data)) # Tell julia that we won't add more data
+    # Free the excess capacity if a significant part would be reclaimed (the shrink copies
+    # the data, so it is not worth it for the typically well-matched size hints).
+    if 4 * length(data) < 3 * ncells * sizehint
+        sizehint!(data, length(data))
+    end
     return ArrayOfVectorViews(indices, data, LinearIndices(1:ncells))
 end
 
@@ -326,20 +416,25 @@ end
 # shared by potentially many cells and only the exclusive neighborhood is stored.
 function _getneighborhood_edge3(top::ExclusiveTopology, grid::AbstractGrid, edgeidx::EdgeIndex, include_self)
     cellid, local_edgeidx = edgeidx[1], edgeidx[2]
-    cell_edges = edges(getcells(grid, cellid))
-    nonlocal_edgeid = cell_edges[local_edgeidx]
-    cell_neighbors = getneighborhood(top, grid, CellIndex(cellid))
-    self_reference_local = EdgeIndex[]
-    for neighbor_cellid in cell_neighbors
-        local_neighbor_edgeid = findfirst(x -> issubset(x, nonlocal_edgeid), edges(getcells(grid, neighbor_cellid)))
-        local_neighbor_edgeid === nothing && continue
-        push!(self_reference_local, EdgeIndex(neighbor_cellid, local_neighbor_edgeid))
+    v1, v2 = edges(getcells(grid, cellid))[local_edgeidx]
+    stored_neighbors = top.edge_edge_neighbor[cellid, local_edgeidx]
+    nstored = length(stored_neighbors)
+    neighbors = EdgeIndex[]
+    sizehint!(neighbors, nstored + 4 + include_self)
+    append!(neighbors, stored_neighbors)
+    for neighbor_cellid in top.cell_neighbor[cellid]
+        for (i, edge) in pairs(edges(getcells(grid, neighbor_cellid)))
+            if (edge[1] == v1 && edge[2] == v2) || (edge[1] == v2 && edge[2] == v1)
+                # The recomputed candidates are distinct (at most one per neighbor cell),
+                # so only the stored entries can duplicate them.
+                candidate = EdgeIndex(neighbor_cellid, i)
+                candidate ∈ view(neighbors, 1:nstored) || push!(neighbors, candidate)
+                break
+            end
+        end
     end
-    if include_self
-        neighbors = unique([top.edge_edge_neighbor[cellid, local_edgeidx]; self_reference_local; edgeidx])
-    else
-        neighbors = unique([top.edge_edge_neighbor[cellid, local_edgeidx]; self_reference_local])
-    end
+    # The edge itself is never a neighbor of itself, so no duplication check is needed.
+    include_self && push!(neighbors, edgeidx)
     return view(neighbors, 1:length(neighbors))
 end
 
@@ -362,17 +457,24 @@ function vertex_star_stencils(top::ExclusiveTopology, grid::Grid)
     stencil_table = ArrayOfVectorViews(VertexIndex[], (getnnodes(grid),); sizehint = 10) do buf
         # Vertex Connectivity
         for (global_vertexid, cellset) in enumerate(top.vertex_to_cell)
-            for cell in cellset
-                neighbor_boundary = edges(cells[cell])
-                neighbor_connected_faces = neighbor_boundary[findall(x -> global_vertexid ∈ x, neighbor_boundary)]
-                this_local_vertex = findfirst(i -> toglobal(grid, VertexIndex(cell, i)) == global_vertexid, 1:nvertices(cells[cell]))
-                push_at_index!(buf, VertexIndex(cell, this_local_vertex), global_vertexid)
-                other_vertices = findfirst.(x -> x != global_vertexid, neighbor_connected_faces)
-                any(other_vertices .=== nothing) && continue
-                neighbor_vertices_global = getindex.(neighbor_connected_faces, other_vertices)
-                neighbor_vertices_local = [VertexIndex(cell, local_vertex) for local_vertex in findall(x -> x ∈ neighbor_vertices_global, vertices(cells[cell]))]
-                for vertex_index in neighbor_vertices_local
-                    push_at_index!(buf, vertex_index, global_vertexid)
+            for cell_id in cellset
+                cell_vertices = vertices(cells[cell_id])
+                # The vertex itself is part of the stencil
+                for (lvi, gvi) in pairs(cell_vertices)
+                    if gvi == global_vertexid
+                        push_at_index!(buf, VertexIndex(cell_id, lvi), global_vertexid)
+                        break
+                    end
+                end
+                # All vertices connected to it by an edge of this cell
+                for (lvi, gvi) in pairs(cell_vertices)
+                    gvi == global_vertexid && continue
+                    for edge in edges(cells[cell_id])
+                        if (edge[1] == global_vertexid && edge[2] == gvi) || (edge[2] == global_vertexid && edge[1] == gvi)
+                            push_at_index!(buf, VertexIndex(cell_id, lvi), global_vertexid)
+                            break
+                        end
+                    end
                 end
             end
         end
