@@ -147,39 +147,196 @@ In order to use boundaries, e.g. for Dirichlet constraints in the ConstraintHand
 
 ## Topology
 
-Ferrite.jl's `Grid` type offers experimental features w.r.t. topology information. The functions [`getneighborhood`](@ref) and [`facetskeleton`](@ref)
-are the interface to obtain topological information.The [`getneighborhood`](@ref) can construct lists of directly connected entities based on a given entity
-(`CellIndex`, `FacetIndex`, `FaceIndex`, `EdgeIndex`, or `VertexIndex`). Please remember that the dimensions of faces (dim=2) and edges (dim=1) are fixed, i.e.
-they are defined independent of the spatial dimension of the grid. You can consult [the entity naming page](@ref entity-naming-docs) for details.
-The [`facetskeleton`](@ref) function can be used to evaluate integrals over material interfaces or computing element interface values such as jumps.
+A `Grid` stores each cell as a tuple of global node ids, but does not directly answer
+questions like "which cells are neighbors of cell 5?" or "which facets are on the interior
+of the domain?". This kind of connectivity information can be computed with
+[`ExclusiveTopology`](@ref):
 
-When working with the topology it can be helpful to express algorithms in terms of
-dimension and co-dimension. This can be especially interesting when dealing with
-embedded elements in mixed dimensional grids, because the neighbour can now have a
-different reference dimension. For example we could have a line attached to a
-quadrilateral in 2D as sketched below:
+```@repl topology
+using Ferrite #hide
+grid = generate_grid(Quadrilateral, (3, 3));
+topology = ExclusiveTopology(grid);
 ```
-+-----+ +
-|     | |
-|  1  | 2
-|     | |
-+-----+ +
-|     |
-|  3  |
-|     |
-+-----+
+
+!!! warning "Experimental feature"
+    `ExclusiveTopology` is an experimental feature and may change in future releases.
+    It only works for conforming grids, i.e. grids without "hanging nodes", and requires
+    the highest reference dimension among the cells to equal the spatial dimension
+    (purely embedded grids, e.g. a shell grid of `Quadrilateral`s in 3D space, are not
+    supported).
+
+The examples in this section use the 3 × 3 quadrilateral grid constructed above, with
+cells numbered row-wise starting in the bottom left corner.
+
+### Neighborhood of a cell
+
+Two cells are considered neighbors if they share at least one vertex. The name
+*exclusive* refers to how the neighborhood is classified and stored: each pair of
+neighboring cells is only connected through the highest-dimensional entity they share.
+Cells sharing a face are *face neighbors*, cells sharing an edge, but no face, are *edge
+neighbors*, and cells sharing only a vertex are *vertex neighbors*. In the grid below,
+cell 5 has four edge neighbors (cells 2, 4, 6, and 8) and four vertex neighbors (cells 1,
+3, 7, and 9). (Face neighbors only exist in 3D, and in 1D all neighbors are vertex
+neighbors.)
+
+![The neighbors of cell 5, classified by the entity they share with it](./assets/topology_cell_neighbors-light.svg)
+![The neighbors of cell 5, classified by the entity they share with it](./assets/topology_cell_neighbors-dark.svg)
+
+Neighborhood queries go through [`getneighborhood`](@ref). Passing a `CellIndex` returns
+all neighboring cells, regardless of how they are connected:
+
+```@repl topology
+getneighborhood(topology, grid, CellIndex(5))
 ```
-Then we can handle the following cases
+
+The returned collections are lightweight `AbstractVector` views -- treat them as
+read-only and `collect` them if an independent copy is needed.
+
+### Neighborhood of vertices, edges, and faces
+
+Vertices, edges, and faces are addressed by a `(cell id, local entity id)` pair, wrapped
+in [`VertexIndex`](@ref), [`EdgeIndex`](@ref), or [`FaceIndex`](@ref), where the local
+numbering is defined by the cell's reference shape (see [Reference shapes](@ref)). Note
+that vertices, edges, and faces denote entities of fixed dimension 0, 1, and 2,
+independent of the spatial dimension of the grid, see
+[Entity naming](@ref entity-naming-docs). In addition, [`FacetIndex`](@ref) addresses
+*facets*, i.e. the entities separating cells: vertices in 1D, edges in 2D, and faces in
+3D. Since an
+interior entity is part of more than one cell it has multiple valid indices, one for each
+cell containing it:
+
+![Local views of an edge shared by two cells and a vertex shared by four cells](./assets/topology_entity_views-light.svg)
+![Local views of an edge shared by two cells and a vertex shared by four cells](./assets/topology_entity_views-dark.svg)
+
+For these index types `getneighborhood` returns the *other* local views of the same
+entity, i.e. how the entity is addressed from the neighboring cells:
+
+```@repl topology
+getneighborhood(topology, grid, FacetIndex(5, 2))
+getneighborhood(topology, grid, VertexIndex(5, 3))
+```
+
+With the optional argument `include_self` set to `true` the queried entity itself is
+also included, thus giving all equivalent representations:
+
+```@repl topology
+getneighborhood(topology, grid, VertexIndex(5, 3), true)
+```
+
+### The facet skeleton
+
+A loop over all facets of all cells visits interior facets twice: once from each of the
+two cells sharing it. [`facetskeleton`](@ref) instead returns an iterable with every
+unique facet of the grid exactly once, where interior facets are represented by the cell
+with the lowest cell id:
+
+![The facet skeleton: every unique facet of the grid exactly once](./assets/topology_facet_skeleton-light.svg)
+![The facet skeleton: every unique facet of the grid exactly once](./assets/topology_facet_skeleton-dark.svg)
+
+```@repl topology
+skeleton = facetskeleton(topology, grid);
+length(skeleton)
+```
+
+For this grid the skeleton contains 24 unique facets (12 interior and 12 on the
+boundary), compared to the 9 × 4 = 36 cell-local facets. The skeleton is
+useful when something should be computed once per facet, e.g. integrals over material
+interfaces. For integrating jump and average terms over interior facets, as needed in
+discontinuous Galerkin methods, the [`InterfaceIterator`](@ref) (which uses the topology
+internally) is more convenient, see the
+[Discontinuous Galerkin heat equation](@ref tutorial-dg-heat-equation) tutorial.
+
+### Mixed reference dimensions
+
+Grids mixing cells of different reference dimension are supported, as long as the
+highest reference dimension equals the spatial dimension. As an example, consider a
+`Line` cell attached to the right edge of a quadrilateral:
+
+![A line cell attached to the edge of a quadrilateral](./assets/topology_mixed_dim-light.svg)
+![A line cell attached to the edge of a quadrilateral](./assets/topology_mixed_dim-dark.svg)
+
+```@repl topology
+nodes = Node.(Vec.([(0.0, 0.0), (1.0, 0.0), (0.0, 1.0), (1.0, 1.0), (0.0, 2.0), (1.0, 2.0)]));
+cells = [
+    Quadrilateral((3, 4, 6, 5)), # top quadrilateral (cell 1)
+    Line((4, 6)),                # line on the right edge of cell 1 (cell 2)
+    Quadrilateral((1, 2, 4, 3)), # bottom quadrilateral (cell 3)
+];
+mixed_grid = Grid(cells, nodes);
+mixed_topology = ExclusiveTopology(mixed_grid);
+```
+
+The neighborhood is classified by the shared entity just as before, so the line cell is
+an edge neighbor of cell 1. For `FacetIndex` queries the facet dimension is resolved
+from the reference dimension of the indexed cell: the facets of the quadrilateral cell 1
+are edges, and querying them finds the neighboring quadrilateral as well as the line
+cell:
+
+```@repl topology
+getneighborhood(mixed_topology, mixed_grid, FacetIndex(1, 1)) # bottom edge
+getneighborhood(mixed_topology, mixed_grid, FacetIndex(1, 2)) # right edge
+```
+
+To distinguish bulk neighbors from embedded ones, [`Ferrite.entity_dim`](@ref) and
+[`Ferrite.entity_codim`](@ref) are useful: an edge of a quadrilateral (reference
+dimension 2) has co-dimension 2 - 1 = 1, whereas the edge making up the whole line cell
+(reference dimension 1) has co-dimension 0:
+
+```@repl topology
+Ferrite.entity_codim(mixed_grid, EdgeIndex(3, 3)) # facet of a bulk cell
+Ferrite.entity_codim(mixed_grid, EdgeIndex(2, 1)) # embedded cell itself
+```
+
+This can be used to dispatch on the type of coupling, e.g.:
+
 ```julia
-for local_face_index in 1:4
-    for neighbor in getneighborhood(topo, mixed_grid, FacetIndex(1, local_face_index)) # neighbor is an EdgeIndex
-        if Ferrite.entity_codim(mixed_grid, neighbor) == 0
-            # This case is the standard facet-to-facet coupling with element 3 in this example
-        elseif Ferrite.entity_codim(mixed_grid, neighbor) == 1
-            # neighbor is the embedded element 2
-        end
+for facet_nr in 1:4, neighbor in getneighborhood(mixed_topology, mixed_grid, FacetIndex(1, facet_nr))
+    if Ferrite.entity_codim(mixed_grid, neighbor) == 1
+        # standard facet-to-facet coupling with another bulk cell (here cell 3)
+    elseif Ferrite.entity_codim(mixed_grid, neighbor) == 0
+        # coupling with an embedded cell (here the line cell 2)
     end
 end
 ```
-Please note that this relation is not symmetric and we cannot use the exact same code
-when dealing with the "1D subdomain" (containing a single element in this example).
+
+Note that these relations are not symmetric: seen from the line cell the facets are
+vertices, so the same facet-based code cannot be reused from the embedded side:
+
+```@repl topology
+getneighborhood(mixed_topology, mixed_grid, FacetIndex(2, 1))
+```
+
+Finally, the bulk operations [`facetskeleton`](@ref) (and thereby
+[`InterfaceIterator`](@ref)) do not support grids with mixed reference dimensions, since
+they assume a common facet dimension across the whole grid.
+
+### Vertex stars
+
+[`vertex_star_stencils`](@ref) computes the *star* of every vertex in the grid: the
+vertex itself and all vertices connected to it by an edge. The stencil of a specific
+vertex is then extracted with [`getstencil`](@ref):
+
+![The star of a vertex: the vertex itself and all edge-connected vertices](./assets/topology_vertex_star-light.svg)
+![The star of a vertex: the vertex itself and all edge-connected vertices](./assets/topology_vertex_star-dark.svg)
+
+```@repl topology
+stencils = vertex_star_stencils(topology, grid);
+getstencil(stencils, grid, VertexIndex(5, 3))
+```
+
+The vertices in the star are given by their local views from the cells containing the
+center vertex. Vertex stars are useful for node-based operations, e.g. constructing
+stencils for finite-difference-like approximations.
+
+### Topology-aware boundary sets
+
+The topology is also used by [`addboundaryfacetset!`](@ref) and
+[`addboundaryvertexset!`](@ref). In contrast to [`addfacetset!`](@ref) and
+[`addvertexset!`](@ref), which consider all entities for which the passed predicate
+holds, these restrict the search to entities on the domain boundary, i.e. entities of
+facets without neighbors:
+
+```@repl topology
+addboundaryfacetset!(grid, topology, "east", x -> x[1] ≈ 1.0);
+getfacetset(grid, "east")
+```
