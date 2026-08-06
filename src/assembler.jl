@@ -149,7 +149,7 @@ function finish_assemble(a::COOAssembler)
 end
 
 """
-    assemble!(g, dofs, ge)
+    assemble!(g, dofs, ge, atomic = Val(false))
 
 Assembles the element residual `ge` into the global residual vector `g`.
 """
@@ -157,12 +157,7 @@ Assembles the element residual `ge` into the global residual vector `g`.
     @boundscheck checkbounds(g, dofs)
     @boundscheck checkbounds(ge, keys(dofs))
     @inbounds for (i, dof) in pairs(dofs)
-        if atomic
-            v = ge[i]
-            iszero(v) || _atomic_add!(g, dof, v)
-        else
-            addindex!(g, ge[i], dof)
-        end
+        addindex!(g, ge[i], dof, Val(atomic))
     end
     return
 end
@@ -178,7 +173,7 @@ matrix_handle, vector_handle
 
 # The `atomic` type parameter of the assemblers below is a `Bool` deciding whether the
 # accumulation into the global matrix and vector uses atomic additions (see
-# `start_assemble` and `_addindex!`). It is a type parameter, and not a field, so that
+# `start_assemble` and `addindex!`). It is a type parameter, and not a field, so that
 # the atomic and non-atomic assembly paths compile to separate specializations: with a
 # runtime flag the never-executed atomic code slows down the non-atomic path by 5-10%
 # (LLVM neither unswitches a branch at the accumulation site out of the assembly loops,
@@ -434,7 +429,7 @@ const SPARSE_COLUMN_SEARCH_RATIO = 8
                 # Match: add the value (if non-zero) and advance the pointers
                 val = Ke[rowpermutation[ri], Kecol]
                 if !iszero(val)
-                    _addindex!(Kvals, R, val, atomic)
+                    addindex!(Kvals, val, R, atomic)
                 end
                 ri += 1
                 Ri += 1

@@ -68,7 +68,7 @@ end
                 # Match: add the value (if non-zero) and advance the pointers
                 val = Ke[Kerow, colpermutation[ci]]
                 if !iszero(val)
-                    Ferrite._addindex!(K.nzval, C, val, atomic)
+                    Ferrite.addindex!(K.nzval, val, C, atomic)
                 end
                 ci += 1
                 Ci += 1
