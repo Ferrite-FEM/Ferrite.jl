@@ -22,6 +22,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
    both keyword arguments behave exactly as before. ([#1468])
 
 ### Added
+ - Added mesh-free [`AlgebraicVariable`s](https://ferrite-fem.github.io/Ferrite.jl/dev/topics/algebraic_variables/)
+   and coupling descriptors for small global unknowns such as Lagrange multipliers and
+   homogenized quantities. See the documentation for details. ([#1422])
  - `ExclusiveTopology` now supports grids with mixed reference dimensions (e.g. a 3D grid
    containing both `Hexahedron` and `Quadrilateral` cells). Mixed-dimensional connections
    are stored in `vertex_vertex_neighbor`, `edge_edge_neighbor`, and `face_face_neighbor`
@@ -1408,6 +1411,7 @@ poking into Ferrite internals:
 [#1417]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1417
 [#1420]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1420
 [#1421]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1421
+[#1422]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1422
 [#1423]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1423
 [#1426]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1426
 [#1428]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1428

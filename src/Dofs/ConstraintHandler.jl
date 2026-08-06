@@ -963,6 +963,7 @@ end
 Add a `Dirichlet` boundary condition to the `ConstraintHandler`.
 """
 function add!(ch::ConstraintHandler{<:Any, Tv, Ti}, dbc::Dirichlet) where {Tv, Ti}
+    _check_not_algebraic_variable(ch.dh, dbc.field_name, "`Dirichlet` (constrain the dofs from `algebraic_dofs(dh, :$(dbc.field_name))` directly, e.g. with an `AffineConstraint`)")
     # Duplicate the Dirichlet constraint for every SubDofHandler
     dbc_added = false
     for sdh in ch.dh.subdofhandlers
@@ -1928,6 +1929,7 @@ end
 _default_bc_qr_order(::Interpolation{<:Any, order}) where {order} = 2 * order
 
 function add!(ch::ConstraintHandler, bc::ProjectedDirichlet)
+    _check_not_algebraic_variable(ch.dh, bc.field_name, "`ProjectedDirichlet` (constrain the dofs from `algebraic_dofs(dh, :$(bc.field_name))` directly, e.g. with an `AffineConstraint`)")
     # Duplicate the Dirichlet constraint for every SubDofHandler
     dbc_added = false
     for sdh in ch.dh.subdofhandlers

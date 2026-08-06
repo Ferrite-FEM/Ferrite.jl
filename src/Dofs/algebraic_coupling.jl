@@ -1,0 +1,507 @@
+# Coupling descriptors and local dof layouts for algebraic variables.
+
+########################
+# Local layout metadata #
+########################
+
+# Metadata for the augmented local layout of one descriptor on one SubDofHandler,
+# precomputed at descriptor construction and reused for every entity.
+# The coupled (test-range, trial-range) block pairs of a layout, split into blocks that
+# involve cell dofs and blocks between algebraic dofs only (the latter reference the same
+# global dofs for every entity and only need to be added to a sparsity pattern once).
+struct LocalLayoutInfo
+    names::Vector{Symbol}          # sdh field names followed by the descriptor's algebraic variables
+    ranges::Vector{UnitRange{Int}} # local dof range for each entry in `names`
+    n_cell_dofs::Int               # number of ordinary cell dofs (0 for AlgebraicCoupling)
+    n_total::Int                   # total number of local dofs
+    algebraic_indices::Vector{Int} # indices into the DofHandler's algebraic registries, in descriptor field order
+    cell_blocks::Vector{NTuple{2, UnitRange{Int}}}      # coupled blocks involving cell dofs
+    algebraic_blocks::Vector{NTuple{2, UnitRange{Int}}} # coupled blocks between algebraic dofs
+end
+
+# Collect the coupled block pairs declared by the field coupling matrix.
+function _coupled_blocks(
+        fields::Tuple{Vararg{Symbol}}, coupling::Matrix{Bool},
+        names::Vector{Symbol}, ranges::Vector{UnitRange{Int}}, n_cell_dofs::Int,
+    )
+    field_ranges = map(fields) do fname
+        i = findfirst(==(fname), names)
+        @assert i !== nothing # validated during descriptor construction
+        return ranges[i]
+    end
+    cell_blocks = NTuple{2, UnitRange{Int}}[]
+    algebraic_blocks = NTuple{2, UnitRange{Int}}[]
+    for (j, rj) in pairs(field_ranges), (i, ri) in pairs(field_ranges)
+        coupling[i, j] || continue
+        # Ranges after the cell dofs belong to algebraic variables
+        onlyalgebraic = first(ri) > n_cell_dofs && first(rj) > n_cell_dofs
+        push!(onlyalgebraic ? algebraic_blocks : cell_blocks, (ri, rj))
+    end
+    return cell_blocks, algebraic_blocks
+end
+
+# Build the layout metadata for one SubDofHandler (`sdh === nothing` for the algebraic-only
+# layout of an AlgebraicCoupling): all cell dofs in celldofs order followed by the active
+# dofs of the descriptor's algebraic variables.
+function _local_layout_info(
+        dh::DofHandler, sdh::Union{SubDofHandler, Nothing},
+        fields::Tuple{Vararg{Symbol}}, coupling::Matrix{Bool},
+    )
+    names = Symbol[]
+    ranges = UnitRange{Int}[]
+    n_cell_dofs = 0
+    if sdh !== nothing
+        n_cell_dofs = ndofs_per_cell(sdh)
+        for (i, fname) in pairs(sdh.field_names)
+            push!(names, fname)
+            push!(ranges, dof_range(sdh, i))
+        end
+    end
+    offset = n_cell_dofs
+    algebraic_indices = Int[]
+    for fname in fields
+        vidx = _find_algebraic_variable(dh, fname)
+        vidx === nothing && continue
+        push!(algebraic_indices, vidx)
+        n = n_algebraic_dofs(dh.algebraic_variables[vidx])
+        push!(names, fname)
+        push!(ranges, (offset + 1):(offset + n))
+        offset += n
+    end
+    n_total = offset
+    cell_blocks, algebraic_blocks = _coupled_blocks(fields, coupling, names, ranges, n_cell_dofs)
+    return LocalLayoutInfo(names, ranges, n_cell_dofs, n_total, algebraic_indices, cell_blocks, algebraic_blocks)
+end
+
+##############################
+# Descriptor validation      #
+##############################
+
+function _validate_coupling_fields(dh::DofHandler, fields)
+    isclosed(dh) || error("coupling descriptors require a closed DofHandler")
+    fields isa Union{Tuple, AbstractVector} || error("`fields` must be a tuple or vector of `Symbol`s, got $(repr(fields))")
+    isempty(fields) && error("`fields` must name at least one variable")
+    all(x -> x isa Symbol, fields) || error("`fields` must be a collection of `Symbol`s, got $(repr(fields))")
+    fields_t = Tuple(fields)
+    allunique(fields_t) || error("duplicate names in `fields = $(fields_t)`")
+    for name in fields_t
+        if _find_algebraic_variable(dh, name) === nothing && name ∉ getfieldnames(dh)
+            error("no spatial field or algebraic variable named :$name in the DofHandler (fields: $(getfieldnames(dh)), algebraic variables: $(dh.algebraic_names))")
+        end
+    end
+    return fields_t
+end
+
+# Normalize pair/tuple entries to a field coupling matrix.
+function _process_algebraic_coupling(dh::DofHandler, spec)
+    # A bare entry is accepted as a one-entry specification
+    if spec isa Pair || spec isa Tuple{Symbol, Symbol}
+        spec = (spec,)
+    end
+    if !(spec isa Union{Tuple, AbstractVector})
+        error("cannot interpret `algebraic_coupling = $(repr(spec))`: expected a collection of `:a => :b` pairs and/or `(:a, :b)` tuples")
+    end
+    isempty(spec) && error("`algebraic_coupling` must declare at least one coupling entry")
+    # Expand each entry to its directed (test, trial) pairs: `:a => :b` couples one way,
+    # `(:a, :b)` couples both ways.
+    directed = Tuple{Symbol, Symbol}[]
+    for entry in spec
+        if entry isa Pair{Symbol, Symbol}
+            push!(directed, (entry.first, entry.second))
+        elseif entry isa Tuple{Symbol, Symbol}
+            push!(directed, entry)
+            entry[1] == entry[2] || push!(directed, (entry[2], entry[1]))
+        else
+            error("cannot interpret the `algebraic_coupling` entry $(repr(entry)): expected a directional pair `:a => :b` (test `:a`, trial `:b`) or a symmetric tuple `(:a, :b)` (both directions)")
+        end
+    end
+    if !allunique(directed)
+        dup = directed[findfirst(i -> directed[i] in view(directed, 1:(i - 1)), eachindex(directed))]
+        error("`algebraic_coupling` declares the coupling (test :$(dup[1]), trial :$(dup[2])) more than once")
+    end
+    # The participating variables, in order of first appearance
+    names = Symbol[]
+    for (a, b) in directed
+        a in names || push!(names, a)
+        b in names || push!(names, b)
+    end
+    fields_t = _validate_coupling_fields(dh, Tuple(names))
+    for (a, b) in directed
+        if _find_algebraic_variable(dh, a) === nothing && _find_algebraic_variable(dh, b) === nothing
+            error(
+                "the `algebraic_coupling` entry (:$a, :$b) couples two spatial fields, but every entry must " *
+                    "involve at least one algebraic variable (entries between spatial fields on the same cell " *
+                    "are governed by the `coupling` keyword of `allocate_matrix`)"
+            )
+        end
+    end
+    coupling_mat = zeros(Bool, length(fields_t), length(fields_t))
+    for (a, b) in directed
+        coupling_mat[findfirst(==(a), fields_t), findfirst(==(b), fields_t)] = true
+    end
+    return fields_t, coupling_mat
+end
+
+# Verify that the descriptor's spatial fields exist on the SubDofHandler of `entity`.
+function _check_spatial_fields_on_sdh(dh::DofHandler, sdh::SubDofHandler, fields::Tuple{Vararg{Symbol}}, entity::String)
+    for name in fields
+        _find_algebraic_variable(dh, name) === nothing || continue
+        if name ∉ sdh.field_names
+            error("the field :$name does not exist on $entity (fields on the corresponding SubDofHandler: $(sdh.field_names))")
+        end
+    end
+    return
+end
+
+##########################
+# Coupling descriptors   #
+##########################
+
+"""
+    CellCoupling(dh::DofHandler, cells; algebraic_coupling)
+
+Structural descriptor for weak-form terms integrated over the cells in `cells`, coupling
+algebraic variables to spatial fields or other algebraic variables.
+
+`algebraic_coupling` accepts entries involving at least one algebraic variable:
+ - `:u => :σ̄` declares a directional coupling: test dofs of `:u` may couple to trial dofs
+   of `:σ̄`;
+ - `(:u, :σ̄)` declares both directions at once.
+
+See also [`FacetCoupling`](@ref) and [`AlgebraicCoupling`](@ref).
+"""
+struct CellCoupling{N, DH <: DofHandler} <: AbstractCoupling
+    dh::DH
+    cells::OrderedSet{Int}
+    fields::NTuple{N, Symbol}
+    coupling::Matrix{Bool}
+    layout_infos::Vector{Union{Nothing, LocalLayoutInfo}} # indexed by SubDofHandler index
+end
+
+function CellCoupling(dh::DofHandler, cells::IntegerCollection; algebraic_coupling)
+    fields_t, coupling_mat = _process_algebraic_coupling(dh, algebraic_coupling)
+    # Own a copy so later mutation of `cells` cannot invalidate the precomputed layouts
+    cellset = OrderedSet{Int}(cells)
+    ncells = getncells(get_grid(dh))
+    layout_infos = Vector{Union{Nothing, LocalLayoutInfo}}(nothing, length(dh.subdofhandlers))
+    for cellid in cellset
+        1 <= cellid <= ncells || error("cell index $cellid is out of bounds (the grid has $ncells cells)")
+        sdhidx = dh.cell_to_subdofhandler[cellid]
+        sdhidx == 0 && error("cell $cellid does not belong to any SubDofHandler")
+        layout_infos[sdhidx] === nothing || continue
+        sdh = dh.subdofhandlers[sdhidx]
+        _check_spatial_fields_on_sdh(dh, sdh, fields_t, "cell $cellid")
+        layout_infos[sdhidx] = _local_layout_info(dh, sdh, fields_t, coupling_mat)
+    end
+    return CellCoupling(dh, cellset, fields_t, coupling_mat, layout_infos)
+end
+
+"""
+    FacetCoupling(dh::DofHandler, facets; algebraic_coupling)
+
+Structural descriptor for weak-form terms integrated over the facets in `facets`
+(a set of `FacetIndex`). See [`CellCoupling`](@ref) for the keywords.
+
+The local layout contains all dofs of each adjacent cell, since facet terms may use cell
+gradients.
+"""
+struct FacetCoupling{N, DH <: DofHandler} <: AbstractCoupling
+    dh::DH
+    facets::OrderedSet{FacetIndex}
+    adjacent_cells::OrderedSet{Int} # unique cells adjacent to `facets`
+    fields::NTuple{N, Symbol}
+    coupling::Matrix{Bool}
+    layout_infos::Vector{Union{Nothing, LocalLayoutInfo}} # indexed by SubDofHandler index
+end
+
+function FacetCoupling(dh::DofHandler, facets::AbstractVecOrSet{FacetIndex}; algebraic_coupling)
+    fields_t, coupling_mat = _process_algebraic_coupling(dh, algebraic_coupling)
+    # The descriptor owns its entity set, see the CellCoupling constructor
+    facetset = OrderedSet{FacetIndex}(facets)
+    grid = get_grid(dh)
+    ncells = getncells(grid)
+    layout_infos = Vector{Union{Nothing, LocalLayoutInfo}}(nothing, length(dh.subdofhandlers))
+    adjacent_cells = OrderedSet{Int}()
+    for (cellid, facetid) in facetset
+        1 <= cellid <= ncells || error("facet ($cellid, $facetid): cell index $cellid is out of bounds (the grid has $ncells cells)")
+        cell = getcells(grid, cellid)
+        1 <= facetid <= nfacets(cell) || error("facet ($cellid, $facetid): facet index $facetid is out of bounds for a cell with $(nfacets(cell)) facets")
+        sdhidx = dh.cell_to_subdofhandler[cellid]
+        sdhidx == 0 && error("facet ($cellid, $facetid): cell $cellid does not belong to any SubDofHandler")
+        push!(adjacent_cells, cellid)
+        layout_infos[sdhidx] === nothing || continue
+        sdh = dh.subdofhandlers[sdhidx]
+        _check_spatial_fields_on_sdh(dh, sdh, fields_t, "the cell of facet ($cellid, $facetid)")
+        layout_infos[sdhidx] = _local_layout_info(dh, sdh, fields_t, coupling_mat)
+    end
+    return FacetCoupling(dh, facetset, adjacent_cells, fields_t, coupling_mat, layout_infos)
+end
+
+"""
+    AlgebraicCoupling(dh::DofHandler; algebraic_coupling)
+
+Descriptor for terms involving only algebraic variables. See [`CellCoupling`](@ref) for
+the keywords. Since diagonal matrix entries are always allocated, this is only needed for
+off-diagonal entries.
+"""
+struct AlgebraicCoupling{N, DH <: DofHandler} <: AbstractCoupling
+    dh::DH
+    fields::NTuple{N, Symbol}
+    coupling::Matrix{Bool}
+    layout_info::LocalLayoutInfo
+end
+
+function AlgebraicCoupling(dh::DofHandler; algebraic_coupling)
+    fields_t, coupling_mat = _process_algebraic_coupling(dh, algebraic_coupling)
+    for name in fields_t
+        if _find_algebraic_variable(dh, name) === nothing
+            error(":$name is a spatial field, but an AlgebraicCoupling can only couple algebraic variables; use a CellCoupling or FacetCoupling for terms involving spatial fields")
+        end
+    end
+    layout_info = _local_layout_info(dh, nothing, fields_t, coupling_mat)
+    return AlgebraicCoupling(dh, fields_t, coupling_mat, layout_info)
+end
+
+########################
+# Descriptor interface #
+########################
+
+"""
+    Ferrite.entities(coupling::Union{CellCoupling, FacetCoupling})
+
+Return a copy of the cell or facet set of `coupling`.
+"""
+entities(c::CellCoupling) = copy(c.cells)
+entities(c::FacetCoupling) = copy(c.facets)
+
+"""
+    Ferrite.fields(coupling::Ferrite.AbstractCoupling)
+
+Return the variable names participating in `coupling`.
+"""
+fields(c::AbstractCoupling) = c.fields
+
+function _show_coupling(io::IO, c::AbstractCoupling, name::String, entity_str::Union{String, Nothing})
+    println(io, name, ":")
+    println(io, "  Fields: ", join(map(repr, c.fields), ", "))
+    entity_str === nothing || println(io, "  Entities: ", entity_str)
+    print(io, "  Coupling matrix: ", size(c.coupling, 1), "×", size(c.coupling, 2))
+    return
+end
+
+function Base.show(io::IO, ::MIME"text/plain", c::CellCoupling)
+    return _show_coupling(io, c, "CellCoupling", string(length(c.cells), " cells"))
+end
+function Base.show(io::IO, ::MIME"text/plain", c::FacetCoupling)
+    return _show_coupling(io, c, "FacetCoupling", string(length(c.facets), " facets (", length(c.adjacent_cells), " adjacent cells)"))
+end
+function Base.show(io::IO, ::MIME"text/plain", c::AlgebraicCoupling)
+    return _show_coupling(io, c, "AlgebraicCoupling", nothing)
+end
+
+# Normalize the `algebraic_couplings` keyword (a single descriptor, a named tuple, or any
+# other iterable) to an iterable of descriptors; the caller validates the elements.
+_iterate_algebraic_couplings(c::AbstractCoupling) = (c,)
+_iterate_algebraic_couplings(cs::NamedTuple) = values(cs)
+function _iterate_algebraic_couplings(cs)
+    if !applicable(Base.iterate, cs)
+        error("cannot interpret `algebraic_couplings = $(repr(cs))`: expected coupling descriptors (`CellCoupling`, `FacetCoupling`, `AlgebraicCoupling`) or an iterable of them")
+    end
+    return cs
+end
+
+##################
+# LocalDofLayout #
+##################
+
+"""
+    LocalDofLayout
+
+Read-only vector of global dof indices for the augmented local system of one coupling
+descriptor. It contains the cell dofs followed by the descriptor's algebraic dofs and can
+be passed to [`assemble!`](@ref) or [`apply_assemble!`](@ref). Construct it once with
+`LocalDofLayout()` and update it with [`local_dofs!`](@ref).
+"""
+mutable struct LocalDofLayout <: AbstractVector{Int}
+    const dofs::Vector{Int}
+    # `names`/`ranges` alias the descriptor's layout metadata and must not be mutated
+    names::Vector{Symbol}
+    ranges::Vector{UnitRange{Int}}
+end
+
+LocalDofLayout() = LocalDofLayout(Int[], Symbol[], UnitRange{Int}[])
+
+Base.size(l::LocalDofLayout) = size(l.dofs)
+Base.IndexStyle(::Type{LocalDofLayout}) = IndexLinear()
+Base.@propagate_inbounds Base.getindex(l::LocalDofLayout, i::Int) = l.dofs[i]
+
+"""
+    dof_range(layout::LocalDofLayout, name::Symbol)
+
+Return the local dof range of `name` in `layout`.
+"""
+function dof_range(l::LocalDofLayout, name::Symbol)
+    i = findfirst(==(name), l.names)
+    if i === nothing
+        error("no field or algebraic variable named :$name in this layout (available: $(l.names))")
+    end
+    return l.ranges[i]
+end
+
+# Resolve the owning DofHandler of a cache created from a DofHandler or SubDofHandler.
+function _owning_dof_handler(cc::CellCache)
+    dh = cc.dh
+    dh === nothing && error("`local_dofs!` requires a cache created from a DofHandler, not from a Grid")
+    return dh isa SubDofHandler ? dh.dh : dh
+end
+
+function _update_local_dofs!(layout::LocalDofLayout, dh::DofHandler, cell_dofs::AbstractVector{Int}, info::LocalLayoutInfo)
+    if length(cell_dofs) != info.n_cell_dofs
+        error("expected $(info.n_cell_dofs) cell dofs but the cache holds $(length(cell_dofs)) (was the cache created with `UpdateFlags(dofs = true)`?)")
+    end
+    # Copy the cell dofs: the iterator's scratch storage is overwritten when it advances
+    dofs = layout.dofs
+    resize!(dofs, info.n_total)
+    copyto!(dofs, 1, cell_dofs, 1, info.n_cell_dofs)
+    k = info.n_cell_dofs
+    for vidx in info.algebraic_indices
+        for d in dh.algebraic_dofs[vidx]
+            k += 1
+            dofs[k] = d
+        end
+    end
+    @assert k == info.n_total
+    layout.names = info.names
+    layout.ranges = info.ranges
+    return layout
+end
+
+"""
+    local_dofs!(layout::LocalDofLayout, cell::CellCache, coupling::CellCoupling)
+    local_dofs!(layout::LocalDofLayout, facet::FacetCache, coupling::FacetCoupling)
+    local_dofs!(layout::LocalDofLayout, coupling::AlgebraicCoupling)
+
+Update `layout` with the augmented local dofs of `coupling` and return it. Construct one
+layout outside the assembly loop and reuse it for each entity.
+"""
+function local_dofs!(layout::LocalDofLayout, cc::CellCache, c::CellCoupling)
+    if _owning_dof_handler(cc) !== c.dh
+        error("the cell cache and the coupling descriptor belong to different DofHandlers")
+    end
+    cid = cellid(cc)
+    if cid ∉ c.cells
+        error("cell $cid is not in the cell set of this CellCoupling")
+    end
+    info = c.layout_infos[c.dh.cell_to_subdofhandler[cid]]::LocalLayoutInfo
+    return _update_local_dofs!(layout, c.dh, celldofs(cc), info)
+end
+
+function local_dofs!(layout::LocalDofLayout, fc::FacetCache, c::FacetCoupling)
+    if _owning_dof_handler(fc.cc) !== c.dh
+        error("the facet cache and the coupling descriptor belong to different DofHandlers")
+    end
+    facet = FacetIndex(cellid(fc), fc.current_facet_id)
+    if facet ∉ c.facets
+        error("facet $(facet.idx) is not in the facet set of this FacetCoupling")
+    end
+    info = c.layout_infos[c.dh.cell_to_subdofhandler[cellid(fc)]]::LocalLayoutInfo
+    return _update_local_dofs!(layout, c.dh, celldofs(fc), info)
+end
+
+function local_dofs!(layout::LocalDofLayout, c::AlgebraicCoupling)
+    return _update_local_dofs!(layout, c.dh, Int[], c.layout_info)
+end
+
+##################################
+# Sparsity pattern contributions #
+##################################
+
+"""
+    add_coupling_entries!(
+        sp::AbstractSparsityPattern, coupling::Ferrite.AbstractCoupling,
+        ch::Union{ConstraintHandler, Nothing} = nothing;
+        keep_constrained::Bool = true,
+    )
+
+Add the entries declared by `coupling` to `sp`. Usually descriptors are passed through the
+`algebraic_couplings` keyword of [`allocate_matrix`](@ref) or
+[`add_sparsity_entries!`](@ref) instead.
+
+# Keyword arguments
+ - `keep_constrained`: whether or not entries for constrained DoFs should be kept
+   (`keep_constrained = true`) or eliminated (`keep_constrained = false`) from the
+   sparsity pattern. `keep_constrained = false` requires passing the ConstraintHandler
+   `ch`.
+"""
+function add_coupling_entries!(
+        sp::AbstractSparsityPattern, coupling::AbstractCoupling,
+        ch::Union{ConstraintHandler, Nothing} = nothing;
+        keep_constrained::Bool = true,
+    )
+    dh = coupling.dh
+    if getnrows(sp) < ndofs(dh) || getncols(sp) < ndofs(dh)
+        error("number of rows ($(getnrows(sp))) or columns ($(getncols(sp))) in the sparsity pattern is smaller than number of dofs ($(ndofs(dh)))")
+    end
+    if !keep_constrained
+        ch === nothing && error("must pass ConstraintHandler when `keep_constrained = false`")
+        isclosed(ch) || error("the ConstraintHandler must be closed")
+        ch.dh === dh || error("the DofHandler and the ConstraintHandler's DofHandler must be the same")
+    end
+    return _add_coupling_entries!(sp, coupling, ch, keep_constrained)
+end
+
+function _add_coupling_entries!(sp::AbstractSparsityPattern, c::AbstractCoupling, ch::Union{ConstraintHandler, Nothing}, keep_constrained::Bool)
+    if c isa AlgebraicCoupling
+        layout = local_dofs!(LocalDofLayout(), c)
+        _add_block_entries!(sp, layout, c.layout_info.algebraic_blocks, ch, keep_constrained)
+        return sp
+    end
+    # A facet term uses all dofs of the adjacent cell, so it suffices to visit each
+    # adjacent cell once.
+    cells = c isa FacetCoupling ? c.adjacent_cells : c.cells
+    return _add_cell_coupling_entries!(sp, c.dh, cells, c.layout_infos, ch, keep_constrained)
+end
+
+function _add_cell_coupling_entries!(
+        sp::AbstractSparsityPattern, dh::DofHandler, cells::OrderedSet{Int},
+        layout_infos::Vector{Union{Nothing, LocalLayoutInfo}},
+        ch::Union{ConstraintHandler, Nothing}, keep_constrained::Bool,
+    )
+    isempty(cells) && return sp
+    cc = CellCache(dh, UpdateFlags(nodes = false, coords = false, dofs = true))
+    layout = LocalDofLayout()
+    firstcell = true
+    for cellid in cells
+        reinit!(cc, cellid)
+        info = layout_infos[dh.cell_to_subdofhandler[cellid]]::LocalLayoutInfo
+        _update_local_dofs!(layout, dh, celldofs(cc), info)
+        _add_block_entries!(sp, layout, info.cell_blocks, ch, keep_constrained)
+        if firstcell
+            # The algebraic-only blocks reference the same global dofs for every cell, so
+            # adding them for one cell suffices
+            _add_block_entries!(sp, layout, info.algebraic_blocks, ch, keep_constrained)
+            firstcell = false
+        end
+    end
+    return sp
+end
+
+# Add the entries of the given (test-range, trial-range) blocks of `dofs` to `sp`.
+function _add_block_entries!(
+        sp::AbstractSparsityPattern, dofs::AbstractVector{Int},
+        blocks::Vector{NTuple{2, UnitRange{Int}}},
+        ch::Union{ConstraintHandler, Nothing}, keep_constrained::Bool,
+    )
+    for (ri, rj) in blocks
+        for i in ri
+            row = dofs[i]
+            !keep_constrained && haskey(ch.dofmapping, row) && continue
+            for j in rj
+                col = dofs[j]
+                !keep_constrained && haskey(ch.dofmapping, col) && continue
+                add_entry!(sp, row, col)
+            end
+        end
+    end
+    return
+end

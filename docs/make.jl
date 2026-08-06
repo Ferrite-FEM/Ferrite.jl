@@ -84,6 +84,7 @@ codeblocks_plugin = CodeBlocks(
             "topics/reference_shapes.md",
             "topics/FEValues.md",
             "topics/degrees_of_freedom.md",
+            "topics/algebraic_variables.md",
             "topics/sparse_matrix.md",
             "topics/assembly.md",
             "topics/boundary_conditions.md",
