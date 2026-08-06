@@ -107,6 +107,7 @@ bibtex_plugin = CitationBibliography(
             "How-to guide overview" => "howto/index.md",
             "howto/postprocessing.md",
             "howto/threaded_assembly.md",
+            "howto/gpu_assembly.md",
         ],
         "Code gallery" => [
             "Code gallery overview" => "gallery/index.md",
@@ -126,9 +127,11 @@ bibtex_plugin = CitationBibliography(
     ]
 )
 
-# make sure there are no *.vtu files left around from the build
+# Make sure there are no generated VTK files left around from the build.
 @timeit dto "remove vtk files" cd(joinpath(@__DIR__, "build", "tutorials")) do
-    foreach(file -> endswith(file, ".vtu") && rm(file), readdir())
+    foreach(readdir()) do file
+        any(ext -> endswith(file, ext), (".vtu", ".pvd", ".vtkhdf")) && rm(file)
+    end
 end
 
 # Insert some <br> in the side menu
@@ -141,9 +144,13 @@ for (root, _, files) in walkdir(joinpath(@__DIR__, "build")), file in joinpath.(
     write(file, str)
 end
 
+# Pull requests from dependabot come from a branch on the correct repository so Documenter
+# thinks it can publish previews but the PR doesn't have access to the SSH key
+const dependabot = get(ENV, "GITHUB_EVENT_NAME", "") == "pull_request" &&
+    startswith(get(ENV, "GITHUB_HEAD_REF", ""), "dependabot/")
 
 # Deploy built documentation
-if !liveserver
+if !(liveserver || dependabot)
     @timeit dto "deploydocs" deploydocs(
         repo = "github.com/Ferrite-FEM/Ferrite.jl.git",
         push_preview = true,

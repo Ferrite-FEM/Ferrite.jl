@@ -11,7 +11,7 @@ by the associated reference element.
 Ferrite.get_node_ids
 ```
 
-### Common utilities and definitions when working with grids internally.
+### Common utilities and definitions when working with grids internally
 
 First we have some topological queries on the element
 

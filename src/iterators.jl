@@ -32,24 +32,24 @@ cell. The cache is updated for a new cell by calling `reinit!(cache, cellid)` wh
 
 See also [`CellIterator`](@ref).
 """
-mutable struct CellCache{X, G <: AbstractGrid, DH <: Union{AbstractDofHandler, Nothing}}
-    const flags::UpdateFlags
-    const grid::G
+struct CellCache{X, G <: AbstractGrid, DH <: Union{AbstractDofHandler, Nothing}, CID <: AbstractArray, NID <: AbstractArray, DID <: AbstractArray, TX <: AbstractArray{X}}
+    flags::UpdateFlags
+    grid::G
     # Pretty useless to store this since you have it already for the reinit! call, but
     # needed for the CellIterator(...) workflow since the user doesn't necessarily control
     # the loop order in the cell subset.
-    cellid::Int
-    const nodes::Vector{Int}
-    const coords::Vector{X}
-    const dh::DH
-    const dofs::Vector{Int}
+    cellid::CID
+    nodes::NID
+    coords::TX
+    dh::DH
+    dofs::DID
 end
 
 function CellCache(grid::Grid{dim, C, T}, flags::UpdateFlags = UpdateFlags()) where {dim, C, T}
     N = nnodes_per_cell(grid, 1) # nodes and coords will be resized in `reinit!`
     nodes = zeros(Int, N)
     coords = zeros(Vec{dim, T}, N)
-    return CellCache(flags, grid, -1, nodes, coords, nothing, Int[])
+    return CellCache(flags, grid, [-1], nodes, coords, nothing, Int[])
 end
 
 function CellCache(dh::DofHandler{dim}, flags::UpdateFlags = UpdateFlags()) where {dim}
@@ -58,26 +58,29 @@ function CellCache(dh::DofHandler{dim}, flags::UpdateFlags = UpdateFlags()) wher
     nodes = zeros(Int, N)
     coords = zeros(Vec{dim, get_coordinate_eltype(get_grid(dh))}, N)
     celldofs = zeros(Int, n)
-    return CellCache(flags, get_grid(dh), -1, nodes, coords, dh, celldofs)
+    return CellCache(flags, get_grid(dh), [-1], nodes, coords, dh, celldofs)
 end
 
 function CellCache(sdh::SubDofHandler, flags::UpdateFlags = UpdateFlags())
     Tv = get_coordinate_type(sdh.dh.grid)
-    return CellCache(flags, sdh.dh.grid, -1, Int[], Tv[], sdh, Int[])
+    return CellCache(flags, sdh.dh.grid, [-1], Int[], Tv[], sdh, Int[])
 end
 
-function reinit!(cc::CellCache, i::Int)
-    cc.cellid = i
+_isresizable(::AbstractArray) = false
+_isresizable(::Vector) = true
+_isresizable(::SubArray) = false
+function reinit!(cc::CellCache, i::Integer)
+    cc.cellid[1] = i
     if cc.flags.nodes
-        resize!(cc.nodes, nnodes_per_cell(cc.grid, i))
+        _isresizable(cc.nodes) && resize!(cc.nodes, nnodes_per_cell(cc.grid, i))
         cellnodes!(cc.nodes, cc.grid, i)
     end
     if cc.flags.coords
-        resize!(cc.coords, nnodes_per_cell(cc.grid, i))
+        _isresizable(cc.coords) && resize!(cc.coords, nnodes_per_cell(cc.grid, i))
         getcoordinates!(cc.coords, cc.grid, i)
     end
     if cc.dh !== nothing && cc.flags.dofs
-        resize!(cc.dofs, ndofs_per_cell(cc.dh, i))
+        _isresizable(cc.dofs) && resize!(cc.dofs, ndofs_per_cell(cc.dh, i))
         celldofs!(cc.dofs, cc.dh, i)
     end
     return cc
@@ -88,7 +91,7 @@ function reinit!(cv::AbstractCellValues, cc::CellCache)
     cell = reinit_needs_cell(cv) ? getcells(cc.grid, cellid(cc)) : nothing
     return reinit!(cv, cell, cc.coords)
 end
-function reinit!(fv::FacetValues, cc::CellCache, f::Int)
+function reinit!(fv::FacetValues, cc::CellCache, f::Integer)
     cell = reinit_needs_cell(fv) ? getcells(cc.grid, cellid(cc)) : nothing
     return reinit!(fv, cell, cc.coords, f)
 end
@@ -97,10 +100,10 @@ end
 getnodes(cc::CellCache) = cc.nodes
 getcoordinates(cc::CellCache) = cc.coords
 celldofs(cc::CellCache) = cc.dofs
-cellid(cc::CellCache) = cc.cellid
+cellid(cc::CellCache) = only(cc.cellid)
 
 # TODO: These should really be replaced with something better...
-nfacets(cc::CellCache) = nfacets(getcells(cc.grid, cc.cellid))
+nfacets(cc::CellCache) = nfacets(getcells(cc.grid, cellid(cc)))
 
 
 """

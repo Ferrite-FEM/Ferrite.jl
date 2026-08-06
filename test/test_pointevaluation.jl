@@ -377,9 +377,16 @@ function test_pe_mixed_grid()
     @test_logs min_level = Logging.Warn PointEvalHandler(mesh, points)
     ph = PointEvalHandler(mesh, points)
     @test all(x -> x !== nothing, ph.cells)
-    vals = evaluate_at_points(ph, projector, projector_values)
+    # points 6:10 are assigned to cells where the projected field is not defined
+    vals = @test_logs (:warn,) evaluate_at_points(ph, projector, projector_values)
     @test vals[1:5] ≈ f.(points[1:5])
     @test all(isnan, vals[6:end])
+
+    # restricting the search to the projected subdomain
+    ph = PointEvalHandler(mesh, points[1:5]; cellset = getcellset(mesh, "quads"))
+    @test all(x -> x !== nothing, ph.cells)
+    vals = @test_logs min_level = Logging.Warn evaluate_at_points(ph, projector, projector_values)
+    @test vals ≈ f.(points[1:5])
 
     # second alternative: assume a vector field :v
     dh = DofHandler(mesh)
@@ -396,6 +403,14 @@ function test_pe_mixed_grid()
     @test all(x -> x !== nothing, ph.cells)
     vals = evaluate_at_points(ph, dh, dof_vals, :v)
     @test vals ≈ [Vec((i, i)) for i in 1.0:6.0]
+
+    # PointIterator with cells of different celltypes (and different number of nodes)
+    for (pointid, point) in enumerate(PointIterator(ph))
+        point === nothing && continue
+        cid = cellid(point)
+        @test cid == ph.cells[pointid]
+        @test point.coords ≈ getcoordinates(mesh, cid)
+    end
     return
 end
 
@@ -452,6 +467,133 @@ function test_pe_first_point_missing()
     return
 end
 
+function test_pe_pointiterator_collect()
+    mesh = generate_grid(Quadrilateral, (2, 2))
+    ph = PointEvalHandler(mesh, [Vec(0.1, 0.1), Vec(2.0, 0.0), Vec(-0.5, 0.5)]; warn = false)
+    it = PointIterator(ph)
+    @test length(it) == 3
+    collected = collect(it)
+    @test length(collected) == 3
+    @test collected[2] === nothing
+    @test cellid(collected[1]) == ph.cells[1]
+    return
+end
+
+function test_pe_tiny_grid()
+    # Fewer nodes in the grid than requested nearest neighbors
+    mesh = generate_grid(Line, (1,))
+    ph = PointEvalHandler(mesh, [Vec((0.5,))])
+    @test ph.cells == [1]
+    @test ph.local_coords[1] ≈ Vec((0.5,))
+    return
+end
+
+function test_pe_scalar_type_promotion()
+    f(x) = x[1] + 2x[2]
+    # Float32 points on a Float64 grid
+    grid = generate_grid(Quadrilateral, (2, 2))
+    dh = DofHandler(grid)
+    add!(dh, :s, Lagrange{RefQuadrilateral, 1}())
+    close!(dh)
+    u = zeros(ndofs(dh))
+    apply_analytical!(u, dh, :s, f)
+    points32 = [Vec(0.1f0, 0.2f0), Vec(-0.5f0, 0.5f0)]
+    ph = PointEvalHandler(grid, points32)
+    @test all(x -> x !== nothing, ph.cells)
+    @test evaluate_at_points(ph, dh, u, :s) ≈ f.(points32)
+
+    # Float64 points on a Float32 grid
+    grid = generate_grid(Quadrilateral, (2, 2), Vec(-1.0f0, -1.0f0), Vec(1.0f0, 1.0f0))
+    dh = DofHandler(grid)
+    add!(dh, :s, Lagrange{RefQuadrilateral, 1}())
+    close!(dh)
+    u = zeros(Float32, ndofs(dh))
+    apply_analytical!(u, dh, :s, f)
+    points64 = [Vec(0.1, 0.2), Vec(-0.5, 0.5)]
+    ph = PointEvalHandler(grid, points64)
+    @test all(x -> x !== nothing, ph.cells)
+    @test evaluate_at_points(ph, dh, u, :s) ≈ f.(points64) rtol = √(eps(Float32))
+    return
+end
+
+function test_pe_inverted_cell()
+    # Cell with clockwise node numbering, i.e. det(J) < 0 everywhere
+    nodes = Node.(Vec{2, Float64}.([(0.0, 0.0), (0.0, 1.0), (1.0, 1.0), (1.0, 0.0)]))
+    grid = Grid([Quadrilateral((1, 2, 3, 4))], nodes)
+    # The first point converges in the first Newton iteration (early convergence check),
+    # the second point needs a Newton step (late convergence check)
+    for point in (Vec((0.5, 0.5)), Vec((0.6, 0.5)))
+        ph = @test_logs (:warn, r"det\(J\) negative") (:warn, r"No cell found") PointEvalHandler(grid, [point])
+        @test ph.cells[1] === nothing
+    end
+    return
+end
+
+function test_pe_embedded_line()
+    # Line cells embedded in 2D: the local coordinates have lower dimension than the
+    # spatial coordinates
+    nodes = Node.(Vec{2, Float64}.([(0.0, 0.0), (1.0, 1.0), (2.0, 2.0)]))
+    grid = Grid([Line((1, 2)), Line((2, 3))], nodes)
+    points = [Vec((0.5, 0.5)), Vec((1.5, 1.5))]
+    ph = PointEvalHandler(grid, points)
+    @test ph.cells == [1, 2]
+
+    ip = Lagrange{RefLine, 1}()
+    pv = PointValues(Float64, ip, ip^2)
+    f(x) = x[1] + 2x[2]
+    ue = zeros(2)
+    for (pointid, point) in enumerate(PointIterator(ph))
+        @test cellid(point) == ph.cells[pointid]
+        reinit!(pv, point)
+        for i in 1:2
+            ue[i] = f(point.coords[i]) # nodal values of f
+        end
+        @test function_value(pv, 1, ue) ≈ f(points[pointid])
+    end
+    return
+end
+
+function test_pe_show()
+    mesh = generate_grid(Quadrilateral, (2, 2))
+    ph = PointEvalHandler(mesh, [Vec(0.0, 0.0), Vec(2.0, 0.0)]; warn = false)
+    str = sprint(show, MIME"text/plain"(), ph)
+    @test occursin("number of points: 2", str)
+    @test occursin("Could not find corresponding cell for 1 points.", str)
+
+    # No points
+    ph = PointEvalHandler(mesh, Vec{2, Float64}[])
+    str = sprint(show, MIME"text/plain"(), ph)
+    @test occursin("number of points: 0", str)
+    @test occursin("Found corresponding cell for all points.", str)
+    return
+end
+
+function test_pe_prism_pyramid()
+    f(x) = x[1] + 2x[2] - 3x[3]
+    for (CT, ip) in ((Wedge, Lagrange{RefPrism, 1}()), (Pyramid, Lagrange{RefPyramid, 1}()))
+        grid = generate_grid(CT, (2, 2, 2)) # covers [-1, 1]^3
+        dh = DofHandler(grid)
+        add!(dh, :s, ip)
+        close!(dh)
+        u = zeros(ndofs(dh))
+        apply_analytical!(u, dh, :s, f)
+
+        points = [Vec((0.12, -0.34, 0.56)), Vec((-1.0, -1.0, -1.0)), Vec((0.5, 0.5, 0.5))]
+        ph = PointEvalHandler(grid, points)
+        @test all(x -> x !== nothing, ph.cells)
+        @test evaluate_at_points(ph, dh, u, :s) ≈ f.(points)
+
+        # Extrapolation from prism/pyramid cells
+        outside_points = [Vec((1.02, 0.3, 0.3)), Vec((-0.2, -1.03, 0.4))]
+        ph = PointEvalHandler(grid, outside_points; warn = false)
+        @test all(isnothing, ph.cells)
+        ph = PointEvalHandler(grid, outside_points; extrapolation_tolerance = 0.2)
+        @test all(x -> x !== nothing, ph.cells)
+        @test evaluate_at_points(ph, dh, u, :s) ≈ f.(outside_points)
+    end
+    return
+end
+
 function test_pe_mapped_interpolations()
     cell = Triangle((1, 2, 3))
     coords = Vec{2, Float64}.([(0.0, 0.0), (2.0, 0.5), (0.5, 2.0)])
@@ -474,6 +616,151 @@ function test_pe_mapped_interpolations()
             @test function_gradient(pv, u) ≈ function_gradient(cv, qp, u)
         end
     end
+    return
+end
+
+function test_pe_extrapolation()
+    f(x) = x[1] + 2x[2]
+
+    # Quadrilaterals
+    mesh = generate_grid(Quadrilateral, (2, 2)) # covers [-1, 1] x [-1, 1]
+    @test_throws ArgumentError PointEvalHandler(mesh, [Vec((0.0, 0.0))]; extrapolation_tolerance = -0.1)
+    @test_throws ArgumentError PointEvalHandler(mesh, [Vec((0.0, 0.0))]; extrapolation_tolerance = NaN)
+    dh = DofHandler(mesh)
+    add!(dh, :s, Lagrange{RefQuadrilateral, 1}())
+    close!(dh)
+    u = zeros(ndofs(dh))
+    apply_analytical!(u, dh, :s, f)
+
+    points = [Vec((1.04, 0.5)), Vec((-1.02, -1.03)), Vec((0.0, 1.001))]
+
+    # Without extrapolation the points are not assigned to cells
+    ph = @test_logs (:warn,) (:warn,) (:warn,) PointEvalHandler(mesh, points)
+    @test all(isnothing, ph.cells)
+    @test all(isnan, evaluate_at_points(ph, dh, u, :s))
+
+    # With extrapolation the points are assigned to the closest cells and the values
+    # extrapolated (exactly, since f is linear)
+    @test_logs min_level = Logging.Warn PointEvalHandler(mesh, points; extrapolation_tolerance = 0.2)
+    ph = PointEvalHandler(mesh, points; extrapolation_tolerance = 0.2)
+    @test all(!isnothing, ph.cells)
+    @test evaluate_at_points(ph, dh, u, :s) ≈ f.(points)
+
+    # Points further outside than the tolerance are still not assigned
+    ph = PointEvalHandler(mesh, [Vec((1.5, 0.5))]; extrapolation_tolerance = 0.2, warn = false)
+    @test isnothing(ph.cells[1])
+
+    # Cells containing a point are preferred over extrapolation candidates
+    inside_point = [Vec((0.1, 0.1))]
+    ph_ref = PointEvalHandler(mesh, inside_point)
+    ph = PointEvalHandler(mesh, inside_point; extrapolation_tolerance = 2.0)
+    @test ph.cells[1] == ph_ref.cells[1]
+    @test Ferrite.boundary_violation(RefQuadrilateral, ph.local_coords[1]) ≤ 1.0e-5
+
+    # Triangles
+    mesh = generate_grid(Triangle, (2, 2))
+    dh = DofHandler(mesh)
+    add!(dh, :s, Lagrange{RefTriangle, 1}())
+    close!(dh)
+    u = zeros(ndofs(dh))
+    apply_analytical!(u, dh, :s, f)
+
+    points = [Vec((1.04, 0.5)), Vec((-0.5, -1.03))]
+    ph = PointEvalHandler(mesh, points; warn = false)
+    @test all(isnothing, ph.cells)
+    ph = PointEvalHandler(mesh, points; extrapolation_tolerance = 0.2)
+    @test all(!isnothing, ph.cells)
+    @test evaluate_at_points(ph, dh, u, :s) ≈ f.(points)
+    return
+end
+
+function test_pe_extrapolation_mixed_grid()
+    # Cells containing the point must be preferred over extrapolation candidates also
+    # when the candidates are of a different celltype
+    nodes = Node.(Vec{2, Float64}.([(0.0, 0.0), (1.0, 0.0), (0.0, 1.0), (1.0, 1.0), (0.0, 2.0), (1.0, 2.0)]))
+    cells = Ferrite.AbstractCell[
+        Quadrilateral((1, 2, 4, 3)),
+        Triangle((3, 4, 6)),
+        Triangle((3, 6, 5)),
+    ]
+    mesh = Grid(cells, nodes)
+    # First point inside triangle 2 (close to quad 1), second point inside quad 1
+    # (close to triangle 2); both are within the extrapolation tolerance of the other cell
+    points = [Vec((0.5, 1.05)), Vec((0.5, 0.95))]
+    ph = PointEvalHandler(mesh, points; extrapolation_tolerance = 1.0)
+    @test ph.cells == [2, 1]
+    return
+end
+
+function test_pe_true_subdomain()
+    # MWE from issue #1181: field defined on two triangles only
+    grid = generate_grid(Triangle, (4, 4), Vec((-2.0, -2.0)), Vec((2.0, 2.0)))
+    addcellset!(grid, "hole", x -> norm(x) ≤ 1.0)
+    subdomain = getcellset(grid, "hole")
+    dh = DofHandler(grid)
+    sdh = SubDofHandler(dh, subdomain)
+    add!(sdh, :v, Lagrange{RefTriangle, 1}())
+    close!(dh)
+    f(x) = x[1] + 2x[2]
+    u = zeros(ndofs(dh))
+    apply_analytical!(u, dh, :v, f)
+
+    # Nodes on the subdomain boundary
+    points = Vec{2, Float64}.([[0.0, -1.0], [0.0, 0.0], [-1.0, 0.0], [1.0, 0.0], [0.0, 1.0]])
+
+    # Full-grid search assigns some points to cells where :v is not defined
+    ph = PointEvalHandler(grid, points)
+    vals = @test_logs (:warn,) evaluate_at_points(ph, dh, u)
+    @test any(isnan, vals)
+
+    # Restricting the search to the subdomain assigns all points correctly
+    ph = PointEvalHandler(grid, points; cellset = subdomain)
+    @test all(x -> x !== nothing, ph.cells)
+    @test all(in(subdomain), ph.cells)
+    vals = @test_logs min_level = Logging.Warn evaluate_at_points(ph, dh, u)
+    @test vals ≈ f.(points)
+
+    # Points slightly outside the subdomain extrapolate from subdomain cells
+    outside_points = [Vec((1.02, 0.0)), Vec((0.0, -1.03))]
+    ph = PointEvalHandler(grid, outside_points; cellset = subdomain, extrapolation_tolerance = 0.2)
+    @test all(in(subdomain), ph.cells)
+    vals = @test_logs min_level = Logging.Warn evaluate_at_points(ph, dh, u)
+    @test vals ≈ f.(outside_points)
+    return
+end
+
+function test_pe_cellset_search()
+    # Cellset cell coarser than the excluded neighboring cells: all nearest nodes of the
+    # points belong to excluded cells only, so the search must be based on the nodes of
+    # the cellset cells
+    nodes = Node.(Vec{2, Float64}.([(0.0, 0.0), (1.0, 0.0), (1.0, 1.0), (0.0, 1.0)]))
+    tiny_x = [0.4, 0.45, 0.5, 0.55, 0.6]
+    append!(nodes, Node.([Vec((x, 0.0)) for x in tiny_x]))  # nodes 5:9
+    append!(nodes, Node.([Vec((x, -0.1)) for x in tiny_x])) # nodes 10:14
+    cells = [Quadrilateral((1, 2, 3, 4)); [Quadrilateral((9 + i, 10 + i, 5 + i, 4 + i)) for i in 1:4]]
+    grid = Grid(cells, nodes)
+
+    points = [Vec((0.5, 0.01)), Vec((0.5, -0.01))] # inside / slightly below cell 1
+    ph = PointEvalHandler(grid, points; cellset = [1], extrapolation_tolerance = 0.1)
+    @test ph.cells == [1, 1]
+
+    # Empty cellset assigns no cells
+    ph = PointEvalHandler(grid, points; cellset = Int[], warn = false)
+    @test all(isnothing, ph.cells)
+
+    # Discontinuous field: the cellset selects which side of the interface to evaluate
+    grid = generate_grid(Quadrilateral, (2, 1)) # interface between cells 1 and 2 at x = 0
+    dh = DofHandler(grid)
+    add!(dh, :u, DiscontinuousLagrange{RefQuadrilateral, 1}())
+    close!(dh)
+    u = zeros(ndofs(dh))
+    u[celldofs(dh, 1)] .= -1.0
+    u[celldofs(dh, 2)] .= 1.0
+    interface_point = [Vec((0.0, 0.0))]
+    ph_left = PointEvalHandler(grid, interface_point; cellset = [1])
+    ph_right = PointEvalHandler(grid, interface_point; cellset = [2])
+    @test evaluate_at_points(ph_left, dh, u, :u) ≈ [-1.0]
+    @test evaluate_at_points(ph_right, dh, u, :u) ≈ [1.0]
     return
 end
 
@@ -511,6 +798,47 @@ end
 
     @testset "failure cases" begin
         test_pe_first_point_missing()
+    end
+
+    @testset "tiny grid" begin
+        test_pe_tiny_grid()
+    end
+
+    @testset "scalar type promotion" begin
+        test_pe_scalar_type_promotion()
+    end
+
+    @testset "inverted cell" begin
+        test_pe_inverted_cell()
+    end
+
+    @testset "embedded cells" begin
+        test_pe_embedded_line()
+    end
+
+    @testset "PointIterator collect" begin
+        test_pe_pointiterator_collect()
+    end
+
+    @testset "show" begin
+        test_pe_show()
+    end
+
+    @testset "prism and pyramid cells" begin
+        test_pe_prism_pyramid()
+    end
+
+    @testset "extrapolation" begin
+        test_pe_extrapolation()
+        test_pe_extrapolation_mixed_grid()
+    end
+
+    @testset "true subdomain (issue #1181)" begin
+        test_pe_true_subdomain()
+    end
+
+    @testset "cellset restricted search" begin
+        test_pe_cellset_search()
     end
 
     @testset "mapped interpolations" begin

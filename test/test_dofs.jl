@@ -647,48 +647,64 @@ end
         end
         return false
     end
-    function _check_dofs(K, dh, sdh, cell_idx, coupling, coupling_idx, vdim, neighbors, is_cross_element)
+    ncopies(ip) = ip isa VectorizedInterpolation ? Ferrite.get_n_copies(ip) : 1
+    function _check_dofs(K, dh, sdh, cell_idx, coupling, interface_coupling, neighbors, is_cross_element, has_interface)
+        cooccur(i, j) = any(c -> i ∈ celldofs(dh, c) && j ∈ celldofs(dh, c), 1:getncells(dh.grid))
+        nfields = length(Ferrite.getfieldnames(dh))
+        # Index into the mask for (field, component): field-level masks (one row/col per
+        # field) are indexed by the field index, component-level masks by the component
+        # index. Note: this relies on the sdh field names being a prefix of the global
+        # field names, as noted for `check_coupling` below.
+        function mask_index(mask, sdh, field_idx, dim)
+            size(mask, 1) == nfields && return field_idx
+            return sum(Int[ncopies(sdh.field_interpolations[f]) for f in 1:(field_idx - 1)]) + dim
+        end
         for field1_idx in eachindex(sdh.field_names)
             i_dofs = dof_range(sdh, field1_idx)
-            ip1 = sdh.field_interpolations[field1_idx]
-            vdim[1] = typeof(ip1) <: VectorizedInterpolation && size(coupling)[1] == 4 ? Ferrite.get_n_copies(ip1) : 1
-            for dim1 in 1:vdim[1]
+            vdim1 = ncopies(sdh.field_interpolations[field1_idx])
+            for dim1 in 1:vdim1
                 for cell2_idx in neighbors
                     sdh2 = dh.subdofhandlers[dh.cell_to_subdofhandler[cell2_idx]]
-                    coupling_idx[2] = 1
                     for field2_idx in eachindex(sdh2.field_names)
                         j_dofs = dof_range(sdh2, field2_idx)
-                        ip2 = sdh2.field_interpolations[field2_idx]
-                        vdim[2] = typeof(ip2) <: VectorizedInterpolation && size(coupling)[1] == 4 ? Ferrite.get_n_copies(ip2) : 1
-                        for dim2 in 1:vdim[2]
-                            i_dofs_v = i_dofs[dim1:vdim[1]:end]
-                            j_dofs_v = j_dofs[dim2:vdim[2]:end]
+                        vdim2 = ncopies(sdh2.field_interpolations[field2_idx])
+                        for dim2 in 1:vdim2
+                            cc = coupling[mask_index(coupling, sdh, field1_idx, dim1), mask_index(coupling, sdh2, field2_idx, dim2)]
+                            icc = interface_coupling[mask_index(interface_coupling, sdh, field1_idx, dim1), mask_index(interface_coupling, sdh2, field2_idx, dim2)]
+                            i_dofs_v = i_dofs[dim1:vdim1:end]
+                            j_dofs_v = j_dofs[dim2:vdim2:end]
                             for i_idx in i_dofs_v, j_idx in j_dofs_v
                                 i = celldofs(dh, cell_idx)[i_idx]
                                 j = celldofs(dh, cell2_idx)[j_idx]
-                                is_cross_element && (i ∈ celldofs(dh, cell2_idx) || j ∈ celldofs(dh, cell_idx)) && continue
-                                @test is_stored(K, i, j) == coupling[coupling_idx...]
+                                if is_cross_element
+                                    # The interface pass adds every masked pair within
+                                    # the union of the two cells' dofs; pairs that (also)
+                                    # co-occur in a cell get entries from the cell pass.
+                                    expected = icc || (cc && cooccur(i, j))
+                                else
+                                    # Same-cell pairs: from the cell pass, or from the
+                                    # same-side blocks of the interface pass if the cell
+                                    # has at least one interior facet.
+                                    expected = cc || (icc && has_interface)
+                                end
+                                @test is_stored(K, i, j) == expected
                             end
-                            coupling_idx[2] += 1
                         end
                     end
                 end
-                coupling_idx[1] += 1
             end
         end
     end
     function check_coupling(dh, topology, K, coupling, interface_coupling)
         for cell_idx in eachindex(getcells(dh.grid))
             sdh = dh.subdofhandlers[dh.cell_to_subdofhandler[cell_idx]]
-            coupling_idx = [1, 1]
-            interface_coupling_idx = [1, 1]
-            vdim = [1, 1]
-            # test inner coupling
-            _check_dofs(K, dh, sdh, cell_idx, coupling, coupling_idx, vdim, [cell_idx], false)
-            # test cross-element coupling
-            neighborhood = Ferrite.get_facet_facet_neighborhood(topology, grid)
+            neighborhood = Ferrite.get_facet_facet_neighborhood(topology, dh.grid)
             neighbors = [neighborhood[cell_idx, i] for i in 1:size(neighborhood, 2)]
-            _check_dofs(K, dh, sdh, cell_idx, interface_coupling, interface_coupling_idx, vdim, [i[1][1] for i in neighbors[.!isempty.(neighbors)]], true)
+            has_interface = any(!isempty, neighbors)
+            # test inner coupling
+            _check_dofs(K, dh, sdh, cell_idx, coupling, interface_coupling, [cell_idx], false, has_interface)
+            # test cross-element coupling
+            _check_dofs(K, dh, sdh, cell_idx, coupling, interface_coupling, [i[1][1] for i in neighbors[.!isempty.(neighbors)]], true, has_interface)
         end
     end
     grid = generate_grid(Quadrilateral, (2, 2))
@@ -738,6 +754,99 @@ end
             for i in prows, j in pcols
                 @test is_stored(K, i, j)
             end
+        end
+    end
+
+    # Interface coupling must be self-sufficient: for every interface, entries exist for
+    # every masked (test dof, trial dof) pair within the union of the two cells' dofs
+    # (including dofs shared between the cells (continuous interpolations) and the same-side
+    # blocks) without relying on the cell coupling to provide them.
+    let
+        grid = generate_grid(Line, (2,))
+        dh = DofHandler(grid)
+        add!(dh, :u, Lagrange{RefLine, 1}())
+        add!(dh, :p, Lagrange{RefLine, 1}())
+        close!(dh)
+        # celldofs: A = [1, 2, 3, 4] (u@n1, u@n2, p@n1, p@n2), B = [2, 5, 4, 6]
+        topology = ExclusiveTopology(grid)
+        cc = [true false; false true] # cell coupling: u-u, p-p only
+        ic = [false true; false false] # interface coupling: u rows, p columns
+        sp = Ferrite.add_sparsity_entries!(
+            init_sparsity_pattern(dh), dh;
+            coupling = cc, topology = topology, interface_coupling = ic
+        )
+        # Every u row (1, 2, 5) couples to every p column (3, 4, 6), including the
+        # shared dof 4 and the same-side pairs such as (1, 3)
+        @test sort(collect(Ferrite.eachrow(sp, 1))) == [1, 2, 3, 4, 6]
+        @test sort(collect(Ferrite.eachrow(sp, 2))) == [1, 2, 3, 4, 5, 6]
+        @test sort(collect(Ferrite.eachrow(sp, 5))) == [2, 3, 4, 5, 6]
+        # No p rows couple to u columns ([p, u] = false)
+        @test sort(collect(Ferrite.eachrow(sp, 3))) == [3, 4]
+        @test sort(collect(Ferrite.eachrow(sp, 4))) == [3, 4, 6]
+    end
+    # Assembly smoke test: ∫_Γ {{δu}} {{p}} dΓ produces nonzero values for shared dofs and
+    # same-side pairs; the pattern from restricted cell coupling + interface coupling
+    # must support assembling it
+    let
+        grid = generate_grid(Quadrilateral, (2, 1))
+        topology = ExclusiveTopology(grid)
+        dh = DofHandler(grid)
+        ip = Lagrange{RefQuadrilateral, 1}()
+        add!(dh, :u, ip)
+        add!(dh, :p, ip)
+        close!(dh)
+        cc = [true false; false true]
+        ic = [false true; false false]
+        K = allocate_matrix(dh; coupling = cc, topology = topology, interface_coupling = ic)
+        iv = InterfaceValues(FacetQuadratureRule{RefQuadrilateral}(2), ip)
+        sdh = dh.subdofhandlers[1]
+        drng_u = dof_range(sdh, :u)
+        drng_p = dof_range(sdh, :p)
+        ncdofs = ndofs_per_cell(dh)
+        assembler = start_assemble(K)
+        for interface in InterfaceIterator(dh, topology)
+            reinit!(iv, interface)
+            Ke = zeros(2 * ncdofs, 2 * ncdofs)
+            # Map interface shape function index (here-side 1:4, there-side 5:8) to the
+            # index in the stacked dof vector [celldofs(a); celldofs(b)]
+            stackedindex(i, drng) = i <= length(drng) ? drng[i] : ncdofs + drng[i - length(drng)]
+            for qp in 1:getnquadpoints(iv)
+                dΓ = getdetJdV(iv, qp)
+                for i in 1:getnbasefunctions(iv)
+                    δu = shape_value_average(iv, qp, i)
+                    for j in 1:getnbasefunctions(iv)
+                        p = shape_value_average(iv, qp, j)
+                        Ke[stackedindex(i, drng_u), stackedindex(j, drng_p)] += δu * p * dΓ
+                    end
+                end
+            end
+            # The stacked dof vector contains the shared (continuous) dofs twice, which
+            # the assembler does not support: accumulate the duplicated rows/columns onto
+            # the unique dofs before assembling
+            idofs = interfacedofs(interface)
+            udofs = unique(idofs)
+            uindex = [findfirst(==(d), udofs) for d in idofs]
+            Kc = zeros(length(udofs), length(udofs))
+            for i in axes(Ke, 1), j in axes(Ke, 2)
+                Kc[uindex[i], uindex[j]] += Ke[i, j]
+            end
+            # This throws a missing sparsity entry error if the pattern misses the
+            # shared-dof strips or the same-side blocks
+            assemble!(assembler, udofs, Kc)
+        end
+        # The trace of p at the shared nodes is nonzero on the facet, so the shared dof
+        # columns must have nonzero values in the rows of the u dofs on the facet
+        shared_u_dofs = intersect(celldofs(dh, 1)[drng_u], celldofs(dh, 2)[drng_u])
+        shared_p_dofs = intersect(celldofs(dh, 1)[drng_p], celldofs(dh, 2)[drng_p])
+        for i in shared_u_dofs, j in shared_p_dofs
+            @test K[i, j] > 0
+        end
+        # Same-side pairs: u rows on the facet couple to p columns away from the facet
+        # with value zero here ({{p}} has zero trace for interior dofs), but the entries
+        # must exist in the pattern
+        other_p_dofs = setdiff(celldofs(dh, 1)[drng_p], shared_p_dofs)
+        for i in shared_u_dofs, j in other_p_dofs
+            @test is_stored(K, i, j)
         end
     end
 

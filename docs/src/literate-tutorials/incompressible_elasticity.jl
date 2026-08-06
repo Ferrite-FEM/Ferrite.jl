@@ -188,7 +188,7 @@ end;
 # the grid. Stresses are evaluated in the quadrature points, however, for
 # export/visualization you typically want values in the nodes of the mesh, or as single data
 # points per cell. For the former you can project the quadrature point data to a finite
-# element space (see the example with the `L2Projector` in [Post processing and
+# element space (see the example with the `L2Projector` in [Postprocessing and
 # visualization](@ref howto-postprocessing)). In this example we choose to compute the mean
 # value of the stress within each cell, and thus end up with one data point per cell. The
 # mean value is computed as

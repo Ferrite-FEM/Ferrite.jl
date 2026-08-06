@@ -88,7 +88,7 @@ be used to calculate the dependent DoFs. Ferrite has functionality for setting u
     Ferrite will not be able to resolve this situation because `` a_2 `` is both a master
     and a slave DoF in different constraints.
 
-### Affine Constraints in Ferrite
+### Affine constraints in Ferrite
 
 To explain how affine constraints are handled in Ferrite, we will use the same example as
 above. The constraint equations can be constructed with `Ferrite.AffineConstraint` and

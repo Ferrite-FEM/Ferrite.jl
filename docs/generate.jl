@@ -1,6 +1,11 @@
 # generate examples
 import Literate
 
+# Skip execution of the following files.
+# These are tested directly in the CI, as they need additional dependencies
+# and/or special machines (e.g. GPUs) to run on.
+DONT_EXECUTE = Set(["gpu_assembly.jl"])
+
 # Tutorials
 TUTORIALS_IN = joinpath(@__DIR__, "src", "literate-tutorials")
 TUTORIALS_OUT = joinpath(@__DIR__, "src", "tutorials")
@@ -23,11 +28,14 @@ include("download_resources.jl")
 @timeit dto "Literate." for (IN, OUT) in [(TUTORIALS_IN, TUTORIALS_OUT), (HOWTO_IN, HOWTO_OUT), (GALLERY_IN, GALLERY_OUT)], program in readdir(IN; join = true)
     name = basename(program)
     if endswith(program, ".jl")
-        if !liveserver
+        skip_execution = name ∈ DONT_EXECUTE
+        if skip_execution
+            code = "<< script output is skipped for this example >>"
+        elseif liveserver
+            code = "<< no script output when building as draft >>"
+        else # Generate output
             script = @timeit dto "script()" @timeit dto name Literate.script(program, OUT)
             code = strip(read(script, String))
-        else
-            code = "<< no script output when building as draft >>"
         end
 
         # remove "hidden" lines which are not shown in the markdown
@@ -44,11 +52,16 @@ include("download_resources.jl")
         end
 
         @timeit dto "markdown()" @timeit dto name begin
-            Literate.markdown(program, OUT, postprocess = mdpost)
+            if skip_execution
+                # Don't use the default `@example` to avoid execution
+                Literate.markdown(program, OUT; postprocess = mdpost, codefence = "````julia" => "````")
+            else
+                Literate.markdown(program, OUT, postprocess = mdpost)
+            end
         end
         if !liveserver
             @timeit dto "notebook()"  @timeit dto name begin
-                Literate.notebook(program, OUT, preprocess = nbpre, execute = is_ci) # Don't execute locally
+                Literate.notebook(program, OUT, preprocess = nbpre, execute = is_ci && !skip_execution) # Don't execute locally
             end
         end
     elseif any(endswith.(program, [".png", ".jpg", ".gif", ".webp"]))
@@ -58,11 +71,33 @@ include("download_resources.jl")
     end
 end
 
-# remove any .vtu files in the generated dir (should not be deployed)
+# In CI, smoke-test every ParaView scene using the VTK files that notebook
+# execution just produced. This avoids running the examples a second time.
+# The --check mode renders small images and only a few animation frames; these
+# assets are intentionally left in the gitignored screenshot-assets directory
+# and are never uploaded.
+const VTK_EXTENSIONS = (".vtu", ".pvd", ".vtkhdf")
+if get(ENV, "FERRITE_SCREENSHOT_CHECK", "false") == "true"
+    datadir = joinpath(@__DIR__, "screenshot-data")
+    outdir = joinpath(@__DIR__, "screenshot-assets")
+    rm(datadir; recursive = true, force = true)
+    mkpath(datadir)
+    mkpath(outdir)
+    for dir in (TUTORIALS_OUT, HOWTO_OUT, GALLERY_OUT), file in readdir(dir)
+        any(ext -> endswith(file, ext), VTK_EXTENSIONS) || continue
+        cp(joinpath(dir, file), joinpath(datadir, file); force = true)
+    end
+    @timeit dto "screenshots" run(
+        `pvbatch --force-offscreen-rendering $(joinpath(@__DIR__, "screenshots.py")) $datadir $outdir --check`
+    )
+end
+
+# Remove generated VTK files; they should not be deployed with the docs.
 @timeit dto "remove vtk files" for dir in [TUTORIALS_OUT, HOWTO_OUT, GALLERY_OUT]
     cd(dir) do
-        foreach(file -> endswith(file, ".vtu") && rm(file), readdir())
-        foreach(file -> endswith(file, ".pvd") && rm(file), readdir())
+        foreach(readdir()) do file
+            any(ext -> endswith(file, ext), VTK_EXTENSIONS) && rm(file)
+        end
     end
 end
 
@@ -134,7 +169,7 @@ write_overview(
         ("reactive_surface", "Reactive surface", ["reactive_surface-light.webp", "reactive_surface-dark.webp"]),
         ("linear_shell", "Linear shell", ["linear_shell-light.png", "linear_shell-dark.png"]),
         ("dg_heat_equation", "DG heat equation", ["dg_heat_equation-light.png", "dg_heat_equation-dark.png"]),
-        ("heat_adaptivity", "Adaptive heat equation", ["heat_adaptivity-light.webp", "heat_adaptivity-dark.webp"]),
+        ("heat_adaptivity", "Heat equation with adaptive mesh refinement", ["heat_adaptivity-light.webp", "heat_adaptivity-dark.webp"]),
         ("darcy_flow", "Darcy flow", ["darcy_flow-light.png", "darcy_flow-dark.png"]),
     ],
 )
@@ -147,6 +182,6 @@ write_overview(
         ("quasi_incompressible_hyperelasticity", "Nearly incompressible hyperelasticity", ["quasi_incompressible_hyperelasticity-light.webp", "quasi_incompressible_hyperelasticity-dark.webp"]),
         ("landau", "Ginzburg–Landau minimization", ["landau_opt-light.png", "landau_opt-dark.png"]),
         ("topology_optimization", "Topology optimization", ["topology_optimization-light.webp", "topology_optimization-dark.webp"]),
-        ("elasticity_adaptivity", "Adaptive linear elasticity", ["elasticity_adaptivity-light.webp", "elasticity_adaptivity-dark.webp"]),
+        ("elasticity_adaptivity", "Linear elasticity with adaptive mesh refinement", ["elasticity_adaptivity-light.webp", "elasticity_adaptivity-dark.webp"]),
     ],
 )

@@ -1,6 +1,7 @@
 abstract type AbstractAssembler{Tv} end
 abstract type AbstractCSCAssembler{Tv} <: AbstractAssembler{Tv} end
 abstract type AbstractCSRAssembler{Tv} <: AbstractAssembler{Tv} end
+abstract type AbstractThreadSafeAssembler{Tv} <: AbstractAssembler{Tv} end
 
 """
     struct COOAssembler{Tv, Ti}
@@ -148,7 +149,7 @@ function finish_assemble(a::COOAssembler)
 end
 
 """
-    assemble!(g, dofs, ge)
+    assemble!(g, dofs, ge, atomic = Val(false))
 
 Assembles the element residual `ge` into the global residual vector `g`.
 """
@@ -156,12 +157,7 @@ Assembles the element residual `ge` into the global residual vector `g`.
     @boundscheck checkbounds(g, dofs)
     @boundscheck checkbounds(ge, keys(dofs))
     @inbounds for (i, dof) in pairs(dofs)
-        if atomic
-            v = ge[i]
-            iszero(v) || _atomic_add!(g, dof, v)
-        else
-            addindex!(g, ge[i], dof)
-        end
+        addindex!(g, ge[i], dof, Val(atomic))
     end
     return
 end
@@ -177,7 +173,7 @@ matrix_handle, vector_handle
 
 # The `atomic` type parameter of the assemblers below is a `Bool` deciding whether the
 # accumulation into the global matrix and vector uses atomic additions (see
-# `start_assemble` and `_addindex!`). It is a type parameter, and not a field, so that
+# `start_assemble` and `addindex!`). It is a type parameter, and not a field, so that
 # the atomic and non-atomic assembly paths compile to separate specializations: with a
 # runtime flag the never-executed atomic code slows down the non-atomic path by 5-10%
 # (LLVM neither unswitches a branch at the accumulation site out of the assembly loops,
@@ -277,7 +273,7 @@ associative. Atomic accumulation is only supported for value types `Float32` and
 its own assembler since the assembler contains buffers that are modified during
 `assemble!`. Note also that the value of `atomic` determines a type parameter of the
 returned assembler, so for a type stable setup the value should be a literal (or
-otherwise a compile time constant). See the [howto on multi-threaded assembly](@ref
+otherwise a compile time constant). See the [howto on multithreaded assembly](@ref
 howto-threaded-assembly) for more details.
 
 Depending on the loaded extensions more assembly formats become available through this interface.
@@ -372,6 +368,10 @@ end
     return _assemble_inner!(K, Ke, rowdofs, sortedrowdofs, rowpermutation, coldofs, sortedcoldofs, colpermutation, sym, atomic)
 end
 
+# Number of stored entries per local row above which a column is searched with binary
+# search instead of the linear merge walk in `_assemble_inner!`.
+const SPARSE_COLUMN_SEARCH_RATIO = 8
+
 @propagate_inbounds function _assemble_inner!(
         K::SparseMatrixCSC, Ke::AbstractMatrix,
         rowdofs::AbstractVector, sortedrowdofs::AbstractVector, rowpermutation::AbstractVector,
@@ -382,12 +382,45 @@ end
     Krows = rowvals(K)
     Kvals = nonzeros(K)
     ld = length(rowdofs)
+    nrows = size(K, 1)
     @inbounds for Kcol in sortedcoldofs
         maxlookups = sym ? current_col : ld
         Kecol = colpermutation[current_col]
+        nzr = nzrange(K, Kcol)
+        # Fast path for a fully dense column
+        if length(nzr) == nrows
+            offset = first(nzr) - 1
+            for ri in 1:maxlookups
+                val = Ke[rowpermutation[ri], Kecol]
+                iszero(val) || _addindex!(Kvals, offset + sortedrowdofs[ri], val, atomic)
+            end
+            current_col += 1
+            continue
+        end
+        # Fast path for a column with many entries per local row, but not dense enough for
+        # the branch above
+        if length(nzr) > SPARSE_COLUMN_SEARCH_RATIO * maxlookups
+            lo = first(nzr)
+            hi = last(nzr)
+            for ri in 1:maxlookups
+                Kerow_dof = sortedrowdofs[ri]
+                R = searchsortedfirst(Krows, Kerow_dof, lo, hi, Base.Order.Forward)
+                if R <= hi && Krows[R] == Kerow_dof
+                    val = Ke[rowpermutation[ri], Kecol]
+                    iszero(val) || _addindex!(Kvals, R, val, atomic)
+                    lo = R + 1
+                else
+                    # No entry exists in the global matrix for this row, which is allowed
+                    # as long as the value which would have been inserted is zero.
+                    iszero(Ke[rowpermutation[ri], Kecol]) || _missing_sparsity_pattern_error(Kerow_dof, Kcol)
+                    lo = R
+                end
+            end
+            current_col += 1
+            continue
+        end
         ri = 1 # row index pointer for the local matrix
         Ri = 1 # row index pointer for the global matrix
-        nzr = nzrange(K, Kcol)
         while Ri <= length(nzr) && ri <= maxlookups
             R = nzr[Ri]
             Krow = Krows[R]
@@ -396,7 +429,7 @@ end
                 # Match: add the value (if non-zero) and advance the pointers
                 val = Ke[rowpermutation[ri], Kecol]
                 if !iszero(val)
-                    _addindex!(Kvals, R, val, atomic)
+                    addindex!(Kvals, val, R, atomic)
                 end
                 ri += 1
                 Ri += 1
@@ -433,19 +466,23 @@ end
 # additions -- the task join at the end of a threaded assembly loop is the synchronization
 # point that makes the accumulated values visible.
 for (T, llvmT) in ((Float64, "double"), (Float32, "float"))
+    ir = if VERSION >= v"1.12.0-DEV"
+        """
+        %rv = atomicrmw fadd ptr %0, $llvmT %1 monotonic
+        ret void
+        """
+    else
+        """
+        %p = inttoptr i$(Sys.WORD_SIZE) %0 to $(llvmT)*
+        %rv = atomicrmw fadd $(llvmT)* %p, $llvmT %1 monotonic
+        ret void
+        """
+    end
     @eval @propagate_inbounds function _atomic_add!(x::Vector{$T}, i::Int, v::$T)
         @boundscheck checkbounds(x, i)
         GC.@preserve x begin
             p = pointer(x, i)
-            Base.llvmcall(
-                $(
-                    """
-                    %p = inttoptr i$(Sys.WORD_SIZE) %0 to $(llvmT)*
-                    %rv = atomicrmw fadd $(llvmT)* %p, $llvmT %1 monotonic
-                    ret void
-                    """
-                ), Cvoid, Tuple{Ptr{$T}, $T}, p, v
-            )
+            Base.llvmcall($ir, Cvoid, Tuple{Ptr{$T}, $T}, p, v)
         end
         return
     end
@@ -462,7 +499,7 @@ end
     return
 end
 
-function _missing_sparsity_pattern_error(Krow::Int, Kcol::Int)
+function _missing_sparsity_pattern_error(Krow::Integer, Kcol::Integer)
     msg = "You are trying to assemble values in to K[$(Krow), $(Kcol)], but K[$(Krow), " *
         "$(Kcol)] is missing in the sparsity pattern. Make sure you have called `K = " *
         "allocate_matrix(dh)` or `K = allocate_matrix(dh, ch)` if you " *

@@ -93,7 +93,7 @@ function TaskCache(dpc::Int, nodespercell, cvP::CellValues, modelparams, elpoten
     return TaskCache(cvP, element_indices, element_dofs, element_gradient, element_hessian, element_coords, potfunc, grad_backend, hess_backend, grad_prep, hess_prep)
 end
 
-# ## The Model
+# ## The model
 # Everything is combined into a model. The caches are pre-allocated (one per task)
 # and indexed by chunk index during assembly.
 mutable struct LandauModel{T, DH <: DofHandler, CH <: ConstraintHandler, TC <: TaskCache}

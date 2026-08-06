@@ -205,9 +205,6 @@ close!(ch);
 
 function assemble_element!(Ke::Matrix, fe::Vector, cellvalues::CellValues)
     n_basefuncs = getnbasefunctions(cellvalues)
-    ## Reset to 0
-    fill!(Ke, 0)
-    fill!(fe, 0)
     ## Loop over quadrature points
     for q_point in 1:getnquadpoints(cellvalues)
         ## Quadrature weight
@@ -230,8 +227,6 @@ function assemble_element!(Ke::Matrix, fe::Vector, cellvalues::CellValues)
 end
 
 function assemble_interface!(Ki::Matrix, iv::InterfaceValues, μ::Float64)
-    ## Reset to 0
-    fill!(Ki, 0)
     ## Loop over quadrature points
     for q_point in 1:getnquadpoints(iv)
         ## Get the normal to facet A
@@ -257,8 +252,6 @@ function assemble_interface!(Ki::Matrix, iv::InterfaceValues, μ::Float64)
 end
 
 function assemble_boundary!(fe::Vector, fv::FacetValues)
-    ## Reset to 0
-    fill!(fe, 0)
     ## Loop over quadrature points
     for q_point in 1:getnquadpoints(fv)
         ## Get the normal to facet A
@@ -295,6 +288,8 @@ function assemble_global(cellvalues::CellValues, facetvalues::FacetValues, inter
     for cell in CellIterator(dh)
         ## Reinitialize cellvalues for this cell
         reinit!(cellvalues, cell)
+        fill!(Ke, 0)
+        fill!(fe, 0)
         ## Compute volume integral contribution
         assemble_element!(Ke, fe, cellvalues)
         ## Assemble Ke and fe into K and f
@@ -309,6 +304,7 @@ function assemble_global(cellvalues::CellValues, facetvalues::FacetValues, inter
         hₑ = getdiameter(interfacecoords)
         ## Calculate μ
         μ = (1 + order)^dim / hₑ
+        fill!(Ki, 0)
         ## Compute interface surface integrals contribution
         assemble_interface!(Ki, interfacevalues, μ)
         ## Assemble Ki into K
@@ -318,6 +314,7 @@ function assemble_global(cellvalues::CellValues, facetvalues::FacetValues, inter
     for fc in FacetIterator(dh, ∂Ωₙ)
         ## Reinitialize facetvalues for this boundary facet
         reinit!(facetvalues, fc)
+        fill!(fe, 0)
         ## Compute boundary facet surface integrals contribution
         assemble_boundary!(fe, facetvalues)
         ## Assemble fe into f

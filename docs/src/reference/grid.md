@@ -2,7 +2,7 @@
 DocTestSetup = :(using Ferrite)
 ```
 
-# Grid & AbstractGrid
+# Grid
 
 ## Grid
 
@@ -17,7 +17,7 @@ FacetIndex
 Grid
 ```
 
-### Utility Functions
+### Utility functions
 
 ```@docs
 getcells
@@ -36,6 +36,8 @@ geometric_interpolation(::Ferrite.AbstractCell)
 get_node_coordinate
 Ferrite.getspatialdim(::Ferrite.AbstractGrid)
 Ferrite.getrefdim(::Ferrite.AbstractCell)
+Ferrite.entity_dim
+Ferrite.entity_codim
 ```
 
 ### Topology
@@ -48,7 +50,7 @@ vertex_star_stencils
 getstencil
 ```
 
-### Grid Sets Utility
+### Grid sets utility
 
 ```@docs
 addcellset!
@@ -59,7 +61,7 @@ addboundaryvertexset!
 addnodeset!
 ```
 
-### Multithreaded Assembly
+### Multithreaded assembly
 ```@docs
 create_coloring
 ```

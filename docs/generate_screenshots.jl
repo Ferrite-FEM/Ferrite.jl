@@ -1,8 +1,8 @@
 # Regenerates the example screenshots/animations for the tutorials.
 #
-# It runs the example scripts that write the required .vtu data files into a
+# It runs the example scripts that write the required VTK data files into a
 # temporary directory and then calls ParaView (pvbatch) on docs/screenshots.py
-# to render a light/dark variant for each scene (png, or gif for time-stepping
+# to render a light/dark variant for each scene (PNG, or WebP for time-stepping
 # examples).
 #
 # The rendered files are written to docs/screenshot-assets/ (gitignored). They
@@ -19,7 +19,7 @@
 # Usage (from the repo root):
 #   julia --project=docs docs/generate_screenshots.jl [--render-only] [names...]
 #
-# --render-only   skip running the examples and reuse the .vtu files already in
+# --render-only   skip running the examples and reuse the VTK files already in
 #                 the data directory (handy while tuning docs/screenshots.py).
 # --upload        after rendering, commit the selected examples' assets to the
 #                 gh-pages `assets/` folder and push (needs push rights to the
@@ -28,7 +28,7 @@
 #
 # Requires `pvbatch` (ParaView) on PATH.
 
-# Each example maps to the literate file that, when run, writes its .vtu data.
+# Each example maps to the literate file that, when run, writes its VTK data.
 const EXAMPLES = Dict(
     "heat_equation" => "literate-tutorials/heat_equation.jl",
     "dg_heat_equation" => "literate-tutorials/dg_heat_equation.jl",
@@ -44,7 +44,7 @@ const EXAMPLES = Dict(
     # How-to guides.
     "postprocessing" => "literate-howto/postprocessing.jl",
     "threaded_assembly" => "literate-howto/threaded_assembly.jl",
-    # Time-stepping examples rendered as animations (write a .pvd collection).
+    # Time-stepping examples rendered as animations (write .pvd or temporal .vtkhdf).
     "transient_heat" => "literate-tutorials/transient_heat_equation.jl",
     "elastodynamics" => "literate-tutorials/elastodynamics.jl",
     "porous_media" => "literate-tutorials/porous_media.jl",
@@ -84,7 +84,7 @@ const OUTPUTS = Dict(
 )
 
 const DOCS = @__DIR__
-const DATADIR = joinpath(DOCS, "screenshot-data")     # gitignored .vtu scratch
+const DATADIR = joinpath(DOCS, "screenshot-data")     # gitignored VTK scratch data
 const OUTDIR = joinpath(DOCS, "screenshot-assets")    # gitignored; upload to gh-pages/assets
 
 # Examples that build on another one include it by its generated path

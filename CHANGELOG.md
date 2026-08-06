@@ -7,7 +7,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Next] - xxxx-xx-xx
 
+### Fixes
+ - Atomic assembly support for BlockAssembler. ([#1452])
+
 ### Added
+ - `ExclusiveTopology` now supports grids with mixed reference dimensions (e.g. a 3D grid
+   containing both `Hexahedron` and `Quadrilateral` cells). Mixed-dimensional connections
+   are stored in `vertex_vertex_neighbor`, `edge_edge_neighbor`, and `face_face_neighbor`
+   according to the shared entity, and can be queried with `VertexIndex`, `EdgeIndex`,
+   `FaceIndex`, and (per cell) `FacetIndex`. The bulk operations `facetskeleton` and
+   `get_facet_facet_neighborhood` remain unsupported for such grids, since they assume a
+   common facet dimension across the whole grid. ([#843])
+ - Experimental CUDA GPU support for assembly using type-stable, non-allocating element
+   routines. ([#1291])
+ - Allow generic (but continuous) local dof orderings for interpolations. ([#1188])
+
+## [v1.6.0] - 2026-08-02
+
+### Added
+ - `PointEvalHandler` can assign points slightly outside the grid to a nearby cell with
+   the new keyword argument `extrapolation_tolerance`, such that evaluation extrapolates
+   from that cell. ([#1238])
+ - The point search of `PointEvalHandler` can be restricted to a subdomain with the new
+   keyword argument `cellset`. This is required for correct results when evaluating fields
+   that are only defined on a subdomain, or that are discontinuous across subdomain
+   interfaces. In addition, `evaluate_at_points` now warns when points are assigned to
+   cells where the evaluated field is not defined. ([#1181])
+ - `PointEvalHandler` now supports grids with `Wedge` and `Pyramid` cells; previously the
+   point search threw a `MethodError` for these cell types. ([#1434])
  - Adaptive mesh refinement (AMR) for quadrilateral and hexahedral (linear) grids via a `p4est`-style
    forest of octrees (`ForestBWG`), constructed from any conforming `Quadrilateral`/`Hexahedron`
    `Grid` (structured or unstructured, including rotated neighboring cells). Marked cells can be
@@ -41,14 +68,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
    updated [howto on multi-threaded
    assembly](https://ferrite-fem.github.io/Ferrite.jl/stable/howto/threaded_assembly/).
    ([#1417])
-  - Allow generic (but continuous) local dof orderings for interpolations. ([#1188])
+ - `VTKHDFGridFile` for exporting to the HDF5-based VTKHDF file format via the
+   new package extension for [VTKHDF.jl](https://github.com/Ferrite-FEM/VTKHDF.jl).
+   A whole simulation can be stored in a single file, with the grid written
+   only once for time series on a fixed mesh. ([#1381])
+
+### Changed
+ - `interface_coupling` in `allocate_matrix`/`add_sparsity_entries!`/`add_interface_entries!`
+   is now self-sufficient for interface assembly: `interface_coupling[i, j] = true` creates
+   entries for *every* (test dof of field `i`, trial dof of field `j`) pair within the union
+   of the dofs of the two cells sharing an interface. Previously, pairs where either dof was
+   shared between the two cells (continuous interpolations), as well as pairs where both
+   dofs belong to the same cell, were left to the cell `coupling` to provide, so assembling
+   interface terms with nonzero values at shared dofs (e.g. flux-type couplings of
+   continuous fields) could hit missing sparsity pattern entries when a restricted cell
+   `coupling` was used. Patterns built with full cell coupling (the default,
+   `coupling = nothing`) are unchanged; the additional entries appear only for `topology`
+   builds that combine a restricted cell `coupling` with `interface_coupling`. ([#1432])
+ - The compat bound for OrderedCollections.jl has been widened to allow version 2.
+   ([#1355])
 
 ### Documentation
- - The figures for the documentation are now programmatically generated and made to have a consistent look.
- - New tutorial: Elastodynamics and modal analysis of a cantilever beam (mass matrix, generalized eigenvalue problem, Rayleigh damping, Newmark time integration).
+ - Code blocks in the documentation now have line numbers, and individual lines can be
+   selected and linked to, similar to code on GitHub. ([#1415])
+ - The figures for the documentation are now programmatically generated and made to have a
+   consistent look. ([#1382], [#1421])
+ - New tutorial: Elastodynamics and modal analysis of a cantilever beam (mass matrix,
+   generalized eigenvalue problem, Rayleigh damping, Newmark time integration). ([#1387])
  - Add adaptive mesh refinement tutorials (heat equation and linear elasticity) and a developer
    documentation page describing the `p4est` implementation. ([#780])
  - New tutorial on Darcy flow using H(div)-conforming Raviart-Thomas elements ([#1388])
+ - Tutorials and howtos now zero the local matrix and vector outside of the element routine
+   to better reflect recommended practice. ([#1376], [#1423], [#1438])
+ - Fix bugs in the linear shell tutorial ([#1380]) and in the incompressible
+   hyperelasticity gallery example ([#1379]), and update the topology optimization gallery
+   example ([#1035]).
 
 ### Fixes
  - `PointValues` can now be reinitialized with the current cell, enabling evaluation of
@@ -69,10 +123,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
    depend on the (internal) orientation of the interface. Symmetric masks, for which the
    two conventions coincide, are not affected. In addition, interface entries are no
    longer computed twice for interfaces where both cells belong to the same
-   `SubDofHandler`.
+   `SubDofHandler`. ([#1428])
  - Fix bug applying the transpose operation in condensation of `AffineConstraints`. This bug gave
    silently wrong results when used on non-symmetric system matrices, but did not affect system matrices
    that were symmetric ([#1426])
+ - `PointIterator` now works for grids with mixed cell types; previously the constructor
+   threw an error. ([#1434])
+ - `show` of a `PointEvalHandler` for which no points were found no longer throws.
+   ([#1434])
+
+### Performance
+ - The point search in `PointEvalHandler` no longer searches candidate cells more than once
+   per point, and the node-to-cell map is now built in a single pass over the cells.
+   ([#1434])
 
 ## [v1.5.0] - 2026-07-13
 
@@ -83,7 +146,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
  - Support generating embedded 2D-grids by passing coordinates `x::Vec{3}` with 2D reference shapes. Note: New calculation of node position leads to slight floating point precision differences in node positions. ([#1367])
 
 ### Documentation
-
 - Landau example in code gallery now shows how to use DifferentiationInterface and HyperHessians as a backend. (#1345)
 
 ## [v1.4.1] - 2026-06-17
@@ -1034,6 +1096,11 @@ poking into Ferrite internals:
 [v1.0.0]: https://github.com/Ferrite-FEM/Ferrite.jl/releases/tag/v1.0.0
 [v1.1.0]: https://github.com/Ferrite-FEM/Ferrite.jl/releases/tag/v1.1.0
 [v1.2.0]: https://github.com/Ferrite-FEM/Ferrite.jl/releases/tag/v1.2.0
+[v1.3.0]: https://github.com/Ferrite-FEM/Ferrite.jl/releases/tag/v1.3.0
+[v1.4.0]: https://github.com/Ferrite-FEM/Ferrite.jl/releases/tag/v1.4.0
+[v1.4.1]: https://github.com/Ferrite-FEM/Ferrite.jl/releases/tag/v1.4.1
+[v1.5.0]: https://github.com/Ferrite-FEM/Ferrite.jl/releases/tag/v1.5.0
+[v1.6.0]: https://github.com/Ferrite-FEM/Ferrite.jl/releases/tag/v1.6.0
 [#352]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/352
 [#363]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/363
 [#378]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/378
@@ -1206,9 +1273,12 @@ poking into Ferrite internals:
 [#779]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/779
 [#780]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/780
 [#835]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/835
+[#843]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/843
 [#855]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/855
 [#864]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/864
+[#865]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/865
 [#867]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/867
+[#872]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/872
 [#880]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/880
 [#888]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/888
 [#914]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/914
@@ -1218,6 +1288,8 @@ poking into Ferrite internals:
 [#949]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/949
 [#953]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/953
 [#974]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/974
+[#1035]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1035
+[#1037]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1037
 [#1044]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1044
 [#1045]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1045
 [#1058]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1058
@@ -1227,11 +1299,13 @@ poking into Ferrite internals:
 [#1089]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1089
 [#1096]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1096
 [#1122]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1122
+[#1132]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1132
 [#1146]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1146
 [#1151]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1151
 [#1162]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1162
 [#1176]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1176
 [#1178]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1178
+[#1181]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1181
 [#1183]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1183
 [#1194]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1194
 [#1197]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1197
@@ -1246,8 +1320,51 @@ poking into Ferrite internals:
 [#1226]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1226
 [#1228]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1228
 [#1235]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1235
+[#1238]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1238
+[#1251]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1251
+[#1252]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1252
+[#1259]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1259
+[#1268]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1268
+[#1271]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1271
+[#1278]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1278
+[#1279]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1279
+[#1281]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1281
+[#1286]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1286
+[#1293]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1293
+[#1294]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1294
+[#1295]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1295
+[#1298]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1298
+[#1302]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1302
+[#1306]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1306
+[#1310]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1310
+[#1313]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1313
+[#1314]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1314
+[#1315]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1315
+[#1321]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1321
+[#1325]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1325
+[#1335]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1335
+[#1343]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1343
+[#1355]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1355
+[#1365]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1365
+[#1367]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1367
+[#1376]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1376
+[#1379]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1379
+[#1380]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1380
+[#1381]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1381
+[#1382]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1382
+[#1384]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1384
+[#1387]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1387
 [#1388]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1388
 [#1389]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1389
+[#1393]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1393
 [#1414]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1414
-[#1416]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1416
+[#1415]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1415
+[#1417]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1417
+[#1420]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1420
 [#1421]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1421
+[#1423]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1423
+[#1426]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1426
+[#1428]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1428
+[#1432]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1432
+[#1434]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1434
+[#1438]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1438

@@ -1,4 +1,4 @@
-# Adaptive Mesh Refinement (AMR)
+# Adaptive mesh refinement (AMR)
 
 This page documents the *internals* of the AMR implementation. If you landed here looking
 for how to *use* AMR, see the [AMR topic guide](@ref topic-amr) for the concepts (hanging
@@ -14,7 +14,7 @@ Ferrite's P4est implementation is based on these papers:
 
 where the basic data structures are implemented from the first paper combined with the algorithms to materialize a grid from the second paper in the serial case.
 
-### Important Concepts
+### Important concepts
 
 One of the most important concepts, which everything is based on, are space filling curves (SFC).
 In particular, [Z-order (also named Morton order, Morton space-filling curves)](https://en.wikipedia.org/wiki/Z-order_curve) are used in p4est.
@@ -241,7 +241,7 @@ Ferrite.AMR._coarsen_all!
 Before a forest can be materialised into a grid it must satisfy the **2:1 balance** condition:
 no two leaves sharing a face, edge or corner may differ by more than one refinement level. This
 is what guarantees that hanging nodes only ever appear at edge midpoints / face centers (see
-[Hanging nodes](@ref) below). [`balanceforest!`](@ref Ferrite.AMR.balanceforest!) enforces it,
+[Hanging nodes](@ref devdocs-hanging-nodes) below). [`balanceforest!`](@ref Ferrite.AMR.balanceforest!) enforces it,
 balancing each tree internally and propagating across tree boundaries for the leaves that touch
 them.
 
@@ -412,7 +412,7 @@ The visited set is exactly `PΩ` of §5.1: every leaf volume and every face/edge
    so the finer vertices in the face's interior lie beyond the recursion frontier and never
    become points. Their information is not lost: it arrives at the finalized coarse face,
    whose leaf support then mixes two levels, and that mixed support *is* the complete
-   hanging-node configuration (see [Hanging nodes](@ref) below).
+   hanging-node configuration (see [Hanging nodes](@ref devdocs-hanging-nodes) below).
 
 ```
 the stop rule at a non-conforming face (2D) — the face point c is the interface
@@ -565,7 +565,7 @@ Ferrite.AMR._treecorners
 Ferrite.AMR._interp_treepoint
 ```
 
-### Hanging nodes
+### [Hanging nodes](@id devdocs-hanging-nodes)
 
 A hanging node is a node that exists on the fine side of a non-conforming interface but is not a
 vertex on the coarse side. On a 2:1-balanced forest these are exactly the **center of a coarse

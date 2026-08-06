@@ -35,7 +35,7 @@ and the `AbstractSparseMatrix` interface for their custom matrix type. Optional 
 Ferrite.add_inhomogeneities!
 ```
 
-## Custom Assembler
+## Custom assembler
 
 In case the default assembler is insufficient, users can implement a custom assembler. For this, they can create a custom type and dispatch the following functions.
 

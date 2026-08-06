@@ -292,6 +292,208 @@ function projected_dirichlet(io, t)
     return print(io, "</svg>\n")
 end
 
+# --- topology figures ---------------------------------------------------------
+
+# Node positions of an n x n quadrilateral grid; index 1 is the bottom/left.
+topo_xs(x0, s, n) = [x0 + (i - 1) * s for i in 1:(n + 1)]
+topo_ys(ybot, s, n) = [ybot - (j - 1) * s for j in 1:(n + 1)]
+
+function topo_gridlines(io, xs, ys, t; c = t.ink, w = 2.0)
+    for x in xs
+        line(io, x, ys[1], x, ys[end]; c, w)
+    end
+    for y in ys
+        line(io, xs[1], y, xs[end], y; c, w)
+    end
+    return
+end
+
+# Center of cell number c (cells numbered row-major from the bottom left).
+function topo_cellcenter(xs, ys, c)
+    n = length(xs) - 1
+    i, j = (c - 1) % n + 1, (c - 1) ÷ n + 1
+    return (xs[i] + xs[i + 1]) / 2, (ys[j] + ys[j + 1]) / 2
+end
+
+"""
+Exclusive neighborhood classification: the neighbors of cell 5 in a 3 x 3 grid,
+colored by the highest-dimensional entity they share with cell 5.
+"""
+function topology_cell_neighbors(io, t)
+    W, H = 430, 424
+    header(io, W, H, t)
+    xs = topo_xs(65.0, 100.0, 3)
+    ys = topo_ys(350.0, 100.0, 3)
+
+    for c in (2, 4, 6, 8) # sharing an edge with cell 5
+        cx, cy = topo_cellcenter(xs, ys, c)
+        rect(io, cx - 50, cy - 50, 100, 100; fill = t.exact, op = 0.18)
+    end
+    for c in (1, 3, 7, 9) # sharing only a vertex with cell 5
+        cx, cy = topo_cellcenter(xs, ys, c)
+        rect(io, cx - 50, cy - 50, 100, 100; fill = t.node, op = 0.18)
+    end
+    rect(io, xs[2], ys[3], 100, 100; fill = "url(#hatch)")
+    topo_gridlines(io, xs, ys, t)
+    for c in 1:9
+        cx, cy = topo_cellcenter(xs, ys, c)
+        pill(io, cx, cy, string(c); fill = t.cell, fg = t.onaccent, w = 28)
+    end
+
+    y = H - 20
+    rect(io, 40, y - 7, 14, 14; fill = "url(#hatch)", stroke = t.ink, sw = 1.2)
+    text(io, 62, y + 5, "the cell"; c = t.muted, size = 14, anchor = "start")
+    rect(io, 140, y - 7, 14, 14; fill = t.exact, op = 0.3, stroke = t.exact, sw = 1.2)
+    text(io, 162, y + 5, "edge neighbors"; c = t.muted, size = 14, anchor = "start")
+    rect(io, 272, y - 7, 14, 14; fill = t.node, op = 0.3, stroke = t.node, sw = 1.2)
+    text(io, 294, y + 5, "vertex neighbors"; c = t.muted, size = 14, anchor = "start")
+    return print(io, "</svg>\n")
+end
+
+"""
+One entity, several local views: an edge shared by two cells and a vertex shared
+by four cells, addressed as (cell, local entity) index pairs.
+"""
+function topology_entity_views(io, t)
+    W, H = 620, 306
+    header(io, W, H, t)
+
+    # left: the edge shared by cells 5 and 6
+    x0, y0, s = 60.0, 95.0, 110.0
+    rect(io, x0, y0, 2s, s; fill = t.tint, op = t.tintop)
+    path(io, "M$(f(x0)),$(f(y0)) H$(f(x0 + 2s)) V$(f(y0 + s)) H$(f(x0)) Z"; c = t.ink, w = 2.2)
+    line(io, x0 + s, y0, x0 + s, y0 + s; c = t.exact, w = 3.5)
+    # local edge numbers, the two views of the shared edge highlighted
+    for (k, hl) in ((0, 2), (1, 4)) # cell offset, highlighted local edge
+        cx = x0 + k * s + s / 2
+        for (i, (ex, ey)) in enumerate(
+                [(cx, y0 + s - 8), (x0 + (k + 1) * s - 12, y0 + s / 2 + 4), (cx, y0 + 18), (x0 + k * s + 12, y0 + s / 2 + 4)]
+            )
+            c, weight = i == hl ? (t.exact, "700") : (t.muted, "400")
+            text(io, ex, ey, string(i); c, size = 13, weight)
+        end
+    end
+    pill(io, x0 + s / 2, y0 + s / 2, "5"; fill = t.cell, fg = t.onaccent)
+    pill(io, x0 + 3s / 2, y0 + s / 2, "6"; fill = t.cell, fg = t.onaccent)
+    text(io, x0 + s, 262, "EdgeIndex(5, 2) ↔ EdgeIndex(6, 4)"; c = t.ink, size = 15)
+    text(io, x0 + s, 284, "two views of the same edge"; c = t.muted, size = 14)
+
+    # right: the vertex shared by cells 5, 6, 8, and 9
+    vx0, vy0, vs = 380.0, 60.0, 90.0
+    vcx, vcy = vx0 + vs, vy0 + vs
+    rect(io, vx0, vy0, 2vs, 2vs; fill = t.tint, op = t.tintop)
+    path(io, "M$(f(vx0)),$(f(vy0)) H$(f(vx0 + 2vs)) V$(f(vy0 + 2vs)) H$(f(vx0)) Z"; c = t.ink, w = 2.2)
+    line(io, vcx, vy0, vcx, vy0 + 2vs; c = t.ink, w = 2.0)
+    line(io, vx0, vcy, vx0 + 2vs, vcy; c = t.ink, w = 2.0)
+    # local number of the shared vertex in each of the four cells
+    for (nr, dx, dy, an) in [(3, -12, 20, "end"), (4, 12, 20, "start"), (2, -12, -12, "end"), (1, 12, -12, "start")]
+        text(io, vcx + dx, vcy + dy, string(nr); c = t.exact, size = 13, weight = "700", anchor = an)
+    end
+    dot(io, vcx, vcy, 7.5; c = t.exact)
+    for (c, dx, dy) in [(5, -1, 1), (6, 1, 1), (8, -1, -1), (9, 1, -1)]
+        pill(io, vcx + dx * vs / 2, vcy + dy * vs / 2, string(c); fill = t.cell, fg = t.onaccent)
+    end
+    text(io, vcx, 262, "VertexIndex: (5, 3), (6, 4), (8, 2), (9, 1)"; c = t.ink, size = 15)
+    text(io, vcx, 284, "four views of the same vertex"; c = t.muted, size = 14)
+    return print(io, "</svg>\n")
+end
+
+"""
+The facet skeleton: each of the 24 unique facets of the 3 x 3 grid exactly once,
+split into interior and boundary facets.
+"""
+function topology_facet_skeleton(io, t)
+    W, H = 430, 410
+    header(io, W, H, t)
+    xs = topo_xs(65.0, 100.0, 3)
+    ys = topo_ys(350.0, 100.0, 3)
+    topo_gridlines(io, xs, ys, t; c = t.muted, w = 1.2)
+    g = 9.0 # gap at the nodes so that each facet reads as its own segment
+    for i in 1:4, j in 1:3 # vertical facets
+        c = i in (2, 3) ? t.cell : t.exact
+        line(io, xs[i], ys[j] - g, xs[i], ys[j + 1] + g; c, w = 3.5)
+    end
+    for j in 1:4, i in 1:3 # horizontal facets
+        c = j in (2, 3) ? t.cell : t.exact
+        line(io, xs[i] + g, ys[j], xs[i + 1] - g, ys[j]; c, w = 3.5)
+    end
+    for x in xs, y in ys
+        dot(io, x, y, 3.0; c = t.muted)
+    end
+
+    y = H - 20
+    line(io, 60, y, 94, y; c = t.cell, w = 3.5)
+    text(io, 104, y + 5, "interior facet"; c = t.muted, size = 14, anchor = "start")
+    line(io, 235, y, 269, y; c = t.exact, w = 3.5)
+    text(io, 279, y + 5, "boundary facet"; c = t.muted, size = 14, anchor = "start")
+    return print(io, "</svg>\n")
+end
+
+"""
+A grid with mixed reference dimensions: a `Line` cell lying on the edge of a
+`Quadrilateral`, drawn offset from the shared nodes for clarity.
+"""
+function topology_mixed_dim(io, t)
+    W, H = 430, 400
+    header(io, W, H, t)
+    x0, x1, lx = 120.0, 260.0, 284.0
+    ys = (50.0, 190.0, 330.0)
+
+    rect(io, x0, ys[1], x1 - x0, ys[3] - ys[1]; fill = t.tint, op = t.tintop)
+    path(io, "M$(f(x0)),$(f(ys[1])) H$(f(x1)) V$(f(ys[3])) H$(f(x0)) Z"; c = t.ink, w = 2.2)
+    line(io, x0, ys[2], x1, ys[2]; c = t.ink, w = 2.0)
+
+    # the line cell, offset from the edge it sits on
+    line(io, lx, ys[1], lx, ys[2]; c = t.cell, w = 4.5)
+    for y in (ys[1], ys[2])
+        line(io, x1, y, lx, y; c = t.muted, w = 1.2, dash = "3 4")
+        dot(io, lx, y, 5.5; c = t.node)
+    end
+
+    # global node numbers
+    for (n, x, y, dx, dy, an) in [
+            (1, x0, ys[3], -13, 6, "end"), (2, x1, ys[3], 13, 6, "start"),
+            (3, x0, ys[2], -13, 6, "end"), (4, x1, ys[2], -8, 24, "end"),
+            (5, x0, ys[1], -13, 6, "end"), (6, x1, ys[1], -8, -12, "end"),
+        ]
+        dot(io, x, y, 6.0; c = t.node)
+        text(io, x + dx, y + dy, string(n); c = t.node, size = 18, anchor = an, weight = "700")
+    end
+
+    pill(io, (x0 + x1) / 2, (ys[1] + ys[2]) / 2, "1"; fill = t.cell, fg = t.onaccent, w = 28)
+    pill(io, (x0 + x1) / 2, (ys[2] + ys[3]) / 2, "3"; fill = t.cell, fg = t.onaccent, w = 28)
+    pill(io, lx, (ys[1] + ys[2]) / 2, "2"; fill = t.cell, fg = t.onaccent, w = 28)
+
+    text(io, W / 2, 365, "cell 2 is a Line lying on the right edge of cell 1"; c = t.muted, size = 14)
+    text(io, W / 2, 385, "(drawn offset for clarity)"; c = t.muted, size = 14)
+    return print(io, "</svg>\n")
+end
+
+"""
+The star (stencil) of a vertex: the vertex itself and all vertices connected to
+it by an edge.
+"""
+function topology_vertex_star(io, t)
+    W, H = 430, 410
+    header(io, W, H, t)
+    xs = topo_xs(65.0, 100.0, 3)
+    ys = topo_ys(350.0, 100.0, 3)
+    topo_gridlines(io, xs, ys, t; c = t.muted, w = 1.2)
+    cx, cy = xs[3], ys[3]
+    for (nx, ny) in ((xs[2], ys[3]), (xs[4], ys[3]), (xs[3], ys[2]), (xs[3], ys[4]))
+        line(io, cx, cy, nx, ny; c = t.cell, w = 3.5)
+        dot(io, nx, ny, 6.5; c = t.node)
+    end
+    dot(io, cx, cy, 8.0; c = t.exact)
+
+    y = H - 20
+    dot(io, 67, y, 7.0; c = t.exact)
+    text(io, 82, y + 5, "center vertex"; c = t.muted, size = 14, anchor = "start")
+    dot(io, 227, y, 6.5; c = t.node)
+    text(io, 242, y + 5, "edge-connected vertices"; c = t.muted, size = 14, anchor = "start")
+    return print(io, "</svg>\n")
+end
+
 # --- driver -------------------------------------------------------------------
 
 const FIGURES = [
@@ -299,6 +501,11 @@ const FIGURES = [
     "global_mesh" => global_mesh,
     "fe_mapping" => fe_mapping,
     "projected_dirichlet" => projected_dirichlet,
+    "topology_cell_neighbors" => topology_cell_neighbors,
+    "topology_entity_views" => topology_entity_views,
+    "topology_facet_skeleton" => topology_facet_skeleton,
+    "topology_mixed_dim" => topology_mixed_dim,
+    "topology_vertex_star" => topology_vertex_star,
 ]
 
 function main(dir = @__DIR__)

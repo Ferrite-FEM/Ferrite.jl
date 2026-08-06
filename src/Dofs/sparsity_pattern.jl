@@ -296,11 +296,11 @@ between cells as described by the DofHandler `dh`.
  - `keep_constrained`: whether or not entries for constrained DoFs should be kept
    (`keep_constrained = true`) or eliminated (`keep_constrained = false`) from the sparsity
    pattern. `keep_constrained = false` requires passing the ConstraintHandler `ch`.
- - `interface_coupling`: the coupling between fields/components across the interface.
-   `interface_coupling[i, j] = true` means that entries exist for (rows of field/component
-   `i` in one cell) × (columns of field/component `j` in the other cell), for both
-   orientations of every interface. As for cell `coupling`, rows correspond to test
-   functions and columns to trial functions.
+ - `interface_coupling`: the coupling between fields/components in interface integrals.
+   `interface_coupling[i, j] = true` means that, for every interface, entries exist for
+   *every* pair of (test DoF of field/component `i`, trial DoF of field/component `j`)
+   within the union of the DoFs of the two cells sharing the interface. As for cell
+   `coupling`, rows correspond to test functions and columns to trial functions.
 """
 function add_interface_entries!(
         sp::SparsityPattern, dh::DofHandler, ch::Union{ConstraintHandler, Nothing} = nothing;
@@ -535,9 +535,9 @@ function _add_cell_entries!(
 end
 
 function _add_constraint_entries!(
-        sp::AbstractSparsityPattern, dofcoefficients::Vector{Union{DofCoefficients{T}, Nothing}},
+        sp::AbstractSparsityPattern, dofcoefficients::Vector{Union{DofCoefficients{T, Ti}, Nothing}},
         dofmapping::Dict{Int, Int}, keep_constrained::Bool,
-    ) where {T}
+    ) where {T, Ti}
 
     # Return early if there are no non-trivial affine constraints
     any(i -> !(i === nothing || isempty(i)), dofcoefficients) || return
@@ -631,46 +631,41 @@ function _add_interface_entries!(
     )
     # Expanded coupling masks, lazily created per (row cell sdh, column cell sdh) pair
     couplings = Dict{NTuple{2, Int}, Matrix{Bool}}()
-    to_check = Dict{Int, Vector{Int}}()
     for ic in InterfaceIterator(dh, topology)
         # TODO: This looks like it can be optimized for the common case where
         #       the cells are in the same subdofhandler
         sdhs_idx = dh.cell_to_subdofhandler[cellid.([ic.a, ic.b])]
         sdhs = dh.subdofhandlers[sdhs_idx]
-        # Two iterations, one per orientation of the interface: the first iteration adds
-        # the entries with rows from `ic.a` and columns from `ic.b`, the second iteration
-        # the entries with rows from `ic.b` and columns from `ic.a`. Both directions are
+        # An interface integral is assembled over the stacked dof vector
+        # [dofs(ic.a); dofs(ic.b)] and its local matrix can be dense within every field
+        # block allowed by the mask (including the same-side blocks, since jump/average
+        # terms expand into same-side products). The pattern must therefore contain every
+        # (test dof, trial dof) pair allowed by the mask from the union of the two cells.
+        # This is realized by looping over all four (row cell, column cell) combinations:
+        # the two cross combinations and the two same-side combinations. Each pair is
         # gated by the coupling mask with the row cell as the first (test function) index
-        # and the neighbor cell as the second (trial function) index.
-        for it in 1:2
-            sdh = sdhs[it]
-            sdh2 = sdhs[it == 1 ? 2 : 1]
-            cell_dofs = celldofs(it == 1 ? ic.a : ic.b)
-            neighbor_dofs = celldofs(it == 1 ? ic.b : ic.a)
-            coupling_sdh = get!(couplings, (sdhs_idx[it], sdhs_idx[it == 1 ? 2 : 1])) do
+        # and the column cell as the second (trial function) index. Pairs that are also
+        # produced by the cell pass, or by neighboring interfaces, are deduplicated by
+        # `add_entry!`.
+        for row_i in 1:2, col_i in 1:2
+            sdh = sdhs[row_i]
+            sdh2 = sdhs[col_i]
+            row_dofs = celldofs(row_i == 1 ? ic.a : ic.b)
+            col_dofs = celldofs(col_i == 1 ? ic.a : ic.b)
+            coupling_sdh = get!(couplings, (sdhs_idx[row_i], sdhs_idx[col_i])) do
                 _coupling_to_local_dof_coupling(dh, interface_coupling, sdh, sdh2)
             end
-            for cell_field in sdh.field_names
-                dofrange1 = dof_range(sdh, cell_field)
-                cell_field_dofs = @view cell_dofs[dofrange1]
-                for neighbor_field in sdh2.field_names
-                    dofrange2 = dof_range(sdh2, neighbor_field)
-                    neighbor_field_dofs = @view neighbor_dofs[dofrange2]
+            for row_field in sdh.field_names
+                dofrange1 = dof_range(sdh, row_field)
+                row_field_dofs = @view row_dofs[dofrange1]
+                for col_field in sdh2.field_names
+                    dofrange2 = dof_range(sdh2, col_field)
+                    col_field_dofs = @view col_dofs[dofrange2]
 
-                    empty!(to_check)
                     for (j, dof_j) in enumerate(dofrange2)
                         for (i, dof_i) in enumerate(dofrange1)
                             coupling_sdh[dof_i, dof_j] || continue
-                            push!(get!(Vector{Int}, to_check, j), i)
-                        end
-                    end
-
-                    for (j, is) in to_check
-                        # Avoid coupling the shared dof in continuous interpolations as cross-element. They're coupled in the local coupling matrix.
-                        neighbor_field_dofs[j] ∈ cell_dofs && continue
-                        for i in is
-                            cell_field_dofs[i] ∈ neighbor_dofs && continue
-                            _add_interface_entry(sp, cell_field_dofs, neighbor_field_dofs, i, j, keep_constrained, ch)
+                            _add_interface_entry(sp, row_field_dofs, col_field_dofs, i, j, keep_constrained, ch)
                         end
                     end
                 end

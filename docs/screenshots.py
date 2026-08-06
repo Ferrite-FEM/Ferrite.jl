@@ -3,19 +3,32 @@
 # annotations and <name>-dark.png with light ones; docs/src/assets/custom.css
 # shows the right one for the active Documenter theme.
 #
-# The .vtu data files are produced by docs/generate_screenshots.jl. Usage:
+# The VTK data files are produced by docs/generate_screenshots.jl. Usage:
 #   julia --project=docs docs/generate_screenshots.jl [names...]
 # which runs the examples and then invokes
-#   pvbatch docs/screenshots.py <datadir> <outdir> [names...]
+#   pvbatch docs/screenshots.py <datadir> <outdir> [--check] [names...]
 # With no names all scenes are rendered, otherwise only the selected ones.
+# --check uses small images and only a few animation frames. It is intended for
+# CI smoke testing; its output is not suitable for publishing.
 import glob
 import os
-import re
+import shutil
 import subprocess
 import sys
 import tempfile
 
 from paraview.simple import *
+
+if len(sys.argv) < 3:
+    sys.exit("usage: pvbatch docs/screenshots.py <datadir> <outdir> [--check] [names...]")
+
+datadir, outdir = sys.argv[1], sys.argv[2]
+args = sys.argv[3:]
+check = "--check" in args
+unknown_options = [a for a in args if a.startswith("--") and a != "--check"]
+if unknown_options:
+    sys.exit("unknown option(s): " + ", ".join(unknown_options))
+selected = [a for a in args if not a.startswith("--")]
 
 try:
     # VTK typesets the "$...$" scalar bar titles through matplotlib. Without it they
@@ -23,16 +36,15 @@ try:
     # out rather than write assets that don't match the rest.
     import matplotlib  # noqa: F401
 except ImportError:
-    sys.exit(
-        "matplotlib is not importable by pvbatch, which is needed to typeset the scalar\n"
-        "bar titles. Install it into ParaView's Python, or install it elsewhere and point\n"
-        "PYTHONPATH at that directory:\n"
-        "    pip install --target=/tmp/pvlibs matplotlib\n"
-        "    PYTHONPATH=/tmp/pvlibs julia --project=docs docs/generate_screenshots.jl ..."
-    )
+    if not check:
+        sys.exit(
+            "matplotlib is not importable by pvbatch, which is needed to typeset the scalar\n"
+            "bar titles. Install it into ParaView's Python, or install it elsewhere and point\n"
+            "PYTHONPATH at that directory:\n"
+            "    pip install --target=/tmp/pvlibs matplotlib\n"
+            "    PYTHONPATH=/tmp/pvlibs julia --project=docs docs/generate_screenshots.jl ..."
+        )
 
-datadir, outdir = sys.argv[1], sys.argv[2]
-selected = sys.argv[3:]
 RES = [1600, 1200]
 ANIM_RES = [1000, 750]  # animations are rendered directly at their final size
 EDGE = [0.15, 0.15, 0.15]  # mesh edge color (reads on both light and dark surfaces)
@@ -46,7 +58,7 @@ VARIANTS = (
     ("light", [0.0, 0.0, 0.0], [1.0, 1.0, 1.0]),
     ("dark", [0.9, 0.9, 0.9], [0.122, 0.133, 0.161]),
 )
-ANIM_FRAMES = 40  # cap on frames per animation (timesteps are subsampled to fit)
+ANIM_FRAMES = 3 if check else 40  # timesteps are subsampled to fit
 
 SCENES = {}
 
@@ -66,6 +78,22 @@ def new_view():
     view.Background = [1.0, 1.0, 1.0]
     view.OrientationAxesVisibility = 0
     return view
+
+
+def render_resolution(res, default):
+    res = res or default
+    if check:
+        return [max(64, int(n * 0.25)) for n in res]
+    return res
+
+
+def check_times(times):
+    """Limit expensive whole-series checks in CI while keeping both endpoints."""
+    times = list(times)
+    if not check or len(times) <= ANIM_FRAMES:
+        return times
+    return [times[round(i * (len(times) - 1) / (ANIM_FRAMES - 1))]
+            for i in range(ANIM_FRAMES)]
 
 
 def surface(source, view, edges=True):
@@ -104,13 +132,6 @@ def warp(source, array, factor):
     w = WarpByVector(Input=source, Vectors=["POINTS", array])
     w.ScaleFactor = factor
     return w
-
-
-def open_series(pattern):
-    # Open a numbered .vtu series (name_1.vtu, name_2.vtu, ...) as a time series.
-    files = sorted(glob.glob(pattern),
-                   key=lambda f: int(re.search(r"_(\d+)\.vtu$", f).group(1)))
-    return OpenDataFile(files)
 
 
 def colorbar(display, view, array, title=None, preset="Cool to Warm",
@@ -205,7 +226,7 @@ def finish(view, name, azimuth=30, elevation=25, zoom=1.0, twod=False, res=None,
            pan_y=0.0, parallel=False):
     # res overrides the frame size (default RES); use a matching aspect ratio for
     # non-square domains so the scene fills the frame instead of leaving margins.
-    res = res or RES
+    res = render_resolution(res, RES)
     view.ViewSize = res
     Render()  # settle the render window / scalar-bar layout at the new size first
     _set_camera(view, azimuth, elevation, zoom, twod, pan_y, parallel=parallel)
@@ -232,7 +253,8 @@ def data_range_over_time(source, array, comp=None, times=None):
     # carry TimestepValues).
     assoc, name = array
     lo, hi = float("inf"), float("-inf")
-    for t in (times if times is not None else list(source.TimestepValues) or [0.0]):
+    times = times if times is not None else list(source.TimestepValues) or [0.0]
+    for t in check_times(times):
         source.UpdatePipeline(t)
         di = source.GetDataInformation()
         info = (di.GetPointDataInformation() if assoc == "POINTS"
@@ -249,7 +271,7 @@ def bounds_over_time(source, times):
     # them passed in). Pass the result as frame_bounds to finish_anim when no
     # single timestep covers the whole motion.
     b = [float("inf"), float("-inf")] * 3
-    for t in times:
+    for t in check_times(times):
         source.UpdatePipeline(t)
         tb = source.GetDataInformation().GetBounds()
         for i in range(3):
@@ -265,7 +287,7 @@ def finish_anim(view, source, name, azimuth=30, elevation=25, zoom=1.0,
     # downscaling afterwards would blur the annotation text. Saved as animated
     # WebP: full 24-bit colour and 8-bit alpha, where GIF's 256 colours and
     # 1-bit transparency butchered the gradients and text edges.
-    res = res or ANIM_RES
+    res = render_resolution(res, ANIM_RES)
     view.ViewSize = res
     times = list(source.TimestepValues) or [0.0]
     if len(times) > ANIM_FRAMES:
@@ -291,10 +313,14 @@ def finish_anim(view, source, name, azimuth=30, elevation=25, zoom=1.0,
                   flush=True)
             # High-quality lossy: lossless blows up on gradient-heavy scenes
             # (>10MB); sharp-yuv keeps the annotation text edges crisp.
+            encoder = shutil.which("magick") or shutil.which("convert")
+            if encoder is None:
+                raise RuntimeError("ImageMagick's 'magick' or 'convert' executable is required")
             subprocess.run(
-                ["magick", "-delay", str(delay), "-loop", "0"]
+                [encoder, "-delay", str(delay), "-loop", "0"]
                 + sorted(glob.glob(frames + "/f*.png"))
-                + ["-quality", "90", "-define", "webp:use-sharp-yuv=1",
+                + ["-quality", "50" if check else "90",
+                   "-define", "webp:use-sharp-yuv=1",
                    "-define", "webp:alpha-quality=100", "-define", "webp:method=6",
                    out],
                 check=True,
@@ -566,7 +592,7 @@ def scene_postprocessing():
 @scene("transient_heat")
 def scene_transient_heat():
     view = new_view()
-    r = OpenDataFile(datadir + "/transient-heat.pvd")
+    r = OpenDataFile(datadir + "/transient-heat.vtkhdf")
     d = surface(r, view, edges=False)
     lut = colorbar(d, view, ("POINTS", "u"), title="T")
     lut.RescaleTransferFunction(*data_range_over_time(r, ("POINTS", "u")))
@@ -624,7 +650,7 @@ def scene_elastodynamics():
 @scene("porous_media")
 def scene_porous_media():
     view = new_view()
-    r = OpenDataFile(datadir + "/porous_media.pvd")
+    r = OpenDataFile(datadir + "/porous_media.vtkhdf")
     # left panel: vertical strain from the displacement gradient; unlike the
     # pressure it is defined on the whole domain (also the solid parts)
     grad = Gradient(Input=r)
@@ -652,7 +678,7 @@ def scene_porous_media():
 @scene("ns_vs_diffeq")
 def scene_ns_vs_diffeq():
     view = new_view()
-    r = OpenDataFile(datadir + "/vortex-street.pvd")
+    r = OpenDataFile(datadir + "/vortex-street.vtkhdf")
     d = surface(r, view)
     lut = colorbar(d, view, ("POINTS", "v"), title="speed", horizontal=True)
     lut.RescaleTransferFunction(*data_range_over_time(r, ("POINTS", "v")))
@@ -665,7 +691,7 @@ def scene_ns_vs_diffeq():
 @scene("reactive_surface")
 def scene_reactive_surface():
     view = new_view()
-    r = OpenDataFile(datadir + "/reactive-surface.pvd")
+    r = OpenDataFile(datadir + "/reactive-surface.vtkhdf")
     d = surface(r, view, edges=False)
     lut = colorbar(d, view, ("POINTS", "reactants"), title="reactant")
     lut.RescaleTransferFunction(*data_range_over_time(r, ("POINTS", "reactants")))
@@ -701,22 +727,27 @@ def scene_topology_optimization():
     # Figure 2 of the example: the converged density for the smaller regularization
     # radius (left) next to the larger one (right), on the shared SIMP scale. The
     # smaller radius comes from the POSTRUN entry in generate_screenshots.jl.
-    view = new_view()
-    small = OpenDataFile(datadir + "/small_radius.vtu")
-    left = surface(small, view, edges=False)
-    ColorBy(left, ("CELLS", "density"))  # shares the "density" transfer function
-    b = small.GetDataInformation().GetBounds()
-    shifted = Transform(Input=OpenDataFile(datadir + "/large_radius.vtu"))
-    shifted.Transform.Translate = [(b[1] - b[0]) * 1.1, 0.0, 0.0]
-    right = surface(shifted, view, edges=False)
-    lut = colorbar(right, view, ("CELLS", "density"), title="density", horizontal=True,
-                   fmt="%.1f", labels=[0.25, 0.5, 0.75])
-    lut.RescaleTransferFunction(0.0, 1.0)  # SIMP density in [0, 1]
-    finish(view, "topology_optimization_result", twod=True, zoom=2.2,
-           res=[1600, 620], pan_y=-0.2)
+    small_path = datadir + "/small_radius.vtu"
+    if not check or os.path.isfile(small_path):
+        view = new_view()
+        small = OpenDataFile(small_path)
+        left = surface(small, view, edges=False)
+        ColorBy(left, ("CELLS", "density"))  # shares the "density" transfer function
+        b = small.GetDataInformation().GetBounds()
+        shifted = Transform(Input=OpenDataFile(datadir + "/large_radius.vtu"))
+        shifted.Transform.Translate = [(b[1] - b[0]) * 1.1, 0.0, 0.0]
+        right = surface(shifted, view, edges=False)
+        lut = colorbar(right, view, ("CELLS", "density"), title="density", horizontal=True,
+                       fmt="%.1f", labels=[0.25, 0.5, 0.75])
+        lut.RescaleTransferFunction(0.0, 1.0)  # SIMP density in [0, 1]
+        finish(view, "topology_optimization_result", twod=True, zoom=2.2,
+               res=[1600, 620], pan_y=-0.2)
+    else:
+        print("  skipping topology_optimization_result (CI data omits POSTRUN output)",
+              flush=True)
 
     view = new_view()
-    r = open_series(datadir + "/topopt_frames_*.vtu")
+    r = OpenDataFile(datadir + "/topopt_frames.vtkhdf")
     d = surface(r, view, edges=False)
     lut = colorbar(d, view, ("CELLS", "density"), title="density", horizontal=True,
                    fmt="%.1f", labels=[0.25, 0.5, 0.75])
@@ -730,7 +761,7 @@ def scene_topology_optimization():
 @scene("quasi_incompressible_hyperelasticity")
 def scene_quasi_incompressible_hyperelasticity():
     view = new_view()
-    r = OpenDataFile(datadir + "/hyperelasticity_incomp_mixed.pvd")
+    r = OpenDataFile(datadir + "/hyperelasticity_incomp_mixed.vtkhdf")
     w = warp(r, "u", 1.0)
     d = surface(w, view, edges=False)
     lut = colorbar(d, view, ("POINTS", "u"), title="$\\vert u \\vert$")
