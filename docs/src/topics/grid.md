@@ -201,8 +201,8 @@ that vertices, edges, and faces denote entities of fixed dimension 0, 1, and 2,
 independent of the spatial dimension of the grid, see
 [Entity naming](@ref entity-naming-docs). In addition, [`FacetIndex`](@ref) addresses
 *facets*, i.e. the entities separating cells: vertices in 1D, edges in 2D, and faces in
-3D. Since an
-interior entity is part of more than one cell it has multiple valid indices, one for each
+3D. Since an interior entity is part of more than
+one cell it has multiple valid indices, one for each
 cell containing it:
 
 ![Local views of an edge shared by two cells and a vertex shared by four cells](./assets/topology_entity_views-light.svg)
