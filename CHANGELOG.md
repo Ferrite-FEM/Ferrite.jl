@@ -55,6 +55,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
    strain is an unknown algebraic variable and the prescribed average stress acts as
    the load, including a blocked-matrix Schur complement solve of the coupled system.
    ([#1396])
+ - The Stokes flow tutorial now also implements the boundary mean value constraint by
+   retaining the Lagrange multiplier as an algebraic variable, as an alternative to
+   eliminating it with an `AffineConstraint`. ([#1422])
 
 ## [v1.6.0] - 2026-08-02
 
