@@ -84,6 +84,9 @@ function _renumber!(dh::DofHandler, perm::AbstractVector{<:Integer})
     for i in eachindex(dh.cell_dofs)
         dh.cell_dofs[i] = perm[dh.cell_dofs[i]]
     end
+    for i in eachindex(dh.system_variables_dofs)
+        dh.system_variables_dofs[i] = perm[dh.system_variables_dofs[i]]
+    end
     return dh
 end
 
@@ -145,8 +148,8 @@ target block is maintained.
 DofOrder.FieldWise
 
 function compute_renumber_permutation(dh::DofHandler, _, order::DofOrder.FieldWise)
-    field_names = getfieldnames(dh)
-    field_dims = map(fieldname -> n_components(dh, fieldname), dh.field_names)
+    field_names = [dh.field_names..., dh.system_variables_names...]
+    field_dims = map(fieldname -> n_components(dh, fieldname), field_names)
     target_blocks = if isempty(order.target_blocks)
         Int[i for (i, dim) in pairs(field_dims) for _ in 1:dim]
     else
@@ -177,7 +180,8 @@ DofOrder.ComponentWise
 
 function compute_renumber_permutation(dh::DofHandler, _, order::DofOrder.ComponentWise)
     # Note: This assumes fields have the same dimension regardless of subdomain
-    field_dims = map(fieldname -> n_components(dh, fieldname), dh.field_names)
+    field_names = [dh.field_names..., dh.system_variables_names...]
+    field_dims = map(fieldname -> n_components(dh, fieldname), field_names)
     target_blocks = if isempty(order.target_blocks)
         collect(Int, 1:sum(field_dims))
     else
@@ -208,6 +212,16 @@ function compute_renumber_permutation(dh::DofHandler, _, order::DofOrder.Compone
                     push!(dofs_for_blocks[block], cdofs[J])
                 end
             end
+        end
+    end
+    for (block_idx, name) in pairs(field_names)
+        name in dh.system_variables_names || continue
+        dofs = system_variable_dofs(dh, name)
+        component_offset = component_offsets[block_idx]
+        for (j, dof) in pairs(dofs)
+            comp = j + component_offset
+            block = target_blocks[comp]
+            push!(dofs_for_blocks[block], dof)
         end
     end
     @assert sum(length, dofs_for_blocks) == ndofs(dh)

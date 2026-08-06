@@ -25,6 +25,28 @@ mutable struct SubDofHandler{DH} <: AbstractDofHandler
     # const dof_ranges::Vector{UnitRange{Int}} # TODO: Why not?
 end
 
+struct SystemVariable{T}
+    function SystemVariable{T}() where {T}
+        if T isa Integer
+            return new{T}()
+        elseif T <: AbstractTensor
+            return new{T}()
+        else
+            throw(ArgumentError("SystemVariable expects an integer number of components or an AbstractTensor type, got $T"))
+        end
+    end
+end
+function n_components(::SystemVariable{T}) where {T}
+    if T isa Integer
+        return Int(T)
+    elseif T <: Tensors.AbstractTensor
+        return Tensors.n_components(Tensors.get_base(T))
+    else
+        throw(ArgumentError("SystemVariable expects an integer number of components or an AbstractTensor type, got $T"))
+    end
+end
+
+
 """
     SubDofHandler(dh::AbstractDofHandler, cellset::AbstractVecOrSet{Int})
 
@@ -116,11 +138,19 @@ end
 mutable struct DofHandler{dim, G <: AbstractGrid{dim}} <: AbstractDofHandler
     const subdofhandlers::Vector{SubDofHandler{DofHandler{dim, G}}}
     const field_names::Vector{Symbol}
+
     # Dofs for cell i are stored in cell_dofs at the range:
-    #     cell_dofs_offset[i]:(cell_dofs_offset[i]+ndofs_per_cell(dh, i)-1)
+    #     cell_dofs_offset[i]:(cell_dofs_offset[i+1]-1)
     const cell_dofs::Vector{Int}
     const cell_dofs_offset::Vector{Int}
     const cell_to_subdofhandler::Vector{Int} # maps cell id -> SubDofHandler id
+
+    # System variables that does not belong to any cell/domain.
+    const system_variables::Vector{SystemVariable}
+    const system_variables_names::Vector{Symbol}
+    const system_variables_dofs::Vector{Int} # Can be seen as an extension of the cell_dofs
+    const system_variables_dofs_offset::Vector{Int}
+
     closed::Bool
     const grid::G
     ndofs::Int
@@ -159,7 +189,11 @@ close!(dh)
 function DofHandler(grid::G) where {dim, G <: AbstractGrid{dim}}
     ncells = getncells(grid)
     sdhs = SubDofHandler{DofHandler{dim, G}}[]
-    return DofHandler{dim, G}(sdhs, Symbol[], Int[], zeros(Int, ncells), zeros(Int, ncells), false, grid, -1, nothing)
+    return DofHandler{dim, G}(
+        sdhs, Symbol[], Int[], zeros(Int, ncells), zeros(Int, ncells),
+        SystemVariable[], Symbol[], Int[], Int[],
+        false, grid, -1, nothing
+    )
 end
 
 function Base.show(io::IO, mime::MIME"text/plain", dh::DofHandler)
@@ -178,6 +212,15 @@ function Base.show(io::IO, mime::MIME"text/plain", dh::DofHandler)
             end
             println(io, "    ", repr(fieldname), ", ", field_type)
         end
+    end
+    if !isempty(dh.system_variables_names)
+        var_strs = String[]
+        for (i, name) in pairs(dh.system_variables_names)
+            i > length(dh.system_variables) && break
+            n = n_components(dh.system_variables[i])
+            push!(var_strs, string(name, " (", n, " dof", n == 1 ? "" : "s", ")"))
+        end
+        println(io, "  System variables: ", join(var_strs, ", "))
     end
     if !isclosed(dh)
         print(io, "  Not closed!")
@@ -273,6 +316,22 @@ getfieldnames(sdh::SubDofHandler) = sdh.field_names
 n_components(sdh::SubDofHandler, field_idx::Int) = n_components(sdh.field_interpolations[field_idx])::Int
 n_components(sdh::SubDofHandler, field_name::Symbol) = n_components(sdh, find_field(sdh, field_name))
 
+function n_components(dh::DofHandler, name::Symbol)
+    #First search for the field in all subdofhandlers
+    for (sdh_idx, sdh) in pairs(dh.subdofhandlers)
+        field_idx = _find_field(sdh, name)
+        if field_idx !== nothing
+            return n_components(dh, (sdh_idx, field_idx))
+        end
+    end
+    #Next search name in system variables
+    idx = findfirst(==(name), dh.system_variables_names)
+    if idx === nothing
+        throw(ArgumentError("Field with name $name does not exist."))
+    end
+    return n_components(dh.system_variables[idx])
+end
+
 """
     n_components(dh::DofHandler, field_idxs::NTuple{2, Int})
     n_components(dh::DofHandler, field_name::Symbol)
@@ -287,7 +346,6 @@ function n_components(dh::DofHandler, field_idxs::NTuple{2, Int})
     n = n_components(dh.subdofhandlers[sdh_idx], field_idx)
     return n
 end
-n_components(dh::DofHandler, name::Symbol) = n_components(dh, find_field(dh, name))
 
 """
     add!(sdh::SubDofHandler, name::Symbol, ip::Interpolation)
@@ -356,6 +414,33 @@ function add!(dh::DofHandler, name::Symbol, ip::Interpolation)
     # Add to SubDofHandler
     add!(sdh, name, ip)
     return dh
+end
+
+"""
+    add!(dh::DofHandler, name::Symbol, bar::SystemVariable)
+
+Adds a system variable to the DofHandler, which can used to e.g. represent unknown Lagrange multipliers.
+The type and number of DoFs added to DofHandler is specified by passing a type parameter to SystemVariable. For example, `SystemVariable{SymmetricTensor{2,2,Float64}}` will add 3 independent DoFs (one for each unique component of the tensor), and SystemVariable{4} will add four independt DoFs.
+"""
+function add!(dh::DofHandler, name::Symbol, var::SystemVariable)
+    @assert !isclosed(dh)
+    name ∈ dh.system_variables_names && throw(ArgumentError(string(":", name, " is already a system variable")))
+    name ∈ dh.field_names && throw(ArgumentError(string(":", name, " is already a field")))
+    push!(dh.system_variables_names, name)
+    return push!(dh.system_variables, var)
+end
+
+"""
+    system_variable_dofs(dh::DofHandler, name::Symbol)
+
+Get the global dof numbers associated with `name`.
+"""
+function system_variable_dofs(dh::DofHandler, name::Symbol)
+    @assert isclosed(dh)
+    i = findfirst(==(name), dh.system_variables_names)
+    i === nothing && throw(ArgumentError("SystemVariable with name $name does not exist."))
+    r = dh.system_variables_dofs_offset[i]:(dh.system_variables_dofs_offset[i + 1] - 1)
+    return dh.system_variables_dofs[r]
 end
 
 """
@@ -438,6 +523,16 @@ function __close!(dh::DofHandler{dim}) where {dim}
             facedicts,
             field_ncells,
         )
+    end
+
+    empty!(dh.system_variables_dofs)
+    empty!(dh.system_variables_dofs_offset)
+    push!(dh.system_variables_dofs_offset, 1)
+    for var in dh.system_variables
+        n = n_components(var)
+        append!(dh.system_variables_dofs, (0:(n - 1)) .+ nextdof)
+        push!(dh.system_variables_dofs_offset, dh.system_variables_dofs_offset[end] + n)
+        nextdof += n
     end
     dh.ndofs = nextdof - 1
     dh.closed = true

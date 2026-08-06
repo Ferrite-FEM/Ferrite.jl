@@ -43,6 +43,29 @@ dofs for the fields we added.
 close!(dh)
 ```
 
+## System variables
+
+In addition to spatially discretized fields above, we can also add **system variables** (global degrees of freedom) to the `DofHandler`. System variables represent global unknown quantities that are not tied to any domain or individual elements. They can be used to e.g. represent Lagrange multipliers. 
+
+To add a system variable, we pass a name (a `Symbol`) and a `Ferrite.SystemVariable` containing the tensor type representing the variable. For example, passing `SymmetricTensor{2,2,Float64}` allocates 3 global degrees of freedom corresponding to the independent components of a 2D symmetric tensor.
+
+```@example dofs
+dh = DofHandler(grid)
+ip = Lagrange{RefTriangle, 1}()
+add!(dh, :u, ip) # Normal Field on elements
+add!(dh, :λ, Ferrite.SystemVariable{SymmetricTensor{2,2,Float64}}())
+close!(dh);
+```
+
+Similarly to the normal DoFs on the cells, the dofs for the system variables can be query as
+
+```@example dofs
+system_variable_dofs(dh, :λ)
+```
+
+Note that when creating the global stiffness matrix via `K = allocate_matrix(dh)`, the system variable DoFs are not coupled with any other DoF. The user has to handle by themselves. For more information on this, see the section about [sparsity patterns](sparse_matrix.md) or the [Tutorial: Computational Homogensiation](../tutorials/computational_homogenization.md).
+
+
 ## Local DoF indices
 
 Locally on each element the DoFs are ordered by field, in the same order they were added
