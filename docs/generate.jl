@@ -171,6 +171,7 @@ write_overview(
         ("dg_heat_equation", "DG heat equation", ["dg_heat_equation-light.png", "dg_heat_equation-dark.png"]),
         ("heat_adaptivity", "Heat equation with adaptive mesh refinement", ["heat_adaptivity-light.webp", "heat_adaptivity-dark.webp"]),
         ("darcy_flow", "Darcy flow", ["darcy_flow-light.png", "darcy_flow-dark.png"]),
+        ("magnetostatics", "Magnetostatics", ["magnetostatics-light.png", "magnetostatics-dark.png"]),
     ],
 )
 

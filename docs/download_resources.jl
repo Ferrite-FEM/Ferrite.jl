@@ -37,6 +37,7 @@ fetch_assets(
                 "hyperelasticity", "plasticity", "computational_homogenization",
                 "stokes-flow", "dg_heat_equation", "linear_shell",
                 "linear_elasticity_stress", "elastodynamics_modes", "darcy_flow",
+                "magnetostatics",
             ], ".png"
         ),
         variants(["transient_heat", "elastodynamics", "porous_media", "ns_vs_diffeq", "reactive_surface", "heat_adaptivity"], ".webp"),

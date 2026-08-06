@@ -26,7 +26,8 @@
 #                 origin remote).
 # names...        only (re)generate data for these examples; default is all.
 #
-# Requires `pvbatch` (ParaView) on PATH.
+# Requires `pvbatch` (ParaView): on PATH, pointed at by the PVBATCH environment
+# variable, or (on macOS) inside a ParaView app bundle in /Applications.
 
 # Each example maps to the literate file that, when run, writes its VTK data.
 const EXAMPLES = Dict(
@@ -41,6 +42,7 @@ const EXAMPLES = Dict(
     "linear_shell" => "literate-tutorials/linear_shell.jl",
     "heat_adaptivity" => "literate-tutorials/heat_adaptivity.jl",
     "darcy_flow" => "literate-tutorials/darcy_flow.jl",
+    "magnetostatics" => "literate-tutorials/magnetostatics.jl",
     # How-to guides.
     "postprocessing" => "literate-howto/postprocessing.jl",
     "threaded_assembly" => "literate-howto/threaded_assembly.jl",
@@ -158,7 +160,25 @@ if !render_only
     end
 end
 
-run(`pvbatch $(joinpath(DOCS, "screenshots.py")) $DATADIR $OUTDIR $selected`)
+# Find pvbatch: the PVBATCH environment variable overrides, then PATH, and
+# finally inside the ParaView app bundle on macOS, which does not put the
+# ParaView binaries on PATH.
+function find_pvbatch()
+    pvbatch = get(ENV, "PVBATCH", nothing)
+    pvbatch === nothing || return pvbatch
+    pvbatch = Sys.which("pvbatch")
+    pvbatch === nothing || return pvbatch
+    if Sys.isapple()
+        apps = filter(startswith("ParaView"), readdir("/Applications"))
+        for app in sort(apps; rev = true) # highest version first
+            pvbatch = joinpath("/Applications", app, "Contents", "bin", "pvbatch")
+            isfile(pvbatch) && return pvbatch
+        end
+    end
+    return error("pvbatch (ParaView) not found: put it on PATH or point the PVBATCH environment variable at it")
+end
+
+run(`$(find_pvbatch()) $(joinpath(DOCS, "screenshots.py")) $DATADIR $OUTDIR $selected`)
 @info "screenshots written to $OUTDIR"
 
 if "--upload" in ARGS

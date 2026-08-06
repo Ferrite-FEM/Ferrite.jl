@@ -216,3 +216,18 @@ is verified and compared against the standard primal formulation.
 
 **Keywords**: mixed finite elements, H(div), Raviart-Thomas, weak (natural) boundary
 conditions, `ProjectedDirichlet`, local conservation.
+
+---
+
+#### [Tutorial 17: Magnetostatics with H(curl) elements](@ref tutorial-magnetostatics)
+
+In this tutorial the magnetic field around a current-carrying conductor, whose flux is
+collected by an iron core as in a current transformer, is computed directly as an unknown
+field discretized by H(curl)-conforming Nédélec (edge) elements, paired with a
+discontinuous approximation of the magnetic vector potential. The tangential trace of the
+field is prescribed with `ProjectedDirichlet`, and it is verified that Ampère's law holds
+exactly — element-wise and around loops — in contrast to the standard potential-based
+formulation.
+
+**Keywords**: mixed finite elements, H(curl), Nédélec, edge elements, magnetostatics,
+`ProjectedDirichlet`, Ampère's law.
