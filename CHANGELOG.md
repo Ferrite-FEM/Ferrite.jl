@@ -144,6 +144,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Documentation
 - Landau example in code gallery now shows how to use DifferentiationInterface and HyperHessians as a backend. (#1345)
 
+### Fixes
+ - `PeriodicDirichlet` now works on mixed grids. ([#1046])
+
 ## [v1.4.1] - 2026-06-17
 
 ### Fixes
@@ -1288,6 +1291,7 @@ poking into Ferrite internals:
 [#1037]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1037
 [#1044]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1044
 [#1045]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1045
+[#1046]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1046
 [#1058]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1058
 [#1059]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1059
 [#1063]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1063
