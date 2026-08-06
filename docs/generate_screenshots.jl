@@ -76,6 +76,7 @@ const POSTRUN = Dict(
 # belong to a scene when uploading a subset.
 const OUTPUTS = Dict(
     "linear_elasticity" => ["linear_elasticity", "linear_elasticity_stress"],
+    "incompressible_elasticity" => ["incompressible_elasticity", "incompressible_elasticity_pressure"],
     "elastodynamics" => ["elastodynamics", "elastodynamics_modes"],
     "landau" => ["landau_orig", "landau_opt"],
     "postprocessing" => ["postprocessing", "postprocessing_cutline"],
