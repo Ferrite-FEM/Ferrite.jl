@@ -14,15 +14,23 @@ let g = SUITE["mesh"]["generate_grid"]
 end
 
 # Topology: construction and neighborhood queries. Hexahedra exercise the 3D path with
-# faces and edges, triangles the simplex path where cells share only vertices diagonally.
+# faces and edges, triangles and tetrahedra the simplex paths where cells share only
+# vertices diagonally (with many more neighbors per cell in 3D).
 SUITE["mesh"]["topology"] = BenchmarkGroup()
 let g = SUITE["mesh"]["topology"]
     hexgrid = generate_grid(Hexahedron, (10, 10, 10))
+    quadgrid = generate_grid(Quadrilateral, (25, 25))
     trigrid = generate_grid(Triangle, (25, 25))
+    tetgrid = generate_grid(Tetrahedron, (8, 8, 8))
     hextopo = ExclusiveTopology(hexgrid)
     g["ExclusiveTopology (Hexahedron 10×10×10)"] = @benchmarkable ExclusiveTopology($hexgrid) evals = 1
+    g["ExclusiveTopology (Quadrilateral 25×25)"] = @benchmarkable ExclusiveTopology($quadgrid) evals = 1
     g["ExclusiveTopology (Triangle 25×25)"] = @benchmarkable ExclusiveTopology($trigrid) evals = 1
+    g["ExclusiveTopology (Tetrahedron 8×8×8)"] = @benchmarkable ExclusiveTopology($tetgrid) evals = 1
     g["getneighborhood all cells (Hexahedron 10×10×10)"] = @benchmarkable FerriteBenchmarkHelpers.neighborhood_sweep($hextopo, $hexgrid) evals = 1
+    # getneighborhood through the EdgeIndex path, which recomputes the full neighborhood
+    # for each query since only the exclusive neighbors are stored for 3D cells.
+    g["getneighborhood all edges (Hexahedron 10×10×10)"] = @benchmarkable FerriteBenchmarkHelpers.edge_neighborhood_sweep($hextopo, $hexgrid) evals = 1
     # Iteration over the raw vertex/edge/face adjacency storage (issue #1019).
     g["neighbor iteration (Hexahedron 10×10×10)"] = @benchmarkable FerriteBenchmarkHelpers.neighbor_index_sum($hextopo) evals = 1
     # getneighborhood through the FacetIndex path for every skeleton facet (issue #1019).
