@@ -20,7 +20,7 @@ dh = DofHandler(grid)
 add!(dh, :u, ip)
 close!(dh);
 
-K = allocate_matrix(dh, topology = topology, interface_coupling = trues(1, 1));
+K = allocate_matrix(dh, interface_coupling = [true;;], topology = topology);
 
 ch = ConstraintHandler(dh)
 add!(ch, Dirichlet(:u, getfacetset(grid, "right"), (x, t) -> 1.0))
@@ -97,7 +97,11 @@ function assemble_boundary!(fe::Vector, fv::FacetValues)
     return fe
 end
 
-function assemble_global(cellvalues::CellValues, facetvalues::FacetValues, interfacevalues::InterfaceValues, K::SparseMatrixCSC, dh::DofHandler, order::Int, dim::Int)
+function assemble_global(
+        cellvalues::CellValues, facetvalues::FacetValues, interfacevalues::InterfaceValues,
+        K::SparseMatrixCSC, dh::DofHandler, topology::ExclusiveTopology,
+        order::Int, dim::Int
+    )
     # Allocate the element stiffness matrix and element force vector
     n_basefuncs = getnbasefunctions(cellvalues)
     Ke = zeros(n_basefuncs, n_basefuncs)
@@ -118,8 +122,8 @@ function assemble_global(cellvalues::CellValues, facetvalues::FacetValues, inter
         # Assemble Ke and fe into K and f
         assemble!(assembler, celldofs(cell), Ke, fe)
     end
-    # Loop over all interfaces
-    for ic in InterfaceIterator(dh)
+    # Loop over all interfaces, reusing the topology constructed above
+    for ic in InterfaceIterator(dh, topology)
         # Reinitialize interfacevalues for this interface
         reinit!(interfacevalues, ic)
         # Calculate the characteristic size hₑ as the face diameter
@@ -145,7 +149,7 @@ function assemble_global(cellvalues::CellValues, facetvalues::FacetValues, inter
     end
     return K, f
 end
-K, f = assemble_global(cellvalues, facetvalues, interfacevalues, K, dh, order, dim);
+K, f = assemble_global(cellvalues, facetvalues, interfacevalues, K, dh, topology, order, dim);
 
 apply!(K, f, ch)
 u = K \ f;
