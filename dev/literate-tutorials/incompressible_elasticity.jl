@@ -13,14 +13,138 @@
 #
 # ## Introduction
 #
-# Mixed elements can be used to overcome locking when the material becomes
-# incompressible. However, for an element to be stable, it needs to fulfill
-# the LBB condition.
-# In this example we will consider two different element formulations
+# In this example we solve the equations of linear elasticity for an incompressible
+# material. For (nearly) incompressible materials the standard displacement-based finite
+# element formulation suffers from *volumetric locking*: low order elements give much too
+# stiff response, and the solution does not (or very slowly) converge with mesh refinement.
+# Mixed elements, where the (hydrostatic) pressure is introduced as an additional unknown
+# field, can be used to overcome this problem. However, for such a mixed element to be
+# stable, the combination of displacement and pressure interpolations needs to fulfill the
+# [LBB condition](https://en.wikipedia.org/wiki/Ladyzhenskaya%E2%80%93Babu%C5%A1ka%E2%80%93Brezzi_condition)
+# (see e.g. [BofBreFor:2013:mfe](@cite)). In this example we will consider two different
+# element formulations:
 # - linear displacement with linear pressure approximation (does *not* fulfill LBB)
 # - quadratic displacement with linear pressure approximation (does fulfill LBB)
 # The quadratic/linear element is also known as the Taylor-Hood element.
-# We will consider Cook's Membrane with an applied traction on the right hand side.
+#
+# ### Problem formulation
+#
+# As a benchmark problem we consider Cook's membrane [Coo:1974:itd](@cite): a tapered
+# quadrilateral panel ``\Omega`` with corners in ``(0, 0)``, ``(48, 44)``, ``(48, 60)``, and
+# ``(0, 44)``, which is clamped on the left edge ``\Gamma_\mathrm{D}`` and subjected to a
+# shear traction ``\boldsymbol{t} = (0, 1/16)`` on the right edge ``\Gamma_\mathrm{N}`` (the
+# remaining part of the boundary is traction free). The combination of bending dominated
+# deformation and an incompressible material makes this a classical benchmark for locking.
+# We consider plane strain conditions and a linear elastic material with Poisson's ratio
+# ``\nu = 0.5``, i.e. an exactly incompressible material.
+#
+# For an isotropic linear elastic material the stress ``\boldsymbol{\sigma}`` can be split
+# into deviatoric and volumetric parts (cf. the [Linear elasticity](@ref
+# tutorial-linear-elasticity) tutorial),
+# ```math
+# \boldsymbol{\sigma} = 2G\, \boldsymbol{\varepsilon}^\mathrm{dev} +
+# K\, \mathrm{tr}(\boldsymbol{\varepsilon})\, \boldsymbol{I}, \quad
+# \boldsymbol{\varepsilon} = \frac{1}{2} \left[
+# \boldsymbol{\nabla} \boldsymbol{u} + (\boldsymbol{\nabla} \boldsymbol{u})^\mathrm{T}
+# \right],
+# ```
+# where ``G`` is the shear modulus, ``K`` the bulk modulus, and
+# ``\boldsymbol{\varepsilon}^\mathrm{dev} = \boldsymbol{\varepsilon} -
+# \frac{1}{3}\mathrm{tr}(\boldsymbol{\varepsilon})\, \boldsymbol{I}`` the deviatoric part of
+# the strain tensor. In the incompressible limit ``\nu \rightarrow 0.5`` the bulk modulus
+# ``K \rightarrow \infty``, which is the cause of the locking (and for ``\nu = 0.5`` the
+# displacement formulation is not even well defined). The remedy is to introduce the
+# pressure
+# ```math
+# p := - K\, \mathrm{tr}(\boldsymbol{\varepsilon}) = - K\, \boldsymbol{\nabla} \cdot \boldsymbol{u}
+# ```
+# as an additional unknown field. The strong form of the mixed problem then reads: find the
+# displacement ``\boldsymbol{u}`` and the pressure ``p`` such that
+# ```math
+# \begin{align*}
+# -\boldsymbol{\nabla} \cdot \boldsymbol{\sigma}(\boldsymbol{u}, p) &= \boldsymbol{0} \quad \forall \boldsymbol{x} \in \Omega, \\
+# \boldsymbol{\nabla} \cdot \boldsymbol{u} + \frac{p}{K} &= 0 \quad \forall \boldsymbol{x} \in \Omega,
+# \end{align*}
+# ```
+# where the stress is now given by
+# ```math
+# \boldsymbol{\sigma}(\boldsymbol{u}, p) = 2G\, \boldsymbol{\varepsilon}^\mathrm{dev}(\boldsymbol{u}) - p\, \boldsymbol{I},
+# ```
+# together with the boundary conditions
+# ```math
+# \boldsymbol{u} = \boldsymbol{0} \quad \forall \boldsymbol{x} \in \Gamma_\mathrm{D}, \qquad
+# \boldsymbol{\sigma} \cdot \boldsymbol{n} = \boldsymbol{t} \quad \forall \boldsymbol{x} \in \Gamma_\mathrm{N}.
+# ```
+# For finite ``K``, the second equation is equivalent to the definition of the pressure
+# above, and eliminating ``p`` recovers the standard displacement formulation. The advantage
+# of the mixed form is that it remains well defined in the incompressible limit: for
+# ``K = \infty`` the second equation reduces to the incompressibility constraint
+# ``\boldsymbol{\nabla} \cdot \boldsymbol{u} = 0``.
+#
+# The corresponding weak form reads: find ``(\boldsymbol{u}, p) \in \mathbb{U} \times
+# \mathbb{P}`` such that
+# ```math
+# \begin{align*}
+# \int_\Omega 2G\, \boldsymbol{\varepsilon}^\mathrm{dev}(\delta\boldsymbol{u}) :
+# \boldsymbol{\varepsilon}^\mathrm{dev}(\boldsymbol{u})\, \mathrm{d}\Omega
+# - \int_\Omega (\boldsymbol{\nabla} \cdot \delta\boldsymbol{u})\, p\, \mathrm{d}\Omega
+# &= \int_{\Gamma_\mathrm{N}} \delta\boldsymbol{u} \cdot \boldsymbol{t}\, \mathrm{d}\Gamma
+# \quad \forall\, \delta\boldsymbol{u} \in \mathbb{U}^0, \\
+# - \int_\Omega \delta p\, (\boldsymbol{\nabla} \cdot \boldsymbol{u})\, \mathrm{d}\Omega
+# - \int_\Omega \frac{1}{K}\, \delta p\, p\, \mathrm{d}\Omega
+# &= 0
+# \quad \forall\, \delta p \in \mathbb{P},
+# \end{align*}
+# ```
+# where ``\mathbb{U}`` and ``\mathbb{U}^0`` are suitable displacement trial and test sets
+# (in particular, functions in ``\mathbb{U}`` fulfill the Dirichlet boundary condition on
+# ``\Gamma_\mathrm{D}``, and functions in ``\mathbb{U}^0`` are zero there), and
+# ``\mathbb{P}`` is the pressure space, for which no boundary conditions apply. In the
+# first equation we have used that ``\boldsymbol{\varepsilon}(\delta\boldsymbol{u}) :
+# \boldsymbol{\varepsilon}^\mathrm{dev}(\boldsymbol{u}) =
+# \boldsymbol{\varepsilon}^\mathrm{dev}(\delta\boldsymbol{u}) :
+# \boldsymbol{\varepsilon}^\mathrm{dev}(\boldsymbol{u})`` and
+# ``\boldsymbol{\varepsilon}(\delta\boldsymbol{u}) : \boldsymbol{I} = \boldsymbol{\nabla}
+# \cdot \delta\boldsymbol{u}``.
+#
+# After finite element discretization we obtain the linear system
+# ```math
+# \begin{bmatrix}
+# \underline{\underline{K}}_{uu} & \underline{\underline{K}}_{pu}^\mathrm{T} \\
+# \underline{\underline{K}}_{pu} & \underline{\underline{K}}_{pp}
+# \end{bmatrix}
+# \begin{bmatrix}
+# \underline{a}_{u} \\
+# \underline{a}_{p}
+# \end{bmatrix}
+# =
+# \begin{bmatrix}
+# \underline{f}_{u} \\
+# \underline{0}
+# \end{bmatrix},
+# ```
+# where
+# ```math
+# \begin{align*}
+# (\underline{\underline{K}}_{uu})_{ij} &= \int_\Omega 2G\,
+# \boldsymbol{\varepsilon}^\mathrm{dev}(\boldsymbol{\phi}^u_i) :
+# \boldsymbol{\varepsilon}^\mathrm{dev}(\boldsymbol{\phi}^u_j)\, \mathrm{d}\Omega, \\
+# (\underline{\underline{K}}_{pu})_{ij} &= - \int_\Omega \phi^p_i\,
+# (\boldsymbol{\nabla} \cdot \boldsymbol{\phi}^u_j)\, \mathrm{d}\Omega, \\
+# (\underline{\underline{K}}_{pp})_{ij} &= - \int_\Omega \frac{1}{K}\, \phi^p_i\, \phi^p_j\,
+# \mathrm{d}\Omega, \\
+# (\underline{f}_{u})_{i} &= \int_{\Gamma_\mathrm{N}} \boldsymbol{\phi}^u_i \cdot
+# \boldsymbol{t}\, \mathrm{d}\Gamma.
+# \end{align*}
+# ```
+# The system is symmetric, but indefinite (a saddle point problem), which is why the
+# stability (LBB) condition mentioned above comes into play.
+#
+# !!! note "Plane strain and the deviatoric operator"
+#     Even though we solve the problem in 2D (plane strain), the deviatoric operator must
+#     act on the full 3D strain tensor: under plane strain the out-of-plane strain
+#     ``\varepsilon_{33} = 0``, but ``\varepsilon^\mathrm{dev}_{33} \neq 0``.
+#     This is handled by the function `dev_3d` in the program below.
 #-
 # ## Commented program
 #
@@ -29,7 +153,10 @@
 #md # [section](@ref incompressible_elasticity-plain-program).
 using Ferrite, Tensors
 
-# First we generate a simple grid, specifying the 4 corners of Cooks membrane.
+# First we generate a simple grid, specifying the 4 corners of Cook's membrane.
+# We also add facetsets for the left edge (`"clamped"`, corresponding to
+# ``\Gamma_\mathrm{D}``) and the right edge (`"traction"`, corresponding to
+# ``\Gamma_\mathrm{N}``), where we will apply the boundary conditions.
 function create_cook_grid(nx, ny)
     corners = [
         Vec{2}((0.0, 0.0)),
@@ -73,8 +200,14 @@ function create_dofhandler(grid, ipu, ipp)
     return dh
 end;
 
-# We also need to add Dirichlet boundary conditions on the `"clamped"` facetset.
-# We specify a homogeneous Dirichlet bc on the displacement field, `:u`.
+# We also need to add Dirichlet boundary conditions on the `"clamped"` facetset,
+# i.e. ``\boldsymbol{u} = \boldsymbol{0}`` on ``\Gamma_\mathrm{D}``. We specify a
+# homogeneous Dirichlet bc on the displacement field, `:u`. Note that no boundary
+# condition is prescribed for the pressure field: the traction on
+# ``\Gamma_\mathrm{N}`` is a natural boundary condition that enters the weak form
+# through the load vector ``\underline{f}_u``, which is assembled in the element
+# routine below, and on the traction free part of the boundary nothing needs to be
+# done.
 function create_bc(dh)
     dbc = ConstraintHandler(dh)
     add!(dbc, Dirichlet(:u, getfacetset(dh.grid, "clamped"), x -> zero(x), [1, 2]))
@@ -118,7 +251,9 @@ function doassemble(
     return K, f
 end;
 
-# The element routine integrates the local stiffness and force vector for all elements.
+# The element routine integrates the local stiffness and force vector for all elements, by
+# computing the blocks ``\underline{\underline{K}}_{uu}``, ``\underline{\underline{K}}_{pu}``,
+# and ``\underline{\underline{K}}_{pp}`` from the weak form above.
 # Since the problem results in a symmetric matrix we choose to only assemble the lower part,
 # and then symmetrize it after the loop over the quadrature points.
 function dev_3d(t::SymmetricTensor{2, 2, T}) where {T}
@@ -185,7 +320,11 @@ function symmetrize_lower!(Ke)
 end;
 
 # To evaluate the stresses after solving the problem we once again loop over the cells in
-# the grid. Stresses are evaluated in the quadrature points, however, for
+# the grid. The stress is computed from the constitutive relation of the mixed
+# formulation given in the introduction, ``\boldsymbol{\sigma} = 2G\,
+# \boldsymbol{\varepsilon}^\mathrm{dev} - p\, \boldsymbol{I}``, using both the computed
+# displacement and pressure fields.
+# Stresses are evaluated in the quadrature points, however, for
 # export/visualization you typically want values in the nodes of the mesh, or as single data
 # points per cell. For the former you can project the quadrature point data to a finite
 # element space (see the example with the `L2Projector` in [Postprocessing and
@@ -299,10 +438,39 @@ quadratic_u = Lagrange{RefTriangle, 2}()^2
 # All that is left is to solve the problem. We choose a value of Poissons
 # ratio that results in incompressibility ($ν = 0.5$) and thus expect the
 # linear/linear approximation to return garbage, and the quadratic/linear
-# approximation to be stable.
+# approximation to be stable. Note that for $ν = 0.5$ the bulk modulus
+# evaluates to `Inf`, such that the $1/K$ term in the weak form vanishes,
+# and the pressure equation reduces to the incompressibility constraint.
 
 u1 = solve(0.5, linear_u, linear_p);
 u2 = solve(0.5, quadratic_u, linear_p);
+
+# ## Results
+#
+# The two solutions are compared in Figure 2, where the computed pressure field is
+# plotted on the deformed geometry.
+#
+# ![](incompressible_elasticity_pressure-light.png)
+# ![](incompressible_elasticity_pressure-dark.png)
+#
+# *Figure 2*: Pressure field for the linear/linear element (left) and the
+# quadratic/linear element (right). The color scale is fitted to the range of the
+# quadratic/linear solution.
+#
+# For the stable quadratic/linear element the pressure field is smooth, but for the
+# unstable linear/linear element it oscillates wildly from node to node in a so called
+# *checkerboard mode*. This is precisely the failure the LBB condition guards against:
+# for the linear/linear pair the pressure space is too rich compared to the displacement
+# space, and (nearly) checkerboard shaped pressure fields produce no divergence that the
+# displacement space can feel, leaving them (almost) unconstrained by the equation system.
+# In this example the checkerboard oscillations are roughly 30 times larger than the true
+# pressure variation, and they completely saturate the color scale on the left. Note that
+# the displacement field, and therefore the deformed shape, looks reasonable also for the
+# linear/linear element, but since the stress depends on the pressure (recall
+# ``\boldsymbol{\sigma} = 2G\, \boldsymbol{\varepsilon}^\mathrm{dev} - p\,
+# \boldsymbol{I}``) the stress output from the unstable element is useless. Figure 1 at
+# the top of this page shows the von Mises stress from the stable quadratic/linear
+# solution.
 
 ## test the result                 #src
 using Test                         #src
