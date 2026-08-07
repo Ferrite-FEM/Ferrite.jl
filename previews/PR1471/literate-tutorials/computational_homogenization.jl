@@ -303,9 +303,7 @@ Ei = 10 * Em;
 # The assembly function is nothing strange, and in particular there is no impact from the
 # choice of boundary conditions, so the same function can be used for both cases. Since
 # we want to solve the system 3 times, once for each macroscopic strain component, we
-# assemble 3 right-hand-sides. Note that all data the kernel needs -- in particular the
-# material stiffnesses -- is passed as arguments: referencing non-`const` globals inside
-# the function would make it type unstable and slow down the assembly considerably.
+# assemble 3 right-hand-sides.
 
 function doassemble!(cellvalues::CellValues, K::SparseMatrixCSC, dh::DofHandler, εᴹ, Ei, Em)
 
