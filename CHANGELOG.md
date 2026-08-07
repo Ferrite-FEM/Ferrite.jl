@@ -14,6 +14,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
    `CellValues`; `MultiFieldCellValues` remains as an alias for this case and behaves as
    before. The type parameters of `CellValues` have changed (internal, but may affect
    code dispatching on them). ([#XXXX])
+ - `FacetValues` now supports multiple fields the same way as `CellValues`, e.g.
+   `FacetValues(fqr, (u = ipu, p = ipp))` with shape function queries on `fv.u` and
+   `fv.p`. The type parameters of `FacetValues` have changed (internal, but may affect
+   code dispatching on them). ([#XXXX])
 
 ### Fixes
  - Atomic assembly support for BlockAssembler. ([#1452])
