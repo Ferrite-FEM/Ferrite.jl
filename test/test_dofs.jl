@@ -1233,3 +1233,27 @@ end
         end
     end
 end
+
+@testset "evaluate_at_grid_nodes for non-identity mappings" begin
+    # Regression test for the missing reinit! (would return garbage from an undef buffer).
+    # Single cell: at shared nodes an H(curl) field is multi-valued (last-writer-wins),
+    # so only a single-cell grid has well-defined expected values.
+    grid = Grid([Triangle((1, 2, 3))], [Node(Vec((0.0, 0.0))), Node(Vec((1.0, 0.0))), Node(Vec((0.0, 1.0)))])
+    ip = Nedelec{RefTriangle, 1}()
+    dh = DofHandler(grid)
+    add!(dh, :A, ip)
+    close!(dh)
+    u = rand(ndofs(dh))
+    vals = evaluate_at_grid_nodes(dh, u, :A)
+    ip_geo = Lagrange{RefTriangle, 1}()
+    ref_coords = Ferrite.reference_coordinates(ip_geo)
+    qr = QuadratureRule{RefTriangle}(zeros(length(ref_coords)), ref_coords)
+    cv = CellValues(qr, ip, ip_geo^2; update_gradients = false, update_detJdV = false)
+    for cc in CellIterator(dh)
+        reinit!(cv, cc)
+        ue = u[celldofs(cc)]
+        for (qp, nodeid) in pairs(cc.nodes)
+            @test vals[nodeid] ≈ function_value(cv, qp, ue)
+        end
+    end
+end

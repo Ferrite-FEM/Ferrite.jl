@@ -130,6 +130,14 @@ quadrature point `q_point`.
 shape_gradient(fe_v::AbstractValues, q_point::Int, base_function::Int)
 
 """
+    shape_hessian(fe_v::AbstractValues, q_point::Int, base_function::Int)
+
+Return the hessian of shape function `base_function` evaluated in quadrature point
+`q_point`. Requires the `AbstractValues` to be constructed with `update_hessians = true`.
+"""
+shape_hessian(fe_v::AbstractValues, q_point::Int, base_function::Int)
+
+"""
     shape_symmetric_gradient(fe_v::AbstractValues, q_point::Int, base_function::Int)
 
 Return the symmetric gradient of shape function `base_function` evaluated in
@@ -257,10 +265,11 @@ function function_gradient_init(cv::AbstractValues, ::AbstractVector{T}) where {
 end
 
 """
-    function_hessian(fe_v::AbstractValues{dim}, q_point::Int, u::AbstractVector{<:AbstractFloat}, [dof_range])
+    function_hessian(fe_v::AbstractValues, q_point::Int, u::AbstractVector, [dof_range])
 
-    Compute the hessian of the function in a quadrature point. `u` is a vector with values
-    for the degrees of freedom.
+Compute the hessian of the function in a quadrature point. `u` is a vector with values
+for the degrees of freedom. Requires the `AbstractValues` to be constructed with
+`update_hessians = true`.
 """
 function function_hessian(fe_v::AbstractValues, q_point::Int, u::AbstractVector, dof_range = eachindex(u))
     n_base_funcs = getnbasefunctions(fe_v)

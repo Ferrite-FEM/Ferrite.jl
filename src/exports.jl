@@ -44,6 +44,7 @@ export
     shape_curl,
     function_value,
     function_gradient,
+    function_hessian,
     function_symmetric_gradient,
     function_divergence,
     function_curl,

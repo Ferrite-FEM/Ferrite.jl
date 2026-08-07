@@ -4,35 +4,88 @@ function _geometric_interpolations(dh::DofHandler)
     return ntuple(i -> geometric_interpolation(getcelltype(i)), length(sdhs))
 end
 
+# Error for unsupported interpolations before any dof value has been assigned, so that
+# `a` is never partially modified. See the `apply_analytical!` docstring for which
+# interpolations are supported and how they are handled.
+function _check_apply_analytical_supported(ip_fun::Interpolation{RefShape}) where {dim, RefShape <: AbstractRefShape{dim}}
+    applicable(reference_coordinates, ip_fun) && return nothing
+    cf = conformity(ip_fun)
+    if cf isa HcurlConformity && dim == 3
+        throw(ArgumentError("apply_analytical! is not implemented for 3D H(curl) interpolations ($ip_fun), whose edge dofs require line integrals along edges"))
+    elseif !(cf isa Union{HdivConformity, HcurlConformity})
+        error("apply_analytical! is not implemented for $(ip_fun).")
+    end
+    return nothing
+end
+
 """
     apply_analytical!(
         a::AbstractVector, dh::AbstractDofHandler, fieldname::Symbol,
-        f::Function, cellset = 1:getncells(get_grid(dh))
+        f::Function, cellset = 1:getncells(get_grid(dh));
+        qr_order = -1
     )
 
 Apply a solution `f(x)` by modifying the values in the degree of freedom vector `a`
 pertaining to the field `fieldname` for all cells in `cellset`.
-The function `f(x)` are given the spatial coordinate
-of the degree of freedom. For scalar fields, `f(x)::Number`,
-and for vector fields with dimension `dim`, `f(x)::Vec{dim}`.
+The function `f(x)` is given the spatial coordinate `x`. For scalar fields,
+`f(x)::Number`, and for vector fields with dimension `dim`, `f(x)::Vec{dim}`.
 
 This function can be used to apply initial conditions for time dependent problems.
 
-!!! note
+# Nodal interpolations
+For standard nodal finite element interpolations (e.g. Lagrange and Serendipity,
+including sub- and superparametric elements), the function value at the (algebraic)
+node is equal to the corresponding degree of freedom value, and `f` is simply
+evaluated at the reference coordinates of the interpolation.
 
-    This function only works for standard nodal finite element interpolations
-    when the function value at the (algebraic) node is equal to the corresponding
-    degree of freedom value.
-    This holds for e.g. Lagrange and Serendipity interpolations, including
-    sub- and superparametric elements.
+# H(div) and H(curl) interpolations
+For H(div) and H(curl) interpolations (`RaviartThomas`,
+`BrezziDouglasMarini`, and `Nedelec`), the dof values are instead determined by
+local L2 projections, and `f` must return the full vector value,
+`f(x)::Vec{dim}`. (Interpolations whose dofs are point values at locations
+other than the nodes, e.g. `CrouzeixRaviart` and `RannacherTurek`,
+use the nodal path above.) The projections are:
+
+* Dofs associated with a facet are determined by projecting the trace of `f`
+  (the normal component ``f \\cdot n`` for H(div), the tangential part
+  ``f \\times n`` for H(curl)) onto the trace of the finite element space on
+  that (physical) facet.
+* Remaining interior dofs (present for e.g. `RaviartThomas{RefTriangle, 2}`) are
+  determined by a cell-local L2 minimization with the facet dofs fixed.
+
+This operator reproduces exactly any function that lies in the (global) finite
+element space. Shared facet dofs get the same value from both neighboring cells
+(up to roundoff), since both project the same function onto the same facet trace
+space. On affine facets, the facet dof values coincide with the classical moment
+functionals of these interpolations; on non-affine facets they are the
+physical-L2 analogue thereof.
+
+The quadrature order can be controlled with the keyword `qr_order`; by default,
+`2 * order` of the interpolation is used, which integrates the projection
+matrices exactly on affine cells. For strongly distorted or curved cells, or
+rapidly varying `f`, a higher order may be beneficial. The keyword is ignored
+for nodal interpolations.
+
+!!! note
+    3D H(curl) interpolations (`Nedelec` on `RefTetrahedron`/`RefHexahedron`)
+    are not yet supported, since their edge dofs require line integrals along
+    edges; an `ArgumentError` is thrown for these.
 """
 function apply_analytical!(
         a::AbstractVector, dh::DofHandler, fieldname::Symbol, f::Function,
-        cellset = 1:getncells(get_grid(dh))
+        cellset = 1:getncells(get_grid(dh)); qr_order::Int = -1
     )
 
     fieldname ∉ getfieldnames(dh) && error("The fieldname $fieldname was not found in the dof handler")
     ip_geos = _geometric_interpolations(dh)
+
+    # Check that all field interpolations are supported before mutating `a` to avoid
+    # partial application
+    for sdh in dh.subdofhandlers
+        isnothing(_find_field(sdh, fieldname)) && continue
+        ip_fun = getfieldinterpolation(sdh, find_field(sdh, fieldname))
+        _check_apply_analytical_supported(ip_fun)
+    end
 
     for (sdh, ip_geo) in zip(dh.subdofhandlers, ip_geos)
         isnothing(_find_field(sdh, fieldname)) && continue
@@ -46,12 +99,16 @@ function apply_analytical!(
             intersect(BitSet(sdh.cellset), BitSet(cellset))
         end
         isempty(set_intersection) && continue
-        _apply_analytical!(a, dh, celldofinds, field_dim, ip_fun, ip_geo, f, set_intersection)
+        if applicable(reference_coordinates, ip_fun) # nodal path
+            _apply_analytical_nodal!(a, dh, celldofinds, field_dim, ip_fun, ip_geo, f, set_intersection)
+        else # H(div)/H(curl) path (checked supported above)
+            _apply_analytical_hdiv_hcurl!(a, dh, celldofinds, field_dim, ip_fun, ip_geo, f, set_intersection, qr_order)
+        end
     end
     return a
 end
 
-function _apply_analytical!(
+function _apply_analytical_nodal!(
         a::AbstractVector, dh::AbstractDofHandler, celldofinds, field_dim,
         ip_fun::Interpolation{RefShape}, ip_geo::Interpolation, f::Function, cellset
     ) where {dim, RefShape <: AbstractRefShape{dim}}
@@ -85,6 +142,102 @@ function _apply_analytical!(a::AbstractVector, dofs::Vector{Int}, coords::Vector
         for (idim, icval) in enumerate(f(x_dof))
             a[dofs[field_dim * (i_dof - 1) + idim]] = icval
         end
+    end
+    return a
+end
+
+# H(div) and H(curl) interpolations: dofs are determined by L2 projection of the
+# trace of f onto each facet's trace space, followed by a cell-local L2 fit for
+# interior dofs. Reuses the facet projection kernels from ProjectedDirichlet.
+_trace_function(::HdivConformity, f::Function) = (x, _, n) -> f(x) ⋅ n
+_trace_function(::HcurlConformity, f::Function) = (x, _, n) -> f(x) × n
+
+function _apply_analytical_hdiv_hcurl!(
+        a::AbstractVector, dh::AbstractDofHandler, celldofinds, field_dim,
+        ip_fun::Interpolation{RefShape}, ip_geo::Interpolation, f::Function, cellset, qr_order::Int
+    ) where {dim, RefShape <: AbstractRefShape{dim}}
+
+    # 3D H(curl) is rejected up front in _check_apply_analytical_supported
+    cf = conformity(ip_fun)
+
+    grid = get_grid(dh)
+    order = _default_bc_qr_order(qr_order, ip_fun)
+    fqr = FacetQuadratureRule{RefShape}(order)
+    fv = FacetValues(fqr, ip_fun, ip_geo)
+    facetdof_indices = dirichlet_facetdof_indices(ip_fun)
+    interior_dofs = setdiff(1:getnbasefunctions(ip_fun), Iterators.flatten(facetdof_indices))
+
+    T = eltype(a)
+    max_facet_dofs = maximum(length, facetdof_indices)
+    Kᶠ = zeros(T, max_facet_dofs, max_facet_dofs)
+    aᶠ = zeros(T, max_facet_dofs)
+    fᶠ = zeros(T, max_facet_dofs)
+    cv = if isempty(interior_dofs)
+        nothing
+    else
+        CellValues(QuadratureRule{RefShape}(order), ip_fun, ip_geo)
+    end
+    Kⁱ = zeros(T, length(interior_dofs), length(interior_dofs))
+    aⁱ = zeros(T, length(interior_dofs))
+    rⁱ = zeros(T, length(interior_dofs))
+
+    coords = getcoordinates(grid, first(cellset))
+    c_dofs = celldofs(dh, first(cellset))
+
+    # Check f before looping
+    length(f(first(coords))) == field_dim || error("length(f(x)) must be equal to dimension of the field ($field_dim)")
+    g = _trace_function(cf, f)
+
+    for cellnr in cellset
+        cell = getcells(grid, cellnr)
+        getcoordinates!(coords, grid, cellnr)
+        celldofs!(c_dofs, dh, cellnr)
+        for facetnr in 1:nfacets(cell)
+            shape_nrs = facetdof_indices[facetnr]
+            isempty(shape_nrs) && continue
+            reinit!(fv, cell, coords, facetnr)
+            solve_projected_dbc!(aᶠ, Kᶠ, fᶠ, g, fv, shape_nrs, coords, 0)
+            for (i, shape_nr) in pairs(shape_nrs)
+                a[c_dofs[celldofinds[shape_nr]]] = aᶠ[i]
+            end
+        end
+        if cv !== nothing
+            reinit!(cv, cell, coords)
+            _solve_interior_dofs!(a, aⁱ, Kⁱ, rⁱ, c_dofs, celldofinds, interior_dofs, cv, coords, f)
+        end
+    end
+    return a
+end
+
+# Determine the interior dofs by minimizing the cell-local L2 error with the
+# (already determined) facet dofs fixed.
+function _solve_interior_dofs!(
+        a::AbstractVector, aⁱ::Vector, Kⁱ::Matrix, rⁱ::Vector, c_dofs, celldofinds, interior_dofs,
+        cv::CellValues, coords::Vector{<:Vec}, f::Function
+    )
+    fill!(Kⁱ, 0)
+    fill!(rⁱ, 0)
+    for q_point in 1:getnquadpoints(cv)
+        dV = getdetJdV(cv, q_point)
+        x = spatial_coordinate(cv, q_point, coords)
+        # Residual: f minus the contribution from the facet dofs
+        v = f(x)
+        for shape_nr in 1:getnbasefunctions(cv)
+            shape_nr in interior_dofs && continue
+            v -= shape_value(cv, q_point, shape_nr) * a[c_dofs[celldofinds[shape_nr]]]
+        end
+        for (i, I) in pairs(interior_dofs)
+            Nᵢ = shape_value(cv, q_point, I)
+            rⁱ[i] += (Nᵢ ⋅ v) * dV
+            for (j, J) in pairs(interior_dofs)
+                Nⱼ = shape_value(cv, q_point, J)
+                Kⁱ[i, j] += (Nᵢ ⋅ Nⱼ) * dV
+            end
+        end
+    end
+    solve_small_spd!(aⁱ, Kⁱ, rⁱ)
+    for (i, I) in pairs(interior_dofs)
+        a[c_dofs[celldofinds[I]]] = aⁱ[i]
     end
     return a
 end
