@@ -149,6 +149,10 @@ function create_vtk_grid(filename::AbstractString, grid::AbstractGrid, write_dis
     return WriteVTK.vtk_grid(filename, coords, cls; kwargs...), cellnodes, node_mapping
 end
 
+function toparaview!(v, x::Number)
+    v[1] = x
+    return v
+end
 function toparaview!(v, x::Vec{D}) where {D}
     v[1:D] .= x
     return v
@@ -228,7 +232,7 @@ function write_projection(vtk::VTKGridFile, proj::L2Projector, vals, name)
     if write_discontinuous(vtk)
         data = evaluate_at_discontinuous_vtkgrid_nodes(proj.dh, vals, only(getfieldnames(proj.dh)), vtk.cellnodes)
     else
-        data = _evaluate_at_grid_nodes(proj, vals, #=vtk=# Val(true))::Matrix
+        data = evaluate_at_grid_nodes(proj, vals, Val(true))::Matrix
         @assert size(data, 2) == getnnodes(get_grid(proj.dh))
     end
 
