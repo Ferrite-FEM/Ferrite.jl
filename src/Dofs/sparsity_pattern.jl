@@ -214,7 +214,9 @@ Convenience method for doing the common task of calling [`add_cell_entries!`](@r
 [`add_interface_entries!`](@ref), and [`add_constraint_entries!`](@ref), depending on what
 arguments are passed:
  - `add_cell_entries!` is always called
- - `add_interface_entries!` is called if `topology` is provided (i.e. not `nothing`)
+ - `add_interface_entries!` is called if `interface_coupling` is provided (i.e. not
+   `nothing`). Passing `topology` is optional, but recommended for performance reasons
+   (see [`add_interface_entries!`](@ref)).
  - `add_constraint_entries!` is called if the ConstraintHandler is provided
 
 For more details about arguments and keyword arguments, see the respective functions.
@@ -235,7 +237,7 @@ function add_sparsity_entries!(
     # Add all entries
     add_diagonal_entries!(sp)
     add_cell_entries!(sp, dh, ch; keep_constrained, coupling)
-    if topology !== nothing
+    if interface_coupling !== nothing
         add_interface_entries!(sp, dh, ch; topology, keep_constrained, interface_coupling)
     end
     if ch !== nothing
@@ -284,7 +286,7 @@ end
 """
     add_interface_entries!(
         sp::SparsityPattern, dh::DofHandler, ch::Union{ConstraintHandler, Nothing};
-        topology::ExclusiveTopology, keep_constrained::Bool = true,
+        topology::Union{ExclusiveTopology, Nothing} = nothing, keep_constrained::Bool = true,
         interface_coupling::AbstractMatrix{Bool},
     )
 
@@ -292,7 +294,10 @@ Add entries to the sparsity pattern `sp` corresponding to DoF couplings on the i
 between cells as described by the DofHandler `dh`.
 
 # Keyword arguments
- - `topology`: the topology corresponding to the grid.
+ - `topology`: the topology corresponding to the grid. If not passed it is constructed
+   from the grid. Since the construction is relatively expensive it is recommended to
+   pass an existing topology, in particular since one is typically needed for e.g.
+   [`InterfaceIterator`](@ref) in the assembly loop anyway.
  - `keep_constrained`: whether or not entries for constrained DoFs should be kept
    (`keep_constrained = true`) or eliminated (`keep_constrained = false`) from the sparsity
    pattern. `keep_constrained = false` requires passing the ConstraintHandler `ch`.
@@ -304,13 +309,16 @@ between cells as described by the DofHandler `dh`.
 """
 function add_interface_entries!(
         sp::SparsityPattern, dh::DofHandler, ch::Union{ConstraintHandler, Nothing} = nothing;
-        topology::ExclusiveTopology, keep_constrained::Bool = true,
+        topology::Union{ExclusiveTopology, Nothing} = nothing, keep_constrained::Bool = true,
         interface_coupling::AbstractMatrix{Bool},
     )
     if !keep_constrained
         ch === nothing && error("must pass ConstraintHandler when `keep_constrained = true`")
         isclosed(ch) || error("the ConstraintHandler must be closed")
         ch.dh === dh || error("the DofHandler and the ConstraintHandler's DofHandler must be the same")
+    end
+    if topology === nothing
+        topology = ExclusiveTopology(get_grid(dh))
     end
     return _add_interface_entries!(sp, dh, ch, topology, keep_constrained, interface_coupling)
 end

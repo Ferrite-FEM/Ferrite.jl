@@ -332,6 +332,10 @@ end
     for p in patterns
         @test_throws ErrorException add_sparsity_entries!(p, dh, ch_bad; keep_constrained = false)
     end
+    # interface_coupling: the topology is constructed automatically when not passed
+    sp_ic = add_sparsity_entries!(SparsityPattern(ndofs(dh), ndofs(dh)), dh; interface_coupling = trues(2, 2))
+    sp_ic_topo = add_sparsity_entries!(SparsityPattern(ndofs(dh), ndofs(dh)), dh; interface_coupling = trues(2, 2), topology = ExclusiveTopology(grid))
+    compare_patterns(sp_ic, sp_ic_topo)
 end
 
 @testset "FastSparsityPattern" begin
