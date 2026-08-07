@@ -87,7 +87,7 @@ end
 default_geometric_interpolation(ip_funs::NamedTuple) = default_geometric_interpolation(first(ip_funs))
 
 struct CellValues{NT, FVT, GM, QR, detT} <: AbstractCellValues
-    fun_values_nt::NT # FunctionValues collected in a NamedTuple aliasing into fun_values, or Nothing (single-field mode)
+    fun_values_nt::NT # NamedTuple mapping field names to Val-indices into fun_values, or Nothing (single-field mode)
     fun_values::FVT   # FunctionValues collected in a tuple (each unique)
     geo_mapping::GM   # GeometryMapping
     qr::QR            # QuadratureRule
@@ -126,7 +126,7 @@ function CellValues(
     geo_mapping = GeometryMapping{GeoDiffOrder}(T, ip_geo.ip, qr)
     unique_ips = unique(values(ip_funs)) # Not type-stable, but ok for advanced users this should be constructed outside...
     fun_values = tuple((FunctionValues{FunDiffOrder}(T, ip_fun, qr, ip_geo) for ip_fun in unique_ips)...)
-    fun_values_nt = NamedTuple((key => fun_values[findfirst(unique_ip -> ip == unique_ip, unique_ips)] for (key, ip) in pairs(ip_funs)))
+    fun_values_nt = NamedTuple((key => Val(findfirst(unique_ip -> ip == unique_ip, unique_ips)) for (key, ip) in pairs(ip_funs)))
     detJdV = DetJdV ? fill(T(NaN), length(getweights(qr))) : nothing
     return CellValues(fun_values_nt, fun_values, geo_mapping, qr, detJdV)
 end
@@ -143,24 +143,17 @@ end
 (::Type{MultiFieldCellValues})(qr::QuadratureRule, ip_funs::NamedTuple, args...; kwargs...) = CellValues(qr, ip_funs, args...; kwargs...)
 (::Type{MultiFieldCellValues})(::Type{T}, qr::QuadratureRule, ip_funs::NamedTuple, args...; kwargs...) where {T} = CellValues(T, qr, ip_funs, args...; kwargs...)
 
-# Given the old and new (e.g. copied) unique fun_values tuples, rebuild the NamedTuple
-# such that keys with aliased values remain aliased in the new tuple.
-_rebuild_fun_values_nt(::Nothing, ::Tuple, ::Tuple) = nothing
-function _rebuild_fun_values_nt(nt::NamedTuple, old_fun_values::Tuple, new_fun_values::Tuple)
-    return map(named_fv -> new_fun_values[findfirst(fv -> fv === named_fv, old_fun_values)], nt)
-end
-
-function Base.copy(cv::CV) where {CV <: CellValues}
-    old_fun_values = get_fun_values(cv)
-    fun_values = map(copy, old_fun_values)
-    fun_values_nt = _rebuild_fun_values_nt(getfield(cv, :fun_values_nt), old_fun_values, fun_values)
-    # Construct via the concrete type CV for an inferred return type (the NamedTuple rebuild is not)
-    return CV(fun_values_nt, fun_values, copy(get_geo_mapping(cv)), copy(get_quadrature_rule(cv)), _copy_or_nothing(getdetJdVs(cv)))
+function Base.copy(cv::CellValues)
+    return CellValues(
+        getfield(cv, :fun_values_nt), map(copy, get_fun_values(cv)),
+        copy(get_geo_mapping(cv)), copy(get_quadrature_rule(cv)), _copy_or_nothing(getdetJdVs(cv))
+    )
 end
 
 # In multi-field mode, properties expose (only) the named FunctionValues, e.g. `cv.u`.
 # Single-field mode keeps the default `getproperty` (plain field access).
-@inline Base.getproperty(cv::MultiFieldCellValues, key::Symbol) = getproperty(getfield(cv, :fun_values_nt), key)
+@inline _tuple_index(t::Tuple, ::Val{i}) where {i} = t[i]
+@inline Base.getproperty(cv::MultiFieldCellValues, key::Symbol) = _tuple_index(getfield(cv, :fun_values), getproperty(getfield(cv, :fun_values_nt), key))
 Base.propertynames(cv::MultiFieldCellValues) = propertynames(getfield(cv, :fun_values_nt))
 
 # Access geometry values
@@ -264,8 +257,8 @@ function Base.show(io::IO, d::MIME"text/plain", cv::MultiFieldCellValues)
     print(io, "\nGeometric interpolation: ")
     sdim === nothing ? show(io, d, ip_geo) : show(io, d, ip_geo^sdim)
     print(io, "\nFunction interpolations")
-    for key in keys(getfield(cv, :fun_values_nt))
-        ip = function_interpolation(getfield(cv, :fun_values_nt)[key])
+    for key in propertynames(cv)
+        ip = function_interpolation(getproperty(cv, key))
         print(io, "\n  ", key, ": "); show(io, d, ip)
     end
     return
