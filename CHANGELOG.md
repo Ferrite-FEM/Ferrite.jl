@@ -20,6 +20,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
    common facet dimension across the whole grid. ([#843])
  - Experimental CUDA GPU support for assembly using type-stable, non-allocating element
    routines. ([#1291])
+ - Allow generic (but continuous) local dof orderings for interpolations. ([#1188])
 
 ## [v1.6.0] - 2026-08-02
 

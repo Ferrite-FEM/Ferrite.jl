@@ -24,7 +24,8 @@ for name in (
 end
 
 # Auto CPU thread count detection in ParallelTestRunner is bad
-push!(ARGS, "--jobs=$(Sys.CPU_THREADS)")
+TEST_THREADS = max(1, min(6, Sys.CPU_THREADS ÷ 2))
+push!(ARGS, "--jobs=$(TEST_THREADS)")
 
 # `init_code` runs in each test's (isolated) sandbox module; `using Ferrite` is
 # the only setup common to all tests. `init_worker_code` runs once per worker in

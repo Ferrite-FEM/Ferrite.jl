@@ -114,7 +114,7 @@ adjust_dofs_during_distribution(::Interpolation)
     interior_facedofs_on_lattice(::Interpolation)
 
 Return `true` if the interior face dofs are placed on a regular lattice, enumerated in the
-order assumed by [`permute_and_push!`](@ref). This is required to distribute an
+order assumed by [`permute_and_set!`](@ref). This is required to distribute an
 interpolation with more than one dof on a face shared between 3D cells, and interpolations
 must opt in (the default is `false`).
 """
@@ -128,21 +128,39 @@ this cache is of the same type no matter the interpolation: the purpose is to ma
 dof-distribution type-stable.
 """
 struct InterpolationInfo
-    nvertexdofs::Vector{Int}
-    nedgedofs::Vector{Int}
-    nfacedofs::Vector{Int}
-    nvolumedofs::Int
+    lvertexdofs::Vector{Int}
+    lvertexdofoffsets::Vector{Int}
+    ledgedofs::Vector{Int}
+    ledgedofoffsets::Vector{Int}
+    lfacedofs::Vector{Int}
+    lfacedofoffsets::Vector{Int}
+    lvolumedofs::Vector{Int}
     reference_dim::Int
     adjust_during_distribution::Bool
     interior_facedofs_on_lattice::Bool
     n_copies::Int
 end
 function InterpolationInfo(interpolation::Interpolation{shape}, n_copies) where {rdim, shape <: AbstractRefShape{rdim}}
+    lvertexdofs = Int[]
+    for ii in vertexdof_indices(interpolation)
+        append!(lvertexdofs, ii)
+    end
+    ledgedofs = Int[]
+    for ii in edgedof_interior_indices(interpolation)
+        append!(ledgedofs, ii)
+    end
+    lfacedofs = Int[]
+    for ii in facedof_interior_indices(interpolation)
+        append!(lfacedofs, ii)
+    end
     info = InterpolationInfo(
-        [length(i) for i in vertexdof_indices(interpolation)],
-        [length(i) for i in edgedof_interior_indices(interpolation)],
-        [length(i) for i in facedof_interior_indices(interpolation)],
-        length(volumedof_interior_indices(interpolation)),
+        lvertexdofs,
+        cumsum([1; [length(i) for i in vertexdof_indices(interpolation)]]),
+        ledgedofs,
+        cumsum([1; [length(i) for i in edgedof_interior_indices(interpolation)]]),
+        lfacedofs,
+        cumsum([1; [length(i) for i in facedof_interior_indices(interpolation)]]),
+        [volumedof_interior_indices(interpolation)...],
         rdim,
         adjust_dofs_during_distribution(interpolation),
         interior_facedofs_on_lattice(interpolation),
@@ -975,7 +993,7 @@ volumedof_interior_indices(::Lagrange{RefTetrahedron, 4}) = (35,)
 # Barycentric multi-indices α (with |α| = order) for the nodes of the interpolation, in
 # local dof order: vertex dofs, then edge interior dofs (following the local edge
 # direction), then face interior dofs (in the lattice enumeration assumed by
-# `permute_and_push!`), and finally volume interior dofs. The node corresponding to α is
+# `permute_and_set!`), and finally volume interior dofs. The node corresponding to α is
 # located at ∑ₜ αₜ xₜ / order, with xₜ the reference vertex coordinates.
 function _lagrange_tet_lattice_multiindices(order::Int)
     # Topology of RefTetrahedron. This must match reference_edges/reference_faces in
@@ -1164,7 +1182,7 @@ end
 # Tricubic tensor-product interpolation. The 64 nodes sit on the regular 4×4×4 lattice of
 # the reference hexahedron, each node being a tensor product of the equispaced 1D order-3
 # nodes. The interior face dofs follow the lattice enumeration assumed by
-# `permute_and_push!` (matching `Lagrange{RefQuadrilateral, 3}`).
+# `permute_and_set!` (matching `Lagrange{RefQuadrilateral, 3}`).
 getnbasefunctions(::Lagrange{RefHexahedron, 3}) = 64
 
 edgedof_interior_indices(::Lagrange{RefHexahedron, 3}) = (
@@ -1183,7 +1201,7 @@ const _lagrange_hex3_nodes_1d_x3 = (-3, -1, 1, 3)
 
 # Tensor-product multi-indices (a, b, c) ∈ (1:4)³ for the 64 nodes, in local dof order:
 # vertices, edge interior dofs (following the local edge direction), face interior dofs (in
-# the lattice enumeration assumed by `permute_and_push!`), and volume interior dofs. The
+# the lattice enumeration assumed by `permute_and_set!`), and volume interior dofs. The
 # node for (a, b, c) is located at (x_a, x_b, x_c) with x the 1D nodes above.
 function _build_lagrange_hex3_multiindices()
     # Topology of RefHexahedron, given as the tensor-product index of each vertex. Must

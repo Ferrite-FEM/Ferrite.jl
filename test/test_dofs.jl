@@ -1018,7 +1018,7 @@ end
 end
 
 @testset "canonical facedof index helpers" begin
-    # Brute-force geometric checks of the helpers used by Ferrite.permute_and_push! to
+    # Brute-force geometric checks of the helpers used by Ferrite.permute_and_set! to
     # adjust face dofs to the orientation of the local face: the local lattice point must
     # map to the index of the canonical lattice point at the same location.
 
@@ -1079,21 +1079,27 @@ end
 
     orientation = Ferrite.SurfaceOrientationInfo((2, 3, 1)) # a rotated triangular face
     dofs = 1:1:3 # three interior face dofs, n_copies = 1
+    table = [1, 2, 3] # identity local dof table
     # rdim = 3, adjust = true, multiple dofs, not on lattice => error
-    @test_throws ErrorException Ferrite.permute_and_push!(Int[], dofs, orientation, true, false, 3, 3)
+    @test_throws ErrorException Ferrite.permute_and_set!(zeros(Int, 3), table, dofs, orientation, true, false, 3, 3)
     # On a lattice it permutes the three dofs without error
-    cell_dofs = Int[]
-    Ferrite.permute_and_push!(cell_dofs, dofs, orientation, true, true, 3, 3)
-    @test length(cell_dofs) == 3
+    cell_dofs = zeros(Int, 3)
+    Ferrite.permute_and_set!(cell_dofs, table, dofs, orientation, true, true, 3, 3)
+    @test sort(cell_dofs) == collect(dofs)
     # A lattice interpolation on a 2D cell uses the same canonical face ordering so it can
     # share these dofs with a 3D face.
-    cell_dofs_2d = Int[]
-    Ferrite.permute_and_push!(cell_dofs_2d, dofs, orientation, true, true, 3, 2)
+    cell_dofs_2d = zeros(Int, 3)
+    Ferrite.permute_and_set!(cell_dofs_2d, table, dofs, orientation, true, true, 3, 2)
     @test cell_dofs_2d == cell_dofs
     # Non-lattice face dofs on a 2D cell retain their local ordering.
-    cell_dofs_2d_nonlattice = Int[]
-    Ferrite.permute_and_push!(cell_dofs_2d_nonlattice, dofs, orientation, true, false, 3, 2)
+    cell_dofs_2d_nonlattice = zeros(Int, 3)
+    Ferrite.permute_and_set!(cell_dofs_2d_nonlattice, table, dofs, orientation, true, false, 3, 2)
     @test cell_dofs_2d_nonlattice == collect(dofs)
+    # A non-identity local dof table relocates the same values within the cell dofs: slot
+    # table[l] receives what slot l received with the identity table.
+    cell_dofs_permuted = zeros(Int, 3)
+    Ferrite.permute_and_set!(cell_dofs_permuted, [3, 1, 2], dofs, orientation, true, true, 3, 3)
+    @test cell_dofs_permuted == cell_dofs[[2, 3, 1]]
 end
 
 @testset "dof distribution on shared faces" begin
@@ -1101,7 +1107,7 @@ end
     # on the entity, regardless of the relative orientation of the cells. For
     # Lagrange{RefTetrahedron, 3} this requires adjusting multiple dofs per edge, and for
     # Lagrange{RefTetrahedron, 4} additionally multiple dofs per face, see
-    # Ferrite.permute_and_push!.
+    # Ferrite.permute_and_set!.
     all_permutations(t::NTuple{4, Int}) = [
         (t[i], t[j], t[k], t[l]) for i in 1:4 for j in 1:4 for k in 1:4 for l in 1:4
             if length(unique((i, j, k, l))) == 4
@@ -1157,7 +1163,7 @@ end
     # Two hexahedra sharing a quadrilateral face must associate the same global dof with the
     # same location on the face for any relative orientation of the cells. For
     # Lagrange{RefHexahedron, 3} the shared face carries multiple interior dofs, exercising
-    # the quadrilateral branch of Ferrite.permute_and_push!.
+    # the quadrilateral branch of Ferrite.permute_and_set!.
 
     # Centered coordinates of the 8 hex corners in Ferrite (reference) node ordering.
     corner = (

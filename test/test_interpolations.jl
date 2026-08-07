@@ -12,6 +12,7 @@ using Ferrite: reference_shape_value, reference_shape_gradient
             Lagrange{RefLine, 2}(),
             Lagrange{RefQuadrilateral, 1}(),
             Lagrange{RefQuadrilateral, 2}(),
+            TensorProductQ9TestInterpolation(),
             Lagrange{RefQuadrilateral, 3}(),
             Lagrange{RefTriangle, 1}(),
             Lagrange{RefTriangle, 2}(),
@@ -129,7 +130,7 @@ using Ferrite: reference_shape_value, reference_shape_gradient
 
         # regression for https://github.com/Ferrite-FEM/Ferrite.jl/issues/520
         interpolation_type = typeof(interpolation).name.wrapper
-        if func_order > 1 && interpolation_type != Ferrite.Serendipity
+        if func_order > 1 && interpolation_type ∉ (Ferrite.Serendipity, TensorProductQ9TestInterpolation)
             first_order = interpolation_type{ref_shape, 1}()
             for (highorderface, firstorderface) in zip(Ferrite.facedof_indices(interpolation), Ferrite.facedof_indices(first_order))
                 for (h_node, f_node) in zip(highorderface, firstorderface)
@@ -174,7 +175,7 @@ using Ferrite: reference_shape_value, reference_shape_gradient
     end
 
     @testset "facedof interior lattice ordering" begin
-        # The dof distribution (see Ferrite.permute_and_push!) assumes that the interior
+        # The dof distribution (see Ferrite.permute_and_set!) assumes that the interior
         # face dofs of interpolations with adjust_dofs_during_distribution == true are
         # ordered according to a regular lattice enumeration: row by row with rows of
         # increasing barycentric v2-weight (triangles) or v1 → v4 coordinate
