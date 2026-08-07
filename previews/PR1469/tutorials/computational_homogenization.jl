@@ -58,7 +58,7 @@ Ei = 10 * Em;
     SymmetricTensor{2, 2}([0.0 0.5; 0.5 0.0]), # ε_12/ε_21 loading
 ];
 
-function doassemble!(cellvalues::CellValues, K::SparseMatrixCSC, dh::DofHandler, εᴹ)
+function doassemble!(cellvalues::CellValues, K::SparseMatrixCSC, dh::DofHandler, εᴹ, Ei, Em)
 
     n_basefuncs = getnbasefunctions(cellvalues)
     ndpc = ndofs_per_cell(dh)
@@ -66,10 +66,11 @@ function doassemble!(cellvalues::CellValues, K::SparseMatrixCSC, dh::DofHandler,
     fe = zeros(ndpc, length(εᴹ))
     f = zeros(ndofs(dh), length(εᴹ))
     assembler = start_assemble(K)
+    inclusions = getcellset(dh.grid, "inclusions")
 
     for cell in CellIterator(dh)
 
-        E = cellid(cell) in getcellset(dh.grid, "inclusions") ? Ei : Em
+        E = cellid(cell) in inclusions ? Ei : Em
         reinit!(cellvalues, cell)
         fill!(Ke, 0)
         fill!(fe, 0)
@@ -97,8 +98,8 @@ function doassemble!(cellvalues::CellValues, K::SparseMatrixCSC, dh::DofHandler,
 end;
 
 rhs = (
-    dirichlet = doassemble!(cellvalues, K.dirichlet, dh, εᴹ),
-    periodic = doassemble!(cellvalues, K.periodic, dh, εᴹ),
+    dirichlet = doassemble!(cellvalues, K.dirichlet, dh, εᴹ, Ei, Em),
+    periodic = doassemble!(cellvalues, K.periodic, dh, εᴹ, Ei, Em),
 );
 
 rhsdata = (
@@ -130,16 +131,18 @@ for i in 1:size(rhs.periodic, 2)
     push!(u.periodic, u_i)                             # Save the solution vector
 end
 
-function compute_stress(cellvalues::CellValues, dh::DofHandler, u, εᴹ)
+function compute_stress(cellvalues::CellValues, dh::DofHandler, u, εᴹ, Ei, Em)
     σvM_qpdata = zeros(getnquadpoints(cellvalues), getncells(dh.grid))
     σ̄Ω = zero(SymmetricTensor{2, 2})
     Ω = 0.0 # Total volume
+    inclusions = getcellset(dh.grid, "inclusions")
     for cell in CellIterator(dh)
-        E = cellid(cell) in getcellset(dh.grid, "inclusions") ? Ei : Em
+        E = cellid(cell) in inclusions ? Ei : Em
         reinit!(cellvalues, cell)
+        ue = u[celldofs(cell)]
         for q_point in 1:getnquadpoints(cellvalues)
             dΩ = getdetJdV(cellvalues, q_point)
-            εμ = function_symmetric_gradient(cellvalues, q_point, u[celldofs(cell)])
+            εμ = function_symmetric_gradient(cellvalues, q_point, ue)
             σ = E ⊡ (εᴹ + εμ)
             σvM_qpdata[q_point, cellid(cell)] = sqrt(3 / 2 * dev(σ) ⊡ dev(σ))
             Ω += dΩ # Update total volume
@@ -162,14 +165,14 @@ end;
 projector = L2Projector(ip, grid)
 
 for i in 1:3
-    σ_qp, σ̄_i = compute_stress(cellvalues, dh, u.dirichlet[i], εᴹ[i])
+    σ_qp, σ̄_i = compute_stress(cellvalues, dh, u.dirichlet[i], εᴹ[i], Ei, Em)
     proj = project(projector, σ_qp, qr)
     push!(σ.dirichlet, proj)
     push!(σ̄.dirichlet, σ̄_i)
 end
 
 for i in 1:3
-    σ_qp, σ̄_i = compute_stress(cellvalues, dh, u.periodic[i], εᴹ[i])
+    σ_qp, σ̄_i = compute_stress(cellvalues, dh, u.periodic[i], εᴹ[i], Ei, Em)
     proj = project(projector, σ_qp, qr)
     push!(σ.periodic, proj)
     push!(σ̄.periodic, σ̄_i)
@@ -198,9 +201,10 @@ end
 function matrix_volume_fraction(grid, cellvalues)
     V = 0.0 # Total volume
     Vm = 0.0 # Volume of the matrix
+    inclusions = getcellset(grid, "inclusions")
     for c in CellIterator(grid)
         reinit!(cellvalues, c)
-        is_matrix = !(cellid(c) in getcellset(grid, "inclusions"))
+        is_matrix = !(cellid(c) in inclusions)
         for qp in 1:getnquadpoints(cellvalues)
             dΩ = getdetJdV(cellvalues, qp)
             V += dΩ
