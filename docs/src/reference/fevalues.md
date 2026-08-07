@@ -6,7 +6,7 @@ DocTestSetup = :(using Ferrite)
 # FEValues
 
 ## Main types
-[`CellValues`](@ref), [`MultiFieldCellValues`](@ref), and [`FacetValues`](@ref) are the most common
+[`CellValues`](@ref) and [`FacetValues`](@ref) are the most common
 subtypes of `Ferrite.AbstractValues`. For more details about how
 these work, please see the related [topic guide](@ref fevalues_topicguide).
 
@@ -18,7 +18,7 @@ FacetValues
 
 ## Applicable functions
 The following functions are applicable to
-`CellValues`, `FacetValues`, and `MultiFieldCellValues`
+`CellValues` and `FacetValues`
 
 ```@docs
 reinit!
@@ -29,7 +29,7 @@ geometric_value
 ```
 
 Furthermore, the following functions are applicable to
-`CellValues`, `FacetValues`, and `FunctionValues` (obtained from [`MultiFieldCellValues`](@ref))
+`CellValues`, `FacetValues`, and `FunctionValues` (obtained from a multi-field [`CellValues`](@ref))
 ```@docs
 shape_value(::Ferrite.AbstractValues, ::Int, ::Int)
 shape_gradient(::Ferrite.AbstractValues, ::Int, ::Int)
